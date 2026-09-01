@@ -40,6 +40,58 @@
 # pytest-Failures liefern kleine positive Codes (1..5) und bleiben rot.
 # Wer das aendert, macht das Windows-Gate unbrauchbar - bitte vorher die
 # Crash-Rate messen, nicht einen Einzellauf interpretieren.
+#
+# ── DASSELBE GILT FUER DAS ZEITLIMIT, UND ZWAR AUS DEMSELBEN GRUND ──────────
+# ★ XPLAT-28 (01.09.2026): hier stand bis heute NICHTS ueber Timeouts. Der
+# Exit-Vertrag unten nimmt sie seit jeher genauso aus wie Crashes, nur stand
+# die Begruendung allein bei den Crashes - und weil sie fehlte, sind ZWEI
+# Sitzungen unabhaengig voneinander auf „das ist mitgeschleift, nicht gemeint"
+# gekommen. Die Regel war richtig, die Begruendung unvollstaendig; das ist
+# teurer als es aussieht, denn beide haben daraufhin einen Umbau erwogen.
+#
+# Warum ein Zeitlimit hier dasselbe ist wie ein Crash - gemessen, nicht
+# vermutet: `pytest.ini` setzt `timeout = 60` (`timeout_method = thread`,
+# `pytest_timeout` ruft `os._exit(1)`). Ein Haenger IM TEST stirbt damit nach
+# ~60 s mit Exit 1, faellt in den `fail`-Zweig und ist HEUTE SCHON ROT - er
+# erreicht die 300 s nie. Was die 300 s ueberhaupt erreicht, ist per
+# Konstruktion der Crash-Zwilling: der finale native Abbau NACH bestandenen
+# Tests, haengend statt crashend (gegengeprueft: das Log traegt dann eine
+# vollstaendige gruene pytest-Zusammenfassung). Die Timeout-Toleranz wird also
+# von derselben Messung getragen wie die Crash-Toleranz.
+#
+# ⚠️ WAS DIESE BEGRUENDUNG NICHT DECKT (offen als eigenes Item):
+# `pytest-timeout` schuetzt nur `pytest_runtest_protocol`/`_call`. COLLECTION,
+# Modul-Import und Session-Teardown sind ungeschuetzt - ein Haenger DORT laeuft
+# wirklich in die 300 s, ohne dass etwas gemessen wurde, und wird trotzdem
+# toleriert. Und wenn KEIN EINZIGES Segment gruen ist, ist das nie
+# Abbau-Flakiness, sondern eine kaputte Umgebung; der Lauf meldet trotzdem
+# Exit 0. Beides ruft nach einem Anteils-Schutz, nicht nach einer Aenderung
+# dieser Einzelregel.
+#
+# Zeitreserve, auf BEIDEN Plattformen gemessen (echter Voll-Lauf):
+#
+#                      Linux (647 Seg.)   Windows (646 Seg., -j 6)
+#   Median                    1,32 s              8,3 s
+#   p99                      31,2  s             73,5 s
+#   Max                      72,3  s            158,3 s
+#   Abstand zu 300 s        Faktor 4,15        Faktor 1,90
+#
+# ⚠️ Die Reserve ist auf WINDOWS nicht einmal halb so gross wie auf Linux, und
+# das ist kein Messartefakt: die schwersten Segmente sind dieselben Dateien
+# (test_zeitbomben_gate 158 s, test_fm14_pixel_head_scene 149 s,
+# test_viz50b_weissband_scene 145 s), sie brauchen hier nur doppelt so lang.
+# Null Segmente ueber der Grenze - die 300 s sind also auch hier sicher, aber
+# mit deutlich weniger Luft, als die Linux-Zahl vermuten laesst. Wer die Grenze
+# senken will, muss sie an der WINDOWS-Zahl bemessen.
+#
+# Die Windows-Zahl enthaelt einen Aufschlag von 6,5 s je Segment fuer
+# Prozessstart und conftest (Kopie der Geraetebibliothek + Qt), separat
+# gemessen; die pytest-Zeit allein liegt im Median bei 1,78 s. Der Aufschlag
+# ist eine Naeherung aus einem EINZELLAUF - unter Volllast duerfte er groesser
+# sein, die Reserve also eher kleiner als hier ausgewiesen.
+#
+# Und sie schrumpft weiter: die serielle WebEngine-Spur ist von 208 s/29
+# Dateien (alter Kommentar) auf gemessene 501 s/42 Dateien gewachsen.
 # PositionalBinding=$false ist Pflicht, nicht Stil: sonst schnappt sich
 # -TimeoutSec das erste freie Argument, und `verify_segmented.ps1 -j 3
 # tests\test_x.py` stirbt mit "Der Wert tests\test_x.py kann nicht in den Typ
@@ -363,10 +415,17 @@ if ($sig.Count) {
 # Zweite bekannte Fremd-Ursache: das Seitenladen eines WebEngine-Segments reisst
 # unter paralleler Last sein Zeitbudget (40 s in den Szenen-Tests).
 #
-# Auch hier gilt: das Segment bleibt ROT, es wird nichts wiederholt und nichts
-# gruen gerechnet — Wiederholungslogik wuerde echte Fehler mitheilen. Der Name
-# ist der Zweck: ohne ihn steht der Mensch vor einem roten Viz-Segment und muss
-# raten, ob die Szene kaputt ist oder der Rechner nur beschaeftigt war.
+# Auch hier gilt: es wird nichts wiederholt und nichts gruen gerechnet —
+# Wiederholungslogik wuerde echte Fehler mitheilen. Der Name ist der Zweck:
+# ohne ihn steht der Mensch vor einem auffaelligen Viz-Segment und muss raten,
+# ob die Szene kaputt ist oder der Rechner nur beschaeftigt war.
+#
+# ⚠️ XPLAT-28: hier stand „das Segment bleibt ROT". Das stimmt nur fuer die
+# Haelfte der Schleife. Sie laeuft ueber `$fail + $timeout`; ROT ist davon nur
+# `$fail`. Ein Segment im ZEITLIMIT faerbt das Gate nach dem Exit-Vertrag
+# ausdruecklich NICHT rot (s. Kopf) — die Zusage sagte also mehr zu, als der
+# Code haelt, und zwar ausgerechnet an der Stelle, an der jemand nachliest,
+# was ein auffaelliges Segment fuer ihn bedeutet.
 #
 # Gemessene Haeufigkeit (2026-08-06, -j 4): einmal ueber drei volle Laeufe; in
 # einer gezielten Messreihe unter Last 0 von 6. Selten, aber nicht null — wer
@@ -383,7 +442,8 @@ if ($last.Count) {
     Write-Host "[seg] Zeitbudget beim Seitenladen gerissen (Last-Verdacht):" -ForegroundColor DarkYellow
     $last | ForEach-Object { Write-Host ("    " + $_) -ForegroundColor DarkYellow }
     Write-Host "[seg]   Gegenprobe: .\tools\verify_loop.ps1 <datei> - bleibt sie isoliert" -ForegroundColor DarkYellow
-    Write-Host "[seg]   gruen, war es die Last. ROT bleibt trotzdem ROT." -ForegroundColor DarkYellow
+    Write-Host "[seg]   gruen, war es die Last. Ein FAILURE bleibt trotzdem rot;" -ForegroundColor DarkYellow
+    Write-Host "[seg]   ein ZEITLIMIT faerbt nicht rot (Exit-Vertrag, s. Skriptkopf)." -ForegroundColor DarkYellow
     Write-Host "[seg]   Dauerhaft? LIGHTOS_VERIFY_JOBS kleiner setzen (Default 4)." -ForegroundColor DarkYellow
 }
 
