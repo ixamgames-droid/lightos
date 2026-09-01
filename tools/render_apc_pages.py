@@ -16,7 +16,13 @@ import zipfile
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # Native Plattform: das offscreen-Plugin hat keine Schrift-Glyphen (Text wuerde als
 # Kaestchen erscheinen). Auf einem Windows-Desktop rendert "windows" mit echten Fonts.
-os.environ.setdefault("QT_QPA_PLATFORM", "windows")
+# XPLAT-25: ein Capture braucht ein ECHT gerendertes Fenster — offscreen
+# liefert bei QtWebEngine schwarze Bilder. Die native Plattform muss deshalb
+# erzwungen werden (ein geerbtes QT_QPA_PLATFORM=offscreen soll NICHT gewinnen)
+# — aber plattformrichtig: "windows" gibt es nur auf Windows, auf Linux heisst
+# die native Plattform "xcb". Hart gesetzt starb das Werkzeug hier mit
+# rc=134 (qt.qpa.plugin: Could not find the Qt platform plugin "windows").
+os.environ["QT_QPA_PLATFORM"] = "windows" if os.name == "nt" else "xcb"
 # Isolations-Schalter (Wegwerf-Show-DB etc.); "windows" oben gewinnt gegen offscreen.
 import _gen_env  # noqa: F401,E402
 
