@@ -7,6 +7,43 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-01 — Windows warnt jetzt auch, wenn der DMX-Port schon belegt ist
+
+#### Neu
+
+- **Die Warnung „jemand hält deinen DMX-Port schon" gibt es endlich auch unter
+  Windows.** Bisher war sie dort schlicht nicht vorhanden — und zwar auf die
+  unangenehmste Art: Die Prüfung lief, meldete nichts und war damit von „alles
+  in Ordnung" nicht zu unterscheiden. Sie war auf ein Linux-Verzeichnis gebaut,
+  das es unter Windows gar nicht gibt.
+
+  **Der Fehler sieht hier anders aus, nicht harmloser.** Unter Linux teilen
+  sich mehrere Programme die Leitung: Das Gerät blinkt, nichts lässt sich
+  steuern, aber Blackout funktioniert noch. Windows vergibt den Anschluss
+  dagegen exklusiv — der zweite Zugriff scheitert einfach. Die Ausgabe läuft
+  dann gar nicht erst an, und zwar lautlos: Im Programm sieht alles normal aus,
+  auf der Bühne passiert nichts.
+
+  Jetzt sagt LightOS beim Start der Ausgabe, dass der Anschluss belegt ist,
+  und dass deshalb nichts gesendet werden wird.
+
+- **Wer ihn hält, wird als Verdacht genannt — nicht als Tatsache.** Windows
+  verrät das nicht direkt. Statt sich etwas auszudenken, listet die Meldung die
+  laufenden Python-Prozesse (in aller Regel ist es ein vergessener
+  Ausgabe-Prozess eines früheren Starts) und nennt den Befehl, mit dem sich der
+  Schuldige zweifelsfrei bestimmen lässt.
+
+- **Kein Fehlalarm bei abgezogenem Adapter.** Ein Anschluss, den es gar nicht
+  gibt, gilt ausdrücklich als „unbekannt" und nicht als „frei" — aber er löst
+  auch keine Warnung aus. Sonst würde jeder Start am Schreibtisch, ohne
+  angestecktes Interface, eine Meldung erzeugen; und eine Warnung, die immer
+  kommt, liest nach zwei Wochen niemand mehr.
+
+  Nachgewiesen ist das Verhalten am echten Windows, ohne Interface: Eine
+  exklusiv gehaltene Datei verhält sich beim zweiten Zugriff genau wie ein
+  belegter Anschluss. Was noch am Gerät zu bestätigen bleibt, steht als eigener
+  Punkt in der Aufgabenliste.
+
 ### 2026-09-01 — Ein belegter Web-Port beendet LightOS nicht mehr
 
 #### Behoben
@@ -18,8 +55,6 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Statt dessen erscheint jetzt die gewohnte Fehlermeldung, der Menü-Haken geht
   zurück auf „aus", und LightOS läuft weiter. Die Meldung nennt den Port und den
   Befehl, mit dem man herausfindet, wer ihn hält.
-
-
 ### 2026-09-01 — Vier Werkzeuge liefen auf Linux gar nicht
 
 #### Behoben
@@ -34,7 +69,6 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 - **Die Sitzungs-Tafel druckte ihre gesamte Blocker-Historie.** Sie zeigt jetzt
   die fünf jüngsten Einträge, nennt die Gesamtzahl und bietet `--blocker -1` für
   die vollständige Ansicht. Die gezeigten Einträge bleiben ungekürzt.
-
 ### 2026-08-31 — Das Test-Gate auf einem Windows-Rechner sagt wieder die Wahrheit
 
 #### Behoben
@@ -84,7 +118,6 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Die Warnung dafür gab es längst („⚠ Speichern schreibt den Verlust fest") — sie
   wurde nur nie erreicht, weil der Fehler eine Ebene tiefer stillschweigend
   verschluckt wurde. Dasselbe galt für verlorene Gerätegruppen.
-
 
 ### 2026-08-31 — Zwei Bedien-Elemente der virtuellen Konsole waren nirgends beschrieben
 
