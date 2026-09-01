@@ -19,6 +19,7 @@ from __future__ import annotations
 import importlib.util
 import math
 import os
+import sys
 import unittest
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -98,18 +99,67 @@ class PortPruefungTest(unittest.TestCase):
     def setUp(self):
         self.m = _modul()
 
-    def test_freier_port_meldet_nichts(self):
-        self.assertEqual(self.m.port_belegt_von("/dev/gibt-es-nicht-xyz"), [])
+    # ★ XPLAT-21: geprueft wird jetzt ``port_halter`` statt der frueheren
+    # tool-eigenen ``port_belegt_von``. Die war eine zweite Kopie des
+    # ``/proc``-Scans und damit Linux-only; sie delegiert seit XPLAT-22 an
+    # ``src/core/dmx/port_check.py``, das beide Systeme kann.
+    #
+    # Die Gegenprobe unten bleibt auf BEIDEN Plattformen erhalten, nur der
+    # Mechanismus unterscheidet sich — sie zu ueberspringen waere der bequeme
+    # Weg und wuerde genau die Aussage aufgeben, um die es geht.
 
-    def test_eigener_offener_port_wird_gefunden(self):
+    def test_freier_port_meldet_nichts(self):
+        belegt, halter, _ = self.m.port_halter("/dev/gibt-es-nicht-xyz")
+        self.assertFalse(belegt)
+        self.assertEqual(halter, [])
+
+    @unittest.skipIf(sys.platform == "win32", "POSIX-Weg: /proc")
+    def test_eigener_offener_port_wird_gefunden_posix(self):
         """Gegenprobe am eigenen Prozess: was WIRKLICH offen ist, muss auch
         gefunden werden. Ein Waechter, der nie anschlaegt, ist keiner."""
         import tempfile
         with tempfile.NamedTemporaryFile(suffix=".port") as fh:
-            treffer = self.m.port_belegt_von(fh.name)
-            pids = [pid for pid, _ in treffer]
-            self.assertIn(os.getpid(), pids,
+            belegt, halter, sicher = self.m.port_halter(fh.name)
+            self.assertTrue(belegt)
+            self.assertTrue(sicher, "auf Linux sind die Halter aus /proc sicher")
+            self.assertIn(os.getpid(), [pid for pid, _ in halter],
                           "der eigene offene Dateideskriptor wurde nicht gefunden")
+
+    @unittest.skipUnless(sys.platform == "win32", "Windows-Weg: exklusives Oeffnen")
+    def test_exklusiv_gehaltener_port_wird_gefunden_windows(self):
+        """Dieselbe Gegenprobe auf Windows — ohne serielle Hardware.
+
+        Eine exklusiv gehaltene Datei verhaelt sich beim Zweitzugriff wie ein
+        belegter COM-Port, weil es derselbe Mechanismus ist
+        (``dwShareMode = 0``). Geprueft wird zusaetzlich, dass ``sicher``
+        ``False`` meldet: auf Windows ist die Halterliste ein Verdacht, und
+        genau das muss der Aufrufer erfahren.
+        """
+        import ctypes
+        import tempfile
+        from ctypes import wintypes
+        with tempfile.TemporaryDirectory() as tmp:
+            pfad = os.path.join(tmp, "belegt.bin")
+            with open(pfad, "wb") as fh:
+                fh.write(b"x")
+            k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+            k32.CreateFileW.argtypes = [
+                wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD,
+                wintypes.LPVOID, wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+            k32.CreateFileW.restype = wintypes.HANDLE
+            k32.CloseHandle.argtypes = [wintypes.HANDLE]
+            handle = k32.CreateFileW("\\\\.\\" + pfad, 0x80000000, 0, None, 3, 0, None)
+            self.assertNotEqual(ctypes.c_void_p(-1).value, handle,
+                                "die Probe konnte nicht exklusiv oeffnen — dann "
+                                "misst dieser Test nichts")
+            try:
+                belegt, _, sicher = self.m.port_halter(pfad)
+                self.assertTrue(belegt, "ein exklusiv gehaltener Port muss als "
+                                        "belegt gelten")
+                self.assertFalse(sicher, "auf Windows ist der Halter nur ein "
+                                         "Verdacht — das muss so gemeldet werden")
+            finally:
+                k32.CloseHandle(handle)
 
 
 class WerkzeugTest(unittest.TestCase):

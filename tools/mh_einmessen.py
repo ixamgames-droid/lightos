@@ -19,12 +19,19 @@ Pfeiltasten bewegen, Leertaste schaltet um, was bewegt wird:
     nur Kopf A        ->  Feinschliff
     nur Kopf B        ->  Feinschliff
 
-    Pfeile      bewegen (fein)          Shift+Pfeile: 8x grob
+    Pfeile      bewegen (fein)
     Leertaste   Auswahl umschalten
     +/-         Dimmer
     Enter       Punkt uebernehmen
     m           Zielpunkt vermessen (Hoehe/Seite/Abstand eingeben)
     q           beenden
+
+    Grob (8x):  Linux/macOS  Shift+Pfeile
+                Windows      Strg+Pfeile — ODER Bild-hoch/-runter und Pos1/Ende
+                             (``msvcrt`` reicht kein Shift durch: Shift+Pfeil
+                             liefert dort denselben Code wie der blanke Pfeil;
+                             der zweite Weg hilft, wenn die Konsole
+                             Strg+Pfeil selbst abfaengt)
 
 WAS DIESES WERKZEUG AUS EINEM ABEND AM RIG GELERNT HAT (26.08.2026)
 -------------------------------------------------------------------
@@ -52,6 +59,10 @@ WAS DIESES WERKZEUG AUS EINEM ABEND AM RIG GELERNT HAT (26.08.2026)
 Aufruf::
 
     venv/bin/python tools/mh_einmessen.py --port /dev/ttyUSB0 --adressen 1,17
+    venv\\Scripts\\python.exe tools\\mh_einmessen.py --port COM3 --adressen 1,17
+
+``--port`` darf entfallen: die Vorgabe ist ``/dev/ttyUSB0`` bzw. auf Windows der
+erste tatsaechlich vorhandene COM-Port (s. ``standard_port``).
 
 Ausgabe: die Kalibrierwerte als Klartext und als fertiger Python-Schnipsel.
 Das Werkzeug SCHREIBT NICHTS — weder in die Show-DB noch in eine Show-Datei.
@@ -63,11 +74,28 @@ import math
 import os
 import subprocess
 import sys
-import termios
 import time
-import tty
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# ── Plattform (XPLAT-21) ─────────────────────────────────────────────────────
+# ``termios``/``tty`` standen bis zum 01.09.2026 als gewoehnliche Importe hier
+# oben. Beide gibt es nur auf POSIX — auf Windows starb damit schon
+# ``mh_einmessen.py --help`` mit ``ModuleNotFoundError: No module named
+# 'termios'``. Das Werkzeug misst Moving Heads am Rig ein und war damit
+# ausgerechnet auf dem Rechner nicht startbar, an dem das Rig haengt.
+#
+# Ueber eine Variable statt direkt ``sys.platform``, sonst wertet Pyright den
+# Vergleich statisch aus und meldet den anderen Zweig als toten Code (dieselbe
+# Schreibweise wie in ``src/core/paths.py``).
+#
+# Die plattformeigenen Module werden BEI BEDARF importiert, nicht hier oben —
+# dasselbe Muster wie in ``src/core/dmx/port_check.py`` (dort ``ctypes``).
+# Ein Import auf Modulebene, egal ob bedingt, macht die Datei fuer jeden
+# Leser und jeden Typpruefer zu einem Sonderfall; ein Import in der Methode ist
+# ein Lookup in ``sys.modules`` und damit auch in der 44-fps-Schleife gratis.
+_PLAT = sys.platform
+IST_WINDOWS = _PLAT == "win32"
 
 DMX_BYTES = 512
 KANAL = {"pan": 1, "pan_fine": 2, "tilt": 3, "tilt_fine": 4,
@@ -75,49 +103,154 @@ KANAL = {"pan": 1, "pan_fine": 2, "tilt": 3, "tilt_fine": 4,
 
 
 # ── Port-Pruefung ────────────────────────────────────────────────────────────
-def port_belegt_von(port: str) -> list[tuple[int, str]]:
-    """Welche Prozesse halten diesen Port offen? (siehe Modulkopf)"""
-    treffer = []
-    for eintrag in os.listdir("/proc"):
-        if not eintrag.isdigit():
-            continue
-        fd_dir = f"/proc/{eintrag}/fd"
-        try:
-            for fd in os.listdir(fd_dir):
-                try:
-                    if os.readlink(f"{fd_dir}/{fd}") == port:
-                        with open(f"/proc/{eintrag}/cmdline", "rb") as fh:
-                            cmd = fh.read().replace(b"\0", b" ").decode(errors="replace")
-                        treffer.append((int(eintrag), cmd.strip()[:90]))
-                        break
-                except OSError:
-                    continue
-        except OSError:
-            continue
-    return treffer
+def port_halter(port: str) -> tuple[bool, list[tuple[int, str]], bool]:
+    """``(belegt, halter, halter_sind_sicher)`` — plattformuebergreifend.
+
+    ★ XPLAT-21: hier stand eine EIGENE Kopie des ``/proc``-Scans. Sie war nicht
+    nur Linux-only, sondern auch die zweite Stelle im Haus, die dieselbe Frage
+    beantwortet — mit dem Risiko, dass beide auseinanderlaufen. Seit XPLAT-22
+    kann ``src/core/dmx/port_check.py`` das fuer beide Systeme; diese Funktion
+    ist nur noch die Uebersetzung auf das, was der Aufrufer hier braucht.
+
+    ★★ Der dritte Rueckgabewert ist keine Spitzfindigkeit. Auf Linux liest
+    ``/proc`` die Halter direkt aus und weiss sie SICHER. Auf Windows ist
+    „belegt\" sicher, „wer\" aber nur ein Verdacht (Windows nennt den Halter
+    ohne Kernel-Handle-Enumeration nicht). Diese Unterscheidung muss bis in die
+    Meldung durchschlagen — wer PIDs als Tatsache liest und dann den falschen
+    Prozess beendet, verliert am Rig Zeit, die er nicht hat.
+    """
+    from src.core.dmx import port_check
+    if IST_WINDOWS:
+        belegt = port_check.windows_port_belegt(port)
+        if belegt is not True:
+            # ``False`` = frei, ``None`` = nicht feststellbar (Port gibt es
+            # nicht). Beides ist hier KEIN Abbruchgrund: existiert der Port
+            # nicht, scheitert das Oeffnen gleich selbst und sagt es besser.
+            return False, [], True
+        return True, port_check.windows_verdaechtige_prozesse(), False
+    treffer = port_check.port_belegt_von(port)
+    return bool(treffer), treffer, True
 
 
 # ── Tastatur ─────────────────────────────────────────────────────────────────
+#
+# ★ XPLAT-21: Die Zuordnung Tastencode -> Bedeutung steht bewusst als REINE
+# DATEN hier und nicht im Lesecode. Grund: eine Tastatureingabe laesst sich in
+# einem Test nicht herstellen (es gibt kein Terminal), die Uebersetzung aber
+# schon — und genau da sitzen die Fehler. So ist der Windows-Zweig pruefbar,
+# ohne dass jemand am Rig eine Taste drueckt.
+#
+# GROSSBUCHSTABE = grosser Schritt (8x). Das wertet die Hauptschleife ueber
+# ``t.isupper()`` aus, deshalb muessen beide Tabellen dieselbe Schreibweise
+# liefern.
+
+#: POSIX: ESC-Sequenzen. Klein = Pfeil, gross = Shift+Pfeil.
+POSIX_TASTEN = {"[A": "hoch", "[B": "runter", "[C": "rechts", "[D": "links",
+                "[a": "HOCH", "[b": "RUNTER", "[c": "RECHTS", "[d": "LINKS"}
+
+#: Windows: ``getwch()`` liefert bei Sondertasten ZWEI Zeichen — erst ``\x00``
+#: oder ``\xe0``, dann den Code. Beide Vorzeichen kommen vor (der eine vom
+#: Ziffernblock, der andere vom Cursorblock), deshalb werden beide akzeptiert.
+#:
+#: ⚠️ **Shift+Pfeil gibt es hier nicht.** ``msvcrt`` reicht keine Modifier
+#: durch: Shift+Pfeil liefert denselben Code wie der blanke Pfeil. Die grossen
+#: Schritte liegen deshalb auf **Strg+Pfeil** — und zusaetzlich auf
+#: Bild-hoch/-runter bzw. Pos1/Ende, falls eine Konsole (Terminal-App, SSH,
+#: Remote-Sitzung) Strg+Pfeil abfaengt, bevor es hier ankommt. Zwei Wege fuer
+#: dieselbe Sache sind hier kein Wildwuchs: am Rig steht man mit einer Hand am
+#: Geraet, und ein Werkzeug, dessen Grobbewegung nicht geht, ist unbrauchbar.
+WIN_TASTEN = {
+    "H": "hoch", "P": "runter", "M": "rechts", "K": "links",
+    "\x8d": "HOCH", "\x91": "RUNTER", "s": "LINKS", "t": "RECHTS",  # Strg+Pfeil
+    "I": "HOCH", "Q": "RUNTER",                                     # Bild ↑/↓
+    "G": "LINKS", "O": "RECHTS",                                    # Pos1/Ende
+}
+
+#: Die beiden Vorzeichen, mit denen Windows eine Sondertaste ankuendigt.
+WIN_PRAEFIXE = ("\x00", "\xe0")
+
+
+def standard_port() -> str:
+    """Vorgabe fuer ``--port`` — auf Windows der erste WIRKLICH vorhandene.
+
+    ★ XPLAT-21: die Vorgabe war fest ``/dev/ttyUSB0``. Auf Windows ist das eine
+    Sackgasse: der Aufruf ohne ``--port`` scheitert dort garantiert, und zwar
+    mit einer Meldung ueber einen Pfad, den es auf dem System gar nicht gibt.
+
+    Statt einer zweiten festen Vorgabe (``COM3`` waere nur auf einem anderen
+    Rechner richtig) wird hier nachgesehen. Findet sich nichts — Adapter nicht
+    angesteckt —, bleibt ``COM3`` als Platzhalter: dann scheitert das Oeffnen
+    zwar, aber mit einer Meldung, die zu Windows passt.
+    """
+    if not IST_WINDOWS:
+        return "/dev/ttyUSB0"
+    try:
+        from serial.tools import list_ports
+        vorhanden = [p.device for p in list_ports.comports()]
+        return vorhanden[0] if vorhanden else "COM3"
+    except Exception:                                    # noqa: BLE001
+        return "COM3"                                    # nie am Start scheitern
+
+
+def uebersetze_posix(rest: str) -> str:
+    """Zwei Zeichen nach dem ESC -> Bedeutung ("" = unbekannt)."""
+    return POSIX_TASTEN.get(rest, "")
+
+
+def uebersetze_windows(code: str) -> str:
+    """Das zweite Zeichen einer Windows-Sondertaste -> Bedeutung."""
+    return WIN_TASTEN.get(code, "")
+
+
 class Tastatur:
-    """Einzelne Tasten ohne Enter lesen; Pfeiltasten als 'hoch'/'runter'/…"""
+    """Einzelne Tasten ohne Enter lesen; Pfeiltasten als 'hoch'/'runter'/…
+
+    Auf POSIX braucht das den Rohmodus des Terminals (``tty.setcbreak``), auf
+    Windows nicht: ``msvcrt`` liest ohnehin ungepuffert an der Zeile vorbei.
+    Deshalb ist ``__enter__``/``__exit__`` dort absichtlich leer statt
+    „irgendetwas Aequivalentes\" — es gibt nichts zu tun und nichts
+    zurueckzustellen.
+    """
 
     def __enter__(self):
-        self._fd = sys.stdin.fileno()
-        self._alt = termios.tcgetattr(self._fd)
-        tty.setcbreak(self._fd)
+        if not IST_WINDOWS:
+            import termios
+            import tty
+            self._fd = sys.stdin.fileno()
+            self._alt = termios.tcgetattr(self._fd)
+            tty.setcbreak(self._fd)
         return self
 
-    def __exit__(self, *a):
-        termios.tcsetattr(self._fd, termios.TCSADRAIN, self._alt)
+    def __exit__(self, *ausnahme):
+        if not IST_WINDOWS:
+            import termios
+            termios.tcsetattr(self._fd, termios.TCSADRAIN, self._alt)
         return False
 
+    def bereit(self) -> bool:
+        """Liegt eine Taste an? (nicht blockierend)
+
+        ★ XPLAT-21: hier stand ``select.select([sys.stdin], ...)``. Auf Windows
+        arbeitet ``select`` nur mit Sockets — ein Datei-Deskriptor der Konsole
+        loest dort ``OSError`` aus. ``msvcrt.kbhit()`` ist das Gegenstueck.
+        """
+        if IST_WINDOWS:
+            import msvcrt
+            return msvcrt.kbhit()
+        import select
+        return bool(select.select([sys.stdin], [], [], 0.005)[0])
+
     def taste(self) -> str:
+        if IST_WINDOWS:
+            import msvcrt
+            c = msvcrt.getwch()
+            if c in WIN_PRAEFIXE:
+                return uebersetze_windows(msvcrt.getwch())
+            return c
         c = sys.stdin.read(1)
         if c != "\x1b":
             return c
-        rest = sys.stdin.read(2)
-        return {"[A": "hoch", "[B": "runter", "[C": "rechts", "[D": "links",
-                "[a": "HOCH", "[b": "RUNTER", "[c": "RECHTS", "[d": "LINKS"}.get(rest, "")
+        return uebersetze_posix(sys.stdin.read(2))
 
 
 # ── Kopf-Zustand ─────────────────────────────────────────────────────────────
@@ -164,7 +297,7 @@ def zeige_zweideutigkeit(pan_diff: float, entfernung: float) -> None:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--port", default="/dev/ttyUSB0")
+    ap.add_argument("--port", default=standard_port())
     ap.add_argument("--adressen", default="1,17",
                     help="DMX-Startadressen der beiden Koepfe, z. B. 1,17")
     ap.add_argument("--pan-range", type=float, default=540.0)
@@ -172,15 +305,31 @@ def main(argv=None) -> int:
     ap.add_argument("--fps", type=float, default=44.0)
     args = ap.parse_args(argv)
 
-    belegt = port_belegt_von(args.port)
+    belegt, halter, sicher = port_halter(args.port)
     if belegt:
-        print(f"ABBRUCH: {args.port} ist belegt von:")
-        for pid, cmd in belegt:
-            print(f"   PID {pid}  {cmd}")
+        print(f"ABBRUCH: {args.port} ist belegt" + (" von:" if halter and sicher
+                                                    else "."))
+        if halter:
+            if not sicher:
+                print("   Verdacht (Windows nennt den Halter nicht) — laufende "
+                      "Python-Prozesse:")
+            for pid, cmd in halter:
+                print(f"   PID {pid}  {cmd}")
+            if not sicher:
+                print("   Welcher es ist, zeigt: Get-CimInstance Win32_Process "
+                      '-Filter "ProcessId=<PID>" | Select CommandLine')
         print("\nLaeuft LightOS? Dann beenden. Sind es Waisen-Prozesse eines hart")
-        print("beendeten LightOS, beende sie einzeln per PID. Zwei Schreiber auf")
-        print("einer seriellen Leitung ergeben zerhacktes DMX — das Geraet blinkt")
-        print("dann und reagiert nicht, und der Fehler sieht aus wie ein Softwarefehler.")
+        print("beendeten LightOS, beende sie einzeln per PID.")
+        if IST_WINDOWS:
+            # XPLAT-21/22: die Linux-Begruendung passt hier nicht. Windows
+            # vergibt serielle Ports exklusiv — zerhacktes DMX gibt es dort gar
+            # nicht, dafuer laeuft die Ausgabe ueberhaupt nicht an.
+            print("Windows vergibt serielle Ports exklusiv: solange ein anderer")
+            print("Prozess ihn haelt, kann dieses Werkzeug gar nicht senden.")
+        else:
+            print("Zwei Schreiber auf einer seriellen Leitung ergeben zerhacktes")
+            print("DMX — das Geraet blinkt dann und reagiert nicht, und der")
+            print("Fehler sieht aus wie ein Softwarefehler.")
         return 2
 
     try:
@@ -224,10 +373,7 @@ def main(argv=None) -> int:
                 if time.monotonic() - letzte >= 1.0 / args.fps:
                     frame(); letzte = time.monotonic()
                     status()
-                if not sys.stdin.readable():
-                    continue
-                import select
-                if not select.select([sys.stdin], [], [], 0.005)[0]:
+                if not tast.bereit():
                     continue
                 t = tast.taste()
                 ziele = koepfe if auswahl == 0 else [koepfe[auswahl - 1]]
