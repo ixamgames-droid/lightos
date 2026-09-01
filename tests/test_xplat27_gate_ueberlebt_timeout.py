@@ -40,6 +40,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -52,7 +53,10 @@ _GRUND = ("verify_segmented.ps1 ist das Windows-Gate; auf Linux macht das "
           "verify_segmented.sh und hat diese PowerShell-Eigenheit nicht")
 
 SCHNELL = "def test_schnell():\n    assert True\n"
-HAENGT = "import time\n\n\ndef test_haengt():\n    time.sleep(45)\n"
+#: Die Schlafdauer wird zur Laufzeit eingesetzt (s. ``setUpClass``) — eine
+#: feste Zahl waere unter Parallellast entweder zu kurz (der Haenger reisst das
+#: Zeitlimit nicht) oder unnoetig teuer.
+HAENGT = "import time\n\n\ndef test_haengt():\n    time.sleep({sek})\n"
 
 
 class TaskkillDarfDenLaufNichtKippenTest(unittest.TestCase):
@@ -97,33 +101,75 @@ class TaskkillDarfDenLaufNichtKippenTest(unittest.TestCase):
 class LaufUeberlebtEinHaengendesSegmentTest(unittest.TestCase):
     """Verhalten: nach einem Timeout muss es weitergehen.
 
-    ⚠️ **Das Zeitlimit muss ueber der Grundlast eines Segments liegen.** Die
-    erste Fassung fuhr mit ``-TimeoutSec 5`` — und riss damit ALLE DREI
-    Segmente, auch die trivialen: ein pytest-Start kostet hier gemessen **6,5 s**
-    (conftest kopiert die Geraetebibliothek und startet Qt), bevor die erste
-    Zeile Testcode laeuft. Der Lauf sah damit aus wie ein bestandener Nachweis
-    und mass etwas voellig anderes.
+    ⚠️ **Das Zeitlimit wird GEMESSEN, nicht gesetzt** — und das in zwei Anlaeufen
+    gelernt:
 
-    Deshalb: ``TIMEOUT`` deutlich ueber der Grundlast, ``HAENGT`` deutlich
-    darueber. Beides mit Luft, denn unter Parallellast wird die Grundlast
-    groesser, nicht kleiner.
+    1. Die erste Fassung fuhr ``-TimeoutSec 5``. Sie riss ALLE DREI Segmente,
+       auch die trivialen: ein pytest-Start kostet allein schon **6,5 s**
+       (conftest kopiert die Geraetebibliothek und startet Qt), bevor die erste
+       Zeile Testcode laeuft.
+    2. Die zweite stand fest auf 25 s. Allein gruen — im Volllauf rot. Denn
+       dieser Test laeuft im Gate als eines von 646 Segmenten unter ``-j 6``,
+       und dort ist die Grundlast ein Vielfaches. Wieder liefen die harmlosen
+       Dateien ins Zeitlimit, und der Test mass nicht mehr „ueberlebt der Lauf
+       einen Haenger", sondern „sind zufaellig alle langsam".
+
+    Beide Male sah der Lauf aus wie ein Nachweis und war keiner. Deshalb wird
+    die Grundlast jetzt **hier und jetzt gemessen** und das Zeitlimit daraus
+    abgeleitet — allein wie unter Volllast.
 
     Der Lauf kostet knapp eine Minute und findet deshalb **einmal fuer die
     ganze Klasse** statt — dreimal waere die dreifache Zeit fuer dieselbe
     Messung.
     """
 
-    TIMEOUT = 25          # > 6,5 s Grundlast, mit Reserve fuer Parallellast
+    #: Untergrenze, falls die Messung unplausibel klein ausfaellt.
+    TIMEOUT_MIN = 25
+    #: Sicherheitsfaktor auf die GEMESSENE Grundlast.
+    TIMEOUT_FAKTOR = 4
     _erg = None
     _ausgabe = ""
+
+    @classmethod
+    def _grundlast(cls, tmp: Path) -> float:
+        """Wie lange braucht ein triviales Segment HIER UND JETZT?
+
+        ★★ Der Grund fuer die Messung statt einer festen Zahl: dieselbe Datei
+        laeuft einmal allein und einmal als eines von 646 Segmenten unter
+        ``-j 6``. Die zweite Lage ist die, in der dieser Test im Gate wirklich
+        stattfindet — und dort ist die Grundlast ein Vielfaches.
+
+        Die erste Fassung stand fest auf 25 s. Sie war allein gruen und im
+        Volllauf rot, weil unter Last jedes Segment ueber 25 s brauchte und
+        damit auch die beiden HARMLOSEN Dateien ins Zeitlimit liefen. Der Test
+        mass dann nicht mehr „ueberlebt der Lauf einen Haenger", sondern „sind
+        zufaellig alle langsam" — und war damit genau die Sorte Test, gegen die
+        dieses Repo an mehreren Stellen anschreibt.
+        """
+        probe = tmp / "test_grundlast.py"
+        probe.write_text(SCHNELL, encoding="utf-8")
+        umgebung = dict(os.environ)
+        umgebung["QT_QPA_PLATFORM"] = "offscreen"
+        start = time.monotonic()
+        subprocess.run([sys.executable, "-m", "pytest", str(probe), "-q",
+                        "--no-header", "-p", "no:cacheprovider"],
+                       cwd=str(REPO), env=umgebung, capture_output=True,
+                       timeout=600)
+        probe.unlink(missing_ok=True)
+        return time.monotonic() - start
 
     @classmethod
     def setUpClass(cls):
         cls._tmp = tempfile.TemporaryDirectory(prefix="lightos_xplat27_")
         tmp = Path(cls._tmp.name)
+        gemessen = cls._grundlast(tmp)
+        cls.TIMEOUT = max(cls.TIMEOUT_MIN, int(gemessen * cls.TIMEOUT_FAKTOR) + 1)
+        # Der Haenger muss das Zeitlimit sicher reissen, auch wenn die Last
+        # zwischen Messung und Lauf noch steigt.
+        cls.HAENGT_SEK = cls.TIMEOUT * 4
         dateien = []
         for name, inhalt in (("a_schnell", SCHNELL),
-                             ("b_haengt", HAENGT),
+                             ("b_haengt", HAENGT.format(sek=cls.HAENGT_SEK)),
                              ("c_schnell", SCHNELL)):
             p = tmp / f"test_{name}.py"
             p.write_text(inhalt, encoding="utf-8")
