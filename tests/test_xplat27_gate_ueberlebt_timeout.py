@@ -97,9 +97,33 @@ class TaskkillDarfDenLaufNichtKippenTest(unittest.TestCase):
         self.assertRegex(quelle, r'\$ErrorActionPreference\s*=\s*"Stop"')
 
 
+#: Laeuft dieser Test SELBST in einem Gate-Lauf? Der Segment-Runner setzt
+#: ``LIGHTOS_SEG_OUT`` fuer jedes Kind — die Variable ist damit das ehrlichste
+#: verfuegbare Merkmal.
+_IM_GATE = bool(os.environ.get("LIGHTOS_SEG_OUT"))
+_GATE_GRUND = (
+    "startet selbst einen Segment-Runner; im Gate waere das ein Gate IM Gate "
+    "(QA-53). Der statische Test dieser Datei laeuft weiter und faengt die "
+    "Regression — dieser Nachweis gehoert in einen gezielten Einzellauf: "
+    "verify_loop.ps1 tests/test_xplat27_gate_ueberlebt_timeout.py")
+
+
 @unittest.skipUnless(_IST_WINDOWS, _GRUND)
+@unittest.skipIf(_IM_GATE, _GATE_GRUND)
 class LaufUeberlebtEinHaengendesSegmentTest(unittest.TestCase):
     """Verhalten: nach einem Timeout muss es weitergehen.
+
+    ⚠️⚠️ **Dieser Test laeuft bewusst NICHT im Volllauf.** Er startet einen
+    zweiten Segment-Runner — im Gate waere das ein Gate IM Gate, und genau
+    davor steht QA-53: der innere Lauf erbt die Umgebung des aeusseren
+    (``LIGHTOS_SHOW_DB``, die Testkopie der Bibliothek) und arbeitet gegen sie.
+    Gemessen am 01.09.2026 im Volllauf: alle drei Segmente des inneren Laufs
+    brachen mit ``exit 2`` ab, bevor ueberhaupt ein Zeitlimit greifen konnte —
+    der Test mass dann nichts mehr und faerbte nur sich selbst rot.
+
+    Der statische Test oben bleibt im Gate und faengt die Regression. Dieser
+    Nachweis hier gehoert in einen gezielten Einzellauf; dass er dort gruen
+    ist, steht im Commit und im BACKLOG-Eintrag.
 
     ⚠️ **Das Zeitlimit wird GEMESSEN, nicht gesetzt** — und das in zwei Anlaeufen
     gelernt:
