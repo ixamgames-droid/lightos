@@ -77,6 +77,18 @@ if (-not $py) {
 if (-not $env:QT_QPA_PLATFORM)   { $env:QT_QPA_PLATFORM = "offscreen" }
 if (-not $env:LIGHTOS_HARDEN_EXIT) { $env:LIGHTOS_HARDEN_EXIT = "1" }
 
+# XPLAT-27: Merkmal fuer die Kinder — "du laeufst als Segment eines Gate-Laufs".
+# Bewusst HART gesetzt und nicht per setdefault: die Aussage gilt hier immer,
+# und ein von aussen geerbter Wert duerfte sie nicht ueberschreiben.
+#
+# WOFUER: ein Test, der selbst einen Runner startet, erzeugt im Volllauf ein
+# Gate IM Gate (QA-53). Bisher konnte er das gar nicht erkennen - es gab kein
+# Merkmal. `LIGHTOS_SEG_OUT` sieht danach aus, taugt aber nicht: der Runner
+# LIEST es nur (mit Default) und setzt es nie, ein Kind sieht es also nur,
+# wenn der Mensch es von Hand gesetzt hat. Genau diese Annahme hat mich hier
+# einen Anlauf gekostet.
+$env:LIGHTOS_IM_SEGMENT = "1"
+
 if ($Jobs -le 0) {
     if ($env:LIGHTOS_VERIFY_JOBS) { $Jobs = [int]$env:LIGHTOS_VERIFY_JOBS } else { $Jobs = 4 }
 }

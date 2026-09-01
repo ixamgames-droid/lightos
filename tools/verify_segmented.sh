@@ -65,6 +65,14 @@ rm -rf "$OUTDIR"; mkdir -p "$OUTDIR"
 export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-offscreen}"
 export LIGHTOS_HARDEN_EXIT="${LIGHTOS_HARDEN_EXIT:-1}"
 
+# XPLAT-27: Merkmal fuer die Kinder — "du laeufst als Segment eines Gate-Laufs".
+# Bewusst HART gesetzt und nicht per ${VAR:-wert}: die Aussage gilt hier immer.
+# Wofuer: ein Test, der selbst einen Runner startet, erzeugt im Volllauf ein
+# Gate IM Gate (QA-53) und konnte das bisher gar nicht erkennen — es gab kein
+# Merkmal. Hier gesetzt, damit beide Plattformen dasselbe anbieten; auf Windows
+# steht die Entsprechung in verify_segmented.ps1.
+export LIGHTOS_IM_SEGMENT=1
+
 echo "[seg] ${#FILES[@]} Testdateien, $JOBS parallel, Ausgabe: $OUTDIR"
 
 # XPLAT-17 / PROC-02c: was vor einem WebEngine-Segment passiert.
