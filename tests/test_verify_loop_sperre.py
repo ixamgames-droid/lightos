@@ -38,8 +38,35 @@ def _hat_flock() -> bool:
     return shutil.which("flock") is not None
 
 
+# ⚠️ QA-69: hier stand ``os.access(_RUNNER, os.X_OK)`` als einziger Guard. Auf
+# Windows liefert das fuer jede vorhandene Datei ``True`` — ein Ausfuehrbar-Bit
+# gibt es dort nicht, und die ``.sh`` ist mit eingecheckt. Der Guard hat also
+# genau das NICHT getan, wonach er aussieht.
+#
+# Die Folgen waren je Klasse verschieden und beide irrefuehrend:
+#   * ``KeineZweiteSuiteAusEinemTestTest`` startete die ``.sh`` als Prozess und
+#     starb mit ``OSError [WinError 193] %1 ist keine zulaessige
+#     Win32-Anwendung``;
+#   * ``SperreGiltUeberWorktreeGrenzenTest`` hatte gar keinen Guard und starb
+#     an ``os.symlink`` mit ``WinError 1314`` (Symlinks brauchen dort Adminrechte
+#     oder den Entwicklermodus).
+# Beides las sich wie ein kaputtes Gate, war aber nur eine Linux-Annahme.
+#
+# ``verify_loop.sh`` IST das Linux-Gate — es startet ``venv/bin/python``, das
+# auf einem Windows-Checkout nicht existiert, und nimmt eine ``flock``-Sperre,
+# die es dort auch nicht gibt. Windows faehrt stattdessen ``verify_loop.ps1``
+# bzw. ``run_tests.ps1``. **Dass es fuer die Zusicherungen dieser Datei auf der
+# Windows-Seite kein Gegenstueck gibt, ist als XPLAT-23 erfasst** — hier wird
+# die Luecke benannt statt stillschweigend uebersprungen.
+_RUNNER_LAEUFT = (os.path.exists(_RUNNER) and os.name != "nt"
+                  and shutil.which("bash") is not None)
+_RUNNER_GRUND = ("verify_loop.sh ist das Linux-Gate — auf Windows faehrt "
+                 "verify_loop.ps1 / run_tests.ps1 (XPLAT-23), und bash fehlt "
+                 "im PATH")
+
+
 @unittest.skipUnless(_hat_flock(), "ohne flock gibt es bewusst keine Sperre")
-@unittest.skipUnless(os.access(_RUNNER, os.X_OK), "verify_loop.sh nicht ausfuehrbar")
+@unittest.skipUnless(_RUNNER_LAEUFT, _RUNNER_GRUND)
 class VolleSuiteSerialisiertTest(unittest.TestCase):
     """★ Eigene Sperrdatei je Test (LIGHTOS_LOCKFILE).
 
@@ -160,7 +187,7 @@ class VolleSuiteSerialisiertTest(unittest.TestCase):
             halter.wait()
 
 
-@unittest.skipUnless(os.access(_RUNNER, os.X_OK), "verify_loop.sh nicht ausfuehrbar")
+@unittest.skipUnless(_RUNNER_LAEUFT, _RUNNER_GRUND)
 class KeineZweiteSuiteAusEinemTestTest(unittest.TestCase):
     """★★ QA-53 — die Regression, die diese Datei selbst verursacht hat.
 
@@ -232,6 +259,7 @@ if __name__ == "__main__":
     unittest.main()
 
 
+@unittest.skipUnless(_RUNNER_LAEUFT, _RUNNER_GRUND)
 class SperreGiltUeberWorktreeGrenzenTest(unittest.TestCase):
     """★★ PROC-02b: Ein VERSCHACHTELTER Worktree bekam eine eigene Sperrdatei.
 

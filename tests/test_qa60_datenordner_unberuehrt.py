@@ -16,10 +16,43 @@ Rechner, dessen Ordner zufaellig gerade so aussieht wie erwartet, blind — gena
 der Fehler, an dem der erste QA-58-Waechter scheiterte.
 """
 import os
+import sys
 import unittest
 
-_ECHTER_ORDNER = os.path.join(os.path.expanduser("~"), ".local", "share",
-                              "LightOS")
+
+def _echter_ordner() -> str:
+    """Der Datenordner des Nutzers — plattformrichtig und UNABHAENGIG ermittelt.
+
+    ★ QA-69: hier stand fest ``~/.local/share/LightOS``. Auf Linux richtig, auf
+    Windows falsch — dort liegt der Ordner unter ``%APPDATA%\\LightOS``. Der
+    Waechter verglich damit auf Windows gegen einen Pfad, den es auf dem
+    Rechner gar nicht gibt: er war dauerhaft rot und hat dabei nichts gemessen.
+
+    ★★ Warum nicht einfach ``os.environ["APPDATA"]``: **weil conftest.py genau
+    diese Variable umlenkt** (Zeile 179), und ``XDG_DATA_HOME`` ebenso. Wer sie
+    hier liest, bekommt den Sandkasten und vergleicht ihn mit sich selbst — der
+    Test waere immer gruen und wertlos. Genau davor warnt schon der Kommentar
+    weiter unten („Sandkasten gegen Sandkasten").
+
+    ★★★ Warum ``expanduser("~")`` trotzdem sicher ist: conftest laesst
+    ``HOME``/``USERPROFILE`` unangetastet (nachgesehen — umgelenkt werden nur
+    ``APPDATA`` und ``XDG_DATA_HOME``). Der Heimatordner ist damit die einzige
+    Groesse, die hier noch echt ist. Die Ableitung folgt bewusst derselben
+    Regel wie ``src/core/paths.app_data_dir()`` — sie ist aber
+    NACHGEBAUT und nicht importiert, denn ein Waechter, der die gepruefte
+    Funktion zur Berechnung seiner eigenen Erwartung benutzt, prueft nichts.
+    """
+    # Ueber eine Variable statt direkt ``sys.platform`` — dieselbe Schreibweise
+    # wie in ``src/core/paths.py``: sonst wertet Pyright den Vergleich statisch
+    # aus und meldet den jeweils anderen Zweig als unerreichbaren Code.
+    plat = sys.platform
+    if plat == "win32":
+        return os.path.join(os.path.expanduser("~"), "AppData", "Roaming",
+                            "LightOS")
+    return os.path.join(os.path.expanduser("~"), ".local", "share", "LightOS")
+
+
+_ECHTER_ORDNER = _echter_ordner()
 
 
 def _aufgeloest(p: str) -> str:

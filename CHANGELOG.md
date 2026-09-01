@@ -7,6 +7,42 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-08-31 — Das Test-Gate auf einem Windows-Rechner sagt wieder die Wahrheit
+
+#### Behoben
+
+- **Sechs Tests waren auf Windows rot, ohne dass am Programm etwas falsch war.**
+  Sie prüften richtige Dinge, taten es aber auf eine Art, die es nur unter Linux
+  gibt — und ein Gate, dessen rote Meldungen nichts bedeuten, ist als
+  Merge-Kriterium wertlos.
+
+  Zwei verglichen Dateipfade in der Schreibweise mit `/`, während Windows `\`
+  liefert. Einer suchte den Datenordner fest unter `~/.local/share/LightOS`,
+  wo er auf Windows nie liegt — der zugehörige Programmcode war dabei die ganze
+  Zeit korrekt. Drei starteten Linux-Shellskripte als Programm.
+
+- **Ein Wächter war auf Windows blind, ohne es zu merken.** Drei der Tests
+  fragten „ist diese Datei ausführbar?", bevor sie ein Shellskript starteten.
+  Unter Windows beantwortet das System diese Frage für *jede* vorhandene Datei
+  mit „ja" — die Prüfung tat also nie, wonach sie aussah. Die Skripte sind
+  mitgeliefert, lagen also auch dort, und der Test lief los.
+
+- **Und einer war abwechselnd rot und grün — je nachdem, wer ihn startete.**
+  Er rief ein Shellskript über `bash` auf. In der Git-Bash ist `bash`
+  auffindbar, in der PowerShell nicht — und aus der PowerShell startet das
+  Gate. Dieselbe Datei war deshalb im großen Lauf rot und einzeln nachgefahren
+  grün. Das sieht genau aus wie die bekannte Empfindlichkeit gegen parallele
+  Last und war es nicht. Wer den Unterschied so deutet, sucht den Fehler
+  dauerhaft an der falschen Stelle.
+
+  Die betroffenen Prüfungen laufen jetzt dort, wo sie etwas messen können, und
+  melden auf Windows einen **sichtbaren Grund**, statt stillschweigend zu
+  verschwinden. Dass es für zwei dieser Zusicherungen auf der Windows-Seite noch
+  gar kein Gegenstück gibt, ist als eigener Punkt festgehalten und nicht
+  weggeräumt.
+
+  Gemessen aus der PowerShell: vorher vier rote Dateien, jetzt **keine**.
+
 ### 2026-08-31 — Ein misslungenes Laden meldet sich wieder
 
 #### Behoben
@@ -67,7 +103,6 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Zurücksetzen mit aufgehoben. Das war der einzige Panik-Zustand ohne
   Notausgang: die naheliegende Rettung — einfach eine neue Show anfangen —
   erreichte ihn nicht.
-
 ### 2026-08-31 — Die Projektwerkzeuge laufen jetzt auch auf einem Windows-Rechner
 
 #### Behoben
