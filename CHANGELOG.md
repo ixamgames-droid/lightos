@@ -7,6 +7,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-01 — STOP ALL kommt wieder durch
+
+#### Behoben
+
+- **Eine Sammlung, die sich selbst enthält, legte STOP ALL lahm.** Baut man
+  versehentlich einen Kreis — Sammlung A enthält B, B enthält wieder A —, dann
+  rief sich das Abspielen endlos selbst auf. Folge: eine Fehlermeldung in jedem
+  Bild, und **STOP ALL wirkte nicht mehr**, während Chaser und Cues weiterliefen.
+
+  Der Kreis wird jetzt erkannt und an Ort und Stelle abgebrochen. LightOS sagt
+  dabei einmal, welche Sammlung betroffen ist und welche Mitglieder sie hat —
+  einmal, nicht in jedem Bild.
+
+
 ### 2026-09-01 — Layer-Effekte beachten die Geräte-Einstellungen
 
 #### Behoben
