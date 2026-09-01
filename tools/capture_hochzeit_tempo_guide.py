@@ -9,7 +9,13 @@ import os
 import sys
 from pathlib import Path
 
-os.environ["QT_QPA_PLATFORM"] = "windows"
+# XPLAT-25: ein Capture braucht ein ECHT gerendertes Fenster — offscreen
+# liefert bei QtWebEngine schwarze Bilder. Die native Plattform muss deshalb
+# erzwungen werden (ein geerbtes QT_QPA_PLATFORM=offscreen soll NICHT gewinnen)
+# — aber plattformrichtig: "windows" gibt es nur auf Windows, auf Linux heisst
+# die native Plattform "xcb". Hart gesetzt starb das Werkzeug hier mit
+# rc=134 (qt.qpa.plugin: Could not find the Qt platform plugin "windows").
+os.environ["QT_QPA_PLATFORM"] = "windows" if os.name == "nt" else "xcb"
 os.environ["QT_SCALE_FACTOR"] = "0.5"
 os.environ.setdefault("QTWEBENGINE_DISABLE_SANDBOX", "1")
 os.environ.setdefault("QT_OPENGL", "software")
@@ -17,7 +23,7 @@ os.environ.setdefault("LIGHTOS_NO_OUTPUT_THREAD", "1")
 os.environ.setdefault("LIGHTOS_NO_AUDIO_AUTOSTART", "1")
 # STAB-CURSHOW (a): load_show schreibt in die Show-DB — isolierte Wegwerf-DB via
 # _gen_env, damit der Capture-Lauf Davids echte data/current_show.db nicht anfasst.
-# (QT_QPA_PLATFORM='windows' oben gewinnt gegen das offscreen-setdefault.)
+# (Die native Plattform oben gewinnt gegen ein geerbtes offscreen.)
 import _gen_env  # noqa: F401
 from _showpath import find_show
 

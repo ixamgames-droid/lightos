@@ -7,6 +7,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-01 — Vier Werkzeuge liefen auf Linux gar nicht
+
+#### Behoben
+
+- **Die Skripte, die Anleitungs-Bilder aufnehmen, starben auf Linux beim Start.**
+  Sie forderten die Qt-Oberfläche unter ihrem Windows-Namen an; unter Linux heißt
+  dieselbe anders. Sie wählen sie jetzt nach Betriebssystem — und laufen wieder.
+
+  Betroffen: die beiden Tempo-Anleitungs-Aufnahmen und die beiden
+  Seiten-Renderer (APC, Neue Demo).
+
+- **Die Sitzungs-Tafel druckte ihre gesamte Blocker-Historie.** Sie zeigt jetzt
+  die fünf jüngsten Einträge, nennt die Gesamtzahl und bietet `--blocker -1` für
+  die vollständige Ansicht. Die gezeigten Einträge bleiben ungekürzt.
+
 ### 2026-08-31 — Das Test-Gate auf einem Windows-Rechner sagt wieder die Wahrheit
 
 #### Behoben

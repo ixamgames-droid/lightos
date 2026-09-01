@@ -300,6 +300,14 @@ def _mit_wiederholung(repo: str, aendern, nachricht: str, versuche: int = 5):
     return False, "konnte nicht schreiben — zu viele gleichzeitige Aenderungen"
 
 
+# PROC-07: Vorgabe fuer `list`. Fuenf statt drei, gemessen begruendet: die
+# QA-66-Erklaerung ("nicht den eigenen Diff verdaechtigen") lag bei drei
+# Blockern knapp ausserhalb, obwohl die juengsten sie zweimal erwaehnen —
+# eine Kurzfassung, die eine Referenz aufreisst, macht die Runde teurer
+# statt billiger.
+_BLOCKER_VORGABE = 5
+
+
 def cmd_list(args, repo: str) -> int:
     tafel, _ = lade_tafel(repo)
     t = jetzt()
@@ -311,9 +319,27 @@ def cmd_list(args, repo: str) -> int:
               f"seit {c['seit']}{marke}")
         if c["dateien"]:
             print(f"{'':<16} Dateien: {c['dateien']}")
-    if tafel["blocker"]:
-        print("\nBlocker:")
-        for b in tafel["blocker"]:
+    blocker = tafel["blocker"]
+    if blocker:
+        # PROC-07: die Blockerliste waechst unbegrenzt und macht 99 % der Ausgabe
+        # aus (gemessen 2026-09-01: 11.516 von 11.637 Bytes). `list` steht als
+        # Schritt 2 im Ablauf JEDES Items (AGENTS.md, COORDINATION.md) — wer sie
+        # jedes Mal ganz liest, zahlt sie jedes Mal. Vorgabe deshalb: nur die
+        # juengsten, aber UNGEKUERZT (ein angeschnittener Blocker ist wertlos —
+        # gerade die letzte Zeile ist meist die Uebergabe der anderen Sitzung).
+        # Die Gesamtzahl und der Weg zur Vollansicht stehen in der Kopfzeile,
+        # damit niemand glaubt, er saehe alles.
+        n = getattr(args, "blocker", _BLOCKER_VORGABE)
+        if n == 0:
+            print(f"\n({len(blocker)} Blocker ausgeblendet — `list --blocker -1` zeigt alle)")
+            return 0
+        zeigen = blocker if n < 0 else blocker[-n:]
+        if len(zeigen) < len(blocker):
+            print(f"\nBlocker (letzte {len(zeigen)} von {len(blocker)} — "
+                  f"alle mit `--blocker -1`):")
+        else:
+            print("\nBlocker:")
+        for b in zeigen:
             print(f"  - {b}")
     return 0
 
@@ -406,6 +432,9 @@ def main(argv=None) -> int:
     sub = p.add_subparsers(dest="cmd", required=True)
 
     s = sub.add_parser("list", help="Wer arbeitet gerade woran?")
+    s.add_argument("--blocker", type=int, default=_BLOCKER_VORGABE,
+                   help=f"Wieviele der juengsten Blocker zeigen "
+                        f"(Vorgabe {_BLOCKER_VORGABE}; 0 = keine, -1 = alle)")
     s.set_defaults(fn=cmd_list)
 
     s = sub.add_parser("claim", help="Item belegen")
