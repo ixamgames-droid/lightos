@@ -10,6 +10,7 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | ENG-16 | A | fix/eng16-layer-effekt-invert | 2026-09-01T16:45Z | src/core/engine/effect_func.py |
+| XPLAT-27 | B | fix/xplat27-gate-bricht-bei-timeout-ab | 2026-09-01T17:06Z | tools/verify_segmented.ps1,tests/test_xplat27_gate_ueberlebt_timeout.py |
 
 ## Blocker & Fallen
 
@@ -39,7 +40,6 @@
 
 ## Verlauf
 
-- 2026-08-26T20:42Z B claim UI-55
 - 2026-08-26T22:46Z B claim OUT-53
 - 2026-08-26T23:10Z B done UI-55
 - 2026-08-26T23:32Z B done OUT-53
@@ -69,3 +69,4 @@
 - 2026-09-01T16:14Z B claim XPLAT-21
 - 2026-09-01T16:45Z A claim ENG-16
 - 2026-09-01T16:58Z B done XPLAT-21
+- 2026-09-01T17:06Z B claim XPLAT-27
