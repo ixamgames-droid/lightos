@@ -462,4 +462,29 @@ if ($fail.Count) {
 # Crashes/Timeouts sind Umgebungs-Flakiness (s. Kopf). Bewusst 1 statt der
 # Segmentanzahl wie auf Linux - verify_loop.ps1 deutet 97/98/99 als
 # Lock-Runner-Codes, eine Zaehlung koennte dort kollidieren.
-if ($fail.Count) { exit 1 } else { exit 0 }
+if ($fail.Count) { exit 1 }
+# ★ XPLAT-31: Anteils-Schutz. Die Toleranz oben gilt dem EINZELFALL - ein
+# Segment, das nach bestandenen Tests nativ abbaut oder haengt. Sie war nie als
+# Aussage ueber einen ganzen Lauf gemeint.
+#
+# Ist KEIN EINZIGES Segment gruen, ist das nie Abbau-Flakiness, sondern eine
+# kaputte Umgebung: kein venv, keine Bibliothek, ein Prozess der jede Datei
+# blockiert. Ohne diese Zeile meldete so ein Lauf "0/3 Segmente gruen" und
+# trotzdem Exit 0 - beobachtet beim Testbau zu XPLAT-27. Ein Mensch liest
+# "0 von 3 gruen" als rot; das Gate sagte das Gegenteil.
+#
+# Bewusst als ANTEIL formuliert und nicht als Aenderung der Einzelregel: die
+# begruendete Toleranz (s. Kopf) bleibt vollstaendig erhalten, nur der
+# Totalausfall wird sichtbar. Vorschlag stammt aus der XPLAT-28-Klaerung.
+#
+# Auf Linux deckt `verify_segmented.sh` denselben Fall bereits ab, weil es
+# JEDEN rc != 0 rot zaehlt - sind alle Segmente auffaellig, ist BAD > 0. Diese
+# Zeile stellt also Gleichstand her, sie fuehrt nichts Neues ein.
+elseif ($files.Count -gt 0 -and $okCount -eq 0) {
+    Write-Host ("[seg] KEIN EINZIGES der {0} Segmente ist gruen - das ist keine " -f $files.Count) -ForegroundColor Red
+    Write-Host "[seg] Umgebungs-Flakiness mehr, sondern eine kaputte Umgebung." -ForegroundColor Red
+    Write-Host "[seg] Erste Verdaechtige: venv/Python fehlt, Geraetebibliothek nicht" -ForegroundColor Red
+    Write-Host "[seg] lesbar, oder ein Prozess haelt etwas, das jedes Segment braucht." -ForegroundColor Red
+    exit 1
+}
+else { exit 0 }
