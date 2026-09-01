@@ -7,6 +7,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-01 — Ein belegter Web-Port beendet LightOS nicht mehr
+
+#### Behoben
+
+- **„Web-Interface" einschalten beendete LightOS sofort, wenn der Port schon
+  belegt war** — etwa durch eine zweite Instanz oder ein anderes Programm. Kein
+  Dialog, keine Meldung: das Fenster war weg.
+
+  Statt dessen erscheint jetzt die gewohnte Fehlermeldung, der Menü-Haken geht
+  zurück auf „aus", und LightOS läuft weiter. Die Meldung nennt den Port und den
+  Befehl, mit dem man herausfindet, wer ihn hält.
+
+
 ### 2026-09-01 — Vier Werkzeuge liefen auf Linux gar nicht
 
 #### Behoben
