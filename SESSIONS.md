@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| _(frei)_ |  |  |  |  |
+| XPLAT-31 | B | feat/xplat31-anteils-schutz | 2026-09-01T20:39Z | tools/verify_segmented.ps1,tests/test_xplat31_anteils_schutz.py |
 
 ## Blocker & Fallen
 
@@ -43,7 +43,6 @@
 
 ## Verlauf
 
-- 2026-08-30T19:39Z A claim VIZ-55
 - 2026-08-31T14:30Z A uebergeben VIZ-55
 - 2026-08-31T19:10Z A claim UI-57
 - 2026-08-31T19:10Z B claim XPLAT-20
@@ -73,3 +72,4 @@
 - 2026-09-01T19:42Z A uebergeben XPLAT-30
 - 2026-09-01T19:45Z B claim XPLAT-28
 - 2026-09-01T20:39Z B done XPLAT-28
+- 2026-09-01T20:39Z B claim XPLAT-31
