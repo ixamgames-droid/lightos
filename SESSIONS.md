@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| NET-11 | A | fix/net11-web-port-belegt | 2026-09-01T15:45Z | src/web/app.py |
+| _(frei)_ |  |  |  |  |
 
 ## Blocker & Fallen
 
@@ -38,7 +38,6 @@
 
 ## Verlauf
 
-- 2026-08-26T18:44Z B done STAB-22
 - 2026-08-26T18:48Z B claim VIZ-59
 - 2026-08-26T19:14Z B done VIZ-59
 - 2026-08-26T20:26Z B claim VIZ-60
@@ -68,3 +67,4 @@
 - 2026-09-01T14:26Z B uebergeben XPLAT-22
 - 2026-09-01T15:24Z A done PROC-07
 - 2026-09-01T15:45Z A claim NET-11
+- 2026-09-01T16:09Z A done NET-11
