@@ -7,6 +7,30 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-01 — Ein Testlauf, in dem nichts durchläuft, meldet nicht mehr „in Ordnung"
+
+#### Behoben
+
+- **Das Test-Gate konnte grün melden, obwohl kein einziger Testabschnitt
+  durchgelaufen war.** Es verzeiht bewusst einzelne Abschnitte, die nach
+  bestandenen Tests noch abstürzen oder hängenbleiben — das ist gemessen und
+  richtig so, sonst wäre es als Freigabekriterium wertlos.
+
+  Diese Nachsicht galt aber auch dann noch, wenn **alles** danebenging. Ein
+  Lauf konnte „0 von 3 Abschnitten grün" anzeigen und trotzdem Erfolg melden.
+  Wer die Zeile liest, hält das für einen Fehlschlag — das Gate sagte das
+  Gegenteil.
+
+  Ist kein einziger Abschnitt grün, ist das keine Laune der Umgebung mehr,
+  sondern eine kaputte: eine fehlende Python-Umgebung, eine nicht lesbare
+  Gerätebibliothek, ein Programm das jede Datei blockiert. Der Lauf gilt jetzt
+  als fehlgeschlagen und sagt dazu, wonach zu suchen ist.
+
+  Die Nachsicht für den Einzelfall bleibt unverändert — geändert hat sich nur,
+  dass sie nicht mehr für einen Totalausfall gilt.
+
+
+
 ### 2026-09-01 — Ein hängender Test beendete den ganzen Testlauf
 
 #### Behoben
