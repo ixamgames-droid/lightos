@@ -119,7 +119,10 @@ class PortPruefungTest(unittest.TestCase):
         gefunden werden. Ein Waechter, der nie anschlaegt, ist keiner."""
         import tempfile
         with tempfile.NamedTemporaryFile(suffix=".port") as fh:
-            belegt, halter, sicher = self.m.port_halter(fh.name)
+            # eigene_pid absichtlich falsch -> der eigene Prozess zaehlt als "fremd".
+            # Ohne das findet der Waechter nichts, denn er laesst den eigenen
+            # Prozess bewusst aus (sonst Fehlalarm bei jedem Start).
+            belegt, halter, sicher = self.m.port_halter(fh.name, eigene_pid=-1)
             self.assertTrue(belegt)
             self.assertTrue(sicher, "auf Linux sind die Halter aus /proc sicher")
             self.assertIn(os.getpid(), [pid for pid, _ in halter],

@@ -103,14 +103,30 @@ KANAL = {"pan": 1, "pan_fine": 2, "tilt": 3, "tilt_fine": 4,
 
 
 # ── Port-Pruefung ────────────────────────────────────────────────────────────
-def port_halter(port: str) -> tuple[bool, list[tuple[int, str]], bool]:
+def port_halter(port: str,
+                eigene_pid: int | None = None) -> tuple[bool, list[tuple[int, str]], bool]:
     """``(belegt, halter, halter_sind_sicher)`` — plattformuebergreifend.
+
+    ``eigene_pid`` wird durchgereicht und ist NICHT nur Test-Zubehoer: der
+    eigene Prozess muss ausgelassen werden, sonst meldete jede Pruefung nach
+    dem eigenen Oeffnen einen Treffer. Genau deshalb muss ein Test, der den
+    Waechter am EIGENEN offenen Deskriptor gegenprueft, eine fremde PID
+    vorgeben koennen — sonst prueft er nichts.
 
     ★ XPLAT-21: hier stand eine EIGENE Kopie des ``/proc``-Scans. Sie war nicht
     nur Linux-only, sondern auch die zweite Stelle im Haus, die dieselbe Frage
     beantwortet — mit dem Risiko, dass beide auseinanderlaufen. Seit XPLAT-22
     kann ``src/core/dmx/port_check.py`` das fuer beide Systeme; diese Funktion
     ist nur noch die Uebersetzung auf das, was der Aufrufer hier braucht.
+
+    ⚠️ Der Umbau hat aber nicht nur die Plattform erweitert, sondern beinahe
+    still das VERHALTEN geaendert: die alte tool-eigene Fassung kannte
+    ``eigene_pid`` nicht und meldete deshalb auch den eigenen Prozess. Ohne die
+    Durchreichung oben war die Linux-CI rot — und zwar zu Recht. Auf Windows
+    fiel es nicht auf, weil dort ueber einen Oeffnungsversuch gemessen wird und
+    der eigene exklusive Halter den zweiten Versuch genauso blockiert wie ein
+    fremder. Ein Beispiel dafuer, dass zwei Plattformen denselben Fehler
+    unterschiedlich gut sichtbar machen.
 
     ★★ Der dritte Rueckgabewert ist keine Spitzfindigkeit. Auf Linux liest
     ``/proc`` die Halter direkt aus und weiss sie SICHER. Auf Windows ist
@@ -127,8 +143,8 @@ def port_halter(port: str) -> tuple[bool, list[tuple[int, str]], bool]:
             # nicht). Beides ist hier KEIN Abbruchgrund: existiert der Port
             # nicht, scheitert das Oeffnen gleich selbst und sagt es besser.
             return False, [], True
-        return True, port_check.windows_verdaechtige_prozesse(), False
-    treffer = port_check.port_belegt_von(port)
+        return True, port_check.windows_verdaechtige_prozesse(eigene_pid), False
+    treffer = port_check.port_belegt_von(port, eigene_pid=eigene_pid)
     return bool(treffer), treffer, True
 
 
