@@ -97,33 +97,34 @@ class TaskkillDarfDenLaufNichtKippenTest(unittest.TestCase):
         self.assertRegex(quelle, r'\$ErrorActionPreference\s*=\s*"Stop"')
 
 
-#: Laeuft dieser Test SELBST in einem Gate-Lauf? Der Segment-Runner setzt
-#: ``LIGHTOS_SEG_OUT`` fuer jedes Kind — die Variable ist damit das ehrlichste
-#: verfuegbare Merkmal.
-_IM_GATE = bool(os.environ.get("LIGHTOS_SEG_OUT"))
-_GATE_GRUND = (
-    "startet selbst einen Segment-Runner; im Gate waere das ein Gate IM Gate "
-    "(QA-53). Der statische Test dieser Datei laeuft weiter und faengt die "
-    "Regression — dieser Nachweis gehoert in einen gezielten Einzellauf: "
-    "verify_loop.ps1 tests/test_xplat27_gate_ueberlebt_timeout.py")
+#: Umgebungsvariablen, die ein AEUSSERER Gate-Lauf gesetzt hat und die der
+#: innere Lauf auf keinen Fall erben darf. Uebernommen aus
+#: ``tests/test_proc02d_volle_suite_fd9.py`` und
+#: ``tests/test_verify_loop_sperre.py`` — beide starten ebenfalls einen Runner
+#: und loesen das seit QA-53 genau so.
+_NICHT_ERBEN = ("LIGHTOS_LOCKFILE", "LIGHTOS_VERIFY_DRYRUN",
+                "LIGHTOS_VERIFY_NOLOCK", "LIGHTOS_VERIFY_SINGLE")
 
 
 @unittest.skipUnless(_IST_WINDOWS, _GRUND)
-@unittest.skipIf(_IM_GATE, _GATE_GRUND)
 class LaufUeberlebtEinHaengendesSegmentTest(unittest.TestCase):
     """Verhalten: nach einem Timeout muss es weitergehen.
 
-    ⚠️⚠️ **Dieser Test laeuft bewusst NICHT im Volllauf.** Er startet einen
-    zweiten Segment-Runner — im Gate waere das ein Gate IM Gate, und genau
-    davor steht QA-53: der innere Lauf erbt die Umgebung des aeusseren
-    (``LIGHTOS_SHOW_DB``, die Testkopie der Bibliothek) und arbeitet gegen sie.
-    Gemessen am 01.09.2026 im Volllauf: alle drei Segmente des inneren Laufs
-    brachen mit ``exit 2`` ab, bevor ueberhaupt ein Zeitlimit greifen konnte —
-    der Test mass dann nichts mehr und faerbte nur sich selbst rot.
+    ⚠️⚠️ **Die Umgebung des inneren Laufs muss isoliert werden.** Dieser Test
+    startet einen zweiten Segment-Runner. Erbt der die Variablen des aeusseren
+    Gate-Laufs — allen voran ``LIGHTOS_SHOW_DB`` —, arbeiten beide auf
+    derselben Datenbank und fallen sich gegenseitig hinein: gemessen am
+    01.09.2026 im Volllauf brachen ALLE DREI Segmente des inneren Laufs mit
+    ``exit 2`` ab, bevor ueberhaupt ein Zeitlimit greifen konnte. Der Test mass
+    dann nichts mehr und faerbte nur noch sich selbst rot.
 
-    Der statische Test oben bleibt im Gate und faengt die Regression. Dieser
-    Nachweis hier gehoert in einen gezielten Einzellauf; dass er dort gruen
-    ist, steht im Commit und im BACKLOG-Eintrag.
+    ★ **Der erste Versuch war, den Test im Gate zu ueberspringen.** Das war die
+    bequeme Loesung und die falsche: sie haette den Nachweis genau dort
+    entfernt, wo er gebraucht wird. ``test_proc02d_volle_suite_fd9.py`` und
+    ``test_verify_loop_sperre.py`` starten ebenfalls Runner und laufen im Gate
+    mit — sie ISOLIEREN die Umgebung, statt auszuweichen (eigene Show-DB,
+    eigenes Ausgabeverzeichnis, geerbte Sperr-Variablen entfernt). Dieses
+    Muster steht seit QA-53 im Haus; hier wird es uebernommen.
 
     ⚠️ **Das Zeitlimit wird GEMESSEN, nicht gesetzt** — und das in zwei Anlaeufen
     gelernt:
@@ -199,9 +200,18 @@ class LaufUeberlebtEinHaengendesSegmentTest(unittest.TestCase):
             p.write_text(inhalt, encoding="utf-8")
             dateien.append(str(p))
         umgebung = dict(os.environ)
+        # Geerbte Sperr-/Modus-Variablen eines aeusseren Laufs entfernen, sonst
+        # faehrt der innere Runner dessen Betriebsart statt seiner eigenen.
+        for schluessel in _NICHT_ERBEN:
+            umgebung.pop(schluessel, None)
         # Eigenes Ausgabeverzeichnis: sonst raeumt dieser Lauf die Ergebnisse
         # eines aeusseren Gate-Laufs ab (die QA-53-Falle).
         umgebung["LIGHTOS_SEG_OUT"] = str(tmp / "out")
+        # ★ Eigene Show-DB. OHNE diese Zeile erbt der innere Lauf die des
+        # aeusseren, beide Seiten loeschen sie sich beim conftest-Import
+        # gegenseitig weg, und die Segmente sterben mit exit 2 — genau der
+        # Fehler, an dem dieser Test am 01.09. im Volllauf haengenblieb.
+        umgebung["LIGHTOS_SHOW_DB"] = str(tmp / "kind_show.db")
         umgebung["QT_QPA_PLATFORM"] = "offscreen"
         cls._erg = subprocess.run(
             ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
