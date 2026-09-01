@@ -10,7 +10,6 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | XPLAT-27 | B | fix/xplat27-gate-bricht-bei-timeout-ab | 2026-09-01T17:06Z | tools/verify_segmented.ps1,tests/test_xplat27_gate_ueberlebt_timeout.py |
-| ENG-14 | A | fix/eng14-collection-zyklus | 2026-09-01T18:23Z | src/core/engine/collection.py |
 
 ## Blocker & Fallen
 
@@ -40,7 +39,6 @@
 
 ## Verlauf
 
-- 2026-08-26T23:32Z B done OUT-53
 - 2026-08-26T23:44Z B done VIZ-60
 - 2026-08-26T23:45Z B claim TOOL-SPOT90
 - 2026-08-27T00:31Z B done TOOL-SPOT90
@@ -70,3 +68,4 @@
 - 2026-09-01T17:06Z B claim XPLAT-27
 - 2026-09-01T17:20Z A done ENG-16
 - 2026-09-01T18:23Z A claim ENG-14
+- 2026-09-01T18:47Z A done ENG-14
