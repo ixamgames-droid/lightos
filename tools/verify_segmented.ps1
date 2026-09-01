@@ -279,7 +279,34 @@ while ($restQueue.Count -or $webQueue.Count -or $laufend.Count) {
         }
         elseif (((Get-Date) - $rec.Start).TotalSeconds -gt $TimeoutSec) {
             # Prozessbaum beenden - pytest kann Qt-/WebEngine-Kinder haben.
-            & taskkill /PID $rec.Proc.Id /T /F 2>$null | Out-Null
+            #
+            # ★ XPLAT-27: `$ErrorActionPreference` MUSS hier lokal auf 'Continue'.
+            # `taskkill` schreibt auf stderr, sobald ein Kind nicht beendet werden
+            # kann ("FEHLER: Der Prozess mit PID <n> (untergeordnetem Prozess von
+            # PID <m>) konnte nicht beendet werden") - und genau das ist bei einem
+            # haengenden Qt-/WebEngine-Segment der Normalfall, nicht die Ausnahme.
+            # PowerShell 5.1 wertet native stderr-Zeilen unter 'Stop' als
+            # TERMINIERENDEN NativeCommandError; `2>$null` unterdrueckt nur die
+            # Anzeige, nicht den ErrorRecord. Der ganze Gate-Lauf brach damit an
+            # dieser Zeile ab, statt das eine Segment als "zeit" zu zaehlen und
+            # weiterzumachen.
+            #
+            # Gemessen am 01.09.2026 auf `main`: der Lauf endete nach 404 von 646
+            # Segmenten mit Exit 1. Das sah aus wie ein rotes Gate und war ein
+            # abgebrochenes - der Unterschied ist erheblich, denn 242 Dateien
+            # waren schlicht nicht gefahren, und die Bilanz darunter zaehlt nur,
+            # was sie gesehen hat.
+            #
+            # Dieselbe Falle ist in `verify_loop.ps1` (beim `& powershell`-Aufruf
+            # des Lock-Runners) laengst benannt und genauso geloest; hier fehlte
+            # sie noch. Der Timeout selbst ist die Aussage - ob `taskkill` jedes
+            # Kind erwischt, aendert daran nichts.
+            $prevEAP = $ErrorActionPreference
+            $ErrorActionPreference = "Continue"
+            try {
+                & taskkill /PID $rec.Proc.Id /T /F 2>$null | Out-Null
+            }
+            finally { $ErrorActionPreference = $prevEAP }
             Start-Sleep -Milliseconds 300     # taskkill nachlaufen lassen, dann Log lesbar
             Merge-SegmentLog $rec
             Complete-Segment $rec 124 "zeit"
