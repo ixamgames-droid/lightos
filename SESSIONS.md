@@ -10,6 +10,7 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | XPLAT-21 | B | feature/xplat21-mh-einmessen-windows | 2026-09-01T16:14Z | tools/mh_einmessen.py,tests/test_viz60_einmessen.py |
+| ENG-16 | A | fix/eng16-layer-effekt-invert | 2026-09-01T16:45Z | src/core/engine/effect_func.py |
 
 ## Blocker & Fallen
 
@@ -38,7 +39,6 @@
 
 ## Verlauf
 
-- 2026-08-26T19:14Z B done VIZ-59
 - 2026-08-26T20:26Z B claim VIZ-60
 - 2026-08-26T20:42Z B claim UI-55
 - 2026-08-26T22:46Z B claim OUT-53
@@ -68,3 +68,4 @@
 - 2026-09-01T15:45Z A claim NET-11
 - 2026-09-01T16:09Z A done NET-11
 - 2026-09-01T16:14Z B claim XPLAT-21
+- 2026-09-01T16:45Z A claim ENG-16
