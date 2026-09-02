@@ -3307,6 +3307,14 @@ def _stairville_mb5x5_modes_data():
         # 7.6 — 25 Pixel zu je R/G/B/W.
         ("100-Kanal 25 Pixel RGBW", _pixel_rgb_channels(25, white=True),
          _STAIRMB5X5_RASTER),
+        # Steht in KEINEM Manual, ist aber am Geraet vorhanden (siehe
+        # Docstring von `_add_stairville_mb5x5`). Belegung aus den Symptomen
+        # am Rig abgeleitet, noch nicht am Geraet nachgemessen — deshalb
+        # „(ungeprueft)" im Namen, wie beim ZQ06121 bis zur Bestaetigung.
+        ("102-Kanal Dimmer + Strobe + 25 Pixel RGBW (ungeprueft)", [
+            ("Master-Dimmer", "intensity", 255, 255),
+            ("Strobe langsam → schnell", "shutter", 0, 0, _STAIRMB_STROBE),
+        ] + _pixel_rgb_channels(25, white=True), _STAIRMB5X5_RASTER),
     ]
 
 
@@ -3325,17 +3333,33 @@ def _add_stairville_mb5x5(s, mfr):
     war die Muehe wert — er hat gefunden, dass Kanal 8 hier zunaechst ganz ohne
     Band stand (73 statt 74).
 
-    ⚠️ **Es gibt KEINEN 102-Kanal-Modus, auch wenn der Handel das schreibt.**
-    Der Thomann-Beschreibungstext nennt „four, nine, 100 or 102 channels" (dazu
-    27 Auto-Shows und 39 Farbmakros). Nachgesehen: die Spezifikationstabelle
-    DERSELBEN Seite sagt „DMX-512 (4/9/100)", in beiden Manual-Revisionen kommt
-    die Zeichenfolge „102" kein einziges Mal vor, und das Geraetemenue selbst
-    (Abschn. 7.2.2) bietet exakt drei Modi an: „4-CH", „9-CH", „100-CH". Auch
-    die Tabelle der hoechsten DMX-Adresse (509/504/413) kennt nur diese drei.
-    Der Werbetext beschreibt ein anderes Geraet. Das steht hier, damit niemand
-    den Modus „nachtraegt", weil er ihn im Shop gelesen hat — wer ihn dennoch am
-    echten Geraet im Menue findet, hat eine andere Revision und sollte den Chart
-    nachmessen statt ihn zu raten.
+    ★★ **Der 102-Kanal-Modus existiert — am Geraet, nicht im Manual.** Beide
+    Manual-Revisionen (v3 fr, v4 de) kennen nur 4/9/100, das Geraetemenue in
+    Abschn. 7.2.2 ebenso, die Tabelle der hoechsten DMX-Adresse (509/504/413)
+    auch. Ich hatte daraus geschlossen, dass der Thomann-Text („four, nine, 100
+    or 102 channels") ein anderes Geraet beschreibt — **das war falsch.** Das
+    Geraet am Rig (Art. 494410, Typenschild bestaetigt) bietet im Menue
+    „102-CH" an; die Firmware ist offenbar neuer als beide Manuals. Die Lehre:
+    zwei uebereinstimmende Manuals beweisen, was dokumentiert ist — nicht, was
+    das Geraet kann. **Das Geraet ist die Wahrheit, das Manual der Stand.**
+
+    Die Belegung des 102-Kanal-Modus stand nirgends; sie ist aus den Symptomen
+    am Rig abgeleitet (02.09.2026): Geraet auf 102-CH, LightOS auf 100-Kanal
+    gepatcht — **Orange blinkte, Rot wurde Blau, Rot blinkte NICHT.** Das
+    passt auf genau eine Belegung: Kanal 1 Dimmer (Orange/Rot schrieben dort
+    255 → sichtbar), Kanal 2 Strobe (Orange schrieb dort G=105 → blitzt ab 11;
+    Rot schrieb 0 → kein Blitz), danach die 100 Pixelkanaele um zwei versetzt
+    (LightOS' P2.R=255 landete auf P1.B → Blau). Zwei ANGEHAENGTE Kanaele
+    (101/102) haetten weder geblinkt noch verschoben. Der Strobe-Chart ist von
+    Kanal 5 des 9-Kanal-Modus uebernommen (dieselbe Firmware, dieselbe
+    Funktion) — auch das ist Annahme, keine Messung.
+
+    **Deshalb „(ungeprueft)" im Modusnamen**, wie beim ZQ06121 bis zur
+    Bestaetigung. Nachmessen am Geraet: 102-CH einstellen, diesen Modus auf
+    derselben Adresse patchen, Orange waehlen → alle 25 Pixel orange, Master-
+    Dimmer dimmt das ganze Panel, Strobe blitzt erst ab 11. Stimmt das, faellt
+    „(ungeprueft)" per Signatur-Umbenennung (Muster ZQ06121 in
+    `ensure_builtins`).
 
     **Dritte Quelle: das Typenschild am echten Geraet** (Foto vom Rig, 02.09.2026)
     — „LED Matrix Blinder 5x5 RGB WW", „Item no:494410", „Watt:115W",
