@@ -7,6 +7,31 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-02 — Ein Panel landet im Gruppen-Raster in seiner echten Form
+
+#### Verbessert
+
+- **Mehrkopf-Geräte und Pixel-Panels lassen sich mit einem Klick so ins
+  Gruppen-Raster legen, wie sie gebaut sind.** Bisher landeten die Köpfe
+  immer als eine Reihe, und Spalten/Zeilen mussten jedes Mal von Hand
+  nachgestellt werden — obwohl die Form (etwa 4×12 für den LED-Balken, 5×5 für
+  den Matrix-Blinder) längst im Fixture-Profil steht. Nur die 3D-Ansicht hat sie
+  bisher benutzt.
+
+  Neu steht unter *Patchen → Fixture-Gruppen* im Menü von „Köpfe einzeln →
+  Raster ▾" ganz oben **„wie im Gerät hinterlegt (4×12)"** — mit der echten Form
+  in Klammern. Dasselbe im Rechtsklick-Menü einer Zelle unter „aufteilen". Der
+  Punkt erscheint nur, wenn die Form zur Kopfzahl passt; sonst bleibt alles wie
+  bisher.
+
+  Auch der Dialog „Als Block aufteilen" ist jetzt aus dem Gerät vorbelegt. Der
+  bisherige Vorschlag war nicht nur unbequem, sondern zuverlässig falsch: bei
+  48 Zonen schlug er 6 oder 8 Spalten vor, der Balken hat 12.
+
+  Hat ein Gerät keine Form, lässt sie sich im Fixture-Generator im Feld
+  „Raster" eintragen — dann steht sie beim nächsten Mal hier.
+
+
 ### 2026-09-02 — Der Stairville Matrix Blinder 5x5 RGBWW ist jetzt in der Gerätebibliothek
 
 #### Neu
