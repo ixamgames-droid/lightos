@@ -136,6 +136,24 @@ class KanalbelegungTest(_SeededCase):
                         set())
 
 
+class KeinModus102Test(_SeededCase):
+    """Der Thomann-Beschreibungstext nennt „four, nine, 100 or 102 channels".
+
+    Nachgesehen statt geglaubt: die Spezifikationstabelle DERSELBEN Seite sagt
+    „DMX-512 (4/9/100)", in beiden Manual-Revisionen (fr v3, de v4) kommt „102"
+    kein einziges Mal vor, das Geraetemenue bietet drei Modi an, und die Tabelle
+    der hoechsten DMX-Adresse (509/504/413) kennt ebenfalls nur drei. Der Test
+    haelt die Entscheidung fest, damit niemand den Modus aus dem Shop-Text
+    nachtraegt — geraten waere er in jedem Fall.
+    """
+
+    def test_es_gibt_genau_drei_modi_und_keiner_hat_102_kanaele(self):
+        with Session(self._eng) as s:
+            zahlen = sorted(m.channel_count for m in _load(s).modes)
+        self.assertEqual(zahlen, [4, 9, 100])
+        self.assertNotIn(102, zahlen)
+
+
 class PixelReihenfolgeTest(_SeededCase):
     """Der teuerste denkbare Fehler: blockweise statt pro Pixel."""
 
@@ -211,6 +229,17 @@ class BaenderTest(_SeededCase):
         self.assertEqual(nach_name["Show-Programm 1"], (16, 55))
         self.assertEqual(nach_name["Show-Programm 6"], (216, 255))
         self._lueckenlos(rr, "Showkanal")
+
+    def test_showspeed_hat_ein_band_mit_der_bedingung(self):
+        """Kanal 8 stand zunaechst ganz ohne Band da — gefunden beim
+        maschinellen Abgleich gegen das Manual (73 Baender hier, 74 dort). Das
+        Band traegt die Bedingung, die sonst nirgends steht: der Regler tut
+        nichts, solange Kanal 7 unter 16 bleibt."""
+        with Session(self._eng) as s:
+            rr = _ranges(_mode(_load(s), M9), 8)
+        self.assertEqual(len(rr), 1)
+        self.assertEqual((rr[0].range_from, rr[0].range_to), (0, 255))
+        self.assertIn("Kanal 7", rr[0].name)
 
     def test_soundkanal_26_modi(self):
         with Session(self._eng) as s:

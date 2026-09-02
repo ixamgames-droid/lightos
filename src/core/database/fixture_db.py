@@ -3244,6 +3244,15 @@ def _stairmb_zeichen():
     return ranges
 
 
+# Kanal 8: EIN Band ueber den ganzen Bereich. Das Manual fuehrt es ausdruecklich
+# auf, und es traegt die Bedingung, die man sonst nirgends sieht — der Regler
+# tut nichts, solange Kanal 7 unter 16 steht. Aufgefallen ist die Luecke beim
+# maschinellen Abgleich Profil gegen Manual: 73 Baender hier, 74 dort.
+_STAIRMB_SHOWSPEED = [
+    (0, 255, "Geschwindigkeit steigend (wirkt nur bei Kanal 7 ab 16)", ""),
+]
+
+
 def _stairmb_shows():
     """Kanal 7 (9-Kanal-Modus): sechs Show-Programme in 40er-Schritten (Manual 7.5)."""
     ranges = [(0, 15, "Ohne Funktion", "open")]
@@ -3292,7 +3301,7 @@ def _stairville_mb5x5_modes_data():
             ("Strobe langsam → schnell", "shutter", 0, 0, _STAIRMB_STROBE),
             ("Zeichen (Ziffer/Buchstabe)", "macro", 0, 0, _stairmb_zeichen()),
             ("Show-Programm 1-6", "effect", 0, 0, _stairmb_shows()),
-            ("Show-Geschwindigkeit", "effect_speed", 0, 0),
+            ("Show-Geschwindigkeit", "effect_speed", 0, 0, _STAIRMB_SHOWSPEED),
             ("Sound-Modus 1-26", "raw", 0, 0, _stairmb_sound()),
         ]),
         # 7.6 — 25 Pixel zu je R/G/B/W.
@@ -3307,11 +3316,26 @@ def _add_stairville_mb5x5(s, mfr):
     25 × RGBWW-LED zu 10 W in einem 5×5-Raster, 38° Abstrahlwinkel,
     Linsendurchmesser 6,3 cm, 450 × 450 × 115 mm, 10,2 kg.
 
-    Quelle: Hersteller-Manual „Matrix Blinder 5x5 RGBWW" (Abschn. 7.4 4-Kanal,
-    7.5 9-Kanal, 7.6 100-Kanal, 8 Technische Daten). Ein QLC+-Gegenstueck gibt
-    es fuer dieses Geraet nicht — die Baender sind deshalb NICHT gegengeprueft,
-    sondern stammen aus genau einer Quelle. Das steht hier, damit niemand die
-    uebliche Formulierung „kanalweise deckungsgleich" hineinliest.
+    Quellen: Hersteller-Manual „Matrix Blinder 5x5 RGBWW", Abschn. 7.4 (4-Kanal),
+    7.5 (9-Kanal), 7.6 (100-Kanal), 8 (Technische Daten) — in ZWEI unabhaengigen
+    Revisionen: `494410_c_494410_v3_fr` (52 Seiten) und `..._v4_de` (60 Seiten).
+    Ein QLC+-Gegenstueck gibt es fuer dieses Geraet nicht; als Ersatz wurden die
+    beiden Revisionen MASCHINELL gegeneinander und gegen dieses Profil gehalten:
+    alle 74 Bandgrenzen-Paare des 9-Kanal-Modus stimmen ueberein. Der Abgleich
+    war die Muehe wert — er hat gefunden, dass Kanal 8 hier zunaechst ganz ohne
+    Band stand (73 statt 74).
+
+    ⚠️ **Es gibt KEINEN 102-Kanal-Modus, auch wenn der Handel das schreibt.**
+    Der Thomann-Beschreibungstext nennt „four, nine, 100 or 102 channels" (dazu
+    27 Auto-Shows und 39 Farbmakros). Nachgesehen: die Spezifikationstabelle
+    DERSELBEN Seite sagt „DMX-512 (4/9/100)", in beiden Manual-Revisionen kommt
+    die Zeichenfolge „102" kein einziges Mal vor, und das Geraetemenue selbst
+    (Abschn. 7.2.2) bietet exakt drei Modi an: „4-CH", „9-CH", „100-CH". Auch
+    die Tabelle der hoechsten DMX-Adresse (509/504/413) kennt nur diese drei.
+    Der Werbetext beschreibt ein anderes Geraet. Das steht hier, damit niemand
+    den Modus „nachtraegt", weil er ihn im Shop gelesen hat — wer ihn dennoch am
+    echten Geraet im Menue findet, hat eine andere Revision und sollte den Chart
+    nachmessen statt ihn zu raten.
 
     ``power_w=115`` ist die im Manual gemessene Leistungsaufnahme (Abschn. 8).
     25 × 10 W waeren 250 W nominal, und die Produktseite nennt diese Zahl als
