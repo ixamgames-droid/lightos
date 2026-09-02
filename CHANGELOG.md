@@ -39,6 +39,31 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Shop-Seite sagt ebenfalls „DMX-512 (4/9/100)".
 
 
+### 2026-09-02 — Eine Test-Voraussetzung, die am falschen Socket maß
+
+#### Behoben
+
+- **Zwei Tests zum belegten Web-Port fielen auf Windows durch, ohne dort
+  überhaupt etwas zu messen.** Sie hängen seit dem 1. September an einer
+  Voraussetzung statt am Namen des Betriebssystems: Sie laufen nur dort, wo ein
+  zweiter Zugriff auf denselben Port auch wirklich abgewiesen wird. Diese
+  Vorprüfung fragte aber mit anderen Einstellungen nach, als der Webserver sie
+  beim Starten verwendet — und bekam deshalb auf Windows eine andere Antwort als
+  der Server selbst: Die Vorprüfung wurde abgewiesen, der Server kam durch. Die
+  Tests hielten ihre Voraussetzung für erfüllt, liefen los und fielen.
+
+  Die Vorprüfung fragt jetzt genau so nach, wie der Server bindet, und liest die
+  Einstellungen dafür direkt aus ihm aus, statt sie nachzubauen — ändert er sie
+  eines Tages, ändert sich die Prüfung mit. Auf Windows überspringen die beiden
+  Tests damit sauber und mit nachvollziehbarem Grund, auf Linux laufen sie
+  unverändert weiter. Die eigentliche Zusicherung — ein belegter Web-Port
+  beendet LightOS nicht mehr — hält ein dritter Test fest, der auf beiden
+  Systemen läuft; an ihr ändert sich nichts.
+
+  Dazu ein Windows-Gegenstück zum vorhandenen Wächter: Es hält den Grund für das
+  Überspringen als Messung fest, statt ihn anzunehmen. Vorher war der Wächter
+  auf Windows stumm — und genau dort saß der Irrtum.
+
 ### 2026-09-01 — Ein Testlauf, in dem nichts durchläuft, meldet nicht mehr „in Ordnung"
 
 #### Behoben

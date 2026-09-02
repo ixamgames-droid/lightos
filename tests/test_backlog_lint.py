@@ -34,6 +34,11 @@ LANDED = re.compile(r"gelandet", re.IGNORECASE)
 # gruen, wenn das Original zurueckfaellt (genau so blieb die Mutation hier
 # zuerst unentdeckt — Fehlerklasse QA-52).
 LOOKS_LIKE_ITEM = re.compile(r"^\|\s*([^|]+?)\s*\|\s*\**\s*(P[123])\b")
+# QA-18e: dieselbe Signatur, aber MITTEN in der Zeile gesucht — zwei Tabellen-
+# zeilen, die zu einer verschmolzen sind. Die Parser oben koennen das nicht
+# sehen: sie lesen je Zeile, und die zweite ID steht nicht am Zeilenanfang.
+EINGEBETTETER_ZEILENANFANG = re.compile(
+    r"\|\s*([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+[a-z]?)\s*\|\s*\**\s*(P[123])\b")
 
 
 def _rows():
@@ -165,6 +170,35 @@ class BacklogLintTest(unittest.TestCase):
                     bad.append((lineno, line.split("|")[1].strip()))
         self.assertEqual(bad, [], f"Item-Zeile passt nicht aufs ID-Muster "
                                   f"(GROSSBUCHSTABEN/Ziffern, mit Bindestrich): {bad}")
+
+    def test_keine_zwei_items_in_einer_zeile(self):
+        """Zwei Tabellenzeilen, die zu einer verschmolzen sind, sind unsichtbar.
+
+        Real passiert am 2026-09-01 beim Aufloesen eines Konflikts, an dem beide
+        Sitzungen dieselbe Zeile geaendert hatten: die aktualisierte Fassung von
+        XPLAT-24 landete hinten an der XPLAT-23-Zeile (``… wurde. || XPLAT-24 |
+        P2 | …``), die veraltete Fassung blieb daneben als eigene Zeile stehen.
+        Das Item stand damit **zweimal** im Backlog — und die schlechtere der
+        beiden Fassungen war die, die man findet.
+
+        ★ Kein vorhandener Waechter konnte das sehen, ``test_ids_are_unique``
+        eingeschlossen: alle lesen **je Zeile** und finden die zweite ID nicht,
+        weil sie nicht am Zeilenanfang steht. Ein Doppel, das sich vor der
+        Duplikat-Pruefung versteckt, ist schlimmer als ein offenes — deshalb
+        sucht dieser Test dieselbe Signatur mitten in der Zeile.
+        """
+        treffer = []
+        for lineno, id_, _prio, _status, line in _rows_with_line():
+            for m in EINGEBETTETER_ZEILENANFANG.finditer(line):
+                if m.start() == 0:
+                    continue                      # der echte Zeilenanfang
+                treffer.append("BACKLOG.md:%d — %r steckt in der Zeile von %r"
+                               % (lineno, m.group(1), id_))
+        self.assertEqual(
+            [], treffer,
+            "Zwei Items in einer Tabellenzeile — das hintere findet kein "
+            "ID-Werkzeug und keine Duplikat-Pruefung:" + "".join(
+                chr(10) + t for t in treffer))
 
     def test_ids_are_unique(self):
         """QA-18c: eine ID darf nur EIN Item bezeichnen.
