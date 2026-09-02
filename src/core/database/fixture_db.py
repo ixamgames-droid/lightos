@@ -2881,7 +2881,7 @@ def _matrix_panel_modes_data():
 #   248-255 ohne Funktion) — eigene Konstante statt „sieht gleich aus".
 #   Die Dimmerkurven-Baender sind dagegen nachweislich identisch → geteilt.
 
-def _pixel_rgb_channels(count: int):
+def _pixel_rgb_channels(count: int, white: bool = False):
     """``count`` Pixel als je [Rot, Gruen, Blau], in der Kanalreihenfolge des
     Geraets (Pixel 1 R/G/B, Pixel 2 R/G/B, …).
 
@@ -2904,12 +2904,21 @@ def _pixel_rgb_channels(count: int):
     `buildMatrixPanel` im 3D aufbaut. Fuer das Stairville-Panel dokumentiert das
     Manual ueberhaupt keine Anordnung. Ein „Z2/S1" im Kanalnamen waere also eine
     Behauptung, die im Werkszustand schlicht falsch ist — die Kanalzuordnung
-    (Kanal 13-15 = Pixel 5) bleibt davon unberuehrt und ist korrekt."""
+    (Kanal 13-15 = Pixel 5) bleibt davon unberuehrt und ist korrekt.
+
+    ``white=True`` haengt je Pixel einen vierten Kanal ``color_w`` an (RGBW-
+    Panels wie der Stairville Matrix Blinder 5x5). Die attr#N-Konvention zaehlt
+    jedes Attribut fuer sich, das N-te ``color_w`` gehoert also zum N-ten
+    ``color_r`` — die beiden Raster fallen zusammen, anders als beim ZQ06121,
+    dessen Weiss-Segmente auf einer EIGENEN Leiste sitzen (CDX-52). Default
+    ``False``: alle Bestandsaufrufer bleiben byte-identisch."""
     channels = []
     for i in range(count):
         channels.append((f"P{i + 1} Rot",  "color_r", 0, 255))
         channels.append((f"P{i + 1} Grün", "color_g", 0, 255))
         channels.append((f"P{i + 1} Blau", "color_b", 0, 255))
+        if white:
+            channels.append((f"P{i + 1} Weiß", "color_w", 0, 255))
     return channels
 
 
@@ -3205,6 +3214,134 @@ def _stairville_pp144_modes_data():
     ]
 
 
+# ── Stairville Matrix Blinder 5x5 RGBWW (Thomann Art. 494410) ────────────────
+# Die drei Effekt-Kanaele des 9-Kanal-Modus tragen 37, 7 und 27 Baender. Als
+# Generatoren und nicht als handgeschriebene Tabellen: die Raster sind im Manual
+# gleichmaessig (6er-, 40er-, 9er-Schritte), und 71 von Hand getippte Grenzwerte
+# waeren eine Fehlerquelle ohne jeden Gegenwert.
+
+_STAIRMB_STROBE = [
+    (0,  10,  "Aus (kein Strobe)",        "open"),
+    (11, 255, "Strobe langsam → schnell", "strobe"),
+]
+
+
+def _stairmb_zeichen():
+    """Kanal 6 (9-Kanal-Modus): Ziffern 0-9 und Buchstaben A-Z — Manual 7.5.
+
+    Gleichmaessiges 6er-Raster ab 16: erst die zehn Ziffern (16-75), dann die
+    26 Buchstaben (76-255). Das letzte Band ist laut Chart breiter (226…255) —
+    76 + 26*6 = 232 liesse sonst 23 Werte unbelegt.
+    """
+    ranges = [(0, 15, "Ohne Funktion", "open")]
+    for i in range(10):
+        lo = 16 + i * 6
+        ranges.append((lo, lo + 5, f"Ziffer {i}", ""))
+    for i in range(26):
+        lo = 76 + i * 6
+        ranges.append((lo, 255 if i == 25 else lo + 5,
+                       f"Buchstabe {chr(ord('A') + i)}", ""))
+    return ranges
+
+
+def _stairmb_shows():
+    """Kanal 7 (9-Kanal-Modus): sechs Show-Programme in 40er-Schritten (Manual 7.5)."""
+    ranges = [(0, 15, "Ohne Funktion", "open")]
+    for i in range(6):
+        lo = 16 + i * 40
+        ranges.append((lo, lo + 39, f"Show-Programm {i + 1}", ""))
+    return ranges
+
+
+def _stairmb_sound():
+    """Kanal 9 (9-Kanal-Modus): 26 Sound-Modi in 9er-Schritten (Manual 7.5).
+
+    Auch hier ist das letzte Band breiter (241…255) als das Raster hergaebe.
+    """
+    ranges = [(0, 15, "Ohne Funktion", "open")]
+    for i in range(26):
+        lo = 16 + i * 9
+        ranges.append((lo, 255 if i == 25 else lo + 8,
+                       f"Sound-Modus {i + 1}", "sound"))
+    return ranges
+
+
+# VIZ-50a: die Rasterform steht im Manual (Abschn. 7.6) ALS BILD — 5x5,
+# zeilenweise von links oben. Siehe `_add_stairville_mb5x5`.
+_STAIRMB5X5_RASTER = (5, 5)
+
+
+def _stairville_mb5x5_modes_data():
+    """Modi als reine Daten (Beschreibung: `_add_stairville_mb5x5`) — getrennt
+    gefuehrt, damit `ensure_builtins` die Rasterform in einer bereits befuellten
+    DB nachziehen kann (VIZ-50a)."""
+    return [
+        # 7.4 — das ganze Panel auf einmal, ohne Effekte.
+        ("4-Kanal Panel gesamt", [
+            ("Rot",  "color_r", 0, 255),
+            ("Grün", "color_g", 0, 255),
+            ("Blau", "color_b", 0, 255),
+            ("Weiß", "color_w", 0, 255),
+        ]),
+        # 7.5 — dasselbe plus Strobe, Zeichen, Show, Speed, Sound.
+        ("9-Kanal Panel gesamt + Effekte", [
+            ("Rot",  "color_r", 0, 255),
+            ("Grün", "color_g", 0, 255),
+            ("Blau", "color_b", 0, 255),
+            ("Weiß", "color_w", 0, 255),
+            ("Strobe langsam → schnell", "shutter", 0, 0, _STAIRMB_STROBE),
+            ("Zeichen (Ziffer/Buchstabe)", "macro", 0, 0, _stairmb_zeichen()),
+            ("Show-Programm 1-6", "effect", 0, 0, _stairmb_shows()),
+            ("Show-Geschwindigkeit", "effect_speed", 0, 0),
+            ("Sound-Modus 1-26", "raw", 0, 0, _stairmb_sound()),
+        ]),
+        # 7.6 — 25 Pixel zu je R/G/B/W.
+        ("100-Kanal 25 Pixel RGBW", _pixel_rgb_channels(25, white=True),
+         _STAIRMB5X5_RASTER),
+    ]
+
+
+def _add_stairville_mb5x5(s, mfr):
+    """Stairville Matrix Blinder 5x5 RGBWW (Thomann Art. 494410).
+
+    25 × RGBWW-LED zu 10 W in einem 5×5-Raster, 38° Abstrahlwinkel,
+    Linsendurchmesser 6,3 cm, 450 × 450 × 115 mm, 10,2 kg.
+
+    Quelle: Hersteller-Manual „Matrix Blinder 5x5 RGBWW" (Abschn. 7.4 4-Kanal,
+    7.5 9-Kanal, 7.6 100-Kanal, 8 Technische Daten). Ein QLC+-Gegenstueck gibt
+    es fuer dieses Geraet nicht — die Baender sind deshalb NICHT gegengeprueft,
+    sondern stammen aus genau einer Quelle. Das steht hier, damit niemand die
+    uebliche Formulierung „kanalweise deckungsgleich" hineinliest.
+
+    ``power_w=115`` ist die im Manual gemessene Leistungsaufnahme (Abschn. 8).
+    25 × 10 W waeren 250 W nominal, und die Produktseite nennt diese Zahl als
+    Maximum — fuer die Verbrauchsanzeige ist der Manual-Wert der ehrlichere.
+
+    ★ **Die Pixelnummerierung ist ZEILENWEISE und im Manual ABGEBILDET**
+    (Abschn. 7.6): 1-5 obere Reihe, 6-10 die zweite, … 21-25 die untere. Damit
+    ist dieses Panel der erste Fall, in dem die Geraetereihenfolge OHNE
+    Geraete-Einstellung mit dem Raster zusammenfaellt, das `buildMatrixPanel`
+    zeilenweise aufbaut: eine waagerechte Lauflicht-Figur laeuft am echten
+    Geraet auch waagerecht. Zum Vergleich — die ADJ Dotz Matrix nummeriert im
+    Werkszustand in Schlangenlinien (erst „Flip 4" richtet sie zeilenweise aus),
+    und beim Pixel Panel 144 sagt das Manual ueberhaupt nichts dazu.
+
+    ⚠️ **Das Geraet hat in KEINEM Modus einen Master-Dimmer.** Helligkeit kommt
+    ausschliesslich aus den Farbwerten. Ein Effekt, der nur den Dimmer treibt,
+    laesst dieses Panel dunkel — dieselbe Klasse wie RIG-DUNKEL, nur hier von
+    vornherein dokumentiert statt am Rig entdeckt.
+
+    Die Kanaele 6/7/9 tragen bewusst DREI VERSCHIEDENE Attribute (`macro`,
+    `effect`, `raw`) statt dreimal `macro`: die attr#N-Konvention liest ein
+    wiederholtes Attribut als Kopf 1..n (ENG-03/07/09-Falle), der Programmer
+    deduplizierte die drei sonst zu EINEM Regler. Kanal 8 ist `effect_speed`
+    und nicht `speed`, weil die Geschwindigkeit zum Show-Kanal 7 gehoert und
+    nicht zum Geraet.
+    """
+    _add_fixture(s, mfr, "Matrix Blinder 5x5 RGBWW", "STAIRMB5X5", "matrix", 115,
+                 _stairville_mb5x5_modes_data())
+
+
 def _get_or_create_mfr(s, name, short):
     m = s.execute(
         select(Manufacturer).where(Manufacturer.short_name == short)
@@ -3445,6 +3582,9 @@ def ensure_builtins():
         if "STAIRPP144" not in have:                      # FM-13 Slice 2: reale Panels
             _add_stairville_pp144(s, _get_or_create_mfr(s, "Stairville", "STAIR"))
             changed = True
+        if "STAIRMB5X5" not in have:                      # Robins Blinder (2026-09-02)
+            _add_stairville_mb5x5(s, _get_or_create_mfr(s, "Stairville", "STAIR"))
+            changed = True
         if "ZQ06121" not in have:                         # Davids LED-Balken (2026-08-05)
             _add_uking_zq06121(s, _get_or_create_mfr(s, "U King", "UKING"))
             changed = True
@@ -3518,6 +3658,7 @@ def ensure_builtins():
         for _kurz, _daten in (("MATRIXPANEL", _matrix_panel_modes_data()),
                               ("DOTZMATRIX", _dotz_matrix_modes_data()),
                               ("STAIRPP144", _stairville_pp144_modes_data()),
+                              ("STAIRMB5X5", _stairville_mb5x5_modes_data()),
                               ("ZQ06121", _zq06121_modes_data())):
             if _ensure_panel_geometrie(s, _kurz, _daten):
                 changed = True
@@ -3785,6 +3926,8 @@ def _seed(s: Session):
     # FM-13 Slice 2: benannte reale Panels (Hersteller sind oben schon angelegt).
     _add_adj_dotz_matrix(s, adj)
     _add_stairville_pp144(s, stairville)
+    # Robins Matrix-Blinder (2026-09-02) — 5x5 RGBWW, Thomann Art. 494410.
+    _add_stairville_mb5x5(s, stairville)
     # ★ Davids LED-Balken stand zunaechst NUR im Backfill von `ensure_builtins`
     # und fehlte hier. Sichtbar geworden ist das erst durch den Profil-Test:
     # `frische_library` seedet ueber genau diese Funktion, das Profil war dort
