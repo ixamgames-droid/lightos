@@ -11,6 +11,7 @@
 |---|---|---|---|---|
 | ENG-15 | A | fix/eng15-schwarzer-pixel-farbrad | 2026-09-02T15:04Z | src/core/engine/rgb_matrix.py |
 | XPLAT-23 | B | feature/xplat23-windows-gate-am-verhalten | 2026-09-02T19:45Z | tools/verify_segmented.ps1 · tools/verify_loop.ps1 · tests/test_gate_runner_parity.py |
+| FM-40 | A | feature/fm40-raster-aus-dem-fixture | 2026-09-02T20:25Z | src/ui/views/fixture_group_view.py |
 
 ## Blocker & Fallen
 
@@ -54,7 +55,6 @@
 
 ## Verlauf
 
-- 2026-08-31T20:16Z A done UI-57
 - 2026-08-31T20:17Z A claim DOC-10
 - 2026-08-31T20:47Z A uebergeben DOC-10
 - 2026-08-31T20:58Z A claim STAB-23
@@ -84,3 +84,4 @@
 - 2026-09-02T15:28Z B claim XPLAT-30
 - 2026-09-02T16:08Z B done XPLAT-30
 - 2026-09-02T19:45Z B claim XPLAT-23
+- 2026-09-02T20:25Z A claim FM-40
