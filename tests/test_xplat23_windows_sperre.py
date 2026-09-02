@@ -104,6 +104,41 @@ class SperrPfadTest(unittest.TestCase):
             "die Sperrdatei haengt nicht am gemeinsamen Git-Verzeichnis — ein "
             "verschachtelter Worktree bekaeme damit eine eigene Sperre (PROC-02b)")
 
+    def test_ein_unbrauchbarer_sperrpfad_bricht_ab_statt_zu_warten(self):
+        """★★ Regression aus der Review-Runde zu diesem PR — der teuerste Fehler
+        der ersten Fassung.
+
+        Sie fing ``[System.IO.IOException]`` und wartete dann. Aber
+        ``DirectoryNotFoundException`` **erbt** von ``IOException`` (gemessen:
+        ``HResult 0x80070003``). Ein ``LIGHTOS_LOCKFILE`` mit vertipptem Ordner
+        lief damit nicht in einen Fehler, sondern in eine **Endlosschleife** —
+        und meldete dabei „eine andere Sitzung faehrt gerade die volle Suite".
+
+        Das ist die schlimmere Sorte Fehler: keine fehlende Diagnose, sondern
+        eine falsche. Man sucht die andere Sitzung, die es nicht gibt, waehrend
+        das Gate steht. Gemessen vor dem Fix: nach 45 s hing der Lauf noch.
+
+        Gewartet wird jetzt nur noch bei einer echten Belegung (Win32 32/33).
+        """
+        with tempfile.TemporaryDirectory(prefix="lightos_xplat23_") as tmp:
+            pfad = Path(tmp) / "gibt_es_nicht" / "probe.lock"
+            rc, ausgabe, dauer = _lauf(
+                umgebung_extra={"LIGHTOS_VERIFY_DRYRUN": "1",
+                                "LIGHTOS_LOCKFILE": str(pfad)},
+                timeout=90)
+        self.assertNotEqual(0, rc,
+                            "ein unbrauchbarer Sperrpfad ist durchgegangen:\n"
+                            + ausgabe[-800:])
+        self.assertNotIn(
+            "faehrt gerade die volle Suite", ausgabe,
+            "der Lauf meldet eine fremde Sitzung, obwohl der Pfad kaputt ist — "
+            "das ist die FALSCHE Diagnose, gegen die dieser Test steht:\n"
+            + ausgabe[-800:])
+        self.assertIn("nicht benutzbar", ausgabe, ausgabe[-800:])
+        self.assertLess(dauer, 60,
+                        f"der Lauf brauchte {dauer:.1f}s — er wartet wieder, "
+                        "statt den kaputten Pfad zu melden")
+
     def test_der_dryrun_meldet_ausdruecklich_dass_er_nichts_geprueft_hat(self):
         """★ Ein Schalter, der das Gate zum No-Op macht, muss das SAGEN.
 

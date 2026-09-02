@@ -81,12 +81,17 @@ $runner = Join-Path $outer "run_tests.ps1"
 function Get-SperrPfad {
     if ($env:LIGHTOS_LOCKFILE) { return $env:LIGHTOS_LOCKFILE }
     $common = $null
+    # PowerShell 5.1 macht aus einer stderr-Zeile eines NATIVEN Programms einen
+    # NativeCommandError - unter "Stop" ist der terminierend. `git` schreibt
+    # ausserhalb eines Repos genau dorthin. Das lokale "Continue" muss deshalb
+    # im finally zurueck, sonst laeuft der REST des Gates mit veraenderter
+    # Fehlerbehandlung weiter, wenn der Aufruf wirft.
+    $prevEAP = $ErrorActionPreference
     try {
-        $prevEAP = $ErrorActionPreference
         $ErrorActionPreference = "Continue"
         $common = (& git -C $repo rev-parse --git-common-dir 2>$null | Select-Object -First 1)
-        $ErrorActionPreference = $prevEAP
     } catch { $common = $null }
+    finally { $ErrorActionPreference = $prevEAP }
     if ($common) {
         $common = $common.Trim()
         if (-not [System.IO.Path]::IsPathRooted($common)) { $common = Join-Path $repo $common }
@@ -99,10 +104,17 @@ function Get-SperrPfad {
 $script:sperrPfad   = Get-SperrPfad
 $script:sperrHandle = $null
 
+# ERROR_SHARING_VIOLATION (32) und ERROR_LOCK_VIOLATION (33) - die einzigen
+# beiden Faelle, in denen Warten sinnvoll ist. Alles andere ist ein kaputter
+# Pfad, kein belegter.
+$script:SPERR_BELEGT = @(32, 33)
+
 function Enter-Sperre {
     if ($TestArgs)                  { return }   # gezielter Lauf: keine Sperre
     if ($env:LIGHTOS_VERIFY_NOLOCK) { return }
     $gemeldet = $false
+    $beginn   = [datetime]::UtcNow
+    $gemerkt  = 0
     while ($true) {
         try {
             $script:sperrHandle = [System.IO.File]::Open(
@@ -114,15 +126,42 @@ function Enter-Sperre {
             return
         }
         catch [System.IO.IOException] {
+            # ⚠ Hier stand zuerst nur `catch [System.IO.IOException]` und sonst
+            # nichts - und das war ein Fehler mit genau der Wirkung, gegen die
+            # dieses Gate gebaut ist. DirectoryNotFoundException ERBT von
+            # IOException (gemessen: HResult 0x80070003). Ein LIGHTOS_LOCKFILE
+            # mit vertipptem Ordner lief damit nicht in einen Fehler, sondern in
+            # eine ENDLOSSCHLEIFE - und meldete dabei "eine andere Sitzung
+            # faehrt gerade die volle Suite". Das ist keine fehlende Diagnose,
+            # das ist eine falsche: man sucht die andere Sitzung, die es nicht
+            # gibt. Gemessen am 02.09.2026: der Lauf haing nach 45 s noch.
+            $fehler = $_.Exception
+            while ($fehler.InnerException) { $fehler = $fehler.InnerException }
+            $win32 = $fehler.HResult -band 0xFFFF
+            if ($script:SPERR_BELEGT -notcontains $win32) {
+                Write-Host "[verify] FEHLER: Sperrdatei nicht benutzbar: $script:sperrPfad" -ForegroundColor Red
+                Write-Host ("[verify]        {0} (Win32 {1}): {2}" -f `
+                            $fehler.GetType().Name, $win32, $fehler.Message) -ForegroundColor Red
+                Write-Host "[verify]        Pfad pruefen (LIGHTOS_LOCKFILE?) - hier wird NICHT gewartet." -ForegroundColor Red
+                exit 2
+            }
             if (-not $gemeldet) {
                 Write-Host "[verify] Eine andere Sitzung faehrt gerade die volle Suite - warte ..."
                 $gemeldet = $true
+            }
+            # Ein Volllauf dauert eine Viertelstunde; das Warten ist also normal.
+            # Stumm darf es trotzdem nicht sein - sonst ist ein haengendes Gate
+            # von einem wartenden nicht zu unterscheiden.
+            $verstrichen = [int]([datetime]::UtcNow - $beginn).TotalSeconds
+            if ($verstrichen -ge $gemerkt + 60) {
+                $gemerkt = $verstrichen - ($verstrichen % 60)
+                Write-Host ("[verify] ... warte weiter auf die Sperre ({0} s): {1}" -f `
+                            $gemerkt, $script:sperrPfad)
             }
             Start-Sleep -Milliseconds 200
         }
     }
 }
-
 function Exit-Sperre {
     if ($script:sperrHandle) {
         $script:sperrHandle.Close()
