@@ -689,7 +689,8 @@ class NurLokaleGeraeteTest(unittest.TestCase):
         Gemessen am 22.08.2026 auf diesem Rechner (lesend, per sqlite3
         ``mode=ro``): die abgelegte Bibliothek haelt **1790 Profile**, davon 49
         mit ``source='builtin'`` — **1741 tragen einen Kurznamen, den kein
-        Builtin traegt**. Der Quelltext-Seed liefert **48**. Faellt die frische
+        Builtin traegt**. Der Quelltext-Seed liefert **49** (Stand 02.09.2026;
+        die 1790/1741 sind die Messung vom 22.08.2026 und wandern mit). Faellt die frische
         Library weg und der Waechter fragt die abgelegte Datei, winkt er genau
         den Fall durch, den er fangen soll: ``'Speider'`` steht dort
         (``source='qlcplus'``, Anzeige- UND Kurzname).
@@ -701,7 +702,11 @@ class NurLokaleGeraeteTest(unittest.TestCase):
         from src.core.database.models import FixtureProfile
         with Session(self.eng) as s:
             alle = [r[0] for r in s.execute(select(FixtureProfile.short_name))]
-        self.assertEqual(48, len(alle), f"Builtin-Zahl geaendert: {sorted(alle)}")
+        # Die Zahl ist ein STOLPERDRAHT, kein Selbstzweck: sie faellt um, sobald
+        # jemand ein Builtin hinzufuegt oder entfernt, und zwingt zu der Frage,
+        # ob der Waechter noch die frische Bibliothek misst. 48 -> 49 am
+        # 02.09.2026 durch STAIRMB5X5 (Stairville Matrix Blinder 5x5 RGBWW).
+        self.assertEqual(49, len(alle), f"Builtin-Zahl geaendert: {sorted(alle)}")
         self.assertTrue(self.kennt_kurznamen("SPIDER14"))
         self.assertFalse(self.kennt_kurznamen("Speider"),
                          "'Speider' steht in der frischen Bibliothek — dann "

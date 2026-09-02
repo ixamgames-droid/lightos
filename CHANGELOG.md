@@ -7,6 +7,37 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-02 — Der Stairville Matrix Blinder 5x5 RGBWW ist jetzt in der Gerätebibliothek
+
+#### Neu
+
+- **Stairville Matrix Blinder 5x5 RGBWW** (Thomann Art. 494410) lässt sich
+  patchen, ohne ihn von Hand anzulegen: 25 RGBWW-LEDs zu 10 W in einem
+  5×5-Raster, mit allen drei Betriebsarten des Geräts — 4 Kanäle (das ganze
+  Panel auf einmal), 9 Kanäle (dasselbe plus Strobe, Zeichenanzeige, sechs
+  Show-Programme, Tempo und 26 Sound-Modi) und 100 Kanäle (jeder der 25 Pixel
+  einzeln in Rot/Grün/Blau/Weiß).
+
+  Die Buchstaben- und Ziffernanzeige des Geräts steht als benannte Auswahl im
+  Kanal, statt als nackte Zahl: „Buchstabe A" ist ablesbar, `76` nicht.
+  Dasselbe für die Show-Programme und die Sound-Modi.
+
+  **Das Raster stimmt ohne Nacharbeit.** Das Handbuch bildet die
+  Pixelnummerierung ab — zeilenweise von links oben, 1-5 obere Reihe bis 21-25
+  untere. Damit läuft eine waagerechte Lauflicht-Figur am echten Gerät auch
+  waagerecht, und die 3D-Ansicht zeigt dieselbe Anordnung. Bei der ADJ Dotz
+  Matrix ist das anders: die nummeriert ab Werk in Schlangenlinien und braucht
+  am Gerät die Einstellung „Flip 4".
+
+  **Zu beachten am Rig:** dieses Gerät hat in keiner Betriebsart einen
+  Master-Dimmer — die Helligkeit kommt ausschließlich aus den Farbwerten. Ein
+  Effekt, der nur den Dimmer bewegt, lässt das Panel dunkel.
+
+  **Und einen 102-Kanal-Modus gibt es nicht**, auch wenn die Produktbeschreibung
+  im Handel ihn nennt: das Gerätemenü bietet „4-CH", „9-CH" und „100-CH" an,
+  beide Handbuch-Ausgaben kennen nur diese drei, und die Datentabelle derselben
+  Shop-Seite sagt ebenfalls „DMX-512 (4/9/100)".
+
 ### 2026-09-02 — Auf Windows sind zwei gleichzeitige Testläufe nicht mehr sich selbst überlassen
 
 #### Behoben
@@ -32,6 +63,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   sehen auch Arbeitskopien, die *innerhalb* des Projekts liegen, dieselbe Sperre
   — vorher hätte jede ihre eigene bekommen, und die Absicherung hätte
   ausgerechnet dort nicht gegriffen, wo wirklich parallel gearbeitet wird.
+
 
 ### 2026-09-02 — Eine Test-Voraussetzung, die am falschen Socket maß
 
