@@ -38,6 +38,32 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   beide Handbuch-Ausgaben kennen nur diese drei, und die Datentabelle derselben
   Shop-Seite sagt ebenfalls „DMX-512 (4/9/100)".
 
+### 2026-09-02 — Auf Windows sind zwei gleichzeitige Testläufe nicht mehr sich selbst überlassen
+
+#### Behoben
+
+- **Die volle Testsuite konnte auf Windows zweimal gleichzeitig laufen.** Wer das
+  Gate startet, während in einer anderen Sitzung schon eines läuft, bekam bisher
+  keinen Hinweis und keine Warteschlange — beide Läufe teilten sich Grafikkarte,
+  Testdatenbank und Prozesstabelle. Das Ergebnis sind rote Abschnitte, die dem
+  jeweils anderen Lauf gehören; man sucht den Fehler dann in eigenem Code, der
+  keinen hat.
+
+  Auf Linux gibt es die Absicherung seit August. Auf Windows lag sie in einer
+  Datei **außerhalb** des Projekts — auf dem Entwicklungsrechner vorhanden, in
+  einer frischen Kopie des Projekts nicht. Genau dort fuhr die volle Suite also
+  ungebremst.
+
+  Das Gate bringt die Sperre jetzt selbst mit: der zweite Lauf meldet, dass
+  gerade ein anderer läuft, wartet und startet danach. **Gezielte Einzelläufe
+  bleiben unverändert schnell** — sie sind kurz, und sie zu serialisieren würde
+  nur bremsen.
+
+  Die Sperre hängt am gemeinsamen Git-Verzeichnis statt am Ordner daneben. Damit
+  sehen auch Arbeitskopien, die *innerhalb* des Projekts liegen, dieselbe Sperre
+  — vorher hätte jede ihre eigene bekommen, und die Absicherung hätte
+  ausgerechnet dort nicht gegriffen, wo wirklich parallel gearbeitet wird.
+
 
 ### 2026-09-02 — Eine Test-Voraussetzung, die am falschen Socket maß
 
