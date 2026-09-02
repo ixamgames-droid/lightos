@@ -11,6 +11,7 @@
 |---|---|---|---|---|
 | ENG-15 | A | fix/eng15-schwarzer-pixel-farbrad | 2026-09-02T15:04Z | src/core/engine/rgb_matrix.py |
 | FM-40 | A | feature/fm40-raster-aus-dem-fixture | 2026-09-02T20:25Z | src/ui/views/fixture_group_view.py |
+| XPLAT-29 | B | fix/xplat29a-aufraeumen-stirbt-nicht | 2026-09-02T21:08Z | tools/verify_segmented.ps1 |
 
 ## Blocker & Fallen
 
@@ -57,7 +58,6 @@
 
 ## Verlauf
 
-- 2026-08-31T20:47Z A uebergeben DOC-10
 - 2026-08-31T20:58Z A claim STAB-23
 - 2026-08-31T21:03Z B uebergeben QA-69
 - 2026-08-31T21:11Z A uebergeben STAB-23
@@ -87,3 +87,4 @@
 - 2026-09-02T19:45Z B claim XPLAT-23
 - 2026-09-02T20:25Z A claim FM-40
 - 2026-09-02T21:05Z B uebergeben XPLAT-23
+- 2026-09-02T21:08Z B claim XPLAT-29
