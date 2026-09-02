@@ -3337,6 +3337,13 @@ def _add_stairville_mb5x5(s, mfr):
     echten Geraet im Menue findet, hat eine andere Revision und sollte den Chart
     nachmessen statt ihn zu raten.
 
+    **Dritte Quelle: das Typenschild am echten Geraet** (Foto vom Rig, 02.09.2026)
+    — „LED Matrix Blinder 5x5 RGB WW", „Item no:494410", „Watt:115W",
+    „LED:5x5 RGB WW". Damit sind Modell, Artikelnummer, Leistungsaufnahme und
+    Bestueckung am Geraet selbst bestaetigt. Das Geraet hat ausserdem ArtNet 1/2
+    (RJ45) neben DMX In/Out — ob LightOS' ArtNet-Ausgabe damit zusammenspielt,
+    ist NICHT geprueft.
+
     ``power_w=115`` ist die im Manual gemessene Leistungsaufnahme (Abschn. 8).
     25 × 10 W waeren 250 W nominal, und die Produktseite nennt diese Zahl als
     Maximum — fuer die Verbrauchsanzeige ist der Manual-Wert der ehrlichere.
