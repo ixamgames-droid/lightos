@@ -33,6 +33,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Master-Dimmer — die Helligkeit kommt ausschließlich aus den Farbwerten. Ein
   Effekt, der nur den Dimmer bewegt, lässt das Panel dunkel.
 
+  **Und einen 102-Kanal-Modus gibt es nicht**, auch wenn die Produktbeschreibung
+  im Handel ihn nennt: das Gerätemenü bietet „4-CH", „9-CH" und „100-CH" an,
+  beide Handbuch-Ausgaben kennen nur diese drei, und die Datentabelle derselben
+  Shop-Seite sagt ebenfalls „DMX-512 (4/9/100)".
+
 
 ### 2026-09-01 — Ein Testlauf, in dem nichts durchläuft, meldet nicht mehr „in Ordnung"
 
