@@ -10,7 +10,6 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | ENG-15 | A | fix/eng15-schwarzer-pixel-farbrad | 2026-09-02T15:04Z | src/core/engine/rgb_matrix.py |
-| XPLAT-30 | B | fix/xplat30-sonde-spiegelt-werkzeug | 2026-09-02T15:28Z | tests/test_net11_web_port_belegt.py |
 
 ## Blocker & Fallen
 
@@ -52,7 +51,6 @@
 
 ## Verlauf
 
-- 2026-08-31T20:02Z B done XPLAT-20
 - 2026-08-31T20:02Z B claim QA-69
 - 2026-08-31T20:16Z A done UI-57
 - 2026-08-31T20:17Z A claim DOC-10
@@ -82,3 +80,4 @@
 - 2026-09-01T21:06Z B done XPLAT-31
 - 2026-09-02T15:04Z A claim ENG-15
 - 2026-09-02T15:28Z B claim XPLAT-30
+- 2026-09-02T16:08Z B done XPLAT-30
