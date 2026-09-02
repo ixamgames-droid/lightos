@@ -109,9 +109,27 @@ $script:sperrHandle = $null
 # Pfad, kein belegter.
 $script:SPERR_BELEGT = @(32, 33)
 
+function Melde-SperreUnbrauchbar($fehler) {
+    while ($fehler.InnerException) { $fehler = $fehler.InnerException }
+    Write-Host "[verify] FEHLER: Sperrdatei nicht benutzbar: $script:sperrPfad" -ForegroundColor Red
+    Write-Host ("[verify]        {0} (Win32 {1}): {2}" -f `
+                $fehler.GetType().Name, ($fehler.HResult -band 0xFFFF), $fehler.Message) -ForegroundColor Red
+    Write-Host "[verify]        Pfad pruefen (LIGHTOS_LOCKFILE?) - hier wird NICHT gewartet." -ForegroundColor Red
+    exit 2
+}
+
 function Enter-Sperre {
-    if ($TestArgs)                  { return }   # gezielter Lauf: keine Sperre
-    if ($env:LIGHTOS_VERIFY_NOLOCK) { return }
+    if ($TestArgs) { return }                    # gezielter Lauf: keine Sperre
+    if ($env:LIGHTOS_VERIFY_NOLOCK) {
+        # Ein Volllauf OHNE Sperre ist am Exit-Code nicht von einem gesperrten
+        # zu unterscheiden. Er muss es also sagen - sonst haelt jemand ein
+        # gruenes Ergebnis fuer eines, das die Serialisierung hatte.
+        Write-Host "[verify] Hinweis: LIGHTOS_VERIFY_NOLOCK gesetzt - die volle Suite laeuft UNGESPERRT."
+        return
+    }
+    if ($env:LIGHTOS_LOCKFILE) {
+        Write-Host "[verify] Hinweis: Sperrdatei per LIGHTOS_LOCKFILE umgelenkt: $script:sperrPfad"
+    }
     $gemeldet = $false
     $beginn   = [datetime]::UtcNow
     $gemerkt  = 0
@@ -124,6 +142,13 @@ function Enter-Sperre {
                 [System.IO.FileShare]::None)
             if ($gemeldet) { Write-Host "[verify] Sperre frei, starte." }
             return
+        }
+        catch [System.UnauthorizedAccessException] {
+            # Erbt NICHT von IOException (gemessen, Win32 5) und flog deshalb
+            # ungefangen aus dem Skript - Enter-Sperre steht ausserhalb des
+            # try/finally, der Aufrufer sah einen rohen Fehlerdump statt einer
+            # Diagnose. Realer Fall: der Sperrpfad zeigt auf einen ORDNER.
+            Melde-SperreUnbrauchbar $_.Exception
         }
         catch [System.IO.IOException] {
             # ⚠ Hier stand zuerst nur `catch [System.IO.IOException]` und sonst
@@ -138,13 +163,7 @@ function Enter-Sperre {
             $fehler = $_.Exception
             while ($fehler.InnerException) { $fehler = $fehler.InnerException }
             $win32 = $fehler.HResult -band 0xFFFF
-            if ($script:SPERR_BELEGT -notcontains $win32) {
-                Write-Host "[verify] FEHLER: Sperrdatei nicht benutzbar: $script:sperrPfad" -ForegroundColor Red
-                Write-Host ("[verify]        {0} (Win32 {1}): {2}" -f `
-                            $fehler.GetType().Name, $win32, $fehler.Message) -ForegroundColor Red
-                Write-Host "[verify]        Pfad pruefen (LIGHTOS_LOCKFILE?) - hier wird NICHT gewartet." -ForegroundColor Red
-                exit 2
-            }
+            if ($script:SPERR_BELEGT -notcontains $win32) { Melde-SperreUnbrauchbar $fehler }
             if (-not $gemeldet) {
                 Write-Host "[verify] Eine andere Sitzung faehrt gerade die volle Suite - warte ..."
                 $gemeldet = $true

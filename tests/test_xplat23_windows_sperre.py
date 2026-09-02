@@ -238,19 +238,39 @@ class SerialisierungTest(unittest.TestCase):
             # Mit DRYRUN steigt der Runner vor dem Testlauf aus; das Argument
             # entscheidet hier nur, ob ``Enter-Sperre`` es als gezielten Lauf
             # ansieht — gefahren wird die Datei nicht.
-            ausgabe = _lauf(
+            rc, ausgabe, _ = _lauf(
                 ["tests/test_xplat23_windows_sperre.py"],
                 umgebung_extra={"LIGHTOS_VERIFY_DRYRUN": "1",
                                 "LIGHTOS_LOCKFILE": self.sperre},
-                timeout=120)[1]
+                timeout=120)
+            # Der Halter muss WAEHREND des Laufs gehalten haben — sonst waere
+            # „hat nicht gewartet" nur die Feststellung, dass nichts belegt war.
+            hielt_noch = halter.poll() is None
         finally:
             halter.wait(timeout=120)
+        self.assertEqual(0, rc,
+                         "der gezielte Lauf ist aus einem anderen Grund "
+                         "gescheitert — dann sagt sein Schweigen zur Sperre "
+                         f"nichts:\n{ausgabe[-800:]}")
+        self.assertTrue(hielt_noch,
+                        "der Halter war schon fertig, als der gezielte Lauf "
+                        "durchkam — der Test hat keine belegte Sperre gesehen")
         self.assertNotIn("warte", ausgabe,
                          "ein gezielter Lauf hat auf die Sperre gewartet — "
                          "gesperrt wird nur die VOLLE Suite:\n" + ausgabe[-800:])
 
     def test_NOLOCK_hebt_die_sperre_auf(self):
-        """Der dokumentierte Notausgang muss wirken — sonst steht er umsonst da."""
+        """Der dokumentierte Notausgang muss wirken — sonst steht er umsonst da.
+
+        ⚠️ Aus der Review-Runde: „kein warte" allein beweist hier **nichts**.
+        Waere die Sperre insgesamt wirkungslos, saehe die Ausgabe genauso aus.
+        Der Test haelt deshalb zwei Dinge zusaetzlich fest: dass der Halter die
+        Sperre **waehrend** dieses Laufs noch hielt (sonst war schlicht nichts
+        belegt), und dass der Lauf sein Ungesperrtsein **ansagt** — ein
+        Volllauf ohne Serialisierung ist am Exit-Code nicht zu erkennen.
+        Die eigentliche Wirksamkeit der Sperre prueft
+        ``test_der_zweite_lauf_wartet_auf_den_ersten``.
+        """
         halter = self._halter_starten()
         try:
             self.assertTrue(self._warten_bis_sperre_haelt(halter))
@@ -258,12 +278,19 @@ class SerialisierungTest(unittest.TestCase):
                 umgebung_extra={"LIGHTOS_VERIFY_DRYRUN": "1",
                                 "LIGHTOS_VERIFY_NOLOCK": "1",
                                 "LIGHTOS_LOCKFILE": self.sperre})
+            hielt_noch = halter.poll() is None
         finally:
             halter.wait(timeout=120)
         self.assertEqual(0, rc, ausgabe[-800:])
+        self.assertTrue(hielt_noch,
+                        "der Halter war schon fertig — dieser Lauf ist an einer "
+                        "FREIEN Sperre vorbeigekommen und beweist nichts")
         self.assertNotIn("warte", ausgabe,
                          "LIGHTOS_VERIFY_NOLOCK hat die Sperre nicht aufgehoben:\n"
                          + ausgabe[-800:])
+        self.assertIn("UNGESPERRT", ausgabe,
+                      "ein Lauf ohne Sperre sagt es nicht — am Exit-Code ist er "
+                      f"von einem gesperrten nicht zu unterscheiden:\n{ausgabe[-800:]}")
 
 
 if __name__ == "__main__":
