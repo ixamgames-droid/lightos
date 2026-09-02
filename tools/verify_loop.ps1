@@ -55,11 +55,119 @@ if (-not $py) { Write-Host "[verify] FEHLER: venv-Python nicht gefunden. Gepruef
 # Lock-Runner im aeusseren Projektordner (Geschwister-Verzeichnis des Repo-Roots).
 $runner = Join-Path $outer "run_tests.ps1"
 
+# -- Sitzungsuebergreifende Sperre fuer die VOLLE Suite (XPLAT-23) ------------
+#
+# Pendant zu `_verify_lock` in tools/verify_loop.sh. Bis hierhin lag die
+# Serialisierung des Windows-Gates AUSSCHLIESSLICH in ../run_tests.ps1 - einer
+# Datei ausserhalb des Repos. Ein frischer Windows-Checkout fuhr die volle
+# Suite damit ungesperrt: zwei parallele Sitzungen (real seit 2026-08-06) sahen
+# rote Segmente, die einander gehoerten. Auf Linux steht die Sperre seit
+# PROC-02 im Repo; hier fehlte sie.
+#
+# Nur die VOLLE Suite wird gesperrt. Gezielte Einzellaeufe sind kurz und
+# billig; sie zu serialisieren wuerde nur bremsen (gleiche Regel wie Linux).
+#
+# Die Sperrdatei haengt am GEMEINSAMEN Git-Verzeichnis (`--git-common-dir`),
+# nicht am Elternordner: nur so sehen ein Haupt-Checkout und ein VERSCHACHTELTER
+# Worktree dieselbe Datei. Das ist PROC-02b, und die Begruendung dort gilt hier
+# unveraendert - eine Sperre, die stillschweigend nicht greift, ist schlimmer
+# als keine.
+#
+# Windows hat kein `flock`. Die Entsprechung ist eine Datei, die exklusiv
+# geoeffnet gehalten wird (FileShare::None): ein zweiter Oeffner bekommt eine
+# IOException, und das Betriebssystem gibt das Handle beim Prozessende in jedem
+# Fall frei - auch nach einem harten Abbruch, wo ein `finally` nicht mehr
+# laeuft.
+function Get-SperrPfad {
+    if ($env:LIGHTOS_LOCKFILE) { return $env:LIGHTOS_LOCKFILE }
+    $common = $null
+    try {
+        $prevEAP = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        $common = (& git -C $repo rev-parse --git-common-dir 2>$null | Select-Object -First 1)
+        $ErrorActionPreference = $prevEAP
+    } catch { $common = $null }
+    if ($common) {
+        $common = $common.Trim()
+        if (-not [System.IO.Path]::IsPathRooted($common)) { $common = Join-Path $repo $common }
+        if (Test-Path $common) { return (Join-Path (Resolve-Path $common).Path ".pytest_lock") }
+    }
+    # Kein Git (Tarball-Kopie)? Dann wie bisher der Elternordner.
+    return (Join-Path $outer ".pytest_lock")
+}
+
+$script:sperrPfad   = Get-SperrPfad
+$script:sperrHandle = $null
+
+function Enter-Sperre {
+    if ($TestArgs)                  { return }   # gezielter Lauf: keine Sperre
+    if ($env:LIGHTOS_VERIFY_NOLOCK) { return }
+    $gemeldet = $false
+    while ($true) {
+        try {
+            $script:sperrHandle = [System.IO.File]::Open(
+                $script:sperrPfad,
+                [System.IO.FileMode]::OpenOrCreate,
+                [System.IO.FileAccess]::ReadWrite,
+                [System.IO.FileShare]::None)
+            if ($gemeldet) { Write-Host "[verify] Sperre frei, starte." }
+            return
+        }
+        catch [System.IO.IOException] {
+            if (-not $gemeldet) {
+                Write-Host "[verify] Eine andere Sitzung faehrt gerade die volle Suite - warte ..."
+                $gemeldet = $true
+            }
+            Start-Sleep -Milliseconds 200
+        }
+    }
+}
+
+function Exit-Sperre {
+    if ($script:sperrHandle) {
+        $script:sperrHandle.Close()
+        $script:sperrHandle = $null
+    }
+}
+
+Enter-Sperre
+
 Push-Location $repo
 try {
     Write-Host "[verify] 1/2 Syntax-Check (compileall src) ..."
     & $py -m compileall -q src
     if ($LASTEXITCODE -ne 0) { Write-Host "[verify] SYNTAX-FEHLER"; exit 1 }
+
+    # QA-53/PROC-02b-Pendant: Ausstieg NACH dem Syntax-Check, VOR dem Testlauf.
+    #
+    # Nur fuer den Test ZU dieser Sperre. Ohne ihn muesste er den Runner ohne
+    # Argumente starten - also die VOLLE Suite, mitten im laufenden Gate. Genau
+    # das war QA-53 (95 pytest-Prozesse auf EINER geerbten Show-Datenbank).
+    # Der zu pruefende Mechanismus - Sperre nehmen, warten, weitergehen - laeuft
+    # hier vollstaendig echt; es entfaellt nur die Nutzlast.
+    #
+    # Der Sperrpfad wird gemeldet, weil er die einzige Angabe ist, die von
+    # aussen nicht nachpruefbar waere: ein Test muesste die Aufloesung sonst
+    # nachbauen und damit seine eigene Kopie pruefen statt das Skript (PROC-02b).
+    #
+    # LIGHTOS_VERIFY_DRYRUN_HOLD_MS haelt die Sperre danach noch die angegebene
+    # Zeit. Das ist der einzige Weg, die Serialisierung SKRIPT GEGEN SKRIPT zu
+    # messen statt gegen einen nachgebauten Halter - ohne dafuer zwei volle
+    # Suiten zu fahren.
+    #
+    # WARNUNG: der Schalter macht das Gate zum No-Op. Er gehoert NICHT in CI und
+    # nicht in eine dauerhaft gesetzte Umgebung: ein Lauf mit gesetztem DRYRUN
+    # endet mit 0, ohne einen einzigen Test gefahren zu haben. Deshalb bleibt
+    # "GRUEN - alles bestanden" hier bewusst aus.
+    if ($env:LIGHTOS_VERIFY_DRYRUN) {
+        Write-Host "[verify] Sperrdatei: $script:sperrPfad"
+        if ($env:LIGHTOS_VERIFY_DRYRUN_HOLD_MS) {
+            Start-Sleep -Milliseconds ([int]$env:LIGHTOS_VERIFY_DRYRUN_HOLD_MS)
+        }
+        Write-Host "[verify] LIGHTOS_VERIFY_DRYRUN - Sperre und Syntax-Check erledigt, KEIN Testlauf."
+        Write-Host "[verify] Das ist KEINE bestandene Pruefung."
+        exit 0
+    }
 
     if (Test-Path $runner) {
         # Immer -Isolate: jede Testdatei laeuft in einem eigenen Prozess. So kippt ein einzelner
@@ -131,4 +239,4 @@ try {
 
     Write-Host "[verify] GRUEN - alles bestanden."
 }
-finally { Pop-Location }
+finally { Exit-Sperre; Pop-Location }
