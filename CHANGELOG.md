@@ -7,6 +7,35 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-03 — Ein fehlendes Gerät verschwindet nicht mehr stillschweigend
+
+#### Behoben
+
+- **Fehlte ein Gerät in der Bibliothek, hat LightOS die Show trotzdem als
+  „geladen" gemeldet — und das Gerät blieb am Rig einfach dunkel.** Gemessen:
+  eine Show auf einem Rechner geöffnet, dem die Geräte fehlten — sechs von
+  sechs ohne jede Ansteuerung, ohne eine einzige Meldung. Auch der
+  Show-Prüfer sagte „0 Fehler".
+
+  Schlimmer war der zweite Fall: zeigte die gespeicherte Gerätenummer auf ein
+  **anderes** Gerät der Bibliothek, wurde stillschweigend dieses angesteuert.
+  Aus einem Moving Head mit elf Kanälen wurde so ein PAR mit vier — ohne
+  Hinweis, und beim nächsten Speichern wäre der falsche Stand
+  zurückgeschrieben worden.
+
+  Beide Fälle melden sich jetzt beim Öffnen im gewohnten Warndialog, und zwar
+  unterscheidbar: einmal „das Gerät bleibt dunkel", einmal „es wird ein
+  anderes Gerät angesteuert" — mit dem Namen des fremden Geräts, damit man
+  nicht in der Show sucht, was in der Bibliothek liegt.
+
+- **Steht ein Gerät doppelt in der Bibliothek, entschied bisher der Zufall,
+  welches die Show bekommt** — genauer: das zuerst eingelesene, also fast
+  immer der ältere Massenimport statt des gepflegten mitgelieferten Geräts.
+  Bei einem der Fälle unterscheidet sich sogar der Gerätetyp, also die
+  3D-Darstellung. Jetzt gewinnt das mitgelieferte Gerät, und die Dublette
+  wird beim Öffnen gemeldet.
+
+
 ### 2026-09-02 — Ein Panel landet im Gruppen-Raster in seiner echten Form
 
 #### Verbessert

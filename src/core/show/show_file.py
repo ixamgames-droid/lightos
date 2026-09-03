@@ -264,6 +264,40 @@ def _resolve_fixture_profile_id(profile_id: int, manufacturer_name: str,
     Shows speichern deshalb Hersteller und Modell mit. Passt die numerische ID
     dort auf ein anderes Profil, wird sie anhand dieser Namen aufgeloest.
     Legacy-Shows ohne Namen behalten unveraendert ihre alte ID.
+
+    ★ **FM-43: die drei Ausgaenge sind verschieden schlimm — und zwei waren
+    stumm.** Gemessen am 02.09.2026:
+
+    * **Treffer** — die ID passt oder der Name loest auf. Unveraendert.
+    * **Kein Treffer, die ID zeigt ins Leere** -> das Geraet loest **null
+      Kanaele** auf. Die Show laedt „erfolgreich", der Patch sieht normal aus
+      (Hersteller/Modell stehen denormalisiert IN der Show-Datei), und am Rig
+      bleibt es dunkel. Gemessen: 6 von 6 Geraeten, ohne eine einzige Meldung.
+    * **Kein Treffer, die ID zeigt auf ein ANDERES Profil** -> es faehrt
+      **still das falsche Geraet**. Gemessen lief ein 11-Kanal-Eintrag als
+      4-Kanal-PAR. Das ist der gefaehrlichste Ausgang und war bis hierher
+      nicht von einem Treffer zu unterscheiden.
+
+    Alle drei melden jetzt in ``_ladeprobleme`` (QA-50) — denselben Sammler,
+    den die UI beim Oeffnen ohnehin als Warnung zeigt. Bewusst KEIN neuer
+    Meldeweg: der Fall gehoert in denselben Dialog wie ein nicht lesbarer
+    Show-Block, und ein zweiter Kanal waere ein zweiter, der uebersehen wird.
+
+    ★★ **Und die Mehrdeutigkeit wird nicht mehr von der Einfuegereihenfolge
+    entschieden.** Bisher gewann ``order_by(FixtureProfile.id).first()`` —
+    also **immer der aeltere Import** statt des gepflegten Builtins. In der
+    gewachsenen Bibliothek gibt es diese Kollision bereits dreimal, und bei
+    einer unterscheidet sich sogar der ``fixture_type`` (``led_bar`` gegen
+    ``matrix``): anderes 3D-Modell, anderer Renderpfad. Jetzt gewinnt
+    ``source='builtin'``.
+
+    Warum das die richtige Wahl ist und keine Geschmacksfrage: dieser Zweig
+    wird ueberhaupt nur erreicht, wenn die gespeicherte ID **nicht** passt —
+    wir raten hier also bereits. Von zwei Rateoptionen ist die eingebaute die
+    bessere, weil sie auf **jedem** Rechner existiert und gepflegt ist; ein
+    lokaler Import existiert womoeglich nur hier. Wer bewusst das importierte
+    Profil wollte, hat dessen ID in der Show — und die kommt oben durch, ohne
+    diesen Zweig zu beruehren.
     """
     if not fixture_name:
         return profile_id
@@ -286,19 +320,53 @@ def _resolve_fixture_profile_id(profile_id: int, manufacturer_name: str,
                     return profile_id
 
             query = (
-                select(FixtureProfile.id)
+                select(FixtureProfile.id, FixtureProfile.source)
                 .join(Manufacturer)
                 .where(FixtureProfile.name == fixture_name)
             )
             if manufacturer_name:
                 query = query.where(Manufacturer.name == manufacturer_name)
-            resolved = session.execute(query.order_by(FixtureProfile.id)).scalars().first()
-            if resolved is not None:
+            # FM-43: `builtin` zuerst, dann wie bisher nach ID. Der zweite
+            # Schluessel bleibt drin, damit die Wahl bei gleicher Herkunft
+            # deterministisch ist — sonst entschiede die Zeilenreihenfolge.
+            treffer = session.execute(
+                query.order_by((FixtureProfile.source != "builtin"),
+                               FixtureProfile.id)
+            ).all()
+            _geraet = f"{manufacturer_name} / {fixture_name}".strip(" /")
+            if treffer:
+                resolved = int(treffer[0][0])
                 print(
                     f"[show_file] Fixture-Profil remapped: {profile_id} -> {resolved} "
-                    f"({manufacturer_name} / {fixture_name})"
+                    f"({_geraet})"
                 )
-                return int(resolved)
+                if len(treffer) > 1:
+                    # Mehrdeutig: gemeldet, nicht verschwiegen. Der Mensch sieht
+                    # sonst ein Geraet, das *fast* stimmt, und sucht den Fehler
+                    # ueberall — nur nicht in der Bibliothek.
+                    _ladeprobleme.append(
+                        f"„{_geraet}“ steht {len(treffer)}× in der Geraetebibliothek — "
+                        f"genommen wurde Profil {resolved} "
+                        f"({treffer[0][1] or 'ohne Herkunft'}). Wenn das Geraet falsch "
+                        f"aussieht, liegt es an der Dublette, nicht an der Show.")
+                return resolved
+            # FM-43: ab hier ist das Geraet NICHT aufloesbar. Bis 2026-09-03
+            # endete die Funktion hier stumm mit der alten ID — und was diese
+            # ID trifft, entscheidet, wie schlimm es wird.
+            if current is None:
+                _ladeprobleme.append(
+                    f"„{_geraet}“ steht nicht in der Geraetebibliothek "
+                    f"(Profil {profile_id}). Das Geraet bleibt DUNKEL: es hat "
+                    f"keine Kanaele, die angesteuert werden koennen.")
+            else:
+                _fremd_mfr = getattr(current.manufacturer, "name", "") or ""
+                _fremd = f"{_fremd_mfr} / {current.name}".strip(" /")
+                _ladeprobleme.append(
+                    f"„{_geraet}“ steht nicht in der Geraetebibliothek — "
+                    f"Profil {profile_id} gehoert dort zu „{_fremd}“. "
+                    f"ACHTUNG: es wird dieses ANDERE Geraet angesteuert, nicht "
+                    f"das der Show. Vor dem Speichern pruefen, sonst wird der "
+                    f"falsche Stand zurueckgeschrieben.")
     except Exception as exc:
         # Ein optionaler Library-DB-Fehler darf den Show-Load nicht verhindern.
         print(f"[show_file] Fixture-Profil-Aufloesung fehlgeschlagen: {exc}")
