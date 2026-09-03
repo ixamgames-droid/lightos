@@ -168,6 +168,18 @@ Das verbindliche Test-Gate des Loop-Modus laeuft ueber `tools/verify_loop.ps1`:
   waere das Windows-Gate wegen des bekannten sporadischen Teardown-Crashes dauerrot.
 - **Gate-Kriterium:** Exit 0 = gruen. Keine neuen Fehler ggue. Baseline; rot → selbst fixen,
   nicht mit kaputtem Stand committen/reporten.
+- **Vor dem Merge: CI-Status pruefen, nicht nur „nichts rot" (PROC-10).**
+  `venv/Scripts/python.exe tools/pr_ci_status.py <PR-Nummer>`
+  (Windows: `venv/Scripts/python.exe`, Linux/macOS: `./venv/bin/python`) —
+  Exit 0 heisst **mindestens ein abgeschlossener Check UND alle erfolgreich**.
+  `gh pr checks --watch` taugt dafuer NICHT: es endet auch mit Exit 0, wenn es
+  **gar keine** Checks gibt. Genau so ist am 2026-09-03 ein PR ungeprueft
+  durchgerutscht — der Lauf war zehn Sekunden alt und stand in der
+  Warteschlange. An demselben Tag hat GitHub **dreimal** fuer einen frischen PR
+  verzoegert oder gar keinen Lauf angelegt; der Zustand ist der Normalfall,
+  nicht die Ausnahme.
+  Legt GitHub gar keinen Lauf an: `main` **in** den Zweig mergen. Das erzeugt
+  frische SHAs, laesst sich ohne Force-Push pushen, und der Lauf entsteht.
 - **Linux/macOS (XPLAT-02):** `verify_loop.ps1` findet jetzt auch ein `venv/bin/python`
   (Windows-Pfade zuerst → auf Windows unveraendert). Der PowerShell-Lock-Runner
   `run_tests.ps1` ist aber Windows-spezifisch; auf Linux/macOS gibt es Davids
