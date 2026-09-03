@@ -4899,6 +4899,35 @@ def open_value_for(fixture, attribute: str, fallback: int = 255) -> int:
     return open_value_of_channel(find_channel(fixture, attribute), fallback)
 
 
+_ORI_ACHSEN = ("pan", "tilt", "pan_fine", "tilt_fine")
+
+
+def _orientierungs_koepfe(attrs) -> list[str]:
+    """Die Kopf-Suffixe, die in dieser Schicht ueberhaupt vorkommen.
+
+    ``""`` fuer den Basis-Kopf, ``"#1"``, ``"#2"`` … fuer die weiteren
+    (attr#N-Konvention).
+
+    ★ OUT-55: bis 2026-09-03 behandelten beide Orientierungs-Funktionen
+    ausschliesslich die BLANKEN Schluessel. Gemessen mit ``invert_pan`` und
+    ``{'pan': 10, 'pan#1': 10}`` kam ``{'pan': 245, 'pan#1': 10}`` heraus — an
+    einem Spider oder einer Mover-Bar fuhr Kopf 0 richtig herum und **jeder
+    weitere spiegelverkehrt**. ``efx.py`` faellt nicht darauf herein, weil es
+    jeden Kopf EINZELN mit blanken Schluesseln durchschickt; im
+    Programmer-Flush und im Render-Pfad schlug es zu.
+    """
+    suffixe = set()
+    for k in attrs:
+        for basis in _ORI_ACHSEN:
+            if k == basis:
+                suffixe.add("")
+            elif k.startswith(basis + "#"):
+                suffixe.add(k[len(basis):])
+    # Basis-Kopf zuerst, danach nach Kopfnummer — nur fuer stabile Reihenfolge
+    # in Tests und Protokollen; die Rechnung je Kopf ist unabhaengig.
+    return sorted(suffixe, key=lambda s: (s != "", s))
+
+
 def apply_pan_tilt_orientation(fx, attrs: dict) -> dict:
     """Wendet ``invert_pan`` / ``invert_tilt`` / ``swap_pan_tilt`` eines
     Geraets auf eine ``{attr: val}``-Schicht an (M0.2).
@@ -4914,23 +4943,10 @@ def apply_pan_tilt_orientation(fx, attrs: dict) -> dict:
     swap = bool(getattr(fx, "swap_pan_tilt", False))
     if not (inv_pan or inv_tilt or swap):
         return attrs
-    if not any(k in attrs for k in ("pan", "pan_fine", "tilt", "tilt_fine")):
+    koepfe = _orientierungs_koepfe(attrs)
+    if not koepfe:
         return attrs
     out = dict(attrs)
-
-    if swap:
-        for a, b in (("pan", "tilt"), ("pan_fine", "tilt_fine")):
-            va, vb = out.get(a), out.get(b)
-            if va is None and vb is None:
-                continue
-            if vb is not None:
-                out[a] = vb
-            else:
-                out.pop(a, None)
-            if va is not None:
-                out[b] = va
-            else:
-                out.pop(b, None)
 
     def _invert(coarse: str, fine: str):
         if coarse not in out:
@@ -4954,10 +4970,26 @@ def apply_pan_tilt_orientation(fx, attrs: dict) -> dict:
         else:
             out[coarse] = 255 - c
 
-    if inv_pan:
-        _invert("pan", "pan_fine")
-    if inv_tilt:
-        _invert("tilt", "tilt_fine")
+    # OUT-55: je Kopf. Die Rechnung selbst ist unveraendert — sie laeuft nur
+    # nicht mehr ausschliesslich auf dem Basis-Kopf.
+    for k in koepfe:
+        if swap:
+            for a, b in ((f"pan{k}", f"tilt{k}"), (f"pan_fine{k}", f"tilt_fine{k}")):
+                va, vb = out.get(a), out.get(b)
+                if va is None and vb is None:
+                    continue
+                if vb is not None:
+                    out[a] = vb
+                else:
+                    out.pop(a, None)
+                if va is not None:
+                    out[b] = va
+                else:
+                    out.pop(b, None)
+        if inv_pan:
+            _invert(f"pan{k}", f"pan_fine{k}")
+        if inv_tilt:
+            _invert(f"tilt{k}", f"tilt_fine{k}")
     return out
 
 
@@ -5008,24 +5040,32 @@ def unapply_pan_tilt_orientation(fx, attrs: dict) -> dict:
         else:
             out[coarse] = 255 - c
 
-    if inv_pan:
-        _invert("pan", "pan_fine")
-    if inv_tilt:
-        _invert("tilt", "tilt_fine")
-
-    if swap:
-        for a, b in (("pan", "tilt"), ("pan_fine", "tilt_fine")):
-            va, vb = out.get(a), out.get(b)
-            if va is None and vb is None:
-                continue
-            if vb is not None:
-                out[a] = vb
-            else:
-                out.pop(a, None)
-            if va is not None:
-                out[b] = va
-            else:
-                out.pop(b, None)
+    # OUT-55: je Kopf — und aus demselben Grund wie in der Vorwaertsrichtung.
+    # ★★ Beide Funktionen MUSSTEN zusammen nachgezogen werden: waere nur die
+    # Vorwaertsrichtung gefixt, staende der Draht fuer die Koepfe >= 1 richtig,
+    # das 3D-Bild aber spiegelverkehrt — die Ausgabestufe haette gedreht und
+    # niemand haette es zurueckgenommen. Genau die Klasse „zwei gekoppelte
+    # Fehler heben sich auf", die VIZ-55 Slice 1 schon einmal gekostet hat
+    # (dort hoben sich doppelte Pan-Invertierung und ein Beam ohne
+    # Invert-Kenntnis gegenseitig auf und blieben deshalb unsichtbar).
+    for k in _orientierungs_koepfe(attrs):
+        if inv_pan:
+            _invert(f"pan{k}", f"pan_fine{k}")
+        if inv_tilt:
+            _invert(f"tilt{k}", f"tilt_fine{k}")
+        if swap:
+            for a, b in ((f"pan{k}", f"tilt{k}"), (f"pan_fine{k}", f"tilt_fine{k}")):
+                va, vb = out.get(a), out.get(b)
+                if va is None and vb is None:
+                    continue
+                if vb is not None:
+                    out[a] = vb
+                else:
+                    out.pop(a, None)
+                if va is not None:
+                    out[b] = va
+                else:
+                    out.pop(b, None)
     return out
 
 

@@ -7,6 +7,29 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-03 — „Pan spiegeln" gilt jetzt für alle Köpfe, nicht nur den ersten
+
+#### Behoben
+
+- **Bei einem Spider oder einer Moving-Bar mit gespiegeltem Pan fuhr nur der
+  erste Kopf richtig herum — alle weiteren spiegelverkehrt.** Die Einstellungen
+  „Pan spiegeln", „Tilt spiegeln" und „Pan/Tilt tauschen" wirkten
+  ausschließlich auf den Basis-Kopf des Geräts.
+
+  Am Rig sah das aus wie ein Fehler in der Figur: Kopf 1 folgte der Bewegung,
+  die Köpfe daneben liefen gegenläufig. Betroffen waren der Programmer und der
+  Render-Pfad; Effekte über die EFX-Figuren waren nie betroffen, weil sie jeden
+  Kopf einzeln durchreichen — deshalb fiel es dort nie auf.
+
+  Die Feinkanäle drehen dabei je Kopf als 16-Bit-Paar mit, und ein Gerät ohne
+  gesetzte Spiegelung verhält sich unverändert.
+
+  **Die 3D-Ansicht zeigt weiterhin die echte Richtung.** Sie rechnet die
+  Spiegelung der Ausgabestufe wieder heraus — das musste zusammen nachgezogen
+  werden, sonst hätte der Draht gestimmt und das Bild wäre spiegelverkehrt
+  gewesen.
+
+
 ### 2026-09-03 — Die Geräteliste im Programmer lässt sich zuklappen
 
 #### Verbessert
