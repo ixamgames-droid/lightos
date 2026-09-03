@@ -281,6 +281,7 @@ Write-Host ("[seg] Spuren: {0} parallel, {1} WebEngine seriell" -f $rest.Count, 
 # nebenher Davids LightOS-Instanz, halten deren Kinder die Bedingung dauerhaft
 # offen und wir laufen sehenden Auges in den Deckel statt in eine Endlosschleife.
 $script:gpuDeckelTreffer = @()
+$script:gpuWartezeitMs = 0
 $script:letzterWebStart = $null
 function Wait-FreieGpu {
     # ⚠️ Es wird auf die Chromium-Kinder des VORIGEN WebEngine-Segments gewartet,
@@ -298,6 +299,13 @@ function Wait-FreieGpu {
     # Der Zeitstempel-Filter macht ihn wieder scharf: relevant sind nur Prozesse,
     # die NACH dem Start des vorigen Segments entstanden - also dessen Kinder.
     if (-not $script:letzterWebStart) { return $true }   # erstes Segment: nichts abzuwarten
+    # XPLAT-23: die WARTEZEIT mitschreiben, nicht nur den ausgeschoepften
+    # Deckel. $gpuDeckelTreffer zaehlt ausschliesslich Segmente, bei denen die
+    # 3 s VOLL abgelaufen sind; wer 2,9 s wartet und dann durchkommt, erscheint
+    # dort als Nicht-Treffer. "0 Treffer" heisst also "der Deckel lief nie aus"
+    # und NICHT "es wurde nicht gewartet" - genau die Frage, die das Item
+    # stellt, konnte das Instrument nicht beantworten.
+    $uhr = [System.Diagnostics.Stopwatch]::StartNew()
     for ($i = 0; $i -lt 30; $i++) {
         $offen = @(Get-Process -Name "QtWebEngineProcess" -ErrorAction SilentlyContinue |
                    Where-Object {
@@ -305,9 +313,13 @@ function Wait-FreieGpu {
                        # "nicht unser Kind" behandeln statt das Gate zu kippen.
                        try { $_.StartTime -ge $script:letzterWebStart } catch { $false }
                    })
-        if ($offen.Count -eq 0) { return $true }
+        if ($offen.Count -eq 0) {
+            $script:gpuWartezeitMs += $uhr.ElapsedMilliseconds
+            return $true
+        }
         Start-Sleep -Milliseconds 100
     }
+    $script:gpuWartezeitMs += $uhr.ElapsedMilliseconds
     return $false
 }
 
@@ -496,6 +508,10 @@ Exit-WebEngineSperre        # XPLAT-23: nicht ueber die Bilanz hinaus halten
 
 # ── Bilanz ──────────────────────────────────────────────────────────────────
 Write-Host ""
+if ($script:gpuWartezeitMs -gt 0) {
+    Write-Host ("[seg] WebEngine-Deckel: insgesamt {0:N1}s auf die Chromium-Kinder des" -f ($script:gpuWartezeitMs / 1000.0)) -ForegroundColor DarkYellow
+    Write-Host ("[seg]   vorigen Segments gewartet, verteilt auf {0} Segmente." -f $web.Count) -ForegroundColor DarkYellow
+}
 if ($script:gpuDeckelTreffer.Count) {
     Write-Host ("[seg] HINWEIS (XPLAT-17): {0} WebEngine-Segmente starteten, obwohl noch" -f $script:gpuDeckelTreffer.Count) -ForegroundColor DarkYellow
     Write-Host "[seg]   Chromium-Kindprozesse liefen (3-s-Deckel erreicht)." -ForegroundColor DarkYellow
