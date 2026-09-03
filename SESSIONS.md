@@ -9,7 +9,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| FM-41 | A | feature/fm41-weiss-segmente | 2026-09-03T16:47Z | src/ui/views/fixture_group_view.py |
 | PROC-10 | B | feature/proc10-ci-status-werkzeug | 2026-09-03T17:31Z | - |
 
 ## Blocker & Fallen
@@ -64,7 +63,6 @@
 
 ## Verlauf
 
-- 2026-09-02T15:04Z A claim ENG-15
 - 2026-09-02T15:28Z B claim XPLAT-30
 - 2026-09-02T16:08Z B done XPLAT-30
 - 2026-09-02T19:45Z B claim XPLAT-23
@@ -94,3 +92,4 @@
 - 2026-09-03T17:07Z A done FM-43
 - 2026-09-03T17:30Z B uebergeben XPLAT-23
 - 2026-09-03T17:31Z B claim PROC-10
+- 2026-09-03T17:53Z A uebergeben FM-41
