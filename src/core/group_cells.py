@@ -41,6 +41,103 @@ def parse_group_cell(value) -> tuple:
         return None, None
 
 
+# ── FM-41: die ACHSE einer Zelle ────────────────────────────────────────────
+# Ein Geraet kann mehrere Emitter-Saetze haben, die NICHT dasselbe Raster
+# bilden. Robins ZQ06121 traegt 48 RGB-Zonen (4x12) UND 8 eigene
+# Warmweiss-Segmente, die mittig zwischen Reihe 2 und 3 sitzen und je
+# anderthalb RGB-Spalten abdecken — „die beiden Raster fallen also NICHT
+# zusammen", sagt die Bibliothek selbst.
+#
+# Bis 2026-09-03 kannte das Zellformat nur EINEN Kopfindex, und der adressierte
+# alle Achsen zugleich: `channels_for_head(chans, 3)` lieferte gemessen
+# `color_r = CH12 'Zone 4 Rot'` UND `color_w = CH150 'Weiss-Zone 4'`. Die
+# Zellen K1..K8 fuhren also acht willkuerliche Weiss-Segmente mit, K9..K48
+# hatten gar keins. Das ist der „Zuordnungs-Salat" aus der Rig-Meldung.
+#
+# ★ Die Entscheidung des Betreibers (03.09.2026): ein solches Geraet soll beim
+# Gruppenbauen ZWEI ansprechbare Saetze zeigen — „einmal die RGB-Variante und
+# einmal die, die nur weiss kann" — damit man eine Gruppe nur aus Weiss, nur
+# aus RGB oder aus beidem bauen kann. Ausdrueckliche Auflage: **generisch aus
+# den Kanaelen abgeleitet, kein Geraete-Sonderfall.**
+ACHSE_FARBE = "rgb"
+ACHSE_WEISS = "w"
+
+# Achse -> Attribut, dessen Vorkommen die Koepfe DIESER Achse zaehlen.
+ACHSEN_ATTRIBUT = {ACHSE_FARBE: "color_r", ACHSE_WEISS: "color_w"}
+
+# Zellwert-Praefix je Achse. Die Farb-Achse hat KEINEN — `"5:2"` bleibt exakt
+# wie bisher, damit jede bestehende Gruppe und jede gespeicherte Show
+# unveraendert laedt.
+_ACHSEN_PRAEFIX = {ACHSE_WEISS: "w"}
+
+
+def zelle_fuer(fid: int, achse: str | None = None, index: int | None = None) -> str:
+    """``(fid, achse, index)`` -> Zellwert. Gegenstueck zu :func:`parse_zelle`.
+
+    EINE Stelle, an der ein Zellwert entsteht — sonst steht in einem Jahr das
+    zweite ``f"{fid}:w{n}"`` im Baum und die beiden laufen auseinander.
+    """
+    if achse is None or index is None:
+        return str(int(fid))
+    if achse == ACHSE_FARBE:
+        return f"{int(fid)}:{int(index)}"
+    praefix = _ACHSEN_PRAEFIX.get(achse)
+    if praefix is None:
+        raise ValueError(f"unbekannte Achse: {achse!r}")
+    return f"{int(fid)}:{praefix}{int(index)}"
+
+
+def parse_zelle(value) -> tuple:
+    """Zellwert -> ``(fid, achse, index)``. Die achsen-bewusste Lesung.
+
+    * ``5`` / ``"5"``   -> ``(5, None, None)``   — ganzes Geraet
+    * ``"5:2"``         -> ``(5, "rgb", 2)``     — Farb-Kopf 2
+    * ``"5:w3"``        -> ``(5, "w", 3)``       — Weiss-Segment 3
+    * unparsbar         -> ``(None, None, None)``
+
+    ★★ **:func:`parse_group_cell` bleibt daneben bestehen und ist bewusst
+    VERLUSTBEHAFTET:** fuer ``"5:w3"`` liefert es ``(None, None)``, also „diese
+    Zelle kenne ich nicht" — und ausdruecklich NICHT ``(5, None)``. Das waere
+    die stille Befoerderung eines Weiss-Segments zum GANZEN Geraet, also genau
+    in die gefaehrliche Richtung (dieselbe Ueberlegung wie bei FM-45s negativem
+    Kopfindex). Gemessen haengen 61 Aufrufstellen in 12 Dateien an dem
+    2-Tupel-Vertrag; sie duerfen unveraendert bleiben und sehen eine Weiss-Zelle
+    schlicht nicht, statt sie falsch zu sehen.
+
+    Negativer Index ist unparsbar — dieselbe Regel wie fuer Kopf-Zellen (FM-45).
+    """
+    try:
+        s = str(value)
+        if ":" not in s:
+            return int(s), None, None
+        fid_s, rest = s.split(":", 1)
+        fid = int(fid_s)
+        for achse, praefix in _ACHSEN_PRAEFIX.items():
+            if rest.startswith(praefix):
+                index = int(rest[len(praefix):])
+                return (fid, achse, index) if index >= 0 else (None, None, None)
+        index = int(rest)
+        return (fid, ACHSE_FARBE, index) if index >= 0 else (None, None, None)
+    except Exception:
+        return None, None, None
+
+
+def achsen_zellen(cells, achse: str) -> list:
+    """Aus einer Zell-Liste die Indizes je Geraet fuer GENAU EINE Achse.
+
+    ``["1", "1:0", "1:w3", "2:w0"]``, Achse ``"w"`` -> ``{1: {3}, 2: {0}}``.
+    Ganz-Geraet-Zellen (``"1"``) zaehlen fuer KEINE Achse — sie meinen das
+    ganze Geraet und damit alles.
+    """
+    out: dict[int, set] = {}
+    for c in cells or []:
+        fid, a, index = parse_zelle(c)
+        if fid is None or a != achse or index is None:
+            continue
+        out.setdefault(fid, set()).add(int(index))
+    return out
+
+
 def head_restrictions(cells) -> dict:
     """Zell-Liste -> ``{fid: {head, ...}}``: auf WELCHE Koepfe eine Auswahl bzw.
     ein Gruppen-Raster ein Geraet einschraenkt (FM-HEADLAYOUT A4).

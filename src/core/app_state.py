@@ -4710,6 +4710,58 @@ def channels_for_head(channels, head: int) -> dict:
     return {a: channels[i] for i, a in sorted(picked)}
 
 
+def channels_for_axis(channels, achse: str | None, index: int | None) -> dict:
+    """Die Kanaele EINES Emitters auf einer bestimmten ACHSE (FM-41).
+
+    ``achse=None`` -> das ganze Geraet (alle Kanaele, wie ohne Kopf-Zelle).
+    ``achse="rgb"`` -> deckungsgleich mit :func:`channels_for_head`; die Funktion
+    delegiert dorthin, statt die Regel ein zweites Mal zu formulieren.
+    ``achse="w"``  -> das ``index``-te ``color_w``-Vorkommen **plus** die
+    geteilten Kanaele.
+
+    ★ **Warum es die Achse ueberhaupt braucht.** Ein Kopfindex adressierte
+    bisher ALLE Achsen zugleich: an Robins ZQ06121 liefert
+    ``channels_for_head(chans, 3)`` gemessen ``color_r = CH12 'Zone 4 Rot'``
+    **und** ``color_w = CH150 'Weiss-Zone 4'`` — obwohl die acht Weiss-Segmente
+    physisch mittig zwischen Reihe 2 und 3 sitzen und je anderthalb RGB-Spalten
+    abdecken. Die Zellen K1..K8 fuhren also acht willkuerliche Segmente mit,
+    K9..K48 hatten gar keins.
+
+    ★★ **Die geteilten Kanaele muessen mit** (Master-Dimmer, Shutter): ein
+    Weiss-Segment ist sonst richtig adressiert und trotzdem dunkel, weil der
+    gemeinsame Dimmer davor auf 0 steht. Genau diese Falle steht in
+    ``matrix_pattern`` als beim ersten Live-Test passiert dokumentiert.
+
+    ⚠️ **Kein Phantom-Emitter** — dieselbe Grenze wie bei FM-45: gibt es das
+    ``index``-te Vorkommen nicht, kommt ``{}`` zurueck und NICHT die geteilten
+    Kanaele allein. Sonst zoege eine Zelle jenseits der Segmentzahl den
+    Master-Dimmer des ganzen Geraets hoch.
+    """
+    from src.core.group_cells import ACHSE_FARBE, ACHSE_WEISS, ACHSEN_ATTRIBUT
+    chans = list(channels or ())
+    if achse is None or index is None:
+        return {(c.attribute or ""): c for c in chans}
+    if achse == ACHSE_FARBE:
+        return channels_for_head(chans, int(index))
+    attribut = ACHSEN_ATTRIBUT.get(achse)
+    if attribut is None:
+        return {}
+    vorkommen = [c for c in chans if (getattr(c, "attribute", "") or "") == attribut]
+    if not (0 <= int(index) < len(vorkommen)):
+        return {}
+    treffer = {attribut: vorkommen[int(index)]}
+    # Geteilt = einmalig vorkommendes Attribut. Dieselbe Definition wie in
+    # `channels_for_head`; hier bewusst nachgeschlagen statt kopiert, damit die
+    # beiden nicht auseinanderlaufen.
+    from collections import Counter
+    haeufigkeit = Counter((getattr(c, "attribute", "") or "") for c in chans)
+    for c in chans:
+        a = (getattr(c, "attribute", "") or "")
+        if a and a != attribut and haeufigkeit[a] == 1:
+            treffer[a] = c
+    return treffer
+
+
 def resolve_attr_channels(channels, values: dict) -> list[tuple[int, str, int]]:
     """Loest einen attribut-gekeyten Wert-Dict gegen die Kanal-Liste eines
     Fixtures auf — mit DERSELBEN Mehrkopf-Vorkommens-Logik wie
