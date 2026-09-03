@@ -56,7 +56,7 @@ stehen. Grand-Master auf, Blackout aus.
 **Handgriff**
 
 1. Programmer-Tab → in der Geräteliste **HYDRABEAM 4000 · 1** aufklappen.
-2. Zeile **„└ Kopf 2"** anklicken (nicht das Gerät selbst).
+2. Zeile **„Kopf 2"** anklicken (nicht das Gerät selbst).
 3. Farbe Rot auf 255 ziehen.
 4. Notieren, **welche Lampe leuchtet** — von vorn gesehen, also aus Publikumssicht.
 5. Dasselbe für **Kopf 3** und **Kopf 4**.

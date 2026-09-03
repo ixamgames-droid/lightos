@@ -80,8 +80,12 @@ def test_refresh_fixture_list_blocks_reentrant_selection_signal():
         lst = view._fixture_list
         # Eine Auswahl herstellen, damit das spaetere clear() ueberhaupt eine
         # Selektionsaenderung ausloesen WUERDE (ohne Auswahl feuert clear() nichts).
-        lst.addItem(QListWidgetItem("[001] dummy"))
-        lst.setCurrentRow(0)
+        # UI-61: die Geraeteliste ist ein Baum (Koepfe als einklappbare Kinder).
+        # Die AUSSAGE dieses Tests aendert sich dadurch nicht — es braucht nur
+        # eine bestehende Auswahl, damit clear() ueberhaupt etwas ausloesen wuerde.
+        from PySide6.QtWidgets import QTreeWidgetItem
+        _dummy = QTreeWidgetItem(lst, ["[001] dummy"])
+        lst.setCurrentItem(_dummy)
 
         fired = {"n": 0}
         # Erst NACH dem Setup verbinden -> der Setup-Klick zaehlt nicht mit.
