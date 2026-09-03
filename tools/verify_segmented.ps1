@@ -156,9 +156,87 @@ else {
                Sort-Object Name | ForEach-Object { "tests/" + $_.Name })
 }
 
+# -- XPLAT-29 (a): das Aufraeumen darf den Lauf nicht beenden ----------------
+#
+# Gemessen am 01.09.2026: der Start endete sofort, ohne ein einziges Segment,
+# mit "Das Element ...tests_test_viz50a_panel_koerper_scene.py.log kann nicht
+# entfernt werden ... da sie von einem anderen Prozess verwendet wird". Am
+# Leben waren zwei python und ein QtWebEngineProcess aus dem VORIGEN Lauf -
+# Windows reisst Prozessbaeume nicht mit.
+#
+# ★ Ein Lauf, der VOR dem ersten Segment endet, sieht aus wie ein rotes Gate
+# und hat dabei nichts gemessen. Das ist die teuerste Variante: dieselbe Klasse
+# wie XPLAT-27 und XPLAT-31 - der Runner soll mit dem Schaden umgehen, statt an
+# ihm zu sterben.
+#
+# Ausgewichen wird in ein UNTERverzeichnis, nicht auf einen Geschwister-Ordner:
+# `.gitignore` deckt `.pytest_segments/` ab, ein `.pytest_segments-<zeit>`
+# daneben waere NICHT ignoriert und landete als unversionierter Muell im
+# `git status` eines oeffentlichen Repos.
+#
+# Waisen werden BENANNT, nicht beendet. Sie wirklich zu toeten ist XPLAT-29(b)
+# und liegt bei Robin - es hiesse, dass ein Absturz des Hauptprozesses den
+# DMX-Worker mitreisst. Ausserdem haelt die laufende App des Menschen selbst
+# Chromium-Kinder ("Die laufende App gehoert dem Menschen", COORDINATION.md).
+function Nenne-Waisen {
+    $gefunden = @()
+    foreach ($name in @("python", "pythonw", "QtWebEngineProcess")) {
+        foreach ($p in @(Get-Process -Name $name -ErrorAction SilentlyContinue)) {
+            $seit = try { $p.StartTime.ToString("HH:mm:ss") } catch { "?" }
+            $cmd = $null
+            try {
+                $cmd = (Get-CimInstance Win32_Process -Filter "ProcessId=$($p.Id)" `
+                        -ErrorAction Stop).CommandLine
+            } catch { $cmd = $null }
+            # Die laufende App ist KEIN Waise - sie ausdruecklich auszunehmen
+            # verhindert, dass jemand sie beim Aufraeumen abschiesst.
+            $hinweis = if ($cmd -and $cmd -match "main\.py") {
+                "   <- die laufende App, kein Waise"
+            } else { "" }
+            $gefunden += ("[seg]          PID {0,-6} {1,-18} seit {2}{3}" -f `
+                          $p.Id, $p.ProcessName, $seit, $hinweis)
+        }
+    }
+    if ($gefunden.Count) {
+        Write-Host "[seg]        Diese Prozesse laufen noch und koennen Dateien halten:" -ForegroundColor DarkYellow
+        $gefunden | ForEach-Object { Write-Host $_ -ForegroundColor DarkYellow }
+    }
+    Write-Host "[seg]        Es wurde NICHTS beendet (XPLAT-29(b) liegt bei Robin)." -ForegroundColor DarkYellow
+}
+
+function Initialize-Ausgabeverzeichnis($pfad) {
+    if (Test-Path $pfad) {
+        try {
+            Remove-Item $pfad -Recurse -Force -ErrorAction Stop
+        }
+        catch {
+            Write-Host "[seg] HINWEIS (XPLAT-29): das Ausgabeverzeichnis des vorigen Laufs" -ForegroundColor DarkYellow
+            Write-Host "[seg]        laesst sich nicht raeumen - der Lauf geht trotzdem weiter." -ForegroundColor DarkYellow
+            Write-Host "[seg]        $($_.Exception.Message)" -ForegroundColor DarkYellow
+            Nenne-Waisen
+            $ausweich = Join-Path $pfad ("lauf-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
+            try {
+                $null = New-Item -ItemType Directory -Path $ausweich -Force -ErrorAction Stop
+            }
+            catch {
+                # Hier ist wirklich Schluss: kein Ausgabeort, also kein Lauf.
+                # Das ist ein ehrliches Scheitern VOR dem ersten Segment - im
+                # Gegensatz zu vorher sagt es aber, woran es lag.
+                Write-Host "[seg] FEHLER: auch das Ausweichverzeichnis liess sich nicht anlegen:" -ForegroundColor Red
+                Write-Host "[seg]        $ausweich" -ForegroundColor Red
+                Write-Host "[seg]        $($_.Exception.Message)" -ForegroundColor Red
+                exit 2
+            }
+            Write-Host "[seg]        Ausgewichen auf: $ausweich" -ForegroundColor DarkYellow
+            return $ausweich
+        }
+    }
+    $null = New-Item -ItemType Directory -Path $pfad -Force
+    return $pfad
+}
+
 $outDir = if ($env:LIGHTOS_SEG_OUT) { $env:LIGHTOS_SEG_OUT } else { Join-Path $repo ".pytest_segments" }
-if (Test-Path $outDir) { Remove-Item $outDir -Recurse -Force }
-$null = New-Item -ItemType Directory -Path $outDir -Force
+$outDir = Initialize-Ausgabeverzeichnis $outDir
 $resultsTsv = Join-Path $outDir "results.tsv"
 
 function Get-LogPfad([string]$rel) {
