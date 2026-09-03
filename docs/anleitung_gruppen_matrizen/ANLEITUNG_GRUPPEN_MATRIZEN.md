@@ -120,14 +120,19 @@ Sektion **Patchen** → Tab **Fixture-Gruppen**.
    so steht es als **ganzes Gerät** in einer Zelle.
 2. **Rechtsklick auf genau diese Zelle.** Für ein Mehrkopf-Gerät bietet das Menü:
    * „Zelle entfernen"
-   * **„aufteilen (48 Elemente)"** mit den Unterpunkten „als Zeile", „als Spalte",
-     **„als Block…"**
+   * **„aufteilen (48 Elemente)"** mit den Unterpunkten
+     **„wie im Gerät hinterlegt (4×12)"**, „als Zeile", „als Spalte", **„als Block…"**
    * „Alle Zellen von" *…Gerätename…* „entfernen"
-3. **„als Block…"** öffnet den Dialog „Als Block aufteilen" mit der Frage
-   „Spalten (bei 48 Elementen):". Vorbelegt ist ein **Teiler** der Elementzahl nahe der
-   Quadratwurzel — bei 48 also 6. Für den Balken **12** eintragen.
+3. **„wie im Gerät hinterlegt (4×12)"** ist der kurze Weg — ein Klick, fertig. Die
+   Form kommt aus dem Fixture-Profil (Feld „Raster" im Fixture-Generator); der
+   Menüpunkt zeigt sie in Klammern und erscheint nur, wenn sie zur Kopfzahl passt.
+   Fehlt er, ist für das Gerät keine Form hinterlegt — dann hilft **„als Block…"**:
+   der Dialog „Als Block aufteilen" fragt „Spalten (bei 48 Elementen):" und ist,
+   wenn das Gerät eine Form kennt, damit **vorbelegt** (bei 48 Zonen: 12). Kennt es
+   keine, steht dort ein Teiler nahe der Quadratwurzel (bei 48 also 6).
+   Für den Balken **12** eintragen.
 
-Ergebnis: **12 Spalten × 4 Zeilen**.
+Ergebnis: **12 Spalten × 4 Zeilen** — auf beiden Wegen.
 
 ```
 Nach „als Block…" mit 12 Spalten (K1 = Kopf 1):
@@ -154,9 +159,10 @@ Dabei gilt:
 * Dasselbe Gerät steht **nie doppelt** im Raster: eine frühere Platzierung wird
   freigegeben, nicht verdoppelt.
 
-**Zwei Dinge kann nur dieser Weg:** Er nimmt das Zielgerät aus der Zelle **unter dem
-Mauszeiger** (kein Suchen im Baum), und **„als Block…"** — also das Rechteck — gibt es
-ausschließlich hier.
+**Eines kann nur dieser Weg:** Er nimmt das Zielgerät aus der Zelle **unter dem
+Mauszeiger** (kein Suchen im Baum). Das Rechteck gibt es seit FM-40 auch links am
+Knopf — dort allerdings nur in der hinterlegten Form, die freie Spaltenwahl
+(„als Block…") bleibt dem Rechtsklick vorbehalten.
 
 ---
 
@@ -164,13 +170,17 @@ ausschließlich hier.
 
 Links im Baum das Gerät **anklicken**, dann **„Köpfe einzeln → Raster ▾"**:
 
+* **„wie im Gerät hinterlegt (4×12)"** — die Form aus dem Fixture-Profil, mit den
+  echten Zahlen in Klammern. Ganz oben, weil sie die einzige Anordnung ist, die nicht
+  geraten ist. Ausgegraut, wenn für das Gerät keine Form hinterlegt ist oder sie nicht
+  zur Kopfzahl passt.
 * „als Zeile (waagerecht)" — ein waagerechter Streifen
 * „als Spalte (hochkant)" — ein senkrechter Streifen
 * **„Köpfe zusammenfassen (eine Zelle)"** — der Rückweg (siehe Abschnitt 5)
 
-Auch hier wächst das Raster vorher so weit, dass der Streifen in der gewünschten
-Richtung überhaupt Platz hat — sonst würde die Ausweichregel die Köpfe umbiegen und die
-Orientierung wäre genau falsch herum.
+Auch hier wächst das Raster vorher so weit, dass Streifen oder Rechteck in der
+gewünschten Form überhaupt Platz haben — sonst würde die Ausweichregel die Köpfe
+umbiegen und die Orientierung wäre genau falsch herum.
 
 > **Fallstrick:** Die **blaue Markierung** im Baum zeigt nur, welche Geräte schon in
 > dieser Gruppe liegen — sie ist **keine Auswahl**. Wenn LightOS nach dem Gerät fragt,

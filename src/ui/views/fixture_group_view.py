@@ -822,6 +822,15 @@ class FixtureGroupView(QWidget):
             "Unabhängig von der Auto-Anlage beim Patchen: hier bestimmst du die "
             "Anordnung von Hand.")
         _heads_menu = QMenu(self._btn_heads)
+        # FM-40: die im Gerät hinterlegte Form steht OBEN — sie ist die einzige
+        # Anordnung, die nicht geraten ist, und damit fast immer die gesuchte.
+        # Beschriftung/Verfügbarkeit werden beim Aufklappen nachgezogen
+        # (`_heads_menu_aktualisieren`), weil sie am gewählten Gerät hängen und
+        # nicht am Menü.
+        self._act_hinterlegt = _heads_menu.addAction("wie im Gerät hinterlegt")
+        self._act_hinterlegt.triggered.connect(self._place_heads_hinterlegt)
+        _heads_menu.addSeparator()
+        _heads_menu.aboutToShow.connect(self._heads_menu_aktualisieren)
         _act_row = _heads_menu.addAction("als Zeile (waagerecht)")
         _act_row.triggered.connect(self._place_heads_horizontal)
         _act_col = _heads_menu.addAction("als Spalte (hochkant)")
@@ -1503,6 +1512,15 @@ class FixtureGroupView(QWidget):
                 # Ganze-Geräte-Zelle mit mehreren Köpfen -> aufteilen anbieten.
                 menu.addSeparator()
                 sub = menu.addMenu(f'„{name}“ aufteilen ({n} Elemente)')
+                # FM-40: hinterlegte Form zuerst — hier wie am Knopf. Zwei Wege
+                # mit unterschiedlichem Angebot waeren schlimmer als einer.
+                _form = self._hinterlegte_form(fx, n)
+                if _form is not None:
+                    _z, _s = _form
+                    sub.addAction(f"wie im Gerät hinterlegt ({_z}×{_s})"
+                                  ).triggered.connect(
+                        lambda: self._cell_menu_split(fx, n, "hinterlegt", col, row))
+                    sub.addSeparator()
                 sub.addAction("als Zeile").triggered.connect(
                     lambda: self._cell_menu_split(fx, n, "row", col, row))
                 sub.addAction("als Spalte").triggered.connect(
@@ -1541,21 +1559,55 @@ class FixtureGroupView(QWidget):
         gw.update()
         gw.positions_changed.emit()
 
+    def _block_platzieren(self, fx, n: int, spalten: int, titel: str,
+                          col: int | None = None, row: int | None = None) -> bool:
+        """Die Köpfe von ``fx`` als Rechteck mit ``spalten`` Spalten ablegen.
+
+        EINE Implementierung für beide Wege — das Kontextmenü („als Block…",
+        mit Rückfrage) und den Knopf („wie im Gerät hinterlegt", ohne). Getrennt
+        gepflegt wären es zwei Fassungen derselben Regeln (Raster vorher
+        vergrößern, Pixel-Reihenfolge, Montage-Drehung/Flip), und genau daran
+        laufen sie erfahrungsgemäß auseinander.
+
+        Rückgabe: ob etwas platziert wurde."""
+        gw = self._grid_widget
+        drehung = int(getattr(fx, "element_rotation", 0) or 0)
+        self._grow_grid_for_block(n, spalten, rotation=drehung)
+        placed = gw.place_fixture_block(
+            fx.fid, n, spalten, col, row,
+            order=getattr(fx, "pixel_order", "rowwise") or "rowwise",
+            rotation=drehung,
+            flip=bool(getattr(fx, "element_flip", False)))
+        if not placed:
+            QMessageBox.information(self, titel,
+                                    "Im Raster ist keine Zelle frei — erst "
+                                    "Spalten/Reihen erhöhen oder Platz machen.")
+            return False
+        if len(placed) < n:
+            QMessageBox.information(
+                self, titel,
+                f"Nur {len(placed)} von {n} Elementen platziert — das Raster "
+                "war voll. Rest nach dem Vergrößern erneut einfügen.")
+        gw.update()
+        gw.positions_changed.emit()
+        return True
+
     def _cell_menu_split(self, fx, n: int, wie: str, col: int, row: int):
         """Aufteilen an der angeklickten Stelle — Zeile, Spalte oder Block."""
         gw = self._grid_widget
         titel = "Aufteilen"
-        if wie == "block":
-            spalten = self._ask_block_cols(n)
-            if spalten is None:
-                return
-            drehung = int(getattr(fx, "element_rotation", 0) or 0)
-            self._grow_grid_for_block(n, spalten, rotation=drehung)
-            placed = gw.place_fixture_block(
-                fx.fid, n, spalten, col, row,
-                order=getattr(fx, "pixel_order", "rowwise") or "rowwise",
-                rotation=drehung,
-                flip=bool(getattr(fx, "element_flip", False)))
+        if wie in ("block", "hinterlegt"):
+            if wie == "hinterlegt":
+                form = self._hinterlegte_form(fx, n)
+                if form is None:
+                    return          # Menue bietet es dann gar nicht erst an
+                spalten = form[1]
+            else:
+                spalten = self._ask_block_cols(n, fx)
+                if spalten is None:
+                    return
+            self._block_platzieren(fx, n, spalten, titel, col, row)
+            return
         else:
             vertical = (wie == "col")
             self._grow_grid_for_strip(n, vertical=vertical)
@@ -1574,16 +1626,29 @@ class FixtureGroupView(QWidget):
         gw.update()
         gw.positions_changed.emit()
 
-    def _ask_block_cols(self, n: int) -> int | None:
-        """Spaltenzahl für den Block erfragen — vorbelegt mit einem TEILER von
-        ``n``, damit der Block aufgeht (48 -> 12, nicht 7). Ein Rest wäre kein
-        Fehler (die letzte Zeile bliebe kürzer), aber bei einem Panel ist eine
-        angebrochene Zeile fast immer ein Vertipper."""
-        teiler = [t for t in range(2, n) if n % t == 0]
-        vorschlag = min(teiler, key=lambda t: abs(t - (n ** 0.5)), default=n)
+    def _ask_block_cols(self, n: int, fx=None) -> int | None:
+        """Spaltenzahl für den Block erfragen.
+
+        **Vorbelegt aus dem Gerät, wenn es eine hinterlegte Form hat** (FM-40) —
+        das ist die einzige Zahl, die nicht geraten ist. Sonst wie bisher ein
+        TEILER von ``n`` nahe der Wurzel, damit der Block aufgeht.
+
+        ★ Warum das mehr als Bequemlichkeit ist: der geratene Teiler liegt beim
+        ZQ06121 (48 Zonen) bei 6 oder 8 — das Gerät hat aber **12** Spalten. Der
+        Vorschlag war also nicht nur unbequem, er war zuverlässig falsch, und
+        wer ihn bestätigt, bekommt ein Panel in der falschen Form."""
+        form = self._hinterlegte_form(fx, n) if fx is not None else None
+        if form is not None:
+            zeilen, spalten = form
+            vorschlag = spalten
+            frage = (f"Spalten (bei {n} Elementen) — "
+                     f"im Gerät hinterlegt: {zeilen}×{spalten}:")
+        else:
+            teiler = [t for t in range(2, n) if n % t == 0]
+            vorschlag = min(teiler, key=lambda t: abs(t - (n ** 0.5)), default=n)
+            frage = f"Spalten (bei {n} Elementen):"
         wert, ok = QInputDialog.getInt(
-            self, "Als Block aufteilen",
-            f"Spalten (bei {n} Elementen):", vorschlag, 1, max(1, n), 1)
+            self, "Als Block aufteilen", frage, vorschlag, 1, max(1, n), 1)
         return int(wert) if ok else None
 
     def _grow_grid_for_block(self, n: int, spalten: int, *,
@@ -1632,12 +1697,51 @@ class FixtureGroupView(QWidget):
                 "Hinweis: Die blaue Markierung im Baum zeigt nur, welche Geräte "
                 "schon in dieser Gruppe liegen — sie ist keine Auswahl.")
             return None
-        fx = next((f for f in self._state.get_patched_fixtures()
-                   if f.fid == int(fid)), None)
+        fx = self._target_fixture_leise()
         if fx is None:
             QMessageBox.information(self, title,
                                     "Das gewählte Gerät ist nicht mehr gepatcht.")
         return fx
+
+    def _target_fixture_leise(self):
+        """Dasselbe Zielgerät wie ``_selected_tree_fixture``, aber OHNE Dialog —
+        für Menü-Beschriftung und Tooltip, die beim Aufklappen laufen und dabei
+        niemanden anreden dürfen. Bewusst dieselbe Quelle (``_target_fid``), damit
+        die beiden Wege nicht auseinanderlaufen."""
+        fid = self._target_fid()
+        if fid is None:
+            return None
+        return next((f for f in self._state.get_patched_fixtures()
+                     if f.fid == int(fid)), None)
+
+    def _hinterlegte_form(self, fx, n: int | None = None):
+        """FM-40: die im Fixture-Profil hinterlegte physische Rasterform
+        ``(zeilen, spalten)`` — oder ``None``.
+
+        ★ Die Form liegt längst vor: VIZ-50a legt sie als
+        ``FixtureMode.grid_rows``/``grid_cols`` ab und ``panel_grid_for`` liest
+        sie. Gelesen hat sie bisher aber **nur der Visualizer** — im
+        Gruppen-Editor landete jedes Panel als Streifen, und die Form musste
+        jedes Mal von Hand nachgestellt werden. Es fehlte kein Datum, nur der
+        Aufruf.
+
+        ``None`` heißt „nicht anbieten" und hat zwei Gründe, die bewusst gleich
+        behandelt werden: es ist **nichts hinterlegt** (dann wäre jede Zahl
+        geraten), oder die Form **passt nicht zur Kopfzahl** (``zeilen*spalten
+        != n``). Der zweite Fall ist der gefährlichere — ein Panel als falsches
+        Rechteck abzulegen sieht richtig aus und ist es nicht. Lieber die
+        bisherige Frage stellen als still danebenlegen."""
+        try:
+            from src.core.app_state import panel_grid_for
+            zeilen, spalten = panel_grid_for(fx)
+            zeilen, spalten = int(zeilen or 0), int(spalten or 0)
+        except Exception:
+            return None
+        if zeilen < 1 or spalten < 1:
+            return None
+        if n is not None and zeilen * spalten != int(n):
+            return None
+        return (zeilen, spalten)
 
     def _grow_grid_for_strip(self, count: int, *, vertical: bool):
         """Raster so vergrößern, dass ein Kopf-Streifen der Länge ``count`` in der
@@ -1698,6 +1802,72 @@ class FixtureGroupView(QWidget):
                 "voll. Rest nach dem Vergrößern erneut einfügen.")
         gw.update()
         gw.positions_changed.emit()
+
+    def _heads_menu_aktualisieren(self):
+        """Beschriftet die „hinterlegt"-Aktion mit der ECHTEN Form des gerade
+        gewählten Geräts und schaltet sie ab, wenn es keine gibt.
+
+        Der Name allein („wie im Gerät hinterlegt") sagt nicht, was passieren
+        wird — „wie im Gerät hinterlegt (4×12)" schon. Und eine Aktion, die für
+        das gewählte Gerät gar nichts tun kann, gehört ausgegraut statt in einen
+        Dialog, der erklärt, warum sie nichts getan hat."""
+        act = getattr(self, "_act_hinterlegt", None)
+        if act is None:
+            return
+        fx = self._target_fixture_leise()
+        n = 0
+        if fx is not None:
+            from src.core.app_state import color_head_count
+            try:
+                n = int(color_head_count(fx))
+            except Exception:
+                n = 0
+        form = self._hinterlegte_form(fx, n) if (fx is not None and n >= 2) else None
+        if form is None:
+            act.setText("wie im Gerät hinterlegt")
+            act.setEnabled(False)
+            act.setToolTip("Für dieses Gerät ist keine Rasterform hinterlegt "
+                           "(oder sie passt nicht zur Kopfzahl) — dann wäre "
+                           "jede Anordnung geraten.")
+            return
+        zeilen, spalten = form
+        act.setText(f"wie im Gerät hinterlegt ({zeilen}×{spalten})")
+        act.setEnabled(True)
+        act.setToolTip(f"Legt die {n} Köpfe als {zeilen}×{spalten} ab — die Form, "
+                       "die im Fixture-Profil steht. Montage-Drehung und "
+                       "Pixel-Reihenfolge des Geräts werden dabei verrechnet.")
+
+    def _place_heads_hinterlegt(self, _checked: bool = False):
+        """FM-40: die Köpfe in der Form ablegen, die am Fixture hinterlegt ist."""
+        titel = "Köpfe → hinterlegtes Raster"
+        fx = self._selected_tree_fixture(titel)
+        if fx is None:
+            return
+        from src.core.app_state import color_head_count
+        try:
+            n = int(color_head_count(fx))
+        except Exception:
+            n = 0
+        if n < 2:
+            _name = getattr(fx, "label", "") or f"Fixture {fx.fid}"
+            QMessageBox.information(
+                self, titel,
+                f"{_name} hat keine pro-Kopf färbbaren Bänke — es gibt also "
+                "keine Einzelköpfe, die man im Raster verteilen könnte.")
+            return
+        form = self._hinterlegte_form(fx, n)
+        if form is None:
+            _name = getattr(fx, "label", "") or f"Fixture {fx.fid}"
+            QMessageBox.information(
+                self, titel,
+                f"Für {_name} ist keine Rasterform hinterlegt, oder sie passt "
+                f"nicht zu den {n} Köpfen.\n\n"
+                'Jede Anordnung wäre hier geraten — nimm „als Zeile“ oder '
+                '„als Spalte“, oder trag die Form im Fixture-Generator '
+                '(Feld „Raster“) ein, dann steht sie künftig hier.')
+            return
+        zeilen, spalten = form
+        self._block_platzieren(fx, n, spalten, titel)
 
     def _place_heads_horizontal(self, _checked: bool = False):
         self._place_heads(vertical=False)
