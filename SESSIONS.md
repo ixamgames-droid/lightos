@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| PROC-10 | B | feature/proc10-ci-status-werkzeug | 2026-09-03T17:31Z | - |
+| _(frei)_ |  |  |  |  |
 
 ## Blocker & Fallen
 
@@ -64,7 +64,6 @@
 
 ## Verlauf
 
-- 2026-09-02T15:28Z B claim XPLAT-30
 - 2026-09-02T16:08Z B done XPLAT-30
 - 2026-09-02T19:45Z B claim XPLAT-23
 - 2026-09-02T20:25Z A claim FM-40
@@ -94,3 +93,4 @@
 - 2026-09-03T17:30Z B uebergeben XPLAT-23
 - 2026-09-03T17:31Z B claim PROC-10
 - 2026-09-03T17:53Z A uebergeben FM-41
+- 2026-09-03T18:04Z B done PROC-10
