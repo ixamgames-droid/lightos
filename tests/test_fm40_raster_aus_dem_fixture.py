@@ -53,9 +53,16 @@ def _stub_view(**attrs):
     die ECHTE Klasse gebunden (kein Nachbau), der Rest ist stubbar."""
     from src.ui.views.fixture_group_view import FixtureGroupView as V
     s = SimpleNamespace(**attrs)
+    # FM-41 hat `_heads_menu_aktualisieren` in drei Teile zerlegt (Aktion
+    # suchen, Zahl der Achse holen, beschriften) — die Stellvertreter-Liste
+    # zieht mit, sonst prueft der Test einen Nachbau statt der echten Methode.
     for name in ("_hinterlegte_form", "_ask_block_cols", "_heads_menu_aktualisieren",
-                 "_block_platzieren", "_grow_grid_for_block"):
+                 "_block_platzieren", "_grow_grid_for_block",
+                 "_act_hinterlegt_fuer", "_achsen_zahl"):
         setattr(s, name, types.MethodType(getattr(V, name), s))
+    # Klassen-Konstanten gehoeren zum Stellvertreter dazu — sie sind Teil der
+    # echten Methoden, nicht ihres Aufrufkontexts.
+    s._ACHSEN_WORT = V._ACHSEN_WORT
     return s
 
 

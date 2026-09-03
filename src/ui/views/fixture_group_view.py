@@ -21,7 +21,7 @@ from sqlalchemy import select, delete
 
 
 from src.core.group_cells import (          # noqa: E402  (nach den Qt-Importen)
-    ACHSE_FARBE, ACHSE_WEISS, parse_zelle, zelle_gehoert_zu,
+    ACHSE_FARBE, ACHSE_WEISS, parse_zelle, zelle_fuer, zelle_gehoert_zu,
 )
 
 
@@ -335,6 +335,18 @@ class FixtureGridWidget(QWidget):
     def place_fixture_heads(self, fid: int, count: int,
                             col: int | None = None, row: int | None = None,
                             *, vertical: bool = False) -> list[tuple[int, int]]:
+        """Die Farb-Achse — der eingefuehrte Name, unveraendert im Verhalten.
+
+        Seit FM-41 die duenne Fassung von :meth:`place_fixture_axis`. Alle
+        Aufrufstellen und die Slice-3-Tests bleiben, wie sie sind; was frueher
+        „die Koepfe" hiess, ist jetzt ausgesprochen „die Koepfe der Farb-Achse".
+        """
+        return self.place_fixture_axis(fid, ACHSE_FARBE, count, col, row,
+                                       vertical=vertical)
+
+    def place_fixture_axis(self, fid: int, achse: str, count: int,
+                           col: int | None = None, row: int | None = None,
+                           *, vertical: bool = False) -> list[tuple[int, int]]:
         """FM-HEADLAYOUT Slice 3: setzt die ``count`` Köpfe eines Multi-Head-
         Fixtures als EINZELNE Zellen (``"fid:head"``) ab — **waagerecht** (Zeile)
         oder **hochkant** (Spalte, ``vertical=True``). Davids Kernwunsch: die Köpfe
@@ -358,7 +370,14 @@ class FixtureGridWidget(QWidget):
         Aufrufer vergrößert vorher, wenn der Streifen sonst nicht hineinpasst.
 
         Rückgabe: die tatsächlich belegten Zellen in Kopf-Reihenfolge (leer, wenn
-        nichts platziert werden konnte)."""
+        nichts platziert werden konnte).
+
+        ★ FM-41: ``achse`` sagt, WELCHER Satz ausgelegt wird — die Farb-Zonen
+        (``ACHSE_FARBE``, das bisherige Verhalten, Zellwerte byte-gleich) oder
+        die eigenen Weiß-Segmente (``ACHSE_WEISS``). Beide Sätze dürfen
+        gleichzeitig im Raster liegen; das Auslegen des einen räumt den anderen
+        nicht weg. Genau das ist der Zweck von FM-41: eine Gruppe aus Weiß, aus
+        RGB oder aus beidem."""
         try:
             count = int(count)
         except (TypeError, ValueError):
@@ -369,7 +388,7 @@ class FixtureGridWidget(QWidget):
         # neu auslegt, raeumt damit nicht dessen Weiss-Segmente weg — sie
         # sind der zweite, eigenstaendige Satz. Die achsenlose
         # Ganz-Geraet-Zelle geht mit, sonst staende es doppelt.
-        self._drop_fid_cells(fid, ACHSE_FARBE)
+        self._drop_fid_cells(fid, achse)
         if col is None or row is None:
             _free = self.first_free_cells(1)
             want_c, want_r = _free[0] if _free else (0, 0)
@@ -395,7 +414,10 @@ class FixtureGridWidget(QWidget):
                 cell = (c, r)
             if cell is None:
                 break               # Raster voll -> Rest bleibt ungesetzt
-            self.positions[cell] = f"{fid}:{h}"
+            # ★ FM-41: ueber `zelle_fuer`, nicht per f-String. Hier stand die
+            # zweite Stelle im Baum, an der ein Zellwert ENTSTEHT — genau die,
+            # vor der `zelle_fuer` warnt. Fuer die Farb-Achse byte-gleich.
+            self.positions[cell] = zelle_fuer(fid, achse, h)
             placed.append(cell)
         return placed
 
@@ -421,6 +443,7 @@ class FixtureGridWidget(QWidget):
 
     def place_fixture_block(self, fid: int, count: int, block_cols: int,
                             col: int | None = None, row: int | None = None,
+                            achse: str = ACHSE_FARBE,
                             *, order: str = "rowwise",
                             rotation: int = 0, flip: bool = False
                             ) -> list[tuple[int, int]]:
@@ -471,7 +494,7 @@ class FixtureGridWidget(QWidget):
         # neu auslegt, raeumt damit nicht dessen Weiss-Segmente weg — sie
         # sind der zweite, eigenstaendige Satz. Die achsenlose
         # Ganz-Geraet-Zelle geht mit, sonst staende es doppelt.
-        self._drop_fid_cells(fid, ACHSE_FARBE)
+        self._drop_fid_cells(fid, achse)
         if col is None or row is None:
             _free = self.first_free_cells(1)
             want_c, want_r = _free[0] if _free else (0, 0)
@@ -496,7 +519,10 @@ class FixtureGridWidget(QWidget):
                 cell = (c, r)
             if cell is None:
                 break               # Raster voll -> Rest bleibt ungesetzt
-            self.positions[cell] = f"{fid}:{h}"
+            # ★ FM-41: ueber `zelle_fuer`, nicht per f-String. Hier stand die
+            # zweite Stelle im Baum, an der ein Zellwert ENTSTEHT — genau die,
+            # vor der `zelle_fuer` warnt. Fuer die Farb-Achse byte-gleich.
+            self.positions[cell] = zelle_fuer(fid, achse, h)
             placed.append(cell)
         return placed
 
@@ -856,34 +882,67 @@ class FixtureGroupView(QWidget):
         # FM-HEADLAYOUT Slice 3: Köpfe eines Multi-Head-Geräts als EINZELNE Zellen
         # ins Raster — mit Orientierung, damit das Raster dem realen Rig-Aufbau
         # folgen kann (Hydrabeam hochkant vs. Spider-Bar waagerecht).
-        self._btn_heads = QPushButton("Köpfe einzeln → Raster ▾")
-        self._btn_heads.setToolTip(
-            "Setzt die Köpfe des im Baum gewählten Mehrkopf-Geräts als einzelne "
-            "Zellen ins Raster (waagerecht oder hochkant) — so ansprechbar wie "
-            "eine Pro-Kopf-Matrix.\n"
-            "Die Köpfe lassen sich danach frei einzeln verschieben/tauschen "
-            "(Drag) und einzeln entfernen (Rechtsklick).\n"
-            "Unabhängig von der Auto-Anlage beim Patchen: hier bestimmst du die "
-            "Anordnung von Hand.")
-        _heads_menu = QMenu(self._btn_heads)
-        # FM-40: die im Gerät hinterlegte Form steht OBEN — sie ist die einzige
-        # Anordnung, die nicht geraten ist, und damit fast immer die gesuchte.
-        # Beschriftung/Verfügbarkeit werden beim Aufklappen nachgezogen
-        # (`_heads_menu_aktualisieren`), weil sie am gewählten Gerät hängen und
-        # nicht am Menü.
-        self._act_hinterlegt = _heads_menu.addAction("wie im Gerät hinterlegt")
-        self._act_hinterlegt.triggered.connect(self._place_heads_hinterlegt)
-        _heads_menu.addSeparator()
-        _heads_menu.aboutToShow.connect(self._heads_menu_aktualisieren)
-        _act_row = _heads_menu.addAction("als Zeile (waagerecht)")
-        _act_row.triggered.connect(self._place_heads_horizontal)
-        _act_col = _heads_menu.addAction("als Spalte (hochkant)")
-        _act_col.triggered.connect(self._place_heads_vertical)
-        _heads_menu.addSeparator()
-        _act_one = _heads_menu.addAction("Köpfe zusammenfassen (eine Zelle)")
-        _act_one.triggered.connect(self._collapse_heads)
-        self._btn_heads.setMenu(_heads_menu)
-        left.addWidget(self._btn_heads)
+        # ★★ FM-41: DASSELBE Menü zweimal — einmal für die Farb-Zonen, einmal
+        # für die eigenen Weiß-Segmente. Robins Bild dazu: ein Gerät mit eigener
+        # Weiß-Leiste hat zwei „Hauptfixtures", aus denen sich Gruppen bauen
+        # lassen — nur RGB, nur Weiß, oder beides zusammen. Deshalb eine
+        # FABRIK und keine Kopie: eine zweite, von Hand gepflegte Menü-Fassung
+        # wäre wieder die Doppelstellen-Klasse (Checkliste 17), und die beiden
+        # liefen beim nächsten Eintrag auseinander.
+        self._acts_hinterlegt: dict[str, object] = {}
+        self._btn_achse: dict[str, QPushButton] = {}
+        for _achse, _titel, _hilfe in (
+            (ACHSE_FARBE, "Köpfe einzeln → Raster ▾",
+             "Setzt die Köpfe des im Baum gewählten Mehrkopf-Geräts als einzelne "
+             "Zellen ins Raster (waagerecht oder hochkant) — so ansprechbar wie "
+             "eine Pro-Kopf-Matrix.\n"
+             "Die Köpfe lassen sich danach frei einzeln verschieben/tauschen "
+             "(Drag) und einzeln entfernen (Rechtsklick).\n"
+             "Unabhängig von der Auto-Anlage beim Patchen: hier bestimmst du die "
+             "Anordnung von Hand."),
+            (ACHSE_WEISS, "Weiß-Segmente einzeln → Raster ▾",
+             "Setzt die EIGENEN Weiß-Segmente des gewählten Geräts als einzelne "
+             "Zellen ins Raster — unabhängig von seinen Farb-Zonen.\n"
+             "Beide Sätze dürfen gleichzeitig im Raster liegen: so entsteht eine "
+             "Gruppe nur aus Weiß, nur aus RGB, oder aus beidem.\n"
+             "Nur aktiv, wenn das Gerät eigene Weiß-Kanäle hat (color_w) — die "
+             "Zahl steht im Fixture-Profil, sie wird nicht geraten."),
+        ):
+            _btn = QPushButton(_titel)
+            _btn.setToolTip(_hilfe)
+            _menu = QMenu(_btn)
+            # FM-40: die im Gerät hinterlegte Form steht OBEN — sie ist die
+            # einzige Anordnung, die nicht geraten ist, und damit fast immer die
+            # gesuchte. Beschriftung/Verfügbarkeit werden beim Aufklappen
+            # nachgezogen (`_heads_menu_aktualisieren`), weil sie am gewählten
+            # Gerät hängen und nicht am Menü.
+            _act_h = _menu.addAction("wie im Gerät hinterlegt")
+            _act_h.triggered.connect(
+                lambda _c=False, a=_achse: self._place_heads_hinterlegt(achse=a))
+            self._acts_hinterlegt[_achse] = _act_h
+            _menu.addSeparator()
+            _menu.aboutToShow.connect(
+                lambda a=_achse: self._heads_menu_aktualisieren(a))
+            _act_row = _menu.addAction("als Zeile (waagerecht)")
+            _act_row.triggered.connect(
+                lambda _c=False, a=_achse: self._place_heads(vertical=False, achse=a))
+            _act_col = _menu.addAction("als Spalte (hochkant)")
+            _act_col.triggered.connect(
+                lambda _c=False, a=_achse: self._place_heads(vertical=True, achse=a))
+            _menu.addSeparator()
+            # Zusammenfassen gilt fuer das GANZE Geraet (beide Achsen) und steht
+            # deshalb nur einmal im Farb-Menue — zweimal derselbe Eintrag mit
+            # derselben Wirkung waere irrefuehrend.
+            if _achse == ACHSE_FARBE:
+                _act_one = _menu.addAction("Köpfe zusammenfassen (eine Zelle)")
+                _act_one.triggered.connect(self._collapse_heads)
+            _btn.setMenu(_menu)
+            left.addWidget(_btn)
+            self._btn_achse[_achse] = _btn
+        # Eingefuehrter Name der Farb-Fassung — Tests und aeltere Aufrufer
+        # kennen ihn, und er meint weiterhin genau dasselbe Menue.
+        self._btn_heads = self._btn_achse[ACHSE_FARBE]
+        self._act_hinterlegt = self._acts_hinterlegt[ACHSE_FARBE]
 
         btn_all = QPushButton("Alle → Raster")
         btn_all.setToolTip("Alle gepatchten Fixtures ins Raster übernehmen "
@@ -1604,7 +1663,8 @@ class FixtureGroupView(QWidget):
         gw.positions_changed.emit()
 
     def _block_platzieren(self, fx, n: int, spalten: int, titel: str,
-                          col: int | None = None, row: int | None = None) -> bool:
+                          col: int | None = None, row: int | None = None,
+                          achse: str = ACHSE_FARBE) -> bool:
         """Die Köpfe von ``fx`` als Rechteck mit ``spalten`` Spalten ablegen.
 
         EINE Implementierung für beide Wege — das Kontextmenü („als Block…",
@@ -1618,7 +1678,7 @@ class FixtureGroupView(QWidget):
         drehung = int(getattr(fx, "element_rotation", 0) or 0)
         self._grow_grid_for_block(n, spalten, rotation=drehung)
         placed = gw.place_fixture_block(
-            fx.fid, n, spalten, col, row,
+            fx.fid, n, spalten, col, row, achse,
             order=getattr(fx, "pixel_order", "rowwise") or "rowwise",
             rotation=drehung,
             flip=bool(getattr(fx, "element_flip", False)))
@@ -1758,7 +1818,8 @@ class FixtureGroupView(QWidget):
         return next((f for f in self._state.get_patched_fixtures()
                      if f.fid == int(fid)), None)
 
-    def _hinterlegte_form(self, fx, n: int | None = None):
+    def _hinterlegte_form(self, fx, n: int | None = None,
+                          achse: str = ACHSE_FARBE):
         """FM-40: die im Fixture-Profil hinterlegte physische Rasterform
         ``(zeilen, spalten)`` — oder ``None``.
 
@@ -1774,18 +1835,65 @@ class FixtureGroupView(QWidget):
         geraten), oder die Form **passt nicht zur Kopfzahl** (``zeilen*spalten
         != n``). Der zweite Fall ist der gefährlichere — ein Panel als falsches
         Rechteck abzulegen sieht richtig aus und ist es nicht. Lieber die
-        bisherige Frage stellen als still danebenlegen."""
+        bisherige Frage stellen als still danebenlegen.
+
+        ★★ FM-41: die Weiß-Segmente haben eine EIGENE hinterlegte Form
+        (``white_grid_for``, CDX-52) — nicht die des Farbrasters. Sie hier
+        mitzulesen ist der Unterschied zwischen „die 8 Weiß-Segmente des
+        ZQ06121 liegen als 1×8-Leiste" und „irgendwie als Rechteck". Und der
+        Fall „nichts hinterlegt" heißt auf beiden Achsen dasselbe: **nicht
+        anbieten**, statt eine Form zu raten."""
         try:
-            from src.core.app_state import panel_grid_for
-            zeilen, spalten = panel_grid_for(fx)
+            from src.core.app_state import panel_grid_for, white_grid_for
+            _quelle = white_grid_for if achse == ACHSE_WEISS else panel_grid_for
+            zeilen, spalten = _quelle(fx)
             zeilen, spalten = int(zeilen or 0), int(spalten or 0)
         except Exception:
             return None
+        if achse == ACHSE_WEISS and n:
+            zeilen, spalten = self._weiss_form_ergaenzen(fx, zeilen, spalten, int(n))
         if zeilen < 1 or spalten < 1:
             return None
         if n is not None and zeilen * spalten != int(n):
             return None
         return (zeilen, spalten)
+
+    @staticmethod
+    def _weiss_form_ergaenzen(fx, zeilen: int, spalten: int, n: int):
+        """Die halb hinterlegte Weiß-Form vervollständigen. Nur für Weiß.
+
+        ★ Zwei Konventionen, die es im Baum SCHON GIBT — hier gelesen statt neu
+        erfunden:
+
+        1. **Eine 0 heißt „aus der Kanalzahl füllen".** Der ZQ06121 trägt
+           bewusst ``(1, 0)``: „die Warmweiß-Leiste ist EINE Reihe, die
+           Spaltenzahl steht als acht ``color_w``-Kanäle in diesem Modus, und
+           ``panelGrid`` füllt sie daraus" (CDX-52, ``_ZQ06121_WEISS``). Wer
+           hier auf ``spalten >= 1`` besteht, wirft eine hinterlegte Form weg
+           und nennt sie „nicht vorhanden".
+        2. **Gleich viele Weiß- wie Farbköpfe heißt: dieselbe Geometrie.** Das
+           ist wortwörtlich die ENG-25-Regel („das Weiß gehört zur Zelle, wenn
+           ``n_w == n_c``") — dort für den Renderer, hier für die Auslegung.
+           Der Stairville Matrix Blinder 5×5 RGBWW hat 25 Weiß-Kanäle und
+           ``white_grid = (0, 0)``, weil es keine eigene LEISTE gibt: die
+           Weiß-LEDs sitzen IN den 25 Pixeln. Ihre Form ist also die des
+           Panels, 5×5 — und die steht hinterlegt da.
+
+        ``(0, 0)`` ohne passende Farbzahl bleibt ``None``: „keine eigene
+        Weiß-Leiste hinterlegt" heißt nach CDX-52 **nein**, nicht *raten*."""
+        if zeilen >= 1 and spalten < 1 and zeilen and n % zeilen == 0:
+            return zeilen, n // zeilen
+        if spalten >= 1 and zeilen < 1 and spalten and n % spalten == 0:
+            return n // spalten, spalten
+        if zeilen < 1 and spalten < 1:
+            from src.core.app_state import color_head_count, panel_grid_for
+            try:
+                if int(color_head_count(fx)) == n:
+                    pz, ps = panel_grid_for(fx)
+                    return int(pz or 0), int(ps or 0)
+            except Exception:
+                return zeilen, spalten
+        return zeilen, spalten
 
     def _grow_grid_for_strip(self, count: int, *, vertical: bool):
         """Raster so vergrößern, dass ein Kopf-Streifen der Länge ``count`` in der
@@ -1807,25 +1915,46 @@ class FixtureGroupView(QWidget):
         if (cols, rows) != (gw.cols, gw.rows):
             gw.set_grid(cols, rows)
 
-    def _place_heads(self, *, vertical: bool):
+    # ★ FM-41: EINE Stelle, die sagt, was eine Achse ist — Zahl und Wortwahl.
+    # Ohne sie stuende „wie viele?" und „wie heisst das?" gleich viermal im
+    # View (zwei Menues x hinterlegt/Streifen), und beim naechsten Geraetetyp
+    # ein fuenftes Mal. Das ist die Doppelstellen-Klasse aus Checkliste 17.
+    _ACHSEN_WORT = {
+        ACHSE_FARBE: ("Köpfe", "pro-Kopf färbbare Bänke"),
+        ACHSE_WEISS: ("Weiß-Segmente", "eigenen Weiß-Segmente"),
+    }
+
+    def _achsen_zahl(self, fx, achse: str) -> int:
+        """Wie viele ansprechbare Elemente hat ``fx`` auf dieser Achse?
+
+        Farbe: dieselbe Quelle wie die Auto-Kopf-Matrix beim Patchen
+        (``color_head_count``) — sonst driften Hand- und Auto-Anlage.
+        Weiß: ``weiss_segment_count``, das bewusst **nicht** auf 1 aufrundet;
+        ein erfundenes Segment wäre sofort eine Phantom-Zelle."""
+        from src.core.app_state import color_head_count, weiss_segment_count
+        try:
+            if achse == ACHSE_WEISS:
+                return int(weiss_segment_count(fx))
+            return int(color_head_count(fx))
+        except Exception:
+            return 0
+
+    def _place_heads(self, *, vertical: bool, achse: str = ACHSE_FARBE):
         """Setzt die Köpfe des gewählten Geräts als Einzel-Zellen ins Raster.
         Kopfzahl kommt aus derselben Quelle wie die Auto-Kopf-Matrix beim Patchen
         (``app_state.color_head_count``) — sonst driften Hand- und Auto-Anlage."""
-        title = "Köpfe einzeln → Raster"
+        _mehrzahl, _quelle = self._ACHSEN_WORT[achse]
+        title = f"{_mehrzahl} einzeln → Raster"
         fx = self._selected_tree_fixture(title)
         if fx is None:
             return
-        from src.core.app_state import color_head_count
-        try:
-            n = int(color_head_count(fx))
-        except Exception:
-            n = 0
+        n = self._achsen_zahl(fx, achse)
         if n < 2:
             _name = getattr(fx, "label", "") or f"Fixture {fx.fid}"
             QMessageBox.information(
                 self, title,
-                f"{_name} hat keine pro-Kopf färbbaren Bänke — es gibt also "
-                "keine Einzelköpfe, die man im Raster verteilen könnte.")
+                f"{_name} hat keine {_quelle} — es gibt also nichts, was man "
+                "einzeln im Raster verteilen könnte.")
             return
         gw = self._grid_widget
         # Raster erst gross genug machen, sonst KIPPT die gewuenschte Orientierung:
@@ -1833,7 +1962,7 @@ class FixtureGroupView(QWidget):
         # und die Ausweich-Regel (naechste freie Zelle) haette die Koepfe wieder
         # waagerecht verteilt — genau das Gegenteil der Anweisung.
         self._grow_grid_for_strip(n, vertical=vertical)
-        placed = gw.place_fixture_heads(fx.fid, n, vertical=vertical)
+        placed = gw.place_fixture_axis(fx.fid, achse, n, vertical=vertical)
         if not placed:
             QMessageBox.information(self, title,
                                     "Im Raster ist keine Zelle frei — erst "
@@ -1842,12 +1971,26 @@ class FixtureGroupView(QWidget):
         if len(placed) < n:
             QMessageBox.information(
                 self, title,
-                f"Nur {len(placed)} von {n} Köpfen platziert — das Raster war "
-                "voll. Rest nach dem Vergrößern erneut einfügen.")
+                f"Nur {len(placed)} von {n} {_mehrzahl} platziert — das Raster "
+                "war voll. Rest nach dem Vergrößern erneut einfügen.")
         gw.update()
         gw.positions_changed.emit()
 
-    def _heads_menu_aktualisieren(self):
+    def _act_hinterlegt_fuer(self, achse: str):
+        """Die „hinterlegt"-Aktion dieser Achse.
+
+        Rückfall auf den eingeführten Einzelnamen ``_act_hinterlegt``: die
+        Stub-Views der FM-40-Tests setzen genau den, und er meint die
+        Farb-Achse. So bleibt der eingeführte Vertrag gültig, ohne dass eine
+        zweite Menü-Fassung entsteht."""
+        acts = getattr(self, "_acts_hinterlegt", None)
+        if acts:
+            return acts.get(achse)
+        if achse == ACHSE_FARBE:
+            return getattr(self, "_act_hinterlegt", None)
+        return None
+
+    def _heads_menu_aktualisieren(self, achse: str = ACHSE_FARBE):
         """Beschriftet die „hinterlegt"-Aktion mit der ECHTEN Form des gerade
         gewählten Geräts und schaltet sie ab, wenn es keine gibt.
 
@@ -1855,18 +1998,13 @@ class FixtureGroupView(QWidget):
         wird — „wie im Gerät hinterlegt (4×12)" schon. Und eine Aktion, die für
         das gewählte Gerät gar nichts tun kann, gehört ausgegraut statt in einen
         Dialog, der erklärt, warum sie nichts getan hat."""
-        act = getattr(self, "_act_hinterlegt", None)
+        act = self._act_hinterlegt_fuer(achse)
         if act is None:
             return
         fx = self._target_fixture_leise()
-        n = 0
-        if fx is not None:
-            from src.core.app_state import color_head_count
-            try:
-                n = int(color_head_count(fx))
-            except Exception:
-                n = 0
-        form = self._hinterlegte_form(fx, n) if (fx is not None and n >= 2) else None
+        n = self._achsen_zahl(fx, achse) if fx is not None else 0
+        form = (self._hinterlegte_form(fx, n, achse)
+                if (fx is not None and n >= 2) else None)
         if form is None:
             act.setText("wie im Gerät hinterlegt")
             act.setEnabled(False)
@@ -1877,29 +2015,28 @@ class FixtureGroupView(QWidget):
         zeilen, spalten = form
         act.setText(f"wie im Gerät hinterlegt ({zeilen}×{spalten})")
         act.setEnabled(True)
-        act.setToolTip(f"Legt die {n} Köpfe als {zeilen}×{spalten} ab — die Form, "
+        _mehrzahl = self._ACHSEN_WORT[achse][0]
+        act.setToolTip(f"Legt die {n} {_mehrzahl} als {zeilen}×{spalten} ab — die Form, "
                        "die im Fixture-Profil steht. Montage-Drehung und "
                        "Pixel-Reihenfolge des Geräts werden dabei verrechnet.")
 
-    def _place_heads_hinterlegt(self, _checked: bool = False):
+    def _place_heads_hinterlegt(self, _checked: bool = False,
+                                achse: str = ACHSE_FARBE):
         """FM-40: die Köpfe in der Form ablegen, die am Fixture hinterlegt ist."""
-        titel = "Köpfe → hinterlegtes Raster"
+        _mehrzahl, _quelle = self._ACHSEN_WORT[achse]
+        titel = f"{_mehrzahl} → hinterlegtes Raster"
         fx = self._selected_tree_fixture(titel)
         if fx is None:
             return
-        from src.core.app_state import color_head_count
-        try:
-            n = int(color_head_count(fx))
-        except Exception:
-            n = 0
+        n = self._achsen_zahl(fx, achse)
         if n < 2:
             _name = getattr(fx, "label", "") or f"Fixture {fx.fid}"
             QMessageBox.information(
                 self, titel,
-                f"{_name} hat keine pro-Kopf färbbaren Bänke — es gibt also "
-                "keine Einzelköpfe, die man im Raster verteilen könnte.")
+                f"{_name} hat keine {_quelle} — es gibt also nichts, was man "
+                "einzeln im Raster verteilen könnte.")
             return
-        form = self._hinterlegte_form(fx, n)
+        form = self._hinterlegte_form(fx, n, achse)
         if form is None:
             _name = getattr(fx, "label", "") or f"Fixture {fx.fid}"
             QMessageBox.information(
@@ -1911,7 +2048,7 @@ class FixtureGroupView(QWidget):
                 '(Feld „Raster“) ein, dann steht sie künftig hier.')
             return
         zeilen, spalten = form
-        self._block_platzieren(fx, n, spalten, titel)
+        self._block_platzieren(fx, n, spalten, titel, achse=achse)
 
     def _place_heads_horizontal(self, _checked: bool = False):
         self._place_heads(vertical=False)

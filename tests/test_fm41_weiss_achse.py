@@ -494,5 +494,98 @@ class BestandsdatenUnveraendertTest(unittest.TestCase):
                                      parse_group_cell(wert)[0] == fid)
 
 
+class WeissFormTest(unittest.TestCase):
+    """★ Woher die Form der Weiss-Segmente kommt — an ECHTEN Profilen.
+
+    Beide Konventionen standen schon im Baum und wurden hier gelesen, nicht
+    erfunden: eine 0 heisst „aus der Kanalzahl fuellen" (CDX-52,
+    ``_ZQ06121_WEISS = (1, 0)``), und gleich viele Weiss- wie Farbkoepfe heisst
+    „dieselbe Geometrie" (das ist wortwoertlich die ENG-25-Regel).
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        from PySide6.QtWidgets import QApplication
+        cls._app = QApplication.instance() or QApplication([])
+        from _fixture_quelle import frische_library
+        cls._eng = frische_library(cls)
+
+    def _stellvertreter(self, kurz):
+        """Ein Geraet aus der echten Bibliothek, an die echten Methoden gebunden."""
+        import types
+        from sqlalchemy import select
+        from sqlalchemy.orm import Session, selectinload
+        from src.core.database.models import FixtureProfile, FixtureMode
+        import src.core.app_state as AS
+        from src.ui.views.fixture_group_view import FixtureGroupView as V
+        with Session(self._eng) as s:
+            p = s.execute(
+                select(FixtureProfile)
+                .options(selectinload(FixtureProfile.modes)
+                         .selectinload(FixtureMode.channels))
+                .where(FixtureProfile.short_name == kurz)).scalars().first()
+            m = max(p.modes, key=lambda m: m.channel_count)
+            ch = [SimpleNamespace(attribute=c.attribute,
+                                  channel_number=c.channel_number)
+                  for c in sorted(m.channels, key=lambda c: c.channel_number)]
+            weiss = (m.white_rows, m.white_cols)
+            panel = (m.grid_rows, m.grid_cols)
+        alt = (AS.get_channels_for_patched, AS.panel_grid_for, AS.white_grid_for)
+        AS.get_channels_for_patched = lambda f: ch
+        AS.panel_grid_for = lambda f, _g=panel: _g
+        AS.white_grid_for = lambda f, _w=weiss: _w
+        def zurueck():
+            (AS.get_channels_for_patched, AS.panel_grid_for,
+             AS.white_grid_for) = alt
+        self.addCleanup(zurueck)
+        v = SimpleNamespace(_ACHSEN_WORT=V._ACHSEN_WORT,
+                            _weiss_form_ergaenzen=V._weiss_form_ergaenzen)
+        for nm in ("_hinterlegte_form", "_achsen_zahl"):
+            setattr(v, nm, types.MethodType(getattr(V, nm), v))
+        return v, SimpleNamespace(fid=1, label=kurz)
+
+    def _formen(self, kurz):
+        v, fx = self._stellvertreter(kurz)
+        nf = v._achsen_zahl(fx, ACHSE_FARBE)
+        nw = v._achsen_zahl(fx, ACHSE_WEISS)
+        return (nf, nw,
+                v._hinterlegte_form(fx, nf, ACHSE_FARBE),
+                v._hinterlegte_form(fx, nw, ACHSE_WEISS))
+
+    def test_eine_null_heisst_aus_der_kanalzahl_fuellen(self):
+        """ZQ06121: hinterlegt steht ``(1, 0)`` — „die Warmweiss-Leiste ist EINE
+        Reihe, die Spaltenzahl steht als acht ``color_w``-Kanaele in diesem
+        Modus". Wer auf ``spalten >= 1`` besteht, wirft eine hinterlegte Form
+        weg und nennt sie „nicht vorhanden"."""
+        nf, nw, farbe, weiss = self._formen("ZQ06121")
+        self.assertEqual((nf, nw), (48, 8))
+        self.assertEqual(farbe, (4, 12), "Farb-Form unveraendert")
+        self.assertEqual(weiss, (1, 8), "1 Reihe, Breite aus den 8 Kanaelen")
+
+    def test_gleich_viele_weiss_wie_farbkoepfe_heisst_dieselbe_geometrie(self):
+        """Stairville Matrix Blinder 5x5 RGBWW: 25 Weiss-Kanaele,
+        ``white_grid = (0, 0)`` — es gibt keine eigene LEISTE, die Weiss-LEDs
+        sitzen IN den 25 Pixeln. Ihre Form ist also die des Panels."""
+        nf, nw, farbe, weiss = self._formen("STAIRMB5X5")
+        self.assertEqual((nf, nw), (25, 25))
+        self.assertEqual(farbe, (5, 5))
+        self.assertEqual(weiss, (5, 5))
+
+    def test_ohne_hinterlegte_form_wird_nichts_geraten(self):
+        """★ Die Gegenprobe. ``(0, 0)`` ohne passende Farbzahl heisst nach
+        CDX-52 **nein** — dann bleibt „wie im Geraet hinterlegt" ausgegraut und
+        der Mensch nimmt „als Zeile"/„als Spalte". Eine geratene Form sieht
+        richtig aus und ist es nicht."""
+        for kurz in ("PARBAR4", "MH16"):
+            with self.subTest(geraet=kurz):
+                _nf, _nw, farbe, weiss = self._formen(kurz)
+                self.assertIsNone(farbe)
+                self.assertIsNone(weiss)
+
+    def test_ohne_weiss_kanaele_gibt_es_keine_weiss_achse(self):
+        _nf, nw, _f, _w = self._formen("MH16")
+        self.assertEqual(nw, 0, "0 heisst 0 — hier wird nicht auf 1 aufgerundet")
+
+
 if __name__ == "__main__":
     unittest.main()
