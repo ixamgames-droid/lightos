@@ -11,7 +11,6 @@
 |---|---|---|---|---|
 | ENG-15 | A | fix/eng15-schwarzer-pixel-farbrad | 2026-09-02T21:11Z | src/core/engine/rgb_matrix.py |
 | FM-40 | A | feature/fm40-raster-aus-dem-fixture | 2026-09-02T20:25Z | src/ui/views/fixture_group_view.py |
-| STAB-28 | B | fix/stab28-freeze-waechter-nativ | 2026-09-03T04:50Z | - |
 
 ## Blocker & Fallen
 
@@ -60,7 +59,6 @@
 
 ## Verlauf
 
-- 2026-09-01T15:24Z A done PROC-07
 - 2026-09-01T15:45Z A claim NET-11
 - 2026-09-01T16:09Z A done NET-11
 - 2026-09-01T16:14Z B claim XPLAT-21
@@ -90,3 +88,4 @@
 - 2026-09-03T04:23Z B claim QA-71
 - 2026-09-03T04:50Z B done QA-71
 - 2026-09-03T04:50Z B claim STAB-28
+- 2026-09-03T05:21Z B done STAB-28
