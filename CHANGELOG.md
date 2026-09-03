@@ -53,6 +53,30 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Kopf von außen ausgewählt (Gruppe, Preset, zweite Ansicht), klappt sein Gerät
   automatisch auf, damit die Auswahl sichtbar ist.
 
+### 2026-09-03 — Eine Rasterzelle mit einem Kopf, den es nicht gibt, zieht nicht mehr das ganze Gerät hoch
+
+#### Behoben
+
+- **Eine Matrixzelle, die auf einen nicht vorhandenen Kopf zeigt, fuhr den
+  Master-Dimmer des ganzen Geräts.** Steht in einer Gruppen-Matrix eine Zelle
+  wie „Kopf 49" an einem Gerät mit 48 Köpfen — durch einen Tippfehler, durch
+  eine von Hand gebaute Gruppe oder weil das Gerät später auf einen kleineren
+  Kanal-Modus umgestellt wurde —, dann wurde sie überall wie ein echter Kopf
+  behandelt. Wirkungslos war sie aber nicht: Sie bekam die Kanäle, die sich
+  *alle* Köpfe teilen, allen voran den **Master-Dimmer**. Eine einzelne Zelle
+  hat damit das komplette Gerät aufgezogen.
+
+  Solche Köpfe bekommen jetzt gar nichts mehr. Echte Köpfe verhalten sich
+  unverändert, und ein Gerät mit nur einem Kopf ebenso.
+
+- **Negative Kopf-Angaben werden nicht mehr als Kopf akzeptiert.** Eine Zelle
+  wie `5:-1` galt als „Kopf minus eins" und landete im selben Pfad wie oben.
+
+- **Beim Löschen eines Geräts wurde die zugehörige Kopf-Gruppe je nach
+  Schreibweise entfernt oder stehengelassen.** Das Aufräumen entschied nach
+  einer anderen Regel als der Rest des Programms; beide Hälften benutzen jetzt
+  dieselbe.
+
 
 ### 2026-09-03 — Ein weißer Effekt lässt den LED-Balken wieder ganz leuchten
 

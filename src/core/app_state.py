@@ -1069,9 +1069,17 @@ class AppState:
                         pos = _json.loads(g.positions_json or "{}")
                     except Exception:
                         continue
-                    vals = [str(v) for v in pos.values()]
-                    if vals and all(":" in v and v.split(":", 1)[0] == str(fid)
-                                    for v in vals):
+                    # FM-45: DERSELBE Parse-Weg wie ueberall sonst. Vorher
+                    # stand hier ein roher String-Vergleich, und die beiden
+                    # Haelften desselben Features widersprachen sich: er nahm
+                    # "fid:irgendwas" als Kopf-Zelle an (parse_group_cell
+                    # verwirft das) und scheiterte umgekehrt an "05:2" (das
+                    # parst als fid 5). Eine Auto-Gruppe wurde damit je nach
+                    # Schreibweise geloescht oder stehengelassen.
+                    from src.core.group_cells import parse_group_cell as _pgc
+                    paare = [_pgc(v) for v in pos.values()]
+                    if paare and all(f is not None and h is not None
+                                     and int(f) == int(fid) for f, h in paare):
                         s.delete(g)
                         removed_group = True
             except Exception as e:
@@ -4653,6 +4661,31 @@ def channels_for_head(channels, head: int) -> dict:
     PRO FRAME auf."""
     positions, hmap = _channel_index(channels)
     picked: list[tuple[int, str]] = []
+    # ── FM-45: geteilte Kanaele fahren nur mit einem Kopf mit, den es GIBT ──
+    #
+    # Gemessen 2026-09-03 an einem Nachbau des ZQ06121 (geteilter Master-Dimmer
+    # + Shutter, danach vier RGB-Koepfe): `channels_for_head(chans, 4)` lieferte
+    # `{intensity, shutter}` — also genau die GETEILTEN Kanaele. Mit
+    # `drive_intensity` stand danach CH1 auf 255, der Master-Dimmer des ganzen
+    # Geraets. Dasselbe fuer `head=9` und `head=-1`.
+    #
+    # Die Ursache war eine Luecke, keine falsche Regel: die beiden per-Kopf-
+    # Zweige pruefen ihre Grenze laengst, der Zweig fuer das EINMALIGE Attribut
+    # („geteilt, also bei jedem Kopf dabei") haengt sie bedingungslos an.
+    # „Jeder Kopf" hiess damit auch: jeder Kopf, den es nicht gibt.
+    #
+    # Die geteilten Kanaele werden deshalb erst am Ende angehaengt — und nur,
+    # wenn im selben Durchlauf ueberhaupt ein per-Kopf-Attribut diesen Kopf
+    # bedient hat. Das ist genau die vorhandene Grenze, nicht eine zweite:
+    # ein Attribut mit N Vorkommen bedient Koepfe 0..N-1, und wo keines
+    # zustaendig ist, gibt es den Kopf nicht.
+    #
+    # ⚠️ `head=0` bleibt ausgenommen und damit unveraendert: auf einem
+    # Single-Head-Fixture ist JEDES Attribut einmalig, es gibt also kein
+    # per-Kopf-Attribut — und der Docstring sagt zu, dass Kopf 0 dort schlicht
+    # alle Kanaele liefert (byte-identisch zum Nicht-Kopf-Pfad).
+    geteilt: list[tuple[int, str]] = []
+    kopf_bedient = False
     for a, occurrences in positions.items():
         per_head = hmap.get(a)
         if per_head is not None:
@@ -4660,13 +4693,18 @@ def channels_for_head(channels, head: int) -> dict:
             # Attributs (Master-Dimmer) gehoeren KEINEM Kopf.
             if 0 <= head < len(per_head):
                 picked.append((per_head[head], a))
+                kopf_bedient = True
         elif len(occurrences) > 1:
             # wiederholtes Attribut ohne Kopf-Karte -> das head-te Vorkommen.
             if 0 <= head < len(occurrences):
                 picked.append((occurrences[head], a))
+                kopf_bedient = True
         else:
-            # einmaliges Attribut -> geteilt (jeder Kopf).
-            picked.append((occurrences[0], a))
+            # einmaliges Attribut -> geteilt (jeder Kopf, den es gibt).
+            geteilt.append((occurrences[0], a))
+    if not kopf_bedient and head != 0:
+        return {}
+    picked.extend(geteilt)
     # In KANAL-Reihenfolge zurueckgeben (wie die fruehere Schleife ueber
     # ``channels``) — Aufrufer schreiben daraus DMX-Kanaele der Reihe nach.
     return {a: channels[i] for i, a in sorted(picked)}
