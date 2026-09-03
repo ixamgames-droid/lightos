@@ -22,11 +22,29 @@ Daraus folgt die Grundregel, aus der alles andere abgeleitet ist:
 
 | Rolle | Wer | Zustaendig fuer |
 |---|---|---|
-| **Leitende Sitzung** (`A`) | die Sitzung, die diese Datei pflegt | Second Brain, Prozess/Regeln, Konfliktentscheidung, Freigabe strittiger Merges |
-| **Mitarbeitende Sitzung** (`B`, `C`, …) | jede weitere | Items abarbeiten, Befunde in `BACKLOG.md`, Blocker in `SESSIONS.md` |
+| **Leitende Sitzung** (`A`) | die Sitzung, die diese Datei pflegt | **Arbeitsverteilung**, Second Brain, Prozess/Regeln, Konfliktentscheidung, Freigabe strittiger Merges |
+| **Mitarbeitende Sitzung** (`B`, `C`, …) | jede weitere | Zugeteilte Items abarbeiten **oder sich freie aus `BACKLOG.md` nehmen**, Befunde ins `BACKLOG.md`, Blocker in `SESSIONS.md` |
 
-**Warum ueberhaupt eine Leitung:** nicht wegen Hierarchie, sondern weil zwei
-Stellen genau **einen** Schreiber brauchen:
+**★ `A` teilt zu, `B` arbeitet ab (Ansage vom Betreiber, 2026-09-03).** Das ist
+die Grundform: `A` entscheidet, was als Naechstes drankommt und wer es macht,
+und legt es auf der Tafel ab. `B` muss dafuer **nicht warten** — was im
+`BACKLOG.md` frei steht (Status `todo`, kein Claim), darf `B` jederzeit selbst
+nehmen. Nur was `A` ausdruecklich fuer sich reserviert oder als `decision`
+markiert hat, bleibt liegen.
+
+Woran `A` sich dabei halten muss, damit aus „Leitung" keine Sackgasse wird:
+
+* **Zuteilen heisst benennen** — Item, Reihenfolge, Begruendung. Ein „das ist
+  frei fuer dich" ist keine Zuteilung; `B` wartet dann, und `A` haelt `B` fuer
+  versorgt. Beide stehen.
+* **`A` zieht Arbeit nicht an sich, nur weil `A` leitet.** Was auf dem anderen
+  Rechner besser messbar ist, gehoert dorthin — auch wenn `A` es schreiben
+  koennte. Ein blind gebauter Fix ist schlechter als ein offenes Item.
+* **Die Zuteilung ist keine Freigabe-Pflicht.** `B` fragt nicht vor jedem
+  Schritt; der Loop-Modus bleibt. `A` entscheidet das *Was*, `B` das *Wie*.
+
+**Warum ueberhaupt eine Leitung:** nicht nur wegen der Verteilung, sondern weil
+zwei Stellen genau **einen** Schreiber brauchen:
 
 * **Der Second Brain** (`~/SecondBrain`, privat, ausserhalb des Repos) hat
   **keine Versionskontrolle**. Zwei gleichzeitige Schreiber ueberschreiben
@@ -36,9 +54,10 @@ Stellen genau **einen** Schreiber brauchen:
 * **Der Prozess selbst** (diese Datei, `tools/session_claim.py`): zwei Sitzungen,
   die gleichzeitig die Regeln aendern, sind kein Prozess mehr.
 
-Alles andere ist gleichberechtigt. `B` braucht fuer normale Arbeit **keine**
-Freigabe von `A` — das waere genau die Ruecksprache, die der Loop-Modus
-abschaffen soll.
+Innerhalb eines zugeteilten oder selbst genommenen Items ist `B` frei: `B`
+braucht fuer die Umsetzung **keine** Freigabe von `A` — das waere genau die
+Ruecksprache, die der Loop-Modus abschaffen soll. Die Guardrails gelten
+weiterhin fuer beide (Test-Gate gruen, CI gruen vor dem Merge, PROC-03).
 
 ---
 
