@@ -117,6 +117,11 @@ $pyCandidates = @(
     (Join-Path $outer "lightos-main/venv/bin/python")
 )
 $py = $pyCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+
+# XPLAT-23: die rechnerweite WebEngine-Sperre liegt in einer EIGENEN Datei,
+# nicht als Kopie hier - Pendant zu tools/_gate_webengine.sh, das aus
+# demselben Grund geteilt wird (XPLAT-11 war die Drift zweier Runner).
+. (Join-Path $PSScriptRoot "_gate_webengine.ps1")
 if (-not $py) {
     Write-Host "[seg] FEHLER: venv-Python nicht gefunden. Geprueft:`n  $($pyCandidates -join "`n  ")"
     exit 2
@@ -256,7 +261,13 @@ function Get-LogPfad([string]$rel) {
 # den hat jede Datei, die eine Seite laden kann, und keine andere.
 $web = @(); $rest = @()
 foreach ($f in $files) {
-    $voll = Join-Path $repo ($f -replace '/', '\')
+    # XPLAT-23: `Join-Path $repo` auf einen ABSOLUTEN Pfad ergibt Unsinn, und
+    # `Test-Path` schlaegt dann fehl - eine absolut angegebene WebEngine-Datei
+    # landete damit still in der schnellen Spur statt in der seriellen, also
+    # ausgerechnet ohne die Serialisierung, fuer die es die Spur gibt.
+    # Gefunden beim Bau der WebEngine-Sperre (Sitzung B, 03.09.2026).
+    $voll = if ([System.IO.Path]::IsPathRooted($f)) { $f }
+            else { Join-Path $repo ($f -replace '/', '\') }
     if ((Test-Path $voll) -and (Select-String -Path $voll -Pattern 'QWebEngineView' -SimpleMatch -Quiet)) {
         $web += $f
     } else { $rest += $f }
@@ -379,8 +390,15 @@ function Complete-Segment($rec, [int]$rc, [string]$art) {
 
 while ($restQueue.Count -or $webQueue.Count -or $laufend.Count) {
 
-    # WebEngine-Spur: genau EIN Prozess gleichzeitig.
+    # XPLAT-23: die schmale Sperre nur so lange halten, wie wirklich ein
+    # WebEngine-Segment laeuft. Ein Punkt, beide Enden - egal ob das Segment
+    # normal endete oder ins Zeitlimit lief.
+    if (-not ($laufend | Where-Object { $_.IstWeb })) { Exit-WebEngineSperre }
+
+    # WebEngine-Spur: genau EIN Prozess gleichzeitig - im Lauf ueber diese
+    # Bedingung, RECHNERWEIT ueber die Sperre aus _gate_webengine.ps1.
     if ($webQueue.Count -and -not ($laufend | Where-Object { $_.IstWeb })) {
+        $null = Enter-WebEngineSperre
         if (-not (Wait-FreieGpu)) { $script:gpuDeckelTreffer += $webQueue.Peek() }
         $script:letzterWebStart = Get-Date   # Bezugspunkt fuer das naechste Warten
         $null = $laufend.Add((Start-Segment $webQueue.Dequeue() $true))
@@ -456,6 +474,8 @@ while ($restQueue.Count -or $webQueue.Count -or $laufend.Count) {
         }
     }
 }
+
+Exit-WebEngineSperre        # XPLAT-23: nicht ueber die Bilanz hinaus halten
 
 # ── Bilanz ──────────────────────────────────────────────────────────────────
 Write-Host ""

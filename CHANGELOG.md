@@ -7,6 +7,27 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-03 — Zwei Testläufe streiten sich nicht mehr um die Grafikkarte
+
+#### Behoben
+
+- **Die Tests, die das 3D-Fenster wirklich öffnen, konnten sich auf Windows
+  gegenseitig stören.** Innerhalb eines Testlaufs liefen sie längst
+  nacheinander — zwischen zwei gleichzeitigen Läufen aber nicht. Dann leben zwei
+  3D-Kontexte parallel, und einer von beiden verliert seinen; das Ergebnis ist
+  ein roter Abschnitt, der nichts mit dem geprüften Code zu tun hat. Auf Linux
+  gibt es die Absicherung seit August.
+
+  Ein solcher Testabschnitt wartet jetzt, bis der andere fertig ist — und sagt
+  das auch. **Warten kann er aber nur begrenzt:** läuft die Zeit ab oder ist die
+  Absicherung nicht benutzbar, macht er mit einem Hinweis weiter. Eine
+  Absicherung, die hängen bleibt, wäre schlimmer als keine.
+
+- **Eine mit vollem Pfad angegebene 3D-Testdatei lief in der falschen Spur.**
+  Sie wurde nicht als solche erkannt und landete bei den schnellen, parallel
+  laufenden Tests — also ausgerechnet ohne die Rücksichtnahme, für die es die
+  eigene Spur gibt.
+
 ### 2026-09-03 — Der Einfrier-Bericht sagt jetzt, wo er NICHT zu suchen ist
 
 #### Verbessert
