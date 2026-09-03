@@ -584,10 +584,26 @@ class WaechterDeckungTest(unittest.TestCase):
     der Datenordner ist ein Sandkasten.
     """
 
-    _NUR_SKIPS = "tests/test_color_fx_show_render.py"
-    """Ein Segment, dessen Tests sich ALLE ueberspringen (die Show ist nicht
-    committet), dessen Modul-Import aber ``app_state`` und damit ``fixture_db``
-    laedt. Genau der Fall, den eine Test-Fixture nicht sieht: sie laeuft nie."""
+    _NUR_SKIPS = "tests/test_qa66_opfer_nur_skips.py"
+    """Ein Segment, dessen Tests sich ALLE ueberspringen, dessen Modul-Import
+    aber ``app_state`` und damit ``fixture_db`` laedt. Genau der Fall, den eine
+    Test-Fixture nicht sieht: sie laeuft nie.
+
+    ★ QA-66: hier stand ``tests/test_color_fx_show_render.py``, mit der Annahme
+    „seine Tests ueberspringen sich, die Show ist nicht committet". Das stimmte
+    in der CI und in einem frischen Worktree — aber
+    ``shows/Farb_FX_VC_Show.lshow`` ist bloss **gitignored, nicht abwesend**.
+    Wer ``tools/build_farb_fx_vc_show.py`` einmal laufen liess, hatte die Datei,
+    das Segment lief (5 passed), und dieser Waechter faerbte **jeden fremden
+    Branch** falsch rot — dieselbe Zeitfalle wie QA-53, nur schlimmer, weil sie
+    die Frage „liegt es an meinem Diff?" verstellt. Auf Davids Windows-Rechner
+    lag die Datei seit dem 28.07.2026.
+
+    Das Opfer wird deshalb nicht mehr aus dem Zufall der Arbeitskopie bezogen,
+    sondern eigens gebaut: ``test_qa66_opfer_nur_skips.py`` laedt die Bibliothek
+    beim Import und ueberspringt per ``pytestmark`` JEDEN Test — unabhaengig von
+    Arbeitskopie, Betriebssystem und davon, welche Werkzeuge jemand einmal
+    laufen liess."""
 
     _FRUEH = "tests/test_dimmer_master.py"
     """Ein Segment, das ``fixture_db`` schon beim MODUL-Import laedt (gemessen:
