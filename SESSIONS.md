@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| FM-41 | A | feature/fm41-weiss-achse | 2026-09-03T20:41Z | src/core/group_cells.py |
+| FM-41 | A | feature/fm41-weiss-achse | 2026-09-03T20:54Z | src/core/group_cells.py |
 | QA-74 | B | fix/qa74-webgl-waechter-aus-einer-quelle | 2026-09-03T20:43Z | - |
 
 ## Blocker & Fallen
