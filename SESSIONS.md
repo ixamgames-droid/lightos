@@ -11,7 +11,6 @@
 |---|---|---|---|---|
 | ENG-15 | A | fix/eng15-schwarzer-pixel-farbrad | 2026-09-02T21:11Z | src/core/engine/rgb_matrix.py |
 | FM-40 | A | feature/fm40-raster-aus-dem-fixture | 2026-09-02T20:25Z | src/ui/views/fixture_group_view.py |
-| XPLAT-23 | B | feature/xplat23-webengine-sperre | 2026-09-03T05:51Z | tools/verify_segmented.ps1 |
 
 ## Blocker & Fallen
 
@@ -61,7 +60,6 @@
 
 ## Verlauf
 
-- 2026-09-01T16:45Z A claim ENG-16
 - 2026-09-01T16:58Z B done XPLAT-21
 - 2026-09-01T17:06Z B claim XPLAT-27
 - 2026-09-01T17:20Z A done ENG-16
@@ -91,3 +89,4 @@
 - 2026-09-03T05:22Z B claim QA-70
 - 2026-09-03T05:48Z B done QA-70
 - 2026-09-03T05:51Z B claim XPLAT-23
+- 2026-09-03T10:42Z B uebergeben XPLAT-23
