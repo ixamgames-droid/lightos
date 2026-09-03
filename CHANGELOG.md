@@ -7,6 +7,30 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-03 — Skriptgebaute Shows finden ihre Geräte auch auf einem anderen Rechner
+
+#### Behoben
+
+- **Eine per Generator gebaute Show merkte sich nur die interne Nummer ihrer
+  Geräte, nicht deren Namen.** Diese Nummer gilt aber nur auf dem Rechner, der
+  die Show gebaut hat — anderswo zeigt sie auf ein anderes Gerät oder ins
+  Leere. Der Name ist der Anker, über den LightOS das richtige Gerät
+  wiederfindet, und den hat der Show-Generator schlicht nie mitgeschrieben.
+
+  Aufgefallen ist es beim ersten Lauf des neuen Wächters: in der
+  mitgelieferten Demo-Show „Demo RGB PAR" stand bei allen vier Geräten kein
+  Name. Beide betroffenen Demo-Shows sind neu gebaut.
+
+- **Die ZQ-Demo-Show nannte für ihre PARs den falschen Hersteller** („U King"
+  statt „Generic") und hatte die Gerätenummern fest im Generator stehen — in
+  einer frisch aufgebauten Gerätebibliothek sind das andere Nummern. Beides
+  behoben; der Generator schlägt die Geräte jetzt über ihr Kürzel nach.
+
+  Ein Wächter prüft ab sofort für **alle** mitgelieferten Demo-Shows, dass
+  jedes Gerät über seinen Namen auffindbar ist — gegen eine frisch aufgebaute
+  Bibliothek, nicht gegen die des eigenen Rechners.
+
+
 ### 2026-09-02 — Ein Panel landet im Gruppen-Raster in seiner echten Form
 
 #### Verbessert
