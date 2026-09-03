@@ -122,6 +122,36 @@ def parse_zelle(value) -> tuple:
         return None, None, None
 
 
+def referenzierte_fids(cells) -> set:
+    """Welche Geräte kommen in diesen Zellen überhaupt VOR — auf JEDER Achse.
+
+    ★★ FM-41: Das ist eine ANDERE Frage als ``base_fids_in_grid_order``, und
+    dass beide bis hierher dieselbe Funktion benutzt haben, ist der eigentliche
+    Fund. Die zwei Fragen haben **entgegengesetzte sichere Richtungen**:
+
+    * *„Welche Geräte FÄHRT diese Gruppe?"* — hier ist Untertreiben sicher.
+      Ein Gerät zu wenig heißt: es leuchtet nicht. Deshalb zählt
+      ``base_fids_in_grid_order`` eine Weiß-Zelle **nicht** mit, solange der
+      Renderer sie nicht bedient — sonst führe der VC-Submaster den ganzen
+      154-Kanal-Balken, wo acht Weiß-Segmente gemeint waren.
+    * *„Wird dieses Gerät IRGENDWO erwähnt?"* — hier ist Übertreiben sicher.
+      Ein Gerät zu wenig heißt hier: ``patch_dedup`` hält es für eine Waise und
+      ``--anwenden`` **entfernt es aus dem Patch**. Gemessen: ein Gerät, das
+      nur über Weiß-Zellen in einer Gruppe steckt, kam als Waise durch —
+      wortgleich der Fehler, den STAB-22 für Kopf-Zellen behoben hat.
+
+    Wer beide Fragen mit einer Antwort bedient, hat für eine davon die falsche
+    Fehlrichtung gewählt. Diese hier ist die großzügige: **jede** parsbare
+    Zelle trägt ihren fid bei.
+    """
+    out: set = set()
+    for c in cells or []:
+        fid, _achse, _index = parse_zelle(c)
+        if fid is not None:
+            out.add(int(fid))
+    return out
+
+
 def zelle_gehoert_zu(value, fid: int, achse: str | None = None) -> bool:
     """Gehoert diese Rasterzelle zu Geraet ``fid`` auf Achse ``achse``?
 

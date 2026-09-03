@@ -587,5 +587,82 @@ class WeissFormTest(unittest.TestCase):
         self.assertEqual(nw, 0, "0 heisst 0 — hier wird nicht auf 1 aufgerundet")
 
 
+class ZweiFragenTest(unittest.TestCase):
+    """★★ „Welche Geraete FAEHRT diese Gruppe" und „welche ERWAEHNT sie" sind
+    zwei Fragen mit ENTGEGENGESETZTEN sicheren Richtungen. Bis FM-41 hat eine
+    Funktion beide beantwortet — und fuer eine davon war die Fehlrichtung
+    falsch.
+    """
+
+    def test_die_beiden_antworten_gehen_auseinander(self):
+        from src.core.group_cells import (base_fids_in_grid_order as FAEHRT,
+                                          referenzierte_fids as ERWAEHNT)
+        nur_weiss = {"0,0": "1:w0", "1,0": "1:w1"}
+        self.assertEqual(FAEHRT(nur_weiss), [],
+                         "faehrt nichts, solange der Renderer Weiss nicht bedient")
+        self.assertEqual(sorted(ERWAEHNT(nur_weiss.values())), [1],
+                         "erwaehnt aber sehr wohl Geraet 1")
+
+    def test_bestand_deckungsgleich_ohne_weiss_zellen(self):
+        """Fuer alles, was es heute gibt, sagen beide dasselbe."""
+        from src.core.group_cells import (base_fids_in_grid_order as FAEHRT,
+                                          referenzierte_fids as ERWAEHNT)
+        for pos in ({"0,0": 1, "1,0": 2},
+                    {"0,0": "1:0", "1,0": "1:1", "2,0": 7},
+                    {"0,0": "5:3"},
+                    {}):
+            with self.subTest(raster=pos):
+                self.assertEqual(sorted(FAEHRT(pos)),
+                                 sorted(ERWAEHNT(pos.values())))
+
+    def test_nur_weiss_ist_keine_waise(self):
+        """★ REGRESSION, gemessen: ein Geraet, das NUR ueber Weiss-Zellen in
+        einer Gruppe steckt, kam durch ``patch_dedup.referenzen`` als Waise
+        durch — und ``--anwenden`` haette es aus dem Patch ENTFERNT. Das ist
+        wortgleich der Fehler, den STAB-22 fuer Kopf-Zellen behoben hat, nur
+        eine Achse weiter."""
+        from src.core.show import patch_dedup
+        from src.core.group_cells import (base_fids_in_grid_order,
+                                          referenzierte_fids)
+
+        class _St:
+            cue_stacks = []
+            visualizer_positions = visualizer_rotations = live_view_positions = {}
+
+            def __init__(self, pos):
+                self._pos = pos
+
+            def list_fixture_groups(self):
+                return [{"id": 1, "name": "Weissleiste", "folder": "",
+                         "fids": base_fids_in_grid_order(self._pos),
+                         "ref_fids": sorted(referenzierte_fids(self._pos.values()))}]
+
+            def get_patched_fixtures(self):
+                return []
+
+        for name, pos in (("nur Weiss-Zellen", {"0,0": "1:w0", "1,0": "1:w1"}),
+                          ("Kopf-Zellen", {"0,0": "1:0"}),
+                          ("ganzes Gerät", {"0,0": 1})):
+            with self.subTest(raster=name):
+                self.assertIn("geraetegruppen",
+                              patch_dedup.referenzen(_St(pos), 1),
+                              f"{name}: Gerät gilt als Waise")
+
+    def test_alte_quelle_ohne_den_schluessel_faellt_auf_den_alten_stand(self):
+        """Eine Attrappe, die ``ref_fids`` nicht kennt, verliert nichts —
+        sie bekommt wieder genau das bisherige Verhalten, nie weniger."""
+        from src.core.show import patch_dedup
+
+        class _Alt:
+            cue_stacks = []
+            visualizer_positions = visualizer_rotations = live_view_positions = {}
+            def list_fixture_groups(self):
+                return [{"id": 1, "name": "G", "folder": "", "fids": [1]}]
+            def get_patched_fixtures(self):
+                return []
+
+        self.assertIn("geraetegruppen", patch_dedup.referenzen(_Alt(), 1))
+
+
 if __name__ == "__main__":
     unittest.main()

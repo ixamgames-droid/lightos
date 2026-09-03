@@ -2519,19 +2519,31 @@ class AppState:
             from .database.models import FixtureGroup
             with self._session() as s:
                 groups = list(s.execute(select(FixtureGroup)).scalars())
-                from .group_cells import base_fids_in_grid_order
+                from .group_cells import (base_fids_in_grid_order,
+                                           referenzierte_fids)
                 for g in groups:
                     # FM16E-HEADCOUNT: Kopf-Zellen "fid:head" mitzaehlen (eine
                     # Parse-Quelle) — sonst leerer Preset-Browser-Eintrag.
                     try:
-                        fids = base_fids_in_grid_order(
-                            json.loads(g.positions_json or "{}") or {})
+                        _pos = json.loads(g.positions_json or "{}") or {}
+                        fids = base_fids_in_grid_order(_pos)
+                        # ★★ FM-41: DANEBEN die zweite, groesszuegige Antwort —
+                        # "wird hier ueberhaupt erwaehnt". `fids` sagt, was die
+                        # Gruppe FAEHRT (untertreiben ist dort sicher);
+                        # `ref_fids` sagt, was sie ERWAEHNT (uebertreiben ist
+                        # HIER sicher, weil `patch_dedup` daraus auf Waisen
+                        # schliesst und ein Fehlurteil Geraete aus dem Patch
+                        # entfernt). Zwei Fragen, zwei Antworten — mit einer
+                        # gemeinsamen war fuer eine die Fehlrichtung falsch.
+                        ref = sorted(referenzierte_fids(
+                            _pos.values() if isinstance(_pos, dict) else _pos))
                     except Exception:
-                        fids = []
+                        fids, ref = [], []
                     out.append({"id": g.id,
                                 "name": g.name or "",
                                 "folder": getattr(g, "folder", "") or "",
-                                "fids": fids})
+                                "fids": fids,
+                                "ref_fids": ref})
         except Exception:
             return []
         return out

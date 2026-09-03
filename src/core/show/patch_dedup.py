@@ -213,7 +213,18 @@ def referenzen(state, fid: int) -> list[str]:
         for g in gruppen:
             if not isinstance(g, dict):
                 continue
-            for x in (g.get("fids") or ()):
+            # ★★ FM-41: hier ist `ref_fids` die richtige Frage, nicht `fids`.
+            # Dieses Modul fragt "wird das Geraet irgendwo ERWAEHNT" und
+            # verschiebt bei Nein Geraete aus dem Patch — also ist Uebertreiben
+            # die sichere Richtung. `fids` sagt dagegen, was die Gruppe FAEHRT,
+            # und laesst eine Weiss-Zelle bewusst weg, solange der Renderer sie
+            # nicht bedient. Gemessen fiel ein Geraet, das NUR ueber
+            # Weiss-Zellen in einer Gruppe steckt, sonst als Waise durch —
+            # wortgleich der Fehler, den STAB-22 fuer Kopf-Zellen behoben hat.
+            # Rueckfall auf `fids`, wenn die Quelle den Schluessel nicht
+            # kennt (aeltere Attrappe): dann gilt wieder der alte Stand,
+            # nie weniger.
+            for x in (g.get("ref_fids") or g.get("fids") or ()):
                 try:
                     if int(x) == fid:
                         return True
