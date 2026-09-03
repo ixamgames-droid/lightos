@@ -102,9 +102,18 @@ class ShowBuilder:
         return {k for k, _ in effect_live.list_actions(fid)}
 
     # ── Fixtures / Patch ────────────────────────────────────────────────────────
-    def _lookup_profile(self, short_name: str) -> tuple[int, str]:
-        """(id, fixture_type) des Profils per short_name. ``fixture_type`` ist der
-        Bibliotheks-Typ (Default 'other'). Fehlt das Profil ganz -> BuildError.
+    def _lookup_profile(self, short_name: str) -> tuple[int, str, str, str]:
+        """``(id, fixture_type, hersteller, modellname)`` des Profils per short_name.
+
+        ``fixture_type`` ist der Bibliotheks-Typ (Default 'other'). Fehlt das
+        Profil ganz -> BuildError.
+
+        FM-44: Hersteller und Modellname kommen mit, weil eine Show BEIDE
+        Referenzen braucht — die ID **und** die Namen. Die ID ist eine
+        SQLite-Auto-Nummer und gilt nur auf dem Rechner, der die Show gebaut hat;
+        der Name ist der Rettungsanker, ueber den ``show_file`` sie anderswo
+        wiederfindet. ``patch()`` hat die Namen bisher gar nicht gesetzt — jede
+        skriptgebaute Show hatte damit **keinen** Anker.
 
         A3D-35: ``FixtureProfile.short_name`` hat KEINE Unique-Constraint — Builtins
         und Importe (source 'qlcplus'/'user') können denselben short_name tragen. Das
@@ -120,9 +129,13 @@ class ShowBuilder:
             from src.core.database.fixture_db import engine as fdb_engine
             from src.core.database.models import FixtureProfile
             with Session(fdb_engine()) as s:
+                from src.core.database.models import Manufacturer
                 rows = s.execute(
                     select(FixtureProfile.id, FixtureProfile.fixture_type,
-                           FixtureProfile.source)
+                           FixtureProfile.source, Manufacturer.name,
+                           FixtureProfile.name)
+                    .join(Manufacturer,
+                          Manufacturer.id == FixtureProfile.manufacturer_id)
                     .where(FixtureProfile.short_name == short_name)
                     .order_by(
                         case((FixtureProfile.source == "builtin", 0), else_=1),
@@ -151,7 +164,8 @@ class ShowBuilder:
                 print(f"[showbuilder] WARN: {msg}")
                 self._ambig_warned.add(short_name)
         chosen = rows[0]
-        return int(chosen[0]), (chosen[1] or "other")
+        return (int(chosen[0]), (chosen[1] or "other"),
+                (chosen[3] or ""), (chosen[4] or ""))
 
     def profile_id(self, short_name: str) -> int:
         """Fixture-Profil-ID per short_name — wirft BuildError, wenn es das Profil
@@ -168,7 +182,7 @@ class ShowBuilder:
         # mitnehmen (statt Model-Default 'other' zu lassen) — sonst rendert der
         # 3D-Visualizer Skript-gepatchte Fixtures als PAR-Fallback ohne DMX->Farbe/
         # Pan/Tilt-Abbildung. Spiegelt die sync.py-Auto-Fix-Semantik, nur schon hier.
-        pid, fixture_type = self._lookup_profile(short_name)
+        pid, fixture_type, mfr_name, fx_name = self._lookup_profile(short_name)
         addr = int(start_address if start_address is not None else
                    self.state.suggest_address(universe, channel_count))
         fids: list[int] = []
@@ -180,6 +194,10 @@ class ShowBuilder:
                 fid=fid, label=(label or short_name) + (f" {i + 1}" if count > 1 else ""),
                 fixture_profile_id=pid, mode_name=mode_name, universe=universe,
                 address=addr, channel_count=channel_count,
+                # FM-44: der Rettungsanker fuer fremde Rechner. Ohne diese beiden
+                # Felder entscheidet allein die rechnerabhaengige ID, welches
+                # Geraet die Show spaeter bekommt.
+                manufacturer_name=mfr_name, fixture_name=fx_name,
                 fixture_type=fixture_type), undoable=False)
             fids.append(fid)
             addr += channel_count

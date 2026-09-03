@@ -55,7 +55,7 @@ def test_duplicate_prefers_builtin_over_smaller_id(monkeypatch):
     eng = _seed([(10, "DUPE", "qlcplus", "moving_head"),
                  (90, "DUPE", "builtin", "laser")])
     monkeypatch.setattr(fdb, "engine", lambda: eng)
-    pid, ftype = _builder()._lookup_profile("DUPE")
+    pid, ftype, *_namen = _builder()._lookup_profile("DUPE")
     assert pid == 90, "builtin muss vor Import gewinnen (auch bei größerer id)"
     assert ftype == "laser"
 
@@ -64,7 +64,7 @@ def test_duplicate_two_builtins_smallest_id_wins(monkeypatch):
     eng = _seed([(20, "DUPE", "builtin", "par"),
                  (5, "DUPE", "builtin", "wash")])
     monkeypatch.setattr(fdb, "engine", lambda: eng)
-    pid, ftype = _builder()._lookup_profile("DUPE")
+    pid, ftype, *_namen = _builder()._lookup_profile("DUPE")
     assert pid == 5, "bei gleicher source gewinnt die kleinste id (total order)"
     assert ftype == "wash"
 
@@ -82,7 +82,12 @@ def test_deterministic_regardless_of_insertion_order(monkeypatch):
     eng_b = _seed([(11, "DUPE", "builtin", "spot"), (7, "DUPE", "user", "spot")])
     monkeypatch.setattr(fdb, "engine", lambda: eng_b)
     b = _builder()._lookup_profile("DUPE")
-    assert a == b == (11, "spot")
+    # FM-44: der Rueckgabewert traegt zusaetzlich Hersteller und Modellname.
+    # Der volle Tupel-Vergleich bleibt die staerkere Aussage (auch die Namen
+    # duerfen nicht an der Einfuegereihenfolge haengen); die Wahl selbst wird
+    # danach einzeln festgenagelt.
+    assert a == b, "die Einfuegereihenfolge darf das Ergebnis nicht drehen"
+    assert a[:2] == (11, "spot")
 
 
 def test_duplicate_emits_warning_listing_all_candidates(monkeypatch, capsys):
@@ -102,7 +107,7 @@ def test_duplicate_emits_warning_listing_all_candidates(monkeypatch, capsys):
 def test_single_match_is_silent(monkeypatch, capsys):
     eng = _seed([(3, "SOLO", "builtin", "par")])
     monkeypatch.setattr(fdb, "engine", lambda: eng)
-    pid, ftype = _builder()._lookup_profile("SOLO")
+    pid, ftype, *_namen = _builder()._lookup_profile("SOLO")
     assert (pid, ftype) == (3, "par")
     assert "WARN" not in capsys.readouterr().out    # kein Rausch-Warnen im Normalfall
 
