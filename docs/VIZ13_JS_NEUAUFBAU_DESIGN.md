@@ -41,7 +41,7 @@ Zielverzeichnis: `src/ui/visualizer/scene_src/` (Quellmodule, ES-`.js`). Der ~35
 
 **Entscheidung: Native ES-Module über `file://`, KEIN Build-Step.** Der Plan (§4.1) nennt esbuild, aber die Toolchain-Faktenlage widerlegt esbuild als tragfähige Grundlage:
 
-- `node`/`npm`/`npx` sind **nicht im PATH**. Das einzige lauffähige node (v26.3.0 unter `C:/Users/David/.cache/pyright-python/nodeenv/Scripts/`) ist ein **inzidentelles Nebenprodukt von pyright-python** — nicht deklariert, kann bei pyright-Reinstall verschwinden. Ein Build-Step, der davon abhängt, macht `tools/verify_loop.ps1` / das CI-Gate fragil. Das verstößt gegen Constraint (2) („kein Node voraussetzen, wenn keins da ist").
+- `node`/`npm`/`npx` sind **nicht im PATH**. Das einzige lauffähige node (v26.3.0 unter `C:/Users/X/.cache/pyright-python/nodeenv/Scripts/`) ist ein **inzidentelles Nebenprodukt von pyright-python** — nicht deklariert, kann bei pyright-Reinstall verschwinden. Ein Build-Step, der davon abhängt, macht `tools/verify_loop.ps1` / das CI-Gate fragil. Das verstößt gegen Constraint (2) („kein Node voraussetzen, wenn keins da ist").
 - Die **ES-Modul-Probe ist erfolgreich verifiziert**: `QWebEngineView` (offscreen, `LocalContentCanAccessFileUrls=True` — bereits gesetzt) lädt `<script type="module">` mit relativem Import über `file://` klaglos (`RESULT: 'esm-ok'`). Das ist **genau die QWebEngine-Konfiguration, die die App produktiv nutzt**.
 - Kein Netzzugriff zur Laufzeit (Constraint 2 erfüllt): alle Module liegen lokal, Imports sind relativ.
 

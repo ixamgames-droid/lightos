@@ -36,7 +36,7 @@ Alle Mover (MH+Spider, für EFX) · Farb-Matrix (PAR+Spider, alle RGB(W)-Geräte
 
 ## 2. Musik & Timing
 
-- Quelle: `C:/Users/David/Desktop/Musik/BP Party` (~183 mp3, „BeachParty"/Bounce/Hardstyle).
+- Quelle: `C:/Users/X/Desktop/Musik/BP Party` (~183 mp3, „BeachParty"/Bounce/Hardstyle).
 - Kuratierte Playlist (Referenz): Mr. Brightside (Bounce), Angels – Jesse Bloch, I Need A Hero,
   Africa – Rayvolt, Major Tom, Gym Hardstyle. Alle ~**150 BPM**.
 - Timing-Raster: **Beat 0,40 s · Takt (4) 1,6 s · Phrase (8) 3,2 s**.

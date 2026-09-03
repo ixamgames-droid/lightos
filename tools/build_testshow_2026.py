@@ -58,7 +58,7 @@ from src.ui.virtualconsole.vc_slider import VCSlider, SliderMode
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(_ROOT, "shows", "Testshow_2026.lshow")
-MUSIC_DIR = r"C:/Users/David/Desktop/Musik/BP Party"
+MUSIC_DIR = r"C:/Users/X/Desktop/Musik/BP Party"
 
 BPM = 150.0
 BEAT = 60.0 / BPM          # 0.40 s
