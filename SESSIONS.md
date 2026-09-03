@@ -10,6 +10,7 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | XPLAT-23 | B | docs/xplat23-deckel-gemessen | 2026-09-03T15:43Z | - |
+| FM-43 | A | fix/fm43-fehlendes-profil-sichtbar | 2026-09-03T16:28Z | src/core/show/show_file.py |
 
 ## Blocker & Fallen
 
@@ -60,7 +61,6 @@
 
 ## Verlauf
 
-- 2026-09-01T19:20Z A claim XPLAT-30
 - 2026-09-01T19:33Z B done XPLAT-27
 - 2026-09-01T19:42Z A uebergeben XPLAT-30
 - 2026-09-01T19:45Z B claim XPLAT-28
@@ -90,3 +90,4 @@
 - 2026-09-03T15:43Z B claim XPLAT-23
 - 2026-09-03T16:27Z A done FM-40
 - 2026-09-03T16:27Z A uebergeben ENG-15
+- 2026-09-03T16:28Z A claim FM-43
