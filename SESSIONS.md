@@ -9,7 +9,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| QA-72 | A | fix/qa72-herkunft-eines-profils | 2026-09-03T19:18Z | src/core/database/qxf_import.py |
 | OUT-55 | A | fix/out55-alle-koepfe-invertieren | 2026-09-03T19:35Z | src/core/app_state.py |
 
 ## Blocker & Fallen
@@ -68,7 +67,6 @@
 
 ## Verlauf
 
-- 2026-09-03T04:23Z B claim QA-71
 - 2026-09-03T04:50Z B done QA-71
 - 2026-09-03T04:50Z B claim STAB-28
 - 2026-09-03T05:21Z B done STAB-28
@@ -98,3 +96,4 @@
 - 2026-09-03T19:18Z A claim QA-72
 - 2026-09-03T19:35Z A claim OUT-55
 - 2026-09-03T19:43Z B uebergeben FM-45
+- 2026-09-03T19:50Z A uebergeben QA-72
