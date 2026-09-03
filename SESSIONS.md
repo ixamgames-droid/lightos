@@ -9,7 +9,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| FM-43 | A | fix/fm43-fehlendes-profil-sichtbar | 2026-09-03T16:28Z | src/core/show/show_file.py |
 | FM-41 | A | feature/fm41-weiss-segmente | 2026-09-03T16:47Z | src/ui/views/fixture_group_view.py |
 | XPLAT-23 | B | feature/xplat23-messblindheit | 2026-09-03T16:51Z | - |
 
@@ -64,7 +63,6 @@
 
 ## Verlauf
 
-- 2026-09-01T20:39Z B done XPLAT-28
 - 2026-09-01T20:39Z B claim XPLAT-31
 - 2026-09-01T21:06Z B done XPLAT-31
 - 2026-09-02T15:04Z A claim ENG-15
@@ -94,3 +92,4 @@
 - 2026-09-03T16:47Z A claim FM-41
 - 2026-09-03T16:50Z B uebergeben XPLAT-23
 - 2026-09-03T16:51Z B claim XPLAT-23
+- 2026-09-03T17:07Z A done FM-43
