@@ -10,6 +10,7 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | FM-45 | B | fix/fm45-kopf-den-es-nicht-gibt | 2026-09-03T18:47Z | - |
+| UI-61 | A | feature/ui61-koepfe-einklappen | 2026-09-03T18:49Z | src/ui/views/programmer_view.py |
 
 ## Blocker & Fallen
 
@@ -64,7 +65,6 @@
 
 ## Verlauf
 
-- 2026-09-02T21:05Z B uebergeben XPLAT-23
 - 2026-09-02T21:08Z B claim XPLAT-29
 - 2026-09-03T00:53Z B uebergeben XPLAT-29
 - 2026-09-03T00:54Z B claim XPLAT-26
@@ -94,3 +94,4 @@
 - 2026-09-03T18:04Z B claim QA-66
 - 2026-09-03T18:45Z B done QA-66
 - 2026-09-03T18:47Z B claim FM-45
+- 2026-09-03T18:49Z A claim UI-61
