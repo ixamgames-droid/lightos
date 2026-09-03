@@ -10,6 +10,7 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | FM-45 | B | fix/fm45-kopf-den-es-nicht-gibt | 2026-09-03T18:47Z | - |
+| QA-72 | A | fix/qa72-herkunft-eines-profils | 2026-09-03T19:18Z | src/core/database/qxf_import.py |
 
 ## Blocker & Fallen
 
@@ -66,7 +67,6 @@
 
 ## Verlauf
 
-- 2026-09-03T00:53Z B uebergeben XPLAT-29
 - 2026-09-03T00:54Z B claim XPLAT-26
 - 2026-09-03T01:35Z B done XPLAT-26
 - 2026-09-03T04:23Z B claim QA-71
@@ -96,3 +96,4 @@
 - 2026-09-03T18:47Z B claim FM-45
 - 2026-09-03T18:49Z A claim UI-61
 - 2026-09-03T19:17Z A done UI-61
+- 2026-09-03T19:18Z A claim QA-72
