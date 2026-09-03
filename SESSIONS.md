@@ -10,7 +10,6 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | FM-41 | A | feature/fm41-weiss-achse | 2026-09-03T20:54Z | src/core/group_cells.py |
-| QA-74 | B | fix/qa74-webgl-waechter-aus-einer-quelle | 2026-09-03T20:43Z | - |
 
 ## Blocker & Fallen
 
@@ -71,7 +70,6 @@
 
 ## Verlauf
 
-- 2026-09-03T05:22Z B claim QA-70
 - 2026-09-03T05:48Z B done QA-70
 - 2026-09-03T05:51Z B claim XPLAT-23
 - 2026-09-03T10:42Z B uebergeben XPLAT-23
@@ -101,3 +99,4 @@
 - 2026-09-03T19:52Z A claim FM-41
 - 2026-09-03T20:06Z A done OUT-55
 - 2026-09-03T20:43Z B claim QA-74
+- 2026-09-03T21:19Z B uebergeben QA-74
