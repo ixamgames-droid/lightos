@@ -1,6 +1,6 @@
 ﻿# VIZ-11 — Ziel-Design „Szenegraph-Datenmodell"
 
-Worktree: `C:/Users/David/Downloads/lightos-main/wt-viz11` (Branch `feature/viz11-scenegraph`). READ-ONLY-Analyse; alle file:line beziehen sich auf diesen Worktree.
+Worktree: `C:/Users/X/Downloads/lightos-main/wt-viz11` (Branch `feature/viz11-scenegraph`). READ-ONLY-Analyse; alle file:line beziehen sich auf diesen Worktree.
 
 **Leitentscheidung (aus Constraint 1 + E1):** Der reine „5 Felder werden Property-Views"-Ansatz **trägt nicht**. E1 belegt Ganz-Dict-Zuweisung (`state.visualizer_positions = {...}`) auf echten AppState-Instanzen UND — härter — `SimpleNamespace`-Fakes, die `VisualizerBridge`-Methoden mit **plain-dict**-Attributen unbound aufrufen (test_visualizer_state_leaks, _aim, _controls, _multiaxis_rotation, _trace, _viz_liveview_spider_tilt, _viz10_ui_repairs). Ein Property-Getter auf AppState erreicht diese Fakes nie. **Gewählter Hybrid:**
 

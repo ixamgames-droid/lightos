@@ -89,8 +89,14 @@ class VerfallTest(unittest.TestCase):
 # Waechter, der genau solche Pfade sucht — stuende das Beispiel woertlich hier,
 # schlueg `tests/test_keine_privaten_dateien.py` an der Testdatei des eigenen
 # Waechters an. (Genau so passiert, 2026-08-06: das Gate fand sich selbst.)
-# Der Name ist erfunden; es geht nur um die FORM des Pfades.
+# Die Namen sind erfunden; es geht nur um die FORM des Pfades. Bewusst
+# ZUSAMMENGESETZT und nicht hingeschrieben: der Waechter in
+# tests/test_keine_privaten_dateien.py durchsucht `tests/` mit, und ein
+# Literal hier waere fuer ihn nicht von einem echten Leck zu unterscheiden.
+# PRIV-04: bis 2026-09-03 galt das nur fuer die Linux-Zeile — die Windows-Form
+# stand als Literal da, weil sie gar nicht geprueft wurde.
 _BEISPIEL_HOME = "/home/" + "martin"
+_BEISPIEL_WIN = r"C:\Users" + "\\" + "Anna" + r"\lightos kaputt"
 
 
 class OeffentlichkeitsPruefungTest(unittest.TestCase):
@@ -98,7 +104,7 @@ class OeffentlichkeitsPruefungTest(unittest.TestCase):
 
     def test_faengt_private_angaben(self):
         self.assertTrue(sc.pruefe_oeffentlich(f"Show liegt in {_BEISPIEL_HOME}/shows"))
-        self.assertTrue(sc.pruefe_oeffentlich(r"C:\Users\Anna\lightos kaputt"))
+        self.assertTrue(sc.pruefe_oeffentlich(_BEISPIEL_WIN))
         self.assertTrue(sc.pruefe_oeffentlich("siehe claude.ai/code/session_abc"))
         self.assertTrue(sc.pruefe_oeffentlich("melde dich bei a.b@example.com"))
 

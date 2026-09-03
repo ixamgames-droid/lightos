@@ -126,9 +126,24 @@ class KeineFremdenBenutzerpfadeTest(unittest.TestCase):
     # Protokolle und werden nicht rueckwirkend umgeschrieben.
     ORDNER = ("src", "tests", "tools", "docs")
 
-    def test_kein_home_verzeichnis_mit_kontonamen(self):
+    # PRIV-04: BEIDE Formen. Die Linux-Form stand hier seit jeher allein — und
+    # der Waechter war gruen, WEIL nur sie geprueft wurde und nur sie bereits
+    # aufgeraeumt war. Gemessen am 2026-09-03 ueber dieselben Ordner:
+    # `/home/<name>/` 0 Treffer, `C:\Users\<name>\` **14**. Ein Waechter, der
+    # die Haelfte seiner eigenen Regel nicht ansieht, misst nichts.
+    #
+    # Die Platzhalter sind die aus COORDINATION.md: `/home/user/`, `C:\Users\X\`.
+    # `runner` bleibt frei — das ist der GitHub-Actions-Lauf, kein Mensch.
+    MUSTER = (
+        (r"/home/(?!user\b|runner\b)[a-z][a-z0-9_-]{1,}/", "/home/user/"),
+        # Windows: Trenner beidseitig, Laufwerksbuchstabe egal, `X`/`user` frei.
+        (r"[A-Za-z]:[\\/]+Users[\\/]+(?![Xx]\b|user\b|Public\b)"
+         r"[A-Za-z][A-Za-z0-9_.-]*[\\/]", r"C:\\Users\\X\\"),
+    )
+
+    def _treffer(self, muster: str) -> list[str]:
         import re
-        muster = re.compile(r"/home/(?!user\b|runner\b)[a-z][a-z0-9_-]{1,}/")
+        rx = re.compile(muster)
         treffer = []
         for p in _getrackte_dateien():
             if not p.startswith(self.ORDNER) or not p.endswith((".py", ".sh", ".md")):
@@ -136,13 +151,51 @@ class KeineFremdenBenutzerpfadeTest(unittest.TestCase):
             try:
                 with open(os.path.join(_REPO, p), encoding="utf-8") as f:
                     for nr, zeile in enumerate(f, 1):
-                        if muster.search(zeile):
+                        if rx.search(zeile):
                             treffer.append(f"{p}:{nr}")
             except (OSError, UnicodeDecodeError):
                 continue
-        self.assertEqual(
-            treffer, [],
-            "Benutzername im Pfad — bitte durch /home/user/ ersetzen.")
+        return treffer
+
+    def test_kein_benutzername_im_pfad(self):
+        """Beide Schreibweisen, in einem Durchlauf — sonst faellt beim naechsten
+        Umbau wieder eine hinten runter."""
+        for muster, ersatz in self.MUSTER:
+            with self.subTest(muster=muster):
+                self.assertEqual(
+                    self._treffer(muster), [],
+                    f"Benutzername im Pfad — bitte durch {ersatz} ersetzen.")
+
+    def test_der_waechter_wuerde_beide_formen_auch_finden(self):
+        """★ Die Selbstpruefung, die PRIV-04 ausgeloest hat.
+
+        Ein leerer Trefferliste bedeutet zweierlei: „es gibt nichts" oder „ich
+        schaue nicht hin". Bis zum 2026-09-03 war es das Zweite — die
+        Windows-Form wurde nie geprueft und hatte 14 Treffer. Deshalb wird hier
+        jedes Muster gegen einen KUENSTLICHEN Fund gehalten, statt sich auf die
+        leere Liste zu verlassen."""
+        import re
+        # ★ Die Proben werden ZUSAMMENGESETZT, nicht hingeschrieben: stuende
+        # der Beispielpfad als Literal in dieser Datei, faende der Waechter
+        # oben sich selbst — `tests/` ist einer seiner eigenen Ordner. Beim
+        # ersten Lauf ist genau das passiert. Die Alternative waere gewesen,
+        # diese Datei auszunehmen; das haette den Waechter dauerhaft blind fuer
+        # sich selbst gemacht, und Testdateien sind ausdruecklich in seinem
+        # Zustaendigkeitsbereich.
+        _konto = "konto" + "name"
+        proben = {
+            self.MUSTER[0][0]: (f"/home/{_konto}/projekt/datei.py",
+                                "/home/user/projekt/datei.py"),
+            self.MUSTER[1][0]: (f"C:/Users/{_konto}/Desktop/x",
+                                "C:/Users/X/Desktop/x"),
+        }
+        for muster, (trifft, trifft_nicht) in proben.items():
+            with self.subTest(muster=muster):
+                rx = re.compile(muster)
+                self.assertTrue(rx.search(trifft),
+                                f"Muster findet {trifft!r} nicht — es wacht ueber nichts")
+                self.assertFalse(rx.search(trifft_nicht),
+                                 f"Muster schlaegt beim Platzhalter {trifft_nicht!r} an")
 
 
 if __name__ == "__main__":

@@ -84,7 +84,7 @@ from src.ui.virtualconsole.vc_effect_editor import VCEffectEditor
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(_ROOT, "shows", "Mega_Arena_2026.lshow")
 STAGE_NAME = "MegaArena2026"
-MUSIC_DIR = os.environ.get("LIGHTOS_MEGA_MUSIC_DIR", r"C:/Users/David/Desktop/Musik/BP Party")
+MUSIC_DIR = os.environ.get("LIGHTOS_MEGA_MUSIC_DIR", r"C:/Users/X/Desktop/Musik/BP Party")
 BUS = "Global"            # Master: folgt der globalen Musik-BPM (Tap/Audio)
 PLAYLIST_MAX = 16
 

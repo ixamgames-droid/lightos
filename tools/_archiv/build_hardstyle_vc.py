@@ -369,7 +369,7 @@ def build_widgets():
 # ════════════════════════════════════════════════════════════════════════════
 #  Playlist
 # ════════════════════════════════════════════════════════════════════════════
-MUSIC_DIR = "C:/Users/David/Desktop/Musik/BP Party/"
+MUSIC_DIR = "C:/Users/X/Desktop/Musik/BP Party/"
 PLAYLIST_TRACKS = [
     ("Adele - Rolling In The Deep (Phyre Hardstyle Remix).mp3", "Hardstyle", 150.0),
     ("Bonnie Tyler - I Need a Hero (HBz Psy-Bounce Remix).mp3", "Bounce", 150.0),

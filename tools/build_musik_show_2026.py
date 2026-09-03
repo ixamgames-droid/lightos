@@ -63,7 +63,7 @@ from src.ui.virtualconsole.vc_slider import VCSlider, SliderMode
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(_ROOT, "shows", "Musik_Show_2026.lshow")
-MUSIC_DIR = r"C:/Users/David/Desktop/Musik/BP Party"
+MUSIC_DIR = r"C:/Users/X/Desktop/Musik/BP Party"
 
 # Repräsentative Party-BPM für die Effekt-Taktung (Bounce/Hardstyle ~150).
 BPM = 150.0

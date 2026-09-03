@@ -61,7 +61,7 @@ from src.ui.virtualconsole.vc_effect_editor import VCEffectEditor
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(_ROOT, "shows", "Demo_Show_Full.lshow")
-MUSIC_DIR = r"C:/Users/David/Desktop/Musik/BP Party"
+MUSIC_DIR = r"C:/Users/X/Desktop/Musik/BP Party"
 BUS = "Global"          # alle Effekte folgen diesem Master-Bus (= globale Musik-BPM)
 PLAYLIST_MAX = 16
 

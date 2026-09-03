@@ -59,7 +59,7 @@ dann in der App nur **laden + vorführen/filmen**.
   `e.phase_mode` `sync|fan|offset`; `spread/counter_rotate/mirror`; `open_beam=True`
   (Intensität 255 + Shutter offen); `bit16`; `speed_hz`; `x_offset/y_offset`; `width/height`.
 - **Cues:** `state.new_cue_stack(name)`; `.mode`; `.beat_sync`; `.beats_per_cue`; `.add_cue(Cue(...))`.
-- **Musik:** `state.playlist` (Ordner `C:/Users/David/Desktop/Musik/BP Party`, Bounce ~150 BPM);
+- **Musik:** `state.playlist` (Ordner `C:/Users/X/Desktop/Musik/BP Party`, Bounce ~150 BPM);
   `state.music_autoshow = {enabled, function_ids, bank, slots}` → `MusicShowDirector` startet die
   Funktionen beim ▶ im Musik-Player. Beat-Sync: `CueStack.beat_sync` + `audio_triggered` Chaser.
 - **VC:** `VCButton/VCColor/VCSlider/VCCueList/VCSongInfo/…`; `state._vc_layout = {"widgets":[…]}`;
