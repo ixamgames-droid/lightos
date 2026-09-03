@@ -20,6 +20,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, delete
 
 
+from src.core.group_cells import (          # noqa: E402  (nach den Qt-Importen)
+    ACHSE_FARBE, ACHSE_WEISS, parse_zelle, zelle_gehoert_zu,
+)
+
+
 def _split_cell(v):
     """FM-16e: Rasterzellwert -> (fid, head). ``v`` ist ENTWEDER ein ganzer fid
     (int/str) ODER eine Kopf-Zelle ``"fid:head"`` (Str, aus create_head_matrix_group
@@ -234,38 +239,49 @@ class FixtureGridWidget(QWidget):
         row = max(0, min(row, self.rows - 1))
         return col, row
 
-    def _is_free(self, cell: tuple[int, int], ignore_fid: int | None) -> bool:
+    def _is_free(self, cell: tuple[int, int], ignore_fid: int | None,
+                 achse: str | None = None) -> bool:
         """Zelle frei? ``ignore_fid`` zaehlt die EIGENEN Zellen dieses Geraets als
         frei — ein Drop ist immer ein MOVE, das Geraet darf sich nicht selbst
         blockieren (FM-HEADLAYOUT Slice 3: sonst scheitert das Zurueckziehen eines
         Multi-Head-Geraets auf ein kleines Raster, das seine eigenen Kopf-Zellen
-        komplett fuellen — z. B. die 1×N-Auto-Kopf-Matrix)."""
+        komplett fuellen — z. B. die 1×N-Auto-Kopf-Matrix).
+
+        ★ FM-41: „eigen" heisst jetzt „eigen AUF DIESER ACHSE". Die Frage ist
+        wortwoertlich dieselbe wie beim Aufraeumen in ``_drop_fid_cells`` —
+        *welche Zellen gibt dieser Wurf frei?* — und wird deshalb an genau
+        einer Stelle beantwortet: ``group_cells.zelle_gehoert_zu``. Zwei
+        Fassungen davon waeren Review-Checkliste 17, und dann laufen Highlight
+        und echte Platzierung auseinander."""
         v = self.positions.get(cell)
         if v is None:
             return True
-        return ignore_fid is not None and _split_cell(v)[0] == ignore_fid
+        return (ignore_fid is not None
+                and zelle_gehoert_zu(v, ignore_fid, achse))
 
     def _nearest_free_cell(self, col: int, row: int,
-                           ignore_fid: int | None = None) -> tuple[int, int] | None:
+                           ignore_fid: int | None = None,
+                           achse: str | None = None) -> tuple[int, int] | None:
         """Naechste freie Zelle zu (col,row). (col,row) selbst, wenn frei; sonst
         die per Manhattan-Distanz naechste (Tie-Break row-major). None, wenn das
         Raster komplett voll ist. So wird beim Drop nie still ueberschrieben.
         ``ignore_fid`` s. ``_is_free``."""
         if (0 <= col < self.cols and 0 <= row < self.rows
-                and self._is_free((col, row), ignore_fid)):
+                and self._is_free((col, row), ignore_fid, achse)):
             return (col, row)
         best_key = None
         best_cell = None
         for r in range(self.rows):
             for c in range(self.cols):
-                if not self._is_free((c, r), ignore_fid):
+                if not self._is_free((c, r), ignore_fid, achse):
                     continue
                 key = (abs(c - col) + abs(r - row), r, c)
                 if best_key is None or key < best_key:
                     best_key, best_cell = key, (c, r)
         return best_cell
 
-    def resolve_drop_cell(self, fid: int | None, col: int, row: int) -> tuple[int, int] | None:
+    def resolve_drop_cell(self, fid: int | None, col: int, row: int,
+                          achse: str | None = None) -> tuple[int, int] | None:
         """Zielzelle fuer einen externen Drop bestimmen (identisch fuer Highlight
         und echten Drop). Liegt fid schon an (col,row) -> genau dort (No-Op);
         ist die Zelle von einem ANDEREN fid belegt -> naechste freie Zelle. Eigene
@@ -275,7 +291,7 @@ class FixtureGridWidget(QWidget):
         row = max(0, min(row, self.rows - 1))
         if self.positions.get((col, row)) == fid and fid is not None:
             return (col, row)
-        return self._nearest_free_cell(col, row, ignore_fid=fid)
+        return self._nearest_free_cell(col, row, ignore_fid=fid, achse=achse)
 
     def place_fixture(self, fid: int, col: int, row: int) -> tuple[int, int] | None:
         """Platziert fid an/nahe (col,row) und gibt die tatsaechliche Zelle zurueck.
@@ -290,17 +306,31 @@ class FixtureGridWidget(QWidget):
         # alte Platzierung dieses fid entfernen (Move statt Duplikat). FM-16e:
         # per Basis-fid vergleichen -> ein extern gedroptetes ganzes Fixture räumt
         # auch etwaige Kopf-Zellen ("fid:head") desselben fid weg (kein Doppel).
-        self.positions = {k: v for k, v in self.positions.items()
-                          if _split_cell(v)[0] != fid}
+        #
+        # ★ FM-41: hier stand dieselbe Zeile wie in ``_drop_fid_cells`` noch
+        # einmal ausgeschrieben. Jetzt der Aufruf — ein ganzes Geraet raeumt
+        # BEIDE Achsen (``achse=None``), sonst bliebe ein Weiss-Segment als
+        # Waise stehen und das Geraet staende doppelt im Raster.
+        self._drop_fid_cells(fid)
         self.positions[target] = fid
         return target
 
-    def _drop_fid_cells(self, fid: int):
-        """Alle Zellen dieses Basis-fid entfernen (ganzes Fixture UND Kopf-Zellen).
-        Gemeinsame Move-Semantik von ``place_fixture``/``place_fixture_heads``:
-        ein Gerät steht nie doppelt im Raster."""
+    def _drop_fid_cells(self, fid: int, achse: str | None = None):
+        """Zellen dieses Basis-fid entfernen. Gemeinsame Move-Semantik von
+        ``place_fixture``/``place_fixture_heads``: ein Gerät steht nie doppelt
+        im Raster.
+
+        ``achse=None`` (Vorgabe) räumt **alles** — ganzes Fixture, Farb-Köpfe
+        UND Weiß-Segmente. Das ist die Lesart des Menüpunkts „Alle Zellen von X
+        entfernen"; gemessen ließ er vor FM-41 Weiß-Zellen als Waisen stehen,
+        weil der verlustbehaftete ``parse_group_cell`` sie gar nicht als zu
+        diesem Gerät gehörig erkennt.
+
+        Mit einer Achse räumt er nur diese eine (plus die achsenlose
+        Ganz-Geräte-Zelle) — die Voraussetzung dafür, dass RGB-Zonen und
+        Weiß-Segmente **nebeneinander** im Raster liegen können."""
         self.positions = {k: v for k, v in self.positions.items()
-                          if _split_cell(v)[0] != fid}
+                          if not zelle_gehoert_zu(v, fid, achse)}
 
     def place_fixture_heads(self, fid: int, count: int,
                             col: int | None = None, row: int | None = None,
@@ -335,7 +365,11 @@ class FixtureGridWidget(QWidget):
             return []
         if count < 1:
             return []
-        self._drop_fid_cells(fid)
+        # ★ FM-41: NUR die Farb-Achse. Wer die RGB-Zonen eines Geraets
+        # neu auslegt, raeumt damit nicht dessen Weiss-Segmente weg — sie
+        # sind der zweite, eigenstaendige Satz. Die achsenlose
+        # Ganz-Geraet-Zelle geht mit, sonst staende es doppelt.
+        self._drop_fid_cells(fid, ACHSE_FARBE)
         if col is None or row is None:
             _free = self.first_free_cells(1)
             want_c, want_r = _free[0] if _free else (0, 0)
@@ -433,7 +467,11 @@ class FixtureGridWidget(QWidget):
         _r0, _c0, eff_rows, eff_cols = place_element(
             0, block_cols, block_rows, order, rotation, flip)
 
-        self._drop_fid_cells(fid)
+        # ★ FM-41: NUR die Farb-Achse. Wer die RGB-Zonen eines Geraets
+        # neu auslegt, raeumt damit nicht dessen Weiss-Segmente weg — sie
+        # sind der zweite, eigenstaendige Satz. Die achsenlose
+        # Ganz-Geraet-Zelle geht mit, sonst staende es doppelt.
+        self._drop_fid_cells(fid, ACHSE_FARBE)
         if col is None or row is None:
             _free = self.first_free_cells(1)
             want_c, want_r = _free[0] if _free else (0, 0)
@@ -466,11 +504,17 @@ class FixtureGridWidget(QWidget):
         """Gegenstück zu ``place_fixture_heads``: die Kopf-Zellen dieses fid durch
         EINE Ganz-Fixture-Zelle ersetzen (an der ersten bisherigen Kopf-Zelle in
         Raster-Reihenfolge). Rückgabe: die belegte Zelle, oder ``None``, wenn das
-        fid gar nicht kopfweise im Raster steht (dann bleibt alles unverändert)."""
+        fid gar nicht kopfweise im Raster steht (dann bleibt alles unverändert).
+
+        ★ FM-41: „kopfweise" heisst auf JEDER Achse. Über ``_split_cell`` waren
+        Weiß-Segmente unsichtbar — ein Gerät, das nur in Weiß-Segmenten im
+        Raster stand, galt als „gar nicht kopfweise da" und ließ sich nicht
+        zusammenfalten. Das Zusammenfalten selbst räumt danach beide Achsen
+        (``achse=None``), denn eine Ganz-Zelle meint das ganze Gerät."""
         head_cells = []
         for (c, r), v in self.positions.items():
-            base, head = _split_cell(v)
-            if base == fid and head is not None:
+            base, achse, index = parse_zelle(v)
+            if base == fid and achse is not None:
                 head_cells.append((r, c))       # Raster-Reihenfolge: Zeile, Spalte
         head_cells.sort()
         if not head_cells:

@@ -25,6 +25,8 @@ gefahrlos — anders als „Gate scharf, Verdrahtung folgt" (AGENTS.md Regel 5).
 from __future__ import annotations
 import os
 import unittest
+
+from src.core.group_cells import ACHSE_FARBE, ACHSE_WEISS
 from types import SimpleNamespace
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -343,6 +345,153 @@ class ZaehlungNichtProZelleTest(unittest.TestCase):
             aufrufe["n"], 2,
             f"{aufrufe['n']} Zaehlungen fuer EIN Geraet in EINEM Frame — die "
             "Zahl gehoert je Fixture geholt, nicht je Zelle")
+
+
+class ZelleGehoertZuTest(unittest.TestCase):
+    """Die eine Zugehoerigkeits-Regel — Wahrheitstabelle."""
+
+    def test_wahrheitstabelle(self):
+        from src.core.group_cells import (zelle_gehoert_zu as G,
+                                          ACHSE_FARBE as F, ACHSE_WEISS as W)
+        faelle = [
+            #  Zellwert   alles  rgb    weiss   Begruendung
+            (5,           True,  True,  True,  "ganzes Geraet gehoert zu jeder Achse"),
+            ("5",         True,  True,  True,  "als Text dasselbe"),
+            ("5:0",       True,  True,  False, "Farb-Kopf ist kein Weiss-Segment"),
+            ("5:2",       True,  True,  False, ""),
+            ("5:w0",      True,  False, True,  "und umgekehrt"),
+            ("5:w3",      True,  False, True,  ""),
+            (7,           False, False, False, "fremdes Geraet"),
+            ("7:w0",      False, False, False, ""),
+            ("5:-1",      False, False, False, "negativer Index ist unparsbar (FM-45)"),
+            ("quatsch",   False, False, False, ""),
+            (None,        False, False, False, ""),
+        ]
+        for wert, alles, rgb, weiss, warum in faelle:
+            with self.subTest(zelle=wert):
+                self.assertEqual(G(wert, 5), alles, warum)
+                self.assertEqual(G(wert, 5, F), rgb, warum)
+                self.assertEqual(G(wert, 5, W), weiss, warum)
+
+
+class RasterZweiAchsenTest(unittest.TestCase):
+    """★★ Der Kern von Scheibe 2: RGB-Zonen und Weiss-Segmente liegen
+    NEBENEINANDER im Raster, und jede Operation trifft genau das, was sie meint.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        from PySide6.QtWidgets import QApplication
+        cls._app = QApplication.instance() or QApplication([])
+
+    def _raster(self):
+        """Geraet 5 mit zwei RGB-Zonen und zwei Weiss-Segmenten, daneben ein
+        fremdes Geraet 7."""
+        from src.ui.views.fixture_group_view import FixtureGridWidget
+        g = FixtureGridWidget()
+        g.cols, g.rows = 4, 2
+        g.positions = {(0, 0): "5:0", (1, 0): "5:1",
+                       (2, 0): "5:w0", (3, 0): "5:w1", (0, 1): 7}
+        return g
+
+    def test_alle_zellen_entfernen_laesst_keine_waisen(self):
+        """★ REGRESSION, vor dem Umbau GEMESSEN: der Menuepunkt „Alle Zellen von
+        X entfernen" liess die Weiss-Zellen stehen — ``parse_group_cell`` ist
+        bewusst verlustbehaftet und erkennt ``"5:w0"`` gar nicht als zu Geraet 5
+        gehoerig. Uebrig blieben Zellen, die keine Operation mehr ansprechen
+        konnte: das Geraet stand als Waise im Raster."""
+        g = self._raster()
+        g._drop_fid_cells(5)
+        self.assertEqual(g.positions, {(0, 1): 7})
+
+    def test_farb_wurf_laesst_die_weiss_segmente_leben(self):
+        g = self._raster()
+        g._drop_fid_cells(5, ACHSE_FARBE)
+        self.assertEqual(g.positions,
+                         {(2, 0): "5:w0", (3, 0): "5:w1", (0, 1): 7})
+
+    def test_weiss_wurf_laesst_die_farb_zonen_leben(self):
+        g = self._raster()
+        g._drop_fid_cells(5, ACHSE_WEISS)
+        self.assertEqual(g.positions,
+                         {(0, 0): "5:0", (1, 0): "5:1", (0, 1): 7})
+
+    def test_die_ganz_geraet_zelle_geht_mit_jeder_achse(self):
+        """Sie meint das ganze Geraet — bliebe sie liegen, staende das Geraet
+        doppelt im Raster: einmal ganz, einmal in Segmenten."""
+        from src.ui.views.fixture_group_view import FixtureGridWidget
+        for achse in (None, ACHSE_FARBE, ACHSE_WEISS):
+            with self.subTest(achse=achse):
+                g = FixtureGridWidget()
+                g.cols, g.rows = 4, 2
+                g.positions = {(0, 0): 5, (0, 1): 7}
+                g._drop_fid_cells(5, achse)
+                self.assertEqual(g.positions, {(0, 1): 7})
+
+    def test_ganzes_geraet_droppen_raeumt_beide_achsen(self):
+        g = self._raster()
+        ziel = g.place_fixture(5, 0, 1)
+        self.assertIsNotNone(ziel)
+        self.assertEqual(g.positions[ziel], 5)
+        self.assertEqual([v for v in g.positions.values() if str(v).startswith("5")],
+                         [5], "das Geraet steht genau einmal im Raster")
+
+    def test_koepfe_auslegen_raeumt_die_weiss_segmente_nicht(self):
+        """Der eigentliche Zweck: zwei ansprechbare Saetze je Geraet."""
+        g = self._raster()
+        g.place_fixture_heads(5, 2, 0, 1)
+        weiss = sorted(v for v in g.positions.values() if str(v).startswith("5:w"))
+        self.assertEqual(weiss, ["5:w0", "5:w1"])
+
+    def test_zusammenfalten_geht_auch_aus_reinem_weiss(self):
+        """★ Ueber ``_split_cell`` waren Weiss-Segmente unsichtbar: ein Geraet,
+        das NUR in Weiss-Segmenten im Raster stand, galt als „gar nicht
+        kopfweise da" und liess sich nicht zusammenfalten."""
+        from src.ui.views.fixture_group_view import FixtureGridWidget
+        g = FixtureGridWidget()
+        g.cols, g.rows = 4, 2
+        g.positions = {(1, 0): "5:w0", (2, 0): "5:w1", (0, 1): 7}
+        zelle = g.collapse_fixture_heads(5)
+        self.assertEqual(zelle, (1, 0))
+        self.assertEqual(g.positions, {(1, 0): 5, (0, 1): 7})
+
+    def test_freiraum_ist_achsen_bewusst(self):
+        """Highlight und echte Platzierung muessen deckungsgleich bleiben —
+        beide fragen dieselbe Funktion."""
+        g = self._raster()
+        for zelle, achse, frei, was in (
+                ((0, 0), ACHSE_FARBE, True,  "eigene Farb-Zone weicht dem Farb-Wurf"),
+                ((0, 0), ACHSE_WEISS, False, "… blockiert aber den Weiss-Wurf"),
+                ((2, 0), ACHSE_WEISS, True,  "eigenes Weiss-Segment weicht dem Weiss-Wurf"),
+                ((2, 0), ACHSE_FARBE, False, "… blockiert aber den Farb-Wurf"),
+                ((0, 1), ACHSE_FARBE, False, "fremdes Geraet blockiert immer"),
+                ((0, 1), ACHSE_WEISS, False, ""),
+        ):
+            with self.subTest(zelle=zelle, achse=achse):
+                self.assertIs(g._is_free(zelle, 5, achse), frei, was)
+
+
+class BestandsdatenUnveraendertTest(unittest.TestCase):
+    """★★ Die wichtigste Zusicherung des ganzen Umbaus: für Raster OHNE
+    Weiss-Zellen — also fuer jede heute gespeicherte Show — antwortet die neue
+    Regel Zeichen fuer Zeichen wie die alte.
+
+    Gemessen ueber die echten Shows: 66 von 66 gelesen, 225 Raster, 1461
+    Zellen (813 ganze Geraete, 116 Kopf-Zellen, Rest Nicht-Zellwerte) —
+    **0** Abweichungen. Der Test haelt dieselbe Aussage an einem Korpus fest,
+    der die dort vorgefundenen Zellformen nachbildet, weil die Shows selbst
+    private Daten sind und nicht ins oeffentliche Repo gehoeren.
+    """
+
+    def test_ohne_weiss_zellen_antwortet_neu_wie_alt(self):
+        from src.core.group_cells import parse_group_cell, zelle_gehoert_zu
+        korpus = [1, 5, 12, "1", "07", "5:0", "5:1", "12:3", "1:11",
+                  "5:-1", "", None, "quatsch", "x:1", [0, 1], {"a": 1}]
+        for fid in (0, 1, 5, 7, 12):
+            for wert in korpus:
+                with self.subTest(fid=fid, zelle=wert):
+                    self.assertEqual(zelle_gehoert_zu(wert, fid),
+                                     parse_group_cell(wert)[0] == fid)
 
 
 if __name__ == "__main__":

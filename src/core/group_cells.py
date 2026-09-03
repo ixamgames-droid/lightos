@@ -122,6 +122,36 @@ def parse_zelle(value) -> tuple:
         return None, None, None
 
 
+def zelle_gehoert_zu(value, fid: int, achse: str | None = None) -> bool:
+    """Gehoert diese Rasterzelle zu Geraet ``fid`` auf Achse ``achse``?
+
+    Die EINE Regel dafuer, wann eine Zelle von einem Wurf betroffen ist —
+    benutzt vom Freiraum-Test (*darf ich hier ablegen?*) UND vom Aufraeumen
+    (*welche Zellen raeume ich vorher weg?*). Beides ist dieselbe Frage; sie
+    zweimal zu beantworten ist die Doppelstellen-Klasse aus Review-Checkliste
+    17, und genau daran ist ENG-25 gescheitert.
+
+    * ``achse=None`` — der ganze Geraetebestand, beide Achsen. Das ist die
+      ehrliche Lesart von „Alle Zellen dieses Geraets".
+    * ``achse=ACHSE_FARBE`` / ``ACHSE_WEISS`` — nur diese Achse …
+    * … **plus die Ganz-Geraet-Zelle**, immer. Eine Zelle ohne Achsen-Angabe
+      meint das GANZE Geraet und ist damit Mitglied jeder Achse: wer die
+      Weiss-Segmente eines Geraets ablegt, das bisher als eine Zelle im Raster
+      stand, muss diese eine Zelle raeumen — sonst steht das Geraet doppelt da,
+      einmal ganz und einmal in Segmenten.
+
+    ★ Der Gegenprobe wegen ausgeschrieben, denn die Asymmetrie ist der Kern:
+    eine Farb-Zelle ist KEIN Weiss-Segment und umgekehrt. Die beiden Achsen
+    raeumen einander also **nicht** weg — nur so kann eine Gruppe aus Weiss,
+    aus RGB oder aus beidem zusammen entstehen, was der ganze Zweck von FM-41
+    ist. Nur die achsenlose Zelle ist beiden gemeinsam.
+    """
+    z_fid, z_achse, _ = parse_zelle(value)
+    if z_fid is None or z_fid != fid:
+        return False
+    return achse is None or z_achse is None or z_achse == achse
+
+
 def achsen_zellen(cells, achse: str) -> list:
     """Aus einer Zell-Liste die Indizes je Geraet fuer GENAU EINE Achse.
 
