@@ -113,6 +113,61 @@ def freeze_header(stall: float, now: datetime.datetime | None = None) -> str:
             f"({stall:.0f}s ohne Event-Loop) — Stacks aller Threads: ===\n")
 
 
+# --- STAB-28: sagt der Dump ueberhaupt etwas ueber den Blockierer? ----------
+#
+# Gemessen an Davids crash.log (drei Freezes vom 06./07.08.2026, alle NACH den
+# beiden bekannten Fixes): der Dump zeigte sechs Threads in ihren voellig
+# normalen Warteschleifen — AudioCapture in numpy.fft, DMX-Output im Sendeloop,
+# MidiDispatch in queue.get — und den Hauptthread mit genau zwei Rahmen:
+#
+#     Thread 0x00007658 [CrBrowserMain] (most recent call first):
+#       File "main.py", line 592 in main
+#       File "main.py", line 596 in <module>
+#
+# Das ist der Einstieg in ``app.exec()`` und sonst nichts. Der Hauptthread
+# steckte also NICHT in Python-Code, sondern in einem nativen Aufruf darunter —
+# und der Thread trug den Namen ``CrBrowserMain``, weil QtWebEngine/Chromium den
+# OS-Thread umbenennt, sobald es ihn uebernimmt.
+#
+# ★ Der Schaden ist nicht, dass der Dump schweigt, sondern dass er in die
+# falsche Richtung zeigt: wer sechs Stacks mit Dateinamen aus ``src/`` liest,
+# sucht den Blockierer dort. Diese sechs sind aber die gesunden Threads — der
+# eine, auf den es ankommt, ist der mit den zwei nichtssagenden Rahmen.
+#
+# Deshalb steht ab sofort ein Befund VOR dem Dump. Die Logik ist rein und ohne
+# Qt testbar; ``main.py`` reicht ihr den Stack des Hauptthreads herein.
+
+#: Rahmen, die nur den Einstieg in den Qt-Event-Loop markieren und nichts
+#: ueber einen Blockierer aussagen.
+EVENT_LOOP_EINSTIEG = ("main", "<module>")
+
+
+def hauptthread_befund(stack) -> str:
+    """Ein Satz darueber, ob der Blockierer ueberhaupt im Python-Code liegt.
+
+    ``stack`` ist der Stack des Hauptthreads als Liste von
+    ``(datei, zeile, funktion)`` — **innerster Rahmen zuerst**, so wie
+    ``faulthandler`` ihn druckt. ``None`` oder leer heisst: gar kein Rahmen
+    gefunden.
+    """
+    if not stack:
+        return ("[freeze] Hauptthread: KEIN Python-Rahmen gefunden — der "
+                "Blockierer liegt im nativen Code. Die Stacks unten gehoeren "
+                "den Nebenthreads und sind kein Befund.\n")
+    datei, zeile, funktion = stack[0]
+    if funktion in EVENT_LOOP_EINSTIEG:
+        return ("[freeze] Hauptthread steht im Event-Loop-Einstieg "
+                f"({datei}:{zeile} in {funktion}) und fuehrt KEINEN Python-Code "
+                "aus — der Blockierer sitzt im nativen Aufruf darunter (Qt, "
+                "QtWebEngine/Chromium, Treiber). ACHTUNG: die Stacks der "
+                "uebrigen Threads unten sind ihre normalen Warteschleifen und "
+                "KEIN Befund; wer dort sucht, sucht falsch. Hinweis: traegt der "
+                "Hauptthread unten einen fremden Namen (z. B. CrBrowserMain), "
+                "hat QtWebEngine ihn uebernommen.\n")
+    return ("[freeze] Hauptthread haengt in Python-Code: "
+            f"{datei}:{zeile} in {funktion} — dort zuerst nachsehen.\n")
+
+
 # --- Freeze/Standby-Klassifikation (rein, testbar) -------------------------
 def is_freeze(stall: float, threshold: float = FREEZE_THRESHOLD_S) -> bool:
     """UI-Freeze: der GUI-Heartbeat stand >= ``threshold`` Sekunden still."""

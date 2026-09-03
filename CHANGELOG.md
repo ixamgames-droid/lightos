@@ -7,6 +7,27 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-03 — Der Einfrier-Bericht sagt jetzt, wo er NICHT zu suchen ist
+
+#### Verbessert
+
+- **Wenn die Oberfläche einfriert, schreibt LightOS die Stapel aller Threads ins
+  Fehlerprotokoll — und die führten bisher auf die falsche Fährte.** Zu sehen
+  waren sechs Threads mitten in ihren völlig normalen Warteschleifen: die
+  Audio-Analyse, die DMX-Ausgabe, die MIDI-Verarbeitung. Wer das liest, sucht
+  den Übeltäter dort. Der Thread, auf den es ankommt, stand dagegen mit zwei
+  nichtssagenden Zeilen da, weil er gar keinen eigenen Code mehr ausführte,
+  sondern in einem Aufruf tiefer im System festhing.
+
+  Über dem Bericht steht jetzt ein Satz, der beides auseinanderhält: hängt die
+  Oberfläche in LightOS-eigenem Code, wird die Stelle beim Namen genannt. Hängt
+  sie darunter — in Qt, im eingebauten Browser des 3D-Fensters oder in einem
+  Treiber — steht das ausdrücklich da, zusammen mit dem Hinweis, dass die
+  Stapel darunter **kein** Befund sind.
+
+  Das ändert nichts am Verhalten der Software; es ändert, wie lange die Suche
+  nach der Ursache dauert.
+
 ### 2026-09-02 — Ein Testlauf scheitert nicht mehr daran, dass noch aufgeräumt werden muss
 
 #### Behoben
