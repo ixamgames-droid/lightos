@@ -7,6 +7,30 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-03 — Ein Testlauf, dessen Ergebnisliste Lücken hat, meldet keinen Erfolg mehr
+
+#### Behoben
+
+- **Ein unvollständiger Testlauf konnte auf Windows als bestanden gelten.** Die
+  Abschlusszahl zählt, was in der Ergebnisliste steht. Fehlen dort Zeilen, sieht
+  ein Teillauf aus wie ein vollständiger — und die grüne Meldung darunter ist
+  schlicht falsch.
+
+  Das passiert nicht nur theoretisch: Ein gezielter Einzeltest, gestartet während
+  ein vollständiger Lauf läuft, räumt diesem seine Ergebniszeilen weg. Der Lauf
+  zählt danach nur noch seinen Rest.
+
+  Passt die Zeilenzahl nicht zur Zahl der gefahrenen Dateien, gilt der Lauf jetzt
+  als **nicht bestanden** und sagt dazu, wonach zu suchen ist. Auf Linux ist das
+  seit August so. Wer nicht weiß, ob alles gelaufen ist, hat kein bestandenes
+  Gate, sondern ein kaputtes Messgerät.
+
+- **Eine nicht schreibbare Ergebniszeile beendete den ganzen Lauf.** Ließ sich
+  eine Zeile nicht anfügen — etwa weil ein anderer Vorgang die Datei geöffnet
+  hielt — brach der Testlauf mitten drin ab, und alles bereits Geprüfte war
+  verloren. Jetzt wird einmal gewarnt und weitergemacht; die fehlende Zeile führt
+  über die Prüfung oben ohnehin zu einem roten Ergebnis.
+
 ### 2026-09-03 — Zwei Testläufe streiten sich nicht mehr um die Grafikkarte
 
 #### Behoben

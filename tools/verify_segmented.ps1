@@ -322,6 +322,7 @@ $webQueue = New-Object System.Collections.Queue
 foreach ($f in $web) { $null = $webQueue.Enqueue($f) }
 
 $okCount = 0; $fail = @(); $crash = @(); $timeout = @()
+$script:ergebnisSchreibfehler = 0
 
 function Start-Segment([string]$rel, [bool]$istWeb) {
     $log = Get-LogPfad $rel
@@ -379,7 +380,23 @@ function Test-NativerAbbau([string]$log) {
 }
 
 function Complete-Segment($rec, [int]$rc, [string]$art) {
-    Add-Content -Path $resultsTsv -Value ("{0}`t{1}" -f $rc, $rec.Rel)
+    # XPLAT-23/QA-53: die Ergebniszeile darf den Lauf nicht mitreissen.
+    # Gemessen: `Add-Content` auf eine exklusiv gehaltene Datei wirft eine
+    # IOException, und unter `$ErrorActionPreference = "Stop"` beendet die den
+    # ganzen Lauf - mitten drin, nach getaner Arbeit, die damit verloren ist.
+    # Dieselbe Klasse wie XPLAT-27 und XPLAT-29: der Runner soll mit dem Schaden
+    # umgehen, statt an ihm zu sterben. Die fehlende Zeile bleibt sichtbar - die
+    # Vollstaendigkeits-Pruefung unten faerbt den Lauf dafuer rot.
+    try {
+        Add-Content -Path $resultsTsv -Value ("{0}`t{1}" -f $rc, $rec.Rel) -ErrorAction Stop
+    }
+    catch {
+        if (-not $script:ergebnisSchreibfehler) {
+            Write-Host "[seg] WARNUNG: Ergebniszeile nicht schreibbar - die Bilanz wird unvollstaendig." -ForegroundColor DarkYellow
+            Write-Host ("[seg]   {0}" -f $_.Exception.Message) -ForegroundColor DarkYellow
+        }
+        $script:ergebnisSchreibfehler++
+    }
     switch ($art) {
         "ok"      { $script:okCount++; Write-Host ("   ok   " + $rec.Rel) -ForegroundColor Green }
         "zeit"    { $script:timeout += $rec.Rel; Write-Host ("  ZEIT  {0} (>{1}s abgebrochen)" -f $rec.Rel, $TimeoutSec) -ForegroundColor Magenta }
@@ -490,6 +507,42 @@ if ($fail.Count)    { Write-Host ("  Failures: " + ($fail    -join ", ")) -Foreg
 if ($crash.Count)   { Write-Host ("  Crashes : " + ($crash   -join ", ")) -ForegroundColor Magenta }
 if ($timeout.Count) { Write-Host ("  Timeouts: " + ($timeout -join ", ")) -ForegroundColor Magenta }
 
+# ── QA-53 auf der Windows-Seite: im Zweifel rot ─────────────────────────────
+#
+# Die Zahl oben zaehlt, was in results.tsv steht. Steht dort weniger, als
+# gefahren wurde, ist die Bilanz nicht bloss ungenau - sie ist irrefuehrend:
+# ein Teillauf sieht aus wie ein Volllauf, und die roten Zeilen darunter
+# koennten aus einem FREMDEN Lauf stammen.
+#
+# ★ Der Fall ist auf Windows real und NICHT theoretisch: beide Runner benutzen
+# dasselbe Ausgabeverzeichnis, egal ob Volllauf oder gezielter Einzellauf
+# (`LIGHTOS_SEG_OUT`, sonst `.pytest_segments`). Wer waehrend eines Volllaufs
+# einen Einzeltest startet, raeumt dem Volllauf die Ergebniszeilen weg - der
+# zaehlt danach nur noch seinen Rest. Die Voll-Suiten-Sperre aus XPLAT-23
+# Scheibe 1 faengt das nicht: gezielte Laeufe sind bewusst ungesperrt.
+#
+# Zweite Quelle: eine Ergebniszeile, die sich nicht schreiben liess (s.
+# Complete-Segment).
+#
+# Die gefaehrlichere Haelfte ist dabei nicht die falsche Zahl - die sieht man -,
+# sondern das falsche GRUEN darunter. Deshalb hier dieselbe Regel wie auf der
+# .sh-Seite: wer nicht weiss, ob alles gelaufen ist, hat kein bestandenes Gate,
+# sondern ein kaputtes Messgeraet.
+$zeilenImErgebnis = 0
+if (Test-Path $resultsTsv) {
+    $zeilenImErgebnis = @(Get-Content $resultsTsv -ErrorAction SilentlyContinue).Count
+}
+$unvollstaendig = ($zeilenImErgebnis -ne $files.Count)
+if ($unvollstaendig) {
+    Write-Host ("[seg] WARNUNG: results.tsv hat {0} Zeilen, gefahren wurden {1} Dateien." -f `
+                $zeilenImErgebnis, $files.Count) -ForegroundColor DarkYellow
+    Write-Host "[seg]   Die Zahl oben ist damit UNVOLLSTAENDIG - vermutlich hat ein zweiter" -ForegroundColor DarkYellow
+    Write-Host ("[seg]   Lauf im selben Repo das Ausgabeverzeichnis geleert ({0})." -f $outDir) -ForegroundColor DarkYellow
+    Write-Host "[seg]   Rote Zeilen koennen aus dem fremden Lauf stammen. Vor dem Deuten:" -ForegroundColor DarkYellow
+    Write-Host "[seg]   nachsehen, ob nebenher eine zweite Suite lief (QA-53)." -ForegroundColor DarkYellow
+    Write-Host "[seg]   Dieser Lauf gilt als NICHT bestanden - s. Exit-Code unten." -ForegroundColor DarkYellow
+}
+
 # XPLAT-17: die EINE bekannte Fremd-Ursache beim Namen nennen. Das Segment
 # bleibt rot - hier wird nichts gruen gerechnet und nichts wiederholt. Der Name
 # ist der ganze Zweck: ohne ihn steht der Mensch vor einem namenlosen roten
@@ -561,6 +614,13 @@ if ($fail.Count) {
 # Segmentanzahl wie auf Linux - verify_loop.ps1 deutet 97/98/99 als
 # Lock-Runner-Codes, eine Zaehlung koennte dort kollidieren.
 if ($fail.Count) { exit 1 }
+# QA-53: unvollstaendige Ergebnisliste -> KEIN Gruen. Bewusst NACH der
+# Failure-Regel: ein roter Lauf ist ohnehin rot, und die Reihenfolge haelt
+# die begruendete Toleranz aus XPLAT-28 unangetastet.
+if ($unvollstaendig) {
+    Write-Host "[seg] Ergebnisliste unvollstaendig -> KEIN Gruen (QA-53)." -ForegroundColor Red
+    exit 1
+}
 # ★ XPLAT-31: Anteils-Schutz. Die Toleranz oben gilt dem EINZELFALL - ein
 # Segment, das nach bestandenen Tests nativ abbaut oder haengt. Sie war nie als
 # Aussage ueber einen ganzen Lauf gemeint.
