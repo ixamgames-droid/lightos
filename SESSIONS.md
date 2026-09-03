@@ -9,7 +9,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| OUT-55 | A | fix/out55-alle-koepfe-invertieren | 2026-09-03T19:35Z | src/core/app_state.py |
 | FM-41 | A | feature/fm41-weiss-achse | 2026-09-03T19:52Z | src/core/group_cells.py |
 
 ## Blocker & Fallen
@@ -68,7 +67,6 @@
 
 ## Verlauf
 
-- 2026-09-03T04:50Z B claim STAB-28
 - 2026-09-03T05:21Z B done STAB-28
 - 2026-09-03T05:22Z B claim QA-70
 - 2026-09-03T05:48Z B done QA-70
@@ -98,3 +96,4 @@
 - 2026-09-03T19:43Z B uebergeben FM-45
 - 2026-09-03T19:50Z A uebergeben QA-72
 - 2026-09-03T19:52Z A claim FM-41
+- 2026-09-03T20:06Z A done OUT-55
