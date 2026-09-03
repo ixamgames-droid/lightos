@@ -3,6 +3,7 @@ oben-links) die SCREEN-Klick-Koordinaten (physische px) je VC-Widget-Mitte.
 Robust gegen vertikales Verschieben des Canvas (z. B. Edit-Modus-Toolbar-Umbruch).
 
 Aufruf:  venv/Scripts/python.exe tools/vc_click_targets.py <vollbild.png> [name]
+         (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 Ausgabe: je Widget eine Zeile  'NAME cx cy'  (Mitte des BEDIEN-Widgets, nicht des Labels)
          + Zeile  'CALIB scale ox oy'
 """

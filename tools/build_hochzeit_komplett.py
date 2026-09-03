@@ -23,6 +23,7 @@ Rig = exakt Davids Hochzeitsshow (shows/hochzeit.lshow), Universe 1, 137 Kanäle
   fid 13-14 U-King Spider       14ch Dual-Tilt, RGBW-Doppelbank             @ 113/127
 
 Aufruf:  venv/Scripts/python.exe tools/build_hochzeit_komplett.py
+         (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 Erzeugt: shows/Hochzeit_Komplett_2026.lshow
 """
 from __future__ import annotations

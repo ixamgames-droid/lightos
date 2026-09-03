@@ -20,6 +20,7 @@ Bänke (APC-SCENE = Bank/Seite):
   Bank 6  LIVE-CHASE     Farb-Kacheln (Farbe hinzufügen) + Start/Clear/±/Speed.
 
 Aufruf:  venv/Scripts/python.exe tools/build_testshow_2026.py
+         (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 Erzeugt: shows/Testshow_2026.lshow
 """
 from __future__ import annotations

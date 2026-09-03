@@ -3,6 +3,7 @@ VC-Widgets-Showcase-Show (kein fragiles Menue-Klicken). Fenster-Titel bleibt
 'LightOS ...' -> lo.ps1 findet es.
 
 Aufruf:  venv/Scripts/python.exe tools/_run_showcase_app.py
+         (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 """
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

@@ -11,6 +11,7 @@ Aufruf::
     venv/Scripts/python.exe tools/upgrade_shows.py            # alle shows/*.lshow
     venv/Scripts/python.exe tools/upgrade_shows.py --check    # nur pruefen (CI/Gate)
     venv/Scripts/python.exe tools/upgrade_shows.py shows/a.lshow shows/b.lshow
+    (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 
 Sicherheitsnetze (das Skript schreibt in Nutzerdaten — jedes ist Absicht):
 

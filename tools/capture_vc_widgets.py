@@ -4,6 +4,7 @@
     ./venv/bin/python tools/build_vc_widgets_showcase.py     # Show + Geometrie
     ./venv/bin/python tools/capture_vc_widgets.py            # Vollbild
     ./venv/bin/python tools/crop_vc_widgets.py docs/anleitung_vc_widgets/_capture/full.png
+      (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 
 ## Warum nicht `gnome-screenshot`
 

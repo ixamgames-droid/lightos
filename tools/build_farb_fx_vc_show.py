@@ -16,6 +16,7 @@ Master-BPM = globale BPM (Tempo-Bus "Global"). Jeder Effekt haengt daran und hat
 seinen eigenen tempo_multiplier (Faktor-Gitter ¼ ½ 1 2 3 4 am Speed-Dial).
 
 Aufruf:  venv/Scripts/python.exe tools/build_farb_fx_vc_show.py
+         (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 Erzeugt: shows/Farb_FX_VC_Show.lshow  (selbst-verifizierend, headless)
 """
 from __future__ import annotations

@@ -26,6 +26,7 @@ sichtbar. Dimmer-Effekte ueberschreiben die Helligkeit (echtes Lauflicht).
 Farb-Kacheln setzen nur Farbe. Matrix bringt Farbe selbst mit (-> Clear zuerst).
 
 Aufruf:  venv/Scripts/python.exe tools/build_apc_test_show.py
+         (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 Erzeugt: shows/APC_Test_Komplett.lshow   (eigenstaendige, in sich saubere Show)
 """
 from __future__ import annotations

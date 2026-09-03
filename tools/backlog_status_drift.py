@@ -86,6 +86,7 @@ Aufruf::
 
     ./venv/bin/python tools/backlog_status_drift.py           # Bericht
     ./venv/bin/python tools/backlog_status_drift.py --strict  # Exit 1 bei Drift
+      (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 
 Es wird zuvor ``git fetch`` gefahren; schlaegt das fehl, bricht das Werkzeug mit
 Exit 2 ab (*fail closed*, wie ``tools/backlog_ids.py``) — mit veralteten Refs

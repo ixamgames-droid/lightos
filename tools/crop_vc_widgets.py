@@ -6,6 +6,7 @@ Die Kachel liefert per Bounding-Box BEIDES: Origin (Screen-px bei logisch 0,0)
 und Skalierung (Pixelbreite / logische Breite). Keine zweite Kachel noetig.
 
 Aufruf:  venv/Scripts/python.exe tools/crop_vc_widgets.py <vollbild.png> [pad]
+         (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 Schreibt: docs/anleitung_vc_widgets/img/<WidgetName>.png  (+ _overview.png)
 """
 from __future__ import annotations

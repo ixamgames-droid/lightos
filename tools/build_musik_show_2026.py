@@ -22,6 +22,7 @@ Banks (APC-SCENE = Bank/Seite, gekoppelt an die Playback-Seite):
   Bank 5  MUSIK        Player-Transport + Songanzeige; Auto-Show-Schalter im Tab „Musik".
 
 Aufruf:  venv/Scripts/python.exe tools/build_musik_show_2026.py
+         (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 Erzeugt: shows/Musik_Show_2026.lshow
 """
 from __future__ import annotations

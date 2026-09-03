@@ -15,6 +15,7 @@ zugleich die Hardware-Verifikation, die als HW-1/HW-4 seit Wochen aussteht.
 
 Aufruf (isoliert, ruehrt data/current_show.db NICHT an — _gen_env sorgt dafuer):
     venv/bin/python tools/build_spot90_testshow.py
+    (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 Ergebnis: shows/Spot90_Testshow.lshow
 """
 import math

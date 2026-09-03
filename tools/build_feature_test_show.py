@@ -18,6 +18,7 @@ gezielt auf der Hardware ausprobieren kann:
 Universell: Track-Tasten Clear/Stop All/Blackout; Fader F6 Dimmer, F7 Speed, F9 Master.
 
 Aufruf:  venv/Scripts/python.exe tools/build_feature_test_show.py
+         (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 Erzeugt: shows/Feature_Test.lshow
 """
 from __future__ import annotations

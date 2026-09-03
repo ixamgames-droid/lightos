@@ -23,6 +23,7 @@ Davids Setup: Akai APC mini (mk2) + 4× PAR (ZQ01424, 8ch RGBW) + 2× Moving Hea
 Universell (alle Banks): Track Clear/Stop/Blackout/Tap; Fader Dimmer/Speed/Master.
 
 Aufruf:  venv/Scripts/python.exe tools/build_neue_demo_show.py
+         (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 Erzeugt: shows/Neue_Demo_2026.lshow
 """
 from __future__ import annotations
