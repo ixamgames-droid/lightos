@@ -37,7 +37,10 @@ RUNNER = REPO / "tools" / "verify_segmented.sh"
 _RUNNER_LAEUFT = (RUNNER.exists() and os.name != "nt"
                   and shutil.which("bash") is not None)
 _RUNNER_GRUND = ("verify_segmented.sh ist das Linux-Gate — auf Windows faehrt "
-                 "run_tests.ps1 -Isolate, und bash fehlt im PATH")
+                 "verify_segmented.ps1, und bash fehlt im PATH. Die rechnerweite "
+                 "WebEngine-Sperre gibt es dort seit XPLAT-23 Scheibe 2 "
+                 "(tools/_gate_webengine.ps1) — geprueft in "
+                 "tests/test_xplat23_webengine_sperre.py.")
 
 # Jede Mini-Testdatei schreibt "<name> <start> <ende>" in eine gemeinsame Datei.
 # Das Anhaengen einer kurzen Zeile mit O_APPEND ist prozessuebergreifend atomar,
