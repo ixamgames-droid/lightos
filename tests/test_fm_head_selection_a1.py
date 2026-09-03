@@ -149,17 +149,30 @@ class ProgrammerHeadRowsTest(unittest.TestCase):
         self.addCleanup(self.view.deleteLater)
         self._hosts: list = []
 
+    # UI-61: die Geraeteliste ist ein Baum (Kopf-Zeilen sind einklappbare
+    # Kinder). Beide Helfer lesen ueber `view._alle_items()` — denselben
+    # Baum-Gang, den auch der Produktivcode benutzt. Ein eigener Gang hier
+    # waere eine zweite Vorstellung vom Aufbau, und genau daran laufen
+    # Test und Code auseinander.
     def _rows(self):
-        lst = self.view._fixture_list
-        return [(i, lst.item(i).data(Qt.ItemDataRole.UserRole))
-                for i in range(lst.count())]
+        return [(i, it.data(0, Qt.ItemDataRole.UserRole))
+                for i, it in enumerate(self.view._alle_items())]
+
+    def _selected_cells(self) -> set:
+        """Die markierten Zell-Schluessel — Geraete- UND Kopf-Zeilen.
+
+        UI-61: liest ueber denselben Baum-Gang wie `_rows`. Wichtig fuer die
+        Aussage der Tests: eine markierte Kopf-Zeile zaehlt auch dann mit, wenn
+        ihr Geraet ZUGEKLAPPT waere — Auswahl und Sichtbarkeit sind zwei Dinge.
+        """
+        return {it.data(0, Qt.ItemDataRole.UserRole)
+                for it in self.view._alle_items() if it.isSelected()}
 
     def _select_rows(self, cells):
-        lst = self.view._fixture_list
-        lst.clearSelection()
-        for i in range(lst.count()):
-            if lst.item(i).data(Qt.ItemDataRole.UserRole) in cells:
-                lst.item(i).setSelected(True)
+        self.view._fixture_list.clearSelection()
+        for it in self.view._alle_items():
+            if it.data(0, Qt.ItemDataRole.UserRole) in cells:
+                it.setSelected(True)
         self.view._on_fixture_selected()
 
     def _color_sliders(self, fixtures):
@@ -230,9 +243,7 @@ class ProgrammerHeadRowsTest(unittest.TestCase):
         self.view._select_fids([1, 2])
         self.assertEqual(self.view._selected_fids, [1, 2])
         self.assertEqual(self.state.get_selected_cells(), ["1", "2"])
-        sel = {self.view._fixture_list.item(i).data(Qt.ItemDataRole.UserRole)
-               for i in range(self.view._fixture_list.count())
-               if self.view._fixture_list.item(i).isSelected()}
+        sel = self._selected_cells()
         self.assertEqual(sel, {"1", "2"},
                          "Gruppenauswahl markierte Kopf-Zeilen oder gar nichts")
 
@@ -258,9 +269,7 @@ class ProgrammerHeadRowsTest(unittest.TestCase):
     def test_external_head_selection_is_mirrored_into_the_list(self):
         self.state.set_selected_cells(["1:0"])
         self.view._sync_follow_selection()
-        sel = {self.view._fixture_list.item(i).data(Qt.ItemDataRole.UserRole)
-               for i in range(self.view._fixture_list.count())
-               if self.view._fixture_list.item(i).isSelected()}
+        sel = self._selected_cells()
         self.assertEqual(sel, {"1:0"})
 
 
