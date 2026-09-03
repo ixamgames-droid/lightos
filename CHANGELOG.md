@@ -121,10 +121,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Master-Dimmer — die Helligkeit kommt ausschließlich aus den Farbwerten. Ein
   Effekt, der nur den Dimmer bewegt, lässt das Panel dunkel.
 
-  **Und einen 102-Kanal-Modus gibt es nicht**, auch wenn die Produktbeschreibung
-  im Handel ihn nennt: das Gerätemenü bietet „4-CH", „9-CH" und „100-CH" an,
-  beide Handbuch-Ausgaben kennen nur diese drei, und die Datentabelle derselben
-  Shop-Seite sagt ebenfalls „DMX-512 (4/9/100)".
+  **Der 102-Kanal-Modus steht in keinem Handbuch — das Gerät hat ihn trotzdem.**
+  Beide Handbuch-Ausgaben, das dort abgedruckte Gerätemenü und die Datentabelle
+  der Shop-Seite kennen nur 4/9/100; das Gerät am Rig bietet „102-CH" dennoch
+  an (neuere Firmware). Er ist als „102-Kanal Dimmer + Strobe + 25 Pixel RGBW
+  (ungeprüft)" angelegt: Kanal 1 Master-Dimmer, Kanal 2 Strobe, dann die 100
+  Pixelkanäle — abgeleitet aus dem, was am Gerät zu sehen war, als es auf 102
+  stand und LightOS auf 100 sendete (Orange blinkte, Rot wurde Blau). Bis das am
+  Gerät bestätigt ist, bleibt „(ungeprüft)" im Namen. **Wer den Blinder patcht,
+  stellt Gerät und LightOS auf denselben Modus** — steht das Gerät auf 102 und
+  LightOS auf 100, blinkt Orange und Rot wird Blau.
 
 ### 2026-09-02 — Auf Windows sind zwei gleichzeitige Testläufe nicht mehr sich selbst überlassen
 

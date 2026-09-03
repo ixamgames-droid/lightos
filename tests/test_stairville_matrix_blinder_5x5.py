@@ -38,6 +38,7 @@ KURZ = "STAIRMB5X5"
 M4 = "4-Kanal Panel gesamt"
 M9 = "9-Kanal Panel gesamt + Effekte"
 M100 = "100-Kanal 25 Pixel RGBW"
+M102 = "102-Kanal Dimmer + Strobe + 25 Pixel RGBW (ungeprueft)"
 
 
 def _load(session, short=KURZ):
@@ -98,7 +99,7 @@ class ProfilVorhandenTest(_SeededCase):
             p = _load(s)
             self.assertEqual(
                 sorted((m.name, m.channel_count) for m in p.modes),
-                sorted([(M4, 4), (M9, 9), (M100, 100)]))
+                sorted([(M4, 4), (M9, 9), (M100, 100), (M102, 102)]))
 
 
 class KanalbelegungTest(_SeededCase):
@@ -123,10 +124,11 @@ class KanalbelegungTest(_SeededCase):
             attrs = _attrs(_mode(_load(s), M9))
             self.assertEqual(len(attrs), len(set(attrs)))
 
-    def test_kein_modus_hat_einen_master_dimmer(self):
+    def test_kein_dokumentierter_modus_hat_einen_master_dimmer(self):
         """Geraetetreu, kein Versehen: das Manual kennt in 4/9/100 keinen
         Dimmer-Kanal. Helligkeit kommt aus den Farbwerten. Wer hier einen
-        `intensity` nachtraegt, erfindet einen Kanal, den das Geraet nicht hat."""
+        `intensity` nachtraegt, erfindet einen Kanal, den das Geraet nicht hat.
+        Der undokumentierte 102er ist die Ausnahme (siehe Modus102Test)."""
         with Session(self._eng) as s:
             p = _load(s)
             for name in (M4, M9, M100):
@@ -134,24 +136,49 @@ class KanalbelegungTest(_SeededCase):
                     self.assertEqual(
                         {"intensity", "dimmer", "master"} & set(_attrs(_mode(p, name))),
                         set())
+            # Der 102er ist die Ausnahme — und genau deshalb existiert er wohl:
+            # er ist der einzige Modus, in dem das Panel einen Master-Dimmer hat.
+            self.assertIn("intensity", _attrs(_mode(p, M102)))
 
 
-class KeinModus102Test(_SeededCase):
-    """Der Thomann-Beschreibungstext nennt „four, nine, 100 or 102 channels".
+class Modus102Test(_SeededCase):
+    """Der 102-Kanal-Modus steht in KEINEM Manual — das Geraet am Rig hat ihn.
 
-    Nachgesehen statt geglaubt: die Spezifikationstabelle DERSELBEN Seite sagt
-    „DMX-512 (4/9/100)", in beiden Manual-Revisionen (fr v3, de v4) kommt „102"
-    kein einziges Mal vor, das Geraetemenue bietet drei Modi an, und die Tabelle
-    der hoechsten DMX-Adresse (509/504/413) kennt ebenfalls nur drei. Der Test
-    haelt die Entscheidung fest, damit niemand den Modus aus dem Shop-Text
-    nachtraegt — geraten waere er in jedem Fall.
+    Die erste Fassung dieser Datei hielt „genau drei Modi, keiner mit 102" fest,
+    weil beide Manual-Revisionen, das Geraetemenue im Manual und die Tabelle der
+    hoechsten DMX-Adresse nur 4/9/100 kennen. Das Geraet (Art. 494410, Typenschild
+    bestaetigt) bietet „102-CH" trotzdem an. Zwei uebereinstimmende Manuals
+    beweisen, was dokumentiert ist — nicht, was das Geraet kann.
+
+    Die Belegung ist aus den Symptomen am Rig abgeleitet, nicht gemessen
+    (Docstring von `_add_stairville_mb5x5`): Dimmer, Strobe, dann 100
+    Pixelkanaele. Solange das nicht am Geraet bestaetigt ist, traegt der Modus
+    „(ungeprueft)" im Namen — dieser Test haelt BEIDES fest: die Belegung und
+    den Vorbehalt. Faellt der Vorbehalt, faellt er hier zuerst.
     """
 
-    def test_es_gibt_genau_drei_modi_und_keiner_hat_102_kanaele(self):
+    def test_belegung_dimmer_strobe_dann_pixel(self):
         with Session(self._eng) as s:
-            zahlen = sorted(m.channel_count for m in _load(s).modes)
-        self.assertEqual(zahlen, [4, 9, 100])
-        self.assertNotIn(102, zahlen)
+            attrs = _attrs(_mode(_load(s), M102))
+        self.assertEqual(attrs[:2], ["intensity", "shutter"])
+        self.assertEqual(attrs[2:], ["color_r", "color_g", "color_b", "color_w"] * 25)
+
+    def test_vorbehalt_steht_im_namen_bis_zur_bestaetigung(self):
+        self.assertIn("(ungeprueft)", M102)
+
+    def test_strobe_band_wie_im_9_kanal_modus(self):
+        """Annahme, ausdruecklich: dieselbe Firmware, dieselbe Funktion → dasselbe
+        Band 0…10 aus / 11…255 Strobe. Steht hier, damit die Annahme sichtbar ist."""
+        with Session(self._eng) as s:
+            rr = _ranges(_mode(_load(s), M102), 2)
+        self.assertEqual([(r.range_from, r.range_to, r.kind) for r in rr],
+                         [(0, 10, "open"), (11, 255, "strobe")])
+
+    def test_rasterform_und_25_koepfe_auch_hier(self):
+        with Session(self._eng) as s:
+            m = _mode(_load(s), M102)
+            self.assertEqual((m.grid_rows, m.grid_cols), (5, 5))
+            self.assertEqual(sum(1 for a in _attrs(m) if a == "color_r"), 25)
 
 
 class PixelReihenfolgeTest(_SeededCase):
