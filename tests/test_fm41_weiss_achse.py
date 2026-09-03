@@ -242,5 +242,108 @@ class AmEchtenGeraetTest(unittest.TestCase):
                          "der Ist-Zustand hat sich geaendert — Scheibe 2 pruefen")
 
 
+class SegmentZaehlungTest(unittest.TestCase):
+    """FM-41 Scheibe 2: EINE Zaehl-Regel fuer die Weiss-Achse.
+
+    Dieselbe Zaehlung stand bis 2026-09-03 zweimal inline im Baum —
+    ``visualizer_window`` (``kanal_attrs.count("color_w")``) und
+    ``rgb_matrix.write`` (Generator-Summe) — und Scheibe 1 legte implizit eine
+    dritte daneben. Drei Fassungen derselben Frage sind die Doppelstellen-Klasse
+    aus Review-Checkliste 17.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        from _fixture_quelle import frische_library
+        cls._eng = frische_library(cls)
+
+    def _chans(self, kurz):
+        from sqlalchemy import select
+        from sqlalchemy.orm import Session, selectinload
+        from src.core.database.models import FixtureProfile, FixtureMode
+        with Session(self._eng) as s:
+            p = s.execute(
+                select(FixtureProfile)
+                .options(selectinload(FixtureProfile.modes)
+                         .selectinload(FixtureMode.channels))
+                .where(FixtureProfile.short_name == kurz)).scalars().first()
+            m = max(p.modes, key=lambda m: m.channel_count)
+            return [SimpleNamespace(attribute=c.attribute,
+                                    channel_number=c.channel_number)
+                    for c in sorted(m.channels, key=lambda c: c.channel_number)]
+
+    def test_an_echten_profilen(self):
+        from src.core.app_state import weiss_segment_count_for_channels as W
+        for kurz, erwartet in (("ZQ06121", 8), ("STAIRMB5X5", 25),
+                               ("DOTZMATRIX", 0), ("MH16", 0)):
+            with self.subTest(geraet=kurz):
+                self.assertEqual(W(self._chans(kurz)), erwartet)
+
+    def test_null_heisst_null__anders_als_bei_den_farbkoepfen(self):
+        """★ `color_head_count` rundet auf 1 auf („ein Geraet hat immer
+        mindestens einen Farbkopf"). Fuer Weiss waere das falsch: ein erfundenes
+        Segment ist sofort eine Phantom-Zelle."""
+        from src.core.app_state import (weiss_segment_count_for_channels as W,
+                                        color_head_count_for_channels as C)
+        chans = self._chans("MH16")
+        self.assertEqual(W(chans), 0)
+        self.assertEqual(C(None, chans), 1, "Vorbedingung: Farbkoepfe runden auf")
+
+
+class ZaehlungNichtProZelleTest(unittest.TestCase):
+    """★★ Die Zahl ist eine Eigenschaft des GERAETS, nicht der Zelle.
+
+    Vor dieser Aenderung lief die Zaehlung in der Zellschleife von
+    ``RgbMatrixInstance.write`` — bei 48 Zellen also 48-mal pro Frame fuer EIN
+    Geraet. **Gemessen am echten ZQ06121: 6,20 ms je Frame vorher, 4,57 ms
+    nachher** (48 Zellen, Style RGBW) — 26 % des gesamten `write()`, allein
+    fuers wiederholte Zaehlen.
+
+    Der Test haelt die Eigenschaft fest, nicht die Millisekunden: eine
+    Zeitmessung im Gate waere eine Wanduhr-Grenze und damit die QA-71-Falle.
+    """
+
+    def test_einmal_je_fixture_und_frame(self):
+        import src.core.app_state as AS
+        from src.core.engine.rgb_matrix import RgbMatrixInstance, MatrixStyle
+        chans = [_ch("intensity", 1)]
+        nr = 2
+        for _ in range(4):
+            for a in ("color_r", "color_g", "color_b"):
+                chans.append(_ch(a, nr)); nr += 1
+        chans.append(_ch("color_w", nr))
+
+        aufrufe = {"n": 0}
+        echt = AS.attr_head_count_for_channels
+
+        def gezaehlt(fixture, channels, attribute):
+            aufrufe["n"] += 1
+            return echt(fixture, channels, attribute)
+
+        alt_get, AS.attr_head_count_for_channels = AS.get_channels_for_patched, gezaehlt
+        AS.get_channels_for_patched = lambda f: chans
+        self.addCleanup(lambda: (setattr(AS, "attr_head_count_for_channels", echt),
+                                 setattr(AS, "get_channels_for_patched", alt_get)))
+
+        class _U:
+            def __init__(self): self.ch = {}
+            def set_channel(self, a, v): self.ch[a] = v
+
+        fx = SimpleNamespace(fid=1, universe=1, address=1, fixture_type="matrix")
+        mx = RgbMatrixInstance(name="T")
+        mx.style = MatrixStyle.RGBW
+        mx.fixture_grid = [1] * 4
+        mx.head_grid = list(range(4))
+        mx.drive_intensity = False
+        mx._running = True
+        mx._render = lambda phase: [(255, 255, 255)] * 4
+        mx.write({1: _U()}, [fx], 0.02)
+
+        self.assertLessEqual(
+            aufrufe["n"], 2,
+            f"{aufrufe['n']} Zaehlungen fuer EIN Geraet in EINEM Frame — die "
+            "Zahl gehoert je Fixture geholt, nicht je Zelle")
+
+
 if __name__ == "__main__":
     unittest.main()

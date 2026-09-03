@@ -38,6 +38,7 @@ from PySide6.QtGui import QAction, QColor, QShortcut, QKeySequence
 from src.core.app_state import (
     AppState, get_state, get_channels_for_patched, is_spider_fixture,
     panel_grid_for, pixel_ring_banks_for, viz_model_for, white_grid_for,
+    weiss_segment_count_for_channels,
 )
 from src.core.database.models import PatchedFixture
 # VIZ-FIX-DECIMAL: Zahlenfelder der 3D-Panels akzeptieren Punkt UND Komma als
@@ -1927,17 +1928,25 @@ class VisualizerBridge(QObject):
             n_heads, pixel_base = pixel_ring_banks_for(f)
         elif model in ("par_bar", "spider", "mover_bar", "matrix"):
             try:
+                _kanaele = get_channels_for_patched(f)
                 kanal_attrs = [(getattr(c, "attribute", "") or "")
-                               for c in get_channels_for_patched(f)]
+                               for c in _kanaele]
                 n_heads = kanal_attrs.count("color_r")
-                # ★ Die ZAHL der eigenen Weiss-Segmente faellt in derselben
-                # Zaehlung ab (VIZ-50b) — sie steht seit dem Anlegen des
-                # Geraets in den Kanaelen. Nur `buildMatrixPanel` liest
-                # `nWhites`; fuer alle anderen Modelle bleibt der Wert 0.
-                # Ob daraus ein BAND wird, entscheidet seit CDX-52 die
-                # Geometrie weiter unten, nicht mehr diese Zahl.
+                # ★ Die ZAHL der eigenen Weiss-Segmente (VIZ-50b) — sie steht
+                # seit dem Anlegen des Geraets in den Kanaelen. Nur
+                # `buildMatrixPanel` liest `nWhites`; fuer alle anderen Modelle
+                # bleibt der Wert 0. Ob daraus ein BAND wird, entscheidet seit
+                # CDX-52 die Geometrie weiter unten, nicht mehr diese Zahl.
+                #
+                # ★★ FM-41: die Zaehlung stand bis 2026-09-03 hier UND in
+                # `rgb_matrix.write` inline — zwei Fassungen derselben Frage,
+                # die Klasse aus Review-Checkliste 17. Jetzt beide auf
+                # `weiss_segment_count_for_channels`. Der Umbau ist
+                # verhaltensgleich, gemessen ueber die ganze Bibliothek:
+                # 1791 Profile, 5125 Modi, 1635 davon mit Weiss, **0**
+                # Abweichungen gegen den frueheren `.count("color_w")`.
                 if model == "matrix":
-                    n_whites = kanal_attrs.count("color_w")
+                    n_whites = weiss_segment_count_for_channels(_kanaele)
             except Exception:
                 # `pixel_base` kommt in diesem Zweig gar nicht mehr vor: seit
                 # VIZ-53 ist 'pixel_head' ein eigener Zweig, der seine Fehler

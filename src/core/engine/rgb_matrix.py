@@ -770,6 +770,13 @@ class RgbMatrixInstance(Function):
         # Function.speed × dt, byte-identisch) fortschreiben; Freeze haelt an.
         self._advance_step(dt)
         grid = self._render(self._step)
+        # FM-41: die Weiss-/Farbkopf-Zahlen sind Eigenschaften des GERAETS, nicht
+        # der Zelle — einmal je Fixture und Frame reicht. Vorher lief die
+        # Zaehlung in der Zellschleife, also 48x pro Frame fuer EIN Geraet
+        # (gemessen 16 us je Aufruf = 31 ms/s bei 40 fps, nur fuers Zaehlen).
+        # Der Merker lebt genau einen Frame; die Kanaele koennen sich zwischen
+        # Frames aendern (Patch-Aenderung), zwischen Zellen nicht.
+        _achsen_cache: dict[int, tuple[int, int]] = {}
         try:
             from src.core.app_state import (get_channels_for_patched,
                                             channels_for_head,
@@ -880,10 +887,25 @@ class RgbMatrixInstance(Function):
             # verlassen — das deckte zufaellig nur den Ein-Kanal-Fall ab.
             _weiss_gehoert_zur_zelle = True
             if self.style == MatrixStyle.RGBW:
-                _n_w = sum(1 for c in chans
-                           if (c.attribute or "").lower() == "color_w")
-                _n_c = sum(1 for c in chans
-                           if (c.attribute or "").lower() == "color_r")
+                _achsen = _achsen_cache.get(fid)
+                if _achsen is None:
+                    # FM-41: EINE Zaehl-Regel — dieselbe, die der Gruppen-Editor
+                    # und der Visualizer fragen. Vorher stand sie hier inline und
+                    # damit zum dritten Mal im Baum.
+                    #
+                    # ★ Bewusst `attr_head_count_for_channels` und NICHT
+                    # `color_head_count_for_channels`: letzteres rundet auf 1 auf
+                    # („ein Geraet hat immer mindestens einen Farbkopf"), was fuer
+                    # die Frage „wie viele Koepfe" richtig ist und fuer die
+                    # AUSRICHTUNGSFRAGE falsch waere. Ein Geraet ohne `color_r`
+                    # hat 0 Farbkoepfe — und dann IST das Weiss sein Emitter-Satz
+                    # (Tunable White). Die allgemeine Zaehlung liefert diese 0
+                    # ausdruecklich (FM-27).
+                    from src.core.app_state import attr_head_count_for_channels
+                    _achsen = (attr_head_count_for_channels(fx, chans, "color_w"),
+                               attr_head_count_for_channels(fx, chans, "color_r"))
+                    _achsen_cache[fid] = _achsen
+                _n_w, _n_c = _achsen
                 _weiss_gehoert_zur_zelle = (_n_w == 0 or _n_c == 0
                                             or _n_w == _n_c)
             if self.style == MatrixStyle.RGBW and _weiss_gehoert_zur_zelle:

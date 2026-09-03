@@ -4447,6 +4447,39 @@ def head_counter_for_attr(attribute: str):
     return lambda fx, chans: attr_head_count_for_channels(fx, chans, attribute)
 
 
+def weiss_segment_count_for_channels(channels) -> int:
+    """Wie viele EIGENE Weiss-Segmente hat dieses Geraet (FM-41)?
+
+    Das Gegenstueck zu :func:`color_head_count_for_channels` auf der
+    Weiss-Achse: die Zahl der ``color_w``-Vorkommen. **0 heisst „keine"** —
+    anders als bei den Farbkoepfen wird hier NICHT auf mindestens 1
+    aufgerundet: ein Geraet ohne Weiss-Kanal hat kein Weiss-Segment, und ein
+    erfundenes waere sofort eine Phantom-Zelle.
+
+    ★ Ob diese Segmente eine EIGENE Leiste bilden oder zum Pixel gehoeren,
+    sagt der Vergleich mit der Farbkopf-Zahl — dieselbe Ausrichtungs-Regel wie
+    in ENG-25 (Blinder 25:25 = Pixel-Weiss, ZQ06121 48:8 = eigene Leiste).
+    Diese Funktion zaehlt nur; sie deutet nicht.
+
+    ★★ **Warum es sie gibt:** dieselbe Zaehlung stand bis 2026-09-03 zweimal
+    inline im Baum — ``visualizer_window`` (``kanal_attrs.count("color_w")``)
+    und ``rgb_matrix.write`` (Generator-Summe) — und Scheibe 1 legte implizit
+    eine dritte daneben. Drei Fassungen derselben Frage sind genau die
+    Doppelstellen-Klasse, die uns an einem Tag viermal getroffen hat
+    (Review-Checkliste 17).
+    """
+    return attr_head_count_for_channels(None, channels, "color_w")
+
+
+def weiss_segment_count(fixture) -> int:
+    """Wie :func:`weiss_segment_count_for_channels`, aber gegen ein Fixture —
+    Gegenstueck zu :func:`color_head_count`."""
+    try:
+        return weiss_segment_count_for_channels(get_channels_for_patched(fixture))
+    except Exception:
+        return 0
+
+
 def color_head_count(fixture) -> int:
     """Anzahl unabhaengig faerbbarer Koepfe/Emitter = Zahl der ``color_r``-Kanaele
     (jeder Kopf hat eine eigene RGB(W)-Bank). 1 = Single-Head/einfarbig, >=2 =
