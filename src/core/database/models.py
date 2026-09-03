@@ -36,6 +36,16 @@ class FixtureProfile(Base):
     power_w: Mapped[int] = mapped_column(Integer, default=0)
     notes: Mapped[str] = mapped_column(Text, default="")
     source: Mapped[str] = mapped_column(String(20), default="builtin")
+    # QA-72: was die QUELLDATEI ueber sich selbst sagt — der `<Creator>`-Block
+    # einer `.qxf` (Werkzeug, Version, Autor). `source` sagt nur, durch welchen
+    # KANAL ein Profil hereinkam; es stand bis 2026-09-03 auf `qlcplus` fuer
+    # alles, was je durch den QXF-Import lief, unabhaengig davon, woher die
+    # Datei stammte. Gemessen tragen 11 handgemachte Eigenbau-Profile dasselbe
+    # Etikett wie die 1730 echten QLC+-Definitionen, und `source='user'` kommt
+    # in der gewachsenen Bibliothek 0-mal vor — erkennbar waren sie nur an der
+    # Rechtschreibung. Hier steht jetzt, was die Datei selbst behauptet.
+    # Leer = keine Angabe (Builtins, handgetippte Dateien ohne `<Creator>`).
+    provenance: Mapped[str] = mapped_column(String(200), default="")
     # FM-12: expliziter 3D-Modell-Override fuer den Visualizer ("" = Automatik:
     # Kanal-Heuristik viz_model_for bzw. fixture_type entscheidet).
     viz_model: Mapped[str] = mapped_column(String(40), default="")
@@ -365,6 +375,12 @@ def migrate_fixtures_db(engine) -> None:
             if fcols and "viz_model" not in fcols:
                 conn.execute(text(
                     "ALTER TABLE fixtures ADD COLUMN viz_model VARCHAR(40) DEFAULT ''"))
+            # QA-72: Herkunftsangabe der Quelldatei. Dieselbe Falle wie bei
+            # `viz_model` — ohne ALTER TABLE waere jede bestehende fixtures.db
+            # unbrauchbar, weil das ORM alle Modell-Spalten abfragt.
+            if fcols and "provenance" not in fcols:
+                conn.execute(text(
+                    "ALTER TABLE fixtures ADD COLUMN provenance VARCHAR(200) DEFAULT ''"))
             # VIZ-50a: physische Rasterform eines Pixel-Panels (0 = nicht
             # hinterlegt -> der Renderer raet wie bisher). Dieselbe Falle wie bei
             # `pixel_order` (PR #514): ohne ALTER TABLE waere jede bestehende

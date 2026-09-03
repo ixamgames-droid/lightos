@@ -64,6 +64,7 @@
 | `check_doc_links.py` | QA-17 Doc-Link-Checker: findet TOTE relative Markdown-Querverweise. |
 | `collect_crash_report.py` | Crash-/Session-Log ernten und als Loop-Bug-Intake ausgeben (TOOLS-CRASHINTAKE). |
 | `crop_vc_widgets.py` | Cropper fuer die VC-Widget-Doku: schneidet aus EINEM Vollbild-Screenshot |
+| `fixture_herkunft.py` | QA-72 — was weiss die Bibliothek ueber die HERKUNFT ihrer Profile? |
 | `gallery_server.py` | DOC-11 Galerie-Render-Server (Dev-/Doku-Werkzeug). |
 | `gen_capabilities.py` | Erzeugt den Agenten-Vertrag aus dem Code: docs/CAPABILITIES.md + |
 | `gen_tools_index.py` | Generiert tools/README.md — Index aller Werkzeuge mit Zweck-Zeile. |

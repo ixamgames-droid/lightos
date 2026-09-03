@@ -262,6 +262,36 @@ def _get_attr(element, attr: str, ns: bool = True) -> str:
     return element.get(attr, "")
 
 
+def herkunft_aus_creator(root) -> str:
+    """QA-72: was die ``.qxf`` ueber sich selbst sagt — ``<Creator>``-Block.
+
+    Liefert z. B. ``"Q Light Controller Plus 4.12.3 GIT · NiKoyes"`` oder ``""``,
+    wenn die Datei keinen Block hat.
+
+    ★ **Warum das ueberhaupt gebraucht wird:** ``source`` sagt nur, durch welchen
+    KANAL ein Profil hereinkam, und stand fuer alles, was je durch diesen
+    Importer lief, auf ``qlcplus`` — unabhaengig davon, woher die Datei stammte.
+    Gemessen tragen 11 handgemachte Eigenbau-Profile dasselbe Etikett wie die
+    1730 echten QLC+-Definitionen; erkennbar waren sie nur an Tippfehlern und
+    deutschen Kanalnamen. Der ``<Creator>``-Block ist die einzige Angabe, die
+    die Datei selbst mitbringt.
+
+    ★★ Er ist ausserdem **Vorbedingung fuer PROC-11**: Apache-2.0 §4(c) verlangt
+    die Namensnennung, und der Autor stand bisher nirgends — er wurde beim
+    Import schlicht weggeworfen.
+    """
+    block = _find(root, "Creator")
+    if block is None:
+        return ""
+    def _txt(tag: str) -> str:
+        el = block.find(_tag(tag))
+        return (el.text or "").strip() if el is not None else ""
+    werkzeug = " ".join(x for x in (_txt("Name"), _txt("Version")) if x).strip()
+    autor = _txt("Author")
+    teile = [x for x in (werkzeug, autor) if x]
+    return " · ".join(teile)[:200]
+
+
 def _find(element, path: str):
     parts = [_tag(p) for p in path.split("/")]
     cur = element
@@ -510,6 +540,12 @@ def import_qxf_file(path: str, session: Session,
         fixture_type=our_type,
         power_w=_physical_power(root),
         source="qlcplus",
+        # QA-72: `source` bleibt der KANAL (durch diesen Importer gekommen) —
+        # bewusst unveraendert, weil genau EINE Stelle darauf baut
+        # (`fixture_db._ist_dual_tilt_spider`, die Spider-Autokorrektur greift
+        # nur bei QLC+-Importen). Die HERKUNFT kommt daneben, statt das
+        # bestehende Feld umzudeuten.
+        provenance=herkunft_aus_creator(root),
     )
     session.add(fixture)
     session.flush()
