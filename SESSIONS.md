@@ -11,6 +11,7 @@
 |---|---|---|---|---|
 | ENG-15 | A | fix/eng15-schwarzer-pixel-farbrad | 2026-09-02T21:11Z | src/core/engine/rgb_matrix.py |
 | FM-40 | A | feature/fm40-raster-aus-dem-fixture | 2026-09-02T20:25Z | src/ui/views/fixture_group_view.py |
+| QA-70 | B | fix/qa70-webgl-kontext | 2026-09-03T05:22Z | - |
 
 ## Blocker & Fallen
 
@@ -59,7 +60,6 @@
 
 ## Verlauf
 
-- 2026-09-01T15:45Z A claim NET-11
 - 2026-09-01T16:09Z A done NET-11
 - 2026-09-01T16:14Z B claim XPLAT-21
 - 2026-09-01T16:45Z A claim ENG-16
@@ -89,3 +89,4 @@
 - 2026-09-03T04:50Z B done QA-71
 - 2026-09-03T04:50Z B claim STAB-28
 - 2026-09-03T05:21Z B done STAB-28
+- 2026-09-03T05:22Z B claim QA-70
