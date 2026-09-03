@@ -61,11 +61,18 @@ def _hat_flock() -> bool:
 _RUNNER_LAEUFT = (os.path.exists(_RUNNER) and os.name != "nt"
                   and shutil.which("bash") is not None)
 _RUNNER_GRUND = ("verify_loop.sh ist das Linux-Gate — auf Windows faehrt "
-                 "verify_loop.ps1 / run_tests.ps1 (XPLAT-23), und bash fehlt "
-                 "im PATH")
+                 "verify_loop.ps1, und bash fehlt im PATH. DIESELBE Zusicherung "
+                 "(nur die VOLLE Suite wird serialisiert, gezielte Laeufe nicht) "
+                 "prueft dort tests/test_xplat23_windows_sperre.py am Verhalten "
+                 "— seit XPLAT-23 Scheibe 1 nimmt verify_loop.ps1 die Sperre "
+                 "selbst, in-repo und am --git-common-dir.")
 
 
-@unittest.skipUnless(_hat_flock(), "ohne flock gibt es bewusst keine Sperre")
+@unittest.skipUnless(_hat_flock(),
+                     "ohne flock kann DIESER Test nicht sperren. Auf Windows gibt "
+                     "es die Sperre trotzdem: verify_loop.ps1 haelt sie seit "
+                     "XPLAT-23 Scheibe 1 ueber eine exklusiv geoeffnete Datei — "
+                     "geprueft in tests/test_xplat23_windows_sperre.py.")
 @unittest.skipUnless(_RUNNER_LAEUFT, _RUNNER_GRUND)
 class VolleSuiteSerialisiertTest(unittest.TestCase):
     """★ Eigene Sperrdatei je Test (LIGHTOS_LOCKFILE).

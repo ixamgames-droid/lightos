@@ -54,7 +54,9 @@ _LAEUFT = (SEG_RUNNER.exists() and os.name != "nt"
            and shutil.which("bash") is not None
            and shutil.which("flock") is not None)
 _GRUND = ("Der Segment-Runner IST das Linux-Gate; auf Windows faehrt "
-          "run_tests.ps1 -Isolate. Ohne flock gibt es bewusst keine Sperre.")
+          "verify_segmented.ps1. Die rechnerweite WebEngine-Sperre gibt es dort "
+          "seit XPLAT-23 Scheibe 2 (tools/_gate_webengine.ps1) — geprueft in "
+          "tests/test_xplat23_webengine_sperre.py.")
 
 # Der Runner entscheidet per Textsuche, welche Datei als WebEngine-Segment gilt.
 # Ein echter Import wuerde diese Mini-Dateien um Sekunden verlangsamen, ohne

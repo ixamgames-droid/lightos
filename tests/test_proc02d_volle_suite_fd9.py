@@ -59,9 +59,11 @@ _LAEUFT = (os.name != "nt"
            and shutil.which("flock") is not None
            and shutil.which("git") is not None
            and os.path.isdir("/proc"))
-_GRUND = ("Die Sperre ist der Linux-Weg (auf Windows serialisiert "
-          "run_tests.ps1). Ohne flock gibt es bewusst keine Sperre; die "
-          "Deskriptor-Pruefung liest /proc.")
+_GRUND = ("Die Sperre ist hier der Linux-Weg (flock), und die "
+          "Deskriptor-Pruefung liest /proc — dafuer gibt es auf Windows kein "
+          "Gegenstueck. Die Serialisierung selbst schon: verify_loop.ps1 nimmt "
+          "sie seit XPLAT-23 Scheibe 1 in-repo, geprueft in "
+          "tests/test_xplat23_windows_sperre.py.")
 
 # Die volle Suite des Wegwerf-Repos: EINE Datei, die ein Kind hinterlaesst,
 # das den Lauf ueberlebt. `start_new_session=True` koppelt es ab (es haengt
