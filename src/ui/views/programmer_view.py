@@ -13,7 +13,8 @@ import weakref
 from src.core.paths import app_data_dir
 from PySide6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel, QSlider, QPushButton,
-    QListWidget, QListWidgetItem, QLineEdit, QGroupBox, QScrollArea, QFrame,
+    QListWidget, QListWidgetItem, QTreeWidget, QTreeWidgetItem,
+    QLineEdit, QGroupBox, QScrollArea, QFrame,
     QTabWidget, QToolButton, QSizePolicy, QMessageBox, QDialog, QSplitter,
     QStackedWidget, QButtonGroup, QInputDialog, QRadioButton, QComboBox,
     QWhatsThis
@@ -326,11 +327,24 @@ class ProgrammerView(QWidget):
         hdr = QLabel("Geräte")
         hdr.setObjectName("label_header")
         left.addWidget(hdr)
-        self._fixture_list = QListWidget()
+        # UI-61: Baum statt flacher Liste. Die Kopf-Zeilen sind jetzt KINDER
+        # ihres Geraets und damit ein-/ausklappbar — bei 48 Zonen waren es
+        # vorher 49 Zeilen fuer EIN Geraet, beim Pixel Panel 144 waeren es 145
+        # („dann sitzt die Liste sehr, sehr schnell sehr unuebersichtlich",
+        # Rig 03.09.2026). Voreinstellung ZU: wer die Koepfe einzeln braucht,
+        # klappt auf; wer sie nie braucht, sieht sie nie.
+        # UI-61: welcher Geraete-Knoten offen ist, ueberlebt den Neuaufbau der
+        # Liste (`_refresh_fixture_list` laeuft bei jeder Patch-Aenderung).
+        # Ohne den Merker klappt jede Adressaenderung alles wieder zu.
+        self._offene_koepfe: set[int] = set()
+        self._fixture_list = QTreeWidget()
+        self._fixture_list.setHeaderHidden(True)
         self._fixture_list.setSelectionMode(
-            QListWidget.SelectionMode.ExtendedSelection
+            QTreeWidget.SelectionMode.ExtendedSelection
         )
         self._fixture_list.itemSelectionChanged.connect(self._on_fixture_selected)
+        self._fixture_list.itemExpanded.connect(self._on_kopf_knoten_geklappt)
+        self._fixture_list.itemCollapsed.connect(self._on_kopf_knoten_geklappt)
         left.addWidget(self._fixture_list)
 
         btn_row = QHBoxLayout()
@@ -860,21 +874,29 @@ class ProgrammerView(QWidget):
         try:
             lst.clear()
             for f in self._state.get_patched_fixtures():
-                it = QListWidgetItem(f"[{f.fid:03d}] {f.label}")
+                it = QTreeWidgetItem(lst, [f"[{f.fid:03d}] {f.label}"])
                 # FM-HEADLAYOUT Slice 5: UserRole traegt jetzt den ZELL-Schluessel
                 # ("fid" fuer das ganze Geraet, "fid:head" fuer einen Kopf) —
                 # dieselbe Syntax wie Gruppen-Zellen. Bestandsleser MUESSEN ihn
                 # ueber parse_group_cell lesen (int(v) wirft bei "5:2").
-                it.setData(Qt.ItemDataRole.UserRole, str(f.fid))
-                lst.addItem(it)
-                for h in range(self._head_row_count(f)):
-                    hit = QListWidgetItem(f"      └ Kopf {h + 1}")
-                    hit.setData(Qt.ItemDataRole.UserRole, f"{f.fid}:{h}")
+                it.setData(0, Qt.ItemDataRole.UserRole, str(f.fid))
+                anzahl = self._head_row_count(f)
+                for h in range(anzahl):
+                    # UI-61: Kind statt Geschwister — die Einrueckung macht jetzt
+                    # der Baum, der Text traegt sie nicht mehr selbst.
+                    hit = QTreeWidgetItem(it, [f"Kopf {h + 1}"])
+                    hit.setData(0, Qt.ItemDataRole.UserRole, f"{f.fid}:{h}")
                     hit.setToolTip(
+                        0,
                         f"Nur Kopf {h + 1} von „{f.label}“ programmieren "
                         f"(Regler/Schnellwahl schreiben dann ausschließlich auf "
-                        f"diesen Kopf). Das Geräte-Zeile darüber wählt alle Köpfe.")
-                    lst.addItem(hit)
+                        f"diesen Kopf). Die Geräte-Zeile darüber wählt alle Köpfe.")
+                if anzahl:
+                    # Die Zahl gehoert an die Geraete-Zeile: zugeklappt ist sonst
+                    # nicht zu sehen, DASS es Koepfe gibt — und ein Pfeil allein
+                    # sagt nicht, wie viele dahinter liegen.
+                    it.setText(0, f"[{f.fid:03d}] {f.label}  ({anzahl} Köpfe)")
+                    it.setExpanded(f.fid in self._offene_koepfe)
         finally:
             lst.blockSignals(blocked)
         # clear() hat die Auswahl geleert. Die Auswahl-Folgelogik (Auswahl
@@ -882,6 +904,39 @@ class ProgrammerView(QWidget):
         # aufgebauten, konsistenten Liste ausfuehren — statt re-entrant je
         # clear()/addItem. Reproduziert den bisherigen Endzustand ohne den Crash.
         self._on_fixture_selected()
+
+    def _on_kopf_knoten_geklappt(self, item):
+        """Klappzustand je Geraet merken (UI-61).
+
+        Haengt am fid, nicht an der Zeilennummer: nach einem Neuaufbau steht das
+        Geraet womoeglich woanders, und ein Index waere dann der falsche Knoten.
+        """
+        fid, head = self._cell_of_item(item)
+        if fid is None or head is not None:
+            return
+        if item.isExpanded():
+            self._offene_koepfe.add(fid)
+        else:
+            self._offene_koepfe.discard(fid)
+
+    def _alle_items(self):
+        """Alle Items des Baums — Geraete-Zeilen UND Kopf-Zeilen.
+
+        UI-61: ersetzt die frueheren ``range(count())``/``item(i)``-Schleifen der
+        flachen Liste. Bewusst EIN Helfer und nicht viermal derselbe Baum-Gang:
+        genau daran laufen Fassungen auseinander. Auch die Tests lesen ueber ihn,
+        damit sie nicht ihre eigene Vorstellung vom Aufbau pflegen.
+
+        Kopf-Zeilen kommen auch dann, wenn ihr Geraet ZUGEKLAPPT ist — sie sind
+        vorhanden, nur nicht sichtbar. Die Auswahl-Abgleiche haengen daran: ein
+        zugeklapptes Geraet darf seine Kopf-Auswahl nicht verlieren.
+        """
+        wurzel = self._fixture_list.invisibleRootItem()
+        for i in range(wurzel.childCount()):
+            geraet = wurzel.child(i)
+            yield geraet
+            for j in range(geraet.childCount()):
+                yield geraet.child(j)
 
     def _head_row_count(self, fixture) -> int:
         """Wie viele Kopf-Zeilen bekommt dieses Geraet in der Liste? 0 = keine.
@@ -918,13 +973,26 @@ class ProgrammerView(QWidget):
         return n if n >= 2 else 0
 
     def _select_all(self):
-        self._fixture_list.selectAll()
+        """„Alle" waehlt Geraete UND Kopf-Zeilen — genau wie die flache Liste.
+
+        UI-61: bewusst nicht ueber ``selectAll()``. Bei einem Baum haengt dessen
+        Ergebnis daran, was gerade aufgeklappt ist; die Bedeutung von „Alle"
+        darf aber nicht davon abhaengen, wie der Nutzer seine Pfeile stehen hat.
+        """
+        lst = self._fixture_list
+        blocked = lst.blockSignals(True)
+        try:
+            for it in self._alle_items():
+                it.setSelected(True)
+        finally:
+            lst.blockSignals(blocked)
+        self._on_fixture_selected()
 
     @staticmethod
     def _cell_of_item(item) -> tuple:
         """UserRole eines Listen-Items -> ``(fid, head)`` ueber die kanonische
         Parse-Quelle. Deckt auch Alt-Items ab, die noch ein int tragen."""
-        return parse_group_cell(item.data(Qt.ItemDataRole.UserRole))
+        return parse_group_cell(item.data(0, Qt.ItemDataRole.UserRole))
 
     def _on_fixture_selected(self):
         # FM-HEADLAYOUT Slice 5: Auswahl auf Zell-Ebene publizieren (Geraet ODER
@@ -1104,8 +1172,8 @@ class ProgrammerView(QWidget):
         # der Vergleich gegen den Zell-String ins Leere und die Gruppenwahl
         # markierte gar nichts mehr (FM16E-Fehlerklasse).
         present = set()
-        for i in range(self._fixture_list.count()):
-            fid, head = self._cell_of_item(self._fixture_list.item(i))
+        for it in self._alle_items():
+            fid, head = self._cell_of_item(it)
             if fid is not None and head is None:
                 present.add(fid)
         # Visuelle Selektion aktualisieren (ohne _on_fixture_selected zu triggern)
@@ -1113,8 +1181,7 @@ class ProgrammerView(QWidget):
         if not add:
             self._fixture_list.clearSelection()
         want = set(fids)
-        for i in range(self._fixture_list.count()):
-            it = self._fixture_list.item(i)
+        for it in self._alle_items():
             fid, head = self._cell_of_item(it)
             if head is None and fid in want:
                 it.setSelected(True)
@@ -1153,21 +1220,24 @@ class ProgrammerView(QWidget):
                 cells = None
         want_cells = set(cells) if cells else {str(f) for f in new_fids}
         present = set()
-        for i in range(self._fixture_list.count()):
-            fid, head = self._cell_of_item(self._fixture_list.item(i))
+        for it in self._alle_items():
+            fid, head = self._cell_of_item(it)
             if fid is not None and head is None:
                 present.add(fid)
         # Visuelle Selektion ohne _on_fixture_selected-Trigger (kein Re-Publish).
         self._fixture_list.blockSignals(True)
         self._fixture_list.clearSelection()
-        for i in range(self._fixture_list.count()):
-            it = self._fixture_list.item(i)
+        for it in self._alle_items():
             fid, head = self._cell_of_item(it)
             if fid is None:
                 continue
             key = f"{fid}" if head is None else f"{fid}:{head}"
             if key in want_cells:
                 it.setSelected(True)
+                # UI-61: eine getroffene Kopf-Zeile aufklappen, sonst steht die
+                # Auswahl unsichtbar hinter einem zugeklappten Pfeil.
+                if head is not None and it.parent() is not None:
+                    it.parent().setExpanded(True)
         self._fixture_list.blockSignals(False)
         # Interne Auswahl in der vom Publisher vorgegebenen Reihenfolge uebernehmen.
         self._selected_fids = [f for f in new_fids if f in present]

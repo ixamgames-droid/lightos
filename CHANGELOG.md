@@ -7,6 +7,30 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-03 — Die Geräteliste im Programmer lässt sich zuklappen
+
+#### Verbessert
+
+- **Ein Gerät mit vielen Köpfen macht die Geräteliste nicht mehr
+  unübersichtlich.** Bisher stand jeder Kopf als eigene Zeile direkt unter dem
+  Gerät — beim LED-Balken mit 48 Zonen waren das 49 Zeilen für ein einziges
+  Gerät, bei einem 144er-Panel wären es 145.
+
+  Die Köpfe hängen jetzt als aufklappbare Unterpunkte am Gerät und sind
+  **voreingestellt zugeklappt**. Die Gerätezeile sagt dabei, wie viele
+  dahinterstecken („(48 Köpfe)"), damit zugeklappt nicht verborgen bleibt,
+  *dass* es welche gibt.
+
+  Wer ein Gerät aufklappt, findet es beim nächsten Mal wieder offen — auch
+  nachdem sich am Patch etwas geändert hat.
+
+  Zwei Dinge bleiben ausdrücklich, wie sie waren: eine ausgewählte Kopf-Zeile
+  bleibt ausgewählt, auch wenn man das Gerät zuklappt, und „Alle" wählt
+  weiterhin alles — unabhängig davon, welche Geräte gerade offen sind. Wird ein
+  Kopf von außen ausgewählt (Gruppe, Preset, zweite Ansicht), klappt sein Gerät
+  automatisch auf, damit die Auswahl sichtbar ist.
+
+
 ### 2026-09-03 — Ein weißer Effekt lässt den LED-Balken wieder ganz leuchten
 
 #### Behoben
