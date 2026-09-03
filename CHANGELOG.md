@@ -7,6 +7,28 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-02 — Ein Testlauf scheitert nicht mehr daran, dass noch aufgeräumt werden muss
+
+#### Behoben
+
+- **Der Testlauf konnte enden, bevor er angefangen hatte.** Blieb aus einem
+  früheren Lauf ein Prozess übrig, der noch eine Protokolldatei offen hielt,
+  brach der nächste Start beim Aufräumen ab — mit einer Fehlermeldung, aber ohne
+  einen einzigen gefahrenen Test.
+
+  Das ist die unangenehmste Variante: Die Meldung sieht aus wie ein
+  fehlgeschlagener Testlauf, und wer sie liest, sucht den Fehler in seiner
+  eigenen Änderung. Tatsächlich war überhaupt nichts geprüft worden.
+
+  Der Lauf weicht jetzt auf ein frisches Unterverzeichnis aus und läuft weiter.
+  Die übriggebliebenen Prozesse werden dabei **benannt** — mit Kennnummer und
+  Startzeit, und eine laufende LightOS-Instanz ausdrücklich als solche markiert
+  — aber keiner davon wird beendet. Übriggebliebene Prozesse wirklich zu
+  beenden ist eine eigene Entscheidung mit Folgen für die Bühne und steht
+  weiterhin aus.
+
+  Ist nichts im Weg, wird wie bisher normal aufgeräumt.
+
 ### 2026-09-02 — Der Stairville Matrix Blinder 5x5 RGBWW ist jetzt in der Gerätebibliothek
 
 #### Neu
