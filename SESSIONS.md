@@ -11,7 +11,6 @@
 |---|---|---|---|---|
 | ENG-15 | A | fix/eng15-schwarzer-pixel-farbrad | 2026-09-02T21:11Z | src/core/engine/rgb_matrix.py |
 | FM-40 | A | feature/fm40-raster-aus-dem-fixture | 2026-09-02T20:25Z | src/ui/views/fixture_group_view.py |
-| XPLAT-26 | B | fix/xplat26-aufrufzeilen-und-compileall | 2026-09-03T00:54Z | tools/verify_loop.ps1 |
 
 ## Blocker & Fallen
 
@@ -59,7 +58,6 @@
 
 ## Verlauf
 
-- 2026-08-31T21:11Z A uebergeben STAB-23
 - 2026-09-01T13:40Z A claim PROC-07
 - 2026-09-01T13:44Z B claim XPLAT-22
 - 2026-09-01T14:26Z B uebergeben XPLAT-22
@@ -89,3 +87,4 @@
 - 2026-09-02T21:08Z B claim XPLAT-29
 - 2026-09-03T00:53Z B uebergeben XPLAT-29
 - 2026-09-03T00:54Z B claim XPLAT-26
+- 2026-09-03T01:35Z B done XPLAT-26
