@@ -24,7 +24,18 @@ def parse_group_cell(value) -> tuple:
         s = str(value)
         if ":" in s:
             fid_s, head_s = s.split(":", 1)
-            return int(fid_s), int(head_s)
+            head = int(head_s)
+            # FM-45: ein NEGATIVER Kopfindex ist keine Kopf-Zelle, sondern eine
+            # kaputte. Vorher kam "1:-1" als Kopf -1 durch und wurde ueberall wie
+            # ein echter Kopf behandelt; im Renderer lieferte er die GETEILTEN
+            # Kanaele, also den Master-Dimmer des ganzen Geraets (gemessen).
+            # Unparsbar heisst hier wie sonst: die Zelle faellt weg. Bewusst
+            # NICHT auf "(fid, None)" abbilden - das waere die stille
+            # Befoerderung einer kaputten Kopf-Zelle zum GANZEN Geraet, also
+            # genau in die gefaehrliche Richtung.
+            if head < 0:
+                return None, None
+            return int(fid_s), head
         return int(s), None
     except Exception:
         return None, None
