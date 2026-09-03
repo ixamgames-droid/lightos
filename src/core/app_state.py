@@ -4660,36 +4660,32 @@ def channels_for_head(channels, head: int) -> dict:
     O(Attribute) statt O(Kanaele) — der Matrix-Pfad ruft diese Funktion PRO ZELLE
     PRO FRAME auf."""
     positions, hmap = _channel_index(channels)
-    # ── FM-45: ein Kopf, den es nicht gibt, bekommt GAR NICHTS ──────────────
+    picked: list[tuple[int, str]] = []
+    # ── FM-45: geteilte Kanaele fahren nur mit einem Kopf mit, den es GIBT ──
     #
     # Gemessen 2026-09-03 an einem Nachbau des ZQ06121 (geteilter Master-Dimmer
     # + Shutter, danach vier RGB-Koepfe): `channels_for_head(chans, 4)` lieferte
     # `{intensity, shutter}` — also genau die GETEILTEN Kanaele. Mit
     # `drive_intensity` stand danach CH1 auf 255, der Master-Dimmer des ganzen
-    # Geraets. Dasselbe fuer `head=9` und fuer `head=-1`.
+    # Geraets. Dasselbe fuer `head=9` und `head=-1`.
     #
-    # Die Ursache ist eine Luecke, keine falsche Regel: die beiden per-Kopf-Zweige
-    # unten pruefen ihre Grenze laengst (`0 <= head < len(...)`), der Zweig fuer
-    # das EINMALIGE Attribut („geteilt, also bei jedem Kopf dabei") haengt es
-    # bedingungslos an. „Jeder Kopf" hiess damit auch: jeder Kopf, den es nicht
-    # gibt.
+    # Die Ursache war eine Luecke, keine falsche Regel: die beiden per-Kopf-
+    # Zweige pruefen ihre Grenze laengst, der Zweig fuer das EINMALIGE Attribut
+    # („geteilt, also bei jedem Kopf dabei") haengt sie bedingungslos an.
+    # „Jeder Kopf" hiess damit auch: jeder Kopf, den es nicht gibt.
     #
-    # Die Kopfzahl steht im Index selbst: es ist das groesste Vorkommen ueber
-    # alle Attribute. Diese Definition ist bewusst dieselbe, nach der die Zweige
-    # unten schon heute entscheiden — ein Attribut mit N Vorkommen bedient
-    # Koepfe 0..N-1. Damit bleibt JEDER Kopf gueltig, der es heute ist, und es
-    # faellt genau der weg, den kein per-Kopf-Attribut bedienen kann.
+    # Die geteilten Kanaele werden deshalb erst am Ende angehaengt — und nur,
+    # wenn im selben Durchlauf ueberhaupt ein per-Kopf-Attribut diesen Kopf
+    # bedient hat. Das ist genau die vorhandene Grenze, nicht eine zweite:
+    # ein Attribut mit N Vorkommen bedient Koepfe 0..N-1, und wo keines
+    # zustaendig ist, gibt es den Kopf nicht.
     #
-    # ⚠️ `head=0` auf einem Single-Head-Fixture bleibt unveraendert (alle
-    # Attribute einmalig -> Kopfzahl 1 -> 0 ist gueltig), byte-identisch zum
-    # Nicht-Kopf-Pfad. Das ist die Zusicherung im Docstring oben.
-    kopfzahl = 0
-    for _a, _occ in positions.items():
-        _ph = hmap.get(_a)
-        kopfzahl = max(kopfzahl, len(_ph) if _ph is not None else len(_occ))
-    if head < 0 or head >= kopfzahl:
-        return {}
-    picked: list[tuple[int, str]] = []
+    # ⚠️ `head=0` bleibt ausgenommen und damit unveraendert: auf einem
+    # Single-Head-Fixture ist JEDES Attribut einmalig, es gibt also kein
+    # per-Kopf-Attribut — und der Docstring sagt zu, dass Kopf 0 dort schlicht
+    # alle Kanaele liefert (byte-identisch zum Nicht-Kopf-Pfad).
+    geteilt: list[tuple[int, str]] = []
+    kopf_bedient = False
     for a, occurrences in positions.items():
         per_head = hmap.get(a)
         if per_head is not None:
@@ -4697,13 +4693,18 @@ def channels_for_head(channels, head: int) -> dict:
             # Attributs (Master-Dimmer) gehoeren KEINEM Kopf.
             if 0 <= head < len(per_head):
                 picked.append((per_head[head], a))
+                kopf_bedient = True
         elif len(occurrences) > 1:
             # wiederholtes Attribut ohne Kopf-Karte -> das head-te Vorkommen.
             if 0 <= head < len(occurrences):
                 picked.append((occurrences[head], a))
+                kopf_bedient = True
         else:
-            # einmaliges Attribut -> geteilt (jeder Kopf).
-            picked.append((occurrences[0], a))
+            # einmaliges Attribut -> geteilt (jeder Kopf, den es gibt).
+            geteilt.append((occurrences[0], a))
+    if not kopf_bedient and head != 0:
+        return {}
+    picked.extend(geteilt)
     # In KANAL-Reihenfolge zurueckgeben (wie die fruehere Schleife ueber
     # ``channels``) — Aufrufer schreiben daraus DMX-Kanaele der Reihe nach.
     return {a: channels[i] for i, a in sorted(picked)}
