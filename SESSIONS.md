@@ -9,7 +9,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| FM-45 | B | fix/fm45-kopf-den-es-nicht-gibt | 2026-09-03T18:47Z | - |
 | QA-72 | A | fix/qa72-herkunft-eines-profils | 2026-09-03T19:18Z | src/core/database/qxf_import.py |
 | OUT-55 | A | fix/out55-alle-koepfe-invertieren | 2026-09-03T19:35Z | src/core/app_state.py |
 
@@ -68,7 +67,6 @@
 
 ## Verlauf
 
-- 2026-09-03T01:35Z B done XPLAT-26
 - 2026-09-03T04:23Z B claim QA-71
 - 2026-09-03T04:50Z B done QA-71
 - 2026-09-03T04:50Z B claim STAB-28
@@ -98,3 +96,4 @@
 - 2026-09-03T19:17Z A done UI-61
 - 2026-09-03T19:18Z A claim QA-72
 - 2026-09-03T19:35Z A claim OUT-55
+- 2026-09-03T19:43Z B uebergeben FM-45
