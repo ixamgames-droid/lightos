@@ -14,6 +14,7 @@ Optik — ein Bild koennte nur „sieht voll aus" sagen.
 Aufruf::
 
     venv/bin/python tools/verify_stage_reload.py [pfad/zur/show.lshow]
+    (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 
 Exit 0 = identisch (Abnahme bestanden), 1 = Abweichung, 2/3 = Lauf kaputt.
 

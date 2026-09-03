@@ -41,6 +41,7 @@ Aufruf::
     venv/bin/python tools/zeitbomben_gate.py --nur-kandidaten
     venv/bin/python tools/zeitbomben_gate.py --tage 400      # anderer Sprung
     venv/bin/python tools/zeitbomben_gate.py --uhr alle      # auch time.time (laut)
+    (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 
 Die GANZE Suite mit vorgerueckter Uhr — bewusst nicht als Schalter hier, weil
 615 Dateien in EINEM pytest-Prozess auf Linux reproduzierbar an akkumulierendem

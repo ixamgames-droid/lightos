@@ -29,6 +29,7 @@ statt globalem stop_all/exclusive). Safety: Mover-Shutter offen, Laser bleibt au
 bis Arm/Muster, base_levels ohne implizite Grundhelligkeit.
 
 Aufruf:  venv/Scripts/python.exe tools/build_mega_arena_2026.py
+         (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 Erzeugt: shows/Mega_Arena_2026.lshow  (selbst-verifizierend, headless)
 """
 from __future__ import annotations

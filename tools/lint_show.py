@@ -4,6 +4,7 @@ Bauteil-Sätze von LightOS — macht halluzinierte Widgets/Algos/Params/Styles l
     venv/Scripts/python.exe tools/lint_show.py shows/Demo_Show_Full.lshow
     venv/Scripts/python.exe tools/lint_show.py shows/*.lshow
     venv/Scripts/python.exe tools/lint_show.py --strict shows/*.lshow   # Warnungen = Fehler
+    (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 
 Exit-Code 1, sobald ein ERROR-Finding existiert (mit --strict auch bei Warnungen).
 """

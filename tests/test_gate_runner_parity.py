@@ -206,6 +206,54 @@ def test_verify_loop_delegates_full_suite_to_the_segmented_runner():
         "genau die Variante, die auf Linux an akkumulierendem Qt-Zustand starb.")
 
 
+# ── XPLAT-26: beide Gates muessen denselben UMFANG kompilieren ───────────────
+#
+# Die Umgebungs-Pruefungen oben nageln fest, dass beide Runner dasselbe MESSEN.
+# Der Syntax-Check davor lief trotzdem auseinander: `verify_loop.sh` kompiliert
+# seit QA-51(e) `src` UND `tools`, `verify_loop.ps1` nur `src`. Ein Syntaxfehler
+# in einem Werkzeug fiel auf Windows also durch — besonders unangenehm bei
+# `gen_tools_index.py`, das einen SyntaxError beim Einlesen in die harmlose
+# Index-Zelle "(Docstring nicht lesbar)" verwandelt: die kaputte Datei erscheint
+# ordentlich im Verzeichnis, und der Index bestaetigt sie sogar.
+_COMPILEALL = "compileall -q "
+
+
+def _compileall_umfang(rel_path: str) -> list[str] | None:
+    """Die Verzeichnisse hinter ``compileall -q`` — aus dem ECHTEN Skript gelesen.
+
+    Bewusst kein Nachbau der Aufruflogik: geprueft werden soll, was die Datei
+    sagt, nicht was der Test glaubt.
+    """
+    with open(os.path.join(_REPO_ROOT, rel_path), encoding="utf-8") as f:
+        for zeile in f:
+            if _COMPILEALL not in zeile or zeile.lstrip().startswith("#"):
+                continue
+            rest = zeile.split(_COMPILEALL, 1)[1]
+            for trenner in (";", "#", "|", ")"):
+                rest = rest.split(trenner, 1)[0]
+            teile = [t for t in rest.split() if not t.startswith("-")]
+            if teile:
+                return teile
+    return None
+
+
+def test_beide_gates_kompilieren_denselben_umfang():
+    linux = _compileall_umfang("tools/verify_loop.sh")
+    windows = _compileall_umfang("tools/verify_loop.ps1")
+    # ⚠ Ohne diese Zeile besteht der Test auch bei None == None — also genau
+    # dann, wenn die Erkennung in BEIDEN Dateien nichts findet.
+    assert linux and windows, (
+        f"compileall-Aufruf nicht gefunden (linux={linux!r}, windows={windows!r}) "
+        "— vermutlich hat sich die Schreibweise geaendert.")
+    assert linux == windows, (
+        f"Die Gates kompilieren Unterschiedliches: Linux {linux}, Windows "
+        f"{windows}. Ein Syntaxfehler in einem nur auf einer Seite geprueften "
+        "Verzeichnis faellt dort durch (XPLAT-26).")
+    assert "tools" in linux, (
+        "Kein Gate kompiliert `tools` — dann faellt ein Syntaxfehler in einem "
+        "Werkzeug erst auf, wenn jemand es benutzt (QA-51(e)).")
+
+
 # ── PROC-04: dieselbe Zusicherung fuer die BEIDEN CI-Legs ────────────────────
 #
 # Die Datei oben nagelt die Umgebung der zwei Linux-RUNNER fest. Dieselbe Drift

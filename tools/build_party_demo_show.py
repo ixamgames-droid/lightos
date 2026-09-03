@@ -21,6 +21,7 @@ OS2L-Server").  Die hier eingebackenen Nominal-BPM (aus Genre/Titel) sind Effekt
 Vorgabe und Fallback.
 
 Aufruf:  venv/Scripts/python.exe tools/build_party_demo_show.py
+         (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 Erzeugt: shows/Party_Demo_2026.lshow
 """
 from __future__ import annotations

@@ -7,6 +7,7 @@ vollstaendig ist — nach dem Anlegen/Umbenennen eines Tools also einmal laufen
 lassen:
 
     venv/Scripts/python.exe tools/gen_tools_index.py
+    (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 
 Reines Stdlib-Werkzeug, keine src-Imports.
 """

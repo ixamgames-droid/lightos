@@ -25,7 +25,8 @@ from _showpath import find_show
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Show liegt seit 2026-07-19 ggf. nur noch in shows/_archiv/ — find_show prueft beide.
 SHOW = str(find_show("Neue_Demo_2026.lshow",
-                     hint="Neu erzeugen: venv/Scripts/python tools/build_neue_demo_show.py"))
+                     hint="Neu erzeugen: venv/Scripts/python.exe (Linux/macOS: ./venv/bin/python) "
+                          "tools/build_neue_demo_show.py"))
 OUT_DIR = os.path.join(_ROOT, "docs", "images")
 PAGE_NAMES = ["quadranten", "matrix-looks", "builder", "moving-heads", "playback"]
 W, H = 1180, 812

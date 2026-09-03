@@ -15,6 +15,7 @@ Rig (Adressierung, Universe 1, 114 Kanaele):
   2x Spider (SPIDER14, 14ch) @ 87 / 101  ->  VOR PAR 1 und PAR 8.
 
 Aufruf:  venv/Scripts/python.exe tools/build_event_demo_2026.py
+         (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 Erzeugt: shows/Event_Demo_2026.lshow
 """
 from __future__ import annotations

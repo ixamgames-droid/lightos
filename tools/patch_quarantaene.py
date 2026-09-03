@@ -5,6 +5,7 @@ Quarantäne verschieben.
     venv/bin/python tools/patch_quarantaene.py --anwenden       # verschieben
     venv/bin/python tools/patch_quarantaene.py --liste          # Quarantäne zeigen
     venv/bin/python tools/patch_quarantaene.py --zurueck 42     # zurückholen
+    (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 
 **Ohne ``--anwenden`` wird nichts verändert.** Das ist keine Höflichkeit,
 sondern die Absicherung: der Befund hängt an einem Scan über ein Dutzend

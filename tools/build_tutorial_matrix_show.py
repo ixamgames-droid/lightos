@@ -20,6 +20,7 @@ R/G/B):
                    Master.  Zeigt Benennung + Layering.
 
 Aufruf:  venv/Scripts/python.exe tools/build_tutorial_matrix_show.py
+         (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 Erzeugt: shows/Tutorial_Matrix.lshow
 """
 from __future__ import annotations

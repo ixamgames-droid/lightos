@@ -26,6 +26,7 @@ David hat am 2026-08-05 ausdruecklich bestaetigt: Weiss soll bei Farbeffekten
 NICHT mitlaufen, aber einzeln ansprechbar sein.
 
 Aufruf:  ./venv/bin/python tools/build_zq06121_demo.py
+           (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 Ergebnis: shows/ZQ06121 Demo.lshow  (git-ignoriert)
 """
 import os

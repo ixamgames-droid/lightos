@@ -8,6 +8,7 @@ der Output-Thread wird per `LIGHTOS_NO_OUTPUT_THREAD=1` gar nicht erst gestartet
 und `_render_frame` wird synchron in der Messschleife aufgerufen.
 
 Aufruf:  venv/Scripts/python.exe tools/benchmark_universes.py [frames]   (Default 300 Frames)
+         (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 Ergebnis: Tabelle auf stdout + geschrieben nach docs/PERFORMANCE.md.
 
 Hinweis: get_state() wendet beim ersten Aufruf die Output-Konfig aus
@@ -175,7 +176,7 @@ def _write_doc(rows: list[dict], pars_per_universe: int, frames: int):
     doc = f"""# Performance — Render-Pipeline (Mehr-Universen-Benchmark)
 
 > **Stand: {date.today().isoformat()}** · erzeugt von `tools/benchmark_universes.py` (Open Point T-8).
-> Maschine: {mach}, Python {py}. Reproduzieren: `venv/Scripts/python.exe tools/benchmark_universes.py`.
+> Maschine: {mach}, Python {py}. Reproduzieren: `venv/Scripts/python.exe tools/benchmark_universes.py` (Linux/macOS: `./venv/bin/python`).
 
 Gemessen wird die reine **`AppState._render_frame()`**-Zeit (Default-Frame →
 Funktionen → Executoren → Programmer → atomarer Commit) **ohne** DMX-/Netzwerk-

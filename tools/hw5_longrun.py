@@ -36,6 +36,7 @@ Aufruf::
     venv/bin/python tools/hw5_longrun.py --hours 12
     venv/bin/python tools/hw5_longrun.py --probe --heartbeat-channel 115-118
     venv/bin/python tools/hw5_longrun.py --status            # laufenden Lauf ansehen
+    (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 """
 from __future__ import annotations
 
@@ -193,7 +194,8 @@ class Run:
             "  durch, kein Auto-Disable). Ein STILLER Tod — FTDI nimmt Bytes an, legt",
             "  aber keine gueltigen DMX-Frames mehr auf die Leitung — ist von hier aus",
             "  nicht sichtbar. Dafuer braucht es den Blick aufs Rig:",
-            "      venv/bin/python tools/hw5_longrun.py --probe --heartbeat-channel <N-M>",
+            "      ./venv/bin/python tools/hw5_longrun.py --probe --heartbeat-channel <N-M>",
+            "      (Windows: venv/Scripts/python.exe)",
             "=" * 72,
             "",
         ]

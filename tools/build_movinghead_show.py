@@ -17,6 +17,7 @@ Zeigt ALLE neuen Moving-Head-Features:
   - Echte Fixture-Gruppen ("PAR-Reihe", "Moving Heads"), persistiert in der .lshow.
 
 Aufruf:  venv/Scripts/python.exe tools/build_movinghead_show.py
+         (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 Erzeugt: shows/MovingHead_Demo.lshow
 """
 from __future__ import annotations

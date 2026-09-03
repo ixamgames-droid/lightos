@@ -11,6 +11,7 @@ Dieses Skript stellt die Frage maschinell, damit sie nicht wieder von Hand
 beantwortet werden muss:
 
     ./venv/bin/python tools/audit_bilder_stand.py docs/BILDER_AUDIT_2026-07-20.md
+      (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 
 Es liest die `### \\`pfad\\` (schwere)`-Überschriften, prüft je Bild, ob es noch
 existiert, und vergleicht seinen letzten Git-Zeitstempel mit dem Zeitpunkt, zu

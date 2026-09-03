@@ -12,6 +12,7 @@ Konzept (passt zum zentralen Per-Frame-Renderer):
     bereits auf grand_master gemappt.
 
 Aufruf:  venv/Scripts/python.exe tools/build_demo_show.py
+         (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 """
 import os
 import sys
@@ -46,7 +47,10 @@ if not fixtures:
         "Kein Fixture gepatcht (isolierte Wegwerf-DB ist leer).\n"
         "Dieses Alt-Skript baut auf dem Bestands-Patch auf. Bewusster Lauf gegen die "
         "echte DB (App vorher schliessen!):\n"
-        "  $env:LIGHTOS_SHOW_DB='data/current_show.db'; venv/Scripts/python tools/build_demo_show.py"
+        "  Windows:     $env:LIGHTOS_SHOW_DB='data/current_show.db'; "
+        "venv/Scripts/python.exe tools/build_demo_show.py" + "\n" +
+        "  Linux/macOS: LIGHTOS_SHOW_DB=data/current_show.db "
+        "./venv/bin/python tools/build_demo_show.py"
     )
 fids = [f.fid for f in fixtures]
 

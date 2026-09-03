@@ -11,6 +11,7 @@ Aufruf (aus Repo-Root oder Worktree):
   venv/Scripts/python.exe tools/janitor.py worktrees --apply
   venv/Scripts/python.exe tools/janitor.py branches  --apply
   venv/Scripts/python.exe tools/janitor.py artifacts --apply [--days 7]
+  (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 
 Harte Guardrails:
   * Default = reiner Report; ohne --apply wird NICHTS veraendert.

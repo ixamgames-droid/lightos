@@ -31,6 +31,7 @@ AUTOPLAY-Konzept:
     aus dem Audio-Eingang (Geraet im View "Audio-Eingang" waehlbar).
 
 Aufruf:  venv/Scripts/python.exe tools/build_komplett_demo_show.py
+         (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 Erzeugt: shows/Komplett_Demo.lshow
 """
 from __future__ import annotations

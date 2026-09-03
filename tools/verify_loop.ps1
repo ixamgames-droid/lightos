@@ -192,8 +192,15 @@ Enter-Sperre
 
 Push-Location $repo
 try {
-    Write-Host "[verify] 1/2 Syntax-Check (compileall src) ..."
-    & $py -m compileall -q src
+    # XPLAT-26: `tools` gehoert mit hinein - Pendant zu verify_loop.sh seit
+    # QA-51(e). Bis hierhin kompilierte das WINDOWS-Gate die Werkzeuge nicht;
+    # ein Syntaxfehler dort fiel erst auf, wenn jemand das Werkzeug benutzte.
+    # Besonders unangenehm bei gen_tools_index.py, das einen SyntaxError beim
+    # Einlesen einer Datei in die harmlose Index-Zelle "(Docstring nicht
+    # lesbar)" verwandelt: die kaputte Datei erscheint damit ordentlich im
+    # Verzeichnis, und der Index bestaetigt sie sogar.
+    Write-Host "[verify] 1/2 Syntax-Check (compileall src tools) ..."
+    & $py -m compileall -q src tools
     if ($LASTEXITCODE -ne 0) { Write-Host "[verify] SYNTAX-FEHLER"; exit 1 }
 
     # QA-53/PROC-02b-Pendant: Ausstieg NACH dem Syntax-Check, VOR dem Testlauf.
