@@ -842,7 +842,38 @@ class RgbMatrixInstance(Function):
             # den weissen Chip (R=G=B=0), nicht zusaetzlich ueber RGB. RGB-Style:
             # r,g,b unveraendert, der W-Kanal wird nie angefasst. Gemeinsame Quelle
             # fuer die Subtraktion: color_utils.rgbw_split (siehe test_color_white_channel).
+            #
+            # ★★ ENG-25: die Subtraktion gilt NUR, wenn das Weiss zu DIESER Zelle
+            # gehoert. Beim ZQ06121 tut es das nicht: 48 RGB-Zonen, aber nur 8
+            # eigene Warmweiss-Segmente, die physisch mittig zwischen Reihe 2 und
+            # 3 sitzen und je anderthalb Spalten abdecken. Gemessen an einem
+            # Vollweiss-Frame lief das so: `rgbw_split` zog den Weissanteil aus
+            # ALLEN 48 Zellen heraus, aufnehmen konnten ihn aber nur die Koepfe
+            # 0-7 -> **144 von 144 Farbkanaelen auf 0**, es leuchteten allein die
+            # acht Mittelsegmente. Ein weisser Chase zeigte statt des Balkens
+            # einen Streifen.
+            #
+            # Die Regel dafuer ist nicht neu, sie stand nur an der anderen
+            # Stelle: `matrix_pattern.cell_channel_values` bedient `color_w`
+            # ausdruecklich NICHT und begruendet es mit Robins Entscheidung vom
+            # 2026-08-05 — „Weiss soll bei Farbeffekten nicht mitlaufen".
+            # Derselbe Renderer, zwei Pfade, zwei Antworten. Hier zieht der
+            # Matrix-Pfad nach.
+            #
+            # Massstab ist die AUSRICHTUNG, nicht der Geraetename: deckt sich die
+            # Zahl der Weiss-Emitter mit der Zahl der Farbkoepfe (Blinder 5x5:
+            # 25 zu 25, oder ein Einzelkopf-RGBW-PAR: 1 zu 1), gehoert das Weiss
+            # zum Pixel und der Split bleibt exakt wie bisher. Weichen sie ab,
+            # ist das Weiss eine eigene Leiste — und die faehrt ein Dimmer- oder
+            # Szenen-Effekt, kein Farbeffekt.
+            _weiss_gehoert_zur_zelle = True
             if self.style == MatrixStyle.RGBW:
+                _n_w = sum(1 for c in chans
+                           if (c.attribute or "").lower() == "color_w")
+                _n_c = sum(1 for c in chans
+                           if (c.attribute or "").lower() == "color_r")
+                _weiss_gehoert_zur_zelle = (_n_w == 0 or _n_w == max(_n_c, 1))
+            if self.style == MatrixStyle.RGBW and _weiss_gehoert_zur_zelle:
                 from src.core.color_utils import rgbw_split
                 cr, cg, cb, cw = rgbw_split(r, g, b)
             else:
@@ -858,7 +889,8 @@ class RgbMatrixInstance(Function):
                         val = cg
                     elif attr == "color_b":
                         val = cb
-                    elif attr == "color_w" and self.style == MatrixStyle.RGBW:
+                    elif (attr == "color_w" and self.style == MatrixStyle.RGBW
+                          and _weiss_gehoert_zur_zelle):
                         val = cw
                     elif attr == "color" and not has_rgb and wheel_val is not None:
                         # Farbrad: Slot setzen, NICHT mit intensity skalieren

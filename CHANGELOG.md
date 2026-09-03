@@ -7,6 +7,33 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-03 — Ein weißer Effekt lässt den LED-Balken wieder ganz leuchten
+
+#### Behoben
+
+- **Ein weißer Matrix-Effekt machte den ZQ06121-Balken fast vollständig
+  dunkel.** Von seinen 48 Farbzonen blieben 40 schwarz; es leuchteten nur die
+  acht Warmweiß-Segmente in der Mitte. Statt eines Balkens sah man einen
+  schmalen Streifen.
+
+  Der Grund: im RGBW-Modus wird der Weißanteil einer Farbe aus Rot/Grün/Blau
+  herausgerechnet und auf den Weiß-Kanal gelegt — richtig bei einem Gerät, bei
+  dem jeder Pixel seinen eigenen weißen Chip hat. Der Balken hat aber nur acht
+  weiße Segmente für 48 Farbzonen, und die sitzen ganz woanders: mittig
+  zwischen den Reihen. Der Weißanteil wurde also allen 48 Zonen abgezogen und
+  konnte nur von acht aufgenommen werden.
+
+  Ab sofort gilt: **ein Farbeffekt rechnet den Weißanteil nur dann heraus, wenn
+  das Weiß auch zu derselben Zelle gehört.** Passen die Zahlen zusammen — etwa
+  beim Stairville Matrix Blinder mit 25 Pixeln und 25 weißen Chips, oder bei
+  einem gewöhnlichen RGBW-PAR — bleibt alles wie bisher. Passen sie nicht,
+  lässt der Farbeffekt die weiße Leiste unangetastet, sodass ein
+  Dimmer-Effekt sie weiterhin eigenständig fahren kann.
+
+  Damit hält sich der Matrix-Effekt an dieselbe Regel, nach der Szenen und
+  Chaser schon seit August arbeiten.
+
+
 ### 2026-09-03 — Ein fehlendes Gerät verschwindet nicht mehr stillschweigend
 
 #### Behoben
