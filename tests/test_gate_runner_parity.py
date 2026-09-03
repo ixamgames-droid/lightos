@@ -17,6 +17,7 @@ Dieser Test nagelt die Umgebung an einer Stelle fest.
 """
 from __future__ import annotations
 
+import ast
 import os
 import re
 import stat
@@ -253,6 +254,85 @@ def test_beide_gates_kompilieren_denselben_umfang():
         "Kein Gate kompiliert `tools` — dann faellt ein Syntaxfehler in einem "
         "Werkzeug erst auf, wenn jemand es benutzt (QA-51(e)).")
 
+
+# ── XPLAT-23: die Querverweise der Linux-Gate-Tests duerfen nicht verrotten ──
+#
+# Die vier Linux-Gate-Testdateien ueberspringen auf Windows — zu Recht, sie
+# pruefen flock, /proc und bash. Was sie NICHT tun duerfen, ist den Leser im
+# Unklaren lassen: bis XPLAT-23 stand in ihren Skip-Gruenden "ohne flock gibt es
+# bewusst keine Sperre", und das war seit Scheibe 1 schlicht falsch — Windows
+# hat eine. Wer das las, hielt den Windows-Runner fuer ungeschuetzt.
+#
+# ★ Die Skip-Gruende nennen deshalb jetzt die Datei, die dieselbe Zusicherung
+# auf der anderen Plattform am Verhalten prueft. Ein Querverweis, den niemand
+# nachhaelt, ist aber schlimmer als keiner: benennt jemand die Zieldatei um,
+# steht in 40 Skip-Meldungen ein Verweis ins Leere. Dieser Test haelt das fest.
+_GATE_TESTS_MIT_QUERVERWEIS = (
+    "tests/test_verify_loop_sperre.py",
+    "tests/test_gate_webengine_lane.py",
+    "tests/test_proc02c_webengine_sperre.py",
+    "tests/test_proc02d_volle_suite_fd9.py",
+)
+_VERWEIS = re.compile(r"tests/test_[A-Za-z0-9_]+\.py")
+
+
+def _skip_gruende(rel_path: str) -> list[str]:
+    """Die Texte, die als Skip-Grund vor dem Leser landen — und nur die.
+
+    ⚠ Eine simple Textsuche ueber die ganze Datei taugt nicht: `proc02d`
+    SCHREIBT Dateinamen wie ``tests/test_enkel.py`` in ein Wegwerf-Repo, und
+    die sahen wie Querverweise aus (beim Bau dieses Waechters prompt als
+    Fehlalarm aufgeschlagen). Geprueft werden deshalb nur String-Konstanten,
+    die auf ``GRUND`` enden, und String-Literale in ``skipUnless``/``skipIf``.
+    """
+    with open(os.path.join(_REPO_ROOT, rel_path), encoding="utf-8") as f:
+        baum = ast.parse(f.read())
+    texte: list[str] = []
+
+    def sammle(knoten):
+        if isinstance(knoten, ast.Constant) and isinstance(knoten.value, str):
+            texte.append(knoten.value)
+        elif isinstance(knoten, ast.BinOp):
+            sammle(knoten.left); sammle(knoten.right)
+        elif isinstance(knoten, ast.JoinedStr):
+            for teil in knoten.values:
+                sammle(teil)
+
+    for knoten in ast.walk(baum):
+        if isinstance(knoten, ast.Assign):
+            for ziel in knoten.targets:
+                if isinstance(ziel, ast.Name) and ziel.id.endswith("GRUND"):
+                    sammle(knoten.value)
+        elif isinstance(knoten, ast.Call):
+            name = getattr(knoten.func, "attr", getattr(knoten.func, "id", ""))
+            if name in ("skipUnless", "skipIf"):
+                for arg in knoten.args[1:]:
+                    sammle(arg)
+    return texte
+
+
+def test_die_querverweise_der_gate_tests_zeigen_auf_vorhandene_dateien():
+    fehlend = []
+    gefunden = 0
+    for rel in _GATE_TESTS_MIT_QUERVERWEIS:
+        assert os.path.isfile(os.path.join(_REPO_ROOT, rel)), f"{rel} fehlt"
+        for text in _skip_gruende(rel):
+            for ziel in set(_VERWEIS.findall(text)):
+                if ziel == rel:
+                    continue                  # Selbstnennung, kein Verweis
+                gefunden += 1
+                if not os.path.isfile(os.path.join(_REPO_ROOT, ziel)):
+                    fehlend.append(f"{rel} -> {ziel}")
+    assert not fehlend, (
+        "Skip-Gruende verweisen auf Dateien, die es nicht (mehr) gibt: "
+        f"{fehlend}. Dann steht in den uebersprungenen Meldungen ein Hinweis "
+        "ins Leere — und der Leser auf der anderen Plattform weiss wieder "
+        "nicht, ob die Zusicherung dort ueberhaupt geprueft wird.")
+    # ⚠ Ohne diese Zeile waere der Test auch dann gruen, wenn die Verweise
+    # komplett verschwaenden — genau die Falle aus QA-52.
+    assert gefunden >= 4, (
+        f"nur {gefunden} Querverweise in Skip-Gruenden gefunden — vermutlich "
+        "sind die Hinweise auf das jeweils andere Gate verschwunden.")
 
 # ── PROC-04: dieselbe Zusicherung fuer die BEIDEN CI-Legs ────────────────────
 #
