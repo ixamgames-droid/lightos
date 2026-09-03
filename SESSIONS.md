@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| QA-66 | B | fix/qa66-waechter-haengt-an-showdatei | 2026-09-03T18:04Z | tests/test_qa58_bibliothek_schema_unberuehrt.py |
+| _(frei)_ |  |  |  |  |
 
 ## Blocker & Fallen
 
@@ -64,7 +64,6 @@
 
 ## Verlauf
 
-- 2026-09-02T19:45Z B claim XPLAT-23
 - 2026-09-02T20:25Z A claim FM-40
 - 2026-09-02T21:05Z B uebergeben XPLAT-23
 - 2026-09-02T21:08Z B claim XPLAT-29
@@ -94,3 +93,4 @@
 - 2026-09-03T17:53Z A uebergeben FM-41
 - 2026-09-03T18:04Z B done PROC-10
 - 2026-09-03T18:04Z B claim QA-66
+- 2026-09-03T18:45Z B done QA-66
