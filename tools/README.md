@@ -8,6 +8,7 @@
 | Werkzeug | Zweck |
 |---|---|
 | `_builder.py` | Gemeinsame Build-Boilerplate für tools/build_*.py — ersetzt das ~95% copy- |
+| `_gate_webengine.ps1` | tools/_gate_webengine.ps1 - rechnerweite WebEngine-Absicherung des Windows-Gates. |
 | `_gate_webengine.sh` | tools/_gate_webengine.sh — gemeinsame WebEngine-Absicherung der Linux-Gate-Runner. |
 | `_gen_env.py` | Spawn-sichere Bootstrap-Schicht fuer alle ``tools/build_*.py``-Generatoren (DEMO-02). |
 | `_run_showcase_app.py` | Wegwerf-Launcher fuer die Doku-Captures: startet LightOS UND laedt direkt die |
@@ -53,7 +54,7 @@
 | `build_uxtest3_full.py` | UXTEST-3 „Full Rig" — 30-Fixture-Test-Show für den UI-Audit (Davids Auftrag 2026-07-15). |
 | `build_validated_demo.py` | Beispiel-/Proof-Show über die ShowBuilder-DSL — baut eine kleine, ECHTE Show, |
 | `build_vc_elements_showcase.py` | VC-Elemente-Schaukasten: legt JEDEN der 15 VC-Widget-Typen einmal beschriftet |
-| `build_vc_widgets_showcase.py` | VC-Widgets-Schaukasten (Doku) — legt JEDEN der 18 VC-Widget-Typen einmal |
+| `build_vc_widgets_showcase.py` | VC-Widgets-Schaukasten (Doku) — legt 17 der 19 VC-Widget-Typen einmal |
 | `build_zq06121_demo.py` | Demo-/Testshow fuer Davids U-King ZQ06121 LED-Balken (2026-08-05). |
 | `capture_hochzeit_tempo_guide.py` | Reproduzierbare Screenshots für die Hochzeit-Tempo-Anleitung. |
 | `capture_test123_tempo_guide.py` | Reproduzierbare Screenshots fuer die Test123-Tempo-Anleitung. |

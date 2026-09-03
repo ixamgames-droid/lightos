@@ -32,6 +32,94 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   „Raster" eintragen — dann steht sie beim nächsten Mal hier.
 
 
+### 2026-09-03 — Ein Testlauf, dessen Ergebnisliste Lücken hat, meldet keinen Erfolg mehr
+
+#### Behoben
+
+- **Ein unvollständiger Testlauf konnte auf Windows als bestanden gelten.** Die
+  Abschlusszahl zählt, was in der Ergebnisliste steht. Fehlen dort Zeilen, sieht
+  ein Teillauf aus wie ein vollständiger — und die grüne Meldung darunter ist
+  schlicht falsch.
+
+  Das passiert nicht nur theoretisch: Ein gezielter Einzeltest, gestartet während
+  ein vollständiger Lauf läuft, räumt diesem seine Ergebniszeilen weg. Der Lauf
+  zählt danach nur noch seinen Rest.
+
+  Passt die Zeilenzahl nicht zur Zahl der gefahrenen Dateien, gilt der Lauf jetzt
+  als **nicht bestanden** und sagt dazu, wonach zu suchen ist. Auf Linux ist das
+  seit August so. Wer nicht weiß, ob alles gelaufen ist, hat kein bestandenes
+  Gate, sondern ein kaputtes Messgerät.
+
+- **Eine nicht schreibbare Ergebniszeile beendete den ganzen Lauf.** Ließ sich
+  eine Zeile nicht anfügen — etwa weil ein anderer Vorgang die Datei geöffnet
+  hielt — brach der Testlauf mitten drin ab, und alles bereits Geprüfte war
+  verloren. Jetzt wird einmal gewarnt und weitergemacht; die fehlende Zeile führt
+  über die Prüfung oben ohnehin zu einem roten Ergebnis.
+
+### 2026-09-03 — Zwei Testläufe streiten sich nicht mehr um die Grafikkarte
+
+#### Behoben
+
+- **Die Tests, die das 3D-Fenster wirklich öffnen, konnten sich auf Windows
+  gegenseitig stören.** Innerhalb eines Testlaufs liefen sie längst
+  nacheinander — zwischen zwei gleichzeitigen Läufen aber nicht. Dann leben zwei
+  3D-Kontexte parallel, und einer von beiden verliert seinen; das Ergebnis ist
+  ein roter Abschnitt, der nichts mit dem geprüften Code zu tun hat. Auf Linux
+  gibt es die Absicherung seit August.
+
+  Ein solcher Testabschnitt wartet jetzt, bis der andere fertig ist — und sagt
+  das auch. **Warten kann er aber nur begrenzt:** läuft die Zeit ab oder ist die
+  Absicherung nicht benutzbar, macht er mit einem Hinweis weiter. Eine
+  Absicherung, die hängen bleibt, wäre schlimmer als keine.
+
+- **Eine mit vollem Pfad angegebene 3D-Testdatei lief in der falschen Spur.**
+  Sie wurde nicht als solche erkannt und landete bei den schnellen, parallel
+  laufenden Tests — also ausgerechnet ohne die Rücksichtnahme, für die es die
+  eigene Spur gibt.
+
+### 2026-09-03 — Der Einfrier-Bericht sagt jetzt, wo er NICHT zu suchen ist
+
+#### Verbessert
+
+- **Wenn die Oberfläche einfriert, schreibt LightOS die Stapel aller Threads ins
+  Fehlerprotokoll — und die führten bisher auf die falsche Fährte.** Zu sehen
+  waren sechs Threads mitten in ihren völlig normalen Warteschleifen: die
+  Audio-Analyse, die DMX-Ausgabe, die MIDI-Verarbeitung. Wer das liest, sucht
+  den Übeltäter dort. Der Thread, auf den es ankommt, stand dagegen mit zwei
+  nichtssagenden Zeilen da, weil er gar keinen eigenen Code mehr ausführte,
+  sondern in einem Aufruf tiefer im System festhing.
+
+  Über dem Bericht steht jetzt ein Satz, der beides auseinanderhält: hängt die
+  Oberfläche in LightOS-eigenem Code, wird die Stelle beim Namen genannt. Hängt
+  sie darunter — in Qt, im eingebauten Browser des 3D-Fensters oder in einem
+  Treiber — steht das ausdrücklich da, zusammen mit dem Hinweis, dass die
+  Stapel darunter **kein** Befund sind.
+
+  Das ändert nichts am Verhalten der Software; es ändert, wie lange die Suche
+  nach der Ursache dauert.
+
+### 2026-09-02 — Ein Testlauf scheitert nicht mehr daran, dass noch aufgeräumt werden muss
+
+#### Behoben
+
+- **Der Testlauf konnte enden, bevor er angefangen hatte.** Blieb aus einem
+  früheren Lauf ein Prozess übrig, der noch eine Protokolldatei offen hielt,
+  brach der nächste Start beim Aufräumen ab — mit einer Fehlermeldung, aber ohne
+  einen einzigen gefahrenen Test.
+
+  Das ist die unangenehmste Variante: Die Meldung sieht aus wie ein
+  fehlgeschlagener Testlauf, und wer sie liest, sucht den Fehler in seiner
+  eigenen Änderung. Tatsächlich war überhaupt nichts geprüft worden.
+
+  Der Lauf weicht jetzt auf ein frisches Unterverzeichnis aus und läuft weiter.
+  Die übriggebliebenen Prozesse werden dabei **benannt** — mit Kennnummer und
+  Startzeit, und eine laufende LightOS-Instanz ausdrücklich als solche markiert
+  — aber keiner davon wird beendet. Übriggebliebene Prozesse wirklich zu
+  beenden ist eine eigene Entscheidung mit Folgen für die Bühne und steht
+  weiterhin aus.
+
+  Ist nichts im Weg, wird wie bisher normal aufgeräumt.
+
 ### 2026-09-02 — Der Stairville Matrix Blinder 5x5 RGBWW ist jetzt in der Gerätebibliothek
 
 #### Neu
@@ -62,6 +150,32 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   im Handel ihn nennt: das Gerätemenü bietet „4-CH", „9-CH" und „100-CH" an,
   beide Handbuch-Ausgaben kennen nur diese drei, und die Datentabelle derselben
   Shop-Seite sagt ebenfalls „DMX-512 (4/9/100)".
+
+### 2026-09-02 — Auf Windows sind zwei gleichzeitige Testläufe nicht mehr sich selbst überlassen
+
+#### Behoben
+
+- **Die volle Testsuite konnte auf Windows zweimal gleichzeitig laufen.** Wer das
+  Gate startet, während in einer anderen Sitzung schon eines läuft, bekam bisher
+  keinen Hinweis und keine Warteschlange — beide Läufe teilten sich Grafikkarte,
+  Testdatenbank und Prozesstabelle. Das Ergebnis sind rote Abschnitte, die dem
+  jeweils anderen Lauf gehören; man sucht den Fehler dann in eigenem Code, der
+  keinen hat.
+
+  Auf Linux gibt es die Absicherung seit August. Auf Windows lag sie in einer
+  Datei **außerhalb** des Projekts — auf dem Entwicklungsrechner vorhanden, in
+  einer frischen Kopie des Projekts nicht. Genau dort fuhr die volle Suite also
+  ungebremst.
+
+  Das Gate bringt die Sperre jetzt selbst mit: der zweite Lauf meldet, dass
+  gerade ein anderer läuft, wartet und startet danach. **Gezielte Einzelläufe
+  bleiben unverändert schnell** — sie sind kurz, und sie zu serialisieren würde
+  nur bremsen.
+
+  Die Sperre hängt am gemeinsamen Git-Verzeichnis statt am Ordner daneben. Damit
+  sehen auch Arbeitskopien, die *innerhalb* des Projekts liegen, dieselbe Sperre
+  — vorher hätte jede ihre eigene bekommen, und die Absicherung hätte
+  ausgerechnet dort nicht gegriffen, wo wirklich parallel gearbeitet wird.
 
 
 ### 2026-09-02 — Eine Test-Voraussetzung, die am falschen Socket maß

@@ -14,6 +14,7 @@ Bis 2026-07-28 wurden (1) und (2) im 3D **schwarz** gerendert, also gar nicht
 angezeigt — der Payload las die Farbe ausschliesslich aus ``color_r/g/b``.
 
 Aufruf:  venv/Scripts/python.exe tools/build_farbprobe_3d.py
+         (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 Erzeugt: shows/Farbprobe_3D.lshow  (selbst-verifizierend, headless)
 
 Die Anleitung dazu: ``docs/anleitung_3d_geraete_ohne_rgb/``.

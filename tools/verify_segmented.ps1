@@ -117,6 +117,11 @@ $pyCandidates = @(
     (Join-Path $outer "lightos-main/venv/bin/python")
 )
 $py = $pyCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+
+# XPLAT-23: die rechnerweite WebEngine-Sperre liegt in einer EIGENEN Datei,
+# nicht als Kopie hier - Pendant zu tools/_gate_webengine.sh, das aus
+# demselben Grund geteilt wird (XPLAT-11 war die Drift zweier Runner).
+. (Join-Path $PSScriptRoot "_gate_webengine.ps1")
 if (-not $py) {
     Write-Host "[seg] FEHLER: venv-Python nicht gefunden. Geprueft:`n  $($pyCandidates -join "`n  ")"
     exit 2
@@ -156,9 +161,87 @@ else {
                Sort-Object Name | ForEach-Object { "tests/" + $_.Name })
 }
 
+# -- XPLAT-29 (a): das Aufraeumen darf den Lauf nicht beenden ----------------
+#
+# Gemessen am 01.09.2026: der Start endete sofort, ohne ein einziges Segment,
+# mit "Das Element ...tests_test_viz50a_panel_koerper_scene.py.log kann nicht
+# entfernt werden ... da sie von einem anderen Prozess verwendet wird". Am
+# Leben waren zwei python und ein QtWebEngineProcess aus dem VORIGEN Lauf -
+# Windows reisst Prozessbaeume nicht mit.
+#
+# ★ Ein Lauf, der VOR dem ersten Segment endet, sieht aus wie ein rotes Gate
+# und hat dabei nichts gemessen. Das ist die teuerste Variante: dieselbe Klasse
+# wie XPLAT-27 und XPLAT-31 - der Runner soll mit dem Schaden umgehen, statt an
+# ihm zu sterben.
+#
+# Ausgewichen wird in ein UNTERverzeichnis, nicht auf einen Geschwister-Ordner:
+# `.gitignore` deckt `.pytest_segments/` ab, ein `.pytest_segments-<zeit>`
+# daneben waere NICHT ignoriert und landete als unversionierter Muell im
+# `git status` eines oeffentlichen Repos.
+#
+# Waisen werden BENANNT, nicht beendet. Sie wirklich zu toeten ist XPLAT-29(b)
+# und liegt bei Robin - es hiesse, dass ein Absturz des Hauptprozesses den
+# DMX-Worker mitreisst. Ausserdem haelt die laufende App des Menschen selbst
+# Chromium-Kinder ("Die laufende App gehoert dem Menschen", COORDINATION.md).
+function Nenne-Waisen {
+    $gefunden = @()
+    foreach ($name in @("python", "pythonw", "QtWebEngineProcess")) {
+        foreach ($p in @(Get-Process -Name $name -ErrorAction SilentlyContinue)) {
+            $seit = try { $p.StartTime.ToString("HH:mm:ss") } catch { "?" }
+            $cmd = $null
+            try {
+                $cmd = (Get-CimInstance Win32_Process -Filter "ProcessId=$($p.Id)" `
+                        -ErrorAction Stop).CommandLine
+            } catch { $cmd = $null }
+            # Die laufende App ist KEIN Waise - sie ausdruecklich auszunehmen
+            # verhindert, dass jemand sie beim Aufraeumen abschiesst.
+            $hinweis = if ($cmd -and $cmd -match "main\.py") {
+                "   <- die laufende App, kein Waise"
+            } else { "" }
+            $gefunden += ("[seg]          PID {0,-6} {1,-18} seit {2}{3}" -f `
+                          $p.Id, $p.ProcessName, $seit, $hinweis)
+        }
+    }
+    if ($gefunden.Count) {
+        Write-Host "[seg]        Diese Prozesse laufen noch und koennen Dateien halten:" -ForegroundColor DarkYellow
+        $gefunden | ForEach-Object { Write-Host $_ -ForegroundColor DarkYellow }
+    }
+    Write-Host "[seg]        Es wurde NICHTS beendet (XPLAT-29(b) liegt bei Robin)." -ForegroundColor DarkYellow
+}
+
+function Initialize-Ausgabeverzeichnis($pfad) {
+    if (Test-Path $pfad) {
+        try {
+            Remove-Item $pfad -Recurse -Force -ErrorAction Stop
+        }
+        catch {
+            Write-Host "[seg] HINWEIS (XPLAT-29): das Ausgabeverzeichnis des vorigen Laufs" -ForegroundColor DarkYellow
+            Write-Host "[seg]        laesst sich nicht raeumen - der Lauf geht trotzdem weiter." -ForegroundColor DarkYellow
+            Write-Host "[seg]        $($_.Exception.Message)" -ForegroundColor DarkYellow
+            Nenne-Waisen
+            $ausweich = Join-Path $pfad ("lauf-" + (Get-Date -Format "yyyyMMdd-HHmmss"))
+            try {
+                $null = New-Item -ItemType Directory -Path $ausweich -Force -ErrorAction Stop
+            }
+            catch {
+                # Hier ist wirklich Schluss: kein Ausgabeort, also kein Lauf.
+                # Das ist ein ehrliches Scheitern VOR dem ersten Segment - im
+                # Gegensatz zu vorher sagt es aber, woran es lag.
+                Write-Host "[seg] FEHLER: auch das Ausweichverzeichnis liess sich nicht anlegen:" -ForegroundColor Red
+                Write-Host "[seg]        $ausweich" -ForegroundColor Red
+                Write-Host "[seg]        $($_.Exception.Message)" -ForegroundColor Red
+                exit 2
+            }
+            Write-Host "[seg]        Ausgewichen auf: $ausweich" -ForegroundColor DarkYellow
+            return $ausweich
+        }
+    }
+    $null = New-Item -ItemType Directory -Path $pfad -Force
+    return $pfad
+}
+
 $outDir = if ($env:LIGHTOS_SEG_OUT) { $env:LIGHTOS_SEG_OUT } else { Join-Path $repo ".pytest_segments" }
-if (Test-Path $outDir) { Remove-Item $outDir -Recurse -Force }
-$null = New-Item -ItemType Directory -Path $outDir -Force
+$outDir = Initialize-Ausgabeverzeichnis $outDir
 $resultsTsv = Join-Path $outDir "results.tsv"
 
 function Get-LogPfad([string]$rel) {
@@ -178,7 +261,13 @@ function Get-LogPfad([string]$rel) {
 # den hat jede Datei, die eine Seite laden kann, und keine andere.
 $web = @(); $rest = @()
 foreach ($f in $files) {
-    $voll = Join-Path $repo ($f -replace '/', '\')
+    # XPLAT-23: `Join-Path $repo` auf einen ABSOLUTEN Pfad ergibt Unsinn, und
+    # `Test-Path` schlaegt dann fehl - eine absolut angegebene WebEngine-Datei
+    # landete damit still in der schnellen Spur statt in der seriellen, also
+    # ausgerechnet ohne die Serialisierung, fuer die es die Spur gibt.
+    # Gefunden beim Bau der WebEngine-Sperre (Sitzung B, 03.09.2026).
+    $voll = if ([System.IO.Path]::IsPathRooted($f)) { $f }
+            else { Join-Path $repo ($f -replace '/', '\') }
     if ((Test-Path $voll) -and (Select-String -Path $voll -Pattern 'QWebEngineView' -SimpleMatch -Quiet)) {
         $web += $f
     } else { $rest += $f }
@@ -233,6 +322,7 @@ $webQueue = New-Object System.Collections.Queue
 foreach ($f in $web) { $null = $webQueue.Enqueue($f) }
 
 $okCount = 0; $fail = @(); $crash = @(); $timeout = @()
+$script:ergebnisSchreibfehler = 0
 
 function Start-Segment([string]$rel, [bool]$istWeb) {
     $log = Get-LogPfad $rel
@@ -290,7 +380,23 @@ function Test-NativerAbbau([string]$log) {
 }
 
 function Complete-Segment($rec, [int]$rc, [string]$art) {
-    Add-Content -Path $resultsTsv -Value ("{0}`t{1}" -f $rc, $rec.Rel)
+    # XPLAT-23/QA-53: die Ergebniszeile darf den Lauf nicht mitreissen.
+    # Gemessen: `Add-Content` auf eine exklusiv gehaltene Datei wirft eine
+    # IOException, und unter `$ErrorActionPreference = "Stop"` beendet die den
+    # ganzen Lauf - mitten drin, nach getaner Arbeit, die damit verloren ist.
+    # Dieselbe Klasse wie XPLAT-27 und XPLAT-29: der Runner soll mit dem Schaden
+    # umgehen, statt an ihm zu sterben. Die fehlende Zeile bleibt sichtbar - die
+    # Vollstaendigkeits-Pruefung unten faerbt den Lauf dafuer rot.
+    try {
+        Add-Content -Path $resultsTsv -Value ("{0}`t{1}" -f $rc, $rec.Rel) -ErrorAction Stop
+    }
+    catch {
+        if (-not $script:ergebnisSchreibfehler) {
+            Write-Host "[seg] WARNUNG: Ergebniszeile nicht schreibbar - die Bilanz wird unvollstaendig." -ForegroundColor DarkYellow
+            Write-Host ("[seg]   {0}" -f $_.Exception.Message) -ForegroundColor DarkYellow
+        }
+        $script:ergebnisSchreibfehler++
+    }
     switch ($art) {
         "ok"      { $script:okCount++; Write-Host ("   ok   " + $rec.Rel) -ForegroundColor Green }
         "zeit"    { $script:timeout += $rec.Rel; Write-Host ("  ZEIT  {0} (>{1}s abgebrochen)" -f $rec.Rel, $TimeoutSec) -ForegroundColor Magenta }
@@ -301,8 +407,15 @@ function Complete-Segment($rec, [int]$rc, [string]$art) {
 
 while ($restQueue.Count -or $webQueue.Count -or $laufend.Count) {
 
-    # WebEngine-Spur: genau EIN Prozess gleichzeitig.
+    # XPLAT-23: die schmale Sperre nur so lange halten, wie wirklich ein
+    # WebEngine-Segment laeuft. Ein Punkt, beide Enden - egal ob das Segment
+    # normal endete oder ins Zeitlimit lief.
+    if (-not ($laufend | Where-Object { $_.IstWeb })) { Exit-WebEngineSperre }
+
+    # WebEngine-Spur: genau EIN Prozess gleichzeitig - im Lauf ueber diese
+    # Bedingung, RECHNERWEIT ueber die Sperre aus _gate_webengine.ps1.
     if ($webQueue.Count -and -not ($laufend | Where-Object { $_.IstWeb })) {
+        $null = Enter-WebEngineSperre
         if (-not (Wait-FreieGpu)) { $script:gpuDeckelTreffer += $webQueue.Peek() }
         $script:letzterWebStart = Get-Date   # Bezugspunkt fuer das naechste Warten
         $null = $laufend.Add((Start-Segment $webQueue.Dequeue() $true))
@@ -379,6 +492,8 @@ while ($restQueue.Count -or $webQueue.Count -or $laufend.Count) {
     }
 }
 
+Exit-WebEngineSperre        # XPLAT-23: nicht ueber die Bilanz hinaus halten
+
 # ── Bilanz ──────────────────────────────────────────────────────────────────
 Write-Host ""
 if ($script:gpuDeckelTreffer.Count) {
@@ -391,6 +506,42 @@ Write-Host ("[seg] {0}/{1} Segmente gruen, {2} Failures, {3} Crashes, {4} Timeou
 if ($fail.Count)    { Write-Host ("  Failures: " + ($fail    -join ", ")) -ForegroundColor Red }
 if ($crash.Count)   { Write-Host ("  Crashes : " + ($crash   -join ", ")) -ForegroundColor Magenta }
 if ($timeout.Count) { Write-Host ("  Timeouts: " + ($timeout -join ", ")) -ForegroundColor Magenta }
+
+# ── QA-53 auf der Windows-Seite: im Zweifel rot ─────────────────────────────
+#
+# Die Zahl oben zaehlt, was in results.tsv steht. Steht dort weniger, als
+# gefahren wurde, ist die Bilanz nicht bloss ungenau - sie ist irrefuehrend:
+# ein Teillauf sieht aus wie ein Volllauf, und die roten Zeilen darunter
+# koennten aus einem FREMDEN Lauf stammen.
+#
+# ★ Der Fall ist auf Windows real und NICHT theoretisch: beide Runner benutzen
+# dasselbe Ausgabeverzeichnis, egal ob Volllauf oder gezielter Einzellauf
+# (`LIGHTOS_SEG_OUT`, sonst `.pytest_segments`). Wer waehrend eines Volllaufs
+# einen Einzeltest startet, raeumt dem Volllauf die Ergebniszeilen weg - der
+# zaehlt danach nur noch seinen Rest. Die Voll-Suiten-Sperre aus XPLAT-23
+# Scheibe 1 faengt das nicht: gezielte Laeufe sind bewusst ungesperrt.
+#
+# Zweite Quelle: eine Ergebniszeile, die sich nicht schreiben liess (s.
+# Complete-Segment).
+#
+# Die gefaehrlichere Haelfte ist dabei nicht die falsche Zahl - die sieht man -,
+# sondern das falsche GRUEN darunter. Deshalb hier dieselbe Regel wie auf der
+# .sh-Seite: wer nicht weiss, ob alles gelaufen ist, hat kein bestandenes Gate,
+# sondern ein kaputtes Messgeraet.
+$zeilenImErgebnis = 0
+if (Test-Path $resultsTsv) {
+    $zeilenImErgebnis = @(Get-Content $resultsTsv -ErrorAction SilentlyContinue).Count
+}
+$unvollstaendig = ($zeilenImErgebnis -ne $files.Count)
+if ($unvollstaendig) {
+    Write-Host ("[seg] WARNUNG: results.tsv hat {0} Zeilen, gefahren wurden {1} Dateien." -f `
+                $zeilenImErgebnis, $files.Count) -ForegroundColor DarkYellow
+    Write-Host "[seg]   Die Zahl oben ist damit UNVOLLSTAENDIG - vermutlich hat ein zweiter" -ForegroundColor DarkYellow
+    Write-Host ("[seg]   Lauf im selben Repo das Ausgabeverzeichnis geleert ({0})." -f $outDir) -ForegroundColor DarkYellow
+    Write-Host "[seg]   Rote Zeilen koennen aus dem fremden Lauf stammen. Vor dem Deuten:" -ForegroundColor DarkYellow
+    Write-Host "[seg]   nachsehen, ob nebenher eine zweite Suite lief (QA-53)." -ForegroundColor DarkYellow
+    Write-Host "[seg]   Dieser Lauf gilt als NICHT bestanden - s. Exit-Code unten." -ForegroundColor DarkYellow
+}
 
 # XPLAT-17: die EINE bekannte Fremd-Ursache beim Namen nennen. Das Segment
 # bleibt rot - hier wird nichts gruen gerechnet und nichts wiederholt. Der Name
@@ -463,6 +614,13 @@ if ($fail.Count) {
 # Segmentanzahl wie auf Linux - verify_loop.ps1 deutet 97/98/99 als
 # Lock-Runner-Codes, eine Zaehlung koennte dort kollidieren.
 if ($fail.Count) { exit 1 }
+# QA-53: unvollstaendige Ergebnisliste -> KEIN Gruen. Bewusst NACH der
+# Failure-Regel: ein roter Lauf ist ohnehin rot, und die Reihenfolge haelt
+# die begruendete Toleranz aus XPLAT-28 unangetastet.
+if ($unvollstaendig) {
+    Write-Host "[seg] Ergebnisliste unvollstaendig -> KEIN Gruen (QA-53)." -ForegroundColor Red
+    exit 1
+}
 # ★ XPLAT-31: Anteils-Schutz. Die Toleranz oben gilt dem EINZELFALL - ein
 # Segment, das nach bestandenen Tests nativ abbaut oder haengt. Sie war nie als
 # Aussage ueber einen ganzen Lauf gemeint.

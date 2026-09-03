@@ -38,6 +38,7 @@ Aufruf::
     ./venv/bin/python tools/backlog_ids.py                # Kollisionen + Uebersicht
     ./venv/bin/python tools/backlog_ids.py --gruppe FM    # naechste freie FM-Nummer
     ./venv/bin/python tools/backlog_ids.py --strict       # Exit 1 bei Kollision
+      (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 
 Braucht die Remote-Refs (``git fetch``) — deshalb ein Werkzeug und kein
 CI-Test: ``actions/checkout@v4`` holt **einen** Commit ohne weitere Refs. Ein

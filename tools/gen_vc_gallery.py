@@ -7,6 +7,7 @@ werden mit Pillow assembliert (Qt kann GIFs NICHT schreiben); jeder Frame wird
 mit QPainter in ein QImage gemalt und per QBuffer-PNG-Roundtrip nach PIL gebracht.
 
 Lauf (headless):  QT_QPA_PLATFORM=offscreen venv/Scripts/python tools/gen_vc_gallery.py
+                                            (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 """
 import _gen_env  # noqa: F401
 import io

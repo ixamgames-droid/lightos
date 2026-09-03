@@ -2,6 +2,7 @@
 
 Erzeugt: shows/demo_rgb_par.lshow
 Aufruf:  venv/Scripts/python.exe tools/build_demo_rgb_par.py
+         (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 
 WARUM ES DIESEN GENERATOR GIBT (2026-07-26)
 -------------------------------------------

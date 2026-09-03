@@ -53,6 +53,7 @@ Aufruf::
     ./venv/bin/python tools/pr_bereit.py            # Bericht ueber alle offenen PRs
     ./venv/bin/python tools/pr_bereit.py 663 664    # nur diese
     ./venv/bin/python tools/pr_bereit.py --strict   # Exit 1, wenn einer nicht bereit ist
+      (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 
 Braucht ``gh`` mit angemeldetem Konto — deshalb ein Werkzeug und kein CI-Test
 (dieselbe Begruendung wie bei ``backlog_status_drift.py``).

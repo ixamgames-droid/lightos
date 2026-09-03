@@ -17,6 +17,7 @@ RIG (Universe 1):
   der Patch stoert nichts (es sendet nur ins Leere).
 
 Aufruf:  venv/Scripts/python.exe tools/build_feature_showcase.py
+         (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 Erzeugt: shows/Feature_Showcase.lshow
 """
 from __future__ import annotations

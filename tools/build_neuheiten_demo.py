@@ -20,6 +20,7 @@ nicht gerechnet. Der Spiider hat auf CH1 **Pan**, nicht Dimmer; seine Pixel
 beginnen bei CH35, nicht direkt hinter den Grundfarben.
 
 Aufruf:  ./venv/bin/python tools/build_neuheiten_demo.py
+           (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 Ergebnis: shows/Neuheiten Demo.lshow  (git-ignoriert)
 """
 import os

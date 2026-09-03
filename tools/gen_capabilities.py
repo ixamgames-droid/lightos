@@ -2,6 +2,7 @@
 docs/capability_manifest.json.
 
     venv/Scripts/python.exe tools/gen_capabilities.py
+    (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 
 Nach jeder Code-Änderung an Widgets/Enums/Algos/Params neu laufen lassen
 (test_capability_manifest erzwingt das per Diff-Test).

@@ -22,6 +22,7 @@ vor — genau die Features der Phasen 1–6:
     Alles mit MIDI-Bindung (APC mini mk2): Pads = Notes, Fader = CC48..56.
 
 Aufruf:  venv/Scripts/python.exe tools/build_live_demo_show.py
+         (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 """
 import os
 import sys

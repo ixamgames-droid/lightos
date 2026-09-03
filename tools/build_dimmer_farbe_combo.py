@@ -17,6 +17,7 @@ sich sauber in der Lampe: Dimmer bestimmt Helligkeit/Bewegung, Farbe den Farbton
 Bedienung: 1 Dimmer-Effekt + 1 Farbe (fest ODER Effekt) anklicken -> fertig.
 
 Aufruf:  venv/Scripts/python.exe tools/build_dimmer_farbe_combo.py
+         (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 Erzeugt: shows/Dimmer_Farbe_Kombinieren.lshow  (selbst-verifizierend, headless)
 """
 from _builder import ShowBuilder, build_and_verify   # noqa: E402

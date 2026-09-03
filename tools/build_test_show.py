@@ -13,6 +13,7 @@ Inhalt:
     (Grand Master + Effekt-Intensität), alles mit MIDI-Bindung (APC mini).
 
 Aufruf:  venv/Scripts/python.exe tools/build_test_show.py
+         (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 """
 import os
 import sys

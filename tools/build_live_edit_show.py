@@ -19,6 +19,7 @@ Fader unten: F1 MH-Speed · F2 MH-Größe (Edit-Slot „MH") · F4 MX-Speed · F
 
 Setup: APC mini (mk2) + 4× PAR (ZQ01424) + 2× Moving Head (ZQ02001).
 Aufruf:  venv/Scripts/python.exe tools/build_live_edit_show.py
+         (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 Erzeugt: shows/Live_Edit.lshow
 """
 from __future__ import annotations

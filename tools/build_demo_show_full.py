@@ -17,6 +17,7 @@ Alle Effekte folgen dem Master (Bus „Global" = globale BPM, FOLGT der Musik/Ta
 Audio-Erkennung) mit eigenem tempo_multiplier (Speed-Dials ¼ ½ 1 2 3 4).
 
 Aufruf:  venv/Scripts/python.exe tools/build_demo_show_full.py
+         (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 Erzeugt: shows/Demo_Show_Full.lshow  (selbst-verifizierend, headless)
 """
 from __future__ import annotations

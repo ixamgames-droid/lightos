@@ -11,7 +11,8 @@ import unittest
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOOLS = os.path.join(REPO, "tools")
 README = os.path.join(TOOLS, "README.md")
-HINT = "-> venv/Scripts/python.exe tools/gen_tools_index.py laufen lassen"
+HINT = ("-> venv/Scripts/python.exe tools/gen_tools_index.py laufen lassen "
+        "(Linux/macOS: ./venv/bin/python)")
 
 
 def _scripts(folder):

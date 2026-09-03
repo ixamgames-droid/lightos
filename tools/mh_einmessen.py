@@ -59,6 +59,7 @@ WAS DIESES WERKZEUG AUS EINEM ABEND AM RIG GELERNT HAT (26.08.2026)
 Aufruf::
 
     venv/bin/python tools/mh_einmessen.py --port /dev/ttyUSB0 --adressen 1,17
+    (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
     venv\\Scripts\\python.exe tools\\mh_einmessen.py --port COM3 --adressen 1,17
 
 ``--port`` darf entfallen: die Vorgabe ist ``/dev/ttyUSB0`` bzw. auf Windows der

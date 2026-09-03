@@ -13,6 +13,7 @@ Moving-Head-Positionen/Beam + Sweep-Chaser, einen Speed-Dial (Multiplikator),
 zwei VC-Frames (PARs / Moving Heads) und einen Multi-Action-Button ("Showtime").
 
 Aufruf:  venv/Scripts/python.exe tools/build_demo_zq_show.py
+         (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 Erzeugt: shows/Demo_ZQ_Buehne.lshow
 """
 from __future__ import annotations

@@ -5,6 +5,7 @@ nacheinander jede Bank aktiv und macht von jeder einen Screenshot. So sieht man
 1:1, welches Pad / welcher Fader auf welcher Seite was tut.
 
 Aufruf:  venv/Scripts/python.exe tools/render_apc_pages.py
+         (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 Ergebnis: docs/images/apc_page_0_farben.png … apc_page_5_color-chase.png
 """
 from __future__ import annotations
@@ -37,7 +38,8 @@ from _showpath import find_show
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Show liegt seit 2026-07-19 ggf. nur noch in shows/_archiv/ — find_show prueft beide.
 SHOW = str(find_show("APC_Test_Komplett.lshow",
-                     hint="Neu erzeugen: venv/Scripts/python tools/build_apc_test_show.py"))
+                     hint="Neu erzeugen: venv/Scripts/python.exe (Linux/macOS: ./venv/bin/python) "
+                          "tools/build_apc_test_show.py"))
 OUT_DIR = os.path.join(_ROOT, "docs", "images")
 PAGE_NAMES = ["farben", "dimmer", "matrix", "mix", "rgbw", "color-chase"]
 W, H = 760, 812

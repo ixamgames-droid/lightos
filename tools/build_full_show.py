@@ -12,6 +12,7 @@ APC-Pads (Note=Reihe*8+Spalte, Reihe 0 unten; untere 2 Reihen = MIDI-Mapper):
   R6 (40-47) FARBEN | R7 (48-49) CLEAR+TAP | R8 (56-61) EFFEKTE 2
 
 Aufruf: venv/Scripts/python.exe tools/build_full_show.py
+        (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 """
 import os, sys, json
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -48,7 +49,10 @@ if not fixtures:
         "Kein Fixture gepatcht (isolierte Wegwerf-DB ist leer).\n"
         "Dieses Alt-Skript baut auf dem Bestands-Patch auf. Bewusster Lauf gegen die "
         "echte DB (App vorher schliessen!):\n"
-        "  $env:LIGHTOS_SHOW_DB='data/current_show.db'; venv/Scripts/python tools/build_full_show.py"
+        "  Windows:     $env:LIGHTOS_SHOW_DB='data/current_show.db'; "
+        "venv/Scripts/python.exe tools/build_full_show.py" + "\n" +
+        "  Linux/macOS: LIGHTOS_SHOW_DB=data/current_show.db "
+        "./venv/bin/python tools/build_full_show.py"
     )
 fids = [f.fid for f in fixtures]
 chan = {c.attribute: c.channel_number for c in get_channels_for_patched(fixtures[0])}

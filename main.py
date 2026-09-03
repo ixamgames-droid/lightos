@@ -5,6 +5,7 @@ import argparse
 import faulthandler
 import datetime
 import threading
+import traceback
 
 # src/ frueh auf den Pfad, damit die Crash-Logging-Infrastruktur (STAB-01) schon
 # fuer die pythonw-Umleitung unten zur Verfuegung steht.
@@ -477,6 +478,11 @@ def _start_freeze_watchdog():
                         fh = _crash_log_handle
                         if fh is not None:
                             fh.write(_cl.freeze_header(stall))
+                            # STAB-28: erst der Befund zum Hauptthread, dann
+                            # der Dump. Ohne ihn liest man sechs gesunde
+                            # Nebenthread-Stacks und sucht den Blockierer dort.
+                            fh.write(_cl.hauptthread_befund(
+                                _hauptthread_stack()))
                             faulthandler.dump_traceback(file=fh)
                             fh.flush()
                     except Exception:
@@ -485,6 +491,25 @@ def _start_freeze_watchdog():
                 dumped = False
 
     threading.Thread(target=_watch, name="FreezeWatchdog", daemon=True).start()
+
+
+def _hauptthread_stack():
+    """Stack des Hauptthreads als ``(datei, zeile, funktion)``, INNERSTER zuerst.
+
+    Dieselbe Reihenfolge, in der ``faulthandler`` darunter druckt — sonst
+    beschriebe der Befund einen anderen Rahmen als den, den der Leser sieht.
+    Faellt still auf ``None`` zurueck: ein Watchdog, der beim Diagnostizieren
+    selbst stirbt, nimmt dem Absturz seinen einzigen Zeugen.
+    """
+    try:
+        ident = threading.main_thread().ident
+        rahmen = sys._current_frames().get(ident)
+        if rahmen is None:
+            return None
+        return [(s.filename, s.lineno, s.name)
+                for s in reversed(traceback.extract_stack(rahmen))]
+    except Exception:
+        return None
 
 
 def _report_already_running() -> None:

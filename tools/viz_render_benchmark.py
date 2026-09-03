@@ -45,6 +45,7 @@ hoch angesetzt war. Seit dem Dach in `fixtures.js` laufen 32 und 48 Fixtures.
 
     for v in "" kegel boden schatten spots; do
       ./venv/bin/python tools/viz_render_benchmark.py 32 ${v:+--aus $v}
+        (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
     done
 
 **Warum umstaendlich?** Weil der bequeme Weg zweimal gescheitert ist. Der Modus

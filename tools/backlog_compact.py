@@ -17,6 +17,7 @@ Stueck zu laden. Dieses Werkzeug macht die Datei wieder loop-tauglich:
                  Default ist DRY-RUN (nur Report); schreiben mit --apply.
 
 Aufruf (Repo-Root):  venv/Scripts/python.exe tools/backlog_compact.py --queue 10
+                     (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 Reines Stdlib-/Text-Werkzeug — keine src-Imports, keine Show-DB.
 Zeilen-Konvention identisch zum Linter tests/test_backlog_lint.py (QA-18).
 """

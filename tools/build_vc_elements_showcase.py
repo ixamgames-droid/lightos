@@ -2,6 +2,7 @@
 in ein Raster auf Bank 1 — als saubere Vorlage fuer die bebilderte Referenz.
 
 Aufruf:  venv/Scripts/python.exe tools/build_vc_elements_showcase.py
+         (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 Erzeugt: shows/VC_Elemente_Showcase.lshow
 """
 from __future__ import annotations

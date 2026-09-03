@@ -15,6 +15,7 @@ Erzeugt zusaetzlich ein Geometrie-Sidecar (JSON) mit allen Widget-Rechtecken
 aus EINEM Vollbild-Screenshot pixelgenau jedes Widget ausschneiden.
 
 Aufruf:  venv/Scripts/python.exe tools/build_vc_widgets_showcase.py
+         (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 Erzeugt: shows/VC_Widgets_Showcase.lshow
          docs/anleitung_vc_widgets/_capture/geometry.json
 """
