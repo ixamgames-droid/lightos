@@ -9,7 +9,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| ENG-15 | A | fix/eng15-schwarzer-pixel-farbrad | 2026-09-02T21:11Z | src/core/engine/rgb_matrix.py |
 | XPLAT-23 | B | docs/xplat23-deckel-gemessen | 2026-09-03T15:43Z | - |
 
 ## Blocker & Fallen
@@ -61,7 +60,6 @@
 
 ## Verlauf
 
-- 2026-09-01T18:47Z A done ENG-14
 - 2026-09-01T19:20Z A claim XPLAT-30
 - 2026-09-01T19:33Z B done XPLAT-27
 - 2026-09-01T19:42Z A uebergeben XPLAT-30
@@ -91,3 +89,4 @@
 - 2026-09-03T11:11Z B uebergeben XPLAT-23
 - 2026-09-03T15:43Z B claim XPLAT-23
 - 2026-09-03T16:27Z A done FM-40
+- 2026-09-03T16:27Z A uebergeben ENG-15
