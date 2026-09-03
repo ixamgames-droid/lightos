@@ -205,6 +205,39 @@ class DieRegelHaengtAnDerAusrichtungTest(_Basis):
         """Ein gewoehnlicher RGBW-PAR (1 zu 1) darf sich nicht aendern."""
         self.assertTrue(self._laeuft_split(1, 1))
 
+    def test_ohne_farbkoepfe__weiss_bleibt_bedient(self):
+        """★★ Tunable White (warm + kalt, KEIN RGB) — der Fall, den meine erste
+        Fassung kaputtgemacht hat.
+
+        Die erste Regel lautete ``_n_w == max(_n_c, 1)``. Fuer ein Geraet ohne
+        Farbkoepfe und mit MEHREREN Weiss-Kanaelen ist das False — gemessen
+        schrieb ein solches Geraet danach **gar nichts** mehr (`{}`), vorher
+        beide Weiss-Kanaele. Betroffen waren 72 Modi der Bibliothek.
+
+        Der Fehler war eine zu enge Formulierung derselben Absicht: hat ein
+        Geraet gar keine Farbkoepfe, IST das Weiss sein Emitter-Satz. Das
+        ``max(_n_c, 1)`` deckte davon zufaellig nur den Ein-Kanal-Fall ab —
+        und genau den hatte ich getestet. **Die Luecke lag also nicht im Code,
+        sondern in meiner Fallauswahl.**
+        """
+        from src.core.engine.rgb_matrix import MatrixStyle
+        chans = [_ch("intensity", 1), _ch("color_w", 2), _ch("color_w", 3)]
+        # OHNE Kopf-Raster: eine Zelle faerbt das GANZE Geraet, also beide
+        # Weiss-Kanaele. (Mit Kopf-Raster adressiert eine Zelle genau einen
+        # Kopf und damit auch nur einen Kanal — daran ist die erste Fassung
+        # dieses Tests gescheitert, nicht am Code.)
+        u = self._frame(chans, 1, style=MatrixStyle.RGBW, head_grid=False)
+        self.assertEqual(u.ch.get(2), 255)
+        self.assertEqual(u.ch.get(3), 255,
+                         "der zweite Weiss-Kanal fehlt — Tunable White bleibt dunkel")
+
+    def test_ohne_farbkoepfe_und_EIN_weiss__weiterhin_bedient(self):
+        """Der Nachbarfall, der zufaellig durchkam und deshalb nichts bewies."""
+        from src.core.engine.rgb_matrix import MatrixStyle
+        chans = [_ch("intensity", 1), _ch("color_w", 2)]
+        u = self._frame(chans, 1, style=MatrixStyle.RGBW, head_grid=False)
+        self.assertEqual(u.ch.get(2), 255)
+
     def test_ganz_ohne_weiss__unveraendert(self):
         """Ein reines RGB-Geraet im RGBW-Style: es gibt nichts zu verteilen, und
         der Split darf trotzdem laufen (Bestandsverhalten, `rgbw_split` zieht den

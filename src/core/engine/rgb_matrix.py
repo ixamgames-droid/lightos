@@ -866,13 +866,26 @@ class RgbMatrixInstance(Function):
             # zum Pixel und der Split bleibt exakt wie bisher. Weichen sie ab,
             # ist das Weiss eine eigene Leiste — und die faehrt ein Dimmer- oder
             # Szenen-Effekt, kein Farbeffekt.
+            #
+            # ⚠️ NACHTRAG (gefunden von der FM-41-Jury, bevor es jemand am Rig
+            # merkte): die erste Fassung schrieb `_n_w == max(_n_c, 1)` und
+            # sperrte damit ein Geraet OHNE Farbkoepfe und mit MEHREREN
+            # Weiss-Kanaelen aus — Tunable White (warm + kalt). Gemessen: ein
+            # solches Geraet schrieb danach **gar nichts** mehr ({}), vorher
+            # beide Weiss-Kanaele. Betroffen waren 72 Modi der Bibliothek.
+            # Der Fehler war eine zu enge Formulierung derselben Absicht: hat
+            # ein Geraet gar keine Farbkoepfe, IST das Weiss sein Emitter-Satz
+            # und gehoert damit sehr wohl zur Zelle. Deshalb steht `_n_c == 0`
+            # jetzt ausdruecklich da, statt sich auf `max(_n_c, 1)` zu
+            # verlassen — das deckte zufaellig nur den Ein-Kanal-Fall ab.
             _weiss_gehoert_zur_zelle = True
             if self.style == MatrixStyle.RGBW:
                 _n_w = sum(1 for c in chans
                            if (c.attribute or "").lower() == "color_w")
                 _n_c = sum(1 for c in chans
                            if (c.attribute or "").lower() == "color_r")
-                _weiss_gehoert_zur_zelle = (_n_w == 0 or _n_w == max(_n_c, 1))
+                _weiss_gehoert_zur_zelle = (_n_w == 0 or _n_c == 0
+                                            or _n_w == _n_c)
             if self.style == MatrixStyle.RGBW and _weiss_gehoert_zur_zelle:
                 from src.core.color_utils import rgbw_split
                 cr, cg, cb, cw = rgbw_split(r, g, b)
