@@ -50,8 +50,29 @@ state = get_state()
 fm = get_function_manager()
 
 # ── 1) PATCH ────────────────────────────────────────────────────────────────────
-PAR_PROFILE, PAR_MODE = 17, "8-Kanal RGBW"
-MH_PROFILE, MH_MODE = 18, "11-Kanal"
+def _profil_id(short: str) -> int:
+    """Profil-ID zum Kurznamen — NICHT hart verdrahtet.
+
+    FM-44: hier standen die Zahlen 17 und 18. Das sind SQLite-Auto-IDs, und in
+    einer frisch aufgebauten Bibliothek sind es 23 und 24 — die gebaute Show
+    zeigte also auf fremde Profile, sobald jemand sie woanders oeffnete. Der
+    Kurzname ist die Angabe, die ueber Rechner hinweg gilt. Muster uebernommen
+    aus ``tools/build_demo_show_full.py``.
+    """
+    from sqlalchemy import select as _select
+    from sqlalchemy.orm import Session as _Session
+    from src.core.database.fixture_db import engine as _fdb_engine
+    from src.core.database.models import FixtureProfile as _FP
+    with _Session(_fdb_engine()) as s:
+        pid = s.execute(_select(_FP.id).where(
+            _FP.short_name == short)).scalar_one_or_none()
+    if pid is None:
+        raise SystemExit(f"Profil '{short}' fehlt — App einmal starten (ensure_builtins).")
+    return int(pid)
+
+
+PAR_PROFILE, PAR_MODE = _profil_id("ZQ01424"), "8-Kanal RGBW"
+MH_PROFILE, MH_MODE = _profil_id("ZQ02001"), "11-Kanal"
 
 par_fids: list[int] = []
 addr = 1
@@ -60,7 +81,7 @@ for i in range(4):
     state.add_fixture(PatchedFixture(
         fid=fid, label=f"PAR {i + 1}", fixture_profile_id=PAR_PROFILE, mode_name=PAR_MODE,
         universe=1, address=addr, channel_count=8,
-        manufacturer_name="U King", fixture_name="Stage Light ZQ01424",
+        manufacturer_name="Generic", fixture_name="Stage Light ZQ01424",
         fixture_type="color"), undoable=False)
     par_fids.append(fid)
     addr += 8
