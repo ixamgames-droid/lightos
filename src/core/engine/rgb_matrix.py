@@ -830,11 +830,26 @@ class RgbMatrixInstance(Function):
             # Dimmer. Der RGB(W)-Pfad bleibt davon bit-identisch unberuehrt.
             has_rgb = any((c.attribute or "").lower() in ("color_r", "color_g", "color_b")
                           for c in chans)
+            # ENG-15: hier importiert, nicht im `not has_rgb`-Zweig — die
+            # Kanalmaske unten braucht den Namen fuer JEDES Geraet, auch fuer
+            # RGB-Geraete. (Eigener Fehler, von der ersten Messung gefangen:
+            # UnboundLocalError am RGBW-PAR.)
+            from src.core.color_utils import _WHEEL_ATTRS
             wheel_val: int | None = None
             if not has_rgb:
                 try:
+                    # ★★★ ENG-15: der Schluessel ist das ATTRIBUT DES GERAETS,
+                    # nicht die Zeichenkette "color" — `color_attrs_for_fixture`
+                    # gibt `{getattr(color_ch, "attribute"): wert}` zurueck.
+                    # Gemessen tragen ALLE 2171 Farbrad-Modi der echten
+                    # Bibliothek das Attribut `color_wheel`; `color` kommt in
+                    # 5125 Modi **null**-mal vor. `.get("color")` lieferte damit
+                    # immer None, und der Zweig unten war toter Code: ein
+                    # Matrix-Effekt hat das Farbrad NIE angefasst.
                     from src.core.color_utils import color_attrs_for_fixture
-                    wheel_val = color_attrs_for_fixture(chans, rgb).get("color")
+                    _payload = color_attrs_for_fixture(chans, rgb)
+                    wheel_val = next((_payload[k] for k in _WHEEL_ATTRS
+                                      if k in _payload), None)
                 except Exception:
                     wheel_val = None
             # RGBW: echtes Weiss -> Weissanteil cw=min(r,g,b) auf den W-Kanal, RGB
@@ -905,14 +920,41 @@ class RgbMatrixInstance(Function):
                     elif (attr == "color_w" and self.style == MatrixStyle.RGBW
                           and _weiss_gehoert_zur_zelle):
                         val = cw
-                    elif attr == "color" and not has_rgb and wheel_val is not None:
+                    elif attr in _WHEEL_ATTRS and not has_rgb and wheel_val is not None:
                         # Farbrad: Slot setzen, NICHT mit intensity skalieren
                         # (Helligkeit gehoert auf den Dimmer, nicht aufs Farbrad).
+                        # ENG-15: `attr in _WHEEL_ATTRS` statt `== "color"` —
+                        # dieselbe Namensfrage wie oben, dieselbe Antwort.
+                        #
+                        # ★ Ein SCHWARZER Pixel waehlt keinen Slot. Schwarz ist
+                        # keine Farbe, die auf einem Rad vorkommt — die naechste
+                        # ist rechnerisch irgendein bunter Slot (am generischen
+                        # Moving Head Spot 16ch gemessen: 71). Der Dimmer ist
+                        # dann ohnehin zu, also waere es nur ein Rad, das ohne
+                        # sichtbaren Grund fuer nichts dreht: Geraeusch und
+                        # Verschleiss. Es behaelt seine Stellung.
+                        if self._pixel_brightness(rgb) <= 0.0:
+                            continue
                         val = wheel_val
                     elif attr in ("intensity", "dimmer", "master"):
                         if not self.drive_intensity:
                             continue
-                        val = 255
+                        # ★★ ENG-15: Bei einem Geraet OHNE RGB traegt der Dimmer
+                        # die Helligkeit — es gibt sonst nichts, was sie tragen
+                        # koennte. Der Farbrad-Slot ist eine ORTSANGABE auf dem
+                        # Rad, kein Pegel; ein schwarzer Pixel waehlt sonst
+                        # weiterhin einen Slot und der Kopf steht auf VOLL.
+                        # Gemessen vorher: alle vier Zellen eines Rasters
+                        # `[weiss, schwarz, dunkel, weiss]` schrieben CH6 = 255,
+                        # die Animation war am Geraet gar nicht zu sehen.
+                        #
+                        # Fuer RGB-Geraete bleibt es byte-gleich bei 255: dort
+                        # tragen die Farbkanaele die Helligkeit, und der Dimmer
+                        # soll nur oeffnen (sonst wuerde doppelt gedimmt — die
+                        # `scale_colors`-Ueberlegung eine Ebene tiefer).
+                        val = (255 if has_rgb
+                               else max(0, min(255, int(round(
+                                   self._pixel_brightness(rgb) * 255)))))
                     else:
                         continue  # andere Kanaele unangetastet lassen
                     if scale_colors and attr in ("color_r", "color_g", "color_b", "color_w"):
