@@ -1032,5 +1032,91 @@ class GegenpruefungFundeTest(unittest.TestCase):
                          "ein neues Raster ersetzt ALLE Achsen")
 
 
+class WeissMatrixSteuertEinGeraetTest(unittest.TestCase):
+    """★★ Eine Matrix, die nur Weiss-Segmente faehrt, meldete „steuert kein
+    Geraet" — und damit fielen zwei Dinge aus.
+
+    * **Solo / „Effekte auf denselben Geraeten stoppen"** liess Farb- und
+      Weiss-Matrix desselben Geraets nebeneinander laufen.
+    * **``patch_dedup``** (`:184` fragt genau hier) hielt ein nur ueber
+      Weiss-Zellen gefahrenes Geraet fuer eine **Waise** — dieselbe
+      Datenverlust-Klasse wie STAB-22, nur ueber Funktionen statt Gruppen.
+
+    ★ Hier fallen „was FAEHRT das" und „was wird ERWAEHNT" ausnahmsweise
+    zusammen, denn der Renderer faehrt die Weiss-Achse seit FM-41 wirklich.
+    Eine Trennung wie bei ``base_fids_in_grid_order`` waere hier **erfunden**,
+    nicht gefunden — und das ist der Grund, warum es hier EINE Antwort gibt und
+    dort zwei.
+    """
+
+    def _fm_mit(self, *funktionen):
+        from src.core.engine.function_manager import get_function_manager
+        fm = get_function_manager()
+        for f in funktionen:
+            for name in ("add", "add_function", "register"):
+                if hasattr(fm, name):
+                    try:
+                        getattr(fm, name)(f)
+                        break
+                    except Exception:
+                        continue
+        return fm
+
+    def _matrix(self, name, fixture_grid, weiss_grid):
+        from src.core.engine.rgb_matrix import RgbMatrixInstance
+        m = RgbMatrixInstance(name=name)
+        m.cols, m.rows = len(fixture_grid), 1
+        m.fixture_grid = list(fixture_grid)
+        m.weiss_grid = list(weiss_grid)
+        return m
+
+    def test_nur_weiss_steuert_sehr_wohl_ein_geraet(self):
+        w = self._matrix("NurWeiss", [None] * 4,
+                         [(5, 0), (5, 1), (5, 2), (5, 3)])
+        fm = self._fm_mit(w)
+        self.assertEqual(sorted(fm.affected_fids(w.id)), [5])
+
+    def test_gemischt_nennt_beide_geraete(self):
+        g = self._matrix("Gemischt", [7, None, None], [None, (5, 0), None])
+        fm = self._fm_mit(g)
+        self.assertEqual(sorted(fm.affected_fids(g.id)), [5, 7])
+
+    def test_missgeformte_eintraege_tragen_NICHTS_bei(self):
+        """★ Streng auf die vereinbarte Form ``(fid, index)``: ein Text wie
+        ``"5abc"`` wuerde ueber ``sub[0]`` sonst als Geraet 5 durchgehen — ein
+        erfundenes Geraet ist schlimmer als ein fehlendes."""
+        k = self._matrix("Kaputt", [None] * 3, ["5abc", None, (9,)])
+        fm = self._fm_mit(k)
+        self.assertEqual(sorted(fm.affected_fids(k.id)), [])
+
+    def test_write_reisst_bei_missgeformten_eintraegen_nicht_ab(self):
+        """★★ Wichtiger als es aussieht: ein ValueError beim Entpacken kaeme
+        aus ``write()`` heraus, und der FunctionManager SCHLUCKT ihn — der Tick
+        braeche mitten in der Schleife ab und die gueltigen Zellen dahinter
+        blieben JEDES Frame dunkel. Genau die Falle, wegen der die Achse nicht
+        in den Kopf-Slot durfte."""
+        import src.core.app_state as AS
+        from src.core.engine.rgb_matrix import MatrixStyle
+        alt = AS.get_channels_for_patched
+        AS.get_channels_for_patched = lambda f: [
+            SimpleNamespace(attribute="color_w", channel_number=1),
+            SimpleNamespace(attribute="color_r", channel_number=2),
+            SimpleNamespace(attribute="color_r", channel_number=3)]
+        self.addCleanup(lambda: setattr(AS, "get_channels_for_patched", alt))
+
+        class _U:
+            def __init__(self): self.ch = {}
+            def set_channel(self, a, v): self.ch[a] = v
+
+        m = self._matrix("Kaputt", [None] * 3, ["quatsch", None, (9,)])
+        m.style = MatrixStyle.RGBW
+        m._running = True
+        m._render = lambda p: [(255, 255, 255)] * 3
+        u = _U()
+        m.write({1: u}, [SimpleNamespace(fid=9, universe=1, address=1,
+                                         fixture_type="matrix")], 0.02)
+        self.assertEqual(u.ch, {}, "nichts geschrieben, aber auch nicht geworfen")
+
+
 if __name__ == "__main__":
     unittest.main()

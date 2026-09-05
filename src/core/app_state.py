@@ -4825,6 +4825,28 @@ def channels_for_axis(channels, achse: str | None, index: int | None) -> dict:
     gemeinsame Dimmer davor auf 0 steht. Genau diese Falle steht in
     ``matrix_pattern`` als beim ersten Live-Test passiert dokumentiert.
 
+    ⚠️ **Und hier ist die Grenze dieser Zusage — sie ist schmaler als der Satz
+    darueber klingt.** „Geteilt" heisst hier operativ: das Attribut kommt
+    **genau einmal** vor. Kommt es MEHRFACH vor, ist keines der Vorkommen ein
+    geteilter Master, und welches zum ``index``-ten Emitter gehoert, laesst sich
+    aus der Kanalliste allein nicht entscheiden — dafuer braeuchte es eine
+    Kopf-Karte (FM-17), und die gibt es fuer diese Geraete nicht.
+
+    **Gemessen ueber die echte Bibliothek**, eingeschraenkt auf die 71 Modi mit
+    einer wirklich eigenen Weiss-Achse: 25 haben einen Dimmer und bekommen ihn
+    mit, 20 haben gar keinen Dimmer-Kanal, und bei **26** kommt ``intensity``
+    mehrfach vor (2- bis 5-mal) und faellt deshalb weg — z. B. Acme Ginamp
+    [36 Channel] mit ``intensity`` auf CH25 und CH32.
+
+    **Fuer diese 26 gilt:** das Segment wird richtig adressiert, ein etwaiger
+    Dimmer davor bleibt aber unangetastet. Bei ``drive_intensity=False`` ist das
+    genau richtig (der Dimmer gehoert dann dem Nutzer). Bei
+    ``drive_intensity=True`` ist es eine **Luecke**: die Matrix soll den Dimmer
+    treiben und kann es fuer dieses Geraet nicht. Bewusst wird dann NICHTS
+    geschrieben statt geraten — einen von zwei Dimmern zu waehlen waere in der
+    Haelfte der Faelle der falsche, und zwar stumm. Steht als eigenes Item im
+    Backlog (FM-46).
+
     ⚠️ **Kein Phantom-Emitter** — dieselbe Grenze wie bei FM-45: gibt es das
     ``index``-te Vorkommen nicht, kommt ``{}`` zurueck und NICHT die geteilten
     Kanaele allein. Sonst zoege eine Zelle jenseits der Segmentzahl den

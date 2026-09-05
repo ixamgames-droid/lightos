@@ -1071,7 +1071,15 @@ class RgbMatrixInstance(Function):
         inten = max(0.0, min(1.0, float(self.intensity)))
         _eigen_cache: dict[int, bool] = {}
         for idx, eintrag in enumerate(self.weiss_grid):
-            if not eintrag or idx >= len(grid):
+            # Dieselbe strenge Form wie in `function_manager.affected_fids`:
+            # ein missgeformter Eintrag darf die Schleife nicht abreissen —
+            # ein ValueError beim Entpacken kaeme aus write() heraus, und der
+            # FunctionManager schluckt ihn: der Tick braeche mitten in der
+            # Schleife ab und die gueltigen Zellen dahinter blieben JEDES Frame
+            # dunkel. Genau die Falle, wegen der die Achse nicht in den
+            # Kopf-Slot durfte.
+            if (idx >= len(grid) or not isinstance(eintrag, (tuple, list))
+                    or len(eintrag) != 2):
                 continue
             fid, segment = eintrag
             fx = _find_fixture(patch_cache, fid)
