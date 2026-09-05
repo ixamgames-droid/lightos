@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| FM-41 | A | feature/fm41-weiss-achse | 2026-09-03T20:54Z | src/core/group_cells.py |
+| FM-41 | A | feature/fm41-weiss-achse | 2026-09-05T14:34Z | src/core/group_cells.py |
 | QA-74 | B | fix/qa74-webgl-waechter-aus-einer-quelle | 2026-09-05T14:13Z | tests/_webgl_gate.py · tests/test_qa74_webgl_gate.py |
 | QA-73 | B | fix/qa73-appdata-sandkasten-erben | 2026-09-05T14:18Z | tests/conftest.py |
 
