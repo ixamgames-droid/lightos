@@ -37,6 +37,29 @@ import conftest
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+
+def _fremder_ordner(fall, name: str) -> str:
+    """Ein Pfad AUSSERHALB des Temp-Bereichs — und er wird wieder weggeraeumt.
+
+    ⚠️ Der Aufraeumer ist nicht Kosmetik, sondern der Unterschied zwischen einem
+    Test und einer Zeitbombe: schlaegt die Erb-Regel fehl, legt ``conftest``
+    genau diesen Ordner an (``makedirs(_TEST_APPDATA/LightOS)``). Ohne
+    Aufraeumen bleibt er liegen, und ab dann ist der Test in JEDEM weiteren Lauf
+    rot — auch wenn der Code laengst wieder stimmt. Genau so ist es passiert:
+    eine Mutationsprobe hinterliess den Ordner, und der naechste Gate-Lauf
+    meldete einen Fehler, den es zu dem Zeitpunkt gar nicht mehr gab. Ein Test,
+    der nach einem Fehlschlag rot BLEIBT, ist schlimmer als keiner — er erzieht
+    dazu, Rot wegzuwinken, und genau davon handelt QA-73.
+    """
+    pfad = os.path.join(_REPO, "build", name)
+    # VORHER raeumen, nicht nur nachher: ein Rest aus einem abgebrochenen
+    # Lauf (Strg-C, Absturz, fremder Prozess) wuerde die Zusicherung sonst
+    # genauso dauerhaft rot faerben wie der Fall oben.
+    shutil.rmtree(pfad, ignore_errors=True)
+    fall.addCleanup(shutil.rmtree, pfad, ignore_errors=True)
+    return pfad
+
+
 #: Meldet die Umgebung, die ``conftest`` im Kind TATSAECHLICH hinterlassen hat.
 #: Bewusst ueber ``os.environ`` statt ueber ``import conftest``: unter pytest
 #: haette ein zweiter Import ein zweites Modul mit eigenem Token ergeben — der
@@ -144,7 +167,7 @@ class BeideVariablenTest(unittest.TestCase):
         Sonst haette man ihn genau dann abgeschaltet, wenn er am meisten
         kostet — bei einem Ordner, in dem echte Nutzerdaten liegen.
         """
-        fremd = os.path.join(_REPO, "build", "qa73_kein_temp_bereich")
+        fremd = _fremder_ordner(self, "qa73_kein_temp_bereich")
         werte = self._konftest_werte(self._kind_umgebung(
             APPDATA=fremd, XDG_DATA_HOME=fremd))
 
@@ -221,7 +244,7 @@ class AufraeumenTest(unittest.TestCase):
         """★ Ohne diese Gegenprobe koennte der Test oben auch dann gruen sein,
         wenn ueberhaupt nichts mehr abgeraeumt wird — und der Temp-Ordner liefe
         mit jedem Gate-Lauf um 668 Verzeichnisse voll."""
-        fremd = os.path.join(_REPO, "build", "qa73_selbst_gebaut")
+        fremd = _fremder_ordner(self, "qa73_selbst_gebaut")
 
         gebaut = self._kind_pytest(fremd)
 
