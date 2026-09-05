@@ -106,6 +106,23 @@ class _FakeState:
         return A.AppState.validate_head_restrictions(
             self, heads, count_heads=count_heads)
 
+    def fids_ohne_bedienbaren_kopf(self, heads, *, count_heads=None):
+        return A.AppState.fids_ohne_bedienbaren_kopf(
+            self, heads, count_heads=count_heads)
+
+    def _head_restrictions_geprueft(self, heads, count_heads=None):
+        return A.AppState._head_restrictions_geprueft(
+            self, heads, count_heads)
+
+    def nur_bedienbare_fids(self, fids, heads, *, count_heads=None):
+        # FM-45/2 — wie die Schwester darueber an die ECHTE Regel
+        # delegiert. Die GANZE Kette, nicht nur der Einstieg: die
+        # Methode ruft intern `self.fids_ohne_bedienbaren_kopf`, und
+        # eine Attrappe, der die fehlt, laesst den Aufrufer in seinen
+        # `except`-Zweig laufen statt zu delegieren.
+        return A.AppState.nur_bedienbare_fids(
+            self, fids, heads, count_heads=count_heads)
+
     def keys_for(self, fid):
         return sorted({k for f, k, _v in self.writes if f == fid})
 
@@ -175,12 +192,22 @@ class KopfAuswahlTests(unittest.TestCase):
         pad._apply()
         self.assertEqual(st.keys_for(1), ["pan", "tilt"])
 
-    def test_kopf_ausserhalb_des_bereichs_faellt_auf_geraeteweit_zurueck(self):
+    def test_kopf_ausserhalb_des_bereichs_faehrt_GAR_NICHTS(self):
+        """★★ UMGEKEHRT seit FM-45 Scheibe 2.
+
+        Vorher fiel „Kopf 8" an einem 2-Kopf-Mover auf ``pan``/``tilt``
+        zurueck, also auf das ganze Geraet. Genau diese Zeile stand fuer die
+        stille Ausweitung, gegen die FM-45/2 antritt: gemeint war ein Kopf,
+        gefahren wurde alles. Begruendung ausfuehrlich in
+        ``test_fm27_fm28_fm29_kopf_zaehlung.py`` (Altlast-Zelle) und
+        ``test_fm45_auswahl_phantomkopf.py``.
+        """
         fx = _mover(1, 2)
         st = _install(self, _FakeState([fx], ["1:7"]))
         pad = _pad()
         pad._apply()
-        self.assertEqual(st.keys_for(1), ["pan", "tilt"])
+        self.assertEqual(st.keys_for(1), [],
+                         "der Phantom-Kopf faehrt weiter das ganze Geraet")
 
 
 class BewegungsKopfzahlTests(unittest.TestCase):

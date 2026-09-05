@@ -626,11 +626,26 @@ class MidiMapper:
             try:
                 from src.core.app_state import head_counter_for_attr
                 from src.core.group_cells import head_restrictions
+                zaehler = head_counter_for_attr(attribute)
+                roh = head_restrictions(st.get_selected_cells())
                 heads = st.validate_head_restrictions(
-                    head_restrictions(st.get_selected_cells()),
-                    count_heads=head_counter_for_attr(attribute)) or {}
+                    roh, count_heads=zaehler) or {}
             except Exception:
-                heads = {}
+                heads, roh, zaehler = {}, {}, None
+            # ⚠️ FM-45/2 in EIGENEM Schutz, nicht im try oben: scheitert die
+            # neue Regel, muss es beim BESTANDSVERHALTEN bleiben. Lag sie mit
+            # im Block, riss ein Fehler hier die Kopf-Maske mit — aus „ein Kopf
+            # zu viel" wuerde „ganzes Geraet", also genau die Richtung, gegen
+            # die FM-45 antritt. Beim ersten Anlauf gemessen: 11 Tests rot, und
+            # sie schrieben `pan` statt `pan#2`.
+            #
+            # Bewusst INNERHALB des `if fids`-Zweigs: unten heisst eine leere
+            # Auswahl absichtlich „alle gepatchten Geraete". Wer vor dieser
+            # Weiche kuerzt und dabei auf null kommt, faehrt das ganze Rig.
+            try:
+                fids = st.nur_bedienbare_fids(fids, roh, count_heads=zaehler)
+            except Exception:
+                pass
             return fids, heads
         try:
             patched = st.get_patched_fixtures()

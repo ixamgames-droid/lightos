@@ -218,11 +218,35 @@ class VCXYPad(VCWidget):
         except Exception:
             return {}
 
+    def _ziel_fids(self, state) -> list:
+        """``_resolve_fids`` ohne die Geraete aus FM-45/2.
+
+        ⚠️ **NACH** dem Rueckfall von ``_resolve_fids`` gefiltert, nicht darin:
+        dort heisst eine leere Auswahl absichtlich „alle gepatchten Geraete"
+        (M3.6). Wer vor dieser Weiche kuerzt und dabei auf null kommt, faehrt
+        statt der gemeinten Koepfe das ganze Rig — die Abhilfe waere schlimmer
+        als der Fehler.
+
+        Eine FESTE Zuweisung (``_fixture_ids``) bleibt unberuehrt: sie ist
+        keine Zell-Auswahl, und ``_resolve_heads`` gibt dort ebenfalls ``{}``.
+        """
+        fids = self._resolve_fids(state)
+        if self._fixture_ids:
+            return fids
+        try:
+            from src.core.group_cells import head_restrictions
+            from src.core.app_state import move_head_count_for_channels
+            return state.nur_bedienbare_fids(
+                fids, head_restrictions(state.get_selected_cells()),
+                count_heads=move_head_count_for_channels)
+        except Exception:
+            return fids
+
     def _apply(self):
         from src.core.app_state import get_state
         state = get_state()
         heads = self._resolve_heads(state)
-        for fid in self._resolve_fids(state):
+        for fid in self._ziel_fids(state):
             # Kein Eintrag = geräteweit (FM-17: head=None) -> byte-identisch zum
             # Bestand. „Kopf 1" wäre seit der Kopf-Karte etwas anderes.
             for head in (sorted(heads[fid]) if heads.get(fid) else (None,)):

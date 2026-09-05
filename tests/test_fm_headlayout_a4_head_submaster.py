@@ -442,6 +442,12 @@ class _FakeState:
         # Fake ohne Patch: reicht durch (die echte Pruefung hat eigene Tests).
         return dict(heads or {})
 
+    def nur_bedienbare_fids(self, fids, heads, *, count_heads=None):
+        # FM-45/2 — Attrappe ohne Patch: ohne Kopfzahl gibt es hier keinen
+        # Phantom-Kopf zu erkennen, also reicht sie durch. Die echte Regel
+        # (AppState.fids_ohne_bedienbaren_kopf) hat ihre eigenen Tests.
+        return list(fids or [])
+
 
 class TestVCSliderHeadScope(unittest.TestCase):
     """``_submaster_targets`` haengt nur an zwei Feldern — ohne Qt-Instanz

@@ -698,19 +698,50 @@ class AltlastKopfZelleAufDemMidiWegTest(_Basis):
         for anderer in ("Kopf 1 Dimmer", "Kopf 2 Dimmer", "Kopf 4 Dimmer"):
             self.assertEqual(dmx[anderer], 0, f"{anderer} zieht mit")
 
-    def test_altlast_zelle_faellt_auf_das_ganze_geraet(self):
-        """Die Zelle ``1:4`` nennt einen Kopf, den es an diesem Geraet nicht
-        gibt. Sie wird geklemmt, es bleibt kein gueltiger Kopf — also
-        geraeteweit. **Alle vier Koepfe** gehen hoch, nicht nur einer; wer diese
-        Altlast in einer Gruppe hat, merkt den Unterschied auf der Buehne."""
+    def test_altlast_zelle_faehrt_GAR_NICHTS(self):
+        """★★ UMGEKEHRT seit FM-45 Scheibe 2 — und das war eine Entscheidung.
+
+        Die Zelle ``1:4`` nennt einen Kopf, den es an diesem Geraet nicht gibt.
+        Sie wird geklemmt, es bleibt kein gueltiger Kopf. **Bis FM-45/2 fiel das
+        Geraet dann in den geraeteweiten Bestandspfad, alle vier Koepfe gingen
+        hoch.** Diese Datei hat genau das festgehalten, ausdruecklich als
+        „Verhaltensaenderung auf der Buehne". Jetzt faehrt die Zelle gar nichts.
+
+        **Warum die Umkehrung richtig ist** — drei Gruende, keiner davon
+        Geschmack:
+
+        1. Der Nutzer hat EIN Segment gemeint. Das ganze Geraet zu fahren ist
+           nicht „ungefaehr das", sondern am ZQ06121 ein 154-Kanal-Vollton.
+           Untertreiben ist hier die sichere Richtung: zu wenig heisst, es
+           leuchtet nicht — zu viel heisst, die Buehne steht weiss.
+        2. **Getippt wird derselbe Fehler laengst abgelehnt.** Die
+           Kommandozeile antwortet „K3 gibt es dort nicht"
+           (``cmdline/parser._typed_heads``). Dasselbe geklickt fuehrte stumm
+           zum ganzen Geraet — das System war in sich widerspruechlich, und
+           FM-45/2 loest den Widerspruch in Richtung der bereits getroffenen,
+           strengeren Antwort auf.
+        3. Die drei ANDEREN Verwerfungsgruende bleiben unangetastet: nicht
+           gepatcht, kein Mehrkopf-Geraet und „alle Koepfe genannt" fallen
+           weiterhin auf den geraeteweiten Pfad. Nur „nach dem Klemmen kein
+           gueltiger Kopf" heisst jetzt: raus aus der Ziel-Liste.
+
+        ⚠️ **Was die Umkehrung kostet, offen gesagt:** auf dem MIDI- und
+        VC-Weg passiert jetzt sichtbar NICHTS, ohne Begruendung — es gibt dort
+        keinen Meldekanal wie in der Kommandozeile. Wer eine solche Altlast in
+        einer Gruppe hat, drueckt den Fader und sieht nichts. Das ist der Preis
+        und er ist bewusst bezahlt; ein Hinweis in der Oberflaeche waere die
+        naechste Scheibe, nicht diese.
+        """
         self._patch(1, "HYDRA4000", 19)
         dmx = self._fahre(["1:4"])
-        self.assertEqual(dmx["Master Dimmer"], 255)
+        self.assertEqual(dmx["Master Dimmer"], 0,
+                         "der Master-Dimmer des ganzen Balkens geht hoch, "
+                         "obwohl EIN Kopf gemeint war (FM-45/2)")
         for kopf in ("Kopf 1 Dimmer", "Kopf 2 Dimmer", "Kopf 3 Dimmer",
                      "Kopf 4 Dimmer"):
-            self.assertEqual(dmx[kopf], 255,
-                             f"{kopf} muesste beim geraeteweiten Rueckfall "
-                             f"mitkommen")
+            self.assertEqual(dmx[kopf], 0,
+                             f"{kopf} kommt mit — der geraeteweite Rueckfall "
+                             f"greift noch")
 
 
 class KeineErreichbareKopfZelleVerliertIhrenKopfTest(unittest.TestCase):
