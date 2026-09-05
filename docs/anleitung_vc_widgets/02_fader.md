@@ -101,7 +101,8 @@ Bei Reichweite `Alle Geräte` gibt es keine Kopf-Einschränkung (globaler Submas
 - Ein von allen Köpfen **geteilter Master-Dimmer bleibt unangetastet**. Das ist Absicht: würde „Kopf 2" ihn herunterziehen, ginge das ganze Gerät dunkel.
 - Hat ein Gerät **gar keine** kopf-eigenen Helligkeits- oder Farbkanäle, hat der Fader dort ehrlich keine Wirkung – er dimmt dann *nicht* ersatzweise das ganze Gerät.
 - Pan/Tilt/Gobo werden nie gedimmt (wie beim Grand Master).
-- Stellst du ein Gerät später auf einen anderen **Kanal-Modus** um, werden Kopf-Angaben, die es dort nicht mehr gibt, verworfen – der Fader fällt dann auf „ganzes Gerät" zurück, statt stillschweigend den falschen Kopf zu dimmen.
+- Stellst du ein Gerät später auf einen anderen **Kanal-Modus** um oder patchst es auf ein Profil mit weniger Köpfen, dann gibt es die alten Kopf-Angaben dort nicht mehr. Der Fader dimmt sie **nicht** ersatzweise als ganzes Gerät – das Gerät fällt aus seiner Zielliste heraus und bleibt unberührt. Das ist dieselbe Regel wie zwei Punkte weiter oben: lieber ehrlich keine Wirkung als still etwas anderes tun. Gemeint war ein einzelner Kopf; das ganze Gerät hochzuziehen ist bei einer 154-Kanal-Leiste kein „ungefähr das“, sondern ein Vollton auf der Bühne.
+  > Auf der Kommandozeile bekommst du dazu eine Meldung („K3 gibt es dort nicht“). Fader, XY-Pad und MIDI haben keinen Meldeweg – dort passiert schlicht nichts. Bleibt ein Fader unerwartet ohne Wirkung, ist eine solche **alte Kopf-Zelle in der Gruppe** der erste Verdacht.
 
 Kopf-, Geräte- und globale Submaster **multiplizieren sich**: ein Gerät auf 50 % und dessen Kopf 2 zusätzlich auf 50 % ergibt für diesen Kopf 25 %, für die anderen Köpfe 50 %.
 

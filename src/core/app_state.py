@@ -294,6 +294,12 @@ _NICHT_GEPATCHT = "nicht_gepatcht"
 _KEIN_MEHRKOPF_GERAET = "kein_mehrkopf_geraet"
 _KEIN_GUELTIGER_KOPF = "kein_gueltiger_kopf"
 _ALLE_KOEPFE = "alle_koepfe"
+#: Der Kopf existiert am GERAET, aber nicht auf DIESER Achse (FM-9/A5:
+#: Farb- und Bewegungskopfzahl gehen in 831 von 5116 Modi auseinander).
+#: Geraeteweit ist hier richtig und gemessen - Davids Spider hat zwei
+#: Farbbaenke und EIN Pan/Tilt; ``pan#1`` liest kein Kanal, der Kopf
+#: fiele auf seinen Default-Wert und folgte dem Pad nicht mehr.
+_KEIN_KOPF_AUF_DIESER_ACHSE = "kein_kopf_auf_dieser_achse"
 
 
 class AppState:
@@ -2579,22 +2585,39 @@ class AppState:
                 continue
             counter = count_heads or color_head_count_for_channels
             try:
-                n = counter(fx, get_channels_for_patched(fx))
+                chans = get_channels_for_patched(fx)
+                n = counter(fx, chans)
+                # Die Kopfzahl des GERAETS, nicht die dieser Achse — nur sie
+                # beantwortet "gibt es diesen Kopf ueberhaupt".
+                n_geraet = max(int(n), geraet_kopfzahl_for_channels(fx, chans))
             except Exception:
                 continue
-            if n < 2:
-                geprueft.append((fid, set(), _KEIN_MEHRKOPF_GERAET))
-                continue
-            valid: set = set()
+            # ⚠️ ERST klemmen, DANN ueber die Kopfzahl entscheiden. Andersherum
+            # verschluckt "kein Mehrkopf-Geraet" den Fall, um den es FM-45/2
+            # geht: eine Altlast-Zelle wie ``1:5`` an einem Geraet, das nach
+            # einem Umpatchen nur noch EINEN Kopf hat, galt dann als
+            # geraeteweit — also genau der unsichere Rueckfall, den dieses
+            # Item beseitigt. Gemessen: ``1:1`` und ``1:5`` am Ein-Kopf-Geraet
+            # lieferten Ziel-Liste ``[1]`` statt ``[]``. Gefunden hat es die
+            # Codex-Review zu PR #734; mein eigener Test deckte nur ``1:0`` ab.
+            genannt: set = set()
             for h in (hs or ()):
                 try:
-                    h = int(h)
+                    genannt.add(int(h))
                 except (TypeError, ValueError):
                     continue
-                if 0 <= h < n:
-                    valid.add(h)
+            if not any(0 <= h < n_geraet for h in genannt):
+                # Kein einziger genannter Kopf existiert am GERAET -> raus.
+                geprueft.append((fid, set(), _KEIN_GUELTIGER_KOPF))
+                continue
+            if n < 2:
+                # „Kopf 1" eines Ein-Kopf-Geraets IST das Geraet.
+                geprueft.append((fid, set(), _KEIN_MEHRKOPF_GERAET))
+                continue
+            valid = {h for h in genannt if 0 <= h < n}
             if not valid:
-                geprueft.append((fid, valid, _KEIN_GUELTIGER_KOPF))
+                # Es gibt den Kopf, nur nicht auf DIESER Achse -> geraeteweit.
+                geprueft.append((fid, valid, _KEIN_KOPF_AUF_DIESER_ACHSE))
             elif len(valid) >= n:
                 geprueft.append((fid, valid, _ALLE_KOEPFE))
             else:
@@ -4546,6 +4569,26 @@ def attr_head_count_for_channels(fixture, channels, attribute: str) -> int:
     if per_head:
         return len(per_head)          # FM-29: die Kopf-Karte weiss es genauer
     return len(occurrences)
+
+
+def geraet_kopfzahl_for_channels(fixture, channels) -> int:
+    """Wie viele Koepfe hat das GERAET — nicht: dieses Attribut.
+
+    Das Maximum ueber die beiden belastbaren Achsen. ★ Der Unterschied ist
+    keine Feinheit: Farb- und Bewegungskopfzahl gehen in **831 von 5116**
+    Library-Modi auseinander, und zwar in beide Richtungen. „Dieses Attribut
+    hat weniger Koepfe als die Zelle nennt" ist deshalb NICHT dasselbe wie
+    „diesen Kopf gibt es nicht" — die erste Aussage heisst geraeteweit, die
+    zweite heisst raus aus der Ziel-Liste (FM-45/2).
+
+    Schwesterfunktion zu ``cmdline/parser._geraet_kopfzahl``, die dieselbe
+    Frage fuer GETIPPTE Kopf-Ziele stellt.
+    """
+    try:
+        return max(int(color_head_count_for_channels(fixture, channels)),
+                   int(move_head_count_for_channels(fixture, channels)))
+    except Exception:
+        return 0
 
 
 def head_counter_for_attr(attribute: str):

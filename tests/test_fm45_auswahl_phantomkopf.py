@@ -161,6 +161,34 @@ class DieDreiAltenGruendeTest(unittest.TestCase):
         self.assertEqual(set(), st.fids_ohne_bedienbaren_kopf(
             head_restrictions(["1:0"])))
 
+    def test_ein_einkopf_geraet_mit_PHANTOM_kopf_wird_gemeldet(self):
+        """★★ Die Luecke, die mein eigener Test offen liess.
+
+        ``1:0`` an einem PAR ist das Geraet — ``1:1`` oder ``1:5`` sind es
+        NICHT, es sind Koepfe, die es nicht gibt. Beide Faelle sahen gleich aus,
+        weil die Kopfzahl VOR dem Klemmen geprueft wurde: ``n < 2`` bog ab, und
+        die Bereichspruefung kam nie dran. Ergebnis war Ziel-Liste ``[1]``, also
+        genau der unsichere Rueckfall, den FM-45/2 beseitigen soll.
+
+        Der Fall ist real: ein Geraet, das auf ein Profil mit weniger Koepfen
+        umgepatcht wurde, behaelt seine alten Kopf-Zellen — ``update_fixture``
+        raeumt die Auto-Gruppe nicht auf.
+
+        Gefunden von der Codex-Review zu PR #734; mein Test darueber pruefte
+        nur ``1:0`` und war deshalb gruen, ohne die Frage zu stellen.
+        """
+        st = _zustand(self, _Fx(1, _ein_kopf()))
+        for zelle in ("1:1", "1:5"):
+            with self.subTest(zelle=zelle):
+                roh = head_restrictions([zelle])
+                self.assertEqual({}, st.validate_head_restrictions(roh),
+                                 "Vorbedingung: es gibt keine Kopf-Maske")
+                self.assertEqual({1}, st.fids_ohne_bedienbaren_kopf(roh),
+                                 "der Phantom-Kopf faehrt weiter das ganze "
+                                 "Geraet, weil 'kein Mehrkopf-Geraet' ihn "
+                                 "verschluckt")
+                self.assertEqual([], st.nur_bedienbare_fids([1], roh))
+
     def test_alle_koepfe_genannt_bleibt_geraeteweit(self):
         """Die Auto-Gruppe „… · Koepfe" besteht aus lauter Kopf-Zellen.
 
@@ -172,6 +200,51 @@ class DieDreiAltenGruendeTest(unittest.TestCase):
         alle = head_restrictions(["1:0", "1:1", "1:2", "1:3"])
         self.assertEqual({}, st.validate_head_restrictions(alle))
         self.assertEqual(set(), st.fids_ohne_bedienbaren_kopf(alle))
+
+
+class GeraetGegenAchseTest(unittest.TestCase):
+    """★★★ „Diese Achse hat weniger Koepfe" ist NICHT „diesen Kopf gibt es nicht".
+
+    Der teuerste Irrtum an dieser Regel, und er ist beim Bauen wirklich
+    passiert: die Phantom-Pruefung lief zuerst gegen die Kopfzahl des
+    ATTRIBUTS. Damit fiel Davids Spider aus der Ziel-Liste — er hat zwei
+    Farbbaenke, aber nur EIN Pan/Tilt, und die Zelle ``1:1`` nennt einen Kopf,
+    den das GERAET sehr wohl hat.
+
+    Geraeteweit ist dort richtig und gemessen (FM-9/A5): ``pan#1`` liest kein
+    Kanal, der Kopf fiele auf seinen Default-Wert und folgte dem Pad nicht
+    mehr. Farb- und Bewegungskopfzahl gehen in **831 von 5116** Modi
+    auseinander — die Verwechslung trifft also keinen Sonderfall.
+
+    ★ Die uebertragbare Form (A, 2026-09-05): eine ZAHLENGLEICHHEIT ist keine
+    Aussage ueber ZUSTAENDIGKEIT.
+    """
+
+    def _spider(self):
+        """Zwei Farbbaenke, EIN Pan/Tilt — Davids Bauform."""
+        return _Fx(1, [_Ch("pan", 1), _Ch("tilt", 2),
+                       _Ch("color_r", 3), _Ch("color_g", 4), _Ch("color_b", 5),
+                       _Ch("color_r", 6), _Ch("color_g", 7), _Ch("color_b", 8)])
+
+    def test_der_kopf_gibt_es_nur_auf_der_anderen_achse(self):
+        from src.core.app_state import move_head_count_for_channels
+        st = _zustand(self, self._spider())
+        roh = head_restrictions(["1:1"])
+
+        self.assertEqual({1: {1}}, st.validate_head_restrictions(roh),
+                         "Vorbedingung: auf der FARB-Achse ist Kopf 2 gueltig")
+        self.assertEqual([1], st.nur_bedienbare_fids(
+            roh and [1], roh, count_heads=move_head_count_for_channels),
+            "der Spider ist aus der Ziel-Liste geflogen — er hat den Kopf, nur "
+            "nicht auf dieser Achse; geraeteweit ist hier richtig")
+
+    def test_ein_kopf_den_es_auf_KEINER_achse_gibt_faellt_raus(self):
+        """Die Gegenprobe: sonst waere die Regel auf dieser Bauform tot."""
+        from src.core.app_state import move_head_count_for_channels
+        st = _zustand(self, self._spider())
+        roh = head_restrictions(["1:7"])
+        self.assertEqual([], st.nur_bedienbare_fids(
+            [1], roh, count_heads=move_head_count_for_channels))
 
 
 class ZielListeTest(unittest.TestCase):
