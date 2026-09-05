@@ -23,6 +23,7 @@ from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEngineProfile
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtCore import QObject, QUrl, Signal, Slot
 from _qt_lifecycle import destroy_webengine_view  # XPLAT-09
+import _webgl_gate                      # QA-74
 
 _app = QApplication.instance() or QApplication([])
 
@@ -142,41 +143,14 @@ class DragDropSceneTest(unittest.TestCase):
         try:
             self._poll_until_true("!!window.__lightosAppReady")
         except AssertionError as e:
-            # XPLAT-19: die Diagnose VOR dem Neuladen lesen — danach sind die
-            # Flags der gescheiterten Ladung weg.
-            diagnose = self._szenen_diagnose()
-            # XPLAT-17: In seltenen Faellen verliert Chromium beim Start den
-            # GL-Kontext IM EIGENEN Prozess („Context lost during MakeCurrent"
-            # -> „Error creating WebGL context"), und three.js kommt gar nicht
-            # erst hoch. Gemessen ueber 6 volle Gate-Laeufe: 1 Ausfall, und nur
-            # in Dateien, die `view.show()` rufen — diese hier ist eine davon.
-            #
-            # Das PRODUKT heilt genau das schon: der Szenen-Start-Waechter
-            # (VIZ-SCENE-SELFHEAL) laedt nach genau EINEM verlorenen Kontext neu,
-            # statt schwarz zu bleiben. Der Harness zieht hier nach — derselbe
-            # Vorgang, dieselbe Begrenzung auf einen Versuch.
-            #
-            # ★ Warum das KEINE Wiederholungslogik im verbotenen Sinn ist: es
-            #   wird nur der Seiten-Aufbau wiederholt, nicht der Test. Startet
-            #   die Szene wirklich nicht mehr (echte Regression), scheitert auch
-            #   der zweite Versuch und das Gate bleibt rot. Und der Fall wird
-            #   LAUT: die Warnung unten steht im Segment-Log, damit aus
-            #   „heilt sich" nie „faellt niemandem auf" wird.
-            if _zweiter_versuch:
-                raise AssertionError(
-                    f"{e} | Szenen-Diagnose: {diagnose}") from None
-            # ★ XPLAT-19: `warnings.warn` statt `print`. Der Runner laeuft mit
-            # `pytest -q ... -rf` OHNE `-s` (tools/verify_segmented.sh) — der
-            # Print eines am Ende BESTANDENEN Tests wird also weggefangen und
-            # ist nie zu sehen. Die Warnings-Summary erscheint dagegen immer.
-            # Damit werden die selbstgeheilten Faelle erstmals zaehlbar; genau
-            # die Zahl fehlt XPLAT-19, um die Rate ueberhaupt zu messen.
-            warnings.warn(
-                f"XPLAT-17/19: Szene kam nicht hoch, EIN Neuversuch "
-                f"(wie VIZ-SCENE-SELFHEAL). Diagnose: {diagnose}",
-                RuntimeWarning, stacklevel=2)
-            _pump(1.0)
-            self._load_and_wait(_zweiter_versuch=True)
+            # QA-74: EINE Quelle fuer "die Szene kam nicht hoch - was nun?".
+            # Die Diagnose VOR dem Neuladen lesen (XPLAT-19), dann entscheidet
+            # _webgl_gate: einmal neu laden (wie VIZ-SCENE-SELFHEAL), beim
+            # wiederholten GL-Ausfall ueberspringen (QA-70), sonst scheitern.
+            if _webgl_gate.nach_szenen_timeout(
+                    e, self._szenen_diagnose(), zweiter_versuch=_zweiter_versuch):
+                _pump(1.0)
+                return self._load_and_wait(_zweiter_versuch=True)
 
     def _eval(self, js):
         # ★ QA-VIZ-TESTS (2026-08-05): ein JS-Wurf kam hier als leerer String
@@ -212,44 +186,14 @@ class DragDropSceneTest(unittest.TestCase):
                 return last
             time.sleep(_POLL_INTERVAL_S)
         self.fail(f"Timeout bei '{js}' (letzter: {last!r})")
-
-    # ── XPLAT-19: Diagnose, wenn die Szene nicht hochkommt ───────────────────
-    # Bisher meldete der Fehlschlag nur „Timeout bei '!!window.__lightosAppReady'
-    # (letzter: False)" — also genau null Information darueber, WORAN es lag.
-    # `__lightosSceneError` haelt den ersten Fehler des Szenen-Starts fest
-    # (stage_scene.html, VIZ-SCENE-SELFHEAL) und wird von der Produktseite
-    # laengst gelesen (visualizer_window.py) — von den Tests bis jetzt nicht.
-    _DIAG_JS = ("JSON.stringify({"
-                "err: String(window.__lightosSceneError || ''),"
-                "ready: !!window.__lightosAppReady,"
-                "three: typeof window.THREE,"
-                "api: typeof window.__lightos,"
-                "chan: !!(window.qt && window.qt.webChannelTransport),"
-                "canvas: document.getElementsByTagName('canvas').length,"
-                "doc: document.readyState})")
-
     def _szenen_diagnose(self, timeout_s=2.0):
-        """Sieben Felder, die den Abbruch verorten: `three: "undefined"` heisst,
-        schon `three_local.js` kam nicht · `three` da und `api: "undefined"`
-        heisst, die ESM-Kette brach ab (typisch beim WebGLRenderer-Bau) ·
-        `canvas: 0` heisst, der Renderer haengte sein Canvas nie ein · `err`
-        traegt die echte Fehlerzeile.
+        """Sieben Felder, die den Abbruch verorten — aus EINER Quelle (QA-74).
 
-        Bewusst NICHT ueber `self._eval`: das assertet bei Zeitueberschreitung
-        und wuerde die eigentliche Fehlermeldung durch seine eigene ersetzen.
-        Und bewusst ohne `getContext` — das waere genau die Ressource, die hier
-        unter Verdacht steht.
+        Der Text stand bis 2026-09-03 in DREI Dateien woertlich gleich. Wer eine
+        davon anfasst, muss sonst die anderen mitlesen; genau daran ist QA-74
+        aufgefallen. Die Erklaerung der Felder steht jetzt bei der Quelle.
         """
-        box = []
-        try:
-            self._view.page().runJavaScript(self._DIAG_JS, box.append)
-            ende = time.monotonic() + timeout_s
-            while not box and time.monotonic() < ende:
-                _app.processEvents()
-                time.sleep(_POLL_INTERVAL_S)
-        except Exception as e:              # Page/View schon tot
-            return f"nicht lesbar: {e!r}"
-        return box[0] if box else "kein Rueckruf (Renderer-Prozess tot?)"
+        return _webgl_gate.szenen_diagnose(self._view, _pump, timeout_s)
 
     def _geist(self):
         return json.loads(self._eval("JSON.stringify(window.__lightos.placeGhostInfo())"))
