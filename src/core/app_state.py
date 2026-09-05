@@ -2498,8 +2498,25 @@ class AppState:
         ganzes Geraet zurueck. Ein Sentinel (``{fid: set()}``) heilt das
         nachweislich nicht: die Verbraucher lesen ``heads.get(fid)`` **truthy**.
         Deshalb die zweite Frage statt eines zweiten Rueckgabewerts — dieselbe
-        Form wie ``base_fids_in_grid_order`` neben ``referenzierte_fids``: EIN
-        Durchgang, zwei Antworten mit entgegengesetzter sicherer Richtung.
+        Form wie ``base_fids_in_grid_order`` neben ``referenzierte_fids``: EINE
+        Implementierung (:meth:`_head_restrictions_geprueft`), zwei Antworten
+        mit entgegengesetzter sicherer Richtung.
+
+        ⚠️ **Zwei Fragen heissen zwei Durchgaenge — bewusst so gelassen.** Wer
+        beide stellt, geht zweimal durch den Patch: an 48 Geraeten gemessen
+        0,280 statt 0,132 ms, also der doppelte Preis. Zusammengelegt waere das
+        billiger, aber es koppelte die Fehlermodi wieder, die hier absichtlich
+        getrennt sind — scheitert die neue Regel, darf sie die Kopf-Maske nicht
+        mitreissen (genau daran sind beim Bauen 11 Tests rot geworden, sie
+        schrieben ``pan`` statt ``pan#2``).
+
+        Und der Preis ist tragbar, weil dieser Pfad NICHT der heisse ist:
+        ``_submaster_targets`` laeuft bei jeder Fader-Bewegung, also je
+        Eingabe-Ereignis — nicht je Frame und nicht im DMX-Budget. Das
+        unterscheidet ihn von der Zellschleife in ``rgb_matrix.write``, wo
+        dieselbe Verdopplung in FM-45 Scheibe 1 sehr wohl auf einen Durchgang
+        zusammengezogen wurde (dort 82-99 % Auslastung). Wer diese Funktion
+        einmal in einen Render-Pfad haengt, muss die Abwaegung neu treffen.
 
         ⚠️ **Getippt wird derselbe Fehler laengst abgelehnt** — die Kommandozeile
         sagt „K3 gibt es dort nicht" (``cmdline/parser._typed_heads``). Nur
