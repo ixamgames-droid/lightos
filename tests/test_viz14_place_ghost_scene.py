@@ -26,6 +26,7 @@ from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEngineProfile
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtCore import QObject, QUrl, Signal, Slot
 from _qt_lifecycle import destroy_webengine_view  # XPLAT-09
+import _webgl_gate                      # QA-74
 
 _app = QApplication.instance() or QApplication([])
 
@@ -84,168 +85,6 @@ def _pump(seconds):
         time.sleep(_POLL_INTERVAL_S)
 
 
-# ── QA-70: fehlender GL-Kontext ist kein Testfehler ─────────────────────────
-#
-# Gemessen am 2026-09-01, isoliert reproduziert: drei Laeufe hintereinander
-# ergaben `1 passed (4,99 s)`, `1 passed (5,02 s)`, `1 failed (12,98 s)`. Im
-# Segment-Log stand die Ursache im Klartext: `Context lost during MakeCurrent`
-# und `Error creating WebGL context`. Der Test prueft den Platzier-Geist im 3D
-# und braucht dafuer einen echten GL-Kontext — den bekommt QtWebEngine unter
-# Last nicht immer. Die verdreifachte Laufzeit im roten Fall ist das
-# Erkennungszeichen: er wartet auf etwas, das nie kommt.
-#
-# ★ Ein Test, der an einer Zusicherung scheitert, die er gar nicht pruefen
-# konnte, faerbt jeden fremden Branch rot und verstellt die Frage „liegt es an
-# meinem Diff?". Er ueberspringt sich deshalb — aber NUR bei genau diesem
-# Fehlerbild.
-#
-# ⚠ Bewusst KEIN `retry`: das verschleiert genau das Signal, um das es geht.
-# Und bewusst eng: die Bedingung haengt am Text, den `stage_scene.html` in
-# `__lightosSceneError` festhaelt (dort im Kommentar namentlich genannt). Jeder
-# andere Fehler — ein TypeError in der Szene, ein nicht geladenes three.js —
-# bleibt ein Testfehler. Ein zu weiter Ueberspringer waere schlimmer als der
-# Flake: er versteckt echte Fehler hinter einem gruenen Lauf.
-_GL_AUSFALL_MERKMALE = ("webgl", "makecurrent", "context lost", "webgl context")
-
-
-def ist_gl_kontext_ausfall(diagnose: str) -> bool:
-    """Beschreibt ``diagnose`` einen verlorenen/nicht erzeugbaren GL-Kontext?
-
-    ``diagnose`` ist die JSON-Zeile aus ``_szenen_diagnose``. Geprueft wird
-    ausschliesslich das ``err``-Feld: die uebrigen Felder (``canvas: 0``,
-    ``api: undefined``) treten bei einem GL-Ausfall zwar ebenfalls auf, aber
-    genauso bei einem echten Skriptfehler — sie taugen nicht zur Unterscheidung.
-    """
-    if not diagnose:
-        return False
-    try:
-        felder = json.loads(diagnose)
-    except (ValueError, TypeError):
-        return False
-    if not isinstance(felder, dict):
-        return False
-    fehler = str(felder.get("err") or "").lower()
-    return any(merkmal in fehler for merkmal in _GL_AUSFALL_MERKMALE)
-
-
-class UeberspringenIstVerdrahtetTest(unittest.TestCase):
-    """Die Erkennung oben kann richtig sein und trotzdem nirgends wirken.
-
-    Diese Klasse fasst den Zweig in ``_load_and_wait`` an, ohne einen kaputten
-    GPU-Treiber zu brauchen: die Diagnose wird eingesetzt, der Rest laeuft echt.
-    """
-
-    class _ImmerGeladen(list):
-        """``_load_and_wait`` ruft ``clear()`` und wartet dann auf den Ladevorgang.
-
-        Hier gibt es keine echte Seite, also bleibt der Eintrag stehen — sonst
-        liefe der Test 40 Sekunden gegen den Lade-Deckel.
-        """
-
-        def clear(self):
-            pass
-
-    class _StummeView:
-        def load(self, _url):
-            pass
-
-    def _fall(self):
-        fall = PlaceGhostSceneTest.__new__(PlaceGhostSceneTest)
-        fall._loaded_ok = self._ImmerGeladen([True])
-        fall._view = self._StummeView()
-        return fall
-
-    def test_bei_gl_ausfall_wird_uebersprungen(self):
-        diagnose = json.dumps({"err": "Error creating WebGL context.",
-                               "ready": False, "canvas": 0})
-        with mock.patch.object(PlaceGhostSceneTest, "_poll_until_true",
-                               side_effect=AssertionError("Timeout bei ...")), \
-             mock.patch.object(PlaceGhostSceneTest, "_szenen_diagnose",
-                               return_value=diagnose):
-            with self.assertRaises(unittest.SkipTest) as ctx:
-                self._fall()._load_and_wait()
-        self.assertIn("QA-70", str(ctx.exception),
-                      "der Ueberspringer nennt seinen Grund nicht — dann sieht "
-                      "niemand im -rs-Bericht, warum der Test nichts geprueft hat")
-        self.assertIn("WebGL", str(ctx.exception))
-
-    def test_ein_anderer_fehler_faellt_weiterhin_durch(self):
-        """★ Die Gegenprobe: aus dem Ueberspringer darf kein Freibrief werden."""
-        diagnose = json.dumps({"err": "TypeError: x is not a function",
-                               "ready": False, "canvas": 0})
-        with mock.patch.object(PlaceGhostSceneTest, "_poll_until_true",
-                               side_effect=AssertionError("Timeout bei ...")), \
-             mock.patch.object(PlaceGhostSceneTest, "_szenen_diagnose",
-                               return_value=diagnose):
-            with self.assertRaises(AssertionError) as ctx:
-                self._fall()._load_and_wait()
-        self.assertNotIsInstance(ctx.exception, unittest.SkipTest)
-        self.assertIn("TypeError", str(ctx.exception),
-                      "die eigentliche Fehlermeldung geht verloren")
-
-
-class GlAusfallErkennungTest(unittest.TestCase):
-    """Der Ueberspringer muss ENG sein — reine Logik, ohne WebEngine.
-
-    ★ Die Gefahr liegt nicht im Flake, sondern in der Reparatur: ein
-    Ueberspringer, der zu viel schluckt, versteckt echte Szenenfehler hinter
-    einem gruenen Lauf. Diese Klasse haelt beide Richtungen fest.
-    """
-
-    #: Wortlaut aus dem Segment-Log vom 2026-09-01 (QA-70).
-    ECHTE_GL_FEHLER = (
-        "Error creating WebGL context.",
-        "Context lost during MakeCurrent",
-    )
-
-    def _diagnose(self, err, **rest):
-        felder = {"err": err, "ready": False, "three": "object",
-                  "api": "undefined", "chan": True, "canvas": 0,
-                  "doc": "complete"}
-        felder.update(rest)
-        return json.dumps(felder)
-
-    def test_die_echten_meldungen_werden_erkannt(self):
-        for text in self.ECHTE_GL_FEHLER:
-            with self.subTest(text=text):
-                self.assertTrue(ist_gl_kontext_ausfall(self._diagnose(text)),
-                                f"nicht als GL-Ausfall erkannt: {text!r}")
-
-    def test_ein_echter_skriptfehler_wird_NICHT_uebersprungen(self):
-        """★★ Die wichtigere Haelfte.
-
-        Ein TypeError in der Szene sieht in der Diagnose fast genauso aus
-        (``canvas: 0``, ``api: undefined``) — er ist aber ein Fehler, den dieser
-        Test finden SOLL.
-        """
-        for text in ("TypeError: window.__lightos.setEditMode is not a function",
-                     "ReferenceError: THREE is not defined",
-                     "SyntaxError: Unexpected token '<'"):
-            with self.subTest(text=text):
-                self.assertFalse(ist_gl_kontext_ausfall(self._diagnose(text)),
-                                 f"faelschlich als GL-Ausfall geschluckt: {text!r}")
-
-    def test_ohne_fehlertext_wird_nicht_uebersprungen(self):
-        """Bleibt ``err`` leer, ist die Ursache unbekannt — dann faellt der Test.
-
-        Unbekannt ist nicht dasselbe wie harmlos. Ein Ueberspringer, der auch
-        ohne Begruendung greift, waere ein Freibrief.
-        """
-        self.assertFalse(ist_gl_kontext_ausfall(self._diagnose("")))
-        self.assertFalse(ist_gl_kontext_ausfall(self._diagnose("", three="undefined")))
-
-    def test_unlesbare_diagnose_wird_nicht_uebersprungen(self):
-        """``_szenen_diagnose`` liefert bei totem Renderer einen Klartext-Satz.
-
-        Der koennte von einem GPU-Absturz kommen — oder von einem echten
-        Absturz der Seite. Im Zweifel rot (QA-53).
-        """
-        for roh in ("", None, "kein Rueckruf (Renderer-Prozess tot?)",
-                    "nicht lesbar: RuntimeError()", "[]", "null"):
-            with self.subTest(roh=roh):
-                self.assertFalse(ist_gl_kontext_ausfall(roh))
-
-
 class PlaceGhostSceneTest(unittest.TestCase):
     def setUp(self):
         self._view = QWebEngineView()
@@ -273,7 +112,7 @@ class PlaceGhostSceneTest(unittest.TestCase):
         destroy_webengine_view(self._view, _pump)   # XPLAT-09
         self._view = None
 
-    def _load_and_wait(self):
+    def _load_and_wait(self, _zweiter_versuch=False):
         self._loaded_ok.clear()
         url = QUrl.fromLocalFile(_HTML_PATH)
         url.setQuery(f"v={int(time.time() * 1000)}")
@@ -285,16 +124,15 @@ class PlaceGhostSceneTest(unittest.TestCase):
         self.assertTrue(self._loaded_ok and self._loaded_ok[-1], "Page nicht geladen")
         try:
             self._poll_until_true("!!window.__lightosAppReady")
-        except AssertionError as e:                      # XPLAT-19
-            diagnose = self._szenen_diagnose()
-            if ist_gl_kontext_ausfall(diagnose):         # QA-70
-                raise unittest.SkipTest(
-                    "Kein WebGL-Kontext — QtWebEngine konnte hier keinen "
-                    "erzeugen bzw. hat ihn verloren. Der Platzier-Geist ist "
-                    "damit nicht pruefbar; das ist KEIN Fehler im Szenen-Code. "
-                    f"Szenen-Diagnose: {diagnose} (QA-70)") from None
-            raise AssertionError(
-                f"{e} | Szenen-Diagnose: {diagnose}") from None
+        except AssertionError as e:
+            # QA-74: EINE Quelle fuer "die Szene kam nicht hoch - was nun?".
+            # Die Diagnose VOR dem Neuladen lesen (XPLAT-19), dann entscheidet
+            # _webgl_gate: einmal neu laden (wie VIZ-SCENE-SELFHEAL), beim
+            # wiederholten GL-Ausfall ueberspringen (QA-70), sonst scheitern.
+            if _webgl_gate.nach_szenen_timeout(
+                    e, self._szenen_diagnose(), zweiter_versuch=_zweiter_versuch):
+                _pump(1.0)
+                return self._load_and_wait(_zweiter_versuch=True)
 
     def _eval(self, js):
         # ★ QA-VIZ-TESTS (2026-08-05): ein JS-Wurf kam hier als leerer String
@@ -330,44 +168,14 @@ class PlaceGhostSceneTest(unittest.TestCase):
                 return last
             time.sleep(_POLL_INTERVAL_S)
         self.fail(f"Timeout bei '{js}' (letzter: {last!r})")
-
-    # ── XPLAT-19: Diagnose, wenn die Szene nicht hochkommt ───────────────────
-    # Bisher meldete der Fehlschlag nur „Timeout bei '!!window.__lightosAppReady'
-    # (letzter: False)" — also genau null Information darueber, WORAN es lag.
-    # `__lightosSceneError` haelt den ersten Fehler des Szenen-Starts fest
-    # (stage_scene.html, VIZ-SCENE-SELFHEAL) und wird von der Produktseite
-    # laengst gelesen (visualizer_window.py) — von den Tests bis jetzt nicht.
-    _DIAG_JS = ("JSON.stringify({"
-                "err: String(window.__lightosSceneError || ''),"
-                "ready: !!window.__lightosAppReady,"
-                "three: typeof window.THREE,"
-                "api: typeof window.__lightos,"
-                "chan: !!(window.qt && window.qt.webChannelTransport),"
-                "canvas: document.getElementsByTagName('canvas').length,"
-                "doc: document.readyState})")
-
     def _szenen_diagnose(self, timeout_s=2.0):
-        """Sieben Felder, die den Abbruch verorten: `three: "undefined"` heisst,
-        schon `three_local.js` kam nicht · `three` da und `api: "undefined"`
-        heisst, die ESM-Kette brach ab (typisch beim WebGLRenderer-Bau) ·
-        `canvas: 0` heisst, der Renderer haengte sein Canvas nie ein · `err`
-        traegt die echte Fehlerzeile.
+        """Sieben Felder, die den Abbruch verorten — aus EINER Quelle (QA-74).
 
-        Bewusst NICHT ueber `self._eval`: das assertet bei Zeitueberschreitung
-        und wuerde die eigentliche Fehlermeldung durch seine eigene ersetzen.
-        Und bewusst ohne `getContext` — das waere genau die Ressource, die hier
-        unter Verdacht steht.
+        Der Text stand bis 2026-09-03 in DREI Dateien woertlich gleich. Wer eine
+        davon anfasst, muss sonst die anderen mitlesen; genau daran ist QA-74
+        aufgefallen. Die Erklaerung der Felder steht jetzt bei der Quelle.
         """
-        box = []
-        try:
-            self._view.page().runJavaScript(self._DIAG_JS, box.append)
-            ende = time.monotonic() + timeout_s
-            while not box and time.monotonic() < ende:
-                _app.processEvents()
-                time.sleep(_POLL_INTERVAL_S)
-        except Exception as e:              # Page/View schon tot
-            return f"nicht lesbar: {e!r}"
-        return box[0] if box else "kein Rueckruf (Renderer-Prozess tot?)"
+        return _webgl_gate.szenen_diagnose(self._view, _pump, timeout_s)
 
     def _geist(self):
         return json.loads(self._eval("JSON.stringify(window.__lightos.placeGhostInfo())"))
