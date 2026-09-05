@@ -349,8 +349,36 @@ def cmd_claim(args, repo: str) -> int:
         t = jetzt()
         vorhanden = finde(tafel, args.item)
         if vorhanden and vorhanden["sitzung"] == args.session:
+            # ★★ PROC-12: Ein erneuter `claim` DERSELBEN Sitzung hat bis
+            # 2026-09-05 nur den Zeitstempel angefasst und `--branch`/`--files`
+            # STILL VERWORFEN — und dabei „Claim aufgefrischt" gemeldet, also
+            # Erfolg. Gemessen ist genau das passiert: A hat FM-41 zweimal mit
+            # neuem Zweig und neuer Dateiliste belegt, die Tafel zeigte
+            # weiterhin den ersten Zweig und EINE Datei. B las daraus, A fasse
+            # `app_state.py` nicht an — und nahm sich ein Item, das genau dort
+            # arbeitet. Die Tafel meldete keinen Konflikt, wo einer war.
+            #
+            # Das ist die Fehlrichtung, die dieses Werkzeug am wenigsten haben
+            # darf: es verschweigt eine Ueberschneidung, statt sie zu nennen.
+            # `refresh` reicht bewusst None durch und bleibt damit ein reines
+            # Auffrischen; angegebene Werte GEWINNEN jetzt.
             vorhanden["seit"] = stempel(t)
-            return True, f"{args.item}: Claim aufgefrischt"
+            geaendert = []
+            if args.branch and args.branch != vorhanden.get("branch"):
+                geaendert.append(f"Branch {vorhanden.get('branch')} -> {args.branch}")
+                vorhanden["branch"] = args.branch
+            if args.files is not None:
+                neu_dateien = " · ".join(args.files) or "-"
+                if neu_dateien != vorhanden.get("dateien"):
+                    geaendert.append(f"Dateien {vorhanden.get('dateien')} -> {neu_dateien}")
+                    vorhanden["dateien"] = neu_dateien
+            if geaendert:
+                tafel["verlauf"].append(
+                    f"{stempel(t)} {args.session} aktualisiert {args.item}: "
+                    + "; ".join(geaendert))
+                return True, (f"{args.item}: Claim aufgefrischt UND geaendert — "
+                              + "; ".join(geaendert))
+            return True, f"{args.item}: Claim aufgefrischt (unveraendert)"
         if vorhanden and not ist_verfallen(vorhanden, t):
             return False, (f"{args.item} ist belegt von Sitzung "
                            f"{vorhanden['sitzung']} (Branch {vorhanden['branch']}, "

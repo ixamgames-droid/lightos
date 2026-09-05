@@ -203,6 +203,55 @@ class EchtesRennenTest(unittest.TestCase):
         tafel, _ = sc.lade_tafel(self.a)
         self.assertEqual(len(tafel["claims"]), 1)
 
+    def test_umbelegen_traegt_zweig_und_dateien_nach(self):
+        """★★★ PROC-12, GEMESSEN IM ECHTEN BETRIEB: ein erneuter ``claim``
+        derselben Sitzung hat nur den Zeitstempel angefasst und ``--branch``
+        sowie ``--files`` STILL VERWORFEN — und dabei „Claim aufgefrischt"
+        gemeldet, also Erfolg.
+
+        Was daraus wurde: A hat FM-41 zweimal mit neuem Zweig und neuer
+        Dateiliste belegt; die Tafel zeigte weiterhin den ERSTEN Zweig und EINE
+        Datei. B las daraus, A fasse ``app_state.py`` nicht an, und nahm sich
+        ein Item, das genau dort arbeitet. **Die Tafel verschwieg eine
+        Ueberschneidung, statt sie zu nennen** — die einzige Fehlrichtung, die
+        dieses Werkzeug nicht haben darf, denn es existiert genau dafuer.
+        """
+        self._claim(self.a, "OUT-51", "A")
+        rc = sc.main(["--repo", self.a, "claim", "OUT-51", "--session", "A",
+                      "--branch", "feature/zweiter-zweig",
+                      "--files", "src/x.py", "src/y.py"])
+        self.assertEqual(rc, 0)
+        tafel, _ = sc.lade_tafel(self.a)
+        self.assertEqual(len(tafel["claims"]), 1, "kein zweiter Eintrag")
+        eintrag = tafel["claims"][0]
+        self.assertEqual(eintrag["branch"], "feature/zweiter-zweig")
+        self.assertIn("src/x.py", eintrag["dateien"])
+        self.assertIn("src/y.py", eintrag["dateien"])
+
+    def test_umbelegen_steht_im_verlauf(self):
+        """Die andere Sitzung muss die Aenderung SEHEN koennen, nicht nur den
+        neuen Endzustand — sonst merkt niemand, dass sich der Zuschnitt
+        verschoben hat."""
+        self._claim(self.a, "OUT-51", "A")
+        sc.main(["--repo", self.a, "claim", "OUT-51", "--session", "A",
+                 "--branch", "feature/zweiter-zweig", "--files", "src/x.py"])
+        tafel, _ = sc.lade_tafel(self.a)
+        verlauf = " ".join(tafel["verlauf"])
+        self.assertIn("aktualisiert OUT-51", verlauf)
+        self.assertIn("feature/zweiter-zweig", verlauf)
+
+    def test_refresh_bleibt_ein_reines_auffrischen(self):
+        """★ Die Gegenprobe, und sie ist der Grund fuer die Bedingung
+        ``args.files is not None``: ``refresh`` reicht bewusst ``None`` durch
+        und darf den Zuschnitt NICHT loeschen. Ohne diese Abgrenzung haette
+        der Fix aus einem stillen Verschweigen ein stilles Vergessen gemacht."""
+        sc.main(["--repo", self.a, "claim", "OUT-51", "--session", "A",
+                 "--branch", "fix/eins", "--files", "src/x.py"])
+        sc.main(["--repo", self.a, "refresh", "OUT-51", "--session", "A"])
+        eintrag = sc.lade_tafel(self.a)[0]["claims"][0]
+        self.assertEqual(eintrag["branch"], "fix/eins")
+        self.assertIn("src/x.py", eintrag["dateien"])
+
     def test_verfallener_claim_wird_uebernommen_und_protokolliert(self):
         self._claim(self.a, "OUT-51", "A")
         # Claim kuenstlich altern lassen.
