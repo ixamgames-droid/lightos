@@ -10,7 +10,6 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | FM-41 | A | feature/fm41-scheibe2-weiss-zellen | 2026-09-05T15:02Z | src/core/engine/rgb_matrix.py · src/ui/views/rgb_matrix_view.py · src/core/group_cells.py · src/core/app_state.py · src/ui/views/fixture_group_view.py |
-| QA-73 | B | fix/qa73-appdata-sandkasten-erben | 2026-09-05T14:18Z | tests/conftest.py |
 | FM-45 | B | feature/fm45-scheibe2-auswahlseite | 2026-09-05T14:41Z | src/core/app_state.py · src/ui/virtualconsole/vc_slider.py · src/ui/virtualconsole/vc_xypad.py · src/core/midi/midi_mapper.py · src/core/cmdline/parser.py |
 
 ## Blocker & Fallen
@@ -77,7 +76,6 @@
 
 ## Verlauf
 
-- 2026-09-03T15:43Z B claim XPLAT-23
 - 2026-09-03T16:27Z A done FM-40
 - 2026-09-03T16:27Z A uebergeben ENG-15
 - 2026-09-03T16:28Z A claim FM-43
@@ -107,3 +105,4 @@
 - 2026-09-05T14:34Z B done QA-74
 - 2026-09-05T14:41Z B claim FM-45
 - 2026-09-05T15:02Z A aktualisiert FM-41: Branch feature/fm41-weiss-achse -> feature/fm41-scheibe2-weiss-zellen; Dateien src/core/group_cells.py -> src/core/engine/rgb_matrix.py · src/ui/views/rgb_matrix_view.py · src/core/group_cells.py · src/core/app_state.py · src/ui/views/fixture_group_view.py
+- 2026-09-05T15:10Z B done QA-73
