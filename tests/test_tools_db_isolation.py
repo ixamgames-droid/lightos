@@ -28,6 +28,75 @@ ISOLATION = re.compile(
     r"|os\.environ(?:\.setdefault)?\s*[\(\[]\s*[\"']LIGHTOS_SHOW_DB",
     re.M)
 
+def _nur_code(text: str) -> str:
+    """Quelltext ohne Kommentare und Docstrings — Zeilen und Spalten bleiben.
+
+    ★★ QA-76: Beide Muster dieses Waechters suchen im ROHTEXT und koennen
+    „erwaehnt" nicht von „benutzt" unterscheiden. Gemessen wurde beides, und
+    die Loecher zeigen in ENTGEGENGESETZTE Richtungen:
+
+    * **Falscher Alarm.** ``tools/session_claim.py`` fasst den App-State
+      nirgends an, erwaehnt aber in einem Kommentar die Datei ``app_state.py``
+      (es erklaert einen Koordinationsfehler). Der Waechter meldete einen
+      Verstoss. Der naheliegende „Fix" waere gewesen, den Kommentar
+      umzuschreiben — also Prosa zu verbiegen, um einen Textsucher zu beruhigen.
+    * **Falsche Entwarnung, und das ist die teure Richtung.** Ein Werkzeug, das
+      ``get_state()`` benutzt und ``LIGHTOS_SHOW_DB`` nur in einem Kommentar
+      oder Docstring NENNT, galt als isoliert und kam durch — es haette auf der
+      echten ``data/current_show.db`` laufen koennen. Genau das schliesst der
+      Kommentar an :data:`ISOLATION` seit 2026-07-19 aus, aber nur fuer die
+      ``import _gen_env``-Haelfte (die einen Zeilenanfang verlangt), nicht fuer
+      die ``os.environ``-Haelfte.
+
+    Es wurde also an Kommentare gedacht, die SICHERHEIT vortaeuschen, und nicht
+    an solche, die GEFAHR vortaeuschen — und die erste Haelfte war nur zur
+    Haelfte umgesetzt. Beides faellt weg, wenn beide Muster auf CODE schauen
+    statt auf Text.
+
+    Zeichenweise GELEERT statt entfernt: ``^\s*import _gen_env`` haengt am
+    Zeilenanfang, ein Umbau der Zeilenstruktur wuerde das Muster brechen.
+    """
+    import ast
+    import io as _io
+    import tokenize
+    zeilen = text.splitlines(keepends=True)
+    if not zeilen:
+        return text
+
+    def leeren(z1, s1, z2, s2):
+        for z in range(z1, z2 + 1):
+            if z - 1 >= len(zeilen):
+                break
+            zeile = zeilen[z - 1]
+            von = s1 if z == z1 else 0
+            bis = s2 if z == z2 else len(zeile.rstrip("\n"))
+            zeilen[z - 1] = zeile[:von] + " " * max(0, bis - von) + zeile[bis:]
+
+    # Docstrings ueber den Syntaxbaum finden (ein String als ganze Anweisung).
+    doc = set()
+    try:
+        for knoten in ast.walk(ast.parse(text)):
+            koerper = getattr(knoten, "body", None)
+            if not isinstance(koerper, list) or not koerper:
+                continue
+            erst = koerper[0]
+            if (isinstance(erst, ast.Expr)
+                    and isinstance(erst.value, ast.Constant)
+                    and isinstance(erst.value.value, str)):
+                doc.add((erst.value.lineno, erst.value.col_offset))
+    except SyntaxError:
+        pass                      # unlesbar -> dann bleibt der Rohtext streng
+
+    try:
+        marken = list(tokenize.generate_tokens(_io.StringIO(text).readline))
+    except (tokenize.TokenError, IndentationError, SyntaxError):
+        return text               # im Zweifel STRENG bleiben, nicht entwarnen
+    for m in marken:
+        if m.type == tokenize.COMMENT or (m.type == tokenize.STRING and m.start in doc):
+            leeren(m.start[0], m.start[1], m.end[0], m.end[1])
+    return "".join(zeilen)
+
+
 # Bewusste Ausnahmen: Datei -> Begruendung (bitte NUR mit gutem Grund erweitern).
 WHITELIST = {
     "_run_showcase_app.py": "Echt-App-Launcher fuer Doku-Captures: soll sich wie die "
@@ -52,6 +121,86 @@ def _tool_scripts():
             yield name, path
 
 
+class ProsaIstKeinCodeTest(unittest.TestCase):
+    """★★★ QA-76 — und der wichtigste Test hier ist die POSITIVKONTROLLE.
+
+    Einen Waechter praeziser zu machen heisst immer auch, ihn blinder machen zu
+    koennen. Diese Klasse prueft deshalb beide Seiten in EINER Tabelle: was
+    weiterhin anschlagen MUSS, und was nie haette anschlagen duerfen.
+    """
+
+    def _urteil(self, quelltext):
+        """(faengt_zustand, gilt_als_isoliert) nach der Bereinigung."""
+        code = _nur_code(quelltext)
+        return bool(STATE_API.search(code)), bool(ISOLATION.search(code))
+
+    def test_faelle(self):
+        F = [
+            # (Name, Quelltext, faengt_zustand, gilt_als_isoliert, Begruendung)
+            ('echte Nutzung ohne Isolation',
+             'from src.core.app_state import get_state\nget_state()\n',
+             True, False, 'POSITIVKONTROLLE: der Fall, fuer den es den Waechter gibt'),
+            ('echte Nutzung MIT _gen_env',
+             'import _gen_env\nfrom src.core.app_state import get_state\n',
+             True, True, 'sauber isoliert'),
+            ('echte Nutzung MIT os.environ',
+             'import os\nos.environ["LIGHTOS_SHOW_DB"] = "/tmp/x.db"\nfrom src.core.app_state import get_state\n',
+             True, True, 'die zweite erlaubte Form'),
+            ('nur im Kommentar ERWAEHNT',
+             '# erklaert einen Fehler in app_state.py, fasst ihn aber nicht an\nprint(1)\n',
+             False, False, 'der falsche Alarm, an dem PROC-12 haengenblieb'),
+            ('nur im Docstring ERWAEHNT',
+             '"""Dieses Werkzeug fasst get_state() ausdruecklich NICHT an."""\nprint(1)\n',
+             False, False, 'dieselbe Klasse, eine Ebene tiefer'),
+            ('Nutzung + Isolation NUR im Kommentar',
+             '# wer will, setzt os.environ["LIGHTOS_SHOW_DB"] selbst\nfrom src.core.app_state import get_state\nget_state()\n',
+             True, False, 'DIE TEURE RICHTUNG: kam vorher als isoliert durch'),
+            ('Nutzung + Isolation NUR im Docstring',
+             '"""Setze os.environ["LIGHTOS_SHOW_DB"], wenn du willst."""\nfrom src.core.app_state import get_state\nget_state()\n',
+             True, False, 'dieselbe falsche Entwarnung'),
+            ('auskommentierter _gen_env-Import',
+             '# import _gen_env\nfrom src.core.app_state import get_state\n',
+             True, False, 'war schon vorher dicht, bleibt es'),
+        ]
+        for name, quelle, zustand, isoliert, warum in F:
+            with self.subTest(fall=name):
+                self.assertEqual(self._urteil(quelle), (zustand, isoliert), warum)
+
+    def test_unlesbare_datei_bleibt_STRENG(self):
+        """★ Die Fehlrichtung im Fehlerfall ist eine Entscheidung, keine
+        Nebensache: laesst sich eine Datei nicht zerlegen, wird der ROHTEXT
+        geprueft. Lieber ein falscher Alarm, den jemand ansieht, als eine
+        stille Entwarnung fuer eine Datei, die niemand lesen konnte."""
+        kaputt = 'def f(:\n  # os.environ["LIGHTOS_SHOW_DB"]\n  get_state()\n'
+        self.assertEqual(_nur_code(kaputt), kaputt, "unveraendert = streng")
+        self.assertTrue(STATE_API.search(_nur_code(kaputt)))
+
+    def test_zeilenstruktur_bleibt_erhalten(self):
+        """Der Zeilenanker von ``import _gen_env`` haengt am Zeilenanfang — wer
+        Kommentare ENTFERNT statt sie zu leeren, verschiebt Zeilen und bricht
+        das Muster."""
+        quelle = '# ein Kommentar\nimport _gen_env\nx = 1  # noch einer\n'
+        code = _nur_code(quelle)
+        self.assertEqual(len(code.splitlines()), len(quelle.splitlines()))
+        self.assertTrue(ISOLATION.search(code), "Zeilenanker muss weiter greifen")
+
+    def test_die_echten_werkzeuge_bleiben_beurteilbar(self):
+        """Gegenprobe am echten Bestand: die Bereinigung darf keine Datei
+        unlesbar machen und keine Isolation wegputzen, die wirklich da ist."""
+        geprueft = 0
+        for name, pfad in _tool_scripts():
+            with open(pfad, "r", encoding="utf-8", errors="replace") as f:
+                roh = f.read()
+            code = _nur_code(roh)
+            geprueft += 1
+            self.assertEqual(len(code.splitlines()), len(roh.splitlines()),
+                             name + ": Zeilenzahl veraendert")
+            if re.search(r"^\s*import _gen_env\b", roh, re.M):
+                self.assertTrue(ISOLATION.search(code),
+                                name + ": echte Isolation wegbereinigt")
+        self.assertGreater(geprueft, 10, "zu wenige Werkzeuge geprueft")
+
+
 class DbIsolationLintTest(unittest.TestCase):
     def test_state_touching_tools_are_isolated(self):
         offenders = []
@@ -59,7 +208,7 @@ class DbIsolationLintTest(unittest.TestCase):
             if name in WHITELIST:
                 continue
             with open(path, "r", encoding="utf-8", errors="replace") as f:
-                text = f.read()
+                text = _nur_code(f.read())      # QA-76: Code lesen, nicht Prosa
             if STATE_API.search(text) and not ISOLATION.search(text):
                 offenders.append(name)
         self.assertEqual(offenders, [], (
@@ -90,7 +239,7 @@ class DbIsolationLintTest(unittest.TestCase):
             if not os.path.isfile(path):
                 continue
             with open(path, "r", encoding="utf-8", errors="replace") as f:
-                text = f.read()
+                text = _nur_code(f.read())      # QA-76, s.o.
             if not STATE_API.search(text):
                 continue
             if ISOLATION.search(text) or re.search(r"^\s*import _bootstrap\b", text, re.M):

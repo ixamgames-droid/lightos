@@ -70,6 +70,33 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Segment, und danach stehen die Spalten drin.
 _OPFER = "tests/test_capability_live.py::test_render_probe_demo_show"
 
+#: Die Variablen, aus denen ``app_data_dir()`` seine BASIS nimmt:
+#: ``XDG_DATA_HOME`` auf Linux/BSD, ``APPDATA`` auf Windows. Immer BEIDE
+#: setzen — die jeweils fremde ist wirkungslos, und genau die Einseitigkeit
+#: war der Fehler von QA-73: die Erb-Regel in ``conftest`` stand nur an der
+#: Linux-Variablen, weshalb diese Datei auf Windows dauerhaft rot war,
+#: waehrend CI gruen meldete.
+#:
+#: ⚠️ ``HOME`` gehoert NICHT dazu und wird bewusst getrennt behandelt. Es ist
+#: der Rueckfall BEIDER Zweige, aber es liefert nicht dieselbe Basis: auf
+#: Linux haengt ``app_data_dir()`` dann ``.local/share`` an, auf Windows
+#: ``expanduser("~")`` — gemessen ``C:/Users/<du>/LightOS`` statt
+#: ``AppData/Roaming/LightOS``. Wer ``APPDATA`` bloss WEGNIMMT, zeigt auf
+#: Windows also nicht auf den echten Datenordner, sondern auf einen, den es
+#: nicht gibt. Genau daran ist der erste Anlauf dieses Fixes gescheitert.
+_DATENORDNER_BASIS = ("XDG_DATA_HOME", "APPDATA")
+
+
+def _echte_datenordner_basis() -> str:
+    """Die Basis, aus der ``app_data_dir()`` den ECHTEN Ordner baut.
+
+    Aus ``conftest._ECHTE_FIXTURE_DB`` zurueckgerechnet
+    (``<basis>/LightOS/fixtures.db``) statt aus der Umgebung geraten —
+    ``conftest`` loest den Pfad auf, BEVOR es die Variablen umbiegt, und ist
+    damit die einzige Stelle, die den echten Ordner noch kennt.
+    """
+    return os.path.dirname(os.path.dirname(_echte_bibliothek()))
+
 # Die VIZ-50a-Spalten — der reale Vorfall. Aus dem Stellvertreter entfernt,
 # damit die Migration wieder etwas zu tun hat.
 _VIZ50A_SPALTEN = ("grid_rows", "grid_cols")
@@ -229,7 +256,16 @@ class BibliothekSchemaTest(unittest.TestCase):
         # nichts zu kopieren, und dieser Test pruefte ins Leere. Er misst
         # gerade den Fall OHNE Vorgabe; dafuer muss das Kind den echten Ordner
         # sehen.
-        env.pop("XDG_DATA_HOME", None)
+        # ★ QA-73: ALLE Datenordner-Variablen, nicht nur die von Linux. Seit
+        # die Erb-Regel auch fuer ``APPDATA`` gilt, saehe das Kind auf Windows
+        # sonst den Sandkasten DIESES Prozesses als „echten" Datenordner —
+        # dort liegt keine Bibliothek, ``shutil.copyfile`` faellt in das
+        # ``except OSError: pass`` von ``conftest``, und die gemeldete Kopie
+        # existiert schlicht nicht. Gemessen genau so, bevor diese Zeile
+        # beide Seiten bediente.
+        for _var in _DATENORDNER_BASIS:
+            env[_var] = _echte_datenordner_basis()
+        env.pop("HOME", None)      # macOS liest nur den; dann greift pwd
         if vorgabe is not None:
             env["LIGHTOS_FIXTURE_DB"] = vorgabe
         env["LIGHTOS_SHOW_DB"] = os.path.join(tmp, "show.db")   # QA-53
@@ -661,8 +697,8 @@ class WaechterDeckungTest(unittest.TestCase):
         # sich zusammen. Auf Windows ist das nach Codelage schon heute so.
         # Die Schwesterfunktion `test_ohne_vorhandene_bibliothek_laeuft_die_
         # suite_trotzdem` macht es laengst richtig; hier stand nur eine.
-        env["XDG_DATA_HOME"] = xdg
-        env["APPDATA"] = xdg
+        for _var in _DATENORDNER_BASIS:
+            env[_var] = xdg
         env["HOME"] = xdg
         env["QT_QPA_PLATFORM"] = "offscreen"
         env["LIGHTOS_SHOW_DB"] = os.path.join(tmp, "show.db")       # QA-53

@@ -156,6 +156,46 @@ def _ist_schon_testkopie(pfad: str) -> bool:
     return os.path.dirname(os.path.realpath(pfad)) == os.path.realpath(_TEST_ROOT)
 
 
+def _geerbter_datenordner(vorgabe):
+    """Ein von AUSSEN vorgegebener Datenordner im TEMP-Bereich wird RESPEKTIERT.
+
+    Liefert die Vorgabe zurueck, wenn sie uebernommen werden soll, sonst
+    ``None`` (dann baut der Aufrufer sich seinen eigenen).
+
+    **Warum es das gibt.** Mehrere Tests starten pytest als KIND und geben ihm
+    einen eigenen Datenordner mit — allen voran der QA-58-Waechter, der seinen
+    Rueckfall in einem Sandkasten nachstellt. Ueberschriebe ``conftest`` das,
+    rechnete der Kindprozess ``_ECHTE_FIXTURE_DB`` aus dem Sandkasten (er wird
+    oben aufgeloest, VOR dieser Umlenkung), ``app_data_dir()`` danach aber aus
+    dem eigenen Testordner. Die beiden zeigen dann auseinander, der Vergleich
+    schlaegt nie an, und der Rueckfall bleibt GRUEN.
+
+    Eine Vorgabe AUSSERHALB des Temp-Bereichs wird dagegen umgelenkt: sonst
+    haette man den Schutz genau dann abgeschaltet, wenn er am meisten kostet.
+    Kriterium ist der TEMP-Bereich, nicht ``_TEST_ROOT`` — die Sandkaesten der
+    Kindprozess-Tests entstehen per ``tempfile.mkdtemp()`` und liegen daneben.
+    Der echte Datenordner eines Nutzers liegt nie unter Temp: auf Windows
+    zeigt ``%APPDATA%`` nach ``AppData/Roaming``, der Temp-Bereich nach
+    ``AppData/Local/Temp`` — der Schutz bleibt also scharf.
+
+    ★ Die Regel gilt fuer BEIDE Datenordner-Variablen. Sie stand ab QA-60 nur
+    an ``XDG_DATA_HOME``, also nur an der LINUX-Variablen — deshalb war genau
+    diese Datei auf Windows dauerhaft rot, waehrend CI gruen meldete (QA-73).
+    """
+    if not vorgabe:
+        return None
+    try:
+        echt = os.path.realpath(vorgabe)
+        wurzel = os.path.realpath(_TEST_TMP)
+    except OSError:
+        return None
+    # Grenze auf dem Trennzeichen statt blossem ``startswith``: sonst zaehlte
+    # ein Nachbar wie ``...\Temp2`` als "im Temp-Bereich".
+    if echt == wurzel or echt.startswith(wurzel + os.sep):
+        return vorgabe
+    return None
+
+
 if _FIXTURE_DB_VORGABE and _ist_schon_testkopie(_FIXTURE_DB_VORGABE):
     _FIXTURE_DB_KOPIE = None
 else:
@@ -174,7 +214,13 @@ else:
                 # fixture_db._seed_if_empty() legt sich eine an, wie bisher auch
     os.environ["LIGHTOS_FIXTURE_DB"] = _FIXTURE_DB_KOPIE
 
-_TEST_APPDATA = os.path.join(_TEST_ROOT, f"lightos_test_appdata_{_TEST_TOKEN}")
+# ★ QA-73: auch hier die Erb-Regel — und auf Windows hat sie GENAU DIE
+# Wirkung, fuer die sie gebaut wurde. Ein Kindprozess, der sich einen
+# Sandkasten mitgibt, behaelt ihn; ohne das rechnet er `_ECHTE_FIXTURE_DB`
+# aus dem Sandkasten und `app_data_dir()` aus dem eigenen Testordner.
+_APPDATA_GEERBT = _geerbter_datenordner(os.environ.get("APPDATA"))
+_TEST_APPDATA = _APPDATA_GEERBT or os.path.join(
+    _TEST_ROOT, f"lightos_test_appdata_{_TEST_TOKEN}")
 os.makedirs(os.path.join(_TEST_APPDATA, "LightOS"), exist_ok=True)
 os.environ["APPDATA"] = _TEST_APPDATA
 
@@ -216,12 +262,8 @@ os.environ["APPDATA"] = _TEST_APPDATA
 # Kindprozess-Tests entstehen per `tempfile.mkdtemp()` und liegen daneben. Der
 # echte Datenordner eines Nutzers liegt nie unter /tmp — der Schutz bleibt also
 # scharf.
-import tempfile as _tempfile                                    # noqa: E402
-_XDG_VORGABE = os.environ.get("XDG_DATA_HOME")
-if _XDG_VORGABE and os.path.realpath(_XDG_VORGABE).startswith(
-        os.path.realpath(_tempfile.gettempdir())):
-    _TEST_XDG = _XDG_VORGABE                      # geerbt, nicht selbst gebaut
-else:
+_TEST_XDG = _geerbter_datenordner(os.environ.get("XDG_DATA_HOME"))
+if not _TEST_XDG:                            # nichts geerbt -> selbst bauen
     _TEST_XDG = os.path.join(_TEST_ROOT, f"lightos_test_xdg_{_TEST_TOKEN}")
     os.makedirs(os.path.join(_TEST_XDG, "LightOS"), exist_ok=True)
     os.environ["XDG_DATA_HOME"] = _TEST_XDG
@@ -732,6 +774,14 @@ def _stop_background_threads_at_end():
     # Das PID-eigene Temp-APPDATA am Suite-Ende best-effort abraeumen (crash.log/
     # stages/... koennen einen offenen Handle halten -> ignore_errors; ein
     # PID-scoped Rest ist harmlos).
+    #
+    # ⚠️ NUR, was wir SELBST gebaut haben. Ein geerbter Sandkasten gehoert dem
+    # ELTERN-Prozess, der noch laeuft und ihn gleich weiterbenutzt — wer die
+    # Datei nicht angelegt hat, raeumt sie nicht ab (Lehre aus QA-53, und
+    # genau die Form des `WinError 2` aus dem Kopf dieser Datei: dort zog ein
+    # Prozess einem anderen das Verzeichnis unter den Fuessen weg).
+    if _APPDATA_GEERBT:
+        return
     try:
         import shutil
         shutil.rmtree(_TEST_APPDATA, ignore_errors=True)
