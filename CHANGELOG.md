@@ -7,6 +7,47 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-05 — Geräte mit eigener Weiß-Leiste haben jetzt zwei ansprechbare Sätze
+
+#### Neu
+
+- **Ein Gerät mit eigenen Weiß-Segmenten lässt sich im Gruppen-Editor als
+  ZWEI Sätze ins Raster legen: die Farb-Zonen und die Weiß-Segmente.** Neben
+  „Köpfe einzeln → Raster" steht dafür ein zweiter Knopf „Weiß-Segmente
+  einzeln → Raster".
+
+  Beide Sätze dürfen gleichzeitig im Raster liegen und stören einander nicht:
+  wer die Farb-Zonen neu auslegt, räumt damit nicht die Weiß-Segmente weg —
+  und umgekehrt. So lässt sich eine Gruppe nur aus Weiß bauen, nur aus RGB,
+  oder aus beidem zusammen.
+
+  Der Knopf bietet dieselben Anordnungen wie sein Gegenstück: die im Gerät
+  hinterlegte Form, als Zeile oder als Spalte. Bei Robins ZQ06121 sind das
+  8 Weiß-Segmente als 1×8; beim Stairville Matrix Blinder 5×5 sitzen die 25
+  Weiß-LEDs in den Pixeln und werden deshalb als 5×5 angeboten. Ist im Gerät
+  keine Form hinterlegt, bleibt „wie im Gerät hinterlegt" ausgegraut, statt
+  eine Anordnung zu raten — „als Zeile" und „als Spalte" gehen weiterhin.
+
+  Geräte ohne eigene Weiß-Kanäle sind davon nicht betroffen; bestehende
+  Gruppen und gespeicherte Shows verhalten sich unverändert.
+
+  **Noch nicht fertig:** eine Gruppe, die AUSSCHLIESSLICH aus Weiß-Segmenten
+  besteht, lässt sich noch nicht auswählen und wird von Matrix-Effekten noch
+  nicht gefahren. Das kommt im nächsten Schritt.
+
+#### Behoben
+
+- **Ein Gerät, das nur über Weiß-Segmente in einer Gruppe steckte, konnte bei
+  der Waisen-Bereinigung aus dem Patch entfernt werden.** Die Prüfung „wird
+  dieses Gerät irgendwo verwendet?" hat Weiß-Zellen nicht als Verwendung
+  gezählt. Ein `--anwenden` hätte das Gerät dann stillschweigend
+  ausgetragen. Solche Zellen zählen jetzt als Verwendung.
+
+- **Große Matrizen kosten spürbar weniger Rechenzeit.** Bei einem Panel mit
+  48 Zonen fällt rund ein Viertel der Arbeit pro Bild weg (gemessen 6,20 auf
+  4,57 ms), weil eine Eigenschaft des Geräts nicht mehr für jede Zelle
+  einzeln neu bestimmt wird. Am Bild ändert sich nichts.
+
 ### 2026-09-03 — „Pan spiegeln" gilt jetzt für alle Köpfe, nicht nur den ersten
 
 #### Behoben
