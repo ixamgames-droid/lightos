@@ -281,6 +281,21 @@ class FeatureDimmer:
     level: float = 1.0
 
 
+# ── FM-HEADLAYOUT A4 / FM-45: warum eine Kopf-Einschraenkung verworfen wird ────
+#
+# Die vier Gruende sehen gleich aus (das Geraet steht am Ende ohne Kopf-Maske
+# da), haben aber NICHT dieselbe richtige Folge. Bei den ersten beiden und beim
+# letzten ist „geraeteweit" gemeint und richtig; bei _KEIN_GUELTIGER_KOPF ist es
+# falsch — dort waren einzelne Koepfe gemeint, die es nicht gibt, und geraeteweit
+# faehrt den ganzen Balken. Genau diese Unterscheidung ist FM-45 Scheibe 2;
+# ``validate_head_restrictions`` allein kann sie nicht ausdruecken, weil sie fuer
+# alle vier dasselbe (naemlich nichts) liefert.
+_NICHT_GEPATCHT = "nicht_gepatcht"
+_KEIN_MEHRKOPF_GERAET = "kein_mehrkopf_geraet"
+_KEIN_GUELTIGER_KOPF = "kein_gueltiger_kopf"
+_ALLE_KOEPFE = "alle_koepfe"
+
+
 class AppState:
     def __init__(self):
         self._show_engine = None
@@ -2454,8 +2469,78 @@ class AppState:
         (2) Kopf-Zellen ueberleben einen Kanal-Modus-Wechsel (``update_fixture``
         raeumt die Auto-Gruppe nicht auf) — ohne Klemmen zeigte „Kopf 2" danach auf
         den Kopf 1 des neuen Modus."""
+        return {fid: gueltig for fid, gueltig, grund
+                in self._head_restrictions_geprueft(heads, count_heads)
+                if grund is None}
+
+    def fids_ohne_bedienbaren_kopf(self, heads, *, count_heads=None) -> set:
+        """FM-45/2: Geraete, die NUR ueber Koepfe gewaehlt sind, die es nicht gibt.
+
+        ``heads`` ist die ROHE Einschraenkung aus ``group_cells.head_restrictions``
+        — dort stehen per Konstruktion nur Geraete, deren Zellen ausschliesslich
+        Kopf-Zellen sind. Bleibt von denen nach dem Klemmen gegen den Patch kein
+        gueltiger Kopf uebrig, gehoert das Geraet aus der Ziel-Liste **entfernt**.
+
+        ★ **Warum das eine eigene Frage ist.** ``validate_head_restrictions``
+        verwirft aus vier Gruenden, aber die Gruende haben nicht dieselbe
+        richtige Folge:
+
+        * *nicht gepatcht* und *kein Mehrkopf-Geraet* → geraeteweiter
+          Bestandspfad, unveraendert richtig.
+        * *alle Koepfe genannt* → „alle Koepfe" IST das ganze Geraet, ebenfalls
+          richtig.
+        * *nach dem Klemmen kein gueltiger Kopf uebrig* → hier ist geraeteweit
+          **falsch**. Gemeint waren acht Segmente; gefahren wuerde der ganze
+          154-Kanal-Balken.
+
+        Ein leeres Ergebnis von ``validate_head_restrictions`` heisst fuer die
+        Verbraucher „keine Einschraenkung", und sie fallen auf ``(None,)`` =
+        ganzes Geraet zurueck. Ein Sentinel (``{fid: set()}``) heilt das
+        nachweislich nicht: die Verbraucher lesen ``heads.get(fid)`` **truthy**.
+        Deshalb die zweite Frage statt eines zweiten Rueckgabewerts — dieselbe
+        Form wie ``base_fids_in_grid_order`` neben ``referenzierte_fids``: EIN
+        Durchgang, zwei Antworten mit entgegengesetzter sicherer Richtung.
+
+        ⚠️ **Getippt wird derselbe Fehler laengst abgelehnt** — die Kommandozeile
+        sagt „K3 gibt es dort nicht" (``cmdline/parser._typed_heads``). Nur
+        geklickt fuehrte er stumm zum ganzen Geraet. Diese Funktion bringt den
+        Auswahl-Weg auf denselben Stand.
+
+        ⚠️ **Wer sie aufruft, muss den Bestandspfad NACH dem Rueckfall filtern.**
+        XY-Pad und MIDI-Fader fahren bei LEERER Auswahl absichtlich ALLE
+        gepatchten Geraete; wer vorher kuerzt und dabei auf null kommt, loest
+        genau diesen Rueckfall aus und faehrt statt acht Segmenten das ganze
+        Rig. Gemeint ist „diese Geraete nicht", nicht „nichts gewaehlt".
+        """
+        return {fid for fid, _, grund
+                in self._head_restrictions_geprueft(heads, count_heads)
+                if grund == _KEIN_GUELTIGER_KOPF}
+
+    def nur_bedienbare_fids(self, fids, heads, *, count_heads=None) -> list:
+        """Die Ziel-Liste OHNE die Geraete aus :meth:`fids_ohne_bedienbaren_kopf`.
+
+        Das ist die Form, die die vier Verbraucher brauchen (VC-Submaster,
+        XY-Pad, MIDI-Fader, Kommandozeile) — EINE Zeile je Stelle, damit die
+        Regel nicht viermal danebensteht. Reihenfolge und Typ der Eingabe
+        bleiben erhalten; ohne Befund wird die Liste unveraendert
+        durchgereicht.
+        """
+        ohne = self.fids_ohne_bedienbaren_kopf(heads, count_heads=count_heads)
+        if not ohne:
+            return list(fids or [])
+        return [f for f in (fids or []) if f not in ohne]
+
+    def _head_restrictions_geprueft(self, heads, count_heads=None) -> list:
+        """Der EINE Durchgang durch die vier Verwerfungsregeln.
+
+        Liefert je Geraet ``(fid, gueltige_koepfe, grund)``; ``grund is None``
+        heisst „die Einschraenkung steht". Geraete, ueber die sich gar nichts
+        sagen laesst (unlesbare fid, Zaehlung wirft), tauchen NICHT auf — dann
+        bleibt es beim Bestandsverhalten, und niemand wird auf einen Verdacht
+        hin aus der Ziel-Liste geworfen.
+        """
         if not heads:
-            return {}
+            return []
         try:
             by_fid = {}
             for fx in self.get_patched_fixtures():
@@ -2464,8 +2549,8 @@ class AppState:
                 except (TypeError, ValueError):
                     continue
         except Exception:
-            return {}
-        out: dict = {}
+            return []
+        geprueft: list = []
         for fid, hs in dict(heads).items():
             try:
                 fid = int(fid)
@@ -2473,6 +2558,7 @@ class AppState:
                 continue
             fx = by_fid.get(fid)
             if fx is None:
+                geprueft.append((fid, set(), _NICHT_GEPATCHT))
                 continue
             counter = count_heads or color_head_count_for_channels
             try:
@@ -2480,6 +2566,7 @@ class AppState:
             except Exception:
                 continue
             if n < 2:
+                geprueft.append((fid, set(), _KEIN_MEHRKOPF_GERAET))
                 continue
             valid: set = set()
             for h in (hs or ()):
@@ -2489,10 +2576,13 @@ class AppState:
                     continue
                 if 0 <= h < n:
                     valid.add(h)
-            if not valid or len(valid) >= n:
-                continue
-            out[fid] = valid
-        return out
+            if not valid:
+                geprueft.append((fid, valid, _KEIN_GUELTIGER_KOPF))
+            elif len(valid) >= n:
+                geprueft.append((fid, valid, _ALLE_KOEPFE))
+            else:
+                geprueft.append((fid, valid, None))
+        return geprueft
 
     def select_group_by_name(self, name_or_ref) -> bool:
         """Wählt die Fixtures einer Gruppe in den Programmer (F-24). True bei Erfolg.
