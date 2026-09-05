@@ -836,7 +836,7 @@ class RgbMatrixInstance(Function):
         # (gemessen 16 us je Aufruf = 31 ms/s bei 40 fps, nur fuers Zaehlen).
         # Der Merker lebt genau einen Frame; die Kanaele koennen sich zwischen
         # Frames aendern (Patch-Aenderung), zwischen Zellen nicht.
-        _achsen_cache: dict[int, tuple[int, int]] = {}
+        _achsen_cache: dict[int, bool] = {}
         try:
             from src.core.app_state import (get_channels_for_patched,
                                             channels_for_head,
@@ -961,13 +961,15 @@ class RgbMatrixInstance(Function):
                     # hat 0 Farbkoepfe — und dann IST das Weiss sein Emitter-Satz
                     # (Tunable White). Die allgemeine Zaehlung liefert diese 0
                     # ausdruecklich (FM-27).
-                    from src.core.app_state import attr_head_count_for_channels
-                    _achsen = (attr_head_count_for_channels(fx, chans, "color_w"),
-                               attr_head_count_for_channels(fx, chans, "color_r"))
+                    # ★★★ FM-41: EINE benannte Regel statt der ausgeschriebenen
+                    # Bedingung. „Gehoert das Weiss zur Farbzelle" und „gibt es
+                    # eine eigene Weiss-Achse" sind DIESELBE Frage, nur einmal
+                    # bejaht und einmal verneint — sie zweimal auszuformulieren
+                    # waere die Doppelstellen-Klasse, aus der ENG-25 entstand.
+                    from src.core.app_state import weiss_ist_eigene_achse_for_channels
+                    _achsen = weiss_ist_eigene_achse_for_channels(chans, fx)
                     _achsen_cache[fid] = _achsen
-                _n_w, _n_c = _achsen
-                _weiss_gehoert_zur_zelle = (_n_w == 0 or _n_c == 0
-                                            or _n_w == _n_c)
+                _weiss_gehoert_zur_zelle = not _achsen
             if self.style == MatrixStyle.RGBW and _weiss_gehoert_zur_zelle:
                 from src.core.color_utils import rgbw_split
                 cr, cg, cb, cw = rgbw_split(r, g, b)
@@ -1061,11 +1063,13 @@ class RgbMatrixInstance(Function):
             return
         try:
             from src.core.app_state import (get_channels_for_patched,
-                                            channels_for_axis)
+                                            channels_for_axis,
+                                            weiss_ist_eigene_achse_for_channels)
             from src.core.group_cells import ACHSE_WEISS
         except Exception:
             return
         inten = max(0.0, min(1.0, float(self.intensity)))
+        _eigen_cache: dict[int, bool] = {}
         for idx, eintrag in enumerate(self.weiss_grid):
             if not eintrag or idx >= len(grid):
                 continue
@@ -1077,6 +1081,22 @@ class RgbMatrixInstance(Function):
             if universe is None:
                 continue
             chans = get_channels_for_patched(fx)
+            # ★★★ FM-41 (nachgemessen 05.09.): NUR Geraete, deren Weiss ein
+            # eigener Satz IST. Wo das Weiss zur Farbzelle gehoert, adressieren
+            # beide Zellen DENSELBEN Kanal — gemessen an einem 4-Kanal-RGBW-PAR
+            # schrieb die Farbzelle ueber den Split `color_w = 0` (rot) und die
+            # Weiss-Zelle ueberschrieb CH4 mit 255. Und sie gewann IMMER, weil
+            # diese Schleife baulich nach der Farbschleife laeuft; der Vorrang
+            # liesse sich nicht einmal umdrehen. Ueber die echte Bibliothek:
+            # 1564 von 5125 Modi waren so betroffen, 71 haben wirklich eine
+            # eigene Achse. Dieselbe Regel wie der ENG-25-Torwaechter oben, nur
+            # andersherum gelesen.
+            _eigen = _eigen_cache.get(fid)
+            if _eigen is None:
+                _eigen = weiss_ist_eigene_achse_for_channels(chans, fx)
+                _eigen_cache[fid] = _eigen
+            if not _eigen:
+                continue
             proj = channels_for_axis(chans, ACHSE_WEISS, segment)
             if not proj:
                 # Segment gibt es nicht -> nichts fahren. ★ EHRLICHER HINWEIS:
@@ -1091,10 +1111,22 @@ class RgbMatrixInstance(Function):
                 continue
             hell = max(0, min(255, int(round(
                 self._pixel_brightness(grid[idx]) * 255))))
+            # ★★ FM-41 (nachgemessen): DERSELBE Vorbehalt wie in der
+            # Farbschleife (`scale_colors`, s. dort). Treibt die Matrix den
+            # Dimmer selbst, skaliert der FunctionManager-Merge bereits ueber
+            # den Dimmer-Kanal — hier nochmal zu multiplizieren dimmt QUADRATISCH.
+            # Gemessen am ZQ06121 mit drive_intensity=True: bei Master 0,5 stand
+            # die Farbzone bei 255 (der Merge dimmt sie ueber CH1), das
+            # Weiss-Segment aber schon bei 127 und wurde danach nochmal halbiert
+            # — acht Segmente auf einem Viertel, waehrend die 48 Farbzonen
+            # desselben Geraets im selben Frame korrekt auf der Haelfte standen.
+            _hat_dimmer = any((c.attribute or "").lower()
+                              in ("intensity", "dimmer", "master") for c in chans)
+            _skalieren = _hat_dimmer and not self.drive_intensity and inten < 0.999
             for attr, ch in proj.items():
                 a = (attr or "").lower()
                 if a == "color_w":
-                    val = int(hell * inten) if inten < 0.999 else hell
+                    val = int(hell * inten) if _skalieren else hell
                 elif a in ("intensity", "dimmer", "master"):
                     # Geteilter Master: nur hochziehen, wenn die Matrix ihn
                     # ohnehin treibt — sonst gehoert er dem Nutzer bzw. dem

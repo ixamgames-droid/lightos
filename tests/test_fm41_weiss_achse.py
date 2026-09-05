@@ -562,14 +562,50 @@ class WeissFormTest(unittest.TestCase):
         self.assertEqual(farbe, (4, 12), "Farb-Form unveraendert")
         self.assertEqual(weiss, (1, 8), "1 Reihe, Breite aus den 8 Kanaelen")
 
-    def test_gleich_viele_weiss_wie_farbkoepfe_heisst_dieselbe_geometrie(self):
-        """Stairville Matrix Blinder 5x5 RGBWW: 25 Weiss-Kanaele,
-        ``white_grid = (0, 0)`` — es gibt keine eigene LEISTE, die Weiss-LEDs
-        sitzen IN den 25 Pixeln. Ihre Form ist also die des Panels."""
+    def test_gleich_viele_weiss_wie_farbkoepfe_heisst_GAR_KEINE_eigene_achse(self):
+        """★★★ HIER LAG ICH ZUERST FALSCH — und die Korrektur ist lehrreicher
+        als der Fehler.
+
+        Meine erste Fassung schloss aus ``n_w == n_c``: „gleiche Anzahl, also
+        gleiche Geometrie, also biete die Weiss-Achse als 5x5 an". Dieselbe
+        Regel sagt in Wahrheit das **Gegenteil**: sitzt je ein Weiss-Emitter IM
+        Pixel, dann gehoert er der FARBZELLE — es gibt gar nichts Zweites
+        anzusprechen. Genau das ist die ENG-25-Aussage, ich hatte sie nur
+        andersherum gelesen.
+
+        Was daraus wurde, gemessen an einem 4-Kanal-RGBW-PAR: die Farbzelle
+        schrieb ueber den RGBW-Split ``color_w = 0`` (rot), die daneben gelegte
+        Weiss-Zelle ueberschrieb CH4 mit **255** — und gewann immer, weil die
+        Weiss-Schleife baulich spaeter laeuft. Ueber die echte Bibliothek waren
+        **1564 von 5125 Modi** so betroffen; eine eigene Achse haben **71**.
+
+        ★ Die Lehre: eine Zahlengleichheit ist noch keine Aussage ueber
+        ZUSTAENDIGKEIT. „Gleich viele" hiess hier nicht „passend anordnen",
+        sondern „es ist dasselbe Ding".
+        """
         nf, nw, farbe, weiss = self._formen("STAIRMB5X5")
-        self.assertEqual((nf, nw), (25, 25))
-        self.assertEqual(farbe, (5, 5))
-        self.assertEqual(weiss, (5, 5))
+        self.assertEqual(nf, 25, "25 Farbzonen")
+        self.assertEqual(nw, 0,
+                         "keine ansprechbare Weiss-Achse — das Weiss sitzt in "
+                         "den Pixeln und gehoert der Farbzelle")
+        self.assertEqual(farbe, (5, 5), "die Farb-Form bleibt unveraendert")
+        self.assertIsNone(weiss, "und damit gibt es auch keine Weiss-Form")
+
+    def test_die_achse_gibt_es_nur_wo_die_zahlen_auseinandergehen(self):
+        """Die Regel an echten Profilen — dieselbe, die der Renderer seit
+        ENG-25 fuehrt, hier fuer die Frage „darf man das ueberhaupt anbieten"."""
+        from src.core.app_state import weiss_ist_eigene_achse_for_channels as EIGEN
+        for kurz, erwartet, warum in (
+                ("ZQ06121", True,  "8 Weiss zu 48 Zonen — eigene Leiste"),
+                ("STAIRMB5X5", False, "25 zu 25 — Weiss sitzt im Pixel"),
+                ("PARW", False, "1 zu 1 — gewoehnlicher RGBW-PAR"),
+                ("PARBAR4", False, "4 zu 4"),
+                ("MH16", False, "gar kein Weiss"),
+        ):
+            with self.subTest(geraet=kurz):
+                v, _fx = self._stellvertreter(kurz)
+                import src.core.app_state as AS
+                self.assertIs(EIGEN(AS.get_channels_for_patched(None)), erwartet, warum)
 
     def test_ohne_hinterlegte_form_wird_nichts_geraten(self):
         """★ Die Gegenprobe. ``(0, 0)`` ohne passende Farbzahl heisst nach
@@ -839,6 +875,161 @@ class WeissZelleBleibtEineLueckeTest(unittest.TestCase):
                 self.assertIn("_zellen_indizes", quelle)
                 self.assertNotIn('.split(",")', quelle,
                                  "zweite Schluessel-Lesung — s. Checkliste 17")
+
+
+class GegenpruefungFundeTest(unittest.TestCase):
+    """★★★ Drei Funde einer adversarischen Gegenpruefung, alle selbst
+    nachgemessen und behoben. Sie stehen hier zusammen, weil sie EINE Ursache
+    haben: die Weiss-Achse wurde angeboten, wo es sie gar nicht gibt.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        from _fixture_quelle import frische_library
+        cls._eng = frische_library(cls)
+
+    def _chans(self, kurz):
+        from sqlalchemy import select
+        from sqlalchemy.orm import Session, selectinload
+        from src.core.database.models import FixtureProfile, FixtureMode
+        with Session(self._eng) as s:
+            p = s.execute(
+                select(FixtureProfile)
+                .options(selectinload(FixtureProfile.modes)
+                         .selectinload(FixtureMode.channels))
+                .where(FixtureProfile.short_name == kurz)).scalars().first()
+            m = max(p.modes, key=lambda m: m.channel_count)
+            return [SimpleNamespace(attribute=c.attribute,
+                                    channel_number=c.channel_number)
+                    for c in sorted(m.channels, key=lambda c: c.channel_number)]
+
+    def _frame(self, chans, positions, cols, rows, farbe=(255, 255, 255),
+               drive=False, inten=1.0, mit_weiss=True):
+        import src.core.app_state as AS
+        from src.core.engine.rgb_matrix import (RgbMatrixInstance, MatrixStyle,
+                                                grids_from_positions,
+                                                weiss_grid_from_positions)
+        alt = AS.get_channels_for_patched
+        AS.get_channels_for_patched = lambda f: chans
+        self.addCleanup(lambda: setattr(AS, "get_channels_for_patched", alt))
+        fg, hg = grids_from_positions(positions, cols, rows)
+        mx = RgbMatrixInstance(name="T")
+        mx.cols, mx.rows = cols, rows
+        mx.style = MatrixStyle.RGBW
+        mx.fixture_grid, mx.head_grid = fg, hg
+        mx.weiss_grid = (weiss_grid_from_positions(positions, cols, rows)
+                         if mit_weiss else [])
+        mx.drive_intensity = drive
+        mx.intensity = inten
+        mx._running = True
+        mx._render = lambda p, n=cols * rows: [farbe] * n
+
+        class _U:
+            def __init__(self): self.ch = {}
+            def set_channel(self, a, v): self.ch[a] = v
+
+        u = _U()
+        fx = SimpleNamespace(fid=1, universe=1, address=1, fixture_type="matrix")
+        mx.write({1: u}, [fx], 0.02)
+        return u.ch
+
+    # ── Fund 1 ──────────────────────────────────────────────────────────────
+    def test_eine_weiss_zelle_ueberschreibt_NIE_einen_farbkanal(self):
+        """★★ Der Fund: bei einem Geraet, dessen Weiss zur Farbzelle gehoert,
+        adressieren Farb- und Weiss-Zelle DENSELBEN Kanal. Gemessen schrieb die
+        Farbzelle ueber den RGBW-Split ``color_w = 0`` (rot) und die
+        Weiss-Zelle ueberschrieb ihn mit 255 — und gewann IMMER, weil die
+        Weiss-Schleife baulich spaeter laeuft; der Vorrang liesse sich nicht
+        einmal umdrehen.
+
+        Die Zusicherung ist deshalb hart: die Weiss-Achse darf Kanaele
+        HINZUFUEGEN, aber niemals einen Wert aendern, den die Farbschleife
+        bereits geschrieben hat."""
+        for kurz in ("PARW", "PARBAR4", "STAIRMB5X5", "ZQ06121"):
+            for farbe in ((255, 0, 0), (0, 128, 255), (255, 255, 255)):
+                with self.subTest(geraet=kurz, farbe=farbe):
+                    chans = self._chans(kurz)
+                    n_w = sum(1 for c in chans if c.attribute == "color_w")
+                    raster = {"0,0": 1}
+                    raster.update({("%d,0" % (i + 1)): ("1:w%d" % i)
+                                   for i in range(min(n_w, 4))})
+                    breite = len(raster)
+                    ohne = self._frame(chans, raster, breite, 1, farbe,
+                                       mit_weiss=False)
+                    mit = self._frame(chans, raster, breite, 1, farbe,
+                                      mit_weiss=True)
+                    geaendert = {k: (ohne[k], mit[k]) for k in ohne
+                                 if k in mit and ohne[k] != mit[k]}
+                    self.assertEqual(geaendert, {},
+                                     "die Weiss-Achse hat bestehende Werte "
+                                     "ueberschrieben")
+
+    # ── Fund 2 ──────────────────────────────────────────────────────────────
+    def test_weiss_wird_genauso_gedimmt_wie_die_farbzonen(self):
+        """★★ Der Fund: die Farbschleife hat einen Vorbehalt (``scale_colors``),
+        weil bei ``drive_intensity=True`` der Merge bereits ueber den
+        Dimmer-Kanal skaliert. Die Weiss-Schleife hatte ihn nicht und
+        multiplizierte unbedingt — also QUADRATISCH. Gemessen stand bei Master
+        0,5 die Farbzone auf 255 und das Weiss-Segment schon auf 127, bevor der
+        Merge nochmal halbierte.
+
+        Der Test vergleicht die beiden Achsen im SELBEN Frame gegeneinander,
+        statt absolute Werte festzunageln — die Aussage ist „gleich behandelt",
+        nicht „dieser Zahlenwert"."""
+        chans = self._chans("ZQ06121")
+        raster = {"0,0": "1:0", "1,0": "1:w0"}
+        for drive in (True, False):
+            for inten in (1.0, 0.75, 0.5, 0.25):
+                with self.subTest(drive_intensity=drive, master=inten):
+                    d = self._frame(chans, raster, 2, 1, (255, 255, 255),
+                                    drive=drive, inten=inten)
+                    self.assertEqual(
+                        d.get(147), d.get(3),
+                        "Weiss-Segment (CH147) und Farbzone (CH3) muessen im "
+                        "selben Frame gleich behandelt werden")
+
+    # ── Fund 3 ──────────────────────────────────────────────────────────────
+    class _Egal:
+        """Schluckt jeden Anzeige-Nachzug: aufrufbar UND attributierbar."""
+        def __call__(self, *_a, **_k):
+            return self
+        def __getattr__(self, _n):
+            return self
+
+    def test_ein_neues_raster_raeumt_die_weiss_achse_mit(self):
+        """★★★ Der schwerste der drei: beim Umhaengen einer Matrix auf andere
+        Geraete wurden ``fixture_grid`` und ``head_grid`` zurueckgesetzt,
+        ``weiss_grid`` aber nicht. Gemessen fuhr die Matrix danach weiter die
+        Weiss-Segmente eines Geraets, das in ``fixture_grid`` gar nicht mehr
+        vorkam — und der Zustand ueberlebte Speichern und Laden.
+
+        Genau die Richtung, die der ``to_dict``-Docstring ausschliessen will:
+        eine verlorene Weiss-Angabe darf zu „leuchtet nicht" degradieren, nie zu
+        ungewolltem Licht."""
+        from src.core.engine.rgb_matrix import RgbMatrixInstance
+        inst = RgbMatrixInstance(name="T")
+        inst.weiss_grid = [None, (5, 3), (5, 7), None]
+
+        class _View:
+            """Stellvertreter fuer die Raster-Politik.
+
+            Die Anzeige-Nachzuege der Methode (Spinboxen, Beschriftung,
+            Vorschau-Naht, Dirty-Marker) sind hier ohne Belang — sie bekommen
+            deshalb pauschal einen Leerlauf. Das macht den Test NICHT blind:
+            die Zusicherung haengt an ``inst.weiss_grid``, und wuerde die
+            Methode das Feld nicht mehr anfassen, faellt sie trotzdem."""
+            _current = inst
+            _saved = None
+
+            def __getattr__(self, name):
+                return GegenpruefungFundeTest._Egal()
+
+        from src.ui.views.rgb_matrix_view import RgbMatrixView
+        v = _View()
+        v.__dict__.clear()          # nur die Klassen-Attribute zaehlen
+        RgbMatrixView._apply_panel_grid(v, 2, 1, [6, None], [0, None], "x")
+        self.assertEqual(inst.weiss_grid, [],
+                         "ein neues Raster ersetzt ALLE Achsen")
 
 
 if __name__ == "__main__":

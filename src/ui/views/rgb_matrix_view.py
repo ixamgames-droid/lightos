@@ -1848,11 +1848,20 @@ class RgbMatrixView(QWidget):
         self._current.rows = 1
         self._current.fixture_grid = list(fids)
         self._current.head_grid = []          # FM-16: lose Auswahl = ganze Fixtures
+        # ★★ FM-41 (nachgemessen 05.09.): weiss_grid MUSS hier mit zurueck.
+        # Sonst fuhr die Matrix weiter die Weiss-Segmente eines Geraets, das in
+        # `fixture_grid` gar nicht mehr vorkommt — gemessen blieb CH154 eines
+        # abgewaehlten ZQ06121 stehen, und der Zustand ueberlebte Speichern und
+        # Laden. Genau die Richtung, die der `to_dict`-Docstring ausschliessen
+        # will: eine verlorene Weiss-Angabe darf zu „leuchtet nicht"
+        # degradieren, nie zu ungewolltem Licht.
+        self._current.weiss_grid = []
         if self._saved is not None:
             self._saved.cols = len(fids)
             self._saved.rows = 1
             self._saved.fixture_grid = list(fids)
             self._saved.head_grid = []
+            self._saved.weiss_grid = []
         for spin, val in ((self._cols_spin, len(fids)), (self._rows_spin, 1)):
             spin.blockSignals(True)
             spin.setValue(val)
@@ -1890,7 +1899,8 @@ class RgbMatrixView(QWidget):
 
     # ── FM-22: Panel-Raster und Muster-Assistent ─────────────────────────────
 
-    def _apply_panel_grid(self, cols, rows, fixture_grid, head_grid, text):
+    def _apply_panel_grid(self, cols, rows, fixture_grid, head_grid, text,
+                          weiss_grid=None):
         """Raster in BEIDE Instanzen schreiben und die Anzeige nachziehen.
 
         Gleiche Politik wie ``_assign_from_selection``: eine Grid-Zuweisung ist
@@ -1905,6 +1915,11 @@ class RgbMatrixView(QWidget):
             inst.rows = rows
             inst.fixture_grid = list(fixture_grid)
             inst.head_grid = list(head_grid)
+            # FM-41, s. `_assign_from_selection`: ein neues Raster ersetzt ALLE
+            # Achsen. Der Vorgabewert ist bewusst die leere Liste und nicht
+            # „unveraendert lassen" — ein Aufrufer, der die Achse nicht kennt,
+            # soll sie loeschen statt sie stehenzulassen.
+            inst.weiss_grid = list(weiss_grid or [])
         for spin, val in ((self._cols_spin, cols), (self._rows_spin, rows)):
             spin.blockSignals(True)
             spin.setValue(val)

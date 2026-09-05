@@ -4483,6 +4483,54 @@ def weiss_segment_count_for_channels(channels) -> int:
     return attr_head_count_for_channels(None, channels, "color_w")
 
 
+def weiss_ist_eigene_achse_for_channels(channels, fixture=None) -> bool:
+    """Sind die Weiss-Emitter dieses Geraets ein EIGENER, getrennt ansprechbarer
+    Satz — oder gehoeren sie zu den Farbzellen?
+
+    ★★★ Das ist **wortwoertlich die ENG-25-Frage**, nur einmal mehr benutzt.
+    Der Renderer fragt sie seit ENG-25, um zu entscheiden, ob ein Farbeffekt den
+    Weissanteil aus R/G/B ziehen darf. Es ist DIESELBE Frage wie „darf man die
+    Weiss-Segmente getrennt ins Raster legen" — und sie zweimal zu formulieren
+    waere die Doppelstellen-Klasse (Review-Checkliste 17), aus der ENG-25
+    ueberhaupt erst entstanden ist.
+
+    Wahr genau dann, wenn es Weiss UND Farbkoepfe gibt und ihre ZAHLEN
+    auseinandergehen. Die drei Gegenfaelle, jeder mit seinem Grund:
+
+    * ``n_w == 0`` — kein Weiss, keine Achse.
+    * ``n_w == n_c`` — je Farbzelle ein Weiss-Emitter: das Weiss sitzt IM Pixel
+      und gehoert der Farbzelle. Ein gewoehnlicher RGBW-PAR (1:1), der
+      Stairville Blinder 5x5 RGBWW (25:25).
+    * ``n_c == 0`` — Tunable White: das Weiss IST der Emittersatz, die Farbzelle
+      fuehrt es ohnehin.
+
+    ⚠️ **Warum das eine SPERRE ist und nicht nur eine Empfehlung.** Wo das Weiss
+    zur Farbzelle gehoert, adressieren Farb- und Weiss-Zelle **denselben
+    physischen Kanal**. Gemessen an einem 4-Kanal-RGBW-PAR: die Farbzelle
+    schreibt ueber den RGBW-Split ``color_w = 0`` (rot), eine daneben gelegte
+    Weiss-Zelle ueberschreibt CH4 mit 255 — und gewinnt IMMER, weil die
+    Weiss-Schleife baulich nach der Farbschleife laeuft. Der Vorrang liesse sich
+    nicht einmal umdrehen. Es gibt dort schlicht nichts zweites anzusprechen.
+
+    **Gemessen ueber die echte Bibliothek (5125 Modi):** 71 Modi haben eine
+    eigene Achse, 1460 haben Weiss im Pixel, 104 sind Tunable White, 3490 haben
+    gar kein Weiss. Ohne diese Sperre bekaemen **1564** Modi eine Achse
+    angeboten, die es bei ihnen nicht gibt.
+    """
+    n_w = attr_head_count_for_channels(fixture, channels, "color_w")
+    n_c = attr_head_count_for_channels(fixture, channels, "color_r")
+    return n_w > 0 and n_c > 0 and n_w != n_c
+
+
+def weiss_ist_eigene_achse(fixture) -> bool:
+    """:func:`weiss_ist_eigene_achse_for_channels` fuer ein gepatchtes Geraet."""
+    try:
+        return weiss_ist_eigene_achse_for_channels(
+            get_channels_for_patched(fixture), fixture)
+    except Exception:
+        return False
+
+
 def weiss_segment_count(fixture) -> int:
     """Wie :func:`weiss_segment_count_for_channels`, aber gegen ein Fixture —
     Gegenstueck zu :func:`color_head_count`."""

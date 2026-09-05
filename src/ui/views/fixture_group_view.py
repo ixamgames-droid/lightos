@@ -1931,9 +1931,21 @@ class FixtureGroupView(QWidget):
         (``color_head_count``) — sonst driften Hand- und Auto-Anlage.
         Weiß: ``weiss_segment_count``, das bewusst **nicht** auf 1 aufrundet;
         ein erfundenes Segment wäre sofort eine Phantom-Zelle."""
-        from src.core.app_state import color_head_count, weiss_segment_count
+        from src.core.app_state import (color_head_count, weiss_segment_count,
+                                        weiss_ist_eigene_achse)
         try:
             if achse == ACHSE_WEISS:
+                # ★★★ FM-41 (nachgemessen 05.09.): 0, wenn das Weiss zur
+                # FARBZELLE gehoert. Bei einem gewoehnlichen RGBW-PAR (1:1) oder
+                # dem Blinder 5x5 RGBWW (25:25) ist `color_w` derselbe physische
+                # Emitter, den die Farbzelle ueber den RGBW-Split fuehrt — eine
+                # Weiss-Zelle daneben adressiert nichts Zweites, sondern
+                # ueberschreibt nur. Gemessen: 1564 von 5125 Modi bekamen die
+                # Achse angeboten, obwohl es sie bei ihnen nicht gibt; wirklich
+                # eigenstaendig ist sie in 71. Die Regel ist DIESELBE, die der
+                # Renderer seit ENG-25 fuehrt.
+                if not weiss_ist_eigene_achse(fx):
+                    return 0
                 return int(weiss_segment_count(fx))
             return int(color_head_count(fx))
         except Exception:
