@@ -519,10 +519,22 @@ class VCSlider(VCWidget):
             else:
                 cells = state.get_selected_cells()
                 fids = list(state.get_selected_fids())
-            heads = state.validate_head_restrictions(head_restrictions(cells))
-            return fids, (heads or {})
+            roh = head_restrictions(cells)
+            heads = state.validate_head_restrictions(roh)
         except Exception:
             return [], {}
+        # FM-45/2: Geraete, die NUR ueber Koepfe in der Reichweite stehen, die
+        # es nicht (mehr) gibt, gehoeren aus der Ziel-Liste — sonst faehrt der
+        # Fader statt acht Segmenten den ganzen Balken. Die Regel liegt in
+        # app_state, damit sie nicht an vier Stellen danebensteht.
+        #
+        # ⚠️ In EIGENEM Schutz: scheitert sie, bleibt es beim Bestand. Lag sie
+        # im Block darueber, machte ein Fehler hier aus einem arbeitenden Fader
+        # einen toten — der Rueckfall dort ist `[], {}`.
+        try:
+            return state.nur_bedienbare_fids(fids, roh), (heads or {})
+        except Exception:
+            return fids, (heads or {})
 
     def _submaster_target_heads(self, state) -> dict:
         """Nur die Kopf-Einschraenkung (Sicht auf ``_submaster_targets``)."""

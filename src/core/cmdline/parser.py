@@ -149,7 +149,7 @@ def _get_selection(state) -> list:
     return list(getattr(state, "selected_fids", []) or [])
 
 
-def _selection_heads(state, attribute: str) -> dict:
+def _selection_heads(state, attribute: str) -> tuple:
     """Kopf-Einschraenkung der aktuellen Auswahl fuer EIN Attribut —
     ``{fid: {head}}``, leer = keine Einschraenkung.
 
@@ -157,16 +157,33 @@ def _selection_heads(state, attribute: str) -> dict:
     ``HYDRABEAM 4000 RGBW [19-Kanal]`` hat 4 Pan, 4 Tilt, 5 Intensity und 1
     Farbbank — mit der falschen Zaehlung entstuende entweder ein ``attr#N`` ohne
     Kanal (der Kopf faellt auf seinen Default) oder die Einschraenkung fiele weg.
+
+    Liefert ``(heads, ohne)``: ``ohne`` sind die Geraete, die NUR ueber Koepfe
+    in der Auswahl stehen, die es fuer dieses Attribut gar nicht gibt
+    (FM-45/2). Sie gehoeren aus der Ziel-Liste, statt geraeteweit gefahren zu
+    werden — getippt lehnt ``_typed_heads`` denselben Fehler laengst mit
+    „K3 gibt es dort nicht" ab, geklickt fuehrte er stumm zum ganzen Geraet.
     """
     try:
         from src.core.app_state import head_counter_for_attr
         from src.core.group_cells import head_restrictions
         cells = state.get_selected_cells()
-        return state.validate_head_restrictions(
-            head_restrictions(cells),
-            count_heads=head_counter_for_attr(attribute)) or {}
+        zaehler = head_counter_for_attr(attribute)
+        roh = head_restrictions(cells)
+        heads = state.validate_head_restrictions(roh, count_heads=zaehler) or {}
     except Exception:
-        return {}
+        return {}, set()
+    # ⚠️ Die neue Regel in EIGENEM Schutz: scheitert sie, bleibt die
+    # Kopf-Maske stehen. Zusammen im Block darueber riss ein Fehler hier
+    # `heads` mit — und aus „ein Kopf zu viel" wuerde „ganzes Geraet".
+    # Defensiv wie ``_typed_heads``: dieser Modulteil wird auch gegen schlanke
+    # Zustands-Attrappen gefahren.
+    try:
+        regel = getattr(state, "fids_ohne_bedienbaren_kopf", None)
+        ohne = regel(roh, count_heads=zaehler) if callable(regel) else set()
+    except Exception:
+        ohne = set()
+    return heads, ohne
 
 
 def _geraet_kopfzahl(fx, chans, zaehle_farbe, zaehle_bewegung) -> int:
@@ -308,7 +325,20 @@ class SetValueCommand(Command):
             # die gespeicherte (geklickte) Auswahl darf kopf-fein sein…
             if self.selection.is_empty():
                 fids = _get_selection(state)
-                heads = _selection_heads(state, self.attribute)
+                heads, ohne = _selection_heads(state, self.attribute)
+                # FM-45/2: Geraete, die nur ueber nicht existierende Koepfe in
+                # der Auswahl stehen, gehoeren raus. Bleibt DADURCH nichts
+                # uebrig, ist „Keine Fixtures selektiert" die falsche Auskunft
+                # — es IST etwas gewaehlt, es laesst sich nur nicht bedienen.
+                if ohne:
+                    uebrig = [f for f in fids if f not in ohne]
+                    if fids and not uebrig:
+                        return CommandResult(
+                            False,
+                            f"Die Auswahl nennt für '{self.attribute}' nur "
+                            f"Köpfe, die es dort nicht gibt "
+                            f"(Gerät {sorted(ohne)[0]}) — nichts gesetzt")
+                    fids = uebrig
             else:
                 fids = self.selection.resolve(all_fids)
                 # …ausser der Kopf wurde ausdruecklich MITGETIPPT (`1:2 @ 50`).

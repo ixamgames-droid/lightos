@@ -79,6 +79,23 @@ class _State:
         return A.AppState.validate_head_restrictions(self, heads,
                                                      count_heads=count_heads)
 
+    def fids_ohne_bedienbaren_kopf(self, heads, *, count_heads=None):
+        return A.AppState.fids_ohne_bedienbaren_kopf(
+            self, heads, count_heads=count_heads)
+
+    def _head_restrictions_geprueft(self, heads, count_heads=None):
+        return A.AppState._head_restrictions_geprueft(
+            self, heads, count_heads)
+
+    def nur_bedienbare_fids(self, fids, heads, *, count_heads=None):
+        # FM-45/2 — wie die Schwester darueber an die ECHTE Regel
+        # delegiert. Die GANZE Kette, nicht nur der Einstieg: die
+        # Methode ruft intern `self.fids_ohne_bedienbaren_kopf`, und
+        # eine Attrappe, der die fehlt, laesst den Aufrufer in seinen
+        # `except`-Zweig laufen statt zu delegieren.
+        return A.AppState.nur_bedienbare_fids(
+            self, fids, heads, count_heads=count_heads)
+
     # vom Mapper beruehrt, aber hier ohne Bedeutung
     playback_engine = None
     output_manager = None
