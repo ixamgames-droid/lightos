@@ -1118,5 +1118,100 @@ class WeissMatrixSteuertEinGeraetTest(unittest.TestCase):
         self.assertEqual(u.ch, {}, "nichts geschrieben, aber auch nicht geworfen")
 
 
+class AnzeigeKenntDieWeissAchseTest(unittest.TestCase):
+    """★★ Die Anzeige-Haelfte. Alle diese Stellen lasen ueber den bewusst
+    verlustbehafteten ``_split_cell`` — und sahen eine Weiss-Zelle deshalb als
+    „nichts". Fuer die ANZEIGE ist das die falsche Fehlrichtung: man sieht die
+    Zelle ja, sie faehrt DMX, und trotzdem war sie namenlos, im Ton eines
+    fremden Geraets gemalt und aus dem Kontextmenue verschwunden.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        from PySide6.QtWidgets import QApplication
+        cls._app = QApplication.instance() or QApplication([])
+
+    def test_zellfarbe_traegt_den_geraeteton_und_ist_trotzdem_unterscheidbar(self):
+        """★ Vorher fiel eine Weiss-Zelle ueber ``fid=None`` auf Index 0 zurueck
+        und bekam den Ton des ERSTEN Geraets — ausgerechnet auf der Flaeche, auf
+        der man die Zugehoerigkeit ablesen soll."""
+        from src.ui.head_cell_colors import fixture_cell_color as F
+        ordnung = [5, 7]
+        w5 = F(5, 0, ordnung, "w")
+        w7 = F(7, 0, ordnung, "w")
+        k5 = F(5, 0, ordnung)
+        self.assertNotEqual(w5.name(), w7.name(),
+                            "zwei Geraete muessen unterscheidbar bleiben")
+        self.assertNotEqual(w5.name(), k5.name(),
+                            "Weiss-Segment darf nicht wie eine Farb-Zone aussehen")
+        self.assertLess(w5.getHsl()[1], k5.getHsl()[1],
+                        "Weiss-Zellen sind entsaettigt — auch semantisch richtig")
+
+    def test_farbzellen_bleiben_byte_gleich(self):
+        """Die Gegenprobe: ohne Achse aendert sich nichts."""
+        from src.ui.head_cell_colors import fixture_cell_color as F
+        ordnung = [5, 7]
+        for fid in (5, 7):
+            for head in (None, 0, 3):
+                with self.subTest(fid=fid, head=head):
+                    self.assertEqual(F(fid, head, ordnung).name(),
+                                     F(fid, head, ordnung, None).name())
+                    self.assertEqual(F(fid, head, ordnung).name(),
+                                     F(fid, head, ordnung, ACHSE_FARBE).name())
+
+    def test_anzeige_zaehlt_geraete_die_NUR_weiss_zellen_haben(self):
+        """★ Fuer die Anzeige zaehlt „kommt vor", nicht „wird gefahren" — die
+        beiden Lesarten sind bewusst getrennt (s. ``referenzierte_fids``), und
+        hier ist die zweite die richtige."""
+        from src.core.group_cells import (base_fids_in_grid_order as FAEHRT,
+                                          referenzierte_fids_in_grid_order as ZEIGT)
+        raster = {"1,0": "7:0", "0,0": "5:w3", "2,0": 5, "0,1": 9}
+        self.assertEqual(FAEHRT(raster), [7, 5, 9])
+        self.assertEqual(ZEIGT(raster), [5, 7, 9],
+                         "Raster-Reihenfolge, Zeile vor Spalte")
+
+    def test_die_reihenfolge_regel_steht_nur_einmal(self):
+        """Beide Lesarten teilen sich EINE Reihenfolge-Regel. Zwei Fassungen
+        waeren die Doppelstellen-Klasse — und ausgerechnet die Reihenfolge ist
+        fuer Fan/Chase relevant, ein Auseinanderlaufen faellt erst am Rig auf."""
+        import inspect
+        from src.core import group_cells as G
+        for fn in (G.base_fids_in_grid_order, G.referenzierte_fids_in_grid_order):
+            with self.subTest(funktion=fn.__name__):
+                quelle = inspect.getsource(fn)
+                self.assertIn("_fids_in_grid_order", quelle)
+                self.assertNotIn("items.sort()", quelle)
+
+    def test_vorschau_nennt_eine_weiss_zelle_nicht_luecke(self):
+        """★★ Die Zelle wird gefahren — „Lücke (kein Gerät)" war schlicht
+        falsch, und zwar an der Stelle, an der man die Zuordnung nachschaut."""
+        from src.ui.views.rgb_matrix_view import MatrixPreview
+        from src.core.engine.rgb_matrix import RgbMatrixInstance
+        m = RgbMatrixInstance(name="T")
+        m.cols, m.rows = 3, 1
+        m.fixture_grid = [7, None, None]
+        m.head_grid = [0, None, None]
+        m.weiss_grid = [None, (5, 2), None]
+        v = MatrixPreview()
+        v._matrix = m
+        v._labels = {5: "Balken", 7: "PAR"}
+        self.assertIn("Weiß-Segment 3", v.assignment_text(1))
+        self.assertIn("Balken", v.assignment_text(1))
+        self.assertEqual(v.assignment_text(2), "Lücke (kein Gerät)",
+                         "eine ECHTE Luecke heisst weiterhin so")
+
+    def test_vorschau_legende_kennt_das_weiss_geraet(self):
+        from src.ui.views.rgb_matrix_view import MatrixPreview
+        from src.core.engine.rgb_matrix import RgbMatrixInstance
+        m = RgbMatrixInstance(name="T")
+        m.cols, m.rows = 3, 1
+        m.fixture_grid = [7, None, None]
+        m.weiss_grid = [None, (5, 2), None]
+        v = MatrixPreview()
+        v._matrix = m
+        v._labels = {}
+        self.assertEqual(sorted(v.fid_order()), [5, 7])
+
+
 if __name__ == "__main__":
     unittest.main()

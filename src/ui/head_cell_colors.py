@@ -34,7 +34,7 @@ FIXTURE_CELL_COLORS = (
 _FIXTURE_CELL_COLORS = FIXTURE_CELL_COLORS
 
 
-def fixture_cell_color(fid, head, fid_order) -> QColor:
+def fixture_cell_color(fid, head, fid_order, achse=None) -> QColor:
     """Zellfarbe fuer ``fid``/``head``: **Farbton je Geraet, Helligkeit je Kopf.**
 
     * ``fid_order`` = Basis-fids in Raster-Reihenfolge (``base_fids_in_grid_order``).
@@ -47,12 +47,33 @@ def fixture_cell_color(fid, head, fid_order) -> QColor:
     * Ein Geraet ohne Kopf-Zelle (ganzes Fixture) behaelt den Basiston; eine
       Ein-Geraet-Gruppe sieht damit aus wie vor Slice 4 (kein Bruch mit Gewohnheit).
 
+    ★★ FM-41: ``achse`` unterscheidet die beiden Saetze eines Geraets. Die
+    Farb-Zonen behalten Ton und Rampe unveraendert (``achse=None`` oder
+    ``"rgb"`` ist byte-gleich zu vorher). Weiss-Segmente bekommen **denselben
+    Geraeteton, aber stark entsaettigt** — sie gehoeren sichtbar zum selben
+    Geraet und sind trotzdem nicht mit einer Farb-Zone zu verwechseln. Das
+    Entsaettigen ist hier auch semantisch richtig: es IST das Weiss.
+
+    ⚠️ Ohne diese Unterscheidung war eine Weiss-Zelle gemessen im Ton des
+    ERSTEN Geraets gemalt — ``fid=None`` fiel unten auf ``idx = 0`` zurueck. Sie
+    sah damit aus wie ein fremdes Geraet, und zwar ausgerechnet auf der Flaeche,
+    auf der man die Zugehoerigkeit ablesen soll.
+
     Reine Funktion (nur Qt-Farbe, kein Widget-Zustand) -> headless testbar."""
     try:
         idx = list(fid_order).index(fid)
     except (ValueError, TypeError):
         idx = 0
     base = QColor(FIXTURE_CELL_COLORS[idx % len(FIXTURE_CELL_COLORS)])
+    if achse == "w":
+        # Geraeteton behalten, Saettigung stark zurueck, Helligkeit je Segment
+        # leicht anheben — dieselbe Rampen-IDEE wie bei den Koepfen, damit die
+        # Reihenfolge ablesbar bleibt, aber in einem klar anderen Register.
+        h, s, light, a = base.getHsl()
+        out = QColor()
+        out.setHsl(h, int(s * 0.25),
+                   min(int(light + 30 + 16 * max(0, int(head or 0))), 190), a)
+        return out
     if head is None:
         return base
     # Helligkeits-Rampe je Kopf: HSL-Lightness in kleinen Schritten anheben,

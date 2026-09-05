@@ -85,6 +85,12 @@ class MatrixPreview(QWidget):
         out: list = []
         for idx, fid in enumerate(grid):
             if is_gap(grid, idx):
+                # FM-41: eine Weiss-Zelle ist in `fixture_grid` eine Luecke,
+                # traegt ihr Geraet aber sehr wohl bei — sonst fehlt es in der
+                # Legende und bekommt keinen eigenen Farbton.
+                _w = self._weiss_at(idx)
+                if _w and _w[0] not in out:
+                    out.append(_w[0])
                 continue
             try:
                 f = int(fid)
@@ -93,6 +99,23 @@ class MatrixPreview(QWidget):
             if f not in out:
                 out.append(f)
         return out
+
+    def _weiss_at(self, idx: int):
+        """``(fid, segment)`` der Weiss-Zelle ``idx``, sonst ``None`` (FM-41).
+
+        Die Weiss-Achse liegt bewusst NEBEN ``fixture_grid`` (dort ist die Zelle
+        eine Luecke), damit kein unbelehrter Konsument sie falsch deutet. Die
+        Vorschau ist aber ein Konsument, der es WISSEN muss — sonst zeichnet und
+        beschriftet sie eine gefahrene Zelle als „Luecke (kein Geraet)"."""
+        wg = list(getattr(self._matrix, "weiss_grid", []) or [])
+        if 0 <= idx < len(wg):
+            e = wg[idx]
+            if isinstance(e, (tuple, list)) and len(e) == 2:
+                try:
+                    return int(e[0]), int(e[1])
+                except (TypeError, ValueError):
+                    return None
+        return None
 
     def _head_at(self, idx: int):
         hg = list(getattr(self._matrix, "head_grid", []) or [])
@@ -132,6 +155,12 @@ class MatrixPreview(QWidget):
         if idx < 0 or idx >= (m.cols * m.rows):
             return ""
         if is_gap(grid, idx):
+            # FM-41: erst pruefen, ob dort ein WEISS-Segment sitzt. Es wird
+            # gefahren; „Luecke" waere schlicht falsch.
+            _w = self._weiss_at(idx)
+            if _w:
+                _name = self._labels.get(_w[0]) or f"Fixture {_w[0]}"
+                return f"{_name} · Weiß-Segment {_w[1] + 1}"
             return "Lücke (kein Gerät)"
         try:
             fid = int(grid[idx])

@@ -14,7 +14,8 @@ from PySide6.QtGui import (
 )
 from src.core.app_state import get_state
 from src.core.database.models import FixtureGroup
-from src.core.group_cells import base_fids_in_grid_order
+from src.core.group_cells import (base_fids_in_grid_order,
+                                  referenzierte_fids_in_grid_order)
 from src.ui.widgets import mini_icons as _mini
 from sqlalchemy.orm import Session
 from sqlalchemy import select, delete
@@ -587,10 +588,15 @@ class FixtureGridWidget(QWidget):
         # EINMAL pro Paint bestimmen (nicht je Zelle) — dieselbe Quelle wie alle
         # anderen Gruppen-fid-Resolver (group_cells), damit die Farbzuordnung nicht
         # von der dict-Reihenfolge abhaengt.
-        fid_order = base_fids_in_grid_order(
+        # ★ FM-41: fuer die ANZEIGE zaehlt „kommt vor", nicht „wird gefahren" —
+        # ein Geraet, das nur mit Weiss-Zellen im Raster steht, muss man sehen
+        # und benennen koennen. (Die Trennung der beiden Lesarten steht in
+        # `group_cells.referenzierte_fids`.)
+        fid_order = referenzierte_fids_in_grid_order(
             {f"{c},{r}": v for (c, r), v in self.positions.items()})
         for (c, r), v in self.positions.items():
-            fid, head = _split_cell(v)
+            fid, achse, index = parse_zelle(v)
+            head = index if achse == ACHSE_FARBE else None
             x = c * cw
             y = r * ch
             rect = (int(x) + 2, int(y) + 2, int(cw) - 4, int(ch) - 4)
@@ -598,13 +604,22 @@ class FixtureGridWidget(QWidget):
             if self._drag_from and (c, r) == self._drag_from:
                 fill_color = QColor("#ff8c00")
             else:
-                fill_color = fixture_cell_color(fid, head, fid_order)
+                fill_color = fixture_cell_color(
+                    fid, index if achse else head, fid_order, achse)
             p.fillRect(rect[0], rect[1], rect[2], rect[3], QBrush(fill_color))
             p.setPen(QColor("#ffffff"))
             p.setFont(font)
-            # FM-16e: Kopf-Zelle als "fid·K{head+1}" (1-basiert), ganzes Fixture als fid.
-            big = f"{fid}·K{head + 1}" if (fid is not None and head is not None) \
-                else (f"{fid}" if fid is not None else str(v))
+            # FM-16e: Kopf-Zelle als "fid·K{head+1}" (1-basiert), ganzes Fixture
+            # als fid. FM-41: Weiss-Segment als "fid·W{n+1}" — eigener Buchstabe,
+            # damit Kopf 3 und Weiss-Segment 3 nicht gleich aussehen.
+            if fid is None:
+                big = str(v)
+            elif achse == ACHSE_WEISS and index is not None:
+                big = f"{fid}·W{index + 1}"
+            elif head is not None:
+                big = f"{fid}·K{head + 1}"
+            else:
+                big = f"{fid}"
             p.drawText(rect[0], rect[1], rect[2], rect[3],
                        Qt.AlignmentFlag.AlignCenter, big)
             label = self._labels.get(fid, str(fid if fid is not None else v))
@@ -1451,9 +1466,14 @@ class FixtureGroupView(QWidget):
     def _group_fids(self) -> list[int]:
         """Fids der aktuell im Raster platzierten Fixtures der Gruppe. FM-16e:
         Kopf-Zellen ``"fid:head"`` -> Basis-fid (dedupliziert) fuer Member-Highlight."""
+        # ★ FM-41: ueber `parse_zelle`, nicht ueber den verlustbehafteten
+        # `_split_cell`. Sonst gilt ein Geraet, das NUR mit Weiss-Zellen im
+        # Raster steht, hier als „nicht in der Gruppe" — es liesse sich weder
+        # im Baum hervorheben noch als Ziel des Kontextmenues waehlen, obwohl
+        # man seine Zellen sieht.
         out: list[int] = []
         for v in self._grid_widget.positions.values():
-            fid, _head = _split_cell(v)
+            fid, _achse, _index = parse_zelle(v)
             if fid is not None and fid not in out:
                 out.append(fid)
         return out
@@ -1596,7 +1616,14 @@ class FixtureGroupView(QWidget):
         """
         gw = self._grid_widget
         wert = gw.positions.get((col, row))
-        fid, head = _split_cell(wert) if wert is not None else (None, None)
+        # ★ FM-41: auch aus einer Weiss-Zelle. Ueber `_split_cell` verlor das
+        # Menue auf einer Weiss-Zelle ALLE geraetebezogenen Eintraege
+        # („zusammenfassen", „alle Zellen entfernen", Aufteilen) — sichtbar war
+        # nur noch „Zelle entfernen". `head` bleibt bewusst None, wenn die Zelle
+        # keine FARB-Kopfzelle ist: die kopfbezogenen Eintraege meinen Koepfe.
+        _fid, _achse, _index = parse_zelle(wert) if wert is not None else (None, None, None)
+        fid = _fid
+        head = _index if _achse == ACHSE_FARBE else None
         fx = self._fixture_by_fid(fid) if fid is not None else None
 
         menu = QMenu(self)

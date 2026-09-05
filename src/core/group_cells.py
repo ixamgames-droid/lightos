@@ -280,6 +280,47 @@ def drop_whole_cells_with_heads(cells: dict) -> dict:
     return out
 
 
+def _fids_in_grid_order(positions: dict, leser) -> list:
+    """Gemeinsamer Kern: fids in Raster-Reihenfolge (Zeile, dann Spalte),
+    dedupliziert. ``leser(value)`` liefert den fid oder ``None``.
+
+    ★ FM-41: herausgezogen, weil es zwei LESARTEN gibt (was faehrt die Gruppe
+    vs. was erwaehnt sie, s. :func:`referenzierte_fids`), aber nur EINE
+    Reihenfolge-Regel. Die zweimal auszuschreiben waere die Doppelstellen-Klasse
+    — und ausgerechnet die Reihenfolge ist fuer Fan/Chase relevant, ein
+    Auseinanderlaufen faellt also erst am Rig auf.
+    """
+    items: list[tuple] = []
+    for key, value in (positions or {}).items():
+        try:
+            c_str, r_str = str(key).split(",")
+            c, r = int(c_str), int(r_str)
+        except (TypeError, ValueError):
+            continue
+        fid = leser(value)
+        if fid is not None:
+            items.append((r, c, fid))
+    items.sort()
+    out: list = []
+    for _r, _c, fid in items:
+        if fid not in out:
+            out.append(fid)
+    return out
+
+
+def referenzierte_fids_in_grid_order(positions: dict) -> list:
+    """Alle Geraete, die in diesem Raster VORKOMMEN — jede Achse, in
+    Raster-Reihenfolge.
+
+    Die geordnete Fassung von :func:`referenzierte_fids`; dort steht auch,
+    warum es zwei Lesarten gibt und welche wo hingehoert. **Fuer die ANZEIGE
+    ist immer diese hier die richtige:** ein Geraet, das nur mit Weiss-Zellen
+    im Raster steht, muss man sehen, benennen und anklicken koennen — auch
+    solange es der Renderer nicht faehrt.
+    """
+    return _fids_in_grid_order(positions, lambda v: parse_zelle(v)[0])
+
+
 def base_fids_in_grid_order(positions: dict) -> list[int]:
     """Basis-fids einer ``positions_json``-Map (``{"col,row": fid|"fid:head"}``) in
     **Raster-Reihenfolge** (Zeile, dann Spalte), **dedupliziert**.
@@ -289,22 +330,7 @@ def base_fids_in_grid_order(positions: dict) -> list[int]:
     Gruppen-fid-Resolver (``app_state``-Kern + Programmer-/EFX-/VC-Views), damit
     Kopf-Matrizen ihre Geraete zeigen statt ``(0)`` (FM16E-HEADCOUNT). Reihenfolge
     ist fuer Fan/Chase relevant (Geraete in Raster-Platzierungsreihenfolge)."""
-    items: list[tuple] = []
-    for key, value in (positions or {}).items():
-        try:
-            c_str, r_str = str(key).split(",")
-            c, r = int(c_str), int(r_str)
-        except (TypeError, ValueError):
-            continue
-        fid, _head = parse_group_cell(value)
-        if fid is not None:
-            items.append((r, c, fid))
-    items.sort()
-    out: list[int] = []
-    for _r, _c, fid in items:
-        if fid not in out:
-            out.append(fid)
-    return out
+    return _fids_in_grid_order(positions, lambda v: parse_group_cell(v)[0])
 
 
 def base_fids_in_cells(cells) -> list[int]:
