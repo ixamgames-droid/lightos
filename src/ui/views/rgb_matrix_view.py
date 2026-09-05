@@ -1786,7 +1786,8 @@ class RgbMatrixView(QWidget):
                     import json
                     from sqlalchemy.orm import Session
                     from src.core.database.models import FixtureGroup
-                    from src.core.engine.rgb_matrix import grids_from_positions
+                    from src.core.engine.rgb_matrix import (
+                        grids_from_positions, weiss_grid_from_positions)
                     with Session(eng) as s:
                         g = s.get(FixtureGroup, gid)
                     if g is not None:
@@ -1794,24 +1795,37 @@ class RgbMatrixView(QWidget):
                         # FM-16: fixture_grid + head_grid parallel (Pro-Kopf-Zellen
                         # "fid:head" tragen einen Kopf-Index; reine fids -> None).
                         grid, head_grid = grids_from_positions(positions, g.cols, g.rows)
+                        # ★ FM-41: die Weiss-Zellen kommen als EIGENE Liste
+                        # daneben. In `grid` sind sie bewusst Luecken (None) —
+                        # so sieht jeder Konsument ohne Achsenkenntnis nichts
+                        # statt etwas Falsches (s. `weiss_grid_from_positions`).
+                        weiss_grid = weiss_grid_from_positions(positions, g.cols, g.rows)
                         # Grid-Zuweisung ist live: sofort in beide Instanzen (kein dirty).
                         self._current.cols = g.cols
                         self._current.rows = g.rows
                         self._current.fixture_grid = grid
                         self._current.head_grid = head_grid
+                        self._current.weiss_grid = weiss_grid
                         if self._saved is not None:
                             self._saved.cols = g.cols
                             self._saved.rows = g.rows
                             self._saved.fixture_grid = list(grid)
                             self._saved.head_grid = list(head_grid)
+                            self._saved.weiss_grid = list(weiss_grid)
                         for spin, val in ((self._cols_spin, g.cols), (self._rows_spin, g.rows)):
                             spin.blockSignals(True)
                             spin.setValue(val)
                             spin.blockSignals(False)
                         n = sum(1 for f in grid if f is not None)
-                        luecken = len(grid) - n
+                        n_weiss = sum(1 for w in weiss_grid if w is not None)
+                        # FM-41: Weiss-Zellen sind in `grid` Luecken — sie hier
+                        # als solche zu zaehlen waere zwar wahr, aber
+                        # irrefuehrend („da fehlt was", obwohl da etwas steht).
+                        luecken = len(grid) - n - n_weiss
+                        _weiss_text = f", {n_weiss} Weiß-Segmente" if n_weiss else ""
                         self._grid_label.setText(
-                            f"{g.rows}×{g.cols} = {n} Fixtures, {luecken} Lücken (Gruppe »{g.name}«)"
+                            f"{g.rows}×{g.cols} = {n} Fixtures{_weiss_text}, "
+                            f"{luecken} Lücken (Gruppe »{g.name}«)"
                         )
                         self._sync_preview(self._current)
                         self._update_dirty()

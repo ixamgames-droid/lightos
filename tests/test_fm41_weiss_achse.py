@@ -664,5 +664,182 @@ class ZweiFragenTest(unittest.TestCase):
         self.assertIn("geraetegruppen", patch_dedup.referenzen(_Alt(), 1))
 
 
+class RendererWeissAchseTest(unittest.TestCase):
+    """★★★ Der Renderer faehrt die Weiss-Achse — gemessen am ECHTEN Geraet.
+
+    Die Abnahme dieser Scheibe stand vor dem Bauen fest: ein Vollweiss-Frame
+    ueber eine Weiss-Gruppe **muss CH147-154 tragen**. Steht dort 0, ist eine
+    der beiden gemessenen Sperren noch scharf (die Weiss-Zelle stirbt in
+    ``fixture_grid``, oder der ENG-25-Torwaechter greift faelschlich).
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        from _fixture_quelle import frische_library
+        from sqlalchemy import select
+        from sqlalchemy.orm import Session, selectinload
+        from src.core.database.models import FixtureProfile, FixtureMode
+        eng = frische_library(cls)
+        with Session(eng) as s:
+            p = s.execute(
+                select(FixtureProfile)
+                .options(selectinload(FixtureProfile.modes)
+                         .selectinload(FixtureMode.channels))
+                .where(FixtureProfile.short_name == "ZQ06121")).scalars().first()
+            m = max(p.modes, key=lambda m: m.channel_count)
+            cls.chans = [SimpleNamespace(attribute=c.attribute,
+                                         channel_number=c.channel_number)
+                         for c in sorted(m.channels, key=lambda c: c.channel_number)]
+        cls.weiss_kanaele = [c.channel_number for c in cls.chans
+                             if c.attribute == "color_w"]
+
+    def setUp(self):
+        import src.core.app_state as AS
+        self._alt = AS.get_channels_for_patched
+        AS.get_channels_for_patched = lambda f: self.chans
+        self.addCleanup(lambda: setattr(AS, "get_channels_for_patched", self._alt))
+
+    def _frame(self, positions, cols, rows, style=None, drive=False):
+        """Ein Vollweiss-Frame ueber dieses Raster -> geschriebene Adressen."""
+        from src.core.engine.rgb_matrix import (RgbMatrixInstance, MatrixStyle,
+                                                grids_from_positions,
+                                                weiss_grid_from_positions)
+        fg, hg = grids_from_positions(positions, cols, rows)
+        wg = weiss_grid_from_positions(positions, cols, rows)
+        mx = RgbMatrixInstance(name="T")
+        mx.cols, mx.rows = cols, rows
+        mx.style = style or MatrixStyle.RGBW
+        mx.fixture_grid, mx.head_grid, mx.weiss_grid = fg, hg, wg
+        mx.drive_intensity = drive
+        mx._running = True
+        mx._render = lambda phase, n=cols * rows: [(255, 255, 255)] * n
+
+        class _U:
+            def __init__(self): self.ch = {}
+            def set_channel(self, a, v): self.ch[a] = v
+
+        u = _U()
+        fx = SimpleNamespace(fid=1, universe=1, address=1, fixture_type="matrix")
+        mx.write({1: u}, [fx], 0.02)
+        return sorted(u.ch)
+
+    def test_die_abnahme__vollweiss_traegt_ch147_bis_154(self):
+        adressen = self._frame({f"{i},0": f"1:w{i}" for i in range(8)}, 8, 1)
+        self.assertEqual(adressen, self.weiss_kanaele)
+        self.assertEqual(adressen, list(range(147, 155)),
+                         "die acht color_w-Kanaele des ZQ06121")
+
+    def test_farb_und_weiss_zellen_stoeren_einander_nicht(self):
+        """Gemischtes Raster: die Farbzonen schreiben ihre RGB-Kanaele, das
+        Weiss-Segment seinen — und keiner den des anderen."""
+        adressen = self._frame({"0,0": "1:0", "1,0": "1:1", "2,0": "1:w3"}, 3, 1)
+        self.assertEqual(adressen, [3, 4, 5, 6, 7, 8, 150],
+                         "Zone 1 (CH3-5), Zone 2 (CH6-8), Weiss-Segment 4 (CH150)")
+
+    def test_kein_phantom_segment(self):
+        """★ 20 Weiss-Zellen bei 8 Segmenten schreiben 8 Kanaele, nicht 20 —
+        und ziehen vor allem NICHT den geteilten Master hoch (FM-45-Grenze)."""
+        adressen = self._frame({f"{i},0": f"1:w{i}" for i in range(20)}, 20, 1)
+        self.assertEqual(adressen, list(range(147, 155)))
+
+    def test_dimmer_und_shutter_stil_fahren_die_weiss_achse_nicht(self):
+        """★★ Ein Weiss-Segment hat keinen EIGENEN Dimmer und keinen eigenen
+        Shutter. Wuerde die Achse dort fahren, schrieben alle acht Zellen auf
+        DENSELBEN geteilten Kanal und ueberholten einander — letzter gewinnt,
+        sichtbar als Flackern. Es gibt dort nichts Pro-Segment zu fahren."""
+        from src.core.engine.rgb_matrix import MatrixStyle
+        raster = {f"{i},0": f"1:w{i}" for i in range(8)}
+        for stil in (MatrixStyle.DIMMER, MatrixStyle.SHUTTER):
+            with self.subTest(stil=stil):
+                self.assertEqual(self._frame(raster, 8, 1, style=stil), [])
+
+    def test_rgb_stil_faehrt_die_weiss_achse_sehr_wohl(self):
+        """★ Die RGB/RGBW-Unterscheidung betrifft die FARB-Zellen (ob deren
+        `color_w` aus dem Split mitlaeuft) — mit einem eigenstaendigen
+        Weiss-Segment hat sie nichts zu tun. Sonst waere hier der
+        ENG-25-Torwaechter auf die falsche Frage angewandt."""
+        from src.core.engine.rgb_matrix import MatrixStyle
+        raster = {f"{i},0": f"1:w{i}" for i in range(8)}
+        self.assertEqual(self._frame(raster, 8, 1, style=MatrixStyle.RGB),
+                         list(range(147, 155)))
+
+
+class WeissZelleBleibtEineLueckeTest(unittest.TestCase):
+    """★★★ Das Regressionsnetz. Die Weiss-Zelle ist in ``fixture_grid``
+    bewusst eine LUECKE, damit jeder Konsument ohne Achsenkenntnis **nichts**
+    erzeugt statt etwas Falschem.
+
+    Gemessen degradieren alle drei Alternativen falsch — deshalb nagelt dieser
+    Test genau die Pfade fest, die es sonst still kaputt machen wuerden.
+    """
+
+    def _grids(self):
+        from src.core.engine.rgb_matrix import (grids_from_positions,
+                                                weiss_grid_from_positions)
+        pos = {"0,0": "1:0", "1,0": "1:1", "2,0": "1:w3", "3,0": 7}
+        return (*grids_from_positions(pos, 4, 1),
+                weiss_grid_from_positions(pos, 4, 1))
+
+    def test_fixture_grid_meldet_eine_luecke(self):
+        from src.core.engine.rgb_matrix import is_gap
+        fg, hg, wg = self._grids()
+        self.assertEqual(fg, [1, 1, None, 7])
+        self.assertEqual(hg, [0, 1, None, None])
+        self.assertEqual(wg, [None, None, (1, 3), None])
+        self.assertTrue(is_gap(fg, 2), "Zelle 2 muss fuer Nicht-Wissende leer sein")
+
+    def test_die_achse_landet_NICHT_im_kopf_slot(self):
+        """★★ Die Falle, in die ein spaeterer „kleiner Umbau" sonst tappt.
+
+        Ein Achsen-String im Kopf-Slot laesst ``channels_for_head`` mit einem
+        ``TypeError`` scheitern, den der FunctionManager schluckt — der Tick
+        bricht dann MITTEN in der Zellschleife ab, und die gueltigen Zellen
+        dahinter rendern nie, jedes Frame aufs Neue. Ein Kopf-INDEX waere
+        genauso falsch, nur leiser: drei Konsumenten faerben dann RGB-Zone 4.
+        """
+        _fg, hg, _wg = self._grids()
+        for eintrag in hg:
+            with self.subTest(eintrag=eintrag):
+                self.assertIsInstance(eintrag, (int, type(None)),
+                                      "head_grid traegt Kopf-Indizes oder None")
+        self.assertIsNone(hg[2], "die Weiss-Zelle hat KEINEN Kopf-Index")
+
+    def test_show_vertrag__fehlender_schluessel_faellt_in_die_schmalere_richtung(self):
+        """★ Bewusst anders herum als ``head_grid``: dort heisst ein fehlender
+        Schluessel „ganzes Geraet" und erzeugt MEHR Ausgabe. Eine verlorene
+        Weiss-Angabe darf zu „leuchtet nicht" degradieren, nie zu ungewolltem
+        Licht — eine Rueckstufung auf ein aelteres LightOS ueberlebt der
+        Schluessel gemessen nicht."""
+        import json
+        from src.core.engine.rgb_matrix import RgbMatrixInstance
+        m = RgbMatrixInstance(name="T")
+        m.cols, m.rows = 4, 1
+        m.weiss_grid = [None, None, (1, 3), None]
+        d = m.to_dict()
+        json.dumps(d)                       # muss serialisierbar bleiben
+        zurueck = RgbMatrixInstance(name="X")
+        zurueck.apply_dict(d)
+        self.assertEqual(zurueck.weiss_grid, [None, None, (1, 3), None])
+
+        ohne = dict(d)
+        del ohne["weiss_grid"]
+        alt = RgbMatrixInstance(name="Y")
+        alt.apply_dict(ohne)
+        self.assertEqual(alt.weiss_grid, [], "kein Schluessel = keine Weiss-Zelle")
+
+    def test_die_schluessel_lesung_steht_nur_an_EINER_stelle(self):
+        """Beide Ableitungen lesen ``\"col,row\"`` ueber denselben Helfer —
+        nebeneinander kopiert waeren es acht Zeilen, die byte-genau synchron
+        bleiben muessten."""
+        import inspect
+        from src.core.engine import rgb_matrix as RM
+        for fn in (RM.grids_from_positions, RM.weiss_grid_from_positions):
+            with self.subTest(funktion=fn.__name__):
+                quelle = inspect.getsource(fn)
+                self.assertIn("_zellen_indizes", quelle)
+                self.assertNotIn('.split(",")', quelle,
+                                 "zweite Schluessel-Lesung — s. Checkliste 17")
+
+
 if __name__ == "__main__":
     unittest.main()
