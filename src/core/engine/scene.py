@@ -66,6 +66,10 @@ class Scene(Function):
 
     def _on_start(self):
         self._done = False
+        # ENG-20: je Lauf EINMAL melden, nicht je Frame. ``write`` laeuft mit
+        # der Bildrate; ein Hinweis pro Frame waere in Sekunden unlesbar und
+        # wuerde die echte Meldung im Rauschen begraben.
+        self._verworfen_gemeldet = set()
         # snapshot cleared — start values are captured on first write call
 
     def _on_stop(self):
@@ -130,6 +134,10 @@ class Scene(Function):
             universe = universes.get(fixture.universe)
             if universe is None:
                 continue
+            grund = self._warum_nicht_schreibbar(fixture, sv)
+            if grund:
+                self._melde_einmal(fixture, sv, grund)
+                continue
             dmx_addr = fixture.address + sv.channel - 1
             if not (1 <= dmx_addr <= 512):
                 continue
@@ -141,6 +149,63 @@ class Scene(Function):
         if fade_out_done:
             self._running = False
             self._done = True
+
+    # ── ENG-20: nicht in fremde Geraete schreiben ────────────────────────────
+
+    def _warum_nicht_schreibbar(self, fixture, sv) -> str:
+        """Warum dieser gespeicherte Wert NICHT ausgegeben werden darf — sonst "".
+
+        ★ Der Unterschied zu allen anderen Stellen, die ``fx.address +
+        channel - 1`` rechnen: dort kommt die Kanalnummer aus der LEBENDEN
+        Kanalliste des Geraets und kann per Konstruktion nicht ueberlaufen.
+        Hier kommt sie aus der GESPEICHERTEN Szene und beschreibt einen
+        Zustand, den es womoeglich nicht mehr gibt.
+
+        Zwei Gruende, beide gemessen:
+
+        * **Kanalzahl** (ENG-20): ein Geraet auf Adresse 7 mit heute 6 Kanaelen
+          und gespeichertem Kanal 10 schreibt auf Adresse 16 — in den Nachbarn.
+          Gemessen an Hydra@7 (6 Kanaele) neben PAR@13: die 200 landete auf 16.
+        * **Netzwerk-Laser**: deren ``address`` ist ein bedeutungsloser
+          Platzhalter (``fixture_uses_dmx``). Der Kommentar dort verlangt
+          ausdruecklich, dass JEDE Stelle mit dieser Rechnung vorher fragt —
+          ``scene.py`` tat es nicht. Gemessen: ein Laser@1 schrieb seinen
+          „Kanal 3" auf Adresse 3, also in einen echten PAR.
+
+        ⚠️ Fehlt die Kanalzahl (Alt-Objekte, Mocks), wird NICHT verworfen. Die
+        sichere Richtung ist hier „schreiben wie bisher": eine Szene, die
+        stumm nichts mehr tut, ist auf der Buehne schlimmer als eine, die zu
+        viel tut — dieselbe Abwaegung, die Robin bei FM-45/2 getroffen hat.
+        """
+        try:
+            from src.core.app_state import fixture_uses_dmx
+            if not fixture_uses_dmx(fixture):
+                return ("das Geraet gibt nicht ueber DMX aus (Netzwerk-Laser), "
+                        "seine Adresse ist ein Platzhalter")
+        except Exception:
+            pass                        # im Zweifel schreiben, s. Docstring
+        anzahl = getattr(fixture, "channel_count", None)
+        try:
+            anzahl = int(anzahl) if anzahl is not None else None
+        except (TypeError, ValueError):
+            anzahl = None
+        if anzahl is not None and not (1 <= sv.channel <= anzahl):
+            return (f"Kanal {sv.channel} gibt es dort nicht mehr — das Geraet "
+                    f"hat heute {anzahl}")
+        return ""
+
+    def _melde_einmal(self, fixture, sv, grund: str):
+        """Einmal je Lauf und je (Geraet, Kanal) — nicht je Frame."""
+        gemeldet = getattr(self, "_verworfen_gemeldet", None)
+        if gemeldet is None:
+            gemeldet = self._verworfen_gemeldet = set()
+        schluessel = (sv.fixture_id, sv.channel)
+        if schluessel in gemeldet:
+            return
+        gemeldet.add(schluessel)
+        print(f"[Scene] {self.name!r}: Wert fuer Geraet {sv.fixture_id} "
+              f"verworfen — {grund}. Szene neu speichern, dann ist der Rest "
+              f"wieder sauber (ENG-20).")
 
     # ── Serialisation ─────────────────────────────────────────────────────────
 
