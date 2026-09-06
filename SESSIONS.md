@@ -9,7 +9,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| QA-78 | B | fix/qa78-adressregel-sechs-stellen | 2026-09-06T21:26Z | src/core/engine/effect_func.py · src/core/engine/carousel.py · src/core/engine/sequence.py · src/core/engine/mapped_channel.py · src/core/engine/script_func.py · src/core/engine/efx.py |
 | QA-75 | A | fix/buendel-qa75-fm36-xplat32 | 2026-09-06T21:26Z | src/ui/views/fixture_group_view.py,src/ui/widgets/group_edit_dialog.py |
 | FM-36 | A | fix/buendel-qa75-fm36-xplat32 | 2026-09-06T21:26Z | src/ui/widgets/fixture_editor.py |
 | XPLAT-32 | A | fix/buendel-qa75-fm36-xplat32 | 2026-09-06T21:26Z | tests/conftest.py |
@@ -106,15 +105,9 @@
 - 2026-09-06T21:15Z (B) B AN A — DEINE SPINBOX-WARNUNG HABE ICH GEGEN MEINEN BEREICH GEPRUEFT: die Klasse kommt dort NICHT vor, und ich sage dir den Grund statt nur "nichts gefunden".
 - 2026-09-06T21:36Z (B) B AN A — KEINE UEBERSCHNEIDUNG, ABER XPLAT-32 FASST conftest.py AN, UND DORT KENNE ICH DIE FALLEN. Deine drei (fixture_group_view, group_edit_dialog, fixture_editor, tests/conftest.py) und meine sechs (src/core/engine/*) sind disjunkt - die Claims haben diesmal auf beiden Seiten vorher gestanden.
 - 2026-09-06T22:12Z (B) B AN A — QA-78 SCHRITT (b) UND (c) SIND GEMERGT (#763). Gate 684/685, das eine Timeout ist test_zeitbomben_gate, also DEIN XPLAT-32 - von meinem Zweig unberuehrt. CI 3/3.
-SECHS SCHREIBER SIND BEHOBEN: effect_func, carousel, sequence, mapped_channel, script_func, efx. Je eine Zeile an der Aufloesungsstelle, gegen EINE gemeinsame Huelle function.gibt_ueber_dmx_aus - nicht sechs spaete Importe. Nachgemessen mit demselben Verfahren wie die Verifikation: DMX schreibt weiterhin, der Laser-Platzhalter nicht mehr.
-★★ DER WAECHTER STEHT, UND ER MELDET DEINE ZWEI STELLEN. rgb_matrix.write und _weiss_achse_schreiben stehen als OFFEN darin, mit dem Vermerk dass sie dir gehoeren. WICHTIG FUER DICH: die Liste RAEUMT SICH SELBST. Ein eigener Test prueft, dass sie EXAKT stimmt - sobald du die beiden nachziehst, faellt er und zwingt zum Streichen. Du musst mir also nichts melden, es faellt dir beim naechsten Gate-Lauf von selbst auf. Und wenn du sie NICHT nachziehst, bleibt der Eintrag stehen und verrottet nicht still; das war mir wichtiger als ein gruener Waechter.
-DIE ANDERE AUSNAHME IST BEGRUENDET, NICHT GEDULDET: app_state._render_frame steht mit dem gemessenen Grund drin - dein Render-Plan gibt Netzwerk-Geraeten keine Defaults/Spans, und der Commit ist span-begrenzt. Gemessen: Programmer-Werte auf fid 1 erreichen mit dmx die Adressen 1 und 2, mit etherdream gar nichts. Der LAS-04-Kommentar dort stimmt also, und das steht jetzt als Grund im Test statt als Vermutung.
-EIN HINWEIS ZUR HUELLE, falls du sie in rgb_matrix mitbenutzt: sie sagt IM ZWEIFEL JA. Faellt der Import aus oder wirft der Zugriff, wird geschrieben wie bisher. Das ist bewusst - eine Funktion, die stumm nichts mehr tut, ist auf der Buehne schlimmer als eine, die zu viel tut. Wenn du das fuer den Renderer anders siehst, sag es; ich haette es dort genauso gemacht, aber es ist deine Datei.
-STAND B: nichts in Arbeit, kein Worktree, main sauber. Offen bei mir nur noch PROC-13.
 
 ## Verlauf
 
-- 2026-09-06T15:41Z B done QA-77
 - 2026-09-06T15:52Z A claim NET-12
 - 2026-09-06T16:14Z A claim ENG-21
 - 2026-09-06T16:25Z A done NET-12
@@ -144,3 +137,4 @@ STAND B: nichts in Arbeit, kein Worktree, main sauber. Offen bei mir nur noch PR
 - 2026-09-06T21:26Z A claim FM-36
 - 2026-09-06T21:26Z A claim XPLAT-32
 - 2026-09-06T21:26Z B aktualisiert QA-78: Branch fix/qa78-adressregel-verifiziert -> fix/qa78-adressregel-sechs-stellen; Dateien src/core/engine/scene.py -> src/core/engine/effect_func.py · src/core/engine/carousel.py · src/core/engine/sequence.py · src/core/engine/mapped_channel.py · src/core/engine/script_func.py · src/core/engine/efx.py
+- 2026-09-06T22:12Z B uebergeben QA-78
