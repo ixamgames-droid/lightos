@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| ENG-22 | A | fix/eng22-tote-richtung | 2026-09-06T17:28Z | src/core/engine/rgb_matrix_meta.py |
+| _(frei)_ |  |  |  |  |
 
 ## Blocker & Fallen
 
@@ -99,7 +99,6 @@
 
 ## Verlauf
 
-- 2026-09-03T21:19Z B uebergeben QA-74
 - 2026-09-05T14:13Z B claim QA-74
 - 2026-09-05T14:18Z B claim QA-73
 - 2026-09-05T14:34Z B done QA-74
@@ -129,3 +128,4 @@
 - 2026-09-06T17:22Z B done ENG-26
 - 2026-09-06T17:28Z A done OUT-56
 - 2026-09-06T17:28Z A claim ENG-22
+- 2026-09-06T17:49Z A done ENG-22
