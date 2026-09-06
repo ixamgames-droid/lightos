@@ -13,11 +13,46 @@ from src.core.engine.effect_func import LayeredEffect
 from src.ui.weak_slots import weak_slot_fwd
 
 
+# UI-59: ``min_val``/``max_val`` bedeuten JE NACH LAYER-TYP etwas anderes. An
+# ``EffectLayer.process`` abgelesen, nicht aus den Feldnamen geschlossen:
+#
+#   RAMP  = ENDPUNKTE        ``prev + min + (max - min) * phase``
+#           min=1.0/max=0.0 -> [1.0, 0.8, 0.6, 0.4, 0.2]: absteigende Rampe.
+#   MAP   = EINGANGSBEREICH  ``(prev - min) / (max - min)`` auf offset..value
+#           min=1.0/max=0.0 -> [1.0, 0.5, 0.0]: invertierte Abbildung.
+#   CLAMP = GRENZEN          ``max(min, min(max, prev))``
+#           min=0.8/max=0.2 -> konstant 0.8, unabhaengig vom Eingang.
+#
+# Nur im letzten Fall ist ``min > max`` sinnlos: der Layer kann dann gar keine
+# Grenze mehr darstellen. Bei RAMP und MAP ist es eine SINNVOLLE Einstellung,
+# und das Nachziehen der Gegen-Grenze machte sie unerreichbar. Die Regel haengt
+# deshalb am Typ und wird an genau einer Stelle beantwortet.
+#
+# Die Engine selbst braucht die Ordnung nirgends — ``process`` rechnet mit jeder
+# Kombination. Es ist eine reine Editor-Wache, darum steht sie hier.
+_GRENZEN_TYPEN = frozenset({LayerType.CLAMP})
+
+
+def grenzen_muessen_geordnet_sein(layer_type) -> bool:
+    """Muss der Editor fuer diesen Layer-Typ ``min <= max`` erzwingen?
+
+    Wahr genau dort, wo ``min_val``/``max_val`` GRENZEN sind. Falsch, wo sie
+    Endpunkte (RAMP) oder ein Eingangsbereich (MAP) sind — dort ist die
+    vertauschte Reihenfolge eine Einstellung, keine Fehleingabe. Reine
+    Funktion, damit sie ohne gebautes Widget pruefbar ist.
+    """
+    return layer_type in _GRENZEN_TYPEN
+
+
 class EffectLayerEditor(QWidget):
     def __init__(self, effect: LayeredEffect, parent=None):
         super().__init__(parent)
         self._effect = effect
         self._setup_ui()
+        # UI-60: ``_refresh`` blendet am Ende die Eigenschaftsfelder passend zur
+        # Auswahl ein — bei einem frischen Effekt (0 Layer) also KEINES. Der
+        # Aufruf steht bewusst nur dort und nicht zusaetzlich hier: eine zweite
+        # Stelle wuerde die erste ungeprueft lassen.
         self._refresh()
 
     def _setup_ui(self):
@@ -137,6 +172,32 @@ class EffectLayerEditor(QWidget):
         self._spin_max = QDoubleSpinBox()
         self._spin_max.setRange(-10, 10)
         self._spin_max.setSingleStep(0.1)
+        # ★★★ UI-59, zweiter Teil: WAEHREND des Tippens darf die Nachzieh-Wache
+        # unten nicht mitlaufen. QDoubleSpinBox hat keyboardTracking=True, also
+        # feuert valueChanged bei JEDEM Zeichen — und bei einem Clamp zerstoert
+        # das die bereits gesetzte Gegen-Grenze, unwiederbringlich.
+        #
+        # Gemessen mit echten Tastenanschlaegen (Locale de_DE, Dezimalkomma):
+        #     min "0,3" dann max "0,7"  ->  (0.0, 0.7)   getippt war (0.3, 0.7)
+        #     min "0,8" dann max "0,2"  ->  (0.0, 0.2)   beworben ist (0.2, 0.2)
+        # Die erste "0" des Maximums zieht das Minimum auf 0.0; danach ist der
+        # Rest groesser und die Wache greift nie wieder. Der Bediener bekommt
+        # also weder seine Eingabe noch die angekuendigte Korrektur, sondern
+        # eine dritte Zahl — und "erst Min, dann Max" ist die natuerlichste
+        # aller Eingaben, kein Verdreher.
+        #
+        # Ohne Tastatur-Verfolgung feuert valueChanged erst bei Enter oder
+        # Fokusverlust, also auf dem FERTIGEN Wert. Gemessen danach: (0.3, 0.7)
+        # wie getippt und (0.2, 0.2) wie beworben. Pfeiltasten und das
+        # Mausrad melden weiterhin sofort (sie erzeugen immer einen fertigen
+        # Wert), das Bedienen aendert sich also nur dort, wo es kaputt war.
+        #
+        # ⚠️ Bewusst NUR min/max: bei den uebrigen Feldern ist ein Zwischenwert
+        # beim Tippen ein kurzes Flackern am laufenden Effekt und korrigiert
+        # sich selbst. Hier ist er ein DATENVERLUST, weil die Wache die
+        # Gegen-Grenze mitzieht.
+        self._spin_min.setKeyboardTracking(False)
+        self._spin_max.setKeyboardTracking(False)
 
         self._spin_fphase = QDoubleSpinBox()
         self._spin_fphase.setRange(0, 6.28)
@@ -277,6 +338,14 @@ class EffectLayerEditor(QWidget):
         self._list.clear()
         for layer in self._effect.layers:
             self._list.addItem(layer.type.value)
+        # UI-60: Die Regel „nur zeigen, was der Layer auswertet" gab es schon,
+        # sie lief aber ausschliesslich ueber ``_on_select`` — und der feuert bei
+        # einem frisch angelegten Effekt mit 0 Layern NIE. Die acht Zeilen aus
+        # ``_setup_ui`` blieben damit stehen, keine davon mit Wirkung. Ohne
+        # Auswahl liefert ``_current_layer`` None und ``_sync_prop_rows``
+        # blendet alles aus (ausblenden, nicht deaktivieren — Begruendung
+        # steht dort).
+        self._sync_prop_rows(self._current_layer())
 
     def _current_layer(self):
         idx = self._list.currentRow()
@@ -321,21 +390,28 @@ class EffectLayerEditor(QWidget):
 
     def _set_layer_prop(self, attr, val):
         layer = self._current_layer()
-        if layer is not None:
-            setattr(layer, attr, val)
-            # Ein Clamp mit min > max kann keine sinnvolle Grenze darstellen.
-            # Beim Überschreiten die Gegen-Grenze mitziehen statt einen
-            # widersprüchlichen Layer zu persistieren.
-            if attr == "min_val" and layer.min_val > layer.max_val:
-                layer.max_val = layer.min_val
-                self._spin_max.blockSignals(True)
-                self._spin_max.setValue(layer.max_val)
-                self._spin_max.blockSignals(False)
-            elif attr == "max_val" and layer.max_val < layer.min_val:
-                layer.min_val = layer.max_val
-                self._spin_min.blockSignals(True)
-                self._spin_min.setValue(layer.min_val)
-                self._spin_min.blockSignals(False)
+        if layer is None:
+            return
+        setattr(layer, attr, val)
+        if attr not in ("min_val", "max_val"):
+            return
+        # UI-59: Ein Clamp mit min > max kann keine sinnvolle Grenze darstellen
+        # — dort die Gegen-Grenze mitziehen statt einen widerspruechlichen Layer
+        # zu persistieren. Bei Ramp (Endpunkte) und Map (Eingangsbereich) ist
+        # min > max dagegen eine gewollte Eingabe: absteigende Rampe bzw.
+        # invertierte Abbildung. Wer dort nachzieht, macht sie uneingebbar.
+        if not grenzen_muessen_geordnet_sein(getattr(layer, "type", None)):
+            return
+        if attr == "min_val" and layer.min_val > layer.max_val:
+            layer.max_val = layer.min_val
+            self._spin_max.blockSignals(True)
+            self._spin_max.setValue(layer.max_val)
+            self._spin_max.blockSignals(False)
+        elif attr == "max_val" and layer.max_val < layer.min_val:
+            layer.min_val = layer.max_val
+            self._spin_min.blockSignals(True)
+            self._spin_min.setValue(layer.min_val)
+            self._spin_min.blockSignals(False)
 
     def _add_layer(self):
         lt = self._add_combo.currentData()
