@@ -154,9 +154,37 @@ def _zahl(x, standard=0):
 
 
 def _matrix_fids(fd: dict) -> set[int]:
-    """Die fids, die diese Matrix bespielt. ``fixture_grid`` ist eine FLACHE
-    row-major-Liste und darf ``None``-Luecken enthalten (rgb_matrix.py:440)."""
+    """Die fids, die diese Matrix bespielt — ueber BEIDE Achsen.
+
+    ``fixture_grid`` ist eine FLACHE row-major-Liste und darf ``None``-Luecken
+    enthalten (rgb_matrix.py:440).
+
+    ★ **Und ``weiss_grid`` gehoert dazu (QA-77).** Eine Weiss-Zelle traegt ihren
+    fid bewusst NICHT in ``fixture_grid`` — dort muss eine Luecke stehen, sonst
+    faerbt ein Verbraucher ohne Achsenkenntnis die falsche Zone (FM-41). Wer
+    wissen MUSS, welche Geraete eine Matrix bespielt, liest deshalb beide
+    Listen; dieselbe Loesung wie in ``function_manager.affected_fids``.
+
+    **Beides gemessen, bevor es gebaut wurde** (das Item trug „nicht
+    ende-zu-ende nachgemessen"), und die Folgen sind gegenlaeufig:
+
+    * Ohne ``weiss_grid`` gilt ein nur weiss gefaerbtes Geraet als „hat keinen
+      Faerber" und wird gar nicht geprueft — die Warnung, fuer die es dieses
+      Modul gibt, bleibt aus.
+    * ``_treibt_dimmer`` fragt dieselbe Funktion. Eine Matrix, die den Dimmer
+      per ``drive_intensity`` sehr wohl hochzieht, aber nur ueber Weiss-Zellen
+      faerbt, galt damit als „treibt ihn nicht" — und ``lint_show --strict``
+      meldete eine FALSCHE Dimmer-dunkel-Warnung.
+
+    ⚠️ Streng auf die vereinbarte Form ``(fid, segment)``, wie in
+    ``affected_fids``: ein Text wie ``"5abc"`` wuerde ueber ``sub[0]`` sonst als
+    Geraet 5 durchgehen.
+    """
     fids = {_zahl(x, -1) for x in (fd.get("fixture_grid") or []) if x is not None}
+    for sub in (fd.get("weiss_grid") or []):
+        if not isinstance(sub, (tuple, list)) or len(sub) != 2:
+            continue
+        fids.add(_zahl(sub[0], -1))
     fids.discard(-1)
     return fids
 
