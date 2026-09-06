@@ -7,6 +7,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-07 — Einfrieren beim Zusammenlegen von Gruppen behoben
+
+#### Behoben
+
+- **Ein Gruppen-Raster ohne Spalte ließ die Oberfläche einfrieren.** „Alle
+  Geräte einfügen" suchte in einem Raster ohne Spalten endlos nach einem freien
+  Platz — das Fenster reagierte nicht mehr und musste abgeschossen werden.
+  Betroffen war dieselbe Suche an zwei Stellen: im Raster-Feld und im
+  Gruppen-Bearbeiten-Dialog. Beide kehren jetzt zurück, statt sich zu drehen.
+
+#### Intern
+
+- Der Fixture-Editor meldet jetzt auch vor dem ersten Speichern verlässlich,
+  dass noch nichts gespeichert wurde, statt an dieser Frage abzustürzen.
+- Die Testumgebung räumt Altlasten nicht mehr auf Kosten laufender Testläufe
+  weg — sie hatte gelegentlich Dateien und das Datenverzeichnis eines gerade
+  laufenden Laufs entfernt.
+
 ### 2026-09-06 — Ungültige Universe-Nummern, verlorene Eingaben und tote Felder
 
 #### Behoben

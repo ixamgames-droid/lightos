@@ -284,6 +284,16 @@ class FixtureEditorDialog(QDialog):
         self.setWindowTitle("Fixture Editor")
         self.setMinimumSize(720, 560)
         self._fixture_id = fixture_id   # None = neu, sonst bearbeiten
+        # ★ FM-36: das Ergebnisfeld existiert ab hier — vorher legte es
+        # ausschliesslich `_save()` an, und jeder Zugriff nach einem
+        # ABGEBROCHENEN Dialog warf einen AttributeError statt None zu geben.
+        # BEIDE Namen, weil dieselbe Frage sonst zwei Antworten haette
+        # (Hausregel 6): `saved_id` ist die Auskunft, die der Schwesterdialog
+        # FixtureGeneratorDialog gibt und die `patch_view` liest; `_saved_id`
+        # ist der eingefuehrte Name, an dem 16 bestehende Tests haengen.
+        # Sie werden hier gemeinsam belegt und in `_save` gemeinsam gesetzt.
+        self._saved_id: int | None = None
+        self.saved_id: int | None = None
         self._setup_ui()
         if self._fixture_id is not None:
             self._load_existing()
@@ -616,7 +626,10 @@ class FixtureEditorDialog(QDialog):
                         except (AttributeError, TypeError, ValueError):
                             continue
             s.commit()
-            self._saved_id = profile.id
+            # ★ FM-36: beide Namen GEMEINSAM — wer sie hier trennt, laesst den
+            # oeffentlichen Namen fuer immer auf None stehen, und Editor und
+            # Generator gaeben auf dieselbe Frage verschiedene Auskunft.
+            self._saved_id = self.saved_id = profile.id
 
         # ★★ FM-23: den Kanal-/Geometrie-Cache verwerfen — sonst kommt die
         # eingetippte Rasterform im laufenden Programm NIE beim Renderer an.

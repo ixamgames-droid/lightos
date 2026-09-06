@@ -7,10 +7,13 @@ Callbacks haeuften sich ueber die Suite an und konnten in einem spaeteren Test z
 einem harten Crash fuehren. Diese Autouse-Fixture meldet nach JEDEM Test alle noch
 lebenden Canvases ab.
 """
+import atexit
+import hashlib
 import os
 import shutil
 import sys
 import tempfile
+import time
 import uuid
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -448,6 +451,152 @@ def _waechter_meldung(stellen: list) -> str:
         "ueber LIGHTOS_FIXTURE_DB darauf.")
 
 
+# ── XPLAT-32: „wem gehoert dieser Pfad" ist eine GETEILTE Auskunft ──────────
+# Der Aufraeumer unten laeuft in JEDEM Prozess, der diese Datei importiert, und
+# er greift in den GEMEINSAMEN Ordner `_TEST_ROOT`. Welche Pfade zu einem noch
+# LEBENDEN Lauf gehoeren, wusste bisher nur der Prozess selbst — die Menge kam
+# aus SEINEN Umgebungsvariablen. Ein Nachbar sah davon nichts und nahm die Datei
+# weg, sobald ihr Zeitstempel alt aussah. „Alt" belegt aber nur, wann zuletzt
+# jemand geschrieben hat, NICHT dass der Besitzer tot ist.
+#
+# GEMESSEN am 2026-09-06 am laufenden Code: ein einziger `import conftest` in
+# einem fremden Prozess nahm die als eigen markierte Datei in 20 von 20 Faellen
+# weg (Kontroll-Leiche 20/20 geloescht — der Loeschzweig war also erreicht), und
+# `test_qa58_bibliothek_schema_unberuehrt.py::…::test_alte_leichen_werden_
+# weggeraeumt_frische_fremde_nicht` wurde damit 7 von 12 Runden rot; ohne
+# Nachbarn 0 von 12. Es braucht dafuer weder einen zweiten qa58-Lauf noch den
+# zeitbomben-Test — der blosse Import genuegt.
+#
+# Deshalb wird die Auskunft AUF PLATTE VEROEFFENTLICHT: jeder Prozess legt fuer
+# JEDEN seiner Pfade eine Anspruchsmarke ab, und der Aufraeumer laesst liegen,
+# was ein lebender Lauf beansprucht. Damit gilt QA-53s Satz „wem die Datei
+# gehoert, der raeumt sie auf" auch ueber Prozessgrenzen hinweg, und die Frage
+# „gehoert dieser Pfad jemandem" hat genau EINE Antwortstelle
+# (`_ist_beansprucht`), die im eigenen wie im fremden Prozess gleich antwortet.
+_ANSPRUECHE = os.path.join(_TEST_ROOT, ".in_benutzung")
+# EIN Wert fuer beide Seiten derselben Frage: so alt darf ein Rest sein, bevor er
+# als Leiche gilt — und so lange gilt eine Marke als lebend. Zwei getrennte
+# Zahlen waeren zwei Wahrheiten ueber denselben Sachverhalt.
+_RESTE_FRIST = 24 * 3600
+
+
+def _eigene_testpfade() -> set:
+    """Die Pfade im geteilten Wurzelordner, die DIESEM Prozess gehoeren.
+
+    Bewusst aus der UMGEBUNG gelesen und nicht aus den Modul-Konstanten: ein
+    Test darf `LIGHTOS_FIXTURE_DB` voruebergehend umsetzen (so prueft der
+    qa58-Waechter den Aufraeumer), und dann gehoert eben dieser Pfad dazu.
+
+    Die SQLite-Seitendateien gehoeren dazu, weil das Muster
+    ``lightos_test_show_*.db*`` auch ``…-wal``/``…-shm`` trifft — die frueher
+    hier stehende Menge kannte nur den nackten DB-Pfad und liess damit einen
+    ZWEITEN WEG an derselben Regel vorbei offen.
+    """
+    pfade = set()
+    for schluessel in ("LIGHTOS_CRASH_LOG", "LIGHTOS_SHOW_DB",
+                       "LIGHTOS_SACN_CID", "LIGHTOS_UNIVERSES_JSON",
+                       "LIGHTOS_FIXTURE_DB"):
+        wert = os.environ.get(schluessel)
+        if not wert:
+            continue
+        pfade.add(wert)
+        if schluessel in ("LIGHTOS_SHOW_DB", "LIGHTOS_FIXTURE_DB"):
+            pfade.update(wert + seite for seite in ("-wal", "-shm"))
+    pfade.add(_TEST_APPDATA)
+    return pfade
+
+
+def _anspruch_ort(pfad: str) -> str:
+    """Der Ablageort der Marken fuer GENAU DIESEN Pfad.
+
+    Ein Ort je Pfad (Name = Streuwert des Pfades), damit die Frage „ist dieser
+    Pfad beansprucht" ein einzelner Verzeichniszugriff ist. Genau deshalb laesst
+    sie sich im Moment der Entscheidung stellen statt einmal am Anfang.
+    """
+    return os.path.join(_ANSPRUECHE,
+                        hashlib.sha1(os.fsencode(pfad)).hexdigest()[:16])
+
+
+def _marken_leben(ort: str) -> bool:
+    """Liegt an diesem Ort die Marke eines noch lebenden Laufs?
+
+    Abgelaufene Marken werden dabei gleich abgetragen: ihr Prozess ist nach
+    `_RESTE_FRIST` sicher tot, und eine ewige Marke schuetzte ihre Reste ewig.
+    """
+    try:
+        marken = os.listdir(ort)
+    except OSError:
+        return False            # niemand hat hier je etwas angemeldet
+    grenze = time.time() - _RESTE_FRIST
+    lebt = False
+    for name in marken:
+        marke = os.path.join(ort, name)
+        try:
+            if os.path.getmtime(marke) >= grenze:
+                lebt = True
+            else:
+                os.remove(marke)
+        except OSError:
+            continue            # fremder Prozess war schneller
+    return lebt
+
+
+def _ist_beansprucht(pfad: str) -> bool:
+    """Haelt ein noch LEBENDER Lauf diesen Pfad?"""
+    return _marken_leben(_anspruch_ort(pfad))
+
+
+def _anspruch_anmelden():
+    """Die eigenen Pfade fuer alle anderen Prozesse sichtbar machen.
+
+    Zweiter Versuch, falls ein gleichzeitig kehrender Nachbar den Ort zwischen
+    `makedirs` und `open` wieder abgeraeumt hat — sonst verloere dieser Prozess
+    seinen Anspruch still. Best effort: eine Marke, die sich nicht schreiben
+    laesst, darf keinen Testlauf verhindern.
+    """
+    for pfad in _eigene_testpfade():
+        ort = _anspruch_ort(pfad)
+        for _versuch in (1, 2):
+            try:
+                os.makedirs(ort, exist_ok=True)
+                with open(os.path.join(ort, _TEST_TOKEN), "w",
+                          encoding="utf-8") as f:
+                    f.write(pfad)
+                break
+            except OSError:
+                continue
+
+
+def _anspruch_abmelden():
+    """Am Prozessende NUR die EIGENEN Marken zuruecknehmen.
+
+    Ein hart abgestuerzter Lauf kommt hier nie an — genau dafuer gibt es
+    `_RESTE_FRIST`.
+    """
+    for pfad in _eigene_testpfade():
+        ort = _anspruch_ort(pfad)
+        try:
+            os.remove(os.path.join(ort, _TEST_TOKEN))
+            os.rmdir(ort)
+        except OSError:
+            pass
+
+
+def _anspruchsmarken_kehren():
+    """Verwaiste Anspruchs-Orte abtragen, damit sie sich nicht anhaeufen."""
+    try:
+        orte = os.listdir(_ANSPRUECHE)
+    except OSError:
+        return
+    for name in orte:
+        ort = os.path.join(_ANSPRUECHE, name)
+        if not _marken_leben(ort):
+            try:
+                os.rmdir(ort)
+            except OSError:
+                pass            # jemand hat sich gerade neu angemeldet
+
+
 def _purge_old_test_crash_logs():
     """Reste frueherer Laeufe wegraeumen (QA-CRASHLOG-TESTS).
 
@@ -465,43 +614,88 @@ def _purge_old_test_crash_logs():
 
     Nur was aelter als 24 h ist: ein fremder LAUFENDER Lauf darf nie getroffen
     werden. Best effort — Aufraeumen darf keinen Testlauf verhindern.
+
+    ★ XPLAT-32 — WARUM DIE ANSPRUCHSFRAGE SO SPAET KOMMT. Der Zeitstempel allein
+    ist kein Beweis fuer „tot"; geschont wird, was eine lebende Marke haelt
+    (Block darueber). Diese Frage steht bewusst UNMITTELBAR vor dem Loeschen und
+    nicht als Momentaufnahme am Anfang: ein Durchgang durchsucht einen Ordner mit
+    tausenden Eintraegen und dauert dabei GEMESSEN 80,8 ms (12319 Eintraege) —
+    lange genug, dass ein Nachbar in derselben Zeit seine Datei anlegt und
+    anmeldet. Mit Momentaufnahme am Anfang: 16 von 24 Runden rot, mit der Frage
+    an dieser Stelle: 0 von 24.
     """
     try:
         import glob
         import shutil as _shutil
-        import time as _time
-        cutoff = _time.time() - 24 * 3600
-        eigene = {os.environ.get("LIGHTOS_CRASH_LOG"),
-                  os.environ.get("LIGHTOS_SHOW_DB"),
-                  os.environ.get("LIGHTOS_SACN_CID"),
-                  os.environ.get("LIGHTOS_UNIVERSES_JSON"),
-                  os.environ.get("LIGHTOS_FIXTURE_DB"),
-                  _TEST_APPDATA}
+        # Die eigenen Pfade ZUERST veroeffentlichen: ein Nachbar, der gleich
+        # aufraeumt, muss sie sehen koennen, bevor hier ueberhaupt gescannt wird.
+        _anspruch_anmelden()
+        cutoff = time.time() - _RESTE_FRIST
         muster = ("lightos_test_crash_*.log", "lightos_test_appdata_*",
                   "lightos_test_show_*.db*", "lightos_test_sacn_cid_*",
                   "lightos_test_universes_*.json",
                   "lightos_test_fixtures_*.db*")
         for m in muster:
             for path in glob.glob(os.path.join(_TEST_ROOT, m)):
-                if path in eigene:
-                    continue
                 try:
                     if os.path.getmtime(path) >= cutoff:
                         continue
+                    if _ist_beansprucht(path):
+                        continue        # gehoert einem LEBENDEN Lauf
                     if os.path.isdir(path):
                         _shutil.rmtree(path, ignore_errors=True)
                     else:
                         os.remove(path)
                 except OSError:
                     pass    # fremder Lauf haelt es noch offen -> naechstes Mal
+        _anspruchsmarken_kehren()
     except Exception:
         pass            # Aufraeumen darf NIE einen Testlauf verhindern
+
+
+# Wie oft der GETEILTE Hausputz ueberhaupt anlaeuft. Er ist Hausputz, kein
+# Startritual: in einem `-j 4`-Volllauf importieren ~600 Prozesse diese Datei,
+# und jeder einzelne durchsuchte bisher den gemeinsamen Ordner (gemessen 12319
+# Eintraege, 80,8 ms je Durchgang). Ein Durchgang je Zeitfenster genuegt — 24 h
+# alte Leichen haben es nicht eilig.
+#
+# ⚠️ Das ist die ZWEITE Verteidigungslinie, nicht die erste. Der Schutz sitzt in
+# `_purge_old_test_crash_logs` selbst (Anspruchsmarken) und gilt damit auch fuer
+# jeden direkten Aufruf, der an diesem Takt vorbeigeht — sonst waere der Takt
+# genau der „zweite Weg", der die Regel umgeht.
+_AUFRAEUM_TAKT = 30.0
+_AUFRAEUM_STEMPEL = os.path.join(_TEST_ROOT, ".zuletzt_aufgeraeumt")
+
+
+def _aufraeumen_beim_import() -> bool:
+    """Den geteilten Hausputz hoechstens alle `_AUFRAEUM_TAKT` Sekunden fahren.
+
+    Der eigene Anspruch wird IN JEDEM FALL angemeldet, auch wenn dieser Prozess
+    diesmal nicht aufraeumt: sonst waeren seine Pfade fuer den Prozess, der
+    gerade aufraeumt, unsichtbar — und damit Freiwild.
+    """
+    _anspruch_anmelden()
+    try:
+        try:
+            if time.time() - os.path.getmtime(_AUFRAEUM_STEMPEL) < _AUFRAEUM_TAKT:
+                return False
+        except OSError:
+            pass                # noch kein Stempel -> jetzt ist Hausputz faellig
+        # Den Stempel VOR dem Aufraeumen setzen: gleichzeitig startende Nachbarn
+        # sehen ihn dann schon frisch und laufen nicht alle zusammen los.
+        with open(_AUFRAEUM_STEMPEL, "w", encoding="utf-8") as f:
+            f.write(str(int(time.time())))
+    except OSError:
+        pass        # ohne Stempel lieber aufraeumen als gar nicht mehr
+    _purge_old_test_crash_logs()
+    return True
 
 
 # Beim conftest-Import (Sammelphase, VOR dem ersten get_state()/engine())
 # etwaige Altdateien derselben PID wegraeumen -> jeder Lauf startet garantiert leer.
 _purge_test_dbs()
-_purge_old_test_crash_logs()
+_aufraeumen_beim_import()
+atexit.register(_anspruch_abmelden)
 # Den 44-Hz-DMX-Output-Thread in Tests gar nicht erst autostarten (siehe
 # app_state.get_state): er rendert in _render_frame und emittiert Sync-Events,
 # die cross-thread in Qt marshallt werden -> race mit dem pytest-Teardown

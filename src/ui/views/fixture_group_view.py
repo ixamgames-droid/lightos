@@ -17,6 +17,10 @@ from src.core.database.models import FixtureGroup
 from src.core.group_cells import (base_fids_in_grid_order,
                                   referenzierte_fids_in_grid_order)
 from src.ui.widgets import mini_icons as _mini
+# QA-75: EIN Wachposten fuer beide Zell-Suchschleifen (Hausregel 6). Er wohnt im
+# Dialog-Modul, weil das ausser json und Qt nichts importiert — die Richtung
+# stimmt mit dem bestehenden Import von GroupEditDialog (:1372 ff.) ueberein.
+from src.ui.widgets.group_edit_dialog import raster_ohne_spalten
 from sqlalchemy.orm import Session
 from sqlalchemy import select, delete
 
@@ -553,7 +557,25 @@ class FixtureGridWidget(QWidget):
 
     def first_free_cells(self, count: int) -> list[tuple[int, int]]:
         """Liefert `count` freie Zellen in row-major Reihenfolge; erweitert die
-        Reihen bei Bedarf virtuell nach unten. Platziert selbst nichts."""
+        Reihen bei Bedarf virtuell nach unten. Platziert selbst nichts.
+
+        QA-75: Wachposten ZUERST — ohne Spalte gibt es keine Zelle, und die
+        Suche muss das von sich aus sagen, statt sich auf die Klemmung des
+        Aufrufers zu verlassen. Die innere ``for c in range(self.cols)`` laeuft
+        dann nie, ``len(out) < count`` wird nie falsch, ``r`` zaehlt ewig weiter:
+        gemessen 2026-09-06 kehrte cols=8 nach 0,005 ms und cols=1 nach 0,007 ms
+        zurueck, cols=0 und cols=-1 dagegen ueberhaupt nicht (> 8 s, Abbruch von
+        aussen) — und zwar im UI-Faden, ohne Fehlermeldung und ohne Absturz.
+        Geprueft wird ``cols < 1``, nicht ``cols == 0``: cols=-1 haengt genauso.
+        ``set_grid`` klemmt weiterhin auf ``max(1, cols)``; das bleibt richtig,
+        ist aber nur die zweite Zusicherung, nicht die einzige.
+
+        Die leere Rueckgabe ist Teil des Vertrags: Aufrufer muessen sie
+        ueberleben (siehe ``_add_all_fixtures``, das ``max(..., default=-1)``
+        rechnet, statt an einem leeren Raster zu sterben).
+        """
+        if raster_ohne_spalten(self.cols):
+            return []
         out: list[tuple[int, int]] = []
         occupied = set(self.positions.keys())
         r = 0
@@ -2134,7 +2156,13 @@ class FixtureGroupView(QWidget):
         for fid, cell in zip(todo, cells):
             gw.positions[cell] = fid
         # Reihenzahl an den tiefsten belegten Punkt anpassen (falls gewachsen).
-        max_row = max(r for (_c, r) in gw.positions)
+        # QA-75: ``default=-1`` fuer das LEERE Raster. Liefert
+        # ``first_free_cells`` nichts (das Raster hat keine Spalte) und lag
+        # vorher auch nichts drin, ist ``gw.positions`` leer — ``max()`` warf
+        # dann ValueError (gemessen an dieser Zeile). Ein Fix, der den Haenger
+        # gegen einen Absturz tauscht, waere keiner. -1 + 1 = 0 ist nie groesser
+        # als ``gw.rows`` (immer >= 1), die Spinbox bleibt also unangetastet.
+        max_row = max((r for (_c, r) in gw.positions), default=-1)
         if max_row + 1 > gw.rows:
             self._spin_rows.blockSignals(True)
             self._spin_rows.setValue(max_row + 1)
