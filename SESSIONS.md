@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| _(frei)_ |  |  |  |  |
+| ENG-19 | A | fix/eng19-fade-ohne-sprung | 2026-09-06T11:32Z | src/core/engine/cue_stack.py |
 
 ## Blocker & Fallen
 
@@ -91,7 +91,6 @@
 
 ## Verlauf
 
-- 2026-09-03T16:47Z A claim FM-41
 - 2026-09-03T16:50Z B uebergeben XPLAT-23
 - 2026-09-03T16:51Z B claim XPLAT-23
 - 2026-09-03T17:07Z A done FM-43
@@ -121,3 +120,4 @@
 - 2026-09-05T19:50Z A aktualisiert FM-41: Dateien src/core/engine/rgb_matrix.py · src/ui/views/rgb_matrix_view.py · src/core/group_cells.py · src/core/app_state.py · src/ui/views/fixture_group_view.py -> src/core/engine/rgb_matrix.py · src/ui/views/rgb_matrix_view.py · src/core/group_cells.py · src/core/app_state.py · src/ui/views/fixture_group_view.py · src/ui/head_cell_colors.py · src/core/engine/function_manager.py
 - 2026-09-06T09:09Z B abgebrochen FM-45
 - 2026-09-06T11:15Z A done FM-41
+- 2026-09-06T11:32Z A claim ENG-19
