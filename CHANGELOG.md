@@ -7,6 +7,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-06 — Beim Laden einer Show gingen still Werte verloren
+
+#### Behoben
+
+- **Beim Öffnen einer Show konnten Programmer-, Cue- und Szenenwerte eines
+  Geräts verschwinden — ohne Meldung, bei jedem Ladevorgang.** Betroffen war
+  jedes Gerät, dessen Prüfung beim Laden auf einen Fehler lief; die Aufräum-
+  Routine hielt es dann für „nicht mehr im Patch" und räumte seine Werte weg.
+
+  In der hier vorliegenden Gerätebibliothek gibt es zwei Profile mit doppelt
+  vergebenem Modusnamen — genau das löst so einen Fehler aus. Ein Gerät auf
+  einem dieser Profile hat seine programmierten Werte bei jedem Laden verloren.
+
+  Ein Gerät, das im Patch steht, behält seine Werte jetzt in jedem Fall. Ob
+  seine Konfiguration in Ordnung ist, wird weiterhin geprüft — aber als
+  Meldung, nicht durch Löschen. Die Meldung nennt jetzt auch, um welches Gerät
+  es geht.
+
 ### 2026-09-05 — Matrix-Effekte wirken jetzt auch auf Moving Heads mit Farbrad
 
 #### Behoben

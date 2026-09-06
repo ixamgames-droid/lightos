@@ -229,6 +229,37 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
                     label = getattr(f, "label", "?")
                     location = f"PatchedFixture[{fid}] '{label}'"
 
+                    # ★★★ ZWEI FRAGEN, EINE MENGE — und ihre sicheren Richtungen
+                    # zeigen gegeneinander (Review-Checkliste 18):
+                    #
+                    #   „EXISTIERT dieses Geraet im Patch?"  -> Loeschgrundlage
+                    #      unten (:441/:469/:500 raeumen Programmer-, Cue- und
+                    #      Szenenwerte fuer fids, die NICHT drinstehen).
+                    #      Uebertreiben ist hier sicher: ein Geraet zu viel
+                    #      heisst „ein verwaister Wert bleibt liegen".
+                    #   „Ist seine KONFIGURATION in Ordnung?" -> das sind die
+                    #      `issues` weiter unten. Untertreiben ist dort sicher.
+                    #
+                    # Bis 2026-09-06 beantwortete `valid_fids` beide: der
+                    # `add` stand am ENDE des try, also NACH allen Pruefungen.
+                    # Warf eine davon, wurde er nie erreicht — und das Geraet
+                    # galt als nicht vorhanden. Die Folge war kein Hinweis,
+                    # sondern ein LOESCHEN seiner Programmer-, Cue- und
+                    # Szenenwerte, bei JEDEM `open_show`.
+                    #
+                    # ⚠️ Der Ausloeser liegt real vor: in der Bibliothek des
+                    # Betreibers stehen 2 doppelte `(fixture_id, name)`-
+                    # Modus-Paare, und `scalar_one_or_none()` unten wirft
+                    # darauf `MultipleResultsFound`. Ein Geraet auf so einem
+                    # Profil verlor seine Werte still.
+                    #
+                    # Deshalb steht der `add` jetzt HIER: das Geraet steht im
+                    # Patch, damit sind seine Werte nicht verwaist — ob seine
+                    # Konfiguration taugt, ist eine andere Frage und wird als
+                    # `issue` gemeldet, nicht durch Loeschen beantwortet.
+                    if fid is not None:
+                        valid_fids.add(fid)
+
                     profile_id = getattr(f, "fixture_profile_id", None)
                     mode_name = getattr(f, "mode_name", "")
                     channel_count = getattr(f, "channel_count", 0)
@@ -390,12 +421,13 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
                             f"Ungültige Startadresse: {address}",
                         ))
 
-                    if fid is not None:
-                        valid_fids.add(fid)
-
                 except Exception as e_inner:
+                    # Die fid gehoert in die Meldung: ohne sie stand hier nur
+                    # „PatchedFixture", und man konnte nicht sehen, WELCHES
+                    # Geraet sich nicht pruefen liess.
                     issues.append(ValidationIssue(
-                        'error', 'PatchedFixture',
+                        'error',
+                        f"PatchedFixture[{locals().get('fid')}]",
                         f"Fehler beim Prüfen: {e_inner}",
                     ))
 
