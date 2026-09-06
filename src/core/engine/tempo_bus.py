@@ -649,6 +649,30 @@ class TempoBusManager:
             if self.DEFAULT_BUS not in self._buses:
                 self._buses[self.DEFAULT_BUS] = TempoBus(self.DEFAULT_BUS, source="bpm_global")
 
+    #: Schreibweisen, die alle den Default-Bus meinen (case-insensitiv, getrimmt).
+    DEFAULT_ALIASE = ("", "default", "global")
+
+    @classmethod
+    def kanonische_bus_id(cls, bus_id: "str | None") -> str:
+        """Die EINE Alias-Aufloesung — ``"Global"``/``"default"``/``""`` → Default-Bus.
+
+        ★ **Warum das eine eigene Funktion ist (ENG-26).** Die Aufloesung stand
+        nur in :meth:`get`; :meth:`ensure_bus` kannte sie nicht und legte fuer
+        JEDE Schreibweise einen eigenen Bus an. Gemessen erzeugten sechs
+        Aufrufe sechs Buses — ``'Global'``, ``'global'``, ``'GLOBAL'``,
+        ``'Default'``, ``' global '`` neben dem echten ``'default'``.
+
+        ⚠️ **Das ist kein erfundener Wert:** ``"Global"`` ist der DEFAULT von
+        ``Function.tempo_bus_id`` (``function.py:107``) und steht in vier
+        Editor-Dropdowns zur Auswahl. Ein Speed-Knoten auf ``"Global"``
+        steuerte damit einen Bus, den kein Effekt liest — waehrend die Anzeige
+        daneben (die ueber ``get`` geht) den richtigen zeigte.
+        """
+        bid = bus_id or cls.DEFAULT_BUS
+        if isinstance(bid, str) and bid.strip().lower() in cls.DEFAULT_ALIASE:
+            return cls.DEFAULT_BUS
+        return bid
+
     def get(self, bus_id: str | None) -> "TempoBus | None":
         """Liefert den Bus. ``""``/``None``/``"default"``/``"global"`` → Default-Bus. Unbekannt → None.
 
@@ -656,11 +680,8 @@ class TempoBusManager:
         Default-Bus, der die globale BPM spiegelt — so kann ein Effekt im
         Tempo-Bus-Dropdown sichtbar an den Master-BPM gekoppelt werden (F7).
         """
-        bid = bus_id or self.DEFAULT_BUS
-        if isinstance(bid, str) and bid.strip().lower() in ("", "default", "global"):
-            bid = self.DEFAULT_BUS
         with self._lock:
-            return self._buses.get(bid)
+            return self._buses.get(self.kanonische_bus_id(bus_id))
 
     def toggle_freeze(self) -> bool:
         """Freeze-Toggle (F3): friert ALLE Tempi ein (alle Master-Buses + globaler
@@ -727,8 +748,13 @@ class TempoBusManager:
         return getattr(self, "_freeze_state", None) is not None
 
     def ensure_bus(self, bus_id: str, source: str = "manual") -> TempoBus:
-        """Holt oder erzeugt einen benannten Bus."""
-        bid = bus_id or self.DEFAULT_BUS
+        """Holt oder erzeugt einen benannten Bus.
+
+        Loest Aliase ueber :meth:`kanonische_bus_id` auf — ``ensure_bus("Global")``
+        liefert also denselben Bus wie ``get("Global")`` und legt keinen zweiten
+        an (ENG-26).
+        """
+        bid = self.kanonische_bus_id(bus_id)
         with self._lock:
             bus = self._buses.get(bid)
             if bus is None:
