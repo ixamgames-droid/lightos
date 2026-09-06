@@ -255,6 +255,66 @@ def cell_channel_values(fx, head, color, *, drive_intensity: bool = True) -> dic
     return out
 
 
+def weiss_cell_values(fx, segment, color, *, drive_intensity: bool = True) -> dict:
+    """``{kanal_offset_1basiert: wert}`` fuer EINE WEISS-Zelle (FM-47).
+
+    Das Gegenstueck zu :func:`cell_channel_values` fuer die zweite Achse. Geht
+    **denselben** Weg wie ``RgbMatrixInstance._weiss_achse_schreiben``, damit es
+    nicht zwei Regeln fuer dieselbe Frage gibt:
+
+    1. nur Geraete, deren Weiss ein EIGENER Satz ist
+       (``weiss_ist_eigene_achse_for_channels``) — wo das Weiss zur Farbzelle
+       gehoert, adressieren beide Zellen denselben Kanal (FM-41/ENG-25);
+    2. ``channels_for_axis(chans, ACHSE_WEISS, segment)`` als Projektion;
+    3. Wert = **Helligkeit** der Zellfarbe (``max(r,g,b)``), wie
+       ``_pixel_brightness`` sie im Renderer bildet — ein Weiss-Emitter kann
+       nichts anderes darstellen als Helligkeit;
+    4. ein GETEILTER Master-Dimmer kommt nur bei ``drive_intensity`` mit, sonst
+       gehoert er dem Nutzer bzw. dem Merge.
+
+    ⚠️ **Nicht zu verwechseln mit dem Vorbehalt in** :func:`cell_channel_values`:
+    dort wird ``color_w`` bewusst NICHT bedient, weil Weiss bei FARB-Effekten
+    nicht mitlaufen soll (Robins Entscheidung vom 2026-08-05). Hier geht es um
+    Zellen, die SELBST Weiss-Zellen sind — der Nutzer hat sie ueber die
+    Weiss-Achse ausdruecklich ins Raster gesetzt, und der Renderer faehrt sie
+    seit FM-41. Zwei Fragen, die gleich aussehen: „faerbt ein Farbeffekt auch
+    das Weiss?" (nein) und „faehrt ein Muster eine Weiss-Zelle?" (ja).
+    """
+    try:
+        from src.core.app_state import (get_channels_for_patched,
+                                        channels_for_axis,
+                                        weiss_ist_eigene_achse_for_channels)
+        from src.core.group_cells import ACHSE_WEISS
+        chans = list(get_channels_for_patched(fx))
+    except Exception:
+        return {}
+    if not chans or not weiss_ist_eigene_achse_for_channels(chans, fx):
+        return {}
+    try:
+        proj = channels_for_axis(chans, ACHSE_WEISS, int(segment))
+    except (TypeError, ValueError):
+        return {}
+    if not proj:
+        return {}                        # Segment gibt es nicht (FM-45-Grenze)
+    hell = max(0, min(255, max(int(color[0]), int(color[1]), int(color[2]))))
+    out: dict = {}
+    for attr, ch in proj.items():
+        a = (attr or "").lower()
+        if a == "color_w":
+            val = hell
+        elif a in ("intensity", "dimmer", "master"):
+            if not drive_intensity:
+                continue
+            val = 255
+        else:
+            continue                     # Shutter u. a. unangetastet
+        try:
+            out[int(ch.channel_number)] = max(0, min(255, int(val)))
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
 def build_pattern_chaser(manager, matrix, frames, *, name: str,
                          color=(255, 255, 255), hold: float = 0.12,
                          patch_cache=None, drive_intensity: bool = True):
@@ -283,7 +343,10 @@ def build_pattern_chaser(manager, matrix, frames, *, name: str,
 
     grid = list(getattr(matrix, "fixture_grid", []) or [])
     heads = list(getattr(matrix, "head_grid", []) or [])
-    if not frames or not grid:
+    weiss = list(getattr(matrix, "weiss_grid", []) or [])      # FM-47
+    # FM-47: ein Raster kann AUSSCHLIESSLICH Weiss-Zellen tragen — dann ist
+    # `grid` leer bzw. lauter Luecken, und die Achse ist die einzige Quelle.
+    if not frames or (not grid and not weiss):
         return None, []
 
     if patch_cache is None:
@@ -304,7 +367,13 @@ def build_pattern_chaser(manager, matrix, frames, *, name: str,
     cache: dict = {}
 
     def _cell_values(idx):
-        """``(fid, {kanal: wert})`` oder ``None``, wenn die Zelle nichts trifft."""
+        """``(fid, {kanal: wert})`` oder ``None``, wenn die Zelle nichts trifft.
+
+        ★ FM-47: eine Zelle kann auf BEIDEN Achsen liegen. In ``grid`` steht bei
+        einer Weiss-Zelle bewusst eine Luecke (sonst faerbte ein Verbraucher
+        ohne Achsenkenntnis die falsche Zone, FM-41) — wer sie fahren will, muss
+        zusaetzlich ``weiss_grid`` lesen, wie es der Renderer tut.
+        """
         if idx not in cache:
             cache[idx] = None
             if 0 <= idx < len(grid) and grid[idx] is not None:
@@ -315,6 +384,22 @@ def build_pattern_chaser(manager, matrix, frames, *, name: str,
                                                drive_intensity=drive_intensity)
                     if vals:
                         cache[idx] = (int(grid[idx]), vals)
+            elif 0 <= idx < len(weiss):
+                # Dieselbe strenge Form wie in `affected_fids` und im Renderer:
+                # ein missgeformter Eintrag darf hier nicht als Geraet 5
+                # durchgehen ("5abc") und die Schleife nicht abreissen.
+                eintrag = weiss[idx]
+                if isinstance(eintrag, (tuple, list)) and len(eintrag) == 2:
+                    try:
+                        wfid, segment = int(eintrag[0]), int(eintrag[1])
+                    except (TypeError, ValueError):
+                        return cache[idx]
+                    fx = by_fid.get(wfid)
+                    if fx is not None:
+                        vals = weiss_cell_values(
+                            fx, segment, color, drive_intensity=drive_intensity)
+                        if vals:
+                            cache[idx] = (wfid, vals)
         return cache[idx]
 
     # ★ Die Schritt-Szenen kommen in einen eigenen Bibliotheks-Ordner. Ein
