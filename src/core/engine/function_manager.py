@@ -262,6 +262,31 @@ class FunctionManager:
                 out.add(int(sub))
             except (TypeError, ValueError):
                 pass
+        # ★★ FM-41: und die WEISS-Achse. Ihre Zellen tragen ihren fid
+        # ausdruecklich NICHT in `fixture_grid` — dort steht bewusst eine
+        # Luecke, damit jeder Konsument ohne Achsenkenntnis nichts erzeugt statt
+        # etwas Falschem. Diese Funktion ist aber genau der Konsument, der es
+        # WISSEN muss: eine Matrix, die acht Weiss-Segmente eines Geraets
+        # faehrt, meldete sonst „steuert kein Geraet". Gemessen fiel damit
+        # zweierlei aus — Solo bzw. „Effekte auf denselben Geraeten stoppen"
+        # liess Farb- und Weiss-Matrix desselben Geraets nebeneinander laufen,
+        # und `patch_dedup` (:184 fragt hier) hielt ein nur ueber Weiss-Zellen
+        # gefahrenes Geraet fuer eine WAISE — dieselbe Datenverlust-Klasse wie
+        # STAB-22, nur ueber Funktionen statt Gruppen.
+        #
+        # ★ Hier fallen die beiden Fragen „was FAEHRT das" und „was wird
+        # ERWAEHNT" ausnahmsweise zusammen, denn der Renderer faehrt die
+        # Weiss-Achse seit FM-41 wirklich. Eine Trennung wie bei
+        # `base_fids_in_grid_order` waere hier also erfunden, nicht gefunden.
+        for sub in _seq("weiss_grid"):
+            # Streng auf die vereinbarte Form (fid, index): ein Text wie
+            # "5abc" wuerde ueber sub[0] sonst als Geraet 5 durchgehen.
+            if not isinstance(sub, (tuple, list)) or len(sub) != 2:
+                continue
+            try:
+                out.add(int(sub[0]))
+            except (TypeError, ValueError):
+                pass
         # Scene: _values (Objekte mit .fixture_id)
         for sv in _seq("_values"):
             sub = getattr(sv, "fixture_id", None)

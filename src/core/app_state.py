@@ -2519,19 +2519,31 @@ class AppState:
             from .database.models import FixtureGroup
             with self._session() as s:
                 groups = list(s.execute(select(FixtureGroup)).scalars())
-                from .group_cells import base_fids_in_grid_order
+                from .group_cells import (base_fids_in_grid_order,
+                                           referenzierte_fids)
                 for g in groups:
                     # FM16E-HEADCOUNT: Kopf-Zellen "fid:head" mitzaehlen (eine
                     # Parse-Quelle) — sonst leerer Preset-Browser-Eintrag.
                     try:
-                        fids = base_fids_in_grid_order(
-                            json.loads(g.positions_json or "{}") or {})
+                        _pos = json.loads(g.positions_json or "{}") or {}
+                        fids = base_fids_in_grid_order(_pos)
+                        # ★★ FM-41: DANEBEN die zweite, groesszuegige Antwort —
+                        # "wird hier ueberhaupt erwaehnt". `fids` sagt, was die
+                        # Gruppe FAEHRT (untertreiben ist dort sicher);
+                        # `ref_fids` sagt, was sie ERWAEHNT (uebertreiben ist
+                        # HIER sicher, weil `patch_dedup` daraus auf Waisen
+                        # schliesst und ein Fehlurteil Geraete aus dem Patch
+                        # entfernt). Zwei Fragen, zwei Antworten — mit einer
+                        # gemeinsamen war fuer eine die Fehlrichtung falsch.
+                        ref = sorted(referenzierte_fids(
+                            _pos.values() if isinstance(_pos, dict) else _pos))
                     except Exception:
-                        fids = []
+                        fids, ref = [], []
                     out.append({"id": g.id,
                                 "name": g.name or "",
                                 "folder": getattr(g, "folder", "") or "",
-                                "fids": fids})
+                                "fids": fids,
+                                "ref_fids": ref})
         except Exception:
             return []
         return out
@@ -4447,6 +4459,87 @@ def head_counter_for_attr(attribute: str):
     return lambda fx, chans: attr_head_count_for_channels(fx, chans, attribute)
 
 
+def weiss_segment_count_for_channels(channels) -> int:
+    """Wie viele EIGENE Weiss-Segmente hat dieses Geraet (FM-41)?
+
+    Das Gegenstueck zu :func:`color_head_count_for_channels` auf der
+    Weiss-Achse: die Zahl der ``color_w``-Vorkommen. **0 heisst „keine"** —
+    anders als bei den Farbkoepfen wird hier NICHT auf mindestens 1
+    aufgerundet: ein Geraet ohne Weiss-Kanal hat kein Weiss-Segment, und ein
+    erfundenes waere sofort eine Phantom-Zelle.
+
+    ★ Ob diese Segmente eine EIGENE Leiste bilden oder zum Pixel gehoeren,
+    sagt der Vergleich mit der Farbkopf-Zahl — dieselbe Ausrichtungs-Regel wie
+    in ENG-25 (Blinder 25:25 = Pixel-Weiss, ZQ06121 48:8 = eigene Leiste).
+    Diese Funktion zaehlt nur; sie deutet nicht.
+
+    ★★ **Warum es sie gibt:** dieselbe Zaehlung stand bis 2026-09-03 zweimal
+    inline im Baum — ``visualizer_window`` (``kanal_attrs.count("color_w")``)
+    und ``rgb_matrix.write`` (Generator-Summe) — und Scheibe 1 legte implizit
+    eine dritte daneben. Drei Fassungen derselben Frage sind genau die
+    Doppelstellen-Klasse, die uns an einem Tag viermal getroffen hat
+    (Review-Checkliste 17).
+    """
+    return attr_head_count_for_channels(None, channels, "color_w")
+
+
+def weiss_ist_eigene_achse_for_channels(channels, fixture=None) -> bool:
+    """Sind die Weiss-Emitter dieses Geraets ein EIGENER, getrennt ansprechbarer
+    Satz — oder gehoeren sie zu den Farbzellen?
+
+    ★★★ Das ist **wortwoertlich die ENG-25-Frage**, nur einmal mehr benutzt.
+    Der Renderer fragt sie seit ENG-25, um zu entscheiden, ob ein Farbeffekt den
+    Weissanteil aus R/G/B ziehen darf. Es ist DIESELBE Frage wie „darf man die
+    Weiss-Segmente getrennt ins Raster legen" — und sie zweimal zu formulieren
+    waere die Doppelstellen-Klasse (Review-Checkliste 17), aus der ENG-25
+    ueberhaupt erst entstanden ist.
+
+    Wahr genau dann, wenn es Weiss UND Farbkoepfe gibt und ihre ZAHLEN
+    auseinandergehen. Die drei Gegenfaelle, jeder mit seinem Grund:
+
+    * ``n_w == 0`` — kein Weiss, keine Achse.
+    * ``n_w == n_c`` — je Farbzelle ein Weiss-Emitter: das Weiss sitzt IM Pixel
+      und gehoert der Farbzelle. Ein gewoehnlicher RGBW-PAR (1:1), der
+      Stairville Blinder 5x5 RGBWW (25:25).
+    * ``n_c == 0`` — Tunable White: das Weiss IST der Emittersatz, die Farbzelle
+      fuehrt es ohnehin.
+
+    ⚠️ **Warum das eine SPERRE ist und nicht nur eine Empfehlung.** Wo das Weiss
+    zur Farbzelle gehoert, adressieren Farb- und Weiss-Zelle **denselben
+    physischen Kanal**. Gemessen an einem 4-Kanal-RGBW-PAR: die Farbzelle
+    schreibt ueber den RGBW-Split ``color_w = 0`` (rot), eine daneben gelegte
+    Weiss-Zelle ueberschreibt CH4 mit 255 — und gewinnt IMMER, weil die
+    Weiss-Schleife baulich nach der Farbschleife laeuft. Der Vorrang liesse sich
+    nicht einmal umdrehen. Es gibt dort schlicht nichts zweites anzusprechen.
+
+    **Gemessen ueber die echte Bibliothek (5125 Modi):** 71 Modi haben eine
+    eigene Achse, 1460 haben Weiss im Pixel, 104 sind Tunable White, 3490 haben
+    gar kein Weiss. Ohne diese Sperre bekaemen **1564** Modi eine Achse
+    angeboten, die es bei ihnen nicht gibt.
+    """
+    n_w = attr_head_count_for_channels(fixture, channels, "color_w")
+    n_c = attr_head_count_for_channels(fixture, channels, "color_r")
+    return n_w > 0 and n_c > 0 and n_w != n_c
+
+
+def weiss_ist_eigene_achse(fixture) -> bool:
+    """:func:`weiss_ist_eigene_achse_for_channels` fuer ein gepatchtes Geraet."""
+    try:
+        return weiss_ist_eigene_achse_for_channels(
+            get_channels_for_patched(fixture), fixture)
+    except Exception:
+        return False
+
+
+def weiss_segment_count(fixture) -> int:
+    """Wie :func:`weiss_segment_count_for_channels`, aber gegen ein Fixture —
+    Gegenstueck zu :func:`color_head_count`."""
+    try:
+        return weiss_segment_count_for_channels(get_channels_for_patched(fixture))
+    except Exception:
+        return 0
+
+
 def color_head_count(fixture) -> int:
     """Anzahl unabhaengig faerbbarer Koepfe/Emitter = Zahl der ``color_r``-Kanaele
     (jeder Kopf hat eine eigene RGB(W)-Bank). 1 = Single-Head/einfarbig, >=2 =
@@ -4731,6 +4824,28 @@ def channels_for_axis(channels, achse: str | None, index: int | None) -> dict:
     Weiss-Segment ist sonst richtig adressiert und trotzdem dunkel, weil der
     gemeinsame Dimmer davor auf 0 steht. Genau diese Falle steht in
     ``matrix_pattern`` als beim ersten Live-Test passiert dokumentiert.
+
+    ⚠️ **Und hier ist die Grenze dieser Zusage — sie ist schmaler als der Satz
+    darueber klingt.** „Geteilt" heisst hier operativ: das Attribut kommt
+    **genau einmal** vor. Kommt es MEHRFACH vor, ist keines der Vorkommen ein
+    geteilter Master, und welches zum ``index``-ten Emitter gehoert, laesst sich
+    aus der Kanalliste allein nicht entscheiden — dafuer braeuchte es eine
+    Kopf-Karte (FM-17), und die gibt es fuer diese Geraete nicht.
+
+    **Gemessen ueber die echte Bibliothek**, eingeschraenkt auf die 71 Modi mit
+    einer wirklich eigenen Weiss-Achse: 25 haben einen Dimmer und bekommen ihn
+    mit, 20 haben gar keinen Dimmer-Kanal, und bei **26** kommt ``intensity``
+    mehrfach vor (2- bis 5-mal) und faellt deshalb weg — z. B. Acme Ginamp
+    [36 Channel] mit ``intensity`` auf CH25 und CH32.
+
+    **Fuer diese 26 gilt:** das Segment wird richtig adressiert, ein etwaiger
+    Dimmer davor bleibt aber unangetastet. Bei ``drive_intensity=False`` ist das
+    genau richtig (der Dimmer gehoert dann dem Nutzer). Bei
+    ``drive_intensity=True`` ist es eine **Luecke**: die Matrix soll den Dimmer
+    treiben und kann es fuer dieses Geraet nicht. Bewusst wird dann NICHTS
+    geschrieben statt geraten — einen von zwei Dimmern zu waehlen waere in der
+    Haelfte der Faelle der falsche, und zwar stumm. Steht als eigenes Item im
+    Backlog (FM-46).
 
     ⚠️ **Kein Phantom-Emitter** — dieselbe Grenze wie bei FM-45: gibt es das
     ``index``-te Vorkommen nicht, kommt ``{}`` zurueck und NICHT die geteilten

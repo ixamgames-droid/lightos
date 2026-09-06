@@ -85,6 +85,12 @@ class MatrixPreview(QWidget):
         out: list = []
         for idx, fid in enumerate(grid):
             if is_gap(grid, idx):
+                # FM-41: eine Weiss-Zelle ist in `fixture_grid` eine Luecke,
+                # traegt ihr Geraet aber sehr wohl bei — sonst fehlt es in der
+                # Legende und bekommt keinen eigenen Farbton.
+                _w = self._weiss_at(idx)
+                if _w and _w[0] not in out:
+                    out.append(_w[0])
                 continue
             try:
                 f = int(fid)
@@ -93,6 +99,23 @@ class MatrixPreview(QWidget):
             if f not in out:
                 out.append(f)
         return out
+
+    def _weiss_at(self, idx: int):
+        """``(fid, segment)`` der Weiss-Zelle ``idx``, sonst ``None`` (FM-41).
+
+        Die Weiss-Achse liegt bewusst NEBEN ``fixture_grid`` (dort ist die Zelle
+        eine Luecke), damit kein unbelehrter Konsument sie falsch deutet. Die
+        Vorschau ist aber ein Konsument, der es WISSEN muss — sonst zeichnet und
+        beschriftet sie eine gefahrene Zelle als „Luecke (kein Geraet)"."""
+        wg = list(getattr(self._matrix, "weiss_grid", []) or [])
+        if 0 <= idx < len(wg):
+            e = wg[idx]
+            if isinstance(e, (tuple, list)) and len(e) == 2:
+                try:
+                    return int(e[0]), int(e[1])
+                except (TypeError, ValueError):
+                    return None
+        return None
 
     def _head_at(self, idx: int):
         hg = list(getattr(self._matrix, "head_grid", []) or [])
@@ -132,6 +155,12 @@ class MatrixPreview(QWidget):
         if idx < 0 or idx >= (m.cols * m.rows):
             return ""
         if is_gap(grid, idx):
+            # FM-41: erst pruefen, ob dort ein WEISS-Segment sitzt. Es wird
+            # gefahren; „Luecke" waere schlicht falsch.
+            _w = self._weiss_at(idx)
+            if _w:
+                _name = self._labels.get(_w[0]) or f"Fixture {_w[0]}"
+                return f"{_name} · Weiß-Segment {_w[1] + 1}"
             return "Lücke (kein Gerät)"
         try:
             fid = int(grid[idx])
@@ -1786,7 +1815,8 @@ class RgbMatrixView(QWidget):
                     import json
                     from sqlalchemy.orm import Session
                     from src.core.database.models import FixtureGroup
-                    from src.core.engine.rgb_matrix import grids_from_positions
+                    from src.core.engine.rgb_matrix import (
+                        grids_from_positions, weiss_grid_from_positions)
                     with Session(eng) as s:
                         g = s.get(FixtureGroup, gid)
                     if g is not None:
@@ -1794,24 +1824,37 @@ class RgbMatrixView(QWidget):
                         # FM-16: fixture_grid + head_grid parallel (Pro-Kopf-Zellen
                         # "fid:head" tragen einen Kopf-Index; reine fids -> None).
                         grid, head_grid = grids_from_positions(positions, g.cols, g.rows)
+                        # ★ FM-41: die Weiss-Zellen kommen als EIGENE Liste
+                        # daneben. In `grid` sind sie bewusst Luecken (None) —
+                        # so sieht jeder Konsument ohne Achsenkenntnis nichts
+                        # statt etwas Falsches (s. `weiss_grid_from_positions`).
+                        weiss_grid = weiss_grid_from_positions(positions, g.cols, g.rows)
                         # Grid-Zuweisung ist live: sofort in beide Instanzen (kein dirty).
                         self._current.cols = g.cols
                         self._current.rows = g.rows
                         self._current.fixture_grid = grid
                         self._current.head_grid = head_grid
+                        self._current.weiss_grid = weiss_grid
                         if self._saved is not None:
                             self._saved.cols = g.cols
                             self._saved.rows = g.rows
                             self._saved.fixture_grid = list(grid)
                             self._saved.head_grid = list(head_grid)
+                            self._saved.weiss_grid = list(weiss_grid)
                         for spin, val in ((self._cols_spin, g.cols), (self._rows_spin, g.rows)):
                             spin.blockSignals(True)
                             spin.setValue(val)
                             spin.blockSignals(False)
                         n = sum(1 for f in grid if f is not None)
-                        luecken = len(grid) - n
+                        n_weiss = sum(1 for w in weiss_grid if w is not None)
+                        # FM-41: Weiss-Zellen sind in `grid` Luecken — sie hier
+                        # als solche zu zaehlen waere zwar wahr, aber
+                        # irrefuehrend („da fehlt was", obwohl da etwas steht).
+                        luecken = len(grid) - n - n_weiss
+                        _weiss_text = f", {n_weiss} Weiß-Segmente" if n_weiss else ""
                         self._grid_label.setText(
-                            f"{g.rows}×{g.cols} = {n} Fixtures, {luecken} Lücken (Gruppe »{g.name}«)"
+                            f"{g.rows}×{g.cols} = {n} Fixtures{_weiss_text}, "
+                            f"{luecken} Lücken (Gruppe »{g.name}«)"
                         )
                         self._sync_preview(self._current)
                         self._update_dirty()
@@ -1834,11 +1877,20 @@ class RgbMatrixView(QWidget):
         self._current.rows = 1
         self._current.fixture_grid = list(fids)
         self._current.head_grid = []          # FM-16: lose Auswahl = ganze Fixtures
+        # ★★ FM-41 (nachgemessen 05.09.): weiss_grid MUSS hier mit zurueck.
+        # Sonst fuhr die Matrix weiter die Weiss-Segmente eines Geraets, das in
+        # `fixture_grid` gar nicht mehr vorkommt — gemessen blieb CH154 eines
+        # abgewaehlten ZQ06121 stehen, und der Zustand ueberlebte Speichern und
+        # Laden. Genau die Richtung, die der `to_dict`-Docstring ausschliessen
+        # will: eine verlorene Weiss-Angabe darf zu „leuchtet nicht"
+        # degradieren, nie zu ungewolltem Licht.
+        self._current.weiss_grid = []
         if self._saved is not None:
             self._saved.cols = len(fids)
             self._saved.rows = 1
             self._saved.fixture_grid = list(fids)
             self._saved.head_grid = []
+            self._saved.weiss_grid = []
         for spin, val in ((self._cols_spin, len(fids)), (self._rows_spin, 1)):
             spin.blockSignals(True)
             spin.setValue(val)
@@ -1876,7 +1928,8 @@ class RgbMatrixView(QWidget):
 
     # ── FM-22: Panel-Raster und Muster-Assistent ─────────────────────────────
 
-    def _apply_panel_grid(self, cols, rows, fixture_grid, head_grid, text):
+    def _apply_panel_grid(self, cols, rows, fixture_grid, head_grid, text,
+                          weiss_grid=None):
         """Raster in BEIDE Instanzen schreiben und die Anzeige nachziehen.
 
         Gleiche Politik wie ``_assign_from_selection``: eine Grid-Zuweisung ist
@@ -1891,6 +1944,11 @@ class RgbMatrixView(QWidget):
             inst.rows = rows
             inst.fixture_grid = list(fixture_grid)
             inst.head_grid = list(head_grid)
+            # FM-41, s. `_assign_from_selection`: ein neues Raster ersetzt ALLE
+            # Achsen. Der Vorgabewert ist bewusst die leere Liste und nicht
+            # „unveraendert lassen" — ein Aufrufer, der die Achse nicht kennt,
+            # soll sie loeschen statt sie stehenzulassen.
+            inst.weiss_grid = list(weiss_grid or [])
         for spin, val in ((self._cols_spin, cols), (self._rows_spin, rows)):
             spin.blockSignals(True)
             spin.setValue(val)

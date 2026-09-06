@@ -153,13 +153,17 @@ def _parse_cell(value) -> tuple:
     return parse_group_cell(value)
 
 
-def grids_from_positions(positions: dict, cols: int, rows: int) -> tuple:
-    """Baut PARALLEL die dichte ``fixture_grid``-Liste (fids) UND die
-    ``head_grid``-Liste (Kopf-Index je Zelle, ``None`` = ganzes Fixture) aus einem
-    ``{"col,row": fid|"fid:head"}``-Dict (FixtureGroup.positions_json). Beide
-    Laenge cols*rows, None-Luecken bleiben. Out-of-range-Schluessel ignoriert."""
-    fid_grid: list = [None] * (cols * rows)
-    head_grid: list = [None] * (cols * rows)
+def _zellen_indizes(positions: dict, cols: int, rows: int):
+    """``(index, zellwert)`` je gueltigem Rasterschluessel — EINE Stelle, die
+    ``"col,row"`` liest und den Bereich prueft.
+
+    ★ FM-41: herausgezogen, BEVOR die zweite Ableitung daneben entstand.
+    ``grids_from_positions`` und ``weiss_grid_from_positions`` beantworten
+    verschiedene Fragen ueber DASSELBE Raster; die Schluessel-Lesung ist keine
+    davon. Nebeneinander kopiert waeren es acht Zeilen, die byte-genau
+    synchron bleiben muessen — laufen sie auseinander, verschiebt sich die
+    eine Achse gegen die andere und niemand sieht es.
+    """
     for key, value in (positions or {}).items():
         try:
             c_str, r_str = str(key).split(",")
@@ -168,12 +172,62 @@ def grids_from_positions(positions: dict, cols: int, rows: int) -> tuple:
             continue
         if not (0 <= c < cols and 0 <= r < rows):
             continue
+        yield r * cols + c, value
+
+
+def grids_from_positions(positions: dict, cols: int, rows: int) -> tuple:
+    """Baut PARALLEL die dichte ``fixture_grid``-Liste (fids) UND die
+    ``head_grid``-Liste (Kopf-Index je Zelle, ``None`` = ganzes Fixture) aus einem
+    ``{"col,row": fid|"fid:head"}``-Dict (FixtureGroup.positions_json). Beide
+    Laenge cols*rows, None-Luecken bleiben. Out-of-range-Schluessel ignoriert."""
+    fid_grid: list = [None] * (cols * rows)
+    head_grid: list = [None] * (cols * rows)
+    for idx, value in _zellen_indizes(positions, cols, rows):
         fid, head = _parse_cell(value)
         if fid is None:
             continue
-        fid_grid[r * cols + c] = fid
-        head_grid[r * cols + c] = head
+        fid_grid[idx] = fid
+        head_grid[idx] = head
     return fid_grid, head_grid
+
+
+def weiss_grid_from_positions(positions: dict, cols: int, rows: int) -> list:
+    """FM-41: ``(fid, segment_index)`` je WEISS-Zelle, sonst ``None``.
+    Laenge ``cols*rows``, parallel zu :func:`grids_from_positions`.
+
+    ★★ **Warum eine eigene Liste und nicht ein drittes Element im Tupel.**
+    Gemessen entpacken fuenf Zeilen in vier Dateien genau zwei Werte aus
+    ``grids_from_positions`` (Produktion: ``rgb_matrix_view``; dazu vier
+    Testzeilen); ein 3-Tupel waere ein harter ``ValueError`` fuer eine
+    Signaturaenderung, die keinen einzigen Aufrufer besser macht.
+
+    ★★★ **Und warum die Achse NICHT in den Kopf-Slot darf** — alle drei
+    denkbaren Traeger degradieren gemessen FALSCH statt leer:
+
+    * ``head_grid = 3`` plus Achsenliste daneben: drei Konsumenten lesen
+      ``head_grid`` ohne Achsenkenntnis und faerben **RGB-Zone 4**
+      (``matrix_pattern.cell_channel_values``, ``rgb_matrix_view._head_at``,
+      ``head_counts``).
+    * ``head_grid = None``: dieselben lesen „ganzes Geraet" — gemessen **145
+      Kanaele** statt nichts.
+    * Achse als String im Kopf-Slot (``"w3"``): ``channels_for_head`` wirft
+      ``TypeError``, den ``function_manager`` schluckt — der Tick bricht
+      **mitten in der Zellschleife** ab, die gueltigen Zellen dahinter
+      rendern NIE, und zwar jedes Frame aufs Neue.
+
+    Deshalb bleibt die Weiss-Zelle in ``fixture_grid`` eine **Luecke**
+    (``is_gap`` = True, gemessen 0 geschriebene Kanaele). Jeder Konsument, der
+    diese Liste hier nicht kennt, erzeugt damit **nichts** statt etwas
+    Falschem — dieselbe Eigenschaft, die ``parse_group_cell`` bewusst hat.
+    """
+    from src.core.group_cells import ACHSE_WEISS, parse_zelle
+    out: list = [None] * (cols * rows)
+    for idx, value in _zellen_indizes(positions, cols, rows):
+        fid, achse, index = parse_zelle(value)
+        if fid is None or achse != ACHSE_WEISS or index is None:
+            continue
+        out[idx] = (int(fid), int(index))
+    return out
 
 
 def grid_from_positions(positions: dict, cols: int, rows: int) -> list:
@@ -454,6 +508,7 @@ class RgbMatrixInstance(Function):
                  cols: int = 8, rows: int = 4,
                  fixture_grid: list[int] | None = None,
                  head_grid: list[int] | None = None,
+                 weiss_grid: list | None = None,
                  algorithm: RgbAlgorithm = RgbAlgorithm.CHASE,
                  color1: Color = (255, 0, 0),
                  color2: Color = (0, 0, 255),
@@ -471,6 +526,11 @@ class RgbMatrixInstance(Function):
         # als fixture_grid -> die fehlenden Zellen gelten als „ganzes Fixture"
         # (Alt-Shows byte-identisch). Siehe write() + channels_for_head.
         self.head_grid: list[int | None] = list(head_grid or [])
+        # FM-41: parallel zu fixture_grid — (fid, segment_index) je Weiss-Zelle,
+        # sonst None. Leer = keine Weiss-Zelle (die SCHMALERE Richtung, s.
+        # `apply_dict`). Die zugehoerigen fixture_grid-Eintraege sind bewusst
+        # None, damit jeder Konsument ohne Achsenkenntnis eine Luecke sieht.
+        self.weiss_grid: list = list(weiss_grid or [])
         # Gruppen-Bindung (nur fuer die Programmer-Listen-Filterung): Name der
         # Fixture-Gruppe, fuer die dieser Matrix-Effekt erstellt wurde. Bewusst per
         # NAME (nicht DB-id), weil Gruppen beim Show-Save/Load per Name neu angelegt
@@ -770,6 +830,13 @@ class RgbMatrixInstance(Function):
         # Function.speed × dt, byte-identisch) fortschreiben; Freeze haelt an.
         self._advance_step(dt)
         grid = self._render(self._step)
+        # FM-41: die Weiss-/Farbkopf-Zahlen sind Eigenschaften des GERAETS, nicht
+        # der Zelle — einmal je Fixture und Frame reicht. Vorher lief die
+        # Zaehlung in der Zellschleife, also 48x pro Frame fuer EIN Geraet
+        # (gemessen 16 us je Aufruf = 31 ms/s bei 40 fps, nur fuers Zaehlen).
+        # Der Merker lebt genau einen Frame; die Kanaele koennen sich zwischen
+        # Frames aendern (Patch-Aenderung), zwischen Zellen nicht.
+        _achsen_cache: dict[int, bool] = {}
         try:
             from src.core.app_state import (get_channels_for_patched,
                                             channels_for_head,
@@ -895,12 +962,29 @@ class RgbMatrixInstance(Function):
             # verlassen — das deckte zufaellig nur den Ein-Kanal-Fall ab.
             _weiss_gehoert_zur_zelle = True
             if self.style == MatrixStyle.RGBW:
-                _n_w = sum(1 for c in chans
-                           if (c.attribute or "").lower() == "color_w")
-                _n_c = sum(1 for c in chans
-                           if (c.attribute or "").lower() == "color_r")
-                _weiss_gehoert_zur_zelle = (_n_w == 0 or _n_c == 0
-                                            or _n_w == _n_c)
+                _achsen = _achsen_cache.get(fid)
+                if _achsen is None:
+                    # FM-41: EINE Zaehl-Regel — dieselbe, die der Gruppen-Editor
+                    # und der Visualizer fragen. Vorher stand sie hier inline und
+                    # damit zum dritten Mal im Baum.
+                    #
+                    # ★ Bewusst `attr_head_count_for_channels` und NICHT
+                    # `color_head_count_for_channels`: letzteres rundet auf 1 auf
+                    # („ein Geraet hat immer mindestens einen Farbkopf"), was fuer
+                    # die Frage „wie viele Koepfe" richtig ist und fuer die
+                    # AUSRICHTUNGSFRAGE falsch waere. Ein Geraet ohne `color_r`
+                    # hat 0 Farbkoepfe — und dann IST das Weiss sein Emitter-Satz
+                    # (Tunable White). Die allgemeine Zaehlung liefert diese 0
+                    # ausdruecklich (FM-27).
+                    # ★★★ FM-41: EINE benannte Regel statt der ausgeschriebenen
+                    # Bedingung. „Gehoert das Weiss zur Farbzelle" und „gibt es
+                    # eine eigene Weiss-Achse" sind DIESELBE Frage, nur einmal
+                    # bejaht und einmal verneint — sie zweimal auszuformulieren
+                    # waere die Doppelstellen-Klasse, aus der ENG-25 entstand.
+                    from src.core.app_state import weiss_ist_eigene_achse_for_channels
+                    _achsen = weiss_ist_eigene_achse_for_channels(chans, fx)
+                    _achsen_cache[fid] = _achsen
+                _weiss_gehoert_zur_zelle = not _achsen
             if self.style == MatrixStyle.RGBW and _weiss_gehoert_zur_zelle:
                 from src.core.color_utils import rgbw_split
                 cr, cg, cb, cw = rgbw_split(r, g, b)
@@ -972,6 +1056,137 @@ class RgbMatrixInstance(Function):
                 else:
                     continue
                 # ────────────────────────────────────────────────────────────
+                addr = fx.address + ch.channel_number - 1
+                if 1 <= addr <= 512:
+                    universe.set_channel(addr, max(0, min(255, int(val))))
+
+        # ── FM-41: die WEISS-Achse, eine eigene Schleife ────────────────────
+        #
+        # ★ Bewusst getrennt von der Schleife oben, nicht als dritter Zweig
+        # darin: die Zellschleife oben und der ENG-25-Torwaechter bleiben damit
+        # Zeichen fuer Zeichen, wie sie waren — sonst waere diese Scheibe doch
+        # eine Verhaltensaenderung fuer alles Bestehende.
+        #
+        # ★★ Und der Torwaechter gilt hier ausdruecklich NICHT. Er beantwortet
+        # „gehoert das Weiss zur FARB-Zelle" (also: darf ein Farbeffekt den
+        # Weissanteil aus R/G/B ziehen). Das ist eine ANDERE Frage als „diese
+        # Zelle IST ein Weiss-Segment". Die zweite mit der Antwort der ersten
+        # zu beantworten waere genau der Fehler, aus dem ENG-25 entstanden ist.
+        self._weiss_achse_schreiben(universes, patch_cache, grid)
+
+    def _weiss_achse_schreiben(self, universes, patch_cache, grid) -> None:
+        """Die Weiss-Zellen des Rasters fahren (FM-41).
+
+        Eine Weiss-Zelle adressiert **ein** eigenes Weiss-Segment eines Geraets
+        (``color_w`` Nr. n) plus dessen geteilte Kanaele — ``channels_for_axis``
+        liefert genau das und verweigert ein Segment, das es nicht gibt (kein
+        Phantom-Emitter, dieselbe Grenze wie FM-45).
+
+        **Nur Farb-Stile.** Ein Weiss-Segment hat keinen EIGENEN Dimmer und
+        keinen eigenen Shutter — unter ``DIMMER``/``SHUTTER`` wuerden alle
+        Weiss-Zellen desselben Geraets auf DENSELBEN geteilten Kanal schreiben
+        und einander ueberholen (letzter gewinnt, sichtbar als Flackern). Es
+        gibt dort schlicht nichts Pro-Segment zu fahren, also faehrt die Achse
+        dort nicht. Das ist dieselbe Zurueckhaltung, mit der DIMMER-Stil die
+        Farbkanaele „unangetastet laesst".
+
+        **RGB und RGBW fahren beide.** Diese Unterscheidung betrifft die
+        FARB-Zellen (ob deren ``color_w`` aus dem RGBW-Split mitlaeuft) und hat
+        mit einem eigenstaendigen Weiss-Segment nichts zu tun.
+
+        Der Wert ist die **Helligkeit** der gerenderten Zelle: ein
+        Weiss-Emitter kann nichts anderes darstellen. Dieselbe Groesse, die
+        ``_dimmer_output`` fuer den Dimmer-Stil benutzt — EINE Helligkeitsregel
+        im Modul, nicht zwei.
+        """
+        if not self.weiss_grid:
+            return
+        if self.style not in (MatrixStyle.RGB, MatrixStyle.RGBW):
+            return
+        try:
+            from src.core.app_state import (get_channels_for_patched,
+                                            channels_for_axis,
+                                            weiss_ist_eigene_achse_for_channels)
+            from src.core.group_cells import ACHSE_WEISS
+        except Exception:
+            return
+        inten = max(0.0, min(1.0, float(self.intensity)))
+        _eigen_cache: dict[int, bool] = {}
+        for idx, eintrag in enumerate(self.weiss_grid):
+            # Dieselbe strenge Form wie in `function_manager.affected_fids`:
+            # ein missgeformter Eintrag darf die Schleife nicht abreissen —
+            # ein ValueError beim Entpacken kaeme aus write() heraus, und der
+            # FunctionManager schluckt ihn: der Tick braeche mitten in der
+            # Schleife ab und die gueltigen Zellen dahinter blieben JEDES Frame
+            # dunkel. Genau die Falle, wegen der die Achse nicht in den
+            # Kopf-Slot durfte.
+            if (idx >= len(grid) or not isinstance(eintrag, (tuple, list))
+                    or len(eintrag) != 2):
+                continue
+            fid, segment = eintrag
+            fx = _find_fixture(patch_cache, fid)
+            if fx is None:
+                continue
+            universe = universes.get(fx.universe)
+            if universe is None:
+                continue
+            chans = get_channels_for_patched(fx)
+            # ★★★ FM-41 (nachgemessen 05.09.): NUR Geraete, deren Weiss ein
+            # eigener Satz IST. Wo das Weiss zur Farbzelle gehoert, adressieren
+            # beide Zellen DENSELBEN Kanal — gemessen an einem 4-Kanal-RGBW-PAR
+            # schrieb die Farbzelle ueber den Split `color_w = 0` (rot) und die
+            # Weiss-Zelle ueberschrieb CH4 mit 255. Und sie gewann IMMER, weil
+            # diese Schleife baulich nach der Farbschleife laeuft; der Vorrang
+            # liesse sich nicht einmal umdrehen. Ueber die echte Bibliothek:
+            # 1564 von 5125 Modi waren so betroffen, 71 haben wirklich eine
+            # eigene Achse. Dieselbe Regel wie der ENG-25-Torwaechter oben, nur
+            # andersherum gelesen.
+            _eigen = _eigen_cache.get(fid)
+            if _eigen is None:
+                _eigen = weiss_ist_eigene_achse_for_channels(chans, fx)
+                _eigen_cache[fid] = _eigen
+            if not _eigen:
+                continue
+            proj = channels_for_axis(chans, ACHSE_WEISS, segment)
+            if not proj:
+                # Segment gibt es nicht -> nichts fahren. ★ EHRLICHER HINWEIS:
+                # diese Zeile ist ein frueher Ausstieg, NICHT die Zusicherung —
+                # ein leeres Dict iteriert unten ohnehin nullmal. Der Riegel
+                # gegen den Phantom-Emitter sitzt in `channels_for_axis`
+                # (FM-45-Grenze: kein Segment -> {} und ausdruecklich NICHT die
+                # geteilten Kanaele allein, sonst zoege eine Zelle jenseits der
+                # Segmentzahl den Master-Dimmer des ganzen Geraets hoch).
+                # Mutationsgemessen: diese Zeile zu entfernen aendert nichts,
+                # die Zusicherung dort zu brechen macht 2 Tests rot.
+                continue
+            hell = max(0, min(255, int(round(
+                self._pixel_brightness(grid[idx]) * 255))))
+            # ★★ FM-41 (nachgemessen): DERSELBE Vorbehalt wie in der
+            # Farbschleife (`scale_colors`, s. dort). Treibt die Matrix den
+            # Dimmer selbst, skaliert der FunctionManager-Merge bereits ueber
+            # den Dimmer-Kanal — hier nochmal zu multiplizieren dimmt QUADRATISCH.
+            # Gemessen am ZQ06121 mit drive_intensity=True: bei Master 0,5 stand
+            # die Farbzone bei 255 (der Merge dimmt sie ueber CH1), das
+            # Weiss-Segment aber schon bei 127 und wurde danach nochmal halbiert
+            # — acht Segmente auf einem Viertel, waehrend die 48 Farbzonen
+            # desselben Geraets im selben Frame korrekt auf der Haelfte standen.
+            _hat_dimmer = any((c.attribute or "").lower()
+                              in ("intensity", "dimmer", "master") for c in chans)
+            _skalieren = _hat_dimmer and not self.drive_intensity and inten < 0.999
+            for attr, ch in proj.items():
+                a = (attr or "").lower()
+                if a == "color_w":
+                    val = int(hell * inten) if _skalieren else hell
+                elif a in ("intensity", "dimmer", "master"):
+                    # Geteilter Master: nur hochziehen, wenn die Matrix ihn
+                    # ohnehin treibt — sonst gehoert er dem Nutzer bzw. dem
+                    # Merge, und mehrere Weiss-Zellen wuerden sich um ihn
+                    # streiten. (Gleiche Regel wie oben in der Farb-Schleife.)
+                    if not self.drive_intensity:
+                        continue
+                    val = 255
+                else:
+                    continue             # Shutter u. a. unangetastet
                 addr = fx.address + ch.channel_number - 1
                 if 1 <= addr <= 512:
                     universe.set_channel(addr, max(0, min(255, int(val))))
@@ -1961,6 +2176,13 @@ class RgbMatrixInstance(Function):
             "cols": self.cols, "rows": self.rows,
             "fixture_grid": self.fixture_grid,
             "head_grid": self.head_grid,       # FM-16: Pro-Kopf-Zellen ("" = Alt)
+            # FM-41: Weiss-Zellen. Fehlt der Schluessel (Alt-Show ODER eine mit
+            # aelterem LightOS zurueckgespeicherte Show), heisst das KEINE
+            # Weiss-Zelle — die schmalere Richtung. Bewusst anders herum als
+            # `head_grid`, wo ein fehlender Key „ganzes Geraet" bedeutet und
+            # damit MEHR Ausgabe erzeugt: eine verlorene Weiss-Angabe darf zu
+            # „leuchtet nicht" degradieren, nie zu ungewolltem Licht.
+            "weiss_grid": self.weiss_grid,
             # Gruppen-Bindung (Programmer-Listen-Scope) — per Name, stabil ueber Save/Load.
             "source_group": self.source_group,
             "algorithm": self.algorithm.value,
@@ -1999,6 +2221,12 @@ class RgbMatrixInstance(Function):
         self.name = d.get("name", self.name)
         self.cols = d.get("cols", 8)
         self.rows = d.get("rows", 4)
+        # FM-41, s. to_dict: fehlender Schluessel -> [] -> keine Weiss-Zelle.
+        # Die Tupel kommen als Listen aus JSON zurueck und werden hier wieder
+        # zu (fid, index) — die Zellschleife entpackt zwei Werte.
+        self.weiss_grid = [tuple(x) if isinstance(x, (list, tuple)) and len(x) == 2
+                           else None
+                           for x in (d.get("weiss_grid") or [])]
         # None-Eintraege = Luecken; alte dichte Listen (ohne None) laden unveraendert (Migration).
         self.fixture_grid = list(d.get("fixture_grid", []))
         # FM-16: Pro-Kopf-Index je Zelle. Alt-Shows ohne den Key -> [] (= alle Zellen

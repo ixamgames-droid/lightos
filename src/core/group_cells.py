@@ -122,6 +122,66 @@ def parse_zelle(value) -> tuple:
         return None, None, None
 
 
+def referenzierte_fids(cells) -> set:
+    """Welche Geräte kommen in diesen Zellen überhaupt VOR — auf JEDER Achse.
+
+    ★★ FM-41: Das ist eine ANDERE Frage als ``base_fids_in_grid_order``, und
+    dass beide bis hierher dieselbe Funktion benutzt haben, ist der eigentliche
+    Fund. Die zwei Fragen haben **entgegengesetzte sichere Richtungen**:
+
+    * *„Welche Geräte FÄHRT diese Gruppe?"* — hier ist Untertreiben sicher.
+      Ein Gerät zu wenig heißt: es leuchtet nicht. Deshalb zählt
+      ``base_fids_in_grid_order`` eine Weiß-Zelle **nicht** mit, solange der
+      Renderer sie nicht bedient — sonst führe der VC-Submaster den ganzen
+      154-Kanal-Balken, wo acht Weiß-Segmente gemeint waren.
+    * *„Wird dieses Gerät IRGENDWO erwähnt?"* — hier ist Übertreiben sicher.
+      Ein Gerät zu wenig heißt hier: ``patch_dedup`` hält es für eine Waise und
+      ``--anwenden`` **entfernt es aus dem Patch**. Gemessen: ein Gerät, das
+      nur über Weiß-Zellen in einer Gruppe steckt, kam als Waise durch —
+      wortgleich der Fehler, den STAB-22 für Kopf-Zellen behoben hat.
+
+    Wer beide Fragen mit einer Antwort bedient, hat für eine davon die falsche
+    Fehlrichtung gewählt. Diese hier ist die großzügige: **jede** parsbare
+    Zelle trägt ihren fid bei.
+    """
+    out: set = set()
+    for c in cells or []:
+        fid, _achse, _index = parse_zelle(c)
+        if fid is not None:
+            out.add(int(fid))
+    return out
+
+
+def zelle_gehoert_zu(value, fid: int, achse: str | None = None) -> bool:
+    """Gehoert diese Rasterzelle zu Geraet ``fid`` auf Achse ``achse``?
+
+    Die EINE Regel dafuer, wann eine Zelle von einem Wurf betroffen ist —
+    benutzt vom Freiraum-Test (*darf ich hier ablegen?*) UND vom Aufraeumen
+    (*welche Zellen raeume ich vorher weg?*). Beides ist dieselbe Frage; sie
+    zweimal zu beantworten ist die Doppelstellen-Klasse aus Review-Checkliste
+    17, und genau daran ist ENG-25 gescheitert.
+
+    * ``achse=None`` — der ganze Geraetebestand, beide Achsen. Das ist die
+      ehrliche Lesart von „Alle Zellen dieses Geraets".
+    * ``achse=ACHSE_FARBE`` / ``ACHSE_WEISS`` — nur diese Achse …
+    * … **plus die Ganz-Geraet-Zelle**, immer. Eine Zelle ohne Achsen-Angabe
+      meint das GANZE Geraet und ist damit Mitglied jeder Achse: wer die
+      Weiss-Segmente eines Geraets ablegt, das bisher als eine Zelle im Raster
+      stand, muss diese eine Zelle raeumen — sonst steht das Geraet doppelt da,
+      einmal ganz und einmal in Segmenten.
+
+    ★ Der Gegenprobe wegen ausgeschrieben, denn die Asymmetrie ist der Kern:
+    eine Farb-Zelle ist KEIN Weiss-Segment und umgekehrt. Die beiden Achsen
+    raeumen einander also **nicht** weg — nur so kann eine Gruppe aus Weiss,
+    aus RGB oder aus beidem zusammen entstehen, was der ganze Zweck von FM-41
+    ist. Nur die achsenlose Zelle ist beiden gemeinsam.
+    """
+    z_fid, z_achse, _ = parse_zelle(value)
+    if z_fid is None or z_fid != fid:
+        return False
+    return achse is None or z_achse is None or z_achse == achse
+
+
 def achsen_zellen(cells, achse: str) -> list:
     """Aus einer Zell-Liste die Indizes je Geraet fuer GENAU EINE Achse.
 
@@ -220,6 +280,47 @@ def drop_whole_cells_with_heads(cells: dict) -> dict:
     return out
 
 
+def _fids_in_grid_order(positions: dict, leser) -> list:
+    """Gemeinsamer Kern: fids in Raster-Reihenfolge (Zeile, dann Spalte),
+    dedupliziert. ``leser(value)`` liefert den fid oder ``None``.
+
+    ★ FM-41: herausgezogen, weil es zwei LESARTEN gibt (was faehrt die Gruppe
+    vs. was erwaehnt sie, s. :func:`referenzierte_fids`), aber nur EINE
+    Reihenfolge-Regel. Die zweimal auszuschreiben waere die Doppelstellen-Klasse
+    — und ausgerechnet die Reihenfolge ist fuer Fan/Chase relevant, ein
+    Auseinanderlaufen faellt also erst am Rig auf.
+    """
+    items: list[tuple] = []
+    for key, value in (positions or {}).items():
+        try:
+            c_str, r_str = str(key).split(",")
+            c, r = int(c_str), int(r_str)
+        except (TypeError, ValueError):
+            continue
+        fid = leser(value)
+        if fid is not None:
+            items.append((r, c, fid))
+    items.sort()
+    out: list = []
+    for _r, _c, fid in items:
+        if fid not in out:
+            out.append(fid)
+    return out
+
+
+def referenzierte_fids_in_grid_order(positions: dict) -> list:
+    """Alle Geraete, die in diesem Raster VORKOMMEN — jede Achse, in
+    Raster-Reihenfolge.
+
+    Die geordnete Fassung von :func:`referenzierte_fids`; dort steht auch,
+    warum es zwei Lesarten gibt und welche wo hingehoert. **Fuer die ANZEIGE
+    ist immer diese hier die richtige:** ein Geraet, das nur mit Weiss-Zellen
+    im Raster steht, muss man sehen, benennen und anklicken koennen — auch
+    solange es der Renderer nicht faehrt.
+    """
+    return _fids_in_grid_order(positions, lambda v: parse_zelle(v)[0])
+
+
 def base_fids_in_grid_order(positions: dict) -> list[int]:
     """Basis-fids einer ``positions_json``-Map (``{"col,row": fid|"fid:head"}``) in
     **Raster-Reihenfolge** (Zeile, dann Spalte), **dedupliziert**.
@@ -229,22 +330,7 @@ def base_fids_in_grid_order(positions: dict) -> list[int]:
     Gruppen-fid-Resolver (``app_state``-Kern + Programmer-/EFX-/VC-Views), damit
     Kopf-Matrizen ihre Geraete zeigen statt ``(0)`` (FM16E-HEADCOUNT). Reihenfolge
     ist fuer Fan/Chase relevant (Geraete in Raster-Platzierungsreihenfolge)."""
-    items: list[tuple] = []
-    for key, value in (positions or {}).items():
-        try:
-            c_str, r_str = str(key).split(",")
-            c, r = int(c_str), int(r_str)
-        except (TypeError, ValueError):
-            continue
-        fid, _head = parse_group_cell(value)
-        if fid is not None:
-            items.append((r, c, fid))
-    items.sort()
-    out: list[int] = []
-    for _r, _c, fid in items:
-        if fid not in out:
-            out.append(fid)
-    return out
+    return _fids_in_grid_order(positions, lambda v: parse_group_cell(v)[0])
 
 
 def base_fids_in_cells(cells) -> list[int]:
