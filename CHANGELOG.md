@@ -7,6 +7,25 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-05 — Matrix-Effekte wirken jetzt auch auf Moving Heads mit Farbrad
+
+#### Behoben
+
+- **Ein Matrix-Effekt auf einem Moving Head mit Farbrad hat das Rad nie
+  bewegt — und die Lampe stand die ganze Zeit auf voll.** Ein Lauflicht über
+  mehrere solcher Köpfe sah deshalb aus, als täte es gar nichts: alle Köpfe
+  gingen an und blieben an.
+
+  Jetzt folgt das Farbrad der Farbe des Pixels, und die **Helligkeit landet auf
+  dem Dimmer** — bei einem Gerät ohne Farbmischung gibt es nichts anderes, was
+  sie tragen könnte. Ein schwarzer Pixel macht den Kopf damit wirklich dunkel,
+  statt ihn hell stehen zu lassen; das Rad bleibt dabei stehen, wo es steht
+  (Schwarz kommt auf keinem Farbrad vor, und ein Rad, das für nichts dreht,
+  macht nur Geräusch).
+
+  Geräte mit Farbmischung (RGB/RGBW) verhalten sich unverändert — dort trägt
+  die Farbe die Helligkeit und der Dimmer öffnet nur.
+
 ### 2026-09-03 — „Pan spiegeln" gilt jetzt für alle Köpfe, nicht nur den ersten
 
 #### Behoben
