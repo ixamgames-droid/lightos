@@ -10,6 +10,7 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | ENG-24 | A | fix/eng24-panik-weiss | 2026-09-06T17:51Z | src/core/all_white.py |
+| FM-47 | B | fix/fm47-muster-chaser-weiss-achse | 2026-09-06T17:51Z | src/core/engine/rgb_matrix.py |
 
 ## Blocker & Fallen
 
@@ -100,7 +101,6 @@
 
 ## Verlauf
 
-- 2026-09-05T14:18Z B claim QA-73
 - 2026-09-05T14:34Z B done QA-74
 - 2026-09-05T14:41Z B claim FM-45
 - 2026-09-05T15:02Z A aktualisiert FM-41: Branch feature/fm41-weiss-achse -> feature/fm41-scheibe2-weiss-zellen; Dateien src/core/group_cells.py -> src/core/engine/rgb_matrix.py · src/ui/views/rgb_matrix_view.py · src/core/group_cells.py · src/core/app_state.py · src/ui/views/fixture_group_view.py
@@ -130,3 +130,4 @@
 - 2026-09-06T17:28Z A claim ENG-22
 - 2026-09-06T17:49Z A done ENG-22
 - 2026-09-06T17:51Z A claim ENG-24
+- 2026-09-06T17:51Z B claim FM-47
