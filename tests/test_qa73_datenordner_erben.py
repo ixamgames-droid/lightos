@@ -52,12 +52,49 @@ def _fremder_ordner(fall, name: str) -> str:
     dazu, Rot wegzuwinken, und genau davon handelt QA-73.
     """
     pfad = os.path.join(_REPO, "build", name)
+    # ★★ DIE PRAEMISSE WIRD GEPRUEFT, NICHT BEHAUPTET. Dieser Pfad liegt
+    # relativ zum REPO — liegt das Repo selbst im Temp-Bereich, ist er es auch,
+    # und dann erbt ``conftest`` ihn voellig richtig. Die Zusicherung
+    # „ausserhalb wird umgelenkt" scheitert dann an ihrer EIGENEN Annahme und
+    # sieht aus wie ein Regressionsfehler.
+    #
+    # Genau das ist Sitzung A passiert: ihr Gate-Worktree lag unter /tmp, vier
+    # Zusicherungen fielen, isoliert war alles gruen. Die Meldung lautete „der
+    # Ordner ausserhalb des Temp-Bereichs wurde geerbt statt umgelenkt" — also
+    # woertlich das Gegenteil dessen, was los war.
+    #
+    # Uebersprungen statt rot: die Umgebung ist nicht kaputt, der Test ist dort
+    # nur nicht durchfuehrbar. Ein harter Fehlschlag waere genau die
+    # Fehldeutung, die A einen Gate-Lauf gekostet hat. Der Grund nennt den Pfad,
+    # damit niemand ihn suchen muss.
+    if _liegt_im_temp_bereich(pfad):
+        raise unittest.SkipTest(
+            f"Dieser Test braucht einen Pfad AUSSERHALB des Temp-Bereichs, aber "
+            f"das Repo liegt selbst darin: {_REPO} unter {tempfile.gettempdir()}. "
+            f"Damit erbt conftest {pfad} zu Recht, und die Zusicherung pruefte "
+            f"ihre eigene Praemisse statt der Regel. Abhilfe: Repo bzw. "
+            f"Gate-Worktree ausserhalb des Temp-Bereichs anlegen (QA-73)")
     # VORHER raeumen, nicht nur nachher: ein Rest aus einem abgebrochenen
     # Lauf (Strg-C, Absturz, fremder Prozess) wuerde die Zusicherung sonst
     # genauso dauerhaft rot faerben wie der Fall oben.
     shutil.rmtree(pfad, ignore_errors=True)
     fall.addCleanup(shutil.rmtree, pfad, ignore_errors=True)
     return pfad
+
+
+def _liegt_im_temp_bereich(pfad: str) -> bool:
+    """Liegt ``pfad`` im Temp-Bereich? — unabhaengig NACHGEBAUT, nicht importiert.
+
+    ⚠️ Bewusst NICHT ueber ``conftest._geerbter_datenordner``: das ist die
+    Funktion, die diese Datei PRUEFT. Waere sie kaputt und lieferte immer einen
+    Treffer, uebersprungen sich die Tests selbst — der Waechter waere von genau
+    dem Fehler stillgelegt, den er finden soll. Dieselbe Ueberlegung wie im Kopf
+    von ``test_qa60_datenordner_unberuehrt``: wer die geprueffte Funktion zur
+    Berechnung seiner eigenen Erwartung benutzt, prueft nichts.
+    """
+    wurzel = os.path.realpath(tempfile.gettempdir())
+    echt = os.path.realpath(pfad)
+    return echt == wurzel or echt.startswith(wurzel + os.sep)
 
 
 #: Meldet die Umgebung, die ``conftest`` im Kind TATSAECHLICH hinterlassen hat.
@@ -253,6 +290,58 @@ class AufraeumenTest(unittest.TestCase):
                             "geerbt statt umgelenkt")
         self.assertFalse(os.path.exists(gebaut),
                          f"das selbst gebaute {gebaut} blieb liegen")
+
+
+class PraemisseTest(unittest.TestCase):
+    """★★ Der Waechter ueber dem Waechter: die Annahme selbst.
+
+    Diese Datei sichert an mehreren Stellen zu, ein Ordner liege AUSSERHALB des
+    Temp-Bereichs. Bis 2026-09-06 wurde das nur behauptet. Sitzung A liess ihr
+    Gate in einem Worktree unter ``/tmp`` laufen — dort stimmte die Annahme
+    nicht, vier Zusicherungen fielen, und die Meldung lautete ausgerechnet „der
+    Ordner ausserhalb des Temp-Bereichs wurde geerbt statt umgelenkt". Ein
+    kaputter Test sah aus wie ein kaputtes Produkt.
+    """
+
+    def test_der_temp_bereich_wird_erkannt(self):
+        eigen = tempfile.mkdtemp(prefix="qa73_praemisse_")
+        self.addCleanup(shutil.rmtree, eigen, ignore_errors=True)
+        self.assertTrue(_liegt_im_temp_bereich(eigen))
+        self.assertTrue(_liegt_im_temp_bereich(os.path.join(eigen, "tief", "er")))
+
+    def test_die_grenze_liegt_auch_hier_auf_dem_trennzeichen(self):
+        """``<temp>2`` faengt mit ``<temp>`` an und liegt nicht darin."""
+        self.assertFalse(_liegt_im_temp_bereich(
+            os.path.realpath(tempfile.gettempdir()) + "2"))
+
+    def test_ein_repo_im_temp_bereich_UEBERSPRINGT_statt_zu_scheitern(self):
+        """★★★ Genau A's Fall, nachgestellt.
+
+        Liegt das Repo im Temp-Bereich, ist die Zusicherung nicht pruefbar.
+        Sie muss dann LAUT uebersprungen werden — nicht rot werden und schon
+        gar nicht gruen bleiben.
+        """
+        import test_qa73_datenordner_erben as selbst
+        gefaelscht = tempfile.mkdtemp(prefix="qa73_repo_im_temp_")
+        self.addCleanup(shutil.rmtree, gefaelscht, ignore_errors=True)
+        echt = selbst._REPO
+        selbst._REPO = gefaelscht
+        self.addCleanup(setattr, selbst, "_REPO", echt)
+
+        with self.assertRaises(unittest.SkipTest) as ctx:
+            selbst._fremder_ordner(self, "qa73_praemisse_probe")
+        grund = str(ctx.exception)
+        self.assertIn("QA-73", grund,
+                      "der Grund nennt sein Item nicht — dann sieht im "
+                      "-rs-Bericht niemand, warum hier nichts geprueft wurde")
+        self.assertIn(gefaelscht, grund,
+                      "der Grund nennt den Pfad nicht, den jemand aendern muss")
+
+    def test_ohne_die_faelschung_wird_NICHT_uebersprungen(self):
+        """★ Die Gegenprobe: sonst koennte die Praemisse-Pruefung alles
+        wegschlucken und die ganze Datei waere still wirkungslos."""
+        pfad = _fremder_ordner(self, "qa73_praemisse_gegenprobe")
+        self.assertFalse(_liegt_im_temp_bereich(pfad))
 
 
 if __name__ == "__main__":
