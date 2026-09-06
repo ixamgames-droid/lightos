@@ -7,6 +7,26 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-06 — „Alles Weiß" ließ Amber, UV und das Farbrad stehen
+
+#### Behoben
+
+- **Auf Geräten mit Amber- oder UV-LEDs war „Alles Weiß" hell, aber nicht
+  weiß.** Rot, Grün, Blau und Weiß wurden gesetzt, Amber und UV blieben auf dem
+  Wert stehen, den sie gerade hatten — das Ergebnis war getönt. Betroffen sind
+  elf Gerätemodi der Bibliothek. Alle Farbkanäle eines Geräts werden jetzt
+  ausdrücklich gesetzt, auch die, die auf 0 sollen.
+
+- **Bei Geräten mit einem Farbmakro- oder Farbradkanal *neben* den echten
+  Farbkanälen färbte dieser das Weiß weiter ein.** Das Rad wird jetzt auf seinen
+  offenen Slot gefahren — also dorthin, wo es der Farbmischung nicht in die
+  Quere kommt („Aus", „Offen", „Manuelle RGB-Steuerung", je nach Gerät). Wo das
+  Profil keinen solchen Slot ausweist, bleibt der Kanal unangetastet: „Alles
+  Weiß" rät nicht, genau wie beim Shutter.
+
+  Geräte, deren einzige Farbquelle ein Farbrad ist, verhalten sich unverändert —
+  dort wird weiterhin der weiße Slot gewählt.
+
 ### 2026-09-06 — Der Regler „Richtung" tat bei der Bewegung „Bounce" nichts
 
 #### Behoben

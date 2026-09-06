@@ -29,6 +29,17 @@ _KEINE_ANGABE = -1
 # app_state importierbar bleiben (Leaf, vgl. Review-Checkliste Klasse 3).
 _HELLIGKEIT = ("intensity", "dimmer", "master_dimmer")
 
+# ENG-24: Farb-Attribute, die KEINE additiven Emitter sind und deshalb NICHT auf
+# 0 duerfen. Ein Farbrad ist eine ORTSANGABE, kein Pegel — der Wert 0 waere dort
+# irgendein Slot, meist „offen", aber eben geraten (Lehre aus ENG-15). Es wird
+# stattdessen ueber dieselbe Abbildung auf seinen weissen Slot gefahren.
+#
+# ⚠️ Waechst die Bibliothek um ein weiteres `color*`-Attribut, muss hier
+# entschieden werden: additiver Emitter (dann auf 0) oder Ortsangabe (dann
+# hierher). `tests/test_eng24_panik_weiss.py` faellt rot, sobald ein unbekanntes
+# auftaucht — damit die Entscheidung nicht still uebergangen wird.
+_KEINE_EMITTER = ("color_wheel", "colour_wheel", "color")
+
 
 def white_attrs_for_fixture(channels, open_value_of_channel) -> dict[str, int]:
     """``{attribut: wert}``, damit dieses Geraet weiss und voll aufgedreht ist.
@@ -54,6 +65,53 @@ def white_attrs_for_fixture(channels, open_value_of_channel) -> dict[str, int]:
     if farbe:
         # Dieselbe RGBW-Reduktion wie ueberall sonst (reines Weiss -> W traegt es).
         out.update(adapt_color_payload(vorhanden, farbe))
+
+    # 1b) ENG-24: JEDER weitere Farb-Emitter ausdruecklich auf 0.
+    #
+    # ``color_attrs_for_fixture`` beantwortet „welche Kanaele machen weiss?" —
+    # es nennt deshalb nur `color_r/g/b/w`. Was es NICHT nennt, behaelt seinen
+    # Vorwert, und genau das war der Fehler: auf einem RGBWA+UV-PAR blieben
+    # Amber und UV stehen, wo sie gerade standen. Das Ergebnis war hell, aber
+    # nicht weiss — bei einer PANIK-Funktion die falscheste Art zu scheitern.
+    #
+    # Gemessen: 11 Modi der Bibliothek tragen `color_a` und/oder `color_uv`.
+    # Ein Override, der „alles weiss" verspricht, muss auch die Kanaele
+    # bestimmen, die er auf 0 will — sonst ist er kein Override, sondern ein
+    # Zuschlag auf einen unbekannten Zustand.
+    for attr in sorted(a for a in vorhanden
+                       if a and a.startswith("color") and a not in _KEINE_EMITTER):
+        out.setdefault(attr, 0)
+
+    # 1c) Das Farbrad / der Farb-Makro-Kanal, falls er NEBEN echten
+    #     Farbkanaelen sitzt.
+    #
+    # ``color_attrs_for_fixture`` hat zwar einen Zweig fuer „weiss auf dem Rad",
+    # aber er wird nur erreicht, wenn das Geraet KEIN RGB hat. Gemessen haben
+    # **17 Modi** beides — dort faellt das Rad hinten runter, und ein auf einem
+    # Farbslot stehendes Rad faerbt das Panik-Weiss weiter ein.
+    #
+    # ★★★ Den Rad-Zweig hier einfach mitzubenutzen waere ein FEHLER GEWESEN, und
+    # zwar ein sichtbarer. Er beantwortet die Frage „welcher Slot kommt der
+    # Wunschfarbe am naechsten?" — sinnvoll, wenn das Rad die EINZIGE Farbquelle
+    # ist. Hier ist die Frage eine andere: „welcher Slot legt das Rad AUS DEM
+    # WEG, damit die echten Farbkanaele gelten?" Gemessen mit der ersten
+    # Fassung: DOTZ TPAR und DOTZ MATRIX haben keinen weiss benannten Slot, also
+    # gewann der naechstgelegene bunte — die Panik-Funktion haette die Lampen
+    # auf **Blau** gestellt. Schlimmer als gar nichts zu tun.
+    #
+    # Die richtige Antwort steht schon im Haus und ist hier schon importiert:
+    # ``open_value_of_channel`` liefert den Slot mit ``kind == "open"`` (sonst
+    # ``highlight_value``, sonst nichts). Genau dieselbe Regel wie beim Shutter
+    # unten, samt derselben Haltung: ohne Beleg wird nicht geraten. Gemessen
+    # trifft sie „Manuelle RGB-Steuerung" (DOTZ TPAR), „Aus" (FPQ WH12X) und
+    # „Offen (RGBW-Mischung aktiv)" (MAC Aura) — und laesst den ADJ 5PX HEX in
+    # Ruhe, dessen Makro-Kanal gar keine Slots hinterlegt hat.
+    rad = next((c for c in chans
+                if (getattr(c, "attribute", None) or "") in _KEINE_EMITTER), None)
+    if rad is not None and getattr(rad, "attribute", None) not in out:
+        wert = open_value_of_channel(rad, _KEINE_ANGABE)
+        if wert != _KEINE_ANGABE:
+            out[rad.attribute] = int(wert)
 
     # 2) Helligkeit auf voll — jedes vorhandene Dimm-Attribut.
     for attr in _HELLIGKEIT:
