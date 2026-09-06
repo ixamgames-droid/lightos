@@ -10,6 +10,7 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | ENG-26 | B | fix/eng26-global-alias | 2026-09-06T16:55Z | src/core/engine/tempo_bus.py · src/ui/views/bpm_manager_view.py |
+| OUT-56 | A | fix/out56-statusleiste | 2026-09-06T17:09Z | src/ui/main_window.py,src/ui/ausgabe_label.py |
 
 ## Blocker & Fallen
 
@@ -98,7 +99,6 @@
 
 ## Verlauf
 
-- 2026-09-03T19:50Z A uebergeben QA-72
 - 2026-09-03T19:52Z A claim FM-41
 - 2026-09-03T20:06Z A done OUT-55
 - 2026-09-03T20:43Z B claim QA-74
@@ -128,3 +128,4 @@
 - 2026-09-06T16:53Z B claim ENG-26
 - 2026-09-06T16:55Z B aktualisiert ENG-26: Dateien src/core/engine/tempo_bus.py · src/ui/virtualconsole/vc_speedial.py -> src/core/engine/tempo_bus.py · src/ui/views/bpm_manager_view.py
 - 2026-09-06T17:09Z A done ENG-23
+- 2026-09-06T17:09Z A claim OUT-56
