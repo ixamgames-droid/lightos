@@ -112,6 +112,14 @@ class Function:
         self.phase_offset: float = 0.0
         self.sync_group: str = ""
         self._beat_anchor: float = 0.0     # Bus-Position beim letzten Sync/Start (privat, nicht serialisiert)
+        # ENG-23: Per-Effekt-„Einfrieren". Haelt DIESEN Effekt an, waehrend alle
+        # anderen weiterlaufen (der globale Freeze aus F3 haelt dagegen ALLE an,
+        # ueber den Tempo-Bus). Laufzeit-Zustand wie ``_running`` — nicht
+        # serialisiert: eine geladene Show soll nicht heimlich eingefroren sein.
+        self._frozen: bool = False
+        # Die beim Einfrieren festgehaltene Position (in Beats), damit das
+        # AUFTAUEN nicht springt. None = frei laufend oder nicht bus-gebunden.
+        self._frozen_local: float | None = None
         # WP-Tempo „taktgleich": startet dieser Effekt auf dem gemeinsamen Beat-Raster
         # seines Bus (True, Default) oder bewusst frei bei seinem eigenen Null (False)?
         # Wirkt nur, wenn der Effekt auf einem Bus liegt (tempo_bus_id != ""); Free-Run
@@ -232,10 +240,121 @@ class Function:
         # er sich nicht kuerzen — und der Regler waere wirkungslos.
         self._beat_anchor = pos - (pos - anker_alt) * m_alt / float(mult_neu)
 
+    # ── ENG-23: Per-Effekt-Einfrieren ─────────────────────────────────────────
+    #
+    # Der GLOBALE Freeze (F3) haelt alles an, indem er die Tempo-Buses auf 0 BPM
+    # setzt. Der Per-Effekt-Freeze haelt NUR diesen Effekt an, waehrend sein Bus
+    # weiterlaeuft — und genau daraus folgt die Schwierigkeit: waehrend des
+    # Einfrierens wandert die Bus-Position weiter, und beim Auftauen wuerde die
+    # aus ihr abgeleitete Position um die verstrichenen Beats SPRINGEN.
+    #
+    # Gemessen vor dem Fix (bus-synchrone Matrix, 120 BPM, 2 s eingefroren):
+    #     _step vor dem Freeze  2,0000
+    #     _step waehrend Freeze 2,0000   (gehalten)
+    #     _step nach Unfreeze   6,0000   (+4,0000 — genau die vergangenen Beats)
+    #
+    # Deshalb merkt sich das Einfrieren die Position und das Auftauen zieht den
+    # Anker nach. Es ist dieselbe Rechnung wie bei ENG-21, nur mit einem
+    # festgehaltenen statt einem umgerechneten ``local`` — und sie steht hier
+    # EINMAL fuer alle vier Typen, weil alle vier dieselbe Formel benutzen.
+
+    #: Die drei Aktionen, die jeder zeitbasierte Effekt beherrscht.
+    #: ★ ``freeze``/``unfreeze`` sind ABSOLUT und gehoeren deshalb in jede Liste:
+    #: ein reiner Toggle ist ein Zustand, den nur er selbst wieder aufhebt — wer
+    #: den Knopf nicht mehr findet (anderes VC-Blatt, MIDI-Pad umbelegt), sitzt
+    #: fest. Absolute Aktionen sind auch fuer Szenenabrufe die richtige Form.
+    FREEZE_ACTIONS: list[tuple[str, str]] = [
+        ("freeze",        "Einfrieren"),
+        ("unfreeze",      "Weiterlaufen"),
+        ("toggle_freeze", "Einfrieren an/aus"),
+    ]
+
+    def _local_beats(self) -> "float | None":
+        """Die Groesse, aus der ALLE vier Typen ihre Position ableiten.
+
+        ``(bus.position - _beat_anchor) * tempo_multiplier + phase_offset`` —
+        Phase bei EFX/Matrix, Ziel-Step bei Chaser/Sequence. ``None``, wenn der
+        Effekt nicht bus-gebunden ist (Free-Run rechnet aus ``dt`` und braucht
+        beim Auftauen nichts nachgezogen).
+        """
+        try:
+            from src.core.engine.tempo_bus import get_tempo_bus_manager
+            bus = get_tempo_bus_manager().bus_for_effect(
+                getattr(self, "tempo_bus_id", "") or "")
+            if bus is None:
+                return None
+            pos = float(bus.position())
+        except Exception:
+            return None
+        mult = float(getattr(self, "tempo_multiplier", 1.0) or 1.0)
+        if mult <= 0:
+            mult = 1.0
+        anker = float(getattr(self, "_beat_anchor", 0.0) or 0.0)
+        return (pos - anker) * mult + float(getattr(self, "phase_offset", 0.0) or 0.0)
+
+    def _einfrieren(self) -> None:
+        if self._frozen:
+            return                      # schon eingefroren: Position NICHT neu merken
+        self._frozen_local = self._local_beats()
+        self._frozen = True
+
+    def _auftauen(self) -> None:
+        """Hebt den Freeze auf und setzt den Anker so, dass es NICHT springt."""
+        gehalten, self._frozen_local = self._frozen_local, None
+        war = self._frozen
+        self._frozen = False
+        if not war or gehalten is None:
+            return
+        try:
+            from src.core.engine.tempo_bus import get_tempo_bus_manager
+            bus = get_tempo_bus_manager().bus_for_effect(
+                getattr(self, "tempo_bus_id", "") or "")
+            if bus is None:
+                return
+            pos = float(bus.position())
+        except Exception:
+            return
+        mult = float(getattr(self, "tempo_multiplier", 1.0) or 1.0)
+        if mult <= 0:
+            return
+        off = float(getattr(self, "phase_offset", 0.0) or 0.0)
+        self._beat_anchor = pos - (gehalten - off) / mult
+
+    def do_action(self, action: str, **kw) -> bool:
+        """Die drei Freeze-Aktionen, gemeinsam fuer alle Funktionstypen.
+
+        ⚠️ Bis 2026-09-06 kannte nur ``RgbMatrixInstance`` ueberhaupt ein
+        ``_frozen``. Die VC bot „Einfrieren an/aus" aber als allgemeine
+        Effekt-Aktion an — auf einem Chaser, einem EFX oder einer Sequenz
+        lieferte ``do_action`` deshalb schlicht ``False``, und der Knopf tat
+        **nichts**, ohne es zu sagen. Ein Bedienelement, das nur manchmal wirkt,
+        ist schlimmer als eines, das fehlt.
+
+        Untertypen rufen das hier ueber ``super().do_action(...)`` als letzten
+        Zweig auf — so bleibt die Zustaendigkeit an EINER Stelle.
+        """
+        a = (action or "").strip()
+        if a == "freeze":
+            self._einfrieren(); return True
+        if a == "unfreeze":
+            self._auftauen(); return True
+        if a in ("toggle_freeze", "toggleFreeze"):
+            self._auftauen() if self._frozen else self._einfrieren()
+            return True
+        return False
+
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
     def start(self):
         """Called when function is started."""
+        # ENG-23: ★★ Ein Zustand, aus dem nur GENAU EIN Knopf herausfuehrt, ist
+        # im Live-Betrieb eine Falle. Bis 2026-09-06 ueberlebte ``_frozen`` das
+        # Aus- und Wiedereinschalten des Effekts — gemessen: nach
+        # ``stop() + start()`` stand ``_frozen`` weiter auf True, und weil
+        # ``_on_start`` gleichzeitig ``_step = 0.0`` setzt, klemmte der Effekt
+        # danach auf Frame 0 (Vollrot 255/0/0). Aus- und Wiedereinschalten ist
+        # der Griff, zu dem jeder greift, wenn etwas haengt.
+        self._auftauen()
         self._running = True
         self._elapsed = 0.0
         self._env_elapsed = 0.0

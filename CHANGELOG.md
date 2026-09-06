@@ -7,6 +7,34 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-06 — Aus dem „Einfrieren" eines einzelnen Effekts führte nur ein einziger Knopf heraus
+
+#### Behoben
+
+- **Ein eingefrorener Effekt ließ sich nur mit genau der Taste wieder starten,
+  mit der er eingefroren wurde.** Aus- und Wiedereinschalten half nicht — im
+  Gegenteil: der Effekt blieb eingefroren und stand danach auf seinem ersten
+  Bild fest. Wer die Taste nicht mehr fand, weil das Konsolen-Blatt gewechselt
+  oder ein MIDI-Pad umbelegt war, kam aus dem Zustand nicht mehr heraus.
+
+  Ein Effekt neu zu starten hebt das Einfrieren jetzt auf. Zusätzlich gibt es
+  „Einfrieren" und „Weiterlaufen" als eigene, eindeutige Aktionen — sie sagen,
+  was danach gilt, statt nur umzuschalten, und eignen sich damit auch für einen
+  Szenenabruf.
+
+- **Der Knopf „Einfrieren an/aus" tat auf Chasern, EFX und Sequenzen gar
+  nichts.** Er ließ sich binden, drücken und blieb wirkungslos — nur Matrizen
+  konnten überhaupt einfrieren. Jetzt können es alle vier Effektarten.
+
+- **Ein eingefrorener Effekt war am Knopf nicht zu erkennen.** Er sah aus wie
+  ein sehr langsamer, und man suchte den Fehler im Rig. Der Knopf zeigt den
+  Zustand jetzt genauso an wie der globale Freeze.
+
+- **Das Weiterlaufen sprang.** Ein Effekt, der am Takt hängt, machte beim
+  Auftauen genau den Sprung, den er während des Einfrierens „verpasst" hatte —
+  bei zwei Sekunden Freeze auf 120 BPM waren das vier Schläge auf einmal. Er
+  läuft jetzt dort weiter, wo er stehengeblieben ist.
+
 ### 2026-09-06 — „Tempo ×" im laufenden Betrieb ändern ließ Effekte springen
 
 #### Behoben

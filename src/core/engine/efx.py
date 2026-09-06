@@ -334,6 +334,12 @@ class EfxInstance(Function):
         """Treibt die Phase um dt Sekunden voran (Richtung beachtet).
         Effektive Rate = speed_hz × Function.speed-Master, damit VC-Slider
         (EFFECT_SPEED / globaler SPEED) das EFX-Tempo steuern."""
+        # ENG-23: Per-Effekt-Freeze haelt die Phase an — die AUSGABE laeuft
+        # weiter (``write`` liest ``_phase``), der Effekt steht nur still. Das
+        # ist die einzige Stelle, an der sich die EFX-Phase bewegt, also die
+        # einzige, die es wissen muss.
+        if self._frozen:
+            return
         # WP-Tempo: bus-synchron? -> Phase direkt aus der Bus-Position ableiten
         # (statt dt zu akkumulieren). Free-Run laeuft sonst unveraendert weiter.
         if self._sync_from_bus():
@@ -1079,7 +1085,10 @@ class EfxInstance(Function):
                 return True
             except Exception:
                 return False
-        return False
+        # ENG-23: die drei Freeze-Aktionen beantwortet die Basisklasse fuer ALLE
+        # Funktionstypen (frueher kannte sie nur die Matrix, und derselbe
+        # VC-Knopf tat auf einem Chaser stumm gar nichts).
+        return super().do_action(action, **kw)
 
     def list_actions(self) -> list[tuple[str, str]]:
         """(key, label) der EFX-Live-Aktionen für die Bindungs-UI (VC/MIDI)."""
@@ -1100,7 +1109,7 @@ class EfxInstance(Function):
             ("toggle_bit16",     "16-bit an/aus"),
             ("apply_selection",  "Auf Auswahl anwenden"),
             ("tap",              "Tap-Tempo"),
-        ]
+        ] + self.FREEZE_ACTIONS
 
     def shift_clock(self, seconds: float) -> None:
         """Freeze-Auftauen: eigener monotonic-Anker mit (s. Function.shift_clock)."""

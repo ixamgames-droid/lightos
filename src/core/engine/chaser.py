@@ -139,6 +139,14 @@ class Chaser(Function):
             bus = None
         if bus is None:
             return False
+        # ENG-23: Per-Effekt-Freeze — derselbe Halt wie beim globalen Freeze eine
+        # Zeile tiefer, nur fuer DIESEN Chaser. Der Schritt bleibt stehen und
+        # wird weiter ausgegeben; ``_synced_target_prev`` wird bewusst NICHT
+        # fortgeschrieben, weil ``_auftauen`` den Anker zurueckzieht — sonst
+        # gaebe es beim Weiterlaufen einen Step-Burst ueber die eingefrorene Zeit.
+        if self._frozen:
+            self._render_and_blend(universes, patch_cache, function_registry)
+            return True
         bpm, _bc, _bp, pos = bus.snapshot()
         if bpm <= 0:
             # F5: nur bei AKTIVEM Freeze den aktuellen Schritt HALTEN (weiter ausgeben,
@@ -235,7 +243,10 @@ class Chaser(Function):
             return
         self._rendering = True
         try:
-            effective_dt = dt * self.speed
+            # ENG-23: eingefroren heisst „keine Zeit vergeht" — der Zeit-/
+            # Audio-Pfad rechnet mit dt, also ist 0 der Halt. Ausgegeben wird
+            # weiter, der Schritt bleibt stehen.
+            effective_dt = 0.0 if self._frozen else dt * self.speed
 
             # WP-Tempo: Tempo-Bus treibt das Stepping (×2/÷2, phasenkohaerent), falls
             # gesetzt + Bus laeuft. Sonst faellt es auf Audio/Zeit zurueck.
@@ -649,7 +660,10 @@ class Chaser(Function):
                 return True
             except Exception:
                 return False
-        return False
+        # ENG-23: die drei Freeze-Aktionen beantwortet die Basisklasse fuer ALLE
+        # Funktionstypen (frueher kannte sie nur die Matrix, und derselbe
+        # VC-Knopf tat auf einem Chaser stumm gar nichts).
+        return super().do_action(action, **kw)
 
     def list_actions(self) -> list[tuple[str, str]]:
         """(key, label) der Chaser-Live-Aktionen fuer die Bindungs-UI (VC/MIDI)."""
@@ -661,7 +675,7 @@ class Chaser(Function):
             ("toggle_bounce",    "Ping-Pong"),
             ("restart",          "Neustart"),
             ("tap",              "Tap-Tempo"),
-        ]
+        ] + self.FREEZE_ACTIONS
 
     # ── Serialisation ─────────────────────────────────────────────────────────
 
