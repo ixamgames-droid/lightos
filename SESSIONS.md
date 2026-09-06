@@ -9,7 +9,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| NET-12 | A | fix/net12-sacn-termination | 2026-09-06T15:52Z | src/core/dmx/sacn.py |
 | ENG-21 | A | fix/eng21-tempo-stetig | 2026-09-06T16:14Z | src/core/engine/efx.py,src/core/engine/rgb_matrix.py,src/core/engine/chaser.py,src/core/engine/sequence.py |
 
 ## Blocker & Fallen
@@ -97,7 +96,6 @@
 
 ## Verlauf
 
-- 2026-09-03T18:47Z B claim FM-45
 - 2026-09-03T18:49Z A claim UI-61
 - 2026-09-03T19:17Z A done UI-61
 - 2026-09-03T19:18Z A claim QA-72
@@ -127,3 +125,4 @@
 - 2026-09-06T15:41Z B done QA-77
 - 2026-09-06T15:52Z A claim NET-12
 - 2026-09-06T16:14Z A claim ENG-21
+- 2026-09-06T16:25Z A done NET-12
