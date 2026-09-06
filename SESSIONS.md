@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| _(frei)_ |  |  |  |  |
+| NET-13 | A | fix/buendel-net13-ui59-ui60 | 2026-09-06T19:11Z | src/ui/widgets/output_config.py |
 
 ## Blocker & Fallen
 
@@ -101,7 +101,6 @@
 
 ## Verlauf
 
-- 2026-09-05T15:10Z B done QA-73
 - 2026-09-05T19:50Z A aktualisiert FM-41: Dateien src/core/engine/rgb_matrix.py · src/ui/views/rgb_matrix_view.py · src/core/group_cells.py · src/core/app_state.py · src/ui/views/fixture_group_view.py -> src/core/engine/rgb_matrix.py · src/ui/views/rgb_matrix_view.py · src/core/group_cells.py · src/core/app_state.py · src/ui/views/fixture_group_view.py · src/ui/head_cell_colors.py · src/core/engine/function_manager.py
 - 2026-09-06T09:09Z B abgebrochen FM-45
 - 2026-09-06T11:15Z A done FM-41
@@ -131,3 +130,4 @@
 - 2026-09-06T17:52Z B aktualisiert FM-47: Dateien src/core/engine/rgb_matrix.py -> src/core/matrix_pattern.py · src/ui/views/rgb_matrix_view.py
 - 2026-09-06T18:22Z B done FM-47
 - 2026-09-06T18:26Z A done ENG-24
+- 2026-09-06T19:11Z A claim NET-13
