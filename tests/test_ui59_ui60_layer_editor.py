@@ -362,39 +362,54 @@ class GetippteWerteUeberlebenTest(_EditorMixin, unittest.TestCase):
     als ein Mensch, misst etwas anderes.
     """
 
-    def _tastatur(self, ed, spin, text):
+    def _tastatur(self, spin, zahl: float):
+        """Eine Zahl so eintippen, wie ein Mensch es tut — Zeichen fuer Zeichen.
+
+        ★★ Der Dezimaltrenner kommt aus dem WIDGET, nicht aus dieser Datei.
+        Erste Fassung tippte ein festes Komma, weil dieser Rechner de_DE
+        benutzt. In der CI laeuft die C-Locale mit Punkt: dort verschluckt die
+        Spinbox das Komma, aus "0,3" wird 3.0, und alle vier Tests fielen —
+        **auf gruener Maschine unbemerkt**. Eine Sonde muss dieselbe Konvention
+        benutzen wie das, was sie bedient; die eigene Umgebung ist keine.
+        """
         from PySide6.QtTest import QTest
+        trenner = spin.locale().decimalPoint()
+        text = ("%.4f" % zahl).rstrip("0").rstrip(".") or "0"
+        text = text.replace(".", trenner)
         spin.lineEdit().selectAll()
         QTest.keyClicks(spin.lineEdit(), text)
         spin.interpretText()
+        # Hausregel 2: erst belegen, dass die Tastenanschlaege ueberhaupt die
+        # gemeinte Zahl ergeben haben. Sonst vergleicht der Test danach zwei
+        # Zahlen, von denen keine die getippte ist — genau das ist passiert.
+        self.assertAlmostEqual(
+            spin.value(), zahl, places=6,
+            msg=f"die Eingabe {text!r} ergab {spin.value()} statt {zahl} — "
+                f"Dezimaltrenner des Widgets ist {trenner!r}")
 
-    def _getippt(self, typ, erst, dann):
+    def _getippt(self, typ, erst: float, dann: float):
         eff, ed = self._editor(EffectLayer(type=typ, min_val=0.0, max_val=1.0))
         self._gewaehlt(ed, 0)
-        # Hausregel 2: das Komma ist Pflicht. Mit "." getippte Werte verschluckt
-        # das Locale ("0.3" wird zu 3,0) — die Sonde haette dann etwas anderes
-        # gemessen als der Bediener tut. Beim ersten Versuch genau so passiert.
-        self.assertIn(",", erst + dann, "Vorbedingung: Dezimalkomma")
-        self._tastatur(ed, ed._spin_min, erst)
-        self._tastatur(ed, ed._spin_max, dann)
+        self._tastatur(ed._spin_min, erst)
+        self._tastatur(ed._spin_max, dann)
         l = eff.layers[0]
         return round(l.min_val, 3), round(l.max_val, 3)
 
     def test_clamp_behaelt_die_getippte_untergrenze(self):
         """★★★ Der Kern: erst Min, dann Max — die alltaegliche Reihenfolge."""
-        self.assertEqual(self._getippt(LayerType.CLAMP, "0,3", "0,7"), (0.3, 0.7))
+        self.assertEqual(self._getippt(LayerType.CLAMP, 0.3, 0.7), (0.3, 0.7))
 
     def test_clamp_liefert_bei_verdrehter_eingabe_was_es_verspricht(self):
         """★★ Der Fall, fuer den die Wache ueberhaupt existiert. Vorher kam
         weder die Eingabe noch die Korrektur heraus, sondern (0.0, 0.2)."""
-        self.assertEqual(self._getippt(LayerType.CLAMP, "0,8", "0,2"), (0.2, 0.2))
+        self.assertEqual(self._getippt(LayerType.CLAMP, 0.8, 0.2), (0.2, 0.2))
 
     def test_die_absteigende_rampe_ist_auch_ueber_die_tastatur_erreichbar(self):
         """Der eigentliche Zweck von UI-59, am echten Bedienweg."""
-        self.assertEqual(self._getippt(LayerType.RAMP, "1,0", "0,0"), (1.0, 0.0))
+        self.assertEqual(self._getippt(LayerType.RAMP, 1.0, 0.0), (1.0, 0.0))
 
     def test_eine_gewoehnliche_rampe_bleibt_gewoehnlich(self):
-        self.assertEqual(self._getippt(LayerType.RAMP, "0,3", "0,7"), (0.3, 0.7))
+        self.assertEqual(self._getippt(LayerType.RAMP, 0.3, 0.7), (0.3, 0.7))
 
     def test_die_tastatur_verfolgung_ist_nur_bei_min_und_max_abgeschaltet(self):
         """★ Gegenprobe zum Umfang: bei den uebrigen Feldern ist ein
