@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| ENG-19 | A | fix/eng19-fade-ohne-sprung | 2026-09-06T11:32Z | src/core/engine/cue_stack.py |
+| _(frei)_ |  |  |  |  |
 
 ## Blocker & Fallen
 
@@ -91,7 +91,6 @@
 
 ## Verlauf
 
-- 2026-09-03T16:50Z B uebergeben XPLAT-23
 - 2026-09-03T16:51Z B claim XPLAT-23
 - 2026-09-03T17:07Z A done FM-43
 - 2026-09-03T17:30Z B uebergeben XPLAT-23
@@ -121,3 +120,4 @@
 - 2026-09-06T09:09Z B abgebrochen FM-45
 - 2026-09-06T11:15Z A done FM-41
 - 2026-09-06T11:32Z A claim ENG-19
+- 2026-09-06T11:45Z A done ENG-19
