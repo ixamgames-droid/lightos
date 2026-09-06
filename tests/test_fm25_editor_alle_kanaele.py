@@ -56,6 +56,27 @@ class _EditorFall(unittest.TestCase):
         p1.start(); self.addCleanup(p1.stop)
         p2 = mock.patch.object(editor_module.QMessageBox, "information")
         p2.start(); self.addCleanup(p2.stop)
+        # ★★ Die Meldung, die HEADLESS BLOCKIERT — hier stillgelegt und
+        # MITGESCHRIEBEN statt nur unterdrueckt.
+        #
+        # `information` war laengst attrappiert, `warning` nicht: genau die
+        # Pflichtfeld-Meldung in `_save` (fixture_editor.py:526) ist modal und
+        # kehrt offscreen nie zurueck. Gemessen mit einem eingebauten Regress:
+        # 60 s Watchdog-Timeout statt 8,5 s klarer Fehler — und der Watchdog
+        # beendet den PROZESS, nimmt also die restlichen Tests dieser Datei mit.
+        # Aus "laut und benannt" wurde "still und tot".
+        #
+        # ⚠️ Nicht einfach unterdruecken: eine verschluckte Fehlermeldung ist
+        # genau die Blindheit, die hier vermieden werden soll. Der Text landet
+        # in `self.meldungen`, damit ein fehlgeschlagenes Speichern SAGEN kann,
+        # woran es lag.
+        self.meldungen: list[str] = []
+        p_warn = mock.patch.object(
+            editor_module.QMessageBox, "warning",
+            lambda *a, **k: self.meldungen.append(" | ".join(
+                str(x) for x in a[1:3])) or 0)
+        p_warn.start()
+        self.addCleanup(p_warn.stop)
 
     def _anlegen(self, short="MEHRKANAL") -> int:
         """Legt ueber den ECHTEN Dialog ein Profil mit mehreren Kanaelen an."""
@@ -69,6 +90,26 @@ class _EditorFall(unittest.TestCase):
             dlg._tabs.removeTab(0)
         dlg._add_mode(name="Standard", channels=[dict(c) for c in _KANAELE])
         dlg._save()
+        # ★★ XPLAT/FM-36: ausdruecklich pruefen, statt sich auf einen
+        # AttributeError zu verlassen.
+        #
+        # Bis FM-36 existierte `_saved_id` erst NACH erfolgreichem Speichern —
+        # ein misslungenes `_save()` schlug hier deshalb sofort und mit Namen
+        # fehl. Seit der Vorbelegung mit None faellt das weg, und der Ablauf
+        # laeuft in die Pflichtfeld-Meldung (`QMessageBox.warning`), die
+        # headless BLOCKIERT: gemessen 60 s Watchdog-Timeout statt 8,5 s
+        # klarer Fehler, und der Watchdog nimmt die restlichen Tests dieser
+        # Datei mit.
+        #
+        # Der Hinweis kam vom Skeptiker, mit kontrollierter Gegenprobe: dieselbe
+        # eingebaute Regression, einmal mit und einmal ohne die Vorbelegung —
+        # "16 failed in 8.45s" gegen "+++ Timeout +++ nach 60s".
+        # Eine Zusicherung, die nur als Absturz existierte, gehoert
+        # hingeschrieben, sonst tauscht man Lautstaerke gegen Stille.
+        self.assertIsNotNone(
+            dlg._saved_id,
+            "Speichern ist fehlgeschlagen. Meldungen des Dialogs: "
+            + (" / ".join(self.meldungen) or "(keine)"))
         return dlg._saved_id
 
     def _kanaele(self, pid: int, modus="Standard"):

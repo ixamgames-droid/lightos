@@ -66,6 +66,27 @@ def group_member_fids(positions_json: str) -> list[int]:
     return [fid for _, _, fid in items]
 
 
+def raster_ohne_spalten(cols) -> bool:
+    """QA-75: Hat dieses Raster KEINE einzige Spalte, in die etwas passen kann?
+
+    EINE Frage, EINE Stelle (Hausregel 6): zwei Zell-Suchschleifen haengen davon
+    ab — ``GroupEditDialog.result_positions`` hier und
+    ``FixtureGridWidget.first_free_cells`` in ``src/ui/views/fixture_group_view.py``,
+    das diese Funktion importiert. Beide drehten sich ohne Spalte ENDLOS im
+    UI-Faden (gemessen 2026-09-06: cols=0 und cols=-1 je ueber 8 s ohne
+    Rueckkehr, waehrend cols=8 nach 0,005 ms fertig ist).
+
+    Geprueft wird ``< 1``, NICHT ``== 0``: cols=-1 haengt gemessen genauso — ein
+    Wachposten auf die Null allein liesse die negative Haelfte offen.
+
+    Die Funktion wohnt in DIESEM Modul, weil es ausser json und Qt nichts
+    importiert. Andersherum zoege der Dialog den ganzen View-Baum (app_state,
+    DB-Modelle, sqlalchemy) nach — die Abhaengigkeit laeuft schon heute in diese
+    Richtung (fixture_group_view importiert GroupEditDialog, nicht umgekehrt).
+    """
+    return cols < 1
+
+
 class GroupEditDialog(QDialog):
     """Mitglieder, Name und Reihenfolge einer Gruppe bearbeiten."""
 
@@ -259,8 +280,19 @@ class GroupEditDialog(QDialog):
         # Zellen; ganze Mitglieder landen NUR in den restlichen freien Zellen.
         positions: dict[str, object] = dict(self._head_cells)
         head_used: set[str] = set(self._head_cells.keys())
-        while cols * rows < len(fids) + len(head_used):
-            rows += 1
+        # QA-75: Wachposten VOR der Wachstumsschleife. Ohne Spalte ist
+        # ``cols * rows`` fuer JEDES rows kleiner als die Mitgliederzahl (bei
+        # cols=0 konstant 0, bei cols<0 sogar fallend) — die Bedingung wird nie
+        # falsch, die Schleife lief endlos im UI-Faden (gemessen: _cols=0 und
+        # _cols=-1 je ueber 8 s ohne Rueckkehr, _cols=8 braucht 0,017 ms).
+        # Die Klemmung in __init__ (``max(1, int(cols))``) bleibt richtig, sie
+        # ist nur nicht die einzige noetige Zusicherung — wer ``_cols`` direkt
+        # setzt, geht an ihr vorbei. Ohne Spalte wachsen keine Reihen, und die
+        # Platzierung unten laeuft ueber ``range(cols)`` von selbst leer aus:
+        # Kopf-Zellen bleiben verbatim, ganze Mitglieder bekommen keine Zelle.
+        if not raster_ohne_spalten(cols):
+            while cols * rows < len(fids) + len(head_used):
+                rows += 1
 
         if self._order_changed:
             free = (f"{c},{r}" for r in range(rows) for c in range(cols)
