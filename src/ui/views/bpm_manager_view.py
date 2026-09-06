@@ -795,7 +795,13 @@ class BpmManagerView(QWidget):
         if not name:
             return
         mgr = self._tbm()
-        if name == mgr.DEFAULT_BUS:
+        # ENG-26: auch die ALIASE des Default-Busses abweisen, nicht nur seinen
+        # woertlichen Namen. Seit `ensure_bus` den Alias aufloest, kaeme bei
+        # einem getippten „Global" sonst der Default-Bus zurueck — der Nutzer
+        # saehe keinen neuen Eintrag und wuesste nicht warum. Vorher entstand
+        # hier ein Phantom-Bus, den kein Effekt liest; beides ist stumm, aber
+        # nur eines davon laesst sich hier abfangen.
+        if mgr.kanonische_bus_id(name) == mgr.DEFAULT_BUS:
             return
         bus = mgr.ensure_bus(name)
         bus.set_role("master")
