@@ -144,6 +144,17 @@ class SACNSender:
             _pack_framing(dmx, universe, seq, self._source_name, self._cid),
             self._dest(universe))
 
+    def uebernimm(self, universe: int) -> None:
+        """NET-12: dieses Universum als Nachfolger uebernehmen, bevor der
+        Vorgaenger geschlossen wird — s. :meth:`SacnSource.uebernehmen`.
+
+        Auch ``_universes`` wird gesetzt: dieser Sender ist ab jetzt fuer das
+        Universum zustaendig und muss es beim eigenen ``close`` ordentlich
+        terminieren, auch wenn er zwischendurch nie zum Senden kam.
+        """
+        self._universes.add(universe)
+        self._source.uebernehmen(universe, self._token)
+
     def _dest(self, universe: int):
         if self._target_ip:
             return (self._target_ip, SACN_PORT)

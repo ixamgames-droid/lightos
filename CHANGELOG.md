@@ -7,6 +7,27 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-06 — „Übernehmen" im Ausgabe-Dialog unterbrach die laufende sACN-Ausgabe
+
+#### Behoben
+
+- **Ein Klick auf „Übernehmen" meldete den sACN-Ausgang bei allen Empfängern
+  kurz ab — auch dann, wenn sich an der Konfiguration gar nichts geändert
+  hatte.** Empfänger dürfen eine so abgemeldete Quelle sofort verwerfen und auf
+  ihre eigene Rückfallebene gehen; auf der Bühne heißt das ein Zucken oder ein
+  kurzer Ausfall mitten in der Show, ausgelöst durch das bloße Bestätigen eines
+  Dialogs.
+
+  Ein Universum, das weiterläuft, wird jetzt an den neuen Sender übergeben,
+  statt abgemeldet und neu angemeldet zu werden. Auch ein Wechsel des
+  Unicast-Ziels gilt als Weiterlaufen: die Ausgabe geht dann woanders hin, sie
+  hört nicht auf.
+
+  Unverändert bleibt das, wofür die Abmeldung da ist: wer die Ausgabe wirklich
+  beendet oder auf einen anderen Ausgabetyp wechselt, meldet sich weiterhin
+  ordentlich ab — die Empfänger reagieren also sofort und warten nicht 2,5
+  Sekunden auf ihren Timeout.
+
 ### 2026-09-06 — Ein Cue-Fade sprang am Ende, statt sauber durchzulaufen
 
 #### Behoben

@@ -80,7 +80,12 @@ class _FakeOutputManager:
     def add_sacn(self, universe, target_ip=None, out_universe=None):
         self._sacn_outputs[int(universe)] = target_ip
 
-    def remove_output(self, universe):
+    def remove_output(self, universe, ausser=None):
+        # NET-12: der echte Manager kennt `ausser` (welcher Adaptertyp
+        # STEHEN bleibt). Ohne den Parameter wirft das Double einen
+        # TypeError, den `_apply_sacn` in seinem try schluckt — dann
+        # laeuft `add_sacn` nie und der Test misst etwas anderes, als
+        # er glaubt.
         for reg in (self._enttec_outputs, self._artnet_outputs, self._sacn_outputs):
             reg.pop(int(universe), None)
 

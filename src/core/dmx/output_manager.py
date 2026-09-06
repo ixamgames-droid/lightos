@@ -630,28 +630,87 @@ class OutputManager:
 
     def add_sacn(self, universe: int, target_ip: str | None = None,
                  out_universe=None):
-        self._swap_device(self._sacn_outputs, universe, SACNSender(target_ip))
+        neu = SACNSender(target_ip)
+        # ★★★ NET-12: den Besitz VOR dem Einhaengen uebernehmen. `_swap_device`
+        # schliesst den Vorgaenger unmittelbar danach, und dessen `close()`
+        # fragt die QUELLE, ob es einen Nachfolger gibt — nicht die Registry.
+        # Ohne diese Zeile wechselt der Besitz erst beim ersten gesendeten
+        # Frame des Neuen, und dazwischen schickt der Alte eine
+        # Stream-Termination fuer ein weiterlaufendes Universum.
+        # Optional aufgerufen, und das ist kein Nachlassen: Art-Net kennt gar
+        # keinen Besitz, und die Test-Attrappen ersetzen BEIDE Sender-Klassen
+        # durch dieselbe — ein harter Aufruf haette dort einen AttributeError
+        # geworfen. Fehlt die Methode, gilt das bisherige Verhalten (eine
+        # ueberfluessige Termination), nicht ein Absturz.
+        # ⚠️ Damit das keine stille Luecke wird, sichert
+        # `test_net12_kein_abbruch_beim_uebernehmen` zu, dass der ECHTE
+        # `SACNSender` die Methode hat.
+        uebernimm = getattr(neu, "uebernimm", None)
+        if uebernimm is not None:
+            uebernimm(universe)
+        self._swap_device(self._sacn_outputs, universe, neu)
         self._set_out_universe(universe, out_universe)
 
-    def remove_output(self, universe: int):
+    #: NET-12: Registry-Name -> Registry-Attribut, fuer ``remove_output(ausser=…)``.
+    _REGISTRY_NAMEN = ("enttec", "artnet", "sacn")
+
+    def remove_output(self, universe: int, ausser: str | None = None):
         """OUT-05: entfernt ALLE Ausgabe-Adapter (Enttec/ArtNet/sACN) fuer ein
         Universe thread-sicher und schliesst sie. Noetig fuer Output-Typ-Wechsel und
         "Disabled": frueher schrieben add_enttec/add_artnet/add_sacn nur in ihre
         EIGENE Registry und es gab kein Remove -> nach einem Typ-Wechsel sendete
         _send_all ueber BEIDE Adapter (Doppel-Output), ein "deaktiviertes" Universe
         gab weiter Licht aus, und das Alt-Handle wurde nie geschlossen (Leak).
-        pop unter Lock, close ausserhalb (Muster wie _swap_device)."""
+        pop unter Lock, close ausserhalb (Muster wie _swap_device).
+
+        ★★★ NET-12: ``ausser`` laesst GENAU EINEN Adaptertyp stehen. Das ist kein
+        Bequemlichkeits-Schalter, sondern die Voraussetzung dafuer, dass die
+        sACN-Uebergabe ueberhaupt greifen kann.
+
+        Hintergrund: ``SACNSender.close`` schickt eine E1.31-Stream-Termination
+        (Options-Bit ``0x40``), damit Empfaenger die Quelle sofort verwerfen statt
+        2,5 s auf den Network-Data-Loss-Timeout zu warten (OUT-06). Genau
+        deswegen fragt sie vorher ``_source.release(...)``: gibt es einen
+        Nachfolger, wird NICHT terminiert — ``_swap_device`` haengt den Neuen
+        naemlich ein, BEVOR es den Alten schliesst.
+
+        ⚠️ Der Dialog rief bis 2026-09-06 aber ``remove_output(univ)`` UND
+        danach ``add_sacn(univ, …)``. Das Entfernen laeuft ueber ``pop`` — im
+        Moment des ``close`` steht also KEIN Nachfolger in der Registry, die
+        Uebergabe-Sperre kann nicht greifen, und jedes „Uebernehmen" schickt eine
+        Termination fuer ein **weiterlaufendes** Universum. Gemessen: 5 von 5
+        Uebernahmen mit unveraenderter Konfiguration, 15 von 20 Paketen mit
+        gesetztem Termination-Bit. Empfaenger duerfen daraufhin auf ihren
+        Fallback gehen — mitten in der Show.
+
+        Mit ``ausser="sacn"`` bleibt der Sender stehen, und das nachfolgende
+        ``add_sacn`` tauscht ihn ueber ``_swap_device`` MIT Uebergabe aus. Der
+        Grund fuer den Aufruf (MU-01: bei einem Typ-Wechsel muessen die FREMDEN
+        Adapter weg, sonst Doppel-Output) bleibt dabei vollstaendig erhalten.
+        """
+        registries = {"enttec": self._enttec_outputs,
+                      "artnet": self._artnet_outputs,
+                      "sacn": self._sacn_outputs}
+        if ausser is not None and ausser not in registries:
+            raise ValueError(f"unbekannter Adaptertyp: {ausser!r}")
         victims = []
         with self._io_lock:
-            for registry in (self._enttec_outputs, self._artnet_outputs,
-                             self._sacn_outputs):
+            for name, registry in registries.items():
+                if name == ausser:
+                    continue
                 dev = registry.pop(universe, None)
                 if dev is not None:
                     victims.append(dev)
             # OUT-03: eine evtl. konfigurierte externe Universe-Nummer mit
             # entfernen, damit ein spaeter neu angelegter Adapter nicht die alte
             # Nummer erbt.
-            self._out_universe.pop(universe, None)
+            #
+            # NET-12: bei `ausser` bleibt sie stehen — der ueberlebende Adapter
+            # BENUTZT sie, und `add_*` setzt sie unmittelbar danach ohnehin neu.
+            # Sie hier zu loeschen waere ein kurzer Zustand, in dem der laufende
+            # Sender seine externe Nummer verloren haette.
+            if ausser is None:
+                self._out_universe.pop(universe, None)
             self._vergiss_fehler(universe)
         for dev in victims:
             try:
