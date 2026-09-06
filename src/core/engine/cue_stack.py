@@ -52,12 +52,37 @@ class FadeState:
             return self.from_vals
         if raw >= 1.0:                    # fertig -> exakt Zielwerte (kurvenunabhaengig)
             self.done = True
-            # KOPIE der inneren dicts: to_vals ist die cue.values des Ziel-Cues
-            # (per-Referenz in _fade_to uebergeben). Gaeben wir sie direkt zurueck,
-            # aliast _own_output die gespeicherten Cue-Werte und ein spaeterer
-            # In-Place-Merge (Sub-Cueliste, tick()) mutiert die persistente Cue —
-            # korrumpiert die Show dauerhaft. Siehe tick()-Merge-Kommentar.
-            return {fid: dict(attrs) for fid, attrs in self.to_vals.items()}
+            # ★★★ ENG-19: DIESELBE Fassung wie waehrend des Fades, mit t=1.0.
+            #
+            # Vorher stand hier `{fid: dict(attrs) for fid, attrs in
+            # self.to_vals.items()}` — nur die ZIELWERTE. Damit beantworteten die
+            # beiden Haelften desselben Uebergangs dieselbe Frage verschieden:
+            #
+            #   `_blend` (der ganze Fade):  ein im Ziel fehlendes Attribut HAELT
+            #                               seinen Wert (`tv = to_f.get(attr, fv)`)
+            #   das Ende (t >= 1.0):        es faellt WEG
+            #
+            # Gemessen an einer Cue 1 (intensity=255, color_r=0) und einer Cue 2,
+            # die NUR color_r=255 nennt: intensity steht ueber den ganzen Fade auf
+            # 255 und ist bei Fortschritt 1.0 schlagartig verschwunden. Das ist
+            # kein Fade, das ist ein Sprung — Review-Checkliste 17 in einer
+            # einzigen Methode.
+            #
+            # ★ Warum HALTEN und nicht "auf den Default fahren", was der
+            # Backlog-Eintrag vorschlug: LightOS fuehrt Cues nach LTP
+            # ("Cues behalten LTP-Ersatz durch den Programmer",
+            # app_state.py:3082). Eine Cue setzt, was sie NENNT; was sie nicht
+            # nennt, bleibt stehen. Waere es anders, wuerde eine Cue, die nur die
+            # FARBE wechselt, die Intensitaet auf 0 ziehen — ein Blackout mitten
+            # in der Show. Gemessen: genau dieser Fall, s. Test.
+            #
+            # `_blend(1.0)` liefert fuer genannte Attribute exakt den Zielwert
+            # (`int(fv + (tv - fv) * 1.0)`), ist also kurvenunabhaengig wie zuvor,
+            # und baut frische innere dicts — die Aliasing-Falle von damals bleibt
+            # damit geschlossen: `to_vals` ist die `cue.values` des Ziel-Cues
+            # (per Referenz), und ein spaeterer In-Place-Merge wuerde die
+            # persistente Cue mutieren.
+            return self._blend(1.0)
         # F-5: Fade-Verlauf der Cue (Default scurve = bisheriges Smoothstep-Verhalten)
         t = eval_named(self.curve, raw)
         return self._blend(t)

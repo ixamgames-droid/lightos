@@ -7,6 +7,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-06 — Ein Cue-Fade sprang am Ende, statt sauber durchzulaufen
+
+#### Behoben
+
+- **Ein Attribut, das die Ziel-Cue gar nicht nennt, blieb den ganzen Fade lang
+  stehen und war im letzten Moment schlagartig weg.** Fährt man von einer Cue
+  mit Helligkeit und Farbe auf eine Cue, die nur die Farbe ändert, hielt die
+  Helligkeit korrekt — und sprang am Ende des Übergangs heraus.
+
+  Eine Cue setzt jetzt durchgängig das, was sie nennt; was sie nicht nennt,
+  bleibt stehen. Der Übergang läuft damit bis zum Schluss so, wie er anfängt.
 ### 2026-09-06 — Ein Netzwerk-Laser konnte in ein echtes Gerät schreiben
 
 #### Behoben
