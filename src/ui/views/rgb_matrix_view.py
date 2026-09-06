@@ -1210,8 +1210,12 @@ class RgbMatrixView(QWidget):
             self._param_form.removeRow(0)
         self._param_widgets = {}
         meta = ALGO_META.get(algo)
-        # Richtung je Metadaten
-        has_dir = bool(meta and meta.direction)
+        # Richtung je Metadaten — ENG-22: und nur, wenn sie an dieser Stelle
+        # ueberhaupt etwas tut. Bei `movement=bounce` ohne Rundenzaehler ist sie
+        # beweisbar wirkungslos (beide Bahnformeln sind gerade Funktionen).
+        from src.core.engine.rgb_matrix_meta import richtung_wirkt
+        cur_p = dict(self._current.params) if self._current is not None else {}
+        has_dir = richtung_wirkt(algo, cur_p)
         self._dir_label.setVisible(has_dir)
         self._dir_combo.setVisible(has_dir)
         # Style + aktuelle Werte bestimmen, welche Specs relevant sind.

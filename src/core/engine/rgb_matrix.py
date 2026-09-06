@@ -1818,7 +1818,8 @@ class RgbMatrixInstance(Function):
 
         VC und MIDI sehen dieselbe Style-/when-Auswahl wie der Matrix-Programmer:
         RGB bietet keine Dimmer-/Shutter-Grenzen an, Dimmer/Shutter keine Farben."""
-        from .rgb_matrix_meta import ALGO_META, ParamSpec, visible_specs
+        from .rgb_matrix_meta import (ALGO_META, ParamSpec, richtung_wirkt,
+                                      visible_specs)
         specs = [
             ParamSpec("speed", "Geschwindigkeit", "float", 1.0, 0.01, 20.0, 0.1,
                       "Animationsrate (Schritte/s)"),
@@ -1869,7 +1870,8 @@ class RgbMatrixInstance(Function):
                       "und „Fade aus“."),
         ])
         meta = ALGO_META.get(self.algorithm)
-        if meta and meta.direction:
+        # ENG-22: nur anbieten, wenn die Richtung hier auch etwas bewirkt.
+        if richtung_wirkt(self.algorithm, self.params):
             specs.append(ParamSpec("direction", "Richtung", "select", "forward",
                                    options=("forward", "reverse"), tooltip="Laufrichtung"))
         n_colors = meta.colors if meta else 1
@@ -2105,7 +2107,7 @@ class RgbMatrixInstance(Function):
 
     def list_actions(self) -> list[tuple[str, str]]:
         """Aktuell sinnvolle Matrix-Live-Aktionen für VC/MIDI."""
-        from .rgb_matrix_meta import ALGO_META, visible_specs
+        from .rgb_matrix_meta import ALGO_META, richtung_wirkt, visible_specs
 
         meta = ALGO_META.get(self.algorithm)
         actions: list[tuple[str, str]] = []
@@ -2121,7 +2123,10 @@ class RgbMatrixInstance(Function):
             ("next_algorithm", "Form +"),
             ("prev_algorithm", "Form −"),
         ])
-        if meta is not None and meta.direction:
+        # ENG-22: dieselbe Frage, dieselbe Antwort. Ein VC-Knopf „Richtung" auf
+        # einem Bounce-Chase waere genau der Knopf, der stumm nichts tut
+        # (dieselbe Klasse wie ENG-23).
+        if richtung_wirkt(self.algorithm, self.params):
             actions.append(("reverse_direction", "Richtung"))
         movement = next(
             (spec for spec in visible_specs(
