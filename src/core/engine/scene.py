@@ -126,6 +126,10 @@ class Scene(Function):
                 else:
                     fade_out_done = True
 
+        # ENG-20: die beiden Pruefgroessen sind Eigenschaften des GERAETS, nicht
+        # des einzelnen Werts — deshalb einmal je Geraet und Frame.
+        geraet_ok: dict = {}
+
         # Write interpolated values to DMX
         for sv in self._values:
             fixture = _find_fixture(patch_cache, sv.fixture_id)
@@ -134,9 +138,13 @@ class Scene(Function):
             universe = universes.get(fixture.universe)
             if universe is None:
                 continue
-            grund = self._warum_nicht_schreibbar(fixture, sv)
-            if grund:
-                self._melde_einmal(fixture, sv, grund)
+            merkmale = geraet_ok.get(sv.fixture_id)
+            if merkmale is None:
+                merkmale = geraet_ok[sv.fixture_id] = _geraet_merkmale(fixture)
+            per_dmx, anzahl = merkmale
+            if not per_dmx or (anzahl is not None
+                               and not (1 <= sv.channel <= anzahl)):
+                self._melde_einmal(sv, per_dmx, anzahl)
                 continue
             dmx_addr = fixture.address + sv.channel - 1
             if not (1 <= dmx_addr <= 512):
@@ -152,50 +160,12 @@ class Scene(Function):
 
     # ── ENG-20: nicht in fremde Geraete schreiben ────────────────────────────
 
-    def _warum_nicht_schreibbar(self, fixture, sv) -> str:
-        """Warum dieser gespeicherte Wert NICHT ausgegeben werden darf — sonst "".
-
-        ★ Der Unterschied zu allen anderen Stellen, die ``fx.address +
-        channel - 1`` rechnen: dort kommt die Kanalnummer aus der LEBENDEN
-        Kanalliste des Geraets und kann per Konstruktion nicht ueberlaufen.
-        Hier kommt sie aus der GESPEICHERTEN Szene und beschreibt einen
-        Zustand, den es womoeglich nicht mehr gibt.
-
-        Zwei Gruende, beide gemessen:
-
-        * **Kanalzahl** (ENG-20): ein Geraet auf Adresse 7 mit heute 6 Kanaelen
-          und gespeichertem Kanal 10 schreibt auf Adresse 16 — in den Nachbarn.
-          Gemessen an Hydra@7 (6 Kanaele) neben PAR@13: die 200 landete auf 16.
-        * **Netzwerk-Laser**: deren ``address`` ist ein bedeutungsloser
-          Platzhalter (``fixture_uses_dmx``). Der Kommentar dort verlangt
-          ausdruecklich, dass JEDE Stelle mit dieser Rechnung vorher fragt —
-          ``scene.py`` tat es nicht. Gemessen: ein Laser@1 schrieb seinen
-          „Kanal 3" auf Adresse 3, also in einen echten PAR.
-
-        ⚠️ Fehlt die Kanalzahl (Alt-Objekte, Mocks), wird NICHT verworfen. Die
-        sichere Richtung ist hier „schreiben wie bisher": eine Szene, die
-        stumm nichts mehr tut, ist auf der Buehne schlimmer als eine, die zu
-        viel tut — dieselbe Abwaegung, die Robin bei FM-45/2 getroffen hat.
-        """
-        try:
-            from src.core.app_state import fixture_uses_dmx
-            if not fixture_uses_dmx(fixture):
-                return ("das Geraet gibt nicht ueber DMX aus (Netzwerk-Laser), "
-                        "seine Adresse ist ein Platzhalter")
-        except Exception:
-            pass                        # im Zweifel schreiben, s. Docstring
-        anzahl = getattr(fixture, "channel_count", None)
-        try:
-            anzahl = int(anzahl) if anzahl is not None else None
-        except (TypeError, ValueError):
-            anzahl = None
-        if anzahl is not None and not (1 <= sv.channel <= anzahl):
-            return (f"Kanal {sv.channel} gibt es dort nicht mehr — das Geraet "
-                    f"hat heute {anzahl}")
-        return ""
-
-    def _melde_einmal(self, fixture, sv, grund: str):
+    def _melde_einmal(self, sv, per_dmx: bool, anzahl):
         """Einmal je Lauf und je (Geraet, Kanal) — nicht je Frame."""
+        grund = ("das Geraet gibt nicht ueber DMX aus (Netzwerk-Laser), seine "
+                 "Adresse ist ein Platzhalter") if not per_dmx else (
+                 f"Kanal {sv.channel} gibt es dort nicht mehr — das Geraet hat "
+                 f"heute {anzahl}")
         gemeldet = getattr(self, "_verworfen_gemeldet", None)
         if gemeldet is None:
             gemeldet = self._verworfen_gemeldet = set()
@@ -239,6 +209,57 @@ class Scene(Function):
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+_UsesDmx = None
+
+
+def _fixture_uses_dmx():
+    """``app_state.fixture_uses_dmx``, EINMAL aufgeloest und dann gemerkt.
+
+    Spaet und nicht auf Modulebene, weil ``app_state`` viel mitzieht und
+    ``scene.py`` sonst am Import-Graphen haengt. Der erste Aufruf zahlt den
+    Nachlade-Posten (gemessen ~0,5 s in einem Prozess, der ``app_state`` noch
+    nicht kennt); danach ist es ein Attributzugriff. In der App ist das Modul
+    laengst geladen, bevor eine Szene laeuft — die Kosten fallen nur in Tests
+    und kleinen Werkzeugen an, und dort einmal.
+    """
+    global _UsesDmx
+    if _UsesDmx is None:
+        from src.core.app_state import fixture_uses_dmx
+        _UsesDmx = fixture_uses_dmx
+    return _UsesDmx
+
+
+def _geraet_merkmale(fixture):
+    """``(gibt_ueber_dmx_aus, kanalzahl)`` — EINMAL je Geraet und Frame.
+
+    ★ **Was diese Pruefung im Betrieb kostet, ist gemessen: 0,220 -> 0,227 ms je
+    Frame** bei 160 Werten und 20 Geraeten, also nichts.
+
+    ⚠️ **Und wie leicht man hier das Falsche misst.** Der erste Vergleich sagte
+    0,21 gegen 2,03 ms, also das Zehnfache — ich habe daraufhin dreimal umgebaut.
+    Der Unterschied war ein EINMALIGER Posten im Mittelwert: der erste Aufruf
+    laedt ueber :func:`_fixture_uses_dmx` das Modul ``app_state`` nach (~0,5 s).
+    Im Testprozess ohne ``app_state`` faellt das auf; in der App ist das Modul
+    laengst geladen, bevor die erste Szene laeuft. Mit einem Aufwaermlauf vor
+    der Messung sind beide Fassungen gleich schnell. **Ein Mittelwert ueber 300
+    Durchlaeufe beantwortet nicht die Frage „was kostet ein Frame", wenn einer
+    davon etwas anderes tut als die anderen 299.**
+
+    ``kanalzahl`` ist ``None``, wenn das Geraet keine traegt (Alt-Objekte,
+    Mocks) — dann wird NICHT verworfen, s. ``Scene.write``.
+    """
+    try:
+        per_dmx = _fixture_uses_dmx()(fixture)
+    except Exception:
+        per_dmx = True                  # im Zweifel schreiben
+    anzahl = getattr(fixture, "channel_count", None)
+    try:
+        anzahl = int(anzahl) if anzahl is not None else None
+    except (TypeError, ValueError):
+        anzahl = None
+    return per_dmx, anzahl
+
 
 def _find_fixture(patch_cache: list["PatchedFixture"], fid: int):
     for f in patch_cache:
