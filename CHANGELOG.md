@@ -7,6 +7,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-06 — Ein Universum ohne Ausgang fiel in der Statusleiste nicht auf
+
+#### Behoben
+
+- **Wenn Geräte in einem Universum gepatcht sind, für das kein Ausgang
+  eingerichtet ist, rechnet LightOS die Kanäle — sie gehen nur nirgendwo hin.**
+  Die Statusleiste zeigte davon nichts: sie meldete zufrieden die Universen, die
+  senden, und schwieg zu dem, das stumm blieb. Zu sehen war es bisher nur, wenn
+  man den DMX-Monitor öffnete *und* dort genau dieses Universum auswählte.
+
+  Die Statusleiste nennt es jetzt von sich aus — sichtbar an erster Stelle, mit
+  dem Hinweis, dass die Werte nur gerechnet werden, und wo man einen Ausgang
+  zuweist. Ein Ausgang, der da ist aber nicht sendet, bleibt wie bisher die
+  dringendere Meldung.
+
 ### 2026-09-06 — Aus dem „Einfrieren" eines einzelnen Effekts führte nur ein einziger Knopf heraus
 
 #### Behoben

@@ -1321,13 +1321,29 @@ class MainWindow(QMainWindow):
         self._portsuche_wert = find_enttec_port()
         return self._portsuche_wert
 
-    def _update_ausgabe_label(self):
-        """OUT-51: das Ausgabe-Label mit dem fuellen, was WIRKLICH rausgeht.
+    def _universen_mit_geraeten(self) -> list[int]:
+        """Universen, in denen wirklich GERAETE stehen.
 
-        Deckt alle drei Wege ab, nicht nur Enttec — ein Art-Net-Ausfall war
-        bisher nirgends in der Oberflaeche zu sehen. Ein Ausfall schlaegt die
+        ⚠️ Nicht ``state.universes``: dort landet auch, was nur in der
+        Output-Konfiguration steht (``app_state.py:1786``) — vor einem solchen
+        Universum zu warnen waere falsch, es rechnet ja fuer niemanden. Die
+        Aussage lautet „es werden Kanaele fuer Geraete gerechnet, die nirgends
+        hingehen", also ist der Patch die richtige Quelle.
+        """
+        try:
+            return sorted({int(f.universe)
+                           for f in self._state.get_patched_fixtures()})
+        except Exception:
+            return []
+
+    def _update_ausgabe_label(self):
+        """OUT-51/OUT-56: das Ausgabe-Label mit dem fuellen, was WIRKLICH
+        rausgeht — und mit dem, was gar nicht erst rausgeht.
+
+        Deckt alle drei Wege ab, nicht nur Enttec. Ein Ausfall schlaegt die
         Aufzaehlung: wenn etwas nicht sendet, ist das die Information, nicht die
-        Liste der Universen.
+        Liste der Universen. Die Entscheidung selbst steht in
+        ``src/ui/ausgabe_label.py`` — dort ist sie ohne Fenster pruefbar.
         """
         # Der Statusbalken darf nie der Grund sein, warum das Fenster nicht
         # aufgeht: waehrend des Hochfahrens (und in Tests) gibt es weder das
@@ -1340,41 +1356,29 @@ class MainWindow(QMainWindow):
             probleme = om.sende_probleme()
         except Exception:
             return
-        if not wege:
-            self._lbl_universe.setText("Ausgabe: —")
-            self._lbl_universe.setStyleSheet("color: #ffb454;")
-            self._lbl_universe.setToolTip(
-                "Kein Universum gibt DMX aus. Output-Einstellungen öffnen und "
-                "einem Universum einen Ausgang geben.")
-            return
-        kaputt = [w for w in wege if w["verbunden"] is False]
-        # Tick-/Modifier-Stoerungen haengen an keinem Ausgang, wuerden in `wege`
-        # also fehlen — sie gehoeren aber genauso gemeldet.
-        sonstige = [p for p in probleme if p["weg"] in ("Tick", "Modifier")]
-        # ★ Kaputte zuerst. Der Text zeigt nur die ersten drei Ausgaenge — bei
-        # einem groesseren Rig waere der ausgefallene sonst genau der, den man
-        # nicht sieht, waehrend drei funktionierende Platz wegnehmen.
-        sichtbar = kaputt + [w for w in wege if w not in kaputt]
-        teile = [f"U{w['universum']} {w['weg']}" for w in sichtbar[:3]]
-        if len(wege) > 3:
-            teile.append(f"+{len(wege) - 3}")
-        text = "Ausgabe: " + " · ".join(teile)
-        if kaputt or sonstige:
-            self._lbl_universe.setText(f"⚠ {text}")
-            self._lbl_universe.setStyleSheet("color: #ff4444;")
-            zeilen = [f"U{w['universum']} {w['weg']}: sendet nicht"
-                      + (f" ({w['problem']})" if w["problem"] else "")
-                      for w in kaputt]
-            zeilen += [f"{p['weg']}: {p['fehler']} Fehler in Folge ({p['text']})"
-                       for p in sonstige]
-            self._lbl_universe.setToolTip("\n".join(zeilen))
-        else:
-            self._lbl_universe.setText(text)
-            self._lbl_universe.setStyleSheet("")
-            self._lbl_universe.setToolTip(
-                "\n".join(f"U{w['universum']} {w['weg']}"
-                          + (f" → {w['ziel']}" if w["ziel"] else "")
-                          for w in wege))
+        # OUT-56: gepatchte Universen ohne jeden Adapter. `sendet_wirklich` ist
+        # dieselbe Frage, die der DMX-Monitor stellt (OUT-52) — eine zweite
+        # Antwort darauf soll es nicht geben.
+        #
+        # ★★ EIGENES `try`, und das ist keine Kosmetik. Im ersten Wurf stand
+        # dieser Aufruf im `try` darueber — dessen `return` bedeutet „gar keine
+        # Anzeige". Ein Fehler in der ZUSATZ-Information haette damit die
+        # BESTEHENDE geloescht: statt „U1 Enttec" stand dort nichts mehr. Die
+        # Bestandstests aus OUT-51 sind darauf sofort rot gefallen, und sie
+        # hatten recht. Dieselbe Klasse wie NET-12: ein breites `except` um
+        # einen Aufruf macht dessen Ausfall unsichtbar — hier war der Ausfall
+        # sogar sichtbar, nur als LEERE Anzeige, was schlimmer ist als die
+        # unvollstaendige. Im Zweifel die bestehende Auskunft, nicht keine.
+        try:
+            ohne = [u for u in self._universen_mit_geraeten()
+                    if not om.sendet_wirklich(u)]
+        except Exception:
+            ohne = []
+        from src.ui.ausgabe_label import ausgabe_label
+        text, farbe, tooltip = ausgabe_label(wege, probleme, ohne)
+        self._lbl_universe.setText(text)
+        self._lbl_universe.setStyleSheet(farbe)
+        self._lbl_universe.setToolTip(tooltip)
 
     # ── Transport / Playback ──────────────────────────────────────────────────
 
