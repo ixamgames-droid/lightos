@@ -13,6 +13,7 @@ Anything else is ignored (logged via print).
 from __future__ import annotations
 from typing import TYPE_CHECKING, Optional
 from .function import Function, FunctionType
+from .function import gibt_ueber_dmx_aus as _gibt_ueber_dmx_aus
 
 if TYPE_CHECKING:
     from src.core.dmx.universe import Universe
@@ -98,6 +99,9 @@ class ScriptFunction(Function):
                 attr = parts[2]
                 val = int(parts[3])
                 fixture = next((f for f in patch_cache if f.fid == fid), None)
+                # QA-78: gemessen erreichbar (Laser schrieb auf Adresse 2).
+                if fixture is not None and not _gibt_ueber_dmx_aus(fixture):
+                    return True
                 if fixture is None:
                     return False
                 # Lookup channel offset by attribute

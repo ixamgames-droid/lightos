@@ -30,6 +30,7 @@ if TYPE_CHECKING:
 
 from .function import Function, FunctionType
 from .fade_curve import eval_named, CURVE_NAMES
+from .function import gibt_ueber_dmx_aus as _gibt_ueber_dmx_aus
 
 
 # Quell-Modi (Eingang). "xy" kombiniert Pan+Tilt zur radialen Auslenkung aus der
@@ -247,6 +248,9 @@ class MappedChannelChange(Function):
         state = get_state()
         for fid in self.fids:
             fx = _find_fixture(patch_cache, fid)
+            # QA-78: gemessen erreichbar (Laser schrieb auf Adresse 2).
+            if fx is not None and not _gibt_ueber_dmx_aus(fx):
+                continue
             if fx is None:
                 continue
             universe = universes.get(fx.universe)

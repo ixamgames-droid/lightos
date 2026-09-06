@@ -7,6 +7,7 @@ from __future__ import annotations
 from enum import Enum
 import math
 from .function import Function, FunctionType
+from .function import gibt_ueber_dmx_aus as _gibt_ueber_dmx_aus
 
 
 class CarouselPattern(Enum):
@@ -160,6 +161,11 @@ class Carousel(Function):
                 print(f"[Carousel] write error: {exc}")
 
     def _set_attr(self, universe, fixture, attr, val):
+        # QA-78: gemessen erreichbar (Laser schrieb auf Adresse 2). Die
+        # Wache sitzt hier, weil das Geraet als PARAMETER hereinkommt —
+        # der Aufrufer hat es schon aufgeloest.
+        if not _gibt_ueber_dmx_aus(fixture):
+            return
         try:
             from src.core.app_state import get_channels_for_patched
             channels = get_channels_for_patched(fixture)

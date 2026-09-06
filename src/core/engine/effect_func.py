@@ -2,6 +2,7 @@
 from __future__ import annotations
 from .function import Function, FunctionType
 from .effect_layers import EffectLayer
+from .function import gibt_ueber_dmx_aus as _gibt_ueber_dmx_aus
 
 
 class LayeredEffect(Function):
@@ -38,6 +39,10 @@ class LayeredEffect(Function):
         for idx, fid in enumerate(self.fixture_ids):
             fixture = patch.get(fid)
             if fixture is None:
+                continue
+            # QA-78: gemessen erreichbar — ein Laser auf Platzhalter-Adresse 1
+            # schrieb hier auf DMX-Adresse 1.
+            if not _gibt_ueber_dmx_aus(fixture):
                 continue
             universe = universes.get(fixture.universe)
             if universe is None:

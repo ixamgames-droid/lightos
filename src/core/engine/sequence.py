@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 from .function import Function, FunctionType, RunOrder, Direction
 from . import fade_curve as fc
+from .function import gibt_ueber_dmx_aus as _gibt_ueber_dmx_aus
 
 if TYPE_CHECKING:
     from src.core.dmx.universe import Universe
@@ -226,6 +227,9 @@ class Sequence(Function):
             except ValueError:
                 continue
             pf = pf_by_fid.get(fid)
+            # QA-78: gemessen erreichbar (Laser schrieb auf Adresse 2).
+            if pf is not None and not _gibt_ueber_dmx_aus(pf):
+                continue
             if pf is None or pf.universe not in universes:
                 continue
             channels = get_channels_for_patched(pf)

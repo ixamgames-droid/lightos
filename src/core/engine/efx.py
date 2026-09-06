@@ -15,6 +15,7 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 from .function import Function, FunctionType
+from .function import gibt_ueber_dmx_aus as _gibt_ueber_dmx_aus
 
 if TYPE_CHECKING:
     from src.core.dmx.universe import Universe
@@ -624,6 +625,9 @@ class EfxInstance(Function):
             target_head = getattr(_target, "head", None)
             fx = _find_fixture(patch_cache, fid)
             if fx is None:
+                continue
+            # QA-78: gemessen erreichbar (Laser schrieb auf 5 und 6).
+            if not _gibt_ueber_dmx_aus(fx):
                 continue
             universe = universes.get(fx.universe)
             if universe is None:
