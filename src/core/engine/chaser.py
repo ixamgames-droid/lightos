@@ -191,24 +191,14 @@ class Chaser(Function):
         self._step_idx = (len(self.steps) - 1) if self.direction == Direction.Backward else 0
         self._step_elapsed = 0.0
 
-    def _reanchor_bus_target(self):
-        """F5: Nach einer LIVE-Aenderung von ``tempo_multiplier`` die Bus-Sync neu
-        ankern, sodass der aktuelle Schritt erhalten bleibt und die neue Rate AB
-        JETZT gilt. Ohne Re-Anker skaliert der neue Faktor die ganze seit dem
-        Anker verstrichene Beat-Distanz RUECKWIRKEND -> ein Step-Burst von bis zu
-        len(steps) Schritten in einem Frame bzw. ein vorzeitiger SingleShot-Stop.
-        No-op, wenn nicht bus-gebunden (freier/Audio-Pfad nutzt den Multiplier nicht)."""
-        bus_id = getattr(self, "tempo_bus_id", "") or ""
-        if not bus_id:
-            return
-        try:
-            from src.core.engine.tempo_bus import get_tempo_bus_manager
-            bus = get_tempo_bus_manager().get(bus_id)
-            if bus is not None:
-                self._beat_anchor = bus.position()
-                self._synced_target_prev = None
-        except Exception:
-            pass
+    # ENG-21: ``_reanchor_bus_target`` (F5) ist ersatzlos entfallen. Es setzte
+    # ``_beat_anchor = bus.position()`` und warf damit die angefangene Beat-Distanz
+    # innerhalb des laufenden Schritts weg; sichtbar blieb der Schritt nur, weil
+    # ``_step_idx`` eigener Zustand ist. Bei EFX/Matrix wird die Phase AUS dem Anker
+    # abgeleitet — dieselbe Zeile erzeugt dort einen anderen harten Sprung. Die
+    # Nachfolgeregel steht in ``Function._tempo_umankern`` und erhaelt ``local``
+    # exakt; ``_synced_target_prev`` bleibt deshalb gueltig und wird NICHT mehr
+    # verworfen (der Ziel-Step ist nach dem Wechsel derselbe).
 
     def _clamp_step_idx(self) -> None:
         """Haelt _step_idx im gueltigen Bereich [0, len(steps)-1].
@@ -601,8 +591,11 @@ class Chaser(Function):
             return True
         if key == "tempo_multiplier":
             try:
+                # ENG-21: der Re-Anker haengt jetzt an der ZUWEISUNG selbst
+                # (Function.tempo_multiplier). Das deckt auch den Editor-Weg ab,
+                # der hier vorbeischreibt — der fruehere Aufruf von
+                # _reanchor_bus_target an dieser Stelle tat es nur fuer set_param.
                 self.tempo_multiplier = max(0.0625, min(16.0, float(value)))
-                self._reanchor_bus_target()   # F5: Rate wechseln ohne Step-Burst
             except (TypeError, ValueError):
                 pass
             return True

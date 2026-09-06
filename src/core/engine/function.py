@@ -105,7 +105,10 @@ class Function:
         # tempo_multiplier = harmonisches Verhältnis (×¼…×4), phase_offset in Beats,
         # sync_group bündelt Effekte, die per "Sync" gemeinsam re-ankern.
         self.tempo_bus_id: str = "Global" if self.tempo_sync_default else ""
-        self.tempo_multiplier: float = 1.0
+        # ENG-21: ueber Properties gefuehrt (siehe unten) — die Zuweisung SELBST
+        # zieht den Anker nach. Hier deshalb ueber das private Feld, denn beim
+        # Aufbau gibt es noch keine Phase, die man erhalten koennte.
+        self._tempo_multiplier: float = 1.0
         self.phase_offset: float = 0.0
         self.sync_group: str = ""
         self._beat_anchor: float = 0.0     # Bus-Position beim letzten Sync/Start (privat, nicht serialisiert)
@@ -115,6 +118,119 @@ class Function:
         # bleibt unberuehrt. Alt-Shows ohne Key laden als True -> ein bus-gebundener
         # Effekt wird damit taktgleich (siehe FunctionManager.from_dict).
         self.align_on_start: bool = True
+
+    # ── ENG-21: Tempo aendern, ohne zu springen ───────────────────────────────
+    #
+    # Alle vier zeitbasierten Subtypen leiten ihre Position aus DERSELBEN Formel ab:
+    #
+    #     local = (bus.position - _beat_anchor) * tempo_multiplier + phase_offset
+    #
+    # `local` steht fuer die Phase (EFX/Matrix) bzw. fuer den Ziel-Step
+    # (Chaser/Sequence). Aendert man `tempo_multiplier` im Betrieb, skaliert der neue
+    # Faktor die GANZE seit dem Anker verstrichene Beat-Distanz **rueckwirkend** —
+    # der Effekt springt in EINEM Frame an eine Stelle, an der er nie war.
+    #
+    # Gemessen (Bus 120 BPM, 3,1 s nach dem Anker, x1,0 -> x1,25):
+    #     EFX/Matrix       local 6,200 -> 7,750   (+1,550 Beats, harter Sprung)
+    #     Chaser/Sequence  Ziel-Step 6 -> 7       (Step-Burst)
+    #
+    # ★★★ Die Regel ist NICHT „auf die Bus-Position re-ankern". Das tat der
+    # F5-Fix (`_reanchor_bus_target`: `_beat_anchor = bus.position()`), und es
+    # traegt nur bei Chaser/Sequence — dort ist `_step_idx` EIGENER Zustand, der
+    # den Sprung ueberlebt. Bei EFX/Matrix wird die Phase AUS dem Anker
+    # ABGELEITET; verbatim uebernommen erzeugt derselbe Code einen anderen harten
+    # Sprung (gemessen: Phase 0,200 -> 0,000).
+    #
+    # Richtig ist, `local` zu ERHALTEN und nur die Rate zu wechseln:
+    #
+    #     anker_neu = pos - (local_alt - phase_offset) / mult_neu
+    #
+    # Damit ist der Wechsel-Frame stetig (Delta 0,000) und ab dem naechsten Frame
+    # laeuft es mit der neuen Rate.
+    #
+    # ⚠️ **Warum Properties und nicht `set_param`:** die Tempo-Spinboxen der vier
+    # Editoren schreiben das Attribut DIREKT aufs Objekt und gehen an `set_param`
+    # vorbei (`efx_view.py`, `rgb_matrix_view.py`, `chaser_editor.py`,
+    # `sequence_editor.py`). Ein Fix in `set_param` wirkt fuer VC-Speed-Dial, MIDI
+    # und `effect_live` — aber nicht dort, wo man am Tempo dreht. Die Zuweisung
+    # ist die einzige Stelle, die ALLE Schreiber sieht, heutige wie kuenftige.
+
+    @property
+    def tempo_multiplier(self) -> float:
+        return self._tempo_multiplier
+
+    @tempo_multiplier.setter
+    def tempo_multiplier(self, wert) -> None:
+        try:
+            neu = float(wert)
+        except (TypeError, ValueError):
+            return
+        self._tempo_umankern(mult_neu=neu,
+                             mult_alt=getattr(self, "_tempo_multiplier", 1.0))
+        self._tempo_multiplier = neu
+
+    # ⚠️ ``phase_offset`` bleibt bewusst ein GEWOEHNLICHES Attribut. Es ist der
+    # Regler, der die Phase VERSCHIEBEN soll — ihn „stetig" zu machen hiesse, ihn
+    # wirkungslos zu machen. Stetig gehoert die RATE, nicht der Versatz.
+
+    def _tempo_umankern(self, *, mult_neu: float, mult_alt: float) -> None:
+        """Zieht ``_beat_anchor`` so nach, dass ``local`` beim Wechsel STETIG bleibt.
+
+        No-op ausserhalb des Betriebs: ein Effekt, der nicht laeuft, hat keine
+        Phase zu verlieren, und ``start()``/``sync_phase()`` ankern ihn ohnehin neu.
+        Das haelt vor allem den Show-Ladepfad unveraendert — ``from_dict`` setzt
+        beide Werte, und ein Anker, der beim LADEN aus einem laufenden Bus
+        abgeleitet wird, waere frei erfunden.
+
+        ★ Die Ausnahmebehandlung liegt bewusst NUR um den fremden Zugriff (Import
+        und Bus-Aufloesung). Ein erster Entwurf hatte auch die Rechnung in einem
+        breiten ``except Exception`` — die Mutationsprobe hat das aufgedeckt: die
+        Wache gegen ``mult_neu <= 0`` liess sich entfernen, ohne dass ein Test
+        rot wurde, weil die Division durch Null anschliessend still geschluckt
+        wurde. Eine Wache, deren einzige Wirkung das Vermeiden einer ohnehin
+        verschluckten Ausnahme ist, ist keine Wache, sondern Zierde.
+        """
+        if not getattr(self, "_running", False):
+            return
+        if mult_neu <= 0:
+            # F7-Parity: die Leser behandeln ``<= 0`` als 1.0 und frieren nicht
+            # ein. Hier waere es eine Division durch Null — also gar nicht
+            # ankern und die Entscheidung dem Leser lassen.
+            return
+        try:
+            from src.core.engine.tempo_bus import get_tempo_bus_manager
+            # ``bus_for_effect`` ist DIE Antwort auf „liegt der Effekt auf einem
+            # Bus?" — leere id heisst dort Free-Run und liefert None. Eine eigene
+            # Abfrage davor waere ein zweites Tor fuer dieselbe Frage.
+            bus = get_tempo_bus_manager().bus_for_effect(
+                getattr(self, "tempo_bus_id", "") or "")
+            pos = float(bus.position()) if bus is not None else None
+        except Exception:
+            return
+        if pos is None:
+            return
+        anker_alt = float(getattr(self, "_beat_anchor", 0.0) or 0.0)
+        # ``0`` lesen BEIDE Leser als 1.0 (EFX/Matrix ueber ``or 1.0``,
+        # Chaser/Sequence ueber ``if mult <= 0: mult = 1.0``) — die Vorgeschichte
+        # ist damit eindeutig, und das Reparieren eines aus einer Alt-Show
+        # geladenen Nullwerts darf nicht springen.
+        m_alt = float(mult_alt or 1.0)
+        if m_alt < 0:
+            # ⚠️ Bei einem NEGATIVEN Altwert lesen die beiden Familien
+            # unterschiedlich: ``or 1.0`` laesst -2 stehen, ``<= 0`` macht 1.0
+            # daraus. Ohne eindeutige Vorgeschichte gibt es keine Phase, die man
+            # erhalten koennte — dann lieber gar nicht ankern als eine erfinden.
+            # (Die Uneinigkeit der Leser selbst ist ein eigener Befund, siehe
+            # Backlog-Eintrag zu ENG-21.)
+            return
+        # ``local = (pos - anker) * mult + phase_offset``. Der Versatz steht auf
+        # BEIDEN Seiten der Gleichung — er aendert sich hier ja nicht — und
+        # kuerzt sich deshalb heraus. Er taucht in dieser Zeile bewusst NICHT
+        # auf; ihn mitzurechnen sah symmetrisch aus und war eine Zeile ohne
+        # Wirkung (von der Mutationsprobe gefunden). Genau deshalb ist
+        # ``phase_offset`` auch kein Fall fuer diese Regel: waere er es, wuerde
+        # er sich nicht kuerzen — und der Regler waere wirkungslos.
+        self._beat_anchor = pos - (pos - anker_alt) * m_alt / float(mult_neu)
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
