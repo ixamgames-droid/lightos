@@ -7,6 +7,42 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-06 — Ungültige Universe-Nummern, verlorene Eingaben und tote Felder
+
+#### Behoben
+
+- **Eine vertippte externe Universe-Nummer verschwand still in der
+  Konfiguration.** Das Feld „Ext-Universe" im Ausgabe-Dialog nahm jede Zahl an,
+  meldete „Gespeichert" und schickte danach auf ein Universum, das es so nicht
+  gibt: bei Art-Net kam `40000` als Universum 7232 an, `70000` sprengte das
+  Zahlenformat und riss jedes Bild ab, bei sACN wurde aus `70000` lautlos 4464.
+
+  Die Nummer wird jetzt auf den gültigen Bereich des in **derselben Zeile**
+  gewählten Ausgabetyps begrenzt — Art-Net 0–32767, sACN 1–63999 — und die
+  Anpassung wird gemeldet, mit Zeile, Typ, altem und neuem Wert. Ein gültiger
+  Wert bleibt unangetastet.
+
+  Das gilt für jeden Weg: auch wenn eine abgeschaltete Zeile mit einer alten,
+  zu großen Nummer über den sACN- oder Art-Net-Reiter wieder scharf geschaltet
+  wird, wird sie dabei geprüft.
+
+- **Eine absteigende Rampe ließ sich im Effekt-Editor nicht eingeben.** Je nach
+  Eingabereihenfolge zog der Editor die Gegen-Grenze mit, sodass „von hell nach
+  dunkel" nie zustande kam. Bei einer Rampe und einer Wertabbildung ist ein
+  Minimum über dem Maximum jetzt erlaubt — es beschreibt dort den umgekehrten
+  Verlauf. Bei einer Begrenzung bleibt es weiterhin geordnet, dort wäre es
+  sinnlos.
+
+- **Beim Tippen ging der eingegebene Wert verloren.** Trug man in eine
+  Begrenzung erst das Minimum `0,3` und dann das Maximum `0,7` ein, stand
+  danach `0,0` als Minimum — schon die erste getippte Ziffer des Maximums zog
+  es herunter, und es kam nicht zurück. Die beiden Felder übernehmen ihren Wert
+  jetzt erst, wenn die Eingabe fertig ist.
+
+- **Ein frisch angelegter Effekt zeigte acht Eigenschaftsfelder, von denen
+  keines etwas tat.** Solange kein Layer ausgewählt ist, sind sie jetzt
+  ausgeblendet — samt Beschriftung.
+
 ### 2026-09-06 — „Alles Weiß" ließ Amber, UV und das Farbrad stehen
 
 #### Behoben

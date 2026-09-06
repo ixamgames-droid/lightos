@@ -38,6 +38,43 @@ _UNIV_CONFIG_PATH = os.environ.get(
 # apply_output_config Art-Net werfen bzw. sACN still auf ein falsches Universum wrappen.
 _UNIVERSE_MIN, _UNIVERSE_MAX = 1, 32
 
+# NET-13: gueltiger Bereich der EXTERNEN Universe-Nummer (`out_universe`) — je
+# AUSGABETYP verschieden, deshalb eine Tabelle und keine einzelne Konstante.
+#
+# ⚠️ Das Backlog-Item verlangte pauschal „1..63999 abweisen". Das ist NUR die
+# sACN-Grenze. `out_universe` gilt fuer Art-Net UND sACN
+# (`output_manager._set_out_universe`), und Art-Net traegt die Port-Address in
+# 15 Bit — 0..32767, ab Werk 0-basiert (`_send_all`: Art-Net num-1, sACN num).
+# Ein pauschales 1..63999 liesse fuer eine Art-Net-Zeile 40000 durch: gemessen
+# an `artnet._build_artdmx` steht dann 40000 im 16-Bit-Feld, und der Empfaenger
+# liest die unteren 15 Bit = Port-Address **7232** — ein anderes Rig.
+#
+# ★ Die Zahlen sind NICHT neu erfunden, sondern genau die der Spinboxen im
+# selben Dialog; jene setzen ihre Range unten aus DIESER Tabelle
+# (`_spin_artnet_start_univ` = externe Art-Net-Nummer, `_spin_sacn_in_univ` =
+# sACN-Universum). Eine Frage, eine Stelle — sonst driftet die Tabellenspalte
+# gegen die Eingabefelder daneben.
+#
+# ⚠️ `_spin_artnet_in_univ` (Art-Net INPUT) steht bewusst NICHT hier: es laeuft
+# heute ab 1, nicht ab 0. Es hier anzuschliessen wuerde seine Untergrenze
+# nebenbei verschieben — eine andere Frage (was hoere ich AB?) und eine eigene
+# Entscheidung, die nicht in diesen Guard gehoert.
+_EXT_UNIVERSE_BEREICHE: dict[str, tuple[int, int]] = {
+    "ArtNet": (0, 32767),    # Art-Net Port-Address, 15 bit
+    "sACN": (1, 63999),      # E1.31, 64000..65535 sind reserviert
+}
+
+
+def _ext_universe_bereich(typ) -> tuple[int, int] | None:
+    """NET-13: welcher Bereich gilt fuer die externe Universe-Nummer dieses Typs?
+
+    ``None`` = dieser Ausgabetyp hat **gar keine** externe Universe-Nummer
+    (``Enttec`` sendet ohne Universum, ``Disabled``/leer sendet nicht) — das ist
+    ausdruecklich etwas anderes als „Bereich unbekannt": der Aufrufer darf einen
+    dort eingetragenen Wert dann weder klemmen noch melden, s. `_coerce_ext_universe`.
+    """
+    return _EXT_UNIVERSE_BEREICHE.get((typ or "").strip())
+
 
 def _list_ifaces() -> list:
     """NET-04: NICs fuer die Auswahl — Fehler kosten hoechstens die Liste."""
@@ -182,6 +219,47 @@ def _coerce_universe_num(text, fallback: int) -> tuple[int, bool]:
     return clamped, clamped != n
 
 
+def _coerce_ext_universe(text, typ) -> tuple[int | None, bool]:
+    """NET-13: externe Universe-Nummer aus dem freien Feld in den Bereich zwingen,
+    der zum in DERSELBEN ZEILE gewaehlten Ausgabetyp gehoert.
+
+    Rueckgabe ``(wert, angepasst?)``:
+    - Nicht parsebar (leer/Muell) -> ``(None, False)``: der Aufrufer laesst das
+      Feld weg = abwaertskompatibler Default. Unveraendertes Verhalten, und
+      bewusst ohne Meldung — genau wie `_coerce_universe_num` fuer ein leeres
+      Feld schweigt.
+    - Typ ohne externes Universum (Enttec/Disabled) -> ``(n, False)``: **wird
+      durchgereicht, nicht geloescht**. Zu diesem Typ gibt es keinen Bereich,
+      an dem man messen koennte, und der Wert wirkt nirgends: `add_enttec`
+      nimmt gar kein ``out_universe``, eine ``Disabled``-Zeile bekommt ueberhaupt
+      keinen Adapter (`apply_output_config`). Eine getippte Nummer stillschweigend
+      zu entfernen, weil die Zeile gerade abgeschaltet ist, waere teurer als sie
+      stehen zu lassen — beim Zurueckschalten auf sACN greift der Guard, und zwar
+      auf JEDEM Weg: ``_persist_output`` misst die Zeile beim Schreiben gegen den
+      Typ, den sie DANN hat (s. dort). ⚠️ Ein erster Entwurf hat das nur fuer den
+      Universe-Manager behauptet; der Skeptiker hat gemessen, dass der sACN-Tab
+      („Uebernehmen") dieselbe Datei ohne Guard schrieb.
+    - Ausserhalb -> auf die naechste Grenze geklemmt, ``angepasst=True``.
+    - Innerhalb -> ``(n, False)``.
+
+    Geklemmt statt verworfen, und das ist dieselbe Haltung wie in der
+    '#'-Spalte nebenan (A3D-33): der Bediener sieht in Meldung UND Zelle, was
+    stattdessen gilt. Ein verworfener Wert fiele auf den stillen Default zurueck
+    (Art-Net num-1, sACN num) — auch ein anderes Universum, aber eines, das
+    nirgends geschrieben steht.
+    """
+    try:
+        n = int(str(text).strip())
+    except (ValueError, TypeError, AttributeError):
+        return None, False
+    bereich = _ext_universe_bereich(typ)
+    if bereich is None:
+        return n, False
+    lo, hi = bereich
+    clamped = max(lo, min(hi, n))
+    return clamped, clamped != n
+
+
 def _load_universe_config() -> list[dict]:
     if not os.path.exists(_UNIV_CONFIG_PATH):
         return []
@@ -301,6 +379,27 @@ def _gespeicherter_enttec_port() -> str:
 _UNSET = object()   # A3D-15: "Argument nicht uebergeben" vs. explizit None unterscheiden.
 
 
+def _ext_zeile_pruefen(r: dict) -> bool:
+    """NET-13: zwingt ``r["out_universe"]`` in den Bereich des Typs von ``r``.
+
+    Arbeitet auf der ZEILE, nicht auf einer Eingabe — deshalb greift sie auch
+    dann, wenn nur der TYP wechselt und die Nummer unberuehrt bleibt. Liefert
+    ``True``, wenn etwas geklemmt wurde.
+
+    Ohne externes Universum (Enttec/Disabled) passiert nichts: dort gibt es
+    keinen Bereich zum Messen, und der Wert wirkt nirgends. Er bleibt stehen,
+    bis die Zeile wieder einen Typ bekommt, der ihn benutzt.
+    """
+    if "out_universe" not in r:
+        return False
+    wert, angepasst = _coerce_ext_universe(r.get("out_universe"), r.get("output"))
+    if wert is None:
+        r.pop("out_universe", None)
+        return False
+    r["out_universe"] = wert
+    return angepasst
+
+
 def _persist_output(num: int, output: str, patch: str, out_universe=_UNSET) -> bool:
     """Schreibt/aktualisiert eine Zeile in universes.json, damit eine zur
     Laufzeit hergestellte Ausgabe-Verbindung beim naechsten Start automatisch
@@ -331,6 +430,24 @@ def _persist_output(num: int, output: str, patch: str, out_universe=_UNSET) -> b
                 r.pop("out_universe", None)
             elif out_universe is not _UNSET:
                 r["out_universe"] = int(out_universe)
+            # ★★★ NET-13: die Zeile MISST SICH AN DEM TYP, DEN SIE JETZT HAT —
+            # unabhaengig davon, ob dieser Aufruf ueberhaupt eine externe Nummer
+            # mitbringt. Das ist der Unterschied zwischen „der Dialog prueft die
+            # Eingabe" und „die Datei enthaelt nie einen ungueltigen Wert".
+            #
+            # ⚠️ Ohne das gab es einen ZWEITEN SCHREIBWEG ohne Guard, vom
+            # Skeptiker gemessen: eine Zeile stand als `Disabled` mit
+            # `out_universe: 70000` in der Datei (ein Wert, den die Klemmung dort
+            # bewusst stehen laesst, weil Enttec/Disabled kein externes Universum
+            # kennen). Schaltet der Bediener sie ueber den sACN-Tab scharf, ruft
+            # `_apply_sacn` hier mit ``_UNSET`` an — der Wert wurde also gar nicht
+            # neu geschrieben und blieb ungeprueft stehen. Ergebnis: `sACN` mit
+            # `out_universe: 70000`, keine Meldung, Statuszeile meldet „Aktiv".
+            # Im Paket landet dann 70000 & 0xFFFF = 4464, ein fremdes Universum.
+            #
+            # Hier ist die einzige Stelle, durch die JEDER Schreiber muss — der
+            # Universe-Manager wie jedes „Uebernehmen" der drei Tabs (Hausregel 5).
+            _ext_zeile_pruefen(r)
             found = True
             break
     if not found:
@@ -338,6 +455,7 @@ def _persist_output(num: int, output: str, patch: str, out_universe=_UNSET) -> b
                  "output": output, "patch": patch}
         if out_universe is not None and out_universe is not _UNSET:
             entry["out_universe"] = int(out_universe)
+        _ext_zeile_pruefen(entry)          # NET-13, auch fuer neue Zeilen
         rows.append(entry)
     return _save_universe_config(rows)
 
@@ -477,7 +595,9 @@ class OutputConfigDialog(QDialog):
         af.addRow("Ziel-IP / Broadcast:", self._edit_artnet_ip)
 
         self._spin_artnet_start_univ = QSpinBox()
-        self._spin_artnet_start_univ.setRange(0, 32767)
+        # NET-13: dieselbe Quelle wie der Guard der Ext-Spalte (eine Frage, eine
+        # Stelle) — dieses Feld IST die externe Art-Net-Universe-Nummer.
+        self._spin_artnet_start_univ.setRange(*_ext_universe_bereich("ArtNet"))
         self._spin_artnet_start_univ.setToolTip(
             'Externe Art-Net-Universe-Nummer für "Übernehmen". Default = '
             'internes Universum − 1 (abwärtskompatibel).')
@@ -567,7 +687,9 @@ class OutputConfigDialog(QDialog):
         sin_l.addRow(self._check_sacn_in)
 
         self._spin_sacn_in_univ = QSpinBox()
-        self._spin_sacn_in_univ.setRange(1, 63999)
+        # NET-13: 1..63999 ist die E1.31-Universumsnummer und gilt fuer sACN in
+        # BEIDE Richtungen; dieselbe Quelle wie der Guard der Ext-Spalte.
+        self._spin_sacn_in_univ.setRange(*_ext_universe_bereich("sACN"))
         self._spin_sacn_in_univ.setValue(1)
         sin_l.addRow("Eingehendes Universe:", self._spin_sacn_in_univ)
 
@@ -1017,6 +1139,8 @@ class OutputConfigDialog(QDialog):
     def _univ_save(self):
         rows = []
         adjusted: list[tuple[int, int]] = []   # A3D-33: (Zeilennr, geklemmte Nummer)
+        # NET-13: (Zeilennr, Ausgabetyp, Eingabe, geklemmter Wert)
+        ext_adjusted: list[tuple[int, str, str, int]] = []
         for r in range(self._univ_table.rowCount()):
             num_item = self._univ_table.item(r, 0)
             name_item = self._univ_table.item(r, 1)
@@ -1042,10 +1166,21 @@ class OutputConfigDialog(QDialog):
             # (leer/ungueltig -> Feld weglassen = abwaertskompatibler Default).
             ext_text = ext_item.text().strip() if ext_item else ""
             if ext_text:
-                try:
-                    entry["out_universe"] = int(ext_text)
-                except ValueError:
-                    pass
+                # ★ NET-13: BEVOR die Nummer in die Datei geht. Vorher stand hier
+                # ein nacktes `int(ext_text)` ohne jede Grenze — ein Tippfehler
+                # (70000) landete still in universes.json, und der Sendepfad
+                # machte daraus wortlos etwas anderes: sACN sendet auf
+                # 70000 & 0xFFFF = Universum 4464, Art-Net 40000 erreicht
+                # Port-Address 7232, und 70000/-5 sprengen bei Art-Net das
+                # 16-Bit-Feld (struct.error je Frame, gefangen im Sende-Thread).
+                # Die Grenze folgt dem Typ DIESER ZEILE, nicht einer pauschalen.
+                wert, ext_ang = _coerce_ext_universe(ext_text, entry["output"])
+                if wert is not None:
+                    entry["out_universe"] = wert
+                if ext_ang:
+                    ext_adjusted.append((r + 1, entry["output"], ext_text, wert))
+                    if ext_item is not None:
+                        ext_item.setText(str(wert))   # UI spiegelt den Wert in der Datei
             rows.append(entry)
         if adjusted:
             _lst = ", ".join(f"Zeile {r}: → {n}" for r, n in adjusted)
@@ -1053,6 +1188,18 @@ class OutputConfigDialog(QDialog):
                 self, "Universe-Nummer angepasst",
                 f"Universe-Nummern müssen zwischen {_UNIVERSE_MIN} und "
                 f"{_UNIVERSE_MAX} liegen. Angepasst: {_lst}.")
+        # NET-13: dieselbe Meldungsform wie darueber — sichtbar statt still.
+        # Der Typ steht mit in der Zeile, weil die Grenze von ihm abhaengt und
+        # eine Meldung ohne ihn nach Willkuer aussaehe.
+        if ext_adjusted:
+            _ext_lst = ", ".join(f"Zeile {z} ({typ}): {alt} → {neu}"
+                                 for z, typ, alt, neu in ext_adjusted)
+            _grenzen = " · ".join(f"{t} {lo}..{hi}"
+                                  for t, (lo, hi) in _EXT_UNIVERSE_BEREICHE.items())
+            QMessageBox.warning(
+                self, "Externe Universe-Nummer angepasst",
+                f"Die externe Universe-Nummer muss zum Ausgabetyp der Zeile "
+                f"passen ({_grenzen}). Angepasst: {_ext_lst}.")
 
         # OUT-07: zwei Universen auf DASSELBE Ziel sind ein Bedienfehler, den die
         # Software bisher still mitgemacht hat. Beide senden dann auf dieselbe
