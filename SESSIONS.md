@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| QA-77 | B | fix/qa77-dimmer-check-weiss-achse | 2026-09-06T15:09Z | src/core/capability/dimmer_check.py |
+| _(frei)_ |  |  |  |  |
 
 ## Blocker & Fallen
 
@@ -95,7 +95,6 @@
 
 ## Verlauf
 
-- 2026-09-03T18:04Z B done PROC-10
 - 2026-09-03T18:04Z B claim QA-66
 - 2026-09-03T18:45Z B done QA-66
 - 2026-09-03T18:47Z B claim FM-45
@@ -125,3 +124,4 @@
 - 2026-09-06T12:14Z B claim QA-78
 - 2026-09-06T14:36Z B abgebrochen QA-78
 - 2026-09-06T15:09Z B claim QA-77
+- 2026-09-06T15:41Z B done QA-77
