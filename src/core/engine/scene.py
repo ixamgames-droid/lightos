@@ -34,6 +34,10 @@ class Scene(Function):
         self._values: list[SceneValue] = []
         self._start_vals: dict[tuple[int, int], int] = {}   # (fid, ch) -> start dmx value
         self._done: bool = False
+        #: ENG-20: schon gemeldete (fid, kanal)-Paare. `write()` laeuft jeden
+        #: Frame — eine Meldung je Frame waere eine Flut und damit dasselbe wie
+        #: keine. Muster wie `collection._zyklus_gemeldet` (ENG-14).
+        self._verworfen_gemeldet: set[tuple[int, int]] = set()
 
     # ── Value management ──────────────────────────────────────────────────────
 
@@ -74,6 +78,45 @@ class Scene(Function):
 
     # ── write ─────────────────────────────────────────────────────────────────
 
+    def _adresse_fuer(self, fixture, sv) -> int | None:
+        """DMX-Adresse dieses Szenenwerts — oder ``None``, wenn er nicht gilt.
+
+        ★★ ENG-20: Eine Szene speichert **Kanalnummern**, kein Wissen darueber,
+        wie viele Kanaele das Geraet hat. Wechselt es spaeter in einen kleineren
+        Modus, zeigt eine gespeicherte Nummer ueber sein Ende hinaus — und da
+        die einzige Pruefung ``1 <= dmx_addr <= 512`` war, landete der Wert im
+        **Nachbargeraet**.
+
+        Gemessen: Geraet 1 auf Adresse 7 mit 6 Kanaelen (belegt 7..12), Geraet 2
+        auf Adresse 13. Eine Szene mit den Kanaelen 1, 4 und 10 schrieb
+        ``{7: 200, 10: 200, 16: 200}`` — und **16 gehoert Geraet 2**.
+
+        ⚠️ Verworfen wird nur, wenn die Kanalzahl BEKANNT ist (> 0). Ist sie
+        unbekannt, bleibt es beim bisherigen Verhalten: lieber ein Wert zu viel
+        auf dem eigenen Geraet als ein stiller Ausfall, weil eine Attrappe oder
+        ein Altbestand das Feld nicht fuehrt.
+
+        ★ EINE Stelle fuer beide Schleifen (Schnappschuss und Schreiben). Zwei
+        Fassungen derselben Frage waeren Review-Checkliste 17 — und hier
+        besonders heimtueckisch: der Schnappschuss wuerde dann einen Startwert
+        aus einem fremden Geraet lesen, den das Schreiben gar nicht mehr setzt.
+        """
+        kanal = int(getattr(sv, "channel", 0) or 0)
+        kanalzahl = int(getattr(fixture, "channel_count", 0) or 0)
+        if kanalzahl > 0 and not (1 <= kanal <= kanalzahl):
+            schluessel = (int(getattr(sv, "fixture_id", -1)), kanal)
+            if schluessel not in self._verworfen_gemeldet:
+                self._verworfen_gemeldet.add(schluessel)
+                _name = getattr(fixture, "label", "") or f"Geraet {schluessel[0]}"
+                print(f"[scene] WARN: Szene '{self.name}' haelt Kanal {kanal} "
+                      f"fuer '{_name}', das nur {kanalzahl} Kanaele hat — der "
+                      f"Wert wird verworfen. Sonst laege er auf Adresse "
+                      f"{int(getattr(fixture, 'address', 0) or 0) + kanal - 1} "
+                      f"und damit im Nachbargeraet (ENG-20).")
+            return None
+        adresse = int(getattr(fixture, "address", 0) or 0) + kanal - 1
+        return adresse if 1 <= adresse <= 512 else None
+
     def write(self, universes: dict[int, "Universe"],
               patch_cache: list["PatchedFixture"],
               dt: float,
@@ -91,8 +134,8 @@ class Scene(Function):
                 universe = universes.get(fixture.universe)
                 if universe is None:
                     continue
-                dmx_addr = fixture.address + sv.channel - 1
-                if 1 <= dmx_addr <= 512:
+                dmx_addr = self._adresse_fuer(fixture, sv)
+                if dmx_addr is not None:
                     self._start_vals[(sv.fixture_id, sv.channel)] = universe.get_channel(dmx_addr)
 
         self._elapsed += dt
@@ -130,8 +173,8 @@ class Scene(Function):
             universe = universes.get(fixture.universe)
             if universe is None:
                 continue
-            dmx_addr = fixture.address + sv.channel - 1
-            if not (1 <= dmx_addr <= 512):
+            dmx_addr = self._adresse_fuer(fixture, sv)
+            if dmx_addr is None:
                 continue
             start = self._start_vals.get((sv.fixture_id, sv.channel), 0)
             current = int((start + (sv.value - start) * t) * out_factor)

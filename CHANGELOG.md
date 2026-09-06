@@ -7,6 +7,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-06 — Eine alte Szene konnte ins Nachbargerät schreiben
+
+#### Behoben
+
+- **Nach einem Moduswechsel konnte eine gespeicherte Szene Werte auf ein ganz
+  anderes Gerät schicken.** Eine Szene merkt sich Kanalnummern. Stellt man ein
+  Gerät später auf einen Modus mit weniger Kanälen um, zeigt eine alte Nummer
+  über sein Ende hinaus — und landete bisher schlicht auf der nächsten Adresse,
+  also im Gerät daneben.
+
+  Gemessen an einem Gerät auf Adresse 7 mit sechs Kanälen: der gespeicherte
+  Kanal 10 landete auf Adresse 16, die dem nächsten Gerät gehört.
+
+  Solche Werte werden jetzt verworfen, und die Meldung sagt, um welches Gerät
+  und welchen Kanal es geht und wo der Wert sonst gelandet wäre — einmal, nicht
+  bei jedem Bild. Geräte, deren Kanalzahl nicht bekannt ist, verhalten sich
+  unverändert.
+
 ### 2026-09-06 — Beim Laden einer Show gingen still Werte verloren
 
 #### Behoben
