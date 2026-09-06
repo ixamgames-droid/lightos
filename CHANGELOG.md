@@ -7,6 +7,26 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-06 — Der Regler „Richtung" tat bei der Bewegung „Bounce" nichts
+
+#### Behoben
+
+- **Bei einem Chase oder Wipe mit der Bewegung „Bounce" hatte die Einstellung
+  „Richtung" keinerlei Wirkung.** Vorwärts und rückwärts sahen identisch aus —
+  was hier auch stimmt: eine Bewegung, die ohnehin hin und her läuft, sieht
+  rückwärts genauso aus wie vorwärts. Der Regler war trotzdem da, man drehte
+  daran und suchte den Fehler anschließend woanders.
+
+  Die Richtung wird jetzt genau dort ausgeblendet, wo sie nachweislich nichts
+  tut. Überall sonst bleibt sie — insbesondere bei „Mitte nach außen" und
+  „außen nach Mitte", und auch bei Bounce, sobald der Läufer pro Runde die
+  Farbe oder den Dimmerwert wechselt: dann dreht die Richtung nämlich die
+  Reihenfolge dieser Wechsel um.
+
+  Eine ausgeblendete Richtung wird **nicht überschrieben**. Wer auf „rückwärts"
+  gestellt hatte und vorübergehend auf Bounce wechselt, bekommt seine
+  Einstellung unverändert zurück, sobald die Bewegung wieder wechselt.
+
 ### 2026-09-06 — Ein Universum ohne Ausgang fiel in der Statusleiste nicht auf
 
 #### Behoben

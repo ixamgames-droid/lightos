@@ -398,6 +398,67 @@ def spec_relevant(spec: ParamSpec, style_value: str, params: dict) -> bool:
     return True
 
 
+def richtung_wirkt(algo: RgbAlgorithm, params: dict | None) -> bool:
+    """ENG-22: Hat die Laufrichtung bei DIESER Einstellung ueberhaupt eine Wirkung?
+
+    ★★ **EINE Antwort auf diese Frage.** Sie wird an drei Stellen gebraucht —
+    dem Richtungs-Feld im Matrix-Editor (``rgb_matrix_view``), der Parameterliste
+    fuer VC/MIDI (``RgbMatrixInstance.list_params``) und der Aktionsliste
+    (``list_actions``, ``reverse_direction``). Drei eigene Antworten waeren
+    Review-Checkliste 17, und zwei davon wuerden irgendwann auseinanderlaufen.
+
+    ──────────────────────────────────────────────────────────────────────────
+
+    **Warum es die Frage ueberhaupt gibt.** Bei ``movement = "bounce"`` sind
+    beide Bahnformeln **gerade Funktionen** — sie liefern fuer ``p`` und ``-p``
+    denselben Wert:
+
+    * CHASE ``head = span - abs((int(p) % (2*span)) - span)``
+    * WIPE  ``tt = (p % (2*length)) / length; t = tt if tt <= 1 else 2 - tt``
+
+    Und ``_render`` wendet die Richtung ausschliesslich als ``p = -phase`` an.
+    Der Regler ist dort also **beweisbar** wirkungslos, nicht nur zufaellig.
+
+    ⚠️ **Gemessen, und es ist schlimmer als „wirkungslos":** CHASE/bounce ergibt
+    0 von 500 Frames Unterschied. WIPE/bounce ergibt **8 von 500 — mit voller
+    Kanaldifferenz 255**, also einem ganzen Pixel, der die Farbe kippt. Das ist
+    kein Effekt, sondern **Fliesskomma-Rauschen**: ``(-p) % 2L`` und
+    ``2L - (p % 2L)`` unterscheiden sich um ~1e-16, und der harte Vergleich
+    ``frac < t`` verstaerkt das zu einem ganzen Pixel. Mit ``edge_fade`` ist der
+    Uebergang weich und es bleiben 1 LSB (18 von 500). *Der Regler steuert
+    nicht — er wuerfelt.*
+
+    ⚠️ **Aber: NUR bei bounce, und nur ohne Rundenzaehler.** Gemessen wirkt die
+    Richtung sehr wohl bei ``center_out`` (341–485 von 500) und ``outside_in``
+    (399–485), und bei bounce **mit** ``color_cycle`` (360 von 500) — denn der
+    Rundenzaehler ``int(p) // (...)`` ist eine Floor-Division und damit **nicht**
+    gerade. Wer den Regler pauschal entfernte, kippte bestehende
+    Bounce-plus-Farbwechsel-Shows.
+
+    ★ **Ausblenden, nicht ueberschreiben.** ``direction`` liegt nicht in
+    ``self.params``, ``visible_specs`` filtert nur params-Keys, und ``to_dict``
+    schreibt den Wert unveraendert weiter. Eine ausgeblendete Richtung bleibt
+    also erhalten und wirkt sofort wieder, sobald die Bewegung wechselt.
+
+    Das Haus fuehrt dieses Muster bereits: ``runner_count`` wird bei bounce per
+    ``when`` ausgeblendet, „statt tote Regler zu zeigen" — die Richtung wurde
+    dort schlicht vergessen.
+    """
+    meta = ALGO_META.get(algo)
+    if not meta or not meta.direction:
+        return False
+    p = dict(params or {})
+    # Dieselben Vorgaben wie im Renderer lesen — eine Anzeige, die andere
+    # Defaults annimmt als der Code, den sie beschreibt, beschreibt etwas
+    # anderes.
+    if str(p.get("movement", "normal")) != "bounce":
+        return True
+    # Der Rundenzaehler ist nicht gerade: mit ihm dreht die Richtung die Farb-
+    # bzw. Dimmerfolge um. Im Zweifel ANZEIGEN — einen wirksamen Regler zu
+    # verstecken ist der teurere Fehler als einen wirkungslosen zu zeigen.
+    return bool(p.get("color_cycle") or p.get("dimmer_cycle"))
+
+
 def visible_specs(algo: RgbAlgorithm, style_value: str, params: dict) -> list:
     """Liste der aktuell relevanten ParamSpecs eines Algorithmus (style-/when-
     gefiltert). Die View baut daraus ihre Felder und schreibt NUR diese Werte."""
