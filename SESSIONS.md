@@ -12,6 +12,7 @@
 | QA-78 | B | fix/qa78-adressregel-verifiziert | 2026-09-06T20:58Z | src/core/engine/scene.py |
 | QA-75 | A | fix/buendel-qa75-fm36-xplat32 | 2026-09-06T21:26Z | src/ui/views/fixture_group_view.py,src/ui/widgets/group_edit_dialog.py |
 | FM-36 | A | fix/buendel-qa75-fm36-xplat32 | 2026-09-06T21:26Z | src/ui/widgets/fixture_editor.py |
+| XPLAT-32 | A | fix/buendel-qa75-fm36-xplat32 | 2026-09-06T21:26Z | tests/conftest.py |
 
 ## Blocker & Fallen
 
@@ -106,7 +107,6 @@
 
 ## Verlauf
 
-- 2026-09-06T14:36Z B abgebrochen QA-78
 - 2026-09-06T15:09Z B claim QA-77
 - 2026-09-06T15:41Z B done QA-77
 - 2026-09-06T15:52Z A claim NET-12
@@ -136,3 +136,4 @@
 - 2026-09-06T21:09Z A done UI-60
 - 2026-09-06T21:26Z A claim QA-75
 - 2026-09-06T21:26Z A claim FM-36
+- 2026-09-06T21:26Z A claim XPLAT-32
