@@ -10,6 +10,7 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | ENG-23 | A | fix/eng23-freeze-ausweg | 2026-09-06T16:36Z | src/core/engine/function.py,src/core/engine/rgb_matrix.py,src/core/engine/efx.py,src/core/engine/chaser.py,src/core/engine/sequence.py,src/ui/virtualconsole/vc_button.py |
+| ENG-26 | B | fix/eng26-global-alias | 2026-09-06T16:53Z | src/core/engine/tempo_bus.py · src/ui/virtualconsole/vc_speedial.py |
 
 ## Blocker & Fallen
 
@@ -97,7 +98,6 @@
 
 ## Verlauf
 
-- 2026-09-03T19:18Z A claim QA-72
 - 2026-09-03T19:35Z A claim OUT-55
 - 2026-09-03T19:43Z B uebergeben FM-45
 - 2026-09-03T19:50Z A uebergeben QA-72
@@ -127,3 +127,4 @@
 - 2026-09-06T16:25Z A done NET-12
 - 2026-09-06T16:36Z A claim ENG-23
 - 2026-09-06T16:40Z A done ENG-21
+- 2026-09-06T16:53Z B claim ENG-26
