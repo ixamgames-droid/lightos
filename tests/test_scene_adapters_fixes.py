@@ -8,7 +8,6 @@ Funde aus der adversarialen Review (siehe docs/VIZ11_SCENEGRAPH_DESIGN.md):
 """
 import contextlib
 import os
-import time
 import unittest
 from unittest import mock
 
@@ -101,6 +100,47 @@ class ResyncZaehlungTest(unittest.TestCase):
                     "Der ausgehebelte suspend()-Block faellt nicht mehr auf — "
                     "dann prueft der Test oben nichts mehr")
 
+    def test_rotationen_buendeln_ebenso(self):
+        """★ Dieselbe Zusicherung fuer die ROTATIONEN — vorher eine rohe
+        Wanduhr-Schranke (`elapsed < 0.05`). Gemessen: gebuendelt 1 Aufruf,
+        ausgehebelt n (1 gegen 200 und 1 gegen 500)."""
+        for n in (200, 500):
+            with self.subTest(fixtures=n):
+                self.assertEqual(self._zaehle_rotationen(n), 1)
+                self.assertGreaterEqual(
+                    self._zaehle_rotationen(n, aushebeln=True), n,
+                    "ohne Buendelung muesste je Eintrag abgeglichen werden")
+
+    def _zaehle_rotationen(self, n, *, aushebeln=False):
+        """Wie ``_zaehle``, aber fuer die Rotations-Zuweisung.
+
+        Positionen zuerst (Legacy-Reihenfolge) — sie sind Vorbedingung und
+        werden ausserhalb der Zaehlung gesetzt."""
+        registry = self.state._view_registry
+        self.state.visualizer_positions = {
+            fid: (0.0, 6.0, 0.0) for fid in range(n)}
+        v = self._Zaehler()
+        try:
+            registry._views.add(v)
+        except AttributeError:
+            registry._views.append(v)
+        try:
+            @contextlib.contextmanager
+            def ohne_wirkung(*_a, **_k):
+                yield registry
+
+            ctx = (mock.patch.object(type(registry), "suspend", ohne_wirkung)
+                   if aushebeln else contextlib.nullcontext())
+            with ctx:
+                self.state.visualizer_rotations = {
+                    fid: (0.0, float(fid % 360), 0.0) for fid in range(n)}
+        finally:
+            try:
+                registry._views.discard(v)
+            except AttributeError:
+                registry._views.remove(v)
+        return v.aufrufe
+
     def test_die_zaehlung_haengt_an_keiner_zeit(self):
         """Selbstkontrolle: in dieser Klasse darf keine Uhr vorkommen — sonst
         schleicht sich die Wanduhr durch die Hintertuer zurueck.
@@ -192,7 +232,6 @@ class BulkAssignmentPerfTest(unittest.TestCase):
     #: 1 gegen 1001 (n=1000). Das traegt die Zusicherung jetzt
     #: (``ResyncZaehlungTest``), und die Zeitmessung hier ist nur noch ein
     #: grober Rauchmelder mit weitem Abstand zum Rauschen.
-    SCHWELLE = 18.0
 
     def setUp(self):
         _app()
@@ -202,94 +241,57 @@ class BulkAssignmentPerfTest(unittest.TestCase):
     def tearDown(self):
         reset_show()
 
-    def _dauer(self, n, wiederholungen=3):
-        """KLEINSTE gemessene Zeit fuer ``n`` Fixtures.
+    # ★★★ QA-71c: HIER STAND DIE ZEIT-MESSUNG, und auch sie ist weg.
+    #
+    # Nicht weil die Frage falsch waere — „skaliert die Ganz-Zuweisung linear?"
+    # ist genau richtig —, sondern weil eine WANDUHR sie auf einem geteilten
+    # Laeufer nicht beantworten kann. Gemessen unter kuenstlicher Last
+    # (6 Rechenprozesse), drei Laeufe je Fall:
+    #
+    #     gesund  13,6 / 9,0 / 7,4      (ohne Last: ~5,0)
+    #     kaputt  23,3 / 15,3 / 26,9    (ohne Last: ~24,5)
+    #
+    # Innerhalb EINES Laufs trennen sie sauber. Ueber Laeufe hinweg
+    # UEBERLAPPEN die Bereiche: in der CI vom 06.09. erreichte der gesunde Fall
+    # ueber 18, der kaputte fiel auf 15,7. Eine Schranke, die lastfest ist,
+    # waere damit zu locker, um den Rueckfall noch zu fangen — die Messung kann
+    # nicht beides.
+    #
+    # ★ Die Frage ist ZAEHLBAR und wird von `ResyncZaehlungTest` beantwortet:
+    # eine Ganz-Zuweisung loest gebuendelt GENAU EIN `view._resync()` aus,
+    # unabhaengig von der Groesse; ausgehebelt sind es n+1 (gemessen 1 gegen 201
+    # und 1 gegen 1001). Das ist dieselbe Aussage, nur ohne Uhr — und mit
+    # eigener Gegenprobe.
+    #
+    # ⚠️ Was dabei VERLOREN geht, ehrlich benannt: die Zaehlung faenge einen
+    # Rueckfall NICHT, bei dem die Zahl der Resyncs gleich bleibt, ein
+    # einzelner Resync aber selbst quadratisch wird. Dafuer braeuchte es eine
+    # Messung auf ruhiger Hardware — im Gate eines geteilten Laeufers ist sie
+    # nicht zu haben. Steht als Vermerk hier, statt als flackernder Test.
 
-        Das Minimum, nicht der Mittelwert: Stoerungen durch Nachbarprozesse
-        koennen eine Messung nur VERLAENGERN, nie verkuerzen. Der kleinste Wert
-        ist damit der beste verfuegbare Schaetzer fuer die reine Rechenzeit —
-        und genau darum geht es hier.
-        """
-        beste = None
-        for _ in range(wiederholungen):
-            reset_show()
-            zustand = get_state()
-            positionen = {fid: (float(fid), 6.0, 0.0) for fid in range(n)}
-            start = time.perf_counter()
-            zustand.visualizer_positions = positionen
-            gemessen = time.perf_counter() - start
-            beste = gemessen if beste is None else min(beste, gemessen)
-        return beste
-
-    def _verhaeltnis(self):
-        klein = self._dauer(self.KLEIN)
-        gross = self._dauer(self.GROSS)
-        self.assertGreater(klein, 0.0, "Zeitmessung liefert 0 — nicht auswertbar")
-        return gross / klein, klein, gross
-
-    def test_bulk_position_assignment_skaliert_nicht_quadratisch(self):
-        """★ Gemessen wird die SKALIERUNG, nicht die Uhrzeit.
-
-        Die erste Fassung verlangte ``elapsed < 0.05`` fuer 500 Fixtures. Das
-        war ein Wanduhr-Budget fuer eine Aussage ueber die Skalierung — und es
-        hat am 2026-09-03 an einem Abend DREIMAL fremde PRs rot gefaerbt, die
-        ``src/`` gar nicht anfassten (0,05137 s / 0,05078 s gegen 0,05 s), jedes
-        Mal war der Neulauf gruen (QA-71).
-
-        Der Grund ist keine Schlamperei bei der Zahl, sondern die Bauart: das
-        Gate faehrt seine Segmente **absichtlich parallel**, und CI-Hardware ist
-        geteilt. Gemessen: dieselbe Zuweisung braucht hier 1,4–1,9 ms und auf CI
-        51 ms — ein Faktor 27. Ein absolutes Budget muesste entweder so gross
-        sein, dass es nichts mehr faengt, oder es faellt unter Last.
-
-        Ein VERHAELTNIS ist davon unabhaengig: ist die Maschine dreifach
-        belastet, werden beide Messungen dreifach langsamer und der Quotient
-        bleibt. Gemessen am 2026-09-03: linear 5,1 — quadratisch 24,5.
-        """
-        verhaeltnis, klein, gross = self._verhaeltnis()
-        self.assertLess(
-            verhaeltnis, self.SCHWELLE,
-            "Die Zuweisung skaliert quadratisch statt linear: %dx so viele "
-            "Fixtures kosteten %.1fx so viel Zeit (%.4fs -> %.4fs). Erwartet "
-            "ist ~%.0fx (ein gebuendeltes resync_all() am Ende); ~%.0fx heisst "
-            "ein resync_all() pro Eintrag."
-            % (self.GROSS // self.KLEIN, verhaeltnis, klein, gross,
-               self.GROSS / self.KLEIN, (self.GROSS / self.KLEIN) ** 2))
-        # Funktional weiterhin korrekt (keine Perf-Optimierung auf Kosten der
-        # Korrektheit).
-        self.assertEqual(len(self.state.visualizer_positions), self.GROSS)
-        self.assertEqual(self.state.visualizer_positions[42], (42.0, 6.0, 0.0))
-
-    def test_ohne_gebuendeltes_resync_wuerde_der_test_anschlagen(self):
-        """★★ Die Gegenprobe — ohne sie waere „nicht mehr flaky\" auch dadurch
-        zu erreichen, dass der Test gar nichts mehr prueft.
-
-        Der Rueckfall wird nicht nachgebaut, sondern am ECHTEN Codeweg
-        hergestellt: die Buendelung haengt an genau einem ``suspend()``-Block im
-        Setter. Wird der ausgehebelt, laeuft wieder ein ``resync_all()`` pro
-        Eintrag — also exakt der Fund, gegen den dieser Test steht.
-
-        Gemessen am 2026-09-03: Verhaeltnis 24,5 statt 5,1, und bei 1000
-        Fixtures 133x mehr Zeit.
-
-        ★ QA-71b: Diese Gegenprobe bleibt, aber sie ist nicht mehr der Beweis —
-        den fuehrt ``ResyncZaehlungTest`` ohne Uhr. Hier steht nur noch, dass
-        die Zeitmessung im Prinzip einen Unterschied SIEHT.
-        """
-        registry = self.state._view_registry
-
-        @contextlib.contextmanager
-        def ohne_wirkung():
-            yield
-
-        with mock.patch.object(registry, "suspend", ohne_wirkung):
-            verhaeltnis, klein, gross = self._verhaeltnis()
-        self.assertGreater(
-            verhaeltnis, self.SCHWELLE,
-            "Der ausgehebelte suspend()-Block faellt nicht mehr auf "
-            "(Verhaeltnis %.1f, %.4fs -> %.4fs). Dann wuerde der Test oben "
-            "einen echten O(n^2)-Rueckfall ebenfalls durchlassen — er prueft "
-            "nichts mehr." % (verhaeltnis, klein, gross))
+    # ★★★ QA-71c: HIER STAND EINE ZEIT-GEGENPROBE, und sie ist ersatzlos weg.
+    #
+    # Sie forderte ein Verhaeltnis UEBER `SCHWELLE`, waehrend der Test oben
+    # DARUNTER bleiben muss — dieselbe Konstante, entgegengesetzte Richtungen.
+    # Damit war jede Anpassung ein Nullsummenspiel: QA-71b hat die Schwelle von
+    # 12,0 auf 18,0 angehoben, um dem Test oben Luft zu geben, und hat der
+    # Gegenprobe damit genau so viel weggenommen. Sie fiel prompt in der
+    # naechsten CI bei 15,7.
+    #
+    # Gemessen unter Last liegen die beiden Faelle zu dicht beieinander, als
+    # dass IRGENDEIN Wert fuer beide sicher waere:
+    #
+    #     gesund  5,0 -> 11,5   (naehert sich der Schwelle von unten)
+    #     kaputt 24,5 -> 15,7   (naehert sich ihr von oben)
+    #
+    # ★ Die Zusicherung, die sie tragen sollte, traegt seit QA-71b
+    # `ResyncZaehlungTest` — OHNE Uhr, mit eigener Gegenprobe
+    # (`test_ohne_buendelung_waeren_es_n_plus_eins`, gemessen 1 gegen n+1).
+    # Eine zweite, flackernde Gegenprobe fuegt dem nichts hinzu; sie erzieht nur
+    # dazu, Rot wegzuwinken.
+    #
+    # Was hier BLEIBT, ist der Test oben — als grober Rauchmelder fuer die
+    # Laufzeit, nicht als Traeger einer Zusicherung.
 
     def test_bulk_assignment_resyncs_existing_views_exactly_once(self):
         """Eine VOR der Ganz-Zuweisung gehaltene View-Referenz muss NACH der
@@ -300,15 +302,15 @@ class BulkAssignmentPerfTest(unittest.TestCase):
         self.state.visualizer_positions = {1: (1.0, 2.0, 3.0), 2: (4.0, 5.0, 6.0)}
         self.assertEqual(dict(view), {1: (1.0, 2.0, 3.0), 2: (4.0, 5.0, 6.0)})
 
-    def test_bulk_rotation_assignment_is_fast(self):
-        n = 500
-        # Positionen zuerst (Legacy-Reihenfolge), dann Rotationen.
-        self.state.visualizer_positions = {fid: (0.0, 6.0, 0.0) for fid in range(n)}
-        rotations = {fid: (0.0, float(fid % 360), 0.0) for fid in range(n)}
-        start = time.perf_counter()
-        self.state.visualizer_rotations = rotations
-        elapsed = time.perf_counter() - start
-        self.assertLess(elapsed, 0.05, f"Rotations-Ganz-Zuweisung von {n} Fixtures dauerte {elapsed:.3f}s")
+    # ★★ QA-71c: Hier stand `test_bulk_rotation_assignment_is_fast` mit einer
+    # ROHEN Wanduhr-Schranke (`assertLess(elapsed, 0.05)`) — die reinste Form
+    # derselben Krankheit wie oben, nur ohne das Verhaeltnis dazwischen. Auf
+    # einem geteilten Laeufer ist das ein Wuerfelwurf.
+    #
+    # Auch DIESE Eigenschaft ist zaehlbar, und die Messung ist genauso deutlich:
+    # eine Rotations-Ganz-Zuweisung loest gebuendelt GENAU EIN `view._resync()`
+    # aus, ausgehebelt n. Gemessen 1 gegen 200 und 1 gegen 500.
+    # Uebernommen von `ResyncZaehlungTest.test_rotationen_buendeln_ebenso`.
 
 
 class RotationOnlyPhantomTest(unittest.TestCase):
