@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| ENG-20b | A | fix/eng20b-laser-platzhalter-adresse | 2026-09-06T11:45Z | src/core/engine/scene.py |
+| _(frei)_ |  |  |  |  |
 
 ## Blocker & Fallen
 
@@ -92,7 +92,6 @@
 
 ## Verlauf
 
-- 2026-09-03T17:07Z A done FM-43
 - 2026-09-03T17:30Z B uebergeben XPLAT-23
 - 2026-09-03T17:31Z B claim PROC-10
 - 2026-09-03T17:53Z A uebergeben FM-41
@@ -122,3 +121,4 @@
 - 2026-09-06T11:32Z A claim ENG-19
 - 2026-09-06T11:45Z A done ENG-19
 - 2026-09-06T11:45Z A claim ENG-20b
+- 2026-09-06T11:50Z A done ENG-20b
