@@ -130,6 +130,140 @@ class SzeneSchreibtNichtInsNachbargeraetTest(unittest.TestCase):
                          "zweite, eigene Adressrechnung im write()")
 
 
+class NetzwerkLaserSchreibtNichtInsDmxTest(unittest.TestCase):
+    """★★★ ENG-20b — die ZWEITE Art, wie eine gespeicherte Zahl veraltet.
+
+    **Gefunden von der zweiten Sitzung (B, PR #744), von mir unabhaengig
+    nachgemessen und hier uebernommen.** Ich hatte ENG-20 ohne Claim bearbeitet;
+    wir haben es doppelt gemacht, und Bs Fassung deckte diesen Fall ab, meine
+    nicht. Die Uebernahme geschieht auf Robins Anweisung.
+
+    Netzwerk-Laser haben ``universe``/``address`` nur als **bedeutungslose
+    Platzhalter**. ``app_state.fixture_uses_dmx`` sagt das seit LAS-04, und sein
+    Kommentar verlangt woertlich: „JEDE Stelle, die
+    ``fx.address + ch.channel_number`` rechnet, MUSS vorher hier fragen, sonst
+    schreibt der Platzhalter in die Spans echter Geraete." ``scene.py`` fragte
+    nicht.
+
+    **Gemessen:** Laser mit ``protocol='etherdream'`` auf Platzhalter-Adresse 1,
+    PAR auf Adresse 3. Eine Szene mit „Kanal 3" des Lasers schrieb ``{3: 200}``
+    — und 3 gehoert dem PAR.
+
+    ⚠️ **Die Kanalzahl-Pruefung faengt das NICHT:** Kanal 3 ist bei 32 Kanaelen
+    voellig gueltig. Zwei verschiedene Arten des Veraltens, beide enden im
+    Nachbargeraet — deshalb EINE gemeinsame Stelle fuer beide.
+
+    ★ Und die allgemeine Lehre: **eine Regel, die nur im Docstring einer
+    Funktion steht, ist nicht durchgesetzt, sondern eine Bitte.** Diese hier
+    stand seit LAS-04 da und wurde an genau dieser Stelle uebersehen.
+    """
+
+    def _laser_und_par(self):
+        from src.core.app_state import LASER_NETWORK_PROTOCOLS
+        proto = sorted(LASER_NETWORK_PROTOCOLS)[0]
+        laser = SimpleNamespace(fid=1, universe=1, address=1, channel_count=32,
+                                label="Laser", protocol=proto)
+        par = SimpleNamespace(fid=2, universe=1, address=3, channel_count=4,
+                              label="PAR", protocol="dmx")
+        return laser, par
+
+    def _lauf(self, fixture_id, kanal, frames=1):
+        laser, par = self._laser_und_par()
+        sc = Scene(name="Alt")
+        sc._values = [SceneValue(fixture_id=fixture_id, channel=kanal, value=200)]
+        sc.fade_in = sc.fade_out = 0.0
+        sc._running = True
+        u = _Universe()
+        puffer = io.StringIO()
+        with redirect_stdout(puffer):
+            for _ in range(frames):
+                sc.write({1: u}, [laser, par], 0.05)
+        return sc, u, puffer.getvalue()
+
+    def test_ein_netzwerk_laser_schreibt_KEIN_dmx(self):
+        """★★ Der Kern: die Platzhalter-Adresse 1 plus Kanal 3 ergaebe Adresse
+        3 — und die gehoert einem echten PAR."""
+        _sc, u, _ = self._lauf(fixture_id=1, kanal=3)
+        self.assertEqual(u.ch, {}, "der Laser hat ins DMX geschrieben")
+
+    def test_ein_echtes_dmx_geraet_ist_unberuehrt(self):
+        """Die Gegenprobe — der Riegel darf nicht alles verwerfen."""
+        _sc, u, _ = self._lauf(fixture_id=2, kanal=1)
+        self.assertEqual(u.ch, {3: 200})
+
+    def test_die_kanalzahl_pruefung_haette_das_NICHT_gefangen(self):
+        """★ Der Beleg, dass es wirklich zwei verschiedene Faelle sind: Kanal 3
+        liegt bei 32 Kanaelen weit innerhalb — die erste Haelfte des Fixes
+        haette hier nichts gemeldet."""
+        laser, _par = self._laser_und_par()
+        self.assertLessEqual(3, laser.channel_count,
+                             "Vorbedingung: der Kanal ist per Kanalzahl gueltig")
+
+    def test_gemeldet_wird_einmal_und_nennt_den_grund(self):
+        sc, _u, ausgabe = self._lauf(fixture_id=1, kanal=3, frames=5)
+        self.assertEqual(ausgabe.count("[scene] WARN"), 1, "fuenf Frames, eine Meldung")
+        for teil in ("Laser", "Platzhalter", "Adresse 3", "ENG-20"):
+            with self.subTest(teil=teil):
+                self.assertIn(teil, ausgabe)
+
+    def test_ein_geraet_ohne_protocol_gilt_als_dmx(self):
+        """★ Die bewusste Fehlrichtung, wie bei der Kanalzahl: ein Alt-Objekt
+        oder eine Attrappe ohne ``protocol`` wird geschrieben wie bisher. Eine
+        Szene, die stumm nichts mehr tut, ist auf der Buehne schlimmer als eine,
+        die zu viel tut."""
+        alt = SimpleNamespace(fid=9, universe=1, address=5, channel_count=4,
+                              label="Alt")
+        sc = Scene(name="Alt")
+        sc._values = [SceneValue(fixture_id=9, channel=1, value=200)]
+        sc.fade_in = sc.fade_out = 0.0
+        sc._running = True
+        u = _Universe()
+        with redirect_stdout(io.StringIO()):
+            sc.write({1: u}, [alt], 0.05)
+        self.assertEqual(u.ch, {5: 200})
+
+    def test_wirft_die_pruefung_selbst_wird_GESCHRIEBEN(self):
+        """★★ Der Ausnahme-Zweig, und er hat eine RICHTUNG. Kann die Pruefung
+        nicht beantwortet werden (Import kaputt, Attrappe, Alt-Objekt), wird
+        geschrieben — nicht verworfen.
+
+        Begruendung dieselbe wie bei der unbekannten Kanalzahl und wie in
+        Robins FM-45/2-Entscheidung: eine Szene, die stumm NICHTS mehr tut, ist
+        auf der Buehne schlimmer als eine, die zu viel tut. Ein dunkles Rig ohne
+        Erklaerung sucht man im Dunkeln.
+
+        (Dieser Test entstand, weil die Mutationsprobe den Zweig UEBERLEBT hat —
+        er war von keinem Test abgedeckt.)
+        """
+        from unittest import mock
+        import src.core.engine.scene as S
+
+        def kaputt(*_a, **_k):
+            raise RuntimeError("Pruefung nicht beantwortbar")
+
+        par = SimpleNamespace(fid=2, universe=1, address=3, channel_count=4,
+                              label="PAR", protocol="dmx")
+        sc = Scene(name="Alt")
+        sc._values = [SceneValue(fixture_id=2, channel=1, value=200)]
+        sc.fade_in = sc.fade_out = 0.0
+        sc._running = True
+        u = _Universe()
+        with mock.patch.object(S, "_fixture_uses_dmx", lambda: kaputt):
+            with redirect_stdout(io.StringIO()):
+                sc.write({1: u}, [par], 0.05)
+        self.assertEqual(u.ch, {3: 200},
+                         "im Zweifel schreiben — nicht stumm verstummen")
+
+    def test_beide_haelften_sitzen_in_DERSELBEN_stelle(self):
+        """★★ Zwei Arten des Veraltens, eine Pruefstelle. Getrennt waeren es
+        zwei Orte, an denen dieselbe Frage („darf dieser gespeicherte Wert
+        ueberhaupt auf den Draht?") beantwortet wird — Checkliste 17."""
+        import inspect
+        quelle = inspect.getsource(Scene._adresse_fuer)
+        self.assertIn("_fixture_uses_dmx", quelle)
+        self.assertIn("channel_count", quelle)
+
+
 class _Nichts:
     def __enter__(self):
         return None
