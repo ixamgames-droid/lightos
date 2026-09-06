@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| _(frei)_ |  |  |  |  |
+| ENG-24 | A | fix/eng24-panik-weiss | 2026-09-06T17:51Z | src/core/all_white.py |
 
 ## Blocker & Fallen
 
@@ -100,7 +100,6 @@
 
 ## Verlauf
 
-- 2026-09-05T14:13Z B claim QA-74
 - 2026-09-05T14:18Z B claim QA-73
 - 2026-09-05T14:34Z B done QA-74
 - 2026-09-05T14:41Z B claim FM-45
@@ -130,3 +129,4 @@
 - 2026-09-06T17:28Z A done OUT-56
 - 2026-09-06T17:28Z A claim ENG-22
 - 2026-09-06T17:49Z A done ENG-22
+- 2026-09-06T17:51Z A claim ENG-24
