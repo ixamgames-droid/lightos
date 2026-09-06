@@ -7,6 +7,26 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-06 — „Tempo ×" im laufenden Betrieb ändern ließ Effekte springen
+
+#### Behoben
+
+- **Wer während der Show am Tempo-Faktor eines Effekts drehte, bekam einen
+  Sprung statt einer Tempoänderung.** Der neue Faktor wirkte rückwirkend auf
+  die gesamte Zeit seit dem letzten Sync: EFX und Matrix setzten in einem
+  einzigen Frame an eine ganz andere Stelle ihrer Figur, Chaser und Sequenzen
+  sprangen im Schritt. Je länger der Effekt schon lief, desto größer der
+  Sprung.
+
+  Ein Tempowechsel behält jetzt die Phase und ändert nur noch die
+  Geschwindigkeit — der Effekt läuft an derselben Stelle weiter, ab dort
+  schneller oder langsamer.
+
+  Das gilt für alle vier Effektarten (EFX, Matrix, Chaser, Sequenz) und für
+  jeden Weg, auf dem sich das Tempo ändern lässt: die Spinbox im Editor, das
+  Speed-Dial der Virtuellen Konsole, MIDI und die Live-Steuerung. Der Regler
+  „Tempo-Versatz" verschiebt weiterhin absichtlich die Phase — das ist seine
+  Aufgabe und bleibt unverändert.
 ### 2026-09-06 — „Übernehmen" im Ausgabe-Dialog unterbrach die laufende sACN-Ausgabe
 
 #### Behoben
