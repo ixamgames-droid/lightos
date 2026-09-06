@@ -55,6 +55,7 @@ class _FakeOutputManager:
         self._artnet_outputs: dict[int, object] = {}
         self._sacn_outputs: dict[int, object] = {}
         self.calls: list[tuple[str, int]] = []
+        self.remove_ausser: list = []   # NET-12: mitgegebener `ausser`-Wert je Aufruf
 
     def add_universe(self, universe):
         return object()
@@ -76,10 +77,22 @@ class _FakeOutputManager:
         self.last_out_universe = out_universe
         self._sacn_outputs[int(universe)] = object()
 
-    def remove_output(self, universe):
+    def remove_output(self, universe, ausser=None):
+        # NET-12: der echte Manager kennt `ausser` (welcher Adaptertyp
+        # STEHEN bleibt). Ohne den Parameter wirft das Double einen
+        # TypeError, den `_apply_sacn` in seinem try schluckt — dann
+        # laeuft `add_sacn` nie und der Test misst etwas anderes, als
+        # er glaubt.
         """Wie OUT-05: entfernt ALLE Adapter dieses Universums (Spy + Registry)."""
         self.calls.append(("remove_output", int(universe)))
-        for reg in (self._enttec_outputs, self._artnet_outputs, self._sacn_outputs):
+        self.remove_ausser.append(ausser)
+        # ★ NET-12: `ausser` laesst GENAU EINEN Typ stehen — das Double muss das
+        # mitmachen, sonst prueft der Test einen Manager, den es nicht gibt.
+        namen = {"enttec": self._enttec_outputs, "artnet": self._artnet_outputs,
+                 "sacn": self._sacn_outputs}
+        for name, reg in namen.items():
+            if name == ausser:
+                continue
             reg.pop(int(universe), None)
 
     def active_registries(self, universe):
@@ -150,6 +163,28 @@ class TestOutputConfigLifecycle(unittest.TestCase):
         add_idx = calls.index(("add_sacn", 2))
         self.assertLess(rm_idx, add_idx)
         self.assertEqual(self.state.output_manager.active_registries(2), ["sacn"])
+
+    def test_sacn_apply_laesst_den_eigenen_adapter_stehen(self):
+        """★★ NET-12: der Dialog MUSS `ausser="sacn"` mitgeben.
+
+        Ohne das entfernt `remove_output` den laufenden sACN-Sender per `pop`;
+        im Moment seines `close()` steht dann kein Nachfolger in der Registry,
+        die Uebergabe-Sperre greift nicht, und es geht eine E1.31-Stream-
+        Termination fuer ein WEITERLAUFENDES Universum raus (gemessen: 5 von 5
+        Uebernahmen mit unveraenderter Konfiguration).
+
+        Der Test sitzt HIER und nicht bei den Paket-Tests, weil er die
+        DIALOG-Seite festhaelt: die Paket-Tests rufen den Manager direkt und
+        blieben gruen, wenn jemand diese Zeile zuruecknimmt. Genau das hat die
+        Mutationsprobe gezeigt — die Mutation „Dialog wieder ohne ausser"
+        ueberlebte, bis es diesen Test gab.
+        """
+        self.dlg._spin_sacn_univ.setValue(2)
+        self.dlg._check_sacn.setChecked(True)
+        self.dlg._apply_sacn()
+        self.assertIn("sacn", self.state.output_manager.remove_ausser,
+                      "der Dialog gibt ausser=sacn nicht mit — das Uebernehmen "
+                      "terminiert dann ein laufendes Universum")
 
     def test_connect_enttec_removes_before_add(self):
         self._select_enttec_port(3)
