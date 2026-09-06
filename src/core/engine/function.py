@@ -10,6 +10,46 @@ if TYPE_CHECKING:
 from .fade_curve import eval_named   # ARC-04/FW-4: Form der Hüllkurve (Leaf-Modul)
 
 
+_UsesDmx = None
+
+
+def gibt_ueber_dmx_aus(fixture) -> bool:
+    """Darf fuer dieses Geraet ``address + channel`` gerechnet werden? (QA-78)
+
+    Duenne, gecachte Huelle um ``app_state.fixture_uses_dmx``. Netzwerk-Laser
+    (Ether Dream, IDN) tragen ``universe``/``address`` nur als bedeutungslose
+    Platzhalter; wer damit rechnet, schreibt in die Spans ECHTER Geraete.
+
+    ★ **Warum das hier steht und nicht sechsmal einzeln.** Die Regel stand seit
+    LAS-04 nur im Docstring von ``fixture_uses_dmx`` — „JEDE Stelle, die
+    ``fx.address + ch.channel_number`` rechnet, MUSS vorher hier fragen". Eine
+    Regel, die nur im Docstring steht, ist nicht durchgesetzt, sondern eine
+    Bitte: gemessen fragten **acht von neun** Schreibern nicht. ``scene.py``
+    war der erste belegte Schaden (ENG-20b).
+
+    ⚠️ **Spaet importiert und EINMAL gemerkt.** ``app_state`` zieht viel mit,
+    und diese Funktion sitzt in Frame-Pfaden. Gemessen kostet der erste Aufruf
+    in einem Prozess, der ``app_state`` noch nicht kennt, rund eine halbe
+    Sekunde; danach ist es ein Attributzugriff. In der App ist das Modul
+    laengst geladen, bevor eine Funktion laeuft.
+
+    ⚠️ **Im Zweifel JA.** Faellt die Aufloesung aus, wird geschrieben wie
+    bisher — eine Funktion, die stumm nichts mehr tut, ist auf der Buehne
+    schlimmer als eine, die zu viel tut.
+    """
+    global _UsesDmx
+    if _UsesDmx is None:
+        try:
+            from src.core.app_state import fixture_uses_dmx
+        except Exception:
+            return True
+        _UsesDmx = fixture_uses_dmx
+    try:
+        return bool(_UsesDmx(fixture))
+    except Exception:
+        return True
+
+
 class FunctionType(Enum):
     Scene = "Scene"
     Chaser = "Chaser"
