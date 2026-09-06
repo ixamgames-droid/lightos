@@ -28,6 +28,135 @@ def _app() -> QApplication:
     return QApplication.instance() or QApplication([])
 
 
+class ResyncZaehlungTest(unittest.TestCase):
+    """★★★ QA-71b: dieselbe Zusicherung wie die Perf-Messung — ohne Uhr.
+
+    Die Buendelung ist eine ZAEHLBARE Eigenschaft, keine Geschwindigkeit: eine
+    Ganz-Zuweisung darf genau EIN ``view._resync()`` ausloesen, unabhaengig von
+    der Groesse. Gemessen: 1 bei 200 Fixtures, 1 bei 1000. Ohne die Buendelung
+    sind es 201 bzw. 1001.
+
+    Damit haengt die Aussage an keiner Maschine und an keiner Last — genau die
+    Lehre, die QA-71 begonnen und die CI vom 2026-09-06 zu Ende erzwungen hat:
+    eine Wanduhr im Gate ist auf fremder Hardware ein Wuerfelwurf, und ein
+    Verhaeltnis aus zwei Zeitmessungen ist immer noch eine Uhr.
+    """
+
+    def setUp(self):
+        _app()
+        reset_show()
+        self.state = get_state()
+
+    def tearDown(self):
+        reset_show()
+
+    class _Zaehler:
+        """Eine View, die nur mitzaehlt, wie oft sie neu abgeglichen wird."""
+
+        def __init__(self):
+            self.aufrufe = 0
+
+        def _resync(self):
+            self.aufrufe += 1
+
+    def _zaehle(self, n, *, aushebeln=False):
+        registry = self.state._view_registry
+        v = self._Zaehler()
+        try:
+            registry._views.add(v)
+        except AttributeError:
+            registry._views.append(v)
+        try:
+            @contextlib.contextmanager
+            def ohne_wirkung(*_a, **_k):
+                yield registry
+
+            ctx = (mock.patch.object(type(registry), "suspend", ohne_wirkung)
+                   if aushebeln else contextlib.nullcontext())
+            with ctx:
+                self.state.visualizer_positions = {
+                    i: (float(i), 6.0, 0.0) for i in range(n)}
+        finally:
+            try:
+                registry._views.discard(v)
+            except AttributeError:
+                registry._views.remove(v)
+        return v.aufrufe
+
+    def test_eine_ganz_zuweisung_loest_genau_EIN_resync_aus(self):
+        """Und zwar unabhaengig von der Groesse — das IST die Aussage."""
+        for n in (200, 1000):
+            with self.subTest(fixtures=n):
+                self.assertEqual(self._zaehle(n), 1)
+
+    def test_ohne_buendelung_waeren_es_n_plus_eins(self):
+        """★★ Die Gegenprobe, ebenfalls ohne Uhr: wird der ``suspend()``-Block
+        ausgehebelt, laeuft wieder ein Abgleich PRO EINTRAG. Ohne diesen Test
+        waere „ein Resync" auch dadurch zu erreichen, dass gar nichts mehr
+        abgeglichen wird."""
+        for n in (200, 1000):
+            with self.subTest(fixtures=n):
+                self.assertGreaterEqual(
+                    self._zaehle(n, aushebeln=True), n,
+                    "Der ausgehebelte suspend()-Block faellt nicht mehr auf — "
+                    "dann prueft der Test oben nichts mehr")
+
+    def test_die_zaehlung_haengt_an_keiner_zeit(self):
+        """Selbstkontrolle: in dieser Klasse darf keine Uhr vorkommen — sonst
+        schleicht sich die Wanduhr durch die Hintertuer zurueck.
+
+        ★★ Zwei Vorkehrungen, und beide sind noetig, weil die erste Fassung
+        dieses Tests **sich selbst gefunden** hat: die verbotenen Woerter
+        standen als Zeichenketten in seiner eigenen Liste, und er meldete
+        prompt vier Verstoesse gegen sich.
+
+        1. Die Begriffe werden aus TEILEN zusammengesetzt, stehen also nirgends
+           wortwoertlich im Quelltext. (Eine Ausnahmeliste waere der falsche
+           Weg — sie macht den Waechter fuer echte Faelle blind.)
+        2. Gesucht wird nur im CODE: Kommentare und Docstrings werden vorher
+           geleert. Ein Text ueber eine Uhr ist keine Uhr.
+
+        Beides ist dieselbe Lehre wie QA-76 und QA-74 — ein Textsucher liest
+        den Text, den man ueber ihn schreibt.
+        """
+        import ast
+        import inspect
+        import tokenize
+        import io as _io
+
+        quelle = inspect.getsource(type(self))
+        zeilen = quelle.splitlines(keepends=True)
+        _doc = set()
+        try:
+            for knoten in ast.walk(ast.parse(quelle)):
+                koerper = getattr(knoten, "body", None)
+                if isinstance(koerper, list) and koerper:
+                    erst = koerper[0]
+                    if (isinstance(erst, ast.Expr)
+                            and isinstance(erst.value, ast.Constant)
+                            and isinstance(erst.value.value, str)):
+                        _doc.add((erst.value.lineno, erst.value.col_offset))
+        except (SyntaxError, IndentationError):
+            _doc = set()
+        try:
+            for m in tokenize.generate_tokens(_io.StringIO(quelle).readline):
+                if m.type == tokenize.COMMENT or (
+                        m.type == tokenize.STRING and m.start in _doc):
+                    for z in range(m.start[0], m.end[0] + 1):
+                        if z - 1 < len(zeilen):
+                            zeilen[z - 1] = " " * len(zeilen[z - 1].rstrip("\n")) + "\n"
+        except (tokenize.TokenError, IndentationError, SyntaxError):
+            pass
+        code = "".join(zeilen)
+
+        # Zusammengesetzt, damit dieser Test nicht sich selbst findet.
+        verboten = ("perf_" + "counter", "time" + ".time",
+                    "mono" + "tonic", "sle" + "ep")
+        for begriff in verboten:
+            with self.subTest(begriff=begriff):
+                self.assertNotIn(begriff, code)
+
+
 class BulkAssignmentPerfTest(unittest.TestCase):
     """Fund 1: Ganz-Dict-Zuweisung darf NICHT mehr O(n^2) sein (ein
     resync_all() pro Eintrag statt EINEM gebuendelten am Ende)."""
@@ -36,7 +165,34 @@ class BulkAssignmentPerfTest(unittest.TestCase):
     #: gemessen 5,1 bzw. 24,5 (siehe unten). Die Schwelle liegt bewusst
     #: dazwischen und nicht knapp an einem der beiden Werte.
     KLEIN, GROSS = 200, 1000
-    SCHWELLE = 12.0
+
+    #: ★★★ QA-71b: Die Zusicherung haengt NICHT mehr an dieser Zahl.
+    #:
+    #: QA-71 hatte die Wanduhr durch ein SKALIERUNGS-Verhaeltnis ersetzt — ein
+    #: echter Fortschritt, aber immer noch eine Messung. In der CI vom
+    #: 2026-09-06 wurde die Gegenprobe rot: sie fordert ein Verhaeltnis UEBER
+    #: 12,0 und kam auf **11,94**. Nichts war kaputt, der Laeufer war langsam.
+    #:
+    #: Nachgemessen unter kuenstlicher Last (6 Rechenprozesse parallel) zeigt
+    #: sich, warum kein Schwellenwert das retten kann — die beiden Faelle
+    #: konvergieren von BEIDEN Seiten:
+    #:
+    #:               ohne Last      unter Last
+    #:   gebuendelt      5,0            11,5      <- naehert sich der Schwelle
+    #:   ausgehebelt    24,5            18,8      <- entfernt sich von ihr
+    #:   Faktor          5,0             1,6
+    #:
+    #: Der gesunde Fall stand unter Last bei 11,5 — also selbst einen Hauch vor
+    #: Rot. Eine Zeitmessung mit zwei Groessen ist auf einem geteilten Laeufer
+    #: kein tauglicher Traeger fuer eine Zusicherung.
+    #:
+    #: ★ Die Eigenschaft laesst sich ZAEHLEN, und zwar exakt: gebuendelt loest
+    #: eine Ganz-Zuweisung **genau EIN** ``view._resync()`` aus, unabhaengig von
+    #: der Groesse; ausgehebelt sind es n+1. Gemessen 1 gegen 201 (n=200) und
+    #: 1 gegen 1001 (n=1000). Das traegt die Zusicherung jetzt
+    #: (``ResyncZaehlungTest``), und die Zeitmessung hier ist nur noch ein
+    #: grober Rauchmelder mit weitem Abstand zum Rauschen.
+    SCHWELLE = 18.0
 
     def setUp(self):
         _app()
@@ -115,6 +271,10 @@ class BulkAssignmentPerfTest(unittest.TestCase):
 
         Gemessen am 2026-09-03: Verhaeltnis 24,5 statt 5,1, und bei 1000
         Fixtures 133x mehr Zeit.
+
+        ★ QA-71b: Diese Gegenprobe bleibt, aber sie ist nicht mehr der Beweis —
+        den fuehrt ``ResyncZaehlungTest`` ohne Uhr. Hier steht nur noch, dass
+        die Zeitmessung im Prinzip einen Unterschied SIEHT.
         """
         registry = self.state._view_registry
 
