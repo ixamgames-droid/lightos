@@ -10,6 +10,28 @@ if TYPE_CHECKING:
     from src.core.database.models import PatchedFixture
 
 
+#: ENG-20b: einmal aufgeloest und dann gemerkt. Uebernommen aus der Fassung der
+#: zweiten Sitzung (B, PR #744) samt ihrer Begruendung.
+_UsesDmx = None
+
+
+def _fixture_uses_dmx():
+    """``app_state.fixture_uses_dmx``, EINMAL aufgeloest und dann gemerkt.
+
+    Spaet und nicht auf Modulebene, weil ``app_state`` viel mitzieht und
+    ``scene.py`` sonst am Import-Graphen haengt. Der erste Aufruf zahlt den
+    Nachlade-Posten (von B gemessen ~0,5 s in einem Prozess, der ``app_state``
+    noch nicht kennt); danach ist es ein Attributzugriff. In der App ist das
+    Modul laengst geladen, bevor eine Szene laeuft — die Kosten fallen nur in
+    Tests und kleinen Werkzeugen an, und dort einmal.
+    """
+    global _UsesDmx
+    if _UsesDmx is None:
+        from src.core.app_state import fixture_uses_dmx
+        _UsesDmx = fixture_uses_dmx
+    return _UsesDmx
+
+
 @dataclass
 class SceneValue:
     fixture_id: int
@@ -102,6 +124,45 @@ class Scene(Function):
         aus einem fremden Geraet lesen, den das Schreiben gar nicht mehr setzt.
         """
         kanal = int(getattr(sv, "channel", 0) or 0)
+
+        # ★★★ ENG-20b, die ZWEITE Haelfte — gefunden von der zweiten Sitzung
+        # (B, PR #744), von mir unabhaengig nachgemessen.
+        #
+        # Netzwerk-Laser haben `universe`/`address` nur als BEDEUTUNGSLOSE
+        # PLATZHALTER. `app_state.fixture_uses_dmx` sagt das seit LAS-04, und
+        # sein Kommentar verlangt woertlich: „JEDE Stelle, die
+        # `fx.address + ch.channel_number` rechnet, MUSS vorher hier fragen,
+        # sonst schreibt der Platzhalter in die Spans echter Geraete."
+        # `scene.py` fragte nicht.
+        #
+        # Gemessen: Laser mit protocol='etherdream' auf Platzhalter-Adresse 1,
+        # PAR auf Adresse 3. Eine Szene mit „Kanal 3" des Lasers schrieb
+        # {3: 200} — und 3 gehoert dem PAR.
+        #
+        # ⚠️ Die Kanalzahl-Pruefung unten faengt das NICHT: Kanal 3 ist bei 32
+        # Kanaelen voellig gueltig. Es sind zwei verschiedene Arten, wie eine
+        # gespeicherte Zahl veralten kann — und beide enden im Nachbargeraet.
+        #
+        # ★ Eine Regel, die nur im Docstring einer Funktion steht, ist nicht
+        # durchgesetzt, sondern eine Bitte. Diese hier stand seit LAS-04 da und
+        # wurde an genau dieser Stelle uebersehen.
+        try:
+            _per_dmx = _fixture_uses_dmx()(fixture)
+        except Exception:
+            _per_dmx = True          # im Zweifel schreiben, s. unten
+        if not _per_dmx:
+            schluessel = (int(getattr(sv, "fixture_id", -1)), kanal)
+            if schluessel not in self._verworfen_gemeldet:
+                self._verworfen_gemeldet.add(schluessel)
+                _name = getattr(fixture, "label", "") or f"Geraet {schluessel[0]}"
+                print(f"[scene] WARN: Szene '{self.name}' haelt Kanal {kanal} "
+                      f"fuer '{_name}' — das Geraet gibt nicht ueber DMX aus "
+                      f"(Netzwerk-Laser), seine Adresse ist ein Platzhalter. "
+                      f"Der Wert wird verworfen; sonst laege er auf Adresse "
+                      f"{int(getattr(fixture, 'address', 0) or 0) + kanal - 1} "
+                      f"und damit in einem echten Geraet (ENG-20).")
+            return None
+
         kanalzahl = int(getattr(fixture, "channel_count", 0) or 0)
         if kanalzahl > 0 and not (1 <= kanal <= kanalzahl):
             schluessel = (int(getattr(sv, "fixture_id", -1)), kanal)

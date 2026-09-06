@@ -7,6 +7,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-06 — Ein Netzwerk-Laser konnte in ein echtes Gerät schreiben
+
+#### Behoben
+
+- **Eine Szene, die Werte für einen Netzwerk-Laser enthielt, konnte damit ein
+  ganz anderes Gerät ansteuern.** Netzwerk-Laser gehen nicht über DMX; ihre
+  Adresse ist nur ein Platzhalter. Die Szene rechnete trotzdem damit — und
+  landete auf der Adresse eines echten Scheinwerfers.
+
+  Gemessen an einem Laser auf Platzhalter-Adresse 1 und einem PAR auf Adresse 3:
+  der gespeicherte „Kanal 3" des Lasers schrieb in den PAR.
+
+  Solche Werte werden jetzt verworfen, mit einer Meldung, die Gerät und Grund
+  nennt. Geräte, die wirklich über DMX ausgeben, sind unverändert.
+
 ### 2026-09-06 — Eine alte Szene konnte ins Nachbargerät schreiben
 
 #### Behoben
