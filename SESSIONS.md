@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| QA-78 | B | fix/qa78-adressregel-verifiziert | 2026-09-06T20:58Z | src/core/engine/scene.py |
+| QA-78 | B | fix/qa78-adressregel-sechs-stellen | 2026-09-06T21:26Z | src/core/engine/effect_func.py · src/core/engine/carousel.py · src/core/engine/sequence.py · src/core/engine/mapped_channel.py · src/core/engine/script_func.py · src/core/engine/efx.py |
 | QA-75 | A | fix/buendel-qa75-fm36-xplat32 | 2026-09-06T21:26Z | src/ui/views/fixture_group_view.py,src/ui/widgets/group_edit_dialog.py |
 | FM-36 | A | fix/buendel-qa75-fm36-xplat32 | 2026-09-06T21:26Z | src/ui/widgets/fixture_editor.py |
 | XPLAT-32 | A | fix/buendel-qa75-fm36-xplat32 | 2026-09-06T21:26Z | tests/conftest.py |
@@ -107,7 +107,6 @@
 
 ## Verlauf
 
-- 2026-09-06T15:09Z B claim QA-77
 - 2026-09-06T15:41Z B done QA-77
 - 2026-09-06T15:52Z A claim NET-12
 - 2026-09-06T16:14Z A claim ENG-21
@@ -137,3 +136,4 @@
 - 2026-09-06T21:26Z A claim QA-75
 - 2026-09-06T21:26Z A claim FM-36
 - 2026-09-06T21:26Z A claim XPLAT-32
+- 2026-09-06T21:26Z B aktualisiert QA-78: Branch fix/qa78-adressregel-verifiziert -> fix/qa78-adressregel-sechs-stellen; Dateien src/core/engine/scene.py -> src/core/engine/effect_func.py · src/core/engine/carousel.py · src/core/engine/sequence.py · src/core/engine/mapped_channel.py · src/core/engine/script_func.py · src/core/engine/efx.py
