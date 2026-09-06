@@ -198,6 +198,34 @@ class SacnSource:
             self._seq[universe] = (seq + 1) & 0xFF
             return seq
 
+    def uebernehmen(self, universe: int, token: int) -> None:
+        """NET-12: Besitz an einen Nachfolger uebergeben, OHNE zu senden.
+
+        ★★★ Der Besitz wechselt sonst erst in :meth:`next_seq`, also beim ERSTEN
+        Frame des Neuen. Genau dazwischen liegt aber das Problem: der Dialog
+        haengt den neuen Sender ein und schliesst den alten SOFORT danach — der
+        Neue hat noch nichts gesendet, ist also nicht Besitzer, und
+        :meth:`release` liefert dem Alten brav eine Sequenznummer fuer eine
+        Stream-Termination. Gemessen: 5 von 5 „Uebernehmen"-Klicks mit
+        UNVERAENDERTER Konfiguration schickten eine Termination fuer ein
+        weiterlaufendes Universum; Empfaenger duerfen daraufhin auf ihren
+        Fallback gehen, mitten in der Show.
+
+        ⚠️ **Zwei Aussagen sahen gleich aus und waren es nicht:** „steht in der
+        Output-Registry" (was ``_swap_device`` sicherstellt) und „ist im Source
+        Besitzer" (was erst das Senden tut). Der Kommentar an ``_swap_device``
+        behauptete die Uebergabe, die Uebergabe fand aber eine Ebene tiefer
+        nicht statt.
+
+        Die Sequenznummer wird BEWUSST nicht angefasst: sie gehoert zum
+        UNIVERSUM, nicht zum Sender (die CID ist prozessweit), und der
+        Nachfolger setzt die Reihe beim naechsten ``next_seq`` einfach fort. Ein
+        Vorruecken hier waere eine Luecke im Zaehler, die ein Empfaenger als
+        Sprung liest.
+        """
+        with self._lock:
+            self._owner[universe] = token
+
     def release(self, universe: int, token: int) -> int | None:
         """Gibt das Universum frei. Rueckgabe = Sequenznummer fuer die
         Stream-Termination, oder ``None``, wenn inzwischen ein anderer Sender

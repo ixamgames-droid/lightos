@@ -1118,7 +1118,16 @@ class OutputConfigDialog(QDialog):
             # MU-01: erst ALLE Alt-Adapter dieses Universums entfernen/schliessen, sonst
             # bleibt bei einem Cross-Typ-Wechsel der alte Adapter aktiv -> Doppel-Output/
             # Leak. Analog apply_output_config (OUT-05).
-            state.output_manager.remove_output(univ)
+            # ★★★ NET-12: `ausser="sacn"` — der laufende sACN-Sender bleibt
+            # stehen, damit `add_sacn` ihn ueber `_swap_device` MIT Uebergabe
+            # austauscht. Vorher wurde er hier per `pop` entfernt und
+            # geschlossen; ohne Nachfolger in der Registry greift die
+            # Uebergabe-Sperre nicht, und `close()` schickte eine
+            # E1.31-Stream-Termination fuer ein WEITERLAUFENDES Universum.
+            # Gemessen: 5 von 5 Uebernahmen mit unveraenderter Konfiguration.
+            # Der MU-01-Grund fuer diesen Aufruf bleibt erhalten — die FREMDEN
+            # Adaptertypen werden weiterhin entfernt.
+            state.output_manager.remove_output(univ, ausser="sacn")
             state.output_manager.add_sacn(univ, target_ip)
             self._sacn_active_univ = univ   # MU-02: fuer korrektes Abwaehlen merken
             gespeichert = _persist_output(univ, "sACN", target_ip or "")
