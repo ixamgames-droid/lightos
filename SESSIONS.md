@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| XPLAT-32 | A | fix/buendel-qa75-fm36-xplat32 | 2026-09-06T21:26Z | tests/conftest.py |
+| _(frei)_ |  |  |  |  |
 
 ## Blocker & Fallen
 
@@ -107,7 +107,6 @@
 
 ## Verlauf
 
-- 2026-09-06T16:25Z A done NET-12
 - 2026-09-06T16:36Z A claim ENG-23
 - 2026-09-06T16:40Z A done ENG-21
 - 2026-09-06T16:53Z B claim ENG-26
@@ -137,3 +136,4 @@
 - 2026-09-06T22:12Z B uebergeben QA-78
 - 2026-09-06T23:26Z A done QA-75
 - 2026-09-06T23:26Z A done FM-36
+- 2026-09-06T23:26Z A done XPLAT-32
