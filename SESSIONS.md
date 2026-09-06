@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| QA-78 | B | fix/qa78-adressregel-durchgesetzt | 2026-09-06T12:14Z | tests/test_qa78_adressregel.py |
+| _(frei)_ |  |  |  |  |
 
 ## Blocker & Fallen
 
@@ -93,7 +93,6 @@
 
 ## Verlauf
 
-- 2026-09-03T17:31Z B claim PROC-10
 - 2026-09-03T17:53Z A uebergeben FM-41
 - 2026-09-03T18:04Z B done PROC-10
 - 2026-09-03T18:04Z B claim QA-66
@@ -123,3 +122,4 @@
 - 2026-09-06T11:45Z A claim ENG-20b
 - 2026-09-06T11:50Z A done ENG-20b
 - 2026-09-06T12:14Z B claim QA-78
+- 2026-09-06T14:36Z B abgebrochen QA-78
