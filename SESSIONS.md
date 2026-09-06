@@ -11,6 +11,7 @@
 |---|---|---|---|---|
 | NET-13 | A | fix/buendel-net13-ui59-ui60 | 2026-09-06T19:11Z | src/ui/widgets/output_config.py |
 | UI-59 | A | fix/buendel-net13-ui59-ui60 | 2026-09-06T19:11Z | src/ui/views/effect_layer_editor.py |
+| UI-60 | A | fix/buendel-net13-ui59-ui60 | 2026-09-06T19:11Z | src/ui/views/effect_layer_editor.py |
 
 ## Blocker & Fallen
 
@@ -102,7 +103,6 @@
 
 ## Verlauf
 
-- 2026-09-06T09:09Z B abgebrochen FM-45
 - 2026-09-06T11:15Z A done FM-41
 - 2026-09-06T11:32Z A claim ENG-19
 - 2026-09-06T11:45Z A done ENG-19
@@ -132,3 +132,4 @@
 - 2026-09-06T18:26Z A done ENG-24
 - 2026-09-06T19:11Z A claim NET-13
 - 2026-09-06T19:11Z A claim UI-59
+- 2026-09-06T19:11Z A claim UI-60
