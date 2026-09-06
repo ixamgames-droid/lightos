@@ -2079,15 +2079,12 @@ class RgbMatrixInstance(Function):
             cur = self.params.get("movement", "normal")
             self.params["movement"] = "normal" if cur == "bounce" else "bounce"
             return True
-        if a in ("freeze",):
-            self._frozen = True
-            return True
-        if a in ("unfreeze",):
-            self._frozen = False
-            return True
-        if a in ("toggle_freeze", "toggleFreeze"):
-            self._frozen = not self._frozen
-            return True
+        # ENG-23: freeze/unfreeze/toggle_freeze standen hier als drei nackte
+        # Zuweisungen auf ``_frozen``. Sie sind in die Basisklasse gewandert —
+        # nicht aus Ordnungsliebe, sondern weil sie dort etwas KOENNEN muessen,
+        # das eine Zuweisung nicht kann: den Anker beim Auftauen nachziehen,
+        # damit ein bus-synchroner Effekt nicht um die eingefrorene Zeit
+        # springt (gemessen +4,0 Beats nach 2 s Freeze bei 120 BPM).
         if a in ("clear_live_override", "clearLiveOverride"):
             self.clear_live_override()
             return True
@@ -2101,7 +2098,10 @@ class RgbMatrixInstance(Function):
                 return True
             except Exception:
                 return False
-        return False
+        # ENG-23: die drei Freeze-Aktionen beantwortet die Basisklasse fuer ALLE
+        # Funktionstypen (frueher kannte sie nur die Matrix, und derselbe
+        # VC-Knopf tat auf einem Chaser stumm gar nichts).
+        return super().do_action(action, **kw)
 
     def list_actions(self) -> list[tuple[str, str]]:
         """Aktuell sinnvolle Matrix-Live-Aktionen für VC/MIDI."""
@@ -2131,8 +2131,8 @@ class RgbMatrixInstance(Function):
         )
         if movement is not None and "bounce" in tuple(movement.options or ()):
             actions.append(("toggle_bounce", "Bounce"))
+        actions.extend(self.FREEZE_ACTIONS)
         actions.extend([
-            ("toggle_freeze",       "Freeze"),
             ("clear_live_override", "Reset Live"),
             ("commit_live",         "Commit"),
             ("tap",                 "Tap"),

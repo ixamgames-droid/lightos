@@ -119,6 +119,11 @@ class Sequence(Function):
             bus = None
         if bus is None:
             return None
+        # ENG-23: eingefroren -> null Schritte. ``_synced_target_prev`` bleibt
+        # stehen, weil ``_auftauen`` den Anker zurueckzieht; sonst holte die
+        # Sequenz die eingefrorene Zeit in einem Frame nach.
+        if self._frozen:
+            return 0
         bpm, _bc, _bp, pos = bus.snapshot()
         if bpm <= 0:
             return None  # Bus aus -> Zeit-Fallback
@@ -189,7 +194,8 @@ class Sequence(Function):
         # ohne _step_idx zu begrenzen) -> vor jedem Zugriff clampen.
         self._clamp_step_idx()
 
-        effective_dt = dt * self.speed
+        # ENG-23: eingefroren heisst „keine Zeit vergeht" (Zeit-Pfad).
+        effective_dt = 0.0 if self._frozen else dt * self.speed
         step = self.steps[self._step_idx]
         total = step.total_duration()
         if total <= 0:
@@ -289,6 +295,16 @@ class Sequence(Function):
             return True
 
         return True
+
+    # ── Aktionen ──────────────────────────────────────────────────────────────
+
+    def list_actions(self) -> list[tuple[str, str]]:
+        """★ Die Sequenz hatte bisher GAR KEINE Aktionsliste — ``effect_live``
+        liefert dann eine leere Liste, und die VC bot trotzdem ihre kuratierte
+        Auswahl an (``EFFECT_ACTION_LABELS``), darunter „Einfrieren an/aus".
+        Gebunden hat der Knopf nichts getan. Jetzt gibt es hier eine Liste, und
+        was darin steht, wirkt auch."""
+        return list(self.FREEZE_ACTIONS)
 
     # ── Serialisation ─────────────────────────────────────────────────────────
 

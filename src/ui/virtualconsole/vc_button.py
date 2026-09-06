@@ -291,6 +291,14 @@ EFFECT_ACTION_LABELS: list[tuple[str, str]] = [
     ("toggle_color",        "Farbe an/aus"),
     ("reverse_direction",   "Richtung umkehren"),
     ("toggle_bounce",       "Bounce an/aus"),
+    # ENG-23: ★ ``freeze``/``unfreeze`` sind ABSOLUT und standen bisher in
+    # KEINER UI-Liste — sie existierten im Code (``rgb_matrix.do_action``) und
+    # waren nur ueber das Freitextfeld des Mehrfach-Aktions-Dialogs erreichbar.
+    # Wer den Toggle-Knopf nicht mehr findet (anderes VC-Blatt, MIDI-Pad
+    # umbelegt), sass damit in einem Zustand fest, aus dem nur genau ein Knopf
+    # herausfuehrte. Ein absoluter Ausweg gehoert sichtbar dazu.
+    ("freeze",              "Einfrieren"),
+    ("unfreeze",            "Weiterlaufen"),
     ("toggle_freeze",       "Einfrieren an/aus"),
     ("reseed",              "Zufall neu würfeln (Random/EFX)"),
     ("clear_live_override", "Live-Overrides löschen"),
@@ -1638,6 +1646,50 @@ class VCButton(VCWidget):
 
     # ── Paint ─────────────────────────────────────────────────────────────────
 
+    def _aktionszustand(self) -> bool:
+        """VCI-01: „ist der Zustand, den dieser Knopf schaltet, gerade AN?"
+
+        ★ Als eigene Methode, nicht als Block in ``paintEvent`` — sonst ist die
+        Aussage nur ueber das Zeichnen pruefbar, und ein `repaint()` auf einem
+        elternlosen Widget reisst headless den Renderer mit (bei ENG-23 genau so
+        passiert). Eine Anzeige-Regel gehoert dorthin, wo man sie befragen kann,
+        ohne sie zu malen.
+        """
+        try:
+            if self.action == ButtonAction.FREEZE:
+                # EINE Quelle: der globale Freeze-Zustand (er friert den Tempo-Bus
+                # mit, die Anzeige darf also nicht mehr am Bus haengen).
+                from src.core.app_state import get_state as _gs
+                return bool(_gs().is_frozen())
+            elif (self.action == ButtonAction.EFFECT_ACTION
+                  and self.effect_action_key in ("freeze", "unfreeze",
+                                                 "toggle_freeze", "toggleFreeze")):
+                # ENG-23: dasselbe Recht wie der globale Freeze (VCI-01). Ein
+                # eingefrorener Effekt sieht sonst aus wie ein langsamer — und
+                # der Bediener sucht den Fehler im Rig. Gezeigt wird der Zustand
+                # des GEBUNDENEN Effekts; bei mehreren gilt „einer reicht",
+                # damit ein noch stehender Effekt nicht unsichtbar bleibt.
+                from src.core.engine.function_manager import get_function_manager
+                _fm = get_function_manager()
+                return any(
+                    bool(getattr(_fm.get(_fid), "_frozen", False))
+                    for _fid in self._all_function_ids())
+            elif self.action == ButtonAction.AUTO_SYNC:
+                from src.core.engine.tempo_bus import get_tempo_bus_manager
+                return bool(get_tempo_bus_manager().auto_sync)
+            elif self.action == ButtonAction.BPM_MODE_TOGGLE:
+                from src.core.engine.bpm_manager import get_bpm_manager, BpmMode
+                return bool(get_bpm_manager().mode == BpmMode.MANUAL)
+            elif self.action == ButtonAction.LASER_ARM:
+                # LAS-10: scharfer Laser bekommt denselben prominenten Aktiv-
+                # Zustand wie Freeze/Auto-Sync (Safety-Sichtbarkeit).
+                from src.core.app_state import get_state
+                lo = getattr(get_state(), "_laser_output", None)
+                return bool(lo is not None and lo.armed)
+        except Exception:
+            return False
+        return False
+
     def paintEvent(self, event):
         super().paintEvent(event)
         p = QPainter(self)
@@ -1650,29 +1702,7 @@ class VCButton(VCWidget):
                 audio_on = get_bpm_manager().audio_active
             except Exception:
                 audio_on = False
-        # VCI-01: Aktiv-Zustand der Tempo-Toggle-Pads sichtbar machen (analog AUDIO_BPM),
-        # damit Freeze/Auto-Sync/BPM-Modus auf einen Blick erkennbar sind.
-        action_on = False
-        try:
-            if self.action == ButtonAction.FREEZE:
-                # EINE Quelle: der globale Freeze-Zustand (er friert den Tempo-Bus
-                # mit, die Anzeige darf also nicht mehr am Bus haengen).
-                from src.core.app_state import get_state as _gs
-                action_on = _gs().is_frozen()
-            elif self.action == ButtonAction.AUTO_SYNC:
-                from src.core.engine.tempo_bus import get_tempo_bus_manager
-                action_on = bool(get_tempo_bus_manager().auto_sync)
-            elif self.action == ButtonAction.BPM_MODE_TOGGLE:
-                from src.core.engine.bpm_manager import get_bpm_manager, BpmMode
-                action_on = (get_bpm_manager().mode == BpmMode.MANUAL)
-            elif self.action == ButtonAction.LASER_ARM:
-                # LAS-10: scharfer Laser bekommt denselben prominenten Aktiv-
-                # Zustand wie Freeze/Auto-Sync (Safety-Sichtbarkeit).
-                from src.core.app_state import get_state
-                lo = getattr(get_state(), "_laser_output", None)
-                action_on = bool(lo is not None and lo.armed)
-        except Exception:
-            action_on = False
+        action_on = self._aktionszustand()
         # Laufzustand der gebundenen Funktion: ein Toggle-Pad bleibt „an", solange
         # sein Effekt laeuft — nicht nur waehrend des Drucks. Sonst sah es aus, als
         # liefe nichts mehr, obwohl die Geraete sich noch bewegten (Anzeige-Desync).
