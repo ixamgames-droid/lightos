@@ -9,7 +9,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| UI-60 | A | fix/buendel-net13-ui59-ui60 | 2026-09-06T19:11Z | src/ui/views/effect_layer_editor.py |
 | QA-78 | B | fix/qa78-adressregel-verifiziert | 2026-09-06T20:58Z | src/core/engine/scene.py |
 
 ## Blocker & Fallen
@@ -103,7 +102,6 @@
 
 ## Verlauf
 
-- 2026-09-06T11:45Z A claim ENG-20b
 - 2026-09-06T11:50Z A done ENG-20b
 - 2026-09-06T12:14Z B claim QA-78
 - 2026-09-06T14:36Z B abgebrochen QA-78
@@ -133,3 +131,4 @@
 - 2026-09-06T20:58Z B claim QA-78
 - 2026-09-06T21:09Z A done NET-13
 - 2026-09-06T21:09Z A done UI-59
+- 2026-09-06T21:09Z A done UI-60
