@@ -12,6 +12,7 @@
 | STAB-24 | A | fix/buendel-stab24-stab25-fm38 | 2026-09-07T16:07Z | src/core/show/show_file.py |
 | STAB-25 | A | fix/buendel-stab24-stab25-fm38 | 2026-09-07T16:07Z | src/core/show/show_file.py |
 | FM-38 | A | fix/buendel-stab24-stab25-fm38 | 2026-09-07T16:07Z | src/core/app_state.py |
+| XPLAT-35 | B | fix/gate-diagnose-kanarie | 2026-09-07T19:11Z | tests/test_zeitbomben_gate.py |
 
 ## Blocker & Fallen
 
@@ -114,7 +115,6 @@
 
 ## Verlauf
 
-- 2026-09-06T18:22Z B done FM-47
 - 2026-09-06T18:26Z A done ENG-24
 - 2026-09-06T19:11Z A claim NET-13
 - 2026-09-06T19:11Z A claim UI-59
@@ -144,3 +144,4 @@
 - 2026-09-07T16:07Z A claim STAB-25
 - 2026-09-07T16:07Z A claim FM-38
 - 2026-09-07T17:08Z B done XPLAT-33
+- 2026-09-07T19:11Z B claim XPLAT-35
