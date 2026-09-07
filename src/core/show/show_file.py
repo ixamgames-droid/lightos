@@ -394,6 +394,28 @@ def _deferred_addr_release(state):
 
 
 def _replace_patch_from_data(state, patch_data: list[dict]):
+    # ★ STAB-25: der Block MUSS eine Liste sein. War er es nicht (Objekt/Text/
+    # null aus einer beschaedigten oder halb-fremden show.json), fiel er im
+    # Aufrufer durch ein `if isinstance(...)` OHNE `else` — kein Ladeproblem,
+    # kein Warndialog, die Geraete waren einfach weg. GEMESSEN am 07.09.2026:
+    # vier Geraete in der Datei, NULL in der DB, `letzte_ladeprobleme()` LEER,
+    # Rueckgabe „Show 'X' geladen." Erst das naechste Speichern schreibt den
+    # Verlust fest — die Meldung muss also VORHER kommen, und zwar ueber den
+    # Weg, den das Haus dafuer hat (`_lenient` -> `letzte_ladeprobleme()` ->
+    # Warndialog), nicht ueber einen zweiten (Hausregel 6).
+    # Die Pruefung sitzt HIER und nicht im Aufrufer: es ist DIE eine Stelle, die
+    # den Patch aus Show-Daten ersetzt (Hausregel 6/8 — kein zweiter Weg vorbei).
+    # Frueh raus, ohne den bestehenden Patch zu leeren: `load_show` hat per
+    # reset-first ohnehin schon geleert, jeder andere Aufrufer behaelt lieber den
+    # alten Patch als einen aus Muell gebauten.
+    if not isinstance(patch_data, list):
+        # Text mit Umlauten: die Meldung landet WOERTLICH als Aufzaehlungspunkt
+        # im Warndialog (`main_window._open_show_path`), ist also Nutzertext.
+        _lenient("Patch-Block übersprungen",
+                 TypeError(f"'patch' ist {type(patch_data).__name__}, "
+                           f"erwartet Liste"))
+        return
+
     # BUG-01: Patch verlustfrei ersetzen und dabei ALLE State-Emits unterdrücken.
     # Jedes clear_patch()/clear_programmer()/add_fixture() würde sonst synchron
     # ein Event feuern → die Views (programmer_view._refresh_effects_list)
@@ -422,13 +444,25 @@ def _replace_patch_from_data(state, patch_data: list[dict]):
         # Volle PatchedFixture-Liste bauen, doppelte FIDs auffangen — REASSIGN auf
         # die naechste freie fid (nie droppen), sonst Intra-Load-Datenverlust bei
         # einer Show-Datei mit fid-Kollision.
+        # STAB-25: PRO EINTRAG gekapselt. Vorher lief die ganze Schleife im
+        # grossen `try` des Aufrufers: EIN unlesbarer Eintrag warf, `replace(pfs)`
+        # wurde nie erreicht und der Patch blieb LEER — gemessen 4 Geraete in der
+        # Datei -> 0 in der DB. Und ein Eintrag, der kein Objekt ist, verschwand
+        # per stummem `continue` voellig unbemerkt. Jetzt kostet ein kaputter
+        # Eintrag nur sich selbst und wird namentlich gemeldet.
         next_fid = 1
         used_fids: set = set()
         pfs: list = []
-        for entry in patch_data:
-            if not isinstance(entry, dict):
+        for nr, entry in enumerate(patch_data, start=1):
+            try:
+                if not isinstance(entry, dict):
+                    raise TypeError(
+                        f"Eintrag ist kein Objekt, sondern {type(entry).__name__}")
+                pf = _patched_fixture_from_data(entry, next_fid)
+            except Exception as e:
+                _lenient(f"Gerät {nr} {_eintrags_hinweis(entry, 'label')}"
+                         f"übersprungen", e)
                 continue
-            pf = _patched_fixture_from_data(entry, next_fid)
             if pf.fid in used_fids:
                 pf.fid = max(used_fids) + 1
             used_fids.add(pf.fid)
@@ -610,22 +644,94 @@ def _collect_fixture_groups(state) -> list:
     return out
 
 
+def _eintrags_hinweis(eintrag, feld: str) -> str:
+    """Namenszusatz fuer die Meldung ueber einen uebersprungenen Eintrag.
+
+    Liefert ``"'Truss-Bars' "`` bzw. ``""``, wenn der Eintrag keinen lesbaren
+    Namen hat. Der Nutzer soll in der Warnung WIEDERERKENNEN, was fehlt — eine
+    blosse Positionsnummer sagt ihm nichts ueber sein Rig."""
+    if isinstance(eintrag, dict):
+        wert = eintrag.get(feld)
+        if isinstance(wert, str) and wert:
+            return f"'{wert}' "
+    return ""
+
+
+def _muss_text(wert, feld: str) -> str:
+    """Textfeld eines Show-Eintrags STRENG pruefen (STAB-24).
+
+    Kein Text -> wirft, und kostet damit nur SEINEN Eintrag. Tolerantes
+    Durchreichen waere der zweite Weg um die Regel herum (Hausregel 8): ein
+    nicht bindbarer Wert (Liste/dict/None als ``name``) faellt sonst erst beim
+    COMMIT auf — also DANN, wenn er alle uebrigen Gruppen mitreisst."""
+    if not isinstance(wert, str):
+        raise TypeError(f"'{feld}' ist kein Text, sondern {type(wert).__name__}")
+    return wert
+
+
+def _fixture_group_aus_daten(g):
+    """EINEN Gruppen-Eintrag der .lshow in ein ``FixtureGroup``-Objekt uebersetzen.
+
+    Wirft bei unlesbarem Eintrag — der Aufrufer ueberspringt und meldet dann
+    GENAU diesen einen (STAB-24). Die Defaults sind unveraendert die von frueher,
+    damit Alt-Shows ohne die Felder gleich laden."""
+    from src.core.database.models import FixtureGroup
+    if not isinstance(g, dict):
+        raise TypeError(f"Eintrag ist kein Objekt, sondern {type(g).__name__}")
+    return FixtureGroup(
+        name=_muss_text(g.get("name", "Gruppe"), "name"),
+        cols=int(g.get("cols", 8)), rows=int(g.get("rows", 8)),
+        positions_json=_muss_text(g.get("positions_json", "{}") or "{}",
+                                  "positions_json"),
+        folder=_muss_text(g.get("folder", "") or "", "folder"),
+    )
+
+
 def _restore_fixture_groups(state, groups: list) -> None:
-    """Spatial-Gruppen beim Laden in die Show-DB zurueckschreiben."""
+    """Spatial-Gruppen beim Laden in die Show-DB zurueckschreiben.
+
+    ★ STAB-24: EIN unlesbarer Eintrag darf nicht ALLE Gruppen kosten. Vorher
+    lagen ``delete(FixtureGroup)``, das Neuanlegen und der ``commit`` in EINEM
+    ``try``: ein ``cols`` als Text riss den Block ab, die Transaktion rollte
+    zurueck — uebrig blieb die vom Reset geleerte Tabelle. GEMESSEN am
+    07.09.2026 am echten Ladeweg: vier Gruppen in der Datei, davon EINE
+    unlesbar -> NULL Gruppen in der DB, gemeldet nur als ein nichtssagendes
+    „restore groups error". Der Verlust wird beim naechsten SPEICHERN
+    endgueltig, deshalb muss die Meldung VORHER da sein.
+
+    Darum ZWEI Phasen: erst wird PRO EINTRAG uebersetzt (ein kaputter kostet nur
+    sich selbst und wird namentlich ueber ``_lenient`` ->
+    ``letzte_ladeprobleme()`` gemeldet — derselbe Weg, den der Warndialog in
+    ``main_window._open_show_path`` schon liest, kein zweiter Kanal), danach
+    schreibt EINE Transaktion die lesbaren weg. Das grosse ``try`` ist damit nur
+    noch fuer den DB-Zugriff selbst zustaendig (Hausregel 7), nicht mehr fuer die
+    Uebersetzung der Eintraege."""
+    if groups is None:
+        groups = []
+    if not isinstance(groups, list):
+        # Der Block ist DA, aber unlesbar (z. B. Objekt statt Liste). Frueher
+        # lief die Schleife dann ueber die dict-SCHLUESSEL, verwarf jeden per
+        # ``continue`` — und die Gruppen waren still weg.
+        _lenient("Fixture-Gruppen-Block übersprungen",
+                 TypeError(f"'fixture_groups' ist {type(groups).__name__}, "
+                           f"erwartet Liste"))
+        groups = []
+
+    gebaut: list = []
+    for nr, g in enumerate(groups, start=1):
+        try:
+            gebaut.append(_fixture_group_aus_daten(g))
+        except Exception as e:
+            _lenient(f"Fixture-Gruppe {nr} {_eintrags_hinweis(g, 'name')}"
+                     f"übersprungen", e)
+
     try:
         from sqlalchemy import delete
         from src.core.database.models import FixtureGroup
         with state._session() as s:
             s.execute(delete(FixtureGroup))
-            for g in groups or []:
-                if not isinstance(g, dict):
-                    continue
-                s.add(FixtureGroup(
-                    name=g.get("name", "Gruppe"),
-                    cols=int(g.get("cols", 8)), rows=int(g.get("rows", 8)),
-                    positions_json=g.get("positions_json", "{}") or "{}",
-                    folder=g.get("folder", "") or "",
-                ))
+            for fg in gebaut:
+                s.add(fg)
             s.commit()
     except Exception as e:
         # STAB-23: ebenfalls im LADE-Pfad (`load_show` -> `_restore_fixture_groups`)
@@ -1302,15 +1408,21 @@ def load_show(path: str | os.PathLike):
             state._suppress_emits = _prev_suppress
 
         # STAB-19b (C-Haertung): der Patch-Replace ist eine der wenigen UNGEFANGENEN
-        # Zeilen (die pfs-Bauschleife in _replace_patch_from_data ist nicht pro-Eintrag
-        # gekapselt) — kapseln, damit ein Wurf hier den Show-Load nicht bis in den
-        # Qt-Slot durchschlaegt (reset-first hat den Rest bereits geleert).
+        # Zeilen — kapseln, damit ein Wurf hier den Show-Load nicht bis in den
+        # Qt-Slot durchschlaegt (reset-first hat den Rest bereits geleert). Die
+        # pfs-Bauschleife ist seit STAB-25 PRO EINTRAG gekapselt; dieses try
+        # deckt nur noch, was danach kommt (der atomare replace_patch).
+        # STAB-25: KEIN `if isinstance(..., list)` mehr um den Aufruf. Genau
+        # dieses stumme Gate liess einen unlesbaren `patch`-Block spurlos
+        # verschwinden. Die Formpruefung sitzt jetzt IN
+        # `_replace_patch_from_data` und meldet (Hausregel 6). Fehlt der Block
+        # ganz (Alt-/Teil-Show), liefert `.get` wie bisher `[]` — kein Problem,
+        # keine Warnung.
         patch_entries = data.get("patch", [])
-        if isinstance(patch_entries, list):
-            try:
-                _replace_patch_from_data(state, patch_entries)
-            except Exception as e:
-                _lenient("load patch error", e)
+        try:
+            _replace_patch_from_data(state, patch_entries)
+        except Exception as e:
+            _lenient("load patch error", e)
 
     # VCB-05: Gruppen-/Fixture-Dimmer der vorigen Show verwerfen (sonst Ghost-Dimmer).
     state.fixture_dimmers = {}
