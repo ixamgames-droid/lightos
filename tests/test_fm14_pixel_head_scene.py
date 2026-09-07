@@ -206,27 +206,50 @@ true
 
 class PixelHeadSceneTest(unittest.TestCase):
 
-    def setUp(self):
-        self.assertTrue(os.path.isfile(_HTML_PATH), f"fehlt: {_HTML_PATH}")
-        self._view = QWebEngineView()
+    # XPLAT-33: Die Seite wird EINMAL fuer die ganze Klasse geladen, nicht je
+    # Test. Gemessen (Sitzung B, 2026-09-07): Vollaufbau 7,1 s, reiner
+    # Fixture-Neubau 0,31 s — bei 25 Tests der Unterschied zwischen ~280 s
+    # (und damit dem 300-s-Zeitlimit) und einer halben Minute. Erlaubt ist das,
+    # weil ALLE Tests dieselbe Liste aus ``_payload()`` schicken und
+    # ``addFixture`` eine vorhandene fid vollstaendig ersetzt: der Neubau setzt
+    # jedes Geraet zurueck, auch die DMX-Werte des Vortests. Nachgemessen:
+    # die Mesh-Zahlen bleiben ueber wiederholte Neubauten konstant (32/13),
+    # es bleibt also keine alte Geometrie liegen.
+    _view = None
+    _bridge = None
+    _channel = None
+    _geladen = None
+    _seite_steht = False
+
+    @classmethod
+    def _fenster_bauen(cls):
+        cls._view = QWebEngineView()
         try:
-            prof = self._view.page().profile()
+            prof = cls._view.page().profile()
             prof.setHttpCacheType(QWebEngineProfile.HttpCacheType.NoCache)
         except Exception:
             pass
-        s = self._view.settings()
+        s = cls._view.settings()
         s.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls, True)
         s.setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled, True)
-        self._bridge = _MockBridge()
-        self._channel = QWebChannel(self._view)
-        self._channel.registerObject("bridge", self._bridge)
-        self._view.page().setWebChannel(self._channel)
-        self._geladen = []
-        self._view.loadFinished.connect(self._geladen.append)
+        cls._bridge = _MockBridge()
+        cls._channel = QWebChannel(cls._view)
+        cls._channel.registerObject("bridge", cls._bridge)
+        cls._view.page().setWebChannel(cls._channel)
+        cls._geladen = []
+        cls._view.loadFinished.connect(cls._geladen.append)
 
-    def tearDown(self):
-        destroy_webengine_view(self._view, _pump)
-        self._view = None
+    def setUp(self):
+        self.assertTrue(os.path.isfile(_HTML_PATH), f"fehlt: {_HTML_PATH}")
+        if type(self)._view is None:
+            type(self)._fenster_bauen()
+
+    @classmethod
+    def tearDownClass(cls):
+        if cls._view is not None:
+            destroy_webengine_view(cls._view, _pump)
+        cls._view = None
+        cls._seite_steht = False
 
     def _eval(self, js):
         box = []
@@ -244,32 +267,50 @@ class PixelHeadSceneTest(unittest.TestCase):
         return float(wert)
 
     def _aufbauen(self):
-        url = QUrl.fromLocalFile(_HTML_PATH)
-        url.setQuery(f"v={int(time.time() * 1000)}")
-        self._view.load(url)
-        ende = time.monotonic() + _LOAD_TIMEOUT_S
-        while not self._geladen and time.monotonic() < ende:
-            _app.processEvents()
-            time.sleep(_POLL_INTERVAL_S)
-        self.assertTrue(self._geladen and self._geladen[-1], "Page nicht geladen")
-        ende = time.monotonic() + _POLL_TIMEOUT_S
-        bereit = False
-        while time.monotonic() < ende:
-            if self._eval("!!window.__lightosAppReady"):
-                bereit = True
-                break
-            time.sleep(_POLL_INTERVAL_S)
-        self.assertTrue(bereit, "Szene wurde nicht bereit")
+        cls = type(self)
+        if not cls._seite_steht:
+            url = QUrl.fromLocalFile(_HTML_PATH)
+            url.setQuery(f"v={int(time.time() * 1000)}")
+            cls._view.load(url)
+            ende = time.monotonic() + _LOAD_TIMEOUT_S
+            while not cls._geladen and time.monotonic() < ende:
+                _app.processEvents()
+                time.sleep(_POLL_INTERVAL_S)
+            self.assertTrue(cls._geladen and cls._geladen[-1],
+                            "Page nicht geladen")
+            ende = time.monotonic() + _POLL_TIMEOUT_S
+            bereit = False
+            while time.monotonic() < ende:
+                if self._eval("!!window.__lightosAppReady"):
+                    bereit = True
+                    break
+                time.sleep(_POLL_INTERVAL_S)
+            self.assertTrue(bereit, "Szene wurde nicht bereit")
+            cls._seite_steht = True
+
+        # Steht die Szene schon, dann ist die alte Bedingung ("ist ein Objekt")
+        # SOFORT wahr — sie wuerde den Zustand des VORTESTS bestaetigen, statt
+        # auf diesen Neubau zu warten. Also eine Marke auf das vorhandene
+        # Objekt setzen: ``addFixture`` ersetzt es, die Marke ist danach weg.
+        # Erst das belegt, dass DIESER Emit angekommen ist.
+        steht = self._eval(f"typeof window.__lightos.fixtures['{_GROSS}'] "
+                           f"=== 'object'")
+        if steht:
+            self._eval(f"window.__lightos.fixtures['{_GROSS}'].__neubau = 1; "
+                       f"true")
+            fertig = f"!window.__lightos.fixtures['{_GROSS}'].__neubau"
+        else:
+            # Auf das ZULETZT gelistete Geraet warten — sonst laeuft eine
+            # Messung los, waehrend die Szene noch baut.
+            fertig = (f"typeof window.__lightos.fixtures['{_GROSS}'] "
+                      f"=== 'object'")
 
         nutzlast = _payload()
         ende = time.monotonic() + _POLL_TIMEOUT_S
         da = False
         while time.monotonic() < ende:
-            self._bridge.allFixtures.emit(nutzlast)
-            # Auf das ZULETZT gelistete Geraet warten — sonst laeuft eine
-            # Messung los, waehrend die Szene noch baut.
-            if self._eval(f"typeof window.__lightos.fixtures['{_GROSS}'] "
-                          f"=== 'object'"):
+            cls._bridge.allFixtures.emit(nutzlast)
+            if self._eval(fertig):
                 da = True
                 break
             time.sleep(_POLL_INTERVAL_S)
