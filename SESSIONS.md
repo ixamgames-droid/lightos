@@ -9,7 +9,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| FM-37 | A | fix/buendel-ui53-fm35-fm37 | 2026-09-07T14:00Z | src/core/app_state.py |
 | XPLAT-33 | B | fix/xplat33-pixel-head-scene-zeit | 2026-09-07T15:54Z | tests/test_fm14_pixel_head_scene.py |
 
 ## Blocker & Fallen
@@ -112,7 +111,6 @@
 
 ## Verlauf
 
-- 2026-09-06T17:28Z A claim ENG-22
 - 2026-09-06T17:49Z A done ENG-22
 - 2026-09-06T17:51Z A claim ENG-24
 - 2026-09-06T17:51Z B claim FM-47
@@ -142,3 +140,4 @@
 - 2026-09-07T15:54Z B claim XPLAT-33
 - 2026-09-07T16:06Z A done UI-53
 - 2026-09-07T16:06Z A done FM-35
+- 2026-09-07T16:06Z A done FM-37
