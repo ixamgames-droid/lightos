@@ -11,6 +11,7 @@
 |---|---|---|---|---|
 | XPLAT-33 | B | fix/xplat33-pixel-head-scene-zeit | 2026-09-07T15:54Z | tests/test_fm14_pixel_head_scene.py |
 | STAB-24 | A | fix/buendel-stab24-stab25-fm38 | 2026-09-07T16:07Z | src/core/show/show_file.py |
+| STAB-25 | A | fix/buendel-stab24-stab25-fm38 | 2026-09-07T16:07Z | src/core/show/show_file.py |
 
 ## Blocker & Fallen
 
@@ -112,7 +113,6 @@
 
 ## Verlauf
 
-- 2026-09-06T17:51Z A claim ENG-24
 - 2026-09-06T17:51Z B claim FM-47
 - 2026-09-06T17:52Z B aktualisiert FM-47: Dateien src/core/engine/rgb_matrix.py -> src/core/matrix_pattern.py · src/ui/views/rgb_matrix_view.py
 - 2026-09-06T18:22Z B done FM-47
@@ -142,3 +142,4 @@
 - 2026-09-07T16:06Z A done FM-35
 - 2026-09-07T16:06Z A done FM-37
 - 2026-09-07T16:07Z A claim STAB-24
+- 2026-09-07T16:07Z A claim STAB-25
