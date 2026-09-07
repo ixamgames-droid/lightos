@@ -26,6 +26,8 @@ from src.core.app_state import (
     color_head_count, pan_tilt_head_count, attr_head_count_for_channels,
     attr_has_head_axis, channel_occurrence_keys, programmer_key_for_head)
 from src.core.database.models import PatchedFixture, FixtureChannel
+from src.core.fixture_filter import (hat_kanal, Nutzlast, fixtures_fuer_nutzlast,
+                                     attr_head_count, range_signature)
 from src.core.group_cells import parse_group_cell
 from src.core.head_mode import effective_color_head_mode, normalize_head_mode
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
@@ -2011,6 +2013,16 @@ class ProgrammerView(QWidget):
         # kein Regler (er koennte ohnehin nichts ausgeben).
         return [(None, hat_attr)] if hat_attr else []
 
+    def _kanaele(self, fixture):
+        """Kanal-Zugriff fuer die Geraete-Regeln — ueber das MODUL-Global.
+
+        Absicht: ``get_channels_for_patched`` wird hier zur LAUFZEIT aus den
+        Globals dieses Moduls geholt. So sieht der ausgelagerte Einstieg
+        (:mod:`src.core.fixture_filter`) dieselbe Kanalquelle wie die View,
+        auch wenn ein Test sie an diesem Modul ersetzt
+        (``test_programmer_codex_audit``)."""
+        return get_channels_for_patched(fixture)
+
     def _attr_head_count(self, fixture, attr: str) -> int:
         """Kopfzahl dieses Geraets fuer dieses Attribut — ``0`` = hat es nicht.
 
@@ -2018,43 +2030,35 @@ class ProgrammerView(QWidget):
         bekommt: ``_slider_head_buckets`` fragte sie schon, die Schnellwahl und
         die Farb-Synchronregler taten es nicht (Gegenpruefung zu #663). Der
         ``except``-Rueckfall auf ``1`` ist Absicht: „nicht messbar" darf ein
-        Geraet nicht aus dem Bestandspfad werfen."""
-        try:
-            return int(attr_head_count_for_channels(
-                fixture, get_channels_for_patched(fixture), attr))
-        except Exception:
-            return 1
+        Geraet nicht aus dem Bestandspfad werfen.
 
-    def _fixtures_with_attr(self, fixtures, attr: str) -> list:
-        """Nur die Geraete, die diesen Kanal WIRKLICH haben (FM-27).
+        UI-53: die Rechnung selbst steht in
+        :func:`src.core.fixture_filter.attr_head_count` — dieselbe Quelle, aus
+        der auch der Geraete-Einstieg schoepft."""
+        return attr_head_count(fixture, attr, self._kanaele)
 
-        ★★ Gegenpruefung zu #663: ``_slider_head_buckets`` warf die anderen
-        heraus, aber es ist nicht der einzige Weg, auf dem ein Regler entsteht.
-        Die **Schnellwahl** des Position-Tabs baut ihren Pan/Tilt-Speed-Regler
-        selbst (``_add_quick_select``), und die **Farb-Synchronregler**
-        (``_add_sync_color_sliders``) ebenso — beide bekamen bis dahin die
-        ganze Auswahl. Gemessen an ``MOVBAR4 [22-Kanal]`` (kein ``speed``-Kanal)
-        neben einer ``HYDRABEAM 4000 RGBW [19-Kanal]``: ein Zug am
-        „Pan/Tilt-Speed"-Regler schrieb ``speed=177`` ins Programmer-Dict der
-        MOVBAR4 und bewegte dort **keinen einzigen DMX-Kanal** — die stille
-        Klasse FM-9/A5, die FM-27 beseitigen sollte. Dasselbe am Farb-Pfad mit
-        ``SHARPY [16-Kanal]`` (kein ``color_r``) neben einem Spiider.
+    def _fixtures_fuer(self, nutzlast: Nutzlast, fixtures, ziel) -> list:
+        """★★ UI-53 — DER EINE EINSTIEG: welche Geraete darf diese Reihe anfassen?
 
-        Bleibt KEIN Geraet uebrig, baut der Aufrufer den Regler gar nicht erst
-        — er koennte ohnehin nichts ausgeben."""
-        return [f for f in fixtures if self._attr_head_count(f, attr) >= 1]
+        Bis 2026-09-07 beantworteten VIER Fassungen diese Frage, und jede der
+        sieben Schnellwahl-Reihen suchte sich ihre Fassung selbst aus. Gemessen
+        stand dabei eine Reihe auf der falschen: der RESET-Knopf backt den
+        Bereichs-Mittelwert der VORLAGE ein (``ResetActionButton``,
+        ``_range_mid`` des Bereichs ``kind='reset'``) und schrieb ihn literal
+        auf jedes Geraet mit einem ``reset``-Kanal. An einer ``CONTIMH``
+        (reset 0–255 „Neustart") neben einem ``Inno Scan LED`` traf derselbe
+        Wert 127 dort den Bereich „Disable blackout while Gobo Change";
+        bibliotheksweit landen 82,2 % der 100128 Modus-Paare mit ``reset``-Kanal
+        in einem FREMDEN Bereich.
 
-    def _fixtures_with_any_attr(self, fixtures, attrs) -> list:
-        """Geraete, die MINDESTENS EINEN dieser Kanaele haben (FM-34).
-
-        Fuer Kachelreihen, deren Nutzlast mehrere Kanaele auf einmal schreibt:
-        die RGB-Schnellwahl setzt ``color_r/g/b`` (und ``color_w``, wo es ihn
-        gibt) in EINEM Klick. Ein Geraet, das keinen davon hat, gehoert nicht
-        an diese Kacheln — dieselbe Regel und dieselbe Quelle wie
-        :meth:`_fixtures_with_attr`, nur ueber eine Attribut-MENGE."""
-        attrs = tuple(attrs)
-        return [f for f in fixtures
-                if any(self._attr_head_count(f, a) >= 1 for a in attrs)]
+        Der Parameter benennt darum die Art der **Nutzlast**, nicht die
+        Filter-Technik (:class:`~src.core.fixture_filter.Nutzlast`) — die Frage
+        „schreibe ich einen Literalwert aus einem Vorlagen-Bereich?" kann der
+        Bauer einer Kachelreihe beantworten, „Range-Regel oder Kanal-Existenz?"
+        konnte er nachweislich nicht. Ohne diese Antwort laesst sich keine
+        Reihe mehr bauen: ``nutzlast`` ist positionell und hat keinen
+        Vorgabewert."""
+        return fixtures_fuer_nutzlast(nutzlast, fixtures, ziel, self._kanaele)
 
     def _anchor_other_heads(self, owners, ch, head: int) -> None:
         """Verankert die ANDEREN Koepfe, wenn dieser Kopf ueber den BASIS-Schluessel
@@ -2145,12 +2149,19 @@ class ProgrammerView(QWidget):
         [91-Kanal Pixel]``: der Regler „Grundfarbe Rot" zeigte beide Geraete an,
         bewegte am SHARPY aber **keinen einzigen Kanal** und legte den Wert nur
         ins Programmer-Dict. Jetzt bekommt jeder Farbregler nur die Geraete, die
-        seine Farbe wirklich haben (:meth:`_fixtures_with_attr`)."""
+        seine Farbe wirklich haben.
+
+        UI-53: die Reihe schreibt einen ABSOLUTEN Wert auf EINEN Kanal — sie
+        faehrt deshalb ueber denselben Einstieg wie die Schnellwahl-Reihen
+        (:meth:`_fixtures_fuer`), obwohl sie keine Kachelreihe ist. Ein
+        Einstieg, der nur ``_add_quick_select`` bedient, liesse genau die
+        Aufrufer draussen, die spaeter falsch abbiegen."""
         color_chs, occ = self._color_template_channels(fixtures)
         for ch, h in color_chs:
             if h != 0:
                 continue
-            besitzer = self._fixtures_with_attr(fixtures, ch.attribute)
+            besitzer = self._fixtures_fuer(
+                Nutzlast.ABSOLUTWERT_EIN_KANAL, fixtures, ch.attribute)
             if not besitzer:
                 continue
             ilay.addWidget(AttributeSlider(
@@ -2216,9 +2227,11 @@ class ProgrammerView(QWidget):
             if group_name == "Intensity":
                 sh = self._template_channel_in(("shutter", "strobe"))
                 if sh is not None:
-                    # UI-07: nur range-kompatible Fixtures fuettern (sonst landet der
-                    # Vorlagen-Range-Mittelwert in einem inkompatiblen Shutter-Kanal).
-                    sh_fixtures = self._range_compatible_fixtures(sh, fixtures)
+                    # Nutzlast (i): die Kachel traegt den Mittelwert eines
+                    # VORLAGEN-Bereichs (UI-07) — sonst landet er in einem
+                    # inkompatiblen Shutter-Kanal.
+                    sh_fixtures = self._fixtures_fuer(
+                        Nutzlast.LITERAL_AUS_VORLAGEN_BEREICH, fixtures, sh)
                     if sh_fixtures:
                         from src.ui.widgets.preset_tile import ShutterQuickBar
                         layout.addWidget(QLabel("Shutter / Strobe:"))
@@ -2234,21 +2247,19 @@ class ProgrammerView(QWidget):
                 # gehoert an keine von beiden (sonst Wert im Dict, nichts auf
                 # DMX — stille Klasse FM-9/A5).
                 #
-                # ★ Die beiden Familien fragen VERSCHIEDENE Eigenschaften ab:
-                # die RGB-Kacheln tragen absolute Farbwerte (0..255 sind an
-                # jedem RGB-Geraet dasselbe) — da genuegt „hat den Kanal".
-                # Die Farbrad-Kacheln sind dagegen RANGE-basiert wie Shutter
-                # und Gobo: die Kachel traegt den Mittelwert eines Bereichs
-                # der VORLAGE. Ein Farbrad mit anderem Slot-Layout bekaeme
-                # denselben Literal-Wert und damit eine ANDERE Farbe — also
-                # derselbe Weg wie oben/unten: ``_range_compatible_fixtures``
-                # (UI-07). Der ist strikt staerker als
-                # ``_fixtures_with_attr`` (ohne den Kanal -> ``ch is None``)
-                # und deckt FM-34 fuers Farbrad mit ab.
-                rgb_fixtures = self._fixtures_with_any_attr(
-                    fixtures, ("color_r", "color_g", "color_b", "color_w"))
-                cw_fixtures = (self._range_compatible_fixtures(cw, fixtures)
-                               if cw is not None else [])
+                # ★ Die beiden Familien tragen VERSCHIEDENE Nutzlasten:
+                # (iii) die RGB-Kacheln schreiben absolute Farbwerte auf eine
+                # KANALMENGE (0..255 sind an jedem RGB-Geraet dasselbe) — wer
+                # mindestens einen der Kanaele hat, gehoert dazu. (i) die
+                # Farbrad-Kacheln tragen den Mittelwert eines VORLAGEN-Bereichs
+                # wie Shutter und Gobo; ein Farbrad mit anderem Slot-Layout
+                # bekaeme denselben Literal-Wert und zeigte eine ANDERE Farbe.
+                rgb_fixtures = self._fixtures_fuer(
+                    Nutzlast.ABSOLUTWERTE_KANALMENGE, fixtures,
+                    ("color_r", "color_g", "color_b", "color_w"))
+                cw_fixtures = (self._fixtures_fuer(
+                    Nutzlast.LITERAL_AUS_VORLAGEN_BEREICH, fixtures, cw)
+                    if cw is not None else [])
                 if rgb_fixtures or cw_fixtures:
                     from src.ui.widgets.preset_tile import ColorQuickBar
                     layout.addWidget(QLabel("Schnellwahl:"))
@@ -2259,8 +2270,10 @@ class ProgrammerView(QWidget):
             elif group_name == "Gobo":
                 gw = self._template_channel_in(("gobo_wheel",))
                 if gw is not None:
-                    # UI-07: nur range-kompatible Fixtures (Gobo-Wheel-Slots) fuettern.
-                    gw_fixtures = self._range_compatible_fixtures(gw, fixtures)
+                    # Nutzlast (i): die Kachel traegt einen Gobo-Slot der
+                    # VORLAGE als Literalwert (UI-07).
+                    gw_fixtures = self._fixtures_fuer(
+                        Nutzlast.LITERAL_AUS_VORLAGEN_BEREICH, fixtures, gw)
                     if gw_fixtures:
                         from src.ui.widgets.preset_tile import GoboQuickBar
                         layout.addWidget(QLabel("Gobo-Auswahl:"))
@@ -2279,7 +2292,8 @@ class ProgrammerView(QWidget):
                     # Auswahl — ``speed`` steht hier also auch dann, wenn ihn nur
                     # EIN Geraet hat. Wer den Kanal nicht hat, gehoert nicht an
                     # diesen Regler (sonst Wert im Dict, nichts auf DMX).
-                    sp_fixtures = self._fixtures_with_attr(fixtures, "speed")
+                    sp_fixtures = self._fixtures_fuer(
+                        Nutzlast.ABSOLUTWERT_EIN_KANAL, fixtures, "speed")
                     if sp_fixtures:
                         layout.addWidget(QLabel("Bewegungs-Speed:" if spider
                                                 else "Pan/Tilt-Speed:"))
@@ -2288,48 +2302,54 @@ class ProgrammerView(QWidget):
             elif group_name == "Weitere":
                 rs = self._template_channel_in(("reset",))
                 if rs is not None:
-                    # FM-34: nur die Geraete, die den Reset-Kanal WIRKLICH
-                    # haben. Ein Spiider neben einem SHARPY bekam bisher den
-                    # Reset-Wert ins Programmer-Dict, ohne einen DMX-Kanal zu
-                    # bewegen — und der Knopf versprach eine Rekalibrierung,
-                    # die dieses Geraet nie ausfuehrt.
-                    rs_fixtures = self._fixtures_with_attr(fixtures, rs.attribute)
+                    # ★★ UI-53, Nutzlast (i): der ``ResetActionButton`` backt
+                    # den Mittelwert des VORLAGEN-Bereichs ``kind='reset'``
+                    # ein und schreibt ihn literal auf alle Geraete — genau
+                    # das Muster, fuer das UI-07 die Range-Regel gebaut hat.
+                    # Gefiltert wurde hier bis 2026-09-07 nur nach
+                    # Kanal-Existenz (FM-34); gemessen bekam ein
+                    # ``Inno Scan LED`` neben einer ``CONTIMH`` den Wert 127
+                    # auf seinen Reset-Kanal, wo er „Disable blackout while
+                    # Gobo Change" bedeutet. Die Range-Regel ist strikt
+                    # staerker als die Kanal-Existenz und deckt FM-34 mit ab.
+                    rs_fixtures = self._fixtures_fuer(
+                        Nutzlast.LITERAL_AUS_VORLAGEN_BEREICH, fixtures, rs)
                     if rs_fixtures:
                         from src.ui.widgets.preset_tile import ResetActionButton
                         layout.addWidget(QLabel("Reset / Rekalibrierung:"))
-                        layout.addWidget(ResetActionButton(rs, rs_fixtures,
-                                                           self._state))
+                        # ★★ UI-53: die Regel darf die Auswahl verkleinern —
+                        # aber nicht STUMM. Der Bestaetigungsdialog versprach
+                        # „die AUSGEWAEHLTEN Moving Heads"; wer acht Mover
+                        # waehlt und vier fahren nicht, kann das waehrend einer
+                        # Show nicht von einem haengenden Geraet unterscheiden.
+                        #
+                        # Gezaehlt wird ueber `hat_kanal` und NICHT ueber einen
+                        # zweiten `_fixtures_fuer`-Aufruf: das hier ist keine
+                        # zweite Nutzlast, sondern eine reine Auskunft. Ein
+                        # zweiter Aufruf haette die Zuordnung Reihe -> Nutzlast
+                        # verwaschen, die der AST-Test festhaelt.
+                        mit_kanal = sum(1 for f in fixtures
+                                        if hat_kanal(f, "reset"))
+                        layout.addWidget(ResetActionButton(
+                            rs, rs_fixtures, self._state,
+                            uebergangen=max(0, mit_kanal - len(rs_fixtures))))
         except Exception as e:
             print(f"[programmer_view] quick-select error: {e}")
 
-    @staticmethod
-    def _range_signature(ch):
-        """Stabile Signatur des Range-Layouts eines Kanals (Grenzen + kind).
-        Zwei Kanaele sind range-kompatibel <=> gleiche Signatur. Range-lose Kanaele
-        haben die leere Signatur und sind untereinander kompatibel."""
-        rs = getattr(ch, "ranges", None) or []
-        return tuple(sorted(
-            (int(getattr(r, "range_from", 0)), int(getattr(r, "range_to", 0)),
-             (getattr(r, "kind", "") or ""))
-            for r in rs))
+    _range_signature = staticmethod(range_signature)
+    """Stabile Signatur des Range-Layouts eines Kanals — UI-53: die Rechnung
+    steht in :func:`src.core.fixture_filter.range_signature`."""
 
     def _range_compatible_fixtures(self, template_channel, fixtures):
-        """UI-07: nur Fixtures, deren Kanal fuer dieses Attribut DASSELBE Range-
-        Layout hat wie die Vorlage. Eine range-basierte QuickBar (Shutter/Gobo)
-        backt die DMX-Werte aus den Vorlagen-Ranges fest ein und schreibt denselben
-        Literal-Wert auf ALLE Fixtures (``_set_on_fixtures``); ein Fixture mit
-        abweichendem Range-Layout bekaeme so den Vorlagen-Mittelwert in einen
-        semantisch fremden Kanal. Die Vorlage selbst (und alle Fixtures mit gleichem
-        Layout) bleiben erhalten."""
-        attr = getattr(template_channel, "attribute", None)
-        sig = self._range_signature(template_channel)
-        out = []
-        for f in fixtures:
-            ch = next((c for c in get_channels_for_patched(f)
-                       if c.attribute == attr), None)
-            if ch is not None and self._range_signature(ch) == sig:
-                out.append(f)
-        return out
+        """UI-07 als benannter Name — durchgereicht an den EINEN Einstieg.
+
+        ★ Regel „gibt es einen ZWEITEN WEG?": diese Methode IST ein zweiter
+        Name fuer dieselbe Frage, aber kein zweiter Weg zu einer anderen
+        Antwort — sie rechnet nichts selbst, sondern ruft
+        :meth:`_fixtures_fuer` mit der Nutzlast (i). Ein Test nagelt fest, dass
+        beide Namen dieselbe Liste liefern."""
+        return self._fixtures_fuer(Nutzlast.LITERAL_AUS_VORLAGEN_BEREICH,
+                                   fixtures, template_channel)
 
     def _build_orientation_bar(self, fixtures):
         """Invert/Swap-Toggles fuer Pan/Tilt (M3.3). Schreibt die Flags pro
@@ -2341,11 +2361,27 @@ class ProgrammerView(QWidget):
         # den Tri-State (ihr Spalten-Default invert_*=False mischt sich in die
         # Mehrheit der Mover) UND bekaemen beim Klick bedeutungslose Orientierungs-
         # Flags persistiert.
-        fixtures = [
-            f for f in fixtures
-            if any(getattr(ch, "attribute", "") in ("pan", "tilt")
-                   for ch in get_channels_for_patched(f))
-        ]
+        #
+        # ★ UI-53: das war die VIERTE Fassung derselben Frage — hier inline
+        # ausgeschrieben. Nutzlast (iii): die Leiste schreibt absolute Flags,
+        # die fuer eine KANALMENGE gelten (Pan ODER Tilt).
+        #
+        # ⚠️ ZAHLEN MIT IHRER GRUNDGESAMTHEIT: gemessen ueber die 5125 Modi der
+        # Bibliothek DIESES Rechners antwortet der gemeinsame Einstieg 1608 mal
+        # „ja", genau wie die alte Inline-Fassung — 0 Abweichungen; 101 dieser
+        # Modi haben Tilt ohne Pan. Davon sind aber nur **97 Modi**
+        # `source='builtin'`, die uebrigen 5028 stammen aus einer lokal
+        # importierten QLC+-Bibliothek. Die Zahl gilt also fuer diesen Rechner,
+        # nicht fuer den mitgelieferten Bestand (im Builtin-Anteil allein: 21
+        # mal „ja", 1 Modus mit Tilt ohne Pan).
+        #
+        # ★ Das ist die Fallenklasse QA-61: eine Messung an der LOKALEN
+        # Bibliothek als Aussage ueber die AUSGELIEFERTE auszugeben. Die
+        # Aussage des Vergleichs — alte und neue Fassung antworten gleich —
+        # traegt trotzdem, denn sie ist ein Vergleich, kein Absolutwert.
+        # nirgends ein Geraet weg.
+        fixtures = self._fixtures_fuer(Nutzlast.ABSOLUTWERTE_KANALMENGE,
+                                       fixtures, ("pan", "tilt"))
         if not fixtures:
             return None
         from PySide6.QtWidgets import QCheckBox, QGroupBox

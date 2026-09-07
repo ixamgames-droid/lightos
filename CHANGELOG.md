@@ -7,6 +7,35 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-07 — Schnellwahl trifft nur noch passende Geräte, Platzhalter-Profile werden nicht gespeichert
+
+#### Behoben
+
+- **Der Knopf „Moving Head Reset" schickte seinen Wert auch an Geräte, bei
+  denen dieselbe Zahl etwas anderes bedeutet.** Der Wert stammt aus dem
+  Reset-Bereich des zuerst ausgewählten Geräts und ging unverändert an alle —
+  an einem Inno Scan LED heißt 127 aber „Blackout beim Gobowechsel abschalten",
+  nicht „Reset". Betroffen war die überwiegende Mehrheit der Gerätepaare.
+
+  Der Knopf fährt jetzt nur noch die Geräte, deren Reset-Kanal genauso
+  aufgebaut ist wie der der Vorlage — und der Bestätigungsdialog sagt, wie
+  viele das sind und warum die übrigen unberührt bleiben. Dieselbe Regel gilt
+  einheitlich für Shutter, Gobo, Farbrad, Farbe, Geschwindigkeit und
+  Ausrichtung.
+
+- **Ein Klick auf „Speichern" direkt nach dem Öffnen legte ein leeres Profil
+  namens „Neues Fixture" in der Bibliothek an** — im Fixture-Generator mit
+  einem Klick, im Editor mit zweien. Beide Dialoge weisen jetzt darauf hin,
+  dass der Modellname noch der Platzhalter ist, und bleiben offen. Ein echter
+  Name speichert unverändert, auch einer, der zufällig mit dem Platzhalter
+  beginnt.
+
+- **„Matrizen zusammenlegen" setzte ein Gerät doppelt ins Raster**, wenn es aus
+  beiden Gruppen in derselben Form kam. Zwei Zellen bedeuteten zwei
+  konkurrierende Werte auf denselben Kanälen; welcher gewann, entschied die
+  Reihenfolge. Jedes Gerät bekommt jetzt genau eine Zelle — die des zuerst
+  gestapelten Rasters.
+
 ### 2026-09-07 — Einfrieren beim Zusammenlegen von Gruppen behoben
 
 #### Behoben
