@@ -942,6 +942,25 @@ class AppState:
         return gid
 
     @staticmethod
+    def _raster_signatur(positions: dict) -> frozenset:
+        """Erkennungsmerkmal EINES Rasters: ``{(zelle, normierter Zellwert)}``.
+
+        Dient allein der Frage aus :meth:`_stack_group_grids`, ob ein Raster ein
+        frueher gestapeltes WIEDERHOLT. Normiert ueber ``parse_zelle``, damit
+        ``2`` und ``"2"`` als dasselbe gelten (der Gruppen-Editor schreibt int,
+        eine geladene Alt-Show str) — ein roher Dict-Vergleich haette die
+        Wiederholung je nach Schreibweise mal erkannt und mal nicht. Zellwerte,
+        die kein Geraet nennen, gehen als Rohtext ein (sie duerfen zwei Raster
+        unterscheiden, auch wenn niemand sie deuten kann)."""
+        from .group_cells import parse_zelle
+        eintraege = []
+        for schluessel, wert in (positions or {}).items():
+            zelle = parse_zelle(wert)
+            eintraege.append((schluessel, zelle if zelle[0] is not None
+                              else ("roh", str(wert))))
+        return frozenset(eintraege)
+
+    @staticmethod
     def _stack_group_grids(grids: list[tuple[int, int, dict]]) -> tuple[int, int, dict]:
         """FM-16e: Stapelt mehrere ``(cols, rows, positions)``-Raster VERTIKAL zu
         EINEM groesseren. ``positions`` = ``{(col,row): value}`` (value = ganzer fid
@@ -957,14 +976,87 @@ class AppState:
         KOPF-Zellen gewinnen, die Ganz-Zelle faellt weg (Begruendung und Messung:
         ``group_cells.drop_whole_cells_with_heads``). Die Rastergroesse aendert
         das NICHT — die frei gewordene Zelle bleibt als Luecke stehen, genau wie
-        nach „Zelle entfernen"."""
-        from .group_cells import drop_whole_cells_with_heads
+        nach „Zelle entfernen".
+
+        ★★ FM-37 — **die Tie-Break-Regel: DAS ERSTE RASTER GEWINNT.** FM-32
+        entscheidet nur das Zusammentreffen zweier FORMEN. Kommt dasselbe Geraet
+        aus beiden Quellen in DERSELBEN Form, stapelte diese Funktion es roh:
+        gemessen lag ``2:0`` danach an ``0,1`` UND ``0,2`` (28 statt 24 Zellen),
+        und am DMX fuhr die SPAETER geschriebene Zelle den Kopf
+        (``RgbMatrixInstance.write`` laeuft row-major) — 41,42,43,44 statt
+        21,22,23,24. Welche der beiden Zellen gilt, entschied damit die
+        Schleifenreihenfolge, also niemand.
+
+        Jetzt ausgesprochen: **ein Zellwert, den ein frueher gestapeltes Raster
+        schon fuehrt, faellt im spaeteren weg.** „Frueher" heisst in der
+        ``gids``-Reihenfolge, und die ist die, die die Oberflaeche zusagt
+        („Gruppen wählen (von oben nach unten gestapelt)"). Innerhalb EINES
+        Rasters gilt dieselbe Regel zeilenweise (Zeile, dann Spalte) — das ist
+        die Reihenfolge, in der die Matrix-Engine schreibt, und sie raeumt
+        nebenbei die Doppel weg, die aeltere Shows aus diesem Fehler schon
+        mitbringen (sonst waechst der Bestand bei jedem Zusammenlegen weiter).
+
+        ★ **Ausnahme, und sie ist der Kern der Regel:** ein Raster, das ein
+        frueher gestapeltes WIEDERHOLT, ist keine Kollision zweier Quellen,
+        sondern dieselbe Quelle mehrfach — „dasselbe Raster absichtlich mehrfach
+        stapeln" (2× Hydrabeam untereinander, ``test_multirow_offset_
+        accumulates``). Es bleibt VOLLSTAENDIG stehen. Ohne diese Ausnahme waere
+        die Regel eine Voll-Dedupe, die genau diesen Bestandsfall auf eine Reihe
+        zusammenfaltet.
+
+        „Wiederholt" heisst dabei eng: gleiche Zellen mit gleichen Werten UND das
+        Vorbild steht selbst VOLLSTAENDIG im Ergebnis. Ein Raster, dem die Regel
+        gerade erst Zellen weggenommen hat, ist kein Vorbild — sonst haette
+        ausgerechnet die halbierte Kopie eines Rasters das Recht, das Doppel
+        wieder hereinzuholen (gemessen an ``[Rig, Bar-Koepfe, Bar-Koepfe]``: mit
+        der weiten Lesart stuenden die vier Bar-Zellen erneut im Raster).
+
+        Verglichen wird der Zellwert NORMIERT ueber ``parse_zelle`` (achsen-
+        bewusst): ``2`` und ``"2"`` sind dasselbe Geraet, ``"2:0"`` und
+        ``"2:w0"`` sind es NICHT — die Farb- und die Weiss-Achse raeumen einander
+        nicht weg (dieselbe Asymmetrie wie in ``group_cells.zelle_gehoert_zu``).
+        Zellwerte, die kein Geraet nennen, bleiben unangetastet (kein stiller
+        Datenverlust, wie bei ``drop_whole_cells_with_heads``)."""
+        from .group_cells import drop_whole_cells_with_heads, parse_zelle
         max_cols = 1
         total_rows = 0
         merged: dict = {}
+        belegt: set = set()          # Zellwerte, die ein frueheres Raster fuehrt
+        # ⚠️ HIER STAND EINE AUSNAHME, UND SIE WAR EIN LOCH.
+        #
+        # Ein Raster, dessen SIGNATUR (Menge seiner Zellwerte) schon einmal
+        # ungekuerzt gestapelt worden war, wurde von der Entdopplung
+        # ausgenommen. Gedacht war das fuer den Unit-Aufruf
+        # ``_stack_group_grids([g, g, g])``, der die Versatz-Akkumulation prueft.
+        #
+        # Die Ausnahme haengt aber am RASTERINHALT, nicht an der QUELLE — sie
+        # feuert deshalb auch bei zwei VERSCHIEDENEN Gruppen mit gleichem
+        # Raster, und genau das ist der erste Fall, den FM-37 nennt. Gemessen
+        # mit zwei symmetrisch gebauten Gruppen, die je die ganze Bar als
+        # Ganz-Zelle fuehren: die Bar landete an '0,0' UND '0,8', am DMX
+        # [65, 65, 65, 65] statt der angesagten [1, 1, 1, 1].
+        #
+        # Die Ausnahme kaufte also einen synthetischen Unit-Test mit einem real
+        # erreichbaren Loch. Der Test pruefte zwei Dinge zugleich (Versatz UND
+        # Doppelbehandlung) und tat es mit dreimal DEMSELBEN Raster — ein
+        # Zustand, den die Oberflaeche nicht erzeugt. Er prueft den Versatz
+        # jetzt an drei VERSCHIEDENEN Rastern; die Doppelfrage steht in
+        # ``tests/test_fm37_zusammenlegen_ohne_doppelte_zellen.py``, wo sie
+        # hingehoert.
         for cols, rows, positions in grids:
             max_cols = max(max_cols, int(cols or 1))
-            for (c, r), val in positions.items():
+            gekuerzt = False
+            # Zeilenweise (Zeile, dann Spalte) = Schreibreihenfolge der Matrix-
+            # Engine. Ohne die Sortierung entschiede die Einfuegereihenfolge des
+            # Dicts, welche von zwei gleichen Zellen EINES Rasters gewinnt.
+            for (c, r), val in sorted(positions.items(),
+                                      key=lambda kv: (kv[0][1], kv[0][0])):
+                zelle = parse_zelle(val)
+                if zelle[0] is not None:
+                    if zelle in belegt:
+                        gekuerzt = True
+                        continue          # das erste Raster behaelt diese Zelle
+                    belegt.add(zelle)
                 merged[(c, total_rows + r)] = val
             total_rows += max(1, int(rows or 1))
         merged = drop_whole_cells_with_heads(merged)

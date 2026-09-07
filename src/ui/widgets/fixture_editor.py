@@ -18,6 +18,10 @@ from src.core.database.models import (
     Manufacturer, FixtureProfile, FixtureMode, FixtureChannel, ChannelRange,
     GEO_MAX,
 )
+# FM-35: der Platzhalter-Modellname und die Frage "ist das Kopfformular
+# ausgefuellt?" stehen an EINER Stelle — dieselbe, die der Generator
+# benutzt. Begruendung im Modul.
+from src.core.kopfformular import PLATZHALTER_MODELL, kopf_beanstandung
 
 
 FIXTURE_TYPES = [
@@ -311,7 +315,7 @@ class FixtureEditorDialog(QDialog):
         self._refresh_manufacturers()
         form.addRow("Hersteller:", self._cb_manufacturer)
 
-        self._edit_name = QLineEdit("Neues Fixture")
+        self._edit_name = QLineEdit(PLATZHALTER_MODELL)
         form.addRow("Modell:", self._edit_name)
 
         self._edit_short = QLineEdit("")
@@ -506,12 +510,16 @@ class FixtureEditorDialog(QDialog):
 
     def _save(self):
         mfr_name = self._cb_manufacturer.currentText().strip()
-        if not mfr_name:
-            QMessageBox.warning(self, "Speichern", "Hersteller fehlt.")
-            return
         name = self._edit_name.text().strip()
-        if not name:
-            QMessageBox.warning(self, "Speichern", "Modell-Name fehlt.")
+        # FM-35: Hersteller, Modellname UND der unveraenderte Platzhalter in
+        # EINER Frage — derselben, die der Generator stellt. Vorher pruefte
+        # dieser Dialog nur auf LEER; der vorbelegte Modellname ist aber nie
+        # leer, und "+ Channel" plus "Speichern" legte `ADB / <Platzhalter>
+        # / NEUES FI` an. Die zwei Dialoge hatten zwei Massstaebe — jetzt
+        # antwortet eine Funktion fuer beide.
+        beanstandung = kopf_beanstandung(mfr_name, name)
+        if beanstandung:
+            QMessageBox.warning(self, "Speichern", beanstandung)
             return
         if self._tabs.count() == 0:
             QMessageBox.warning(self, "Speichern", "Mindestens ein Mode nötig.")

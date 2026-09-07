@@ -795,9 +795,27 @@ class ResetActionButton(QPushButton, _ApplyMixin):
 
     HOLD_MS = 4000
 
-    def __init__(self, channel, fixtures, state, parent=None):
+    def __init__(self, channel, fixtures, state, parent=None, *,
+                 uebergangen: int = 0):
+        """``uebergangen`` — wie viele AUSGEWAEHLTE Geraete die Range-Regel
+        herausgenommen hat (UI-53).
+
+        ★★★ Ohne diese Zahl ist der Fix von UI-53 ein STILLER Verlust, und der
+        Bestaetigungsdialog sagte sogar das Gegenteil: „die AUSGEWAEHLTEN Moving
+        Heads fahren in ihre Home-Position". Der Bediener waehlt acht Mover,
+        bestaetigt — und vier fahren nicht. Waehrend einer Show ist das nicht
+        von einem haengenden Geraet oder einer toten DMX-Strecke zu
+        unterscheiden.
+
+        Die Regel selbst ist richtig (ein fremdes Reset-Layout bekaeme den
+        Vorlagenwert in einen semantisch anderen Bereich — an einem
+        ``Inno Scan LED`` bedeutet 127 „Disable blackout while Gobo Change").
+        Falsch war nur, sie stumm anzuwenden. *Wer eine Auswahl verkleinert,
+        muss es sagen.*
+        """
         super().__init__("⟳ Moving Head Reset…", parent)
         self._fixtures = fixtures
+        self._uebergangen = max(0, int(uebergangen or 0))
         self._state = state
         self._attr = channel.attribute
         self._idle = int(getattr(channel, "default_value", 0) or 0)
@@ -812,11 +830,22 @@ class ResetActionButton(QPushButton, _ApplyMixin):
         self.clicked.connect(self._on_clicked)
 
     def _on_clicked(self):
+        n = len(self._fixtures)
+        gesamt = n + self._uebergangen
+        wen = (f"{n} von {gesamt} ausgewählten Geräten" if self._uebergangen
+               else "Die ausgewählten Moving Heads")
+        zusatz = ("" if not self._uebergangen else
+                  f"\n\n{self._uebergangen} Gerät"
+                  f"{'e' if self._uebergangen != 1 else ''} "
+                  f"{'bleiben' if self._uebergangen != 1 else 'bleibt'} "
+                  "unberührt: dort bedeutet derselbe DMX-Wert etwas anderes "
+                  "als an der Vorlage.")
         ans = QMessageBox.question(
             self, "Moving Head Reset",
             "Reset/Rekalibrierung wirklich auslösen?\n\n"
-            "Die ausgewählten Moving Heads fahren dabei in ihre Home-Position "
-            "— während einer laufenden Show ist das deutlich sichtbar.",
+            f"{wen} fahren dabei in ihre Home-Position "
+            f"— während einer laufenden Show ist das deutlich sichtbar."
+            f"{zusatz}",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No)
         if ans != QMessageBox.StandardButton.Yes:

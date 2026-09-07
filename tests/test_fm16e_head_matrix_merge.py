@@ -84,10 +84,27 @@ class StackGridsTest(unittest.TestCase):
         self.assertEqual(merged[(0, 1)], "7:0")
 
     def test_multirow_offset_accumulates(self):
-        g = (1, 2, {(0, 0): "1:0", (0, 1): "1:1"})     # 1×2
-        _c, rows, merged = A.AppState._stack_group_grids([g, g, g])
+        """Der Versatz addiert sich ueber die gestapelten Raster.
+
+        ★ Fruehere Fassung stapelte dreimal DASSELBE Raster (``[g, g, g]``) und
+        pruefte damit zwei Dinge zugleich: den Versatz UND dass ein
+        wiederholtes Geraet trotzdem eine Zelle bekommt. Der zweite Teil ist
+        seit FM-37 falsch — ein Geraet gehoert genau EINE Zelle —, und er hat
+        dort eine Ausnahme erzwungen, die bei zwei VERSCHIEDENEN Gruppen mit
+        gleichem Raster ein echtes Loch riss (Bar an '0,0' und '0,8', am DMX
+        [65,65,65,65] statt [1,1,1,1]).
+
+        Der Versatz wird deshalb an drei VERSCHIEDENEN Rastern geprueft — so,
+        wie die Oberflaeche sie auch erzeugt. Die Doppelfrage steht in
+        ``tests/test_fm37_zusammenlegen_ohne_doppelte_zellen.py``.
+        """
+        raster = [(1, 2, {(0, 0): f"{fid}:0", (0, 1): f"{fid}:1"})
+                  for fid in (1, 2, 3)]
+        _c, rows, merged = A.AppState._stack_group_grids(raster)
         self.assertEqual(rows, 6)                       # 3× Höhe 2
         self.assertIn((0, 5), merged)                   # letzte Reihe belegt
+        self.assertEqual(merged[(0, 5)], "3:1",
+                         "die letzte Reihe traegt das letzte Raster")
 
 
 # ── Integration: Merge über den echten Show-DB-/Gruppen-Pfad ──────────────────

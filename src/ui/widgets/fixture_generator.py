@@ -36,6 +36,10 @@ from src.ui.widgets.fixture_editor import FIXTURE_TYPES, CHANNEL_ATTRS
 # GEO_MAX (FM-23/FM-26): die Obergrenze der Rastereingabe steht bei den SPALTEN
 # und nicht im anderen Dialog — Begruendung an `models.GEO_MAX`.
 from src.core.database.models import GEO_MAX
+# FM-35: der Platzhalter-Modellname und die Frage "ist das Kopfformular
+# ausgefuellt?" stehen an EINER Stelle — dieselbe, die der einfache
+# Fixture-Editor benutzt. Begruendung im Modul.
+from src.core.kopfformular import PLATZHALTER_MODELL, kopf_beanstandung
 
 
 # Attribute, die fuer eine 16-bit-Aufloesung (coarse + Fine-Kanal) sinnvoll
@@ -130,7 +134,7 @@ class GeneratorModel:
     """Vollstaendiges Generator-Modell (Kopf + Modi)."""
     manufacturer: str = "Generic"
     short_mfr: str = ""
-    model: str = "Neues Fixture"
+    model: str = PLATZHALTER_MODELL
     short_name: str = ""
     fixture_type: str = "par"
     power_w: int = 0
@@ -189,7 +193,7 @@ def build_profile_payload(model: GeneratorModel) -> dict:
     return {
         "manufacturer": (model.manufacturer or "Generic").strip(),
         "short_mfr": short_mfr,
-        "name": (model.model or "Neues Fixture").strip(),
+        "name": (model.model or PLATZHALTER_MODELL).strip(),
         "short_name": short or "FIXTURE",
         "fixture_type": (model.fixture_type or "other").strip(),
         "power_w": int(model.power_w or 0),
@@ -1317,7 +1321,8 @@ class FixtureGeneratorDialog(QDialog):
     # ── Sync Kopf/Modi → Modell ──────────────────────────────────────────
     def _sync_all(self):
         self._model.manufacturer = self._edit_mfr.text().strip() or "Generic"
-        self._model.model = self._edit_model.text().strip() or "Neues Fixture"
+        self._model.model = (self._edit_model.text().strip()
+                             or PLATZHALTER_MODELL)
         self._model.short_name = self._edit_short.text().strip()
         self._model.fixture_type = self._cb_type.currentText()
         self._model.viz_model = self._cb_vizmodel.currentData() or ""
@@ -1403,6 +1408,19 @@ class FixtureGeneratorDialog(QDialog):
     # ── Speichern ────────────────────────────────────────────────────────
     def _save(self):
         self._sync_all()
+        # FM-35: EINE Wache fuer beide Dialoge. Vorher war der Modus-Check
+        # unten die einzige Huerde — und die nimmt ein frisch geoeffneter
+        # Generator muehelos (der Default-Modus hat Kanaele). Ein Mausklick
+        # auf "Speichern" legte damit `Generic / <Platzhalter> / NEUES FI`
+        # in der Bibliothek an, ohne dass der Nutzer etwas eingegeben hatte,
+        # und schloss den Dialog. Die Pruefung steht VOR dem Modus-Check und
+        # vor `self._live.shutdown()`, damit der Live-Test beim blossen
+        # Verklicken weiterlaeuft.
+        beanstandung = kopf_beanstandung(self._model.manufacturer,
+                                         self._model.model)
+        if beanstandung:
+            QMessageBox.warning(self, "Speichern", beanstandung)
+            return
         if not self._model.modes or not any(m.channels for m in self._model.modes):
             QMessageBox.warning(self, "Speichern",
                                 "Mindestens ein Modus mit Kanälen nötig.")
