@@ -9,7 +9,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| XPLAT-33 | B | fix/xplat33-pixel-head-scene-zeit | 2026-09-07T15:54Z | tests/test_fm14_pixel_head_scene.py |
 | STAB-24 | A | fix/buendel-stab24-stab25-fm38 | 2026-09-07T16:07Z | src/core/show/show_file.py |
 | STAB-25 | A | fix/buendel-stab24-stab25-fm38 | 2026-09-07T16:07Z | src/core/show/show_file.py |
 | FM-38 | A | fix/buendel-stab24-stab25-fm38 | 2026-09-07T16:07Z | src/core/app_state.py |
@@ -114,7 +113,6 @@
 
 ## Verlauf
 
-- 2026-09-06T17:52Z B aktualisiert FM-47: Dateien src/core/engine/rgb_matrix.py -> src/core/matrix_pattern.py · src/ui/views/rgb_matrix_view.py
 - 2026-09-06T18:22Z B done FM-47
 - 2026-09-06T18:26Z A done ENG-24
 - 2026-09-06T19:11Z A claim NET-13
@@ -144,3 +142,4 @@
 - 2026-09-07T16:07Z A claim STAB-24
 - 2026-09-07T16:07Z A claim STAB-25
 - 2026-09-07T16:07Z A claim FM-38
+- 2026-09-07T17:08Z B done XPLAT-33
