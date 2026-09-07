@@ -10,6 +10,7 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | XPLAT-35 | B | fix/gate-diagnose-kanarie | 2026-09-07T19:11Z | tests/test_zeitbomben_gate.py |
+| BPM-AREA | A | feat/bpm-erkennung-ui | 2026-09-07T20:39Z | src/core/audio/beat_detector.py · src/core/audio/capture.py · src/core/audio/bpm_settings.py · src/core/audio/genre_presets.py · src/ui/views/bpm_manager_view.py · src/ui/views/audio_input_view.py · src/ui/views/bpm_generator_view.py |
 
 ## Blocker & Fallen
 
@@ -115,7 +116,6 @@
 
 ## Verlauf
 
-- 2026-09-06T19:11Z A claim UI-60
 - 2026-09-06T20:58Z B claim QA-78
 - 2026-09-06T21:09Z A done NET-13
 - 2026-09-06T21:09Z A done UI-59
@@ -145,3 +145,4 @@
 - 2026-09-07T20:08Z A done STAB-24
 - 2026-09-07T20:08Z A done STAB-25
 - 2026-09-07T20:08Z A done FM-38
+- 2026-09-07T20:39Z A claim BPM-AREA
