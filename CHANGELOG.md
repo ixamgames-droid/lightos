@@ -53,6 +53,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 - Die Testumgebung räumt Altlasten nicht mehr auf Kosten laufender Testläufe
   weg — sie hatte gelegentlich Dateien und das Datenverzeichnis eines gerade
   laufenden Laufs entfernt.
+- Der Test der Pixel-Kopf-Szene baute die komplette 3D-Szene 25 Mal neu auf —
+  einmal je Test — und brauchte dafür 277 Sekunden bei einem Zeitlimit von 300.
+  Er lädt sie jetzt einmal und stellt je Test nur die Geräte neu. Das kostet
+  38 statt 277 Sekunden. Wichtiger als die Zeit: unter einem eingebauten Fehler
+  wuchs die alte Fassung auf 313 Sekunden, lief also ausgerechnet dann ins
+  Zeitlimit, wenn sie einen Fehler zu melden hatte — und ein Zeitlimit färbt
+  den Testlauf nicht rot.
 
 ### 2026-09-06 — Ungültige Universe-Nummern, verlorene Eingaben und tote Felder
 
