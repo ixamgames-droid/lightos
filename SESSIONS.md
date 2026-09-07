@@ -12,7 +12,6 @@
 | UI-53 | A | fix/buendel-ui53-fm35-fm37 | 2026-09-07T13:59Z | src/ui/views/programmer_view.py,src/core/fixture_filter.py |
 | FM-35 | A | fix/buendel-ui53-fm35-fm37 | 2026-09-07T14:00Z | src/ui/widgets/fixture_generator.py,src/ui/widgets/fixture_editor.py,src/core/kopfformular.py |
 | FM-37 | A | fix/buendel-ui53-fm35-fm37 | 2026-09-07T14:00Z | src/core/app_state.py |
-| XPLAT-30 | B | fix/xplat30-zwei-prozesse-ein-port | 2026-09-07T14:07Z | src/web/__init__.py |
 
 ## Blocker & Fallen
 
@@ -113,7 +112,6 @@
 
 ## Verlauf
 
-- 2026-09-06T17:09Z A done ENG-23
 - 2026-09-06T17:09Z A claim OUT-56
 - 2026-09-06T17:22Z B done ENG-26
 - 2026-09-06T17:28Z A done OUT-56
@@ -143,3 +141,4 @@
 - 2026-09-07T14:00Z A claim FM-35
 - 2026-09-07T14:00Z A claim FM-37
 - 2026-09-07T14:07Z B claim XPLAT-30
+- 2026-09-07T15:05Z B done XPLAT-30
