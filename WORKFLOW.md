@@ -245,6 +245,56 @@ Das verbindliche Test-Gate des Loop-Modus laeuft ueber `tools/verify_loop.ps1`:
 
 Details zur Sperre: `SecondBrain/reference_pytest_lock.md`.
 
+### Kein Flake, ein Messfehler: das Gate misst den Baum, den es bekommt (PROC-13)
+
+Ein roter Gate-Lauf ist nicht automatisch ein roter Code. Zwei Messfehler haben
+beide Sitzungen am 05./06.09. je **Stunden** gekostet, und beide sehen aus wie
+ein Flake:
+
+1. **Der Baum aendert sich WAEHREND des Laufs.** Wer weiterarbeitet, waehrend das
+   Gate laeuft, laesst jedes Segment einen anderen Stand testen. Das Ergebnis ist
+   kein Signal, egal wie es ausfaellt.
+2. **Der Baum war von vornherein der falsche.** Ein Zweig, der vor einem Merge
+   abgezweigt wurde, testet den Fehler, den dieser Merge schon behoben hat.
+   Beide Sitzungen sind das an einem Tag getreten — einmal an einem
+   Szenen-Test, einmal an `test_qa58`.
+
+**Die Abhilfe ist mechanisch, nicht diszipliniert:**
+
+```
+git worktree add --detach ../wt-gate <commit>     # auf den Commit festgepinnt
+cd ../wt-gate && ./tools/verify_loop.ps1          # bzw. verify_loop.sh
+```
+
+Danach kann man im Arbeits-Worktree weiterarbeiten, ohne das Ergebnis zu
+zerstoeren. Vor dem Lauf **einmal `git log -1` gegen `origin/main` halten** —
+das ist die ganze Vorsorge gegen Fall 2.
+
+- **Das venv verhaelt sich je Plattform ANDERS — nachgesehen, nicht angenommen.**
+  `verify_loop.ps1` sucht auch im Haupt-Checkout des aeusseren Ordners
+  (`../lightos-main/venv/...`), ein frischer Worktree braucht dort also keins.
+  `verify_loop.sh` sucht **nur im Repo** und bricht sonst ab — auf Linux/macOS
+  muss das venv also hinein (Symlink genuegt).
+- ⚠️ **Den Gate-Worktree nicht in den Temp-Bereich legen.** `conftest.py`
+  uebernimmt einen Datenordner, der dort liegt (QA-73), und
+  `test_qa73_datenordner_erben` kann seine eigene Praemisse dann nicht mehr
+  pruefen — es ueberspringt dann mit benanntem Grund statt rot zu werden.
+
+**Zwei Fallen beim Bauen solcher Warteschleifen, beide selbst getreten:**
+
+- `pgrep -f verify_segmented` findet die **eigene** Kommandozeile und dreht
+  endlos; `pkill -f` killt entsprechend die eigene Shell. Ueber die PID warten
+  oder das Suchmuster aus Teilen zusammensetzen.
+- `sauber: $([ -z "$(git -C "$W" status --porcelain)" ] && echo ja)` meldet
+  **ja**, wenn der Befehl FEHLSCHLAEGT. Leere Ausgabe ist nicht dasselbe wie
+  „nichts zu melden" — den Exit-Code pruefen, nicht die Ausgabe.
+
+**Und beim LESEN des Ergebnisses:** wandernde Ausfaelle sind Last, kein Regress.
+Gemessen am 05.09. auf demselben Baum: mit dem Default (`-j 4`) zweimal rot mit
+**verschiedenen** Dateien, jede isoliert gruen; mit `LIGHTOS_VERIFY_JOBS=2`
+sauber durch. Wer bei `-j 4` Rot sieht, prueft das zuerst — und erst dann den
+eigenen Diff.
+
 ### Keine Zeitbomben: festes Datum + gleitende Schwelle (QA-62/QA-63)
 
 **Die Regel:** ein Test darf ein festes Kalenderdatum nicht gegen eine Schwelle
