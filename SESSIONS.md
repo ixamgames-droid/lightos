@@ -9,7 +9,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| STAB-25 | A | fix/buendel-stab24-stab25-fm38 | 2026-09-07T16:07Z | src/core/show/show_file.py |
 | FM-38 | A | fix/buendel-stab24-stab25-fm38 | 2026-09-07T16:07Z | src/core/app_state.py |
 | XPLAT-35 | B | fix/gate-diagnose-kanarie | 2026-09-07T19:11Z | tests/test_zeitbomben_gate.py |
 
@@ -116,7 +115,6 @@
 
 ## Verlauf
 
-- 2026-09-06T19:11Z A claim NET-13
 - 2026-09-06T19:11Z A claim UI-59
 - 2026-09-06T19:11Z A claim UI-60
 - 2026-09-06T20:58Z B claim QA-78
@@ -146,3 +144,4 @@
 - 2026-09-07T17:08Z B done XPLAT-33
 - 2026-09-07T19:11Z B claim XPLAT-35
 - 2026-09-07T20:08Z A done STAB-24
+- 2026-09-07T20:08Z A done STAB-25
