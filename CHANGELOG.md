@@ -60,6 +60,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   wuchs die alte Fassung auf 313 Sekunden, lief also ausgerechnet dann ins
   Zeitlimit, wenn sie einen Fehler zu melden hatte — und ein Zeitlimit färbt
   den Testlauf nicht rot.
+- Wenn eine Pruefung des Zeitbomben-Waechters einen Unterprozess starten liess
+  und dieser scheiterte, meldete der Test nur die nackte Zahl seines
+  Rueckgabewerts. Die Ausgabe des Unterprozesses — also die einzige Stelle, an
+  der die Ursache stand — wurde verworfen. Sie steht jetzt in der Meldung.
 
 ### 2026-09-06 — Ungültige Universe-Nummern, verlorene Eingaben und tote Felder
 

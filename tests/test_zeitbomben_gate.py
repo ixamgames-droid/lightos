@@ -66,6 +66,35 @@ QA62_GESUND = [
 ]
 
 
+def _kind_ausgabe(ergebnis, zeilen=30):
+    """Die letzten Zeilen der Kindprozess-Ausgabe, fuer eine Fehlermeldung.
+
+    ★ XPLAT-35 — WARUM DAS HIER STEHT. Diese Datei ist auf Windows mehrfach
+    undurchsichtig rot geworden: in der Meldung stand nur „AssertionError:
+    2 != 0", und die Ursache lag ausschliesslich in der Ausgabe des Kindes,
+    die weggeworfen wurde. Exit 2 ist bei pytest „ERROR collecting test
+    session" — WELCHE Sammlung scheiterte, sagt aber nur **stdout**: pytest
+    schreibt Sammelfehler NICHT auf stderr. Wer hier nur ``stderr``
+    weiterreicht, bekommt bei genau dieser Fehlerklasse eine LEERE Meldung —
+    das war der Zustand vorher, an drei von vier Stellen.
+
+    Nimmt beides: ein ``subprocess.CompletedProcess`` (stdout/stderr) und ein
+    ``zg.Ergebnis`` (``ausgabe``). Gekuerzt wird VORNE, nicht hinten: ein
+    Sammelfehler steht am Ende der Ausgabe.
+    """
+    roh = getattr(ergebnis, "ausgabe", None)
+    if roh is None:
+        roh = ((getattr(ergebnis, "stdout", "") or "")
+               + (getattr(ergebnis, "stderr", "") or ""))
+    roh = (roh or "").strip()
+    if not roh:
+        return "(Kindprozess ohne Ausgabe)"
+    teile = roh.splitlines()
+    if len(teile) > zeilen:
+        teile = [f"... {len(teile) - zeilen} Zeilen davor ..."] + teile[-zeilen:]
+    return "Ausgabe des Kindprozesses:" + chr(10) + chr(10).join(teile)
+
+
 class FesteDatenTest(unittest.TestCase):
     """Die statische Vorauswahl — grosszuegig, aber nicht wahllos."""
 
@@ -192,7 +221,7 @@ class UhrVorspannTest(unittest.TestCase):
         fertig = subprocess.run([sys.executable, "-c", self.ABFRAGE],
                                 cwd=REPO, env=env, text=True,
                                 capture_output=True, timeout=120)
-        self.assertEqual(fertig.returncode, 0, fertig.stderr)
+        self.assertEqual(fertig.returncode, 0, _kind_ausgabe(fertig))
         werte = [datetime.date.fromisoformat(w)
                  for w in fertig.stdout.split()]
         return dict(zip(("date.today", "datetime.now", "time.time",
@@ -274,7 +303,7 @@ class UhrVorspannTest(unittest.TestCase):
             fertig = subprocess.run(
                 [sys.executable, "-c", "import time;print(time.monotonic())"],
                 cwd=REPO, env=env, text=True, capture_output=True, timeout=120)
-            self.assertEqual(fertig.returncode, 0, fertig.stderr)
+            self.assertEqual(fertig.returncode, 0, _kind_ausgabe(fertig))
             dort = float(fertig.stdout.strip())
             self.assertLess(abs(dort - hier), 60,
                             f"uhr={uhr}: monotonic steht bei {dort} statt "
@@ -374,7 +403,8 @@ class KanarieTest(unittest.TestCase):
         ergebnis = zg.lauf([harmlos], zg.SPRUNG_TAGE, shim=stumm)
         self.assertEqual(ergebnis.rc, 0,
                          "die harmlose Probe muss gruen sein — sonst misst "
-                         "dieser Test den falschen Zweig")
+                         "dieser Test den falschen Zweig" + chr(10)
+                         + _kind_ausgabe(ergebnis))
         self.assertFalse(ergebnis.sprung_wirksam)
         with self.assertRaises(zg.SprungUnwirksam):
             zg.pruefe(ordner, dateien=[harmlos], shim=stumm)
@@ -420,7 +450,8 @@ class KanarieTest(unittest.TestCase):
             cwd=REPO, env=env, text=True, capture_output=True, timeout=300)
         self.assertEqual(fertig.returncode, 0,
                          "ohne Vorspann muss die Bombe gruen sein — sonst "
-                         "misst der Test daneben")
+                         "misst der Test daneben" + chr(10)
+                         + _kind_ausgabe(fertig))
         self.assertNotIn(zg.MARKE_OK, fertig.stdout + fertig.stderr)
 
 
@@ -446,7 +477,8 @@ class ProbenTest(unittest.TestCase):
         """Ohne diesen Nachweis waere die „Bombe" nur ein kaputter Test — und
         der Fund unten hiesse nichts."""
         pfad, _ = self._probe("bombe")
-        self.assertEqual(zg.lauf([pfad], 0).rc, 0)
+        ergebnis = zg.lauf([pfad], 0)
+        self.assertEqual(ergebnis.rc, 0, _kind_ausgabe(ergebnis))
 
     def test_die_gebaute_zeitbombe_wird_gefunden(self):
         pfad, ordner = self._probe("bombe")
@@ -521,7 +553,7 @@ class ProbenTest(unittest.TestCase):
                      "    assert e.rc == 0, e.ausgabe[-2000:]\n"
                      % (tools, enkel, enkel_echt))
         ergebnis = zg.lauf([kind], zg.SPRUNG_TAGE)
-        self.assertEqual(ergebnis.rc, 0, ergebnis.ausgabe[-3000:])
+        self.assertEqual(ergebnis.rc, 0, _kind_ausgabe(ergebnis))
 
     def test_die_probe_traegt_ein_frisch_gepraegtes_datum(self):
         """Eine EINGECHECKTE Zeitbombe waere selbst eine: ein paar Wochen nach
@@ -565,7 +597,7 @@ class RepoTest(unittest.TestCase):
                         "ohne wirksamen Sprung beweist gruen hier nichts")
         self.assertEqual(ergebnis.rc, 0,
                          "eine der sechs als gesund gemessenen Dateien wurde "
-                         "rot:\n" + ergebnis.ausgabe[-3000:])
+                         "rot:" + chr(10) + _kind_ausgabe(ergebnis))
 
 
 class ProzessHygieneTest(unittest.TestCase):
@@ -605,8 +637,10 @@ class ProzessHygieneTest(unittest.TestCase):
                      "def test_eigene_db():\n"
                      "    assert os.environ['LIGHTOS_SHOW_DB'] != ELTERN\n"
                      % eltern)
-        self.assertEqual(zg.lauf([pfad], 0).rc, 0,
-                         "das Kind arbeitet auf der Show-Datenbank des Elters")
+        ergebnis = zg.lauf([pfad], 0)
+        self.assertEqual(ergebnis.rc, 0,
+                         "das Kind arbeitet auf der Show-Datenbank des Elters"
+                         + chr(10) + _kind_ausgabe(ergebnis))
 
 
 class BerichtUndCliTest(unittest.TestCase):
