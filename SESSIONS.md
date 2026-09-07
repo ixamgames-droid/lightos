@@ -9,7 +9,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| UI-53 | A | fix/buendel-ui53-fm35-fm37 | 2026-09-07T13:59Z | src/ui/views/programmer_view.py,src/core/fixture_filter.py |
 | FM-35 | A | fix/buendel-ui53-fm35-fm37 | 2026-09-07T14:00Z | src/ui/widgets/fixture_generator.py,src/ui/widgets/fixture_editor.py,src/core/kopfformular.py |
 | FM-37 | A | fix/buendel-ui53-fm35-fm37 | 2026-09-07T14:00Z | src/core/app_state.py |
 | XPLAT-33 | B | fix/xplat33-pixel-head-scene-zeit | 2026-09-07T15:54Z | tests/test_fm14_pixel_head_scene.py |
@@ -114,7 +113,6 @@
 
 ## Verlauf
 
-- 2026-09-06T17:22Z B done ENG-26
 - 2026-09-06T17:28Z A done OUT-56
 - 2026-09-06T17:28Z A claim ENG-22
 - 2026-09-06T17:49Z A done ENG-22
@@ -144,3 +142,4 @@
 - 2026-09-07T14:07Z B claim XPLAT-30
 - 2026-09-07T15:05Z B done XPLAT-30
 - 2026-09-07T15:54Z B claim XPLAT-33
+- 2026-09-07T16:06Z A done UI-53
