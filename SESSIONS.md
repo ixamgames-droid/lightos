@@ -10,6 +10,7 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | UI-53 | A | fix/buendel-ui53-fm35-fm37 | 2026-09-07T13:59Z | src/ui/views/programmer_view.py,src/core/fixture_filter.py |
+| FM-35 | A | fix/buendel-ui53-fm35-fm37 | 2026-09-07T14:00Z | src/ui/widgets/fixture_generator.py,src/ui/widgets/fixture_editor.py,src/core/kopfformular.py |
 
 ## Blocker & Fallen
 
@@ -109,7 +110,6 @@
 
 ## Verlauf
 
-- 2026-09-06T16:40Z A done ENG-21
 - 2026-09-06T16:53Z B claim ENG-26
 - 2026-09-06T16:55Z B aktualisiert ENG-26: Dateien src/core/engine/tempo_bus.py · src/ui/virtualconsole/vc_speedial.py -> src/core/engine/tempo_bus.py · src/ui/views/bpm_manager_view.py
 - 2026-09-06T17:09Z A done ENG-23
@@ -139,3 +139,4 @@
 - 2026-09-06T23:26Z A done FM-36
 - 2026-09-06T23:26Z A done XPLAT-32
 - 2026-09-07T13:59Z A claim UI-53
+- 2026-09-07T14:00Z A claim FM-35
