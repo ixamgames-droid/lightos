@@ -450,6 +450,18 @@ def _register_socketio(sio):
         _get_state().output_manager.set_blackout(enabled)
 
 
+def _halter_hinweis(port: int) -> str:
+    """Der Befehl, mit dem man den Halter des Ports findet — je Plattform.
+
+    ⚠️ Bis XPLAT-30 stand hier fest ``ss -lptn``. Das Werkzeug gibt es auf
+    Windows nicht; die Meldung schickte also genau die Nutzer ins Leere, bei
+    denen der Fall ueberhaupt erst auftreten kann.
+    """
+    if os.name == "nt":
+        return f"`netstat -ano | findstr :{port}` (die letzte Spalte ist die PID)."
+    return f"`ss -lptn 'sport = :{port}'`."
+
+
 def start_server(port: int = 5000):
     """Start the web server in a background thread."""
     global _thread, _running, _server
@@ -479,7 +491,7 @@ def start_server(port: int = 5000):
     # -> ``make_server(host, port, app, threaded=True)`` bedient HTTP UND SocketIO
     # identisch zu vorher, und ``srv.shutdown()`` beendet ``serve_forever()``
     # thread-safe (Socket schliesst beim Toggle 'aus').
-    from werkzeug.serving import make_server
+    from werkzeug.serving import make_server, BaseWSGIServer
     # NET-11: ``make_server`` ruft bei belegtem Port ``sys.exit(1)`` — es wirft
     # also ``SystemExit``, und das ist KEINE ``Exception``. Jeder Aufrufer, der
     # ``except Exception`` schreibt (der Menue-Schalter in main_window tut genau
@@ -491,6 +503,34 @@ def start_server(port: int = 5000):
     # ``OSError`` ist der Typ, den ein fehlgeschlagenes Binden ohnehin haette,
     # und den die Aufrufer schon behandeln. Das schuetzt ALLE Aufrufer (Menue,
     # OSC, Kommandozeile) statt nur den einen, der zuerst auffiel.
+    # XPLAT-30: Auf Windows griff der NET-11-Schutz oben NIE, weil dort gar
+    # nichts fehlschlaegt. ``make_server`` setzt ``SO_REUSEADDR``, und diese
+    # Option bedeutet auf den beiden Plattformen etwas VERSCHIEDENES:
+    #
+    #   Linux   — „nach TIME_WAIT wieder binden duerfen". Notwendig, damit der
+    #             Menue-Schalter aus/ein sofort wieder starten kann.
+    #   Windows — „einen belegten Port MITBENUTZEN duerfen". Der zweite Bind
+    #             gelingt, und es laufen ZWEI Server auf demselben Port; welche
+    #             Instanz eine Verbindung bekommt, ist nicht definiert.
+    #
+    # Gemessen auf diesem Rechner: ohne die Option scheitert der zweite Bind
+    # auch auf Windows (WSAEADDRINUSE 10048); MIT der Option gelingt er. Die
+    # App meldete deshalb „Web laeuft", und je nach Zufall antwortete mal die
+    # eine, mal die andere Instanz — stiller als ein Absturz und schwerer zu
+    # finden als ein Fehler.
+    #
+    # ★ Deshalb wird die Option NUR auf Windows abgeschaltet, und nur um diesen
+    # einen Aufruf herum. Dann faellt der belegte Port wieder in den
+    # SystemExit-Pfad unten, den es laengst gibt — ein zweiter, eigener
+    # Meldeweg waere dieselbe Frage an zwei Stellen beantwortet.
+    #
+    # ⚠️ Auf Linux bleibt sie an: dort hiesse Abschalten, dass „Web aus, Web
+    # an" nach einer echten Verbindung an TIME_WAIT scheitert. Auf Windows ist
+    # genau das gemessen NICHT der Fall (aus/ein direkt nach einer bedienten
+    # Verbindung startet weiterhin).
+    _reuse_alt = BaseWSGIServer.allow_reuse_address
+    if os.name == "nt":
+        BaseWSGIServer.allow_reuse_address = False
     try:
         _server = make_server(host, port, app, threaded=True)
     except SystemExit as e:
@@ -498,8 +538,10 @@ def start_server(port: int = 5000):
             f"Port {port} ist belegt — ein anderes Programm (oder eine zweite "
             f"LightOS-Instanz) haelt ihn bereits. Das Web-Interface wurde NICHT "
             f"gestartet; LightOS laeuft weiter. Wer den Halter sucht: "
-            f"`ss -lptn 'sport = :{port}'`."
+            f"{_halter_hinweis(port)}"
         ) from e
+    finally:
+        BaseWSGIServer.allow_reuse_address = _reuse_alt
     _running = True
     _thread = threading.Thread(
         target=_server.serve_forever,
