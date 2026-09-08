@@ -64,6 +64,12 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   und dieser scheiterte, meldete der Test nur die nackte Zahl seines
   Rueckgabewerts. Die Ausgabe des Unterprozesses — also die einzige Stelle, an
   der die Ursache stand — wurde verworfen. Sie steht jetzt in der Meldung.
+- Derselbe Waechter liess seine Unterprozesse das ganze Benutzerverzeichnis
+  durchsuchen, bevor sie ueberhaupt zu testen anfingen — sie suchten dort nach
+  Testdateien, weil ihre Probe ausserhalb des Projektordners lag. Das kostete
+  nicht nur Zeit, es machte den Waechter auch sporadisch rot: ein anderer Test
+  raeumte waehrenddessen im selben temporaeren Ordner auf. Er sucht jetzt nur
+  noch dort, wo seine Probe liegt — und braucht dafuer 147 statt 409 Sekunden.
 
 ### 2026-09-06 — Ungültige Universe-Nummern, verlorene Eingaben und tote Felder
 
