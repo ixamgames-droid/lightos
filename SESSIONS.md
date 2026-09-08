@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| BPM-AREA | A | feat/bpm-erkennung-ui | 2026-09-07T20:39Z | src/core/audio/beat_detector.py · src/core/audio/capture.py · src/core/audio/bpm_settings.py · src/core/audio/genre_presets.py · src/ui/views/bpm_manager_view.py · src/ui/views/audio_input_view.py · src/ui/views/bpm_generator_view.py |
+| BPM-AREA | A | feat/bpm-erkennung-ui | 2026-09-08T13:35Z | src/core/audio/beat_detector.py · src/core/audio/capture.py · src/core/audio/bpm_settings.py · src/core/audio/genre_presets.py · src/ui/views/bpm_manager_view.py · src/ui/views/audio_input_view.py · src/ui/views/bpm_generator_view.py |
 | XPLAT-38 | B | fix/xplat38-kind-pytest-wurzel | 2026-09-07T21:29Z | tools/zeitbomben_gate.py,tests/test_zeitbomben_gate.py |
 
 ## Blocker & Fallen
