@@ -117,7 +117,16 @@ class DieFlaggeWirktBeiPytestTest(unittest.TestCase):
         ueber `%TEMP%`. Ohne diese Pruefung belegte der Test unten nur, dass eine
         Zeile existiert, nicht dass sich etwas geaendert hat."""
         ohne = self._kopfzeile([])
-        self.assertNotEqual(os.path.normcase(ohne), os.path.normcase(self.ordner))
+        if os.path.normcase(ohne) == os.path.normcase(self.ordner):
+            # Gemessen am 2026-09-08 in der Linux-CI: dort waehlt pytest schon
+            # OHNE Flagge den Probenordner, weil /tmp und das Repo weit
+            # auseinanderliegen. Auf Windows liegen beide unter dem
+            # Benutzerverzeichnis, und genau darum landet die Wurzel dort.
+            # Die Fehlklasse gibt es hier also nicht -- laut ueberspringen
+            # statt einen Zustand zu behaupten, den diese Plattform nicht hat.
+            self.skipTest(
+                "pytest waehlt hier schon ohne Flagge " + ohne
+                + " - die Fehlklasse XPLAT-38 tritt auf dieser Plattform nicht auf")
         for drunter in (self.ordner, zg.REPO):
             self.assertTrue(
                 os.path.normcase(drunter).startswith(os.path.normcase(ohne) + os.sep),
