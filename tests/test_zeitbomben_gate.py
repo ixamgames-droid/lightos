@@ -446,7 +446,10 @@ class KanarieTest(unittest.TestCase):
         env["LIGHTOS_SHOW_DB"] = os.path.join(self.tmp, "show.db")
         fertig = subprocess.run(
             [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider",
-             self.probe],
+             # XPLAT-38: ohne eigenes rootdir laeuft die Sammlung vom
+             # gemeinsamen Vorfahren von Repo und Probe aus los - also
+             # durch das halbe Home-Verzeichnis samt %TEMP%.
+             "--rootdir", os.path.dirname(self.probe), self.probe],
             cwd=REPO, env=env, text=True, capture_output=True, timeout=300)
         self.assertEqual(fertig.returncode, 0,
                          "ohne Vorspann muss die Bombe gruen sein — sonst "

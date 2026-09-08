@@ -303,6 +303,66 @@ def sprung_umgebung(tage: int, basis: dict | None = None,
     return env
 
 
+def _wurzel_fuer(dateien) -> str | None:
+    """Das ``--rootdir`` fuer den Kindprozess — oder ``None`` fuer "wie bisher".
+
+    ★ XPLAT-38 — DER GRUND. Liegt das Ziel AUSSERHALB des Repos (die Proben
+    liegen im Temp-Bereich), dann findet pytest in dessen Vorfahren keine
+    ini-Datei und nimmt als rootdir den gemeinsamen Vorfahren von
+    Aufrufverzeichnis und Ziel. Gemessen, nicht vermutet: pytest meldet dann
+    woertlich `rootdir: C:/Users/<name>` — das Benutzerverzeichnis. Beim
+    Sammeln zaehlt es die Verzeichnisse auf diesem Weg auf, `%TEMP%`
+    eingeschlossen. (Es steigt NICHT hinein: eine Testdatei, die dort
+    danebenliegt, wird nicht gesammelt — nachgemessen. Das blosse Aufzaehlen
+    genuegt aber fuer den Schaden.)
+    Dort loeschen Nachbartests laufend ihre eigenen Ordner, und ein ``lstat``
+    auf einen gerade verschwundenen Eintrag beendet die Sammlung mit
+    ``Interrupted: 1 error during collection`` und Exit 2.
+
+    Gemessen am 2026-09-07 (Sitzung B) mit einer Schleife ueber
+    ``test_qa58_bibliothek_schema_unberuehrt`` als Nachbarn, zwoelf Kindlaeufe
+    je Variante: **wie bisher 11 von 12 gescheitert, mit ``--rootdir`` 0 von
+    12.** Das erklaert, warum es immer qa58 war und nie ein anderer Nachbar:
+    diese Datei erzeugt und loescht besonders viele kurzlebige Temp-Ordner.
+
+    Bewusst NUR, wenn ALLE Ziele draussen liegen. Bei gemischten Zielen waere
+    der gemeinsame Vorfahr wieder das Home-Verzeichnis — dann lieber nichts
+    setzen als etwas Falsches. Der echte Gate-Lauf uebergibt Repo-Dateien und
+    faellt darum in den ``None``-Zweig, unveraendert.
+    """
+    if not dateien:
+        return None
+    absolut = [os.path.abspath(d) for d in dateien]
+    if any(d.startswith(REPO + os.sep) or d == REPO for d in absolut):
+        return None
+    ordner = [os.path.dirname(d) for d in absolut]
+    try:
+        return os.path.commonpath(ordner)
+    except ValueError:            # verschiedene Laufwerke
+        return None
+
+
+def _befehl_fuer(dateien, tage: int) -> list:
+    """Der Kind-Befehl an EINER Stelle -- damit pruefbar ist, was er traegt.
+
+    Herausgezogen fuer XPLAT-38: dass das ``--rootdir`` gesetzt wird, laesst
+    sich am fertigen Lauf NICHT deterministisch zeigen. Der Schaden ist ein
+    Wettlauf (pytest zaehlt beim Sammeln das gemeinsame Vorfahren-Verzeichnis
+    auf, ein Nachbar loescht dort gerade einen Ordner, ``lstat`` faellt hin).
+    Nachweisbar ist der Wettlauf nur statistisch -- 11 von 12 gegen 0 von 12.
+    Am Befehl selbst ist es dagegen eindeutig, und darum steht er hier.
+    """
+    befehl = [sys.executable, "-m", "pytest", "-q", "--tb=short",
+              "-p", "no:cacheprovider"]
+    if tage:
+        befehl += ["-p", KANARIE_PLUGIN]
+    wurzel = _wurzel_fuer(dateien)
+    if wurzel:
+        befehl += ["--rootdir", wurzel]
+    return befehl + [os.path.relpath(d, REPO) if d.startswith(REPO) else d
+                     for d in dateien]
+
+
 def lauf(dateien, tage: int, shim: str = SHIM, zeitlimit: int = 480,
          uhr: str = SPRUNG_UHR) -> Ergebnis:
     """pytest im Kindprozess ueber ``dateien``, Uhr um ``tage`` vorgerueckt.
@@ -320,12 +380,7 @@ def lauf(dateien, tage: int, shim: str = SHIM, zeitlimit: int = 480,
     with tempfile.TemporaryDirectory(prefix="zeitbomben_") as tmp:
         env = sprung_umgebung(tage, shim=shim, uhr=uhr)
         env["LIGHTOS_SHOW_DB"] = os.path.join(tmp, "show.db")
-        befehl = [sys.executable, "-m", "pytest", "-q", "--tb=short",
-                  "-p", "no:cacheprovider"]
-        if tage:
-            befehl += ["-p", KANARIE_PLUGIN]
-        befehl += [os.path.relpath(d, REPO) if d.startswith(REPO) else d
-                   for d in dateien]
+        befehl = _befehl_fuer(dateien, tage)
         fertig = subprocess.run(befehl, cwd=REPO, env=env, text=True, encoding="utf-8",
                                 capture_output=True, timeout=zeitlimit)
     ausgabe = (fertig.stdout or "") + (fertig.stderr or "")
