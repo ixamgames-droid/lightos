@@ -34,6 +34,16 @@ BRUMM_RATIO = 0.4            # hum_ratio ab hier = BRUMM. Gemessen 2026-09-14 mi
                              # (iii) Kick −30 dB + Brumm 50 Hz −30 dBFS (Bassband-SNR 0 dB) min 0,517 /
                              # Median 0,594 · (iv) reiner Brumm −30 dBFS 0,994. SNR +3 dB schwankt
                              # 0,18–0,61, SNR +10 dB 0,000. 0,4 liegt zwischen (i/ii) und min (iii).
+                             # ABER: gehaltener tiefer Bass OHNE Kick (Breakdown, Sub-Drone 46–62 Hz)
+                             # ergibt ebenfalls 0,75–0,99, und der Detektor faellt nach ~6 s Breakdown
+                             # auf „searching". Deshalb gilt BRUMM nur mit ZWEI weiteren Bedingungen
+                             # (_brumm_aktiv): Detektor NICHT eingerastet (ui_diagnose F2) UND
+                             # CaptureSnapshot.netz_linie >= NETZ_LINIE_MIN.
+NETZ_LINIE_MIN = 0.5         # Schaerfe der 50/60-Hz-Linie (level_meter.netz_linie, 4-s-Fenster). Gemessen
+                             # 2026-09-14, bpm_bench/signals.py: Bass-Ton 46,2/49/51,9/55/58,3/61,7/98/110 Hz
+                             # ≤ 0,089 · Kick 90/128/174 ≤ 0,222 · Kick+Bass+Hats ≤ 0,126 · Rauschen ≤ 0,21 ·
+                             # Kick −30 dB + Brumm 50 Hz −40…−20 dBFS ≥ 0,991 · reiner Brumm 50,2 Hz 0,921,
+                             # 49,6 Hz 0,501 (Netz driftet real ±0,1 Hz). Blind: Bass-Ton genau 50/60/100/120 Hz.
 JITTER_CHUNK_MS = 70.0       # p95 der Chunk-Abstaende darueber (normal 21–43 ms, Briefing G4)
 JITTER_BACKLOG_MS = 250.0    # Detektor-Rueckstand darueber
 DC_MAX = 0.02                # |DC-Offset| darueber = Chip DC (Bank: +0,05 als Stoerfall)
@@ -268,13 +278,23 @@ def _r_clip(cap, det, m, o, now):
         None, key="clip", stabil=True)
 
 
+def _brumm_aktiv(cap, det) -> bool:
+    """BRUMM nur, wenn ALLE drei gelten: ``hum_ratio >= BRUMM_RATIO`` (Detektor),
+    Detektor nicht eingerastet (F2 — eingerastet stoert der Brumm die Erkennung nicht)
+    und die Energie liegt als scharfe Linie auf 50/60 Hz (``netz_linie >= NETZ_LINIE_MIN``).
+    Ein gehaltener Bass im Breakdown hat hohen ``hum_ratio``, aber keine Netzlinie."""
+    if det is None or cap is None or _g(det, "state", "no_signal") == "locked":
+        return False
+    if float(_g(cap, "netz_linie", 0.0)) < NETZ_LINIE_MIN:
+        return False
+    return float(_g(det, "hum_ratio", 0.0)) >= BRUMM_RATIO
+
+
 def _r_brumm(cap, det, m, o, now):
-    if m.kind not in AUDIO_KINDS or det is None:
+    if m.kind not in AUDIO_KINDS or not _brumm_aktiv(cap, det):
         return None
     ratio = float(_g(det, "hum_ratio", 0.0))
-    if ratio < BRUMM_RATIO:
-        return None
-    hz = int(_g(det, "hum_hz", 0)) or 50
+    hz = int(_g(cap, "netz_hz", 0)) or int(_g(det, "hum_hz", 0)) or 50
     return StatusLine(
         "problem", f"Netzbrumm {hz} Hz",
         f"Brummanteil im Bassband {ratio * 100:.0f} % (Erkennung kippt ab ~50 %)",
@@ -518,9 +538,9 @@ def chips(cap_snap, det_snap) -> set[str]:
             out.add("JITTER")
         if abs(float(_g(cap_snap, "dc_offset", 0.0))) > DC_MAX:
             out.add("DC")
+    if _brumm_aktiv(cap_snap, det_snap):
+        out.add("BRUMM")
     if det_snap is not None:
-        if float(_g(det_snap, "hum_ratio", 0.0)) >= BRUMM_RATIO:
-            out.add("BRUMM")
         if float(_g(det_snap, "backlog_ms", 0.0)) > JITTER_BACKLOG_MS:
             out.add("JITTER")
     return out

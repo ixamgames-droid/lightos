@@ -37,8 +37,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Quelle-Liste heißt jetzt **„PC-Audio (Systemstandard)"**, damit er nicht wie ein
   Doppel des Geräte-Eintrags aussieht; gespeicherte Einstellungen passen
   unverändert. Die Diagnosezeile zeigt zusätzlich DC-Offset und Chunk-Abstand des
-  Eingangs. Alle Schwellen sind Annahmen, bis die erste echte Aufnahme vom Rig
-  vorliegt. Keine Änderung an Show-Datei oder Einstellungsformat.
+  Eingangs. **BRUMM** meldet sich nur, wenn die Erkennung nicht eingerastet ist
+  und die Energie als scharfe Linie genau auf 50/60 Hz liegt — ein gehaltener
+  Bass im Breakdown (z. B. 58 Hz) ist kein Brumm mehr. Alle Schwellen sind
+  Annahmen, bis die erste echte Aufnahme vom Rig vorliegt. Keine Änderung an Show-Datei oder Einstellungsformat.
 
 ### 2026-09-14 — Audio: Pegelmeter bei der BPM-Erkennung, Tab „Audio Input" entfällt
 

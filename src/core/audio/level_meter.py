@@ -15,6 +15,15 @@ RMS ueber 300 ms und 1 s, Clip-Zaehler ueber 1 s, Peak-Hold faellt mit
 ``PEAK_HOLD_ABFALL_DB_S`` je Sekunde Audio. ``chunk_ms_p95`` misst dagegen die
 WANDUHR (Ankunftsabstaende der Chunks, Uhr injizierbar) — Jitter/Aussetzer des
 Treibers.
+
+``netz_linie`` (BPM-11, S6) misst, wie SCHARF die Energie um 50/60 Hz samt
+zwei Oberwellen auf der Netzfrequenz liegt: Leistung in ±``NETZ_LINIE_HZ``
+um k·50 bzw. k·60 Hz geteilt durch die Leistung in ±``NETZ_UMGEBUNG_HZ``,
+aus einem ``NETZ_FENSTER_S`` langen, auf ~2,8 kHz dezimierten Fenster
+(Aufloesung 0,25 Hz). Netzbrumm ist eine Linie genau auf 50/60 Hz (≈1,0);
+ein gehaltener Bass-Ton liegt fast nie dort (G1 49,0 · G#1 51,9 · A#1 58,3 ·
+B1 61,7 Hz → ≤0,07), eine Kick ist breitbandig (≤0,22). Die Statusregel BRUMM
+braucht beides: ``hum_ratio`` des Detektors UND diese Linie.
 """
 from __future__ import annotations
 
@@ -38,6 +47,11 @@ BODEN_DBFS = -120.0           # Stille / kein Signal
 FENSTER_KURZ_S = 0.3
 FENSTER_LANG_S = 1.0
 JITTER_ABSTAENDE = 64         # so viele Ankunftsabstaende gehen in p95 ein
+NETZ_FENSTER_S = 4.0          # Fensterlaenge der Netzlinien-Messung (Aufloesung 1/4 s = 0,25 Hz)
+NETZ_ALLE_S = 1.0             # so oft (Audio-Zeit) wird die Netzlinie neu gerechnet (CPU-Budget)
+NETZ_DEZIMATION = 16          # 44,1 kHz -> 2,76 kHz (Blocksumme, Nullstellen auf fs/16-Vielfachen)
+NETZ_LINIE_HZ = 0.5           # Linienbreite um k·50/60 Hz (Hann-Hauptkeule bei 4 s)
+NETZ_UMGEBUNG_HZ = 4.0        # Vergleichsband um k·50/60 Hz
 
 _CLIP_LIN = 10.0 ** (CLIP_SAMPLE_DBFS / 20.0)
 _BODEN_LIN = 10.0 ** (BODEN_DBFS / 20.0)
@@ -65,6 +79,8 @@ class CaptureSnapshot:
     chunk_ms_p95: float = 0.0              # p95 der Chunk-Ankunftsabstaende (Wanduhr)
     sample_rate: int = 44100
     chunks: int = 0                        # verarbeitete Chunks seit reset()
+    netz_linie: float = 0.0                # 0..1 Schaerfe der 50/60-Hz-Linie (s. Moduldoku); 0 = unbekannt
+    netz_hz: int = 0                       # 50 | 60 (staerkere Linie), 0 = noch nicht gemessen
     running: bool = False
     device: str | None = None
     source_mode: str | None = None
@@ -106,6 +122,15 @@ class LevelMeter:
         self._t_last: float | None = None
         self._hold = 0.0                     # linear
         self._count = 0
+        fs = self.sample_rate / NETZ_DEZIMATION
+        self._netz_w = int(NETZ_FENSTER_S * fs)
+        self._netz_ring = np.zeros(self._netz_w, dtype=np.float32)   # dezimiert, Ringpuffer
+        self._netz_pos = 0
+        self._netz_n = 0
+        self._netz_rest = np.zeros(0, dtype=np.float32)
+        self._netz_win = np.hanning(self._netz_w)
+        self._netz_seit = 0                  # Roh-Samples seit der letzten Messung
+        self._netz = (0.0, 0)
         self._snap = CaptureSnapshot(sample_rate=self.sample_rate)
 
     def snapshot(self) -> CaptureSnapshot:
@@ -166,6 +191,7 @@ class LevelMeter:
             p95 = srt[min(len(srt) - 1, int(math.ceil(0.95 * len(srt))) - 1)]
         else:
             p95 = 0.0
+        self._netz_chunk(x)
         self._count += 1
         self._snap = CaptureSnapshot(
             dbfs(math.sqrt(sq_k / self._n_kurz)),
@@ -178,4 +204,58 @@ class LevelMeter:
             p95,
             sr,
             self._count,
+            netz_linie=self._netz[0],
+            netz_hz=self._netz[1],
         )
+
+    # ── Netzlinie ────────────────────────────────────────────────────────────
+
+    def _netz_chunk(self, x: np.ndarray) -> None:
+        d = NETZ_DEZIMATION
+        y = np.concatenate((self._netz_rest, x)) if self._netz_rest.shape[0] else x
+        m = (y.shape[0] // d) * d
+        self._netz_rest = y[m:].astype(np.float32, copy=True)
+        if m:
+            blk = y[:m].reshape(-1, d).sum(axis=1)       # Blocksumme: Skala egal (Verhaeltnis)
+            w, k = self._netz_w, blk.shape[0]
+            if k >= w:
+                self._netz_ring[:] = blk[-w:]
+                self._netz_pos = 0
+            else:
+                e = self._netz_pos + k
+                if e <= w:
+                    self._netz_ring[self._netz_pos:e] = blk
+                else:
+                    self._netz_ring[self._netz_pos:] = blk[:w - self._netz_pos]
+                    self._netz_ring[:e - w] = blk[w - self._netz_pos:]
+                self._netz_pos = e % w
+            self._netz_n = min(w, self._netz_n + k)
+        self._netz_seit += int(x.shape[0])
+        if self._netz_n < self._netz_w or self._netz_seit < int(NETZ_ALLE_S * self.sample_rate):
+            return
+        self._netz_seit = 0
+        y = np.roll(self._netz_ring, -self._netz_pos)
+        self._netz = netz_linie(y, self.sample_rate / d, self._netz_win)
+
+
+def netz_linie(y: np.ndarray, fs: float, fenster: np.ndarray | None = None) -> tuple[float, int]:
+    """(Schaerfe 0..1, 50|60) der Netzlinie in ``y`` (Abtastrate ``fs``); (0, 0) bei Stille."""
+    n = int(y.shape[0])
+    if n < 16:
+        return 0.0, 0
+    nfft = 1 << max(12, int(math.ceil(math.log2(n))))
+    win = fenster if fenster is not None and fenster.shape[0] == n else np.hanning(n)
+    p = np.abs(np.fft.rfft((y - y.mean()) * win, nfft)) ** 2
+    df = fs / nfft
+    best, best_hz = 0.0, 0
+    for f0 in (50, 60):
+        linie = umgebung = 0.0
+        for k in (1, 2, 3):
+            c = k * f0
+            lo, hi = int(math.ceil((c - NETZ_LINIE_HZ) / df)), int(math.floor((c + NETZ_LINIE_HZ) / df))
+            ulo, uhi = int(math.ceil((c - NETZ_UMGEBUNG_HZ) / df)), int(math.floor((c + NETZ_UMGEBUNG_HZ) / df))
+            linie += float(p[lo:hi + 1].sum())
+            umgebung += float(p[ulo:uhi + 1].sum())
+        if umgebung > 1e-18 and linie / umgebung > best:
+            best, best_hz = linie / umgebung, f0
+    return best, best_hz

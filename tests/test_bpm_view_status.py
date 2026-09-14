@@ -187,7 +187,8 @@ def test_brumm_statuszeile_und_chip_2s_an_3s_aus(env):
     make, cap, clock, det = env
     v, *_ = make()
     _tick(v, clock, 0.0)
-    det["snap"] = _det(hum_ratio=0.8, hum_hz=50)
+    det["snap"] = _det(state="searching", hum_ratio=0.8, hum_hz=50)
+    cap.snap = replace(cap.snap, netz_linie=0.99, netz_hz=50)
     t = 10.0
     while t < 11.95:
         assert _tick(v, clock, t).startswith("Eingerastet")

@@ -188,7 +188,7 @@ erst nach 2 s und bleibt 3 s nach ihrem Ende stehen, damit nichts flackert. Die 
 | **Ausgabegerät nicht gefunden** | das gemerkte PC-Audio-Gerät fehlt, es wird die Standardausgabe mitgehört | Gerät anstecken oder ein vorhandenes wählen |
 | **Audio-Fehler** / **Audio gestoppt** | der Eingang ist abgebrochen (Gerät gezogen, Treiber) | Gerät anstecken, dann den Link **erneut verbinden** |
 | **Übersteuert** | das Signal stößt an 0 dBFS (Chip CLIP) | Pegel am Mischpult/Interface senken, bis der Balken grün pendelt |
-| **Netzbrumm 50 Hz** | Brumm im Bassband so laut wie der Beat (Chip BRUMM) | Masseschleife: DI-Box/Ground-Lift, anderes Netzteil, symmetrisches Kabel |
+| **Netzbrumm 50 Hz** | Brumm genau auf 50/60 Hz im Bassband so laut wie der Beat, und der Takt wird nicht gefunden (Chip BRUMM); ein gehaltener Bass im Breakdown löst das nicht aus | Masseschleife: DI-Box/Ground-Lift, anderes Netzteil, symmetrisches Kabel |
 | **Pegel niedrig** | unter −40 dBFS (Chip LEISE) | Ausgang am Mischpult bzw. Interface-Gain anheben |
 | **Audio kommt stoßweise** | der Rechner liefert das Audio ruckelig (Chip AUSSETZER) | andere Programme schließen |
 | **Sucht Tempo** / **Kein Takt gefunden** | Signal da, aber (noch) kein stabiler Beat | kurz warten; sonst TAP viermal im Takt |

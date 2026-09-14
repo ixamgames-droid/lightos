@@ -197,3 +197,43 @@ def test_cpu_budget_hoechstens_0_05_ms_je_1024er_chunk():
         best = min(best, (time.perf_counter() - t0) / runs * 1000.0)
     print(f"LevelMeter: {best:.4f} ms/Chunk")
     assert best <= 0.05, f"{best:.4f} ms je Chunk"
+
+
+# ── Netzlinie (BPM-11, S6): Brumm vs. gehaltener Bass ────────────────────────
+
+def _feed(m: LevelMeter, sig: np.ndarray) -> None:
+    x = sig.astype(np.float32)
+    for i in range(0, x.shape[0] - N + 1, N):
+        m.on_chunk(x[i:i + N])
+
+
+def _ton(f: float, dauer: float, amp: float, obertoene=(1.0, 0.4, 0.2)):
+    t = np.arange(int(dauer * SR)) / SR
+    return amp * sum(a * np.sin(2 * np.pi * (k + 1) * f * t) for k, a in enumerate(obertoene))
+
+
+@pytest.mark.parametrize("f,hz,mind", [(50.0, 50, 0.9), (60.0, 60, 0.9), (50.2, 50, 0.6)])
+def test_netzlinie_brumm_ist_scharf(f, hz, mind):
+    m = LevelMeter(SR)
+    _feed(m, _ton(f, 3.5, 0.03, (1.0, 0.5, 0.25)))
+    assert m.snapshot().netz_linie == 0.0 and m.snapshot().netz_hz == 0   # Fenster (4 s) noch nicht voll
+    _feed(m, _ton(f, 3.0, 0.03, (1.0, 0.5, 0.25)))
+    s = m.snapshot()
+    assert s.netz_linie >= mind and s.netz_hz == hz
+
+
+@pytest.mark.parametrize("f", [46.2, 49.0, 51.9, 55.0, 58.3, 61.7, 98.0, 110.0])
+def test_netzlinie_bass_ton_ist_keine_netzlinie(f):
+    m = LevelMeter(SR)
+    _feed(m, _ton(f, 7.0, 0.2))
+    assert m.snapshot().netz_linie < 0.1
+
+
+def test_netzlinie_kick_rauschen_stille_und_reset():
+    m = LevelMeter(SR)
+    _feed(m, np.random.default_rng(3).standard_normal(int(7 * SR)) * 0.1)
+    assert m.snapshot().netz_linie < 0.3
+    m.reset()
+    _feed(m, np.zeros(int(7 * SR)))
+    assert m.snapshot().netz_linie == 0.0 and m.snapshot().netz_hz == 0
+    assert lm.netz_linie(np.zeros(8), 2756.25) == (0.0, 0)
