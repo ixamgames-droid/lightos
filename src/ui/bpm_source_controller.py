@@ -5,11 +5,16 @@ Je Eintrag (``kind``, ``device``):
 
 | kind        | Capture                              | OS2L   | Manager                                    |
 |-------------|--------------------------------------|--------|--------------------------------------------|
-| ``loopback``| ``set_source_mode("loopback")``      | stop   | ``use_audio_source(True)`` (startet Capture)|
+| ``loopback``| ``set_source_mode("loopback", sink)``| stop   | ``use_audio_source(True)`` (startet Capture)|
 | ``input``   | ``set_source_mode("input", device)`` | stop   | ``use_audio_source(True)``                 |
 | ``os2l``    | stop                                 | start  | ``use_audio_source(False)``                |
 | ``song``    | stop                                 | stop   | ``use_audio_source(False)`` + aktueller Player-Track (``request_bpm``, nur in AUTO) |
 | ``off``     | stop                                 | stop   | ``use_audio_source(False)``                |
+
+``sink`` (S5) ist die ``sink_id`` eines Ausgabegeraets aus
+``AudioCapture.list_loopback_sinks()``; alles andere (z. B. ein Mikrofonname aus
+alten Einstellungen) wird zu None = Standard-Ausgabegeraet — ein Eingangsname
+darf den Loopback nie aufs Mikrofon lenken.
 
 Bei JEDEM Wechsel: ``det.set_tempo_hint(None)`` (Suche wieder frei) und
 ``det.reset()`` (alter Tempo-Zustand gehoert zur alten Quelle). Der Manager-
@@ -37,6 +42,18 @@ damit ein fehlendes Backend (kein soundcard/numpy) die uebrigen nicht blockiert.
 from __future__ import annotations
 
 AUDIO_KINDS = ("loopback", "input")
+
+
+def _known_sink(device: str | None) -> str | None:
+    """``device`` nur zurueckgeben, wenn es eine aktuelle ``sink_id`` ist."""
+    if not device:
+        return None
+    try:
+        from src.core.audio.capture import AudioCapture
+        ids = {str(i) for i, _n in (AudioCapture.list_loopback_sinks() or [])}
+    except Exception:
+        return None
+    return device if device in ids else None
 KINDS = ("loopback", "input", "os2l", "song", "off")
 
 
@@ -121,7 +138,7 @@ class SourceController:
         if kind not in AUDIO_KINDS:
             device = None
         if kind == "loopback":
-            device = None            # Sink-Wahl kommt mit S5 (capture loest den Default auf)
+            device = _known_sink(device)   # nur echte sink_id, sonst Standard-Ausgabegeraet
         key = (kind, device)
         if key == self._current and not force:
             return False
