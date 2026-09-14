@@ -7,6 +7,39 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-14 — BPM: Statuszeile sagt Problem, Ursache und Abhilfe; „Eingang 30 s aufnehmen"
+
+#### Neu / Geändert
+
+- **BPM: Statuszeile nennt Problem, Ursache und Abhilfe (Kein Signal, zu leise,
+  übersteuert, Brumm, Aussetzer …); Hinweis-Chips am Pegelmeter; „Eingang 30 s
+  aufnehmen" schreibt eine WAV in den Datenordner.** Unter den Knöpfen der
+  **Erkennung** steht jetzt eine Statuszeile, die **nie leer** ist: sie sagt in
+  einem Satz, was los ist, warum — mit dem gemessenen Wert — und was zu tun ist,
+  z. B. „Kein Signal — Eingang »USB Audio CODEC« liefert −70 dBFS — Kabel/Gerät
+  prüfen oder anderen Eingang wählen" oder „Netzbrumm 50 Hz — Brummanteil im
+  Bassband 71 % — Masseschleife: DI-Box/Ground-Lift …". Grün = ok, gelb = Hinweis,
+  rot = Problem; eine Störung erscheint erst nach 2 s und bleibt 3 s nach ihrem
+  Ende stehen, damit nichts flackert. Ist die Abhilfe unterstrichen, führt ein
+  Klick sie aus: **erneut verbinden** nach einem Audio-Fehler, Aufnahme starten,
+  „Erweitert" aufklappen oder die Quelle-Liste öffnen. Unter dem Pegelmeter
+  zeigen kleine Chips **CLIP**, **BRUMM**, **LEISE**, **AUSSETZER** und **DC**,
+  was den Detektor gerade stört. In **„Erweitert"** neu: **„Eingang 30 s
+  aufnehmen"** — Musik laufen lassen, klicken, 30 s warten; danach steht in der
+  Statuszeile „Aufnahme gespeichert — audio_diag/lightos_eingang_….wav — Datei an
+  Robin/Support schicken". Neben der WAV liegt eine gleichnamige JSON mit den
+  Messwerten (Gerät, Pegel, Clips, Brumm, Version, Zeit — kein Benutzername, kein
+  Pfad); nichts wird automatisch versendet. **×½ / ×2** in Auto verstellen nichts
+  mehr, wenn das Ziel außerhalb des Tempo-Bereichs liegt — die Statuszeile sagt
+  „×2 nicht möglich — … außerhalb des Tempo-Bereichs 60–200" mit Link zum Bereich.
+  Fehlt beim Start das gemerkte PC-Audio-Gerät, sagt die Statuszeile jetzt, dass
+  die Standardausgabe mitgehört wird (vorher still). Der generische Eintrag der
+  Quelle-Liste heißt jetzt **„PC-Audio (Systemstandard)"**, damit er nicht wie ein
+  Doppel des Geräte-Eintrags aussieht; gespeicherte Einstellungen passen
+  unverändert. Die Diagnosezeile zeigt zusätzlich DC-Offset und Chunk-Abstand des
+  Eingangs. Alle Schwellen sind Annahmen, bis die erste echte Aufnahme vom Rig
+  vorliegt. Keine Änderung an Show-Datei oder Einstellungsformat.
+
 ### 2026-09-14 — Audio: Pegelmeter bei der BPM-Erkennung, Tab „Audio Input" entfällt
 
 #### Neu / Geändert
