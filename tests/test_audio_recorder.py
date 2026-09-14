@@ -211,3 +211,47 @@ def test_zwei_aufnahmen_gleiche_sekunde_zwei_paare(tmp_path):
 
 def test_version_ermittelbar():
     assert ar._lightos_version()
+
+
+def _offen(pfad: str) -> int:
+    """Wie viele Datei-Handles dieses Prozesses zeigen auf ``pfad`` (Linux /proc; sonst 0)."""
+    fd_dir = "/proc/self/fd"
+    if not os.path.isdir(fd_dir):
+        return 0
+    ziel, n = os.path.realpath(pfad), 0
+    for fd in os.listdir(fd_dir):
+        try:
+            n += os.readlink(os.path.join(fd_dir, fd)) == ziel
+        except OSError:
+            pass
+    return n
+
+
+@pytest.mark.parametrize("ende", ["cancel", "capture_stop"])
+def test_wav_ist_beim_callback_schon_geschlossen_und_gueltig(tmp_path, ende):
+    """on_finished meldet eine FERTIGE Datei: Header mit Frame-Zahl, Groesse passt —
+    auch bei Abbruch (die View zeigt „Aufnahme abgebrochen — Datei …" sofort an)."""
+    cap = FakeCap()
+    beim_callback: list = []
+    done = threading.Event()
+
+    def fin(p):
+        offen = _offen(p)                     # vor dem eigenen Lesen zaehlen
+        with wave.open(p, "rb") as wf:
+            beim_callback.append((wf.getnframes(), os.path.getsize(p), offen))
+        done.set()
+    r = AudioRecorder(capture=cap, detector=FakeDet(), base_dir=str(tmp_path), on_finished=fin)
+    r.start(30)
+    cap.feed(2.0)
+    t0 = time.monotonic()
+    while r.progress_s() < 1.9 and time.monotonic() - t0 < 5:
+        time.sleep(0.01)
+    if ende == "cancel":
+        r.cancel()
+    else:
+        cap.running = False
+    assert done.wait(5.0)
+    frames, groesse, offen = beim_callback[0]
+    assert frames >= int(1.9 * cap.sr)
+    assert groesse == 44 + 2 * frames
+    assert offen == 0, "WAV-Datei noch offen (Handle nicht geschlossen)"
