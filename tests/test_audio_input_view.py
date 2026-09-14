@@ -45,7 +45,7 @@ class _FakeDetector:
         return 0.0
 
     def process_chunk(self, _samples):
-        pass
+        self.chunks = getattr(self, "chunks", 0) + 1
 
     def set_sensitivity(self, _value):
         pass
@@ -67,6 +67,9 @@ class _FakeCapture:
     def unsubscribe(self, cb):
         if cb in self.subscribers:
             self.subscribers.remove(cb)
+
+    def is_subscribed(self, cb):
+        return cb in self.subscribers
 
     def set_device(self, name):
         self._device_name = name
@@ -224,4 +227,27 @@ def test_audio_input_view_unregisters_worker_callbacks(qapp, monkeypatch):
     assert capture.subscribers == []
 
     view.deleteLater()
+    app.processEvents()
+
+
+def test_audio_input_view_feeds_detector_only_when_manager_does_not(qapp, monkeypatch):
+    """S1 (BPM-06): der neue Detektor zaehlt Samples — ein zweiter ``process_chunk``
+    je Chunk liesse seine Uhr doppelt laufen. Die View fuettert ihn deshalb nur,
+    solange der BPMManager ``det.process_chunk`` nicht selbst am Capture abonniert
+    hat (Aufnahme aus diesem Tab ohne „BPM-Manager steuern")."""
+    import numpy as np
+
+    capture = _FakeCapture(start_ok=True)
+    detector = _FakeDetector()
+    app, view = _make_view(monkeypatch, capture, detector)
+    chunk = np.zeros(1024, dtype=np.float32)
+
+    view._on_audio_chunk(chunk)
+    assert detector.chunks == 1, "ohne Manager muss die View den Detektor fuettern"
+
+    capture.subscribe(detector.process_chunk)      # so abonniert BPMManager.use_audio_source
+    view._on_audio_chunk(chunk)
+    assert detector.chunks == 1, "mit Manager-Abo darf die View NICHT noch einmal fuettern"
+
+    view.close()
     app.processEvents()
