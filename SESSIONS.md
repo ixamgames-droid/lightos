@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| BPM-08 | A | feat/bpm-s3-tempobus | 2026-09-14T11:10Z | src/ui/views/bpm_manager_view.py · src/ui/views/tempo_bus_view.py · src/ui/main_window.py |
+| _(frei)_ |  |  |  |  |
 
 ## Blocker & Fallen
 
@@ -120,7 +120,6 @@
 
 ## Verlauf
 
-- 2026-09-06T21:26Z B aktualisiert QA-78: Branch fix/qa78-adressregel-verifiziert -> fix/qa78-adressregel-sechs-stellen; Dateien src/core/engine/scene.py -> src/core/engine/effect_func.py · src/core/engine/carousel.py · src/core/engine/sequence.py · src/core/engine/mapped_channel.py · src/core/engine/script_func.py · src/core/engine/efx.py
 - 2026-09-06T22:12Z B uebergeben QA-78
 - 2026-09-06T23:26Z A done QA-75
 - 2026-09-06T23:26Z A done FM-36
@@ -150,3 +149,4 @@
 - 2026-09-14T10:22Z A claim BPM-07
 - 2026-09-14T11:09Z A done BPM-07
 - 2026-09-14T11:10Z A claim BPM-08
+- 2026-09-14T11:34Z A done BPM-08
