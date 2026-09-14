@@ -43,6 +43,16 @@ def _isolated_prefs(tmp_path, monkeypatch):
     return bs
 
 
+@pytest.fixture(autouse=True)
+def _kein_echtes_capture(monkeypatch):
+    """S2-Lehre: ein Quellenwechsel startet sonst den echten Capture (Exit 134)."""
+    import src.core.audio.capture as cap_mod
+    monkeypatch.setattr(cap_mod.AudioCapture, "start", lambda self: False)
+    yield
+    from src.core.engine.bpm_manager import get_bpm_manager
+    get_bpm_manager().use_audio_source(False)
+
+
 def test_bpm_view_constructs_and_drives_backend(qapp, _isolated_prefs):
     from src.ui.views.bpm_manager_view import BpmManagerView
     from src.core.engine.bpm_manager import get_bpm_manager, BpmMode
@@ -52,29 +62,29 @@ def test_bpm_view_constructs_and_drives_backend(qapp, _isolated_prefs):
     qapp.processEvents()
     mgr = get_bpm_manager()
 
-    # Grenzen-Spinboxen -> Manager (und gespiegelt in den Detektor)
+    # Grenzen-Spinboxen (Erweitert) -> Manager (und gespiegelt in den Detektor)
     v._sp_min.setValue(110)
     v._sp_max.setValue(170)
     assert mgr.min_bpm == 110 and mgr.max_bpm == 170
 
-    # Modus-Umschalter
-    v._rb_manual.setChecked(True)
+    # Modus-Umschalter Auto | Manuell (S4: QToolButtons statt Radios)
+    v._btn_manual.setChecked(True)
     assert mgr.mode == BpmMode.MANUAL
-    v._rb_auto.setChecked(True)
+    v._btn_auto.setChecked(True)
     assert mgr.mode == BpmMode.AUTO
 
-    # Lock-Toggle
+    # Lock-Toggle („Tempo einfrieren" in Erweitert)
     v._btn_lock.setChecked(True)
     assert mgr.is_locked is True
     v._btn_lock.setChecked(False)
     assert mgr.is_locked is False
 
-    # Sensitivity/Smoothing -> Detektor
-    v._sl_sens.setValue(200)
-    v._sl_smooth.setValue(50)
+    # Beat-Latenz -> Detektor (S4, ersetzt Sensitivity/Smoothing)
     from src.core.audio.beat_detector import get_beat_detector
     det = get_beat_detector()
-    assert det.sensitivity == 2.0 and det.smoothing == 0.5
+    v._sp_latency.setValue(-40)
+    assert det.beat_latency_ms == -40
+    v._sp_latency.setValue(0)
 
     # Eingehender Beat aktualisiert die Takt-Anzeige ohne Crash
     v._beat_sig.emit(0)
@@ -86,6 +96,7 @@ def test_bpm_view_constructs_and_drives_backend(qapp, _isolated_prefs):
     v.flush_pending_save()
     saved = _isolated_prefs.load_settings()
     assert saved["min_bpm"] == 110 and saved["max_bpm"] == 170
+    assert saved["version"] == 3 and "sensitivity" not in saved
 
     v.hide()
     v.deleteLater()
@@ -95,8 +106,10 @@ def test_bpm_view_constructs_and_drives_backend(qapp, _isolated_prefs):
 
 
 def test_bpm_source_kind_selector(qapp, _isolated_prefs):
-    """Der user-friendly Quellen-Umschalter Live/Lied-Analyse/Manuell."""
+    """Quelle-Combo „Lied-Analyse (Player)" + Auto | Manuell (S4): nimmt den
+    aktuellen Player-Track, keine eigene Song-Auswahl mehr."""
     from src.ui.views.bpm_manager_view import BpmManagerView
+    from src.ui.bpm_source_controller import SourceController
     from src.core.engine.bpm_manager import get_bpm_manager, BpmMode
     from src.core.audio.media_player import get_media_player, Track
 
@@ -111,25 +124,24 @@ def test_bpm_source_kind_selector(qapp, _isolated_prefs):
     mp = get_media_player()
     mp.set_tracks([Track(path="song.mp3", title="Test Song", bpm_timeline=tl)])
 
-    v = BpmManagerView()
+    v = BpmManagerView(source_controller=SourceController())
     v.show()
     qapp.processEvents()
 
-    # analysierter Song in der Auswahl
-    assert v._cmb_song.itemData(0) == 0
-
     # Manuell → MANUAL
-    v._rb_kind_manual.setChecked(True)
+    v._btn_manual.setChecked(True)
     qapp.processEvents()
     assert mgr.mode == BpmMode.MANUAL
 
-    # Lied-Analyse → AUTO + Quelle "timeline" + statische BPM aus der Analyse
-    v._rb_kind_song.setChecked(True)
+    # Auto + Quelle „Lied-Analyse" → AUTO + Quelle "timeline" + statische BPM aus der Analyse
+    v._btn_auto.setChecked(True)
+    v._cmb_source.setCurrentIndex(v._cmb_source.findData("song"))
     qapp.processEvents()
     assert mgr.mode == BpmMode.AUTO
     assert mgr.current_source == "timeline"
     assert abs(mgr.bpm - 128.0) < 1.0
-    assert v._cmb_song.isEnabled()
+    v.flush_pending_save()
+    assert _isolated_prefs.load_settings()["source"] == "song"
 
     v.hide()
     v.deleteLater()

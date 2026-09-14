@@ -461,8 +461,10 @@ def test_view_liest_backend_statt_datei(qapp, bs):
     v.show()
     qapp.processEvents()
     assert (v._sp_min.value(), v._sp_max.value(), v._sp_bpb.value()) == (100, 180, 8)
-    assert v._rb_input.isChecked()                   # Quelle aus den Prefs
-    assert v._source_pref == "input"
+    # Quelle aus den Prefs — ein nicht vorhandenes Geraet bleibt waehlbar
+    assert v._cmb_source.currentData() == "input:Nicht vorhanden"
+    assert "(nicht gefunden)" in v._cmb_source.currentText()
+    assert v._source_pref == "input" and v._device_pref == "Nicht vorhanden"
     v.hide()
     v.deleteLater()
     qapp.processEvents()
@@ -470,7 +472,7 @@ def test_view_liest_backend_statt_datei(qapp, bs):
     mgr.set_beats_per_bar(4)
 
 
-def test_view_source_off_ueberlebt_fremde_saves(qapp, bs, save_counter):
+def test_view_source_off_ueberlebt_fremde_saves(qapp, bs, save_counter, _kein_echtes_capture):
     """Alt-Datei mit auto_default=false → source off; ein Grenzen-Save darf das
     nicht auf loopback kippen, erst ein Klick auf die Quelle."""
     from src.ui.views.bpm_manager_view import BpmManagerView
@@ -482,9 +484,9 @@ def test_view_source_off_ueberlebt_fremde_saves(qapp, bs, save_counter):
     v._sp_min.setValue(90)
     v.flush_pending_save()
     assert save_counter[-1]["source"] == "off"
-    v._rb_input.setChecked(True)                     # Nutzer waehlt die Quelle selbst
+    v._cmb_source.setCurrentIndex(v._cmb_source.findData("loopback"))   # Nutzer waehlt selbst
     v.flush_pending_save()
-    assert save_counter[-1]["source"] == "input"
+    assert save_counter[-1]["source"] == "loopback"
     v.hide()
     v.deleteLater()
     qapp.processEvents()
@@ -492,10 +494,11 @@ def test_view_source_off_ueberlebt_fremde_saves(qapp, bs, save_counter):
 
 def test_view_schreibt_geraet_nur_fuer_eingang(qapp, bs, save_counter, monkeypatch,
                                                _kein_echtes_capture):
-    """PC-Audio darf keinen Mikrofonnamen als device speichern: die Combo listet
-    nur Eingaenge, und start_auto wuerde den Namen mit include_loopback=True
-    aufloesen — nach dem Neustart naehme PC-Audio das Mikrofon auf. Live-Wechsel
-    und Neustart muessen dieselbe Quelle/dasselbe Geraet ergeben."""
+    """PC-Audio darf keinen Mikrofonnamen als device speichern: das Geraet gehoert
+    zum Eintrag „Eingang: …", und start_auto wuerde den Namen mit
+    include_loopback=True aufloesen — nach dem Neustart naehme PC-Audio das
+    Mikrofon auf. Live-Wechsel und Neustart muessen dieselbe Quelle/dasselbe
+    Geraet ergeben."""
     import src.core.audio.capture as cap_mod
     from src.ui.views.bpm_manager_view import BpmManagerView
     monkeypatch.setattr(cap_mod.AudioCapture, "list_input_devices",
@@ -504,11 +507,11 @@ def test_view_schreibt_geraet_nur_fuer_eingang(qapp, bs, save_counter, monkeypat
     v = BpmManagerView()
     v.show()
     qapp.processEvents()
-    v._rb_input.setChecked(True)
+    v._cmb_source.setCurrentIndex(v._cmb_source.findData("input:USB Audio CODEC Analog Stereo"))
     v.flush_pending_save()
     assert (save_counter[-1]["source"], save_counter[-1]["device"]) == \
         ("input", "USB Audio CODEC Analog Stereo")
-    v._rb_loop.setChecked(True)
+    v._cmb_source.setCurrentIndex(v._cmb_source.findData("loopback"))
     v.flush_pending_save()
     assert (save_counter[-1]["source"], save_counter[-1]["device"]) == ("loopback", None)
     assert (cap.source_mode, cap._device_name) == ("loopback", None)   # Live-Wechsel
