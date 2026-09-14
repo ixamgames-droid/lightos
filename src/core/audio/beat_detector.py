@@ -11,10 +11,13 @@ Verfahren (Details: onset_flux.py, tempo_tracker.py):
 6. Alle Zeiten aus dem Sample-Zaehler (kein time.monotonic fuer Beats) -> Burst/Jitter der Chunks egal.
 
 Messbank (synthetische Signale, 30 s, alt -> neu): Brumm mit Bassband-SNR 0 dB 104,5 BPM / 27 von
-64 Treffern / 76 Fehlalarme -> 128,4 BPM / 56 von 64 / 0; Klick 140 halbiert (70,2) -> 139,8;
-Chunks in 8er-Salven 15 von 64 -> 56 von 64 (wie Idealfall); Phasenfehler mittel -8..+12 ms, max
-34 ms; CPU 0,39 ms je 1024er-Chunk (alt 0,23). Preis: Einrasten dauert nach Start/Quellenwechsel
-~3,8 s (Autokorrelation braucht ein gefuelltes Fenster), vorher werden keine Beats gemeldet.
+64 Treffern / 76 Fehlalarme -> 127,6 BPM / 56 von 64 / 0; Klick 140 halbiert (70,2) -> 140,0;
+Chunks in 8er-Salven 15 von 64 -> 56 von 64 (wie Idealfall); ab dem Einrasten alle Beats
+getroffen; Phasenfehler mittel -2..+11 ms, max 47 ms (Tempowechsel); CPU 0,41 ms je 1024er-Chunk
+(alt 0,22). Reine Kicks/Klicks 60..200 BPM ohne Oktavfehler. Preis: Einrasten dauert nach
+Start/Quellenwechsel ~3,8 s (Autokorrelation braucht ein gefuelltes Fenster), vorher werden
+keine Beats gemeldet. Grenze: Kick jeder Beat + Snare 2/4 ab ~150 BPM rastet auf die halbe
+Oktave (Bank 08l; x2 / Tempo-Bereich korrigieren, s. tempo_tracker.py).
 
 Threads: ``process_chunk`` laeuft auf dem Capture-Thread; Getter lesen einen unveraenderlichen
 ``DetectorSnapshot`` (per Referenz veroeffentlicht), Setter arbeiten unter einem kleinen Lock.
