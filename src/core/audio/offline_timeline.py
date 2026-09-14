@@ -351,35 +351,9 @@ def analyze_timeline(samples, sr: int, window_s: float = 8.0, step_s: float = 2.
 
 # ── Multiband-Onset (Spectral Flux) + echtes Beatgrid ─────────────────────────
 
-def onset_envelope(samples, sr: int, hop: int = 512, win: int = 1024):
-    """Onset-Strength via **Spectral Flux** ueber das ganze Spektrum (log-Magnitude).
-
-    Robuster ueber Genres als das reine Bass-Band (`compute_novelty`): erfasst auch
-    Snare/HiHat/Synth-Onsets, nicht nur den Kick. → (onset float32-Array, fps)."""
-    if not HAS_NUMPY or samples is None or sr <= 0:
-        return None, 0.0
-    x = np.asarray(samples, dtype=np.float32)
-    if x.size < win + hop:
-        return None, 0.0
-    n_frames = 1 + (len(x) - win) // hop
-    if n_frames < 4:
-        return None, 0.0
-    window = np.hanning(win).astype(np.float32)
-    prev = None
-    env = np.empty(n_frames, dtype=np.float32)
-    # Blockweise (Speicher schonen bei langen Songs) statt eine n_frames×win-Matrix.
-    for i in range(n_frames):
-        seg = x[i * hop:i * hop + win] * window
-        mag = np.log1p(np.abs(np.fft.rfft(seg)).astype(np.float32))
-        if prev is None:
-            env[i] = 0.0
-        else:
-            diff = mag - prev
-            diff[diff < 0] = 0.0
-            env[i] = float(diff.sum())
-        prev = mag
-    fps = sr / float(hop)
-    return env, fps
+# ``onset_envelope`` lebt jetzt in ``onset_flux`` (streambar fuer die Live-Erkennung,
+# bitgleich zum frueheren Batch hier); der Name bleibt in diesem Modul importierbar.
+from src.core.audio.onset_flux import onset_envelope  # noqa: E402
 
 
 def _fit_beatgrid(onset, fps: float, bpm: float, beats_per_bar: int = 4):
