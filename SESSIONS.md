@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| BPM-AREA | A | feat/bpm-erkennung-ui | 2026-09-13T22:34Z | src/core/audio/beat_detector.py · src/core/audio/capture.py · src/core/audio/bpm_settings.py · src/core/audio/genre_presets.py · src/ui/views/bpm_manager_view.py · src/ui/views/audio_input_view.py · src/ui/views/bpm_generator_view.py |
+| BPM-AREA | A | feat/bpm-erkennung-ui | 2026-09-14T07:26Z | src/core/audio/beat_detector.py · src/core/audio/capture.py · src/core/audio/bpm_settings.py · src/core/audio/genre_presets.py · src/ui/views/bpm_manager_view.py · src/ui/views/audio_input_view.py · src/ui/views/bpm_generator_view.py |
 
 ## Blocker & Fallen
 
