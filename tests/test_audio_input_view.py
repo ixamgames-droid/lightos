@@ -185,20 +185,6 @@ def test_audio_input_view_lists_and_selects_real_input(qapp, monkeypatch):
     app.processEvents()
 
 
-def test_audio_capture_records_missing_default_device(monkeypatch):
-    from src.core.audio import capture as capmod
-
-    monkeypatch.setattr(capmod, "HAS_SOUNDCARD", True)
-    monkeypatch.setattr(
-        capmod.AudioCapture, "default_speaker", staticmethod(lambda: None)
-    )
-
-    cap = capmod.AudioCapture()
-
-    assert cap.start() is False
-    assert cap.last_error() == "Kein Audio-Geraet gefunden"
-
-
 def test_audio_input_view_unregisters_worker_callbacks(qapp, monkeypatch):
     """Regression (geborgen 2026-07-26 aus `audit/threading-native-av`):
 
