@@ -7,6 +7,29 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-14 — Audio: Pegelmeter bei der BPM-Erkennung, Tab „Audio Input" entfällt
+
+#### Neu / Geändert
+
+- **Audio: Tab „Audio Input" entfällt; Pegelmeter mit Zielbereich und
+  Clip-Anzeige steht jetzt direkt bei der BPM-Erkennung; PC-Audio-Quelle je
+  Ausgabegerät wählbar.** Alles zur Live-Erkennung steht an einem Ort: im
+  BPM-Bereich unter **„Erkennung"**. Der Pegel sitzt direkt unter der BPM-Zahl:
+  **grün** = gut (−30 bis −6 dBFS), **rot/CLIP** = zu laut, Mischpult
+  runterdrehen, **grau** = kein Signal; ein heller Strich hält kurz die letzte
+  Spitze, „CLIP" bleibt 1 s stehen. Die **Quelle**-Liste hat jetzt neben
+  „PC-Audio" (Standard-Ausgabegerät) je Ausgabegerät einen Eintrag
+  „PC-Audio: <Ausgabegerät>" (z. B. Lautsprecher, HDMI, USB-Interface); was du
+  wählst, wird gemerkt — nach dem Neustart auch das Gerät für PC-Audio. Ein
+  gerade nicht vorhandenes Gerät steht als „(nicht gefunden)" in der Liste.
+  Unter Linux wird eine Monitor-Quelle nie mehr als „Eingang" genommen, auch
+  nicht als Standard (das endete bisher in einem unverständlichen Fehler beim
+  Start); ein nicht gefundener Eingang wird mit Namen gemeldet. Die Zuordnung PC-Audio → Gerät läuft
+  über die Geräte-Kennung statt über einen Namensvergleich, der bei ähnlichen
+  Namen das falsche Gerät nehmen konnte. Unter E/A bleiben Output, DMX Monitor,
+  MIDI und Musik. Keine Änderung an Show-Datei; die BPM-Einstellungen (v3) bleiben
+  kompatibel.
+
 ### 2026-09-14 — BPM: Sub-Tab „Erkennung" mit 6 Bedienelementen
 
 #### Neu / Geändert
