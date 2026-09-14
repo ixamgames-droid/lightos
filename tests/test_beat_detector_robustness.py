@@ -140,33 +140,6 @@ def _kick_snare24(bpm: float, seconds: float) -> np.ndarray:
     return buf
 
 
-def _song(bpm: float, seconds: float, hats16: bool, pad_db: float = -20.0) -> np.ndarray:
-    """Dichtes Material: Kick + Snare 2/4 + Bass-Achtel + Hats (Achtel/Sechzehntel) + Pad."""
-    n = int(seconds * SR)
-    x = np.zeros(n, np.float32)
-    P = 60.0 / bpm
-    t, i = 0.0, 0
-    while t < seconds:
-        _place(x, t, _kick(SR))
-        if i % 2 == 1:
-            _place(x, t, _snare(SR))
-        _place(x, t, _bass(SR, 0.22, 55.0, amp=0.4))
-        _place(x, t + P / 2, _bass(SR, 0.2, 55.0, amp=0.3))
-        if hats16:
-            for q in (0.25, 0.5, 0.75):
-                _place(x, t + q * P, _hihat(SR, amp=0.3 if q == 0.5 else 0.2, seed=7))
-        else:
-            _place(x, t + P / 2, _hihat(SR, amp=0.3, seed=7))
-        t += P
-        i += 1
-    tt = np.arange(n) / SR
-    rng = np.random.default_rng(3)
-    pad = (np.sin(2 * np.pi * 220 * tt) + np.sin(2 * np.pi * 277.2 * tt) + np.sin(2 * np.pi * 329.6 * tt)) / 3
-    noise = np.convolve(rng.standard_normal(n), np.ones(32) / 32, mode="same")
-    x += (10 ** (pad_db / 20) * (pad + noise)).astype(np.float32)
-    return np.clip(x, -1, 1).astype(np.float32)
-
-
 # ── Runner mit Roh-Tempo im Verlauf ──────────────────────────────────────────
 
 class _Run:
@@ -209,12 +182,25 @@ def test_comb_max_filter_kick_bass_hats_174_never_116():
     assert not [r for r in run.rows if 110.0 < r[4] < 122.0], "Roh-Tempo lag im 2/3-Tal 110..122"
 
 
-def test_comb_max_filter_dense_128_not_64():
-    """Dichtes Material (Kick, Snare 2/4, Bass-Achtel, Hats, Pad) bei 128: ohne Max-Filter an
-    den Oberwellen kippt es auf 64."""
-    run = _Run().feed(_song(128.0, 10.0, hats16=False))
-    assert abs(run.det.get_bpm() - 128.0) <= 1.3, run.det.get_bpm()
-    assert run.det.snapshot().alt_score <= 0.9, run.det.snapshot()
+def test_comb_max_filter_half_integer_lag_unit():
+    """Direkt auf TempoTracker._estimate: Pulszug mit Periode 26,5 Frames (195 BPM). Die
+    Oberwellen liegen bei 79,5 / 106 Frames, der Kamm tastet h*round(L) = 78/81 bzw. 104/108
+    ab — ohne Max-Filter (+-1, ab der 3. +-2) verliert das wahre Tempo dort ~1/3 und die
+    Sub-Oktave (97,5, alle Vielfachen ganzzahlig) kommt auf 0,94 des Siegers statt 0,77."""
+    from src.core.audio.tempo_tracker import TempoTracker
+    tr = TempoTracker(SR)
+    t = np.arange(tr.N)
+    for period, bpm, alt_max in ((26.5, 195.0, 0.85), (86.13, 60.0, 0.75)):
+        env = np.zeros(tr.N, np.float32)
+        for k in np.arange(0.0, tr.N, period):
+            env += np.exp(-0.5 * ((t - k) / 0.7) ** 2).astype(np.float32)
+        tr.reset()
+        tr.env[:] = env
+        tr.frames_filled = tr.frames_total = tr.N
+        raw, conf, alt_bpm, alt_score, _ = tr._estimate()
+        assert abs(tr._fold(raw) - bpm) <= 0.02 * bpm, (period, raw)
+        assert conf >= 0.9
+        assert alt_score <= alt_max, (period, alt_bpm, alt_score)
 
 
 # ── (b1/b2) Hysterese ────────────────────────────────────────────────────────
