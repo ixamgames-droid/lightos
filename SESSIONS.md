@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| _(frei)_ |  |  |  |  |
+| BPM-07 | A | feat/bpm-s2-einstellungen | 2026-09-14T10:22Z | src/core/audio/bpm_settings.py · src/ui/views/bpm_manager_view.py · src/core/audio/beat_detector.py · src/core/audio/genre_presets.py · src/ui/views/audio_input_view.py |
 
 ## Blocker & Fallen
 
@@ -120,7 +120,6 @@
 
 ## Verlauf
 
-- 2026-09-06T21:26Z A claim QA-75
 - 2026-09-06T21:26Z A claim FM-36
 - 2026-09-06T21:26Z A claim XPLAT-32
 - 2026-09-06T21:26Z B aktualisiert QA-78: Branch fix/qa78-adressregel-verifiziert -> fix/qa78-adressregel-sechs-stellen; Dateien src/core/engine/scene.py -> src/core/engine/effect_func.py · src/core/engine/carousel.py · src/core/engine/sequence.py · src/core/engine/mapped_channel.py · src/core/engine/script_func.py · src/core/engine/efx.py
@@ -150,3 +149,4 @@
 - 2026-09-07T21:29Z B claim XPLAT-38
 - 2026-09-08T18:43Z B done XPLAT-38
 - 2026-09-14T10:22Z A done BPM-AREA
+- 2026-09-14T10:22Z A claim BPM-07
