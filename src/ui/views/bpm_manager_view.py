@@ -911,7 +911,10 @@ class BpmManagerView(QWidget):
     def _on_status_link(self, aktion: str) -> None:
         aktion = str(aktion)
         if aktion == "reconnect":
-            kind, dev = self._src.current or (self._source_pref, self._device_pref)
+            # den GEWUENSCHTEN Eintrag (mit ggf. fehlender sink_id) neu anwenden, nicht den
+            # auf die Standardausgabe gemappten — sonst loescht der Klick „Ausgabegeraet fehlt"
+            kind, dev = (getattr(self._src, "wanted", None) or self._src.current
+                         or (self._source_pref, self._device_pref))
             self._src.apply(kind, dev, force=True)
             self._reflect_state()
         elif aktion == "record":

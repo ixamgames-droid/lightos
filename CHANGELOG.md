@@ -33,7 +33,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   mehr, wenn das Ziel außerhalb des Tempo-Bereichs liegt — die Statuszeile sagt
   „×2 nicht möglich — … außerhalb des Tempo-Bereichs 60–200" mit Link zum Bereich.
   Fehlt beim Start das gemerkte PC-Audio-Gerät, sagt die Statuszeile jetzt, dass
-  die Standardausgabe mitgehört wird (vorher still). Der generische Eintrag der
+  die Standardausgabe mitgehört wird (vorher still); **erneut verbinden** versucht
+  dann wieder das gemerkte Gerät und lässt den Hinweis stehen, solange es fehlt. Der generische Eintrag der
   Quelle-Liste heißt jetzt **„PC-Audio (Systemstandard)"**, damit er nicht wie ein
   Doppel des Geräte-Eintrags aussieht; gespeicherte Einstellungen passen
   unverändert. Die Diagnosezeile zeigt zusätzlich DC-Offset und Chunk-Abstand des

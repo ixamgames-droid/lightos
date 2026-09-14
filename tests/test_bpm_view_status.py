@@ -391,6 +391,36 @@ def test_fehlender_sink_statuszeile(env, monkeypatch):
     assert ctrl.missing_sink is None
 
 
+def test_reconnect_behaelt_fehlenden_sink_und_setzt_ihn_nach_anstecken(env, monkeypatch):
+    make, cap, clock, det = env
+    import src.core.audio.capture as cap_mod
+    sinks = [("alsa_output.pci", "Built-in Audio")]
+    monkeypatch.setattr(cap_mod.AudioCapture, "list_loopback_sinks", staticmethod(lambda: list(sinks)))
+    modes: list = []
+    cap.set_source_mode = lambda kind, dev: modes.append((kind, dev))
+    ctrl = SourceController(mgr=_Mgr(128.0), cap=cap, det=_Det())
+    ctrl._manager().use_audio_source = lambda on: None
+    ctrl._manager().set_mode = lambda m: None
+    ctrl._os2l = type("O", (), {"is_running": lambda self: False})()
+    ctrl.apply("loopback", "alsa_output.usb-weg")
+    v, *_ = make(src=ctrl)
+    cap.running = False                                   # Capture gestoppt -> Link „erneut verbinden"
+    assert _tick(v, clock, 0.0).startswith("Audio gestoppt")
+    v._lbl_abhilfe.linkActivated.emit("reconnect")
+    cap.running = True
+    assert ctrl.current == ("loopback", None) and ctrl.wanted == ("loopback", "alsa_output.usb-weg")
+    assert ctrl.missing_sink == "alsa_output.usb-weg"
+    assert _tick(v, clock, 0.1).startswith("Ausgabegerät nicht gefunden")
+    sinks.append(("alsa_output.usb-weg", "USB Interface"))  # Geraet angesteckt
+    v._lbl_abhilfe.linkActivated.emit("reconnect")
+    assert ctrl.current == ("loopback", "alsa_output.usb-weg") and ctrl.missing_sink is None
+    assert modes[-1] == ("loopback", "alsa_output.usb-weg")
+    # Nutzer waehlt danach „Systemstandard" bei weiter fehlendem Geraet: Hinweis weg
+    sinks.pop()
+    ctrl.apply("loopback", "alsa_output.usb-weg")
+    assert ctrl.apply("loopback", None) is False and ctrl.missing_sink is None
+
+
 def test_diagnosezeile_zeigt_dc_und_chunk_p95(env):
     make, cap, clock, det = env
     v, *_ = make()

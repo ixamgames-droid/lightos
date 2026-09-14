@@ -41,7 +41,11 @@ Ereignis.
 
 Fehlender Sink (S6): wird PC-Audio mit einer ``sink_id`` gewaehlt, die es gerade
 nicht gibt, laeuft der Capture auf dem Standard-Ausgabegeraet; ``missing_sink``
-nennt dann die gewuenschte id (Statuszeile), sonst None.
+nennt dann die gewuenschte id (Statuszeile), sonst None. ``wanted`` behaelt den
+GEWUENSCHTEN Eintrag (mit der fehlenden id), ``current`` den angewandten.
+``reconnect()`` wendet ``wanted`` erzwungen neu an: ist das Geraet inzwischen
+angesteckt, laeuft der Capture wieder darauf; fehlt es weiter, bleibt
+``missing_sink`` gesetzt.
 
 Backends werden nur AUFGERUFEN (bpm_manager.py, capture.py, os2l.py,
 beat_detector.py bleiben unangetastet); jeder Schritt ist einzeln abgesichert,
@@ -81,6 +85,7 @@ class SourceController:
     def __init__(self, mgr=None, cap=None, os2l=None, det=None, player=None):
         self._mgr, self._cap, self._os2l, self._det, self._player = mgr, cap, os2l, det, player
         self._current: tuple[str, str | None] | None = None
+        self._wanted: tuple[str, str | None] | None = None
         self.missing_sink: str | None = None
 
     # ── Backends lazily (Singletons; Tests reichen Fakes herein) ────────────
@@ -133,6 +138,17 @@ class SourceController:
         return self._current
 
     @property
+    def wanted(self) -> tuple[str, str | None] | None:
+        """Zuletzt GEWUENSCHTER Eintrag ``(kind, device)`` — bei fehlendem Sink mit dessen id."""
+        return self._wanted
+
+    def reconnect(self) -> bool:
+        """„erneut verbinden": den gewuenschten Eintrag erzwungen neu anwenden."""
+        if self._wanted is None:
+            return False
+        return self.apply(*self._wanted, force=True)
+
+    @property
     def kind(self) -> str | None:
         return self._current[0] if self._current else None
 
@@ -150,10 +166,11 @@ class SourceController:
         if kind == "loopback":
             device = _known_sink(device)   # nur echte sink_id, sonst Standard-Ausgabegeraet
         key = (kind, device)
+        self._wanted = (kind, wanted)
+        self.missing_sink = wanted if (kind == "loopback" and wanted and device is None) else None
         if key == self._current and not force:
             return False
         self._current = key
-        self.missing_sink = wanted if (kind == "loopback" and wanted and device is None) else None
         mgr = self._manager()
         det = self._detector()
         if det is not None:
