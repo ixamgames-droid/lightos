@@ -3,7 +3,8 @@
 Verfahren (Details: onset_flux.py, tempo_tracker.py):
 1. DC-Blocker/Hochpass 30 Hz -> Hann 1024 / Hop 512, unabhaengig von Chunkgroesse und Abtastrate.
 2. Adaptives Whitening je Bin (2 s) -> Spectral Flux je log-Band, bandweise normiert (Onset-Huellkurve).
-3. 6-s-Ring -> unbiased ACF + 4-fach-Kamm (Max-Filter +-1 Lag) + Log-Normal-Prior 120 BPM -> Parabel.
+3. 6-s-Ring -> unbiased ACF + 4-fach-Kamm (Max-Filter an den Oberwellen) + Sub-Oktav-Strafe
+   + Log-Normal-Prior 120 BPM -> Parabel (Details und Grenzfall Backbeat: tempo_tracker.py).
 4. Konfidenz = Periodizitaet x Onset-Kontrast; Zustand no_signal / searching / locked, Totband 4 %,
    Haltezeiten 1 s (Oktave 3 s), Stille dreistufig 0,5 / 2 / 10 s.
 5. Comb-Phasenfit (32 Phasen, 4 s) -> Beat-Vorhersage als Sample-Position; Callbacks nur im Zustand locked.

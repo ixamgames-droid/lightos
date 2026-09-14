@@ -3,17 +3,24 @@
 Bekommt vom ``BeatDetector`` die Onset-Huellkurve frameweise (Hop 512) und haelt sie in
 einem Ringpuffer (6 s). Alle ``EST_EVERY_FRAMES`` Frames (~93 ms):
 
-1. **Tempo:** Autokorrelation via FFT, **unbiased** (ac[l] / (M - l)), 4-fach-Kamm mit
-   Max-Filter +-1 Lag an den Oberwellen (Ellis 2007 / aubio), Log-Normal-Prior
+1. **Tempo:** Huellkurve gaussisch geglaettet (1 Frame), Autokorrelation via FFT,
+   **unbiased** (ac[l] / (M - l)), 4-fach-Kamm mit Max-Filter an den Oberwellen (+-1 Lag,
+   ab der 3. +-2; Ellis 2007 / aubio), Sub-Oktav-Strafe (Spitze beim halben Lag fast so hoch
+   wie die eigene -> Kandidat ist die halbe Oktave eines Pulszugs), Log-Normal-Prior
    (120 BPM, sigma 0,9 Oktaven; mit Tempo-Hinweis sigma 0,15), Parabel-Verfeinerung auf
-   der rohen ACF. Kandidatenraum min/2 .. 2*max, Ergebnis in [min, max] gefaltet.
+   der rohen ACF. Kandidatenraum min/2 .. 2*max, Ergebnis in [min, max] gefaltet (knapp
+   ausserhalb: geklemmt). Nicht loesbar bleibt der Backbeat (Kick jeder Beat + Snare 2/4 ab
+   ~150 BPM): dieselbe Huellkurve wie Hats auf Achteln bei der halben Oktave — Alternative
+   steht im Snapshot, x2 / Tempo-Bereich korrigieren.
 2. **Konfidenz:** normierte Periodizitaet r = ac[P]/ac[0] x Onset-Kontrast-Gate
    (max/mean der Huellkurve im 4-s-Fenster) — kalibriert 0..1.
 3. **Zustandsautomat:** no_signal / searching / locked; Lock ab gefuelltem Mindestfenster,
    Konfidenz >= 0,35 und drei stabilen Roh-Schaetzungen; Totband 4 % mit EMA-
    Feinnachfuehrung; ausserhalb: Kandidat muss HOLD_S (Oktave: OCT_HOLD_S) konsistent
-   bleiben; Stille dreistufig (haelt / friert ein / laesst los).
-4. **Phase:** Comb-Suche (32 Phasen, 4-s-Fenster, vektorisiert) + Parabel, Kontinuitaet
+   bleiben; Stille dreistufig (haelt / friert ein / laesst los) — eingerastet beginnt
+   „haelt" fruehestens nach 1,25 Beat-Perioden (Klick 60 BPM = 1 s Luecke je Beat).
+4. **Phase:** Comb-Suche (32 Phasen, bei langen Perioden 1 Frame je Schritt; 4-s-Fenster,
+   vektorisiert) + Parabel, Kontinuitaet
    ueber halbe Fehlerkorrektur; naechster Beat als Sample-Position vorhergesagt.
 5. **Beat-Emission:** ``beat_due(sample_pos)`` — nur in ``locked`` / hold_stage 0,
    Mindestabstand 0,5 Periode, Latenz-Offset.
@@ -68,6 +75,11 @@ class TempoTracker:
     PRIOR_BPM = 120.0
     PRIOR_SIGMA = 0.9       # Oktaven (Ellis 2007)
     HINT_SIGMA = 0.15       # Oktaven, bei set_tempo_hint
+    SUB_OCT_PENALTY = 1.0   # Kamm: Sub-Oktav-Strafe (s. _estimate), 0 = aus
+    SUB_OCT_TAU = 0.5       # ... nur der Anteil von acm[Lag/2] ueber TAU x acm[Lag] zaehlt
+    EST_SMOOTH = True       # Huellkurve vor der ACF gaussisch glaetten (SMOOTH_SIGMA Frames)
+    SMOOTH_SIGMA = 1.0      # Frames (~12 ms); Spitzen zwischen zwei Lags verlieren sonst ACF-Hoehe
+    HARM_WIDE = True        # Max-Filter +-2 an den Oberwellen 3 und 4
     DEADBAND = 0.04
     HOLD_S = 1.0            # Widerspruch-Haltezeit fuer Tempowechsel
     OCT_HOLD_S = 3.0        # Haltezeit fuer Oktavsprung
@@ -76,6 +88,7 @@ class TempoTracker:
     UNLOCK_S = 2.0
     STABLE_N = 3            # Roh-Schaetzungen, die fuer den Lock innerhalb DEADBAND liegen muessen
     SIL_HOLD_S = 0.5
+    SIL_HOLD_PERIODS = 1.25 # eingerastet: Halten fruehestens nach 1,25 Beat-Perioden (Klick 60 BPM = 1 s Luecke)
     SIL_FREEZE_S = 2.0
     SIL_RELEASE_S = 10.0
     EST_EVERY_FRAMES = 8    # Schaetzung alle 8 Hops (~93 ms bei 44,1 kHz)
@@ -100,7 +113,10 @@ class TempoTracker:
         self.max_bpm = float(max_bpm)
         self.tempo_hint: float | None = None
         self._lags_setup()
-        self._phase_grid = np.arange(self.PHASE_STEPS, dtype=np.float64) / self.PHASE_STEPS
+        self._grids: dict[int, np.ndarray] = {}
+        r = int(np.ceil(2.0 * self.SMOOTH_SIGMA))
+        k = np.exp(-0.5 * (np.arange(-r, r + 1) / self.SMOOTH_SIGMA) ** 2)
+        self._smooth_k = k / k.sum()
         self.reset()
 
     # ------------------------------------------------------------ Setup
@@ -185,6 +201,10 @@ class TempoTracker:
         if M < self.MIN_EST_S * self.fps:
             return 0.0, 0.0, 0.0, 0.0, 0
         e = self.env[-M:].astype(np.float64)
+        if self.EST_SMOOTH:
+            # leichte Glaettung: eine Spitze, die zwischen zwei Lags faellt (195 BPM = 26,5 Frames),
+            # verliert sonst ~1/3 ihrer ACF-Hoehe gegen die ganzzahlige Sub-Oktave (Kick 195 -> 97)
+            e = np.convolve(e, self._smooth_k, mode="same")
         e -= e.mean()
         nfft = 1 << int(np.ceil(np.log2(2 * M)))
         F = np.fft.rfft(e, nfft)
@@ -205,11 +225,28 @@ class TempoTracker:
         acm[-1] = ac[-1]
         np.maximum(ac[:-2], ac[1:-1], out=acm[1:-1])
         np.maximum(acm[1:-1], ac[2:], out=acm[1:-1])
-        sc = ac[L].copy()
+        if self.HARM_WIDE:
+            # Oberwellen h*round(L) liegen bis zu h/2 Frames neben h*L -> ab h=3 Max ueber +-2
+            acm2 = acm.copy()
+            np.maximum(acm2[1:-1], acm[:-2], out=acm2[1:-1])
+            np.maximum(acm2[1:-1], acm[2:], out=acm2[1:-1])
+        else:
+            acm2 = acm
+        sc = acm[L].copy()
         for h in (2, 3, 4):
             idx = L * h
             m = idx < M
-            sc[m] += acm[idx[m]] / h
+            sc[m] += (acm if h == 2 else acm2)[idx[m]] / h
+        # Sub-Oktav-Strafe: ist die Spitze beim HALBEN Lag fast so hoch wie die eigene, ist
+        # der Kandidat die halbe Oktave eines schnelleren Pulses. Ohne sie ist der Kamm fuer
+        # reine Pulszuege symmetrisch (alle Vielfachen gleich hoch) und allein der Prior
+        # entscheidet — der kippt ab 120*sqrt(2) = 170 BPM zur halben Oktave (Kick 185 -> 92).
+        # Nur der Ueberschuss ueber TAU x eigene Spitze zaehlt: Pulszug 0,94 (voll bestraft),
+        # Hats auf Achteln 0,64 / Backbeat-Kick 0,75 (kaum) — die schnelle Oktave selbst hat
+        # beim halben Lag nichts (ac ~ 0).
+        own = np.maximum(acm[L], 0.0)
+        half = np.maximum(acm[np.rint(L / 2.0).astype(np.intp)], 0.0)
+        sc -= (self.SUB_OCT_PENALTY / (1.0 - self.SUB_OCT_TAU)) * np.maximum(half - self.SUB_OCT_TAU * own, 0.0)
         np.maximum(sc, 0.0, out=sc)
         sc *= pri
         k = int(np.argmax(sc))
@@ -233,10 +270,11 @@ class TempoTracker:
         # Oktav-Alternative (Score relativ zum Sieger)
         alt_bpm, alt_score = 0.0, 0.0
         for fac in (2.0, 0.5):
-            lag_alt = int(round(a / fac))
-            j = int(np.searchsorted(L, lag_alt))
-            if 0 <= j < nl and abs(int(L[j]) - lag_alt) <= 1:
-                s = float(sc[j] / sc[k])
+            la = a / fac                                # Lag der Alternative (evtl. halbzahlig)
+            j0 = int(np.searchsorted(L, la - 1.0))
+            j1 = int(np.searchsorted(L, la + 1.0, side="right"))
+            if j0 < j1:                                 # Max ueber +-1 Lag, sonst rutscht der
+                s = float(sc[j0:j1].max() / sc[k])      # Wert bei scharfen Spitzen ins Tal
                 if s > alt_score:
                     alt_score, alt_bpm = s, bpm * fac
         return bpm, conf, alt_bpm, alt_score, a
@@ -258,6 +296,12 @@ class TempoTracker:
     def _fold(self, bpm: float) -> float:
         if bpm <= 0:
             return 0.0
+        # knapp ausserhalb (Parabel liefert 59,9 bei Klick 60 BPM, Grenze 60): klemmen statt
+        # oktavieren — sonst meldet der Tracker 119,9 und rastet nach OCT_HOLD_S dort ein
+        if self.min_bpm * (1.0 - self.DEADBAND) <= bpm < self.min_bpm:
+            return self.min_bpm
+        if self.max_bpm < bpm <= self.max_bpm * (1.0 + self.DEADBAND):
+            return self.max_bpm
         for _ in range(8):
             if bpm < self.min_bpm:
                 bpm *= 2.0
@@ -298,7 +342,11 @@ class TempoTracker:
             self.conf = 0.0
             self.next_beat_sample = 0
             return
-        if self.silent_s >= self.SIL_HOLD_S:
+        hold_s = self.SIL_HOLD_S
+        if self.state == "locked" and self.bpm > 0:
+            # sparsames Material (Klick 60 BPM: 1 s digitale Stille je Beat) sonst im Dauer-Halten
+            hold_s = min(self.SIL_FREEZE_S, max(hold_s, self.SIL_HOLD_PERIODS * 60.0 / self.bpm))
+        if self.silent_s >= hold_s:
             self.hold_stage = 1
             self.conf = 0.0
             self.next_beat_sample = 0
@@ -360,6 +408,17 @@ class TempoTracker:
         self._fit_phase()
 
     # ------------------------------------------------------------ Phase
+    def _phase_grid(self, P: float) -> np.ndarray:
+        """Phasenraster 0..1: PHASE_STEPS Schritte, bei langen Perioden hoechstens ein Frame
+        je Schritt (60 BPM = 86 Frames: 32 Schritte waeren 2,7 Frames — eine 1-Frame-Spitze
+        faellt dann zwischen die Raster, der Fit zieht das Beat-Raster um bis zu eine
+        Periode weg)."""
+        n = max(self.PHASE_STEPS, int(np.ceil(P)))
+        g = self._grids.get(n)
+        if g is None:
+            g = self._grids[n] = np.arange(n, dtype=np.float64) / n
+        return g
+
     def _last_frame_sample(self) -> float:
         """Sample-Position der Mitte des letzten Frames (dort liegt der Onset, dessen
         Flux in env[-1] steht)."""
@@ -374,8 +433,10 @@ class TempoTracker:
         if n_beats < 2:
             return
         env = self.env[-M:]
-        # Comb-Suche vektorisiert: (PHASE_STEPS x n_beats) Indizes, ein Fancy-Index
-        phis = self._phase_grid * P
+        # Comb-Suche vektorisiert: (Phasen x n_beats) Indizes, ein Fancy-Index
+        grid = self._phase_grid(P)
+        n_ph = int(grid.size)
+        phis = grid * P
         idx = (M - 1) - phis[:, None] - np.arange(n_beats, dtype=np.float64)[None, :] * P
         ii = np.floor(idx + 0.5).astype(np.intp)
         valid = ii >= 0
@@ -383,10 +444,10 @@ class TempoTracker:
         scores = (env[ii] * valid).sum(axis=1)
         s = int(np.argmax(scores))
         # Parabel ueber die Nachbar-Phasen (zyklisch) gegen die Rasterung von P/32
-        y0, y1, y2 = scores[(s - 1) % self.PHASE_STEPS], scores[s], scores[(s + 1) % self.PHASE_STEPS]
+        y0, y1, y2 = scores[(s - 1) % n_ph], scores[s], scores[(s + 1) % n_ph]
         den = y0 - 2 * y1 + y2
         sh = float(np.clip(0.5 * (y0 - y2) / den, -0.5, 0.5)) if den != 0 else 0.0
-        best_phi = (s + sh) * P / self.PHASE_STEPS
+        best_phi = (s + sh) * P / n_ph
         last_beat = self._last_frame_sample() - best_phi * HOP
         if force:
             self.phase_ok, self._disagree = True, 0
@@ -404,7 +465,7 @@ class TempoTracker:
             return
         env = self.env[-M2:]
         ks = np.arange(n2, dtype=np.float64)[None, :] * P
-        idx = (M2 - 1) - (self._phase_grid * P)[:, None] - ks
+        idx = (M2 - 1) - (self._phase_grid(P) * P)[:, None] - ks
         ii = np.floor(idx + 0.5).astype(np.intp)
         valid = ii >= 0
         ii[~valid] = 0
