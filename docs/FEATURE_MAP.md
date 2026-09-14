@@ -27,7 +27,7 @@ Visualizer als separates Fenster.
 | 3 | **Virtual Console** | – | Frei konfigurierbare Konsole: Toolbar + Canvas + Snapshot-Seitenleiste (`virtual_console_view.py`, 619) |
 | 4 | **Simple Desk** | Simple Desk · Channel Groups | 512 direkte DMX-Fader + Kanal-Gruppen-Submaster |
 | 5 | **Playback** | Playback · Show Manager | Executor-Fader/Cuelisten + Timeline-Show-Editor |
-| 6 | **E/A** (Eingabe / Ausgabe) | Output · DMX Monitor · MIDI · Audio Input | DMX-Ausgabe, Monitor, MIDI, Audio in einem Bereich |
+| 6 | **E/A** (Eingabe / Ausgabe) | Output · DMX Monitor · MIDI · Musik | DMX-Ausgabe, Monitor, MIDI, Musik-Player in einem Bereich |
 
 ### Sub-Tabs im Detail
 
@@ -48,7 +48,6 @@ Visualizer als separates Fenster.
 | 6 | Output | `views/output_view.py` (118) | DMX-Kanalwerte in Echtzeit (Zellen) |
 | 6 | DMX Monitor | `views/dmx_monitor_view.py` (204) | Alle 512 DMX-Kanäle als 32×16-Grid |
 | 6 | MIDI | `views/midi_view.py` (599) | MIDI-Monitoring, Konfiguration, Mapping, virtueller Port |
-| 6 | Audio Input | `views/audio_input_view.py` (359) | WASAPI-Loopback-Aufnahme + Beat/BPM-Anzeige |
 
 ---
 

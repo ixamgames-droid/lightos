@@ -3,10 +3,12 @@
 Klassenname bleibt ``BpmManagerView`` (Smoke-Inventar tests/test_ui_smoke_enumerated.py).
 
 **Standardansicht = genau 6 Bedienelemente** (plan.md 1.2):
-(1) Quelle-Combo (PC-Audio / Eingang je Geraet / OS2L / Lied-Analyse / Aus),
+(1) Quelle-Combo (PC-Audio Standard / PC-Audio je Ausgabegeraet / Eingang je
+Geraet / OS2L / Lied-Analyse / Aus),
 (2) grosser TAP-Knopf (Doppelrolle, ``bpm_tap_helper``), (3) Zweizustand
 Auto | Manuell, (4) ×½, (5) ×2, (6) Aufklapper „Erweitert".
-Anzeigen: grosse BPM-Zahl, Beat-Punkt + Taktzellen, Zustandswort
+Anzeigen: grosse BPM-Zahl mit Pegelmeter direkt darunter (S5, ``cap.snapshot()``
+im 50-ms-Timer; Anzeige, kein Bedienelement), Beat-Punkt + Taktzellen, Zustandswort
 (KEIN SIGNAL / SUCHT / EINGERASTET / PAUSE · haelt N / MANUELL), Quelle-Text,
 Konfidenzbalken.
 
@@ -47,6 +49,7 @@ from src.ui.bpm_source_controller import get_source_controller, AUDIO_KINDS
 from src.ui.bpm_tap_helper import get_tap_helper
 from src.ui.weak_slots import weak_slot
 from src.ui.widgets.collapsible_section import CollapsibleSection
+from src.ui.widgets.level_meter_widget import LevelMeterWidget
 
 try:
     from src.core.audio.beat_detector import get_beat_detector
@@ -213,6 +216,9 @@ class BpmManagerView(QWidget):
         unit.setAlignment(Qt.AlignmentFlag.AlignCenter)
         unit.setStyleSheet("color:#8b949e; font-weight:bold;")
         bpm_col.addWidget(unit)
+        # Pegelmeter direkt unter der BPM-Zahl (BPM-10): reine Anzeige aus cap.snapshot()
+        self._level = LevelMeterWidget()
+        bpm_col.addWidget(self._level)
         top.addLayout(bpm_col)
 
         col = QVBoxLayout()
@@ -516,10 +522,19 @@ class BpmManagerView(QWidget):
         except Exception:
             return []
 
+    @staticmethod
+    def _list_sinks() -> list[tuple[str, str]]:
+        try:
+            from src.core.audio.capture import get_audio_capture
+            return [(str(i), str(n)) for i, n in (type(get_audio_capture()).list_loopback_sinks() or [])]
+        except Exception:
+            return []
+
     def _populate_sources(self, keep: str | None = None):
-        """Eintraege: PC-Audio (ein Eintrag bis S5), Eingang je Geraet, OS2L,
-        Lied-Analyse, Aus. Ein gespeichertes, nicht vorhandenes Eingangsgeraet
-        bleibt als „(nicht gefunden)" waehlbar."""
+        """Eintraege: PC-Audio (Standard-Ausgabegeraet), PC-Audio je Ausgabegeraet
+        (Daten ``loopback:<sink_id>``, S5), Eingang je Geraet, OS2L, Lied-Analyse,
+        Aus. Ein gespeichertes, nicht vorhandenes Geraet bleibt als
+        „(nicht gefunden)" waehlbar."""
         cur = keep if keep is not None else (self._cmb_source.currentData() or "")
         was_loading = self._loading
         self._loading = True
@@ -527,6 +542,11 @@ class BpmManagerView(QWidget):
         try:
             self._cmb_source.clear()
             self._cmb_source.addItem("PC-Audio", "loopback")
+            sinks = self._list_sinks()
+            for sid, name in sinks:
+                self._cmb_source.addItem(f"PC-Audio: {name}", f"loopback:{sid}")
+            if cur.startswith("loopback:") and cur[9:] not in {sid for sid, _ in sinks}:
+                self._cmb_source.addItem(f"PC-Audio: {cur[9:]} (nicht gefunden)", cur)
             devs = self._list_inputs()
             for d in devs:
                 self._cmb_source.addItem(f"Eingang: {d}", f"input:{d}")
@@ -546,6 +566,8 @@ class BpmManagerView(QWidget):
         s = str(data or "loopback")
         if s.startswith("input:"):
             return "input", (s[6:] or None)
+        if s.startswith("loopback:"):
+            return "loopback", (s[9:] or None)
         return s, None
 
     def _on_source_changed(self, *_):
@@ -578,8 +600,9 @@ class BpmManagerView(QWidget):
 
         s = bpm_settings.load_settings()
         self._source_pref = s["source"]
-        self._device_pref = s["device"] if s["source"] == "input" else None
-        key = f"input:{self._device_pref}" if (self._source_pref == "input" and self._device_pref) else self._source_pref
+        self._device_pref = s["device"] if s["source"] in AUDIO_KINDS else None
+        key = (f"{self._source_pref}:{self._device_pref}"
+               if (self._source_pref in AUDIO_KINDS and self._device_pref) else self._source_pref)
         self._populate_sources(keep=key)
         self._reflect_state()
         self._rebuild_phase_cells()
@@ -682,10 +705,13 @@ class BpmManagerView(QWidget):
             self._lbl_diag.setText(diag_line(snap))
         try:
             from src.core.audio.capture import get_audio_capture
-            err = get_audio_capture().last_error()
+            cap = get_audio_capture()
+            err = cap.last_error()
             self._lbl_status.setText(f"⚠ {err}" if err and kind in AUDIO_KINDS else "")
+            self._level.set_snapshot(cap.snapshot() if kind in AUDIO_KINDS else None)
         except Exception:
             self._lbl_status.setText("")
+            self._level.set_snapshot(None)
 
     # ── Bedien-Handler ────────────────────────────────────────────────────────
 
@@ -779,10 +805,11 @@ class BpmManagerView(QWidget):
         return True
 
     def _write_settings(self):
-        """Der eigentliche Schreibvorgang (v3-Keys). ``device`` nur fuer den Eingang."""
+        """Der eigentliche Schreibvorgang (v3-Keys). ``device`` = Eingangsname bzw.
+        bei PC-Audio die ``sink_id`` eines Ausgabegeraets (None = Standard)."""
         bpm_settings.save_settings({
             "source": self._source_pref,
-            "device": self._device_pref if self._source_pref == "input" else None,
+            "device": self._device_pref if self._source_pref in AUDIO_KINDS else None,
             "mode": "auto" if self._btn_auto.isChecked() else "manual",
             "min_bpm": self._sp_min.value(),
             "max_bpm": self._sp_max.value(),

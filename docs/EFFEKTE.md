@@ -152,8 +152,8 @@ Ein Chaser spielt mehrere **Funktionen** (meist Szenen) der Reihe nach ab.
 
 **Kern-Rezept „Tempo-Regler + Effekt":** Chaser auf **Beat** stellen → er folgt
 dem globalen Tempo. Dieses Tempo regelst du zentral über **TAP**, **Klick auf
-die BPM-Anzeige** oder automatisch über **Eingabe / Ausgabe → Audio Input**
-(Beat-Erkennung). Ein einziger Regler (BPM) ändert alle Beat-Effekte gleichzeitig.
+die BPM-Anzeige** oder automatisch über **BPM → Erkennung**
+(Beat-Erkennung, Pegelmeter unter der BPM-Zahl). Ein einziger Regler (BPM) ändert alle Beat-Effekte gleichzeitig.
 
 ---
 
@@ -214,7 +214,7 @@ Ein **Doppelklick** auf einen Eintrag schaltet ihn an/aus.
 | Eine RGB Matrix schneller/langsamer | `Geschwindigkeit` im Matrix-Editor |
 | Ein Chaser frei schneller/langsamer | Trigger = Timer, **Speed (x)** ziehen |
 | Effekt **im Takt der Musik** | Chaser Trigger = Beat + **Beats/Step**, dann BPM regeln |
-| Globales Tempo setzen | **TAP** / Klick auf **BPM** / **Audio Input** |
+| Globales Tempo setzen | **TAP** / Klick auf **BPM** / **BPM → Erkennung** |
 | Globale Helligkeit | **GM**-Fader oben |
 | Funktion/Widget auf Pad/Fader legen | **„MIDI Lernen"** aktivieren → VC-Element anklicken → Pad/Fader betätigen |
 | Effekte synchron mit Tempo-**Verhältnis** | VC-**Speed-Dial (Sub)** auf einen Master, Faktor ¼…×4 (Abschnitt 9) |
@@ -233,7 +233,7 @@ Ein **Doppelklick** auf einen Eintrag schaltet ihn an/aus.
 | **Langsamer Build-up** | **+ Chaser**, Trigger = Timer, Speed langsam → im Drop Speed hochziehen |
 | **LED-Bar-Lauf** | Programmer → Tab Matrix → Spalten = Geräte, Reihen = 1, „Auto-Zuweisung aus Patch" |
 | **Drop (alles auf einmal)** | EFX + Matrix + Strobe-Szene **gemeinsam starten** — z. B. ein VC-Button mit **Mehrfach-Aktion** (mehrere Funktionen auf einen Druck). *(Der Funktionstyp „Collection" existiert in der Engine, hat aber keinen sichtbaren „+"-Button — siehe Abschnitt 5.)* |
-| **Auto-Sync zur Musik** | Audio Input starten → BPM kommt automatisch → Beat-Chaser laufen mit |
+| **Auto-Sync zur Musik** | In **BPM → Erkennung** die Quelle wählen → BPM kommt automatisch → Beat-Chaser laufen mit |
 
 ---
 

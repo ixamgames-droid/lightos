@@ -41,7 +41,6 @@ REPORT_PATH = REPO / "docs" / "UI_TOOLTIP_COVERAGE.md"
 # View gilt implizit 0: sie muss von Anfang an beschriftete/betooltippte Buttons
 # haben oder bewusst hier eingetragen werden.
 BASELINE: dict[str, int] = {
-    "audio_input_view": 0,
     "bpm_generator_view": 0,
     "bpm_manager_view": 0,
     "channel_groups_view": 1,

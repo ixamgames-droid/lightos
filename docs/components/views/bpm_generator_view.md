@@ -25,8 +25,8 @@ Tempo-Quelle nutzen kann. Ein Metronom-Klick (Sinus-Burst-WAV) hilft beim Prüfe
 
 - **BPM-Analyse:** schreibt `bpm_timeline` in den Track; Quelle für den
   BPM-Manager (analysierter Song).
-- **Audio-Input:** teilt die Beat-Erkennung mit
-  [`audio_input_view`](audio_input_view.md).
+- **Erkennung:** teilt die Beat-Erkennung mit
+  [`bpm_manager_view`](bpm_manager_view.md) (Sub-Tab „Erkennung" mit Pegelmeter).
 - **Cache:** Analyse-Ergebnisse werden atomar gecacht.
 
 ## Zugehörige Tests

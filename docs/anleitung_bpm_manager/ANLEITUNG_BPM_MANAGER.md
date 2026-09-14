@@ -27,7 +27,7 @@ Hauptsteuerung — alles andere ist Feintuning.
 
 | Du willst… | Quelle | Voraussetzung |
 |---|---|---|
-| dass das Licht **live zur laufenden Musik** läuft (Spotify, Player auf diesem PC) | **PC-Audio** | Musik läuft hörbar über den PC |
+| dass das Licht **live zur laufenden Musik** läuft (Spotify, Player auf diesem PC) | **PC-Audio** (Standard-Ausgabe) oder **PC-Audio: <Ausgabegerät>** | Musik läuft hörbar über den PC (bzw. über dieses Ausgabegerät) |
 | Musik von **außen** (Fremd-DJ, Mischpult, Live-Band) | **Eingang: <Gerät>** | Mikro/Line-In/Interface angeschlossen |
 | das Tempo **vom DJ-Programm** (VirtualDJ, Mixxx) | **OS2L (DJ-Software)** | OS2L im DJ-Programm aktiviert |
 | ein **vorbereitetes Lied** sauber & exakt zum Beat abspielen | **Lied-Analyse (Player)** | Song vorher im **Generator** analysiert und im Player geladen |
@@ -47,7 +47,7 @@ Die Standardansicht hat **genau sechs Bedienelemente** — mehr braucht es im Be
 
 | # | Element | Was es tut |
 |---|---|---|
-| 1 | **Quelle** (Liste) | PC-Audio · Eingang: <Gerät> (je Eingang ein Eintrag) · OS2L (DJ-Software) · Lied-Analyse (Player) · Aus. Die Liste liest die Geräte beim Öffnen neu; ein gespeichertes, gerade nicht vorhandenes Gerät steht als „(nicht gefunden)" drin. Was du wählst, wird gemerkt. |
+| 1 | **Quelle** (Liste) | PC-Audio (folgt dem Standard-Ausgabegerät) · PC-Audio: <Ausgabegerät> (je Lautsprecher/HDMI/USB-Ausgang ein Eintrag) · Eingang: <Gerät> (je Eingang ein Eintrag) · OS2L (DJ-Software) · Lied-Analyse (Player) · Aus. Die Liste liest die Geräte beim Öffnen neu; ein gespeichertes, gerade nicht vorhandenes Gerät steht als „(nicht gefunden)" drin. Was du wählst, wird gemerkt. |
 | 2 | **TAP** (großer Knopf) | **Zwei Rollen:** *einmal* tippen = Beat-Punkt auf „jetzt" setzen, wenn er neben der Musik blinkt (Tempo bleibt). *Viermal im Takt* tippen = Tempo setzen (zwei Tipps ändern noch nichts — ein Doppelklick kippt nicht nach Manuell); ab dem dritten Tipp sucht die Erkennung um dieses Tempo (und entscheidet damit auch Halb/Doppel). Der TAP oben in der Kopfzeile ist derselbe Knopf. |
 | 3 | **Auto \| Manuell** | **Auto** folgt der Quelle. **Manuell** hält dein Tempo (TAP/Nudge) — die Quelle ändert es nicht, läuft aber im Hintergrund weiter (das Zustandswort zeigt, was sie erkennen würde). |
 | 4 | **×½** | Halbes Tempo mit einem Klick: läuft das Licht doppelt so schnell wie die Musik. In Auto zwingt das die Erkennung auf die halbe Oktave, in Manuell halbiert es dein Tempo. |
@@ -57,6 +57,15 @@ Die Standardansicht hat **genau sechs Bedienelemente** — mehr braucht es im Be
 ### 1.1 Anzeigen — was läuft gerade?
 
 * **Große BPM-Zahl:** gelb = Auto, grün = Manuell, grau „--" = kein Tempo.
+* **Pegelmeter** direkt unter der BPM-Zahl (nur bei PC-Audio/Eingang; reine Anzeige):
+  der Balken zeigt, wie laut das Signal ankommt (−60 bis 0 dBFS, gemittelt über 0,3 s).
+  **Grün** = gut für die Erkennung (Zielbereich **−30 bis −6 dBFS**, heller Streifen im
+  Hintergrund) · **gelb** = knapp daneben (etwas leise bzw. schon heiß) · **grau** = zu leise
+  oder kein Signal (unter −45 dBFS: Kabel, Gerät, Lautstärke am Mischpult prüfen) ·
+  **rot** = zu laut (über −3 dBFS). Der **helle Strich** hält die letzte Spitze kurz fest
+  und fällt dann langsam ab. **CLIP** (rotes Feld rechts, bleibt 1 s stehen) = das Signal
+  übersteuert — Mischpult/Eingangsverstärkung runterdrehen, bis CLIP weg ist und der
+  Balken im grünen Bereich pendelt.
 * **Beat-Punkt + Taktzellen 1 · 2 · 3 · 4:** blinken im Takt mit; die **1** (Downbeat) ist
   gold. Die Zahl der Zellen folgt **Beats/Takt** (Erweitert).
 * **Zustandswort** (immer sichtbar, nie nur Farbe):

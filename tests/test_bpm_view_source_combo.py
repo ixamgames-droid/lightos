@@ -65,6 +65,11 @@ class _Cap(_Log):
     def list_input_devices():
         return ["USB Audio CODEC Analog Stereo", "Scarlett 2i2"]
 
+    @staticmethod
+    def list_loopback_sinks():
+        return [("alsa_output.pci.analog-stereo", "Built-in Audio Analog Stereo"),
+                ("alsa_output.hdmi", "HDMI Audio")]
+
 
 class _Os2l(_Log):
     def __init__(self):
@@ -152,6 +157,7 @@ def _clear(*logs):
 def _make(ctrl, monkeypatch):
     import src.core.audio.capture as cap_mod
     monkeypatch.setattr(cap_mod.AudioCapture, "list_input_devices", staticmethod(_Cap.list_input_devices))
+    monkeypatch.setattr(cap_mod.AudioCapture, "list_loopback_sinks", staticmethod(_Cap.list_loopback_sinks))
     from src.ui.views.bpm_manager_view import BpmManagerView
     v = BpmManagerView(source_controller=ctrl)
     v.show()
@@ -176,6 +182,8 @@ def test_combo_eintraege(fakes, _isolated_prefs, monkeypatch):
         items = [(v._cmb_source.itemText(i), v._cmb_source.itemData(i)) for i in range(v._cmb_source.count())]
         assert items == [
             ("PC-Audio", "loopback"),
+            ("PC-Audio: Built-in Audio Analog Stereo", "loopback:alsa_output.pci.analog-stereo"),
+            ("PC-Audio: HDMI Audio", "loopback:alsa_output.hdmi"),
             ("Eingang: USB Audio CODEC Analog Stereo", "input:USB Audio CODEC Analog Stereo"),
             ("Eingang: Scarlett 2i2", "input:Scarlett 2i2"),
             ("OS2L (DJ-Software)", "os2l"),
@@ -223,6 +231,41 @@ def test_pc_audio_ohne_geraet(fakes, _isolated_prefs, monkeypatch):
         v.flush_pending_save()
         s = _isolated_prefs.load_settings()
         assert (s["source"], s["device"]) == ("loopback", None)
+    finally:
+        v.hide(); v.deleteLater(); _app.processEvents()
+
+
+def test_pc_audio_je_ausgabegeraet_merkt_sink_id(fakes, _isolated_prefs, monkeypatch):
+    """S5: PC-Audio je Sink — die sink_id geht an den Capture und in die
+    Einstellungen; nach dem Neustart steht derselbe Eintrag. Ein Mikrofonname als
+    Loopback-Geraet wird verworfen (Standard-Ausgabegeraet)."""
+    ctrl, cap, os2l, det, mgr = fakes
+    v = _make(ctrl, monkeypatch)
+    try:
+        _clear(cap, os2l, det, mgr)
+        _select(v, "loopback:alsa_output.hdmi")
+        assert cap.calls == [("set_source_mode", "loopback", "alsa_output.hdmi"), ("start",)]
+        v.flush_pending_save()
+        s = _isolated_prefs.load_settings()
+        assert (s["source"], s["device"]) == ("loopback", "alsa_output.hdmi")
+    finally:
+        v.hide(); v.deleteLater(); _app.processEvents()
+    v2 = _make(ctrl, monkeypatch)                 # „Neustart" der Ansicht
+    try:
+        assert v2._cmb_source.currentData() == "loopback:alsa_output.hdmi"
+    finally:
+        v2.hide(); v2.deleteLater(); _app.processEvents()
+    _clear(cap, os2l, det, mgr)
+    assert ctrl.apply("loopback", "Scarlett 2i2") is True
+    assert cap.calls[0] == ("set_source_mode", "loopback", None)
+
+
+def test_nicht_vorhandener_sink_bleibt_waehlbar(fakes, _isolated_prefs, monkeypatch):
+    _isolated_prefs.save_settings({"source": "loopback", "device": "alsa_output.usb"})
+    v = _make(fakes[0], monkeypatch)
+    try:
+        assert v._cmb_source.currentData() == "loopback:alsa_output.usb"
+        assert v._cmb_source.currentText() == "PC-Audio: alsa_output.usb (nicht gefunden)"
     finally:
         v.hide(); v.deleteLater(); _app.processEvents()
 
@@ -319,5 +362,33 @@ def test_tap_knopf_ruft_den_helfer(fakes, _isolated_prefs, monkeypatch):
     try:
         v._btn_tap.click(); v._btn_tap.click()
         assert tap.n == 2
+    finally:
+        v.hide(); v.deleteLater(); _app.processEvents()
+
+
+def test_pegelmeter_neben_bpm_zahl_aus_capture_snapshot(fakes, _isolated_prefs, monkeypatch):
+    """S5: der 50-ms-Timer speist das Pegelmeter aus ``cap.snapshot()``; bei
+    Nicht-Audio-Quellen bleibt es leer. Das Meter sitzt in der Spalte der BPM-Zahl."""
+    import src.core.audio.capture as cap_mod
+    from src.core.audio.level_meter import CaptureSnapshot
+    snap = CaptureSnapshot(rms_dbfs_300ms=-12.0, peak_hold_dbfs=-8.0, chunks=5, running=True)
+
+    class _SnapCap:
+        def last_error(self):
+            return None
+
+        def snapshot(self):
+            return snap
+    monkeypatch.setattr(cap_mod, "get_audio_capture", lambda: _SnapCap())
+    ctrl = fakes[0]
+    v = _make(ctrl, monkeypatch)
+    try:
+        assert v._level.parentWidget() is v._lbl_bpm.parentWidget()
+        _select(v, "loopback")
+        v._refresh_monitor()
+        assert v._level._snap is snap and v._level.zone() == "ziel"
+        _select(v, "off")
+        v._refresh_monitor()
+        assert v._level._snap is None and not v._level.active()
     finally:
         v.hide(); v.deleteLater(); _app.processEvents()

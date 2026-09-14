@@ -113,7 +113,6 @@ Pflege pro neu geschriebener Doc die Spalte **Doc** (`✅ ja` / `— nein` /
 | `rgb_matrix_view` | [✅ ja](views/rgb_matrix_view.md) |
 | `laser_view` | [✅ ja](views/laser_view.md) |
 | `music_view` | [✅ ja](views/music_view.md) |
-| `audio_input_view` | [✅ ja](views/audio_input_view.md) |
 | `midi_view` | [✅ ja](views/midi_view.md) |
 | `output_view` | [✅ ja](views/output_view.md) |
 | `dmx_monitor_view` | [✅ ja](views/dmx_monitor_view.md) |

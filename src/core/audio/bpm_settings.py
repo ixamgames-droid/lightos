@@ -18,9 +18,10 @@ Persistenz v2 (BPM-07):
   nicht atomaren Schreibers) wird vor dem ersten Ueberschreiben einmalig als
   ``ui_prefs.json.corrupt.bak`` gesichert — die Fremd-Sektionen darin sind
   sonst weg, ohne dass es jemand merkt.
-- ``device`` ist das Eingangsgeraet und gilt nur fuer ``source == "input"``;
-  fuer PC-Audio (loopback) bleibt es None, sonst nimmt der Loopback nach dem
-  Neustart das Mikrofon auf (capture.py sucht den Namen mit include_loopback).
+- ``device`` ist bei ``source == "input"`` das Eingangsgeraet und bei PC-Audio
+  (loopback) ab S5 die ``sink_id`` des Ausgabegeraets (None = Standard). Ein
+  Mikrofonname wird fuer loopback NIE benutzt: der SourceController laesst nur
+  aktuelle sink_ids durch (sonst naehme der Loopback das Mikrofon auf).
 
 Persistenz v3 (BPM-09, S4): ``beat_latency_ms`` neu (int −300..300, Default 0);
 ``sensitivity``/``smoothing``/``subdivision`` entfallen mit ihren Reglern —
@@ -53,7 +54,7 @@ VERSION = 3
 DEFAULTS: dict = {
     "version": VERSION,
     "source": "loopback",        # loopback (PC-Audio) | input (Mikro/Line-In) | os2l | song | off
-    "device": None,              # Eingangsgeraet, nur bei source=input (Sink fuer loopback: S5)
+    "device": None,              # input: Eingangsname; loopback: sink_id (S5); sonst None
     "mode": "auto",              # Manager-Modus: auto | manual
     "min_bpm": 60,               # untere AUTO-Grenze („Tiefen")
     "max_bpm": 200,              # obere AUTO-Grenze („Hoehen")
@@ -342,8 +343,9 @@ def start_auto_if_configured(settings: dict) -> bool:
     den ``SourceController`` (EINE Stelle fuer Capture/OS2L/Manager, S4): der
     merkt sich den Eintrag, damit der erste Klick auf denselben Eintrag im Tab
     „Erkennung" idempotent bleibt (sonst Doppelstart + Detektor-Reset an der
-    Boot-Kante). ``device`` gilt nur fuer den Eingang — ein Loopback bekommt
-    None und loest sein Ausgabegeraet selbst auf. Der gespeicherte Manager-
+    Boot-Kante). ``device`` gilt fuer den Eingang und (als sink_id, S5) fuer
+    PC-Audio; der Controller verwirft fuer loopback alles, was keine aktuelle
+    sink_id ist — dann gilt das Standard-Ausgabegeraet. Der gespeicherte Manager-
     ``mode`` wird vor dem Schalten gesetzt und vom Controller nach
     ``use_audio_source(True)`` (erzwingt AUTO) wiederhergestellt — Capture haengt
     an der Quelle, der Modus am Manager. Ein bereits aktiver Eintrag (Tab war
@@ -360,7 +362,7 @@ def start_auto_if_configured(settings: dict) -> bool:
         from src.ui.bpm_source_controller import get_source_controller
         mgr = get_bpm_manager()
         mgr.set_mode(mode)
-        get_source_controller().apply(source, device if source == "input" else None)
+        get_source_controller().apply(source, device if source in ("input", "loopback") else None)
         return True
     except Exception as e:
         _log(f"auto-start error: {e}")
