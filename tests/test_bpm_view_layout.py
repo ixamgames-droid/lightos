@@ -6,7 +6,9 @@
   Mitglieder EINER exklusiven ``QButtonGroup`` (Auto | Manuell, ein
   Segment-Schalter aus zwei QToolButtons) zaehlen als EIN Bedienelement
   (plan.md 1.2: „Auto | Manuell (Zweizustand)" ist ein Element). Roh sind es 7.
-* Erweitert aufgeklappt: 6 + 11.
+* Erweitert aufgeklappt: 6 + 12 (S6: + „Eingang 30 s aufnehmen").
+* Die Statuszeile (Abhilfe-Link in einem QLabel) und die Chips sind Anzeigen
+  und zaehlen nicht.
 * Der 50-ms-Snapshot-Timer laeuft nur bei Sichtbarkeit (showEvent/hideEvent).
 * Kein ``get_bpm(`` in der View, den beiden Helfern und ueberhaupt in
   ``src/ui`` (Briefing 7c; seit S5 ohne Ausnahme — die AudioInputView ist weg).
@@ -99,15 +101,15 @@ def test_standardansicht_hat_genau_sechs_bedienelemente(_isolated_prefs):
         v.hide(); v.deleteLater(); _app.processEvents()
 
 
-def test_erweitert_hat_genau_elf_bedienelemente(_isolated_prefs):
+def test_erweitert_hat_genau_zwoelf_bedienelemente(_isolated_prefs):
     v = _make()
     try:
         v._advanced.set_expanded(True)
         _app.processEvents()
         ctrls = visible_controls(v)
-        assert len(ctrls) == 6 + 11, [type(w).__name__ + ":" + getattr(w, "text", lambda: "")() for w in ctrls]
+        assert len(ctrls) == 6 + 12, [type(w).__name__ + ":" + getattr(w, "text", lambda: "")() for w in ctrls]
         for w in (v._sp_min, v._sp_max, v._btn_preset, v._sp_bpb, v._sp_latency,
-                  v._btn_lock, v._chk_phase, *v._btn_nudge.values()):
+                  v._btn_lock, v._chk_phase, v._btn_record, *v._btn_nudge.values()):
             assert w in ctrls
         assert set(v._btn_nudge) == {-5, -1, 1, 5}          # kein ±10 mehr
         v._advanced.set_expanded(False)

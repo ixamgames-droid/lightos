@@ -33,7 +33,19 @@ bei Quelle ``song`` wird der Player-Track erneut angeboten. Manuell =
 sichtbar, Rueckweg auf Auto sofort).
 
 ×½ / ×2 (``octave``): in AUTO ``det.set_octave_preference(-1/+1)``, in MANUAL
-``mgr.set_manual_bpm(bpm/2 bzw. bpm*2)``.
+``mgr.set_manual_bpm(bpm/2 bzw. bpm*2)``. S6 (BPM-11): in AUTO wird vorher der
+Tempo-Bereich geprueft (``mgr.min_bpm``/``max_bpm``) — liegt das Ziel ausserhalb,
+passiert NICHTS und ``octave`` liefert ``(False, Grund)``; der Bereich wird nie
+stumm veraendert (ui_diagnose 5.4). Die View zeigt den Grund als Statuszeilen-
+Ereignis.
+
+Fehlender Sink (S6): wird PC-Audio mit einer ``sink_id`` gewaehlt, die es gerade
+nicht gibt, laeuft der Capture auf dem Standard-Ausgabegeraet; ``missing_sink``
+nennt dann die gewuenschte id (Statuszeile), sonst None. ``wanted`` behaelt den
+GEWUENSCHTEN Eintrag (mit der fehlenden id), ``current`` den angewandten.
+``reconnect()`` wendet ``wanted`` erzwungen neu an: ist das Geraet inzwischen
+angesteckt, laeuft der Capture wieder darauf; fehlt es weiter, bleibt
+``missing_sink`` gesetzt.
 
 Backends werden nur AUFGERUFEN (bpm_manager.py, capture.py, os2l.py,
 beat_detector.py bleiben unangetastet); jeder Schritt ist einzeln abgesichert,
@@ -73,6 +85,8 @@ class SourceController:
     def __init__(self, mgr=None, cap=None, os2l=None, det=None, player=None):
         self._mgr, self._cap, self._os2l, self._det, self._player = mgr, cap, os2l, det, player
         self._current: tuple[str, str | None] | None = None
+        self._wanted: tuple[str, str | None] | None = None
+        self.missing_sink: str | None = None
 
     # ── Backends lazily (Singletons; Tests reichen Fakes herein) ────────────
     def _manager(self):
@@ -124,6 +138,17 @@ class SourceController:
         return self._current
 
     @property
+    def wanted(self) -> tuple[str, str | None] | None:
+        """Zuletzt GEWUENSCHTER Eintrag ``(kind, device)`` — bei fehlendem Sink mit dessen id."""
+        return self._wanted
+
+    def reconnect(self) -> bool:
+        """„erneut verbinden": den gewuenschten Eintrag erzwungen neu anwenden."""
+        if self._wanted is None:
+            return False
+        return self.apply(*self._wanted, force=True)
+
+    @property
     def kind(self) -> str | None:
         return self._current[0] if self._current else None
 
@@ -137,9 +162,12 @@ class SourceController:
             return False
         if kind not in AUDIO_KINDS:
             device = None
+        wanted = device
         if kind == "loopback":
             device = _known_sink(device)   # nur echte sink_id, sonst Standard-Ausgabegeraet
         key = (kind, device)
+        self._wanted = (kind, wanted)
+        self.missing_sink = wanted if (kind == "loopback" and wanted and device is None) else None
         if key == self._current and not force:
             return False
         self._current = key
@@ -181,11 +209,34 @@ class SourceController:
         else:
             self._safe("set_mode manual", lambda: mgr.set_mode("manual"))
 
-    def octave(self, step: int) -> None:
+    def octave_target(self, step: int) -> float:
+        """Tempo, auf das ×½ (step < 0) / ×2 (step > 0) fuehren wuerde (0 = unbekannt)."""
+        mgr = self._manager()
+        bpm = float(getattr(mgr, "bpm", 0.0) or 0.0)
+        if bpm <= 0 and _is_auto(mgr):
+            det = self._detector()
+            try:
+                bpm = float(det.snapshot().bpm) if det is not None else 0.0
+            except Exception:
+                bpm = 0.0
+        if bpm <= 0:
+            return 0.0
+        return bpm / 2.0 if step < 0 else bpm * 2.0
+
+    def octave(self, step: int) -> tuple[bool, str | None]:
         """×½ (step < 0) / ×2 (step > 0): in AUTO Oktav-Vorzug des Detektors, in
-        MANUAL das manuelle Tempo halbieren/verdoppeln."""
+        MANUAL das manuelle Tempo halbieren/verdoppeln. Liefert ``(True, None)``
+        oder ``(False, Grund)``, wenn das Ziel in AUTO ausserhalb des Tempo-Bereichs
+        liegt (dann kein Aufruf)."""
         mgr = self._manager()
         if _is_auto(mgr):
+            ziel = self.octave_target(step)
+            lo = float(getattr(mgr, "min_bpm", 0.0) or 0.0)
+            hi = float(getattr(mgr, "max_bpm", 0.0) or 0.0)
+            if ziel > 0 and hi > lo and not (lo <= ziel <= hi):
+                knopf = "×2" if step > 0 else "×½"
+                return False, (f"{knopf} nicht möglich: {ziel:.0f} BPM außerhalb des "
+                               f"Tempo-Bereichs {lo:.0f}–{hi:.0f}")
             det = self._detector()
             if det is not None:
                 self._safe("set_octave_preference",
@@ -195,6 +246,7 @@ class SourceController:
             if bpm > 0:
                 self._safe("set_manual_bpm",
                            lambda: mgr.set_manual_bpm(bpm / 2.0 if step < 0 else bpm * 2.0))
+        return True, None
 
     def apply_player_track(self) -> float:
         """Quelle „Lied-Analyse": den AKTUELLEN Player-Track als Timeline-Quelle

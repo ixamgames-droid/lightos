@@ -181,7 +181,7 @@ def test_combo_eintraege(fakes, _isolated_prefs, monkeypatch):
     try:
         items = [(v._cmb_source.itemText(i), v._cmb_source.itemData(i)) for i in range(v._cmb_source.count())]
         assert items == [
-            ("PC-Audio", "loopback"),
+            ("PC-Audio (Systemstandard)", "loopback"),
             ("PC-Audio: Built-in Audio Analog Stereo", "loopback:alsa_output.pci.analog-stereo"),
             ("PC-Audio: HDMI Audio", "loopback:alsa_output.hdmi"),
             ("Eingang: USB Audio CODEC Analog Stereo", "input:USB Audio CODEC Analog Stereo"),

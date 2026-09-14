@@ -53,7 +53,7 @@ class BeatDetector:
     def __init__(self, sample_rate: int = SAMPLE_RATE):
         self._lock = threading.Lock()
         self._beat_callbacks: list = []
-        # --- Alt-Attribute (Leser: audio_input_view, bpm_settings, genre_presets, Bench) ---
+        # --- Alt-Attribute (Leser: bpm_settings, genre_presets, Bench; Tab „Audio Input" entfiel in BPM-10) ---
         self.sensitivity: float = 1.3
         self.smoothing: float = 0.3
         self.band_low_hz: int = 40

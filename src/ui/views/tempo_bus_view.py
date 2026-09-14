@@ -1,6 +1,6 @@
 """Tempo-Buses-Tab (BPM-08) — Tempo-Speeds, Grand-Master und „Effekte je Bus".
 
-Eigener Sub-Tab der Sektion BPM (Manager | Tempo-Buses | Generator). Die beiden
+Eigener Sub-Tab der Sektion BPM (Erkennung | Tempo-Buses | Generator). Die beiden
 Gruppen „Tempo-Speeds && Grand-Master" (Phase D2) und „Effekte je Bus —
 taktgleich" (Stufe 2) lagen bis BPM-08 im BPM-Manager-Tab und sind unveraendert
 hierher gezogen: Attribut-, Methoden- und Beschriftungsnamen sind dieselben

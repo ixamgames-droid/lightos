@@ -27,7 +27,7 @@ Hauptsteuerung — alles andere ist Feintuning.
 
 | Du willst… | Quelle | Voraussetzung |
 |---|---|---|
-| dass das Licht **live zur laufenden Musik** läuft (Spotify, Player auf diesem PC) | **PC-Audio** (Standard-Ausgabe) oder **PC-Audio: <Ausgabegerät>** | Musik läuft hörbar über den PC (bzw. über dieses Ausgabegerät) |
+| dass das Licht **live zur laufenden Musik** läuft (Spotify, Player auf diesem PC) | **PC-Audio (Systemstandard)** oder **PC-Audio: <Ausgabegerät>** | Musik läuft hörbar über den PC (bzw. über dieses Ausgabegerät) |
 | Musik von **außen** (Fremd-DJ, Mischpult, Live-Band) | **Eingang: <Gerät>** | Mikro/Line-In/Interface angeschlossen |
 | das Tempo **vom DJ-Programm** (VirtualDJ, Mixxx) | **OS2L (DJ-Software)** | OS2L im DJ-Programm aktiviert |
 | ein **vorbereitetes Lied** sauber & exakt zum Beat abspielen | **Lied-Analyse (Player)** | Song vorher im **Generator** analysiert und im Player geladen |
@@ -47,11 +47,11 @@ Die Standardansicht hat **genau sechs Bedienelemente** — mehr braucht es im Be
 
 | # | Element | Was es tut |
 |---|---|---|
-| 1 | **Quelle** (Liste) | PC-Audio (folgt dem Standard-Ausgabegerät) · PC-Audio: <Ausgabegerät> (je Lautsprecher/HDMI/USB-Ausgang ein Eintrag) · Eingang: <Gerät> (je Eingang ein Eintrag) · OS2L (DJ-Software) · Lied-Analyse (Player) · Aus. Die Liste liest die Geräte beim Öffnen neu; ein gespeichertes, gerade nicht vorhandenes Gerät steht als „(nicht gefunden)" drin. Was du wählst, wird gemerkt. |
+| 1 | **Quelle** (Liste) | PC-Audio (Systemstandard) (folgt dem Ausgabegerät, das gerade im System als Standard eingestellt ist) · PC-Audio: <Ausgabegerät> (je Lautsprecher/HDMI/USB-Ausgang ein Eintrag) · Eingang: <Gerät> (je Eingang ein Eintrag) · OS2L (DJ-Software) · Lied-Analyse (Player) · Aus. Die Liste liest die Geräte beim Öffnen neu; ein gespeichertes, gerade nicht vorhandenes Gerät steht als „(nicht gefunden)" drin. Was du wählst, wird gemerkt. |
 | 2 | **TAP** (großer Knopf) | **Zwei Rollen:** *einmal* tippen = Beat-Punkt auf „jetzt" setzen, wenn er neben der Musik blinkt (Tempo bleibt). *Viermal im Takt* tippen = Tempo setzen (zwei Tipps ändern noch nichts — ein Doppelklick kippt nicht nach Manuell); ab dem dritten Tipp sucht die Erkennung um dieses Tempo (und entscheidet damit auch Halb/Doppel). Der TAP oben in der Kopfzeile ist derselbe Knopf. |
 | 3 | **Auto \| Manuell** | **Auto** folgt der Quelle. **Manuell** hält dein Tempo (TAP/Nudge) — die Quelle ändert es nicht, läuft aber im Hintergrund weiter (das Zustandswort zeigt, was sie erkennen würde). |
 | 4 | **×½** | Halbes Tempo mit einem Klick: läuft das Licht doppelt so schnell wie die Musik. In Auto zwingt das die Erkennung auf die halbe Oktave, in Manuell halbiert es dein Tempo. |
-| 5 | **×2** | Doppeltes Tempo — das Gegenstück. Tipp: ein enger Tempo-Bereich (Erweitert) verhindert den Fehler dauerhaft. |
+| 5 | **×2** | Doppeltes Tempo — das Gegenstück. Tipp: ein enger Tempo-Bereich (Erweitert) verhindert den Fehler dauerhaft. Liegt das Ziel in Auto außerhalb des Tempo-Bereichs, passiert nichts und die Statuszeile sagt es („×2 nicht möglich — 256 BPM liegt außerhalb des Tempo-Bereichs 60–200 — Tempo-Bereich anpassen“); der Bereich wird nie heimlich verstellt. |
 | 6 | **▸ Erweitert** | Klappt die Feineinstellungen auf (Abschnitt 1.3). Bleibt nur für die Sitzung offen. |
 
 ### 1.1 Anzeigen — was läuft gerade?
@@ -66,6 +66,11 @@ Die Standardansicht hat **genau sechs Bedienelemente** — mehr braucht es im Be
   und fällt dann langsam ab. **CLIP** (rotes Feld rechts, bleibt 1 s stehen) = das Signal
   übersteuert — Mischpult/Eingangsverstärkung runterdrehen, bis CLIP weg ist und der
   Balken im grünen Bereich pendelt.
+* **Hinweis-Chips** unter dem Pegelmeter (reine Anzeigen): **CLIP** (übersteuert),
+  **BRUMM** (Netzbrumm 50/60 Hz), **LEISE** (unter −40 dBFS), **AUSSETZER** (Audio kommt
+  stoßweise, Rechner ausgelastet), **DC** (Gleichspannungsversatz am Eingang). Ein Chip
+  erscheint erst, wenn die Störung 2 s anhält, und verschwindet 3 s nach ihrem Ende —
+  kurzes Flackern zeigt nichts.
 * **Beat-Punkt + Taktzellen 1 · 2 · 3 · 4:** blinken im Takt mit; die **1** (Downbeat) ist
   gold. Die Zahl der Zellen folgt **Beats/Takt** (Erweitert).
 * **Zustandswort** (immer sichtbar, nie nur Farbe):
@@ -79,7 +84,13 @@ Die Standardansicht hat **genau sechs Bedienelemente** — mehr braucht es im Be
   Nudge, Lied-Analyse, OS2L) und ob **🔒** eingefroren ist.
 * **Konfidenz:** wie sicher die Erkennung ist (0–100 %). Hoch = klarer Beat; niedrig =
   unklares Signal, Pause, Sprache.
-* **Status-Zeile** (orange): erscheint nur bei einem Eingangs-Fehler („⚠ …").
+* **Statuszeile** unter den Knöpfen — **nie leer**, immer in drei Teilen
+  **Problem — Ursache — Abhilfe**, farbig nach Schwere (grün = ok, gelb = Hinweis,
+  rot = Problem). Beispiele: „Eingerastet — 128 BPM aus PC-Audio »Systemstandard« — Pegel im
+  Zielbereich“, „Kein Signal — Eingang »USB Audio CODEC« liefert −70 dBFS — Kabel/Gerät
+  prüfen oder anderen Eingang wählen“. Ist die Abhilfe **unterstrichen**, ist sie ein Link:
+  anklicken und LightOS führt sie aus (erneut verbinden, Aufnahme starten, „Erweitert“
+  aufklappen, Quelle-Liste öffnen). Details: Abschnitt 1.4.
 
 > **Wozu:** Wenn das Licht „daneben" läuft, schau zuerst hierher: Stimmt die Zahl? Sagt
 > das Zustandswort EINGERASTET? Ist die Konfidenz hoch? Blinkt der Punkt neben der Musik →
@@ -98,7 +109,7 @@ erkannten/gesetzten globalen BPM.
 
 ![Einstellungen (Stand bis 2026-09-14)](img/manager_einstellungen.png)
 
-Aufklappen mit **▸ Erweitert**. Elf Bedienelemente, alle werden gespeichert:
+Aufklappen mit **▸ Erweitert**. Zwölf Bedienelemente; alle außer „Eingang 30 s aufnehmen“ werden gespeichert:
 
 #### Tempo-Bereich  (von / bis, 20–400 BPM) + „Vorlage ▾"
 Die untere und obere Grenze, in die die Erkennung das Tempo **faltet**.
@@ -143,10 +154,19 @@ Nur für die Quelle **Lied-Analyse**: Wenn aktiv, treffen die Beats **exakt das 
 des Liedes** (nicht nur den BPM-Wert) — die Lichtshow sitzt phasen-genau auf der Musik.
 Aus = es folgt nur der **BPM-Wert** (Phase läuft frei mit). Details in Abschnitt 3.
 
+#### Eingang 30 s aufnehmen  (Knopf)
+Nimmt 30 Sekunden von der laufenden Audio-Quelle auf und legt zwei Dateien in den
+Datenordner, Unterordner `audio_diag/`: eine WAV (`lightos_eingang_<Datum-Uhrzeit>.wav`)
+und daneben eine JSON mit den Messwerten (Gerät, Pegel, Spitze, Clips, Brumm, Version,
+Zeit — kein Benutzername, kein Pfad). Während der Aufnahme zeigt der Knopf
+„Aufnahme … 12 s“; ein zweiter Klick bricht ab (die Datei ist dann kürzer, aber gültig).
+Ohne laufende Audio-Quelle (Aus, OS2L, Lied-Analyse, Capture gestoppt) ist der Knopf grau.
+Siehe Abschnitt 1.4.
+
 #### Diagnose + Spektrum  (nur Anzeige)
 Rohwerte des Detektors: Roh-Tempo, Alternativ-Oktave mit Wert, Fensterfüllung, Pegel,
 Rauschteppich, Brumm (50/60 Hz, Anteil), DC, Jitter, Rückstand, Beat-Kontrast, gesetzter
-Tempo-Hinweis. Darunter das 8-Band-**Spektrum** des Eingangssignals. Beides hilft, wenn
+Tempo-Hinweis; dazu vom Eingang der DC-Offset und der Chunk-Abstand (p95, normal um 23 ms). Darunter das 8-Band-**Spektrum** des Eingangssignals. Beides hilft, wenn
 etwas nicht erkannt wird (Brummanteil hoch? Pegel −70 dBFS = nichts da?).
 
 > **Entfernt seit 2026-09-14:** Empfindlichkeit, Glättung, Genre-Preset + Anwenden (entfernt),
@@ -155,6 +175,37 @@ etwas nicht erkannt wird (Brummanteil hoch? Pegel −70 dBFS = nichts da?).
 > Genre-Bereiche gibt es unter „Vorlage ▾" weiter; die Lied-Analyse nimmt den Titel, der
 > im Player geladen ist; „Tempo einfrieren" steht in „Erweitert".
 
+
+### 1.4 Wenn nichts erkannt wird
+
+**1. Statuszeile lesen.** Sie steht direkt unter TAP/Auto/×½/×2 und sagt in einem Satz,
+was los ist, warum (mit dem gemessenen Wert) und was zu tun ist. Eine Störung erscheint
+erst nach 2 s und bleibt 3 s nach ihrem Ende stehen, damit nichts flackert. Die häufigsten:
+
+| Statuszeile beginnt mit | Bedeutet | Was tun |
+|---|---|---|
+| **Kein Signal** | unter −60 dBFS, praktisch nichts kommt an | Kabel/Gerät prüfen; bei PC-Audio: läuft die Musik über genau dieses Ausgabegerät? Link öffnet die Quelle-Liste |
+| **Ausgabegerät nicht gefunden** | das gemerkte PC-Audio-Gerät fehlt, es wird die Standardausgabe mitgehört | Gerät anstecken oder ein vorhandenes wählen |
+| **Audio-Fehler** / **Audio gestoppt** | der Eingang ist abgebrochen (Gerät gezogen, Treiber) | Gerät anstecken, dann den Link **erneut verbinden** |
+| **Übersteuert** | das Signal stößt an 0 dBFS (Chip CLIP) | Pegel am Mischpult/Interface senken, bis der Balken grün pendelt |
+| **Netzbrumm 50 Hz** | Brumm genau auf 50/60 Hz im Bassband so laut wie der Beat, und der Takt wird nicht gefunden (Chip BRUMM); ein gehaltener Bass im Breakdown löst das nicht aus | Masseschleife: DI-Box/Ground-Lift, anderes Netzteil, symmetrisches Kabel |
+| **Pegel niedrig** | unter −40 dBFS (Chip LEISE) | Ausgang am Mischpult bzw. Interface-Gain anheben |
+| **Audio kommt stoßweise** | der Rechner liefert das Audio ruckelig (Chip AUSSETZER) | andere Programme schließen |
+| **Sucht Tempo** / **Kein Takt gefunden** | Signal da, aber (noch) kein stabiler Beat | kurz warten; sonst TAP viermal im Takt |
+| **Eingerastet — … ähnlich plausibel** | Halb-/Doppeltempo möglich | ×2 bzw. ×½ klicken |
+| **OS2L wartet** | der Server läuft, keine DJ-Software verbunden | in VirtualDJ OS2L aktivieren |
+
+**2. Chips am Pegelmeter ansehen.** Die Statuszeile nennt nur das Wichtigste; weitere
+Störungen stehen gleichzeitig als Chips (CLIP, BRUMM, LEISE, AUSSETZER, DC) unter dem Meter.
+
+**3. Aufnahme machen und schicken.** Hilft nichts davon: Musik so laufen lassen wie im
+Problemfall, **▸ Erweitert → „Eingang 30 s aufnehmen“** klicken (oder den Link
+„Aufnahme machen und schicken“ in der Statuszeile) und 30 s warten. Danach steht in der
+Statuszeile z. B. „Aufnahme gespeichert — audio_diag/lightos_eingang_20260914-213000.wav —
+Datei an Robin/Support schicken“. Die **WAV und die gleichnamige JSON** aus dem Datenordner
+(Linux `~/.local/share/LightOS/audio_diag/`, Windows `%APPDATA%\LightOS\audio_diag\`)
+schicken. Die Aufnahme bleibt lokal, nichts wird automatisch versendet. Mit der Datei
+lassen sich die Schwellen der Statuszeile am echten Rig nachziehen.
 
 ---
 
@@ -309,7 +360,8 @@ Track) — eine einmal analysierte Datei bleibt also über Sitzungen hinweg als 
 * **Tempo erkannt, aber halb/doppelt:** **×½ / ×2** klicken (Einmal-Korrektur) oder in
   „Erweitert" den **Tempo-Bereich** enger setzen bzw. eine **Vorlage** wählen (dauerhaft).
 * **KEIN SIGNAL bei laufender Musik:** Läuft die Musik über das Gerät, das die Quelle mithört?
-  Bei „Eingang" das richtige Gerät in der Liste wählen; die Diagnosezeile zeigt den Pegel.
+  Bei „Eingang" das richtige Gerät in der Liste wählen; die Statuszeile nennt den Pegel.
+  Weiter mit Abschnitt 1.4 (Aufnahme machen und schicken).
 * **SUCHT bleibt stehen:** Musik ohne klaren Beat, Sprache, Pause? **TAP** drei-, viermal im
   Takt — die Erkennung sucht dann um dein Tempo.
 * **Licht liegt hörbar hinter dem Beat:** **Beat-Latenz** in „Erweitert" ins Plus.

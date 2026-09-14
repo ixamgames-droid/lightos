@@ -16,10 +16,10 @@ Bus" liegen seit BPM-08 im eigenen Sub-Tab [`tempo_bus_view`](tempo_bus_view.md)
 
 | Bedienung | Wirkung |
 |---|---|
-| **Quelle** (`_cmb_source`, Daten `loopback` / `input:<Gerät>` / `os2l` / `song` / `off`) | `bpm_source_controller.SourceController.apply(kind, device)` — EINE Stelle schaltet Capture (`set_source_mode` + start/stop), OS2L (start/stop) und Manager (`use_audio_source`); `det.set_tempo_hint(None)` + `det.reset()` beim Wechsel; idempotent. `activated` ist zusätzlich angebunden („erneut verbinden" auf denselben Eintrag). Die Liste wird bei `showPopup` neu gelesen; ein gespeichertes, fehlendes Gerät steht als „(nicht gefunden)". |
+| **Quelle** (`_cmb_source`, Daten `loopback` / `loopback:<sink_id>` / `input:<Gerät>` / `os2l` / `song` / `off`) | `bpm_source_controller.SourceController.apply(kind, device)` — EINE Stelle schaltet Capture (`set_source_mode` + start/stop), OS2L (start/stop) und Manager (`use_audio_source`); `det.set_tempo_hint(None)` + `det.reset()` beim Wechsel; idempotent. `activated` ist zusätzlich angebunden (derselbe Eintrag schaltet wegen der Idempotenz nichts erneut; „erneut verbinden" ist der Statuszeilen-Link mit `force=True`). Die Liste wird bei `showPopup` neu gelesen; der generische Eintrag heißt „PC-Audio (Systemstandard)" (S6, Daten weiter `loopback`); ein gespeichertes, fehlendes Gerät steht als „(nicht gefunden)" und setzt `SourceController.missing_sink`. |
 | **TAP** (`_btn_tap`) | `bpm_tap_helper.TapHelper.tap()` — 1. Tipp `det.resync_phase()`, 2. Tipp nichts, ab dem 3. Tipp `mgr.tap()` + `det.set_tempo_hint(<gemessen>)` (Manager-Tempo ab dem 4.); derselbe Helfer wie der Topbar-TAP. |
 | **Auto \| Manuell** (`_btn_auto`/`_btn_manual`, exklusive `QButtonGroup`) | `SourceController.set_auto(bool)` → `mgr.set_mode`; Auto holt bei Audio-Quelle `use_audio_source(True)` nach, bei `song` den Player-Track. Die Quelle bleibt. |
-| **×½ / ×2** (`_btn_half`/`_btn_double`) | `SourceController.octave(±1)`: in AUTO `det.set_octave_preference`, in MANUAL `mgr.set_manual_bpm(bpm/2 bzw. ×2)`. |
+| **×½ / ×2** (`_btn_half`/`_btn_double`) | `SourceController.octave(±1) -> (ok, grund)`: in AUTO erst Tempo-Bereich prüfen (`octave_target` gegen `mgr.min_bpm/max_bpm`; außerhalb kein Aufruf, `(False, grund)` → Statuszeilen-Ereignis `ereignis_oktave`, 3 s, Link `range`), sonst `det.set_octave_preference`; in MANUAL `mgr.set_manual_bpm(bpm/2 bzw. ×2)`. |
 | **▸ Erweitert** (`_advanced`, `CollapsibleSection` ohne `prefs_key`) | Zustand nur je Sitzung. |
 | Erweitert: Tempo-Bereich (`_sp_min`/`_sp_max`) | `mgr.set_bounds` (spiegelt in den Detektor). |
 | Erweitert: „Vorlage ▾" (`_btn_preset`, `QMenu` aus `genre_presets.ORDER`) | `genre_presets.apply_to_live(key)` — setzt NUR Bereich + Beats/Takt; die Spins ziehen nach. |
@@ -28,11 +28,17 @@ Bus" liegen seit BPM-08 im eigenen Sub-Tab [`tempo_bus_view`](tempo_bus_view.md)
 | Erweitert: „🔒 Tempo einfrieren" (`_btn_lock`) | `mgr.set_locked`. |
 | Erweitert: Nudge −5/−1/+1/+5 (`_btn_nudge`) | `mgr.nudge(delta)`. |
 | Erweitert: „Taktgenau" (`_chk_phase`) | `get_music_director().set_phase_accurate`. |
+| Erweitert: „Eingang 30 s aufnehmen" (`_btn_record`, S6) | `AudioRecorder.start(30)` bzw. `cancel()` bei laufender Aufnahme; Text „Aufnahme … N s"; deaktiviert ohne laufende Audio-Quelle. Abschluss `on_finished` (Worker-Thread) → `_rec_done_sig` → Ereignis „Aufnahme gespeichert — audio_diag/<datei>.wav — Datei an Robin/Support schicken". |
+| Statuszeilen-Link (`_lbl_abhilfe.linkActivated`, S6; QLabel, kein Bedienelement) | `reconnect` → `apply(aktuelle Quelle, force=True)` · `record` → Aufnahme · `range` → Erweitert aufklappen · `source` → `_cmb_source.showPopup()`. |
 
 Anzeigen: `_lbl_bpm` (aus `mgr.bpm` per `subscribe_bpm_change` → Qt-Signal; gelb Auto,
 grün Manuell, grau kein Tempo), `_dot` + `_phase_lbls` (Beat-Signal), `_lbl_state`
 (Zustandswort, `state_word()` — reine Funktion), `_lbl_source`, `_conf`, in Erweitert
-`_lbl_diag` (`diag_line()`) und `SpectrumBars`. **Kein `get_bpm(`-Aufruf** in
+`_lbl_diag` (`diag_line(det_snap, cap_snap)` inkl. DC-Offset und Chunk-Abstand p95 des
+Eingangs) und `SpectrumBars`. **Statuszeile** (S6): `_lbl_problem` — `_lbl_ursache` —
+`_lbl_abhilfe` aus `bpm_status_rules.status_line()` über `StatusHysterese`, Farbe nach
+Schwere; **Chips** `_chips` (CLIP/BRUMM/LEISE/AUSSETZER/DC) unter dem Pegelmeter aus
+`chips()` + `ChipHysterese`. **Kein `get_bpm(`-Aufruf** in
 `src/ui/views/bpm_manager_view.py` und `src/ui/bpm_*.py` (Grep-Test).
 
 ## Datenfluss
@@ -42,6 +48,13 @@ grün Manuell, grau kein Tempo), `_dot` + `_phase_lbls` (Beat-Signal), `_lbl_sta
 - **Kontinuierliche Werte** (Zustandswort, Konfidenz, Diagnose, Capture-Fehler) liest
   `_refresh_monitor` alle **50 ms** (`POLL_MS`) aus dem unveränderlichen
   `det.snapshot()` — der Timer läuft **nur bei Sichtbarkeit** (`showEvent`/`hideEvent`).
+- **Statuszeile/Chips** (S6): im selben Poll `MgrState` (Quelle, Gerät, Modus, BPM,
+  Lock, Bereich, `last_error`, `missing_sink`, Ereignis, Aufnahme-Fortschritt) +
+  `Os2lState` → `status_line()` (erster Treffer gewinnt; alle Schwellen im Konstantenblock
+  von `src/ui/bpm_status_rules.py`) → `StatusHysterese` (Störung 2 s an / 3 s aus,
+  Zustandszeilen/Ereignisse sofort). Uhr injizierbar (`clock=`).
+- **Aufnahme** (`src/core/audio/audio_recorder.py`): Capture-Callback nur `Queue.put`,
+  Worker-Thread schreibt WAV PCM16 mono + Sidecar-JSON nach `app_data_dir()/audio_diag/`.
 - Zustandswort (ui_diagnose 3.1): MANUELL · KEIN SIGNAL · SUCHT · EINGERASTET ·
   PAUSE · hält N (`hold_stage` 1/2) · OS2L (· wartet auf DJ-Software) · LIED-ANALYSE · AUS.
 
@@ -78,7 +91,14 @@ Die Einstellungen liegen in `ui_prefs.json`, Sektion `bpm_settings`, Version 3
 ## Zugehörige Tests
 
 - `tests/test_bpm_view_layout.py` — 6 Bedienelemente (roh 7: Auto | Manuell = eine
-  exklusive Gruppe), Erweitert 6 + 11, Timer nur bei Sichtbarkeit, Tooltips, kein `get_bpm(`.
+  exklusive Gruppe; Statuszeilen-Link und Chips zählen nicht), Erweitert 6 + 12, Timer nur
+  bei Sichtbarkeit, Tooltips, kein `get_bpm(`.
+- `tests/test_bpm_view_status.py` — Statuszeile/Chips erscheinen nach 2 s, verschwinden nach
+  3 s (Uhr gestellt); Links reconnect/record/range/source; Aufnahme-Knopf; ×2 außerhalb des
+  Bereichs; fehlender Sink; Diagnosezeile; „PC-Audio (Systemstandard)".
+- `tests/test_bpm_status_rules.py` — alle Situationen als Snapshot-Fixtures, nie leerer Text,
+  Hysterese, gemessene Brumm-Fälle. `tests/test_audio_recorder.py` — WAV/JSON, Abbruch,
+  Callback-Kosten.
 - `tests/test_bpm_view_state_table.py` — Wahrheitstabelle Auto | Manuell × Quelle × Lock →
   `mgr.mode` / `current_source` / `_audio_active`; `state_word()`.
 - `tests/test_bpm_view_source_combo.py` — jeder Combo-Eintrag → Fake-Capture/-OS2L/-Manager,
@@ -90,12 +110,15 @@ Die Einstellungen liegen in `ui_prefs.json`, Sektion `bpm_settings`, Version 3
 
 ## Quelle (file:line)
 
-- `src/ui/views/bpm_manager_view.py:88` — `state_word()` · `:111` — `diag_line()`
-- `src/ui/views/bpm_manager_view.py:143` — Klasse `BpmManagerView`
-- `src/ui/views/bpm_manager_view.py:201` — `_build_head` (Quelle, Beat, Zustandswort, Konfidenz)
-- `src/ui/views/bpm_manager_view.py:290` — `_build_buttons` (TAP, Auto | Manuell, ×½, ×2)
-- `src/ui/views/bpm_manager_view.py:346` — `_build_advanced` (11 Bedienelemente)
-- `src/ui/views/bpm_manager_view.py:519` — `_populate_sources` · `:551` — `_on_source_changed`
-- `src/ui/views/bpm_manager_view.py:663` — `_refresh_monitor` (50-ms-Poll)
-- `src/ui/bpm_source_controller.py` — `SourceController` · `src/ui/bpm_tap_helper.py` — `TapHelper`
+- `src/ui/views/bpm_manager_view.py:120` — `state_word()` · `:143` — `diag_line()`
+- `src/ui/views/bpm_manager_view.py:179` — Klasse `BpmManagerView`
+- `src/ui/views/bpm_manager_view.py:243` — `_build_head` (Quelle, Pegelmeter + Chips, Beat, Zustandswort, Konfidenz)
+- `src/ui/views/bpm_manager_view.py:353` — `_build_buttons` (TAP, Auto | Manuell, ×½, ×2)
+- `src/ui/views/bpm_manager_view.py:409` — `_build_status` (Statuszeile)
+- `src/ui/views/bpm_manager_view.py:440` — `_build_advanced` (12 Bedienelemente)
+- `src/ui/views/bpm_manager_view.py:636` — `_populate_sources` · `:689` — `_on_source_changed`
+- `src/ui/views/bpm_manager_view.py:804` — `_refresh_monitor` (50-ms-Poll) · `:911` — `_on_status_link` · `:942` — `_start_recording` · `:1004` — `_octave`
+- `src/ui/bpm_status_rules.py:157` — `status_line()` · `:463` — `StatusHysterese` · `:508` — `chips()` · `:530` — `ChipHysterese`
+- `src/ui/bpm_source_controller.py:209` — `SourceController.octave` · `src/ui/bpm_tap_helper.py` — `TapHelper`
+- `src/core/audio/audio_recorder.py:119` — `AudioRecorder.start` · `:156` — `_worker`
 - `src/core/audio/bpm_settings.py:45` — `DEFAULTS` (v3) · `:150` — `_v2_to_v3` · `:160` — `migrate`
