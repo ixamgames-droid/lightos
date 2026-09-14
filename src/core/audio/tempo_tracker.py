@@ -81,8 +81,10 @@ class TempoTracker:
     EST_EVERY_FRAMES = 8    # Schaetzung alle 8 Hops (~93 ms bei 44,1 kHz)
     PHASE_STEPS = 32
     PHASE_WIN_S = 4.0
-    CONTRAST_LO = 2.5       # Onset-Kontrast max/mean: darunter Konfidenz 0 ...
-    CONTRAST_HI = 7.0       # ... ab hier volles Gate
+    CONTRAST_LO = 3.0       # Onset-Kontrast max/mean: darunter Konfidenz 0 ...
+    CONTRAST_HI = 7.5       # ... ab hier volles Gate (Brumm allein 3,7; Kick+Rauschen -30 dB 11,8)
+    SPARSE_LO = 3.0         # zweites, mildes Gate max/median: Brumm-Modulation ~5, Beats >> 10
+    SPARSE_HI = 7.0
     R_LO = 0.15             # Periodizitaet r: darunter 0 ...
     R_HI = 0.60             # ... ab hier 1
     AGREE_WIN_S = 1.5       # Fenster fuer den Abgleich Raster <-> juengste Onsets
@@ -148,6 +150,7 @@ class TempoTracker:
         self.last_beat_time = 0.0
         self.phase_ok = True
         self._disagree = 0
+        self.oct_pref = 0       # Nutzer-Oktave (set_octave_preference): -1 / 0 / +1 ...
         self.changed = True     # Zustand seit dem letzten Snapshot veraendert
 
     # ------------------------------------------------------------ Eingang
@@ -223,8 +226,9 @@ class TempoTracker:
         # Konfidenz: Periodizitaet x Onset-Kontrast
         r = float(np.clip(acm[a] / r0, 0.0, 1.0))
         conf_r = float(np.clip((r - self.R_LO) / (self.R_HI - self.R_LO), 0.0, 1.0))
-        contrast = self._contrast()
+        contrast, sparse = self._contrast(with_sparse=True)
         gate = float(np.clip((contrast - self.CONTRAST_LO) / (self.CONTRAST_HI - self.CONTRAST_LO), 0.0, 1.0))
+        gate *= float(np.clip((sparse - self.SPARSE_LO) / (self.SPARSE_HI - self.SPARSE_LO), 0.0, 1.0))
         conf = conf_r * gate
         # Oktav-Alternative (Score relativ zum Sieger)
         alt_bpm, alt_score = 0.0, 0.0
@@ -237,13 +241,19 @@ class TempoTracker:
                     alt_score, alt_bpm = s, bpm * fac
         return bpm, conf, alt_bpm, alt_score, a
 
-    def _contrast(self) -> float:
+    def _contrast(self, with_sparse: bool = False):
+        """Onset-Kontrast im 4-s-Fenster: max/mean (und max/median als Sparsity-Mass)."""
         M = min(int(self.frames_filled), int(self.PHASE_WIN_S * self.fps))
         if M <= 0:
-            return 0.0
+            return (0.0, 0.0) if with_sparse else 0.0
         w = self.env[-M:]
         mean = float(w.mean())
-        return float(w.max()) / (mean + 1e-9) if mean > 0 else 0.0
+        mx = float(w.max())
+        c = mx / (mean + 1e-9) if mean > 0 else 0.0
+        if not with_sparse:
+            return c
+        med = float(np.median(w))
+        return c, (mx / (med + 1e-6) if mean > 0 else 0.0)
 
     def _fold(self, bpm: float) -> float:
         if bpm <= 0:
@@ -256,6 +266,13 @@ class TempoTracker:
             else:
                 break
         return bpm
+
+    def _with_pref(self, bpm: float) -> float:
+        """Nutzer-Oktave (x2 / x0,5 je Stufe) anwenden, wenn das Ergebnis in den Grenzen bleibt."""
+        if not self.oct_pref or bpm <= 0:
+            return bpm
+        b = bpm * (2.0 ** self.oct_pref)
+        return b if self.min_bpm <= b <= self.max_bpm else bpm
 
     def _set_period(self, bpm: float):
         self.period_samples = 60.0 / bpm * self.sr if bpm > 0 else 0.0
@@ -320,21 +337,22 @@ class TempoTracker:
                 return
         else:
             self._unlock_s = 0.0
-        dev = abs(self.bpm_raw - self.bpm) / self.bpm
+        raw = self._with_pref(self.bpm_raw)     # Nutzer-Oktave auf die Roh-Schaetzung anwenden
+        dev = abs(raw - self.bpm) / self.bpm
         if dev <= self.DEADBAND:
-            self.bpm = 0.9 * self.bpm + 0.1 * self.bpm_raw      # Feinnachfuehrung im Totband
+            self.bpm = 0.9 * self.bpm + 0.1 * raw               # Feinnachfuehrung im Totband
             self._set_period(self.bpm)
             self._cand_bpm, self._cand_since = 0.0, 0.0
         else:
-            is_oct = any(abs(self.bpm_raw - self.bpm * f) / (self.bpm * f) <= self.DEADBAND
+            is_oct = any(abs(raw - self.bpm * f) / (self.bpm * f) <= self.DEADBAND
                          for f in (2.0, 0.5))
-            if self._cand_bpm and abs(self.bpm_raw - self._cand_bpm) / self._cand_bpm <= self.DEADBAND:
+            if self._cand_bpm and abs(raw - self._cand_bpm) / self._cand_bpm <= self.DEADBAND:
                 self._cand_since += est_dt
             else:
-                self._cand_bpm, self._cand_since = self.bpm_raw, est_dt
+                self._cand_bpm, self._cand_since = raw, est_dt
             need = self.OCT_HOLD_S if is_oct else self.HOLD_S
             if self._cand_since >= need and self.conf >= self.LOCK_CONF:
-                self.bpm = self.bpm_raw
+                self.bpm = raw
                 self._set_period(self.bpm)
                 self._cand_bpm, self._cand_since = 0.0, 0.0
                 self._fit_phase(force=True)
@@ -467,6 +485,7 @@ class TempoTracker:
     def set_tempo_hint(self, bpm: float | None):
         self.tempo_hint = float(bpm) if bpm else None
         self._prior_update()
+        self.oct_pref = 0           # der Hinweis entscheidet die Oktave
         if bpm and self.bpm > 0:
             b = self.bpm
             while b < bpm / 1.4:
@@ -482,10 +501,15 @@ class TempoTracker:
         self.changed = True
 
     def set_octave_preference(self, step: int):
-        if self.bpm <= 0:
+        """Rastung x2 (step > 0) / x0,5 (step < 0) innerhalb der Grenzen; die Wahl bleibt
+        gegen die Oktav-Hysterese bestehen (Roh-Schaetzungen werden mitgefaltet), bis
+        reset()/set_tempo_hint() sie aufheben."""
+        if self.bpm <= 0 or step == 0:
             return
+        step = 1 if step > 0 else -1
         b = self.bpm * (2.0 if step > 0 else 0.5)
         if self.min_bpm <= b <= self.max_bpm:
+            self.oct_pref += step
             self.bpm = b
             self._set_period(b)
             self._cand_bpm, self._cand_since = 0.0, 0.0

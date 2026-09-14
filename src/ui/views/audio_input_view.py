@@ -342,9 +342,9 @@ class AudioInputView(QWidget):
         if not HAS_NUMPY:
             return
         try:
-            # Detector verarbeiten lassen
-            self._detector.process_chunk(samples)
-            # Eigene Pegel/Spektrum berechnen fuer UI
+            # Den Detektor fuettert NUR der BPMManager (bpm_manager.py use_audio_source);
+            # ein zweiter process_chunk-Aufruf hier liesse den Sample-Zaehler des neuen
+            # Detektors doppelt laufen. Hier nur eigene Pegel/Spektrum fuer die UI.
             rms = float(np.sqrt(np.mean(samples * samples)))
             self._level = min(1.0, rms * 4.0)
             n = len(samples)
