@@ -82,7 +82,8 @@ def test_bpm_view_constructs_and_drives_backend(qapp, _isolated_prefs):
     v._beat_sig.emit(1)
     qapp.processEvents()
 
-    # Persistenz: Einstellungen wurden gespeichert
+    # Persistenz: entprellt (400 ms) — flush schreibt Ausstehendes sofort
+    v.flush_pending_save()
     saved = _isolated_prefs.load_settings()
     assert saved["min_bpm"] == 110 and saved["max_bpm"] == 170
 

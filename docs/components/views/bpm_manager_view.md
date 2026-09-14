@@ -32,15 +32,55 @@ Beat-Erkennung passend ein.
 - **VC:** dieselben Aktionen wie `vc_button` (`TAP`, `FREEZE`, `AUTO_SYNC`,
   `TAP_BUS`…) und `vc_bpm_display`.
 
+## Persistenz (BPM-07, v2)
+
+Die Einstellungen liegen in `ui_prefs.json`, Sektion `bpm_settings`, Version 2
+(`src/core/audio/bpm_settings.py`, Migrationstabelle in `bpm_arbeit/plan.md` 3.):
+
+- **Eine Default-Quelle:** `bpm_settings.DEFAULTS`. Beim App-Start wendet
+  `bpm_settings.boot()` die Datei auf Manager/Detektor/Director an; die View
+  liest danach in `_load_into_controls` den **Backend-Zustand** (Grenzen, Takt,
+  Unterteilung, Taktgenau) — nur Audio-Quelle und Gerät kommen aus den Prefs,
+  weil der Capture gestoppt oder die Quelle `off` sein kann.
+- **Keys v2:** `source` (`loopback`/`input`/`os2l`/`song`/`off`), `device`
+  (Eingangsgerät — nur bei `input`, sonst `null`; ein Mikrofonname unter
+  `loopback` würde PC-Audio nach dem Neustart auf das Mikrofon lenken, ein
+  Sink-Name für PC-Audio kommt mit S5), `mode`, `min_bpm`, `max_bpm`, `beats_per_bar`,
+  `phase_accurate_beats`; geduldet bis S4: `sensitivity`, `smoothing`,
+  `subdivision`. Alte v1-Dateien (`auto_default`/`mode_default`/`source_mode`/
+  `input_device`) werden beim Laden migriert; das erste Schreiben sichert die
+  Datei einmalig als `ui_prefs.json.v1.bak`. Ungültige Werte fallen auf den
+  Default, unbekannte Keys werden mit Log verworfen; eine Datei einer
+  **neueren** Version bleibt unangetastet (Defaults, kein Schreiben).
+- **Entprellung:** `_save()` startet einen 400-ms-Single-Shot neu; aus einem
+  Sliderzug mit hunderten `valueChanged` wird **ein** Schreibvorgang
+  (`_write_settings`). `flush_pending_save()` schreibt Ausstehendes sofort und
+  läuft in `hideEvent`/`closeEvent` (und in Tests vor dem Lese-Assert).
+- **Atomar:** tmp-Datei im selben Ordner + `flush` + `fsync` + `os.replace`;
+  Fremd-Sektionen (`live_view` u. a.) bleiben erhalten. Bricht das Schreiben ab,
+  bleibt die alte Datei vollständig, die tmp wird entfernt. Ist die Datei beim
+  Speichern vorhanden, aber unlesbar (halbe Datei eines nicht atomaren
+  Schreibers), wird sie vor dem Überschreiben einmalig als
+  `ui_prefs.json.corrupt.bak` gesichert.
+
 ## Zugehörige Tests
 
 - `tests/test_bpm_view.py`, `test_bpm_view_speeds.py` — View-Verhalten/Speeds.
-- `tests/test_bpm_leader.py` — Leader-Quelle.
+- `tests/test_bpm_settings_v2.py` — Persistenz v2: Migration (Beispiel aus
+  `plan.md` 3. byte-genau), Typprüfung, atomares Schreiben, v1-/corrupt-Sicherung,
+  Entprellung (250 Ticks → 1 Schreibvorgang), `flush_pending_save()`, `device`
+  nur für `input` (View und Auto-Start); `AudioCapture.start` ist dort gestubbt.
+- `tests/test_bpm_leader.py` — Leader-Quelle, Roundtrip/`apply_to_backend`.
 - `tests/test_bpm_meter.py`, `test_bpm_timeline.py`, `test_vc_bpm.py`.
 
 ## Quelle (file:line)
 
 - `src/ui/views/bpm_manager_view.py:51` — Klasse `BpmManagerView`
-- `src/ui/views/bpm_manager_view.py:842` — globaler Auto-Sync · `:846` — globaler Sync
-- `src/ui/views/bpm_manager_view.py:1170` — BPM-Quelle umschalten
-- `src/ui/views/bpm_manager_view.py:868` — Takt-Zellen (beats_per_bar)
+- `src/ui/views/bpm_manager_view.py:861` — globaler Auto-Sync · `:865` — globaler Sync
+- `src/ui/views/bpm_manager_view.py:1195` — BPM-Quelle umschalten
+- `src/ui/views/bpm_manager_view.py:887` — Takt-Zellen (beats_per_bar)
+- `src/ui/views/bpm_manager_view.py:906` — `_load_into_controls` (Backend-Zustand)
+- `src/ui/views/bpm_manager_view.py:1279` — `_save` (Entprellung) · `:1286` —
+  `flush_pending_save` · `:1295` — `_write_settings`
+- `src/core/audio/bpm_settings.py:31` — `DEFAULTS` (v2) · `:139` — `migrate` ·
+  `:213` — `save_settings` (atomar) · `:242` — `apply_to_backend`
