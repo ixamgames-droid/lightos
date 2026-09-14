@@ -296,7 +296,7 @@ class BpmManagerView(QWidget):
         self._btn_tap.setStyleSheet(_TAP_STYLE)
         self._btn_tap.setToolTip(
             "Einmal tippen = Beat-Punkt auf „jetzt“ setzen (Tempo bleibt). "
-            "Drei-, viermal im Takt tippen = Tempo setzen; die Erkennung sucht dann um dieses Tempo.")
+            "Viermal im Takt tippen = Tempo setzen; ab dem dritten Tipp sucht die Erkennung um dieses Tempo.")
         self._btn_tap.clicked.connect(self._on_tap)
         row.addWidget(self._btn_tap)
 

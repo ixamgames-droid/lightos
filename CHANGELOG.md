@@ -19,9 +19,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   **Quelle** ist eine Liste — „PC-Audio", „Eingang: <Gerät>" (je Eingang ein
   Eintrag, beim Öffnen neu gelesen), „OS2L (DJ-Software)", „Lied-Analyse (Player)",
   „Aus"; was du wählst, wird gemerkt. **TAP hat zwei Rollen:** einmal tippen =
-  Beat auf „jetzt" setzen (wenn der Punkt neben der Musik blinkt); drei-, viermal
-  tippen = Tempo setzen, die Erkennung sucht dann um dieses Tempo — der TAP oben
-  in der Kopfzeile ist derselbe Knopf. **Auto | Manuell:** Auto folgt der Musik,
+  Beat auf „jetzt" setzen (wenn der Punkt neben der Musik blinkt); viermal im Takt
+  tippen = Tempo setzen (zwei Tipps ändern noch nichts, ein Doppelklick kippt also
+  nicht nach Manuell), ab dem dritten Tipp sucht die Erkennung um dieses Tempo —
+  der TAP oben in der Kopfzeile ist derselbe Knopf. **Auto | Manuell:** Auto folgt der Musik,
   Manuell hält dein Tempo (TAP/Nudge). **×½ / ×2** korrigieren Halb-/Doppeltempo
   mit einem Klick — auch im Auto-Modus. Dazu die Anzeigen: große BPM-Zahl,
   Beat-Punkt + Takt, **Zustandswort** KEIN SIGNAL / SUCHT / EINGERASTET (bei
@@ -36,8 +37,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   „OS2L-Server" spiegelt den echten Serverzustand. **Alte Einstellungen** werden
   beim ersten Start automatisch übernommen (Tempo-Bereich, Gerät, Takt; Sektion
   `bpm_settings` v3); Empfindlichkeit/Glättung/Unterteilung werden verworfen und
-  einmal ins Log geschrieben. Ein Quellenwechsel ist immer nur EIN Schaltvorgang
-  (der frühere Doppelstart des Audio-Eingangs beim Radio-Wechsel ist damit weg).
+  einmal ins Log geschrieben. Vor dem ersten Schreiben im neuen Format wird die
+  Datei einmalig als `ui_prefs.json.v2.bak` gesichert — eine ältere LightOS-Version
+  liest das v3-Format nicht (sie nähme Defaults und speichert nichts mehr); wer
+  zurück muss, nennt die Sicherung zurück. Ein Quellenwechsel ist immer nur EIN
+  Schaltvorgang, auch direkt nach dem Start (der Auto-Start läuft über dieselbe
+  Stelle wie die Quelle-Liste; der frühere Doppelstart des Audio-Eingangs beim
+  Radio-Wechsel und beim ersten Klick nach dem Start ist damit weg).
 
 ### 2026-09-14 — BPM: Tempo-Buses in eigenem Sub-Tab
 

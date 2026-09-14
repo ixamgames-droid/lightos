@@ -35,7 +35,7 @@ sechs Bedienelemente:
 
 - **Quelle** — **PC-Audio** (Standard), **Eingang: <Gerät>**, **OS2L (DJ-Software)**,
   **Lied-Analyse (Player)** (folgt dem Beatgrid des analysierten, im Player geladenen Songs), **Aus**.
-- **TAP** — einmal = Beat auf „jetzt"; drei-, viermal im Takt = Tempo setzen.
+- **TAP** — einmal = Beat auf „jetzt"; viermal im Takt = Tempo setzen.
 - **Auto | Manuell** — Auto folgt der Quelle, Manuell hält dein Tempo.
 - **×½ / ×2** — Halb-/Doppeltempo mit einem Klick.
 - **▸ Erweitert** — **Tempo-Bereich** von/bis + **Vorlage ▾** (Genre-Bereiche), **Beats/Takt**,

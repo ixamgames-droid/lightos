@@ -854,7 +854,7 @@ class MainWindow(QMainWindow):
         self._btn_tap = QPushButton("TAP")
         self._btn_tap.setFixedHeight(26)
         self._btn_tap.setFixedWidth(48)
-        self._btn_tap.setToolTip("TAP: einmal = Beat auf „jetzt“ setzen, 3–4× im Takt = Tempo setzen")
+        self._btn_tap.setToolTip("TAP: einmal = Beat auf „jetzt“ setzen, 4× im Takt = Tempo setzen")
         self._btn_tap.clicked.connect(self._on_tap_tempo)
         bar_layout.addWidget(self._btn_tap)
 
@@ -1473,7 +1473,7 @@ class MainWindow(QMainWindow):
 
     def _on_tap_tempo(self):
         """Topbar-TAP: derselbe Helfer wie der TAP im Tab „Erkennung" (BPM-09):
-        1 Tipp = Beat-Phase auf „jetzt", ab dem 3. Tipp Tempo + Suchhinweis."""
+        1 Tipp = Beat-Phase auf „jetzt", ab dem 3. Tipp Suchhinweis, 4 Tipps = Tempo."""
         if not self._bpm_mgr:
             return
         from src.ui.bpm_tap_helper import get_tap_helper

@@ -1,9 +1,10 @@
 """BPM-09 (S4): TapHelper — TAP mit Doppelrolle.
 
-1 Tipp = ``det.resync_phase()`` (Phase auf „jetzt", Tempo bleibt); jeder Tipp
-ruft ``mgr.tap()``; ab dem 3. Tipp innerhalb 2 s zusaetzlich
-``det.set_tempo_hint(<gemessenes Tempo>)``; nach 2 s Pause beginnt eine neue
-Folge. Uhr wird gestellt (kein Schlafen). Der Topbar-TAP und der Tab-TAP
+1 Tipp = ``det.resync_phase()`` (Phase auf „jetzt", Tempo bleibt), KEIN
+``mgr.tap()`` (Mutation (a): ein Doppelklick darf nicht nach MANUELL kippen);
+ab dem 3. Tipp innerhalb 2 s ``mgr.tap()`` + ``det.set_tempo_hint(<gemessenes
+Tempo>)`` — der Manager hat nach 4 Tipps ein Intervall (120 BPM); nach 2 s
+Pause beginnt eine neue Folge. Uhr wird gestellt (kein Schlafen). Der Topbar-TAP und der Tab-TAP
 teilen sich denselben Helfer (``get_tap_helper``).
 """
 from __future__ import annotations
@@ -49,17 +50,27 @@ def test_ein_tipp_setzt_nur_die_phase():
     h, det, mgr, _ = _make()
     h.tap()
     assert det.resyncs == 1
-    assert mgr.taps == 1                      # der Manager zaehlt jeden Tipp
+    assert mgr.taps == 0                      # Mutation (a): 1. Tipp ruft KEIN mgr.tap()
     assert det.hints == []                    # noch kein Tempo-Hinweis
     assert h.count == 1 and h.measured_bpm() == 0.0
 
 
-def test_vier_tipps_bei_120_bpm_geben_tap_x4_und_hint_120():
+def test_zwei_tipps_tippen_den_manager_nicht_an():
+    """Doppelklick auf TAP = Phase, nicht Manuell (plan.md S4: mgr.tap() ab 3. Tipp)."""
     h, det, mgr, clk = _make()
+    h.tap(); clk.t += 0.5
+    assert h.tap() == 0.0
+    assert mgr.taps == 0 and det.hints == [] and det.resyncs == 1
+
+
+def test_vier_tipps_bei_120_bpm_geben_tap_x2_und_hint_120():
+    h, det, mgr, clk = _make()
+    got = []
     for _ in range(4):
-        h.tap()
+        got.append(h.tap())
         clk.t += 0.5                          # 120 BPM
-    assert mgr.taps == 4
+    assert mgr.taps == 2                      # 3. und 4. Tipp -> ein Manager-Intervall
+    assert got == [0.0, 0.0, 0.0, 120.0]      # erst der 4. Tipp liefert das Manager-Tempo
     assert det.resyncs == 1                   # nur der erste Tipp resynct
     assert len(det.hints) == 2                # ab dem 3. Tipp: 3. und 4.
     assert all(abs(x - 120.0) <= 1.0 for x in det.hints)
@@ -87,7 +98,7 @@ def test_ohne_detektor_wirkt_nur_der_manager():
     for _ in range(3):
         h.tap()
         clk.t += 0.5
-    assert mgr.taps == 3
+    assert mgr.taps == 1                      # nur der 3. Tipp
 
 
 def test_get_tap_helper_ist_singleton():

@@ -26,8 +26,16 @@ Persistenz v3 (BPM-09, S4): ``beat_latency_ms`` neu (int −300..300, Default 0)
 ``sensitivity``/``smoothing``/``subdivision`` entfallen mit ihren Reglern —
 ``migrate`` verwirft sie mit Log „v2->v3: verworfen …". ``apply_to_backend``
 ruft ``mgr.set_subdivision(1)`` (Altwert neutralisieren) und
-``det.set_beat_latency_ms``. Eine v3-Datei liest v2-Code weiter (unbekannte
-Keys -> Defaults, bekannte bleiben).
+``det.set_beat_latency_ms``. Das erste v3-Schreiben ueber einer v2-Sektion
+sichert die Datei einmalig als ``ui_prefs.json.v2.bak``. ACHTUNG Rueckfall:
+v2-Code (Stand vor S4) liest eine v3-Datei NICHT — ``version > VERSION`` heisst
+dort „Datei bleibt unangetastet, Defaults" und ``save_settings`` schreibt die
+Sektion nicht mehr (gemessen mit origin/main). Rueckfall = revert +
+``ui_prefs.json.v2.bak`` zuruecknennen, sonst bleibt Robin mit Defaults und ohne
+Speichermoeglichkeit zurueck. Der Auto-Start (``start_auto_if_configured``)
+laeuft ueber ``bpm_source_controller.get_source_controller().apply`` — dieselbe
+Stelle wie die Quelle-Combo, damit der erste Klick auf den bereits aktiven
+Eintrag nichts ein zweites Mal startet.
 """
 from __future__ import annotations
 import json
@@ -217,10 +225,16 @@ def _is_v1_section(section) -> bool:
     return isinstance(section, dict) and "version" not in section
 
 
+def _is_v2_section(section) -> bool:
+    return isinstance(section, dict) and section.get("version") == 2
+
+
 def _backup_once(tag: str) -> None:
     """Originaldatei einmalig als ``ui_prefs.json.<tag>.bak`` sichern — ``v1``
-    beim ersten v2-Schreiben ueber einer v1-Sektion, ``corrupt`` bevor eine
-    unlesbare Datei ueberschrieben wird. Eine vorhandene Sicherung bleibt."""
+    beim ersten v2-Schreiben ueber einer v1-Sektion, ``v2`` beim ersten
+    v3-Schreiben ueber einer v2-Sektion (v2-Code liest v3 nicht: Rueckfall =
+    zuruecknennen), ``corrupt`` bevor eine unlesbare Datei ueberschrieben wird.
+    Eine vorhandene Sicherung bleibt."""
     bak = f"{_PREFS_PATH}.{tag}.bak"
     if os.path.exists(bak) or not os.path.exists(_PREFS_PATH):
         return
@@ -273,6 +287,8 @@ def save_settings(settings: dict) -> None:
                 return
             if _is_v1_section(old):
                 _backup_once("v1")
+            elif _is_v2_section(old):
+                _backup_once("v2")
         all_prefs[_KEY] = _merge_checked(migrate(old), settings or {})
         _write_atomic(all_prefs)
     except Exception as e:
@@ -322,11 +338,16 @@ def apply_to_backend(settings: dict) -> None:
 
 def start_auto_if_configured(settings: dict) -> bool:
     """Startet die konfigurierte Audio-Quelle (``source``: Loopback, Eingang mit
-    ``device`` bzw. OS2L-Server); ``off``/``song`` starten nichts. ``device``
-    gilt nur fuer den Eingang — ein Loopback bekommt None und loest sein
-    Ausgabegeraet selbst auf (wie der Live-Wechsel im BPM-Tab). Danach wird der
-    gespeicherte Manager-``mode`` erneut gesetzt, weil ``use_audio_source(True)``
-    AUTO erzwingt — Capture haengt an der Quelle, der Modus am Manager.
+    ``device`` bzw. OS2L-Server); ``off``/``song`` starten nichts. Laeuft ueber
+    den ``SourceController`` (EINE Stelle fuer Capture/OS2L/Manager, S4): der
+    merkt sich den Eintrag, damit der erste Klick auf denselben Eintrag im Tab
+    „Erkennung" idempotent bleibt (sonst Doppelstart + Detektor-Reset an der
+    Boot-Kante). ``device`` gilt nur fuer den Eingang — ein Loopback bekommt
+    None und loest sein Ausgabegeraet selbst auf. Der gespeicherte Manager-
+    ``mode`` wird vor dem Schalten gesetzt und vom Controller nach
+    ``use_audio_source(True)`` (erzwingt AUTO) wiederhergestellt — Capture haengt
+    an der Quelle, der Modus am Manager. Ein bereits aktiver Eintrag (Tab war
+    schneller) wird nicht erneut geschaltet; die Rueckgabe bleibt True.
     In Tests/Headless via ``LIGHTOS_NO_AUDIO_AUTOSTART`` unterdrueckbar."""
     if os.environ.get("LIGHTOS_NO_AUDIO_AUTOSTART"):
         return False
@@ -336,17 +357,10 @@ def start_auto_if_configured(settings: dict) -> bool:
         return False
     try:
         from src.core.engine.bpm_manager import get_bpm_manager
+        from src.ui.bpm_source_controller import get_source_controller
         mgr = get_bpm_manager()
-        if source == "os2l":
-            # OS2L ist der externe Treiber: KEIN Audio-Capture starten.
-            mgr.use_audio_source(False)
-            from src.core.audio.os2l import get_os2l_server
-            get_os2l_server().start()
-        else:
-            from src.core.audio.capture import get_audio_capture
-            get_audio_capture().set_source_mode(source, device if source == "input" else None)
-            mgr.use_audio_source(True)
         mgr.set_mode(mode)
+        get_source_controller().apply(source, device if source == "input" else None)
         return True
     except Exception as e:
         _log(f"auto-start error: {e}")

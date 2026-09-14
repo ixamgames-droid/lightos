@@ -3,11 +3,13 @@ mehrfach tippen = Tempo setzen.
 
 - **1. Tipp** (bzw. erster Tipp nach > 2 s Pause): ``det.resync_phase()`` — der
   Beat-Punkt springt auf den Tipp, das Tempo bleibt.
-- **jeder Tipp**: ``mgr.tap()`` (der Manager bildet ab dem 2. Tipp sein
-  Tap-Tempo und geht in MANUAL — unveraendert, bpm_manager.py bleibt unangetastet).
-- **ab dem 3. Tipp** innerhalb des 2-s-Fensters: zusaetzlich
-  ``det.set_tempo_hint(<gemessenes Tempo>)`` — die Erkennung sucht danach um
-  dieses Tempo und entscheidet damit auch die Oktave.
+- **2. Tipp**: nur zaehlen — der Manager wird NICHT angetippt (ein Doppelklick
+  auf TAP kippt sonst nach MANUELL; plan.md S4: „ab 3. Tipp -> mgr.tap()").
+- **ab dem 3. Tipp** innerhalb des 2-s-Fensters: ``mgr.tap()`` (der Manager
+  bildet ab seinem 2. Tipp — also dem 4. der Folge — sein Tap-Tempo und geht in
+  MANUAL; bpm_manager.py bleibt unangetastet) und ``det.set_tempo_hint(<gemessenes
+  Tempo>)`` — die Erkennung sucht danach um dieses Tempo und entscheidet damit
+  auch die Oktave. Vier Tipps im Takt = Tempo gesetzt.
 - **Ruecksetzen** nach 2 s Pause (gleiches Fenster wie ``BPMManager.TAP_WINDOW_SEC``).
 
 Der Topbar-TAP (main_window.py) und der TAP-Knopf im Tab „Erkennung" rufen
@@ -20,11 +22,11 @@ import time
 
 TAP_WINDOW_S = 2.0      # Pause, nach der eine neue Tipp-Folge beginnt
 MAX_INTERVALS = 4       # Mittel ueber die letzten 4 Intervalle (wie der Manager)
-HINT_FROM_TAP = 3       # ab diesem Tipp der Folge wird das Tempo als Hinweis gesetzt
+HINT_FROM_TAP = 3       # ab diesem Tipp der Folge: mgr.tap() + Tempo-Hinweis an den Detektor
 
 
 class TapHelper:
-    """Tipp-Folge → Phase (1. Tipp) bzw. Tempo + Suchhinweis (ab 3. Tipp)."""
+    """Tipp-Folge → Phase (1. Tipp) bzw. Tempo + Suchhinweis (ab 3. Tipp, Manager-Tempo ab dem 4.)."""
 
     def __init__(self, mgr=None, det=None, clock=time.monotonic):
         self._mgr = mgr
@@ -81,11 +83,13 @@ class TapHelper:
             except Exception as e:
                 print(f"[TapHelper] resync_phase: {e}")
         bpm = 0.0
+        if n < HINT_FROM_TAP:
+            return bpm                       # 1./2. Tipp: Phase bzw. nur zaehlen
         try:
             bpm = float(self._manager().tap())
         except Exception as e:
             print(f"[TapHelper] mgr.tap: {e}")
-        if n >= HINT_FROM_TAP and det is not None:
+        if det is not None:
             hint = self.measured_bpm()
             if hint > 0:
                 try:

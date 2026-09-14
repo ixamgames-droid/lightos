@@ -48,7 +48,7 @@ Die Standardansicht hat **genau sechs Bedienelemente** — mehr braucht es im Be
 | # | Element | Was es tut |
 |---|---|---|
 | 1 | **Quelle** (Liste) | PC-Audio · Eingang: <Gerät> (je Eingang ein Eintrag) · OS2L (DJ-Software) · Lied-Analyse (Player) · Aus. Die Liste liest die Geräte beim Öffnen neu; ein gespeichertes, gerade nicht vorhandenes Gerät steht als „(nicht gefunden)" drin. Was du wählst, wird gemerkt. |
-| 2 | **TAP** (großer Knopf) | **Zwei Rollen:** *einmal* tippen = Beat-Punkt auf „jetzt" setzen, wenn er neben der Musik blinkt (Tempo bleibt). *Drei-, viermal im Takt* tippen = Tempo setzen; die Erkennung sucht danach um dieses Tempo (und entscheidet damit auch Halb/Doppel). Der TAP oben in der Kopfzeile ist derselbe Knopf. |
+| 2 | **TAP** (großer Knopf) | **Zwei Rollen:** *einmal* tippen = Beat-Punkt auf „jetzt" setzen, wenn er neben der Musik blinkt (Tempo bleibt). *Viermal im Takt* tippen = Tempo setzen (zwei Tipps ändern noch nichts — ein Doppelklick kippt nicht nach Manuell); ab dem dritten Tipp sucht die Erkennung um dieses Tempo (und entscheidet damit auch Halb/Doppel). Der TAP oben in der Kopfzeile ist derselbe Knopf. |
 | 3 | **Auto \| Manuell** | **Auto** folgt der Quelle. **Manuell** hält dein Tempo (TAP/Nudge) — die Quelle ändert es nicht, läuft aber im Hintergrund weiter (das Zustandswort zeigt, was sie erkennen würde). |
 | 4 | **×½** | Halbes Tempo mit einem Klick: läuft das Licht doppelt so schnell wie die Musik. In Auto zwingt das die Erkennung auf die halbe Oktave, in Manuell halbiert es dein Tempo. |
 | 5 | **×2** | Doppeltes Tempo — das Gegenstück. Tipp: ein enger Tempo-Bereich (Erweitert) verhindert den Fehler dauerhaft. |

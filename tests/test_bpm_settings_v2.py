@@ -91,15 +91,32 @@ def test_hardstyle_datei_wird_beim_laden_und_schreiben_v3(bs):
     assert _tmp_reste(bs) == []
 
 
-def test_v2_datei_wird_beim_schreiben_v3_ohne_neue_sicherung(bs):
-    """Eine v2-Datei ist keine v1-Datei: kein .v1.bak; die Altschluessel fallen
-    beim ersten Schreiben aus der Datei, alles andere bleibt."""
+def test_v2_datei_wird_beim_schreiben_v3_einmal_als_v2_bak_gesichert(bs):
+    """Skeptiker S4: v2-Code liest eine v3-Datei NICHT (version > VERSION ->
+    Defaults, kein Schreiben). Deshalb sichert das erste v3-Schreiben ueber einer
+    v2-Sektion einmalig als .v2.bak (kein .v1.bak — es ist keine v1-Datei); die
+    Altschluessel fallen aus der Datei, alles andere bleibt."""
     _write(bs, V2_HARDSTYLE, {"live_view": {"zoom": 2}})
+    original = open(bs._PREFS_PATH, "rb").read()
     bs.save_settings({"beat_latency_ms": -40})
     data = _read(bs)
     assert data["bpm_settings"] == {**V3_HARDSTYLE, "beat_latency_ms": -40}
     assert data["live_view"] == {"zoom": 2}
     assert not os.path.exists(bs._PREFS_PATH + ".v1.bak")
+    bak = bs._PREFS_PATH + ".v2.bak"
+    assert open(bak, "rb").read() == original
+    bs.save_settings({"beat_latency_ms": -50})      # zweites Schreiben: v3 -> keine neue Sicherung
+    assert open(bak, "rb").read() == original
+    _write(bs, V2_HARDSTYLE)                        # v2 erneut hingelegt: Sicherung bleibt die erste
+    bs.save_settings({"min_bpm": 120})
+    assert open(bak, "rb").read() == original
+    assert [n for n in os.listdir(bs._PREFS_DIR) if n.endswith(".bak")] == ["ui_prefs.json.v2.bak"]
+
+
+def test_v1_datei_bekommt_nur_v1_bak_und_frische_v3_keine(bs):
+    _write(bs, V1_HARDSTYLE)
+    bs.save_settings({"min_bpm": 100})
+    assert sorted(n for n in os.listdir(bs._PREFS_DIR) if n.endswith(".bak")) == ["ui_prefs.json.v1.bak"]
 
 
 def test_auto_default_false_wird_source_off(bs):
@@ -303,21 +320,27 @@ class _FakeCap:
 class _FakeMgr:
     def __init__(self):
         self.calls = []
+        self.mode = "auto"
 
     def use_audio_source(self, on):
         self.calls.append(("audio", on))
 
     def set_mode(self, mode):
         self.calls.append(("mode", mode))
+        self.mode = mode
 
 
 @pytest.fixture
 def fake_backend(monkeypatch):
+    """Fake-Capture/-Manager UND ein frischer SourceController (der Auto-Start
+    laeuft seit S4 ueber ``get_source_controller().apply``)."""
     import src.core.audio.capture as cap_mod
     import src.core.engine.bpm_manager as mgr_mod
+    import src.ui.bpm_source_controller as ctrl_mod
     cap, mgr = _FakeCap(), _FakeMgr()
     monkeypatch.setattr(cap_mod, "get_audio_capture", lambda: cap)
     monkeypatch.setattr(mgr_mod, "get_bpm_manager", lambda: mgr)
+    monkeypatch.setattr(ctrl_mod, "_controller", None)
     monkeypatch.delenv("LIGHTOS_NO_AUDIO_AUTOSTART", raising=False)
     return cap, mgr
 
@@ -336,7 +359,29 @@ def test_start_auto_liest_source_device_mode(bs, fake_backend):
     assert ok is True
     assert cap.calls == [("source", "input", "USB Audio CODEC Analog Stereo")]
     # Capture haengt an der Quelle, der Modus am Manager: MANUAL ueberlebt use_audio_source
-    assert mgr.calls == [("audio", True), ("mode", "manual")]
+    assert mgr.calls == [("mode", "manual"), ("audio", True), ("mode", "manual")]
+    assert mgr.mode == "manual"
+
+
+def test_start_auto_laeuft_ueber_den_source_controller(bs, fake_backend):
+    """Skeptiker S4: der Boot-Pfad umging den Controller — der erste Klick auf den
+    bereits aktiven Eintrag startete den Capture ein zweites Mal und setzte den
+    Detektor zurueck. Jetzt kennt der Controller den Boot-Eintrag, derselbe
+    Eintrag ist idempotent, ein anderer schaltet."""
+    from src.ui.bpm_source_controller import get_source_controller
+    cap, mgr = fake_backend
+    assert bs.start_auto_if_configured({"source": "loopback"}) is True
+    ctrl = get_source_controller()
+    assert ctrl.current == ("loopback", None)
+    n_cap, n_mgr = len(cap.calls), len(mgr.calls)
+    assert ctrl.apply("loopback") is False              # erster Klick auf „PC-Audio": nichts
+    assert (len(cap.calls), len(mgr.calls)) == (n_cap, n_mgr)
+    assert ctrl.apply("input", "Mic") is True           # anderer Eintrag schaltet
+    assert cap.calls[-1] == ("source", "input", "Mic")
+    # Tab war schneller als der Boot: derselbe Eintrag wird nicht erneut geschaltet
+    n_cap = len(cap.calls)
+    assert bs.start_auto_if_configured({"source": "input", "device": "Mic"}) is True
+    assert len(cap.calls) == n_cap
 
 
 def test_start_auto_off_und_song_starten_nichts(bs, fake_backend):

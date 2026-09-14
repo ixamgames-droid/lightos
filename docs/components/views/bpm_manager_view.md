@@ -17,7 +17,7 @@ Bus" liegen seit BPM-08 im eigenen Sub-Tab [`tempo_bus_view`](tempo_bus_view.md)
 | Bedienung | Wirkung |
 |---|---|
 | **Quelle** (`_cmb_source`, Daten `loopback` / `input:<Gerät>` / `os2l` / `song` / `off`) | `bpm_source_controller.SourceController.apply(kind, device)` — EINE Stelle schaltet Capture (`set_source_mode` + start/stop), OS2L (start/stop) und Manager (`use_audio_source`); `det.set_tempo_hint(None)` + `det.reset()` beim Wechsel; idempotent. `activated` ist zusätzlich angebunden („erneut verbinden" auf denselben Eintrag). Die Liste wird bei `showPopup` neu gelesen; ein gespeichertes, fehlendes Gerät steht als „(nicht gefunden)". |
-| **TAP** (`_btn_tap`) | `bpm_tap_helper.TapHelper.tap()` — 1. Tipp `det.resync_phase()`, jeder Tipp `mgr.tap()`, ab dem 3. Tipp `det.set_tempo_hint(<gemessen>)`; derselbe Helfer wie der Topbar-TAP. |
+| **TAP** (`_btn_tap`) | `bpm_tap_helper.TapHelper.tap()` — 1. Tipp `det.resync_phase()`, 2. Tipp nichts, ab dem 3. Tipp `mgr.tap()` + `det.set_tempo_hint(<gemessen>)` (Manager-Tempo ab dem 4.); derselbe Helfer wie der Topbar-TAP. |
 | **Auto \| Manuell** (`_btn_auto`/`_btn_manual`, exklusive `QButtonGroup`) | `SourceController.set_auto(bool)` → `mgr.set_mode`; Auto holt bei Audio-Quelle `use_audio_source(True)` nach, bei `song` den Player-Track. Die Quelle bleibt. |
 | **×½ / ×2** (`_btn_half`/`_btn_double`) | `SourceController.octave(±1)`: in AUTO `det.set_octave_preference`, in MANUAL `mgr.set_manual_bpm(bpm/2 bzw. ×2)`. |
 | **▸ Erweitert** (`_advanced`, `CollapsibleSection` ohne `prefs_key`) | Zustand nur je Sitzung. |
@@ -83,8 +83,8 @@ Die Einstellungen liegen in `ui_prefs.json`, Sektion `bpm_settings`, Version 3
   `mgr.mode` / `current_source` / `_audio_active`; `state_word()`.
 - `tests/test_bpm_view_source_combo.py` — jeder Combo-Eintrag → Fake-Capture/-OS2L/-Manager,
   doppelter Aufruf idempotent, ×½/×2 je Modus, TAP → Helfer.
-- `tests/test_bpm_tap_helper.py` — 1 Tipp = `resync_phase`, 4 Tipps bei 120 BPM =
-  `mgr.tap` ×4 + `set_tempo_hint` 120 ± 1.
+- `tests/test_bpm_tap_helper.py` — 1 Tipp = `resync_phase` (kein `mgr.tap`), 2 Tipps
+  aendern nichts, 4 Tipps bei 120 BPM = `mgr.tap` ×2 + `set_tempo_hint` 120 ± 1.
 - `tests/test_bpm_view.py`, `tests/test_bpm_settings_v2.py` (v1→v2→v3, View-Teil),
   `tests/test_tempo_bus_view_move.py`, `tests/test_bpm_leader.py`.
 
