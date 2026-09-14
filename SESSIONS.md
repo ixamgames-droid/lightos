@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| BPM-AREA | A | feat/bpm-erkennung-ui | 2026-09-14T07:26Z | src/core/audio/beat_detector.py · src/core/audio/capture.py · src/core/audio/bpm_settings.py · src/core/audio/genre_presets.py · src/ui/views/bpm_manager_view.py · src/ui/views/audio_input_view.py · src/ui/views/bpm_generator_view.py |
+| _(frei)_ |  |  |  |  |
 
 ## Blocker & Fallen
 
@@ -120,7 +120,6 @@
 
 ## Verlauf
 
-- 2026-09-06T21:09Z A done UI-60
 - 2026-09-06T21:26Z A claim QA-75
 - 2026-09-06T21:26Z A claim FM-36
 - 2026-09-06T21:26Z A claim XPLAT-32
@@ -150,3 +149,4 @@
 - 2026-09-07T20:59Z B done XPLAT-35
 - 2026-09-07T21:29Z B claim XPLAT-38
 - 2026-09-08T18:43Z B done XPLAT-38
+- 2026-09-14T10:22Z A done BPM-AREA
