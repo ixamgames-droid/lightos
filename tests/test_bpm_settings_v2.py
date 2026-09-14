@@ -1,5 +1,6 @@
-"""BPM-07 (S2): Persistenz v2 der BPM-Einstellungen — Migration v1→v2 (byte-genau
-nach bpm_arbeit/plan.md Abschnitt 3), Typpruefung je Key, unbekannte Keys weg,
+"""BPM-07 (S2) + BPM-09 (S4): Persistenz der BPM-Einstellungen — Migration
+v1→v2→v3 (byte-genau nach bpm_arbeit/plan.md Abschnitt 3; v3 verwirft
+sensitivity/smoothing/subdivision mit Log, beat_latency_ms neu), Typpruefung je Key, unbekannte Keys weg,
 Fremd-Sektionen bleiben, atomares Schreiben ohne .tmp-Reste, Abbruch laesst die
 alte Datei intakt, neuere Dateiversion bleibt unangetastet, v1-Sicherung genau
 einmal, unlesbare Datei wird vor dem Ueberschreiben als .corrupt.bak gesichert,
@@ -24,6 +25,9 @@ V2_HARDSTYLE = {"version": 2, "source": "input", "device": "USB Audio CODEC Anal
                 "mode": "auto", "min_bpm": 145, "max_bpm": 160, "beats_per_bar": 4,
                 "phase_accurate_beats": True, "sensitivity": 1.35, "smoothing": 0.35,
                 "subdivision": 1}
+V3_HARDSTYLE = {"version": 3, "source": "input", "device": "USB Audio CODEC Analog Stereo",
+                "mode": "auto", "min_bpm": 145, "max_bpm": 160, "beats_per_bar": 4,
+                "phase_accurate_beats": True, "beat_latency_ms": 0}
 
 
 @pytest.fixture
@@ -52,24 +56,50 @@ def _tmp_reste(bs):
 
 # ── Migration ──────────────────────────────────────────────────────────────────
 
-def test_migrationsbeispiel_plan_byte_genau(bs):
+def test_migrationsbeispiel_plan_byte_genau(bs, capsys):
+    """plan.md 3.: v1 (Hardstyle) → v3 in einem Zug, mit dem v2->v3-Log."""
     got = bs.migrate(dict(V1_HARDSTYLE))
-    assert got == V2_HARDSTYLE
+    assert got == V3_HARDSTYLE
     # byte-genau inkl. Schluesselreihenfolge (= DEFAULTS-Reihenfolge)
-    assert json.dumps(got) == json.dumps(V2_HARDSTYLE)
+    assert json.dumps(got) == json.dumps(V3_HARDSTYLE)
+    assert "v2->v3: verworfen sensitivity=1.35, smoothing=0.35, subdivision=1" in capsys.readouterr().out
 
 
-def test_hardstyle_datei_wird_beim_laden_und_schreiben_v2(bs):
+def test_v2_hardstyle_wird_v3_und_verwirft_altschluessel(bs, capsys):
+    """S4: die v2-Datei mit Hardstyle-Altschluesseln (plan.md 3. durchgespielt)."""
+    got = bs.migrate(dict(V2_HARDSTYLE))
+    assert got == V3_HARDSTYLE
+    assert json.dumps(got) == json.dumps(V3_HARDSTYLE)
+    out = capsys.readouterr().out
+    assert "v2->v3: verworfen sensitivity=1.35, smoothing=0.35, subdivision=1" in out
+    assert "unbekannter Key" not in out        # verworfen, nicht als „unbekannt" gemeldet
+    # v3-Datei ohne Altschluessel: kein Log mehr
+    bs.migrate(dict(V3_HARDSTYLE))
+    assert "v2->v3" not in capsys.readouterr().out
+
+
+def test_hardstyle_datei_wird_beim_laden_und_schreiben_v3(bs):
     _write(bs, V1_HARDSTYLE, {"live_view": {"zoom": 2}})
     s = bs.load_settings()
     assert s["min_bpm"] == 145 and s["max_bpm"] == 160 and s["source"] == "input"
-    assert s["sensitivity"] == 1.35            # v2 geduldet
+    assert "sensitivity" not in s and s["beat_latency_ms"] == 0
     bs.save_settings(s)
     data = _read(bs)
-    assert data["bpm_settings"] == V2_HARDSTYLE
-    assert list(data["bpm_settings"].keys()) == list(V2_HARDSTYLE.keys())
+    assert data["bpm_settings"] == V3_HARDSTYLE
+    assert list(data["bpm_settings"].keys()) == list(V3_HARDSTYLE.keys())
     assert data["live_view"] == {"zoom": 2}    # Fremd-Sektion bleibt
     assert _tmp_reste(bs) == []
+
+
+def test_v2_datei_wird_beim_schreiben_v3_ohne_neue_sicherung(bs):
+    """Eine v2-Datei ist keine v1-Datei: kein .v1.bak; die Altschluessel fallen
+    beim ersten Schreiben aus der Datei, alles andere bleibt."""
+    _write(bs, V2_HARDSTYLE, {"live_view": {"zoom": 2}})
+    bs.save_settings({"beat_latency_ms": -40})
+    data = _read(bs)
+    assert data["bpm_settings"] == {**V3_HARDSTYLE, "beat_latency_ms": -40}
+    assert data["live_view"] == {"zoom": 2}
+    assert not os.path.exists(bs._PREFS_PATH + ".v1.bak")
 
 
 def test_auto_default_false_wird_source_off(bs):
@@ -89,23 +119,26 @@ def test_fehlende_datei_und_kaputtes_json_geben_defaults(bs):
 
 
 def test_typfehler_fallen_auf_default(bs):
-    s = bs.migrate({"version": 2, "source": "radio", "device": 7, "mode": 5,
+    s = bs.migrate({"version": 3, "source": "radio", "device": 7, "mode": 5,
                     "min_bpm": "abc", "max_bpm": 150.5, "beats_per_bar": True,
-                    "phase_accurate_beats": "ja", "sensitivity": "hoch",
-                    "smoothing": None, "subdivision": 0})
+                    "phase_accurate_beats": "ja", "beat_latency_ms": 301})
     assert s == bs.DEFAULTS
+    s = bs.migrate({"version": 3, "beat_latency_ms": -301})
+    assert s["beat_latency_ms"] == 0
+    s = bs.migrate({"version": 3, "beat_latency_ms": 12.5})
+    assert s["beat_latency_ms"] == 0
     # min >= max -> beide auf Default
-    s = bs.migrate({"version": 2, "min_bpm": 180, "max_bpm": 120})
+    s = bs.migrate({"version": 3, "min_bpm": 180, "max_bpm": 120})
     assert s["min_bpm"] == 60 and s["max_bpm"] == 200
     # gueltige Werte bleiben, auch bei bool-aehnlichen Ints
-    s = bs.migrate({"version": 2, "min_bpm": 20, "max_bpm": 400, "beats_per_bar": 32,
-                    "sensitivity": 2, "phase_accurate_beats": False})
+    s = bs.migrate({"version": 3, "min_bpm": 20, "max_bpm": 400, "beats_per_bar": 32,
+                    "beat_latency_ms": -300, "phase_accurate_beats": False})
     assert (s["min_bpm"], s["max_bpm"], s["beats_per_bar"]) == (20, 400, 32)
-    assert s["sensitivity"] == 2.0 and s["phase_accurate_beats"] is False
+    assert s["beat_latency_ms"] == -300 and s["phase_accurate_beats"] is False
 
 
 def test_unbekannte_keys_werden_verworfen(bs, capsys):
-    _write(bs, {"version": 2, "foo": 1, "min_bpm": 100, "max_bpm": 150, "bar": "x"})
+    _write(bs, {"version": 3, "foo": 1, "min_bpm": 100, "max_bpm": 150, "bar": "x"})
     s = bs.load_settings()
     assert "foo" not in s and "bar" not in s and s["min_bpm"] == 100
     out = capsys.readouterr().out
@@ -117,10 +150,10 @@ def test_unbekannte_keys_werden_verworfen(bs, capsys):
 
 
 def test_teil_speichern_behaelt_dateistand_und_verwirft_ungueltiges(bs):
-    _write(bs, V2_HARDSTYLE)
+    _write(bs, V3_HARDSTYLE)
     bs.save_settings({"mode": "manual", "min_bpm": "kaputt"})
     sec = _read(bs)["bpm_settings"]
-    assert sec["mode"] == "manual" and sec["min_bpm"] == 145 and sec["device"] == V2_HARDSTYLE["device"]
+    assert sec["mode"] == "manual" and sec["min_bpm"] == 145 and sec["device"] == V3_HARDSTYLE["device"]
 
 
 # ── Atomares Schreiben ─────────────────────────────────────────────────────────
@@ -140,7 +173,7 @@ def test_kein_tmp_nach_schreiben_und_replace_wird_genutzt(bs, monkeypatch):
 
 
 def test_abbruch_mitten_im_schreiben_laesst_alte_datei_intakt(bs, monkeypatch):
-    _write(bs, V2_HARDSTYLE, {"live_view": {"zoom": 2}})
+    _write(bs, V3_HARDSTYLE, {"live_view": {"zoom": 2}})
     vorher = open(bs._PREFS_PATH, "rb").read()
 
     def boom(src, dst):
@@ -155,8 +188,8 @@ def test_abbruch_mitten_im_schreiben_laesst_alte_datei_intakt(bs, monkeypatch):
 # ── Versionen ──────────────────────────────────────────────────────────────────
 
 def test_neuere_version_bleibt_unangetastet_und_liefert_defaults(bs):
-    v3 = {"version": 3, "source": "input", "beat_latency_ms": 40, "min_bpm": 100, "max_bpm": 150}
-    _write(bs, v3, {"live_view": {"zoom": 2}})
+    v4 = {"version": 4, "source": "input", "calibration": {}, "min_bpm": 100, "max_bpm": 150}
+    _write(bs, v4, {"live_view": {"zoom": 2}})
     vorher = open(bs._PREFS_PATH, "rb").read()
     assert bs.load_settings() == bs.DEFAULTS
     bs.save_settings({"min_bpm": 90})
@@ -170,8 +203,8 @@ def test_v1_sicherung_genau_einmal(bs):
     original = open(bs._PREFS_PATH, "rb").read()
     bs.save_settings({"min_bpm": 100})
     assert open(bak, "rb").read() == original
-    assert _read(bs)["bpm_settings"]["version"] == 2
-    bs.save_settings({"min_bpm": 110})              # zweites Schreiben: v2 -> keine neue Sicherung
+    assert _read(bs)["bpm_settings"]["version"] == 3
+    bs.save_settings({"min_bpm": 110})              # zweites Schreiben: v3 -> keine neue Sicherung
     assert open(bak, "rb").read() == original
     _write(bs, V1_HARDSTYLE)                        # v1 erneut hingelegt: Sicherung bleibt die erste
     bs.save_settings({"min_bpm": 120})
@@ -179,18 +212,18 @@ def test_v1_sicherung_genau_einmal(bs):
     assert len([n for n in os.listdir(bs._PREFS_DIR) if n.endswith(".v1.bak")]) == 1
 
 
-def test_frische_v2_datei_legt_keine_sicherung_an(bs):
+def test_frische_v3_datei_legt_keine_sicherung_an(bs):
     bs.save_settings({"min_bpm": 100})
     bs.save_settings({"min_bpm": 110})
     assert not os.path.exists(bs._PREFS_PATH + ".v1.bak")
-    assert _read(bs)["bpm_settings"]["version"] == 2
+    assert _read(bs)["bpm_settings"]["version"] == 3
 
 
 def test_unlesbare_datei_wird_vor_dem_ueberschreiben_gesichert(bs, capsys):
     """Halbe Datei eines anderen (nicht atomaren) Schreibers: load → Defaults,
     save darf sie nicht stillschweigend durch eine Nur-bpm_settings-Datei
     ersetzen — erst ui_prefs.json.corrupt.bak (einmalig), dann neu schreiben."""
-    halb = '{"live_view": {"zoom": 2}, "bpm_settings": {"version": 2, "min_b'
+    halb = '{"live_view": {"zoom": 2}, "bpm_settings": {"version": 3, "min_b'
     with open(bs._PREFS_PATH, "w", encoding="utf-8") as f:
         f.write(halb)
     bak = bs._PREFS_PATH + ".corrupt.bak"
@@ -199,7 +232,7 @@ def test_unlesbare_datei_wird_vor_dem_ueberschreiben_gesichert(bs, capsys):
     bs.save_settings({"min_bpm": 90})
     assert open(bak, encoding="utf-8").read() == halb   # byte-genau gesichert
     data = _read(bs)
-    assert data["bpm_settings"]["min_bpm"] == 90 and data["bpm_settings"]["version"] == 2
+    assert data["bpm_settings"]["min_bpm"] == 90 and data["bpm_settings"]["version"] == 3
     assert "corrupt" in capsys.readouterr().out     # Log nennt die Sicherung
     # Gueltiges JSON, aber kein Objekt: ebenfalls kaputt — die ERSTE Sicherung bleibt
     with open(bs._PREFS_PATH, "w", encoding="utf-8") as f:
@@ -218,7 +251,7 @@ def test_fehlende_datei_und_datei_ohne_sektion_sichern_nichts(bs):
         json.dump({"live_view": {"zoom": 2}}, f)    # gueltig, ohne bpm_settings
     bs.save_settings({"min_bpm": 90})
     data = _read(bs)
-    assert data["live_view"] == {"zoom": 2} and data["bpm_settings"]["version"] == 2
+    assert data["live_view"] == {"zoom": 2} and data["bpm_settings"]["version"] == 3
     assert not os.path.exists(bak)
 
 # ── apply_to_backend / start_auto_if_configured ────────────────────────────────
@@ -230,12 +263,25 @@ def test_apply_to_backend_ein_fehler_ueberspringt_nicht_den_rest(bs, monkeypatch
 
     def boom(*_a, **_k):
         raise RuntimeError("Setter kaputt")
-    monkeypatch.setattr(det, "set_sensitivity", boom)
+    monkeypatch.setattr(det, "set_beat_latency_ms", boom)
     monkeypatch.setattr(mgr, "set_bounds", boom)
     bs.apply_to_backend({"min_bpm": 110, "max_bpm": 150, "mode": "manual", "beats_per_bar": 8})
     assert mgr.mode == BpmMode.MANUAL and mgr.beats_per_bar == 8   # trotz zwei Fehlern davor
     mgr.set_mode(BpmMode.AUTO)
     mgr.set_beats_per_bar(4)
+
+
+def test_apply_to_backend_setzt_beat_latenz_und_neutralisiert_unterteilung(bs):
+    """v3: beat_latency_ms → Detektor; subdivision hat keinen Regler mehr → 1."""
+    from src.core.engine.bpm_manager import get_bpm_manager
+    from src.core.audio.beat_detector import get_beat_detector
+    det, mgr = get_beat_detector(), get_bpm_manager()
+    mgr.set_subdivision(4)
+    bs.apply_to_backend({"beat_latency_ms": -40})
+    assert det.beat_latency_ms == -40 and det.snapshot().beat_latency_ms == -40
+    assert mgr.subdivision == 1
+    bs.apply_to_backend({})
+    assert det.beat_latency_ms == 0
 
 
 def test_apply_to_backend_nimmt_defaults_fuer_fehlende_keys(bs):

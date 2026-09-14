@@ -98,18 +98,19 @@ def test_genre_presets_table():
 
 
 def test_genre_apply_to_live():
+    """S4 (BPM-09): apply_to_live setzt NUR Bereich + Beats/Takt — Sensitivity/
+    Smoothing des Detektors bleiben unangetastet (Menue „Vorlage ▾")."""
     from src.core.engine.bpm_manager import get_bpm_manager
     from src.core.audio.beat_detector import get_beat_detector
-    GP.apply_to_live("hardstyle")
-    mgr = get_bpm_manager()
     det = get_beat_detector()
-    assert mgr.min_bpm == 145 and mgr.max_bpm == 160
-    assert mgr.beats_per_bar == 4
-    assert abs(det.sensitivity - 1.35) < 0.01
-    assert abs(det.smoothing - 0.35) < 0.01
-    # Aufraeumen (Detektor-Singleton fuer andere Tests neutralisieren)
     det.set_sensitivity(1.3)
     det.set_smoothing(0.3)
+    GP.apply_to_live("hardstyle")
+    mgr = get_bpm_manager()
+    assert mgr.min_bpm == 145 and mgr.max_bpm == 160
+    assert det.min_bpm == 145 and det.max_bpm == 160   # ueber den Manager gespiegelt
+    assert mgr.beats_per_bar == 4
+    assert abs(det.sensitivity - 1.3) < 0.01 and abs(det.smoothing - 0.3) < 0.01
     mgr.set_bounds(60, 200)
     mgr.set_beats_per_bar(4)
 

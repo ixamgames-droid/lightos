@@ -422,10 +422,10 @@ class BpmManagerView(QWidget):
         mgr = self._mgr
         self._sp_min.setValue(int(mgr.min_bpm))
         self._sp_max.setValue(int(mgr.max_bpm))
-        sens = float(getattr(self._det, "sensitivity", D["sensitivity"]))
+        sens = float(getattr(self._det, "sensitivity", 1.3))
         self._sl_sens.setValue(int(round(sens * 100)))
         self._lbl_sens.setText(f"{sens:.2f}")
-        sm = float(getattr(self._det, "smoothing", D["smoothing"]))
+        sm = float(getattr(self._det, "smoothing", 0.3))
         self._sl_smooth.setValue(int(round(sm * 100)))
         self._lbl_smooth.setText(f"{sm:.2f}")
 
@@ -818,9 +818,6 @@ class BpmManagerView(QWidget):
             "max_bpm": self._sp_max.value(),
             "beats_per_bar": self._sp_bpb.value(),
             "phase_accurate_beats": self._chk_phase.isChecked(),
-            "sensitivity": self._sl_sens.value() / 100.0,
-            "smoothing": self._sl_smooth.value() / 100.0,
-            "subdivision": int(self._cmb_subdiv.currentData() or 1),
         })
 
     # ── Sichtbarkeit: Poll-Timer nur im Vordergrund ───────────────────────────

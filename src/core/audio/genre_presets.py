@@ -3,10 +3,12 @@
 Pro Musikstil ein Satz Parameter, der die Erkennung deutlich treffsicherer macht —
 der groesste Hebel ist das **enge Tempo-Fenster** (min/max) + der **Tempo-Prior**
 (Zentrum der Oktav-Aufloesung): damit verschwindet der haeufigste Fehler (75 statt
-150 BPM). Zusaetzlich Empfindlichkeit/Glaettung (Live-Detektor) und das Takt-Raster.
+150 BPM). Dazu das Takt-Raster. ``sensitivity``/``smoothing`` stehen nur noch fuer
+den Offline-Pfad/Altleser in der Tabelle — der Live-Detektor ist seit S1
+selbstkalibrierend und bekommt sie nicht mehr (BPM-09).
 
 Ein Preset wirkt auf BEIDE Pfade:
-- **Live** (`apply_to_live`): Detektor-Sensitivity/Smoothing + Manager-Grenzen + beats_per_bar.
+- **Live** (`apply_to_live`, Menue „Vorlage ▾" im Tab „Erkennung"): NUR Manager-Grenzen + beats_per_bar.
 - **Offline-Generator**: liefert ``min_bpm``/``max_bpm``/``prior``/``beats_per_bar`` an den Analyzer.
 """
 from __future__ import annotations
@@ -83,8 +85,9 @@ def suggest(median_bpm: float, filename: str = "") -> str:
 
 
 def apply_to_live(name: str) -> dict:
-    """Spielt das Preset in den Live-Detektor + Manager (Grenzen, Sens, Smoothing,
-    Takt). Gibt das angewandte Preset zurueck. Faengt fehlende Backends ab."""
+    """Spielt das Preset in den Manager: NUR Tempo-Bereich + Beats/Takt (der
+    Manager spiegelt die Grenzen in den Detektor). Sensitivity/Smoothing werden
+    seit BPM-09 nicht mehr gesetzt. Gibt das angewandte Preset zurueck."""
     p = get(name)
     try:
         from src.core.engine.bpm_manager import get_bpm_manager
@@ -94,11 +97,4 @@ def apply_to_live(name: str) -> dict:
             mgr.set_beats_per_bar(int(p["beats_per_bar"]))
     except Exception as e:
         print(f"[genre_presets] manager apply error: {e}")
-    try:
-        from src.core.audio.beat_detector import get_beat_detector
-        det = get_beat_detector()
-        det.set_sensitivity(float(p["sensitivity"]))
-        det.set_smoothing(float(p["smoothing"]))
-    except Exception as e:
-        print(f"[genre_presets] detector apply error: {e}")
     return p
