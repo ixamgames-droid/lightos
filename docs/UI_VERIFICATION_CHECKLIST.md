@@ -48,13 +48,12 @@ fehlt zunaechst hier und macht das Gate rot (Schutz gegen Doku-Drift).
 
 Spalten: **headless** = ohne Argumente offscreen baubar · **Tooltip/Label** = mind. ein beschrifteter Text/Tooltip · **Aktion/Signal** = Button/`QAction`/Klassen-`Signal` vorhanden · **Regressionstest** = abdeckende Testdatei · **Doc** = Komponentenseite · **Verifikationspfad** = ausfuehrbarer `pytest`-Testname ODER `manuell`.
 
-**Stand:** 25 no-arg Views (25 headless baubar), 19 VC-Widgets (19 headless baubar).
+**Stand:** 24 no-arg Views (24 headless baubar), 19 VC-Widgets (19 headless baubar).
 
 ### Views (`src/ui/views/*.py`, no-arg `*View`)
 
 | Modul | Klasse | headless | Tooltip/Label | Aktion/Signal | Regressionstest | Doc | Verifikationspfad |
 |---|---|:--:|:--:|:--:|---|---|---|
-| `audio_input_view.py` | `AudioInputView` | ja | ja | ja | `tests/test_audio_input_view.py` | `docs/components/views/audio_input_view.md` | `test_every_no_arg_view_builds` |
 | `bpm_generator_view.py` | `BpmGeneratorView` | ja | ja | ja | `tests/test_ui_smoke_enumerated.py` | `docs/components/views/bpm_generator_view.md` | `test_every_no_arg_view_builds` |
 | `bpm_manager_view.py` | `BpmManagerView` | ja | ja | ja | `tests/test_ui_smoke_enumerated.py` | `docs/components/views/bpm_manager_view.md` | `test_every_no_arg_view_builds` |
 | `channel_groups_view.py` | `ChannelGroupsView` | ja | ja | ja | `tests/test_ui_smoke_enumerated.py` | `docs/components/views/channel_groups_view.md` | `test_every_no_arg_view_builds` |

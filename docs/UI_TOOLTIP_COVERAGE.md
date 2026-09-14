@@ -10,13 +10,12 @@ dokumentierte Baseline: es wird rot, sobald eine View NEUE textlose
 Buttons ohne Tooltip bekommt (Regressionsschutz). Bestehende Verstoesse
 abzubauen ist jederzeit erlaubt (Baseline in der Skript-Datei nachziehen).
 
-**Stand:** 25 no-arg Views geprueft, 35 Verstoesse in der aktuellen Baseline.
+**Stand:** 24 no-arg Views geprueft, 35 Verstoesse in der aktuellen Baseline.
 
 ## Uebersicht
 
 | View (`src/ui/views/…`) | Klasse | Buttons | textlos & tooltiplos | Baseline |
 |---|---|---:|---:|---:|
-| `audio_input_view.py` | `AudioInputView` | 4 | 0 | 0 |
 | `bpm_generator_view.py` | `BpmGeneratorView` | 13 | 0 | 0 |
 | `bpm_manager_view.py` | `BpmManagerView` | 13 | 0 | 0 |
 | `channel_groups_view.py` | `ChannelGroupsView` | 4 | 1 | 1 |

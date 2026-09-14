@@ -231,3 +231,48 @@ def test_start_haengt_levelmeter_an_und_snapshot_fuellt_sich(pulse, monkeypatch)
     cap.stop()
     assert not cap.is_subscribed(cap._meter.on_chunk)
     assert cap.snapshot().running is False
+
+
+def test_capture_abonnenten_im_betrieb_genau_2(pulse, monkeypatch):
+    """S5-Abnahme: im Betrieb haengen genau ``det.process_chunk`` (ueber den
+    BPM-Manager) und ``LevelMeter.on_chunk`` am Capture — auch nach Quellen-
+    wechseln und mit gebauter Ansicht „Erkennung" (die AudioInputView mit ihrem
+    eigenen Abo ist weg)."""
+    from PySide6.QtWidgets import QApplication
+    from src.core.audio.beat_detector import get_beat_detector
+    from src.core.engine.bpm_manager import get_bpm_manager
+    from src.ui.bpm_source_controller import SourceController
+
+    app = QApplication.instance() or QApplication([])
+    cap = capmod.AudioCapture()
+    monkeypatch.setattr(capmod, "_capture", cap)
+    monkeypatch.setattr(capmod.threading.Thread, "start", lambda self: None)   # kein echter Thread
+
+    class _NoOs2l:
+        def is_running(self):
+            return False
+    mgr, det = get_bpm_manager(), get_beat_detector()
+    ctrl = SourceController(mgr=mgr, cap=cap, os2l=_NoOs2l(), det=det, player=None)
+    try:
+        ctrl.apply("loopback", "alsa_output.hdmi")
+        assert cap.is_running()
+        assert cap._subscribers == [det.process_chunk, cap._meter.on_chunk]
+        cap._thread = None
+        ctrl.apply("input", "USB Audio CODEC Analog Stereo")
+        cap._thread = None
+        ctrl.apply("loopback")
+        assert len(cap._subscribers) == 2
+        from src.ui.views.bpm_manager_view import BpmManagerView
+        v = BpmManagerView(source_controller=ctrl)
+        v.show()
+        app.processEvents()
+        v._refresh_monitor()
+        assert len(cap._subscribers) == 2
+        v.hide()
+        v.deleteLater()
+        app.processEvents()
+    finally:
+        mgr.use_audio_source(False)
+        cap.unsubscribe(det.process_chunk)
+        cap._thread = None
+        cap.stop()

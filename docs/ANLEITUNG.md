@@ -29,7 +29,7 @@ Ganz oben liegt eine **Sektions-Leiste** mit 8 Hauptbereichen. Ein Klick (oder
 | 4 | **Virtual Console** | (frei belegbare Live-Bedienoberfläche) |
 | 5 | **Simple Desk** | Simple Desk · Submaster/Kanal-Gruppen |
 | 6 | **Playback** | Playback · Show Manager · Kurven |
-| 7 | **E/A** (Eingabe / Ausgabe) | Output · DMX Monitor · MIDI · Audio Input · Musik |
+| 7 | **E/A** (Eingabe / Ausgabe) | Output · DMX Monitor · MIDI · Musik |
 | 8 | **BPM** | BPM-Manager (AUTO/MANUAL, Quelle PC-Audio/Loopback, Tap, Lock) |
 
 > **Umgezogen:** **EFX**, **RGB Matrix**, **Funktionen** und **Paletten** sind
@@ -233,8 +233,9 @@ stehen in [EFFEKTE.md](EFFEKTE.md).
   Menü **Ausgabe → Konfigurieren…**.
 - **DMX Monitor:** Live-Anzeige der ausgegebenen DMX-Werte (zum Debuggen).
 - **MIDI:** Controller (z. B. APC mini) anbinden und Bedienelemente zuweisen.
-- **Audio Input:** Beat-Erkennung → liefert die globale BPM für tempo-synchrone
-  Effekte.
+- Einen eigenen Tab für die Audio-Aufnahme gibt es hier seit 2026-09 nicht
+  mehr: Quelle (PC-Audio je Ausgabegerät, Eingang je Gerät) und Pegelmeter
+  stehen jetzt in **BPM → Erkennung** (siehe Abschnitt 8).
 - **Musik:** integrierter Musik-Player (Playlist pro Show) — beim Play kann eine
   Auto-Lichtshow mitstarten. Details:
   [Musik-Sync & Auto-Show](anleitung_musik_sync/ANLEITUNG_MUSIK_SYNC.md).

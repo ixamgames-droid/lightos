@@ -113,7 +113,7 @@ Für jede Palette: Programmer setzen → `P` → Name eingeben → OK
 3. Tempo: „BPM Sync" aktivieren
 
 ### Schritt 2 — Audio starten
-1. `Ansicht → Audio Input` → Gerät wählen → Start
+1. Sektion `BPM → Erkennung` → Quelle wählen (PC-Audio / Eingang) → Pegelmeter im grünen Bereich
 2. Musik abspielen → BPM wird erkannt (z.B. 128 BPM)
 
 ### Schritt 3 — Executor

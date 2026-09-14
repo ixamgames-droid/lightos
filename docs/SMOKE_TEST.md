@@ -9,9 +9,9 @@
 
 **Voraussetzung:** Soundcard / WASAPI-Gerät verfügbar, Musik abspielbar.
 
-- [ ] Ansicht „Audio Input" öffnen (`Ansicht → Audio Input`)
-- [ ] Eingabegerät aus Dropdown wählen und „Start" klicken
-- [ ] Pegel-Anzeige reagiert auf Musiksignal (Balken bewegt sich)
+- [ ] Sektion **BPM → Erkennung** öffnen
+- [ ] Quelle wählen („PC-Audio", „PC-Audio: <Ausgabegerät>" oder „Eingang: <Gerät>")
+- [ ] Pegelmeter unter der BPM-Zahl reagiert auf Musiksignal (Balken bewegt sich, grüner Bereich = gut)
 - [ ] BPM-Anzeige aktualisiert sich bei konstantem Beat (±5 BPM Toleranz)
 - [ ] „Tap BPM"-Button setzt erkannten Wert korrekt
 - [ ] Stopp-Button beendet Capture ohne Exception im Log

@@ -26,7 +26,6 @@ def _app() -> QApplication:
 # DmxGrid, TimelineCanvas) und Editoren mit Pflichtobjekt gehoeren bewusst nicht
 # in dieses Inventar; die acht bisher ungetesteten Editoren stehen weiter unten.
 PUBLIC_NO_ARG_VIEWS = {
-    "audio_input_view": "AudioInputView",
     "bpm_generator_view": "BpmGeneratorView",
     "bpm_manager_view": "BpmManagerView",
     "channel_groups_view": "ChannelGroupsView",

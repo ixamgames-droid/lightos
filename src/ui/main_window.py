@@ -1158,7 +1158,10 @@ class MainWindow(QMainWindow):
         return tabs
 
     def _build_section_io(self) -> QWidget:
-        """Sektion 5: Output-Monitor + DMX-Monitor + MIDI + Audio Input."""
+        """Sektion 5: Output-Monitor + DMX-Monitor + MIDI + Musik.
+
+        Den frueheren Tab fuer die Audio-Aufnahme gibt es seit BPM-10 (S5) nicht
+        mehr: Pegelmeter und Geraetewahl stehen im Sub-Tab „Erkennung" (BPM)."""
         tabs = _SubTabs()
         self._output_view = OutputView()
         try:
@@ -1167,12 +1170,6 @@ class MainWindow(QMainWindow):
             print(f"[main_window] DmxMonitorView init error: {e}")
             self._dmx_monitor_view = QWidget()
         self._midi_view = MidiView()
-        try:
-            from src.ui.views.audio_input_view import AudioInputView
-            self._audio_input_view = AudioInputView()
-        except Exception as e:
-            print(f"[main_window] AudioInputView init error: {e}")
-            self._audio_input_view = QWidget()
         try:
             from src.ui.views.music_view import MusicView
             self._music_view = MusicView()
@@ -1189,7 +1186,6 @@ class MainWindow(QMainWindow):
         tabs.addTab(self._output_view,      "Output")
         tabs.addTab(self._dmx_monitor_view, "DMX Monitor")
         tabs.addTab(self._midi_view,        "MIDI")
-        tabs.addTab(self._audio_input_view, "Audio Input")
         tabs.addTab(self._music_view,       "Musik")
         return tabs
 

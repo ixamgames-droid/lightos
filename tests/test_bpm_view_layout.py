@@ -8,8 +8,8 @@
   (plan.md 1.2: „Auto | Manuell (Zweizustand)" ist ein Element). Roh sind es 7.
 * Erweitert aufgeklappt: 6 + 11.
 * Der 50-ms-Snapshot-Timer laeuft nur bei Sichtbarkeit (showEvent/hideEvent).
-* Kein ``get_bpm(`` in der View und den beiden Helfern (Briefing 7c; die
-  AudioInputView faellt erst in S5 und ist ausgenommen).
+* Kein ``get_bpm(`` in der View, den beiden Helfern und ueberhaupt in
+  ``src/ui`` (Briefing 7c; seit S5 ohne Ausnahme — die AudioInputView ist weg).
 * Jedes Bedienelement traegt einen Tooltip.
 """
 from __future__ import annotations
@@ -157,6 +157,9 @@ def test_jedes_bedienelement_hat_einen_tooltip(_isolated_prefs):
 def test_kein_get_bpm_in_view_und_helfern():
     files = ["src/ui/views/bpm_manager_view.py", "src/ui/bpm_tap_helper.py",
              "src/ui/bpm_source_controller.py"]
+    for wurzel, _d, namen in os.walk(os.path.join(_REPO, "src", "ui")):   # S5: ohne Ausnahme
+        files += [os.path.relpath(os.path.join(wurzel, n), _REPO) for n in namen if n.endswith(".py")]
+    assert not os.path.exists(os.path.join(_REPO, "src/ui/views/audio_input_view.py"))
     for rel in files:
         text = open(os.path.join(_REPO, rel), encoding="utf-8").read()
         assert not re.search(r"get_bpm\(", text), f"{rel}: get_bpm( gefunden"

@@ -85,6 +85,11 @@ _ENTFERNT = {
                      "Quelle 'Lied-Analyse (Player)' nimmt den im Player geladenen Titel"),
     "Unterteilung": ("2026-09-14 (BPM-09)",
                      "entfaellt ersatzlos (Sub-Ticks gibt es nicht mehr; bpm_settings v3)"),
+    # BPM-10 (2026-09-14, S5): der E/A-Tab „Audio Input" ist aufgeloest —
+    # Pegelmeter + Geraet je Sink stehen im Sub-Tab „Erkennung".
+    "Audio Input": ("2026-09-14 (BPM-10)",
+                    "Sektion BPM → Erkennung: Quelle-Combo (PC-Audio je Ausgabegeraet, "
+                    "Eingang je Geraet) und Pegelmeter unter der BPM-Zahl"),
     # NICHT aufgenommen: „Controller-Vorlage". Die Gegenprobe dieses Gates hat
     # das zurueckgewiesen, und sie hatte recht — weggefallen ist nur der
     # gleichnamige BAUKASTEN-BLOCK, die Funktion selbst lebt
