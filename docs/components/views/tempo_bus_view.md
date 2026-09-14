@@ -47,7 +47,7 @@ Die beiden Gruppen lagen vorher unten im
   `TAP_BUS`) und der Speed-Dial; Anleitung: `docs/ANLEITUNG_TEMPO_SYNC.md`,
   `docs/anleitung_speed/ANLEITUNG_SPEED.md`.
 - **Hauptfenster:** `src/ui/main_window.py`, Sektion 7 BPM — Sub-Tabs
-  Manager | Tempo-Buses | Generator.
+  Erkennung | Tempo-Buses | Generator (Sub-Tab „Erkennung" seit BPM-09, vorher „Manager").
 
 ## Zugehörige Tests
 

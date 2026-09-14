@@ -707,6 +707,9 @@ class MainWindow(QMainWindow):
         self._act_os2l = om.addAction("OS2L-Server (Port 1234)")
         self._act_os2l.setCheckable(True)
         self._act_os2l.triggered.connect(self._toggle_os2l_server)
+        # Der Haken spiegelt den echten Serverzustand — der Server wird auch aus
+        # dem Tab „Erkennung" (Quelle OS2L) gestartet/gestoppt (BPM-09).
+        om.aboutToShow.connect(self._sync_os2l_action)
         om.addSeparator()
         om.addAction("Input-Profile verwalten...").triggered.connect(self._open_input_profile_editor)
 
@@ -851,7 +854,7 @@ class MainWindow(QMainWindow):
         self._btn_tap = QPushButton("TAP")
         self._btn_tap.setFixedHeight(26)
         self._btn_tap.setFixedWidth(48)
-        self._btn_tap.setToolTip("Tap-Tempo (4x klicken)")
+        self._btn_tap.setToolTip("TAP: einmal = Beat auf „jetzt“ setzen, 4× im Takt = Tempo setzen")
         self._btn_tap.clicked.connect(self._on_tap_tempo)
         bar_layout.addWidget(self._btn_tap)
 
@@ -1039,7 +1042,7 @@ class MainWindow(QMainWindow):
         self._stack.addWidget(self._build_section_playback())
         # Sektion 6: Eingabe / Ausgabe
         self._stack.addWidget(self._build_section_io())
-        # Sektion 7: BPM (Manager | Tempo-Buses | Generator)
+        # Sektion 7: BPM (Erkennung | Tempo-Buses | Generator)
         bpm_tabs = _SubTabs()
         try:
             from src.ui.views.bpm_manager_view import BpmManagerView
@@ -1047,7 +1050,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"[main_window] BpmManagerView init error: {e}")
             self._bpm_manager_view = QWidget()
-        bpm_tabs.addTab(self._bpm_manager_view, "Manager")
+        bpm_tabs.addTab(self._bpm_manager_view, "Erkennung")
         try:
             from src.ui.views.tempo_bus_view import TempoBusView
             self._tempo_bus_view = TempoBusView()
@@ -1469,9 +1472,12 @@ class MainWindow(QMainWindow):
         self._lbl_gm_val.setText(f"{val}%")
 
     def _on_tap_tempo(self):
+        """Topbar-TAP: derselbe Helfer wie der TAP im Tab „Erkennung" (BPM-09):
+        1 Tipp = Beat-Phase auf „jetzt", ab dem 3. Tipp Suchhinweis, 4 Tipps = Tempo."""
         if not self._bpm_mgr:
             return
-        bpm = self._bpm_mgr.tap()
+        from src.ui.bpm_tap_helper import get_tap_helper
+        bpm = get_tap_helper().tap()
         if bpm > 0:
             self._lbl_bpm.setText(f"BPM: {bpm:.1f}")
             self._lbl_bpm.setStyleSheet("color: #FFD700; padding: 0 8px;")
@@ -1499,9 +1505,10 @@ class MainWindow(QMainWindow):
         self._bpm_indicator.setStyleSheet(self._BPM_DOT_IDLE)
 
     def _flash_bpm_indicator(self, idx: int = 0):
-        # Akzent auf Beat 1 (alle 4) — Index kommt direkt vom Beat-Callback,
-        # kein Re-Read des privaten Zaehlers (war off-by-one).
-        col = "#FFD700" if (idx % 4 == 0) else "#9DFF52"
+        # Akzent auf Beat 1 (alle beats_per_bar) — Index kommt direkt vom
+        # Beat-Callback, kein Re-Read des privaten Zaehlers (war off-by-one).
+        bpb = max(1, int(getattr(self._bpm_mgr, "beats_per_bar", 4) or 4)) if self._bpm_mgr else 4
+        col = "#FFD700" if (idx % bpb == 0) else "#9DFF52"
         self._bpm_indicator.setStyleSheet(
             f"background:{col}; border:1px solid {col}; border-radius:13px; margin:2px 4px;")
         self._bpm_indicator_timer.start()
@@ -2337,6 +2344,14 @@ class MainWindow(QMainWindow):
                 get_osc_server().stop()
             except Exception:
                 pass
+
+    def _sync_os2l_action(self):
+        """Menue-Haken = ``os2l.is_running()`` (Quelle OS2L im Tab schaltet ihn mit)."""
+        try:
+            from src.core.audio.os2l import get_os2l_server
+            self._act_os2l.setChecked(bool(get_os2l_server().is_running()))
+        except Exception:
+            pass
 
     def _toggle_os2l_server(self, checked: bool):
         if checked:

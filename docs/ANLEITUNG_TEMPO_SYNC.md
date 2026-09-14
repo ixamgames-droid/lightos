@@ -29,18 +29,18 @@ Zyklus **gemeinsam auf der Eins** beginnen — nicht „gleich schnell", sondern
 
 ## 1. Globale BPM setzen (BPM-Tab, Strg+8)
 
-Der **BPM-Manager** (Tab öffnen mit **Strg+8**) ist die Zentrale. Oben der **Monitor**
-(große BPM-Zahl, Takt 1·2·3·4, Beat-Flash), unten die **Einstellungen**.
+Der Sub-Tab **Erkennung** der BPM-Sektion (öffnen mit **Strg+8**) ist die Zentrale: große
+BPM-Zahl, Beat-Punkt + Takt 1·2·3·4, Zustandswort (KEIN SIGNAL / SUCHT / EINGERASTET) und
+sechs Bedienelemente:
 
-**BPM-Quelle** wählen:
-- **Live-Audio** — BPM wird aus dem PC-Audio/Eingang live erkannt (Standard).
-- **Lied-Analyse** — folgt dem Beatgrid eines vorab analysierten Songs.
-- **Manuell / Tap** — du gibst die BPM per **TAP** (mehrmals im Takt klicken) oder Zahl vor.
-
-Weitere Stellschrauben: **Genre-Preset** (stellt Grenzen/Empfindlichkeit/Takt passend ein),
-**Grenzen** (Höhen/Tiefen), **Empfindlichkeit**, **Glättung**, **Takt-Raster**
-(Beats/Takt + Unterteilung), **Nudge** (±1…±10) und **🔒 Lock** (BPM einfrieren, damit
-keine Quelle sie mehr verändert).
+- **Quelle** — **PC-Audio** (Standard), **Eingang: <Gerät>**, **OS2L (DJ-Software)**,
+  **Lied-Analyse (Player)** (folgt dem Beatgrid des analysierten, im Player geladenen Songs), **Aus**.
+- **TAP** — einmal = Beat auf „jetzt"; viermal im Takt = Tempo setzen.
+- **Auto | Manuell** — Auto folgt der Quelle, Manuell hält dein Tempo.
+- **×½ / ×2** — Halb-/Doppeltempo mit einem Klick.
+- **▸ Erweitert** — **Tempo-Bereich** von/bis + **Vorlage ▾** (Genre-Bereiche), **Beats/Takt**,
+  **Beat-Latenz** (ms), **🔒 Tempo einfrieren** (damit keine Quelle die BPM mehr verändert),
+  **Nudge** (±1/±5), **Taktgenau**.
 
 → Tiefer: **[BPM-Manager-Anleitung](anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md)** ·
 **[Musik-Sync & Auto-Show](anleitung_musik_sync/ANLEITUNG_MUSIK_SYNC.md)**
@@ -188,7 +188,7 @@ Eine ausführlich bebilderte Variante steht in
 ## Verwandte Anleitungen
 
 - **[Tempo-Controller-Widget](anleitung_tempo_controller/ANLEITUNG_TEMPO_CONTROLLER.md)** — das All-in-One-Tempo-Widget (Bus + Quelle + Faktor + gekoppelte Effekte) in der VC.
-- **[BPM-Manager](anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md)** — Quelle, Genre-Presets, Takt-Raster, Generator (Lied → Beatgrid), Beatgrid-Editor, Panel „Effekte je Bus".
+- **[BPM-Manager](anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md)** — Sub-Tab „Erkennung" (Quelle, TAP, Auto | Manuell, ×½/×2, Erweitert), Generator (Lied → Beatgrid), Beatgrid-Editor, Panel „Effekte je Bus".
 - **[Speed-Dial, Master/Sub & Grand-Master](anleitung_speed/ANLEITUNG_SPEED.md)** — Tempo aus der VC, Verhältnisse koppeln.
 - **[Dimmer-Matrix & relative Geschwindigkeit](anleitung_dimmermatrix/ANLEITUNG_DIMMERMATRIX.md)** — phasen-gekoppeltes ×2/×½ in der Praxis.
 - **[Musik-Sync & Auto-Show](anleitung_musik_sync/ANLEITUNG_MUSIK_SYNC.md)** — Playlist → Play startet die Show, Tempo folgt der Musik.

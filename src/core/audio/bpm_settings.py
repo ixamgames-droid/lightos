@@ -1,6 +1,6 @@
 """BPM-Manager-Einstellungen: Laden/Migrieren/Speichern in ui_prefs.json + Anwenden.
 
-EINE autoritative Quelle fuer Quelle/Geraet/Modus/Grenzen/Takt: ``DEFAULTS`` (v2).
+EINE autoritative Quelle fuer Quelle/Geraet/Modus/Grenzen/Takt/Beat-Latenz: ``DEFAULTS`` (v3).
 Wird beim App-Start (``boot``) angewandt; der BPM-Tab liest danach den
 Backend-Zustand und speichert Aenderungen (entprellt) hierher. Liegt wie die
 uebrigen UI-Prefs in ``<app_data_dir>/ui_prefs.json``, Sektion ``bpm_settings``.
@@ -21,6 +21,21 @@ Persistenz v2 (BPM-07):
 - ``device`` ist das Eingangsgeraet und gilt nur fuer ``source == "input"``;
   fuer PC-Audio (loopback) bleibt es None, sonst nimmt der Loopback nach dem
   Neustart das Mikrofon auf (capture.py sucht den Namen mit include_loopback).
+
+Persistenz v3 (BPM-09, S4): ``beat_latency_ms`` neu (int −300..300, Default 0);
+``sensitivity``/``smoothing``/``subdivision`` entfallen mit ihren Reglern —
+``migrate`` verwirft sie mit Log „v2->v3: verworfen …". ``apply_to_backend``
+ruft ``mgr.set_subdivision(1)`` (Altwert neutralisieren) und
+``det.set_beat_latency_ms``. Das erste v3-Schreiben ueber einer v2-Sektion
+sichert die Datei einmalig als ``ui_prefs.json.v2.bak``. ACHTUNG Rueckfall:
+v2-Code (Stand vor S4) liest eine v3-Datei NICHT — ``version > VERSION`` heisst
+dort „Datei bleibt unangetastet, Defaults" und ``save_settings`` schreibt die
+Sektion nicht mehr (gemessen mit origin/main). Rueckfall = revert +
+``ui_prefs.json.v2.bak`` zuruecknennen, sonst bleibt Robin mit Defaults und ohne
+Speichermoeglichkeit zurueck. Der Auto-Start (``start_auto_if_configured``)
+laeuft ueber ``bpm_source_controller.get_source_controller().apply`` — dieselbe
+Stelle wie die Quelle-Combo, damit der erste Klick auf den bereits aktiven
+Eintrag nichts ein zweites Mal startet.
 """
 from __future__ import annotations
 import json
@@ -32,7 +47,7 @@ from src.core.paths import app_data_dir
 _PREFS_DIR = app_data_dir()
 _PREFS_PATH = os.path.join(_PREFS_DIR, "ui_prefs.json")
 _KEY = "bpm_settings"
-VERSION = 2
+VERSION = 3
 
 # Reihenfolge = Schreibreihenfolge in der Datei (Migrationstabelle plan.md 3.).
 DEFAULTS: dict = {
@@ -44,10 +59,7 @@ DEFAULTS: dict = {
     "max_bpm": 200,              # obere AUTO-Grenze („Hoehen")
     "beats_per_bar": 4,          # Schlaege pro Takt (4 = Viertakt, 16 = Sechzehntakt)
     "phase_accurate_beats": True,  # Lied-Analyse: Beats taktgenau aufs Beatgrid
-    # v2 geduldet — fallen in S4 (v3) zusammen mit ihren Reglern:
-    "sensitivity": 1.3,          # Detektor-Empfindlichkeit (seit S1 ohne Wirkung)
-    "smoothing": 0.3,            # Detektor-Glaettung (seit S1 ohne Wirkung)
-    "subdivision": 1,            # Sub-Ticks pro Beat (1 = aus)
+    "beat_latency_ms": 0,        # v3: Beat-Callback frueher (+) / spaeter (−), ms
 }
 
 SOURCES = ("loopback", "input", "os2l", "song", "off")
@@ -56,8 +68,10 @@ MODES = ("auto", "manual")
 # den der Tab schreiben kann, beim naechsten Laden auf den Default zurueckfaellt.
 _BPM_RANGE = (20, 400)
 _BPB_RANGE = (1, 32)
-_SUBDIV_RANGE = (1, 16)
+_LATENCY_RANGE = (-300, 300)
 _V1_ONLY_KEYS = ("auto_default", "mode_default", "source_mode", "input_device")
+# v2-Keys, die mit ihren Reglern in S4 gefallen sind (Migrationstabelle plan.md 3.).
+_V2_DROPPED_KEYS = ("sensitivity", "smoothing", "subdivision")
 
 
 def _log(msg: str) -> None:
@@ -73,7 +87,7 @@ def _is_num(v) -> bool:
 
 
 def _check(key: str, v):
-    """Typ-/Bereichspruefung EINES v2-Keys. Liefert (gueltig, normierter Wert)."""
+    """Typ-/Bereichspruefung EINES v3-Keys. Liefert (gueltig, normierter Wert)."""
     if key == "version":
         return _is_int(v) and v == VERSION, VERSION
     if key == "source":
@@ -90,15 +104,13 @@ def _check(key: str, v):
         return _is_int(v) and _BPB_RANGE[0] <= v <= _BPB_RANGE[1], v
     if key == "phase_accurate_beats":
         return isinstance(v, bool), v
-    if key in ("sensitivity", "smoothing"):
-        return _is_num(v), (float(v) if _is_num(v) else v)
-    if key == "subdivision":
-        return _is_int(v) and _SUBDIV_RANGE[0] <= v <= _SUBDIV_RANGE[1], v
+    if key == "beat_latency_ms":
+        return _is_int(v) and _LATENCY_RANGE[0] <= v <= _LATENCY_RANGE[1], v
     return False, v
 
 
 def _merge_checked(target: dict, src: dict) -> dict:
-    """Uebernimmt gueltige v2-Werte aus ``src`` in ``target`` (Key fuer Key).
+    """Uebernimmt gueltige v3-Werte aus ``src`` in ``target`` (Key fuer Key).
     Ungueltige Werte bleiben beim bisherigen Wert von ``target`` (Default bzw.
     Dateistand), unbekannte Keys werden verworfen — beides mit Log."""
     for k, v in src.items():
@@ -121,7 +133,7 @@ def _merge_checked(target: dict, src: dict) -> dict:
 
 
 def _normalize(raw: dict) -> dict:
-    """Vollstaendiges v2-Dict aus einem (ggf. teilweisen/fehlerhaften) Dict."""
+    """Vollstaendiges v3-Dict aus einem (ggf. teilweisen/fehlerhaften) Dict."""
     return _merge_checked(dict(DEFAULTS), raw or {})
 
 
@@ -143,8 +155,18 @@ def _v1_to_v2(raw: dict) -> dict:
     return out
 
 
+def _v2_to_v3(raw: dict) -> dict:
+    """v2 → v3: ``sensitivity``/``smoothing``/``subdivision`` fallen (ihre Regler
+    sind weg, der Detektor ist seit S1 selbstkalibrierend) — EIN Log nennt die
+    verworfenen Werte. ``beat_latency_ms`` kommt ueber die Defaults hinzu."""
+    dropped = [f"{k}={raw[k]!r}" for k in _V2_DROPPED_KEYS if k in raw]
+    if dropped:
+        _log("v2->v3: verworfen " + ", ".join(dropped))
+    return {k: v for k, v in raw.items() if k not in _V2_DROPPED_KEYS}
+
+
 def migrate(raw) -> dict:
-    """Hebt eine gelesene ``bpm_settings``-Sektion auf v2.
+    """Hebt eine gelesene ``bpm_settings``-Sektion auf v3 (v1 → v2 → v3).
     Fehlt ``version`` → v1. ``version > VERSION`` → Defaults (Datei bleibt fremd).
     Typpruefung je Key mit Rueckfall auf den Default; unbekannte Keys weg."""
     if not isinstance(raw, dict):
@@ -160,6 +182,8 @@ def migrate(raw) -> dict:
         return dict(DEFAULTS)
     if ver == 1:
         raw = _v1_to_v2(raw)
+    if ver <= 2:
+        raw = _v2_to_v3(raw)
     return _normalize(raw)
 
 
@@ -193,7 +217,7 @@ def _read_all() -> dict:
 
 
 def load_settings() -> dict:
-    """Liest die BPM-Einstellungen als vollstaendiges v2-Dict."""
+    """Liest die BPM-Einstellungen als vollstaendiges v3-Dict."""
     return migrate(_read_all().get(_KEY))
 
 
@@ -201,10 +225,16 @@ def _is_v1_section(section) -> bool:
     return isinstance(section, dict) and "version" not in section
 
 
+def _is_v2_section(section) -> bool:
+    return isinstance(section, dict) and section.get("version") == 2
+
+
 def _backup_once(tag: str) -> None:
     """Originaldatei einmalig als ``ui_prefs.json.<tag>.bak`` sichern — ``v1``
-    beim ersten v2-Schreiben ueber einer v1-Sektion, ``corrupt`` bevor eine
-    unlesbare Datei ueberschrieben wird. Eine vorhandene Sicherung bleibt."""
+    beim ersten v2-Schreiben ueber einer v1-Sektion, ``v2`` beim ersten
+    v3-Schreiben ueber einer v2-Sektion (v2-Code liest v3 nicht: Rueckfall =
+    zuruecknennen), ``corrupt`` bevor eine unlesbare Datei ueberschrieben wird.
+    Eine vorhandene Sicherung bleibt."""
     bak = f"{_PREFS_PATH}.{tag}.bak"
     if os.path.exists(bak) or not os.path.exists(_PREFS_PATH):
         return
@@ -236,7 +266,7 @@ def _write_atomic(all_prefs: dict) -> None:
 
 
 def save_settings(settings: dict) -> None:
-    """Schreibt die BPM-Einstellungen (v2, atomar), ohne fremde ui_prefs-Sektionen
+    """Schreibt die BPM-Einstellungen (v3, atomar), ohne fremde ui_prefs-Sektionen
     zu verlieren. ``settings`` darf teilweise sein — fehlende Keys behalten den
     Dateistand; ungueltige Werte werden mit Log verworfen."""
     try:
@@ -257,6 +287,8 @@ def save_settings(settings: dict) -> None:
                 return
             if _is_v1_section(old):
                 _backup_once("v1")
+            elif _is_v2_section(old):
+                _backup_once("v2")
         all_prefs[_KEY] = _merge_checked(migrate(old), settings or {})
         _write_atomic(all_prefs)
     except Exception as e:
@@ -272,10 +304,11 @@ def _apply(what: str, fn) -> None:
 
 
 def apply_to_backend(settings: dict) -> None:
-    """Spielt Grenzen/Modus/Takt (+ geduldet Sensitivity/Smoothing/Subdivision) in
-    Detektor + Manager + MusicDirector. Jeder Key einzeln abgesichert: ein
-    fehlender Setter laesst die uebrigen Werte nicht aus.
-    ``BPMManager.set_bounds`` spiegelt die Grenzen in den Detektor (eine Quelle)."""
+    """Spielt Grenzen/Modus/Takt/Beat-Latenz in Detektor + Manager + MusicDirector.
+    Jeder Key einzeln abgesichert: ein fehlender Setter laesst die uebrigen Werte
+    nicht aus. ``BPMManager.set_bounds`` spiegelt die Grenzen in den Detektor
+    (eine Quelle). Die Unterteilung hat seit v3 keinen Regler mehr und wird auf
+    1 (aus) gesetzt, damit kein Altwert im Manager haengen bleibt."""
     s = _normalize(settings)
     det = mgr = None
     try:
@@ -289,14 +322,13 @@ def apply_to_backend(settings: dict) -> None:
     except Exception as e:
         _log(f"apply: kein Manager ({e})")
     if det is not None:
-        _apply("sensitivity", lambda: det.set_sensitivity(s["sensitivity"]))
-        _apply("smoothing", lambda: det.set_smoothing(s["smoothing"]))
+        _apply("beat_latency_ms", lambda: det.set_beat_latency_ms(s["beat_latency_ms"]))
     if mgr is not None:
         _apply("bounds", lambda: mgr.set_bounds(s["min_bpm"], s["max_bpm"]))
         _apply("mode", lambda: mgr.set_mode(s["mode"]))
         if hasattr(mgr, "set_beats_per_bar"):
             _apply("beats_per_bar", lambda: mgr.set_beats_per_bar(s["beats_per_bar"]))
-            _apply("subdivision", lambda: mgr.set_subdivision(s["subdivision"]))
+            _apply("subdivision", lambda: mgr.set_subdivision(1))
 
     def _phase():
         from src.core.audio.music_show import get_music_director
@@ -306,11 +338,16 @@ def apply_to_backend(settings: dict) -> None:
 
 def start_auto_if_configured(settings: dict) -> bool:
     """Startet die konfigurierte Audio-Quelle (``source``: Loopback, Eingang mit
-    ``device`` bzw. OS2L-Server); ``off``/``song`` starten nichts. ``device``
-    gilt nur fuer den Eingang — ein Loopback bekommt None und loest sein
-    Ausgabegeraet selbst auf (wie der Live-Wechsel im BPM-Tab). Danach wird der
-    gespeicherte Manager-``mode`` erneut gesetzt, weil ``use_audio_source(True)``
-    AUTO erzwingt — Capture haengt an der Quelle, der Modus am Manager.
+    ``device`` bzw. OS2L-Server); ``off``/``song`` starten nichts. Laeuft ueber
+    den ``SourceController`` (EINE Stelle fuer Capture/OS2L/Manager, S4): der
+    merkt sich den Eintrag, damit der erste Klick auf denselben Eintrag im Tab
+    „Erkennung" idempotent bleibt (sonst Doppelstart + Detektor-Reset an der
+    Boot-Kante). ``device`` gilt nur fuer den Eingang — ein Loopback bekommt
+    None und loest sein Ausgabegeraet selbst auf. Der gespeicherte Manager-
+    ``mode`` wird vor dem Schalten gesetzt und vom Controller nach
+    ``use_audio_source(True)`` (erzwingt AUTO) wiederhergestellt — Capture haengt
+    an der Quelle, der Modus am Manager. Ein bereits aktiver Eintrag (Tab war
+    schneller) wird nicht erneut geschaltet; die Rueckgabe bleibt True.
     In Tests/Headless via ``LIGHTOS_NO_AUDIO_AUTOSTART`` unterdrueckbar."""
     if os.environ.get("LIGHTOS_NO_AUDIO_AUTOSTART"):
         return False
@@ -320,17 +357,10 @@ def start_auto_if_configured(settings: dict) -> bool:
         return False
     try:
         from src.core.engine.bpm_manager import get_bpm_manager
+        from src.ui.bpm_source_controller import get_source_controller
         mgr = get_bpm_manager()
-        if source == "os2l":
-            # OS2L ist der externe Treiber: KEIN Audio-Capture starten.
-            mgr.use_audio_source(False)
-            from src.core.audio.os2l import get_os2l_server
-            get_os2l_server().start()
-        else:
-            from src.core.audio.capture import get_audio_capture
-            get_audio_capture().set_source_mode(source, device if source == "input" else None)
-            mgr.use_audio_source(True)
         mgr.set_mode(mode)
+        get_source_controller().apply(source, device if source == "input" else None)
         return True
     except Exception as e:
         _log(f"auto-start error: {e}")

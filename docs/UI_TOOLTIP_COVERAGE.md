@@ -18,7 +18,7 @@ abzubauen ist jederzeit erlaubt (Baseline in der Skript-Datei nachziehen).
 |---|---|---:|---:|---:|
 | `audio_input_view.py` | `AudioInputView` | 4 | 0 | 0 |
 | `bpm_generator_view.py` | `BpmGeneratorView` | 13 | 0 | 0 |
-| `bpm_manager_view.py` | `BpmManagerView` | 22 | 0 | 0 |
+| `bpm_manager_view.py` | `BpmManagerView` | 13 | 0 | 0 |
 | `channel_groups_view.py` | `ChannelGroupsView` | 4 | 1 | 1 |
 | `curve_library_view.py` | `CurveLibraryView` | 5 | 0 | 0 |
 | `dmx_monitor_view.py` | `DmxMonitorView` | 0 | 0 | 0 |

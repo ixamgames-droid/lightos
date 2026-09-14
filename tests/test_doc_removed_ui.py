@@ -75,6 +75,16 @@ _ENTFERNT = {
                        "Live-Edit-Panel: Effekt hineinziehen, Ziele ankreuzen "
                        "(docs/LIVE_EDIT_FENSTER.md)"),
     "🟦 Chase-Bereich": ("2026-07 (Live-Edit-Panel)", "s. 🎨 Color-Chase"),
+    # BPM-09 (2026-09-14, S4): der Sub-Tab „Erkennung" ersetzt die Gruppe
+    # „Einstellungen" des Manager-Tabs. Nur Literale, die danach in src/ fehlen —
+    # „Empfindlichkeit"/„Glättung" NICHT: die Woerter leben in fixture_db.py
+    # (Sound-Empfindlichkeit) bzw. laser_draw_editor.py (Glättungs-Stufen).
+    "Genre-Preset": ("2026-09-14 (BPM-09)",
+                     "Menue 'Vorlage' in Erweitert (setzt nur Tempo-Bereich + Beats/Takt)"),
+    "Analyse-Song": ("2026-09-14 (BPM-09)",
+                     "Quelle 'Lied-Analyse (Player)' nimmt den im Player geladenen Titel"),
+    "Unterteilung": ("2026-09-14 (BPM-09)",
+                     "entfaellt ersatzlos (Sub-Ticks gibt es nicht mehr; bpm_settings v3)"),
     # NICHT aufgenommen: „Controller-Vorlage". Die Gegenprobe dieses Gates hat
     # das zurueckgewiesen, und sie hatte recht — weggefallen ist nur der
     # gleichnamige BAUKASTEN-BLOCK, die Funktion selbst lebt

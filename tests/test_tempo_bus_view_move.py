@@ -12,7 +12,7 @@ wuerde:
     zusammen (Risiko laut plan.md: doppelte Abos, wenn kopiert statt
     verschoben) — und es stammt aus ``TempoBusView``.
 (d) Sektion BPM des Hauptfensters hat die drei Sub-Tabs
-    Manager | Tempo-Buses | Generator.
+    Erkennung | Tempo-Buses | Generator (Sub-Tab „Erkennung" seit BPM-09, vorher „Manager").
 """
 from __future__ import annotations
 
@@ -138,7 +138,7 @@ def _visible_controls(view: QWidget) -> list[QWidget]:
 
 
 def test_control_counts_after_move(_isolated_prefs):
-    """Abnahme plan.md S3: Manager 48 -> 29, Tempo-Buses 18 (13 - 1 + 6).
+    """Abnahme plan.md S3: Manager 48 -> 29 (seit S4: 6, roh 7), Tempo-Buses 18 (13 - 1 + 6).
 
     Gezaehlt werden SICHTBARE ``QAbstractButton``/``QComboBox``/
     ``QAbstractSpinBox``/``QSlider`` (Qt-interne Helfer wie der
@@ -155,7 +155,9 @@ def test_control_counts_after_move(_isolated_prefs):
     mgr_view = _make(BpmManagerView)
     tb_view = _make(TempoBusView)
     try:
-        assert len(_visible_controls(mgr_view)) == 29
+        # BPM-09 (S4): Standardansicht 6 Bedienelemente — roh 7, weil Auto | Manuell
+        # zwei QToolButtons EINER exklusiven Gruppe sind (tests/test_bpm_view_layout.py).
+        assert len(_visible_controls(mgr_view)) == 7
         assert len(_visible_controls(tb_view)) == 13
         labels = {getattr(w, "text", lambda: "")() for w in _visible_controls(tb_view)}
         assert "Aktualisieren" not in labels, "zweiter Knopf muss entfallen (BPM-08)"
@@ -204,7 +206,7 @@ def test_main_window_bpm_section_has_three_sub_tabs(_isolated_prefs):
             tabs = tabs.parentWidget()
         assert tabs is not None
         assert [tabs.tabText(i) for i in range(tabs.count())] == \
-            ["Manager", "Tempo-Buses", "Generator"]
+            ["Erkennung", "Tempo-Buses", "Generator"]
         assert isinstance(win._bpm_manager_view, BpmManagerView)
     finally:
         win.close(); win.deleteLater(); _app.processEvents()

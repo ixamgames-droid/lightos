@@ -191,7 +191,7 @@ def test_bpm_settings_roundtrip(tmp_path, monkeypatch):
     monkeypatch.setattr(bs, "_PREFS_DIR", str(tmp_path))
     monkeypatch.setattr(bs, "_PREFS_PATH", str(p))
     s = bs.load_settings()
-    assert s["version"] == 2 and s["source"] == "loopback" and s["min_bpm"] == 60
+    assert s["version"] == 3 and s["source"] == "loopback" and s["min_bpm"] == 60
     s.update({"min_bpm": 100, "max_bpm": 175, "source": "input",
               "device": "USB Audio CODEC Analog Stereo", "mode": "manual"})
     bs.save_settings(s)
@@ -203,28 +203,29 @@ def test_bpm_settings_roundtrip(tmp_path, monkeypatch):
     data = json.loads(p.read_text(encoding="utf-8"))
     data["other"] = {"x": 1}
     p.write_text(json.dumps(data), encoding="utf-8")
-    bs.save_settings({"smoothing": 0.5})
+    bs.save_settings({"beat_latency_ms": 25})
     data2 = json.loads(p.read_text(encoding="utf-8"))
     assert data2["other"] == {"x": 1}
-    assert data2["bpm_settings"]["smoothing"] == 0.5
+    assert data2["bpm_settings"]["beat_latency_ms"] == 25
     assert data2["bpm_settings"]["min_bpm"] == 100   # bestehende Werte bleiben
-    assert data2["bpm_settings"]["version"] == 2
+    assert data2["bpm_settings"]["version"] == 3
 
 
 def test_bpm_settings_apply_to_backend(monkeypatch):
     from src.core.audio import bpm_settings as bs
     from src.core.engine.bpm_manager import get_bpm_manager, BpmMode
     from src.core.audio.beat_detector import get_beat_detector
-    bs.apply_to_backend({"sensitivity": 2.0, "smoothing": 0.5,
+    bs.apply_to_backend({"beat_latency_ms": 30,
                          "min_bpm": 110, "max_bpm": 150, "mode": "manual"})
     det = get_beat_detector()
     mgr = get_bpm_manager()
-    assert det.sensitivity == 2.0 and det.smoothing == 0.5
+    assert det.beat_latency_ms == 30                 # v3 (S4): statt sens/smooth
     assert det.min_bpm == 110 and det.max_bpm == 150
     assert mgr.min_bpm == 110 and mgr.max_bpm == 150   # in den Manager gespiegelt
     assert mgr.mode == BpmMode.MANUAL
     # Aufraeumen fuer andere Tests
     mgr.set_mode(BpmMode.AUTO)
+    det.set_beat_latency_ms(0)
 
 
 # ── reset()-Threadsicherheit (BPM-04) ────────────────────────────────────────

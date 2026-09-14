@@ -161,18 +161,19 @@ def test_meter_settings_persist(tmp_path, monkeypatch):
     monkeypatch.setattr(bs, "_PREFS_DIR", str(tmp_path))
     monkeypatch.setattr(bs, "_PREFS_PATH", str(tmp_path / "ui_prefs.json"))
     s = bs.load_settings()
-    assert s["beats_per_bar"] == 4 and s["subdivision"] == 1
+    assert s["beats_per_bar"] == 4 and "subdivision" not in s   # v3 (S4): kein Setting mehr
     s.update({"beats_per_bar": 16, "subdivision": 4})
     bs.save_settings(s)
     s2 = bs.load_settings()
-    assert s2["beats_per_bar"] == 16 and s2["subdivision"] == 4
+    assert s2["beats_per_bar"] == 16 and "subdivision" not in s2
 
 
 def test_meter_apply_to_backend():
     from src.core.audio import bpm_settings as bs
     from src.core.engine.bpm_manager import get_bpm_manager
-    bs.apply_to_backend({"beats_per_bar": 16, "subdivision": 4})
     mgr = get_bpm_manager()
-    assert mgr.beats_per_bar == 16 and mgr.subdivision == 4
+    mgr.set_subdivision(4)
+    bs.apply_to_backend({"beats_per_bar": 16})
+    # S4 (v3): subdivision ist kein Setting mehr — apply setzt sie auf 1 (aus)
+    assert mgr.beats_per_bar == 16 and mgr.subdivision == 1
     mgr.set_beats_per_bar(4)             # Aufraeumen fuer andere Tests
-    mgr.set_subdivision(1)
