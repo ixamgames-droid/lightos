@@ -76,7 +76,7 @@ class TempoTracker:
     PRIOR_SIGMA = 0.9       # Oktaven (Ellis 2007)
     HINT_SIGMA = 0.15       # Oktaven, bei set_tempo_hint
     SUB_OCT_PENALTY = 1.0   # Kamm: Sub-Oktav-Strafe (s. _estimate), 0 = aus
-    SUB_OCT_TAU = 0.5       # ... nur der Anteil von acm[Lag/2] ueber TAU x acm[Lag] zaehlt
+    SUB_OCT_TAU = 0.7       # ... nur der Anteil von acm[Lag/2] ueber TAU x acm[Lag] zaehlt
     EST_SMOOTH = True       # Huellkurve vor der ACF gaussisch glaetten (SMOOTH_SIGMA Frames)
     SMOOTH_SIGMA = 1.0      # Frames (~12 ms); Spitzen zwischen zwei Lags verlieren sonst ACF-Hoehe
     HARM_WIDE = True        # Max-Filter +-2 an den Oberwellen 3 und 4
@@ -232,18 +232,26 @@ class TempoTracker:
             np.maximum(acm2[1:-1], acm[2:], out=acm2[1:-1])
         else:
             acm2 = acm
+        # Kamm, normiert auf die im Fenster verfuegbaren Oberwellen: bei kurzem Fenster
+        # (Aufwaermphase, SHORT_S) fehlen langsamen Kandidaten die 3./4. Oberwelle, der
+        # doppelt so schnelle hat alle — unnormiert kippt Kick+Bass+Hats 90 beim Einrasten
+        # auf 180 (Bank-Fall 03: 9,3 s Einrastzeit, 8 Fehlalarme)
         sc = acm[L].copy()
+        wsum = np.ones(nl)
         for h in (2, 3, 4):
             idx = L * h
             m = idx < M
             sc[m] += (acm if h == 2 else acm2)[idx[m]] / h
+            wsum[m] += 1.0 / h
+        sc *= (1.0 + 1.0 / 2 + 1.0 / 3 + 1.0 / 4) / wsum
         # Sub-Oktav-Strafe: ist die Spitze beim HALBEN Lag fast so hoch wie die eigene, ist
         # der Kandidat die halbe Oktave eines schnelleren Pulses. Ohne sie ist der Kamm fuer
         # reine Pulszuege symmetrisch (alle Vielfachen gleich hoch) und allein der Prior
         # entscheidet — der kippt ab 120*sqrt(2) = 170 BPM zur halben Oktave (Kick 185 -> 92).
-        # Nur der Ueberschuss ueber TAU x eigene Spitze zaehlt: Pulszug 0,94 (voll bestraft),
-        # Hats auf Achteln 0,64 / Backbeat-Kick 0,75 (kaum) — die schnelle Oktave selbst hat
-        # beim halben Lag nichts (ac ~ 0).
+        # Nur der Ueberschuss ueber TAU x eigene Spitze zaehlt: Pulszug 0,94 (bestraft),
+        # Hats auf Achteln 0,64 (Bank-Fall 03_kick_bass_hats_90: unter TAU, sonst kippt er beim
+        # Einrasten auf 180) / Backbeat-Kick 0,75-0,78 (kaum) — die schnelle Oktave selbst
+        # hat beim halben Lag nichts (ac ~ 0).
         own = np.maximum(acm[L], 0.0)
         half = np.maximum(acm[np.rint(L / 2.0).astype(np.intp)], 0.0)
         sc -= (self.SUB_OCT_PENALTY / (1.0 - self.SUB_OCT_TAU)) * np.maximum(half - self.SUB_OCT_TAU * own, 0.0)

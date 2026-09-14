@@ -140,6 +140,33 @@ def _kick_snare24(bpm: float, seconds: float) -> np.ndarray:
     return buf
 
 
+def _song(bpm: float, seconds: float, hats16: bool, pad_db: float = -20.0) -> np.ndarray:
+    """Dichtes Material: Kick + Snare 2/4 + Bass-Achtel + Hats (Achtel/Sechzehntel) + Pad."""
+    n = int(seconds * SR)
+    x = np.zeros(n, np.float32)
+    P = 60.0 / bpm
+    t, i = 0.0, 0
+    while t < seconds:
+        _place(x, t, _kick(SR))
+        if i % 2 == 1:
+            _place(x, t, _snare(SR))
+        _place(x, t, _bass(SR, 0.22, 55.0, amp=0.4))
+        _place(x, t + P / 2, _bass(SR, 0.2, 55.0, amp=0.3))
+        if hats16:
+            for q in (0.25, 0.5, 0.75):
+                _place(x, t + q * P, _hihat(SR, amp=0.3 if q == 0.5 else 0.2, seed=7))
+        else:
+            _place(x, t + P / 2, _hihat(SR, amp=0.3, seed=7))
+        t += P
+        i += 1
+    tt = np.arange(n) / SR
+    rng = np.random.default_rng(3)
+    pad = (np.sin(2 * np.pi * 220 * tt) + np.sin(2 * np.pi * 277.2 * tt) + np.sin(2 * np.pi * 329.6 * tt)) / 3
+    noise = np.convolve(rng.standard_normal(n), np.ones(32) / 32, mode="same")
+    x += (10 ** (pad_db / 20) * (pad + noise)).astype(np.float32)
+    return np.clip(x, -1, 1).astype(np.float32)
+
+
 # ── Runner mit Roh-Tempo im Verlauf ──────────────────────────────────────────
 
 class _Run:
@@ -180,6 +207,14 @@ def test_comb_max_filter_kick_bass_hats_174_never_116():
     assert abs(run.det.get_raw_bpm() - 174.0) <= 2.0, run.det.get_raw_bpm()
     assert abs(run.det.get_bpm() - 174.0) <= 2.0
     assert not [r for r in run.rows if 110.0 < r[4] < 122.0], "Roh-Tempo lag im 2/3-Tal 110..122"
+
+
+def test_comb_max_filter_dense_128_not_64():
+    """Dichtes Material (Kick, Snare 2/4, Bass-Achtel, Hats, Pad) bei 128: ohne Max-Filter an
+    den Oberwellen kippt es auf 64."""
+    run = _Run().feed(_song(128.0, 10.0, hats16=False))
+    assert abs(run.det.get_bpm() - 128.0) <= 1.3, run.det.get_bpm()
+    assert run.det.snapshot().alt_score <= 0.9, run.det.snapshot()
 
 
 # ── (b1/b2) Hysterese ────────────────────────────────────────────────────────
@@ -242,11 +277,12 @@ def test_highpass_blocks_dc_passes_audio():
 
 
 def test_dc_step_keeps_confidence():
-    """Kick -20 dB, nach 5 s springt ein DC-Versatz von 0,3 auf (Geraetewechsel/Steckkontakt):
-    ohne Hochpass faellt die Konfidenz auf ~0,66, mit bleibt sie bei 1."""
-    sig, beats = _track(_kick(SR, amp=0.08), 128.0, 10.0)
+    """Kick -30 dB, nach 5 s springt ein DC-Versatz von 0,5 auf (Geraetewechsel/Steckkontakt):
+    ohne Hochpass hebt der DC-Bin den Whitening-Floor, die Konfidenz faellt auf ~0,6 —
+    mit bleibt sie bei 1."""
+    sig, beats = _track(_kick(SR, amp=0.025), 128.0, 10.0)
     sig = sig.copy()
-    sig[int(5.0 * SR):] += 0.3
+    sig[int(5.0 * SR):] += 0.5
     run = _Run().feed(sig)
     assert run.det.snapshot().state == "locked"
     assert abs(run.det.get_bpm() - 128.0) <= 1.3
@@ -263,11 +299,17 @@ def test_bounds_fold_down_keeps_min_beat_spacing():
     sig, _ = _kick128()
     run = _Run().feed(sig)
     assert run.det.snapshot().state == "locked"
+    more, _ = _track(_kick(SR), 128.0, 8.0)
+    # bis kurz (< 1 Chunk) vor den naechsten geplanten Beat fuettern, DANN den Bereich setzen —
+    # der Beat ist dann vor der naechsten Schaetzung faellig, nur beat_due selbst kann ihn halten
+    i = 0
+    while run.det.sample_pos + 1024 < run.det.snapshot().next_beat_sample:
+        run.det.process_chunk(more[i:i + 1024])
+        i += 1024
     n0 = len(run.beats)
     run.det.set_bounds(30, 50)
     assert abs(run.det.get_bpm() - 32.0) <= 0.5, run.det.get_bpm()
-    more, _ = _track(_kick(SR), 128.0, 8.0)
-    run.feed(more)
+    run.feed(more[i:])
     new = run.beats[n0 - 1:]
     assert len(new) >= 3
     assert np.min(np.diff(new)) >= 0.5 * 60.0 / 32.0, np.diff(new)
