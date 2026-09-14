@@ -191,11 +191,13 @@ def test_bpm_settings_roundtrip(tmp_path, monkeypatch):
     monkeypatch.setattr(bs, "_PREFS_DIR", str(tmp_path))
     monkeypatch.setattr(bs, "_PREFS_PATH", str(p))
     s = bs.load_settings()
-    assert s["auto_default"] is True and s["min_bpm"] == 60
-    s.update({"min_bpm": 100, "max_bpm": 175, "source_mode": "input"})
+    assert s["version"] == 2 and s["source"] == "loopback" and s["min_bpm"] == 60
+    s.update({"min_bpm": 100, "max_bpm": 175, "source": "input",
+              "device": "USB Audio CODEC Analog Stereo", "mode": "manual"})
     bs.save_settings(s)
     s2 = bs.load_settings()
-    assert s2["min_bpm"] == 100 and s2["max_bpm"] == 175 and s2["source_mode"] == "input"
+    assert s2["min_bpm"] == 100 and s2["max_bpm"] == 175 and s2["source"] == "input"
+    assert s2["device"] == "USB Audio CODEC Analog Stereo" and s2["mode"] == "manual"
     # Fremde ui_prefs-Keys in derselben Datei bleiben erhalten
     import json
     data = json.loads(p.read_text(encoding="utf-8"))
@@ -206,6 +208,7 @@ def test_bpm_settings_roundtrip(tmp_path, monkeypatch):
     assert data2["other"] == {"x": 1}
     assert data2["bpm_settings"]["smoothing"] == 0.5
     assert data2["bpm_settings"]["min_bpm"] == 100   # bestehende Werte bleiben
+    assert data2["bpm_settings"]["version"] == 2
 
 
 def test_bpm_settings_apply_to_backend(monkeypatch):
@@ -213,7 +216,7 @@ def test_bpm_settings_apply_to_backend(monkeypatch):
     from src.core.engine.bpm_manager import get_bpm_manager, BpmMode
     from src.core.audio.beat_detector import get_beat_detector
     bs.apply_to_backend({"sensitivity": 2.0, "smoothing": 0.5,
-                         "min_bpm": 110, "max_bpm": 150, "mode_default": "manual"})
+                         "min_bpm": 110, "max_bpm": 150, "mode": "manual"})
     det = get_beat_detector()
     mgr = get_bpm_manager()
     assert det.sensitivity == 2.0 and det.smoothing == 0.5

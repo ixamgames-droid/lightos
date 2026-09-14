@@ -61,6 +61,14 @@ class BpmManagerView(QWidget):
         self._det = get_beat_detector() if get_beat_detector else None
         self._loading = True            # unterdrueckt Save/Backend waehrend Init
         self._beat_phase = 0
+        # Entprellung (BPM-07): ein Sliderzug loest hunderte valueChanged aus —
+        # gesammelt wird EIN Schreibvorgang 400 ms nach dem letzten Tick.
+        # hideEvent/closeEvent schreiben Ausstehendes sofort (flush_pending_save).
+        self._save_timer = QTimer(self)
+        self._save_timer.setSingleShot(True)
+        self._save_timer.setInterval(400)
+        self._save_timer.timeout.connect(self._write_settings)
+        self._source_pref = bpm_settings.DEFAULTS["source"]
 
         self._build_ui()
         self._load_into_controls()
@@ -896,33 +904,34 @@ class BpmManagerView(QWidget):
     # ── Init-Werte ────────────────────────────────────────────────────────────
 
     def _load_into_controls(self):
-        s = bpm_settings.load_settings()
-        self._sp_min.setValue(int(s.get("min_bpm", 60)))
-        self._sp_max.setValue(int(s.get("max_bpm", 200)))
-        sens = float(s.get("sensitivity", 1.3))
+        """Regler aus dem BACKEND-Zustand fuellen (Manager/Detektor/Director).
+        ``bpm_settings.boot()`` hat die Datei beim App-Start bereits angewandt —
+        eine Default-Quelle (``bpm_settings.DEFAULTS``), kein zweites Anwenden
+        hier. Nur Audio-Quelle und Geraet kommen aus den Prefs: dafuer gibt es
+        keinen Backend-Stand (Capture kann gestoppt oder ``off`` sein)."""
+        D = bpm_settings.DEFAULTS
+        mgr = self._mgr
+        self._sp_min.setValue(int(mgr.min_bpm))
+        self._sp_max.setValue(int(mgr.max_bpm))
+        sens = float(getattr(self._det, "sensitivity", D["sensitivity"]))
         self._sl_sens.setValue(int(round(sens * 100)))
         self._lbl_sens.setText(f"{sens:.2f}")
-        sm = float(s.get("smoothing", 0.3))
+        sm = float(getattr(self._det, "smoothing", D["smoothing"]))
         self._sl_smooth.setValue(int(round(sm * 100)))
         self._lbl_smooth.setText(f"{sm:.2f}")
 
-        # Takt-Raster (Controls + live in den Manager spiegeln)
-        bpb = int(s.get("beats_per_bar", 4))
-        sub = int(s.get("subdivision", 1))
-        self._sp_bpb.setValue(max(1, min(32, bpb)))
-        si = self._cmb_subdiv.findData(sub)
+        # Takt-Raster (Spinbox klemmt selbst auf ihren Bereich)
+        self._sp_bpb.setValue(int(mgr.beats_per_bar))
+        si = self._cmb_subdiv.findData(int(mgr.subdivision))
         self._cmb_subdiv.setCurrentIndex(si if si >= 0 else 0)
-        self._mgr.set_beats_per_bar(bpb)
-        self._mgr.set_subdivision(sub)
 
-        # Taktgenaue Wiedergabe (Lied-Analyse) + in den Director spiegeln
-        pa = bool(s.get("phase_accurate_beats", True))
-        self._chk_phase.setChecked(pa)
+        # Taktgenaue Wiedergabe (Lied-Analyse)
         try:
             from src.core.audio.music_show import get_music_director
-            get_music_director().set_phase_accurate(pa)
+            pa = bool(get_music_director().is_phase_accurate())
         except Exception:
-            pass
+            pa = D["phase_accurate_beats"]
+        self._chk_phase.setChecked(pa)
 
         # Geraeteliste fuellen
         try:
@@ -932,19 +941,23 @@ class BpmManagerView(QWidget):
             devs = []
         self._cmb_device.clear()
         self._cmb_device.addItems(devs or ["(kein Eingang gefunden)"])
-        dev = s.get("input_device")
+
+        # Quelle + Geraet aus den Prefs (v2: source/device)
+        s = bpm_settings.load_settings()
+        dev = s["device"]
         if dev and dev in devs:
             self._cmb_device.setCurrentText(dev)
-
-        # Quelle
-        sm_mode = s.get("source_mode", "loopback")
-        if sm_mode == "input":
+        self._source_pref = s["source"]
+        if self._source_pref == "input":
             self._rb_input.setChecked(True)
             self._cmb_device.setEnabled(True)
-        elif sm_mode == "os2l":
+        elif self._source_pref == "os2l":
             self._rb_os2l.setChecked(True)
             self._cmb_device.setEnabled(False)
         else:
+            # loopback — und bis S4 ohne eigenen Schalter auch song/off; der
+            # gespeicherte Wert bleibt in _source_pref, bis der Nutzer die
+            # Quelle selbst umschaltet (_on_source_changed).
             self._rb_loop.setChecked(True)
 
         # Modus aus dem Manager (Live-Zustand gewinnt)
@@ -1100,6 +1113,7 @@ class BpmManagerView(QWidget):
                 self._mgr.use_audio_source(True)
         except Exception as e:
             print(f"[BpmManagerView] source change: {e}")
+        self._source_pref = self._source_from_radios()
         self._save()
 
     def _on_bounds_changed(self, _v=0):
@@ -1255,29 +1269,45 @@ class BpmManagerView(QWidget):
             print(f"[BpmManagerView] phase toggle error: {e}")
         self._save()
 
+    def _source_from_radios(self) -> str:
+        if self._rb_input.isChecked():
+            return "input"
+        if self._rb_os2l.isChecked():
+            return "os2l"
+        return "loopback"
+
     def _save(self):
+        """Entprellt speichern: (Neu-)Start des 400-ms-Single-Shots — aus 250
+        Slider-Ticks wird EIN Schreibvorgang (BPM-07)."""
         if self._loading:
             return
-        if self._rb_input.isChecked():
-            source_mode = "input"
-        elif self._rb_os2l.isChecked():
-            source_mode = "os2l"
-        else:
-            source_mode = "loopback"
+        self._save_timer.start()
+
+    def flush_pending_save(self) -> bool:
+        """Schreibt eine ausstehende Aenderung SOFORT (hideEvent/closeEvent/Tests).
+        True, wenn tatsaechlich geschrieben wurde."""
+        if not self._save_timer.isActive():
+            return False
+        self._save_timer.stop()
+        self._write_settings()
+        return True
+
+    def _write_settings(self):
+        """Der eigentliche Schreibvorgang (v2-Keys: source/device/mode/…)."""
         dev = self._cmb_device.currentText() or None
         if dev and dev.startswith("("):
             dev = None
         bpm_settings.save_settings({
-            "mode_default": "auto" if self._rb_auto.isChecked() else "manual",
+            "source": self._source_pref,
+            "device": dev,
+            "mode": "auto" if self._rb_auto.isChecked() else "manual",
             "min_bpm": self._sp_min.value(),
             "max_bpm": self._sp_max.value(),
+            "beats_per_bar": self._sp_bpb.value(),
+            "phase_accurate_beats": self._chk_phase.isChecked(),
             "sensitivity": self._sl_sens.value() / 100.0,
             "smoothing": self._sl_smooth.value() / 100.0,
-            "source_mode": source_mode,
-            "input_device": dev,
-            "beats_per_bar": self._sp_bpb.value(),
             "subdivision": int(self._cmb_subdiv.currentData() or 1),
-            "phase_accurate_beats": self._chk_phase.isChecked(),
         })
 
     # ── Sichtbarkeit: Poll-Timer nur im Vordergrund ───────────────────────────
@@ -1290,5 +1320,10 @@ class BpmManagerView(QWidget):
         super().showEvent(e)
 
     def hideEvent(self, e):
+        self.flush_pending_save()
         self._poll.stop()
         super().hideEvent(e)
+
+    def closeEvent(self, e):
+        self.flush_pending_save()
+        super().closeEvent(e)
