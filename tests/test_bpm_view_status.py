@@ -141,6 +141,10 @@ class FakeRec:
 @pytest.fixture
 def env(monkeypatch):
     import src.core.audio.capture as cap_mod
+    # Die View liest capture.HAS_SOUNDCARD fuer „Audio nicht verfuegbar“. Ohne Audio-Server
+    # (CI) ist das Flag False und diese Regel verdraengt jede andere Zeile — die Tests
+    # pruefen aber die uebrigen Situationen und muessen unabhaengig vom Rechner sein.
+    monkeypatch.setattr(cap_mod, "HAS_SOUNDCARD", True)
     monkeypatch.setattr(cap_mod.AudioCapture, "start", lambda self: False)
     cap = FakeCap()
     monkeypatch.setattr(cap_mod, "get_audio_capture", lambda: cap)
