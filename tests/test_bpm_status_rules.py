@@ -180,17 +180,21 @@ def _brumm():
     return status_line(cap(**NETZ), det(state="searching", hum_ratio=0.8, hum_hz=50), PC, None, 0)
 
 
+def _leise():
+    return status_line(cap(rms_dbfs_300ms=-44.0, rms_dbfs_1s=-44.0), det(), PC, None, 0)
+
+
 def test_hysterese_2s_an_3s_aus():
     h = StatusHysterese(clock=lambda: 0.0)
     assert h.update(_ok(), 0.0).key == "ok"
     t = 10.0
-    assert h.update(_brumm(), t).key == "ok"
-    assert h.update(_brumm(), t + 1.9).key == "ok"
-    assert h.update(_brumm(), t + 2.0).key == "brumm"
-    assert h.update(_brumm(), t + 5.0).key == "brumm"
+    assert h.update(_leise(), t).key == "ok"
+    assert h.update(_leise(), t + 1.9).key == "ok"
+    assert h.update(_leise(), t + 2.0).key == "leise"
+    assert h.update(_leise(), t + 5.0).key == "leise"
     t2 = t + 5.0
-    assert h.update(_ok(), t2 + 0.05).key == "brumm"
-    assert h.update(_ok(), t2 + 2.95).key == "brumm"
+    assert h.update(_ok(), t2 + 0.05).key == "leise"
+    assert h.update(_ok(), t2 + 2.95).key == "leise"
     assert h.update(_ok(), t2 + 3.0).key == "ok"
 
 
@@ -199,8 +203,8 @@ def test_hysterese_kurzes_flackern_zeigt_nichts():
     h.update(_ok(), 0.0)
     for i in range(20):                       # 1,5 s an, 0,5 s aus im Wechsel
         t = i * 2.0
-        assert h.update(_brumm(), t).key == "ok"
-        assert h.update(_brumm(), t + 1.5).key == "ok"
+        assert h.update(_leise(), t).key == "ok"
+        assert h.update(_leise(), t + 1.5).key == "ok"
         assert h.update(_ok(), t + 1.6).key == "ok"
 
 
@@ -212,8 +216,68 @@ def test_hysterese_zustandszeilen_sofort_und_messwert_aktualisiert():
     assert h.update(err, 0.1).key == "capture_fehler"        # Fehler sofort
     h2 = StatusHysterese()
     h2.update(_brumm(), 0.0)
+    assert h2.update(_brumm(), 2.0).key == "brumm"
     b2 = status_line(cap(**NETZ), det(state="searching", hum_ratio=0.55, hum_hz=50), PC, None, 0)
-    assert "55 %" in h2.update(b2, 0.05).ursache
+    assert "55 %" in h2.update(b2, 2.05).ursache
+
+
+def _sucht():
+    return status_line(cap(), det(state="searching", signal_s=3.0, window_filled_s=3.0), PC, None, 0)
+
+
+def _leise_sucht():
+    return status_line(cap(rms_dbfs_300ms=-44.0, rms_dbfs_1s=-44.0),
+                       det(state="searching", signal_s=3.0, window_filled_s=3.0), PC, None, 0)
+
+
+def test_hysterese_ein_frame_sucht_verdraengt_gehaltenes_leise_nicht():
+    h = StatusHysterese()
+    assert h.update(_sucht(), 0.0).key == "sucht"
+    t = 0.0
+    while t < 3.0:                                   # 3 s LEISE im Zustand „searching"
+        h.update(_leise_sucht(), t)
+        t = round(t + 0.05, 2)
+    assert h.shown.key == "leise"
+    assert h.update(_sucht(), 3.0).key == "leise"   # 1 Frame −39,9 dBFS: LEISE bleibt
+    assert h.update(_leise_sucht(), 3.05).key == "leise"
+    for i in range(40):                              # Wert schwankt frameweise um −40 dBFS
+        tt = 3.1 + i * 0.05
+        assert h.update(_sucht() if i % 2 else _leise_sucht(), tt).key == "leise"
+    assert h.update(_sucht(), 5.05).key == "leise"
+    assert h.update(_sucht(), 8.05).key == "sucht"  # erst nach 3 s ohne LEISE
+
+
+def test_hysterese_erstes_update_zeigt_stoerung_erst_nach_2_s():
+    kein = status_line(cap(rms_dbfs_300ms=-70.0, rms_dbfs_1s=-70.0), det(state="no_signal", hold_stage=3),
+                       IN, None, 0)
+    assert kein.key == "kein_signal" and kein.basis is not None and kein.basis.key == "sucht"
+    h = StatusHysterese()
+    assert h.update(kein, 1.0).key == "sucht"
+    assert h.update(kein, 2.9).key == "sucht"
+    assert h.update(kein, 3.0).key == "kein_signal"
+    h2 = StatusHysterese()
+    dc = status_line(cap(dc_offset=0.03), det(), IN, None, 0)
+    assert h2.update(dc, 0.02).key == "ok"           # kein kurzes Aufblitzen beim Start
+    assert h2.update(_ok(), 0.07).key == "ok"
+
+
+def test_hysterese_fehler_und_quellenwechsel_verdraengen_stoerung_sofort():
+    h = StatusHysterese()
+    h.update(_leise(), 0.0)
+    assert h.update(_leise(), 2.0).key == "leise"
+    aus = status_line(None, None, MgrState(kind="off"), None, 0)
+    assert h.update(aus, 2.05).key == "aus"          # Handlung (Quelle aus): sofort
+    h.update(_leise(), 3.0)
+    assert h.update(_leise(), 5.0).key == "leise"
+    err = status_line(cap(running=False), None, replace(PC, capture_error="Aufnahme abgebrochen: x"), None, 0)
+    assert h.update(err, 5.05).key == "capture_fehler"
+
+
+def test_basis_nicht_stabil_und_unabhaengig_von_gleichheit():
+    b = _brumm()
+    assert b.stabil and not b.basis.stabil and b.basis.key == "sucht"
+    assert b == replace(b, basis=None)
+    assert _ok().basis is None
 
 
 # ── Chips ────────────────────────────────────────────────────────────────────

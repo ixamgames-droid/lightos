@@ -21,7 +21,7 @@ Hinweis-Chips am Pegelmeter mit derselben Hysterese.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 # ── Schwellen (EIN Block) ────────────────────────────────────────────────────
 # ALLE Werte sind Annahmen bis zur ersten echten Aufnahme vom Rig („Eingang 30 s
@@ -72,6 +72,9 @@ class StatusLine:
     aktion: str | None = None    # None | reconnect | record | range | source
     key: str = ""                # Situation (fuer Hysterese/Tests)
     stabil: bool = False         # True = Stoerung mit Hysterese 2 s an / 3 s aus
+    # Nur bei stabil: die Zeile, die OHNE Stoerungen gaelte (Zustandszeile). Die Hysterese
+    # zeigt sie, solange die Stoerung noch nicht 2 s anhaelt (auch beim allerersten Update).
+    basis: "StatusLine | None" = field(default=None, compare=False, repr=False)
 
     @property
     def text(self) -> str:
@@ -169,11 +172,18 @@ def status_line(cap_snap, det_snap, mgr_state: MgrState | None, os2l_state: Os2l
     """Die EINE Statuszeile; erster Treffer gewinnt. Nie leerer Text."""
     m = mgr_state if mgr_state is not None else MgrState()
     o = os2l_state if os2l_state is not None else Os2lState()
+    erste: StatusLine | None = None
     for rule in _RULES:
         line = rule(cap_snap, det_snap, m, o, now)
-        if line is not None:
-            return line
-    return _fallback(m)
+        if line is None:
+            continue
+        if not line.stabil:
+            if erste is None:
+                return line
+            return replace(erste, basis=line)
+        if erste is None:
+            erste = line
+    return replace(erste, basis=_fallback(m)) if erste is not None else _fallback(m)
 
 
 def _r_ereignis(cap, det, m, o, now):
@@ -478,14 +488,21 @@ _RULES = (
 
 _RANG = {"ok": 0, "hinweis": 1, "problem": 2}
 SOFORT_KEYS = ("ereignis", "aufnahme")   # Rueckmeldung auf einen Klick: nie verzoegert
+# Zustandszeilen, die der Detektor von selbst (frameweise) wechselt. Sie verdraengen eine
+# gehaltene Stoerung nur, wenn sie STRIKT schwerer sind — sonst loescht ein einzelner Frame
+# „Sucht" ein gehaltenes LEISE. Alle anderen nicht stabilen Zeilen (Fehler, Quellenwechsel,
+# Manuell, Eingefroren …) folgen einer Handlung oder einem Fehler und gelten ab gleicher Schwere.
+ZUSTAND_KEYS = ("sucht", "ok", "pause", "kein_detektor")
 
 
 class StatusHysterese:
     """Entprellt die Statuszeile. Eine Stoerung (``stabil``) erscheint erst nach
     ``an_s`` Anhalten und verschwindet erst nach ``aus_s`` Abwesenheit; alles
-    andere wechselt sofort (eine sofortige Zeile verdraengt eine gehaltene
-    Stoerung nur, wenn sie mindestens gleich schwer ist). Ereignisse und die
-    laufende Aufnahme (``SOFORT_KEYS``) erscheinen immer sofort. Uhr injizierbar."""
+    andere wechselt sofort. Eine gehaltene Stoerung verdraengen: Zustandszeilen
+    (``ZUSTAND_KEYS``) nur, wenn strikt schwerer; sonstige sofortige Zeilen ab gleicher
+    Schwere; Ereignisse und die laufende Aufnahme (``SOFORT_KEYS``) immer. Solange eine
+    Stoerung noch nicht ``an_s`` anhaelt, zeigt die Hysterese deren ``basis`` (die
+    Zustandszeile darunter) — auch beim ersten Update. Uhr injizierbar."""
 
     def __init__(self, clock=None, an_s: float = AN_S, aus_s: float = AUS_S):
         import time
@@ -507,22 +524,43 @@ class StatusHysterese:
     def update(self, line: StatusLine, now: float | None = None) -> StatusLine:
         t = self._clock() if now is None else float(now)
         shown = self._shown
-        if shown is None or line.key == shown.key or line.key.startswith(SOFORT_KEYS):
-            self._shown, self._shown_seen = line, t
-            self._cand_key = None
-            return line
+        if line.key.startswith(SOFORT_KEYS) or (shown is not None and line.key == shown.key):
+            return self._zeige(line, t)
         if line.key != self._cand_key:
             self._cand_key, self._cand_since = line.key, t
-        weg = (not shown.stabil) or (t - self._shown_seen >= self.aus_s)
         if line.stabil:
-            nimm = (t - self._cand_since >= self.an_s) and (
-                weg or _RANG[line.schwere] > _RANG[shown.schwere])
+            reif = t - self._cand_since >= self.an_s
+            if shown is None:
+                if reif:
+                    return self._zeige(line, t)
+                return self._zeige_basis(line, t)
+            weg = (not shown.stabil) or (t - self._shown_seen >= self.aus_s)
+            if reif and (weg or _RANG[line.schwere] > _RANG[shown.schwere]):
+                return self._zeige(line, t)
+            if not shown.stabil or weg:
+                self._zeige_basis(line, t)       # Zustandszeile darunter aktuell halten
+            return self._shown  # type: ignore[return-value]
+        if shown is None or not shown.stabil or t - self._shown_seen >= self.aus_s:
+            return self._zeige(line, t)
+        if line.key in ZUSTAND_KEYS:
+            nimm = _RANG[line.schwere] > _RANG[shown.schwere]
         else:
-            nimm = weg or _RANG[line.schwere] >= _RANG[shown.schwere]
+            nimm = _RANG[line.schwere] >= _RANG[shown.schwere]
         if nimm:
-            self._shown, self._shown_seen = line, t
-            self._cand_key = None
-        return self._shown  # type: ignore[return-value]
+            return self._zeige(line, t)
+        return shown
+
+    def _zeige(self, line: StatusLine, t: float) -> StatusLine:
+        self._shown, self._shown_seen = line, t
+        self._cand_key = None
+        return line
+
+    def _zeige_basis(self, line: StatusLine, t: float) -> StatusLine:
+        """Stoerung ``line`` noch nicht reif: deren Basis zeigen, Kandidat behalten."""
+        b = line.basis
+        if b is not None:
+            self._shown, self._shown_seen = b, t
+        return self._shown if self._shown is not None else line
 
 
 def chips(cap_snap, det_snap) -> set[str]:

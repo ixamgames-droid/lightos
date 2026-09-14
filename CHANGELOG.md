@@ -19,8 +19,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   z. B. „Kein Signal — Eingang »USB Audio CODEC« liefert −70 dBFS — Kabel/Gerät
   prüfen oder anderen Eingang wählen" oder „Netzbrumm 50 Hz — Brummanteil im
   Bassband 71 % — Masseschleife: DI-Box/Ground-Lift …". Grün = ok, gelb = Hinweis,
-  rot = Problem; eine Störung erscheint erst nach 2 s und bleibt 3 s nach ihrem
-  Ende stehen, damit nichts flackert. Ist die Abhilfe unterstrichen, führt ein
+  rot = Problem; eine Störung erscheint erst nach 2 s (auch direkt nach dem
+  Start) und bleibt 3 s nach ihrem Ende stehen — ein kurzer Wechsel auf „Sucht
+  Tempo" löscht sie nicht —, damit nichts flackert. Ist die Abhilfe unterstrichen, führt ein
   Klick sie aus: **erneut verbinden** nach einem Audio-Fehler, Aufnahme starten,
   „Erweitert" aufklappen oder die Quelle-Liste öffnen. Unter dem Pegelmeter
   zeigen kleine Chips **CLIP**, **BRUMM**, **LEISE**, **AUSSETZER** und **DC**,
