@@ -20,12 +20,22 @@ import time
 from functools import lru_cache
 
 import numpy as np
+import pytest
 
 from src.core.audio.beat_detector import BeatDetector
 from src.core.audio.onset_flux import HighPass
 
-_T0 = time.perf_counter()
+_T0 = None      # Start des ersten Tests DIESER Datei — nicht der Import: pytest sammelt alle
+                # Dateien vorab, mit anderen Dateien im selben Lauf waere das Budget schon weg
 SR = 44100
+
+
+@pytest.fixture(autouse=True)
+def _budget_clock():
+    global _T0
+    if _T0 is None:
+        _T0 = time.perf_counter()
+    yield
 
 
 # ── Signalbausteine (wie test_beat_detector_signal.py / bpm_bench/signals.py; bewusst
