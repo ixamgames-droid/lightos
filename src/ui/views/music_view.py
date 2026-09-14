@@ -79,7 +79,7 @@ class MusicView(QWidget):
         # AUTODJ-(b): Spektrum/VU (Quelle = Loopback-Beat-Detector, nicht der Player-Stream)
         self._spectrum = SpectrumBars()
         np_lay.addWidget(self._spectrum)
-        spec_hint = QLabel("Spektrum: Audio-Eingang (Loopback) — Menü „Ausgabe → Audio-Eingang“")
+        spec_hint = QLabel("Spektrum = das, was die BPM-Quelle hört (Sektion BPM → Erkennung → Quelle)")
         spec_hint.setStyleSheet("color:#6b7480; font-size:10px;")
         np_lay.addWidget(spec_hint)
         root.addWidget(np_box)
