@@ -263,8 +263,8 @@ BPM — entspricht QLC+ „Erscheinungsbild").
   schnell, und **jeder Farbwechsel** beginnt sauber mit „voll an".
 - Den **Faktor wechseln springt nicht** — die Phase bleibt stetig erhalten.
 
-### 9.3 Mehrere Tempo-Master + Grand-Master (BPM-Tab, Strg+8)
-Im **BPM**-Tab gibt es das Panel **„Tempo-Speeds & Grand-Master"**:
+### 9.3 Mehrere Tempo-Master + Grand-Master (BPM-Tab, Strg+8, Sub-Tab „Tempo-Buses")
+Im **BPM**-Tab, Sub-Tab **„Tempo-Buses"**, gibt es das Panel **„Tempo-Speeds & Grand-Master"**:
 - **Master anlegen/benennen** (z. B. „Bass", „Drums") — beliebig viele, jeweils
   per Tap/Zahl gesetzt; dazu der Audio-**Sound-BPM** (Default-Bus).
 - Pro Bus **Rolle / Folgt / Faktor** in der Tabelle einstellen.

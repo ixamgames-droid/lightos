@@ -1,15 +1,16 @@
 # bpm_manager_view (BpmManagerView)
 
-> Der „Leader"-zentrierte BPM-Tab: globale Tempo-Quelle, Tempo-Buses, Tap/Sync,
+> Der „Leader"-zentrierte BPM-Tab: Monitor, globale Tempo-Quelle, Tap/Lock,
 > Genre-Presets und Takt-Anzeige.
 
 ## Zweck
 
-Eigenständiger Tab zur globalen Tempo-Steuerung. Wählt die BPM-Quelle
-(Manual/Tap/Audio/analysierter Song), zeigt die Takt-Zellen zum aktuellen Beat,
-verwaltet Tempo-Buses (Tap/Sync/Arm je Bus) und spiegelt Auto-Sync/Freeze wie die
-VC-Aktionen — nur global über alle Buses. Genre-Presets stellen die
-Beat-Erkennung passend ein.
+Sub-Tab „Manager" der Sektion BPM (Manager | Tempo-Buses | Generator). Wählt die
+BPM-Quelle (Manual/Tap/Audio/analysierter Song), zeigt Monitor und Takt-Zellen
+zum aktuellen Beat und spiegelt Lock/Freeze wie die VC-Aktionen. Genre-Presets
+stellen die Beat-Erkennung passend ein. **Tempo-Buses, Grand-Master, Auto-Sync
+und „Effekte je Bus" liegen seit BPM-08 im eigenen Sub-Tab
+[`tempo_bus_view`](tempo_bus_view.md).**
 
 ## Bedienung / Optionen
 
@@ -17,16 +18,16 @@ Beat-Erkennung passend ein.
 |---|---|
 | Quelle umschalten | Primär-Steuerung der globalen BPM-Quelle (`_SRC_LABELS`) |
 | Modus/Lock | AUTO/MANUAL + Lock-Zustand |
-| Auto-Sync (global) | Auto-Sync für ALLE Tempo-Buses (spiegelt VC) |
-| Sync (global) | Einmal-Sync für alle Buses gleichzeitig |
 | Genre-Preset | Erkennungs-Parameter je Genre setzen + UI nachziehen |
 | Analysierter Song | Track mit `bpm_timeline` als aktive Quelle wählen |
 | Takt-Zellen | An `beats_per_bar` angepasst (max. 16 sichtbar) |
 
 ## Verknüpfungen
 
-- **BpmManager / TempoBus:** Kern-Kopplung — Modus, Quelle, Tap, Auto-Sync,
-  Freeze laufen über `bpm_manager` und die Tempo-Buses.
+- **BpmManager:** Kern-Kopplung — Modus, Quelle, Tap, Freeze laufen über
+  `bpm_manager`; der Default-Bus folgt der hier gesetzten globalen BPM.
+- **Tempo-Buses:** [`tempo_bus_view`](tempo_bus_view.md) (Bus-Tabelle,
+  Grand-Master, Auto-Sync, Effekte je Bus).
 - **Audio:** analysierte Songs (`bpm_timeline`) kommen aus dem
   [`bpm_generator_view`](bpm_generator_view.md)/Audio-Analyse.
 - **VC:** dieselben Aktionen wie `vc_button` (`TAP`, `FREEZE`, `AUTO_SYNC`,
@@ -65,7 +66,9 @@ Die Einstellungen liegen in `ui_prefs.json`, Sektion `bpm_settings`, Version 2
 
 ## Zugehörige Tests
 
-- `tests/test_bpm_view.py`, `test_bpm_view_speeds.py` — View-Verhalten/Speeds.
+- `tests/test_bpm_view.py` — View-Verhalten (Speeds: siehe `tempo_bus_view`).
+- `tests/test_tempo_bus_view_move.py` — BPM-08: keine Tempo-Bus-Attribute mehr
+  hier, 29 sichtbare Bedienelemente, kein `FUNCTION_CHANGED`-Abo.
 - `tests/test_bpm_settings_v2.py` — Persistenz v2: Migration (Beispiel aus
   `plan.md` 3. byte-genau), Typprüfung, atomares Schreiben, v1-/corrupt-Sicherung,
   Entprellung (250 Ticks → 1 Schreibvorgang), `flush_pending_save()`, `device`
@@ -76,11 +79,11 @@ Die Einstellungen liegen in `ui_prefs.json`, Sektion `bpm_settings`, Version 2
 ## Quelle (file:line)
 
 - `src/ui/views/bpm_manager_view.py:51` — Klasse `BpmManagerView`
-- `src/ui/views/bpm_manager_view.py:861` — globaler Auto-Sync · `:865` — globaler Sync
-- `src/ui/views/bpm_manager_view.py:1195` — BPM-Quelle umschalten
-- `src/ui/views/bpm_manager_view.py:887` — Takt-Zellen (beats_per_bar)
-- `src/ui/views/bpm_manager_view.py:906` — `_load_into_controls` (Backend-Zustand)
-- `src/ui/views/bpm_manager_view.py:1279` — `_save` (Entprellung) · `:1286` —
-  `flush_pending_save` · `:1295` — `_write_settings`
-- `src/core/audio/bpm_settings.py:31` — `DEFAULTS` (v2) · `:139` — `migrate` ·
-  `:213` — `save_settings` (atomar) · `:242` — `apply_to_backend`
+- `src/ui/views/bpm_manager_view.py:704` — BPM-Quelle umschalten (`_apply_source_kind`)
+- `src/ui/views/bpm_manager_view.py:396` — Takt-Zellen (beats_per_bar)
+- `src/ui/views/bpm_manager_view.py:415` — `_load_into_controls` (Backend-Zustand)
+- `src/ui/views/bpm_manager_view.py:553` — `_refresh_monitor` (150-ms-Poll)
+- `src/ui/views/bpm_manager_view.py:788` — `_save` (Entprellung) · `:795` —
+  `flush_pending_save` · `:804` — `_write_settings`
+- `src/core/audio/bpm_settings.py:38` — `DEFAULTS` (v2) · `:146` — `migrate` ·
+  `:238` — `save_settings` (atomar) · `:274` — `apply_to_backend`

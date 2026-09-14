@@ -124,6 +124,7 @@ Pflege pro neu geschriebener Doc die Spalte **Doc** (`✅ ja` / `— nein` /
 | `snapshots_view` | [✅ ja](views/snapshots_view.md) |
 | `channel_groups_view` | [✅ ja](views/channel_groups_view.md) |
 | `bpm_manager_view` | [✅ ja](views/bpm_manager_view.md) |
+| `tempo_bus_view` | [✅ ja](views/tempo_bus_view.md) |
 | `bpm_generator_view` | [✅ ja](views/bpm_generator_view.md) |
 
 **Funktions-Editoren:**

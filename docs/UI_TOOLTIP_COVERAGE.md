@@ -10,7 +10,7 @@ dokumentierte Baseline: es wird rot, sobald eine View NEUE textlose
 Buttons ohne Tooltip bekommt (Regressionsschutz). Bestehende Verstoesse
 abzubauen ist jederzeit erlaubt (Baseline in der Skript-Datei nachziehen).
 
-**Stand:** 24 no-arg Views geprueft, 35 Verstoesse in der aktuellen Baseline.
+**Stand:** 25 no-arg Views geprueft, 35 Verstoesse in der aktuellen Baseline.
 
 ## Uebersicht
 
@@ -18,36 +18,33 @@ abzubauen ist jederzeit erlaubt (Baseline in der Skript-Datei nachziehen).
 |---|---|---:|---:|---:|
 | `audio_input_view.py` | `AudioInputView` | 4 | 0 | 0 |
 | `bpm_generator_view.py` | `BpmGeneratorView` | 13 | 0 | 0 |
-| `bpm_manager_view.py` | `BpmManagerView` | 37 | 1 | 1 |
+| `bpm_manager_view.py` | `BpmManagerView` | 22 | 0 | 0 |
 | `channel_groups_view.py` | `ChannelGroupsView` | 4 | 1 | 1 |
 | `curve_library_view.py` | `CurveLibraryView` | 5 | 0 | 0 |
 | `dmx_monitor_view.py` | `DmxMonitorView` | 0 | 0 | 0 |
 | `efx_view.py` | `EfxView` | 25 | 0 | 0 |
-| `fixture_group_view.py` | `FixtureGroupView` | 9 | 0 | 0 |
+| `fixture_group_view.py` | `FixtureGroupView` | 12 | 0 | 0 |
 | `function_manager_view.py` | `FunctionManagerView` | 14 | 0 | 0 |
 | `laser_view.py` | `LaserView` | 8 | 0 | 0 |
-| `live_view.py` | `LiveView` | 15 | 4 | 4 |
+| `live_view.py` | `LiveView` | 17 | 4 | 4 |
 | `midi_view.py` | `MidiView` | 19 | 1 | 1 |
 | `music_view.py` | `MusicView` | 10 | 1 | 1 |
 | `output_view.py` | `OutputView` | 0 | 0 | 0 |
 | `palette_view.py` | `PaletteView` | 27 | 7 | 7 |
-| `patch_view.py` | `PatchView` | 6 | 1 | 1 |
+| `patch_view.py` | `PatchView` | 7 | 1 | 1 |
 | `playback_view.py` | `PlaybackView` | 61 | 1 | 1 |
 | `preset_browser_view.py` | `PresetBrowserView` | 1 | 1 | 1 |
-| `programmer_view.py` | `ProgrammerView` | 119 | 14 | 14 |
-| `rgb_matrix_view.py` | `RgbMatrixView` | 18 | 3 | 3 |
+| `programmer_view.py` | `ProgrammerView` | 122 | 14 | 14 |
+| `rgb_matrix_view.py` | `RgbMatrixView` | 21 | 3 | 3 |
 | `show_manager_view.py` | `ShowManagerView` | 6 | 0 | 0 |
 | `simple_desk.py` | `SimpleDeskView` | 5 | 0 | 0 |
 | `snapshots_view.py` | `SnapshotsView` | 58 | 0 | 0 |
+| `tempo_bus_view.py` | `TempoBusView` | 14 | 1 | 1 |
 | `virtual_console_view.py` | `VirtualConsoleView` | 38 | 0 | 0 |
 
 ## Verstoesse im Detail
 
 Pro betroffener View die Button-Kennungen (`Klasse(objectName)`), die weder Text noch Tooltip tragen — Ansatzpunkte fuer kuenftige Verbesserung.
-
-### `bpm_manager_view.py` (1)
-
-- `QAbstractButton(qt_tableview_cornerbutton)`
 
 ### `channel_groups_view.py` (1)
 
@@ -112,3 +109,7 @@ Pro betroffener View die Button-Kennungen (`Klasse(objectName)`), die weder Text
 - `ColorButton(<unbenannt>)`
 - `ColorButton(<unbenannt>)`
 - `ColorButton(<unbenannt>)`
+
+### `tempo_bus_view.py` (1)
+
+- `QAbstractButton(qt_tableview_cornerbutton)`

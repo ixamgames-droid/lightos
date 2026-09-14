@@ -59,7 +59,7 @@ laufen lassen willst (z. B. Strobe auf Drums, Farbe auf Bass).
   (`¼ ½ 1× 2× 4×`). So bleibt alles sauber im Verhältnis, nie „aus dem Takt".
 - **Grand-Master** — übertrumpft (wenn scharf) **alle** Master auf seinen Takt; Subs behalten ihr Verhältnis.
 
-Verwaltet wird das im BPM-Tab im Panel **„Tempo-Speeds & Grand-Master"** (Bus-Tabelle,
+Verwaltet wird das im BPM-Tab, Sub-Tab **„Tempo-Buses"**, im Panel **„Tempo-Speeds & Grand-Master"** (Bus-Tabelle,
 Master anlegen, Rolle/Folgt/Faktor) oder live per **Speed-Dial** in der Virtuellen Konsole.
 
 → Tiefer: **[Speed-Dial, Master/Sub & Grand-Master](anleitung_speed/ANLEITUNG_SPEED.md)**
@@ -114,7 +114,7 @@ bleiben dauerhaft im Raster.
 Du hast **drei Werkzeuge** dafür:
 
 ### a) Auto-Sync (Dauer-Toggle) — *Standard*
-**BPM-Tab (Strg+8) → Panel „Tempo-Speeds & Grand-Master" → ☑ Auto-Sync.**
+**BPM-Tab (Strg+8) → Sub-Tab „Tempo-Buses" → Panel „Tempo-Speeds & Grand-Master" → ☑ Auto-Sync.**
 Bei neuen Shows ist Auto-Sync bereits aktiv. Solange aktiv, übernimmt
 **jeder neu (oder erneut) gestartete** bus-gekoppelte Effekt
 denselben Beat-Raster-Ursprung → er fällt automatisch in den gemeinsamen Takt, **egal wann**
@@ -131,7 +131,7 @@ setzt den Downbeat dieses Bus neu („jetzt ist die Eins"). Für Live-Performanc
 Taste/ein Pad legbar (auch **„Auto-Sync an/aus"** gibt es als VC-Button-Aktion).
 
 ### d) „Effekte je Bus" im BPM-Tab — Übersicht + Häkchen pro Effekt
-**BPM-Tab (Strg+8) → Panel „Effekte je Bus — taktgleich".** Listet **alle** Effekte,
+**BPM-Tab (Strg+8) → Sub-Tab „Tempo-Buses" → Panel „Effekte je Bus — taktgleich".** Listet **alle** Effekte,
 gruppiert nach ihrem Bus (Haupt-BPM · A–D · Frei). Pro Effekt-Zeile: **Typ**, ein
 **Bus-Dropdown** (verschiebt den Effekt taktgleich auf einen anderen Bus), **Tempo ×**
 und das Häkchen **„Taktgleich"** (= startet auf dem gemeinsamen Raster). Pro Bus ein
