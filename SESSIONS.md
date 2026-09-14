@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| BPM-09 | A | feat/bpm-s4-erkennung | 2026-09-14T11:34Z | src/ui/views/bpm_manager_view.py · src/ui/bpm_tap_helper.py · src/ui/bpm_source_controller.py · src/core/audio/bpm_settings.py · src/core/audio/genre_presets.py · src/ui/views/music_view.py · src/ui/main_window.py |
+| _(frei)_ |  |  |  |  |
 
 ## Blocker & Fallen
 
@@ -120,7 +120,6 @@
 
 ## Verlauf
 
-- 2026-09-06T23:26Z A done QA-75
 - 2026-09-06T23:26Z A done FM-36
 - 2026-09-06T23:26Z A done XPLAT-32
 - 2026-09-07T13:59Z A claim UI-53
@@ -150,3 +149,4 @@
 - 2026-09-14T11:10Z A claim BPM-08
 - 2026-09-14T11:34Z A done BPM-08
 - 2026-09-14T11:34Z A claim BPM-09
+- 2026-09-14T18:53Z A done BPM-09
