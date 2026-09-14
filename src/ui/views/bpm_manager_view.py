@@ -8,14 +8,17 @@ Geraet / OS2L / Lied-Analyse / Aus),
 (2) grosser TAP-Knopf (Doppelrolle, ``bpm_tap_helper``), (3) Zweizustand
 Auto | Manuell, (4) ×½, (5) ×2, (6) Aufklapper „Erweitert".
 Anzeigen: grosse BPM-Zahl mit Pegelmeter direkt darunter (S5, ``cap.snapshot()``
-im 50-ms-Timer; Anzeige, kein Bedienelement), Beat-Punkt + Taktzellen, Zustandswort
+im 50-ms-Timer; Anzeige, kein Bedienelement) und Hinweis-Chips CLIP/BRUMM/LEISE/
+AUSSETZER/DC daneben (S6), Beat-Punkt + Taktzellen, Zustandswort
 (KEIN SIGNAL / SUCHT / EINGERASTET / PAUSE · haelt N / MANUELL), Quelle-Text,
-Konfidenzbalken.
+Konfidenzbalken, **Statuszeile** Problem — Ursache — Abhilfe (S6,
+``bpm_status_rules``; die Abhilfe ist ein Link in einem QLabel, kein Knopf).
 
-**„Erweitert" = 11 Bedienelemente** (eingeklappt, Zustand nur je Sitzung):
+**„Erweitert" = 12 Bedienelemente** (eingeklappt, Zustand nur je Sitzung):
 Tempo-Bereich von/bis, „Vorlage ▾" (Genre-Bereiche), Beats/Takt, Beat-Latenz ms,
-„Tempo einfrieren", Nudge −5/−1/+1/+5, „Taktgenau". Anzeigen: Diagnosezeile aus
-dem Detektor-Snapshot, Spektrum.
+„Tempo einfrieren", Nudge −5/−1/+1/+5, „Taktgenau", „Eingang 30 s aufnehmen" (S6,
+``AudioRecorder``). Anzeigen: Diagnosezeile aus Detektor- und Capture-Snapshot,
+Spektrum.
 
 Entfallen ersatzlos (S4): Empfindlichkeit, Glaettung, Genre-Preset + Anwenden,
 Analyse-Song + ↻ (Quelle „Lied-Analyse" nimmt den aktuellen Player-Track),
@@ -35,6 +38,9 @@ Topbar-TAP). Manager/Detektor/Capture werden nur AUFGERUFEN.
 """
 from __future__ import annotations
 
+import os
+import time
+
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
@@ -46,6 +52,10 @@ from PySide6.QtWidgets import (
 from src.core.engine.bpm_manager import get_bpm_manager, BpmMode
 from src.core.audio import bpm_settings
 from src.ui.bpm_source_controller import get_source_controller, AUDIO_KINDS
+from src.ui import bpm_status_rules as rules
+from src.ui.bpm_status_rules import (
+    ChipHysterese, MgrState, Os2lState, StatusHysterese, StatusLine, chips, status_line,
+)
 from src.ui.bpm_tap_helper import get_tap_helper
 from src.ui.weak_slots import weak_slot
 from src.ui.widgets.collapsible_section import CollapsibleSection
@@ -55,6 +65,11 @@ try:
     from src.core.audio.beat_detector import get_beat_detector
 except Exception:  # pragma: no cover - numpy fehlt o.ae.
     get_beat_detector = None  # type: ignore[assignment]
+
+try:
+    from src.core.audio.audio_recorder import get_audio_recorder
+except Exception:  # pragma: no cover - numpy fehlt o.ae.
+    get_audio_recorder = None  # type: ignore[assignment]
 
 try:
     from src.ui.views.spectrum_bars import SpectrumBars
@@ -86,6 +101,20 @@ _TAP_STYLE = (
     " border-radius:6px; background:#1b2028; color:#FFD700; }"
     "QPushButton:pressed { background:#3b3200; }")
 POLL_MS = 50
+_SCHWERE_FARBE = {"ok": "#3fb950", "hinweis": "#d29922", "problem": "#f85149"}
+# Chip-Name (bpm_status_rules.CHIPS) -> (Anzeigetext, Farbe, Tooltip)
+_CHIP_STIL = {
+    "CLIP": ("CLIP", "#f85149", "Übersteuert: das Eingangssignal stößt an 0 dBFS. Pegel am Mischpult senken."),
+    "BRUMM": ("BRUMM", "#f0883e", "Netzbrumm 50/60 Hz im Bassband — meist eine Masseschleife (DI-Box/Ground-Lift)."),
+    "LEISE": ("LEISE", "#d29922", "Pegel unter −40 dBFS: die Erkennung läuft, ist aber störanfälliger."),
+    "JITTER": ("AUSSETZER", "#d29922", "Audio kommt stoßweise (Chunk-Abstand/Rückstand zu groß) — Rechner ausgelastet?"),
+    "DC": ("DC", "#d29922", "Gleichspannungsversatz im Eingang — Interface/Kabel prüfen."),
+}
+_REC_TEXT = "Eingang 30 s aufnehmen"
+
+
+def _html(text: str) -> str:
+    return (str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
 
 
 def state_word(mode_manual: bool, kind: str | None, snap, os2l_waiting: bool = False) -> tuple[str, str]:
@@ -111,10 +140,14 @@ def state_word(mode_manual: bool, kind: str | None, snap, os2l_waiting: bool = F
     return "AUS", _COL_GREY
 
 
-def diag_line(snap) -> str:
-    """Diagnosezeile aus dem Snapshot (was der Snapshot hergibt)."""
+def diag_line(snap, cap_snap=None) -> str:
+    """Diagnosezeile aus Detektor- und (optional) Capture-Snapshot."""
+    cap_teil = ""
+    if cap_snap is not None:
+        cap_teil = (f" · DC (Eingang) {float(getattr(cap_snap, 'dc_offset', 0.0)):+.4f}"
+                    f" · Chunk p95 {float(getattr(cap_snap, 'chunk_ms_p95', 0.0)):.0f} ms")
     if snap is None:
-        return "kein Detektor"
+        return "kein Detektor" + cap_teil
     g = lambda n, d=0.0: getattr(snap, n, d)  # noqa: E731
     hint = g("tempo_hint", None)
     return (f"roh {float(g('bpm_raw')):.1f} · alt {float(g('alt_bpm')):.1f} "
@@ -124,7 +157,7 @@ def diag_line(snap) -> str:
             f"Brumm {int(g('hum_hz', 0))} Hz {float(g('hum_ratio')) * 100:.0f} % · "
             f"DC {float(g('dc_offset')):.3f} · Jitter {float(g('jitter_ms')):.0f} ms · "
             f"Rückstand {float(g('backlog_ms')):.0f} ms · Kontrast {float(g('onset_contrast')):.1f}"
-            + (f" · Hinweis {float(hint):.0f}" if hint else ""))
+            + (f" · Hinweis {float(hint):.0f}" if hint else "") + cap_teil)
 
 
 class _SourceCombo(QComboBox):
@@ -149,9 +182,18 @@ class BpmManagerView(QWidget):
     _bpm_sig = Signal(float)
     _beat_sig = Signal(int)
     _state_sig = Signal()
+    _rec_done_sig = Signal(str)
 
-    def __init__(self, parent=None, source_controller=None, tap_helper=None):
+    def __init__(self, parent=None, source_controller=None, tap_helper=None, recorder=None,
+                 clock=None):
         super().__init__(parent)
+        self._clock = clock if clock is not None else time.monotonic
+        self._recorder = recorder
+        self._hyst = StatusHysterese(clock=self._clock)
+        self._chip_hyst = ChipHysterese()
+        self._ereignis: StatusLine | None = None
+        self._ereignis_bis = 0.0
+        self._shown_line: StatusLine | None = None
         self._mgr = get_bpm_manager()
         self._det = get_beat_detector() if get_beat_detector else None
         self._src = source_controller if source_controller is not None else get_source_controller()
@@ -194,10 +236,7 @@ class BpmManagerView(QWidget):
 
         root.addLayout(self._build_head())
         root.addLayout(self._build_buttons())
-        self._lbl_status = QLabel("")
-        self._lbl_status.setStyleSheet("color:#f0883e;")
-        self._lbl_status.setWordWrap(True)
-        root.addWidget(self._lbl_status)
+        root.addWidget(self._build_status())
         root.addWidget(self._build_advanced())
         root.addStretch(1)
 
@@ -219,6 +258,23 @@ class BpmManagerView(QWidget):
         # Pegelmeter direkt unter der BPM-Zahl (BPM-10): reine Anzeige aus cap.snapshot()
         self._level = LevelMeterWidget()
         bpm_col.addWidget(self._level)
+        # Hinweis-Chips (S6): reine Anzeigen, Hysterese 2 s an / 3 s aus
+        chip_row = QHBoxLayout()
+        chip_row.setContentsMargins(0, 0, 0, 0)
+        chip_row.setSpacing(4)
+        self._chips: dict[str, QLabel] = {}
+        for name in rules.CHIPS:
+            text, col, tip = _CHIP_STIL[name]
+            lbl = QLabel(text)
+            lbl.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            lbl.setStyleSheet(f"color:#0d1117; background:{col}; border-radius:3px;"
+                              " padding:0px 4px; font-size:10px; font-weight:bold;")
+            lbl.setToolTip(tip)
+            lbl.setVisible(False)
+            chip_row.addWidget(lbl)
+            self._chips[name] = lbl
+        chip_row.addStretch(1)
+        bpm_col.addLayout(chip_row)
         top.addLayout(bpm_col)
 
         col = QVBoxLayout()
@@ -233,9 +289,10 @@ class BpmManagerView(QWidget):
             "Eingang (Mikrofon/Line-In je Gerät), OS2L (DJ-Software wie VirtualDJ), "
             "Lied-Analyse (analysierter Titel im Player) oder Aus. Die Liste wird beim Öffnen neu gelesen.")
         self._cmb_source.currentIndexChanged.connect(self._on_source_changed)
-        # ``activated`` auch fuer den SELBEN Eintrag: „erneut verbinden" nach
-        # einem Capture-Fehler; der Controller ist idempotent, ein Wechsel
-        # loest ueber beide Signale also nur EINEN Schaltvorgang aus.
+        # ``activated`` feuert auch beim Waehlen des SELBEN Eintrags. Der Controller
+        # ist idempotent: derselbe Eintrag schaltet NICHTS erneut, ein Wechsel loest
+        # ueber beide Signale nur EINEN Schaltvorgang aus. „Erneut verbinden" nach
+        # einem Capture-Fehler ist der Statuszeilen-Link (apply(..., force=True)).
         self._cmb_source.activated.connect(self._on_source_changed)
         src_row.addWidget(self._cmb_source, 1)
         col.addLayout(src_row)
@@ -349,8 +406,39 @@ class BpmManagerView(QWidget):
         row.addStretch(1)
         return row
 
+    def _build_status(self) -> QFrame:
+        """Statuszeile (S6): Problem — Ursache — Abhilfe; Abhilfe als Link (QLabel)."""
+        box = QFrame()
+        box.setObjectName("bpmStatusLine")
+        lay = QHBoxLayout(box)
+        lay.setContentsMargins(8, 4, 8, 4)
+        lay.setSpacing(6)
+        self._status_box = box
+        self._lbl_problem = QLabel("")
+        self._lbl_problem.setStyleSheet("font-weight:bold;")
+        self._lbl_ursache = QLabel("")
+        self._lbl_ursache.setWordWrap(True)
+        self._lbl_ursache.setStyleSheet("color:#c9d1d9;")
+        self._lbl_ursache.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        self._lbl_abhilfe = QLabel("")
+        self._lbl_abhilfe.setWordWrap(True)
+        self._lbl_abhilfe.setTextFormat(Qt.TextFormat.RichText)
+        self._lbl_abhilfe.setTextInteractionFlags(Qt.TextInteractionFlag.LinksAccessibleByMouse)
+        self._lbl_abhilfe.setOpenExternalLinks(False)
+        self._lbl_abhilfe.linkActivated.connect(self._on_status_link)
+        for w, tip in ((self._lbl_problem, "Was los ist."),
+                       (self._lbl_ursache, "Warum — mit dem gemessenen Wert."),
+                       (self._lbl_abhilfe, "Was du tun kannst. Unterstrichen = anklicken, "
+                                           "LightOS führt es aus.")):
+            w.setToolTip(tip)
+        lay.addWidget(self._lbl_problem)
+        lay.addWidget(self._lbl_ursache, 1)
+        lay.addWidget(self._lbl_abhilfe)
+        self._show_status(StatusLine("hinweis", "Erkennung", "startet", "", key="start"))
+        return box
+
     def _build_advanced(self) -> CollapsibleSection:
-        """(6) Aufklapper „Erweitert" mit 11 Bedienelementen + Diagnose/Spektrum."""
+        """(6) Aufklapper „Erweitert" mit 12 Bedienelementen + Diagnose/Spektrum."""
         content = QWidget()
         grid = QGridLayout(content)
         grid.setContentsMargins(8, 6, 8, 6)
@@ -459,12 +547,27 @@ class BpmManagerView(QWidget):
         grid.addLayout(ph, r, 1)
         r += 1
 
+        # Eingang 30 s aufnehmen (S6)
+        grid.addWidget(QLabel("Aufnahme"), r, 0)
+        rec_row = QHBoxLayout()
+        self._btn_record = QPushButton(_REC_TEXT)
+        self._btn_record.setToolTip(
+            "Nimmt 30 s vom aktuellen Audio-Eingang auf (WAV + Messwerte) und legt sie im "
+            "Datenordner unter audio_diag/ ab. Wenn die Erkennung nicht klappt: einmal klicken, "
+            "Musik laufen lassen, Datei an Robin/Support schicken. Erneuter Klick bricht ab. "
+            "Nur verfügbar, wenn eine Audio-Quelle läuft.")
+        self._btn_record.clicked.connect(self._on_record_clicked)
+        rec_row.addWidget(self._btn_record)
+        rec_row.addStretch(1)
+        grid.addLayout(rec_row, r, 1)
+        r += 1
+
         # Diagnosezeile (Anzeige)
         grid.addWidget(QLabel("Diagnose"), r, 0)
         self._lbl_diag = QLabel("")
         self._lbl_diag.setStyleSheet("color:#8b949e; font-size:11px;")
         self._lbl_diag.setWordWrap(True)
-        self._lbl_diag.setToolTip("Rohwerte des Detektors: Roh-Tempo, Alternativ-Oktave, Fensterfüllung, Pegel, Rauschteppich, Brumm, Jitter, Rückstand.")
+        self._lbl_diag.setToolTip("Rohwerte des Detektors: Roh-Tempo, Alternativ-Oktave, Fensterfüllung, Pegel, Rauschteppich, Brumm, DC, Jitter, Rückstand; dazu DC-Offset und Chunk-Abstand (p95) des Eingangs.")
         grid.addWidget(self._lbl_diag, r, 1)
         r += 1
 
@@ -480,7 +583,7 @@ class BpmManagerView(QWidget):
         self._advanced = CollapsibleSection("Erweitert", content, collapsed=True)
         btn = getattr(self._advanced, "_btn", None)
         if btn is not None:
-            btn.setToolTip("Tempo-Bereich, Vorlage, Beats/Takt, Beat-Latenz, Tempo einfrieren, Nudge, Taktgenau, Diagnose.")
+            btn.setToolTip("Tempo-Bereich, Vorlage, Beats/Takt, Beat-Latenz, Tempo einfrieren, Nudge, Taktgenau, Eingang 30 s aufnehmen, Diagnose.")
         return self._advanced
 
     def _on_dot_idle(self):
@@ -531,7 +634,9 @@ class BpmManagerView(QWidget):
             return []
 
     def _populate_sources(self, keep: str | None = None):
-        """Eintraege: PC-Audio (Standard-Ausgabegeraet), PC-Audio je Ausgabegeraet
+        """Eintraege: „PC-Audio (Systemstandard)" (folgt dem Standard-Ausgabegeraet,
+        Daten ``loopback`` — S6: umbenannt, damit er nicht wie ein Doppel des festen
+        Eintrags desselben Geraets aussieht), PC-Audio je Ausgabegeraet
         (Daten ``loopback:<sink_id>``, S5), Eingang je Geraet, OS2L, Lied-Analyse,
         Aus. Ein gespeichertes, nicht vorhandenes Geraet bleibt als
         „(nicht gefunden)" waehlbar."""
@@ -541,7 +646,7 @@ class BpmManagerView(QWidget):
         self._cmb_source.blockSignals(True)
         try:
             self._cmb_source.clear()
-            self._cmb_source.addItem("PC-Audio", "loopback")
+            self._cmb_source.addItem("PC-Audio (Systemstandard)", "loopback")
             sinks = self._list_sinks()
             for sid, name in sinks:
                 self._cmb_source.addItem(f"PC-Audio: {name}", f"loopback:{sid}")
@@ -560,6 +665,17 @@ class BpmManagerView(QWidget):
         finally:
             self._cmb_source.blockSignals(False)
             self._loading = was_loading
+
+    def _device_label_for(self, kind: str | None, dev: str | None) -> str | None:
+        """Anzeigename des Geraets der AKTIVEN Quelle fuer die Statuszeile: Text des
+        passenden Combo-Eintrags ohne Praefix („PC-Audio: HDMI" -> „HDMI")."""
+        if kind not in AUDIO_KINDS:
+            return None
+        if kind == "loopback" and not dev:
+            return "Systemstandard"
+        idx = self._cmb_source.findData(f"{kind}:{dev}") if dev else -1
+        text = self._cmb_source.itemText(idx) if idx >= 0 else (dev or "")
+        return text.split(": ", 1)[1] if ": " in text else (text or None)
 
     @staticmethod
     def _parse_source(data) -> tuple[str, str | None]:
@@ -613,6 +729,8 @@ class BpmManagerView(QWidget):
         self._bpm_sig.connect(self._on_bpm)
         self._beat_sig.connect(self._on_beat)
         self._state_sig.connect(self._reflect_state)
+        self._rec_done_sig.connect(self._on_record_done)
+        self._cb_rec = lambda p: self._rec_done_sig.emit(str(p))
         self._cb_bpm = lambda b: self._bpm_sig.emit(float(b))
         self._cb_beat = lambda idx: self._beat_sig.emit(int(idx))
         self._cb_state = lambda: self._state_sig.emit()
@@ -701,17 +819,169 @@ class BpmManagerView(QWidget):
             self._lbl_state.setStyleSheet(_STATE_STYLE.format(col=col))
         c = int(round(float(getattr(snap, "confidence", 0.0) or 0.0) * 100)) if snap is not None else 0
         self._conf.setValue(max(0, min(100, c)))
+        now = float(self._clock())
+        cap = cap_snap = err = None
+        audio_ok = True
+        try:
+            from src.core.audio import capture as cap_mod
+            audio_ok = bool(getattr(cap_mod, "HAS_SOUNDCARD", True))
+            cap = cap_mod.get_audio_capture()
+            err = cap.last_error()
+            cap_snap = cap.snapshot() if kind in AUDIO_KINDS else None
+        except Exception:
+            audio_ok = audio_ok and cap is not None
+        self._level.set_snapshot(cap_snap)
         if self._advanced.is_expanded():
-            self._lbl_diag.setText(diag_line(snap))
+            self._lbl_diag.setText(diag_line(snap, cap_snap))
+
+        rec = self._get_recorder()
+        rec_running = bool(rec is not None and rec.is_running())
+        mgr = self._mgr
+        m = MgrState(
+            kind=kind, device_label=self._device_label_for(
+                kind, (self._src.current or (kind, self._device_pref))[1]),
+            manual=(mgr.mode == BpmMode.MANUAL), bpm=float(mgr.bpm or 0.0),
+            locked=bool(mgr.is_locked), min_bpm=float(mgr.min_bpm), max_bpm=float(mgr.max_bpm),
+            audio_available=audio_ok, capture_error=err,
+            sink_missing=getattr(self._src, "missing_sink", None),
+            song_available=self._song_available() if kind == "song" else None,
+            ereignis=self._ereignis, ereignis_bis=self._ereignis_bis,
+            aufnahme_s=rec.progress_s() if rec_running else None)
+        line = status_line(cap_snap, snap, m, self._os2l_state() if kind == "os2l" else None, now)
+        self._show_status(self._hyst.update(line, now))
+        roh = chips(cap_snap, snap) if kind in AUDIO_KINDS else set()
+        self._set_chips(self._chip_hyst.update(roh, now))
+        self._update_record_button(rec, rec_running, kind, cap)
+
+    # ── Statuszeile / Chips / Aufnahme (S6) ──────────────────────────────────
+
+    def _os2l_state(self) -> Os2lState:
+        try:
+            from src.core.audio.os2l import get_os2l_server
+            srv = get_os2l_server()
+            return Os2lState(running=bool(srv.is_running()), last_bpm=float(srv.last_bpm() or 0.0),
+                             port=getattr(srv, "port", None))
+        except Exception:
+            return Os2lState()
+
+    @staticmethod
+    def _song_available() -> bool | None:
+        try:
+            from src.core.audio.media_player import get_media_player
+            t = get_media_player().current_track
+            return bool(t is not None and getattr(t, "bpm_timeline", None))
+        except Exception:
+            return None
+
+    def _show_status(self, line: StatusLine) -> None:
+        if line == self._shown_line:
+            return
+        self._shown_line = line
+        col = _SCHWERE_FARBE.get(line.schwere, "#c9d1d9")
+        self._lbl_problem.setText(line.problem)
+        self._lbl_problem.setStyleSheet(f"font-weight:bold; color:{col};")
+        self._lbl_ursache.setText(f"— {line.ursache}" if line.ursache else "")
+        if line.abhilfe:
+            if line.aktion:
+                self._lbl_abhilfe.setText(
+                    f'— <a href="{line.aktion}" style="color:#58a6ff;">{_html(line.abhilfe)}</a>')
+            else:
+                self._lbl_abhilfe.setText(f"— {_html(line.abhilfe)}")
+        else:
+            self._lbl_abhilfe.setText("")
+        self._status_box.setStyleSheet(
+            f"QFrame#bpmStatusLine {{ border-left:3px solid {col}; background:#161b22; }}")
+
+    def status_text(self) -> str:
+        """Aktuell angezeigte Zeile als Klartext (Tests/Smoke)."""
+        return self._shown_line.text if self._shown_line is not None else ""
+
+    def _set_chips(self, sichtbar: set) -> None:
+        for name, lbl in self._chips.items():
+            on = name in sichtbar
+            if lbl.isVisibleTo(self) != on:
+                lbl.setVisible(on)
+
+    def visible_chips(self) -> set:
+        return {n for n, l in self._chips.items() if not l.isHidden()}
+
+    def set_ereignis(self, line: StatusLine, bis: float) -> None:
+        self._ereignis, self._ereignis_bis = line, float(bis)
+
+    def _on_status_link(self, aktion: str) -> None:
+        aktion = str(aktion)
+        if aktion == "reconnect":
+            kind, dev = self._src.current or (self._source_pref, self._device_pref)
+            self._src.apply(kind, dev, force=True)
+            self._reflect_state()
+        elif aktion == "record":
+            self._start_recording()
+        elif aktion == "range":
+            self._advanced.set_expanded(True)
+            self._sp_min.setFocus()
+        elif aktion == "source":
+            self._cmb_source.showPopup()
+
+    def _get_recorder(self):
+        if self._recorder is None and get_audio_recorder is not None:
+            try:
+                self._recorder = get_audio_recorder()
+            except Exception:
+                self._recorder = None
+        return self._recorder
+
+    def _audio_running(self) -> bool:
+        if (self._src.kind or self._source_pref) not in AUDIO_KINDS:
+            return False
         try:
             from src.core.audio.capture import get_audio_capture
-            cap = get_audio_capture()
-            err = cap.last_error()
-            self._lbl_status.setText(f"⚠ {err}" if err and kind in AUDIO_KINDS else "")
-            self._level.set_snapshot(cap.snapshot() if kind in AUDIO_KINDS else None)
+            return bool(get_audio_capture().is_running())
         except Exception:
-            self._lbl_status.setText("")
-            self._level.set_snapshot(None)
+            return False
+
+    def _start_recording(self) -> bool:
+        rec = self._get_recorder()
+        now = float(self._clock())
+        if rec is None or not self._audio_running():
+            self.set_ereignis(*rules.ereignis(
+                "Aufnahme nicht möglich", "keine Audio-Quelle läuft",
+                "PC-Audio oder Eingang wählen", aktion="source", now=now))
+            return False
+        rec.on_finished = self._cb_rec
+        ok = bool(rec.start(30))
+        self._refresh_monitor()
+        return ok
+
+    def _on_record_clicked(self):
+        rec = self._get_recorder()
+        if rec is not None and rec.is_running():
+            rec.cancel()
+            return
+        self._start_recording()
+
+    def _on_record_done(self, path: str):
+        rec = self._get_recorder()
+        info = getattr(rec, "last_info", None) or {}
+        rel = str(info.get("datei") or f"audio_diag/{os.path.basename(path)}")
+        self.set_ereignis(*rules.ereignis_aufnahme(
+            rel, float(info.get("dauer_s", 0.0) or 0.0), bool(info.get("abgebrochen", False)),
+            float(self._clock())))
+        self._btn_record.setText(_REC_TEXT)
+
+    def _update_record_button(self, rec, running: bool, kind, cap) -> None:
+        if running:
+            text = f"Aufnahme … {int(rec.progress_s())} s"
+            enabled = True
+        else:
+            text = _REC_TEXT
+            try:
+                enabled = rec is not None and kind in AUDIO_KINDS and cap is not None and bool(cap.is_running())
+            except Exception:
+                enabled = False
+        if self._btn_record.text() != text:
+            self._btn_record.setText(text)
+        if self._btn_record.isEnabled() != enabled:
+            self._btn_record.setEnabled(enabled)
 
     # ── Bedien-Handler ────────────────────────────────────────────────────────
 
@@ -726,10 +996,26 @@ class BpmManagerView(QWidget):
         self._save()
 
     def _on_half(self):
-        self._src.octave(-1)
+        self._octave(-1)
 
     def _on_double(self):
-        self._src.octave(+1)
+        self._octave(+1)
+
+    def _octave(self, step: int):
+        """×½/×2 ueber den Controller; ausserhalb des Tempo-Bereichs (Auto) kommt
+        ``(False, Grund)`` zurueck -> Statuszeilen-Ereignis ~3 s mit Link „Bereich"."""
+        res = self._src.octave(step)
+        ok, _grund = res if isinstance(res, tuple) else (True, None)
+        if ok:
+            return
+        ziel = 0.0
+        try:
+            ziel = float(self._src.octave_target(step))
+        except Exception:
+            pass
+        self.set_ereignis(*rules.ereignis_oktave(
+            step, ziel, float(self._mgr.min_bpm), float(self._mgr.max_bpm), float(self._clock())))
+        self._refresh_monitor()
 
     def _on_lock_toggled(self, checked: bool):
         if self._loading:
@@ -765,7 +1051,8 @@ class BpmManagerView(QWidget):
             from src.core.audio import genre_presets as gp
             p = gp.apply_to_live(key)
         except Exception as e:
-            self._lbl_status.setText(f"Vorlage-Fehler: {e}")
+            self.set_ereignis(*rules.ereignis("Vorlage-Fehler", str(e), schwere="problem",
+                                              now=float(self._clock()), dauer_s=5.0))
             return
         self._loading = True
         try:

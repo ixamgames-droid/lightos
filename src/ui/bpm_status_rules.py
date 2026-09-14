@@ -43,6 +43,7 @@ SUCHFENSTER_S = 6.0          # Fenster, das die Erkennung zum Einrasten braucht 
 ZIEL_LO_DBFS = -30.0         # Pegel-Zielbereich im Ok-Text (wie level_meter.ZIEL_*)
 ZIEL_HI_DBFS = -6.0
 EREIGNIS_S = 3.0             # so lange zeigt die Zeile ein Ereignis (×2 ausserhalb Bereich)
+EREIGNIS_AUFNAHME_S = 20.0   # „Aufnahme gespeichert — …" steht laenger (Dateiname abschreiben)
 AN_S = 2.0                   # Hysterese: Stoerung erscheint nach so viel Anhalten
 AUS_S = 3.0                  # Hysterese: Stoerung verschwindet nach so viel Abwesenheit
 
@@ -129,6 +130,26 @@ def ereignis_oktave(step: int, ziel_bpm: float, min_bpm: float, max_bpm: float,
         f"(Bereich {grenze})",
         "Tempo-Bereich in „Erweitert“ anpassen", "range", key="ereignis_oktave")
     return line, now + EREIGNIS_S
+
+
+def ereignis_aufnahme(datei_rel: str, dauer_s: float, abgebrochen: bool,
+                      now: float) -> tuple[StatusLine, float]:
+    """Ereignis nach einer Aufnahme; ``datei_rel`` NUR relativ (audio_diag/<datei>.wav)."""
+    if abgebrochen:
+        line = StatusLine("hinweis", "Aufnahme abgebrochen",
+                          f"{datei_rel} ({dauer_s:.0f} s)",
+                          "Datei trotzdem an Robin/Support schicken", None, key="ereignis_aufnahme")
+    else:
+        line = StatusLine("ok", "Aufnahme gespeichert", datei_rel,
+                          "Datei an Robin/Support schicken", None, key="ereignis_aufnahme")
+    return line, now + EREIGNIS_AUFNAHME_S
+
+
+def ereignis(problem: str, ursache: str, abhilfe: str = "", schwere: str = "hinweis",
+             aktion: str | None = None, now: float = 0.0,
+             dauer_s: float = EREIGNIS_S) -> tuple[StatusLine, float]:
+    """Allgemeines kurzes Ereignis (z. B. „Aufnahme nicht möglich")."""
+    return StatusLine(schwere, problem, ursache, abhilfe, aktion, key="ereignis"), now + dauer_s
 
 
 # ── Regeln ───────────────────────────────────────────────────────────────────
@@ -436,13 +457,15 @@ _RULES = (
 # ── Hysterese ────────────────────────────────────────────────────────────────
 
 _RANG = {"ok": 0, "hinweis": 1, "problem": 2}
+SOFORT_KEYS = ("ereignis", "aufnahme")   # Rueckmeldung auf einen Klick: nie verzoegert
 
 
 class StatusHysterese:
     """Entprellt die Statuszeile. Eine Stoerung (``stabil``) erscheint erst nach
     ``an_s`` Anhalten und verschwindet erst nach ``aus_s`` Abwesenheit; alles
     andere wechselt sofort (eine sofortige Zeile verdraengt eine gehaltene
-    Stoerung nur, wenn sie mindestens gleich schwer ist). Uhr injizierbar."""
+    Stoerung nur, wenn sie mindestens gleich schwer ist). Ereignisse und die
+    laufende Aufnahme (``SOFORT_KEYS``) erscheinen immer sofort. Uhr injizierbar."""
 
     def __init__(self, clock=None, an_s: float = AN_S, aus_s: float = AUS_S):
         import time
@@ -464,7 +487,7 @@ class StatusHysterese:
     def update(self, line: StatusLine, now: float | None = None) -> StatusLine:
         t = self._clock() if now is None else float(now)
         shown = self._shown
-        if shown is None or line.key == shown.key:
+        if shown is None or line.key == shown.key or line.key.startswith(SOFORT_KEYS):
             self._shown, self._shown_seen = line, t
             self._cand_key = None
             return line
@@ -533,4 +556,4 @@ class ChipHysterese:
 
 
 __all__ = ["StatusLine", "MgrState", "Os2lState", "status_line", "StatusHysterese", "chips",
-           "ChipHysterese", "ereignis_oktave"]
+           "ChipHysterese", "ereignis_oktave", "ereignis_aufnahme", "ereignis"]

@@ -133,6 +133,22 @@ def test_ereignis_laeuft_nach_3_s_ab():
     assert status_line(cap(), det(), m, None, 103.1).key == "ok"
 
 
+def test_ereignis_verdraengt_gehaltene_stoerung_sofort():
+    h = StatusHysterese()
+    h.update(_brumm(), 0.0)
+    m = replace(PC, ereignis=_EV, ereignis_bis=_EV_BIS)
+    assert h.update(status_line(cap(), det(hum_ratio=0.8), m, None, 101.0), 101.0).key == "ereignis_oktave"
+
+
+def test_ereignis_aufnahme_nur_relativer_pfad():
+    line, bis = R.ereignis_aufnahme("audio_diag/lightos_eingang_20260914-120000.wav", 30.0, False, 5.0)
+    assert line.text == ("Aufnahme gespeichert — audio_diag/lightos_eingang_20260914-120000.wav — "
+                         "Datei an Robin/Support schicken")
+    assert bis == 5.0 + R.EREIGNIS_AUFNAHME_S
+    ab, _ = R.ereignis_aufnahme("audio_diag/x.wav", 12.0, True, 0.0)
+    assert "abgebrochen" in ab.problem and "12 s" in ab.ursache
+
+
 def test_kein_signal_nennt_fehlenden_sink():
     m = replace(PC, sink_missing="alsa_output.usb")
     line = status_line(cap(rms_dbfs_300ms=-120.0), det(state="no_signal", hold_stage=3), m, None, 0)
