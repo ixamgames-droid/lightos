@@ -14,6 +14,13 @@ Persistenz v2 (BPM-07):
   Fremd-Sektionen (``live_view`` u. a.) bleiben (Read-Modify-Write).
 - Das erste v2-Schreiben ueber einer v1-Sektion sichert die Datei einmalig als
   ``ui_prefs.json.v1.bak`` (Rueckfall = zuruecknennen).
+- Eine vorhandene, aber unlesbare ``ui_prefs.json`` (halbe Datei eines anderen,
+  nicht atomaren Schreibers) wird vor dem ersten Ueberschreiben einmalig als
+  ``ui_prefs.json.corrupt.bak`` gesichert — die Fremd-Sektionen darin sind
+  sonst weg, ohne dass es jemand merkt.
+- ``device`` ist das Eingangsgeraet und gilt nur fuer ``source == "input"``;
+  fuer PC-Audio (loopback) bleibt es None, sonst nimmt der Loopback nach dem
+  Neustart das Mikrofon auf (capture.py sucht den Namen mit include_loopback).
 """
 from __future__ import annotations
 import json
@@ -31,7 +38,7 @@ VERSION = 2
 DEFAULTS: dict = {
     "version": VERSION,
     "source": "loopback",        # loopback (PC-Audio) | input (Mikro/Line-In) | os2l | song | off
-    "device": None,              # Geraetename (wird auch fuer PC-Audio gemerkt)
+    "device": None,              # Eingangsgeraet, nur bei source=input (Sink fuer loopback: S5)
     "mode": "auto",              # Manager-Modus: auto | manual
     "min_bpm": 60,               # untere AUTO-Grenze („Tiefen")
     "max_bpm": 200,              # obere AUTO-Grenze („Hoehen")
@@ -156,17 +163,33 @@ def migrate(raw) -> dict:
     return _normalize(raw)
 
 
-def _read_all() -> dict:
-    """Ganze ui_prefs.json (alle Sektionen); {} wenn fehlend/unlesbar."""
+class _Unreadable(Exception):
+    """ui_prefs.json ist vorhanden, aber kein JSON-Objekt (halbe Datei o. ae.)."""
+
+
+def _read_all_strict() -> dict:
+    """Ganze ui_prefs.json (alle Sektionen); {} wenn fehlend, ``_Unreadable``
+    wenn vorhanden-aber-kaputt — damit ``save_settings`` den Kaputt-Fall vom
+    Fehlen unterscheiden und die Datei vor dem Ueberschreiben sichern kann."""
     try:
         with open(_PREFS_PATH, encoding="utf-8") as f:
             data = json.load(f)
     except FileNotFoundError:
         return {}
     except Exception as e:
+        raise _Unreadable(str(e)) from e
+    if not isinstance(data, dict):
+        raise _Unreadable(f"Wurzel ist {type(data).__name__}, kein Objekt")
+    return data
+
+
+def _read_all() -> dict:
+    """Ganze ui_prefs.json (alle Sektionen); {} wenn fehlend/unlesbar."""
+    try:
+        return _read_all_strict()
+    except _Unreadable as e:
         _log(f"ui_prefs.json unlesbar ({e}) → leer")
         return {}
-    return data if isinstance(data, dict) else {}
 
 
 def load_settings() -> dict:
@@ -178,16 +201,18 @@ def _is_v1_section(section) -> bool:
     return isinstance(section, dict) and "version" not in section
 
 
-def _backup_v1_once() -> None:
-    """Erstes v2-Schreiben ueber einer v1-Sektion: Originaldatei einmalig sichern."""
-    bak = f"{_PREFS_PATH}.v1.bak"
+def _backup_once(tag: str) -> None:
+    """Originaldatei einmalig als ``ui_prefs.json.<tag>.bak`` sichern — ``v1``
+    beim ersten v2-Schreiben ueber einer v1-Sektion, ``corrupt`` bevor eine
+    unlesbare Datei ueberschrieben wird. Eine vorhandene Sicherung bleibt."""
+    bak = f"{_PREFS_PATH}.{tag}.bak"
     if os.path.exists(bak) or not os.path.exists(_PREFS_PATH):
         return
     try:
         shutil.copyfile(_PREFS_PATH, bak)
-        _log(f"v1-Sicherung angelegt: {os.path.basename(bak)}")
+        _log(f"{tag}-Sicherung angelegt: {os.path.basename(bak)}")
     except OSError as e:
-        _log(f"v1-Sicherung fehlgeschlagen: {e}")
+        _log(f"{tag}-Sicherung fehlgeschlagen: {e}")
 
 
 def _write_atomic(all_prefs: dict) -> None:
@@ -216,7 +241,14 @@ def save_settings(settings: dict) -> None:
     Dateistand; ungueltige Werte werden mit Log verworfen."""
     try:
         os.makedirs(os.path.dirname(_PREFS_PATH) or _PREFS_DIR, exist_ok=True)
-        all_prefs = _read_all()
+        try:
+            all_prefs = _read_all_strict()
+        except _Unreadable as e:
+            # Nicht stillschweigend durch eine Nur-bpm_settings-Datei ersetzen:
+            # die Fremd-Sektionen (remote_settings, live_view, …) haengen mit drin.
+            _log(f"ui_prefs.json unlesbar ({e}) → Sicherung, dann neu geschrieben")
+            _backup_once("corrupt")
+            all_prefs = {}
         old = all_prefs.get(_KEY)
         if isinstance(old, dict):
             ver = old.get("version", 1)
@@ -224,7 +256,7 @@ def save_settings(settings: dict) -> None:
                 _log(f"version={ver} ist neuer als {VERSION} → nicht ueberschrieben")
                 return
             if _is_v1_section(old):
-                _backup_v1_once()
+                _backup_once("v1")
         all_prefs[_KEY] = _merge_checked(migrate(old), settings or {})
         _write_atomic(all_prefs)
     except Exception as e:
@@ -273,8 +305,10 @@ def apply_to_backend(settings: dict) -> None:
 
 
 def start_auto_if_configured(settings: dict) -> bool:
-    """Startet die konfigurierte Audio-Quelle (``source``: Loopback/Eingang mit
-    ``device`` bzw. OS2L-Server); ``off``/``song`` starten nichts. Danach wird der
+    """Startet die konfigurierte Audio-Quelle (``source``: Loopback, Eingang mit
+    ``device`` bzw. OS2L-Server); ``off``/``song`` starten nichts. ``device``
+    gilt nur fuer den Eingang — ein Loopback bekommt None und loest sein
+    Ausgabegeraet selbst auf (wie der Live-Wechsel im BPM-Tab). Danach wird der
     gespeicherte Manager-``mode`` erneut gesetzt, weil ``use_audio_source(True)``
     AUTO erzwingt — Capture haengt an der Quelle, der Modus am Manager.
     In Tests/Headless via ``LIGHTOS_NO_AUDIO_AUTOSTART`` unterdrueckbar."""
@@ -294,7 +328,7 @@ def start_auto_if_configured(settings: dict) -> bool:
             get_os2l_server().start()
         else:
             from src.core.audio.capture import get_audio_capture
-            get_audio_capture().set_source_mode(source, device)
+            get_audio_capture().set_source_mode(source, device if source == "input" else None)
             mgr.use_audio_source(True)
         mgr.set_mode(mode)
         return True

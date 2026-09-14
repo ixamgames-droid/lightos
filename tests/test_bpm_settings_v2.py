@@ -2,8 +2,12 @@
 nach bpm_arbeit/plan.md Abschnitt 3), Typpruefung je Key, unbekannte Keys weg,
 Fremd-Sektionen bleiben, atomares Schreiben ohne .tmp-Reste, Abbruch laesst die
 alte Datei intakt, neuere Dateiversion bleibt unangetastet, v1-Sicherung genau
-einmal, apply_to_backend je Key abgesichert, Auto-Start liest source/device/mode,
-und die 400-ms-Entprellung der View (250 Ticks → 1 Schreibvorgang).
+einmal, unlesbare Datei wird vor dem Ueberschreiben als .corrupt.bak gesichert,
+apply_to_backend je Key abgesichert, Auto-Start liest source/device/mode (device
+nur fuer input — ein Loopback bekommt None), die 400-ms-Entprellung der View
+(250 Ticks → 1 Schreibvorgang) und dass die View device nur fuer den Eingang
+schreibt. Die View-Tests stubben AudioCapture.start: ein echter PulseAudio-Thread
+im Testprozess endet mit SIGABRT beim Prozessende (Exit 134).
 """
 from __future__ import annotations
 import json
@@ -182,6 +186,41 @@ def test_frische_v2_datei_legt_keine_sicherung_an(bs):
     assert _read(bs)["bpm_settings"]["version"] == 2
 
 
+def test_unlesbare_datei_wird_vor_dem_ueberschreiben_gesichert(bs, capsys):
+    """Halbe Datei eines anderen (nicht atomaren) Schreibers: load → Defaults,
+    save darf sie nicht stillschweigend durch eine Nur-bpm_settings-Datei
+    ersetzen — erst ui_prefs.json.corrupt.bak (einmalig), dann neu schreiben."""
+    halb = '{"live_view": {"zoom": 2}, "bpm_settings": {"version": 2, "min_b'
+    with open(bs._PREFS_PATH, "w", encoding="utf-8") as f:
+        f.write(halb)
+    bak = bs._PREFS_PATH + ".corrupt.bak"
+    assert bs.load_settings() == bs.DEFAULTS        # kein Absturz, Defaults
+    assert not os.path.exists(bak)                  # Lesen allein sichert nicht
+    bs.save_settings({"min_bpm": 90})
+    assert open(bak, encoding="utf-8").read() == halb   # byte-genau gesichert
+    data = _read(bs)
+    assert data["bpm_settings"]["min_bpm"] == 90 and data["bpm_settings"]["version"] == 2
+    assert "corrupt" in capsys.readouterr().out     # Log nennt die Sicherung
+    # Gueltiges JSON, aber kein Objekt: ebenfalls kaputt — die ERSTE Sicherung bleibt
+    with open(bs._PREFS_PATH, "w", encoding="utf-8") as f:
+        f.write("[1, 2]")
+    bs.save_settings({"min_bpm": 95})
+    assert open(bak, encoding="utf-8").read() == halb
+    assert _read(bs)["bpm_settings"]["min_bpm"] == 95
+    assert _tmp_reste(bs) == []
+
+
+def test_fehlende_datei_und_datei_ohne_sektion_sichern_nichts(bs):
+    bak = bs._PREFS_PATH + ".corrupt.bak"
+    bs.save_settings({"min_bpm": 90})               # Datei fehlt: kein Kaputt-Fall
+    assert not os.path.exists(bak)
+    with open(bs._PREFS_PATH, "w", encoding="utf-8") as f:
+        json.dump({"live_view": {"zoom": 2}}, f)    # gueltig, ohne bpm_settings
+    bs.save_settings({"min_bpm": 90})
+    data = _read(bs)
+    assert data["live_view"] == {"zoom": 2} and data["bpm_settings"]["version"] == 2
+    assert not os.path.exists(bak)
+
 # ── apply_to_backend / start_auto_if_configured ────────────────────────────────
 
 def test_apply_to_backend_ein_fehler_ueberspringt_nicht_den_rest(bs, monkeypatch):
@@ -261,10 +300,13 @@ def test_start_auto_off_und_song_starten_nichts(bs, fake_backend):
     assert cap.calls == [] and mgr.calls == []
 
 
-def test_start_auto_loopback_merkt_geraet(bs, fake_backend):
+def test_start_auto_loopback_nimmt_kein_eingangsgeraet(bs, fake_backend):
+    """Ein gespeicherter Mikrofonname darf den Loopback nicht aufs Mikrofon lenken
+    (capture.py loest den Namen mit include_loopback=True auf): PC-Audio startet
+    wie beim Live-Wechsel im Tab ohne Geraet; der Sink-Name kommt mit S5."""
     cap, mgr = fake_backend
     assert bs.start_auto_if_configured({"source": "loopback", "device": "Line Out"}) is True
-    assert cap.calls == [("source", "loopback", "Line Out")]
+    assert cap.calls == [("source", "loopback", None)]
 
 
 # ── View: Entprellung ──────────────────────────────────────────────────────────
@@ -292,6 +334,28 @@ def save_counter(bs, monkeypatch):
     real = bs.save_settings
     monkeypatch.setattr(bs, "save_settings", lambda s: (calls.append(dict(s)), real(s)))
     return calls
+
+
+@pytest.fixture(autouse=True)
+def _kein_echtes_capture(monkeypatch):
+    """Ein Quellenwechsel in der View startet den echten Capture
+    (_on_source_changed → mgr.use_audio_source(True) → cap.start()); der
+    PulseAudio-Thread ueberlebt bis zum Prozessende und stirbt dort mit SIGABRT
+    (Exit 134 — das segmentierte Gate wertet den Exit-Code). start() ist hier
+    ein No-op; danach Quelle und Manager zuruecksetzen."""
+    import src.core.audio.capture as cap_mod
+    from src.core.engine.bpm_manager import get_bpm_manager
+    starts = []
+
+    def _no_start(self):
+        starts.append(self.source_mode)
+        return False
+    monkeypatch.setattr(cap_mod.AudioCapture, "start", _no_start)
+    cap, mgr = cap_mod.get_audio_capture(), get_bpm_manager()
+    yield starts
+    mgr.use_audio_source(False)
+    cap.set_source_mode("loopback")
+    assert not cap.is_running()
 
 
 def test_view_250_ticks_ergeben_einen_schreibvorgang(qapp, bs, save_counter):
@@ -375,6 +439,39 @@ def test_view_source_off_ueberlebt_fremde_saves(qapp, bs, save_counter):
     v._rb_input.setChecked(True)                     # Nutzer waehlt die Quelle selbst
     v.flush_pending_save()
     assert save_counter[-1]["source"] == "input"
+    v.hide()
+    v.deleteLater()
+    qapp.processEvents()
+
+
+def test_view_schreibt_geraet_nur_fuer_eingang(qapp, bs, save_counter, monkeypatch,
+                                               _kein_echtes_capture):
+    """PC-Audio darf keinen Mikrofonnamen als device speichern: die Combo listet
+    nur Eingaenge, und start_auto wuerde den Namen mit include_loopback=True
+    aufloesen — nach dem Neustart naehme PC-Audio das Mikrofon auf. Live-Wechsel
+    und Neustart muessen dieselbe Quelle/dasselbe Geraet ergeben."""
+    import src.core.audio.capture as cap_mod
+    from src.ui.views.bpm_manager_view import BpmManagerView
+    monkeypatch.setattr(cap_mod.AudioCapture, "list_input_devices",
+                        staticmethod(lambda: ["USB Audio CODEC Analog Stereo"]))
+    cap = cap_mod.get_audio_capture()
+    v = BpmManagerView()
+    v.show()
+    qapp.processEvents()
+    v._rb_input.setChecked(True)
+    v.flush_pending_save()
+    assert (save_counter[-1]["source"], save_counter[-1]["device"]) == \
+        ("input", "USB Audio CODEC Analog Stereo")
+    v._rb_loop.setChecked(True)
+    v.flush_pending_save()
+    assert (save_counter[-1]["source"], save_counter[-1]["device"]) == ("loopback", None)
+    assert (cap.source_mode, cap._device_name) == ("loopback", None)   # Live-Wechsel
+    assert _kein_echtes_capture[-1] == "loopback" and not cap.is_running()   # nur der Stub lief
+    # Neustart mit dieser Datei: derselbe Zustand wie nach dem Live-Wechsel
+    monkeypatch.delenv("LIGHTOS_NO_AUDIO_AUTOSTART", raising=False)
+    assert bs.load_settings()["device"] is None
+    assert bs.start_auto_if_configured(bs.load_settings()) is True
+    assert (cap.source_mode, cap._device_name) == ("loopback", None)
     v.hide()
     v.deleteLater()
     qapp.processEvents()

@@ -1293,13 +1293,17 @@ class BpmManagerView(QWidget):
         return True
 
     def _write_settings(self):
-        """Der eigentliche Schreibvorgang (v2-Keys: source/device/mode/…)."""
+        """Der eigentliche Schreibvorgang (v2-Keys: source/device/mode/…).
+        ``device`` nur fuer den Eingang: die Combo listet ausschliesslich
+        Eingaenge (``list_input_devices``), und ein Mikrofonname unter
+        ``loopback`` liesse PC-Audio nach dem Neustart das Mikrofon aufnehmen
+        (Live-Wechsel ruft ``set_source_mode("loopback")`` ohne Geraet)."""
         dev = self._cmb_device.currentText() or None
         if dev and dev.startswith("("):
             dev = None
         bpm_settings.save_settings({
             "source": self._source_pref,
-            "device": dev,
+            "device": dev if self._source_pref == "input" else None,
             "mode": "auto" if self._rb_auto.isChecked() else "manual",
             "min_bpm": self._sp_min.value(),
             "max_bpm": self._sp_max.value(),

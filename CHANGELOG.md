@@ -7,21 +7,27 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
-### 2026-09-14 — BPM-Einstellungen: versioniert (v2), sicher geschrieben, Gerät wird gemerkt
+### 2026-09-14 — BPM-Einstellungen: versioniert (v2), sicher geschrieben
 
 #### Neu / Geändert
 
-- **BPM-Einstellungen: versioniert (v2), werden sicher geschrieben; Gerät wird auch
-  für PC-Audio gemerkt.** Die Sektion `bpm_settings` in `ui_prefs.json` trägt jetzt
-  ein Versionsfeld; alte Dateien werden beim Start migriert (die Originaldatei
-  bleibt einmalig als `ui_prefs.json.v1.bak` liegen). Geschrieben wird atomar
-  (Temp-Datei + Umbenennen) — ein Absturz oder voller Datenträger hinterlässt nie
-  eine halbe Datei. Ungültige Werte fallen auf den Standard zurück, unbekannte
-  Einträge werden verworfen (mit Meldung im Log); eine Datei einer neueren
-  LightOS-Version bleibt unangetastet. Der BPM-Tab schreibt entprellt: ein
-  Sliderzug ergibt einen Schreibvorgang statt hunderte. Ein gespeicherter
+- **BPM-Einstellungen: versioniert (v2), werden sicher geschrieben.** Die Sektion
+  `bpm_settings` in `ui_prefs.json` trägt jetzt ein Versionsfeld; alte Dateien
+  werden beim Start migriert (die Originaldatei bleibt einmalig als
+  `ui_prefs.json.v1.bak` liegen). Geschrieben wird atomar (Temp-Datei +
+  Umbenennen) — ein Absturz oder voller Datenträger hinterlässt nie eine halbe
+  Datei. Ist `ui_prefs.json` beim Speichern unlesbar (halbe Datei eines anderen
+  Schreibers), wird sie vor dem Überschreiben einmalig als
+  `ui_prefs.json.corrupt.bak` gesichert, statt die übrigen Einstellungen darin
+  stillschweigend zu verlieren. Ungültige Werte fallen auf den Standard zurück,
+  unbekannte Einträge werden verworfen (mit Meldung im Log); eine Datei einer
+  neueren LightOS-Version bleibt unangetastet. Der BPM-Tab schreibt entprellt:
+  ein Sliderzug ergibt einen Schreibvorgang statt hunderte. Ein gespeicherter
   MANUAL-Modus überlebt jetzt den Neustart, auch wenn die Audio-Quelle startet.
-  Keine Änderung an der Bedienung.
+  Das Eingangsgerät wird nur für „Eingang" gemerkt: PC-Audio nimmt nach dem
+  Neustart wie beim Umschalten das Standard-Ausgabegerät — vorher konnte ein
+  gemerkter Mikrofonname den Loopback auf das Mikrofon lenken. Keine Änderung an
+  der Bedienung.
 
 ### 2026-09-14 — BPM: neue Live-Erkennung (Spectral Flux + Autokorrelation)
 

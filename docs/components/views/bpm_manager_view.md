@@ -42,8 +42,10 @@ Die Einstellungen liegen in `ui_prefs.json`, Sektion `bpm_settings`, Version 2
   liest danach in `_load_into_controls` den **Backend-Zustand** (Grenzen, Takt,
   Unterteilung, Taktgenau) — nur Audio-Quelle und Gerät kommen aus den Prefs,
   weil der Capture gestoppt oder die Quelle `off` sein kann.
-- **Keys v2:** `source` (`loopback`/`input`/`os2l`/`song`/`off`), `device` (wird
-  auch für PC-Audio gemerkt), `mode`, `min_bpm`, `max_bpm`, `beats_per_bar`,
+- **Keys v2:** `source` (`loopback`/`input`/`os2l`/`song`/`off`), `device`
+  (Eingangsgerät — nur bei `input`, sonst `null`; ein Mikrofonname unter
+  `loopback` würde PC-Audio nach dem Neustart auf das Mikrofon lenken, ein
+  Sink-Name für PC-Audio kommt mit S5), `mode`, `min_bpm`, `max_bpm`, `beats_per_bar`,
   `phase_accurate_beats`; geduldet bis S4: `sensitivity`, `smoothing`,
   `subdivision`. Alte v1-Dateien (`auto_default`/`mode_default`/`source_mode`/
   `input_device`) werden beim Laden migriert; das erste Schreiben sichert die
@@ -56,14 +58,18 @@ Die Einstellungen liegen in `ui_prefs.json`, Sektion `bpm_settings`, Version 2
   läuft in `hideEvent`/`closeEvent` (und in Tests vor dem Lese-Assert).
 - **Atomar:** tmp-Datei im selben Ordner + `flush` + `fsync` + `os.replace`;
   Fremd-Sektionen (`live_view` u. a.) bleiben erhalten. Bricht das Schreiben ab,
-  bleibt die alte Datei vollständig, die tmp wird entfernt.
+  bleibt die alte Datei vollständig, die tmp wird entfernt. Ist die Datei beim
+  Speichern vorhanden, aber unlesbar (halbe Datei eines nicht atomaren
+  Schreibers), wird sie vor dem Überschreiben einmalig als
+  `ui_prefs.json.corrupt.bak` gesichert.
 
 ## Zugehörige Tests
 
 - `tests/test_bpm_view.py`, `test_bpm_view_speeds.py` — View-Verhalten/Speeds.
 - `tests/test_bpm_settings_v2.py` — Persistenz v2: Migration (Beispiel aus
-  `plan.md` 3. byte-genau), Typprüfung, atomares Schreiben, v1-Sicherung,
-  Entprellung (250 Ticks → 1 Schreibvorgang), `flush_pending_save()`.
+  `plan.md` 3. byte-genau), Typprüfung, atomares Schreiben, v1-/corrupt-Sicherung,
+  Entprellung (250 Ticks → 1 Schreibvorgang), `flush_pending_save()`, `device`
+  nur für `input` (View und Auto-Start); `AudioCapture.start` ist dort gestubbt.
 - `tests/test_bpm_leader.py` — Leader-Quelle, Roundtrip/`apply_to_backend`.
 - `tests/test_bpm_meter.py`, `test_bpm_timeline.py`, `test_vc_bpm.py`.
 
