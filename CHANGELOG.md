@@ -7,6 +7,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-14 — BPM: Tempo-Buses in eigenem Sub-Tab
+
+#### Neu / Geändert
+
+- **BPM: Tempo-Buses, Grand-Master und Effekte je Bus haben einen eigenen
+  Sub-Tab; doppelter Knopf „Aktualisieren" entfernt.** Die Sektion BPM hat jetzt
+  drei Sub-Tabs **Manager | Tempo-Buses | Generator**. Die Gruppen
+  „Tempo-Speeds & Grand-Master" und „Effekte je Bus — taktgleich" sind
+  unverändert vom Manager in den Sub-Tab „Tempo-Buses" gezogen (gleiche
+  Beschriftungen, gleiche Bedienung); der Manager zeigt nur noch Monitor und
+  Einstellungen. Der zweite Knopf „Aktualisieren" unter der Bus-Tabelle ist
+  weg — die Tabelle zieht ohnehin alle 150 ms nach, „⟳ Aktualisieren" im
+  Effekte-Panel bleibt. Keine Änderung an Datenformat oder Show-Datei.
+
 ### 2026-09-14 — BPM-Einstellungen: versioniert (v2), sicher geschrieben
 
 #### Neu / Geändert

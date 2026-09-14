@@ -134,13 +134,13 @@ def test_auto_sync_button_action_exists():
     assert ButtonAction.AUTO_SYNC in {a for a, _ in BUTTON_ACTION_LABELS}
 
 
-# ── BPM-Manager-Tab: fester Auto-Sync-Toggle + „Jetzt synchronisieren" ──────────
+# ── Tempo-Buses-Tab (bis BPM-08: BPM-Manager-Tab): fester Auto-Sync-Toggle + „Jetzt synchronisieren" ──────────
 def test_bpm_view_auto_sync_toggle_drives_and_reflects_manager():
     reset_tempo_bus_manager()
-    from src.ui.views.bpm_manager_view import BpmManagerView
+    from src.ui.views.tempo_bus_view import TempoBusView
     tbm = get_tempo_bus_manager()
     tbm.set_auto_sync(False)
-    view = BpmManagerView()
+    view = TempoBusView()
     try:
         assert view._chk_auto_sync.isChecked() is False   # spiegelt Aus-Zustand
         view._chk_auto_sync.setChecked(True)              # User-Toggle treibt Manager
@@ -157,9 +157,9 @@ def test_bpm_view_auto_sync_toggle_drives_and_reflects_manager():
 
 def test_bpm_view_sync_now_reanchors_all_buses():
     reset_tempo_bus_manager()
-    from src.ui.views.bpm_manager_view import BpmManagerView
+    from src.ui.views.tempo_bus_view import TempoBusView
     tbm = get_tempo_bus_manager(); fm = get_function_manager(); mgr = get_bpm_manager()
-    view = BpmManagerView()
+    view = TempoBusView()
     try:
         mgr.set_manual_bpm(120.0)
         d = tbm.get("default")

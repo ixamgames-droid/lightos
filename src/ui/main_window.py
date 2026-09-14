@@ -1039,7 +1039,7 @@ class MainWindow(QMainWindow):
         self._stack.addWidget(self._build_section_playback())
         # Sektion 6: Eingabe / Ausgabe
         self._stack.addWidget(self._build_section_io())
-        # Sektion 7: BPM (Manager | Generator)
+        # Sektion 7: BPM (Manager | Tempo-Buses | Generator)
         bpm_tabs = _SubTabs()
         try:
             from src.ui.views.bpm_manager_view import BpmManagerView
@@ -1048,6 +1048,13 @@ class MainWindow(QMainWindow):
             print(f"[main_window] BpmManagerView init error: {e}")
             self._bpm_manager_view = QWidget()
         bpm_tabs.addTab(self._bpm_manager_view, "Manager")
+        try:
+            from src.ui.views.tempo_bus_view import TempoBusView
+            self._tempo_bus_view = TempoBusView()
+        except Exception as e:
+            print(f"[main_window] TempoBusView init error: {e}")
+            self._tempo_bus_view = QWidget()
+        bpm_tabs.addTab(self._tempo_bus_view, "Tempo-Buses")
         try:
             from src.ui.views.bpm_generator_view import BpmGeneratorView
             self._bpm_generator_view = BpmGeneratorView()

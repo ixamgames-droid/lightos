@@ -38,8 +38,10 @@ die **BPM-Quelle**. Er ist die einfache Hauptsteuerung — alles andere ist Fein
 
 ![Manager-Tab — Monitor, Tempo-Speeds, Einstellungen](img/manager_oben.png)
 
-Der Manager-Tab besteht von oben nach unten aus drei Blöcken: **Monitor** (Anzeige),
-**Tempo-Speeds & Grand-Master** (Bus-Tempi) und **Einstellungen** (alle Regler).
+Der Manager-Tab besteht von oben nach unten aus zwei Blöcken: **Monitor** (Anzeige)
+und **Einstellungen** (alle Regler). **Tempo-Speeds & Grand-Master** (Bus-Tempi) liegt
+seit 2026-09-14 im eigenen Sub-Tab **„Tempo-Buses"** (im Bild oben noch zwischen den
+beiden Blöcken; die Sektion BPM hat jetzt Manager | Tempo-Buses | Generator).
 
 ### 1.1 Monitor — was läuft gerade?
 
@@ -58,9 +60,9 @@ Der Manager-Tab besteht von oben nach unten aus drei Blöcken: **Monitor** (Anze
 > schau zuerst hierher: Stimmt die Zahl? Führt die richtige Quelle? Ist die
 > Erkennungs-Qualität hoch?
 
-### 1.2 Tempo-Speeds & Grand-Master (kurz)
+### 1.2 Tempo-Speeds & Grand-Master (kurz — Sub-Tab „Tempo-Buses")
 
-Diese Tabelle steuert die **Tempo-Busse** (eigene Tempi pro Effektgruppe, ½×/2× usw.)
+Diese Tabelle (Sub-Tab **„Tempo-Buses"**) steuert die **Tempo-Busse** (eigene Tempi pro Effektgruppe, ½×/2× usw.)
 und den **Grand-Master**, der bei Bedarf *alle* Master-Busse auf ein gemeinsames Tempo
 zwingt. Das ist ein eigenes Thema — Details in
 [ANLEITUNG_SPEED_BPM.md](../anleitung_speed_bpm/ANLEITUNG_SPEED_BPM.md). Für den

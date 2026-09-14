@@ -47,9 +47,9 @@ BPM-Anzeige — das entspricht dem „Erscheinungsbild" in QLC+).
 
 ---
 
-## 3. Mehrere Tempo-Master + Grand-Master verwalten (BPM-Tab, Strg+8)
+## 3. Mehrere Tempo-Master + Grand-Master verwalten (BPM-Tab, Strg+8, Sub-Tab „Tempo-Buses")
 
-Im **BPM**-Tab gibt es das Panel **„Tempo-Speeds & Grand-Master"**:
+Im **BPM**-Tab, Sub-Tab **„Tempo-Buses"**, gibt es das Panel **„Tempo-Speeds & Grand-Master"**:
 
 ![Tempo-Speeds & Grand-Master Panel](panel.png)
 

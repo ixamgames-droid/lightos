@@ -1,4 +1,4 @@
-"""Phase D2: Tempo-Speeds & Grand-Master-Panel im BPM-Manager-Tab.
+"""Phase D2: Tempo-Speeds & Grand-Master-Panel im Tempo-Buses-Tab (bis BPM-08: BPM-Manager-Tab).
 
 Headless (offscreen Qt). Das Panel mutiert ausschliesslich den TempoBusManager;
 hier wird ueber die echten Widgets gefahren und der Manager-Zustand geprueft.
@@ -79,8 +79,8 @@ def _row_for(view, busid: str) -> int:
 
 
 def _make_view(qapp):
-    from src.ui.views.bpm_manager_view import BpmManagerView
-    v = BpmManagerView()
+    from src.ui.views.tempo_bus_view import TempoBusView
+    v = TempoBusView()
     qapp.processEvents()
     return v
 

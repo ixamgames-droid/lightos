@@ -48,7 +48,7 @@ fehlt zunaechst hier und macht das Gate rot (Schutz gegen Doku-Drift).
 
 Spalten: **headless** = ohne Argumente offscreen baubar · **Tooltip/Label** = mind. ein beschrifteter Text/Tooltip · **Aktion/Signal** = Button/`QAction`/Klassen-`Signal` vorhanden · **Regressionstest** = abdeckende Testdatei · **Doc** = Komponentenseite · **Verifikationspfad** = ausfuehrbarer `pytest`-Testname ODER `manuell`.
 
-**Stand:** 24 no-arg Views (24 headless baubar), 19 VC-Widgets (19 headless baubar).
+**Stand:** 25 no-arg Views (25 headless baubar), 19 VC-Widgets (19 headless baubar).
 
 ### Views (`src/ui/views/*.py`, no-arg `*View`)
 
@@ -77,6 +77,7 @@ Spalten: **headless** = ohne Argumente offscreen baubar · **Tooltip/Label** = m
 | `show_manager_view.py` | `ShowManagerView` | ja | ja | ja | `tests/test_ui_smoke_enumerated.py` | `docs/components/views/show_manager_view.md` | `test_every_no_arg_view_builds` |
 | `simple_desk.py` | `SimpleDeskView` | ja | ja | ja | `tests/test_ui_smoke_enumerated.py` | — | `test_every_no_arg_view_builds` |
 | `snapshots_view.py` | `SnapshotsView` | ja | ja | ja | `tests/test_ui_smoke_enumerated.py` | `docs/components/views/snapshots_view.md` | `test_every_no_arg_view_builds` |
+| `tempo_bus_view.py` | `TempoBusView` | ja | ja | ja | `tests/test_ui_smoke_enumerated.py` | `docs/components/views/tempo_bus_view.md` | `test_every_no_arg_view_builds` |
 | `virtual_console_view.py` | `VirtualConsoleView` | ja | ja | ja | `tests/test_ui_smoke_enumerated.py` | `docs/components/views/virtual_console_view.md` | `test_every_no_arg_view_builds` |
 
 ### Virtual Console (`WIDGET_REGISTRY`)

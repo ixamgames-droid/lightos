@@ -43,7 +43,7 @@ REPORT_PATH = REPO / "docs" / "UI_TOOLTIP_COVERAGE.md"
 BASELINE: dict[str, int] = {
     "audio_input_view": 0,
     "bpm_generator_view": 0,
-    "bpm_manager_view": 1,
+    "bpm_manager_view": 0,
     "channel_groups_view": 1,
     "curve_library_view": 0,
     "dmx_monitor_view": 0,
@@ -64,6 +64,9 @@ BASELINE: dict[str, int] = {
     "show_manager_view": 0,
     "simple_desk": 0,
     "snapshots_view": 0,
+    # BPM-08: der eine Verstoss (qt_tableview_cornerbutton der Bus-Tabelle)
+    # ist mit der Tabelle von bpm_manager_view hierher gezogen.
+    "tempo_bus_view": 1,
     "virtual_console_view": 0,
 }
 

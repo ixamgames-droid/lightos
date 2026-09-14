@@ -248,7 +248,8 @@ Eigene Sektion für das Tempo: **AUTO** (Beat-Erkennung aus dem PC-Audio
 gesetzte Tempo treibt alle Beat-Effekte (Chaser im Beat-Modus, Tempo-Busse). Die
 obere Leiste spiegelt BPM-Wert, AUTO/MAN-Badge und Beat-Indikator.
 
-Im selben Tab liegt das Panel **„Tempo-Speeds & Grand-Master"**: hier legst du
+Im Sub-Tab **„Tempo-Buses"** derselben Sektion liegt das Panel
+**„Tempo-Speeds & Grand-Master"**: hier legst du
 **mehrere Tempo-Master** an (benennbar, z. B. „Bass"/„Drums"), machst einzelne zu
 **Subs** (folgen einem Master mit Faktor ¼…×4) und schaltest den
 **Grand-Master** scharf, der bei Bedarf alle übertrumpft. Die Bedienung am
