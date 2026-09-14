@@ -182,7 +182,14 @@ def test_leser_ohne_lock_sieht_immer_stimmige_snapshots():
     assert not fehler and m.snapshot().chunks == 300
 
 
-def test_cpu_budget_hoechstens_0_05_ms_je_1024er_chunk():
+def test_cpu_budget_hoechstens_0_10_ms_je_1024er_chunk():
+    """Budget je 1024er-Chunk (23,2 ms Audio): 0,10 ms = 0,4 % davon.
+
+    S5 legte 0,05 ms fest (gemessen 0,018 ms). Seit S6 rechnet der Meter einmal je
+    Sekunde Audio die Netzlinie (FFT ueber 4 s auf 2,8 kHz dezimiert) — im Mittel
+    0,0375 ms je Chunk. Mit 0,05 ms blieb nur 1,3-facher Abstand, zu wenig fuer ein
+    lastempfindliches Gate. Der Test soll eine Groessenordnungs-Regression fangen
+    (z. B. FFT je Chunk statt je Sekunde: ~0,4 ms), nicht Mikrosekunden."""
     m = LevelMeter(SR)
     rng = np.random.default_rng(1)
     chunk = (rng.standard_normal(N) * 0.2).astype(np.float32)
@@ -196,7 +203,7 @@ def test_cpu_budget_hoechstens_0_05_ms_je_1024er_chunk():
             m.on_chunk(chunk)
         best = min(best, (time.perf_counter() - t0) / runs * 1000.0)
     print(f"LevelMeter: {best:.4f} ms/Chunk")
-    assert best <= 0.05, f"{best:.4f} ms je Chunk"
+    assert best <= 0.10, f"{best:.4f} ms je Chunk"
 
 
 # ── Netzlinie (BPM-11, S6): Brumm vs. gehaltener Bass ────────────────────────
