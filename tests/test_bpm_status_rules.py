@@ -1,0 +1,242 @@
+"""BPM-11 (S6): Statuszeile Problem — Ursache — Abhilfe als reine Regeln.
+
+Jede Situation als Snapshot-Fixture -> erwartete Schwere/Aktion + Schluesselwort;
+Text nie leer; Hysterese 2 s an / 3 s aus (Uhr gestellt); Chips inkl. der
+gemessenen Brumm-Faelle (hum_ratio mit dem echten BeatDetector, 2026-09-14).
+"""
+from __future__ import annotations
+
+from dataclasses import replace
+
+import pytest
+
+from src.core.audio.level_meter import CaptureSnapshot
+from src.core.audio.tempo_tracker import DetectorSnapshot
+from src.ui import bpm_status_rules as R
+from src.ui.bpm_status_rules import (
+    ChipHysterese, MgrState, Os2lState, StatusHysterese, StatusLine, chips, ereignis_oktave,
+    status_line,
+)
+
+# Gemessen (bpm_bench/signals.py, BeatDetector, Werte ab t > 3 s):
+HUM_KICK_128_MAX = 0.000            # (i)
+HUM_KICK_BASS_HATS_128_MAX = 0.000  # (ii)
+HUM_KICK_BRUMM_SNR0_MIN = 0.517     # (iii) Kick −30 dB + Brumm 50 Hz −30 dBFS
+HUM_KICK_BRUMM_SNR0_MED = 0.594
+HUM_REINER_BRUMM = 0.994            # (iv)
+
+
+def det(**kw) -> DetectorSnapshot:
+    base = dict(sample_pos=0, sample_rate=44100, state="locked", hold_stage=0, bpm=128.0,
+                bpm_raw=128.0, confidence=0.9, alt_bpm=64.0, alt_score=0.1, tempo_hint=None,
+                next_beat_sample=0, beat_latency_ms=0, window_s=6.0, window_filled_s=6.0,
+                signal_s=20.0, level_rms_dbfs=-18.0, peak_dbfs=-6.0, clip_1s=0,
+                noise_floor_dbfs=-60.0, hum_ratio=0.0, hum_hz=0, dc_offset=0.0, backlog_ms=5.0,
+                jitter_ms=2.0, onset_contrast=8.0)
+    base.update(kw)
+    return DetectorSnapshot(**base)
+
+
+def cap(**kw) -> CaptureSnapshot:
+    base = dict(rms_dbfs_300ms=-18.0, rms_dbfs_1s=-18.0, peak_dbfs=-6.0, peak_hold_dbfs=-6.0,
+                chunk_ms_p95=24.0, chunks=500, running=True)
+    base.update(kw)
+    return CaptureSnapshot(**base)
+
+
+PC = MgrState(kind="loopback", device_label="Built-in Audio", bpm=128.0)
+IN = MgrState(kind="input", device_label="USB Audio CODEC", bpm=128.0)
+_EV, _EV_BIS = ereignis_oktave(+1, 256.0, 60.0, 200.0, now=100.0)
+
+# (id, cap, det, mgr, os2l, now, schwere, aktion, schluesselwort)
+FAELLE = [
+    ("ereignis_oktave", cap(), det(), replace(PC, ereignis=_EV, ereignis_bis=_EV_BIS), None, 101.0,
+     "hinweis", "range", "Tempo-Bereich"),
+    ("aufnahme", cap(), det(), replace(IN, aufnahme_s=12.0), None, 0, "hinweis", None, "12 / 30 s"),
+    ("audio_fehlt", None, None, replace(IN, audio_available=False), None, 0, "problem", "source", "soundcard"),
+    ("monitor_als_eingang", cap(running=False), None,
+     replace(IN, capture_error="no soundcard with id Monitor of Built-in"), None, 0, "problem", "source", "Monitor"),
+    ("capture_fehler", cap(running=False), None, replace(IN, capture_error="Aufnahme abgebrochen: device lost"),
+     None, 0, "problem", "reconnect", "device lost"),
+    ("capture_haengt", cap(running=False), None, replace(IN, capture_error="Vorheriger Audio-Thread haengt noch"),
+     None, 0, "problem", "source", "Neustart"),
+    ("capture_gestoppt", cap(running=False), det(), IN, None, 0, "problem", "reconnect", "erneut verbinden"),
+    ("kein_signal", cap(rms_dbfs_300ms=-70.0, rms_dbfs_1s=-70.0), det(state="no_signal", hold_stage=3),
+     IN, None, 0, "problem", "source", "−70 dBFS"),
+    ("sink_fehlt", cap(), det(), replace(PC, sink_missing="alsa_output.usb"), None, 0, "hinweis", "source",
+     "Standardausgabe"),
+    ("clip", cap(clip_chunks_1s=5, clip_samples_1s=140, peak_hold_dbfs=0.0), det(), IN, None, 0,
+     "problem", None, "Übersteuert"),
+    ("brumm", cap(), det(hum_ratio=0.71, hum_hz=50), IN, None, 0, "problem", "record", "71 %"),
+    ("leise", cap(rms_dbfs_300ms=-44.0, rms_dbfs_1s=-44.0), det(), IN, None, 0, "hinweis", None, "−44 dBFS"),
+    ("jitter", cap(chunk_ms_p95=95.0), det(), IN, None, 0, "hinweis", "record", "95 ms"),
+    ("dc", cap(dc_offset=0.05), det(), IN, None, 0, "hinweis", "record", "+0.050"),
+    ("os2l_aus", None, None, MgrState(kind="os2l"), Os2lState(running=False), 0, "problem", "reconnect",
+     "läuft nicht"),
+    ("os2l_wartet", None, None, MgrState(kind="os2l"), Os2lState(running=True, port=1234), 0, "hinweis", None,
+     "VirtualDJ"),
+    ("os2l_ok", None, None, MgrState(kind="os2l"), Os2lState(running=True, last_bpm=126.0), 0, "ok", None,
+     "126 BPM"),
+    ("song_ohne_titel", None, None, MgrState(kind="song", song_available=False), None, 0, "hinweis", None,
+     "kein analysierter Titel"),
+    ("song_ok", None, None, MgrState(kind="song", song_available=True, bpm=124.0), None, 0, "ok", None, "124"),
+    ("aus", None, None, MgrState(kind="off"), None, 0, "hinweis", "source", "Quelle wählen"),
+    ("eingefroren", cap(), det(), replace(IN, locked=True), None, 0, "hinweis", "range", "Eingefroren"),
+    ("manuell", cap(), det(bpm=127.8), replace(IN, manual=True, bpm=128.0), None, 0, "ok", None, "127.8"),
+    ("manuell_aus", cap(), det(), replace(IN, manual=True, bpm=0.0), None, 0, "ok", None, "Tempo aus"),
+    ("halbtempo", cap(), det(bpm=70.2, alt_bpm=140.4, alt_score=0.8), IN, None, 0, "hinweis", None, "×2"),
+    ("pause", cap(rms_dbfs_300ms=-120.0, rms_dbfs_1s=-120.0), det(hold_stage=1), PC, None, 0, "ok", None,
+     "gehalten"),
+    ("kein_takt", cap(), det(state="searching", signal_s=18.0), IN, None, 0, "hinweis", "record",
+     "kein stabiles Tempo"),
+    ("sucht", cap(), det(state="searching", signal_s=3.0, window_filled_s=3.0), IN, None, 0, "hinweis", None,
+     "Sucht"),
+    ("kein_detektor", cap(), None, IN, None, 0, "hinweis", None, "Detektor"),
+    ("ok", cap(), det(), PC, None, 0, "ok", None, "Eingerastet — 128 BPM aus PC-Audio"),
+]
+
+
+@pytest.mark.parametrize("key,c,d,m,o,now,schwere,aktion,wort", FAELLE, ids=[f[0] for f in FAELLE])
+def test_situation(key, c, d, m, o, now, schwere, aktion, wort):
+    line = status_line(c, d, m, o, now)
+    assert line.key == key
+    assert line.schwere == schwere
+    assert line.aktion == aktion
+    assert wort in line.text
+    assert line.schwere in R.SCHWEREN and line.aktion in R.AKTIONEN
+
+
+@pytest.mark.parametrize("fall", FAELLE, ids=[f[0] for f in FAELLE])
+def test_text_nie_leer(fall):
+    _k, c, d, m, o, now, *_ = fall
+    line = status_line(c, d, m, o, now)
+    assert line.problem.strip() and line.ursache.strip() and line.text.strip()
+
+
+def test_mindestens_17_situationen_und_fallback_nie_leer():
+    assert len({f[0] for f in FAELLE}) >= 17
+    for m in (None, MgrState(kind="weird"), MgrState(kind="input")):
+        for c in (None, cap()):
+            for d in (None, det(), det(state="no_signal")):
+                assert status_line(c, d, m, None, 0).text.strip()
+
+
+def test_messwert_in_ursache():
+    line = status_line(cap(rms_dbfs_300ms=-70.0), det(state="no_signal"), IN, None, 0)
+    assert line.text == ("Kein Signal — Eingang »USB Audio CODEC« liefert −70 dBFS — "
+                         "Kabel/Gerät prüfen oder anderen Eingang wählen")
+
+
+def test_ereignis_laeuft_nach_3_s_ab():
+    m = replace(PC, ereignis=_EV, ereignis_bis=_EV_BIS)
+    assert status_line(cap(), det(), m, None, 102.9).key == "ereignis_oktave"
+    assert status_line(cap(), det(), m, None, 103.1).key == "ok"
+
+
+def test_kein_signal_nennt_fehlenden_sink():
+    m = replace(PC, sink_missing="alsa_output.usb")
+    line = status_line(cap(rms_dbfs_300ms=-120.0), det(state="no_signal", hold_stage=3), m, None, 0)
+    assert line.key == "kein_signal" and "Standardausgabe" in line.ursache
+
+
+def test_reihenfolge_problem_vor_hinweis():
+    # Clip + Brumm + Leise-Chip gleichzeitig -> Clip (vor Brumm) gewinnt
+    line = status_line(cap(clip_chunks_1s=5), det(hum_ratio=0.9), IN, None, 0)
+    assert line.key == "clip"
+    assert status_line(cap(chunk_ms_p95=99.0), det(hum_ratio=0.9), IN, None, 0).key == "brumm"
+
+
+def test_halbtempo_ausserhalb_bereich_aktion_range():
+    m = replace(IN, max_bpm=130.0)
+    line = status_line(cap(), det(bpm=70.2, alt_bpm=140.4, alt_score=0.8), m, None, 0)
+    assert line.key == "halbtempo" and line.aktion == "range"
+
+
+# ── Hysterese ────────────────────────────────────────────────────────────────
+
+def _ok():
+    return status_line(cap(), det(), PC, None, 0)
+
+
+def _brumm():
+    return status_line(cap(), det(hum_ratio=0.8, hum_hz=50), PC, None, 0)
+
+
+def test_hysterese_2s_an_3s_aus():
+    h = StatusHysterese(clock=lambda: 0.0)
+    assert h.update(_ok(), 0.0).key == "ok"
+    t = 10.0
+    assert h.update(_brumm(), t).key == "ok"
+    assert h.update(_brumm(), t + 1.9).key == "ok"
+    assert h.update(_brumm(), t + 2.0).key == "brumm"
+    assert h.update(_brumm(), t + 5.0).key == "brumm"
+    t2 = t + 5.0
+    assert h.update(_ok(), t2 + 0.05).key == "brumm"
+    assert h.update(_ok(), t2 + 2.95).key == "brumm"
+    assert h.update(_ok(), t2 + 3.0).key == "ok"
+
+
+def test_hysterese_kurzes_flackern_zeigt_nichts():
+    h = StatusHysterese()
+    h.update(_ok(), 0.0)
+    for i in range(20):                       # 1,5 s an, 0,5 s aus im Wechsel
+        t = i * 2.0
+        assert h.update(_brumm(), t).key == "ok"
+        assert h.update(_brumm(), t + 1.5).key == "ok"
+        assert h.update(_ok(), t + 1.6).key == "ok"
+
+
+def test_hysterese_zustandszeilen_sofort_und_messwert_aktualisiert():
+    h = StatusHysterese()
+    h.update(status_line(cap(), det(state="searching", signal_s=3.0), PC, None, 0), 0.0)
+    assert h.update(_ok(), 0.05).key == "ok"               # Sucht -> Eingerastet sofort
+    err = status_line(cap(running=False), None, replace(PC, capture_error="Aufnahme abgebrochen: x"), None, 0)
+    assert h.update(err, 0.1).key == "capture_fehler"        # Fehler sofort
+    h2 = StatusHysterese()
+    h2.update(_brumm(), 0.0)
+    b2 = status_line(cap(), det(hum_ratio=0.55, hum_hz=50), PC, None, 0)
+    assert "55 %" in h2.update(b2, 0.05).ursache
+
+
+# ── Chips ────────────────────────────────────────────────────────────────────
+
+@pytest.mark.parametrize("ratio,erwartet", [
+    (HUM_KICK_128_MAX, False), (HUM_KICK_BASS_HATS_128_MAX, False),
+    (HUM_KICK_BRUMM_SNR0_MIN, True), (HUM_KICK_BRUMM_SNR0_MED, True), (HUM_REINER_BRUMM, True),
+], ids=["i_kick", "ii_kick_bass_hats", "iii_snr0_min", "iii_snr0_median", "iv_reiner_brumm"])
+def test_brumm_chip_gemessene_faelle(ratio, erwartet):
+    assert ("BRUMM" in chips(cap(), det(hum_ratio=ratio))) is erwartet
+    assert R.BRUMM_RATIO > HUM_KICK_BASS_HATS_128_MAX and R.BRUMM_RATIO < HUM_KICK_BRUMM_SNR0_MIN
+
+
+def test_chips_bedingungen():
+    assert chips(None, None) == set()
+    assert chips(cap(), det()) == set()
+    assert chips(cap(clip_chunks_1s=3), None) == {"CLIP"}
+    assert chips(cap(rms_dbfs_1s=-50.0), None) == {"LEISE"}
+    assert chips(cap(rms_dbfs_1s=-80.0), None) == set()          # kein Signal ist nicht „leise"
+    assert chips(cap(chunk_ms_p95=80.0), None) == {"JITTER"}
+    assert chips(cap(), det(backlog_ms=300.0)) == {"JITTER"}
+    assert chips(cap(dc_offset=-0.03), None) == {"DC"}
+    assert chips(cap(clip_chunks_1s=4, dc_offset=0.1), det(hum_ratio=0.6)) == {"CLIP", "DC", "BRUMM"}
+
+
+def test_chip_hysterese_2s_an_3s_aus():
+    h = ChipHysterese()
+    assert h.update({"CLIP"}, 0.0) == set()
+    assert h.update({"CLIP"}, 1.9) == set()
+    assert h.update({"CLIP", "LEISE"}, 2.0) == {"CLIP"}      # CLIP 2 s an; LEISE neu
+    assert h.update({"CLIP", "LEISE"}, 4.0) == {"CLIP", "LEISE"}
+    assert h.update(set(), 6.9) == {"CLIP", "LEISE"}         # zuletzt 4,0 -> noch 2,9 s
+    assert h.update(set(), 7.0) == set()                     # 3,0 s ohne -> weg
+    assert h.update({"DC"}, 8.0) == set()
+    assert h.update(set(), 8.5) == set()                      # zu kurz, nie sichtbar
+    assert h.update({"DC"}, 9.0) == set()
+    assert h.update({"DC"}, 10.9) == set()
+    assert h.update({"DC"}, 11.0) == {"DC"}
+
+
+def test_regeln_modul_ist_qt_frei():
+    import src.ui.bpm_status_rules as mod
+    text = open(mod.__file__, encoding="utf-8").read()
+    assert "PySide6" not in text
