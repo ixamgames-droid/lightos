@@ -49,6 +49,7 @@ PUBLIC_NO_ARG_VIEWS = {
     "show_manager_view": "ShowManagerView",
     "simple_desk": "SimpleDeskView",
     "snapshots_view": "SnapshotsView",
+    "tempo_bus_view": "TempoBusView",
     "virtual_console_view": "VirtualConsoleView",
 }
 

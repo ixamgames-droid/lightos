@@ -6,7 +6,7 @@ Deckt ab:
   erzeugt, Free-Run unter "", statische Scenes fallen raus.
 - TempoBusManager.assign_effects_to_bus: setzt Bus + re-ankert nur die genannten fids
   (Chaser-Exklusivitaet gegen audio_triggered greift).
-- BpmManagerView-Panel: baut auf, listet Effekte je Bus, Haken schreibt align_on_start,
+- TempoBusView-Panel (bis BPM-08 in BpmManagerView): baut auf, listet Effekte je Bus, Haken schreibt align_on_start,
   Bus-Dropdown verschiebt, Multiplikator schreibt tempo_multiplier, Sync re-ankert.
 """
 import os
@@ -19,7 +19,7 @@ _app = QApplication.instance() or QApplication([])
 from src.core.engine.tempo_bus import get_tempo_bus_manager, reset_tempo_bus_manager
 from src.core.engine.function_manager import get_function_manager
 from src.core.engine.bpm_manager import get_bpm_manager
-from src.ui.views.bpm_manager_view import BpmManagerView
+from src.ui.views.tempo_bus_view import TempoBusView
 
 
 @pytest.fixture(autouse=True)
@@ -96,7 +96,7 @@ def _row_checkbox(view, fid):
 def test_panel_builds_and_lists_effects():
     fm = get_function_manager()
     m = fm.new_rgb_matrix("M"); m.tempo_bus_id = "Global"
-    view = BpmManagerView()
+    view = TempoBusView()
     view._refresh_effects_panel()
     assert view._fx_tree.topLevelItemCount() == 6   # Haupt-BPM + A-D + Frei
     top_main = view._fx_tree.topLevelItem(0)
@@ -108,7 +108,7 @@ def test_panel_checkbox_writes_align_on_start():
     fm = get_function_manager()
     m = fm.new_rgb_matrix("M"); m.tempo_bus_id = "Global"
     assert m.align_on_start is True
-    view = BpmManagerView()
+    view = TempoBusView()
     view._refresh_effects_panel()
     chk = _row_checkbox(view, m.id)
     assert chk is not None and chk.isChecked() is True
@@ -119,7 +119,7 @@ def test_panel_checkbox_writes_align_on_start():
 def test_panel_bus_dropdown_moves_effect():
     fm = get_function_manager()
     m = fm.new_rgb_matrix("M"); m.tempo_bus_id = "Global"
-    view = BpmManagerView()
+    view = TempoBusView()
     view._on_row_bus_changed(m.id, "C")         # Handler direkt (Dropdown-Wahl)
     assert m.tempo_bus_id == "C"
 
@@ -127,7 +127,7 @@ def test_panel_bus_dropdown_moves_effect():
 def test_panel_mult_handler_writes_multiplier():
     fm = get_function_manager()
     m = fm.new_rgb_matrix("M"); m.tempo_bus_id = "Global"
-    view = BpmManagerView()
+    view = TempoBusView()
     view._on_row_mult_changed(m.id, 2.0)
     assert abs(m.tempo_multiplier - 2.0) < 1e-9
 
@@ -139,6 +139,6 @@ def test_panel_sync_now_reanchors_running_bus_effects():
     d = tbm.get("default")
     d.advance_frame(1.0)
     m._beat_anchor = 0.0                        # kuenstlich verstellt
-    view = BpmManagerView()
+    view = TempoBusView()
     view._on_bus_sync_now("default")
     assert abs(m._beat_anchor - d.position()) < 1e-6, "Sync jetzt muss alle Bus-Effekte re-ankern"

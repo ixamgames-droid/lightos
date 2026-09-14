@@ -127,7 +127,7 @@ def main() -> int:
 
     # BPM-Panel mit aktivem Auto-Sync.
     window._switch_section(7)
-    bpm_view = window._bpm_manager_view
+    bpm_view = window._tempo_bus_view   # BPM-08: Sub-Tab „Tempo-Buses"
     get_tempo_bus_manager().set_auto_sync(True)
     bpm_view._refresh_speeds()
     bpm_view._chk_auto_sync.setChecked(True)

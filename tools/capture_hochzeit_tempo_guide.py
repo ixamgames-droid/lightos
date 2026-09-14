@@ -117,7 +117,7 @@ def main() -> int:
     editor.close()
 
     window._switch_section(7)
-    bpm_view = window._bpm_manager_view
+    bpm_view = window._tempo_bus_view   # BPM-08: Sub-Tab „Tempo-Buses"
     bpm_view._refresh_speeds()
     settle(app, 350)
     panel = next(
