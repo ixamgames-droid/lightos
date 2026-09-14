@@ -7,6 +7,23 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-14 — BPM: neue Live-Erkennung (Spectral Flux + Autokorrelation)
+
+#### Neu / Geändert
+
+- **BPM: neue Live-Erkennung (Spectral Flux + Autokorrelation)** — robust gegen
+  Netzbrumm, kurze Onsets und Chunk-Jitter; die Konfidenz misst jetzt das Signal
+  (Stille und reiner Brumm liegen bei 0, nicht mehr bei 1). Der Beat-Takt kommt
+  aus einer Tempo-Vorhersage im Sample-Zähler statt aus einzelnen Pegelspitzen —
+  deshalb feuern Beats erst, wenn das Tempo eingerastet ist, und dann im Raster.
+  **Erkennung braucht nach Start/Quellenwechsel etwa 4 s** (die Autokorrelation
+  braucht ein gefülltes Fenster). Empfindlichkeit und Glättung haben keine Wirkung
+  mehr (die Regler entfallen im UI mit einem späteren Schritt). Nebenwirkung: der
+  30-Hz-Poll der Ansicht beschleunigt die Glättung nicht mehr, weil `get_bpm()`
+  jetzt ein reiner Leser ist. Messbank (synthetische Signale, 30 s): Brumm mit Bassband-SNR 0 dB
+  104,5 → 128 BPM, 27 → 56 von 64 Treffern, 76 → 0 Fehlalarme; Klick 140 BPM
+  70,2 (halbiert) → 139,8; Chunks in 8er-Salven 15 → 56 von 64 Treffern.
+
 ### 2026-09-07 — Schnellwahl trifft nur noch passende Geräte, Platzhalter-Profile werden nicht gespeichert
 
 #### Behoben

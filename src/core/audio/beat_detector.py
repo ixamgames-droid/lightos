@@ -9,10 +9,11 @@ Verfahren (Details: onset_flux.py, tempo_tracker.py):
 5. Comb-Phasenfit (32 Phasen, 4 s) -> Beat-Vorhersage als Sample-Position; Callbacks nur im Zustand locked.
 6. Alle Zeiten aus dem Sample-Zaehler (kein time.monotonic fuer Beats) -> Burst/Jitter der Chunks egal.
 
-Messbank (synthetische Signale, 30 s, alt -> neu): Brumm SNR 0 dB 104,5 BPM / 27 von 64 Treffern /
-76 Fehlalarme -> 128 BPM / >= 55 / 0; Klick 140 halbiert (70,2) -> 140; Chunks in 8er-Salven
-15 von 64 -> wie Idealfall. Preis: Einrasten dauert nach Start/Quellenwechsel ~4 s (Autokorrelation
-braucht ein gefuelltes Fenster), vorher werden keine Beats gemeldet.
+Messbank (synthetische Signale, 30 s, alt -> neu): Brumm mit Bassband-SNR 0 dB 104,5 BPM / 27 von
+64 Treffern / 76 Fehlalarme -> 128,4 BPM / 56 von 64 / 0; Klick 140 halbiert (70,2) -> 139,8;
+Chunks in 8er-Salven 15 von 64 -> 56 von 64 (wie Idealfall); Phasenfehler mittel -8..+12 ms, max
+34 ms; CPU 0,39 ms je 1024er-Chunk (alt 0,23). Preis: Einrasten dauert nach Start/Quellenwechsel
+~3,8 s (Autokorrelation braucht ein gefuelltes Fenster), vorher werden keine Beats gemeldet.
 
 Threads: ``process_chunk`` laeuft auf dem Capture-Thread; Getter lesen einen unveraenderlichen
 ``DetectorSnapshot`` (per Referenz veroeffentlicht), Setter arbeiten unter einem kleinen Lock.
