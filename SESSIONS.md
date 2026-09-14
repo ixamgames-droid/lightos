@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| BPM-11 | A | feat/bpm-s6-statuszeile | 2026-09-14T20:23Z | src/ui/bpm_status_rules.py · src/core/audio/audio_recorder.py · src/ui/views/bpm_manager_view.py · src/ui/widgets/level_meter_widget.py · src/ui/bpm_source_controller.py |
+| _(frei)_ |  |  |  |  |
 
 ## Blocker & Fallen
 
@@ -120,7 +120,6 @@
 
 ## Verlauf
 
-- 2026-09-07T14:00Z A claim FM-35
 - 2026-09-07T14:00Z A claim FM-37
 - 2026-09-07T14:07Z B claim XPLAT-30
 - 2026-09-07T15:05Z B done XPLAT-30
@@ -150,3 +149,4 @@
 - 2026-09-14T18:54Z A claim BPM-10
 - 2026-09-14T19:36Z A done BPM-10
 - 2026-09-14T20:23Z A claim BPM-11
+- 2026-09-14T21:48Z A done BPM-11
