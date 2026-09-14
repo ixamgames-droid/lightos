@@ -329,7 +329,8 @@ class BeatDetector:
             peak_dbfs=float(self._peak_dbfs), clip_1s=int(self._clip_1s),
             noise_floor_dbfs=noise, hum_ratio=float(self._hum_ratio), hum_hz=int(self._hum_hz),
             dc_offset=float(self._dc_offset), backlog_ms=float(self._backlog_ms),
-            jitter_ms=float(self._jitter_ms), onset_contrast=float(tr.onset_contrast))
+            jitter_ms=float(self._jitter_ms), onset_contrast=float(tr.onset_contrast),
+            phase_ok=bool(tr.phase_ok))
 
 
 _detector: BeatDetector | None = None

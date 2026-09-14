@@ -57,6 +57,7 @@ class DetectorSnapshot:
     backlog_ms: float
     jitter_ms: float
     onset_contrast: float
+    phase_ok: bool = True   # False: Beat-Raster widerspricht den juengsten Onsets -> Beats stumm
 
 
 class TempoTracker:
@@ -84,6 +85,10 @@ class TempoTracker:
     CONTRAST_HI = 7.0       # ... ab hier volles Gate
     R_LO = 0.15             # Periodizitaet r: darunter 0 ...
     R_HI = 0.60             # ... ab hier 1
+    AGREE_WIN_S = 1.5       # Fenster fuer den Abgleich Raster <-> juengste Onsets
+    AGREE_MIN = 0.4         # Raster-Score / bester Phasen-Score: darunter zaehlt ein Widerspruch
+    AGREE_N = 3             # so viele Widersprueche in Folge -> Beats stumm, Schaetzfenster kurz
+    SHORT_S = 3.0           # verkuerztes ACF-Fenster bei Widerspruch (schnellerer Tempowechsel)
 
     def __init__(self, sample_rate: int, min_bpm: float = 60.0, max_bpm: float = 200.0):
         self.sr = int(sample_rate)
@@ -141,6 +146,8 @@ class TempoTracker:
         self.next_beat_sample = 0
         self.last_beat_sample = -(10 ** 12)
         self.last_beat_time = 0.0
+        self.phase_ok = True
+        self._disagree = 0
         self.changed = True     # Zustand seit dem letzten Snapshot veraendert
 
     # ------------------------------------------------------------ Eingang
@@ -170,6 +177,8 @@ class TempoTracker:
     def _estimate(self):
         """-> (bpm_roh, conf, alt_bpm, alt_score, lag) oder Nullen."""
         M = int(self.frames_filled)
+        if not self.phase_ok:
+            M = min(M, int(self.SHORT_S * self.fps))    # Widerspruch: kurzes Gedaechtnis
         if M < self.MIN_EST_S * self.fps:
             return 0.0, 0.0, 0.0, 0.0, 0
         e = self.env[-M:].astype(np.float64)
@@ -361,7 +370,48 @@ class TempoTracker:
         sh = float(np.clip(0.5 * (y0 - y2) / den, -0.5, 0.5)) if den != 0 else 0.0
         best_phi = (s + sh) * P / self.PHASE_STEPS
         last_beat = self._last_frame_sample() - best_phi * HOP
+        if force:
+            self.phase_ok, self._disagree = True, 0
+        else:
+            self._check_agreement(P)
         return self._apply_phase(last_beat, force)
+
+    def _check_agreement(self, P: float):
+        """Passt das vorhergesagte Raster zu den Onsets der letzten AGREE_WIN_S Sekunden?
+        Score des Rasters (Max-Filter +-2 Frames) gegen den besten Phasen-Score im selben
+        Fenster; AGREE_N Widersprueche in Folge schalten die Beats stumm."""
+        M2 = min(int(self.frames_filled), int(self.AGREE_WIN_S * self.fps))
+        n2 = int(M2 / P)
+        if n2 < 2 or self.next_beat_sample <= 0:
+            return
+        env = self.env[-M2:]
+        ks = np.arange(n2, dtype=np.float64)[None, :] * P
+        idx = (M2 - 1) - (self._phase_grid * P)[:, None] - ks
+        ii = np.floor(idx + 0.5).astype(np.intp)
+        valid = ii >= 0
+        ii[~valid] = 0
+        best = float((env[ii] * valid).sum(axis=1).max())
+        # Raster: juengster vorhergesagter Beat, als Frames vom letzten Frame aus
+        last_pred = self.next_beat_sample - self.period_samples
+        phi = ((self._last_frame_sample() - last_pred) / HOP) % P
+        gi = np.floor((M2 - 1) - phi - ks[0] + 0.5).astype(np.intp)
+        gi = gi[gi >= 2]
+        if gi.size == 0:
+            return
+        score = 0.0
+        for d in (-2, -1, 0, 1, 2):
+            score = np.maximum(score, env[np.clip(gi + d, 0, M2 - 1)])
+        score = float(np.sum(score))
+        if best > 0 and score / best < self.AGREE_MIN:
+            self._disagree += 1
+            if self._disagree >= self.AGREE_N and self.phase_ok:
+                self.phase_ok = False
+                self.changed = True
+        else:
+            self._disagree = 0
+            if not self.phase_ok:
+                self.phase_ok = True
+                self.changed = True
 
     def _apply_phase(self, last_beat: float, force: bool):
         P = self.period_samples
@@ -390,6 +440,10 @@ class TempoTracker:
         if sample_pos + latency_samples < self.next_beat_sample:
             return False
         P = self.period_samples
+        if not self.phase_ok:
+            # Raster widerspricht den Onsets: weiterzaehlen, aber nicht feuern
+            self.next_beat_sample += int(round(P))
+            return False
         if self.next_beat_sample - self.last_beat_sample < 0.5 * P:
             # Doppel-Beat-Schutz: Mindestabstand halbe Periode
             self.next_beat_sample += int(round(P))

@@ -116,6 +116,7 @@ class FluxStream:
     RELAX_S = 2.0            # Whitening: Halbwertszeit des Bin-Maximums
     WHITE_FLOOR = 0.1        # Whitening: Floor relativ zum lautesten Bin
     BAND_NORM_S = 1.5        # Bandnormierung: Zeitkonstante des laufenden Mittels
+    BAND_CAP = 20.0          # Obergrenze je Band (Verhaeltnis zum Mittel), gegen Ausreisser
     N_BANDS = 12             # log-Baender ab 30 Hz
     LOW_HZ = 30.0
 
@@ -148,7 +149,8 @@ class FluxStream:
         self.tail = np.zeros(0, np.float32)
         self.prev = None
         self.psp = np.full(nb, 1e-4, np.float32)
-        self.band_mean = np.full(self._n_bands, 1e-3, np.float32)
+        self.band_mean = np.zeros(self._n_bands, np.float32)
+        self._bn_n = 0
         self.last_magnitude = np.zeros(nb, np.float32)
         self.frames = 0
 
@@ -200,7 +202,11 @@ class FluxStream:
         # nur der Ueberschuss zaehlt (stationaeres Rauschen/Brummen -> ~0)
         bf = np.add.reduceat(d[self._lo_bin:], self._band_starts - self._lo_bin)
         bm = self.band_mean
-        bm += self._bn_alpha * (bf - bm)
+        # Warmlauf: erst echtes laufendes Mittel (1/n), dann EMA — sonst dominieren die
+        # ersten Frames mit riesigen Verhaeltnissen den Ring sekundenlang
+        self._bn_n += 1
+        alpha = max(self._bn_alpha, np.float32(1.0 / self._bn_n))
+        bm += alpha * (bf - bm)
         ratio = bf / (bm + np.float32(1e-6)) - np.float32(1.0)
-        np.maximum(ratio, 0.0, out=ratio)
+        np.clip(ratio, 0.0, self.BAND_CAP, out=ratio)
         return float(ratio.sum())
