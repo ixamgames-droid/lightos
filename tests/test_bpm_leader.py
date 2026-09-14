@@ -153,10 +153,9 @@ def test_reset_clears(mgr):
 # ── Detektor (WP-2): Oktav-Faltung in die Grenzen + Confidence ────────────────
 
 def _fill_beats(det: BeatDetector, interval_s: float, n: int = 8):
-    det._beat_times.clear()
-    base = 1000.0
-    for i in range(n):
-        det._beat_times.append(base + i * interval_s)
+    """S1: statt ``_beat_times`` zu fuellen, den dokumentierten Test-Hook nutzen —
+    Tempo aus dem Beat-Intervall, Detektor im Zustand ``locked``."""
+    det._inject_tempo(60.0 / interval_s)
 
 
 def test_detector_octave_fold_into_bounds():
@@ -180,7 +179,7 @@ def test_detector_confidence_stable_vs_none():
     assert det.get_confidence() == 0.0   # keine Schaetzungen
     _fill_beats(det, 0.5)                # 120 BPM
     for _ in range(5):
-        det.get_bpm()                    # fuellt _bpm_estimates stabil
+        det.get_bpm()                    # reiner Getter, aendert nichts
     assert det.get_confidence() > 0.8
 
 

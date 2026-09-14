@@ -127,6 +127,11 @@ class AudioCapture:
         if cb in self._subscribers:
             self._subscribers.remove(cb)
 
+    def is_subscribed(self, cb) -> bool:
+        """True, wenn ``cb`` bereits Chunks bekommt — Abgleich gegen Doppel-Fuetterung
+        (der Detektor zaehlt Samples; zwei Zubringer liessen seine Uhr doppelt laufen)."""
+        return cb in self._subscribers
+
     def is_running(self) -> bool:
         return self._running
 

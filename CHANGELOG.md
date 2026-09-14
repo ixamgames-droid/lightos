@@ -7,6 +7,32 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-14 — BPM: neue Live-Erkennung (Spectral Flux + Autokorrelation)
+
+#### Neu / Geändert
+
+- **BPM: neue Live-Erkennung (Spectral Flux + Autokorrelation)** — robust gegen
+  Netzbrumm, kurze Onsets und Chunk-Jitter; die Konfidenz misst jetzt das Signal
+  (Stille und reiner Brumm liegen bei 0, nicht mehr bei 1). Der Beat-Takt kommt
+  aus einer Tempo-Vorhersage im Sample-Zähler statt aus einzelnen Pegelspitzen —
+  deshalb feuern Beats erst, wenn das Tempo eingerastet ist, und dann im Raster.
+  **Erkennung braucht nach Start/Quellenwechsel etwa 4 s** (die Autokorrelation
+  braucht ein gefülltes Fenster). Empfindlichkeit und Glättung haben keine Wirkung
+  mehr (die Regler entfallen im UI mit einem späteren Schritt). Nebenwirkung: der
+  30-Hz-Poll der Ansicht beschleunigt die Glättung nicht mehr, weil `get_bpm()`
+  jetzt ein reiner Leser ist. Messbank (synthetische Signale, 30 s): Brumm mit Bassband-SNR 0 dB
+  104,5 → 128 BPM, 27 → 56 von 64 Treffern, 76 → 0 Fehlalarme; Klick 140 BPM
+  70,2 (halbiert) → 140,0; Chunks in 8er-Salven 15 → 56 von 64 Treffern; ab dem
+  Einrasten werden alle Beats getroffen (Spalte „ab Lock" der Messbank).
+- **BPM: Oktave über den ganzen Tempo-Bereich stabil** — reine Kicks/Klicks von 60 bis
+  200 BPM ohne Halbierung (der Tempo-Prior kippte vorher ab 170 BPM zur halben Oktave,
+  Klick 60 wurde an der Bereichsgrenze zu 120). **Bekannte Grenze:** Kick auf jedem Beat
+  plus Snare auf 2 und 4 ab etwa 150 BPM (Drum & Bass, Hardstyle) rastet auf die halbe
+  Oktave, weil die Hüllkurve dann genauso aussieht wie Hi-Hats auf Achteln beim halben
+  Tempo — **×2 bzw. ein passender Tempo-Bereich (z. B. 140–200) korrigiert das**; die
+  Alternative steht im Detektor-Snapshot bereit. Sparsames Material mit digitaler Stille
+  zwischen den Schlägen (Klick 60 BPM) hält jetzt den Beat, statt jede Sekunde zu pausieren.
+
 ### 2026-09-07 — Schnellwahl trifft nur noch passende Geräte, Platzhalter-Profile werden nicht gespeichert
 
 #### Behoben

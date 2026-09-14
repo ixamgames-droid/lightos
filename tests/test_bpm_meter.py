@@ -1,7 +1,7 @@
 """Tests fuer die BPM-Erweiterungen:
 
-- Detektor: robuste BPM (Median + Ausreisser-Verwerfung), kontinuitaets-stabile
-  Oktav-Faltung, Stille-Re-Lock.
+- Detektor: Tempo-Rastung ueber den Test-Hook ``_inject_tempo``, Oktav-Faltung in
+  die Grenzen, Stille -> no_signal (S1: Signal-Tests in test_beat_detector_signal.py).
 - Manager: konfigurierbares Takt-Raster (beats_per_bar) + Bar-Events,
   Unterteilung (subdivision) + Tick-Kanal.
 - Persistenz/Anwendung der neuen Einstellungen.
@@ -10,7 +10,6 @@ Reine Logik-Tests: kein Qt. Der Timer-Thread des Leaders wird wie in
 test_bpm_leader durch Flag-Stubs ersetzt.
 """
 from __future__ import annotations
-import time
 import numpy as np
 import pytest
 
@@ -26,70 +25,52 @@ def mgr():
     return m
 
 
-# ── Detektor: robuste BPM-Schaetzung ──────────────────────────────────────────
+# ── Detektor: Tempo-Rastung + Oktav-Faltung (S1: Hook ``_inject_tempo`` statt ``_beat_times``) ──
 
-def _fill(det: BeatDetector, intervals):
-    """Fuellt _beat_times mit kumulierten Zeitstempeln aus Intervallen."""
-    det._beat_times.clear()
-    t = 1000.0
-    det._beat_times.append(t)
-    for iv in intervals:
-        t += iv
-        det._beat_times.append(t)
-
-
-def test_raw_bpm_median_ignores_outlier():
-    """Ein verpasster Beat (doppeltes Intervall) darf die BPM nicht verziehen."""
+def test_inject_tempo_locks_and_getters_are_pure():
+    """Der Test-Hook versetzt den Detektor in ``locked``; die Getter sind reine Leser."""
     det = BeatDetector()
-    # sechs saubere 0.5 s-Intervalle (120 BPM) + ein verpasster Beat (1.0 s)
-    _fill(det, [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 1.0])
-    bpm = det.get_raw_bpm()
-    assert 115 < bpm < 125, bpm          # Median bleibt bei 120
-    # Ein flacher Mittelwert laege deutlich daneben (~105 BPM):
-    flat = 60.0 / (sum([0.5] * 6 + [1.0]) / 7)
-    assert flat < 110
-
-
-def test_raw_bpm_uses_recent_window():
-    det = BeatDetector()
-    _fill(det, [0.5] * 7)                 # 120 BPM
+    assert det.get_bpm() == 0.0 and det.get_confidence() == 0.0
+    det._inject_tempo(120.0)
+    assert det.snapshot().state == "locked"
     assert 115 < det.get_raw_bpm() < 125
+    assert 115 < det.get_bpm() < 125
+    snap = det.snapshot()
+    for _ in range(20):
+        det.get_bpm(); det.get_confidence()
+    assert det.snapshot() is snap                 # kein Seiteneffekt (frueher EMA in get_bpm)
 
 
-def test_fold_octave_continuity():
-    """Bei vorhandenem geglaettetem Wert wird die naechste Oktave gewaehlt."""
+def test_fold_octave_into_bounds():
+    """Roh-Tempi ausserhalb der Grenzen werden oktavweise hineingefaltet."""
     det = BeatDetector()
     det.set_bounds(60, 220)
-    det._bpm_smoothed = 190.0
-    # raw 95 -> in Bounds bleibt 95, aber 190 ist naeher am bisherigen Wert
-    assert abs(det._fold_octave(95.0) - 190.0) < 1.0
-    det._bpm_smoothed = 95.0
-    # raw 190 -> 95 ist naeher am bisherigen Wert
-    assert abs(det._fold_octave(190.0) - 95.0) < 1.0
-    # ohne bisherigen Wert: normale Faltung in die Bounds
-    det._bpm_smoothed = 0.0
-    assert 60 <= det._fold_octave(95.0) <= 220
+    det._inject_tempo(45.0)
+    assert abs(det.get_bpm() - 90.0) < 0.01       # 45 -> *2
+    det._inject_tempo(300.0)
+    assert abs(det.get_bpm() - 150.0) < 0.01      # 300 -> /2
+    det._inject_tempo(95.0)
+    assert abs(det.get_bpm() - 95.0) < 0.01       # in den Grenzen: unveraendert
 
 
 def test_silence_relock_clears_state():
-    """Nach laengerer Stille wird der BPM-Zustand verworfen."""
+    """Nach 10 s Stille wird der Zustand verworfen: no_signal, get_bpm 0."""
     det = BeatDetector()
-    det.silence_reset_s = 0.5
-    for _ in range(12):                   # Energy-History fuellen
-        det._energy_history.append(0.0)
-    det._beat_times.append(time.monotonic())
-    det._last_beat_time = time.monotonic() - 2.0   # lange kein Beat
-    det._bpm_smoothed = 120.0
-    det.process_chunk(np.zeros(1024, dtype=np.float32))
-    assert len(det._beat_times) == 0
-    assert det._bpm_smoothed == 0.0
+    det._inject_tempo(120.0)
+    assert det.get_bpm() > 0
+    silence = np.zeros(1024, dtype=np.float32)
+    for _ in range(int(11.0 * 44100 / 1024)):
+        det.process_chunk(silence)
+    assert det.snapshot().state == "no_signal"
+    assert det.get_bpm() == 0.0
+    assert det.get_confidence() == 0.0
 
 
 def test_existing_octave_fold_unbroken():
-    """Bestehendes Verhalten (frischer Detektor, smoothed=0) bleibt erhalten."""
+    """Bestehendes Verhalten: 75 BPM roh bei Grenzen 120..200 -> 150."""
     det = BeatDetector()
     det.set_bounds(120, 200)
-    _fill(det, [0.8] * 7)                 # 75 BPM roh
+    det._inject_tempo(75.0)
     assert 70 < det.get_raw_bpm() < 80
     assert 140 < det.get_bpm() < 160      # 75 -> *2 -> 150
 

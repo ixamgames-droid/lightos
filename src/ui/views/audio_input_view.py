@@ -342,9 +342,15 @@ class AudioInputView(QWidget):
         if not HAS_NUMPY:
             return
         try:
-            # Detector verarbeiten lassen
-            self._detector.process_chunk(samples)
-            # Eigene Pegel/Spektrum berechnen fuer UI
+            # Den Detektor fuettert normalerweise der BPMManager (use_audio_source
+            # abonniert det.process_chunk am Capture). Solange er das nicht tut
+            # (Aufnahme aus diesem Tab ohne "BPM-Manager steuern"), fuettert die
+            # View selbst — aber nie beide: der neue Detektor zaehlt Samples, ein
+            # zweiter process_chunk je Chunk liesse seine Uhr doppelt laufen.
+            frage = getattr(self._capture, "is_subscribed", None)
+            if not (frage and frage(self._detector.process_chunk)):
+                self._detector.process_chunk(samples)
+            # Eigene Pegel/Spektrum fuer die UI
             rms = float(np.sqrt(np.mean(samples * samples)))
             self._level = min(1.0, rms * 4.0)
             n = len(samples)
