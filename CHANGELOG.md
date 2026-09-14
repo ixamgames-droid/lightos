@@ -7,6 +7,38 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-14 — BPM: Sub-Tab „Erkennung" mit 6 Bedienelementen
+
+#### Neu / Geändert
+
+- **BPM: Sub-Tab „Erkennung" mit 6 Bedienelementen (Quelle, TAP, Auto | Manuell,
+  ×½, ×2, Erweitert); Empfindlichkeit, Glättung, Genre-Preset, Unterteilung,
+  Presets 4/8/16, Nudge ±10 entfallen; TAP setzt einmal die Phase, mehrfach das
+  Tempo; Beat-Latenz einstellbar.** Der bisherige Sub-Tab „Manager" heißt jetzt
+  **Erkennung** und zeigt ohne Klick nur noch, was im Betrieb gebraucht wird:
+  **Quelle** ist eine Liste — „PC-Audio", „Eingang: <Gerät>" (je Eingang ein
+  Eintrag, beim Öffnen neu gelesen), „OS2L (DJ-Software)", „Lied-Analyse (Player)",
+  „Aus"; was du wählst, wird gemerkt. **TAP hat zwei Rollen:** einmal tippen =
+  Beat auf „jetzt" setzen (wenn der Punkt neben der Musik blinkt); drei-, viermal
+  tippen = Tempo setzen, die Erkennung sucht dann um dieses Tempo — der TAP oben
+  in der Kopfzeile ist derselbe Knopf. **Auto | Manuell:** Auto folgt der Musik,
+  Manuell hält dein Tempo (TAP/Nudge). **×½ / ×2** korrigieren Halb-/Doppeltempo
+  mit einem Klick — auch im Auto-Modus. Dazu die Anzeigen: große BPM-Zahl,
+  Beat-Punkt + Takt, **Zustandswort** KEIN SIGNAL / SUCHT / EINGERASTET (bei
+  einer Pause hält die Erkennung das Tempo: „PAUSE · hält 128") und Konfidenz.
+  **„Erweitert"** (Aufklappen): Tempo-Bereich von/bis mit **„Vorlage ▾"** (die
+  Genre-Tempobereiche gibt es dort weiter), Beats/Takt, **Beat-Latenz** (Licht
+  früher/später, ms), Tempo einfrieren, Nudge ±1/±5, Taktgenau, Diagnosezeile
+  und Spektrum. **Weg sind:** Empfindlichkeit, Glättung, Genre-Preset + Anwenden,
+  Analyse-Song + ↻ (die Lied-Analyse nimmt den Titel im Player), Presets 4/8/16,
+  Unterteilung, Nudge ±10 — die neue Erkennung braucht sie nicht. Der Takt-1-Akzent
+  des Beat-Punkts in der Kopfzeile folgt jetzt Beats/Takt; der Menüpunkt
+  „OS2L-Server" spiegelt den echten Serverzustand. **Alte Einstellungen** werden
+  beim ersten Start automatisch übernommen (Tempo-Bereich, Gerät, Takt; Sektion
+  `bpm_settings` v3); Empfindlichkeit/Glättung/Unterteilung werden verworfen und
+  einmal ins Log geschrieben. Ein Quellenwechsel ist immer nur EIN Schaltvorgang
+  (der frühere Doppelstart des Audio-Eingangs beim Radio-Wechsel ist damit weg).
+
 ### 2026-09-14 — BPM: Tempo-Buses in eigenem Sub-Tab
 
 #### Neu / Geändert

@@ -12,7 +12,7 @@ wuerde:
     zusammen (Risiko laut plan.md: doppelte Abos, wenn kopiert statt
     verschoben) — und es stammt aus ``TempoBusView``.
 (d) Sektion BPM des Hauptfensters hat die drei Sub-Tabs
-    Manager | Tempo-Buses | Generator.
+    Erkennung | Tempo-Buses | Generator (Sub-Tab „Erkennung" seit BPM-09, vorher „Manager").
 """
 from __future__ import annotations
 

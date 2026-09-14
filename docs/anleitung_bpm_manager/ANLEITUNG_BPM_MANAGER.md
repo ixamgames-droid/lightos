@@ -3,190 +3,149 @@
 > **Was ist das?** Die BPM-Sektion in LightOS ist der zentrale **Tempo-Leader**: Sie
 > erkennt das Tempo der Musik (oder lässt es dich vorgeben) und liefert die **Beats**,
 > auf die sich alle tempo-gekoppelten Effekte (Matrix, EFX, Chaser, Sequenzen, VC)
-> synchronisieren. Diese Anleitung erklärt die **neuen** Funktionen rund um den
-> BPM-Manager: den Quellen-Umschalter, Genre-Presets, das Takt-Raster, die smartere
-> Live-Erkennung, den **BPM-Generator** (ganzes Lied → Beatgrid) samt Analyse-Engines
-> und Beatgrid-Editor sowie die **taktgenaue** Beat-Wiedergabe.
+> synchronisieren. Diese Anleitung erklärt den Sub-Tab **„Erkennung"** (Quelle, TAP,
+> Auto | Manuell, ×½/×2, „Erweitert"), die Live-Erkennung, den **BPM-Generator**
+> (ganzes Lied → Beatgrid) samt Analyse-Engines und Beatgrid-Editor sowie die
+> **taktgenaue** Beat-Wiedergabe.
 >
 > **Öffnen:** Oben in der Sektionsleiste auf **BPM** klicken (oder Tastenkürzel **Strg+8**).
-> Die Sektion hat jetzt zwei Unter-Tabs: **Manager** und **Generator**.
+> Die Sektion hat drei Unter-Tabs: **Erkennung | Tempo-Buses | Generator**.
 
-Stand: 2026-06-21. Verifiziert gegen die laufende App und den Quellcode
-(`src/ui/views/bpm_manager_view.py`, `bpm_generator_view.py`,
-`src/core/engine/bpm_manager.py`, `src/core/audio/{beat_detector,genre_presets,offline_timeline,analysis_engines,bpm_settings,music_show}.py`).
+Stand: 2026-09-14 (Sub-Tab „Erkennung", BPM-09). Verifiziert gegen den Quellcode
+(`src/ui/views/bpm_manager_view.py`, `bpm_generator_view.py`, `src/ui/bpm_tap_helper.py`,
+`src/ui/bpm_source_controller.py`, `src/core/engine/bpm_manager.py`,
+`src/core/audio/{beat_detector,genre_presets,offline_timeline,analysis_engines,bpm_settings,music_show}.py`).
+Die Bilder unten zeigen noch den früheren Manager-Tab (bis 2026-09-14) — die Beschriftungen
+im Text gelten.
 
 ---
 
-## 0. In 30 Sekunden: Welche BPM-Quelle nehme ich?
+## 0. In 30 Sekunden: Welche Quelle nehme ich?
 
-Im **Manager**-Tab unter *Einstellungen* ganz oben steht der wichtigste neue Schalter,
-die **BPM-Quelle**. Er ist die einfache Hauptsteuerung — alles andere ist Feintuning.
+Im Sub-Tab **Erkennung** steht oben rechts die Liste **Quelle**. Sie ist die einfache
+Hauptsteuerung — alles andere ist Feintuning.
 
-| Du willst… | BPM-Quelle | Voraussetzung |
+| Du willst… | Quelle | Voraussetzung |
 |---|---|---|
-| dass das Licht **live zur laufenden Musik** läuft (DJ-Set, Party, Spotify) | **Live-Audio** | Musik läuft hörbar über den PC oder ein externes Signal |
-| ein **vorbereitetes Lied** sauber & exakt zum Beat abspielen | **Lied-Analyse** | Song vorher im **Generator** analysiert |
-| das Tempo **selbst vorgeben** (Bandprobe, Klick, kein verwertbares Audio) | **Manuell / Tap** | — |
+| dass das Licht **live zur laufenden Musik** läuft (Spotify, Player auf diesem PC) | **PC-Audio** | Musik läuft hörbar über den PC |
+| Musik von **außen** (Fremd-DJ, Mischpult, Live-Band) | **Eingang: <Gerät>** | Mikro/Line-In/Interface angeschlossen |
+| das Tempo **vom DJ-Programm** (VirtualDJ, Mixxx) | **OS2L (DJ-Software)** | OS2L im DJ-Programm aktiviert |
+| ein **vorbereitetes Lied** sauber & exakt zum Beat abspielen | **Lied-Analyse (Player)** | Song vorher im **Generator** analysiert und im Player geladen |
+| das Tempo **selbst vorgeben** (Bandprobe, Klick, kein verwertbares Audio) | beliebig + **Manuell** (oder **Aus**) | — |
 
-> **Faustregel:** *Live-Audio* ist der Standard und für 90 % der Fälle richtig.
+> **Faustregel:** *PC-Audio* bzw. *Eingang* ist der Standard und für 90 % der Fälle richtig.
 > *Lied-Analyse* lohnt sich, wenn ein bestimmter Track **taktgenau** sitzen muss.
-> *Manuell* ist der Notnagel, wenn keine brauchbare Tonquelle da ist.
+> *Manuell* + **TAP** ist der Notnagel, wenn keine brauchbare Tonquelle da ist.
 
 ---
 
-## 1. Der Manager-Tab
+## 1. Der Sub-Tab „Erkennung"
 
-![Manager-Tab — Monitor, Tempo-Speeds, Einstellungen](img/manager_oben.png)
+![Manager-Tab (Stand bis 2026-09-14) — Monitor, Tempo-Speeds, Einstellungen](img/manager_oben.png)
 
-Der Manager-Tab besteht von oben nach unten aus zwei Blöcken: **Monitor** (Anzeige)
-und **Einstellungen** (alle Regler). **Tempo-Speeds & Grand-Master** (Bus-Tempi) liegt
-seit 2026-09-14 im eigenen Sub-Tab **„Tempo-Buses"** (im Bild oben noch zwischen den
-beiden Blöcken; die Sektion BPM hat jetzt Manager | Tempo-Buses | Generator).
+Die Standardansicht hat **genau sechs Bedienelemente** — mehr braucht es im Betrieb nicht:
 
-### 1.1 Monitor — was läuft gerade?
+| # | Element | Was es tut |
+|---|---|---|
+| 1 | **Quelle** (Liste) | PC-Audio · Eingang: <Gerät> (je Eingang ein Eintrag) · OS2L (DJ-Software) · Lied-Analyse (Player) · Aus. Die Liste liest die Geräte beim Öffnen neu; ein gespeichertes, gerade nicht vorhandenes Gerät steht als „(nicht gefunden)" drin. Was du wählst, wird gemerkt. |
+| 2 | **TAP** (großer Knopf) | **Zwei Rollen:** *einmal* tippen = Beat-Punkt auf „jetzt" setzen, wenn er neben der Musik blinkt (Tempo bleibt). *Drei-, viermal im Takt* tippen = Tempo setzen; die Erkennung sucht danach um dieses Tempo (und entscheidet damit auch Halb/Doppel). Der TAP oben in der Kopfzeile ist derselbe Knopf. |
+| 3 | **Auto \| Manuell** | **Auto** folgt der Quelle. **Manuell** hält dein Tempo (TAP/Nudge) — die Quelle ändert es nicht, läuft aber im Hintergrund weiter (das Zustandswort zeigt, was sie erkennen würde). |
+| 4 | **×½** | Halbes Tempo mit einem Klick: läuft das Licht doppelt so schnell wie die Musik. In Auto zwingt das die Erkennung auf die halbe Oktave, in Manuell halbiert es dein Tempo. |
+| 5 | **×2** | Doppeltes Tempo — das Gegenstück. Tipp: ein enger Tempo-Bereich (Erweitert) verhindert den Fehler dauerhaft. |
+| 6 | **▸ Erweitert** | Klappt die Feineinstellungen auf (Abschnitt 1.3). Bleibt nur für die Sitzung offen. |
 
-* **Große BPM-Zahl** (gelb): die aktuelle globale BPM. Grau/„-- BPM", wenn nichts erkannt wird.
-* **Quelle:** zeigt, *welche* Quelle gerade führt — z. B. `AUTO · Audio`, `AUTO · Lied-Analyse`,
-  `MANUAL · Tap`, `OS2L (extern)`. So siehst du auf einen Blick, woher das Tempo kommt.
-* **Status** (orange): „Audio läuft" / „Audio gestoppt" oder eine Fehlermeldung des Eingangs.
-* **Takt: 1 · 2 · 3 · 4** — die Zähl-Zellen leuchten im Takt mit; die **1** (Downbeat) ist
-  gold, die anderen grün. Die Zahl der Zellen folgt dem **Takt-Raster** (s. u.).
-* **Beat-Punkt** (rechts): blinkt auf jedem Beat.
-* **Erkennungs-Qualität:** wie stabil/sicher die Live-Erkennung gerade ist (0–100 %).
-  Hohe Werte = sauberer 4/4-Beat erkannt; niedrige Werte = unklares/wechselndes Signal.
-* **Spektrum:** 8-Band-Pegelanzeige des Eingangssignals (nur Anzeige).
+### 1.1 Anzeigen — was läuft gerade?
 
-> **Wozu:** Der Monitor ist deine Kontrollinstanz. Wenn das Licht „daneben" läuft,
-> schau zuerst hierher: Stimmt die Zahl? Führt die richtige Quelle? Ist die
-> Erkennungs-Qualität hoch?
+* **Große BPM-Zahl:** gelb = Auto, grün = Manuell, grau „--" = kein Tempo.
+* **Beat-Punkt + Taktzellen 1 · 2 · 3 · 4:** blinken im Takt mit; die **1** (Downbeat) ist
+  gold. Die Zahl der Zellen folgt **Beats/Takt** (Erweitert).
+* **Zustandswort** (immer sichtbar, nie nur Farbe):
+  **KEIN SIGNAL** — nichts zu hören (Kabel? richtiges Gerät? läuft die Musik über diesen
+  Ausgang?) · **SUCHT** — Signal da, das Analysefenster füllt sich (~4 s nach Start oder
+  Quellenwechsel) · **EINGERASTET** — Beats laufen · **PAUSE · hält 128** — Stille, das Tempo
+  wird gehalten und die Beats laufen weiter (nach 10 s Stille wird losgelassen) ·
+  **MANUELL** — du gibst das Tempo vor · **OS2L · wartet auf DJ-Software** — Server läuft,
+  kein Client · **LIED-ANALYSE** / **AUS**.
+* **Quelle-Text** neben dem Zustandswort: wer die BPM zuletzt gesetzt hat (Audio, Tap,
+  Nudge, Lied-Analyse, OS2L) und ob **🔒** eingefroren ist.
+* **Konfidenz:** wie sicher die Erkennung ist (0–100 %). Hoch = klarer Beat; niedrig =
+  unklares Signal, Pause, Sprache.
+* **Status-Zeile** (orange): erscheint nur bei einem Eingangs-Fehler („⚠ …").
+
+> **Wozu:** Wenn das Licht „daneben" läuft, schau zuerst hierher: Stimmt die Zahl? Sagt
+> das Zustandswort EINGERASTET? Ist die Konfidenz hoch? Blinkt der Punkt neben der Musik →
+> **TAP** einmal.
 
 ### 1.2 Tempo-Speeds & Grand-Master (kurz — Sub-Tab „Tempo-Buses")
 
-Diese Tabelle (Sub-Tab **„Tempo-Buses"**) steuert die **Tempo-Busse** (eigene Tempi pro Effektgruppe, ½×/2× usw.)
+Der Sub-Tab **„Tempo-Buses"** steuert die **Tempo-Busse** (eigene Tempi pro Effektgruppe, ½×/2× usw.)
 und den **Grand-Master**, der bei Bedarf *alle* Master-Busse auf ein gemeinsames Tempo
 zwingt. Das ist ein eigenes Thema — Details in
-[ANLEITUNG_SPEED_BPM.md](../anleitung_speed_bpm/ANLEITUNG_SPEED_BPM.md). Für den
-BPM-Manager reicht: der Bus **„Default (Sound-BPM)"** folgt automatisch der hier
+[ANLEITUNG_SPEED_BPM.md](../anleitung_speed_bpm/ANLEITUNG_SPEED_BPM.md). Für die
+Erkennung reicht: der Bus **„Default (Sound-BPM)"** folgt automatisch der hier
 erkannten/gesetzten globalen BPM.
 
-### 1.3 Einstellungen — alle Regler im Detail
+### 1.3 „Erweitert" — die Feineinstellungen
 
-![Einstellungen inkl. Takt-Raster](img/manager_einstellungen.png)
+![Einstellungen (Stand bis 2026-09-14)](img/manager_einstellungen.png)
 
-#### BPM-Quelle  (Live-Audio / Lied-Analyse / Manuell / Tap)
-Der Hauptumschalter aus Abschnitt 0.
+Aufklappen mit **▸ Erweitert**. Elf Bedienelemente, alle werden gespeichert:
 
-* **Einstellen:** Radio-Button anklicken.
-* **Wozu:** schaltet im Hintergrund automatisch das Richtige — *Live-Audio* startet die
-  Audio-Erkennung; *Lied-Analyse* schaltet Live-Audio ab und lässt die Song-Analyse führen;
-  *Manuell* schaltet auf Hand-Tempo (Tap/Eingabe).
-* **Use-Case:** Während eines Sets von „Live-Audio" auf „Lied-Analyse" wechseln, wenn ein
-  besonders wichtiger, vorbereiteter Track kommt — danach zurück auf „Live-Audio".
+#### Tempo-Bereich  (von / bis, 20–400 BPM) + „Vorlage ▾"
+Die untere und obere Grenze, in die die Erkennung das Tempo **faltet**.
 
-#### Analyse-Song  (+ ↻ + „Taktgenau")
-Nur relevant, wenn BPM-Quelle = **Lied-Analyse**.
+* **Wozu:** Außerhalb liegende Schätzungen werden per **Oktav-Faltung** (×2 / ÷2) in dieses
+  Fenster geholt. Ein enges Fenster verhindert das Halb-/Doppel-Tempo-Springen dauerhaft
+  (×½/×2 sind die Einmal-Korrektur).
+* **„Vorlage ▾":** Menü mit den Genre-Bereichen — setzt **nur** Tempo-Bereich und Beats/Takt:
 
-* **Auswahl:** Liste aller Songs, die im **Generator** analysiert wurden (haben ein
-  gespeichertes Beatgrid). `↻` aktualisiert die Liste. Ist nichts analysiert, steht hier
-  „(kein analysierter Song — im Generator erstellen)".
-* **„Taktgenau"** (Checkbox, standardmäßig **an**): Wenn aktiv, treffen die Beats **exakt
-  das Beatgrid des Liedes** (nicht nur den BPM-Wert) — die Lichtshow sitzt also phasen-genau
-  auf der Musik. Aus = es folgt nur der **BPM-Wert** (Phase läuft frei mit).
-* **Wozu/Use-Case:** Für vorbereitete Tracks, bei denen jeder Hit sitzen soll (z. B. ein
-  Drop, ein Break), willst du „Taktgenau" **an** lassen. Die Beat-Phase wird dabei beim
-  Abspielen laufend an die echten Lied-Beats (inkl. Downbeats) angehängt.
+| Vorlage | Tempo-Bereich | Vorlage | Tempo-Bereich |
+|---|---|---|---|
+| Allgemein | 70–180 | Frenchcore / Uptempo | 180–230 |
+| House / Tech-House | 118–130 | Drum & Bass | 165–180 |
+| Techno | 125–140 | Dubstep | 135–145 |
+| Trance | 130–145 | Trap / Hip-Hop | 70–100 |
+| Hardstyle / Rawstyle | 145–160 | Pop / Rock | 90–140 |
 
-> **Wichtig:** Die Lied-Analyse **führt nur, wenn Live-Audio aus ist** — der Live-Detektor
-> hat im AUTO-Modus Vorrang. Genau deshalb schaltet die Quelle „Lied-Analyse" das
-> Live-Audio automatisch ab. Außerdem muss der Song im **Musik-Tab abgespielt** werden,
-> damit die Analyse dem Lied über die Zeit folgt.
-
-#### Genre-Preset  (Dropdown + „Anwenden")
-Ein Klick stellt **Tempo-Grenzen, Empfindlichkeit, Glättung und Takt** passend zum
-Musikstil ein.
-
-* **Einstellen:** Genre wählen → **Anwenden**. Die Regler darunter (Grenzen,
-  Empfindlichkeit, Glättung, Beats/Takt) springen auf die Preset-Werte.
-* **Wozu:** Der größte Hebel für **treffsichere** Erkennung ist ein **enges Tempo-Fenster**
-  plus passender Tempo-Schwerpunkt. Damit verschwindet der häufigste Fehler — dass z. B.
-  75 statt 150 BPM (halbes/doppeltes Tempo) erkannt wird.
-* **Use-Case:** Vor einem Techno-Set einmal „Techno" anwenden → die Erkennung bleibt sicher
+* **Use-Case:** Vor einem Techno-Set einmal „Techno" wählen → die Erkennung bleibt sicher
   im 125–140-BPM-Fenster und springt nicht mehr auf 65 BPM.
 
-Die Presets (Werte aus `genre_presets.py`):
+#### Beats/Takt  (1–32)
+Alle N Beats wird ein **Downbeat / Bar-Event** ausgelöst und die Takt-Zählung beginnt neu.
+4 = klassischer Viertakt, 16 = „Sechzehntakt" (langer Bogen). **Ändert nicht** die
+Beat-Geschwindigkeit, nur die Takt-Einteilung. Auch der Takt-1-Akzent des Beat-Punkts in
+der Kopfzeile folgt diesem Wert.
 
-| Preset | Tempo-Fenster | Schwerpunkt (Prior) | Empfindl. | Glättung |
-|---|---|---|---|---|
-| Allgemein | 70–180 | 120 | 1.30 | 0.30 |
-| House / Tech-House | 118–130 | 125 | 1.25 | 0.40 |
-| Techno | 125–140 | 132 | 1.30 | 0.40 |
-| Trance | 130–145 | 138 | 1.25 | 0.40 |
-| Hardstyle / Rawstyle | 145–160 | 150 | 1.35 | 0.35 |
-| Frenchcore / Uptempo | 180–230 | 200 | 1.45 | 0.30 |
-| Drum & Bass | 165–180 | 174 | 1.40 | 0.30 |
-| Dubstep | 135–145 | 140 | 1.35 | 0.35 |
-| Trap / Hip-Hop | 70–100 | 85 | 1.25 | 0.35 |
-| Pop / Rock | 90–140 | 120 | 1.20 | 0.30 |
+#### Beat-Latenz  (−300 … +300 ms)
+Beats **früher (+)** oder **später (−)** melden — gleicht die Laufzeit von Audio-Weg und
+Lichtausgabe aus. Wenn das Licht hörbar hinter dem Beat liegt: in 5-ms-Schritten ins Plus.
 
-#### Lock  („🔒 BPM einfrieren")
-* **Einstellen:** Schalter umlegen.
-* **Wozu:** Friert die aktuelle BPM **ein** — keine Quelle ändert sie mehr, bis du den Lock
-  wieder löst. Use-Case: Das Tempo passt, du willst kurzes Reinreden des Detektors
-  (Ansage, Stille, Übergang) **nicht** durchlassen.
+#### Tempo einfrieren  („🔒 Tempo einfrieren")
+Friert die aktuelle BPM **ein** — keine Quelle ändert sie mehr, bis du den Schalter wieder
+löst; die Beats laufen weiter. Use-Case: Das Tempo passt, du willst kurzes Reinreden der
+Erkennung (Ansage, Stille, Übergang) **nicht** durchlassen.
 
-#### Audio-Eingang  (PC-Audio / Externer Eingang / OS2L)
-Das Detail-Setting für „Live-Audio": **woher** das Tonsignal kommt.
+#### Nudge  (−5 · −1 · +1 · +5)
+Die aktuelle BPM in Schritten anheben/absenken — zum Feinjustieren, wenn die Erkennung
+leicht daneben liegt (schaltet auf Manuell).
 
-* **PC-Audio (Player/Spotify):** greift die PC-Wiedergabe ab (WASAPI-Loopback) — der
-  eingebaute Player **und** Spotify/YouTube usw. laufen darüber. **Standard.**
-* **Externer Eingang:** Mikrofon / Line-In (Gerät im Dropdown wählbar) — z. B. ein
-  Mikro im Raum oder ein Mischpult-Ausgang.
-* **OS2L (VirtualDJ):** das Tempo kommt vom externen DJ-Programm (VirtualDJ/Mixxx) über
-  das OS2L-Protokoll, statt aus dem Audio.
-* **Wozu/Use-Case:** „Externer Eingang" nimmst du, wenn die Musik **nicht** über diesen PC
-  läuft (Fremd-DJ, Live-Band) — dann ein Mikro/Line-Signal anschließen. „OS2L" ist die
-  präziseste Variante, wenn du ohnehin mit VirtualDJ auflegst.
+#### Taktgenau  (Checkbox, standardmäßig an)
+Nur für die Quelle **Lied-Analyse**: Wenn aktiv, treffen die Beats **exakt das Beatgrid
+des Liedes** (nicht nur den BPM-Wert) — die Lichtshow sitzt phasen-genau auf der Musik.
+Aus = es folgt nur der **BPM-Wert** (Phase läuft frei mit). Details in Abschnitt 3.
 
-#### Grenzen (BPM)  („Tiefen" / „Höhen")
-Die untere und obere Grenze, in die die Erkennung das Tempo **faltet** (20–400 möglich).
+#### Diagnose + Spektrum  (nur Anzeige)
+Rohwerte des Detektors: Roh-Tempo, Alternativ-Oktave mit Wert, Fensterfüllung, Pegel,
+Rauschteppich, Brumm (50/60 Hz, Anteil), DC, Jitter, Rückstand, Beat-Kontrast, gesetzter
+Tempo-Hinweis. Darunter das 8-Band-**Spektrum** des Eingangssignals. Beides hilft, wenn
+etwas nicht erkannt wird (Brummanteil hoch? Pegel −70 dBFS = nichts da?).
 
-* **Einstellen:** Zahlen für Tiefen (min) und Höhen (max) setzen.
-* **Wozu:** Außerhalb liegende Schätzungen werden per **Oktav-Faltung** (×2 / ÷2) in dieses
-  Fenster geholt. Ein enges Fenster verhindert das Halb-/Doppel-Tempo-Springen.
-* **Tipp:** Meist über das **Genre-Preset** setzen lassen — manuell nur fürs Feintuning.
+> **Entfernt seit 2026-09-14:** Empfindlichkeit, Glättung, Genre-Preset + Anwenden (entfernt),
+> Analyse-Song + ↻ (entfernt), Schnellwahl 4/8/16, Unterteilung, Nudge ±10 (entfernt), der
+> 🔒-Knopf in der Standardansicht. Die neue Erkennung (seit BPM-06) kalibriert sich selbst; die
+> Genre-Bereiche gibt es unter „Vorlage ▾" weiter; die Lied-Analyse nimmt den Titel, der
+> im Player geladen ist; „Tempo einfrieren" steht in „Erweitert".
 
-#### Empfindlichkeit  (0.50–3.00, Standard 1.30)
-Wie stark ein Beat aus dem Bass herausragen muss, um zu zählen.
-* **Niedriger** = empfindlicher (mehr Beats, auch leise) · **höher** = strenger (nur klare Beats).
-* **Use-Case:** Bei basslastiger, „matschiger" Musik etwas höher; bei leisem/sauberem
-  Material etwas niedriger.
-
-#### Glättung  (0.00–1.00, Standard 0.30)
-Wie träge der BPM-Wert reagiert (EMA-Glättung).
-* **Höher** = stabiler, aber langsamer bei Tempowechsel · **niedriger** = reagiert schneller, zappelt aber eher.
-* **Use-Case:** Für gleichmäßige Vier-zum-Boden-Sets ruhig höher; für Live-Bands mit
-  Tempo-Schwankungen niedriger.
-
-#### Takt-Raster  (Beats/Takt + Unterteilung) — *neu*
-Bestimmt, **wann ein Takt beginnt** (Downbeat) und ob es **Zwischen-Ticks** gibt.
-
-* **Beats/Takt** (1–32; Schnellwahl-Buttons **4 · 8 · 16**): Alle N Beats wird ein
-  **Downbeat / Bar-Event** ausgelöst und die Takt-Zählung beginnt neu. 4 = klassischer
-  Viertakt, 16 = „Sechzehntakt" (langer Bogen). **Ändert nicht** die Beat-Geschwindigkeit,
-  nur die Takt-Einteilung.
-* **Unterteilung** (aus, 1/2, 1/3, 1/4, 1/6, 1/8, 1/16): zusätzliche **Sub-Ticks pro Beat**
-  für schnellere Effekte. Wirkt im **Timer-/Tap-/Datei-Modus**; bei Live-Audio gibt es nur
-  die Beat-Rate (kein künstliches Unterteilen des erkannten Beats).
-* **Wozu/Use-Case:**
-  * *Beats/Takt 16* → ein Effekt, der „einmal pro Takt" etwas tut (Farbwechsel, Chase-Reset,
-    Downbeat-Flash), löst nur alle 16 Beats aus → ruhige, große Bögen statt Geflacker.
-  * *Unterteilung 1/2 oder 1/4* → ein Strobe/Chase, der „auf jeden Beat" läuft, läuft
-    doppelt/vierfach so schnell, ohne die globale BPM zu ändern.
-
-#### Manuell  (TAP + Nudge −10 −5 −1 +1 +5 +10)
-* **TAP:** im Takt mehrmals klicken → setzt die BPM aus deinem Tipp-Tempo (schaltet auf MANUAL).
-* **Nudge** (±1/±5/±10): die aktuelle BPM in Schritten anheben/absenken — zum Feinjustieren,
-  wenn die Erkennung leicht daneben liegt.
 
 ---
 
@@ -266,26 +225,30 @@ aktiv ist, passiert beim Abspielen Folgendes:
   den freilaufenden Timer (kann minimal „weglaufen"). Reicht, wenn nur das Tempo, nicht die
   exakte Phase zählt.
 
-**Voraussetzungen:** Song im Generator analysiert (Beatgrid vorhanden) · Quelle „Lied-Analyse" ·
-Live-Audio aus · Song läuft im Musik-Tab · Pause/Stop hält die taktgenaue Wiedergabe an.
+**Voraussetzungen:** Song im Generator analysiert (Beatgrid vorhanden) · Quelle **Lied-Analyse
+(Player)** (schaltet das Live-Audio ab) · **Auto** · Song läuft im Musik-Tab · Pause/Stop hält
+die taktgenaue Wiedergabe an.
 
 ---
 
-## 4. Smartere Live-Erkennung (läuft automatisch im Hintergrund)
+## 4. Die Live-Erkennung (läuft automatisch im Hintergrund)
 
-Die Live-Erkennung wurde robuster gemacht — du musst dafür nichts einstellen, aber gut zu wissen:
+Seit 2026-09-14 (BPM-06) arbeitet eine neue Erkennung (Spectral Flux + Autokorrelation) —
+du musst dafür nichts einstellen, aber gut zu wissen:
 
-* **Robuste Tempo-Schätzung (Median + Ausreißer-Filter):** Statt eines flachen Mittelwerts
-  über viele Schläge nimmt LightOS die **letzten ≤ 9 Beats**, bildet deren **Median** als
-  Bezug, **verwirft Ausreißer (±35 % vom Median)** und mittelt nur die verbliebenen Werte.
-  Verpasste oder doppelte Schläge ziehen den Wert nicht mehr weg, und Tempowechsel kommen
-  schneller durch.
-* **Oktav-Faltung mit Kontinuität:** Halb-/Doppel-Tempo-Passagen springen nicht mehr hin und
-  her — die zur bisherigen BPM **nächstliegende** Oktave wird gehalten.
-* **Stille-Re-Lock:** Nach ~3 s **Stille** wird der alte BPM-Zustand verworfen, damit der
-  nächste Einsatz **frisch** einrastet (statt das alte Tempo „festzuhalten").
-* **Erkennungs-Qualität:** Der Prozentbalken im Monitor zeigt, wie stabil die Schätzungen
-  gerade sind — dein Indikator, ob die Erkennung dem Signal traut.
+* **Selbstkalibrierend:** Das Signal wird je Frequenzband auf seinen eigenen Pegel normiert
+  („Whitening") — Empfindlichkeit und Glättung gibt es deshalb nicht mehr. Netzbrumm, kurze
+  Onsets und stoßweise Audio-Chunks stören nicht.
+* **Einrasten dauert ~4 s:** Nach Start oder Quellenwechsel füllt sich erst das Analysefenster
+  (Zustandswort **SUCHT**); vorher werden keine Beats gemeldet. Schneller: **TAP** drei-,
+  viermal im Takt — die Erkennung sucht dann um dein Tempo.
+* **Oktave:** Der Tempo-Bereich (Erweitert) entscheidet, welche Oktave gilt; **×½ / ×2**
+  korrigieren einmalig, ein TAP-Tempo setzt die Oktave ebenfalls.
+* **Stille:** Das Tempo wird **gehalten** (Zustandswort **PAUSE · hält N**, Beats laufen
+  weiter) und nach 10 s Stille losgelassen (**KEIN SIGNAL**) — der nächste Einsatz rastet
+  frisch ein. **Manuell** hält das Tempo beliebig lange.
+* **Konfidenz:** Der Balken zeigt, wie sicher die Erkennung ist (Periodizität × Beat-Kontrast);
+  Beats werden nur im Zustand EINGERASTET gemeldet.
 
 ---
 
@@ -296,13 +259,17 @@ Alle Einstellungen liegen user-global in `%APPDATA%/LightOS/ui_prefs.json` (Bloc
 
 | Einstellung | Standard |
 |---|---|
-| AUTO beim Start | an |
-| Grenzen (Tiefen/Höhen) | 60 / 200 BPM |
-| Empfindlichkeit | 1.30 |
-| Glättung | 0.30 |
-| Audio-Eingang | PC-Audio (Loopback) |
-| Beats/Takt · Unterteilung | 4 · aus |
+| Quelle · Gerät | PC-Audio · (kein Eingangsgerät) |
+| Modus | Auto |
+| Tempo-Bereich | 60 / 200 BPM |
+| Beats/Takt | 4 |
+| Beat-Latenz | 0 ms |
 | Taktgenau | an |
+
+Die Sektion trägt ein Versionsfeld (v3 seit 2026-09-14). Alte Dateien werden beim ersten
+Start übernommen (Tempo-Bereich, Gerät, Takt); die früheren Werte Empfindlichkeit, Glättung
+und Unterteilung (bis 2026-09-14) werden verworfen und einmal ins Log geschrieben. Nicht gespeichert werden
+„Tempo einfrieren", ×½/×2 und der Aufklapp-Zustand von „Erweitert".
 
 Das **analysierte Beatgrid** eines Songs wird in der Show-Playlist mitgespeichert (mit dem
 Track) — eine einmal analysierte Datei bleibt also über Sitzungen hinweg als BPM-Quelle nutzbar.
@@ -311,28 +278,32 @@ Track) — eine einmal analysierte Datei bleibt also über Sitzungen hinweg als 
 
 ## 6. Use-Case-Szenarien (Zusammenfassung)
 
-* **DJ-Set / Party (Spotify, Fremd-DJ):** BPM-Quelle **Live-Audio**, Audio-Eingang **PC-Audio**
-  (oder **Externer Eingang** bei Fremd-DJ). Vorab das passende **Genre-Preset** anwenden.
-* **VirtualDJ:** Audio-Eingang **OS2L** → präzises Tempo direkt vom DJ-Programm.
+* **DJ-Set / Party (Spotify, Fremd-DJ):** Quelle **PC-Audio** (oder **Eingang: <Gerät>** bei
+  Fremd-DJ), **Auto**. Vorab in „Erweitert" die passende **Vorlage** wählen.
+* **VirtualDJ:** Quelle **OS2L (DJ-Software)** → präzises Tempo direkt vom DJ-Programm.
 * **Wichtiger vorbereiteter Track, alles muss sitzen:** im **Generator** analysieren (Engine
   *Beat This!* für maximale Genauigkeit), ggf. im **Beatgrid-Editor** nachziehen,
-  **„Im Player laden"**, Quelle **Lied-Analyse**, **„Taktgenau" an**, im Musik-Tab abspielen.
-* **Bandprobe / kein verwertbares Audio:** Quelle **Manuell / Tap**, Tempo per **TAP** geben,
-  mit **Nudge** feinjustieren, bei Bedarf **Lock**.
-* **Schnelle/langsame Effekte ohne Tempowechsel:** **Takt-Raster** nutzen — Beats/Takt für
-  große Bögen, Unterteilung für schnellere Strobes/Chases.
+  **„Im Player laden"**, Quelle **Lied-Analyse (Player)**, **„Taktgenau" an**, im Musik-Tab
+  abspielen.
+* **Bandprobe / kein verwertbares Audio:** **Manuell**, Tempo per **TAP** (3–4× im Takt) geben,
+  mit **Nudge** feinjustieren, bei Bedarf **Tempo einfrieren**.
+* **Beat-Punkt blinkt neben der Musik:** einmal **TAP** — setzt die Phase, das Tempo bleibt.
+* **Große Bögen ohne Tempowechsel:** **Beats/Takt** hochsetzen (8/16) — ein Effekt „einmal pro
+  Takt" läuft dann nur alle 8/16 Beats.
 
 ---
 
 ## 7. Stolpersteine
 
-* **„Lied-Analyse" tut nichts:** Läuft Live-Audio noch? Es hat im AUTO Vorrang — die Quelle
-  „Lied-Analyse" schaltet es ab; prüfe, dass der Song wirklich **abgespielt** wird.
-* **Tempo erkannt, aber halb/doppelt:** **Genre-Preset** anwenden (engt das Fenster ein) oder
-  die **Grenzen** manuell setzen.
-* **Erkennung zappelt:** **Glättung** erhöhen. **Erkennung träge:** Glättung senken.
-* **Unterteilung wirkt nicht bei Live-Audio:** Sub-Ticks gibt es nur im Timer-/Tap-/Datei-Modus
-  — bei Live-Audio kommt nur die echte Beat-Rate (so gewollt).
+* **„Lied-Analyse" tut nichts:** Steht der Schalter auf **Auto**? Ist ein **analysierter** Titel
+  im Player geladen (im Generator „Im Player laden")? Wird der Song wirklich **abgespielt**?
+* **Tempo erkannt, aber halb/doppelt:** **×½ / ×2** klicken (Einmal-Korrektur) oder in
+  „Erweitert" den **Tempo-Bereich** enger setzen bzw. eine **Vorlage** wählen (dauerhaft).
+* **KEIN SIGNAL bei laufender Musik:** Läuft die Musik über das Gerät, das die Quelle mithört?
+  Bei „Eingang" das richtige Gerät in der Liste wählen; die Diagnosezeile zeigt den Pegel.
+* **SUCHT bleibt stehen:** Musik ohne klaren Beat, Sprache, Pause? **TAP** drei-, viermal im
+  Takt — die Erkennung sucht dann um dein Tempo.
+* **Licht liegt hörbar hinter dem Beat:** **Beat-Latenz** in „Erweitert" ins Plus.
 * **Datei lässt sich nicht analysieren:** Fehlt evtl. der System-Codec — als `.wav`
   konvertieren und erneut versuchen.
 
