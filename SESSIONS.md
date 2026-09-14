@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| BPM-10 | A | feat/bpm-s5-pegelmeter | 2026-09-14T18:54Z | src/core/audio/level_meter.py · src/core/audio/capture.py · src/ui/widgets/level_meter_widget.py · src/ui/views/bpm_manager_view.py · src/ui/views/audio_input_view.py · src/ui/main_window.py |
+| _(frei)_ |  |  |  |  |
 
 ## Blocker & Fallen
 
@@ -120,7 +120,6 @@
 
 ## Verlauf
 
-- 2026-09-06T23:26Z A done XPLAT-32
 - 2026-09-07T13:59Z A claim UI-53
 - 2026-09-07T14:00Z A claim FM-35
 - 2026-09-07T14:00Z A claim FM-37
@@ -150,3 +149,4 @@
 - 2026-09-14T11:34Z A claim BPM-09
 - 2026-09-14T18:53Z A done BPM-09
 - 2026-09-14T18:54Z A claim BPM-10
+- 2026-09-14T19:36Z A done BPM-10
