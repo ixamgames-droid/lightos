@@ -71,7 +71,7 @@ FAELLE = [
     ("brumm", cap(**NETZ), det(state="searching", hum_ratio=0.71, hum_hz=50), IN, None, 0, "problem", "record", "71 %"),
     ("leise", cap(rms_dbfs_300ms=-44.0, rms_dbfs_1s=-44.0), det(), IN, None, 0, "hinweis", None, "−44 dBFS"),
     ("jitter", cap(chunk_ms_p95=95.0), det(), IN, None, 0, "hinweis", "record", "95 ms"),
-    ("dc", cap(dc_offset=0.05), det(), IN, None, 0, "hinweis", "record", "+0.050"),
+    ("dc", cap(dc_offset=0.05), det(), IN, None, 0, "hinweis", "record", "+0,050"),
     ("os2l_aus", None, None, MgrState(kind="os2l"), Os2lState(running=False), 0, "problem", "reconnect",
      "läuft nicht"),
     ("os2l_wartet", None, None, MgrState(kind="os2l"), Os2lState(running=True, port=1234), 0, "hinweis", None,
@@ -83,7 +83,7 @@ FAELLE = [
     ("song_ok", None, None, MgrState(kind="song", song_available=True, bpm=124.0), None, 0, "ok", None, "124"),
     ("aus", None, None, MgrState(kind="off"), None, 0, "hinweis", "source", "Quelle wählen"),
     ("eingefroren", cap(), det(), replace(IN, locked=True), None, 0, "hinweis", "range", "Eingefroren"),
-    ("manuell", cap(), det(bpm=127.8), replace(IN, manual=True, bpm=128.0), None, 0, "ok", None, "127.8"),
+    ("manuell", cap(), det(bpm=127.8), replace(IN, manual=True, bpm=128.0), None, 0, "ok", None, "127,8"),
     ("manuell_aus", cap(), det(), replace(IN, manual=True, bpm=0.0), None, 0, "ok", None, "Tempo aus"),
     ("halbtempo", cap(), det(bpm=70.2, alt_bpm=140.4, alt_score=0.8), IN, None, 0, "hinweis", None, "×2"),
     ("pause", cap(rms_dbfs_300ms=-120.0, rms_dbfs_1s=-120.0), det(hold_stage=1), PC, None, 0, "ok", None,
@@ -250,10 +250,11 @@ def test_hysterese_ein_frame_sucht_verdraengt_gehaltenes_leise_nicht():
 def test_hysterese_erstes_update_zeigt_stoerung_erst_nach_2_s():
     kein = status_line(cap(rms_dbfs_300ms=-70.0, rms_dbfs_1s=-70.0), det(state="no_signal", hold_stage=3),
                        IN, None, 0)
-    assert kein.key == "kein_signal" and kein.basis is not None and kein.basis.key == "sucht"
+    # BPM-13: Basis bei Stille ist „Wartet auf Signal", nicht „Sucht Tempo — N s Musik gehört"
+    assert kein.key == "kein_signal" and kein.basis is not None and kein.basis.key == "wartet"
     h = StatusHysterese()
-    assert h.update(kein, 1.0).key == "sucht"
-    assert h.update(kein, 2.9).key == "sucht"
+    assert h.update(kein, 1.0).key == "wartet"
+    assert h.update(kein, 2.9).key == "wartet"
     assert h.update(kein, 3.0).key == "kein_signal"
     h2 = StatusHysterese()
     dc = status_line(cap(dc_offset=0.03), det(), IN, None, 0)
@@ -295,7 +296,7 @@ def test_chips_bedingungen():
     assert chips(None, None) == set()
     assert chips(cap(), det()) == set()
     assert chips(cap(clip_chunks_1s=3), None) == {"CLIP"}
-    assert chips(cap(rms_dbfs_1s=-50.0), None) == {"LEISE"}
+    assert chips(cap(rms_dbfs_300ms=-50.0, rms_dbfs_1s=-50.0), None) == {"LEISE"}  # BPM-13: 300 ms mit
     assert chips(cap(rms_dbfs_1s=-80.0), None) == set()          # kein Signal ist nicht „leise"
     assert chips(cap(chunk_ms_p95=80.0), None) == {"JITTER"}
     assert chips(cap(), det(backlog_ms=300.0)) == {"JITTER"}
@@ -440,3 +441,111 @@ def test_bank_kick_allein_und_brumm_snr0():
     # reiner Brumm (keine Musik, Detektor sucht): Zeile und Chip
     zeilen, sichtbar, hum = _pipeline(_sig_brumm(9.0, sr, -30.0))
     assert "brumm" in zeilen and "BRUMM" in sichtbar
+
+
+# ── BPM-13: Abwesenheit/Ueberschuss verschwindet sofort, wenn der Pegel sie widerlegt ──
+
+def test_kein_signal_verschwindet_sofort_wenn_musik_klar_da():
+    """Protokoll Sichtpruefung: 2,5 s nach Start rms −14 dBFS, Zeile stand weiter
+    „Kein Signal". Jetzt: RMS 300 ms > −60 + 6 dB -> sofort die Zustandszeile."""
+    h = StatusHysterese()
+    still = cap(rms_dbfs_300ms=-120.0, rms_dbfs_1s=-120.0)
+    for i in range(60):                                   # 3 s Stille -> Kein Signal steht
+        h.update(status_line(still, det(state="no_signal", signal_s=0.0), PC, None, 0), i * 0.05, still)
+    assert h.shown.key == "kein_signal"
+    laut = cap(rms_dbfs_300ms=-14.0, rms_dbfs_1s=-40.0)   # 1-s-Mittel hinkt noch hinterher
+    line = status_line(laut, det(state="searching", signal_s=0.3, window_filled_s=0.3), PC, None, 0)
+    assert h.update(line, 3.05, laut).key == "sucht"      # sofort, nicht erst nach 3 s
+    # ohne Pegel-Snapshot (alter Aufruf) gilt weiter die Aus-Hysterese
+    h2 = StatusHysterese()
+    for i in range(60):
+        h2.update(status_line(still, det(state="no_signal"), PC, None, 0), i * 0.05)
+    assert h2.update(line, 3.05).key == "kein_signal"
+
+
+def test_leise_verschwindet_sofort_wenn_pegel_klar_darueber():
+    h = StatusHysterese()
+    leise = cap(rms_dbfs_300ms=-44.0, rms_dbfs_1s=-44.0)
+    for i in range(60):
+        h.update(status_line(leise, det(), PC, None, 0), i * 0.05, leise)
+    assert h.shown.key == "leise"
+    wieder = cap(rms_dbfs_300ms=-20.0, rms_dbfs_1s=-38.0)
+    assert h.update(status_line(wieder, det(), PC, None, 0), 3.05, wieder).key == "ok"
+    # auch wenn das 1-s-Mittel noch unter −40 liegt: RMS 300 ms klar darueber -> kein LEISE mehr
+    hinkt = cap(rms_dbfs_300ms=-20.0, rms_dbfs_1s=-42.0)
+    assert status_line(hinkt, det(), PC, None, 0).key == "ok"
+    assert "LEISE" not in chips(hinkt, det())
+
+
+def test_clip_verschwindet_sofort_bei_stille():
+    """Nach Stopp stand „Übersteuert" 3 s bei −120 dBFS. Jetzt sofort weg."""
+    h = StatusHysterese()
+    heiss = cap(rms_dbfs_300ms=-3.0, rms_dbfs_1s=-3.0, clip_chunks_1s=5, clip_samples_1s=40,
+                peak_hold_dbfs=0.0)
+    for i in range(60):
+        h.update(status_line(heiss, det(), PC, None, 0), i * 0.05, heiss)
+    assert h.shown.key == "clip"
+    stille = cap(rms_dbfs_300ms=-120.0, rms_dbfs_1s=-60.0, clip_chunks_1s=5, clip_samples_1s=40)
+    line = status_line(stille, det(state="searching", signal_s=0.0), PC, None, 0)
+    assert line.key == "kein_signal"                      # Stoerung, aber noch nicht reif
+    assert h.update(line, 3.05, stille).key != "clip"
+    ch = ChipHysterese()
+    for i in range(60):
+        ch.update(chips(heiss, det()), i * 0.05, heiss)
+    assert "CLIP" in ch.update(chips(heiss, det()), 3.0, heiss)
+    assert "CLIP" not in ch.update(chips(stille, det()), 3.05, stille)
+
+
+def test_flackern_an_der_schwelle_bleibt_unterdrueckt():
+    """Pegel pendelt um −60 dBFS (nicht KLAR darueber): Kein Signal bleibt stehen, bis
+    3 s lang keines mehr gemeldet wird; LEISE-Chip entsprechend."""
+    h = StatusHysterese()
+    unter = cap(rms_dbfs_300ms=-63.0, rms_dbfs_1s=-63.0)
+    knapp = cap(rms_dbfs_300ms=-56.0, rms_dbfs_1s=-56.0)          # −60 + 4 dB: nicht klar
+    for i in range(60):
+        h.update(status_line(unter, det(state="no_signal"), PC, None, 0), i * 0.05, unter)
+    assert h.shown.key == "kein_signal"
+    t = 3.0
+    for i in range(40):                                   # 2 s Wechsel unter/knapp
+        c = knapp if i % 2 else unter
+        assert h.update(status_line(c, det(state="searching"), PC, None, 0), t, c).key == "kein_signal"
+        t += 0.05
+    for i in range(20):                                   # 1 s nur knapp: weiter gehalten
+        assert h.update(status_line(knapp, det(state="searching"), PC, None, 0), t, knapp).key == "kein_signal"
+        t += 0.05
+    assert R.aufgeloest("kein_signal", cap(rms_dbfs_300ms=-53.9))
+    assert not R.aufgeloest("kein_signal", cap(rms_dbfs_300ms=-54.0))
+    assert not R.aufgeloest("kein_signal", cap(rms_dbfs_300ms=-10.0, running=False))
+    assert not R.aufgeloest("clip", cap(rms_dbfs_300ms=-59.0))
+    assert not R.aufgeloest("brumm", cap(rms_dbfs_300ms=-120.0))
+
+
+def test_start_bei_stille_sagt_nicht_musik_gehoert():
+    """BPM-13 (Sichtpruefung 01): rms −120 dBFS, Fenster 6 s „gefuellt" -> die Zeile unter
+    einer noch nicht reifen Kein-Signal-Stoerung lautet „Wartet auf Signal"."""
+    still = cap(rms_dbfs_300ms=-120.0, rms_dbfs_1s=-120.0)
+    d = det(state="no_signal", signal_s=0.0, window_filled_s=6.0)
+    line = status_line(still, d, PC, None, 0)
+    assert line.key == "kein_signal"
+    assert line.basis.text == "Wartet auf Signal — PC-Audio »Built-in Audio« ist still — Musik starten"
+    assert "Musik gehört" not in StatusHysterese().update(line, 0.0).text
+    # ohne Capture-Snapshot entscheidet der Detektor
+    assert status_line(None, d, PC, None, 0).key == "wartet"
+    # Signal da, Fenster schon 6 s, aber erst 2 s Musik: „2 s Musik gehört"
+    s2 = status_line(cap(), det(state="searching", signal_s=2.0, window_filled_s=6.0), PC, None, 0)
+    assert s2.key == "sucht" and s2.ursache.startswith("2 s Musik gehört")
+
+
+def test_zahlen_deutsch_komma_und_minus():
+    """BPM-13: Statuszeile einheitlich deutsch (Komma, echtes Minus)."""
+    assert R.zahl(-17.2, ".1f") == "\u221217,2" and R.zahl(0.005, "+.3f") == "+0,005"
+    line = status_line(cap(), det(bpm=127.6), PC, None, 0)
+    assert line.problem == "Eingerastet — 127,6 BPM aus PC-Audio »Built-in Audio«"
+    heiss = cap(clip_chunks_1s=5, clip_samples_1s=40, peak_hold_dbfs=-0.5)
+    assert "Spitze \u22120,5 dBFS" in status_line(heiss, det(), PC, None, 0).ursache
+    dc = status_line(cap(dc_offset=-0.031), det(), PC, None, 0)
+    assert dc.ursache == "DC-Offset \u22120,031 (Grenze ±0,02)"
+    halb = status_line(cap(), det(alt_bpm=64.0, alt_score=0.82), PC, None, 0)
+    assert "(0,82)" in halb.ursache
+    for l in (line, status_line(heiss, det(), PC, None, 0), dc, halb):
+        assert not any(ch.isdigit() and nx == "." for ch, nx in zip(l.text, l.text[1:]))

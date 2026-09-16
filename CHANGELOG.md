@@ -7,6 +7,27 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-16 — BPM-Erkennung: Feinschliff nach der Sichtprüfung (BPM-13)
+
+#### Geändert
+
+- **Pegel gut sichtbar:** eigene Zeile „Pegel" direkt unter dem Zustandswort, mit breitem
+  Pegelmeter (grüner Zielbereich −30…−6 dBFS, auch bei Stille zu sehen), Zahlenwert
+  („−17 dBFS") und den Hinweis-Chips daneben. Die Konfidenz ist jetzt ein kleiner Balken
+  neben dem Zustandswort.
+- **„Kein Signal" verschwindet sofort, wenn die Musik läuft** (vorher bis zu 3 s trotz
+  grünem Pegel). Ebenso „Pegel niedrig", sobald der Pegel klar darüber liegt, und
+  „Übersteuert", sobald Stille ist. Kurzes Flackern an der Schwelle bleibt unterdrückt.
+- **Start ohne Musik:** statt „Sucht Tempo — 6 s Musik gehört" steht jetzt „Wartet auf
+  Signal — PC-Audio … ist still — Musik starten". „N s Musik gehört" zählt nur noch Zeit mit
+  echtem Signal.
+- Neben „EINGERASTET" steht kein „· —" mehr; ein Zusatz erscheint nur, wenn er etwas sagt
+  (z. B. „· Tap", „· 🔒").
+- „Vorlage ▾" in „Erweitert" zeigt nur noch einen Pfeil.
+- **Zahlen deutsch:** BPM-Zahl, Statuszeile und Diagnose mit Komma und echtem Minus
+  („127,6", „−17 dBFS"). Die Diagnose nennt den DC-Versatz nur noch einmal
+  („DC +0,005") und zeigt ohne Brumm „Brumm —" statt „0 Hz 0 %".
+
 ### 2026-09-16 — BPM: Kick auf jedem Beat + Snare auf 2/4 rastet auf das volle Tempo
 
 #### Neu / Geändert

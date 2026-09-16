@@ -5,7 +5,8 @@ uebergebenen ``CaptureSnapshot`` (``set_snapshot``), greift nie selbst auf den
 Capture zu. Gespeist wird es im 50-ms-Timer der Ansicht „Erkennung".
 
 * Hintergrund −60..0 dBFS, gruene Zielzone ``ZIEL_LO_DBFS``..``ZIEL_HI_DBFS``
-  (−30..−6) als heller Streifen.
+  (−30..−6) als deutlich gruener Streifen mit Randlinien — IMMER gemalt, auch bei
+  Stille/ohne Snapshot (BPM-13: man sieht vorher, wohin der Pegel soll).
 * Balken = RMS ueber 300 ms; Farbe: grau unter ``GRAU_UNTER_DBFS`` (−45),
   gruen in der Zielzone, rot ueber ``ROT_UEBER_DBFS`` (−3), dazwischen gelb.
 * Peak-Hold als senkrechter Strich.
@@ -32,7 +33,8 @@ COL_GRAU = QColor("#6e7681")
 COL_GELB = QColor("#d29922")
 COL_GRUEN = QColor("#3fb950")
 COL_ROT = QColor("#f85149")
-COL_ZONE = QColor(63, 185, 80, 55)
+COL_ZONE = QColor(63, 185, 80, 95)
+COL_ZONE_RAND = QColor("#3fb950")
 COL_GRUND = QColor("#161b22")
 COL_RAHMEN = QColor("#30363d")
 COL_HOLD = QColor("#e6edf3")
@@ -115,6 +117,9 @@ class LevelMeterWidget(QWidget):
             x_lo = self._x(ZIEL_LO_DBFS, r.left(), r.width())
             x_hi = self._x(ZIEL_HI_DBFS, r.left(), r.width())
             p.fillRect(QRectF(x_lo, r.top(), x_hi - x_lo, r.height()), COL_ZONE)
+            p.setPen(QPen(COL_ZONE_RAND, 1))
+            p.drawLine(int(x_lo), int(r.top()), int(x_lo), int(r.bottom()))
+            p.drawLine(int(x_hi), int(r.top()), int(x_hi), int(r.bottom()))
             if self.active():
                 x = self._x(self.level_dbfs(), r.left(), r.width())
                 p.fillRect(QRectF(r.left(), r.top() + 3, x - r.left(), r.height() - 6), self.bar_color())

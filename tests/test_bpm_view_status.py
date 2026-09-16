@@ -430,7 +430,8 @@ def test_diagnosezeile_zeigt_dc_und_chunk_p95(env):
     v, *_ = make()
     v._advanced.set_expanded(True)
     _tick(v, clock, 0.0)
-    assert "DC (Eingang) +0.0012" in v._lbl_diag.text()
+    assert "DC +0,001" in v._lbl_diag.text()                 # BPM-13: einmal, deutsch
+    assert v._lbl_diag.text().count("DC") == 1
     assert "Chunk p95 23 ms" in v._lbl_diag.text()
 
 
@@ -445,3 +446,115 @@ def test_systemstandard_eintrag_alte_einstellung_passt(env, _isolated_prefs, mon
     assert v._cmb_source.currentText() == "PC-Audio (Systemstandard)"
     texts = [v._cmb_source.itemText(i) for i in range(v._cmb_source.count())]
     assert texts.count("PC-Audio (Systemstandard)") == 1 and "PC-Audio" not in texts
+
+
+def test_pegelzeile_breit_mit_zahlenwert(env):
+    """BPM-13: eigene Zeile „Pegel" — Meter mindestens halb so breit wie die View bei
+    1500 px, Zahlenwert deutsch und aus dem Snapshot, Chips in derselben Zeile,
+    Konfidenz kompakt."""
+    make, cap, clock, det = env
+    v, *_ = make()
+    v.resize(1500, 800)
+    _app.processEvents()
+    _tick(v, clock, 0.0)
+    assert v._level.width() >= 0.5 * v.width()
+    assert 16 <= v._level.height() <= 20
+    assert v._lbl_level.text() == "−18 dBFS"
+    cap.snap = replace(cap.snap, rms_dbfs_300ms=-7.4)
+    _tick(v, clock, 0.05)
+    assert v._lbl_level.text() == "−7 dBFS"
+    cap.snap = replace(cap.snap, rms_dbfs_300ms=-120.0)
+    _tick(v, clock, 0.1)
+    assert v._lbl_level.text() == "Stille"
+    cap.running = False
+    _tick(v, clock, 0.15)
+    assert v._lbl_level.text() == "— dBFS"
+    def _zeile(lay):
+        if lay.indexOf(v._level) >= 0:
+            return lay
+        for i in range(lay.count()):
+            sub = lay.itemAt(i).layout()
+            if sub is not None and (hit := _zeile(sub)) is not None:
+                return hit
+        return None
+    zeile = _zeile(v._level.parentWidget().layout())
+    assert zeile is not None and zeile.indexOf(v._lbl_level) >= 0
+    assert all(zeile.indexOf(c) >= 0 for c in v._chips.values())
+    # Meter und Zahl liegen auf einer Hoehe
+    mitte = v._level.mapTo(v, v._level.rect().center()).y()
+    assert abs(v._lbl_level.mapTo(v, v._lbl_level.rect().center()).y() - mitte) <= 4
+    assert v._conf.width() <= 200
+    assert v._level.width() > 5 * v._conf.width()
+
+
+def test_kein_signal_weg_sobald_musik_laeuft(env):
+    """BPM-13 (Sichtpruefung): Stille -> „Kein Signal" steht; Musik startet (RMS 300 ms
+    −14 dBFS, Detektor sucht) -> Statuszeile wechselt im selben Tick, nicht nach 3 s."""
+    make, cap, clock, det = env
+    v, *_ = make()
+    cap.snap = replace(cap.snap, rms_dbfs_300ms=-120.0, rms_dbfs_1s=-120.0)
+    det["snap"] = _det(state="no_signal", signal_s=0.0, window_filled_s=6.0)
+    t = 0.0
+    while t < 3.0:
+        _tick(v, clock, t)
+        t = round(t + 0.25, 2)
+    assert v.status_text().startswith("Kein Signal")
+    cap.snap = replace(cap.snap, rms_dbfs_300ms=-14.0, rms_dbfs_1s=-50.0)
+    det["snap"] = _det(state="searching", signal_s=0.5, window_filled_s=6.0)
+    assert _tick(v, clock, 3.05).startswith("Sucht Tempo")
+
+
+def test_start_bei_stille_wartet_auf_signal(env):
+    """BPM-13 (Sichtpruefung 01): Quelle gewaehlt, aber Stille — die ersten 2 s (Kein
+    Signal noch nicht reif) steht „Wartet auf Signal", nicht „N s Musik gehört"."""
+    make, cap, clock, det = env
+    v, *_ = make()
+    cap.snap = replace(cap.snap, rms_dbfs_300ms=-120.0, rms_dbfs_1s=-120.0)
+    det["snap"] = _det(state="no_signal", signal_s=0.0, window_filled_s=6.0)
+    txt = _tick(v, clock, 0.0)
+    assert txt.startswith("Wartet auf Signal — Eingang »USB Audio CODEC« ist still — Musik starten")
+    assert "Musik gehört" not in txt
+    assert _tick(v, clock, 2.5).startswith("Kein Signal")
+
+
+def test_eingerastet_ohne_platzhalter(env):
+    """BPM-13: neben „EINGERASTET" steht kein „· —"."""
+    make, cap, clock, det = env
+    v, *_ = make()
+    _tick(v, clock, 0.0)
+    assert v._lbl_state.text() == "EINGERASTET"
+    assert "—" not in v._lbl_source.text()
+    assert v._lbl_source.text() == "" and v._lbl_source.isHidden()
+
+
+def test_diagnosezeile_deutsch_dc_einmal_brumm_strich():
+    """BPM-13: „DC 0.005 … DC (Eingang) +0.0049" -> einmal „DC +0,005"; „Brumm 0 Hz 0 %"
+    -> „Brumm —"; Zahlen mit Komma und echtem Minus."""
+    from src.ui.views.bpm_manager_view import diag_line
+    d = _det(bpm_raw=127.6, alt_bpm=63.8, alt_score=0.33, level_rms_dbfs=-28.0,
+             noise_floor_dbfs=-24.0, dc_offset=0.005, onset_contrast=25.8, hum_ratio=0.0, hum_hz=0)
+    c = CaptureSnapshot(dc_offset=0.0049, chunk_ms_p95=43.0, chunks=10, running=True)
+    txt = diag_line(d, c)
+    assert txt.count("DC") == 1 and "DC +0,005" in txt
+    assert "Brumm —" in txt and "0 Hz" not in txt
+    assert "roh 127,6 · alt 63,8 (0,33)" in txt and "Kontrast 25,8" in txt
+    assert "Pegel −28 dBFS" in txt and "Rauschteppich −24 dBFS" in txt
+    assert "Fenster 6,0/6 s" in txt and "Chunk p95 43 ms" in txt
+    assert "." not in txt and "-" not in txt
+    b = diag_line(replace(d, hum_hz=50, hum_ratio=0.62), None)
+    assert "Brumm 50 Hz 62 %" in b and "DC +0,005" in b
+    assert diag_line(None, None) == "kein Detektor"
+    assert diag_line(None, c) == "kein Detektor · DC +0,005 · Chunk p95 43 ms"
+
+
+def test_zahlen_deutsch_in_bpm_zahl_und_statuszeile(env):
+    """BPM-13: grosse BPM-Zahl „127,6", Statuszeile „127,6 BPM"."""
+    from src.core.engine.bpm_manager import get_bpm_manager
+    make, cap, clock, det = env
+    v, *_ = make()
+    v._on_bpm(127.6)
+    assert v._lbl_bpm.text() == "127,6"
+    det["snap"] = _det(bpm=127.6)
+    txt = _tick(v, clock, 0.0)
+    assert txt.startswith("Eingerastet — 127,6 BPM aus Eingang")
+    assert "127.6" not in txt

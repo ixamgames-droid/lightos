@@ -181,3 +181,16 @@ def test_entfallene_bedienelemente_sind_weg(_isolated_prefs):
         assert not ({"4", "8", "16", "+10", "-10", "Anwenden", "↻"} & texts)
     finally:
         v.hide(); v.deleteLater(); _app.processEvents()
+
+
+def test_vorlage_knopf_zeigt_genau_einen_pfeil(_isolated_prefs):
+    """BPM-13: „Vorlage ▾" zeigte zwei Pfeile (Text-▾ + Menue-Indikator)."""
+    v = _make()
+    try:
+        b = v._btn_preset
+        assert b.text().count("▾") == 1
+        ss = b.styleSheet().replace(" ", "")
+        assert "::menu-indicator{image:none;width:0px;}" in ss
+        assert b.menu() is not None and b.menu().actions()
+    finally:
+        v.hide(); v.deleteLater(); _app.processEvents()

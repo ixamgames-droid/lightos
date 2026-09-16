@@ -33,11 +33,16 @@ Bus" liegen seit BPM-08 im eigenen Sub-Tab [`tempo_bus_view`](tempo_bus_view.md)
 
 Anzeigen: `_lbl_bpm` (aus `mgr.bpm` per `subscribe_bpm_change` → Qt-Signal; gelb Auto,
 grün Manuell, grau kein Tempo), `_dot` + `_phase_lbls` (Beat-Signal), `_lbl_state`
-(Zustandswort, `state_word()` — reine Funktion), `_lbl_source`, `_conf`, in Erweitert
-`_lbl_diag` (`diag_line(det_snap, cap_snap)` inkl. DC-Offset und Chunk-Abstand p95 des
-Eingangs) und `SpectrumBars`. **Statuszeile** (S6): `_lbl_problem` — `_lbl_ursache` —
+(Zustandswort, `state_word()` — reine Funktion), `_lbl_source` (`source_suffix()`: „· Tap“, „· 🔒“ … — leer statt „· —“, wenn die Manager-Quelle der Auswahl folgt; auch im Poll aktualisiert, BPM-13), `_conf` (seit BPM-13
+kompakter 150-px-Balken „Konfidenz N %" neben dem Zustandswort), die **Zeile „Pegel"**
+(BPM-13) direkt unter der Beat-/Zustandszeile: `_level` (`LevelMeterWidget`, volle
+Breite, 18 px hoch, grüne Zielzone −30…−6 dBFS auch bei Stille sichtbar, Peak-Hold),
+`_lbl_level` (`pegel_text(cap_snap)`: „−17 dBFS" / „Stille" / „— dBFS") und die Chips; in Erweitert
+`_lbl_diag` (`diag_line(det_snap, cap_snap)`: DC-Offset EINMAL — vom Eingang, sonst
+vom Detektor —, „Brumm —“ ohne Brumm, Chunk-Abstand p95 des Eingangs; Zahlen deutsch
+mit Komma und echtem Minus über `bpm_status_rules.zahl()`, ebenso BPM-Zahl und Statuszeile, BPM-13) und `SpectrumBars`. **Statuszeile** (S6): `_lbl_problem` — `_lbl_ursache` —
 `_lbl_abhilfe` aus `bpm_status_rules.status_line()` über `StatusHysterese`, Farbe nach
-Schwere; **Chips** `_chips` (CLIP/BRUMM/LEISE/AUSSETZER/DC) unter dem Pegelmeter aus
+Schwere; **Chips** `_chips` (CLIP/BRUMM/LEISE/AUSSETZER/DC) rechts in der Pegel-Zeile aus
 `chips()` + `ChipHysterese`. **Kein `get_bpm(`-Aufruf** in
 `src/ui/views/bpm_manager_view.py` und `src/ui/bpm_*.py` (Grep-Test).
 
@@ -52,7 +57,10 @@ Schwere; **Chips** `_chips` (CLIP/BRUMM/LEISE/AUSSETZER/DC) unter dem Pegelmeter
   Lock, Bereich, `last_error`, `missing_sink`, Ereignis, Aufnahme-Fortschritt) +
   `Os2lState` → `status_line()` (erster Treffer gewinnt; alle Schwellen im Konstantenblock
   von `src/ui/bpm_status_rules.py`) → `StatusHysterese` (Störung 2 s an / 3 s aus,
-  Zustandszeilen/Ereignisse sofort). Uhr injizierbar (`clock=`).
+  Zustandszeilen/Ereignisse sofort; BPM-13: `update(line, now, cap_snap)` — widerlegt der
+  Pegel eine Abwesenheits-Störung klar (Kein Signal/Pegel niedrig: RMS 300 ms > Schwelle
+  + 6 dB) oder eine Überschuss-Störung (Übersteuert: RMS 300 ms < −60 dBFS), entfällt die
+  Aus-Hysterese, `bpm_status_rules.aufgeloest()`; gilt auch für `ChipHysterese`). Uhr injizierbar (`clock=`).
 - **Aufnahme** (`src/core/audio/audio_recorder.py`): Capture-Callback nur `Queue.put`,
   Worker-Thread schreibt WAV PCM16 mono + Sidecar-JSON nach `app_data_dir()/audio_diag/`.
 - Zustandswort (ui_diagnose 3.1): MANUELL · KEIN SIGNAL · SUCHT · EINGERASTET ·

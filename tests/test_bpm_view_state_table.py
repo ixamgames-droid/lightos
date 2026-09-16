@@ -189,3 +189,20 @@ def test_zustandswort_reine_funktion():
     assert state_word(False, "os2l", None, os2l_waiting=True)[0].startswith("OS2L · wartet")
     assert state_word(False, "song", None)[0] == "LIED-ANALYSE"
     assert state_word(False, "off", None)[0] == "AUS"
+
+
+def test_zusatz_hinter_zustandswort_nie_platzhalter():
+    """BPM-13: „EINGERASTET · —" — ohne Zusatz steht nur das Zustandswort."""
+    from src.ui.views.bpm_manager_view import source_suffix
+    assert source_suffix("off", "loopback", False) == ""
+    assert source_suffix(None, "input", False) == ""
+    assert source_suffix("audio", "loopback", False) == ""       # folgt ohnehin der Auswahl
+    assert source_suffix("os2l", "os2l", False) == ""
+    assert source_suffix("timeline", "song", False) == ""
+    assert source_suffix("tap", "loopback", False) == "· Tap"
+    assert source_suffix("nudge", "input", False) == "· Nudge"
+    assert source_suffix("off", "loopback", True) == "· 🔒"
+    assert source_suffix("tap", "loopback", True) == "· Tap · 🔒"
+    for src in ("off", "audio", "tap", None):
+        for kind in ("loopback", "os2l", "song", "off", None):
+            assert "—" not in source_suffix(src, kind, False)
