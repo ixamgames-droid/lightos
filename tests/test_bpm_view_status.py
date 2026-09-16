@@ -558,3 +558,34 @@ def test_zahlen_deutsch_in_bpm_zahl_und_statuszeile(env):
     txt = _tick(v, clock, 0.0)
     assert txt.startswith("Eingerastet — 127,6 BPM aus Eingang")
     assert "127.6" not in txt
+
+
+def test_abhilfe_steht_in_eigener_zeile_in_voller_breite(env):
+    """Sichtpruefung 2026-09-16: nebeneinander brach eine lange Abhilfe (Brumm) in einer
+    schmalen rechten Spalte auf fuenf Zeilen um. Jetzt steht sie UNTER Problem/Ursache."""
+    make, cap, clock, det = env
+    v, *_ = make()
+    v.resize(1400, 700)
+    _app.processEvents()
+    _tick(v, clock, 0.0)
+    det["snap"] = _det(state="searching", hum_ratio=0.9, hum_hz=50)
+    cap.snap = replace(cap.snap, netz_linie=0.99, netz_hz=50)
+    _tick(v, clock, 10.0)
+    assert _tick(v, clock, 12.0).startswith("Netzbrumm 50 Hz")
+    _app.processEvents()
+    box = v._status_box
+    p = v._lbl_problem.mapTo(box, v._lbl_problem.rect().topLeft())
+    a = v._lbl_abhilfe.mapTo(box, v._lbl_abhilfe.rect().topLeft())
+    assert a.y() > p.y(), "Abhilfe muss unter der Problemzeile stehen"
+    assert v._lbl_abhilfe.width() >= 0.8 * box.width() - 20, (v._lbl_abhilfe.width(), box.width())
+
+
+def test_leere_abhilfe_nimmt_keinen_platz(env):
+    make, cap, clock, det = env
+    v, *_ = make()
+    from src.ui.bpm_status_rules import StatusLine
+    v._show_status(StatusLine("ok", "Eingerastet", "128 BPM", "", key="ok"))
+    assert v._lbl_abhilfe.isHidden()
+    v._show_status(StatusLine("problem", "Kein Signal", "Stille", "Kabel pruefen", "source", key="kein_signal"))
+    assert not v._lbl_abhilfe.isHidden()
+    assert v._lbl_abhilfe.text().startswith("→ ")

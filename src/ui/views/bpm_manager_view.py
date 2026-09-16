@@ -463,9 +463,15 @@ class BpmManagerView(QWidget):
         """Statuszeile (S6): Problem — Ursache — Abhilfe; Abhilfe als Link (QLabel)."""
         box = QFrame()
         box.setObjectName("bpmStatusLine")
-        lay = QHBoxLayout(box)
+        # Zwei Zeilen: oben Problem — Ursache, darunter die Abhilfe in voller Breite.
+        # Nebeneinander bekam eine lange Abhilfe nur den Rest der Breite und brach in
+        # einer schmalen rechten Spalte auf fuenf Zeilen um (Sichtpruefung 2026-09-16).
+        lay = QVBoxLayout(box)
         lay.setContentsMargins(8, 4, 8, 4)
-        lay.setSpacing(6)
+        lay.setSpacing(2)
+        top = QHBoxLayout()
+        top.setContentsMargins(0, 0, 0, 0)
+        top.setSpacing(6)
         self._status_box = box
         self._lbl_problem = QLabel("")
         self._lbl_problem.setStyleSheet("font-weight:bold;")
@@ -484,8 +490,10 @@ class BpmManagerView(QWidget):
                        (self._lbl_abhilfe, "Was du tun kannst. Unterstrichen = anklicken, "
                                            "LightOS führt es aus.")):
             w.setToolTip(tip)
-        lay.addWidget(self._lbl_problem)
-        lay.addWidget(self._lbl_ursache, 1)
+        top.addWidget(self._lbl_problem)
+        top.addWidget(self._lbl_ursache, 1)
+        lay.addLayout(top)
+        self._lbl_abhilfe.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         lay.addWidget(self._lbl_abhilfe)
         self._show_status(StatusLine("hinweis", "Erkennung", "startet", "", key="start"))
         return box
@@ -948,11 +956,13 @@ class BpmManagerView(QWidget):
         if line.abhilfe:
             if line.aktion:
                 self._lbl_abhilfe.setText(
-                    f'— <a href="{line.aktion}" style="color:#58a6ff;">{_html(line.abhilfe)}</a>')
+                    f'→ <a href="{line.aktion}" style="color:#58a6ff;">{_html(line.abhilfe)}</a>')
             else:
-                self._lbl_abhilfe.setText(f"— {_html(line.abhilfe)}")
+                self._lbl_abhilfe.setText(f"→ {_html(line.abhilfe)}")
+            self._lbl_abhilfe.setVisible(True)
         else:
             self._lbl_abhilfe.setText("")
+            self._lbl_abhilfe.setVisible(False)
         self._status_box.setStyleSheet(
             f"QFrame#bpmStatusLine {{ border-left:3px solid {col}; background:#161b22; }}")
 

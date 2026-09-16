@@ -221,7 +221,7 @@ class BpmGeneratorView(QWidget):
         intro.setStyleSheet("color:#bbb;")
         root.addWidget(intro)
 
-        box = QGroupBox("Quelle, Genre & Engine")
+        box = QGroupBox("Quelle, Genre && Engine")
         grid = QGridLayout(box)
         grid.setHorizontalSpacing(10)
         grid.setVerticalSpacing(8)
@@ -289,7 +289,7 @@ class BpmGeneratorView(QWidget):
         grid.addWidget(self._btn_batch, 3, 3)
         root.addWidget(box)
 
-        res = QGroupBox("BPM-Verlauf & Beatgrid")
+        res = QGroupBox("BPM-Verlauf && Beatgrid")
         rlay = QVBoxLayout(res)
         self._summary = QLabel("—")
         self._summary.setStyleSheet("color:#FFD700; font-size:15px;")
@@ -335,7 +335,7 @@ class BpmGeneratorView(QWidget):
         rlay.addLayout(ed)
 
         act = QHBoxLayout()
-        self._btn_use = QPushButton("Im Player laden & als BPM-Quelle nutzen")
+        self._btn_use = QPushButton("Im Player laden && als BPM-Quelle nutzen")
         self._btn_use.clicked.connect(self._use_as_source)
         self._btn_use.setEnabled(False)
         act.addWidget(self._btn_use)
