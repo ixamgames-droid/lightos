@@ -188,7 +188,7 @@ Eine ausführlich bebilderte Variante steht in
 ## Verwandte Anleitungen
 
 - **[Tempo-Controller-Widget](anleitung_tempo_controller/ANLEITUNG_TEMPO_CONTROLLER.md)** — das All-in-One-Tempo-Widget (Bus + Quelle + Faktor + gekoppelte Effekte) in der VC.
-- **[BPM-Manager](anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md)** — Sub-Tab „Erkennung" (Quelle, TAP, Auto | Manuell, ×½/×2, Erweitert), Generator (Lied → Beatgrid), Beatgrid-Editor, Panel „Effekte je Bus".
+- **[BPM-Manager](anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md)** — Sub-Tab „Erkennung" (Quelle, Pegel, Statuszeile, TAP, Auto | Manuell, ×½/×2, Erweitert, Fehlersuche), dazu kurz die Sub-Tabs „Tempo-Buses" (mit Panel „Effekte je Bus") und „Generator" (Lied → Beatgrid).
 - **[Speed-Dial, Master/Sub & Grand-Master](anleitung_speed/ANLEITUNG_SPEED.md)** — Tempo aus der VC, Verhältnisse koppeln.
 - **[Dimmer-Matrix & relative Geschwindigkeit](anleitung_dimmermatrix/ANLEITUNG_DIMMERMATRIX.md)** — phasen-gekoppeltes ×2/×½ in der Praxis.
 - **[Musik-Sync & Auto-Show](anleitung_musik_sync/ANLEITUNG_MUSIK_SYNC.md)** — Playlist → Play startet die Show, Tempo folgt der Musik.

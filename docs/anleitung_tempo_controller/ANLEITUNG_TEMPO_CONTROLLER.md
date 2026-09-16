@@ -141,6 +141,6 @@ zusammenzuziehen.
 ## Verwandte Anleitungen
 
 - **[Tempo & Synchronisierung — Gesamtüberblick](../ANLEITUNG_TEMPO_SYNC.md)** — das große Bild (BPM · Buses · Multiplikatoren · Sync).
-- **[BPM-Manager](../anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md)** — Quelle, Presets, Takt-Raster, und das Panel **„Effekte je Bus"** (Häkchen „taktgleich" pro Effekt).
+- **[BPM-Manager](../anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md)** — Quelle, Pegel und Statuszeile im Sub-Tab „Erkennung"; im Sub-Tab „Tempo-Buses" das Panel **„Effekte je Bus"** (Häkchen „taktgleich" pro Effekt).
 - **[Speed-Dial, Master/Sub & Grand-Master](../anleitung_speed/ANLEITUNG_SPEED.md)** — die Spezialwerkzeuge.
 - **[Hochzeit-Show: taktgleich starten](../anleitung_hochzeit_tempo/ANLEITUNG_HOCHZEIT_TEMPO.md)** — konkretes Beispiel mit drei Tempo-Controllern.

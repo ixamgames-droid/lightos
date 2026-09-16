@@ -32,12 +32,13 @@ Oben zeigt der Sub-Tab live, was die Erkennung gerade macht:
 
 | Element | Bedeutung |
 |---|---|
-| **Große BPM-Zahl** (z. B. „98.3") | Das aktuell gültige globale Tempo. Gelb = Auto, grün = Manuell; `--` (grau) = gerade keine BPM aktiv. |
+| **Große BPM-Zahl** (z. B. „98,3") | Das aktuell gültige globale Tempo. Gelb = Auto, grün = Manuell; `--` (grau) = gerade keine BPM aktiv. |
 | **Beat-Punkt** (Kreis) | Blinkt auf jeden Schlag — gold auf der **Eins** (Downbeat), grün auf den übrigen Schlägen. Sicht-Check, ob der Beat sitzt; blinkt er neben der Musik: einmal **TAP**. |
 | **Takt: 1 2 3 4 …** | Die Zellen leuchten reihum mit; die gelbe Zelle ist die **Eins**. Die Anzahl der Zellen folgt *Beats/Takt* (Erweitert). Bei sehr vielen Schlägen pro Takt (>16) steht rechts zusätzlich die genaue Position als „n / N". |
 | **Zustandswort** | **KEIN SIGNAL** (nichts zu hören), **SUCHT** (Analysefenster füllt sich, ~4 s), **EINGERASTET** (Beats laufen), **PAUSE · hält N** (Stille, Tempo wird gehalten), **MANUELL**, **OS2L · wartet auf DJ-Software**, **LIED-ANALYSE**, **AUS**. Daneben, wer die BPM zuletzt gesetzt hat („· Audio", „· Tap", „· Lied-Analyse", „· OS2L (extern)") und ob **🔒** eingefroren ist. |
 | **Konfidenz** (Balken) | Wie sicher die Erkennung ist, in Prozent. Hoch = stabiler Beat; niedrig = unsicher (leiser/komplexer Track, Pause, Sprache). |
-| **Status-Zeile** (orange) | Nur bei einem Eingangs-Fehler: „⚠ …". |
+| **Pegel** (breiter Balken + dBFS-Zahl) | Wie laut die Quelle ankommt; grüne Zielzone −30…−6 dBFS. Daneben Chips CLIP/BRUMM/LEISE/AUSSETZER/DC bei Störungen. |
+| **Statuszeile** | Nie leer: „Problem — Ursache", darunter „→ Abhilfe" (unterstrichen = anklickbar). Grün = ok, gelb = Hinweis, rot = Problem. Bebildert in der [BPM-Manager-Anleitung](../anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md). |
 | **Spektrum** (Bargraph) | Live-Frequenzanzeige des Eingangssignals — nützlich, um zu sehen, ob überhaupt Audio ankommt und wo die Energie liegt. |
 
 ## Quelle, TAP, Auto | Manuell, ×½ / ×2 (Sub-Tab „Erkennung", seit 2026-09-14)
@@ -73,7 +74,7 @@ Alle Einstellungen werden gespeichert und beim nächsten Start wieder geladen (S
 
 ## Tempo-Buses & Grand-Master (Master/Sub, Folgt, Faktor — wie Effekt-Tempi koppeln)
 
-Der mittlere Kasten **Tempo-Speeds & Grand-Master** verwaltet **mehrere** benannte Tempo-Spuren („Buses"), an die du einzelne Effekte hängen kannst — statt dass alles starr auf der einen Sound-BPM läuft.
+Der Kasten **Tempo-Speeds & Grand-Master** im Sub-Tab **Tempo-Buses** verwaltet **mehrere** benannte Tempo-Spuren („Buses"), an die du einzelne Effekte hängen kannst — statt dass alles starr auf der einen Sound-BPM läuft.
 
 **Begriffe:**
 
@@ -137,10 +138,10 @@ Faustregel: **Hier** (Manager) bestimmst du die Quelle und die Buses, **in der V
 
 ## Tipps & Fallen
 
-- **Halbes/doppeltes Tempo?** Fast immer ein Grenzen-Problem. Setze *Tiefen/Höhen* enger um den erwarteten Bereich, dann verschwindet das Verdoppeln/Halbieren.
+- **Halbes/doppeltes Tempo?** Fast immer ein Grenzen-Problem. Setze den *Tempo-Bereich* (Erweitert) enger um den erwarteten Bereich, dann verschwindet das Verdoppeln/Halbieren.
 - **Erkennung springt:** In „Erweitert" den **Tempo-Bereich** enger setzen oder eine **Vorlage** wählen.
 - **Sitzt der Beat, aber soll bleiben?** **🔒 Tempo einfrieren** (Erweitert) drücken, bevor du in eine ruhige/breakige Passage gehst.
 - **Automatik liegt komplett daneben:** auf **Manuell** gehen und **TAP** (3–4× im Takt) — sicherer als gegen die Erkennung anzukämpfen. Mit **Nudge** feinjustieren.
 - **Nur eine AUTO-Quelle:** OS2L und Audio-Analyse schließen sich aus. Beim Wechsel stoppt LightOS die jeweils andere automatisch — wundere dich nicht, wenn beim Umschalten kurz nichts erkannt wird.
-- **„Eingang" ohne Ton?** In der **Quelle**-Liste das richtige Gerät wählen (die Liste liest beim Öffnen neu) und die Status-Zeile („⚠ …") sowie die Diagnosezeile in „Erweitert" (Pegel) prüfen.
+- **„Eingang" ohne Ton?** In der **Quelle**-Liste das richtige Gerät wählen (die Liste liest beim Öffnen neu) und die Pegel-Zeile, die Statuszeile sowie die Diagnosezeile in „Erweitert" prüfen.
 - **Grand-Master nicht vergessen zu entschärfen:** Solange „scharf", ignorieren alle Master ihr eigenes Tempo. Häkchen wieder weg, wenn die Buses wieder eigenständig laufen sollen.

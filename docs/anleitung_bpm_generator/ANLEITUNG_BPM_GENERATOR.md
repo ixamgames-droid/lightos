@@ -90,9 +90,9 @@ Nach jeder Korrektur wird die BPM-Kurve neu abgeleitet; beim Vorhören hörst du
 in den Player und schaltet die Live-Audio-Erkennung ab, damit die Analyse **führt**.
 
 Danach im **Musik-Tab** abspielen: die globale BPM folgt jetzt dem Lied über die Zeit.
-Im **Manager-Tab** steht die Quelle dann auf **Lied-Analyse**. Mit **„Taktgenau"** (Manager,
+Im Sub-Tab **Erkennung** steht die Quelle dann auf **Lied-Analyse (Player)**. Mit **„Taktgenau"** (Erkennung → Erweitert,
 Standard an) treffen die Lichter die **echten Beats** des Songs sample-nah — nicht nur den
-BPM-Wert. (Details: [BPM-Manager-Anleitung, Abschnitt „Taktgenau"](../anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md).)
+BPM-Wert. (Details: [BPM-Manager-Anleitung, Abschnitt „Taktgenau"](../anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md#73-taktgenau).)
 
 > **Wichtig:** Die Analyse führt nur, wenn **Live-Audio aus** ist (das macht der Button
 > automatisch). Live-Audio, OS2L und MANUAL/Lock haben weiterhin Vorrang.
@@ -120,6 +120,6 @@ Struktur) als Datei.
 | Schnellstes gutes Ergebnis | Datei → Analysieren → **Vorschlag übernehmen** → ggf. Vorhören |
 | Beste Qualität (inkl. echter Taktart) | Engine **Beat This!** |
 | Grid sitzt nicht | **Vorhören** + ½×/2× / nudge / Downbeat-Buttons / Klick im Plot |
-| Lichter exakt auf den Beat | „Im Player laden …" → Musik-Tab abspielen → Manager: **Taktgenau** an |
+| Lichter exakt auf den Beat | „Im Player laden …" → Musik-Tab abspielen → Erkennung → Erweitert: **Taktgenau** an |
 | Ganzes Set vorbereiten | **Ordner analysieren…** (einmalig), danach laden alle sofort |
 | Songstruktur sehen | Marker im Plot (Intro/Drop/Breakdown …) — Looks dagegen bauen |

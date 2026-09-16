@@ -7,6 +7,29 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-16 — BPM-Manager: neue Anleitung mit Bildern
+
+#### Neu
+
+- **Anleitung zum BPM-Manager neu geschrieben** (`docs/anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md`):
+  „In 30 Sekunden startklar", die Oberfläche mit nummerierter Legende, Quelle wählen,
+  Zustandswort/Pegel/Statuszeile lesen, TAP, Auto | Manuell, ×½/×2 (mit ihren Grenzen),
+  „Erweitert" inklusive Beat-Latenz („Licht zu spät → ins Plus") und Diagnosezeile Feld für
+  Feld, „Wenn nichts erkannt wird" mit allen Statuszeilen, „Eingang 30 s aufnehmen",
+  Tempo-Buses und Generator kurz, Einstellungen und was beim Umstieg wegfällt. Elf neue
+  Bilder aus der laufenden App (Eingerastet, Quelle-Liste, Erweitert, Wartet auf Signal,
+  Pause, Pegel niedrig, Übersteuert, Netzbrumm, Kein Signal, Tempo-Buses, Generator); die
+  zwei Bilder der früheren Oberfläche sind entfernt. Querverweise in den verwandten
+  Anleitungen nachgezogen.
+
+#### Behoben
+
+- **Statuszeile:** Die Abhilfe steht jetzt in einer eigenen Zeile in voller Breite unter
+  „Problem — Ursache". Vorher bekam eine lange Abhilfe (z. B. bei Netzbrumm) nur den Rest der
+  Breite und brach in einer schmalen Spalte auf fünf Zeilen um.
+- **Generator-Tab:** „Quelle, Genre & Engine", „BPM-Verlauf & Beatgrid" und „Im Player laden
+  & als BPM-Quelle nutzen" zeigen wieder das „&" (vorher erschien z. B. „Genre _Engine").
+
 ### 2026-09-16 — BPM-Erkennung: Feinschliff nach der Sichtprüfung (BPM-13)
 
 #### Geändert
