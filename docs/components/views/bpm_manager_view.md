@@ -56,7 +56,10 @@ Schwere; **Chips** `_chips` (CLIP/BRUMM/LEISE/AUSSETZER/DC) rechts in der Pegel-
   Lock, Bereich, `last_error`, `missing_sink`, Ereignis, Aufnahme-Fortschritt) +
   `Os2lState` → `status_line()` (erster Treffer gewinnt; alle Schwellen im Konstantenblock
   von `src/ui/bpm_status_rules.py`) → `StatusHysterese` (Störung 2 s an / 3 s aus,
-  Zustandszeilen/Ereignisse sofort). Uhr injizierbar (`clock=`).
+  Zustandszeilen/Ereignisse sofort; BPM-13: `update(line, now, cap_snap)` — widerlegt der
+  Pegel eine Abwesenheits-Störung klar (Kein Signal/Pegel niedrig: RMS 300 ms > Schwelle
+  + 6 dB) oder eine Überschuss-Störung (Übersteuert: RMS 300 ms < −60 dBFS), entfällt die
+  Aus-Hysterese, `bpm_status_rules.aufgeloest()`; gilt auch für `ChipHysterese`). Uhr injizierbar (`clock=`).
 - **Aufnahme** (`src/core/audio/audio_recorder.py`): Capture-Callback nur `Queue.put`,
   Worker-Thread schreibt WAV PCM16 mono + Sidecar-JSON nach `app_data_dir()/audio_diag/`.
 - Zustandswort (ui_diagnose 3.1): MANUELL · KEIN SIGNAL · SUCHT · EINGERASTET ·

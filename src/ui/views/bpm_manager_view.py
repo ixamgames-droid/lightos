@@ -878,9 +878,9 @@ class BpmManagerView(QWidget):
             ereignis=self._ereignis, ereignis_bis=self._ereignis_bis,
             aufnahme_s=rec.progress_s() if rec_running else None)
         line = status_line(cap_snap, snap, m, self._os2l_state() if kind == "os2l" else None, now)
-        self._show_status(self._hyst.update(line, now))
+        self._show_status(self._hyst.update(line, now, cap_snap))
         roh = chips(cap_snap, snap) if kind in AUDIO_KINDS else set()
-        self._set_chips(self._chip_hyst.update(roh, now))
+        self._set_chips(self._chip_hyst.update(roh, now, cap_snap))
         self._update_record_button(rec, rec_running, kind, cap)
 
     # ── Statuszeile / Chips / Aufnahme (S6) ──────────────────────────────────

@@ -15,6 +15,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Pegelmeter (grüner Zielbereich −30…−6 dBFS, auch bei Stille zu sehen), Zahlenwert
   („−17 dBFS") und den Hinweis-Chips daneben. Die Konfidenz ist jetzt ein kleiner Balken
   neben dem Zustandswort.
+- **„Kein Signal" verschwindet sofort, wenn die Musik läuft** (vorher bis zu 3 s trotz
+  grünem Pegel). Ebenso „Pegel niedrig", sobald der Pegel klar darüber liegt, und
+  „Übersteuert", sobald Stille ist. Kurzes Flackern an der Schwelle bleibt unterdrückt.
 
 ### 2026-09-16 — BPM: Kick auf jedem Beat + Snare auf 2/4 rastet auf das volle Tempo
 

@@ -15,7 +15,8 @@ aus Manager, SourceController, Capture und OS2L-Server.
 
 ``StatusHysterese`` verhindert Flackern: eine Stoerung (``stabil=True``) erscheint
 erst nach ``AN_S`` (2 s) Anhalten und verschwindet erst nach ``AUS_S`` (3 s)
-Abwesenheit. Zustandszeilen (Sucht, Eingerastet, Manuell …), Ereignisse und
+Abwesenheit — ausser der Pegel widerlegt sie klar (``aufgeloest``, BPM-13: Musik
+laeuft wieder bzw. Stille nach „Uebersteuert"), dann sofort. Zustandszeilen (Sucht, Eingerastet, Manuell …), Ereignisse und
 Capture-Fehler wechseln sofort. ``chips()`` + ``ChipHysterese`` liefern die
 Hinweis-Chips am Pegelmeter mit derselben Hysterese.
 """
@@ -56,6 +57,10 @@ EREIGNIS_S = 3.0             # so lange zeigt die Zeile ein Ereignis (×2 ausser
 EREIGNIS_AUFNAHME_S = 20.0   # „Aufnahme gespeichert — …" steht laenger (Dateiname abschreiben)
 AN_S = 2.0                   # Hysterese: Stoerung erscheint nach so viel Anhalten
 AUS_S = 3.0                  # Hysterese: Stoerung verschwindet nach so viel Abwesenheit
+KLAR_UEBER_DB = 6.0          # BPM-13: Abwesenheits-Stoerung (Kein Signal, Pegel niedrig) verschwindet
+                             # SOFORT, sobald RMS 300 ms die Schwelle um so viel uebersteigt; eine
+                             # Ueberschuss-Stoerung (Uebersteuert) sofort, wenn RMS 300 ms unter
+                             # KEIN_SIGNAL_DBFS liegt. Knapp an der Schwelle gilt weiter AUS_S.
 
 SCHWEREN = ("ok", "hinweis", "problem")
 AKTIONEN = (None, "reconnect", "record", "range", "source")
@@ -284,7 +289,8 @@ def _r_sink_fehlt(cap, det, m, o, now):
 
 
 def _r_clip(cap, det, m, o, now):
-    if m.kind not in AUDIO_KINDS or cap is None or not bool(_g(cap, "clipping", False)):
+    if (m.kind not in AUDIO_KINDS or cap is None or not bool(_g(cap, "clipping", False))
+            or aufgeloest("clip", cap)):
         return None
     return StatusLine(
         "problem", "Übersteuert",
@@ -318,12 +324,16 @@ def _r_brumm(cap, det, m, o, now):
         "Aufnahme machen und schicken", "record", key="brumm", stabil=True)
 
 
+def _leise(cap) -> bool:
+    """Pegel niedrig nach RMS 1 s — ausser RMS 300 ms liegt schon klar darueber (BPM-13)."""
+    rms = float(_g(cap, "rms_dbfs_1s", -120.0))
+    return KEIN_SIGNAL_DBFS <= rms < LEISE_DBFS and not aufgeloest("leise", cap)
+
+
 def _r_leise(cap, det, m, o, now):
-    if m.kind not in AUDIO_KINDS or cap is None:
+    if m.kind not in AUDIO_KINDS or cap is None or not _leise(cap):
         return None
     rms = float(_g(cap, "rms_dbfs_1s", -120.0))
-    if not (KEIN_SIGNAL_DBFS <= rms < LEISE_DBFS):
-        return None
     return StatusLine(
         "hinweis", "Pegel niedrig",
         f"Eingang liefert {_db(rms)} dBFS RMS, Ziel {_db(ZIEL_LO_DBFS)}…{_db(ZIEL_HI_DBFS)}",
@@ -492,6 +502,27 @@ _RULES = (
 
 # ── Hysterese ────────────────────────────────────────────────────────────────
 
+# Stoerungen, die ABWESENHEIT von Signal melden -> Schwelle (RMS), ueber der sie widerlegt sind
+ABWESENHEIT_SCHWELLE = {"kein_signal": KEIN_SIGNAL_DBFS, "leise": LEISE_DBFS}
+UEBERSCHUSS_KEYS = ("clip",)
+_CHIP_KEY = {"LEISE": "leise", "CLIP": "clip"}
+
+
+def aufgeloest(key: str, cap_snap) -> bool:
+    """True, wenn der aktuelle Pegel die Stoerung ``key`` KLAR widerlegt (BPM-13):
+    Abwesenheit (kein_signal, leise) bei RMS 300 ms > Schwelle + ``KLAR_UEBER_DB``,
+    Ueberschuss (clip) bei RMS 300 ms < ``KEIN_SIGNAL_DBFS``. Ohne laufenden
+    Capture-Snapshot nie — dann gilt die normale Aus-Hysterese."""
+    if cap_snap is None or not bool(_g(cap_snap, "running", True)):
+        return False
+    rms = float(_g(cap_snap, "rms_dbfs_300ms", -120.0))
+    if key in ABWESENHEIT_SCHWELLE:
+        return rms > ABWESENHEIT_SCHWELLE[key] + KLAR_UEBER_DB
+    if key in UEBERSCHUSS_KEYS:
+        return rms < KEIN_SIGNAL_DBFS
+    return False
+
+
 _RANG = {"ok": 0, "hinweis": 1, "problem": 2}
 SOFORT_KEYS = ("ereignis", "aufnahme")   # Rueckmeldung auf einen Klick: nie verzoegert
 # Zustandszeilen, die der Detektor von selbst (frameweise) wechselt. Sie verdraengen eine
@@ -527,11 +558,15 @@ class StatusHysterese:
         self._shown = None
         self._cand_key = None
 
-    def update(self, line: StatusLine, now: float | None = None) -> StatusLine:
+    def update(self, line: StatusLine, now: float | None = None, cap_snap=None) -> StatusLine:
+        """``cap_snap`` (optional): widerlegt der Pegel die gehaltene Stoerung klar
+        (``aufgeloest``), entfaellt deren Aus-Hysterese."""
         t = self._clock() if now is None else float(now)
         shown = self._shown
         if line.key.startswith(SOFORT_KEYS) or (shown is not None and line.key == shown.key):
             return self._zeige(line, t)
+        if shown is not None and shown.stabil and aufgeloest(shown.key, cap_snap):
+            self._shown_seen = t - self.aus_s      # sofort „weg" (BPM-13)
         if line.key != self._cand_key:
             self._cand_key, self._cand_since = line.key, t
         if line.stabil:
@@ -573,10 +608,9 @@ def chips(cap_snap, det_snap) -> set[str]:
     """Rohe Chip-Menge (ohne Hysterese) aus {CLIP, BRUMM, LEISE, JITTER, DC}."""
     out: set[str] = set()
     if cap_snap is not None:
-        if bool(_g(cap_snap, "clipping", False)):
+        if bool(_g(cap_snap, "clipping", False)) and not aufgeloest("clip", cap_snap):
             out.add("CLIP")
-        rms = float(_g(cap_snap, "rms_dbfs_1s", -120.0))
-        if KEIN_SIGNAL_DBFS <= rms < LEISE_DBFS:
+        if _leise(cap_snap):
             out.add("LEISE")
         if float(_g(cap_snap, "chunk_ms_p95", 0.0)) > JITTER_CHUNK_MS:
             out.add("JITTER")
@@ -599,9 +633,15 @@ class ChipHysterese:
     _zuletzt: dict = field(default_factory=dict)
     _sichtbar: set = field(default_factory=set)
 
-    def update(self, roh: set[str], now: float) -> set[str]:
+    def update(self, roh: set[str], now: float, cap_snap=None) -> set[str]:
+        """``cap_snap`` (optional): LEISE/CLIP verschwinden sofort, wenn der Pegel sie
+        klar widerlegt (``aufgeloest``, BPM-13)."""
         t = float(now)
         for c in CHIPS:
+            if c not in roh and c in _CHIP_KEY and aufgeloest(_CHIP_KEY[c], cap_snap):
+                self._an_seit.pop(c, None)
+                self._sichtbar.discard(c)
+                continue
             if c in roh:
                 self._an_seit.setdefault(c, t)
                 self._zuletzt[c] = t
@@ -619,5 +659,5 @@ class ChipHysterese:
         self._sichtbar.clear()
 
 
-__all__ = ["zahl", "StatusLine", "MgrState", "Os2lState", "status_line", "StatusHysterese", "chips",
+__all__ = ["zahl", "aufgeloest", "StatusLine", "MgrState", "Os2lState", "status_line", "StatusHysterese", "chips",
            "ChipHysterese", "ereignis_oktave", "ereignis_aufnahme", "ereignis"]

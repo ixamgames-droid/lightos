@@ -484,3 +484,20 @@ def test_pegelzeile_breit_mit_zahlenwert(env):
     assert abs(v._lbl_level.mapTo(v, v._lbl_level.rect().center()).y() - mitte) <= 4
     assert v._conf.width() <= 200
     assert v._level.width() > 5 * v._conf.width()
+
+
+def test_kein_signal_weg_sobald_musik_laeuft(env):
+    """BPM-13 (Sichtpruefung): Stille -> „Kein Signal" steht; Musik startet (RMS 300 ms
+    −14 dBFS, Detektor sucht) -> Statuszeile wechselt im selben Tick, nicht nach 3 s."""
+    make, cap, clock, det = env
+    v, *_ = make()
+    cap.snap = replace(cap.snap, rms_dbfs_300ms=-120.0, rms_dbfs_1s=-120.0)
+    det["snap"] = _det(state="no_signal", signal_s=0.0, window_filled_s=6.0)
+    t = 0.0
+    while t < 3.0:
+        _tick(v, clock, t)
+        t = round(t + 0.25, 2)
+    assert v.status_text().startswith("Kein Signal")
+    cap.snap = replace(cap.snap, rms_dbfs_300ms=-14.0, rms_dbfs_1s=-50.0)
+    det["snap"] = _det(state="searching", signal_s=0.5, window_filled_s=6.0)
+    assert _tick(v, clock, 3.05).startswith("Sucht Tempo")
