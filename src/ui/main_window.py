@@ -1475,7 +1475,7 @@ class MainWindow(QMainWindow):
         from src.ui.bpm_tap_helper import get_tap_helper
         bpm = get_tap_helper().tap()
         if bpm > 0:
-            self._lbl_bpm.setText(f"BPM: {bpm:.1f}")
+            self._lbl_bpm.setText(f"BPM: {bpm:.1f}".replace(".", ","))
             self._lbl_bpm.setStyleSheet("color: #FFD700; padding: 0 8px;")
 
     def _on_beat(self, idx: int):
@@ -1489,7 +1489,7 @@ class MainWindow(QMainWindow):
         """Aktualisiert die BPM-Anzeige sofort bei jeder Tempo-Aenderung (UI-Thread)."""
         try:
             if bpm and bpm > 0:
-                self._lbl_bpm.setText(f"BPM: {bpm:.1f}")
+                self._lbl_bpm.setText(f"BPM: {bpm:.1f}".replace(".", ","))
                 self._lbl_bpm.setStyleSheet("color: #FFD700; padding: 0 8px;")
             else:
                 self._lbl_bpm.setText("BPM: --")
@@ -1511,7 +1511,7 @@ class MainWindow(QMainWindow):
         # BPM-Label synchron halten — auch wenn das Tempo extern (APC-TAP / Audio)
         # geaendert wurde und nicht ueber den Tap-Button im Hauptfenster.
         if self._bpm_mgr and self._bpm_mgr.bpm > 0:
-            self._lbl_bpm.setText(f"BPM: {self._bpm_mgr.bpm:.1f}")
+            self._lbl_bpm.setText(f"BPM: {self._bpm_mgr.bpm:.1f}".replace(".", ","))
             self._lbl_bpm.setStyleSheet("color: #FFD700; padding: 0 8px;")
 
     def _set_bpm_manually(self):
@@ -1531,7 +1531,7 @@ class MainWindow(QMainWindow):
                 # Nachricht _bpm sofort wieder ('springt zurueck').
                 self._bpm_mgr.turn_off()
             if val > 0:
-                self._lbl_bpm.setText(f"BPM: {val:.1f}")
+                self._lbl_bpm.setText(f"BPM: {val:.1f}".replace(".", ","))
                 self._lbl_bpm.setStyleSheet("color: #FFD700; padding: 0 8px;")
             else:
                 self._lbl_bpm.setText("BPM: --")
