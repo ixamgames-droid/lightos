@@ -71,7 +71,7 @@ FAELLE = [
     ("brumm", cap(**NETZ), det(state="searching", hum_ratio=0.71, hum_hz=50), IN, None, 0, "problem", "record", "71 %"),
     ("leise", cap(rms_dbfs_300ms=-44.0, rms_dbfs_1s=-44.0), det(), IN, None, 0, "hinweis", None, "−44 dBFS"),
     ("jitter", cap(chunk_ms_p95=95.0), det(), IN, None, 0, "hinweis", "record", "95 ms"),
-    ("dc", cap(dc_offset=0.05), det(), IN, None, 0, "hinweis", "record", "+0.050"),
+    ("dc", cap(dc_offset=0.05), det(), IN, None, 0, "hinweis", "record", "+0,050"),
     ("os2l_aus", None, None, MgrState(kind="os2l"), Os2lState(running=False), 0, "problem", "reconnect",
      "läuft nicht"),
     ("os2l_wartet", None, None, MgrState(kind="os2l"), Os2lState(running=True, port=1234), 0, "hinweis", None,
@@ -83,7 +83,7 @@ FAELLE = [
     ("song_ok", None, None, MgrState(kind="song", song_available=True, bpm=124.0), None, 0, "ok", None, "124"),
     ("aus", None, None, MgrState(kind="off"), None, 0, "hinweis", "source", "Quelle wählen"),
     ("eingefroren", cap(), det(), replace(IN, locked=True), None, 0, "hinweis", "range", "Eingefroren"),
-    ("manuell", cap(), det(bpm=127.8), replace(IN, manual=True, bpm=128.0), None, 0, "ok", None, "127.8"),
+    ("manuell", cap(), det(bpm=127.8), replace(IN, manual=True, bpm=128.0), None, 0, "ok", None, "127,8"),
     ("manuell_aus", cap(), det(), replace(IN, manual=True, bpm=0.0), None, 0, "ok", None, "Tempo aus"),
     ("halbtempo", cap(), det(bpm=70.2, alt_bpm=140.4, alt_score=0.8), IN, None, 0, "hinweis", None, "×2"),
     ("pause", cap(rms_dbfs_300ms=-120.0, rms_dbfs_1s=-120.0), det(hold_stage=1), PC, None, 0, "ok", None,
@@ -534,3 +534,18 @@ def test_start_bei_stille_sagt_nicht_musik_gehoert():
     # Signal da, Fenster schon 6 s, aber erst 2 s Musik: „2 s Musik gehört"
     s2 = status_line(cap(), det(state="searching", signal_s=2.0, window_filled_s=6.0), PC, None, 0)
     assert s2.key == "sucht" and s2.ursache.startswith("2 s Musik gehört")
+
+
+def test_zahlen_deutsch_komma_und_minus():
+    """BPM-13: Statuszeile einheitlich deutsch (Komma, echtes Minus)."""
+    assert R.zahl(-17.2, ".1f") == "\u221217,2" and R.zahl(0.005, "+.3f") == "+0,005"
+    line = status_line(cap(), det(bpm=127.6), PC, None, 0)
+    assert line.problem == "Eingerastet — 127,6 BPM aus PC-Audio »Built-in Audio«"
+    heiss = cap(clip_chunks_1s=5, clip_samples_1s=40, peak_hold_dbfs=-0.5)
+    assert "Spitze \u22120,5 dBFS" in status_line(heiss, det(), PC, None, 0).ursache
+    dc = status_line(cap(dc_offset=-0.031), det(), PC, None, 0)
+    assert dc.ursache == "DC-Offset \u22120,031 (Grenze ±0,02)"
+    halb = status_line(cap(), det(alt_bpm=64.0, alt_score=0.82), PC, None, 0)
+    assert "(0,82)" in halb.ursache
+    for l in (line, status_line(heiss, det(), PC, None, 0), dc, halb):
+        assert not any(ch.isdigit() and nx == "." for ch, nx in zip(l.text, l.text[1:]))

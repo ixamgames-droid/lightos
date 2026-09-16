@@ -135,12 +135,12 @@ def zahl(v: float, fmt: str = ".0f") -> str:
 
 
 def _db(v: float, fmt: str = ".0f") -> str:
-    """dB-Wert mit echtem Minuszeichen (Anzeige), z. B. „−70"."""
-    return format(float(v), fmt).replace("-", "\u2212")
+    """dB-Wert mit echtem Minuszeichen und Komma (Anzeige), z. B. „−70", „−0,5"."""
+    return zahl(v, fmt)
 
 
 def _bpm(v: float) -> str:
-    return f"{float(v):.0f}" if abs(float(v) - round(float(v))) < 0.05 else f"{float(v):.1f}"
+    return zahl(v, ".0f") if abs(float(v) - round(float(v))) < 0.05 else zahl(v, ".1f")
 
 
 def ereignis_oktave(step: int, ziel_bpm: float, min_bpm: float, max_bpm: float,
@@ -364,7 +364,7 @@ def _r_dc(cap, det, m, o, now):
         return None
     return StatusLine(
         "hinweis", "Gleichspannungsversatz",
-        f"DC-Offset {dc:+.3f} (Grenze ±{DC_MAX:.2f})",
+        f"DC-Offset {zahl(dc, '+.3f')} (Grenze ±{zahl(DC_MAX, '.2f')})",
         "Interface/Kabel prüfen (defekter Eingang, Phantomspeisung am Line-Eingang?)",
         "record", key="dc", stabil=True)
 
@@ -433,7 +433,7 @@ def _r_halbtempo(cap, det, m, o, now):
     im_bereich = m.min_bpm <= alt <= m.max_bpm
     return StatusLine(
         "hinweis", f"Eingerastet — {_bpm(bpm)} BPM",
-        f"{art} {_bpm(alt)} ist ähnlich plausibel ({score:.2f})",
+        f"{art} {_bpm(alt)} ist ähnlich plausibel ({zahl(score, '.2f')})",
         (f"läuft das Licht {'zu langsam' if alt > bpm else 'zu schnell'}: {knopf} klicken" if im_bereich
          else f"{_bpm(alt)} liegt außerhalb des Tempo-Bereichs — Bereich anpassen"),
         None if im_bereich else "range", key="halbtempo", stabil=True)

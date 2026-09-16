@@ -430,7 +430,8 @@ def test_diagnosezeile_zeigt_dc_und_chunk_p95(env):
     v, *_ = make()
     v._advanced.set_expanded(True)
     _tick(v, clock, 0.0)
-    assert "DC (Eingang) +0.0012" in v._lbl_diag.text()
+    assert "DC +0,001" in v._lbl_diag.text()                 # BPM-13: einmal, deutsch
+    assert v._lbl_diag.text().count("DC") == 1
     assert "Chunk p95 23 ms" in v._lbl_diag.text()
 
 
@@ -524,3 +525,36 @@ def test_eingerastet_ohne_platzhalter(env):
     assert v._lbl_state.text() == "EINGERASTET"
     assert "—" not in v._lbl_source.text()
     assert v._lbl_source.text() == "" and v._lbl_source.isHidden()
+
+
+def test_diagnosezeile_deutsch_dc_einmal_brumm_strich():
+    """BPM-13: „DC 0.005 … DC (Eingang) +0.0049" -> einmal „DC +0,005"; „Brumm 0 Hz 0 %"
+    -> „Brumm —"; Zahlen mit Komma und echtem Minus."""
+    from src.ui.views.bpm_manager_view import diag_line
+    d = _det(bpm_raw=127.6, alt_bpm=63.8, alt_score=0.33, level_rms_dbfs=-28.0,
+             noise_floor_dbfs=-24.0, dc_offset=0.005, onset_contrast=25.8, hum_ratio=0.0, hum_hz=0)
+    c = CaptureSnapshot(dc_offset=0.0049, chunk_ms_p95=43.0, chunks=10, running=True)
+    txt = diag_line(d, c)
+    assert txt.count("DC") == 1 and "DC +0,005" in txt
+    assert "Brumm —" in txt and "0 Hz" not in txt
+    assert "roh 127,6 · alt 63,8 (0,33)" in txt and "Kontrast 25,8" in txt
+    assert "Pegel −28 dBFS" in txt and "Rauschteppich −24 dBFS" in txt
+    assert "Fenster 6,0/6 s" in txt and "Chunk p95 43 ms" in txt
+    assert "." not in txt and "-" not in txt
+    b = diag_line(replace(d, hum_hz=50, hum_ratio=0.62), None)
+    assert "Brumm 50 Hz 62 %" in b and "DC +0,005" in b
+    assert diag_line(None, None) == "kein Detektor"
+    assert diag_line(None, c) == "kein Detektor · DC +0,005 · Chunk p95 43 ms"
+
+
+def test_zahlen_deutsch_in_bpm_zahl_und_statuszeile(env):
+    """BPM-13: grosse BPM-Zahl „127,6", Statuszeile „127,6 BPM"."""
+    from src.core.engine.bpm_manager import get_bpm_manager
+    make, cap, clock, det = env
+    v, *_ = make()
+    v._on_bpm(127.6)
+    assert v._lbl_bpm.text() == "127,6"
+    det["snap"] = _det(bpm=127.6)
+    txt = _tick(v, clock, 0.0)
+    assert txt.startswith("Eingerastet — 127,6 BPM aus Eingang")
+    assert "127.6" not in txt

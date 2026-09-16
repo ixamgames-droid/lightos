@@ -24,6 +24,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 - Neben „EINGERASTET" steht kein „· —" mehr; ein Zusatz erscheint nur, wenn er etwas sagt
   (z. B. „· Tap", „· 🔒").
 - „Vorlage ▾" in „Erweitert" zeigt nur noch einen Pfeil.
+- **Zahlen deutsch:** BPM-Zahl, Statuszeile und Diagnose mit Komma und echtem Minus
+  („127,6", „−17 dBFS"). Die Diagnose nennt den DC-Versatz nur noch einmal
+  („DC +0,005") und zeigt ohne Brumm „Brumm —" statt „0 Hz 0 %".
 
 ### 2026-09-16 — BPM: Kick auf jedem Beat + Snare auf 2/4 rastet auf das volle Tempo
 

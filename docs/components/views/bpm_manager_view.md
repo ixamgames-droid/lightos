@@ -38,8 +38,9 @@ kompakter 150-px-Balken „Konfidenz N %" neben dem Zustandswort), die **Zeile �
 (BPM-13) direkt unter der Beat-/Zustandszeile: `_level` (`LevelMeterWidget`, volle
 Breite, 18 px hoch, grüne Zielzone −30…−6 dBFS auch bei Stille sichtbar, Peak-Hold),
 `_lbl_level` (`pegel_text(cap_snap)`: „−17 dBFS" / „Stille" / „— dBFS") und die Chips; in Erweitert
-`_lbl_diag` (`diag_line(det_snap, cap_snap)` inkl. DC-Offset und Chunk-Abstand p95 des
-Eingangs) und `SpectrumBars`. **Statuszeile** (S6): `_lbl_problem` — `_lbl_ursache` —
+`_lbl_diag` (`diag_line(det_snap, cap_snap)`: DC-Offset EINMAL — vom Eingang, sonst
+vom Detektor —, „Brumm —“ ohne Brumm, Chunk-Abstand p95 des Eingangs; Zahlen deutsch
+mit Komma und echtem Minus über `bpm_status_rules.zahl()`, ebenso BPM-Zahl und Statuszeile, BPM-13) und `SpectrumBars`. **Statuszeile** (S6): `_lbl_problem` — `_lbl_ursache` —
 `_lbl_abhilfe` aus `bpm_status_rules.status_line()` über `StatusHysterese`, Farbe nach
 Schwere; **Chips** `_chips` (CLIP/BRUMM/LEISE/AUSSETZER/DC) rechts in der Pegel-Zeile aus
 `chips()` + `ChipHysterese`. **Kein `get_bpm(`-Aufruf** in

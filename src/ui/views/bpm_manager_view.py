@@ -176,23 +176,29 @@ def pegel_text(cap_snap) -> str:
 
 
 def diag_line(snap, cap_snap=None) -> str:
-    """Diagnosezeile aus Detektor- und (optional) Capture-Snapshot."""
+    """Diagnosezeile aus Detektor- und (optional) Capture-Snapshot. Deutsch geschrieben
+    (Komma, echtes Minus); DC nur einmal (Eingang, sonst Detektor); ohne Brumm „Brumm —"."""
+    z = rules.zahl
     cap_teil = ""
     if cap_snap is not None:
-        cap_teil = (f" · DC (Eingang) {float(getattr(cap_snap, 'dc_offset', 0.0)):+.4f}"
-                    f" · Chunk p95 {float(getattr(cap_snap, 'chunk_ms_p95', 0.0)):.0f} ms")
+        cap_teil = f" · Chunk p95 {z(getattr(cap_snap, 'chunk_ms_p95', 0.0))} ms"
     if snap is None:
-        return "kein Detektor" + cap_teil
+        if cap_snap is not None:
+            return f"kein Detektor · DC {z(getattr(cap_snap, 'dc_offset', 0.0), '+.3f')}" + cap_teil
+        return "kein Detektor"
     g = lambda n, d=0.0: getattr(snap, n, d)  # noqa: E731
     hint = g("tempo_hint", None)
-    return (f"roh {float(g('bpm_raw')):.1f} · alt {float(g('alt_bpm')):.1f} "
-            f"({float(g('alt_score')):.2f}) · Fenster {float(g('window_filled_s')):.1f}/"
-            f"{float(g('window_s')):.0f} s · Pegel {float(g('level_rms_dbfs', -100.0)):.0f} dBFS · "
-            f"Rauschteppich {float(g('noise_floor_dbfs', -100.0)):.0f} dBFS · "
-            f"Brumm {int(g('hum_hz', 0))} Hz {float(g('hum_ratio')) * 100:.0f} % · "
-            f"DC {float(g('dc_offset')):.3f} · Jitter {float(g('jitter_ms')):.0f} ms · "
-            f"Rückstand {float(g('backlog_ms')):.0f} ms · Kontrast {float(g('onset_contrast')):.1f}"
-            + (f" · Hinweis {float(hint):.0f}" if hint else "") + cap_teil)
+    dc = float(getattr(cap_snap, "dc_offset", 0.0)) if cap_snap is not None else float(g("dc_offset"))
+    hum_hz, hum_ratio = int(g("hum_hz", 0) or 0), float(g("hum_ratio") or 0.0)
+    brumm = (f"Brumm {hum_hz} Hz {z(hum_ratio * 100)} %"
+             if hum_hz > 0 and round(hum_ratio * 100) > 0 else "Brumm —")
+    return (f"roh {z(g('bpm_raw'), '.1f')} · alt {z(g('alt_bpm'), '.1f')} "
+            f"({z(g('alt_score'), '.2f')}) · Fenster {z(g('window_filled_s'), '.1f')}/"
+            f"{z(g('window_s'))} s · Pegel {z(g('level_rms_dbfs', -100.0))} dBFS · "
+            f"Rauschteppich {z(g('noise_floor_dbfs', -100.0))} dBFS · {brumm} · "
+            f"DC {z(dc, '+.3f')} · Jitter {z(g('jitter_ms'))} ms · "
+            f"Rückstand {z(g('backlog_ms'))} ms · Kontrast {z(g('onset_contrast'), '.1f')}"
+            + (f" · Hinweis {z(hint)}" if hint else "") + cap_teil)
 
 
 class _SourceCombo(QComboBox):
@@ -616,7 +622,7 @@ class BpmManagerView(QWidget):
         self._lbl_diag = QLabel("")
         self._lbl_diag.setStyleSheet("color:#8b949e; font-size:11px;")
         self._lbl_diag.setWordWrap(True)
-        self._lbl_diag.setToolTip("Rohwerte des Detektors: Roh-Tempo, Alternativ-Oktave, Fensterfüllung, Pegel, Rauschteppich, Brumm, DC, Jitter, Rückstand; dazu DC-Offset und Chunk-Abstand (p95) des Eingangs.")
+        self._lbl_diag.setToolTip("Rohwerte des Detektors: Roh-Tempo, Alternativ-Oktave, Fensterfüllung, Pegel, Rauschteppich, Brumm, DC-Offset (Eingang), Jitter, Rückstand, Kontrast; dazu der Chunk-Abstand (p95) des Eingangs.")
         grid.addWidget(self._lbl_diag, r, 1)
         r += 1
 
@@ -808,7 +814,7 @@ class BpmManagerView(QWidget):
         return _COL_GREEN if self._mgr.mode == BpmMode.MANUAL else _COL_GOLD
 
     def _on_bpm(self, bpm: float):
-        self._lbl_bpm.setText(f"{bpm:.1f}" if bpm and bpm > 0 else "--")
+        self._lbl_bpm.setText(rules.zahl(bpm, ".1f") if bpm and bpm > 0 else "--")
         self._lbl_bpm.setStyleSheet(_BPM_STYLE.format(col=self._bpm_color(bpm)))
 
     def _on_beat(self, idx: int):
