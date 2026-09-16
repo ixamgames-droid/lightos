@@ -116,17 +116,15 @@ class TempoTracker:
     BASS_ALT_MIN = 0.45     # Flux-Score der x2-Alternative: Backbeat 0,52..1,00; Kick/Klick allein <= 0,30 und
                             # Kick 90 + Brumm 0,29 (dort taeuscht die Bass-ACF) -> gar nicht erst pruefen
     BASS_CONTRAST_MIN = 6.0   # Bass-Flux max/mean: Backbeat >= 12,2; bassdominierter Brumm 3,9..6,7 (Sicherheitsgate)
-    BASS_SIM_MIN = 0.6      # Gleichartigkeit ac_bass[L/2]/ac_bass[L]: Backbeat 0,63..1,35 (Reese bis 1,6);
-    BASS_SIM_MAX = 1.5      # darunter Kick+Bass+Hats 90 0,23..0,32, Two-Step; darueber Brumm (1,6..6,0), Boom-Bap
     BASS_PHASE_MIN = 0.6    # Kick-Lage: Bass-Flux zwischen / auf den Flux-Beats: Backbeat 0,74..1,32; Kick+Bass+
     BASS_PHASE_MAX = 1.6    # Hats 90 0,13..0,21, Offbeat-Bass 0,27..0,30, Two-Step 5,0..7,2; Pluck-Offbeat 0,64..1,61
     BASS_HI_MIN = 0.17      # Klick-Lage (TRAGEND gegen Offbeat-Bass): Hochband-Flux zwischen / auf den Beats:
     BASS_HI_MAX = 1.0       # Backbeat 0,18..0,36 (Median >= 0,19); Pluck-/Offbeat-Bass 0,01..0,16 (Median <= 0,12),
                             # Achtel-Bass ohne Kick 0,01..0,05; ueber 1: Flux-Phase liegt auf dem Offbeat
     BASS_R_MIN = 0.3        # Bass-Periodizitaet ac_bass[L]/ac_bass[0]: Backbeat 0,45..1,00; Boom-Bap (Kick 1 + 3-und)
-                            # 0,00..0,17, Breakbeat 0,00..0,04 — dort ist die Gleichartigkeit ein Quotient aus Rauschen
-    BASS_PHASE_HOLD = (0.5, 1.8)    # Halten (Hysterese): weitere Grenzen, sobald x2 entschieden ist
-    BASS_SIM_HOLD = (0.5, 1.7)
+                            # 0,00..0,17, Breakbeat 0,00..0,04
+    BASS_PHASE_HOLD = (0.5, 1.8)    # Halten (Hysterese): weitere Grenzen, sobald x2 entschieden ist (Hardstyle
+                                    # 150: Roh-Oktave sprang ohne sie 26-mal in 20 s)
     BASS_HI_HOLD = (0.12, 1.0)
     BASS_DEBOUNCE_N = 3     # so viele widersprechende Pruefungen in Folge kippen die Entscheidung (~0,28 s)
 
@@ -343,9 +341,11 @@ class TempoTracker:
         Bass/Hats auf Achteln und Offbeat-Bass, die ebenfalls Bass-Onsets bei L/2 haben:
         1. Kick-Lage: Bass-Flux zwischen den Flux-Beats (Phase + L/2) muss aehnlich stark sein
            wie auf ihnen (Phase aus der Flux-Huellkurve, Max +-1 Frame).
-        2. Gleichartigkeit: ac_bass[L/2] / ac_bass[L] im Fenster (Brumm-/Pulszug-Sicherung).
-        3. Klick-Lage (tragend gegen Offbeat-Bass): Hochband-Flux (ab ~800 Hz) zwischen den
+        2. Klick-Lage (tragend gegen Offbeat-Bass): Hochband-Flux (ab ~800 Hz) zwischen den
            Beats / auf den Beats — eine Kick bringt ihre Transiente mit, eine Bassnote nicht.
+        3. Bass-Periodizitaet ac_bass[L]/ac_bass[0]: der Bass wiederholt sich mit der Flux-Periode.
+        Die Gleichartigkeit ac_bass[L/2]/ac_bass[L] steht nur noch in der Diagnose: sie trennte
+        Offbeat-Bass nur fuer Plateau-Bassnoten (Pluck-Bass 0,6..1,0 wie Backbeat).
         Entprellt: die Entscheidung kippt erst nach BASS_DEBOUNCE_N widersprechenden Pruefungen
         in Folge, und das Halten nutzt weitere Grenzen als das Einschalten (Hysterese).
         Gates: Tempo-Hinweis entscheidet selbst; x2 muss in den Grenzen liegen; Flux-Score der
@@ -400,7 +400,7 @@ class TempoTracker:
         q_phase = float(bm[off].sum()) / on_s
         hi_on = float(hm[on].sum())
         q_hi = float(hm[off].sum()) / hi_on if hi_on > 1e-12 else 0.0
-        # nur 6 Lags noetig -> Skalarprodukte statt FFT (unbiased wie in _estimate)
+        # nur 7 Lags noetig -> Skalarprodukte statt FFT (unbiased wie in _estimate)
         b -= mean_b
         hl = int(round(a / 2.0))
 
@@ -412,14 +412,12 @@ class TempoTracker:
         q_sim = ac_max(hl) / pk_full
         r_bass = pk_full / max(float(np.dot(b, b)) / M, 1e-12)
         self.bass_diag = (s_dbl, contrast, q_phase, q_sim, q_hi, r_bass)     # Diagnose (Messbank/Tests)
-        if r_bass < self.BASS_R_MIN:        # Bass ohne Periode L (Boom-Bap, Breakbeat): q_sim waere Rauschen
+        if r_bass < self.BASS_R_MIN:        # Bass ohne Periode L (Boom-Bap, Breakbeat)
             return False
         if self.bass_dbl:                   # halten: weitere Grenzen (Hysterese)
             return (self.BASS_PHASE_HOLD[0] <= q_phase <= self.BASS_PHASE_HOLD[1]
-                    and self.BASS_SIM_HOLD[0] <= q_sim <= self.BASS_SIM_HOLD[1]
                     and self.BASS_HI_HOLD[0] <= q_hi <= self.BASS_HI_HOLD[1])
         return (self.BASS_PHASE_MIN <= q_phase <= self.BASS_PHASE_MAX
-                and self.BASS_SIM_MIN <= q_sim <= self.BASS_SIM_MAX
                 and self.BASS_HI_MIN <= q_hi <= self.BASS_HI_MAX)
 
     def _contrast(self, with_sparse: bool = False):
