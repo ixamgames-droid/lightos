@@ -2,16 +2,17 @@
 
 Kick auf jedem Beat + Snare auf 2/4 rastete ab ~150 BPM auf die halbe Oktave (Flux-
 Huellkurve wiederholt sich alle zwei Beats). Der Bass-Flux (30..200 Hz, eigener Ring)
-entscheidet die Oktave, wenn zwischen den Flux-Beats *dieselben* Bass-Onsets liegen.
-Jeder Test faengt eine Mutation (je einmal eingebaut -> ROT -> zurueckgenommen -> GRUEN):
+entscheidet die Oktave, wenn zwischen den Flux-Beats Kicks liegen (Bass-Onset UND
+Hochband-Transiente). Jeder Test faengt eine Mutation (je einmal eingebaut -> ROT ->
+zurueckgenommen -> GRUEN):
 
 * ``BASS_OCT = False``                         -> Backbeat 150/174 wieder halb
-* Gleichartigkeit weg (``BASS_SIM_MIN`` -inf)  -> lauter Offbeat-Bass 95 verdoppelt
+* Klick-Lage weg (``BASS_HI_MIN`` -inf)        -> lauter Offbeat-Bass 95 verdoppelt
 * Kick-Lage weg (``BASS_PHASE_MIN`` -inf)      -> leiser Ghost-Kick auf der Achtel 95 verdoppelt
 
-Tempo-Hinweis/Tempo-Bereich/x2-x0,5 behalten Vorrang (eigene Tests). Das Hinweis-Gate im
-Entscheider ist doppelt abgesichert: der Hinweis-Prior (sigma 0,15 Oktaven) drueckt den
-x2-Score ohnehin unter ``BASS_ALT_MIN`` — die Mutation "Gate weg" bleibt deshalb GRUEN.
+Tempo-Hinweis/Tempo-Bereich/x2-x0,5 behalten Vorrang (eigene Tests). Die Grenzfaelle der
+Nachbesserung (Pluck-Bass, Achtel-Bass ohne Kick, Boom-Bap, Hysterese, Hinweis-Gate,
+x2-Grenzen-Gate, Bassband) stehen in ``test_beat_detector_backbeat_grenzen.py``.
 
 Signalbausteine wie ``bpm_bench/signals.py`` (bewusst kopiert, nicht importiert).
 Reines numpy, Laufzeit der Datei < 5 s (``test_zz_runtime_budget``).
@@ -166,8 +167,8 @@ def test_backbeat_locks_full_tempo(bpm):
     assert abs(s.bpm - bpm) <= 0.02 * bpm, s.bpm
     # die Flux-Wahl (halbe Oktave) bleibt als Alternative sichtbar
     assert abs(s.alt_bpm - bpm / 2.0) <= 0.02 * bpm, (s.alt_bpm, s.alt_score)
-    diag = det._tracker.bass_diag
-    assert diag is not None and diag[3] >= 0.6, diag
+    diag = det._tracker.bass_diag       # (x2-Score, Kontrast, Kick-Lage, Gleichartigkeit, Klick-Lage, Bass-Periode)
+    assert diag is not None and diag[4] >= 0.17 and diag[5] >= 0.3, diag
 
 
 # ── darf NICHT verdoppeln ────────────────────────────────────────────────────
@@ -177,16 +178,16 @@ def test_offbeat_bass_95_stays():
     assert abs(det.get_bpm() - 95.0) <= 1.9, det.get_bpm()
 
 
-def test_loud_offbeat_bass_stays_via_similarity():
+def test_loud_offbeat_bass_stays_via_click_position():
     """Offbeat-Bass so laut wie der Kick: Kick-Lage ~1 (sieht aus wie Backbeat), nur die
-    Gleichartigkeit ac_bass[L/2]/ac_bass[L] (verschiedene Ereignisse) haelt 95."""
+    Klick-Lage (keine Hochband-Transiente zwischen den Beats) haelt 95."""
     det = _feed(BeatDetector(), _offbeat_bass(95.0, 1.6))
     assert abs(det.get_bpm() - 95.0) <= 1.9, det.get_bpm()
 
 
 def test_ghost_kick_offbeat_stays_via_kick_position():
-    """Gleicher Kick mit 30 % auf der Achtel: Gleichartigkeit grenzwertig (~0,6), die Kick-Lage
-    (zwischen / auf den Beats ~0,3) haelt 95."""
+    """Gleicher Kick mit 30 % auf der Achtel: Klick-Lage ~0,3 (eine echte Kick), nur die
+    Kick-Lage (Bass zwischen / auf den Beats ~0,3) haelt 95."""
     det = _feed(BeatDetector(), _ghost_kick(95.0, 0.3, 10.0))
     assert abs(det.get_bpm() - 95.0) <= 1.9, det.get_bpm()
 
