@@ -14,6 +14,10 @@ Zwei Betriebsarten derselben Kette Hann(win) / Hop hop / |rfft|:
   in einem sonst ruhigen Band genauso viel wie ein breitbandiger Klick, und
   stationaeres Rauschen/Brummen (Flux konstant ueber die Zeit) traegt fast nichts
   bei. Das ist die Live-Kette des ``BeatDetector``.
+  Nebenbei (BPM-12) im selben FFT-Durchlauf eine **Bass-Huellkurve**: halbweg-
+  gleichgerichteter Flux der *linearen* Roh-Magnitude nur ~30..200 Hz, ohne Whitening
+  und ohne Bandnormierung — die Staerke der Bass-Onsets bleibt vergleichbar (Kick vs.
+  Bassnote), das braucht der Oktav-Entscheider im ``TempoTracker``.
 
 Dazu ``HighPass`` (1-Pol-DC-Blocker/Hochpass 30 Hz, blockweise vektorisiert).
 """
@@ -119,6 +123,8 @@ class FluxStream:
     BAND_CAP = 20.0          # Obergrenze je Band (Verhaeltnis zum Mittel), gegen Ausreisser
     N_BANDS = 12             # log-Baender ab 30 Hz
     LOW_HZ = 30.0
+    BASS_LO_HZ = 30.0        # Bass-Huellkurve (BPM-12): Bins 30..200 Hz (bei 44,1 kHz/1024: 43..172 Hz)
+    BASS_HI_HZ = 200.0
 
     def __init__(self, sr: int, win: int = WIN, hop: int = HOP, mode: str = "whitened"):
         if mode not in ("log1p", "whitened"):
@@ -139,6 +145,8 @@ class FluxStream:
         self._band_starts = idx[:-1]
         self._n_bands = int(self._band_starts.size)
         self._lo_bin = int(idx[0])
+        self._bass_lo = int(np.searchsorted(self.freqs, self.BASS_LO_HZ))
+        self._bass_hi = max(self._bass_lo + 1, int(np.searchsorted(self.freqs, self.BASS_HI_HZ, side="right")))
         self.relax = np.float32(np.exp(np.log(0.5) * self.hop / (self.RELAX_S * self.sr)))
         self._bn_alpha = np.float32(self.hop / (self.BAND_NORM_S * self.sr))
         self._nb = nb
@@ -153,6 +161,8 @@ class FluxStream:
         self._bn_n = 0
         self.last_magnitude = np.zeros(nb, np.float32)
         self.frames = 0
+        self._bass_prev = None
+        self.bass = np.zeros(0, np.float32)     # Bass-Flux der Frames des letzten push (nur whitened)
 
     # ---------------------------------------------------------------- Kern
     def push(self, x: np.ndarray) -> np.ndarray:
@@ -162,14 +172,18 @@ class FluxStream:
         n_new = 0 if buf.size < self.win else 1 + (buf.size - self.win) // self.hop
         if n_new <= 0:
             self.tail = buf
+            self.bass = np.zeros(0, np.float32)
             return np.zeros(0, np.float32)
         out = np.empty(n_new, np.float32)
         if self.mode == "log1p":
             for i in range(n_new):
                 out[i] = self._frame_log1p(buf[i * self.hop:i * self.hop + self.win])
         else:
+            bass = np.empty(n_new, np.float32)
             for i in range(n_new):
                 out[i] = self._frame_whitened(buf[i * self.hop:i * self.hop + self.win])
+                bass[i] = self._bass_val
+            self.bass = bass
         self.tail = buf[n_new * self.hop:]
         self.frames += n_new
         return out
@@ -187,6 +201,13 @@ class FluxStream:
     def _frame_whitened(self, seg: np.ndarray) -> float:
         mag = np.abs(np.fft.rfft(seg * self.window)).astype(np.float32)
         self.last_magnitude = mag
+        # Bass-Flux (BPM-12) aus derselben FFT: lineare Magnitude, nur 30..200 Hz
+        mb = mag[self._bass_lo:self._bass_hi]
+        if self._bass_prev is None:
+            self._bass_val = 0.0
+        else:
+            self._bass_val = float(np.maximum(mb - self._bass_prev, 0.0).sum())
+        self._bass_prev = mb
         # adaptives Whitening: Bin / (eigenes abklingendes Maximum, Floor relativ zum lautesten)
         psp = np.maximum(mag, self.psp * self.relax)
         self.psp = psp

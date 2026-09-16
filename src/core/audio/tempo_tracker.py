@@ -104,6 +104,21 @@ class TempoTracker:
     AGREE_MIN = 0.4         # Raster-Score / bester Phasen-Score: darunter zaehlt ein Widerspruch
     AGREE_N = 3             # so viele Widersprueche in Folge -> Beats stumm, Schaetzfenster kurz
     SHORT_S = 3.0           # verkuerztes ACF-Fenster bei Widerspruch (schnellerer Tempowechsel)
+    # ---- Bass-Oktav-Entscheider (BPM-12). Nur wenn die Flux-Wahl die LANGSAME Oktave ist und
+    # x2 in den Grenzen liegt; kein Tempo-Hinweis. Messung: Messbank 08l/08p (Backbeat 150..200,
+    # soll x2) gegen 03_kick_bass_hats_90, 08n_offbeat_bass, 08m_dauerbass, 08o_halftime, Brumm-
+    # und Rausch-Varianten, lauten Offbeat-Bass (bleibt) — Tabelle in der PR BPM-12.
+    BASS_OCT = True         # Schalter (Tests/Bank)
+    BASS_ALT_MIN = 0.45     # Flux-Score der x2-Alternative: Backbeat >= 0,54, Kick/Klick allein 0,23-0,30,
+                            # Kick 90 + Brumm 0,29 (dort taeuscht die Bass-ACF)
+    BASS_CONTRAST_MIN = 10.0  # Bass-Flux max/mean: Backbeat >= 12,5 (mit Achtel-Bass), Brumm-dominiert <= 8,4
+    BASS_SIM_MIN = 0.6      # Gleichartigkeit ac_bass[L/2] / ac_bass[L]: Backbeat 0,78-1,26 (gleiche Kicks auf
+                            # beiden Phasen), Offbeat-Bass 0,18-0,41 (auch so laut wie der Kick), Kick+Bass+Hats 90
+                            # <= 0,31, Dauerbass 90 <= 0,58
+    BASS_SIM_MAX = 1.5      # darueber Brumm-Modulation statt Pulszug (Brumm 1,6-6,0)
+    BASS_PHASE_MIN = 0.6    # Kick-Lage: Bass zwischen / auf den Flux-Beats (L-Raster, +-1 Frame): Backbeat
+    BASS_PHASE_MAX = 1.6    # 0,71-1,34; Kick+Bass+Hats 90 <= 0,31, Offbeat-Bass 95 <= 0,33 (laut: bis 1,77),
+                            # Two-Step (Kick 1+3) Median 5,3
 
     def __init__(self, sample_rate: int, min_bpm: float = 60.0, max_bpm: float = 200.0):
         self.sr = int(sample_rate)
@@ -143,6 +158,7 @@ class TempoTracker:
 
     def reset(self):
         self.env = np.zeros(self.N, np.float32)
+        self.env_bass = np.zeros(self.N, np.float32)     # Bass-Huellkurve (BPM-12), gleicher Takt
         self.frames_total = 0
         self.frames_filled = 0
         self.frames_since_est = 0
@@ -170,19 +186,25 @@ class TempoTracker:
         self.changed = True     # Zustand seit dem letzten Snapshot veraendert
 
     # ------------------------------------------------------------ Eingang
-    def push(self, flux: np.ndarray, silent_s: float, signal_s: float) -> bool:
-        """Neue Flux-Werte (ein Wert je Frame) anhaengen. Liefert True, wenn eine
+    def push(self, flux: np.ndarray, silent_s: float, signal_s: float, bass: np.ndarray | None = None) -> bool:
+        """Neue Flux-Werte (ein Wert je Frame) anhaengen; ``bass`` = Bass-Flux derselben
+        Frames (None: Nullen, Oktav-Entscheider enthaelt sich). Liefert True, wenn eine
         Schaetzung gelaufen ist (Snapshot-Anlass)."""
         k = int(flux.size)
         self.silent_s = float(silent_s)
         self.signal_s = float(signal_s)
         if k <= 0:
             return False
+        if bass is None or int(bass.size) != k:
+            bass = np.zeros(k, np.float32)
         if k >= self.N:
             self.env[:] = flux[-self.N:]
+            self.env_bass[:] = bass[-self.N:]
         else:
             self.env[:-k] = self.env[k:]
             self.env[-k:] = flux
+            self.env_bass[:-k] = self.env_bass[k:]
+            self.env_bass[-k:] = bass
         self.frames_total += k
         self.frames_filled = min(self.N, self.frames_filled + k)
         self.frames_since_est += k
@@ -277,15 +299,73 @@ class TempoTracker:
         conf = conf_r * gate
         # Oktav-Alternative (Score relativ zum Sieger)
         alt_bpm, alt_score = 0.0, 0.0
+        s_dbl = 0.0
         for fac in (2.0, 0.5):
             la = a / fac                                # Lag der Alternative (evtl. halbzahlig)
             j0 = int(np.searchsorted(L, la - 1.0))
             j1 = int(np.searchsorted(L, la + 1.0, side="right"))
             if j0 < j1:                                 # Max ueber +-1 Lag, sonst rutscht der
                 s = float(sc[j0:j1].max() / sc[k])      # Wert bei scharfen Spitzen ins Tal
+                if fac == 2.0:
+                    s_dbl = s
                 if s > alt_score:
                     alt_score, alt_bpm = s, bpm * fac
+        if self._bass_says_double(M, a, bpm, s_dbl):
+            # Bass-Huellkurve traegt die schnelle Oktave: Sieger x2, die Flux-Wahl wird Alternative
+            return bpm * 2.0, conf, bpm, min(1.0, 1.0 / max(s_dbl, 1e-9)), a
         return bpm, conf, alt_bpm, alt_score, a
+
+    def _bass_says_double(self, M: int, a: int, bpm: float, s_dbl: float) -> bool:
+        """Oktav-Entscheider (BPM-12): Flux waehlte Lag ``a``, die x2-Alternative hat Score
+        ``s_dbl``. True = die Bass-Huellkurve traegt die halbe Periode als *dieselben* Onsets.
+
+        Unterscheidet Backbeat (Kick auf jedem Beat, Snare 2/4 -> Flux-Periode 2 Beats) von
+        Bass/Hats auf Achteln und Offbeat-Bass, die ebenfalls Bass-Onsets bei L/2 haben:
+        1. Kick-Lage: Bass-Flux zwischen den Flux-Beats (Phase + L/2) muss aehnlich stark sein
+           wie auf ihnen (Phase aus der Flux-Huellkurve, Max +-1 Frame).
+        2. Gleichartigkeit: ac_bass[L/2] / ac_bass[L] — gleiche Kicks auf beiden Phasen ~1;
+           verschiedene Ereignisse (Kick vs. Bassnote: andere Form/Staerke) deutlich kleiner.
+        Gates: Tempo-Hinweis entscheidet selbst; x2 muss in den Grenzen liegen; Flux-Score der
+        x2-Alternative >= BASS_ALT_MIN; Bass-Kontrast >= BASS_CONTRAST_MIN (Brumm)."""
+        if (not self.BASS_OCT or self.tempo_hint or s_dbl < self.BASS_ALT_MIN
+                or a < 4 or self._fold(bpm) * 2.0 > self.max_bpm):
+            return False
+        b = self.env_bass[-M:].astype(np.float64)
+        mean_b = float(b.mean())
+        if mean_b <= 1e-12 or float(b.max()) < self.BASS_CONTRAST_MIN * mean_b:
+            return False
+        n = (M - 2) // a
+        if n < 2:
+            return False
+        e = self.env[-M:]
+        # Max-Filter +-1 Frame (Onset kann zwischen zwei Frames liegen)
+        em = np.maximum(np.maximum(e[:-2], e[1:-1]), e[2:])
+        bm = np.maximum(np.maximum(b[:-2], b[1:-1]), b[2:])
+        # Beat-Indizes relativ zum letzten gefilterten Frame (em hat Laenge M-2, Index i <-> Frame i+1)
+        ph = np.arange(a)
+        idx = (M - 3) - ph[:, None] - np.arange(n)[None, :] * a
+        ok = idx >= 0
+        idx[~ok] = 0
+        j = int(np.argmax((em[idx] * ok).sum(axis=1)))
+        on = idx[j][ok[j]]
+        off = on - (a // 2) if a % 2 == 0 else on - (a + 1) // 2
+        on_s = float(bm[on].sum())
+        off_s = float(bm[off[off >= 0]].sum())
+        if on_s <= 1e-12:
+            return False
+        q_phase = off_s / on_s
+        if not (self.BASS_PHASE_MIN <= q_phase <= self.BASS_PHASE_MAX):
+            return False
+        b -= mean_b
+        nfft = 1 << int(np.ceil(np.log2(2 * M)))
+        F = np.fft.rfft(b, nfft)
+        ac = np.fft.irfft(F * np.conj(F), nfft)[:M] / (M - np.arange(M))
+        h = int(round(a / 2.0))
+        pk_full = float(ac[a - 1:a + 2].max())
+        if pk_full <= 1e-12:
+            return False
+        q_sim = float(ac[h - 1:h + 2].max()) / pk_full
+        return self.BASS_SIM_MIN <= q_sim <= self.BASS_SIM_MAX
 
     def _contrast(self, with_sparse: bool = False):
         """Onset-Kontrast im 4-s-Fenster: max/mean (und max/median als Sparsity-Mass)."""
@@ -337,6 +417,7 @@ class TempoTracker:
         if self.silent_s >= self.SIL_RELEASE_S:
             if self.state != "no_signal":
                 self.env[:] = 0.0
+                self.env_bass[:] = 0.0
                 self.frames_filled = 0
             self.state, self.hold_stage = "no_signal", 3
             self.bpm, self.bpm_raw, self.conf = 0.0, 0.0, 0.0
