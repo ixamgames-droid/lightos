@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| BPM-12 | A | feat/bpm12-backbeat-oktave | 2026-09-16T14:36Z | src/core/audio/tempo_tracker.py · src/core/audio/onset_flux.py · src/core/audio/beat_detector.py |
+| _(frei)_ |  |  |  |  |
 
 ## Blocker & Fallen
 
@@ -120,7 +120,6 @@
 
 ## Verlauf
 
-- 2026-09-07T14:07Z B claim XPLAT-30
 - 2026-09-07T15:05Z B done XPLAT-30
 - 2026-09-07T15:54Z B claim XPLAT-33
 - 2026-09-07T16:06Z A done UI-53
@@ -150,3 +149,4 @@
 - 2026-09-14T20:23Z A claim BPM-11
 - 2026-09-14T21:48Z A done BPM-11
 - 2026-09-16T14:36Z A claim BPM-12
+- 2026-09-16T15:58Z A done BPM-12
