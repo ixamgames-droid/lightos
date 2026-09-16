@@ -240,3 +240,21 @@ def test_grid_driver_fires_crossed_beats():
         mgr.unsubscribe_beat(cb)
         mgr.use_grid_source(False)
         mgr.reset()
+
+
+def test_beschriftungen_ohne_einzelnes_ampersand():
+    """Sichtpruefung 2026-09-16: ein einzelnes '&' ist fuer Qt ein Tastenkuerzel-Marker —
+    'Quelle, Genre & Engine' erschien als 'Quelle, Genre _Engine'. Sichtbares '&' = '&&'."""
+    import re
+    from PySide6.QtWidgets import QApplication, QGroupBox, QAbstractButton
+    app = QApplication.instance() or QApplication([])
+    from src.ui.views.bpm_generator_view import BpmGeneratorView
+    v = BpmGeneratorView()
+    try:
+        texte = [b.title() for b in v.findChildren(QGroupBox)] + \
+                [b.text() for b in v.findChildren(QAbstractButton)]
+        falsch = [t for t in texte if re.search(r"(?<!&)&(?!&)\s", t)]
+        assert not falsch, f"einzelnes & vor Leerzeichen (wird als Unterstrich gerendert): {falsch}"
+    finally:
+        v.deleteLater()
+        app.processEvents()
