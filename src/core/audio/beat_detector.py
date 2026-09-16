@@ -241,7 +241,7 @@ class BeatDetector:
                 flux = self._flux.push(y)
                 self.sample_pos += int(x.size)
                 tr = self._tracker
-                est = tr.push(flux, self._silent_s, self._signal_s, self._flux.bass)
+                est = tr.push(flux, self._silent_s, self._signal_s, self._flux.bass, self._flux.hi)
                 lat = self.beat_latency_ms / 1000.0 * self.sr
                 while fire < 2 and tr.beat_due(self.sample_pos, lat):
                     fire += 1
