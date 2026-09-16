@@ -514,3 +514,13 @@ def test_start_bei_stille_wartet_auf_signal(env):
     assert txt.startswith("Wartet auf Signal — Eingang »USB Audio CODEC« ist still — Musik starten")
     assert "Musik gehört" not in txt
     assert _tick(v, clock, 2.5).startswith("Kein Signal")
+
+
+def test_eingerastet_ohne_platzhalter(env):
+    """BPM-13: neben „EINGERASTET" steht kein „· —"."""
+    make, cap, clock, det = env
+    v, *_ = make()
+    _tick(v, clock, 0.0)
+    assert v._lbl_state.text() == "EINGERASTET"
+    assert "—" not in v._lbl_source.text()
+    assert v._lbl_source.text() == "" and v._lbl_source.isHidden()

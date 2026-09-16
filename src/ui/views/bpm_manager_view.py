@@ -143,6 +143,25 @@ def state_word(mode_manual: bool, kind: str | None, snap, os2l_waiting: bool = F
     return "AUS", _COL_GREY
 
 
+# Quelle des Manager-Tempos, die die gewaehlte Quelle ohnehin nahelegt -> kein Zusatz
+_SRC_SELBSTVERSTAENDLICH = {"loopback": ("audio",), "input": ("audio",), "os2l": ("os2l",),
+                            "song": ("timeline", "file")}
+
+
+def source_suffix(current_source: str | None, kind: str | None, locked: bool) -> str:
+    """Zusatz hinter dem Zustandswort (BPM-13): „· Tap", „· 🔒" … — leer, wenn es nichts
+    zu sagen gibt (keine Quelle „—" oder die Quelle folgt ohnehin der Auswahl). Nie „· —"."""
+    teile = []
+    src = current_source or "off"
+    if src != "off" and src not in _SRC_SELBSTVERSTAENDLICH.get(kind or "", ()):
+        label = _SRC_LABELS.get(src, src)
+        if label and label != "—":
+            teile.append(label)
+    if locked:
+        teile.append("🔒")
+    return ("· " + " · ".join(teile)) if teile else ""
+
+
 def pegel_text(cap_snap) -> str:
     """Zahlenwert neben dem Pegelmeter (BPM-13): RMS 300 ms, deutsch geschrieben
     („−17 dBFS"); ohne laufenden Capture „— dBFS", digitale Stille „Stille"."""
@@ -813,12 +832,17 @@ class BpmManagerView(QWidget):
             self._btn_auto.setChecked(is_auto)
             self._btn_manual.setChecked(not is_auto)
             self._btn_lock.setChecked(self._mgr.is_locked)
-            src = self._mgr.current_source
-            lock = " · 🔒" if self._mgr.is_locked else ""
-            self._lbl_source.setText(f"· {_SRC_LABELS.get(src, src)}{lock}")
+            self._update_source_suffix()
             self._on_bpm(self._mgr.bpm)
         finally:
             self._loading = was
+
+    def _update_source_suffix(self) -> None:
+        txt = source_suffix(self._mgr.current_source, self._src.kind or self._source_pref,
+                            bool(self._mgr.is_locked))
+        if self._lbl_source.text() != txt:
+            self._lbl_source.setText(txt)
+        self._lbl_source.setVisible(bool(txt))
 
     def _snapshot(self):
         if self._det is None:
@@ -841,6 +865,7 @@ class BpmManagerView(QWidget):
             except Exception:
                 waiting = False
         word, col = state_word(self._mgr.mode == BpmMode.MANUAL, kind, snap, waiting)
+        self._update_source_suffix()          # Manager-Quelle wechselt auch ohne Zustands-Signal
         if self._lbl_state.text() != word:
             self._lbl_state.setText(word)
             self._lbl_state.setStyleSheet(_STATE_STYLE.format(col=col))

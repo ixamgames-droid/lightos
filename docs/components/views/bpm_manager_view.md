@@ -33,7 +33,7 @@ Bus" liegen seit BPM-08 im eigenen Sub-Tab [`tempo_bus_view`](tempo_bus_view.md)
 
 Anzeigen: `_lbl_bpm` (aus `mgr.bpm` per `subscribe_bpm_change` → Qt-Signal; gelb Auto,
 grün Manuell, grau kein Tempo), `_dot` + `_phase_lbls` (Beat-Signal), `_lbl_state`
-(Zustandswort, `state_word()` — reine Funktion), `_lbl_source`, `_conf` (seit BPM-13
+(Zustandswort, `state_word()` — reine Funktion), `_lbl_source` (`source_suffix()`: „· Tap“, „· 🔒“ … — leer statt „· —“, wenn die Manager-Quelle der Auswahl folgt; auch im Poll aktualisiert, BPM-13), `_conf` (seit BPM-13
 kompakter 150-px-Balken „Konfidenz N %" neben dem Zustandswort), die **Zeile „Pegel"**
 (BPM-13) direkt unter der Beat-/Zustandszeile: `_level` (`LevelMeterWidget`, volle
 Breite, 18 px hoch, grüne Zielzone −30…−6 dBFS auch bei Stille sichtbar, Peak-Hold),

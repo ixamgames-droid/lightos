@@ -21,6 +21,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 - **Start ohne Musik:** statt „Sucht Tempo — 6 s Musik gehört" steht jetzt „Wartet auf
   Signal — PC-Audio … ist still — Musik starten". „N s Musik gehört" zählt nur noch Zeit mit
   echtem Signal.
+- Neben „EINGERASTET" steht kein „· —" mehr; ein Zusatz erscheint nur, wenn er etwas sagt
+  (z. B. „· Tap", „· 🔒").
 
 ### 2026-09-16 — BPM: Kick auf jedem Beat + Snare auf 2/4 rastet auf das volle Tempo
 
