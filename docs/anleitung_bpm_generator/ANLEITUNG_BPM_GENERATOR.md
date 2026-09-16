@@ -90,7 +90,8 @@ Nach jeder Korrektur wird die BPM-Kurve neu abgeleitet; beim Vorhören hörst du
 in den Player und schaltet die Live-Audio-Erkennung ab, damit die Analyse **führt**.
 
 Danach im **Musik-Tab** abspielen: die globale BPM folgt jetzt dem Lied über die Zeit.
-Im Sub-Tab **Erkennung** steht die Quelle dann auf **Lied-Analyse (Player)**. Mit **„Taktgenau"** (Erkennung → Erweitert,
+Die Quelle-Liste im Sub-Tab **Erkennung** stellt sich dabei **noch nicht** von selbst um — wähle dort
+**Lied-Analyse (Player)**, damit Anzeige und tatsächliche Quelle übereinstimmen (Backlog BPM-14). Mit **„Taktgenau"** (Erkennung → Erweitert,
 Standard an) treffen die Lichter die **echten Beats** des Songs sample-nah — nicht nur den
 BPM-Wert. (Details: [BPM-Manager-Anleitung, Abschnitt „Taktgenau"](../anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md#73-taktgenau).)
 
