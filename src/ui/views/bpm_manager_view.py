@@ -112,6 +112,7 @@ _CHIP_STIL = {
     "DC": ("DC", "#d29922", "Gleichspannungsversatz im Eingang — Interface/Kabel prüfen."),
 }
 _REC_TEXT = "Eingang 30 s aufnehmen"
+_PRESET_STYLE = "QToolButton::menu-indicator { image: none; width: 0px; }"
 _LABEL_W = 44          # Beschriftungsspalte „Quelle"/„Pegel"
 _CONF_W = 150          # kompakter Konfidenzbalken (BPM-13)
 
@@ -512,6 +513,8 @@ class BpmManagerView(QWidget):
         self._btn_preset = QToolButton()
         self._btn_preset.setText("Vorlage ▾")
         self._btn_preset.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        # BPM-13: der Pfeil steht im Text — den zweiten (Menue-Indikator) ausblenden
+        self._btn_preset.setStyleSheet(_PRESET_STYLE)
         self._btn_preset.setToolTip("Tempo-Bereich und Beats/Takt nach Musikstil vorbelegen (House, Techno, Hardstyle …). Setzt nur diese beiden Werte.")
         self._preset_menu = QMenu(self._btn_preset)
         try:

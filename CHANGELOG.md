@@ -23,6 +23,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   echtem Signal.
 - Neben „EINGERASTET" steht kein „· —" mehr; ein Zusatz erscheint nur, wenn er etwas sagt
   (z. B. „· Tap", „· 🔒").
+- „Vorlage ▾" in „Erweitert" zeigt nur noch einen Pfeil.
 
 ### 2026-09-16 — BPM: Kick auf jedem Beat + Snare auf 2/4 rastet auf das volle Tempo
 
