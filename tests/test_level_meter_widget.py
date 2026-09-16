@@ -114,3 +114,17 @@ def test_widget_ist_kein_bedienelement_und_greift_nicht_auf_capture_zu():
     assert w.focusPolicy() == Qt.FocusPolicy.NoFocus and w.toolTip()
     src = inspect.getsource(lmw)
     assert "get_audio_capture" not in src and "import capture" not in src
+
+
+def test_zielzone_auch_bei_stille_sichtbar():
+    """BPM-13: ohne Snapshot (Stille/Capture aus) zeigt das Meter die gruene Zielzone
+    −30…−6 dBFS trotzdem — innen gruenlich, ausserhalb Grundfarbe."""
+    w = LevelMeterWidget()
+    img = _render(w)
+    innen = _pixel_bei(w, img, -18.0)
+    aussen = _pixel_bei(w, img, -45.0)
+    assert aussen == lmw.COL_GRUND
+    assert innen != lmw.COL_GRUND and innen.green() > innen.red() + 40
+    w.set_snapshot(CaptureSnapshot(rms_dbfs_300ms=-120.0, chunks=10, running=True))
+    img = _render(w)
+    assert _pixel_bei(w, img, -18.0) == innen

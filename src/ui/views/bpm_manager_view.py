@@ -7,11 +7,12 @@ Klassenname bleibt ``BpmManagerView`` (Smoke-Inventar tests/test_ui_smoke_enumer
 Geraet / OS2L / Lied-Analyse / Aus),
 (2) grosser TAP-Knopf (Doppelrolle, ``bpm_tap_helper``), (3) Zweizustand
 Auto | Manuell, (4) ×½, (5) ×2, (6) Aufklapper „Erweitert".
-Anzeigen: grosse BPM-Zahl mit Pegelmeter direkt darunter (S5, ``cap.snapshot()``
-im 50-ms-Timer; Anzeige, kein Bedienelement) und Hinweis-Chips CLIP/BRUMM/LEISE/
-AUSSETZER/DC daneben (S6), Beat-Punkt + Taktzellen, Zustandswort
+Anzeigen: grosse BPM-Zahl, Beat-Punkt + Taktzellen, Zustandswort
 (KEIN SIGNAL / SUCHT / EINGERASTET / PAUSE · haelt N / MANUELL), Quelle-Text,
-Konfidenzbalken, **Statuszeile** Problem — Ursache — Abhilfe (S6,
+kompakter Konfidenzbalken; darunter die Zeile „Pegel" (BPM-13): breites Pegelmeter
+(S5, ``cap.snapshot()`` im 50-ms-Timer), Zahlenwert („−17 dBFS") und Hinweis-Chips
+CLIP/BRUMM/LEISE/AUSSETZER/DC (S6) — alles Anzeigen, keine Bedienelemente;
+**Statuszeile** Problem — Ursache — Abhilfe (S6,
 ``bpm_status_rules``; die Abhilfe ist ein Link in einem QLabel, kein Knopf).
 
 **„Erweitert" = 12 Bedienelemente** (eingeklappt, Zustand nur je Sitzung):
@@ -111,6 +112,8 @@ _CHIP_STIL = {
     "DC": ("DC", "#d29922", "Gleichspannungsversatz im Eingang — Interface/Kabel prüfen."),
 }
 _REC_TEXT = "Eingang 30 s aufnehmen"
+_LABEL_W = 44          # Beschriftungsspalte „Quelle"/„Pegel"
+_CONF_W = 150          # kompakter Konfidenzbalken (BPM-13)
 
 
 def _html(text: str) -> str:
@@ -138,6 +141,18 @@ def state_word(mode_manual: bool, kind: str | None, snap, os2l_waiting: bool = F
     if kind == "song":
         return "LIED-ANALYSE", _COL_GREEN
     return "AUS", _COL_GREY
+
+
+def pegel_text(cap_snap) -> str:
+    """Zahlenwert neben dem Pegelmeter (BPM-13): RMS 300 ms, deutsch geschrieben
+    („−17 dBFS"); ohne laufenden Capture „— dBFS", digitale Stille „Stille"."""
+    if (cap_snap is None or not bool(getattr(cap_snap, "running", True))
+            or int(getattr(cap_snap, "chunks", 0) or 0) <= 0):
+        return "— dBFS"
+    rms = float(getattr(cap_snap, "rms_dbfs_300ms", -120.0))
+    if rms <= -119.0:
+        return "Stille"
+    return f"{rules.zahl(rms)} dBFS"
 
 
 def diag_line(snap, cap_snap=None) -> str:
@@ -255,33 +270,16 @@ class BpmManagerView(QWidget):
         unit.setAlignment(Qt.AlignmentFlag.AlignCenter)
         unit.setStyleSheet("color:#8b949e; font-weight:bold;")
         bpm_col.addWidget(unit)
-        # Pegelmeter direkt unter der BPM-Zahl (BPM-10): reine Anzeige aus cap.snapshot()
-        self._level = LevelMeterWidget()
-        bpm_col.addWidget(self._level)
-        # Hinweis-Chips (S6): reine Anzeigen, Hysterese 2 s an / 3 s aus
-        chip_row = QHBoxLayout()
-        chip_row.setContentsMargins(0, 0, 0, 0)
-        chip_row.setSpacing(4)
-        self._chips: dict[str, QLabel] = {}
-        for name in rules.CHIPS:
-            text, col, tip = _CHIP_STIL[name]
-            lbl = QLabel(text)
-            lbl.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-            lbl.setStyleSheet(f"color:#0d1117; background:{col}; border-radius:3px;"
-                              " padding:0px 4px; font-size:10px; font-weight:bold;")
-            lbl.setToolTip(tip)
-            lbl.setVisible(False)
-            chip_row.addWidget(lbl)
-            self._chips[name] = lbl
-        chip_row.addStretch(1)
-        bpm_col.addLayout(chip_row)
+        bpm_col.addStretch(1)
         top.addLayout(bpm_col)
 
         col = QVBoxLayout()
         col.setSpacing(6)
         # (1) Quelle
         src_row = QHBoxLayout()
-        src_row.addWidget(QLabel("Quelle"))
+        lbl_quelle = QLabel("Quelle")
+        lbl_quelle.setMinimumWidth(_LABEL_W)
+        src_row.addWidget(lbl_quelle)
         self._cmb_source = _SourceCombo(on_popup=self._populate_sources)
         self._cmb_source.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self._cmb_source.setToolTip(
@@ -323,30 +321,59 @@ class BpmManagerView(QWidget):
             "Zustand der Erkennung: KEIN SIGNAL (nichts zu hören), SUCHT (Fenster füllt sich), "
             "EINGERASTET (Beats laufen), PAUSE · hält N (Stille, Tempo wird gehalten), MANUELL.")
         beat_row.addWidget(self._lbl_state)
-        self._lbl_source = QLabel("· —")
+        self._lbl_source = QLabel("")
         self._lbl_source.setStyleSheet("color:#8b949e;")
         beat_row.addWidget(self._lbl_source)
+        beat_row.addSpacing(16)
+        # Konfidenz (BPM-13): kompakter Balken neben dem Zustandswort
+        self._conf = QProgressBar()
+        self._conf.setRange(0, 100)
+        self._conf.setValue(0)
+        self._conf.setTextVisible(True)
+        self._conf.setFormat("Konfidenz %p %")
+        self._conf.setFixedSize(_CONF_W, 16)
+        self._conf.setToolTip("Wie sicher die Erkennung ist (Periodizität × Beat-Kontrast, 0–100 %).")
+        # sichtbare Kontur auch bei 0 % (UI-24c)
+        self._conf.setStyleSheet(
+            "QProgressBar { border: 1px solid #3d444d; border-radius: 3px; "
+            "background: #161b22; text-align: center; color: #e6edf3; font-size:10px; } "
+            "QProgressBar::chunk { background: #2f6f3a; border-radius: 2px; }")
+        beat_row.addWidget(self._conf)
         beat_row.addStretch(1)
         col.addLayout(beat_row)
         self._phase_lbls: list[QLabel] = []
         self._rebuild_phase_cells()
 
-        # Konfidenz
-        conf = QHBoxLayout()
-        conf.addWidget(QLabel("Konfidenz"))
-        self._conf = QProgressBar()
-        self._conf.setRange(0, 100)
-        self._conf.setValue(0)
-        self._conf.setTextVisible(True)
-        self._conf.setFixedHeight(16)
-        self._conf.setToolTip("Wie sicher die Erkennung ist (Periodizität × Beat-Kontrast, 0–100 %).")
-        # sichtbare Kontur auch bei 0 % (UI-24c)
-        self._conf.setStyleSheet(
-            "QProgressBar { border: 1px solid #3d444d; border-radius: 3px; "
-            "background: #161b22; text-align: center; color: #e6edf3; } "
-            "QProgressBar::chunk { background: #3fb950; border-radius: 2px; }")
-        conf.addWidget(self._conf, 1)
-        col.addLayout(conf)
+        # Pegel (BPM-13): eigene Zeile, breites Meter + Zahlenwert + Chips. Reine Anzeigen
+        # aus cap.snapshot() im 50-ms-Timer — keine Bedienelemente.
+        pegel_row = QHBoxLayout()
+        pegel_row.setSpacing(8)
+        lbl_pegel = QLabel("Pegel")
+        lbl_pegel.setMinimumWidth(_LABEL_W)
+        lbl_pegel.setToolTip("Eingangspegel der gewählten Audio-Quelle; grüner Bereich = gut für die Erkennung.")
+        pegel_row.addWidget(lbl_pegel)
+        self._level = LevelMeterWidget()
+        self._level.setFixedHeight(18)
+        pegel_row.addWidget(self._level, 1)
+        self._lbl_level = QLabel(pegel_text(None))
+        self._lbl_level.setMinimumWidth(78)
+        self._lbl_level.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self._lbl_level.setStyleSheet("color:#c9d1d9; font-weight:bold;")
+        self._lbl_level.setToolTip("Pegel (RMS über 300 ms) in dBFS; Ziel −30 bis −6 dBFS.")
+        pegel_row.addWidget(self._lbl_level)
+        # Hinweis-Chips (S6): reine Anzeigen, Hysterese 2 s an / 3 s aus
+        self._chips: dict[str, QLabel] = {}
+        for name in rules.CHIPS:
+            text, ccol, tip = _CHIP_STIL[name]
+            lbl = QLabel(text)
+            lbl.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            lbl.setStyleSheet(f"color:#0d1117; background:{ccol}; border-radius:3px;"
+                              " padding:1px 5px; font-size:11px; font-weight:bold;")
+            lbl.setToolTip(tip)
+            lbl.setVisible(False)
+            pegel_row.addWidget(lbl)
+            self._chips[name] = lbl
+        col.addLayout(pegel_row)
         top.addLayout(col, 1)
         return top
 
@@ -831,6 +858,9 @@ class BpmManagerView(QWidget):
         except Exception:
             audio_ok = audio_ok and cap is not None
         self._level.set_snapshot(cap_snap)
+        lt = pegel_text(cap_snap)
+        if self._lbl_level.text() != lt:
+            self._lbl_level.setText(lt)
         if self._advanced.is_expanded():
             self._lbl_diag.setText(diag_line(snap, cap_snap))
 

@@ -445,3 +445,42 @@ def test_systemstandard_eintrag_alte_einstellung_passt(env, _isolated_prefs, mon
     assert v._cmb_source.currentText() == "PC-Audio (Systemstandard)"
     texts = [v._cmb_source.itemText(i) for i in range(v._cmb_source.count())]
     assert texts.count("PC-Audio (Systemstandard)") == 1 and "PC-Audio" not in texts
+
+
+def test_pegelzeile_breit_mit_zahlenwert(env):
+    """BPM-13: eigene Zeile „Pegel" — Meter mindestens halb so breit wie die View bei
+    1500 px, Zahlenwert deutsch und aus dem Snapshot, Chips in derselben Zeile,
+    Konfidenz kompakt."""
+    make, cap, clock, det = env
+    v, *_ = make()
+    v.resize(1500, 800)
+    _app.processEvents()
+    _tick(v, clock, 0.0)
+    assert v._level.width() >= 0.5 * v.width()
+    assert 16 <= v._level.height() <= 20
+    assert v._lbl_level.text() == "−18 dBFS"
+    cap.snap = replace(cap.snap, rms_dbfs_300ms=-7.4)
+    _tick(v, clock, 0.05)
+    assert v._lbl_level.text() == "−7 dBFS"
+    cap.snap = replace(cap.snap, rms_dbfs_300ms=-120.0)
+    _tick(v, clock, 0.1)
+    assert v._lbl_level.text() == "Stille"
+    cap.running = False
+    _tick(v, clock, 0.15)
+    assert v._lbl_level.text() == "— dBFS"
+    def _zeile(lay):
+        if lay.indexOf(v._level) >= 0:
+            return lay
+        for i in range(lay.count()):
+            sub = lay.itemAt(i).layout()
+            if sub is not None and (hit := _zeile(sub)) is not None:
+                return hit
+        return None
+    zeile = _zeile(v._level.parentWidget().layout())
+    assert zeile is not None and zeile.indexOf(v._lbl_level) >= 0
+    assert all(zeile.indexOf(c) >= 0 for c in v._chips.values())
+    # Meter und Zahl liegen auf einer Hoehe
+    mitte = v._level.mapTo(v, v._level.rect().center()).y()
+    assert abs(v._lbl_level.mapTo(v, v._lbl_level.rect().center()).y() - mitte) <= 4
+    assert v._conf.width() <= 200
+    assert v._level.width() > 5 * v._conf.width()

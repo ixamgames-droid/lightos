@@ -7,6 +7,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-16 — BPM-Erkennung: Feinschliff nach der Sichtprüfung (BPM-13)
+
+#### Geändert
+
+- **Pegel gut sichtbar:** eigene Zeile „Pegel" direkt unter dem Zustandswort, mit breitem
+  Pegelmeter (grüner Zielbereich −30…−6 dBFS, auch bei Stille zu sehen), Zahlenwert
+  („−17 dBFS") und den Hinweis-Chips daneben. Die Konfidenz ist jetzt ein kleiner Balken
+  neben dem Zustandswort.
+
 ### 2026-09-16 — BPM: Kick auf jedem Beat + Snare auf 2/4 rastet auf das volle Tempo
 
 #### Neu / Geändert

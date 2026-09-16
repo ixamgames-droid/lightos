@@ -33,11 +33,15 @@ Bus" liegen seit BPM-08 im eigenen Sub-Tab [`tempo_bus_view`](tempo_bus_view.md)
 
 Anzeigen: `_lbl_bpm` (aus `mgr.bpm` per `subscribe_bpm_change` → Qt-Signal; gelb Auto,
 grün Manuell, grau kein Tempo), `_dot` + `_phase_lbls` (Beat-Signal), `_lbl_state`
-(Zustandswort, `state_word()` — reine Funktion), `_lbl_source`, `_conf`, in Erweitert
+(Zustandswort, `state_word()` — reine Funktion), `_lbl_source`, `_conf` (seit BPM-13
+kompakter 150-px-Balken „Konfidenz N %" neben dem Zustandswort), die **Zeile „Pegel"**
+(BPM-13) direkt unter der Beat-/Zustandszeile: `_level` (`LevelMeterWidget`, volle
+Breite, 18 px hoch, grüne Zielzone −30…−6 dBFS auch bei Stille sichtbar, Peak-Hold),
+`_lbl_level` (`pegel_text(cap_snap)`: „−17 dBFS" / „Stille" / „— dBFS") und die Chips; in Erweitert
 `_lbl_diag` (`diag_line(det_snap, cap_snap)` inkl. DC-Offset und Chunk-Abstand p95 des
 Eingangs) und `SpectrumBars`. **Statuszeile** (S6): `_lbl_problem` — `_lbl_ursache` —
 `_lbl_abhilfe` aus `bpm_status_rules.status_line()` über `StatusHysterese`, Farbe nach
-Schwere; **Chips** `_chips` (CLIP/BRUMM/LEISE/AUSSETZER/DC) unter dem Pegelmeter aus
+Schwere; **Chips** `_chips` (CLIP/BRUMM/LEISE/AUSSETZER/DC) rechts in der Pegel-Zeile aus
 `chips()` + `ChipHysterese`. **Kein `get_bpm(`-Aufruf** in
 `src/ui/views/bpm_manager_view.py` und `src/ui/bpm_*.py` (Grep-Test).
 

@@ -123,6 +123,12 @@ def _quelle(m: MgrState) -> str:
     return base
 
 
+def zahl(v: float, fmt: str = ".0f") -> str:
+    """Anzeigezahl in deutscher Schreibweise: Komma statt Punkt, echtes Minus (BPM-13),
+    z. B. ``zahl(-17.2, ".1f") == "−17,2"``."""
+    return format(float(v), fmt).replace("-", "\u2212").replace(".", ",")
+
+
 def _db(v: float, fmt: str = ".0f") -> str:
     """dB-Wert mit echtem Minuszeichen (Anzeige), z. B. „−70"."""
     return format(float(v), fmt).replace("-", "\u2212")
@@ -613,5 +619,5 @@ class ChipHysterese:
         self._sichtbar.clear()
 
 
-__all__ = ["StatusLine", "MgrState", "Os2lState", "status_line", "StatusHysterese", "chips",
+__all__ = ["zahl", "StatusLine", "MgrState", "Os2lState", "status_line", "StatusHysterese", "chips",
            "ChipHysterese", "ereignis_oktave", "ereignis_aufnahme", "ereignis"]
