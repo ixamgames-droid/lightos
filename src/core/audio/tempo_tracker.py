@@ -9,9 +9,12 @@ einem Ringpuffer (6 s). Alle ``EST_EVERY_FRAMES`` Frames (~93 ms):
    wie die eigene -> Kandidat ist die halbe Oktave eines Pulszugs), Log-Normal-Prior
    (120 BPM, sigma 0,9 Oktaven; mit Tempo-Hinweis sigma 0,15), Parabel-Verfeinerung auf
    der rohen ACF. Kandidatenraum min/2 .. 2*max, Ergebnis in [min, max] gefaltet (knapp
-   ausserhalb: geklemmt). Nicht loesbar bleibt der Backbeat (Kick jeder Beat + Snare 2/4 ab
-   ~150 BPM): dieselbe Huellkurve wie Hats auf Achteln bei der halben Oktave — Alternative
-   steht im Snapshot, x2 / Tempo-Bereich korrigieren.
+   ausserhalb: geklemmt). **Oktav-Entscheider Bass (BPM-12):** waehlt der Kamm die langsame
+   Oktave und ist x2 plausibel, prueft eine zweite Huellkurve (Bass-Flux 30..200 Hz, eigener
+   Ring), ob zwischen den Beats *dieselben* Bass-Onsets liegen (Kick-Lage + ACF-Gleichartigkeit)
+   -> Backbeat (Kick jeder Beat + Snare 2/4) rastet auf das volle Tempo; Offbeat-Bass und
+   Bass/Hats auf Achteln bleiben. Grenze: Two-Step (Kick nur auf 1 und 3) und Halftime
+   bleiben auf der halben Oktave — Alternative im Snapshot, x2 / Tempo-Bereich korrigieren.
 2. **Konfidenz:** normierte Periodizitaet r = ac[P]/ac[0] x Onset-Kontrast-Gate
    (max/mean der Huellkurve im 4-s-Fenster) — kalibriert 0..1.
 3. **Zustandsautomat:** no_signal / searching / locked; Lock ab gefuelltem Mindestfenster,
@@ -104,21 +107,22 @@ class TempoTracker:
     AGREE_MIN = 0.4         # Raster-Score / bester Phasen-Score: darunter zaehlt ein Widerspruch
     AGREE_N = 3             # so viele Widersprueche in Folge -> Beats stumm, Schaetzfenster kurz
     SHORT_S = 3.0           # verkuerztes ACF-Fenster bei Widerspruch (schnellerer Tempowechsel)
-    # ---- Bass-Oktav-Entscheider (BPM-12). Nur wenn die Flux-Wahl die LANGSAME Oktave ist und
-    # x2 in den Grenzen liegt; kein Tempo-Hinweis. Messung: Messbank 08l/08p (Backbeat 150..200,
-    # soll x2) gegen 03_kick_bass_hats_90, 08n_offbeat_bass, 08m_dauerbass, 08o_halftime, Brumm-
-    # und Rausch-Varianten, lauten Offbeat-Bass (bleibt) — Tabelle in der PR BPM-12.
+    # ---- Bass-Oktav-Entscheider (BPM-12). Greift nur, wenn die Flux-Wahl die LANGSAME Oktave ist,
+    # x2 in den Grenzen liegt und kein Tempo-Hinweis gesetzt ist. Messherkunft: Messbank
+    # bpm_bench (08l/08p Backbeat 150..200 soll x2; 03_kick_bass_hats_90, 08n_offbeat_bass_80..100,
+    # 08m_dauerbass, 08o_halftime_140 und Zusatzmessungen lauter Offbeat-Bass 0,9..2,5, Two-Step,
+    # Brumm/Rauschen sollen bleiben), Werte min..max je Pruefung nach 4 s.
     BASS_OCT = True         # Schalter (Tests/Bank)
-    BASS_ALT_MIN = 0.45     # Flux-Score der x2-Alternative: Backbeat >= 0,54, Kick/Klick allein 0,23-0,30,
-                            # Kick 90 + Brumm 0,29 (dort taeuscht die Bass-ACF)
-    BASS_CONTRAST_MIN = 10.0  # Bass-Flux max/mean: Backbeat >= 12,5 (mit Achtel-Bass), Brumm-dominiert <= 8,4
-    BASS_SIM_MIN = 0.6      # Gleichartigkeit ac_bass[L/2] / ac_bass[L]: Backbeat 0,78-1,26 (gleiche Kicks auf
-                            # beiden Phasen), Offbeat-Bass 0,18-0,41 (auch so laut wie der Kick), Kick+Bass+Hats 90
-                            # <= 0,31, Dauerbass 90 <= 0,58
-    BASS_SIM_MAX = 1.5      # darueber Brumm-Modulation statt Pulszug (Brumm 1,6-6,0)
-    BASS_PHASE_MIN = 0.6    # Kick-Lage: Bass zwischen / auf den Flux-Beats (L-Raster, +-1 Frame): Backbeat
-    BASS_PHASE_MAX = 1.6    # 0,71-1,34; Kick+Bass+Hats 90 <= 0,31, Offbeat-Bass 95 <= 0,33 (laut: bis 1,77),
-                            # Two-Step (Kick 1+3) Median 5,3
+    BASS_ALT_MIN = 0.45     # Flux-Score der x2-Alternative: Backbeat 0,52..1,00; Kick/Klick allein <= 0,30 und
+                            # Kick 90 + Brumm 0,29 (dort taeuscht die Bass-ACF) -> gar nicht erst pruefen
+    BASS_CONTRAST_MIN = 6.0   # Bass-Flux max/mean: Backbeat >= 12,2; bassdominierter Brumm 3,9..6,7 (Sicherheitsgate)
+    BASS_SIM_MIN = 0.6      # Gleichartigkeit ac_bass[L/2]/ac_bass[L] (TRAGEND): Backbeat 0,77..1,28 (dieselben Kicks
+                            # auf beiden Phasen); Offbeat-Bass 0,21..0,34, auch laut wie der Kick <= 0,35;
+                            # Kick+Bass+Hats 90 0,23..0,32; Two-Step 0,27..0,32
+    BASS_SIM_MAX = 1.5      # darueber Brumm-Modulation statt Pulszug (Brumm 1,6..6,0)
+    BASS_PHASE_MIN = 0.6    # Kick-Lage: Bass-Flux zwischen / auf den Flux-Beats: Backbeat 0,74..1,32; Kick+Bass+
+    BASS_PHASE_MAX = 1.6    # Hats 90 0,13..0,21, Offbeat-Bass 0,20..0,42, Two-Step 5,0..7,2 — lauter Offbeat-Bass
+                            # 0,94..1,77 faellt NICHT hier, nur ueber BASS_SIM_MIN
 
     def __init__(self, sample_rate: int, min_bpm: float = 60.0, max_bpm: float = 200.0):
         self.sr = int(sample_rate)
@@ -182,6 +186,7 @@ class TempoTracker:
         self.last_beat_time = 0.0
         self.phase_ok = True
         self._disagree = 0
+        self.bass_diag = None   # (x2-Score, Bass-Kontrast, Kick-Lage, Gleichartigkeit) der letzten Pruefung
         self.oct_pref = 0       # Nutzer-Oktave (set_octave_preference): -1 / 0 / +1 ...
         self.changed = True     # Zustand seit dem letzten Snapshot veraendert
 
@@ -326,14 +331,18 @@ class TempoTracker:
         2. Gleichartigkeit: ac_bass[L/2] / ac_bass[L] — gleiche Kicks auf beiden Phasen ~1;
            verschiedene Ereignisse (Kick vs. Bassnote: andere Form/Staerke) deutlich kleiner.
         Gates: Tempo-Hinweis entscheidet selbst; x2 muss in den Grenzen liegen; Flux-Score der
-        x2-Alternative >= BASS_ALT_MIN; Bass-Kontrast >= BASS_CONTRAST_MIN (Brumm)."""
+        x2-Alternative >= BASS_ALT_MIN; Bass-Kontrast >= BASS_CONTRAST_MIN (Brumm). Die
+        Nutzer-Oktave (set_octave_preference) wird danach auf das Ergebnis angewandt, die
+        Oktav-Hysterese (OCT_HOLD_S) gilt unveraendert."""
+        self.bass_diag = None
         if (not self.BASS_OCT or self.tempo_hint or s_dbl < self.BASS_ALT_MIN
                 or a < 4 or self._fold(bpm) * 2.0 > self.max_bpm):
             return False
         b = self.env_bass[-M:].astype(np.float64)
         mean_b = float(b.mean())
-        if mean_b <= 1e-12 or float(b.max()) < self.BASS_CONTRAST_MIN * mean_b:
+        if mean_b <= 1e-12:
             return False
+        contrast = float(b.max()) / mean_b
         n = (M - 2) // a
         if n < 2:
             return False
@@ -354,18 +363,20 @@ class TempoTracker:
         if on_s <= 1e-12:
             return False
         q_phase = off_s / on_s
-        if not (self.BASS_PHASE_MIN <= q_phase <= self.BASS_PHASE_MAX):
-            return False
+        # nur 6 Lags noetig -> Skalarprodukte statt FFT (unbiased wie in _estimate)
         b -= mean_b
-        nfft = 1 << int(np.ceil(np.log2(2 * M)))
-        F = np.fft.rfft(b, nfft)
-        ac = np.fft.irfft(F * np.conj(F), nfft)[:M] / (M - np.arange(M))
         h = int(round(a / 2.0))
-        pk_full = float(ac[a - 1:a + 2].max())
+
+        def ac_max(l0: int) -> float:
+            return max(float(np.dot(b[:M - l], b[l:])) / (M - l) for l in (l0 - 1, l0, l0 + 1))
+        pk_full = ac_max(a)
         if pk_full <= 1e-12:
             return False
-        q_sim = float(ac[h - 1:h + 2].max()) / pk_full
-        return self.BASS_SIM_MIN <= q_sim <= self.BASS_SIM_MAX
+        q_sim = ac_max(h) / pk_full
+        self.bass_diag = (s_dbl, contrast, q_phase, q_sim)     # Diagnose (Messbank/Tests)
+        return (contrast >= self.BASS_CONTRAST_MIN
+                and self.BASS_PHASE_MIN <= q_phase <= self.BASS_PHASE_MAX
+                and self.BASS_SIM_MIN <= q_sim <= self.BASS_SIM_MAX)
 
     def _contrast(self, with_sparse: bool = False):
         """Onset-Kontrast im 4-s-Fenster: max/mean (und max/median als Sparsity-Mass)."""
