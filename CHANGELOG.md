@@ -7,26 +7,33 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
-### 2026-09-16 — BPM: Drum & Bass und Hardstyle rasten auf das volle Tempo
+### 2026-09-16 — BPM: Kick auf jedem Beat + Snare auf 2/4 rastet auf das volle Tempo
 
 #### Neu / Geändert
 
-- **BPM: Drum & Bass und Hardstyle werden nicht mehr auf das halbe Tempo erkannt, wenn
-  die Kick auf jedem Beat liegt.** Kick auf jedem Beat plus Snare auf 2 und 4 ab etwa
-  150 BPM rastete bisher auf die Hälfte (174 → 87) und musste mit **×2** oder einem
-  Tempo-Bereich korrigiert werden. Die Erkennung hört jetzt zusätzlich nur auf den Bass
-  (30–200 Hz): liegen zwischen den erkannten Beats **dieselben** Kicks, gilt das volle
-  Tempo. Eine Bassline auf den Achteln, ein Offbeat-Bass (House, Reggaeton — auch so laut
-  wie die Kick) und ein gehaltener Bass bleiben beim richtigen Tempo (95 bleibt 95, 90
-  bleibt 90). **×½ / ×2**, ein gesetztes Tempo (TAP) und der Tempo-Bereich haben weiter
-  Vorrang. Messbank: Backbeat 150 / 160 / 174 / 180 BPM vorher 75 / 80 / 87 / 90, jetzt
-  150,0 / 160,2 / 174,0 / 180,0, eingerastet nach 3,6–3,8 s wie bei reinen Kicks; alle
-  übrigen Fälle unverändert; Rechenzeit je Audio-Block 0,40 → höchstens 0,45 ms.
-  **Grenze, die bleibt:** Liegt die Kick nur auf 1 und 3 (klassischer Two-Step-Beat im
-  Drum & Bass) oder ist es echtes Halftime (Kick auf 1, Snare auf 3), rastet die
-  Erkennung weiter auf das halbe Tempo — dort sieht auch der Bass nur jeden zweiten Beat.
-  Dann wie bisher **×2** oder den Tempo-Bereich (z. B. 140–200) setzen. Keine Änderung an
-  Show-Datei oder Einstellungsformat.
+- **BPM: Kick auf jedem Beat plus Snare auf 2 und 4 wird ab etwa 150 BPM nicht mehr auf
+  das halbe Tempo erkannt** (Drum & Bass / Hardstyle mit Kick auf jedem Viertel). Bisher
+  rastete das auf die Hälfte (174 → 87) und musste mit **×2** oder einem Tempo-Bereich
+  korrigiert werden. Die Erkennung prüft jetzt zusätzlich, ob **zwischen** den erkannten
+  Beats Kicks liegen: ein Bass-Anschlag (30–200 Hz) **und** die Klick-Transiente der Kick
+  (ab ~800 Hz). Nur dann gilt das volle Tempo. Ein Bass-Ton ohne Transiente (Offbeat-Bass,
+  Pluck-Bass, Bassline auf den Achteln ohne Kick) und ein Bass, der sich nicht mit dem
+  Beat wiederholt (Boom-Bap), lösen das nicht aus; die Entscheidung ist entprellt und hat
+  eine Hysterese, damit die Oktave an der Schwelle nicht flackert. **×½ / ×2**, ein
+  gesetztes Tempo (TAP) und der Tempo-Bereich haben weiter Vorrang. Messbank (30 s, vorher
+  → jetzt): Backbeat 150 / 160 / 174 / 180 BPM 75 / 80 / 87 / 90 → 150,0 / 160,2 / 174,0 /
+  180,0; Hardstyle mit Reverse-Bass 150: 75 → 150,0; eingerastet nach 3,6–3,8 s wie bei
+  reinen Kicks. Unverändert gegenüber vorher: Offbeat-Pluck-Bass 90 / 95 / 100, Achtel-
+  Bass ohne Kick 90, Boom-Bap 88, Kick + Bass + Hats 90, Dauerbass 128 und alle übrigen
+  Fälle; Rechenzeit je Audio-Block 0,41 → höchstens 0,46 ms.
+  **Grenzen, die bleiben:** Liegt die Kick nicht auf jedem Beat — Two-Step (Kick auf 1 und
+  3), Breakbeat/Amen (Kick 1 + 3-und), echtes Halftime (Kick 1, Snare 3) — rastet die
+  Erkennung weiter auf das halbe Tempo (Breakbeat 172 → 86, Amen 170 → 85). Ist die Snare
+  deutlich lauter als der Klick der Kick, bleibt es ebenfalls halb (Messbank: Snare 0,7 →
+  174, Snare 1,0 → 87). Wo die Erkennung schon vorher doppelt rastete (lauter Offbeat-
+  Pluck-Bass 85–95 BPM, Offbeat-Bass mit Hi-Hat auf der Achtel), bleibt es dabei — dann
+  wie bisher **×½**, **×2** oder den Tempo-Bereich (z. B. 140–200) setzen. Keine Änderung
+  an Show-Datei oder Einstellungsformat.
 
 ### 2026-09-14 — BPM: Statuszeile sagt Problem, Ursache und Abhilfe; „Eingang 30 s aufnehmen"
 

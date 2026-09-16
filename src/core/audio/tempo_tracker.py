@@ -10,11 +10,14 @@ einem Ringpuffer (6 s). Alle ``EST_EVERY_FRAMES`` Frames (~93 ms):
    (120 BPM, sigma 0,9 Oktaven; mit Tempo-Hinweis sigma 0,15), Parabel-Verfeinerung auf
    der rohen ACF. Kandidatenraum min/2 .. 2*max, Ergebnis in [min, max] gefaltet (knapp
    ausserhalb: geklemmt). **Oktav-Entscheider Bass (BPM-12):** waehlt der Kamm die langsame
-   Oktave und ist x2 plausibel, prueft eine zweite Huellkurve (Bass-Flux 30..200 Hz, eigener
-   Ring), ob zwischen den Beats *dieselben* Bass-Onsets liegen (Kick-Lage + ACF-Gleichartigkeit)
-   -> Backbeat (Kick jeder Beat + Snare 2/4) rastet auf das volle Tempo; Offbeat-Bass und
-   Bass/Hats auf Achteln bleiben. Grenze: Two-Step (Kick nur auf 1 und 3) und Halftime
-   bleiben auf der halben Oktave — Alternative im Snapshot, x2 / Tempo-Bereich korrigieren.
+   Oktave und ist x2 plausibel, pruefen zwei weitere Huellkurven (Bass-Flux 30..200 Hz,
+   Hochband-Flux ab ~800 Hz, eigene Ringe), ob zwischen den Beats *Kicks* liegen: Bass-Anschlag
+   aehnlich stark wie auf den Beats (Kick-Lage), Klick-Transiente (Klick-Lage), Bass periodisch
+   mit der Flux-Periode; entprellt, mit Hysterese -> Backbeat (Kick jeder Beat + Snare 2/4) und
+   Hardstyle rasten auf das volle Tempo; Offbeat-/Pluck-Bass, Achtel-Bass ohne Kick, Boom-Bap und
+   Bass/Hats auf Achteln bleiben. Grenzen: Kick nicht auf jedem Beat (Two-Step, Breakbeat, Amen,
+   Halftime) und Snare deutlich lauter als der Kick-Klick bleiben auf der halben Oktave —
+   Alternative im Snapshot, x2 / Tempo-Bereich korrigieren.
 2. **Konfidenz:** normierte Periodizitaet r = ac[P]/ac[0] x Onset-Kontrast-Gate
    (max/mean der Huellkurve im 4-s-Fenster) — kalibriert 0..1.
 3. **Zustandsautomat:** no_signal / searching / locked; Lock ab gefuelltem Mindestfenster,
@@ -110,8 +113,9 @@ class TempoTracker:
     # ---- Bass-Oktav-Entscheider (BPM-12). Greift nur, wenn die Flux-Wahl die LANGSAME Oktave ist,
     # x2 in den Grenzen liegt und kein Tempo-Hinweis gesetzt ist. Messherkunft: Messbank
     # bpm_bench (08l/08p Backbeat 150..200 soll x2; 03_kick_bass_hats_90, 08n_offbeat_bass_80..100,
-    # 08m_dauerbass, 08o_halftime_140 und Zusatzmessungen lauter Offbeat-Bass 0,9..2,5, Two-Step,
-    # Brumm/Rauschen sollen bleiben), Werte min..max je Pruefung nach 4 s.
+    # 08m_dauerbass, 08o_halftime_140, 08q_offbeat_pluck_90..100, 08r_achtelbass_ohne_kick_90,
+    # 08s_boombap_88 und Zusatzmessungen lauter Offbeat-Bass 0,9..2,5, Two-Step, Breakbeat, Amen,
+    # Brumm/Rauschen sollen bleiben; 08t_hardstyle_150 soll x2), Werte min..max je Pruefung nach 4 s.
     BASS_OCT = True         # Schalter (Tests/Bank)
     BASS_ALT_MIN = 0.45     # Flux-Score der x2-Alternative: Backbeat 0,52..1,00; Kick/Klick allein <= 0,30 und
                             # Kick 90 + Brumm 0,29 (dort taeuscht die Bass-ACF) -> gar nicht erst pruefen
