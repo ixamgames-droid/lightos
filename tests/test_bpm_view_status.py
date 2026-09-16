@@ -501,3 +501,16 @@ def test_kein_signal_weg_sobald_musik_laeuft(env):
     cap.snap = replace(cap.snap, rms_dbfs_300ms=-14.0, rms_dbfs_1s=-50.0)
     det["snap"] = _det(state="searching", signal_s=0.5, window_filled_s=6.0)
     assert _tick(v, clock, 3.05).startswith("Sucht Tempo")
+
+
+def test_start_bei_stille_wartet_auf_signal(env):
+    """BPM-13 (Sichtpruefung 01): Quelle gewaehlt, aber Stille — die ersten 2 s (Kein
+    Signal noch nicht reif) steht „Wartet auf Signal", nicht „N s Musik gehört"."""
+    make, cap, clock, det = env
+    v, *_ = make()
+    cap.snap = replace(cap.snap, rms_dbfs_300ms=-120.0, rms_dbfs_1s=-120.0)
+    det["snap"] = _det(state="no_signal", signal_s=0.0, window_filled_s=6.0)
+    txt = _tick(v, clock, 0.0)
+    assert txt.startswith("Wartet auf Signal — Eingang »USB Audio CODEC« ist still — Musik starten")
+    assert "Musik gehört" not in txt
+    assert _tick(v, clock, 2.5).startswith("Kein Signal")

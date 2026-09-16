@@ -250,10 +250,11 @@ def test_hysterese_ein_frame_sucht_verdraengt_gehaltenes_leise_nicht():
 def test_hysterese_erstes_update_zeigt_stoerung_erst_nach_2_s():
     kein = status_line(cap(rms_dbfs_300ms=-70.0, rms_dbfs_1s=-70.0), det(state="no_signal", hold_stage=3),
                        IN, None, 0)
-    assert kein.key == "kein_signal" and kein.basis is not None and kein.basis.key == "sucht"
+    # BPM-13: Basis bei Stille ist „Wartet auf Signal", nicht „Sucht Tempo — N s Musik gehört"
+    assert kein.key == "kein_signal" and kein.basis is not None and kein.basis.key == "wartet"
     h = StatusHysterese()
-    assert h.update(kein, 1.0).key == "sucht"
-    assert h.update(kein, 2.9).key == "sucht"
+    assert h.update(kein, 1.0).key == "wartet"
+    assert h.update(kein, 2.9).key == "wartet"
     assert h.update(kein, 3.0).key == "kein_signal"
     h2 = StatusHysterese()
     dc = status_line(cap(dc_offset=0.03), det(), IN, None, 0)
@@ -517,3 +518,19 @@ def test_flackern_an_der_schwelle_bleibt_unterdrueckt():
     assert not R.aufgeloest("kein_signal", cap(rms_dbfs_300ms=-10.0, running=False))
     assert not R.aufgeloest("clip", cap(rms_dbfs_300ms=-59.0))
     assert not R.aufgeloest("brumm", cap(rms_dbfs_300ms=-120.0))
+
+
+def test_start_bei_stille_sagt_nicht_musik_gehoert():
+    """BPM-13 (Sichtpruefung 01): rms −120 dBFS, Fenster 6 s „gefuellt" -> die Zeile unter
+    einer noch nicht reifen Kein-Signal-Stoerung lautet „Wartet auf Signal"."""
+    still = cap(rms_dbfs_300ms=-120.0, rms_dbfs_1s=-120.0)
+    d = det(state="no_signal", signal_s=0.0, window_filled_s=6.0)
+    line = status_line(still, d, PC, None, 0)
+    assert line.key == "kein_signal"
+    assert line.basis.text == "Wartet auf Signal — PC-Audio »Built-in Audio« ist still — Musik starten"
+    assert "Musik gehört" not in StatusHysterese().update(line, 0.0).text
+    # ohne Capture-Snapshot entscheidet der Detektor
+    assert status_line(None, d, PC, None, 0).key == "wartet"
+    # Signal da, Fenster schon 6 s, aber erst 2 s Musik: „2 s Musik gehört"
+    s2 = status_line(cap(), det(state="searching", signal_s=2.0, window_filled_s=6.0), PC, None, 0)
+    assert s2.key == "sucht" and s2.ursache.startswith("2 s Musik gehört")

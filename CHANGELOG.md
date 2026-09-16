@@ -18,6 +18,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 - **„Kein Signal" verschwindet sofort, wenn die Musik läuft** (vorher bis zu 3 s trotz
   grünem Pegel). Ebenso „Pegel niedrig", sobald der Pegel klar darüber liegt, und
   „Übersteuert", sobald Stille ist. Kurzes Flackern an der Schwelle bleibt unterdrückt.
+- **Start ohne Musik:** statt „Sucht Tempo — 6 s Musik gehört" steht jetzt „Wartet auf
+  Signal — PC-Audio … ist still — Musik starten". „N s Musik gehört" zählt nur noch Zeit mit
+  echtem Signal.
 
 ### 2026-09-16 — BPM: Kick auf jedem Beat + Snare auf 2/4 rastet auf das volle Tempo
 

@@ -460,6 +460,14 @@ def _r_kein_takt(cap, det, m, o, now):
         "record", key="kein_takt", stabil=True)
 
 
+def _still(cap, det) -> bool:
+    """Kein Signal im Moment: RMS 300 ms unter ``KEIN_SIGNAL_DBFS``; ohne Capture-Snapshot
+    entscheidet der Detektor (``no_signal`` und noch nie Signal)."""
+    if cap is not None:
+        return float(_g(cap, "rms_dbfs_300ms", -120.0)) < KEIN_SIGNAL_DBFS
+    return _g(det, "state", "") == "no_signal" and float(_g(det, "signal_s", 0.0)) <= 0.0
+
+
 def _r_sucht(cap, det, m, o, now):
     if m.kind not in AUDIO_KINDS:
         return None
@@ -469,10 +477,15 @@ def _r_sucht(cap, det, m, o, now):
     st = _g(det, "state", "no_signal")
     if st == "locked":
         return None
-    gefuellt = float(_g(det, "window_filled_s", 0.0))
+    if _still(cap, det):
+        # BPM-13: bei Stille nicht „N s Musik gehört" (das Fenster fuellt sich auch mit Stille)
+        return StatusLine("hinweis", "Wartet auf Signal", f"{_quelle(m)} ist still",
+                          "Musik starten", None, key="wartet")
+    # „Musik gehört" = hoechstens so viel, wie wirklich Signal da war
+    gehoert = min(float(_g(det, "window_filled_s", 0.0)), float(_g(det, "signal_s", 0.0)))
     return StatusLine(
         "hinweis", "Sucht Tempo",
-        f"{gefuellt:.0f} s Musik gehört, Fenster braucht ~{SUCHFENSTER_S:.0f} s",
+        f"{gehoert:.0f} s Musik gehört, Fenster braucht ~{SUCHFENSTER_S:.0f} s",
         "warten; schneller: TAP im Takt tippen", None, key="sucht")
 
 
@@ -529,7 +542,7 @@ SOFORT_KEYS = ("ereignis", "aufnahme")   # Rueckmeldung auf einen Klick: nie ver
 # gehaltene Stoerung nur, wenn sie STRIKT schwerer sind — sonst loescht ein einzelner Frame
 # „Sucht" ein gehaltenes LEISE. Alle anderen nicht stabilen Zeilen (Fehler, Quellenwechsel,
 # Manuell, Eingefroren …) folgen einer Handlung oder einem Fehler und gelten ab gleicher Schwere.
-ZUSTAND_KEYS = ("sucht", "ok", "pause", "kein_detektor")
+ZUSTAND_KEYS = ("sucht", "wartet", "ok", "pause", "kein_detektor")
 
 
 class StatusHysterese:
