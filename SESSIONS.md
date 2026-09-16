@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| _(frei)_ |  |  |  |  |
+| DOC-BPM | A | docs/bpm-anleitung | 2026-09-16T16:44Z | docs/anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md · docs/anleitung_bpm_manager/img · docs/ANLEITUNGEN.md |
 
 ## Blocker & Fallen
 
@@ -120,7 +120,6 @@
 
 ## Verlauf
 
-- 2026-09-07T16:06Z A done UI-53
 - 2026-09-07T16:06Z A done FM-35
 - 2026-09-07T16:06Z A done FM-37
 - 2026-09-07T16:07Z A claim STAB-24
@@ -150,3 +149,4 @@
 - 2026-09-16T15:58Z A done BPM-12
 - 2026-09-16T16:03Z A claim BPM-13
 - 2026-09-16T16:38Z A done BPM-13
+- 2026-09-16T16:44Z A claim DOC-BPM
