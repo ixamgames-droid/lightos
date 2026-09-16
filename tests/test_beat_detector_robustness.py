@@ -327,9 +327,10 @@ def test_click_60_sparse_material_keeps_beats():
 
 
 def test_backbeat_halves_but_alternative_and_x2_correct():
-    """Kick + Snare 2/4 bei 174: die Huellkurve wiederholt sich alle zwei Beats, die Live-
-    Erkennung rastet auf 87 (mit Hats auf Achteln bei 90 BPM ununterscheidbar). Die
-    Alternative steht im Snapshot, x2 (set_octave_preference) und der Tempo-Bereich
+    """Kick + Snare 2/4 bei 174: die Flux-Huellkurve wiederholt sich alle zwei Beats. Bis
+    BPM-11 rastete die Live-Erkennung auf 87; seit BPM-12 entscheidet der Bass-Flux auf 174
+    (eigene Tests: test_beat_detector_backbeat.py). Beide Zweige bleiben geprueft: rastet sie
+    halb, steht die Alternative im Snapshot, x2 (set_octave_preference) und der Tempo-Bereich
     korrigieren — und die Wahl bleibt."""
     run = _Run().feed(_kick_snare24(174.0, 8.0))
     s = run.det.snapshot()

@@ -2,9 +2,12 @@
 
 Verfahren (Details: onset_flux.py, tempo_tracker.py):
 1. DC-Blocker/Hochpass 30 Hz -> Hann 1024 / Hop 512, unabhaengig von Chunkgroesse und Abtastrate.
-2. Adaptives Whitening je Bin (2 s) -> Spectral Flux je log-Band, bandweise normiert (Onset-Huellkurve).
+2. Adaptives Whitening je Bin (2 s) -> Spectral Flux je log-Band, bandweise normiert (Onset-Huellkurve);
+   im selben FFT-Durchlauf Bass-Flux 30..200 Hz und Hochband-Flux ab ~800 Hz fuer den Oktav-Entscheider.
 3. 6-s-Ring -> unbiased ACF + 4-fach-Kamm (Max-Filter an den Oberwellen) + Sub-Oktav-Strafe
-   + Log-Normal-Prior 120 BPM -> Parabel (Details und Grenzfall Backbeat: tempo_tracker.py).
+   + Log-Normal-Prior 120 BPM -> Parabel; waehlt der Kamm die langsame Oktave, entscheidet der
+   Bass-/Hochband-Ring ueber x2 (Kicks zwischen den Beats: Bass-Anschlag + Klick-Transiente,
+   entprellt mit Hysterese; Details: tempo_tracker.py).
 4. Konfidenz = Periodizitaet x Onset-Kontrast; Zustand no_signal / searching / locked, Totband 4 %,
    Haltezeiten 1 s (Oktave 3 s), Stille dreistufig 0,5 / 2 / 10 s.
 5. Comb-Phasenfit (32 Phasen, 4 s) -> Beat-Vorhersage als Sample-Position; Callbacks nur im Zustand locked.
@@ -13,11 +16,16 @@ Verfahren (Details: onset_flux.py, tempo_tracker.py):
 Messbank (synthetische Signale, 30 s, alt -> neu): Brumm mit Bassband-SNR 0 dB 104,5 BPM / 27 von
 64 Treffern / 76 Fehlalarme -> 127,6 BPM / 56 von 64 / 0; Klick 140 halbiert (70,2) -> 140,0;
 Chunks in 8er-Salven 15 von 64 -> 56 von 64 (wie Idealfall); ab dem Einrasten alle Beats
-getroffen; Phasenfehler mittel -2..+11 ms, max 47 ms (Tempowechsel); CPU 0,41 ms je 1024er-Chunk
-(alt 0,22). Reine Kicks/Klicks 60..200 BPM ohne Oktavfehler. Preis: Einrasten dauert nach
-Start/Quellenwechsel ~3,8 s (Autokorrelation braucht ein gefuelltes Fenster), vorher werden
-keine Beats gemeldet. Grenze: Kick jeder Beat + Snare 2/4 ab ~150 BPM rastet auf die halbe
-Oktave (Bank 08l; x2 / Tempo-Bereich korrigieren, s. tempo_tracker.py).
+getroffen; Phasenfehler mittel -2..+11 ms, max 47 ms (Tempowechsel); CPU 0,40..0,45 ms je
+1024er-Chunk (alt 0,22). Reine Kicks/Klicks 60..200 BPM ohne Oktavfehler. Backbeat (Kick jeder
+Beat + Snare 2/4) 150/160/174/180 BPM und Hardstyle 150 (BPM-12, vorher halbe Oktave) ->
+150,0/160,2/174,0/180,0/150,0; Offbeat-Bass 95, Pluck-Offbeat 90/95/100, Achtel-Bass ohne Kick 90,
+Boom-Bap 88, Kick+Bass+Hats 90, Dauerbass 128 unveraendert (CPU bis 0,46 ms). Preis: Einrasten
+dauert nach Start/Quellenwechsel ~3,8 s (Autokorrelation braucht ein gefuelltes Fenster), vorher
+werden keine Beats gemeldet. Grenzen Backbeat: Kick nicht auf jedem Beat (Two-Step, Breakbeat/
+Amen 170..172 -> 85..86, Halftime 08o_140 -> 70) und Snare deutlich lauter als der Kick-Klick
+(08u Snare 1,0 bei 174 -> 87) bleiben auf der halben Oktave; lauter Offbeat-Pluck-Bass 85..95 und
+Offbeat-Bass mit Hats rasten wie vorher doppelt (reiner Flux) — x2 / x0,5 / Tempo-Bereich.
 
 Threads: ``process_chunk`` laeuft auf dem Capture-Thread; Getter lesen einen unveraenderlichen
 ``DetectorSnapshot`` (per Referenz veroeffentlicht), Setter arbeiten unter einem kleinen Lock.
@@ -236,7 +244,7 @@ class BeatDetector:
                 flux = self._flux.push(y)
                 self.sample_pos += int(x.size)
                 tr = self._tracker
-                est = tr.push(flux, self._silent_s, self._signal_s)
+                est = tr.push(flux, self._silent_s, self._signal_s, self._flux.bass, self._flux.hi)
                 lat = self.beat_latency_ms / 1000.0 * self.sr
                 while fire < 2 and tr.beat_due(self.sample_pos, lat):
                     fire += 1
