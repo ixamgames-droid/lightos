@@ -7,6 +7,27 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-16 — BPM: Drum & Bass und Hardstyle rasten auf das volle Tempo
+
+#### Neu / Geändert
+
+- **BPM: Drum & Bass und Hardstyle werden nicht mehr auf das halbe Tempo erkannt, wenn
+  die Kick auf jedem Beat liegt.** Kick auf jedem Beat plus Snare auf 2 und 4 ab etwa
+  150 BPM rastete bisher auf die Hälfte (174 → 87) und musste mit **×2** oder einem
+  Tempo-Bereich korrigiert werden. Die Erkennung hört jetzt zusätzlich nur auf den Bass
+  (30–200 Hz): liegen zwischen den erkannten Beats **dieselben** Kicks, gilt das volle
+  Tempo. Eine Bassline auf den Achteln, ein Offbeat-Bass (House, Reggaeton — auch so laut
+  wie die Kick) und ein gehaltener Bass bleiben beim richtigen Tempo (95 bleibt 95, 90
+  bleibt 90). **×½ / ×2**, ein gesetztes Tempo (TAP) und der Tempo-Bereich haben weiter
+  Vorrang. Messbank: Backbeat 150 / 160 / 174 / 180 BPM vorher 75 / 80 / 87 / 90, jetzt
+  150,0 / 160,2 / 174,0 / 180,0, eingerastet nach 3,6–3,8 s wie bei reinen Kicks; alle
+  übrigen Fälle unverändert; Rechenzeit je Audio-Block 0,40 → höchstens 0,45 ms.
+  **Grenze, die bleibt:** Liegt die Kick nur auf 1 und 3 (klassischer Two-Step-Beat im
+  Drum & Bass) oder ist es echtes Halftime (Kick auf 1, Snare auf 3), rastet die
+  Erkennung weiter auf das halbe Tempo — dort sieht auch der Bass nur jeden zweiten Beat.
+  Dann wie bisher **×2** oder den Tempo-Bereich (z. B. 140–200) setzen. Keine Änderung an
+  Show-Datei oder Einstellungsformat.
+
 ### 2026-09-14 — BPM: Statuszeile sagt Problem, Ursache und Abhilfe; „Eingang 30 s aufnehmen"
 
 #### Neu / Geändert
