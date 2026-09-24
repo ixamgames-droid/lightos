@@ -42,7 +42,7 @@ Die Aktion wird im Button-Editor über deutsche Labels
 | `FREEZE` | Freeze (alles anhalten) | `AppState.set_freeze()` — Renderer rechnet nicht mehr, Ausgabe hält ihren Stand, Tempo-Bus friert mit (BUG-FBW Slice 3) | — |
 | `AUTO_SYNC` | Auto-Sync an/aus | `tempo_bus.set_auto_sync(...)` | — |
 | `TAP` | Tap-Tempo | `bpm_manager.tap()` (globaler Leader) | — |
-| `AUDIO_BPM` | Musik-BPM | `bpm_manager.use_audio_source(...)` | — |
+| `AUDIO_BPM` | Musik-BPM | `bpm_source_controller.get_source_controller().toggle_audio()` (BPM-16) — dieselbe Schaltstelle wie die Quelle-Liste: an = zuletzt gewählte Audio-Quelle (sonst `loopback`) + AUTO, aus = zuletzt gewählte Nicht-Audio-Quelle (sonst `off`); Richtung nach `mgr.audio_active` | — |
 | `BPM_NUDGE_UP` / `BPM_NUDGE_DOWN` | BPM ±1 | `bpm_manager.nudge(±1.0)` → MANUAL | — |
 | `BPM_MODE_TOGGLE` | BPM-Modus AUTO/MANUAL | `bpm_manager.set_mode(...)` | — |
 | `TAP_BUS` / `SYNC_BUS` / `ARM_BUS` | Tempo-Bus tap/sync/arm | Wirkt auf benannten Bus `tempo_bus_id` | `tempo_bus_id` |

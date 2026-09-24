@@ -136,6 +136,7 @@ Damit bekommst du auch bei tempo-wechselnden oder schwer erkennbaren Tracks ein 
 Die hier verwaltete BPM ist global — die Virtuelle Konsole greift direkt darauf zu:
 
 - **BPM-Anzeige-Widget** — spiegelt die große BPM-Zahl/den Beat in deine VC-Seite.
+- **Button „Musik-BPM“** — schaltet die Quelle wie die **Quelle**-Liste hier: an = die zuletzt gewählte Audio-Quelle (sonst PC-Audio Systemstandard) in **Auto**, aus = zurück zur zuletzt gewählten anderen Quelle (OS2L, Lied-Analyse oder Aus). Die Liste im Reiter Erkennung springt jedes Mal mit.
 - **Tempo-Bus-Widget** — wählt aus, **welchem Bus** (Default/Master/Sub) ein Bereich folgen soll; so steuerst du, dass z. B. ein Effekt auf „½×" läuft.
 - **Speed-Dial** — regelt die Geschwindigkeit eines tempo-gebundenen Effekts relativ zum Bus.
 - **Fader im BPM-Modus** — ein Fader, der nicht einen DMX-Wert, sondern ein **Tempo/eine Rate** vorgibt; setzt damit (im MANUAL-Sinn) die BPM bzw. den Bus-Faktor.
