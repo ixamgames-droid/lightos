@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| BPM-16 | C | fix/bpm16-musik-bpm-controller | 2026-09-24T20:48Z | src/ui/virtualconsole/vc_button.py · src/ui/bpm_source_controller.py · src/core/midi/apc_mk2_feedback.py |
+| _(frei)_ |  |  |  |  |
 
 ## Blocker & Fallen
 
@@ -122,7 +122,6 @@
 
 ## Verlauf
 
-- 2026-09-07T16:07Z A claim FM-38
 - 2026-09-07T17:08Z B done XPLAT-33
 - 2026-09-07T19:11Z B claim XPLAT-35
 - 2026-09-07T20:08Z A done STAB-24
@@ -152,3 +151,4 @@
 - 2026-09-24T15:40Z C claim BPM-14
 - 2026-09-24T16:49Z C uebergeben BPM-14
 - 2026-09-24T20:48Z C claim BPM-16
+- 2026-09-24T21:15Z C uebergeben BPM-16
