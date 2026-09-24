@@ -7,6 +7,22 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-24 — Generator: „als BPM-Quelle nutzen" stellt die Quelle-Liste mit um (BPM-14)
+
+#### Behoben
+
+- **Generator-Knopf „Im Player laden & als BPM-Quelle nutzen":** Die Quelle-Liste im
+  Sub-Tab **Erkennung** springt jetzt von selbst auf **Lied-Analyse (Player)**. Bisher blieb
+  sie auf der vorherigen Quelle (z. B. „PC-Audio"), das Mithören lief im Hintergrund
+  weiter, und Zustandswort und Statuszeile sprachen noch von der alten Quelle. Jetzt
+  schaltet der Knopf genauso um wie eine Auswahl in der Liste: PC-Audio/Eingang und OS2L
+  gehen aus, in Auto startet die BPM beim Median des geladenen Lieds und folgt beim
+  Abspielen der Analyse, und die Wahl wird für den nächsten Start gemerkt. Ein zweiter Klick schaltet
+  nichts erneut. Die Generator- und die BPM-Manager-Anleitung beschreiben das wieder so;
+  die Seite zum BPM-Manager in der VC-Widget-Anleitung zeigt das aktuelle Bild der
+  Erkennung und erklärt den Vorrang neu (eine Quelle, darüber nur Manuell und
+  „Tempo einfrieren").
+
 ### 2026-09-16 — BPM-Manager: neue Anleitung mit Bildern
 
 #### Neu
