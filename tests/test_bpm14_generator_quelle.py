@@ -399,3 +399,94 @@ def test_controller_meldet_jeden_wirksamen_wechsel_genau_einmal(monkeypatch):
     ctrl.unsubscribe_change(kaputt)
     ctrl.unsubscribe_change(kaputt)                      # doppelt abmelden ist harmlos
     assert len(ctrl._listeners) == 1
+
+
+# ── Nacharbeit: Audio am Controller vorbei (VC-Aktion „Musik-BPM") ──────────────
+#
+# Pruefer-Befund zu BPM-14: steht der Controller schon auf „song" und schaltet die
+# VC-Aktion AUDIO_BPM (``vc_button``: ``mgr.use_audio_source(not mgr.audio_active)``)
+# den Manager am Controller vorbei auf Live-Audio, war ``apply("song")`` idempotent
+# und lieferte False — Live-Audio blieb am Manager, ``request_bpm("timeline")`` wurde
+# verworfen, und die Statuszeile meldete trotzdem Erfolg. Der alte Knopf
+# (``use_audio_source(False)``) deckte das ab. Die Umgehung selbst ist BPM-16.
+
+def test_klick_holt_die_lied_analyse_zurueck_wenn_audio_am_controller_vorbei_lief(
+        _prefs, _geraete, _player, _echter_mgr, monkeypatch):
+    import src.core.audio.capture as cap_mod
+    from src.core.audio.beat_detector import get_beat_detector
+    from src.ui.bpm_source_controller import SourceController
+    cap = _Cap()
+    monkeypatch.setattr(cap_mod, "get_audio_capture", lambda: cap)
+    mgr, det = _echter_mgr, get_beat_detector()
+    ctrl = SourceController(cap=cap, os2l=_Os2l())
+    v = _erkennung(ctrl)
+    g = _generator(ctrl, monkeypatch)
+    try:
+        assert ctrl.apply("song") is True
+        assert v._cmb_source.currentData() == "song"
+        mgr.use_audio_source(not mgr.audio_active)        # wie VC-Aktion AUDIO_BPM
+        assert mgr.audio_active and cap.running
+        assert ctrl.kind == "song"                        # der Controller merkt nichts
+
+        _klick(g)
+        assert not mgr.audio_active
+        assert mgr._on_audio_beat not in det._beat_callbacks
+        assert not cap.running
+        assert mgr.current_source == "timeline"
+        assert mgr.bpm == pytest.approx(124.0, abs=0.05)
+        assert v._cmb_source.currentData() == "song"
+        assert g._status.text().startswith("✓")
+
+        schaltungen = []
+        orig_use = mgr.use_audio_source
+        monkeypatch.setattr(mgr, "use_audio_source",
+                            lambda on: (schaltungen.append(on), orig_use(on))[1])
+        _klick(g)                                         # danach wieder EIN Vorgang
+        assert schaltungen == [] and not mgr.audio_active
+    finally:
+        destroy_widget(g, _app)
+        destroy_widget(v, _app)
+
+
+@pytest.mark.parametrize("kind", ["song", "os2l", "off"])
+def test_nicht_audio_quelle_schaltet_erneut_wenn_der_manager_noch_audio_hoert(kind):
+    """Die Idempotenz gilt fuer Nicht-Audio-Quellen nur, solange der Manager
+    wirklich kein Live-Audio hoert — sonst ist der Eintrag nicht mehr aktiv."""
+    from src.ui.bpm_source_controller import SourceController
+    cap, os2l, det = _Cap(), _Os2l(), _Det()
+    mgr = _Mgr(cap)
+    ctrl = SourceController(mgr=mgr, cap=cap, os2l=os2l, det=det, player=_Player())
+    got = []
+    ctrl.subscribe_change(lambda k, d: got.append((k, d)))
+    assert ctrl.apply(kind) is True
+    mgr.use_audio_source(True)                            # am Controller vorbei
+    assert cap.running
+    _clear(cap, os2l, det, mgr)
+    got.clear()
+
+    assert ctrl.apply(kind) is True
+    assert [c for c in mgr.calls if c[0] == "use_audio_source"] == [("use_audio_source", False)]
+    assert not mgr.audio_active and cap.calls == [("stop",)] and not cap.running
+    assert det.calls == [("set_tempo_hint", None), ("reset",)]
+    assert got == [(kind, None)]
+
+    _clear(cap, os2l, det, mgr)
+    assert ctrl.apply(kind) is False                      # danach wieder idempotent
+    assert mgr.calls == [] and cap.calls == [] and det.calls == []
+
+
+def test_audio_quelle_bleibt_idempotent_auch_wenn_der_manager_kein_audio_hoert():
+    """Grenze der Nacharbeit, bewusst: fuer PC-Audio/Eingang bleibt es beim alten
+    Verhalten. Ein fehlgeschlagener Capture-Start laesst ``audio_active`` auf False;
+    ein erneutes Schalten bei jedem doppelt feuernden Signal waere genau der
+    S2-Befund (Capture zweimal gestartet). Zurueck geht es ueber Auto
+    (``set_auto`` holt ``use_audio_source(True)`` nach) oder „erneut verbinden"."""
+    from src.ui.bpm_source_controller import SourceController
+    cap = _Cap()
+    mgr = _Mgr(cap)
+    ctrl = SourceController(mgr=mgr, cap=cap, os2l=_Os2l(), det=_Det(), player=_Player())
+    assert ctrl.apply("loopback") is True
+    mgr.use_audio_source(False)                           # am Controller vorbei
+    _clear(cap, mgr)
+    assert ctrl.apply("loopback") is False
+    assert mgr.calls == [] and cap.calls == []

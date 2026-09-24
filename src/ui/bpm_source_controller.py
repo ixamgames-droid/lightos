@@ -24,7 +24,15 @@ Capture haengt an der Quelle, der Modus am Manager).
 
 **Idempotent:** derselbe Eintrag zweimal hintereinander schaltet nichts ein
 zweites Mal (S2-Befund: Radio-Wechsel feuerte doppelt und startete den Capture
-zweimal). ``apply`` liefert False, wenn nichts zu tun war.
+zweimal). ``apply`` liefert False, wenn nichts zu tun war. Ausnahme (BPM-14-
+Nacharbeit): ein Nicht-Audio-Eintrag (``os2l``/``song``/``off``) gilt nur als
+aktiv, solange der Manager kein Live-Audio hoert (``mgr.audio_active``). Hat
+jemand am Controller vorbei Audio eingeschaltet (VC-Aktion „Musik-BPM", BPM-16),
+schaltet derselbe Eintrag erneut — sonst bliebe Audio am Manager und verwuerfe
+jede ``request_bpm`` der gewaehlten Quelle. Fuer PC-Audio/Eingang bleibt es bei
+der reinen Idempotenz: ein fehlgeschlagener Capture-Start laesst ``audio_active``
+auf False, und bei jedem doppelt feuernden Signal neu zu starten waere wieder der
+S2-Befund; zurueck geht es dort ueber Auto (``set_auto``) oder ``reconnect``.
 
 Auto | Manuell (``set_auto``): Auto = ``mgr.set_mode("auto")`` und — falls die
 Quelle Audio ist und der Manager sie nicht mehr hoert — ``use_audio_source(True)``;
@@ -189,7 +197,7 @@ class SourceController:
         old_wanted = self._wanted
         self._wanted = (kind, wanted)
         self.missing_sink = wanted if (kind == "loopback" and wanted and device is None) else None
-        if key == self._current and not force:
+        if key == self._current and not force and not self._audio_drift(kind):
             if self._wanted != old_wanted:
                 self._notify()
             return False
@@ -293,6 +301,19 @@ class SourceController:
             return 0.0
 
     # ── intern ───────────────────────────────────────────────────────────────
+    def _audio_drift(self, kind: str) -> bool:
+        """Nicht-Audio-Eintrag angewandt, aber der Manager hoert noch Live-Audio:
+        jemand hat am Controller vorbei geschaltet (VC-Aktion „Musik-BPM",
+        ``vc_button`` AUDIO_BPM, BPM-16). Dann ist der Eintrag nicht mehr aktiv,
+        und ``apply`` schaltet erneut (BPM-14-Nacharbeit). Nur ``is True`` zaehlt —
+        Fakes ohne ``audio_active`` (oder ein Mock) loesen nichts aus."""
+        if kind in AUDIO_KINDS:
+            return False
+        try:
+            return getattr(self._manager(), "audio_active", False) is True
+        except Exception:
+            return False
+
     def _notify(self) -> None:
         """Abonnenten den gewuenschten Eintrag melden; jeder einzeln abgesichert."""
         kind, device = self._wanted if self._wanted else (None, None)
