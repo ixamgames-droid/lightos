@@ -2,7 +2,7 @@
 
 > Der eigene **BPM**-Tab, in dem LightOS das globale Tempo erkennt, anzeigt und verwaltet — die zentrale Stelle, von der alle tempo-gebundenen Effekte ihren Takt holen.
 
-![BPM-Manager](img/editor_bpm_manager.png)
+![Sub-Tab Erkennung im Normalbetrieb: große BPM-Zahl 127,6, Quelle PC-Audio: Lautsprecher, Beat-Punkt mit Takt 1 2 3 4, Zustandswort EINGERASTET, Konfidenz 100 %, Pegel −19 dBFS im grünen Bereich; darunter TAP, Auto | Manuell, ×½, ×2, grüne Statuszeile und der eingeklappte Bereich Erweitert](../anleitung_bpm_manager/img/erkennung_eingerastet.png)
 
 ## Wozu
 
@@ -39,7 +39,7 @@ Oben zeigt der Sub-Tab live, was die Erkennung gerade macht:
 | **Konfidenz** (Balken) | Wie sicher die Erkennung ist, in Prozent. Hoch = stabiler Beat; niedrig = unsicher (leiser/komplexer Track, Pause, Sprache). |
 | **Pegel** (breiter Balken + dBFS-Zahl) | Wie laut die Quelle ankommt; grüne Zielzone −30…−6 dBFS. Daneben Chips CLIP/BRUMM/LEISE/AUSSETZER/DC bei Störungen. |
 | **Statuszeile** | Nie leer: „Problem — Ursache", darunter „→ Abhilfe" (unterstrichen = anklickbar). Grün = ok, gelb = Hinweis, rot = Problem. Bebildert in der [BPM-Manager-Anleitung](../anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md). |
-| **Spektrum** (Bargraph) | Live-Frequenzanzeige des Eingangssignals — nützlich, um zu sehen, ob überhaupt Audio ankommt und wo die Energie liegt. |
+| **Spektrum** (Bargraph, in **Erweitert**) | Live-Frequenzanzeige des Eingangssignals — nützlich, um zu sehen, ob überhaupt Audio ankommt und wo die Energie liegt. |
 
 ## Quelle, TAP, Auto | Manuell, ×½ / ×2 (Sub-Tab „Erkennung", seit 2026-09-14)
 
@@ -47,15 +47,15 @@ Der Sub-Tab **Erkennung** zeigt ohne Klick genau **sechs Bedienelemente**; alles
 
 | Element | Wirkung |
 |---|---|
-| **Quelle** (Liste) | Woher das Tempo kommt: **PC-Audio** (Loopback — LightOS hört mit, was am PC läuft: Player, Spotify, Browser), **Eingang: <Gerät>** (je Mikrofon/Line-In/Interface ein Eintrag; die Liste liest die Geräte beim Öffnen neu), **OS2L (DJ-Software)** (Tempo & Beats kommen von VirtualDJ/Mixxx; LightOS startet seinen OS2L-Server und schaltet die eigene Audio-Analyse ab), **Lied-Analyse (Player)** (folgt dem Beatgrid des im Player geladenen, analysierten Titels), **Aus**. |
+| **Quelle** (Liste) | Woher das Tempo kommt: **PC-Audio** (Loopback — LightOS hört mit, was am PC läuft: Player, Spotify, Browser), **Eingang: <Gerät>** (je Mikrofon/Line-In/Interface ein Eintrag; die Liste liest die Geräte beim Öffnen neu), **OS2L (DJ-Software)** (Tempo & Beats kommen von VirtualDJ/Mixxx; LightOS startet seinen OS2L-Server und schaltet die eigene Audio-Analyse ab), **Lied-Analyse (Player)** (folgt dem Beatgrid des im Player geladenen, analysierten Titels; der Generator-Knopf „Im Player laden & als BPM-Quelle nutzen" stellt diesen Eintrag selbst ein), **Aus**. Schaltet der Generator-Knopf um, zieht die Liste mit. |
 | **TAP** (großer Knopf) | *Einmal* tippen = Beat-Punkt auf „jetzt" (Tempo bleibt). *Drei-, viermal im Takt* = Tempo setzen, die Erkennung sucht um dieses Tempo. Derselbe Knopf wie **TAP** in der Kopfzeile. |
 | **Auto \| Manuell** | **Auto:** das Tempo folgt der Quelle. **Manuell:** das Tempo bleibt, wie du es per TAP/Nudge setzt; die Quelle läuft im Hintergrund weiter. Das Badge **AUTO/MANUAL** in der Kopfzeile spiegelt denselben Zustand. |
 | **×½ / ×2** | Halb-/Doppeltempo mit einem Klick — in Auto als Oktav-Vorgabe an die Erkennung, in Manuell direkt am Tempo. |
 | **▸ Erweitert** | Tempo-Bereich von/bis + **Vorlage ▾** (Genre-Bereiche), Beats/Takt, Beat-Latenz (ms), **🔒 Tempo einfrieren**, Nudge −5/−1/+1/+5, Taktgenau, dazu Diagnosezeile und Spektrum. |
 
-> **Zustandswort** neben dem Beat-Punkt: **KEIN SIGNAL** / **SUCHT** / **EINGERASTET** / **PAUSE · hält N** / **MANUELL** — plus **Konfidenz**-Balken. Beim Wechsel der Quelle stoppt LightOS die jeweils andere (Audio ↔ OS2L), damit nicht zwei Quellen um die BPM konkurrieren; ein Wechsel ist immer nur EIN Schaltvorgang.
+> **Zustandswort** neben dem Beat-Punkt: **KEIN SIGNAL** / **SUCHT** / **EINGERASTET** / **PAUSE · hält N** / **MANUELL** — plus **Konfidenz**-Balken. Beim Wechsel der Quelle stoppt LightOS die jeweils anderen (Audio, OS2L, Lied-Analyse), damit nicht zwei Quellen um die BPM konkurrieren; ein Wechsel ist immer nur EIN Schaltvorgang.
 
-**Präzedenz (wer gewinnt):** **Manuell / TAP / Tempo einfrieren** überstimmen alles → darunter **Audio** → darunter **Lied-Analyse/OS2L**. Es gibt immer **genau eine** Beat-Quelle gleichzeitig.
+**Präzedenz (wer gewinnt):** Die **Quelle**-Liste bestimmt **eine** Tempo-Quelle — PC-Audio/Eingang, OS2L oder Lied-Analyse (oder Aus). Beim Wechsel schaltet LightOS die übrigen ab, auch wenn der Wechsel vom Generator-Knopf kommt. Darüber stehen **Manuell** (auch durch TAP ab dem dritten Tipp im Takt oder durch Nudge) und **🔒 Tempo einfrieren**: solange eins davon gilt, ändert keine Quelle das Tempo.
 
 ## Erweitert (Tempo-Bereich, Vorlage, Beats/Takt, Beat-Latenz, Einfrieren, Nudge, Taktgenau)
 
@@ -116,12 +116,12 @@ So koppelst du z. B. für einen Drop blitzartig **alle** Effekt-Tempi auf einen 
 
 ## Generator-Reiter (kurz)
 
-Der zweite Reiter **Generator** analysiert ein **komplettes Lied vorab** statt live:
+Der dritte Reiter **Generator** analysiert ein **komplettes Lied vorab** statt live:
 
 1. **Datei wählen** (Audiodatei), **Genre** und **Analyse-Engine** auswählen (Eingebaut/numpy, librosa, Beat This! — nicht installierte fallen sauber auf die eingebaute Engine zurück).
 2. **Analysieren** dekodiert den Track und erzeugt eine **BPM-Kurve** + ein phasen-genaues **Beatgrid** (geplottet mit Zeitachse).
 3. Das Grid lässt sich wie bei VirtualDJ/Serato **korrigieren**: ½×/2×, nudgen, **Downbeat per Klick** im Plot setzen.
-4. **„Im Player laden & als BPM-Quelle nutzen"** macht die Analyse zur BPM-Quelle: beim Abspielen folgt die globale BPM dann dem Lied über die Zeit. Alternativ **als .json exportieren**.
+4. **„Im Player laden & als BPM-Quelle nutzen"** macht die Analyse zur BPM-Quelle: die **Quelle**-Liste im Reiter Erkennung springt auf **Lied-Analyse (Player)**, PC-Audio/Eingang und OS2L werden abgeschaltet, und beim Abspielen folgt die globale BPM dem Lied über die Zeit. Alternativ **als .json exportieren**.
 
 Damit bekommst du auch bei tempo-wechselnden oder schwer erkennbaren Tracks ein sauberes, vorab geprüftes Tempo.
 
@@ -142,6 +142,6 @@ Faustregel: **Hier** (Manager) bestimmst du die Quelle und die Buses, **in der V
 - **Erkennung springt:** In „Erweitert" den **Tempo-Bereich** enger setzen oder eine **Vorlage** wählen.
 - **Sitzt der Beat, aber soll bleiben?** **🔒 Tempo einfrieren** (Erweitert) drücken, bevor du in eine ruhige/breakige Passage gehst.
 - **Automatik liegt komplett daneben:** auf **Manuell** gehen und **TAP** (3–4× im Takt) — sicherer als gegen die Erkennung anzukämpfen. Mit **Nudge** feinjustieren.
-- **Nur eine AUTO-Quelle:** OS2L und Audio-Analyse schließen sich aus. Beim Wechsel stoppt LightOS die jeweils andere automatisch — wundere dich nicht, wenn beim Umschalten kurz nichts erkannt wird.
+- **Nur eine Quelle:** PC-Audio/Eingang, OS2L und Lied-Analyse schließen sich aus. Beim Wechsel stoppt LightOS die jeweils anderen automatisch — wundere dich nicht, wenn beim Umschalten kurz nichts erkannt wird.
 - **„Eingang" ohne Ton?** In der **Quelle**-Liste das richtige Gerät wählen (die Liste liest beim Öffnen neu) und die Pegel-Zeile, die Statuszeile sowie die Diagnosezeile in „Erweitert" prüfen.
 - **Grand-Master nicht vergessen zu entschärfen:** Solange „scharf", ignorieren alle Master ihr eigenes Tempo. Häkchen wieder weg, wenn die Buses wieder eigenständig laufen sollen.

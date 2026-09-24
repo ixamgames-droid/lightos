@@ -24,7 +24,10 @@ Tempo-Quelle nutzen kann. Ein Metronom-Klick (Sinus-Burst-WAV) hilft beim Prüfe
 ## Verknüpfungen
 
 - **BPM-Analyse:** schreibt `bpm_timeline` in den Track; Quelle für den
-  BPM-Manager (analysierter Song).
+  BPM-Manager (analysierter Song). „Im Player laden & als BPM-Quelle nutzen"
+  (`_use_as_source`) legt den Track in den Player und schaltet über
+  `get_source_controller().apply("song")` — dieselbe Stelle wie die Quelle-Liste in
+  „Erkennung", die dabei mitzieht (BPM-14); ein zweiter Klick schaltet nichts erneut.
 - **Erkennung:** teilt die Beat-Erkennung mit
   [`bpm_manager_view`](bpm_manager_view.md) (Sub-Tab „Erkennung" mit Pegelmeter).
 - **Cache:** Analyse-Ergebnisse werden atomar gecacht.
@@ -32,6 +35,7 @@ Tempo-Quelle nutzen kann. Ein Metronom-Klick (Sinus-Burst-WAV) hilft beim Prüfe
 ## Zugehörige Tests
 
 - `tests/test_bpm_generator.py` — Analyse/Generator-Pfad.
+- `tests/test_bpm14_generator_quelle.py` — „als BPM-Quelle nutzen" über den SourceController.
 - `tests/test_bpm_beatgrid.py` — Beatgrid-Erzeugung/-Edit.
 - `tests/test_bpm_cache_atomic.py` — atomarer Analyse-Cache.
 

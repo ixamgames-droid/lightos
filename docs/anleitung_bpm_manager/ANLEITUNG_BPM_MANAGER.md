@@ -74,7 +74,7 @@ wieder eingeschaltet.
 | **PC-Audio: <Ausgabegerät>** | die Musik auf diesem Rechner über ein **bestimmtes** Gerät läuft (im Bild „Lautsprecher" oder „Built-in Audio Digitales Stereo (HDMI)"). | Je Ausgabegerät ein Eintrag. Läuft die Musik über ein anderes Gerät, hört LightOS Stille. |
 | **Eingang: <Gerät>** | die Musik **von außen** kommt: Mischpult, Fremd-DJ, Band — über Line-In, Mikrofon oder Audio-Interface. | Je Eingang ein Eintrag. Pegel am Mischpult/Interface einstellen, bis der Balken grün ist. |
 | **OS2L (DJ-Software)** | ein DJ mit **VirtualDJ** (oder einem anderen OS2L-fähigen Programm) auflegt. | Tempo und Beats kommen direkt aus dem DJ-Programm; LightOS hört dann nicht selbst zu. Im DJ-Programm OS2L einschalten. |
-| **Lied-Analyse (Player)** | du ein **vorher im Generator analysiertes Lied** im Player abspielst und das Licht taktgenau sitzen soll. | Nimmt den Titel, der gerade im Player geladen ist (Abschnitt 7.2). |
+| **Lied-Analyse (Player)** | du ein **vorher im Generator analysiertes Lied** im Player abspielst und das Licht taktgenau sitzen soll. | Nimmt den Titel, der gerade im Player geladen ist (Abschnitt 7.2). Der Generator-Knopf **Im Player laden & als BPM-Quelle nutzen** stellt diesen Eintrag selbst ein. |
 | **Aus** | du keine Erkennung willst — z. B. nur Manuell mit TAP. | Die Statuszeile sagt dann „Erkennung aus — keine Beat-Quelle gewählt". |
 
 Ein gespeichertes Gerät, das gerade nicht angesteckt ist, steht als **„… (nicht gefunden)"**
@@ -421,9 +421,10 @@ sitzen muss; die Live-Erkennung schätzt dagegen immer nur den Moment.
 7. Bei Bedarf korrigieren (Beatgrid-Knöpfe unten) und mit **▶ Vorhören** prüfen — der Song
    spielt mit Klick auf jedem Beat.
 8. **Im Player laden & als BPM-Quelle nutzen** — lädt den Song in den Player, hängt das
-   Beatgrid an und schaltet die Live-Erkennung ab, damit die Analyse führt. Dann im
-   Musik-Tab abspielen. Im Sub-Tab Erkennung steht die Quelle dafür auf
-   **Lied-Analyse (Player)** — falls nicht, dort auswählen.
+   Beatgrid an und stellt die Quelle auf **Lied-Analyse (Player)**, damit die Analyse
+   führt: die Quelle-Liste im Sub-Tab Erkennung springt von selbst um, PC-Audio/Eingang
+   und OS2L werden abgeschaltet. Dann im Musik-Tab abspielen. Steht die Erkennung auf
+   **Manuell**, bleibt dein Tempo stehen — für die Lied-Analyse auf **Auto** stellen.
 9. Optional **Als .json exportieren**.
 
 **Engines:**

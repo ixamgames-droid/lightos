@@ -87,16 +87,18 @@ Nach jeder Korrektur wird die BPM-Kurve neu abgeleitet; beim Vorhören hörst du
 ## 5. Als BPM-Quelle nutzen
 
 **„Im Player laden & als BPM-Quelle nutzen"**: legt den (korrigierten) Song mit seiner Analyse
-in den Player und schaltet die Live-Audio-Erkennung ab, damit die Analyse **führt**.
+in den Player und stellt die BPM-Quelle auf **Lied-Analyse (Player)**, damit die Analyse
+**führt**. Die Quelle-Liste im Sub-Tab **Erkennung** stellt sich dabei **selbst um**;
+PC-Audio/Eingang und OS2L schaltet LightOS ab. Ein zweiter Klick schaltet nichts erneut.
 
 Danach im **Musik-Tab** abspielen: die globale BPM folgt jetzt dem Lied über die Zeit.
-Die Quelle-Liste im Sub-Tab **Erkennung** stellt sich dabei **noch nicht** von selbst um — wähle dort
-**Lied-Analyse (Player)**, damit Anzeige und tatsächliche Quelle übereinstimmen (Backlog BPM-14). Mit **„Taktgenau"** (Erkennung → Erweitert,
+Mit **„Taktgenau"** (Erkennung → Erweitert,
 Standard an) treffen die Lichter die **echten Beats** des Songs sample-nah — nicht nur den
 BPM-Wert. (Details: [BPM-Manager-Anleitung, Abschnitt „Taktgenau"](../anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md#73-taktgenau).)
 
-> **Wichtig:** Die Analyse führt nur, wenn **Live-Audio aus** ist (das macht der Button
-> automatisch). Live-Audio, OS2L und MANUAL/Lock haben weiterhin Vorrang.
+> **Wichtig:** Die Analyse führt nur bei Quelle **Lied-Analyse (Player)** — die stellt der
+> Button selbst ein. **Manuell** und **🔒 Tempo einfrieren** haben weiterhin Vorrang: dann
+> bleibt das Tempo stehen, bis du in **Erkennung** auf **Auto** gehst bzw. das Einfrieren löst.
 
 Mit **„Als .json exportieren"** sicherst du die komplette Analyse (BPM-Kurve, Beatgrid,
 Struktur) als Datei.

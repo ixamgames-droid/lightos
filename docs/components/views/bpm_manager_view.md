@@ -16,7 +16,7 @@ Bus" liegen seit BPM-08 im eigenen Sub-Tab [`tempo_bus_view`](tempo_bus_view.md)
 
 | Bedienung | Wirkung |
 |---|---|
-| **Quelle** (`_cmb_source`, Daten `loopback` / `loopback:<sink_id>` / `input:<Gerät>` / `os2l` / `song` / `off`) | `bpm_source_controller.SourceController.apply(kind, device)` — EINE Stelle schaltet Capture (`set_source_mode` + start/stop), OS2L (start/stop) und Manager (`use_audio_source`); `det.set_tempo_hint(None)` + `det.reset()` beim Wechsel; idempotent. `activated` ist zusätzlich angebunden (derselbe Eintrag schaltet wegen der Idempotenz nichts erneut; „erneut verbinden" ist der Statuszeilen-Link mit `force=True`). Die Liste wird bei `showPopup` neu gelesen; der generische Eintrag heißt „PC-Audio (Systemstandard)" (S6, Daten weiter `loopback`); ein gespeichertes, fehlendes Gerät steht als „(nicht gefunden)" und setzt `SourceController.missing_sink`. |
+| **Quelle** (`_cmb_source`, Daten `loopback` / `loopback:<sink_id>` / `input:<Gerät>` / `os2l` / `song` / `off`) | `bpm_source_controller.SourceController.apply(kind, device)` — EINE Stelle schaltet Capture (`set_source_mode` + start/stop), OS2L (start/stop) und Manager (`use_audio_source`); `det.set_tempo_hint(None)` + `det.reset()` beim Wechsel; idempotent. `activated` ist zusätzlich angebunden (derselbe Eintrag schaltet wegen der Idempotenz nichts erneut; „erneut verbinden" ist der Statuszeilen-Link mit `force=True`). Die Liste wird bei `showPopup` neu gelesen; der generische Eintrag heißt „PC-Audio (Systemstandard)" (S6, Daten weiter `loopback`); ein gespeichertes, fehlendes Gerät steht als „(nicht gefunden)" und setzt `SourceController.missing_sink`. Wechsel, die NICHT aus der Liste kommen (Generator-Knopf „Im Player laden & als BPM-Quelle nutzen", BPM-14), meldet der Controller per `subscribe_change`; `_on_source_switched` stellt die Liste mit geblockten Signalen um (kein zweites `apply`), legt bei Bedarf den „(nicht gefunden)"-Eintrag an und merkt die Quelle wie eine Auswahl (`_save()`). |
 | **TAP** (`_btn_tap`) | `bpm_tap_helper.TapHelper.tap()` — 1. Tipp `det.resync_phase()`, 2. Tipp nichts, ab dem 3. Tipp `mgr.tap()` + `det.set_tempo_hint(<gemessen>)` (Manager-Tempo ab dem 4.); derselbe Helfer wie der Topbar-TAP. |
 | **Auto \| Manuell** (`_btn_auto`/`_btn_manual`, exklusive `QButtonGroup`) | `SourceController.set_auto(bool)` → `mgr.set_mode`; Auto holt bei Audio-Quelle `use_audio_source(True)` nach, bei `song` den Player-Track. Die Quelle bleibt. |
 | **×½ / ×2** (`_btn_half`/`_btn_double`) | `SourceController.octave(±1) -> (ok, grund)`: in AUTO erst Tempo-Bereich prüfen (`octave_target` gegen `mgr.min_bpm/max_bpm`; außerhalb kein Aufruf, `(False, grund)` → Statuszeilen-Ereignis `ereignis_oktave`, 3 s, Link `range`), sonst `det.set_octave_preference`; in MANUAL `mgr.set_manual_bpm(bpm/2 bzw. ×2)`. |
@@ -50,6 +50,10 @@ Schwere; **Chips** `_chips` (CLIP/BRUMM/LEISE/AUSSETZER/DC) rechts in der Pegel-
 
 - **Ereignisse** (BPM/Beat/Zustand) kommen aus Audio-/Timer-Threads → `_bpm_sig`/
   `_beat_sig`/`_state_sig` (Queued) → UI-Thread.
+- **Quellenwechsel von außen** (BPM-14): `SourceController.subscribe_change(cb)` →
+  `_src_sig` → `_on_source_switched(kind, device)` — Rückruf, kein Poll; gemeldet wird
+  `wanted`. Abmeldung über `destroyed`; Controller ohne `subscribe_change` (Test-Fakes)
+  werden einfach nicht abonniert.
 - **Kontinuierliche Werte** (Zustandswort, Konfidenz, Diagnose, Capture-Fehler) liest
   `_refresh_monitor` alle **50 ms** (`POLL_MS`) aus dem unveränderlichen
   `det.snapshot()` — der Timer läuft **nur bei Sichtbarkeit** (`showEvent`/`hideEvent`).
@@ -111,6 +115,9 @@ Die Einstellungen liegen in `ui_prefs.json`, Sektion `bpm_settings`, Version 3
   `mgr.mode` / `current_source` / `_audio_active`; `state_word()`.
 - `tests/test_bpm_view_source_combo.py` — jeder Combo-Eintrag → Fake-Capture/-OS2L/-Manager,
   doppelter Aufruf idempotent, ×½/×2 je Modus, TAP → Helfer.
+- `tests/test_bpm14_generator_quelle.py` — Generator-Knopf schaltet über den Controller, die
+  Liste zieht mit, `current_source` folgt der Timeline, doppelter Klick = ein Schaltvorgang;
+  jeder Wechsel von außen landet in der Liste, ohne dass sie nachschaltet.
 - `tests/test_bpm_tap_helper.py` — 1 Tipp = `resync_phase` (kein `mgr.tap`), 2 Tipps
   aendern nichts, 4 Tipps bei 120 BPM = `mgr.tap` ×2 + `set_tempo_hint` 120 ± 1.
 - `tests/test_bpm_view.py`, `tests/test_bpm_settings_v2.py` (v1→v2→v3, View-Teil),
