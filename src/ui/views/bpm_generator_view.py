@@ -697,11 +697,15 @@ class BpmGeneratorView(QWidget):
                 get_state().playlist = mp.to_dicts()
             except Exception:
                 pass
+            # BPM-14: ueber die EINE Schaltstelle (BPM-09) statt am Manager vorbei —
+            # stoppt Capture/OS2L, bietet den eben geladenen Track an und meldet
+            # den Wechsel, sodass die Quelle-Liste in „Erkennung" mitzieht.
+            # Idempotent: ein zweiter Klick schaltet nichts ein zweites Mal.
             try:
-                from src.core.engine.bpm_manager import get_bpm_manager
-                get_bpm_manager().use_audio_source(False)
-            except Exception:
-                pass
+                from src.ui.bpm_source_controller import get_source_controller
+                get_source_controller().apply("song")
+            except Exception as e:
+                print(f"[BpmGenerator] ERROR: Quelle Lied-Analyse: {e}")
             self._set_status(
                 "✓ Im Player geladen — die Lied-Analyse ist jetzt die BPM-Quelle. "
                 "Im Musik-Tab abspielen; die BPM folgt dem Lied über die Zeit.")

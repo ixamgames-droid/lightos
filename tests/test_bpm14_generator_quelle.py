@@ -170,12 +170,166 @@ def _geraete(monkeypatch):
                         staticmethod(_Cap.list_loopback_sinks))
 
 
+@pytest.fixture
+def _player():
+    """Echter Player-Singleton (den fuellt der Generator); danach Ausgangszustand."""
+    from src.core.audio.media_player import get_media_player
+    from src.core.app_state import get_state
+    mp = get_media_player()
+    vorher = (list(mp.tracks), mp.index, mp.couple_bpm, list(get_state().playlist))
+    mp.set_tracks([])
+    mp.couple_bpm = True
+    yield mp
+    tracks, index, couple, playlist = vorher
+    mp.set_tracks(tracks)
+    mp.index = index
+    mp.couple_bpm = couple
+    get_state().playlist = playlist
+
+
+@pytest.fixture
+def _echter_mgr():
+    from src.core.engine.bpm_manager import get_bpm_manager, BpmMode
+    mgr = get_bpm_manager()
+    mgr.use_audio_source(False)
+    mgr.reset()
+    mgr.set_locked(False)
+    mgr.set_mode(BpmMode.AUTO)
+    yield mgr
+    mgr.use_audio_source(False)
+    mgr.reset()
+    mgr.set_mode(BpmMode.AUTO)
+
+
+def _timeline():
+    """Drei Tempo-Abschnitte 120 → 124 → 128 BPM; Median 124."""
+    from src.core.audio.offline_timeline import BpmTimeline, BpmSegment
+    return BpmTimeline(segments=[BpmSegment(0, 120.0, 0.9), BpmSegment(8000, 124.0, 0.9),
+                                 BpmSegment(16000, 128.0, 0.9)],
+                       duration_ms=24000, step_ms=8000, window_ms=8000)
+
+
+def _generator(ctrl, monkeypatch):
+    """Generator mit fertiger Analyse; ``get_source_controller()`` liefert ``ctrl``."""
+    import src.ui.bpm_source_controller as sc
+    monkeypatch.setattr(sc, "_controller", ctrl)
+    from src.ui.views.bpm_generator_view import BpmGeneratorView
+    g = BpmGeneratorView()
+    g._path = _LIED
+    g._timeline = _timeline()
+    g._btn_use.setEnabled(True)
+    return g
+
+
+def _klick(g):
+    g._btn_use.click()
+    _app.processEvents()
+
+
 def _erkennung(ctrl):
     from src.ui.views.bpm_manager_view import BpmManagerView
     v = BpmManagerView(source_controller=ctrl)
     v.show()
     _app.processEvents()
     return v
+
+
+def _waehle(v, data):
+    """Nutzer waehlt einen Eintrag der Liste (beide Signale, wie in der echten App)."""
+    idx = v._cmb_source.findData(data)
+    assert idx >= 0, data
+    v._cmb_source.setCurrentIndex(idx)
+    v._cmb_source.activated.emit(idx)
+    _app.processEvents()
+
+
+# ── Abnahme ─────────────────────────────────────────────────────────────────────
+
+def test_klick_schaltet_ueber_den_controller_und_die_liste_zieht_mit(
+        _prefs, _geraete, _player, _echter_mgr, monkeypatch):
+    """Vorher PC-Audio: nach dem Klick steht die Liste auf „Lied-Analyse (Player)",
+    der Capture ist gestoppt, das Zustandswort spricht von der Lied-Analyse, die
+    Einstellung ist gemerkt. Der zweite Klick schaltet nichts mehr."""
+    from src.ui.bpm_source_controller import SourceController
+    cap, os2l, det = _Cap(), _Os2l(), _Det()
+    mgr = _Mgr(cap)
+    ctrl = SourceController(mgr=mgr, cap=cap, os2l=os2l, det=det, player=None)
+    v = _erkennung(ctrl)
+    g = _generator(ctrl, monkeypatch)
+    try:
+        _waehle(v, "loopback")
+        assert cap.running and mgr.audio_active
+        _clear(cap, os2l, det, mgr)
+
+        _klick(g)
+        assert v._cmb_source.currentText() == "Lied-Analyse (Player)"
+        assert v._cmb_source.currentData() == "song"
+        assert ctrl.kind == "song"
+        assert cap.calls == [("stop",)] and not cap.running          # Capture gestoppt
+        assert [c for c in mgr.calls if c[0] == "use_audio_source"] == [("use_audio_source", False)]
+        assert ("request_bpm", 124.0, "timeline") in mgr.calls         # Median des geladenen Lieds
+        assert det.calls == [("set_tempo_hint", None), ("reset",)]
+        v._refresh_monitor()
+        assert v._lbl_state.text() == "LIED-ANALYSE"
+        v.flush_pending_save()
+        assert _prefs.load_settings()["source"] == "song"
+
+        _clear(cap, os2l, det, mgr)
+        _klick(g)                                                       # doppelter Klick
+        assert mgr.calls == [] and cap.calls == [] and det.calls == [] and os2l.calls == []
+        assert v._cmb_source.currentData() == "song"
+    finally:
+        destroy_widget(g, _app)
+        destroy_widget(v, _app)
+
+
+def test_current_source_folgt_der_timeline_und_capture_nicht_mehr_am_manager(
+        _prefs, _player, _echter_mgr, monkeypatch):
+    """Echter Manager, echter Detektor: vorher haengt der Detektor am Capture und
+    der Manager am Detektor. Nach dem Klick hoert der Manager nicht mehr zu, der
+    Capture steht, und die BPM folgt der Timeline des geladenen Lieds."""
+    import src.core.audio.capture as cap_mod
+    from src.core.audio.beat_detector import get_beat_detector
+    from src.core.audio.music_show import MusicShowDirector
+    from src.ui.bpm_source_controller import SourceController
+    cap = _Cap()
+    monkeypatch.setattr(cap_mod, "get_audio_capture", lambda: cap)
+    mgr, det = _echter_mgr, get_beat_detector()
+    ctrl = SourceController(cap=cap, os2l=_Os2l())
+    g = _generator(ctrl, monkeypatch)
+    try:
+        assert ctrl.apply("loopback") is True
+        assert mgr.audio_active and cap.running
+        assert mgr._on_audio_beat in det._beat_callbacks
+
+        schaltungen = []
+        orig_use = mgr.use_audio_source
+        monkeypatch.setattr(mgr, "use_audio_source",
+                            lambda on: (schaltungen.append(on), orig_use(on))[1])
+        orig_reset = det.reset
+        monkeypatch.setattr(det, "reset", lambda: (schaltungen.append("reset"), orig_reset())[1])
+
+        _klick(g)
+        assert schaltungen == ["reset", False]                   # EIN Schaltvorgang
+        assert not mgr.audio_active
+        assert mgr._on_audio_beat not in det._beat_callbacks     # nicht mehr am Manager
+        assert not cap.running                                   # Capture gestoppt
+        assert mgr.current_source == "timeline"
+        assert mgr.bpm == pytest.approx(124.0, abs=0.05)         # Median als Start-BPM
+
+        d = MusicShowDirector()
+        d._on_position(17000, 24000)
+        assert mgr.current_source == "timeline" and mgr.bpm == pytest.approx(128.0, abs=0.05)
+        d._on_position(500, 24000)
+        assert mgr.current_source == "timeline" and mgr.bpm == pytest.approx(120.0, abs=0.05)
+
+        schaltungen.clear()
+        cap.calls.clear()
+        _klick(g)                                                 # doppelter Klick
+        assert schaltungen == [] and cap.calls == []
+        assert mgr.current_source == "timeline" and not mgr.audio_active
+    finally:
+        destroy_widget(g, _app)
 
 
 # ── Mechanik: Rueckruf statt Poll ───────────────────────────────────────────────
