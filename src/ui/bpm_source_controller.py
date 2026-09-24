@@ -27,8 +27,8 @@ zweites Mal (S2-Befund: Radio-Wechsel feuerte doppelt und startete den Capture
 zweimal). ``apply`` liefert False, wenn nichts zu tun war. Ausnahme (BPM-14-
 Nacharbeit): ein Nicht-Audio-Eintrag (``os2l``/``song``/``off``) gilt nur als
 aktiv, solange der Manager kein Live-Audio hoert (``mgr.audio_active``). Hat
-jemand am Controller vorbei Audio eingeschaltet (VC-Aktion „Musik-BPM", BPM-16),
-schaltet derselbe Eintrag erneut — sonst bliebe Audio am Manager und verwuerfe
+jemand am Controller vorbei Audio eingeschaltet (bis BPM-16 die VC-Aktion
+„Musik-BPM"), schaltet derselbe Eintrag erneut — sonst bliebe Audio am Manager und verwuerfe
 jede ``request_bpm`` der gewaehlten Quelle. Fuer PC-Audio/Eingang bleibt es bei
 der reinen Idempotenz: ein fehlgeschlagener Capture-Start laesst ``audio_active``
 auf False, und bei jedem doppelt feuernden Signal neu zu starten waere wieder der
@@ -68,6 +68,16 @@ Wechsel, die nicht aus seiner eigenen Liste kommen (Generator-Knopf „Im Player
 laden & als BPM-Quelle nutzen") — per Rueckruf statt Poll. Gerufen wird im
 Thread des Schaltenden; Qt-Ansichten reichen ueber ein Signal in ihren Thread
 weiter. Ein defekter Abonnent blockiert die uebrigen nicht.
+
+**VC-Taste „Musik-BPM" (BPM-16):** ``toggle_audio()`` — vorher rief die Taste
+``use_audio_source`` direkt am Manager, die Liste blieb stehen, OS2L lief weiter
+und beim Ausschalten auch der Capture. Jetzt schaltet sie ueber ``apply``: an =
+die zuletzt gewaehlte Audio-Quelle (sonst PC-Audio Systemstandard) plus Auto,
+aus = die zuletzt gewaehlte Nicht-Audio-Quelle (sonst Aus). Gemerkt werden beide
+in ``apply``; vorbelegt einmal aus ``bpm_settings`` (``_seed_memory``).
+„BPM = 0/aus" (``BPMManager.turn_off``) bleibt ein Modus-Wechsel am Manager
+(Manuell + 0) und laesst die Quelle stehen — zurueck ueber Auto (``set_auto``)
+oder die Taste, beides ueber diesen Controller.
 """
 from __future__ import annotations
 
@@ -106,6 +116,12 @@ class SourceController:
         self._wanted: tuple[str, str | None] | None = None
         self.missing_sink: str | None = None
         self._listeners: list = []      # BPM-14: cb(kind, device) nach jedem Wechsel
+        # BPM-16: zuletzt gewaehlte Audio- bzw. Nicht-Audio-Quelle (``wanted``-Form),
+        # fuer die VC-Taste „Musik-BPM" (``toggle_audio``); einmal aus den
+        # Einstellungen vorbelegt (``_seed_memory``).
+        self._last_audio: tuple[str, str | None] | None = None
+        self._last_other: tuple[str, str | None] | None = None
+        self._seeded = False
 
     # ── Backends lazily (Singletons; Tests reichen Fakes herein) ────────────
     def _manager(self):
@@ -194,6 +210,7 @@ class SourceController:
         if kind == "loopback":
             device = _known_sink(device)   # nur echte sink_id, sonst Standard-Ausgabegeraet
         key = (kind, device)
+        self._remember(kind, wanted)
         old_wanted = self._wanted
         self._wanted = (kind, wanted)
         self.missing_sink = wanted if (kind == "loopback" and wanted and device is None) else None
@@ -240,6 +257,29 @@ class SourceController:
                 self.apply_player_track()
         else:
             self._safe("set_mode manual", lambda: mgr.set_mode("manual"))
+
+    def toggle_audio(self) -> bool:
+        """VC-Taste „Musik-BPM" (``ButtonAction.AUDIO_BPM``, BPM-16): Live-Audio an
+        bzw. aus — ueber ``apply`` wie eine Auswahl in der Liste, damit Liste,
+        Capture und OS2L zusammenbleiben. Liefert, ob geschaltet wurde.
+
+        Die Richtung folgt ``mgr.audio_active`` (dasselbe, was Tastenrahmen und
+        APC-LED zeigen). **an** = die zuletzt gewaehlte Audio-Quelle samt Geraet,
+        sonst PC-Audio (Systemstandard), und Auto wie bisher — ohne Auto folgte die
+        BPM der Musik nicht, und ``use_audio_source(True)`` erzwang es schon immer.
+        Ist genau dieser Eintrag schon angewandt, hoert der Manager aber nicht zu
+        (nach „BPM = 0/aus" oder einem gescheiterten Capture-Start), wird er
+        erzwungen neu angewandt: EIN Schaltvorgang. **aus** = die zuletzt gewaehlte
+        Nicht-Audio-Quelle (OS2L, Lied-Analyse, Aus), sonst Aus; der Modus bleibt."""
+        self._seed_memory()
+        mgr = self._manager()
+        if getattr(mgr, "audio_active", False) is True:
+            kind, device = self._last_other or ("off", None)
+            return self.apply(kind, device)
+        kind, device = self._last_audio or ("loopback", None)
+        if not _is_auto(mgr):
+            self._safe("set_mode auto", lambda: mgr.set_mode("auto"))
+        return self.apply(kind, device, force=True)
 
     def octave_target(self, step: int) -> float:
         """Tempo, auf das ×½ (step < 0) / ×2 (step > 0) fuehren wuerde (0 = unbekannt)."""
@@ -301,12 +341,43 @@ class SourceController:
             return 0.0
 
     # ── intern ───────────────────────────────────────────────────────────────
+    def _remember(self, kind: str, wanted: str | None) -> None:
+        """Eintrag als zuletzt gewaehlte Audio- bzw. Nicht-Audio-Quelle merken (BPM-16)."""
+        self._seed_memory()
+        if kind in AUDIO_KINDS:
+            self._last_audio = (kind, wanted)
+        else:
+            self._last_other = (kind, None)
+
+    def _seed_memory(self) -> None:
+        """Einmal je Controller: die gespeicherte Quelle (``bpm_settings``) als zuletzt
+        gewaehlte vorbelegen — beim ersten ``apply``/``toggle_audio``, solange die
+        Datei noch den Stand vom Start traegt (die Ansicht speichert nach jedem
+        Wechsel). Wichtig fuer „Lied-Analyse"/„Aus": dafuer schaltet der Auto-Start
+        nichts, der Controller haette sonst keine Vorgeschichte."""
+        if self._seeded:
+            return
+        self._seeded = True
+        try:
+            from src.core.audio.bpm_settings import load_settings
+            s = load_settings()
+        except Exception as e:
+            _log(f"Einstellungen: {e}")
+            return
+        kind = s.get("source")
+        if kind in AUDIO_KINDS:
+            if self._last_audio is None:
+                self._last_audio = (kind, s.get("device") or None)
+        elif kind in KINDS and self._last_other is None:
+            self._last_other = (kind, None)
+
     def _audio_drift(self, kind: str) -> bool:
         """Nicht-Audio-Eintrag angewandt, aber der Manager hoert noch Live-Audio:
-        jemand hat am Controller vorbei geschaltet (VC-Aktion „Musik-BPM",
-        ``vc_button`` AUDIO_BPM, BPM-16). Dann ist der Eintrag nicht mehr aktiv,
-        und ``apply`` schaltet erneut (BPM-14-Nacharbeit). Nur ``is True`` zaehlt —
-        Fakes ohne ``audio_active`` (oder ein Mock) loesen nichts aus."""
+        jemand hat am Controller vorbei geschaltet (bis BPM-16 die VC-Aktion
+        „Musik-BPM"; heute nur noch ein direkter ``use_audio_source``-Aufruf). Dann
+        ist der Eintrag nicht mehr aktiv, und ``apply`` schaltet erneut (BPM-14-
+        Nacharbeit). Nur ``is True`` zaehlt — Fakes ohne ``audio_active`` (oder ein
+        Mock) loesen nichts aus."""
         if kind in AUDIO_KINDS:
             return False
         try:

@@ -1429,11 +1429,13 @@ class VCButton(VCWidget):
             return
 
         if self.action == ButtonAction.AUDIO_BPM:
+            # BPM-16: ueber den SourceController (die eine Schaltstelle der
+            # Quelle-Liste), nicht mehr ``use_audio_source`` direkt am Manager —
+            # sonst blieben Liste, Capture und OS2L auf der alten Quelle stehen.
             if press:
                 try:
-                    from src.core.engine.bpm_manager import get_bpm_manager
-                    mgr = get_bpm_manager()
-                    mgr.use_audio_source(not mgr.audio_active)
+                    from src.ui.bpm_source_controller import get_source_controller
+                    get_source_controller().toggle_audio()
                 except Exception as e:
                     print(f"[VCButton] audio-bpm toggle error: {e}")
                 self.update()
