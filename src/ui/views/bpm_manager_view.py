@@ -35,7 +35,11 @@ die Zahl kommt aus ``mgr.bpm``, alles andere aus dem Snapshot.
 
 Quellenwechsel laufen ausschliesslich ueber ``bpm_source_controller`` (eine
 Stelle, idempotent); TAP ueber ``bpm_tap_helper`` (derselbe Helfer wie der
-Topbar-TAP). Manager/Detektor/Capture werden nur AUFGERUFEN.
+Topbar-TAP). Manager/Detektor/Capture werden nur AUFGERUFEN. Wechsel, die NICHT
+aus der eigenen Liste kommen (Generator „Im Player laden & als BPM-Quelle
+nutzen"), meldet der Controller per ``subscribe_change``; die Liste spiegelt sie
+ohne erneut zu schalten und merkt sie wie eine Auswahl (BPM-14) — Rueckruf,
+kein Poll.
 """
 from __future__ import annotations
 
@@ -224,6 +228,7 @@ class BpmManagerView(QWidget):
     _beat_sig = Signal(int)
     _state_sig = Signal()
     _rec_done_sig = Signal(str)
+    _src_sig = Signal(str, object)      # BPM-14: Quellenwechsel am Controller (kind, device)
 
     def __init__(self, parent=None, source_controller=None, tap_helper=None, recorder=None,
                  clock=None):
@@ -758,6 +763,28 @@ class BpmManagerView(QWidget):
         self._reflect_state()
         self._save()
 
+    def _on_source_switched(self, kind: str, dev) -> None:
+        """BPM-14: ein Wechsel am Controller — auch einer, der nicht aus dieser Liste
+        kam (Generator „Im Player laden & als BPM-Quelle nutzen") — wird in die Liste
+        gespiegelt, OHNE erneut zu schalten (Signale geblockt), und wie eine Auswahl
+        gemerkt. Kam der Wechsel aus der Liste selbst, steht sie schon richtig."""
+        dev = dev if kind in AUDIO_KINDS else None
+        key = f"{kind}:{dev}" if (kind in AUDIO_KINDS and dev) else kind
+        if self._cmb_source.currentData() != key:
+            idx = self._cmb_source.findData(key)
+            if idx < 0:
+                self._populate_sources(keep=key)     # legt „(nicht gefunden)" an, geblockt
+            else:
+                self._cmb_source.blockSignals(True)
+                try:
+                    self._cmb_source.setCurrentIndex(idx)
+                finally:
+                    self._cmb_source.blockSignals(False)
+        if (kind, dev) != (self._source_pref, self._device_pref):
+            self._source_pref, self._device_pref = kind, dev
+            self._save()
+        self._reflect_state()
+
     # ── Init-Werte ────────────────────────────────────────────────────────────
 
     def _load_into_controls(self):
@@ -793,22 +820,31 @@ class BpmManagerView(QWidget):
         self._beat_sig.connect(self._on_beat)
         self._state_sig.connect(self._reflect_state)
         self._rec_done_sig.connect(self._on_record_done)
+        self._src_sig.connect(self._on_source_switched)
         self._cb_rec = lambda p: self._rec_done_sig.emit(str(p))
+        self._cb_src = lambda kind, dev: self._src_sig.emit(str(kind), dev)
         self._cb_bpm = lambda b: self._bpm_sig.emit(float(b))
         self._cb_beat = lambda idx: self._beat_sig.emit(int(idx))
         self._cb_state = lambda: self._state_sig.emit()
         self._mgr.subscribe_bpm_change(self._cb_bpm)
         self._mgr.subscribe_beat(self._cb_beat)
         self._mgr.subscribe_state_change(self._cb_state)
+        # Controller ohne Abo-Schnittstelle (Test-Fakes) bleiben erlaubt.
+        src_sub = getattr(self._src, "subscribe_change", None)
+        src_unsub = getattr(self._src, "unsubscribe_change", None)
+        if callable(src_sub):
+            src_sub(self._cb_src)
         mgr = self._mgr
-        cbb, cbt, cbs = self._cb_bpm, self._cb_beat, self._cb_state
+        cbb, cbt, cbs, cbq = self._cb_bpm, self._cb_beat, self._cb_state, self._cb_src
 
         def _unsub(*_):
             for fn, cb in ((mgr.unsubscribe_bpm_change, cbb),
                            (mgr.unsubscribe_beat, cbt),
-                           (mgr.unsubscribe_state_change, cbs)):
+                           (mgr.unsubscribe_state_change, cbs),
+                           (src_unsub, cbq)):
                 try:
-                    fn(cb)
+                    if fn is not None:
+                        fn(cb)
                 except Exception:
                     pass
         self.destroyed.connect(_unsub)

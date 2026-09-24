@@ -50,6 +50,16 @@ angesteckt, laeuft der Capture wieder darauf; fehlt es weiter, bleibt
 Backends werden nur AUFGERUFEN (bpm_manager.py, capture.py, os2l.py,
 beat_detector.py bleiben unangetastet); jeder Schritt ist einzeln abgesichert,
 damit ein fehlendes Backend (kein soundcard/numpy) die uebrigen nicht blockiert.
+
+**Wechsel melden (BPM-14):** ``subscribe_change(cb)`` — ``cb(kind, device)``
+bekommt nach jedem wirksamen Wechsel (``apply`` liefert True, auch
+``reconnect``) den GEWUENSCHTEN Eintrag (``wanted``), ebenso wenn sich nur
+``wanted`` aendert (fehlender Sink bei schon laufendem Standard-Ausgabegeraet).
+Ein idempotenter Aufruf meldet nichts. Damit spiegelt der Tab „Erkennung"
+Wechsel, die nicht aus seiner eigenen Liste kommen (Generator-Knopf „Im Player
+laden & als BPM-Quelle nutzen") — per Rueckruf statt Poll. Gerufen wird im
+Thread des Schaltenden; Qt-Ansichten reichen ueber ein Signal in ihren Thread
+weiter. Ein defekter Abonnent blockiert die uebrigen nicht.
 """
 from __future__ import annotations
 
@@ -87,6 +97,7 @@ class SourceController:
         self._current: tuple[str, str | None] | None = None
         self._wanted: tuple[str, str | None] | None = None
         self.missing_sink: str | None = None
+        self._listeners: list = []      # BPM-14: cb(kind, device) nach jedem Wechsel
 
     # ── Backends lazily (Singletons; Tests reichen Fakes herein) ────────────
     def _manager(self):
@@ -142,6 +153,15 @@ class SourceController:
         """Zuletzt GEWUENSCHTER Eintrag ``(kind, device)`` — bei fehlendem Sink mit dessen id."""
         return self._wanted
 
+    def subscribe_change(self, cb) -> None:
+        """``cb(kind, device)`` nach jedem wirksamen Wechsel (BPM-14, s. Modulkopf)."""
+        if cb not in self._listeners:
+            self._listeners.append(cb)
+
+    def unsubscribe_change(self, cb) -> None:
+        if cb in self._listeners:
+            self._listeners.remove(cb)
+
     def reconnect(self) -> bool:
         """„erneut verbinden": den gewuenschten Eintrag erzwungen neu anwenden."""
         if self._wanted is None:
@@ -166,9 +186,12 @@ class SourceController:
         if kind == "loopback":
             device = _known_sink(device)   # nur echte sink_id, sonst Standard-Ausgabegeraet
         key = (kind, device)
+        old_wanted = self._wanted
         self._wanted = (kind, wanted)
         self.missing_sink = wanted if (kind == "loopback" and wanted and device is None) else None
         if key == self._current and not force:
+            if self._wanted != old_wanted:
+                self._notify()
             return False
         self._current = key
         mgr = self._manager()
@@ -195,6 +218,7 @@ class SourceController:
                 self._os2l_stop()
             if kind == "song":
                 self.apply_player_track()
+        self._notify()
         return True
 
     def set_auto(self, auto: bool) -> None:
@@ -269,6 +293,15 @@ class SourceController:
             return 0.0
 
     # ── intern ───────────────────────────────────────────────────────────────
+    def _notify(self) -> None:
+        """Abonnenten den gewuenschten Eintrag melden; jeder einzeln abgesichert."""
+        kind, device = self._wanted if self._wanted else (None, None)
+        for cb in list(self._listeners):
+            try:
+                cb(kind, device)
+            except Exception as e:
+                _log(f"Abonnent: {e}")
+
     def _os2l_stop(self):
         srv = self._server()
         if srv is not None and srv.is_running():
