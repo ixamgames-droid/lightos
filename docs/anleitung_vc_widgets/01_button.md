@@ -94,7 +94,7 @@ Der Dialog blendet je nach gewählter **Aktion** nur die passenden Felder ein. B
 | Freeze (BPM einfrieren) | Friert das Tempo ein — alle Buses + globaler Leader auf 0 (Toggle); bus-gekoppelte Effekte halten ihre Position |
 | Auto-Sync an/aus | Schaltet Auto-Sync um: neu startende bus-gekoppelte Effekte starten phasengleich am gemeinsamen Beat-Raster |
 | Tap-Tempo | Tippt das globale Tempo (Tap-Tempo); beat-basierte Effekte folgen der so gesetzten BPM |
-| Musik-BPM | Schaltet den Musik-Modus um: BPM kommt aus dem Audio-Eingang (an/aus) |
+| Musik-BPM | Schaltet das Mithören an/aus — genau wie eine Auswahl in der **Quelle**-Liste des BPM-Managers, die Liste springt mit. **An:** die zuletzt gewählte Audio-Quelle (PC-Audio oder Eingang, sonst PC-Audio Systemstandard) und **Auto**, ein laufender OS2L-Server geht aus. **Aus:** zurück zur zuletzt gewählten anderen Quelle (OS2L, Lied-Analyse oder Aus) |
 | BPM +1 (Nudge) | Zieht das Tempo um +1 BPM nach (wechselt zu MANUAL) |
 | BPM -1 (Nudge) | Zieht das Tempo um -1 BPM nach (wechselt zu MANUAL) |
 | BPM-Modus AUTO/MANUAL | Schaltet die Betriebsart zwischen AUTO und MANUAL um |
