@@ -233,7 +233,7 @@ Aufklappen mit **▸ Erweitert**. Der Bereich klappt beim nächsten Start wieder
 | **Beat-Latenz** | Zahlenfeld in ms (−300 bis +300, 5-ms-Schritte) | Verschiebt, **wann** LightOS den Beat meldet. Beschriftung daneben: **„+ = Licht früher, − = später"**. Siehe unten. |
 | **Tempo halten** | **🔒 Tempo einfrieren** | Friert die BPM ein: keine Quelle ändert sie mehr, bis du den Knopf wieder löst. Die Beats laufen weiter. Gut vor Ansagen, Breaks, wackeligen Übergängen. |
 | **Nudge** | **−5 · −1 · +1 · +5** | Tempo in festen Schritten verschieben. **Schaltet auf Manuell.** |
-| **Lied-Analyse** | ☑ **Taktgenau** (Standard an) | Nur bei Quelle *Lied-Analyse*: Beats treffen exakt das Beatgrid des Lieds (Abschnitt 7.3). |
+| **Lied-Analyse** | ☑ **Taktgenau** (Standard an) | Wirkt, wenn ein analysiertes Lied im Player führt (Quelle *Lied-Analyse*, Auto): Beats treffen exakt das Beatgrid des Lieds (Abschnitt 7.3). |
 | **Aufnahme** | **Eingang 30 s aufnehmen** | Nimmt 30 s der laufenden Audio-Quelle für die Fehlersuche auf (Abschnitt 6). |
 | **Diagnose** | Textzeile | Rohwerte der Erkennung (siehe unten). |
 | **Spektrum** | acht Balken | Wo im Frequenzbereich Energie liegt — links Bass, rechts Höhen. Im Bild arbeiten vor allem die beiden Bass-Bänder. |

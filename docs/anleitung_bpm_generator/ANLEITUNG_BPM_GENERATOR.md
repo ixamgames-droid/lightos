@@ -96,9 +96,12 @@ Mit **„Taktgenau"** (Erkennung → Erweitert,
 Standard an) treffen die Lichter die **echten Beats** des Songs sample-nah — nicht nur den
 BPM-Wert. (Details: [BPM-Manager-Anleitung, Abschnitt „Taktgenau"](../anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md#73-taktgenau).)
 
-> **Wichtig:** Die Analyse führt nur bei Quelle **Lied-Analyse (Player)** — die stellt der
-> Button selbst ein. **Manuell** und **🔒 Tempo einfrieren** haben weiterhin Vorrang: dann
+> **Wichtig:** Die Analyse führt nur, wenn **Live-Audio aus** ist — PC-Audio oder Eingang
+> sperren sie. Der Button stellt deshalb selbst auf **Lied-Analyse (Player)** und schaltet
+> Mithören und OS2L ab. **Manuell** und **🔒 Tempo einfrieren** haben weiterhin Vorrang: dann
 > bleibt das Tempo stehen, bis du in **Erkennung** auf **Auto** gehst bzw. das Einfrieren löst.
+> Umgekehrt führt ein analysiertes Lied im Player in Auto auch bei Quelle **Aus** oder
+> **OS2L** — abschalten lässt sich das im Musik-Tab mit dem Haken **BPM koppeln**.
 
 Mit **„Als .json exportieren"** sicherst du die komplette Analyse (BPM-Kurve, Beatgrid,
 Struktur) als Datei.

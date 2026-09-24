@@ -53,9 +53,15 @@ Der Sub-Tab **Erkennung** zeigt ohne Klick genau **sechs Bedienelemente**; alles
 | **×½ / ×2** | Halb-/Doppeltempo mit einem Klick — in Auto als Oktav-Vorgabe an die Erkennung, in Manuell direkt am Tempo. |
 | **▸ Erweitert** | Tempo-Bereich von/bis + **Vorlage ▾** (Genre-Bereiche), Beats/Takt, Beat-Latenz (ms), **🔒 Tempo einfrieren**, Nudge −5/−1/+1/+5, Taktgenau, dazu Diagnosezeile und Spektrum. |
 
-> **Zustandswort** neben dem Beat-Punkt: **KEIN SIGNAL** / **SUCHT** / **EINGERASTET** / **PAUSE · hält N** / **MANUELL** — plus **Konfidenz**-Balken. Beim Wechsel der Quelle stoppt LightOS die jeweils anderen (Audio, OS2L, Lied-Analyse), damit nicht zwei Quellen um die BPM konkurrieren; ein Wechsel ist immer nur EIN Schaltvorgang.
+> **Zustandswort** neben dem Beat-Punkt: **KEIN SIGNAL** / **SUCHT** / **EINGERASTET** / **PAUSE · hält N** / **MANUELL** — plus **Konfidenz**-Balken. Beim Wechsel der Quelle stoppt LightOS die jeweils andere Live-Quelle (Audio ↔ OS2L), damit nicht beide um die BPM konkurrieren; ein Wechsel ist immer nur EIN Schaltvorgang.
 
-**Präzedenz (wer gewinnt):** Die **Quelle**-Liste bestimmt **eine** Tempo-Quelle — PC-Audio/Eingang, OS2L oder Lied-Analyse (oder Aus). Beim Wechsel schaltet LightOS die übrigen ab, auch wenn der Wechsel vom Generator-Knopf kommt. Darüber stehen **Manuell** (auch durch TAP ab dem dritten Tipp im Takt oder durch Nudge) und **🔒 Tempo einfrieren**: solange eins davon gilt, ändert keine Quelle das Tempo.
+**Präzedenz (wer gewinnt):**
+
+1. **Manuell** (auch durch TAP ab dem dritten Tipp im Takt oder durch Nudge) und **🔒 Tempo einfrieren** stehen über allem: solange eins davon gilt, ändert keine Quelle das Tempo.
+2. **PC-Audio / Eingang:** hört LightOS live mit, führt allein die Erkennung. Die Lied-Analyse und die Nominal-BPM des Players kommen dann nicht durch.
+3. Sonst — bei Quelle **Lied-Analyse (Player)**, aber auch bei **Aus** und **OS2L** — führt in **Auto** ein im Player laufendes, im Generator **analysiertes** Lied mit seiner BPM-Kurve. Ein Lied ohne Analyse setzt beim Start seine Nominal-BPM (bei OS2L nur, solange das DJ-Programm noch kein Tempo geschickt hat). Bei OS2L schreiben DJ-Programm und Lied-Kurve dann beide ins Tempo. Wer das nicht will, nimmt im **Musik**-Tab den Haken **BPM koppeln** heraus.
+
+Die **Quelle**-Liste schaltet also Mithören und OS2L-Server; sie sperrt die Lied-Analyse nicht. Der Generator-Knopf schaltet genauso um wie eine Auswahl in der Liste.
 
 ## Erweitert (Tempo-Bereich, Vorlage, Beats/Takt, Beat-Latenz, Einfrieren, Nudge, Taktgenau)
 
@@ -67,7 +73,7 @@ Der Sub-Tab **Erkennung** zeigt ohne Klick genau **sechs Bedienelemente**; alles
 | **Beat-Latenz** (ms) | Beats früher (+) / später (−) melden. | Licht hinkt hörbar hinterher → in 5-ms-Schritten ins Plus. |
 | **🔒 Tempo einfrieren** | Friert die BPM ein; keine Quelle ändert sie, bis du löst. | Vor einem Break/einer Ansage drücken. |
 | **Nudge (−5 … +5)** | Korrigiert die BPM in festen Schritten (schaltet auf Manuell). | Zum Feintrimmen, wenn der Wert fast passt. |
-| **Taktgenau** | Beats treffen das Beatgrid des analysierten Lieds exakt (nur bei Quelle Lied-Analyse). | An lassen. |
+| **Taktgenau** | Beats treffen das Beatgrid des analysierten Lieds exakt (nur wenn ein analysiertes Lied im Player führt — in Auto, ohne PC-Audio/Eingang, siehe Präzedenz). | An lassen. |
 
 Alle Einstellungen werden gespeichert und beim nächsten Start wieder geladen (Sektion `bpm_settings`, v3).
 
@@ -121,7 +127,7 @@ Der dritte Reiter **Generator** analysiert ein **komplettes Lied vorab** statt l
 1. **Datei wählen** (Audiodatei), **Genre** und **Analyse-Engine** auswählen (Eingebaut/numpy, librosa, Beat This! — nicht installierte fallen sauber auf die eingebaute Engine zurück).
 2. **Analysieren** dekodiert den Track und erzeugt eine **BPM-Kurve** + ein phasen-genaues **Beatgrid** (geplottet mit Zeitachse).
 3. Das Grid lässt sich wie bei VirtualDJ/Serato **korrigieren**: ½×/2×, nudgen, **Downbeat per Klick** im Plot setzen.
-4. **„Im Player laden & als BPM-Quelle nutzen"** macht die Analyse zur BPM-Quelle: die **Quelle**-Liste im Reiter Erkennung springt auf **Lied-Analyse (Player)**, PC-Audio/Eingang und OS2L werden abgeschaltet, und beim Abspielen folgt die globale BPM dem Lied über die Zeit. Alternativ **als .json exportieren**.
+4. **„Im Player laden & als BPM-Quelle nutzen"** macht die Analyse zur BPM-Quelle: die **Quelle**-Liste im Reiter Erkennung springt auf **Lied-Analyse (Player)**, PC-Audio/Eingang und OS2L werden abgeschaltet, und beim Abspielen folgt die globale BPM in **Auto** dem Lied über die Zeit (in Manuell oder bei eingefrorenem Tempo bleibt es stehen). Alternativ **als .json exportieren**.
 
 Damit bekommst du auch bei tempo-wechselnden oder schwer erkennbaren Tracks ein sauberes, vorab geprüftes Tempo.
 
@@ -142,6 +148,6 @@ Faustregel: **Hier** (Manager) bestimmst du die Quelle und die Buses, **in der V
 - **Erkennung springt:** In „Erweitert" den **Tempo-Bereich** enger setzen oder eine **Vorlage** wählen.
 - **Sitzt der Beat, aber soll bleiben?** **🔒 Tempo einfrieren** (Erweitert) drücken, bevor du in eine ruhige/breakige Passage gehst.
 - **Automatik liegt komplett daneben:** auf **Manuell** gehen und **TAP** (3–4× im Takt) — sicherer als gegen die Erkennung anzukämpfen. Mit **Nudge** feinjustieren.
-- **Nur eine Quelle:** PC-Audio/Eingang, OS2L und Lied-Analyse schließen sich aus. Beim Wechsel stoppt LightOS die jeweils anderen automatisch — wundere dich nicht, wenn beim Umschalten kurz nichts erkannt wird.
+- **Nur eine Live-Quelle:** PC-Audio/Eingang und OS2L schließen sich aus. Beim Wechsel stoppt LightOS die jeweils andere automatisch — wundere dich nicht, wenn beim Umschalten kurz nichts erkannt wird. Ein analysiertes Lied im Player führt in Auto trotzdem, solange nicht PC-Audio/Eingang gewählt ist (siehe Präzedenz).
 - **„Eingang" ohne Ton?** In der **Quelle**-Liste das richtige Gerät wählen (die Liste liest beim Öffnen neu) und die Pegel-Zeile, die Statuszeile sowie die Diagnosezeile in „Erweitert" prüfen.
 - **Grand-Master nicht vergessen zu entschärfen:** Solange „scharf", ignorieren alle Master ihr eigenes Tempo. Häkchen wieder weg, wenn die Buses wieder eigenständig laufen sollen.

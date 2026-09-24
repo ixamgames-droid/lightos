@@ -28,6 +28,8 @@ Tempo-Quelle nutzen kann. Ein Metronom-Klick (Sinus-Burst-WAV) hilft beim Prüfe
   (`_use_as_source`) legt den Track in den Player und schaltet über
   `get_source_controller().apply("song")` — dieselbe Stelle wie die Quelle-Liste in
   „Erkennung", die dabei mitzieht (BPM-14); ein zweiter Klick schaltet nichts erneut.
+  Die Statuszeile (`_status_quelle_lied`) meldet „✓" nur, wenn das Umschalten gelang,
+  und sagt in Manuell bzw. bei eingefrorenem Tempo, dass die BPM dem Lied dann nicht folgt.
 - **Erkennung:** teilt die Beat-Erkennung mit
   [`bpm_manager_view`](bpm_manager_view.md) (Sub-Tab „Erkennung" mit Pegelmeter).
 - **Cache:** Analyse-Ergebnisse werden atomar gecacht.
