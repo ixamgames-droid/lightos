@@ -492,6 +492,31 @@ def test_audio_quelle_bleibt_idempotent_auch_wenn_der_manager_kein_audio_hoert()
     assert mgr.calls == [] and cap.calls == []
 
 
+def test_erneute_auswahl_in_der_liste_schaltet_audio_nach_musik_bpm_wieder_ab(_prefs, _geraete):
+    """Derselbe Weg ueber die Liste: steht sie auf „Aus" und hat „Musik-BPM" Audio
+    am Controller vorbei eingeschaltet, schaltet ein erneutes Waehlen von „Aus"
+    (``activated`` — ``currentIndexChanged`` feuert beim selben Eintrag nicht)
+    das Mithoeren wieder ab. Vorher war die Auswahl wirkungslos (idempotent)."""
+    from src.ui.bpm_source_controller import SourceController
+    cap, os2l, det = _Cap(), _Os2l(), _Det()
+    mgr = _Mgr(cap)
+    ctrl = SourceController(mgr=mgr, cap=cap, os2l=os2l, det=det, player=_Player())
+    v = _erkennung(ctrl)
+    try:
+        _waehle(v, "off")
+        mgr.use_audio_source(True)                        # wie VC-Aktion AUDIO_BPM
+        assert cap.running and mgr.audio_active
+        _clear(cap, os2l, det, mgr)
+
+        v._cmb_source.activated.emit(v._cmb_source.findData("off"))
+        _app.processEvents()
+        assert [c for c in mgr.calls if c[0] == "use_audio_source"] == [("use_audio_source", False)]
+        assert not mgr.audio_active and not cap.running
+        assert v._cmb_source.currentData() == "off"
+    finally:
+        destroy_widget(v, _app)
+
+
 # ── Statuszeile des Generators: ehrlich ─────────────────────────────────────────
 
 class _KaputterController:
