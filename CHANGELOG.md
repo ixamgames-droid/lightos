@@ -18,10 +18,22 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   schaltet der Knopf genauso um wie eine Auswahl in der Liste: PC-Audio/Eingang und OS2L
   gehen aus, in Auto startet die BPM beim Median des geladenen Lieds und folgt beim
   Abspielen der Analyse, und die Wahl wird für den nächsten Start gemerkt. Ein zweiter Klick schaltet
-  nichts erneut. Die Generator- und die BPM-Manager-Anleitung beschreiben das wieder so;
-  die Seite zum BPM-Manager in der VC-Widget-Anleitung zeigt das aktuelle Bild der
-  Erkennung und erklärt den Vorrang neu (eine Quelle, darüber nur Manuell und
-  „Tempo einfrieren").
+  nichts erneut. Scheitert das Umschalten, meldet die Statuszeile des Generators das
+  ehrlich statt „✓“; steht die Erkennung auf **Manuell** oder ist das Tempo eingefroren,
+  sagt sie, dass die BPM dem Lied erst mit **Auto** bzw. nach dem Lösen folgt. Die
+  Generator- und die BPM-Manager-Anleitung beschreiben das wieder so.
+- **Quelle-Liste nach der VC-Taste „Musik-BPM“:** Hatte „Musik-BPM“ das Mithören am Tab
+  vorbei eingeschaltet, blieb ein erneutes Wählen von **Lied-Analyse**, **OS2L** oder
+  **Aus** wirkungslos. Jetzt schaltet derselbe Eintrag das Mithören wieder ab; der
+  Generator-Knopf ebenso. Dass „Musik-BPM“ selbst an der Liste vorbei schaltet, ist als
+  BPM-16 notiert.
+- **VC-Widget-Anleitung, Seite BPM-Manager:** aktuelles Bild der Erkennung, und der
+  Vorrang ist so beschrieben, wie LightOS sich tatsächlich verhält: Manuell und „Tempo
+  einfrieren“ stehen über allem, darunter PC-Audio/Eingang. Ein im Generator
+  analysiertes Lied im Player führt in Auto auch bei Quelle **Aus** oder **OS2L**;
+  abschalten lässt sich das mit dem Haken **BPM koppeln** im Musik-Tab. Ob die
+  Quelle-Liste die Lied-Analyse künftig sperren soll, ist als BPM-17 zur Entscheidung
+  notiert.
 
 ### 2026-09-16 — BPM-Manager: neue Anleitung mit Bildern
 
