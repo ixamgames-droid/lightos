@@ -7,6 +7,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-24 — VC-Taste „Musik-BPM" stellt die Quelle-Liste mit um (BPM-16)
+
+#### Behoben
+
+- **VC-Taste „Musik-BPM“ (auch als APC-Pad):** Die Taste schaltet jetzt genauso um wie eine
+  Auswahl in der Quelle-Liste im Sub-Tab **Erkennung**, und die Liste springt mit. **An** nimmt
+  die zuletzt gewählte Audio-Quelle samt Gerät (PC-Audio oder Eingang; ohne Vorgeschichte
+  **PC-Audio (Systemstandard)**) und stellt wie bisher auf **Auto**; ein laufender OS2L-Server
+  geht dabei aus. **Aus** kehrt zur zuletzt gewählten anderen Quelle zurück (**OS2L**,
+  **Lied-Analyse** oder **Aus**) und beendet das Mithören ganz. Bisher lief nach dem Ausschalten
+  der Audio-Mitschnitt im Hintergrund weiter, die Liste zeigte die alte Quelle, und OS2L blieb
+  an. Die Wahl wird wie eine Auswahl in der Liste für den nächsten Start gemerkt. Nach
+  „BPM = 0/aus“ holt ein Druck das Mithören wie bisher zurück; die Pad-LED am APC zeigt den
+  Zustand unverändert. VC-Button- und BPM-Manager-Anleitung beschreiben das so.
+
 ### 2026-09-24 — Generator: „als BPM-Quelle nutzen" stellt die Quelle-Liste mit um (BPM-14)
 
 #### Behoben
