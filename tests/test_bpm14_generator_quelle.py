@@ -490,3 +490,49 @@ def test_audio_quelle_bleibt_idempotent_auch_wenn_der_manager_kein_audio_hoert()
     _clear(cap, mgr)
     assert ctrl.apply("loopback") is False
     assert mgr.calls == [] and cap.calls == []
+
+
+# ── Statuszeile des Generators: ehrlich ─────────────────────────────────────────
+
+class _KaputterController:
+    def apply(self, *_a, **_k):
+        raise RuntimeError("Quelle-Backend fehlt")
+
+
+def test_statuszeile_meldet_keinen_erfolg_wenn_das_umschalten_scheitert(
+        _prefs, _player, monkeypatch):
+    g = _generator(_KaputterController(), monkeypatch)
+    try:
+        _klick(g)
+        text = g._status.text()
+        assert not text.startswith("✓"), text
+        assert "Quelle-Backend fehlt" in text
+        assert "Lied-Analyse (Player)" in text                # sagt, was zu tun ist
+        assert _player.current_track is not None and _player.current_track.path == _LIED
+    finally:
+        destroy_widget(g, _app)
+
+
+@pytest.mark.parametrize("zustand, erwartet", [("manuell", "Manuell"),
+                                                 ("eingefroren", "eingefroren")])
+def test_statuszeile_nennt_manuell_und_einfrieren(
+        zustand, erwartet, _prefs, _player, _echter_mgr, monkeypatch):
+    """In Manuell bzw. bei eingefrorenem Tempo folgt die BPM dem Lied NICHT —
+    die Statuszeile darf das nicht behaupten."""
+    from src.core.engine.bpm_manager import BpmMode
+    from src.ui.bpm_source_controller import SourceController
+    cap = _Cap()
+    ctrl = SourceController(mgr=_Mgr(cap), cap=cap, os2l=_Os2l(), det=_Det(), player=_Player())
+    g = _generator(ctrl, monkeypatch)
+    try:
+        if zustand == "manuell":
+            _echter_mgr.set_mode(BpmMode.MANUAL)
+        else:
+            _echter_mgr.set_locked(True)
+        _klick(g)
+        text = g._status.text()
+        assert erwartet in text, text
+        assert "die BPM folgt dem Lied über die Zeit" not in text
+    finally:
+        _echter_mgr.set_locked(False)
+        destroy_widget(g, _app)

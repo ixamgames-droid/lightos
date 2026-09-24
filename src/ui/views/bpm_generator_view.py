@@ -705,12 +705,33 @@ class BpmGeneratorView(QWidget):
                 from src.ui.bpm_source_controller import get_source_controller
                 get_source_controller().apply("song")
             except Exception as e:
+                # Nacharbeit BPM-14: kein „✓", wenn die Quelle nicht umgestellt ist.
                 print(f"[BpmGenerator] ERROR: Quelle Lied-Analyse: {e}")
-            self._set_status(
-                "✓ Im Player geladen — die Lied-Analyse ist jetzt die BPM-Quelle. "
-                "Im Musik-Tab abspielen; die BPM folgt dem Lied über die Zeit.")
+                self._set_status(
+                    f"Im Player geladen, aber die BPM-Quelle ließ sich nicht umstellen "
+                    f"({e}). In „Erkennung“ die Quelle „Lied-Analyse (Player)“ wählen.")
+                return
+            self._set_status(self._status_quelle_lied())
         except Exception as e:
             self._set_status(f"Fehler beim Laden in den Player: {e}")
+
+    @staticmethod
+    def _status_quelle_lied() -> str:
+        """Statuszeile nach dem Umstellen — ehrlich: in Manuell und bei eingefrorenem
+        Tempo folgt die BPM dem Lied NICHT (``request_bpm`` blockt dann)."""
+        text = "✓ Im Player geladen — die Lied-Analyse ist jetzt die BPM-Quelle. "
+        try:
+            from src.core.engine.bpm_manager import get_bpm_manager, BpmMode
+            mgr = get_bpm_manager()
+            if mgr.is_locked:
+                return text + ("Das Tempo ist aber eingefroren (🔒, Erkennung → Erweitert) — "
+                               "erst nach dem Lösen folgt die BPM dem Lied.")
+            if mgr.mode == BpmMode.MANUAL:
+                return text + ("Die Erkennung steht aber auf Manuell — erst mit Auto "
+                               "folgt die BPM dem Lied.")
+        except Exception:
+            pass
+        return text + "Im Musik-Tab abspielen; die BPM folgt dem Lied über die Zeit."
 
     def _export_json(self):
         if self._timeline is None or self._timeline.is_empty():
