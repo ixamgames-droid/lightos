@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| _(frei)_ |  |  |  |  |
+| BPM-17 | A | fix/bpm17-quelle-sperrt-lied | 2026-09-28T13:57Z | src/core/audio/music_show.py,src/core/audio/media_player.py |
 
 ## Blocker & Fallen
 
@@ -125,7 +125,6 @@
 
 ## Verlauf
 
-- 2026-09-07T20:08Z A done FM-38
 - 2026-09-07T20:39Z A claim BPM-AREA
 - 2026-09-07T20:59Z B done XPLAT-35
 - 2026-09-07T21:29Z B claim XPLAT-38
@@ -155,3 +154,4 @@
 - 2026-09-28T13:21Z A done BPM-14
 - 2026-09-28T13:25Z A claim BPM-16
 - 2026-09-28T13:57Z A done BPM-16
+- 2026-09-28T13:57Z A claim BPM-17
