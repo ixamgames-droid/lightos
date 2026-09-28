@@ -14,10 +14,45 @@ Server nicht bereit ist. Ein ``except ImportError`` haette das nicht gefangen �
 LightOS und die gesamte Testsuite waeren beim Modulimport gestorben.
 """
 import builtins
+import contextlib
 import importlib
 import sys
 import unittest
 from unittest import mock
+
+_MOD = "src.core.audio.capture"
+_FEHLT = object()
+
+
+@contextlib.contextmanager
+def _frischer_import():
+    """Raum fuer einen FRISCHEN Import von ``src.core.audio.capture`` — und danach
+    alles so zurueck, wie es war (QA-79).
+
+    Ein Frischimport veraendert DREI Stellen, nicht eine: ``sys.modules[_MOD]``,
+    ``sys.modules["soundcard"]`` und das Attribut ``capture`` am Paket
+    ``src.core.audio`` (das setzt der Import-Mechanismus auf das NEUE Modul).
+    Bis 2026-09-28 stellten beide Hilfen nur die erste wieder her. Folge: jedes
+    spaetere ``from src.core.audio import capture`` bekam das Wegwerf-Modul, und
+    Tests, die ``capture.HAS_SOUNDCARD`` oder ``get_audio_capture`` patchen, patchten
+    am falschen Objekt — gemessen 4 bis 18 Fehlschlaege im selben Prozess, jede
+    Datei einzeln gruen. Und das echte ``soundcard`` fehlte danach in
+    ``sys.modules``, der naechste Import haette PulseAudio neu initialisiert."""
+    import src.core.audio as paket
+    vorher_mod = sys.modules.pop(_MOD, _FEHLT)
+    vorher_sc = sys.modules.pop("soundcard", _FEHLT)
+    vorher_attr = paket.__dict__.get("capture", _FEHLT)
+    try:
+        yield
+    finally:
+        for name, alt in ((_MOD, vorher_mod), ("soundcard", vorher_sc)):
+            sys.modules.pop(name, None)
+            if alt is not _FEHLT:
+                sys.modules[name] = alt
+        if vorher_attr is _FEHLT:
+            paket.__dict__.pop("capture", None)
+        else:
+            paket.capture = vorher_attr
 
 
 def _lade_capture_mit_import_fehler(fehler: BaseException):
@@ -30,15 +65,9 @@ def _lade_capture_mit_import_fehler(fehler: BaseException):
             raise fehler
         return echt(name, *a, **kw)
 
-    vorher = sys.modules.pop("src.core.audio.capture", None)
-    sys.modules.pop("soundcard", None)
-    try:
+    with _frischer_import():
         with mock.patch.object(builtins, "__import__", gefaelscht):
-            return importlib.import_module("src.core.audio.capture")
-    finally:
-        sys.modules.pop("src.core.audio.capture", None)
-        if vorher is not None:
-            sys.modules["src.core.audio.capture"] = vorher
+            return importlib.import_module(_MOD)
 
 
 class ImportBleibtWeichTest(unittest.TestCase):
@@ -79,18 +108,38 @@ class ImportBleibtWeichTest(unittest.TestCase):
                 return attrappe
             return echt(name, *a, **kw)
 
-        vorher = sys.modules.pop("src.core.audio.capture", None)
-        sys.modules.pop("soundcard", None)
-        try:
+        with _frischer_import():
             with mock.patch.object(builtins, "__import__", gefaelscht):
-                modul = importlib.import_module("src.core.audio.capture")
+                modul = importlib.import_module(_MOD)
             self.assertTrue(modul.HAS_SOUNDCARD)
             self.assertIs(attrappe, modul.sc)
-        finally:
-            sys.modules.pop("src.core.audio.capture", None)
-            sys.modules.pop("soundcard", None)
-            if vorher is not None:
-                sys.modules["src.core.audio.capture"] = vorher
+
+
+class HinterlaesstNichtsTest(unittest.TestCase):
+    """★ QA-79: der eigentliche Vertrag dieser Datei — nach jedem Frischimport ist
+    der Prozess wieder im Ausgangszustand. Genau das hat bisher niemand geprueft."""
+
+    def _stand(self):
+        import src.core.audio as paket
+        return (sys.modules.get(_MOD), sys.modules.get("soundcard"),
+                paket.__dict__.get("capture"))
+
+    def test_fehlerfall_stellt_alle_drei_stellen_wieder_her(self):
+        import src.core.audio.capture  # noqa: F401 — Ausgangszustand: echtes Modul geladen
+        vorher = self._stand()
+        _lade_capture_mit_import_fehler(AssertionError("pulseaudio not ready"))
+        nachher = self._stand()
+        for name, a, b in zip(("sys.modules[capture]", "sys.modules[soundcard]",
+                               "src.core.audio.capture"), vorher, nachher):
+            self.assertIs(a, b, name)
+
+    def test_paketattribut_zeigt_danach_auf_dasselbe_modul_wie_sys_modules(self):
+        """Die Form, in der der Fehler andere Dateien traf: ``from src.core.audio
+        import capture`` und ``sys.modules`` liefern verschiedene Objekte."""
+        import src.core.audio.capture  # noqa: F401
+        _lade_capture_mit_import_fehler(ImportError("weg"))
+        from src.core.audio import capture as ueber_paket
+        self.assertIs(ueber_paket, sys.modules[_MOD])
 
 
 if __name__ == "__main__":
