@@ -10,7 +10,6 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | FM-48 | A | fix/fm48-bedienelemente | 2026-09-28T21:29Z | src/ui/views/programmer_view.py,src/ui/widgets/preset_tile.py,src/core/app_state.py |
-| LAS-21 | A | fix/las21-allesweiss-nur-licht | 2026-09-28T22:06Z | src/core/all_white.py |
 | FM-50 | A | fix/fm50-builtins-abgleich | 2026-09-28T22:20Z | src/core/database/fixture_db.py |
 
 ## Blocker & Fallen
@@ -130,7 +129,6 @@
 
 ## Verlauf
 
-- 2026-09-14T21:48Z A done BPM-11
 - 2026-09-16T14:36Z A claim BPM-12
 - 2026-09-16T15:58Z A done BPM-12
 - 2026-09-16T16:03Z A claim BPM-13
@@ -160,3 +158,4 @@
 - 2026-09-28T21:29Z A claim FM-48
 - 2026-09-28T22:06Z A claim LAS-21
 - 2026-09-28T22:20Z A claim FM-50
+- 2026-09-28T22:34Z A done LAS-21
