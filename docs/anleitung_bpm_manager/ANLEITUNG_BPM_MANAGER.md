@@ -80,6 +80,14 @@ wieder eingeschaltet.
 Ein gespeichertes Gerät, das gerade nicht angesteckt ist, steht als **„… (nicht gefunden)"**
 in der Liste.
 
+**Von der Virtuellen Konsole aus** (oder einem Pad am APC) schaltet die Taste **Musik-BPM**
+dieselbe Liste um — sie springt jedes Mal mit, und die Wahl wird genauso gemerkt:
+
+* **An:** die zuletzt gewählte Audio-Quelle samt Gerät (PC-Audio oder Eingang; ohne
+  Vorgeschichte **PC-Audio (Systemstandard)**), dazu **Auto**. Ein laufender OS2L-Server geht aus.
+* **Aus:** zurück zur zuletzt gewählten anderen Quelle — **OS2L**, **Lied-Analyse** oder
+  **Aus**. Das Mithören endet dabei ganz.
+
 **Einrasten dauert etwa 4–6 Sekunden.** Die Erkennung braucht ein gefülltes
 Analysefenster von rund sechs Sekunden Musik, bevor sie Beats meldet. Solange steht
 **SUCHT**. Schneller geht's mit **TAP** drei-, viermal im Takt (Abschnitt 4.1).
