@@ -5,6 +5,7 @@ getestet wird die reine Playlist-/Index-Logik und die Nominal-BPM-Kopplung.
 """
 import os
 import unittest
+from unittest import mock
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -87,13 +88,31 @@ class BpmCouplingTest(unittest.TestCase):
         get_bpm_manager().reset()
 
     def test_nominal_bpm_set_as_fallback(self):
+        """BPM-17: nur noch bei gewaehlter Quelle „Lied-Analyse (Player)". Bis
+        2026-09-28 stand hier kein Quellen-Zusammenhang, und der Test lief mit der
+        Standardquelle ``loopback`` durch — genau der Fall, den der Betreiber
+        entschieden hat: steht die Liste auf PC-Audio, fuehrt Audio, nicht das Lied."""
         mgr = get_bpm_manager()
         mgr.reset()
         mp = MediaPlayer()
         mp.set_playlist_dicts([{"path": "a.mp3", "title": "A", "bpm": 150}])
         mp.couple_bpm = True
-        mp._apply_track_bpm()
+        with mock.patch("src.ui.bpm_source_controller.song_may_lead", return_value=True):
+            mp._apply_track_bpm()
         self.assertAlmostEqual(mgr.bpm, 150.0, delta=1.0)
+
+    def test_no_coupling_when_another_source_is_chosen(self):
+        """Gegenprobe zum vorigen Test (BPM-17): steht die Quelle-Liste auf etwas
+        anderem als „Lied-Analyse", koppelt die Nominal-BPM NICHT — auch dann nicht,
+        wenn gerade kein Live-Audio laeuft."""
+        mgr = get_bpm_manager()
+        mgr.reset()
+        mp = MediaPlayer()
+        mp.set_playlist_dicts([{"path": "a.mp3", "title": "A", "bpm": 150}])
+        mp.couple_bpm = True
+        with mock.patch("src.ui.bpm_source_controller.song_may_lead", return_value=False):
+            mp._apply_track_bpm()
+        self.assertEqual(mgr.bpm, 0.0)
 
     def test_no_coupling_when_disabled(self):
         mgr = get_bpm_manager()

@@ -22,6 +22,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   — der Knopf „Im Player laden & als BPM-Quelle nutzen" im Generator tut das von selbst.
   Lässt sich die gewählte Quelle ausnahmsweise gar nicht ermitteln, führt das Lied wie bisher
   weiter; die Regel ist eine Präzisierung, kein Schutzmechanismus.
+  **Das betrifft auch, wer die Quelle nie angefasst hat:** die Voreinstellung ist **PC-Audio**,
+  und damit koppelt ein Lied jetzt nicht mehr von selbst — vorher tat es das immer dann, wenn
+  gerade kein Ton ankam. Zwei Bestandstests hatten genau diese alte Annahme festgehalten und
+  sind mitgezogen.
 
 ### 2026-09-24 — VC-Taste „Musik-BPM" stellt die Quelle-Liste mit um (BPM-16)
 
