@@ -180,10 +180,11 @@ def _prism_facets(attrs: dict, channels) -> int | None:
     return 0 if wert <= 0 else PRISM_FACETTEN_FALLBACK
 
 
-def _mit_fein(pt: dict, achse: str, default: int = 128):
-    """Grobwert + ``<achse>_fine``/256 (VIZ-61); ohne oder mit 0 Fein der Grobwert."""
-    grob = pt.get(achse, default)
-    fein = pt.get(f"{achse}_fine", 0)
+def _mit_fein(pt: dict, achse: str, default: int = 128, sfx: str = ""):
+    """Grobwert + ``<achse>_fine``/256 (VIZ-61); ohne oder mit 0 Fein der Grobwert.
+    ``sfx`` = Kopf-Suffix (``"#1"`` …) fuer ``pan#1``/``pan_fine#1`` (VIZ-63)."""
+    grob = pt.get(f"{achse}{sfx}", default)
+    fein = pt.get(f"{achse}_fine{sfx}", 0)
     try:
         fein = int(fein)
     except (TypeError, ValueError):
@@ -273,12 +274,18 @@ def _build_fixture_payload(fixture, attrs: dict[str, int],
     head_count = _multihead_count(attrs)
     if head_count >= 2:
         heads = []
-        tilt_keys = ["tilt"] + [f"tilt#{h}" for h in range(1, head_count)]
-        tilt_sources = [attrs[k] for k in tilt_keys if k in attrs]
+        # VIZ-63: Pan/Tilt je Kopf aus ``pt`` (invert/swap zurueckgenommen, wie
+        # fuer das Gesamtgeraet) und mit Feinkanal — bis 2026-09-29 kamen sie aus
+        # den DRAHT-Werten ``attrs``: eine Mover-Bar mit ``invert_pan`` stand im
+        # Bild spiegelverkehrt zum echten Geraet, obwohl ``unapply`` die Koepfe
+        # seit OUT-55 laengst kann.
+        tilt_keys = [""] + [f"#{h}" for h in range(1, head_count)]
+        tilt_sources = [_mit_fein(pt, "tilt", sfx=k) for k in tilt_keys
+                        if f"tilt{k}" in pt]
         # Spider-Sonderfall: zwei Tilts aus pan+tilt, wenn zu wenige echte Tilts da
         # sind (der Spider hat kein zweites Tilt-Attribut, nutzt pan als Bar-0-Tilt).
-        if len(tilt_sources) < head_count and "pan" in attrs:
-            tilt_sources = [attrs["pan"]] + tilt_sources
+        if len(tilt_sources) < head_count and "pan" in pt:
+            tilt_sources = [pan] + tilt_sources
         while len(tilt_sources) < head_count:
             tilt_sources.append(tilt_sources[-1] if tilt_sources else tilt)
         for h in range(head_count):
@@ -302,7 +309,8 @@ def _build_fixture_payload(fixture, attrs: dict[str, int],
                 "g": hrgb[1],
                 "b": hrgb[2],
                 "cr": hr, "cg": hg, "cb": hb, "cw": hw,
-                "pan": attrs.get(f"pan{sfx}", pan),   # FM-2: pro-Kopf-Pan (Mover-Bar)
+                # FM-2: pro-Kopf-Pan (Mover-Bar); VIZ-63: Modellwert mit Fein
+                "pan": _mit_fein(pt, "pan", sfx=sfx) if f"pan{sfx}" in pt else pan,
                 "tilt": tilt_sources[h],
             })
         payload["heads"] = heads
