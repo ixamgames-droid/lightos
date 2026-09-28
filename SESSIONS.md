@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| _(frei)_ |  |  |  |  |
+| FM-49 | A | fix/fm49-import-zuordnung | 2026-09-28T23:27Z | src/core/database/qxf_import.py,src/core/database/fixture_db.py |
 
 ## Blocker & Fallen
 
@@ -128,7 +128,6 @@
 
 ## Verlauf
 
-- 2026-09-16T16:03Z A claim BPM-13
 - 2026-09-16T16:38Z A done BPM-13
 - 2026-09-16T16:44Z A claim DOC-BPM
 - 2026-09-16T17:29Z A done DOC-BPM
@@ -158,3 +157,4 @@
 - 2026-09-28T22:34Z A done LAS-21
 - 2026-09-28T23:16Z A done FM-50
 - 2026-09-28T23:27Z A done FM-48
+- 2026-09-28T23:27Z A claim FM-49
