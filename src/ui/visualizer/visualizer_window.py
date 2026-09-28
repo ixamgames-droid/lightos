@@ -54,7 +54,7 @@ from src.core.stage.coords import (
     live_to_world3d, world3d_to_live, default_height_for, normalize_rotation,
 )
 from src.core.stage.aim import (
-    aim_pan_tilt, aim_orientation, plane_basis,
+    aim_pan_tilt, aim_pan_tilt_16, aim_orientation, plane_basis,
     circle_points, rect_points, line_points, trace_pan_tilt,
 )
 from src.core.stage import scene_commands as _scmd
@@ -1249,6 +1249,41 @@ class VisualizerBridge(QObject):
         tilts = attrs.count("tilt")
         return min(pans, tilts) if (pans >= 2 and tilts >= 2) else 0
 
+    def _aim_values(self, f, pos, target, rot, n_heads: int = 1) -> dict:
+        """Pan/Tilt fuers Zielen als ``{attr: wert}`` — mit Feinkanal, wenn das
+        Geraet einen hat (VIZ-61).
+
+        Mit ``pan_fine``/``tilt_fine`` (bei einer Bar: je Kopf einer) wird der
+        16-Bit-Wert auf Grob + Fein verteilt — ein 8-Bit-Schritt sind bei 540 Grad
+        2,11 Grad, auf 5 m Wurf 18 cm; zwei Strahlen bekommt man so nie zur Deckung
+        (VIZ-60 am echten Rig). OHNE Feinkanal bleibt es beim gerundeten 8-Bit-Wert,
+        byte-genau wie vorher (Positivkontrolle), und ``*_fine`` wird auf 0 gesetzt,
+        damit kein alter Feinwert im Programmer stehen bleibt.
+
+        Achsen einzeln: ein Geraet mit Pan-Fein, aber ohne Tilt-Fein bekommt nur
+        dort 16 Bit. Die Kanalliste wird ueber ``getattr`` gelesen — Bestandstests
+        fahren den Handler mit einem ``SimpleNamespace``-self (s. ``aimFixturesAt``)."""
+        kw = dict(
+            pan_range_deg=float(getattr(f, "pan_range_deg", 540) or 540),
+            tilt_range_deg=float(getattr(f, "tilt_range_deg", 270) or 270),
+            pan_zero_dmx=float(getattr(f, "pan_zero_dmx", 128) or 128),
+            tilt_zero_dmx=float(getattr(f, "tilt_zero_dmx", 128) or 128),
+        )
+        try:
+            attrs = [(getattr(c, "attribute", "") or "") for c
+                     in get_channels_for_patched(f)]
+        except Exception:
+            attrs = []
+        grob8 = aim_pan_tilt(pos, target, rot, **kw)
+        fein16 = aim_pan_tilt_16(pos, target, rot, **kw)
+        out = {}
+        for achse, a8, a16 in (("pan", grob8[0], fein16[0]), ("tilt", grob8[1], fein16[1])):
+            if attrs.count(f"{achse}_fine") >= max(1, n_heads):
+                out[achse], out[f"{achse}_fine"] = a16 >> 8, a16 & 0xFF
+            else:
+                out[achse], out[f"{achse}_fine"] = a8, 0
+        return out
+
     @Slot(str)
     @_bridge_slot_guard
     def aimFixturesAt(self, json_str: str):
@@ -1290,16 +1325,10 @@ class VisualizerBridge(QObject):
                 # vor allem: es schreibt ECHTE Kanaele, waehrend die
                 # Gehaeuse-Drehung am Rig gar nichts tat.
                 rot = normalize_rotation(self._state.visualizer_rotations.get(fid))
-                pan, tilt = aim_pan_tilt(
-                    pos, target, rot,
-                    pan_range_deg=float(getattr(f, "pan_range_deg", 540) or 540),
-                    tilt_range_deg=float(getattr(f, "tilt_range_deg", 270) or 270),
-                    pan_zero_dmx=float(getattr(f, "pan_zero_dmx", 128) or 128),
-                    tilt_zero_dmx=float(getattr(f, "tilt_zero_dmx", 128) or 128),
-                )
+                werte = VisualizerBridge._aim_values(self, f, pos, target, rot, n_heads=n_bar)
                 for _h in range(n_bar):
-                    self._state.set_programmer_value(fid, "pan", pan, head=_h)
-                    self._state.set_programmer_value(fid, "tilt", tilt, head=_h)
+                    for attr, wert in werte.items():
+                        self._state.set_programmer_value(fid, attr, wert, head=_h)
                 n_mh += 1
             elif self._is_moving_head(f):
                 # VIZ-55: KEINE invert/swap-Flags an aim_pan_tilt. Der Programmer
@@ -1309,18 +1338,10 @@ class VisualizerBridge(QObject):
                 # standen sie hier und wurden damit ZWEIMAL angewandt: an Davids
                 # Hero Spot 90 (invert_pan) zeigte der Strahl dadurch nach hinten
                 # statt auf den angetippten Punkt (gemessen, nicht geschlossen).
+                # VIZ-61: mit Feinkanal 16 Bit statt fest ``*_fine = 0``.
                 rot = normalize_rotation(self._state.visualizer_rotations.get(fid))
-                pan, tilt = aim_pan_tilt(
-                    pos, target, rot,
-                    pan_range_deg=float(getattr(f, "pan_range_deg", 540) or 540),
-                    tilt_range_deg=float(getattr(f, "tilt_range_deg", 270) or 270),
-                    pan_zero_dmx=float(getattr(f, "pan_zero_dmx", 128) or 128),
-                    tilt_zero_dmx=float(getattr(f, "tilt_zero_dmx", 128) or 128),
-                )
-                self._state.set_programmer_value(fid, "pan", pan)
-                self._state.set_programmer_value(fid, "tilt", tilt)
-                self._state.set_programmer_value(fid, "pan_fine", 0)
-                self._state.set_programmer_value(fid, "tilt_fine", 0)
+                for attr, wert in VisualizerBridge._aim_values(self, f, pos, target, rot).items():
+                    self._state.set_programmer_value(fid, attr, wert)
                 n_mh += 1
             else:
                 rx, ry, rz = aim_orientation(pos, target)

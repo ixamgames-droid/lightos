@@ -180,6 +180,17 @@ def _prism_facets(attrs: dict, channels) -> int | None:
     return 0 if wert <= 0 else PRISM_FACETTEN_FALLBACK
 
 
+def _mit_fein(pt: dict, achse: str, default: int = 128):
+    """Grobwert + ``<achse>_fine``/256 (VIZ-61); ohne oder mit 0 Fein der Grobwert."""
+    grob = pt.get(achse, default)
+    fein = pt.get(f"{achse}_fine", 0)
+    try:
+        fein = int(fein)
+    except (TypeError, ValueError):
+        return grob
+    return grob + fein / 256.0 if fein else grob
+
+
 def _build_fixture_payload(fixture, attrs: dict[str, int],
                            channels=None) -> dict[str, object]:
     """Baut den Pro-Fixture-Payload (inkl. Spider-/Bar-``heads``-Array). Seit
@@ -210,8 +221,14 @@ def _build_fixture_payload(fixture, attrs: dict[str, int],
     # gesetzte Flag gibt die Funktion das Original unveraendert zurueck (kein
     # Overhead im Takt).
     pt = unapply_pan_tilt_orientation(fixture, attrs)
-    pan = pt.get("pan", 128)
-    tilt = pt.get("tilt", 128)
+    # VIZ-61: der Feinkanal gehoert ins Bild. Bis 2026-09-28 trug der Payload nur
+    # den Grobwert — eine reine Feinkorrektur (Zielen/Einmessen in 16 Bit) waere
+    # am Geraet sichtbar und im 3D unsichtbar gewesen. ``pt`` hat invert/swap
+    # schon zurueckgenommen, und zwar als 16-Bit-Paar; die JS-Winkelformel
+    # (``builders.js::applyPanTilt``) rechnet ohnehin stufenlos. Fein = 0 laesst
+    # den Wert als ganze Zahl stehen (byte-gleicher Payload, kein Diff im Takt).
+    pan = _mit_fein(pt, "pan")
+    tilt = _mit_fein(pt, "tilt")
     payload: dict[str, object] = {
         "fid": fixture.fid,
         "r": r,
