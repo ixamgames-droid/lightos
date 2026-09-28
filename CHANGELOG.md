@@ -7,6 +7,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-28 — 3D-Zielen: Moving Heads mit Feinkanal treffen jetzt auf den Millimeter (VIZ-61)
+
+#### Verbessert
+
+- **„⌖ Zielen" im Visualizer nutzt die Feinkanäle.** Bisher rechnete das Zielen nur in ganzen
+  DMX-Schritten und setzte `Pan fein`/`Tilt fein` fest auf 0. Ein Schritt sind bei 540° Pan gut
+  2°, auf 5 m Wurf rund 18 cm — zwei Strahlen ließen sich so nie genau zur Deckung bringen. Hat
+  ein Gerät Feinkanäle, verteilt LightOS den Wert jetzt auf Grob + Fein: auf der Rig-Geometrie von Robin
+  gemessen trifft der Strahl auf **unter 0,5 mm** statt bis zu ~1 cm auf 2,5 m. Das gilt auch für
+  Mover-Bars (je Kopf), die ihre Feinkanäle bisher gar nicht bekamen, und je Achse einzeln.
+  Geräte **ohne** Feinkanal verhalten sich genau wie vorher.
+- **Das 3D zeigt die feine Stellung mit.** Vorher kam nur der Grobwert im Bild an; eine feine
+  Korrektur wäre am Gerät sichtbar gewesen und im Visualizer nicht.
+
 ### 2026-09-28 — BPM: der Menüpunkt „OS2L-Server" stellt die Quelle um (BPM-18)
 
 #### Behoben

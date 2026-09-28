@@ -73,7 +73,28 @@ def _clamp(v, lo, hi):
     return lo if v < lo else (hi if v > hi else v)
 
 
-def aim_pan_tilt(
+def aim_pan_tilt(pos, target, rot_deg=(0.0, 0.0, 0.0), **kw):
+    """Pan/Tilt als ganze 8-Bit-DMX-Werte (0..255) — siehe :func:`_aim_dmx`.
+
+    Ein Schritt sind bei 540 Grad Pan 2,11 Grad, auf 5 m Wurf 18 cm. Fuer Geraete
+    mit Feinkanaelen :func:`aim_pan_tilt_16` benutzen (VIZ-61)."""
+    pan, tilt = _aim_dmx(pos, target, rot_deg, **kw)
+    return (int(round(pan)), int(round(tilt)))
+
+
+def aim_pan_tilt_16(pos, target, rot_deg=(0.0, 0.0, 0.0), **kw):
+    """Pan/Tilt als 16-Bit-Werte (0..65535) fuer Grob- + Feinkanal (VIZ-61).
+
+    Dieselbe Rechnung wie :func:`aim_pan_tilt`, nur ohne das Runden auf ganze
+    DMX-Schritte: ``wert16 = modellwert * 256``, also Grob = ``wert16 >> 8``,
+    Fein = ``wert16 & 0xFF``. Das ist genau die Lesart der Ausgabestufe
+    (``apply_pan_tilt_orientation`` behandelt Grob/Fein als 16-Bit-Paar) und des
+    3D (``grob + fein/256``). Rest-Rundung: 1/256 DMX-Schritt."""
+    pan, tilt = _aim_dmx(pos, target, rot_deg, **kw)
+    return (min(65535, int(round(pan * 256.0))), min(65535, int(round(tilt * 256.0))))
+
+
+def _aim_dmx(
     pos,
     target,
     rot_deg=(0.0, 0.0, 0.0),
@@ -82,7 +103,7 @@ def aim_pan_tilt(
     pan_zero_dmx: float = 128.0,
     tilt_zero_dmx: float = 128.0,
 ):
-    """Pan/Tilt-DMX (0..255) berechnen, damit der Strahl von ``pos`` (mit Montage-
+    """Pan/Tilt-DMX STUFENLOS (0.0..255.0) berechnen, damit der Strahl von ``pos`` (mit Montage-
     Ausrichtung ``rot_deg`` = (rx,ry,rz) Grad) auf ``target`` zeigt.
 
     ``pan_range_deg``/``tilt_range_deg`` = physischer Bewegungsbereich des Geraets
@@ -90,7 +111,8 @@ def aim_pan_tilt(
     diesen Bereich, damit DMX UND 3D-Visualizer-Beam zusammenpassen. Defaults
     360/180/128 entsprechen der bisherigen (generischen) Abbildung.
 
-    ``pos`` / ``target``: (x, y, z) in Metern. Gibt ``(pan, tilt)`` als ints zurueck.
+    ``pos`` / ``target``: (x, y, z) in Metern. Gibt ``(pan, tilt)`` als floats zurueck
+    (die oeffentlichen Huellen runden auf 8 bzw. 16 Bit).
     Bei ``pos == target`` (kein Richtungsvektor) -> Ruhelage (Nullpunkt).
 
     Das Ergebnis ist ein MODELL-Wert und gehoert so in den Programmer bzw. in
@@ -102,7 +124,7 @@ def aim_pan_tilt(
     dz = float(target[2]) - float(pos[2])
     length = math.sqrt(dx * dx + dy * dy + dz * dz)
     if length < 1e-9:
-        return (int(round(pan_zero_dmx)), int(round(tilt_zero_dmx)))
+        return (float(pan_zero_dmx), float(tilt_zero_dmx))
     dw = (dx / length, dy / length, dz / length)
 
     # Montage-Rotation entfernen -> Richtung im lokalen Kopf-Frame
@@ -128,9 +150,7 @@ def aim_pan_tilt(
     pan = pan_zero_dmx + (math.degrees(pan_rad) / half_pan) * 128.0
     tilt = tilt_zero_dmx + (math.degrees(theta) / half_tilt) * 128.0
 
-    pi = int(round(_clamp(pan, 0.0, 255.0)))
-    ti = int(round(_clamp(tilt, 0.0, 255.0)))
-    return (pi, ti)
+    return (_clamp(pan, 0.0, 255.0), _clamp(tilt, 0.0, 255.0))
 
 
 # ── Statische Fixtures (PAR etc.): die ganze Montage-Ausrichtung drehen ──────
