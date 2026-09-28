@@ -36,6 +36,8 @@ class _FakePatchedFixture:
     tilt_range_deg: int = 270
     pan_zero_dmx: int = 128
     tilt_zero_dmx: int = 128
+    aim_offset_pan: float = 0.0      # VIZ-55: Einmess-Versatz (Attrappe folgt dem Modell)
+    aim_offset_tilt: float = 0.0
     manufacturer_name: str = ""
     fixture_name: str = ""
     fixture_type: str = "other"

@@ -96,6 +96,10 @@ def _copy_fixture(src: PatchedFixture, fid: int, universe: int,
         tilt_range_deg=src.tilt_range_deg,
         pan_zero_dmx=src.pan_zero_dmx,
         tilt_zero_dmx=src.tilt_zero_dmx,
+        # VIZ-55: der Einmess-Versatz gehoert zum KONKRETEN Geraet am konkreten
+        # Standort — eine Kopie haengt woanders und startet uneingemessen.
+        aim_offset_pan=0.0,
+        aim_offset_tilt=0.0,
         # LAS-05: sonst wuerde die Kopie eines Netzwerk-Lasers still zum
         # DMX-Geraet (ORM-Default 'dmx') und verloere ihre Ziel-IP.
         protocol=getattr(src, "protocol", "dmx") or "dmx",

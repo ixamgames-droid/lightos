@@ -1,6 +1,7 @@
 """2D Top-Down Live-View - zeigt alle gepatchten Fixtures aus der Vogelperspektive."""
 from __future__ import annotations
 import json
+from src.core.stage.einmessen import effektive_nullpunkte   # VIZ-55
 import math
 import os
 import time
@@ -1298,10 +1299,9 @@ class StageCanvas(QWidget):
                     _ring = 0
             _pr = float(getattr(fixture, "pan_range_deg", 540) or 540)
             _tr = float(getattr(fixture, "tilt_range_deg", 270) or 270)
-            _pz = getattr(fixture, "pan_zero_dmx", 128)
-            _tz = getattr(fixture, "tilt_zero_dmx", 128)
-            _pz = 128 if _pz is None else _pz
-            _tz = 128 if _tz is None else _tz
+            # VIZ-55: effektiver Nullpunkt (inkl. Einmess-Versatz), dieselbe Quelle
+            # wie Zielen und 3D.
+            _pz, _tz = effektive_nullpunkte(fixture)
             # UI-26: Label-Detailgrad aus dem Bildschirm-Nachbarabstand. Selektierte
             # oder hervorgehobene Fixtures bekommen IMMER das volle Label (der Nutzer
             # will genau die sehen), unabhaengig von der Dichte.

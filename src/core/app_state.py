@@ -1284,6 +1284,7 @@ class AppState:
             # Diesmal von Anfang an, statt sie beim naechsten Vorfall zu finden.
             "element_rotation", "element_flip",
             "pan_range_deg", "tilt_range_deg", "pan_zero_dmx", "tilt_zero_dmx",
+            "aim_offset_pan", "aim_offset_tilt",
             "protocol", "net_host",
         }
         values = {k: v for k, v in changes.items() if k in allowed}
@@ -1319,6 +1320,10 @@ class AppState:
                     "pan_range_deg", "tilt_range_deg", "pan_zero_dmx", "tilt_zero_dmx"):
             if key in values:
                 values[key] = int(values[key])
+        for key in ("aim_offset_pan", "aim_offset_tilt"):      # VIZ-55: Kommazahl
+            if key in values:
+                from src.core.stage.einmessen import normiere_versatz
+                values[key] = normiere_versatz(values[key])
 
         changed = any(before.get(k) != values.get(k) for k in values.keys())
         if not changed:
@@ -1379,6 +1384,8 @@ class AppState:
             "tilt_range_deg": getattr(f, "tilt_range_deg", 270),
             "pan_zero_dmx": getattr(f, "pan_zero_dmx", 128),
             "tilt_zero_dmx": getattr(f, "tilt_zero_dmx", 128),
+            "aim_offset_pan": float(getattr(f, "aim_offset_pan", 0.0) or 0.0),
+            "aim_offset_tilt": float(getattr(f, "aim_offset_tilt", 0.0) or 0.0),
             "manufacturer_name": f.manufacturer_name,
             "fixture_name": f.fixture_name,
             "fixture_type": f.fixture_type,
@@ -1387,6 +1394,7 @@ class AppState:
         }
 
     def _restore_fixture_dict(self, d: dict):
+        from src.core.stage.einmessen import normiere_versatz as _normiere_versatz
         f = PatchedFixture(
             fid=d["fid"], label=d.get("label", ""),
             fixture_profile_id=d.get("fixture_profile_id", 0),
@@ -1410,6 +1418,8 @@ class AppState:
             tilt_range_deg=d.get("tilt_range_deg", 270),
             pan_zero_dmx=d.get("pan_zero_dmx", 128),
             tilt_zero_dmx=d.get("tilt_zero_dmx", 128),
+            aim_offset_pan=_normiere_versatz(d.get("aim_offset_pan", 0.0)),
+            aim_offset_tilt=_normiere_versatz(d.get("aim_offset_tilt", 0.0)),
             manufacturer_name=d.get("manufacturer_name", ""),
             fixture_name=d.get("fixture_name", ""),
             fixture_type=d.get("fixture_type", "other"),

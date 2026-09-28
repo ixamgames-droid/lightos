@@ -7,6 +7,30 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-28 — 3D-Visualizer: Moving Heads am echten Aufbau einmessen (VIZ-55)
+
+#### Neu
+
+- **Einmessen im Visualizer** (Reiter **Fixtures** → Gruppe **Einmessen**): mit ⌖ auf einen
+  Punkt zielen, den Strahl mit **Pan/Tilt −/+** schieben, bis er am echten Gerät sitzt,
+  **„Sitzt — merken"**. Ab dann trifft das Zielen diesen Punkt. Ab **vier** Punkten rechnet
+  LightOS aus, wo der Kopf wirklich hängt und wie er gedreht ist, prüft das gegen und bietet
+  **„Position übernehmen"** an — danach stimmt das Zielen überall, auch an nie angetippten
+  Punkten, und das 3D zeigt den Kopf am echten Ort. Funktioniert für stehende, hängende und
+  seitlich montierte Köpfe an beliebiger Stelle. Anleitung:
+  `docs/anleitung_einmessen/ANLEITUNG_EINMESSEN.md`.
+- Die Korrektur wird mit der Show gespeichert und lässt sich rückgängig machen; alte Shows
+  laden unverändert.
+
+#### Verbessert
+
+- Die Reiter im Visualizer **scrollen** jetzt — auf Bildschirmen mit 768 px Höhe wurde das
+  Ende des Fixtures-Reiters bisher abgeschnitten.
+- Ein im Patch geänderter **Nullpunkt** kommt jetzt sofort im 3D an, nicht erst nach einem
+  Neuaufbau der Szene.
+- Ein Pan-/Tilt-Nullpunkt von **0** wird beim Zielen nicht mehr als 128 gelesen — Zielen,
+  3D und 2D-Ansicht lesen den Nullpunkt jetzt an einer Stelle.
+
 ### 2026-09-28 — 3D-Zielen: Moving Heads mit Feinkanal treffen jetzt auf den Millimeter (VIZ-61)
 
 #### Verbessert
