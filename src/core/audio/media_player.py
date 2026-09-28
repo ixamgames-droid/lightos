@@ -313,9 +313,19 @@ class MediaPlayer(QObject):
             print(f"[MediaPlayer] Abspielen fehlgeschlagen ({t.path}): {e}")
 
     def _apply_track_bpm(self):
-        """Nominal-BPM des aktuellen Tracks als FALLBACK setzen (OS2L hat Vorrang)."""
+        """Nominal-BPM des aktuellen Tracks als FALLBACK setzen (OS2L hat Vorrang).
+
+        Setzt nur, wenn in „Erkennung" **Lied-Analyse (Player)** gewaehlt ist
+        (BPM-17) — sonst fuehrte ein Lied das Tempo auch bei Quelle „Aus"/„OS2L",
+        waehrend die Anzeige etwas anderes sagte."""
         if not self.couple_bpm:
             return
+        try:                                    # fail-open, s. ``song_may_lead``
+            from src.ui.bpm_source_controller import song_may_lead
+            if not song_may_lead():
+                return
+        except Exception as e:
+            print(f"[MediaPlayer] gewaehlte Quelle nicht ermittelbar: {e}")
         t = self.current_track
         if t is None or t.bpm <= 0:
             return

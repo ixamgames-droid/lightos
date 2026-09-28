@@ -59,9 +59,12 @@ Der Sub-Tab **Erkennung** zeigt ohne Klick genau **sechs Bedienelemente**; alles
 
 1. **Manuell** (auch durch TAP ab dem dritten Tipp im Takt oder durch Nudge) und **🔒 Tempo einfrieren** stehen über allem: solange eins davon gilt, ändert keine Quelle das Tempo.
 2. **PC-Audio / Eingang:** hört LightOS live mit, führt allein die Erkennung. Die Lied-Analyse und die Nominal-BPM des Players kommen dann nicht durch.
-3. Sonst — bei Quelle **Lied-Analyse (Player)**, aber auch bei **Aus** und **OS2L** — führt in **Auto** ein im Player laufendes, im Generator **analysiertes** Lied mit seiner BPM-Kurve. Ein Lied ohne Analyse setzt beim Start seine Nominal-BPM (bei OS2L nur, solange das DJ-Programm noch kein Tempo geschickt hat). Bei OS2L schreiben DJ-Programm und Lied-Kurve dann beide ins Tempo. Wer das nicht will, nimmt im **Musik**-Tab den Haken **BPM koppeln** heraus.
+3. **Lied-Analyse (Player):** in **Auto** führt ein im Player laufendes, im Generator **analysiertes** Lied mit seiner BPM-Kurve. Ein Lied ohne Analyse setzt beim Start seine Nominal-BPM — Voraussetzung ist der Haken **BPM koppeln** im **Musik**-Tab.
+4. **Aus** und **OS2L:** das Lied führt **nicht**. Bei **OS2L** kommt das Tempo allein vom DJ-Programm, bei **Aus** ändert gar keine Quelle die BPM.
 
-Die **Quelle**-Liste schaltet also Mithören und OS2L-Server; sie sperrt die Lied-Analyse nicht. Der Generator-Knopf schaltet genauso um wie eine Auswahl in der Liste.
+Die **Quelle**-Liste entscheidet also, **wer führen darf** — nicht nur, ob mitgehört wird. Der Generator-Knopf schaltet genauso um wie eine Auswahl in der Liste.
+
+> **Seit 2026-09-28 (BPM-17) geändert:** vorher führte ein analysiertes Lied auch bei **Aus** und **OS2L**. Bei „Aus" sagten Statuszeile und Zustandswort dann „Erkennung aus", während die BPM dem Lied folgte; bei OS2L schrieben DJ-Programm und Lied-Kurve beide ins Tempo. Wenn bei dir ein Lied das Licht treiben soll, muss die Quelle jetzt auf **Lied-Analyse (Player)** stehen.
 
 ## Erweitert (Tempo-Bereich, Vorlage, Beats/Takt, Beat-Latenz, Einfrieren, Nudge, Taktgenau)
 

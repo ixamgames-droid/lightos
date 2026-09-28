@@ -122,6 +122,7 @@ class SourceController:
         self._last_audio: tuple[str, str | None] | None = None
         self._last_other: tuple[str, str | None] | None = None
         self._seeded = False
+        self._saved_kind: str | None = None   # BPM-17: gespeicherte Quelle, s. _seed_memory
 
     # ── Backends lazily (Singletons; Tests reichen Fakes herein) ────────────
     def _manager(self):
@@ -198,6 +199,25 @@ class SourceController:
 
     def is_audio(self) -> bool:
         return self.kind in AUDIO_KINDS
+
+    def chosen_kind(self) -> str | None:
+        """Die vom Nutzer GEWAEHLTE Quellenart (BPM-17) — auch dann, wenn der
+        Controller selbst noch nichts geschaltet hat.
+
+        Reihenfolge: ``wanted`` (der Wunsch, auch bei fehlendem Sink) vor
+        ``current`` (das Aufgeloeste) vor der **gespeicherten** Quelle aus
+        ``bpm_settings``. Der letzte Schritt ist der wichtige: fuer „Lied-Analyse"
+        und „Aus" schaltet der Auto-Start beim Hochfahren **nichts**, der
+        Controller haette sonst bis zum ersten Wechsel keine Meinung — und ein
+        gespeichertes „Lied-Analyse" wuerde nach jedem Neustart als „unbekannt"
+        gelten. Kostet nichts im Dauerbetrieb: ``_seed_memory`` liest die Datei
+        genau einmal."""
+        if self._wanted:
+            return self._wanted[0]
+        if self._current:
+            return self._current[0]
+        self._seed_memory()
+        return self._saved_kind
 
     def apply(self, kind: str, device: str | None = None, force: bool = False) -> bool:
         """Quelle schalten. Liefert False, wenn der Eintrag schon aktiv war (idempotent)."""
@@ -365,6 +385,7 @@ class SourceController:
             _log(f"Einstellungen: {e}")
             return
         kind = s.get("source")
+        self._saved_kind = kind if kind in KINDS else None
         if kind in AUDIO_KINDS:
             if self._last_audio is None:
                 self._last_audio = (kind, s.get("device") or None)
@@ -421,3 +442,25 @@ def get_source_controller() -> SourceController:
     if _controller is None:
         _controller = SourceController()
     return _controller
+
+
+def song_may_lead() -> bool:
+    """Darf die Lied-Analyse (bzw. die Nominal-BPM eines Tracks) das Tempo setzen?
+    (BPM-17)
+
+    **Ja nur, wenn die gewaehlte Quelle „Lied-Analyse" ist.** Bis 2026-09-28 fragten
+    ``MusicShowDirector._on_position`` und ``MediaPlayer._apply_track_bpm`` nur
+    ``mgr.audio_active`` — gemessen fuehrte ein analysiertes Lied damit auch bei
+    Quelle **Aus** (waehrend Statuszeile und Zustandswort „Erkennung aus" sagten)
+    und bei **OS2L** (dann schrieben DJ-Programm und Lied-Kurve beide ins Tempo).
+
+    **Fail-open:** laesst sich die Quelle gar nicht ermitteln (kein Controller,
+    kaputte Einstellungen), liefert die Funktion ``True`` — das ist das Verhalten
+    von vorher. Ein Fehler in der Abfrage soll die BPM-Kopplung nicht stumm
+    abschalten; die Sperre ist eine Praezisierung, kein Schutzmechanismus."""
+    try:
+        kind = get_source_controller().chosen_kind()
+    except Exception as e:      # pragma: no cover - Verteidigung, s. Docstring
+        _log(f"gewaehlte Quelle nicht ermittelbar: {e}")
+        return True
+    return True if kind is None else kind == "song"

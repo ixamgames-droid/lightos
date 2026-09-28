@@ -7,6 +7,26 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-28 — BPM: die gewählte Quelle entscheidet, wer das Tempo führt (BPM-17)
+
+#### Geändert
+
+- **Ein analysiertes Lied führt nur noch bei Quelle „Lied-Analyse (Player)".** Bisher setzte
+  es die BPM in **Auto** auch bei **Aus** und **OS2L**: bei „Aus" sagten Statuszeile und
+  Zustandswort „Erkennung aus", während die BPM in Wirklichkeit dem Lied folgte; bei **OS2L**
+  schrieben DJ-Programm und Lied-Kurve beide ins Tempo. Dasselbe galt für die **Nominal-BPM**
+  eines Lieds ohne Analyse (Haken „BPM koppeln"). Jetzt gilt die Quelle-Liste: sie entscheidet
+  nicht nur, ob mitgehört wird, sondern **wer führen darf**. PC-Audio/Eingang und
+  Manuell/Einfrieren haben unverändert Vorrang.
+  **Wenn bei dir ein Lied das Licht treiben soll, stelle die Quelle auf „Lied-Analyse (Player)"**
+  — der Knopf „Im Player laden & als BPM-Quelle nutzen" im Generator tut das von selbst.
+  Lässt sich die gewählte Quelle ausnahmsweise gar nicht ermitteln, führt das Lied wie bisher
+  weiter; die Regel ist eine Präzisierung, kein Schutzmechanismus.
+  **Das betrifft auch, wer die Quelle nie angefasst hat:** die Voreinstellung ist **PC-Audio**,
+  und damit koppelt ein Lied jetzt nicht mehr von selbst — vorher tat es das immer dann, wenn
+  gerade kein Ton ankam. Zwei Bestandstests hatten genau diese alte Annahme festgehalten und
+  sind mitgezogen.
+
 ### 2026-09-24 — VC-Taste „Musik-BPM" stellt die Quelle-Liste mit um (BPM-16)
 
 #### Behoben

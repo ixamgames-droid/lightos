@@ -60,6 +60,11 @@ def test_track_timeline_defensive_from_dict():
 # ── MusicShowDirector treibt BPM aus der Timeline ─────────────────────────────
 
 def test_director_timeline_drives_bpm():
+    """BPM-17: der Director fuehrt nur bei gewaehlter Quelle „Lied-Analyse". Der
+    Test setzte das bis 2026-09-28 stillschweigend voraus und lief mit der
+    Standardquelle ``loopback`` durch; die Quelle ist jetzt ausdruecklich gesetzt.
+    Die Sperre selbst je Quelle deckt ``test_bpm17_quelle_sperrt_lied.py`` ab."""
+    from unittest import mock
     from src.core.audio.music_show import MusicShowDirector
     mgr = get_bpm_manager()
     mgr.reset()
@@ -74,12 +79,13 @@ def test_director_timeline_drives_bpm():
     mp.couple_bpm = True
 
     d = MusicShowDirector()
-    d._on_position(300, 20000)
-    assert abs(mgr.bpm - 120.0) < 1.0
-    assert mgr.current_source == "timeline"
+    with mock.patch("src.ui.bpm_source_controller.song_may_lead", return_value=True):
+        d._on_position(300, 20000)
+        assert abs(mgr.bpm - 120.0) < 1.0
+        assert mgr.current_source == "timeline"
 
-    d._on_position(10000, 20000)
-    assert abs(mgr.bpm - 140.0) < 1.0
+        d._on_position(10000, 20000)
+        assert abs(mgr.bpm - 140.0) < 1.0
 
     # Aufraeumen
     mp.set_tracks([])
