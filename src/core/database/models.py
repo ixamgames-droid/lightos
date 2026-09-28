@@ -229,6 +229,10 @@ class PatchedFixture(Base):
     tilt_range_deg: Mapped[int] = mapped_column(Integer, default=270)
     pan_zero_dmx: Mapped[int] = mapped_column(Integer, default=128)
     tilt_zero_dmx: Mapped[int] = mapped_column(Integer, default=128)
+    # VIZ-55 Stufe A: Einmess-Versatz (DMX, Kommazahl = 16-Bit-genau), wirkt als
+    # Verschiebung des Nullpunkts — gelesen NUR ueber einmessen.effektive_nullpunkte.
+    aim_offset_pan: Mapped[float] = mapped_column(Float, default=0.0)
+    aim_offset_tilt: Mapped[float] = mapped_column(Float, default=0.0)
 
     # LAS-04: Ausgabe-Protokoll des Geraets. "dmx" (Default) = klassischer
     # DMX-Adressraum (universe/address gelten). Netzwerk-Laser ("etherdream",
@@ -321,6 +325,11 @@ def migrate_show_db(engine) -> None:
                 if pcols and _col not in pcols:
                     conn.execute(text(
                         f"ALTER TABLE patched_fixtures ADD COLUMN {_col} INTEGER DEFAULT {_def}"))
+            # VIZ-55 Stufe A: Einmess-Versatz (Kommazahl, Default 0 = nie eingemessen).
+            for _col in ("aim_offset_pan", "aim_offset_tilt"):
+                if pcols and _col not in pcols:
+                    conn.execute(text(
+                        f"ALTER TABLE patched_fixtures ADD COLUMN {_col} REAL DEFAULT 0"))
             # LAS-04: Ausgabe-Protokoll (dmx | etherdream | idn).
             if pcols and "protocol" not in pcols:
                 conn.execute(text(

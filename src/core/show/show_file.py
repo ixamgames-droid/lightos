@@ -109,6 +109,12 @@ def _lenient(msg: str, exc: Exception) -> None:
         raise exc
 
 
+def _to_offset(value) -> float:
+    """Einmess-Versatz (VIZ-55) — dieselbe Normalisierung wie ``update_fixture``."""
+    from src.core.stage.einmessen import normiere_versatz
+    return normiere_versatz(value)
+
+
 def _to_int(value, default: int) -> int:
     try:
         return int(value)
@@ -164,6 +170,8 @@ def _fixture_to_dict(pf) -> dict:
             "tilt_range_deg": _to_int(pf.get("tilt_range_deg", 270), 270),
             "pan_zero_dmx": _to_int(pf.get("pan_zero_dmx", 128), 128),
             "tilt_zero_dmx": _to_int(pf.get("tilt_zero_dmx", 128), 128),
+            "aim_offset_pan": _to_offset(pf.get("aim_offset_pan", 0.0)),
+            "aim_offset_tilt": _to_offset(pf.get("aim_offset_tilt", 0.0)),
             "manufacturer_name": str(pf.get("manufacturer_name", "") or ""),
             "fixture_name": str(pf.get("fixture_name", "") or ""),
             "fixture_type": str(pf.get("fixture_type", "other") or "other"),
@@ -198,6 +206,8 @@ def _fixture_to_dict(pf) -> dict:
         "tilt_range_deg": _to_int(getattr(pf, "tilt_range_deg", 270), 270),
         "pan_zero_dmx": _to_int(getattr(pf, "pan_zero_dmx", 128), 128),
         "tilt_zero_dmx": _to_int(getattr(pf, "tilt_zero_dmx", 128), 128),
+        "aim_offset_pan": _to_offset(getattr(pf, "aim_offset_pan", 0.0)),
+        "aim_offset_tilt": _to_offset(getattr(pf, "aim_offset_tilt", 0.0)),
         "manufacturer_name": str(getattr(pf, "manufacturer_name", "") or ""),
         "fixture_name": str(getattr(pf, "fixture_name", "") or ""),
         "fixture_type": str(getattr(pf, "fixture_type", "other") or "other"),
@@ -246,6 +256,8 @@ def _patched_fixture_from_data(d: dict, fallback_fid: int):
         tilt_range_deg=_to_int(d.get("tilt_range_deg", 270), 270),
         pan_zero_dmx=_to_int(d.get("pan_zero_dmx", 128), 128),
         tilt_zero_dmx=_to_int(d.get("tilt_zero_dmx", 128), 128),
+        aim_offset_pan=_to_offset(d.get("aim_offset_pan", 0.0)),
+        aim_offset_tilt=_to_offset(d.get("aim_offset_tilt", 0.0)),
         manufacturer_name=str(d.get("manufacturer_name", "") or ""),
         fixture_name=str(d.get("fixture_name", "") or ""),
         fixture_type=str(d.get("fixture_type", "other") or "other"),
