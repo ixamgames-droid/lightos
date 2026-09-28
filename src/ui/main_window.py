@@ -2342,7 +2342,8 @@ class MainWindow(QMainWindow):
                 pass
 
     def _sync_os2l_action(self):
-        """Menue-Haken = ``os2l.is_running()`` (Quelle OS2L im Tab schaltet ihn mit)."""
+        """Menue-Haken = ``os2l.is_running()`` — seit BPM-18 schaltet der Haken selbst
+        die Quelle, Tab und Menue zeigen also dasselbe."""
         try:
             from src.core.audio.os2l import get_os2l_server
             self._act_os2l.setChecked(bool(get_os2l_server().is_running()))
@@ -2350,20 +2351,20 @@ class MainWindow(QMainWindow):
             pass
 
     def _toggle_os2l_server(self, checked: bool):
-        if checked:
-            try:
-                from src.core.audio.os2l import get_os2l_server
-                get_os2l_server().start()
-                self.statusBar().showMessage("OS2L-Server: TCP :1234", 4000)
-            except Exception as e:
-                self._act_os2l.setChecked(False)
-                QMessageBox.warning(self, "OS2L-Server Fehler", str(e))
-        else:
-            try:
-                from src.core.audio.os2l import get_os2l_server
-                get_os2l_server().stop()
-            except Exception:
-                pass
+        """BPM-18: der Menuepunkt stellt die BPM-QUELLE um (an = OS2L, aus = zurueck
+        zur Quelle davor) — ueber den SourceController, damit Liste in „Erkennung",
+        Server und Capture nicht mehr auseinanderlaufen. Vorher startete/stoppte er
+        den Server direkt."""
+        try:
+            from src.ui.bpm_source_controller import get_source_controller
+            ok, grund = get_source_controller().toggle_os2l(bool(checked))
+        except Exception as e:
+            ok, grund = False, str(e)
+        if checked and ok:
+            self.statusBar().showMessage("OS2L-Server: TCP :1234 — BPM-Quelle ist jetzt OS2L", 4000)
+        elif not ok:
+            QMessageBox.warning(self, "OS2L-Server Fehler", grund or "unbekannter Fehler")
+        self._sync_os2l_action()
 
     # ── QXF Import ────────────────────────────────────────────────────────────
 

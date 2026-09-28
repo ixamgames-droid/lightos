@@ -62,8 +62,8 @@ passiert automatisch:
   **PC-Audio (Player/Spotify)** wählen — dann erkennt LightOS das Tempo aus der laufenden Musik (den Modus setzt LightOS dabei automatisch auf AUTO)
   (im **Monitor** oben springt die große **BPM-Zahl** mit, z. B. ~150 BPM bei Hardstyle).
 - Am **taktgenausten** läuft es über **OS2L (VirtualDJ)**: als Quelle **OS2L (VirtualDJ)** wählen
-  und in VirtualDJ den OS2L-Versand aktivieren (in LightOS Menü *Ausgabe → OS2L-Server (Port 1234)*
-  aktivieren) —
+  (das startet den Server auf Port 1234 gleich mit — der Menüpunkt *Ausgabe → OS2L-Server (Port 1234)*
+  tut genau dasselbe und stellt die Quelle ebenfalls um) und in VirtualDJ den OS2L-Versand aktivieren —
   dann liefert der DJ-Player den exakten Takt statt der Audio-Schätzung.
 - Alternativ **MANUAL** mit **Tap-Tempo** (TAP), den **Nudge-Tasten** (±1/±5/±10) oder dem
   **BPM-Fader** in der VC.
