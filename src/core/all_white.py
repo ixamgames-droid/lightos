@@ -21,6 +21,8 @@ VIZ-COLORLESS: ohne Range-Daten wird nicht geraten).
 """
 from __future__ import annotations
 
+import re
+
 # Sentinel: „das Profil sagt nichts ueber einen offenen Zustand".
 _KEINE_ANGABE = -1
 
@@ -129,6 +131,38 @@ def white_attrs_for_fixture(channels, open_value_of_channel) -> dict[str, int]:
     return out
 
 
+# LAS-21: Geraete OHNE Licht — „Alles Weiss" ist ein Panik-Knopf fuer LICHT und
+# darf sie nicht anfassen. Gemessen (2026-09-28): ein DMX-Laser (L2600, 6 Kanaele)
+# bekam Shutter 128 = „An" plus eine Farbe, die Nebelmaschine N-10 ihren einzigen
+# Kanal auf 255 = Vollgas. Ausgerechnet in einer Paniksituation ein Laser ins
+# Publikum. Netzwerk-Laser waren schon aussen vor (kein DMX-Adressraum, LAS-04),
+# DMX-Laser nicht.
+_OHNE_LICHT_TYPEN = frozenset(("laser", "hazer", "haze", "fog", "smoke", "fogger"))
+_OHNE_LICHT_NAME = re.compile(
+    r"laser|\bfog|nebel|haze|hazer|smoke|\brauch|\bspark(ular)?\b|cold ?spark|funken"
+    r"|\bco2\b|bubble|seifenblase|konfetti|confetti|\bflammen?\b|\bflames?\b",
+    re.IGNORECASE)
+
+
+def ist_geraet_ohne_licht(fx, channels=()) -> bool:
+    """Laser, Nebel/Haze, Funken-, CO2-, Seifenblasen-, Konfetti-, Flammengeraete.
+
+    Erkannt am Typ, an ``laser_*``-Kanaelen oder — weil der Typ aus Importen oft
+    nur „other" ist (26 Nebel-/Haze-/Funkengeraete der Bibliothek) — am Geraete-
+    namen bzw. an der Beschriftung im Patch. Im Zweifel gilt ein Geraet als
+    „ohne Licht": eine ausgelassene Lampe im Panikfall ist harmlos, ein
+    eingeschalteter Laser nicht."""
+    typ = (getattr(fx, "fixture_type", "") or "").strip().lower()
+    if typ in _OHNE_LICHT_TYPEN:
+        return True
+    for c in channels or ():
+        if (getattr(c, "attribute", "") or "").startswith("laser_"):
+            return True
+    text = " ".join(str(getattr(fx, k, "") or "") for k in
+                    ("fixture_name", "label", "manufacturer_name"))
+    return bool(_OHNE_LICHT_NAME.search(text))
+
+
 def white_map(fixtures, channels_of, open_value_of_channel,
               exclude_fids=()) -> dict[int, dict[str, int]]:
     """Die Weiss-Schicht fuer eine ganze Geraeteliste.
@@ -144,7 +178,10 @@ def white_map(fixtures, channels_of, open_value_of_channel,
         fid = int(getattr(fx, "fid", -1))
         if fid < 0 or fid in aus:
             continue
-        attrs = white_attrs_for_fixture(channels_of(fx), open_value_of_channel)
+        kanaele = channels_of(fx)
+        if ist_geraet_ohne_licht(fx, kanaele):
+            continue                      # LAS-21: Laser/Nebel & Co. bleiben, wie sie sind
+        attrs = white_attrs_for_fixture(kanaele, open_value_of_channel)
         if attrs:
             layer[fid] = attrs
     return layer

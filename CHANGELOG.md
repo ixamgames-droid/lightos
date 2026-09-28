@@ -7,6 +7,17 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-28 — Sicherheit: „Alles Weiß“ lässt Laser und Nebel in Ruhe (LAS-21)
+
+#### Behoben
+
+- **„Alles Weiß“ schaltete einen DMX-Laser ein und die Nebelmaschine auf Vollgas.** Der
+  Panik-Knopf für Licht setzte bisher jedes gepatchte DMX-Gerät „voll auf“ — bei einem Laser
+  heißt das Shutter „An“ plus eine Farbe, bei einer Nebelmaschine 255 = maximaler Nebel.
+  Jetzt fasst er nur noch Lichtgeräte an: Laser, Nebel-/Haze-Maschinen, Funken-, CO₂-,
+  Seifenblasen-, Konfetti- und Flammengeräte bleiben, wie sie sind (erkannt am Gerätetyp, an
+  Laser-Kanälen oder am Namen — auch wenn ein Import den Typ nur als „other“ kennt).
+
 ### 2026-09-28 — 3D-Visualizer: Moving Heads am echten Aufbau einmessen (VIZ-55)
 
 #### Neu
