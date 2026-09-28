@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| _(frei)_ |  |  |  |  |
+| QA-80 | A | fix/qa80-detektor-budget-cpu | 2026-09-28T15:07Z | tests/test_beat_detector_robustness.py |
 
 ## Blocker & Fallen
 
@@ -127,7 +127,6 @@
 
 ## Verlauf
 
-- 2026-09-08T18:43Z B done XPLAT-38
 - 2026-09-14T10:22Z A done BPM-AREA
 - 2026-09-14T10:22Z A claim BPM-07
 - 2026-09-14T11:09Z A done BPM-07
@@ -157,3 +156,4 @@
 - 2026-09-28T14:28Z A done BPM-17
 - 2026-09-28T14:38Z A claim BPM-18
 - 2026-09-28T14:52Z A done BPM-18
+- 2026-09-28T15:07Z A claim QA-80
