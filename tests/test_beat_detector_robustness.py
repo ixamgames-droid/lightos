@@ -27,14 +27,16 @@ from src.core.audio.onset_flux import HighPass
 
 _T0 = None      # Start des ersten Tests DIESER Datei — nicht der Import: pytest sammelt alle
                 # Dateien vorab, mit anderen Dateien im selben Lauf waere das Budget schon weg
+_C0 = None      # dasselbe als CPU-Zeit dieses Prozesses (QA-80), s. test_zz_runtime_budget
 SR = 44100
 
 
 @pytest.fixture(autouse=True)
 def _budget_clock():
-    global _T0
+    global _T0, _C0
     if _T0 is None:
         _T0 = time.perf_counter()
+        _C0 = time.process_time()
     yield
 
 
@@ -349,4 +351,18 @@ def test_backbeat_halves_but_alternative_and_x2_correct():
 
 
 def test_zz_runtime_budget():
-    assert time.perf_counter() - _T0 < 5.0
+    """Rechenzeit-Waechter fuer den Detektor: die ganze Datei (12 Faelle, je einige
+    Sekunden Signal) muss in einem Budget bleiben — faellt es, ist der Detektor
+    grob langsamer geworden.
+
+    **Gemessen wird CPU-Zeit, nicht Wanduhrzeit (QA-80).** Bis 2026-09-28 stand hier
+    ``perf_counter() < 5.0``: lokal 3,5 s auf ruhiger Maschine, auf dem geteilten
+    CI-Rechner mit drei parallelen Spuren 5,15 s und 5,47 s — zweimal an einem Tag
+    rot auf ``main`` nach Merges, die den Detektor gar nicht beruehrten, gruen in
+    den PR-Laeufen davor. Die Wanduhr mass die Nachbarn mit. ``process_time`` zaehlt
+    nur, was dieser Prozess rechnet (lokal 3,6 s); 8 s lassen Platz fuer langsamere
+    CI-Kerne und fangen trotzdem jede Verdopplung. Die Wanduhr steht in der Meldung,
+    damit ein roter Lauf beide Zahlen zeigt."""
+    cpu = time.process_time() - _C0
+    wand = time.perf_counter() - _T0
+    assert cpu < 8.0, f"CPU {cpu:.2f} s (Wanduhr {wand:.2f} s) — Detektor langsamer geworden?"
