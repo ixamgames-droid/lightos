@@ -3,6 +3,31 @@ from __future__ import annotations
 import json
 from src.core.stage.einmessen import effektive_nullpunkte   # VIZ-55
 _PT_ATTRS = frozenset(("pan", "tilt", "pan_fine", "tilt_fine"))
+
+
+def _strobe_hz(ch, val: int) -> float:
+    """Blinkfrequenz der 2D-Anzeige fuer einen Shutter-/Strobe-Wert (FM-48).
+
+    Mit Bereichsdaten zaehlt NUR ein Strobe-Bereich; die Frequenz steigt innerhalb
+    dieses Bereichs von ~0,5 auf 20 Hz. Bis 2026-09-28 galt pauschal „> 10 =
+    Strobe" — gemessen blinkten damit Geraete mit offenem Shutter: Spider 14ch
+    („Offen" 8–15), Hero Spot 90 („Open" 251–255, Grundwert 253), ZQ02001/Conti
+    („Strobe aus (offen)" 250–255). Ohne Bereichsdaten bleibt die alte Regel."""
+    from src.core.app_state import shutter_bereich_art
+    try:
+        val = int(val)
+    except (TypeError, ValueError):
+        return 0.0
+    ranges = list(getattr(ch, "ranges", None) or ())
+    if ranges:
+        for r in ranges:
+            lo, hi = int(r.range_from), int(r.range_to)
+            if lo <= val <= hi:
+                if shutter_bereich_art(r) != "strobe":
+                    return 0.0
+                return 0.5 + (val - lo) / max(1, hi - lo) * 19.5
+        return 0.0
+    return 0.5 + (val - 11) / 244.0 * 19.5 if val > 10 else 0.0
 import math
 import os
 import time
@@ -980,10 +1005,7 @@ class StageCanvas(QWidget):
                     if ch.attribute in ("shutter", "strobe"):
                         addr = fixture.address + ch.channel_number - 1
                         if 1 <= addr <= 512:
-                            val = universe.get_channel(addr)
-                            if val > 10:
-                                # DMX 11-255 → ~0.5-20 Hz
-                                freq_hz = 0.5 + (val - 11) / 244.0 * 19.5
+                            freq_hz = max(freq_hz, _strobe_hz(ch, universe.get_channel(addr)))
         except Exception:
             pass
 
