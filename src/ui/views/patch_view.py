@@ -250,10 +250,14 @@ class PatchFixtureEditDialog(QDialog):
             self._spin_tilt_range.setValue(int(getattr(self._fixture, "tilt_range_deg", 270) or 270))
             self._spin_tilt_range.setToolTip("Physischer Tilt-Bereich des Geräts (z.B. 270°).")
             self._spin_pan_zero = QSpinBox(); self._spin_pan_zero.setRange(0, 255)
-            self._spin_pan_zero.setValue(int(getattr(self._fixture, "pan_zero_dmx", 128) or 128))
+            # VIZ-55 (Review B7): nur ein FEHLENDER Wert ist 128 — eine echte 0 blieb
+            # sonst beim Oeffnen+OK still als 128 zurueckgeschrieben.
+            _pz = getattr(self._fixture, "pan_zero_dmx", 128)
+            _tz = getattr(self._fixture, "tilt_zero_dmx", 128)
+            self._spin_pan_zero.setValue(int(128 if _pz is None else _pz))
             self._spin_pan_zero.setToolTip("DMX-Wert, bei dem der Pan in der Mitte steht (meist 128).")
             self._spin_tilt_zero = QSpinBox(); self._spin_tilt_zero.setRange(0, 255)
-            self._spin_tilt_zero.setValue(int(getattr(self._fixture, "tilt_zero_dmx", 128) or 128))
+            self._spin_tilt_zero.setValue(int(128 if _tz is None else _tz))
             self._spin_tilt_zero.setToolTip("DMX-Wert, bei dem der Tilt in der Mitte steht (meist 128).")
             form.addRow("Pan-Bereich:", self._spin_pan_range)
             form.addRow("Tilt-Bereich:", self._spin_tilt_range)

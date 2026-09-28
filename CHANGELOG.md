@@ -15,8 +15,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Punkt zielen, den Strahl mit **Pan/Tilt −/+** schieben, bis er am echten Gerät sitzt,
   **„Sitzt — merken"**. Ab dann trifft das Zielen diesen Punkt. Ab **vier** Punkten rechnet
   LightOS aus, wo der Kopf wirklich hängt und wie er gedreht ist, prüft das gegen und bietet
-  **„Position übernehmen"** an — danach stimmt das Zielen überall, auch an nie angetippten
-  Punkten, und das 3D zeigt den Kopf am echten Ort. Funktioniert für stehende, hängende und
+  **„Position übernehmen"** an — danach stimmt das Zielen im ganzen Bereich der Messpunkte,
+  auch an nie angetippten Stellen, und das 3D zeigt den Kopf am echten Ort. Punkte auf einer
+  Linie (Bühnenkante) erkennt LightOS und sagt, dass ein Punkt seitlich davon fehlt. Funktioniert für stehende, hängende und
   seitlich montierte Köpfe an beliebiger Stelle. Anleitung:
   `docs/anleitung_einmessen/ANLEITUNG_EINMESSEN.md`.
 - Die Korrektur wird mit der Show gespeichert und lässt sich rückgängig machen; alte Shows
@@ -28,8 +29,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Ende des Fixtures-Reiters bisher abgeschnitten.
 - Ein im Patch geänderter **Nullpunkt** kommt jetzt sofort im 3D an, nicht erst nach einem
   Neuaufbau der Szene.
-- Ein Pan-/Tilt-Nullpunkt von **0** wird beim Zielen nicht mehr als 128 gelesen — Zielen,
-  3D und 2D-Ansicht lesen den Nullpunkt jetzt an einer Stelle.
+- Ein Pan-/Tilt-Nullpunkt von **0** wird beim Zielen und im Patch-Dialog nicht mehr als 128
+  gelesen (der Dialog schrieb ihn beim OK sogar still als 128 zurück) — Zielen, 3D und
+  2D-Ansicht lesen den Nullpunkt jetzt an einer Stelle.
+- Die **2D-Live-Ansicht** zeigt Moving Heads mit „Pan/Tilt invertieren" bzw. „tauschen" jetzt
+  richtig herum (bisher gespiegelt) und berücksichtigt die Feinkanäle — wie das 3D.
 
 ### 2026-09-28 — 3D-Zielen: Moving Heads mit Feinkanal treffen jetzt auf den Millimeter (VIZ-61)
 

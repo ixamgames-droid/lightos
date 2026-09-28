@@ -237,6 +237,56 @@ def _loese(pts, start_pos, R0, kw, modus, iterationen=200):
     return (p[0], p[1], p[2]), R, _rest_grad((p[0], p[1], p[2]), R, pts, kw)
 
 
+#: Mindest-Faecherbreite (Grad) der Zielrichtungen QUER zur Hauptrichtung — s.
+#: :func:`faecher_grad`.
+MIN_FAECHER_GRAD = 8.0
+
+
+def faecher_grad(pts, pos) -> tuple[float, float]:
+    """Wie weit faechern die Richtungen vom Kopf zu den Messpunkten auf (Grad) —
+    entlang der Hauptrichtung und QUER dazu (Wurzeln der zwei groessten
+    Eigenwerte der Kovarianz der Einheitsvektoren; geschlossene 3x3-Formel).
+
+    Warum: liegen die Punkte auf einer LINIE (Buehnenkante, Bodenlinie) oder in
+    einem schmalen Streifen, passt eine ganze Schar von Standorten gleich gut — und
+    die Gegenprobe merkt das grundsaetzlich nicht, weil jede Teilmenge dieselbe
+    Mehrdeutigkeit traegt (Befund der Review 2026-09-28: Gegenprobe 0,02 cm, an
+    neuen Punkten 18-31 cm daneben). Gemessen (316 Faelle, 4-6 Punkte, 1 cm
+    Einstellrauschen, Pruefpunkte im ganzen 55-Grad-Kegel auf 4 m): Linie und
+    schmale Streifen (quer 4-6 Grad) bis 130 cm daneben; mit quer >= 8 Grad UND
+    Gegenprobe Median 3,1 cm, 95 % < 9,4 cm, max 14,6 cm — der Rest ist
+    Extrapolation weit ausserhalb der Messpunkte."""
+    us = []
+    for m in pts:
+        v = [m.ziel[k] - pos[k] for k in range(3)]
+        n = math.sqrt(sum(x * x for x in v)) or 1e-9
+        us.append([x / n for x in v])
+    n = len(us)
+    mu = [sum(u[k] for u in us) / n for k in range(3)]
+    C = [[sum((u[i] - mu[i]) * (u[j] - mu[j]) for u in us) / n for j in range(3)] for i in range(3)]
+    ev = sorted(_eig3_sym(C), reverse=True)
+    return (math.degrees(math.sqrt(max(ev[0], 0.0))), math.degrees(math.sqrt(max(ev[1], 0.0))))
+
+
+def _eig3_sym(A) -> list[float]:
+    """Eigenwerte einer symmetrischen 3x3-Matrix (trigonometrische Formel)."""
+    p1 = A[0][1] ** 2 + A[0][2] ** 2 + A[1][2] ** 2
+    q = (A[0][0] + A[1][1] + A[2][2]) / 3.0
+    if p1 < 1e-30:
+        return [A[0][0], A[1][1], A[2][2]]
+    p2 = (A[0][0] - q) ** 2 + (A[1][1] - q) ** 2 + (A[2][2] - q) ** 2 + 2.0 * p1
+    p = math.sqrt(p2 / 6.0)
+    B = [[(A[i][j] - (q if i == j else 0.0)) / p for j in range(3)] for i in range(3)]
+    detB = (B[0][0] * (B[1][1] * B[2][2] - B[1][2] * B[2][1])
+            - B[0][1] * (B[1][0] * B[2][2] - B[1][2] * B[2][0])
+            + B[0][2] * (B[1][0] * B[2][1] - B[1][1] * B[2][0]))
+    r = max(-1.0, min(1.0, detB / 2.0))
+    phi = math.acos(r) / 3.0
+    e1 = q + 2.0 * p * math.cos(phi)
+    e3 = q + 2.0 * p * math.cos(phi + 2.0 * math.pi / 3.0)
+    return [e1, 3.0 * q - e1 - e3, e3]
+
+
 #: Groesster erlaubter Fehler der Gegenprobe (cm), damit eine Loesung angeboten
 #: wird — s. :func:`_gegenprobe_cm`.
 MAX_GEGENPROBE_CM = 5.0
@@ -288,13 +338,18 @@ def loese_position(messpunkte: list[Messpunkt], start_pos, start_rot, kw: dict
     * **Mindestens vier Punkte** (:data:`MIN_PUNKTE`). Aus genau drei laesst sich
       eine Loesung rechnen, aber nicht PRUEFEN: mit realistischem Einstellrauschen
       lag sie gelegentlich 25 cm daneben, ohne dass ein Mass es vorher zeigte.
+    * Die Punkte muessen quer aufgefaechert sein (:data:`MIN_FAECHER_GRAD`) —
+      eine Linie ist mehrdeutig, das zeigt keine Gegenprobe.
     * Angeboten wird nur mit Restfehler <= :data:`MAX_REST_GRAD` UND Gegenprobe
       <= :data:`MAX_GEGENPROBE_CM`; sonst ``None`` — lieber keine Position als
-      eine geratene. Mehr Punkte an verschiedenen Stellen machen es sicherer."""
+      eine geratene. Verlaesslich ist sie im BEREICH der Messpunkte; weit
+      ausserhalb extrapoliert jede Rechnung."""
     from src.core.stage.aim import _euler_xyz_from_matrix, _mount_matrix
     pts = verschiedene(messpunkte)
     if len(pts) < MIN_PUNKTE:
         return None
+    if faecher_grad(pts, start_pos)[1] < MIN_FAECHER_GRAD:
+        return None                     # Linie/Streifen: mehrdeutig, s. faecher_grad
     R0 = _mount_matrix(*start_rot)
     for modus in ("voll", "gierung"):
         pos, R, rest = _loese(pts, start_pos, R0, kw, modus)
@@ -379,14 +434,35 @@ class EinmessSitzung:
     """Merkt je Geraet den zuletzt angezielten Punkt und die gesammelten
     Korrekturen. Bewusst NUR im Speicher: eine Einmess-Runde ist ein Abend am
     Rig; was bleiben soll, ist der Versatz bzw. die uebernommene Position — beide
-    liegen in Patch bzw. Show. Nach einem Neustart beginnt das Sammeln neu."""
+    liegen in Patch bzw. Show. Nach einem Neustart beginnt das Sammeln neu.
+
+    ``punkte[fid]`` ist die ROHE Liste in Reihenfolge; ``_versatz[fid]`` haelt
+    parallel den Versatz, den der jeweilige Punkt gesetzt hat. Stimmt der
+    aktuelle Versatz des Geraets nicht mehr mit dem des letzten Punkts, wurde das
+    „Merken" rueckgaengig gemacht — der Punkt faellt dann aus der Sammlung
+    (Review B6: vorher blockierte ein falscher Punkt Stufe B bis zum Zuruecksetzen)."""
 
     def __init__(self):
         self.ziel: dict[int, tuple[float, float, float]] = {}
         self.punkte: dict[int, list[Messpunkt]] = {}
+        self._versatz: dict[int, list[tuple[float, float]]] = {}
 
     def ziel_gesetzt(self, fid: int, ziel) -> None:
         self.ziel[fid] = (float(ziel[0]), float(ziel[1]), float(ziel[2]))
+
+    def _bereinigen(self, f) -> None:
+        jetzt = (float(getattr(f, "aim_offset_pan", 0.0) or 0.0),
+                 float(getattr(f, "aim_offset_tilt", 0.0) or 0.0))
+        pts = self.punkte.get(f.fid, [])
+        vs = self._versatz.get(f.fid, [])
+        while pts and vs and (abs(vs[-1][0] - jetzt[0]) > 1e-9 or abs(vs[-1][1] - jetzt[1]) > 1e-9):
+            pts.pop()
+            vs.pop()
+
+    def anzahl(self, f) -> int:
+        """Verschiedene, noch gueltige Messpunkte dieses Geraets."""
+        self._bereinigen(f)
+        return len(verschiedene(self.punkte.get(f.fid, [])))
 
     def schiebe(self, state, fid: int, kanaele, achse: str, schritt16: int) -> bool:
         v = wert16(state, fid, kanaele, achse)
@@ -401,27 +477,49 @@ class EinmessSitzung:
         """„Sitzt — merken": der aktuelle Programmer-Wert trifft das zuletzt
         angezielte Ziel. Setzt den Versatz (Stufe A, sofort wirksam, undo-faehig
         ueber ``update_fixture``) und sammelt den Punkt fuer Stufe B.
-        ``None``, wenn fuer dieses Geraet noch kein Ziel angetippt wurde."""
+        ``None``, wenn fuer dieses Geraet noch kein Ziel angetippt wurde.
+
+        Achse OHNE Feinkanal: der Versatz wird auf ganze DMX-Schritte gerundet.
+        Der Programmer kennt dort nur ganze Schritte; ohne Rundung speicherte ein
+        „Merken" ohne Schieben das Rundungsrauschen (bis +-0,5 Schritt) als
+        Versatz, und das Zielen lag danach an anderen Punkten oft einen Schritt
+        daneben (Review B3: 1833 von 4000 Faellen)."""
         ziel = self.ziel.get(f.fid)
         if ziel is None:
             return None
         ist = (wert16(state, f.fid, kanaele, "pan"), wert16(state, f.fid, kanaele, "tilt"))
         if None in ist:
             return None
+        self._bereinigen(f)
         from src.core.stage.aim import aim_pan_tilt_16
         kw0 = _kw_ohne_versatz(f)
         soll = aim_pan_tilt_16(pos, ziel, rot, **kw0)
-        versatz = versatz_aus_korrektur(ist, soll)
+        versatz = list(versatz_aus_korrektur(ist, soll))
+        for i, achse in enumerate(("pan", "tilt")):
+            if not _hat_fein(kanaele, achse):
+                versatz[i] = float(round(versatz[i]))
+        versatz = (versatz[0], versatz[1])
         state.update_fixture(f.fid, aim_offset_pan=versatz[0], aim_offset_tilt=versatz[1])
-        liste = self.punkte.setdefault(f.fid, [])
-        liste.append(Messpunkt(ziel, ist[0], ist[1]))
-        pts = verschiedene(liste)
-        self.punkte[f.fid] = pts
+        # Mit dem Wert merken, den update_fixture speichert (dieselbe Normalisierung) —
+        # NICHT von ``f`` zuruecklesen: im echten AppState aendert update_fixture die
+        # Datenbank, nicht das Objekt in der Hand. So gelesen stand hier 0, und beim
+        # naechsten Blick fiel der eben gemerkte Punkt wieder heraus (Sichtpruefung
+        # 2026-09-28: „0 Punkt(e)" direkt nach dem Merken).
+        gesetzt = (normiere_versatz(versatz[0]), normiere_versatz(versatz[1]))
+        self.punkte.setdefault(f.fid, []).append(Messpunkt(ziel, ist[0], ist[1]))
+        self._versatz.setdefault(f.fid, []).append(gesetzt)
+        pts = verschiedene(self.punkte[f.fid])
         return Merken(versatz=versatz, punkte=len(pts),
                       loesung=loese_position(pts, pos, rot, kw0))
 
     def vergessen(self, state, fid: int) -> None:
-        """Versatz auf 0 und gesammelte Punkte weg („Korrektur zuruecksetzen" bzw.
-        nach dem Uebernehmen der Position — die ersetzt den Versatz)."""
+        """Versatz auf 0 und gesammelte Punkte weg („Korrektur zuruecksetzen")."""
         state.update_fixture(fid, aim_offset_pan=0.0, aim_offset_tilt=0.0)
         self.punkte.pop(fid, None)
+        self._versatz.pop(fid, None)
+
+    def punkte_verwerfen(self, fid: int) -> None:
+        """Nur die Sammlung verwerfen (nach „Position uebernehmen", das den Versatz
+        selbst im selben Undo-Schritt setzt)."""
+        self.punkte.pop(fid, None)
+        self._versatz.pop(fid, None)

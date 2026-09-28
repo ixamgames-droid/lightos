@@ -1721,9 +1721,9 @@ class VisualizerBridge(QObject):
         effektiver Nullpunkt (Nullpunkt + Einmess-Versatz) sich gegenueber dem
         zuletzt ans 3D gesendeten geaendert hat (VIZ-55). Deckt Rueckgaengig/
         Wiederholen eines „Merken" ab — und das Aendern des Nullpunkts im Patch,
-        das bisher erst nach einem Neuaufbau der Szene im Bild ankam. Beim ersten
-        Sehen eines Geraets wird nur der Stand gemerkt (es wurde mit genau diesem
-        Stand angelegt)."""
+        das bisher erst nach einem Neuaufbau der Szene im Bild ankam. Der Stand
+        wird beim Anlegen (``_fixture_to_dict``) gemerkt; ein Geraet ohne Eintrag
+        (angelegt vor dieser Aenderung) gilt beim ersten Sehen als synchron."""
         gesendet = self.__dict__.setdefault("_gesendete_nullpunkte", {})
         for f in self._state.get_patched_fixtures():
             if f.fid not in self._state.visualizer_positions:
@@ -1933,6 +1933,9 @@ class VisualizerBridge(QObject):
         return viz_model_for(f) or f.fixture_type
 
     def _fixture_to_dict(self, f: PatchedFixture) -> dict:
+        # VIZ-55 (Review B4): merken, mit welchem Nullpunkt das Geraet ans 3D geht —
+        # sonst verpasste ``_nullpunkte_nachziehen`` die ERSTE Aenderung einer Sitzung.
+        self.__dict__.setdefault("_gesendete_nullpunkte", {})[f.fid] = effektive_nullpunkte(f)
         pos = self._state.visualizer_positions.get(f.fid, (0.0, 6.5, 0.0))
         rot = normalize_rotation(self._state.visualizer_rotations.get(f.fid))
         model = self._viz_model_for(f)
@@ -2108,7 +2111,6 @@ class VisualizerBridge(QObject):
                 print(f"[Visualizer] show_loaded emit error: {e}")
             return
         if event == "patch_changed":
-            self._nullpunkte_nachziehen()
             current_fids = {f.fid for f in self._state.get_patched_fixtures()}
             stale = [fid for fid in list(self._state.visualizer_positions) if fid not in current_fids]
             for fid in stale:
@@ -2126,6 +2128,13 @@ class VisualizerBridge(QObject):
             if isinstance(lv, dict):
                 for fid in [f for f in list(lv) if f not in current_fids]:
                     lv.pop(fid, None)
+            # VIZ-55: NACH dem Aufraeumen und abgesichert — ein Fehler beim
+            # Nachziehen darf das Prunen nie verhindern (ungebunden, weil
+            # Bestandstests den Handler mit einem SimpleNamespace-self fahren).
+            try:
+                VisualizerBridge._nullpunkte_nachziehen(self)
+            except Exception as e:                       # noqa: BLE001
+                print(f"[Visualizer] Nullpunkte nachziehen: {e}")
 
 
 # ============================================================================
@@ -2733,8 +2742,8 @@ class VisualizerWindow(QMainWindow):
             "2. Schieben, bis der Strahl am ECHTEN Gerät genau dort sitzt.\n"
             "3. „Sitzt — merken“. Das gilt sofort für diesen Punkt.\n"
             "Ab 4 Punkten rechnet LightOS aus, wo der Kopf wirklich hängt, und prüft "
-            "das gegen — danach stimmt es überall. Punkte verteilen: nah und fern, "
-            "Wand UND Boden.")
+            "das gegen — danach stimmt es im ganzen Bereich der Punkte. Verteilen: nah "
+            "und fern, Wand UND Boden, nicht auf einer Linie.")
         hilfe.setWordWrap(True)
         hilfe.setStyleSheet("font-size: 11px;")
         v.addWidget(hilfe)
@@ -2818,14 +2827,16 @@ class VisualizerWindow(QMainWindow):
         self._einmess_status()
 
     def _einmess_status(self) -> None:
+        from src.core.stage.einmessen import MIN_FAECHER_GRAD, faecher_grad, verschiedene
         geraete = self._einmess_geraete()
         if not geraete:
             self._lbl_einmess.setText("Einen Moving Head wählen (Mover-Bars: noch nicht).")
             self._btn_einmess_uebernehmen.setEnabled(False)
             return
         zeilen = []
-        for f, _k, _p, _r in geraete:
-            n = len(self._bridge.einmessen.punkte.get(f.fid, []))
+        sitzung = self._bridge.einmessen
+        for f, kanaele, pos, _r in geraete:
+            n = sitzung.anzahl(f)
             op = float(getattr(f, "aim_offset_pan", 0.0) or 0.0)
             ot = float(getattr(f, "aim_offset_tilt", 0.0) or 0.0)
             z = f"{getattr(f, 'label', '') or f.fid}: {n} Punkt(e)"
@@ -2839,47 +2850,93 @@ class VisualizerWindow(QMainWindow):
                     z += (f" ⚠ {grad:.0f}° — stimmen Standort, Montage (hängend/stehend) "
                           "und Pan/Tilt-Bereich im Patch?")
             L = self._einmess_loesung.get(f.fid)
-            if L is not None:
+            if L is not None and n >= L.punkte:
                 z += (f" — Position gefunden ({L.punkte} Punkte, Gegenprobe "
                       f"{L.gegenprobe_cm:.1f} cm): {L.verschiebung_m * 100:.0f} cm und "
                       f"{L.drehung_grad:.1f}° neben dem eingetragenen Standort")
             elif n >= 4:
-                z += (" — Gegenprobe hält noch nicht: weitere Punkte an anderen Stellen "
-                      "(nah/fern, Boden) nehmen")
+                self._einmess_loesung.pop(f.fid, None)
+                pts = verschiedene(sitzung.punkte.get(f.fid, []))
+                if faecher_grad(pts, pos)[1] < MIN_FAECHER_GRAD:
+                    z += (" — die Punkte liegen fast auf einer Linie: einen Punkt deutlich "
+                          "SEITLICH davon nehmen (z. B. Wand statt Boden)")
+                else:
+                    z += (" — Gegenprobe hält noch nicht: weitere Punkte an anderen Stellen "
+                          "(nah/fern, Wand/Boden) nehmen")
             elif n:
+                self._einmess_loesung.pop(f.fid, None)
                 z += f" — noch {4 - n} Punkt(e) bis zur Positions-Rechnung"
+            ohne_fein = [a for a in ("pan", "tilt")
+                         if not any((getattr(c, "attribute", "") or "") == f"{a}_fine"
+                                    for c in kanaele)]
+            if ohne_fein and n:
+                z += (" (ohne Feinkanal für " + "/".join(a.capitalize() for a in ohne_fein)
+                      + ": ein Schritt ist grob, die Position ist dann selten sicher rechenbar)")
             zeilen.append(z)
         self._lbl_einmess.setText("\n".join(zeilen))
         self._btn_einmess_uebernehmen.setEnabled(
             len(geraete) == 1 and geraete[0][0].fid in self._einmess_loesung)
 
     def _einmess_uebernehmen(self) -> None:
-        """Positions-Loesung uebernehmen: ueber die Eingabefelder, damit Undo,
-        Andocken und 3D genau den normalen Weg gehen (EIN Undo-Schritt)."""
+        """Positions-Loesung uebernehmen — als EIN Undo-Schritt, der Standort,
+        Drehung, Andocken UND den Versatz (-> 0) gemeinsam setzt und zuruecknimmt.
+
+        Bis zur Review (B2) liefen hier zwei Commands (Transform + Versatz-Reset):
+        ein Strg+Z stellte nur den alten Versatz wieder her, die neue Position blieb
+        — doppelt korrigiert, ~20 cm auf 5 m, ohne Meldung. Die Richtung liest der
+        Rueckruf an der angewandten Position ab (neu -> Versatz 0, alt -> alter
+        Versatz); der Szenen-Command bleibt der normale (Dock, JS, Live-View)."""
         geraete = self._einmess_geraete()
         if len(geraete) != 1:
             return
         f = geraete[0][0]
         L = self._einmess_loesung.get(f.fid)
-        item = self._patch_list.currentItem()
-        if L is None or item is None or item.data(Qt.ItemDataRole.UserRole) != f.fid:
+        if L is None:
             return
+        fid = f.fid
+        old_pos = tuple(self._state.visualizer_positions.get(fid, (0.0, 0.0, 0.0)))
+        old_rot = tuple(self._state.visualizer_rotations.get(fid, (0.0, 0.0, 0.0)))
+        old_dock = self._state.visualizer_docks.get(fid)
+        old_versatz = (float(getattr(f, "aim_offset_pan", 0.0) or 0.0),
+                       float(getattr(f, "aim_offset_tilt", 0.0) or 0.0))
+        new_pos, new_rot = tuple(L.pos), tuple(L.rot)
+
+        def _anwenden(fid_, pos_, rot_):
+            neu = tuple(pos_) == new_pos
+            v = (0.0, 0.0) if neu else old_versatz
+            self._state.update_fixture(fid_, undoable=False,
+                                       aim_offset_pan=v[0], aim_offset_tilt=v[1])
+            self._bridge.push_apply_fixture_transform(fid_, pos_[0], pos_[1], pos_[2], *rot_,
+                                                      dock=None if neu else old_dock)
+            self._bridge.refresh_fixture(fid_)
+
+        # Jetzt anwenden (der Command wird mit execute=False gepusht) …
+        self._state.visualizer_positions[fid] = new_pos
+        self._state.visualizer_rotations[fid] = new_rot
+        if old_dock is not None:
+            self._state.visualizer_docks.pop(fid, None)
+        _anwenden(fid, new_pos, new_rot)
+        # … und EIN Command fuer Undo/Redo.
+        _scmd.push_transform_and_dock_fixture(
+            self._state, fid,
+            old_pos=old_pos, new_pos=new_pos, old_rot=old_rot, new_rot=new_rot,
+            old_dock=old_dock, new_dock=None,
+            label="Einmessen: Position übernehmen",
+            apply_push=_anwenden)
+        self._bridge.einmessen.punkte_verwerfen(fid)
+        self._einmess_loesung.pop(fid, None)
         self._suppress_property_signals = True
         try:
             for sp, wert in zip((self._spin_x, self._spin_y, self._spin_z,
                                  self._spin_rot_x, self._spin_rot_y, self._spin_rot_z),
-                                (*L.pos, *L.rot)):
+                                (*new_pos, *new_rot)):
                 sp.setValue(wert)
         finally:
             self._suppress_property_signals = False
-        self._on_fixture_pos_spin_changed()
-        # Die Position ersetzt den Versatz (der war nur die Notloesung).
-        self._bridge.einmessen.vergessen(self._state, f.fid)
-        self._einmess_loesung.pop(f.fid, None)
-        self._bridge.refresh_fixture(f.fid)
         self._einmess_status()
         self._lbl_einmess.setText(self._lbl_einmess.text()
-                                  + "\n✓ Position übernommen — gilt jetzt an jedem Punkt.")
+                                  + "\n✓ Position übernommen — gilt jetzt im ganzen Bereich "
+                                  "der Messpunkte. Rückgängig nimmt alles in einem Schritt zurück.")
 
     def _einmess_zuruecksetzen(self) -> None:
         for f, _k, _p, _r in self._einmess_geraete():

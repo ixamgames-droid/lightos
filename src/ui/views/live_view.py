@@ -2,6 +2,7 @@
 from __future__ import annotations
 import json
 from src.core.stage.einmessen import effektive_nullpunkte   # VIZ-55
+_PT_ATTRS = frozenset(("pan", "tilt", "pan_fine", "tilt_fine"))
 import math
 import os
 import time
@@ -18,7 +19,8 @@ from PySide6.QtGui import (QPainter, QColor, QBrush, QPen, QFont, QPolygonF,
                             QLinearGradient, QRadialGradient, QMouseEvent,
                             QDrag)
 from src.core.app_state import (
-    get_state, get_channels_for_patched, pixel_ring_segments, viz_model_for)
+    get_state, get_channels_for_patched, pixel_ring_segments, viz_model_for,
+    unapply_pan_tilt_orientation)
 from src.core.color_utils import visual_intensity, visual_rgb
 from src.core.stage.coords import world3d_to_live
 from src.ui.widgets import mini_icons as _mini
@@ -1141,10 +1143,7 @@ class StageCanvas(QWidget):
         if has_pantilt:
             pan_rng = float(getattr(fixture, "pan_range_deg", 540) or 540)
             tilt_rng = float(getattr(fixture, "tilt_range_deg", 270) or 270)
-            pan_z = getattr(fixture, "pan_zero_dmx", 128)
-            tilt_z = getattr(fixture, "tilt_zero_dmx", 128)
-            pan_z = 128 if pan_z is None else pan_z
-            tilt_z = 128 if tilt_z is None else tilt_z
+            pan_z, tilt_z = effektive_nullpunkte(fixture)     # VIZ-55: inkl. Versatz
             pan_deg = int(dmx_to_angle_deg(pan, pan_z, pan_rng))
             tilt_deg = int(dmx_to_angle_deg(tilt, tilt_z, tilt_rng))
             painter.setPen(QColor("#aaaaaa"))
@@ -1267,12 +1266,20 @@ class StageCanvas(QWidget):
                 universe = self._state.universes.get(fixture.universe)
                 if universe:
                     channels = get_channels_for_patched(fixture)
+                    _pt = {}
                     for ch in channels:
                         addr = fixture.address + ch.channel_number - 1
-                        if 1 <= addr <= 512:
-                            v = universe.get_channel(addr)
-                            if ch.attribute == "pan": pan = v
-                            elif ch.attribute == "tilt": tilt = v
+                        if 1 <= addr <= 512 and ch.attribute in _PT_ATTRS:
+                            _pt[ch.attribute] = universe.get_channel(addr)
+                    # VIZ-55: DRAHT -> MODELL wie im 3D (visualizer_service): die
+                    # Ausgabestufe hat invert/swap angewandt, die 2D-Winkelformel
+                    # kennt sie nicht — ohne Ruecknahme stand der Beam bei solchen
+                    # Geraeten gespiegelt, und der Einmess-Versatz (Modellraum)
+                    # bekam das falsche Vorzeichen. Feinkanal wie im 3D mit.
+                    if _pt:
+                        _pt = unapply_pan_tilt_orientation(fixture, _pt)
+                        pan = _pt.get("pan", 128) + (_pt.get("pan_fine", 0) or 0) / 256.0
+                        tilt = _pt.get("tilt", 128) + (_pt.get("tilt_fine", 0) or 0) / 256.0
             except Exception:
                 pass
             strobe_hz, blink_on = self._get_strobe_info(fixture.fid, fixture, running)

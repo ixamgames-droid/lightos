@@ -82,6 +82,21 @@ def _ziel_im_kegel(rnd, pos, rot, kegel_grad=55.0):
         return tuple(pos[i] + w[i] * dist for i in range(3))
 
 
+def _verteilte_ziele(rnd, pos, rot, n):
+    """So, wie die Anleitung es empfiehlt: rundum verteilt (Azimut gleichmaessig),
+    verschieden weit vom Achsen-Mittel und verschieden entfernt."""
+    R = _mount_matrix(*rot)
+    out = []
+    for i in range(n):
+        th = math.radians(rnd.uniform(25, 50))
+        ph = 2 * math.pi * i / n + rnd.uniform(-0.3, 0.3)
+        lok = (math.sin(th) * math.cos(ph), -math.cos(th), math.sin(th) * math.sin(ph))
+        w = tuple(sum(R[a][b] * lok[b] for b in range(3)) for a in range(3))
+        d = 2.0 + 3.0 * (i % 2) + rnd.uniform(-0.3, 0.3)
+        out.append(tuple(pos[a] + w[a] * d for a in range(3)))
+    return out
+
+
 def _echtes_geraet(rnd, pos, rot, neigung=0.0):
     """Das Geraet haengt in Wahrheit bis 40 cm woanders und ist um die Hochachse
     bis 10 Grad verdreht (+ optional etwas Neigung)."""
@@ -109,6 +124,7 @@ class _State:
         self.fixtures = {f.fid: f for f in fixtures}
         self.visualizer_positions = {}
         self.visualizer_rotations = {}
+        self.visualizer_docks = {}
         self.updates = []
 
     def get_programmer_value(self, fid, attr, head=None):
@@ -118,9 +134,17 @@ class _State:
         self.prog[(fid, attr)] = value
 
     def update_fixture(self, fid, undoable=True, **changes):
+        """Wie der echte AppState: die Aenderung landet in der „Datenbank" und
+        kommt als NEUES Objekt zurueck — das Objekt, das der Aufrufer in der Hand
+        haelt, bleibt unveraendert. (Eine Attrappe, die es direkt aenderte,
+        verdeckte einen echten Fehler: Sichtpruefung 2026-09-28.)"""
         self.updates.append((fid, changes))
+        from src.core.stage.einmessen import normiere_versatz
+        neu = SimpleNamespace(**vars(self.fixtures[fid]))
         for k, v in changes.items():
-            setattr(self.fixtures[fid], k, v)
+            # dieselbe Normalisierung wie der echte AppState
+            setattr(neu, k, normiere_versatz(v) if k.startswith("aim_offset") else v)
+        self.fixtures[fid] = neu
         return True
 
     def get_patched_fixtures(self):
@@ -202,7 +226,7 @@ class StufeBTest(unittest.TestCase):
         for _ in range(n_faelle):
             pos = (rnd.uniform(-3, 3), rnd.uniform(2, 5), rnd.uniform(-3, 3))
             echt_pos, echt_rot = _echtes_geraet(rnd, pos, rot, neigung)
-            ziele = [_ziel_im_kegel(rnd, echt_pos, echt_rot) for _ in range(n_punkte)]
+            ziele = _verteilte_ziele(rnd, echt_pos, echt_rot, n_punkte)
             pruef = [_ziel_im_kegel(rnd, echt_pos, echt_rot) for _ in range(3)]
             mp = [Messpunkt(z, *_korrektur(echt_pos, echt_rot, z, rausch_m, rnd)) for z in ziele]
             L = loese_position(mp, pos, rot, GERAET)
@@ -228,6 +252,31 @@ class StufeBTest(unittest.TestCase):
                 self.assertLess(max(fehler), 1.0)
                 self.assertGreater(sorted(vorher)[len(vorher) // 2], 10.0)   # vorher daneben
 
+    def test_punkte_auf_einer_linie_keine_position(self):
+        """Review-Befund B1: Punkte auf einer Linie (Buehnenkante) — eine ganze
+        Schar von Standorten passt, die Gegenprobe merkt es nicht (0,02 cm), an
+        neuen Punkten lag der Strahl 18-31 cm daneben. Jetzt: keine Loesung."""
+        rnd = random.Random(21)
+        pos, rot = (0.0, 4.0, 0.0), MONTAGEN["haengend"]
+        for quer in (0.0, 0.2):
+            for _ in range(10):
+                echt_pos, echt_rot = _echtes_geraet(rnd, pos, rot, 3.0)
+                ziele = [(x, 0.0, 1.0 + rnd.uniform(-quer, quer)) for x in (-3, -1.5, 0, 1.5, 3)]
+                mp = [Messpunkt(z, *_korrektur(echt_pos, echt_rot, z, 0.01, rnd)) for z in ziele]
+                with self.subTest(quer=quer):
+                    self.assertIsNone(loese_position(mp, pos, rot, GERAET))
+
+    def test_faecherbreite(self):
+        from src.core.stage.einmessen import faecher_grad
+        pos = (0.0, 4.0, 0.0)
+        linie = [Messpunkt((x, 0.0, 1.0), 0, 0) for x in (-3, -1, 1, 3)]
+        # Eine Linie ergibt vom Kopf aus einen gebogenen Bogen (~4-5 Grad quer),
+        # nicht 0 — sie liegt trotzdem klar unter der Schwelle.
+        from src.core.stage.einmessen import MIN_FAECHER_GRAD
+        self.assertLess(faecher_grad(linie, pos)[1], MIN_FAECHER_GRAD)
+        flaeche = [Messpunkt(z, 0, 0) for z in ((-2, 0, -2), (2, 0, -2), (2, 0, 2), (-2, 0, 2))]
+        self.assertGreater(faecher_grad(flaeche, pos)[1], 20.0)
+
     def test_drei_punkte_noch_keine_position(self):
         """Drei Punkte: rechenbar, aber nicht pruefbar — also nicht angeboten."""
         fehler, _v, modi = self._lauf("haengend", 3, 0.0, 0.0, 10, 8)
@@ -246,7 +295,7 @@ class StufeBTest(unittest.TestCase):
         fehler.sort()
         self.assertGreater(len(fehler), 60)
         self.assertLess(fehler[len(fehler) // 2], 3.0)
-        self.assertLess(fehler[-1], 15.0)
+        self.assertLess(fehler[-1], 10.0)
         self.assertLess(fehler[len(fehler) // 2], sorted(vorher)[len(vorher) // 2] / 5)
 
     def test_zu_wenige_oder_zu_nahe_punkte_keine_loesung(self):
@@ -318,7 +367,9 @@ class SitzungTest(unittest.TestCase):
             p16, t16 = _korrektur(echt_pos, echt_rot, ziel)
             st.prog = {(1, "pan"): p16 >> 8, (1, "pan_fine"): p16 & 255,
                        (1, "tilt"): t16 >> 8, (1, "tilt_fine"): t16 & 255}
+            f = st.fixtures[1]                        # frisch, wie das Fenster es holt
             r = s.merken(st, f, FEIN, pos, rot)
+            f = st.fixtures[1]
             # Stufe A sofort: mit dem gemerkten Versatz trifft das Zielen diesen Punkt
             neu = aim_pan_tilt_16(pos, ziel, rot, **aim_kw(f))
             self.assertLess(_fehler_cm(echt_pos, echt_rot, *neu, ziel), 0.1)
@@ -334,6 +385,7 @@ class SitzungTest(unittest.TestCase):
         f.aim_offset_pan = 1.5
         s.punkte[1] = [Messpunkt((0, 0, 1), 0, 0)]
         s.vergessen(st, 1)
+        f = st.fixtures[1]
         self.assertEqual((f.aim_offset_pan, f.aim_offset_tilt), (0.0, 0.0))
         self.assertNotIn(1, s.punkte)
 
@@ -560,6 +612,226 @@ class VerdrahtungTest(unittest.TestCase):
                          ['{"fid": 1}'])
         VW.VisualizerBridge._nullpunkte_nachziehen(fake)          # nichts Neues
         self.assertEqual(fake.fixtureAdded.emit.call_count, 1)
+
+
+# ── Befunde der adversarialen Review (2026-09-28) ───────────────────────────────
+
+class ReviewBefundeTest(unittest.TestCase):
+
+    def test_b3_ohne_feinkanal_merken_ohne_schieben_speichert_null(self):
+        """Ohne Feinkanal kennt der Programmer nur ganze Schritte — der Versatz
+        darf dort kein Rundungsrauschen (+-0,5 Schritt) aufnehmen."""
+        rnd = random.Random(33)
+        for _ in range(30):
+            f = _fx()
+            st = _State([f])
+            s = EinmessSitzung()
+            pos, rot = (0.0, 4.0, 0.0), MONTAGEN["haengend"]
+            ziel = _ziel_im_kegel(rnd, pos, rot)
+            s.ziel_gesetzt(1, ziel)
+            p8, t8 = __import__("src.core.stage.aim", fromlist=["x"]).aim_pan_tilt(
+                pos, ziel, rot, **aim_kw(f))
+            st.prog = {(1, "pan"): p8, (1, "tilt"): t8}        # gezielt, NICHT geschoben
+            r = s.merken(st, f, GROB, pos, rot)
+            self.assertEqual(r.versatz, (0.0, 0.0))
+
+    def test_b3_ohne_feinkanal_ganzer_schritt_bleibt_ganz(self):
+        f = _fx()
+        st = _State([f])
+        s = EinmessSitzung()
+        pos, rot, ziel = (0.0, 4.0, 0.0), MONTAGEN["haengend"], (1.0, 0.0, 1.0)
+        s.ziel_gesetzt(1, ziel)
+        from src.core.stage.aim import aim_pan_tilt
+        p8, t8 = aim_pan_tilt(pos, ziel, rot, **aim_kw(f))
+        st.prog = {(1, "pan"): p8 + 2, (1, "tilt"): t8 - 1}   # zwei bzw. einen Schritt geschoben
+        r = s.merken(st, f, GROB, pos, rot)
+        self.assertEqual(r.versatz, (2.0, -1.0))
+
+    def test_b6_rueckgaengig_eines_merkens_entfernt_den_punkt(self):
+        f = _fx()
+        st = _State([f])
+        s = EinmessSitzung()
+        pos, rot = (0.0, 4.0, 0.0), MONTAGEN["haengend"]
+        for i, ziel in enumerate(((1.0, 0.0, 1.0), (-1.0, 0.0, 2.0))):
+            s.ziel_gesetzt(1, ziel)
+            st.prog = {(1, "pan"): 100 + i, (1, "pan_fine"): 0, (1, "tilt"): 90, (1, "tilt_fine"): 0}
+            s.merken(st, st.fixtures[1], FEIN, pos, rot)
+        self.assertEqual(s.anzahl(st.fixtures[1]), 2)
+        versatz_nach_1 = s._versatz[1][0]
+        st.update_fixture(1, aim_offset_pan=versatz_nach_1[0],         # = Rueckgaengig
+                          aim_offset_tilt=versatz_nach_1[1])           #   des 2. Merkens
+        self.assertEqual(s.anzahl(st.fixtures[1]), 1)
+        st.update_fixture(1, aim_offset_pan=0.0, aim_offset_tilt=0.0)  # = auch das 1.
+        self.assertEqual(s.anzahl(st.fixtures[1]), 0)
+
+    def test_gemerkter_punkt_zaehlt_sofort_mit_frischem_objekt(self):
+        """Sichtpruefung 2026-09-28: direkt nach dem Merken stand „0 Punkt(e)" —
+        der Punkt hatte sich den Versatz vom ALTEN Objekt gemerkt (0), das frisch
+        geholte trug den neuen, und die Bereinigung warf ihn hinaus."""
+        f = _fx()
+        st = _State([f])
+        s = EinmessSitzung()
+        s.ziel_gesetzt(1, (1.0, 0.0, 1.0))
+        st.prog = {(1, "pan"): 101, (1, "pan_fine"): 48, (1, "tilt"): 90, (1, "tilt_fine"): 7}
+        s.merken(st, f, FEIN, (0.0, 4.0, 0.0), MONTAGEN["haengend"])
+        self.assertIsNot(st.fixtures[1], f)                         # echtes Verhalten
+        self.assertEqual(s.anzahl(st.fixtures[1]), 1)
+
+    def test_b4_erste_nullpunkt_aenderung_nach_dem_anlegen(self):
+        """Der Stand beim Anlegen wird gemerkt — die ERSTE Aenderung danach (z. B.
+        Pan-Mitte im Patch-Dialog) baut das Geraet im 3D neu auf."""
+        import src.ui.visualizer.visualizer_window as VW
+        f = _fx()
+        for k, v in dict(fixture_type="moving_head", manufacturer_name="", fixture_name="",
+                         mode_name="", channel_count=16, universe=1, address=1).items():
+            setattr(f, k, v)
+        fake = SimpleNamespace(
+            _state=SimpleNamespace(get_patched_fixtures=lambda: [f],
+                                   visualizer_positions={1: (0.0, 4.0, 0.0)},
+                                   visualizer_rotations={}, visualizer_docks={},
+                                   visualizer_beam_hidden=set()),
+            _viz_model_for=lambda x: "moving_head", fixtureAdded=MagicMock())
+        fake._fixture_to_dict = lambda x: VW.VisualizerBridge._fixture_to_dict(fake, x)
+        VW.VisualizerBridge._fixture_to_dict(fake, f)            # = Anlegen im 3D
+        f.pan_zero_dmx = 140                                     # erste Aenderung
+        VW.VisualizerBridge._nullpunkte_nachziehen(fake)
+        self.assertEqual(fake.fixtureAdded.emit.call_count, 1)
+
+
+class UebernehmenUndoTest(unittest.TestCase):
+    """B2: „Position uebernehmen" ist EIN Undo-Schritt (echter Undo-Stapel)."""
+
+    @classmethod
+    def setUpClass(cls):
+        from PySide6.QtWidgets import QApplication
+        cls._app = QApplication.instance() or QApplication([])
+
+    def test_ein_rueckgaengig_nimmt_position_und_versatz_zurueck(self):
+        import src.ui.visualizer.visualizer_window as VW
+        from PySide6.QtCore import Qt
+        from PySide6.QtWidgets import QListWidget, QListWidgetItem
+        from src.core.undo import get_undo_stack
+        from src.core.stage.einmessen import Loesung
+
+        class _W(VW.VisualizerWindow):
+            def __init__(self):
+                VW.QMainWindow.__init__(self)
+
+        f = _fx(aim_offset_pan=1.25, aim_offset_tilt=-0.5)
+        st = _State([f])
+        st.visualizer_positions[1] = (0.0, 4.0, 0.0)
+        st.visualizer_rotations[1] = (0.0, 0.0, 0.0)
+        st.visualizer_docks = {1: "traverse-1"}
+        w = _W()
+        self.addCleanup(w.deleteLater)
+        w._state = st
+        w._bridge = SimpleNamespace(einmessen=EinmessSitzung(), _is_moving_head=lambda x: True,
+                                    _mover_bar_heads=lambda x: 0, refresh_fixture=MagicMock(),
+                                    push_apply_fixture_transform=MagicMock())
+        w._patch_list = QListWidget()
+        it = QListWidgetItem(f.label)
+        it.setData(Qt.ItemDataRole.UserRole, 1)
+        w._patch_list.addItem(it)
+        box = VW.VisualizerWindow._build_einmessen_box(w)
+        self.addCleanup(box.deleteLater)
+        for name in ("_spin_x", "_spin_y", "_spin_z", "_spin_rot_x", "_spin_rot_y", "_spin_rot_z"):
+            sp = VW.LocaleTolerantDoubleSpinBox()
+            sp.setRange(-360, 360)
+            setattr(w, name, sp)
+        orig = VW.get_channels_for_patched
+        VW.get_channels_for_patched = lambda x: FEIN
+        self.addCleanup(setattr, VW, "get_channels_for_patched", orig)
+        w._patch_list.item(0).setSelected(True)
+        w._einmess_loesung[1] = Loesung(pos=(0.3, 4.1, -0.2), rot=(0.0, 5.0, 0.0), modus="voll",
+                                        punkte=4, rest_grad=0.01, gegenprobe_cm=1.0,
+                                        verschiebung_m=0.37, drehung_grad=5.0)
+        stapel = get_undo_stack()
+        stapel.clear()
+        w._einmess_uebernehmen()
+        self.assertEqual(st.visualizer_positions[1], (0.3, 4.1, -0.2))
+        f = st.fixtures[1]
+        self.assertEqual((f.aim_offset_pan, f.aim_offset_tilt), (0.0, 0.0))
+        self.assertNotIn(1, st.visualizer_docks)
+        self.assertTrue(stapel.undo())                     # EIN Strg+Z
+        self.assertEqual(st.visualizer_positions[1], (0.0, 4.0, 0.0))
+        f = st.fixtures[1]
+        self.assertEqual((f.aim_offset_pan, f.aim_offset_tilt), (1.25, -0.5))
+        self.assertEqual(st.visualizer_docks.get(1), "traverse-1")
+        self.assertFalse(stapel.can_undo())                # kein zweiter Schritt uebrig
+        self.assertTrue(stapel.redo())
+        self.assertEqual(st.visualizer_positions[1], (0.3, 4.1, -0.2))
+        f = st.fixtures[1]
+        self.assertEqual((f.aim_offset_pan, f.aim_offset_tilt), (0.0, 0.0))
+        stapel.clear()
+
+
+class PatchDialogNullpunktTest(unittest.TestCase):
+    """B7: ein Nullpunkt 0 wurde beim Oeffnen als 128 gelesen und beim OK still
+    zurueckgeschrieben."""
+
+    def test_null_bleibt_null(self):
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+        from src.core.app_state import get_state
+        from src.core.database.fixture_db import ensure_builtins
+        from src.core.database.models import PatchedFixture
+        from src.core.show.show_file import reset_show
+        from src.ui.views.patch_view import PatchFixtureEditDialog
+        ensure_builtins()
+        reset_show()
+        st = get_state()
+        st.add_fixture(PatchedFixture(fid=1, label="MH", fixture_profile_id=9, mode_name="",
+                                      universe=1, address=1, channel_count=16,
+                                      fixture_type="moving_head", pan_zero_dmx=0, tilt_zero_dmx=0))
+        fx = next(x for x in st.get_patched_fixtures() if x.fid == 1)
+        dlg = PatchFixtureEditDialog(st, fx)
+        self.addCleanup(dlg.deleteLater)
+        if not hasattr(dlg, "_spin_pan_zero"):
+            self.skipTest("Dialog zeigt fuer dieses Profil keine Pan/Tilt-Felder")
+        self.assertEqual((dlg._spin_pan_zero.value(), dlg._spin_tilt_zero.value()), (0, 0))
+
+
+class Ansicht2DTest(unittest.TestCase):
+    """B8/B9: die 2D-Ansicht zeichnet den MODELL-Wert (invert zurueckgenommen,
+    Feinkanal mit) gegen den effektiven Nullpunkt (inkl. Versatz). Vorher: Draht-
+    werte gegen den Modell-Nullpunkt — bei invert_pan bekam der Versatz das
+    falsche Vorzeichen, und eine Mutation „2D ohne Versatz" ueberlebte alle Tests."""
+
+    def test_2d_zeichnet_modellwert_gegen_effektiven_nullpunkt(self):
+        from PySide6.QtWidgets import QApplication
+        QApplication.instance() or QApplication([])
+        import src.ui.views.live_view as LV
+        c = LV.StageCanvas()
+        self.addCleanup(c.deleteLater)
+        fx = _fx(aim_offset_pan=0.75, aim_offset_tilt=-0.5)
+        for k, v in dict(universe=1, address=1, fixture_type="moving_head",
+                         invert_pan=True, invert_tilt=False, swap_pan_tilt=False).items():
+            setattr(fx, k, v)
+        chans = [SimpleNamespace(channel_number=i + 1, attribute=a)
+                 for i, a in enumerate(("pan", "pan_fine", "tilt", "tilt_fine"))]
+        modell_pan16, tilt16 = 100 * 256 + 64, 90 * 256 + 128
+        draht_pan16 = 65535 - modell_pan16                    # invert_pan auf dem Draht
+        werte = {1: draht_pan16 >> 8, 2: draht_pan16 & 255, 3: tilt16 >> 8, 4: tilt16 & 255}
+        uni = SimpleNamespace(get_channel=lambda a: werte.get(a, 0))
+        gezeichnet = []
+        orig = (LV.get_channels_for_patched, LV.FixtureRenderer.draw)
+        LV.get_channels_for_patched = lambda f: chans
+        LV.FixtureRenderer.draw = staticmethod(lambda *a, **k: gezeichnet.append(k))
+        self.addCleanup(setattr, LV, "get_channels_for_patched", orig[0])
+        self.addCleanup(setattr, LV.FixtureRenderer, "draw", orig[1])
+        alte_universen = c._state.universes
+        c._state.get_patched_fixtures = lambda: [fx]        # Instanz-Attribut ueberdeckt die Methode
+        c._state.universes = {1: uni}
+        self.addCleanup(vars(c._state).pop, "get_patched_fixtures", None)
+        self.addCleanup(setattr, c._state, "universes", alte_universen)
+        c._positions = {1: (100.0, 100.0)}
+        c.resize(400, 300)
+        c.grab()
+        self.assertTrue(gezeichnet, "nichts gezeichnet")
+        k = gezeichnet[-1]
+        self.assertAlmostEqual(k["pan"], modell_pan16 / 256.0, places=6)
+        self.assertAlmostEqual(k["tilt"], tilt16 / 256.0, places=6)
+        self.assertEqual((k["pan_zero_dmx"], k["tilt_zero_dmx"]), (128.75, 127.5))
 
 
 if __name__ == "__main__":

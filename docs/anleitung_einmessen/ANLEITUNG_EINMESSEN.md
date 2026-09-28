@@ -38,14 +38,19 @@ jeder Punkt wird einmal weggelassen und nachgesehen, ob die Rechnung ihn trotzde
 trifft. Nur wenn das hält, erscheint in der Statuszeile *„Position gefunden …"* und
 **Position übernehmen** wird anklickbar.
 
-Nach dem Übernehmen stimmt das Zielen **an jedem Punkt**, auch an solchen, die du nie
-angetippt hast — und das 3D-Bild zeigt den Kopf dort, wo er wirklich hängt.
+Nach dem Übernehmen stimmt das Zielen **im ganzen Bereich, den deine Punkte abdecken** —
+auch an Stellen, die du nie angetippt hast — und das 3D-Bild zeigt den Kopf dort, wo er
+wirklich hängt. Weit außerhalb der Messpunkte wird es ungenauer (jede Rechnung muss dort
+schätzen); wenn du später dort zielen willst, nimm dort einen Punkt dazu.
 
 **Tipps für die Punkte:**
 
-- **Verteilen:** nah **und** fern, Wand **und** Boden, links **und** rechts.
-  Vier Punkte auf einer Wand nebeneinander sagen wenig darüber, wie weit der Kopf
-  vorne oder hinten hängt.
+- **Verteilen:** nah **und** fern, Wand **und** Boden, links **und** rechts — über den
+  ganzen Bereich, in dem du später zielst.
+- **Nicht auf einer Linie.** Punkte entlang der Bühnenkante oder einer Bodenlinie passen
+  zu vielen verschiedenen Standorten gleich gut — LightOS erkennt das und sagt
+  *„die Punkte liegen fast auf einer Linie"*. Dann einen Punkt deutlich seitlich davon
+  nehmen (z. B. an der Wand).
 - **Genau einstellen lohnt sich.** Gemessen an 600 zufälligen Aufbauten: wer auf
   etwa 1 cm genau einstellt, landet danach an neuen Punkten meist bei 1–2 cm, selten
   über 5 cm. Bei 2 cm Ungenauigkeit bietet LightOS die Position seltener an — lieber
@@ -58,7 +63,9 @@ angetippt hast — und das 3D-Bild zeigt den Kopf dort, wo er wirklich hängt.
 | Meldung | Bedeutung |
 |---|---|
 | *„noch N Punkt(e) bis zur Positions-Rechnung"* | Korrektur ist gemerkt und wirkt für diesen Punkt; für die Position fehlen noch Punkte. |
+| *„die Punkte liegen fast auf einer Linie …"* | Genug Punkte, aber zu wenig aufgefächert — einen Punkt deutlich seitlich davon nehmen. |
 | *„Gegenprobe hält noch nicht …"* | Genug Punkte, aber sie passen nicht sicher zu einem Standort — weitere Punkte an anderen Stellen nehmen. |
+| *„(ohne Feinkanal für Pan/Tilt …)"* | Das Gerät kann nur ganze DMX-Schritte (bei 540° gut 2°). Die Korrektur für einen Punkt klappt, die Positions-Rechnung aber selten sicher. |
 | *„Position gefunden (N Punkte, Gegenprobe X cm): … neben dem eingetragenen Standort"* | Sicher gerechnet. **Position übernehmen** ist frei. |
 | *„⚠ … — stimmen Standort, Montage und Pan/Tilt-Bereich im Patch?"* | Die Korrektur ist größer als ~10°. Das ist fast nie ein Feinabgleich, sondern ein falscher Eintrag: Kopf hängend statt stehend, falscher Pan/Tilt-Bereich (z. B. 540° statt 630°) oder ein grob falscher Standort. Erst das im Patch prüfen. |
 
@@ -66,7 +73,9 @@ angetippt hast — und das 3D-Bild zeigt den Kopf dort, wo er wirklich hängt.
 
 - **Korrektur zurücksetzen** löscht die gemerkte Korrektur und die gesammelten Punkte
   der gewählten Geräte.
-- **Merken** und **Position übernehmen** lassen sich mit **Rückgängig** zurücknehmen.
+- **Merken** und **Position übernehmen** lassen sich mit **Rückgängig** zurücknehmen —
+  „Position übernehmen" in **einem** Schritt (Standort, Drehung und Korrektur zusammen).
+  Nimmst du ein „Merken" zurück, fällt auch der Messpunkt aus der Sammlung.
 - Die Korrektur und die übernommene Position werden **mit der Show gespeichert**. Die
   gesammelten Punkte nicht — wer die App neu startet, beginnt mit dem Sammeln von vorn
   (die Korrektur bleibt).
