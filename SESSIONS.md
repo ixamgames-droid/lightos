@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| VIZ-61 | A | fix/viz61-zielen-16bit | 2026-09-28T19:38Z | src/core/stage/aim.py,src/ui/visualizer_window.py,src/ui/visualizer/visualizer_service.py |
+| _(frei)_ |  |  |  |  |
 
 ## Blocker & Fallen
 
@@ -127,7 +127,6 @@
 
 ## Verlauf
 
-- 2026-09-14T11:34Z A done BPM-08
 - 2026-09-14T11:34Z A claim BPM-09
 - 2026-09-14T18:53Z A done BPM-09
 - 2026-09-14T18:54Z A claim BPM-10
@@ -157,3 +156,4 @@
 - 2026-09-28T19:06Z A claim QA-79
 - 2026-09-28T19:20Z A done QA-79
 - 2026-09-28T19:38Z A claim VIZ-61
+- 2026-09-28T19:55Z A done VIZ-61
