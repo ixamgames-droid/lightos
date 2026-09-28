@@ -3555,8 +3555,37 @@ def ensure_builtins():
                     _builtins_abgleichen(s)
                 _stand_schreiben(s, soll)
                 changed = True
+            if _qlc_korrektur(s):
+                changed = True
         if changed:
             s.commit()
+
+
+# ── FM-49: Attribut-Korrektur der schon importierten QLC+-Profile ─────────────
+#: Hochzaehlen, wenn ``qxf_import.attribut_korrigieren`` neue Regeln bekommt.
+QLC_KORREKTUR_VERSION = 1
+#: Was die letzte Korrektur geaendert hat (Log/Tests).
+LETZTE_QLC_KORREKTUR: list[str] = []
+
+
+def _qlc_korrektur(s) -> bool:
+    """Einmal je Regel-Version: importierte Profile mit der Import-Regel
+    nachziehen. Nur Attribute, nie Kanalzahl/-folge (gepatchte Geraete bleiben)."""
+    from sqlalchemy import text
+    global LETZTE_QLC_KORREKTUR
+    s.execute(text("CREATE TABLE IF NOT EXISTS qlc_korrektur (version INTEGER)"))
+    row = s.execute(text("SELECT version FROM qlc_korrektur LIMIT 1")).first()
+    if row and (row[0] or 0) >= QLC_KORREKTUR_VERSION:
+        return False
+    from src.core.database.qxf_import import bibliothek_reparieren
+    LETZTE_QLC_KORREKTUR = bibliothek_reparieren(s)
+    if LETZTE_QLC_KORREKTUR:
+        print(f"[fixture_db] FM-49: {len(LETZTE_QLC_KORREKTUR)} Kanaele importierter "
+              f"Profile neu zugeordnet (z. B. {LETZTE_QLC_KORREKTUR[0]})")
+    s.execute(text("DELETE FROM qlc_korrektur"))
+    s.execute(text("INSERT INTO qlc_korrektur (version) VALUES (:v)"),
+              {"v": QLC_KORREKTUR_VERSION})
+    return True
 
 
 # ── FM-50: installierte Builtins an die Code-Fassung angleichen ──────────────

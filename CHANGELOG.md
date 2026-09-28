@@ -7,6 +7,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-29 — Importierte Geräte zeigen die richtigen Regler (FM-49)
+
+#### Behoben
+
+- **Farbkanäle als Dimmer, Gobo-Rotation als Geschwindigkeit, Frost als Makro.** Viele
+  QLC+-Profile nennen für einen Kanal nur eine grobe Gruppe. LightOS hat daraus z. B. beim
+  Hyper Gem LED 48 „Dimmer" statt Rot/Grün/Blau/Weiß gemacht, beim Wash FX Hex Amber und UV
+  als Dimmer, bei der Boom Box die Gobo-Rotation als Geschwindigkeit und Framing-Blades als
+  Zoom. Der Import prüft die Gruppe jetzt am Kanalnamen gegen. Schon importierte Profile
+  werden beim ersten Start einmal nachgezogen (nur die Zuordnung, Kanalzahl und DMX-Belegung
+  bleiben). Eigene und mitgelieferte Profile bleiben unberührt.
+- Hinweis: Hast du mit einem solchen Gerät schon Szenen gespeichert, stehen dort die Werte
+  noch unter der alten Zuordnung (z. B. „Dimmer" statt „Rot") — die Szene einmal neu
+  einstellen und speichern.
+
 ### 2026-09-29 — Programmer zeigt keine leeren Reiter mehr (FM-48, Teil 2)
 
 #### Behoben
