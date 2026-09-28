@@ -123,6 +123,8 @@ class SourceController:
         self._last_other: tuple[str, str | None] | None = None
         self._seeded = False
         self._saved_kind: str | None = None   # BPM-17: gespeicherte Quelle, s. _seed_memory
+        # BPM-18: der Eintrag VOR dem Wechsel auf OS2L — dahin fuehrt „OS2L-Server" aus.
+        self._before_os2l: tuple[str, str | None] | None = None
 
     # ── Backends lazily (Singletons; Tests reichen Fakes herein) ────────────
     def _manager(self):
@@ -232,9 +234,19 @@ class SourceController:
         key = (kind, device)
         self._remember(kind, wanted)
         old_wanted = self._wanted
+        if kind == "os2l":
+            vorher = old_wanted
+            if vorher is None and self._saved_kind and self._saved_kind != "os2l":
+                # noch nichts geschaltet (fuer „Lied-Analyse"/„Aus" tut der Auto-Start
+                # nichts) — dann gilt die gespeicherte Quelle als die davor
+                vorher = (self._last_audio if self._saved_kind in AUDIO_KINDS
+                          else (self._saved_kind, None))
+            if vorher is not None and vorher[0] != "os2l":
+                self._before_os2l = vorher
         self._wanted = (kind, wanted)
         self.missing_sink = wanted if (kind == "loopback" and wanted and device is None) else None
-        if key == self._current and not force and not self._audio_drift(kind):
+        if (key == self._current and not force and not self._audio_drift(kind)
+                and not self._os2l_drift(kind)):
             if self._wanted != old_wanted:
                 self._notify()
             return False
@@ -300,6 +312,38 @@ class SourceController:
         if not _is_auto(mgr):
             self._safe("set_mode auto", lambda: mgr.set_mode("auto"))
         return self.apply(kind, device, force=True)
+
+    def toggle_os2l(self, on: bool) -> tuple[bool, str | None]:
+        """Menuepunkt „OS2L-Server (Port 1234)" (BPM-18): der Menuepunkt IST die
+        Quelle OS2L, kein zweiter Schalter daneben (Entscheidung des Betreibers,
+        2026-09-28) — sonst liefen Liste und Server auseinander.
+
+        **an** = ``apply("os2l")``; ein gestoppter Server bei schon gewaehltem OS2L
+        wird dabei neu gestartet (``_os2l_drift``). **aus** = zurueck zu dem Eintrag,
+        der VOR OS2L galt (samt Geraet), sonst „Aus". Laeuft der Server, obwohl eine
+        andere Quelle gewaehlt ist (am Controller vorbei gestartet), stoppt „aus" nur
+        ihn und laesst die Quelle stehen.
+
+        Liefert ``(ok, grund)`` — ``grund`` nennt, warum der Server nach „an" nicht
+        laeuft (``apply`` verschluckt den Startfehler, das Menue soll ihn zeigen)."""
+        if on:
+            self.apply("os2l")
+            srv = self._server()
+            if srv is None:
+                return False, "OS2L ist in dieser Installation nicht verfuegbar."
+            try:
+                laeuft = bool(srv.is_running())
+            except Exception as e:
+                return False, str(e)
+            if not laeuft:
+                return False, "Der OS2L-Server liess sich nicht starten (Port 1234 belegt?)."
+            return True, None
+        if self.chosen_kind() == "os2l":
+            kind, device = self._before_os2l or ("off", None)
+            self.apply(kind, device)
+        else:
+            self._os2l_stop()
+        return True, None
 
     def octave_target(self, step: int) -> float:
         """Tempo, auf das ×½ (step < 0) / ×2 (step > 0) fuehren wuerde (0 = unbekannt)."""
@@ -403,6 +447,21 @@ class SourceController:
             return False
         try:
             return getattr(self._manager(), "audio_active", False) is True
+        except Exception:
+            return False
+
+    def _os2l_drift(self, kind: str) -> bool:
+        """OS2L gewaehlt, aber der Server steht (am Controller vorbei gestoppt oder
+        abgestuerzt): derselbe Eintrag startet ihn erneut (BPM-18-DoD). Anders als bei
+        PC-Audio (BPM-14, S2-Befund) ist ein wiederholter Start hier harmlos — ein
+        laufender Server wird nicht angefasst. Nur ``is False`` zaehlt (Fakes/Mocks)."""
+        if kind != "os2l":
+            return False
+        srv = self._server()
+        if srv is None:
+            return False
+        try:
+            return srv.is_running() is False
         except Exception:
             return False
 

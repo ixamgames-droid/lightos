@@ -7,6 +7,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-28 — BPM: der Menüpunkt „OS2L-Server" stellt die Quelle um (BPM-18)
+
+#### Behoben
+
+- **Menü *Ausgabe → OS2L-Server (Port 1234)* und die Quelle-Liste laufen nicht mehr auseinander.**
+  Bisher startete und stoppte der Menüpunkt nur den Server: stand die Liste auf **PC-Audio**,
+  liefen danach OS2L und das Mithören gleichzeitig; stand sie auf **OS2L**, ging mit dem Haken
+  nur der Server aus, die Liste zeigte weiter OS2L, und ein erneutes Wählen von OS2L startete
+  ihn nicht wieder. Jetzt ist der Menüpunkt dieselbe Umschaltung wie die Liste: **Haken an** =
+  Quelle OS2L (das Mithören geht aus), **Haken aus** = zurück zu der Quelle, die vorher galt,
+  samt Gerät. Lässt sich der Server nicht starten (Port 1234 belegt), sagt eine Meldung das.
+  Ein gestoppter Server startet außerdem wieder, wenn OS2L in der Liste erneut gewählt wird.
+
 ### 2026-09-28 — BPM: die gewählte Quelle entscheidet, wer das Tempo führt (BPM-17)
 
 #### Geändert
