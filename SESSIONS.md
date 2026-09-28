@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| _(frei)_ |  |  |  |  |
+| FM-48 | A | fix/fm48-bedienelemente | 2026-09-28T21:29Z | src/ui/views/programmer_view.py,src/ui/widgets/preset_tile.py,src/core/app_state.py |
 
 ## Blocker & Fallen
 
@@ -128,7 +128,6 @@
 
 ## Verlauf
 
-- 2026-09-14T18:54Z A claim BPM-10
 - 2026-09-14T19:36Z A done BPM-10
 - 2026-09-14T20:23Z A claim BPM-11
 - 2026-09-14T21:48Z A done BPM-11
@@ -158,3 +157,4 @@
 - 2026-09-28T19:55Z A done VIZ-61
 - 2026-09-28T19:58Z A claim VIZ-55
 - 2026-09-28T21:03Z A done VIZ-55
+- 2026-09-28T21:29Z A claim FM-48
