@@ -130,8 +130,13 @@ class MusicShowDirector(QObject):
         (für Top-Bar/Busse) und (2) — wenn ein echtes Beatgrid vorliegt und es
         führen darf — TAKTGENAUE Beats über den schnellen Timer.
 
-        Präzedenz: MANUAL/Lock und aktiver Live-Audio gewinnen weiter; daher führt
-        die Analyse nur, wenn der Nutzer „Lied-Analyse" gewählt hat (Live-Audio aus)."""
+        Präzedenz: MANUAL/Lock und aktiver Live-Audio gewinnen weiter — **und die
+        gewählte Quelle entscheidet** (BPM-17): geführt wird nur, wenn in
+        „Erkennung" **Lied-Analyse (Player)** steht. Bis 2026-09-28 stand hier nur
+        `not mgr.audio_active`, und der Docstring behauptete trotzdem schon, die
+        Analyse führe nur bei gewählter Lied-Analyse; gemessen führte sie auch bei
+        Quelle **Aus** (während die Statuszeile „Erkennung aus" sagte) und bei
+        **OS2L** (dann schrieben DJ-Programm und Lied-Kurve beide ins Tempo)."""
         try:
             from src.core.audio.media_player import get_media_player
             mp = get_media_player()
@@ -140,6 +145,20 @@ class MusicShowDirector(QObject):
                 return
             tl = self._timeline_for(mp.current_track)
             if tl is None or tl.is_empty():
+                self._grid_stop()
+                return
+            # BPM-17: die gewaehlte Quelle sperrt — vor allem anderen, damit bei
+            # „Aus"/„OS2L" auch der BPM-WERT unten nicht mehr gesetzt wird.
+            # Fail-open wie in ``song_may_lead``: ist die Abfrage selbst kaputt,
+            # fuehrt das Lied wie frueher weiter — der ganze Rumpf haengt in einem
+            # ``except: pass``, ein Importfehler wuerde sonst STILL sperren.
+            try:
+                from src.ui.bpm_source_controller import song_may_lead
+                darf_fuehren = song_may_lead()
+            except Exception as e:
+                print(f"[MusicShowDirector] gewaehlte Quelle nicht ermittelbar: {e}")
+                darf_fuehren = True
+            if not darf_fuehren:
                 self._grid_stop()
                 return
             from src.core.engine.bpm_manager import get_bpm_manager, BpmMode
