@@ -24,7 +24,15 @@ Capture haengt an der Quelle, der Modus am Manager).
 
 **Idempotent:** derselbe Eintrag zweimal hintereinander schaltet nichts ein
 zweites Mal (S2-Befund: Radio-Wechsel feuerte doppelt und startete den Capture
-zweimal). ``apply`` liefert False, wenn nichts zu tun war.
+zweimal). ``apply`` liefert False, wenn nichts zu tun war. Ausnahme (BPM-14-
+Nacharbeit): ein Nicht-Audio-Eintrag (``os2l``/``song``/``off``) gilt nur als
+aktiv, solange der Manager kein Live-Audio hoert (``mgr.audio_active``). Hat
+jemand am Controller vorbei Audio eingeschaltet (VC-Aktion „Musik-BPM", BPM-16),
+schaltet derselbe Eintrag erneut — sonst bliebe Audio am Manager und verwuerfe
+jede ``request_bpm`` der gewaehlten Quelle. Fuer PC-Audio/Eingang bleibt es bei
+der reinen Idempotenz: ein fehlgeschlagener Capture-Start laesst ``audio_active``
+auf False, und bei jedem doppelt feuernden Signal neu zu starten waere wieder der
+S2-Befund; zurueck geht es dort ueber Auto (``set_auto``) oder ``reconnect``.
 
 Auto | Manuell (``set_auto``): Auto = ``mgr.set_mode("auto")`` und — falls die
 Quelle Audio ist und der Manager sie nicht mehr hoert — ``use_audio_source(True)``;
@@ -50,6 +58,16 @@ angesteckt, laeuft der Capture wieder darauf; fehlt es weiter, bleibt
 Backends werden nur AUFGERUFEN (bpm_manager.py, capture.py, os2l.py,
 beat_detector.py bleiben unangetastet); jeder Schritt ist einzeln abgesichert,
 damit ein fehlendes Backend (kein soundcard/numpy) die uebrigen nicht blockiert.
+
+**Wechsel melden (BPM-14):** ``subscribe_change(cb)`` — ``cb(kind, device)``
+bekommt nach jedem wirksamen Wechsel (``apply`` liefert True, auch
+``reconnect``) den GEWUENSCHTEN Eintrag (``wanted``), ebenso wenn sich nur
+``wanted`` aendert (fehlender Sink bei schon laufendem Standard-Ausgabegeraet).
+Ein idempotenter Aufruf meldet nichts. Damit spiegelt der Tab „Erkennung"
+Wechsel, die nicht aus seiner eigenen Liste kommen (Generator-Knopf „Im Player
+laden & als BPM-Quelle nutzen") — per Rueckruf statt Poll. Gerufen wird im
+Thread des Schaltenden; Qt-Ansichten reichen ueber ein Signal in ihren Thread
+weiter. Ein defekter Abonnent blockiert die uebrigen nicht.
 """
 from __future__ import annotations
 
@@ -87,6 +105,7 @@ class SourceController:
         self._current: tuple[str, str | None] | None = None
         self._wanted: tuple[str, str | None] | None = None
         self.missing_sink: str | None = None
+        self._listeners: list = []      # BPM-14: cb(kind, device) nach jedem Wechsel
 
     # ── Backends lazily (Singletons; Tests reichen Fakes herein) ────────────
     def _manager(self):
@@ -142,6 +161,15 @@ class SourceController:
         """Zuletzt GEWUENSCHTER Eintrag ``(kind, device)`` — bei fehlendem Sink mit dessen id."""
         return self._wanted
 
+    def subscribe_change(self, cb) -> None:
+        """``cb(kind, device)`` nach jedem wirksamen Wechsel (BPM-14, s. Modulkopf)."""
+        if cb not in self._listeners:
+            self._listeners.append(cb)
+
+    def unsubscribe_change(self, cb) -> None:
+        if cb in self._listeners:
+            self._listeners.remove(cb)
+
     def reconnect(self) -> bool:
         """„erneut verbinden": den gewuenschten Eintrag erzwungen neu anwenden."""
         if self._wanted is None:
@@ -166,9 +194,12 @@ class SourceController:
         if kind == "loopback":
             device = _known_sink(device)   # nur echte sink_id, sonst Standard-Ausgabegeraet
         key = (kind, device)
+        old_wanted = self._wanted
         self._wanted = (kind, wanted)
         self.missing_sink = wanted if (kind == "loopback" and wanted and device is None) else None
-        if key == self._current and not force:
+        if key == self._current and not force and not self._audio_drift(kind):
+            if self._wanted != old_wanted:
+                self._notify()
             return False
         self._current = key
         mgr = self._manager()
@@ -195,6 +226,7 @@ class SourceController:
                 self._os2l_stop()
             if kind == "song":
                 self.apply_player_track()
+        self._notify()
         return True
 
     def set_auto(self, auto: bool) -> None:
@@ -269,6 +301,28 @@ class SourceController:
             return 0.0
 
     # ── intern ───────────────────────────────────────────────────────────────
+    def _audio_drift(self, kind: str) -> bool:
+        """Nicht-Audio-Eintrag angewandt, aber der Manager hoert noch Live-Audio:
+        jemand hat am Controller vorbei geschaltet (VC-Aktion „Musik-BPM",
+        ``vc_button`` AUDIO_BPM, BPM-16). Dann ist der Eintrag nicht mehr aktiv,
+        und ``apply`` schaltet erneut (BPM-14-Nacharbeit). Nur ``is True`` zaehlt —
+        Fakes ohne ``audio_active`` (oder ein Mock) loesen nichts aus."""
+        if kind in AUDIO_KINDS:
+            return False
+        try:
+            return getattr(self._manager(), "audio_active", False) is True
+        except Exception:
+            return False
+
+    def _notify(self) -> None:
+        """Abonnenten den gewuenschten Eintrag melden; jeder einzeln abgesichert."""
+        kind, device = self._wanted if self._wanted else (None, None)
+        for cb in list(self._listeners):
+            try:
+                cb(kind, device)
+            except Exception as e:
+                _log(f"Abonnent: {e}")
+
     def _os2l_stop(self):
         srv = self._server()
         if srv is not None and srv.is_running():
