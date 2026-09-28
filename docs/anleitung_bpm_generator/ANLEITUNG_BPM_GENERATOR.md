@@ -100,8 +100,9 @@ BPM-Wert. (Details: [BPM-Manager-Anleitung, Abschnitt „Taktgenau"](../anleitun
 > sperren sie. Der Button stellt deshalb selbst auf **Lied-Analyse (Player)** und schaltet
 > Mithören und OS2L ab. **Manuell** und **🔒 Tempo einfrieren** haben weiterhin Vorrang: dann
 > bleibt das Tempo stehen, bis du in **Erkennung** auf **Auto** gehst bzw. das Einfrieren löst.
-> Umgekehrt führt ein analysiertes Lied im Player in Auto auch bei Quelle **Aus** oder
-> **OS2L** — abschalten lässt sich das im Musik-Tab mit dem Haken **BPM koppeln**.
+> Und die Quelle muss wirklich auf **Lied-Analyse (Player)** stehen: bei **Aus** oder
+> **OS2L** führt das Lied **nicht** (seit BPM-17 — vorher tat es das, obwohl die Anzeige
+> etwas anderes sagte). Zusätzlich braucht es im Musik-Tab den Haken **BPM koppeln**.
 
 Mit **„Als .json exportieren"** sicherst du die komplette Analyse (BPM-Kurve, Beatgrid,
 Struktur) als Datei.
