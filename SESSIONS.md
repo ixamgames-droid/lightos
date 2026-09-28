@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| VIZ-55 | A | feature/viz55-einmessen | 2026-09-28T19:58Z | src/core/stage/aim.py,src/ui/visualizer/visualizer_window.py |
+| _(frei)_ |  |  |  |  |
 
 ## Blocker & Fallen
 
@@ -127,7 +127,6 @@
 
 ## Verlauf
 
-- 2026-09-14T18:53Z A done BPM-09
 - 2026-09-14T18:54Z A claim BPM-10
 - 2026-09-14T19:36Z A done BPM-10
 - 2026-09-14T20:23Z A claim BPM-11
@@ -157,3 +156,4 @@
 - 2026-09-28T19:38Z A claim VIZ-61
 - 2026-09-28T19:55Z A done VIZ-61
 - 2026-09-28T19:58Z A claim VIZ-55
+- 2026-09-28T21:03Z A done VIZ-55
