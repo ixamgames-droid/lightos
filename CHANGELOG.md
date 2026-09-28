@@ -7,6 +7,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-28 — Mitgelieferte Geräteprofile bleiben aktuell (FM-50)
+
+#### Behoben
+
+- **Verbesserungen an mitgelieferten Profilen kamen bei bestehenden Installationen nie an.**
+  Beim Start wurden nur *fehlende* Profile nachgetragen, vorhandene nie aktualisiert. Eine
+  ältere Installation hatte deshalb z. B. den Stage Light ZQ01424 ohne Strobe-Bereiche, und
+  ein neuer Modus der Stairville MB5x5 fehlte ganz. Jetzt gleicht LightOS die mitgelieferten
+  Profile nach einem Update einmal an: fehlende Modi werden ergänzt, Wertebereiche und
+  Kanalnamen aktualisiert. Ändert sich an einem Profil die Kanal-*Belegung*, wird das nicht
+  still übernommen (es würde gepatchte Geräte verschieben), sondern nur im Protokoll gemeldet.
+  Eigene und importierte Profile bleiben unberührt.
+
 ### 2026-09-28 — Sicherheit: „Alles Weiß“ lässt Laser und Nebel in Ruhe (LAS-21)
 
 #### Behoben

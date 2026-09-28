@@ -160,11 +160,13 @@ def search_fixtures(query: str) -> list[FixtureProfile]:
 # ── Initiale Daten ────────────────────────────────────────────────────────────
 
 def _seed_if_empty():
+    global _FRISCH_GESEEDET
     with Session(engine()) as s:
         if s.execute(select(Manufacturer)).first():
             return
         _seed(s)
         s.commit()
+        _FRISCH_GESEEDET = True        # FM-50: frisch = Code-Stand, kein Abgleich noetig
 
 
 def _infer_range_kind(name: str) -> str:
@@ -3543,187 +3545,371 @@ def ensure_builtins():
     stabil (gepatchte Fixtures referenzieren fixture_profile_id).
     Wird bei jedem engine()-Aufbau aufgerufen."""
     with Session(engine()) as s:
-        changed = False
-        have = {row[0] for row in s.execute(select(FixtureProfile.short_name))}
-        if "ZQ01424" not in have:
-            _add_zq01424(s, _get_or_create_mfr(s, "Generic", "GEN"))
-            changed = True
-        if "ZQ02001" not in have:
-            _add_zq02001(s, _get_or_create_mfr(s, "U King", "UKING"))
-            changed = True
-        if "SPIDER14" not in have:
-            _add_spider(s, _get_or_create_mfr(s, "U King", "UKING"))
-            changed = True
-        if "CONTIMH" not in have:
-            _add_conti_mh(s, _get_or_create_mfr(s, "Conti", "CONTI"))
-            changed = True
-        if "SHARPY" not in have:                         # Clay Paky Sharpy (Beam)
-            _add_claypaky_sharpy(s, _get_or_create_mfr(s, "Clay Paky", "CLAYPAKY"))
-            changed = True
-        if "KLEINCONTI" not in have:
-            _add_klein_conti(s, _get_or_create_mfr(s, "Klein", "KLEIN"))
-            changed = True
-        if "PARTYLASER" not in have:
-            _add_party_laser(s, _get_or_create_mfr(s, "Party Lights", "PARTYLT"))
-            changed = True
-        if "EUROGROSS" not in have:
-            _add_eurolite_gross(s, _get_or_create_mfr(s, "Eurolite", "EURO"))
-            changed = True
-        if "EURON10" not in have:                       # FIX-FOG: Nebelmaschine
-            _add_fog_hazer(s, _get_or_create_mfr(s, "Eurolite", "EURO"))
-            changed = True
-        if "FPQWH12X" not in have:
-            _add_adj_flatpar(s, _get_or_create_mfr(s, "ADJ", "ADJ"))
-            changed = True
-        if "DOTZTPAR" not in have:
-            _add_adj_dotz_tpar(s, _get_or_create_mfr(s, "ADJ", "ADJ"))
-            changed = True
-        if "L2600LASER" not in have:
-            _add_ehaho_l2600(s, _get_or_create_mfr(s, "Ehaho", "EHAHO"))
-            changed = True
-        if "PANGFB4" not in have:
-            _add_pangolin_fb4(s, _get_or_create_mfr(s, "Pangolin", "PANG"))
-            changed = True
-        if "MOVBAR4" not in have:                       # FM-5
-            _add_mover_bar4(s, _get_or_create_mfr(s, "Generic", "GEN"))
-            changed = True
-        if "PARBAR4" not in have:                       # FM-5
-            _add_par_bar4(s, _get_or_create_mfr(s, "Generic", "GEN"))
-            changed = True
-        if "ADJ5PXHEX" not in have:                      # Katalog Runde 2
-            _add_adj_5px_hex(s, _get_or_create_mfr(s, "ADJ", "ADJ"))
-            changed = True
-        if "CBANDPIX" not in have:                       # Katalog Runde 2
-            _add_chauvet_colorband_pix(s, _get_or_create_mfr(s, "Chauvet DJ", "CHAUVET"))
-            changed = True
-        if "FLATPRO7" not in have:                       # Katalog Runde 2
-            _add_cameo_flatpro7(s, _get_or_create_mfr(s, "Cameo", "CAMEO"))
-            changed = True
-        if "STAIRB2408" not in have:                     # Katalog Runde 2
-            _add_stairville_bar2408(s, _get_or_create_mfr(s, "Stairville", "STAIR"))
-            changed = True
-        if "HYDRA4000" not in have:                       # Katalog Runde 3
-            _add_cameo_hydrabeam(s, _get_or_create_mfr(s, "Cameo", "CAMEO"))
-            changed = True
-        if "EVENTPARIP65" not in have:                    # Katalog Runde 3
-            _add_varytec_event_par(s, _get_or_create_mfr(s, "Varytec", "VARYTEC"))
-            changed = True
-        if "ATOMIC3000" not in have:                      # Katalog Runde 4
-            _add_martin_atomic3000(s, _get_or_create_mfr(s, "Martin", "MARTIN"))
-            changed = True
-        if "MACAURA" not in have:                         # Katalog Runde 4
-            _add_martin_mac_aura(s, _get_or_create_mfr(s, "Martin", "MARTIN"))
-            changed = True
-        if "POINTE" not in have:                          # Katalog Runde 4
-            _add_robe_pointe(s, _get_or_create_mfr(s, "Robe", "ROBE"))
-            changed = True
-        if "MEGAPNT" not in have:                         # FM-15: Robe MegaPointe
-            _add_robe_megapointe(s, _get_or_create_mfr(s, "Robe", "ROBE"))
-            changed = True
-        if "MYTHOS" not in have:                          # FM-15: Clay Paky Mythos
-            _add_claypaky_mythos(s, _get_or_create_mfr(s, "Clay Paky", "CLAYPAKY"))
-        if "MAC700P" not in have:                         # FM-15: Martin MAC 700 Profile
-            _add_martin_mac700_profile(s, _get_or_create_mfr(s, "Martin", "MARTIN"))
-            changed = True
-        if "SPIIDER" not in have:                         # FM-14: Pixel-Moving-Head
-            _add_robe_spiider(s, _get_or_create_mfr(s, "Robe", "ROBE"))
-            changed = True
-        if "MATRIXPANEL" not in have:                     # FM-13: Pixel-Panel-Typ
-            _add_generic_matrix_panel(s, _get_or_create_mfr(s, "Generic", "GEN"))
-            changed = True
-        if "DOTZMATRIX" not in have:                      # FM-13 Slice 2: reale Panels
-            _add_adj_dotz_matrix(s, _get_or_create_mfr(s, "ADJ", "ADJ"))
-            changed = True
-        if "STAIRPP144" not in have:                      # FM-13 Slice 2: reale Panels
-            _add_stairville_pp144(s, _get_or_create_mfr(s, "Stairville", "STAIR"))
-            changed = True
-        if "STAIRMB5X5" not in have:                      # Robins Blinder (2026-09-02)
-            _add_stairville_mb5x5(s, _get_or_create_mfr(s, "Stairville", "STAIR"))
-            changed = True
-        if "ZQ06121" not in have:                         # Davids LED-Balken (2026-08-05)
-            _add_uking_zq06121(s, _get_or_create_mfr(s, "U King", "UKING"))
-            changed = True
-        if "ZQ06121" in have:
-            # Profil-Bestaetigung 2026-08-05: die Kanalreihenfolge ist am echten
-            # Geraet nachgesehen, „(ungeprueft)" faellt aus beiden Modusnamen.
-            # Reine Umbenennung — die Kanaele bleiben identisch; erkannt wird sie
-            # nur, weil der Modusname der Schluessel der Signatur ist.
-            prof = s.execute(
-                select(FixtureProfile)
-                .options(selectinload(FixtureProfile.modes)
-                         .selectinload(FixtureMode.channels))
-                .where(FixtureProfile.short_name == "ZQ06121",
-                       FixtureProfile.source == "builtin")
-            ).scalars().first()
-            if prof is not None and _mode_attr_signature(prof) != _ZQ06121_SIGNATURE:
-                prof.modes.clear()          # cascade loescht Kanaele + Ranges
-                s.flush()
-                _add_modes(s, prof, _zq06121_modes_data())
+        changed = _ensure_builtins_in(s)
+        if _abgleich_faellig():
+            # FM-50: nur wenn der gestempelte Code-Stand nicht der aktuelle ist —
+            # sonst kostete jeder Start (und jeder Testprozess) ~0,7 s.
+            soll = _code_stand()
+            if _FRISCH_GESEEDET or _stand_lesen(s) != soll:
+                if not _FRISCH_GESEEDET:
+                    _builtins_abgleichen(s)
+                _stand_schreiben(s, soll)
                 changed = True
-        if "ZQ02001" in have:
-            # Profil-Korrektur 2026-06-09: Dimmer/Strobe waren vertauscht,
-            # 9-Kanal-Modus hatte faelschlich Fine-Kanaele statt FX/Reset.
-            prof = s.execute(
-                select(FixtureProfile)
-                .options(selectinload(FixtureProfile.modes)
-                         .selectinload(FixtureMode.channels))
-                .where(FixtureProfile.short_name == "ZQ02001",
-                       FixtureProfile.source == "builtin")
-            ).scalars().first()
-            if prof is not None and _mode_attr_signature(prof) != _ZQ02001_SIGNATURE:
-                prof.modes.clear()          # cascade loescht Kanaele + Ranges
-                s.flush()
-                _add_modes(s, prof, _zq02001_modes_data())
-                changed = True
-        if "SPIDER14" in have:
-            # Profil-Umstellung 2026-06-16: CH1/CH2 = zwei separate Tilts (Bar L/R)
-            # statt Pan/Tilt (Mehrkopf, X-6). Aeltere DB (CH1=pan) in-place migrieren.
-            prof = s.execute(
-                select(FixtureProfile)
-                .options(selectinload(FixtureProfile.modes)
-                         .selectinload(FixtureMode.channels))
-                .where(FixtureProfile.short_name == "SPIDER14",
-                       FixtureProfile.source == "builtin")
-            ).scalars().first()
-            if prof is not None and _mode_attr_signature(prof) != _SPIDER14_SIGNATURE:
-                prof.modes.clear()
-                s.flush()
-                _add_modes(s, prof, _spider_modes_data())
-                changed = True
-        if "EURON10" in have:
-            # CDX-07: alte DBs (seit FIX-FOG) haben den Lüfter-Kanal des 2-Kanal-
-            # Modus faelschlich als `dimmer` -> der Programmer dedupliziert beide
-            # `dimmer`-Kanaele zu EINEM Regler, der Lüfter ist nicht getrennt
-            # steuerbar. In-place auf `fan` migrieren (Signatur-Abgleich).
-            prof = s.execute(
-                select(FixtureProfile)
-                .options(selectinload(FixtureProfile.modes)
-                         .selectinload(FixtureMode.channels))
-                .where(FixtureProfile.short_name == "EURON10",
-                       FixtureProfile.source == "builtin")
-            ).scalars().first()
-            if prof is not None and _mode_attr_signature(prof) != _EURON10_SIGNATURE:
-                prof.modes.clear()
-                s.flush()
-                _add_modes(s, prof, _fog_hazer_modes_data())
-                changed = True
-        # VIZ-50a: Rasterform der Pixel-Panels in bestehende DBs nachtragen.
-        # NACH den Signatur-Bloecken oben: hat einer davon die Modi neu gebaut,
-        # tragen sie die Form schon und der Nachtrag findet nichts mehr zu tun.
-        for _kurz, _daten in (("MATRIXPANEL", _matrix_panel_modes_data()),
-                              ("DOTZMATRIX", _dotz_matrix_modes_data()),
-                              ("STAIRPP144", _stairville_pp144_modes_data()),
-                              ("STAIRMB5X5", _stairville_mb5x5_modes_data()),
-                              ("ZQ06121", _zq06121_modes_data())):
-            if _ensure_panel_geometrie(s, _kurz, _daten):
-                changed = True
-        # X-3: generische MH-Spots mit Farb-/Gobo-Rad-Slots nachruesten
-        if _ensure_wheel_ranges(s, "MH8", _mh8_modes_data()):
-            changed = True
-        if _ensure_wheel_ranges(s, "MH16", _mh16_modes_data()):
-            changed = True
         if changed:
             s.commit()
+
+
+# ── FM-50: installierte Builtins an die Code-Fassung angleichen ──────────────
+#
+# ``_ensure_builtins_in`` traegt nur FEHLENDE Profile nach und kennt fuer eine
+# Handvoll Profile handgepflegte Signatur-Migrationen. Reine Bereichsaenderungen
+# (Strobe-/Farbrad-Werte) und neue Modi erreichten bestehende Installationen nie:
+# gemessen am 2026-09-28 lagen 7 Modi hinter dem Code, darunter der ZQ01424 ohne
+# Strobe-Bereiche (dort schrieb „Auf" 255 = Strobe schnell), der L2600 und die
+# Dotz TPar; der 102-Kanal-Modus der Stairville MB5x5 fehlte ganz.
+
+_CODE_BUILTINS: dict | None = None
+_ABGLEICH_FUER: object = None
+_FRISCH_GESEEDET = False
+
+
+def _code_stand() -> str:
+    """Fingerabdruck der Builtin-Definitionen: der Quelltext DIESES Moduls (hier
+    stehen ``_seed`` und alle ``_add_*``). Aendert sich eine Definition, aendert
+    sich der Stand — dann (und nur dann) laeuft der Abgleich einmal."""
+    import hashlib
+    try:
+        with open(__file__, "rb") as fh:
+            return hashlib.sha256(fh.read()).hexdigest()[:16]
+    except OSError:
+        return ""
+
+
+def _stand_lesen(s) -> str:
+    from sqlalchemy import text
+    s.execute(text("CREATE TABLE IF NOT EXISTS builtin_stand (stand TEXT)"))
+    row = s.execute(text("SELECT stand FROM builtin_stand LIMIT 1")).first()
+    return row[0] if row else ""
+
+
+def _stand_schreiben(s, stand: str) -> None:
+    from sqlalchemy import text
+    s.execute(text("CREATE TABLE IF NOT EXISTS builtin_stand (stand TEXT)"))
+    s.execute(text("DELETE FROM builtin_stand"))
+    s.execute(text("INSERT INTO builtin_stand (stand) VALUES (:s)"), {"s": stand})
+#: Was der letzte Abgleich getan bzw. bewusst NICHT getan hat (fuer Log/Tests).
+LETZTER_ABGLEICH: dict = {"ergaenzt": [], "angeglichen": [], "strukturell": []}
+
+
+def _profil_als_daten(prof) -> dict:
+    out = {}
+    for m in prof.modes:
+        out[m.name] = {
+            "kopf": (m.channel_count, m.description or "", m.grid_rows or 0, m.grid_cols or 0),
+            "kanaele": [
+                (c.channel_number, c.name, c.attribute, c.default_value, c.highlight_value,
+                 bool(c.invert), c.resolution,
+                 tuple(sorted((r.range_from, r.range_to, r.name, r.kind or "")
+                              for r in c.ranges)))
+                for c in sorted(m.channels, key=lambda c: c.channel_number)],
+        }
+    return out
+
+
+def _code_builtins() -> dict:
+    """Die eingebauten Profile, wie der CODE sie heute definiert —
+    ``{kurzname: {modus: {"kopf": …, "kanaele": [...]}}}``. Einmal je Prozess in
+    einer Speicher-DB gebaut (``_seed`` + ``_ensure_builtins_in``) und gemerkt."""
+    global _CODE_BUILTINS
+    if _CODE_BUILTINS is None:
+        eng = create_engine("sqlite://")
+        create_all_idempotent(eng)
+        with Session(eng) as s:
+            _seed(s)
+            s.flush()
+            _ensure_builtins_in(s)
+            s.commit()
+            profs = s.execute(
+                select(FixtureProfile)
+                .options(selectinload(FixtureProfile.modes)
+                         .selectinload(FixtureMode.channels)
+                         .selectinload(FixtureChannel.ranges))
+                .where(FixtureProfile.source == "builtin")).scalars().all()
+            _CODE_BUILTINS = {p.short_name: _profil_als_daten(p) for p in profs}
+        eng.dispose()
+    return _CODE_BUILTINS
+
+
+def _abgleich_faellig() -> bool:
+    """Einmal je Engine (Testsuiten rufen ``ensure_builtins`` hundertfach)."""
+    global _ABGLEICH_FUER
+    aktuell = _engine
+    if aktuell is None or aktuell is _ABGLEICH_FUER:
+        return False
+    _ABGLEICH_FUER = aktuell
+    return True
+
+
+def _builtins_abgleichen(s) -> bool:
+    """Installierte eingebaute Profile vorsichtig an die Code-Fassung angleichen.
+
+    * **Modus fehlt** -> ergaenzen (beruehrt keine gepatchten Geraete).
+    * **Gleiche Kanalliste** (Nummer + Attribut) -> Namen, Default/Highlight,
+      Invert/Aufloesung und die Wertebereiche angleichen. Die DMX-Belegung
+      gepatchter Geraete bleibt dabei unveraendert.
+    * **Strukturell anders** -> NICHT still aendern (wuerde die DMX-Belegung
+      gepatchter Geraete verschieben), nur melden (``LETZTER_ABGLEICH``, Log).
+
+    Nur Profile mit ``source == 'builtin'``; eigene und importierte bleiben
+    unberuehrt. Gibt zurueck, ob etwas geaendert wurde."""
+    code = _code_builtins()
+    bericht = {"ergaenzt": [], "angeglichen": [], "strukturell": []}
+    profs = s.execute(
+        select(FixtureProfile)
+        .options(selectinload(FixtureProfile.modes)
+                 .selectinload(FixtureMode.channels)
+                 .selectinload(FixtureChannel.ranges))
+        .where(FixtureProfile.source == "builtin")).scalars().all()
+    changed = False
+    for prof in profs:
+        soll = code.get(prof.short_name)
+        if not soll:
+            continue
+        ist = {m.name: m for m in prof.modes}
+        for modus, d in soll.items():
+            m = ist.get(modus)
+            if m is None:
+                cc, desc, gr, gc = d["kopf"]
+                m = FixtureMode(name=modus, channel_count=cc, description=desc,
+                                grid_rows=gr, grid_cols=gc)
+                prof.modes.append(m)
+                for (num, name, attr, dv, hv, inv, res, ranges) in d["kanaele"]:
+                    ch = FixtureChannel(channel_number=num, name=name, attribute=attr,
+                                        default_value=dv, highlight_value=hv,
+                                        invert=inv, resolution=res)
+                    for (a, b, rn, k) in ranges:
+                        ch.ranges.append(ChannelRange(range_from=a, range_to=b,
+                                                      name=rn, kind=k))
+                    m.channels.append(ch)
+                bericht["ergaenzt"].append(f"{prof.short_name} [{modus}]")
+                changed = True
+                continue
+            kanaele = sorted(m.channels, key=lambda c: c.channel_number)
+            if ([(c.channel_number, c.attribute) for c in kanaele]
+                    != [(k[0], k[2]) for k in d["kanaele"]]):
+                bericht["strukturell"].append(f"{prof.short_name} [{modus}]")
+                continue
+            geaendert = False
+            for c, (num, name, attr, dv, hv, inv, res, ranges) in zip(kanaele, d["kanaele"]):
+                if (c.name, c.default_value, c.highlight_value, bool(c.invert), c.resolution) != \
+                        (name, dv, hv, inv, res):
+                    c.name, c.default_value, c.highlight_value = name, dv, hv
+                    c.invert, c.resolution = inv, res
+                    geaendert = True
+                ist_r = tuple(sorted((r.range_from, r.range_to, r.name, r.kind or "")
+                                     for r in c.ranges))
+                if ist_r != ranges:
+                    c.ranges.clear()
+                    for (a, b, rn, k) in ranges:
+                        c.ranges.append(ChannelRange(range_from=a, range_to=b, name=rn, kind=k))
+                    geaendert = True
+            if geaendert:
+                bericht["angeglichen"].append(f"{prof.short_name} [{modus}]")
+                changed = True
+    LETZTER_ABGLEICH.clear()
+    LETZTER_ABGLEICH.update(bericht)
+    if any(bericht.values()):
+        print(f"[fixture_db] Builtin-Abgleich (FM-50): ergaenzt {bericht['ergaenzt']}, "
+              f"angeglichen {bericht['angeglichen']}, strukturell nur gemeldet "
+              f"{bericht['strukturell']}")
+    return changed
+
+
+def _ensure_builtins_in(s) -> bool:
+    """Der Koerper von :func:`ensure_builtins` auf einer beliebigen Session —
+    fehlende Builtins nachruesten + die handgepflegten Signatur-Migrationen.
+    Herausgeloest (FM-50), damit dieselbe Logik auch die FRISCHE Code-Fassung in
+    einer Speicher-DB aufbauen kann (:func:`_code_builtins`)."""
+    changed = False
+    have = {row[0] for row in s.execute(select(FixtureProfile.short_name))}
+    if "ZQ01424" not in have:
+        _add_zq01424(s, _get_or_create_mfr(s, "Generic", "GEN"))
+        changed = True
+    if "ZQ02001" not in have:
+        _add_zq02001(s, _get_or_create_mfr(s, "U King", "UKING"))
+        changed = True
+    if "SPIDER14" not in have:
+        _add_spider(s, _get_or_create_mfr(s, "U King", "UKING"))
+        changed = True
+    if "CONTIMH" not in have:
+        _add_conti_mh(s, _get_or_create_mfr(s, "Conti", "CONTI"))
+        changed = True
+    if "SHARPY" not in have:                         # Clay Paky Sharpy (Beam)
+        _add_claypaky_sharpy(s, _get_or_create_mfr(s, "Clay Paky", "CLAYPAKY"))
+        changed = True
+    if "KLEINCONTI" not in have:
+        _add_klein_conti(s, _get_or_create_mfr(s, "Klein", "KLEIN"))
+        changed = True
+    if "PARTYLASER" not in have:
+        _add_party_laser(s, _get_or_create_mfr(s, "Party Lights", "PARTYLT"))
+        changed = True
+    if "EUROGROSS" not in have:
+        _add_eurolite_gross(s, _get_or_create_mfr(s, "Eurolite", "EURO"))
+        changed = True
+    if "EURON10" not in have:                       # FIX-FOG: Nebelmaschine
+        _add_fog_hazer(s, _get_or_create_mfr(s, "Eurolite", "EURO"))
+        changed = True
+    if "FPQWH12X" not in have:
+        _add_adj_flatpar(s, _get_or_create_mfr(s, "ADJ", "ADJ"))
+        changed = True
+    if "DOTZTPAR" not in have:
+        _add_adj_dotz_tpar(s, _get_or_create_mfr(s, "ADJ", "ADJ"))
+        changed = True
+    if "L2600LASER" not in have:
+        _add_ehaho_l2600(s, _get_or_create_mfr(s, "Ehaho", "EHAHO"))
+        changed = True
+    if "PANGFB4" not in have:
+        _add_pangolin_fb4(s, _get_or_create_mfr(s, "Pangolin", "PANG"))
+        changed = True
+    if "MOVBAR4" not in have:                       # FM-5
+        _add_mover_bar4(s, _get_or_create_mfr(s, "Generic", "GEN"))
+        changed = True
+    if "PARBAR4" not in have:                       # FM-5
+        _add_par_bar4(s, _get_or_create_mfr(s, "Generic", "GEN"))
+        changed = True
+    if "ADJ5PXHEX" not in have:                      # Katalog Runde 2
+        _add_adj_5px_hex(s, _get_or_create_mfr(s, "ADJ", "ADJ"))
+        changed = True
+    if "CBANDPIX" not in have:                       # Katalog Runde 2
+        _add_chauvet_colorband_pix(s, _get_or_create_mfr(s, "Chauvet DJ", "CHAUVET"))
+        changed = True
+    if "FLATPRO7" not in have:                       # Katalog Runde 2
+        _add_cameo_flatpro7(s, _get_or_create_mfr(s, "Cameo", "CAMEO"))
+        changed = True
+    if "STAIRB2408" not in have:                     # Katalog Runde 2
+        _add_stairville_bar2408(s, _get_or_create_mfr(s, "Stairville", "STAIR"))
+        changed = True
+    if "HYDRA4000" not in have:                       # Katalog Runde 3
+        _add_cameo_hydrabeam(s, _get_or_create_mfr(s, "Cameo", "CAMEO"))
+        changed = True
+    if "EVENTPARIP65" not in have:                    # Katalog Runde 3
+        _add_varytec_event_par(s, _get_or_create_mfr(s, "Varytec", "VARYTEC"))
+        changed = True
+    if "ATOMIC3000" not in have:                      # Katalog Runde 4
+        _add_martin_atomic3000(s, _get_or_create_mfr(s, "Martin", "MARTIN"))
+        changed = True
+    if "MACAURA" not in have:                         # Katalog Runde 4
+        _add_martin_mac_aura(s, _get_or_create_mfr(s, "Martin", "MARTIN"))
+        changed = True
+    if "POINTE" not in have:                          # Katalog Runde 4
+        _add_robe_pointe(s, _get_or_create_mfr(s, "Robe", "ROBE"))
+        changed = True
+    if "MEGAPNT" not in have:                         # FM-15: Robe MegaPointe
+        _add_robe_megapointe(s, _get_or_create_mfr(s, "Robe", "ROBE"))
+        changed = True
+    if "MYTHOS" not in have:                          # FM-15: Clay Paky Mythos
+        _add_claypaky_mythos(s, _get_or_create_mfr(s, "Clay Paky", "CLAYPAKY"))
+    if "MAC700P" not in have:                         # FM-15: Martin MAC 700 Profile
+        _add_martin_mac700_profile(s, _get_or_create_mfr(s, "Martin", "MARTIN"))
+        changed = True
+    if "SPIIDER" not in have:                         # FM-14: Pixel-Moving-Head
+        _add_robe_spiider(s, _get_or_create_mfr(s, "Robe", "ROBE"))
+        changed = True
+    if "MATRIXPANEL" not in have:                     # FM-13: Pixel-Panel-Typ
+        _add_generic_matrix_panel(s, _get_or_create_mfr(s, "Generic", "GEN"))
+        changed = True
+    if "DOTZMATRIX" not in have:                      # FM-13 Slice 2: reale Panels
+        _add_adj_dotz_matrix(s, _get_or_create_mfr(s, "ADJ", "ADJ"))
+        changed = True
+    if "STAIRPP144" not in have:                      # FM-13 Slice 2: reale Panels
+        _add_stairville_pp144(s, _get_or_create_mfr(s, "Stairville", "STAIR"))
+        changed = True
+    if "STAIRMB5X5" not in have:                      # Robins Blinder (2026-09-02)
+        _add_stairville_mb5x5(s, _get_or_create_mfr(s, "Stairville", "STAIR"))
+        changed = True
+    if "ZQ06121" not in have:                         # Davids LED-Balken (2026-08-05)
+        _add_uking_zq06121(s, _get_or_create_mfr(s, "U King", "UKING"))
+        changed = True
+    if "ZQ06121" in have:
+        # Profil-Bestaetigung 2026-08-05: die Kanalreihenfolge ist am echten
+        # Geraet nachgesehen, „(ungeprueft)" faellt aus beiden Modusnamen.
+        # Reine Umbenennung — die Kanaele bleiben identisch; erkannt wird sie
+        # nur, weil der Modusname der Schluessel der Signatur ist.
+        prof = s.execute(
+            select(FixtureProfile)
+            .options(selectinload(FixtureProfile.modes)
+                     .selectinload(FixtureMode.channels))
+            .where(FixtureProfile.short_name == "ZQ06121",
+                   FixtureProfile.source == "builtin")
+        ).scalars().first()
+        if prof is not None and _mode_attr_signature(prof) != _ZQ06121_SIGNATURE:
+            prof.modes.clear()          # cascade loescht Kanaele + Ranges
+            s.flush()
+            _add_modes(s, prof, _zq06121_modes_data())
+            changed = True
+    if "ZQ02001" in have:
+        # Profil-Korrektur 2026-06-09: Dimmer/Strobe waren vertauscht,
+        # 9-Kanal-Modus hatte faelschlich Fine-Kanaele statt FX/Reset.
+        prof = s.execute(
+            select(FixtureProfile)
+            .options(selectinload(FixtureProfile.modes)
+                     .selectinload(FixtureMode.channels))
+            .where(FixtureProfile.short_name == "ZQ02001",
+                   FixtureProfile.source == "builtin")
+        ).scalars().first()
+        if prof is not None and _mode_attr_signature(prof) != _ZQ02001_SIGNATURE:
+            prof.modes.clear()          # cascade loescht Kanaele + Ranges
+            s.flush()
+            _add_modes(s, prof, _zq02001_modes_data())
+            changed = True
+    if "SPIDER14" in have:
+        # Profil-Umstellung 2026-06-16: CH1/CH2 = zwei separate Tilts (Bar L/R)
+        # statt Pan/Tilt (Mehrkopf, X-6). Aeltere DB (CH1=pan) in-place migrieren.
+        prof = s.execute(
+            select(FixtureProfile)
+            .options(selectinload(FixtureProfile.modes)
+                     .selectinload(FixtureMode.channels))
+            .where(FixtureProfile.short_name == "SPIDER14",
+                   FixtureProfile.source == "builtin")
+        ).scalars().first()
+        if prof is not None and _mode_attr_signature(prof) != _SPIDER14_SIGNATURE:
+            prof.modes.clear()
+            s.flush()
+            _add_modes(s, prof, _spider_modes_data())
+            changed = True
+    if "EURON10" in have:
+        # CDX-07: alte DBs (seit FIX-FOG) haben den Lüfter-Kanal des 2-Kanal-
+        # Modus faelschlich als `dimmer` -> der Programmer dedupliziert beide
+        # `dimmer`-Kanaele zu EINEM Regler, der Lüfter ist nicht getrennt
+        # steuerbar. In-place auf `fan` migrieren (Signatur-Abgleich).
+        prof = s.execute(
+            select(FixtureProfile)
+            .options(selectinload(FixtureProfile.modes)
+                     .selectinload(FixtureMode.channels))
+            .where(FixtureProfile.short_name == "EURON10",
+                   FixtureProfile.source == "builtin")
+        ).scalars().first()
+        if prof is not None and _mode_attr_signature(prof) != _EURON10_SIGNATURE:
+            prof.modes.clear()
+            s.flush()
+            _add_modes(s, prof, _fog_hazer_modes_data())
+            changed = True
+    # VIZ-50a: Rasterform der Pixel-Panels in bestehende DBs nachtragen.
+    # NACH den Signatur-Bloecken oben: hat einer davon die Modi neu gebaut,
+    # tragen sie die Form schon und der Nachtrag findet nichts mehr zu tun.
+    for _kurz, _daten in (("MATRIXPANEL", _matrix_panel_modes_data()),
+                          ("DOTZMATRIX", _dotz_matrix_modes_data()),
+                          ("STAIRPP144", _stairville_pp144_modes_data()),
+                          ("STAIRMB5X5", _stairville_mb5x5_modes_data()),
+                          ("ZQ06121", _zq06121_modes_data())):
+        if _ensure_panel_geometrie(s, _kurz, _daten):
+            changed = True
+    # X-3: generische MH-Spots mit Farb-/Gobo-Rad-Slots nachruesten
+    if _ensure_wheel_ranges(s, "MH8", _mh8_modes_data()):
+        changed = True
+    if _ensure_wheel_ranges(s, "MH16", _mh16_modes_data()):
+        changed = True
+    return changed
 
 
 def _seed(s: Session):
