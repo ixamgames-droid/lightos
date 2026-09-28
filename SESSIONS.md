@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| BPM-18 | A | fix/bpm18-os2l-menue-quelle | 2026-09-28T14:38Z | src/ui/main_window.py,src/ui/bpm_source_controller.py |
+| _(frei)_ |  |  |  |  |
 
 ## Blocker & Fallen
 
@@ -126,7 +126,6 @@
 
 ## Verlauf
 
-- 2026-09-07T21:29Z B claim XPLAT-38
 - 2026-09-08T18:43Z B done XPLAT-38
 - 2026-09-14T10:22Z A done BPM-AREA
 - 2026-09-14T10:22Z A claim BPM-07
@@ -156,3 +155,4 @@
 - 2026-09-28T13:57Z A claim BPM-17
 - 2026-09-28T14:28Z A done BPM-17
 - 2026-09-28T14:38Z A claim BPM-18
+- 2026-09-28T14:52Z A done BPM-18
