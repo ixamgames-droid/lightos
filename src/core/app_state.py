@@ -5181,6 +5181,41 @@ def channel_addr(fixture, attribute: str):
     return addr if 1 <= addr <= 512 else None
 
 
+# FM-48: Namen, die auf einem Shutter-/Strobe-Kanal „Licht an, kein Strobe"
+# bedeuten, aber beim Import keine Art bekamen. Gemessen in der Bibliothek:
+# 156 Bereiche „No Function", die QLC+-Uebersetzung „An" (U-King Speider).
+# NUR fuer Shutter gedeutet — auf einem Gobo-Kanal heisst „No Function" etwas
+# anderes, deshalb nicht im allgemeinen _infer_range_kind.
+_SHUTTER_OFFEN_NAMEN = frozenset((
+    "an", "on", "licht an", "led on", "lamp on", "light on", "open", "offen",
+    "no function", "nofunction", "no strobe", "kein strobe", "strobe off",
+    "shutter open", "shutter off", "none",
+))
+
+
+def shutter_bereich_art(rng) -> str:
+    """Art eines Shutter-Bereichs: die gespeicherte ``kind``, sonst „open", wenn
+    der Name eindeutig „Licht an" heisst (s. ``_SHUTTER_OFFEN_NAMEN``)."""
+    kind = (getattr(rng, "kind", "") or "").lower()
+    if kind:
+        return kind
+    name = " ".join((getattr(rng, "name", "") or "").lower().replace("(", " ")
+                    .replace(")", " ").split())
+    return "open" if name in _SHUTTER_OFFEN_NAMEN else ""
+
+
+def ist_strobe_kanal_ohne_bereiche(ch) -> bool:
+    """Ein Strobe-Kanal ohne Bereichsdaten (FM-48: 575 in der Bibliothek, fast
+    alle „Strobe"): dort ist nach gaengiger Belegung 0 = kein Strobe, 1..255 =
+    langsam -> schnell. „Auf" = 255 hiess bei diesen Geraeten Strobe mit
+    Hoechstgeschwindigkeit (z. B. Stage Light ZQ01424: „CH6 total strobe from
+    slow to fast")."""
+    if ch is None or (getattr(ch, "ranges", None) or ()):
+        return False
+    n = (getattr(ch, "name", "") or "").lower()
+    return any(w in n for w in ("strob", "stobe", "flash", "blitz"))
+
+
 def open_value_of_channel(ch, fallback: int = 255) -> int:
     """Wie ``open_value_for``, aber auf einem bereits aufgeloesten Kanal.
 
@@ -5192,9 +5227,13 @@ def open_value_of_channel(ch, fallback: int = 255) -> int:
     """
     if ch is None:
         return fallback
+    shutter = (getattr(ch, "attribute", "") or "") in ("shutter", "strobe")
     for rng in (getattr(ch, "ranges", None) or ()):
-        if (getattr(rng, "kind", "") or "").lower() == "open":
+        art = shutter_bereich_art(rng) if shutter else (getattr(rng, "kind", "") or "").lower()
+        if art == "open":
             return max(0, min(255, (int(rng.range_from) + int(rng.range_to)) // 2))
+    if shutter and ist_strobe_kanal_ohne_bereiche(ch):
+        return 0
     hv = getattr(ch, "highlight_value", None)
     return int(hv) if hv is not None else fallback
 

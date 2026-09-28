@@ -192,11 +192,12 @@ def _range_mid(r) -> int:
 def shutter_presets(channel) -> list[tuple[str, int]]:
     """(Label, DMX-Wert)-Liste fuer Shutter aus ChannelRange-Daten.
     Ohne Ranges: konventioneller Fallback Auf=255 / Zu=0."""
+    from src.core.app_state import ist_strobe_kanal_ohne_bereiche, shutter_bereich_art
     ranges = list(getattr(channel, "ranges", None) or [])
     out: list[tuple[str, int]] = []
-    open_r = [r for r in ranges if (getattr(r, "kind", "") or "") == "open"]
-    closed_r = [r for r in ranges if (getattr(r, "kind", "") or "") == "closed"]
-    strobe_r = [r for r in ranges if (getattr(r, "kind", "") or "") == "strobe"]
+    open_r = [r for r in ranges if shutter_bereich_art(r) == "open"]
+    closed_r = [r for r in ranges if shutter_bereich_art(r) == "closed"]
+    strobe_r = [r for r in ranges if shutter_bereich_art(r) == "strobe"]
     if open_r:
         out.append(("Auf", _range_mid(open_r[0])))
     if closed_r:
@@ -209,7 +210,12 @@ def shutter_presets(channel) -> list[tuple[str, int]]:
         out.append(("Strobe mittel", lo + span // 2))
         out.append(("Strobe schnell", hi - span // 10))
     if not ranges:
-        out = [("Auf", 255), ("Zu", 0)]
+        if ist_strobe_kanal_ohne_bereiche(channel):
+            # FM-48: 0 = kein Strobe; ein „Zu" gibt es auf so einem Kanal nicht.
+            out = [("Kein Strobe", 0), ("Strobe langsam", 51),
+                   ("Strobe mittel", 128), ("Strobe schnell", 230)]
+        else:
+            out = [("Auf", 255), ("Zu", 0)]
     return out
 
 
@@ -578,16 +584,25 @@ class ShutterQuickBar(QWidget, _ApplyMixin):
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(4)
 
+        from src.core.app_state import ist_strobe_kanal_ohne_bereiche, shutter_bereich_art
         ranges = list(getattr(channel, "ranges", None) or [])
-        strobe_r = next((r for r in ranges
-                         if (getattr(r, "kind", "") or "") == "strobe"), None)
+        strobe_r = next((r for r in ranges if shutter_bereich_art(r) == "strobe"), None)
 
         # Status-Kacheln: Open/Closed direkt aus den Range-Namen, dazu
         # Strobe-Stufen (langsam/mittel/schnell) aus dem Strobe-Bereich.
         tiles = []
         if ranges:
+            # FM-48: gleich benannte Bereiche nur EINMAL (der erste gilt). Spider-
+            # Profile tragen fuenfmal „Offen"/„An" — fuenf gleiche Knoepfe halfen
+            # niemandem.
+            gesehen: set[tuple[str, str]] = set()
             for r in ranges:
-                kind = (getattr(r, "kind", "") or "")
+                kind = shutter_bereich_art(r)
+                schluessel = (kind, (getattr(r, "name", "") or "").strip().lower())
+                if kind in ("open", "closed"):
+                    if schluessel in gesehen:
+                        continue
+                    gesehen.add(schluessel)
                 if kind == "open":
                     tiles.append(PresetTile(
                         getattr(r, "name", "Auf"), _range_mid(r),
@@ -607,6 +622,15 @@ class ShutterQuickBar(QWidget, _ApplyMixin):
                     tiles.append(PresetTile(label, val, color="#3a2f5a",
                                             touch=touch,
                                             tooltip=f"DMX {val}"))
+        elif ist_strobe_kanal_ohne_bereiche(channel):
+            # FM-48: Strobe-Kanal ohne Bereichsdaten — 0 = kein Strobe (Licht an).
+            # Bisher „Auf" = 255 = Strobe mit Hoechstgeschwindigkeit.
+            tiles = [PresetTile("Kein Strobe", 0, color="#1f6f3f", touch=touch,
+                                tooltip="DMX 0 — Licht an, kein Strobe")]
+            for label, val in (("Strobe langsam", 51), ("Strobe mittel", 128),
+                               ("Strobe schnell", 230)):
+                tiles.append(PresetTile(label, val, color="#3a2f5a", touch=touch,
+                                        tooltip=f"DMX {val}"))
         else:
             tiles = [PresetTile("Auf", 255, color="#1f6f3f", touch=touch),
                      PresetTile("Zu", 0, color="#5a1f1f", touch=touch)]
@@ -781,6 +805,59 @@ class GoboQuickBar(QWidget, _ApplyMixin):
 
     def _on_rotate_speed(self, value: int):
         self._active_shake = None
+        self._set_on_fixtures(self._attr, int(value))
+
+
+_OHNE_FUNKTION = ("no function", "without function", "ohne funktion", "keine funktion",
+                  "nofunction", "none", "dmx", "off", "aus")
+
+
+class ProgrammQuickBar(QWidget, _ApplyMixin):
+    """FM-48: Schnellwahl fuer Programm-/Makrokanaele aus ihren benannten Bereichen.
+
+    Bis 2026-09-28 standen Makrokanaele (Farbprogramme, Auto-/Sound-Modus, Shows,
+    Bewegungsprogramme) nur als nackter Regler da — man sah nicht, dass beim
+    Varytec Event PAR 11–32 „7 Farben" und 201–255 „Sound" heisst, obwohl die
+    Bereiche im Profil stehen. Eine Kachel je Bereichsname (gleiche Namen nur
+    einmal), „ohne Funktion" als „Aus" vorn. Der Aufrufer reicht nur Geraete
+    herein, deren Bereiche zur Vorlage passen (Nutzlast
+    ``LITERAL_AUS_VORLAGEN_BEREICH``, UI-53) — ein Literalwert aus FREMDEN
+    Bereichen landete sonst in einer fremden Funktion."""
+
+    def __init__(self, channel, fixtures, state, touch: bool = False, parent=None):
+        super().__init__(parent)
+        self._fixtures = fixtures
+        self._state = state
+        self._attr = channel.attribute
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(4)
+        lay.addWidget(_section_label(f"{channel.name}:"))
+        tiles, gesehen = [], set()
+        aus = None
+        for r in sorted(getattr(channel, "ranges", None) or [],
+                        key=lambda r: int(r.range_from)):
+            name = (getattr(r, "name", "") or "").strip()
+            key = name.lower()
+            if not name or key in gesehen:
+                continue
+            gesehen.add(key)
+            wert = _range_mid(r)
+            tip = f"DMX {int(r.range_from)}–{int(r.range_to)}"
+            if any(key == w or key.startswith(w + " ") for w in _OHNE_FUNKTION):
+                if aus is None:
+                    aus = PresetTile("Aus", wert, color="#3a3a3a", touch=touch,
+                                     tooltip=f"{name} — {tip}")
+                continue
+            tiles.append(PresetTile(name, wert, color="#24405a", touch=touch, tooltip=tip))
+        if aus is not None:
+            tiles.insert(0, aus)
+        for t in tiles:
+            t.clicked.connect(self._on_tile_clicked)
+        self._anzahl = len(tiles)
+        lay.addWidget(_grid(tiles, cols=4))
+
+    def _on_tile_clicked(self, value):
         self._set_on_fixtures(self._attr, int(value))
 
 

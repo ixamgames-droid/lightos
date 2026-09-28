@@ -1577,6 +1577,11 @@ class ProgrammerView(QWidget):
                         display_name=(None if _head is None else
                                       self._head_slider_label(
                                           _owners, ch, _head))))
+                    if _head is None:
+                        for k, owners_k, ch_k in self._weitere_gleiche_kanaele(_owners, ch):
+                            ilay.addWidget(AttributeSlider(
+                                ch_k, owners_k, self._state, owner=self, head=k,
+                                display_name=ch_k.name))
         ilay.addStretch(1)
 
         scroll.setWidget(inner)
@@ -2013,6 +2018,42 @@ class ProgrammerView(QWidget):
         # kein Regler (er koennte ohnehin nichts ausgeben).
         return [(None, hat_attr)] if hat_attr else []
 
+    def _weitere_gleiche_kanaele(self, owners, ch) -> list:
+        """FM-48: weitere Kanaele DESSELBEN Attributs an einem EINKOPF-Geraet —
+        ``[(k, owners_k, kanal_k)]`` fuer k = 1, 2, …
+
+        An einem Einkopf-Geraet sind zwei gleiche Attribute zwei verschiedene
+        Funktionen: Varytec Hero Spot 90 „Gobo 1"/„Gobo 2" (festes + rotierendes
+        Goborad), „Shows"/„Moving Programs". Die Vorlage ist aber EIN Kanal je
+        Attribut (``_rebuild_attr_editor``), und ohne Kopf-Auswahl entsteht nur
+        der geraeteweite Regler auf dem Basis-Schluessel — der zweite Kanal hatte
+        gar keinen Regler. Gemessen: 1328 Einkopf-Modi der Bibliothek haben
+        doppelte Attribute (615 macro, 545 speed, 349 color_wheel, 217
+        gobo_rotation, 181 zoom, 150 gobo_wheel …).
+
+        Adressiert wird ueber denselben Weg wie ein Kopf: ``head=k`` ->
+        ``programmer_key_for_head`` -> ``attr#k``, das der DMX-Pfad dem k-ten
+        Vorkommen zuordnet. Mehrkopf-Geraete (>= 2 Farbbaenke ODER >= 2
+        Bewegungskoepfe) bleiben aussen vor — dort SIND die Vorkommen Koepfe und
+        laufen ueber die Kopf-Auswahl. ``reset`` bekommt nie einen Regler."""
+        attr = getattr(ch, "attribute", "") or ""
+        if attr in ("reset", "", "raw"):
+            return []
+        eimer: dict[int, list] = {}
+        vorlage: dict[int, object] = {}
+        for f in owners:
+            try:
+                if self._head_row_count(f) >= 2:
+                    continue
+                gleiche = [c for c in self._kanaele(f)
+                           if (getattr(c, "attribute", "") or "") == attr]
+            except Exception:
+                continue
+            for k in range(1, len(gleiche)):
+                eimer.setdefault(k, []).append(f)
+                vorlage.setdefault(k, gleiche[k])
+        return [(k, eimer[k], vorlage[k]) for k in sorted(eimer)]
+
     def _kanaele(self, fixture):
         """Kanal-Zugriff fuer die Geraete-Regeln — ueber das MODUL-Global.
 
@@ -2333,6 +2374,20 @@ class ProgrammerView(QWidget):
                         layout.addWidget(ResetActionButton(
                             rs, rs_fixtures, self._state,
                             uebergangen=max(0, mit_kanal - len(rs_fixtures))))
+                # FM-48: Programm-/Makrokanaele als Kacheln aus ihren benannten
+                # Bereichen (vorher nur ein nackter Regler). Nutzlast (i): ein
+                # Literalwert aus dem VORLAGEN-Bereich -> nur Geraete mit
+                # passenden Bereichen (UI-53).
+                for _attr in ("macro", "gobo_fx", "effect", "animation"):
+                    mk = self._template_channel_in((_attr,))
+                    if mk is None or len(getattr(mk, "ranges", None) or []) < 2:
+                        continue
+                    mk_fixtures = self._fixtures_fuer(
+                        Nutzlast.LITERAL_AUS_VORLAGEN_BEREICH, fixtures, mk)
+                    if mk_fixtures:
+                        from src.ui.widgets.preset_tile import ProgrammQuickBar
+                        layout.addWidget(ProgrammQuickBar(mk, mk_fixtures, self._state,
+                                                          touch=touch))
         except Exception as e:
             print(f"[programmer_view] quick-select error: {e}")
 

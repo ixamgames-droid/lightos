@@ -662,7 +662,7 @@ class KeinZweiterWegTest(unittest.TestCase):
     """⚠️ Regel: 'gibt es einen ZWEITEN WEG, der die Regel umgeht?' — genau das
     war UI-53. Diese Tests halten die Zuordnung Reihe -> Nutzlast fest."""
 
-    def test_alle_sechs_reihen_in_add_quick_select_nennen_ihre_nutzlast(self):
+    def test_alle_sieben_reihen_in_add_quick_select_nennen_ihre_nutzlast(self):
         got = _nutzlast_aufrufe(ProgrammerView._add_quick_select)
         self.assertEqual(
             got,
@@ -671,7 +671,8 @@ class KeinZweiterWegTest(unittest.TestCase):
              "LITERAL_AUS_VORLAGEN_BEREICH",     # Farbrad
              "LITERAL_AUS_VORLAGEN_BEREICH",     # Gobo
              "ABSOLUTWERT_EIN_KANAL",            # Pan/Tilt-Speed
-             "LITERAL_AUS_VORLAGEN_BEREICH"],    # Reset
+             "LITERAL_AUS_VORLAGEN_BEREICH",     # Reset
+             "LITERAL_AUS_VORLAGEN_BEREICH"],    # FM-48: Programme/Makros
             "jede Reihe muss ihre Geraeteliste ueber _fixtures_fuer mit einer "
             "ausdruecklich benannten Nutzlast bekommen")
 
