@@ -65,7 +65,10 @@ class SeedBackfillParitaetTest(unittest.TestCase):
 
     def setUp(self):
         self.seed = _profil_aufrufe("_seed")
-        self.backfill = _profil_aufrufe("ensure_builtins")
+        # FM-50: der Backfill-Koerper steht seit 2026-09-28 in ``_ensure_builtins_in``
+        # (herausgeloest, damit er auch die Code-Fassung in einer Speicher-DB baut);
+        # ``ensure_builtins`` ruft ihn nur noch auf.
+        self.backfill = _profil_aufrufe("_ensure_builtins_in")
 
     def test_jedes_backfill_profil_steht_auch_in_der_erstbefuellung(self):
         fehlend = sorted(self.backfill - self.seed)
