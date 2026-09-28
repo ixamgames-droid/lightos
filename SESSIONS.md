@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| QA-79 | A | fix/qa79-capture-importtest | 2026-09-28T19:06Z | tests/test_audio_capture_import_resilience.py |
+| _(frei)_ |  |  |  |  |
 
 ## Blocker & Fallen
 
@@ -127,7 +127,6 @@
 
 ## Verlauf
 
-- 2026-09-14T11:09Z A done BPM-07
 - 2026-09-14T11:10Z A claim BPM-08
 - 2026-09-14T11:34Z A done BPM-08
 - 2026-09-14T11:34Z A claim BPM-09
@@ -157,3 +156,4 @@
 - 2026-09-28T15:07Z A claim QA-80
 - 2026-09-28T15:20Z A done QA-80
 - 2026-09-28T19:06Z A claim QA-79
+- 2026-09-28T19:20Z A done QA-79
