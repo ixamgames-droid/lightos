@@ -7,6 +7,22 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-29 — Programmer zeigt keine leeren Reiter mehr (FM-48, Teil 2)
+
+#### Behoben
+
+- **Leere Reiter „Color" und „Weitere".** Eine Nebelmaschine bekam einen Farb-Reiter mit
+  „Keine Color-Kanäle gefunden", ein Pixel-Balken einen leeren „Weitere"-Reiter. Beide
+  verschwinden jetzt, wenn die Auswahl dafür keine Kanäle hat — wie schon Gobo und Position.
+- **„Synchron (beide gleich)" bei 48 Zonen.** Ab drei Köpfen heißt der Umschalter jetzt
+  „Synchron (alle gleich)".
+
+#### Neu
+
+- **Anleitung „Programmer: jedes Gerät richtig bedienen"** mit Bildern aus der echten App:
+  Shutter-/Strobe-Knöpfe, Programm-Kacheln, zweite gleiche Kanäle, Mehrkopf-Umschalter,
+  Nebel und Laser. Dazu steht die Einmess-Anleitung jetzt im Anleitungs-Verzeichnis.
+
 ### 2026-09-28 — Mitgelieferte Geräteprofile bleiben aktuell (FM-50)
 
 #### Behoben

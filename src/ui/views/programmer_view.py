@@ -1288,6 +1288,10 @@ class ProgrammerView(QWidget):
                     self._main_tabs.setTabVisible(self._position_tab_index, False)
                 if getattr(self, "_efx_tab_index", -1) >= 0:
                     self._main_tabs.setTabVisible(self._efx_tab_index, False)
+                for key in ("Color", "Weitere"):     # Hinweis „erst waehlen" zeigen
+                    idx = self._main_tabs.indexOf(self._attr_group_tabs[key])
+                    if idx >= 0:
+                        self._main_tabs.setTabVisible(idx, True)
                 return
 
             # FM-HEADLAYOUT Slice 5: Ist die Auswahl auf Köpfe eingeschränkt, muss
@@ -1343,6 +1347,14 @@ class ProgrammerView(QWidget):
                 inner = self._build_group_tab(key, groups.get(key, []), selected)
                 _clear(cont).addWidget(inner)
 
+            # FM-48: Farbe/Weitere ohne passende Kanaele ausblenden (Nebel ohne
+            # Farbe, Pixel-Balken ohne Sonderkanaele) — wie Gobo/Position. Die
+            # Intensitaet bleibt immer: dort steht der Hinweis „Helligkeit laeuft
+            # ueber die Farbe" fuer Geraete ohne Dimmer.
+            for key in ("Color", "Weitere"):
+                idx = self._main_tabs.indexOf(self._attr_group_tabs[key])
+                if idx >= 0:
+                    self._main_tabs.setTabVisible(idx, bool(groups.get(key)))
             # M2.1: Gobo-Tab nur bei vorhandenen Gobo-Kanaelen einblenden.
             if getattr(self, "_gobo_tab_index", -1) >= 0:
                 self._main_tabs.setTabVisible(
@@ -1415,7 +1427,9 @@ class ProgrammerView(QWidget):
             if self._color_head_count() > 1:
                 sub_tb.addWidget(QLabel("Köpfe:"))
                 head_combo = QComboBox()
-                head_combo.addItem("Synchron (beide gleich)", "sync")
+                head_combo.addItem("Synchron (beide gleich)"
+                                   if self._color_head_count() == 2
+                                   else "Synchron (alle gleich)", "sync")
                 head_combo.addItem("Getrennt (pro Kopf)", "separate")
                 head_combo.setCurrentIndex(
                     0 if self.color_head_mode() == "sync" else 1)

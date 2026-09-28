@@ -32,6 +32,8 @@
 | [VC-Bau-Elemente: Referenz aller Widget-Typen](anleitung_vc_widgets/README.md) | Eine Seite je Widget (Knopf, Fader, XY-Pad, Encoder, Matrix-Editor …): Einstellungen, Dialog-Felder, Fallstricke — zum Nachschlagen beim Bauen. |
 | [Hochzeits-Show von Anfang bis Ende](anleitung_hochzeit_komplett/00_INDEX.md) | Zehnteiliger Durchlauf einer kompletten, ruhigeren Show — Patch, Farben, Tempo-Controller, Live-Edit, Ablauf. |
 | [Gruppen und Matrizen anlegen](anleitung_gruppen_matrizen/ANLEITUNG_GRUPPEN_MATRIZEN.md) | Mehrkopf-Geräte und Panels: Kopf-Gruppe beim Patchen, Köpfe als Raster/Block aufteilen, zu **einer** Zelle zusammenfassen, neben andere Geräte legen, Matrizen zusammenlegen — beide Wege (Rechtsklick und Knopf-Menü). |
+| [Programmer: jedes Gerät richtig bedienen](anleitung_geraete_bedienen/ANLEITUNG_GERAETE_BEDIENEN.md) | Was der Programmer je Gerät zeigt: Shutter-/Strobe-Knöpfe, Programm-Kacheln, zweite gleiche Kanäle, Mehrkopf-Umschalter, Nebel/Laser — und was tun, wenn etwas nicht passt. |
+| [Moving Heads einmessen](anleitung_einmessen/ANLEITUNG_EINMESSEN.md) | Zielen im 3D-Visualizer an den echten Aufbau angleichen: Punkt anfahren, Korrektur merken, ab vier Punkten die echte Position rechnen lassen. |
 
 ## Schichten-Modell (so kombiniert die Show)
 
