@@ -820,41 +820,139 @@ class AppState:
                 except Exception as e:
                     debug_swallow("app_state.add_fixture.head_matrix_group", e)
         if undoable:
+            # FM-38 (zweiter Weg): Ctrl+Z loescht mit dem Geraet auch seine
+            # Kopf-Gruppe. Ohne Merken holte Ctrl+Y nur die WERKS-Gruppe zurueck
+            # (gemessen: 'Buehne Links' 2x2 -> 'B · Koepfe' 4x1).
+            gemerkt: dict = {"gruppen": []}
+
+            def _undo(s=snapshot, m=gemerkt):
+                m["gruppen"] = self.remove_fixture(s["fid"], undoable=False) or []
+
             self._push_undo(
                 label=f"Fixture +{snapshot.get('label', '')}",
                 do=lambda: None,   # already executed
-                undo=lambda s=snapshot: self.remove_fixture(s["fid"], undoable=False),
-                redo=lambda s=snapshot: self._restore_fixture_dict(s),
+                undo=_undo,
+                redo=lambda s=snapshot, m=gemerkt: self._restore_fixture_with_groups(
+                    s, m["gruppen"]),
             )
+        return snapshot["fid"]
+
+    # FM-38: Felder EINER Fixture-Gruppe, die ein Undo feldweise zurueckholt —
+    # EINE Liste fuer Schnappschuss UND Wiederherstellung (zwei driften).
+    # Die id gehoert bewusst NICHT dazu: keine Bindung haengt an ihr (VC/Matrix/
+    # EFX binden ueber den NAMEN, die .lshow speichert sie gar nicht).
+    _GROUP_SNAP_FIELDS = ("name", "cols", "rows", "positions_json", "folder")
+
+    @staticmethod
+    def _gruppe_adressiert_fid(g, fid_i: int, dedicated: bool) -> bool:
+        """EINE Stelle fuer „gehoert diese Gruppe zu ``fid_i``?" (vorher dreimal
+        im Modul). ``dedicated``: AUSSCHLIESSLICH Koepfe dieses fid (die Auto-
+        Gruppe); sonst: irgendeine Zelle adressiert einen Kopf davon.
+
+        Eine unlesbare oder nicht-Objekt-``positions_json`` heisst „diese Gruppe
+        nicht" — NICHT „Scan gescheitert". Vorher lief ``(pos or {}).values()``
+        ausserhalb des try: EINE Gruppe mit ``[1, 2, 3]`` liess den Scan werfen,
+        und danach bekam kein neu gepatchtes Mehrkopf-Geraet mehr eine Kopf-Gruppe."""
+        import json as _json
+        from .group_cells import parse_group_cell as _pgc
+        try:
+            pos = _json.loads(getattr(g, "positions_json", None) or "{}")
+        except Exception:
+            return False
+        if not isinstance(pos, dict):
+            return False
+        zellen = [_pgc(v) for v in pos.values()]
+        if not zellen:
+            return False
+        if dedicated:
+            return all(h is not None and cf == fid_i for cf, h in zellen)
+        return any(h is not None and cf == fid_i for cf, h in zellen)
+
+    @classmethod
+    def _group_to_dict(cls, g) -> dict:
+        return {k: getattr(g, k) for k in cls._GROUP_SNAP_FIELDS}
+
+    @staticmethod
+    def _zellen_umschreiben(positions_json: str, alt_fid: int, neu_fid: int) -> str:
+        """Kopf-Zellen ``"alt:h"`` -> ``"neu:h"``; alles andere unveraendert."""
+        import json as _json
+        from .group_cells import parse_group_cell as _pgc
+        pos = _json.loads(positions_json or "{}")
+        if alt_fid == neu_fid or not isinstance(pos, dict):
+            return positions_json
+        out = {}
+        for k, v in pos.items():
+            cf, h = _pgc(v)
+            out[k] = f"{neu_fid}:{h}" if (h is not None and cf == alt_fid) else v
+        return _json.dumps(out)
+
+    def _restore_fixture_with_groups(self, d: dict, gruppen) -> None:
+        """FM-38: Undo von ``remove_fixture`` (und Redo von ``add_fixture``).
+
+        ZUERST das Geraet — ``add_fixture`` kann es per fid-Guard auf eine neue
+        Nummer schieben (z. B. wenn inzwischen ein XML-Import die alte belegt).
+        DANN die mitgeloeschten Kopf-Gruppen feldweise, mit den Zellen auf die
+        TATSAECHLICH vergebene Nummer umgeschrieben; die von ``add_fixture``
+        frisch erzeugte Werks-Gruppe weicht ihnen. Die Gegenrichtung (Gruppe
+        zuerst, alte id erhalten) liess im ersten Entwurf eine Gruppe mit dem
+        Namen des Nutzers ein FREMDES Geraet steuern.
+
+        Scheitert eine Gruppe, wird das gemeldet (Ereignis ``hinweis``) —
+        still die Werks-Gruppe stehen zu lassen waere derselbe stumme Verlust,
+        den STAB-24 abgeschafft hat."""
+        neu_fid = self._restore_fixture_dict(d)
+        if not gruppen or getattr(self, "_show_engine", None) is None:
+            return
+        try:
+            alt_fid = int(d["fid"])
+            neu_fid = int(neu_fid if neu_fid is not None else alt_fid)
+        except (TypeError, ValueError, KeyError):
+            return
+        from sqlalchemy import select as _select
+        from src.core.database.models import FixtureGroup as _FG
+        gescheitert: list[str] = []
+        with self._session() as s:
+            try:
+                for g in s.execute(_select(_FG).where(
+                        _FG.folder == "Multi-Head")).scalars().all():
+                    if self._gruppe_adressiert_fid(g, neu_fid, True):
+                        s.delete(g)          # die Werks-Gruppe von add_fixture
+                s.flush()
+            except Exception as e:
+                debug_swallow("app_state._restore_fixture_with_groups.werk", e)
+            for gd in gruppen:
+                try:
+                    with s.begin_nested():
+                        felder = {k: gd[k] for k in self._GROUP_SNAP_FIELDS if k in gd}
+                        felder["positions_json"] = self._zellen_umschreiben(
+                            felder.get("positions_json") or "{}", alt_fid, neu_fid)
+                        s.add(_FG(**felder))
+                except Exception as e:
+                    gescheitert.append(f"{gd.get('name', '?')} ({e})")
+            s.commit()
+        try:
+            self.notify_groups_changed()
+        except Exception as e:
+            debug_swallow("app_state._restore_fixture_with_groups.notify", e)
+        if gescheitert:
+            text = ("Rückgängig: Kopf-Gruppe(n) nicht wiederhergestellt — "
+                    + "; ".join(gescheitert))
+            print(f"[AppState] {text}")
+            self._emit("hinweis", text)
 
     def _scan_head_matrix_group(self, fid_i: int, dedicated: bool) -> int | None:
         """Interner Scan — WIRFT bei DB-Fehlern (damit ``create_head_matrix_group``
         einen fehlgeschlagenen Scan NICHT als „nicht vorhanden" missdeutet und ein
         Duplikat anlegt, Review-Fund LOW)."""
-        import json as _json
         from sqlalchemy import select as _select
         from src.core.database.models import FixtureGroup as _FG
-        from .group_cells import parse_group_cell
         with self._session() as s:
             stmt = _select(_FG)
             if dedicated:
                 stmt = stmt.where(_FG.folder == "Multi-Head")
             for g in s.execute(stmt).scalars().all():
-                try:
-                    pos = _json.loads(g.positions_json or "{}")
-                except Exception:
-                    continue
-                cells = [parse_group_cell(v) for v in (pos or {}).values()]
-                if dedicated:
-                    # Die DEDIZIERTE Auto-Gruppe: AUSSCHLIESSLICH Koepfe DIESES
-                    # fid (identisch zum Cleanup in remove_fixture). Eine vom
-                    # Nutzer zusammengelegte Matrix (mehrere fids) zaehlt NICHT.
-                    if cells and all(h is not None and cf == fid_i
-                                     for cf, h in cells):
-                        return g.id
-                else:
-                    if any(h is not None and cf == fid_i for cf, h in cells):
-                        return g.id
+                if self._gruppe_adressiert_fid(g, fid_i, dedicated):
+                    return g.id
         return None
 
     def find_head_matrix_group(self, fid, *, dedicated: bool = False) -> int | None:
@@ -1142,7 +1240,9 @@ class AppState:
             if f.fid == fid:
                 snap = self._fixture_to_dict(f)
                 break
-        removed_group = False
+        # FM-38: mitgeloeschte Kopf-Gruppen FELDWEISE merken (Name, Raster,
+        # Mitglieder, Ordner) — das Undo holt sie so zurueck statt als Werksstand.
+        gruppen_snaps: list[dict] = []
         with self._session() as s:
             from sqlalchemy import select, delete
             s.execute(delete(PatchedFixture).where(PatchedFixture.fid == fid))
@@ -1152,31 +1252,24 @@ class AppState:
             # AUSSCHLIESSLICH die Koepfe DIESES fid adressiert (die dedizierte 1×N-
             # Auto-Gruppe) — vom Nutzer zusammengelegte Matrizen (mehrere fids)
             # bleiben unberuehrt.
+            # FM-45: DERSELBE Parse-Weg wie ueberall (``_gruppe_adressiert_fid``).
+            from src.core.database.models import FixtureGroup as _FG
             try:
-                from src.core.database.models import FixtureGroup as _FG
-                import json as _json
-                for g in s.execute(
-                        select(_FG).where(_FG.folder == "Multi-Head")).scalars().all():
-                    try:
-                        pos = _json.loads(g.positions_json or "{}")
-                    except Exception:
-                        continue
-                    # FM-45: DERSELBE Parse-Weg wie ueberall sonst. Vorher
-                    # stand hier ein roher String-Vergleich, und die beiden
-                    # Haelften desselben Features widersprachen sich: er nahm
-                    # "fid:irgendwas" als Kopf-Zelle an (parse_group_cell
-                    # verwirft das) und scheiterte umgekehrt an "05:2" (das
-                    # parst als fid 5). Eine Auto-Gruppe wurde damit je nach
-                    # Schreibweise geloescht oder stehengelassen.
-                    from src.core.group_cells import parse_group_cell as _pgc
-                    paare = [_pgc(v) for v in pos.values()]
-                    if paare and all(f is not None and h is not None
-                                     and int(f) == int(fid) for f, h in paare):
-                        s.delete(g)
-                        removed_group = True
+                kandidaten = s.execute(
+                    select(_FG).where(_FG.folder == "Multi-Head")).scalars().all()
             except Exception as e:
-                debug_swallow("app_state.remove_fixture.head_group_cleanup", e)
+                debug_swallow("app_state.remove_fixture.head_group_scan", e)
+                kandidaten = []
+            for g in kandidaten:
+                # je Gruppe: eine kaputte reisst die uebrigen nicht mit
+                try:
+                    if self._gruppe_adressiert_fid(g, int(fid), True):
+                        gruppen_snaps.append(self._group_to_dict(g))
+                        s.delete(g)
+                except Exception as e:
+                    debug_swallow("app_state.remove_fixture.head_group_cleanup", e)
             s.commit()
+        removed_group = bool(gruppen_snaps)
         self.programmer.pop(fid, None)
         self._reload_patch_cache()
         self._emit("patch_changed")
@@ -1189,9 +1282,11 @@ class AppState:
             self._push_undo(
                 label=f"Fixture -{snap.get('label', '')}",
                 do=lambda: None,
-                undo=lambda s=snap: self._restore_fixture_dict(s),
+                undo=lambda s=snap, gs=gruppen_snaps: (
+                    self._restore_fixture_with_groups(s, gs)),
                 redo=lambda fid=fid: self.remove_fixture(fid, undoable=False),
             )
+        return gruppen_snaps
 
     def clear_patch(self):
         """Loescht ALLE gepatchten Fixtures hart aus der Show-DB — auch Zeilen,
@@ -1426,7 +1521,7 @@ class AppState:
             protocol=d.get("protocol", "dmx") or "dmx",
             net_host=d.get("net_host", "") or "",
         )
-        self.add_fixture(f, undoable=False)
+        return self.add_fixture(f, undoable=False)
 
     def _push_undo(self, label, do, undo, redo=None):
         try:
