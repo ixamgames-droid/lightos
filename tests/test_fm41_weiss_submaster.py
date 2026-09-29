@@ -184,5 +184,40 @@ class LeerHeisstAlleTest(_Balken):
                          "der PAR wurde ueber eine Weiss-Auswahl gefahren")
 
 
+
+class SpiiderUndGruppenTest(_Balken):
+    """Review 29.09.: der 20:1-Fall und die Gruppen-Reichweite im Programmer-Modus."""
+
+    def test_spiider_grundfarbe_weiss_haengt_an_keinem_pixel(self):
+        """Robin Spiider Pixelmodus: 20 Farbbaenke, EIN Weiss (Grundfarbe).
+        Vorher hing es als „geteilt" an allen 20 Koepfen (Pixel 1..19 zogen das
+        Grundfarben-Weiss mit). Jetzt an keinem — erreichbar ueber „Weiß 1"."""
+        from src.core.app_state import channels_for_head, get_channels_for_patched, programmer_key_for_head
+        self.st.add_fixture(PatchedFixture(
+            fid=5, label="Spiider", fixture_profile_id=_pid("SPIIDER"),
+            mode_name="91-Kanal Pixel RGB (Mode 7)", universe=2, address=1,
+            channel_count=91, fixture_type="moving_head"), undoable=False)
+        fx = next(f for f in self.st.get_patched_fixtures() if f.fid == 5)
+        chans = get_channels_for_patched(fx)
+        for k in (0, 1, 19):
+            self.assertNotIn("color_w", channels_for_head(chans, k), k)
+            self.assertIsNone(programmer_key_for_head(chans, "color_w", k))
+        self.assertEqual(self.st.weiss_programmer_key(5, 0), "color_w")
+
+    def test_programmer_slider_gruppe_nur_weiss_faehrt_nicht_alle(self):
+        from src.ui.virtualconsole.vc_slider import SliderMode
+        self.st.add_fixture(PatchedFixture(
+            fid=2, label="PAR", fixture_profile_id=_pid("ZQ01424"),
+            mode_name="8-Kanal RGBW", universe=1, address=300, channel_count=8,
+            fixture_type="par"), undoable=False)
+        self._gruppe("Nur Weiss", [zelle_fuer(1, ACHSE_WEISS, k) for k in range(8)])
+        sl = self._slider(mode=SliderMode.PROGRAMMER, programmer_scope="group",
+                          programmer_group="Nur Weiss", programmer_attr="intensity")
+        vorher = dict(self.st.programmer.get(2, {}))
+        sl._value = 10
+        sl._apply()
+        self.assertEqual(self.st.programmer.get(2, {}), vorher,
+                         "eine reine Weiss-Gruppe fuhr alle Geraete")
+
 if __name__ == "__main__":
     unittest.main()

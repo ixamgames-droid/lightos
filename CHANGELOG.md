@@ -21,6 +21,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Köpfe 9–48 gar keins. Ein Farbkopf trägt bei Geräten mit eigener Weiß-Leiste jetzt kein Weiß
   mehr; die Weiß-Segmente bedienst du über „Weiß 1…8". Geräte, deren Weiß zur Farbzelle gehört
   (RGBW-PAR, Blinder 5×5), bleiben unverändert.
+- **Verhaltensänderung beim Robin Spiider im Pixelmodus:** sein einziges Weiß (das der
+  Grundfarbe) hing bisher an allen 20 Köpfen — ein Pixel-Effekt zog es mit. Jetzt gehört es zu
+  keinem Farbkopf mehr; du erreichst es über die Zeile „Weiß 1" unter dem Gerät bzw. über den
+  gerätweiten Weiß-Regler.
 - **„Nichts gewählt" heißt nur noch wirklich nichts.** VC-Slider im Programmer-Modus, MIDI-Fader
   und XY-Pad wirken bei leerer Auswahl auf alle Geräte — eine Auswahl nur aus Weiß-Segmenten
   zählte dabei als leer und hätte das ganze Rig gefahren.
