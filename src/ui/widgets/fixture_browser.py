@@ -56,6 +56,38 @@ def universum_vorschlag(fixtures) -> int:
     return universum
 
 
+
+def plane_patch_adressen(universe: int, address: int, ch_count: int, count: int,
+                         offset: int, max_univ: int = 32, univ_size: int = 512):
+    """Adressen fuer ``count`` Geraete ab (universe, address), Abstand ``offset``.
+
+    EINE Regel fuer ALLE Geraete (FM-39): passt ein Geraet mit seinen
+    ``ch_count`` Kanaelen nicht mehr ins Universe, rollt es ins naechste ab
+    Adresse 1 — auch das erste. Bis 2026-09-29 lief das erste still ueber
+    Kanal 512 hinaus (die letzten Kanaele gingen nirgends hin), die Kopien
+    wurden gerollt. Jenseits von ``max_univ`` wird abgebrochen.
+
+    Liefert ``(plan, uebersprungen, gerollt)``: ``plan`` = ``[(universe,
+    address), ...]``, ``gerollt`` = Nummern (0-basiert) der Geraete, die
+    ins naechste Universe ausweichen mussten — damit die Oberflaeche es sagt.
+    """
+    ch = max(1, int(ch_count))
+    plan: list[tuple[int, int]] = []
+    gerollt: list[int] = []
+    u, a = int(universe), int(address)
+    for i in range(int(count)):
+        if i:
+            a += int(offset)
+        if a + ch - 1 > univ_size:
+            u += 1
+            a = 1
+            gerollt.append(i)
+        if u > max_univ or ch > univ_size:
+            # dieses und alle folgenden passen nirgends mehr hin
+            return plan, int(count) - i, [g for g in gerollt if g < i]
+        plan.append((u, a))
+    return plan, 0, gerollt
+
 class FixtureBrowserDialog(QDialog):
     def __init__(self, next_fid: int, parent=None):
         super().__init__(parent)
@@ -266,6 +298,17 @@ class FixtureBrowserDialog(QDialog):
         label_base = self._edit_label.text() or self._selected_profile.name
         fid = self._next_fid
 
+        # FM-39: EINE Regel fuer das erste Geraet und die Kopien (vorher lief das
+        # erste still ueber Kanal 512 hinaus, die Kopien wurden gerollt).
+        plan, self.skipped_count, self.gerollt = plane_patch_adressen(
+            universe, address, ch_count, count, offset)
+        if not plan:
+            self.result_fixture = None
+            self.extra_fixtures = []
+            self.accept()
+            return
+        universe, address = plan[0]
+
         # Bei mehreren Geräten: erstes zurückgeben (weitere werden in patch_view hinzugefügt)
         self.result_fixture = PatchedFixture(
             fid=fid,
@@ -280,22 +323,9 @@ class FixtureBrowserDialog(QDialog):
             fixture_type=self._selected_profile.fixture_type,
             spider_dual_tilt=auto_dual_tilt,
         )
-        # Zusatz-Geräte als Liste mitgeben. Laeuft die Adresse ueber 512, wird
-        # ins naechste Universe gerollt (statt Geraete still zu verwerfen).
-        # Erst wenn auch Universe 32 voll ist, brechen wir ab und melden, wie
-        # viele Geraete nicht mehr gepatcht werden konnten (self.skipped_count).
+        # Zusatz-Geräte als Liste mitgeben (Adressen aus demselben Plan).
         self.extra_fixtures = []
-        self.skipped_count = 0
-        cur_univ = universe
-        cur_addr = address
-        for i in range(1, count):
-            cur_addr += offset
-            if cur_addr + ch_count - 1 > 512:
-                cur_univ += 1
-                cur_addr = 1
-                if cur_univ > 32:
-                    self.skipped_count = count - i
-                    break
+        for i, (cur_univ, cur_addr) in enumerate(plan[1:], start=1):
             self.extra_fixtures.append(PatchedFixture(
                 fid=fid + i,
                 label=f"{label_base} {i + 1}",

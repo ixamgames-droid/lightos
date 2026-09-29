@@ -865,16 +865,33 @@ class PatchView(QWidget):
 
     def _add_fixture(self):
         dlg = FixtureBrowserDialog(self._state.next_fid(), self)
-        if dlg.exec() and dlg.result_fixture:
+        if not dlg.exec():
+            return
+        # FM-39: Meldung VOR dem Patchen bauen — nach add_fixture sind die
+        # Objekte von der Sitzung geloest, ein Lesen von ``label`` wirft dann.
+        gerollt = getattr(dlg, "gerollt", [])
+        zeilen = []
+        if gerollt and dlg.result_fixture:
+            alle = [dlg.result_fixture] + list(getattr(dlg, "extra_fixtures", []))
+            zeilen = [f"• {alle[i].label}: Universe {alle[i].universe}, Adresse 1"
+                      for i in gerollt if i < len(alle)]
+        if dlg.result_fixture:
             self._state.add_fixture(dlg.result_fixture)
             for extra in getattr(dlg, "extra_fixtures", []):
                 self._state.add_fixture(extra)
-            skipped = getattr(dlg, "skipped_count", 0)
-            if skipped:
-                QMessageBox.warning(
-                    self, "Nicht alle Geräte gepatcht",
-                    f"{skipped} Gerät(e) konnten nicht gepatcht werden — "
-                    "ab Universe 32 war kein Platz mehr.")
+        skipped = getattr(dlg, "skipped_count", 0)
+        if skipped:
+            QMessageBox.warning(
+                self, "Nicht alle Geräte gepatcht",
+                f"{skipped} Gerät(e) konnten nicht gepatcht werden — "
+                "ab Universe 32 war kein Platz mehr.")
+        # FM-39: ein Ausweichen ins naechste Universe nicht still passieren lassen.
+        if zeilen:
+            QMessageBox.information(
+                self, "Ins nächste Universe verschoben",
+                "Diese Geräte hätten über Kanal 512 hinausgereicht und liegen "
+                "deshalb im nächsten Universe:\n\n" + "\n".join(zeilen[:12])
+                + (f"\n… und {len(zeilen) - 12} weitere" if len(zeilen) > 12 else ""))
 
     def _open_generator(self):
         """Oeffnet den Fixture Generator. Nach erfolgreichem Speichern

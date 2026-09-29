@@ -7,6 +7,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-29 — Neues Gerät ragt nicht mehr über Kanal 512 hinaus (FM-39)
+
+#### Behoben
+
+- **Das erste neu hinzugefügte Gerät konnte über Kanal 512 hinausragen.** Mehrere Geräte auf
+  einmal wurden ins nächste Universe verschoben, sobald sie nicht mehr passten, das erste aber
+  nicht — seine letzten Kanäle gingen dann nirgends hin. Jetzt gilt für alle dieselbe Regel,
+  und LightOS sagt, welche Geräte ins nächste Universe ausgewichen sind.
+
 ### 2026-09-29 — STOP ALL macht auch die Musik sofort aus (ENG-18)
 
 #### Behoben
