@@ -10,6 +10,7 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | STAB-26 | A | fix/stab26-ueberlappung | 2026-09-29T01:14Z | src/core/sync.py |
+| STAB-27 | A | fix/stab27-doppelte-fid | 2026-09-29T01:31Z | src/core/show/show_file.py |
 
 ## Blocker & Fallen
 
@@ -128,7 +129,6 @@
 
 ## Verlauf
 
-- 2026-09-28T14:28Z A done BPM-17
 - 2026-09-28T14:38Z A claim BPM-18
 - 2026-09-28T14:52Z A done BPM-18
 - 2026-09-28T15:07Z A claim QA-80
@@ -158,3 +158,4 @@
 - 2026-09-29T01:09Z A done ENG-18
 - 2026-09-29T01:14Z A claim STAB-26
 - 2026-09-29T01:26Z A done FM-39
+- 2026-09-29T01:31Z A claim STAB-27
