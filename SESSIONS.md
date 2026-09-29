@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| _(frei)_ |  |  |  |  |
+| STAB-24 | A | fix/stab24-stab25-laden-ohne-verlust | 2026-09-29T13:23Z | src/core/show/show_file.py,src/core/app_state.py |
 
 ## Blocker & Fallen
 
@@ -129,7 +129,6 @@
 
 ## Verlauf
 
-- 2026-09-28T19:38Z A claim VIZ-61
 - 2026-09-28T19:55Z A done VIZ-61
 - 2026-09-28T19:58Z A claim VIZ-55
 - 2026-09-28T21:03Z A done VIZ-55
@@ -159,3 +158,4 @@
 - 2026-09-29T02:10Z A done STAB-27
 - 2026-09-29T02:36Z A done QA-67
 - 2026-09-29T02:36Z A done QA-81
+- 2026-09-29T13:23Z A claim STAB-24
