@@ -10,6 +10,7 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | VIZ-64 | A | fix/viz64-zweite-loesung | 2026-09-29T00:04Z | src/core/stage/aim.py |
+| UI-58 | A | fix/ui58-blackout-rueckkopplung | 2026-09-29T00:22Z | src/core/dmx/output_manager.py,src/ui/main_window.py |
 
 ## Blocker & Fallen
 
@@ -128,7 +129,6 @@
 
 ## Verlauf
 
-- 2026-09-24T16:49Z C uebergeben BPM-14
 - 2026-09-24T20:48Z C claim BPM-16
 - 2026-09-24T21:15Z C uebergeben BPM-16
 - 2026-09-28T12:48Z A claim BPM-14
@@ -158,3 +158,4 @@
 - 2026-09-29T00:01Z A done FM-49
 - 2026-09-29T00:04Z A claim VIZ-64
 - 2026-09-29T00:16Z A done VIZ-63
+- 2026-09-29T00:22Z A claim UI-58
