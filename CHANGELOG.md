@@ -7,6 +7,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-29 — BLACKOUT-Knopf zeigt, was wirklich los ist (UI-58)
+
+#### Behoben
+
+- **Der BLACKOUT-Knopf oben konnte das Gegenteil tun.** Wurde Blackout über einen VC-Taster,
+  das Handy (Web-Remote), OSC oder die Kommandozeile geschaltet, blieb der Knopf in der
+  Kopfzeile auf seinem alten Stand — der nächste Druck darauf machte dann nichts dunkel.
+  Jetzt folgt er dem echten Zustand, egal woher die Änderung kommt.
+
 ### 2026-09-29 — Zielen erreicht auch Punkte „hinter" dem Kopf (VIZ-64)
 
 #### Behoben

@@ -188,6 +188,7 @@ class OutputManager:
         self._tick_callbacks: list = []   # callables(dt: float)
         self.grand_master: float = 1.0  # 0.0–1.0 — globale Helligkeit
         self._gm_callbacks: list = []   # callables(value: float)
+        self._blackout_callbacks: list = []   # callables(enabled: bool), UI-58
         # Adressen je Universum, die der Grand-Master skalieren darf (Intensitaet/
         # Farbe — NICHT Pan/Tilt/Gobo). Wird vom AppState aus dem Patch gesetzt
         # (_rebuild_render_plan). Universen OHNE Eintrag (rein roh/ungepatcht)
@@ -466,7 +467,35 @@ class OutputManager:
                                for u, universe in list(self.universes.items())}
 
     def set_blackout(self, enabled: bool):
+        """Blackout an/aus. UI-58: jede Aenderung wird gemeldet — egal ob sie aus
+        der Kopfzeile, einem VC-Taster, Web, OSC oder der Kommandozeile kommt.
+        Ohne das zeigte der Kopfzeilen-Knopf nach einer fremden Aenderung den
+        alten Stand, und sein naechster Druck machte das Gegenteil (Blackout
+        „an" gedrueckt -> nichts wurde dunkel)."""
+        enabled = bool(enabled)
+        geaendert = enabled != self._blackout
         self._blackout = enabled
+        if not geaendert:
+            return
+        for cb in list(self._blackout_callbacks):
+            try:
+                cb(enabled)
+            except Exception:
+                pass
+
+    @property
+    def blackout(self) -> bool:
+        return bool(self._blackout)
+
+    def subscribe_blackout(self, cb):
+        if cb not in self._blackout_callbacks:
+            self._blackout_callbacks.append(cb)
+
+    def unsubscribe_blackout(self, cb):
+        try:
+            self._blackout_callbacks.remove(cb)
+        except ValueError:
+            pass
 
     def set_submaster(self, slot, level: float, fids=None, heads=None):
         """Setzt einen Submaster-Slot (multiplikativer Dimmer-Faktor 0.0–1.0).
