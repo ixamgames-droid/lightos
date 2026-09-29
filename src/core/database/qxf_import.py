@@ -20,7 +20,9 @@ Hersteller + Modell) werden übersprungen, Builtins nie überschrieben.
 """
 from __future__ import annotations
 import os
+import re
 import xml.etree.ElementTree as ET
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from .models import Manufacturer, FixtureProfile, FixtureMode, FixtureChannel, ChannelRange
 from .fixture_db import engine, _infer_range_kind
@@ -347,8 +349,84 @@ def _attr_from_name(name: str | None) -> str:
     return "raw"
 
 
+# ── FM-49: Gruppen-Zuordnung am Kanalnamen gegenpruefen ──────────────────────
+#
+# QLC+-Profile ohne Channel-Preset tragen nur eine grobe <Group>. Gemessen am
+# 2026-09-29 an 64 092 importierten Kanaelen: Farbkanaele in der Gruppe
+# „Intensity" („Red 1", „Amber", „Warm White") wurden Dimmer, „Gobo Rotation"
+# in „Speed" eine Geschwindigkeit, „Frost" in „Effect" ein Makro, Framing-Blades
+# und „Barrel Roll" in „Beam" ein Zoom. EINE Regel, genutzt vom Import UND von
+# der Reparatur der schon importierten Bibliothek (``bibliothek_reparieren``) —
+# sie sieht nur Attribut + Name, weil die Bibliothek die Gruppe nicht speichert.
+
+_FARB_WOERTER = [(r"red|rot", "color_r"), (r"green|gr(?:ue|ü)n", "color_g"),
+                 (r"blue|blau", "color_b"), (r"white|wei(?:ss|ß)|ww|cw", "color_w"),
+                 (r"amber", "color_a"), (r"uv", "color_uv"), (r"cyan", "cmy_c"),
+                 (r"magenta", "cmy_m"), (r"yellow|gelb", "cmy_y"), (r"lime", "raw")]
+_FARB_RE = [(re.compile(rf"(?<![a-z]){w}(?![a-z])"), a) for w, a in _FARB_WOERTER]
+# Sammel-/Steuerkanaele mit Farbwort im Namen bleiben, wie sie sind
+# („Red | Step Time", „Cyan/Random CMY", „Red Laser" — ein Laser-Kanal wird
+# keine Farbe, die Highlight/„Alles Weiss" aufdrehen).
+_KEIN_FARBKANAL = re.compile(
+    r"dimmer|master|intensity|fine|fein|macro|program|auto|strobe|mode|chase|preset|"
+    r"effect|temperature|cto|ctc|ctb|speed|sound|fad|curve|all\b|total|time|step|"
+    r"random|laser|/|,")
+_ZOOM_NAME = re.compile(r"zoom|beam(?! ?shap)|angle|spread|width")
+_BEAM_NAMEN = (("focus", "focus"), ("fokus", "focus"), ("iris", "iris"),
+               ("frost", "frost"), ("diffusion", "frost"), ("prism", "prism"))
+
+
+def attribut_korrigieren(attr: str, name: str | None) -> str:
+    """Offensichtliche Fehlzuordnung aus der groben QLC+-Gruppe am Kanalnamen
+    richtigstellen; alles andere unveraendert zurueckgeben."""
+    n = (name or "").lower()
+    if attr == "intensity" and not _KEIN_FARBKANAL.search(n):
+        treffer = {a for rx, a in _FARB_RE if rx.search(n)}
+        if len(treffer) == 1:
+            return treffer.pop()
+    if (attr == "speed" and "rotation" in n
+            and not re.search(r"select|effect|colou?r|time", n)):
+        if "gobo" in n:
+            return "gobo_rotation"
+        if "prism" in n:
+            return "prism_rotation"
+    if attr == "macro" and "frost" in n and not re.search(r"[/,]", n):
+        return "frost"
+    if attr == "zoom" and not _ZOOM_NAME.search(n):
+        for wort, a in _BEAM_NAMEN:
+            if wort in n:
+                return a
+        return "raw"
+    return attr
+
+
+def bibliothek_reparieren(session: Session) -> list[str]:
+    """FM-49: schon importierte QLC+-Profile mit ``attribut_korrigieren``
+    nachziehen. Nur das Attribut aendert sich — Kanalzahl und -reihenfolge
+    bleiben, gepatchte Geraete behalten ihre DMX-Belegung. Liefert
+    ``["Profil [Modus] Kanal: alt -> neu", ...]``."""
+    rows = session.execute(
+        select(FixtureChannel, FixtureMode.name, FixtureProfile.name)
+        .join(FixtureMode, FixtureChannel.mode_id == FixtureMode.id)
+        .join(FixtureProfile, FixtureMode.fixture_id == FixtureProfile.id)
+        .where(FixtureProfile.source == "qlcplus")).all()
+    geaendert = []
+    for ch, modus, profil in rows:
+        neu = attribut_korrigieren(ch.attribute, ch.name)
+        if neu != ch.attribute:
+            geaendert.append(f"{profil} [{modus}] {ch.name}: {ch.attribute} -> {neu}")
+            ch.attribute = neu
+    return geaendert
+
+
 def _resolve_attribute(channel_el) -> str:
     """Bestimmt unser Attribut-Kürzel aus einem QLC+ Channel-Element."""
+    return attribut_korrigieren(_resolve_attribute_roh(channel_el),
+                                channel_el.get("Name", ""))
+
+
+def _resolve_attribute_roh(channel_el) -> str:
+    """Attribut aus Preset / Gruppe / Name, noch ohne FM-49-Gegenpruefung."""
     # 1. Direkt-Preset auf dem Channel-Tag
     preset = channel_el.get("Preset", "")
     if preset in PRESET_MAP:
