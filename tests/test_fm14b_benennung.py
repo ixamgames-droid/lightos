@@ -887,6 +887,36 @@ class KanalnameStattSegmentnameTest(_RigFall):
         return [(ProgrammerView._head_slider_label([fx], vorlage, head), kanal.name,
                  int(fx.address) + int(kanal.channel_number) - 1)]
 
+    def test_die_grundfarben_regler_heissen_wie_ihr_kanal(self):
+        """An Kopf 0 (Grundfarbe) baut der Programmer echte Pro-Kopf-Regler fuer
+        Attribute OHNE Segment-Bezug (intensity, shutter, pan, tilt, zoom, …).
+        Jeder muss den Kanal nennen, den er wirklich schreibt — ohne Pixel-
+        oder „GR"-Anhang. Ueber die OBERFLAECHE gemessen: jeder Regler wird
+        bewegt und der geschriebene Kanal im Chart nachgeschlagen (Review
+        29.09.: die Umstellung der raw-Sonden auf die Funktion hatte diese
+        Messung mitgenommen)."""
+        from src.core.app_state import attr_head_is_segment, channel_occurrence_keys
+        from src.ui.views.programmer_view import AttributeSlider
+        view, _ = self._programmer_auf(1, 0)
+        fx = next(f for f in self.state.get_patched_fixtures() if f.fid == 1)
+        chans = self._channels(fx)
+        regler = [w for w in view.findChildren(AttributeSlider)
+                  if w._display_name and w._head == 0
+                  and not attr_head_is_segment(_PIXEL_MODELL, w._channel.attribute)
+                  and all(getattr(f, "fid", None) == 1 for f in w._fixtures)]
+        self.assertGreaterEqual(len(regler), 5, "Vorbedingung: Grundfarben-Regler")
+        for w in regler:
+            with self.subTest(regler=w._display_name):
+                vorher = dict(self.state.programmer.get(1, {}))
+                w._slider.setValue(7 if w._slider.value() != 7 else 9)
+                nachher = dict(self.state.programmer.get(1, {}))
+                geaendert = [k for k, v in nachher.items() if vorher.get(k) != v]
+                self.assertEqual(len(geaendert), 1, f"{w._display_name!r} schrieb {geaendert}")
+                kanal = next(c for c, k in channel_occurrence_keys(chans)
+                             if k == geaendert[0])
+                self.assertEqual(w._display_name, kanal.name)
+                self.assertNotIn(" · ", w._display_name)
+
     def test_rohkanaele_haben_keine_pro_kopf_regler(self):
         """Der heutige Stand der Flaeche (FM-28): am Spiider-Pixelkopf entsteht
         fuer ``raw`` kein Regler je Kopf — der Griff daneben ist dort also gar

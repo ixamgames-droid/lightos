@@ -115,11 +115,13 @@ class _RigBasis(unittest.TestCase):
 
     def _auto_gid(self, fid: int) -> int:
         """Die beim Patchen automatisch angelegte Kopf-Matrix dieses Geraets."""
-        with Session(self.state._show_engine) as s:
-            for g in s.execute(select(FixtureGroup)).scalars():
-                pos = g.positions_json or ""
-                if f'"{fid}:0"' in pos:
-                    return int(g.id)
+        # FM-14b: am Pixel-Kopf steht die Grundfarbe (Kopf 0) nicht im Ring-
+        # Raster — die Gruppe ueber „fid:0" zu suchen fand sie dann nicht mehr.
+        # Gefragt wird deshalb die EINE Stelle, die „Auto-Gruppe dieses
+        # Geraets" beantwortet.
+        gid = self.state.find_head_matrix_group(fid, dedicated=True)
+        if gid is not None:
+            return int(gid)
         self.fail(f"keine Auto-Kopf-Matrix fuer Geraet {fid} gefunden")
 
     def _rig_gid(self) -> int:
@@ -238,13 +240,12 @@ class LegendeZaehltZellenTest(_RigBasis):
     # ── 1) Ring-Raster: 19 Pixel → „19 Köpfe" ────────────────────────────────
 
     def test_ring_raster_meldet_die_zahl_der_pixel(self):
-        """Der Fall aus dem Item — auf dem Weg, auf dem er im Betrieb entsteht:
-        die Grundfarben-Zelle (Kopf 0) aus der Auto-Kopf-Matrix entfernen."""
+        """Der Fall aus dem Item. Bis FM-14b entstand der Ring per Rechtsklick
+        (Grundfarben-Zelle aus der 20-zelligen Auto-Kopf-Matrix entfernen);
+        seit FM-14b legt schon das PATCHEN ihn so an — die Grundfarbe steht
+        nicht im Ring. Gemessen wird dieselbe Aussage: die Legende zaehlt die
+        19 Pixel, nicht ``max(head)+1`` = 20."""
         self._gruppe_waehlen(self._rig_gid())
-        self.assertEqual(len(self._kopfzellen(1)), 20,
-                         "Vorbedingung: Auto-Kopf-Matrix mit 20 Zellen")
-
-        self._rechtsklick("1:0", "Zelle entfernen")
 
         koepfe = self._kopfzellen(1)
         self.assertEqual(koepfe, list(range(1, 20)), "Ring 1..19 nicht entstanden")
@@ -274,25 +275,25 @@ class LegendeZaehltZellenTest(_RigBasis):
                          f"Legende zaehlt die entfernten Koepfe mit: {txt!r}")
         self.assertNotIn("4 Köpfe", txt)     # max(head)+1
         self.assertNotIn("3 Köpfe", txt)     # „einfach 1 abziehen"
-        self.assertEqual(_kopfzahl(txt, "Spiider"), 20, txt)
+        self.assertEqual(_kopfzahl(txt, "Spiider"), len(self._kopfzellen(1)), txt)
 
     # ── 3) Positivkontrolle: unberuehrte Streifen melden wie vorher ──────────
 
     def test_zusammengelegte_streifen_melden_dieselbe_zahl_wie_vorher(self):
-        """Der haeufige Fall: zwei Auto-Kopf-Matrizen, luecken los ab Kopf 0.
-        Dort ist `max(head)+1` richtig — der Waechter darf hier NICHT anschlagen."""
+        """Der haeufige Fall: eine Auto-Kopf-Matrix luecken los ab Kopf 0 (die
+        Bar). Dort ist `max(head)+1` richtig — der Waechter darf hier NICHT
+        anschlagen. (Der Spiider ist seit FM-14b der Ring-Fall, Test 1.)"""
         self._gruppe_waehlen(self._rig_gid())
         txt = self._legende()
-        for fid, name in ((1, "Spiider"), (2, "Bar")):
+        for fid, name in ((2, "Bar"),):
             koepfe = self._kopfzellen(fid)
             self.assertEqual(koepfe, list(range(len(koepfe))), "Streifen hat Luecken")
             alt = max(koepfe) + 1        # das, was die Legende VORHER meldete
             self.assertEqual(_kopfzahl(txt, name), alt,
                              f"der gesunde Fall hat sich geaendert: {txt!r}")
-        self.assertEqual(_kopfzahl(txt, "Spiider"), 20)
+        self.assertEqual(_kopfzahl(txt, "Spiider"), len(self._kopfzellen(1)))
         self.assertEqual(_kopfzahl(txt, "Bar"), 4)
-        self.assertNotIn("19 Köpfe", txt)    # „einfach 1 abziehen" waere falsch
-        self.assertNotIn("3 Köpfe", txt)
+        self.assertNotIn("3 Köpfe", txt)     # „einfach 1 abziehen" waere falsch
 
     # ── 4) Positivkontrolle am ECHTEN Knopf „Köpfe einzeln → Raster" ─────────
 
@@ -331,7 +332,8 @@ class LegendeZaehltZellenTest(_RigBasis):
             self._rechtsklick(f"2:{kopf}", "Zelle entfernen")
         self.assertEqual(self._kopfzellen(2), [3])
         # Das andere Geraet als GANZE Zelle (echter Menuepunkt „zusammenfassen").
-        self._rechtsklick("1:0", '„Spiider“ zu einer Zelle zusammenfassen')
+        self._rechtsklick(f"1:{self._kopfzellen(1)[0]}",
+                          '„Spiider“ zu einer Zelle zusammenfassen')
         self.assertEqual(self._kopfzellen(1), [])
 
         txt = self._legende()
@@ -369,9 +371,10 @@ class MatrixEditorLegendeTest(_RigBasis):
     zeigen DASSELBE Raster — sie duerfen nicht zwei verschiedene Zahlen nennen."""
 
     def _ring_gruppe_speichern(self) -> int:
+        # Seit FM-14b ist das Rig schon beim Patchen ein Ring (keine Grundfarben-
+        # Zelle zu entfernen) — gespeichert wird es wie zuvor ueber den Editor.
         gid = self._rig_gid()
         self._gruppe_waehlen(gid)
-        self._rechtsklick("1:0", "Zelle entfernen")
         with patch("src.ui.views.fixture_group_view.QMessageBox"):
             self.view._save_group()
         return gid

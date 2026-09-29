@@ -325,11 +325,29 @@ class _RigBasis(unittest.TestCase):
 
     def _auto_gid(self, fid: int) -> int:
         """Die beim Patchen automatisch angelegte Kopf-Matrix dieses Geraets."""
-        with Session(self.state._show_engine) as s:
-            for g in s.execute(select(FixtureGroup)).scalars():
-                if f'"{fid}:0"' in (g.positions_json or ""):
-                    return int(g.id)
+        # FM-14b: am Pixel-Kopf steht die Grundfarbe (Kopf 0) nicht im Ring-
+        # Raster — die Gruppe ueber „fid:0" zu suchen fand sie dann nicht mehr.
+        # Gefragt wird deshalb die EINE Stelle, die „Auto-Gruppe dieses
+        # Geraets" beantwortet.
+        gid = self.state.find_head_matrix_group(fid, dedicated=True)
+        if gid is not None:
+            return int(gid)
         self.fail(f"keine Auto-Kopf-Matrix fuer Geraet {fid} gefunden")
+
+    def _kopfzellen(self, fid: int) -> int:
+        """Wie viele Zellen das Geraet KOPFWEISE im Raster belegt — gelesen aus
+        seiner Auto-Kopf-Matrix, nicht aus der Bankzahl. Gewoehnlich dasselbe;
+        am Pixel-Kopf (FM-14b) fehlt die Grundfarbe im Ring: 20 Baenke, 19 Zellen."""
+        return len(self._lade(self._auto_gid(fid))[2])
+
+    def _bar_reihe_im_rig(self, cols: int) -> list:
+        """Erwarteter Rotwert je Bar-Kopf, wenn die Bar-Koepfe des RIGS fahren:
+        sie liegen in der Reihe direkt unter dem Raster von Geraet 1, also bei
+        Zellindex ``r1 * cols + kopf`` (+1, s. ``_rot_je_kopf``). Mit dem alten
+        1x20-Streifen des Spiiders war das 21..24; mit dem Ring-Raster (FM-14b)
+        folgt es aus dessen Hoehe."""
+        _c1, r1, _p1 = self._lade(self._auto_gid(1))
+        return [r1 * cols + h + 1 for h in range(self._koepfe(2))]
 
     def _lade(self, gid: int) -> tuple[int, int, dict]:
         with Session(self.state._show_engine) as s:
@@ -388,7 +406,7 @@ class _RigBasis(unittest.TestCase):
         Spiider-Pixel in Reihe 0, die vier Bar-Koepfe in Reihe 1."""
         rig = self._merge([self._auto_gid(1), self._auto_gid(2)], "Rig")
         _c, _r, pos = self._lade(rig)
-        self.assertEqual(len(pos), self._koepfe(1) + self._koepfe(2),
+        self.assertEqual(len(pos), self._kopfzellen(1) + self._koepfe(2),
                          "Vorbedingung: das Rig fuehrt beide Geraete kopfweise")
         return rig
 
@@ -474,8 +492,8 @@ class MergeOhneDoppelteZellenTest(_RigBasis):
                          f"die Bar hat nicht genau EINE Zelle: "
                          f"{self._zellen_von(pos, 2)}")
         # Wache gegen Leerlauf: das Raster traegt beide Geraete vollstaendig.
-        self.assertEqual(len(self._zellen_von(pos, 1)), self._koepfe(1))
-        self.assertEqual(len(pos), self._koepfe(1) + 1)
+        self.assertEqual(len(self._zellen_von(pos, 1)), self._kopfzellen(1))
+        self.assertEqual(len(pos), self._kopfzellen(1) + 1)
 
     def test_fall_a_am_dmx_gewinnt_die_zelle_des_ERSTEN_rasters(self):
         """⚠️ UNIFORM ist hier das RICHTIGE Ergebnis — eine Ganz-Zelle faerbt
@@ -493,7 +511,8 @@ class MergeOhneDoppelteZellenTest(_RigBasis):
         rot = self._rot_je_kopf(pos, cols, rows, 2)
         self.assertEqual(rot, [erwartet] * self._koepfe(2),
                          f"nicht die Zelle des ersten Rasters faehrt die Bar: {rot}")
-        self.assertEqual(erwartet, 21, "die Messgroesse hat sich verschoben")
+        self.assertEqual(erwartet, self._bar_reihe_im_rig(cols)[0],
+                         "die Messgroesse hat sich verschoben")
 
     # ── Fall (b): kopfweise Bar + deren Auto-Kopf-Matrix ─────────────────────
 
@@ -503,15 +522,16 @@ class MergeOhneDoppelteZellenTest(_RigBasis):
         cols, rows, pos = self._lade(self._merge([rig, self._auto_gid(2)], "Fall b"))
         self.assertEqual(self._doppelte_zellwerte(pos), {},
                          f"Zellwerte stehen doppelt im Raster: {pos}")
-        self.assertEqual(len(pos), self._koepfe(1) + self._koepfe(2),
-                         f"nicht {self._koepfe(1) + self._koepfe(2)} Zellen: {len(pos)}")
+        self.assertEqual(len(pos), self._kopfzellen(1) + self._koepfe(2),
+                         f"nicht {self._kopfzellen(1) + self._koepfe(2)} Zellen: {len(pos)}")
         self.assertEqual(sorted(parse_zelle(v)[2]
                                 for _k, v in self._zellen_von(pos, 2)),
                          list(range(self._koepfe(2))),
                          "die Bar-Koepfe sind nicht mehr vollstaendig im Raster")
         # Die Rastergroesse bleibt, wie gestapelt — die frei gewordenen Zellen
         # sind Luecken, keine Verschiebung (wie nach „Zelle entfernen").
-        self.assertEqual((cols, rows), (self._koepfe(1), 3))
+        c1, r1, _p1 = self._lade(self._auto_gid(1))
+        self.assertEqual((cols, rows), (c1, r1 + 2))
 
     def test_fall_b_am_dmx_faehrt_jeden_kopf_die_zelle_des_ERSTEN_rasters(self):
         """Vorher 41,42,43,44 (die spaeter geschriebene Zelle), jetzt 21,22,23,24
@@ -519,7 +539,7 @@ class MergeOhneDoppelteZellenTest(_RigBasis):
         rig = self._rig_kopfweise()
         cols, rows, pos = self._lade(self._merge([rig, self._auto_gid(2)], "Fall b"))
         rot = self._rot_je_kopf(pos, cols, rows, 2)
-        self.assertEqual(rot, [21, 22, 23, 24],
+        self.assertEqual(rot, self._bar_reihe_im_rig(cols),
                          f"nicht die Zellen des ersten Rasters fahren die Bar: {rot}")
 
     # ── Die Regel selbst, am DMX ─────────────────────────────────────────────
@@ -539,10 +559,11 @@ class MergeOhneDoppelteZellenTest(_RigBasis):
                 cols, rows, pos = self._lade(self._merge(reihenfolge, "Fall"))
                 self.assertEqual(self._doppelte_zellwerte(pos), {},
                                  f"Doppel in Reihenfolge {reihenfolge}: {pos}")
-                self.assertEqual(len(pos), self._koepfe(1) + self._koepfe(2))
+                self.assertEqual(len(pos), self._kopfzellen(1) + self._koepfe(2))
                 gemessen[tuple(reihenfolge)] = self._rot_je_kopf(pos, cols, rows, 2)
+                breite = cols
         # Rig zuerst: die Bar-Koepfe liegen in Reihe 1 (Index 20..23) -> 21..24.
-        self.assertEqual(gemessen[(rig, auto2)], [21, 22, 23, 24])
+        self.assertEqual(gemessen[(rig, auto2)], self._bar_reihe_im_rig(breite))
         # Auto-Kopf-Matrix zuerst: sie ist jetzt Reihe 0 (Index 0..3) -> 1..4.
         self.assertEqual(gemessen[(auto2, rig)], [1, 2, 3, 4])
         self.assertNotEqual(gemessen[(rig, auto2)], gemessen[(auto2, rig)],
@@ -561,7 +582,7 @@ class MergeOhneDoppelteZellenTest(_RigBasis):
                 gid = self._merge([gid, auto2], f"Runde {runde}")
                 _c, _r, pos = self._lade(gid)
                 self.assertEqual(self._doppelte_zellwerte(pos), {}, pos)
-                self.assertEqual(len(pos), self._koepfe(1) + self._koepfe(2),
+                self.assertEqual(len(pos), self._kopfzellen(1) + self._koepfe(2),
                                  f"Runde {runde} hat das Raster wachsen lassen")
 
     def test_eine_alt_show_mit_doppelzellen_wird_beim_zusammenlegen_geraeumt(self):
@@ -592,7 +613,7 @@ class MergeOhneDoppelteZellenTest(_RigBasis):
         _c, _r, pos = self._lade(self._merge([alt_gid, self._auto_gid(1)], "Aufraeumen"))
         self.assertEqual(self._doppelte_zellwerte(pos), {},
                          f"das Alt-Doppel steht immer noch im Raster: {pos}")
-        self.assertEqual(len(pos), self._koepfe(1) + self._koepfe(2))
+        self.assertEqual(len(pos), self._kopfzellen(1) + self._koepfe(2))
 
     # ── Gegenproben: was sich NICHT aendern darf ─────────────────────────────
 
@@ -611,7 +632,7 @@ class MergeOhneDoppelteZellenTest(_RigBasis):
         cols, rows, pos = self._lade(self._merge([g1, g2], "Rig"))
         self.assertEqual((cols, rows), (max(c1, c2), r1 + r2))
         self.assertEqual(pos, erwartet, "das gesunde Stapeln hat sich veraendert")
-        self.assertEqual(len(pos), self._koepfe(1) + self._koepfe(2))
+        self.assertEqual(len(pos), self._kopfzellen(1) + self._koepfe(2))
 
     def test_fm32_bleibt_die_ganz_zelle_weicht_den_kopf_zellen(self):
         """Gegenprobe an der Nachbarregel: FM-37 darf FM-32 nicht abschalten.
@@ -637,7 +658,7 @@ class MergeOhneDoppelteZellenTest(_RigBasis):
         abschaltet, besteht jede Doppel-Pruefung."""
         gid = self._merge([self._auto_gid(1), self._auto_gid(2)], "Rig")
         _c, _r, pos = self._lade(gid)
-        self.assertEqual(len(pos), self._koepfe(1) + self._koepfe(2))
+        self.assertEqual(len(pos), self._kopfzellen(1) + self._koepfe(2))
         self.assertIsNone(self.state.merge_head_matrix_groups([gid]),
                           "unter zwei Gruppen darf nichts entstehen")
 

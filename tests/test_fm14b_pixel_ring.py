@@ -611,6 +611,22 @@ class BeschriftungTest(_RigFall):
         self.assertEqual(w.zell_beschriftung("7:3"), "7·K4")
         self.assertEqual(w.zell_beschriftung(7), "7")
 
+    def test_weiss_segmente_behalten_ihren_buchstaben(self):
+        """FM-41 trifft FM-14b: die Zellbeschriftung ist beim Zusammenfuehren
+        neu geschrieben worden — die Weiss-Achse (``7:w0``) muss dabei ``W``
+        bleiben und darf nicht als Kopf („K1") oder ganzes Geraet gelten. Auch
+        der Tooltip nennt das Weiss-Segment (Review 29.09.)."""
+        from src.core.group_cells import ACHSE_WEISS, zelle_fuer
+        from src.ui.views.fixture_group_view import FixtureGridWidget
+        w = FixtureGridWidget()
+        self.addCleanup(w.deleteLater)
+        w.update_fixture_labels({7: "Balken"})
+        self.assertEqual(w.zell_beschriftung(zelle_fuer(7, ACHSE_WEISS, 0)), "7·W1")
+        self.assertEqual(w.zell_beschriftung(zelle_fuer(7, ACHSE_WEISS, 7)), "7·W8")
+        self.assertEqual(w.zell_tooltip(zelle_fuer(7, ACHSE_WEISS, 0)),
+                         "Balken · Weiß-Segment 1")
+        self.assertEqual(w.zell_beschriftung("7:0"), "7·K1")   # Farb-Achse bleibt
+
     def test_der_gruppen_editor_reicht_das_modell_wirklich_durch(self):
         """★★ Wieder die VIZ-51-Frage: kommt das Modell auch an? Gefahren wird
         der echte Aufbau des Editors (``_refresh_fixtures`` laeuft im
