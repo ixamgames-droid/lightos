@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| STAB-29 | A | fix/stab29-undo-bei-showwechsel | 2026-09-29T14:47Z | src/core/show/show_file.py |
+| _(frei)_ |  |  |  |  |
 
 ## Blocker & Fallen
 
@@ -129,7 +129,6 @@
 
 ## Verlauf
 
-- 2026-09-28T22:06Z A claim LAS-21
 - 2026-09-28T22:20Z A claim FM-50
 - 2026-09-28T22:34Z A done LAS-21
 - 2026-09-28T23:16Z A done FM-50
@@ -159,3 +158,4 @@
 - 2026-09-29T14:14Z A claim FM-38
 - 2026-09-29T14:47Z A claim STAB-29
 - 2026-09-29T14:55Z A done FM-38
+- 2026-09-29T15:17Z A done STAB-29
