@@ -1,0 +1,9 @@
+<!doctype html><meta charset="utf-8">
+        <script type="module">
+        import { panelGrid } from './pixel_order.js';
+        const faelle = [[16, 0, 0], [48, 0, 0], [64, 0, 0], [144, 0, 0], [12, 0, 0], [1, 0, 0], [0, 0, 0], [300, 0, 0], [48, 12, 4], [16, 4, 4], [144, 12, 12], [8, 8, 1], [48, 12, 0], [48, 0, 4], [50, 12, 4], [24, 12, 4], [48, -3, -3], [48, null, null]];
+        window.__out = JSON.stringify(faelle.map(function (f) {
+          const g = panelGrid(f[0], f[1], f[2]);
+          return [g.cols, g.rows, g.count, g.explizit ? 1 : 0];
+        }));
+        </script>

@@ -128,6 +128,14 @@ def _liste_im_block(data: dict, schluessel: str, was: str) -> list:
     return []
 
 
+def _kegel_fid(wert) -> int:
+    """Ein ``beams_off``-Eintrag: Geraete-Nummer als Zahl (auch als Text "3"),
+    nie ``None``/Wahrheitswert."""
+    if wert is None or isinstance(wert, bool):
+        raise TypeError(f"keine Geräte-Nummer: {wert!r}")
+    return _als_ganzzahl(wert, "fid", 0, -_SQLITE_INT_MAX, _SQLITE_INT_MAX)
+
+
 def _je_eintrag(eintraege, bauen, was: str, *namensfelder) -> list:
     """Jeden Eintrag EINZELN uebersetzen (STAB-24): ein kaputter kostet nur
     sich selbst und wird mit Nummer UND Namen ueber ``_lenient`` gemeldet.
@@ -140,6 +148,38 @@ def _je_eintrag(eintraege, bauen, was: str, *namensfelder) -> list:
         except Exception as ex:
             _lenient(f"{was} {nr} {_eintrags_hinweis(e, *namensfelder)}übersprungen", ex)
     return out
+
+
+#: Groesste Ganzzahl, die SQLite binden kann. Groessere ueberstanden die
+#: Uebersetzung je Eintrag und scheiterten erst beim COMMIT — dann kosteten sie
+#: wieder ALLE Eintraege (Review STAB-24: ``cols = 10**20`` -> 0 von 4 Gruppen).
+_SQLITE_INT_MAX = 2 ** 63 - 1
+
+
+def _als_ganzzahl(wert, feld: str, default: int, lo: int = 0,
+                  hi: int = _SQLITE_INT_MAX) -> int:
+    """Ganzzahlfeld eines Show-Eintrags: fehlt -> Default; sonst ``int()`` und
+    Bereichspruefung — ausserhalb wirft es und kostet nur SEINEN Eintrag."""
+    if wert is None:
+        return default
+    zahl = int(wert)
+    if not lo <= zahl <= hi:
+        raise ValueError(f"'{feld}' = {zahl} liegt ausserhalb {lo}..{hi}")
+    return zahl
+
+
+def _raster_mass(g: dict, feld: str) -> int:
+    """``cols``/``rows`` einer Gruppe. Ausserhalb 1..4096 wird BEGRENZT und
+    gemeldet statt verworfen — Name und Belegung der Gruppe bleiben erhalten.
+    (cols 0/-1 liessen den Gruppen-Editor haengen; 10**20 scheiterte erst beim
+    COMMIT und kostete dann alle Gruppen.)"""
+    zahl = int(g.get(feld, 8) if g.get(feld) is not None else 8)
+    begrenzt = min(4096, max(1, zahl))
+    if begrenzt != zahl:
+        _ladeprobleme.append(
+            f"Fixture-Gruppe {_eintrags_hinweis(g, 'name')}: '{feld}' = {zahl} "
+            f"auf {begrenzt} begrenzt")
+    return begrenzt
 
 
 def _als_text(wert, feld: str, default: str) -> str:
@@ -537,6 +577,11 @@ def _replace_patch_from_data(state, patch_data: list[dict]):
                     raise TypeError(
                         f"Eintrag ist kein Objekt, sondern {type(entry).__name__}")
                 pf = _patched_fixture_from_data(entry, next_fid)
+                # Review STAB-24: Zahlen, die SQLite nicht bindet, scheiterten
+                # erst im atomaren replace_patch — dann waren ALLE Geraete weg.
+                for feld in ("fid", "universe", "address", "channel_count"):
+                    _als_ganzzahl(getattr(pf, feld, 0), feld, 0,
+                                  -_SQLITE_INT_MAX, _SQLITE_INT_MAX)
             except Exception as e:
                 _lenient(f"Gerät {nr} {_eintrags_hinweis(entry, 'label', 'fid')}"
                          f"übersprungen", e)
@@ -736,7 +781,8 @@ def _collect_fixture_groups(state) -> list:
                     })
                 except Exception as e:
                     _speicherprobleme.append(
-                        f"Fixture-Gruppe {nr} '{getattr(g, 'name', '?')}' ({e})")
+                        f"Fixture-Gruppe {nr} '{getattr(g, 'name', '?')}' — FEHLT "
+                        f"in der Datei ({e})")
     except Exception as e:
         _speicherprobleme.append(f"Fixture-Gruppen ({e})")
     return out
@@ -751,7 +797,7 @@ def _fixture_group_aus_daten(g):
         raise TypeError(f"Eintrag ist kein Objekt, sondern {type(g).__name__}")
     return FixtureGroup(
         name=_als_text(g.get("name", "Gruppe"), "name", "Gruppe"),
-        cols=int(g.get("cols", 8)), rows=int(g.get("rows", 8)),
+        cols=_raster_mass(g, "cols"), rows=_raster_mass(g, "rows"),
         positions_json=_als_text(g.get("positions_json", "{}"),
                                  "positions_json", "{}") or "{}",
         folder=_als_text(g.get("folder", ""), "folder", ""),
@@ -1832,8 +1878,12 @@ def load_show(path: str | os.PathLike):
     try:
         viz = data.get("visualizer", {}) or {}
         # STAB-24 (d): je Eintrag — der Kommentar oben versprach es schon.
-        beams_off = set(_je_eintrag(viz.get("beams_off", []) or [], int,
-                                    "Ausgeblendeter Lichtkegel"))
+        # Blockvertrag wie ueberall: fehlt -> leer, vorhanden aber keine Liste
+        # (auch null, auch "12" -> frueher {1, 2}!) -> gemeldet.
+        beams_off = set(_je_eintrag(
+            _liste_im_block(viz if isinstance(viz, dict) else {}, "beams_off",
+                            "Ausgeblendete-Lichtkegel"),
+            _kegel_fid, "Ausgeblendeter Lichtkegel"))
     except Exception as e:
         _lenient("load beams_off error", e)
         beams_off = set()

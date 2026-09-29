@@ -87,9 +87,14 @@ class ShowPersistenzTest(unittest.TestCase):
         self.assertEqual(set(), self._laden_mit_viz_block(None))
 
     def test_kaputte_eintraege_kippen_die_show_nicht(self):
-        """Ein unbrauchbarer Eintrag darf die Show nicht mit zu Fall bringen."""
-        self.assertEqual(set(), self._laden_mit_viz_block(
+        """Ein unbrauchbarer Eintrag darf die Show nicht mit zu Fall bringen —
+        und seit STAB-24 (d) auch die LESBAREN Eintraege nicht mehr: frueher
+        leerte ein einziger kaputter die ganze Menge."""
+        from src.core.show.show_file import letzte_ladeprobleme
+        self.assertEqual({3, 5}, self._laden_mit_viz_block(
             {"beams_off": ["3", 5, None, "abc"]}))
+        self.assertEqual(2, len([m for m in letzte_ladeprobleme()
+                                 if "Lichtkegel" in m]), letzte_ladeprobleme())
 
     def _laden_mit_viz_block(self, viz):
         """Eine echte Show schreiben, ihren ``visualizer``-Block ersetzen und

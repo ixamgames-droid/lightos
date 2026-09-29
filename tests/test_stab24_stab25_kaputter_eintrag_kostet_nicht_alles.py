@@ -230,7 +230,9 @@ class GruppenTest(_GruppenBasis):
         """Gegenprobe zur Einschraenkung 'nur der erste kaputte Eintrag zaehlt'."""
         def kaputt(data):
             data["fixture_groups"][0]["rows"] = "zwei"
-            data["fixture_groups"][3]["cols"] = None
+            # Runde 2: ``null`` gilt wie ein fehlendes Feld (Default 8, Gruppe
+            # bleibt) — unlesbar ist erst ein Wert, der keine Zahl ist.
+            data["fixture_groups"][3]["cols"] = "viele"
         self._datei_mit_vier_gruppen(kaputt)
 
         SF.load_show(self.pfad)
@@ -580,6 +582,87 @@ class MeldungTest(_Basis):
         self.assertEqual(1, len(m), SF.letzte_ladeprobleme())
         self.assertIn("Gerät 2 ", m[0])
         self.assertIn("'Mitte'", m[0])
+
+
+class ReviewTest(_GruppenBasis):
+    """Befunde der adversarialen Review vom 29.09.2026."""
+
+    def _laden(self, aendern):
+        self._datei_mit_vier_gruppen(aendern)
+        ok, msg = SF.load_show(self.pfad)
+        self.assertTrue(ok, msg)
+        with self.st._session() as s:
+            return {g.name: g for g in s.execute(select(FixtureGroup)).scalars().all()}
+
+    def test_null_felder_werden_defaults_nicht_verlust(self):
+        """M3: ``_als_text`` darf bei None NICHT werfen — genau dort brach es
+        in der Vorrunde."""
+        def nullen(data):
+            g = data["fixture_groups"][1]
+            g["folder"] = None
+            g["positions_json"] = None
+        gruppen = self._laden(nullen)
+        self.assertEqual(4, len(gruppen))
+        self.assertEqual(("", "{}"), (gruppen["Back-Spots"].folder,
+                                      gruppen["Back-Spots"].positions_json))
+        self.assertEqual([], SF.letzte_ladeprobleme())
+
+    def test_alt_show_ohne_felder_bekommt_die_alten_defaults(self):
+        """M11/M8: fehlende Felder und leeres positions_json."""
+        def alt(data):
+            g = data["fixture_groups"][2]
+            for k in ("folder", "positions_json", "cols"):
+                g.pop(k)
+            g["rows"] = None                      # null wie fehlend
+            data["fixture_groups"][3]["positions_json"] = ""
+        gruppen = self._laden(alt)
+        t = gruppen["Truss-Bars"]
+        self.assertEqual(("", "{}", 8, 8), (t.folder, t.positions_json, t.cols, t.rows))
+        self.assertEqual("{}", gruppen["Floor-Pars"].positions_json)
+
+    def test_riesige_zahl_kostet_keine_gruppe(self):
+        """Befund 1: ``cols = 10**20`` scheiterte erst beim COMMIT -> 0 von 4."""
+        def riesig(data):
+            data["fixture_groups"][1]["cols"] = 10 ** 20
+        gruppen = self._laden(riesig)
+        self.assertEqual(4, len(gruppen))
+        self.assertEqual(4096, gruppen["Back-Spots"].cols)
+        self.assertTrue([m for m in SF.letzte_ladeprobleme() if "begrenzt" in m])
+
+
+class ReviewPatchTest(_Basis):
+
+    def test_riesige_fid_kostet_nur_ihr_geraet(self):
+        """Befund 2: ``fid = 10**20`` liess den atomaren Replace scheitern ->
+        alle Geraete weg."""
+        self._geraete_patchen(["A", "B", "C", "D"])
+        self._speichern()
+        self._show_json_aendern(lambda d: d["patch"][1].__setitem__("fid", 10 ** 20))
+        SF.reset_show()
+        SF.load_show(self.pfad)
+        self.assertEqual(["A", "C", "D"], self._geraete_in_db())
+        self.assertEqual(1, len([m for m in SF.letzte_ladeprobleme() if "Gerät 2" in m]),
+                         SF.letzte_ladeprobleme())
+
+
+class ReviewKegelTest(_Basis):
+
+    def _kegel(self, wert):
+        self._speichern()
+        self._show_json_aendern(lambda d: d.setdefault("visualizer", {})
+                                .__setitem__("beams_off", wert))
+        SF.reset_show()
+        SF.load_show(self.pfad)
+        return set(self.st.visualizer_beams_off)
+
+    def test_text_statt_liste_blendet_nicht_die_falschen_aus(self):
+        """Befund 3: ``"12"`` wurde zu {1, 2} — falsche Geraete, keine Meldung."""
+        self.assertEqual(set(), self._kegel("12"))
+        self.assertTrue([m for m in SF.letzte_ladeprobleme() if "Lichtkegel" in m])
+
+    def test_null_wird_gemeldet(self):
+        self.assertEqual(set(), self._kegel(None))
+        self.assertTrue([m for m in SF.letzte_ladeprobleme() if "Lichtkegel" in m])
 
 if __name__ == "__main__":
     unittest.main()

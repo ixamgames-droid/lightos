@@ -2144,8 +2144,9 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(
                     self, "Unvollstaendig gespeichert",
                     "Die Show wurde geschrieben, aber diese Teile konnten nicht "
-                    "eingesammelt werden und stehen in der Datei im Stand von "
-                    "vorher:\n\n  • " + "\n  • ".join(verloren) +
+                    "eingesammelt werden — sie stehen in der Datei im Stand von "
+                    "vorher oder FEHLEN dort ganz (steht dann dabei):\n\n  • "
+                    + "\n  • ".join(verloren) +
                     "\n\nAenderungen daran sind NICHT in der Datei. Vor dem "
                     "naechsten Speichern pruefen — sonst wird der alte Stand "
                     "endgueltig festgeschrieben.")
