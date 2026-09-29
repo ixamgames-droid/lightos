@@ -10,6 +10,7 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | ENG-18 | A | fix/eng18-stop-all-audio | 2026-09-29T00:39Z | src/core/engine/function_manager.py,src/core/engine/audio_func.py |
+| FM-39 | A | fix/fm39-patch-ueberlauf | 2026-09-29T00:56Z | src/ui/widgets/fixture_browser.py,src/ui/views/patch_view.py |
 
 ## Blocker & Fallen
 
@@ -128,7 +129,6 @@
 
 ## Verlauf
 
-- 2026-09-28T13:21Z A done BPM-14
 - 2026-09-28T13:25Z A claim BPM-16
 - 2026-09-28T13:57Z A done BPM-16
 - 2026-09-28T13:57Z A claim BPM-17
@@ -158,3 +158,4 @@
 - 2026-09-29T00:34Z A done VIZ-64
 - 2026-09-29T00:39Z A claim ENG-18
 - 2026-09-29T00:51Z A done UI-58
+- 2026-09-29T00:56Z A claim FM-39
