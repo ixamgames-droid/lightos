@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| _(frei)_ |  |  |  |  |
+| FM-41 | A | feature/fm41-projektion | 2026-09-29T19:56Z | src/core/app_state.py |
 
 ## Blocker & Fallen
 
@@ -130,7 +130,6 @@
 
 ## Verlauf
 
-- 2026-09-28T23:27Z A claim FM-49
 - 2026-09-28T23:49Z A claim VIZ-63
 - 2026-09-29T00:01Z A done FM-49
 - 2026-09-29T00:04Z A claim VIZ-64
@@ -160,3 +159,4 @@
 - 2026-09-29T18:13Z A done FM-14b
 - 2026-09-29T18:30Z A claim FM-41
 - 2026-09-29T19:55Z A uebergeben FM-41
+- 2026-09-29T19:56Z A claim FM-41
