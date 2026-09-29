@@ -2128,6 +2128,13 @@ class MainWindow(QMainWindow):
                 print(f"[main_window] collect_layout error: {e}")
                 verloren.append(f"Fensterlayout ({e})")
             save_show(path, layout=layout)
+            # STAB-24 (c): was save_show selbst nicht einsammeln konnte (z. B. eine
+            # unlesbare Fixture-Gruppe) gehoert in DIESELBE Lueckenliste.
+            try:
+                from src.core.show.show_file import letzte_speicherprobleme
+                verloren.extend(letzte_speicherprobleme())
+            except Exception:
+                pass
             self.setWindowTitle(f"LightOS  -  {path}")
             _add_recent_file(path)
             self._rebuild_recent_menu()

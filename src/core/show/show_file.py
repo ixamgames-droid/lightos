@@ -87,6 +87,73 @@ def _prune_ghost_placeholder_nodes(scene) -> None:
 _ladeprobleme: list[str] = []
 
 
+#: STAB-24 (c): Was ``save_show`` beim Einsammeln NICHT in die Datei bekam.
+#: Die Speichern-Aktion der Oberflaeche haengt es an ihre Lueckenliste
+#: („Unvollstaendig gespeichert") — derselbe Dialog, kein zweiter Kanal.
+_speicherprobleme: list[str] = []
+
+
+def letzte_speicherprobleme() -> list[str]:
+    """Die beim letzten :func:`save_show` ausgelassenen Eintraege (STAB-24)."""
+    return list(_speicherprobleme)
+
+
+def _eintrags_hinweis(eintrag, *felder) -> str:
+    """Namenszusatz fuer die Meldung ueber einen uebersprungenen Eintrag:
+    ``"'Truss-Bars' "`` bzw. ``""``. Der Nutzer soll WIEDERERKENNEN, was fehlt —
+    eine Positionsnummer allein sagt ihm nichts ueber sein Rig."""
+    if isinstance(eintrag, dict):
+        for feld in felder:
+            wert = eintrag.get(feld)
+            if isinstance(wert, (str, int, float)) and not isinstance(wert, bool) \
+                    and str(wert):
+                return f"'{wert}' "
+    return ""
+
+
+def _liste_im_block(data: dict, schluessel: str, was: str) -> list:
+    """Einen Listen-Block der show.json lesen (STAB-24/25).
+
+    Fehlt der Schluessel: ``[]`` ohne Meldung (Alt-/Teil-Show). Ist er DA, aber
+    keine Liste — auch ``null`` —, wird das gemeldet und ``[]`` geliefert.
+    Frueher machte ``data.get(...) or []`` einen ``null``-Block stumm zu
+    ``[]``: gemessen 4 Gruppen in der Datei -> 0 geladen, keine Meldung."""
+    if schluessel not in data:
+        return []
+    wert = data.get(schluessel)
+    if isinstance(wert, list):
+        return wert
+    _lenient(f"{was}-Block übersprungen",
+             TypeError(f"'{schluessel}' ist {type(wert).__name__}, erwartet Liste"))
+    return []
+
+
+def _je_eintrag(eintraege, bauen, was: str, *namensfelder) -> list:
+    """Jeden Eintrag EINZELN uebersetzen (STAB-24): ein kaputter kostet nur
+    sich selbst und wird mit Nummer UND Namen ueber ``_lenient`` gemeldet.
+    Vorher lagen ganze Bloecke in EINEM try — ein Punkt ``"x": "links"``
+    kostete gemessen 0 von 4 Laser-Figuren."""
+    out = []
+    for nr, e in enumerate(eintraege, start=1):
+        try:
+            out.append(bauen(e))
+        except Exception as ex:
+            _lenient(f"{was} {nr} {_eintrags_hinweis(e, *namensfelder)}übersprungen", ex)
+    return out
+
+
+def _als_text(wert, feld: str, default: str) -> str:
+    """Textfeld eines Show-Eintrags (STAB-24 a): Zahlen/Wahrheitswerte als Text
+    durchlassen — wie ``_patched_fixture_from_data`` —, ``None`` -> Default.
+    Nur Liste/Objekt sind wirklich unlesbar: die bindet SQLite nicht und
+    risse sonst erst beim COMMIT alle uebrigen Eintraege mit."""
+    if wert is None:
+        return default
+    if isinstance(wert, (list, dict, set, tuple)):
+        raise TypeError(f"'{feld}' ist kein Text, sondern {type(wert).__name__}")
+    return str(wert)
+
+
 def letzte_ladeprobleme() -> list[str]:
     """Die beim letzten :func:`load_show` verworfenen Teile (QA-50).
 
@@ -406,6 +473,17 @@ def _deferred_addr_release(state):
 
 
 def _replace_patch_from_data(state, patch_data: list[dict]):
+    # ★ STAB-25: der Block MUSS eine Liste sein. Vorher fiel ein Objekt/Text/
+    # null im Aufrufer durch ein ``if isinstance(...)`` OHNE ``else``: gemessen
+    # vier Geraete in der Datei, NULL in der DB, keine Meldung. Die Pruefung
+    # sitzt HIER, der einen Stelle, die den Patch aus Show-Daten ersetzt.
+    # Frueh raus, ohne den bestehenden Patch zu leeren (load_show hat per
+    # reset-first ohnehin geleert, jeder andere Aufrufer behaelt lieber den alten).
+    if not isinstance(patch_data, list):
+        _lenient("Patch-Block übersprungen",
+                 TypeError(f"'patch' ist {type(patch_data).__name__}, "
+                           f"erwartet Liste"))
+        return
     # BUG-01: Patch verlustfrei ersetzen und dabei ALLE State-Emits unterdrücken.
     # Jedes clear_patch()/clear_programmer()/add_fixture() würde sonst synchron
     # ein Event feuern → die Views (programmer_view._refresh_effects_list)
@@ -450,10 +528,19 @@ def _replace_patch_from_data(state, patch_data: list[dict]):
                 except (TypeError, ValueError):
                     pass
         erstes_label: dict = {}
-        for entry in patch_data:
-            if not isinstance(entry, dict):
+        # STAB-25: PRO EINTRAG gekapselt. Vorher warf EIN unlesbarer Eintrag die
+        # ganze Schleife, ``replace(pfs)`` wurde nie erreicht und der Patch blieb
+        # LEER; ein Nicht-Objekt verschwand per stummem ``continue``.
+        for nr, entry in enumerate(patch_data, start=1):
+            try:
+                if not isinstance(entry, dict):
+                    raise TypeError(
+                        f"Eintrag ist kein Objekt, sondern {type(entry).__name__}")
+                pf = _patched_fixture_from_data(entry, next_fid)
+            except Exception as e:
+                _lenient(f"Gerät {nr} {_eintrags_hinweis(entry, 'label', 'fid')}"
+                         f"übersprungen", e)
                 continue
-            pf = _patched_fixture_from_data(entry, next_fid)
             if pf.fid in used_fids:
                 alt_fid = pf.fid
                 pf.fid = max(used_fids | datei_fids) + 1
@@ -635,33 +722,63 @@ def _collect_fixture_groups(state) -> list:
         from sqlalchemy import select
         from src.core.database.models import FixtureGroup
         with state._session() as s:
-            for g in s.execute(select(FixtureGroup)).scalars().all():
-                out.append({
-                    "name": g.name, "cols": int(g.cols), "rows": int(g.rows),
-                    "positions_json": g.positions_json or "{}",
-                    "folder": g.folder or "",
-                })
+            zeilen = s.execute(select(FixtureGroup)).scalars().all()
+            # STAB-24 (c): JE ZEILE. Vorher EIN try um die Schleife: eine kaputte
+            # Zeile kostete sich UND ALLE FOLGENDEN (gemessen Position 1 -> 0 von
+            # 4 Gruppen in der Datei), gemeldet nur per print. HIER wird der
+            # Verlust festgeschrieben — also muss er hier gemeldet werden.
+            for nr, g in enumerate(zeilen, start=1):
+                try:
+                    out.append({
+                        "name": g.name, "cols": int(g.cols), "rows": int(g.rows),
+                        "positions_json": g.positions_json or "{}",
+                        "folder": g.folder or "",
+                    })
+                except Exception as e:
+                    _speicherprobleme.append(
+                        f"Fixture-Gruppe {nr} '{getattr(g, 'name', '?')}' ({e})")
     except Exception as e:
-        print(f"[show_file] collect groups error: {e}")
+        _speicherprobleme.append(f"Fixture-Gruppen ({e})")
     return out
 
 
+def _fixture_group_aus_daten(g):
+    """EINEN Gruppen-Eintrag der .lshow uebersetzen; wirft bei unlesbarem
+    Eintrag (der Aufrufer ueberspringt und meldet genau diesen, STAB-24).
+    Defaults wie frueher, damit Alt-Shows unveraendert laden."""
+    from src.core.database.models import FixtureGroup
+    if not isinstance(g, dict):
+        raise TypeError(f"Eintrag ist kein Objekt, sondern {type(g).__name__}")
+    return FixtureGroup(
+        name=_als_text(g.get("name", "Gruppe"), "name", "Gruppe"),
+        cols=int(g.get("cols", 8)), rows=int(g.get("rows", 8)),
+        positions_json=_als_text(g.get("positions_json", "{}"),
+                                 "positions_json", "{}") or "{}",
+        folder=_als_text(g.get("folder", ""), "folder", ""),
+    )
+
+
 def _restore_fixture_groups(state, groups: list) -> None:
-    """Spatial-Gruppen beim Laden in die Show-DB zurueckschreiben."""
+    """Spatial-Gruppen beim Laden in die Show-DB zurueckschreiben.
+
+    ★ STAB-24: EIN unlesbarer Eintrag darf nicht ALLE Gruppen kosten. Vorher
+    lagen Loeschen, Neuanlegen und Commit in EINEM try: ein ``cols`` als Text
+    riss den Block ab, uebrig blieb die vom Reset geleerte Tabelle (gemessen
+    4 Gruppen in der Datei -> 0 in der DB). Jetzt zwei Phasen: erst je Eintrag
+    uebersetzen (kaputte werden namentlich gemeldet), dann EINE Transaktion."""
+    if not isinstance(groups, list):
+        _lenient("Fixture-Gruppen-Block übersprungen",
+                 TypeError(f"'fixture_groups' ist {type(groups).__name__}, "
+                           f"erwartet Liste"))
+        groups = []
+    gebaut = _je_eintrag(groups, _fixture_group_aus_daten, "Fixture-Gruppe", "name")
     try:
         from sqlalchemy import delete
         from src.core.database.models import FixtureGroup
         with state._session() as s:
             s.execute(delete(FixtureGroup))
-            for g in groups or []:
-                if not isinstance(g, dict):
-                    continue
-                s.add(FixtureGroup(
-                    name=g.get("name", "Gruppe"),
-                    cols=int(g.get("cols", 8)), rows=int(g.get("rows", 8)),
-                    positions_json=g.get("positions_json", "{}") or "{}",
-                    folder=g.get("folder", "") or "",
-                ))
+            for fg in gebaut:
+                s.add(fg)
             s.commit()
     except Exception as e:
         # STAB-23: ebenfalls im LADE-Pfad (`load_show` -> `_restore_fixture_groups`)
@@ -686,6 +803,7 @@ def save_show(path: str | os.PathLike, layout: dict | None = None):
     from src.core.engine.curve_library import get_curve_library
     from src.core.engine.snap_library import get_snap_library
 
+    _speicherprobleme.clear()        # STAB-24 (c): Meldungen DIESES Speicherns
     state = get_state()
     pm = get_palette_manager()
 
@@ -1341,12 +1459,14 @@ def load_show(path: str | os.PathLike):
         # Zeilen (die pfs-Bauschleife in _replace_patch_from_data ist nicht pro-Eintrag
         # gekapselt) — kapseln, damit ein Wurf hier den Show-Load nicht bis in den
         # Qt-Slot durchschlaegt (reset-first hat den Rest bereits geleert).
+        # STAB-25: kein stummes ``if isinstance(..., list)`` mehr um den Aufruf —
+        # die Formpruefung sitzt in ``_replace_patch_from_data`` und meldet.
+        # Fehlt der Block ganz, bleibt es beim ``[]`` ohne Warnung.
         patch_entries = data.get("patch", [])
-        if isinstance(patch_entries, list):
-            try:
-                _replace_patch_from_data(state, patch_entries)
-            except Exception as e:
-                _lenient("load patch error", e)
+        try:
+            _replace_patch_from_data(state, patch_entries)
+        except Exception as e:
+            _lenient("load patch error", e)
 
     # VCB-05: Gruppen-/Fixture-Dimmer der vorigen Show verwerfen (sonst Ghost-Dimmer).
     state.fixture_dimmers = {}
@@ -1358,7 +1478,9 @@ def load_show(path: str | os.PathLike):
         _lenient("load clear_feature_dimmers error", e)
 
     # Spatial-Gruppen wiederherstellen (sonst fehlt die MH-/PAR-Gruppe nach Load).
-    _restore_fixture_groups(state, data.get("fixture_groups", []) or [])
+    # STAB-24 (b): KEIN ``or []`` — das machte einen ``null``-Block stumm leer.
+    _restore_fixture_groups(
+        state, _liste_im_block(data, "fixture_groups", "Fixture-Gruppen"))
 
     # CDX-18: EURON10-2-Kanal-fids EINMAL bestimmen (nach dem Patch, daher fid->
     # Profil verfuegbar) fuer die fan-Split-Kompat, die unten pro Playback-Container
@@ -1473,16 +1595,19 @@ def load_show(path: str | os.PathLike):
     # LAS-07b: gezeichnete Laser-Muster.
     try:
         from src.core.laser.figure import LaserFigure
-        state.laser_figures = [LaserFigure.from_dict(d)
-                               for d in (data.get("laser_figures") or [])]
+        # STAB-24 (d): je Figur — ein kaputter Punkt kostete sonst alle Figuren.
+        state.laser_figures = _je_eintrag(
+            _liste_im_block(data, "laser_figures", "Laser-Figuren"),
+            LaserFigure.from_dict, "Laser-Figur", "name")
     except Exception as e:
         _lenient("load laser figures error", e)
 
     # LAS-18b: gemerkte Werksmuster-Slots (Alt-Shows: Key fehlt -> leer).
     try:
         from src.core.laser.pattern_slots import PatternSlot
-        state.laser_patterns = [PatternSlot.from_dict(d)
-                                for d in (data.get("laser_patterns") or [])]
+        state.laser_patterns = _je_eintrag(
+            _liste_im_block(data, "laser_patterns", "Laser-Muster"),
+            PatternSlot.from_dict, "Laser-Muster", "name", "label")
     except Exception as e:
         _lenient("load laser patterns error", e)
 
@@ -1706,7 +1831,9 @@ def load_show(path: str | os.PathLike):
     # zu Fall bringen. Alte Shows ohne den Key -> leere Menge, also unveraendert.
     try:
         viz = data.get("visualizer", {}) or {}
-        beams_off = {int(f) for f in (viz.get("beams_off", []) or [])}
+        # STAB-24 (d): je Eintrag — der Kommentar oben versprach es schon.
+        beams_off = set(_je_eintrag(viz.get("beams_off", []) or [], int,
+                                    "Ausgeblendeter Lichtkegel"))
     except Exception as e:
         _lenient("load beams_off error", e)
         beams_off = set()

@@ -7,6 +7,22 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-29 — Ein kaputter Eintrag in der Show-Datei kostet nur sich selbst (STAB-24, STAB-25)
+
+#### Behoben
+
+- **Ein einziger unlesbarer Gruppen-Eintrag löschte beim Laden ALLE Fixture-Gruppen** —
+  still, und das nächste Speichern schrieb den Verlust fest. Jetzt fällt nur dieser eine weg,
+  und die Ladewarnung nennt ihn mit Nummer und Namen.
+- **Ein beschädigter Patch-Block verschwand spurlos** (Geräte einfach weg, keine Warnung).
+  Jetzt kommt die Warnung vor dem nächsten Speichern; ein einzelnes kaputtes Gerät kostet nur
+  sich selbst.
+- **Dasselbe beim Speichern:** eine kaputte Gruppe riss alle folgenden mit aus der Datei.
+  Jetzt fehlt nur sie, und „Unvollständig gespeichert" sagt, welche.
+- **Laser-Figuren, Laser-Muster und ausgeblendete Lichtkegel:** ein kaputter Eintrag kostete
+  bisher alle. Jetzt nur sich selbst, mit Meldung.
+- Zahlen als Gruppen- oder Ordnername (z. B. „2024") laden weiter ganz normal.
+
 ### 2026-09-29 — Show-Prüfung findet jede Adress-Überschneidung (QA-67)
 
 #### Behoben
