@@ -412,6 +412,9 @@ class MainWindow(QMainWindow):
     # QSlider und QLabel direkt an. Das ausgelieferte APC-mini-Profil legt CC 56
     # — den Master-Fader — auf genau diese Aktion, es ist also kein Exotenpfad.
     _gm_changed_sig = Signal(float)
+    # UI-58: Blackout kann aus Fremd-Threads kommen (Web, OSC, MIDI) — wie beim
+    # Grand-Master nur emittieren, der Slot laeuft im UI-Thread.
+    _blackout_changed_sig = Signal(bool)
     # Marshallt beliebige State-Event-Zustellungen aus Worker-Threads (MIDI/OSC/
     # Web/Audio) in den UI-Thread. AutoConnection => Cross-Thread-Emits werden
     # gequeued, Emits aus dem UI-Thread laufen direkt.
@@ -428,6 +431,7 @@ class MainWindow(QMainWindow):
         # GM-THREAD: vor dem Aufbau der Kopfleiste verbinden — das Abonnement
         # unten emittiert nur noch, der Slot laeuft garantiert im UI-Thread.
         self._gm_changed_sig.connect(self._sync_header_gm)
+        self._blackout_changed_sig.connect(self._sync_blackout_button)
         self._state.subscribe(self._on_state_event)
         self._visualizer_window = None
         self._current_show_path: str | None = None
@@ -997,6 +1001,16 @@ class MainWindow(QMainWindow):
         btn_blackout.clicked.connect(self._toggle_blackout)
         self._btn_blackout = btn_blackout
         bar_layout.addWidget(btn_blackout)
+        try:
+            om = self._state.output_manager
+            self._blackout_abo = lambda an: self._blackout_changed_sig.emit(bool(an))
+            om.subscribe_blackout(self._blackout_abo)
+            # beim Abbau wieder abmelden (Tests bauen viele Fenster je Prozess)
+            _abo = self._blackout_abo
+            self.destroyed.connect(lambda *_a, om=om, cb=_abo: om.unsubscribe_blackout(cb))
+            self._sync_blackout_button(om.blackout)
+        except Exception:
+            pass
 
         root.addWidget(self._section_bar)
 
@@ -1569,13 +1583,23 @@ class MainWindow(QMainWindow):
 
     def _toggle_blackout(self, checked: bool):
         self._state.output_manager.set_blackout(checked)
-        if checked:
-            self._btn_blackout.setStyleSheet(
+        self._sync_blackout_button(checked)
+
+    def _sync_blackout_button(self, an: bool):
+        """UI-58: der Knopf zeigt den ECHTEN Blackout-Zustand, auch wenn ihn ein
+        VC-Taster, Web, OSC oder die Kommandozeile geschaltet hat."""
+        btn = getattr(self, "_btn_blackout", None)
+        if btn is None:
+            return
+        try:
+            btn.blockSignals(True)
+            btn.setChecked(bool(an))
+            btn.blockSignals(False)
+            btn.setStyleSheet(
                 "background:#cc0000; color:#ffffff; font-weight:bold;"
-                "border:2px solid #ff0000;"
-            )
-        else:
-            self._btn_blackout.setStyleSheet("")
+                "border:2px solid #ff0000;" if an else "")
+        except RuntimeError:
+            pass        # Fenster schon abgebaut
 
     def _quick_record_cue(self):
         stacks = self._state.cue_stacks
