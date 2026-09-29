@@ -1026,7 +1026,6 @@ class ProgrammerView(QWidget):
         self._on_fixture_selected()
 
     @staticmethod
-    @staticmethod
     def _weiss_segment_zahl(fixture) -> int:
         """FM-41: wie viele EIGENE Weiss-Segmente bekommen eine Zeile? 0, wenn das
         Weiss zur Farbzelle gehoert (ENG-25-Regel) oder das Geraet im Patch als
@@ -1326,8 +1325,6 @@ class ProgrammerView(QWidget):
             new_fids = list(getattr(self._state, "selected_fids", []) or [])
         except Exception:
             return
-        if new_fids == self._selected_fids:
-            return  # eigenes Echo oder keine Aenderung
         # FM-HEADLAYOUT Slice 5: Kopf-Zeilen mitdenken. Traegt der State eine
         # ZELL-Auswahl (z. B. weil eine andere View Koepfe gewaehlt hat), spiegeln
         # wir genau die; sonst meint eine reine fid-Liste das ganze Geraet.
@@ -1338,6 +1335,21 @@ class ProgrammerView(QWidget):
                 cells = list(getter() or [])
             except Exception:
                 cells = None
+        # FM-41: nur-Weiss-gewaehlte Geraete stehen nicht in ``selected_fids`` —
+        # die Programmer-Liste der Geraete kommt deshalb aus den ZELLEN.
+        if cells:
+            new_fids = []
+            for c in cells:
+                f = parse_zelle(c)[0]
+                if f is not None and f not in new_fids:
+                    new_fids.append(f)
+        # Gleichheit ueber fids UND Zellen (Review 29.09.): ein Wechsel „ganzes
+        # Geraet" -> „nur Weiss 4" aendert die fids nicht, und die View blieb
+        # sonst mit gerätweiten Reglern stehen — ein Rot-Regler fuhr dann alle
+        # 48 RGB-Zonen.
+        if new_fids == self._selected_fids and (
+                cells is None or list(cells) == list(getattr(self, "_selected_cells", None) or [])):
+            return  # eigenes Echo oder keine Aenderung
         want_cells = set(cells) if cells else {str(f) for f in new_fids}
         present = set()
         for it in self._alle_items():
@@ -2301,7 +2313,7 @@ class ProgrammerView(QWidget):
             for w in sorted(self._weiss_filter_for(f)):
                 key = self._state.weiss_programmer_key(f.fid, w)
                 if key:
-                    segmente.setdefault(w, []).append((f.fid, key))
+                    segmente.setdefault(w, []).append((f.fid, key, w))
                     # Nur wenn das Geraet NICHT zusaetzlich normal gewaehlt ist —
                     # dann hat es seinen Dimmer-Regler schon oben.
                     dk = self._state.weiss_dimmer_key(f.fid, w)
@@ -3167,7 +3179,7 @@ class WeissSegmentBlock(QGroupBox):
             lay.addLayout(self._zeile(f"Weiß {w + 1}", ziele, w))
 
     def _wert(self, ziele) -> int:
-        for fid, key in ziele:
+        for fid, key, *_ in ziele:
             v = (self._state.programmer.get(fid, {}) or {}).get(key)
             if v is not None:
                 return int(v)
@@ -3192,8 +3204,13 @@ class WeissSegmentBlock(QGroupBox):
 
     def _setzen(self, ziele, value, lbl, seg):
         lbl.setText(str(value))
-        for fid, key in ziele:
-            self._state.set_programmer_value(fid, key, int(value))
+        for fid, key, *seg in ziele:
+            if seg and seg[0] is not None:
+                # Segment: ueber AppState.weiss_setzen — verankert die uebrigen
+                # Segmente, sonst faehrt der Basis-Schluessel alle mit.
+                self._state.weiss_setzen(fid, seg[0], int(value))
+            else:
+                self._state.set_programmer_value(fid, key, int(value))
         if seg is None:
             # Sammelregler: die Einzelregler optisch nachziehen, ohne erneut zu
             # schreiben.

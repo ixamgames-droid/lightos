@@ -2527,10 +2527,18 @@ class AppState:
             for fid in list(weiss):
                 if fid in whole:
                     weiss.pop(fid, None)
+        # FM-41 (Review 29.09.): ein Geraet, von dem NUR Weiss-Segmente gewaehlt
+        # sind, steht NICHT in ``selected_fids``. Das ist der Vertrag fuer ALLE
+        # uebrigen Konsumenten (VC-Submaster „Auswahl", Command-Line, EFX, Fan,
+        # Paletten, MIDI, XY-Pad …) — fuer sie hiesse ein fid „ganzes Geraet",
+        # gemessen fuhr ein Submaster so den ganzen Balken (48 RGB-Zonen +
+        # Master). Nicht dabei = sie tun NICHTS; nur der Programmer liest die
+        # feinen Zellen und bedient die Segmente.
+        nur_weiss = {f for f in weiss if f not in whole and not heads.get(f)}
         base: list[int] = []
         for k in norm:
             fid = int(k.split(":", 1)[0])
-            if fid not in base:
+            if fid not in base and fid not in nur_weiss:
                 base.append(fid)
         if norm == list(getattr(self, "selected_cells", [])) and base == self.selected_fids:
             return
@@ -2583,7 +2591,7 @@ class AppState:
             fid = int(fid)
         except (TypeError, ValueError):
             return False
-        if fid not in self.selected_fids or not self.selected_weiss_for(fid):
+        if fid in self.selected_fids or not self.selected_weiss_for(fid):
             return False
         return not (getattr(self, "_selected_heads", None) or {}).get(fid)
 
@@ -2610,6 +2618,31 @@ class AppState:
             return None
         return None
 
+    def weiss_setzen(self, fid, segment, value) -> bool:
+        """FM-41: EIN Weiss-Segment setzen — und nur dieses.
+
+        ★ Das erste Segment traegt den BASIS-Schluessel (``color_w``). Den
+        spiegelt der DMX-Flush auf jedes Vorkommen, das keinen eigenen Wert hat
+        — „Weiss 1" fuhr so gemessen ALLE acht Segmente mit. Darum werden vor dem
+        Schreiben die uebrigen Segmente auf ihrem aktuellen Wert verankert (0,
+        solange nie gesetzt) — dieselbe Antwort wie beim Getrennt-Modus der
+        Farbkoepfe (``_seed_separate_head``)."""
+        key = self.weiss_programmer_key(fid, segment)
+        if not key:
+            return False
+        prog = self.programmer.get(fid, {})
+        k = 0
+        while True:
+            other = self.weiss_programmer_key(fid, k)
+            if other is None:
+                break
+            if other != key and other not in prog:
+                self.set_programmer_value(fid, other, int(prog.get(other, 0) or 0))
+                prog = self.programmer.get(fid, {})
+            k += 1
+        self.set_programmer_value(fid, key, int(value))
+        return True
+
     def weiss_programmer_key(self, fid, segment) -> str | None:
         """FM-41: Programmer-Schluessel des Weiss-Segments ``segment`` von
         ``fid`` — der Vorkommens-Schluessel (``color_w#N``) genau des Kanals, den
@@ -2621,6 +2654,11 @@ class AppState:
         if fx is None:
             return None
         try:
+            # Dieselbe Sperre wie die Baumzeilen: ein als EINE Lampe gefuehrtes
+            # Geraet hat keine getrennt ansprechbaren Segmente.
+            from .head_mode import normalize_head_mode
+            if normalize_head_mode(getattr(fx, "head_mode", "auto")) == "single":
+                return None
             chans = get_channels_for_patched(fx)
             if not weiss_ist_eigene_achse_for_channels(chans, fx):
                 return None

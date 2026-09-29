@@ -67,7 +67,10 @@ class AuswahlTest(_Basis):
 
     def test_weiss_zellen_in_der_auswahl(self):
         self.st.set_selected_cells(["1:w1", "1:w3"])
-        self.assertEqual(self.st.get_selected_fids(), [1])
+        # Review 29.09.: NICHT in selected_fids — sonst fuehren alle anderen
+        # Werkzeuge (Submaster, Command-Line, EFX, Fan …) den GANZEN Balken.
+        self.assertEqual(self.st.get_selected_fids(), [])
+        self.assertEqual(self.st.get_selected_cells(), ["1:w1", "1:w3"])
         self.assertEqual(self.st.selected_weiss_for(1), {1, 3})
         self.assertTrue(self.st.nur_weiss_gewaehlt(1))
 
@@ -186,6 +189,101 @@ class ProgrammerTest(_Basis):
         self.assertEqual(len(v.findChildren(WeissSegmentBlock)), 1)
         self.assertIn("W8", v._lbl_selection.text())
 
+
+
+class ReviewTest(_Basis):
+    """Befunde der Gegenpruefung 29.09.: eine reine Weiss-Auswahl darf ausserhalb
+    des Programmers NICHTS am Geraet bewirken."""
+
+    def _balken_leuchtet(self):
+        for k in range(48):
+            self.st.set_programmer_value(1, "color_r" if k == 0 else f"color_r#{k}", 200)
+        self.st.set_programmer_value(1, "intensity", 255)
+
+    def test_submaster_auswahl_dimmt_nicht_den_balken(self):
+        from src.ui.virtualconsole.vc_slider import VCSlider
+        self.st.set_selected_cells(["1:w3"])
+        sl = VCSlider()
+        self.addCleanup(sl.deleteLater)
+        sl.programmer_scope = "selected"
+        self.assertEqual(sl._submaster_targets(self.st), ([], {}))
+
+    def test_submaster_nach_gruppenwahl_ebenso(self):
+        from src.ui.virtualconsole.vc_slider import VCSlider
+        self._gruppe("Nur Weiss", [zelle_fuer(1, ACHSE_WEISS, k) for k in range(8)])
+        self.assertTrue(self.st.select_group_by_name("Nur Weiss"))
+        sl = VCSlider()
+        self.addCleanup(sl.deleteLater)
+        sl.programmer_scope = "selected"
+        self.assertEqual(sl._submaster_targets(self.st), ([], {}))
+
+    def test_efx_und_andere_sehen_kein_geraet(self):
+        self.st.set_selected_cells(["1:w3"])
+        self.assertEqual(self.st.get_selected_fids(), [])
+        self.assertEqual(self.st.selected_heads_for(1), set())
+
+    def test_einkopf_modus_hat_keine_segmente(self):
+        with self.st._session() as s:
+            fx = s.get(PatchedFixture, 1) if False else None
+        self.st.update_fixture(1, head_mode="single") if hasattr(
+            self.st, "update_fixture") else None
+        if getattr(next(f for f in self.st.get_patched_fixtures() if f.fid == 1),
+                   "head_mode", "auto") != "single":
+            self.skipTest("head_mode liess sich nicht setzen")
+        self.assertIsNone(self.st.weiss_programmer_key(1, 0))
+
+
+class ProgrammerReviewTest(ProgrammerTest):
+
+    def test_auswahl_von_aussen_ganz_zu_nur_weiss_baut_um(self):
+        """Befund 2: ganz -> nur Weiss aendert die fids nicht; die View blieb mit
+        einem Rot-Regler stehen, der alle 48 Zonen fuhr."""
+        from PySide6.QtCore import QEvent
+        from src.ui.views.programmer_view import AttributeSlider, WeissSegmentBlock
+        v = self._view()
+        self.st.set_selected_cells(["1"])
+        v._sync_follow_selection()
+        self.st.set_selected_cells(["1:w3"])
+        v._sync_follow_selection()
+        _app.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        self.assertEqual(len(v.findChildren(WeissSegmentBlock)), 1)
+        rot = [w for w in v.findChildren(AttributeSlider)
+               if (w._channel.attribute or "").startswith("color_r")]
+        self.assertEqual(rot, [], "geraeteweiter Farbregler steht noch")
+
+    def test_sammelregler_und_farbreiter(self):
+        """M1/M4: bei zwei Segmenten gibt es den Sammelregler, und der
+        Farb-Reiter ist sichtbar (sonst laege der Block in einem versteckten Tab)."""
+        from PySide6.QtCore import QEvent
+        from src.ui.views.programmer_view import WeissSegmentBlock
+        v = self._view()
+        self.st.set_selected_cells(["1:w0", "1:w5"])
+        v._sync_follow_selection()
+        _app.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        block = v.findChildren(WeissSegmentBlock)[0]
+        self.assertIn(None, block._regler)
+        block._regler[None][0].setValue(90)
+        self.assertEqual((self._kanal(147), self._kanal(152)), (90, 90))
+        self.assertEqual(self._kanal(148), 0)
+        idx = v._main_tabs.indexOf(v._attr_group_tabs["Color"])
+        self.assertTrue(v._main_tabs.isTabVisible(idx))
+
+
+class ErstesSegmentTest(_Basis):
+    """Gefunden beim Bauen: Segment 1 traegt den BASIS-Schluessel ``color_w``,
+    den der DMX-Flush auf jedes Segment ohne eigenen Wert spiegelt — „Weiß 1"
+    fuhr alle acht."""
+
+    def test_weiss_1_faehrt_nur_sich(self):
+        self.assertTrue(self.st.weiss_setzen(1, 0, 150))
+        self.assertEqual([self._kanal(c) for c in range(147, 155)],
+                         [150, 0, 0, 0, 0, 0, 0, 0])
+
+    def test_gesetzte_segmente_bleiben_stehen(self):
+        self.st.weiss_setzen(1, 4, 80)
+        self.st.weiss_setzen(1, 0, 150)
+        self.assertEqual([self._kanal(c) for c in range(147, 155)],
+                         [150, 0, 0, 0, 80, 0, 0, 0])
 
 if __name__ == "__main__":
     unittest.main()
