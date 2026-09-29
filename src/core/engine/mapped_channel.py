@@ -269,14 +269,19 @@ class MappedChannelChange(Function):
                     # auf einem Geraet mit geteiltem Master einen Kopf daneben.
                     src = self._read_source(state, fx, chans, rule.source, h)
                     res = rule.evaluate(src)
+                    # FM-41: ``None`` = dieser Kopf hat den Kanal nicht (Weiss
+                    # auf eigener Achse) -> nichts schreiben.
                     if "value" in res:
-                        attrs[programmer_key_for_head(chans, rule.target, h)] = \
-                            res["value"]
+                        _k = programmer_key_for_head(chans, rule.target, h)
+                        if _k is not None:
+                            attrs[_k] = res["value"]
                     else:
                         payload = color_attrs_for_fixture(chans, res["rgb"])
                         payload = adapt_color_payload(attr_set, payload)
                         for k, v in payload.items():
-                            attrs[programmer_key_for_head(chans, k, h)] = v
+                            _k = programmer_key_for_head(chans, k, h)
+                            if _k is not None:
+                                attrs[_k] = v
             if not attrs:
                 continue
             # Vorkommens-bewusst schreiben (gleiche #N-Logik wie efx.py).

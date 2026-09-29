@@ -29,6 +29,15 @@ def _clear_feature_dimmer_slot(slot):
         pass
 
 
+
+def _auswahl_leer(state) -> bool:
+    """FM-41: „nichts gewaehlt" heisst wirklich NICHTS — auch keine Weiss-Zelle."""
+    fn = getattr(state, "auswahl_ist_leer", None)
+    try:
+        return bool(fn()) if callable(fn) else True
+    except Exception:
+        return True
+
 class SliderMode(str):
     LEVEL    = "Level"
     PLAYBACK = "Playback"
@@ -368,11 +377,16 @@ class VCSlider(VCWidget):
             try:
                 if self.programmer_scope == "group" and self.programmer_group:
                     fids = self._group_fids(state, self.programmer_group)
-                    if not fids:                       # Gruppe leer/fehlt -> alle
+                    # „leer -> alle" nur, wenn die Gruppe WIRKLICH keine Zellen
+                    # hat (FM-41): eine reine Weiss-Gruppe hat keine ganzen
+                    # Geraete und fuehre sonst das ganze Rig.
+                    if not fids and not self._hat_zellen(state, self.programmer_group):
                         fids = [f.fid for f in state.get_patched_fixtures()]
                 elif self.programmer_scope == "selected":
                     fids = list(state.get_selected_fids())
-                    if not fids:                       # Fallback: nichts gewaehlt -> alle
+                    # Fallback „nichts gewaehlt -> alle" — aber nur, wenn wirklich
+                    # NICHTS gewaehlt ist (FM-41: reine Weiss-Auswahl).
+                    if not fids and _auswahl_leer(state):
                         fids = [f.fid for f in state.get_patched_fixtures()]
                 else:
                     fids = [f.fid for f in state.get_patched_fixtures()]
@@ -431,6 +445,27 @@ class VCSlider(VCWidget):
         Delegiert an die zentrale Auflösung in app_state (dedupliziert)."""
         try:
             return state.group_fids_by_name(group_name)
+        except Exception:
+            return []
+
+    @staticmethod
+    def _hat_zellen(state, group_name) -> bool:
+        """Hat die Gruppe ueberhaupt Zellen (auch Weiss-Zellen)? FM-41."""
+        fn = getattr(state, "group_zellen_by_name", None)
+        try:
+            return bool(fn(group_name)) if callable(fn) else False
+        except Exception:
+            return False
+
+    @staticmethod
+    def _group_zellen(state, group_name: str) -> list[str]:
+        """Achsen-bewusste Zellen der Gruppe (FM-41); faellt auf die
+        kopf-aufloesende Fassung zurueck, wenn der State sie nicht kennt."""
+        fn = getattr(state, "group_zellen_by_name", None)
+        try:
+            if callable(fn):
+                return fn(group_name)
+            return state.group_cells_by_name(group_name)
         except Exception:
             return []
 
@@ -510,17 +545,30 @@ class VCSlider(VCWidget):
         if scope not in ("group", "selected"):
             return None, {}
         try:
-            from src.core.group_cells import head_restrictions, base_fids_in_cells
+            from src.core.group_cells import (head_restrictions, base_fids_in_cells,
+                                              weiss_restrictions)
             if scope == "group":
                 if not self.programmer_group:
                     return None, {}
-                cells = self._group_cells(state, self.programmer_group)
+                # FM-41: achsen-bewusst, EINE Abfrage (Weiss-Zellen inklusive).
+                cells = self._group_zellen(state, self.programmer_group)
                 fids = base_fids_in_cells(cells)
             else:
                 cells = state.get_selected_cells()
                 fids = list(state.get_selected_fids())
-            heads = state.validate_head_restrictions(head_restrictions(cells))
-            return fids, (heads or {})
+            heads = dict(state.validate_head_restrictions(head_restrictions(cells)) or {})
+            # FM-41: Geraete NUR mit Weiss-Zellen — der Fader dimmt genau deren
+            # Weiss-Segmente. Ziel-fid UND Einschraenkung kommen ZUSAMMEN dazu:
+            # ein fid ohne Einschraenkung hiesse „ganzes Geraet" (der Befund,
+            # vor dem der Backlog warnte).
+            validate_w = getattr(state, "validate_weiss_restrictions", None)
+            if callable(validate_w):
+                for fid, keys in (validate_w(weiss_restrictions(cells)) or {}).items():
+                    if fid in fids:
+                        continue
+                    fids.append(fid)
+                    heads[fid] = set(keys)
+            return fids, heads
         except Exception:
             return [], {}
 

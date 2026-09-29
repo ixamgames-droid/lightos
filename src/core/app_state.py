@@ -2338,6 +2338,8 @@ class AppState:
         # adressiert, entscheidet _head_key gegen die Kanalliste — bei einem
         # geteilten Master-Dimmer ist "Kopf 1" NICHT der Basis-Schluessel.
         key = self._head_key(fid, attribute, head)
+        if key is None:
+            return  # FM-41: dieser Kopf hat keinen solchen Kanal (Weiss-Achse)
         master = self._shared_dimmer_key(fid, attribute, key) if head is not None else None
         with self._prog_lock:
             old = self.programmer.get(fid, {}).get(key, None)
@@ -2572,6 +2574,20 @@ class AppState:
     def get_selected_fids(self) -> list[int]:
         return list(self.selected_fids)
 
+    def auswahl_ist_leer(self) -> bool:
+        """FM-41: ist WIRKLICH nichts gewaehlt? Mehrere Bedienflaechen deuten eine
+        leere Auswahl als „alle Geraete" (VC-Slider, MIDI-Fader, XY-Pad). Eine
+        reine Weiss-Auswahl hat leere ``selected_fids`` — sie darf dort nicht als
+        „nichts gewaehlt" gelten, sonst fuehre ein Fader das ganze Rig."""
+        return not (getattr(self, "selected_cells", None) or [])
+
+    def group_zellen_by_name(self, name_or_ref) -> list[str]:
+        """FM-41: ALLE Zellen einer Gruppe ACHSEN-BEWUSST (``"7"``, ``"7:2"``,
+        ``"7:w3"``) — Gegenstueck zu ``group_cells_by_name``, das Weiss-Zellen
+        bewusst nicht sieht."""
+        from .group_cells import zellen_in_grid_order
+        return zellen_in_grid_order(self._group_positions(name_or_ref)[1])
+
     def selected_weiss_for(self, fid) -> set:
         """FM-41: welche WEISS-Segmente von ``fid`` sind gewaehlt? Leeres Set =
         keines (auch: das ganze Geraet ist gewaehlt — dann gilt das Geraet, nicht
@@ -2771,6 +2787,31 @@ class AppState:
         wegwirft — fuer Konsumenten, die sie brauchen (VC-Submaster pro Kopf, A4)."""
         from .group_cells import cells_in_grid_order
         return cells_in_grid_order(self._group_positions(name_or_ref)[1])
+
+    def validate_weiss_restrictions(self, weiss) -> dict:
+        """FM-41: ``{fid: {"wN"}}`` gegen den Live-Patch pruefen — nur Segmente,
+        die es als EIGENE Weiss-Achse wirklich gibt (``weiss_programmer_key``)."""
+        from .group_cells import ACHSE_WEISS
+        out: dict = {}
+        for fid, keys in dict(weiss or {}).items():
+            try:
+                fid = int(fid)
+            except (TypeError, ValueError):
+                continue
+            gut = set()
+            for k in keys or ():
+                s = str(k)
+                if not s.startswith(ACHSE_WEISS):
+                    continue
+                try:
+                    idx = int(s[len(ACHSE_WEISS):])
+                except ValueError:
+                    continue
+                if self.weiss_programmer_key(fid, idx):
+                    gut.add(s)
+            if gut:
+                out[fid] = gut
+        return out
 
     def validate_head_restrictions(self, heads, *, count_heads=None) -> dict:
         """FM-HEADLAYOUT A4: eine Kopf-Einschraenkung ``{fid: {head}}`` gegen den
@@ -4130,9 +4171,23 @@ class AppState:
         EIN Durchlauf ueber die Kanaele fuer ALLE Koepfe: der Renderer ruft das pro
         Fixture und Frame: die frueher kopfweise Fassung war bei Pixel-Panels
         O(Koepfe x Kanaele) und sprengte bei 144 Pixeln das 22,7-ms-Frame-Budget."""
+        # FM-41: eigene Weiss-Segmente bekommen EIGENE Schluessel "w0".."wN" —
+        # je Segment genau sein ``color_w``-Kanal. Vor dem Kopf-Ausstieg, denn
+        # auch ein Geraet mit EINEM Farbkopf kann eine eigene Weiss-Leiste haben.
+        weiss_map: dict = {}
+        if weiss_ist_eigene_achse_for_channels(chans, fx):
+            from .group_cells import weiss_schluessel
+            k = 0
+            for ch in chans:
+                if (getattr(ch, "attribute", "") or "").lower() != "color_w":
+                    continue
+                addr = fx.address + ch.channel_number - 1
+                if 1 <= addr <= 512:
+                    weiss_map[weiss_schluessel(k)] = [addr]
+                k += 1
         n_heads = color_head_count_for_channels(fx, chans)
         if n_heads < 2:
-            return {}
+            return weiss_map
         counts: dict[str, int] = {}
         for ch in chans:
             a = (getattr(ch, "attribute", "") or "").lower()
@@ -4153,7 +4208,9 @@ class AppState:
                 inten.setdefault(occ, []).append(addr)
             elif attr in _DIM_COLOR_ATTRS and attr not in _SUBTRACTIVE_COLOR_ATTRS:
                 color.setdefault(occ, []).append(addr)
-        return {h: (inten.get(h) or color.get(h) or []) for h in range(n_heads)}
+        out = {h: (inten.get(h) or color.get(h) or []) for h in range(n_heads)}
+        out.update(weiss_map)
+        return out
 
     def _fixture_head_intensity_addrs(self, fx, chans, head) -> list[int]:
         """Kopf-Maske eines EINZELNEN Kopfes (Bequemlichkeits-Sicht auf
@@ -5041,7 +5098,7 @@ def _channel_index(channels):
     return positions, out
 
 
-def programmer_key_for_head(channels, attribute: str, head) -> str:
+def programmer_key_for_head(channels, attribute: str, head) -> str | None:
     """Welchen Programmer-Schluessel adressiert „Kopf ``head``" fuer ``attribute``?
 
     ★ FM-17, und die EINE Stelle, an der aus einem Kopf ein Schluessel wird.
@@ -5073,6 +5130,15 @@ def programmer_key_for_head(channels, attribute: str, head) -> str:
         return attribute
     positions, hmap = _channel_index(channels)
     occurrences = positions.get(a, ())
+    # FM-41 (Scheibe 3b): bei EIGENER Weiss-Achse gehoert ``color_w`` zu keinem
+    # Farbkopf (dieselbe Regel wie in ``channels_for_head``) — „Weiss von Kopf 4"
+    # gibt es dann nicht, und es darf auch nicht still Weiss-Zone 4 treffen.
+    # ``None`` = kein Schluessel; die Aufrufer schreiben dann nichts. Die
+    # Segmente erreicht man ueber ``AppState.weiss_setzen``.
+    if a == "color_w":
+        n_c = len(hmap.get("color_r") or positions.get("color_r", ()))
+        if len(occurrences) > 0 and n_c > 0 and len(occurrences) != n_c:
+            return None
     per_head = hmap.get(a)
     if per_head is not None and 0 <= head < len(per_head):
         occ = list(occurrences).index(per_head[head])
@@ -5144,7 +5210,21 @@ def channels_for_head(channels, head: int) -> dict:
     # alle Kanaele liefert (byte-identisch zum Nicht-Kopf-Pfad).
     geteilt: list[tuple[int, str]] = []
     kopf_bedient = False
+    # FM-41 (Scheibe 3b): hat das Geraet eine EIGENE Weiss-Achse (ZQ06121: 8
+    # Weiss-Segmente neben 48 RGB-Zonen), gehoert ``color_w`` zu KEINEM
+    # Farbkopf. Vorher trug Farbkopf k das k-te Weiss-Segment mit (Kopf 4 ->
+    # CH150 „Weiss-Zone 4", physisch woanders), Koepfe 9..48 gar keins — und
+    # ein einmaliges Weiss (Spiider: Grundfarbe) hing als „geteilt" an JEDEM
+    # Pixel. Die Segmente erreicht man ueber die Weiss-Achse
+    # (``channels_for_axis``). Dieselbe Regel wie ueberall
+    # (``weiss_ist_eigene_achse_for_channels``, ENG-25), hier aus dem Index
+    # gerechnet, weil die Funktion pro Zelle und Frame laeuft.
+    n_w = len(positions.get("color_w", ()))
+    n_c = len(hmap.get("color_r") or positions.get("color_r", ()))
+    weiss_eigen = n_w > 0 and n_c > 0 and n_w != n_c
     for a, occurrences in positions.items():
+        if weiss_eigen and a == "color_w":
+            continue
         per_head = hmap.get(a)
         if per_head is not None:
             # FM-17: die Karte entscheidet — geteilte Kanaele desselben

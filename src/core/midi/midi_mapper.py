@@ -632,6 +632,14 @@ class MidiMapper:
             except Exception:
                 heads = {}
             return fids, heads
+        # FM-41: „nichts gewaehlt -> alle" nur, wenn WIRKLICH nichts gewaehlt ist
+        # — eine reine Weiss-Auswahl hat leere fids und fuehre sonst das ganze Rig.
+        leer = getattr(st, "auswahl_ist_leer", None)
+        try:
+            if callable(leer) and not leer():
+                return [], {}
+        except Exception:
+            pass
         try:
             patched = st.get_patched_fixtures()
         except Exception:

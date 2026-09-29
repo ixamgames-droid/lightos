@@ -231,17 +231,21 @@ class AmEchtenGeraetTest(unittest.TestCase):
         from src.core.app_state import channels_for_axis
         self.assertEqual(channels_for_axis(self._chans(), ACHSE_WEISS, 8), {})
 
-    def test_der_gemessene_zuordnungs_salat_ist_benannt(self):
-        """★ Der Ausgangsbefund, als Messung festgehalten: der FARB-Kopf 3
-        traegt heute auch das 4. Weiss-Segment mit. Diese Scheibe aendert das
-        NICHT (das waere eine Verhaltensaenderung im Programmer) — sie schafft
-        nur die getrennte Adressierung daneben. Der Test haelt den Ist-Zustand
-        fest, damit Scheibe 2 ihn bewusst umstellt statt versehentlich."""
-        from src.core.app_state import channels_for_head
+    def test_der_gemessene_zuordnungs_salat_ist_behoben(self):
+        """★ Der Ausgangsbefund: der FARB-Kopf 3 trug das 4. Weiss-Segment
+        (CH150) mit. Scheibe 1 hielt das als Ist-Zustand fest, damit es BEWUSST
+        umgestellt wird — das ist Scheibe 3b (29.09.): ein Farbkopf traegt an
+        einem Geraet mit eigener Weiss-Achse KEIN Weiss mehr, das Segment ist
+        ueber die Weiss-Achse erreichbar."""
+        from src.core.app_state import channels_for_axis, channels_for_head
+        from src.core.group_cells import ACHSE_WEISS
         d = channels_for_head(self._chans(), 3)
         self.assertEqual(d["color_r"].channel_number, 12)
-        self.assertEqual(d["color_w"].channel_number, 150,
-                         "der Ist-Zustand hat sich geaendert — Scheibe 2 pruefen")
+        self.assertNotIn("color_w", d)
+        for k in (0, 8, 47):
+            self.assertNotIn("color_w", channels_for_head(self._chans(), k), k)
+        w = channels_for_axis(self._chans(), ACHSE_WEISS, 3)
+        self.assertEqual(w["color_w"].channel_number, 150)
 
 
 class SegmentZaehlungTest(unittest.TestCase):
@@ -273,6 +277,16 @@ class SegmentZaehlungTest(unittest.TestCase):
             return [SimpleNamespace(attribute=c.attribute,
                                     channel_number=c.channel_number)
                     for c in sorted(m.channels, key=lambda c: c.channel_number)]
+
+    def test_weiss_im_pixel_bleibt_beim_farbkopf(self):
+        """Scheibe 3b, Positivkontrolle: wo das Weiss ZUR Farbzelle gehoert
+        (Blinder 5x5 RGBWW, 25:25), traegt Kopf k weiter sein Weiss — nur die
+        EIGENE Achse (ZQ06121, 48:8) verliert es aus der Farbprojektion."""
+        from src.core.app_state import channels_for_head
+        blinder = self._chans("STAIRMB5X5")
+        for k in (0, 12, 24):
+            self.assertIn("color_w", channels_for_head(blinder, k), k)
+        self.assertNotIn("color_w", channels_for_head(self._chans("ZQ06121"), 2))
 
     def test_an_echten_profilen(self):
         from src.core.app_state import weiss_segment_count_for_channels as W

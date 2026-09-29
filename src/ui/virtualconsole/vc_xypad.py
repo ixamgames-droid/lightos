@@ -182,6 +182,13 @@ class VCXYPad(VCWidget):
             fids = []
         if fids:
             return fids
+        # FM-41: nur bei WIRKLICH leerer Auswahl auf „alle" zurueckfallen.
+        leer = getattr(state, "auswahl_ist_leer", None)
+        try:
+            if callable(leer) and not leer():
+                return []
+        except Exception:
+            pass
         try:
             patched = state.get_patched_fixtures()
         except Exception:

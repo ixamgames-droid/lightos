@@ -201,7 +201,9 @@ class TestVCSliderSubmasterApply(unittest.TestCase):
         # FM-HEADLAYOUT A4: der Submaster loest die Gruppe ueber die FEINEN Zellen
         # auf (_group_cells), weil er Geraete UND Koepfe in EINER Abfrage braucht;
         # base_fids_in_cells liefert daraus dieselben fids wie _group_fids.
-        with patch.object(VCSlider, "_group_cells", return_value=["1"]):
+        # FM-41: seit der Weiss-Achse ueber die achsen-bewusste Schwester
+        # `_group_zellen` — weiterhin EINE Abfrage je Fader-Bewegung.
+        with patch.object(VCSlider, "_group_zellen", return_value=["1"]):
             s.value = 128
         om = self.state.output_manager
         self.assertEqual(om.effective_submaster(), 1.0)            # nicht global
