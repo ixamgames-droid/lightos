@@ -7,6 +7,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-29 — Rückgängig greift nicht mehr über einen Showwechsel hinweg (STAB-29)
+
+#### Behoben
+
+- **Strg+Z nach „Show öffnen" oder „Neue Show" konnte Geräte der neuen Show löschen.** Der
+  Rückgängig-Verlauf der vorigen Show blieb stehen und bezog sich auf Geräte-Nummern — traf er
+  in der neuen Show ein Gerät mit derselben Nummer, wurde das gelöscht oder überschrieben. Jetzt
+  beginnt jede geöffnete oder neue Show mit leerem Verlauf.
+
 ### 2026-09-29 — Rückgängig holt die gepflegte Kopf-Gruppe zurück (FM-38)
 
 #### Behoben

@@ -1098,6 +1098,22 @@ def reset_show():
     _reset_state(get_state(), emit_events=True)
 
 
+def _undo_verlauf_leeren() -> None:
+    """STAB-29: Der Rueckgaengig-Verlauf gehoert zur Show, nicht zur App.
+
+    Bis 2026-09-29 ueberlebte er „Neue Show" und „Show oeffnen": seine
+    Eintraege sind Closures auf Geraete-NUMMERN (``remove_fixture(fid)``,
+    ``_restore_fixture_dict``). Strg+Z nach einem Showwechsel loeschte oder
+    ueberschrieb damit Geraete der NEUEN Show, die zufaellig dieselbe Nummer
+    tragen. Geleert wird beim Zuruecksetzen UND nach dem Laden (falls der
+    Loader selbst Eintraege erzeugt)."""
+    try:
+        from src.core.undo import get_undo_stack
+        get_undo_stack().clear()
+    except Exception as e:
+        print(f"[show_file] undo clear error: {e}")
+
+
 def _reset_state(state, *, emit_events: bool = True, blackout_output: bool = True):
     """STAB-19b: geteilte SSOT-Reset-Logik (Rumpf von reset_show). Leert den
     App-State auf eine leere Show.
@@ -1117,6 +1133,7 @@ def _reset_state(state, *, emit_events: bool = True, blackout_output: bool = Tru
     sonst kippt die reset-first-Garantie fuer ein neu hinzugefuegtes Feld still
     nach Frankenstein zurueck. Regressionstest: ``test_stab19b_load_atomic.py``.
     """
+    _undo_verlauf_leeren()           # STAB-29
     from src.core.engine.palette import get_palette_manager
 
     # UI-57: LIVE-Uebersteuerungen ZUERST aufheben — vor allem anderen.
@@ -2057,6 +2074,8 @@ def load_show(path: str | os.PathLike):
         state.sync.refresh_all()
     except Exception as e:
         print(f"[show_file] post-load events error: {e}")
+
+    _undo_verlauf_leeren()           # STAB-29: auch was der Loader selbst gepusht hat
 
     # ★ QA-50: „geladen" nur sagen, wenn auch alles gelesen wurde. Sonst steht
     # die Zahl im Text — die Einzelheiten holt die UI ueber
