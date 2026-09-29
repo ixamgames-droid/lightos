@@ -112,6 +112,20 @@ class AudioFunction(Function):
                 pass
         self._cancel_fade()
 
+    def sofort_stoppen(self):
+        """ENG-18: Ton HART beenden, auch mitten in einem Fade-Out.
+
+        STOP ALL ist die Panik-Taste. Bis 2026-09-29 lief eine Audio-Funktion
+        mit ``fade_out`` nach STOP ALL die volle Ausblendzeit weiter (bei 8 s
+        acht Sekunden Musik bei stehendem Licht), und ein zweites STOP ALL half
+        nicht, weil die Funktion da schon als gestoppt galt."""
+        self._cancel_fade()
+        if self._player is not None:
+            try:
+                self._player.stop()
+            except Exception:
+                pass
+
     # ── Fade-Rampe ───────────────────────────────────────────────────────────
 
     def _start_fade(self, from_vol: float, to_vol: float, duration: float,

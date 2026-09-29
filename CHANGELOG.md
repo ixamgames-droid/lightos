@@ -7,6 +7,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-29 — STOP ALL macht auch die Musik sofort aus (ENG-18)
+
+#### Behoben
+
+- **Nach STOP ALL lief die Musik weiter.** Hatte eine Audio-Funktion eine Ausblendzeit,
+  blendete sie nach STOP ALL die volle Zeit aus — bei 8 Sekunden also acht Sekunden Musik bei
+  schon stehendem Licht —, und ein zweiter Druck half nicht. STOP ALL beendet den Ton jetzt
+  sofort, auch mitten im Ausblenden. Ein normales Stoppen einer einzelnen Audio-Funktion
+  blendet weiterhin aus.
+
 ### 2026-09-29 — BLACKOUT-Knopf zeigt, was wirklich los ist (UI-58)
 
 #### Behoben
