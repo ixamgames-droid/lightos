@@ -24,7 +24,10 @@ from PySide6.QtGui import QColor, QPainter
 from src.core.app_state import (
     get_state, AppState, get_channels_for_patched, resolve_attr_channels,
     color_head_count, pan_tilt_head_count, attr_head_count_for_channels,
-    attr_has_head_axis, channel_occurrence_keys, programmer_key_for_head)
+    attr_has_head_axis, channel_occurrence_keys, programmer_key_for_head,
+    head_label, head_label_gemeinsam, head_label_short,
+    attr_head_is_segment, gemeinsames_modell, head_channel_name,
+    is_pixel_head_fixture)
 from src.core.database.models import PatchedFixture, FixtureChannel
 from src.core.fixture_filter import (hat_kanal, Nutzlast, fixtures_fuer_nutzlast,
                                      attr_head_count, range_signature)
@@ -886,18 +889,30 @@ class ProgrammerView(QWidget):
                 for h in range(anzahl):
                     # UI-61: Kind statt Geschwister — die Einrueckung macht jetzt
                     # der Baum, der Text traegt sie nicht mehr selbst.
-                    hit = QTreeWidgetItem(it, [f"Kopf {h + 1}"])
+                    # FM-14b: Wie die Kopf-Zeile heisst, sagt EINE Quelle
+                    # (app_state.head_label). Am Pixel-Kopf ist Kopf 0 die
+                    # GRUNDFARBE des Geraets und nicht das erste Pixel — hiesse
+                    # sie weiter „Kopf 1", griffe man beim ersten Pixel ins
+                    # ganze Geraet.
+                    _hl = head_label(f, h)
+                    hit = QTreeWidgetItem(it, [_hl])
                     hit.setData(0, Qt.ItemDataRole.UserRole, f"{f.fid}:{h}")
                     hit.setToolTip(
                         0,
-                        f"Nur Kopf {h + 1} von „{f.label}“ programmieren "
+                        f"Nur „{_hl}“ von „{f.label}“ programmieren "
                         f"(Regler/Schnellwahl schreiben dann ausschließlich auf "
                         f"diesen Kopf). Die Geräte-Zeile darüber wählt alle Köpfe.")
                 if anzahl:
                     # Die Zahl gehoert an die Geraete-Zeile: zugeklappt ist sonst
                     # nicht zu sehen, DASS es Koepfe gibt — und ein Pfeil allein
                     # sagt nicht, wie viele dahinter liegen.
-                    it.setText(0, f"[{f.fid:03d}] {f.label}  ({anzahl} Köpfe)")
+                    # FM-14b: am Pixel-Kopf dieselbe Sprache wie in den Zeilen
+                    # darunter — „Grundfarbe + 19 Pixel", nicht „20 Köpfe".
+                    if anzahl > 1 and is_pixel_head_fixture(f):
+                        zahl = f"Grundfarbe + {anzahl - 1} Pixel"
+                    else:
+                        zahl = f"{anzahl} Köpfe"
+                    it.setText(0, f"[{f.fid:03d}] {f.label}  ({zahl})")
                     it.setExpanded(f.fid in self._offene_koepfe)
         finally:
             lst.blockSignals(blocked)
@@ -1297,11 +1312,16 @@ class ProgrammerView(QWidget):
             # FM-HEADLAYOUT Slice 5: Ist die Auswahl auf Köpfe eingeschränkt, muss
             # die Kopfzeile das sagen — sonst steht dort „1 Gerät", während die
             # Regler nur einen Kopf treiben.
+            # FM-14b (Nachbesserung): der Kopf-Name kommt aus DERSELBEN Quelle
+            # wie die Zeile in der Geraeteliste. Vorher stand hier fest „K{h+1}"
+            # — die Liste sagte „Pixel 3", die Kopfzeile darueber „K4", und der
+            # Nutzer sah zwei Namen fuer dasselbe Segment nebeneinander.
             def _sel_name(f):
                 hs = self._heads_filter_for(f)
                 if not hs:
                     return f"[{f.fid}] {f.label}"
-                ks = ", ".join(f"K{h + 1}" for h in sorted(hs))
+                ks = ", ".join(head_label_gemeinsam([f], h, kurz=True)
+                               for h in sorted(hs))
                 return f"[{f.fid}] {f.label} · {ks}"
             self._lbl_selection.setText(
                 f"{len(selected)} Gerät(e): " +
@@ -1586,6 +1606,9 @@ class ProgrammerView(QWidget):
                 if not ziele:
                     continue
                 for _head, _owners in self._slider_head_buckets(ziele, ch):
+                    # FM-14b: dieselbe EINE Quelle wie die Geraeteliste — und
+                    # sie nennt nur dort ein Segment, wo der Kopf-Index eines
+                    # adressiert (s. _head_slider_label).
                     ilay.addWidget(AttributeSlider(
                         ch, _owners, self._state, owner=self, head=_head,
                         display_name=(None if _head is None else
@@ -1703,7 +1726,10 @@ class ProgrammerView(QWidget):
         jeder Regler bekommt nur die Geraete, die diesen Kopf wirklich haben —
         sonst entstuende ein ``tilt#N`` ohne Kanal, und der Kopf fiele im
         DMX-Pfad still auf seinen Default zurueck (Fehlerklasse FM-9/A5).
-        Beschriftung ``K1``/``K2`` wie ueberall sonst (1-basiert)."""
+        Beschriftung aus derselben EINEN Quelle wie ueberall sonst
+        (``_head_slider_label``): am gewoehnlichen Doppeltilter ``· K1``/``· K2``
+        wie bisher, an einem als ``pixel_head`` gefuehrten Geraet der Name des
+        Tilt-Kanals selbst — die zweite TILT-Achse ist dort kein Pixel."""
         if not fixtures:
             return
         template = max(fixtures, key=self._tilt_count)
@@ -1717,7 +1743,7 @@ class ProgrammerView(QWidget):
                     self._seed_separate_head(owners, ch, occ)
                 ilay.addWidget(AttributeSlider(
                     ch, owners, self._state, owner=self, head=occ,
-                    display_name=f"{ch.name or 'Tilt'} · K{occ + 1}"))
+                    display_name=self._head_slider_label(owners, ch, occ)))
             occ += 1
 
     @staticmethod
@@ -1908,61 +1934,43 @@ class ProgrammerView(QWidget):
 
     @staticmethod
     def _head_slider_label(owners, ch, head: int) -> str:
-        """Beschriftung eines Pro-Kopf-Reglers — der Name des Kanals, den er
-        WIRKLICH schreibt.
+        """Beschriftung eines Pro-Kopf-Reglers — EINE Quelle fuer zwei Regeln.
 
-        ★ FM-24. Bisher stand hier ``ch.name``, und ``ch`` ist die VORLAGE aus
-        ``_template_channels``: dort bleibt pro Attribut nur EIN Kanal uebrig
-        (das erste Vorkommen, bevorzugt eines mit ``ranges``) — und zwar ueber
-        die GANZE Auswahl hinweg, der Kanal kann also aus einem anderen Geraet
-        stammen. An einem Mehrkopf-Geraet gehoerte der Name damit einem ANDEREN
-        Kopf. Gemessen:
+        ★ FM-24: der Name ist der des Kanals, den der Regler WIRKLICH schreibt —
+        ueber genau den Schluessel, den ``AttributeSlider._apply_value`` ->
+        ``set_programmer_value(head=…)`` gleich schreibt
+        (:func:`programmer_key_for_head`, zurueckgefuehrt ueber
+        :func:`channel_occurrence_keys`). ``ch`` ist nur die VORLAGE aus
+        ``_template_channels`` und kann aus einem anderen Kopf oder Geraet
+        stammen (gemessen: MOVBAR4 Kopf 4 hiess „Kopf 1 Pan · K4"). Gefragt
+        werden alle ``owners`` in ihrer Reihenfolge; der Rueckfall ist das
+        ATTRIBUT (:func:`attr_label`), nie ein fremdes Geraet.
 
-        * ``MOVBAR4 [22-Kanal]``, Kopf 4 gewaehlt -> „**Kopf 1 Pan** · K4",
-          geschrieben wird CH16 „Kopf 4 Pan".
-        * ``HYDRABEAM 4000 RGBW [19-Kanal]``, Kopf 1 gewaehlt -> „**Master
-          Dimmer** · K1", geschrieben wird ueber die Kopf-Karte (FM-17)
-          ``intensity#1`` = CH9 „Kopf 1 Dimmer".
-        * ``Robin Spiider [91-Kanal Pixel]``, Kopf 3 gewaehlt -> „**Grundfarbe
-          Shutter** · K3", waehrend der Regler ``raw#2`` = CH11 „Grundfarbe
-          Gruen Fein" schreibt — der Name nannte also einen DRITTEN Kanal.
-
-        Deshalb wird der Name ueber genau den Schluessel geholt, den
-        ``AttributeSlider._apply_value`` -> ``set_programmer_value(head=…)``
-        gleich schreibt (:func:`programmer_key_for_head`), und ueber
-        :func:`channel_occurrence_keys` auf den Kanal zurueckgefuehrt — die eine
-        Quelle, die auch die Kopf-Karte kennt.
-
-        ★ Nachbesserung: gefragt werden ALLE ``owners`` des Reglers in ihrer
-        Reihenfolge, und der Rueckfall nennt **kein fremdes Geraet** mehr. Der
-        erste Besitzer hatte das Attribut naemlich nicht immer:
-        ``_slider_head_buckets`` behielt fuer Kopf 1 auch ein Geraet, das den
-        Kanal gar nicht hat (``attr_head_count_for_channels`` antwortete fuer
-        ein fehlendes Attribut ``1``). Vorher fiel die Aufschrift dann auf die
-        Vorlage zurueck — auf einen Kanal aus einem Geraet, das dieser Regler
-        womoeglich ueberhaupt nicht treibt. Gemessen an ``SHARPY [16-Kanal]``
-        GANZ gewaehlt + ``MOVBAR4 [22-Kanal]`` Kopf 1 + ``HYDRABEAM 19ch``
-        Kopf 1: der ``speed``-Regler von Kopf 1 trieb MOVBAR4 + HYDRABEAM und
-        hiess „**P/T-Speed** · K1" — das ist der Kanal des SHARPY, der seinen
-        eigenen geraeteweiten Regler hat und von diesem Regler nicht angefasst
-        wird, waehrend „Head Speed" der getriebenen HYDRABEAM danebenlag und
-        ungenutzt blieb.
-
-        ★★ Seit **FM-27** (2026-08-24) hat JEDER Besitzer den Kanal wirklich —
-        ``_slider_head_buckets`` wirft die anderen heraus, und hat ihn keiner,
-        entsteht der Regler gar nicht. Die Suche ueber alle Besitzer und der
-        Rueckfall auf das ATTRIBUT (:func:`attr_label`, „Speed · K1") bleiben
-        als Absicherung stehen; ueber die Oberflaeche sind sie nicht mehr
-        erreichbar."""
+        ★ FM-14b: dahinter steht die Kurzform des Kopfnamens aus
+        :func:`head_label_gemeinsam` — am Pixel-Kopf ``P3`` statt ``K4``, weil
+        Kopf 0 die Grundfarbe ist. Das gilt aber nur, wo der Kopf-Index
+        wirklich ein SEGMENT adressiert (:func:`attr_head_is_segment`): am
+        Spiider ist ``raw#3`` der vierte Rohkanal („Grundfarbe Blau Fein"),
+        nicht Pixel 3. Dort steht nur der Kanalname — und laesst der sich
+        nicht fuer alle Besitzer gleich aufloesen, die Kopf-NUMMER (``K2``),
+        nie ein Pixelname: unbekannt ist dann der Kanal, nicht der Index."""
         attr = getattr(ch, "attribute", "") or ""
+        modell = gemeinsames_modell(owners)
+        if not attr_head_is_segment(modell, attr):
+            echt = head_channel_name(owners, attr, head)
+            if echt:
+                return echt
+            return f"{attr_label(attr)} · {head_label_short('', head)}"
+        name = None
         for fx in owners:
             chans = get_channels_for_patched(fx)
             key = programmer_key_for_head(chans, attr, head)
             eigen = {k: c for c, k in channel_occurrence_keys(chans)}.get(key)
             name = getattr(eigen, "name", None)
             if name:
-                return f"{name} · K{head + 1}"
-        return f"{attr_label(attr)} · K{head + 1}"
+                break
+        return (f"{name or attr_label(attr)} · "
+                f"{head_label_gemeinsam(owners, head, kurz=True)}")
 
     def _slider_head_buckets(self, fixtures, ch) -> list:
         """Auf welche Koepfe verteilt sich EIN Attribut-Regler? ``[(head, owners)]``.

@@ -241,7 +241,11 @@ class _FakeAddChannel:
     attrs: list = []
     val = 0
 
-    def __init__(self, type_label, addable, n_devices, parent=None):
+    def __init__(self, type_label, addable, n_devices, parent=None, **kw):
+        # ``**kw``: FM-14b reicht zusaetzlich die Geraete des Typs durch
+        # (``fixtures=``) — ohne sie benennt der Dialog ``color_r#3`` nach dem
+        # Kopf-INDEX statt nach dem Segment. Der Fake interessiert sich nicht
+        # dafuer, darf aber nicht daran scheitern.
         type(self).addable_seen = list(addable)
 
     def exec(self):
@@ -318,10 +322,10 @@ class SnapEditorRealFixtureTest(unittest.TestCase):
         captured = {}
 
         class _Cap(_FakeAddChannel):
-            def __init__(self, type_label, addable, n_devices, parent=None):
+            def __init__(self, type_label, addable, n_devices, parent=None, **kw):
                 captured["addable"] = list(addable)
                 _FakeAddChannel.attrs = [addable[0]] if addable else []
-                super().__init__(type_label, addable, n_devices, parent)
+                super().__init__(type_label, addable, n_devices, parent, **kw)
         _SEmod._AddChannelDialog = _Cap
         ed._add_channel(tkey, [1, 2])
         added = captured["addable"][0]
@@ -340,10 +344,10 @@ class SnapEditorRealFixtureTest(unittest.TestCase):
         captured = {}
 
         class _Cap(_FakeAddChannel):
-            def __init__(self, type_label, addable, n_devices, parent=None):
+            def __init__(self, type_label, addable, n_devices, parent=None, **kw):
                 captured["addable"] = list(addable)
                 _FakeAddChannel.attrs = ["color_r#1"] if "color_r#1" in addable else []
-                super().__init__(type_label, addable, n_devices, parent)
+                super().__init__(type_label, addable, n_devices, parent, **kw)
         _SEmod._AddChannelDialog = _Cap
         _FakeAddChannel.val = 120
         ed._add_channel(tkey, [3])

@@ -1032,7 +1032,15 @@ class AppState:
         from src.core.database.models import FixtureGroup as _FG
         label = (getattr(fixture, "label", None)
                  or getattr(fixture, "fixture_name", None) or f"Fixture {fid}")
-        positions = {f"{i},0": f"{fid}:{i}" for i in range(n)}
+        # FM-14b: Wie die Koepfe im Raster liegen, sagt EINE Quelle
+        # (head_matrix_layout) — 1xN wie bisher, beim Pixel-Kopf das Ring-Raster.
+        cols, rows, plaetze, ist_ring = head_matrix_layout(fixture, n)
+        positions = {f"{c},{r}": f"{fid}:{h}" for h, (c, r) in plaetze.items()}
+        # Und dann heisst die Gruppe auch nach dem, was drinsteht: „Koepfe"
+        # waere beim Pixel-Kopf falsch — die Grundfarbe (Kopf 0) steht bewusst
+        # NICHT im Raster, die Zellen sind Pixel. Der Name kommt aus DERSELBEN
+        # Antwort wie das Raster, nicht aus einer zweiten Abfrage.
+        zusatz = "Pixel" if ist_ring else "Köpfe"
         try:
             # Idempotenz: adressiert schon IRGENDEINE Gruppe dieses fid kopfweise?
             # Der Scan liegt BEWUSST im try und wirft bei DB-Fehlern — sonst
@@ -1043,7 +1051,7 @@ class AppState:
             if existing is not None:
                 return existing
             with self._session() as s:
-                g = _FG(name=f"{label} · Köpfe", cols=n, rows=1,
+                g = _FG(name=f"{label} · {zusatz}", cols=cols, rows=rows,
                         positions_json=_json.dumps(positions), folder="Multi-Head")
                 s.add(g)
                 s.commit()
@@ -5212,6 +5220,318 @@ def viz_model_for(fixture):
     return suggest_viz_model(
         getattr(fixture, "fixture_type", ""),
         [(getattr(c, "attribute", "") or "") for c in chans]) or "spider"
+
+
+# ── FM-14b: Der Pixel-Kopf in der BEDIENUNG (Programmer/Matrix) ──────────────
+#
+# FM-14 hat den Ring gezeichnet und den Datenweg gelegt (20 Baenke -> Kopf 0 =
+# Grundfarbe, Kopf 1..19 = Pixel 1..19). Bedienbar war er damit noch nicht:
+#
+#  (1) Kopf 0 heisst ueberall „Kopf 1" — er ist aber die GRUNDFARBE des ganzen
+#      Geraets (faerbt Linse/Kegel/Bodenfleck), nicht das erste Pixel. Wer „das
+#      erste Pixel" anfasst, faerbt damit das ganze Geraet.
+#  (2) Die Auto-Kopf-Matrix (FM-16) ist eine 1xN-Reihe in DMX-Reihenfolge. Bei
+#      einem Ring-Kopf laeuft ein Lauflicht darueber am Ring VORBEI: es beginnt
+#      bei der Grundfarbe, faellt in die Mitte, dreht den Innenring, und der
+#      Aussenring kommt erst in den letzten 12 von 20 Schritten dran.
+
+
+_PIXEL_HEAD_MODEL = "pixel_head"
+
+
+def is_pixel_head_fixture(fixture) -> bool:
+    """Hat dieses Geraet Ring-/Pixel-Segmente statt gewoehnlicher Koepfe?
+
+    Genau dann, wenn das ZENTRALE Render-Modell-Routing ``pixel_head`` sagt
+    (``viz_model_for``) — dieselbe Quelle wie 3D-Modell und 2D-Symbol, inklusive
+    des ausdruecklichen Profil-Overrides aus dem Fixture-Generator. Eine zweite
+    Erkennungsregel (z. B. „viele Baenke") wuerde genau dort abweichen, wo der
+    Nutzer das Modell von Hand gesetzt hat.
+    """
+    try:
+        return viz_model_for(fixture) == _PIXEL_HEAD_MODEL
+    except Exception:
+        return False
+
+
+def _segment_vorhanden(head: int, n_segmente) -> bool:
+    """Gibt es das ``head``-te Segment an diesem Geraet ueberhaupt?
+
+    ★ FM-14b (vierte Runde). Ein Segmentname darf nur fuer ein Segment stehen,
+    das es GIBT. Am Spiider gibt es 20 Baenke, also die Koepfe 0..19
+    („Grundfarbe" + „Pixel 1..19") — ``head=20`` als „Pixel 20" zu benennen
+    erfindet ein Segment. Die index-basierte Bestandsbeschriftung tut das nie:
+    ``K21`` benennt kein Segment, sondern gibt die 1-basierte Nummer zurueck,
+    die der Nutzer getippt hat (dieselbe Ueberlegung, mit der die Fehlermeldung
+    der Command-Line ihre zu gross getippte Nummer als ``K21`` stehen laesst).
+
+    ``None`` = die Flaeche zaehlt ihre Koepfe selbst ab (Programmer-Liste,
+    Gruppen-Raster) und kann deshalb keinen erfinden -> unveraendert ja.
+    """
+    if n_segmente is None:
+        return True
+    try:
+        return 0 <= int(head) < int(n_segmente)
+    except (TypeError, ValueError):
+        return True
+
+
+def head_label_for_model(model: str, head: int, n_segmente=None) -> str:
+    """Wie heisst Kopf ``head`` (0-basiert) in der Bedienung?
+
+    Normalfall ``"Kopf 3"`` (1-basiert, Bestandsbeschriftung). Beim PIXEL-KOPF
+    ist Bank 0 keine Lampe unter vielen, sondern die **Grundfarbe** des Geraets;
+    Pixel 1 liegt auf Kopf 1. Die Verschiebung um eins ist der eigentliche
+    Stolperstein — „Kopf 1" und „Pixel 1" waeren sonst zwei Namen fuer zwei
+    VERSCHIEDENE Dinge.
+
+    Nimmt das Modell (nicht das Fixture), damit Flaechen ohne Fixture-Objekt in
+    der Hand — die Matrix-Vorschau haelt nur fids — dieselbe Beschriftung
+    benutzen koennen statt eine zweite zu erfinden.
+
+    ``n_segmente`` = wie viele Koepfe das Geraet WIRKLICH hat, falls die Flaeche
+    das weiss (s. :func:`_segment_vorhanden`). Ein Kopf ausserhalb bekommt die
+    index-basierte Bestandsbeschriftung, damit hier kein Segment entsteht, das
+    es am Geraet nicht gibt.
+    """
+    try:
+        h = int(head)
+    except (TypeError, ValueError):
+        return "Kopf ?"
+    if (model or "") == _PIXEL_HEAD_MODEL and _segment_vorhanden(h, n_segmente):
+        return "Grundfarbe" if h <= 0 else f"Pixel {h}"
+    return f"Kopf {h + 1}"
+
+
+def head_label_short(model: str, head: int, n_segmente=None) -> str:
+    """Kurzform derselben Beschriftung fuer ENGE Flaechen (Rasterzellen).
+
+    ``"Kopf 4"`` -> ``"K4"``, ``"Pixel 3"`` -> ``"P3"``, ``"Grundfarbe"`` ->
+    ``"GR"``. **Abgeleitet, nicht zweitgeschrieben** — schriebe man die Regel
+    hier ein zweites Mal, koennten enge und weite Flaechen denselben Kopf
+    verschieden nennen, und genau das ist der Fehler, den FM-14b behebt.
+
+    ``n_segmente`` wird unveraendert durchgereicht: die Kurzform darf nicht
+    nennen, was die Vollform nicht nennt.
+    """
+    voll = head_label_for_model(model, head, n_segmente)
+    wort, _, rest = voll.partition(" ")
+    rest = rest.strip()
+    if rest.isdigit():
+        return f"{wort[:1].upper()}{rest}"
+    return voll[:2].upper()
+
+
+def head_label(fixture, head: int) -> str:
+    """``head_label_for_model`` fuer ein gepatchtes Geraet (EINE Quelle)."""
+    try:
+        model = viz_model_for(fixture) or ""
+    except Exception:
+        model = ""
+    return head_label_for_model(model, head)
+
+
+def head_label_gemeinsam(fixtures, head: int, *, kurz: bool = False) -> str:
+    """Beschriftung fuer einen Kopf, den MEHRERE Geraete gemeinsam tragen.
+
+    Ein Regler im Programmer treibt selten genau ein Geraet: ``head=3`` kann
+    gleichzeitig das Pixel 3 eines Spiiders und den vierten Kopf einer Mover-Bar
+    meinen. Deshalb:
+
+    * **einheitliches Render-Modell** -> dessen Beschriftung (``"Pixel 3"``);
+    * **uneinheitlich** -> die index-basierte Bestandsbeschriftung (``"Kopf 4"``
+      / ``"K4"``). Der Regler benennt dann kein einzelnes Segment mehr, sondern
+      den Kopf-INDEX, den alle gemeinsam haben — ein Pixel-Name waere fuer die
+      andere Haelfte der Auswahl schlicht falsch.
+
+    ``kurz`` waehlt die Kurzform DERSELBEN Beschriftung (``head_label_short``),
+    nicht eine zweite Regel.
+    """
+    model = gemeinsames_modell(fixtures)
+    return head_label_short(model, head) if kurz else head_label_for_model(model, head)
+
+
+def gemeinsames_modell(fixtures) -> str:
+    """Das Render-Modell, das ALLE uebergebenen Geraete teilen — sonst ``""``.
+
+    Die Bedingung, unter der eine Flaeche ueberhaupt ein einzelnes Segment
+    benennen darf. Steht ueber der Flaeche ein Pixel-Kopf UND eine Mover-Bar,
+    gibt es kein gemeinsames Segment mehr, nur noch den gemeinsamen Kopf-INDEX
+    — ``""`` fuehrt genau dorthin zurueck (``head_label_for_model`` liefert dann
+    die index-basierte Bestandsbeschriftung).
+    """
+    modelle = set()
+    for f in fixtures or []:
+        try:
+            modelle.add(viz_model_for(f) or "")
+        except Exception:
+            modelle.add("")
+    return modelle.pop() if len(modelle) == 1 else ""
+
+
+def attr_head_is_segment(model: str, attribute: str) -> bool:
+    """Adressiert ``attribute#N`` an diesem Modell wirklich ein **Segment**?
+
+    ★ Die Trennlinie zwischen **Segmentname** und **Kanalname**. Der Kopf-Index
+    ist keine Geraete-Eigenschaft, sondern eine Eigenschaft **je Attribut**:
+    ``attr#N`` ist das N-te Vorkommen VON DIESEM Attribut
+    (``channel_occurrence_keys``). Am Pixel-Kopf sind die Segmente die
+    **Farb-Baenke** — dort ist ``color_r#3`` tatsaechlich Pixel 3 (die
+    Bibliothek nennt den Kanal selbst ``P3 Rot``). Jedes andere Attribut zaehlt
+    seine eigenen Kanaele: am Robe Spiider im Pixelmodus ist ``raw#3`` der
+    VIERTE Rohkanal des Geraets (``Grundfarbe Blau Fein``, DMX 13) und hat mit
+    Pixel 3 nichts zu tun. Ein Pixelname waere dort keine zweite Benennung
+    desselben Dings, sondern der Name eines ANDEREN Dings — genau der Griff
+    daneben, um den es in FM-14b geht.
+
+    An jedem anderen Modell zaehlt die Bedienung alle Attribute ueber denselben
+    Kopf-Index -> ``True``, und ein Geraet ohne Ringe bleibt damit unveraendert.
+    """
+    if (model or "") != _PIXEL_HEAD_MODEL:
+        return True
+    return (attribute or "").split("#", 1)[0].lower() in _DIM_COLOR_ATTRS
+
+
+def attr_label_for(attr: str, fixtures=None) -> str:
+    """Attribut-Beschriftung MIT Geraetekenntnis — die Flaechen-Fassung von
+    ``attr_groups.attr_label``.
+
+    ``attr_label`` uebersetzt kontextfrei: ``color_r#3`` -> „Rot (Kopf 4)".
+    Dasselbe Segment heisst im Programmer, im Gruppen-Raster und in der
+    Command-Line „Pixel 3" — zwei Namen fuer ein Ding. WELCHES Segment ein
+    ``#N`` meint, kann aber nur das **Geraet** sagen; ``attr_groups`` hat keines
+    in der Hand. Deshalb steht diese Fassung hier, wo die Geraete sind, und
+    ``attr_label`` bleibt unveraendert die kontextfreie Fassung fuer Aufrufer
+    ohne Geraet.
+
+    ``fixtures`` sind die Geraete, ueber denen die Beschriftung steht. Tragen
+    sie nicht alle dasselbe Render-Modell, benennt sie kein einzelnes Segment
+    mehr -> unveraendert ``attr_label`` (dieselbe Regel wie
+    ``head_label_gemeinsam``). Ebenso, wenn das Modell seine Koepfe gar nicht
+    umbenennt: dann ist die Bestandsbeschriftung schon die richtige.
+    """
+    from .attr_groups import attr_label as _attr_label
+    base, sep, head = (attr or "").partition("#")
+    model = gemeinsames_modell(fixtures)
+    if not attr_head_is_segment(model, base):
+        return _attr_label(attr)
+    if sep and head:
+        try:
+            h = int(head)
+        except (TypeError, ValueError):
+            return _attr_label(attr)
+    else:
+        # Ohne ``#`` meint die Mehrkopf-Konvention Kopf 0 — am Pixel-Kopf also
+        # die GRUNDFARBE. Genau die Zeile, die sonst schlicht „Rot" heisst und
+        # damit wie das erste Pixel aussieht.
+        h = 0
+    if head_label_for_model(model, h) == head_label_for_model("", h):
+        return _attr_label(attr)
+    return f"{_attr_label(base)} ({head_label_for_model(model, h)})"
+
+
+def head_channel_name(fixtures, attribute: str, head) -> str | None:
+    """Wie heisst der Kanal, den ``attribute``/``head`` an DIESEN Geraeten
+    wirklich trifft? ``None``, wenn er nicht bei allen denselben Namen traegt.
+
+    Aufloesung ueber ``channels_for_head`` — dieselbe EINE Quelle, aus der auch
+    ``programmer_key_for_head`` den Schluessel bildet, den ein Regler schreibt.
+    So kann eine Beschriftung den Kanal benennen, der wirklich bewegt wird,
+    statt den der Vorlage.
+    """
+    base = (attribute or "").split("#", 1)[0].lower()
+    if not base:
+        return None
+    namen = set()
+    for f in fixtures or []:
+        try:
+            ch = channels_for_head(get_channels_for_patched(f), int(head)).get(base)
+        except Exception:
+            return None
+        name = (getattr(ch, "name", "") or "").strip() if ch is not None else ""
+        if not name:
+            return None
+        namen.add(name)
+    return namen.pop() if len(namen) == 1 else None
+
+
+def head_labeller(fixtures=None):
+    """``(fid, head, kurz=False) -> Beschriftung`` fuer Flaechen, die nur **fids**
+    in der Hand halten (EFX-Zielliste, Fan-Werkzeug, Command-Line-Statuszeile).
+
+    Ohne sie muessten diese Flaechen die Kopf-Beschriftung selbst erfinden — und
+    genau daran ist FM-14b in der ersten Fassung gescheitert: dasselbe Pixel
+    hiess im Programmer „Pixel 3" und drei Flaechen weiter „K4".
+
+    ★ Die Karte traegt **Modell UND Kopfzahl**. Der Grund ist die vierte Runde:
+    diese drei Flaechen bekommen ihren Kopf-Index von aussen (getippt, aus einer
+    Show-Datei, aus einer Auswahl, die aelter ist als der heutige Modus) — sie
+    zaehlen ihn nicht selbst ab wie die Programmer-Liste. Mit dem Modell allein
+    wurde ``1:21`` am Spiider zu ``1·P20``, also zum Namen eines Segments, das
+    es nicht gibt. Die Kopfzahl kommt aus den **Farb-Baenken**: am Pixel-Kopf
+    SIND die Baenke die Segmente (``viz_model_for`` verlangt dafuer genau ein
+    Pan und ein Tilt), und die Beschriftung zaehlt genau sie ab.
+
+    Ein unbekanntes fid bleibt bei der index-basierten Bestandsbeschriftung —
+    dasselbe Verhalten wie bisher, wenn kein Modell zu finden war.
+
+    ``fixtures`` uebergeben, wenn der Aufrufer die Liste schon hat (die
+    Command-Line bekommt ihren ``state`` als Argument und darf nicht am globalen
+    Zustand vorbei arbeiten).
+    """
+    if fixtures is None:
+        try:
+            fixtures = get_state().get_patched_fixtures()
+        except Exception:
+            fixtures = []
+    karte: dict = {}
+    for f in fixtures or []:
+        try:
+            karte[int(f.fid)] = (viz_model_for(f) or "", int(color_head_count(f)))
+        except Exception:
+            continue
+
+    def beschriftung(fid, head, *, kurz: bool = False) -> str:
+        try:
+            modell, n = karte[int(fid)]
+        except (KeyError, TypeError, ValueError):
+            modell, n = "", None
+        return (head_label_short(modell, head, n) if kurz
+                else head_label_for_model(modell, head, n))
+
+    return beschriftung
+
+
+def head_matrix_layout(fixture, n_heads: int) -> tuple:
+    """Raster der Auto-Kopf-Matrix: ``(cols, rows, {kopf: (col, row)}, ist_ring)``.
+
+    **Gewoehnliches Mehrkopf-Geraet** (Spider, Mover-Bar, Hydrabeam): 1xN in
+    DMX-Reihenfolge, Kopf 0 inbegriffen — Bestandsverhalten, unveraendert.
+
+    **Pixel-Kopf**: das RING-Raster aus ``core.pixel_order.waben_raster``
+    (Zeile = Ring, Spalte = Winkel), gebaut ueber die PIXEL — Kopf h traegt
+    Pixel h, also Wabenindex h-1. Ohne Ausnahme: auch ein Pixel-Kopf mit nur
+    zwei Baenken (nur ueber einen Profil-Override erreichbar) wird nach dieser
+    Regel gelegt. Eine Sonderregel fuer den Randfall waere ein Zweig, den nie
+    jemand faehrt — und eine zweite Antwort auf dieselbe Frage.
+
+    ★ Kopf 0 (die Grundfarbe) steht bewusst NICHT im Raster. Sie faerbt Linse,
+    Kegel und Bodenfleck des ganzen Geraets; als Matrix-Zelle wuerde jeder
+    Effekt sie mitziehen und damit den Ring, den er gerade zeichnet, sofort
+    wieder ueberstrahlen. Es ist dasselbe Argument, mit dem FM-14 sie im 3D
+    nicht als 20. Segment gezeichnet hat: dieselbe Information zweimal. Ueber
+    den Programmer (Kanaele „Grundfarbe …") bleibt sie unveraendert bedienbar.
+
+    ``ist_ring`` sagt, WELCHE der beiden Regeln gegriffen hat. Der Aufrufer
+    benennt die Gruppe danach; wuerde er stattdessen selbst noch einmal nach dem
+    Modell fragen, koennten Name und Inhalt auseinanderlaufen.
+    """
+    n = max(0, int(n_heads or 0))
+    if is_pixel_head_fixture(fixture):
+        from .pixel_order import waben_raster
+        cols, rows, plaetze = waben_raster(n - 1)
+        return cols, rows, {i + 1: plaetze[i] for i in sorted(plaetze)}, True
+    return n, 1, {i: (i, 0) for i in range(n)}, False
 
 
 def tilt_head_count(fixture) -> int:

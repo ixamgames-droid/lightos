@@ -169,6 +169,27 @@ def _selection_heads(state, attribute: str) -> dict:
         return {}
 
 
+def _kopf_spanne(fixture, n: int) -> str:
+    """Die Koepfe, die es WIRKLICH gibt — in denselben Namen wie ueberall sonst.
+
+    ``K1–K4`` an einem gewoehnlichen Mehrkopf-Geraet (wortwoertlich der
+    Bestand), ``GR–P19`` am Pixel-Kopf. Beide kommen aus der EINEN Quelle
+    (``app_state.head_label_gemeinsam``), damit die Fehlermeldung nicht die
+    zweite Benennung ist, gegen die FM-14b angeht.
+
+    Die zu gross getippte Nummer daneben bleibt bewusst in der GETIPPTEN
+    Zaehlung (``K21``): sie beschreibt die Eingabe und benennt kein vorhandenes
+    Segment. Am Pixel-Kopf ist sie damit auch nicht verwechselbar — dort heisst
+    kein einziges Segment ``K…``.
+    """
+    try:
+        from src.core.app_state import head_label_gemeinsam
+        return (f"{head_label_gemeinsam([fixture], 0, kurz=True)}–"
+                f"{head_label_gemeinsam([fixture], n - 1, kurz=True)}")
+    except Exception:
+        return f"K1–K{n}"
+
+
 def _geraet_kopfzahl(fx, chans, zaehle_farbe, zaehle_bewegung) -> int:
     """Wie viele Koepfe hat das GERAET (nicht: das Attribut)? Pan/Tilt und
     Farbbaenke sind die beiden belastbaren Belege; ohne beide gibt es keinen.
@@ -264,7 +285,8 @@ def _typed_heads(state, selection: "SelectionExpr", attribute: str,
             zu_gross = [h for h in hs if h >= n]
             if zu_gross:
                 return {}, (f"Gerät {fid} hat für '{attribute}' {n} Köpfe "
-                            f"(K1–K{n}) — K{zu_gross[0] + 1} gibt es dort nicht")
+                            f"({_kopf_spanne(fx, n)}) — K{zu_gross[0] + 1} "
+                            f"gibt es dort nicht")
     validator = getattr(state, "validate_head_restrictions", None)
     if callable(validator) and counter is not None:
         try:
@@ -366,8 +388,10 @@ class SelectionCommand(Command):
             if not fids:
                 return CommandResult(True, "Selektion leer")
             # Ohne Kopf-Ziele bleibt die Meldung wortgleich zum Bestand.
-            liste = (_short_cells(zellen) if self.selection.cells
-                     else _short_list(fids))
+            # FM-14b: die Modelle kommen aus DEM state, den dieser Befehl
+            # bekommen hat — nicht aus dem globalen Zustand daneben.
+            liste = (_short_cells(zellen, _head_beschriftung(state))
+                     if self.selection.cells else _short_list(fids))
             return CommandResult(True, f"Selektiert: {len(fids)} ({liste})")
         except Exception as e:
             return CommandResult(False, f"Selektion Fehler: {e}")
@@ -605,14 +629,49 @@ ATTR_MAP = {
 
 # ── Hilfsfunktionen ──────────────────────────────────────────────────────────
 
-def _short_cells(cells: list[str], limit: int = 8) -> str:
+def _head_beschriftung(state):
+    """Kopf-Beschriftung ``(fid, head, kurz=…)`` aus DEM uebergebenen State
+    (FM-14b).
+
+    Die Command-Line arbeitet grundsaetzlich auf dem ``state``, den sie bekommen
+    hat (Test-Fakes, zweite Instanz); ein Griff nach ``get_state()`` waere hier
+    eine zweite Quelle — die Geraete kommen deshalb ausdruecklich aus DIESEM
+    State.
+
+    **Kein Rueckfall auf „kein Geraet bekannt".** Gerufen wird erst, nachdem
+    ``state.get_patched_fixtures()`` fuer die fid-Aufloesung schon geliefert hat
+    — ein Fehler ist hier also kein Normalfall, sondern ein kaputter State, und
+    der Aufrufer macht ihn als Fehlermeldung sichtbar. Ein stiller Rueckfall
+    waere eine zweite Beschriftungsregel an der Stelle, an der FM-14b gerade die
+    zweite Regel entfernt.
+    """
+    from src.core.app_state import head_labeller
+    return head_labeller(state.get_patched_fixtures())
+
+
+def _short_cells(cells: list[str], beschriften, limit: int = 8) -> str:
     """Zellen fuer die Statuszeile — ``"2:1"`` wird zu ``"2·K2"``, weil jede
-    Oberflaeche den Kopf 1-basiert beschriftet (``K{head + 1}``). Wer hier den
-    rohen Zellwert zeigte, wuerde dem Nutzer eine andere Kopf-Nummer melden, als
-    er getippt hat."""
+    Oberflaeche den Kopf 1-basiert beschriftet. Wer hier den rohen Zellwert
+    zeigte, wuerde dem Nutzer eine andere Kopf-Nummer melden, als er getippt hat.
+
+    FM-14b: WIE der Kopf heisst, sagt ``beschriften`` — die EINE Quelle
+    (``app_state.head_labeller``), aus der auch Programmer, Gruppen-Raster und
+    EFX-Liste ihre Namen holen. Am Pixel-Kopf meldet die Statuszeile damit
+    ``1·P3`` statt ``1·K4`` — und heisst das Segment so, wie die Geraeteliste
+    daneben es nennt.
+
+    ★ Und **nur** dort, wo es das Segment gibt: die getippte Nummer wird hier
+    nicht geprueft, ``1:21`` erreicht diese Zeile also auch an einem Geraet mit
+    20 Baenken. ``P20`` waere der Name eines Segments, das der Spiider nicht hat
+    — und stuende zwei Zeilen neben der Fehlermeldung, die dieselbe Eingabe
+    ausdruecklich als ``K21`` (= die getippte Nummer) zurueckgibt. Die Kopfzahl
+    steckt deshalb in ``head_labeller``.
+    """
     def _label(z: str) -> str:
         fid, _sep, head = z.partition(":")
-        return f"{fid}·K{int(head) + 1}" if head else fid
+        if not head:
+            return fid
+        return f"{fid}·{beschriften(int(fid), int(head), kurz=True)}"
     if len(cells) <= limit:
         return ",".join(_label(z) for z in cells)
     head = ",".join(_label(z) for z in cells[:limit])

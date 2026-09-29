@@ -143,11 +143,20 @@ class _RigBasis(unittest.TestCase):
 
     def _auto_gid(self, fid: int) -> int:
         """Die beim Patchen automatisch angelegte Kopf-Matrix dieses Geraets."""
-        with Session(self.state._show_engine) as s:
-            for g in s.execute(select(FixtureGroup)).scalars():
-                if f'"{fid}:0"' in (g.positions_json or ""):
-                    return int(g.id)
+        # FM-14b: am Pixel-Kopf steht die Grundfarbe (Kopf 0) nicht im Ring-
+        # Raster — die Gruppe ueber „fid:0" zu suchen fand sie dann nicht mehr.
+        # Gefragt wird deshalb die EINE Stelle, die „Auto-Gruppe dieses
+        # Geraets" beantwortet.
+        gid = self.state.find_head_matrix_group(fid, dedicated=True)
+        if gid is not None:
+            return int(gid)
         self.fail(f"keine Auto-Kopf-Matrix fuer Geraet {fid} gefunden")
+
+    def _kopfzellen(self, fid: int) -> int:
+        """Wie viele Zellen das Geraet KOPFWEISE im Raster belegt — gelesen aus
+        seiner Auto-Kopf-Matrix, nicht aus der Bankzahl. Gewoehnlich dasselbe;
+        am Pixel-Kopf (FM-14b) fehlt die Grundfarbe im Ring: 20 Baenke, 19 Zellen."""
+        return len(self._lade(self._auto_gid(fid))[2])
 
     def _lade(self, gid: int) -> tuple[int, int, dict]:
         with Session(self.state._show_engine) as s:
@@ -262,8 +271,8 @@ class MergeKeineDoppelformTest(_RigBasis):
 
         # Wache gegen Leerlauf: das Raster traegt beide Geraete, Schwellen aus
         # dem Profil (Spiider-Pixel + Bar-Koepfe), nicht von Hand gesetzt.
-        self.assertEqual(len(self._zellen_von(pos, 1)), self._koepfe(1))
-        self.assertEqual(len(pos), self._koepfe(1) + self._koepfe(2))
+        self.assertEqual(len(self._zellen_von(pos, 1)), self._kopfzellen(1))
+        self.assertEqual(len(pos), self._kopfzellen(1) + self._kopfzellen(2))
 
         for fid in (1, 2):
             self.assertEqual(self._formen(pos, fid), {"kopf"},
@@ -275,8 +284,9 @@ class MergeKeineDoppelformTest(_RigBasis):
                          "die Bar-Koepfe sind nicht vollstaendig im Raster")
         # Die Rastergroesse bleibt, wie sie gestapelt wurde — die frei gewordene
         # Zelle ist eine Luecke, keine Verschiebung.
-        self.assertEqual(cols, self._koepfe(1))
-        self.assertEqual(rows, 3)
+        c1, r1, _p1 = self._lade(self._auto_gid(1))
+        self.assertEqual(cols, c1)
+        self.assertEqual(rows, r1 + 2)
 
     def test_nur_noch_kopfform_egal_in_welcher_stapelreihenfolge(self):
         """Heute entscheidet die Reihenfolge, WELCHE Form auf DMX gewinnt. Die
@@ -352,7 +362,7 @@ class MergeKeineDoppelformTest(_RigBasis):
         cols, rows, pos = self._lade(self._merge([g1, g2], "Rig"))
         self.assertEqual((cols, rows), (max(c1, c2), r1 + r2))
         self.assertEqual(pos, erwartet, "das gesunde Stapeln hat sich veraendert")
-        self.assertEqual(len(pos), self._koepfe(1) + self._koepfe(2))
+        self.assertEqual(len(pos), self._kopfzellen(1) + self._kopfzellen(2))
         self.assertEqual(self._formen(pos, 1), {"kopf"})
         self.assertEqual(self._formen(pos, 2), {"kopf"})
 

@@ -107,6 +107,12 @@ def attr_label(attr: str) -> str:
 
     ``"color_r"`` -> ``"Rot"``; ``"color_r#1"`` -> ``"Rot (Kopf 2)"`` (Kopf 0 ist
     der Basis-Kopf ohne Suffix). Unbekannte Attribute -> roher Name.
+
+    ★ Bewusst KONTEXTFREI: diese Funktion hat kein Geraet in der Hand und kann
+    deshalb nicht sagen, WELCHES Segment ein ``#N`` meint (am Pixel-Kopf heisst
+    ``color_r#3`` ueberall sonst „Pixel 3"). Wer ein Geraet hat, nimmt
+    ``app_state.attr_label_for(attr, fixtures)`` — dort liegt die Geraetekenntnis
+    (FM-14b).
     """
     base, sep, head = (attr or "").partition("#")
     label = ATTR_LABELS.get(base.lower(), base or attr)
