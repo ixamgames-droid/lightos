@@ -16,6 +16,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Leere. Jetzt kommt die Gruppe genau so zurück, wie sie war, und steuert das wiederhergestellte
   Gerät — auch wenn es dabei eine neue Nummer bekommen musste.
 - **Dasselbe bei Hinzufügen → Rückgängig → Wiederholen.**
+- **Wiederholen nach einer Umnummerierung konnte ein fremdes Gerät löschen.** Hatte ein
+  Rückgängig das Gerät auf eine neue Nummer legen müssen (weil die alte inzwischen belegt war),
+  traf das nächste Wiederholen die alte Nummer — also das andere Gerät. Jetzt nicht mehr.
 - **Nach einer beschädigten Gruppe bekam kein neu gepatchtes Mehrkopf-Gerät mehr eine
   Kopf-Gruppe.** Behoben.
 - Kann eine Gruppe beim Rückgängig nicht wiederhergestellt werden, steht das jetzt in der

@@ -177,5 +177,134 @@ class ScanTest(_Basis):
         self.assertIsNotNone(self.state.find_head_matrix_group(9, dedicated=True))
 
 
+
+class ReviewTest(_Basis):
+    """Befunde der adversarialen Review vom 29.09.2026 (Commit d69c2c36)."""
+
+    def _labels(self):
+        return {f.fid: f.label for f in self.state.get_patched_fixtures()}
+
+    def test_redo_nach_umnummerierung_loescht_nicht_das_fremdgeraet(self):
+        """P1: loeschen -> Fremdgeraet auf die alte fid -> Undo (umnummeriert)
+        -> Redo. Vorher traf das Redo die ALTE fid = das Fremdgeraet."""
+        self._drei()
+        self._pflegen(12, "Fronttruss")
+        self.state.remove_fixture(12, undoable=True)
+        self._patch(12, "Fremd", 97, undoable=False)
+        self.stack.undo()
+        self.stack.redo()
+        labels = self._labels()
+        self.assertIn("Fremd", labels.values())
+        self.assertNotIn("HydraC", labels.values())
+        self.stack.undo()                    # und noch einmal zurueck
+        self.assertEqual(["Fronttruss"], [n for n in self._gruppen() if n == "Fronttruss"])
+        hc = [fid for fid, l in self._labels().items() if l == "HydraC"]
+        self.assertEqual(hc, self.state.group_fids_by_name("Fronttruss"))
+
+    def test_undo_nach_redo_mit_umnummerierung_im_add_weg(self):
+        """P2: patchen -> Undo -> Fremdgeraet auf die fid -> Redo (umnummeriert)
+        -> Undo. Vorher war danach das Fremdgeraet weg und B noch da."""
+        self._patch(7, "B", 1)
+        self.stack.undo()
+        self._patch(7, "Fremd", 97, undoable=False)
+        self.stack.redo()
+        self.assertEqual({"B", "Fremd"}, set(self._labels().values()))
+        self.stack.undo()
+        self.assertEqual({7: "Fremd"}, self._labels())
+
+    def test_umbenennung_zwischen_zwei_zyklen_bleibt(self):
+        """P4/M6: veralteter Schnappschuss verwarf die Umbenennung."""
+        self._drei()
+        self._pflegen(9, "Bühne Links")
+        self.state.remove_fixture(9, undoable=True)
+        self.stack.undo()
+        with Session(self.state._show_engine) as s:
+            g = s.execute(select(FixtureGroup).where(
+                FixtureGroup.name == "Bühne Links")).scalars().one()
+            g.name = "Umbenannt"
+            s.commit()
+        self.stack.redo()
+        self.stack.undo()
+        self.assertIn("Umbenannt", self._gruppen())
+        self.assertNotIn("Bühne Links", self._gruppen())
+
+    def test_umbenennung_zwischen_zwei_zyklen_im_add_weg(self):
+        self._patch(7, "B", 1)
+        self._pflegen(7, "Erst")
+        self.stack.undo()
+        self.stack.redo()
+        with Session(self.state._show_engine) as s:
+            g = s.execute(select(FixtureGroup).where(
+                FixtureGroup.name == "Erst")).scalars().one()
+            g.name = "Zweit"
+            s.commit()
+        self.stack.undo()
+        self.stack.redo()
+        self.assertIn("Zweit", self._gruppen())
+        self.assertNotIn("Erst", self._gruppen())
+
+    def test_zusammengelegte_matrix_im_multi_head_ordner_bleibt(self):
+        """M1: die Werks-Loeschung darf nur DEDIZIERTE Gruppen treffen."""
+        self._drei()
+        self._pflegen(9, "Bühne Links")
+        with Session(self.state._show_engine) as s:
+            s.add(FixtureGroup(name="Verbund", cols=8, rows=1, folder="Multi-Head",
+                               positions_json=json.dumps(
+                                   {f"{i},0": f"{9 if i < 4 else 5}:{i % 4}"
+                                    for i in range(8)})))
+            s.commit()
+        self.state.remove_fixture(9, undoable=True)
+        self.stack.undo()
+        self.assertIn("Verbund", self._gruppen())
+        self.assertEqual([9, 5], self.state.group_fids_by_name("Verbund"))
+
+    def test_umsortierte_eigene_gruppe_bleibt(self):
+        """M5: eine dedizierte Gruppe, die der Nutzer in einen anderen Ordner
+        gelegt hat, ist keine Werks-Gruppe."""
+        self._drei()
+        self._pflegen(9, "Bühne Links")
+        with Session(self.state._show_engine) as s:
+            s.add(FixtureGroup(name="Front-Kopie", cols=4, rows=1, folder="Front",
+                               positions_json=json.dumps(
+                                   {f"{i},0": f"9:{i}" for i in range(4)})))
+            s.commit()
+        self.state.remove_fixture(9, undoable=True)
+        self.stack.undo()
+        self.assertIn("Front-Kopie", self._gruppen())
+
+    def test_scheitert_alles_bleibt_die_werks_gruppe_und_es_wird_gemeldet(self):
+        """Befund 3 + 2: kommt keine Gruppe zurueck, wird die Werks-Gruppe NICHT
+        geloescht — das Geraet behaelt wenigstens eine Kopf-Gruppe."""
+        self._drei()
+        self._pflegen(9, "Bühne Links")
+        self.state.remove_fixture(9, undoable=True)
+        echt = A.AppState._zellen_umschreiben
+        A.AppState._zellen_umschreiben = staticmethod(
+            lambda pj, a, n: (_ for _ in ()).throw(ValueError("kaputt")))
+        try:
+            self.stack.undo()
+        finally:
+            A.AppState._zellen_umschreiben = staticmethod(echt)
+        self.assertIn("HydraB · Köpfe", self._gruppen())
+        self.assertTrue(self.hinweise)
+
+    def test_commit_fehler_wird_gemeldet(self):
+        """Befund 2: ein Fehler beim Schreiben blieb stumm (PendingRollbackError
+        nur in der Konsole)."""
+        from sqlalchemy import event
+        self._drei()
+        self._pflegen(9, "Bühne Links")
+        self.state.remove_fixture(9, undoable=True)
+
+        def boom(*_a, **_k):
+            raise RuntimeError("database is locked")
+        event.listen(FixtureGroup, "before_insert", boom)
+        try:
+            self.stack.undo()
+        finally:
+            event.remove(FixtureGroup, "before_insert", boom)
+        self.assertTrue(self.hinweise and "Bühne Links" in self.hinweise[-1],
+                        self.hinweise)
+
 if __name__ == "__main__":
     unittest.main()
