@@ -127,3 +127,6 @@ artifacts_*.png
 
 # Generator-Artefakt (build_*.py aus tools/ schreibt current_show.db)
 tools/data/
+
+# Temp-Seiten, die Szenen-Tests kurz in scene_src anlegen (nie einchecken)
+src/ui/visualizer/scene_src/**/_*_tmp.html

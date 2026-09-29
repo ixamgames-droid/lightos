@@ -1,0 +1,668 @@
+"""STAB-24/STAB-25: EIN kaputter Eintrag darf nicht ALLES kosten - und nie still.
+
+Zwei Stellen im Lade-Pfad, dieselbe Fehlerklasse:
+
+* ``_restore_fixture_groups`` loeschte ERST alle Gruppen (``delete(FixtureGroup)``)
+  und legte sie danach einzeln neu an - alles in EINEM ``try``. Ein unlesbares
+  Feld (``cols`` als Text) riss den ganzen Block ab; die Transaktion rollte
+  zurueck, uebrig blieb die vom Reset geleerte Tabelle. Vier Gruppen in der
+  Datei, null in der DB - wegen EINER.
+* Der ``patch``-Block wurde still verworfen, wenn er keine Liste ist
+  (``if isinstance(patch_entries, list)`` ohne ``else``), und einzelne
+  Nicht-Objekt-Eintraege verschwanden mit einem stummen ``continue``. Kein
+  Ladeproblem, kein Warndialog - die Geraete waren einfach weg.
+
+**Die Schadensrichtung ist das Entscheidende:** der Verlust entsteht nicht beim
+Laden, sondern beim naechsten SPEICHERN. Ein Hinweis danach ist wertlos. Darum
+laufen beide Meldungen ueber den Weg, den das Haus schon hat - ``_lenient`` ->
+``letzte_ladeprobleme()`` -> Warndialog in ``main_window._open_show_path`` -
+und nicht ueber einen zweiten, neu erfundenen Kanal (Hausregel 6).
+
+Gemessen wird am ECHTEN Weg: eine per ``save_show`` erzeugte Datei, deren
+``show.json`` an GENAU EINER Stelle beschaedigt wird, danach ``load_show`` und
+gezaehlt, was in der Show-DB steht.
+"""
+import contextlib
+import json
+import os
+import tempfile
+import unittest
+import zipfile
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+from sqlalchemy import delete, select
+
+from src.core.database.models import FixtureGroup, PatchedFixture
+from src.core.show import show_file as SF
+
+
+class _Basis(unittest.TestCase):
+    """Gemeinsamer Aufbau: echte Show-Datei bauen, gezielt EINEN Eintrag
+    beschaedigen, ueber ``load_show`` laden, das Ergebnis in der DB zaehlen."""
+
+    def setUp(self):
+        from src.core.app_state import get_state
+        self.st = get_state()
+        SF.reset_show()
+        self.pfad = os.path.join(tempfile.gettempdir(),
+                                 f"stab2425_{os.getpid()}_{id(self)}.lshow")
+
+    def tearDown(self):
+        SF.reset_show()
+        with contextlib.suppress(OSError):
+            os.remove(self.pfad)
+
+    # ── Aufbau ───────────────────────────────────────────────────────────────
+
+    def _gruppen_anlegen(self, namen):
+        """Gruppen in die Show-DB schreiben - die Quelle, aus der save_show sammelt."""
+        with self.st._session() as s:
+            s.execute(delete(FixtureGroup))
+            for i, name in enumerate(namen, start=1):
+                s.add(FixtureGroup(name=name, cols=i + 1, rows=2,
+                                   positions_json='{"0,0": %d}' % i,
+                                   folder="Front"))
+            s.commit()
+
+    def _gruppen_in_db(self):
+        with self.st._session() as s:
+            return sorted(g.name for g in s.execute(select(FixtureGroup)).scalars().all())
+
+    def _geraete_patchen(self, labels):
+        for i, name in enumerate(labels, start=1):
+            self.st.add_fixture(PatchedFixture(
+                fid=i, label=name, fixture_profile_id=1, mode_name="m",
+                universe=1, address=i * 10, channel_count=8,
+                fixture_type="par"), undoable=False)
+
+    def _geraete_in_db(self):
+        return sorted(f.label for f in self.st.get_patched_fixtures())
+
+    def _speichern(self):
+        SF.save_show(self.pfad)
+
+    def _show_json_aendern(self, aendern):
+        """``show.json`` IN der gespeicherten Datei umschreiben, Rest unveraendert.
+
+        Bewusst kein von Hand zusammengebautes ZIP: die Datei bleibt eine echte
+        save_show-Ausgabe, nur eben mit einem beschaedigten Feld - so wie sie
+        nach einem Absturz oder einer Handbearbeitung auf der Platte liegt."""
+        with zipfile.ZipFile(self.pfad, "r") as zf:
+            inhalt = [(i.filename, zf.read(i.filename)) for i in zf.infolist()]
+        data = json.loads(dict(inhalt)["show.json"].decode("utf-8"))
+        aendern(data)
+        with zipfile.ZipFile(self.pfad, "w", zipfile.ZIP_DEFLATED) as zf:
+            for name, roh in inhalt:
+                if name == "show.json":
+                    zf.writestr(name, json.dumps(data, ensure_ascii=False))
+                else:
+                    zf.writestr(name, roh)
+        return data
+
+    def _show_json_lesen(self):
+        with zipfile.ZipFile(self.pfad, "r") as zf:
+            return json.loads(zf.read("show.json").decode("utf-8"))
+
+
+# ══ STAB-24: Fixture-Gruppen ═════════════════════════════════════════════════
+
+class _GruppenBasis(_Basis):
+
+    NAMEN = ["Front-Wash", "Back-Spots", "Truss-Bars", "Floor-Pars"]
+
+    def _datei_mit_vier_gruppen(self, beschaedigen=None):
+        self._gruppen_anlegen(self.NAMEN)
+        self._speichern()
+        if beschaedigen is not None:
+            self._show_json_aendern(beschaedigen)
+        # ★ Vorbedingung: die Datei enthaelt WIRKLICH vier Gruppen-Eintraege.
+        data = self._show_json_lesen()
+        self.assertEqual(4, len(data["fixture_groups"]),
+                         "Die Sonde misst nicht, was sie messen will: die Datei "
+                         "haelt gar keine vier Gruppen.")
+        SF.reset_show()
+        self.assertEqual([], self._gruppen_in_db(),
+                         "Ausgangslage nicht leer - die Zaehlung danach waere wertlos.")
+        return data
+
+
+
+class GruppenTest(_GruppenBasis):
+
+    def test_ein_unlesbares_feld_kostet_nur_seine_eigene_gruppe(self):
+        """``cols`` als Text im DRITTEN von vier Eintraegen (Hausregel 4: nicht
+        der bequeme Ein-Eintrag-Fall, sondern der Alltagsfall mit mehreren)."""
+        def kaputt(data):
+            data["fixture_groups"][2]["cols"] = "acht"
+        self._datei_mit_vier_gruppen(kaputt)
+
+        ok, msg = SF.load_show(self.pfad)
+        uebrig = self._gruppen_in_db()
+        print(f"[MESSUNG STAB-24] Datei: 4 Gruppen (1 unlesbar) -> DB: {len(uebrig)} {uebrig}")
+
+        self.assertTrue(ok, msg)
+        self.assertEqual(["Back-Spots", "Floor-Pars", "Front-Wash"], uebrig,
+                         "Ein einziger unlesbarer Eintrag hat die uebrigen Gruppen "
+                         "mitgerissen.")
+        self.assertTrue(
+            any("Truss-Bars" in p for p in SF.letzte_ladeprobleme()),
+            f"Die uebersprungene Gruppe wird nicht gemeldet: {SF.letzte_ladeprobleme()}")
+        self.assertIn("konnten nicht gelesen werden", msg,
+                      f"load_show meldet glatten Erfolg: {msg!r}")
+
+    def test_eintrag_der_kein_objekt_ist_wird_gemeldet_statt_verschluckt(self):
+        """Bisher ein stummes ``continue`` - die Gruppe war weg, ohne ein Wort."""
+        def kaputt(data):
+            data["fixture_groups"][1] = "Back-Spots"
+        self._datei_mit_vier_gruppen(kaputt)
+
+        SF.load_show(self.pfad)
+        uebrig = self._gruppen_in_db()
+        print(f"[MESSUNG STAB-24b] Datei: 4 Gruppen (1 kein Objekt) -> DB: {len(uebrig)} {uebrig}")
+
+        self.assertEqual(["Floor-Pars", "Front-Wash", "Truss-Bars"], uebrig)
+        self.assertEqual(1, len(SF.letzte_ladeprobleme()),
+                         "Ein verworfener Gruppen-Eintrag bleibt still - der Nutzer "
+                         "erfaehrt es erst, wenn das Speichern es festgeschrieben hat.")
+        self.assertIn("Fixture-Gruppe 2", SF.letzte_ladeprobleme()[0],
+                      "Die Meldung sagt nicht, WELCHER Eintrag fehlt.")
+
+    def test_gruppen_block_der_keine_liste_ist_wird_gemeldet(self):
+        """Der Block ist da, aber unlesbar (Objekt statt Liste) - EINE klare
+        Meldung, nicht eine unverstaendliche pro Schluessel."""
+        def kaputt(data):
+            data["fixture_groups"] = {g["name"]: g for g in data["fixture_groups"]}
+        self._gruppen_anlegen(self.NAMEN)
+        self._speichern()
+        data = self._show_json_aendern(kaputt)
+        self.assertNotIsInstance(data["fixture_groups"], list)
+        SF.reset_show()
+
+        ok, msg = SF.load_show(self.pfad)
+        print(f"[MESSUNG STAB-24d] Gruppen-Block kein Liste -> DB: "
+              f"{len(self._gruppen_in_db())}, Ladeprobleme: {SF.letzte_ladeprobleme()}")
+        self.assertTrue(ok, msg)
+        self.assertEqual(1, len(SF.letzte_ladeprobleme()),
+                         f"Erwartet EINE Meldung: {SF.letzte_ladeprobleme()}")
+        self.assertIn("Gruppen-Block", SF.letzte_ladeprobleme()[0])
+
+    def test_feld_das_erst_beim_commit_scheitert_kostet_nur_seine_gruppe(self):
+        """★ Der zweite Weg um die Regel herum (Hausregel 8): ein Wert, den erst
+        SQLite nicht binden kann (``name`` als Liste), wird beim Uebersetzen noch
+        nicht bemerkt — er reisst dann die GEMEINSAME Transaktion und damit alle
+        uebrigen Gruppen mit, obwohl jeder Eintrag einzeln gebaut wurde."""
+        def kaputt(data):
+            data["fixture_groups"][2]["name"] = ["Truss-Bars"]
+        self._datei_mit_vier_gruppen(kaputt)
+
+        SF.load_show(self.pfad)
+        uebrig = self._gruppen_in_db()
+        print(f"[MESSUNG STAB-24e] Datei: 4 Gruppen (1 unbindbarer name) -> DB: "
+              f"{len(uebrig)} {uebrig}")
+
+        self.assertEqual(["Back-Spots", "Floor-Pars", "Front-Wash"], uebrig,
+                         "Ein Feld, das erst beim Commit scheitert, kostet "
+                         "weiterhin alle Gruppen.")
+        self.assertEqual(1, len(SF.letzte_ladeprobleme()),
+                         f"Genau EIN Ausfall erwartet: {SF.letzte_ladeprobleme()}")
+        self.assertIn("Fixture-Gruppe 3", SF.letzte_ladeprobleme()[0])
+
+    def test_positions_json_als_objekt_kostet_nur_seine_gruppe(self):
+        """Zweite Auspraegung derselben Falle an einem ANDEREN Feld — damit die
+        Haertung nicht nur fuer ``name`` gilt."""
+        def kaputt(data):
+            data["fixture_groups"][0]["positions_json"] = {"0,0": 1}
+        self._datei_mit_vier_gruppen(kaputt)
+
+        SF.load_show(self.pfad)
+        uebrig = self._gruppen_in_db()
+        print(f"[MESSUNG STAB-24f] Datei: 4 Gruppen (1 positions_json als Objekt) "
+              f"-> DB: {len(uebrig)} {uebrig}")
+
+        self.assertEqual(["Back-Spots", "Floor-Pars", "Truss-Bars"], uebrig)
+        self.assertEqual(1, len(SF.letzte_ladeprobleme()),
+                         f"Genau EIN Ausfall erwartet: {SF.letzte_ladeprobleme()}")
+        self.assertIn("Front-Wash", SF.letzte_ladeprobleme()[0],
+                      "Die Meldung sagt nicht, WELCHE Gruppe fehlt.")
+
+    def test_zwei_kaputte_von_vier_kosten_genau_zwei(self):
+        """Gegenprobe zur Einschraenkung 'nur der erste kaputte Eintrag zaehlt'."""
+        def kaputt(data):
+            data["fixture_groups"][0]["rows"] = "zwei"
+            # Runde 2: ``null`` gilt wie ein fehlendes Feld (Default 8, Gruppe
+            # bleibt) — unlesbar ist erst ein Wert, der keine Zahl ist.
+            data["fixture_groups"][3]["cols"] = "viele"
+        self._datei_mit_vier_gruppen(kaputt)
+
+        SF.load_show(self.pfad)
+        uebrig = self._gruppen_in_db()
+        print(f"[MESSUNG STAB-24c] Datei: 4 Gruppen (2 unlesbar) -> DB: {len(uebrig)} {uebrig}")
+
+        self.assertEqual(["Back-Spots", "Truss-Bars"], uebrig)
+        self.assertEqual(2, len([p for p in SF.letzte_ladeprobleme() if "Gruppe" in p]),
+                         f"Nicht beide Ausfaelle gemeldet: {SF.letzte_ladeprobleme()}")
+
+    # ── Positivkontrolle ─────────────────────────────────────────────────────
+
+    def test_saubere_datei_laedt_alle_vier_gruppen_unveraendert(self):
+        """Ein Fix, der 'gelingt', indem er nichts mehr laedt, besteht sonst
+        jeden Test (Hausregel 5). Gleiche Datei, nur unbeschaedigt."""
+        self._datei_mit_vier_gruppen()
+
+        ok, msg = SF.load_show(self.pfad)
+        with self.st._session() as s:
+            geladen = {g.name: (g.cols, g.rows, g.positions_json, g.folder)
+                       for g in s.execute(select(FixtureGroup)).scalars().all()}
+        print(f"[MESSUNG STAB-24 Positivkontrolle] Datei: 4 saubere Gruppen -> DB: {len(geladen)}")
+
+        self.assertTrue(ok, msg)
+        self.assertEqual(sorted(self.NAMEN), sorted(geladen))
+        self.assertEqual((4, 2, '{"0,0": 3}', "Front"), geladen["Truss-Bars"],
+                         "Felder einer sauberen Gruppe wurden veraendert.")
+        self.assertEqual([], SF.letzte_ladeprobleme(),
+                         "Fehlalarm bei sauberer Datei - dann ist die Warnung wertlos.")
+        self.assertNotIn("ABER", msg)
+
+    def test_gescheiterte_db_meldet_sich_weiterhin(self):
+        """STAB-23-Regress: schlaegt der DB-Zugriff SELBST fehl (kein Eintrags-
+        problem), muss das weiterhin gemeldet werden."""
+        self._datei_mit_vier_gruppen()
+
+        class _Sperre(Exception):
+            pass
+
+        echt = self.st._session
+        self.st._session = lambda: (_ for _ in ()).throw(_Sperre("database is locked"))
+        try:
+            SF.load_show(self.pfad)
+        finally:
+            self.st._session = echt
+
+        self.assertTrue(any("groups" in p for p in SF.letzte_ladeprobleme()),
+                        f"DB-Fehler nicht gemeldet: {SF.letzte_ladeprobleme()}")
+
+
+# ══ STAB-25: Geraete-Patch ═══════════════════════════════════════════════════
+
+class PatchTest(_Basis):
+
+    LABELS = ["A-Spot 1", "B-Wash 2", "C-Bar 3", "D-Par 4"]
+
+    def _datei_mit_vier_geraeten(self, beschaedigen=None):
+        self._geraete_patchen(self.LABELS)
+        self._speichern()
+        if beschaedigen is not None:
+            self._show_json_aendern(beschaedigen)
+        SF.reset_show()
+        self.assertEqual([], self._geraete_in_db(),
+                         "Ausgangslage nicht leer - die Zaehlung danach waere wertlos.")
+
+    def test_patch_block_der_keine_liste_ist_wird_gemeldet(self):
+        """★ STAB-25 im Kern: der Block ist da, aber nicht lesbar - bisher fiel
+        er durch ein ``if isinstance(...)`` OHNE ``else`` und war einfach weg."""
+        def kaputt(data):
+            data["patch"] = {str(i): e for i, e in enumerate(data["patch"])}
+        self._geraete_patchen(self.LABELS)
+        self._speichern()
+        data = self._show_json_aendern(kaputt)
+        # ★ Vorbedingung: der Block ist vorhanden, enthaelt alle vier Geraete und
+        # ist wirklich keine Liste - sonst misst die Sonde einen anderen Fall.
+        self.assertEqual(4, len(data["patch"]))
+        self.assertNotIsInstance(data["patch"], list)
+        SF.reset_show()
+
+        ok, msg = SF.load_show(self.pfad)
+        danach = self._geraete_in_db()
+        print(f"[MESSUNG STAB-25] Datei: 4 Geraete in unlesbarem Block -> DB: "
+              f"{len(danach)} {danach}, Ladeprobleme: {SF.letzte_ladeprobleme()}")
+
+        self.assertTrue(ok, msg)
+        self.assertTrue(SF.letzte_ladeprobleme(),
+                        "Alle Geraete weg, und kein Wort darueber - das naechste "
+                        "Speichern schreibt den Verlust fest.")
+        self.assertIn("konnten nicht gelesen werden", msg,
+                      f"load_show meldet glatten Erfolg: {msg!r}")
+        # ⚠️ EINE klare Meldung ueber den BLOCK - nicht eine pro dict-Schluessel.
+        # Ohne diese Zusicherung genuegt es, ueber den kaputten Block zu ITERIEREN
+        # (ueber die Schluessel eines dicts, ueber die Zeichen eines Textes): dann
+        # steht in der Warnung viermal "Gerät N übersprungen: Eintrag ist kein
+        # Objekt, sondern str" und der Nutzer erfaehrt NICHT, was wirklich los ist.
+        self.assertEqual(1, len(SF.letzte_ladeprobleme()),
+                         f"Erwartet EINE Meldung ueber den Block: "
+                         f"{SF.letzte_ladeprobleme()}")
+        self.assertIn("Patch-Block", SF.letzte_ladeprobleme()[0])
+
+    def test_patch_block_null_wird_gemeldet(self):
+        """Zweite Auspraegung desselben Falls: ``"patch": null``. Bewusst mit
+        dabei, weil ein ``data.get("patch") or []`` sie wieder verschluckte."""
+        self._geraete_patchen(self.LABELS)
+        self._speichern()
+        data = self._show_json_aendern(lambda d: d.__setitem__("patch", None))
+        self.assertIsNone(data["patch"])
+        SF.reset_show()
+
+        ok, msg = SF.load_show(self.pfad)
+        print(f"[MESSUNG STAB-25d] patch-Block ist null -> DB: "
+              f"{len(self._geraete_in_db())}, Ladeprobleme: {SF.letzte_ladeprobleme()}")
+        self.assertTrue(ok, msg)
+        self.assertEqual(1, len(SF.letzte_ladeprobleme()),
+                         f"Erwartet EINE Meldung: {SF.letzte_ladeprobleme()}")
+        self.assertIn("Patch-Block", SF.letzte_ladeprobleme()[0])
+
+    def test_ein_eintrag_der_kein_objekt_ist_kostet_nur_sich_selbst(self):
+        def kaputt(data):
+            data["patch"][2] = "C-Bar 3"
+        self._datei_mit_vier_geraeten(kaputt)
+
+        SF.load_show(self.pfad)
+        danach = self._geraete_in_db()
+        print(f"[MESSUNG STAB-25b] Datei: 4 Geraete (1 kein Objekt) -> DB: {len(danach)} {danach}")
+
+        self.assertEqual(["A-Spot 1", "B-Wash 2", "D-Par 4"], danach)
+        self.assertEqual(1, len(SF.letzte_ladeprobleme()),
+                         "Das verworfene Geraet bleibt still - der Nutzer erfaehrt "
+                         "es erst nach dem Speichern, also zu spaet.")
+        self.assertIn("Gerät 3", SF.letzte_ladeprobleme()[0],
+                      "Die Meldung sagt nicht, WELCHES Geraet fehlt.")
+
+    def test_ein_unlesbarer_eintrag_reisst_den_patch_nicht_mit(self):
+        """Fehlerinjektion GENAU an einem Eintrag, echter Ladeweg drumherum:
+        die Bauschleife war nicht pro Eintrag gekapselt, ein Wurf kostete ALLE
+        Geraete."""
+        self._datei_mit_vier_geraeten()
+        gesehen = []
+        echt = SF._patched_fixture_from_data
+
+        def stolpert(d, fallback_fid):
+            gesehen.append(d.get("label"))
+            if d.get("label") == "C-Bar 3":
+                raise ValueError("Feld unlesbar")
+            return echt(d, fallback_fid)
+
+        SF._patched_fixture_from_data = stolpert
+        try:
+            SF.load_show(self.pfad)
+        finally:
+            SF._patched_fixture_from_data = echt
+        danach = self._geraete_in_db()
+        print(f"[MESSUNG STAB-25c] Datei: 4 Geraete (1 wirft) -> DB: {len(danach)} {danach}; "
+              f"Eintraege gesehen: {gesehen}")
+
+        # ★ Vorbedingung: die Injektion hat den Zieleintrag WIRKLICH erreicht.
+        self.assertIn("C-Bar 3", gesehen,
+                      "Die Sonde hat den kaputten Eintrag nie beruehrt.")
+        self.assertEqual(["A-Spot 1", "B-Wash 2", "D-Par 4"], danach,
+                         "Ein kaputter Eintrag kostet weiterhin den ganzen Patch.")
+        self.assertEqual(4, len(gesehen),
+                         "Die Bauschleife bricht beim kaputten Eintrag weiterhin ab.")
+        self.assertEqual(1, len(SF.letzte_ladeprobleme()),
+                         f"Genau EIN Ausfall erwartet: {SF.letzte_ladeprobleme()}")
+        self.assertIn("C-Bar 3", SF.letzte_ladeprobleme()[0],
+                      "Die Meldung sagt nicht, WELCHES Geraet fehlt.")
+
+    # ── Positivkontrolle ─────────────────────────────────────────────────────
+
+    def test_saubere_datei_laedt_alle_vier_geraete_unveraendert(self):
+        self._datei_mit_vier_geraeten()
+
+        ok, msg = SF.load_show(self.pfad)
+        danach = self._geraete_in_db()
+        adressen = sorted((f.label, f.universe, f.address, f.channel_count)
+                          for f in self.st.get_patched_fixtures())
+        print(f"[MESSUNG STAB-25 Positivkontrolle] Datei: 4 saubere Geraete -> DB: {len(danach)}")
+
+        self.assertTrue(ok, msg)
+        self.assertEqual(sorted(self.LABELS), danach)
+        self.assertEqual([("A-Spot 1", 1, 10, 8), ("B-Wash 2", 1, 20, 8),
+                          ("C-Bar 3", 1, 30, 8), ("D-Par 4", 1, 40, 8)], adressen)
+        self.assertEqual([], SF.letzte_ladeprobleme(),
+                         "Fehlalarm bei sauberer Datei - dann ist die Warnung wertlos.")
+        self.assertNotIn("ABER", msg)
+
+    def test_show_ohne_patch_block_warnt_nicht(self):
+        """Gegenprobe: FEHLT der Block ganz (Alt-Show/Teil-Show), ist das kein
+        Ladeproblem - sonst warnt die UI bei Dateien, denen nichts fehlt."""
+        self._geraete_patchen(self.LABELS)
+        self._speichern()
+        self._show_json_aendern(lambda data: data.pop("patch"))
+        SF.reset_show()
+
+        ok, msg = SF.load_show(self.pfad)
+        print(f"[MESSUNG STAB-25 Gegenprobe] ohne patch-Block -> Ladeprobleme: "
+              f"{SF.letzte_ladeprobleme()}")
+        self.assertTrue(ok, msg)
+        self.assertEqual([], SF.letzte_ladeprobleme())
+
+
+
+# ══ Runde 2 (29.09.2026): die fuenf Befunde der Gegenpruefung ═══════════════
+
+class ToleranzTest(_GruppenBasis):
+    """(a) Nur wirklich Unbindbares ist unlesbar. Zahlen als Name/Ordner luden
+    auf dem alten Stand (Gruppe hiess dann '2024'); der geparkte Entwurf warf
+    sie weg — genau der Verlust, den STAB-24 verhindern soll."""
+
+    def test_zahl_als_name_und_ordner_bleibt_erhalten(self):
+        def zahlen(data):
+            data["fixture_groups"][2]["name"] = 2024
+            data["fixture_groups"][1]["folder"] = 7
+        self._datei_mit_vier_gruppen(zahlen)
+        ok, msg = SF.load_show(self.pfad)
+        self.assertTrue(ok, msg)
+        self.assertEqual(sorted(["Front-Wash", "Back-Spots", "2024", "Floor-Pars"]),
+                         self._gruppen_in_db())
+        self.assertEqual([], [m for m in SF.letzte_ladeprobleme() if "Gruppe" in m])
+
+    def test_ordner_als_liste_kostet_nur_seine_gruppe(self):
+        """Die ueberlebende Mutation: ``folder`` war von keiner Sonde beruehrt."""
+        def kaputt(data):
+            data["fixture_groups"][0]["folder"] = ["Front"]
+        self._datei_mit_vier_gruppen(kaputt)
+        SF.load_show(self.pfad)
+        self.assertEqual(sorted(self.NAMEN[1:]), self._gruppen_in_db())
+        meldungen = [m for m in SF.letzte_ladeprobleme() if "Front-Wash" in m]
+        self.assertEqual(1, len(meldungen), SF.letzte_ladeprobleme())
+
+
+class NullBlockTest(_GruppenBasis):
+    """(b) ``"fixture_groups": null`` wurde per ``or []`` stumm leer."""
+
+    def test_null_block_wird_gemeldet(self):
+        self._gruppen_anlegen(self.NAMEN)
+        self._speichern()
+        self._show_json_aendern(lambda d: d.__setitem__("fixture_groups", None))
+        SF.reset_show()
+        SF.load_show(self.pfad)
+        self.assertTrue([m for m in SF.letzte_ladeprobleme()
+                         if "Fixture-Gruppen-Block" in m], SF.letzte_ladeprobleme())
+
+    def test_fehlender_block_warnt_nicht(self):
+        self._gruppen_anlegen(self.NAMEN)
+        self._speichern()
+        self._show_json_aendern(lambda d: d.pop("fixture_groups"))
+        SF.reset_show()
+        SF.load_show(self.pfad)
+        self.assertFalse([m for m in SF.letzte_ladeprobleme() if "Gruppe" in m])
+
+
+class SpeichernTest(_Basis):
+    """(c) Der Speicher-Pfad: HIER wird ein Verlust festgeschrieben."""
+
+    NAMEN = ["Front-Wash", "Back-Spots", "Truss-Bars", "Floor-Pars"]
+
+    def _kaputte_zeile(self, name):
+        from sqlalchemy import text
+        with self.st._session() as s:
+            s.execute(text("UPDATE fixture_groups SET cols='acht' WHERE name=:n"),
+                      {"n": name})
+            s.commit()
+
+    def test_kaputte_zeile_an_position_1_kostet_nur_sich(self):
+        self._gruppen_anlegen(self.NAMEN)
+        self._kaputte_zeile("Front-Wash")
+        self._speichern()
+        namen = sorted(g["name"] for g in self._show_json_lesen()["fixture_groups"])
+        self.assertEqual(sorted(self.NAMEN[1:]), namen)
+        probleme = SF.letzte_speicherprobleme()
+        self.assertEqual(1, len(probleme), probleme)
+        self.assertIn("Front-Wash", probleme[0])
+
+    def test_sauberes_speichern_meldet_nichts(self):
+        self._gruppen_anlegen(self.NAMEN)
+        self._speichern()
+        self.assertEqual([], SF.letzte_speicherprobleme())
+        self.assertEqual(4, len(self._show_json_lesen()["fixture_groups"]))
+
+
+class LaserUndKegelTest(_Basis):
+    """(d) Dieselbe Klasse 100 Zeilen tiefer."""
+
+    def _vier_figuren(self):
+        from src.core.laser.figure import FigurePoint, LaserFigure
+        self.st.laser_figures = [
+            LaserFigure(name=f"Fig{i}", closed=True,
+                        points=[FigurePoint(x=0.1 * i, y=0.0), FigurePoint(x=0.0, y=0.2)])
+            for i in range(1, 5)]
+        self._speichern()
+
+    def test_ein_kaputter_punkt_kostet_nur_seine_figur(self):
+        self._vier_figuren()
+        self._show_json_aendern(
+            lambda d: d["laser_figures"][2]["points"][0].__setitem__("x", "links"))
+        SF.reset_show()
+        SF.load_show(self.pfad)
+        self.assertEqual(["Fig1", "Fig2", "Fig4"],
+                         [f.name for f in self.st.laser_figures])
+        meldungen = [m for m in SF.letzte_ladeprobleme() if "Laser-Figur" in m]
+        self.assertEqual(1, len(meldungen), SF.letzte_ladeprobleme())
+        self.assertIn("3", meldungen[0])
+        self.assertIn("Fig3", meldungen[0])
+
+    def test_kaputter_kegel_eintrag_kostet_nur_sich(self):
+        self._speichern()
+        self._show_json_aendern(lambda d: d.setdefault("visualizer", {})
+                                .__setitem__("beams_off", [1, "x", 3]))
+        SF.reset_show()
+        SF.load_show(self.pfad)
+        self.assertEqual({1, 3}, set(self.st.visualizer_beams_off))
+
+
+class MeldungTest(_Basis):
+    """(e) Die zwei uebrigen ueberlebenden Mutationen."""
+
+    def test_patch_als_text_ist_EINE_meldung(self):
+        """Nicht ueber die ZEICHEN iterieren (12 Meldungen statt einer)."""
+        self._geraete_patchen(["A", "B"])
+        self._speichern()
+        self._show_json_aendern(lambda d: d.__setitem__("patch", "vier Geraete"))
+        SF.reset_show()
+        SF.load_show(self.pfad)
+        patch_meldungen = [m for m in SF.letzte_ladeprobleme()
+                           if "Patch" in m or "Gerät" in m]
+        self.assertEqual(1, len(patch_meldungen), patch_meldungen)
+
+    def test_meldung_nennt_nummer_UND_namen(self):
+        self._geraete_patchen(["Links", "Mitte", "Rechts"])
+        self._speichern()
+        echt = SF._patched_fixture_from_data
+
+        def stolpert(d, fallback_fid):
+            if d.get("label") == "Mitte":
+                raise ValueError("Feld unlesbar")
+            return echt(d, fallback_fid)
+
+        SF.reset_show()
+        SF._patched_fixture_from_data = stolpert
+        try:
+            SF.load_show(self.pfad)
+        finally:
+            SF._patched_fixture_from_data = echt
+        m = [x for x in SF.letzte_ladeprobleme() if "Gerät" in x]
+        self.assertEqual(1, len(m), SF.letzte_ladeprobleme())
+        self.assertIn("Gerät 2 ", m[0])
+        self.assertIn("'Mitte'", m[0])
+
+
+class ReviewTest(_GruppenBasis):
+    """Befunde der adversarialen Review vom 29.09.2026."""
+
+    def _laden(self, aendern):
+        self._datei_mit_vier_gruppen(aendern)
+        ok, msg = SF.load_show(self.pfad)
+        self.assertTrue(ok, msg)
+        with self.st._session() as s:
+            return {g.name: g for g in s.execute(select(FixtureGroup)).scalars().all()}
+
+    def test_null_felder_werden_defaults_nicht_verlust(self):
+        """M3: ``_als_text`` darf bei None NICHT werfen — genau dort brach es
+        in der Vorrunde."""
+        def nullen(data):
+            g = data["fixture_groups"][1]
+            g["folder"] = None
+            g["positions_json"] = None
+        gruppen = self._laden(nullen)
+        self.assertEqual(4, len(gruppen))
+        self.assertEqual(("", "{}"), (gruppen["Back-Spots"].folder,
+                                      gruppen["Back-Spots"].positions_json))
+        self.assertEqual([], SF.letzte_ladeprobleme())
+
+    def test_alt_show_ohne_felder_bekommt_die_alten_defaults(self):
+        """M11/M8: fehlende Felder und leeres positions_json."""
+        def alt(data):
+            g = data["fixture_groups"][2]
+            for k in ("folder", "positions_json", "cols"):
+                g.pop(k)
+            g["rows"] = None                      # null wie fehlend
+            data["fixture_groups"][3]["positions_json"] = ""
+        gruppen = self._laden(alt)
+        t = gruppen["Truss-Bars"]
+        self.assertEqual(("", "{}", 8, 8), (t.folder, t.positions_json, t.cols, t.rows))
+        self.assertEqual("{}", gruppen["Floor-Pars"].positions_json)
+
+    def test_riesige_zahl_kostet_keine_gruppe(self):
+        """Befund 1: ``cols = 10**20`` scheiterte erst beim COMMIT -> 0 von 4."""
+        def riesig(data):
+            data["fixture_groups"][1]["cols"] = 10 ** 20
+        gruppen = self._laden(riesig)
+        self.assertEqual(4, len(gruppen))
+        self.assertEqual(4096, gruppen["Back-Spots"].cols)
+        self.assertTrue([m for m in SF.letzte_ladeprobleme() if "begrenzt" in m])
+
+
+class ReviewPatchTest(_Basis):
+
+    def test_riesige_fid_kostet_nur_ihr_geraet(self):
+        """Befund 2: ``fid = 10**20`` liess den atomaren Replace scheitern ->
+        alle Geraete weg."""
+        self._geraete_patchen(["A", "B", "C", "D"])
+        self._speichern()
+        self._show_json_aendern(lambda d: d["patch"][1].__setitem__("fid", 10 ** 20))
+        SF.reset_show()
+        SF.load_show(self.pfad)
+        self.assertEqual(["A", "C", "D"], self._geraete_in_db())
+        self.assertEqual(1, len([m for m in SF.letzte_ladeprobleme() if "Gerät 2" in m]),
+                         SF.letzte_ladeprobleme())
+
+
+class ReviewKegelTest(_Basis):
+
+    def _kegel(self, wert):
+        self._speichern()
+        self._show_json_aendern(lambda d: d.setdefault("visualizer", {})
+                                .__setitem__("beams_off", wert))
+        SF.reset_show()
+        SF.load_show(self.pfad)
+        return set(self.st.visualizer_beams_off)
+
+    def test_text_statt_liste_blendet_nicht_die_falschen_aus(self):
+        """Befund 3: ``"12"`` wurde zu {1, 2} — falsche Geraete, keine Meldung."""
+        self.assertEqual(set(), self._kegel("12"))
+        self.assertTrue([m for m in SF.letzte_ladeprobleme() if "Lichtkegel" in m])
+
+    def test_null_wird_gemeldet(self):
+        self.assertEqual(set(), self._kegel(None))
+        self.assertTrue([m for m in SF.letzte_ladeprobleme() if "Lichtkegel" in m])
+
+if __name__ == "__main__":
+    unittest.main()
