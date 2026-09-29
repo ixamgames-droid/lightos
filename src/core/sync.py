@@ -438,10 +438,22 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
                     u = getattr(f, "universe", 0)
                     by_univ.setdefault(u, []).append(f)
                 for univ, fxs in by_univ.items():
+                    # STAB-26: JEDES Paar mit Ueberschneidung, nicht nur Nachbarn
+                    # in Adress-Reihenfolge. Bis 2026-09-29 verschwand ein Geraet,
+                    # das komplett in einem langen Bereich lag, hinter seinem
+                    # Nachbarn: A 1-100, B 10-12, C 20-22 meldete nur A/B, nie A/C.
+                    # Sweep: alle noch „offenen" Bereiche (Ende >= Start von b).
                     sorted_fxs = sorted(fxs, key=lambda x: getattr(x, "address", 0))
-                    for i in range(len(sorted_fxs) - 1):
-                        a = sorted_fxs[i]
-                        b = sorted_fxs[i + 1]
+                    offen: list = []
+                    paare = []
+                    for b in sorted_fxs:
+                        b_addr = getattr(b, "address", 0)
+                        offen = [a for a in offen
+                                 if getattr(a, "address", 0)
+                                 + getattr(a, "channel_count", 0) - 1 >= b_addr]
+                        paare.extend((a, b) for a in offen)
+                        offen.append(b)
+                    for a, b in paare:
                         a_end = getattr(a, "address", 0) + getattr(a, "channel_count", 0) - 1
                         b_addr = getattr(b, "address", 0)
                         b_end = b_addr + getattr(b, "channel_count", 0) - 1
