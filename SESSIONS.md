@@ -9,7 +9,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| FM-39 | A | fix/fm39-patch-ueberlauf | 2026-09-29T00:56Z | src/ui/widgets/fixture_browser.py,src/ui/views/patch_view.py |
 | STAB-26 | A | fix/stab26-ueberlappung | 2026-09-29T01:14Z | src/core/sync.py |
 
 ## Blocker & Fallen
@@ -129,7 +128,6 @@
 
 ## Verlauf
 
-- 2026-09-28T13:57Z A claim BPM-17
 - 2026-09-28T14:28Z A done BPM-17
 - 2026-09-28T14:38Z A claim BPM-18
 - 2026-09-28T14:52Z A done BPM-18
@@ -159,3 +157,4 @@
 - 2026-09-29T00:56Z A claim FM-39
 - 2026-09-29T01:09Z A done ENG-18
 - 2026-09-29T01:14Z A claim STAB-26
+- 2026-09-29T01:26Z A done FM-39
