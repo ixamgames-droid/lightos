@@ -7,6 +7,13 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-29 — Show-Prüfung findet jede Adress-Überschneidung (QA-67)
+
+#### Behoben
+
+- **Die Show-Prüfung (Lint) übersah Überschneidungen, wenn ein kurzes Gerät dazwischen lag.**
+  Sie nutzt jetzt dieselbe Regel wie die Prüfung beim Laden und meldet jedes Paar.
+
 ### 2026-09-29 — Doppelte Geräte-Nummer in einer Show-Datei wird gemeldet (STAB-27)
 
 #### Behoben

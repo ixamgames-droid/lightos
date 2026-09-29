@@ -147,9 +147,11 @@ def _check_patch(show: dict) -> list[Finding]:
                 "show_file.py:196"))
         belegt.setdefault(universe, []).append(
             (address, min(512, ende), label))
+    # QA-67: jedes ueberlappende Paar, nicht nur Nachbarn — dieselbe Regel
+    # wie die Reparatur beim Laden (sync.validate_and_repair, STAB-26).
+    from src.core.patch_ueberlappung import ueberlappende_paare
     for universe, eintraege in sorted(belegt.items()):
-        eintraege.sort()
-        for (a1, e1, l1), (a2, e2, l2) in zip(eintraege, eintraege[1:]):
+        for (a1, e1, l1), (a2, e2, l2) in ueberlappende_paare(eintraege):
             if a2 <= e1:
                 findings.append(Finding(
                     ERROR, "PATCH-UEBERLAPPUNG", f"patch (Universum {universe})",
