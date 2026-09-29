@@ -7,6 +7,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-29 — Zielen erreicht auch Punkte „hinter" dem Kopf (VIZ-64)
+
+#### Behoben
+
+- **Zielen zeigte bei manchen Geräten still daneben.** Ein Moving Head kommt an fast jeden
+  Punkt auf zwei Wegen (Pan +180° und Tilt zur anderen Seite). LightOS kannte nur einen; lag
+  der außerhalb des Pan-Bereichs, blieb der Kopf am Anschlag stehen. Das traf vor allem Geräte,
+  deren Pan-Nullpunkt nicht in der Mitte liegt. Jetzt nimmt das Zielen den erreichbaren Weg.
+  Geräte mit mittigem Nullpunkt zielen genau wie bisher.
+- **Figuren nachfahren ohne Rücksprung.** Beim Nachfahren eines Kreises um den Kopf herum
+  sprang er an der Rückseite um eine ganze Umdrehung zurück. Jetzt fährt er vom letzten
+  Punkt aus weiter, solange der Pan-Bereich reicht.
+
 ### 2026-09-29 — 3D: Köpfe einer Mover-Bar zeigen wie am echten Gerät (VIZ-63)
 
 #### Behoben
