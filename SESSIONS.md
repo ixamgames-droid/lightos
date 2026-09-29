@@ -10,6 +10,7 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | UI-58 | A | fix/ui58-blackout-rueckkopplung | 2026-09-29T00:22Z | src/core/dmx/output_manager.py,src/ui/main_window.py |
+| ENG-18 | A | fix/eng18-stop-all-audio | 2026-09-29T00:39Z | src/core/engine/function_manager.py,src/core/engine/audio_func.py |
 
 ## Blocker & Fallen
 
@@ -128,7 +129,6 @@
 
 ## Verlauf
 
-- 2026-09-24T21:15Z C uebergeben BPM-16
 - 2026-09-28T12:48Z A claim BPM-14
 - 2026-09-28T13:21Z A done BPM-14
 - 2026-09-28T13:25Z A claim BPM-16
@@ -158,3 +158,4 @@
 - 2026-09-29T00:16Z A done VIZ-63
 - 2026-09-29T00:22Z A claim UI-58
 - 2026-09-29T00:34Z A done VIZ-64
+- 2026-09-29T00:39Z A claim ENG-18
