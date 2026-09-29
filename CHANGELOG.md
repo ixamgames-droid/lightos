@@ -7,6 +7,15 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-29 — 3D: Köpfe einer Mover-Bar zeigen wie am echten Gerät (VIZ-63)
+
+#### Behoben
+
+- **Mover-Bar mit „Pan umkehren"/„Tilt umkehren"/„Pan/Tilt tauschen": Köpfe im 3D
+  gespiegelt.** Für das ganze Gerät nahm der Visualizer die Einstellung schon zurück, für die
+  einzelnen Köpfe nicht — sie zeigten im Bild in die Gegenrichtung des echten Geräts. Jetzt
+  stehen alle Köpfe richtig, und auch ihre Feinkanäle kommen im Bild an.
+
 ### 2026-09-29 — Importierte Geräte zeigen die richtigen Regler (FM-49)
 
 #### Behoben
