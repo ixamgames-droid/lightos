@@ -233,6 +233,34 @@ def head_restrictions(cells) -> dict:
     return {f: hs for f, hs in heads.items() if hs and f not in whole}
 
 
+def weiss_schluessel(index: int) -> str:
+    """FM-41: Schluessel eines Weiss-Segments in einer Kopf-Einschraenkung
+    (``{fid: {0, 2, "w3"}}``) — getrennt von den Farbkopf-Nummern, damit „Kopf 3"
+    und „Weiss-Segment 3" nicht zusammenfallen."""
+    return f"{ACHSE_WEISS}{int(index)}"
+
+
+def weiss_restrictions(cells) -> dict:
+    """Zell-Liste -> ``{fid: {"w0", "w3", ...}}`` fuer Geraete, die NUR ueber
+    Weiss-Zellen in der Liste stehen (weder ganz noch mit einem Farbkopf).
+
+    Gegenstueck zu :func:`head_restrictions` auf der Weiss-Achse (FM-41). Nur
+    reine Weiss-Geraete: steht dasselbe Geraet auch ganz oder kopfweise da, gilt
+    fuer den Submaster die bisherige Regel dieses Geraets — ein zusaetzlicher
+    Weiss-Eintrag daneben wuerde sonst den geraeteweiten Faktor abschalten."""
+    weiss: dict[int, set] = {}
+    andere: set = set()
+    for c in cells or []:
+        fid, achse, index = parse_zelle(c)
+        if fid is None:
+            continue
+        if achse == ACHSE_WEISS and index is not None:
+            weiss.setdefault(fid, set()).add(weiss_schluessel(index))
+        else:
+            andere.add(fid)
+    return {f: ws for f, ws in weiss.items() if ws and f not in andere}
+
+
 def drop_whole_cells_with_heads(cells: dict) -> dict:
     """Raster-Zellen -> dieselben Zellen OHNE die GANZ-Zellen der Geraete, die im
     selben Raster auch KOPFWEISE liegen (FM-32). Eingabe/Ausgabe: eine beliebig

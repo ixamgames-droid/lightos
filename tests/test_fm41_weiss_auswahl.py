@@ -105,17 +105,19 @@ class AuswahlTest(_Basis):
             fixture_type="par"), undoable=False)
         self.assertIsNone(self.st.weiss_programmer_key(2, 0))
 
-    def test_submaster_bleibt_auf_der_weiss_gruppe_wirkungslos(self):
-        """Absicht dieser Scheibe: der VC-Submaster kennt die Achse noch nicht.
-        Er darf dann NICHTS tun — nicht den ganzen Balken dimmen (Backlog:
-        „halb nachgeruestet ist schlechter als gar nicht")."""
+    def test_submaster_auf_der_weiss_gruppe_dimmt_nur_die_segmente(self):
+        """Scheibe 3a hielt hier fest, dass der Submaster NICHTS tut (statt den
+        ganzen Balken). Seit 3b kennt er die Achse: Ziel ist das Geraet MIT
+        einer Einschraenkung auf genau die Segmente — nie das ganze Geraet
+        (Wirkung am Frame: ``test_fm41_weiss_submaster``)."""
         from src.ui.virtualconsole.vc_slider import VCSlider
         self._gruppe("Nur Weiss", [zelle_fuer(1, ACHSE_WEISS, k) for k in range(8)])
         sl = VCSlider()
         self.addCleanup(sl.deleteLater)
         sl.programmer_scope = "group"
         sl.programmer_group = "Nur Weiss"
-        self.assertEqual(sl._submaster_targets(self.st), ([], {}))
+        self.assertEqual(sl._submaster_targets(self.st),
+                         ([1], {1: {f"w{k}" for k in range(8)}}))
 
 
 class ProgrammerTest(_Basis):
@@ -201,12 +203,14 @@ class ReviewTest(_Basis):
         self.st.set_programmer_value(1, "intensity", 255)
 
     def test_submaster_auswahl_dimmt_nicht_den_balken(self):
+        """Ziel ist das Geraet NUR mit Segment-Einschraenkung — ein fid ohne
+        Einschraenkung hiesse „ganzes Geraet" (Review 29.09.)."""
         from src.ui.virtualconsole.vc_slider import VCSlider
         self.st.set_selected_cells(["1:w3"])
         sl = VCSlider()
         self.addCleanup(sl.deleteLater)
         sl.programmer_scope = "selected"
-        self.assertEqual(sl._submaster_targets(self.st), ([], {}))
+        self.assertEqual(sl._submaster_targets(self.st), ([1], {1: {"w3"}}))
 
     def test_submaster_nach_gruppenwahl_ebenso(self):
         from src.ui.virtualconsole.vc_slider import VCSlider
@@ -215,7 +219,8 @@ class ReviewTest(_Basis):
         sl = VCSlider()
         self.addCleanup(sl.deleteLater)
         sl.programmer_scope = "selected"
-        self.assertEqual(sl._submaster_targets(self.st), ([], {}))
+        self.assertEqual(sl._submaster_targets(self.st),
+                         ([1], {1: {f"w{k}" for k in range(8)}}))
 
     def test_efx_und_andere_sehen_kein_geraet(self):
         self.st.set_selected_cells(["1:w3"])

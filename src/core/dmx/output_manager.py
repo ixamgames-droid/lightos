@@ -154,6 +154,17 @@ def geraet_verbunden(dev) -> bool | None:
     return None
 
 
+def _kopf_schluessel(h):
+    """Kopf-Schluessel eines Submaster-Slots: ``int`` fuer Farbkoepfe,
+    ``"wN"`` fuer Weiss-Segmente (FM-41); Unbrauchbares -> ``None``."""
+    if isinstance(h, str) and h.startswith("w") and h[1:].isdigit():
+        return h
+    try:
+        return int(h)
+    except (TypeError, ValueError):
+        return None
+
+
 class OutputManager:
     def __init__(self):
         self.universes: dict[int, Universe] = {}
@@ -519,7 +530,8 @@ class OutputManager:
                     fi = int(f)
                 except (TypeError, ValueError):
                     continue
-                s = frozenset(int(h) for h in (hs or ()))
+                # FM-41: Farbkoepfe als Zahl, Weiss-Segmente als "wN".
+                s = frozenset(_kopf_schluessel(h) for h in (hs or ())) - {None}
                 if s:
                     hd[fi] = s
             hd = hd or None

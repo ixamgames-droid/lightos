@@ -1937,9 +1937,16 @@ class ProgrammerView(QWidget):
     def _color_head_counts(fixture) -> dict:
         """Vorkommen je RGB(W)-Farb-Attribut in DIESEM Fixture (= Farb-Koepfe)."""
         counts: dict[str, int] = {}
-        for ch in get_channels_for_patched(fixture):
+        chans = get_channels_for_patched(fixture)
+        for ch in chans:
             if ch.attribute in COLOR_ATTRS:
                 counts[ch.attribute] = counts.get(ch.attribute, 0) + 1
+        # FM-41 (Scheibe 3b): eine EIGENE Weiss-Achse ist kein Farbkopf-Attribut
+        # (ZQ06121: 8 Weiss-Segmente neben 48 RGB-Zonen). Sonst bekaeme Kopf 4
+        # einen Weiss-Regler, der seit 3b nichts mehr schreibt — die Segmente
+        # stehen als eigene Zeilen „Weiß N" im Baum.
+        if "color_w" in counts and weiss_ist_eigene_achse_for_channels(chans, fixture):
+            counts.pop("color_w", None)
         return counts
 
     def _color_head_count(self) -> int:

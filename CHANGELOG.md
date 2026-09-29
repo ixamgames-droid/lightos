@@ -7,6 +7,24 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-29 — Weiß-Segmente: Submaster, und Farbköpfe schalten kein fremdes Weiß mehr (FM-41)
+
+#### Neu
+
+- **Ein VC-Submaster auf einer Weiß-Gruppe dimmt jetzt genau deren Weiß-Segmente** — der
+  Master-Dimmer und die RGB-Zonen des Balkens bleiben unberührt. Auch mit Reichweite „Auswahl",
+  wenn im Programmer nur Weiß-Segmente gewählt sind.
+
+#### Behoben
+
+- **Farbkopf 4 des ZQ06121 schaltete Weiß-Zone 4 mit** (physisch an ganz anderer Stelle), die
+  Köpfe 9–48 gar keins. Ein Farbkopf trägt bei Geräten mit eigener Weiß-Leiste jetzt kein Weiß
+  mehr; die Weiß-Segmente bedienst du über „Weiß 1…8". Geräte, deren Weiß zur Farbzelle gehört
+  (RGBW-PAR, Blinder 5×5), bleiben unverändert.
+- **„Nichts gewählt" heißt nur noch wirklich nichts.** VC-Slider im Programmer-Modus, MIDI-Fader
+  und XY-Pad wirken bei leerer Auswahl auf alle Geräte — eine Auswahl nur aus Weiß-Segmenten
+  zählte dabei als leer und hätte das ganze Rig gefahren.
+
 ### 2026-09-29 — Weiß-Segmente im Programmer auswählen und bedienen (FM-41)
 
 #### Neu
