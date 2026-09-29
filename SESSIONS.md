@@ -9,7 +9,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| QA-67 | A | fix/qa67-eine-ueberlappungsregel | 2026-09-29T01:48Z | src/core/sync.py,src/core/capability/validate.py |
 | QA-81 | A | fix/qa81-cpu-budgets | 2026-09-29T02:05Z | tests/test_beat_detector_signal.py,tests/test_beat_detector_backbeat.py,tests/test_beat_detector_backbeat_grenzen.py |
 
 ## Blocker & Fallen
@@ -129,7 +128,6 @@
 
 ## Verlauf
 
-- 2026-09-28T19:06Z A claim QA-79
 - 2026-09-28T19:20Z A done QA-79
 - 2026-09-28T19:38Z A claim VIZ-61
 - 2026-09-28T19:55Z A done VIZ-61
@@ -159,3 +157,4 @@
 - 2026-09-29T01:48Z A claim QA-67
 - 2026-09-29T02:05Z A claim QA-81
 - 2026-09-29T02:10Z A done STAB-27
+- 2026-09-29T02:36Z A done QA-67
