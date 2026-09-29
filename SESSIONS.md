@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| _(frei)_ |  |  |  |  |
+| FM-41 | A | feature/fm41-renderer-weiss | 2026-09-29T18:30Z | src/core/engine/rgb_matrix.py,src/core/app_state.py,src/core/group_cells.py |
 
 ## Blocker & Fallen
 
@@ -130,7 +130,6 @@
 
 ## Verlauf
 
-- 2026-09-28T23:16Z A done FM-50
 - 2026-09-28T23:27Z A done FM-48
 - 2026-09-28T23:27Z A claim FM-49
 - 2026-09-28T23:49Z A claim VIZ-63
@@ -160,3 +159,4 @@
 - 2026-09-29T15:17Z A done STAB-29
 - 2026-09-29T16:49Z A claim FM-14b
 - 2026-09-29T18:13Z A done FM-14b
+- 2026-09-29T18:30Z A claim FM-41
