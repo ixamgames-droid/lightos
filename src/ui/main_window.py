@@ -2451,6 +2451,13 @@ class MainWindow(QMainWindow):
             self._lbl_fixtures.setText(f"{count} Gerät(e)")
         elif event == "programmer_changed":
             self._refresh_foreign_badges()
+        elif event == "hinweis" and _data:
+            # FM-38: z. B. ein Rueckgaengig, das eine Gruppe nicht zurueckholen
+            # konnte — nicht still verschlucken.
+            try:
+                self.statusBar().showMessage(str(_data), 10000)
+            except Exception:
+                pass
 
     # ── ISO-01/02: aktive Fremdwerte anzeigen + zentral leeren ─────────────────
 
