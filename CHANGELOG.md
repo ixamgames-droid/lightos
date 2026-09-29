@@ -7,6 +7,20 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-29 — Weiß-Segmente im Programmer auswählen und bedienen (FM-41)
+
+#### Neu
+
+- **Geräte mit eigener Weiß-Leiste** (z. B. ZQ06121: 48 RGB-Zonen + 8 Weiß-Segmente) zeigen
+  im Programmer unter dem Gerät jetzt auch **„Weiß 1…8“**. Ein Klick darauf wählt genau dieses
+  Segment; im Farb-Reiter erscheint der Block **„Weiß-Segmente“** mit einem Regler je Segment,
+  einem Sammelregler und dem **Dimmer des ganzen Geräts** (ohne ihn bliebe das Weiß dunkel —
+  Farbe macht nicht von selbst hell). Die RGB-Zonen bleiben dabei unberührt.
+- **Eine Gruppe, die nur Weiß-Segmente enthält,** lässt sich jetzt anklicken und auswählen —
+  vorher stand sie als „(0)" in der Liste und tat nichts. Sie zeigt „(8 Weiß)".
+- Noch nicht: ein VC-Submaster auf einer reinen Weiß-Gruppe tut vorerst bewusst nichts
+  (statt den ganzen Balken zu dimmen) — das folgt als eigener Schritt.
+
 ### 2026-09-29 — Die Pixel eines LED-Ring-Kopfes lassen sich bedienen (FM-14b)
 
 #### Neu

@@ -347,6 +347,34 @@ def base_fids_in_cells(cells) -> list[int]:
     return out
 
 
+def zellen_in_grid_order(positions: dict) -> list[str]:
+    """Wie :func:`cells_in_grid_order`, aber ACHSEN-BEWUSST (FM-41): auch
+    Weiss-Zellen (``"fid:w3"``) kommen mit, normalisiert ueber ``zelle_fuer``.
+
+    Bewusst eine EIGENE Funktion: ``cells_in_grid_order`` fuettert den
+    VC-Submaster (``head_restrictions`` + ``base_fids_in_cells``), und dort muss
+    eine Weiss-Zelle weiterhin NICHTS bewirken, bis der Submaster die Achse
+    kennt — sonst faehrt ein Fader auf einer reinen Weiss-Gruppe den GANZEN
+    Balken (Backlog FM-41, „halb nachgeruestet ist schlechter als gar nicht").
+    Diese Fassung ist fuer die AUSWAHL (Programmer), die die Achse kennt."""
+    items: list[tuple] = []
+    for key, value in (positions or {}).items():
+        try:
+            c_str, r_str = str(key).split(",")
+            c, r = int(c_str), int(r_str)
+        except (TypeError, ValueError):
+            continue
+        fid, achse, index = parse_zelle(value)
+        if fid is not None:
+            items.append((r, c, zelle_fuer(fid, achse, index)))
+    items.sort()
+    out: list[str] = []
+    for _r, _c, cell in items:
+        if cell not in out:
+            out.append(cell)
+    return out
+
+
 def cells_in_grid_order(positions: dict) -> list[str]:
     """Wie ``base_fids_in_grid_order``, aber mit der FEINEN Aufloesung: die
     normalisierten Zellwerte (``"fid"`` bzw. ``"fid:head"``) in Raster-Reihenfolge

@@ -27,11 +27,13 @@ from src.core.app_state import (
     attr_has_head_axis, channel_occurrence_keys, programmer_key_for_head,
     head_label, head_label_gemeinsam, head_label_short,
     attr_head_is_segment, gemeinsames_modell, head_channel_name,
-    is_pixel_head_fixture)
+    is_pixel_head_fixture, weiss_ist_eigene_achse_for_channels,
+    weiss_segment_count_for_channels)
 from src.core.database.models import PatchedFixture, FixtureChannel
 from src.core.fixture_filter import (hat_kanal, Nutzlast, fixtures_fuer_nutzlast,
                                      attr_head_count, range_signature)
-from src.core.group_cells import parse_group_cell
+from src.core.group_cells import (ACHSE_WEISS, parse_group_cell, parse_zelle,
+                                  zelle_fuer)
 from src.core.head_mode import effective_color_head_mode, normalize_head_mode
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
 
@@ -902,7 +904,20 @@ class ProgrammerView(QWidget):
                         f"Nur „{_hl}“ von „{f.label}“ programmieren "
                         f"(Regler/Schnellwahl schreiben dann ausschließlich auf "
                         f"diesen Kopf). Die Geräte-Zeile darüber wählt alle Köpfe.")
-                if anzahl:
+                # FM-41: die zweite Achse — eigene Weiss-Segmente (ZQ06121: 8
+                # neben 48 RGB-Zonen) als eigene Kind-Zeilen. Nur, wo das Weiss
+                # WIRKLICH ein eigener Satz ist (ENG-25-Regel); am RGBW-PAR
+                # gehoert das Weiss zur Farbzelle und bekommt keine Zeile.
+                n_weiss = self._weiss_segment_zahl(f)
+                for k in range(n_weiss):
+                    wit = QTreeWidgetItem(it, [f"Weiß {k + 1}"])
+                    wit.setData(0, Qt.ItemDataRole.UserRole,
+                                zelle_fuer(f.fid, ACHSE_WEISS, k))
+                    wit.setToolTip(
+                        0,
+                        f"Nur das Weiß-Segment {k + 1} von „{f.label}“ "
+                        f"programmieren — die RGB-Zonen bleiben unberührt.")
+                if anzahl or n_weiss:
                     # Die Zahl gehoert an die Geraete-Zeile: zugeklappt ist sonst
                     # nicht zu sehen, DASS es Koepfe gibt — und ein Pfeil allein
                     # sagt nicht, wie viele dahinter liegen.
@@ -910,8 +925,13 @@ class ProgrammerView(QWidget):
                     # darunter — „Grundfarbe + 19 Pixel", nicht „20 Köpfe".
                     if anzahl > 1 and is_pixel_head_fixture(f):
                         zahl = f"Grundfarbe + {anzahl - 1} Pixel"
-                    else:
+                    elif anzahl:
                         zahl = f"{anzahl} Köpfe"
+                    else:
+                        zahl = ""
+                    if n_weiss:
+                        zahl = (f"{zahl} + {n_weiss} Weiß" if zahl
+                                else f"{n_weiss} Weiß")
                     it.setText(0, f"[{f.fid:03d}] {f.label}  ({zahl})")
                     it.setExpanded(f.fid in self._offene_koepfe)
         finally:
@@ -1006,6 +1026,31 @@ class ProgrammerView(QWidget):
         self._on_fixture_selected()
 
     @staticmethod
+    @staticmethod
+    def _weiss_segment_zahl(fixture) -> int:
+        """FM-41: wie viele EIGENE Weiss-Segmente bekommen eine Zeile? 0, wenn das
+        Weiss zur Farbzelle gehoert (ENG-25-Regel) oder das Geraet im Patch als
+        EINE Lampe gefuehrt wird."""
+        try:
+            if normalize_head_mode(getattr(fixture, "head_mode", "auto")) == "single":
+                return 0
+            chans = get_channels_for_patched(fixture)
+            if not weiss_ist_eigene_achse_for_channels(chans, fixture):
+                return 0
+            return int(weiss_segment_count_for_channels(chans))
+        except Exception:
+            return 0
+
+    @staticmethod
+    def _zelle_of_item(item) -> tuple:
+        """UserRole -> ``(fid, zellwert)`` ACHSEN-BEWUSST (FM-41): ``"7"``,
+        ``"7:2"`` oder ``"7:w3"``, normalisiert ueber ``zelle_fuer``."""
+        fid, achse, index = parse_zelle(item.data(0, Qt.ItemDataRole.UserRole))
+        if fid is None:
+            return None, None
+        return fid, zelle_fuer(fid, achse, index)
+
+    @staticmethod
     def _cell_of_item(item) -> tuple:
         """UserRole eines Listen-Items -> ``(fid, head)`` ueber die kanonische
         Parse-Quelle. Deckt auch Alt-Items ab, die noch ein int tragen."""
@@ -1017,10 +1062,10 @@ class ProgrammerView(QWidget):
         cells: list[str] = []
         self._selected_fids = []
         for it in self._fixture_list.selectedItems():
-            fid, head = self._cell_of_item(it)
+            fid, zelle = self._zelle_of_item(it)       # FM-41: auch „7:w3"
             if fid is None:
                 continue
-            cells.append(f"{fid}" if head is None else f"{fid}:{head}")
+            cells.append(zelle)
             if fid not in self._selected_fids:
                 self._selected_fids.append(fid)
         self._selected_cells = cells
@@ -1059,6 +1104,28 @@ class ProgrammerView(QWidget):
             return None
         from sqlalchemy.orm import Session
         return Session(eng)
+
+    @staticmethod
+    def _gruppen_weiss(group, fids) -> list[str]:
+        """FM-41: Weiss-Zellen einer Gruppe fuer Geraete, die NICHT schon als
+        Ganzes/Kopf darin stehen — dieselbe Regel wie
+        ``AppState.select_group_by_name``."""
+        try:
+            pos = json.loads(group.positions_json or "{}")
+        except Exception:
+            return []
+        from src.core.group_cells import zellen_in_grid_order
+        return [z for z in zellen_in_grid_order(pos)
+                if parse_zelle(z)[1] == ACHSE_WEISS and parse_zelle(z)[0] not in fids]
+
+    @classmethod
+    def _gruppen_zahl(cls, group, fids) -> str:
+        """„(3)" wie bisher; mit Weiss-Segmenten „(8 Weiß)" bzw. „(2 + 8 Weiß)" —
+        eine reine Weiss-Gruppe hiess sonst „(0)" und sah leer aus."""
+        n_w = len(cls._gruppen_weiss(group, fids))
+        if not n_w:
+            return f"{len(fids)}"
+        return f"{len(fids)} + {n_w} Weiß" if fids else f"{n_w} Weiß"
 
     @staticmethod
     def _group_fids(group) -> list[int]:
@@ -1106,9 +1173,12 @@ class ProgrammerView(QWidget):
                             continue
                         fids = self._group_fids(g)
                         suffix = f"   📁 {folder}" if folder else ""
-                        it = QListWidgetItem(f"{name}  ({len(fids)}){suffix}")
+                        it = QListWidgetItem(
+                            f"{name}  ({self._gruppen_zahl(g, fids)}){suffix}")
                         it.setData(Qt.ItemDataRole.UserRole, fids)
                         it.setData(Qt.ItemDataRole.UserRole + 1, g.id)
+                        it.setData(Qt.ItemDataRole.UserRole + 3,
+                                   self._gruppen_weiss(g, fids))   # FM-41
                         self._group_list.addItem(it)
                     return
                 # Ordner-Kopfzeilen sind antippbar und klappen ihre Gruppen
@@ -1132,10 +1202,13 @@ class ProgrammerView(QWidget):
                         continue  # Inhalt eingeklappter Ordner verbergen
                     fids = self._group_fids(g)
                     prefix = "    " if folder else ""
-                    it = QListWidgetItem(f"{prefix}{g.name}  ({len(fids)})")
+                    it = QListWidgetItem(
+                        f"{prefix}{g.name}  ({self._gruppen_zahl(g, fids)})")
                     it.setData(Qt.ItemDataRole.UserRole, fids)
                     # Gruppen-ID fuer den Gruppen-Pfad in der Matrix speichern
                     it.setData(Qt.ItemDataRole.UserRole + 1, g.id)
+                    it.setData(Qt.ItemDataRole.UserRole + 3,
+                               self._gruppen_weiss(g, fids))       # FM-41
                     self._group_list.addItem(it)
         except Exception as e:
             print(f"[programmer_view] group list error: {e}")
@@ -1160,7 +1233,14 @@ class ProgrammerView(QWidget):
             self._state.set_selected_group_id(gid)
         except Exception:
             pass
-        self._select_fids(item.data(Qt.ItemDataRole.UserRole) or [], add=False)
+        fids = item.data(Qt.ItemDataRole.UserRole) or []
+        weiss = item.data(Qt.ItemDataRole.UserRole + 3) or []
+        if weiss:
+            # FM-41: eine Gruppe mit Weiss-Segmenten waehlt GENAU diese Segmente
+            # (vorher: eine reine Weiss-Gruppe hatte keine fids -> nichts).
+            self._select_cells([str(f) for f in fids] + list(weiss))
+        else:
+            self._select_fids(fids, add=False)
         # F-1: Gruppenklick oeffnet direkt die Matrix-Ansicht der Gruppe.
         try:
             idx = getattr(self, "_matrix_tab_index", -1)
@@ -1176,6 +1256,29 @@ class ProgrammerView(QWidget):
         except Exception:
             pass
         self._select_fids(item.data(Qt.ItemDataRole.UserRole) or [], add=True)
+
+    def _select_cells(self, cells: list[str]):
+        """FM-41: Auswahl auf Zell-Ebene (Geraet, Kopf ODER Weiss-Segment) in
+        Baum + State uebernehmen — Gegenstueck zu ``_select_fids`` fuer Gruppen,
+        die mehr als ganze Geraete meinen."""
+        want = set(cells)
+        self._fixture_list.blockSignals(True)
+        self._fixture_list.clearSelection()
+        for it in self._alle_items():
+            fid, zelle = self._zelle_of_item(it)
+            if fid is not None and zelle in want:
+                it.setSelected(True)
+                if it.parent() is not None:
+                    it.parent().setExpanded(True)
+        self._fixture_list.blockSignals(False)
+        self._selected_fids = []
+        for c in cells:
+            fid = parse_zelle(c)[0]
+            if fid is not None and fid not in self._selected_fids:
+                self._selected_fids.append(fid)
+        self._selected_cells = list(cells)
+        self._publish_selection()
+        self._rebuild_attr_editor()
 
     def _select_fids(self, fids: list[int], add: bool = False):
         """Markiert die übergebenen Fids in der Fixture-Liste.
@@ -1245,15 +1348,14 @@ class ProgrammerView(QWidget):
         self._fixture_list.blockSignals(True)
         self._fixture_list.clearSelection()
         for it in self._alle_items():
-            fid, head = self._cell_of_item(it)
+            fid, key = self._zelle_of_item(it)         # FM-41: auch „7:w3"
             if fid is None:
                 continue
-            key = f"{fid}" if head is None else f"{fid}:{head}"
             if key in want_cells:
                 it.setSelected(True)
                 # UI-61: eine getroffene Kopf-Zeile aufklappen, sonst steht die
                 # Auswahl unsichtbar hinter einem zugeklappten Pfeil.
-                if head is not None and it.parent() is not None:
+                if it.parent() is not None:
                     it.parent().setExpanded(True)
         self._fixture_list.blockSignals(False)
         # Interne Auswahl in der vom Publisher vorgegebenen Reihenfolge uebernehmen.
@@ -1317,6 +1419,10 @@ class ProgrammerView(QWidget):
             # — die Liste sagte „Pixel 3", die Kopfzeile darueber „K4", und der
             # Nutzer sah zwei Namen fuer dasselbe Segment nebeneinander.
             def _sel_name(f):
+                ws = self._weiss_filter_for(f)
+                if ws and self._nur_weiss(f):
+                    return (f"[{f.fid}] {f.label} · "
+                            + ", ".join(f"W{w + 1}" for w in sorted(ws)))
                 hs = self._heads_filter_for(f)
                 if not hs:
                     return f"[{f.fid}] {f.label}"
@@ -1340,8 +1446,13 @@ class ProgrammerView(QWidget):
             # Dedup pro Attribut; ein Kanal MIT ranges/kind wird als Repraesentant
             # bevorzugt (fuer die Slot-/Kind-Schnellwahl, z.B. Gobo-Bilder).
             # "Weitere" buendelt Beam+Effect+Other (eine Stelle, keine Doppelung).
+            # FM-41: Geraete, die NUR ueber Weiss-Segmente gewaehlt sind, bekommen
+            # KEINE geraeteweiten Regler — die fuehren den ganzen Balken (48
+            # RGB-Zonen + Master), gemeint waren acht Weiss-Segmente. Sie werden
+            # unten ueber den eigenen Weiss-Block bedient.
+            normal = [f for f in selected if not self._nur_weiss(f)]
             union: dict[str, FixtureChannel] = {}
-            for f in selected:
+            for f in normal:
                 for ch in get_channels_for_patched(f):
                     prev = union.get(ch.attribute)
                     if prev is None or (
@@ -1364,8 +1475,12 @@ class ProgrammerView(QWidget):
                 key=lambda c: 0 if c.attribute in INTENSITY_ATTRS else 1)
 
             for key, cont in self._attr_group_tabs.items():
-                inner = self._build_group_tab(key, groups.get(key, []), selected)
+                inner = self._build_group_tab(key, groups.get(key, []), normal)
                 _clear(cont).addWidget(inner)
+            # FM-41: die gewaehlten Weiss-Segmente — ein Regler je Segment.
+            weiss_block = self._weiss_block(selected)
+            if weiss_block is not None:
+                self._attr_group_tabs["Color"].layout().addWidget(weiss_block)
 
             # FM-48: Farbe/Weitere ohne passende Kanaele ausblenden (Nebel ohne
             # Farbe, Pixel-Balken ohne Sonderkanaele) — wie Gobo/Position. Die
@@ -1374,7 +1489,9 @@ class ProgrammerView(QWidget):
             for key in ("Color", "Weitere"):
                 idx = self._main_tabs.indexOf(self._attr_group_tabs[key])
                 if idx >= 0:
-                    self._main_tabs.setTabVisible(idx, bool(groups.get(key)))
+                    sichtbar = bool(groups.get(key)) or (
+                        key == "Color" and weiss_block is not None)
+                    self._main_tabs.setTabVisible(idx, sichtbar)
             # M2.1: Gobo-Tab nur bei vorhandenen Gobo-Kanaelen einblenden.
             if getattr(self, "_gobo_tab_index", -1) >= 0:
                 self._main_tabs.setTabVisible(
@@ -2159,6 +2276,40 @@ class ProgrammerView(QWidget):
                 if other == head:
                     continue
                 self._seed_separate_head([f], ch, other)
+
+    def _weiss_filter_for(self, fixture) -> set:
+        """FM-41: welche Weiss-Segmente dieses Geraets sind gewaehlt (leer = keine)."""
+        fn = getattr(self._state, "selected_weiss_for", None)
+        try:
+            return set(fn(getattr(fixture, "fid", None))) if callable(fn) else set()
+        except Exception:
+            return set()
+
+    def _nur_weiss(self, fixture) -> bool:
+        fn = getattr(self._state, "nur_weiss_gewaehlt", None)
+        try:
+            return bool(fn(getattr(fixture, "fid", None))) if callable(fn) else False
+        except Exception:
+            return False
+
+    def _weiss_block(self, fixtures):
+        """FM-41: ``WeissSegmentBlock`` fuer die gewaehlten Weiss-Segmente — oder
+        ``None``, wenn keines gewaehlt ist."""
+        segmente: dict[int, list] = {}
+        dimmer: list = []
+        for f in fixtures:
+            for w in sorted(self._weiss_filter_for(f)):
+                key = self._state.weiss_programmer_key(f.fid, w)
+                if key:
+                    segmente.setdefault(w, []).append((f.fid, key))
+                    # Nur wenn das Geraet NICHT zusaetzlich normal gewaehlt ist —
+                    # dann hat es seinen Dimmer-Regler schon oben.
+                    dk = self._state.weiss_dimmer_key(f.fid, w)
+                    if dk and self._nur_weiss(f) and (f.fid, dk) not in dimmer:
+                        dimmer.append((f.fid, dk))
+        if not segmente:
+            return None
+        return WeissSegmentBlock(segmente, self._state, dimmer)
 
     def _heads_filter_for(self, fixture) -> set | None:
         """FM-HEADLAYOUT Slice 5: Auf welche Koepfe ist dieses Geraet gerade
@@ -2984,6 +3135,74 @@ class AttributeSlider(QWidget):
     def _update_labels(self, value: int, divergent: bool = False):
         self._lbl_val.setText("—" if divergent else str(value))
         self._lbl_pct.setText("" if divergent else f"{int(value / 255 * 100)}%")
+
+
+class WeissSegmentBlock(QGroupBox):
+    """FM-41: Regler fuer gewaehlte EIGENE Weiss-Segmente (ZQ06121: 8 neben 48
+    RGB-Zonen). Ein Regler je Segment-Nummer; er schreibt fuer JEDES Geraet
+    dessen eigenen Programmer-Schluessel (``AppState.weiss_programmer_key``) —
+    zwei Geraete koennen dasselbe Segment unter verschiedenen Schluesseln
+    fuehren. Bei mehr als einem Segment kommt ein Sammelregler „Alle gewählten"
+    darueber.
+
+    Bewusst ein eigener Block statt eines ``AttributeSlider``: der liest und
+    schreibt ueber die FARBKOPF-Projektion (``channels_for_head``), und genau
+    dort gehoert das Weiss-Segment nicht hin."""
+
+    def __init__(self, segmente: dict, state, dimmer=None, parent=None):
+        super().__init__("Weiß-Segmente", parent)
+        self._state = state
+        self._segmente = {w: list(z) for w, z in sorted(segmente.items())}
+        self._regler: dict = {}
+        lay = QVBoxLayout(self)
+        if dimmer:
+            # Der Dimmer des GANZEN Geraets — ohne ihn bleibt das Segment dunkel
+            # (Farbe macht nicht von selbst hell). Beschriftet, damit niemand
+            # glaubt, er dimme nur das Weiss.
+            lay.addLayout(self._zeile("Dimmer (ganzes Gerät)", list(dimmer), "dimmer"))
+        if len(self._segmente) > 1:
+            alle = [z for ziele in self._segmente.values() for z in ziele]
+            lay.addLayout(self._zeile("Alle gewählten", alle, None))
+        for w, ziele in self._segmente.items():
+            lay.addLayout(self._zeile(f"Weiß {w + 1}", ziele, w))
+
+    def _wert(self, ziele) -> int:
+        for fid, key in ziele:
+            v = (self._state.programmer.get(fid, {}) or {}).get(key)
+            if v is not None:
+                return int(v)
+        return 0
+
+    def _zeile(self, titel, ziele, w):
+        row = QHBoxLayout()
+        lbl = QLabel(titel)
+        lbl.setMinimumWidth(120)
+        sl = QSlider(Qt.Orientation.Horizontal)
+        sl.setRange(0, 255)
+        sl.setValue(self._wert(ziele))
+        wert = QLabel(str(sl.value()))
+        wert.setMinimumWidth(36)
+        sl.valueChanged.connect(
+            lambda v, z=list(ziele), l=wert, seg=w: self._setzen(z, v, l, seg))
+        row.addWidget(lbl)
+        row.addWidget(sl, 1)
+        row.addWidget(wert)
+        self._regler[w] = (sl, wert)
+        return row
+
+    def _setzen(self, ziele, value, lbl, seg):
+        lbl.setText(str(value))
+        for fid, key in ziele:
+            self._state.set_programmer_value(fid, key, int(value))
+        if seg is None:
+            # Sammelregler: die Einzelregler optisch nachziehen, ohne erneut zu
+            # schreiben.
+            for w, (sl, wl) in self._regler.items():
+                if w is not None and w != "dimmer":
+                    sl.blockSignals(True)
+                    sl.setValue(int(value))
+                    sl.blockSignals(False)
+                    wl.setText(str(int(value)))
 
 
 class ColorPreview(QWidget):
