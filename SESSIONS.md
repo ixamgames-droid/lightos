@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| _(frei)_ |  |  |  |  |
+| FM-38 | A | fix/fm38-undo-kopfgruppe | 2026-09-29T14:14Z | src/core/app_state.py |
 
 ## Blocker & Fallen
 
@@ -129,7 +129,6 @@
 
 ## Verlauf
 
-- 2026-09-28T19:58Z A claim VIZ-55
 - 2026-09-28T21:03Z A done VIZ-55
 - 2026-09-28T21:29Z A claim FM-48
 - 2026-09-28T22:06Z A claim LAS-21
@@ -159,3 +158,4 @@
 - 2026-09-29T02:36Z A done QA-81
 - 2026-09-29T13:23Z A claim STAB-24
 - 2026-09-29T14:14Z A done STAB-24
+- 2026-09-29T14:14Z A claim FM-38
