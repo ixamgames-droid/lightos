@@ -267,6 +267,10 @@ class ProgrammerReviewTest(ProgrammerTest):
         self.assertEqual(self._kanal(148), 0)
         idx = v._main_tabs.indexOf(v._attr_group_tabs["Color"])
         self.assertTrue(v._main_tabs.isTabVisible(idx))
+        from PySide6.QtWidgets import QLabel
+        texte = [l.text() for l in v._attr_group_tabs["Color"].findChildren(QLabel)]
+        self.assertFalse([t for t in texte if "Keine Color" in t],
+                         "bei reiner Weiss-Auswahl steht „Keine Color-Kanäle“ da")
 
 
 class ErstesSegmentTest(_Basis):

@@ -1508,7 +1508,16 @@ class ProgrammerView(QWidget):
             # FM-41: die gewaehlten Weiss-Segmente — ein Regler je Segment.
             weiss_block = self._weiss_block(selected)
             if weiss_block is not None:
-                self._attr_group_tabs["Color"].layout().addWidget(weiss_block)
+                if normal:
+                    self._attr_group_tabs["Color"].layout().addWidget(weiss_block)
+                else:
+                    # Nur Weiss gewaehlt: der Farb-Reiter zeigt NUR den Block —
+                    # „Keine Color-Kanäle gefunden", Kopf-Umschalter und
+                    # Farbwaehler darueber waeren hier irrefuehrend (in der
+                    # echten App gesehen).
+                    lay = _clear(self._attr_group_tabs["Color"])
+                    lay.addWidget(weiss_block)
+                    lay.addStretch(1)
 
             # FM-48: Farbe/Weitere ohne passende Kanaele ausblenden (Nebel ohne
             # Farbe, Pixel-Balken ohne Sonderkanaele) — wie Gobo/Position. Die
