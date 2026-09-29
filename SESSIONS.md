@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| _(frei)_ |  |  |  |  |
+| FM-14b | A | feature/fm14b-ring-bedienung-v3 | 2026-09-29T16:49Z | src/core/pixel_order.py,src/ui/views/programmer_view.py,src/core/cmdline/parser.py,src/core/app_state.py |
 
 ## Blocker & Fallen
 
@@ -130,7 +130,6 @@
 
 ## Verlauf
 
-- 2026-09-28T22:20Z A claim FM-50
 - 2026-09-28T22:34Z A done LAS-21
 - 2026-09-28T23:16Z A done FM-50
 - 2026-09-28T23:27Z A done FM-48
@@ -160,3 +159,4 @@
 - 2026-09-29T14:47Z A claim STAB-29
 - 2026-09-29T14:55Z A done FM-38
 - 2026-09-29T15:17Z A done STAB-29
+- 2026-09-29T16:49Z A claim FM-14b
