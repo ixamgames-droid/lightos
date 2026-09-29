@@ -7,6 +7,27 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-29 — Die Pixel eines LED-Ring-Kopfes lassen sich bedienen (FM-14b)
+
+#### Neu
+
+- **Der Ring ist im Programmer ein Ring.** Beim Patchen eines Pixel-Kopfes (z. B. Robe
+  Spiider im Pixelmodus) entsteht jetzt gleich das passende Raster: **eine Zeile je Ring,
+  eine Spalte je Winkelposition**. Ein waagerechtes Lauflicht dreht sich damit wirklich um
+  den Kopf, ein senkrechtes läuft von der Mitte nach außen. Vorher lief es in
+  Kanal-Reihenfolge am Ring vorbei.
+- **Die Grundfarbe heißt Grundfarbe, die Pixel tragen ihre Nummer aus dem Handbuch.** Die
+  erste Farbbank eines Pixel-Kopfes färbt das ganze Gerät; sie hieß bisher „Kopf 1", und
+  „Pixel 1" lag eine Zeile tiefer als erwartet. Geräteliste, Rasterzellen (`P3`, `GR`),
+  Matrix-Vorschau, Command-Line, EFX-Zielliste, Fan-Werkzeug und Snap-Dialoge nennen jetzt
+  dasselbe Segment gleich. Im Ring-Raster steht die Grundfarbe bewusst nicht — jeder Effekt
+  würde sie sonst mitziehen; über den Programmer bleibt sie bedienbar.
+- **Kein Name für ein Segment, das es nicht gibt.** `1:21` am Spiider (20 Bänke) meldet
+  `1·K21`, nicht ein erfundenes „Pixel 20". Regler, deren Kanal kein Pixel ist, tragen den
+  Namen des Kanals, den sie wirklich schreiben.
+- **Geräte ohne Ringe bleiben unverändert** — Spider, Mover-Bars und Pixel-Bars behalten
+  Raster, Beschriftung und Verhalten.
+
 ### 2026-09-29 — Rückgängig greift nicht mehr über einen Showwechsel hinweg (STAB-29)
 
 #### Behoben

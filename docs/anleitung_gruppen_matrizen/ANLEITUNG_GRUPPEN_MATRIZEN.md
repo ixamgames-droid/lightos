@@ -63,6 +63,91 @@ Automatische Kopf-Gruppe (1 × 48):
 Lauflicht in einer Reihe. Für den Balken willst du 12 × 4. Genau das machen die
 Abschnitte 3 und 4.
 
+### Ausnahme: Pixel-Köpfe (LED-Ring) bekommen gleich ein Ring-Raster
+
+Ein **Pixel-Moving-Head** — ein Kopf, dessen Lichtaustritt in einzeln ansteuerbare
+Pixel zerlegt ist (z. B. *Robe Robin Spiider* im Pixel-Modus) — zählt seine Pixel nicht
+in Zeilen, sondern in **Ringen** um die Mitte. Eine 1×N-Reihe wäre dort keine Hilfe: ein
+Lauflicht darüber liefe am Ring vorbei. Deshalb legt LightOS für solche Geräte gleich
+das richtige Raster an:
+
+* **Name:** *Geräte-Label* + ` · Pixel` (nicht ` · Köpfe` — in den Zellen stehen Pixel)
+* **Raster:** **eine Zeile je Ring**, **eine Spalte je Winkelposition**
+
+```
+Ring-Raster eines 19-Pixel-Kopfes (3 × 12):
+        Spalte →   0    1    2    3    4    5    6    7    8    9   10   11
+Zeile 0 (Mitte)   P1    ·    ·    ·    ·    ·    ·    ·    ·    ·    ·    ·
+Zeile 1 (Ring 2)   ·   P2    ·   P3    ·   P4    ·   P5    ·   P6    ·   P7
+Zeile 2 (Ring 3)  P8   P9  P10  P11  P12  P13  P14  P15  P16  P17  P18  P19
+```
+
+Damit ist ein **waagerechtes** Lauflicht eine Drehung um den Kopf (alle Ringe drehen
+gleichzeitig mit), ein **senkrechtes** eine Welle von der Mitte nach außen.
+
+★ **Die Grundfarbe steht bewusst nicht im Raster.** Bank 0 eines Pixel-Kopfes ist die
+Farbe des *ganzen* Geräts (Linse, Kegel, Bodenfleck) — als Matrix-Zelle würde jeder
+Effekt sie mitziehen und den Ring, den er gerade zeichnet, sofort überstrahlen. In der
+Geräteliste des **Programmers** trägt sie deshalb ihren Funktionsnamen statt einer
+Kopfnummer, und die Zeilen darunter ihre **Pixelnummer** aus dem Geräte-Handbuch — sonst
+griffe man beim ersten Pixel versehentlich ins ganze Gerät.
+
+### Wie ein Segment überall heißt
+
+Ein Segment hat **einen** Namen, und den zeigt jede Fläche, die es benennt — die
+Geräteliste und die Kopfzeile des Programmers, die Farbregler, die Rasterzelle im
+Gruppen-Editor, der Zell-Tooltip der Matrix-Vorschau, die EFX-Zielliste, das
+Fan-Werkzeug, die Statuszeile der Command-Line sowie die beiden Kanal-Dialoge rund um
+Snaps (beim Speichern und beim nachträglichen Ergänzen im Snap-Editor).
+
+| | gewöhnliches Mehrkopf-Gerät | Pixel-Kopf |
+|---|---|---|
+| Bank 0 | `Kopf 1` / kurz `K1` | `Grundfarbe` / kurz `GR` |
+| Bank 3 | `Kopf 4` / kurz `K4` | `Pixel 3` / kurz `P3` |
+
+Die **Kurzform** ist dieselbe Beschriftung, nur abgekürzt (Anfangsbuchstabe + Nummer);
+sie steht dort, wo nur wenige Zeichen Platz haben. Die Rasterzelle im Gruppen-Editor ist
+die engste dieser Flächen — **fährst du mit der Maus darüber, nennt der Tooltip den
+vollen Namen** (`Spiider · Pixel 3`).
+
+Die Kurzform ist keine Erfindung dieser Ansicht: die Gerätebibliothek nennt die
+Pixelkanäle des Spiiders selbst `P3 Rot`, `P3 Grün`, `P3 Blau` und die des ganzen Geräts
+`Grundfarbe Rot`. Wer im Programmer `Pixel 3` wählt, findet also im Kanalnamen dasselbe
+`P3` wieder.
+
+> **Ein Regler über gemischte Geräte** — etwa ein Pixel-Kopf und eine Mover-Bar,
+> beide auf Kopf 4 eingeschränkt — trägt weiter die Kopfnummer (`K4`). Er benennt
+> dort kein einzelnes Segment mehr, sondern den Kopf-Index, den beide gemeinsam
+> haben; `Pixel 3` wäre für die Mover-Bar schlicht falsch. Dasselbe gilt beim
+> Speichern eines Snaps, wenn **mehrere** Geräte denselben Kanal liefern.
+
+### Warum nicht jeder Regler einen Pixelnamen trägt
+
+Die Kopfnummer gehört dem **Kanal-Typ**, nicht dem Gerät: der zweite Rot-Kanal ist Pixel 1,
+der zweite Roh-Kanal ist einfach der zweite Roh-Kanal. Am Spiider sind das 20 Farb-Bänke,
+aber 21 Roh-Kanäle — die zählen völlig unabhängig voneinander.
+
+Deshalb steht ein Pixelname nur dort, wo er auch stimmt. Wählst du `Pixel 3` und öffnest
+den Tab *Weitere*, heißt der Regler dort nach dem Kanal, den er wirklich bewegt
+(`Grundfarbe Blau Fein`) — **nicht** `… · P3`. Der Kanal gehört zur Grundfarbe, und
+genau das sagt sein Name. Bei einem gewöhnlichen Mehrkopf-Gerät ändert sich nichts:
+dort heißt der Regler unverändert `Kopf 1 Pan · K4`.
+
+Trägt **ein** solcher Regler mehrere Pixel-Köpfe, an denen der Kanal verschieden heißt,
+gibt es keinen gemeinsamen Kanalnamen mehr. Dann steht dort die Kopfnummer (`· K2`) —
+und kein Pixelname: unbekannt ist der Kanal, nicht der Kopf-Index.
+
+Die Fehlermeldungen der Command-Line nennen die vorhandenen Köpfe ebenfalls beim Namen
+(`Gerät 1 hat für 'color_r' 20 Köpfe (GR–P19)`). Die zu groß **getippte** Nummer bleibt
+dagegen eine Nummer (`K21`) — sie beschreibt deine Eingabe und kein vorhandenes Segment.
+
+Dieselbe Regel gilt für die **Statuszeile** darunter und für jede andere Fläche, die nur
+eine Gerätenummer in der Hand hält (EFX-Zielliste, Fan-Werkzeug): ein Segmentname steht
+dort nur, wenn es das Segment am Gerät wirklich gibt. `1:20` meldet also `1·P19` (das
+letzte Pixel des Spiiders), `1:21` dagegen `1·K21` — deine Eingabe, unverändert
+zurückgegeben. Ein `Pixel 20` gibt es an diesem Gerät nicht, und die Statuszeile erfindet
+es auch nicht.
+
 ### Was im Dialog *Gerät bearbeiten* dazugehört
 
 Doppelklick auf die Patch-Zeile öffnet den Dialog. Für Mehrkopf-Geräte gibt es dort:

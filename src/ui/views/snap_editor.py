@@ -28,7 +28,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 
-from src.core.app_state import get_state, get_channels_for_patched
+from src.core.app_state import (
+    get_state, get_channels_for_patched, attr_label_for as _attr_label_for)
 from src.core.engine.snap_library import get_snap_library
 from src.core.attr_groups import (  # kanonisch, kein Zyklus
     classify_attr as _classify_attr,
@@ -206,11 +207,16 @@ class _AddDeviceDialog(QDialog):
 class _AddChannelDialog(QDialog):
     """Waehlt nachzutragende Kanaele eines Typs + einen gemeinsamen Wert."""
 
-    def __init__(self, type_label: str, addable: list[str], n_devices: int, parent=None):
+    def __init__(self, type_label: str, addable: list[str], n_devices: int, parent=None,
+                 fixtures=None):
         super().__init__(parent)
         self.setWindowTitle("Kanal hinzufügen")
         self.setMinimumWidth(340)
         self._checks: dict[str, QCheckBox] = {}
+        # FM-14b: die Geraete DIESES Typs — ohne sie benennt ``color_r#3`` den
+        # Kopf-Index („Rot (Kopf 4)") statt das Segment, das ueberall sonst
+        # „Pixel 3" heisst.
+        self._fixtures = list(fixtures or [])
         self._setup_ui(type_label, addable, n_devices)
 
     def _setup_ui(self, type_label: str, addable: list[str], n_devices: int):
@@ -225,7 +231,7 @@ class _AddChannelDialog(QDialog):
             v.addWidget(QLabel("Welche Kanäle nachtragen?"))
             for attr in addable:
                 grp = _classify_attr(attr)
-                cb = QCheckBox(f"{_attr_label(attr)}  ·  {grp}")
+                cb = QCheckBox(f"{_attr_label_for(attr, self._fixtures)}  ·  {grp}")
                 v.addWidget(cb)
                 self._checks[attr] = cb
 
@@ -343,6 +349,12 @@ class SnapEditor(QWidget):
         if fx is None:
             return ("<nicht gepatcht>", attr, None)
         label = getattr(fx, "label", None) or f"FID {getattr(fx, 'fid', '?')}"
+        # ★ Hier bewusst die KONTEXTFREIE Beschriftung (FM-14b, dritte Runde):
+        # dieser Rueckfall greift genau dann, wenn das Geraet den Kanal gar
+        # nicht hat. Dann gibt es auch kein Segment zu benennen — „Rot
+        # (Pixel 25)" wuerde eines erfinden, das dieses Geraet nicht besitzt.
+        # Der Hauptweg darunter gewinnt ohnehin mit dem echten Kanalnamen
+        # („P3 Rot"), der die Segmentnummer schon traegt.
         chan_name, dmx = _attr_label(attr), None
         base, sep, head = attr.partition("#")
         base = base.lower()
@@ -441,6 +453,10 @@ class SnapEditor(QWidget):
         for fid in fids:
             for attr in self._snap.values.get(fid, {}):
                 rows.append((fid, attr, self._snap.values[fid][attr]))
+        # Der SORTIER-Schluessel bleibt bewusst die kontextfreie ``attr_label``:
+        # er steht auf keiner Flaeche, und eine Geraete-Abfrage je Vergleich
+        # waere Aufwand ohne sichtbares Ergebnis (die „Kanal"-Spalte zeigt den
+        # echten Kanalnamen, nicht dieses Label).
         rows.sort(key=lambda r: (r[0], _classify_attr(r[1]), _attr_label(r[1]).lower()))
 
         tbl = QTableWidget(len(rows), len(_COLS))
@@ -620,7 +636,9 @@ class SnapEditor(QWidget):
 
         type_label = fixture_type_label(fixtures.get(next(iter(present)))) \
             if fixtures.get(next(iter(present))) is not None else "Typ"
-        dlg = _AddChannelDialog(type_label, addable, len(present), self)
+        dlg = _AddChannelDialog(type_label, addable, len(present), self,
+                                fixtures=[fixtures.get(int(f)) for f in sorted(present)
+                                          if fixtures.get(int(f)) is not None])
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
         attrs = dlg.selected_attrs()
