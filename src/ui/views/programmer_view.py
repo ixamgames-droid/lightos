@@ -1088,7 +1088,21 @@ class ProgrammerView(QWidget):
             cells = getattr(self, "_selected_cells", None)
             setter = getattr(self._state, "set_selected_cells", None)
             if cells is not None and callable(setter):
-                setter(cells)
+                # Das eigene Echo (SELECTION_CHANGED kommt synchron zurueck) nicht
+                # als fremde Aenderung behandeln — siehe `_sync_follow_selection`.
+                self._veroeffentliche = True
+                try:
+                    setter(cells)
+                finally:
+                    self._veroeffentliche = False
+                # FM-41: die vom State NORMALISIERTE Zellliste merken („ganzes
+                # Geraet schlaegt seine Koepfe"). Sonst hielte der Zellen-Vergleich
+                # in `_sync_follow_selection` das eigene Echo fuer eine fremde
+                # Aenderung und naehme z. B. nach „Alle" die Kopfzeilen-Markierung
+                # zurueck.
+                norm = getattr(self._state, "get_selected_cells", None)
+                if callable(norm):
+                    self._selected_cells = list(norm() or [])
             else:
                 self._state.set_selected_fids(self._selected_fids)
         except Exception as e:
@@ -1321,6 +1335,8 @@ class ProgrammerView(QWidget):
         (``set_selected_fids``). Der Gleichheits-Guard verhindert, dass das eigene
         Echo (nach ``_publish_selection``) einen ueberfluessigen Rebuild ausloest.
         """
+        if getattr(self, "_veroeffentliche", False):
+            return  # FM-41: eigenes Echo aus _publish_selection
         try:
             new_fids = list(getattr(self._state, "selected_fids", []) or [])
         except Exception:
