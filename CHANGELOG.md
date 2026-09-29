@@ -788,6 +788,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   werden, sonst hätte der Draht gestimmt und das Bild wäre spiegelverkehrt
   gewesen.
 
+
 ### 2026-09-03 — Die Geräteliste im Programmer lässt sich zuklappen
 
 #### Verbessert
@@ -835,6 +836,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   einer anderen Regel als der Rest des Programms; beide Hälften benutzen jetzt
   dieselbe.
 
+
 ### 2026-09-03 — Ein weißer Effekt lässt den LED-Balken wieder ganz leuchten
 
 #### Behoben
@@ -860,6 +862,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
   Damit hält sich der Matrix-Effekt an dieselbe Regel, nach der Szenen und
   Chaser schon seit August arbeiten.
+
 
 ### 2026-09-03 — Skriptgebaute Shows finden ihre Geräte auch auf einem anderen Rechner
 
@@ -912,6 +915,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   3D-Darstellung. Jetzt gewinnt das mitgelieferte Gerät, und die Dublette
   wird beim Öffnen gemeldet.
 
+
 ### 2026-09-02 — Ein Panel landet im Gruppen-Raster in seiner echten Form
 
 #### Verbessert
@@ -935,6 +939,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
   Hat ein Gerät keine Form, lässt sie sich im Fixture-Generator im Feld
   „Raster" eintragen — dann steht sie beim nächsten Mal hier.
+
 
 ### 2026-09-03 — Ein Testlauf, dessen Ergebnisliste Lücken hat, meldet keinen Erfolg mehr
 
@@ -1087,6 +1092,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   — vorher hätte jede ihre eigene bekommen, und die Absicherung hätte
   ausgerechnet dort nicht gegriffen, wo wirklich parallel gearbeitet wird.
 
+
 ### 2026-09-02 — Eine Test-Voraussetzung, die am falschen Socket maß
 
 #### Behoben
@@ -1134,6 +1140,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Die Nachsicht für den Einzelfall bleibt unverändert — geändert hat sich nur,
   dass sie nicht mehr für einen Totalausfall gilt.
 
+
+
 ### 2026-09-01 — Ein hängender Test beendete den ganzen Testlauf
 
 #### Behoben
@@ -1169,6 +1177,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Der Kreis wird jetzt erkannt und an Ort und Stelle abgebrochen. LightOS sagt
   dabei einmal, welche Sammlung betroffen ist und welche Mitglieder sie hat —
   einmal, nicht in jedem Bild.
+
 
 ### 2026-09-01 — Layer-Effekte beachten die Geräte-Einstellungen
 
@@ -1218,6 +1227,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   auf Strg+Pfeil, und zusätzlich auf Bild auf/ab sowie Pos1/Ende, falls ein
   Terminalfenster die Strg-Kombination selbst abfängt. Unter Linux und macOS
   bleibt alles wie gewohnt bei Umschalt+Pfeil.
+
+
 
 ### 2026-09-01 — Windows warnt jetzt auch, wenn der DMX-Port schon belegt ist
 
@@ -1355,6 +1366,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   fest, die Übersicht nicht. Die Aufzählung nennt jetzt die Knöpfe, die wirklich
   da sind, mit einem aktuellen Bild der Werkzeugleiste.
 
+
 ### 2026-08-31 — Panik-Taster bleibt nicht mehr haengen
 
 #### Behoben
@@ -1411,6 +1423,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   Das Test-Gate setzt dafür bewusst **keine** Umgebungsvariable: das würde den
   Fehler zwar im Gate verschwinden lassen, aber genau dort bestehen lassen, wo
   die Werkzeuge tatsächlich benutzt werden.
+
+
 
 ### 2026-08-30 — „Zielen" trifft jetzt auch bei Geräten mit invertierter Bewegung
 
@@ -1963,6 +1977,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
   die Bibliothek kam, konnte „99999 Spalten" hinterlegen, und der 3D-Renderer
   bekam das so zu sehen. Die Grenze steht jetzt an einer einzigen Stelle und
   gilt fuer jeden Schreibweg.
+
 
 ### 2026-08-24 — Der Beweis-Upload der CI hat nie etwas hochgeladen
 
@@ -2888,6 +2903,7 @@ Betrifft nur die Entwicklungswerkzeuge, nicht die Anwendung.
   Schlangenlinien zaehlt und hochkant montiert ist, landet damit ohne
   Handarbeit richtig im Raster.
 
+
 ### 2026-08-05 — Davids LED-Balken ist am Geraet bestaetigt
 
 #### Geaendert
@@ -2937,6 +2953,7 @@ Betrifft nur die Entwicklungswerkzeuge, nicht die Anwendung.
   Ohne Einstellung aendert sich nichts: Bestandsgeraete verhalten sich
   unveraendert, und alte Shows laden wie bisher.
 
+
 ### 2026-08-05 — Matrix-Panels liessen sich nicht bearbeiten, und die Pixel-Reihenfolge wirkte nie
 
 #### Behoben
@@ -2963,6 +2980,7 @@ Betrifft nur die Entwicklungswerkzeuge, nicht die Anwendung.
   „Mit Offset kopieren" vergass sie — man kopierte vier Panels und drei zaehlten
   anders als das Original.
 
+
 ### 2026-08-05 — Gezeichnete Laser-Figuren gehen jetzt in voller Aufloesung raus
 
 #### Verbessert
@@ -2981,6 +2999,7 @@ Betrifft nur die Entwicklungswerkzeuge, nicht die Anwendung.
   > konnte Luecken in der Zeichnung verschlucken, sodass der Strahl eine Linie
   > zog, wo keine sein sollte. Beides hatte dieselbe Ursache — zu wenig Platz in
   > einem Paket.
+
 
 ### 2026-08-05 — Ein fehlerhaftes 3D-Modell konnte im Visualizer unsichtbar werden
 
@@ -3003,6 +3022,7 @@ Betrifft nur die Entwicklungswerkzeuge, nicht die Anwendung.
   Betrifft die mitgelieferten Modelle nicht; sie sind in Ordnung. Wichtig wird
   es, sobald eigene Modelldateien dazukommen.
 
+
 ### 2026-08-05 — Am Profi-Laser fehlte der Dimmer, und gezeichnete Figuren sprangen in der Groesse
 
 #### Behoben
@@ -3021,6 +3041,7 @@ Betrifft nur die Entwicklungswerkzeuge, nicht die Anwendung.
   einen anderen Startwert als das Testmuster; beim blossen Umschalten zwischen
   beiden sprang die Figur also in der Groesse. Beide nehmen jetzt denselben
   Startwert.
+
 
 ### 2026-08-05 — Netzwerkkarte fuer DMX waehlbar (Fixtures blieben auf Multi-NIC-Rechnern schwarz)
 
@@ -3052,6 +3073,7 @@ Betrifft nur die Entwicklungswerkzeuge, nicht die Anwendung.
 
   Ein ausdruecklich eingetragenes Ziel im Universe-Manager bleibt unangetastet.
 
+
 ### 2026-08-05 — Die Lichtkegel laufen aus, statt an einer Kante zu enden
 
 #### Verbessert
@@ -3066,6 +3088,7 @@ Betrifft nur die Entwicklungswerkzeuge, nicht die Anwendung.
   sich nichts, an der DMX-Ausgabe ohnehin nicht — es geht ausschliesslich um die
   Darstellung. Auch die Leistung bleibt gleich: es ist EIN gemeinsames Bild fuer
   alle Geraete, keine Rechnung je Kegel und keine je Bild.
+
 
 ### 2026-08-05 — Der Master-Fader am APC mini griff der Oberflaeche in die Speichen
 
@@ -3303,6 +3326,7 @@ Betrifft nur die Entwicklungswerkzeuge, nicht die Anwendung.
 Noch offen und bewusst eine eigene Runde: der **Schatten im Strahl** — ein
 Körper im Lichtkegel wirft weiterhin keinen Schatten in den sichtbaren Nebel.
 Das ist Ray-Marching und gehört an die Qualitätsstufe „Hoch".
+
 
 ### 2026-08-02 — Geräteprofil-Tests prüfen wieder, was im Quelltext steht
 
@@ -5186,6 +5210,7 @@ Reine Buchhaltung, kein Verhalten der App betroffen.
   jederzeit über das Menü erreichbar — ein kompromittiertes Token liess sich
   während einer laufenden Show sonst praktisch nicht wechseln.
 
+
 ### 2026-07-27 — Ein EFX kann auf einem einzelnen Kopf laufen (FM-HEADLAYOUT A3)
 
 #### Hinzugefügt
@@ -5230,6 +5255,7 @@ Reine Buchhaltung, kein Verhalten der App betroffen.
 - **Positionen aus den Zahlenfeldern markieren die Show wieder als geändert.**
   Der Eingabe-Pfad meldete überhaupt keine Änderung, weshalb die automatische
   Speicherung solche Positionen still überging.
+
 
 ### 2026-07-27 — Fächer und Snap-Aufnahme verstehen Köpfe (FM-HEADLAYOUT A2)
 
@@ -5280,6 +5306,7 @@ Reine Buchhaltung, kein Verhalten der App betroffen.
   pro Abruf-Intervall traf das regelmässig. Die Pakete werden jetzt pro Gerät
   zusammengeführt.
 
+
 ### 2026-07-27 — Ein einzelner Kopf lässt sich im Programmer auswählen (FM-HEADLAYOUT Slice 5 / FM-9)
 
 #### Hinzugefügt
@@ -5324,6 +5351,7 @@ BACKLOG waren bei fester Breite mitten im Satz abgeschnitten und dadurch nicht
 als Arbeitsauftrag nutzbar (aus der Audit-Quelle regeneriert), und ein
 nachträglich als falsch erkanntes Verdikt im Anleitungen-Audit vom 2026-07-20
 wurde als „revidiert" markiert statt still überschrieben._
+
 
 ### 2026-07-27 — Rasterzellen zeigen, zu welchem Gerät und Kopf sie gehören (FM-HEADLAYOUT Slice 4)
 
@@ -6031,6 +6059,7 @@ _Beim Repo-Aufräumen (≈130→8 lokale Branches, primärer Worktree zurück au
   VC-Buttons kommen — die Funktion steckt im **Rechtsklick-Kontextmenue** und
   ist deshalb leicht zu uebersehen.
 
+
 ### 2026-07-17 — 3D-Visualizer: benannte Kameras nach Show-Wechsel (A3D-13 / A3D-22)
 
 #### Behoben
@@ -6173,6 +6202,7 @@ _Beim Repo-Aufräumen (≈130→8 lokale Branches, primärer Worktree zurück au
 #### Neu / Tests
 
 - **Einstellungen-Tab „Render-Qualität":** Stufe `Automatisch (empfohlen)` / `Hoch` / `Niedrig`. Automatisch = die GPU-Probe beim Szenen-Start entscheidet (schwache Chips wie das Surface-Adreno → Niedrig); die manuelle Wahl übersteuert sie, falls die Erkennung danebenliegt. Ein Label zeigt die **aktive** Stufe der laufenden Szene (JS meldet sie beim Channel-Connect über den neuen Slot `reportGpuTier`). Die Wahl ist **geräte-gebunden** (`ui_prefs.json`, nicht in der Show) und reist als `gputier`-Query mit jedem `load_stage_html` — sie greift damit für alle Targets (Vollfenster, eingebettete 3D-View, Crash-Guard-Selbstheilung, „Szene neu laden"); ein Stufenwechsel lädt die Szene automatisch neu. `tests/test_viz_quality_tier.py` (11 Tests: Pref-Roundtrip/Fallbacks, URL-Query, Combo-Handler, Bridge-Slot, Label).
+
 
 ### 2026-07-11 — Low-Spec-Modus: Visualizer läuft flüssig auf schwachen GPUs (Surface)
 
@@ -6363,6 +6393,7 @@ _Beim Repo-Aufräumen (≈130→8 lokale Branches, primärer Worktree zurück au
 
 - **Kein Roh-Kanal-Zombie mehr nach Patch-Change:** Schreibt eine `ScriptFunction` per `setdmx` einen **nicht gepatchten** Roh-Kanal, committet der Renderer ihn und merkt ihn in `_engine_extra_prev`, um ihn später (wenn das Skript stoppt) wieder auf 0 freizugeben. Ein Patch-Rebuild (`_rebuild_render_plan`, `app_state.py`) setzte dieses Tracking bisher **hart auf `{}`** — ohne die Live-Werte zu nullen. Stoppte das Skript danach, blieb `prev` leer, die `prev-cur`-Freigabe feuerte nie → der Roh-Kanal blieb **dauerhaft an** (bei Strobe/Shutter/Beam sicht- und sicherheitsrelevant). **Fix:** neuer Helfer `_release_engine_extra()` gibt die gemerkten Roh-Adressen im Live-Universe aktiv auf 0 frei, bevor das Tracking geleert wird (`list()`-Snapshot gegen den Render-Thread; `set_channel` per Universe-Lock thread-safe). Wird die Adresse jetzt gepatcht/weiter beschrieben, setzt der nächste Frame sie neu — höchstens 1 Frame Dip.
 - **Tests:** `tests/test_render_frame.py::test_engine_extra_released_on_repatch` — Roh-Kanal committen → Repatch → Skript stoppt → Adresse wird auf 0 freigegeben (und bleibt es). Herkunft: AUD-02 (`docs/RENDER_AUDIT_2026_07_08.md`).
+
 
 #### Geaendert / Fixes
 
