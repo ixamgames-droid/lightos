@@ -9,7 +9,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| FM-49 | A | fix/fm49-import-zuordnung | 2026-09-28T23:27Z | src/core/database/qxf_import.py,src/core/database/fixture_db.py |
 | VIZ-63 | A | fix/viz63-kopf-orientierung | 2026-09-28T23:49Z | src/ui/visualizer/visualizer_service.py |
 
 ## Blocker & Fallen
@@ -129,7 +128,6 @@
 
 ## Verlauf
 
-- 2026-09-16T16:44Z A claim DOC-BPM
 - 2026-09-16T17:29Z A done DOC-BPM
 - 2026-09-24T15:40Z C claim BPM-14
 - 2026-09-24T16:49Z C uebergeben BPM-14
@@ -159,3 +157,4 @@
 - 2026-09-28T23:27Z A done FM-48
 - 2026-09-28T23:27Z A claim FM-49
 - 2026-09-28T23:49Z A claim VIZ-63
+- 2026-09-29T00:01Z A done FM-49
