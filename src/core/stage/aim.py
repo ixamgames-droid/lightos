@@ -102,6 +102,7 @@ def _aim_dmx(
     tilt_range_deg: float = 180.0,
     pan_zero_dmx: float = 128.0,
     tilt_zero_dmx: float = 128.0,
+    aktuell=None,
 ):
     """Pan/Tilt-DMX STUFENLOS (0.0..255.0) berechnen, damit der Strahl von ``pos`` (mit Montage-
     Ausrichtung ``rot_deg`` = (rx,ry,rz) Grad) auf ``target`` zeigt.
@@ -118,6 +119,20 @@ def _aim_dmx(
     Das Ergebnis ist ein MODELL-Wert und gehoert so in den Programmer bzw. in
     eine Szene. ``invert_pan``/``invert_tilt``/``swap_pan_tilt`` dreht erst die
     Ausgabestufe (siehe Modulkopf) — hier werden sie bewusst NICHT angewandt.
+
+    **Zwei Wege zum selben Ziel (VIZ-64).** Ein Moving Head erreicht fast jede
+    Richtung als (Pan, Tilt) UND als (Pan+180, -Tilt), bei grossem Pan-Bereich
+    zusaetzlich Pan+-360. Frueher galt nur der erste Weg mit Pan in (-180, 180];
+    lag er ausserhalb 0..255, wurde abgeschnitten und der Strahl zeigte still
+    daneben (gemessen: 330 Grad Bereich, Nullpunkt 167,5 -> ueber ~+112 Grad
+    unerreichbar). Jetzt:
+
+    * Ohne ``aktuell``: der bisherige erste Weg, wenn er passt — sonst der
+      erreichbare Weg nahe am Nullpunkt. Eindeutig, damit Zielen und Einmessen
+      (``einmessen``: Soll = dieselbe Rechnung) denselben Weg nehmen.
+    * Mit ``aktuell`` = (pan, tilt): unter den erreichbaren Wegen der kuerzeste
+      von dort (Nachfahren einer Figur: kein Umschlagen mitten in der Bewegung).
+    * Kein Weg erreichbar -> wie bisher der erste, abgeschnitten.
     """
     dx = float(target[0]) - float(pos[0])
     dy = float(target[1]) - float(pos[1])
@@ -135,21 +150,50 @@ def _aim_dmx(
     # Bereiche (z.B. 270 Grad) koennen ueber die Horizontale hinaus nach oben.
     theta = math.acos(_clamp(-ly, -1.0, 1.0))
 
+    half_pan = max(1.0, pan_range_deg / 2.0)
+    half_tilt = max(1.0, tilt_range_deg / 2.0)
+
     sin_t = math.sin(theta)
     if sin_t < 1e-6:
-        # Strahl ~ senkrecht nach unten -> Pan unbestimmt, Ruhelage behalten
-        pan_rad = 0.0
-    else:
-        # -sin t * sin p = lx ; -sin t * cos p = lz  ->  p = atan2(-lx, -lz)
-        pan_rad = math.atan2(-lx, -lz)
+        # Strahl ~ senkrecht nach unten -> Pan unbestimmt: Ruhelage behalten,
+        # beim Nachfahren den bisherigen Pan (kein Sprung durch den Nadir).
+        pan = float(aktuell[0]) if aktuell is not None else float(pan_zero_dmx)
+        tilt = tilt_zero_dmx + (math.degrees(theta) / half_tilt) * 128.0
+        return (_clamp(pan, 0.0, 255.0), _clamp(tilt, 0.0, 255.0))
+    # -sin t * sin p = lx ; -sin t * cos p = lz  ->  p = atan2(-lx, -lz)
+    pan_deg = math.degrees(math.atan2(-lx, -lz))
+    theta_deg = math.degrees(theta)
 
     # Grad -> DMX ueber den physischen Bereich (gleiche Abbildung wie Visualizer):
     #   dmx = zero + winkel / (bereich/2) * 128
-    half_pan = max(1.0, pan_range_deg / 2.0)
-    half_tilt = max(1.0, tilt_range_deg / 2.0)
-    pan = pan_zero_dmx + (math.degrees(pan_rad) / half_pan) * 128.0
-    tilt = tilt_zero_dmx + (math.degrees(theta) / half_tilt) * 128.0
+    def _dmx(p_deg, t_deg):
+        return (pan_zero_dmx + p_deg / half_pan * 128.0,
+                tilt_zero_dmx + t_deg / half_tilt * 128.0)
 
+    erster = _dmx(pan_deg, theta_deg)
+    wege = [_dmx(p + 360.0 * k, t)
+            for p, t in ((pan_deg, theta_deg), (pan_deg + 180.0, -theta_deg))
+            for k in (0, -1, 1, -2, 2)]
+    # Bis zu EINEM DMX-Schritt Ueberstand gilt als erreichbar: die Abbildung
+    # hat die Mitte bei 128, der Anschlag „+halber Bereich" liegt rechnerisch bei
+    # 256 (waagerecht bei 180 Grad Tilt). Das wird wie bisher abgeschnitten —
+    # dafuer auf den anderen Weg umzuschlagen waere ein Sprung ueber den ganzen
+    # Bereich fuer einen Fehler von einem Schritt.
+    tol = 1.0 + 1e-9
+    erreichbar = [w for w in wege
+                  if -tol <= w[0] <= 255.0 + tol and -tol <= w[1] <= 255.0 + tol]
+    if not erreichbar:
+        pan, tilt = erster
+    elif aktuell is None:
+        pan, tilt = erster if erster in erreichbar else min(
+            erreichbar, key=lambda w: (abs(w[0] - pan_zero_dmx) * half_pan
+                                       + abs(w[1] - tilt_zero_dmx) * half_tilt))
+    else:
+        ap, at = float(aktuell[0]), float(aktuell[1])
+        # Weg in GRAD vergleichen — ein DMX-Schritt Pan ist meist mehr Winkel
+        # als einer Tilt.
+        pan, tilt = min(erreichbar, key=lambda w: (abs(w[0] - ap) * half_pan
+                                                   + abs(w[1] - at) * half_tilt))
     return (_clamp(pan, 0.0, 255.0), _clamp(tilt, 0.0, 255.0))
 
 
@@ -300,9 +344,12 @@ def trace_pan_tilt(pos, points, rot_deg=(0.0, 0.0, 0.0),
     Ausgabestufe (siehe Modulkopf)."""
     out = []
     for p in points:
+        # VIZ-64: jeder Punkt vom vorigen aus — kein Umschlagen auf den anderen
+        # Weg mitten in der Figur. Der erste Punkt wie ein einzelnes Zielen.
         out.append(aim_pan_tilt(
             pos, p, rot_deg,
             pan_range_deg=pan_range_deg, tilt_range_deg=tilt_range_deg,
             pan_zero_dmx=pan_zero_dmx, tilt_zero_dmx=tilt_zero_dmx,
+            aktuell=out[-1] if out else None,
         ))
     return out
