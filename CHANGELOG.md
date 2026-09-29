@@ -7,6 +7,16 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-29 — Doppelte Geräte-Nummer in einer Show-Datei wird gemeldet (STAB-27)
+
+#### Behoben
+
+- **Zwei Geräte mit derselben Nummer in einer Show-Datei.** LightOS gab dem zweiten still eine
+  neue Nummer — die aber mit einem Gerät weiter unten in der Datei zusammenfallen konnte; dann
+  landeten dessen Werte, 3D-Position und Gruppen auf dem falschen Gerät. Die neue Nummer ist
+  jetzt garantiert frei, und nach dem Laden sagt die Ladewarnung, welches Gerät umnummeriert
+  wurde.
+
 ### 2026-09-29 — Die Patch-Prüfung findet jede Adress-Überschneidung (STAB-26)
 
 #### Behoben

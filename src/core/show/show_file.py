@@ -437,13 +437,37 @@ def _replace_patch_from_data(state, patch_data: list[dict]):
         next_fid = 1
         used_fids: set = set()
         pfs: list = []
+        # STAB-27: die neue Nummer darf mit KEINER fid der Datei kollidieren —
+        # auch nicht mit einer, die erst weiter unten steht. Vorher bekam bei
+        # [1, 1, 2] das zweite Geraet die 2, und das echte Geraet 2 wurde
+        # seinerseits umnummeriert: dessen Programmer-Werte, 3D-Position und
+        # Gruppen landeten still auf dem falschen Geraet.
+        datei_fids: set = set()
+        for entry in patch_data:
+            if isinstance(entry, dict):
+                try:
+                    datei_fids.add(int(entry.get("fid", entry.get("id"))))
+                except (TypeError, ValueError):
+                    pass
+        erstes_label: dict = {}
         for entry in patch_data:
             if not isinstance(entry, dict):
                 continue
             pf = _patched_fixture_from_data(entry, next_fid)
             if pf.fid in used_fids:
-                pf.fid = max(used_fids) + 1
+                alt_fid = pf.fid
+                pf.fid = max(used_fids | datei_fids) + 1
+                # Werte, Position und Gruppen unter der alten Nummer gehoeren dem
+                # ERSTEN Geraet mit dieser Nummer — das zweite beginnt leer.
+                # Nicht still: sonst sieht niemand, warum es dunkel bleibt.
+                _ladeprobleme.append(
+                    f"Doppelte Geräte-Nummer {alt_fid} in der Show-Datei: "
+                    f"„{pf.label}“ hat jetzt die Nummer {pf.fid}. Werte, 3D-Position "
+                    f"und Gruppen der Nummer {alt_fid} gehören zu "
+                    f"„{erstes_label.get(alt_fid, '?')}“ — das umnummerierte Gerät "
+                    f"bitte prüfen.")
             used_fids.add(pf.fid)
+            erstes_label.setdefault(pf.fid, pf.label)
             next_fid = max(next_fid, pf.fid + 1)
             pfs.append(pf)
 
