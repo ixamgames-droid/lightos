@@ -319,6 +319,7 @@ class AppState:
         # werden AUSSCHLIESSLICH in set_selected_cells fortgeschrieben.
         self.selected_cells: list[str] = []
         self._selected_heads: dict[int, set] = {}
+        self._selected_weiss: dict[int, set] = {}   # FM-41: Weiss-Segment-Auswahl
         # Aktive Gruppen-ID im Programmer (None = lose Einzel-/Mehrfachauswahl).
         # Wird VOR set_selected_fids gesetzt, damit die Matrix beim SELECTION_CHANGED
         # bereits die korrekte Gruppen-ID vorfindet.
@@ -2494,39 +2495,56 @@ class AppState:
 
         Ist ein Geraet sowohl als Ganzes als auch per Kopf gewaehlt, gewinnt das
         GANZE Geraet (die groebere Aussage ist die sichere: alle Koepfe)."""
-        from .group_cells import parse_group_cell
+        # FM-41: achsen-bewusst gelesen — eine Weiss-Zelle ``"7:w3"`` ist ein
+        # eigenes Segment, kein Kopf und kein ganzes Geraet.
+        from .group_cells import ACHSE_FARBE, ACHSE_WEISS, parse_zelle, zelle_fuer
         norm: list[str] = []
         whole: set[int] = set()
         heads: dict[int, list[int]] = {}
+        weiss: dict[int, list[int]] = {}
         for c in cells or []:
-            fid, head = parse_group_cell(c)
+            fid, achse, index = parse_zelle(c)
             if fid is None:
                 continue
-            key = f"{fid}" if head is None else f"{fid}:{head}"
+            key = zelle_fuer(fid, achse, index)
             if key in norm:
                 continue
             norm.append(key)
-            if head is None:
-                whole.add(fid)
+            if achse == ACHSE_WEISS and index is not None:
+                weiss.setdefault(fid, []).append(index)
+            elif achse == ACHSE_FARBE and index is not None:
+                heads.setdefault(fid, []).append(index)
             else:
-                heads.setdefault(fid, []).append(head)
-        # Ganzes Geraet schlaegt seine Kopf-Eintraege (sonst waere unklar, ob
-        # „alle Koepfe" oder „nur diese" gemeint ist).
+                whole.add(fid)
+        # Ganzes Geraet schlaegt seine Kopf- UND Weiss-Eintraege (sonst waere
+        # unklar, ob „alles" oder „nur diese" gemeint ist).
         if whole:
             norm = [k for k in norm
                     if ":" not in k or int(k.split(":", 1)[0]) not in whole]
             for fid in list(heads):
                 if fid in whole:
                     heads.pop(fid, None)
+            for fid in list(weiss):
+                if fid in whole:
+                    weiss.pop(fid, None)
+        # FM-41 (Review 29.09.): ein Geraet, von dem NUR Weiss-Segmente gewaehlt
+        # sind, steht NICHT in ``selected_fids``. Das ist der Vertrag fuer ALLE
+        # uebrigen Konsumenten (VC-Submaster „Auswahl", Command-Line, EFX, Fan,
+        # Paletten, MIDI, XY-Pad …) — fuer sie hiesse ein fid „ganzes Geraet",
+        # gemessen fuhr ein Submaster so den ganzen Balken (48 RGB-Zonen +
+        # Master). Nicht dabei = sie tun NICHTS; nur der Programmer liest die
+        # feinen Zellen und bedient die Segmente.
+        nur_weiss = {f for f in weiss if f not in whole and not heads.get(f)}
         base: list[int] = []
         for k in norm:
             fid = int(k.split(":", 1)[0])
-            if fid not in base:
+            if fid not in base and fid not in nur_weiss:
                 base.append(fid)
         if norm == list(getattr(self, "selected_cells", [])) and base == self.selected_fids:
             return
         self.selected_cells = norm
         self._selected_heads = {f: set(hs) for f, hs in heads.items()}
+        self._selected_weiss = {f: set(ws) for f, ws in weiss.items()}
         self.selected_fids = base
         try:
             from .sync import SyncEvent
@@ -2553,6 +2571,104 @@ class AppState:
 
     def get_selected_fids(self) -> list[int]:
         return list(self.selected_fids)
+
+    def selected_weiss_for(self, fid) -> set:
+        """FM-41: welche WEISS-Segmente von ``fid`` sind gewaehlt? Leeres Set =
+        keines (auch: das ganze Geraet ist gewaehlt — dann gilt das Geraet, nicht
+        einzelne Segmente)."""
+        try:
+            fid = int(fid)
+        except (TypeError, ValueError):
+            return set()
+        return set((getattr(self, "_selected_weiss", None) or {}).get(fid) or ())
+
+    def nur_weiss_gewaehlt(self, fid) -> bool:
+        """FM-41: ist ``fid`` AUSSCHLIESSLICH ueber Weiss-Segmente gewaehlt —
+        weder als ganzes Geraet noch mit einem Farbkopf? Dann darf der Programmer
+        fuer dieses Geraet NUR die Weiss-Segmente anbieten; ein geraeteweiter
+        Regler fuehre sonst den ganzen Balken."""
+        try:
+            fid = int(fid)
+        except (TypeError, ValueError):
+            return False
+        if fid in self.selected_fids or not self.selected_weiss_for(fid):
+            return False
+        return not (getattr(self, "_selected_heads", None) or {}).get(fid)
+
+    def weiss_dimmer_key(self, fid, segment) -> str | None:
+        """FM-41: Programmer-Schluessel des GETEILTEN Dimmers, der das
+        Weiss-Segment mitfaehrt (ZQ06121: Master-Dimmer CH1) — ``None``, wenn es
+        keinen gibt. Ohne ihn bliebe ein programmiertes Segment dunkel: seit
+        2026-06-24 macht Farbe nicht mehr von selbst hell
+        (``implicit_brightness=False``)."""
+        fx = next((f for f in self._patch_cache
+                   if getattr(f, "fid", None) == fid), None)
+        if fx is None:
+            return None
+        try:
+            chans = get_channels_for_patched(fx)
+            from .group_cells import ACHSE_WEISS
+            proj = channels_for_axis(chans, ACHSE_WEISS, int(segment))
+            keys = {id(c): k for c, k in channel_occurrence_keys(chans)}
+            for attr in ("intensity", "dimmer", "master"):
+                ch = proj.get(attr)
+                if ch is not None:
+                    return keys.get(id(ch))
+        except Exception:
+            return None
+        return None
+
+    def weiss_setzen(self, fid, segment, value) -> bool:
+        """FM-41: EIN Weiss-Segment setzen — und nur dieses.
+
+        ★ Das erste Segment traegt den BASIS-Schluessel (``color_w``). Den
+        spiegelt der DMX-Flush auf jedes Vorkommen, das keinen eigenen Wert hat
+        — „Weiss 1" fuhr so gemessen ALLE acht Segmente mit. Darum werden vor dem
+        Schreiben die uebrigen Segmente auf ihrem aktuellen Wert verankert (0,
+        solange nie gesetzt) — dieselbe Antwort wie beim Getrennt-Modus der
+        Farbkoepfe (``_seed_separate_head``)."""
+        key = self.weiss_programmer_key(fid, segment)
+        if not key:
+            return False
+        prog = self.programmer.get(fid, {})
+        k = 0
+        while True:
+            other = self.weiss_programmer_key(fid, k)
+            if other is None:
+                break
+            if other != key and other not in prog:
+                self.set_programmer_value(fid, other, int(prog.get(other, 0) or 0))
+                prog = self.programmer.get(fid, {})
+            k += 1
+        self.set_programmer_value(fid, key, int(value))
+        return True
+
+    def weiss_programmer_key(self, fid, segment) -> str | None:
+        """FM-41: Programmer-Schluessel des Weiss-Segments ``segment`` von
+        ``fid`` — der Vorkommens-Schluessel (``color_w#N``) genau des Kanals, den
+        ``channels_for_axis`` fuer dieses Segment liefert. ``None``, wenn das
+        Geraet keine EIGENE Weiss-Achse hat oder es das Segment nicht gibt: dann
+        gibt es nichts getrennt anzusprechen (ENG-25-Sperre)."""
+        fx = next((f for f in self._patch_cache
+                   if getattr(f, "fid", None) == fid), None)
+        if fx is None:
+            return None
+        try:
+            # Dieselbe Sperre wie die Baumzeilen: ein als EINE Lampe gefuehrtes
+            # Geraet hat keine getrennt ansprechbaren Segmente.
+            from .head_mode import normalize_head_mode
+            if normalize_head_mode(getattr(fx, "head_mode", "auto")) == "single":
+                return None
+            chans = get_channels_for_patched(fx)
+            if not weiss_ist_eigene_achse_for_channels(chans, fx):
+                return None
+            from .group_cells import ACHSE_WEISS
+            ch = channels_for_axis(chans, ACHSE_WEISS, int(segment)).get("color_w")
+            if ch is None:
+                return None
+            return {id(c): k for c, k in channel_occurrence_keys(chans)}.get(id(ch))
+        except Exception:
+            return None
 
     def set_selected_group_id(self, gid: int | None):
         """Merkt die aktuell im Programmer gewaehlte Gruppe (oder None bei loser
@@ -2740,10 +2856,21 @@ class AppState:
         gleichnamigen Gruppen).
         """
         gid, fids = self._group_lookup(name_or_ref)
-        if gid is None or not fids:
+        if gid is None:
+            return False
+        # FM-41: Weiss-Zellen von Geraeten, die NICHT schon als Ganzes/Kopf in
+        # der Gruppe stehen, kommen als Segment-Auswahl mit — so ist eine reine
+        # Weiss-Gruppe waehlbar (vorher: keine fids -> „nichts gewaehlt").
+        from .group_cells import ACHSE_WEISS, parse_zelle, zellen_in_grid_order
+        weiss = [z for z in zellen_in_grid_order(self._group_positions(name_or_ref)[1])
+                 if parse_zelle(z)[1] == ACHSE_WEISS and parse_zelle(z)[0] not in fids]
+        if not fids and not weiss:
             return False
         self.set_selected_group_id(gid)
-        self.set_selected_fids(fids)
+        if weiss:
+            self.set_selected_cells([str(f) for f in fids] + weiss)
+        else:
+            self.set_selected_fids(fids)
         return True
 
     def list_fixture_groups(self) -> list[dict]:

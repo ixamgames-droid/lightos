@@ -510,7 +510,10 @@ class BeschriftungTest(_RigFall):
         view = ProgrammerView()
         self.addCleanup(view.deleteLater)
         lst = view._fixture_list
-        kopfzeilen = [z.text().strip() for z in _zeilen(lst) if z.ist_kopf()]
+        # FM-41: Weiss-Segment-Zeilen ("Weiß N") sind eine ZWEITE Achse, keine
+        # Kopfzeilen — gezaehlt werden hier nur die Farbkoepfe.
+        kopfzeilen = [z.text().strip() for z in _zeilen(lst)
+                      if z.ist_kopf() and not z.text().startswith("Weiß")]
         self.assertEqual(len(kopfzeilen), 20,
                          f"20 Kopf-Zeilen erwartet: {kopfzeilen}")
         self.assertEqual(kopfzeilen[0], "Grundfarbe")
@@ -519,7 +522,7 @@ class BeschriftungTest(_RigFall):
         self.assertEqual([t for t in kopfzeilen if t.startswith("Kopf")], [],
                          "am Pixel-Kopf steht weiterhin „Kopf N“ in der Liste")
         geraet = [z.text() for z in _zeilen(lst) if not z.ist_kopf()]
-        self.assertTrue(any("(Grundfarbe + 19 Pixel)" in t for t in geraet), geraet)
+        self.assertTrue(any("(Grundfarbe + 19 Pixel" in t for t in geraet), geraet)
         # Die Zeile waehlt weiterhin denselben Kopf aus — nur ihr NAME aendert
         # sich. Sonst haette die Umbenennung die Auswahl mitverschoben.
         from PySide6.QtCore import Qt
