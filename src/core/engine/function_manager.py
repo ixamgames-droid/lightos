@@ -213,6 +213,17 @@ class FunctionManager:
         # Sofort-Stopp ohne Fade-Out (fuer Show-Reset/Blackout/Clear).
         for fid in list(self._running_ids):
             self.stop(fid, allow_release=False)
+        # ENG-18: Audio blendet beim Stoppen sonst aus — auch hier, wo es sofort
+        # still sein muss. Ueber ALLE Funktionen, nicht nur die laufenden: eine,
+        # die noch aus einem frueheren Stopp ausblendet, steht nicht mehr in
+        # ``_running_ids`` (sonst hilft ein zweites STOP ALL nicht).
+        for f in list(self._functions.values()):
+            hart = getattr(f, "sofort_stoppen", None)
+            if hart is not None:
+                try:
+                    hart()
+                except Exception as e:
+                    print(f"[FunctionManager] sofort_stoppen({getattr(f, 'id', '?')}) error: {e}")
 
     # ── Geraete-Zuordnung / „Solo auf gleichen Geraeten" ────────────────────────
 
