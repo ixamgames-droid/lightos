@@ -26,7 +26,8 @@ from src.core.app_state import (
     color_head_count, pan_tilt_head_count, attr_head_count_for_channels,
     attr_has_head_axis, channel_occurrence_keys, programmer_key_for_head,
     head_label, head_label_gemeinsam, head_label_short,
-    attr_head_is_segment, gemeinsames_modell, head_channel_name)
+    attr_head_is_segment, gemeinsames_modell, head_channel_name,
+    is_pixel_head_fixture)
 from src.core.database.models import PatchedFixture, FixtureChannel
 from src.core.fixture_filter import (hat_kanal, Nutzlast, fixtures_fuer_nutzlast,
                                      attr_head_count, range_signature)
@@ -905,7 +906,13 @@ class ProgrammerView(QWidget):
                     # Die Zahl gehoert an die Geraete-Zeile: zugeklappt ist sonst
                     # nicht zu sehen, DASS es Koepfe gibt — und ein Pfeil allein
                     # sagt nicht, wie viele dahinter liegen.
-                    it.setText(0, f"[{f.fid:03d}] {f.label}  ({anzahl} Köpfe)")
+                    # FM-14b: am Pixel-Kopf dieselbe Sprache wie in den Zeilen
+                    # darunter — „Grundfarbe + 19 Pixel", nicht „20 Köpfe".
+                    if anzahl > 1 and is_pixel_head_fixture(f):
+                        zahl = f"Grundfarbe + {anzahl - 1} Pixel"
+                    else:
+                        zahl = f"{anzahl} Köpfe"
+                    it.setText(0, f"[{f.fid:03d}] {f.label}  ({zahl})")
                     it.setExpanded(f.fid in self._offene_koepfe)
         finally:
             lst.blockSignals(blocked)

@@ -518,6 +518,8 @@ class BeschriftungTest(_RigFall):
         self.assertEqual(kopfzeilen[19], "Pixel 19")
         self.assertEqual([t for t in kopfzeilen if t.startswith("Kopf")], [],
                          "am Pixel-Kopf steht weiterhin „Kopf N“ in der Liste")
+        geraet = [z.text() for z in _zeilen(lst) if not z.ist_kopf()]
+        self.assertTrue(any("(Grundfarbe + 19 Pixel)" in t for t in geraet), geraet)
         # Die Zeile waehlt weiterhin denselben Kopf aus — nur ihr NAME aendert
         # sich. Sonst haette die Umbenennung die Auswahl mitverschoben.
         from PySide6.QtCore import Qt
@@ -534,6 +536,8 @@ class BeschriftungTest(_RigFall):
         lst = view._fixture_list
         kopfzeilen = [z.text().strip() for z in _zeilen(lst) if z.ist_kopf()]
         self.assertEqual(kopfzeilen, [f"Kopf {i}" for i in range(1, 5)])
+        geraet = [z.text() for z in _zeilen(lst) if not z.ist_kopf()]
+        self.assertTrue(any("(4 Köpfe)" in t for t in geraet), geraet)
 
     def test_die_matrix_vorschau_nennt_die_zelle_beim_namen(self):
         """Der Tooltip der Matrix-Zelle: dort sieht man, WELCHES Pixel man
