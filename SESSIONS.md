@@ -10,6 +10,7 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | VIZ-63 | A | fix/viz63-kopf-orientierung | 2026-09-28T23:49Z | src/ui/visualizer/visualizer_service.py |
+| VIZ-64 | A | fix/viz64-zweite-loesung | 2026-09-29T00:04Z | src/core/stage/aim.py |
 
 ## Blocker & Fallen
 
@@ -128,7 +129,6 @@
 
 ## Verlauf
 
-- 2026-09-16T17:29Z A done DOC-BPM
 - 2026-09-24T15:40Z C claim BPM-14
 - 2026-09-24T16:49Z C uebergeben BPM-14
 - 2026-09-24T20:48Z C claim BPM-16
@@ -158,3 +158,4 @@
 - 2026-09-28T23:27Z A claim FM-49
 - 2026-09-28T23:49Z A claim VIZ-63
 - 2026-09-29T00:01Z A done FM-49
+- 2026-09-29T00:04Z A claim VIZ-64
