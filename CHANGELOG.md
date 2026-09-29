@@ -7,6 +7,14 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-29 — Die Patch-Prüfung findet jede Adress-Überschneidung (STAB-26)
+
+#### Behoben
+
+- **Ein Gerät, das ganz im Adressbereich eines größeren lag, blieb unbemerkt.** Die Prüfung
+  beim Laden verglich nur jeweils zwei in der Adressreihenfolge benachbarte Geräte. Jetzt
+  meldet sie jedes Paar, das sich überschneidet.
+
 ### 2026-09-29 — Neues Gerät ragt nicht mehr über Kanal 512 hinaus (FM-39)
 
 #### Behoben
