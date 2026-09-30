@@ -95,7 +95,7 @@ Befunde, Aenderungen, Verifikation und verbleibende Hardwaregrenzen.
     durch die Datenbank der funktionierenden Windows-Installation ersetzt.
 24. Alle 30 Fixtures von `bierpong.lshow` liegen auf Universe 1. Deshalb wurde
     Universe 1 auf den persistenten ENTTEC-Pfad
-    `/dev/serial/by-id/usb-ENTTEC_DMX_USB_PRO_EN492875-if00-port0` gestellt.
+    `/dev/serial/by-id/usb-ENTTEC_DMX_USB_PRO_EN••••••-if00-port0` gestellt.
     Alte Test-/Broadcast-Ausgaenge (`COM_FAKE`, Art-Net, sACN) sind deaktiviert.
 25. Das interne Funkmodul wurde von Linux zunaechst ueberhaupt nicht enumeriert
     (`nmcli`: `WIFI-HW missing`; kein PCI-/USB-WLAN- oder Bluetooth-Geraet).
@@ -171,7 +171,7 @@ Befunde, Aenderungen, Verifikation und verbleibende Hardwaregrenzen.
 | `bierpong.lshow` statische Validierung | BESTANDEN | 0 Findings, 0 Fehler; lokale Kopie SHA-256-identisch zum USB-Original |
 | `bierpong.lshow` Live-Validierung | BESTANDEN | 30 Fixtures geladen, 0 bindungsbewusste Findings/Fehler; alle auf Universe 1 |
 | Onboard-Ethernet | BESTANDEN | `eno1`, 1 Gbit/s Full Duplex; Gateway und `1.1.1.1` je 3/3 Pings; HTTPS zu GitHub explizit ueber `eno1` erfolgreich |
-| ENTTEC DMX USB Pro | BESTANDEN (Host/Protokoll) | Seriennummer EN492875, `ftdi_sio`; stabiler by-id-Pfad; Port geoeffnet, drei 512-Kanal-Blackout-Frames gesendet, sauber geschlossen |
+| ENTTEC DMX USB Pro | BESTANDEN (Host/Protokoll) | Seriennummer EN••••••, `ftdi_sio`; stabiler by-id-Pfad; Port geoeffnet, drei 512-Kanal-Blackout-Frames gesendet, sauber geschlossen |
 | Bierpong-Outputkonfiguration | BESTANDEN | Universe 1 oeffnet realen ENTTEC; 0 Art-Net- und 0 sACN-Ausgaenge; Port beim Shutdown geschlossen |
 | Internes WLAN/Bluetooth | NEUSTART AUSSTEHEND | ThinkCentre M720q: beide Funkoptionen im BIOS von `Disabled` auf `Enabled` gesetzt; Treiber/Firmware vorhanden, Hardware muss nach Neustart neu enumeriert und real verbunden werden |
 | VC-Raster auf breitem Touchscreen | BESTANDEN | Screenshot-Befund behoben; Canvas fuellt breite Viewports, Popout identisch; 28 VC-/Touch-/Frame-Tests bestanden |
