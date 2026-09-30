@@ -7,6 +7,26 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-30 — Vier neue bebilderte Anleitungen für den Einstieg, Bilder aus dem Code
+
+#### Neu
+
+- **Neue Anleitungen mit Bildern der aktuellen Oberfläche:**
+  [Erste Schritte](docs/anleitung_erste_schritte/ANLEITUNG.md) (Hauptfenster, die acht
+  Sektionen, neue Show, erstes Gerät, erster Wert, speichern),
+  [Ausgabe einrichten](docs/anleitung_ausgabe_einrichten/ANLEITUNG.md) (ENTTEC, Art-Net, sACN,
+  Universen, Output- und DMX-Monitor),
+  [Programmer-Grundlagen](docs/anleitung_programmer_grundlagen/ANLEITUNG.md) und
+  [Szenen, Snaps & Cue-Listen](docs/anleitung_szenen_cues/ANLEITUNG.md). Die
+  [Anleitungs-Übersicht](docs/ANLEITUNGEN.md) ist jetzt nach Themen sortiert, führt alle
+  Anleitungen auf und sagt bei jeder, woher die passende Show kommt (Generator-Befehl) oder dass
+  die Beispiel-Show nicht im Repo liegt. Die Projektseite (README) zeigt neue Bilder mit Links
+  auf die passenden Anleitungen.
+- **Anleitungsbilder aus dem Code:** `tools/anleitungsbilder.py` startet die Oberfläche
+  unsichtbar mit einer Demo-Show aus Generic-Geräten und rendert die Bilder einer Anleitung neu
+  (`--pruefen` prüft nur und schreibt nichts). Es arbeitet in einem Wegwerf-Ordner und fasst
+  deine Shows und Einstellungen nicht an. Beschreibung: [docs/ANLEITUNGSBILDER.md](docs/ANLEITUNGSBILDER.md).
+
 ### 2026-09-30 — Nur Weiß-Segmente gewählt: kein Werkzeug fährt mehr das ganze Rig (FM-51, Scheibe A)
 
 #### Behoben

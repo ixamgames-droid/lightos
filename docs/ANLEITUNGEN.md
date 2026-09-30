@@ -1,69 +1,143 @@
-# LightOS — Anleitungen (Hardstyle-Show-Kit)
+# LightOS — Anleitungen
 
-> Deutsche Schritt-für-Schritt-Anleitungen mit Bildern/GIFs. Roter Faden: die **Hardstyle-Show**
-> (`shows/Hardstyle_Show.lshow`) — vom Patchen bis zur musiksynchronen Live-Show.
-> Rig: **8 PAR** (RGBW) + **2 Moving Heads** + **2 Spider**, ~150 BPM.
+Deutsche Schritt-für-Schritt-Anleitungen mit Bildern, nach Themen sortiert. Wer neu ist,
+fängt bei **[Einstieg](#einstieg)** an und arbeitet die ersten vier Anleitungen der Reihe
+nach durch.
+
+**Zur Show jeder Anleitung** steht in der Zeile darunter, woher du sie bekommst:
+
+- **Generator** — ein Skript baut die Beispiel-Show nach `shows/`, danach
+  **Datei → Öffnen...**:
+  `venv/bin/python tools/<generator>.py` (Linux) bzw.
+  `venv\Scripts\python tools\<generator>.py` (Windows).
+- **Keine Show nötig** — die Anleitung beginnt mit einer leeren oder deiner eigenen Show.
+- **Beispiel-Show nicht im Repo** — die Bilder stammen aus einer privaten Show. Die Schritte
+  gelten trotzdem für jedes Rig; Namen von Tasten und Gruppen weichen dann ab.
+
+Die neuen Anleitungen (Erste Schritte, Ausgabe, Programmer-Grundlagen, Szenen & Cues) zeigen
+die aktuelle Oberfläche; ihre Bilder entstehen aus dem Code ([so geht das](ANLEITUNGSBILDER.md)).
+Ältere Anleitungen zeigen teils eine frühere Oberfläche — etwa „Live View“ statt **Bühne** in
+der Sektionsleiste. Die Abläufe gelten weiter.
 
 ---
 
-## Reihenfolge (vom Aufbau zur Live-Show)
+## Einstieg
 
-| # | Anleitung | Worum geht's |
+| Anleitung | Worum geht's | Show |
 |---|---|---|
-| 1 | [Patchen & Gruppen](anleitung_patch_gruppen/ANLEITUNG_PATCH_GRUPPEN.md) | Geräte auf DMX-Adressen legen, Fixture-Gruppen + Raster anlegen. |
-| 2 | [Farb-Matrix](anleitung_farbmatrix/ANLEITUNG_FARBMATRIX.md) | RGB/RGBW-Farbeffekte über eine Gruppe (Algorithmen, Raster). |
-| 3 | [Farbchase (Blau-Weiß)](anleitung_farbchase/ANLEITUNG_FARBCHASE.md) | Konkreter Chase mit frei wählbarer Farbfolge (Color Sequence). |
-| 4 | [Dimmer-Matrix & relative Geschwindigkeit](anleitung_dimmermatrix/ANLEITUNG_DIMMERMATRIX.md) | Helligkeits-Lauflicht ×2 zur Farbe, phasen-gekoppelt. |
-| 5 | [EFX — Moving-Head-Bewegung](anleitung_efx/ANLEITUNG_EFX.md) | Pan/Tilt-Bahnen (Kreis …), `open_beam`, Geräte-Verhältnis. |
-| 6 | [Moving Heads steuern](anleitung_moving_heads/ANLEITUNG_MOVING_HEADS.md) | Farbrad, Gobo, Bewegung (EFX) und gezieltes Pan/Tilt über die VC. |
-| 7 | [Spider steuern](anleitung_spider/ANLEITUNG_SPIDER.md) | Farb-Themes pro Bar (L/R) und Tilt-Bewegung (Scheren/Wippe). |
-| 8 | [Virtuelle Konsole bauen & designen](anleitung_vc/ANLEITUNG_VC.md) | Eigene Bedienoberfläche: 5 beschriftete Bänke, Fader, Labels, Strobe. |
-| 9 | [APC mini mappen](anleitung_apc_mapping/ANLEITUNG_APC.md) | VC-Widgets auf Pads/Fader legen (MIDI-Learn / Teach), LED-Feedback. |
-| 10 | [Musik-Sync & Auto-Show](anleitung_musik_sync/ANLEITUNG_MUSIK_SYNC.md) | Playlist → Play startet die Show automatisch, Tempo folgt der Musik. |
-| 11 | [Speed-Dial, Master/Sub & Grand-Master](anleitung_speed/ANLEITUNG_SPEED.md) | Tempo aus der VC (QLC+-Stil): Master/Sub × Faktor, Grand-Master, mehrere Effekte je Regler. |
-| 12 | [Laser bedienen](anleitung_laser/ANLEITUNG_LASER.md) | Muster wählen (Bank/Wert), als Muster speichern, Werksmuster-Kacheln mit Foto, VC-Knopf + Tempo-Fader; Netzwerk-Laser: Zeichen-Studio + Sicherheit. |
+| [Erste Schritte](anleitung_erste_schritte/ANLEITUNG.md) | Hauptfenster und die acht Sektionen, neue Show anlegen, ein Gerät patchen, erster Wert im Programmer, speichern und öffnen. | Keine Show nötig |
+| [Ausgabe einrichten: ENTTEC, Art-Net, sACN](anleitung_ausgabe_einrichten/ANLEITUNG.md) | Dialog **Ausgabe → Konfigurieren...**: ENTTEC USB Pro, Art-Net, sACN, Universen verwalten, Kontrolle im Output- und DMX-Monitor, Warnungen verstehen. | Keine Show nötig |
+| [Programmer-Grundlagen](anleitung_programmer_grundlagen/ANLEITUNG.md) | Geräte und Gruppen wählen, Reiter Intensity/Color/Position/Paletten, Hervorheben/Abdunkeln, Farb-, Positions- und Fächer-Werkzeug, Löschen und Rückgängig. | Übungs-Rig aus Generic-Profilen, Tabelle zum Nachbauen in der Anleitung |
+| [Szenen, Snaps & Cue-Listen](anleitung_szenen_cues/ANLEITUNG.md) | Programmer-Stand als Snap, Snapshot oder Szene speichern und abrufen, Preset-Browser, Cue-Liste aufnehmen, auf einen Executor legen, mit GO abfahren und aus der Virtual Console auslösen. | Eigene Show mit Geräten und Gruppen; die Bilder zeigen das Übungs-Rig der Programmer-Grundlagen |
+| [Komplettshow von Grund auf](anleitung_komplettshow_2026/ANLEITUNGEN.md) | Acht Kapitel von der neuen Show über Geräte, 3D-Positionen, Gruppen, Farbe, Matrix, Bewegung bis zur Virtual Console. | Die Anleitung baut die Show selbst auf; die fertige Show liegt nicht im Repo |
+| [Lichtshow-Tutorial: Matrix, Chase, Moving-Head-EFX, VC](tutorial_matrix/TUTORIAL_LICHTSHOW.md) | Ein kompletter Durchlauf mit vielen Bildern und GIFs. | Generator `build_tutorial_matrix_show.py` → `Tutorial_Matrix.lshow` |
 
-## Nachschlagen (nicht Teil des roten Fadens)
+## Geräte & Patch
 
-| Anleitung | Worum geht's |
-|---|---|
-| [3D-Bühne bauen & Fixtures hängen](anleitung_3d_visualizer_2026/ANLEITUNG_3D_BUEHNE.md) | Trassen, Stützen, Plattform bauen und Geräte daran hängen. |
-| [Woher der 3D-Visualizer seine Farbe nimmt](anleitung_3d_geraete_ohne_rgb/ANLEITUNG_3D_GERAETE_OHNE_RGB.md) | Geräte ohne RGB — Blinder, Farbrad-Mover, Dimmer-PAR: welche Farbe und welche Helligkeit der Visualizer daraus ableitet. |
-| [VC-Bau-Elemente: Referenz aller Widget-Typen](anleitung_vc_widgets/README.md) | Eine Seite je Widget (Knopf, Fader, XY-Pad, Encoder, Matrix-Editor …): Einstellungen, Dialog-Felder, Fallstricke — zum Nachschlagen beim Bauen. |
-| [Hochzeits-Show von Anfang bis Ende](anleitung_hochzeit_komplett/00_INDEX.md) | Zehnteiliger Durchlauf einer kompletten, ruhigeren Show — Patch, Farben, Tempo-Controller, Live-Edit, Ablauf. |
-| [Gruppen und Matrizen anlegen](anleitung_gruppen_matrizen/ANLEITUNG_GRUPPEN_MATRIZEN.md) | Mehrkopf-Geräte und Panels: Kopf-Gruppe beim Patchen, Köpfe als Raster/Block aufteilen, zu **einer** Zelle zusammenfassen, neben andere Geräte legen, Matrizen zusammenlegen — beide Wege (Rechtsklick und Knopf-Menü). |
-| [Programmer: jedes Gerät richtig bedienen](anleitung_geraete_bedienen/ANLEITUNG_GERAETE_BEDIENEN.md) | Was der Programmer je Gerät zeigt: Shutter-/Strobe-Knöpfe, Programm-Kacheln, zweite gleiche Kanäle, Mehrkopf-Umschalter, Nebel/Laser — und was tun, wenn etwas nicht passt. |
-| [Moving Heads einmessen](anleitung_einmessen/ANLEITUNG_EINMESSEN.md) | Zielen im 3D-Visualizer an den echten Aufbau angleichen: Punkt anfahren, Korrektur merken, ab vier Punkten die echte Position rechnen lassen. |
+| Anleitung | Worum geht's | Show |
+|---|---|---|
+| [Patchen & Gruppen](anleitung_patch_gruppen/ANLEITUNG_PATCH_GRUPPEN.md) | Geräte auf DMX-Adressen legen, Fixture-Gruppen und ihr Raster anlegen. | Beispiel-Show nicht im Repo |
+| [Gruppen und Matrizen anlegen](anleitung_gruppen_matrizen/ANLEITUNG_GRUPPEN_MATRIZEN.md) | Mehrkopf-Geräte und Panels: Kopf-Gruppe beim Patchen, Köpfe als Raster oder Block, zu einer Zelle zusammenfassen, Matrizen zusammenlegen. | Keine Show nötig |
+| [Programmer: jedes Gerät richtig bedienen](anleitung_geraete_bedienen/ANLEITUNG_GERAETE_BEDIENEN.md) | Was der Programmer je Gerät zeigt: Shutter-/Strobe-Knöpfe, Programm-Kacheln, zweite gleiche Kanäle, Mehrkopf-Umschalter, Nebel und Laser. | Keine Show nötig |
+| [Moving Heads steuern](anleitung_moving_heads/ANLEITUNG_MOVING_HEADS.md) | Farbrad, Gobo, Bewegung und gezieltes Pan/Tilt über die Virtual Console. | Generator `build_event_demo_2026.py` → `Event_Demo_2026.lshow` |
+| [Spider steuern](anleitung_spider/ANLEITUNG_SPIDER.md) | Farb-Themes je Bar und Tilt-Bewegung (Schere, Wippe). | Generator `build_event_demo_2026.py` |
 
-## Schichten-Modell (so kombiniert die Show)
+## Programmer
 
-Die Looks sind **getrennte Ebenen** über denselben Geräten und lassen sich frei kombinieren:
+| Anleitung | Worum geht's | Show |
+|---|---|---|
+| [Programmer-Grundlagen](anleitung_programmer_grundlagen/ANLEITUNG.md) | Siehe [Einstieg](#einstieg) — die Sektion Programmer von Grund auf. | Tabelle zum Nachbauen in der Anleitung |
+| [Programmer: jedes Gerät richtig bedienen](anleitung_geraete_bedienen/ANLEITUNG_GERAETE_BEDIENEN.md) | Vertiefung: Bedienelemente je Gerätetyp. | Keine Show nötig |
+| [Manuell mischen über die VC (RGBW, Gruppen, Pan)](anleitung_programmer/ANLEITUNG_PROGRAMMER.md) | Programmer-Bank der Event-Demo: RGBW-Fader und Gruppen direkt aus der Virtual Console. | Generator `build_event_demo_2026.py` |
+| [Szenen, Snaps & Cue-Listen](anleitung_szenen_cues/ANLEITUNG.md) | Siehe [Einstieg](#einstieg) — Looks speichern und als Cue-Liste abfahren. | Eigene Show mit Geräten und Gruppen |
 
-- **Farbe** — Farb-Matrix/Chase (auch über die Moving Heads) → *Farbmatrix / Farbchase*
-- **Beat-Farbe** — beat-synchroner Farb-Chase auf dem gemeinsamen **Tempo-Bus** (eine Farbe pro Beat, z. B. RRRW/RWRW, live umfärbbar) → *Farbchase*
-- **Helligkeit** — Dimmer-Matrix, läuft **×2 phasen-gekoppelt** zur Farbe → *Dimmer-Matrix*
-- **Bewegung** — EFX auf den Moving Heads (mit `open_beam`) → *EFX*
-- **Moving Heads** — Farbrad & Gobo (Ring/Punkte/Zebra/Rotation) zusätzlich zur Bewegung → *Moving Heads*
-- **Spider** — Farb-Themes pro Bar (L/R) und Tilt-Schwenk (Scheren/Wippe) → *Spider*
-- **Tempo** — alles über **Tempo-Speeds** (Master/Sub × Faktor, Grand-Master) an die **globale BPM** koppelbar → *Speed-Dial / Musik-Sync*
+## Effekte
 
-## Bedienung
+| Anleitung | Worum geht's | Show |
+|---|---|---|
+| [Farb-Matrix](anleitung_farbmatrix/ANLEITUNG_FARBMATRIX.md) | RGB/RGBW-Farbeffekte über eine Gruppe: Algorithmen, Raster. | Beispiel-Show nicht im Repo |
+| [Farbchase frei zusammenstellen](anleitung_farbchase/ANLEITUNG_FARBCHASE.md) | Chase mit frei wählbarer Farbfolge, z. B. Blau-Weiß, auch beat-synchron. | Beispiel-Show nicht im Repo |
+| [Dimmer-Matrix & relative Geschwindigkeit](anleitung_dimmermatrix/ANLEITUNG_DIMMERMATRIX.md) | Helligkeits-Lauflicht als eigene Ebene, phasengekoppelt zur Farbe. | Beispiel-Show nicht im Repo |
+| [EFX — Moving-Head-Bewegung](anleitung_efx/ANLEITUNG_EFX.md) | Pan/Tilt-Bahnen (Kreis, Acht …), „Dimmer/Shutter mit öffnen“, Geräte-Verhältnis. | Beispiel-Show nicht im Repo |
+| [Matrix-Effekte](anleitung_matrix_effekte/ANLEITUNG_MATRIX_EFFEKTE.md) | Feuer, Regen, Radar, Spirale, Wisch und Welle. | Generator `build_event_demo_2026.py` |
+| [Abläufe & Mischen](anleitung_ablaeufe/ANLEITUNG_ABLAEUFE_MISCHEN.md) | Collections, Chaser, Cue-Listen und Live-Chase: Farbe × Bewegung × Strobo kombinieren. | Generator `build_event_demo_2026.py` |
+| [Weiche Farbwechsel in der VC](anleitung_colorfade_vc/ANLEITUNG_COLORFADE_VC.md) | Eine RGB/RGBW-Matrix überblendet weich zwischen Farben, ohne den Tempo-Sync zu verlieren. | Beispiel-Show nicht im Repo |
 
-- **Virtuelle Konsole** (5 Bänke): Performance (Looks/Farben/LIVE-SHOW/Master), Tempo/BPM, Strobe/Musik, BEAT-BLINK / Effekt-Farben (RRRW/RWRW + Dimmer-Blink + Farb-Editor), MH-Gobos / Spider / Bewegung (Gobos, Spider-Bar-Farben, MH-Kreis/Spider-Schwenk).
-- **APC mini** als Hardware-Controller (optional, per MIDI-Learn).
-- **Live-Show**: ein Klick auf **LIVE-SHOW** oder **Play** startet den kompletten Look music-synchron.
+**So greifen die Ebenen ineinander:** Farbe (Farb-Matrix, Farbchase), Helligkeit
+(Dimmer-Matrix) und Bewegung (EFX) sind getrennte Ebenen über denselben Geräten und lassen sich
+frei kombinieren; das Tempo aller Ebenen hängt an Tempo-Buses (siehe
+[Musik & BPM](#musik--bpm)). Hintergrund: [Effekte bauen & mit Tempo steuern](EFFEKTE.md).
 
-## Verwandte Dokumente
+## Virtual Console
 
-- **Tempo-Controller-Widget** (All-in-One: Bus + Quelle Sound/Tap/Fix + Faktor ×¼…×4 + gekoppelte Effekte in einem VC-Panel; Effekt draufziehen): [anleitung_tempo_controller/ANLEITUNG_TEMPO_CONTROLLER.md](anleitung_tempo_controller/ANLEITUNG_TEMPO_CONTROLLER.md)
-- **Hochzeit-Show: Farbwechsel und Dimmer taktgleich** (drei **Tempo-Controller** auf Bus A/B/C · unterschiedliche Geschwindigkeit · gemeinsamer Taktstart): [anleitung_hochzeit_tempo/ANLEITUNG_HOCHZEIT_TEMPO.md](anleitung_hochzeit_tempo/ANLEITUNG_HOCHZEIT_TEMPO.md)
-- **Tempo & Synchronisierung — Gesamtüberblick** (BPM · Tempo-Buses · Multiplikatoren · „Taktgleich"-Haken · **Auto-Sync/Phasen-Sync** · Panel „Effekte je Bus"): [ANLEITUNG_TEMPO_SYNC.md](ANLEITUNG_TEMPO_SYNC.md)
-- **BPM-Manager — Anleitung mit Bildern** (In 30 Sekunden startklar · Quelle wählen · Zustandswort, Pegel, Statuszeile lesen · TAP mit Doppelrolle · Auto | Manuell · ×½/×2 · Erweitert inkl. Beat-Latenz und Diagnose · Wenn nichts erkannt wird · Eingang 30 s aufnehmen · Tempo-Buses & Generator kurz · Einstellungen & Umstieg): [anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md](anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md)
-- **Web-Remote — das Handy als Konsole** (Server auf Port 5000 starten · LAN-IP finden · GO/BACK/STOP/Blackout/Fader · Sicherheitshinweis offenes LAN): [anleitung_web_remote/ANLEITUNG.md](anleitung_web_remote/ANLEITUNG.md)
-- **Event-Demo-2026-Anleitungen** (Moving Heads · Spider · Speed/BPM · VC live bearbeiten): [ANLEITUNGEN_EVENT_DEMO.md](ANLEITUNGEN_EVENT_DEMO.md)
-- **Zwei Universen über zwei Adapter** (U1 via Enttec USB Pro · U2 via Art-Net · Patchen auf U1/U2 · Ausgabe-Konfig pro Universum · Verifikation im Output-Monitor): [anleitung_zwei_universen/ANLEITUNG.md](anleitung_zwei_universen/ANLEITUNG.md)
-- Komplette Oberflächen-Anleitung (alle 8 Sektionen): [ANLEITUNG.md](ANLEITUNG.md)
-- Effekte bauen & mit Tempo steuern: [EFFEKTE.md](EFFEKTE.md)
-- Komplettes Lichtshow-Tutorial (Matrix · Chase · MH-EFX · VC): [tutorial_matrix/TUTORIAL_LICHTSHOW.md](tutorial_matrix/TUTORIAL_LICHTSHOW.md)
-- Show-Plan/Hintergrund: [HARDSTYLE_SHOW_PLAN.md](HARDSTYLE_SHOW_PLAN.md)
-- Offene Punkte/Feature-Wünsche: [OPEN_POINTS_OVERVIEW.md](OPEN_POINTS_OVERVIEW.md)
+| Anleitung | Worum geht's | Show |
+|---|---|---|
+| [Virtual Console bauen & designen](anleitung_vc/ANLEITUNG_VC.md) | Eigene Bedienoberfläche: Bänke, Tasten, Fader, Labels, Strobe. | Beispiel-Show nicht im Repo |
+| [VC-Widget-Referenz](anleitung_vc_widgets/README.md) | Eine Seite je Element (Taste, Fader, XY-Pad, Encoder, Matrix-Editor …): Einstellungen, Dialogfelder, Fallstricke. | Generator `build_vc_widgets_showcase.py` → `VC_Widgets_Showcase.lshow` |
+| [Alle VC-Elemente im Überblick](anleitung_vc_elemente/ANLEITUNG_VC_ELEMENTE.md) | Kurzreferenz aller Bau-Elemente und der Baukasten-Knöpfe. | Generator `build_vc_elements_showcase.py` → `VC_Elemente_Showcase.lshow` |
+| [Effekte einfach aufbauen](anleitung_vc_smartbuild/ANLEITUNG.md) | Effekte per Drag & Drop auf die VC legen und einrichten. | Generator `build_farb_fx_vc_show.py` → `Farb_FX_VC_Show.lshow` |
+| [VC live bearbeiten](anleitung_vc_workflow/ANLEITUNG_VC_WORKFLOW.md) | Elemente löschen und hinzufügen, Effekt an einen Schalter binden, Geschwindigkeit, Submaster, speichern. | Generator `build_event_demo_2026.py` |
+| [Testshow mit Live-Edit-Widget](anleitung_testshow_liveedit/ANLEITUNG_TESTSHOW_LIVEEDIT.md) | Eine Test-Show mit drei Seiten aufbauen und Effekte im Live-Edit-Widget feintunen. | Die Anleitung baut die Show selbst auf; die fertige Show liegt nicht im Repo |
+| [Bilder und GIFs auf VC-Tasten](anleitung_grosse_demo_2026/ANLEITUNG_GROSSE_DEMO_2026.md) | Rundgang durch eine große Demo-Show und Tasten-Hintergründe über das Rechtsklick-Menü. | Generator `build_grosse_demo_show_2026.py` → `Grosse Demo Show 2026.lshow` |
+| [APC mini mappen](anleitung_apc_mapping/ANLEITUNG_APC.md) | VC-Elemente auf Pads und Fader legen (MIDI-Lernen), LED-Feedback. | Keine Show nötig |
+| [Web-Remote — das Handy als Konsole](anleitung_web_remote/ANLEITUNG.md) | Web-Interface starten, LAN-Adresse finden, GO/BACK/STOP, Blackout und Fader im Browser. | Keine Show nötig |
+
+## Musik & BPM
+
+| Anleitung | Worum geht's | Show |
+|---|---|---|
+| [BPM-Manager](anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md) | Quelle wählen, Zustandswort, Pegel und Statuszeile lesen, TAP, Auto/Manuell, „Erweitert“, Hilfe wenn nichts erkannt wird, „Eingang 30 s aufnehmen“. | Keine Show nötig |
+| [BPM-Generator — ganzes Lied analysieren](anleitung_bpm_generator/ANLEITUNG_BPM_GENERATOR.md) | Lied analysieren, BPM-Verlauf und Beatgrid prüfen, im Player als BPM-Quelle nutzen. | Keine Show nötig |
+| [Tempo & Synchronisierung — Gesamtüberblick](ANLEITUNG_TEMPO_SYNC.md) | BPM, Tempo-Buses, Multiplikatoren, „Taktgleich“, Auto-Sync — das Gedankenmodell mit Rezepten. | Keine Show nötig |
+| [Tempo-Controller](anleitung_tempo_controller/ANLEITUNG_TEMPO_CONTROLLER.md) | Das All-in-One-Tempo-Element der VC: Bus, Quelle, Faktor und mitlaufende Effekte. | Keine Show nötig |
+| [Speed-Dial, Master/Sub & Grand-Master](anleitung_speed/ANLEITUNG_SPEED.md) | Tempo aus der VC regeln, mehrere Tempi koppeln, Grand-Master. | Keine Show nötig |
+| [Tempo steuern: Speed, BPM, Master/Sub, Tempo-Buses](anleitung_speed_bpm/ANLEITUNG_SPEED_BPM.md) | Die Tempo-Bank der Event-Demo. | Generator `build_event_demo_2026.py` |
+| [Musik-Sync & Auto-Show](anleitung_musik_sync/ANLEITUNG_MUSIK_SYNC.md) | Playlist abspielen, die Show startet automatisch, das Tempo folgt der Musik. | Beispiel-Show nicht im Repo |
+| [Hochzeit: Farbwechsel und Dimmer taktgleich](anleitung_hochzeit_tempo/ANLEITUNG_HOCHZEIT_TEMPO.md) | Drei Tempo-Controller auf eigenen Bussen, unterschiedlich schnell, gemeinsamer Taktstart. | Beispiel-Show nicht im Repo |
+| [Drei Geschwindigkeiten aus einer Master-BPM](anleitung_test123_tempo/ANLEITUNG_TEST123_TEMPO.md) | Farbwechsel, Dimmer und Bewegung mit je eigener relativer Geschwindigkeit. | Beispiel-Show nicht im Repo |
+
+## Bühne & 3D
+
+| Anleitung | Worum geht's | Show |
+|---|---|---|
+| [3D-Bühne bauen & Geräte hängen](anleitung_3d_visualizer_2026/ANLEITUNG_3D_BUEHNE.md) | Traversen, Stützen, Plattform bauen und Geräte daran hängen. | Beispiel-Show nicht im Repo |
+| [Moving Heads einmessen](anleitung_einmessen/ANLEITUNG_EINMESSEN.md) | Zielen im 3D-Visualizer an den echten Aufbau angleichen; ab vier Punkten rechnet LightOS die echte Position. | Keine Show nötig |
+| [Woher der 3D-Visualizer seine Farbe nimmt](anleitung_3d_geraete_ohne_rgb/ANLEITUNG_3D_GERAETE_OHNE_RGB.md) | Geräte ohne RGB — Blinder, Farbrad-Mover, Dimmer-PAR: welche Farbe und Helligkeit der Visualizer ableitet. | Generator `build_farbprobe_3d.py` → `Farbprobe_3D.lshow` |
+| [Laser bedienen](anleitung_laser/ANLEITUNG_LASER.md) | Muster wählen und speichern, Werksmuster-Kacheln, VC-Knopf und Tempo-Fader; Netzwerk-Laser mit Zeichen-Studio und Sicherheit. | Keine Show nötig |
+| [Test-Show „Laser Gobo Test 2026“](ANLEITUNG_LASER_GOBO_TEST_2026.md) | Laser, Gobo-Moving-Heads, PARs und Nebel an einem Rig prüfen. | Generator `build_laser_gobo_test.py` |
+
+## Ausgabe
+
+| Anleitung | Worum geht's | Show |
+|---|---|---|
+| [Ausgabe einrichten: ENTTEC, Art-Net, sACN](anleitung_ausgabe_einrichten/ANLEITUNG.md) | Siehe [Einstieg](#einstieg) — der aktuelle Weg mit Bildern. | Keine Show nötig |
+| [Zwei Universen über zwei Adapter](anleitung_zwei_universen/ANLEITUNG.md) | Universe 1 über ENTTEC USB Pro, Universe 2 über Art-Net, patchen und im Output-Monitor prüfen. | Keine Show nötig |
+| [ENTTEC und Art-Net gleichzeitig](anleitung_enttec_artnet/ANLEITUNG_ENTTEC_ARTNET.md) | Jedes Universum mit eigenem Ausgabe-Backend; ENTTEC, Art-Net und sACN frei mischen. | Keine Show nötig |
+
+## Shows & Beispiele
+
+| Anleitung | Worum geht's | Show |
+|---|---|---|
+| [Event-Demo 2026](ANLEITUNGEN_EVENT_DEMO.md) | Bank-Übersicht einer kompletten Show mit PARs, Moving Heads und Spidern; führt zu den Einzelanleitungen. | Generator `build_event_demo_2026.py` → `Event_Demo_2026.lshow` |
+| [Hochzeits-Show von Anfang bis Ende](anleitung_hochzeit_komplett/00_INDEX.md) | Zehnteiliger Durchlauf einer ruhigeren Show: Patch, Farben, Tempo-Controller, Live-Edit, Ablauf. | Generator `build_hochzeit_komplett.py` → `Hochzeit_Komplett_2026.lshow` |
+| [Feature-Showcase](FEATURE_SHOWCASE.md) | Eine Test-Show, die möglichst jede Funktion einmal zeigt. | Generator `build_feature_showcase.py` → `Feature_Showcase.lshow` |
+| [APC mini + vier RGBW-Strahler](APC_SCHRITT_FUER_SCHRITT.md) | Schritt für Schritt mit der APC-Test-Show; dazu die [Seiten-Übersicht](APC_SEITEN_UEBERSICHT.md). | Generator `build_apc_test_show.py` → `APC_Test_Komplett.lshow` |
+| [Farb-/Effekt-VC-Show](FARB_FX_VC_SHOW.md) | Bedienung der Show, aus der „Effekte einfach aufbauen“ stammt. | Generator `build_farb_fx_vc_show.py` |
+| [Live-Edit-Show](LIVE_EDIT.md) | Vordefinierte Effekte live einmappen und bearbeiten. | Generator `build_live_edit_show.py` → `Live_Edit.lshow` |
+
+Direkt im Repo liegen außerdem einige kleine Demo-Shows in `shows/`: `Demo_Show_Full.lshow`,
+`Demo_ZQ_Buehne.lshow`, `APC_Demo_Show.lshow`, `demo_apc_mk2.lshow` und `demo_rgb_par.lshow`.
+
+## Nachschlagen
+
+- [Komplette Oberflächen-Anleitung](ANLEITUNG.md) — Oberfläche, Patchen, Gruppen und Programmer in Textform
+- [Praxis-Workflows](WORKFLOWS.md) — typische Aufgaben Schritt für Schritt
+- [Effekte bauen & mit Tempo steuern](EFFEKTE.md)
+- [RGB-Matrix live programmieren](MATRIX_LIVE.md)
+- [Multiplikator-Fenster in der VC bauen](MULTIPLIKATOR_DIAL_ANLEITUNG.md)
+- [Live-Edit-Panel](LIVE_EDIT_FENSTER.md)
+- [Moving Heads: Gobo, Farbrad, Strobe, Reset](MOVING_HEADS.md)
+- [Tastatur-Belegung in der VC](KEYBOARD_MAPPING.md)
+- [3D-Modell-Galerie](FIXTURE_3D_GALLERY.md)
+- [Fixture-Bibliothek](FIXTURE_LIBRARY.md) · [Show-Dateiformat](SHOW_FILE_FORMAT.md) ·
+  [Env-Flags und Config-Dateien](CONFIG_REFERENCE.md)

@@ -1,0 +1,254 @@
+"""DOC-16 — Das Bild-Werkzeug ``tools/anleitungsbilder.py`` bleibt in seiner Sandbox.
+
+Das Werkzeug baut ein VOLLES ``MainWindow``. Ohne Umlenkung griffe das auf die
+echte Fixture-Bibliothek, ``recent.json``, ``auto_save.lshow``, die sACN-CID und
+— relativ zum Arbeitsverzeichnis — auf ``data/`` im Repo zu. Diese Tests halten
+fest:
+
+* alle Pfade, die die geladenen Module tatsaechlich benutzen, liegen im
+  Temp-Ordner der Sandbox (das Werkzeug meldet sie als ``SANDBOX {...}``);
+* ein Mini-Lauf mit EINER Szene erzeugt eine PNG in einem Temp-Ausgabeordner,
+  das Manifest enthaelt keine absoluten Pfade;
+* der echte Datenordner und ``data/``/``shows/`` im Repo sind danach
+  unveraendert (mtime/Groesse/Existenz);
+* die Sandbox verweigert sich, wenn ``src`` schon importiert ist (dann waeren
+  die Pfade der Module bereits eingefroren);
+* ein nicht gefundenes Marken-Widget ist ein Fehler, keine stille Luecke.
+
+Der Mini-Lauf ist ein eigener Prozess (die Sandbox biegt ``os.environ`` und das
+cwd um — das darf die Testsuite nicht erben). Laufzeit ca. 10 s.
+"""
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import unittest
+
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TOOLS = os.path.join(REPO, "tools")
+if TOOLS not in sys.path:
+    sys.path.insert(0, TOOLS)
+
+from anleitungsbilder import sandbox  # noqa: E402
+
+
+def _echte_orte():
+    home = sandbox.echter_home()
+    return [os.path.join(home, ".local", "share", "LightOS"),
+            os.path.join(home, ".config", "LightOS"),
+            os.path.join(REPO, "data"),
+            os.path.join(REPO, "shows")]
+
+
+def _stand(orte):
+    """Unabhaengig vom Werkzeug: {pfad: (mtime_ns, groesse)} bis Tiefe 2."""
+    st = {}
+    for ort in orte:
+        if not os.path.isdir(ort):
+            st[ort] = None
+            continue
+        tiefe0 = ort.rstrip(os.sep).count(os.sep)
+        for wurzel, dirs, dateien in os.walk(ort):
+            if wurzel.count(os.sep) - tiefe0 >= 2:
+                dirs[:] = []
+            for d in dateien:
+                p = os.path.join(wurzel, d)
+                try:
+                    s = os.stat(p)
+                    st[p] = (s.st_mtime_ns, s.st_size)
+                except OSError:
+                    pass
+    return st
+
+
+class MiniLaufTest(unittest.TestCase):
+    """Ein echter Lauf mit einer Szene — einmal fuer alle Pruefungen."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.ausgabe = tempfile.mkdtemp(prefix="lightos_abtest_")
+        cls.orte = _echte_orte()
+        cls.vorher = _stand(cls.orte)
+        env = dict(os.environ)
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        cls.lauf = subprocess.run(
+            [sys.executable, os.path.join(TOOLS, "anleitungsbilder.py"),
+             "projektseite", "--nur", "02_patch", "--ausgabe", cls.ausgabe],
+            cwd=REPO, env=env, capture_output=True, text=True, timeout=180)
+        cls.nachher = _stand(cls.orte)
+        cls.app_laeuft = sandbox.laufende_instanz()
+
+    @classmethod
+    def tearDownClass(cls):
+        import shutil
+        shutil.rmtree(cls.ausgabe, ignore_errors=True)
+
+    def _log(self):
+        return (self.lauf.stdout[-3000:] + "\n--- stderr ---\n"
+                + self.lauf.stderr[-3000:])
+
+    def test_lauf_gruen(self):
+        self.assertEqual(self.lauf.returncode, 0, self._log())
+
+    def test_sandbox_pfade_liegen_alle_im_temp_ordner(self):
+        zeilen = [z for z in self.lauf.stdout.splitlines() if z.startswith("SANDBOX ")]
+        self.assertEqual(len(zeilen), 1, self._log())
+        pfade = json.loads(zeilen[0][len("SANDBOX "):])
+        # Die Liste muss die kritischen Stellen wirklich enthalten.
+        for pflicht in ("app_data_dir", "fixture_db", "show_db", "universes_json",
+                        "crash_log", "sacn_cid", "ui_prefs", "recent_json",
+                        "midi_mappings", "channel_groups", "home", "cwd"):
+            self.assertIn(pflicht, pfade)
+        tmp = os.path.realpath(tempfile.gettempdir())
+        basis = os.path.dirname(os.path.realpath(pfade["cwd"]))   # <basis>/arbeit
+        self.assertTrue(os.path.basename(basis).startswith("lightos_doku_"), basis)
+        self.assertTrue(basis.startswith(tmp + os.sep), f"{basis} nicht unter {tmp}")
+        for name, p in pfade.items():
+            self.assertTrue(os.path.realpath(p).startswith(basis + os.sep),
+                            f"{name} liegt ausserhalb der Sandbox {basis}: {p}")
+        # ... und die Sandbox ist nach dem Lauf wieder weg.
+        self.assertFalse(os.path.exists(pfade["cwd"]), "Sandbox wurde nicht aufgeraeumt")
+
+    def test_png_und_manifest_im_ausgabeordner(self):
+        from PIL import Image
+        ziel = os.path.join(self.ausgabe, "projektseite")
+        png = os.path.join(ziel, "02_patch.png")
+        self.assertTrue(os.path.isfile(png), self._log())
+        with Image.open(png) as bild:
+            self.assertEqual(bild.size, (1600, 900))
+            self.assertEqual(bild.mode, "P", "Bild ist nicht palettiert verkleinert")
+        self.assertLess(os.path.getsize(png), 150 * 1024)
+        # Nur die eine Szene wurde gebaut.
+        self.assertEqual(sorted(f for f in os.listdir(ziel) if f.endswith(".png")),
+                         ["02_patch.png"])
+        with open(os.path.join(ziel, "bilder.json"), encoding="utf-8") as f:
+            text = f.read()
+        manifest = json.loads(text)
+        self.assertEqual([b["datei"] for b in manifest["bilder"]], ["02_patch.png"])
+        self.assertEqual(manifest["bilder"][0]["groesse"], [1600, 900])
+        self.assertTrue(manifest["schrift"])
+        self.assertNotIn(os.path.realpath(tempfile.gettempdir()), text)
+        self.assertNotIn(sandbox.echter_home(), text)
+        self.assertNotIn("/home/", text)
+        self.assertNotIn(REPO, text)
+
+    def test_echter_datenordner_unveraendert(self):
+        diff = sandbox.vergleiche(self.vorher, self.nachher, app_laeuft=self.app_laeuft)
+        self.assertEqual(diff, [], "Das Werkzeug hat echte Datenorte veraendert")
+
+
+class SandboxRiegelTest(unittest.TestCase):
+
+    def test_sandbox_verweigert_sich_nach_src_import(self):
+        import src.core.paths  # noqa: F401  (friert die Modulpfade ein)
+        vorher = dict(os.environ)
+        cwd = os.getcwd()
+        with self.assertRaises(RuntimeError):
+            sandbox.einrichten()
+        self.assertEqual(dict(os.environ), vorher)
+        self.assertEqual(os.getcwd(), cwd)
+
+
+class MarkenFinderTest(unittest.TestCase):
+
+    def test_fehlendes_widget_ist_ein_fehler(self):
+        from PySide6.QtWidgets import QApplication, QPushButton, QVBoxLayout, QWidget
+        from anleitungsbilder import runner
+        app = QApplication.instance() or QApplication([])
+        fenster = QWidget()
+        lay = QVBoxLayout(fenster)
+        knopf = QPushButton("Farb-Werkzeug…")
+        lay.addWidget(knopf)
+        fenster.show()
+        app.processEvents()
+        try:
+            ui = runner.UI(app, fenster, None, {})
+            # „…" im Code und „..." in der Szene gelten als gleich.
+            self.assertIs(ui.finde("Farb-Werkzeug..."), knopf)
+            with self.assertRaises(runner.SzenenFehler):
+                ui.finde("Gibt es nicht")
+        finally:
+            fenster.close()
+            fenster.deleteLater()
+
+
+class PlatzierungTest(unittest.TestCase):
+    """Reine Geometrie der Kreis-Lage (``marker.platzieren``) — ohne App."""
+
+    def setUp(self):
+        from PySide6.QtCore import QRect
+        from anleitungsbilder import marker
+        self.marker, self.QRect = marker, QRect
+        self.ziel = QRect(300, 200, 80, 30)
+
+    def _feld(self, c):
+        return self.marker._kreisfeld(c)
+
+    def test_vorzug_wird_genommen_wenn_frei(self):
+        (c, linie, gefunden), = self.marker.platzieren(
+            [self.ziel], 800, 600, [], ["links"])
+        self.assertTrue(gefunden)
+        self.assertFalse(linie)
+        self.assertLess(c.x(), self.ziel.left())               # links daneben
+        self.assertTrue(self.ziel.top() <= c.y() <= self.ziel.bottom())
+
+    def test_kandidat_mit_kollision_wird_verworfen(self):
+        # Ein beschrifteter Nachbar-Knopf direkt links: der Vorzug „links"
+        # kollidiert und muss verworfen werden.
+        nachbar = self.QRect(230, 195, 64, 40)
+        (c, _linie, gefunden), = self.marker.platzieren(
+            [self.ziel], 800, 600, [nachbar], ["links"])
+        self.assertTrue(gefunden)
+        self.assertFalse(self._feld(c).intersects(nachbar))
+        self.assertGreaterEqual(c.x(), self.ziel.left())       # nicht mehr links
+
+    def test_kein_kreis_auf_fremdem_rahmen_oder_kreis(self):
+        a = self.ziel
+        b = self.QRect(300, 250, 80, 30)                       # direkt darunter
+        (ca, _l1, g1), (cb, _l2, g2) = self.marker.platzieren(
+            [a, b], 800, 600, [], ["unten", "oben"])
+        self.assertTrue(g1 and g2)
+        rahmen_b = self.marker.rahmen_von(b, 800, 600)
+        rahmen_a = self.marker.rahmen_von(a, 800, 600)
+        self.assertFalse(self._feld(ca).intersects(rahmen_b))
+        self.assertFalse(self._feld(cb).intersects(rahmen_a))
+        self.assertFalse(self._feld(ca).intersects(self._feld(cb)))
+
+    def test_kreis_haengt_eindeutig_am_eigenen_rahmen(self):
+        # Zwei Menuezeilen uebereinander, rechts neben der oberen ein
+        # beschrifteter Knopf: der Kreis der oberen Zeile darf nicht so
+        # ausweichen, dass er naeher an der unteren Zeile sitzt.
+        oben = self.QRect(0, 100, 270, 27)
+        unten = self.QRect(0, 127, 270, 27)
+        knopf = self.QRect(276, 90, 80, 40)
+        (c, _l, gefunden), _zweite = self.marker.platzieren(
+            [oben, unten], 800, 600, [knopf], ["rechts", "rechts"])
+        ra = self.marker.rahmen_von(oben, 800, 600)
+        rb = self.marker.rahmen_von(unten, 800, 600)
+        self.assertLess(self.marker._abstand(ra, c), self.marker._abstand(rb, c))
+        self.assertFalse(self._feld(c).intersects(knopf))
+
+    def test_kreis_bleibt_im_bild(self):
+        am_rand = self.QRect(0, 0, 120, 30)
+        (c, _linie, gefunden), = self.marker.platzieren(
+            [am_rand], 800, 600, [], ["links"])
+        self.assertTrue(gefunden)
+        self.assertTrue(self.QRect(0, 0, 800, 600).contains(self._feld(c)))
+
+    def test_eingekesselt_weiter_weg_mit_linie(self):
+        # Rundum eine schmale beschriftete Zeile (8 px) dicht am Rahmen: der
+        # Kreis muss dahinter, haengt dann per Verbindungslinie am Rahmen.
+        z = self.ziel
+        ring = [self.QRect(z.left() - 60, z.top() - 14, z.width() + 120, 8),
+                self.QRect(z.left() - 60, z.bottom() + 7, z.width() + 120, 8),
+                self.QRect(z.left() - 14, z.top() - 6, 8, z.height() + 12),
+                self.QRect(z.right() + 7, z.top() - 6, 8, z.height() + 12)]
+        (c, linie, gefunden), = self.marker.platzieren([z], 800, 600, ring)
+        self.assertTrue(gefunden)
+        self.assertTrue(all(not self._feld(c).intersects(h) for h in ring))
+        self.assertTrue(linie)
+
+
+if __name__ == "__main__":
+    unittest.main()

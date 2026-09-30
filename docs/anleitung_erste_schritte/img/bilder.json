@@ -1,0 +1,120 @@
+{
+  "anleitung": "erste_schritte",
+  "werkzeug": "tools/anleitungsbilder.py",
+  "stand": "c0ff194d",
+  "schrift": "Noto Sans (statt Roboto Condensed)",
+  "qt": "6.11.1",
+  "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py erste_schritte'.",
+  "bilder": [
+    {
+      "datei": "01_hauptfenster.png",
+      "szene": "01_hauptfenster",
+      "titel": "Hauptfenster nach „Neue Show“ — leer",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "8674b71874c5ff268e3a16da56bd4fe7"
+    },
+    {
+      "datei": "02_sektionen.png",
+      "szene": "02_sektionen",
+      "titel": "Die acht Sektionen",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "2d35cfdad2d0f3053c07ce4ca5bd88e9"
+    },
+    {
+      "datei": "03_datei_neu.png",
+      "szene": "03_datei_neu",
+      "titel": "Menü Datei → Neue Show",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "7a192fe00b71a46bebbac63e13da3092"
+    },
+    {
+      "datei": "04_rueckfrage.png",
+      "szene": "04_rueckfrage",
+      "titel": "Rückfrage „Neue Show“",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "b968895c8c15fc5b8eae7cf5d4309cc1"
+    },
+    {
+      "datei": "05_patch_leer.png",
+      "szene": "05_patch_leer",
+      "titel": "Patch einer neuen Show",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "fbe6b09db4c06f444a7c4c9211850a1c"
+    },
+    {
+      "datei": "06_geraet_waehlen.png",
+      "szene": "06_geraet_waehlen",
+      "titel": "Dialog „Gerät hinzufügen“",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "a640e272286ca40ee497cd8b2bfb6b00"
+    },
+    {
+      "datei": "07_patch_ein_geraet.png",
+      "szene": "07_patch_ein_geraet",
+      "titel": "Ein Gerät gepatcht",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "a3451044017b1c2bd92388d234239d34"
+    },
+    {
+      "datei": "08_programmer.png",
+      "szene": "08_programmer",
+      "titel": "Programmer: Dimmer auf 255",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "c881a7f18688f8cca0d15c641e1c7aa0"
+    },
+    {
+      "datei": "09_programmer_farbe.png",
+      "szene": "09_programmer_farbe",
+      "titel": "Programmer: Rot auf 255",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "f2e222bd47a7630a487af28acf050788"
+    },
+    {
+      "datei": "10_datei_speichern.png",
+      "szene": "10_datei_speichern",
+      "titel": "Menü Datei: Speichern und Öffnen",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "3e37b8d7c143de7fb7c8481e46a0de21"
+    }
+  ]
+}
