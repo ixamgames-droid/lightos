@@ -370,10 +370,11 @@ class PositionTool(QWidget):
         try:
             state = get_state()
             # M3.1: bevorzugt die aktuelle Programmer-Auswahl.
-            fids = list(state.get_selected_fids())
-            if not fids:
-                fids = list(state.programmer.keys()) or \
-                    [f.fid for f in state.get_patched_fixtures()]
+            # FM-51: der Rueckfall (Programmer-Geraete, sonst alle) greift NUR,
+            # wenn wirklich nichts gewaehlt ist. Eine reine Weiss-Auswahl
+            # ("1:w3") liefert [] -> das Werkzeug schreibt nichts, statt pan/tilt
+            # auf den Balken und das ganze Rig zu legen.
+            fids = list(state.auswahl_ziel_fids(rueckfall="programmer_oder_alle"))
             for fid in fids:
                 state.set_programmer_value(fid, "pan", self._pan)
                 state.set_programmer_value(fid, "tilt", self._tilt)

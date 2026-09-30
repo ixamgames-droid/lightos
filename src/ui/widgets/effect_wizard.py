@@ -91,6 +91,14 @@ class _FixturePage(QWizardPage):
             # Vorauswahl aus dem Programmer (R2): liegen gewählte Geräte vor, nur
             # diese vorab ankreuzen; sonst (leer) wie bisher alle.
             sel = set(state.get_selected_fids())
+            # FM-51: reine Weiss-Auswahl ist NICHT „leer" -> nichts vorhaken.
+            # (getattr: aeltere Test-Attrappen kennen den Helfer nicht.)
+            leer = getattr(state, "auswahl_ist_leer", lambda: True)()
+            if not sel and not leer:
+                hint = QLabel("Nur Weiß-Segmente gewählt – bitte Geräte anhaken.")
+                hint.setWordWrap(True)
+                lay.addWidget(hint)
+                self._weiss_hinweis = hint
             # EA-01: Gruppen-Schnellauswahl — ein Klick kreuzt die Mitglieder der
             # Gruppe zusaetzlich an (Union; hebt andere Haken nicht auf).
             try:
@@ -123,7 +131,7 @@ class _FixturePage(QWizardPage):
                 lay.addLayout(grow)
             for f in state.get_patched_fixtures():
                 cb = QCheckBox(f"{getattr(f,'label','Fixture')}  (ID {f.fid}, U{f.universe} @{f.address})")
-                cb.setChecked(f.fid in sel if sel else True)
+                cb.setChecked(f.fid in sel if sel else leer)
                 cb.fid = f.fid
                 self.checks.append(cb)
                 lay.addWidget(cb)

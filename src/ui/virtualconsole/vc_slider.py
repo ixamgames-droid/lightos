@@ -30,13 +30,20 @@ def _clear_feature_dimmer_slot(slot):
 
 
 
-def _auswahl_leer(state) -> bool:
-    """FM-41: „nichts gewaehlt" heisst wirklich NICHTS — auch keine Weiss-Zelle."""
-    fn = getattr(state, "auswahl_ist_leer", None)
-    try:
-        return bool(fn()) if callable(fn) else True
-    except Exception:
-        return True
+def _auswahl_ziel_fids(state, rueckfall=None) -> list:
+    """FM-41/FM-51: Ziel-Geraete der Auswahl ueber den zentralen Helfer
+    ``AppState.auswahl_ziel_fids`` — „nichts gewaehlt -> alle" nur, wenn
+    wirklich NICHTS gewaehlt ist (auch keine Weiss-Zelle)."""
+    fn = getattr(state, "auswahl_ziel_fids", None)
+    if callable(fn):
+        try:
+            return list(fn(rueckfall=rueckfall) or [])
+        except Exception:
+            pass
+    fids = list(state.get_selected_fids())
+    if not fids and rueckfall == "alle":
+        fids = [f.fid for f in state.get_patched_fixtures()]
+    return fids
 
 class SliderMode(str):
     LEVEL    = "Level"
@@ -383,11 +390,9 @@ class VCSlider(VCWidget):
                     if not fids and not self._hat_zellen(state, self.programmer_group):
                         fids = [f.fid for f in state.get_patched_fixtures()]
                 elif self.programmer_scope == "selected":
-                    fids = list(state.get_selected_fids())
                     # Fallback „nichts gewaehlt -> alle" — aber nur, wenn wirklich
-                    # NICHTS gewaehlt ist (FM-41: reine Weiss-Auswahl).
-                    if not fids and _auswahl_leer(state):
-                        fids = [f.fid for f in state.get_patched_fixtures()]
+                    # NICHTS gewaehlt ist (FM-41: reine Weiss-Auswahl -> nichts).
+                    fids = _auswahl_ziel_fids(state, rueckfall="alle")
                 else:
                     fids = [f.fid for f in state.get_patched_fixtures()]
                 pv = self._programmer_mapped(v)   # LAS-Speed: 0..255 → [min,max]

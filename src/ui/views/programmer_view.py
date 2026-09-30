@@ -2753,11 +2753,44 @@ class ProgrammerView(QWidget):
 
     # ── Toolbar Actions ──────────────────────────────────────────────────────
 
+    def _nur_weiss_ziel(self, fid) -> bool:
+        """FM-51: ist ``fid`` laut AppState NUR ueber Weiss-Segmente gewaehlt?
+        Die View-Liste ``_selected_fids`` fuehrt solche Geraete mit (sie kommt aus
+        den Zellen) — die Toolbar-Aktionen duerfen sie aber nicht als GANZES
+        Geraet behandeln, sonst faehrt z. B. Highlight alle 48 RGB-Zonen."""
+        fn = getattr(self._state, "nur_weiss_gewaehlt", None)
+        try:
+            return bool(fn(fid)) if callable(fn) else False
+        except Exception:
+            return False
+
+    def _weiss_segmente(self, fid) -> list:
+        """FM-51: die gewaehlten Weiss-Segmente von ``fid`` in fester Reihenfolge."""
+        try:
+            return sorted(self._state.selected_weiss_for(fid))
+        except Exception:
+            return []
+
     def _highlight(self):
-        """Setzt selektierte Fixtures auf: Intensity 255, Pan/Tilt center, weiss."""
+        """Setzt selektierte Fixtures auf: Intensity 255, Pan/Tilt center, weiss.
+
+        FM-51: ein Geraet, das NUR ueber Weiss-Segmente gewaehlt ist, bekommt
+        wie beim Command-Line-Highlight nur SEINE Segmente (``weiss_setzen``)
+        plus den geteilten Master-Dimmer — nicht den ganzen Balken."""
         if not self._selected_fids:
             return
+        st = self._state
         for fid in self._selected_fids:
+            if self._nur_weiss_ziel(fid):
+                for seg in self._weiss_segmente(fid):
+                    if not st.weiss_setzen(fid, seg, 255):
+                        continue
+                    # Geteilter Master-Dimmer: ohne ihn bliebe das Segment
+                    # dunkel (Farbe macht nicht von selbst hell).
+                    dk = st.weiss_dimmer_key(fid, seg)
+                    if dk:
+                        st.set_programmer_value(fid, dk, 255)
+                continue
             self._state.set_programmer_value(fid, "intensity", 255)
             self._state.set_programmer_value(fid, "pan", 127)
             self._state.set_programmer_value(fid, "tilt", 127)
@@ -2766,9 +2799,16 @@ class ProgrammerView(QWidget):
             self._state.set_programmer_value(fid, "color_b", 255)
 
     def _lowlight(self):
-        """Dimmt nicht-selektierte Fixtures auf ca 30 % (intensity 76)."""
+        """Dimmt nicht-selektierte Fixtures auf ca 30 % (intensity 76).
+
+        FM-51: ausgenommen ist JEDES Geraet, auf das die Auswahl verweist — auch
+        eines, das nur ueber Weiss-Segmente gewaehlt ist."""
         all_fids = [f.fid for f in self._state.get_patched_fixtures()]
         sel = set(self._selected_fids)
+        try:
+            sel |= set(self._state.auswahl_referenzierte_fids())
+        except Exception:
+            pass
         for fid in all_fids:
             if fid in sel:
                 continue
@@ -2829,10 +2869,47 @@ class ProgrammerView(QWidget):
         self._rebuild_attr_editor()
 
     def _copy_to_clipboard(self):
-        self._clipboard = copy.deepcopy({
-            fid: self._state.programmer.get(fid, {})
-            for fid in self._selected_fids
-        })
+        """Kopiert die Programmer-Werte der Auswahl.
+
+        FM-51: von einem NUR ueber Weiss-Segmente gewaehlten Geraet nur die
+        Schluessel der gewaehlten Segmente — nicht RGB und die uebrigen
+        Segmente des ganzen Balkens."""
+        clip = {}
+        for fid in self._selected_fids:
+            prog = self._state.programmer.get(fid, {})
+            if self._nur_weiss_ziel(fid):
+                keys = [self._state.weiss_programmer_key(fid, seg)
+                        for seg in self._weiss_segmente(fid)]
+                prog = {k: prog[k] for k in keys if k and k in prog}
+            clip[fid] = prog
+        self._clipboard = copy.deepcopy(clip)
+
+    @staticmethod
+    def _weiss_werte(src: dict) -> list:
+        """FM-51: die Weiss-Werte eines Clip-Eintrags in Segment-Reihenfolge
+        (``color_w``, ``color_w#1``, ...)."""
+        def nr(attr):
+            _, _, n = attr.partition("#")
+            return int(n) if n.isdigit() else 0
+        keys = [a for a in src if a.split("#", 1)[0] == "color_w"]
+        return [src[a] for a in sorted(keys, key=nr)]
+
+    def _paste_weiss(self, fid, src: dict):
+        """FM-51: Clip-Eintrag auf ein NUR ueber Weiss gewaehltes Geraet —
+        eingefuegt werden nur Weiss-Werte, und zwar auf die gewaehlten Segmente
+        (``weiss_setzen``); alle uebrigen Attribute werden verworfen."""
+        werte = self._weiss_werte(src)
+        if not werte:
+            return
+        for i, seg in enumerate(self._weiss_segmente(fid)):
+            key = self._state.weiss_programmer_key(fid, seg)
+            # Gleicher Segment-Schluessel im Clip (Balken -> Balken) gewinnt,
+            # sonst reihum ueber die Weiss-Werte der Quelle.
+            val = src[key] if key and key in src else werte[i % len(werte)]
+            try:
+                self._state.weiss_setzen(fid, seg, int(val))
+            except (TypeError, ValueError):
+                continue
 
     def _paste_from_clipboard(self):
         if not self._clipboard or not self._selected_fids:
@@ -2843,6 +2920,9 @@ class ProgrammerView(QWidget):
         # Round-robin: clip Value n -> selected fixture n (mod len)
         for i, fid in enumerate(self._selected_fids):
             src = clip_list[i % len(clip_list)]
+            if self._nur_weiss_ziel(fid):
+                self._paste_weiss(fid, src)
+                continue
             for attr, val in src.items():
                 self._state.set_programmer_value(fid, attr, val)
 

@@ -7,6 +7,25 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-09-30 — Nur Weiß-Segmente gewählt: kein Werkzeug fährt mehr das ganze Rig (FM-51, Scheibe A)
+
+#### Behoben
+
+- **Eine Auswahl nur aus Weiß-Segmenten zählte in vielen Werkzeugen als „nichts gewählt"** und
+  damit als „alle Geräte" bzw. „alle Geräte im Programmer". Positions-, Spider-, Farb- und
+  Fächer-Werkzeug, Presets, Paletten, RGB-Matrix (Auto-Zuweisen), EFX (Hinzufügen, Auto-Mover)
+  und der Effekt-Assistent tun dann jetzt nichts bzw. zeigen einen Hinweis, statt den ganzen
+  Balken oder das ganze Rig zu verändern.
+- **Highlight** (Command-Line `hi` und Programmer-Knopf) hellt bei Weiß-Segmenten genau diese
+  Segmente samt Master-Dimmer auf, nicht mehr alle 48 Farbzonen. **Lowlight** dunkelt das gewählte
+  Gerät nicht mehr mit ab.
+- **Kopieren/Einfügen im Programmer** nimmt bei Weiß-Segmenten nur deren Werte mit bzw. setzt nur
+  Weiß-Werte auf die gewählten Segmente.
+- **Palette aufzeichnen/überschreiben** nahm bei reiner Weiß-Auswahl den ganzen Programmer auf —
+  jetzt kommt ein Hinweis.
+- Eine VC-Farbkachel („Programmer/Selektion") färbt bei reiner Weiß-Auswahl nichts; sonst wirkt
+  sie wie bisher.
+
 ### 2026-09-29 — Weiß-Segmente: Submaster, und Farbköpfe schalten kein fremdes Weiß mehr (FM-41)
 
 #### Neu

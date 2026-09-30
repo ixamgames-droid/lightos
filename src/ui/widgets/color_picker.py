@@ -690,9 +690,14 @@ class ColorPicker(QWidget):
         Geraete zurueck. BEWUSST KEIN Fallback auf alle gepatchten Fixtures —
         sonst faerbt der Picker bei leerer Auswahl + leerem Programmer
         versehentlich die ganze Anlage. (Frueher: toter findChild-Loop, der das
-        Ergebnis nie nutzte und immer auf programmer.keys()/alle zurueckfiel.)"""
+        Ergebnis nie nutzte und immer auf programmer.keys()/alle zurueckfiel.)
+
+        FM-51: der programmer.keys()-Rueckfall greift NUR bei wirklich leerer
+        Auswahl. Bei reiner Weiss-Auswahl ("1:w3") steht das Geraet nach
+        weiss_setzen im Programmer — der RGB-Picker faerbte sonst alle Zonen,
+        schriebe color_w=0 auf den Balken und loeschte Kopf-Overrides. Die
+        Weiss-Segmente regelt der Weiss-Block, nicht dieses Werkzeug."""
         try:
-            fids = list(state.get_selected_fids())
-            return fids if fids else list(state.programmer.keys())
+            return list(state.auswahl_ziel_fids(rueckfall="programmer"))
         except Exception:
             return []

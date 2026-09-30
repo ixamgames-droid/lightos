@@ -265,9 +265,9 @@ class SpiderPositionTool(QWidget):
             return
         try:
             state = get_state()
-            fids = list(state.get_selected_fids())
-            if not fids:
-                fids = list(state.programmer.keys())
+            # FM-51: programmer.keys() nur bei WIRKLICH leerer Auswahl — eine
+            # reine Weiss-Auswahl bewegt keine fremden Spider im Programmer.
+            fids = list(state.auswahl_ziel_fids(rueckfall="programmer"))
             patched = {f.fid: f for f in state.get_patched_fixtures()}
             for fid in fids:
                 fx = patched.get(fid)

@@ -176,19 +176,20 @@ class VCXYPad(VCWidget):
         gepatchten (M3.6)."""
         if self._fixture_ids:
             return list(self._fixture_ids)
+        # FM-41/FM-51: nur bei WIRKLICH leerer Auswahl auf „alle" zurueckfallen
+        # — zentral ueber AppState.auswahl_ziel_fids (reine Weiss-Auswahl: []).
+        ziel = getattr(state, "auswahl_ziel_fids", None)
+        if callable(ziel):
+            try:
+                return list(ziel(rueckfall="alle") or [])
+            except Exception:
+                pass
         try:
             fids = list(state.get_selected_fids())
         except Exception:
             fids = []
         if fids:
             return fids
-        # FM-41: nur bei WIRKLICH leerer Auswahl auf „alle" zurueckfallen.
-        leer = getattr(state, "auswahl_ist_leer", None)
-        try:
-            if callable(leer) and not leer():
-                return []
-        except Exception:
-            pass
         try:
             patched = state.get_patched_fixtures()
         except Exception:

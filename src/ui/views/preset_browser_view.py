@@ -120,7 +120,15 @@ class PresetBrowserView(QWidget):
             return
         try:
             if entry.kind == "palette":
-                entry.ref.apply_to_programmer(self._target_fids())
+                fids = self._target_fids()
+                if fids == []:
+                    # FM-51: Auswahl vorhanden, aber kein ganzes Geraet (nur
+                    # Weiss-Segmente). apply_to_programmer(None) waere das
+                    # GANZE Rig — also nichts anwenden.
+                    self._status.setText(
+                        "Nur Weiß-Segmente gewählt – Palette gilt ganzen Geräten")
+                    return
+                entry.ref.apply_to_programmer(fids)
                 self._status.setText(f"Palette angewendet: {entry.name}")
             elif entry.kind == "group":
                 from src.core.app_state import get_state
@@ -133,10 +141,17 @@ class PresetBrowserView(QWidget):
 
     @staticmethod
     def _target_fids() -> list[int] | None:
-        """Aktuelle Programmer-Auswahl; None = alle Geräte (Fallback)."""
+        """Aktuelle Programmer-Auswahl; None = alle Geräte (Fallback).
+
+        FM-51: None NUR, wenn WIRKLICH nichts gewaehlt ist. Eine reine
+        Weiss-Auswahl liefert ``[]`` (-> der Aufrufer wendet nichts an), sonst
+        faerbte apply_to_programmer(None) das ganze Rig."""
         try:
             from src.core.app_state import get_state
-            fids = get_state().get_selected_fids()
-            return list(fids) if fids else None
+            state = get_state()
+            fids = state.auswahl_ziel_fids()
+            if fids:
+                return list(fids)
+            return None if state.auswahl_ist_leer() else []
         except Exception:
             return None

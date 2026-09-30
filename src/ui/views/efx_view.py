@@ -41,6 +41,19 @@ def _head_beschriftung():
         return None
 
 
+def _nur_weiss_auswahl() -> bool:
+    """FM-51: besteht die Auswahl NUR aus Weiss-Segmenten (``["1:w3"]``)?
+    Dann sind ``selected_fids`` leer, es ist aber etwas gewaehlt — die
+    Rueckfaelle „alle Mover"/„erstes Geraet" gelten dann NICHT. Ganze Geraete
+    in der Auswahl (auch ohne Mover) behalten das bisherige Verhalten."""
+    try:
+        from src.core.app_state import get_state
+        st = get_state()
+        return not st.auswahl_ist_leer() and not st.auswahl_ziel_fids()
+    except Exception:
+        return False
+
+
 # Geraete-Verhaeltnis: (engine-key, deutsches Label) — Reihenfolge = Combo-Reihenfolge.
 PHASE_MODE_LABELS = [
     ("sync",   "Synchron (alle Köpfe gleich)"),
@@ -2183,7 +2196,9 @@ class EfxView(QWidget):
         if self._current.fixtures:
             return len(self._current.fixtures)
         movers = self._selected_movers()
-        if not movers and allow_all:
+        # FM-51: „alle Mover" nicht bei reiner Weiss-Auswahl — sie hat leere
+        # selected_fids, ist aber eine Auswahl.
+        if not movers and allow_all and not _nur_weiss_auswahl():
             movers = self._patched_movers()
         if movers:
             self._current.fixtures = self._targets_for(movers)
@@ -2208,6 +2223,12 @@ class EfxView(QWidget):
         # Fixtures anpassen — sonst bleiben sie beim Start aus leerer Liste versteckt.
         self._update_spider_mode()
         if not self._current.fixtures:
+            if _nur_weiss_auswahl():
+                # FM-51: reine Weiss-Auswahl — kein Rueckfall auf alle Mover,
+                # nur ein Hinweis (kein Dialog: es ist ja etwas gewaehlt).
+                self._fx_box.setTitle(
+                    "Geräte: nur Weiß-Segmente gewählt – keine beweglichen Geräte")
+                return
             self._fx_box.setTitle("Geräte: keine beweglichen Geräte vorhanden")
             try:
                 QMessageBox.warning(
@@ -2232,13 +2253,18 @@ class EfxView(QWidget):
             from src.core.app_state import get_state
             state = get_state()
             # M0.5: die aktuelle Auswahl hinzufuegen (vorher hartkodiert patched[0]).
+            # FM-51: Rueckfall aufs erste Geraet NUR bei wirklich leerer Auswahl.
             try:
                 fids = [int(f) for f in state.get_selected_fids()]
+                if not fids:
+                    fids = [int(f) for f in
+                            state.auswahl_ziel_fids(rueckfall="erstes")]
             except Exception:
                 fids = []
-            if not fids:
-                patched = state.get_patched_fixtures()
-                fids = [patched[0].fid] if patched else []
+            if not fids and not state.auswahl_ist_leer():
+                self._fx_box.setTitle(
+                    "Geräte: nur Weiß-Segmente gewählt – nichts hinzugefügt")
+                return
             # A3: Ziel-Identitaet ist (fid, head) — sonst blockiert ein bereits
             # vorhandenes Geraete-Ziel das Hinzufuegen eines Kopf-Ziels (und
             # umgekehrt), obwohl es verschiedene Ziele sind.
