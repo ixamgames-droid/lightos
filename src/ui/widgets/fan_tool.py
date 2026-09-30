@@ -131,6 +131,11 @@ class FanTool(QWidget):
         # _selected_fids: je Eintrag der Kopf-Index oder None (= ganzes Geraet).
         # So faechert der Fan ueber die 4 Koepfe EINER Bar statt nur ueber Geraete.
         self._selected_heads: list = []
+        # FM-51: wurden die Ziele von aussen aus einer NICHT leeren Auswahl
+        # gesetzt? Dann ist eine leere Zielliste (reine Weiss-Auswahl) „explizit
+        # leer" und darf nicht als „nie gesetzt" in den Programmer-Rueckfall
+        # fallen.
+        self._ziele_gesetzt = False
         self._setup_ui()
         self._refresh_table()
 
@@ -138,6 +143,7 @@ class FanTool(QWidget):
         """Setze welche Fixture-IDs benutzt werden sollen (ganze Geraete)."""
         self._selected_fids = list(fids)
         self._selected_heads = [None] * len(self._selected_fids)
+        self._ziele_gesetzt = bool(self._selected_fids)
         self._refresh_table()
 
     def set_cells(self, cells):
@@ -146,18 +152,25 @@ class FanTool(QWidget):
 
         Damit faechert das Werkzeug ueber Koepfe: die 4 Koepfe einer PAR-Bar
         bekommen einen Verlauf, statt dass alle denselben Wert erhalten. Reine
-        fid-Aufrufer bleiben ueber ``set_selection`` unveraendert gueltig."""
-        from src.core.group_cells import parse_group_cell
+        fid-Aufrufer bleiben ueber ``set_selection`` unveraendert gueltig.
+
+        FM-51: Weiss-Zellen (``"7:w3"``) sind KEINE Faecher-Ziele — das Werkzeug
+        bedient die Weiss-Achse nicht. Sie werden bewusst uebersprungen; bei
+        reiner Weiss-Auswahl bleibt die Zielliste leer (und bleibt es auch,
+        statt auf die Programmer-Geraete zurueckzufallen)."""
+        from src.core.group_cells import parse_zelle, ACHSE_WEISS
+        cells = list(cells or [])
         fids: list[int] = []
         heads: list = []
-        for c in cells or []:
-            fid, head = parse_group_cell(c)
-            if fid is None:
+        for c in cells:
+            fid, achse, index = parse_zelle(c)
+            if fid is None or achse == ACHSE_WEISS:
                 continue
             fids.append(fid)
-            heads.append(head)
+            heads.append(index)
         self._selected_fids = fids
         self._selected_heads = heads
+        self._ziele_gesetzt = bool(cells)
         self._refresh_table()
 
     def _head_of(self, i: int):
@@ -286,8 +299,11 @@ class FanTool(QWidget):
             if cells:
                 self.set_cells(cells)
                 return
-            self._selected_fids = list(state.get_selected_fids()) or list(state.programmer.keys())
+            # FM-51: Rueckfall auf Programmer-Geraete nur bei wirklich leerer
+            # Auswahl (die EINE Regel in AppState).
+            self._selected_fids = list(state.auswahl_ziel_fids(rueckfall="programmer"))
             self._selected_heads = [None] * len(self._selected_fids)
+            self._ziele_gesetzt = False
             self._refresh_table()
         except Exception as e:
             print(f"[fan_tool] reload error: {e}")
@@ -301,11 +317,15 @@ class FanTool(QWidget):
         vmax = self._slider_max.value()
 
         # Default falls keine Selection: erst Programmer-Auswahl, dann programmer-Keys
+        # FM-51: explizit leere Ziele (reine Weiss-Auswahl) bleiben leer; der
+        # Rueckfall greift nur, wenn nie Ziele gesetzt wurden, und auch dann nur
+        # bei wirklich leerer Auswahl.
         fids = list(self._selected_fids)
-        if not fids and get_state is not None:
+        if not fids and not getattr(self, "_ziele_gesetzt", False) \
+                and get_state is not None:
             try:
                 st = get_state()
-                fids = list(st.get_selected_fids()) or list(st.programmer.keys())
+                fids = list(st.auswahl_ziel_fids(rueckfall="programmer"))
             except Exception:
                 fids = []
         self._selected_fids = fids

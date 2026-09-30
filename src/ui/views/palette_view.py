@@ -173,14 +173,47 @@ class PalettePage(QWidget):
         if not fids:
             # Sicherheitsnetz: leere Auswahl wuerde sonst per apply_to_programmer(None)
             # die Palette auf ALLE gepatchten Geraete schreiben (ganzes Rig).
+            # FM-51: bei reiner Weiss-Auswahl ist etwas gewaehlt — eigene Meldung.
+            try:
+                from src.core.app_state import get_state
+                leer = get_state().auswahl_ist_leer()
+            except Exception:
+                leer = True
             QMessageBox.information(
                 self, "Palette",
                 "Keine Geräte ausgewählt — bitte zuerst die Fixtures auswählen, "
-                "auf die die Palette wirken soll.")
+                "auf die die Palette wirken soll." if leer else
+                "Nur Weiß-Segmente gewählt – Paletten wirken auf ganze Geräte.")
             return
         pal.apply_to_programmer(fids)
 
+    def _nur_weiss(self) -> bool:
+        """FM-51: Auswahl nicht leer, aber keine ganzen Geraete (nur Weiss-Segmente).
+        Aufzeichnen/Ueberschreiben wuerde sonst per record_from_programmer(None)
+        den GANZEN Programmer in die Palette schreiben."""
+        try:
+            from src.core.app_state import get_state
+            st = get_state()
+            return not st.auswahl_ist_leer() and not st.get_selected_fids()
+        except Exception:
+            return False
+
+    def _weiss_hinweis(self):
+        QMessageBox.information(
+            self, "Palette",
+            "Nur Weiß-Segmente gewählt – Paletten zeichnen ganze Geräte auf.")
+
+    def _overwrite(self, pal: Palette):
+        if self._nur_weiss():
+            self._weiss_hinweis()
+            return
+        pal.record_from_programmer(self._target_fids())
+        self._refresh()
+
     def _record_new(self):
+        if self._nur_weiss():
+            self._weiss_hinweis()
+            return
         name, ok = QInputDialog.getText(self, "Palette aufzeichnen", "Name:")
         if not ok or not name:
             return
@@ -195,7 +228,7 @@ class PalettePage(QWidget):
         menu = QMenu(self)
         menu.addAction("Anwenden").triggered.connect(lambda: self._apply(pal))
         menu.addAction("Überschreiben (Programmer)").triggered.connect(
-            lambda: (pal.record_from_programmer(self._target_fids()), self._refresh())
+            lambda: self._overwrite(pal)
         )
         menu.addAction("In Ordner verschieben…").triggered.connect(
             lambda: self._set_folder(pal)

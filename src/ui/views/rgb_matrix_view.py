@@ -1896,7 +1896,12 @@ class RgbMatrixView(QWidget):
             self._grid_label.setText(f"Fehler: {e}")
             return
         if not fids:
-            self._grid_label.setText("Keine Geräte im Programmer ausgewählt.")
+            # FM-51: reine Weiss-Auswahl ist nicht „nichts gewaehlt" — die lose
+            # Auswahl kennt keine Weiss-Achse, dafuer gibt es das Gruppen-Raster.
+            self._grid_label.setText(
+                "Keine Geräte im Programmer ausgewählt." if state.auswahl_ist_leer()
+                else "Nur Weiß-Segmente gewählt – für die Matrix eine Gruppe "
+                     "mit Weiß-Raster verwenden.")
             return
         # Grid-Zuweisung ist live: sofort in beide Instanzen (kein dirty).
         self._current.cols = len(fids)
@@ -1936,10 +1941,15 @@ class RgbMatrixView(QWidget):
         try:
             from src.core.app_state import get_state
             state = get_state()
-            fids = [int(f) for f in state.active_scope_fids()]
+            # FM-51: ganzer Patch NUR bei wirklich leerer Auswahl. Reine
+            # Weiss-Auswahl -> [] -> keine Zuweisung (sonst stand der Balken als
+            # ganzes Geraet im Raster).
+            fids = [int(f) for f in state.auswahl_ziel_fids(rueckfall="alle")]
             if not fids:
-                fids = [getattr(f, "fid", None) for f in state.get_patched_fixtures()]
-                fids = [fid for fid in fids if fid is not None]
+                self._grid_label.setText(
+                    "Keine Geräte gepatcht." if state.auswahl_ist_leer() else
+                    "Nur Weiß-Segmente gewählt – keine ganzen Geräte zum Zuweisen.")
+                return
             total = self._current.cols * self._current.rows
             grid = []
             for i in range(total):

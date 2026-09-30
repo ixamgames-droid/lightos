@@ -149,6 +149,56 @@ def _get_selection(state) -> list:
     return list(getattr(state, "selected_fids", []) or [])
 
 
+def _auswahl_leer(state) -> bool:
+    """FM-51: ist WIRKLICH nichts gewaehlt (auch keine Weiss-Zelle)? Ohne den
+    AppState-Helfer (Test-Attrappen) gilt die alte Lesung: leere fid-Liste."""
+    fn = getattr(state, "auswahl_ist_leer", None)
+    if callable(fn):
+        try:
+            return bool(fn())
+        except Exception:
+            pass
+    return not _get_selection(state)
+
+
+def _get_ziel_fids(state, rueckfall: str | None = None) -> list:
+    """FM-51: Zwilling von :func:`_get_selection` ueber den zentralen Helfer
+    ``AppState.auswahl_ziel_fids`` — der ``rueckfall`` greift NUR bei wirklich
+    leerer Auswahl, eine reine Weiss-Auswahl liefert ``[]``."""
+    fn = getattr(state, "auswahl_ziel_fids", None)
+    if callable(fn):
+        try:
+            return list(fn(rueckfall=rueckfall) or [])
+        except Exception:
+            pass
+    fids = _get_selection(state)
+    if fids or rueckfall != "alle":
+        return fids
+    return [f.fid for f in state.get_patched_fixtures()]
+
+
+def _referenzierte_fids(state) -> list:
+    """FM-51: alle Geraete, auf die die Auswahl VERWEIST (auch nur ueber
+    Weiss-Segmente) — fuer Ausnahmen, nicht als Schreibziel."""
+    fn = getattr(state, "auswahl_referenzierte_fids", None)
+    if callable(fn):
+        try:
+            return list(fn() or [])
+        except Exception:
+            pass
+    return _get_selection(state)
+
+
+def _nur_weiss_fids(state) -> list:
+    fn = getattr(state, "nur_weiss_fids", None)
+    if callable(fn):
+        try:
+            return list(fn() or [])
+        except Exception:
+            pass
+    return []
+
+
 def _selection_heads(state, attribute: str) -> dict:
     """Kopf-Einschraenkung der aktuellen Auswahl fuer EIN Attribut —
     ``{fid: {head}}``, leer = keine Einschraenkung.
@@ -339,6 +389,10 @@ class SetValueCommand(Command):
                 if fehler:
                     return CommandResult(False, fehler)
             if not fids:
+                # FM-51: eine reine Weiss-Auswahl ist NICHT „nichts gewaehlt" —
+                # der Befehl bedient die Weiss-Achse nur nicht (kein Schreiben).
+                if self.selection.is_empty() and not _auswahl_leer(state):
+                    return CommandResult(False, "Nur Weiß-Segmente gewählt")
                 return CommandResult(False, "Keine Fixtures selektiert")
             if self.value_pct is not None:
                 pct = max(0, min(100, int(self.value_pct)))
@@ -577,14 +631,28 @@ class PageCommand(Command):
 class HighlightCommand(Command):
     def execute(self, state) -> CommandResult:
         try:
-            sel = _get_selection(state)
-            if not sel:
-                sel = [f.fid for f in state.get_patched_fixtures()]
+            # FM-51: „alle" nur bei WIRKLICH leerer Auswahl — eine reine
+            # Weiss-Auswahl macht nur ihre Segmente hell, nie das ganze Rig.
+            sel = _get_ziel_fids(state, rueckfall="alle")
             for fid in sel:
                 state.set_programmer_value(fid, "intensity", 255)
                 state.set_programmer_value(fid, "color_r", 255)
                 state.set_programmer_value(fid, "color_g", 255)
                 state.set_programmer_value(fid, "color_b", 255)
+            segmente = 0
+            for fid in _nur_weiss_fids(state):
+                for seg in sorted(state.selected_weiss_for(fid)):
+                    if not state.weiss_setzen(fid, seg, 255):
+                        continue
+                    segmente += 1
+                    # Geteilter Master-Dimmer: ohne ihn bliebe das Segment
+                    # dunkel (Farbe macht nicht von selbst hell).
+                    dk = state.weiss_dimmer_key(fid, seg)
+                    if dk:
+                        state.set_programmer_value(fid, dk, 255)
+            if segmente:
+                return CommandResult(
+                    True, f"Highlight {len(sel)} Fixtures, {segmente} Weiß-Segmente")
             return CommandResult(True, f"Highlight {len(sel)} Fixtures")
         except Exception as e:
             return CommandResult(False, f"Highlight Fehler: {e}")
@@ -594,7 +662,9 @@ class HighlightCommand(Command):
 class LowlightCommand(Command):
     def execute(self, state) -> CommandResult:
         try:
-            sel = set(_get_selection(state))
+            # FM-51: ausgenommen ist JEDES Geraet, auf das die Auswahl verweist
+            # — auch eines, das nur ueber Weiss-Segmente gewaehlt ist.
+            sel = set(_referenzierte_fids(state))
             count = 0
             for f in state.get_patched_fixtures():
                 if f.fid not in sel:

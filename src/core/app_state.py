@@ -2581,6 +2581,56 @@ class AppState:
         „nichts gewaehlt" gelten, sonst fuehre ein Fader das ganze Rig."""
         return not (getattr(self, "selected_cells", None) or [])
 
+    def auswahl_ziel_fids(self, rueckfall: str | None = None) -> list[int]:
+        """FM-51: die EINE Antwort auf „auf welche GANZEN Geraete wirkt ein
+        Werkzeug?" — kein Konsument deutet eine leere fid-Liste mehr selbst.
+
+        Liefert ``selected_fids`` (ganze Geraete und Kopf-Geraete). Ist das leer,
+        greift der ``rueckfall`` NUR, wenn WIRKLICH nichts gewaehlt ist
+        (:meth:`auswahl_ist_leer`):
+
+        * ``None``                  -> ``[]``
+        * ``"programmer"``          -> Geraete mit Programmer-Werten
+        * ``"alle"``                -> alle gepatchten Geraete
+        * ``"programmer_oder_alle"`` -> Programmer-Geraete, sonst alle
+        * ``"erstes"``              -> das erste gepatchte Geraet
+
+        Bei einer REINEN Weiss-Auswahl (``["1:w3"]``) kommt immer ``[]`` zurueck:
+        ein Werkzeug, das die Weiss-Achse nicht bedient, tut dann NICHTS statt
+        „alle" (Review FM-41: Positions-/Farb-/Faecher-Werkzeug schrieben sonst
+        auf das ganze Rig)."""
+        fids = list(self.selected_fids)
+        if fids or not self.auswahl_ist_leer() or rueckfall is None:
+            return fids
+        if rueckfall == "programmer":
+            return [int(f) for f in self.programmer.keys()]
+        patched = [f.fid for f in self.get_patched_fixtures()]
+        if rueckfall == "alle":
+            return patched
+        if rueckfall == "programmer_oder_alle":
+            return [int(f) for f in self.programmer.keys()] or patched
+        if rueckfall == "erstes":
+            return patched[:1]
+        return []
+
+    def auswahl_referenzierte_fids(self) -> list[int]:
+        """FM-51: jedes Geraet, auf das die Auswahl VERWEIST — auch nur ueber
+        Weiss-Segmente. Fuer Ausnahmen und Anzeige (Abdunkeln „alle AUSSER den
+        gewaehlten", Markierung in Live-/3D-Ansicht), NICHT als Schreibziel."""
+        from .group_cells import parse_zelle
+        out: list[int] = []
+        for c in (getattr(self, "selected_cells", None) or []):
+            fid = parse_zelle(c)[0]
+            if fid is not None and fid not in out:
+                out.append(fid)
+        return out
+
+    def nur_weiss_fids(self) -> list[int]:
+        """FM-51: Geraete, die AUSSCHLIESSLICH ueber Weiss-Segmente gewaehlt sind
+        (Schreiber, die die Weiss-Achse bedienen — Highlight, Einfuegen — fahren
+        fuer sie nur die Segmente ueber :meth:`weiss_setzen`)."""
+        return [f for f in self.auswahl_referenzierte_fids() if self.nur_weiss_gewaehlt(f)]
+
     def group_zellen_by_name(self, name_or_ref) -> list[str]:
         """FM-41: ALLE Zellen einer Gruppe ACHSEN-BEWUSST (``"7"``, ``"7:2"``,
         ``"7:w3"``) — Gegenstueck zu ``group_cells_by_name``, das Weiss-Zellen

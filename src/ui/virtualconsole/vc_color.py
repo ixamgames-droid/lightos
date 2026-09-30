@@ -129,6 +129,13 @@ class VCColor(VCWidget):
 
     def _target_fids(self, state) -> list[int]:
         if self.target == ColorTarget.PROGRAMMER:
+            # FM-51: reine Weiss-Auswahl -> NICHTS (die Kachel bedient die
+            # Weiss-Achse nicht; sonst faerbte sie den ganzen Balken, der nach
+            # weiss_setzen im Programmer steht). Sonst unveraendert:
+            # Programmer-Geraete, bei leerem Programmer alle.
+            leer = getattr(state, "auswahl_ist_leer", None)
+            if callable(leer) and not leer() and not state.get_selected_fids():
+                return []
             fids = list(state.programmer.keys())
             if fids:
                 return fids

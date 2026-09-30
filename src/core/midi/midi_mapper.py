@@ -618,8 +618,15 @@ class MidiMapper:
         weg — beides stumm.
         """
         st = self._state
+        # FM-41/FM-51: „nichts gewaehlt -> alle" nur, wenn WIRKLICH nichts
+        # gewaehlt ist — der zentrale Helfer liefert bei reiner Weiss-Auswahl
+        # ``[]`` (sonst fuehre der Fader das ganze Rig).
+        ziel = getattr(st, "auswahl_ziel_fids", None)
         try:
-            fids = list(st.get_selected_fids())
+            if callable(ziel):
+                fids = list(ziel() or [])
+            else:
+                fids = list(st.get_selected_fids())
         except Exception:
             fids = []
         if fids:
@@ -632,14 +639,11 @@ class MidiMapper:
             except Exception:
                 heads = {}
             return fids, heads
-        # FM-41: „nichts gewaehlt -> alle" nur, wenn WIRKLICH nichts gewaehlt ist
-        # — eine reine Weiss-Auswahl hat leere fids und fuehre sonst das ganze Rig.
-        leer = getattr(st, "auswahl_ist_leer", None)
-        try:
-            if callable(leer) and not leer():
-                return [], {}
-        except Exception:
-            pass
+        if callable(ziel):
+            try:
+                return list(ziel(rueckfall="alle") or []), {}
+            except Exception:
+                pass
         try:
             patched = st.get_patched_fixtures()
         except Exception:
