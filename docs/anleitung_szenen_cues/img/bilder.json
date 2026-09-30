@@ -1,0 +1,242 @@
+{
+  "anleitung": "szenen_cues",
+  "werkzeug": "tools/anleitungsbilder.py",
+  "stand": "c0ff194d",
+  "schrift": "Noto Sans (statt Roboto Condensed)",
+  "qt": "6.11.1",
+  "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py szenen_cues'.",
+  "bilder": [
+    {
+      "datei": "01_speichern.png",
+      "szene": "01_speichern",
+      "titel": "Programmer-Stand: acht PARs rot, Bibliothek",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [
+        {
+          "nummer": 1,
+          "beschriftung": "Speichern"
+        },
+        {
+          "nummer": 2,
+          "beschriftung": "Ordner +"
+        }
+      ],
+      "md5": "6f63f0bc6726a2b6ff406c6952295388"
+    },
+    {
+      "datei": "02_kanaele.png",
+      "szene": "02_kanaele",
+      "titel": "Welche Kanäle sollen gespeichert werden?",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [
+        {
+          "nummer": 1,
+          "beschriftung": "Intensity"
+        },
+        {
+          "nummer": 2,
+          "beschriftung": "Color"
+        },
+        {
+          "nummer": 3,
+          "beschriftung": "OK"
+        }
+      ],
+      "md5": "d23a9811ee4d29b5677d4efb88aa881b"
+    },
+    {
+      "datei": "03_snap_abrufen.png",
+      "szene": "03_snap_abrufen",
+      "titel": "Snap „PAR Rot“ in der Bibliothek",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [
+        {
+          "nummer": 1,
+          "beschriftung": "Snap"
+        },
+        {
+          "nummer": 2,
+          "beschriftung": "Anwenden"
+        },
+        {
+          "nummer": 3,
+          "beschriftung": "Szene"
+        }
+      ],
+      "md5": "ee0c098cfee9885d8c653be7c049d1bc"
+    },
+    {
+      "datei": "04_assistent.png",
+      "szene": "04_assistent",
+      "titel": "Reiter Assistent: Programmer → Szene",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [
+        {
+          "nummer": 1,
+          "beschriftung": "Programmer → Szene"
+        },
+        {
+          "nummer": 2,
+          "beschriftung": "Funktionen"
+        },
+        {
+          "nummer": 3,
+          "beschriftung": "Start"
+        },
+        {
+          "nummer": 4,
+          "beschriftung": "Stop"
+        }
+      ],
+      "md5": "a754e5de4af937cfac173b6a677d8611"
+    },
+    {
+      "datei": "05_snapshots.png",
+      "szene": "05_snapshots",
+      "titel": "Snapshots: 48 Schnellzugriff-Slots",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [
+        {
+          "nummer": 1,
+          "beschriftung": "gefüllter Slot"
+        },
+        {
+          "nummer": 2,
+          "beschriftung": "leerer Slot"
+        }
+      ],
+      "md5": "d9044182e183a7d504a553a45713e237"
+    },
+    {
+      "datei": "06_preset_browser.png",
+      "szene": "06_preset_browser",
+      "titel": "Preset-Browser: Suche nach „PAR“",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [
+        {
+          "nummer": 1,
+          "beschriftung": "Suche"
+        },
+        {
+          "nummer": 2,
+          "beschriftung": "Treffer"
+        },
+        {
+          "nummer": 3,
+          "beschriftung": "Status"
+        }
+      ],
+      "md5": "7ae61ff316cdf7dfec74b783ad9e1877"
+    },
+    {
+      "datei": "07_cueliste_neu.png",
+      "szene": "07_cueliste_neu",
+      "titel": "Neue, leere Cueliste",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [
+        {
+          "nummer": 1,
+          "beschriftung": "+ Neu"
+        },
+        {
+          "nummer": 2,
+          "beschriftung": "+ Cue aufnehmen"
+        },
+        {
+          "nummer": 3,
+          "beschriftung": "Quick-Rec"
+        }
+      ],
+      "md5": "21f8ecc42031ba91e1a3c417a2f9d97b"
+    },
+    {
+      "datei": "08_executor.png",
+      "szene": "08_executor",
+      "titel": "Drei Cues, Cueliste auf Executor 1",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [
+        {
+          "nummer": 1,
+          "beschriftung": "Cues"
+        },
+        {
+          "nummer": 2,
+          "beschriftung": "Executor 1"
+        }
+      ],
+      "md5": "0bebd63ae8beaa057a0df794d385b584"
+    },
+    {
+      "datei": "09_go.png",
+      "szene": "09_go",
+      "titel": "Nach dem ersten GO",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [
+        {
+          "nummer": 1,
+          "beschriftung": "GO"
+        },
+        {
+          "nummer": 2,
+          "beschriftung": "BACK"
+        },
+        {
+          "nummer": 3,
+          "beschriftung": "STOP"
+        },
+        {
+          "nummer": 4,
+          "beschriftung": "Aktive Cue"
+        }
+      ],
+      "md5": "8a7c40c1e0f22441202a8e36e5d1a6f1"
+    },
+    {
+      "datei": "10_vc_cueliste.png",
+      "szene": "10_vc_cueliste",
+      "titel": "Cueliste in der Virtual Console",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [
+        {
+          "nummer": 1,
+          "beschriftung": "Cueliste"
+        },
+        {
+          "nummer": 2,
+          "beschriftung": "GO"
+        }
+      ],
+      "md5": "358c73af824631eba9c9bf34735ce9aa"
+    }
+  ]
+}

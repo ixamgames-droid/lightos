@@ -198,9 +198,6 @@ class KeineFremdenBenutzerpfadeTest(unittest.TestCase):
                                  f"Muster schlaegt beim Platzhalter {trifft_nicht!r} an")
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 class KeineGeraeteSeriennummerTest(unittest.TestCase):
     """DOC-16a: keine ENTTEC-Seriennummer im oeffentlichen Repo.
@@ -236,3 +233,7 @@ class KeineGeraeteSeriennummerTest(unittest.TestCase):
         probe = "EN" + "123456"   # zusammengesetzt, sonst faende der Test sich selbst
         self.assertTrue(rx.search(f"Seriennr. {probe}"))
         self.assertFalse(rx.search("EN••••••"))
+
+
+if __name__ == "__main__":
+    unittest.main()

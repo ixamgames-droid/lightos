@@ -96,13 +96,15 @@ sudo apt-get update
 sudo apt-get install -y \
     python3 python3-venv python3-pip \
     build-essential libasound2-dev \
-    libpulse0 \
+    libpulse0 libxcb-cursor0 \
     fonts-noto fonts-dejavu
 ```
 
 Wozu die Pakete:
 - `build-essential` + `libasound2-dev` → `python-rtmidi` (MIDI, C-Extension)
 - `libpulse0` → `soundcard`-Loopback (BPM aus Audio)
+- `libxcb-cursor0` → Qt 6 braucht es fuer das X11-Plugin `xcb`; fehlt es, bricht der Start mit
+  „Could not load the Qt platform plugin "xcb"“ ab
 - `fonts-noto` + `fonts-dejavu` → saubere UI-Fonts (s. Font-Hinweis unten)
 
 - **`build-essential` + `libasound2-dev` sind fuer MIDI Pflicht.** `python-rtmidi` ist

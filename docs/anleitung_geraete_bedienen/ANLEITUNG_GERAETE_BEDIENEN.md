@@ -6,6 +6,9 @@
 > stammen aus der echten App mit echten Geräteprofilen (PAR, Moving Heads, Mehrkopf-Mover,
 > Laser, Nebelmaschine, Pixel-Balken).
 
+> Neu im Programmer? Die Grundbedienung (Geräte wählen, Reiter, Werkzeuge, Löschen)
+> steht in den [Programmer-Grundlagen](../anleitung_programmer_grundlagen/ANLEITUNG.md).
+
 **Grundsatz:** Du siehst nur, was das Gerät kann. Reiter ohne passende Kanäle
 (z. B. **Color** bei einer Nebelmaschine, **Position** bei einem PAR) werden ausgeblendet.
 Wählst du mehrere verschiedene Geräte, siehst du die **Summe** ihrer Fähigkeiten.

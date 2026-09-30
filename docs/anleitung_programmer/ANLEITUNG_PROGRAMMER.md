@@ -1,5 +1,10 @@
 # Anleitung: Programmer (manuell mischen — RGBW · Gruppen · Pan)
 
+> **Suchst du die App-Sektion „Programmer“?** Diese Seite beschreibt eine vorgebaute
+> VC-Bank der Event-Demo-Show. Wie man in der Sektion **Programmer** Geräte wählt und
+> Helligkeit, Farbe und Position einstellt, steht in den
+> [Programmer-Grundlagen](../anleitung_programmer_grundlagen/ANLEITUNG.md).
+
 > **Lernziel:** Farben und Werte **von Hand** setzen — per Farb-Kacheln oder RGBW-Fadern mischen.
 > Das ist die „manuelle Mischpult"-Ebene neben den Effekten. (In dieser Bank wirken Kacheln und
 > Fader auf **alle** Fixtures — siehe „Reichweite beachten" unten.)

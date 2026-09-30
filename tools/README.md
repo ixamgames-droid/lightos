@@ -13,6 +13,7 @@
 | `_gen_env.py` | Spawn-sichere Bootstrap-Schicht fuer alle ``tools/build_*.py``-Generatoren (DEMO-02). |
 | `_run_showcase_app.py` | Wegwerf-Launcher fuer die Doku-Captures: startet LightOS UND laedt direkt die |
 | `_showpath.py` | Show-Datei-Aufloesung fuer tools/-Skripte: shows/ mit Fallback shows/_archiv/. |
+| `anleitungsbilder.py` | DOC-16: Anleitungsbilder reproduzierbar aus dem Code erzeugen. |
 | `app.ps1` | LightOS App-Treiber — App starten/stoppen/warten/screenshotten aus EINEM Skript. |
 | `app.sh` | tools/app.sh — Linux-Pendant zu tools/app.ps1 (App-Steuerung fuer UI-Verifikation). |
 | `audit_bilder_stand.py` | Welche Punkte eines Bilder-Audits sind noch offen? |

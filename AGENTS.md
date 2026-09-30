@@ -39,18 +39,19 @@ Code- und Git-Root.
    cd <repo-root> && ./tools/verify_loop.sh
    ```
    ```powershell
-   # Windows-PowerShell
-   $env:QT_QPA_PLATFORM='offscreen'; .\venv\Scripts\python.exe -m pytest tests\ -q
+   # Windows-PowerShell (Segment-Runner, setzt offscreen selbst)
+   .\tools\verify_segmented.ps1
    ```
-   **Auf Linux nicht direkt `pytest tests/` aufrufen:** die Suite läuft dort
-   segmentiert (ein Prozess je Testdatei), weil ein einzelner Sammelprozess
+   **Nicht direkt `pytest tests/` aufrufen — auf keiner Plattform:** die Suite
+   läuft segmentiert (ein Prozess je Testdatei), weil ein einzelner Sammelprozess
    reproduzierbar an akkumuliertem nativem Qt-Zustand stirbt. `verify_loop.sh`
-   delegiert dafür automatisch an `tools/verify_segmented.sh` und braucht rund
-   6,5 Minuten (`LIGHTOS_VERIFY_JOBS=3`). Einzelne Datei:
-   `./tools/verify_loop.sh tests/test_x.py`.
+   delegiert dafür automatisch an `tools/verify_segmented.sh`; Parallelität über
+   `LIGHTOS_VERIFY_JOBS`. Einzelne Datei:
+   `./tools/verify_loop.sh tests/test_x.py` bzw.
+   `.\tools\verify_segmented.ps1 tests\test_x.py`. Details: `WORKFLOW.md`.
 
-   501 Testdateien mit 4.430 Testfunktionen. **Neue/geänderte Logik braucht einen
-   Test.** Wenn etwas rot ist: erst fixen, nicht abgeben.
+   **Neue/geänderte Logik braucht einen Test.** Wenn etwas rot ist: erst fixen,
+   nicht abgeben.
 
 3. **CHANGELOG.md pflegen** — Einträge gehören **unter** den Kopftext in einen
    `####`-Abschnitt (Konvention: `#### Neu / …` z. B. `Neu / Tests`,
@@ -167,7 +168,7 @@ Store nachgezogen werden kann:
 ## Schnell-Checkliste vor dem Abgeben
 
 - [ ] Eigener `feature/`- oder `fix/`-Branch, **committet** (nichts lose auf `main`)
-- [ ] `QT_QPA_PLATFORM=offscreen … pytest tests/ -q` ist grün
+- [ ] Test-Gate grün (`./tools/verify_loop.sh` bzw. `.\tools\verify_segmented.ps1`)
 - [ ] Test für neue/geänderte Logik vorhanden
 - [ ] CHANGELOG.md ergänzt (richtiger Abschnitt)
 - [ ] Default-/Verhaltensänderung in `docs/` dokumentiert

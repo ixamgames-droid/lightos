@@ -1,0 +1,98 @@
+{
+  "anleitung": "ausgabe_einrichten",
+  "werkzeug": "tools/anleitungsbilder.py",
+  "stand": "c0ff194d",
+  "schrift": "Noto Sans (statt Roboto Condensed)",
+  "qt": "6.11.1",
+  "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py ausgabe_einrichten'.",
+  "bilder": [
+    {
+      "datei": "01_menue_ausgabe.png",
+      "szene": "01_menue_ausgabe",
+      "titel": "Menü Ausgabe → Konfigurieren…",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "00c83d436751d4b62da2a4540fb335f9"
+    },
+    {
+      "datei": "02_enttec.png",
+      "szene": "02_enttec",
+      "titel": "Reiter Enttec Pro USB (Beispiel-Port)",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "65c98c1c6957ff7ee32b23b5e4a6bcb1"
+    },
+    {
+      "datei": "03_artnet.png",
+      "szene": "03_artnet",
+      "titel": "Reiter Art-Net (Beispiel-Node)",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "52a731414d8ffcd6db8f363bea660f6a"
+    },
+    {
+      "datei": "04_sacn.png",
+      "szene": "04_sacn",
+      "titel": "Reiter sACN (E1.31)",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "7ec5f7bad82668340167861b92aac431"
+    },
+    {
+      "datei": "05_universen.png",
+      "szene": "05_universen",
+      "titel": "Reiter Universen mit zwei Beispiel-Universen",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "dc293a561ec47c67cbec74424f5047aa"
+    },
+    {
+      "datei": "06_output_monitor.png",
+      "szene": "06_output_monitor",
+      "titel": "E/A → Output: Kanalwerte von Universe 1",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "12b6ae424ae176e694ab30b82b2f0f2c"
+    },
+    {
+      "datei": "07_dmx_monitor.png",
+      "szene": "07_dmx_monitor",
+      "titel": "E/A → DMX Monitor",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "99caf5d96cc87f36ef003cbce5f8e9a9"
+    },
+    {
+      "datei": "08_warnungen.png",
+      "szene": "08_warnungen",
+      "titel": "Warnungen: Universe ohne Ausgang",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "abb7cd0b9b4ddc67132e58d0409ca47c"
+    }
+  ]
+}

@@ -1,0 +1,109 @@
+{
+  "anleitung": "projektseite",
+  "werkzeug": "tools/anleitungsbilder.py",
+  "stand": "c0ff194d",
+  "schrift": "Noto Sans (statt Roboto Condensed)",
+  "qt": "6.11.1",
+  "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py projektseite'.",
+  "bilder": [
+    {
+      "datei": "01_ueberblick.png",
+      "szene": "01_ueberblick",
+      "titel": "Hauptfenster: Programmer mit acht PARs und Farbverlauf",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "4baee4a4227b201cd576e39f2ad212d8"
+    },
+    {
+      "datei": "02_patch.png",
+      "szene": "02_patch",
+      "titel": "Patch mit der Doku-Demo",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [
+        {
+          "nummer": 1,
+          "beschriftung": "Gerät hinzufügen"
+        },
+        {
+          "nummer": 2,
+          "beschriftung": "Adressen automatisch vergeben"
+        }
+      ],
+      "md5": "9d684572e0b0db99c017a8d46dacf497"
+    },
+    {
+      "datei": "03_programmer.png",
+      "szene": "03_programmer",
+      "titel": "Programmer: Moving Heads gewählt, Werkzeuge",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [
+        {
+          "nummer": 1,
+          "beschriftung": "Farb-Werkzeug"
+        },
+        {
+          "nummer": 2,
+          "beschriftung": "Positions-Werkzeug"
+        },
+        {
+          "nummer": 3,
+          "beschriftung": "Bibliothek"
+        }
+      ],
+      "md5": "886990aaf94e612bd320dc3afc39fdaf"
+    },
+    {
+      "datei": "04_vc.png",
+      "szene": "04_vc",
+      "titel": "Virtual Console im Bedienmodus",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "25f9142a16f3f23f92910d79976106ea"
+    },
+    {
+      "datei": "05_playback.png",
+      "szene": "05_playback",
+      "titel": "Cue-Liste mit drei Cues",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "2b2ccc9b3460719f051cb5a51661f1d6"
+    },
+    {
+      "datei": "06_bpm.png",
+      "szene": "06_bpm",
+      "titel": "BPM-Erkennung, Tempo manuell",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "5afc4ff54d6c6ccc374f7290cfd421a2"
+    },
+    {
+      "datei": "07_buehne.png",
+      "szene": "07_buehne",
+      "titel": "2D-Bühnenansicht",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "dad59a6f860286cffd4b7ee5a2529551"
+    }
+  ]
+}

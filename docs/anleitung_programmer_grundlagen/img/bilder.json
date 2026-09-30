@@ -1,0 +1,278 @@
+{
+  "anleitung": "programmer_grundlagen",
+  "werkzeug": "tools/anleitungsbilder.py",
+  "stand": "c0ff194d",
+  "schrift": "Noto Sans (statt Roboto Condensed)",
+  "qt": "6.11.1",
+  "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py programmer_grundlagen'.",
+  "bilder": [
+    {
+      "datei": "01_ueberblick.png",
+      "szene": "01_ueberblick",
+      "titel": "Programmer ohne Auswahl: die Bereiche",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [
+        {
+          "nummer": 1,
+          "beschriftung": "Geräte"
+        },
+        {
+          "nummer": 2,
+          "beschriftung": "Alle"
+        },
+        {
+          "nummer": 3,
+          "beschriftung": "Keine"
+        },
+        {
+          "nummer": 4,
+          "beschriftung": "Gruppen"
+        },
+        {
+          "nummer": 5,
+          "beschriftung": "Reiter"
+        },
+        {
+          "nummer": 6,
+          "beschriftung": "Bibliothek"
+        }
+      ],
+      "md5": "5c47d01bc8ea330265795d31addf4888"
+    },
+    {
+      "datei": "02_gruppe.png",
+      "szene": "02_gruppe",
+      "titel": "Klick auf eine Gruppe wählt ihre Geräte und öffnet Matrix",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [
+        {
+          "nummer": 1,
+          "beschriftung": "Gruppe"
+        },
+        {
+          "nummer": 2,
+          "beschriftung": "Auswahl"
+        },
+        {
+          "nummer": 3,
+          "beschriftung": "Matrix"
+        }
+      ],
+      "md5": "3996ee32f439b4d8fe9daa9f04ea0f23"
+    },
+    {
+      "datei": "03_intensity.png",
+      "szene": "03_intensity",
+      "titel": "Reiter Intensity mit acht PARs",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [
+        {
+          "nummer": 1,
+          "beschriftung": "Auswahl"
+        },
+        {
+          "nummer": 2,
+          "beschriftung": "Gruppen-Modus"
+        },
+        {
+          "nummer": 3,
+          "beschriftung": "Intensity"
+        },
+        {
+          "nummer": 4,
+          "beschriftung": "Dimmer"
+        },
+        {
+          "nummer": 5,
+          "beschriftung": "Lampen-Vorschau"
+        }
+      ],
+      "md5": "db1183a9814b1cb3611d744e6e8a465a"
+    },
+    {
+      "datei": "04_color.png",
+      "szene": "04_color",
+      "titel": "Reiter Color mit acht PARs",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [
+        {
+          "nummer": 1,
+          "beschriftung": "Farbwähler als Fenster"
+        },
+        {
+          "nummer": 2,
+          "beschriftung": "Schnellwahl"
+        },
+        {
+          "nummer": 3,
+          "beschriftung": "Rot"
+        }
+      ],
+      "md5": "56812e7bcaaeaed6149890c41df9d8a4"
+    },
+    {
+      "datei": "05_position.png",
+      "szene": "05_position",
+      "titel": "Reiter Position mit zwei Spots",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [
+        {
+          "nummer": 1,
+          "beschriftung": "Position"
+        }
+      ],
+      "md5": "dd3c0766c1843dce55534ef46b35409c"
+    },
+    {
+      "datei": "06_paletten.png",
+      "szene": "06_paletten",
+      "titel": "Reiter Paletten",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [
+        {
+          "nummer": 1,
+          "beschriftung": "Paletten"
+        },
+        {
+          "nummer": 2,
+          "beschriftung": "Neu aufzeichnen"
+        },
+        {
+          "nummer": 3,
+          "beschriftung": "Palette"
+        }
+      ],
+      "md5": "5dfbbca4ba25b2c411183dfb28dd2895"
+    },
+    {
+      "datei": "07_hervorheben.png",
+      "szene": "07_hervorheben",
+      "titel": "Hervorheben und Abdunkeln",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [
+        {
+          "nummer": 1,
+          "beschriftung": "Hervorheben"
+        },
+        {
+          "nummer": 2,
+          "beschriftung": "Abdunkeln"
+        },
+        {
+          "nummer": 3,
+          "beschriftung": "Lampen-Vorschau"
+        }
+      ],
+      "md5": "2d199f742426f7e2547230adc79c6565"
+    },
+    {
+      "datei": "08_farbwerkzeug.png",
+      "szene": "08_farbwerkzeug",
+      "titel": "Farb-Werkzeug (Color Tool)",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [
+        {
+          "nummer": 1,
+          "beschriftung": "Anwenden"
+        },
+        {
+          "nummer": 2,
+          "beschriftung": "Live"
+        },
+        {
+          "nummer": 3,
+          "beschriftung": "Als Palette"
+        }
+      ],
+      "md5": "1a63a40dc18f7ba0adf7f03669a9620f"
+    },
+    {
+      "datei": "09_positionswerkzeug.png",
+      "szene": "09_positionswerkzeug",
+      "titel": "Positions-Werkzeug (Position Tool)",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [
+        {
+          "nummer": 1,
+          "beschriftung": "Anwenden"
+        },
+        {
+          "nummer": 2,
+          "beschriftung": "Live"
+        },
+        {
+          "nummer": 3,
+          "beschriftung": "Mitte"
+        }
+      ],
+      "md5": "935cb5d51f9790c36dd8801a26c84f73"
+    },
+    {
+      "datei": "10_faecher.png",
+      "szene": "10_faecher",
+      "titel": "Fächer-Werkzeug (Fan Tool)",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [
+        {
+          "nummer": 1,
+          "beschriftung": "Anwenden"
+        }
+      ],
+      "md5": "185c8712b6bbe7e94eca9a7ce54a4767"
+    },
+    {
+      "datei": "11_loeschen.png",
+      "szene": "11_loeschen",
+      "titel": "Auswahl löschen, Rückgängig",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [
+        {
+          "nummer": 1,
+          "beschriftung": "Löschen"
+        },
+        {
+          "nummer": 2,
+          "beschriftung": "Rückgängig"
+        },
+        {
+          "nummer": 3,
+          "beschriftung": "Wiederholen"
+        }
+      ],
+      "md5": "560b91668a0d548a28fb8d0456acee35"
+    }
+  ]
+}
