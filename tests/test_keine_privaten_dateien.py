@@ -200,3 +200,39 @@ class KeineFremdenBenutzerpfadeTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class KeineGeraeteSeriennummerTest(unittest.TestCase):
+    """DOC-16a: keine ENTTEC-Seriennummer im oeffentlichen Repo.
+
+    Die Nummer des Rig-Interfaces stand in drei Doku-/Protokoll-Zeilen
+    (RIG_CHECKLISTE, LINUX_STABILITY_FULL_CHECK, BACKLOG HW-5c). Sie hilft
+    niemandem, der das Repo liest, identifiziert aber ein konkretes Geraet.
+    Anders als bei den Benutzerpfaden gilt das auch fuer BACKLOG/CHANGELOG.
+    """
+
+    # ENTTEC-Seriennummern: "EN" + sechs Ziffern, am Wortrand.
+    MUSTER = r"\bEN\d{6}\b"
+
+    def test_keine_seriennummer(self):
+        import re
+        rx = re.compile(self.MUSTER)
+        treffer = []
+        for p in _getrackte_dateien():
+            if not p.endswith((".py", ".sh", ".md", ".json", ".txt")):
+                continue
+            try:
+                with open(os.path.join(_REPO, p), encoding="utf-8") as f:
+                    for nr, zeile in enumerate(f, 1):
+                        if rx.search(zeile):
+                            treffer.append(f"{p}:{nr}")
+            except (OSError, UnicodeDecodeError):
+                continue
+        self.assertEqual(treffer, [], "Seriennummer im Repo — bitte als EN•••••• schreiben.")
+
+    def test_muster_trifft(self):
+        import re
+        rx = re.compile(self.MUSTER)
+        probe = "EN" + "123456"   # zusammengesetzt, sonst faende der Test sich selbst
+        self.assertTrue(rx.search(f"Seriennr. {probe}"))
+        self.assertFalse(rx.search("EN••••••"))

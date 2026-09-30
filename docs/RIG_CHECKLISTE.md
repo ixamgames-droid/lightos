@@ -33,7 +33,7 @@ etwas anderes als du denkst.
   den Enttec also gar nicht — sie gehen über den Art-Net-Node.
 * **Auf dem Enttec-Universe (3) ist nichts gepatcht.** Weder in dieser Show noch
   in einer der 15 gespeicherten oder 47 archivierten. Der Enttec ist angeschlossen
-  (`/dev/ttyUSB0`, ENTTEC DMX USB PRO, Seriennr. EN492875) und der Port ist seit
+  (`/dev/ttyUSB0`, ENTTEC DMX USB PRO, Seriennr. EN••••••) und der Port ist seit
   dem 2026-08-02 korrekt eingetragen — er trägt nur derzeit keine Geräte.
 
 ---
