@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| _(frei)_ |  |  |  |  |
+| FM-51 | A | fix/fm51-weiss-auswahl-ueberall | 2026-09-30T15:47Z | src/ui/widgets/position_tool.py,src/ui/views/programmer_view.py,src/core/app_state.py |
 
 ## Blocker & Fallen
 
@@ -130,7 +130,6 @@
 
 ## Verlauf
 
-- 2026-09-29T00:01Z A done FM-49
 - 2026-09-29T00:04Z A claim VIZ-64
 - 2026-09-29T00:16Z A done VIZ-63
 - 2026-09-29T00:22Z A claim UI-58
@@ -160,3 +159,4 @@
 - 2026-09-29T19:55Z A uebergeben FM-41
 - 2026-09-29T19:56Z A claim FM-41
 - 2026-09-29T20:46Z A done FM-41
+- 2026-09-30T15:47Z A claim FM-51
