@@ -227,6 +227,13 @@ class PlaybackView(QWidget):
         self._lbl_next.setStyleSheet("color: #888;")
         bc.addWidget(self._lbl_current)
         bc.addWidget(self._lbl_next)
+        # UI-68: Hinweis zur Executor-Bindung ("liegt jetzt auf Ex N" bzw.
+        # "Kein freier Executor …") — sonst leer und unsichtbar.
+        self._lbl_hinweis = QLabel("")
+        self._lbl_hinweis.setWordWrap(True)
+        self._lbl_hinweis.setStyleSheet("color: #ffb347;")
+        self._lbl_hinweis.hide()
+        bc.addWidget(self._lbl_hinweis)
         rv.addWidget(box_current)
 
         # Crossfade-Fader (manueller Crossfade auf die aktive Cueliste)
@@ -292,6 +299,11 @@ class PlaybackView(QWidget):
         # zentraler Sync) NICHT ungewollt auf die erste Cueliste zurueckspringt.
         prev = self._current_stack
         stacks = self._state.cue_stacks
+        # UI-68: ein Bindungshinweis ("liegt jetzt auf Ex N", "Kein freier
+        # Executor …") gilt nur fuer die Lage beim GO — nach Show-Laden,
+        # Loeschen, Sync-Refresh oder Page-Wechsel (alle laufen hierueber)
+        # waere er veraltet.
+        self._zeige_hinweis("")
         if prev not in stacks:
             # UI-62: neu gebaute Ansicht uebernimmt die zentral gemerkte Auswahl.
             prev = getattr(self._state, "gewaehlte_cueliste", None)
@@ -320,6 +332,7 @@ class PlaybackView(QWidget):
         if 0 <= idx < len(self._state.cue_stacks):
             self._current_stack = self._state.cue_stacks[idx]
             self._merke_auswahl()
+            self._zeige_hinweis("")
             self._refresh_table()
             self._sync_mode_combo()
             self._reset_xfade()
@@ -407,12 +420,67 @@ class PlaybackView(QWidget):
     # ── Transport ─────────────────────────────────────────────────────────────
 
     def _go(self):
-        if self._current_stack:
+        if self._current_stack and self._sichere_executor():
             self._current_stack.go()
 
     def _back(self):
-        if self._current_stack:
+        if self._current_stack and self._sichere_executor():
             self._current_stack.back()
+
+    def _sichere_executor(self) -> bool:
+        """UI-68: Licht macht nur eine Liste auf einem Executor (die
+        PlaybackEngine tickt nur Executor-Stacks). Liegt die gewaehlte Liste auf
+        keinem, wird sie auf den ersten FREIEN Executor der aktuellen Page gelegt
+        (nie einen belegten ueberschreiben) und das gemeldet. Ist keiner frei:
+        False -> kein GO, nur der Hinweis. Stop bindet bewusst nicht."""
+        from src.core.cueliste_ziel import (binde_an_freien_executor,
+                                            executor_mit_fader_zu,
+                                            liegt_auf_executor, listen_name)
+        stack = self._current_stack
+        if stack is None:
+            return False
+        if liegt_auf_executor(self._state, stack):
+            return True
+        # Nur die sichtbaren Slots der Executor-Leiste (Ex 1–10) — eine Liste
+        # auf Ex 11+ waere fuer den Bediener nicht zu sehen.
+        sichtbar = len(getattr(self, "_executors_widgets", []) or []) or None
+        slot = binde_an_freien_executor(self._state, stack, max_slot=sichtbar)
+        if slot is None:
+            # Nur Slots mit Fader auf 0 frei: nicht binden (GO ohne Licht, und
+            # beim Hochziehen spraenge die Liste ungewollt live) — Bediener
+            # entscheidet selbst.
+            zu = executor_mit_fader_zu(self._state, max_slot=sichtbar)
+            if zu is not None:
+                self._zeige_hinweis(
+                    f"Freier Executor Ex {getattr(zu, 'slot', '?')} hat den "
+                    "Fader auf 0 % — Liste zuweisen und Fader hochziehen",
+                    status=True)
+                return False
+            self._zeige_hinweis(
+                "Kein freier Executor — Liste zuerst einem Executor zuweisen",
+                status=True)
+            return False
+        self._refresh_executors()       # Leiste zeigt die neue Belegung sofort
+        self._zeige_hinweis(f"„{listen_name(stack)}“ liegt jetzt auf Ex {slot}",
+                            status=True)
+        return True
+
+    def _zeige_hinweis(self, text: str, status: bool = False):
+        """UI-68: Hinweis in der Playback-Ansicht und (status=True) zusaetzlich
+        in der Statuszeile des Hauptfensters."""
+        lbl = getattr(self, "_lbl_hinweis", None)
+        if lbl is not None:
+            lbl.setText(text)
+            lbl.setVisible(bool(text))
+        if not (status and text):
+            return
+        try:
+            fenster = self.window()
+            leiste = fenster.statusBar() if hasattr(fenster, "statusBar") else None
+            if leiste is not None:
+                leiste.showMessage(text, 5000)
+        except RuntimeError:
+            pass        # Fenster schon abgebaut
 
     def _stop(self):
         if self._current_stack:
@@ -510,6 +578,8 @@ class PlaybackView(QWidget):
             return
         rows = sorted({idx.row() for idx in self._table.selectedIndexes()})
         if not rows or rows[0] >= len(self._current_stack.cues):
+            return
+        if not self._sichere_executor():          # UI-68: wie GO
             return
         self._current_stack.go_to(self._current_stack.cues[rows[0]].number)
 
