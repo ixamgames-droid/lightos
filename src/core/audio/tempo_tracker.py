@@ -7,8 +7,9 @@ einem Ringpuffer (6 s). Alle ``EST_EVERY_FRAMES`` Frames (~93 ms):
    **unbiased** (ac[l] / (M - l)), 4-fach-Kamm mit Max-Filter an den Oberwellen (+-1 Lag,
    ab der 3. +-2; Ellis 2007 / aubio), Sub-Oktav-Strafe (Spitze beim halben Lag fast so hoch
    wie die eigene -> Kandidat ist die halbe Oktave eines Pulszugs), Log-Normal-Prior
-   (120 BPM, sigma 0,9 Oktaven; mit Tempo-Hinweis sigma 0,15), Parabel-Verfeinerung auf
-   der rohen ACF. Kandidatenraum min/2 .. 2*max, Ergebnis in [min, max] gefaltet (knapp
+   (120 BPM, sigma 0,9 Oktaven; mit Tempo-Hinweis sigma 0,15), Feinlage auf der rohen ACF
+   (Gipfel neben dem Kamm-Lag, Gauss-Interpolation, verfeinert an der hoechsten Oberwelle,
+   die ins Fenster passt — BPM-20, ``_feinlage``). Kandidatenraum min/2 .. 2*max, Ergebnis in [min, max] gefaltet (knapp
    ausserhalb: geklemmt). **Oktav-Entscheider Bass (BPM-12):** waehlt der Kamm die langsame
    Oktave und ist x2 plausibel, pruefen zwei weitere Huellkurven (Bass-Flux 30..200 Hz,
    Hochband-Flux ab ~800 Hz, eigene Ringe), ob zwischen den Beats *Kicks* liegen: Bass-Anschlag
@@ -75,6 +76,8 @@ class DetectorSnapshot:
     phase_ok: bool = True   # False: Beat-Raster widerspricht den juengsten Onsets -> Beats stumm
     search_s: float = 0.0   # BPM-22: Signal-Sekunden der LAUFENDEN Suche (0 ab Lock/Stille-Loslassen);
                             # ``signal_s`` dagegen zaehlt seit Quellenstart ueber Lock und Stille hinweg
+    unsicher_s: float = 0.0  # BPM-23: im Lock Sekunden IN FOLGE unter UNLOCK_CONF (Entrast-Countdown,
+                             # nach UNLOCK_S -> searching); die Anzeige zeigt dann nicht mehr EINGERASTET
 
 
 class TempoTracker:
@@ -191,6 +194,7 @@ class TempoTracker:
         self._cand_since = 0.0
         self._stable: list[float] = []
         self._unlock_s = 0.0
+        self._leer_s = 0.0      # BPM-23: im Lock Sekunden in Folge mit LEERER Schaetzung (nur Anzeige)
         self.silent_s = 0.0
         self.signal_s = 0.0
         self.search_s = 0.0     # BPM-22: Suche mit Signal seit Suchbeginn (Snapshot-Feld)
@@ -310,13 +314,7 @@ class TempoTracker:
         if sc[k] <= 0:
             return 0.0, 0.0, 0.0, 0.0, 0
         a = int(L[k])
-        sh = 0.0
-        if 0 < a < M - 1:
-            y0, y1, y2 = ac[a - 1], ac[a], ac[a + 1]
-            den = y0 - 2 * y1 + y2
-            if den != 0:
-                sh = float(np.clip(0.5 * (y0 - y2) / den, -0.5, 0.5))
-        bpm = 60.0 * self.fps / (a + sh)
+        bpm = 60.0 * self.fps / self._feinlage(ac, a, M)
         # Konfidenz: Periodizitaet x Onset-Kontrast
         r = float(np.clip(acm[a] / r0, 0.0, 1.0))
         conf_r = float(np.clip((r - self.R_LO) / (self.R_HI - self.R_LO), 0.0, 1.0))
@@ -342,6 +340,70 @@ class TempoTracker:
             return bpm * 2.0, conf, bpm, min(1.0, 1.0 / max(s_dbl, 1e-9)), a
         return bpm, conf, alt_bpm, alt_score, a
 
+    # ------------------------------------------------------------ Feinlage (BPM-20)
+    # Bis BPM-20 lag die Parabel um den KAMM-Lag ``a`` und war auf +-0,5 gekappt. Der Kamm waehlt
+    # aber oft den Ganzzahl-NACHBARN des wahren Lags (128 BPM: wahr 40,375 Frames, gewaehlt 41) —
+    # dann kann die Parabel den Gipfel gar nicht erreichen und klebt bei x,500: 128 -> 127,60,
+    # 150 -> 149,80, 160 -> 159,01 (genau das zeigte die Windows-Abnahme am echten Testbeat).
+    # Jetzt: (1) Gipfel der rohen ACF neben ``a`` suchen, (2) Gauss- statt Parabel-Interpolation
+    # (der ACF-Gipfel der geglaetteten Huellkurve ist naeherungsweise gaussfoermig; Parabel-Rest
+    # bei kurzen Lags bis 0,28 BPM), (3) Feinlage an der hoechsten Oberwelle 4/3/2, die ins Fenster
+    # passt — derselbe Interpolationsfehler, geteilt durch h. Messbank 60..195 BPM: max 0,99 -> 0,043.
+
+    @staticmethod
+    def _gipfel(ac: np.ndarray, q: int, M: int) -> int:
+        """Lokales Maximum der rohen ACF bei ``q`` — hoechstens ein Schritt zur Seite."""
+        if 0 < q < M - 1:
+            if ac[q - 1] > ac[q] and ac[q - 1] >= ac[q + 1]:
+                return q - 1
+            if ac[q + 1] > ac[q]:
+                return q + 1
+        return q
+
+    @staticmethod
+    def _interp(ac: np.ndarray, q: int, M: int) -> float:
+        """Sub-Lag-Lage des Gipfels bei ``q``: Gauss-Interpolation (Log-Parabel), Rueckfall auf
+        die Parabel, wenn ein Nachbar nicht positiv ist oder die Kruemmung nicht passt."""
+        if not 0 < q < M - 1:
+            return float(q)
+        y0, y1, y2 = float(ac[q - 1]), float(ac[q]), float(ac[q + 1])
+        if min(y0, y1, y2) > 0.0:
+            l0, l1, l2 = np.log(y0), np.log(y1), np.log(y2)
+            den = l0 - 2.0 * l1 + l2
+            if den < 0.0:
+                return q + float(np.clip(0.5 * (l0 - l2) / den, -0.5, 0.5))
+        den = y0 - 2.0 * y1 + y2
+        if den == 0.0:
+            return float(q)
+        return q + float(np.clip(0.5 * (y0 - y2) / den, -0.5, 0.5))
+
+    OBERWELLE_UEBERLAPP = 2.0   # Oberwelle nur, wenn ihr ACF-Wert mind. so viele Perioden Paare hat
+    OBERWELLE_HOEHE = 0.3       # ... und ihr Gipfel mind. so hoch ist wie dieser Teil des Grundgipfels
+    OBERWELLE_TOL = 0.2         # ... und sie hoechstens so viele Frames vom Grundwert abweicht
+
+    def _feinlage(self, ac: np.ndarray, a: int, M: int) -> float:
+        """Periode in Frames (Sub-Lag-genau) zum Kamm-Lag ``a``; siehe Block oben.
+
+        Review BPM-20: eine Oberwelle zaehlt nur mit genug Ueberlappung (die unbiased-ACF bei
+        Lag q mittelt ueber M−q Paare — unter zwei Perioden ist ihr Gipfel Zufall, beim Einrasten
+        mit ~3,5 s Fenster lag die 4. Oberwelle von 75 BPM fast am Rand), mit echtem Gipfel und
+        enger Toleranz (±0,5 Frames liess jeden Nachbarn durch). Nicht endliche ACF -> Kamm-Lag."""
+        g0 = self._gipfel(ac, a, M)
+        p0 = self._interp(ac, g0, M)
+        if not np.isfinite(p0):
+            return float(a)
+        for h in (4, 3, 2):
+            q = int(round(h * p0))
+            if q + 2 >= M or M - q < self.OBERWELLE_UEBERLAPP * p0:
+                continue
+            gq = self._gipfel(ac, q, M)
+            if not ac[gq] >= self.OBERWELLE_HOEHE * ac[g0]:
+                continue
+            p = self._interp(ac, gq, M) / h
+            if np.isfinite(p) and abs(p - p0) < self.OBERWELLE_TOL:
+                return p
+        return p0
+
     def _bass_says_double(self, M: int, a: int, bpm: float, s_dbl: float) -> bool:
         """Oktav-Entscheider (BPM-12): Flux waehlte Lag ``a``, die x2-Alternative hat Score
         ``s_dbl``. True = zwischen den Flux-Beats liegen *Kicks* wie auf ihnen (Backbeat).
@@ -365,7 +427,9 @@ class TempoTracker:
         if not self.BASS_OCT or self.tempo_hint:    # Hinweis entscheidet selbst: Entscheidung verwerfen
             self.bass_dbl, self._bass_run = False, 0
             return False
-        if a < 4 or self._fold(bpm) * 2.0 > self.max_bpm:
+        # Review BPM-20: Toleranz wie ``_fold`` (klemmt bis max*(1+DEADBAND) auf max) — seit die
+        # Feinlage exakt ist, war ein echter Backbeat bei genau max_bpm sonst ein Muenzwurf 100/200.
+        if a < 4 or self._fold(bpm) * 2.0 > self.max_bpm * (1.0 + self.DEADBAND):
             return False                    # x2 nicht moeglich (Flux steht schon oben): Entscheidung bleibt
         raw = self._bass_raw(M, a, s_dbl)
         if raw != self.bass_dbl:
@@ -487,6 +551,7 @@ class TempoTracker:
             self.alt_bpm, self.alt_score = 0.0, 0.0
             self.next_beat_sample = 0
             self.search_s = 0.0
+            self._unlock_s = self._leer_s = 0.0
             self._stable.clear()
             self._cand_bpm, self._cand_since = 0.0, 0.0
             return
@@ -516,7 +581,15 @@ class TempoTracker:
         min_frames = self.MIN_WINDOW_S * self.fps
         self.conf = conf if self.frames_filled >= min_frames else conf * (self.frames_filled / min_frames)
         if raw <= 0:
+            # BPM-23: eine LEERE Schaetzung (flache Huellkurve, kein Gipfel — z. B. eine Flaeche
+            # ohne jeden Anschlag im Breakdown) haelt den Lock wie bisher: so laeuft das Tempo
+            # bis zum Drop durch (Entrasten hiesse ~4 s ohne Beats nach dem Drop). Ehrlich
+            # ANGEZEIGT wird es trotzdem: ``_leer_s`` fliesst in ``unsicher_s``. Ob Breakdowns
+            # halten oder loslassen sollen, klaert BPM-24 mit echten Aufnahmen.
+            if self.state == "locked":
+                self._leer_s += est_dt
             return
+        self._leer_s = 0.0
         # --- Suche -> Lock
         if self.state != "locked":
             self._stable.append(self.bpm_raw)
@@ -526,22 +599,14 @@ class TempoTracker:
                     and max(self._stable) - min(self._stable) <= self.DEADBAND * self.bpm_raw):
                 self.state = "locked"
                 self.search_s = 0.0
+                self._unlock_s = 0.0    # Review BPM-23: kein Rest-Countdown aus einem frueheren Lock
                 self.bpm = self.bpm_raw
                 self._set_period(self.bpm)
                 self._fit_phase(force=True)
             return
         # --- eingerastet: Hysterese nach unten
-        if self.conf < self.UNLOCK_CONF:
-            self._unlock_s += est_dt
-            if self._unlock_s >= self.UNLOCK_S:
-                self.state = "searching"
-                self.search_s = 0.0     # BPM-22: neue Suche beginnt jetzt
-                self._unlock_s = 0.0
-                self.next_beat_sample = 0
-                self._stable.clear()
-                return
-        else:
-            self._unlock_s = 0.0
+        if self._entrast_hysterese(est_dt):
+            return
         raw = self._with_pref(self.bpm_raw)     # Nutzer-Oktave auf die Roh-Schaetzung anwenden
         dev = abs(raw - self.bpm) / self.bpm
         if dev <= self.DEADBAND:
@@ -563,6 +628,32 @@ class TempoTracker:
                 self._fit_phase(force=True)
                 return
         self._fit_phase()
+
+    @property
+    def unsicher_s(self) -> float:
+        """BPM-23 (Snapshot-Feld): im aktiven Lock die Sekunden in Folge ohne sicheren Takt —
+        Konfidenz unter ``UNLOCK_CONF`` (Entrast-Countdown) oder leere Schaetzungen. In der
+        Stille-Pause und ausserhalb des Locks 0 (dort sagt die Pause bzw. SUCHT genug)."""
+        if self.state != "locked" or self.hold_stage != 0:
+            return 0.0
+        return max(self._unlock_s, self._leer_s)
+
+    def _entrast_hysterese(self, est_dt: float) -> bool:
+        """Hysterese nach unten (nur im Zustand ``locked``): Konfidenz unter ``UNLOCK_CONF``
+        zaehlt ``_unlock_s`` hoch (fliesst in ``unsicher_s``), jede Schaetzung darueber setzt
+        ihn auf 0; nach ``UNLOCK_S`` -> ``searching``. True = gerade entrastet."""
+        if self.conf < self.UNLOCK_CONF:
+            self._unlock_s += est_dt
+            if self._unlock_s >= self.UNLOCK_S:
+                self.state = "searching"
+                self.search_s = 0.0     # BPM-22: neue Suche beginnt jetzt
+                self._unlock_s = 0.0
+                self.next_beat_sample = 0
+                self._stable.clear()
+                return True
+        else:
+            self._unlock_s = 0.0
+        return False
 
     # ------------------------------------------------------------ Phase
     def _phase_grid(self, P: float) -> np.ndarray:
@@ -739,6 +830,7 @@ class TempoTracker:
         Schaetzung es geliefert (Roh ungefaltet, Rastung gefaltet, Konfidenz 1)."""
         self.state, self.hold_stage = "locked", 0
         self.search_s = 0.0
+        self._unlock_s = self._leer_s = 0.0
         self.bpm_raw = float(bpm)
         self.bpm = self._fold(float(bpm))
         self.conf = 1.0

@@ -100,10 +100,10 @@ Analysefenster von rund sechs Sekunden Musik, bevor sie Beats meldet. Solange st
 
 | Zustandswort | Bedeutung |
 |---|---|
-| **KEIN SIGNAL** (grau) | Es kommt nichts Brauchbares an — oder die Erkennung ist gerade gestartet und die Musik läuft noch nicht. |
-| **SUCHT** (orange) | Signal ist da, das Analysefenster füllt sich bzw. es wird noch kein stabiler Takt gefunden. |
-| **EINGERASTET** (grün) | Tempo steht, die Beats laufen. |
-| **PAUSE · hält 128** (grün) | Die Musik ist still, das letzte Tempo wird **gehalten**, die Beats laufen weiter. |
+| **KEIN SIGNAL** (grau) | Es kommt nichts Brauchbares an — die Statuszeile sagt dazu „Kein Signal" (Pegel unter −60 dBFS), „Wartet auf Signal" oder einen Audio-Fehler. Auch direkt nach dem Start, solange die Musik noch nicht läuft. |
+| **SUCHT** (orange) | Signal ist da, das Analysefenster füllt sich bzw. es wird noch kein stabiler Takt gefunden. **Auch:** der Takt ist unsicher geworden (Konfidenz seit ½ s unter 15 %, Statuszeile „Takt unsicher") — das alte Tempo läuft dann noch weiter; kommt kein klarer Beat zurück, gibt die Erkennung es nach etwa 2 s frei. Bei ganz gleichmäßigem Klang ohne jeden Anschlag (Fläche im Breakdown) hält sie das Tempo, bis wieder Beats kommen. |
+| **EINGERASTET** (grün) | Tempo steht, die Beats laufen, der Takt ist sicher (Konfidenz ab 15 %) und es kommt genug Signal an. |
+| **PAUSE · hält 128** (grün) | Die Musik ist still, das letzte Tempo wird **gehalten**; die Beats pausieren, bis die Musik zurückkommt. |
 | **MANUELL** | Du gibst das Tempo vor (TAP, Nudge, Manuell-Knopf). |
 | **OS2L** / **OS2L · wartet auf DJ-Software** | Quelle OS2L — verbunden bzw. noch kein DJ-Programm verbunden. |
 | **LIED-ANALYSE** / **AUS** | Die entsprechende Quelle ist gewählt. |
@@ -124,9 +124,10 @@ ist zu tun.
 
 ![Pause: BPM 127,6 bleibt stehen, Taktzelle 4 leuchtet, Zustandswort PAUSE · hält 128, Konfidenz 0 %, Pegel Stille, grüne Statuszeile „Pause — Tempo 127,6 gehalten, Beats laufen weiter", darunter „→ nichts zu tun"](img/erkennung_pause.png)
 
-Das Tempo bleibt stehen (**PAUSE · hält 128**), die Taktzellen laufen weiter, die
-Statuszeile ist **grün**: „**Pause** — Tempo 127,6 gehalten, Beats laufen weiter —
-→ nichts zu tun". Setzt die Musik wieder ein, läuft die Erkennung einfach weiter. Bleibt es
+Das Tempo bleibt stehen (**PAUSE · hält 128**), Beats und Taktzellen pausieren, die
+Statuszeile ist **grün**: „**Pause** — Tempo 127,6 gehalten, die Beats pausieren, bis die
+Musik zurückkommt — → nichts zu tun". (Das Bild oben zeigt noch die frühere Formulierung.)
+Setzt die Musik wieder ein, laufen die Beats im gehaltenen Tempo weiter. Bleibt es
 länger als etwa **10–15 Sekunden** still, lässt sie los und zeigt **KEIN SIGNAL** — der
 nächste Einsatz rastet frisch ein. Soll das Tempo auch über lange Pausen stehen bleiben:
 **Manuell** oder **Tempo einfrieren** (Erweitert).
@@ -161,7 +162,11 @@ zeigt nichts an):
 ### 3.3 Konfidenz und Statuszeile
 
 **Konfidenz** (0–100 %) sagt, wie sicher die Erkennung ist. Hoch = klarer Beat. Niedrig =
-Pause, Sprache, Musik ohne deutlichen Schlag — oder eine Störung wie Brumm.
+Pause, Sprache, Musik ohne deutlichen Schlag — oder eine Störung wie Brumm. Bleibt sie eine
+halbe Sekunde unter 15 %, steht nicht mehr EINGERASTET, sondern SUCHT („Takt unsicher").
+Endet die Musik mit Geräusch statt Stille (Applaus, Ansage), bleibt die Konfidenz noch einige
+Sekunden hoch: die Erkennung schaut auf die letzten 6 Sekunden. Bei Stille wechselt die
+Anzeige schon nach etwa einer Sekunde auf PAUSE.
 
 Die **Statuszeile** ist **nie leer** und immer gleich aufgebaut:
 
@@ -341,6 +346,8 @@ Pegel **Stille**, Zustandswort **KEIN SIGNAL**. Die große Zahl zeigt noch das l
 | **Gleichspannungsversatz** | DC am Eingang | Interface/Kabel prüfen (defekter Eingang, Phantomspeisung am Line-Eingang?) |
 | **Sucht Tempo** — N s Musik gehört, Fenster braucht ~6 s | läuft gerade an | warten; schneller: TAP im Takt |
 | **Kein Takt gefunden** — Signal da, aber kein stabiles Tempo seit N s | Musik ohne klaren Beat, Sprache | TAP viermal tippen — oder Aufnahme machen |
+| **Takt unsicher** — Konfidenz N %, das Tempo … läuft noch weiter | der Beat ist weg (Ansage, Breakdown, Liedende), das alte Tempo läuft noch | nichts, wenn gleich wieder Beat kommt — sonst TAP im Takt |
+| **Pause** — Tempo … gehalten, die Beats pausieren … | Musik ist still | nichts zu tun |
 | **Eingerastet — … ähnlich plausibel** | Halb-/Doppeltempo möglich | ×½ bzw. ×2 klicken |
 | **Ausgabegerät nicht gefunden** | gemerktes Gerät fehlt, es wird die Standardausgabe mitgehört | Gerät anstecken oder ein vorhandenes wählen |
 | **Audio gestoppt** / **Audio-Fehler** | Gerät gezogen oder Treiber-Problem | Gerät anstecken, dann Link **erneut verbinden** |

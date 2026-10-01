@@ -125,18 +125,24 @@ def _html(text: str) -> str:
     return (str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
 
 
-def state_word(mode_manual: bool, kind: str | None, snap, os2l_waiting: bool = False) -> tuple[str, str]:
+def state_word(mode_manual: bool, kind: str | None, snap, os2l_waiting: bool = False,
+               zeile_key: str | None = None) -> tuple[str, str]:
     """Zustandswort + Farbe aus Manager-Modus, Quelle und Detektor-Snapshot
-    (ui_diagnose 3.1). Reine Funktion — testbar ohne Qt."""
+    (ui_diagnose 3.1). Reine Funktion — testbar ohne Qt. ``zeile_key`` (BPM-23): Key der
+    gerade ANGEZEIGTEN (entprellten) Statuszeile — zeigt sie „Kein Signal", „Wartet auf
+    Signal" oder einen Audio-Fehler (``KEIN_SIGNAL_KEYS``), heisst das Wort KEIN SIGNAL."""
     if mode_manual:
         return "MANUELL", _COL_GREEN
     if kind in AUDIO_KINDS:
-        if snap is None:
+        if snap is None or zeile_key in rules.KEIN_SIGNAL_KEYS:
             return "KEIN SIGNAL", _COL_GREY
         st = getattr(snap, "state", "no_signal")
         if st == "locked":
             if int(getattr(snap, "hold_stage", 0)) in (1, 2):
                 return f"PAUSE · hält {float(getattr(snap, 'bpm', 0.0)):.0f}", "#5fae4a"
+            # BPM-23: EINGERASTET nur mit sicherem Takt — vorher stand es auch bei Konfidenz 0 %
+            if rules.unsicher(snap):
+                return "SUCHT", _COL_AMBER
             return "EINGERASTET", _COL_GREEN
         if st == "searching":
             return "SUCHT", _COL_AMBER
@@ -349,8 +355,9 @@ class BpmManagerView(QWidget):
         self._lbl_state = QLabel("KEIN SIGNAL")
         self._lbl_state.setStyleSheet(_STATE_STYLE.format(col=_COL_GREY))
         self._lbl_state.setToolTip(
-            "Zustand der Erkennung: KEIN SIGNAL (nichts zu hören), SUCHT (Fenster füllt sich), "
-            "EINGERASTET (Beats laufen), PAUSE · hält N (Stille, Tempo wird gehalten), MANUELL.")
+            "Zustand der Erkennung: KEIN SIGNAL (nichts zu hören), SUCHT (Fenster füllt sich "
+            "oder Takt unsicher), EINGERASTET (Takt sicher, Beats laufen), PAUSE · hält N "
+            "(Stille, Tempo wird gehalten), MANUELL.")
         beat_row.addWidget(self._lbl_state)
         self._lbl_source = QLabel("")
         self._lbl_source.setStyleSheet("color:#8b949e;")
@@ -917,11 +924,7 @@ class BpmManagerView(QWidget):
                 waiting = bool(srv.is_running()) and float(srv.last_bpm() or 0) <= 0
             except Exception:
                 waiting = False
-        word, col = state_word(self._mgr.mode == BpmMode.MANUAL, kind, snap, waiting)
         self._update_source_suffix()          # Manager-Quelle wechselt auch ohne Zustands-Signal
-        if self._lbl_state.text() != word:
-            self._lbl_state.setText(word)
-            self._lbl_state.setStyleSheet(_STATE_STYLE.format(col=col))
         c = int(round(float(getattr(snap, "confidence", 0.0) or 0.0) * 100)) if snap is not None else 0
         self._conf.setValue(max(0, min(100, c)))
         now = float(self._clock())
@@ -959,7 +962,14 @@ class BpmManagerView(QWidget):
             ereignis=self._ereignis, ereignis_bis=self._ereignis_bis,
             aufnahme_s=rec.progress_s() if rec_running else None)
         line = status_line(cap_snap, snap, m, self._os2l_state() if kind == "os2l" else None, now)
-        self._show_status(self._hyst.update(line, now, cap_snap, snap))
+        gezeigt = self._hyst.update(line, now, cap_snap, snap)
+        self._show_status(gezeigt)
+        # Zustandswort NACH der Statuszeile: „KEIN SIGNAL" folgt der entprellten Zeile (BPM-23),
+        # damit Wort und Zeile sich nie widersprechen (auch nicht beim Übergang in die Pause)
+        word, col = state_word(self._mgr.mode == BpmMode.MANUAL, kind, snap, waiting, gezeigt.key)
+        if self._lbl_state.text() != word:
+            self._lbl_state.setText(word)
+            self._lbl_state.setStyleSheet(_STATE_STYLE.format(col=col))
         roh = chips(cap_snap, snap) if kind in AUDIO_KINDS else set()
         self._set_chips(self._chip_hyst.update(roh, now, cap_snap))
         self._update_record_button(rec, rec_running, kind, cap)
