@@ -118,6 +118,23 @@ Arbeits-Commits. Er ist die **menschliche** Sicht; `SESSIONS.md` ist die
 **maschinelle** — bewusst getrennt, weil `BACKLOG.md` 1500 Zeilen hat und bei
 jedem Claim ein Konfliktkandidat waere.
 
+### Blocker und Briefe an eine Sitzung (PROC-17)
+
+Ein Blocker ist ein Listenpunkt auf der Tafel; eine Frage an eine bestimmte
+Sitzung beginnt mit `AN B:` (bzw. `AN A UND B:`, `AN ALLE:`).
+
+* **Text ueber stdin, nicht als Argument:** `session_claim.py blocker
+  --session A --datei - <<'EOF'` … `EOF`. Als Shell-Argument fuehrt die Shell
+  Backticks im Text AUS. Mehrere Zeilen werden zu einem Listenpunkt verbunden;
+  `--datei <pfad>` liest aus einer Datei (UTF-8). ⚠ **Windows PowerShell 5.1**
+  kodiert eine Pipe nach `$OutputEncoding` (Vorgabe US-ASCII) — Umlaute kommen
+  still als `?` an. Dort `--datei brief.txt` (Datei als UTF-8 speichern) oder
+  vorher `$OutputEncoding = [Text.UTF8Encoding]::new()`; das Werkzeug weist auf
+  `?` zwischen Buchstaben hin.
+* **Briefe lesen:** `session_claim.py list --fuer B` zeigt ungekuerzt alles an
+  `B` (und `AN ALLE`) seit dem letzten eigenen Eintrag von `B` — `list` allein
+  zeigt nur die juengsten fuenf Blocker, aeltere Fragen gingen dort unter.
+
 ---
 
 ## 3. Was oeffentlich stehen darf
