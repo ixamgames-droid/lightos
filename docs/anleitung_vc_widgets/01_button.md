@@ -50,7 +50,7 @@ Der Dialog blendet je nach gewählter **Aktion** nur die passenden Felder ein. B
 | --- | --- | --- |
 | Beschriftung | Text auf der Kachel | Freitext |
 | Aktion | Was der Button beim Drücken tut | siehe Aktions-Tabelle unten |
-| Executor-Slot / Function-ID | Ziel-ID: Funktions-ID (Effekt/Chase/Szene) bzw. Executor-Slot-Nummer | Zahl, leer = keins |
+| Executor-Slot / Function-ID | Ziel-ID: Funktions-ID (Effekt/Chase/Szene) bzw. bei den Executor-Aktionen der **0-basierte Executor-Index der aktiven Playback-Page** (0 = Ex 1, 9 = Ex 10 – nicht die Playback-Seite) | Zahl, leer = keins |
 | Funktion/Chase (Name) | Funktion per Name wählen; füllt das ID-Feld automatisch | Dropdown aller Funktionen `Name [Typ #ID]`; `(nach ID/Slot oben)` = manuell |
 | Weitere Ziel-IDs | Zusätzliche Funktions-IDs, die mit umgeschaltet/geflasht werden (als Gruppe) | Komma-getrennte IDs (nur Funktion an/aus & nur gehalten) |
 | Steuert | Lesbare Liste der gesteuerten Funktionen nach Namen; hat beim Speichern Vorrang. Erste Zeile → Haupt-ID, Rest → weitere IDs | Zeilen per Dropdown wählen, mit `✕` entfernen, `+ Funktion/Effekt hinzufügen` |
@@ -104,7 +104,7 @@ Der Dialog blendet je nach gewählter **Aktion** nur die passenden Felder ein. B
 | Musik: Play/Pause | Wiedergabe des Musik-Players umschalten |
 | Musik: Nächstes Lied | Nächster Titel im Musik-Player |
 | Musik: Voriges Lied | Vorheriger Titel im Musik-Player |
-| Executor: Umschalten (Go) | Drückt „Go" auf dem Executor im angegebenen Slot |
+| Executor: Umschalten (Go) | Drückt „Go" auf dem Executor im angegebenen Slot der aktiven Page (Slot 0 = Ex 1) |
 | Executor: Flash | Hält „Flash" auf dem Executor-Slot, solange gedrückt |
 
 ### Effekt-Aktionen (für „Effekt-Aktion (Live)")

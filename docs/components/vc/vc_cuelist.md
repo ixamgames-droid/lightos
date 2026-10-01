@@ -20,7 +20,7 @@ Transport-Buttons. Ein 200-ms-Timer hält Liste und Markierung aktuell. Erbt von
 
 | Feld | Wirkung | Default |
 |---|---|---|
-| `stack_slot` | Executor-Slot (0..19), dessen Stack angezeigt wird | 0 |
+| `stack_slot` | 0-basierter Executor-Index der aktiven Page (`playback_engine.executors`), dessen Stack angezeigt wird; der Dialog zeigt ihn 1-basiert als „Ex 1“…„Ex 10“ | 0 |
 
 Im Edit-Modus werden Buttons und Liste deaktiviert (`set_edit_mode`), damit
 Verschieben/Skalieren nicht versehentlich Transport auslöst.

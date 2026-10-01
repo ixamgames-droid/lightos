@@ -37,9 +37,9 @@ mini**. Jeder Abschnitt ist ein konkreter Ablauf zum Mitmachen.
    `1 Dimmer · 2 Rot · 3 Grün · 4 Blau · 5 Weiß · 6 Strobe · 7 Funktion · 8 Funk.Speed`.
 2. **LightOS starten** und die Show öffnen: **Playback → Show Manager →
    `APC_Test_Komplett.lshow`**.
-3. **DMX‑Ausgabe:** **Eingabe/Ausgabe → Output → Konfiguration** → dein Interface
+3. **DMX‑Ausgabe:** **E/A → Output → Konfiguration** → dein Interface
    (Enttec/Art‑Net/sACN) auf Universe 1.
-4. **APC mini anschließen** (USB, kein Treiber nötig). **Eingabe/Ausgabe → MIDI**:
+4. **APC mini anschließen** (USB, kein Treiber nötig). **E/A → MIDI**:
    APC mini muss als Eingang aktiv sein.
 5. **Virtual Console** öffnen → oben **„APC LEDs"** einschalten → die Pads leuchten.
 6. **Seiten wechseln:** Mit den **Scene‑Tasten rechts** am APC (mk2: Notes 112–119)

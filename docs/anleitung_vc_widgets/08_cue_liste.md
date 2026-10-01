@@ -6,7 +6,7 @@
 
 ## Wozu & was es steuert
 
-Die Cue-Liste ist an **einen Executor-Slot** (Playback-Seite/Cuestack) gebunden. Sie zeigt die Cues dieses Slots als Liste und hebt den aktuell laufenden Cue hervor. Mit den drei Transport-Knöpfen am unteren Rand schaltest du im Betrieb durch die Liste — vor, zurück oder Stopp.
+Die Cue-Liste ist an **einen Executor** (einen Platz in der Executor-Leiste des Playbacks, mit seinem Cuestack) gebunden. Sie zeigt die Cues dieses Slots als Liste und hebt den aktuell laufenden Cue hervor. Mit den drei Transport-Knöpfen am unteren Rand schaltest du im Betrieb durch die Liste — vor, zurück oder Stopp.
 
 Das Element spiegelt den Zustand des Slots laufend: Es fragt den Executor etwa **5-mal pro Sekunde** (alle 200 ms) ab, übernimmt Änderungen an der Cue-Liste automatisch und markiert den gerade aktiven Cue. Du steuerst also immer denselben Cuestack, den auch das Playback selbst verwendet — das Widget ist eine Fernbedienung dafür.
 
@@ -35,12 +35,12 @@ Das Element besteht von oben nach unten aus drei Teilen:
 | Einstellung | Bedeutung | Werte/Optionen |
 |---|---|---|
 | **Beschriftung** | Text in der blauen Titelzeile über der Liste. Reine Anzeige. | Freitext. Bleibt leer das Feld, wird die bisherige Beschriftung beibehalten. |
-| **Executor-Slot** | Welchen Executor-Slot (Playback-Seite/Cuestack) das Widget fernsteuert und anzeigt. Slot **N** entspricht der gleichnamigen Playback-Seite. | Ganzzahl **0 bis 19** (Standard: 0). |
+| **Executor-Slot** | Welchen Executor das Widget fernsteuert und anzeigt. **Ex N** ist der Executor N in der Executor-Leiste der **gerade aktiven Playback-Page** – nicht die Playback-Seite N. | **Ex 1 bis Ex 10** (Standard: Ex 1). In der Show-Datei steht der 0-basierte Index (`stack_slot`: 0 = Ex 1, 9 = Ex 10). |
 
 ## Tipps & Fallen
 
 - **Slot muss belegt sein:** Zeigt die Liste nichts an, ist auf dem eingestellten Executor-Slot kein Cuestack geladen. Lege erst einen Cuestack auf den passenden Slot, oder stelle den **Executor-Slot** auf die richtige Nummer.
-- **Slot-Nummer = Playback-Seite:** Der Wert im Feld „Executor-Slot" ist dieselbe Nummerierung wie deine Playback-Seiten/Banks. Wenn ein anderer Cuestack als erwartet erscheint, stimmt die Slot-Nummer nicht.
+- **Executor, nicht Seite:** „Ex 3" heißt „dritter Executor der Executor-Leiste", nicht „Playback-Seite 3". Die Cue-Liste folgt immer der **aktuell aktiven Page**: Wechselst du die Page (z. B. per Bank-Taste am APC), steuert dasselbe Widget den Ex 3 der neuen Page. Erscheint ein anderer Cuestack als erwartet, stimmt entweder die Ex-Nummer oder die aktive Page nicht.
 - **Liste ist nur Anzeige:** Ein Klick in die Cue-Liste springt nicht zu diesem Cue. Zum Schalten immer GO / BACK / STOP benutzen.
 - **Automatische Aktualisierung:** Die Anzeige folgt dem echten Playback-Stand (ca. alle 200 ms). Was du in der Liste markiert siehst, ist der real laufende Cue — auch wenn er von woanders (Hardware, anderes Widget) ausgelöst wurde.
 - **GO ► springt weiter:** GO ist nicht nur „Start", sondern jeder Druck rückt einen Cue vor. Mehrfaches Drücken läuft die Liste Schritt für Schritt durch; BACK geht entsprechend zurück.

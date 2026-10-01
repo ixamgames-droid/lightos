@@ -189,7 +189,7 @@ Ein **Doppelklick** auf einen Eintrag schaltet ihn an/aus.
   aktivieren, dann das gewünschte Pad/Fader im Bearbeiten-Modus anklicken und
   schließlich das Pad/den Fader am Controller (z. B. APC mini) betätigen → das
   Bedienelement liegt danach auf dieser Hardware.
-- **Eingabe / Ausgabe → MIDI:** vollständige Mapping-Tabelle. Verfügbare
+- **E/A → MIDI:** vollständige Mapping-Tabelle. Verfügbare
   Aktionen: **Executor GO / BACK / FLASH / FADER**, **Programmer Attribut**,
   **Grand Master** sowie (neu) **Effekt-Parameter** (`effect_param:<key>`) und
   **Effekt-Aktion** (`effect_action:<key>`). Schnell-Vorlagen: „CC1-10 →

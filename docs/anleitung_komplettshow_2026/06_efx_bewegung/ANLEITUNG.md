@@ -13,10 +13,12 @@ In dieser Anleitung lernst du, wie du eine EFX-Bewegungsfigur (Kreis) für die M
 
 ## Bewegung verifizieren
 
-5. Beachte: Die **2D-Live-View** zeigt die **Pan-Drehung** an – die Beam-Linie des Movers dreht sich mit der EFX. Der **Tilt** wird im Beam **nicht** dargestellt.
-6. Prüfe die Bewegung über die Sektion **"Eingabe / Ausgabe" → "DMX Monitor"**: Die Pan-Kanäle **65** und **76** verlassen die Mitte **128** (z. B. **151** bzw. **104**) und laufen gegenläufig. Alternativ kannst du die Bewegung im **3D-Visualizer** kontrollieren.
+5. Beachte: Die **2D-Bühne** (Sektion **Bühne**) zeigt die **Pan-Drehung** an – die Beam-Linie des Movers dreht sich mit der EFX. Der **Tilt** wird im Beam **nicht** dargestellt.
+6. Prüfe die Bewegung über die Sektion **"E/A" → "DMX Monitor"**: Die Pan-Kanäle **65** und **76** verlassen die Mitte **128** (z. B. **151** bzw. **104**) und laufen gegenläufig. Alternativ kannst du die Bewegung im **3D-Visualizer** kontrollieren.
 
 ![DMX-Monitor: MH-Kanäle 65 und 76 stehen auf 151 bzw. 104 statt Mitte 128 – Pan bewegt sich gegenläufig](img/02_dmx_mh_pan_bewegung.png)
+
+   *Bild zeigt eine ältere Oberfläche: die Sektionen heißen heute **Bühne** und **E/A** statt „Live View“ und „Eingabe / Ausgabe“.*
 
 ## Spider: EFX im Spider-Modus (Tilt-Bewegungsmuster)
 
@@ -28,6 +30,6 @@ Die Tilt-Stellung lässt sich alternativ **statisch** über den **Position-Tab (
 ## Tipps / Fallen
 
 - **MH bleiben dunkel?** "Dimmer/Shutter mit öffnen" (`open_beam`) im Abschnitt "Sichtbarkeit & Sonstiges" muss aktiviert sein.
-- **Keine Bewegung sichtbar?** Die 2D-Live-View zeigt die Pan-Drehung (Beam-Linie), aber keinen Tilt – zur genauen Kontrolle nutze den DMX Monitor (Kanäle 65/76 verlassen die Mitte 128) oder den 3D-Visualizer.
+- **Keine Bewegung sichtbar?** Die 2D-Bühne zeigt die Pan-Drehung (Beam-Linie), aber keinen Tilt – zur genauen Kontrolle nutze den DMX Monitor (Kanäle 65/76 verlassen die Mitte 128) oder den 3D-Visualizer.
 - **Spider bewegen sich nicht?** Prüfe, dass der **Spider-Modus** aktiv ist (Abschnitt "Bewegungsmuster (Spider)" sichtbar, Geräte-Box zeigt "… Spider"), ein **Muster** gewählt und **Start** gedrückt ist. Bleiben die Bars dunkel: **"Dimmer/Shutter mit öffnen"** aktivieren.
 - Die **EFX-Geschwindigkeit** stellst du im Editor unter **"Tempo & Richtung"** (in Hz) ein.

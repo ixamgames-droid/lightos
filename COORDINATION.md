@@ -84,6 +84,15 @@ git fetch origin                      # 1. Was ist passiert, waehrend ich dachte
 Ohne Werkzeug geht es auch (die Datei ist gewoehnliches Markdown), aber dann
 faellt Schritt 4 weg — und genau der ist der Grund fuer das Werkzeug.
 
+**Durchgesetzt wird der Claim beim Merge (PROC-14):** `tools/pr_bereit.py <PR>`
+endet mit Exit 1, wenn der Zweig des PR keinen Claim auf der Tafel hat —
+deshalb erst **nach** dem Merge `release`. Ein verfallener Claim (laenger als
+4 h ohne `refresh`, etwa weil CI lange dauert) haelt den Merge nicht auf, er
+wird nur als Warnung gemeldet. Der Bericht ohne PR-Nummern zeigt fehlende
+Claims nur an (Exit 1 erst mit `--strict`), Entwuerfe zaehlen nie als
+„Claim fehlt". Ein alter PR von vor der Regel laesst sich bewusst durchwinken:
+`pr_bereit.py <PR> --ohne-claim "Begruendung"`.
+
 ### Warum ein eigener Branch `sessions`
 
 Die Tafel liegt auf dem Branch **`sessions`**, nicht auf `main`:

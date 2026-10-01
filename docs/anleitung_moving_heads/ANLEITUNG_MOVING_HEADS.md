@@ -39,7 +39,7 @@ Die zweite Reihe legt ein **Gobo** auf (mit passender Farbe kombiniert):
 | **MH Gobo Rotation** | Gobo rotiert (DMX 190) |
 | **MH Strobe** (rote Taste, Flash) | Blitz, solange gehalten |
 
-> Gobos sind nur als scharfer Strahl im Nebel/an der Wand sichtbar — in der 2D-Live-View
+> Gobos sind nur als scharfer Strahl im Nebel/an der Wand sichtbar — in der 2D-Bühne
 > wird der MH nur als Strahl-Symbol gezeigt.
 
 ## 3. Bewegung / EFX (Reihe 2)

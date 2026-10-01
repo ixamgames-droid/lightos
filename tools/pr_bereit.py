@@ -45,14 +45,40 @@ sind:
 4. **Teilweise geprueft.** Ein Teil der Legs hat abgeschlossen, der Rest nicht.
    ``gh pr checks`` zeigt das, aber „kein Fehlschlag" liest sich auch hier gruen.
 
+5. **Ohne Claim.** (PROC-14) Claim und Release waren bis dahin reine
+   Modelldisziplin — COORDINATION.md verlangt den Claim, aber nichts hat ihn
+   durchgesetzt, und genau so ist ENG-20 (#743/#744) entstanden: zwei
+   Sitzungen am selben Item, weil eine nie auf der Tafel stand. Jetzt muss der
+   Zweig des PR einen Claim auf ``origin/sessions`` haben; sonst ist der PR
+   nicht bereit, und bei der **Merge-Pruefung** (PR-Nummern angegeben) endet
+   das Werkzeug mit Exit 1 — **auch ohne** ``--strict``, denn ein fehlender
+   Claim ist keine Frage der Geduld, sondern eine Regel. Gelesen wird ueber
+   die Lesefunktionen von ``session_claim.py`` (dieselbe Tafel, derselbe
+   Verfall).
+
+   ★ **Verfallen ist nicht fehlend.** Der Claim wird erst nach dem Merge
+   released; ein PR, der laenger als ``session_claim.VERFALL`` (4 h) auf CI
+   oder Merge wartet, hat dann einen verfallenen Claim. Fuer die
+   Merge-Pruefung reicht „es gibt einen Claim fuer diesen Zweig" — ein
+   verfallener laeuft mit Warnung durch (``refresh`` empfohlen), kein Exit 1.
+
+   ★ **Der Bericht ueber alle offenen PRs** (ohne Nummern) zeigt fehlende
+   Claims an, endet deswegen aber nur mit ``--strict`` mit Exit 1 — dort
+   stehen auch alte PRs und PRs anderer Sitzungen. Entwuerfe zaehlen nie als
+   „Claim fehlt": sie sind ohnehin nicht bereit.
+   Bewusst uebersteuern (z. B. ein alter PR von vor der Regel):
+   ``--ohne-claim "Begruendung"`` — nur zusammen mit PR-Nummern und nur mit
+   Begruendung, damit daraus keine Pauschalabschaltung wird.
+
 Das Werkzeug beantwortet die andere Frage: **sind Checks tatsaechlich GELAUFEN,
 und gilt ihr Ergebnis noch?**
 
 Aufruf::
 
     ./venv/bin/python tools/pr_bereit.py            # Bericht ueber alle offenen PRs
-    ./venv/bin/python tools/pr_bereit.py 663 664    # nur diese
+    ./venv/bin/python tools/pr_bereit.py 663 664    # nur diese (Exit 1 ohne Claim)
     ./venv/bin/python tools/pr_bereit.py --strict   # Exit 1, wenn einer nicht bereit ist
+    ./venv/bin/python tools/pr_bereit.py 612 --ohne-claim "PR von vor PROC-14"
       (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 
 Braucht ``gh`` mit angemeldetem Konto — deshalb ein Werkzeug und kein CI-Test
@@ -62,8 +88,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
+
+# PROC-14: dieselben Lesefunktionen wie `session_claim.py list` — eine eigene
+# Nachbildung des Tafelformats oder des Verfalls wuerde frueher oder spaeter
+# etwas anderes fuer "aktiv" halten als das Werkzeug, das den Claim schreibt.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import session_claim  # noqa: E402
 
 BEREIT = "bereit"
 NIE_GEPRUEFT = "nie geprueft"
@@ -76,6 +109,7 @@ UNFERTIG = "laeuft noch"
 ALT = "gruen auf altem Stand"
 KONFLIKT = "Konflikt"
 ENTWURF = "Entwurf"
+OHNE_CLAIM = "ohne Claim"
 
 
 def urteil(anzahl_checks: int, schluesse: list[str], zurueck: int,
@@ -115,6 +149,83 @@ def urteil(anzahl_checks: int, schluesse: list[str], zurueck: int,
     return BEREIT, f"{len(schluesse)} Checks gruen, Stand aktuell"
 
 
+def _zweig_norm(name: str) -> str:
+    """Zweigname ohne ``refs/heads/``- bzw. ``origin/``-Vorsatz.
+
+    Auf der Tafel steht, was beim ``claim --branch`` eingetippt wurde — mal mit,
+    mal ohne Vorsatz. Gross-/Kleinschreibung bleibt: Git-Zweige unterscheiden sie.
+    """
+    name = (name or "").strip()
+    for vorsatz in ("refs/heads/", "origin/"):
+        if name.startswith(vorsatz):
+            name = name[len(vorsatz):]
+    return name
+
+
+def claim_pruefung(tafel: dict, zweig: str, t) -> tuple[bool, str]:
+    """PROC-14: ``(Claim vorhanden?, Begruendung)`` fuer einen PR-Zweig.
+
+    Rein und ohne Git — die Tafel kommt fertig gelesen herein, ``t`` ist die
+    Uhrzeit, gegen die der Verfall gemessen wird. Ein Claim zaehlt, wenn sein
+    Zweig dem PR-Zweig entspricht. Ein aktiver wird bevorzugt genannt; ist
+    nur ein verfallener da (``session_claim.ist_verfallen``), zaehlt er
+    trotzdem — der Release kommt erst nach dem Merge, und ein PR, der laenger
+    als ``VERFALL`` auf CI wartet, darf daran nicht scheitern. Die Begruendung
+    beginnt dann mit „Warnung" und nennt den ``refresh``-Befehl.
+    """
+    ziel = _zweig_norm(zweig)
+    if not ziel:
+        return False, "der PR nennt keinen Zweig — Claim nicht pruefbar"
+    passend = [c for c in tafel.get("claims", [])
+               if _zweig_norm(c.get("branch", "")) == ziel]
+    if not passend:
+        return False, (f"kein Claim auf der Tafel fuer Zweig {ziel} — erst "
+                       f"`session_claim.py claim <ITEM> --branch {ziel}`, "
+                       "oder bewusst `--ohne-claim \"Begruendung\"`")
+    aktiv = [c for c in passend if not session_claim.ist_verfallen(c, t)]
+    if not aktiv:
+        c = passend[0]
+        return True, (f"Warnung: Claim {c['item']} ({c['sitzung']}) fuer Zweig "
+                      f"{ziel} ist verfallen (seit {c['seit']}) — fuer den Merge "
+                      "genuegt er, aber besser `session_claim.py refresh "
+                      f"{c['item']} --session {c['sitzung']}`")
+    c = aktiv[0]
+    return True, f"Claim {c['item']} ({c['sitzung']}) seit {c['seit']}"
+
+
+def mit_claim(u: str, grund: str, claim_ok: bool, claim_grund: str,
+              uebersteuert: str | None = None,
+              entwurf: bool = False) -> tuple[str, str, bool]:
+    """``(Urteil, Begruendung, Claim fehlt?)`` — Checks und Claim zusammengefuehrt.
+
+    Ein echtes Check-Problem (rot, Konflikt, …) behaelt seinen Namen; der
+    fehlende Claim wird angehaengt, nicht verschluckt. Ist sonst alles gruen,
+    heisst das Urteil „ohne Claim". Der dritte Wert entscheidet bei der
+    Merge-Pruefung ueber Exit 1 — unabhaengig von ``--strict``. Ein Entwurf
+    zaehlt nie als „Claim fehlt" (er ist ohnehin nicht bereit); der Hinweis
+    steht trotzdem in der Begruendung. Ein verfallener Claim kommt als
+    ``claim_ok`` mit „Warnung" herein und wird angehaengt, nicht verschluckt.
+    """
+    if claim_ok:
+        if claim_grund.startswith("Warnung"):
+            return u, f"{grund}; {claim_grund}", False
+        return u, grund, False
+    if uebersteuert:
+        return u, f"{grund}; Claim-Pruefung uebersteuert: {uebersteuert}", False
+    if entwurf:
+        return u, f"{grund}; ausserdem {claim_grund}", False
+    if u == BEREIT:
+        return OHNE_CLAIM, f"{grund}, aber {claim_grund}", True
+    return u, f"{grund}; ausserdem {claim_grund}", True
+
+
+def _lade_tafel() -> dict:
+    """Tafel von ``origin/sessions`` — Werkzeug-Wurzel ist das Repo."""
+    repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    tafel, _spitze = session_claim.lade_tafel(repo)
+    return tafel
+
+
 # ── Alles ab hier redet mit gh ───────────────────────────────────────────────
 
 def _gh(*args: str) -> str:
@@ -136,7 +247,16 @@ def main(argv=None) -> int:
     ap.add_argument("pr", nargs="*", help="PR-Nummern (Vorgabe: alle offenen)")
     ap.add_argument("--strict", action="store_true",
                     help="Exit 1, wenn ein PR nicht bereit ist")
+    ap.add_argument("--ohne-claim", metavar="BEGRUENDUNG",
+                    help="PROC-14: fehlenden Claim bewusst hinnehmen (nur mit "
+                         "PR-Nummern, Begruendung Pflicht)")
     args = ap.parse_args(argv)
+    if args.ohne_claim is not None:
+        if not args.ohne_claim.strip():
+            ap.error("--ohne-claim braucht eine Begruendung")
+        if not args.pr:
+            ap.error("--ohne-claim nur zusammen mit PR-Nummern — "
+                     "keine Pauschalabschaltung fuer alle offenen PRs")
 
     if args.pr:
         nummern = [int(n) for n in args.pr]
@@ -147,10 +267,18 @@ def main(argv=None) -> int:
         print("keine offenen PRs.")
         return 0
 
-    zeilen, nicht_bereit = [], 0
+    # PROC-14: die Tafel EINMAL lesen, nicht je PR. Ist sie nicht lesbar, faellt
+    # die Claim-Pruefung durch (im Zweifel rot) — mit Grund statt Absturz.
+    try:
+        tafel, tafel_fehler = _lade_tafel(), None
+    except Exception as e:  # noqa: BLE001 — git fehlt, kein Netz, …
+        tafel, tafel_fehler = {"claims": []}, f"Tafel nicht lesbar ({e})"
+    t = session_claim.jetzt()
+
+    zeilen, nicht_bereit, ohne_claim, verfallen = [], 0, 0, 0
     for nr in sorted(nummern):
         info = _gh_json("pr", "view", str(nr), "--json",
-                        "headRefOid,title,mergeable,isDraft")
+                        "headRefOid,headRefName,title,mergeable,isDraft")
         runs = _gh_json("api", f"repos/:owner/:repo/commits/{info['headRefOid']}/check-runs")
         liste = runs.get("check_runs") or []
         schluesse = [c.get("conclusion") for c in liste]
@@ -169,6 +297,16 @@ def main(argv=None) -> int:
         u, grund = urteil(len(liste), schluesse, zurueck,
                           info.get("mergeable"), alter,
                           bool(info.get("isDraft")))
+        if tafel_fehler:
+            claim_ok, claim_grund = False, tafel_fehler
+        else:
+            claim_ok, claim_grund = claim_pruefung(
+                tafel, info.get("headRefName") or "", t)
+        verfallen += claim_ok and claim_grund.startswith("Warnung")
+        u, grund, fehlt = mit_claim(u, grund, claim_ok, claim_grund,
+                                    args.ohne_claim,
+                                    bool(info.get("isDraft")))
+        ohne_claim += fehlt
         if u != BEREIT:
             nicht_bereit += 1
         zeilen.append((nr, u, grund, info["title"], info.get("isDraft")))
@@ -181,6 +319,18 @@ def main(argv=None) -> int:
 
     print()
     print(f"{len(zeilen) - nicht_bereit} von {len(zeilen)} bereit.")
+    if verfallen:
+        print(f"{verfallen} PR(s) mit verfallenem Claim — kein Hindernis, "
+              "aber besser `session_claim.py refresh` (PROC-14).")
+    if ohne_claim:
+        # Exit 1 nur bei der Merge-Pruefung (PR-Nummern) oder mit --strict:
+        # der Bericht ueber alle offenen PRs enthaelt auch alte PRs und die
+        # anderer Sitzungen — dort ist der fehlende Claim Auskunft, kein Halt.
+        if args.pr or args.strict:
+            print(f"{ohne_claim} PR(s) ohne Claim — Exit 1 (PROC-14).")
+            return 1
+        print(f"{ohne_claim} PR(s) ohne Claim (nur Bericht — Exit 1 erst mit "
+              "PR-Nummern oder --strict, PROC-14).")
     return 1 if (nicht_bereit and args.strict) else 0
 
 
