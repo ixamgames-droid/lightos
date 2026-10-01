@@ -106,7 +106,7 @@ Felder einer `Szene`:
 | `ausschnitt` | `None` (ganzes Fenster), `"stack"` (nur die Sektion), ein Finder oder `(x, y, b, h)` |
 | `warte_s` | echte Wartezeit vor der Aufnahme, für Timer-gesteuerte Anzeigen |
 | `groesse` | Fenster- bzw. Dialoggröße, Standard 1600 × 900 |
-| `braucht_gpu` | 3D-Visualizer: wird offscreen mit Meldung übersprungen |
+| `braucht_gpu` | 3D-Visualizer: wird offscreen mit Meldung übersprungen, mit `--bildschirm` gebaut (siehe [Grenzen](#grenzen)) |
 | `beschriftungen` | Beschriftung zusätzlich als Schild ins Bild schreiben |
 | `frames` | Liste von `Frame`: statt einer PNG entsteht ein GIF (siehe [GIFs](#gifs)) |
 | `gif_breite` | GIF auf diese Breite verkleinern, z. B. `1200` (nie vergrößern) |
@@ -233,8 +233,19 @@ venv/bin/python -c "import sys; sys.path.insert(0, 'tools'); from anleitungsbild
 ## Grenzen
 
 - **3D-Visualizer:** WebGL bekommt offscreen keinen Kontext, die Fläche bleibt schwarz.
-  Szenen mit `braucht_gpu=True` werden deshalb übersprungen. 3D-Bilder entstehen
-  weiterhin von Hand an einem Rechner mit echter Grafik.
+  Szenen mit `braucht_gpu=True` werden deshalb übersprungen. Gebaut werden sie am
+  echten Bildschirm (X11) mit `--bildschirm`:
+
+  ```bash
+  DISPLAY=:0 venv/bin/python tools/anleitungsbilder.py vc_widgets --bildschirm
+  ```
+
+  Die Sandbox bleibt dabei genauso aktiv. Das Werkzeug zeichnet dann statt `offscreen`
+  über `xcb`, das Fenster erscheint für die Dauer des Laufs auf dem Bildschirm (ohne
+  den Fokus zu nehmen) und es entstehen **nur** die Szenen mit `braucht_gpu` — alle
+  anderen bleiben offscreen gebaut und unverändert. Das 3D-Fenster braucht beim Start
+  rund 20 s, bis die Szene steht. Beispiel: `05_blackout_links_3d.gif` in
+  `szenen_vc_widgets.py` (Visualizer öffnen, Kamera setzen, nur die 3D-Fläche aufnehmen).
 - **Audio:** In der Sandbox gibt es keine Audio-Geräte. Bilder der BPM-Erkennung
   zeigen deshalb den manuellen Modus.
 - Die Statusleiste zeigt „Enttec: nicht gefunden", weil die Sandbox nur einen

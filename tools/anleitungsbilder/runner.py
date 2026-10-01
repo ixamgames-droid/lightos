@@ -511,11 +511,16 @@ def git_stand() -> str:
 # ── Lauf ────────────────────────────────────────────────────────────────────
 
 def lauf(auftraege, *, sb, pruefen: bool = False, ausgabe: str | None = None,
-         nur: set | None = None) -> int:
+         nur: set | None = None, bildschirm: bool = False) -> int:
     """``auftraege``: Liste ``(anleitung, szenen, ziel_relativ)``. Rueckgabe = Exit-Code.
 
     ``ausgabe`` ersetzt den Zielordner (alle Anleitungen darunter je in einen
     Unterordner) — fuer Tests und ``--pruefen``.
+
+    ``bildschirm`` (DOC-21): das Fenster steht auf dem echten Bildschirm; es
+    entstehen NUR Szenen mit ``braucht_gpu``. Alle anderen bleiben offscreen
+    gebaut — am echten Bildschirm sahen sie (Schrift-Hinting, Fensterrahmen)
+    minimal anders aus und aenderten ohne Grund den Diff.
     """
     from . import sandbox
     import main as lo_main
@@ -542,6 +547,9 @@ def lauf(auftraege, *, sb, pruefen: bool = False, ausgabe: str | None = None,
     from src.ui.main_window import MainWindow
     win = MainWindow(kiosk=False, touch=False)
     win.resize(BREITE, HOEHE)
+    if bildschirm:
+        # Am echten Bildschirm nicht den Fokus an sich reissen.
+        win.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
     win.show()
     ui = UI(app, win, get_state(), info)
     ui.pump(0.5)
@@ -581,6 +589,8 @@ def lauf(auftraege, *, sb, pruefen: bool = False, ausgabe: str | None = None,
             if nur and szene.name not in nur:
                 continue
             datei = szene.datei
+            if bildschirm and not szene.braucht_gpu:
+                continue
             if szene.braucht_gpu and os.environ.get("QT_QPA_PLATFORM") == "offscreen":
                 print(f"[anleitungsbilder] {anleitung}/{datei}: UEBERSPRUNGEN — braucht "
                       "eine GPU (3D/WebGL bleibt offscreen schwarz).", flush=True)

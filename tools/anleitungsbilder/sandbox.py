@@ -115,17 +115,27 @@ def echte_datenorte() -> list[str]:
     return aus
 
 
-def einrichten(basis: str | None = None) -> Sandbox:
+def einrichten(basis: str | None = None, *, bildschirm: bool = False) -> Sandbox:
     """Lenkt alle Datenpfade in ``basis`` (Default: frischer mkdtemp) um.
 
     MUSS vor dem ersten ``src``-Import laufen. Setzt hart (kein setdefault):
     eine geerbte Umgebung — etwa aus der Testsuite oder einer Shell, in der
     ``LIGHTOS_SHOW_DB`` auf eine echte DB zeigt — darf hier NICHT gewinnen.
+
+    ``bildschirm=True`` (DOC-21, ``--bildschirm``): statt ``offscreen`` auf dem
+    echten X11-Bildschirm (``xcb``) zeichnen — nur fuer 3D-Szenen, deren WebGL
+    offscreen schwarz bleibt. Alle Datenpfade bleiben genauso umgelenkt.
     """
     if any(m == "src" or m.startswith("src.") for m in sys.modules):
         raise RuntimeError(
             "Sandbox zu spaet: src ist schon importiert — die Pfade der Module "
             "sind damit bereits eingefroren.")
+    if bildschirm and not os.environ.get("DISPLAY"):
+        raise SystemExit("[anleitungsbilder] --bildschirm braucht einen X11-Bildschirm "
+                         "(DISPLAY ist leer).")
+    # Die X-Anmeldung liegt sonst unter ~/.Xauthority — HOME wird gleich
+    # umgelenkt. Nur der Verweis wird gemerkt, die Datei liest Xlib selbst.
+    xauth = os.environ.get("XAUTHORITY") or os.path.expanduser("~/.Xauthority")
     basis = os.path.realpath(basis or tempfile.mkdtemp(prefix="lightos_doku_"))
     p = {
         "HOME": os.path.join(basis, "home"),
@@ -160,7 +170,9 @@ def einrichten(basis: str | None = None) -> Sandbox:
     for k in _ENTFERNEN:
         os.environ.pop(k, None)
     # Qt: offscreen, feste Skalierung (dpr 1.0 -> 1600x900 bleibt 1600x900).
-    os.environ["QT_QPA_PLATFORM"] = "offscreen"
+    os.environ["QT_QPA_PLATFORM"] = "xcb" if bildschirm else "offscreen"
+    if bildschirm and os.path.exists(xauth):
+        os.environ["XAUTHORITY"] = xauth
     os.environ["QT_ENABLE_HIGHDPI_SCALING"] = "0"
     os.environ["QT_SCALE_FACTOR"] = "1"
     os.environ.pop("QT_SCREEN_SCALE_FACTORS", None)

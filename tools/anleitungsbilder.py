@@ -11,6 +11,7 @@ Aufruf (aus dem Repo-Root)::
     venv/bin/python tools/anleitungsbilder.py projektseite --nur 02_patch
     venv/bin/python tools/anleitungsbilder.py --alle --pruefen # nur baubar?
     venv/bin/python tools/anleitungsbilder.py --liste          # Szenen zeigen
+    venv/bin/python tools/anleitungsbilder.py vc_widgets --bildschirm  # 3D-Szenen
 
 Windows (PowerShell/cmd) entsprechend::
 
@@ -58,6 +59,9 @@ def _argumente(argv):
                     help="statt docs/<anleitung>/img nach ORDNER/<anleitung> schreiben")
     ap.add_argument("--behalten", action="store_true",
                     help="Sandbox-Ordner nach dem Lauf nicht loeschen (Fehlersuche)")
+    ap.add_argument("--bildschirm", action="store_true",
+                    help="auf dem echten X11-Bildschirm statt offscreen zeichnen; baut "
+                         "NUR Szenen mit braucht_gpu (3D), alle anderen bleiben offscreen")
     return ap.parse_args(argv)
 
 
@@ -95,7 +99,7 @@ def main(argv=None) -> int:
     # Echte Datenorte VOR der Umlenkung erfassen, danach nie wieder anfassen.
     orte = sandbox.echte_datenorte()
     vorher = sandbox.schnappschuss(orte)
-    sb = sandbox.einrichten()
+    sb = sandbox.einrichten(bildschirm=args.bildschirm)
     code = 2
     try:
         # Lint tests/test_tools_db_isolation.py: der bestehende Bootstrap der
@@ -109,7 +113,7 @@ def main(argv=None) -> int:
             ausgabe = os.path.abspath(os.path.join(sandbox.REPO, ausgabe)) \
                 if not os.path.isabs(ausgabe) else ausgabe
         code = runner.lauf(auftraege, sb=sb, pruefen=args.pruefen, ausgabe=ausgabe,
-                           nur=nur or None)
+                           nur=nur or None, bildschirm=args.bildschirm)
         if args.pruefen:
             print("[anleitungsbilder] Pruefung: " + ("alle Szenen baubar." if code == 0
                                                      else "Szenen NICHT baubar, s. o."))
