@@ -24,7 +24,7 @@ werden mit dem Default-Frame vorbelegt) → keine hängenden Werte gestoppter Qu
 | 4b | **Dimmer-Master** | `submaster_level` · `fixture_dimmers` · Programmer-Dimmer | multiplikativ auf Intensitäts-/Ersatz-Farbkanäle |
 | 4c | **Simple Desk** | `state.simple_desk` (ISO-03) | **nur wenn `simple_desk_override` aktiv** — sonst reine Anzeige; dann oberste Schicht, nur explizit gesetzte Kanäle |
 | 5 | **Commit** | gepatchte Spans atomar; freie Kanäle über Engine-Extra (+ Freigabe) | ins Live-Universe |
-| — | **Grand Master / Blackout** | `OutputManager._send_all` (GM-Adressmaske) | erst beim Senden, nur Intensität/Farbe |
+| — | **Grand Master / Blackout** | `OutputManager._send_all` (GM-Adressmaske bzw. Blackout-Erhalten-Maske) | erst beim Senden; GM nur Intensität/Farbe — Blackout nullt alles außer Pan/Tilt/Speed/Gobo/Prisma/Optik/Farbrad gepatchter Lampen mit echtem Dimmer; Roh-Adressen, `raw`/Fine, Geräte ohne Dimmer, Laser/Nebel und ungepatchte Universen komplett (OUT-57) |
 
 ## Sonderregeln (warum der Programmer NICHT „durchfunkt")
 
