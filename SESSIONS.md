@@ -18,6 +18,7 @@
 | DOC-19 | A | docs/doc19-bilder-neue-funktionen | 2026-10-01T21:56Z | docs/anleitung_vc_widgets · docs/anleitung_playback |
 | DOC-20 | A | docs/doc20-anleitungs-gifs | 2026-10-01T22:24Z | tools/anleitungsbilder · docs/ANLEITUNGSBILDER.md |
 | DOC-21 | A | docs/doc21-3d-gif | 2026-10-01T22:51Z | tools/anleitungsbilder · docs/anleitung_vc_widgets |
+| VIZ-65 | A | fix/viz65-startwaechter | 2026-10-01T23:12Z | src/ui/visualizer/visualizer_window.py |
 
 ## Blocker & Fallen
 
@@ -176,7 +177,6 @@
 
 ## Verlauf
 
-- 2026-10-01T20:16Z A done XPLAT-43
 - 2026-10-01T20:32Z A done XPLAT-41
 - 2026-10-01T20:41Z A claim UI-68
 - 2026-10-01T20:41Z A claim BPM-25
@@ -206,3 +206,4 @@
 - 2026-10-01T22:42Z C done TOOL-1
 - 2026-10-01T22:51Z A claim DOC-21
 - 2026-10-01T23:00Z C done DOC-15
+- 2026-10-01T23:12Z A claim VIZ-65
