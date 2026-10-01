@@ -1,7 +1,7 @@
 """Beispiel-/Proof-Show über die ShowBuilder-DSL — baut eine kleine, ECHTE Show,
 bei der jeder Baustein gegen die reflektierten echten Sätze validiert ist.
 
-    venv/Scripts/python.exe tools/build_validated_demo.py
+    venv/Scripts/python.exe tools/_archiv/build_validated_demo.py
     (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
     -> shows/Validated_Demo.lshow  (statisch + live validiert, Render-geprüft)
 
@@ -9,13 +9,14 @@ Zeigt das Muster für künftige Generatoren: kurze, deklarative Bau-Schritte; je
 fake Algo/Action/Param/Fixture würde SOFORT mit BuildError abbrechen.
 """
 from __future__ import annotations
+import _bootstrap  # noqa: F401  # Repo-Root + tools/ auf sys.path (siehe _bootstrap.py)
 
 import os
 
 from _builder import (ShowBuilder, RgbAlgorithm, ButtonAction, BuildError,
                       build_and_verify)
 
-_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ROOT = _bootstrap.REPO_ROOT
 OUT = os.path.join(_ROOT, "shows", "Validated_Demo.lshow")
 
 b = ShowBuilder()
