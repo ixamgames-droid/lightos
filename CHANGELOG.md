@@ -7,6 +7,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-10-01 — Nur über Weiß gewählte Geräte: Dimmer, Aufräum-Werkzeug und Live-Ansicht (FM-51 Scheibe C)
+
+#### Behoben
+
+- **Der Dimmer eines Weiß-Segments wirkte im Intensity-Tab nicht gegen einen laufenden
+  Dimmer-Effekt.** Wer an einem Balken mit eigenen Weiß-Segmenten nur „Weiß 4“ gewählt hatte,
+  konnte im Intensity-Tab den gemeinsamen Master-Dimmer ziehen, ohne dass sich etwas tat – der
+  Effekt behielt den Dimmer. Jetzt gewinnt der Regler wie bei einem ganz gewählten Gerät.
+- **Das Werkzeug gegen doppelt gepatchte Geräte übersah die Auswahl.** Ein Gerät, das nur über
+  ein Weiß-Segment gewählt ist, gilt dort jetzt als benutzt und wird nicht als verwaist
+  vorgeschlagen.
+- **Die Live-Ansicht zeigte ein nur über Weiß gewähltes Gerät nicht als gewählt.** Es bekommt
+  jetzt seinen Ring. Das ist reine Anzeige: Ein Klick oder „Gruppe aus Auswahl“ macht daraus
+  nicht das ganze Gerät.
+
 ### 2026-10-01 — Speichern und Löschen halten sich an gewählte Weiß-Segmente (FM-51 Scheibe B)
 
 #### Behoben
