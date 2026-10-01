@@ -1,11 +1,9 @@
-"""VC-Widgets-Schaukasten (Doku) — legt 17 der 19 VC-Widget-Typen einmal
-# DOC-10 (2026-08-31): hier stand "JEDEN der 18". Beides war falsch — die
-# Selbstpruefung am Ende zaehlt 17, und die Registry in
-# virtual_console_view.py kennt 19 Typen (16 Toolbar-Knoepfe + Stepper,
-# Effekt-Anzeige, Effekt-Editor-Box ohne Knopf). Es fehlen
-# VCTempoBusController und VCMultiLiveEditor; beide sind seit heute in
-# docs/anleitung_vc_widgets/22_*.md und 23_*.md beschrieben. Sie hier
-# nachzuruesten ist als DOC-11 erfasst.
+"""VC-Widgets-Schaukasten (Doku) — legt JEDEN der 19 VC-Widget-Typen einmal
+# DOC-14 (2026-10-02): bis hier standen nur 17 der 19 — es fehlten
+# VCTempoBusController und VCMultiLiveEditor. Die Selbstpruefung am Ende
+# zaehlt jetzt gegen die Registry der Canvas (vc_canvas.WIDGET_REGISTRY) statt
+# gegen eine eigene Liste: kommt ein Widget-Typ dazu, faellt der Generator rot,
+# statt still „alle" zu melden.
 beschriftet in ein klares Raster auf Bank 1 (active_bank 0), bindet sie an einen
 Demo-Effekt (damit Farb-/Chase-/Vorschau-Widgets Inhalt zeigen) und legt zwei
 KALIBRIER-Kacheln (reines Magenta/Cyan) an bekannten Canvas-Koordinaten ab.
@@ -55,12 +53,16 @@ from src.ui.virtualconsole.vc_xypad import VCXYPad
 from src.ui.virtualconsole.vc_frame import VCFrame
 from src.ui.virtualconsole.vc_effect_editor import VCEffectEditor
 from src.ui.virtualconsole.vc_effect_display import VCEffectDisplay
+from src.ui.virtualconsole.vc_tempo_bus_controller import VCTempoBusController
+from src.ui.virtualconsole.vc_multi_live_editor import VCMultiLiveEditor
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(_ROOT, "shows", "VC_Widgets_Showcase.lshow")
+# DOC-14: LIGHTOS_GEN_OUT / LIGHTOS_GEN_GEO lenken Show und Geometrie um — so
+# faehrt ein Test den Generator, ohne die mitgelieferte geometry.json zu ersetzen.
+OUT = os.environ.get("LIGHTOS_GEN_OUT") or os.path.join(_ROOT, "shows", "VC_Widgets_Showcase.lshow")
 CAP_DIR = os.path.join(_ROOT, "docs", "anleitung_vc_widgets", "_capture")
-os.makedirs(CAP_DIR, exist_ok=True)
-GEO = os.path.join(CAP_DIR, "geometry.json")
+GEO = os.environ.get("LIGHTOS_GEN_GEO") or os.path.join(CAP_DIR, "geometry.json")
+os.makedirs(os.path.dirname(GEO), exist_ok=True)
 
 # ── Demo-Rig + Effekte ───────────────────────────────────────────────────────
 reset_show()
@@ -264,6 +266,16 @@ fr = VCFrame("Rahmen / Gruppe")
 reihe(fr, "VCFrame", "Container (VCFrame)", 240, 150)
 ee = VCEffectEditor("Effekt-Editor"); ee.set_effect(mtx.id)
 reihe(ee, "VCEffectEditor", "Effekt-Editor-Box (VCEffectEditor)", 380, 224)
+# DOC-14: die beiden Typen ohne eigenen Platz bis 2026-10-02. Sie passen rechts
+# neben den Effekt-Editor in die dritte Reihe — die Reihen davor bleiben damit
+# pixelgleich (die vorhandenen Ausschnitte stimmen weiter). Live-Edit steht auf
+# seiner Mindestbreite (MIN_SIZE 320): unter 430 px zeigt er sein zweizeiliges
+# Layout, und breiter passt er nicht mehr in die Aufnahmeflaeche (logisch 900 hoch).
+tbc = VCTempoBusController("Tempo-Controller"); tbc.tempo_bus_id = "A"
+tbc.function_id = mtx.id; tbc.function_ids = [mtx.id]
+reihe(tbc, "VCTempoBusController", "Tempo-Controller (VCTempoBusController)", 280, 196)
+le = VCMultiLiveEditor("Live-Edit"); le.add_effect(mtx.id)
+reihe(le, "VCMultiLiveEditor", "Live-Edit (VCMultiLiveEditor)", 320, 400)
 
 # ── Speichern ────────────────────────────────────────────────────────────────
 state._vc_layout = {"widgets": widgets}
@@ -290,9 +302,15 @@ vc = state._vc_layout.get("widgets", [])
 from collections import Counter
 types = Counter(w["type"] for w in vc)
 print("Widget-Typen:", dict(types))
-need = {"VCButton", "VCSlider", "VCColor", "VCXYPad", "VCSpeedDial", "VCEncoder", "VCStepper",
-        "VCCueList", "VCSongInfo", "VCColorList", "VCEffectColors",
-        "VCBpmDisplay", "VCBusSelector", "VCFrame", "VCLabel", "VCEffectEditor", "VCEffectDisplay"}
+# DOC-14: gegen die Registry der Canvas, nicht gegen eine eigene Liste — die
+# eigene Liste hatte 17 Eintraege und meldete deshalb „alle", waehrend die
+# Canvas 19 Typen kennt.
+from src.ui.virtualconsole.vc_canvas import WIDGET_REGISTRY
+need = set(WIDGET_REGISTRY)
 missing = need - set(types)
 assert not missing, f"fehlend: {missing}"
-print("FERTIG — alle 17 Typen vorhanden")
+assert set(geometry) == need, f"Geometrie ohne: {need - set(geometry)}"
+# Aufnahmeflaeche (logisch 1600x900, s. _MAX_X): kein Ausschnitt darf darueber.
+_rand = max(g["y"] + g["h"] for g in geometry.values())
+assert _rand <= 900, f"Schaukasten ragt unten aus der Aufnahme: y={_rand}"
+print(f"FERTIG — alle {len(need)} Typen vorhanden")
