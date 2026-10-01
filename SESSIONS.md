@@ -9,7 +9,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| UI-68 | A | fix/ui68-go-ohne-executor | 2026-10-01T21:34Z | src/ui/views/playback_view.py |
 | BPM-25 | A | fix/bpm25-beats-stumm-anzeigen | 2026-10-01T21:34Z | src/ui/bpm_status_rules.py,src/ui/views/bpm_manager_view.py,src/core/audio/tempo_tracker.py |
 | TOOL-5 | C | fix/tool5-demo-global-bus | 2026-10-01T21:00Z | tools/build_demo_show_full.py · tools/capture_hochzeit_tempo_guide.py · tools/_archiv · tools/README.md · tests/test_proc07_werkzeuge.py · tests/test_tool5_demo_global_bus.py · BACKLOG.md · changelog.d/2026-10-02-TOOL-5.md |
 | TOOL-4 | C | fix/tool5-demo-global-bus | 2026-10-01T21:03Z | tools/capture_hochzeit_tempo_guide.py · tools/_archiv · BACKLOG.md |
@@ -175,7 +174,6 @@
 
 ## Verlauf
 
-- 2026-10-01T17:54Z A done XPLAT-40
 - 2026-10-01T17:57Z B claim BPM-26
 - 2026-10-01T19:33Z A done PROC-16
 - 2026-10-01T19:33Z A claim XPLAT-41
@@ -205,3 +203,4 @@
 - 2026-10-01T21:34Z A aktualisiert DOC-18: Branch - -> docs/doc18-bpm-anleitung
 - 2026-10-01T21:35Z C claim FM-46
 - 2026-10-01T21:37Z C claim DOC-14
+- 2026-10-01T21:48Z A done UI-68
