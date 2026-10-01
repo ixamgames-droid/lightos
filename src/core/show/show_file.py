@@ -759,9 +759,16 @@ def _fill_fan_from_dimmer(attrs, fid_key, euron10_fids: set) -> None:
             pass
 
 
-def _collect_fixture_groups(state) -> list:
+def _collect_fixture_groups(state, probleme: list | None = None) -> list:
     """Spatial-Gruppen (FixtureGroup) aus der Show-DB fuer die .lshow sammeln.
-    Frueher gingen Gruppen beim Save/Load verloren (nur in current_show.db)."""
+    Frueher gingen Gruppen beim Save/Load verloren (nur in current_show.db).
+
+    UI-69: ``probleme`` ist der Sammler fuer Ausfaelle (Default: die
+    Speicher-Lueckenliste). Der Aenderungs-Vergleich reicht eine Wegwerf-Liste
+    herein — er darf die Meldungen des letzten echten Speicherns nicht
+    ueberschreiben."""
+    if probleme is None:
+        probleme = _speicherprobleme
     out: list = []
     try:
         from sqlalchemy import select
@@ -780,11 +787,11 @@ def _collect_fixture_groups(state) -> list:
                         "folder": g.folder or "",
                     })
                 except Exception as e:
-                    _speicherprobleme.append(
+                    probleme.append(
                         f"Fixture-Gruppe {nr} '{getattr(g, 'name', '?')}' — FEHLT "
                         f"in der Datei ({e})")
     except Exception as e:
-        _speicherprobleme.append(f"Fixture-Gruppen ({e})")
+        probleme.append(f"Fixture-Gruppen ({e})")
     return out
 
 
@@ -837,20 +844,19 @@ def _restore_fixture_groups(state, groups: list) -> None:
         pass
 
 
-def save_show(path: str | os.PathLike, layout: dict | None = None):
-    """Save the current show state to a .lshow ZIP file.
+def _show_daten(state, probleme: list) -> dict:
+    """Der Inhalt von show.json fuer den aktuellen Stand (ohne Fensterlayout).
 
-    Args:
-        path: target path.
-        layout: optional layout state from collect_layout(main_window).
+    UI-69: aus ``save_show`` herausgezogen, damit der Aenderungs-Vergleich
+    (:func:`show_hat_aenderungen`) GENAU das betrachtet, was eine Speicherung
+    schreiben wuerde — eine zweite, parallel gepflegte Liste der Show-Teile
+    liefe frueher oder spaeter auseinander. Ohne Seiteneffekte auf den State;
+    das Aufraeumen verwaister Platzhalter-Nodes bleibt in ``save_show``.
     """
-    from src.core.app_state import get_state
     from src.core.engine.palette import get_palette_manager
     from src.core.engine.curve_library import get_curve_library
     from src.core.engine.snap_library import get_snap_library
 
-    _speicherprobleme.clear()        # STAB-24 (c): Meldungen DIESES Speicherns
-    state = get_state()
     pm = get_palette_manager()
 
     patch_data = [_fixture_to_dict(pf) for pf in state.get_patched_fixtures()]
@@ -931,15 +937,6 @@ def save_show(path: str | os.PathLike, layout: dict | None = None):
     # Adapter), wird der Block einfach weggelassen (Dual-Write ist additiv,
     # kein Pflichtfeld beim Laden -- siehe load_show-Migrationsgate).
     scene = getattr(state, "_scene", None)
-    if scene is not None:
-        # Review-Fix (Geister-Platzhalter-Nodes): vor jedem Speichern
-        # verwaiste Dock-Platzhalter (kein echtes Stage-Element, keine
-        # Kinder mehr) aus dem LEBENDEN Graphen entfernen -- sonst wuerden sie
-        # sich ueber wiederholte Save-Zyklen unbegrenzt in der .lshow
-        # ansammeln (s. _prune_ghost_placeholder_nodes). In-place auf dem
-        # echten state._scene (keine Kopie) -- konsistent mit load_show, wo
-        # dieselbe Aufraeumfunktion nach dem Graph-Aufbau laeuft.
-        _prune_ghost_placeholder_nodes(scene)
     scene_graph_data = scene.to_dict() if scene is not None else None
 
     # Live-View-2D-Positionen (eigene Persistenz, entkoppelt vom 3D-Visualizer)
@@ -1001,12 +998,41 @@ def save_show(path: str | os.PathLike, layout: dict | None = None):
         "live_view": live_view_data,
         "snapshots": getattr(state, "_snapshots_data", None) or [],
         "channel_groups": getattr(state, "_channel_groups_data", None) or [],
-        "fixture_groups": _collect_fixture_groups(state),
+        "fixture_groups": _collect_fixture_groups(state, probleme),
         "library": get_snap_library().to_dict(),
         "playlist": getattr(state, "playlist", []) or [],
         "music_autoshow": getattr(state, "music_autoshow", None)
         or {"enabled": False, "function_ids": [], "bank": 0},
     }
+    if scene_graph_data is not None:
+        show["scene_graph"] = scene_graph_data
+    return show
+
+
+def save_show(path: str | os.PathLike, layout: dict | None = None):
+    """Save the current show state to a .lshow ZIP file.
+
+    Args:
+        path: target path.
+        layout: optional layout state from collect_layout(main_window).
+    """
+    from src.core.app_state import get_state
+
+    _speicherprobleme.clear()        # STAB-24 (c): Meldungen DIESES Speicherns
+    state = get_state()
+    scene = getattr(state, "_scene", None)
+    if scene is not None:
+        # Review-Fix (Geister-Platzhalter-Nodes): vor jedem Speichern
+        # verwaiste Dock-Platzhalter (kein echtes Stage-Element, keine
+        # Kinder mehr) aus dem LEBENDEN Graphen entfernen -- sonst wuerden sie
+        # sich ueber wiederholte Save-Zyklen unbegrenzt in der .lshow
+        # ansammeln (s. _prune_ghost_placeholder_nodes). In-place auf dem
+        # echten state._scene (keine Kopie) -- konsistent mit load_show, wo
+        # dieselbe Aufraeumfunktion nach dem Graph-Aufbau laeuft.
+        _prune_ghost_placeholder_nodes(scene)
+    show = _show_daten(state, _speicherprobleme)
+    # Reihenfolge der Bloecke wie bisher: Fensterlayout VOR dem Szenegraphen.
+    scene_graph_data = show.pop("scene_graph", None)
     if layout:
         show["layout"] = layout
     if scene_graph_data is not None:
@@ -1085,6 +1111,248 @@ def save_show(path: str | os.PathLike, layout: dict | None = None):
         pass
 
 
+# ── UI-69: Aenderungen seit dem letzten Laden/Speichern ─────────────────────
+#
+# Beenden fragte bei einer aus Datei geladenen Show nie nach dem Speichern:
+# das Hauptfenster hatte kein Dirty-Flag, Aenderungen landeten nur im
+# Auto-Save. Geloest wird das hier ueber den SPEICHERPFAD statt ueber Ereignisse:
+# gemerkt wird ein Fingerabdruck dessen, was ``save_show`` schreiben wuerde, und
+# „geaendert" heisst „der Fingerabdruck weicht vom gemerkten ab".
+#
+# Warum nicht die vorhandenen SyncEvents oder der Undo-Stapel?
+#   * FUNCTION_CHANGED feuert auch beim Starten/Stoppen einer Funktion,
+#     CUE_STACK_CHANGED beim GO — reine Live-Bedienung waere ein Fehlalarm.
+#   * Das VC-Layout, Snapshots und Kanal-Gruppen melden gar kein Ereignis, der
+#     Undo-Stapel deckt nur einen Teil der Bearbeitungen ab — da fehlten echte
+#     Aenderungen.
+#   * Das Laden selbst feuert alle Ereignisse — es haette die Show sofort
+#     „geaendert" gemacht.
+# Der Vergleich deckt dagegen JEDEN Block der Datei ab (neue Bloecke kommen
+# automatisch dazu), und wer eine Aenderung rueckgaengig macht, ist wieder
+# „unveraendert".
+
+#: Blockweise Felder, die sich durch reine LIVE-Bedienung aendern und deshalb
+#: nicht als Show-Aenderung zaehlen. Gespeichert werden sie trotzdem (die Datei
+#: haelt den letzten Stand fest) — nur die Frage „Speichern?" loesen sie nicht
+#: aus. Abgrenzung: was der Bediener waehrend der Vorstellung anfasst
+#: (Programmer, Fader, Tempo/BPM, Ansicht), ist keine Arbeit an der Show; was er
+#: einrichtet (Patch, Gruppen, Cues, Funktionen, Paletten, VC-Layout, Szene),
+#: ist es.
+_LIVE_BLOECKE = frozenset({
+    "programmer",          # Programmer-Werte: Arbeitsspeicher jedes Klicks
+})
+_LIVE_FELDER_FUNKTION = ("intensity", "speed")   # VC-Fader/Speed-Dial setzen sie live
+#: Tempo-Bus: BPM (Tap/Beat-Erkennung, BPM-Regler) und Quelle — ``source``
+#: stellt nur die Laufzeit um (jeder Tap -> "tap", Beat-Erkennung angedockt ->
+#: "external", Master-Wechsel -> "manual"); einrichten laesst sie sich nirgends.
+_LIVE_FELDER_TEMPO_BUS = ("bpm", "source")
+#: Hierarchie-Felder eines Tempo-Bus, die ein VC-Tempo-Bedienelement beim
+#: BEDIENEN umstellt (Tempo-Bus-Regler: Quelle Sound -> Sub/Faktor 1, Tap/Fix ->
+#: Master; Speed-Knoten: Faktor-Gitter -> bus_multiplier). Nur fuer Busse, die
+#: ein solches Element steuert — eingerichtet im Tempo-Bus-Tab zaehlen sie.
+_LIVE_FELDER_TEMPO_BUS_GESTEUERT = ("role", "parent_id", "bus_multiplier")
+_LIVE_FELDER_GRANDMASTER = ("bpm", "armed")      # auto_sync bleibt Einstellung
+_LIVE_FELDER_EXECUTOR = ("fader_value",)         # Executor-Fader
+_LIVE_FELDER_LIVE_VIEW_META = ("zoom",)          # Ansicht, wie das Fensterlayout
+#: VC-Bedienelemente: Typ -> Felder, die im Run-Modus beim Bedienen mitlaufen.
+#: Systematisch gegen src/ui/virtualconsole geprueft (Stand UI-69-Korrektur):
+#:   VCSlider            value                    Fader ziehen / MIDI
+#:   VCSpeedDial         bpm, active_factor, mult Rad, Tap, Faktor-Gitter
+#:   VCXYPad             pan, tilt, area          Pad ziehen, Feld markieren, MIDI
+#:   VCTempoBusController source, factor, fixed_bpm  Quelle/Tap, Faktor, Fix-Rad
+#: Bewusst NICHT live: VCColor-Farbe (der Doppelklick-Waehler aendert, WAS die
+#: Kachel tut, und gilt in Edit- wie Run-Modus), VCTempoBusController
+#: tempo_bus_id/function_ids (koppeln Effekte um — das landet ohnehin im
+#: Funktionsblock), MIDI-Learn (Einrichtung), VCMultiLiveEditor checked/hidden
+#: (Einrichtung des Panels; die eingestellten WERTE speichert es gar nicht),
+#: VCFrame-Seite (steht nicht in der Datei). Die uebrigen Typen (Button, Label,
+#: Cueliste, Encoder, Stepper, Bus-Auswahl, Effekt-Anzeigen, BPM-/Song-Anzeige)
+#: veraendern beim Bedienen nichts, was ``to_dict`` schreibt.
+_LIVE_FELDER_VC = {
+    "VCSlider": ("value",),
+    "VCSpeedDial": ("bpm", "active_factor", "mult"),
+    "VCXYPad": ("pan", "tilt", "area"),
+    "VCTempoBusController": ("source", "factor", "fixed_bpm"),
+}
+
+#: Bloecke, die der 3D-Visualizer aus der Live View ABLEITET (Auto-Patch, s.
+#: ``abgeleitete_aenderung_nachfuehren``).
+ABGELEITETE_3D_BLOECKE = ("visualizer", "scene_graph")
+
+#: Fingerabdruck des zuletzt geladenen/gespeicherten Stands, je Block der Datei
+#: (None = keiner). Blockweise, damit eine abgeleitete Aenderung einzelne Bloecke
+#: nachfuehren kann, ohne echte Aenderungen anderswo zu verdecken.
+_gemerkter_stand: dict | None = None
+
+
+def _ohne(d, felder) -> dict:
+    return {k: v for k, v in d.items() if k not in felder} if isinstance(d, dict) else d
+
+
+def _vc_ohne_live_werte(knoten):
+    """VC-Baum (auch in Frames verschachtelt) ohne die Bedienwerte."""
+    if isinstance(knoten, list):
+        return [_vc_ohne_live_werte(k) for k in knoten]
+    if isinstance(knoten, dict):
+        felder = _LIVE_FELDER_VC.get(knoten.get("type"), ())
+        return {k: _vc_ohne_live_werte(v) for k, v in knoten.items() if k not in felder}
+    return knoten
+
+
+def _vc_gesteuerte_busse(knoten, out: set) -> set:
+    """Tempo-Busse, die ein VC-Element beim Bedienen umkonfiguriert: der
+    Bus eines Tempo-Bus-Reglers und der eines Speed-Knotens (``SpeedNode``)."""
+    if isinstance(knoten, list):
+        for k in knoten:
+            _vc_gesteuerte_busse(k, out)
+    elif isinstance(knoten, dict):
+        typ = knoten.get("type")
+        bus = knoten.get("tempo_bus_id")
+        if bus and (typ == "VCTempoBusController"
+                    or (typ == "VCSpeedDial" and knoten.get("target_mode") == "SpeedNode")):
+            out.add(str(bus))
+        for v in knoten.values():
+            if isinstance(v, (list, dict)):
+                _vc_gesteuerte_busse(v, out)
+    return out
+
+
+def _executor_nur_fader(e) -> bool:
+    """Ein Executor im Werkszustand, der nur wegen seines Faders in der Datei
+    steht (``to_dict`` legt jeden abweichenden ab) — fuer den Vergleich wie
+    nicht vorhanden."""
+    if not isinstance(e, dict):
+        return False
+    return (e.get("stack_index", -1) == -1
+            and e.get("label") == f"Exec {e.get('slot')}"
+            and e.get("fader_function", "volume") == "volume"
+            and (e.get("btn1"), e.get("btn2"), e.get("btn3")) == ("go", "back", "flash"))
+
+
+def _ohne_live_werte(show: dict) -> dict:
+    """Kopie von ``show`` ohne die Live-Felder (s. ``_LIVE_*``)."""
+    d = {k: v for k, v in show.items() if k not in _LIVE_BLOECKE}
+    fn = d.get("functions")
+    if isinstance(fn, dict) and isinstance(fn.get("functions"), list):
+        d["functions"] = dict(fn, functions=[
+            _ohne(f, _LIVE_FELDER_FUNKTION) for f in fn["functions"]])
+    if isinstance(d.get("tempo_buses"), list):
+        gesteuert = _vc_gesteuerte_busse(d.get("virtual_console"), set())
+
+        def _bus_ohne(b):
+            felder = _LIVE_FELDER_TEMPO_BUS
+            if isinstance(b, dict) and str(b.get("bus_id", "")) in gesteuert:
+                felder = felder + _LIVE_FELDER_TEMPO_BUS_GESTEUERT
+            return _ohne(b, felder)
+        d["tempo_buses"] = [_bus_ohne(b) for b in d["tempo_buses"]]
+    d["tempo_grandmaster"] = _ohne(d.get("tempo_grandmaster"), _LIVE_FELDER_GRANDMASTER)
+    ex = d.get("executors")
+    if isinstance(ex, dict):
+        # current_page: welche Executor-Seite gerade offen ist = Bedienung
+        ex = _ohne(ex, ("current_page",))
+        if isinstance(ex.get("pages"), list):
+            ex["pages"] = [[_ohne(e, _LIVE_FELDER_EXECUTOR) for e in seite
+                            if not _executor_nur_fader(e)]
+                           if isinstance(seite, list) else seite
+                           for seite in ex["pages"]]
+        d["executors"] = ex
+    lv = d.get("live_view")
+    if isinstance(lv, dict):
+        d["live_view"] = dict(lv, meta=_ohne(lv.get("meta"), _LIVE_FELDER_LIVE_VIEW_META))
+    d["virtual_console"] = _vc_ohne_live_werte(d.get("virtual_console"))
+    return d
+
+
+def _abdruck(wert) -> str:
+    import hashlib
+    try:
+        text = json.dumps(wert, sort_keys=True, ensure_ascii=False, default=str)
+    except TypeError:   # gemischte Schluesseltypen lassen sich nicht sortieren
+        text = json.dumps(wert, ensure_ascii=False, default=str)
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _block_abdruecke(state=None, views: dict | None = None) -> dict | None:
+    """Fingerabdruck je Block des aktuellen Show-Inhalts ohne Live-Felder.
+
+    ``views``: Bloecke, die der Aufrufer statt aus dem State liefert — das
+    Hauptfenster reicht so VC-Layout, Snapshots und Kanal-Gruppen aus seinen
+    Views herein, OHNE sie in den State zu schreiben (der State-Stand des
+    VC-Layouts enthaelt noch die beim Laden uebersprungenen Widgets, die der
+    Auto-Save sonst verloere). ``None``, wenn der Inhalt nicht einsammelbar ist.
+    """
+    if state is None:
+        from src.core.app_state import get_state
+        state = get_state()
+    try:
+        show = _show_daten(state, [])
+        for block, wert in (views or {}).items():
+            show[block] = wert
+        inhalt = _ohne_live_werte(show)
+        return {block: _abdruck(wert) for block, wert in inhalt.items()}
+    except Exception as e:
+        print(f"[show_file] fingerabdruck error: {e}")
+        return None
+
+
+def show_fingerabdruck(state=None, views: dict | None = None) -> str | None:
+    """Fingerabdruck des aktuellen Show-Inhalts ohne Live-Felder.
+
+    ``None``, wenn der Inhalt nicht einsammelbar ist (dann laesst sich nichts
+    vergleichen). ``views`` wie bei :func:`_block_abdruecke`; ohne sammelt er
+    NUR aus dem State.
+    """
+    bloecke = _block_abdruecke(state, views)
+    return None if bloecke is None else _abdruck(bloecke)
+
+
+def merke_show_stand(state=None, views: dict | None = None) -> None:
+    """Aktuellen Stand als „unveraendert" merken — nach Laden, Speichern,
+    Neue Show. NICHT nach dem Auto-Save: der sichert nur gegen Abstuerze, die
+    Show-Datei des Nutzers ist danach weiterhin alt."""
+    global _gemerkter_stand
+    _gemerkter_stand = _block_abdruecke(state, views)
+
+
+def show_hat_aenderungen(state=None, views: dict | None = None) -> bool:
+    """True, wenn sich der Show-Inhalt seit :func:`merke_show_stand` geaendert hat.
+
+    Ohne gemerkten Stand oder ohne berechenbaren Fingerabdruck: True — lieber
+    einmal zu viel fragen als ungespeicherte Arbeit kommentarlos verwerfen."""
+    if _gemerkter_stand is None:
+        return True
+    jetzt = _block_abdruecke(state, views)
+    return jetzt is None or jetzt != _gemerkter_stand
+
+
+def abgeleitete_aenderung_nachfuehren(aendern, state=None,
+                                      bloecke=ABGELEITETE_3D_BLOECKE):
+    """``aendern()`` ausfuehren — eine Aenderung, die die Software selbst aus
+    schon gespeicherten Daten ABLEITET, nicht der Bediener. Entsprachen die
+    ``bloecke`` vorher dem gemerkten Stand, gilt ihr neuer Inhalt danach als
+    gemerkt; andere Bloecke bleiben unberuehrt (eine echte Aenderung dort zaehlt
+    weiter). Lagen in den Bloecken schon ungespeicherte Aenderungen, bleibt alles
+    wie es ist. Liefert, was ``aendern()`` liefert.
+
+    Anlass (UI-69-Korrektur): der 3D-Visualizer uebernimmt beim ersten
+    ``requestFixtures`` nach dem Laden die Live-View-Positionen asynchron in
+    ``visualizer_positions`` (Auto-Patch) — nach reinem Oeffnen fragte Beenden
+    sonst nach dem Speichern."""
+    global _gemerkter_stand
+    gemerkt = _gemerkter_stand
+    vorher = _block_abdruecke(state) if gemerkt is not None else None
+    ergebnis = aendern()
+    if (gemerkt is None or vorher is None or ergebnis is False
+            or _gemerkter_stand is not gemerkt):
+        return ergebnis
+    if any(vorher.get(b) != gemerkt.get(b) for b in bloecke):
+        return ergebnis
+    nachher = _block_abdruecke(state)
+    if nachher is not None:
+        _gemerkter_stand = dict(gemerkt, **{b: nachher.get(b) for b in bloecke})
+    return ergebnis
+
+
 def reset_show():
     """Setzt den App-State vollstaendig auf eine leere Show zurueck.
 
@@ -1095,7 +1363,9 @@ def reset_show():
     behaelt nichts aus der vorherigen Show (auch nicht aus current_show.db).
     """
     from src.core.app_state import get_state
-    _reset_state(get_state(), emit_events=True)
+    state = get_state()
+    _reset_state(state, emit_events=True)
+    merke_show_stand(state)          # UI-69: frisch geleert = nichts zu speichern
 
 
 def _undo_verlauf_leeren() -> None:
@@ -1161,6 +1431,12 @@ def _reset_state(state, *, emit_events: bool = True, blackout_output: bool = Tru
         state.set_freeze(False)
     except Exception as e:
         print(f"[show_file] reset unfreeze error: {e}")
+    # VCB-11: gezielte Blackouts (gedrueckte VC-Blackout-Tasten mit Ziel) gehoeren
+    # zur alten Show — ihre fids zeigten in der neuen auf fremde Geraete.
+    try:
+        state.clear_all_target_blackouts()
+    except Exception as e:
+        print(f"[show_file] reset target blackout error: {e}")
 
     # Patch (gepatchte Fixtures) leeren — entfernt sie auch aus current_show.db
     _replace_patch_from_data(state, [])
@@ -2090,6 +2366,10 @@ def load_show(path: str | os.PathLike):
         print(f"[show_file] post-load events error: {e}")
 
     _undo_verlauf_leeren()           # STAB-29: auch was der Loader selbst gepusht hat
+    # UI-69: das Laden selbst ist keine Aenderung. Hier auf dem Stand des
+    # States; das Hauptfenster merkt nach dem Neuaufbau seiner Views erneut
+    # (dessen VC-Layout kommt aus der Flaeche, nicht aus der Datei).
+    merke_show_stand(state)
 
     # ★ QA-50: „geladen" nur sagen, wenn auch alles gelesen wurde. Sonst steht
     # die Zahl im Text — die Einzelheiten holt die UI ueber

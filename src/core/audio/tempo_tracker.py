@@ -90,6 +90,11 @@ class TempoTracker:
     HINT_SIGMA = 0.15       # Oktaven, bei set_tempo_hint
     SUB_OCT_PENALTY = 1.0   # Kamm: Sub-Oktav-Strafe (s. _estimate), 0 = aus
     SUB_OCT_TAU = 0.7       # ... nur der Anteil von acm[Lag/2] ueber TAU x acm[Lag] zaehlt
+    SUB_OCT_RANGE = True    # BPM-26: ... und nur, wenn die schnellere Oktave selbst waehlbar ist (Schalter)
+    RASTER_BASS = True      # BPM-26: Bass-Raster-Waechter (s. _bass_raster), Schalter
+    RASTER_BASS_AUS = 0.3   # ... greift nur, wenn sich der Bass mit dem Sieger-Lag NICHT wiederholt
+    RASTER_BASS_EIN = 0.5   # ... aber mit 2/3 davon deutlich (ac_bass/ac_bass[0]; Fehlfaelle 0,95..0,98)
+    RASTER_SC_MIN = 0.5     # ... und der Kamm beim 2/3-Lag mind. diesen Anteil des Siegers traegt
     EST_SMOOTH = True       # Huellkurve vor der ACF gaussisch glaetten (SMOOTH_SIGMA Frames)
     SMOOTH_SIGMA = 1.0      # Frames (~12 ms); Spitzen zwischen zwei Lags verlieren sonst ACF-Hoehe
     HARM_WIDE = True        # Max-Filter +-2 an den Oberwellen 3 und 4
@@ -305,14 +310,27 @@ class TempoTracker:
         # Hats auf Achteln 0,64 (Bank-Fall 03_kick_bass_hats_90: unter TAU, sonst kippt er beim
         # Einrasten auf 180) / Backbeat-Kick 0,75-0,78 (kaum) — die schnelle Oktave selbst
         # hat beim halben Lag nichts (ac ~ 0).
+        # BPM-26: Kick auf jedem Viertel + breitbandiger Schlag NUR auf der Offbeat-Achtel (Hihat,
+        # Clap, Stab) hat beim halben Lag die Kreuz-Spitze Kick->Offbeat, 0,73..1,04 x eigene Spitze —
+        # die Strafe traf das WAHRE Tempo, und es gewann 1,5 x Lag (128 -> 85,3, Konfidenz 100 %).
+        # Die Strafe soll aber nur die schnellere Oktave bevorzugen; liegt die ausserhalb der Grenzen
+        # (128 -> 256), kann sie nie gewinnen (``_fold`` faltet sie auf den Kandidaten zurueck) — dann
+        # entfaellt die Strafe. Innerhalb der Grenzen bleibt alles wie vorher: dort sind Kick+Offbeat bei
+        # 90..100 und Kick 1/3 + Clap 2/4 ohne Bass bei 170..200 dasselbe Signal (Review BPM-26, F2:
+        # eine Bass-Gewichtung kippte das zweite auf das halbe Tempo).
         own = np.maximum(acm[L], 0.0)
         half = np.maximum(acm[np.rint(L / 2.0).astype(np.intp)], 0.0)
-        sc -= (self.SUB_OCT_PENALTY / (1.0 - self.SUB_OCT_TAU)) * np.maximum(half - self.SUB_OCT_TAU * own, 0.0)
+        excess = np.maximum(half - self.SUB_OCT_TAU * own, 0.0)
+        if self.SUB_OCT_RANGE:
+            excess[self.cand[:nl] * 2.0 > self.max_bpm * (1.0 + self.DEADBAND)] = 0.0
+        sc -= (self.SUB_OCT_PENALTY / (1.0 - self.SUB_OCT_TAU)) * excess
         np.maximum(sc, 0.0, out=sc)
         sc *= pri
         k = int(np.argmax(sc))
         if sc[k] <= 0:
             return 0.0, 0.0, 0.0, 0.0, 0
+        if self.RASTER_BASS and not self.tempo_hint:
+            k = self._bass_raster(L, sc, k, self._bass_acf(M))
         a = int(L[k])
         bpm = 60.0 * self.fps / self._feinlage(ac, a, M)
         # Konfidenz: Periodizitaet x Onset-Kontrast
@@ -339,6 +357,55 @@ class TempoTracker:
             # Bass-Huellkurve traegt die schnelle Oktave: Sieger x2, die Flux-Wahl wird Alternative
             return bpm * 2.0, conf, bpm, min(1.0, 1.0 / max(s_dbl, 1e-9)), a
         return bpm, conf, alt_bpm, alt_score, a
+
+    # ------------------------------------------------------------ Bass-Raster (BPM-26)
+    # Die Gesamt-Huellkurve ist geweisst: eine Hihat zaehlt darin so viel wie eine Kick. Die Bass-
+    # Huellkurve (lineare Magnitude 30..200 Hz) sieht nur die Kicks/Bassnoten — an ihr laesst sich
+    # pruefen, wo das Kick-Raster liegt.
+
+    def _bass_acf(self, M: int):
+        """(ac_bass[0], ac_bass mit Max-Filter +-1) ueber das Schaetzfenster, gleiche Kette wie die
+        Gesamt-ACF (Glaettung, unbiased) — oder None, wenn das Fenster keinen Bass hat."""
+        b = self.env_bass[-M:].astype(np.float64)
+        if self.EST_SMOOTH:
+            b = np.convolve(b, self._smooth_k, mode="same")
+        b -= b.mean()
+        nfft = 1 << int(np.ceil(np.log2(2 * M)))
+        F = np.fft.rfft(b, nfft)
+        acb = np.fft.irfft(F * np.conj(F), nfft)[:M]
+        if not acb[0] > 1e-12:
+            return None
+        acb = acb / (M - np.arange(M))
+        acbm = acb.copy()
+        np.maximum(acb[:-2], acb[1:-1], out=acbm[1:-1])
+        np.maximum(acbm[1:-1], acb[2:], out=acbm[1:-1])
+        return float(acb[0]), acbm
+
+    def _bass_raster(self, L: np.ndarray, sc: np.ndarray, k: int, bacf) -> int:
+        """Bass-Raster-Waechter: Index des Kamm-Kandidaten, der gewinnt (``k`` oder der 2/3-Lag).
+
+        Ist die Hihat im geweissten Flux so stark wie die Kick, ist die Huellkurve ein gleichmaessiger
+        Puls im Achtel-Abstand: Kamm(Lag) und Kamm(1,5 x Lag) sind gleich, der Prior (Mitte 120 BPM)
+        entscheidet — ab ~147 BPM fuer 2/3 des Tempos (150 -> 100, 170 -> 113,3, 180 -> 120). Die
+        Kicks wiederholen sich dann aber NICHT mit dem Sieger-Lag (ac_bass/ac_bass[0] gemessen
+        -0,10..-0,15), wohl aber mit 2/3 davon (0,95..0,98); bei allen richtigen Faellen der Messbank
+        ist es umgekehrt (Sieger 0,75..1,00, 2/3 hoechstens -0,06). Dann gilt das Kick-Raster —
+        sofern der Kamm dort mind. RASTER_SC_MIN des Siegers traegt. Tempo-Hinweis: kein Eingriff."""
+        if bacf is None:
+            return k
+        r0, acbm = bacf
+        a = int(L[k])
+        if acbm[a] >= self.RASTER_BASS_AUS * r0:        # Bass wiederholt sich mit dem Sieger: passt
+            return k
+        z = a * 2.0 / 3.0
+        j0 = int(np.searchsorted(L, z - 1.0))
+        j1 = int(np.searchsorted(L, z + 1.0, side="right"))
+        if j0 >= j1:
+            return k
+        j = j0 + int(np.argmax(sc[j0:j1]))
+        if sc[j] < self.RASTER_SC_MIN * sc[k] or acbm[int(L[j])] < self.RASTER_BASS_EIN * r0:
+            return k
+        return j
 
     # ------------------------------------------------------------ Feinlage (BPM-20)
     # Bis BPM-20 lag die Parabel um den KAMM-Lag ``a`` und war auf +-0,5 gekappt. Der Kamm waehlt

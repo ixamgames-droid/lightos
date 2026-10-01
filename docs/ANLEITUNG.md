@@ -50,7 +50,11 @@ Rechts in der Sektions-Leiste liegen die globalen Live-Bedienelemente:
   und manuell um (mehr im eigenen **BPM**-Tab, Sektion 8).
 - **● Beat-Indikator** – runder Puls-Punkt, blinkt im Takt (Takt 1 gelb, sonst grün).
 - **STOP ALL** – alle laufenden Playbacks stoppen.
-- **BLACKOUT** – sofort alles dunkel (erneut = wieder an).
+- **BLACKOUT** – sofort alles dunkel (erneut = wieder an). Alle Kanäle gehen auf 0 —
+  nur Position, Gobo, Prisma, Fokus/Zoom und Farbrad von Moving Heads mit
+  Dimmerkanal bleiben stehen, damit sie beim Lösen nicht sichtbar zurückfahren.
+  Ungepatchte Kanäle (z. B. ein Dimmerpack übers Simple Desk), Geräte ohne
+  Dimmerkanal, Laser und Nebelmaschinen gehen komplett aus.
 
 > Der frühere **Snap**-Button in der Leiste ist entfallen — Snapshots nimmst du
 > jetzt über **Programmer → Snapshots** oder das Menü **Programmer → Snapshot

@@ -132,10 +132,10 @@ class TargetListEditor(QWidget):
         for _id, _lbl in self._func_choices:
             func.addItem(_lbl, _id)
         # gespeicherte, aber nicht (mehr) gelistete ID dennoch zeigen
-        if fid is not None and not any(_id == int(fid) for _id, _ in self._func_choices):
-            func.addItem(f"#{int(fid)} (nicht gefunden)", int(fid))
+        if fid is not None and not any(_id == self._key(fid) for _id, _ in self._func_choices):
+            func.addItem(self._fehlt_label(fid), self._key(fid))
         if fid is not None:
-            idx = next((i for i in range(func.count()) if func.itemData(i) == int(fid)), -1)
+            idx = next((i for i in range(func.count()) if func.itemData(i) == self._key(fid)), -1)
             if idx >= 0:
                 func.setCurrentIndex(idx)
         hl.addWidget(func, 2)
@@ -215,10 +215,21 @@ class TargetListEditor(QWidget):
         self._refresh_title()
         self.changed.emit()
 
-    @staticmethod
-    def _row_fid(row):
+    def _row_fid(self, row):
         data = row["func"].currentData()
-        return int(data) if data is not None and int(data) >= 0 else None
+        if data is None or data == -1:
+            return None
+        key = self._key(data)
+        return key if not isinstance(key, int) or key >= 0 else None
+
+    # VCB-11: Schluessel-Typ der Zeilen. Basis = Funktions-/Snap-ID (int);
+    # Unterklassen mit anderen Zielen (Geraete/Gruppen) ueberschreiben beides.
+    @staticmethod
+    def _key(value):
+        return int(value)
+
+    def _fehlt_label(self, value) -> str:
+        return f"#{int(value)} (nicht gefunden)"
 
     @staticmethod
     def _row_param(row) -> str:
@@ -240,7 +251,7 @@ class TargetListEditor(QWidget):
         _seen: set[int] = set()
         for fid in (ids or []):
             try:
-                fid_i = int(fid)
+                fid_i = self._key(fid)
             except (TypeError, ValueError):
                 continue
             if fid_i in _seen:        # Duplikate beim Befuellen ueberspringen
@@ -290,3 +301,82 @@ class SnapListEditor(TargetListEditor):
             self.findChild(QPushButton).setText("+ Snap hinzufuegen")
         except Exception:
             pass
+
+
+def _blackout_choices() -> list[tuple[str, str]]:
+    """VCB-11: (Schluessel, Anzeigename) aller Fixture-Gruppen und gepatchten
+    Geraete — ``"g:<Name>"`` bzw. ``"f:<fid>"``. Gruppen zuerst (der Normalfall
+    „diese Seite der Buehne aus"), danach die Geraete nach fid."""
+    out: list[tuple[str, str]] = []
+    try:
+        from sqlalchemy import select
+        from src.core.database.models import FixtureGroup
+        from src.core.app_state import get_state
+        with get_state()._session() as s:
+            namen = sorted({n for n in s.execute(select(FixtureGroup.name)).scalars().all() if n},
+                           key=str.lower)
+        out += [(f"g:{n}", f"Gruppe: {n}") for n in namen]
+    except Exception:
+        pass
+    try:
+        from src.core.app_state import get_state
+        for fx in sorted(get_state().get_patched_fixtures(), key=lambda f: int(f.fid)):
+            name = getattr(fx, "name", "") or f"#{fx.fid}"
+            out.append((f"f:{int(fx.fid)}", f"Gerät: {name}  [#{int(fx.fid)}]"))
+    except Exception:
+        pass
+    return out
+
+
+def blackout_ziel_schluessel(fids, groups) -> list[str]:
+    """VCB-11: (fids, Gruppennamen) -> Zeilen-Schluessel des BlackoutTargetEditor."""
+    out = [f"g:{g}" for g in (groups or []) if g]
+    for f in (fids or []):
+        try:
+            out.append(f"f:{int(f)}")
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+class BlackoutTargetEditor(TargetListEditor):
+    """VCB-11: Ziel-Liste einer VC-Blackout-Taste — einzelne Geraete und/oder
+    Fixture-Gruppen. Leere Liste = globaler Blackout (Bestandsverhalten).
+
+    Gleiche kleine API wie ``TargetListEditor``; die Zeilen-Schluessel sind
+    Strings (``"f:<fid>"`` / ``"g:<Gruppe>"``), ``fids()``/``groups()`` liefern
+    die getrennten Listen fuer die Taste."""
+
+    def __init__(self, title: str = "Blackout-Ziel", parent=None):
+        super().__init__(with_params=False, title=title, parent=parent)
+        self._func_choices = _blackout_choices()
+        try:
+            self.findChild(QPushButton).setText("+ Gerät/Gruppe hinzufügen")
+            self._empty_lbl.setText("(kein Ziel = globaler Blackout)")
+        except Exception:
+            pass
+
+    @staticmethod
+    def _key(value):
+        v = str(value)
+        if not (v.startswith("f:") or v.startswith("g:")) or len(v) < 3:
+            raise ValueError(v)
+        return v
+
+    def _fehlt_label(self, value) -> str:
+        v = str(value)
+        art = "Gruppe" if v.startswith("g:") else "Gerät"
+        return f"{art}: {v[2:]} (nicht gefunden)"
+
+    def fids(self) -> list[int]:
+        out: list[int] = []
+        for k in self.ids():
+            if k.startswith("f:"):
+                try:
+                    out.append(int(k[2:]))
+                except ValueError:
+                    continue
+        return out
+
+    def groups(self) -> list[str]:
+        return [k[2:] for k in self.ids() if k.startswith("g:")]

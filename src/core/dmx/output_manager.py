@@ -206,6 +206,28 @@ class OutputManager:
         # fallen auf "alle Kanaele" zurueck, damit reine Roh-DMX-Setups weiter
         # global dimmen. {universe:int -> frozenset[addr 1..512]}
         self._gm_address_mask: dict[int, frozenset] = {}
+        # OUT-57: Adressen je Universum, die der BLACKOUT STEHEN LAESST (Erhalten-
+        # Maske) — nur Pan/Tilt/Gobo/Prisma/Optik gepatchter Lampen mit echtem
+        # Dimmer (s. AppState._build_blackout_keep_mask), damit Moving Heads beim
+        # Blackout nicht in die Grundstellung fahren und beim Loesen zurueck. ALLES
+        # andere geht auf 0 — auch ungepatchte Roh-Adressen im selben Universum
+        # (Simple Desk, Kanal-Fader, Engine-Extra): eine Liste der Licht-Kanaele
+        # waere nie vollstaendig. Universen OHNE Eintrag (ungepatcht/roh) nullt der
+        # Blackout KOMPLETT. {universe:int -> frozenset[addr 1..512]}
+        self._blackout_keep_mask: dict[int, frozenset] = {}
+        # OUT-57: zaehlt jede echte Blackout-Aenderung hoch. Ein Skript merkt sich
+        # den Stand nach seinem eigenen „blackout on" und nimmt den Blackout nur
+        # zurueck, solange niemand sonst ihn seitdem angefasst hat.
+        self._blackout_epoch = 0
+        # VCB-11: GEZIELTE Blackouts (VC-Blackout-Taste mit Ziel). slot -> {universe:
+        # frozenset[addr]} der Adressen, die DIESE Taste auf 0 zieht (Licht-Kanaele
+        # ihrer Ziel-Geraete, s. AppState.set_target_blackout). Jede Taste belegt
+        # einen eigenen Slot, damit sich mehrere Tasten sauber ueberlagern: das
+        # Loesen der einen laesst die andere dunkel. ``_ziel_blackout_union`` ist
+        # die Vereinigung aller Slots je Universum; sie wird bei jeder Aenderung
+        # NEU gebunden (immutable), der Output-Thread liest sie ohne Sperre.
+        self._ziel_blackouts: dict = {}
+        self._ziel_blackout_union: dict[int, frozenset] = {}
         # A3D-01: Adressen je Universum, die bei aktivem Laser-NOT-AUS FINAL (nach
         # Channel-Modifier + Grand-Master + Blackout) hart auf 0 gezwungen werden.
         # Leeres Dict = kein NOT-AUS aktiv. Vom AppState gepflegt (set_laser_estop /
@@ -262,6 +284,13 @@ class OutputManager:
         (Intensitaet/Farbe). Pan/Tilt/Gobo etc. bleiben unberuehrt. Vom AppState
         aus dem Patch gepflegt."""
         self._gm_address_mask = mask or {}
+
+    def set_blackout_keep_mask(self, mask: dict[int, frozenset]):
+        """OUT-57: Setzt je Universum die Adressen, die der Blackout STEHEN LAESST
+        (Position/Gobo/Prisma/Optik gepatchter Lampen mit echtem Dimmer); alle
+        anderen Adressen zieht er auf 0. Universen ohne Eintrag nullt der Blackout
+        komplett. Vom AppState aus dem Patch gepflegt."""
+        self._blackout_keep_mask = mask or {}
 
     def set_laser_estop_mask(self, mask: dict[int, frozenset]):
         """A3D-01: Setzt je Universum die Laser-Adressen, die bei aktivem NOT-AUS
@@ -488,6 +517,8 @@ class OutputManager:
         self._blackout = enabled
         if not geaendert:
             return
+        # getattr: Tests bauen den Manager teils per __new__ ohne __init__.
+        self._blackout_epoch = getattr(self, "_blackout_epoch", 0) + 1
         for cb in list(self._blackout_callbacks):
             try:
                 cb(enabled)
@@ -498,6 +529,11 @@ class OutputManager:
     def blackout(self) -> bool:
         return bool(self._blackout)
 
+    @property
+    def blackout_epoch(self) -> int:
+        """OUT-57: Zaehler der echten Blackout-Aenderungen (s. ``set_blackout``)."""
+        return getattr(self, "_blackout_epoch", 0)
+
     def subscribe_blackout(self, cb):
         if cb not in self._blackout_callbacks:
             self._blackout_callbacks.append(cb)
@@ -507,6 +543,47 @@ class OutputManager:
             self._blackout_callbacks.remove(cb)
         except ValueError:
             pass
+
+    # ── VCB-11: gezielter Blackout ──────────────────────────────────────────
+
+    def set_target_blackout(self, slot, mask: dict[int, frozenset]):
+        """VCB-11: Setzt den gezielten Blackout eines Slots (z. B. einer VC-Taste).
+        ``mask`` = {universe: Adressen}, die auf 0 gehen. Der Rest des Universums
+        laeuft normal weiter. Leere Maske = Slot belegt, wirkt aber auf nichts
+        (Ziel ohne gepatchte Geraete — bewusst KEIN globaler Fallback)."""
+        clean: dict[int, frozenset] = {}
+        for u, addrs in dict(mask or {}).items():
+            try:
+                fs = frozenset(int(a) for a in addrs if 1 <= int(a) <= 512)
+            except (TypeError, ValueError):
+                continue
+            if fs:
+                clean[int(u)] = fs
+        self._ziel_blackouts[slot] = clean
+        self._ziel_blackout_neu_vereinigen()
+
+    def clear_target_blackout(self, slot):
+        """VCB-11: Gibt den gezielten Blackout eines Slots frei (Taste losgelassen,
+        geloescht, Show/Seite gewechselt). Unbekannter Slot = no-op."""
+        if self._ziel_blackouts.pop(slot, None) is not None:
+            self._ziel_blackout_neu_vereinigen()
+
+    def clear_all_target_blackouts(self):
+        """VCB-11: Alle gezielten Blackouts freigeben (Show-Wechsel/Reset)."""
+        self._ziel_blackouts.clear()
+        self._ziel_blackout_neu_vereinigen()
+
+    def target_blackout_slots(self) -> list:
+        """VCB-11: Aktuell belegte Slots (fuer Tests/Diagnose)."""
+        return list(self._ziel_blackouts.keys())
+
+    def _ziel_blackout_neu_vereinigen(self):
+        union: dict[int, set] = {}
+        for mask in list(self._ziel_blackouts.values()):
+            for u, addrs in mask.items():
+                union.setdefault(u, set()).update(addrs)
+        # Ein Rutsch, immutable — der Output-Thread sieht alt ODER neu, nie halb.
+        self._ziel_blackout_union = {u: frozenset(a) for u, a in union.items() if a}
 
     def set_submaster(self, slot, level: float, fids=None, heads=None):
         """Setzt einen Submaster-Slot (multiplikativer Dimmer-Faktor 0.0–1.0).
@@ -913,7 +990,20 @@ class OutputManager:
             else:
                 self._buche_erfolg("Modifier", univ_num)
             if self._blackout:
-                data = bytes(512)
+                # OUT-57: Blackout nullt ALLES ausser der Erhalten-Maske (Pan/Tilt/
+                # Gobo/Prisma/Optik gepatchter Lampen mit echtem Dimmer) — sonst
+                # fuhren Moving Heads bei jedem Blackout in die Grundstellung und
+                # beim Loesen sichtbar zurueck. Invertiert, damit ungepatchte Roh-
+                # Adressen, raw-/Fine-Kanaele und unbekannte Attribute sicher dunkel
+                # werden. Der Grand-Master braucht hier nicht mehr zu laufen: seine
+                # Adressen sind nie in der Erhalten-Maske (dort steht ohnehin 0).
+                keep = self._blackout_keep_mask.get(univ_num)
+                buf = bytearray(512)
+                if keep:
+                    for addr in keep:
+                        if 1 <= addr <= len(data) and addr <= 512:
+                            buf[addr - 1] = data[addr - 1]
+                data = bytes(buf)
             elif self.grand_master < 0.999:
                 gm = self.grand_master
                 mask = self._gm_address_mask.get(univ_num)
@@ -930,6 +1020,20 @@ class OutputManager:
                         if 1 <= addr <= 512:
                             buf[addr - 1] = min(255, int(buf[addr - 1] * gm + 0.5))
                     data = bytes(buf)
+            # VCB-11: gezielte Blackouts (VC-Tasten mit Ziel) NACH dem Grand-Master
+            # — nur die Licht-Kanaele ihrer Ziel-Geraete auf 0, der Rest laeuft
+            # weiter. Beim globalen Blackout ist ohnehin alles ausser der
+            # Erhalten-Maske 0; die Ziel-Masken enthalten nie Erhalten-Adressen.
+            # getattr: Tests bauen den Manager teils per __new__ ohne __init__.
+            ziel = getattr(self, "_ziel_blackout_union", None)
+            ziel_mask = ziel.get(univ_num) if ziel else None
+            if ziel_mask and not self._blackout:
+                buf = bytearray(data)
+                n = len(buf)
+                for addr in ziel_mask:
+                    if addr <= n:
+                        buf[addr - 1] = 0
+                data = bytes(buf)
             # A3D-01: Laser-NOT-AUS als ALLERLETZTE Ebene — nach Channel-Modifier,
             # Grand-Master UND Blackout die verriegelten Laser-Adressen hart auf 0
             # zwingen. Der Modifier-Pass oben laeuft VOR diesem Schritt und wuerde
