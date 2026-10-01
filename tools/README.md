@@ -9,6 +9,7 @@
 |---|---|
 | `_builder.py` | Gemeinsame Build-Boilerplate für tools/build_*.py — ersetzt das ~95% copy- |
 | `_ci_beobachtend.py` | XPLAT-41: CI-Checks, die nur beobachten — die EINE Liste fuer die Merge-Werkzeuge. |
+| `_gate_summary.py` | XPLAT-43: maschinenlesbare Bilanz eines Segment-Gate-Laufs (summary.json). |
 | `_gate_webengine.ps1` | tools/_gate_webengine.ps1 - rechnerweite WebEngine-Absicherung des Windows-Gates. |
 | `_gate_webengine.sh` | tools/_gate_webengine.sh — gemeinsame WebEngine-Absicherung der Linux-Gate-Runner. |
 | `_gen_env.py` | Spawn-sichere Bootstrap-Schicht fuer alle ``tools/build_*.py``-Generatoren (DEMO-02). |
