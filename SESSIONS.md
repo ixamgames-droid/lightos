@@ -10,7 +10,6 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | PRIV-05 | A | fix/priv05-klarnamen-waechter | 2026-10-01T15:37Z | tools/session_claim.py,tests/test_session_claim.py |
-| PROC-14 | A | fix/proc14-claim-pruefung | 2026-10-01T15:41Z | tools/pr_bereit.py,tests/test_pr_bereit.py |
 | XPLAT-40 | A | ci/xplat40-anleitungsbilder-smoke | 2026-10-01T15:41Z | .github/workflows/ci.yml |
 | PROC-16 | A | fix/proc16-claim-ueberschneidung | 2026-10-01T15:41Z | tools/session_claim.py,tests/test_session_claim.py,COORDINATION.md |
 | PROC-09 | A | feat/proc09-changelog-fragmente | 2026-10-01T15:41Z | changelog.d,tools,tests,CHANGELOG.md,WORKFLOW.md |
@@ -155,7 +154,6 @@
 
 ## Verlauf
 
-- 2026-10-01T12:14Z A aktualisiert FM-51: Branch fix/fm51b-speicher-scope -> fix/fm51c-anzeige; Dateien src/core/app_state.py,src/ui/views/snap_file_panel.py,src/ui/views/snapshots_view.py,src/ui/views/programmer_view.py,src/ui/main_window.py -> src/core/app_state.py,src/core/show/patch_dedup.py,src/ui/views/live_view.py
 - 2026-10-01T12:47Z A done FM-51
 - 2026-10-01T12:47Z A claim UI-62
 - 2026-10-01T12:47Z A claim UI-63
@@ -185,3 +183,4 @@
 - 2026-10-01T16:25Z B claim BPM-23
 - 2026-10-01T16:35Z A done DOC-17
 - 2026-10-01T16:52Z A claim XPLAT-43
+- 2026-10-01T16:53Z A done PROC-14
