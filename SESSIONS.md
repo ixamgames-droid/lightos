@@ -9,7 +9,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| UI-64 | A | fix/buendel-ui64-ui65 | 2026-10-01T14:44Z | - |
 | UI-65 | A | fix/buendel-ui64-ui65 | 2026-10-01T14:44Z | - |
 | BPM-22 | B | fix/bpm22-kein-takt | 2026-10-01T15:14Z | src/ui/bpm_status_rules.py · src/core/audio/tempo_tracker.py · src/core/audio/beat_detector.py · src/ui/views/bpm_manager_view.py |
 | UI-67 | B | fix/bpm22-kein-takt | 2026-10-01T15:14Z | src/ui/bpm_status_rules.py · src/ui/views/bpm_manager_view.py |
@@ -141,7 +140,6 @@
 
 ## Verlauf
 
-- 2026-09-29T15:17Z A done STAB-29
 - 2026-09-29T16:49Z A claim FM-14b
 - 2026-09-29T18:13Z A done FM-14b
 - 2026-09-29T18:30Z A claim FM-41
@@ -171,3 +169,4 @@
 - 2026-10-01T15:14Z B claim BPM-22
 - 2026-10-01T15:14Z B claim UI-67
 - 2026-10-01T15:27Z A claim DOC-17
+- 2026-10-01T15:31Z A done UI-64
