@@ -9,7 +9,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| XPLAT-40 | A | ci/xplat40-anleitungsbilder-smoke | 2026-10-01T15:41Z | .github/workflows/ci.yml |
 | PROC-16 | A | fix/proc16-claim-ueberschneidung | 2026-10-01T15:41Z | tools/session_claim.py,tests/test_session_claim.py,COORDINATION.md |
 | PROC-09 | A | feat/proc09-changelog-fragmente | 2026-10-01T15:41Z | changelog.d,tools,tests,CHANGELOG.md,WORKFLOW.md |
 | XPLAT-43 | A | feat/xplat43-gate-summary | 2026-10-01T16:52Z | tools/verify_segmented.sh,tools/verify_segmented.ps1,tests |
@@ -158,7 +157,6 @@
 
 ## Verlauf
 
-- 2026-10-01T13:24Z A done UI-62
 - 2026-10-01T13:24Z A done UI-63
 - 2026-10-01T13:24Z A done BPM-19
 - 2026-10-01T13:46Z B claim BPM-15
@@ -188,3 +186,4 @@
 - 2026-10-01T17:15Z B done BPM-23
 - 2026-10-01T17:32Z B claim FUNKTIONSTEST-B
 - 2026-10-01T17:40Z A done PRIV-05
+- 2026-10-01T17:54Z A done XPLAT-40
