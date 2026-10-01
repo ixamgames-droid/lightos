@@ -42,7 +42,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
 from PySide6.QtCore import Qt, QTimer, QPointF, QRectF, Signal, QByteArray, QMimeData
 from PySide6.QtGui import (QPainter, QColor, QBrush, QPen, QFont, QPolygonF,
                             QLinearGradient, QRadialGradient, QMouseEvent,
-                            QDrag)
+                            QDrag, QFontMetricsF)
 from src.core.app_state import (
     get_state, get_channels_for_patched, pixel_ring_segments, viz_model_for,
     unapply_pan_tilt_orientation)
@@ -523,29 +523,33 @@ class FixtureRenderer:
             _fl = QFont("Arial"); _fl.setPointSizeF(8 * tscale)
             painter.setPen(QColor("#bbb"))
             painter.setFont(_fl)
-            text_rect = QRectF(-size, size*0.55, size*2, 16)
+            text_rect = label_rect(size, tscale)
             if lod == 0:
                 _txt = (f"{label_prefix} {label}" if label else label_prefix)
             else:
                 _txt = (label if label else label_prefix)
             painter.drawText(text_rect,
-                             Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextDontClip,
+                             Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop
+                             | Qt.TextFlag.TextDontClip,
                              _txt)
 
         # Intensity-Wert oben — nur bei voller Detailstufe (sonst Text-Salat)
+        _pct_w = 0.0
         if intensity > 0 and lod == 0:
             _fi = QFont("Arial"); _fi.setPointSizeF(7 * tscale)
             painter.setPen(QColor("#FFD700") if intensity > 200 else QColor("#aaa"))
             painter.setFont(_fi)
             inten_pct = int(intensity / 255 * 100)
-            painter.drawText(QRectF(-size, -size*0.9, size*2, 12),
-                            Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextDontClip,
-                            f"{inten_pct}%")
+            _pct_txt = f"{inten_pct}%"
+            _pct_w = QFontMetricsF(_fi).horizontalAdvance(_pct_txt)
+            painter.drawText(oben_rect(size, tscale),
+                            Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignBottom
+                            | Qt.TextFlag.TextDontClip,
+                            _pct_txt)
 
         # FX-Badge oben rechts (Geometrie + Schrift bildschirm-konstant) — nur LOD 0
         if effects and lod == 0:
-            bw, bh = 22 * tscale, 12 * tscale
-            badge_rect = QRectF(size*0.25, -size*0.9, bw, bh)
+            badge_rect = fx_badge_rect(size, tscale, _pct_w)
             painter.setBrush(QBrush(QColor(60, 130, 255, 200)))
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawRoundedRect(badge_rect, 3 * tscale, 3 * tscale)
@@ -557,6 +561,43 @@ class FixtureRenderer:
                              f"FX{len(effects)}" if len(effects) > 1 else "FX")
 
         painter.restore()
+
+
+# ── UI-64(g): Text-Geometrie rund um das Symbol ─────────────────────────────
+# Die Ringe (Effekt 0.72, Auswahl 0.70, Gruppe 0.82 x size plus halbe
+# Stiftbreite) liegen in Weltkoordinaten. Frueher sass das Label ab
+# ``size*0.55`` — der gelbe Auswahlring lief mitten durch die Schrift — und das
+# FX-Badge ab ``size*0.25`` rechts der Mitte, also ueber dem zentrierten
+# „100%". Jetzt beginnen alle Texte ausserhalb des AEUSSERSTEN Rings, auch wenn
+# er gerade nicht gezeichnet wird: so springt beim Anklicken nichts.
+
+def ring_aussenradius(size: float) -> float:
+    """Aeusserer Rand des groessten Rings (Gruppen-Highlight, Stift 4)."""
+    return size * 0.82 + 2.0
+
+
+def label_rect(size: float, tscale: float = 1.0) -> QRectF:
+    """Rahmen des Labels unter dem Symbol (Text oben buendig darin)."""
+    top = ring_aussenradius(size) + 2.0 * tscale
+    return QRectF(-size, top, size * 2, 16 * tscale)
+
+
+def oben_rect(size: float, tscale: float = 1.0) -> QRectF:
+    """Rahmen des %-Schilds ueber dem Symbol (Text unten buendig darin)."""
+    h = 12 * tscale
+    bottom = -(ring_aussenradius(size) + 2.0 * tscale)
+    return QRectF(-size, bottom - h, size * 2, h)
+
+
+def fx_badge_rect(size: float, tscale: float = 1.0,
+                  pct_breite: float = 0.0) -> QRectF:
+    """FX-Badge auf Hoehe des %-Schilds, rechts NEBEN dessen Text.
+
+    ``pct_breite`` = Breite des zentrierten %-Texts (0, wenn keiner da ist)."""
+    bw, bh = 22 * tscale, 12 * tscale
+    oben = oben_rect(size, tscale)
+    x = max(size * 0.25, pct_breite / 2 + 3.0 * tscale)
+    return QRectF(x, oben.bottom() - bh, bw, bh)
 
 
 def _lod_for_screen_gap(screen_gap: float) -> int:
