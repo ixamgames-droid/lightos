@@ -77,7 +77,7 @@ hängenden Werte gestoppter Quellen. Verbindlich spezifiziert in
 | 4b | Dimmer-Master | Submaster · Fixture-/Gruppen-Dimmer · Programmer-Dimmer | multiplikativ auf Intensitätskanäle |
 | 4c | Simple Desk | nur bei aktivem Override | oberste Schicht, nur gesetzte Kanäle |
 | 5 | Commit | gepatchte Spans atomar; freie Kanäle über Engine-Extra | ins Live-Universe |
-| — | Channel-Modifier → Grand Master/Blackout | `_send_all` beim Senden | GM dimmt nur Intensitäts-/Farbadressen (Maske) |
+| — | Channel-Modifier → Grand Master/Blackout | `_send_all` beim Senden | GM dimmt nur Intensitäts-/Farbadressen (Maske); Blackout nullt alles außer Pan/Tilt/Gobo/Optik von Lampen mit Dimmer (Erhalten-Maske, OUT-57) |
 
 **Schutzregeln** (warum nichts „durchfunkt"):
 - **WP-6**: Treibt eine laufende Funktion in diesem Frame einen
@@ -133,8 +133,14 @@ skaliert (Dim-/Farbadressen × intensity) ins gemeinsame Scratch gemerged.
 4. **Cues** ersetzen Effektwerte per LTP (Schicht 3 > 2).
 5. **Simple Desk** nur mit „Manueller Override" wirksam — dann absolute
    Oberhand auf explizit gesetzten Kanälen.
-6. **Grand Master/Blackout** wirken erst beim Senden und nur auf
-   Intensitäts-/Farbadressen (Moving Heads behalten Position/Gobo).
+6. **Grand Master/Blackout** wirken erst beim Senden. Der GM skaliert nur
+   Intensitäts-/Farbadressen. Der Blackout ist invertiert: er nullt ALLES außer
+   einer Erhalten-Maske — Pan/Tilt (inkl. Fine), Speed, Gobo, Prisma,
+   Fokus/Zoom/Iris/Frost und Farbrad gepatchter Lampen MIT echtem Dimmerkanal
+   (Moving Heads bleiben stehen). Ungepatchte Roh-Adressen im selben Universum,
+   `raw`-/Fine-Kanäle, unbekannte Attribute, Geräte ohne Dimmer, Laser/Nebel &
+   Co. und ungepatchte Universen gehen komplett auf 0 (OUT-57,
+   `AppState._build_blackout_keep_mask`).
 
 **Bekannte Grenzfälle** (by design, bei Showbau wissen):
 - Die WP-6-/EE-02-Erkennung ist ein Per-Frame-**Diff gegen den Default-Frame**:

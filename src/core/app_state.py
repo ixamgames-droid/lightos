@@ -231,6 +231,21 @@ _SUBTRACTIVE_COLOR_ATTRS = frozenset({
     "cmy_c", "cmy_m", "cmy_y", "cyan", "magenta", "yellow",
 })
 
+# OUT-57: Nicht-Licht-Attribute, die der Blackout bei einer Lampe MIT echtem
+# Dimmerkanal stehen laesst (Erhalten-Maske, s. _build_blackout_keep_mask) —
+# damit Moving Heads beim Blackout nicht in die Grundstellung fahren. BEWUSST
+# eine Positivliste: jedes hier NICHT genannte Attribut (Dimmer, Farbe, Shutter,
+# Strobe, raw, Makro, Lampe …) und jede unbekannte Adresse geht auf 0. Das
+# Farbrad steht hier, weil es allein kein Licht macht (Dimmer ist ja 0).
+_BLACKOUT_ERHALTEN_ATTRS = frozenset({
+    "pan", "tilt", "pan_fine", "tilt_fine", "pan_speed", "tilt_speed", "speed",
+    "gobo", "gobo_wheel", "gobo_wheel2", "gobo_rotation", "gobo_rot", "gobo_fx",
+    "gobo1", "gobo2",
+    "prism", "prism_rot", "prism_rotation",
+    "focus", "zoom", "iris", "frost",
+    "color_wheel", "colour_wheel",
+})
+
 # A3D-02: Nur diese Laser-Attribute sind "output-/emissions-relevant" und heben den
 # DMX-Laser-NOT-AUS-Latch wieder auf ("wieder an" = bewusstes Einschalten): die
 # Betriebsart/Musterbank (laser_bank), die Muster-/Gobo-Auswahl (gobo_wheel), der
@@ -1745,6 +1760,14 @@ class AppState:
                 {u: frozenset(s) for u, s in gm_mask.items()})
         except Exception as e:
             print(f"[AppState] set gm mask error: {e}")
+        # OUT-57: Blackout-ERHALTEN-Maske — nur Position/Gobo/Prisma/Optik gepatchter
+        # Lampen mit echtem Dimmer bleiben beim Blackout stehen, alles andere geht
+        # auf 0 (auch ungepatchte Roh-Adressen im selben Universum).
+        try:
+            self.output_manager.set_blackout_keep_mask(
+                {u: frozenset(s) for u, s in self._build_blackout_keep_mask(fix_index).items()})
+        except Exception as e:
+            print(f"[AppState] set blackout mask error: {e}")
         # A3D-01: die Laser-Estop-Maske am OutputManager mitpflegen (Adressen
         # koennen sich geaendert haben, waehrend der NOT-AUS-Latch aktiv ist).
         self._push_laser_estop_mask()
@@ -4561,6 +4584,72 @@ class AppState:
             for addr in self._fixture_intensity_addrs(fx, chans):
                 addrs.add(addr)
         return gm_mask
+
+    def _build_blackout_keep_mask(self, fix_index) -> dict[int, set]:
+        """OUT-57: Blackout-ERHALTEN-Maske pro gepatchtem DMX-Universum — die
+        Adressen, die der Blackout NICHT auf 0 zieht. Alles andere im Universum geht
+        auf 0. Die Regel ist bewusst invertiert („alles aus ausser …" statt „nur
+        Dimmer/Farbe aus"): eine Liste der Licht-Kanaele ist nie vollstaendig —
+        ``raw``-Kanaele (Lime/Indigo/IntensityValue/16-Bit-Dimmer-Fine aus dem
+        QXF-Import), additives ``cmy_c``, ungepatchte Roh-Adressen aus Simple Desk,
+        Kanal-Fadern oder Engine-Extra (STAB-14) im selben Universum wuerden sie
+        verfehlen und beim Blackout weiterleuchten (z. B. ein Dimmerpack fuer das
+        Saallicht auf ungepatchten Adressen). Unbekannt heisst deshalb: 0.
+
+        Erhalten bleiben NUR die Nicht-Licht-Kanaele (``_BLACKOUT_ERHALTEN_ATTRS``:
+        Pan/Tilt inkl. Fine, Speed, Gobo, Prisma, Fokus/Zoom/Iris/Frost, Farbrad)
+        einer gepatchten Lampe MIT echtem Dimmerkanal (``_DIM_INTENSITY_ATTRS``) —
+        nur dann ist sicher, dass Dimmer 0 die Lampe dunkel macht, und Moving Heads
+        fahren beim Blackout nicht in die Grundstellung und beim Loesen sichtbar
+        zurueck. Das Farbrad bleibt mit, weil es allein kein Licht macht.
+
+        Ganz auf 0 (kein Eintrag in der Erhalten-Maske):
+
+        * **Geraete ohne echten Dimmer** (RGB-PAR, CMY-only-Mover, Farbrad-Spot nur
+          mit Shutter): kein Kanal, ueber den sich „dunkel" sicher sagen liesse —
+          Dunkel geht vor Position.
+        * **Laser, Nebel/Haze, Funken, CO2 & Co.** (``ist_geraet_ohne_licht``,
+          dieselbe Erkennung wie LAS-21): ein Blackout ist der Knopf fuer „sofort
+          alles aus"; ein Laser, der weiter ins Publikum strahlt, oder eine
+          Nebelmaschine, die weiter pumpt, waere das Gegenteil. Der Laser-NOT-AUS
+          bleibt davon unberuehrt die letzte Ebene im Sende-Pfad.
+
+        Ueberlappen sich Geraete (Fehlpatch), gewinnt die 0: eine Adresse, die ein
+        anderes Geraet als Licht-/Unbekannt-Kanal belegt, wird nicht erhalten.
+
+        Wie bei der GM-Maske bekommt JEDES gepatchte DMX-Universum einen Eintrag
+        (ggf. leer); ein fehlender Key heisst „ungepatcht" -> auch dann nullt der
+        Sende-Pfad das Universum komplett."""
+        from .all_white import ist_geraet_ohne_licht
+        keep: dict[int, set] = {}
+        nullen: dict[int, set] = {}
+        for _fid, (fx, chans) in fix_index.items():
+            if not fixture_uses_dmx(fx):
+                continue
+            keep.setdefault(fx.universe, set())   # Universum registrieren
+            aus = nullen.setdefault(fx.universe, set())
+            adr_attr: list[tuple[int, str]] = []
+            hat_dimmer = False
+            for ch in chans:
+                addr = fx.address + ch.channel_number - 1
+                if not (1 <= addr <= 512):
+                    continue
+                # Mehrkopf-Suffix ``attr#N`` aendert die Funktion nicht.
+                attr = (getattr(ch, "attribute", "") or "").lower().partition("#")[0]
+                adr_attr.append((addr, attr))
+                if attr in _DIM_INTENSITY_ATTRS:
+                    hat_dimmer = True
+            if not hat_dimmer or ist_geraet_ohne_licht(fx, chans):
+                aus.update(a for a, _ in adr_attr)
+                continue
+            for addr, attr in adr_attr:
+                if attr in _BLACKOUT_ERHALTEN_ATTRS:
+                    keep[fx.universe].add(addr)
+                else:
+                    aus.add(addr)
+        for u, addrs in keep.items():
+            addrs -= nullen.get(u, set())
+        return keep
 
     def _resolve_cue_stack(self, idx):
         """F-16: Index → Geschwister-Cueliste (oder None). Liest die Liste LIVE, ist
