@@ -14,9 +14,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 - **Falsches Tempo mit 100 % Konfidenz:** Ein Beat mit Kick auf jedem Schlag und einem hellen
   Schlag dazwischen (Hihat, Clap, Akkord-Stab auf der Offbeat-Achtel — typisch fuer House und
   Techno) wurde als 2/3 des Tempos erkannt: 128 als 85,3, 150 als 100, 170 als 113. Jetzt
-  prueft die Erkennung an den Bass-Schlaegen, wo die Kicks wirklich liegen. In der Messbank
-  (60–190 BPM, verschiedene Lautstaerken) sank die Fehlerzahl von 69 auf 11; die uebrigen
-  sind langsame Titel (60–80 BPM), die als doppeltes Tempo erscheinen — dafuer gibt es ×½.
+  stimmt das Tempo von 104 bis 190 BPM; langsame Titel (60–100 BPM) mit lautem Offbeat
+  erscheinen weiter als doppeltes Tempo — dafuer gibt es ×½.
 
 ### 2026-10-01 — BPM-Erkennung trifft das Tempo genau, „EINGERASTET“ nur bei sicherem Takt (BPM-20, BPM-23)
 

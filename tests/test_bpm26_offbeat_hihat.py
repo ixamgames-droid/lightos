@@ -8,10 +8,11 @@ Ursache 1: die Sub-Oktav-Strafe im Kamm. Beim halben Lag liegt die Kreuz-Spitze 
 (0,73..1,04 x eigene Spitze) — die Strafe traf das wahre Tempo, es gewann 1,5 x Lag.
 Ursache 2 (ab ~147 BPM, Offbeat so stark wie die Kick): Kamm(Lag) = Kamm(1,5 x Lag), der Prior
 (Mitte 120) entscheidet fuer 2/3 (150 -> 100, 170 -> 113,3).
-Fix: die Strafe zaehlt nur, wenn der schnellere Puls auch in der Bass-Huellkurve steht
-(Kicks), und der Bass-Raster-Waechter nimmt 2/3 des Lags, wenn sich die Kicks nur dort
-wiederholen. Messbank (Scratch, 100 Faelle 60..190 BPM x 5 Pegel): vorher 69 Fehler, nachher
-11 — die uebrigen sind 60..80 BPM -> doppelt (Oktave, auf main identisch, ausser Umfang).
+Fix: die Strafe entfaellt, wenn die schnellere Oktave ausserhalb der Grenzen liegt (sie kann dann
+nie gewinnen), und der Bass-Raster-Waechter nimmt 2/3 des Lags, wenn sich die Kicks nur dort
+wiederholen. Innerhalb der Grenzen bleibt alles wie vorher (Review F2: Kick 1/3 + Clap 2/4 ohne
+Bass bei 170..200 ist dasselbe Signal wie Kick + Offbeat bei 85..100 — eine erste Fassung mit
+Bass-Gewichtung kippte es auf das halbe Tempo).
 
 Die Testbank-Hihat (hochpassgefiltert) loest den Fehler NICHT aus — es braucht einen
 breitbandigen Offbeat (Hihat mit Mitten, Clap, Akkord-Stab), wie ihn der Testbeat hat.
@@ -77,13 +78,37 @@ def test_offbeat_schlag_rastet_aufs_wahre_tempo(bpm, amp):
     assert s.bpm == pytest.approx(bpm, rel=0.01), f"{bpm} BPM -> {s.bpm:.2f}"
 
 
-def test_ursache_belegt_ohne_bass_bestaetigung_wieder_zwei_drittel(monkeypatch):
-    """Beide Schalter aus = Verhalten vor BPM-26: der Testbeat rastet auf 2/3 ein."""
-    monkeypatch.setattr(TempoTracker, "SUB_OCT_BASS", False)
+def test_ursache_belegt_ohne_fix_falsches_tempo(monkeypatch):
+    """Beide Schalter aus = Verhalten vor BPM-26: der Testbeat rastet NICHT auf 128 ein."""
+    monkeypatch.setattr(TempoTracker, "SUB_OCT_RANGE", False)
     monkeypatch.setattr(TempoTracker, "RASTER_BASS", False)
     s = _feed(BeatDetector(SR), _groove(128.0, 12.0, 0.25)).snapshot()
     assert s.state == "locked"
-    assert s.bpm == pytest.approx(128.0 * 2.0 / 3.0, rel=0.01)
+    assert s.bpm != pytest.approx(128.0, rel=0.02)
+
+
+def _clap(rng, amp: float) -> np.ndarray:
+    n = int(0.08 * SR)
+    x = np.diff(rng.standard_normal(n + 1))
+    return amp * x * np.exp(-np.arange(n) / (0.02 * SR))
+
+
+@pytest.mark.parametrize("bpm,amp", [(172.0, 0.3), (172.0, 0.6), (180.0, 0.6)])
+def test_kick_eins_drei_clap_zwei_vier_ohne_bass_bleibt_wie_vorher(bpm, amp):
+    """Review F2: Kick auf 1/3 + Clap auf 2/4 ohne Bass (DnB-Drums) — main erkennt das volle Tempo;
+    die erste Fassung (Bass-Gewichtung) lieferte das halbe. Innerhalb der Grenzen gilt die alte Strafe."""
+    rng = np.random.default_rng(3)
+    x = np.zeros(int(12.0 * SR))
+    per, t, i = 60.0 / bpm, 0.0, 0
+    while t < 12.0:
+        piece = _kick(rng) if i % 2 == 0 else _clap(rng, amp)
+        s0 = int(round(t * SR))
+        e = min(len(x), s0 + len(piece))
+        x[s0:e] += piece[:e - s0]
+        t, i = t + per, i + 1
+    x = (x / np.max(np.abs(x)) * 10 ** (-12 / 20)).astype(np.float32)
+    s = _feed(BeatDetector(SR), x).snapshot()
+    assert s.bpm == pytest.approx(bpm, rel=0.01), f"{bpm} BPM -> {s.bpm:.2f}"
 
 
 def test_reiner_kick_pulszug_behaelt_die_sub_oktav_strafe():
@@ -101,12 +126,9 @@ def test_tempo_hinweis_hat_vorrang_vor_dem_bass_raster():
 
 
 def test_ohne_bass_keine_aussage():
-    """Leere Bass-Huellkurve: kein Bass-Urteil -> Strafe wie vor BPM-26, Waechter ohne Eingriff."""
+    """Leere Bass-Huellkurve: kein Bass-Urteil -> der Waechter greift nicht ein."""
     tr = TempoTracker(SR)
-    M = 400
-    assert tr._bass_acf(M) is None
+    assert tr._bass_acf(400) is None
     L = np.arange(30, 60)
-    w = tr._sub_oct_bass_weight(L, np.rint(L / 2.0).astype(np.intp), None)
-    assert np.all(w == 1.0)
     sc = np.linspace(0.1, 1.0, L.size)
     assert tr._bass_raster(L, sc, 5, None) == 5
