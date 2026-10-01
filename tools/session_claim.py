@@ -67,7 +67,10 @@ _KOPF = """# SESSIONS.md — wer arbeitet gerade woran
 <!-- Gepflegt von tools/session_claim.py. Branch `sessions`, wird NIE nach main
      gemergt. Von Hand editieren ist moeglich, verliert aber die Konflikt-
      erkennung: erst der abgelehnte Push macht sichtbar, dass jemand schneller
-     war. Spielregeln: COORDINATION.md -->
+     war. Spielregeln: COORDINATION.md
+     PROC-08: Blocker verfallen beim naechsten Schreiben nach 7 Tagen — nicht
+     aber ungelesene Briefe und der letzte Eintrag jeder Sitzung. Volltext
+     aelterer Eintraege: git log -p origin/sessions -- SESSIONS.md -->
 """
 
 _H_AKTIV = "## Aktive Claims"
@@ -282,6 +285,69 @@ def blocker_fuer(blocker: list[str], sitzung: str) -> list[str]:
     return [b for b in blocker[start:] if ist_an(b, ziel)]
 
 
+# ─── PROC-08: Blocker verfallen ──────────────────────────────────────────────
+# PROC-07 hat die LESE-Seite gekuerzt (`list --blocker N`), geschrieben wurde
+# aber unbegrenzt: am 2026-10-01 stand die Tafel bei 144 Blockern / 253 kB,
+# allein an diesem Tag kamen 30 dazu. Jeder `claim` holt und schreibt die ganze
+# Datei. Der Verlauf daneben hat mit `_VERLAUF_MAX` laengst eine Grenze.
+#
+# Bewusst ein Alter statt einer festen Anzahl: an einem vollen Tag fielen sonst
+# die Uebergaben vom Vortag heraus. Und drei Ausnahmen, damit nichts verloren
+# geht, was noch jemand braucht:
+#   * ein Brief, den ein Adressat noch NICHT gelesen hat (`blocker_offen`),
+#   * der letzte Eintrag jeder Sitzung — er ist die Lesemarke von
+#     `blocker_fuer`; faellt er weg, tauchen schon gelesene Briefe wieder auf,
+#   * ein Eintrag ohne lesbaren Zeitstempel (von Hand geschrieben) — was man
+#     nicht datieren kann, wird nicht weggeworfen.
+# Verfallene Eintraege stehen weiter in der Git-Historie des Zweigs `sessions`.
+
+#: Ab diesem Alter faellt ein Blocker beim naechsten Schreiben von der Tafel.
+BLOCKER_VERFALL = timedelta(days=7)
+
+
+def blocker_offen(blocker: list[str], i: int) -> bool:
+    """Ist Eintrag ``i`` ein Brief, den ein Adressat noch nicht gelesen hat?
+
+    „Gelesen" heisst wie bei :func:`blocker_fuer`: der Adressat hat NACH dem
+    Brief selbst etwas geschrieben. ``AN ALLE`` ist offen, solange irgendeine
+    andere Sitzung, die je auf der Tafel geschrieben hat, seitdem schweigt.
+    """
+    eintrag = blocker[i]
+    autor = (blocker_sitzung(eintrag) or "").upper()
+    spaeter = {(blocker_sitzung(b) or "").upper() for b in blocker[i + 1:]}
+    adressaten: set[str] = set()
+    for m in _ANREDE.finditer(eintrag):
+        gruppe = m.group(1)
+        if gruppe == "ALLE":
+            adressaten |= {(blocker_sitzung(b) or "").upper() for b in blocker}
+        else:
+            adressaten |= set(re.findall(r"\b[A-Z]\b", gruppe))
+    adressaten -= {autor, ""}
+    return any(a not in spaeter for a in adressaten)
+
+
+def blocker_behalten(blocker: list[str], t: datetime) -> list[str]:
+    """Die Blocker, die beim Schreiben zum Zeitpunkt ``t`` stehen bleiben.
+
+    Reihenfolge bleibt erhalten. Verfallen ist ein Eintrag nur, wenn er
+    datierbar, aelter als :data:`BLOCKER_VERFALL`, kein offener Brief und
+    nicht der letzte Eintrag seiner Sitzung ist.
+    """
+    letzter: dict[str, int] = {}
+    for i, b in enumerate(blocker):
+        sitzung = (blocker_sitzung(b) or "").upper()
+        if sitzung:
+            letzter[sitzung] = i
+    behalten = []
+    for i, b in enumerate(blocker):
+        st = lies_stempel(b.split(" ", 1)[0]) if b.strip() else None
+        if (st is None or t - st <= BLOCKER_VERFALL
+                or letzter.get((blocker_sitzung(b) or "").upper()) == i
+                or blocker_offen(blocker, i)):
+            behalten.append(b)
+    return behalten
+
+
 def blocker_text(roh: bytes) -> str:
     """Rohbytes (stdin oder Datei) -> EINE Blocker-Zeile.
 
@@ -491,6 +557,15 @@ def schreibe_tafel(repo: str, tafel: dict, eltern: str | None,
     Ueber Plumbing statt Checkout: der Arbeitsbaum der Sitzung (und der einer
     parallel laufenden!) bleibt unberuehrt.
     """
+    # PROC-08: die Schreib-Seite haelt die Blockerliste begrenzt — an genau
+    # einer Stelle, damit claim/release/blocker es gleich halten.
+    t = jetzt()
+    bleibt = blocker_behalten(tafel["blocker"], t)
+    weg = len(tafel["blocker"]) - len(bleibt)
+    if weg:
+        tafel = dict(tafel, blocker=bleibt, verlauf=list(tafel["verlauf"]) + [
+            f"{stempel(t)} {weg} Blocker verfallen (aelter als "
+            f"{BLOCKER_VERFALL.days} Tage, gelesen; Volltext in der Historie)"])
     blob = _git("hash-object", "-w", "--stdin", eingabe=rendere(tafel), repo=repo)
     baum = _git("mktree", eingabe=f"100644 blob {blob}\t{DATEI}\n", repo=repo)
     args = ["commit-tree", baum, "-m", nachricht]
