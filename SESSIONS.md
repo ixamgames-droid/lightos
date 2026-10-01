@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| _(frei)_ |  |  |  |  |
+| BPM-15 | B | (kein Code, Rig-Test) | 2026-10-01T13:46Z | - |
 
 ## Blocker & Fallen
 
@@ -131,7 +131,6 @@
 
 ## Verlauf
 
-- 2026-09-29T02:05Z A claim QA-81
 - 2026-09-29T02:10Z A done STAB-27
 - 2026-09-29T02:36Z A done QA-67
 - 2026-09-29T02:36Z A done QA-81
@@ -161,3 +160,4 @@
 - 2026-10-01T13:24Z A done UI-62
 - 2026-10-01T13:24Z A done UI-63
 - 2026-10-01T13:24Z A done BPM-19
+- 2026-10-01T13:46Z B claim BPM-15
