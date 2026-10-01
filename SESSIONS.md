@@ -9,7 +9,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| BPM-25 | A | fix/bpm25-beats-stumm-anzeigen | 2026-10-01T21:34Z | src/ui/bpm_status_rules.py,src/ui/views/bpm_manager_view.py,src/core/audio/tempo_tracker.py |
 | TOOL-3 | C | fix/tool3-generator-pfade | 2026-10-01T21:11Z | tools/build_full_show.py · tools/build_spot90_testshow.py · tools/_profil.py · tools/README.md · tests/test_tool3_generator_annahmen.py · BACKLOG.md |
 | PROC-08 | C | fix/proc08-blocker-verfall | 2026-10-01T21:24Z | tools/session_claim.py · COORDINATION.md · tests/test_proc08_blocker_verfall.py · changelog.d/2026-10-02-PROC-08.md |
 | ENG-27 | C | fix/eng27-open-value | 2026-10-01T21:27Z | src/core/app_state.py · src/core/all_white.py · src/core/engine/efx.py |
@@ -177,7 +176,6 @@
 
 ## Verlauf
 
-- 2026-10-01T20:32Z A done XPLAT-41
 - 2026-10-01T20:41Z A claim UI-68
 - 2026-10-01T20:41Z A claim BPM-25
 - 2026-10-01T21:00Z C claim TOOL-5
@@ -207,3 +205,4 @@
 - 2026-10-01T22:51Z A claim DOC-21
 - 2026-10-01T23:00Z C done DOC-15
 - 2026-10-01T23:12Z A claim VIZ-65
+- 2026-10-01T23:27Z A done BPM-25
