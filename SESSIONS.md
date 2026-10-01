@@ -9,7 +9,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| BPM-26 | B | fix/bpm26-offbeat-hihat | 2026-10-01T19:32Z | src/core/audio/tempo_tracker.py · tests/test_bpm26_offbeat_hihat.py · BACKLOG.md · CHANGELOG.md |
 | UI-69 | A | fix/ui69-speichern-beim-beenden | 2026-10-01T20:02Z | src/ui/main_window.py,src/core/show |
 | UI-68 | A | fix/ui68-go-ohne-executor | 2026-10-01T20:41Z | src/ui/views/playback_view.py |
 | BPM-25 | A | fix/bpm25-beats-stumm-anzeigen | 2026-10-01T20:41Z | src/ui/bpm_status_rules.py,src/ui/views/bpm_manager_view.py,src/core/audio/tempo_tracker.py |
@@ -171,7 +170,6 @@
 
 ## Verlauf
 
-- 2026-10-01T16:35Z A done DOC-17
 - 2026-10-01T16:52Z A claim XPLAT-43
 - 2026-10-01T16:53Z A done PROC-14
 - 2026-10-01T17:15Z B done BPM-20
@@ -201,3 +199,4 @@
 - 2026-10-01T21:21Z C claim DOC-15
 - 2026-10-01T21:22Z A claim DOC-18
 - 2026-10-01T21:24Z C claim PROC-08
+- 2026-10-01T21:24Z B done BPM-26
