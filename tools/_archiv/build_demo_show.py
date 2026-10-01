@@ -11,12 +11,12 @@ Konzept (passt zum zentralen Per-Frame-Renderer):
     schon vom MIDI-Mapper belegt -> kein Doppel-Trigger). Master-Fader (CC56) ist
     bereits auf grand_master gemappt.
 
-Aufruf:  venv/Scripts/python.exe tools/build_demo_show.py
+Aufruf:  venv/Scripts/python.exe tools/_archiv/build_demo_show.py
          (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 """
 import os
 import sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import _bootstrap  # noqa: F401  # Repo-Root + tools/ auf sys.path (siehe _bootstrap.py)
 # DEMO-02: spawn-sichere Env-Schalter setzen, BEVOR app_state importiert wird.
 # Ohne diese Zeile re-importiert ein multiprocessing-'spawn'-Kindprozess dieses
 # guardlose Skript als __mp_main__ und baut die Show ein zweites Mal -> halber
@@ -34,7 +34,7 @@ from src.ui.virtualconsole.vc_button import VCButton, ButtonAction
 from src.ui.virtualconsole.vc_color import VCColor, ColorTarget
 from src.ui.virtualconsole.vc_label import VCLabel
 
-_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ROOT = _bootstrap.REPO_ROOT
 OUT = os.path.join(_ROOT, "shows", "APC_Demo_Show.lshow")
 
 state = get_state()
@@ -48,9 +48,9 @@ if not fixtures:
         "Dieses Alt-Skript baut auf dem Bestands-Patch auf. Bewusster Lauf gegen die "
         "echte DB (App vorher schliessen!):\n"
         "  Windows:     $env:LIGHTOS_SHOW_DB='data/current_show.db'; "
-        "venv/Scripts/python.exe tools/build_demo_show.py" + "\n" +
+        "venv/Scripts/python.exe tools/_archiv/build_demo_show.py" + "\n" +
         "  Linux/macOS: LIGHTOS_SHOW_DB=data/current_show.db "
-        "./venv/bin/python tools/build_demo_show.py"
+        "./venv/bin/python tools/_archiv/build_demo_show.py"
     )
 fids = [f.fid for f in fixtures]
 

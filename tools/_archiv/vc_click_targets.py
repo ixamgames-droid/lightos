@@ -2,16 +2,17 @@
 oben-links) die SCREEN-Klick-Koordinaten (physische px) je VC-Widget-Mitte.
 Robust gegen vertikales Verschieben des Canvas (z. B. Edit-Modus-Toolbar-Umbruch).
 
-Aufruf:  venv/Scripts/python.exe tools/vc_click_targets.py <vollbild.png> [name]
+Aufruf:  venv/Scripts/python.exe tools/_archiv/vc_click_targets.py <vollbild.png> [name]
          (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 Ausgabe: je Widget eine Zeile  'NAME cx cy'  (Mitte des BEDIEN-Widgets, nicht des Labels)
          + Zeile  'CALIB scale ox oy'
 """
 from __future__ import annotations
+import _bootstrap  # noqa: F401  # Repo-Root + tools/ auf sys.path (siehe _bootstrap.py)
 import os, sys, json
 from PIL import Image
 
-_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ROOT = _bootstrap.REPO_ROOT
 GEO = os.path.join(_ROOT, "docs", "anleitung_vc_widgets", "_capture", "geometry.json")
 
 

@@ -307,6 +307,16 @@ EFFECT_ACTION_LABELS: list[tuple[str, str]] = [
 ]
 
 
+def _clear_target_blackout_slot(slot) -> None:
+    """VCB-11: gibt den gezielten Blackout einer (geloeschten/umgestellten) Taste
+    frei — sonst bliebe ihr Teil-Blackout als Geist haengen."""
+    try:
+        from src.core.app_state import get_state
+        get_state().clear_target_blackout(slot)
+    except Exception:
+        pass
+
+
 def _badge_text_right_inset(has_gobo: bool, gobo_w: int, has_badge: bool,
                             face_w: float | None = None,
                             badge_d: int = 16, margin: int = 8) -> int:
@@ -358,6 +368,13 @@ class VCButton(VCWidget):
         self.group_name: str = ""
         # LAS-18: Name des Laser-Musters (PaletteType.LASER) fuer LASER_PATTERN.
         self.laser_palette: str = ""
+        # VCB-11: Ziel einer BLACKOUT-Taste — einzelne Geraete (fids) und/oder
+        # Fixture-Gruppen (Namen, zur Laufzeit aufgeloest). Beides leer = globaler
+        # Blackout wie bisher (alte Layouts ohne die Felder laden genau so).
+        self.blackout_fids: list[int] = []
+        self.blackout_groups: list[str] = []
+        # Slot des gezielten Blackouts raeumen, wenn die Taste geloescht wird.
+        self.destroyed.connect(lambda *_, s=id(self): _clear_target_blackout_slot(s))
         # Tempo-Sync Phase 5: Ziel-Bus fuer TAP_BUS/SYNC_BUS/ARM_BUS ("" = aktiver/Default-Bus).
         self.tempo_bus_id: str = ""
         # Live-Bearbeitung: macht den gestarteten Effekt zum aktiven Bearbeitungsziel
@@ -944,8 +961,21 @@ class VCButton(VCWidget):
         if self._bg_movie is not None:      # VC-IMG: GIF nur laufen lassen wenn sichtbar
             self._bg_movie.start()
 
+    def has_blackout_target(self) -> bool:
+        """VCB-11: Hat diese (BLACKOUT-)Taste ein Ziel? Nein = globaler Blackout."""
+        return bool(self.blackout_fids or self.blackout_groups)
+
+    def _release_target_blackout(self):
+        """VCB-11: eigenen gezielten Blackout freigeben (no-op wenn keiner)."""
+        _clear_target_blackout_slot(id(self))
+
     def hideEvent(self, event):
         super().hideEvent(event)
+        # VCB-11: BEWUSST keine Teil-Blackout-Freigabe hier. hideEvent kommt auch,
+        # wenn nur die Hauptansicht wechselt oder das Fenster minimiert wird,
+        # waehrend ein MIDI-Pad gehalten ist — dann muss es dunkel bleiben (wie
+        # beim globalen Blackout). Den Bankwechsel erledigt VCCanvas ueber
+        # ``release_if_held`` (UI-57).
         if self._badge_timer.isActive():
             self._badge_timer.stop()
         if self._bg_movie is not None:      # VC-IMG: off-bank -> GIF stoppen (keine CPU)
@@ -1228,7 +1258,15 @@ class VCButton(VCWidget):
         state = get_state()
 
         if self.action == ButtonAction.BLACKOUT:
-            state.output_manager.set_blackout(bool(press))
+            if self.has_blackout_target():
+                # VCB-11: nur die Ziel-Geraete dunkel, der Rest laeuft weiter.
+                if press:
+                    state.set_target_blackout(id(self), self.blackout_fids,
+                                              self.blackout_groups)
+                else:
+                    state.clear_target_blackout(id(self))
+            else:
+                state.output_manager.set_blackout(bool(press))
             return
 
         if self.action == ButtonAction.STOP_ALL:
@@ -1894,7 +1932,8 @@ class VCButton(VCWidget):
         zusammensetzen. ``live=True`` = jede Aenderung wird sofort angewendet
         (Inspector); ``live=False`` = erst beim OK (modaler Dialog)."""
         from PySide6.QtWidgets import QPushButton, QColorDialog
-        from .target_list_editor import TargetListEditor, SnapListEditor
+        from .target_list_editor import (TargetListEditor, SnapListEditor,
+                                         BlackoutTargetEditor, blackout_ziel_schluessel)
 
         cap = QLineEdit(self.caption)
 
@@ -2001,6 +2040,15 @@ class VCButton(VCWidget):
             pass
         group_combo.setCurrentText(self.group_name or "")
         group_combo.setToolTip("Fixture-Gruppe für Aktion = SelectGroup.")
+
+        # VCB-11: Ziel der Blackout-Taste — Geraete und/oder Gruppen; leer = global.
+        blackout_editor = BlackoutTargetEditor(title="Blackout-Ziel")
+        blackout_editor.set_targets(
+            blackout_ziel_schluessel(self.blackout_fids, self.blackout_groups))
+        blackout_editor.setToolTip(
+            "Leer = globaler Blackout. Mit Ziel schaltet die Taste NUR diese Geräte/"
+            "Gruppen dunkel (Dimmer/Farbe auf 0, Pan/Tilt/Gobo bleiben); der Rest "
+            "läuft weiter. Gruppen werden beim Drücken aufgelöst.")
 
         # LAS-18: Auswahl des Laser-Musters (PaletteType.LASER) für LASER_PATTERN.
         laser_pal_combo = QComboBox()
@@ -2119,6 +2167,7 @@ class VCButton(VCWidget):
         TB, SB, AB = ButtonAction.TAP_BUS, ButtonAction.SYNC_BUS, ButtonAction.ARM_BUS
         AW = ButtonAction.ALL_WHITE   # bindet die (hochpriore) Weiss-Szene wie ein Flash
         LP = ButtonAction.LASER_PATTERN   # LAS-18: Laser-Muster abrufen
+        BO = ButtonAction.BLACKOUT        # VCB-11: Blackout mit optionalem Ziel
 
         def apply():
             self.caption = cap.text() or self.caption
@@ -2156,6 +2205,14 @@ class VCButton(VCWidget):
             self.effect_action_key = eff_action_combo.currentData() or self.effect_action_key
             self.group_name = group_combo.currentText().strip()
             self.laser_palette = laser_pal_combo.currentText().strip()
+            # VCB-11: Ziel nur bei BLACKOUT; ein gehaltener Teil-Blackout wird
+            # freigegeben (Ziel/Aktion koennten sich gerade geaendert haben).
+            self._release_target_blackout()
+            if self.action == BO:
+                self.blackout_fids = blackout_editor.fids()
+                self.blackout_groups = blackout_editor.groups()
+            else:
+                self.blackout_fids, self.blackout_groups = [], []
             self.edit_slot = edit_slot_edit.text().strip()
             self.tempo_bus_id = bus_combo.currentData() or ""
             self.midi_type = midi_type_combo.currentText()
@@ -2185,6 +2242,7 @@ class VCButton(VCWidget):
                 snap_mode_combo:  a == LS,
                 eff_action_combo: a == EA,
                 group_combo:      a == SG,
+                blackout_editor:  a == BO,
                 laser_pal_combo:  a == LP,
                 bus_combo:        a in (TB, SB, AB),
                 edit_slot_edit:   a in (FT, FF, EA),
@@ -2217,6 +2275,7 @@ class VCButton(VCWidget):
             snap_mode_combo.currentIndexChanged.connect(lambda *_: _live())
             eff_action_combo.currentIndexChanged.connect(lambda *_: _live())
             group_combo.currentTextChanged.connect(lambda *_: _live())
+            blackout_editor.changed.connect(lambda *_: _live())
             laser_pal_combo.currentTextChanged.connect(lambda *_: _live())
             bus_combo.currentIndexChanged.connect(lambda *_: _live())
             edit_slot_edit.textChanged.connect(lambda *_: _live())
@@ -2243,6 +2302,7 @@ class VCButton(VCWidget):
                     ("Tasten-Modus (Snap):", snap_mode_combo),
                     ("Effekt-Aktion:", eff_action_combo),
                     ("Gruppe (SelectGroup):", group_combo),
+                    ("Blackout-Ziel:", blackout_editor),
                     ("Laser-Muster (Palette):", laser_pal_combo),
                     ("Tempo-Bus:", bus_combo),
                     ("Live-Edit-Slot:", edit_slot_edit),
@@ -2454,6 +2514,9 @@ class VCButton(VCWidget):
         d["effect_action_key"] = self.effect_action_key
         d["group_name"] = self.group_name
         d["laser_palette"] = self.laser_palette
+        # VCB-11: Ziel der Blackout-Taste (leer = global).
+        d["blackout_fids"] = list(self.blackout_fids)
+        d["blackout_groups"] = list(self.blackout_groups)
         d["tempo_bus_id"] = self.tempo_bus_id
         d["edit_slot"] = self.edit_slot
         d["actions"] = [dict(a) for a in self.actions]
@@ -2516,6 +2579,22 @@ class VCButton(VCWidget):
         self.effect_action_key = d.get("effect_action_key", "next_color")
         self.group_name = d.get("group_name", "")
         self.laser_palette = d.get("laser_palette", "")
+        # VCB-11: Blackout-Ziel; fehlende Felder (altes Layout) = globaler Blackout.
+        _bf = []
+        _bf_roh = d.get("blackout_fids", None)
+        for i in (_bf_roh if isinstance(_bf_roh, (list, tuple)) else []):
+            try:
+                iv = int(i)
+            except (TypeError, ValueError):
+                continue
+            if iv not in _bf:
+                _bf.append(iv)
+        self.blackout_fids = _bf
+        _bg_roh = d.get("blackout_groups", None)
+        self.blackout_groups = [g for g in (_bg_roh if isinstance(_bg_roh, (list, tuple)) else [])
+                                if isinstance(g, str) and g.strip()]
+        # Show neu geladen: ein noch gehaltener Teil-Blackout gehoert zur alten Show.
+        self._release_target_blackout()
         self.tempo_bus_id = d.get("tempo_bus_id", "") or ""
         self.edit_slot = d.get("edit_slot", "")
         self.actions = [dict(a) for a in d.get("actions", []) if isinstance(a, dict)]
