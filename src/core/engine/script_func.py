@@ -31,6 +31,12 @@ class ScriptFunction(Function):
         self._lines: list[str] = []
         # Mark this as a script subclass via attribute for editors
         self.is_script = True
+        # OUT-57: Besitz am globalen Blackout. ``None`` = dieses Skript hat ihn
+        # nicht gesetzt; sonst der ``blackout_epoch`` des OutputManagers direkt nach
+        # dem eigenen „blackout on". Nur dann darf „blackout off" bzw. ein Stop des
+        # Skripts ihn zuruecknehmen — einen Blackout des Operators (oder einen, den
+        # der Operator seitdem selbst neu geschaltet hat) loest ein Skript nie.
+        self._blackout_epoch: int | None = None
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -43,6 +49,24 @@ class ScriptFunction(Function):
         self._lines = []
         self._line_idx = 0
         self._wait_until = 0.0
+        # OUT-57: Stop/Abbruch nimmt einen vom Skript gesetzten Blackout zurueck —
+        # sonst rastete „blackout on" dauerhaft ein, und nur der Operator-Knopf
+        # kaeme wieder heraus. Laeuft das Skript dagegen regulaer zu Ende, bleibt
+        # der Blackout bewusst stehen (ein Einzeiler „blackout on" soll wirken);
+        # der Besitz bleibt gemerkt, ein spaeterer Stop nimmt ihn zurueck.
+        self._blackout_freigeben()
+
+    def _blackout_freigeben(self):
+        """OUT-57: hebt den Blackout auf, wenn ER von diesem Skript stammt und
+        seitdem niemand sonst ihn umgeschaltet hat; vergisst den Besitz immer."""
+        epoch, self._blackout_epoch = self._blackout_epoch, None
+        if epoch is None:
+            return
+        om = self._output_manager()
+        if om is None:
+            return
+        if om.blackout and getattr(om, "blackout_epoch", None) == epoch:
+            om.set_blackout(False)
 
     # ── write ─────────────────────────────────────────────────────────────────
 
@@ -74,6 +98,18 @@ class ScriptFunction(Function):
                     return
             except Exception as exc:
                 print(f"[ScriptFunction] Line {self._line_idx}: '{line}' error: {exc}")
+
+    @staticmethod
+    def _output_manager():
+        """OUT-57: der OutputManager der laufenden App — oder None. Bewusst NICHT
+        ``get_state()``: das wuerde ohne App eine komplette AppState samt Show und
+        Output-Thread anlegen."""
+        try:
+            from src.core import app_state as _app_state
+            st = getattr(_app_state, "_state", None)
+            return getattr(st, "output_manager", None) if st is not None else None
+        except Exception:
+            return None
 
     def _execute_line(self, line: str, universes, patch_cache, registry) -> bool:
         """Returns True if execution should pause this frame (wait command)."""
@@ -126,8 +162,28 @@ class ScriptFunction(Function):
                 if child is not None:
                     child.stop()
         elif cmd == "blackout":
-            # Best-effort: zero out all universes
-            if len(parts) >= 2 and parts[1].lower() in ("on", "1", "true"):
+            # OUT-57: derselbe Blackout wie Kopfzeilen-Knopf, VC, Web, OSC und
+            # Kommandozeile — ueber den OutputManager (nullt nur Dimmer/Farbe,
+            # Laser/Nebel komplett; Pan/Tilt bleiben). Frueher schrieb das Skript
+            # alle 512 Kanaele direkt auf 0: das liess Moving Heads in die
+            # Grundstellung fahren, der Kopfzeilen-Knopf bekam nichts mit und
+            # „blackout off" tat gar nichts.
+            an = len(parts) >= 2 and parts[1].lower() in ("on", "1", "true")
+            om = self._output_manager()
+            if om is not None:
+                if an:
+                    # Nur wer den Blackout wirklich EINschaltet, besitzt ihn — stand
+                    # er schon (Operator), bleibt er dessen Sache.
+                    if not om.blackout:
+                        om.set_blackout(True)
+                        self._blackout_epoch = getattr(om, "blackout_epoch", None)
+                else:
+                    # „blackout off" loest nur den eigenen Blackout, nie den des
+                    # Operators (der Knopf oben rechts bleibt Herr ueber seinen).
+                    self._blackout_freigeben()
+            elif an:
+                # Ohne laufende App (isolierter Aufruf) bleibt nur das alte
+                # Best-effort-Nullen der uebergebenen Universen.
                 for u in universes.values():
                     for c in range(1, 513):
                         u.set_channel(c, 0)
