@@ -15,6 +15,7 @@ Neu ggue. der Laser-Gobo-Show: jeder VC-Button bekommt via ``bg_image=<name>`` e
 zum Effekt passende Galerie-Grafik (animierte GIFs). Die Grafiken werden portabel in
 die .lshow eingebettet. Erzeugt shows/Komplette Show mit animierten Buttons.lshow.
 """
+import _bootstrap  # noqa: F401  # Repo-Root + tools/ auf sys.path (siehe _bootstrap.py)
 import _gen_env  # noqa: F401  (MUSS erster Import sein — spawn-sichere Env-Switches)
 import os
 import json
@@ -30,7 +31,7 @@ from src.core.stage.scene_graph import NodeKind, SceneNode, Transform
 from src.core.app_state import get_channels_for_patched
 from src.core.engine.chaser import ChaserStep
 
-_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ROOT = _bootstrap.REPO_ROOT
 OUT = os.path.join(_ROOT, "shows", "Komplette Show mit animierten Buttons.lshow")
 STAGE_NAME = "KomplettAnimiert2026"
 

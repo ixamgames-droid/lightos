@@ -8,10 +8,11 @@ Ausgabe: je Widget eine Zeile  'NAME cx cy'  (Mitte des BEDIEN-Widgets, nicht de
          + Zeile  'CALIB scale ox oy'
 """
 from __future__ import annotations
+import _bootstrap  # noqa: F401  # Repo-Root + tools/ auf sys.path (siehe _bootstrap.py)
 import os, sys, json
 from PIL import Image
 
-_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ROOT = _bootstrap.REPO_ROOT
 GEO = os.path.join(_ROOT, "docs", "anleitung_vc_widgets", "_capture", "geometry.json")
 
 

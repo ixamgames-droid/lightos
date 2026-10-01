@@ -26,7 +26,6 @@
 | `benchmark_universes.py` | T-8 / RM-Benchmark — Render-Performance fuer mehrere Universen. |
 | `build_apc_test_show.py` | KOMPLETTE Test-/Demo-Show fuer Davids reale Hardware: |
 | `build_demo_rgb_par.py` | Demo-Show "Demo RGB PAR" — 4x RGB-PAR mit einer 4-Cue-Cueliste. |
-| `build_demo_show.py` | Erzeugt eine komplett vorprogrammierte Demo-Show (.lshow) fuer die 3 RGBW-PARs |
 | `build_demo_show_full.py` | DEMO SHOW FULL — komplette, nach ZWECK organisierte Show auf Davids realem Rig. |
 | `build_demo_zq_show.py` | Demo-/Bühnen-Show fuer Davids reale Hardware (DMO-01, Masterplan 2026-06-08): |
 | `build_dimmer_farbe_combo.py` | Dimmer + Farbe frei kombinieren — EINE VC-Bank fuer Davids 8 PAR (ZQ01424 RGBW). |
@@ -40,7 +39,6 @@
 | `build_grosses_rig.py` | Grosses Rig 2026 — komplette Show mit Trassen-Rig (Davids Auftrag 2026-07-08). |
 | `build_hochzeit_komplett.py` | HOCHZEIT KOMPLETT 2026 — Feature-Demo auf Davids Hochzeits-Rig. |
 | `build_komplett_demo_show.py` | KOMPLETT-DEMO-SHOW: alle Features der Software auf Davids realer Hardware. |
-| `build_komplette_animierte_show.py` | „Komplette Show mit animierten Buttons" — volle Test-Show (Laser + Gobo-Moving- |
 | `build_laser_gobo_test.py` | „Laser Gobo Test 2026" — Test-Show mit Laser + Gobo-Moving-Heads + PARs + Nebel |
 | `build_live_demo_show.py` | Demo-Show fuer das LIVE-PROGRAMMING der RGB-Matrix (Phase 7 der Matrix-Initiative). |
 | `build_live_edit_show.py` | LIVE-EDIT-SHOW — vordefinierte Effekte live einmappen & bearbeiten (Quadranten). |
@@ -54,15 +52,12 @@
 | `build_test_show.py` | Erzeugt eine KOMPLETT vorprogrammierte Test-Show (.lshow) zum Anschauen aller |
 | `build_testshow_2026.py` | TESTSHOW 2026 — komplette musik-synchrone Show für Davids reales Rig. |
 | `build_tutorial_matrix_show.py` | TUTORIAL_MATRIX — Begleit-Show zur bebilderten Schritt-fuer-Schritt-Anleitung. |
-| `build_uxtest3_full.py` | UXTEST-3 „Full Rig" — 30-Fixture-Test-Show für den UI-Audit (Davids Auftrag 2026-07-15). |
-| `build_validated_demo.py` | Beispiel-/Proof-Show über die ShowBuilder-DSL — baut eine kleine, ECHTE Show, |
 | `build_vc_elements_showcase.py` | VC-Elemente-Schaukasten: legt JEDEN der 15 VC-Widget-Typen einmal beschriftet |
 | `build_vc_widgets_showcase.py` | VC-Widgets-Schaukasten (Doku) — legt 17 der 19 VC-Widget-Typen einmal |
 | `build_zq06121_demo.py` | Demo-/Testshow fuer Davids U-King ZQ06121 LED-Balken (2026-08-05). |
 | `capture_test123_tempo_guide.py` | Reproduzierbare Screenshots fuer die Test123-Tempo-Anleitung. |
 | `capture_vc_widgets.py` | Vollbild der VC-Widget-Showcase aufnehmen — OHNE Desktop, ohne Fotoapparat. |
 | `changelog_sammeln.py` | CHANGELOG-Fragmente sammeln — und direkte CHANGELOG-Aenderungen melden (PROC-09). |
-| `check_demo_show_full.py` | Prueft shows/Demo_Show_Full.lshow headless und rendert echte Bilder: |
 | `check_doc_images.py` | DOC-10 Anleitungs-/Bild-Audit: findet TOTE Bild-Links in der Doku. |
 | `check_doc_links.py` | QA-17 Doc-Link-Checker: findet TOTE relative Markdown-Querverweise. |
 | `collect_crash_report.py` | Crash-/Session-Log ernten und als Loop-Bug-Intake ausgeben (TOOLS-CRASHINTAKE). |
@@ -88,8 +83,6 @@
 | `session_claim.py` | session_claim.py — Belegzettel fuer parallel arbeitende Claude-Sitzungen. |
 | `ui_verification_checklist.py` | QA-12 UI-Verifikations-Checklisten-Generator/-Checker. |
 | `upgrade_shows.py` | Alt-Shows auf das aktuelle Show-Format (``show_file.SHOW_VERSION``) heben. |
-| `vc_click_targets.py` | Berechnet aus einem Vollbild-Screenshot (mit der Magenta-Kalibrier-Kachel |
-| `verify_color_dimmer_separation.py` | Verifikation: Trennung FARBE <-> DIMMER an Effekten (Color/Matrix/Chase). |
 | `verify_loop.ps1` | tools/verify_loop.ps1 - Test-Gate fuer den LightOS Loop-Modus |
 | `verify_loop.sh` | tools/verify_loop.sh — Test-Gate fuer Linux/macOS (Pendant zu verify_loop.ps1). |
 | `verify_segmented.ps1` | tools/verify_segmented.ps1 - Test-Gate in Segmenten (Windows-Pendant zu tools/verify_segmented.sh). |
@@ -107,17 +100,24 @@ Begruendungen: [tools/_archiv/README.md](_archiv/README.md).
 - `_archiv/_shot_matrix_group_scope_live.py`
 - `_archiv/build_apc_probier_show.py`
 - `_archiv/build_custom_path_demo.py`
+- `_archiv/build_demo_show.py`
 - `_archiv/build_hardstyle_vc.py`
+- `_archiv/build_komplette_animierte_show.py`
 - `_archiv/build_master_demo_show.py`
 - `_archiv/build_practice_show.py`
 - `_archiv/build_profi_show.py`
 - `_archiv/build_snaps_show.py`
 - `_archiv/build_stage_show.py`
+- `_archiv/build_uxtest3_full.py`
+- `_archiv/build_validated_demo.py`
 - `_archiv/build_vc_test_2026.py`
 - `_archiv/capture_hochzeit_tempo_guide.py`
+- `_archiv/check_demo_show_full.py`
 - `_archiv/diag_hardstyle.py`
 - `_archiv/diag_movers.py`
 - `_archiv/patch_stage_show_pages.py`
+- `_archiv/vc_click_targets.py`
+- `_archiv/verify_color_dimmer_separation.py`
 - `_archiv/verify_efx_group_scope.py`
 - `_archiv/verify_komplett_demo.py`
 - `_archiv/verify_matrix_group_scope.py`

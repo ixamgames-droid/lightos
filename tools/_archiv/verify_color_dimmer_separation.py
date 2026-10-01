@@ -30,7 +30,7 @@ from __future__ import annotations
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import _bootstrap  # noqa: F401  # Repo-Root + tools/ auf sys.path (siehe _bootstrap.py)
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ["LIGHTOS_SHOW_DB"] = os.path.join(os.environ.get("TEMP", "."),
                                              "lightos_cd_verify.db")
