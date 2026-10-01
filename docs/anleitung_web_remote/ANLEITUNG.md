@@ -89,7 +89,7 @@ sind in `src/web/app.py` als Routen/SocketIO-Handler umgesetzt):
 | **GO ▶** | nächster Cue der **GO-Zielliste** (siehe unten) | `POST /api/go` · SocketIO `go` |
 | **◀◀ BACK** | einen Cue zurück (GO-Zielliste) | `POST /api/back` · SocketIO `back` |
 | **■ STOP** | GO-Zielliste anhalten | `POST /api/stop` · SocketIO `stop` |
-| **Blackout** | schaltet die gesamte Ausgabe dunkel und wieder hell (Toggle) | `POST /api/blackout` · SocketIO `blackout` |
+| **Blackout** | schaltet die gesamte Ausgabe dunkel und wieder hell (Toggle) — derselbe Blackout wie oben rechts in der App: alles auf 0, nur Positionen/Gobo von Moving Heads bleiben | `POST /api/blackout` · SocketIO `blackout` |
 | **Fader 1–5** | setzen den Pegel der **Executor-Fader** (Slots 1–5, 0–100 %) | `POST /api/executor/<slot>/fader` · SocketIO `fader` |
 
 **Welche Cueliste trifft GO / BACK / STOP?** Dieselbe wie die Leertaste am Pult:

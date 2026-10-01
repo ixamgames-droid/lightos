@@ -206,6 +206,19 @@ class OutputManager:
         # fallen auf "alle Kanaele" zurueck, damit reine Roh-DMX-Setups weiter
         # global dimmen. {universe:int -> frozenset[addr 1..512]}
         self._gm_address_mask: dict[int, frozenset] = {}
+        # OUT-57: Adressen je Universum, die der BLACKOUT STEHEN LAESST (Erhalten-
+        # Maske) — nur Pan/Tilt/Gobo/Prisma/Optik gepatchter Lampen mit echtem
+        # Dimmer (s. AppState._build_blackout_keep_mask), damit Moving Heads beim
+        # Blackout nicht in die Grundstellung fahren und beim Loesen zurueck. ALLES
+        # andere geht auf 0 — auch ungepatchte Roh-Adressen im selben Universum
+        # (Simple Desk, Kanal-Fader, Engine-Extra): eine Liste der Licht-Kanaele
+        # waere nie vollstaendig. Universen OHNE Eintrag (ungepatcht/roh) nullt der
+        # Blackout KOMPLETT. {universe:int -> frozenset[addr 1..512]}
+        self._blackout_keep_mask: dict[int, frozenset] = {}
+        # OUT-57: zaehlt jede echte Blackout-Aenderung hoch. Ein Skript merkt sich
+        # den Stand nach seinem eigenen „blackout on" und nimmt den Blackout nur
+        # zurueck, solange niemand sonst ihn seitdem angefasst hat.
+        self._blackout_epoch = 0
         # A3D-01: Adressen je Universum, die bei aktivem Laser-NOT-AUS FINAL (nach
         # Channel-Modifier + Grand-Master + Blackout) hart auf 0 gezwungen werden.
         # Leeres Dict = kein NOT-AUS aktiv. Vom AppState gepflegt (set_laser_estop /
@@ -262,6 +275,13 @@ class OutputManager:
         (Intensitaet/Farbe). Pan/Tilt/Gobo etc. bleiben unberuehrt. Vom AppState
         aus dem Patch gepflegt."""
         self._gm_address_mask = mask or {}
+
+    def set_blackout_keep_mask(self, mask: dict[int, frozenset]):
+        """OUT-57: Setzt je Universum die Adressen, die der Blackout STEHEN LAESST
+        (Position/Gobo/Prisma/Optik gepatchter Lampen mit echtem Dimmer); alle
+        anderen Adressen zieht er auf 0. Universen ohne Eintrag nullt der Blackout
+        komplett. Vom AppState aus dem Patch gepflegt."""
+        self._blackout_keep_mask = mask or {}
 
     def set_laser_estop_mask(self, mask: dict[int, frozenset]):
         """A3D-01: Setzt je Universum die Laser-Adressen, die bei aktivem NOT-AUS
@@ -488,6 +508,8 @@ class OutputManager:
         self._blackout = enabled
         if not geaendert:
             return
+        # getattr: Tests bauen den Manager teils per __new__ ohne __init__.
+        self._blackout_epoch = getattr(self, "_blackout_epoch", 0) + 1
         for cb in list(self._blackout_callbacks):
             try:
                 cb(enabled)
@@ -497,6 +519,11 @@ class OutputManager:
     @property
     def blackout(self) -> bool:
         return bool(self._blackout)
+
+    @property
+    def blackout_epoch(self) -> int:
+        """OUT-57: Zaehler der echten Blackout-Aenderungen (s. ``set_blackout``)."""
+        return getattr(self, "_blackout_epoch", 0)
 
     def subscribe_blackout(self, cb):
         if cb not in self._blackout_callbacks:
@@ -913,7 +940,20 @@ class OutputManager:
             else:
                 self._buche_erfolg("Modifier", univ_num)
             if self._blackout:
-                data = bytes(512)
+                # OUT-57: Blackout nullt ALLES ausser der Erhalten-Maske (Pan/Tilt/
+                # Gobo/Prisma/Optik gepatchter Lampen mit echtem Dimmer) — sonst
+                # fuhren Moving Heads bei jedem Blackout in die Grundstellung und
+                # beim Loesen sichtbar zurueck. Invertiert, damit ungepatchte Roh-
+                # Adressen, raw-/Fine-Kanaele und unbekannte Attribute sicher dunkel
+                # werden. Der Grand-Master braucht hier nicht mehr zu laufen: seine
+                # Adressen sind nie in der Erhalten-Maske (dort steht ohnehin 0).
+                keep = self._blackout_keep_mask.get(univ_num)
+                buf = bytearray(512)
+                if keep:
+                    for addr in keep:
+                        if 1 <= addr <= len(data) and addr <= 512:
+                            buf[addr - 1] = data[addr - 1]
+                data = bytes(buf)
             elif self.grand_master < 0.999:
                 gm = self.grand_master
                 mask = self._gm_address_mask.get(univ_num)
