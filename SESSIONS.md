@@ -14,6 +14,7 @@
 | XPLAT-41 | A | ci/xplat41-windows-arm-job | 2026-10-01T19:33Z | .github/workflows/ci.yml,tools/pr_bereit.py,tools/pr_ci_status.py,tools/_ci_beobachtend.py |
 | PROC-17 | A | fix/proc17-tafel-briefe | 2026-10-01T19:47Z | tools/session_claim.py,tests/test_session_claim.py,COORDINATION.md |
 | OUT-57 | A | fix/out57-blackout-nur-licht | 2026-10-01T20:01Z | src/core/output/output_manager.py,src/core/app_state.py,docs |
+| UI-69 | A | fix/ui69-speichern-beim-beenden | 2026-10-01T20:02Z | src/ui/main_window.py,src/core/show |
 
 ## Blocker & Fallen
 
@@ -162,7 +163,6 @@
 
 ## Verlauf
 
-- 2026-10-01T14:54Z B done BPM-15
 - 2026-10-01T15:14Z B claim BPM-22
 - 2026-10-01T15:14Z B claim UI-67
 - 2026-10-01T15:27Z A claim DOC-17
@@ -192,3 +192,4 @@
 - 2026-10-01T19:47Z A claim PROC-17
 - 2026-10-01T19:49Z B done FUNKTIONSTEST-B
 - 2026-10-01T20:01Z A claim OUT-57
+- 2026-10-01T20:02Z A claim UI-69
