@@ -9,7 +9,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| DOC-17 | A | docs/doc17-nacharbeiten | 2026-10-01T15:27Z | docs |
 | PRIV-05 | A | fix/priv05-klarnamen-waechter | 2026-10-01T15:37Z | tools/session_claim.py,tests/test_session_claim.py |
 | PROC-14 | A | fix/proc14-claim-pruefung | 2026-10-01T15:41Z | tools/pr_bereit.py,tests/test_pr_bereit.py |
 | XPLAT-40 | A | ci/xplat40-anleitungsbilder-smoke | 2026-10-01T15:41Z | .github/workflows/ci.yml |
@@ -154,7 +153,6 @@
 
 ## Verlauf
 
-- 2026-10-01T11:08Z A done FM-52
 - 2026-10-01T11:08Z A aktualisiert FM-51: Branch fix/fm51-weiss-auswahl-ueberall -> fix/fm51b-speicher-scope; Dateien src/ui/widgets/position_tool.py,src/ui/views/programmer_view.py,src/core/app_state.py -> src/core/app_state.py,src/ui/views/snap_file_panel.py,src/ui/views/snapshots_view.py,src/ui/views/programmer_view.py,src/ui/main_window.py
 - 2026-10-01T12:14Z A aktualisiert FM-51: Branch fix/fm51b-speicher-scope -> fix/fm51c-anzeige; Dateien src/core/app_state.py,src/ui/views/snap_file_panel.py,src/ui/views/snapshots_view.py,src/ui/views/programmer_view.py,src/ui/main_window.py -> src/core/app_state.py,src/core/show/patch_dedup.py,src/ui/views/live_view.py
 - 2026-10-01T12:47Z A done FM-51
@@ -184,3 +182,4 @@
 - 2026-10-01T16:18Z B done UI-67
 - 2026-10-01T16:25Z B claim BPM-20
 - 2026-10-01T16:25Z B claim BPM-23
+- 2026-10-01T16:35Z A done DOC-17
