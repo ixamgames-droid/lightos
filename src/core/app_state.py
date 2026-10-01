@@ -431,6 +431,8 @@ class AppState:
         # Vorberechneter Render-Plan (bei Patch-Aenderung erneuert) fuer den
         # zentralen Per-Frame-Renderer _render_frame().
         self._fix_index: dict[int, tuple] = {}          # fid -> (fixture, channels)
+        # VCB-11: slot -> (fids, gruppen) der gedrueckten Blackout-Tasten mit Ziel.
+        self._ziel_blackout_specs: dict = {}
         self._default_frame: dict[int, bytes] = {}      # univ -> 512B Default-Frame
         self._commit_spans: dict[int, list[tuple[int, int]]] = {}  # univ -> [(start,len)]
         self._patched_set: dict[int, frozenset] = {}    # univ -> {gepatchte Adressen}
@@ -587,6 +589,7 @@ class AppState:
         # Zentraler StateSync Event-Bus
         from .sync import get_sync
         self.sync = get_sync()
+        self._abo_gruppen_sync()
 
     # ── VIZ-11: SceneGraph-Adapter (Schritt 3+4) ────────────────────────────────
     # Die 5 Legacy-Felder sind Properties ueber state._scene. Getter liefern
@@ -1768,6 +1771,8 @@ class AppState:
                 {u: frozenset(s) for u, s in self._build_blackout_keep_mask(fix_index).items()})
         except Exception as e:
             print(f"[AppState] set blackout mask error: {e}")
+        # VCB-11: aktive gezielte Blackouts auf den neuen Patch umrechnen.
+        self._refresh_target_blackouts()
         # A3D-01: die Laser-Estop-Maske am OutputManager mitpflegen (Adressen
         # koennen sich geaendert haben, waehrend der NOT-AUS-Latch aktiv ist).
         self._push_laser_estop_mask()
@@ -4620,36 +4625,231 @@ class AppState:
         Wie bei der GM-Maske bekommt JEDES gepatchte DMX-Universum einen Eintrag
         (ggf. leer); ein fehlender Key heisst „ungepatcht" -> auch dann nullt der
         Sende-Pfad das Universum komplett."""
-        from .all_white import ist_geraet_ohne_licht
         keep: dict[int, set] = {}
         nullen: dict[int, set] = {}
         for _fid, (fx, chans) in fix_index.items():
             if not fixture_uses_dmx(fx):
                 continue
-            keep.setdefault(fx.universe, set())   # Universum registrieren
-            aus = nullen.setdefault(fx.universe, set())
-            adr_attr: list[tuple[int, str]] = []
-            hat_dimmer = False
-            for ch in chans:
-                addr = fx.address + ch.channel_number - 1
-                if not (1 <= addr <= 512):
-                    continue
-                # Mehrkopf-Suffix ``attr#N`` aendert die Funktion nicht.
-                attr = (getattr(ch, "attribute", "") or "").lower().partition("#")[0]
-                adr_attr.append((addr, attr))
-                if attr in _DIM_INTENSITY_ATTRS:
-                    hat_dimmer = True
-            if not hat_dimmer or ist_geraet_ohne_licht(fx, chans):
-                aus.update(a for a, _ in adr_attr)
-                continue
-            for addr, attr in adr_attr:
-                if attr in _BLACKOUT_ERHALTEN_ATTRS:
-                    keep[fx.universe].add(addr)
-                else:
-                    aus.add(addr)
+            erhalten, aus = self._blackout_aufteilung(fx, chans)
+            keep.setdefault(fx.universe, set()).update(erhalten)   # Universum registrieren
+            nullen.setdefault(fx.universe, set()).update(aus)
         for u, addrs in keep.items():
             addrs -= nullen.get(u, set())
         return keep
+
+    @staticmethod
+    def _blackout_aufteilung(fx, chans) -> tuple[set, set]:
+        """OUT-57/VCB-11: teilt die Adressen EINES gepatchten DMX-Geraets in
+        (erhalten, nullen) — EINE Regel fuer den globalen Blackout (Erhalten-Maske)
+        und den gezielten Blackout einer VC-Taste (Null-Maske ihrer Ziel-Geraete).
+        Erhalten nur ``_BLACKOUT_ERHALTEN_ATTRS`` einer Lampe MIT echtem Dimmer;
+        Lampen ohne Dimmer sowie Laser/Nebel & Co. (``ist_geraet_ohne_licht``)
+        gehen komplett auf 0 (Begruendung s. ``_build_blackout_keep_mask``)."""
+        from .all_white import ist_geraet_ohne_licht
+        erhalten: set = set()
+        aus: set = set()
+        adr_attr: list[tuple[int, str]] = []
+        hat_dimmer = False
+        for ch in chans:
+            addr = fx.address + ch.channel_number - 1
+            if not (1 <= addr <= 512):
+                continue
+            # Mehrkopf-Suffix ``attr#N`` aendert die Funktion nicht.
+            attr = (getattr(ch, "attribute", "") or "").lower().partition("#")[0]
+            adr_attr.append((addr, attr))
+            if attr in _DIM_INTENSITY_ATTRS:
+                hat_dimmer = True
+        if not hat_dimmer or ist_geraet_ohne_licht(fx, chans):
+            aus.update(a for a, _ in adr_attr)
+            return erhalten, aus
+        for addr, attr in adr_attr:
+            if attr in _BLACKOUT_ERHALTEN_ATTRS:
+                erhalten.add(addr)
+            else:
+                aus.add(addr)
+        return erhalten, aus
+
+    # ── VCB-11: gezielter Blackout (VC-Blackout-Taste mit Ziel) ──────────────
+
+    def set_target_blackout(self, slot, fids=(), groups=()):
+        """VCB-11: Gezielter Blackout fuer ``slot`` (eine VC-Taste): NUR die Ziel-
+        Geraete (einzelne ``fids`` und/oder Fixture-``groups`` per Name) gehen
+        dunkel — dieselbe Regel wie der globale Blackout (OUT-57): Dimmer/Farbe/
+        Intensitaet 0, Pan/Tilt/Gobo/Optik bleiben; Lampen ohne echten Dimmer und
+        Laser/Nebel komplett 0. Alles andere laeuft weiter.
+
+        Das ZIEL (nicht die aufgeloesten Adressen) wird gemerkt: Gruppen loesen
+        sich bei jeder Gruppen- oder Patch-Aenderung neu auf
+        (``_refresh_target_blackouts``), eine spaeter geaenderte Gruppe wirkt also
+        auch auf eine schon gedrueckte Taste."""
+        spec = (tuple(int(f) for f in (fids or ()) if f is not None),
+                tuple(str(g) for g in (groups or ()) if g))
+        specs = getattr(self, "_ziel_blackout_specs", None)
+        if specs is None:
+            specs = self._ziel_blackout_specs = {}
+        specs[slot] = spec
+        self._push_target_blackout(slot, spec)
+
+    def clear_target_blackout(self, slot):
+        """VCB-11: Gezielten Blackout eines Slots freigeben (no-op wenn keiner)."""
+        specs = getattr(self, "_ziel_blackout_specs", None)
+        if specs is not None:
+            specs.pop(slot, None)
+        try:
+            self.output_manager.clear_target_blackout(slot)
+        except Exception as e:
+            print(f"[AppState] clear target blackout error: {e}")
+
+    def clear_all_target_blackouts(self):
+        """VCB-11: Alle gezielten Blackouts freigeben (Show-Wechsel/Reset)."""
+        specs = getattr(self, "_ziel_blackout_specs", None)
+        if specs is not None:
+            specs.clear()
+        try:
+            self.output_manager.clear_all_target_blackouts()
+        except Exception as e:
+            print(f"[AppState] clear target blackouts error: {e}")
+
+    def _target_blackout_ziele(self, spec) -> tuple[set, dict]:
+        """Ziel -> (ganze Geraete, {fid: {kopf}}). Gruppen werden ueber ihre FEINEN
+        Zellen aufgeloest: eine Kopf-Zelle ``"5:1"`` meint nur Kopf 1 von Geraet 5,
+        nicht das ganze Geraet. Vorrang wie ueberall (``head_restrictions``): steht
+        dasselbe Geraet auch als ganze Zelle oder als direktes fid-Ziel da,
+        gewinnt das ganze Geraet."""
+        from .group_cells import base_fids_in_cells, head_restrictions
+        fids, groups = spec
+        ganz: set = set(fids)
+        koepfe: dict = {}
+        for g in groups:
+            try:
+                cells = list(self.group_cells_by_name(g) or [])
+            except Exception:
+                continue
+            hr = head_restrictions(cells) or {}
+            for fid in base_fids_in_cells(cells):
+                if fid in hr:
+                    koepfe.setdefault(fid, set()).update(hr[fid])
+                else:
+                    ganz.add(fid)
+        for fid in ganz:
+            koepfe.pop(fid, None)
+        return ganz, koepfe
+
+    def _target_blackout_fids(self, spec) -> set:
+        """Alle Ziel-Geraete (ganz oder mit Kopf-Einschraenkung)."""
+        ganz, koepfe = self._target_blackout_ziele(spec)
+        return ganz | set(koepfe)
+
+    @staticmethod
+    def _blackout_kopf_adressen(fx, chans, heads, aus) -> set | None:
+        """VCB-11: Null-Adressen eines Geraets, das nur mit einzelnen KOEPFEN im
+        Ziel steht. Dieselbe Kopf-Regel wie der Submaster pro Kopf (A4,
+        ``_fixture_head_intensity_addr_map``): kopf-exklusiv ist ein Attribut, das
+        GENAU so oft vorkommt, wie das Geraet Farbkoepfe hat; das n-te Vorkommen
+        gehoert Kopf n. Geteilte Kanaele (Master-Dimmer, Strobe, Makro …) bleiben
+        unangetastet — sonst ginge mit „Kopf 2" das ganze Geraet aus. Von den
+        Kopf-Kanaelen gehen nur die auf 0, die auch der Geraete-Blackout nullen
+        wuerde (``aus``): Pan/Tilt eines Kopfes bleiben stehen.
+
+        ``None`` = die Einschraenkung meint in Wahrheit das ganze Geraet (kein
+        Mehrkopf-Geraet, kein gueltiger Kopf oder ALLE Koepfe) — wie
+        ``validate_head_restrictions``, nur gegen den Patch-Index statt die DB."""
+        n = color_head_count_for_channels(fx, chans)
+        if n < 2:
+            return None
+        gueltig = set()
+        for h in heads or ():
+            try:
+                h = int(h)
+            except (TypeError, ValueError):
+                continue
+            if 0 <= h < n:
+                gueltig.add(h)
+        if not gueltig or len(gueltig) >= n:
+            return None
+        counts: dict[str, int] = {}
+        for ch in chans:
+            a = (getattr(ch, "attribute", "") or "").lower()
+            counts[a] = counts.get(a, 0) + 1
+        out: set = set()
+        seen: dict[str, int] = {}
+        for ch in chans:
+            attr = (getattr(ch, "attribute", "") or "").lower()
+            occ = seen.get(attr, 0)
+            seen[attr] = occ + 1
+            if counts.get(attr, 0) != n or occ not in gueltig:
+                continue          # geteilter Kanal bzw. fremder Kopf
+            addr = fx.address + ch.channel_number - 1
+            if addr in aus:
+                out.add(addr)
+        return out
+
+    def _push_target_blackout(self, slot, spec):
+        """Ziel -> Null-Maske {universe: Adressen} aus dem aktuellen Patch-Index."""
+        ganz, koepfe = self._target_blackout_ziele(spec)
+        with self._get_plan_lock():
+            fix_index = dict(getattr(self, "_fix_index", None) or {})
+        mask: dict[int, set] = {}
+        for fid in ganz | set(koepfe):
+            entry = fix_index.get(fid)
+            if entry is None:
+                continue
+            fx, chans = entry
+            if not fixture_uses_dmx(fx):
+                continue
+            _erhalten, aus = self._blackout_aufteilung(fx, chans)
+            if fid in koepfe:
+                teil = self._blackout_kopf_adressen(fx, chans, koepfe[fid], aus)
+                if teil is not None:
+                    aus = teil
+            if aus:
+                mask.setdefault(fx.universe, set()).update(aus)
+        try:
+            self.output_manager.set_target_blackout(
+                slot, {u: frozenset(a) for u, a in mask.items()})
+        except Exception as e:
+            print(f"[AppState] set target blackout error: {e}")
+
+    def _abo_gruppen_sync(self):
+        """VCB-11: GROUP_CHANGED am zentralen Bus abonnieren (einmalig). Nicht jede
+        Gruppen-Aenderung laeuft ueber ``notify_groups_changed`` — Gruppen-View und
+        Live View senden das Event direkt. Schwache Referenz: der Bus ist ein
+        Singleton und soll keinen alten AppState am Leben halten. Der Refresh
+        selbst sendet nichts, es gibt also keine Schleife."""
+        if self._gruppen_sync_aktiv():
+            return
+        import weakref
+        from .sync import get_sync, SyncEvent
+        ref = weakref.ref(self)
+
+        def _on_group_changed(_ev, _data, _ref=ref):
+            st = _ref()
+            if st is not None:
+                st._refresh_target_blackouts()
+
+        self._gruppen_sync_cb = _on_group_changed
+        get_sync().subscribe(SyncEvent.GROUP_CHANGED, _on_group_changed)
+
+    def _gruppen_sync_aktiv(self) -> bool:
+        """Haengt das GROUP_CHANGED-Abo (noch) am Bus? Nicht nur das Attribut
+        pruefen: wer den Bus leert (Tests, Reset), nimmt das Abo mit."""
+        cb = getattr(self, "_gruppen_sync_cb", None)
+        if cb is None:
+            return False
+        try:
+            from .sync import get_sync, SyncEvent
+            return cb in get_sync()._subscribers.get(SyncEvent.GROUP_CHANGED, [])
+        except Exception:
+            return False
+
+    def _refresh_target_blackouts(self, *_a):
+        """VCB-11: alle aktiven gezielten Blackouts neu aufloesen (Gruppe oder
+        Patch geaendert)."""
+        specs = getattr(self, "_ziel_blackout_specs", None)
+        if not specs:
+            return
+        for slot, spec in list(specs.items()):
+            self._push_target_blackout(slot, spec)
 
     def _resolve_cue_stack(self, idx):
         """F-16: Index → Geschwister-Cueliste (oder None). Liest die Liste LIVE, ist
@@ -4736,6 +4936,12 @@ class AppState:
         geaendert/geloescht). Alle gruppen-konsumierenden Views (Programmer,
         Live View, Matrix, Patcher) lauschen auf GROUP_CHANGED und aktualisieren
         ihre Gruppenlisten ohne manuelles Neuladen (Abschnitt 1)."""
+        # VCB-11: gedrueckte Blackout-Tasten mit Gruppen-Ziel folgen der Gruppe.
+        # Ist das Sync-Abo aktiv, kommt der Refresh ueber GROUP_CHANGED (aus dem
+        # _emit unten) — hier nicht zusaetzlich, sonst liefe er doppelt. Ein
+        # unterdrueckter Emit (Bulk-Laden) erreicht das Abo nicht -> dann direkt.
+        if not self._gruppen_sync_aktiv() or getattr(self, "_suppress_emits", False):
+            self._refresh_target_blackouts()
         self._emit("group_changed", data)
 
     def _emit(self, event: str, data=None):

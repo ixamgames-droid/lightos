@@ -45,7 +45,7 @@ Verwendung:
     Die gemeinsame Boilerplate ``tools/_builder.py`` importiert dieses Modul bereits
     automatisch; ``_builder``-basierte Generatoren sind damit ohne weiteres Zutun
     geschuetzt. Generatoren mit eigener Boilerplate fuegen die eine Import-Zeile
-    oben hinzu (Beispiele: ``build_demo_show.py``, ``build_test_show.py``).
+    oben hinzu (Beispiele: ``build_demo_show_full.py``, ``build_test_show.py``).
 """
 import os
 import sys
