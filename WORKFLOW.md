@@ -60,6 +60,30 @@ fix/midi-apc-detection     Bugfix
   Zeigt gepatchte Fixtures mit Live-DMX-Farben.
   ```
 
+### CHANGELOG-Fragmente (PROC-09)
+
+Ein PR schreibt seinen CHANGELOG-Eintrag **nicht** in `CHANGELOG.md`, sondern
+als eigene Datei `changelog.d/JJJJ-MM-TT-<ID>.md` (fertiger `###`-Abschnitt,
+Vorlage in [`changelog.d/README.md`](changelog.d/README.md); ob ueberhaupt ein
+Eintrag noetig ist, regelt AGENTS.md Regel 3 / CDX-29). Grund: am Kopf unter
+`## [Unreleased]` konfliktete jeder PR mit jedem parallelen (81 % der
+Zweig-Merges in der Parallelphase), und ein konfliktbehafteter PR bekommt auf
+GitHub keine CI.
+
+- **Sammeln** nur im Release-/Sammel-Lauf, von EINER Sitzung:
+  `./venv/bin/python tools/changelog_sammeln.py --pruefen`, dann ohne
+  `--pruefen`; Commit-Betreff `changelog: sammeln`.
+- **Waechter:** `tests/test_changelog_fragmente.py` (bzw.
+  `tools/changelog_sammeln.py --waechter`) vergleicht `CHANGELOG.md` mit der
+  Abzweigung von `origin/main` und meldet Zeilen, die nicht aus einem
+  eingesammelten Fragment stammen. Ohne `origin/main` (CI-Checkout) gilt er als
+  bestanden — er ist ein lokales Gate fuer den eigenen Zweig.
+- **Bewusste Korrektur** alter Eintraege (umbenannte ID, Tippfehler): Commit-
+  Betreff beginnt mit `changelog:`.
+- **Release-Schritt** (`## [Unreleased]` in `## [x.y.z] — Datum` umbenennen,
+  neuen leeren `## [Unreleased]`-Kopf setzen): erzeugt Zeilen ohne Fragment,
+  daher Commit-Betreff `changelog: release x.y.z` — sonst meldet der Waechter.
+
 ## Tests vor jedem Commit
 
 - `python main.py` muss starten ohne Crash
@@ -365,6 +389,7 @@ zusaetzlichen Funden.
 - `.gitignore` halten — neue Build-Artefakte ergaenzen
 - Bei neuen Dependencies: `requirements.txt` aktualisieren
 - Bei Architektur-Aenderungen: `README.md` oder `INSTALL.md` synchron halten
+- Nutzer-sichtbare Aenderung: CHANGELOG-Fragment unter `changelog.d/` (nicht `CHANGELOG.md` direkt)
 
 ## Plattform-Kompatibilitaet
 

@@ -53,11 +53,30 @@ Code- und Git-Root.
    **Neue/geänderte Logik braucht einen Test.** Wenn etwas rot ist: erst fixen,
    nicht abgeben.
 
-3. **CHANGELOG.md pflegen** — Einträge gehören **unter** den Kopftext in einen
-   `####`-Abschnitt (Konvention: `#### Neu / …` z. B. `Neu / Tests`,
-   `Neu / Verbessert / Tests`, `Neu / Hinzugefuegt` — bzw. `#### Behoben`),
-   **nicht** ganz oben über die Beschreibung. Format: Keep a Changelog. (CDX-10:
-   die gelebte Konvention nutzt `Neu / …`-Varianten; hier verankert.)
+3. **CHANGELOG pflegen — als Fragment, nicht in `CHANGELOG.md`** (seit
+   2026-10-01, PROC-09). Jeder PR legt **eine eigene Datei**
+   `changelog.d/JJJJ-MM-TT-<ID>.md` an, Inhalt = der fertige Abschnitt
+   (`### Datum — Titel (ID)`, darunter ein `####`-Abschnitt; Konvention:
+   `#### Neu / …` z. B. `Neu / Tests`, `Neu / Verbessert / Tests`,
+   `Neu / Hinzugefuegt` — bzw. `#### Behoben`). Format: Keep a Changelog.
+   (CDX-10: die gelebte Konvention nutzt `Neu / …`-Varianten; hier verankert.)
+   Vorlage: [`changelog.d/README.md`](changelog.d/README.md).
+
+   **Warum:** Direkt unter `## [Unreleased]` schrieben alle PRs an dieselbe
+   Stelle — ein garantierter Konflikt zwischen parallelen Sitzungen, und für
+   einen konfliktbehafteten PR startet GitHub nicht einmal die CI. Zwei
+   Fragment-Dateien kollidieren nie. **Eingesammelt** wird nur im Release- bzw.
+   Sammel-Lauf von EINER Sitzung:
+   `./venv/bin/python tools/changelog_sammeln.py --pruefen` (Trockenlauf), dann
+   ohne `--pruefen` — das sortiert die Fragmente neueste zuerst unter
+   `## [Unreleased]` ein und löscht sie; Commit-Betreff `changelog: sammeln`.
+   `tests/test_changelog_fragmente.py` meldet lokal jede direkte Änderung an
+   `CHANGELOG.md` seit `origin/main`; eine bewusste Korrektur alter Einträge
+   (z. B. umbenannte ID) bekommt einen Commit-Betreff, der mit `changelog:`
+   beginnt. Der **Release-Schritt** (`## [Unreleased]` in `## [x.y.z] — Datum`
+   umbenennen, neuen leeren `## [Unreleased]`-Kopf setzen) erzeugt Zeilen ohne
+   Fragment und braucht deshalb ebenfalls den Betreff
+   `changelog: release x.y.z` — sonst schlägt der Wächter an.
 
    **Wann ein Eintrag nötig ist — entschieden 2026-07-31 (CDX-29):** der
    CHANGELOG ist das Protokoll dessen, was sich **für den Nutzer** ändert, nicht
@@ -170,6 +189,6 @@ Store nachgezogen werden kann:
 - [ ] Eigener `feature/`- oder `fix/`-Branch, **committet** (nichts lose auf `main`)
 - [ ] Test-Gate grün (`./tools/verify_loop.sh` bzw. `.\tools\verify_segmented.ps1`)
 - [ ] Test für neue/geänderte Logik vorhanden
-- [ ] CHANGELOG.md ergänzt (richtiger Abschnitt)
+- [ ] CHANGELOG-Fragment `changelog.d/JJJJ-MM-TT-<ID>.md` angelegt (richtiger Abschnitt; `CHANGELOG.md` selbst unberührt)
 - [ ] Default-/Verhaltensänderung in `docs/` dokumentiert
 - [ ] „Memory-/Doku-Updates"-Block in der Zusammenfassung ausgegeben
