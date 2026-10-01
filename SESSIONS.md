@@ -14,7 +14,6 @@
 | ENG-27 | C | fix/eng27-open-value | 2026-10-01T21:27Z | src/core/app_state.py · src/core/all_white.py · src/core/engine/efx.py |
 | FM-46 | C | docs/fm46-befund | 2026-10-01T21:35Z | BACKLOG.md |
 | DOC-14 | C | fix/doc14-schaukasten-19 | 2026-10-01T21:37Z | tools/build_vc_widgets_showcase.py · docs/anleitung_vc_widgets/README.md · docs/anleitung_vc_widgets/_capture/geometry.json · tests/test_doc14_schaukasten_alle_typen.py · changelog.d/2026-10-02-DOC-14.md |
-| DOC-19 | A | docs/doc19-bilder-neue-funktionen | 2026-10-01T21:56Z | docs/anleitung_vc_widgets · docs/anleitung_playback |
 | DOC-20 | A | docs/doc20-anleitungs-gifs | 2026-10-01T22:24Z | tools/anleitungsbilder · docs/ANLEITUNGSBILDER.md |
 | DOC-21 | A | docs/doc21-3d-gif | 2026-10-01T22:51Z | tools/anleitungsbilder · docs/anleitung_vc_widgets |
 | VIZ-65 | A | fix/viz65-startwaechter | 2026-10-01T23:12Z | src/ui/visualizer/visualizer_window.py |
@@ -176,7 +175,6 @@
 
 ## Verlauf
 
-- 2026-10-01T20:41Z A claim UI-68
 - 2026-10-01T20:41Z A claim BPM-25
 - 2026-10-01T21:00Z C claim TOOL-5
 - 2026-10-01T21:03Z C claim TOOL-4
@@ -206,3 +204,4 @@
 - 2026-10-01T23:00Z C done DOC-15
 - 2026-10-01T23:12Z A claim VIZ-65
 - 2026-10-01T23:27Z A done BPM-25
+- 2026-10-01T23:41Z A done DOC-19
