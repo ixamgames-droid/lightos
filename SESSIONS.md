@@ -10,7 +10,6 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | XPLAT-43 | A | feat/xplat43-gate-summary | 2026-10-01T16:52Z | tools/verify_segmented.sh,tools/verify_segmented.ps1,tests |
-| FUNKTIONSTEST-B | B | - | 2026-10-01T17:32Z | keine-repo-dateien |
 | BPM-26 | B | fix/bpm26-offbeat-hihat | 2026-10-01T19:32Z | src/core/audio/tempo_tracker.py · tests/test_bpm26_offbeat_hihat.py · BACKLOG.md · CHANGELOG.md |
 | XPLAT-41 | A | ci/xplat41-windows-arm-job | 2026-10-01T19:33Z | .github/workflows/ci.yml,tools/pr_bereit.py,tools/pr_ci_status.py,tools/_ci_beobachtend.py |
 | PROC-17 | A | fix/proc17-tafel-briefe | 2026-10-01T19:47Z | tools/session_claim.py,tests/test_session_claim.py,COORDINATION.md |
@@ -161,7 +160,6 @@
 
 ## Verlauf
 
-- 2026-10-01T14:44Z A claim UI-64
 - 2026-10-01T14:44Z A claim UI-65
 - 2026-10-01T14:54Z B done BPM-15
 - 2026-10-01T15:14Z B claim BPM-22
@@ -191,3 +189,4 @@
 - 2026-10-01T19:33Z A claim XPLAT-41
 - 2026-10-01T19:42Z A done PROC-09
 - 2026-10-01T19:47Z A claim PROC-17
+- 2026-10-01T19:49Z B done FUNKTIONSTEST-B
