@@ -99,7 +99,14 @@ _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Archiv in den Scan laufen -> der Waechter war auf Windows rot, auf Linux gruen
 # (XPLAT-WIN). Auf POSIX sind beide Schreibweisen identisch.
 # Nur hier darf APPDATA vorkommen: das ist die zentrale Aufloesung selbst.
-_ALLOWED = {"src/core/paths.py"}
+_ALLOWED = {
+    "src/core/paths.py",
+    # PRIV-05: die LOKALE Klarnamen-Liste des Tafel-Werkzeugs liegt bewusst
+    # NICHT im App-Datenordner (%APPDATA%\\lightos\\klarnamen.txt bzw.
+    # ~/.config/lightos/) — sie gehoert zum Werkzeug, nicht zur App, und wird
+    # auf jedem Rechner von Hand angelegt.
+    "tools/session_claim.py",
+}
 
 # Nicht gescannt: venv (fremder Code), tools/_archiv (stillgelegt), tests
 # (duerfen das alte Muster zu Vergleichszwecken nennen — siehe oben).
