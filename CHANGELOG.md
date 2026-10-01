@@ -7,6 +7,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-10-01 — BPM-Erkennung trifft das Tempo genau, „EINGERASTET“ nur bei sicherem Takt (BPM-20, BPM-23)
+
+#### Behoben
+
+- **Tempo genau:** Ein 128,00-BPM-Beat wurde als 127,6 erkannt, bei anderen Tempi lag die
+  Erkennung bis zu 1 BPM daneben (160 → 159,0). Jetzt liegt sie über 60–195 BPM unter
+  0,05 BPM, auch kurz nach dem Einrasten und bei Swing, Backbeat oder Offbeat-Bass.
+- **„EINGERASTET“ nur bei sicherem Takt:** Bricht der Beat weg (Ansage, Breakdown, Liedende),
+  steht nach einer halben Sekunde **SUCHT** und die Statuszeile sagt „Takt unsicher — das Tempo
+  läuft noch weiter“ — vorher stand dort „EINGERASTET“ mit Konfidenz 0 %. **KEIN SIGNAL** steht
+  jetzt immer dann, wenn auch die Statuszeile „Kein Signal“, „Wartet auf Signal“ oder einen
+  Audio-Fehler meldet.
+- **Pause ehrlich beschrieben:** In der Pause pausieren die Beats, bis die Musik zurückkommt —
+  die Statuszeile behauptete bisher „Beats laufen weiter“.
+
 ### 2026-10-01 — „Kein Takt gefunden“ nur noch bei echter Suche, neutraler Aufnahme-Hinweis (BPM-22, UI-67)
 
 #### Behoben
