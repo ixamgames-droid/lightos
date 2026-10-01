@@ -1,7 +1,7 @@
 {
   "anleitung": "vc_widgets",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "3403c9c7",
+  "stand": "1ebada4f",
   "schrift": "Noto Sans (statt Roboto Condensed)",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py vc_widgets'.",
@@ -15,7 +15,7 @@
         900
       ],
       "marken": [],
-      "md5": "93dc9105aac9c436a33a5fabf5ca9e37"
+      "md5": "5f7458b9a102c651268e30bb705fa3a6"
     },
     {
       "datei": "02_blackout_tasten.png",

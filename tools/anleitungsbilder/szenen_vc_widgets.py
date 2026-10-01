@@ -36,18 +36,15 @@ def _taste(ui, name):
 
 
 def _tasten_anlegen(ui):
-    """Zwei Tasten mit Aktion Blackout: „Blackout Links" (Gruppe „PAR links")
-    und „Blackout alles" (leeres Ziel = globaler Blackout).
-
-    Bewusst nur eine Gruppe, kein einzelnes Geraet: die Ziel-Liste zeigte
-    Geraete beim Erstellen dieser Szene als „Gerät: #9 [#9]" statt mit ihrem
-    Namen (``_blackout_choices`` liest ``fx.name``, das Patch-Modell heisst
-    ``label``) — das soll nicht als Soll-Zustand in der Anleitung stehen."""
+    """Zwei Tasten mit Aktion Blackout: „Blackout Links" (Gruppe „PAR links"
+    + Geraet „Wash 1", der linke Wash der Doku-Demo) und „Blackout alles"
+    (leeres Ziel = globaler Blackout)."""
     from PySide6.QtCore import QPoint
     from src.ui.virtualconsole.vc_button import ButtonAction
     canvas = _canvas(ui)
+    wash1 = ui.info["washes"][0]
     for name, text, pos, gruppen, fids in (
-            (_LINKS, "Blackout Links", QPoint(680, 280), [_GRUPPE], []),
+            (_LINKS, "Blackout Links", QPoint(680, 280), [_GRUPPE], [wash1]),
             (_ALLES, "Blackout alles", QPoint(840, 280), [], [])):
         w = _taste(ui, name)
         if w is None:
