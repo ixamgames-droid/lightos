@@ -1,7 +1,7 @@
 {
   "anleitung": "szenen_cues",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "c0ff194d",
+  "stand": "3403c9c7",
   "schrift": "Noto Sans (statt Roboto Condensed)",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py szenen_cues'.",
@@ -237,6 +237,50 @@
         }
       ],
       "md5": "358c73af824631eba9c9bf34735ce9aa"
+    },
+    {
+      "datei": "11_go_ohne_executor.png",
+      "szene": "11_go_ohne_executor",
+      "titel": "GO ohne Executor: Liste liegt jetzt auf einem freien Executor",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [
+        {
+          "nummer": 1,
+          "beschriftung": "GO"
+        },
+        {
+          "nummer": 2,
+          "beschriftung": "Hinweis"
+        },
+        {
+          "nummer": 3,
+          "beschriftung": "Executor 1"
+        }
+      ],
+      "md5": "270240bd0b2865013601a27610ca9c71"
+    },
+    {
+      "datei": "12_go_fader_null.png",
+      "szene": "12_go_fader_null",
+      "titel": "GO ohne Executor: freier Executor hat den Fader auf 0",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [
+        {
+          "nummer": 1,
+          "beschriftung": "Hinweis"
+        },
+        {
+          "nummer": 2,
+          "beschriftung": "Executor 1"
+        }
+      ],
+      "md5": "aac19ae7fbd5317ab5119a1460efa804"
     }
   ]
 }

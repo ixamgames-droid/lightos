@@ -321,7 +321,7 @@ def _blackout_choices() -> list[tuple[str, str]]:
     try:
         from src.core.app_state import get_state
         for fx in sorted(get_state().get_patched_fixtures(), key=lambda f: int(f.fid)):
-            name = getattr(fx, "name", "") or f"#{fx.fid}"
+            name = getattr(fx, "label", "") or f"#{fx.fid}"
             out.append((f"f:{int(fx.fid)}", f"Gerät: {name}  [#{int(fx.fid)}]"))
     except Exception:
         pass

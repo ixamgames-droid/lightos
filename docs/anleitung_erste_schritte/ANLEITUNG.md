@@ -39,6 +39,11 @@ Nach dem Start öffnet LightOS in der Sektion **Bühne**. Von oben nach unten:
    sie fahren also nicht in die Grundstellung und beim Lösen wieder zurück.
    Ungepatchte Kanäle, Geräte ohne Dimmer, Laser und Nebelmaschinen gehen
    komplett aus. Der Knopf rastet ein; ein zweiter Klick hebt den Blackout wieder auf.
+   Wie das im DMX-Monitor aussieht, zeigt
+   [Ausgabe einrichten, Schritt 7](../anleitung_ausgabe_einrichten/ANLEITUNG.md#7-kontrolle-der-dmx-monitor).
+   Nur einzelne Geräte oder Gruppen dunkel schaltet eine
+   [Blackout-Taste mit Ziel](../anleitung_vc_widgets/01_button.md#blackout-mit-ziel-vcb-11)
+   in der Virtual Console.
 7. **Befehlszeile** — für Tastatur-Befehle wie `1 thru 5 @ 80`. Beispiele stehen als
    Platzhaltertext im Feld.
 8. **Statusleiste** — links der Zustand des ENTTEC-Adapters (`Enttec: nicht gefunden`,
@@ -95,9 +100,14 @@ LightOS fragt nach, bevor es die aktuelle Show verwirft:
 
 ![Rückfrage Neue Show](img/04_rueckfrage.png)
 
-Mit **Yes** (1) werden gepatchte Geräte, Virtual Console, Funktionen, Paletten und
-Bibliothek geleert, und du beginnst mit einer leeren Show. **No** lässt alles, wie es
-ist. Die Knöpfe sind englisch beschriftet, weil sie von Qt stammen.
+Mit **Ja** (1) werden gepatchte Geräte, Virtual Console, Funktionen, Paletten und
+Bibliothek geleert, und du beginnst mit einer leeren Show. **Nein** lässt alles, wie es
+ist.
+
+Hat die aktuelle Show ungespeicherte Änderungen, kommt statt dieser Frage die
+Speichern-Frage mit **Speichern**, **Verwerfen** und **Abbrechen** — dieselbe wie beim
+Beenden (Schritt 7). **Verwerfen** leert dann die Show, **Abbrechen** lässt alles, wie es
+ist. Dasselbe gilt für **Datei → Öffnen...** und **Zuletzt verwendet**.
 
 > Die leere Show hat noch keinen Dateinamen. Den bekommt sie erst beim ersten
 > Speichern (Schritt 7).
@@ -199,8 +209,24 @@ in der Statusleiste (`Gespeichert: …`).
 im LightOS-Datenordner. Das Intervall stellst du unter **Datei → Auto-Save-Intervall...**
 ein (1–60 Minuten). Ist beim nächsten Start diese Sicherung neuer als deine zuletzt
 gespeicherte Show — etwa nach einem Absturz —, bietet LightOS an, sie
-wiederherzustellen. Beim Beenden fragt LightOS nach, wenn es ungespeicherte Änderungen
-vermutet.
+wiederherzustellen.
+
+**Beenden mit ungespeicherten Änderungen.** Hast du seit dem letzten Speichern oder
+Öffnen etwas am Inhalt der Show geändert — Patch, Cuelisten, Funktionen, VC-Layout
+usw. —, fragt LightOS beim Beenden nach. Im Bild wurde eine Cueliste angelegt:
+
+![Rückfrage beim Beenden](img/11_beenden.png)
+
+1. **Speichern** — speichert unter dem bisherigen Namen und beendet dann. Hat die Show
+   noch keinen Namen, öffnet sich *Speichern unter...*; brichst du dort ab oder klappt
+   das Speichern nicht, bleibt LightOS offen.
+2. **Verwerfen** — beendet ohne zu speichern.
+3. **Abbrechen** — LightOS bleibt offen, nichts geht verloren.
+
+Was du nur bedienst, zählt nicht als Änderung: Programmer-Werte, **GO** auf einer
+Cueliste, Fader und das Tempo lösen die Frage nicht aus. Eine nie gespeicherte Show mit
+Inhalt fragt immer („Die Show wurde noch nie gespeichert."), ebenso eine aus dem
+Auto-Save wiederhergestellte.
 
 ---
 

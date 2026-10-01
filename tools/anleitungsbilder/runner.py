@@ -349,6 +349,9 @@ def lauf(auftraege, *, sb, pruefen: bool = False, ausgabe: str | None = None,
     app = QApplication.instance() or QApplication(["lightos-anleitungsbilder"])
     app.setApplicationName("LightOS")
     lo_main._install_font_substitutions()
+    # Wie main.main(): Qt-Standardknoepfe (Yes/No/Cancel …) deutsch — sonst
+    # zeigten die Bilder englische Knoepfe, die App aber deutsche (UI-64h).
+    lo_main._install_qt_translator(app)
 
     pf = sandbox.selbstpruefung(sb)
     print("SANDBOX " + json.dumps(pf, sort_keys=True), flush=True)
