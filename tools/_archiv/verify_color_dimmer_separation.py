@@ -22,7 +22,7 @@ Beweis-Ziele:
   D) Aufklaerung Chase: ein Chase erbt den Dimmer NUR, wenn seine Schritt-Snaps
      mit Intensitaet gespeichert wurden. Saubere Farb-Snaps -> kein Dimmer.
 
-Aufruf:  venv\Scripts\python.exe tools\verify_color_dimmer_separation.py
+Aufruf:  venv\Scripts\python.exe tools\_archiv\verify_color_dimmer_separation.py
          (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 Headless, kein Output-Thread, eigene Wegwerf-Show-DB (echte DB unberuehrt).
 """

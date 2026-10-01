@@ -1,7 +1,7 @@
 """Beispiel-/Proof-Show über die ShowBuilder-DSL — baut eine kleine, ECHTE Show,
 bei der jeder Baustein gegen die reflektierten echten Sätze validiert ist.
 
-    venv/Scripts/python.exe tools/build_validated_demo.py
+    venv/Scripts/python.exe tools/_archiv/build_validated_demo.py
     (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
     -> shows/Validated_Demo.lshow  (statisch + live validiert, Render-geprüft)
 

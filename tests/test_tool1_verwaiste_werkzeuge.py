@@ -80,6 +80,25 @@ class VerwaisteWerkzeugeSindArchiviert(unittest.TestCase):
         self.assertEqual(fehlend, [], "ohne Begruendung archiviert")
 
 
+class ArchivierteNennenIhrenNeuenPfad(unittest.TestCase):
+    """Review-Fund (Codex zu #837): Aufrufbeispiele und Hilfemeldungen nannten
+    nach dem Verschieben weiter ``tools/<name>.py`` — wer sie kopierte, bekam
+    „No such file"."""
+
+    def test_kein_aufruf_ueber_den_alten_pfad(self):
+        import re
+        treffer = []
+        for name in VERWAIST:
+            with open(os.path.join(ARCHIV, name), encoding="utf-8") as f:
+                text = f.read()
+            alt = re.compile(r"tools[/\\]" + re.escape(name))
+            for nr, zeile in enumerate(text.splitlines(), 1):
+                if alt.search(zeile):
+                    treffer.append(f"{name}:{nr}  {zeile.strip()}")
+        self.assertEqual(treffer, [], "alter Pfad im archivierten Skript:\n  "
+                         + "\n  ".join(treffer))
+
+
 class KeineZweiGeneratorenMitDerselbenShow(unittest.TestCase):
 
     def test_jede_zielshow_hat_genau_einen_lebenden_generator(self):
