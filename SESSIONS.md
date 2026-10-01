@@ -10,7 +10,6 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | BPM-26 | B | fix/bpm26-offbeat-hihat | 2026-10-01T19:32Z | src/core/audio/tempo_tracker.py · tests/test_bpm26_offbeat_hihat.py · BACKLOG.md · CHANGELOG.md |
-| XPLAT-41 | A | ci/xplat41-windows-arm-job | 2026-10-01T19:33Z | .github/workflows/ci.yml,tools/pr_bereit.py,tools/pr_ci_status.py,tools/_ci_beobachtend.py |
 | OUT-57 | A | fix/out57-blackout-nur-licht | 2026-10-01T20:01Z | src/core/output/output_manager.py,src/core/app_state.py,docs |
 | UI-69 | A | fix/ui69-speichern-beim-beenden | 2026-10-01T20:02Z | src/ui/main_window.py,src/core/show |
 
@@ -162,7 +161,6 @@
 
 ## Verlauf
 
-- 2026-10-01T15:27Z A claim DOC-17
 - 2026-10-01T15:31Z A done UI-64
 - 2026-10-01T15:31Z A done UI-65
 - 2026-10-01T15:37Z A claim PRIV-05
@@ -192,3 +190,4 @@
 - 2026-10-01T20:02Z A claim UI-69
 - 2026-10-01T20:02Z A done PROC-17
 - 2026-10-01T20:16Z A done XPLAT-43
+- 2026-10-01T20:32Z A done XPLAT-41
