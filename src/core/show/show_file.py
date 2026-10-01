@@ -1431,6 +1431,12 @@ def _reset_state(state, *, emit_events: bool = True, blackout_output: bool = Tru
         state.set_freeze(False)
     except Exception as e:
         print(f"[show_file] reset unfreeze error: {e}")
+    # VCB-11: gezielte Blackouts (gedrueckte VC-Blackout-Tasten mit Ziel) gehoeren
+    # zur alten Show — ihre fids zeigten in der neuen auf fremde Geraete.
+    try:
+        state.clear_all_target_blackouts()
+    except Exception as e:
+        print(f"[show_file] reset target blackout error: {e}")
 
     # Patch (gepatchte Fixtures) leeren — entfernt sie auch aus current_show.db
     _replace_patch_from_data(state, [])
