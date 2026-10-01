@@ -187,9 +187,10 @@ Damit findest du Geräte auf der Bühne wieder:
    (Tastenkürzel **Umschalt+H**).
 3. In der **Lampen-Vorschau** leuchten die gewählten Wash-Lampen weiß.
 
-Beide Knöpfe schreiben echte Werte in den Programmer. Die bleiben stehen, bis du sie
-löschst (Schritt 11). **Abdunkeln** betrifft dabei *alle anderen* Geräte: Zum
-Aufräumen erst **Keine** und dann **Alles löschen** drücken.
+Beide Knöpfe schreiben echte Werte in den Programmer — nicht nur vorübergehend. Die
+bleiben stehen, bis du sie löschst (Schritt 11) oder **Rückgängig** drückst.
+**Abdunkeln** betrifft dabei *alle anderen* Geräte: Zum Aufräumen erst **Keine** und
+dann **Alles löschen** drücken.
 
 ## 8. Farb-Werkzeug
 

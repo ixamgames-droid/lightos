@@ -107,10 +107,16 @@ def _save_prefs(updates: dict) -> None:
 # U-3 (P-08): Hilfetexte fuer den Hilfe-Modus (Qt "What's This?"). Per setWhatsThis
 # an die Bedienelemente gehaengt; der Hilfe-Modus zeigt sie statt die Aktion auszuloesen.
 _PROGRAMMER_HELP = {
-    "Hervorheben": "Setzt die ausgewählten Fixtures vorübergehend auf volle "
-                 "Helligkeit, um sie auf der Bühne zu lokalisieren.",
-    "Abdunkeln": "Dimmt alle NICHT ausgewählten Fixtures ab, damit die aktuelle "
-                "Auswahl hervorsticht.",
+    # UI-64b: beide Knoepfe schreiben BLEIBENDE Programmer-Werte (kein
+    # „vorübergehend") — der Hilfetext sagt das und nennt den Weg zurück.
+    "Hervorheben": "Setzt die ausgewählten Geräte auf volle Helligkeit, Weiß "
+                   "und Pan/Tilt in die Mitte, um sie auf der Bühne zu finden "
+                   "(Taste H). Die Werte bleiben im Programmer stehen, bis du "
+                   "sie löschst oder Rückgängig drückst.",
+    "Abdunkeln": "Dimmt alle NICHT ausgewählten Geräte auf etwa 30 %, damit "
+                 "die Auswahl hervorsticht (Umschalt+H). Die Werte bleiben im "
+                 "Programmer stehen — zum Aufräumen „Keine“ wählen und dann "
+                 "„Alles löschen“ oder Rückgängig drücken.",
     # BUG-CLEAR: Der Knopf hat ZWEI Reichweiten (Auswahl / alles) — welche gilt,
     # sagen Beschriftung und Hilfetext seit 2026-08-02 selbst. Die Eintraege hier
     # sind die beiden Fassungen; ``_clear_button_labels`` waehlt aus.
@@ -1454,6 +1460,10 @@ class ProgrammerView(QWidget):
             while lay.count():
                 w = lay.takeAt(0).widget()
                 if w:
+                    # UI-64a: takeAt loest das Widget nur aus dem Layout — bis
+                    # deleteLater greift, bliebe es an alter Stelle SICHTBAR
+                    # stehen (Leer-Hinweis stand so doppelt im Reiter).
+                    w.hide()
                     w.deleteLater()
             return lay
 

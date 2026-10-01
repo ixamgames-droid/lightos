@@ -150,6 +150,29 @@ class SandboxRiegelTest(unittest.TestCase):
         self.assertEqual(os.getcwd(), cwd)
 
 
+class WindowsHomeTest(unittest.TestCase):
+    """XPLAT-39: auf Windows liest expanduser("~") USERPROFILE. Die Sandbox muss
+    es (und LOCALAPPDATA) wie HOME umlenken — gemessen in einem frischen
+    Prozess, weil einrichten() sich nach einem src-Import verweigert."""
+
+    def test_userprofile_und_localappdata_liegen_in_der_sandbox(self):
+        code = (
+            "import os, sys; sys.path.insert(0, %r)\n"
+            "from anleitungsbilder import sandbox\n"
+            "sb = sandbox.einrichten()\n"
+            "b = os.path.realpath(sb.basis)\n"
+            "for k in ('USERPROFILE', 'LOCALAPPDATA', 'HOME'):\n"
+            "    v = os.path.realpath(os.environ[k])\n"
+            "    print(k, v.startswith(b + os.sep))\n"
+            "import shutil; os.chdir(%r); shutil.rmtree(b, ignore_errors=True)\n"
+        ) % (TOOLS, REPO)
+        r = subprocess.run([sys.executable, "-c", code], capture_output=True,
+                           text=True, timeout=60, cwd=REPO)
+        self.assertEqual(r.returncode, 0, r.stderr[-2000:])
+        for k in ("USERPROFILE", "LOCALAPPDATA", "HOME"):
+            self.assertIn(f"{k} True", r.stdout)
+
+
 class MarkenFinderTest(unittest.TestCase):
 
     def test_fehlendes_widget_ist_ein_fehler(self):

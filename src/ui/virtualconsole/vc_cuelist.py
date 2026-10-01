@@ -12,6 +12,9 @@ from .vc_widget import VCWidget
 class VCCueList(VCWidget):
     """Shows a CueStack's cue list with GO/BACK/STOP transport."""
 
+    # UI-64i: so viele Executoren zeigt die Executor-Leiste im Playback.
+    SICHTBARE_EXECUTOREN = 10
+
     def __init__(self, caption: str = "Cueliste", parent=None):
         super().__init__(caption, parent)
         self.stack_slot: int = 0
@@ -125,9 +128,17 @@ class VCCueList(VCWidget):
         form = QFormLayout(dlg)
         cap = QLineEdit(self.caption)
         form.addRow("Beschriftung:", cap)
+        # UI-64i: Die Engine kennt 20 Executoren, belegen (Cueliste zuweisen)
+        # laesst sich aber nur, was die Executor-Leiste im Playback zeigt —
+        # Ex 1–10. Auswahl darauf begrenzt und wie dort 1-basiert angezeigt;
+        # gespeichert bleibt der 0-basierte Index (Show-Format unveraendert).
+        # Ein alter, hoeherer Wert aus einer Show bleibt waehlbar statt
+        # beim Oeffnen stillschweigend umgebogen zu werden.
         slot = QSpinBox()
-        slot.setRange(0, 19)
-        slot.setValue(self.stack_slot)
+        slot.setPrefix("Ex ")
+        slot.setRange(1, max(self.SICHTBARE_EXECUTOREN, self.stack_slot + 1))
+        slot.setValue(self.stack_slot + 1)
+        slot.setToolTip("Executor aus der Executor-Leiste im Playback (Ex 1–10)")
         form.addRow("Executor-Slot:", slot)
         btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         btns.accepted.connect(dlg.accept)
@@ -135,7 +146,7 @@ class VCCueList(VCWidget):
         form.addRow(btns)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             self.caption = cap.text() or self.caption
-            self.stack_slot = slot.value()
+            self.stack_slot = slot.value() - 1
             self._title_label.setText(self.caption)
             self.update()
 

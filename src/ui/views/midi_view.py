@@ -310,9 +310,22 @@ class MidiView(QWidget):
         port = self._combo_in.currentText()
         if not port or port.startswith("("):
             return
-        self._midi.open_input(port)
-        self._lbl_midi_status.setText(f"IN: {port}")
-        self._lbl_midi_status.setStyleSheet("color: #00cc66;")
+        try:
+            ok = self._midi.open_input(port)
+        except Exception as exc:
+            # UI-65: wie beim Ausgang — ein optionales MIDI-Backend darf keine
+            # unbehandelte Qt-Slot-Exception ausloesen.
+            ok = False
+            self._append_log(f"✗ MIDI-Eingang konnte nicht geöffnet werden: {exc}")
+        # Alt-/Test-Backends ohne Rueckgabewert (None) gelten als Erfolg;
+        # gruen nur, wenn nicht ausdruecklich False gemeldet wurde.
+        if ok is not False:
+            self._lbl_midi_status.setText(f"IN: {port}")
+            self._lbl_midi_status.setStyleSheet("color: #00cc66;")
+        else:
+            self._lbl_midi_status.setText(
+                f"MIDI-Eingang „{port}“ nicht verfügbar – siehe MIDI-Log")
+            self._lbl_midi_status.setStyleSheet("color: #ff5555;")
 
     def _open_output(self):
         port = self._combo_out.currentText()

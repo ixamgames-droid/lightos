@@ -310,6 +310,60 @@ def _install_font_substitutions():
         print(f"[main] Font-Substitutionen fehlgeschlagen: {e}")
 
 
+#: UI-64(h): Basis-Uebersetzungen von Qt, in dieser Reihenfolge versucht.
+#: ``qtbase_de`` traegt die Standardknoepfe (Yes/No/Cancel …); ``qt_de`` ist
+#: der Sammelkatalog aelterer Pakete und dient nur als Rueckfall.
+_QT_UEBERSETZUNGEN = ("qtbase_de", "qt_de")
+
+
+def _qt_uebersetzungs_ordner() -> list[str]:
+    """UI-64(h): Wo die ``.qm``-Dateien liegen koennen — plattformneutral.
+
+    Erst der Ordner, den Qt selbst meldet (``QLibraryInfo``; deckt PySide6-
+    Wheels unter Linux/Windows/ARM und den PyInstaller-Build ab), dann der
+    ``Qt/translations``-Ordner neben dem PySide6-Paket als Rueckfall, falls
+    ``QLibraryInfo`` in einer eingefrorenen Umgebung ins Leere zeigt."""
+    ordner: list[str] = []
+    try:
+        from PySide6.QtCore import QLibraryInfo
+        ordner.append(QLibraryInfo.path(
+            QLibraryInfo.LibraryPath.TranslationsPath))
+    except Exception:
+        pass
+    try:
+        import PySide6
+        ordner.append(os.path.join(os.path.dirname(PySide6.__file__),
+                                   "Qt", "translations"))
+    except Exception:
+        pass
+    # Reihenfolge erhalten, Doppelte (beide Wege zeigen meist dorthin) raus.
+    return list(dict.fromkeys(o for o in ordner if o))
+
+
+def _install_qt_translator(app):
+    """UI-64(h): Qt-Standardtexte (QMessageBox-Knoepfe „Yes"/„No", Datei-
+    dialoge …) auf Deutsch stellen. Ohne geladenen QTranslator zeigt Qt seine
+    englischen Vorgaben — mitten in einer sonst deutschen Oberflaeche, z. B.
+    bei der Rueckfrage zu „Neue Show".
+
+    Eigene Texte bleiben unberuehrt: LightOS nutzt kein ``tr()``-Katalog, der
+    Uebersetzer kennt nur Qt-Kontexte. Fehlt die Datei, bleibt es bei Englisch
+    — kein Fehler, kein Abbruch. Gibt den installierten Uebersetzer zurueck
+    (oder ``None``); er wird zusaetzlich an ``app`` gehaengt, damit ihn die
+    Garbage Collection nicht wieder entfernt."""
+    try:
+        from PySide6.QtCore import QTranslator
+        for ordner in _qt_uebersetzungs_ordner():
+            for name in _QT_UEBERSETZUNGEN:
+                tr = QTranslator(app)
+                if tr.load(name, ordner) and app.installTranslator(tr):
+                    app._lightos_qt_translator = tr
+                    return tr
+    except Exception as e:
+        print(f"[main] Qt-Uebersetzung nicht geladen: {e}")
+    return None
+
+
 def _install_crash_dialog():
     """F-9: Haengt einen nutzersichtbaren Fehler-Dialog an sys.excepthook UND
     threading.excepthook an. Wird NACH der QApplication aufgerufen. Die vorhandenen
@@ -616,6 +670,8 @@ def main():
 
     # XPLAT-05: Font-Fallbacks registrieren, bevor Dialoge/UI Fonts aufloesen.
     _install_font_substitutions()
+    # UI-64(h): Qt-Standardknoepfe deutsch (Ja/Nein statt Yes/No).
+    _install_qt_translator(app)
 
     # F-9: nutzersichtbarer Crash-Report-Dialog (nach der QApplication, da er
     # QMessageBox nutzt). Ergaenzt das stille crash.log-Logging.
