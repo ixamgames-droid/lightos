@@ -35,6 +35,12 @@ gepflegte Anleitung mit „neu bauen"-Befehl verweist darauf.
 | `build_profi_show.py` | `Profi_Modus.lshow` | Grenzfall: `docs/PROFI_MODUS.md` ist als „aktuell" gefuehrt, nutzt das Skript aber rein als Provenienz-/Seed-Nachweis, nicht als Regenerier-Befehl. |
 | `build_vc_test_2026.py` | `VC_Test_2026.lshow` | Sauberster Fall — als einziger Kandidat **ohne** jede eigene `docs/`-Anleitung; ausser dem generierten `tools/README.md` gibt es repo-weit keine Referenz. |
 
+## Stillgelegte Bilder-Werkzeuge (TOOL-5, 2026-10-02)
+
+| Skript | Warum archiviert |
+|---|---|
+| `capture_hochzeit_tempo_guide.py` | DOC-17 hat `docs/anleitung_hochzeit_tempo/` auf Tempo-Controller umgestellt und die Bilder entfernt — die Anleitung ist bildlos. Das Werkzeug fotografierte das alte Multiplikator-Layout (Speed-Dials „Farb Wechsel“/„An Aus“) der privaten `hochzeit.lshow` und schrieb weiter nach `docs/`. Es schreibt jetzt in einen Wegwerf-Ordner (`LIGHTOS_CAPTURE_OUT` oder Temp) und nennt bei fehlenden Dials Show, Fehlendes und Vorhandenes (TOOL-4). Neue Anleitungsbilder: `tools/anleitungsbilder.py`. |
+
 ## ⚠ Pfad-Fallstrick beim Archivieren (gefixt 2026-07-27)
 
 Skripte in `tools/` leiten den Repo-Root aus der **Ordnertiefe** ab:

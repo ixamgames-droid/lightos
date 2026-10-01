@@ -59,7 +59,6 @@
 | `build_vc_elements_showcase.py` | VC-Elemente-Schaukasten: legt JEDEN der 15 VC-Widget-Typen einmal beschriftet |
 | `build_vc_widgets_showcase.py` | VC-Widgets-Schaukasten (Doku) — legt 17 der 19 VC-Widget-Typen einmal |
 | `build_zq06121_demo.py` | Demo-/Testshow fuer Davids U-King ZQ06121 LED-Balken (2026-08-05). |
-| `capture_hochzeit_tempo_guide.py` | Reproduzierbare Screenshots für die Hochzeit-Tempo-Anleitung. |
 | `capture_test123_tempo_guide.py` | Reproduzierbare Screenshots fuer die Test123-Tempo-Anleitung. |
 | `capture_vc_widgets.py` | Vollbild der VC-Widget-Showcase aufnehmen — OHNE Desktop, ohne Fotoapparat. |
 | `changelog_sammeln.py` | CHANGELOG-Fragmente sammeln — und direkte CHANGELOG-Aenderungen melden (PROC-09). |
@@ -115,6 +114,7 @@ Begruendungen: [tools/_archiv/README.md](_archiv/README.md).
 - `_archiv/build_snaps_show.py`
 - `_archiv/build_stage_show.py`
 - `_archiv/build_vc_test_2026.py`
+- `_archiv/capture_hochzeit_tempo_guide.py`
 - `_archiv/diag_hardstyle.py`
 - `_archiv/diag_movers.py`
 - `_archiv/patch_stage_show_pages.py`
