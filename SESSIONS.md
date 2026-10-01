@@ -21,6 +21,7 @@
 | ENG-27 | C | fix/eng27-open-value | 2026-10-01T21:27Z | src/core/app_state.py · src/core/all_white.py · src/core/engine/efx.py |
 | FM-46 | C | docs/fm46-befund | 2026-10-01T21:35Z | BACKLOG.md |
 | DOC-14 | C | fix/doc14-schaukasten-19 | 2026-10-01T21:37Z | tools/build_vc_widgets_showcase.py · docs/anleitung_vc_widgets/README.md · docs/anleitung_vc_widgets/_capture/geometry.json · tests/test_doc14_schaukasten_alle_typen.py · changelog.d/2026-10-02-DOC-14.md |
+| DOC-19 | A | docs/doc19-bilder-neue-funktionen | 2026-10-01T21:56Z | docs/anleitung_vc_widgets · docs/anleitung_playback |
 
 ## Blocker & Fallen
 
@@ -175,7 +176,6 @@
 
 ## Verlauf
 
-- 2026-10-01T17:57Z B claim BPM-26
 - 2026-10-01T19:33Z A done PROC-16
 - 2026-10-01T19:33Z A claim XPLAT-41
 - 2026-10-01T19:42Z A done PROC-09
@@ -205,3 +205,4 @@
 - 2026-10-01T21:35Z C claim FM-46
 - 2026-10-01T21:37Z C claim DOC-14
 - 2026-10-01T21:48Z A done UI-68
+- 2026-10-01T21:56Z A claim DOC-19
