@@ -13,7 +13,7 @@
 | PROC-09 | A | feat/proc09-changelog-fragmente | 2026-10-01T15:41Z | changelog.d,tools,tests,CHANGELOG.md,WORKFLOW.md |
 | XPLAT-43 | A | feat/xplat43-gate-summary | 2026-10-01T16:52Z | tools/verify_segmented.sh,tools/verify_segmented.ps1,tests |
 | FUNKTIONSTEST-B | B | - | 2026-10-01T17:32Z | keine-repo-dateien |
-| BPM-26 | B | fix/bpm26-offbeat-hihat | 2026-10-01T17:57Z | src/core/audio/tempo_tracker.py · tests/test_bpm26_offbeat_hihat.py · BACKLOG.md · CHANGELOG.md |
+| BPM-26 | B | fix/bpm26-offbeat-hihat | 2026-10-01T19:32Z | src/core/audio/tempo_tracker.py · tests/test_bpm26_offbeat_hihat.py · BACKLOG.md · CHANGELOG.md |
 
 ## Blocker & Fallen
 
