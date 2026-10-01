@@ -7,6 +7,34 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-10-01 — Speichern und Löschen halten sich an gewählte Weiß-Segmente (FM-51 Scheibe B)
+
+#### Behoben
+
+- **Ein Snapshot, Snap oder eine Szene nahm bei reiner Weiß-Auswahl den ganzen Programmer mit.**
+  Wer an einem Gerät mit eigenen Weiß-Segmenten (z. B. LED-Balken mit 48 Farbzonen und 8 Weiß-
+  Segmenten) nur „Weiß 4“ gewählt und dann gespeichert hat, bekam alle Restwerte anderer Geräte
+  und alle acht Weiß-Segmente in den Speicher. Jetzt speichern Snapshot-Slot, Schnell-Snapshot,
+  Snap-Bibliothek und „Programmer → Szene“ nur die gewählten Segmente und den gemeinsamen
+  Master-Dimmer; den Dimmer kann man im Kanal-Dialog abwählen. Ist das erste Segment dabei,
+  kommen die übrigen Segmente mit ihrem aktuellen Wert mit, sonst würde der Abruf es auf alle acht
+  übertragen. Bei gemischter Auswahl (ganzes Gerät plus Segment) fehlt das Segment nicht mehr.
+- **Der Schnell-Snapshot speicherte bei einzeln gewählten Köpfen alle Köpfe.** Er nutzt jetzt
+  dieselbe Auswahl wie die anderen Speicherwege. Ein gewählter Kopf nimmt außerdem nicht mehr
+  das gleich nummerierte Weiß-Segment mit.
+- **„Löschen“ im Programmer leerte bei reiner Weiß-Auswahl das ganze Gerät.** Er leert jetzt
+  genau die gewählten Segmente. Farbzonen, übrige Segmente, der gemeinsame Master und andere
+  Geräte bleiben. Ein geleertes Segment geht dabei auf 0, damit das erste Segment nicht auf es
+  durchscheint. Der Knopf heißt dann „Auswahl löschen (1 Segment)“ bzw. „Segmente löschen (n)“,
+  und der Hilfetext sagt, was bleibt. Den ganzen Programmer leert er nur, wenn wirklich nichts
+  gewählt ist. Ein Löschen ist ein Rückgängig-Schritt.
+- **Hervorheben, Kopieren, Einfügen und Fächer im Programmer** nehmen ihre Ziele immer aus der
+  aktuellen Auswahl und nicht mehr aus der Geräteliste des Editors.
+- **Speichern einer Auswahl ohne Werte** meldet jetzt klar „Die gewählten Geräte/Segmente haben
+  keine Werte im Programmer.“ statt eines leeren Kanal-Dialogs und „Keine Kanäle ausgewählt“.
+- Der Umschalter „Köpfe: Synchron“ erscheint und wirkt nur noch für ganz gewählte Geräte; ein nur
+  über ein Weiß-Segment gewählter Balken verliert dabei nicht mehr seine Zonenfarben.
+
 ### 2026-10-01 — „Rückgängig" im Programmer nimmt den letzten Programmer-Schritt zurück (FM-52)
 
 #### Behoben

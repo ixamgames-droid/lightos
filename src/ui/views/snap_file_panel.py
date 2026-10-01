@@ -60,6 +60,103 @@ def _scope_heads(state) -> dict:
         return {}
 
 
+def _scope(state) -> dict:
+    """FM-51 Scheibe B: der EINE Speicher-Scope fuer alle Aufrufer des
+    ChannelSelectDialog (Snapshot-Slot, Quick-Snapshot, Snap-Bibliothek,
+    Programmer -> Szene) — als Keyword-Argumente fuer den Dialog.
+
+    Bevorzugt ``AppState.auswahl_programmer_scope()`` (Schluessel-Scope je
+    Geraet, ``None`` NUR bei wirklich leerer Auswahl). Eine reine Weiss-Auswahl
+    speichert damit nur die gewaehlten Segment-Schluessel (+ geteilten Dimmer)
+    statt des ganzen Programmers. Aeltere States/Test-Fakes ohne die API
+    bekommen den Bestandsweg (``scope_fids`` + ``scope_heads``)."""
+    fn = getattr(state, "auswahl_programmer_scope", None)
+    if callable(fn):
+        try:
+            return {"scope_keys": fn()}
+        except Exception as e:
+            print(f"[snap_file_panel] scope error: {e}")
+    fids_fn = getattr(state, "active_scope_fids", None)
+    fids = fids_fn() if callable(fids_fn) else None
+    return {"scope_fids": fids, "scope_heads": _scope_heads(state)}
+
+
+# FM-51 Scheibe B: Klartext, wenn eine Auswahl besteht, aber keiner ihrer
+# Schluessel einen Wert im Programmer hat (z. B. reine Weiss-Auswahl ohne
+# Segmentwert, waehrend nur ein PAR-Rest im Programmer steht). „Keine Werte im
+# Programmer." stimmte dann nicht, „Keine Kanäle ausgewählt" auch nicht.
+KEINE_WERTE_IM_SCOPE = ("Die gewählten Geräte/Segmente haben keine Werte im "
+                        "Programmer.")
+
+
+def _head_of_key(attr: str) -> int:
+    """Kopf-Index eines Programmer-Schluessels: ``"color_r"`` -> 0,
+    ``"color_r#2"`` -> 2 (die ``attr#N``-Konvention des Programmers)."""
+    if "#" in str(attr):
+        try:
+            return int(str(attr).rsplit("#", 1)[1])
+        except ValueError:
+            return 0
+    return 0
+
+
+def _im_scope(programmer: dict, *, scope_keys=None, scope_fids=None,
+              scope_heads=None) -> dict:
+    """Programmer auf einen Scope reduzieren — die EINE Regel fuer den
+    Kanal-Dialog und den Vorab-Check :func:`scope_ohne_werte`.
+
+    ``scope_keys`` (``{fid: None | set}``, ``None`` = keine Einschraenkung)
+    geht vor; sonst ``scope_fids`` (leer = alle) und je Geraet ``scope_heads``."""
+    out: dict = {}
+    if scope_keys is not None:
+        sk = {int(f): ks for f, ks in scope_keys.items()}
+        for fid, attrs in programmer.items():
+            if int(fid) not in sk:
+                continue
+            keys = sk[int(fid)]
+            if keys is not None:
+                attrs = {a: v for a, v in attrs.items() if a in keys}
+                if not attrs:
+                    continue
+            out[fid] = attrs
+        return out
+    fids = {int(f) for f in scope_fids} if scope_fids else None
+    heads_by = {int(f): {int(h) for h in hs}
+                for f, hs in (scope_heads or {}).items() if hs}
+    for fid, attrs in programmer.items():
+        if fids and int(fid) not in fids:
+            continue
+        heads = heads_by.get(int(fid))
+        if heads:
+            attrs = {a: v for a, v in attrs.items() if _head_of_key(a) in heads}
+            if not attrs:
+                continue
+        out[fid] = attrs
+    return out
+
+
+def scope_ohne_werte(state, programmer: dict) -> bool:
+    """FM-51 Scheibe B: gemeinsamer Vorab-Check aller Speicherwege
+    (Snapshot-Slot, Quick-Snapshot, Snap speichern, Programmer -> Szene).
+
+    ``True``, wenn etwas gewaehlt ist, der Programmer aber fuer genau diese
+    Auswahl nichts enthaelt — dann melden die Aufrufer
+    :data:`KEINE_WERTE_IM_SCOPE` und oeffnen den Kanal-Dialog gar nicht. Ein
+    LEERER Programmer ist nicht gemeint (dafuer hat jeder Aufrufer seine eigene
+    Meldung), ebenso wenig „nichts gewaehlt" (dann gilt der ganze Programmer)."""
+    if not programmer:
+        return False
+    kw = _scope(state)
+    if "scope_keys" in kw:
+        if kw["scope_keys"] is None:
+            return False
+        return not _im_scope(programmer, scope_keys=kw["scope_keys"])
+    if not kw.get("scope_fids"):
+        return False
+    return not _im_scope(programmer, scope_fids=kw.get("scope_fids"),
+                         scope_heads=kw.get("scope_heads"))
+
+
 class ChannelSelectDialog(QDialog):
     """Auswahl, WAS beim Speichern (Snap/Szene) uebernommen wird.
 
@@ -76,7 +173,7 @@ class ChannelSelectDialog(QDialog):
     """
 
     def __init__(self, programmer: dict, parent=None, *, scope_fids=None,
-                 scope_heads=None):
+                 scope_heads=None, scope_keys=None):
         super().__init__(parent)
         self.setWindowTitle("Kanäle auswählen")
         self.setMinimumWidth(320)
@@ -92,34 +189,31 @@ class ChannelSelectDialog(QDialog):
         # mit auf. Ohne Angabe: alle Koepfe (Bestandsverhalten).
         self._scope_heads = {int(f): {int(h) for h in hs}
                              for f, hs in (scope_heads or {}).items() if hs}
+        # FM-51 Scheibe B: Schluessel-Scope {fid: None | set(Programmer-
+        # Schluessel)} aus ``AppState.auswahl_programmer_scope`` — geht vor
+        # scope_fids/scope_heads. ``None`` = keine Einschraenkung (wirklich
+        # nichts gewaehlt); ein LEERES Dict heisst „gewaehlt, aber nichts davon
+        # im Programmer" und nimmt nichts mit — nie „alles".
+        self._scope_keys = None
+        if scope_keys is not None:
+            self._scope_keys = {int(f): (None if ks is None else set(ks))
+                                for f, ks in scope_keys.items()}
+            self._scope = set(self._scope_keys)
         self._setup_ui(programmer)
 
     @staticmethod
     def _head_of_key(attr: str) -> int:
-        """Kopf-Index eines Programmer-Schluessels: ``"color_r"`` -> 0,
-        ``"color_r#2"`` -> 2 (die ``attr#N``-Konvention des Programmers)."""
-        if "#" in attr:
-            try:
-                return int(attr.rsplit("#", 1)[1])
-            except ValueError:
-                return 0
-        return 0
+        """Kopf-Index eines Programmer-Schluessels (siehe :func:`_head_of_key`)."""
+        return _head_of_key(attr)
 
     def _in_scope(self, programmer: dict) -> dict:
         """Programmer auf die Geraete im aktiven Scope reduzieren — und, falls
-        gesetzt, je Geraet auf die gewaehlten KOEPFE."""
-        out: dict = {}
-        for fid, attrs in programmer.items():
-            if self._scope and int(fid) not in self._scope:
-                continue
-            heads = self._scope_heads.get(int(fid))
-            if heads:
-                attrs = {a: v for a, v in attrs.items()
-                         if self._head_of_key(a) in heads}
-                if not attrs:
-                    continue
-            out[fid] = attrs
-        return out
+        gesetzt, je Geraet auf die gewaehlten Schluessel (Schluessel-Scope) bzw.
+        KOEPFE (Bestandsweg). Regel: :func:`_im_scope`."""
+        if self._scope_keys is not None:
+            return _im_scope(programmer, scope_keys=self._scope_keys)
+        return _im_scope(programmer, scope_fids=self._scope,
+                         scope_heads=self._scope_heads)
 
     @staticmethod
     def _attr_text(attr: str, attr_fids: dict) -> str:
@@ -213,7 +307,12 @@ class ChannelSelectDialog(QDialog):
             cb.toggled.connect(child_box.setEnabled)
 
         if not self._checks:
-            layout.addWidget(QLabel("Keine Werte im Programmer."))
+            # FM-51 Scheibe B: bei eingeschraenktem Scope ehrlich sagen, dass
+            # nur die AUSWAHL nichts hat — der Programmer ist evtl. nicht leer.
+            eingeschraenkt = (self._scope_keys is not None) or bool(self._scope)
+            layout.addWidget(QLabel(
+                KEINE_WERTE_IM_SCOPE if eingeschraenkt and programmer
+                else "Keine Werte im Programmer."))
 
         layout.addSpacing(4)
         btn_row = QHBoxLayout()
@@ -866,8 +965,11 @@ class SnapFilePanel(QWidget):
                     "Programmer ist leer - nichts zu speichern.")
                 return
 
-            dlg = ChannelSelectDialog(prog, self, scope_fids=state.active_scope_fids(),
-                                      scope_heads=_scope_heads(state))
+            if scope_ohne_werte(state, prog):
+                QMessageBox.information(self, "Snap speichern",
+                                        KEINE_WERTE_IM_SCOPE)
+                return
+            dlg = ChannelSelectDialog(prog, self, **_scope(state))
             if dlg.exec() != QDialog.DialogCode.Accepted:
                 return
             filtered = dlg.filter_programmer(prog)

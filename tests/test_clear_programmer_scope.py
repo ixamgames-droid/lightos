@@ -2,7 +2,7 @@
 
 Davids Meldung aus dem Betrieb (2026-08-01). Das *manchmal* war keine Laune und
 kein Race: der Knopf „Löschen" im Programmer-Tab hat **zwei Reichweiten**.
-``ProgrammerView._clear_programmer`` verzweigt auf ``_selected_fids`` — ohne
+``ProgrammerView._clear_programmer`` verzweigt auf die Auswahl (seit FM-51 B ``AppState.auswahl_leeren``) — ohne
 Auswahl leert er alles, mit Auswahl nur diese Geräte. Sein Hilfetext versprach
 dagegen „alle hier manuell gesetzten Werte", und im Programmer ist fast immer
 etwas gewählt, weil man die Auswahl zum Einstellen braucht.
@@ -75,7 +75,14 @@ class _Basis(unittest.TestCase):
     def _view(self) -> ProgrammerView:
         v = ProgrammerView()
         self.addCleanup(v.deleteLater)
+        self.addCleanup(self.state.set_selected_cells, [])
         return v
+
+    def _waehle(self, v, zellen):
+        """Auswahl ueber den AppState (FM-51 Scheibe B: die Reichweite des
+        Knopfs liest den AppState, nicht die Editor-Liste der View)."""
+        self.state.set_selected_cells([str(z) for z in zellen])
+        v._sync_follow_selection()
 
     def _werte_setzen(self):
         for fid in (1, 2, 3):
@@ -92,7 +99,7 @@ class ReichweiteTest(_Basis):
         """Davids Fall: das *manchmal* ist die Auswahl."""
         v = self._view()
         self._werte_setzen()
-        v._selected_fids = [1]
+        self._waehle(v, [1])
         v._clear_programmer()
 
         self.assertEqual(sorted(self._programmer()), [2, 3],
@@ -101,7 +108,7 @@ class ReichweiteTest(_Basis):
     def test_ohne_auswahl_ist_der_programmer_wirklich_leer(self):
         v = self._view()
         self._werte_setzen()
-        v._selected_fids = []
+        self._waehle(v, [])
         v._clear_programmer()
 
         self.assertEqual(self._programmer(), {})
@@ -116,8 +123,7 @@ class ReichweiteTest(_Basis):
         self.assertGreaterEqual(len(self._programmer().get(4, {})), 2,
                                 "Vorbedingung: Gerät hat Werte auf zwei Schlüsseln")
 
-        v._selected_fids = [4]
-        v._selected_cells = ["4:1"]        # nur Kopf 2 in der Liste markiert
+        self._waehle(v, ["4:1"])           # nur Kopf 2 gewaehlt
         v._clear_programmer()
 
         self.assertNotIn(4, self._programmer(),
@@ -143,12 +149,10 @@ class BeschriftungTest(_Basis):
         self.assertEqual(v._btn_clear.text(), "Alles löschen",
                          "frisch gebaut ist nichts gewählt")
 
-        v._selected_fids = [1, 2]
-        v._rebuild_attr_editor()
+        self._waehle(v, [1, 2])
         self.assertEqual(v._btn_clear.text(), "Auswahl löschen (2)")
 
-        v._selected_fids = []
-        v._rebuild_attr_editor()
+        self._waehle(v, [])
         self.assertEqual(v._btn_clear.text(), "Alles löschen",
                          "Auswahl aufgehoben -> wieder die volle Reichweite")
 
@@ -166,8 +170,7 @@ class BeschriftungTest(_Basis):
         """Sonst steht die alte Reichweite im Hilfe-Modus (U-3), waehrend der
         Knopf schon die neue traegt — die schlechtere Haelfte des Fehlers."""
         v = self._view()
-        v._selected_fids = [1]
-        v._rebuild_attr_editor()
+        self._waehle(v, [1])
 
         self.assertIn("1", v._btn_clear.text())
         self.assertEqual(v._btn_clear.whatsThis(), v._btn_clear.toolTip())
