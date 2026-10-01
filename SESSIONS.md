@@ -13,6 +13,7 @@
 | UI-67 | B | fix/bpm22-kein-takt | 2026-10-01T15:14Z | src/ui/bpm_status_rules.py · src/ui/views/bpm_manager_view.py |
 | DOC-17 | A | docs/doc17-nacharbeiten | 2026-10-01T15:27Z | docs |
 | PRIV-05 | A | fix/priv05-klarnamen-waechter | 2026-10-01T15:37Z | tools/session_claim.py,tests/test_session_claim.py |
+| PROC-14 | A | fix/proc14-claim-pruefung | 2026-10-01T15:41Z | tools/pr_bereit.py,tests/test_pr_bereit.py |
 
 ## Blocker & Fallen
 
@@ -140,7 +141,6 @@
 
 ## Verlauf
 
-- 2026-09-29T18:30Z A claim FM-41
 - 2026-09-29T19:55Z A uebergeben FM-41
 - 2026-09-29T19:56Z A claim FM-41
 - 2026-09-29T20:46Z A done FM-41
@@ -170,3 +170,4 @@
 - 2026-10-01T15:31Z A done UI-64
 - 2026-10-01T15:31Z A done UI-65
 - 2026-10-01T15:37Z A claim PRIV-05
+- 2026-10-01T15:41Z A claim PROC-14
