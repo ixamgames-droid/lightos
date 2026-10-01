@@ -1925,17 +1925,28 @@ class MainWindow(QMainWindow):
     # ── Show-Datei ────────────────────────────────────────────────────────────
 
     def _new_show(self):
-        reply = QMessageBox.question(self, "Neue Show",
-            "Aktuelle Show komplett verwerfen und leer neu beginnen?\n\n"
-            "Gepatchte Fixtures, Virtual Console, Funktionen, Paletten und "
-            "Bibliothek werden geleert.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-        if reply == QMessageBox.StandardButton.Yes:
-            from src.core.show.show_file import reset_show
-            reset_show()
-            self._current_show_path = None
-            self.setWindowTitle("LightOS")
-            self._sync_render_toggles()
+        # UI-69: mit ungespeicherten Aenderungen ersetzt die Speichern-Frage
+        # die Verwerfen-Bestaetigung (zwei Dialoge hintereinander waeren einer
+        # zu viel) — „Verwerfen" ist dort die ausdrueckliche Zustimmung.
+        if self._has_unsaved_changes() and not _exit_prompt_suppressed():
+            if not self._rueckfrage_ungespeichert(
+                    "Neue Show", "Vor dem Leeren speichern?"):
+                return
+        else:
+            reply = QMessageBox.question(self, "Neue Show",
+                "Aktuelle Show komplett verwerfen und leer neu beginnen?\n\n"
+                "Gepatchte Fixtures, Virtual Console, Funktionen, Paletten und "
+                "Bibliothek werden geleert.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+        from src.core.show.show_file import reset_show
+        reset_show()
+        self._current_show_path = None
+        self._aus_auto_save = False
+        self.setWindowTitle("LightOS")
+        self._sync_render_toggles()
+        self._show_stand_merken()
 
     def _open_show(self):
         path, _ = QFileDialog.getOpenFileName(
@@ -1944,18 +1955,50 @@ class MainWindow(QMainWindow):
         )
         if not path:
             return
+        self._open_show_nach_rueckfrage(path)
+
+    def _open_show_nach_rueckfrage(self, path: str):
+        """UI-69: „Show öffnen" und die Zuletzt-Liste ersetzen die offene Show —
+        ungespeicherte Aenderungen vorher anbieten zu sichern. Die Auto-Save-
+        Wiederherstellung beim Start ruft ``_open_show_path`` direkt (dort gibt
+        es noch nichts zu verlieren)."""
+        if self._has_unsaved_changes() and not _exit_prompt_suppressed():
+            if not self._rueckfrage_ungespeichert(
+                    "Show öffnen", "Vor dem Öffnen der anderen Show speichern?"):
+                return
         self._open_show_path(path)
 
-    def _open_show_path(self, path: str):
+    def _open_show_path(self, path: str, wiederherstellung: bool = False):
+        """Show laden. ``wiederherstellung``: ``path`` ist die Auto-Save-Datei
+        (Absturz-Wiederherstellung beim Start) — siehe unten."""
         from src.core.show.show_file import load_show, letzte_ladeprobleme
         ok, msg = load_show(path)
-        if ok:
+        if ok and wiederherstellung:
+            # UI-69-Korrektur: der wiederhergestellte Stand steht NUR im
+            # Auto-Save, in keiner Show-Datei des Nutzers. Galt er als „geoeffnet
+            # aus auto_save.lshow", fragte Beenden nicht, und Strg+S schrieb in
+            # die Auto-Save-Datei (die der naechste Auto-Save ueberschreibt).
+            # Darum: kein Pfad (Speichern = „Speichern unter"), nicht in die
+            # Zuletzt-Liste, und als ungespeichert markiert — auch eine Show
+            # ohne Cuelisten/Funktionen fragt dann beim Beenden. Den
+            # Originalpfad kennt der Auto-Save nicht; raten (z. B. der erste
+            # Eintrag der Zuletzt-Liste) koennte eine fremde Show ueberschreiben.
+            self._current_show_path = None
+            self._aus_auto_save = True
+            self.setWindowTitle("LightOS  -  wiederhergestellt (nicht gespeichert)")
+            self.statusBar().showMessage(
+                "Auto-Save wiederhergestellt — bitte speichern", 6000)
+            self._sync_render_toggles()
+        elif ok:
             self._current_show_path = path
+            self._aus_auto_save = False
             self.setWindowTitle(f"LightOS  -  {msg}")
             self.statusBar().showMessage(msg, 4000)
+            self._show_stand_merken(nachlaufend=True)   # UI-69: Laden ist keine Aenderung
             _add_recent_file(path)
             self._rebuild_recent_menu()
             self._sync_render_toggles()
+        if ok:
             # ★★ QA-50: Der Loader ist bewusst tolerant — eine Show mit einem
             # kaputten Block soll sich oeffnen lassen. Falsch war, dass davon
             # NICHTS uebrig blieb: es stand „geladen" da, und das naechste
@@ -1989,7 +2032,7 @@ class MainWindow(QMainWindow):
         for path, short in zip(recents, labels):
             act = self._recent_menu.addAction(short)
             act.setToolTip(path)  # voller Pfad bleibt im Tooltip
-            act.triggered.connect(weak_slot(self._open_show_path, path))
+            act.triggered.connect(weak_slot(self._open_show_nach_rueckfrage, path))
         self._recent_menu.addSeparator()
         clear_act = self._recent_menu.addAction("Liste leeren")
         clear_act.triggered.connect(self._clear_recent_files)
@@ -2076,13 +2119,14 @@ class MainWindow(QMainWindow):
             pass
         return base
 
-    def _save_show(self):
+    def _save_show(self) -> bool:
+        """Speichern; True, wenn die Show danach in einer Datei steht (UI-69:
+        die Rueckfragen brechen bei False ab, statt die Arbeit zu verwerfen)."""
         if not self._current_show_path:
-            self._save_show_as()
-            return
-        self._do_save(self._current_show_path)
+            return self._save_show_as()
+        return self._do_save(self._current_show_path)
 
-    def _save_show_as(self):
+    def _save_show_as(self) -> bool:
         path, _ = QFileDialog.getSaveFileName(
             self, "Show speichern", self._default_show_dir(),
             "LightOS Show (*.lshow)"
@@ -2091,9 +2135,87 @@ class MainWindow(QMainWindow):
             if not path.endswith(".lshow"):
                 path += ".lshow"
             self._current_show_path = path
-            self._do_save(path)
+            return self._do_save(path)
+        return False
 
-    def _do_save(self, path: str):
+    def _views_in_state(self, nur_vergleich: dict | None = None) -> list[str]:
+        """Was die Views erst beim Speichern herausgeben (VC-Layout, Snapshots,
+        Kanal-Gruppen), in den State uebernehmen. Liefert die Teile, die sich
+        nicht einsammeln liessen.
+
+        UI-69: aus ``_do_save`` herausgezogen — der Aenderungs-Vergleich braucht
+        denselben Stand, sonst saehe er VC-Aenderungen nie.
+
+        ``nur_vergleich``: statt in den State in dieses Dict schreiben (Schluessel
+        = Block der Show-Datei) — fuer den Vergleich. Der darf den State NICHT
+        anfassen: ``state._vc_layout`` haelt nach dem Laden noch die
+        uebersprungenen Widgets (QA-50), die ``to_dict`` nicht kennt; ein blosser
+        Vergleich ueberschrieb sie, und der naechste Auto-Save schrieb die Show
+        ohne sie (Verlust nach einem Absturz)."""
+        verloren: list[str] = []
+
+        def _ablegen(block: str, attr: str, wert) -> None:
+            if nur_vergleich is None:
+                setattr(self._state, attr, wert)
+            else:
+                nur_vergleich[block] = wert
+
+        # VC-Layout (Buttons/Fader) aus dem aktuellen Canvas uebernehmen
+        try:
+            _ablegen("virtual_console", "_vc_layout", self._vc_view.to_dict() or {})
+            # QA-50: Beim Laden uebersprungene Widgets stehen NICHT im
+            # to_dict — dieses Speichern loescht sie endgueltig. Der
+            # richtige Moment fuer die Warnung ist genau hier: beim Laden
+            # war der Verlust noch nicht eingetreten.
+            uebersprungen = getattr(
+                self._vc_view, "uebersprungene_widgets", lambda: [])()
+            if uebersprungen:
+                verloren.append(
+                    "Virtual Console: "
+                    f"{len(uebersprungen)} Bedienelement(e) konnten beim "
+                    f"Laden nicht gebaut werden und werden mit diesem "
+                    f"Speichern GELOESCHT — " + "; ".join(uebersprungen[:3]))
+        except Exception as e:
+            print(f"[main_window] collect vc layout error: {e}")
+            verloren.append(f"Virtual Console ({e})")
+        # Snapshots (pro Show) aus der View uebernehmen
+        try:
+            sv = getattr(self, "_snapshots_view", None)
+            if sv is not None:
+                _ablegen("snapshots", "_snapshots_data", sv.to_dict() or [])
+        except Exception as e:
+            print(f"[main_window] collect snapshots error: {e}")
+            verloren.append(f"Snapshots ({e})")
+        # Kanal-Gruppen (pro Show, SDK-02) aus der View uebernehmen
+        try:
+            cg = getattr(self, "_channel_groups_view", None)
+            if cg is not None and hasattr(cg, "to_dict"):
+                _ablegen("channel_groups", "_channel_groups_data", cg.to_dict() or [])
+        except Exception as e:
+            print(f"[main_window] collect channel groups error: {e}")
+            verloren.append(f"Kanal-Gruppen ({e})")
+        return verloren
+
+    def _show_stand_merken(self, nachlaufend: bool = False) -> None:
+        """UI-69: aktuellen Stand als „gespeichert" merken (nach Laden,
+        Speichern, Neue Show).
+
+        ``nachlaufend``: nach dem Laden noch einmal im naechsten Durchlauf der
+        Ereignisschleife. Manche Views bauen per ``singleShot(0)`` nach (z. B.
+        die Live View passt beim ersten Laden ohne gespeicherten Zoom die
+        Ansicht ein) — das gehoert noch zum Laden und darf die Show nicht
+        „geaendert" machen."""
+        try:
+            from src.core.show.show_file import merke_show_stand
+            views: dict = {}
+            self._views_in_state(nur_vergleich=views)
+            merke_show_stand(self._state, views)
+        except Exception as e:
+            print(f"[main_window] show stand merken error: {e}")
+        if nachlaufend:
+            QTimer.singleShot(0, self._show_stand_merken)
+
+    def _do_save(self, path: str) -> bool:
         from src.core.show.show_file import save_show
         try:
             # VIZ-11 (Schritt 5, Orchestrator-Entscheidung 2): vor dem
@@ -2115,41 +2237,7 @@ class MainWindow(QMainWindow):
             # Gespeichert wird trotzdem: nicht zu speichern hiesse, auch die
             # Teile zu verlieren, die in Ordnung sind. Nur die MELDUNG sagt
             # jetzt die Wahrheit.
-            verloren: list[str] = []
-            # VC-Layout (Buttons/Fader) aus dem aktuellen Canvas uebernehmen
-            try:
-                self._state._vc_layout = self._vc_view.to_dict()
-                # QA-50: Beim Laden uebersprungene Widgets stehen NICHT im
-                # to_dict — dieses Speichern loescht sie endgueltig. Der
-                # richtige Moment fuer die Warnung ist genau hier: beim Laden
-                # war der Verlust noch nicht eingetreten.
-                uebersprungen = getattr(
-                    self._vc_view, "uebersprungene_widgets", lambda: [])()
-                if uebersprungen:
-                    verloren.append(
-                        "Virtual Console: "
-                        f"{len(uebersprungen)} Bedienelement(e) konnten beim "
-                        f"Laden nicht gebaut werden und werden mit diesem "
-                        f"Speichern GELOESCHT — " + "; ".join(uebersprungen[:3]))
-            except Exception as e:
-                print(f"[main_window] collect vc layout error: {e}")
-                verloren.append(f"Virtual Console ({e})")
-            # Snapshots (pro Show) aus der View uebernehmen
-            try:
-                sv = getattr(self, "_snapshots_view", None)
-                if sv is not None:
-                    self._state._snapshots_data = sv.to_dict()
-            except Exception as e:
-                print(f"[main_window] collect snapshots error: {e}")
-                verloren.append(f"Snapshots ({e})")
-            # Kanal-Gruppen (pro Show, SDK-02) aus der View uebernehmen
-            try:
-                cg = getattr(self, "_channel_groups_view", None)
-                if cg is not None and hasattr(cg, "to_dict"):
-                    self._state._channel_groups_data = cg.to_dict()
-            except Exception as e:
-                print(f"[main_window] collect channel groups error: {e}")
-                verloren.append(f"Kanal-Gruppen ({e})")
+            verloren: list[str] = self._views_in_state()
             # T1.6 Layout-Persistenz: Layout dazupacken
             layout = None
             try:
@@ -2185,6 +2273,17 @@ class MainWindow(QMainWindow):
                 self.statusBar().showMessage(f"Gespeichert: {path}", 3000)
         except Exception as e:
             QMessageBox.warning(self, "Speicherfehler", str(e))
+            return False
+        # UI-69: die Datei entspricht jetzt dem Stand — auch „mit Luecken":
+        # die fehlenden Teile kann ein erneutes Speichern nicht retten, eine
+        # Speichern-Frage beim Beenden waere dafuer der falsche Hinweis.
+        self._aus_auto_save = False
+        try:
+            from src.core.show.show_file import merke_show_stand
+            merke_show_stand(self._state)
+        except Exception as e:
+            print(f"[main_window] show stand merken error: {e}")
+        return True
 
     @staticmethod
     def _backup_pre_viz11_show(path: str) -> None:
@@ -2768,7 +2867,7 @@ class MainWindow(QMainWindow):
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
             if reply == QMessageBox.StandardButton.Yes:
-                self._open_show_path(auto)
+                self._open_show_path(auto, wiederherstellung=True)
         except Exception as e:
             print(f"[autosave] recovery check error: {e}")
 
@@ -2795,21 +2894,10 @@ class MainWindow(QMainWindow):
         # Abfrage IMMER — auch wenn der Benutzer den Recovery-Dialog beim Start
         # abgeschaltet hat (eigener Guard, siehe _exit_prompt_suppressed).
         if self._has_unsaved_changes() and not _exit_prompt_suppressed():
-            reply = QMessageBox.question(
-                self, "Show speichern?",
-                "Es gibt möglicherweise ungespeicherte Änderungen "
-                "(Cuelisten, VC-Layout, Snapshots).\n\n"
-                "Vor dem Beenden speichern?",
-                QMessageBox.StandardButton.Save |
-                QMessageBox.StandardButton.Discard |
-                QMessageBox.StandardButton.Cancel,
-                QMessageBox.StandardButton.Save
-            )
-            if reply == QMessageBox.StandardButton.Cancel:
+            if not self._rueckfrage_ungespeichert(
+                    "Show speichern?", "Vor dem Beenden speichern?"):
                 event.ignore()
                 return
-            if reply == QMessageBox.StandardButton.Save:
-                self._save_show()
 
         # Keine neuen MIDI-Handles mehr waehrend des Teardowns oeffnen. Der
         # 4-s-Autoconnect-Timer konnte sonst zwischen close_all() und dem
@@ -2854,8 +2942,20 @@ class MainWindow(QMainWindow):
         super().closeEvent(event)
 
     def _has_unsaved_changes(self) -> bool:
-        """Heuristik: Show hat Cuelisten oder Funktionen aber wurde nie gespeichert."""
+        """Gibt es Arbeit, die beim Beenden/Wechseln verloren ginge?
+
+        * Nie gespeicherte Show: sobald es Inhalt gibt (Heuristik wie bisher).
+        * Aus Datei geladene/gespeicherte Show (UI-69): wenn sich der Inhalt
+          seit dem letzten Laden/Speichern geaendert hat. Frueher stand hier
+          fest ``False`` — Aenderungen landeten nur im Auto-Save, Beenden schloss
+          kommentarlos. Was als Aenderung zaehlt (und warum Programmer, GO,
+          Fader und BPM es nicht tun), steht bei ``show_hat_aenderungen``.
+        """
         try:
+            # Aus dem Auto-Save wiederhergestellt und seitdem nicht gespeichert:
+            # der Stand steht in keiner Show-Datei (UI-69-Korrektur).
+            if getattr(self, "_aus_auto_save", False):
+                return True
             # Nie gespeichert + es gibt Inhalt?
             if self._current_show_path is None:
                 has_content = (
@@ -2864,9 +2964,39 @@ class MainWindow(QMainWindow):
                     or bool(self._state.programmer)
                 )
                 return has_content
-            return False  # Bei gespeicherter Show wuerde ein "dirty"-Flag noetig sein
-        except Exception:
+            from src.core.show.show_file import show_hat_aenderungen
+            views: dict = {}
+            self._views_in_state(nur_vergleich=views)
+            return show_hat_aenderungen(self._state, views)
+        except Exception as e:
+            print(f"[main_window] unsaved check error: {e}")
             return False
+
+    def _rueckfrage_ungespeichert(self, titel: str, frage: str) -> bool:
+        """UI-69: Speichern / Verwerfen / Abbrechen. True = weitermachen
+        (gespeichert oder bewusst verworfen), False = abbrechen — auch wenn
+        das Speichern scheitert oder „Speichern unter" abgebrochen wird; sonst
+        ginge die Arbeit genau in dem Fall verloren, vor dem gefragt wurde."""
+        if getattr(self, "_aus_auto_save", False):
+            text = ("Die Show wurde aus dem Auto-Save wiederhergestellt und "
+                    "noch nicht gespeichert.")
+        elif self._current_show_path is None:
+            text = "Die Show wurde noch nie gespeichert."
+        else:
+            text = ("Die Show hat ungespeicherte Änderungen "
+                    "(z. B. Patch, Cuelisten, Funktionen, VC-Layout).")
+        reply = QMessageBox.question(
+            self, titel, f"{text}\n\n{frage}",
+            QMessageBox.StandardButton.Save |
+            QMessageBox.StandardButton.Discard |
+            QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Save
+        )
+        if reply == QMessageBox.StandardButton.Cancel:
+            return False
+        if reply == QMessageBox.StandardButton.Save:
+            return bool(self._save_show())
+        return True
 
 
 # ── Hilfklassen ───────────────────────────────────────────────────────────────
