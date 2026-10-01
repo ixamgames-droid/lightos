@@ -305,12 +305,15 @@ def blocker_fuer(blocker: list[str], sitzung: str) -> list[str]:
 BLOCKER_VERFALL = timedelta(days=7)
 
 
-def blocker_offen(blocker: list[str], i: int) -> bool:
+def blocker_offen(blocker: list[str], i: int, sitzungen=()) -> bool:
     """Ist Eintrag ``i`` ein Brief, den ein Adressat noch nicht gelesen hat?
 
     „Gelesen" heisst wie bei :func:`blocker_fuer`: der Adressat hat NACH dem
-    Brief selbst etwas geschrieben. ``AN ALLE`` ist offen, solange irgendeine
-    andere Sitzung, die je auf der Tafel geschrieben hat, seitdem schweigt.
+    Brief selbst einen Blocker geschrieben. ``AN ALLE`` ist offen, solange
+    irgendeine andere bekannte Sitzung seitdem schweigt — bekannt aus den
+    Blockern UND aus ``sitzungen`` (Claims, Verlauf): eine Sitzung, die nur
+    belegt und freigibt, aber nie einen Blocker schreibt, liest ``list --fuer``
+    genauso (Review-Fund zu PROC-08).
     """
     eintrag = blocker[i]
     autor = (blocker_sitzung(eintrag) or "").upper()
@@ -320,18 +323,33 @@ def blocker_offen(blocker: list[str], i: int) -> bool:
         gruppe = m.group(1)
         if gruppe == "ALLE":
             adressaten |= {(blocker_sitzung(b) or "").upper() for b in blocker}
+            adressaten |= {str(s).strip().upper() for s in sitzungen}
         else:
             adressaten |= set(re.findall(r"\b[A-Z]\b", gruppe))
     adressaten -= {autor, ""}
     return any(a not in spaeter for a in adressaten)
 
 
-def blocker_behalten(blocker: list[str], t: datetime) -> list[str]:
+def tafel_sitzungen(tafel: dict) -> set[str]:
+    """Alle Sitzungen, die auf der Tafel vorkommen: Claims und Verlauf
+    (``<stempel> <SITZUNG> claim …``) — Empfaenger eines ``AN ALLE``."""
+    out = {str(c.get("sitzung", "")).strip().upper() for c in tafel.get("claims", ())}
+    for v in tafel.get("verlauf", ()):
+        m = re.match(r"^\S+\s+([A-Z])\b", v or "")
+        if m:
+            out.add(m.group(1))
+    out.discard("")
+    return out
+
+
+def blocker_behalten(blocker: list[str], t: datetime, sitzungen=()) -> list[str]:
     """Die Blocker, die beim Schreiben zum Zeitpunkt ``t`` stehen bleiben.
 
     Reihenfolge bleibt erhalten. Verfallen ist ein Eintrag nur, wenn er
     datierbar, aelter als :data:`BLOCKER_VERFALL`, kein offener Brief und
-    nicht der letzte Eintrag seiner Sitzung ist.
+    nicht der letzte Eintrag seiner Sitzung ist. ``sitzungen`` ergaenzt die
+    Empfaenger eines ``AN ALLE`` um Sitzungen ohne eigenen Blocker
+    (:func:`tafel_sitzungen`).
     """
     letzter: dict[str, int] = {}
     for i, b in enumerate(blocker):
@@ -343,7 +361,7 @@ def blocker_behalten(blocker: list[str], t: datetime) -> list[str]:
         st = lies_stempel(b.split(" ", 1)[0]) if b.strip() else None
         if (st is None or t - st <= BLOCKER_VERFALL
                 or letzter.get((blocker_sitzung(b) or "").upper()) == i
-                or blocker_offen(blocker, i)):
+                or blocker_offen(blocker, i, sitzungen)):
             behalten.append(b)
     return behalten
 
@@ -560,7 +578,7 @@ def schreibe_tafel(repo: str, tafel: dict, eltern: str | None,
     # PROC-08: die Schreib-Seite haelt die Blockerliste begrenzt — an genau
     # einer Stelle, damit claim/release/blocker es gleich halten.
     t = jetzt()
-    bleibt = blocker_behalten(tafel["blocker"], t)
+    bleibt = blocker_behalten(tafel["blocker"], t, tafel_sitzungen(tafel))
     weg = len(tafel["blocker"]) - len(bleibt)
     if weg:
         tafel = dict(tafel, blocker=bleibt, verlauf=list(tafel["verlauf"]) + [

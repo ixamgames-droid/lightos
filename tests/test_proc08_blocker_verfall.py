@@ -67,6 +67,22 @@ class VerfallsRegelTest(unittest.TestCase):
         b.append(_e(0, "C", "C auch"))
         self.assertNotIn(b[1], sc.blocker_behalten(b, JETZT))
 
+    def test_an_alle_kennt_auch_sitzungen_ohne_eigenen_blocker(self):
+        """Review-Fund (Codex zu #842): B belegt nur Items und schreibt nie
+        einen Blocker — der Rundbrief bleibt fuer B trotzdem ungelesen."""
+        b = [_e(20, "A", "A AN ALLE: neue Regel"), _e(1, "A", "neu")]
+        self.assertNotIn(b[0], sc.blocker_behalten(b, JETZT),
+                         "Vorbedingung: ohne Kenntnis von B verfiele der Brief")
+        self.assertIn(b[0], sc.blocker_behalten(b, JETZT, {"B"}))
+        tafel = {"claims": [{"item": "X-1", "sitzung": "B", "branch": "-",
+                             "seit": "", "dateien": ""}],
+                 "verlauf": [f"{sc.stempel(JETZT)} C claim Y-2",
+                             f"{sc.stempel(JETZT)} 3 Blocker verfallen (…)"],
+                 "blocker": b}
+        self.assertEqual(sc.tafel_sitzungen(tafel), {"B", "C"})
+        self.assertEqual(sc.blocker_fuer(b, "B"), [b[0]],
+                         "list --fuer B zeigt den Brief — also darf er nicht verfallen")
+
     def test_letzter_eintrag_jeder_sitzung_bleibt(self):
         b = [_e(40, "B", "B alt"), _e(30, "B", "B zuletzt"), _e(1, "A", "A neu")]
         self.assertEqual(sc.blocker_behalten(b, JETZT), b[1:])
