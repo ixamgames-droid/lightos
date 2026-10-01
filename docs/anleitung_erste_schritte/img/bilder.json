@@ -1,7 +1,7 @@
 {
   "anleitung": "erste_schritte",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "53659073",
+  "stand": "3403c9c7",
   "schrift": "Noto Sans (statt Roboto Condensed)",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py erste_schritte'.",
@@ -37,7 +37,7 @@
         900
       ],
       "marken": [],
-      "md5": "7a192fe00b71a46bebbac63e13da3092"
+      "md5": "ab519bd69bf193585868b93a2543a798"
     },
     {
       "datei": "04_rueckfrage.png",
@@ -48,7 +48,7 @@
         900
       ],
       "marken": [],
-      "md5": "b968895c8c15fc5b8eae7cf5d4309cc1"
+      "md5": "133b0c3b28c1fe11fc3533edbab9ccc8"
     },
     {
       "datei": "05_patch_leer.png",
@@ -70,7 +70,7 @@
         900
       ],
       "marken": [],
-      "md5": "a640e272286ca40ee497cd8b2bfb6b00"
+      "md5": "4777f44c98d5963790a4d5b1a2779f3a"
     },
     {
       "datei": "07_patch_ein_geraet.png",
@@ -114,7 +114,18 @@
         900
       ],
       "marken": [],
-      "md5": "3e37b8d7c143de7fb7c8481e46a0de21"
+      "md5": "3b72b1c75985d613bf8b0bcd27011d42"
+    },
+    {
+      "datei": "11_beenden.png",
+      "szene": "11_beenden",
+      "titel": "Beenden mit ungespeicherten Änderungen: Rückfrage",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "0a4027222de8a2df81196aa7e6b72c6e"
     }
   ]
 }
