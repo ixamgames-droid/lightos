@@ -17,6 +17,7 @@
 | TOOL-5 | C | fix/tool5-demo-global-bus | 2026-10-01T21:00Z | tools/build_demo_show_full.py · tools/capture_hochzeit_tempo_guide.py · tools/_archiv · tools/README.md · tests/test_proc07_werkzeuge.py · tests/test_tool5_demo_global_bus.py · BACKLOG.md · changelog.d/2026-10-02-TOOL-5.md |
 | TOOL-4 | C | fix/tool5-demo-global-bus | 2026-10-01T21:03Z | tools/capture_hochzeit_tempo_guide.py · tools/_archiv · BACKLOG.md |
 | VCB-11 | A | - | 2026-10-01T21:03Z | src/ui/widgets/vc_button.py · src/core/dmx/output_manager.py |
+| TOOL-1 | C | fix/tool1-verwaiste-werkzeuge | 2026-10-01T21:08Z | tools/build_komplette_animierte_show.py · tools/build_uxtest3_full.py · tools/build_validated_demo.py · tools/check_demo_show_full.py · tools/vc_click_targets.py · tools/verify_color_dimmer_separation.py · tools/build_demo_show.py · tools/_archiv · tools/README.md · tools/_gen_env.py · BACKLOG.md |
 
 ## Blocker & Fallen
 
@@ -166,7 +167,6 @@
 
 ## Verlauf
 
-- 2026-10-01T15:41Z A claim PROC-16
 - 2026-10-01T15:41Z A claim PROC-09
 - 2026-10-01T16:17Z B done BPM-22
 - 2026-10-01T16:18Z B done UI-67
@@ -196,3 +196,4 @@
 - 2026-10-01T21:00Z C claim TOOL-5
 - 2026-10-01T21:03Z C claim TOOL-4
 - 2026-10-01T21:03Z A claim VCB-11
+- 2026-10-01T21:08Z C claim TOOL-1
