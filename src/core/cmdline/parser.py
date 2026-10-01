@@ -557,9 +557,13 @@ class RecordCueCommand(Command):
             stacks = getattr(state, "cue_stacks", [])
             if not stacks:
                 return CommandResult(False, "Keine Cueliste vorhanden")
-            cue = state.record_cue(stacks[0], float(self.number),
+            # UI-62: gewaehlte Cueliste des Playbacks (Rueckfall: erste).
+            wahl = getattr(state, "aufnahme_cueliste", None)
+            stack = (wahl() if callable(wahl) else None) or stacks[0]
+            cue = state.record_cue(stack, float(self.number),
                                    f"Cue {self.number}")
-            return CommandResult(True, f"Cue {self.number} aufgenommen")
+            return CommandResult(
+                True, f"Cue {self.number} in „{stack.name}“ aufgenommen")
         except Exception as e:
             return CommandResult(False, f"Record Fehler: {e}")
 

@@ -22,6 +22,39 @@ from dataclasses import replace
 
 from src.core.audio.level_meter import CaptureSnapshot, LevelMeter
 
+# BPM-19: WARUM Audio fehlt, getrennt nach Ursache — die Statuszeile rät sonst
+# bei einem nicht laufenden Audio-Server zu „pip install", was nichts hilft.
+#   None      Audio verfuegbar
+#   "paket"   soundcard (oder eine seiner Abhaengigkeiten) ist nicht installiert
+#   "server"  Paket da, aber der Audio-Server/-Dienst antwortet nicht
+#             (Linux: PulseAudio/PipeWire nicht gestartet; Windows: Audiodienst)
+#   "bibliothek" Paket da, aber die native Client-Bibliothek fehlt (Linux:
+#             libpulse0) — soundcard laedt sie beim Import per dlopen
+AUDIO_GRUND_PAKET = "paket"
+AUDIO_GRUND_SERVER = "server"
+AUDIO_GRUND_BIBLIOTHEK = "bibliothek"
+AUDIO_FEHLT_GRUND: str | None = None
+AUDIO_FEHLT_DETAIL: str | None = None   # Ausnahmetext fuer die Diagnose
+
+
+def _grund_fuer(exc: BaseException) -> str:
+    """Ordnet eine Import-Ausnahme von soundcard einer Ursache zu.
+
+    Nur ``ImportError`` (inkl. ``ModuleNotFoundError``) heisst „Paket fehlt" —
+    alles andere wirft soundcard, wenn das Paket da ist, der Audio-Server aber
+    nicht antwortet (unter Linux u. a. ``AssertionError``/``RuntimeError`` aus
+    der PulseAudio-Initialisierung)."""
+    if isinstance(exc, ImportError):
+        return AUDIO_GRUND_PAKET
+    # Review BPM-19: fehlt die native Bibliothek, wirft cffi einen OSError
+    # "cannot load library 'pulse'" — das ist weder Paket noch Server.
+    text = str(exc).lower()
+    if isinstance(exc, OSError) and ("cannot load library" in text or "dlopen" in text
+                                     or "libpulse" in text):
+        return AUDIO_GRUND_BIBLIOTHEK
+    return AUDIO_GRUND_SERVER
+
+
 try:
     import soundcard as sc
     HAS_SOUNDCARD = True
@@ -33,7 +66,12 @@ except Exception as exc:
     # noch die Testsuite schon beim Modulimport beenden.
     sc = None
     HAS_SOUNDCARD = False
-    print(f"[AudioCapture] soundcard nicht verfügbar: {exc}")
+    AUDIO_FEHLT_GRUND = _grund_fuer(exc)
+    AUDIO_FEHLT_DETAIL = f"{type(exc).__name__}: {exc}"
+    if AUDIO_FEHLT_GRUND == AUDIO_GRUND_PAKET:
+        print(f"[AudioCapture] Paket soundcard nicht installiert: {exc}")
+    else:
+        print(f"[AudioCapture] Audio-Server nicht erreichbar: {AUDIO_FEHLT_DETAIL}")
 
 SAMPLE_RATE = 44100
 CHUNK_SIZE = 1024

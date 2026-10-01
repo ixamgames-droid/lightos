@@ -7,6 +7,21 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-10-01 — Cue-Aufnahme in die gewählte Liste, ehrliche Lampen-Vorschau, klare Audio-Meldung (UI-62, UI-63, BPM-19)
+
+#### Behoben
+
+- **„Cue aufnehmen“ (Menü Show / Taste R) und „record cue“ in der Kommandozeile** nehmen jetzt in
+  die im Playback gewählte Cueliste auf statt immer in die erste; die Statusleiste nennt die
+  Ziel-Liste.
+- **Die Lampen-Vorschau im Programmer zeigt die Farbe, die das Gerät wirklich ausgibt:** Ein
+  RGB-Scheinwerfer mit vollem Dimmer, aber ohne Farbe bleibt dunkel statt weiß. Die Gerätenamen
+  sind auch auf hellen Kacheln lesbar.
+- **BPM-Erkennung:** Läuft der Audio-Server nicht (Linux: PulseAudio/PipeWire, Windows:
+  Audiodienst), meldet die Statuszeile „Audio-Server nicht erreichbar“ mit passender Abhilfe;
+  fehlt unter Linux die Bibliothek libpulse, sagt sie das. Bisher hieß es in beiden Fällen
+  fälschlich „Paket soundcard oder numpy fehlt – pip install …“.
+
 ### 2026-10-01 — Nur über Weiß gewählte Geräte: Dimmer, Aufräum-Werkzeug und Live-Ansicht (FM-51 Scheibe C)
 
 #### Behoben

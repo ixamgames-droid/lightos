@@ -291,6 +291,9 @@ class PlaybackView(QWidget):
         # zentraler Sync) NICHT ungewollt auf die erste Cueliste zurueckspringt.
         prev = self._current_stack
         stacks = self._state.cue_stacks
+        if prev not in stacks:
+            # UI-62: neu gebaute Ansicht uebernimmt die zentral gemerkte Auswahl.
+            prev = getattr(self._state, "gewaehlte_cueliste", None)
         self._combo_stack.blockSignals(True)
         self._combo_stack.clear()
         for stack in stacks:
@@ -305,10 +308,17 @@ class PlaybackView(QWidget):
         else:
             self._current_stack = None
             self._refresh_table()
+        self._merke_auswahl()
+
+    def _merke_auswahl(self):
+        """UI-62: die gewaehlte Cueliste zentral im AppState ablegen — Ziel fuer
+        "Cue aufnehmen" (Taste R, Menue Show, Kommandozeile)."""
+        self._state.gewaehlte_cueliste = self._current_stack
 
     def _on_stack_selected(self, idx: int):
         if 0 <= idx < len(self._state.cue_stacks):
             self._current_stack = self._state.cue_stacks[idx]
+            self._merke_auswahl()
             self._refresh_table()
             self._sync_mode_combo()
             self._reset_xfade()

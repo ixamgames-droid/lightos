@@ -96,8 +96,10 @@ Wähle **Alle PAR**, dann den Reiter **Intensity**.
 4. **Dimmer**: Regler von 0 bis 255, daneben Wert und Prozent. Der kleine Knopf ganz
    rechts am Regler (Tooltip „Auf Standard zurücksetzen“) stellt den Standardwert des
    Profils her.
-5. **Lampen-Vorschau**: eine Kachel je gewähltem Gerät in seiner aktuellen Farbe.
-   Mit dem Pfeil klappst du sie ein und aus.
+5. **Lampen-Vorschau**: eine Kachel je gewähltem Gerät in der Farbe, die es gerade
+   ausgibt. Ein RGB-PAR mit vollem Dimmer, aber ohne Farbe bleibt hier dunkel wie
+   das echte Gerät; nur Geräte ohne Farbkanal (reine Dimmer) leuchten weiß. Mit dem
+   Pfeil klappst du sie ein und aus.
 
 Sobald ein Wert im Programmer steht, zeigt die Kopfleiste ganz oben
 „● Programmer *n*“: So viele Werte (Gerät × Kanal) hält der Programmer gerade, im

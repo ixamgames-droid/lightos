@@ -97,6 +97,7 @@ class MgrState:
     min_bpm: float = 60.0
     max_bpm: float = 200.0
     audio_available: bool = True            # soundcard/numpy vorhanden
+    audio_grund: str | None = None          # BPM-19: "paket" | "server" (capture.AUDIO_FEHLT_GRUND)
     capture_error: str | None = None        # cap.last_error()
     sink_missing: str | None = None         # gespeicherter Sink fehlt -> Standardausgabe
     song_available: bool | None = None      # Lied-Analyse: analysierter Titel im Player?
@@ -214,6 +215,24 @@ def _r_aufnahme(cap, det, m, o, now):
 
 def _r_audio_fehlt(cap, det, m, o, now):
     if m.kind in AUDIO_KINDS and not m.audio_available:
+        if m.audio_grund == "bibliothek":
+            # Review BPM-19: Client-Bibliothek fehlt — weder pip noch ein
+            # Server-Neustart hilft.
+            return StatusLine(
+                "problem", "Audio nicht verfügbar",
+                "Audio-Bibliothek fehlt (libpulse, Paket ist installiert)",
+                "Linux: sudo apt install libpulse0 (INSTALL.md) — danach LightOS neu "
+                "starten; oder OS2L/Lied-Analyse wählen",
+                "source", key="audio_bibliothek")
+        if m.audio_grund == "server":
+            # BPM-19: Paket installiert, aber der Audio-Server antwortet nicht —
+            # „pip install" waere hier eine falsche Faehrte.
+            return StatusLine(
+                "problem", "Audio nicht verfügbar",
+                "Audio-Server nicht erreichbar (Paket ist installiert)",
+                "Linux: läuft PulseAudio/PipeWire? (pactl info) · Windows: Audiodienst "
+                "prüfen — danach LightOS neu starten; oder OS2L/Lied-Analyse wählen",
+                "source", key="audio_server")
         return StatusLine(
             "problem", "Audio nicht verfügbar",
             "Paket soundcard oder numpy fehlt",

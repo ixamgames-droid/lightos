@@ -1,7 +1,7 @@
 {
   "anleitung": "erste_schritte",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "c0ff194d",
+  "stand": "53659073",
   "schrift": "Noto Sans (statt Roboto Condensed)",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py erste_schritte'.",
@@ -92,7 +92,7 @@
         900
       ],
       "marken": [],
-      "md5": "c881a7f18688f8cca0d15c641e1c7aa0"
+      "md5": "0a1cc7330cd307348791a7df070a98d0"
     },
     {
       "datei": "09_programmer_farbe.png",
