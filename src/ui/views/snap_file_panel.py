@@ -912,9 +912,12 @@ class SnapFilePanel(QWidget):
             return
         try:
             state = get_state()
-            for fid, attrs in snap.values.items():
-                for attr, val in attrs.items():
-                    state.set_programmer_value(int(fid), attr, int(val))
+            # FM-52: ein Snap-Abruf = EIN Schritt im Programmer-Verlauf.
+            from src.core.programmer_verlauf import schritt
+            with schritt(state, f"Snap {getattr(snap, 'name', '')}".strip()):
+                for fid, attrs in snap.values.items():
+                    for attr, val in attrs.items():
+                        state.set_programmer_value(int(fid), attr, int(val))
         except Exception as e:
             QMessageBox.warning(self, "Fehler beim Anwenden", str(e))
 

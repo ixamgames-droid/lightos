@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (QWidget, QFrame, QLabel, QVBoxLayout, QHBoxLayout
                                QFormLayout)
 from PySide6.QtCore import Qt, Signal, QTimer
 from src.ui.weak_slots import weak_slot
+from src.core import programmer_verlauf as _pv
 
 
 def _contrast(hex_color: str) -> str:
@@ -260,8 +261,10 @@ def _slot_speed_value(slot: dict, percent: int) -> int:
 
 class _ApplyMixin:
     def _set_on_fixtures(self, attr: str, value: int):
-        for f in self._fixtures:
-            self._state.set_programmer_value(f.fid, attr, int(value))
+        # FM-52: ein Kachel-Klick ueber alle Geraete = EIN Verlaufsschritt.
+        with _pv.schritt(self._state, "Schnellwahl"):
+            for f in self._fixtures:
+                self._state.set_programmer_value(f.fid, attr, int(value))
 
     def _apply_payload(self, payload: dict):
         self._apply_payload_on(self._fixtures, payload)
@@ -289,6 +292,12 @@ class _ApplyMixin:
         # P6: Farb-Payloads pro Fixture an dessen Farbsystem anpassen —
         # RGBW-Geraete bekommen Weiss ueber den W-Kanal statt RGB+W doppelt.
         from src.core.color_utils import adapt_color_payload, fixture_attr_set
+        with _pv.schritt(self._state, "Schnellwahl"):   # FM-52: EIN Schritt
+            self._payload_schreiben(fixtures, payload,
+                                    adapt_color_payload, fixture_attr_set)
+
+    def _payload_schreiben(self, fixtures, payload, adapt_color_payload,
+                           fixture_attr_set):
         for f in fixtures:
             vorhanden = fixture_attr_set(f)
             adapted = adapt_color_payload(vorhanden, payload)
@@ -559,7 +568,9 @@ class ColorWheelAutoBar(QWidget, _ApplyMixin):
             return
         slot = slots[self._sw_index % len(slots)]
         self._sw_index += 1
-        self._set_on_fixtures(self._attr, slot["value"])
+        # FM-52: der Automatik-Lauf ist Wiedergabe, keine Bedienung.
+        with _pv.ohne_verlauf(self._state):
+            self._set_on_fixtures(self._attr, slot["value"])
 
     def _stop_sw(self):
         if self._sw_timer.isActive():
@@ -932,7 +943,12 @@ class ResetActionButton(QPushButton, _ApplyMixin):
     def _trigger_reset(self):
         self.setEnabled(False)
         self.setText("Reset läuft…")
-        self._set_on_fixtures(self._attr, self._reset_value)
+        # FM-52: der Reset ist eine Geraete-AKTION mit Rueckfrage, kein
+        # Programmer-Zustand — er gehoert NICHT in den Verlauf. Sonst loeste
+        # „Wiederholen" ihn ohne Rueckfrage erneut aus und liesse ihn stehen
+        # (das Zuruecksetzen nach HOLD_MS laeuft ebenfalls ohne Verlauf).
+        with _pv.ohne_verlauf(self._state):
+            self._set_on_fixtures(self._attr, self._reset_value)
         QTimer.singleShot(self.HOLD_MS, self._make_revert())
 
     def _make_revert(self):
@@ -943,11 +959,13 @@ class ResetActionButton(QPushButton, _ApplyMixin):
         btn = self
 
         def _revert():
-            for fid in fids:
-                try:
-                    state.set_programmer_value(fid, attr, idle)
-                except Exception:
-                    pass
+            # FM-52: wie das Ausloesen ohne Verlauf (s. _trigger_reset).
+            with _pv.ohne_verlauf(state):
+                for fid in fids:
+                    try:
+                        state.set_programmer_value(fid, attr, idle)
+                    except Exception:
+                        pass
             try:
                 btn.setEnabled(True)
                 btn.setText("⟳ Moving Head Reset…")

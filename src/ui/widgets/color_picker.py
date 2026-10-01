@@ -208,8 +208,12 @@ class ColorPicker(QWidget):
         # 30 Hz Live-Apply Timer (optional - default off)
         self._live_timer = QTimer(self)
         self._live_timer.setInterval(33)
-        self._live_timer.timeout.connect(self._apply_to_selection)
+        self._live_timer.timeout.connect(self._live_tick)
         self._live_apply = False
+        # FM-52: zuletzt LIVE gesendeter Stand (Farbe + Ziele). Der Tick schreibt
+        # nur, wenn sich daran etwas geaendert hat — sonst ueberschriebe er jedes
+        # „Rückgängig" nach 33 ms und loeschte damit das „Wiederholen".
+        self._live_gesendet = None
 
     # ── UI Build ─────────────────────────────────────────────────────────────
 
@@ -603,10 +607,33 @@ class ColorPicker(QWidget):
     def _toggle_live(self, checked: bool):
         self._live_apply = checked
         self._btn_live.setText("Live EIN" if checked else "Live AUS")
+        # Neu Einschalten sendet den aktuellen Stand einmal sofort.
+        self._live_gesendet = None
         if checked:
             self._live_timer.start()
         else:
             self._live_timer.stop()
+
+    def _live_stand(self):
+        """FM-52: was ein Live-Tick senden wuerde — Farbe, W/A/UV und die
+        Ziel-Geraete. Ein Auswahlwechsel aendert den Stand, die neue Auswahl
+        bekommt die Farbe also wie bisher sofort."""
+        fids = ()
+        if get_state is not None:
+            try:
+                fids = tuple(self._get_selected_fids(get_state()))
+            except Exception:
+                fids = ()
+        return (self._color.rgb(), self._white, self._amber, self._uv, fids)
+
+    def _live_tick(self):
+        """Live-Modus (30 Hz): nur senden, wenn sich der Stand seit dem letzten
+        Senden geaendert hat."""
+        stand = self._live_stand()
+        if stand == self._live_gesendet:
+            return
+        self._live_gesendet = stand
+        self._apply_to_selection()
 
     def _apply_to_selection(self):
         """Sendet Farbe an alle selektierten Fixtures via Programmer.

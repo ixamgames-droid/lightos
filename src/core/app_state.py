@@ -14,7 +14,8 @@ from .dmx.universe import Universe
 from .dmx.output_manager import OutputManager
 from .dmx.enttec_pro import diagnose_port as diagnose_enttec_port
 from .debug_log import debug_swallow
-from .attr_groups import ATTR_GROUPS, classify_attr
+from .attr_groups import ATTR_GROUPS, attr_label, classify_attr
+from .programmer_verlauf import ProgrammerVerlauf
 from .stage.scene_graph import SceneGraph
 from .stage.scene_adapters import _DockView, _LiveViewDict, _SceneBackedDict, _ViewRegistry
 
@@ -298,6 +299,10 @@ class AppState:
         # "dict changed size during iteration". RLock, damit re-entrante Aufrufe
         # (z. B. ueber Undo) nicht selbst-blockieren.
         self._prog_lock = threading.RLock()
+        # FM-52: eigener Rueckgaengig-Verlauf des Programmers (getrennt vom
+        # globalen Undo-Stapel fuer Patch/Geraete). Siehe programmer_verlauf.py.
+        self.programmer_verlauf = ProgrammerVerlauf(
+            on_change=self._programmer_verlauf_melden)
         # Marshalling von Event-Callbacks in den Qt-UI-Thread (vom MainWindow per
         # set_ui_marshaller gesetzt). Ohne dieses Marshalling wuerden Worker-
         # Threads (MIDI/OSC/Audio) ueber _emit direkt Qt-Widgets anfassen → Crash.
@@ -2342,7 +2347,8 @@ class AppState:
             return  # FM-41: dieser Kopf hat keinen solchen Kanal (Weiss-Achse)
         master = self._shared_dimmer_key(fid, attribute, key) if head is not None else None
         with self._prog_lock:
-            old = self.programmer.get(fid, {}).get(key, None)
+            vorher = dict(self.programmer.get(fid, {}))   # FM-52
+            old = vorher.get(key, None)
             if fid not in self.programmer:
                 self.programmer[fid] = {}
             self.programmer[fid][key] = max(0, min(255, value))
@@ -2368,6 +2374,9 @@ class AppState:
                 brightest = max((self.programmer[fid][k] for k, _ in heads
                                  if k in self.programmer[fid]), default=new_val)
                 self.programmer[fid][master_key] = brightest
+            # FM-52: mitgezogene Master-/Anker-Schluessel gehoeren zum Schritt.
+            aenderungen = self._prog_unterschied(fid, vorher, self.programmer.get(fid, {}))
+        self._verlauf_notiere(aenderungen, attr_label(key))
         self._flush_programmer_to_dmx(fid)
         # UXT-12 / A3D-02: bewusstes Setzen eines OUTPUT-relevanten Laser-Werts
         # (Betriebsart/Musterbank/Gobo/Shutter/Macro = Muster-Abruf/„wieder an") hebt
@@ -2409,12 +2418,15 @@ class AppState:
             prog = self.programmer.get(int(fid))
             if prog is None:
                 return
+            vorher = dict(prog)
             if master_old is None:
                 prog.pop(master_key, None)
             else:
                 prog[master_key] = master_old
+            aenderungen = self._prog_unterschied(int(fid), vorher, prog)
             if not prog:
                 self.programmer.pop(int(fid), None)
+        self._verlauf_notiere(aenderungen)
         self._flush_programmer_to_dmx(int(fid))
         self._emit("programmer_changed", int(fid))
 
@@ -2422,9 +2434,11 @@ class AppState:
         with self._prog_lock:
             if fid not in self.programmer:
                 return
-            self.programmer[fid].pop(attribute, None)
+            alt = self.programmer[fid].pop(attribute, None)
             if not self.programmer[fid]:
                 self.programmer.pop(fid, None)
+        if alt is not None:
+            self._verlauf_notiere([(fid, attribute, alt, None)], "Wert entfernen")
         self._flush_programmer_to_dmx(fid)
         self._emit("programmer_changed", fid)
 
@@ -2443,9 +2457,14 @@ class AppState:
         der WEB-01-Release laufen unveraendert."""
         with self._prog_lock:
             if fid is None:
+                weg = self.programmer.copy()
                 self.programmer.clear()
             else:
-                self.programmer.pop(fid, None)
+                weg = {fid: self.programmer.pop(fid, None) or {}}
+        # FM-52: alle entfernten Schluessel als alt -> None (Clear ist ruecknehmbar)
+        self._verlauf_notiere(
+            [(f, k, v, None) for f, prog in weg.items() for k, v in prog.items()],
+            "Löschen")
         # WEB-01: Der globale Clear ist auch der Release-Pfad fuer die per Web/OSC
         # ueber set_input_channel gesetzten Roh-Kanaele. Ein Per-Fixture-Clear
         # (fid gesetzt) laesst die Roh-Overrides stehen (sie sind nicht fid-basiert).
@@ -2456,6 +2475,85 @@ class AppState:
                 print(f"[app_state] clear_remote_input error: {e}")
         if flush:
             self._flush_all_to_dmx()
+        self._emit("programmer_changed", None)
+
+    # ── FM-52: Programmer-Verlauf ─────────────────────────────────────────────
+
+    def _get_programmer_verlauf(self) -> ProgrammerVerlauf:
+        """Liefert den Programmer-Verlauf; legt ihn defensiv an, falls das
+        Objekt ohne __init__ gebaut wurde (Test-Helfer via AppState.__new__ —
+        gleiches Muster wie _get_plan_lock)."""
+        v = getattr(self, "programmer_verlauf", None)
+        if v is None:
+            v = self.programmer_verlauf = ProgrammerVerlauf(
+                on_change=self._programmer_verlauf_melden)
+        return v
+
+    @staticmethod
+    def _prog_unterschied(fid, vorher: dict, nachher: dict) -> list:
+        """(fid, key, alt, neu) fuer jeden Schluessel, der sich geaendert hat."""
+        out = []
+        for k in set(vorher) | set(nachher):
+            a, n = vorher.get(k), nachher.get(k)
+            if a != n:
+                out.append((fid, k, a, n))
+        return out
+
+    def _verlauf_notiere(self, aenderungen, label: str = ""):
+        if aenderungen:
+            self._get_programmer_verlauf().notiere(aenderungen, label)
+
+    def _programmer_verlauf_melden(self):
+        self._emit("programmer_verlauf_changed", None)
+
+    def programmer_schritt(self, label: str = ""):
+        """Kontext: alle Programmer-Aenderungen im Block sind EIN Schritt."""
+        return self._get_programmer_verlauf().schritt(label)
+
+    def programmer_ohne_verlauf(self):
+        """Kontext: Programmer-Aenderungen im Block nicht aufzeichnen."""
+        return self._get_programmer_verlauf().ohne_verlauf()
+
+    def programmer_rueckgaengig(self) -> str | None:
+        """Nimmt den letzten Programmer-Schritt zurueck; liefert sein Label."""
+        r = self._get_programmer_verlauf().rueckgaengig()
+        if r is None:
+            return None
+        self._programmer_werte_anwenden(r[1])
+        return r[0]
+
+    def programmer_wiederholen(self) -> str | None:
+        r = self._get_programmer_verlauf().wiederholen()
+        if r is None:
+            return None
+        self._programmer_werte_anwenden(r[1])
+        return r[0]
+
+    def _programmer_werte_anwenden(self, werte: dict):
+        """FM-52: schreibt ``{(fid, key): wert|None}`` direkt in den Programmer
+        (``None`` = Schluessel entfernen). Bewusst NICHT ueber
+        set_programmer_value: das wuerde den Laser-NOT-AUS aufheben (UXT-12) —
+        ein Rueckgaengig darf einen Laser nie wieder scharf schalten. Ebenso kein
+        clear_remote_input. Nicht mehr gepatchte Geraete werden uebersprungen
+        (remove_fixture entfernt deren Eintrag ohne Ereignis)."""
+        gepatcht = {f.fid for f in getattr(self, "_patch_cache", [])}
+        betroffen = set()
+        with self._get_programmer_verlauf().ohne_verlauf():
+            with self._prog_lock:
+                for (fid, key), wert in werte.items():
+                    if fid not in gepatcht:
+                        continue
+                    if wert is None:
+                        prog = self.programmer.get(fid)
+                        if prog is not None:
+                            prog.pop(key, None)
+                            if not prog:
+                                self.programmer.pop(fid, None)
+                    else:
+                        self.programmer.setdefault(fid, {})[key] = int(wert)
+                    betroffen.add(fid)
+            for fid in betroffen:
+                self._flush_programmer_to_dmx(fid)
         self._emit("programmer_changed", None)
 
     def get_programmer_value(self, fid: int, attribute: str, head=None) -> int | None:
@@ -2696,6 +2794,10 @@ class AppState:
         key = self.weiss_programmer_key(fid, segment)
         if not key:
             return False
+        # FM-52: KEIN eigener Verlaufsschritt hier — Verankern + Setzen landen
+        # im Schritt des Aufrufers (Weiss-Block, Kommandozeile „hi",
+        # Hervorheben, Einfuegen) bzw. im Ruhe-Zeitfenster. Ein eigener Schritt
+        # je Aufruf machte aus EINEM Regler-Tick ueber n Geraete n Schritte.
         prog = self.programmer.get(fid, {})
         k = 0
         while True:

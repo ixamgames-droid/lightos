@@ -393,11 +393,14 @@ class SnapshotsView(QWidget):
             if snap.is_empty():
                 return
             state = get_state()
-            for fid, attrs in snap.values.items():
-                for attr, val in attrs.items():
-                    if snap.is_ignored(fid, attr):
-                        continue          # SNP-01: bewusst ignorierter Kanal
-                    state.set_programmer_value(int(fid), attr, int(val))
+            # FM-52: ein Snapshot-Abruf = EIN Schritt im Programmer-Verlauf.
+            from src.core.programmer_verlauf import schritt
+            with schritt(state, f"Snapshot {snap.name}"):
+                for fid, attrs in snap.values.items():
+                    for attr, val in attrs.items():
+                        if snap.is_ignored(fid, attr):
+                            continue          # SNP-01: bewusst ignorierter Kanal
+                        state.set_programmer_value(int(fid), attr, int(val))
         except Exception as e:
             print(f"[snapshots] apply error: {e}")
 

@@ -1408,15 +1408,19 @@ class VisualizerBridge(QObject):
         if not st:
             return
         i = st["i"]
-        for fid, seq in st["seqs"].items():
-            if not seq:
-                continue
-            pan, tilt = seq[i % len(seq)]
-            try:
-                self._state.set_programmer_value(fid, "pan", pan)
-                self._state.set_programmer_value(fid, "tilt", tilt)
-            except Exception:
-                pass
+        # FM-52: der Live-Trace ist Wiedergabe, keine Bedienung -> nicht in
+        # den Programmer-Verlauf.
+        from src.core.programmer_verlauf import ohne_verlauf
+        with ohne_verlauf(self._state):
+            for fid, seq in st["seqs"].items():
+                if not seq:
+                    continue
+                pan, tilt = seq[i % len(seq)]
+                try:
+                    self._state.set_programmer_value(fid, "pan", pan)
+                    self._state.set_programmer_value(fid, "tilt", tilt)
+                except Exception:
+                    pass
         st["i"] = i + 1
 
     @Slot()

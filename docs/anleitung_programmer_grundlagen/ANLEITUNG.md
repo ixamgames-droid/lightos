@@ -127,7 +127,8 @@ Moving Heads. Hier wählst du **Spot 1** und **Spot 2**. Im Reiter stehen:
 
 - **Ausrichtung (pro Fixture)** mit **Pan invertieren**, **Tilt invertieren** und
   **Pan/Tilt tauschen**. Diese Haken ändern das Gerät im Patch, nicht den
-  Programmer, und lassen sich mit **Rückgängig** zurücknehmen.
+  Programmer. Zurücknehmen lassen sie sich deshalb nur über **Bearbeiten →
+  Rückgängig** (**Strg+Z**), nicht mit dem Knopf **Rückgängig** im Programmer.
 - **Pan/Tilt-Speed:** mit dem Regler **Speed**, falls das Gerät so einen Kanal hat.
 - **Position-Tool (XY-Pad)**: ein aufklappbares Pad zum Ziehen.
 - Die Regler **Pan** und **Tilt**.
@@ -251,11 +252,20 @@ Helligkeitsrampe über acht PARs oder einen Pan-Fächer über Moving Heads.
    Gespeicherte Szenen, Cues und Snapshots bleiben in beiden Fällen unberührt.
    **Esc** leert immer den ganzen Programmer (Menü **Programmer → Programmer leeren**).
    Das Menü **✖ Clear ▾** oben in der Kopfleiste leert außerdem Simple-Desk-Werte.
-2. **Rückgängig** und 3. **Wiederholen** arbeiten auf demselben Verlauf wie
-   **Bearbeiten → Rückgängig** (**Strg+Z**). Darin landen Änderungen am Patch und die
-   Ausrichtungs-Haken aus Schritt 5. **Reglerwerte im Programmer landen nicht darin.**
-   Einen verstellten Regler stellst du von Hand zurück, mit dem Zurücksetzen-Knopf
-   rechts am Regler oder mit **Löschen**.
+2. **Rückgängig** und 3. **Wiederholen** haben einen **eigenen Programmer-Verlauf**.
+   Darin steht jede Änderung an Programmer-Werten, egal woher sie kommt: Regler,
+   Schnellwahl-Kachel, Palette, **Hervorheben**, **Abdunkeln**, **Einfügen**,
+   **Löschen** oder die Befehlszeile. Ein Regler-Zug vom Drücken bis zum Loslassen ist
+   **ein** Schritt, ebenso ein Knopfdruck, auch wenn er viele Geräte trifft.
+   **Rückgängig** stellt den Stand vor diesem Schritt wieder her, **Wiederholen** holt
+   ihn zurück. Beide Knöpfe sind nur aktiv, wenn es etwas zurückzunehmen bzw.
+   wiederherzustellen gibt; der Tooltip nennt den Schritt.
+
+   Änderungen am Patch und an den Geräte-Einstellungen, etwa die Ausrichtungs-Haken
+   aus Schritt 5 (**Pan invertieren** …), stehen **nicht** in diesem Verlauf. Die nimmst
+   du über **Bearbeiten → Rückgängig** (**Strg+Z**) zurück und über **Bearbeiten →
+   Wiederherstellen** wieder her. **Neue Show** und **Show öffnen** leeren beide
+   Verläufe.
 
 **Kopieren** merkt sich die Programmer-Werte der gewählten Geräte, **Einfügen** legt
 sie auf die aktuelle Auswahl. Bei mehreren Geräten geht das reihum: der erste kopierte
@@ -270,7 +280,7 @@ Wert auf das erste gewählte Gerät usw. (Tastenkürzel **Strg+C** / **Strg+V**)
 | Eine Szene oder Cue wirkt nicht | Der Programmer hat Vorrang und überdeckt sie | **Keine**, dann **Alles löschen** (oder **Esc**) |
 | Nach dem Gruppenklick sind keine Regler zu sehen | Der Gruppenklick springt auf den Reiter **Matrix** | Reiter **Intensity** oder **Color** anklicken |
 | Der Reiter **Position** fehlt | In der Auswahl ist kein Gerät mit Pan/Tilt | Moving Heads mitwählen |
-| **Rückgängig** holt den alten Reglerwert nicht zurück | Reglerwerte stehen nicht im Verlauf | Regler von Hand oder mit dem Zurücksetzen-Knopf am Regler zurückstellen |
+| **Rückgängig** im Programmer nimmt einen **Pan invertieren**-Haken nicht zurück | Geräte- und Patch-Einstellungen stehen im Verlauf von **Bearbeiten**, nicht im Programmer-Verlauf | **Bearbeiten → Rückgängig** (**Strg+Z**) |
 | Nach **Abdunkeln** bleiben andere Geräte dunkel | Die 30 % stehen im Programmer | **Keine**, dann **Alles löschen** |
 | Ein Gerät zeigt Knöpfe, die hier nicht erklärt sind | Gerätespezifische Bedienelemente | [Programmer: jedes Gerät richtig bedienen](../anleitung_geraete_bedienen/ANLEITUNG_GERAETE_BEDIENEN.md) |
 

@@ -660,8 +660,11 @@ class SnapEditor(QWidget):
     def _preview(self):
         try:
             st = get_state()
-            for fid, attrs in self._snap.values.items():
-                for attr, val in attrs.items():
-                    st.set_programmer_value(int(fid), attr, int(val))
+            # FM-52: eine Vorschau = EIN Schritt im Programmer-Verlauf.
+            from src.core.programmer_verlauf import schritt
+            with schritt(st, "Snap-Vorschau"):
+                for fid, attrs in self._snap.values.items():
+                    for attr, val in attrs.items():
+                        st.set_programmer_value(int(fid), attr, int(val))
         except Exception:
             pass

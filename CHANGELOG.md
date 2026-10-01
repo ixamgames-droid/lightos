@@ -7,6 +7,26 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-10-01 — „Rückgängig" im Programmer nimmt den letzten Programmer-Schritt zurück (FM-52)
+
+#### Behoben
+
+- **„Rückgängig" im Programmer machte die letzte Patch-Änderung rückgängig statt der letzten
+  Programmer-Änderung.** Wer einen Regler verstellt und dann „Rückgängig" gedrückt hat, hat still
+  z. B. das zuletzt gepatchte Gerät wieder entfernt. Der Programmer hat jetzt einen eigenen
+  Verlauf: „Rückgängig" und „Wiederholen" wirken nur auf Programmer-Werte. Ein Regler-Zug, ein
+  Knopfdruck (Hervorheben, Abdunkeln, Kachel, Palette, Snap, Einfügen, Fächer, eine Zeile der
+  Kommandozeile) und ein Löschen sind je ein Schritt; auch Weiß-Segmente und einzelne Köpfe
+  kommen vollständig zurück. Der Verlauf merkt sich bis zu 100 Schritte und wird bei „Neue Show"
+  und „Show öffnen" geleert. Die Knöpfe sind nur aktiv, wenn es etwas zurückzunehmen gibt, und
+  der Tooltip nennt den Schritt. Geräte- und Patch-Änderungen nimmt weiter Strg+Z im Hauptfenster
+  zurück. Ein Rückgängig schaltet einen per NOT-AUS gesperrten Laser nicht wieder frei;
+  gehaltene Flash-Snap-Tasten und automatische Abläufe (Farbrad-Automatik, Live-Trace) kommen
+  nicht in den Verlauf. Der Moving-Head-Reset steht ebenfalls nicht im Verlauf („Wiederholen"
+  löst ihn nie ohne Rückfrage aus). Der Farbwähler im Live-Modus sendet nur noch, wenn sich die
+  Farbe oder die Auswahl ändert, und überschreibt ein „Rückgängig" deshalb nicht mehr. Die
+  Anleitung „Programmer-Grundlagen" beschreibt den neuen Verlauf.
+
 ### 2026-09-30 — Vier neue bebilderte Anleitungen für den Einstieg, Bilder aus dem Code
 
 #### Neu

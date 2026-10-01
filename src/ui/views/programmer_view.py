@@ -35,6 +35,7 @@ from src.core.fixture_filter import (hat_kanal, Nutzlast, fixtures_fuer_nutzlast
 from src.core.group_cells import (ACHSE_WEISS, parse_group_cell, parse_zelle,
                                   zelle_fuer)
 from src.core.head_mode import effective_color_head_mode, normalize_head_mode
+from src.core import programmer_verlauf as _pv
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
 
 # ── UI-Praeferenzen (Layout-Modus, eingeklappte Zonen) ───────────────────────
@@ -117,8 +118,16 @@ _PROGRAMMER_HELP = {
              "Gespeicherte Funktionen, Cues und Snapshots bleiben unberührt.",
     "Kopieren": "Kopiert die aktuellen Programmer-Werte in die Zwischenablage.",
     "Einfügen": "Fügt zuvor kopierte Programmer-Werte wieder ein.",
-    "Rückgängig": "Macht die letzte Programmer-Änderung rückgängig.",
-    "Wiederholen": "Stellt eine rückgängig gemachte Programmer-Änderung wieder her.",
+    # FM-52: eigener Programmer-Verlauf — Patch/Geraete gehoeren zu Strg+Z.
+    # Kuerzel nur fuer Rueckgaengig (Strg+Z ist ueberall gleich); Wiederherstellen
+    # ist plattformabhaengig (Linux Strg+Umschalt+Z, Windows Strg+Y) -> Menuepfad.
+    "Rückgängig": "Nimmt den letzten Programmer-Schritt zurück (Regler-Zug, "
+                  "Kachel, Palette, Hervorheben, Löschen …). Geräte- und "
+                  "Patch-Änderungen nimmt Bearbeiten → Rückgängig (Strg+Z) "
+                  "zurück.",
+    "Wiederholen": "Stellt einen im Programmer zurückgenommenen Schritt wieder "
+                   "her. Geräte- und Patch-Änderungen stellt Bearbeiten → "
+                   "Wiederherstellen wieder her.",
     "Farb-Werkzeug...": "Öffnet den Farbwähler als eigenes, frei platzierbares Fenster "
                      "für die ausgewählten Fixtures.",
     "Positions-Werkzeug...": "Öffnet das Pan/Tilt-Pad für Moving Heads als eigenes Fenster "
@@ -191,6 +200,10 @@ class ProgrammerView(QWidget):
             self._refresh_effects_list()
         except Exception as e:
             print(f"[programmer_view] sync_refresh error: {e}")
+        # FM-52: Show oeffnen/Neue Show leeren den Verlauf teils unter
+        # _suppress_emits (Meldung verworfen) — der Voll-Refresh danach zieht die
+        # Verlaufsknoepfe deshalb selbst nach.
+        self._sync_verlauf_buttons()
 
     def _refresh_sliders_from_state(self):
         """P7: Alle sichtbaren AttributeSlider aus dem Programmer-State neu
@@ -238,6 +251,10 @@ class ProgrammerView(QWidget):
             )
             b.clicked.connect(slot)
             b.setWhatsThis(_PROGRAMMER_HELP.get(label, ""))   # U-3: Hilfe-Modus
+            if label == "Rückgängig":
+                self._btn_undo = b      # FM-52: aktiv nur mit Verlauf
+            elif label == "Wiederholen":
+                self._btn_redo = b
             if label == "Löschen":
                 # BUG-CLEAR: Beschriftung folgt der Reichweite (s. _sync_clear_button).
                 # Breite auf die LAENGERE der beiden Fassungen festnageln, sonst
@@ -247,6 +264,7 @@ class ProgrammerView(QWidget):
                     self._clear_button_labels(99)[0]) + 24)
             tb.addWidget(b)
         self._sync_clear_button()
+        self._sync_verlauf_buttons()
         tb.addSpacing(20)
 
         # Tool-Buttons (Color, Position, Fan)
@@ -2012,14 +2030,15 @@ class ProgrammerView(QWidget):
         FM-HEADLAYOUT Slice 2: Fixtures, die PRO FIXTURE auf „Koepfe einzeln"
         stehen, bleiben verschont — ihre Pro-Kopf-Werte sind gewollt, und der
         globale Umschalter darf sie nicht plattmachen."""
-        for f in self._selected_fixtures():
-            if self._fixture_color_head_mode(f) == "separate":
-                continue
-            prog = self._state.programmer.get(f.fid, {})
-            for attr, cnt in self._color_head_counts(f).items():
-                for h in range(1, cnt):
-                    if f"{attr}#{h}" in prog:
-                        self._state.clear_programmer_value(f.fid, f"{attr}#{h}")
+        with _pv.schritt(self._state, "Köpfe synchron"):   # FM-52: EIN Schritt
+            for f in self._selected_fixtures():
+                if self._fixture_color_head_mode(f) == "separate":
+                    continue
+                prog = self._state.programmer.get(f.fid, {})
+                for attr, cnt in self._color_head_counts(f).items():
+                    for h in range(1, cnt):
+                        if f"{attr}#{h}" in prog:
+                            self._state.clear_programmer_value(f.fid, f"{attr}#{h}")
 
     def _fixture_color_head_mode(self, fixture) -> str:
         """FM-HEADLAYOUT Slice 2: „sync"/„separate" fuer DIESES Fixture.
@@ -2450,14 +2469,17 @@ class ProgrammerView(QWidget):
         gesetzter Kopf dadurch einen (byte-gleichen) Default-Wert persistiert, ist
         der bewusst akzeptierte Trade-off fuer die Getrennt-Kopf-Unabhaengigkeit."""
         attr = ch.attribute
-        for f in owners:
-            if self._state.get_programmer_value(f.fid, attr, head=head) is not None:
-                continue
-            # FM-17: Saat ist der GERAETEWEITE Wert (head=None), nicht „Kopf 1".
-            base = self._state.get_programmer_value(f.fid, attr, head=None)
-            if base is None:
-                base = ch.default_value
-            self._state.set_programmer_value(f.fid, attr, base, head=head)
+        # FM-52: Aufbau eines Reiters ist keine Bedienung (Ausgabe byte-gleich)
+        # -> kein Schritt im Programmer-Verlauf.
+        with _pv.ohne_verlauf(self._state):
+            for f in owners:
+                if self._state.get_programmer_value(f.fid, attr, head=head) is not None:
+                    continue
+                # FM-17: Saat ist der GERAETEWEITE Wert (head=None), nicht „Kopf 1".
+                base = self._state.get_programmer_value(f.fid, attr, head=None)
+                if base is None:
+                    base = ch.default_value
+                self._state.set_programmer_value(f.fid, attr, base, head=head)
 
     _COLOR_LABELS = {
         "color_r": "Rot", "color_g": "Grün", "color_b": "Blau",
@@ -2779,6 +2801,10 @@ class ProgrammerView(QWidget):
         plus den geteilten Master-Dimmer — nicht den ganzen Balken."""
         if not self._selected_fids:
             return
+        with _pv.schritt(self._state, "Hervorheben"):   # FM-52: EIN Schritt
+            self._highlight_werte()
+
+    def _highlight_werte(self):
         st = self._state
         for fid in self._selected_fids:
             if self._nur_weiss_ziel(fid):
@@ -2809,10 +2835,11 @@ class ProgrammerView(QWidget):
             sel |= set(self._state.auswahl_referenzierte_fids())
         except Exception:
             pass
-        for fid in all_fids:
-            if fid in sel:
-                continue
-            self._state.set_programmer_value(fid, "intensity", 76)
+        with _pv.schritt(self._state, "Abdunkeln"):     # FM-52: EIN Schritt
+            for fid in all_fids:
+                if fid in sel:
+                    continue
+                self._state.set_programmer_value(fid, "intensity", 76)
 
     @staticmethod
     def _clear_button_labels(anzahl: int) -> tuple[str, str]:
@@ -2860,13 +2887,17 @@ class ProgrammerView(QWidget):
         ist „mehr" die sichere Richtung — ein halb geleertes Geraet waere genau
         die Sorte Rest, um die es in diesem Item geht.
         """
-        if not self._selected_fids:
-            # Komplett leeren
-            self._state.clear_programmer()
-        else:
-            for fid in self._selected_fids:
-                self._state.clear_programmer(fid)
-        self._rebuild_attr_editor()
+        # FM-52: auch das Teil-Leeren ueber n Geraete ist EIN Schritt.
+        with _pv.schritt(self._state, "Löschen"):
+            if not self._selected_fids:
+                # Komplett leeren
+                self._state.clear_programmer()
+            else:
+                for fid in self._selected_fids:
+                    self._state.clear_programmer(fid)
+        # Der Neuaufbau verankert Koepfe (Seeding) — kein eigener Schritt.
+        with _pv.ohne_verlauf(self._state):
+            self._rebuild_attr_editor()
 
     def _copy_to_clipboard(self):
         """Kopiert die Programmer-Werte der Auswahl.
@@ -2918,27 +2949,70 @@ class ProgrammerView(QWidget):
         if not clip_list:
             return
         # Round-robin: clip Value n -> selected fixture n (mod len)
-        for i, fid in enumerate(self._selected_fids):
-            src = clip_list[i % len(clip_list)]
-            if self._nur_weiss_ziel(fid):
-                self._paste_weiss(fid, src)
-                continue
-            for attr, val in src.items():
-                self._state.set_programmer_value(fid, attr, val)
+        with _pv.schritt(self._state, "Einfügen"):      # FM-52: EIN Schritt
+            for i, fid in enumerate(self._selected_fids):
+                src = clip_list[i % len(clip_list)]
+                if self._nur_weiss_ziel(fid):
+                    self._paste_weiss(fid, src)
+                    continue
+                for attr, val in src.items():
+                    self._state.set_programmer_value(fid, attr, val)
+
+    # FM-52: „Rückgängig"/„Wiederholen" wirken NUR auf den eigenen
+    # Programmer-Verlauf (AppState.programmer_verlauf). Bis FM-52 riefen sie den
+    # globalen Undo-Stapel — in dem landen Programmer-Werte nie, also nahm der
+    # Knopf still die letzte Patch-/Geraete-Aenderung zurueck. Strg+Z im
+    # Hauptfenster bleibt fuer Patch/Geraete; bewusst KEIN zweites Strg+Z hier
+    # (zwei gleiche Kuerzel im Fenster = mehrdeutig, Qt loest dann keins aus).
 
     def _undo(self):
         try:
-            from src.core.undo import get_undo_stack
-            get_undo_stack().undo()
+            label = self._state.programmer_rueckgaengig()
         except Exception as e:
             print(f"[programmer_view] undo error: {e}")
+            return
+        if label is not None:
+            self._nach_verlauf_schritt()
 
     def _redo(self):
         try:
-            from src.core.undo import get_undo_stack
-            get_undo_stack().redo()
+            label = self._state.programmer_wiederholen()
         except Exception as e:
             print(f"[programmer_view] redo error: {e}")
+            return
+        if label is not None:
+            self._nach_verlauf_schritt()
+
+    def _nach_verlauf_schritt(self):
+        """Nach Rueckgaengig/Wiederholen die Oberflaeche nachziehen: der
+        Neuaufbau erfasst auch den Weiss-Block (den der Regler-Sync nicht laedt);
+        sein Seeding darf keinen neuen Schritt erzeugen."""
+        with _pv.ohne_verlauf(self._state):
+            self._rebuild_attr_editor()
+        self._sync_verlauf_buttons()
+
+    def _sync_verlauf_buttons(self):
+        """FM-52: Knoepfe nur aktiv, wenn es etwas zurueckzunehmen bzw.
+        wiederherzustellen gibt; der Tooltip nennt den Schritt."""
+        v = _pv.verlauf_von(self._state)
+        for attr, kann, label, praefix in (
+                ("_btn_undo", "kann_rueckgaengig", "label_rueckgaengig", "Rückgängig"),
+                ("_btn_redo", "kann_wiederholen", "label_wiederholen", "Wiederholen")):
+            btn = getattr(self, attr, None)
+            if btn is None:
+                continue
+            try:
+                if v is None:
+                    btn.setEnabled(False)
+                    btn.setToolTip(_PROGRAMMER_HELP[praefix])
+                    continue
+                aktiv = getattr(v, kann)()
+                btn.setEnabled(aktiv)
+                text = getattr(v, label)() if aktiv else None
+                btn.setToolTip(f"{praefix}: {text}" if text
+                               else _PROGRAMMER_HELP[praefix])
+            except RuntimeError:
+                setattr(self, attr, None)   # Widget schon abgebaut (Teardown)
 
     # ── Tools (Dialoge) ──────────────────────────────────────────────────────
 
@@ -3021,6 +3095,8 @@ class ProgrammerView(QWidget):
         if event == "programmer_changed":
             if hasattr(self, "_color_preview"):
                 self._color_preview.update_colors()
+        elif event == "programmer_verlauf_changed":
+            self._sync_verlauf_buttons()
 
 
 class _ToolDialog(QDialog):
@@ -3117,6 +3193,10 @@ class AttributeSlider(QWidget):
         self._slider.setRange(0, 255)
         self._slider.setValue(self._channel.default_value)
         self._slider.valueChanged.connect(self._on_value_changed)
+        # FM-52: ein Regler-Zug (Druecken bis Loslassen) = EIN Verlaufsschritt.
+        # Rad/Tastatur laufen ohne Pressed/Released -> Ruhe-Zeitfenster.
+        self._slider.sliderPressed.connect(self._zug_beginn)
+        self._slider.sliderReleased.connect(self._zug_ende)
         layout.addWidget(self._slider, stretch=1)
 
         self._lbl_val = QLabel("0")
@@ -3253,8 +3333,21 @@ class AttributeSlider(QWidget):
         else:
             self._state.set_programmer_value(fid, attr, value, head=self._head)
 
+    def _zug_beginn(self):
+        v = _pv.verlauf_von(self._state)
+        if v is not None and not getattr(self, "_zug_offen", False):
+            self._zug_offen = True
+            v.beginne(self._display_name or self._channel.name)
+
+    def _zug_ende(self):
+        v = _pv.verlauf_von(self._state)
+        if v is not None and getattr(self, "_zug_offen", False):
+            self._zug_offen = False
+            v.beende()
+
     def _reset(self):
-        self._slider.setValue(self._channel.default_value)
+        with _pv.schritt(self._state, "Zurücksetzen"):   # FM-52
+            self._slider.setValue(self._channel.default_value)
 
     def _update_labels(self, value: int, divergent: bool = False):
         self._lbl_val.setText("—" if divergent else str(value))
@@ -3308,21 +3401,37 @@ class WeissSegmentBlock(QGroupBox):
         wert.setMinimumWidth(36)
         sl.valueChanged.connect(
             lambda v, z=list(ziele), l=wert, seg=w: self._setzen(z, v, l, seg))
+        # FM-52: ein Zug = EIN Verlaufsschritt (wie AttributeSlider).
+        sl.sliderPressed.connect(lambda t=titel: self._zug(True, t))
+        sl.sliderReleased.connect(lambda: self._zug(False))
         row.addWidget(lbl)
         row.addWidget(sl, 1)
         row.addWidget(wert)
         self._regler[w] = (sl, wert)
         return row
 
+    def _zug(self, beginn: bool, titel: str = ""):
+        v = _pv.verlauf_von(self._state)
+        if v is None or beginn == getattr(self, "_zug_offen", False):
+            return
+        self._zug_offen = beginn
+        if beginn:
+            v.beginne(titel)
+        else:
+            v.beende()
+
     def _setzen(self, ziele, value, lbl, seg):
         lbl.setText(str(value))
-        for fid, key, *seg in ziele:
-            if seg and seg[0] is not None:
-                # Segment: ueber AppState.weiss_setzen — verankert die uebrigen
-                # Segmente, sonst faehrt der Basis-Schluessel alle mit.
-                self._state.weiss_setzen(fid, seg[0], int(value))
-            else:
-                self._state.set_programmer_value(fid, key, int(value))
+        # FM-52: ein Regler-Wert ueber ALLE Ziele = EIN Verlaufsschritt
+        # (weiss_setzen oeffnet keinen eigenen; im Zug verschachtelt).
+        with _pv.schritt(self._state, "Weiß"):
+            for fid, key, *rest in ziele:
+                if rest and rest[0] is not None:
+                    # Segment: ueber AppState.weiss_setzen — verankert die
+                    # uebrigen Segmente, sonst faehrt der Basis-Schluessel alle mit.
+                    self._state.weiss_setzen(fid, rest[0], int(value))
+                else:
+                    self._state.set_programmer_value(fid, key, int(value))
         if seg is None:
             # Sammelregler: die Einzelregler optisch nachziehen, ohne erneut zu
             # schreiben.

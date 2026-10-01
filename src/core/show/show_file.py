@@ -1099,7 +1099,7 @@ def reset_show():
 
 
 def _undo_verlauf_leeren() -> None:
-    """STAB-29: Der Rueckgaengig-Verlauf gehoert zur Show, nicht zur App.
+    """STAB-29/FM-52: Die Rueckgaengig-Verlaeufe gehoeren zur Show, nicht zur App.
 
     Bis 2026-09-29 ueberlebte er „Neue Show" und „Show oeffnen": seine
     Eintraege sind Closures auf Geraete-NUMMERN (``remove_fixture(fid)``,
@@ -1112,6 +1112,13 @@ def _undo_verlauf_leeren() -> None:
         get_undo_stack().clear()
     except Exception as e:
         print(f"[show_file] undo clear error: {e}")
+    # FM-52: der Programmer hat einen EIGENEN Verlauf (Programmer-Werte je
+    # Geraete-Nummer) — aus demselben Grund mit leeren.
+    try:
+        from src.core.app_state import get_state
+        get_state()._get_programmer_verlauf().leeren()
+    except Exception as e:
+        print(f"[show_file] programmer verlauf clear error: {e}")
 
 
 def _reset_state(state, *, emit_events: bool = True, blackout_output: bool = True):
@@ -1194,6 +1201,13 @@ def _reset_state(state, *, emit_events: bool = True, blackout_output: bool = Tru
         print(f"[show_file] reset groups error: {e}")
 
     state.programmer = {}
+    # FM-52: der Patch-Ersatz oben leert den Programmer ueber clear_programmer —
+    # das wuerde als ruecknehmbarer Schritt im Programmer-Verlauf landen. Der
+    # Verlauf gehoert zur alten Show: nach dem Leeren hier erneut verwerfen.
+    try:
+        state._get_programmer_verlauf().leeren()
+    except AttributeError:
+        pass  # gefaelschter State ohne Verlauf
     state.base_levels = {}
     # VCB-05: Gruppen-/Fixture-Dimmer (F-25 GROUP_DIMMER-Fader) leeren — sonst dimmt
     # ein Fader der vorigen Show die Fixtures der neuen Show weiter herunter.

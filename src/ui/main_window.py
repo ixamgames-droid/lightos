@@ -1651,20 +1651,26 @@ class MainWindow(QMainWindow):
         if pv and hasattr(pv, "_highlight"):
             pv._highlight()
         else:
-            # Fallback: alle gepatchten Fixtures voll an
-            for f in self._state.get_patched_fixtures():
-                self._state.set_programmer_value(f.fid, "intensity", 255)
-                self._state.set_programmer_value(f.fid, "color_r", 255)
-                self._state.set_programmer_value(f.fid, "color_g", 255)
-                self._state.set_programmer_value(f.fid, "color_b", 255)
+            # FM-52: EIN Schritt im Programmer-Verlauf.
+            from src.core.programmer_verlauf import schritt
+            with schritt(self._state, "Hervorheben"):
+                # Fallback: alle gepatchten Fixtures voll an
+                for f in self._state.get_patched_fixtures():
+                    self._state.set_programmer_value(f.fid, "intensity", 255)
+                    self._state.set_programmer_value(f.fid, "color_r", 255)
+                    self._state.set_programmer_value(f.fid, "color_g", 255)
+                    self._state.set_programmer_value(f.fid, "color_b", 255)
 
     def _global_lowlight(self):
         pv = getattr(self, "_programmer_view", None)
         if pv and hasattr(pv, "_lowlight"):
             pv._lowlight()
         else:
-            for f in self._state.get_patched_fixtures():
-                self._state.set_programmer_value(f.fid, "intensity", 76)
+            # FM-52: EIN Schritt im Programmer-Verlauf.
+            from src.core.programmer_verlauf import schritt
+            with schritt(self._state, "Abdunkeln"):
+                for f in self._state.get_patched_fixtures():
+                    self._state.set_programmer_value(f.fid, "intensity", 76)
 
     def _global_clear_programmer(self):
         self._state.clear_programmer()
