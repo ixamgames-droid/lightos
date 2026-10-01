@@ -27,6 +27,8 @@ Aufrufe::
     python tools/session_claim.py list
     python tools/session_claim.py claim OUT-51 --session B \\
         --branch fix/out51-sendefehler --files src/core/dmx/output_manager.py
+    python tools/session_claim.py claim QA-50 --session B --strikt \\
+        --files src/core/dmx/            # Ordner: alles darunter (PROC-16)
     python tools/session_claim.py refresh OUT-51 --session B
     python tools/session_claim.py release OUT-51 --session B --status done
     python tools/session_claim.py blocker "Rig haengt am Enttec — nicht neu starten" \\
@@ -143,6 +145,83 @@ def rendere(tafel: dict) -> str:
     for v in tafel["verlauf"][-_VERLAUF_MAX:]:
         teile.append(f"- {v}\n")
     return "".join(teile)
+
+
+# ─── PROC-16: Dateiueberschneidung beim Claim ────────────────────────────────
+# Bis 2026-10-01 hat `claim` die Liste aus `--files` nur GESPEICHERT. Verglichen
+# wurde nichts — COORDINATION.md fuehrte Fall 4 („beide aendern dieselbe Datei
+# aus verschiedenen Items") deshalb ehrlich als „nur sichtbar gemacht". Sichtbar
+# hiess: die andere Sitzung haette die Tafel lesen UND die Spalte selbst gegen
+# die eigene Liste halten muessen. Das tut niemand zuverlaessig, also tut es
+# jetzt das Werkzeug — vor dem Schreiben, gegen den frisch geholten Stand.
+
+def normalisiere_pfad(pfad: str) -> str:
+    """Repo-Pfad vergleichbar machen: Trenner, ``./``, Endschraegstrich, Gross-
+    und Kleinschreibung.
+
+    ``\\`` und ``/`` gelten als gleich — eine Windows-Sitzung schreibt
+    ``src\\core\\x.py``, die Linux-Sitzung ``src/core/x.py``, gemeint ist
+    dieselbe Datei. Gross/klein wird bewusst ignoriert: auf Windows (und macOS)
+    IST es dieselbe Datei, und eine Warnung zu viel kostet weniger als eine
+    verschwiegene Ueberschneidung.
+    """
+    p = pfad.strip().replace("\\", "/")
+    while "//" in p:
+        p = p.replace("//", "/")
+    teile = [t for t in p.split("/") if t not in ("", ".")]
+    return "/".join(teile).casefold()
+
+
+def _dateien_der_tafel(spalte: str) -> list[str]:
+    """Die Dateien-Spalte (``a · b`` oder ``-``) zurueck in eine Liste."""
+    return [d.strip() for d in (spalte or "").split("·")
+            if d.strip() and d.strip() != "-"]
+
+
+def pfade_ueberlappen(a: str, b: str) -> bool:
+    """Gleiche Datei, oder einer ist ein Ordner, in dem der andere liegt.
+
+    Verglichen wird nach ganzen Pfadteilen: ``src/core`` umfasst
+    ``src/core/x.py``, aber NICHT ``src/core_alt.py``. Ein leerer Pfad
+    (``.`` oder ``./``) steht fuer das ganze Repo und ueberlappt mit allem.
+    """
+    na, nb = normalisiere_pfad(a), normalisiere_pfad(b)
+    if not na or not nb:
+        return True
+    return na == nb or nb.startswith(na + "/") or na.startswith(nb + "/")
+
+
+def ueberschneidungen(tafel: dict, sitzung: str, item: str,
+                      dateien: list[str], t: datetime) -> list[tuple[dict, list[str]]]:
+    """Nicht verfallene Claims ANDERER Items, die eine der ``dateien`` beruehren.
+
+    Rueckgabe: ``[(claim, [beruehrte Pfade des anderen Claims]), ...]``.
+    Ausgenommen ist nur das identische Item (ein Claim ueberschneidet sich
+    nicht mit sich selbst) und verfallene Claims — ein Claim, den niemand mehr
+    auffrischt, darf keine Warnung mehr erzeugen, sonst lernt man, sie zu
+    uebergehen.
+
+    ★ Claims anderer Items DERSELBEN Sitzung zaehlen mit. Bis 2026-10-01 stand
+    hier „eigene Claims nicht mitzaehlen, dieselbe Sitzung arbeitet ohnehin
+    nacheinander" — das stimmt nicht: die leitende Sitzung laesst mehrere
+    Worktree-Agenten parallel unter DERSELBEN Kennung arbeiten. Genau dort
+    entsteht der haeufigste reale Konflikt, und er blieb stumm. Ob ein Treffer
+    fremd oder eigen ist, entscheidet erst die Meldung (``c["sitzung"]``).
+    """
+    eigene = [d for d in dateien if d.strip() and d.strip() != "-"]
+    if not eigene:
+        return []
+    treffer = []
+    for c in tafel["claims"]:
+        if c.get("item", "").upper() == item.upper():
+            continue
+        if ist_verfallen(c, t):
+            continue
+        beruehrt = [f for f in _dateien_der_tafel(c.get("dateien", ""))
+                    if any(pfade_ueberlappen(f, e) for e in eigene)]
+        if beruehrt:
+            treffer.append((c, beruehrt))
+    return treffer
 
 
 def ist_verfallen(claim: dict, t: datetime) -> bool:
@@ -405,10 +484,52 @@ def cmd_list(args, repo: str) -> int:
     return 0
 
 
+def _melde_ueberschneidung(treffer, sitzung: str) -> None:
+    # Zwei Kategorien, weil die Abhilfe verschieden ist: bei einer fremden
+    # Sitzung hilft nur ein Blocker, bei der eigenen reicht es, die eigenen
+    # parallelen Agenten (Worktrees) nicht auf dieselbe Datei loszulassen.
+    fremd = [(c, b) for c, b in treffer if c.get("sitzung") != sitzung]
+    eigen = [(c, b) for c, b in treffer if c.get("sitzung") == sitzung]
+    if fremd:
+        print("⚠ Dateiueberschneidung mit fremden Claims (PROC-16):",
+              file=sys.stderr)
+        for c, beruehrt in fremd:
+            print(f"  - {c['item']} (Sitzung {c['sitzung']}, Branch "
+                  f"{c['branch']}, seit {c['seit']}): {' · '.join(beruehrt)}",
+                  file=sys.stderr)
+        print("  Vorher absprechen (Blocker an die Sitzung) oder ein anderes "
+              "Item nehmen.", file=sys.stderr)
+    if eigen:
+        print(f"⚠ Hinweis: Dateiueberschneidung mit eigenen Claims "
+              f"(Sitzung {sitzung}, PROC-16):", file=sys.stderr)
+        for c, beruehrt in eigen:
+            print(f"  - eigenes Item {c['item']} (Branch {c['branch']}) "
+                  f"beruehrt dieselbe Datei: {' · '.join(beruehrt)}",
+                  file=sys.stderr)
+        print("  Laufen beide Items parallel (eigene Worktree-Agenten), "
+              "nacheinander mergen oder zusammenlegen.", file=sys.stderr)
+
+
 def cmd_claim(args, repo: str) -> int:
+    # PROC-16: `refresh` laeuft durch diese Funktion, ist aber ein reines
+    # Auffrischen — es fragt weder nach Dateien noch vergleicht es welche.
+    auffrischen = getattr(args, "auffrischen", False)
+    strikt = getattr(args, "strikt", False)
+    gefunden: list = []
+
     def aendern(tafel):
         t = jetzt()
+        gefunden.clear()                   # jeder Versuch liest neu
         vorhanden = finde(tafel, args.item)
+        if (vorhanden is None or vorhanden["sitzung"] == args.session
+                or ist_verfallen(vorhanden, t)) and args.files:
+            # Erst NACH der Belegt-Pruefung sinnvoll — ein belegtes Item
+            # meldet „belegt", nicht eine Ueberschneidung mit sich selbst.
+            gefunden.extend(ueberschneidungen(tafel, args.session, args.item,
+                                              args.files, t))
+            if gefunden and strikt:
+                return False, (f"{args.item}: NICHT belegt — --strikt und "
+                               f"{len(gefunden)} Dateiueberschneidung(en).")
         if vorhanden and vorhanden["sitzung"] == args.session:
             # ★★ PROC-12: Ein erneuter `claim` DERSELBEN Sitzung hat bis
             # 2026-09-05 nur den Zeitstempel angefasst und `--branch`/`--files`
@@ -459,12 +580,25 @@ def cmd_claim(args, repo: str) -> int:
 
     ok, meldung = _mit_wiederholung(
         repo, aendern, f"claim {args.item} ({args.session})")
+    if gefunden:
+        _melde_ueberschneidung(gefunden, args.session)
+    if (not auffrischen and ok and not [f for f in (args.files or [])
+                                         if f.strip() and f.strip() != "-"]):
+        # Ohne Dateiliste kann niemand — weder die andere Sitzung noch dieses
+        # Werkzeug — eine Ueberschneidung erkennen. Kein Abbruch: manches
+        # Item kennt seine Dateien erst nach dem Lesen; dann nachreichen.
+        print(f"⚠ {args.item}: ohne --files ist keine Ueberschneidungspruefung "
+              f"moeglich — nachreichen mit `claim {args.item} --session "
+              f"{args.session} --files …`.", file=sys.stderr)
     print(meldung)
+    if gefunden and strikt and not ok:
+        return 2
     return 0 if ok else 1
 
 
 def cmd_refresh(args, repo: str) -> int:
     args.branch, args.files = None, None
+    args.auffrischen, args.strikt = True, False
     return cmd_claim(args, repo)
 
 
@@ -530,7 +664,11 @@ def main(argv=None) -> int:
     s.add_argument("item")
     s.add_argument("--session", required=True)
     s.add_argument("--branch")
-    s.add_argument("--files", nargs="*")
+    s.add_argument("--files", nargs="*",
+                   help="Dateien/Ordner, die das Item aendert (Ordner = alles "
+                        "darunter); wird gegen die Claims anderer Items geprueft")
+    s.add_argument("--strikt", action="store_true",
+                   help="bei Dateiueberschneidung NICHT belegen, Exit 2")
     s.set_defaults(fn=cmd_claim)
 
     s = sub.add_parser("refresh", help="Claim auffrischen (laenger als 4 h dran)")

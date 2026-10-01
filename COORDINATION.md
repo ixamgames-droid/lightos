@@ -225,7 +225,15 @@ ist ein Eingriff, den nur der Mensch entscheidet, nicht die Sitzung.
   Claim.
 * **Dieselbe Datei aus zwei Items** ist der haeufigste echte Konflikt. Deshalb
   nennt `claim --files` die Dateien, an die man will: die andere Sitzung sieht
-  es **vorher** statt beim Merge.
+  es **vorher** statt beim Merge. Seit PROC-16 vergleicht `claim` die Liste
+  selbst mit allen **fremden, nicht verfallenen** Claims (Ordner umfassen alles
+  darunter, `/` und `\` gelten gleich) und **warnt** bei Ueberschneidung;
+  mit `--strikt` belegt es dann gar nicht und endet mit Exit 2. Claims
+  **anderer Items derselben Sitzung** meldet es als eigenen Hinweis („eigenes
+  Item X beruehrt dieselbe Datei") — die leitende Sitzung laesst mehrere
+  Worktree-Agenten parallel unter einer Kennung laufen; `--strikt` zaehlt sie
+  mit. Ohne `--files` (oder mit `-`) warnt es ebenfalls — ohne Liste kann
+  niemand vergleichen.
 * **Die laufende App gehoert dem Menschen.** Sie haelt MIDI-Clients und macht
   View-bauende Tests messbar instabiler (XPLAT-14). Vor der Deutung eines roten
   Segments: `pgrep -fa "python main.py"`. Und `app.sh restart` waehrend die
@@ -245,7 +253,7 @@ Ehrliche Bestandsaufnahme: **was faengt dieser Prozess — und was nicht.**
 | 1 | Beide nehmen dasselbe Item | **Ja** | `claim` prueft gegen `origin/sessions`; bei Gleichzeitigkeit lehnt Git den zweiten Push ab, das Werkzeug liest neu und meldet „belegt" |
 | 2 | Claim nur lokal, nie gepusht | **Ja** | `claim` pusht selbst; ohne Push gibt es keinen Claim |
 | 3 | Sitzung stirbt, Item bleibt ewig belegt | **Teilweise** | Claims verfallen nach 4 h; das Uebernehmen wird protokolliert. Eine echte Sitzung, die laenger als 4 h an einem Item sitzt, muss `claim --refresh` fahren |
-| 4 | Beide aendern dieselbe Datei aus verschiedenen Items | **Nein**, nur sichtbar gemacht | `--files` im Claim; der Konflikt selbst faellt beim Merge an |
+| 4 | Beide aendern dieselbe Datei aus verschiedenen Items | **Ja (Warnung), seit PROC-16** — sofern beide `--files` angeben | `claim` vergleicht `--files` mit nicht verfallenen Claims anderer Items (Ordner-Praefix, Trenner egal) und warnt — eigene parallele Items als Hinweis; `--strikt` verweigert den Claim (Exit 2). **Vorher gar nicht** verglichen, nur gespeichert. Grenze: eine Datei, die erst waehrend der Arbeit dazukommt, sieht die Pruefung nur, wenn man `claim … --files` nachzieht |
 | 5 | Zwei volle Suiten gleichzeitig | **Ja, seit PROC-02** | `flock` in `verify_loop.sh`. **Vorher gar nicht** — der Lock-Runner ist Windows-spezifisch; dieser Punkt stand in der ersten Fassung dieses Audits faelschlich als „geloest" |
 | 6 | Beide schreiben in den Second Brain | **Nein** — durch Regel verhindert, nicht technisch | Nur `A` schreibt. **Das ist die schwaechste Stelle des Prozesses**: der Store hat keine Versionskontrolle, ein Verstoss faellt niemandem auf |
 | 7 | Private Datei ins Repo | **Ja** | `tests/test_keine_privaten_dateien.py` (Teil des Gates) |
