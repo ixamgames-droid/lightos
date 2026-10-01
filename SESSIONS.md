@@ -12,6 +12,7 @@
 | UI-64 | A | fix/buendel-ui64-ui65 | 2026-10-01T14:44Z | - |
 | UI-65 | A | fix/buendel-ui64-ui65 | 2026-10-01T14:44Z | - |
 | BPM-22 | B | fix/bpm22-kein-takt | 2026-10-01T15:14Z | src/ui/bpm_status_rules.py · src/core/audio/tempo_tracker.py · src/core/audio/beat_detector.py · src/ui/views/bpm_manager_view.py |
+| UI-67 | B | fix/bpm22-kein-takt | 2026-10-01T15:14Z | src/ui/bpm_status_rules.py · src/ui/views/bpm_manager_view.py |
 
 ## Blocker & Fallen
 
@@ -139,7 +140,6 @@
 
 ## Verlauf
 
-- 2026-09-29T14:47Z A claim STAB-29
 - 2026-09-29T14:55Z A done FM-38
 - 2026-09-29T15:17Z A done STAB-29
 - 2026-09-29T16:49Z A claim FM-14b
@@ -169,3 +169,4 @@
 - 2026-10-01T14:44Z A claim UI-65
 - 2026-10-01T14:54Z B done BPM-15
 - 2026-10-01T15:14Z B claim BPM-22
+- 2026-10-01T15:14Z B claim UI-67
