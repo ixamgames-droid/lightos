@@ -180,6 +180,20 @@ Reiter **DMX Monitor** daneben — dieselben Werte, aber mit Gerätenamen:
 draußen, nicht am Patch: falscher Port, falsche Ziel-IP, falsches Netz (unten) oder eine
 andere DMX-Adresse am Gerät.
 
+**So sieht BLACKOUT im Monitor aus.** Im Bild sind die PARs wie oben eingestellt, die
+Moving Heads leuchten und stehen auf Pan 200 / Tilt 60. Dann wurde **BLACKOUT** in der
+Kopfleiste gedrückt:
+
+![BLACKOUT im DMX Monitor](img/09_blackout_dmx_monitor.png)
+
+1. **BLACKOUT** ist eingerastet (rot).
+2. Alle PAR-Kanäle stehen auf 0 — Dimmer und Farbe.
+3. Unter **Hervorgehobene Kanäle:** stehen hier die Pan-/Tilt-Kanäle der vier Moving
+   Heads. Sie behalten ihre Werte (200 und 60), nur deren Dimmer geht auf 0. Die Köpfe
+   bleiben also stehen und fahren beim Lösen nicht erst zurück.
+
+Geräte ohne Dimmerkanal, Laser und Nebel gehen beim Blackout ganz aus.
+
 ## 8. Warnungen in der Statusleiste lesen
 
 Die Statusleiste meldet dauerhaft, ob etwas nicht hinausgeht. Im Bild wurde Universe 1

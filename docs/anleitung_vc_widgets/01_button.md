@@ -130,6 +130,31 @@ Der Dialog blendet je nach gewählter **Aktion** nur die passenden Felder ein. B
 
 Bei der Aktion **Blackout** zeigt der Dialog die Liste **Blackout-Ziel**. Bleibt sie leer, ist die Taste der globale Blackout wie bisher. Mit **+ Gerät/Gruppe hinzufügen** lassen sich einzelne Geräte und/oder Fixture-Gruppen eintragen — dann schaltet die Taste, solange sie gedrückt ist, **nur diese** dunkel; alles andere läuft weiter. Es gilt dieselbe Regel wie beim globalen Blackout: Dimmer, Farbe und Intensität gehen auf 0, Pan/Tilt/Gobo/Optik von Lampen mit Dimmer bleiben stehen, Lampen ohne Dimmer sowie Laser und Nebel gehen ganz aus.
 
+**So richtest du sie ein** (die Bilder zeigen die Doku-Demo-Show aus [Anleitungsbilder aus dem Code erzeugen](../ANLEITUNGSBILDER.md) mit der Gruppe „PAR links“ = PAR 1–4): **Bearbeiten** einschalten, eine Taste anlegen und doppelt anklicken.
+
+![Button-Einstellungen mit Blackout-Ziel](img/01_blackout_ziel_dialog.png)
+
+1. **Aktion:** auf **Blackout** stellen. Erst dann erscheint die Liste **Blackout-Ziel**.
+2. Die Liste **Blackout-Ziel** — hier mit der Gruppe „PAR links“ und dem einzelnen Gerät „Wash 1“ (dahinter die Geräte-Nummer `[#9]`). Mit **×** nimmst du einen Eintrag wieder heraus.
+3. **+ Gerät/Gruppe hinzufügen** hängt eine Zeile an; im Auswahlfeld stehen erst alle Gruppen („Gruppe: …“), dann alle gepatchten Geräte („Gerät: …“). Gruppen und einzelne Geräte lassen sich mischen.
+4. **OK** übernimmt die Einstellung.
+
+Zwei Tasten nebeneinander — eine mit Ziel, eine ohne:
+
+![Zwei Blackout-Tasten in der Virtual Console](img/02_blackout_tasten.png)
+
+1. **Blackout Links** — Ziel „PAR links“ + „Wash 1“: nur PAR 1–4 und Wash 1 gehen dunkel, solange du drückst.
+2. **Blackout alles** — Ziel leer: der globale Blackout, wie der Knopf **BLACKOUT** oben rechts, aber nur solange gedrückt.
+
+Beide tragen unten den roten Balken der Blackout-Aktion. Was „Blackout Links“ bewirkt, zeigt der DMX-Monitor (Sektion **E/A**, Reiter **DMX Monitor**), während die Taste gedrückt ist — PAR 1–4 standen vorher auf Rot, PAR 5–8 auf Blau, alle voll:
+
+![DMX-Monitor, während „Blackout Links“ gedrückt ist](img/03_blackout_links_monitor.png)
+
+1. PAR 1–4 (Kanäle 1–16): Dimmer und Farbe auf 0.
+2. PAR 5–8 (Kanäle 17–32): leuchten unverändert weiter.
+
+Wash 1 (ab Kanal 41) war im Bild ohnehin aus; bei ihm ginge nur der Dimmer auf 0, Pan und Tilt (128) bleiben stehen.
+
 - **Gruppen** werden zur Laufzeit aufgelöst: wird die Gruppe geändert (Gruppen-Ansicht oder Live View), folgt auch eine gerade gehaltene Taste. Enthält die Gruppe nur einzelne **Köpfe** eines Mehrkopf-Geräts (z. B. Kopf 2 und 3 einer Pixelbar), gehen nur diese Köpfe dunkel; gemeinsame Kanäle wie ein Master-Dimmer bleiben — wie beim Submaster pro Kopf. Alle Köpfe zusammen zählen als ganzes Gerät.
 - **Mehrere Tasten** überlagern sich: lässt man eine los, bleiben die Geräte der anderen dunkel.
 - **Loslassen, Taste löschen, Bank wechseln, Show laden** geben den Teil-Blackout frei — es bleibt nichts hängen. Wechselt nur die Hauptansicht oder wird das Fenster minimiert, während ein MIDI-Pad gehalten ist, bleibt es dunkel (wie beim globalen Blackout).

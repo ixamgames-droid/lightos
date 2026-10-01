@@ -13,9 +13,12 @@ Helligkeit und Shutter zu „voll offen, weiss" zusammen.
 nach Geraet Blende, Strobe oder Betriebsart, und ein geratener Wert kann ein
 Geraet mitten in einer Panik-Situation in schnelles Blitzen schicken. Deshalb
 wird der Shutter **nur** gesetzt, wenn das Profil ihn belegt — ein
-``ChannelRange`` mit ``kind == "open"`` oder ein ``highlight_value``. Fehlt
-beides, bleibt der Kanal in Ruhe: ein Geraet, das schon offen ist, bleibt offen,
-und eines mit geschlossener Blende bleibt dunkel. Lieber ein dunkles Geraet als
+``ChannelRange`` mit ``kind == "open"`` oder ein ``highlight_value``, der NICHT
+in einem Bereich ``closed``/``strobe`` liegt (ENG-27; bis dahin galt jeder
+``highlight_value``, und weil er in der Bibliothek nie fehlt, lief der Zweig
+„in Ruhe lassen" fuer echte Kanaele nie). Fehlt ein solcher Beleg, bleibt der
+Kanal in Ruhe: ein Geraet, das schon offen ist, bleibt offen, und eines mit
+geschlossener Blende bleibt dunkel. Lieber ein dunkles Geraet als
 ein unerwartet blitzendes (dieselbe Haltung wie beim Visualizer-Shutter-Zweig,
 VIZ-COLORLESS: ohne Range-Daten wird nicht geraten).
 """
@@ -103,11 +106,14 @@ def white_attrs_for_fixture(channels, open_value_of_channel) -> dict[str, int]:
     #
     # Die richtige Antwort steht schon im Haus und ist hier schon importiert:
     # ``open_value_of_channel`` liefert den Slot mit ``kind == "open"`` (sonst
-    # ``highlight_value``, sonst nichts). Genau dieselbe Regel wie beim Shutter
-    # unten, samt derselben Haltung: ohne Beleg wird nicht geraten. Gemessen
-    # trifft sie „Manuelle RGB-Steuerung" (DOTZ TPAR), „Aus" (FPQ WH12X) und
-    # „Offen (RGBW-Mischung aktiv)" (MAC Aura) — und laesst den ADJ 5PX HEX in
-    # Ruhe, dessen Makro-Kanal gar keine Slots hinterlegt hat.
+    # den ``highlight_value``, wenn er nicht in einem closed/strobe-Bereich
+    # liegt, sonst nichts). Genau dieselbe Regel wie beim Shutter unten.
+    # Gemessen trifft sie „Manuelle RGB-Steuerung" (DOTZ TPAR), „Aus"
+    # (FPQ WH12X) und „Offen (RGBW-Mischung aktiv)" (MAC Aura).
+    # ⚠️ ENG-27, nachgemessen 2026-10-02: der ADJ 5PX HEX bleibt NICHT in Ruhe,
+    # wie hier zuerst stand — sein Makro-Kanal hat keine Slots, also gilt der
+    # ``highlight_value`` 0 als Beleg (dort „kein Makro", also richtig). Ein
+    # Kanal ganz ohne Bereiche bleibt nur unberuehrt, wenn er keinen Wert traegt.
     rad = next((c for c in chans
                 if (getattr(c, "attribute", None) or "") in _KEINE_EMITTER), None)
     if rad is not None and getattr(rad, "attribute", None) not in out:

@@ -347,8 +347,9 @@ def _bild_rueckfrage(ui):
     box.show()
     ui.pump(0.2)
     ja = box.button(QMessageBox.StandardButton.Yes)
-    if ja is None or _norm(ja.text()) != "Yes":
-        raise SzenenFehler("Rückfrage ohne Knopf 'Yes'")
+    # Qt-Standardknopf, deutsch ueber den Qt-Uebersetzer (wie in der App).
+    if ja is None or _norm(ja.text()) != "Ja":
+        raise SzenenFehler("Rückfrage ohne Knopf 'Ja'")
     return bild(ui, box, [(rechteck(box, ja), 1, "links")], titel=box.windowTitle())
 
 
@@ -511,6 +512,79 @@ def _bild_datei_speichern(ui):
                 pos=pos, abdunkeln=False)
 
 
+# ── Beenden mit ungespeicherten Aenderungen (UI-69) ─────────────────────────
+
+def _show_geaendert(ui):
+    """Doku-Demo wie ueber „Datei → Öffnen" laden (echter Weg, merkt den
+    gespeicherten Stand), dann eine Cueliste anlegen — eine echte Aenderung."""
+    pfad = os.path.join(os.getcwd(), "Doku_Demo.lshow")
+    ui.win._open_show_path(pfad)
+    ui.win._refresh_all_views()
+    ui.pump(0.5)
+    ui.state.new_cue_stack("Meine Show")
+    ui.pump(0.2)
+    if not ui.win._has_unsaved_changes():
+        raise SzenenFehler("Show gilt nach der Änderung nicht als geändert")
+
+
+def _bild_beenden(ui):
+    """Rueckfrage aus dem ECHTEN ``closeEvent`` abfangen.
+
+    Offscreen unterdrueckt ``_exit_prompt_suppressed`` die Frage — fuer die
+    Dauer des Aufrufs gilt deshalb der Desktop-Fall. Die Falle antwortet
+    ``Cancel``: ``closeEvent`` ignoriert das Ereignis und kehrt zurueck, bevor
+    irgendetwas heruntergefahren wird. Zur Sicherheit wird vorher geprueft,
+    dass die Frage wirklich kommt (ungespeicherte Aenderung, kein Visualizer
+    mit eigener Rueckfrage), und nachher, dass das Ereignis ignoriert wurde.
+    """
+    from PySide6.QtGui import QCloseEvent
+    from PySide6.QtWidgets import QMessageBox
+    from src.ui import main_window
+    if not ui.win._has_unsaved_changes():
+        raise SzenenFehler("Keine ungespeicherte Änderung — Beenden fragte nicht")
+    if getattr(ui.win, "_visualizer_window", None) is not None:
+        raise SzenenFehler("Visualizer offen — dessen Rückfrage käme zuerst")
+    gefangen = {}
+    alt_frage = QMessageBox.question
+    alt_unterdrueckt = main_window._exit_prompt_suppressed
+
+    def _falle(parent, titel, text, knoepfe=None, *_a, **_k):
+        gefangen.setdefault("frage", (titel, text, knoepfe))
+        return QMessageBox.StandardButton.Cancel
+    QMessageBox.question = staticmethod(_falle)
+    main_window._exit_prompt_suppressed = lambda: False
+    ereignis = QCloseEvent()
+    try:
+        ui.win.closeEvent(ereignis)
+    finally:
+        QMessageBox.question = alt_frage
+        main_window._exit_prompt_suppressed = alt_unterdrueckt
+    if "frage" not in gefangen:
+        raise SzenenFehler("Beenden stellte keine Rückfrage")
+    if ereignis.isAccepted():
+        raise SzenenFehler("Beenden lief trotz „Abbrechen“ weiter")
+    titel, text, knoepfe = gefangen["frage"]
+    box = QMessageBox(QMessageBox.Icon.Question, titel, text, knoepfe, ui.win)
+    box.show()
+    ui.pump(0.2)
+    kreise = []
+    for nr, art in enumerate((QMessageBox.StandardButton.Save,
+                              QMessageBox.StandardButton.Discard,
+                              QMessageBox.StandardButton.Cancel), 1):
+        b = box.button(art)
+        if b is None:
+            raise SzenenFehler(f"Rückfrage ohne Knopf {art.name}")
+        kreise.append((rechteck(box, b), nr, "unten"))
+    return bild(ui, box, kreise, titel=box.windowTitle())
+
+
+def _beenden_aufraeumen(ui):
+    """Doku-Demo wieder wie beim Start: ohne Datei-Pfad, ohne „Meine Show"."""
+    demo_show_zurueck(ui)
+    ui.win._current_show_path = None
+    ui.pump(0.1)
+
+
 SZENEN = [
     Szene("01_hauptfenster", sektion="Bühne", vorher=_neue_show,
           dialog=_bild_hauptfenster, titel="Hauptfenster nach „Neue Show“ — leer"),
@@ -538,4 +612,8 @@ SZENEN = [
     Szene("10_datei_speichern", sektion="E/A", unterreiter="Output",
           dialog=_bild_datei_speichern, nachher=demo_show_zurueck,
           titel="Menü Datei: Speichern und Öffnen"),
+    Szene("11_beenden", sektion="Playback", unterreiter="Playback",
+          vorher=_show_geaendert, dialog=_bild_beenden,
+          nachher=_beenden_aufraeumen,
+          titel="Beenden mit ungespeicherten Änderungen: Rückfrage"),
 ]
