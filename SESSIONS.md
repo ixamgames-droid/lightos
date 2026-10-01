@@ -10,7 +10,6 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | BPM-25 | A | fix/bpm25-beats-stumm-anzeigen | 2026-10-01T21:34Z | src/ui/bpm_status_rules.py,src/ui/views/bpm_manager_view.py,src/core/audio/tempo_tracker.py |
-| TOOL-4 | C | fix/tool5-demo-global-bus | 2026-10-01T21:03Z | tools/capture_hochzeit_tempo_guide.py · tools/_archiv · BACKLOG.md |
 | TOOL-1 | C | fix/tool1-verwaiste-werkzeuge | 2026-10-01T21:08Z | tools/build_komplette_animierte_show.py · tools/build_uxtest3_full.py · tools/build_validated_demo.py · tools/check_demo_show_full.py · tools/vc_click_targets.py · tools/verify_color_dimmer_separation.py · tools/build_demo_show.py · tools/_archiv · tools/README.md · tools/_gen_env.py · BACKLOG.md |
 | TOOL-3 | C | fix/tool3-generator-pfade | 2026-10-01T21:11Z | tools/build_full_show.py · tools/build_spot90_testshow.py · tools/_profil.py · tools/README.md · tests/test_tool3_generator_annahmen.py · BACKLOG.md |
 | DOC-15 | C | fix/doc15-bildbestaende | 2026-10-01T21:21Z | docs/anleitung_vc_widgets/_capture · docs/check_demo_show_full · tests/test_doc15_bildbestaende.py · changelog.d/2026-10-02-DOC-15.md |
@@ -176,7 +175,6 @@
 
 ## Verlauf
 
-- 2026-10-01T19:49Z B done FUNKTIONSTEST-B
 - 2026-10-01T20:01Z A claim OUT-57
 - 2026-10-01T20:02Z A claim UI-69
 - 2026-10-01T20:02Z A done PROC-17
@@ -206,3 +204,4 @@
 - 2026-10-01T22:13Z A done DOC-18
 - 2026-10-01T22:24Z A claim DOC-20
 - 2026-10-01T22:28Z C done TOOL-5
+- 2026-10-01T22:28Z C done TOOL-4
