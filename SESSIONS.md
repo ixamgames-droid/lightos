@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| _(frei)_ |  |  |  |  |
+| UI-62 | A | fix/buendel-ui62-ui63-bpm19 | 2026-10-01T12:47Z | - |
 
 ## Blocker & Fallen
 
@@ -130,7 +130,6 @@
 
 ## Verlauf
 
-- 2026-09-29T01:09Z A done ENG-18
 - 2026-09-29T01:14Z A claim STAB-26
 - 2026-09-29T01:26Z A done FM-39
 - 2026-09-29T01:31Z A claim STAB-27
@@ -160,3 +159,4 @@
 - 2026-10-01T11:08Z A aktualisiert FM-51: Branch fix/fm51-weiss-auswahl-ueberall -> fix/fm51b-speicher-scope; Dateien src/ui/widgets/position_tool.py,src/ui/views/programmer_view.py,src/core/app_state.py -> src/core/app_state.py,src/ui/views/snap_file_panel.py,src/ui/views/snapshots_view.py,src/ui/views/programmer_view.py,src/ui/main_window.py
 - 2026-10-01T12:14Z A aktualisiert FM-51: Branch fix/fm51b-speicher-scope -> fix/fm51c-anzeige; Dateien src/core/app_state.py,src/ui/views/snap_file_panel.py,src/ui/views/snapshots_view.py,src/ui/views/programmer_view.py,src/ui/main_window.py -> src/core/app_state.py,src/core/show/patch_dedup.py,src/ui/views/live_view.py
 - 2026-10-01T12:47Z A done FM-51
+- 2026-10-01T12:47Z A claim UI-62
