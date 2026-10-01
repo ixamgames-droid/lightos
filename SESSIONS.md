@@ -10,7 +10,6 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | BPM-26 | B | fix/bpm26-offbeat-hihat | 2026-10-01T19:32Z | src/core/audio/tempo_tracker.py · tests/test_bpm26_offbeat_hihat.py · BACKLOG.md · CHANGELOG.md |
-| OUT-57 | A | fix/out57-blackout-nur-licht | 2026-10-01T20:01Z | src/core/output/output_manager.py,src/core/app_state.py,docs |
 | UI-69 | A | fix/ui69-speichern-beim-beenden | 2026-10-01T20:02Z | src/ui/main_window.py,src/core/show |
 | UI-68 | A | fix/ui68-go-ohne-executor | 2026-10-01T20:41Z | src/ui/views/playback_view.py |
 | BPM-25 | A | fix/bpm25-beats-stumm-anzeigen | 2026-10-01T20:41Z | src/ui/bpm_status_rules.py,src/ui/views/bpm_manager_view.py,src/core/audio/tempo_tracker.py |
@@ -167,7 +166,6 @@
 
 ## Verlauf
 
-- 2026-10-01T15:41Z A claim PROC-09
 - 2026-10-01T16:17Z B done BPM-22
 - 2026-10-01T16:18Z B done UI-67
 - 2026-10-01T16:25Z B claim BPM-20
@@ -197,3 +195,4 @@
 - 2026-10-01T21:03Z C claim TOOL-4
 - 2026-10-01T21:03Z A claim VCB-11
 - 2026-10-01T21:08Z C claim TOOL-1
+- 2026-10-01T21:10Z A done OUT-57
