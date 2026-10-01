@@ -13,7 +13,6 @@
 | XPLAT-40 | A | ci/xplat40-anleitungsbilder-smoke | 2026-10-01T15:41Z | .github/workflows/ci.yml |
 | PROC-16 | A | fix/proc16-claim-ueberschneidung | 2026-10-01T15:41Z | tools/session_claim.py,tests/test_session_claim.py,COORDINATION.md |
 | PROC-09 | A | feat/proc09-changelog-fragmente | 2026-10-01T15:41Z | changelog.d,tools,tests,CHANGELOG.md,WORKFLOW.md |
-| BPM-23 | B | fix/bpm20-bpm23-detektor | 2026-10-01T17:00Z | src/core/audio/tempo_tracker.py · src/ui/views/bpm_manager_view.py · src/ui/bpm_status_rules.py · docs/anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md · tests/test_bpm20_tempo_genau.py · tests/test_bpm23_eingerastet_konfidenz.py · tests/test_bpm_view_state_table.py · tests/test_bpm_status_rules.py · BACKLOG.md · CHANGELOG.md |
 | XPLAT-43 | A | feat/xplat43-gate-summary | 2026-10-01T16:52Z | tools/verify_segmented.sh,tools/verify_segmented.ps1,tests |
 
 ## Blocker & Fallen
@@ -154,7 +153,6 @@
 
 ## Verlauf
 
-- 2026-10-01T12:47Z A claim UI-62
 - 2026-10-01T12:47Z A claim UI-63
 - 2026-10-01T12:47Z A claim BPM-19
 - 2026-10-01T13:24Z A done UI-62
@@ -184,3 +182,4 @@
 - 2026-10-01T16:52Z A claim XPLAT-43
 - 2026-10-01T16:53Z A done PROC-14
 - 2026-10-01T17:15Z B done BPM-20
+- 2026-10-01T17:15Z B done BPM-23
