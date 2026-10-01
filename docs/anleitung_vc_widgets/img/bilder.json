@@ -1,0 +1,43 @@
+{
+  "anleitung": "vc_widgets",
+  "werkzeug": "tools/anleitungsbilder.py",
+  "stand": "1ebada4f",
+  "schrift": "Noto Sans (statt Roboto Condensed)",
+  "qt": "6.11.1",
+  "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py vc_widgets'.",
+  "bilder": [
+    {
+      "datei": "01_blackout_ziel_dialog.png",
+      "szene": "01_blackout_ziel_dialog",
+      "titel": "Button-Einstellungen: Aktion Blackout mit Blackout-Ziel",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "5f7458b9a102c651268e30bb705fa3a6"
+    },
+    {
+      "datei": "02_blackout_tasten.png",
+      "szene": "02_blackout_tasten",
+      "titel": "Zwei Blackout-Tasten: mit Ziel und global",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "d3875bcbcab4743c24cbce75e4b75701"
+    },
+    {
+      "datei": "03_blackout_links_monitor.png",
+      "szene": "03_blackout_links_monitor",
+      "titel": "„Blackout Links“ gehalten: PAR 1–4 dunkel, PAR 5–8 leuchten",
+      "groesse": [
+        1600,
+        325
+      ],
+      "marken": [],
+      "md5": "7ebaf6e0dbb791af0c465fe52dcdad42"
+    }
+  ]
+}

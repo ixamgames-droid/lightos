@@ -177,9 +177,32 @@ gewählte.
 2. **Executor 1** in der **Executor-Leiste**: Im Auswahlfeld „— Leer —“ die
    Cueliste „Meine Show“ wählen. Der Executor heißt dann wie die Cueliste.
 
-**Dieser Schritt ist Pflicht:** Nur eine Cueliste, die auf einem Executor liegt, gibt
-Licht aus. **GO** ohne Executor schaltet in der Tabelle weiter, die Lampen bleiben
-aber dunkel.
+**Nur eine Cueliste, die auf einem Executor liegt, gibt Licht aus.** Vergisst du diesen
+Schritt, hilft dir **GO** (ebenso **◀ BACK** und **▶ Hierhin springen**) auf der
+Playback-Seite: Die gewählte Cueliste wird automatisch auf den ersten freien Executor
+der aktuellen Page gelegt, und unter **Aktive Cue** steht, wohin:
+
+![GO ohne Executor: Cueliste liegt jetzt auf Ex 1](img/11_go_ohne_executor.png)
+
+1. **GO** auf der Cueliste „Meine Show“, die noch auf keinem Executor lag.
+2. Der Hinweis: *„Meine Show“ liegt jetzt auf Ex 1*. Dieselbe Meldung steht kurz in der
+   Statusleiste.
+3. **Executor 1** trägt jetzt die Cueliste, Cue 1 läuft.
+
+Ein belegter Executor wird dabei nie überschrieben. Auch Executoren mit eigenem Namen
+(**⚙**, Label) und solche, deren Fader auf 0 steht, bleiben frei — dort käme kein Licht,
+und beim Hochziehen spränge die Liste unerwartet an. Ist nur noch so ein Executor frei,
+passiert bei **GO** nichts, und der Hinweis sagt, was zu tun ist:
+
+![GO ohne Executor: freier Executor hat den Fader auf 0](img/12_go_fader_null.png)
+
+1. „Freier Executor Ex 1 hat den Fader auf 0 % — Liste zuweisen und Fader hochziehen“.
+2. **Executor 1** mit Fader ganz unten.
+
+Gibt es gar keinen freien Executor, steht dort „Kein freier Executor — Liste zuerst
+einem Executor zuweisen“. Der Hinweis verschwindet, sobald du eine andere Cueliste
+wählst oder die Page wechselst. Leertaste, Befehlszeile (`go`), Web-Remote und OSC legen
+keine Liste automatisch auf einen Executor.
 
 Am Executor: Der Fader regelt die Helligkeit der Cueliste. Die grüne Taste ist **GO**,
 **◀** geht zurück, **FL** blitzt die Cueliste, solange du drückst. **⚙** öffnet
@@ -235,7 +258,8 @@ Alle Einstellungen im Detail:
 
 | Beobachtung | Ursache | Was tun |
 |---|---|---|
-| **GO** schaltet weiter, aber kein Licht | Die Cueliste liegt auf keinem Executor | Schritt 8: im Executor „— Leer —“ die Cueliste wählen |
+| **GO** auf der Playback-Seite tut nichts, Hinweis „Kein freier Executor …“ bzw. „… Fader auf 0 %“ | Kein freier Executor, oder der freie hat den Fader unten | Schritt 8: Cueliste von Hand einem Executor zuweisen, Fader hochziehen |
+| Leertaste, `go`, Tablet oder OSC: kein Licht | Die Cueliste liegt auf keinem Executor (diese Wege legen sie nicht automatisch hin) | Schritt 8: im Executor „— Leer —“ die Cueliste wählen oder einmal **GO** auf der Playback-Seite |
 | Die Cues wirken nicht, das Licht bleibt wie eingestellt | Der Programmer hat Vorrang | **Esc** bzw. **Alles löschen** |
 | Cue 2 enthält noch Werte aus Cue 1 | Zwischen den Aufnahmen nicht gelöscht | vor jeder Aufnahme **Alles löschen**, dann neu aufnehmen |
 | **R** hat in die falsche Cueliste aufgenommen | **Show → Cue aufnehmen** nimmt immer in die erste Cueliste auf | in **Playback** mit **+ Cue aufnehmen** aufnehmen |

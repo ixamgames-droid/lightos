@@ -4,8 +4,9 @@
 Neu erzeugen: ``venv/bin/python tools/anleitungsbilder.py szenen_cues``.
 Die Szenen laufen der Reihe nach im SELBEN Fenster. Was hier angelegt wird
 (Snap „PAR Rot", Snapshot-Slot 1, Cueliste „Meine Show", Executor 1, eine
-VC-Cueliste), raeumt die letzte Szene wieder ab — bei ``--alle`` sollen
-nachfolgende Anleitungen die Doku-Demo unveraendert sehen.
+VC-Cueliste), raeumt Szene 10 wieder ab; die Szenen 11/12 (GO ohne Executor,
+UI-68) legen sich ihren Stand selbst an und raeumen ihn ebenso ab — bei
+``--alle`` sollen nachfolgende Anleitungen die Doku-Demo unveraendert sehen.
 
 Die Hilfen fuer Rahmen ueber Listeneintraegen und fuer Dialoge ueber dem
 Fenster stammen aus ``szenen_programmer_grundlagen`` (dort beschrieben).
@@ -352,6 +353,46 @@ def _alles_abraeumen(ui):
     ui.pump(0.2)
 
 
+# ── 11–12: GO ohne Executor (UI-68) ────────────────────────────────────────
+
+def _hinweis(ui):
+    return _pb(ui)._lbl_hinweis
+
+
+def _go_ohne_executor(ui):
+    """Cues aufgenommen, Liste auf KEINEM Executor, GO im Playback-Tab:
+    der echte Weg (``PlaybackView._go``) legt sie auf den ersten freien
+    Executor und zeigt den Hinweis."""
+    _cues_aufnehmen(ui)
+    st = _stack(ui)
+    st.stop()
+    _pb(ui)._go()
+    ui.pump(0.3)
+
+
+def _fader_null(ui):
+    """Alle sichtbaren Executoren ohne Liste mit Fader auf 0: GO bindet nicht,
+    sondern meldet den freien Executor mit Fader 0."""
+    _alles_abraeumen(ui)
+    _cues_aufnehmen(ui)
+    pe = ui.state.playback_engine
+    sichtbar = len(_pb(ui)._executors_widgets)
+    for ex in pe.executors:
+        if ex.slot <= sichtbar and ex.stack is None:
+            ex.fader_value = 0.0
+    _pb(ui)._refresh_executors()
+    # „Aktive Cue" stammt sonst noch aus Szene 11 (andere Liste) — wie STOP.
+    _pb(ui)._stop()
+    _pb(ui)._go()
+    ui.pump(0.3)
+
+
+def _fader_zurueck(ui):
+    for ex in ui.state.playback_engine.executors:
+        ex.fader_value = 1.0
+    _alles_abraeumen(ui)
+
+
 SZENEN = [
     Szene("01_speichern", sektion="Programmer", unterreiter="Attribute",
           titel="Programmer-Stand: acht PARs rot, Bibliothek",
@@ -411,4 +452,15 @@ SZENEN = [
           vorher=_vc_cueliste, nachher=_alles_abraeumen, warte_s=0.8,
           marken=[(_vc_widget, 1, "Cueliste"),
                   (_vc_go, 2, "GO")]),
+    Szene("11_go_ohne_executor", sektion="Playback", unterreiter="Playback",
+          titel="GO ohne Executor: Liste liegt jetzt auf einem freien Executor",
+          vorher=_go_ohne_executor, nachher=_alles_abraeumen,
+          marken=[("GO", 1, "GO"),
+                  (_hinweis, 2, "Hinweis"),
+                  (_executor(1), 3, "Executor 1")]),
+    Szene("12_go_fader_null", sektion="Playback", unterreiter="Playback",
+          titel="GO ohne Executor: freier Executor hat den Fader auf 0",
+          vorher=_fader_null, nachher=_fader_zurueck,
+          marken=[(_hinweis, 1, "Hinweis"),
+                  (_executor(1), 2, "Executor 1")]),
 ]
