@@ -365,7 +365,7 @@ passende Abhilfe nennt — oder wenn sie „Aufnahme machen und schicken" vorsch
 3. 30 s warten. Der Knopf zählt mit („Aufnahme … 12 s"), die Statuszeile sagt
    „Aufnahme läuft". Ein zweiter Klick bricht ab; die Datei ist dann kürzer, aber brauchbar.
 4. Danach steht in der Statuszeile z. B. „Aufnahme gespeichert —
-   audio_diag/lightos_eingang_20260916-213000.wav — → Datei an Robin/Support schicken".
+   audio_diag/lightos_eingang_20260916-213000.wav — → Datei an den Support schicken".
 
 **Wo die Dateien liegen:** im LightOS-Datenordner, Unterordner `audio_diag/`:
 

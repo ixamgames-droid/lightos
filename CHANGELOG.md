@@ -7,6 +7,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-10-01 — „Kein Takt gefunden“ nur noch bei echter Suche, neutraler Aufnahme-Hinweis (BPM-22, UI-67)
+
+#### Behoben
+
+- **BPM-Erkennung, Statuszeile „Kein Takt gefunden … seit N s“:** zählt jetzt nur die laufende
+  Suche. Vorher zählte sie die gesamte Signalzeit seit dem Start der Quelle — nach einem
+  Beat-Neustart oder einem kurz verlorenen Takt stand deshalb schon nach 2 s „seit 93 s“ da, und
+  die Zeile blieb noch 3 s neben „EINGERASTET“ stehen. Jetzt erscheint sie erst nach 15 s Suche mit
+  Signal und verschwindet im selben Moment, in dem die Erkennung einrastet.
+- **Aufnahme-Hinweis neutral:** Nach „Eingang 30 s aufnehmen“ steht „Datei an den Support
+  schicken“ statt eines Personennamens (Statuszeile, Tooltip, Anleitung).
+
 ### 2026-10-01 — Kleine Bedienfehler, MIDI-Eingang abgesichert, Qt-Dialoge deutsch (UI-64, UI-65, XPLAT-39)
 
 #### Behoben

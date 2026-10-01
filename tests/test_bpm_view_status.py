@@ -286,7 +286,7 @@ def test_aufnahme_knopf_fortschritt_und_deaktiviert(env):
     _app.processEvents()
     txt = _tick(v, clock, 13.0)
     assert txt == ("Aufnahme gespeichert — audio_diag/lightos_eingang_20260914-120000.wav — "
-                   "Datei an Robin/Support schicken")
+                   "Datei an den Support schicken")
     assert "/irgendwo" not in txt
     assert v._btn_record.text() == "Eingang 30 s aufnehmen"
     # Capture gestoppt -> Knopf aus
@@ -502,6 +502,35 @@ def test_kein_signal_weg_sobald_musik_laeuft(env):
     cap.snap = replace(cap.snap, rms_dbfs_300ms=-14.0, rms_dbfs_1s=-50.0)
     det["snap"] = _det(state="searching", signal_s=0.5, window_filled_s=6.0)
     assert _tick(v, clock, 3.05).startswith("Sucht Tempo")
+
+
+def test_aufnahme_tooltip_ohne_betreiber_namen(env):
+    """UI-67 (Windows-Abnahme BPM-15): der Programmtext nannte „Robin/Support" — das
+    Repo-Pseudonym des Rig-Betreibers. Neutral: „an den Support schicken"."""
+    make, *_ = env
+    v, *_ = make()
+    tip = v._btn_record.toolTip()
+    assert "Robin" not in tip
+    assert "Datei an den Support schicken" in tip
+
+
+def test_kein_takt_weg_sobald_eingerastet(env):
+    """BPM-22 (Windows-Abnahme BPM-15): „Kein Takt gefunden" stand nach einem Beat-Neustart
+    noch 3 s neben EINGERASTET. Die Ansicht reicht den Detektor-Snapshot an die Hysterese
+    weiter — rastet er ein, wechselt die Zeile im selben Tick."""
+    make, cap, clock, det = env
+    v, *_ = make()
+    det["snap"] = _det(state="searching", signal_s=93.0, search_s=20.0, window_filled_s=6.0)
+    t = 0.0
+    while t < 2.5:
+        _tick(v, clock, t)
+        t = round(t + 0.25, 2)
+    assert v.status_text().startswith("Kein Takt gefunden"), v.status_text()
+    assert "seit 20 s" in v.status_text()
+    det["snap"] = _det(state="locked", signal_s=95.0, confidence=1.0)
+    txt = _tick(v, clock, 2.55)
+    assert txt.startswith("Eingerastet"), txt
+    assert v._lbl_state.text() == "EINGERASTET"
 
 
 def test_start_bei_stille_wartet_auf_signal(env):
