@@ -14,6 +14,7 @@
 | UI-69 | A | fix/ui69-speichern-beim-beenden | 2026-10-01T20:02Z | src/ui/main_window.py,src/core/show |
 | UI-68 | A | fix/ui68-go-ohne-executor | 2026-10-01T20:41Z | src/ui/views/playback_view.py |
 | BPM-25 | A | fix/bpm25-beats-stumm-anzeigen | 2026-10-01T20:41Z | src/ui/bpm_status_rules.py,src/ui/views/bpm_manager_view.py,src/core/audio/tempo_tracker.py |
+| TOOL-5 | C | fix/tool5-demo-global-bus | 2026-10-01T21:00Z | tools/build_demo_show_full.py · tools/capture_hochzeit_tempo_guide.py · tools/_archiv · tools/README.md · tests/test_proc07_werkzeuge.py · tests/test_tool5_demo_global_bus.py · BACKLOG.md · changelog.d/2026-10-02-TOOL-5.md |
 
 ## Blocker & Fallen
 
@@ -163,7 +164,6 @@
 
 ## Verlauf
 
-- 2026-10-01T15:37Z A claim PRIV-05
 - 2026-10-01T15:41Z A claim PROC-14
 - 2026-10-01T15:41Z A claim XPLAT-40
 - 2026-10-01T15:41Z A claim PROC-16
@@ -193,3 +193,4 @@
 - 2026-10-01T20:32Z A done XPLAT-41
 - 2026-10-01T20:41Z A claim UI-68
 - 2026-10-01T20:41Z A claim BPM-25
+- 2026-10-01T21:00Z C claim TOOL-5
