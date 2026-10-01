@@ -10,7 +10,7 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | UI-68 | A | fix/ui68-go-ohne-executor | 2026-10-01T21:34Z | src/ui/views/playback_view.py |
-| BPM-25 | A | fix/bpm25-beats-stumm-anzeigen | 2026-10-01T20:41Z | src/ui/bpm_status_rules.py,src/ui/views/bpm_manager_view.py,src/core/audio/tempo_tracker.py |
+| BPM-25 | A | fix/bpm25-beats-stumm-anzeigen | 2026-10-01T21:34Z | src/ui/bpm_status_rules.py,src/ui/views/bpm_manager_view.py,src/core/audio/tempo_tracker.py |
 | TOOL-5 | C | fix/tool5-demo-global-bus | 2026-10-01T21:00Z | tools/build_demo_show_full.py · tools/capture_hochzeit_tempo_guide.py · tools/_archiv · tools/README.md · tests/test_proc07_werkzeuge.py · tests/test_tool5_demo_global_bus.py · BACKLOG.md · changelog.d/2026-10-02-TOOL-5.md |
 | TOOL-4 | C | fix/tool5-demo-global-bus | 2026-10-01T21:03Z | tools/capture_hochzeit_tempo_guide.py · tools/_archiv · BACKLOG.md |
 | VCB-11 | A | - | 2026-10-01T21:03Z | src/ui/widgets/vc_button.py · src/core/dmx/output_manager.py |
