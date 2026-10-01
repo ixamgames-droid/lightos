@@ -1775,6 +1775,13 @@ class MainWindow(QMainWindow):
                 QMessageBox.information(self, "Snapshot",
                     "Programmer ist leer - nichts zu speichern.")
                 return
+            # FM-51 Scheibe B: gemeinsamer Vorab-Check aller Speicherwege —
+            # hat die Auswahl keine Werte, weder Namen noch Kanaele abfragen.
+            from src.ui.views.snap_file_panel import (
+                KEINE_WERTE_IM_SCOPE, scope_ohne_werte)
+            if scope_ohne_werte(self._state, self._state.programmer):
+                QMessageBox.information(self, "Snapshot", KEINE_WERTE_IM_SCOPE)
+                return
             # Name abfragen + capture
             name, ok = QInputDialog.getText(
                 self, "Snapshot speichern",
@@ -1789,12 +1796,12 @@ class MainWindow(QMainWindow):
             # …) in den Snapshot wandern. So kommt ein Dimmer nur mit, wenn man ihn
             # bewusst angehakt laesst (loest Davids "Color speichert Dimmer mit").
             import copy
-            from src.ui.views.snap_file_panel import ChannelSelectDialog
+            from src.ui.views.snap_file_panel import ChannelSelectDialog, _scope
             from PySide6.QtWidgets import QDialog
             vals = copy.deepcopy(self._state.programmer)
-            scope = (self._state.active_scope_fids()
-                     if hasattr(self._state, "active_scope_fids") else None)
-            dlg = ChannelSelectDialog(vals, self, scope_fids=scope)
+            # FM-51 Scheibe B: derselbe Schluessel-Scope wie die drei anderen
+            # Speicherwege (vorher fehlte hier sogar die Kopf-Einschraenkung).
+            dlg = ChannelSelectDialog(vals, self, **_scope(self._state))
             if dlg.exec() != QDialog.DialogCode.Accepted:
                 return
             vals = dlg.filter_programmer(vals)

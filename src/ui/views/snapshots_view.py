@@ -349,6 +349,16 @@ class SnapshotsView(QWidget):
                     "Programmer ist leer - es gibt nichts zu speichern."
                 )
                 return
+            # FM-51 Scheibe B: gemeinsamer Vorab-Check — hat die Auswahl keine
+            # Werte, weder Namen abfragen noch den Kanal-Dialog oeffnen.
+            try:
+                from src.ui.views.snap_file_panel import (
+                    KEINE_WERTE_IM_SCOPE, scope_ohne_werte)
+                if scope_ohne_werte(state, vals):
+                    QMessageBox.information(self, "Snapshot", KEINE_WERTE_IM_SCOPE)
+                    return
+            except ImportError:
+                pass
             name, ok = QInputDialog.getText(
                 self, "Snapshot speichern",
                 f"Name für Snapshot {index + 1}:",
@@ -360,14 +370,13 @@ class SnapshotsView(QWidget):
             # Kanal-Auswahl: welche Attribut-Gruppen sollen gespeichert werden?
             try:
                 from src.ui.views.snap_file_panel import (
-                    ChannelSelectDialog, _scope_heads)
+                    ChannelSelectDialog, _scope)
                 # Scope wie an den anderen Call-Sites (snap_file_panel/programmer_view/
                 # main_window) uebergeben: nur die aktuell ausgewaehlten Geraete kommen
                 # in den Snapshot. Sonst landen liegengebliebene Programmer-Werte zuvor
                 # gewaehlter Gruppen mit im Snapshot ("Color speichert Dimmer mit").
-                scope = state.active_scope_fids() if hasattr(state, "active_scope_fids") else None
-                chan_dlg = ChannelSelectDialog(vals, self, scope_fids=scope,
-                                           scope_heads=_scope_heads(state))
+                # FM-51 Scheibe B: Schluessel-Scope (Koepfe, Weiss-Segmente).
+                chan_dlg = ChannelSelectDialog(vals, self, **_scope(state))
                 if chan_dlg.exec() != QDialog.DialogCode.Accepted:
                     return
                 vals = chan_dlg.filter_programmer(vals)

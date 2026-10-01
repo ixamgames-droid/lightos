@@ -154,7 +154,12 @@ class ProgrammerView(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._state: AppState = get_state()
-        self._selected_fids: list[int] = []
+        # FM-51 Scheibe B: Geraete, fuer die der EDITOR Regler baut — inkl. der
+        # NUR ueber Weiss gewaehlten (die stehen bewusst NICHT in
+        # ``AppState.selected_fids``). KEIN Aktionsziel: Toolbar-Aktionen lesen
+        # ihre Ziele ueber die AppState-Helfer (``auswahl_ziel_fids``,
+        # ``auswahl_programmer_scope``, ``nur_weiss_fids``).
+        self._editor_fids: list[int] = []
         self._clipboard: dict[int, dict[str, int]] = {}
         self._state.subscribe(self._on_state_change)
         self._setup_ui()  # baut Body + befuellt Listen/Editor aus dem State
@@ -190,7 +195,23 @@ class ProgrammerView(QWidget):
     # ── Public Helpers ───────────────────────────────────────────────────────
 
     def get_selected_fids(self) -> list[int]:
-        return list(self._selected_fids)
+        """GANZE Geraete und Kopf-Geraete der Auswahl — dieselbe Antwort wie
+        ``AppState.get_selected_fids`` (FM-51 Scheibe B). Frueher kam hier die
+        Editor-Liste heraus, die nur-Weiss-Geraete als ganze Geraete fuehrt."""
+        try:
+            return list(self._state.auswahl_ziel_fids())
+        except Exception:
+            return list(self._state.get_selected_fids())
+
+    # Alt-Name der Editor-Liste (Tests/Alt-Aufrufer). Neuer Code liest
+    # ``_editor_fids`` fuer den Editor-Aufbau und die AppState-Helfer fuer Ziele.
+    @property
+    def _selected_fids(self) -> list[int]:
+        return self._editor_fids
+
+    @_selected_fids.setter
+    def _selected_fids(self, fids) -> None:
+        self._editor_fids = list(fids or [])
 
     def _sync_refresh(self):
         try:
@@ -837,10 +858,15 @@ class ProgrammerView(QWidget):
             return
         try:
             from src.ui.views.snap_file_panel import (
-                ChannelSelectDialog, _scope_heads)
-            scope = state.active_scope_fids() if hasattr(state, "active_scope_fids") else None
-            dlg = ChannelSelectDialog(prog, self, scope_fids=scope,
-                                      scope_heads=_scope_heads(state))
+                KEINE_WERTE_IM_SCOPE, ChannelSelectDialog, _scope,
+                scope_ohne_werte)
+            # FM-51 Scheibe B: derselbe Schluessel-Scope wie alle Speicherwege;
+            # hat die Auswahl keine Werte, gar nicht erst den Dialog oeffnen.
+            if scope_ohne_werte(state, prog):
+                QMessageBox.information(self, "Programmer → Szene",
+                                        KEINE_WERTE_IM_SCOPE)
+                return
+            dlg = ChannelSelectDialog(prog, self, **_scope(state))
             if dlg.exec() != QDialog.DialogCode.Accepted:
                 return
             filtered = dlg.filter_programmer(prog)
@@ -881,7 +907,7 @@ class ProgrammerView(QWidget):
         tp = getattr(self, "_tile_preview", None)
         if tp is not None:
             try:
-                tp.set_fixtures(self._selected_fids)
+                tp.set_fixtures(self._editor_fids)
             except RuntimeError:
                 pass  # Widget beim Layout-Wechsel geloescht
 
@@ -1075,16 +1101,16 @@ class ProgrammerView(QWidget):
 
     def _on_fixture_selected(self):
         # FM-HEADLAYOUT Slice 5: Auswahl auf Zell-Ebene publizieren (Geraet ODER
-        # Kopf). _selected_fids bleibt die Basisliste fuer alles Bestehende.
+        # Kopf). _editor_fids ist die Editor-Liste (kein Aktionsziel, FM-51 B).
         cells: list[str] = []
-        self._selected_fids = []
+        self._editor_fids = []
         for it in self._fixture_list.selectedItems():
             fid, zelle = self._zelle_of_item(it)       # FM-41: auch „7:w3"
             if fid is None:
                 continue
             cells.append(zelle)
-            if fid not in self._selected_fids:
-                self._selected_fids.append(fid)
+            if fid not in self._editor_fids:
+                self._editor_fids.append(fid)
         self._selected_cells = cells
         # Einzelauswahl = keine Gruppe aktiv; VOR dem Publish setzen
         try:
@@ -1122,7 +1148,7 @@ class ProgrammerView(QWidget):
                 if callable(norm):
                     self._selected_cells = list(norm() or [])
             else:
-                self._state.set_selected_fids(self._selected_fids)
+                self._state.set_selected_fids(self._editor_fids)
         except Exception as e:
             print(f"[programmer_view] publish selection error: {e}")
 
@@ -1302,11 +1328,11 @@ class ProgrammerView(QWidget):
                 if it.parent() is not None:
                     it.parent().setExpanded(True)
         self._fixture_list.blockSignals(False)
-        self._selected_fids = []
+        self._editor_fids = []
         for c in cells:
             fid = parse_zelle(c)[0]
-            if fid is not None and fid not in self._selected_fids:
-                self._selected_fids.append(fid)
+            if fid is not None and fid not in self._editor_fids:
+                self._editor_fids.append(fid)
         self._selected_cells = list(cells)
         self._publish_selection()
         self._rebuild_attr_editor()
@@ -1338,10 +1364,10 @@ class ProgrammerView(QWidget):
                 it.setSelected(True)
         self._fixture_list.blockSignals(False)
         # Interne Auswahl in Gruppen-Reihenfolge setzen
-        existing = list(self._selected_fids) if add else []
+        existing = list(self._editor_fids) if add else []
         ordered = existing + [f for f in fids if f not in existing]
-        self._selected_fids = [f for f in ordered if f in present]
-        self._selected_cells = [str(f) for f in self._selected_fids]
+        self._editor_fids = [f for f in ordered if f in present]
+        self._selected_cells = [str(f) for f in self._editor_fids]
         self._publish_selection()
         self._rebuild_attr_editor()
 
@@ -1381,7 +1407,7 @@ class ProgrammerView(QWidget):
         # Geraet" -> „nur Weiss 4" aendert die fids nicht, und die View blieb
         # sonst mit gerätweiten Reglern stehen — ein Rot-Regler fuhr dann alle
         # 48 RGB-Zonen.
-        if new_fids == self._selected_fids and (
+        if new_fids == self._editor_fids and (
                 cells is None or list(cells) == list(getattr(self, "_selected_cells", None) or [])):
             return  # eigenes Echo oder keine Aenderung
         want_cells = set(cells) if cells else {str(f) for f in new_fids}
@@ -1405,9 +1431,9 @@ class ProgrammerView(QWidget):
                     it.parent().setExpanded(True)
         self._fixture_list.blockSignals(False)
         # Interne Auswahl in der vom Publisher vorgegebenen Reihenfolge uebernehmen.
-        self._selected_fids = [f for f in new_fids if f in present]
+        self._editor_fids = [f for f in new_fids if f in present]
         self._selected_cells = (list(cells) if cells
-                                else [str(f) for f in self._selected_fids])
+                                else [str(f) for f in self._editor_fids])
         self._rebuild_attr_editor()
 
     # ── Attr Tabs Build ──────────────────────────────────────────────────────
@@ -1433,7 +1459,7 @@ class ProgrammerView(QWidget):
 
         try:
             fixtures = {f.fid: f for f in self._state.get_patched_fixtures()}
-            selected = [fixtures[fid] for fid in self._selected_fids if fid in fixtures]
+            selected = [fixtures[fid] for fid in self._editor_fids if fid in fixtures]
             if not selected:
                 self._lbl_selection.setText(_EMPTY_SELECTION_MSG)
                 self._color_preview.set_fixtures([])
@@ -1657,7 +1683,7 @@ class ProgrammerView(QWidget):
                     # als „im Patch-Dialog festgelegt", auch wenn beide den
                     # Umschalter überstimmen.
                     _by_head = any(self._heads_filter_for(f) is not None
-                                   for f in self._selected_fixtures())
+                                   for f in self._kopf_fixtures())
                     _pin_hint = QLabel("↳ Kopf gewählt — Regler folgen der Auswahl"
                                        if _by_head
                                        else "↳ pro Gerät gesetzt (Patch-Dialog)")
@@ -1948,8 +1974,17 @@ class ProgrammerView(QWidget):
     def _selected_fixtures(self) -> list:
         """Die aktuell ausgewaehlten Fixture-Objekte (in Auswahl-Reihenfolge)."""
         by_fid = {f.fid: f for f in self._state.get_patched_fixtures()}
-        return [by_fid[fid] for fid in getattr(self, "_selected_fids", [])
+        return [by_fid[fid] for fid in getattr(self, "_editor_fids", [])
                 if fid in by_fid]
+
+    def _kopf_fixtures(self) -> list:
+        """FM-51 Scheibe B: die Geraete, auf die der Kopf-Umschalter
+        („Köpfe: Synchron/Getrennt") wirkt — die Editor-Liste OHNE Geraete, die
+        NUR ueber Weiss-Segmente gewaehlt sind. Deren Farbkoepfe (z. B. die 48
+        RGB-Zonen des Balkens) sind nicht gewaehlt: sie duerfen den Umschalter
+        weder einblenden noch von „Synchron" ihre ``color_*#N`` geloescht
+        bekommen."""
+        return [f for f in self._selected_fixtures() if not self._nur_weiss(f)]
 
     @staticmethod
     def _color_head_counts(fixture) -> dict:
@@ -1972,7 +2007,7 @@ class ProgrammerView(QWidget):
         das Template selected[0]). >1 => mind. ein Mehrkopf-Farbgeraet ist dabei
         (z. B. Spider mit zwei RGBW-Baenken) -> Synchron/Getrennt-Umschalter."""
         best = 1
-        for f in self._selected_fixtures():
+        for f in self._kopf_fixtures():
             c = self._color_head_counts(f)
             if c:
                 best = max(best, max(c.values()))
@@ -1988,7 +2023,7 @@ class ProgrammerView(QWidget):
         wirkungslos. Sonst zeigte er „Synchron", waehrend sichtbar Pro-Kopf-Regler
         stehen (die Klasse „sichtbarer Zustand != Logikzustand", die schon zweimal
         live aufgefallen ist)."""
-        for f in self._selected_fixtures():
+        for f in self._kopf_fixtures():
             if self._heads_filter_for(f) is not None:
                 continue
             counts = self._color_head_counts(f)
@@ -2031,7 +2066,7 @@ class ProgrammerView(QWidget):
         stehen, bleiben verschont — ihre Pro-Kopf-Werte sind gewollt, und der
         globale Umschalter darf sie nicht plattmachen."""
         with _pv.schritt(self._state, "Köpfe synchron"):   # FM-52: EIN Schritt
-            for f in self._selected_fixtures():
+            for f in self._kopf_fixtures():
                 if self._fixture_color_head_mode(f) == "separate":
                     continue
                 prog = self._state.programmer.get(f.fid, {})
@@ -2777,8 +2812,8 @@ class ProgrammerView(QWidget):
 
     def _nur_weiss_ziel(self, fid) -> bool:
         """FM-51: ist ``fid`` laut AppState NUR ueber Weiss-Segmente gewaehlt?
-        Die View-Liste ``_selected_fids`` fuehrt solche Geraete mit (sie kommt aus
-        den Zellen) — die Toolbar-Aktionen duerfen sie aber nicht als GANZES
+        Die Editor-Liste ``_editor_fids`` fuehrt solche Geraete mit (sie kommt
+        aus den Zellen) — die Toolbar-Aktionen duerfen sie aber nicht als GANZES
         Geraet behandeln, sonst faehrt z. B. Highlight alle 48 RGB-Zonen."""
         fn = getattr(self._state, "nur_weiss_gewaehlt", None)
         try:
@@ -2793,21 +2828,42 @@ class ProgrammerView(QWidget):
         except Exception:
             return []
 
+    def _aktions_ziele(self) -> list:
+        """FM-51 Scheibe B: Ziele einer Toolbar-Aktion aus dem AppState — in
+        Auswahl-Reihenfolge ``(fid, nur_weiss)``. Ganze Geraete und Kopf-Geraete
+        (``auswahl_ziel_fids``) wirken als Geraet, NUR ueber Weiss gewaehlte
+        (``nur_weiss_gewaehlt``) nur auf ihre Segmente. Die Editor-Liste
+        ``_editor_fids`` ist KEIN Aktionsziel."""
+        st = self._state
+        try:
+            ganz = set(st.auswahl_ziel_fids())
+            reihe = list(st.auswahl_referenzierte_fids())
+        except Exception:
+            ganz = set(st.get_selected_fids())
+            reihe = list(ganz)
+        out = []
+        for fid in reihe:
+            if fid in ganz:
+                out.append((fid, False))
+            elif self._nur_weiss_ziel(fid):
+                out.append((fid, True))
+        return out
+
     def _highlight(self):
         """Setzt selektierte Fixtures auf: Intensity 255, Pan/Tilt center, weiss.
 
         FM-51: ein Geraet, das NUR ueber Weiss-Segmente gewaehlt ist, bekommt
         wie beim Command-Line-Highlight nur SEINE Segmente (``weiss_setzen``)
         plus den geteilten Master-Dimmer — nicht den ganzen Balken."""
-        if not self._selected_fids:
+        if not self._aktions_ziele():
             return
         with _pv.schritt(self._state, "Hervorheben"):   # FM-52: EIN Schritt
             self._highlight_werte()
 
     def _highlight_werte(self):
         st = self._state
-        for fid in self._selected_fids:
-            if self._nur_weiss_ziel(fid):
+        for fid, nur_weiss in self._aktions_ziele():
+            if nur_weiss:
                 for seg in self._weiss_segmente(fid):
                     if not st.weiss_setzen(fid, seg, 255):
                         continue
@@ -2830,11 +2886,10 @@ class ProgrammerView(QWidget):
         FM-51: ausgenommen ist JEDES Geraet, auf das die Auswahl verweist — auch
         eines, das nur ueber Weiss-Segmente gewaehlt ist."""
         all_fids = [f.fid for f in self._state.get_patched_fixtures()]
-        sel = set(self._selected_fids)
         try:
-            sel |= set(self._state.auswahl_referenzierte_fids())
+            sel = set(self._state.auswahl_referenzierte_fids())
         except Exception:
-            pass
+            sel = set(self._state.get_selected_fids())
         with _pv.schritt(self._state, "Abdunkeln"):     # FM-52: EIN Schritt
             for fid in all_fids:
                 if fid in sel:
@@ -2842,7 +2897,7 @@ class ProgrammerView(QWidget):
                 self._state.set_programmer_value(fid, "intensity", 76)
 
     @staticmethod
-    def _clear_button_labels(anzahl: int) -> tuple[str, str]:
+    def _clear_button_labels(anzahl: int, segmente: int = 0) -> tuple[str, str]:
         """Beschriftung + Hilfetext des „Löschen"-Knopfs zu einer Auswahlgroesse.
 
         BUG-CLEAR (David 2026-08-01: „Programmer leeren hat manchmal nicht alles
@@ -2852,7 +2907,35 @@ class ProgrammerView(QWidget):
         etwas ausgewaehlt, weil man die Auswahl zum Einstellen braucht. Das
         „manchmal" WAR die Auswahl. Reine Funktion, damit die Zuordnung ohne
         gebaute View pruefbar ist.
+
+        FM-51 Scheibe B: ``segmente`` = gewaehlte Weiss-Segmente von Geraeten,
+        die NUR ueber Weiss gewaehlt sind. Die leert der Knopf einzeln — er
+        heisst dann nie „Alles löschen" und spricht nicht von ganzen Geraeten.
         """
+        if segmente:
+            seg_txt = f"{segmente} Segment" + ("e" if segmente != 1 else "")
+            if anzahl:
+                text = f"Auswahl löschen ({anzahl} + {seg_txt})"
+            elif segmente == 1:
+                text = "Auswahl löschen (1 Segment)"
+            else:
+                text = f"Segmente löschen ({segmente})"
+            if anzahl == 1:
+                geraete = "die Programmer-Werte des ausgewählten Geräts und "
+            elif anzahl:
+                geraete = (f"die Programmer-Werte der {anzahl} ausgewählten "
+                           f"Geräte und ")
+            else:
+                geraete = ""
+            segs = ("das gewählte Weiß-Segment" if segmente == 1
+                    else f"die {segmente} gewählten Weiß-Segmente")
+            return (text,
+                    f"Leert {geraete}{segs}. Am Gerät der Segmente "
+                    f"bleiben die übrigen Weiß-Segmente, die Farbzonen (RGB) "
+                    f"und der gemeinsame Master-Dimmer stehen, ebenso alle "
+                    f"anderen Geräte. Ohne Auswahl leert derselbe Knopf den GANZEN "
+                    f"Programmer. Gespeicherte Funktionen, Cues und Snapshots "
+                    f"bleiben unberührt.")
         if anzahl:
             return (f"Auswahl löschen ({anzahl})",
                     f"Leert die Programmer-Werte der {anzahl} ausgewählten "
@@ -2870,7 +2953,11 @@ class ProgrammerView(QWidget):
         btn = getattr(self, "_btn_clear", None)
         if btn is None:
             return
-        text, hilfe = self._clear_button_labels(len(self._selected_fids))
+        try:
+            anzahl, segmente = self._state.auswahl_umfang()
+        except Exception:
+            anzahl, segmente = len(self._state.get_selected_fids()), 0
+        text, hilfe = self._clear_button_labels(anzahl, segmente)
         try:
             btn.setText(text)
             btn.setToolTip(hilfe)
@@ -2882,19 +2969,18 @@ class ProgrammerView(QWidget):
         """Leert die Auswahl — oder alles, wenn nichts gewaehlt ist.
 
         Die Reichweite steht seit BUG-CLEAR auf dem Knopf (``_sync_clear_button``).
+        Ist ein Geraet NUR ueber Weiss-Segmente gewaehlt, werden genau diese
+        Segmente geleert (FM-51 Scheibe B, ``AppState.auswahl_leeren``).
         Ist ein KOPF gewaehlt, wird trotzdem das ganze Geraet geleert: die
         Kopf-Zeile ist eine Verfeinerung der Geraeteauswahl, und beim Aufraeumen
         ist „mehr" die sichere Richtung — ein halb geleertes Geraet waere genau
         die Sorte Rest, um die es in diesem Item geht.
         """
-        # FM-52: auch das Teil-Leeren ueber n Geraete ist EIN Schritt.
-        with _pv.schritt(self._state, "Löschen"):
-            if not self._selected_fids:
-                # Komplett leeren
-                self._state.clear_programmer()
-            else:
-                for fid in self._selected_fids:
-                    self._state.clear_programmer(fid)
+        # FM-51 Scheibe B: die Reichweite entscheidet der AppState
+        # (``auswahl_leeren``) — ganzer Programmer NUR bei wirklich leerer
+        # Auswahl, nur-Weiss-Geraete segmentgenau (mit Verankerung gegen die
+        # color_w-Spiegelung). FM-52: EIN Schritt (auswahl_leeren klammert).
+        self._state.auswahl_leeren()
         # Der Neuaufbau verankert Koepfe (Seeding) — kein eigener Schritt.
         with _pv.ohne_verlauf(self._state):
             self._rebuild_attr_editor()
@@ -2906,9 +2992,9 @@ class ProgrammerView(QWidget):
         Schluessel der gewaehlten Segmente — nicht RGB und die uebrigen
         Segmente des ganzen Balkens."""
         clip = {}
-        for fid in self._selected_fids:
+        for fid, nur_weiss in self._aktions_ziele():
             prog = self._state.programmer.get(fid, {})
-            if self._nur_weiss_ziel(fid):
+            if nur_weiss:
                 keys = [self._state.weiss_programmer_key(fid, seg)
                         for seg in self._weiss_segmente(fid)]
                 prog = {k: prog[k] for k in keys if k and k in prog}
@@ -2943,16 +3029,17 @@ class ProgrammerView(QWidget):
                 continue
 
     def _paste_from_clipboard(self):
-        if not self._clipboard or not self._selected_fids:
+        ziele = self._aktions_ziele()
+        if not self._clipboard or not ziele:
             return
         clip_list = list(self._clipboard.values())
         if not clip_list:
             return
         # Round-robin: clip Value n -> selected fixture n (mod len)
         with _pv.schritt(self._state, "Einfügen"):      # FM-52: EIN Schritt
-            for i, fid in enumerate(self._selected_fids):
+            for i, (fid, nur_weiss) in enumerate(ziele):
                 src = clip_list[i % len(clip_list)]
-                if self._nur_weiss_ziel(fid):
+                if nur_weiss:
                     self._paste_weiss(fid, src)
                     continue
                 for attr, val in src.items():
@@ -3043,11 +3130,15 @@ class ProgrammerView(QWidget):
         bekommen einen Verlauf, statt alle denselben Wert) — sonst wie bisher über
         ganze Geräte. Eine Zell-Liste, die nur ganze Geräte enthält, ist dabei
         gleichwertig zur fid-Liste; der Umweg schadet also nie."""
-        cells = getattr(self, "_selected_cells", None)
+        # FM-51 Scheibe B: Ziele aus dem AppState, nicht aus View-Listen.
+        try:
+            cells = list(self._state.get_selected_cells())
+        except Exception:
+            cells = None
         if cells and hasattr(ft, "set_cells"):
             ft.set_cells(cells)
         else:
-            ft.set_selection(self._selected_fids)
+            ft.set_selection(self._state.auswahl_ziel_fids())
 
     def _open_fan_tool(self):
         try:

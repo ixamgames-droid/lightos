@@ -2854,13 +2854,15 @@ class AppState:
         self.programmer_focus = str(key) if key else None
 
     def active_scope_fids(self) -> list[int]:
-        """Geraete im aktiven Speicher-Scope = die gemeinsame Auswahl.
+        """GANZE Geraete und Kopf-Geraete der Auswahl (= ``selected_fids``).
 
-        Beim Gruppenwechsel setzt der Programmer die Auswahl auf die Geraete der
-        Gruppe (set_selected_fids), daher ist die aktuelle Auswahl der korrekte
-        Scope: Speichern beruecksichtigt nur diese Geraete und NICHT liegen-
-        gebliebene Programmer-Werte zuvor gewaehlter Gruppen. Leere Liste = kein
-        Scope -> alles speichern (Alt-Verhalten, z. B. wenn nichts gewaehlt ist)."""
+        ★ FM-51 Scheibe B: KEIN Speicher-Scope mehr. Eine leere Liste heisst hier
+        NICHT „nichts gewaehlt" — bei einer reinen Weiss-Auswahl (``"1:w3"``) ist
+        sie leer, und alle vier Speicherwege machten daraus „ganzer Programmer"
+        (fremde PAR-Restwerte und alle acht Weiss-Schluessel im Snapshot).
+        Speichern, Loeschen und der Kanal-Dialog lesen
+        :meth:`auswahl_programmer_scope`. Bleibt als duenne Bruecke fuer
+        Alt-Aufrufer/Tests."""
         return list(self.selected_fids)
 
     def active_scope_heads(self) -> dict:
@@ -2875,6 +2877,168 @@ class AppState:
         return {fid: set(hs)
                 for fid, hs in (getattr(self, "_selected_heads", None) or {}).items()
                 if hs and fid in self.selected_fids}
+
+    def weiss_alle_keys(self, fid) -> list[str]:
+        """FM-51: Programmer-Schluessel ALLER Weiss-Segmente von ``fid`` in
+        Segment-Reihenfolge (``color_w``, ``color_w#1`` …); leer ohne eigene
+        Weiss-Achse."""
+        out: list[str] = []
+        k = 0
+        while True:
+            key = self.weiss_programmer_key(fid, k)
+            if key is None:
+                return out
+            out.append(key)
+            k += 1
+
+    def _weiss_scope_keys(self, fid, segmente, mit_dimmer: bool = True) -> set:
+        """FM-51 Scheibe B: Programmer-Schluessel, die eine Weiss-Segment-Auswahl
+        von ``fid`` beim Speichern umfasst.
+
+        * je gewaehltem Segment sein ``weiss_programmer_key``;
+        * ★ Anker-Regel: ist das BASIS-Segment (0, Schluessel ``color_w``) dabei,
+          kommen die Schluessel der uebrigen Segmente mit. Der DMX-Flush (und
+          jede Wiedergabe ueber dieselbe Kanal-Zuordnung) spiegelt ``color_w``
+          auf jedes Vorkommen OHNE eigenen Wert — ein Snapshot mit nur
+          ``color_w`` fuehre beim Abruf alle acht Segmente. ``weiss_setzen`` hat
+          die uebrigen beim Setzen verankert; genau diese Anker gehoeren dann
+          auch in die Aufnahme, damit der Abruf ausgibt, was jetzt zu sehen ist.
+          Ein Nicht-Basis-Segment braucht das nicht: ``color_w#N`` spiegelt nie.
+        * ``mit_dimmer``: der GETEILTE Master (``weiss_dimmer_key``) — ohne ihn
+          bliebe das Segment beim Abruf dunkel. Im Kanal-Dialog abwaehlbar.
+        """
+        segs = sorted({int(s) for s in (segmente or ())})
+        keys = {k for k in (self.weiss_programmer_key(fid, s) for s in segs) if k}
+        if not keys:
+            return set()
+        if 0 in segs:
+            keys |= set(self.weiss_alle_keys(fid))
+        if mit_dimmer:
+            for s in segs:
+                dk = self.weiss_dimmer_key(fid, s)
+                if dk:
+                    keys.add(dk)
+        return keys
+
+    def _kopf_scope_keys(self, fid, koepfe) -> set:
+        """FM-51 Scheibe B: Programmer-Schluessel der gewaehlten KOEPFE von
+        ``fid`` — dieselbe Regel wie bisher im Kanal-Dialog (``attr`` = Kopf 0,
+        ``attr#N`` = Kopf N), jetzt als Schluesselmenge. Kandidaten sind die
+        Kanal-Vorkommen des Geraets plus seine aktuellen Programmer-Schluessel.
+
+        Neu: Weiss-SEGMENT-Schluessel (``color_w#N`` an Geraeten mit eigener
+        Weiss-Achse) sind KEINE Koepfe — „Kopf 2" nahm sonst Weiss 2 mit."""
+        hs = {int(h) for h in (koepfe or ())}
+        cand: set = set((self.programmer.get(fid) or {}).keys())
+        fx = next((f for f in self._patch_cache
+                   if getattr(f, "fid", None) == fid), None)
+        if fx is not None:
+            try:
+                cand |= {k for _c, k in channel_occurrence_keys(
+                    get_channels_for_patched(fx))}
+            except Exception:
+                pass
+        weiss = set(self.weiss_alle_keys(fid))
+        return {k for k in cand
+                if k not in weiss and _kopf_index_of_key(k) in hs}
+
+    def auswahl_programmer_scope(self, mit_dimmer: bool = True) -> dict | None:
+        """FM-51 Scheibe B: der EINE Scope fuer Speichern (Snapshot,
+        Quick-Snapshot, Snap, Szene), Loeschen und den Kanal-Dialog.
+
+        ``None`` NUR, wenn WIRKLICH nichts gewaehlt ist (:meth:`auswahl_ist_leer`)
+        — dann gilt der ganze Programmer (Bestand). Sonst
+        ``{fid: None | set(Programmer-Schluessel)}``:
+
+        * ganzes Geraet -> ``None`` (alle Schluessel);
+        * Kopf-Auswahl -> die Schluessel der Koepfe (:meth:`_kopf_scope_keys`);
+        * Weiss-Segmente -> :meth:`_weiss_scope_keys` (Segment, Anker-Regel,
+          geteilter Dimmer je nach ``mit_dimmer``);
+        * gemischt (``"1:2"`` + ``"1:w3"``) -> Vereinigung je Geraet.
+
+        Ein Geraet, fuer das nichts uebrig bleibt, fehlt im Ergebnis; ein leeres
+        Dict heisst „gewaehlt, aber nichts davon im Programmer-Scope" — nie
+        „alles"."""
+        if self.auswahl_ist_leer():
+            return None
+        scope: dict = {}
+        koepfe = self.active_scope_heads()
+        for fid in self.selected_fids:
+            hs = koepfe.get(fid)
+            scope[fid] = None if not hs else self._kopf_scope_keys(fid, hs)
+        for fid, segs in (getattr(self, "_selected_weiss", None) or {}).items():
+            if fid in scope and scope[fid] is None:
+                continue                    # ganzes Geraet umfasst alles
+            keys = self._weiss_scope_keys(fid, segs, mit_dimmer)
+            if keys:
+                scope[fid] = set(scope.get(fid) or ()) | keys
+        return {f: k for f, k in scope.items() if k is None or k}
+
+    def auswahl_leeren(self) -> dict:
+        """FM-51 Scheibe B: der „Löschen"-Knopf des Programmers fuer die Auswahl.
+
+        * nichts gewaehlt -> der GANZE Programmer (Bestand);
+        * ganze Geraete und Kopf-Geraete -> das ganze Geraet (BUG-CLEAR-
+          Entscheidung: eine Kopf-Zeile ist eine Verfeinerung der
+          Geraeteauswahl, beim Aufraeumen ist „mehr" die sichere Richtung);
+        * NUR ueber Weiss gewaehlte Geraete -> genau die gewaehlten Segment-
+          Schluessel; RGB, die uebrigen Segmente und der geteilte Master bleiben.
+
+        ★ Spiegelung: der DMX-Flush gibt ``color_w`` (Segment 0) auf jedes
+        Weiss-Vorkommen ohne eigenen Wert aus. Wuerde ein Nicht-Basis-Segment
+        einfach entfernt, waehrend ``color_w`` steht, leuchtete es danach mit
+        dem Wert von Segment 0 weiter. Darum wird es in diesem Fall auf 0
+        VERANKERT statt entfernt; ohne stehendes ``color_w`` (oder wenn Segment
+        0 mit geleert wird) wird es wirklich entfernt. Umgekehrt werden beim
+        Leeren von Segment 0 die NICHT gewaehlten Segmente ohne eigenen Wert
+        vorher auf den bisher gespiegelten ``color_w``-Wert verankert — sonst
+        gingen sie mit aus.
+
+        Alles als EIN Verlaufsschritt. Rueckgabe ``{"geraete": n, "segmente": m}``."""
+        from . import programmer_verlauf as _pv
+        with _pv.schritt(self, "Löschen"):
+            if self.auswahl_ist_leer():
+                self.clear_programmer()
+                return {"geraete": 0, "segmente": 0}
+            geraete = list(self.selected_fids)
+            for fid in geraete:
+                self.clear_programmer(fid)
+            segmente = 0
+            for fid in self.nur_weiss_fids():
+                segs = sorted(self.selected_weiss_for(fid))
+                basis = self.weiss_programmer_key(fid, 0)
+                prog = self.programmer.get(fid) or {}
+                basis_bleibt = bool(basis) and basis in prog and 0 not in segs
+                if basis and basis in prog and 0 in segs:
+                    # ★ Basis-Segment wird geleert: jedes NICHT gewaehlte
+                    # Segment ohne eigenen Schluessel gab bisher ``color_w``
+                    # ueber die Flush-Spiegelung aus und ginge nach dem
+                    # Entfernen mit aus. Vorher auf genau diesen Wert
+                    # verankern — im selben Verlaufsschritt.
+                    wert = int(prog.get(basis, 0) or 0)
+                    for k, other in enumerate(self.weiss_alle_keys(fid)):
+                        if k in segs or other == basis or other in prog:
+                            continue
+                        self.set_programmer_value(fid, other, wert)
+                for seg in segs:
+                    key = self.weiss_programmer_key(fid, seg)
+                    if not key:
+                        continue
+                    segmente += 1
+                    if key == basis or not basis_bleibt:
+                        self._clear_programmer_attr(fid, key)
+                    else:
+                        self.set_programmer_value(fid, key, 0)
+            return {"geraete": len(geraete), "segmente": segmente}
+
+    def auswahl_umfang(self) -> tuple[int, int]:
+        """FM-51 Scheibe B: ``(ganze/Kopf-Geraete, nur-weiss-Segmente)`` der
+        Auswahl — fuer die Beschriftung des „Löschen"-Knopfs."""
+        segmente = 0
+        for fid in self.nur_weiss_fids():
+            segmente += sum(1 for s in self.selected_weiss_for(fid)
+                            if self.weiss_programmer_key(fid, s))
+        return len(self.selected_fids), segmente
 
     # ── Gruppen-Auflösung (zentral; von VC SELECT_GROUP / GROUP_DIMMER genutzt) ──
     def _group_positions(self, name_or_ref):
@@ -4821,6 +4985,17 @@ def white_grid_for(fixture) -> tuple:
     ein selbstgebautes Panel mit 48 Zonen und EINEM globalen Weiss-Kanal bekam
     so eine volle Leiste quer ueber die Mitte, gefahren von ``heads[0].cw``."""
     return _mode_raster_for(fixture, "white_rows", "white_cols")
+
+
+def _kopf_index_of_key(attr: str) -> int:
+    """Kopf-Index eines Programmer-Schluessels: ``"color_r"`` -> 0,
+    ``"color_r#2"`` -> 2 (die ``attr#N``-Konvention des Programmers)."""
+    if "#" in str(attr):
+        try:
+            return int(str(attr).rsplit("#", 1)[1])
+        except ValueError:
+            return 0
+    return 0
 
 
 def get_channels_for_patched(fixture: PatchedFixture):
