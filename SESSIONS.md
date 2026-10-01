@@ -11,7 +11,6 @@
 |---|---|---|---|---|
 | TOOL-3 | C | fix/tool3-generator-pfade | 2026-10-01T21:11Z | tools/build_full_show.py · tools/build_spot90_testshow.py · tools/_profil.py · tools/README.md · tests/test_tool3_generator_annahmen.py · BACKLOG.md |
 | PROC-08 | C | fix/proc08-blocker-verfall | 2026-10-01T21:24Z | tools/session_claim.py · COORDINATION.md · tests/test_proc08_blocker_verfall.py · changelog.d/2026-10-02-PROC-08.md |
-| ENG-27 | C | fix/eng27-open-value | 2026-10-01T21:27Z | src/core/app_state.py · src/core/all_white.py · src/core/engine/efx.py |
 | FM-46 | C | docs/fm46-befund | 2026-10-01T21:35Z | BACKLOG.md |
 | DOC-14 | C | fix/doc14-schaukasten-19 | 2026-10-01T21:37Z | tools/build_vc_widgets_showcase.py · docs/anleitung_vc_widgets/README.md · docs/anleitung_vc_widgets/_capture/geometry.json · tests/test_doc14_schaukasten_alle_typen.py · changelog.d/2026-10-02-DOC-14.md |
 | DOC-20 | A | docs/doc20-anleitungs-gifs | 2026-10-01T22:24Z | tools/anleitungsbilder · docs/ANLEITUNGSBILDER.md |
@@ -176,7 +175,6 @@
 
 ## Verlauf
 
-- 2026-10-01T20:41Z A claim BPM-25
 - 2026-10-01T21:00Z C claim TOOL-5
 - 2026-10-01T21:03Z C claim TOOL-4
 - 2026-10-01T21:03Z A claim VCB-11
@@ -206,3 +204,4 @@
 - 2026-10-01T23:12Z A claim VIZ-65
 - 2026-10-01T23:27Z A done BPM-25
 - 2026-10-01T23:41Z A done DOC-19
+- 2026-10-01T23:55Z C done ENG-27
