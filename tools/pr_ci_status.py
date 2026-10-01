@@ -31,6 +31,10 @@ Unterscheidung nicht anbot. Deshalb ein Werkzeug und kein weiterer Absatz.
   * ein Ergebnis, das nicht SUCCESS/SKIPPED/NEUTRAL ist
   * ein unbekanntes Ergebnis  -> lieber melden als raten
 
+**Ausnahme (XPLAT-41):** Checks aus ``tools/_ci_beobachtend.py`` (Legs mit
+``continue-on-error``) zaehlen weder als rot noch als "laeuft noch"; ihr
+Zustand steht nur als Hinweis in der Begruendung.
+
 **Abhilfe, wenn gar kein Lauf angelegt wurde** (von Sitzung A am 03.09. zweimal
 erfolgreich gefahren, ohne Force-Push): ``main`` IN den Zweig mergen. Das
 erzeugt frische SHAs, laesst sich normal pushen, und GitHub legt dafuer einen
@@ -40,8 +44,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
+
+# XPLAT-41: die Liste der nur beobachtenden Checks — dieselbe wie in pr_bereit.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _ci_beobachtend  # noqa: E402
 
 #: Ergebnisse, die einen abgeschlossenen Check nicht rot machen. SKIPPED und
 #: NEUTRAL sind bewusst dabei: ein bedingt uebersprungener Job ist kein
@@ -71,11 +80,18 @@ def bewerte(checks) -> tuple[bool, str]:
         return False, ("KEINE Checks am PR. Das ist NICHT gruen, sondern "
                        "ungeprueft (PROC-10).\n" + KEIN_LAUF_HINWEIS)
 
-    offen, rot, unbekannt = [], [], []
+    offen, rot, unbekannt, beobachtet = [], [], [], []
+    pflicht = 0
     for eintrag in checks:
         name = str(eintrag.get("name") or eintrag.get("context") or "<ohne Namen>")
         status = str(eintrag.get("status") or eintrag.get("state") or "").upper()
         ergebnis = str(eintrag.get("conclusion") or "").upper()
+        if _ci_beobachtend.ist_beobachtend(name):
+            # XPLAT-41: continue-on-error-Leg — ihr Check-Run waere sonst rot
+            # bzw. "laeuft noch" bis zum Timeout. Nur Hinweis, kein Urteil.
+            beobachtet.append((name, _ci_beobachtend.zustand(status, ergebnis)))
+            continue
+        pflicht += 1
         if status in LAEUFT_NOCH or (status and status != "COMPLETED" and not ergebnis):
             offen.append(f"{name} ({status or 'ohne Status'})")
         elif ergebnis in OK_ERGEBNISSE:
@@ -85,13 +101,20 @@ def bewerte(checks) -> tuple[bool, str]:
         else:
             unbekannt.append(f"{name} (Status {status or '?'}, ohne Ergebnis)")
 
+    zusatz = _ci_beobachtend.hinweis(beobachtet)
+    zusatz = f"\n  {zusatz}" if zusatz else ""
+    if pflicht == 0:
+        # Nur beobachtende Checks am PR: die blockierenden fehlen — ungeprueft.
+        return False, ("KEINE blockierenden Checks am PR. Das ist NICHT gruen, "
+                       "sondern ungeprueft (PROC-10).\n" + KEIN_LAUF_HINWEIS + zusatz)
     if offen:
-        return False, "Noch nicht fertig: " + ", ".join(offen)
+        return False, "Noch nicht fertig: " + ", ".join(offen) + zusatz
     if rot:
-        return False, "Fehlgeschlagen: " + ", ".join(rot)
+        return False, "Fehlgeschlagen: " + ", ".join(rot) + zusatz
     if unbekannt:
-        return False, ("Unklares Ergebnis, im Zweifel rot: " + ", ".join(unbekannt))
-    return True, f"{len(checks)} Check(s), alle erfolgreich."
+        return False, ("Unklares Ergebnis, im Zweifel rot: " + ", ".join(unbekannt)
+                       + zusatz)
+    return True, f"{pflicht} Check(s), alle erfolgreich." + zusatz
 
 
 def hole_checks(pr: str, repo: str | None = None):

@@ -11,10 +11,12 @@ jobs:
   # und README/INSTALL nennen es ausdruecklich unterstuetzt — geprueft hat das
   # bisher aber keine Automatik, nur lokale Laeufe auf genau einem Rechner.
   #
-  # Diese Leg faehrt bewusst die VOLLE Suite, nicht die 5 Smoke-Dateien des
-  # Windows-Jobs: auf Linux gibt es dafuer den segmentierten Runner (ein Prozess
-  # je Testdatei, XPLAT-11), und genau der ist auf Windows nicht verfuegbar. Der
-  # Linux-Job ist damit der breitere von beiden.
+  # Diese Leg faehrt bewusst die VOLLE Suite segmentiert (ein Prozess je
+  # Testdatei, XPLAT-11), nicht die handverlesene Liste des Windows-x64-Smokes.
+  # Den segmentierten Runner gibt es seit XPLAT-WIN auch fuer Windows
+  # (tools/verify_segmented.ps1); in der CI faehrt ihn bisher nur die NICHT
+  # blockierende ARM64-Leg (`windows-arm`, XPLAT-41). Blockierend ist die volle
+  # Suite damit nur hier — der Linux-Job ist der breiteste.
   #
   # NICHT `pytest tests/` aufrufen: die Suite in EINEM Prozess stirbt auf Linux
   # reproduzierbar an akkumulierendem nativem Qt-Zustand (XPLAT-11). verify_loop.sh
@@ -204,3 +206,96 @@ jobs:
           LIGHTOS_HARDEN_EXIT_ALL: "1"
         run: |
           python -m pytest tests/test_show_file.py tests/test_core_engine.py tests/test_show_lint.py tests/test_render_contract_props.py tests/test_views.py tests/test_anleitungsbilder.py::WindowsHomeTest tests/test_anleitungsbilder.py::SandboxRiegelTest -v --tb=short
+
+  # XPLAT-41: Windows auf ARM64 (Snapdragon) — requirements.txt verspricht das,
+  # geprueft hat es bisher keine Automatik. Die Leg faehrt die VOLLE Suite mit
+  # dem segmentierten Windows-Runner auf einem echten ARM-Runner, mit nativem
+  # ARM64-Python (architecture: arm64; ohne das liefe x64-Python unter
+  # Emulation und die ARM64-Wheels blieben ungeprueft).
+  #
+  # ★ ZUNAECHST NICHT BLOCKIEREND (continue-on-error). Belegt ist nur, dass es
+  # PySide6-Essentials/-Addons als win_arm64-Wheels gibt (cp310-abi3, laeuft
+  # also auch unter 3.14). Offen ist, ob python-rtmidi (C-Extension, ggf. Bau
+  # aus den Quellen) und QtWebEngine ohne GPU auf dem Runner laufen. Auswertung
+  # nach einer Woche Laeufen (BACKLOG XPLAT-41): gruen genug -> scharf schalten
+  # (continue-on-error raus, tests/test_ci_windows_legs.py anpassen), sonst die
+  # Befunde als eigene Items.
+  #
+  # Abhaengigkeiten wie in der Linux-Leg ins venv/ (verify_segmented.ps1 sucht
+  # genau venv\Scripts\python.exe) und VOLL aus requirements*.txt — nicht die
+  # Kernauswahl des x64-Smokes: die volle Suite importiert Flask, python-osc,
+  # soundcard usw. python-rtmidi (C-Extension) und die optionalen winrt-Pakete
+  # (MIDI 2.0) kommen in einen EIGENEN Schritt, damit ein fehlgeschlagener Bau
+  # die Leg nicht vor dem ersten Test beendet — genau das ist eine der offenen
+  # Fragen, also soll die Antwort im Log stehen.
+  windows-arm:
+    name: Windows-ARM64 — volle Suite (segmentiert, beobachtend)
+    runs-on: windows-11-arm
+    timeout-minutes: 90
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 3.14 gibt es fuer win32-arm64 im Manifest von actions/python-versions
+      # (stabil seit 3.14.0) — die neueste stabile Linie.
+      - name: Python 3.14 (ARM64) einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          architecture: arm64
+          cache: pip
+
+      - name: venv + Abhaengigkeiten (ohne native Optionale)
+        shell: pwsh
+        run: |
+          # Ohne das bricht pwsh bei einem fehlgeschlagenen pip NICHT ab, und
+          # der Schritt waere gruen, solange nur der LETZTE Befehl klappt.
+          $PSNativeCommandUseErrorActionPreference = $true
+          python -c "import platform, sys; print(sys.version); print('Maschine:', platform.machine())"
+          python -m venv venv
+          venv\Scripts\python.exe -m pip install --upgrade pip
+          # python-rtmidi + winrt herausfiltern -> eigener Schritt unten.
+          Get-Content requirements.txt | Where-Object { $_ -notmatch '^\s*(python-rtmidi|winrt-)' } |
+            Set-Content -Encoding utf8 "$env:RUNNER_TEMP\requirements-kern.txt"
+          venv\Scripts\python.exe -m pip install -r "$env:RUNNER_TEMP\requirements-kern.txt"
+          venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+
+      - name: python-rtmidi + winrt (offene Frage, darf scheitern)
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          Get-Content requirements.txt | Where-Object { $_ -match '^\s*(python-rtmidi|winrt-)' } |
+            Set-Content -Encoding utf8 "$env:RUNNER_TEMP\requirements-nativ.txt"
+          venv\Scripts\python.exe -m pip install -r "$env:RUNNER_TEMP\requirements-nativ.txt"
+          venv\Scripts\python.exe -c "import rtmidi; print('python-rtmidi OK', rtmidi.__file__)"
+
+      - name: WebEngine-Import gegenpruefen (offene Frage, darf scheitern)
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          venv\Scripts\python.exe -c "import PySide6, platform; from PySide6 import QtWebEngineWidgets; print('QtWebEngine OK', PySide6.__version__, platform.machine())"
+
+      # LIGHTOS_HARDEN_EXIT_ALL wie in den anderen Legs (PROC-04): os._exit nach
+      # dem echten Ergebnis, ueberspringt den flaky nativen Abbau. Maskiert
+      # keine Failures. QT_QPA_PLATFORM=offscreen setzt das Skript selbst.
+      # -j 4: der Parameter heisst -Jobs (Alias -j), windows-11-arm hat 4 Kerne.
+      - name: Volle Suite (segmentiert)
+        shell: pwsh
+        env:
+          LIGHTOS_HARDEN_EXIT_ALL: "1"
+        run: |
+          pwsh tools/verify_segmented.ps1 -j 4
+
+      - name: Segment-Logs bei Fehlschlag hochladen
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-arm-segment-logs
+          path: .pytest_segments/
+          retention-days: 7
+          # Versteckter Pfad -> ohne das laedt v4.4+ NICHTS hoch (PROC-02b).
+          include-hidden-files: true
+          if-no-files-found: warn

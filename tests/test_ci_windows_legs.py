@@ -1,4 +1,4 @@
-"""Waechter: was die Windows-Legs der CI wirklich fahren (XPLAT-40).
+"""Waechter: was die Windows-Legs der CI wirklich fahren (XPLAT-40, XPLAT-41).
 
 Warum es diesen Waechter gibt
 -----------------------------
@@ -13,6 +13,13 @@ Smoke. Dieser Waechter haelt fest, dass sie dort BLEIBEN, und dass jedes Ziel
 der Liste existiert — ein Tippfehler in einem Pfad liesse pytest sonst mit
 "file or directory not found" abbrechen, ein falscher Klassenname mit
 "no tests ran" (beides faellt erst auf GitHub auf).
+
+XPLAT-41 ergaenzt eine Windows-ARM64-Leg (Job ``windows-arm``), die zunaechst
+NICHT blockiert. Der Waechter haelt ihre Eckdaten fest: echter ARM-Runner,
+ARM64-Python (nicht x64 unter Emulation — dann pruefte die Leg nichts), der
+segmentierte Runner mit einem Parameter, den ``tools/verify_segmented.ps1``
+wirklich kennt, ein Timeout, und ``continue-on-error``, solange die Leg nur
+beobachtet.
 
 Zum Parser
 ----------
@@ -228,6 +235,139 @@ class WindowsSmokeTest(unittest.TestCase):
 
     def test_alle_smoke_ziele_existieren(self):
         self.assertEqual(kaputte_ziele(self.ziele), [])
+
+
+ARM_JOB = "windows-arm"
+SEGMENT_PS1 = os.path.join(REPO, "tools", "verify_segmented.ps1")
+
+
+def job_schluessel(job_zeilen: list[str], schluessel: str) -> str | None:
+    """Wert eines Schluessels direkt auf Job-Ebene (Einrueckung 4)."""
+    for z in job_zeilen:
+        if _einrueckung(z) == 4 and z.strip().startswith(schluessel + ":"):
+            return z.strip()[len(schluessel) + 1:].split(" #", 1)[0].strip().strip("'\"")
+    return None
+
+
+def with_werte(job_zeilen: list[str], action: str) -> dict[str, str]:
+    """``with:``-Werte des ersten Schritts, der ``action`` benutzt."""
+    for i, z in enumerate(job_zeilen):
+        if "uses:" not in z or action not in z:
+            continue
+        tiefe = _einrueckung(z)
+        werte, im_with = {}, False
+        for zj in job_zeilen[i + 1:]:
+            if not zj.strip() or zj.lstrip().startswith("#"):
+                continue
+            t = _einrueckung(zj)
+            if t < tiefe or (t == tiefe - 2 and zj.lstrip().startswith("- ")):
+                break
+            if t == tiefe:
+                im_with = zj.strip() == "with:"
+                continue
+            if im_with and t > tiefe:
+                k, _, v = zj.strip().partition(":")
+                werte[k] = v.split(" #", 1)[0].strip().strip("'\"")
+        return werte
+    return {}
+
+
+def ps1_parameter(pfad: str = SEGMENT_PS1) -> set[str]:
+    """Namen + Aliase aus dem ``param(...)``-Block, klein geschrieben."""
+    with open(pfad, encoding="utf-8") as f:
+        quelle = f.read()
+    m = re.search(r"^param\((.*?)^\)", quelle, re.M | re.S)
+    if not m:
+        return set()
+    block = m.group(1)
+    namen = {n.lower() for n in re.findall(r"\$(\w+)", block)}
+    for aliase in re.findall(r"\[Alias\(([^)]*)\)\]", block):
+        namen |= {a.strip().strip("'\"").lower() for a in aliase.split(",")}
+    return namen
+
+
+def segment_aufrufe(job_zeilen: list[str]) -> list[list[str]]:
+    """Argumente jedes ``verify_segmented.ps1``-Aufrufs im Job."""
+    aufrufe = []
+    for z in job_zeilen:
+        if "verify_segmented.ps1" not in z or z.lstrip().startswith("#"):
+            continue
+        teile = z.strip().split()
+        ab = next(i for i, t in enumerate(teile) if "verify_segmented.ps1" in t) + 1
+        aufrufe.append(teile[ab:])
+    return aufrufe
+
+
+def unbekannte_schalter(argumente: list[str], bekannt: set[str]) -> list[str]:
+    return [a for a in argumente
+            if a.startswith("-") and a[1:].lower() not in bekannt]
+
+
+class WindowsArmParserTest(unittest.TestCase):
+    _MUSTER = """
+jobs:
+  windows-arm:
+    runs-on: windows-11-arm
+    timeout-minutes: 90
+    continue-on-error: true  # beobachtet nur
+    steps:
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          architecture: arm64
+      - name: Suite
+        run: pwsh tools/verify_segmented.ps1 -j 4
+"""
+
+    def test_liest_job_eckdaten(self):
+        job = ci_jobs(self._MUSTER)[ARM_JOB]
+        self.assertEqual(job_schluessel(job, "runs-on"), "windows-11-arm")
+        self.assertEqual(job_schluessel(job, "continue-on-error"), "true")
+        self.assertEqual(job_schluessel(job, "timeout-minutes"), "90")
+        self.assertEqual(with_werte(job, "actions/setup-python"),
+                         {"python-version": "3.14", "architecture": "arm64"})
+        self.assertEqual(segment_aufrufe(job), [["-j", "4"]])
+
+    def test_param_block_des_echten_skripts(self):
+        p = ps1_parameter()
+        self.assertIn("jobs", p)
+        self.assertIn("j", p)
+        self.assertNotIn("parallel", p)
+
+    def test_unbekannter_schalter_wird_gemeldet(self):
+        self.assertEqual(unbekannte_schalter(["-Parallel", "4", "-j", "4"],
+                                             {"jobs", "j"}), ["-Parallel"])
+
+
+class WindowsArmJobTest(unittest.TestCase):
+    """XPLAT-41 — an der ECHTEN ci.yml."""
+
+    def setUp(self):
+        self.job = ci_jobs(_ci_text()).get(ARM_JOB)
+        self.assertIsNotNone(self.job, f"Job '{ARM_JOB}' fehlt in ci.yml")
+
+    def test_laeuft_auf_echtem_arm_runner_mit_arm64_python(self):
+        self.assertEqual(job_schluessel(self.job, "runs-on"), "windows-11-arm")
+        py = with_werte(self.job, "actions/setup-python")
+        self.assertEqual(py.get("architecture"), "arm64",
+                         "ohne arm64 laeuft x64-Python unter Emulation — die "
+                         "Leg pruefte dann die ARM64-Wheels gar nicht")
+        self.assertTrue(py.get("python-version", "").startswith("3."))
+
+    def test_faehrt_den_segmentierten_runner_mit_gueltigen_schaltern(self):
+        aufrufe = segment_aufrufe(self.job)
+        self.assertTrue(aufrufe, "verify_segmented.ps1 wird nicht aufgerufen")
+        bekannt = ps1_parameter()
+        for args in aufrufe:
+            self.assertEqual(unbekannte_schalter(args, bekannt), [], args)
+
+    def test_beobachtet_nur_und_hat_ein_timeout(self):
+        # Solange XPLAT-41 nicht ausgewertet ist, darf die Leg keinen PR
+        # blockieren. Wer sie scharf schaltet, passt diesen Test bewusst an.
+        self.assertEqual(job_schluessel(self.job, "continue-on-error"), "true")
+        t = job_schluessel(self.job, "timeout-minutes")
+        self.assertTrue(t and t.isdigit() and 0 < int(t) <= 180, t)
 
 
 if __name__ == "__main__":
