@@ -465,6 +465,26 @@ def _r_unsicher(cap, det, m, o, now):
         None, key="unsicher")
 
 
+def beats_stumm(det) -> bool:
+    """BPM-25: eingerastet (nicht pausiert, Takt nicht unsicher), aber das Beat-Raster
+    widerspricht den juengsten Onsets (``DetectorSnapshot.phase_ok`` False, ``AGREE_N``
+    Widersprueche in Folge): ``beat_due`` zaehlt weiter, feuert aber nicht — im
+    AUTO-Audio-Modus laufen dann KEINE Beats. Vorher stand dabei „EINGERASTET"."""
+    return (_g(det, "state", "") == "locked" and not _pausiert(det) and not unsicher(det)
+            and not bool(_g(det, "phase_ok", True)))
+
+
+def _r_beats_stumm(cap, det, m, o, now):
+    if m.kind not in AUDIO_KINDS or not beats_stumm(det):
+        return None
+    # stabil: phase_ok kippt pro Pruefung (~0,1 s) — erst nach AN_S zeigen, AUS_S halten
+    return StatusLine(
+        "hinweis", f"Eingerastet — {_bpm(float(_g(det, 'bpm', 0.0)))} BPM · Beats stumm",
+        "das Beat-Raster passt nicht zu den Schlägen (Tempowechsel?), es werden keine Beats gesendet",
+        "fängt sich meist von selbst — sonst TAP einmal auf dem Beat tippen",
+        None, key="beats_stumm", stabil=True)
+
+
 def _r_halbtempo(cap, det, m, o, now):
     if m.kind not in AUDIO_KINDS or _g(det, "state", "") != "locked" or _pausiert(det):
         return None
@@ -557,7 +577,7 @@ _RULES = (
     _r_ereignis, _r_aufnahme, _r_audio_fehlt, _r_monitor, _r_capture_fehler, _r_capture_gestoppt,
     _r_kein_signal, _r_sink_fehlt, _r_clip, _r_brumm, _r_leise, _r_jitter, _r_dc,
     _r_os2l, _r_song, _r_aus, _r_eingefroren, _r_manuell,
-    _r_unsicher, _r_halbtempo, _r_pause, _r_kein_takt, _r_sucht, _r_ok,
+    _r_unsicher, _r_beats_stumm, _r_halbtempo, _r_pause, _r_kein_takt, _r_sucht, _r_ok,
 )
 
 
@@ -575,6 +595,10 @@ ZUSTAND_PRAEMISSE = {
     "kein_takt": lambda det: _g(det, "state", "") == "searching",
     "halbtempo": lambda det: (_g(det, "state", "") == "locked" and not _pausiert(det)
                               and not unsicher(det)),
+    # BPM-25: Lock weg, Pause oder Takt unsicher -> sofort weg; ein wieder passendes Raster
+    # (phase_ok True) dagegen nur ueber die Aus-Hysterese (phase_ok kippt pro Pruefung)
+    "beats_stumm": lambda det: (_g(det, "state", "") == "locked" and not _pausiert(det)
+                                and not unsicher(det)),
 }
 # Angezeigte Statuszeilen, bei denen das Zustandswort „KEIN SIGNAL" heisst (BPM-23, Review):
 # das Wort folgt der ENTPRELLTEN Zeile statt eines eigenen Pegelvergleichs — sonst blitzte
@@ -705,6 +729,46 @@ def chips(cap_snap, det_snap) -> set[str]:
     return out
 
 
+class BeatsStummHysterese:
+    """BPM-25 (Review): entprellter Zustand „Beats stumm" fuer das Zustandswort,
+    UNABHAENGIG von der angezeigten Statuszeile. Die Zeile zeigt eine frueher
+    stabile Stoerung (LEISE, BRUMM, AUSSETZER, DC, CLIP …) weiter, waehrend die
+    Beats verstummen — folgte das Wort nur der Zeile, stand es dann gruen auf
+    EINGERASTET. Gleiche Hysterese wie die Regel (``AN_S`` an, ``AUS_S`` aus);
+    faellt die Voraussetzung (``ZUSTAND_PRAEMISSE``: Lock weg, Pause, Takt
+    unsicher) oder ist die Quelle kein Audio, sofort aus. Uhr kommt per ``now``."""
+
+    def __init__(self, an_s: float = AN_S, aus_s: float = AUS_S):
+        self.an_s, self.aus_s = float(an_s), float(aus_s)
+        self.reset()
+
+    def reset(self) -> None:
+        self._an = False
+        self._seit: float | None = None      # roh stumm seit (Kandidat)
+        self._zuletzt = 0.0                  # zuletzt roh stumm gesehen
+
+    @property
+    def an(self) -> bool:
+        return self._an
+
+    def update(self, det, now: float, audio: bool = True) -> bool:
+        t = float(now)
+        if not audio or det is None or not ZUSTAND_PRAEMISSE["beats_stumm"](det):
+            self.reset()
+            return False
+        if beats_stumm(det):
+            if self._seit is None:
+                self._seit = t
+            self._zuletzt = t
+            if not self._an and t - self._seit >= self.an_s:
+                self._an = True
+        else:
+            self._seit = None
+            if self._an and t - self._zuletzt >= self.aus_s:
+                self._an = False
+        return self._an
+
+
 @dataclass
 class ChipHysterese:
     """Je Chip: sichtbar nach ``an_s`` durchgehender Bedingung, weg nach ``aus_s`` ohne."""
@@ -740,5 +804,5 @@ class ChipHysterese:
         self._sichtbar.clear()
 
 
-__all__ = ["zahl", "aufgeloest", "unsicher", "KEIN_SIGNAL_KEYS", "StatusLine", "MgrState", "Os2lState", "status_line", "StatusHysterese", "chips",
+__all__ = ["zahl", "aufgeloest", "unsicher", "beats_stumm", "KEIN_SIGNAL_KEYS", "StatusLine", "MgrState", "Os2lState", "status_line", "StatusHysterese", "BeatsStummHysterese", "chips",
            "ChipHysterese", "ereignis_oktave", "ereignis_aufnahme", "ereignis"]

@@ -103,6 +103,7 @@ Analysefenster von rund sechs Sekunden Musik, bevor sie Beats meldet. Solange st
 | **KEIN SIGNAL** (grau) | Es kommt nichts Brauchbares an — die Statuszeile sagt dazu „Kein Signal" (Pegel unter −60 dBFS), „Wartet auf Signal" oder einen Audio-Fehler. Auch direkt nach dem Start, solange die Musik noch nicht läuft. |
 | **SUCHT** (orange) | Signal ist da, das Analysefenster füllt sich bzw. es wird noch kein stabiler Takt gefunden. **Auch:** der Takt ist unsicher geworden (Konfidenz seit ½ s unter 15 %, Statuszeile „Takt unsicher") — das alte Tempo läuft dann noch weiter; kommt kein klarer Beat zurück, gibt die Erkennung es nach etwa 2 s frei. Bei ganz gleichmäßigem Klang ohne jeden Anschlag (Fläche im Breakdown) hält sie das Tempo, bis wieder Beats kommen. |
 | **EINGERASTET** (grün) | Tempo steht, die Beats laufen, der Takt ist sicher (Konfidenz ab 15 %) und es kommt genug Signal an. |
+| **EINGERASTET · BEATS STUMM** (orange) | Tempo steht, aber das Beat-Raster passt seit mindestens 2 s nicht zu den gehörten Schlägen (meist nach einem Tempowechsel) — die Erkennung sendet so lange **keine Beats**. Fängt sich meist von selbst; sonst TAP einmal auf dem Beat tippen. |
 | **PAUSE · hält 128** (grün) | Die Musik ist still, das letzte Tempo wird **gehalten**; die Beats pausieren, bis die Musik zurückkommt. |
 | **MANUELL** | Du gibst das Tempo vor (TAP, Nudge, Manuell-Knopf). |
 | **OS2L** / **OS2L · wartet auf DJ-Software** | Quelle OS2L — verbunden bzw. noch kein DJ-Programm verbunden. |
@@ -347,6 +348,7 @@ Pegel **Stille**, Zustandswort **KEIN SIGNAL**. Die große Zahl zeigt noch das l
 | **Sucht Tempo** — N s Musik gehört, Fenster braucht ~6 s | läuft gerade an | warten; schneller: TAP im Takt |
 | **Kein Takt gefunden** — Signal da, aber kein stabiles Tempo seit N s | Musik ohne klaren Beat, Sprache | TAP viermal tippen — oder Aufnahme machen |
 | **Takt unsicher** — Konfidenz N %, das Tempo … läuft noch weiter | der Beat ist weg (Ansage, Breakdown, Liedende), das alte Tempo läuft noch | nichts, wenn gleich wieder Beat kommt — sonst TAP im Takt |
+| **Eingerastet — N BPM · Beats stumm** — das Beat-Raster passt nicht zu den Schlägen | Raster und Musik laufen auseinander (meist nach einem Tempowechsel), die Beats sind stumm | nichts, fängt sich meist von selbst — sonst TAP einmal auf dem Beat |
 | **Pause** — Tempo … gehalten, die Beats pausieren … | Musik ist still | nichts zu tun |
 | **Eingerastet — … ähnlich plausibel** | Halb-/Doppeltempo möglich | ×½ bzw. ×2 klicken |
 | **Ausgabegerät nicht gefunden** | gemerktes Gerät fehlt, es wird die Standardausgabe mitgehört | Gerät anstecken oder ein vorhandenes wählen |
