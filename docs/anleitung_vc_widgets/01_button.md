@@ -155,6 +155,14 @@ Beide tragen unten den roten Balken der Blackout-Aktion. Was „Blackout Links�
 
 Wash 1 (ab Kanal 41) war im Bild ohnehin aus; bei ihm ginge nur der Dimmer auf 0, Pan und Tilt (128) bleiben stehen.
 
+Als Ablauf — vorher, gedrückt, losgelassen; hier ist auch der Dimmer beider Washes voll, rechts oben der Ausschnitt der Virtual Console:
+
+![Ablauf: „Blackout Links“ drücken und loslassen, DMX-Monitor](img/04_blackout_links_ablauf.gif)
+
+1. Die Taste **Blackout Links** — im mittleren Bild gedrückt.
+2. PAR 1–4 (Kanäle 1–16) gehen auf 0, solange die Taste gehalten wird, und sind nach dem Loslassen sofort wieder hell.
+3. Der Dimmer von Wash 1 (Kanal 43) ebenso; Wash 2 (Kanal 50) leuchtet durchgehend weiter.
+
 - **Gruppen** werden zur Laufzeit aufgelöst: wird die Gruppe geändert (Gruppen-Ansicht oder Live View), folgt auch eine gerade gehaltene Taste. Enthält die Gruppe nur einzelne **Köpfe** eines Mehrkopf-Geräts (z. B. Kopf 2 und 3 einer Pixelbar), gehen nur diese Köpfe dunkel; gemeinsame Kanäle wie ein Master-Dimmer bleiben — wie beim Submaster pro Kopf. Alle Köpfe zusammen zählen als ganzes Gerät.
 - **Mehrere Tasten** überlagern sich: lässt man eine los, bleiben die Geräte der anderen dunkel.
 - **Loslassen, Taste löschen, Bank wechseln, Show laden** geben den Teil-Blackout frei — es bleibt nichts hängen. Wechselt nur die Hauptansicht oder wird das Fenster minimiert, während ein MIDI-Pad gehalten ist, bleibt es dunkel (wie beim globalen Blackout).

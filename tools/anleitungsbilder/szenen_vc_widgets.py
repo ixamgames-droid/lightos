@@ -7,6 +7,10 @@ stammen aus ``tools/capture_vc_widgets.py`` und einer eigenen Showcase-Show;
 hier entstehen nur die Bilder mit Nummer ``NN_``, die die Doku-Demo-Show
 brauchen (Gruppen und Geraete fuer das Blackout-Ziel, VCB-11).
 
+``04_blackout_links_ablauf.gif`` (DOC-20) zeigt denselben Vorgang als
+Ablauf: vorher, „Blackout Links" gedrueckt, losgelassen. Ueber dem DMX-Monitor
+steht dafuer ein Ausschnitt der Virtual Console mit den beiden Tasten.
+
 Die Szenen legen zwei Blackout-Tasten auf Bank 1 der Doku-Demo an und raeumen
 sie in der letzten Szene wieder ab — bei ``--alle`` sollen nachfolgende
 Anleitungen die Doku-Demo unveraendert sehen.
@@ -16,7 +20,7 @@ Der Einstellungsdialog der Taste ist modal (``VCButton._open_properties`` ruft
 Ereignis-Loop nimmt ihn auf und schliesst ihn mit „Cancel" — es wird also
 nichts uebernommen.
 """
-from anleitungsbilder.runner import Szene, SzenenFehler
+from anleitungsbilder.runner import Frame, Szene, SzenenFehler
 from anleitungsbilder.szenen_erste_schritte import bild, feld, knopf, rechteck
 
 ZIEL = "docs/anleitung_vc_widgets/img"
@@ -168,6 +172,106 @@ def _loslassen(ui):
     _monitor_zurueck(ui)
     _tasten_weg(ui)
 
+# ── 4: Ablauf als GIF (DOC-20) ──────────────────────────────────────────────
+
+def _wash1_dimmer(ui) -> int:
+    """DMX-Adresse des Dimmer-Kanals von Wash 1 (Universum 1)."""
+    from src.core.app_state import get_channels_for_patched
+    wash1 = ui.info["washes"][0]
+    for f in ui.state.get_patched_fixtures():
+        if f.fid != wash1:
+            continue
+        for c in get_channels_for_patched(f):
+            if (getattr(c, "attribute", "") or "") == "intensity":
+                return f.address + c.channel_number - 1
+    raise SzenenFehler("Wash 1 hat keinen Dimmer-Kanal")
+
+
+def _ablauf_vorher(ui):
+    """PAR 1–4 rot, PAR 5–8 blau, beide Washes mit Dimmer voll; Tasten da."""
+    from anleitungsbilder.szenen_ausgabe_einrichten import _werte_setzen
+    _tasten_anlegen(ui)
+    _werte_setzen(ui)
+    ui.wert(ui.info["washes"], "intensity", 255)
+    ui.waehle([])
+
+
+def _druecken(gedrueckt: bool):
+    def schritt(ui):
+        """Wie eine MIDI-Note/ein Hotkey: Tastenzustand + echter ``_trigger``."""
+        taste = _taste(ui, _LINKS)
+        taste._pressed = gedrueckt
+        taste._trigger(gedrueckt)
+        taste.update()
+        ziel = bool(ui.state.output_manager.target_blackout_slots())
+        if ziel != gedrueckt:
+            raise SzenenFehler("„Blackout Links“ setzt/loest den Ziel-Blackout nicht")
+    schritt.__name__ = "druecken" if gedrueckt else "loslassen"
+    return schritt
+
+
+def _ablauf_bild(*, taste: bool, kanaele: bool):
+    """DMX-Monitor (oberer Streifen) mit eingesetztem VC-Ausschnitt rechts
+    oben; Kreis 1 auf „Blackout Links“, Kreis 2 auf PAR 1–4, Kreis 3 auf
+    den Dimmer von Wash 1."""
+    def bauen(ui):
+        from PySide6.QtCore import QPoint, QRect
+        from PySide6.QtGui import QColor, QPainter
+        from PySide6.QtWidgets import QLabel
+        from anleitungsbilder import marker
+        from anleitungsbilder.szenen_ausgabe_einrichten import (
+            STREIFEN_H, frame_wie_ausgabe, platz_ueber_raster, zellen)
+        from anleitungsbilder.szenen_erste_schritte import kreise_malen
+        w = ui.win
+        # VC-Ausschnitt: beide Tasten mit etwas Rand.
+        ui.sektion("Virtual Console")
+        ui.pump(0.2)
+        links = rechteck(w, _taste(ui, _LINKS))
+        alles = rechteck(w, _taste(ui, _ALLES))
+        vc_rect = links.united(alles).adjusted(-24, -14, 24, 14)
+        vc_pix = w.grab(vc_rect)
+        # DMX-Monitor mit dem Frame, den die Ausgabe senden wuerde.
+        ui.sektion("E/A")
+        ui.reiter("DMX Monitor")
+        frame_wie_ausgabe(ui)
+        dm = w._dmx_monitor_view
+        with platz_ueber_raster(ui):
+            ui.pump(0.2)
+            frei = marker.hindernisse(w) + [rechteck(w, dm._grid)]
+            pix = w.grab()
+            raster = rechteck(w, dm._grid)
+            # Einsatz rechts ueber dem Raster, neben der Legende.
+            pos = QPoint(BREITE_EINSATZ_RECHTS - vc_pix.width(),
+                         raster.top() - vc_pix.height() - 40)
+            p = QPainter(pix)
+            p.drawPixmap(pos, vc_pix)
+            p.setPen(QColor("#59636e"))
+            p.drawRect(QRect(pos.x() - 1, pos.y() - 1,
+                             vc_pix.width() + 1, vc_pix.height() + 1))
+            p.end()
+            einsatz = QRect(pos.x() - 1, pos.y() - 1,
+                            vc_pix.width() + 2, vc_pix.height() + 2)
+            frei = marker.ohne(frei, einsatz)
+            frei.append(QRect(alles.translated(pos - vc_rect.topLeft())))
+            kreise = []
+            if taste:
+                kreise.append((links.translated(pos - vc_rect.topLeft()), 1, "links"))
+            if kanaele:
+                kreise.append((zellen(ui, 1, 16), 2, "oben"))
+                adr = _wash1_dimmer(ui)
+                kreise.append((zellen(ui, adr, adr), 3, "oben"))
+            kreise_malen(pix, kreise, frei)
+        pix = pix.copy(0, 0, pix.width(), STREIFEN_H)
+        flaeche = QLabel()
+        flaeche.setFixedSize(pix.width(), pix.height())
+        flaeche.setPixmap(pix)
+        return flaeche
+    return bauen
+
+
+BREITE_EINSATZ_RECHTS = 1588
+
+
 SZENEN = [
     Szene("01_blackout_ziel_dialog", sektion="Virtual Console",
           dialog=_bild_dialog,
@@ -179,4 +283,15 @@ SZENEN = [
           vorher=_links_gehalten, dialog=_bild_links, nachher=_loslassen,
           groesse=(1600, 325),
           titel="„Blackout Links“ gehalten: PAR 1–4 dunkel, PAR 5–8 leuchten"),
+    Szene("04_blackout_links_ablauf", sektion="E/A",
+          vorher=_ablauf_vorher, nachher=_loslassen,
+          groesse=(1600, 325),
+          frames=[
+              Frame(dauer_s=1.4, dialog=_ablauf_bild(taste=True, kanaele=False)),
+              Frame(dauer_s=1.6, schritt=_druecken(True),
+                    dialog=_ablauf_bild(taste=True, kanaele=True)),
+              Frame(dauer_s=1.4, schritt=_druecken(False),
+                    dialog=_ablauf_bild(taste=False, kanaele=True)),
+          ],
+          titel="GIF: „Blackout Links“ drücken und loslassen — DMX-Monitor"),
 ]

@@ -59,6 +59,11 @@ class Szene:
     * ``groesse``     Fenster- bzw. Dialoggroesse
     * ``braucht_gpu`` offscreen nicht darstellbar (3D) -> wird uebersprungen
     * ``beschriftungen`` Beschriftungen zusaetzlich ins Bild schreiben
+    * ``frames``      DOC-20: Liste von :class:`Frame` -> statt ``NN_name.png``
+      entsteht ``NN_name.gif`` (Endlosschleife, je Frame eigene Dauer)
+    * ``gif_breite``  GIF auf diese Breite verkleinern (``None`` = Originalgroesse)
+    * ``gif_zuschnitt`` ``(x, y, b, h)`` im aufgenommenen Bild: nur diesen
+      Bereich ins GIF (vor dem Verkleinern)
     """
     name: str
     sektion: int | str = 0
@@ -73,6 +78,40 @@ class Szene:
     groesse: tuple = (BREITE, HOEHE)
     braucht_gpu: bool = False
     beschriftungen: bool = False
+    frames: list = field(default_factory=list)
+    gif_breite: int | None = None
+    gif_zuschnitt: tuple | None = None
+
+    @property
+    def ist_gif(self) -> bool:
+        return bool(self.frames)
+
+    @property
+    def datei(self) -> str:
+        return f"{self.name}.gif" if self.ist_gif else f"{self.name}.png"
+
+
+@dataclass
+class Frame:
+    """DOC-20: ein Einzelbild eines GIFs.
+
+    * ``dauer_s``  Anzeigedauer im GIF (Sekunden, Standard 1,2 s)
+    * ``schritt``  ``f(ui)``: Bedienschritt VOR diesem Bild (Knopf druecken,
+      loslassen …). Die Frames laufen der Reihe nach im selben Fenster; der
+      Zustand des vorigen Frames bleibt stehen.
+    * ``marken``   wie ``Szene.marken``; ``None`` = die Marken der Szene
+    * ``dialog``   wie ``Szene.dialog``; ``None`` = der Dialog der Szene
+    * ``warte_s``  echte Wartezeit nach ``schritt`` vor dem Grab
+    """
+    dauer_s: float = 1.2
+    schritt: Callable | None = None
+    marken: list | None = None
+    dialog: Callable | None = None
+    warte_s: float = 0.3
+
+
+GIF_LIMIT = 2 * 1024 * 1024          # harte Obergrenze je GIF
+GIF_ZIEL = 1024 * 1024               # darueber: Hinweis im Lauf
 
 
 # ── Szenen-Dateien finden ───────────────────────────────────────────────────
@@ -212,10 +251,7 @@ def _hindernisse(quelle, versatz):
     return aus
 
 
-def aufnehmen(ui: UI, szene: Szene):
-    """Stellt die Szene her und liefert ``(QPixmap, marken_info)``."""
-    from PySide6.QtCore import QRect
-    from . import marker
+def _vorbereiten(ui: UI, szene: Szene) -> None:
     ui.win.resize(*(szene.groesse if szene.dialog is None else (BREITE, HOEHE)))
     ui.sektion(szene.sektion)
     if szene.unterreiter:
@@ -223,10 +259,53 @@ def aufnehmen(ui: UI, szene: Szene):
     if szene.vorher:
         szene.vorher(ui)
     ui.pump(szene.warte_s)
+
+
+def _nachher(ui: UI, szene: Szene) -> None:
+    if szene.nachher:
+        szene.nachher(ui)
+        ui.pump(0.1)
+
+
+def aufnehmen(ui: UI, szene: Szene):
+    """Stellt die Szene her und liefert ``(QPixmap, marken_info)``."""
+    _vorbereiten(ui, szene)
+    try:
+        return _grab(ui, szene, szene.dialog, szene.marken)
+    finally:
+        _nachher(ui, szene)
+
+
+def aufnehmen_frames(ui: UI, szene: Szene):
+    """DOC-20: GIF-Szene herstellen, je Frame Schritt + Grab.
+
+    Liefert ``(pixmaps, dauern_ms, marken_info_je_frame)``."""
+    _vorbereiten(ui, szene)
+    try:
+        bilder, dauern, infos = [], [], []
+        for fr in szene.frames:
+            if fr.schritt is not None:
+                fr.schritt(ui)
+            ui.pump(fr.warte_s)
+            pix, info = _grab(ui, szene,
+                              fr.dialog if fr.dialog is not None else szene.dialog,
+                              fr.marken if fr.marken is not None else szene.marken)
+            bilder.append(pix)
+            dauern.append(int(round(fr.dauer_s * 1000)))
+            infos.append(info)
+        return bilder, dauern, infos
+    finally:
+        _nachher(ui, szene)
+
+
+def _grab(ui: UI, szene: Szene, dialog_fn, marken_liste):
+    """Ein Bild aufnehmen (Fenster, Ausschnitt oder Dialog) und markieren."""
+    from PySide6.QtCore import QRect
+    from . import marker
     dlg = None
     try:
-        if szene.dialog is not None:
-            dlg = szene.dialog(ui)
+        if dialog_fn is not None:
+            dlg = dialog_fn(ui)
             dlg.resize(*szene.groesse)
             dlg.show()
             ui.pump(max(0.5, szene.warte_s))
@@ -241,7 +320,7 @@ def aufnehmen(ui: UI, szene: Szene):
             elif a is not None:
                 quelle = ui.finde(a)
         marken = []
-        for eintrag in szene.marken:
+        for eintrag in marken_liste:
             finder, nr = eintrag[0], eintrag[1]
             text = eintrag[2] if len(eintrag) > 2 else ""
             lage = eintrag[3] if len(eintrag) > 3 else None
@@ -260,9 +339,18 @@ def aufnehmen(ui: UI, szene: Szene):
             dlg.close()
             dlg.deleteLater()
             ui.pump(0.1)
-        if szene.nachher:
-            szene.nachher(ui)
-            ui.pump(0.1)
+
+
+def pil_bild(pix):
+    """QPixmap -> PIL-Bild (RGB)."""
+    from PySide6.QtCore import QBuffer, QByteArray, QIODevice
+    from PIL import Image
+    ba = QByteArray()
+    buf = QBuffer(ba)
+    buf.open(QIODevice.OpenModeFlag.WriteOnly)
+    pix.toImage().save(buf, "PNG")
+    buf.close()
+    return Image.open(io.BytesIO(bytes(ba))).convert("RGB")
 
 
 def png_bytes(pix) -> bytes:
@@ -271,19 +359,108 @@ def png_bytes(pix) -> bytes:
     UI-Bilder haben wenige Flaechenfarben; 256 Palettenfarben ohne Dithering
     sehen aus wie das Original und landen bei 1600 x 900 unter 150 KB.
     """
-    from PySide6.QtCore import QBuffer, QByteArray, QIODevice
     from PIL import Image
-    ba = QByteArray()
-    buf = QBuffer(ba)
-    buf.open(QIODevice.OpenModeFlag.WriteOnly)
-    pix.toImage().save(buf, "PNG")
-    buf.close()
-    bild = Image.open(io.BytesIO(bytes(ba))).convert("RGB")
+    bild = pil_bild(pix)
     pal = bild.quantize(colors=256, method=Image.Quantize.MEDIANCUT,
                         dither=Image.Dither.NONE)
     aus = io.BytesIO()
     pal.save(aus, "PNG", optimize=True)
     return aus.getvalue()
+
+
+class GifZuGross(SzenenFehler):
+    """Ein GIF liegt ueber :data:`GIF_LIMIT`."""
+
+
+def gif_bytes(bilder, dauern_ms, *, breite: int | None = None,
+              zuschnitt: tuple | None = None, limit: int = GIF_LIMIT) -> bytes:
+    """DOC-20: PIL-Bilder (RGB) -> GIF mit Endlosschleife.
+
+    * ``zuschnitt`` ``(x, y, b, h)``: nur diesen Bereich (vor dem Verkleinern)
+    * ``breite``: auf diese Breite verkleinern (Lanczos), nie vergroessern
+    * EINE gemeinsame Palette (Median-Cut ueber alle Frames, ohne Dithering):
+      gleiche Flaechen behalten in jedem Frame denselben Index, Pillow
+      speichert ab Frame 2 nur das geaenderte Rechteck — ein UI-GIF mit drei
+      Frames bleibt so bei wenigen hundert KB. Ohne Dithering flimmert
+      nichts, und gleiche Eingabe ergibt byte-gleiche Ausgabe.
+    * ueber ``limit`` -> :class:`GifZuGross` mit der Groesse.
+    """
+    from PIL import Image
+    if not bilder:
+        raise SzenenFehler("GIF ohne Frames")
+    if len(bilder) != len(dauern_ms):
+        raise SzenenFehler("GIF: Anzahl Frames und Dauern verschieden")
+    rgb = []
+    for b in bilder:
+        b = b.convert("RGB")
+        if zuschnitt is not None:
+            x, y, w, h = zuschnitt
+            b = b.crop((x, y, x + w, y + h))
+        if breite and b.width > breite:
+            hoehe = max(1, round(b.height * breite / b.width))
+            b = b.resize((breite, hoehe), Image.Resampling.LANCZOS)
+        rgb.append(b)
+    if len({b.size for b in rgb}) != 1:
+        raise SzenenFehler(f"GIF-Frames haben verschiedene Groessen: "
+                           f"{sorted({b.size for b in rgb})}")
+    w, h = rgb[0].size
+    gesamt = Image.new("RGB", (w, h * len(rgb)))
+    for i, b in enumerate(rgb):
+        gesamt.paste(b, (0, i * h))
+    palette = gesamt.quantize(colors=256, method=Image.Quantize.MEDIANCUT,
+                              dither=Image.Dither.NONE)
+    frames = [b.quantize(palette=palette, dither=Image.Dither.NONE) for b in rgb]
+    aus = io.BytesIO()
+    frames[0].save(aus, "GIF", save_all=True, append_images=frames[1:],
+                   duration=[int(d) for d in dauern_ms], loop=0, optimize=True,
+                   disposal=1)
+    daten = aus.getvalue()
+    if len(daten) > limit:
+        raise GifZuGross(f"GIF ist {len(daten) / 1024 / 1024:.2f} MB gross "
+                         f"(Grenze {limit / 1024 / 1024:.1f} MB) — weniger Frames, "
+                         "gif_breite kleiner oder gif_zuschnitt setzen")
+    return daten
+
+
+def gif_frames(quelle):
+    """GIF (Pfad oder Bytes) -> ``[(RGB-Bild, dauer_ms)]``, je Frame voll
+    zusammengesetzt (Pillow setzt Teil-Frames beim ``seek`` selbst zusammen)."""
+    from PIL import Image, ImageSequence
+    datei = io.BytesIO(quelle) if isinstance(quelle, (bytes, bytearray)) else quelle
+    with Image.open(datei) as im:
+        return [(f.convert("RGB"), int(f.info.get("duration", 0)))
+                for f in ImageSequence.Iterator(im)]
+
+
+def gif_fast_gleich(alt_pfad: str, neu: bytes, *, schwelle: int = 48,
+                    anteil: float = 0.0005) -> bool:
+    """Wie :func:`fast_gleich`, fuer GIFs: gleiche Frame-Zahl, gleiche Dauern
+    und jeder Frame unter der Schwelle."""
+    from PIL import ImageChops
+    if not os.path.exists(alt_pfad):
+        return False
+    try:
+        a = gif_frames(alt_pfad)
+        b = gif_frames(neu)
+    except Exception:
+        return False
+    if len(a) != len(b):
+        return False
+    for (fa, da), (fb, db) in zip(a, b):
+        if da != db or fa.size != fb.size:
+            return False
+        diff = ImageChops.difference(fa, fb).convert("L").point(
+            lambda v: 255 if v > schwelle else 0)
+        if diff.histogram()[255] >= anteil * fa.size[0] * fa.size[1]:
+            return False
+    return True
+
+
+def ist_gleich(pfad: str, neu: bytes) -> bool:
+    """PNG oder GIF je nach Endung unter der Unveraendert-Schwelle?"""
+    if pfad.endswith(".gif"):
+        return gif_fast_gleich(pfad, neu)
+    return fast_gleich(pfad, neu)
 
 
 def schrift(win) -> str:
@@ -403,14 +580,24 @@ def lauf(auftraege, *, sb, pruefen: bool = False, ausgabe: str | None = None,
         for szene in szenen:
             if nur and szene.name not in nur:
                 continue
-            datei = f"{szene.name}.png"
+            datei = szene.datei
             if szene.braucht_gpu and os.environ.get("QT_QPA_PLATFORM") == "offscreen":
                 print(f"[anleitungsbilder] {anleitung}/{datei}: UEBERSPRUNGEN — braucht "
                       "eine GPU (3D/WebGL bleibt offscreen schwarz).", flush=True)
                 continue
+            gif_info = None
             try:
-                pix, marken = aufnehmen(ui, szene)
-                daten = png_bytes(pix)
+                if szene.ist_gif:
+                    pixe, dauern, marken = aufnehmen_frames(ui, szene)
+                    daten = gif_bytes([pil_bild(p) for p in pixe], dauern,
+                                      breite=szene.gif_breite,
+                                      zuschnitt=szene.gif_zuschnitt)
+                    groesse = gif_frames(daten)[0][0].size
+                    gif_info = {"frames": len(pixe), "dauern_ms": dauern}
+                else:
+                    pix, marken = aufnehmen(ui, szene)
+                    daten = png_bytes(pix)
+                    groesse = (pix.width(), pix.height())
             except SzenenFehler as e:
                 print(f"[anleitungsbilder] {anleitung}/{datei}: FEHLER — {e}", flush=True)
                 fehler += 1
@@ -418,7 +605,7 @@ def lauf(auftraege, *, sb, pruefen: bool = False, ausgabe: str | None = None,
                     return 2
                 continue
             pfad = os.path.join(ziel, datei)
-            if fast_gleich(pfad, daten):
+            if ist_gleich(pfad, daten):
                 with open(pfad, "rb") as f:
                     daten = f.read()
                 hinweis = " (unveraendert)"
@@ -431,17 +618,21 @@ def lauf(auftraege, *, sb, pruefen: bool = False, ausgabe: str | None = None,
                 im_repo = os.path.join(REPO, ziel_rel, datei)
                 if not os.path.exists(im_repo):
                     hinweis = f" (fehlt noch in {ziel_rel}/)"
-                elif fast_gleich(im_repo, daten):
+                elif ist_gleich(im_repo, daten):
                     hinweis = " (wie im Repo)"
                 else:
                     hinweis = " (weicht vom Stand im Repo ab — neu rendern?)"
-            print(f"[anleitungsbilder] {anleitung}/{datei}: {pix.width()}x{pix.height()}, "
+            if gif_info is not None and len(daten) > GIF_ZIEL:
+                hinweis += " — Hinweis: ueber 1 MB, Ausschnitt/Breite pruefen"
+            print(f"[anleitungsbilder] {anleitung}/{datei}: {groesse[0]}x{groesse[1]}, "
                   f"{len(daten) // 1024} KB{hinweis}", flush=True)
             eintraege[datei] = {
                 "datei": datei, "szene": szene.name, "titel": szene.titel,
-                "groesse": [pix.width(), pix.height()], "marken": marken,
+                "groesse": list(groesse), "marken": marken,
                 "md5": md5,
             }
+            if gif_info is not None:
+                eintraege[datei].update(gif_info)
         if not pruefen:
             manifest = {
                 "anleitung": anleitung,

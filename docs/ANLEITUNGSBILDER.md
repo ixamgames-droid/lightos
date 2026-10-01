@@ -27,6 +27,7 @@ Ein Lauf dauert rund 12 Sekunden (davon 5–6 Sekunden für Fenster und Demo-Sho
 | `tools/anleitungsbilder/marker.py` | roter Rahmen und Nummernkreis, freie Lage für den Kreis |
 | `tools/anleitungsbilder/szenen_<anleitung>.py` | die Szenen einer Anleitung |
 | `docs/<anleitung>/img/NN_name.png` | die Bilder |
+| `docs/<anleitung>/img/NN_name.gif` | animierte Abläufe (Szenen mit `frames`, siehe [GIFs](#gifs)) |
 | `docs/<anleitung>/img/bilder.json` | Manifest: Szene, Titel, Bildgröße, Markierungen, md5, Schrift, git-Stand |
 
 ## Datenschutz: die Sandbox
@@ -107,6 +108,9 @@ Felder einer `Szene`:
 | `groesse` | Fenster- bzw. Dialoggröße, Standard 1600 × 900 |
 | `braucht_gpu` | 3D-Visualizer: wird offscreen mit Meldung übersprungen |
 | `beschriftungen` | Beschriftung zusätzlich als Schild ins Bild schreiben |
+| `frames` | Liste von `Frame`: statt einer PNG entsteht ein GIF (siehe [GIFs](#gifs)) |
+| `gif_breite` | GIF auf diese Breite verkleinern, z. B. `1200` (nie vergrößern) |
+| `gif_zuschnitt` | `(x, y, b, h)` im aufgenommenen Bild: nur diesen Bereich ins GIF |
 
 Ein **Finder** ist ein `objectName`, der sichtbare Text eines Knopfs oder einer
 Beschriftung („…" und „..." gelten als gleich) oder eine Funktion `f(ui) -> QWidget`.
@@ -140,6 +144,72 @@ venv/bin/python tools/anleitungsbilder.py <anleitung>
 
 Jedes Bild vor dem Commit ansehen: sinnvoller Inhalt, keine Pfade oder Namen, keine
 abgeschnittenen Texte.
+
+## GIFs
+
+Ein Ablauf (Knopf drücken → Wirkung → loslassen) wird als animiertes GIF gezeigt.
+Eine GIF-Szene ist eine normale `Szene` mit einer Liste `frames`; jeder `Frame` ist
+ein Einzelbild mit eigener Anzeigedauer. `vorher` stellt den Ausgangszustand her, dann
+laufen die Frames der Reihe nach im selben Fenster: erst `schritt(ui)` (der
+Bedienschritt), dann die Aufnahme. `nachher` räumt nach dem letzten Frame auf.
+
+```python
+from anleitungsbilder.runner import Frame, Szene
+
+def _go(ui):
+    ui.win._playback_view._go()        # echter Weg wie der Knopf
+
+SZENEN = [
+    Szene("13_go_ablauf", sektion="Playback", unterreiter="Playback",
+          vorher=_liste_ohne_executor, nachher=_aufraeumen,
+          gif_breite=1200,
+          frames=[
+              Frame(dauer_s=1.5, marken=[("GO", 1, "GO")]),
+              Frame(dauer_s=2.2, schritt=_go,
+                    marken=[("GO", 1, "GO"), (_hinweis, 2, "Hinweis")]),
+              Frame(dauer_s=1.8, schritt=_go, marken=[("GO", 1, "GO")]),
+          ]),
+]
+```
+
+Felder eines `Frame`:
+
+| Feld | Bedeutung |
+|---|---|
+| `dauer_s` | Anzeigedauer im GIF, Standard 1,2 s (1–2 s je Frame lesen sich gut) |
+| `schritt` | `f(ui)`: Bedienschritt vor diesem Bild; der Zustand des vorigen Frames bleibt stehen |
+| `marken` | wie `Szene.marken`; `None` = die Marken der Szene. Üblich: Kreis auf dem Knopf, der als Nächstes gedrückt wird |
+| `dialog` | wie `Szene.dialog` (z. B. ein zusammengesetztes Bild); `None` = der Dialog der Szene |
+| `warte_s` | echte Wartezeit nach `schritt`, Standard 0,3 s |
+
+Was das Werkzeug daraus macht:
+
+- **Eine Palette für alle Frames** (256 Farben, Median-Cut, ohne Dithering). Gleiche
+  Flächen behalten so in jedem Frame denselben Farbindex, und ab dem zweiten Frame
+  speichert das GIF nur das geänderte Rechteck. Nichts flimmert.
+- **Endlosschleife**, je Frame die eigene Dauer.
+- `gif_zuschnitt` schneidet zuerst zu, `gif_breite` verkleinert danach (Lanczos).
+- **Größenbudget:** Ziel unter 1 MB, harte Grenze **2 MB** je GIF. Darüber bricht
+  die Szene mit `GIF ist … MB groß` ab; ab 1 MB steht im Lauf ein Hinweis. Ein
+  Vollbild-GIF mit drei Frames liegt bei 1200 px Breite um 100 KB. Wird es zu groß:
+  weniger Frames, auf den wichtigen Bereich zuschneiden, `gif_breite` kleiner.
+  Unter 1000 px Breite werden die Beschriftungen eines Vollbilds schwer lesbar —
+  dann lieber zuschneiden.
+- **Stabil:** Gleiche Eingabe ergibt ein byte-gleiches GIF. Weicht ein neu gerendertes
+  GIF nur unmerklich ab (gleiche Frame-Zahl und Dauern, je Frame unter derselben
+  Schwelle wie bei PNGs), bleibt die alte Datei liegen. `--pruefen` vergleicht GIFs
+  genauso.
+- Im Manifest `bilder.json` stehen zusätzlich `frames` (Anzahl) und `dauern_ms`;
+  `marken` ist dort eine Liste je Frame.
+
+Jedes GIF vor dem Commit ansehen — zum Beispiel in Einzelbilder zerlegen:
+
+```bash
+venv/bin/python -c "import sys; sys.path.insert(0, 'tools'); from anleitungsbilder import runner; [f.save(f'/tmp/frame{i}.png') for i, (f, _d) in enumerate(runner.gif_frames('docs/<anleitung>/img/NN_name.gif'))]"
+```
+
+`tests/test_anleitungsbilder.py` prüft außerdem, dass jedes GIF unter `docs/` höchstens
+2 MB groß ist.
 
 ## Ausgabe und Neu-Rendern
 

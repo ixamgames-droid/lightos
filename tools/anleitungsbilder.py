@@ -16,7 +16,8 @@ Windows (PowerShell/cmd) entsprechend::
 
     venv/Scripts/python tools/anleitungsbilder.py projektseite
 
-Ausgabe: ``docs/<anleitung>/img/NN_name.png`` + ``bilder.json`` (Manifest ohne
+Ausgabe: ``docs/<anleitung>/img/NN_name.png`` (bzw. ``.gif`` fuer Szenen mit
+``frames``, DOC-20) + ``bilder.json`` (Manifest ohne
 absolute Pfade). ``--pruefen`` schreibt nichts nach ``docs/`` — es rendert in
 die Sandbox und meldet, ob jede Szene noch baubar ist (Pixelgleichheit wird
 nicht verlangt: die Schrift ist rechnerabhaengig).
@@ -86,6 +87,8 @@ def main(argv=None) -> int:
             print(f"{n}  ->  {ziel}/")
             for s in szenen:
                 extra = " [braucht GPU]" if s.braucht_gpu else ""
+                if s.frames:
+                    extra += f" [GIF, {len(s.frames)} Frames]"
                 print(f"  {s.name:<22} {s.titel}{extra}")
         return 0
 
