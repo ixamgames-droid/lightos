@@ -62,6 +62,177 @@ class TafelFormatTest(unittest.TestCase):
         self.assertEqual([c["item"] for c in tafel["claims"]], ["OUT-51"])
 
 
+class _TafelRepos(unittest.TestCase):
+    """Bare-Repo + zwei Klone im Temp-Ordner — NIE die echte Tafel.
+
+    Eigene Basis statt ``EchtesRennenTest`` zu erben: sonst liefen dessen
+    Tests in jeder abgeleiteten Klasse ein zweites Mal.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="lightos_claim_")
+        self.bare = os.path.join(self.tmp, "origin.git")
+        _git("init", "--quiet", "--bare", self.bare)
+        self.a = self._klon("a")
+        self.b = self._klon("b")
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _klon(self, name):
+        pfad = os.path.join(self.tmp, name)
+        _git("clone", "--quiet", self.bare, pfad)
+        _git("config", "user.email", "test@example.invalid", repo=pfad)
+        _git("config", "user.name", "Test", repo=pfad)
+        return pfad
+
+    def _main(self, *argv):
+        """``sc.main`` mit eingefangenem stdout/stderr -> (rc, out, err)."""
+        import contextlib
+        import io
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            rc = sc.main(list(argv))
+        return rc, out.getvalue(), err.getvalue()
+
+
+class PfadVergleichTest(unittest.TestCase):
+    """PROC-16 — die reine Logik hinter der Ueberschneidungspruefung."""
+
+    def test_trenner_und_schreibweise_sind_egal(self):
+        self.assertTrue(sc.pfade_ueberlappen("src\\core\\x.py", "src/core/x.py"))
+        self.assertTrue(sc.pfade_ueberlappen("./src//core/x.py", "src/core/x.py"))
+        self.assertTrue(sc.pfade_ueberlappen("SRC/Core/X.py", "src/core/x.py"))
+
+    def test_ordner_umfasst_seinen_inhalt_in_beide_richtungen(self):
+        self.assertTrue(sc.pfade_ueberlappen("src/core/", "src/core/dmx/a.py"))
+        self.assertTrue(sc.pfade_ueberlappen("src/core/dmx/a.py", "src\\core"))
+
+    def test_praefix_nur_nach_ganzen_pfadteilen(self):
+        """``src/core`` ist nicht ``src/core_alt.py`` — sonst warnt jede
+        zweite Datei, und die Warnung wird uebergangen."""
+        self.assertFalse(sc.pfade_ueberlappen("src/core", "src/core_alt.py"))
+        self.assertFalse(sc.pfade_ueberlappen("src/a.py", "src/b.py"))
+
+    def test_verfallener_claim_und_identisches_item_zaehlen_nicht(self):
+        t = sc.jetzt()
+        frisch = sc.stempel(t - timedelta(minutes=10))
+        alt = sc.stempel(t - timedelta(hours=9))
+        tafel = {"claims": [
+            {"item": "X-1", "sitzung": "A", "branch": "a", "seit": frisch,
+             "dateien": "src/x.py"},
+            {"item": "X-2", "sitzung": "C", "branch": "c", "seit": alt,
+             "dateien": "src/x.py"},
+            {"item": "X-3", "sitzung": "B", "branch": "b", "seit": frisch,
+             "dateien": "docs/y.md · src/x.py"},
+        ], "blocker": [], "verlauf": []}
+        treffer = sc.ueberschneidungen(tafel, "A", "X-9", ["src/x.py"], t)
+        # X-1 gehoert derselben Sitzung A, ist aber ein ANDERES Item: zaehlt.
+        self.assertEqual([(c["item"], d) for c, d in treffer],
+                         [("X-1", ["src/x.py"]), ("X-3", ["src/x.py"])])
+        # Das identische Item ueberschneidet sich nicht mit sich selbst.
+        treffer = sc.ueberschneidungen(tafel, "A", "x-1", ["src/x.py"], t)
+        self.assertEqual([c["item"] for c, _ in treffer], ["X-3"])
+
+
+class UeberschneidungBeimClaimTest(_TafelRepos):
+    """★ PROC-16: ``claim`` hat ``--files`` nur gespeichert, nie verglichen.
+
+    Zwei Sitzungen konnten dieselbe Datei aus verschiedenen Items belegen, und
+    das Werkzeug meldete beiden Erfolg ohne ein Wort — der Konflikt fiel erst
+    beim Merge an (COORDINATION.md, Fall 4)."""
+
+    def test_zwei_claims_auf_dieselbe_datei_warnen(self):
+        self.assertEqual(self._main("--repo", self.a, "claim", "OUT-51",
+                                    "--session", "A", "--files",
+                                    "src/core/app_state.py")[0], 0)
+        rc, out, err = self._main("--repo", self.b, "claim", "QA-50",
+                                  "--session", "B", "--files",
+                                  "src\\core\\app_state.py")
+        self.assertEqual(rc, 0, "ohne --strikt nur warnen")
+        self.assertIn("Dateiueberschneidung", err)
+        self.assertIn("OUT-51", err)
+        self.assertIn("src/core/app_state.py", err)
+        # Ohne --strikt wird trotzdem belegt.
+        items = {c["item"] for c in sc.lade_tafel(self.a)[0]["claims"]}
+        self.assertEqual(items, {"OUT-51", "QA-50"})
+
+    def test_strikt_belegt_nicht_und_endet_mit_2(self):
+        self._main("--repo", self.a, "claim", "OUT-51", "--session", "A",
+                   "--files", "src/core/")
+        rc, out, err = self._main("--repo", self.b, "claim", "QA-50",
+                                  "--session", "B", "--strikt", "--files",
+                                  "src/core/dmx/output_manager.py")
+        self.assertEqual(rc, 2)
+        self.assertIn("OUT-51", err)
+        items = {c["item"] for c in sc.lade_tafel(self.a)[0]["claims"]}
+        self.assertEqual(items, {"OUT-51"}, "--strikt darf nicht schreiben")
+
+    def test_verfallener_fremder_claim_zaehlt_nicht(self):
+        self._main("--repo", self.a, "claim", "OUT-51", "--session", "A",
+                   "--files", "src/x.py")
+        tafel, eltern = sc.lade_tafel(self.a)
+        tafel["claims"][0]["seit"] = sc.stempel(sc.jetzt() - timedelta(hours=9))
+        sc.schreibe_tafel(self.a, tafel, eltern, "altern")
+        rc, out, err = self._main("--repo", self.b, "claim", "QA-50",
+                                  "--session", "B", "--strikt",
+                                  "--files", "src/x.py")
+        self.assertEqual(rc, 0)
+        self.assertNotIn("Dateiueberschneidung", err)
+
+    def test_eigenes_anderes_item_wird_als_hinweis_gemeldet(self):
+        """★ Die leitende Sitzung laesst mehrere Worktree-Agenten parallel
+        unter DERSELBEN Kennung arbeiten. Bis 2026-10-01 wurden eigene Claims
+        komplett uebersprungen — der haeufigste reale Konflikt blieb stumm."""
+        self._main("--repo", self.a, "claim", "OUT-51", "--session", "A",
+                   "--files", "src/x.py")
+        rc, out, err = self._main("--repo", self.a, "claim", "QA-50",
+                                  "--session", "A", "--files", "src/x.py")
+        self.assertEqual(rc, 0, "ohne --strikt nur Hinweis")
+        self.assertIn("eigenes Item OUT-51", err)
+        self.assertIn("src/x.py", err)
+        self.assertNotIn("fremden Claims", err, "eigene Kategorie, nicht fremd")
+        items = {c["item"] for c in sc.lade_tafel(self.a)[0]["claims"]}
+        self.assertEqual(items, {"OUT-51", "QA-50"})
+
+    def test_eigenes_anderes_item_zaehlt_bei_strikt(self):
+        self._main("--repo", self.a, "claim", "OUT-51", "--session", "A",
+                   "--files", "src/x.py")
+        rc, out, err = self._main("--repo", self.a, "claim", "QA-50",
+                                  "--session", "A", "--strikt",
+                                  "--files", "src/x.py")
+        self.assertEqual(rc, 2)
+        self.assertIn("eigenes Item OUT-51", err)
+        items = {c["item"] for c in sc.lade_tafel(self.a)[0]["claims"]}
+        self.assertEqual(items, {"OUT-51"}, "--strikt darf nicht schreiben")
+
+    def test_erneuter_claim_desselben_items_meldet_nichts(self):
+        self._main("--repo", self.a, "claim", "OUT-51", "--session", "A",
+                   "--files", "src/x.py")
+        rc, out, err = self._main("--repo", self.a, "claim", "OUT-51",
+                                  "--session", "A", "--strikt",
+                                  "--files", "src/x.py")
+        self.assertEqual(rc, 0)
+        self.assertNotIn("Dateiueberschneidung", err)
+
+    def test_ohne_files_wird_gewarnt_aber_belegt(self):
+        for files in ([], ["--files", "-"]):
+            item = f"QA-{len(files)}"
+            rc, out, err = self._main("--repo", self.a, "claim", item,
+                                      "--session", "A", *files)
+            self.assertEqual(rc, 0, files)
+            self.assertIn("ohne --files", err, files)
+
+    def test_refresh_warnt_nicht_wegen_fehlender_files(self):
+        self._main("--repo", self.a, "claim", "OUT-51", "--session", "A",
+                   "--files", "src/x.py")
+        rc, out, err = self._main("--repo", self.a, "refresh", "OUT-51",
+                                  "--session", "A")
+        self.assertEqual(rc, 0)
+        self.assertEqual(err, "")
+
+
 class VerfallTest(unittest.TestCase):
     def test_frischer_claim_gilt(self):
         t = datetime(2026, 8, 6, 14, 0, tzinfo=timezone.utc)
