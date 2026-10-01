@@ -11,6 +11,7 @@
 |---|---|---|---|---|
 | BPM-15 | B | (kein Code, Rig-Test) | 2026-10-01T13:46Z | - |
 | UI-64 | A | fix/buendel-ui64-ui65 | 2026-10-01T14:44Z | - |
+| UI-65 | A | fix/buendel-ui64-ui65 | 2026-10-01T14:44Z | - |
 
 ## Blocker & Fallen
 
@@ -134,7 +135,6 @@
 
 ## Verlauf
 
-- 2026-09-29T13:23Z A claim STAB-24
 - 2026-09-29T14:14Z A done STAB-24
 - 2026-09-29T14:14Z A claim FM-38
 - 2026-09-29T14:47Z A claim STAB-29
@@ -164,3 +164,4 @@
 - 2026-10-01T13:55Z A claim UI-66
 - 2026-10-01T14:44Z A done UI-66
 - 2026-10-01T14:44Z A claim UI-64
+- 2026-10-01T14:44Z A claim UI-65
