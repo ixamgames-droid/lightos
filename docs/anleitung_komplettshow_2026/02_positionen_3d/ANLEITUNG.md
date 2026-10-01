@@ -1,10 +1,10 @@
-# Positionen in der 2D-Live-View und im 3D-Visualizer
+# Positionen auf der 2D-Bühne und im 3D-Visualizer
 
-In dieser Anleitung lernst du, wie du deine Geräte in der 2D-Live-View auf der Bühnenfläche platzierst und die Positionen anschließend im 3D-Visualizer ansiehst. Grundlage ist die Show `shows/Komplettshow_2026.lshow`.
+In dieser Anleitung lernst du, wie du deine Geräte in der Sektion **Bühne** (2D-Ansicht) auf der Bühnenfläche platzierst und die Positionen anschließend im 3D-Visualizer ansiehst. Grundlage ist die Show `shows/Komplettshow_2026.lshow`.
 
 1. Öffne die Sektion **„Bühne"**.
 
-2. Beim Öffnen der Live-View sind bereits **alle 12 Geräte** an ihren fertigen 2D-Positionen platziert — die Show `Komplettshow_2026.lshow` enthält das gespeicherte Layout, du musst also nichts erst aufbauen. Möchtest du etwas anders stellen, ziehst du das jeweilige Gerät per Drag & Drop an die neue Zielposition.
+2. Beim Öffnen der Bühne sind bereits **alle 12 Geräte** an ihren fertigen 2D-Positionen platziert — die Show `Komplettshow_2026.lshow` enthält das gespeicherte Layout, du musst also nichts erst aufbauen. Möchtest du etwas anders stellen, ziehst du das jeweilige Gerät per Drag & Drop an die neue Zielposition.
 
 3. Das gespeicherte Layout sieht so aus:
    - Die **8 PAR** stehen nebeneinander in einer Reihe mittig auf der Bühne.
@@ -14,6 +14,8 @@ In dieser Anleitung lernst du, wie du deine Geräte in der 2D-Live-View auf der 
    Der Auto-Bogen (Halbkreis vor der Bühne) erscheint nur für **neu gepatchte** Geräte, die noch keine gespeicherte Position haben — bei dieser Show gibt es ihn daher nicht.
 
    ![Top-Down-Bühne: PAR-Reihe 1–8 mittig, MH 9/10 oben hinter PAR1/PAR8, Spider 11/12 unten vor PAR2/PAR6; „BÜHNE" oben, „PUBLIKUM" unten](img/01_live_view_2d_layout.png)
+
+   *Bild zeigt eine ältere Oberfläche: die Sektion links oben hieß damals „Live View“, heute **Bühne**; „Eingabe / Ausgabe“ heißt heute **E/A**.*
 
 4. Schalte oben rechts auf **„3D"** um. Die in der 2D-View platzierten Geräte erscheinen automatisch im 3D-Visualizer. Kamera-Steuerung im 3D:
    - **1-Finger- / Maus-Drag** = drehen

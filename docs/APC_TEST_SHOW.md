@@ -50,7 +50,7 @@ dann passt die Show 1:1.
 
 ### Laden
 1. **Playback → Show Manager** (oder Menü „Show öffnen") → `APC_Test_Komplett.lshow`.
-2. **Eingabe/Ausgabe → MIDI**: APC mini als Eingang aktiv (Backend WinMM).
+2. **E/A → MIDI**: APC mini als Eingang aktiv (Backend WinMM).
 3. **Virtual Console**: oben **„APC LEDs"** einschalten → die Pads leuchten.
 4. **Ausgabe → Konfiguration**: dein DMX‑Interface (Enttec/Art‑Net/sACN) auf Universe 1.
 

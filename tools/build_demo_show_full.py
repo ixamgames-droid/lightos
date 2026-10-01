@@ -133,18 +133,22 @@ state.base_levels = {fid: {"shutter": open_value_for(fx_of[fid], "shutter")}
 state.implicit_brightness = False
 state._rebuild_render_plan()
 
-# ── 2D-Live-View + 3D-Positionen (MH hinten hoch, Spider vorne tief) ──────────
-PX = {par_fids[i]: 230.0 + i * 105.0 for i in range(8)}
-lv = {fid: (PX[fid], 420.0) for fid in par_fids}
-lv[9] = (PX[par_fids[0]], 250.0); lv[10] = (PX[par_fids[7]], 250.0)
-lv[11] = (PX[par_fids[0]], 600.0); lv[12] = (PX[par_fids[7]], 600.0)
-state.live_view_positions = {fid: list(p) for fid, p in lv.items()}
+# ── Positionen (MH hinten hoch, Spider vorne tief) — EINE Quelle: 3D in Metern ──
+# DOC-17 (e): Die 2D-Bühne ist seit dem Szenengraphen nur noch eine PROJEKTION
+# der 3D-Weltposition (X/Z, coords.world3d_to_live). Frueher setzte dieser
+# Generator zuerst ein eigenes 2D-Layout (PARs bei x=230..965 px, y=420) und
+# DANACH visualizer_positions — die zweite Zuweisung ueberschrieb X/Z, das
+# 2D-Layout war toter Code (gemessen: gespeichert x=207..391 px, y=200). Deshalb
+# hier nur noch die 3D-Werte; die 2D-Lage ergibt sich daraus (wie in
+# build_mega_arena_2026.py). Kein state.live_view_positions zuweisen.
+PAR_SPACING_M = 105.0 / 80.0     # 1,3125 m Abstand (Werte wie bisher gespeichert)
+PAR_X0_M = -4.625                # PAR 1 links; Reihe ~mittig um x=0
+vz = {fid: (PAR_X0_M + i * PAR_SPACING_M, 0.0, 0.0) for i, fid in enumerate(par_fids)}
+vz[mh_fids[0]] = (vz[par_fids[0]][0], 6.0, -1.8); vz[mh_fids[1]] = (vz[par_fids[7]][0], 6.0, -1.8)
+vz[spider_fids[0]] = (vz[par_fids[0]][0], 0.6, 1.8); vz[spider_fids[1]] = (vz[par_fids[7]][0], 0.6, 1.8)
+state.visualizer_positions = {fid: tuple(p) for fid, p in vz.items()}
 state.live_view_meta = {"zoom": 1.0, "grid_size": 20, "snap": True,
                         "grid_visible": True, "world_w": 1200, "world_h": 800}
-vz = {fid: ((PX[fid] - 600.0) / 80.0, 0.0, 0.0) for fid in par_fids}
-vz[9] = (vz[par_fids[0]][0], 6.0, -1.8); vz[10] = (vz[par_fids[7]][0], 6.0, -1.8)
-vz[11] = (vz[par_fids[0]][0], 0.6, 1.8); vz[12] = (vz[par_fids[7]][0], 0.6, 1.8)
-state.visualizer_positions = {fid: tuple(p) for fid, p in vz.items()}
 state.active_stage_name = "simple"
 
 # ── Fixture-Gruppen (Effekt-Areale) ──────────────────────────────────────────
@@ -866,6 +870,16 @@ from src.core.engine.show_engine import Show
 
 fx = state.get_patched_fixtures()
 assert len(fx) == 12, f"Fixtures: {len(fx)}"
+
+# DOC-17 (e): 2D-Bühne = Projektion der 3D-Lage (keine zweite, abweichende Quelle).
+from src.core.stage.coords import world3d_to_live
+_lv, _vz = dict(state.live_view_positions), dict(state.visualizer_positions)
+for _fid in par_fids + mh_fids + spider_fids:
+    _ex = world3d_to_live(_vz[_fid][0], _vz[_fid][2])
+    assert all(abs(float(a) - b) < 0.01 for a, b in zip(_lv[_fid], _ex)), \
+        f"2D-Lage von {_fid} weicht von der 3D-Projektion ab: {_lv[_fid]} != {_ex}"
+assert _lv[mh_fids[0]][1] < _lv[par_fids[0]][1] < _lv[spider_fids[0]][1], \
+    "MH hinten / PAR Mitte / Spider vorne stimmt in der 2D-Bühne nicht"
 
 mats = [f for f in fm.all() if isinstance(f, RgbMatrixInstance)]
 color_m = [m for m in mats if m.style == MS.RGB and not m.drive_intensity]

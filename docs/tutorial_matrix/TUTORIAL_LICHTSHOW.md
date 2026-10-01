@@ -16,7 +16,7 @@ und **Helligkeit** als zwei **getrennte Ebenen** sauber übereinanderzulegen.
 ## Inhalt
 
 1. [Geräte patchen](#1-geräte-patchen)
-2. [In der Live‑View platzieren](#2-in-der-live-view-platzieren)
+2. [Auf der Bühne platzieren](#2-auf-der-bühne-platzieren)
 3. [Gruppen anlegen](#3-gruppen-anlegen)
 4. [Matrix‑Effekte – Farbe, Dimmer und beides als Ebenen](#4-matrix-effekte)
 5. [Chase (Lauflicht) live bauen](#5-chase-lauflicht-live-bauen)
@@ -60,14 +60,14 @@ Ergebnis – die Patch‑Tabelle: 8 PARs (Adressen 1, 5, 9 … 29) + 2 MH (33, 4
 
 ---
 
-## 2. In der Live-View platzieren
+## 2. Auf der Bühne platzieren
 
 In der Sektion **„Bühne"** ordnest du die Strahler so an, wie sie real auf
 der Bühne stehen. Hier: die 8 PARs als **4×2‑Block**, die 2 Moving Heads darüber.
-Die Live‑View zeigt **live** Farbe und Helligkeit jedes Geräts – das ist unser
+Die Bühne zeigt **live** Farbe und Helligkeit jedes Geräts – das ist unser
 „Monitor" für alle folgenden Effekte.
 
-![Live‑View mit 4×2‑Raster](web/02_liveview_grid.png)
+![Bühne mit 4×2‑Raster](web/02_liveview_grid.png)
 
 *(Alle Geräte stehen hier auf Weiß/100 % – das ist der Grundzustand der Show.)*
 
@@ -79,7 +79,7 @@ Gruppen fassen Geräte zusammen, damit Effekte „die ganze Gruppe" treffen.
 
 ### So legst du eine Gruppe an (live)
 
-1. In der Live‑View **`☑ Mehrfachauswahl`** aktivieren.
+1. In der Bühne **`☑ Mehrfachauswahl`** aktivieren.
 2. Mit der Maus ein **Auswahl‑Rechteck** über die 8 PARs ziehen → sie bekommen
    einen gelben Ring (Statuszeile: *„Selektion: 8 Fixtures"*).
 
@@ -165,7 +165,7 @@ sich nicht** – sie ergänzen sich:
 > **Farbe** kommt von Ebene 1, **Helligkeit** von Ebene 2 → bewegte Farbe **mit**
 > Helligkeits‑Welle.
 
-In der Live‑View erkennst du das am Badge **„FX2"** an jedem PAR: **zwei**
+Auf der Bühne erkennst du das am Badge **„FX2"** an jedem PAR: **zwei**
 Effekte treiben dasselbe Gerät (Farbe + Dimmer):
 
 ![Layering FX2 – Farbe + Dimmer](web/12_vc_layering_live.png)
@@ -307,7 +307,7 @@ Im selben Dialog (siehe Bild oben) gibt es zwei Schalter:
 ### e) Wie die Effekte zusammenwirken (Layering / Priorität)
 
 Mehrere Pads gleichzeitig sind erlaubt, solange sie **verschiedene Ebenen**
-treiben. In der Live‑View zeigt das Badge **FX2/FX3** an, wie viele Effekte ein
+treiben. Auf der Bühne zeigt das Badge **FX2/FX3** an, wie viele Effekte ein
 Gerät gerade bespielen:
 
 ![Pads gleichzeitig: Farbe + Dimmer = FX2](web/12_vc_layering_live.png)

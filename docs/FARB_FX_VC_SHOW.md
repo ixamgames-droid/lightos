@@ -12,6 +12,10 @@ Jeder Effekt hängt daran und hat einen **eigenen Multiplikator** (Speed-Dial-Gi
 `¼ ½ 1 2 3 4`). Ohne BPM laufen die Effekte in ihrem Eigentempo; sobald BPM da ist (Tap/Musik),
 rasten sie taktsynchron ein — jeder mit seinem Faktor (z. B. PAR-Farbe ×1, Spider ×2, MH ×½).
 
+![Multiplikator-Dial „PAR ×“ mit Faktor-Gitter neben der Master-BPM und dem Musik-BPM-Knopf](anleitung_farb_fx_vc/img/02_speeddial_factorgrid.png)
+
+*Ausschnitt Bank 1: oben die Master-BPM und **Musik-BPM**, darunter der Dial „PAR ×“ — Faktor im Gitter wählen, **-** / **+** gehen eine Stufe langsamer/schneller, **X** setzt auf 1× zurück.*
+
 ## Synchronisation — gleicher Schlag trotz verschiedener Tempi
 Oben (auf jeder Bank): **◆ SYNC** und **Auto-Sync**.
 - **Auto-Sync** (standardmäßig AN): neu gestartete Effekte übernehmen automatisch den

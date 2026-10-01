@@ -213,8 +213,10 @@ Das verbindliche Test-Gate des Loop-Modus laeuft ueber `tools/verify_loop.ps1`:
   > sind ausserdem kein Argument dagegen — der abgestuerzte Sammellauf brauchte
   > 26 min bis 83 %, das vollstaendige segmentierte Gate liegt in derselben
   > Groessenordnung und laeuft dafuer durch. **Nachgemessen ohne konkurrierende Last:
-  > das volle segmentierte Gate braucht mit `-j 3` rund 6,5 Minuten** — es ist also
-  > nicht nur robuster, sondern deutlich schneller als der Sammellauf.
+  > das volle segmentierte Gate brauchte damals mit `-j 3` rund 6,5 Minuten; mit der
+  > gewachsenen Suite sind es inzwischen rund 12 Minuten mit `LIGHTOS_VERIFY_JOBS=3`
+  > (Stand 2026-09/10)** — es ist also nicht nur robuster, sondern deutlich schneller
+  > als der Sammellauf. Im Hintergrund starten und weiterarbeiten.
   >
   > **Zwei Fallen beim Deuten eines roten Segments:**
   >

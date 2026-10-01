@@ -43,7 +43,7 @@ frei (kein manuelles „Clear" mehr nötig).
 
 ### Laden
 1. **Playback → Show Manager** → `Feature_Showcase.lshow`.
-2. **Eingabe/Ausgabe → MIDI**: APC mini als Eingang (Backend WinMM), VC → **„APC LEDs"** an.
+2. **E/A → MIDI**: APC mini als Eingang (Backend WinMM), VC → **„APC LEDs"** an.
 3. **Ausgabe → Konfiguration**: dein Interface auf Universe 1.
 
 ### Neu erzeugen (Generator)
@@ -203,7 +203,7 @@ Regen` (Seite 4, 2D). *Live Color‑Chase* (Seite 8) ist eine 18. Matrix‑Insta
 - **Effekt‑Aktionen:** `toggle_bounce`, `reverse_direction`, `toggle_freeze`,
   `clear_live_override`, `commit_live`, `clear_colors`, `next/prev_color`,
   `remove_color`, `add_color` (via Color‑Hinzufügen‑Kacheln).
-- **Live View:** 2D‑Positionen für alle 6 Geräte sind vorbelegt.
+- **Bühne:** 2D‑Positionen für alle 6 Geräte sind vorbelegt.
 
 ---
 
