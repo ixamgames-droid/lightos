@@ -129,6 +129,11 @@ def einrichten(basis: str | None = None) -> Sandbox:
     basis = os.path.realpath(basis or tempfile.mkdtemp(prefix="lightos_doku_"))
     p = {
         "HOME": os.path.join(basis, "home"),
+        # XPLAT-39 (Windows-Gate von B, 01.10.2026): expanduser("~") liest dort
+        # USERPROFILE, nicht HOME — ohne diese Umlenkung meldete die
+        # Selbstpruefung zu Recht "Sandbox undicht" und brach ab.
+        "USERPROFILE": os.path.join(basis, "home"),
+        "LOCALAPPDATA": os.path.join(basis, "localappdata"),
         "XDG_DATA_HOME": os.path.join(basis, "xdg", "data"),
         "XDG_CONFIG_HOME": os.path.join(basis, "xdg", "config"),
         "XDG_CACHE_HOME": os.path.join(basis, "xdg", "cache"),

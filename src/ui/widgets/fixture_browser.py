@@ -10,6 +10,33 @@ from src.core.database import fixture_db as fdb
 from src.core.database.models import FixtureProfile, PatchedFixture
 
 _UNIVERSE_MIN = 1
+
+#: UI-64(e): lesbare Typnamen fuer die „Typ"-Spalte. Die Datenbank fuehrt
+#: Bezeichner wie ``moving_head`` — in einer 80-px-Spalte wurde daraus
+#: „moving_h…". Unbekannte Typen bekommen per ``typ_anzeige`` einen
+#: lesbaren Rueckfall statt des rohen Bezeichners.
+_TYP_NAMEN = {
+    "moving_head": "Moving Head",
+    "par":         "PAR",
+    "led_bar":     "LED-Bar",
+    "par_bar":     "PAR-Bar",
+    "strobe":      "Strobe",
+    "dimmer":      "Dimmer",
+    "scanner":     "Scanner",
+    "laser":       "Laser",
+    "matrix":      "Matrix",
+    "smoke":       "Nebel",
+    "hazer":       "Hazer",
+    "other":       "Sonstiges",
+}
+
+
+def typ_anzeige(fixture_type: str | None) -> str:
+    """UI-64(e): Datenbank-Typ -> Anzeige-Text der „Typ"-Spalte."""
+    roh = (fixture_type or "").strip()
+    if not roh:
+        return ""
+    return _TYP_NAMEN.get(roh.lower(), roh.replace("_", " ").title())
 _UNIVERSE_MAX = 32
 
 
@@ -201,9 +228,10 @@ class FixtureBrowserDialog(QDialog):
             for f in fixtures:
                 mfr_name = f.manufacturer.name if f.manufacturer else "Unbekannt"
                 item = QTreeWidgetItem([
-                    f"{mfr_name} — {f.name}", f.fixture_type,
+                    f"{mfr_name} — {f.name}", typ_anzeige(f.fixture_type),
                     str(f.modes[0].channel_count) if f.modes else "?"
                 ])
+                item.setToolTip(1, f.fixture_type or "")
                 item.setData(0, Qt.ItemDataRole.UserRole, f.id)
                 self._tree.addTopLevelItem(item)
         else:
@@ -213,12 +241,32 @@ class FixtureBrowserDialog(QDialog):
                 fixtures = fdb.get_fixtures_by_manufacturer(mfr.id)
                 for f in fixtures:
                     ch = str(f.modes[0].channel_count) if f.modes else "?"
-                    child = QTreeWidgetItem([f.name, f.fixture_type, ch])
+                    child = QTreeWidgetItem([f.name, typ_anzeige(f.fixture_type), ch])
+                    child.setToolTip(1, f.fixture_type or "")
                     child.setData(0, Qt.ItemDataRole.UserRole, f.id)
                     mfr_item.addChild(child)
                 if fixtures:
                     self._tree.addTopLevelItem(mfr_item)
             self._tree.expandAll()
+        self._typ_spalte_anpassen()
+
+    def _typ_spalte_anpassen(self):
+        """UI-64(e): Typ-Spalte so breit wie ihr laengster Eintrag (nie
+        schmaler als die bisherigen 80 px), damit nichts mehr mit „…" endet.
+
+        Bewusst selbst gemessen statt ``resizeColumnToContents``: das sieht
+        nur die gerade sichtbaren Zeilen an, und bei rund 1800 Geraeten steht
+        der breiteste Typ selten oben."""
+        fm = self._tree.fontMetrics()
+        texte = {"Typ"}
+        stack = [self._tree.topLevelItem(i)
+                 for i in range(self._tree.topLevelItemCount())]
+        while stack:
+            it = stack.pop()
+            texte.add(it.text(1))
+            stack.extend(it.child(j) for j in range(it.childCount()))
+        breite = max(fm.horizontalAdvance(t) for t in texte) + 24
+        self._tree.setColumnWidth(1, max(80, breite))
 
     def _on_search(self, text: str):
         self._load_tree(text.strip())

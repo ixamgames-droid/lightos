@@ -1088,7 +1088,7 @@ class MainWindow(QMainWindow):
         self._section_btns[0].setChecked(True)
         self._stack.setCurrentIndex(0)
 
-        # Keyboard-Shortcuts fuer Sektionswechsel (Ctrl+1..6)
+        # Keyboard-Shortcuts fuer Sektionswechsel (Strg+1..8, eine je Sektion)
         for i, btn in enumerate(self._section_btns):
             act = QAction(f"Sektion {i+1}", self)
             act.setShortcut(f"Ctrl+{i+1}")

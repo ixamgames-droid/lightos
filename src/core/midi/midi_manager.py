@@ -207,11 +207,22 @@ class MidiManager:
         except Exception:
             pass
 
-    def open_input(self, port_name: str):
+    def open_input(self, port_name: str) -> bool:
+        """Eingang oeffnen. Liefert True, wenn der Port danach offen ist.
+
+        UI-65: ein fehlerhaftes ALSA-Backend (``rtmidi.MidiIn()`` wirft) darf
+        den Klick in der MIDI-Ansicht nicht als unbehandelte Exception enden
+        lassen — der Fehler landet im MIDI-Log, das Ergebnis ist False."""
         existing = self._inputs.get(port_name)
+        if (existing is not None and not _USE_WINMM
+                and time.monotonic() < self._rtmidi_retry_after):
+            # Review UI-65: bei aktivem Breaker liefert der Portscan [], ein
+            # funktionierender Handle saehe "tot" aus. Nicht evakuieren — wir
+            # koennten ihn waehrend des Breakers ohnehin nicht neu oeffnen.
+            return True
         if existing is not None:
             if self._input_handle_alive(existing, port_name):
-                return
+                return True
             # Toter Handle (z.B. nach USB-Unplug/Replug) -> evakuieren + neu oeffnen,
             # sonst bleibt der Controller stumm bis App-Neustart trotz Auto-Connect.
             print(f"[midi_manager] toter Input-Handle fuer '{port_name}' erkannt "
@@ -220,27 +231,57 @@ class MidiManager:
         if _USE_WINMM:
             ports = _winmm_list_inputs()
             if port_name not in ports:
-                return
+                self._log(f"MIDI Input nicht gefunden: {port_name}")
+                return False
             idx = ports.index(port_name)
             try:
                 m = WinMMInput(idx, port_name, self._on_message)
                 self._inputs[port_name] = m
                 self._log(f"MIDI Input geöffnet (WinMM): {port_name}")
+                return True
             except Exception as e:
                 self._log(f"MIDI Input Fehler: {e}")
-            return
+                return False
         if not RTMIDI_OK:
-            return
-        m = rtmidi.MidiIn()
-        ports = [m.get_port_name(i) for i in range(m.get_port_count())]
-        if port_name not in ports:
-            del m
-            return
-        idx = ports.index(port_name)
-        m.open_port(idx)
-        m.set_callback(lambda msg, _: self._on_message(msg[0], port_name))
+            self._log(f"MIDI Input nicht geöffnet ({port_name}): kein MIDI-Backend "
+                      f"(python-rtmidi fehlt)")
+            return False
+        # Circuit-Breaker von _list_rtmidi_ports respektieren: solange das
+        # Backend als gestoert gilt, keinen weiteren ALSA-Client anlegen.
+        if time.monotonic() < self._rtmidi_retry_after:
+            self._log(f"MIDI Input nicht geöffnet ({port_name}): "
+                      f"MIDI-Backend vorübergehend nicht verfügbar")
+            return False
+        try:
+            m = rtmidi.MidiIn()
+        except Exception as exc:
+            # Wie beim Portscan: Konstruktor-Fehler = Backend gestoert ->
+            # Breaker setzen, damit Hotplug-Scans nicht weiter Clients bauen.
+            self._rtmidi_retry_after = time.monotonic() + _RTMIDI_RETRY_SECONDS
+            self._rtmidi_error = str(exc)
+            self._log(f"MIDI Input Fehler ({port_name}): {exc}")
+            print(f"[midi_manager] MidiIn() fehlgeschlagen: {exc}")
+            return False
+        try:
+            ports = [m.get_port_name(i) for i in range(m.get_port_count())]
+            if port_name not in ports:
+                del m
+                self._log(f"MIDI Input nicht gefunden: {port_name}")
+                return False
+            idx = ports.index(port_name)
+            m.open_port(idx)
+            m.set_callback(lambda msg, _: self._on_message(msg[0], port_name))
+        except Exception as exc:
+            # Port-spezifischer Fehler (z. B. belegt) — kein Backend-Breaker.
+            try:
+                m.close_port()
+            except Exception:
+                pass
+            self._log(f"MIDI Input Fehler ({port_name}): {exc}")
+            return False
         self._inputs[port_name] = m
         self._log(f"MIDI Input geöffnet: {port_name}")
+        return True
 
     def open_all_inputs(self) -> int:
         """Öffnet alle verfügbaren MIDI-Eingänge (Auto-Connect, idempotent).

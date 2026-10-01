@@ -7,6 +7,25 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-10-01 — Kleine Bedienfehler, MIDI-Eingang abgesichert, Qt-Dialoge deutsch (UI-64, UI-65, XPLAT-39)
+
+#### Behoben
+
+- **Rückfragen auf Deutsch:** Qt-Standardknöpfe heißen „Ja“/„Nein“ statt „Yes“/„No“ (der
+  deutsche Qt-Übersetzer wird beim Start geladen; fehlt er, bleibt es englisch).
+- **Programmer:** Der Hinweis „Attribute erscheinen hier …“ steht nur noch einmal da; die
+  Hilfetexte zu „Hervorheben“/„Abdunkeln“ sagen ehrlich, dass beide bleibende Werte schreiben.
+- **Playback:** Die GO-Taste der Executor-Leiste ist gut lesbar; der Leerhinweis der Cue-Tabelle
+  nennt den Knopf „+ Cue aufnehmen“; die VC-Cueliste bietet nur die Executoren Ex 1–10 an, die
+  die Leiste auch zeigt (gespeicherte Shows bleiben unverändert).
+- **Gerät hinzufügen:** Die Typ-Spalte zeigt lesbare Typnamen (Moving Head, LED-Bar …) in voller
+  Breite. **DMX-Monitor:** Die Legende wird neben einer Warnung nicht mehr abgeschnitten.
+  **2D-Bühne:** FX-Badge, %-Schild, Auswahlring und Name überdecken sich nicht mehr.
+- **MIDI:** Ist das ALSA-Backend gestört, stürzt „MIDI-Eingang öffnen“ nicht mehr ab — der Fehler
+  steht im MIDI-Log, die Anzeige bleibt rot; ein laufender Controller wird dabei nicht geschlossen.
+- **Screenshot-Werkzeug unter Windows:** die Datenschutz-Sandbox lenkt jetzt auch `USERPROFILE`
+  um (vorher brach es dort ab).
+
 ### 2026-10-01 — GO/Zurück/Stop treffen überall dieselbe Cueliste (UI-66)
 
 #### Behoben

@@ -206,6 +206,12 @@ class DmxMonitorView(QWidget):
         top.addWidget(self._lbl_ausgang)
 
         top.addStretch(1)
+        root.addLayout(top)
+
+        # UI-64(f): Legende in eigener Zeile und umbrechend. Neben der
+        # OUT-52-Warnung („⚠ Universe 1 hat keinen Ausgang — nur gerechnet")
+        # passte sie bei 1600 px nicht mehr in die Werkzeugzeile und wurde
+        # rechts abgeschnitten („…Blau/Positic").
         self._lbl_legend = QLabel(
             'Blauer Rahmen = gepatcht  |  Gelber Rahmen = hervorgehoben  |  '
             'Farbige Kürzel = Kanalfunktion (z. B. Rot = Rot-Farbkanal, '
@@ -213,8 +219,8 @@ class DmxMonitorView(QWidget):
         )
         # UI-24a: kräftigeres Grau für besseren Kontrast auf dunklem Grund.
         self._lbl_legend.setStyleSheet("color: #b0b6c0; font-size: 11px;")
-        top.addWidget(self._lbl_legend)
-        root.addLayout(top)
+        self._lbl_legend.setWordWrap(True)
+        root.addWidget(self._lbl_legend)
 
         # Grid
         self._grid = DmxGrid()

@@ -201,8 +201,9 @@ class PlaybackView(QWidget):
 
         # UI-24b: Leerzustand-Hinweis über der (leeren) Cue-Tabelle statt leerer
         # Fläche. Als Overlay auf dem Viewport, per eventFilter mitzentriert.
+        # UI-64c: nennt den Knopf mit seiner echten Beschriftung.
         self._table_empty = QLabel(
-            'Keine Cues — „+ Cue" hinzufügen oder oben eine Cueliste wählen.',
+            'Keine Cues — „+ Cue aufnehmen" drücken oder oben eine Cueliste wählen.',
             self._table.viewport())
         self._table_empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._table_empty.setWordWrap(True)
@@ -688,7 +689,11 @@ class ExecutorWidget(QWidget):
             b.setToolTip(self.BTN_TIPS.get(fn, fn))
             style = "font-size: 10px;"
             if fn == "go":
-                style += " background: #006600; color: #00ff00;"
+                # UI-64d: Grün bleibt das GO-Erkennungszeichen, die Schrift
+                # aber weiß + fett — vorher #00ff00 auf #006600 (10px, dünn)
+                # kaum lesbar. Kontrast jetzt ~7:1.
+                style += (" background: #006600; color: #ffffff;"
+                          " font-weight: bold;")
             b.setStyleSheet(style)
 
     def _press(self, i: int):
