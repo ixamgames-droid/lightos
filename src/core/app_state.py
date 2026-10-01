@@ -6524,13 +6524,31 @@ def ist_strobe_kanal_ohne_bereiche(ch) -> bool:
 
 
 def open_value_of_channel(ch, fallback: int = 255) -> int:
-    """Wie ``open_value_for``, aber auf einem bereits aufgeloesten Kanal.
+    """Welcher Wert oeffnet diesen Kanal NACHWEISLICH? Sonst ``fallback``.
 
     EINE Quelle fuer beide Wege (BUG-FBW Slice 2): „Alles Weiß" hat die Kanaele
     ohnehin schon in der Hand, ein zweiter Lookup ueber das Fixture waere nur
     eine weitere Gelegenheit zur Drift. Ein ``fallback``, den der Aufrufer
-    erkennen kann (z. B. -1), heisst „das Profil sagt nichts" — genau darauf
-    stuetzt sich die Shutter-Regel in ``core.all_white``.
+    erkennen kann (z. B. -1), heisst „das Profil belegt keinen offenen
+    Zustand" — darauf stuetzen sich ``core.all_white`` (Shutter und Farbrad)
+    und der Sichtbarkeits-Shutter der EFX.
+
+    Belege, in dieser Reihenfolge:
+
+    1. ein Bereich mit ``kind == "open"`` (Mitte des Bereichs),
+    2. ein Strobe-Kanal ganz ohne Bereiche -> 0 (FM-48),
+    3. der ``highlight_value`` — **aber nur, wenn er nicht in einem Bereich
+       ``closed`` oder ``strobe`` liegt.**
+
+    ★ ENG-27: Punkt 3 galt bis 2026-10-02 ohne Einschraenkung. Weil
+    ``highlight_value`` in der Bibliothek NOT NULL ist (gemessen 0 von 66 247
+    Kanaelen ohne Wert), war der ``fallback`` fuer echte Kanaele unerreichbar:
+    ein importierter Shutter ohne ``open``-Bereich, dessen ``highlight_value``
+    im Strobe-Bereich liegt, haette „Alles Weiss" das Geraet blitzen lassen —
+    und einer im ``closed``-Bereich haette es abgedunkelt. Die Bereichs-Auskunft
+    ist dieselbe wie im Visualizer-Shutter-Zweig
+    (``color_utils._range_kind_for_value``). Liegt der Wert in keinem Bereich
+    oder hat der Kanal keine, bleibt er wie bisher der Beleg.
     """
     if ch is None:
         return fallback
@@ -6542,13 +6560,25 @@ def open_value_of_channel(ch, fallback: int = 255) -> int:
     if shutter and ist_strobe_kanal_ohne_bereiche(ch):
         return 0
     hv = getattr(ch, "highlight_value", None)
-    return int(hv) if hv is not None else fallback
+    if hv is None:
+        return fallback
+    from src.core.color_utils import _range_kind_for_value   # Leaf, kein Zyklus
+    if (_range_kind_for_value(ch, int(hv)) or "").lower() in _NICHT_OFFEN:
+        return fallback
+    return int(hv)
+
+
+#: ENG-27: Bereichsarten, in denen ein ``highlight_value`` NICHT „offen" belegt.
+_NICHT_OFFEN = ("closed", "strobe")
 
 
 def open_value_for(fixture, attribute: str, fallback: int = 255) -> int:
-    """Sinnvoller "offener"/Highlight-Wert eines Kanals: bevorzugt eine
-    ChannelRange mit ``kind == "open"`` (Mittelwert), sonst ``highlight_value``,
-    sonst ``fallback``. Nutzt nur vorhandene Capability-Daten (kein Raten)."""
+    """Sinnvoller "offener"/Highlight-Wert eines Kanals ueber das Fixture —
+    dieselben Belege wie :func:`open_value_of_channel`, sonst ``fallback``.
+
+    ⚠️ ENG-27: Am Shutter einen erkennbaren ``fallback`` (z. B. -1) uebergeben
+    und ihn ausdruecklich behandeln — der Vorgabewert 255 ist dort ohne Beleg
+    oft „schnelles Blitzen"."""
     return open_value_of_channel(find_channel(fixture, attribute), fallback)
 
 
