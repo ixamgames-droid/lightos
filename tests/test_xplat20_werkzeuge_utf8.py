@@ -61,6 +61,7 @@ GEPRUEFTE_WERKZEUGE = (
     "zeitbomben_gate.py",
     "library_testreste.py",
     "audit_bilder_stand.py",
+    "changelog_sammeln.py",
 )
 
 
