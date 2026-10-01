@@ -154,7 +154,11 @@ class TestAutosaveRecoveryHeadless(unittest.TestCase):
             if not suppressed:
                 MW._recovery_prompt_suppressed = lambda: False
             MW.QMessageBox = _FakeMessageBox
-            self.win._open_show_path = lambda p: opened.append(p)
+            # UI-69-Korrektur: die Wiederherstellung oeffnet mit
+            # ``wiederherstellung=True`` (kein Pfad, gilt als ungespeichert).
+            self.win._open_show_path = (
+                lambda p, wiederherstellung=False: opened.append(
+                    p if wiederherstellung else ("OHNE wiederherstellung", p)))
             self.win._check_autosave_recovery()
             self.app.processEvents()
         finally:
