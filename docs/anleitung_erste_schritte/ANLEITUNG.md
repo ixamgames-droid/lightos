@@ -34,8 +34,11 @@ Nach dem Start öffnet LightOS in der Sektion **Bühne**. Von oben nach unten:
    viermal im Takt setzt das Tempo.
 5. **STOP ALL** — hält alles an, was läuft: Cue-Listen auf allen Pages und alle
    gestarteten Funktionen (Szenen, Chaser, Effekte).
-6. **BLACKOUT** — schaltet alle Ausgänge auf 0. Der Knopf rastet ein; ein zweiter
-   Klick hebt den Blackout wieder auf.
+6. **BLACKOUT** — macht alles dunkel: alle Kanäle gehen auf 0, nur Moving Heads
+   mit Dimmerkanal bleiben in ihrer Position (inkl. Gobo/Prisma/Zoom) stehen —
+   sie fahren also nicht in die Grundstellung und beim Lösen wieder zurück.
+   Ungepatchte Kanäle, Geräte ohne Dimmer, Laser und Nebelmaschinen gehen
+   komplett aus. Der Knopf rastet ein; ein zweiter Klick hebt den Blackout wieder auf.
 7. **Befehlszeile** — für Tastatur-Befehle wie `1 thru 5 @ 80`. Beispiele stehen als
    Platzhaltertext im Feld.
 8. **Statusleiste** — links der Zustand des ENTTEC-Adapters (`Enttec: nicht gefunden`,
