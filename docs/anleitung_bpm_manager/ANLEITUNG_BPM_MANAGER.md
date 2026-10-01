@@ -40,7 +40,7 @@ Von oben links nach unten:
 | # | Element | Im Bild | Was es ist |
 |---|---|---|---|
 | 1 | **Sub-Tabs** | Erkennung · Tempo-Buses · Generator | Erkennung ist gelb unterstrichen = aktiv. |
-| 2 | **Große BPM-Zahl** | „127,6" in Gelb, darunter „BPM" | Das gültige Tempo. **Gelb** = Auto, **grün** = Manuell, grau **--** = kein Tempo. |
+| 2 | **Große BPM-Zahl** | „127,6" in Gelb, darunter „BPM" | Das gültige Tempo. **Gelb** = Auto, **grün** = Manuell, grau **--** = noch kein Tempo (z. B. direkt nach dem Start). Fällt die Erkennung auf **KEIN SIGNAL** zurück, bleibt die zuletzt gültige Zahl stehen. |
 | 3 | **Quelle** | „PC-Audio: Lautsprecher" | Woher das Tempo kommt (Abschnitt 2). **Bedienelement.** |
 | 4 | **Beat-Punkt + Taktzellen** | gelber Kreis, Zellen 1 · 2 · 3 · 4 | Blinken im Takt mit; die **1** (Downbeat) leuchtet gold. Wie viele Zellen: *Beats/Takt* in Erweitert. |
 | 5 | **Zustandswort** | „EINGERASTET" in Grün | Was die Erkennung gerade tut (Abschnitt 3.1). |
@@ -123,15 +123,18 @@ ist zu tun.
 
 **Wenn die Musik kurz aussetzt** (Break, Ansage, Liedwechsel):
 
-![Pause: BPM 127,6 bleibt stehen, Taktzelle 4 leuchtet, Zustandswort PAUSE · hält 128, Konfidenz 0 %, Pegel Stille, grüne Statuszeile „Pause — Tempo 127,6 gehalten, Beats laufen weiter", darunter „→ nichts zu tun"](img/erkennung_pause.png)
+![Pause: BPM 127,6 bleibt stehen, Taktzelle 4 leuchtet, Zustandswort PAUSE · hält 128, Konfidenz 0 %, Pegel Stille, grüne Statuszeile „Pause — Tempo 127,6 gehalten, die Beats pausieren, bis die Musik zurückkommt", darunter „→ nichts zu tun"](img/erkennung_pause.png)
 
 Das Tempo bleibt stehen (**PAUSE · hält 128**), Beats und Taktzellen pausieren, die
 Statuszeile ist **grün**: „**Pause** — Tempo 127,6 gehalten, die Beats pausieren, bis die
-Musik zurückkommt — → nichts zu tun". (Das Bild oben zeigt noch die frühere Formulierung.)
+Musik zurückkommt — → nichts zu tun".
 Setzt die Musik wieder ein, laufen die Beats im gehaltenen Tempo weiter. Bleibt es
-länger als etwa **10–15 Sekunden** still, lässt sie los und zeigt **KEIN SIGNAL** — der
-nächste Einsatz rastet frisch ein. Soll das Tempo auch über lange Pausen stehen bleiben:
-**Manuell** oder **Tempo einfrieren** (Erweitert).
+**10 Sekunden** still, vergisst die Erkennung den Takt und zeigt **KEIN SIGNAL**. Die große
+Zahl bleibt dabei auf dem letzten Tempo stehen, die Beats bleiben aus. Der nächste Einsatz
+wird frisch gesucht und eingerastet; erst dann kommen wieder Beats, ggf. mit neuem Tempo.
+Sollen die Beats auch durch lange Pausen im alten Tempo weiterlaufen: **Manuell**. Soll nur
+die Zahl beim Wiedereinsatz nicht auf ein neues Tempo springen: **Tempo einfrieren**
+(Erweitert).
 
 ### 3.2 Pegel und Chips
 
@@ -381,9 +384,29 @@ passende Abhilfe nennt — oder wenn sie „Aufnahme machen und schicken" vorsch
 * Linux: `~/.local/share/LightOS/audio_diag/`
 * Windows: `%APPDATA%\LightOS\audio_diag\`
 
-Es sind immer **zwei Dateien mit gleichem Namen**: die **WAV** (der Ton) und eine **JSON**
-mit den Messwerten (Gerät, Pegel, Spitze, Clips, Brumm, Version, Zeit — ohne Benutzername
-und ohne Pfade). Schick **beide**.
+Es sind immer **zwei Dateien mit gleichem Namen**: die **WAV** (der Ton, 16 bit mono) und
+eine **JSON** mit den Messwerten. Schick **beide**. Die JSON enthält:
+
+| Feld | Inhalt |
+|---|---|
+| `version` | Version des JSON-Formats |
+| `zeit_utc` | Startzeit der Aufnahme (UTC) |
+| `dauer_s` / `soll_s` | tatsächliche / geplante Länge in Sekunden |
+| `sample_rate`, `format` | Abtastrate, „WAV PCM 16 bit mono" |
+| `quelle`, `geraet` | Quellart (`loopback` = PC-Audio, `input` = Eingang) und Gerätename |
+| `rms_dbfs`, `peak_dbfs` | mittlerer Pegel und Spitze über die ganze Aufnahme |
+| `clip_samples` | Anzahl übersteuerter Samples |
+| `dc_offset` | Gleichspannungsversatz |
+| `datei` | `audio_diag/<Name>.wav` (nur relativ zum Datenordner) |
+| `plattform` | Betriebssystem (z. B. `win32`, `linux`) |
+| `abgebrochen` | `true`, wenn die Aufnahme vorzeitig endete; dann zusätzlich `grund` |
+| `chunk_ms_p95` | Takt der ankommenden Audioblöcke (95-%-Wert, ms) |
+| `hum_ratio`, `hum_hz` | Brumm-Anteil und -Frequenz (50/60 Hz) |
+| `erkennung` | Zustand der Erkennung am Ende: `zustand`, `bpm`, `konfidenz`, `backlog_ms` |
+| `lightos_version` | LightOS-Version |
+
+Kein Benutzername und kein vollständiger Pfad. Die Felder ab `chunk_ms_p95` fehlen, wenn der
+jeweilige Wert gerade nicht lesbar war.
 
 **Nichts wird automatisch versendet.** Die Aufnahme bleibt auf dem Rechner, bis du sie
 selbst weitergibst. Der Knopf ist grau, wenn gerade keine Audio-Quelle läuft (Aus, OS2L,
@@ -508,12 +531,17 @@ Das Beatgrid eines analysierten Lieds wird mit dem Track in der Show-Playlist ge
 Die Einstellungen tragen eine Versionsnummer; aktuell ist **Version 3**. Beim ersten Start
 mit einer älteren Datei übernimmt LightOS Quelle, Gerät, Modus, Tempo-Bereich, Takt und
 Taktgenau. Werte, die es nicht mehr gibt, werden verworfen und einmal ins Log geschrieben.
-Vorher legt LightOS **einmalig eine Sicherung** der alten Datei an:
-`ui_prefs.json.v2.bak` (bei ganz alten Dateien `ui_prefs.json.v1.bak`).
+Bevor LightOS die Datei zum ersten Mal im neuen Format speichert (sobald du eine
+Einstellung änderst), legt es **einmalig eine Sicherung** der alten Datei an. Ihr Name
+richtet sich nach der Herkunft:
+
+* Datei aus Version 2: `ui_prefs.json.v2.bak`
+* Datei aus Version 1 (ganz alte Stände, ohne Versionsnummer): `ui_prefs.json.v1.bak`.
+  Eine `.v2.bak` entsteht dann nicht.
 
 > **Achtung beim Zurückgehen:** Eine ältere LightOS-Version kann die neue Datei nicht lesen
-> und startet mit Standardwerten. Wer zurück muss, benennt `ui_prefs.json.v2.bak` wieder in
-> `ui_prefs.json` um.
+> und startet mit Standardwerten. Wer zurück muss, benennt die vorhandene Sicherung
+> (`ui_prefs.json.v2.bak` bzw. `ui_prefs.json.v1.bak`) wieder in `ui_prefs.json` um.
 
 ### 8.3 Was es nicht mehr gibt — und womit du es ersetzt
 
