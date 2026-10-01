@@ -7,6 +7,18 @@ Format: [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)
 
 ## [Unreleased]
 
+### 2026-10-01 — GO/Zurück/Stop treffen überall dieselbe Cueliste (UI-66)
+
+#### Behoben
+
+- **GO, Zurück und Stop ohne Listenangabe** (Leertaste, Kommandozeile `go`/`back`, Web-Remote,
+  OSC `/lightos/go|back`) treffen jetzt überall dieselbe Cueliste: die im Playback gewählte, aber
+  nur, wenn sie auf einem Executor liegt — sonst wie bisher bei der Leertaste die Liste des ersten
+  belegten Executors der aktuellen Page. Neu ist dadurch: Web-Remote und OSC nehmen nicht mehr fest
+  die erste Cueliste, und `go` ohne Nummer nicht mehr fest Executor 1 (`go 2` trifft weiter
+  Executor 2). Liegt keine Cueliste auf einem Executor, warnen Statusleiste, Kommandozeile und
+  Web-Remote „kein Licht“.
+
 ### 2026-10-01 — Cue-Aufnahme in die gewählte Liste, ehrliche Lampen-Vorschau, klare Audio-Meldung (UI-62, UI-63, BPM-19)
 
 #### Behoben

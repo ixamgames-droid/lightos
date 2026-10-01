@@ -60,8 +60,8 @@ Rechts in der Sektions-Leiste liegen die globalen Live-Bedienelemente:
 | Kürzel | Funktion |
 |--------|----------|
 | `Strg+1`…`8` | Sektion wechseln |
-| `Leertaste` | GO (nächste Cue) |
-| `Shift+Leertaste` | BACK (Cue zurück) |
+| `Leertaste` | GO (nächste Cue der GO-Zielliste, s. Abschnitt 6) |
+| `Shift+Leertaste` | BACK (Cue zurück, GO-Zielliste) |
 | `Esc` | Programmer leeren |
 | `H` / `Shift+H` | Hervorheben / Abdunkeln |
 | `Strg+C` / `Strg+V` | Selektion kopieren / einfügen |
@@ -221,6 +221,13 @@ stehen in [EFFEKTE.md](EFFEKTE.md).
 - **Playback → Playback:** Cuelisten/Executoren bedienen.
   `R` nimmt den aktuellen Programmer als Cue auf, `Leertaste` = GO,
   `Shift+Leertaste` = BACK.
+- **Welche Cueliste trifft GO ohne Angabe?** (Leertaste, Kommandozeile `go`/`back`
+  ohne Nummer, Web-Remote, OSC `/lightos/go`): die im Playback gewählte Cueliste,
+  **wenn sie auf einem Executor liegt**; sonst die des ersten belegten Executors
+  der aktuellen Page; sonst die erste Cueliste auf irgendeinem Executor. Liegt
+  keine Cueliste auf einem Executor, schaltet GO trotzdem weiter, es kommt aber
+  kein Licht — die Statusleiste bzw. Kommandozeile warnt dann. `go 2` trifft immer
+  Executor 2. „Cue aufnehmen“ (`R`) nimmt dagegen in die gewählte (sonst erste) Liste auf.
 - **Playback → Show Manager:** Funktionslisten/Shows organisieren.
 - **Playback → Kurven:** Dimmer-/Fade-Kurven verwalten (Linear, Ease In, Ease Out,
   S-Kurve, Snap) sowie eigene, frei gezeichnete Kurven und Kanälen zuweisen.

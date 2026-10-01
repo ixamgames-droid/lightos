@@ -86,11 +86,23 @@ sind in `src/web/app.py` als Routen/SocketIO-Handler umgesetzt):
 
 | Element | Wirkung | Route / Handler in `app.py` |
 |---|---|---|
-| **GO ▶** | nächster Cue der ersten Cueliste (`cue_stacks[0].go()`) | `POST /api/go` · SocketIO `go` |
-| **◀◀ BACK** | einen Cue zurück (`cue_stacks[0].back()`) | `POST /api/back` · SocketIO `back` |
-| **■ STOP** | laufende Cueliste anhalten (`cue_stacks[0].stop()`) | `POST /api/stop` · SocketIO `stop` |
+| **GO ▶** | nächster Cue der **GO-Zielliste** (siehe unten) | `POST /api/go` · SocketIO `go` |
+| **◀◀ BACK** | einen Cue zurück (GO-Zielliste) | `POST /api/back` · SocketIO `back` |
+| **■ STOP** | GO-Zielliste anhalten | `POST /api/stop` · SocketIO `stop` |
 | **Blackout** | schaltet die gesamte Ausgabe dunkel und wieder hell (Toggle) | `POST /api/blackout` · SocketIO `blackout` |
 | **Fader 1–5** | setzen den Pegel der **Executor-Fader** (Slots 1–5, 0–100 %) | `POST /api/executor/<slot>/fader` · SocketIO `fader` |
+
+**Welche Cueliste trifft GO / BACK / STOP?** Dieselbe wie die Leertaste am Pult:
+
+1. die im Playback gewählte Cueliste, **wenn sie auf einem Executor liegt**;
+2. sonst die Cueliste des ersten belegten Executors der aktuellen Page;
+3. sonst die erste Cueliste, die auf irgendeinem Executor liegt.
+
+Liegt gar keine Cueliste auf einem Executor, schaltet GO die gewählte (bzw.
+erste) Cueliste trotzdem weiter — es kommt aber **kein Licht**. Die Antwort von
+`/api/go|back|stop` und das SocketIO-`ack` nennen dazu `liste` (Name), `licht`
+(`true`/`false`) und bei fehlendem Licht eine `warnung`. (Regel im Code:
+`src/core/cueliste_ziel.py`.)
 
 Weitere Details:
 

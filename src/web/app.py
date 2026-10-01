@@ -133,6 +133,39 @@ def _num(data, key, default, cast):
         return default
 
 
+def bediene_cueliste(state, aktion: str):
+    """UI-66: GO/Zurueck/Stop des Web-Remotes (REST + Socket) auf die
+    Transport-Ziel-Liste (gewaehlte, wenn auf einem Executor; sonst erster
+    Executor der aktuellen Page mit Liste; sonst erste gebundene; sonst ohne
+    Licht) — Regel zentral in src/core/cueliste_ziel.py (zieht auch den
+    A3D-40-Snapshot)."""
+    from src.core.cueliste_ziel import bediene_cueliste as _bediene
+    return _bediene(state, aktion)
+
+
+def _listen_name(stack):
+    return getattr(stack, "name", None) if stack is not None else None
+
+
+def _transport_info(aktion: str) -> dict:
+    """Fuehrt die Aktion aus; liefert ``liste`` (Name/None), ``licht`` (bool) und
+    bei fehlendem Licht eine ``warnung`` — fuer REST-JSON und Socket-ack."""
+    from src.core.cueliste_ziel import liegt_auf_executor
+    state = _get_state()
+    stack = bediene_cueliste(state, aktion)
+    licht = liegt_auf_executor(state, stack)
+    info = {"liste": _listen_name(stack), "licht": licht}
+    if stack is None:
+        info["warnung"] = "Keine Cueliste vorhanden"
+    elif not licht:
+        info["warnung"] = "Keine Cueliste liegt auf einem Executor — kein Licht"
+    return info
+
+
+def _transport_antwort(aktion: str):
+    return jsonify({"ok": True, **_transport_info(aktion)})
+
+
 def create_app(port: int = 5000) -> tuple:
     """Create and configure the Flask app + SocketIO."""
     global _flask_app, _socketio
@@ -320,28 +353,24 @@ def _register_routes(app):
         # allein war KEIN Schutz — sie aliast dieselbe Live-Liste, die show_file beim
         # Laden per cue_stacks.clear() IN-PLACE leert; zwischen 'if stacks:' und
         # 'stacks[0]' gab das weiterhin einen IndexError (HTTP 500). list(...) kopiert
-        # -> index-sicher (identisches Muster wie /api/status).
-        stacks = list(_get_state().cue_stacks)
-        if stacks:
-            stacks[0].go()
-        return jsonify({"ok": True})
+        # -> index-sicher (identisches Muster wie /api/status). Den Snapshot zieht
+        # jetzt cueliste_ziel.ziel_cueliste.
+        # UI-66: trifft die Transport-Ziel-Liste (gewaehlte, wenn auf einem
+        # Executor; sonst erster Executor der aktuellen Page mit Liste; ...) —
+        # dieselbe wie Leertaste, Kommandozeile und OSC (frueher fest
+        # cue_stacks[0]). Antwort nennt 'liste' + 'licht' (+ 'warnung').
+        return _transport_antwort("go")
 
     @app.route("/api/back", methods=["POST"])
     def api_back():
-        stacks = list(_get_state().cue_stacks)  # WEB-04/A3D-40: echter Snapshot
-        if stacks:
-            stacks[0].back()
-        return jsonify({"ok": True})
+        return _transport_antwort("back")   # UI-66, s. api_go
 
     @app.route("/api/stop", methods=["POST"])
     def api_stop():
         # STOP-Button im Remote-UI stoppt die laufende Cueliste (Pendant zu
         # go/back). Vorher rief das Frontend die nicht existierende Route
         # /api/executor/1/back auf -> stiller 404, STOP tat nichts.
-        stacks = list(_get_state().cue_stacks)  # WEB-04/A3D-40: echter Snapshot
-        if stacks:
-            stacks[0].stop()
-        return jsonify({"ok": True})
+        return _transport_antwort("stop")   # UI-66, s. api_go
 
     @app.route("/api/blackout", methods=["POST"])
     def api_blackout():
@@ -414,24 +443,18 @@ def _register_socketio(sio):
 
     @sio.on("go")
     def on_go(data=None):
-        stacks = list(_get_state().cue_stacks)  # WEB-04/A3D-40: echter Snapshot
-        if stacks:
-            stacks[0].go()
-        sio.emit("ack", {"action": "go"})
+        # UI-66: Transport-Ziel-Liste (cueliste_ziel.py), s. api_go.
+        sio.emit("ack", {"action": "go", **_transport_info("go")})
 
     @sio.on("back")
     def on_back(data=None):
-        stacks = list(_get_state().cue_stacks)  # WEB-04/A3D-40: echter Snapshot
-        if stacks:
-            stacks[0].back()
-        sio.emit("ack", {"action": "back"})
+        # UI-66: Transport-Ziel-Liste (cueliste_ziel.py), s. api_go.
+        sio.emit("ack", {"action": "back", **_transport_info("back")})
 
     @sio.on("stop")
     def on_stop(data=None):
-        stacks = list(_get_state().cue_stacks)  # WEB-04/A3D-40: echter Snapshot
-        if stacks:
-            stacks[0].stop()
-        sio.emit("ack", {"action": "stop"})
+        # UI-66: Transport-Ziel-Liste (cueliste_ziel.py), s. api_go.
+        sio.emit("ack", {"action": "stop", **_transport_info("stop")})
 
     @sio.on("fader")
     def on_fader(data=None):

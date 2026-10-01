@@ -1403,18 +1403,29 @@ class MainWindow(QMainWindow):
     # ── Transport / Playback ──────────────────────────────────────────────────
 
     def _global_go(self):
-        pe = self._state.playback_engine
-        if pe:
-            for ex in pe.executors:
-                if ex.stack:
-                    ex.stack.go()
-                    return
-        if self._state.cue_stacks:
-            self._state.cue_stacks[0].go()
+        # UI-66: Leertaste trifft die Transport-Ziel-Liste — die gewaehlte, WENN
+        # sie auf einem Executor liegt, sonst wie frueher der erste Executor der
+        # aktuellen Page mit Liste (Regel a–d: src/core/cueliste_ziel.py);
+        # dieselbe wie Kommandozeile, Web und OSC.
+        self._global_transport("go", "GO")
 
     def _global_back(self):
-        if self._state.cue_stacks:
-            self._state.cue_stacks[0].back()
+        # UI-66: wie _global_go — frueher fest cue_stacks[0].
+        self._global_transport("back", "Zurück")
+
+    def _global_transport(self, aktion: str, anzeige: str):
+        from src.core.cueliste_ziel import (bediene_cueliste, liegt_auf_executor,
+                                            listen_name)
+        stack = bediene_cueliste(self._state, aktion)
+        if stack is None:
+            return
+        msg = f"{anzeige} „{listen_name(stack)}“"
+        if not liegt_auf_executor(self._state, stack):
+            msg += " — keine Cueliste liegt auf einem Executor, kein Licht"
+        try:
+            self.statusBar().showMessage(msg, 3000)
+        except RuntimeError:
+            pass        # Fenster schon abgebaut
 
     def _stop_all(self):
         pe = self._state.playback_engine

@@ -20,13 +20,21 @@ Default-Adressschema (TouchOSC/Lemur-kompatibel):
 
 | Adresse | Wirkung |
 |---------|---------|
-| `/lightos/go` | globales GO (`cue_stacks[0].go()`) |
-| `/lightos/back` | globales BACK |
+| `/lightos/go` | globales GO auf die GO-Zielliste (siehe unten) |
+| `/lightos/back` | globales BACK auf die GO-Zielliste |
 | `/lightos/blackout {1\|0}` | Blackout an/aus |
 | `/lightos/programmer/clear` | Programmer leeren |
 | `/lightos/exec/{n}/go` \| `/back` \| `/stop` | Executor n Taste |
 | `/lightos/exec/{n}/fader {f}` | Executor n Fader (0.0–1.0) |
 | `/lightos/ch/{u}/{c} {v}` | Universe u, Kanal c, Wert v (0–255) |
+
+**GO-Zielliste** (`/lightos/go`, `/lightos/back`; gleiche Regel wie Leertaste,
+Kommandozeile `go`/`back` ohne Nummer und Web-Remote, zentral in
+`src/core/cueliste_ziel.py`): die im Playback gewählte Cueliste, wenn sie auf
+einem Executor liegt; sonst die des ersten belegten Executors der aktuellen Page;
+sonst die erste Cueliste auf irgendeinem Executor; liegt keine auf einem
+Executor, wird die gewählte (bzw. erste) weitergeschaltet — ohne Licht.
+`/lightos/exec/{n}/…` trifft immer genau Executor n.
 
 **Typ-tolerantes Blackout (`_as_on`, OSC-04):** Ein String-Argument `'0'`/`'off'`
 ist in Python truthy — `bool('0') == True`. Darum werden Strings gegen die

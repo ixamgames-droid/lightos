@@ -462,23 +462,38 @@ class ClearCommand(Command):
             return CommandResult(False, f"Clear Fehler: {e}")
 
 
+def _transport_ohne_liste(state, aktion: str, anzeige: str) -> CommandResult:
+    """UI-66: ``go``/``back`` OHNE Nummer treffen die Transport-Ziel-Liste
+    (gewaehlte, wenn auf einem Executor; sonst erster Executor der aktuellen Page
+    mit Liste; ...) — dieselbe wie Leertaste, Web und OSC. Regel zentral in
+    src/core/cueliste_ziel.py. ok=False, wenn die Liste kein Licht macht."""
+    from src.core.cueliste_ziel import (bediene_cueliste, liegt_auf_executor,
+                                        listen_name)
+    stack = bediene_cueliste(state, aktion)
+    if stack is None:
+        return CommandResult(False, "Keine Cueliste vorhanden")
+    msg = f"{anzeige} „{listen_name(stack)}“"
+    if not liegt_auf_executor(state, stack):
+        return CommandResult(
+            False, msg + " — keine Cueliste liegt auf einem Executor, kein Licht")
+    return CommandResult(True, msg)
+
+
 @dataclass
 class GoCommand(Command):
-    slot: int = 1
+    # UI-66: None = ohne Nummer -> Transport-Ziel-Liste; Zahl = Executor-Slot.
+    slot: int | None = None
 
     def execute(self, state) -> CommandResult:
         try:
+            if self.slot is None:
+                return _transport_ohne_liste(state, "go", "GO")
             # Executor-Slots sind 1-basiert; get_executor(0) wuerde per
             # Python-Negativindex den LETZTEN Executor treffen.
             if self.slot < 1:
                 return CommandResult(False, f"Ungültiger Executor {self.slot} (1-basiert)")
             pe = state.playback_engine
             if pe is None:
-                # Fallback: Cue-Stack direkt
-                stacks = getattr(state, "cue_stacks", [])
-                if stacks:
-                    stacks[0].go()
-                    return CommandResult(True, "GO (Stack 1)")
                 return CommandResult(False, "Kein Playback-Engine")
             ex = pe.get_executor(self.slot)
             ex.press_btn("go")
@@ -489,18 +504,17 @@ class GoCommand(Command):
 
 @dataclass
 class BackCommand(Command):
-    slot: int = 1
+    # UI-66: None = ohne Nummer -> Transport-Ziel-Liste; Zahl = Executor-Slot.
+    slot: int | None = None
 
     def execute(self, state) -> CommandResult:
         try:
+            if self.slot is None:
+                return _transport_ohne_liste(state, "back", "BACK")
             if self.slot < 1:   # 1-basiert; 0 waere Negativindex (letzter Executor)
                 return CommandResult(False, f"Ungültiger Executor {self.slot} (1-basiert)")
             pe = state.playback_engine
             if pe is None:
-                stacks = getattr(state, "cue_stacks", [])
-                if stacks:
-                    stacks[0].back()
-                    return CommandResult(True, "BACK (Stack 1)")
                 return CommandResult(False, "Kein Playback")
             ex = pe.get_executor(self.slot)
             ex.press_btn("back")
@@ -815,11 +829,12 @@ def parse(text: str) -> Command:
             n = consume_number()
             # `is not None` statt Falsy-Check: `go 0`/`stop 0` fiel sonst still auf
             # den Default (Slot 1 bzw. Stop-ALL!) statt als ungueltig zu gelten.
-            return GoCommand(slot=int(n) if n is not None else 1)
+            # UI-66: ohne Nummer -> Transport-Ziel-Liste (slot None, cueliste_ziel.py).
+            return GoCommand(slot=int(n) if n is not None else None)
         if kw == "back":
             advance()
             n = consume_number()
-            return BackCommand(slot=int(n) if n is not None else 1)
+            return BackCommand(slot=int(n) if n is not None else None)
         if kw == "stop":
             advance()
             n = consume_number()

@@ -4609,12 +4609,20 @@ class AppState:
         Die im Playback gewaehlte Liste, solange sie noch existiert (nach
         Loeschen/Show-Laden ist die Referenz tot) — sonst Rueckfall auf die erste
         Cueliste; None, wenn es keine gibt. Funktioniert auch ohne offene
-        Playback-Ansicht."""
-        stacks = self.cue_stacks
-        gew = self.gewaehlte_cueliste
-        if gew is not None and any(st is gew for st in stacks):
-            return gew
-        return stacks[0] if stacks else None
+        Playback-Ansicht. UI-66: GO/Zurueck/Stop ohne Listenangabe nutzen eine
+        live-sichere Variante (bedien_cueliste) — beide in src/core/cueliste_ziel.py."""
+        from .cueliste_ziel import ziel_cueliste
+        return ziel_cueliste(self)
+
+    def bedien_cueliste(self):
+        """UI-66: Ziel-Cueliste fuer die globalen GO/Zurueck/Stop-Befehle ohne
+        ausdrueckliche Liste (Leertaste, Kommandozeile ``go``/``back``, Web-Remote,
+        OSC ``/lightos/go|back``). Live-sicher, NICHT dieselbe wie die Aufnahme:
+        gewaehlte Liste nur, wenn sie auf einem Executor liegt; sonst erster
+        Executor der aktuellen Page mit Liste, sonst erste gebundene Liste, sonst
+        Aufnahme-Regel (kein Licht). Regel + Begruendung: src/core/cueliste_ziel.py."""
+        from .cueliste_ziel import transport_cueliste
+        return transport_cueliste(self)
 
     def record_cue(self, stack, number: float, label: str = "",
                    fade_in: float = 2.0, fade_out: float = 0.0):
