@@ -241,6 +241,62 @@ def finde(tafel: dict, item: str) -> dict | None:
     return None
 
 
+def klarnamen_datei() -> str:
+    """PRIV-05: LOKALE Liste echter Namen, die nie auf die Tafel duerfen.
+
+    Liegt bewusst AUSSERHALB des Repos — die Liste selbst waere sonst genau das
+    Leck, das sie verhindern soll. Zusaetzlich wird ``<git-common-dir>/klarnamen.txt``
+    gelesen (im Projektordner, aber nie versioniert). ``LIGHTOS_KLARNAMEN`` ueberschreibt den Ort
+    (Tests). Linux/macOS: ``~/.config/lightos/klarnamen.txt``; Windows:
+    ``%APPDATA%\\lightos\\klarnamen.txt``. Ein Name je Zeile, ``#`` = Kommentar.
+    """
+    ort = os.environ.get("LIGHTOS_KLARNAMEN")
+    if ort:
+        return ort
+    if os.name == "nt" and os.environ.get("APPDATA"):
+        return os.path.join(os.environ["APPDATA"], "lightos", "klarnamen.txt")
+    basis = os.environ.get("XDG_CONFIG_HOME") or os.path.join(os.path.expanduser("~"), ".config")
+    return os.path.join(basis, "lightos", "klarnamen.txt")
+
+
+def _git_klarnamen_datei() -> str | None:
+    """Zweiter Ort: ``<git-common-dir>/klarnamen.txt`` — liegt im Projektordner,
+    wird aber nie versioniert oder gepusht (``.git`` ist kein Arbeitsbaum).
+    Fuer Rechner, auf denen ausserhalb des Projektordners nichts angelegt werden
+    darf (Windows-Sitzung B, 01.10.2026)."""
+    if os.environ.get("LIGHTOS_KLARNAMEN"):
+        return None                              # Tests: nur die ausdrueckliche Datei
+    try:
+        r = subprocess.run(["git", "rev-parse", "--git-common-dir"], capture_output=True,
+                           text=True, encoding="utf-8", errors="replace",
+                           cwd=os.path.dirname(os.path.abspath(__file__)),
+                           timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    common = r.stdout.strip()
+    if r.returncode != 0 or not common:
+        return None
+    if not os.path.isabs(common):
+        common = os.path.join(os.path.dirname(os.path.abspath(__file__)), common)
+    return os.path.join(common, "klarnamen.txt")
+
+
+def _klarnamen() -> list[str]:
+    """Namen aus :func:`klarnamen_datei` und ``<git-common-dir>/klarnamen.txt``;
+    fehlen beide, ist die Liste leer (dann prueft der Waechter nur
+    Pfade/Links/Adressen wie bisher)."""
+    namen: list[str] = []
+    for ort in (klarnamen_datei(), _git_klarnamen_datei()):
+        if not ort:
+            continue
+        try:
+            with open(ort, encoding="utf-8-sig") as f:
+                namen += [z.strip() for z in f]
+        except OSError:
+            continue
+    return [z for z in dict.fromkeys(namen) if len(z) >= 2 and not z.startswith("#")]
+
+
 def pruefe_oeffentlich(text: str) -> list[str]:
     """PRIV-01/02: was in ein oeffentliches Repo nicht hineingehoert.
 
@@ -251,8 +307,13 @@ def pruefe_oeffentlich(text: str) -> list[str]:
     funde = []
     if re.search(r"/home/(?!user\b|runner\b)[a-z][a-z0-9_-]+/", text):
         funde.append("Home-Pfad mit Kontonamen (nutze /home/user/…)")
-    if re.search(r"[A-Za-z]:\\Users\\(?!X\b)[A-Za-z]", text):
+    # PRIV-05: beide Trenner — "C:/Users/<konto>/" stand so schon auf der Tafel.
+    if re.search(r"[A-Za-z]:[\\/]+Users[\\/]+(?![Xx]\b|user\b|Public\b)[A-Za-z]", text):
         funde.append("Windows-Nutzerpfad (nutze C:\\Users\\X\\…)")
+    for name in _klarnamen():
+        if re.search(r"(?<![\w])" + re.escape(name) + r"s?(?![\w])", text, re.IGNORECASE):
+            funde.append(f"Klarname aus der lokalen Namensliste (im Repo heisst der "
+                         f"Betreiber „Robin“): {name[:1]}…")
     if "claude.ai/code/session" in text:
         funde.append("Sitzungs-Link")
     if re.search(r"[\w.+-]+@[\w-]+\.[\w.]+", text):

@@ -287,6 +287,70 @@ class OeffentlichkeitsPruefungTest(unittest.TestCase):
             self.assertEqual(sc.pruefe_oeffentlich(text), [], text)
 
 
+# PRIV-05: Testname zusammengesetzt — ein echter Klarname steht nie im Repo.
+_TESTNAME = "Kunig" + "unde"
+
+
+class KlarnamenUndSchraegstrichTest(unittest.TestCase):
+    """PRIV-05: Klarnamen aus einer LOKALEN Liste und ``C:/Users/<konto>/``."""
+
+    def setUp(self):
+        import tempfile
+        self._tmp = tempfile.TemporaryDirectory()
+        self.liste = os.path.join(self._tmp.name, "klarnamen.txt")
+        with open(self.liste, "w", encoding="utf-8") as f:
+            f.write("# Kommentar\n" + _TESTNAME + "\n\n")
+        self._alt = os.environ.get("LIGHTOS_KLARNAMEN")
+        os.environ["LIGHTOS_KLARNAMEN"] = self.liste
+
+    def tearDown(self):
+        if self._alt is None:
+            os.environ.pop("LIGHTOS_KLARNAMEN", None)
+        else:
+            os.environ["LIGHTOS_KLARNAMEN"] = self._alt
+        self._tmp.cleanup()
+
+    def test_klarname_wird_gefunden_auch_genitiv_und_klein(self):
+        for text in (f"{_TESTNAME} hat bestaetigt", f"auf {_TESTNAME}s Rig",
+                     f"laut {_TESTNAME.lower()}"):
+            self.assertTrue(sc.pruefe_oeffentlich(text), text)
+
+    def test_meldung_verraet_den_namen_nicht(self):
+        funde = sc.pruefe_oeffentlich(f"{_TESTNAME} war da")
+        self.assertTrue(funde)
+        self.assertNotIn(_TESTNAME, " ".join(funde))
+
+    def test_wortteile_und_pseudonym_bleiben_frei(self):
+        for text in (f"{_TESTNAME}nbaum ist kein Name", "Robin hat bestaetigt"):
+            self.assertEqual(sc.pruefe_oeffentlich(text), [], text)
+
+    def test_ohne_liste_keine_namenspruefung(self):
+        os.environ["LIGHTOS_KLARNAMEN"] = os.path.join(self._tmp.name, "fehlt.txt")
+        self.assertEqual(sc.pruefe_oeffentlich(f"{_TESTNAME} war da"), [])
+
+    def test_windows_pfad_mit_schraegstrich(self):
+        pfad = "C:/Users/" + "Anna" + "/lightos"
+        self.assertTrue(sc.pruefe_oeffentlich(f"liegt in {pfad}"))
+        self.assertEqual(sc.pruefe_oeffentlich("liegt in C:/Users/X/lightos"), [])
+
+    def test_git_ordner_ist_zweiter_ort_und_nicht_versioniert(self):
+        """Fuer Rechner ohne Schreibrecht ausserhalb des Projektordners: die
+        Liste darf in <git-common-dir> liegen — dort wird nichts versioniert."""
+        os.environ.pop("LIGHTOS_KLARNAMEN", None)
+        ort = sc._git_klarnamen_datei()
+        self.assertTrue(ort and ort.endswith("klarnamen.txt"), ort)
+        common = subprocess.run(["git", "rev-parse", "--git-common-dir"],
+                                capture_output=True, text=True,
+                                cwd=os.path.dirname(os.path.abspath(__file__))).stdout.strip()
+        self.assertEqual(os.path.basename(os.path.dirname(ort)), os.path.basename(common))
+
+    def test_liste_liegt_ausserhalb_des_repos(self):
+        os.environ.pop("LIGHTOS_KLARNAMEN", None)
+        repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        ort = os.path.abspath(sc.klarnamen_datei())
+        self.assertFalse(ort.startswith(repo + os.sep), ort)
+
+
 class EchtesRennenTest(unittest.TestCase):
     """★★ Der Test, wegen dem es das Werkzeug gibt.
 
