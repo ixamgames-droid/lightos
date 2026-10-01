@@ -9,7 +9,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| UI-62 | A | fix/buendel-ui62-ui63-bpm19 | 2026-10-01T12:47Z | - |
 | UI-63 | A | fix/buendel-ui62-ui63-bpm19 | 2026-10-01T12:47Z | - |
 | BPM-19 | A | fix/buendel-ui62-ui63-bpm19 | 2026-10-01T12:47Z | - |
 
@@ -132,7 +131,6 @@
 
 ## Verlauf
 
-- 2026-09-29T01:31Z A claim STAB-27
 - 2026-09-29T01:41Z A done STAB-26
 - 2026-09-29T01:48Z A claim QA-67
 - 2026-09-29T02:05Z A claim QA-81
@@ -162,3 +160,4 @@
 - 2026-10-01T12:47Z A claim UI-62
 - 2026-10-01T12:47Z A claim UI-63
 - 2026-10-01T12:47Z A claim BPM-19
+- 2026-10-01T13:24Z A done UI-62
