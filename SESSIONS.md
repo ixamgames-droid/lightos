@@ -9,7 +9,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| UI-67 | B | fix/bpm22-kein-takt | 2026-10-01T15:14Z | src/ui/bpm_status_rules.py · src/ui/views/bpm_manager_view.py |
 | DOC-17 | A | docs/doc17-nacharbeiten | 2026-10-01T15:27Z | docs |
 | PRIV-05 | A | fix/priv05-klarnamen-waechter | 2026-10-01T15:37Z | tools/session_claim.py,tests/test_session_claim.py |
 | PROC-14 | A | fix/proc14-claim-pruefung | 2026-10-01T15:41Z | tools/pr_bereit.py,tests/test_pr_bereit.py |
@@ -149,7 +148,6 @@
 
 ## Verlauf
 
-- 2026-09-30T18:57Z A claim DOC-16
 - 2026-09-30T21:43Z A done DOC-16
 - 2026-10-01T10:04Z A claim FM-52
 - 2026-10-01T11:08Z A done FM-52
@@ -179,3 +177,4 @@
 - 2026-10-01T15:41Z A claim PROC-16
 - 2026-10-01T15:41Z A claim PROC-09
 - 2026-10-01T16:17Z B done BPM-22
+- 2026-10-01T16:18Z B done UI-67
