@@ -100,37 +100,40 @@ class Palette:
                     fid = f.get("id") or f.get("fid")
                 if fid is not None:
                     targets.append(fid)
-        for fid in targets:
-            # ENG-03: Kopf-Vorkommen je Attribut der ZIELleuchte zaehlen, damit
-            # Mehrkopf-Keys (``attr#N``) NICHT als Bogus-Schluessel auf eine
-            # Einkopf-Fixture landen (sie wuerden sonst spaeter ueber
-            # record_from_programmer in Snaps/Paletten weiterwandern).
-            fx = patched.get(fid)
-            head_counts: dict[str, int] = {}
-            if fx is not None:
-                for ch in get_channels_for_patched(fx):
-                    a = getattr(ch, "attribute", None)
-                    if a is not None:
-                        head_counts[a] = head_counts.get(a, 0) + 1
-            vals = self.get_values_for_fixture(fid)
-            for attr, val in vals.items():
-                # Mehrkopf (Spider): gespeicherte Schluessel koennen ``attr#N``
-                # sein (Kopf N). In Basisname + Kopf-Index aufspalten und ueber das
-                # head-Argument schreiben, sonst landet der Wert nie auf dem N-ten
-                # Kanal-Vorkommen.
-                base, _, suffix = attr.partition("#")
-                head = int(suffix) if suffix.isdigit() else 0
-                # ENG-03: Kopf>0 nur schreiben, wenn die Ziel-Leuchte so viele
-                # Vorkommen dieses Attributs wirklich hat (sonst Bogus-``attr#N``).
-                if head > 0 and head_counts.get(base, 0) <= head:
-                    continue
-                # FM-17: den GESPEICHERTEN Schluessel unveraendert zurueckspielen
-                # (wie die Snap-/VC-Restore-Pfade), NICHT ueber das head-Argument.
-                # ``attr#N`` ist eine Kanal-Zusage, keine Kopf-Nummer: seit der
-                # Kopf-Karte sind das bei einem geteilten Master zwei
-                # verschiedene Kanaele, und ein Umweg ueber den Kopf wuerde die
-                # Palette beim Abruf um einen Kanal verschieben.
-                state.set_programmer_value(fid, attr, val)
+        # FM-52: ein Paletten-Abruf = EIN Schritt im Programmer-Verlauf.
+        from src.core.programmer_verlauf import schritt
+        with schritt(state, f"Palette {getattr(self, 'name', '')}".strip()):
+            for fid in targets:
+                # ENG-03: Kopf-Vorkommen je Attribut der ZIELleuchte zaehlen, damit
+                # Mehrkopf-Keys (``attr#N``) NICHT als Bogus-Schluessel auf eine
+                # Einkopf-Fixture landen (sie wuerden sonst spaeter ueber
+                # record_from_programmer in Snaps/Paletten weiterwandern).
+                fx = patched.get(fid)
+                head_counts: dict[str, int] = {}
+                if fx is not None:
+                    for ch in get_channels_for_patched(fx):
+                        a = getattr(ch, "attribute", None)
+                        if a is not None:
+                            head_counts[a] = head_counts.get(a, 0) + 1
+                vals = self.get_values_for_fixture(fid)
+                for attr, val in vals.items():
+                    # Mehrkopf (Spider): gespeicherte Schluessel koennen ``attr#N``
+                    # sein (Kopf N). In Basisname + Kopf-Index aufspalten und ueber das
+                    # head-Argument schreiben, sonst landet der Wert nie auf dem N-ten
+                    # Kanal-Vorkommen.
+                    base, _, suffix = attr.partition("#")
+                    head = int(suffix) if suffix.isdigit() else 0
+                    # ENG-03: Kopf>0 nur schreiben, wenn die Ziel-Leuchte so viele
+                    # Vorkommen dieses Attributs wirklich hat (sonst Bogus-``attr#N``).
+                    if head > 0 and head_counts.get(base, 0) <= head:
+                        continue
+                    # FM-17: den GESPEICHERTEN Schluessel unveraendert zurueckspielen
+                    # (wie die Snap-/VC-Restore-Pfade), NICHT ueber das head-Argument.
+                    # ``attr#N`` ist eine Kanal-Zusage, keine Kopf-Nummer: seit der
+                    # Kopf-Karte sind das bei einem geteilten Master zwei
+                    # verschiedene Kanaele, und ein Umweg ueber den Kopf wuerde die
+                    # Palette beim Abruf um einen Kanal verschieben.
+                    state.set_programmer_value(fid, attr, val)
 
     def record_from_programmer(self, fixture_ids: list[int] | None = None):
         """Capture current programmer state into this palette."""

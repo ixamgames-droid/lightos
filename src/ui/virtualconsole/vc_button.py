@@ -708,18 +708,29 @@ class VCButton(VCWidget):
             # note_on ohne dazwischenliegendes note_off (schnelles
             # Doppeldruecken, verschlucktes Release).
             prev = dict(getattr(self, "_snap_prev", None) or {})
-            for snap in snaps:
-                for fid, attrs in snap.values.items():
-                    for attr, val in attrs.items():
-                        fid_i = int(fid)
-                        key = (fid_i, attr)
-                        val_i = max(0, min(255, int(val)))
-                        current = state.get_programmer_value(fid_i, attr)
-                        prev[key] = _snap_claim(self, key, current, val_i)
-                        state.set_programmer_value(fid_i, attr, val_i)
+            with self._snap_verlauf(state):
+                for snap in snaps:
+                    for fid, attrs in snap.values.items():
+                        for attr, val in attrs.items():
+                            fid_i = int(fid)
+                            key = (fid_i, attr)
+                            val_i = max(0, min(255, int(val)))
+                            current = state.get_programmer_value(fid_i, attr)
+                            prev[key] = _snap_claim(self, key, current, val_i)
+                            state.set_programmer_value(fid_i, attr, val_i)
             self._snap_prev = prev
         except Exception as e:
             print(f"[VCButton] Snap-Apply-Fehler: {e}")
+
+    def _snap_verlauf(self, state):
+        """FM-52: Halten/Loslassen einer Flash-Snap-Taste ist Wiedergabe und
+        kommt NICHT in den Programmer-Verlauf — sonst schaltete ein Rueckgaengig
+        nach dem Loslassen den Strobe wieder ein. Setzen/Umschalten ist
+        Bedienung und wird EIN Schritt."""
+        from src.core import programmer_verlauf as pv
+        if getattr(self, "snap_mode", "") == "flash":
+            return pv.ohne_verlauf(state)
+        return pv.schritt(state, f"Taste {getattr(self, 'caption', '')}".strip())
 
     def _restore_library_snap(self):
         """Stellt die vor dem Snap aktiven Programmer-Werte wieder her.
@@ -735,17 +746,18 @@ class VCButton(VCWidget):
         try:
             from src.core.app_state import get_state
             state = get_state()
-            for (fid, attr) in list(prev):
-                current = state.get_programmer_value(fid, attr)
-                what, value = _snap_release(self, (fid, attr), current)
-                if what == "drop":
-                    continue          # Kanal gehoert inzwischen jemand anderem
-                if what == "reapply":
-                    state.set_programmer_value(fid, attr, int(value))
-                elif value is None:
-                    state.clear_programmer_value(fid, attr)
-                else:
-                    state.set_programmer_value(fid, attr, int(value))
+            with self._snap_verlauf(state):
+                for (fid, attr) in list(prev):
+                    current = state.get_programmer_value(fid, attr)
+                    what, value = _snap_release(self, (fid, attr), current)
+                    if what == "drop":
+                        continue          # Kanal gehoert inzwischen jemand anderem
+                    if what == "reapply":
+                        state.set_programmer_value(fid, attr, int(value))
+                    elif value is None:
+                        state.clear_programmer_value(fid, attr)
+                    else:
+                        state.set_programmer_value(fid, attr, int(value))
         except Exception as e:
             print(f"[VCButton] Snap-Restore-Fehler: {e}")
         finally:

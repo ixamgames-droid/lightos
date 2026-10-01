@@ -132,7 +132,10 @@ class CommandLine(QWidget):
     def _execute(self, text: str):
         try:
             state = get_state()
-            result = cmd_execute(text, state)
+            # FM-52: eine Kommandozeile = EIN Schritt im Programmer-Verlauf.
+            from src.core.programmer_verlauf import schritt
+            with schritt(state, f"Befehl {text.strip()}"[:60]):
+                result = cmd_execute(text, state)
         except Exception as e:
             self._set_status(False, f"Fehler: {e}")
             return
