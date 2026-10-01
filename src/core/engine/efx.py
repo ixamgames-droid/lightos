@@ -639,7 +639,12 @@ class EfxInstance(Function):
                 attrs = dict(attrs)
                 attrs["intensity"] = 255
                 if any(ch.attribute == "shutter" for ch in chans):
-                    attrs["shutter"] = open_value_for(fx, "shutter")
+                    # ENG-27: nur mit Beleg oeffnen. Der 255-Vorgabewert von
+                    # open_value_for war hier die eigentliche Blitz-Quelle —
+                    # ohne Beleg bleibt der Shutter, wie er ist (wie „Alles Weiss").
+                    offen = open_value_for(fx, "shutter", -1)
+                    if offen >= 0:
+                        attrs["shutter"] = offen
             # M0.2: Pan/Tilt-Invert/Swap des Geraets anwenden.
             attrs = apply_pan_tilt_orientation(fx, attrs)
             # FM-16b: Mehrkopf-Fixtures (>=2 Pan- ODER >=2 Tilt-Kanaele) — jeder

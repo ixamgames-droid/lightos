@@ -1,7 +1,7 @@
 {
   "anleitung": "ausgabe_einrichten",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "c0ff194d",
+  "stand": "3403c9c7",
   "schrift": "Noto Sans (statt Roboto Condensed)",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py ausgabe_einrichten'.",
@@ -93,6 +93,17 @@
       ],
       "marken": [],
       "md5": "abb7cd0b9b4ddc67132e58d0409ca47c"
+    },
+    {
+      "datei": "09_blackout_dmx_monitor.png",
+      "szene": "09_blackout_dmx_monitor",
+      "titel": "BLACKOUT im DMX-Monitor: Licht 0, Pan/Tilt bleibt",
+      "groesse": [
+        1600,
+        325
+      ],
+      "marken": [],
+      "md5": "1919ecfd60ea2922b6d4b9327b94db85"
     }
   ]
 }

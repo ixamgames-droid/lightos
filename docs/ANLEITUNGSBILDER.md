@@ -150,6 +150,10 @@ abgeschnittenen Texte.
 - Weicht ein neu gerendertes Bild nur unmerklich vom vorhandenen ab (weniger als
   0,05 % der Pixel, zum Beispiel eine leicht anders glimmende Lampe), bleibt die alte
   Datei liegen. So ändert ein Neu-Rendern nicht jedes Mal alle Bilder im Diff.
+  Vorsicht: Auch ein geänderter Knopftext (etwa „Yes“ → „Ja“) bleibt unter dieser
+  Schwelle. Soll so eine Änderung ins Bild, die alte PNG vorher löschen.
+- Qt-Standardtexte (Knöpfe wie „Ja“/„Abbrechen“, Tastenkürzel wie „Strg+N“) sind
+  deutsch: Das Werkzeug lädt denselben Qt-Übersetzer wie die App.
 - `--pruefen` rendert in die Sandbox, schreibt nichts nach `docs/` und meldet je Bild
   „wie im Repo", „weicht ab" oder „fehlt noch". Exit-Code 1, wenn eine Szene nicht
   mehr baubar ist.
