@@ -86,7 +86,7 @@ Der Dialog blendet je nach gewählter **Aktion** nur die passenden Felder ein. B
 | Programmer leeren (Clear) | Leert den Programmer (gibt manuelle Farben/Snaps frei) |
 | Alles stoppen | Stoppt alle Executors/Playbacks (`stop_all`) |
 | Effekte stoppen (Tempo bleibt) | Stoppt alle laufenden Effekt-Funktionen; Tempo/BPM bleiben unverändert (Pause/Effekt-Stop) |
-| Blackout | Schaltet Blackout an, solange gedrückt (Moment-Override) — alles auf 0, nur Position/Gobo/Optik von Moving Heads mit Dimmer bleiben stehen; Laser/Nebel ganz aus |
+| Blackout | Schaltet Blackout an, solange gedrückt (Moment-Override) — alles auf 0, nur Position/Gobo/Optik von Moving Heads mit Dimmer bleiben stehen; Laser/Nebel ganz aus. Mit **Blackout-Ziel** nur die gewählten Geräte/Gruppen (s. u.) |
 | Laser scharf/unscharf | Schaltet den Netzwerk-Laser-Ausgang scharf/unscharf (unscharf = Ausgabe geblankt) — LAS-10 |
 | Laser NOT-AUS | Laser-Not-Aus: sofort dunkel + entwaffnen |
 | Laser-Muster abrufen | Ruft ein gespeichertes Laser-Muster (Muster-Palette) ab — LAS-18 |
@@ -125,6 +125,16 @@ Der Dialog blendet je nach gewählter **Aktion** nur die passenden Felder ein. B
 | Tap-Tempo | Effekt-internes Tap-Tempo |
 
 > Mehrfach-Aktionen, Pad-Stile (APC), Exklusiv/Geräte-Solo und Long-Press lassen sich beliebig kombinieren — so wird ein Button zum Pad mit mehreren Wirkungen.
+
+## Blackout mit Ziel (VCB-11)
+
+Bei der Aktion **Blackout** zeigt der Dialog die Liste **Blackout-Ziel**. Bleibt sie leer, ist die Taste der globale Blackout wie bisher. Mit **+ Gerät/Gruppe hinzufügen** lassen sich einzelne Geräte und/oder Fixture-Gruppen eintragen — dann schaltet die Taste, solange sie gedrückt ist, **nur diese** dunkel; alles andere läuft weiter. Es gilt dieselbe Regel wie beim globalen Blackout: Dimmer, Farbe und Intensität gehen auf 0, Pan/Tilt/Gobo/Optik von Lampen mit Dimmer bleiben stehen, Lampen ohne Dimmer sowie Laser und Nebel gehen ganz aus.
+
+- **Gruppen** werden zur Laufzeit aufgelöst: wird die Gruppe geändert (Gruppen-Ansicht oder Live View), folgt auch eine gerade gehaltene Taste. Enthält die Gruppe nur einzelne **Köpfe** eines Mehrkopf-Geräts (z. B. Kopf 2 und 3 einer Pixelbar), gehen nur diese Köpfe dunkel; gemeinsame Kanäle wie ein Master-Dimmer bleiben — wie beim Submaster pro Kopf. Alle Köpfe zusammen zählen als ganzes Gerät.
+- **Mehrere Tasten** überlagern sich: lässt man eine los, bleiben die Geräte der anderen dunkel.
+- **Loslassen, Taste löschen, Bank wechseln, Show laden** geben den Teil-Blackout frei — es bleibt nichts hängen. Wechselt nur die Hauptansicht oder wird das Fenster minimiert, während ein MIDI-Pad gehalten ist, bleibt es dunkel (wie beim globalen Blackout).
+- DMX-Monitor und Visualizer zeigen den Teil-Blackout wie den globalen. Der Laser-NOT-AUS bleibt unabhängig davon die letzte Ebene.
+- Gespeichert wird das Ziel in der Show (`blackout_fids`, `blackout_groups`); ältere Layouts ohne diese Felder laden als globaler Blackout.
 
 ## Bindung an einen Effekt
 
