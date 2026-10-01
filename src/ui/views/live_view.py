@@ -663,6 +663,11 @@ class StageCanvas(QWidget):
         # Self-Service); Default moderat 30 -> MH-Kopf (size*0.4) bleibt erkennbar.
         self._fixture_size: float = float(lv_prefs.get("fixture_size", 30.0))
         self._selected_fids: list[int] = []
+        # FM-51 C: Geraete, die NUR ueber Weiss-Segmente gewaehlt sind ("1:w3").
+        # Reine ANZEIGE (Ring) — bewusst getrennt von ``_selected_fids``, denn
+        # die Canvas-Auswahl wird bei Klick/Gummiband/„Gruppe aus Auswahl"
+        # zurueckgeschrieben und machte das Segment sonst zum ganzen Geraet.
+        self._teil_fids: set[int] = set()
         self._drag_fid: int | None = None
         self._drag_offset: QPointF = QPointF()
         # Drag-Schwelle: ein reiner Klick (ohne Bewegung) darf das Fixture weder
@@ -712,6 +717,28 @@ class StageCanvas(QWidget):
         Bewusst OHNE selection_changed-Emit — der Aufrufer pflegt den globalen
         State selbst (sonst Ping-Pong zwischen Liste und Canvas)."""
         self._selected_fids = list(fids)
+        self.update()
+
+    def _teil_auswahl_entfernen(self, fid: int) -> None:
+        """Nimmt die Weiss-Segment-Zellen von ``fid`` aus der globalen Auswahl."""
+        try:
+            from src.core.group_cells import ACHSE_WEISS, parse_zelle
+            st = get_state()
+            rest = []
+            for z in st.get_selected_cells():
+                zf, achse, _idx = parse_zelle(z)
+                if zf is not None and int(zf) == int(fid) and achse == ACHSE_WEISS:
+                    continue
+                rest.append(z)
+            self._teil_fids.discard(int(fid))
+            st.set_selected_cells(rest)
+        except Exception as e:
+            print(f"[live_view] Teil-Auswahl entfernen: {e}")
+
+    def set_teil_markierung(self, fids) -> None:
+        """FM-51 C: nur ueber Weiss-Segmente gewaehlte Geraete markieren (Ring),
+        ohne sie in die Canvas-Auswahl aufzunehmen."""
+        self._teil_fids = {int(f) for f in (fids or ())}
         self.update()
 
     # ── Canvas-Groesse (Welt × Zoom) ─────────────────────────────────────────
@@ -1335,12 +1362,14 @@ class StageCanvas(QWidget):
             # oder hervorgehobene Fixtures bekommen IMMER das volle Label (der Nutzer
             # will genau die sehen), unabhaengig von der Dichte.
             _lod = _lod_for_screen_gap(self._nn_gap.get(fixture.fid, 1e9) * self.zoom)
-            if fixture.fid in self._selected_fids or fixture.fid in self._highlight_fids:
+            _teil = fixture.fid in self._teil_fids
+            if (fixture.fid in self._selected_fids or _teil
+                    or fixture.fid in self._highlight_fids):
                 _lod = 0
             FixtureRenderer.draw(
                 painter, _render_type, x, y,
                 self._fixture_size, color, intensity, label,
-                selected=(fixture.fid in self._selected_fids),
+                selected=(fixture.fid in self._selected_fids or _teil),
                 pan=pan, tilt=tilt,
                 effects=effects, anim_phase=anim_phase,
                 blink_off=not blink_on,
@@ -1384,6 +1413,15 @@ class StageCanvas(QWidget):
                 x, y = self._positions[hit]
                 if shift or self._multi_select_mode:
                     # Toggle ohne Drag (Shift ODER Touch-Mehrfachauswahl-Modus)
+                    if hit in self._teil_fids and hit not in self._selected_fids:
+                        # FM-51 C (Review): Das Geraet ist nur ueber Weiss-Segmente
+                        # gewaehlt und traegt den Ring der Teil-Markierung. Umschalten
+                        # heisst hier ABWAEHLEN (seine Segment-Zellen raus) — nicht
+                        # hinzufuegen, sonst wuerde aus dem Segment das ganze Geraet.
+                        self._teil_auswahl_entfernen(hit)
+                        self.fixture_clicked.emit(hit)
+                        self.update()
+                        return
                     if hit in self._selected_fids:
                         self._selected_fids.remove(hit)
                     else:
@@ -3084,6 +3122,11 @@ class LiveView(QWidget):
             if fids is None:
                 fids = self._state.get_selected_fids()
             self._canvas.set_selection(list(fids))
+            # FM-51 C: ein nur ueber Weiss gewaehltes Geraet fehlt im Payload
+            # (selected_fids) — es bekommt trotzdem seinen Ring.
+            nur_weiss = getattr(self._state, "nur_weiss_fids", None)
+            self._canvas.set_teil_markierung(
+                nur_weiss() if callable(nur_weiss) else ())
             self._mirror_selection_to_tree(fids)
             self._clear_status()
             self._update_selection_label()

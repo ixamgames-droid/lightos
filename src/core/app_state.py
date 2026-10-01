@@ -3899,6 +3899,11 @@ class AppState:
         intensity_wins: set[int] = set()
         if getattr(self, "programmer_focus", None) == "Intensity" and func_inten_fids:
             sel = set(getattr(self, "selected_fids", None) or ())
+            # FM-51 C: auch ein NUR ueber Weiss-Segmente gewaehltes Geraet
+            # ("1:w3") — sein Segment-Dimmer (weiss_dimmer_key) muss im
+            # Intensity-Tab genauso gewinnen wie bei ganzen Geraeten.
+            if getattr(self, "selected_cells", None):
+                sel.update(self.auswahl_referenzierte_fids())
             intensity_wins = func_inten_fids & sel
         owned_by_func = func_inten_fids - intensity_wins   # hier wirkt Programmer NICHT
 

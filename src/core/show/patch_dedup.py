@@ -166,7 +166,16 @@ def referenzen(state, fid: int) -> list[str]:
 
     _melde("programmer", lambda: fid in (getattr(state, "programmer", {}) or {}))
     _melde("base_levels", lambda: fid in (getattr(state, "base_levels", {}) or {}))
-    _melde("auswahl", lambda: fid in (getattr(state, "selected_fids", []) or []))
+    # FM-51 C: ein NUR ueber Weiss-Segmente gewaehltes Geraet ("1:w3") steht
+    # bewusst nicht in ``selected_fids`` — erwaehnt ist es trotzdem. Hier ist
+    # Uebertreiben die sichere Richtung (jede Unsicherheit ist eine Referenz),
+    # darum zaehlt jede fid, die in den Auswahl-Zellen vorkommt.
+    def _auswahl():
+        if fid in (getattr(state, "selected_fids", []) or []):
+            return True
+        from ..group_cells import referenzierte_fids
+        return fid in referenzierte_fids(getattr(state, "selected_cells", None) or [])
+    _melde("auswahl", _auswahl)
 
     # Funktionen: EFX/Matrix/Scene/Carousel/Chaser/Collection — die Auflösung
     # (inkl. Rekursion und Zyklusschutz) leistet der FunctionManager selbst.
