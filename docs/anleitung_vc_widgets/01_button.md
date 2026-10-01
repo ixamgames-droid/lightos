@@ -86,7 +86,7 @@ Der Dialog blendet je nach gewählter **Aktion** nur die passenden Felder ein. B
 | Programmer leeren (Clear) | Leert den Programmer (gibt manuelle Farben/Snaps frei) |
 | Alles stoppen | Stoppt alle Executors/Playbacks (`stop_all`) |
 | Effekte stoppen (Tempo bleibt) | Stoppt alle laufenden Effekt-Funktionen; Tempo/BPM bleiben unverändert (Pause/Effekt-Stop) |
-| Blackout | Schaltet Blackout an, solange gedrückt (Moment-Override) |
+| Blackout | Schaltet Blackout an, solange gedrückt (Moment-Override) — alles auf 0, nur Position/Gobo/Optik von Moving Heads mit Dimmer bleiben stehen; Laser/Nebel ganz aus |
 | Laser scharf/unscharf | Schaltet den Netzwerk-Laser-Ausgang scharf/unscharf (unscharf = Ausgabe geblankt) — LAS-10 |
 | Laser NOT-AUS | Laser-Not-Aus: sofort dunkel + entwaffnen |
 | Laser-Muster abrufen | Ruft ein gespeichertes Laser-Muster (Muster-Palette) ab — LAS-18 |

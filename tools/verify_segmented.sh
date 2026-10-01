@@ -58,6 +58,8 @@ fi
 
 OUTDIR="${LIGHTOS_SEG_OUT:-$REPO/.pytest_segments}"
 rm -rf "$OUTDIR"; mkdir -p "$OUTDIR"
+# XPLAT-43: Startzeit fuer dauer_s in summary.json (s. Ende des Skripts).
+SEG_START="${EPOCHREALTIME:-$(date +%s)}"
 
 # ── Gate-Umgebung ───────────────────────────────────────────────────────────
 # MUSS identisch zu tools/verify_loop.sh bleiben — test_gate_runner_parity.py
@@ -356,6 +358,19 @@ if [ "$BAD" -gt 0 ]; then
     # neun Dateien lang genau hinter dieser Lesart.
     echo "[seg] Fehlgeschlagene Tests:"
     grep -h '^FAILED' "$OUTDIR"/*.log 2>/dev/null | sed 's/^/  /' | sort -u
+fi
+# ── XPLAT-43: maschinenlesbare Bilanz ───────────────────────────────────────
+# $OUTDIR/summary.json mit denselben Feldern wie verify_segmented.ps1 (commit,
+# plattform, python, arch, gruen/rot/crash/timeout, toleriert[], gesamt,
+# dauer_s, zeitstempel). Grundlage, um ueber Wochen zu sehen, welche Dateien
+# wo abstuerzen oder haengen.
+#
+# ★ Der Exit-Code haengt NICHT daran: scheitert das Schreiben, steht hier eine
+# Warnung und der Lauf endet genauso wie ohne die Datei. `toleriert` bleibt
+# auf Linux leer — dieser Runner zaehlt jeden rc != 0 rot (XPLAT-27/29).
+if ! "$PY" "$REPO/tools/_gate_summary.py" --out "$OUTDIR" \
+        --gesamt "${#FILES[@]}" --start "$SEG_START" 8>&- 9>&-; then
+    echo "[seg] WARNUNG (XPLAT-43): summary.json nicht geschrieben — Exit-Code unberuehrt."
 fi
 # ★★ QA-53: Eine unvollstaendige Ergebnisliste darf NICHT gruen sein.
 #

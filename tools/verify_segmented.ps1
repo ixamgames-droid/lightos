@@ -105,6 +105,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$laufStart = Get-Date    # XPLAT-43: fuer dauer_s in summary.json
 $repo = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 
 # venv-Python: identische Kandidaten-Reihenfolge wie tools/verify_loop.ps1
@@ -624,6 +625,68 @@ if ($fail.Count) {
         Select-String -Path $_.FullName -Pattern '^FAILED' -ErrorAction SilentlyContinue
     } | ForEach-Object { $_.Line } | Sort-Object -Unique | ForEach-Object { Write-Host ("  " + $_) }
 }
+
+# -- XPLAT-43: maschinenlesbare Bilanz ---------------------------------------
+# $outDir\summary.json mit DENSELBEN Feldern wie die Linux-Seite
+# (tools/_gate_summary.py, von verify_segmented.sh aufgerufen) -
+# tests/test_xplat43_gate_summary.py vergleicht die Namen.
+#
+# `toleriert` sind die Dateien, die die Einzelfall-Toleranz dieses Runners NICHT
+# rot gezaehlt hat: Crashes und Timeouts (s. Kopf, XPLAT-28). Auf Linux bleibt
+# die Liste leer. Der Unterschied ist bewusst (XPLAT-27/29) - die Datei macht
+# ihn nur sichtbar und zaehlbar.
+#
+# ★ Der Exit-Code haengt NICHT daran. Alles hier steht unter 'Continue' und in
+# try/catch: ein fehlendes git, ein Python, das auf stderr schreibt, oder eine
+# gesperrte Datei duerfen den Lauf nicht kippen (dieselbe Klasse wie XPLAT-27).
+# Python wird hier bewusst NICHT fuer das Schreiben benutzt, nur fuer Version
+# und Architektur des Interpreters, der die Segmente gefahren hat.
+# Geschrieben wird UTF-8 OHNE BOM (PowerShell 5.1 schreibt mit Set-Content
+# -Encoding UTF8 einen BOM, an dem json.load ohne utf-8-sig scheitert).
+function Write-GateSummary {
+    $prevEAP = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $commit = $null
+        try {
+            $commit = (& git -C $repo rev-parse HEAD 2>$null | Select-Object -First 1)
+            if ($commit) { $commit = "$commit".Trim() } else { $commit = $null }
+        } catch { $commit = $null }
+
+        $pyVersion = $null; $arch = $null
+        try {
+            $info = @(& $py -c "import platform; print(platform.python_version()); print(platform.machine())" 2>$null)
+            if ($info.Count -ge 2) { $pyVersion = "$($info[0])".Trim(); $arch = "$($info[1])".Trim() }
+        } catch { }
+        if (-not $arch) {
+            $arch = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
+        }
+
+        $daten = [ordered]@{
+            commit      = $commit
+            plattform   = "windows"
+            python      = $pyVersion
+            arch        = $arch
+            gruen       = [int]$okCount
+            rot         = [int]$fail.Count
+            crash       = [int]$crash.Count
+            timeout     = [int]$timeout.Count
+            toleriert   = [string[]]@(@($crash) + @($timeout))
+            gesamt      = [int]$files.Count
+            dauer_s     = [math]::Round(((Get-Date) - $laufStart).TotalSeconds, 1)
+            zeitstempel = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'",
+                              [System.Globalization.CultureInfo]::InvariantCulture)
+        }
+        $json = ConvertTo-Json -InputObject $daten -Depth 3
+        $ziel = Join-Path $outDir "summary.json"
+        [System.IO.File]::WriteAllText($ziel, $json + "`n", (New-Object System.Text.UTF8Encoding($false)))
+    }
+    catch {
+        Write-Host ("[seg] WARNUNG (XPLAT-43): summary.json nicht geschrieben - Exit-Code unberuehrt. {0}" -f $_.Exception.Message) -ForegroundColor DarkYellow
+    }
+    finally { $ErrorActionPreference = $prevEAP }
+}
+Write-GateSummary
 
 # Exit-Vertrag wie run_tests.ps1 -Isolate: NUR echte Test-Failures faerben rot.
 # Crashes/Timeouts sind Umgebungs-Flakiness (s. Kopf). Bewusst 1 statt der

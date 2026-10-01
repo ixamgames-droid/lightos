@@ -97,6 +97,8 @@ import sys
 # etwas anderes fuer "aktiv" halten als das Werkzeug, das den Claim schreibt.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import session_claim  # noqa: E402
+# XPLAT-41: die Liste der nur beobachtenden Checks — dieselbe wie in pr_ci_status.
+import _ci_beobachtend  # noqa: E402
 
 BEREIT = "bereit"
 NIE_GEPRUEFT = "nie geprueft"
@@ -114,8 +116,15 @@ OHNE_CLAIM = "ohne Claim"
 
 def urteil(anzahl_checks: int, schluesse: list[str], zurueck: int,
            mergeable: str | None, kopf_alter_s: float | None = None,
-           entwurf: bool = False) -> tuple[str, str]:
+           entwurf: bool = False,
+           beobachtet: list[tuple[str, str]] | None = None) -> tuple[str, str]:
     """``(Urteil, Begruendung)`` — die ganze Entscheidungsregel an einer Stelle.
+
+    ``anzahl_checks``/``schluesse`` sind nur die BLOCKIERENDEN Checks.
+    ``beobachtet`` (XPLAT-41) sind ``(Name, Zustand)`` der Checks aus
+    ``_ci_beobachtend.BEOBACHTEND`` — sie gehen nicht ins Urteil ein, ihr
+    Zustand wird an die Begruendung angehaengt. Die Trennung macht
+    :func:`teile_checks`, weil hier die Namen schon fehlen.
 
     Bewusst ohne Netz und ohne ``gh``: so misst der Test diese Funktion und
     nicht seine eigene Nachbildung des Aufrufs.
@@ -124,6 +133,32 @@ def urteil(anzahl_checks: int, schluesse: list[str], zurueck: int,
     der einzige Zustand ist, den man am PR nicht sieht — rot, laufend und
     Konflikt zeigt die Oberflaeche von selbst.
     """
+    u, grund = _urteil(anzahl_checks, schluesse, zurueck, mergeable,
+                       kopf_alter_s, entwurf)
+    zusatz = _ci_beobachtend.hinweis(beobachtet or [])
+    return u, (f"{grund}; {zusatz}" if zusatz else grund)
+
+
+def teile_checks(check_runs: list[dict]) -> tuple[list[dict], list[tuple[str, str]]]:
+    """XPLAT-41: ``(blockierende Check-Runs, [(Name, Zustand) der beobachtenden])``.
+
+    Hier und nicht in :func:`urteil`, weil nur die Check-Runs-Liste die Namen
+    traegt — ``schluesse`` ist schon die nackte Ergebnisliste.
+    """
+    pflicht, beobachtet = [], []
+    for c in check_runs:
+        name = c.get("name") or ""
+        if _ci_beobachtend.ist_beobachtend(name):
+            beobachtet.append((name, _ci_beobachtend.zustand(
+                c.get("status"), c.get("conclusion"))))
+        else:
+            pflicht.append(c)
+    return pflicht, beobachtet
+
+
+def _urteil(anzahl_checks: int, schluesse: list[str], zurueck: int,
+            mergeable: str | None, kopf_alter_s: float | None,
+            entwurf: bool) -> tuple[str, str]:
     if anzahl_checks == 0:
         if kopf_alter_s is not None and kopf_alter_s < FRISCH_SEKUNDEN:
             return FRISCH, (f"Kopf-Commit ist {int(kopf_alter_s)} s alt — GitHub legt "
@@ -280,7 +315,9 @@ def main(argv=None) -> int:
         info = _gh_json("pr", "view", str(nr), "--json",
                         "headRefOid,headRefName,title,mergeable,isDraft")
         runs = _gh_json("api", f"repos/:owner/:repo/commits/{info['headRefOid']}/check-runs")
-        liste = runs.get("check_runs") or []
+        # XPLAT-41: beobachtende Legs (continue-on-error) zaehlen nicht mit —
+        # ihr Check-Run waere sonst rot bzw. "laeuft noch" bis zum Timeout.
+        liste, beobachtet = teile_checks(runs.get("check_runs") or [])
         schluesse = [c.get("conclusion") for c in liste]
         # ★ CDX-57: wie weit haengt der GEPRUEFTE Stand hinter main? Eine Aussage
         # ueber Commits — im Gegensatz zur frueheren Zeitprobe unabhaengig davon,
@@ -296,7 +333,7 @@ def main(argv=None) -> int:
                      - datetime.fromisoformat(kopf_zeit.replace("Z", "+00:00"))).total_seconds()
         u, grund = urteil(len(liste), schluesse, zurueck,
                           info.get("mergeable"), alter,
-                          bool(info.get("isDraft")))
+                          bool(info.get("isDraft")), beobachtet)
         if tafel_fehler:
             claim_ok, claim_grund = False, tafel_fehler
         else:

@@ -33,6 +33,15 @@ Aufrufe::
     python tools/session_claim.py release OUT-51 --session B --status done
     python tools/session_claim.py blocker "Rig haengt am Enttec — nicht neu starten" \\
         --session A
+    python tools/session_claim.py blocker --session A --datei - <<'EOF'
+    AN B: bitte `app_state.py` erst nach meinem Merge anfassen
+    EOF
+    python tools/session_claim.py list --fuer B   # Briefe an B (PROC-17)
+
+Windows PowerShell 5.1: ``… | python … --datei -`` kodiert die Pipe nach
+``$OutputEncoding`` (Vorgabe US-ASCII) — Umlaute kommen still als ``?`` an.
+Dort den Dateiweg nehmen (``--datei brief.txt``, Datei als UTF-8 speichern)
+oder vorher ``$OutputEncoding = [Text.UTF8Encoding]::new()`` setzen.
 
 Regeln stehen in ``COORDINATION.md``.
 """
@@ -222,6 +231,87 @@ def ueberschneidungen(tafel: dict, sitzung: str, item: str,
         if beruehrt:
             treffer.append((c, beruehrt))
     return treffer
+
+
+# ─── PROC-17: Briefe auf der Tafel ──────────────────────────────────────────
+# Die Blockerliste ist auch der Briefkasten zwischen den Sitzungen („AN B: …").
+# Bei 228 KB Tafel wurden solche Fragen schlicht ueberlesen: `list` zeigt
+# bewusst nur die juengsten fuenf (PROC-07), und alles davor ist fuer die
+# angesprochene Sitzung verloren, wenn sie es nicht gezielt sucht.
+
+# Ein Blocker-Eintrag beginnt mit Stempel und Sitzung: ``2026-10-01T08:00Z (B) …``
+_BLOCKER_KOPF = re.compile(r"^\S+\s+\(([^)]+)\)\s")
+# Anrede: ``AN B``, ``AN A UND B``, ``AN A, B UND C``, ``AN ALLE``. Bewusst nur
+# GROSS geschrieben — „an" ist im Fliesstext ein gewoehnliches Wort.
+_ANREDE = re.compile(r"\bAN\s+(ALLE\b|[A-Z]\b(?:\s*(?:,|UND)\s*[A-Z]\b)*)")
+
+#: Ab dieser Laenge wird ein Blocker-Text angemahnt (nicht abgelehnt).
+BLOCKER_LANG = 300
+
+
+def blocker_sitzung(eintrag: str) -> str | None:
+    """Die Sitzung, die den Eintrag geschrieben hat (``None`` = unlesbar)."""
+    m = _BLOCKER_KOPF.match(eintrag)
+    return m.group(1).strip() if m else None
+
+
+def ist_an(eintrag: str, sitzung: str) -> bool:
+    """Spricht der Eintrag ``sitzung`` an (``AN X`` / ``AN … UND X`` / ``AN ALLE``)?"""
+    ziel = sitzung.strip().upper()
+    for m in _ANREDE.finditer(eintrag):
+        gruppe = m.group(1)
+        if gruppe == "ALLE":
+            return True
+        if ziel in re.findall(r"\b[A-Z]\b", gruppe):
+            return True
+    return False
+
+
+def blocker_fuer(blocker: list[str], sitzung: str) -> list[str]:
+    """Alle Eintraege an ``sitzung`` NACH ihrem letzten eigenen Eintrag.
+
+    Ohne Altersgrenze: eine Frage von vor drei Tagen ist genau dann noch
+    offen, wenn die Sitzung seitdem nichts geschrieben hat. Hat sie noch nie
+    etwas geschrieben, zaehlt die ganze Liste.
+    """
+    ziel = sitzung.strip().upper()
+    start = 0
+    for i, b in enumerate(blocker):
+        if (blocker_sitzung(b) or "").upper() == ziel:
+            start = i + 1
+    return [b for b in blocker[start:] if ist_an(b, ziel)]
+
+
+def blocker_text(roh: bytes) -> str:
+    """Rohbytes (stdin oder Datei) -> EINE Blocker-Zeile.
+
+    UTF-8 (mit oder ohne BOM) und UTF-16 mit BOM — das Letzte schreibt
+    Windows PowerShell 5 mit ``Out-File``/``>`` als Vorgabe. Zeilenenden
+    ``\r\n``/``\r``/``\n`` sind gleich; Zeilen werden zu einer verbunden,
+    denn auf der Tafel ist ein Blocker genau ein Listenpunkt — eine zweite
+    Zeile ohne ``- `` davor wuerde beim naechsten Lesen still verschwinden.
+    Wirft ``UnicodeDecodeError`` bei allem anderen (lieber laut als ein
+    Ersatzzeichen auf der geteilten Tafel).
+    """
+    if roh.startswith((b"\xff\xfe", b"\xfe\xff")):
+        text = roh.decode("utf-16")
+    else:
+        text = roh.decode("utf-8-sig")
+    zeilen = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    return " ".join(z.strip() for z in zeilen if z.strip())
+
+
+# Ein ``?`` direkt zwischen zwei Buchstaben (``f?r``, ``Gr??e``) ist das
+# typische Muster eines verlorenen Umlauts: Windows PowerShell 5.1 kodiert eine
+# Pipe an ein natives Programm nach ``$OutputEncoding`` — Vorgabe US-ASCII —
+# und ersetzt alles ausserhalb davon STILL durch ``?``. Bei uns kommt dann
+# gueltiges UTF-8 an, die Dekodierung kann den Verlust nicht bemerken.
+_UMLAUT_VERLOREN = re.compile(r"[^\W\d_]\?+[^\W\d_]")
+
+
+def verdacht_verlorene_umlaute(text: str) -> list[str]:
+    """Stellen, an denen vermutlich ein Umlaut zu ``?`` geworden ist."""
+    return [m.group(0) for m in _UMLAUT_VERLOREN.finditer(text)]
 
 
 def ist_verfallen(claim: dict, t: datetime) -> bool:
@@ -460,6 +550,18 @@ def cmd_list(args, repo: str) -> int:
         if c["dateien"]:
             print(f"{'':<16} Dateien: {c['dateien']}")
     blocker = tafel["blocker"]
+    fuer = getattr(args, "fuer", None)
+    if fuer:
+        # PROC-17: statt der juengsten fuenf genau die Briefe, die seit dem
+        # letzten eigenen Eintrag an diese Sitzung gingen — ungekuerzt.
+        an = blocker_fuer(blocker, fuer)
+        if an:
+            print(f"\nAn {fuer} seit dem letzten eigenen Eintrag ({len(an)}):")
+            for b in an:
+                print(f"  - {b}")
+        else:
+            print(f"\nNichts an {fuer} seit dem letzten eigenen Eintrag.")
+        return 0
     if blocker:
         # PROC-07: die Blockerliste waechst unbegrenzt und macht 99 % der Ausgabe
         # aus (gemessen 2026-09-01: 11.516 von 11.637 Bytes). `list` steht als
@@ -622,7 +724,62 @@ def cmd_release(args, repo: str) -> int:
     return 0 if ok else 1
 
 
+def _blocker_quelle(args) -> str | None:
+    """PROC-17: Text aus dem Argument, aus ``--datei <pfad>`` oder ``--datei -``.
+
+    stdin bzw. Datei gibt es, weil Freitext als Shell-Argument zwei Fallen
+    hat: Backticks fuehrt die Shell AUS (``"… `x` …"`` wird zu dessen
+    Ausgabe), und lange Texte mit Anfuehrungszeichen brechen das Quoting.
+    Mit ``<<'EOF' … EOF | … blocker --datei -`` kommt der Text unveraendert an.
+    """
+    datei = getattr(args, "datei", None)
+    if datei is None:
+        return args.text
+    if datei == "-":
+        if sys.stdin is None:              # pythonw.exe auf Windows: kein stdin
+            raise OSError("kein stdin vorhanden")
+        strom = getattr(sys.stdin, "buffer", None)
+        roh = strom.read() if strom is not None else sys.stdin.read().encode("utf-8")
+        text = blocker_text(roh)
+        verdacht = verdacht_verlorene_umlaute(text)
+        if verdacht:
+            # Nur ein Hinweis, kein Abbruch: ``?`` zwischen Buchstaben kann
+            # auch gewollt sein. Aber der Verlust selbst ist stumm.
+            print(f"Hinweis: '?' zwischen Buchstaben ({', '.join(verdacht[:3])})"
+                  f" — verlorene Umlaute? Unter Windows PowerShell 5.1 kodiert "
+                  f"die Pipe nach $OutputEncoding (US-ASCII). Besser "
+                  f"`--datei brief.txt` (Datei als UTF-8 speichern) oder "
+                  f"`$OutputEncoding = [Text.UTF8Encoding]::new()`. "
+                  f"Wird trotzdem geschrieben.", file=sys.stderr)
+        return text
+    with open(datei, "rb") as f:
+        roh = f.read()
+    return blocker_text(roh)
+
+
 def cmd_blocker(args, repo: str) -> int:
+    if (getattr(args, "datei", None) is None) == (args.text is None):
+        print("Blocker-Text ODER --datei <pfad|-> angeben (genau eins).",
+              file=sys.stderr)
+        return 2
+    try:
+        args.text = _blocker_quelle(args)
+    except UnicodeDecodeError:
+        print("Blocker-Text ist kein UTF-8 (Datei als UTF-8 speichern).",
+              file=sys.stderr)
+        return 2
+    except OSError as e:
+        print(f"Blocker-Datei nicht lesbar: {e}", file=sys.stderr)
+        return 2
+    if not args.text.strip():
+        print("Blocker-Text ist leer.", file=sys.stderr)
+        return 2
+    if not args.remove and len(args.text) >= BLOCKER_LANG:
+        # Nur ein Hinweis: manches braucht den Platz. Aber die Tafel wird
+        # gelesen, nicht durchsucht — ein langer Brief wird eher ueberlesen.
+        print(f"Hinweis: {len(args.text)} Zeichen (ab {BLOCKER_LANG} wird ein "
+              f"Blocker leicht ueberlesen) — Details besser ins BACKLOG, hier "
+              f"nur Kern + Verweis. Wird trotzdem geschrieben.", file=sys.stderr)
     funde = pruefe_oeffentlich(args.text)
     if funde:
         print("Abgelehnt — die Tafel liegt in einem OEFFENTLICHEN Repo:",
@@ -658,6 +815,9 @@ def main(argv=None) -> int:
     s.add_argument("--blocker", type=int, default=_BLOCKER_VORGABE,
                    help=f"Wieviele der juengsten Blocker zeigen "
                         f"(Vorgabe {_BLOCKER_VORGABE}; 0 = keine, -1 = alle)")
+    s.add_argument("--fuer", metavar="SITZUNG",
+                   help="nur Blocker mit 'AN <SITZUNG>' (auch 'AN … UND <SITZUNG>', "
+                        "'AN ALLE') nach deren letztem eigenen Eintrag")
     s.set_defaults(fn=cmd_list)
 
     s = sub.add_parser("claim", help="Item belegen")
@@ -685,7 +845,14 @@ def main(argv=None) -> int:
     s.set_defaults(fn=cmd_release)
 
     s = sub.add_parser("blocker", help="Falle/Blocker fuer die andere Sitzung")
-    s.add_argument("text")
+    s.add_argument("text", nargs="?")
+    s.add_argument("--datei", metavar="PFAD",
+                   help="Text aus Datei (UTF-8) lesen, '-' = stdin; "
+                        "vermeidet Backtick-/Quoting-Fallen der Shell. "
+                        "Windows PowerShell 5.1: Pipe verliert Umlaute "
+                        "($OutputEncoding = US-ASCII) — dort Dateiweg nehmen "
+                        "(UTF-8) oder $OutputEncoding = "
+                        "[Text.UTF8Encoding]::new()")
     s.add_argument("--session", required=True)
     s.add_argument("--remove", action="store_true")
     s.set_defaults(fn=cmd_blocker)
