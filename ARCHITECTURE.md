@@ -140,7 +140,11 @@ skaliert (Dim-/Farbadressen × intensity) ins gemeinsame Scratch gemerged.
    (Moving Heads bleiben stehen). Ungepatchte Roh-Adressen im selben Universum,
    `raw`-/Fine-Kanäle, unbekannte Attribute, Geräte ohne Dimmer, Laser/Nebel &
    Co. und ungepatchte Universen gehen komplett auf 0 (OUT-57,
-   `AppState._build_blackout_keep_mask`).
+   `AppState._build_blackout_keep_mask`). Eine VC-Blackout-Taste mit Ziel
+   (VCB-11) nullt nach demselben Geräte-Schnitt (`_blackout_aufteilung`) nur
+   die Licht-Adressen ihrer Ziel-Geräte: je Taste ein Slot im OutputManager
+   (`set_target_blackout`), die Vereinigung aller Slots wird nach dem GM
+   angewandt, der Laser-NOT-AUS bleibt danach die letzte Ebene.
 
 **Bekannte Grenzfälle** (by design, bei Showbau wissen):
 - Die WP-6-/EE-02-Erkennung ist ein Per-Frame-**Diff gegen den Default-Frame**:

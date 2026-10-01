@@ -1,12 +1,24 @@
-"""Reproduzierbare Screenshots für die Hochzeit-Tempo-Anleitung.
+"""Reproduzierbare Screenshots für die Hochzeit-Tempo-Anleitung (ARCHIVIERT).
 
 Die Show wird nur im Arbeitsspeicher bedient. ``hochzeit.lshow`` wird nicht
 erneut gespeichert oder verändert.
+
+★ **Ausgemustert mit TOOL-5 (2026-10-02).** DOC-17 hat die Anleitung
+``docs/anleitung_hochzeit_tempo/`` auf Tempo-Controller umgestellt und ihre
+Bilder entfernt — sie ist seither bildlos. Dieses Werkzeug fotografierte das
+ALTE Bedienkonzept (Speed-Dials „Farb Wechsel"/„An Aus" als Multiplikatoren)
+und hat damit kein Ziel mehr. Es schreibt deshalb nicht mehr nach ``docs/``,
+sondern in einen Wegwerf-Ordner (``LIGHTOS_CAPTURE_OUT`` oder Temp-Ordner).
+Neue Anleitungsbilder entstehen ueber ``tools/anleitungsbilder.py``.
+
+TOOL-4: fehlt der Show ein erwartetes Widget, nennt die Meldung die Show, das
+fehlende Widget und die vorhandenen — statt eines nackten ``RuntimeError``.
 """
 from __future__ import annotations
 
 import os
 import sys
+import tempfile
 from pathlib import Path
 
 # XPLAT-25: ein Capture braucht ein ECHT gerendertes Fenster — offscreen
@@ -22,13 +34,13 @@ os.environ.setdefault("QT_OPENGL", "software")
 os.environ.setdefault("LIGHTOS_NO_OUTPUT_THREAD", "1")
 os.environ.setdefault("LIGHTOS_NO_AUDIO_AUTOSTART", "1")
 # STAB-CURSHOW (a): load_show schreibt in die Show-DB — isolierte Wegwerf-DB via
-# _gen_env, damit der Capture-Lauf Davids echte data/current_show.db nicht anfasst.
-# (Die native Plattform oben gewinnt gegen ein geerbtes offscreen.)
-import _gen_env  # noqa: F401
+# _gen_env (zieht _bootstrap mit), damit der Capture-Lauf die echte
+# data/current_show.db nicht anfasst. (Die native Plattform oben gewinnt gegen
+# ein geerbtes offscreen.) _bootstrap legt Repo-Root + tools/ auf sys.path.
+import _bootstrap  # noqa: F401
 from _showpath import find_show
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
+ROOT = Path(_bootstrap.REPO_ROOT)
 
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication, QDialog, QGroupBox
@@ -41,8 +53,26 @@ from src.ui.virtualconsole.vc_live_editor import VCLiveEditor
 from src.ui.virtualconsole.vc_speedial import VCSpeedDial
 
 
-SHOW = find_show("hochzeit.lshow")
-OUT = ROOT / "docs" / "anleitung_hochzeit_tempo" / "img"
+SHOW_NAME = "hochzeit.lshow"
+SHOW = find_show(SHOW_NAME, hint="private Show des Projektinhabers, nicht im Repo")
+# TOOL-5: nicht mehr nach docs/ — die Anleitung ist seit DOC-17 bildlos.
+OUT = Path(os.environ.get("LIGHTOS_CAPTURE_OUT")
+           or Path(tempfile.gettempdir()) / "lightos_capture_hochzeit_tempo")
+#: Speed-Dials (Bank 4) aus dem alten Multiplikator-Layout, die das Werkzeug fotografiert.
+ERWARTETE_DIALS = ("Farb Wechsel", "An Aus")
+
+
+def fehlende_dials_meldung(vorhanden, show=SHOW_NAME) -> str:
+    """TOOL-4: Leerer Text, wenn alle erwarteten Dials da sind — sonst eine
+    Meldung, die Show, fehlende und vorhandene Dials nennt."""
+    fehlend = [c for c in ERWARTETE_DIALS if c not in vorhanden]
+    if not fehlend:
+        return ""
+    da = ", ".join(sorted(f"'{c}'" for c in vorhanden)) or "keine"
+    return (f"Show '{show}' passt nicht zu diesem (archivierten) Werkzeug: "
+            f"Speed-Dial(s) fehlen: {', '.join(repr(c) for c in fehlend)}. "
+            f"Vorhanden: {da}. Das Werkzeug erwartet das alte Multiplikator-Layout "
+            f"(Bank 4); die Anleitung nutzt seit DOC-17 Tempo-Controller und keine Bilder.")
 
 
 def settle(app: QApplication, ms: int = 200) -> None:
@@ -100,9 +130,10 @@ def main() -> int:
     save_widget(window, "01_bank4_uebersicht.png")
 
     dials = {d.caption: d for d in vc._canvas.findChildren(VCSpeedDial)}
-    for caption in ("Farb Wechsel", "An Aus"):
-        if caption not in dials:
-            raise RuntimeError(f"Speed-Dial fehlt: {caption}")
+    meldung = fehlende_dials_meldung(dials)
+    if meldung:
+        window.close()
+        raise SystemExit(meldung)
 
     vc._btn_edit.setChecked(True)
     settle(app, 250)
@@ -142,6 +173,7 @@ def main() -> int:
 
     window.close()
     app.processEvents()
+    print(f"Bilder in {OUT}")
     os._exit(0)
 
 

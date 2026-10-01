@@ -9,7 +9,7 @@ import os
 import sys
 import math
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import _bootstrap  # noqa: F401  # Repo-Root + tools/ auf sys.path (siehe _bootstrap.py)
 os.environ.setdefault("LIGHTOS_SHOW_DB", os.path.join(os.environ.get("TEMP", "."), "lightos_check.db"))
 # Restliche Isolations-Schalter (offscreen, kein Output-Thread/Audio, SERIAL_INPROC
 # gegen den __mp_main__-Doppellauf) zentral aus _gen_env — DEMO-02/STAB-CURSHOW.
@@ -25,7 +25,7 @@ from src.core.engine.function_manager import get_function_manager
 from src.core.engine.bpm_manager import get_bpm_manager
 from src.core.show.show_file import load_show
 
-_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ROOT = _bootstrap.REPO_ROOT
 OUTDIR = os.path.join(_ROOT, "docs", "check_demo_show_full")
 os.makedirs(OUTDIR, exist_ok=True)
 SHOW = os.path.join(_ROOT, "shows", "Demo_Show_Full.lshow")
