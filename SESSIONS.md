@@ -16,6 +16,7 @@
 | PROC-16 | A | fix/proc16-claim-ueberschneidung | 2026-10-01T15:41Z | tools/session_claim.py,tests/test_session_claim.py,COORDINATION.md |
 | PROC-09 | A | feat/proc09-changelog-fragmente | 2026-10-01T15:41Z | changelog.d,tools,tests,CHANGELOG.md,WORKFLOW.md |
 | BPM-20 | B | fix/bpm20-bpm23-detektor | 2026-10-01T16:25Z | src/core/audio/tempo_tracker.py · tests/test_bpm20_tempo_genau.py · BACKLOG.md · CHANGELOG.md |
+| BPM-23 | B | fix/bpm20-bpm23-detektor | 2026-10-01T16:25Z | src/core/audio/tempo_tracker.py · src/ui/views/bpm_manager_view.py · src/ui/bpm_status_rules.py · docs/anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md · tests/test_bpm20_tempo_genau.py · tests/test_bpm23_eingerastet_konfidenz.py · tests/test_bpm_view_state_table.py · tests/test_bpm_status_rules.py · BACKLOG.md · CHANGELOG.md |
 
 ## Blocker & Fallen
 
@@ -152,7 +153,6 @@
 
 ## Verlauf
 
-- 2026-10-01T10:04Z A claim FM-52
 - 2026-10-01T11:08Z A done FM-52
 - 2026-10-01T11:08Z A aktualisiert FM-51: Branch fix/fm51-weiss-auswahl-ueberall -> fix/fm51b-speicher-scope; Dateien src/ui/widgets/position_tool.py,src/ui/views/programmer_view.py,src/core/app_state.py -> src/core/app_state.py,src/ui/views/snap_file_panel.py,src/ui/views/snapshots_view.py,src/ui/views/programmer_view.py,src/ui/main_window.py
 - 2026-10-01T12:14Z A aktualisiert FM-51: Branch fix/fm51b-speicher-scope -> fix/fm51c-anzeige; Dateien src/core/app_state.py,src/ui/views/snap_file_panel.py,src/ui/views/snapshots_view.py,src/ui/views/programmer_view.py,src/ui/main_window.py -> src/core/app_state.py,src/core/show/patch_dedup.py,src/ui/views/live_view.py
@@ -182,3 +182,4 @@
 - 2026-10-01T16:17Z B done BPM-22
 - 2026-10-01T16:18Z B done UI-67
 - 2026-10-01T16:25Z B claim BPM-20
+- 2026-10-01T16:25Z B claim BPM-23
