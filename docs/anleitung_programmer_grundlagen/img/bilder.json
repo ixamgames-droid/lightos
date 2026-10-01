@@ -1,7 +1,7 @@
 {
   "anleitung": "programmer_grundlagen",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "c0ff194d",
+  "stand": "53659073",
   "schrift": "Noto Sans (statt Roboto Condensed)",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py programmer_grundlagen'.",
@@ -40,7 +40,7 @@
           "beschriftung": "Bibliothek"
         }
       ],
-      "md5": "5c47d01bc8ea330265795d31addf4888"
+      "md5": "430233a3c421de6cab821efbc96f54a1"
     },
     {
       "datei": "02_gruppe.png",
@@ -96,7 +96,7 @@
           "beschriftung": "Lampen-Vorschau"
         }
       ],
-      "md5": "db1183a9814b1cb3611d744e6e8a465a"
+      "md5": "1146fc79d592da1a073f51cb94e924d8"
     },
     {
       "datei": "04_color.png",
@@ -208,7 +208,7 @@
           "beschriftung": "Als Palette"
         }
       ],
-      "md5": "1a63a40dc18f7ba0adf7f03669a9620f"
+      "md5": "f84592bc8a7e3b7492709a78a6579fc0"
     },
     {
       "datei": "09_positionswerkzeug.png",
@@ -248,7 +248,7 @@
           "beschriftung": "Anwenden"
         }
       ],
-      "md5": "185c8712b6bbe7e94eca9a7ce54a4767"
+      "md5": "ef039c86955e8cc6087eaeec5766ef10"
     },
     {
       "datei": "11_loeschen.png",

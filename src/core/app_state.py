@@ -533,6 +533,10 @@ class AppState:
         # Cuelisten und Playback
         from .engine.cue_stack import CueStack
         self.cue_stacks: list[CueStack] = []
+        # UI-62: die im Playback gewaehlte Cueliste (Ziel fuer "Cue aufnehmen",
+        # Taste R / Kommandozeile). Nur eine Merk-Referenz — gueltig ist sie erst,
+        # wenn sie noch in cue_stacks steckt; siehe aufnahme_cueliste().
+        self.gewaehlte_cueliste = None
         # LAS-07b: gezeichnete Laser-Muster (Show-persistent, Bibliothek für
         # den Zeichen-Editor + die Figur-Auswahl der Laser-Steuerseite).
         self.laser_figures: list = []
@@ -4598,6 +4602,19 @@ class AppState:
                         ex.stack = None
         self._emit("stacks_changed", None)
         self._emit("cue_stack_changed", None)
+
+    def aufnahme_cueliste(self):
+        """UI-62: Ziel-Cueliste fuer "Cue aufnehmen" ohne explizite Liste.
+
+        Die im Playback gewaehlte Liste, solange sie noch existiert (nach
+        Loeschen/Show-Laden ist die Referenz tot) — sonst Rueckfall auf die erste
+        Cueliste; None, wenn es keine gibt. Funktioniert auch ohne offene
+        Playback-Ansicht."""
+        stacks = self.cue_stacks
+        gew = self.gewaehlte_cueliste
+        if gew is not None and any(st is gew for st in stacks):
+            return gew
+        return stacks[0] if stacks else None
 
     def record_cue(self, stack, number: float, label: str = "",
                    fade_in: float = 2.0, fade_out: float = 0.0):

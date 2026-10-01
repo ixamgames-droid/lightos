@@ -1607,10 +1607,17 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Cue aufnehmen",
                                     "Zuerst eine Cueliste im Playback-Tab anlegen.")
             return
-        stack = stacks[0]
+        # UI-62: in die im Playback gewaehlte Cueliste (Rueckfall: erste) —
+        # frueher fest cue_stacks[0], mit mehreren Listen landete der Cue falsch.
+        stack = self._state.aufnahme_cueliste() or stacks[0]
         existing = [c.number for c in stack.cues]
         n = (max(existing) + 1.0) if existing else 1.0
-        self._state.record_cue(stack, n, f"Cue {n:.0f}")
+        self._state.record_cue(stack, n, f"Cue {n:g}")
+        try:
+            self.statusBar().showMessage(
+                f"Cue {n:g} in „{stack.name}“ aufgenommen", 3000)
+        except RuntimeError:
+            pass        # Fenster schon abgebaut
 
     # ── Multi-Page-Playback (T0.1) ─────────────────────────────────────────────
 

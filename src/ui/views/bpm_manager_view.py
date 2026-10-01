@@ -927,9 +927,11 @@ class BpmManagerView(QWidget):
         now = float(self._clock())
         cap = cap_snap = err = None
         audio_ok = True
+        audio_grund = "paket"                 # Modul nicht ladbar (z. B. numpy fehlt) = Paket fehlt
         try:
             from src.core.audio import capture as cap_mod
             audio_ok = bool(getattr(cap_mod, "HAS_SOUNDCARD", True))
+            audio_grund = getattr(cap_mod, "AUDIO_FEHLT_GRUND", None) or "paket"   # BPM-19
             cap = cap_mod.get_audio_capture()
             err = cap.last_error()
             cap_snap = cap.snapshot() if kind in AUDIO_KINDS else None
@@ -950,7 +952,8 @@ class BpmManagerView(QWidget):
                 kind, (self._src.current or (kind, self._device_pref))[1]),
             manual=(mgr.mode == BpmMode.MANUAL), bpm=float(mgr.bpm or 0.0),
             locked=bool(mgr.is_locked), min_bpm=float(mgr.min_bpm), max_bpm=float(mgr.max_bpm),
-            audio_available=audio_ok, capture_error=err,
+            audio_available=audio_ok, audio_grund=None if audio_ok else audio_grund,
+            capture_error=err,
             sink_missing=getattr(self._src, "missing_sink", None),
             song_available=self._song_available() if kind == "song" else None,
             ereignis=self._ereignis, ereignis_bis=self._ereignis_bis,

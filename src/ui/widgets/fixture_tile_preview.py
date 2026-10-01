@@ -1,8 +1,9 @@
 """FixtureTilePreview - ausklappbare 2D-Kachel-Vorschau der Programmer-Lampen.
 
 Zone UNTEN des 5-Zonen-Programmers (LAYOUT-05 / P-06). Spiegelt live den
-Programmierer-Output der aktuell selektierten Fixtures: Kachelfarbe = RGB,
-Helligkeit = Dimmer/Intensity. Reines 2D, ressourcenschonend (~20 Hz), keine
+Programmierer-Output der aktuell selektierten Fixtures: Kachelfarbe und
+Helligkeit kommen aus derselben Quelle wie Live-View/Visualizer
+(``color_utils.visual_rgb``/``visual_intensity``). Reines 2D, ressourcenschonend (~20 Hz), keine
 DMX-Ausgabe.
 
 Strobo-Blinken und animiertes Lauflicht sind als spaetere Ausbaustufe vorgesehen.
@@ -18,8 +19,7 @@ try:
 except Exception:  # pragma: no cover - defensiv beim Import
     get_state = None  # type: ignore
 
-# Attribut-Kandidaten fuer die Helligkeit (erste vorhandene gewinnt).
-_INTENSITY_ATTRS = ("intensity", "dimmer", "master")
+from src.core.color_utils import visual_intensity, visual_rgb
 
 
 class _TileGrid(QWidget):
@@ -40,28 +40,67 @@ class _TileGrid(QWidget):
         self.update()
 
     def _tile_color(self, fid: int) -> QColor:
-        """Programmer-Farbe * Helligkeit. Dimmer-only Fixtures => Weiss skaliert."""
+        """Farbe, die das Geraet aus dem Programmer heraus WIRKLICH ausgibt.
+
+        UI-63: Frueher wurde ein Geraet mit Dimmer > 0 und R=G=B=0 als Weiss
+        gezeichnet („Dimmer-only -> Weiss"), auch wenn es Farbkanaele hat. Der
+        echte RGB-PAR bleibt dabei aber dunkel — die Vorschau log. Jetzt laeuft
+        dieselbe Kette wie beim DMX-Flush des Programmers
+        (``AppState._flush_programmer_to_dmx``: Programmer-Wert, sonst
+        ``default_value`` des Kanals) und danach dieselbe Lese-Funktion wie
+        Live-View und 3D-Visualizer (``color_utils.visual_rgb`` /
+        ``visual_intensity``). Damit ist nur ein Geraet OHNE Farbkanaele (reiner
+        Dimmer-PAR, Strobe) weiss; Farbrad-/CMY-Mover zeigen ihren Slot bzw. ihre
+        Mischung, ein Weiss-Segment leuchtet ueber ``color_w`` weiss.
+        """
         if get_state is None:
             return QColor("#222")
         st = get_state()
-        r = st.get_programmer_value(fid, "color_r")
-        g = st.get_programmer_value(fid, "color_g")
-        b = st.get_programmer_value(fid, "color_b")
-        inten = None
-        for a in _INTENSITY_ATTRS:
-            v = st.get_programmer_value(fid, a)
-            if v is not None:
-                inten = v
-                break
-        rgb = (r or 0, g or 0, b or 0)
-        if max(rgb) == 0 and inten is not None:
-            base = (255, 255, 255)   # Dimmer-only -> Weiss
+        try:
+            prog = dict(st.programmer.get(fid, {}) or {})
+        except Exception:
+            prog = {}
+        if not prog:
+            # Nichts im Programmer -> die Vorschau hat nichts zu zeigen (wie bisher).
+            return QColor(0, 0, 0)
+        channels = None
+        finder = getattr(st, "_channels_for_fid", None)
+        if finder is not None:
+            try:
+                channels = finder(fid)
+            except Exception:
+                channels = None
+        attrs: dict[str, int] = {}
+        if channels:
+            # Kopf 0 = erstes Vorkommen je Attribut (wie Live-View/3D-Top-Down).
+            for ch in channels:
+                attr = getattr(ch, "attribute", None)
+                if not attr or attr in attrs:
+                    continue
+                val = prog.get(attr)
+                if val is None:
+                    val = getattr(ch, "default_value", 0)
+                try:
+                    attrs[attr] = max(0, min(255, int(val or 0)))
+                except (TypeError, ValueError):
+                    attrs[attr] = 0
         else:
-            base = rgb
-        factor = (inten / 255.0) if inten is not None else 1.0
-        return QColor(
-            int(base[0] * factor), int(base[1] * factor), int(base[2] * factor)
-        )
+            # Kanalliste unbekannt (nicht gepatcht/keine Bibliothek): nur die
+            # Programmer-Werte von Kopf 0 auswerten.
+            for key, val in prog.items():
+                if "#" in str(key) or val is None:
+                    continue
+                attrs[str(key)] = max(0, min(255, int(val)))
+        r, g, b = visual_rgb(attrs, channels)
+        factor = visual_intensity(attrs, channels) / 255.0
+        return QColor(int(r * factor), int(g * factor), int(b * factor))
+
+    @staticmethod
+    def _label_color(tile: QColor) -> QColor:
+        """Schriftfarbe mit Kontrast zur Kachel (UI-63: weisse Namen auf weissen
+        Kacheln waren unlesbar). Relative Helligkeit nach ITU-R BT.601."""
+        luma = 0.299 * tile.red() + 0.587 * tile.green() + 0.114 * tile.blue()
+        return QColor("#111111") if luma >= 140 else QColor("#cccccc")
 
     def paintEvent(self, _event):
         p = QPainter(self)
@@ -90,12 +129,13 @@ class _TileGrid(QWidget):
             x = int(4 + col * cw)
             y = int(4 + row * ch)
             iw, ih = int(cw) - 2, int(ch) - 2
-            p.fillRect(x, y, iw, ih, self._tile_color(fid))
+            color = self._tile_color(fid)
+            p.fillRect(x, y, iw, ih, color)
             p.drawRect(x, y, iw, ih)
             # Beschriftung nur, wenn genug Platz ist.
             if iw >= 26 and ih >= 16:
                 lbl = self._labels.get(fid, str(fid))
-                p.setPen(QColor("#cccccc"))
+                p.setPen(self._label_color(color))
                 p.drawText(
                     x + 2, y + 2, iw - 4, ih - 4,
                     Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignLeft,

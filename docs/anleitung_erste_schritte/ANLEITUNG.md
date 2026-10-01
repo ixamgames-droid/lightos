@@ -155,8 +155,8 @@ Programmer aktiv.
 
 > **Warum bleibt der PAR noch dunkel?** Ein RGB-Scheinwerfer leuchtet nur, wenn auch
 > eine Farbe gesetzt ist — mit Rot, Grün und Blau auf 0 ist er trotz vollem Dimmer
-> schwarz. Die **Lampen-Vorschau** unten zeigt in diesem Fall trotzdem Weiß; darauf
-> ist hier kein Verlass. Also noch eine Farbe:
+> schwarz. Genau so zeigt es auch die **Lampen-Vorschau** unten: Die Kachel bleibt
+> dunkel. Also noch eine Farbe:
 
 ![Programmer mit Rot auf 255](img/09_programmer_farbe.png)
 
