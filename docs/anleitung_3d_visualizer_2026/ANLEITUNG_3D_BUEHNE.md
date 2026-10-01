@@ -17,7 +17,7 @@ seitlich, unten und oben. Sie entstand beim Live-Durchspielen der Demo-Show
 1. Show mit gepatchten Fixtures öffnen (hier: 8 PAR ZQ01424, 2 MH ZQ02001, 2 Spider
    SPIDER14, 1 Laser Ehaho L2600 = 13 Geräte).
 2. Menü **Visualizer → 3D Visualizer öffnen**. Alle gepatchten Fixtures erscheinen als
-   Liste rechts (Tab **Fixtures**) und werden — dank Auto-Patch aus der 2D-Live-View —
+   Liste rechts (Tab **Fixtures**) und werden — dank Auto-Patch aus der 2D-Bühne (Sektion **Bühne**) —
    direkt im Raum gerendert (Statuszeile unten: „N Fixture(s) in Szene").
 
 ## Teil A — Bühne/Trassen bauen (Tab „Bühne")

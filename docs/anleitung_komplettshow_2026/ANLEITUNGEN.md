@@ -14,7 +14,7 @@ Anleitung steht für sich und hat ein klares Lernziel.
 ## Die Anleitungen (in Reihenfolge)
 1. [Neue Show anlegen & benennen](00_grundlagen/ANLEITUNG.md)
 2. [Fixtures anlegen (Patchen)](01_fixtures/ANLEITUNG.md)
-3. [Positionen in 2D-Live-View & 3D-Visualizer](02_positionen_3d/ANLEITUNG.md)
+3. [Positionen auf der 2D-Bühne & im 3D-Visualizer](02_positionen_3d/ANLEITUNG.md)
 4. [Fixture-Gruppen anlegen (PAR/MH/Spider)](03_gruppen/ANLEITUNG.md)
 5. [Coloreffekte über den Color-Tab — **nur die Farbe speichern**](04_coloreffekt/ANLEITUNG.md) ⭐
 6. [Matrix-/Dimmereffekte — **Farbe + Dimmer mischen**](05_matrix_dimmer/ANLEITUNG.md) ⭐ (mit GIF)

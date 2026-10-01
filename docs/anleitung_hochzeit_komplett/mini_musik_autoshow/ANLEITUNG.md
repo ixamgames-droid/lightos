@@ -5,6 +5,8 @@
 
 ![Bank 6 — Musik-Steuerung rechts unten](../img/bank6_ablaeufe.png)
 
+*Bild zeigt eine ältere Oberfläche: die Sektionen heißen heute **Bühne** und **E/A** statt „Bühnen-Layout“ und „Eingabe / Ausgabe“.*
+
 ---
 
 ### Musik steuern
@@ -24,7 +26,7 @@ Die Show hat die **Auto-Show eingeschaltet**: Sobald du **▶ Play** drückst, s
 3. Anderes Lied: **„Lied ▶"**. Auto-Show passt sich an.
 
 ### Was du anpassen kannst
-- **Pro Lied** eine eigene Auto-Show: in **Eingabe/Ausgabe → Musik** (`Strg+7`) lässt sich je Lied
+- **Pro Lied** eine eigene Auto-Show: in **E/A → Musik** (`Strg+7`) lässt sich je Lied
   festlegen, welche Funktionen automatisch starten.
 - **Quelle:** PC-Audio (Player/Spotify) oder **OS2L** (VirtualDJ) als präzise Taktquelle.
 
