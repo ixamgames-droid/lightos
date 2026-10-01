@@ -14,6 +14,7 @@
 | PROC-16 | A | fix/proc16-claim-ueberschneidung | 2026-10-01T15:41Z | tools/session_claim.py,tests/test_session_claim.py,COORDINATION.md |
 | PROC-09 | A | feat/proc09-changelog-fragmente | 2026-10-01T15:41Z | changelog.d,tools,tests,CHANGELOG.md,WORKFLOW.md |
 | XPLAT-43 | A | feat/xplat43-gate-summary | 2026-10-01T16:52Z | tools/verify_segmented.sh,tools/verify_segmented.ps1,tests |
+| FUNKTIONSTEST-B | B | - | 2026-10-01T17:32Z | keine-repo-dateien |
 
 ## Blocker & Fallen
 
@@ -156,7 +157,6 @@
 
 ## Verlauf
 
-- 2026-10-01T12:47Z A claim UI-63
 - 2026-10-01T12:47Z A claim BPM-19
 - 2026-10-01T13:24Z A done UI-62
 - 2026-10-01T13:24Z A done UI-63
@@ -186,3 +186,4 @@
 - 2026-10-01T16:53Z A done PROC-14
 - 2026-10-01T17:15Z B done BPM-20
 - 2026-10-01T17:15Z B done BPM-23
+- 2026-10-01T17:32Z B claim FUNKTIONSTEST-B
