@@ -100,9 +100,9 @@ Analysefenster von rund sechs Sekunden Musik, bevor sie Beats meldet. Solange st
 
 | Zustandswort | Bedeutung |
 |---|---|
-| **KEIN SIGNAL** (grau) | Es kommt nichts Brauchbares an — oder die Erkennung ist gerade gestartet und die Musik läuft noch nicht. |
-| **SUCHT** (orange) | Signal ist da, das Analysefenster füllt sich bzw. es wird noch kein stabiler Takt gefunden. |
-| **EINGERASTET** (grün) | Tempo steht, die Beats laufen. |
+| **KEIN SIGNAL** (grau) | Es kommt nichts Brauchbares an (Pegel unter −60 dBFS) — oder die Erkennung ist gerade gestartet und die Musik läuft noch nicht. |
+| **SUCHT** (orange) | Signal ist da, das Analysefenster füllt sich bzw. es wird noch kein stabiler Takt gefunden. **Auch:** der Takt ist unsicher geworden (Konfidenz seit ½ s unter 15 %) — das alte Tempo läuft dann noch kurz weiter, nach etwa 2 s gibt die Erkennung es frei; die Statuszeile sagt „Takt unsicher". |
+| **EINGERASTET** (grün) | Tempo steht, die Beats laufen, der Takt ist sicher (Konfidenz ab 15 %) und der Pegel reicht. |
 | **PAUSE · hält 128** (grün) | Die Musik ist still, das letzte Tempo wird **gehalten**, die Beats laufen weiter. |
 | **MANUELL** | Du gibst das Tempo vor (TAP, Nudge, Manuell-Knopf). |
 | **OS2L** / **OS2L · wartet auf DJ-Software** | Quelle OS2L — verbunden bzw. noch kein DJ-Programm verbunden. |
@@ -161,7 +161,10 @@ zeigt nichts an):
 ### 3.3 Konfidenz und Statuszeile
 
 **Konfidenz** (0–100 %) sagt, wie sicher die Erkennung ist. Hoch = klarer Beat. Niedrig =
-Pause, Sprache, Musik ohne deutlichen Schlag — oder eine Störung wie Brumm.
+Pause, Sprache, Musik ohne deutlichen Schlag — oder eine Störung wie Brumm. Bleibt sie eine
+halbe Sekunde unter 15 %, steht nicht mehr EINGERASTET, sondern SUCHT („Takt unsicher").
+Kurz nach dem Ende der Musik ist die Konfidenz trotzdem noch einige Sekunden hoch: die
+Erkennung schaut auf die letzten 6 Sekunden.
 
 Die **Statuszeile** ist **nie leer** und immer gleich aufgebaut:
 

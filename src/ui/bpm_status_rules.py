@@ -50,6 +50,10 @@ JITTER_BACKLOG_MS = 250.0    # Detektor-Rueckstand darueber
 DC_MAX = 0.02                # |DC-Offset| darueber = Chip DC (Bank: +0,05 als Stoerfall)
 HALBTEMPO_ALT_SCORE = 0.7    # alt_score ab hier = Doppel-/Halbtempo ist aehnlich plausibel
 KEIN_TAKT_S = 15.0           # so lange Suche MIT Signal ohne Lock = „Kein Takt gefunden" (search_s, BPM-22)
+UNSICHER_S = 0.5             # BPM-23: so lange IN FOLGE unter UNLOCK_CONF (DetectorSnapshot.unsicher_s), dann
+                             # zeigen Zustandswort und Statuszeile nicht mehr „Eingerastet" (das Entrasten
+                             # selbst folgt nach UNLOCK_S = 2 s). Halbe Sekunde statt sofort: Sprache pendelt
+                             # um 0,15 — sonst flackerte das Zustandswort mit ~10 Hz.
 SUCHFENSTER_S = 6.0          # Fenster, das die Erkennung zum Einrasten braucht (MEM_S)
 ZIEL_LO_DBFS = -30.0         # Pegel-Zielbereich im Ok-Text (wie level_meter.ZIEL_*)
 ZIEL_HI_DBFS = -6.0
@@ -279,6 +283,15 @@ def _pausiert(det) -> bool:
     return _g(det, "state", "") == "locked" and int(_g(det, "hold_stage", 0)) in (1, 2)
 
 
+def unsicher(det) -> bool:
+    """BPM-23: eingerastet (nicht pausiert), aber die Konfidenz liegt seit ``UNSICHER_S`` in
+    Folge unter der Entrast-Schwelle — der Countdown zum Freigeben laeuft, die Beats laufen
+    noch. Dann zeigen weder Zustandswort noch Statuszeile „Eingerastet" (vorher stand dort
+    „EINGERASTET" bei Konfidenz 0 %)."""
+    return (_g(det, "state", "") == "locked" and not _pausiert(det)
+            and float(_g(det, "unsicher_s", 0.0)) >= UNSICHER_S)
+
+
 def _r_kein_signal(cap, det, m, o, now):
     if m.kind not in AUDIO_KINDS or cap is None:
         return None
@@ -441,6 +454,17 @@ def _r_aus(cap, det, m, o, now):
     return None
 
 
+def _r_unsicher(cap, det, m, o, now):
+    if m.kind not in AUDIO_KINDS or not unsicher(det):
+        return None
+    konf = float(_g(det, "confidence", 0.0))
+    return StatusLine(
+        "hinweis", "Takt unsicher",
+        f"Konfidenz {konf * 100:.0f} %, das Tempo {_bpm(float(_g(det, 'bpm', 0.0)))} läuft noch weiter",
+        "kommt kein klarer Beat zurück, gibt die Erkennung es nach ~2 s frei",
+        None, key="unsicher")
+
+
 def _r_halbtempo(cap, det, m, o, now):
     if m.kind not in AUDIO_KINDS or _g(det, "state", "") != "locked" or _pausiert(det):
         return None
@@ -531,7 +555,7 @@ _RULES = (
     _r_ereignis, _r_aufnahme, _r_audio_fehlt, _r_monitor, _r_capture_fehler, _r_capture_gestoppt,
     _r_kein_signal, _r_sink_fehlt, _r_clip, _r_brumm, _r_leise, _r_jitter, _r_dc,
     _r_os2l, _r_song, _r_aus, _r_eingefroren, _r_manuell,
-    _r_halbtempo, _r_pause, _r_kein_takt, _r_sucht, _r_ok,
+    _r_unsicher, _r_halbtempo, _r_pause, _r_kein_takt, _r_sucht, _r_ok,
 )
 
 
@@ -573,7 +597,7 @@ SOFORT_KEYS = ("ereignis", "aufnahme")   # Rueckmeldung auf einen Klick: nie ver
 # gehaltene Stoerung nur, wenn sie STRIKT schwerer sind — sonst loescht ein einzelner Frame
 # „Sucht" ein gehaltenes LEISE. Alle anderen nicht stabilen Zeilen (Fehler, Quellenwechsel,
 # Manuell, Eingefroren …) folgen einer Handlung oder einem Fehler und gelten ab gleicher Schwere.
-ZUSTAND_KEYS = ("sucht", "wartet", "ok", "pause", "kein_detektor")
+ZUSTAND_KEYS = ("sucht", "wartet", "ok", "pause", "kein_detektor", "unsicher")
 
 
 class StatusHysterese:
@@ -704,5 +728,5 @@ class ChipHysterese:
         self._sichtbar.clear()
 
 
-__all__ = ["zahl", "aufgeloest", "StatusLine", "MgrState", "Os2lState", "status_line", "StatusHysterese", "chips",
+__all__ = ["zahl", "aufgeloest", "unsicher", "StatusLine", "MgrState", "Os2lState", "status_line", "StatusHysterese", "chips",
            "ChipHysterese", "ereignis_oktave", "ereignis_aufnahme", "ereignis"]

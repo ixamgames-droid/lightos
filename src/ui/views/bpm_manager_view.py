@@ -125,9 +125,11 @@ def _html(text: str) -> str:
     return (str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
 
 
-def state_word(mode_manual: bool, kind: str | None, snap, os2l_waiting: bool = False) -> tuple[str, str]:
+def state_word(mode_manual: bool, kind: str | None, snap, os2l_waiting: bool = False,
+               cap_snap=None) -> tuple[str, str]:
     """Zustandswort + Farbe aus Manager-Modus, Quelle und Detektor-Snapshot
-    (ui_diagnose 3.1). Reine Funktion — testbar ohne Qt."""
+    (ui_diagnose 3.1). Reine Funktion — testbar ohne Qt. ``cap_snap`` (optional, BPM-23):
+    unter ``KEIN_SIGNAL_DBFS`` (RMS 300 ms) heisst ein Lock „KEIN SIGNAL" wie die Statuszeile."""
     if mode_manual:
         return "MANUELL", _COL_GREEN
     if kind in AUDIO_KINDS:
@@ -137,6 +139,13 @@ def state_word(mode_manual: bool, kind: str | None, snap, os2l_waiting: bool = F
         if st == "locked":
             if int(getattr(snap, "hold_stage", 0)) in (1, 2):
                 return f"PAUSE · hält {float(getattr(snap, 'bpm', 0.0)):.0f}", "#5fae4a"
+            # BPM-23: EINGERASTET nur mit Mindestpegel und Mindest-Konfidenz — vorher stand es
+            # auch bei Konfidenz 0 % (Mikro, Raumgeraeusch) und neben „Kein Signal"
+            if (cap_snap is not None and bool(getattr(cap_snap, "running", True))
+                    and float(getattr(cap_snap, "rms_dbfs_300ms", -120.0)) < rules.KEIN_SIGNAL_DBFS):
+                return "KEIN SIGNAL", _COL_GREY
+            if rules.unsicher(snap):
+                return "SUCHT", _COL_AMBER
             return "EINGERASTET", _COL_GREEN
         if st == "searching":
             return "SUCHT", _COL_AMBER
@@ -349,8 +358,9 @@ class BpmManagerView(QWidget):
         self._lbl_state = QLabel("KEIN SIGNAL")
         self._lbl_state.setStyleSheet(_STATE_STYLE.format(col=_COL_GREY))
         self._lbl_state.setToolTip(
-            "Zustand der Erkennung: KEIN SIGNAL (nichts zu hören), SUCHT (Fenster füllt sich), "
-            "EINGERASTET (Beats laufen), PAUSE · hält N (Stille, Tempo wird gehalten), MANUELL.")
+            "Zustand der Erkennung: KEIN SIGNAL (nichts zu hören), SUCHT (Fenster füllt sich "
+            "oder Takt unsicher), EINGERASTET (Takt sicher, Beats laufen), PAUSE · hält N "
+            "(Stille, Tempo wird gehalten), MANUELL.")
         beat_row.addWidget(self._lbl_state)
         self._lbl_source = QLabel("")
         self._lbl_source.setStyleSheet("color:#8b949e;")
@@ -917,11 +927,7 @@ class BpmManagerView(QWidget):
                 waiting = bool(srv.is_running()) and float(srv.last_bpm() or 0) <= 0
             except Exception:
                 waiting = False
-        word, col = state_word(self._mgr.mode == BpmMode.MANUAL, kind, snap, waiting)
         self._update_source_suffix()          # Manager-Quelle wechselt auch ohne Zustands-Signal
-        if self._lbl_state.text() != word:
-            self._lbl_state.setText(word)
-            self._lbl_state.setStyleSheet(_STATE_STYLE.format(col=col))
         c = int(round(float(getattr(snap, "confidence", 0.0) or 0.0) * 100)) if snap is not None else 0
         self._conf.setValue(max(0, min(100, c)))
         now = float(self._clock())
@@ -937,6 +943,11 @@ class BpmManagerView(QWidget):
             cap_snap = cap.snapshot() if kind in AUDIO_KINDS else None
         except Exception:
             audio_ok = audio_ok and cap is not None
+        # Zustandswort erst hier: es braucht den Pegel (BPM-23, „KEIN SIGNAL" statt EINGERASTET)
+        word, col = state_word(self._mgr.mode == BpmMode.MANUAL, kind, snap, waiting, cap_snap)
+        if self._lbl_state.text() != word:
+            self._lbl_state.setText(word)
+            self._lbl_state.setStyleSheet(_STATE_STYLE.format(col=col))
         self._level.set_snapshot(cap_snap)
         lt = pegel_text(cap_snap)
         if self._lbl_level.text() != lt:

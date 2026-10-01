@@ -343,7 +343,8 @@ class BeatDetector:
             noise_floor_dbfs=noise, hum_ratio=float(self._hum_ratio), hum_hz=int(self._hum_hz),
             dc_offset=float(self._dc_offset), backlog_ms=float(self._backlog_ms),
             jitter_ms=float(self._jitter_ms), onset_contrast=float(tr.onset_contrast),
-            phase_ok=bool(tr.phase_ok), search_s=float(tr.search_s))
+            phase_ok=bool(tr.phase_ok), search_s=float(tr.search_s),
+            unsicher_s=float(tr._unlock_s) if tr.state == "locked" else 0.0)
 
 
 _detector: BeatDetector | None = None
