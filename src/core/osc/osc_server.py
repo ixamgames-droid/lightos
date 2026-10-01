@@ -15,8 +15,8 @@ class OscServer:
     """Listens for OSC messages and maps them to app-state actions.
 
     Default address scheme (compatible with TouchOSC / Lemur):
-      /lightos/go          → Global GO
-      /lightos/back        → Global BACK
+      /lightos/go          → Global GO   (Transport-Ziel-Liste, UI-66)
+      /lightos/back        → Global BACK (Transport-Ziel-Liste, UI-66)
       /lightos/exec/{n}/go → Executor n GO
       /lightos/exec/{n}/fader {f}  → Executor n fader (0.0–1.0)
       /lightos/ch/{u}/{c} {v}      → Universe u, channel c, value v (0–255)
@@ -83,17 +83,21 @@ class OscServer:
             # A3D-40: einen Snapshot ziehen (kein Doppel-Fetch/Alias auf die Live-Liste,
             # die show_file beim Laden per cue_stacks.clear() in-place leert). Ohne das
             # koennte das GO zwischen 'if' und Index still verschluckt werden.
-            stacks = list(self._get_state().cue_stacks)
-            if stacks:
-                stacks[0].go()
+            # Den Snapshot zieht jetzt cueliste_ziel.ziel_cueliste.
+            # UI-66: /lightos/go trifft die Transport-Ziel-Liste (gewaehlte, wenn
+            # auf einem Executor; sonst erster Executor der aktuellen Page mit
+            # Liste; ...) — dieselbe wie Leertaste, Kommandozeile und Web (frueher
+            # fest cue_stacks[0]). Regel: src/core/cueliste_ziel.py. /lightos/exec/N/go bleibt
+            # ausdruecklich Executor N.
+            from src.core.cueliste_ziel import bediene_cueliste
+            bediene_cueliste(self._get_state(), "go")
         except Exception:
             pass
 
     def _handle_back(self, address, *args):
         try:
-            stacks = list(self._get_state().cue_stacks)   # A3D-40: Snapshot, s. _handle_go
-            if stacks:
-                stacks[0].back()
+            from src.core.cueliste_ziel import bediene_cueliste
+            bediene_cueliste(self._get_state(), "back")   # UI-66, s. _handle_go
         except Exception:
             pass
 

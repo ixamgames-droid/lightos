@@ -755,9 +755,10 @@ class TestCmdlineParser(unittest.TestCase):
         self.assertIsInstance(parse("lowlight"), LowlightCommand)
 
     def test_go_default_slot(self):
+        # UI-66: "go" ohne Nummer -> gewaehlte Cueliste (slot None), nicht Exec 1.
         cmd = parse("go")
         self.assertIsInstance(cmd, GoCommand)
-        self.assertEqual(cmd.slot, 1)
+        self.assertIsNone(cmd.slot)
 
     def test_go_with_slot(self):
         cmd = parse("go 3")
