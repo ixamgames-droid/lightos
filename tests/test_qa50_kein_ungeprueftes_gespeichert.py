@@ -178,6 +178,9 @@ class SpeichernMitLueckenTest(unittest.TestCase):
             to_dict=kaputt if vc_kaputt else (lambda: {"widgets": []}))
         stub._snapshots_view = None
         stub._channel_groups_view = None
+        # UI-69: das Einsammeln der Views steht seit dem Aenderungs-Vergleich in
+        # einer eigenen Methode — der Stub nimmt die echte.
+        stub._views_in_state = lambda: mw.MainWindow._views_in_state(stub)
         return mw, stub, sb
 
     def test_lueckenhaftes_speichern_meldet_nicht_einfach_gespeichert(self):
