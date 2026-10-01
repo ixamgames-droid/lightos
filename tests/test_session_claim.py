@@ -233,6 +233,153 @@ class UeberschneidungBeimClaimTest(_TafelRepos):
         self.assertEqual(err, "")
 
 
+class BriefeAnSitzungTest(unittest.TestCase):
+    """PROC-17 — ``list --fuer X``: was seit X' letztem Eintrag an X ging."""
+
+    BLOCKER = [
+        "2026-09-28T08:00Z (A) AN B: alte Frage, laengst beantwortet",
+        "2026-09-28T09:00Z (B) erledigt, danke",
+        "2026-09-29T10:00Z (A) AN B: neue Frage zu `app_state.py`",
+        "2026-09-29T11:00Z (C) AN A UND B: Rig ab 14 Uhr belegt",
+        "2026-09-29T12:00Z (A) AN C: nur fuer C",
+        "2026-09-29T13:00Z (C) AN A, B UND C: Gate bitte nur mit -j 2",
+        "2026-09-29T14:00Z (A) Ein PLAN B ist kein Brief an B",
+        "2026-09-29T15:00Z (C) AN ALLE: main ist rot",
+    ]
+
+    def test_nur_nach_dem_letzten_eigenen_eintrag(self):
+        an_b = sc.blocker_fuer(self.BLOCKER, "B")
+        self.assertEqual([b[:17] for b in an_b], [
+            "2026-09-29T10:00Z", "2026-09-29T11:00Z",
+            "2026-09-29T13:00Z", "2026-09-29T15:00Z"])
+
+    def test_ohne_eigenen_eintrag_zaehlt_die_ganze_liste(self):
+        an_d = sc.blocker_fuer(self.BLOCKER[:3], "D")
+        self.assertEqual(an_d, [])
+        an_b = sc.blocker_fuer(self.BLOCKER[:1], "b")
+        self.assertEqual(len(an_b), 1, "Gross/klein der Sitzung egal")
+
+    def test_ausgabe_von_list_fuer(self):
+        import contextlib
+        import io
+        from types import SimpleNamespace
+        alt = sc.lade_tafel
+        sc.lade_tafel = lambda repo: (
+            {"claims": [], "blocker": list(self.BLOCKER)}, None)
+        try:
+            puffer = io.StringIO()
+            with contextlib.redirect_stdout(puffer):
+                sc.cmd_list(SimpleNamespace(blocker=5, fuer="C"), "-")
+        finally:
+            sc.lade_tafel = alt
+        aus = puffer.getvalue()
+        # C schrieb zuletzt um 15:00 — danach kam nichts mehr an C.
+        self.assertIn("Nichts an C", aus)
+        self.assertNotIn("nur fuer C", aus)
+
+    def test_text_aus_bytes_mit_windows_zeilenenden(self):
+        roh = "AN B: Zeile eins\r\n  Zeile zwei mit `x` und Ümlaut\r\n\r\n".encode()
+        self.assertEqual(sc.blocker_text(roh),
+                         "AN B: Zeile eins Zeile zwei mit `x` und Ümlaut")
+
+    def test_text_mit_bom_und_utf16(self):
+        self.assertEqual(sc.blocker_text("﻿Ärger\r\n".encode("utf-8")), "Ärger")
+        # Windows PowerShell 5: `> datei.txt` schreibt UTF-16LE mit BOM.
+        self.assertEqual(sc.blocker_text("Ärger\r\n".encode("utf-16")), "Ärger")
+
+    def test_kein_utf8_ist_ein_lauter_fehler(self):
+        with self.assertRaises(UnicodeDecodeError):
+            sc.blocker_text("Ärger".encode("cp1252"))
+
+
+class BlockerAusStdinTest(_TafelRepos):
+    """PROC-17 — ``blocker --datei -`` / ``--datei <pfad>`` gegen ein Temp-Repo.
+
+    Hintergrund: als Shell-Argument wurden Backticks im Blocker-Text von der
+    Shell AUSGEFUEHRT. Ueber stdin kommt der Text unveraendert an."""
+
+    def _mit_stdin(self, roh, *argv):
+        import io
+        alt = sys.stdin
+        sys.stdin = io.TextIOWrapper(io.BytesIO(roh), encoding="utf-8")
+        try:
+            return self._main(*argv)
+        finally:
+            sys.stdin = alt
+
+    def test_stdin_mit_crlf_und_backticks(self):
+        roh = "AN B: bitte `rm -rf` NICHT ausfuehren\r\nzweite Zeile — Ü\r\n".encode()
+        rc, out, err = self._mit_stdin(roh, "--repo", self.a, "blocker",
+                                       "--session", "A", "--datei", "-")
+        self.assertEqual(rc, 0, err)
+        tafel, _ = sc.lade_tafel(self.b)
+        self.assertEqual(len(tafel["blocker"]), 1)
+        self.assertTrue(tafel["blocker"][0].endswith(
+            "(A) AN B: bitte `rm -rf` NICHT ausfuehren zweite Zeile — Ü"))
+        self.assertNotIn("\r", tafel["blocker"][0])
+
+    def test_datei_als_quelle(self):
+        pfad = os.path.join(self.tmp, "brief.txt")
+        with open(pfad, "wb") as f:
+            f.write(b"AN B: aus der Datei\r\n")
+        rc, out, err = self._main("--repo", self.a, "blocker", "--session",
+                                  "A", "--datei", pfad)
+        self.assertEqual(rc, 0, err)
+        self.assertIn("aus der Datei", sc.lade_tafel(self.a)[0]["blocker"][0])
+
+    def test_text_und_datei_zugleich_ist_ein_fehler(self):
+        rc, out, err = self._main("--repo", self.a, "blocker", "x",
+                                  "--session", "A", "--datei", "-")
+        self.assertEqual(rc, 2)
+        self.assertEqual(sc.lade_tafel(self.a)[0]["blocker"], [])
+
+    def test_privates_aus_stdin_wird_ebenso_abgelehnt(self):
+        roh = ("liegt unter " + "/home/" + "martin" + "/x").encode()
+        rc, out, err = self._mit_stdin(roh, "--repo", self.a, "blocker",
+                                       "--session", "A", "--datei", "-")
+        self.assertEqual(rc, 2)
+
+    def test_verlorene_umlaute_aus_stdin_werden_angemahnt(self):
+        """Windows PowerShell 5.1 kodiert die Pipe nach ``$OutputEncoding``
+        (US-ASCII): aus „für“ wird still „f?r“ — gueltiges UTF-8, die
+        Dekodierung merkt nichts. Nur das Muster verraet es."""
+        rc, out, err = self._mit_stdin(b"AN B: f?r die Gr??e bitte warten",
+                                       "--repo", self.a, "blocker",
+                                       "--session", "A", "--datei", "-")
+        self.assertEqual(rc, 0, "nur Hinweis, geschrieben wird trotzdem")
+        self.assertIn("verlorene Umlaute", err)
+        self.assertIn("f?r", err)
+        self.assertIn("--datei brief.txt", err)
+        self.assertEqual(len(sc.lade_tafel(self.a)[0]["blocker"]), 1)
+
+    def test_gewolltes_fragezeichen_bleibt_still(self):
+        rc, out, err = self._mit_stdin("AN B: fertig? Ja — für 1?2 nicht"
+                                       .encode(), "--repo", self.a, "blocker",
+                                       "--session", "A", "--datei", "-")
+        self.assertEqual(rc, 0, err)
+        self.assertNotIn("Umlaute", err)
+
+    def test_langer_text_wird_angemahnt_aber_geschrieben(self):
+        rc, out, err = self._main("--repo", self.a, "blocker", "x" * 300,
+                                  "--session", "A")
+        self.assertEqual(rc, 0)
+        self.assertIn("300 Zeichen", err)
+        self.assertEqual(len(sc.lade_tafel(self.a)[0]["blocker"]), 1)
+        rc, out, err = self._main("--repo", self.a, "blocker", "kurz",
+                                  "--session", "A")
+        self.assertNotIn("Zeichen", err)
+
+    def test_list_fuer_ueber_die_echte_tafel(self):
+        self._main("--repo", self.a, "blocker", "AN B: Frage eins", "--session", "A")
+        self._main("--repo", self.b, "blocker", "gelesen", "--session", "B")
+        self._main("--repo", self.a, "blocker", "AN A UND B: Frage zwei",
+                   "--session", "C")
+        rc, out, err = self._main("--repo", self.b, "list", "--fuer", "B")
+        self.assertEqual(rc, 0)
+        self.assertIn("Frage zwei", out)
+        self.assertNotIn("Frage eins", out)
+
+
 class VerfallTest(unittest.TestCase):
     def test_frischer_claim_gilt(self):
         t = datetime(2026, 8, 6, 14, 0, tzinfo=timezone.utc)
