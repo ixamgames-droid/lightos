@@ -20,6 +20,7 @@
 | TOOL-3 | C | fix/tool3-generator-pfade | 2026-10-01T21:11Z | tools/build_full_show.py · tools/build_spot90_testshow.py · tools/_profil.py · tools/README.md · tests/test_tool3_generator_annahmen.py · BACKLOG.md |
 | DOC-15 | C | fix/doc15-bildbestaende | 2026-10-01T21:21Z | docs/anleitung_vc_widgets/_capture · docs/check_demo_show_full · tests/test_doc15_bildbestaende.py · changelog.d/2026-10-02-DOC-15.md |
 | DOC-18 | A | - | 2026-10-01T21:22Z | docs/anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md · docs/anleitung_bpm_manager/img |
+| PROC-08 | C | fix/proc08-blocker-verfall | 2026-10-01T21:24Z | tools/session_claim.py · COORDINATION.md · tests/test_proc08_blocker_verfall.py · changelog.d/2026-10-02-PROC-08.md |
 
 ## Blocker & Fallen
 
@@ -170,7 +171,6 @@
 
 ## Verlauf
 
-- 2026-10-01T16:25Z B claim BPM-23
 - 2026-10-01T16:35Z A done DOC-17
 - 2026-10-01T16:52Z A claim XPLAT-43
 - 2026-10-01T16:53Z A done PROC-14
@@ -200,3 +200,4 @@
 - 2026-10-01T21:11Z C claim TOOL-3
 - 2026-10-01T21:21Z C claim DOC-15
 - 2026-10-01T21:22Z A claim DOC-18
+- 2026-10-01T21:24Z C claim PROC-08
