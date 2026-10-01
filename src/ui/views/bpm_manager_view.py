@@ -8,7 +8,7 @@ Geraet / OS2L / Lied-Analyse / Aus),
 (2) grosser TAP-Knopf (Doppelrolle, ``bpm_tap_helper``), (3) Zweizustand
 Auto | Manuell, (4) ×½, (5) ×2, (6) Aufklapper „Erweitert".
 Anzeigen: grosse BPM-Zahl, Beat-Punkt + Taktzellen, Zustandswort
-(KEIN SIGNAL / SUCHT / EINGERASTET / PAUSE · haelt N / MANUELL), Quelle-Text,
+(KEIN SIGNAL / SUCHT / EINGERASTET [· BEATS STUMM] / PAUSE · haelt N / MANUELL), Quelle-Text,
 kompakter Konfidenzbalken; darunter die Zeile „Pegel" (BPM-13): breites Pegelmeter
 (S5, ``cap.snapshot()`` im 50-ms-Timer), Zahlenwert („−17 dBFS") und Hinweis-Chips
 CLIP/BRUMM/LEISE/AUSSETZER/DC (S6) — alles Anzeigen, keine Bedienelemente;
@@ -59,7 +59,8 @@ from src.core.audio import bpm_settings
 from src.ui.bpm_source_controller import get_source_controller, AUDIO_KINDS
 from src.ui import bpm_status_rules as rules
 from src.ui.bpm_status_rules import (
-    ChipHysterese, MgrState, Os2lState, StatusHysterese, StatusLine, chips, status_line,
+    BeatsStummHysterese, ChipHysterese, MgrState, Os2lState, StatusHysterese, StatusLine,
+    chips, status_line,
 )
 from src.ui.bpm_tap_helper import get_tap_helper
 from src.ui.weak_slots import weak_slot
@@ -126,11 +127,13 @@ def _html(text: str) -> str:
 
 
 def state_word(mode_manual: bool, kind: str | None, snap, os2l_waiting: bool = False,
-               zeile_key: str | None = None) -> tuple[str, str]:
+               zeile_key: str | None = None, stumm: bool = False) -> tuple[str, str]:
     """Zustandswort + Farbe aus Manager-Modus, Quelle und Detektor-Snapshot
     (ui_diagnose 3.1). Reine Funktion — testbar ohne Qt. ``zeile_key`` (BPM-23): Key der
     gerade ANGEZEIGTEN (entprellten) Statuszeile — zeigt sie „Kein Signal", „Wartet auf
-    Signal" oder einen Audio-Fehler (``KEIN_SIGNAL_KEYS``), heisst das Wort KEIN SIGNAL."""
+    Signal" oder einen Audio-Fehler (``KEIN_SIGNAL_KEYS``), heisst das Wort KEIN SIGNAL.
+    ``stumm`` (BPM-25): entprellter Zustand „Beats stumm" (``BeatsStummHysterese``) —
+    unabhaengig davon, welche Statuszeile gerade vorne steht."""
     if mode_manual:
         return "MANUELL", _COL_GREEN
     if kind in AUDIO_KINDS:
@@ -143,6 +146,11 @@ def state_word(mode_manual: bool, kind: str | None, snap, os2l_waiting: bool = F
             # BPM-23: EINGERASTET nur mit sicherem Takt — vorher stand es auch bei Konfidenz 0 %
             if rules.unsicher(snap):
                 return "SUCHT", _COL_AMBER
+            # BPM-25: Raster widerspricht den Onsets -> Beats stumm. Entprellt (phase_ok
+            # kippt pro Pruefung, sonst flackerte es) — aus eigenem Zustand, denn eine
+            # gehaltene Stoerung (LEISE, BRUMM …) verdeckt die Zeile „Beats stumm"
+            if stumm or zeile_key == "beats_stumm":
+                return "EINGERASTET · BEATS STUMM", _COL_AMBER
             return "EINGERASTET", _COL_GREEN
         if st == "searching":
             return "SUCHT", _COL_AMBER
@@ -243,6 +251,7 @@ class BpmManagerView(QWidget):
         self._recorder = recorder
         self._hyst = StatusHysterese(clock=self._clock)
         self._chip_hyst = ChipHysterese()
+        self._stumm_hyst = BeatsStummHysterese()     # BPM-25: Wort unabhaengig von der Zeile
         self._ereignis: StatusLine | None = None
         self._ereignis_bis = 0.0
         self._shown_line: StatusLine | None = None
@@ -356,7 +365,8 @@ class BpmManagerView(QWidget):
         self._lbl_state.setStyleSheet(_STATE_STYLE.format(col=_COL_GREY))
         self._lbl_state.setToolTip(
             "Zustand der Erkennung: KEIN SIGNAL (nichts zu hören), SUCHT (Fenster füllt sich "
-            "oder Takt unsicher), EINGERASTET (Takt sicher, Beats laufen), PAUSE · hält N "
+            "oder Takt unsicher), EINGERASTET (Takt sicher, Beats laufen), "
+            "EINGERASTET · BEATS STUMM (Beat-Raster passt nicht zu den Schlägen, keine Beats), PAUSE · hält N "
             "(Stille, Tempo wird gehalten), MANUELL.")
         beat_row.addWidget(self._lbl_state)
         self._lbl_source = QLabel("")
@@ -966,7 +976,9 @@ class BpmManagerView(QWidget):
         self._show_status(gezeigt)
         # Zustandswort NACH der Statuszeile: „KEIN SIGNAL" folgt der entprellten Zeile (BPM-23),
         # damit Wort und Zeile sich nie widersprechen (auch nicht beim Übergang in die Pause)
-        word, col = state_word(self._mgr.mode == BpmMode.MANUAL, kind, snap, waiting, gezeigt.key)
+        stumm = self._stumm_hyst.update(snap, now, audio=kind in AUDIO_KINDS)
+        word, col = state_word(self._mgr.mode == BpmMode.MANUAL, kind, snap, waiting, gezeigt.key,
+                               stumm)
         if self._lbl_state.text() != word:
             self._lbl_state.setText(word)
             self._lbl_state.setStyleSheet(_STATE_STYLE.format(col=col))
