@@ -20,6 +20,7 @@
 | DOC-18 | A | docs/doc18-bpm-anleitung | 2026-10-01T21:34Z | docs/anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md · docs/anleitung_bpm_manager/img |
 | PROC-08 | C | fix/proc08-blocker-verfall | 2026-10-01T21:24Z | tools/session_claim.py · COORDINATION.md · tests/test_proc08_blocker_verfall.py · changelog.d/2026-10-02-PROC-08.md |
 | ENG-27 | C | fix/eng27-open-value | 2026-10-01T21:27Z | src/core/app_state.py · src/core/all_white.py · src/core/engine/efx.py |
+| FM-46 | C | docs/fm46-befund | 2026-10-01T21:35Z | BACKLOG.md |
 
 ## Blocker & Fallen
 
@@ -172,7 +173,6 @@
 
 ## Verlauf
 
-- 2026-10-01T17:32Z B claim FUNKTIONSTEST-B
 - 2026-10-01T17:40Z A done PRIV-05
 - 2026-10-01T17:54Z A done XPLAT-40
 - 2026-10-01T17:57Z B claim BPM-26
@@ -202,3 +202,4 @@
 - 2026-10-01T21:34Z A done UI-69
 - 2026-10-01T21:34Z A aktualisiert VCB-11: Branch - -> feat/vcb11-blackout-ziel
 - 2026-10-01T21:34Z A aktualisiert DOC-18: Branch - -> docs/doc18-bpm-anleitung
+- 2026-10-01T21:35Z C claim FM-46
