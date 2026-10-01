@@ -908,7 +908,16 @@ class VisualizerBridge(QObject):
     @Slot()
     @_bridge_slot_guard
     def requestFixtures(self):
-        self._sync_positions_from_live_view()
+        # UI-69-Korrektur: der Auto-Patch leitet visualizer_positions aus der
+        # (gespeicherten) Live View ab — asynchron, beim ersten requestFixtures
+        # nach dem Laden. Das ist keine Arbeit an der Show; ohne Nachfuehren
+        # fragte Beenden nach reinem Oeffnen nach dem Speichern.
+        try:
+            from src.core.show.show_file import abgeleitete_aenderung_nachfuehren
+            abgeleitete_aenderung_nachfuehren(
+                self._sync_positions_from_live_view, self._state)
+        except Exception as e:
+            print(f"[Visualizer] auto-patch error: {e}")
         fixtures = self._build_fixture_list()
         self.allFixtures.emit(json.dumps(fixtures))
 
