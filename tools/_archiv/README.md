@@ -41,6 +41,23 @@ gepflegte Anleitung mit „neu bauen"-Befehl verweist darauf.
 |---|---|
 | `capture_hochzeit_tempo_guide.py` | DOC-17 hat `docs/anleitung_hochzeit_tempo/` auf Tempo-Controller umgestellt und die Bilder entfernt — die Anleitung ist bildlos. Das Werkzeug fotografierte das alte Multiplikator-Layout (Speed-Dials „Farb Wechsel“/„An Aus“) der privaten `hochzeit.lshow` und schrieb weiter nach `docs/`. Es schreibt jetzt in einen Wegwerf-Ordner (`LIGHTOS_CAPTURE_OUT` oder Temp) und nennt bei fehlenden Dials Show, Fehlendes und Vorhandenes (TOOL-4). Neue Anleitungsbilder: `tools/anleitungsbilder.py`. |
 
+## Verwaiste Werkzeuge aus PROC-07 (TOOL-1, 2026-10-02)
+
+Am 2026-10-02 nachgeprueft: keines der sieben wird von einer Anleitung, einem
+Test, einem Skill oder einem anderen Werkzeug aufgerufen (einzige Nennungen:
+der generierte Index und ein Beispiel im Docstring von `tools/_gen_env.py`,
+das jetzt auf `build_demo_show_full.py` zeigt).
+
+| Skript | Warum archiviert |
+|---|---|
+| `build_demo_show.py` | **Duplikat** von `build_full_show.py`: beide schrieben `shows/APC_Demo_Show.lshow`. Wer das falsche startete, ueberschrieb die mitgelieferte Show mit einem aelteren Stand. `build_full_show.py` (v4) bleibt; `tests/test_tool1_verwaiste_werkzeuge.py` verbietet zwei lebende Generatoren mit derselben Zieldatei. |
+| `build_komplette_animierte_show.py` | Ziel-Show nicht im Repo; einmalige VC-Galerie-Abnahme (2026-07-16). |
+| `build_uxtest3_full.py` | Ziel-Show nicht im Repo; Test-Show des UI-Audits UXTEST-3 (2026-07-15). |
+| `build_validated_demo.py` | Ziel-Show laut PROC-07 nur noch in `shows/_archiv/`. Das Muster (ShowBuilder-DSL) lebt in `tools/_builder.py` und `tests/test_showbuilder.py`. |
+| `check_demo_show_full.py` | **Kein `__main__`-Guard** — schon ein Import startete den vollen Pruef- und Renderlauf. Die Selbstpruefung steckt im Generator `build_demo_show_full.py`. Seine Bilder unter `docs/check_demo_show_full/` bindet keine Anleitung ein (DOC-15). |
+| `verify_color_dimmer_separation.py` | **Kein `__main__`-Guard** (wie oben). Einmal-Verifikation der Farbe/Dimmer-Trennung; dauerhaft abgedeckt u. a. durch `tests/test_implicit_intensity.py`. |
+| `vc_click_targets.py` | Klick-Koordinaten fuer eine Computer-Use-Runde; liest `docs/anleitung_vc_widgets/_capture/geometry.json` (DOC-15). |
+
 ## ⚠ Pfad-Fallstrick beim Archivieren (gefixt 2026-07-27)
 
 Skripte in `tools/` leiten den Repo-Root aus der **Ordnertiefe** ab:
