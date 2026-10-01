@@ -49,7 +49,7 @@ JITTER_CHUNK_MS = 70.0       # p95 der Chunk-Abstaende darueber (normal 21–43 
 JITTER_BACKLOG_MS = 250.0    # Detektor-Rueckstand darueber
 DC_MAX = 0.02                # |DC-Offset| darueber = Chip DC (Bank: +0,05 als Stoerfall)
 HALBTEMPO_ALT_SCORE = 0.7    # alt_score ab hier = Doppel-/Halbtempo ist aehnlich plausibel
-KEIN_TAKT_S = 15.0           # so lange Signal ohne Lock = „Kein Takt gefunden"
+KEIN_TAKT_S = 15.0           # so lange Suche MIT Signal ohne Lock = „Kein Takt gefunden" (search_s, BPM-22)
 SUCHFENSTER_S = 6.0          # Fenster, das die Erkennung zum Einrasten braucht (MEM_S)
 ZIEL_LO_DBFS = -30.0         # Pegel-Zielbereich im Ok-Text (wie level_meter.ZIEL_*)
 ZIEL_HI_DBFS = -6.0
@@ -163,10 +163,10 @@ def ereignis_aufnahme(datei_rel: str, dauer_s: float, abgebrochen: bool,
     if abgebrochen:
         line = StatusLine("hinweis", "Aufnahme abgebrochen",
                           f"{datei_rel} ({dauer_s:.0f} s)",
-                          "Datei trotzdem an Robin/Support schicken", None, key="ereignis_aufnahme")
+                          "Datei trotzdem an den Support schicken", None, key="ereignis_aufnahme")
     else:
         line = StatusLine("ok", "Aufnahme gespeichert", datei_rel,
-                          "Datei an Robin/Support schicken", None, key="ereignis_aufnahme")
+                          "Datei an den Support schicken", None, key="ereignis_aufnahme")
     return line, now + EREIGNIS_AUFNAHME_S
 
 
@@ -468,13 +468,16 @@ def _r_pause(cap, det, m, o, now):
 def _r_kein_takt(cap, det, m, o, now):
     if m.kind not in AUDIO_KINDS or _g(det, "state", "") != "searching":
         return None
-    sig = float(_g(det, "signal_s", 0.0))
-    if sig < KEIN_TAKT_S:
+    # BPM-22: Dauer der LAUFENDEN Suche — nicht ``signal_s`` (Signal seit Quellenstart, zaehlt
+    # ueber Lock und Stille weiter): nach einem Beat-Neustart stand sonst schon 2 s nach
+    # Suchbeginn „kein stabiles Tempo seit 93 s" da, und das noch neben EINGERASTET.
+    such = float(_g(det, "search_s", 0.0))
+    if such < KEIN_TAKT_S:
         return None
     rms = float(_g(cap, "rms_dbfs_1s", _g(det, "level_rms_dbfs", -100.0)))
     return StatusLine(
         "hinweis", "Kein Takt gefunden",
-        f"Signal da ({_db(rms)} dBFS), aber kein stabiles Tempo seit {sig:.0f} s",
+        f"Signal da ({_db(rms)} dBFS), aber kein stabiles Tempo seit {such:.0f} s",
         "Musik ohne klaren Beat? TAP viermal tippen — oder Aufnahme machen und schicken",
         "record", key="kein_takt", stabil=True)
 
@@ -537,14 +540,23 @@ _RULES = (
 # Stoerungen, die ABWESENHEIT von Signal melden -> Schwelle (RMS), ueber der sie widerlegt sind
 ABWESENHEIT_SCHWELLE = {"kein_signal": KEIN_SIGNAL_DBFS, "leise": LEISE_DBFS}
 UEBERSCHUSS_KEYS = ("clip",)
+# Stoerungen, deren Voraussetzung ein Detektor-ZUSTAND ist -> dieser Zustand (BPM-22). Der
+# Zustandsautomat entprellt selbst (Lock: 3 stabile Schaetzungen, Lock-Verlust: 2 s); verlaesst
+# der Detektor den Zustand, ist die Stoerung widerlegt — „Kein Takt" stand sonst noch die
+# 3 s Aus-Hysterese neben EINGERASTET.
+ZUSTAND_PRAEMISSE = {"kein_takt": "searching"}
 _CHIP_KEY = {"LEISE": "leise", "CLIP": "clip"}
 
 
-def aufgeloest(key: str, cap_snap) -> bool:
+def aufgeloest(key: str, cap_snap, det_snap=None) -> bool:
     """True, wenn der aktuelle Pegel die Stoerung ``key`` KLAR widerlegt (BPM-13):
     Abwesenheit (kein_signal, leise) bei RMS 300 ms > Schwelle + ``KLAR_UEBER_DB``,
     Ueberschuss (clip) bei RMS 300 ms < ``KEIN_SIGNAL_DBFS``. Ohne laufenden
-    Capture-Snapshot nie — dann gilt die normale Aus-Hysterese."""
+    Capture-Snapshot nie — dann gilt die normale Aus-Hysterese. Zustands-Stoerungen
+    (``ZUSTAND_PRAEMISSE``, BPM-22) widerlegt der Detektor-Snapshot ``det_snap``, sobald
+    er ihren Zustand verlassen hat; ohne ``det_snap`` nie."""
+    if key in ZUSTAND_PRAEMISSE:
+        return det_snap is not None and _g(det_snap, "state", "") != ZUSTAND_PRAEMISSE[key]
     if cap_snap is None or not bool(_g(cap_snap, "running", True)):
         return False
     rms = float(_g(cap_snap, "rms_dbfs_300ms", -120.0))
@@ -590,14 +602,15 @@ class StatusHysterese:
         self._shown = None
         self._cand_key = None
 
-    def update(self, line: StatusLine, now: float | None = None, cap_snap=None) -> StatusLine:
-        """``cap_snap`` (optional): widerlegt der Pegel die gehaltene Stoerung klar
-        (``aufgeloest``), entfaellt deren Aus-Hysterese."""
+    def update(self, line: StatusLine, now: float | None = None, cap_snap=None,
+               det_snap=None) -> StatusLine:
+        """``cap_snap``/``det_snap`` (optional): widerlegt der Pegel bzw. der Detektor-Zustand
+        die gehaltene Stoerung klar (``aufgeloest``), entfaellt deren Aus-Hysterese."""
         t = self._clock() if now is None else float(now)
         shown = self._shown
         if line.key.startswith(SOFORT_KEYS) or (shown is not None and line.key == shown.key):
             return self._zeige(line, t)
-        if shown is not None and shown.stabil and aufgeloest(shown.key, cap_snap):
+        if shown is not None and shown.stabil and aufgeloest(shown.key, cap_snap, det_snap):
             self._shown_seen = t - self.aus_s      # sofort „weg" (BPM-13)
         if line.key != self._cand_key:
             self._cand_key, self._cand_since = line.key, t

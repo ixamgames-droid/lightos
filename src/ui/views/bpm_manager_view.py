@@ -622,7 +622,7 @@ class BpmManagerView(QWidget):
         self._btn_record.setToolTip(
             "Nimmt 30 s vom aktuellen Audio-Eingang auf (WAV + Messwerte) und legt sie im "
             "Datenordner unter audio_diag/ ab. Wenn die Erkennung nicht klappt: einmal klicken, "
-            "Musik laufen lassen, Datei an Robin/Support schicken. Erneuter Klick bricht ab. "
+            "Musik laufen lassen, Datei an den Support schicken. Erneuter Klick bricht ab. "
             "Nur verfügbar, wenn eine Audio-Quelle läuft.")
         self._btn_record.clicked.connect(self._on_record_clicked)
         rec_row.addWidget(self._btn_record)
@@ -959,7 +959,7 @@ class BpmManagerView(QWidget):
             ereignis=self._ereignis, ereignis_bis=self._ereignis_bis,
             aufnahme_s=rec.progress_s() if rec_running else None)
         line = status_line(cap_snap, snap, m, self._os2l_state() if kind == "os2l" else None, now)
-        self._show_status(self._hyst.update(line, now, cap_snap))
+        self._show_status(self._hyst.update(line, now, cap_snap, snap))
         roh = chips(cap_snap, snap) if kind in AUDIO_KINDS else set()
         self._set_chips(self._chip_hyst.update(roh, now, cap_snap))
         self._update_record_button(rec, rec_running, kind, cap)

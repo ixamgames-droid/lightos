@@ -88,8 +88,9 @@ FAELLE = [
     ("halbtempo", cap(), det(bpm=70.2, alt_bpm=140.4, alt_score=0.8), IN, None, 0, "hinweis", None, "×2"),
     ("pause", cap(rms_dbfs_300ms=-120.0, rms_dbfs_1s=-120.0), det(hold_stage=1), PC, None, 0, "ok", None,
      "gehalten"),
-    ("kein_takt", cap(), det(state="searching", signal_s=18.0), IN, None, 0, "hinweis", "record",
-     "kein stabiles Tempo"),
+    # BPM-22: die Dauer kommt aus search_s (laufende Suche), nicht aus signal_s
+    ("kein_takt", cap(), det(state="searching", signal_s=93.0, search_s=18.0), IN, None, 0, "hinweis",
+     "record", "kein stabiles Tempo seit 18 s"),
     ("sucht", cap(), det(state="searching", signal_s=3.0, window_filled_s=3.0), IN, None, 0, "hinweis", None,
      "Sucht"),
     ("kein_detektor", cap(), None, IN, None, 0, "hinweis", None, "Detektor"),
@@ -145,10 +146,13 @@ def test_ereignis_verdraengt_gehaltene_stoerung_sofort():
 def test_ereignis_aufnahme_nur_relativer_pfad():
     line, bis = R.ereignis_aufnahme("audio_diag/lightos_eingang_20260914-120000.wav", 30.0, False, 5.0)
     assert line.text == ("Aufnahme gespeichert — audio_diag/lightos_eingang_20260914-120000.wav — "
-                         "Datei an Robin/Support schicken")
+                         "Datei an den Support schicken")
     assert bis == 5.0 + R.EREIGNIS_AUFNAHME_S
     ab, _ = R.ereignis_aufnahme("audio_diag/x.wav", 12.0, True, 0.0)
     assert "abgebrochen" in ab.problem and "12 s" in ab.ursache
+    # UI-67: kein Betreiber-Name (Repo-Pseudonym) im Programmtext
+    assert "Robin" not in line.text and "Robin" not in ab.text
+    assert ab.abhilfe == "Datei trotzdem an den Support schicken"
 
 
 def test_kein_signal_nennt_fehlenden_sink():

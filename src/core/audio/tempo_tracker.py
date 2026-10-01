@@ -25,6 +25,8 @@ einem Ringpuffer (6 s). Alle ``EST_EVERY_FRAMES`` Frames (~93 ms):
    Feinnachfuehrung; ausserhalb: Kandidat muss HOLD_S (Oktave: OCT_HOLD_S) konsistent
    bleiben; Stille dreistufig (haelt / friert ein / laesst los) — eingerastet beginnt
    „haelt" fruehestens nach 1,25 Beat-Perioden (Klick 60 BPM = 1 s Luecke je Beat).
+   ``search_s`` zaehlt die Signal-Sekunden der LAUFENDEN Suche (0 bei Lock, Lock-Verlust
+   und Loslassen) — Grundlage fuer „Kein Takt gefunden" (BPM-22).
 4. **Phase:** Comb-Suche (32 Phasen, bei langen Perioden 1 Frame je Schritt; 4-s-Fenster,
    vektorisiert) + Parabel, Kontinuitaet
    ueber halbe Fehlerkorrektur; naechster Beat als Sample-Position vorhergesagt.
@@ -71,6 +73,8 @@ class DetectorSnapshot:
     jitter_ms: float
     onset_contrast: float
     phase_ok: bool = True   # False: Beat-Raster widerspricht den juengsten Onsets -> Beats stumm
+    search_s: float = 0.0   # BPM-22: Signal-Sekunden der LAUFENDEN Suche (0 ab Lock/Stille-Loslassen);
+                            # ``signal_s`` dagegen zaehlt seit Quellenstart ueber Lock und Stille hinweg
 
 
 class TempoTracker:
@@ -189,6 +193,7 @@ class TempoTracker:
         self._unlock_s = 0.0
         self.silent_s = 0.0
         self.signal_s = 0.0
+        self.search_s = 0.0     # BPM-22: Suche mit Signal seit Suchbeginn (Snapshot-Feld)
         self.period_samples = 0.0
         self.next_beat_sample = 0
         self.last_beat_sample = -(10 ** 12)
@@ -481,6 +486,7 @@ class TempoTracker:
             self.bpm, self.bpm_raw, self.conf = 0.0, 0.0, 0.0
             self.alt_bpm, self.alt_score = 0.0, 0.0
             self.next_beat_sample = 0
+            self.search_s = 0.0
             self._stable.clear()
             self._cand_bpm, self._cand_since = 0.0, 0.0
             return
@@ -501,6 +507,8 @@ class TempoTracker:
         if self.state == "no_signal" and self.signal_s > 0:
             self.state = "searching"
         self.hold_stage = 0
+        if self.state == "searching":
+            self.search_s += est_dt     # BPM-22: Stille zaehlt nicht (die Halte-Pfade oben kehren vorher um)
         raw, conf, alt_bpm, alt_score, lag = self._estimate()
         self.bpm_raw = self._fold(raw)
         self.alt_bpm, self.alt_score = self._fold(alt_bpm), alt_score
@@ -517,6 +525,7 @@ class TempoTracker:
                     and len(self._stable) >= self.STABLE_N
                     and max(self._stable) - min(self._stable) <= self.DEADBAND * self.bpm_raw):
                 self.state = "locked"
+                self.search_s = 0.0
                 self.bpm = self.bpm_raw
                 self._set_period(self.bpm)
                 self._fit_phase(force=True)
@@ -526,6 +535,7 @@ class TempoTracker:
             self._unlock_s += est_dt
             if self._unlock_s >= self.UNLOCK_S:
                 self.state = "searching"
+                self.search_s = 0.0     # BPM-22: neue Suche beginnt jetzt
                 self._unlock_s = 0.0
                 self.next_beat_sample = 0
                 self._stable.clear()
@@ -728,6 +738,7 @@ class TempoTracker:
         """Test-Hook: Zustand 'locked' mit gegebenem Tempo setzen, als haette die
         Schaetzung es geliefert (Roh ungefaltet, Rastung gefaltet, Konfidenz 1)."""
         self.state, self.hold_stage = "locked", 0
+        self.search_s = 0.0
         self.bpm_raw = float(bpm)
         self.bpm = self._fold(float(bpm))
         self.conf = 1.0
