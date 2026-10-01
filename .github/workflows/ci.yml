@@ -189,9 +189,18 @@ jobs:
       # "Zusammenfassen"-Lauf derselben 5 Dateien — reine Redundanz ohne Mehr-
       # Abdeckung, die den Teardown-Crash nur ein zweites Mal wuerfelte und CI
       # zuverlaessig rot faerbte (traf #294/#296). Entfernt -> ein Lauf genuegt.
+      #
+      # XPLAT-40: dazu die SANDBOX-Tests des Bild-Werkzeugs. Die Undichtigkeit
+      # unter Windows (USERPROFILE/LOCALAPPDATA, XPLAT-39) war auf Linux nicht
+      # zu sehen, weil Linux HOME liest — nur hier faellt ein Rueckfall auf.
+      # Bewusst NUR WindowsHomeTest + SandboxRiegelTest, nicht die ganze Datei:
+      # MiniLaufTest baut im Unterprozess ein VOLLES MainWindow und rendert eine
+      # PNG (Schrift-/Groessenpruefung), und dieser Job installiert nur die
+      # Kernpakete (kein rtmidi/soundcard/Flask). Die volle Datei faehrt das
+      # lokale Windows-Gate. tests/test_ci_windows_legs.py haelt die Liste fest.
       - name: Unit-Tests ausfuehren
         env:
           QT_QPA_PLATFORM: offscreen
           LIGHTOS_HARDEN_EXIT_ALL: "1"
         run: |
-          python -m pytest tests/test_show_file.py tests/test_core_engine.py tests/test_show_lint.py tests/test_render_contract_props.py tests/test_views.py -v --tb=short
+          python -m pytest tests/test_show_file.py tests/test_core_engine.py tests/test_show_lint.py tests/test_render_contract_props.py tests/test_views.py tests/test_anleitungsbilder.py::WindowsHomeTest tests/test_anleitungsbilder.py::SandboxRiegelTest -v --tb=short
