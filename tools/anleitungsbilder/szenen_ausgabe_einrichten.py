@@ -300,6 +300,129 @@ def _bild_warnungen(ui):
     ], hindernisse=[rechteck(w, dm._grid)])
 
 
+# ── 9: Blackout im DMX-Monitor (OUT-57) ─────────────────────────────────────
+#
+# Die Hilfen hier benutzt auch ``szenen_vc_widgets`` (Blackout-Taste mit Ziel).
+
+def frame_wie_ausgabe(ui):
+    """Einen Frame mit dem ECHTEN ``OutputManager._send_all`` rechnen — mit
+    Channel-Modifier, Grand-Master, Blackout und Ziel-Blackout —, aber ohne
+    zu senden: die Sender-Tabellen sind waehrenddessen leer und werden danach
+    unveraendert zurueckgelegt. So zeigt der Monitor genau das, was die
+    Ausgabe senden wuerde (anders als :func:`_frame_rechnen`, das Blackout
+    und GM bewusst auslaesst)."""
+    om = ui.state.output_manager
+    tabellen = (om._enttec_outputs, om._artnet_outputs, om._sacn_outputs)
+    gemerkt = [dict(t) for t in tabellen]
+    try:
+        for t in tabellen:
+            t.clear()
+        om._send_all()
+    finally:
+        for t, alt in zip(tabellen, gemerkt):
+            t.clear()
+            t.update(alt)
+    ui.win._dmx_monitor_view._refresh()
+    ui.pump(0.3)
+
+
+def zellen(ui, von: int, bis: int):
+    """Rechteck der DMX-Monitor-Kacheln ``von``…``bis`` (eine Zeile) in
+    Fensterkoordinaten."""
+    from PySide6.QtCore import QPoint, QRect
+    from src.ui.views.dmx_monitor_view import COLS, ROWS
+    grid = ui.win._dmx_monitor_view._grid
+    if (von - 1) // COLS != (bis - 1) // COLS:
+        raise SzenenFehler(f"Kanäle {von}–{bis} liegen nicht in einer Zeile")
+    cw, ch = grid.width() / COLS, grid.height() / ROWS
+    zeile, s1, s2 = (von - 1) // COLS, (von - 1) % COLS, (bis - 1) % COLS
+    oben_links = grid.mapTo(ui.win, QPoint(int(s1 * cw), int(zeile * ch)))
+    return QRect(oben_links.x(), oben_links.y(),
+                 int((s2 - s1 + 1) * cw), int(ch))
+
+
+def oberer_streifen(flaeche, hoehe: int):
+    """Nur den oberen Teil eines :func:`bild` behalten (Monitor-Zeilen 1–3;
+    darunter stehen nur Nullen)."""
+    from PySide6.QtWidgets import QLabel
+    pix = flaeche.pixmap().copy(0, 0, flaeche.width(), hoehe)
+    aus = QLabel()
+    aus.setFixedSize(pix.width(), pix.height())
+    aus.setPixmap(pix)
+    flaeche.deleteLater()
+    return aus
+
+
+STREIFEN_H = 325
+
+
+@contextmanager
+def platz_ueber_raster(ui, px: int = 34):
+    """Nur fuer ein Bild: Abstand zwischen Legende und DMX-Raster. Ueber Zeile 1
+    steht sonst die Legende, und die Kreise fuer Kanalbereiche saessen auf
+    einer Nachbar-Kachel. Das Raster wird dafuer minimal flacher."""
+    dm = ui.win._dmx_monitor_view
+    lay = dm.layout()
+    idx = lay.indexOf(dm._grid)
+    if idx < 0:
+        raise SzenenFehler("DMX-Raster nicht im Layout des Monitors")
+    lay.insertSpacing(idx, px)
+    try:
+        ui.pump(0.2)
+        yield
+    finally:
+        lay.takeAt(idx)
+        lay.invalidate()
+        ui.pump(0.1)
+
+# Doku-Demo: Wash 1/2 ab 41/48, Spot 1/2 ab 61/69 — bei beiden Profilen sind
+# die ersten zwei Kanaele Pan und Tilt (siehe Kachel-Kuerzel im Bild).
+_BEWEGUNG = "41,42,48,49,61,62,69,70"
+
+
+def _blackout_knopf(ui):
+    return knopf(ui.win, "BLACKOUT")
+
+
+def _blackout_an(ui):
+    """PARs rot, Moving Heads an und auf eine Position gefahren, dann der
+    BLACKOUT-Knopf der Kopfleiste (echter Klick)."""
+    _werte_setzen(ui)
+    mover = ui.info["mover"]
+    ui.wert(mover, "intensity", 255)
+    ui.wert(mover, "pan", 200)
+    ui.wert(mover, "tilt", 60)
+    ui.reiter("DMX Monitor")
+    dm = ui.win._dmx_monitor_view
+    dm._edit_filter.setText(_BEWEGUNG)
+    b = _blackout_knopf(ui)
+    if not b.isChecked():
+        b.click()
+    if not ui.state.output_manager.blackout:
+        raise SzenenFehler("BLACKOUT-Knopf schaltet den Blackout nicht ein")
+    frame_wie_ausgabe(ui)
+
+
+def _blackout_aus(ui):
+    b = _blackout_knopf(ui)
+    if b.isChecked():
+        b.click()
+    ui.win._dmx_monitor_view._edit_filter.setText("")
+    _monitor_zurueck(ui)
+
+
+def _bild_blackout(ui):
+    w = ui.win
+    dm = w._dmx_monitor_view
+    with platz_ueber_raster(ui):
+        flaeche = bild(ui, kreise=[
+            (rechteck(w, _blackout_knopf(ui)), 1, "unten"),
+            (zellen(ui, 1, 32), 2, "oben"),
+            (rechteck(w, dm._edit_filter), 3, "oben"),
+        ], hindernisse=[rechteck(w, dm._grid)])
+    return oberer_streifen(flaeche, STREIFEN_H)
+
+
 SZENEN = [
     Szene("01_menue_ausgabe", sektion="Programmer", unterreiter="Attribute",
           dialog=_bild_menue, titel="Menü Ausgabe → Konfigurieren…"),
@@ -320,4 +443,7 @@ SZENEN = [
     Szene("08_warnungen", sektion="E/A", vorher=_ohne_ausgang,
           dialog=_bild_warnungen, nachher=_ausgang_zurueck,
           titel="Warnungen: Universe ohne Ausgang"),
+    Szene("09_blackout_dmx_monitor", sektion="E/A", vorher=_blackout_an,
+          dialog=_bild_blackout, nachher=_blackout_aus, groesse=(1600, STREIFEN_H),
+          titel="BLACKOUT im DMX-Monitor: Licht 0, Pan/Tilt bleibt"),
 ]
