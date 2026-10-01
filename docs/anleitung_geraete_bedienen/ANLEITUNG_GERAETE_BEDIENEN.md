@@ -91,6 +91,12 @@ Intensity den Hinweis, dass die Helligkeit über die Farbe läuft.
 - **Sicherheit:** **Highlight** setzt nur die Intensität, **„Alles Weiß"** lässt Laser,
   Nebel-, Flammen- und Funkenmaschinen ganz in Ruhe. Beides zündet also nie
   versehentlich Nebel oder Laser.
+- **Shutter nur mit Beleg:** „Alles Weiß" und eine Bewegung mit geöffnetem Strahl
+  (EFX-Häkchen „Dimmer/Shutter mit öffnen") öffnen den Shutter nur, wenn das Gerät einen
+  offenen Zustand hinterlegt hat. Liegt der hinterlegte Wert im Strobe- oder
+  Zu-Bereich, bleibt der Shutter, wie er ist — lieber ein dunkles Gerät als ein
+  unerwartet blitzendes. Mitgelieferte Geräte sind davon nicht betroffen; es kann
+  importierte Profile treffen.
 
 ---
 
