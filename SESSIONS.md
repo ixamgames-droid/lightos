@@ -10,7 +10,6 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | BPM-15 | B | (kein Code, Rig-Test) | 2026-10-01T13:46Z | - |
-| UI-66 | A | fix/ui66-cueliste-ueberall | 2026-10-01T13:55Z | src/ui/main_window.py,src/core/cmdline/parser.py,src/web/app.py,src/core/osc_server.py |
 
 ## Blocker & Fallen
 
@@ -134,7 +133,6 @@
 
 ## Verlauf
 
-- 2026-09-29T02:36Z A done QA-67
 - 2026-09-29T02:36Z A done QA-81
 - 2026-09-29T13:23Z A claim STAB-24
 - 2026-09-29T14:14Z A done STAB-24
@@ -164,3 +162,4 @@
 - 2026-10-01T13:24Z A done BPM-19
 - 2026-10-01T13:46Z B claim BPM-15
 - 2026-10-01T13:55Z A claim UI-66
+- 2026-10-01T14:44Z A done UI-66
