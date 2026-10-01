@@ -15,7 +15,6 @@
 | TOOL-1 | C | fix/tool1-verwaiste-werkzeuge | 2026-10-01T21:08Z | tools/build_komplette_animierte_show.py · tools/build_uxtest3_full.py · tools/build_validated_demo.py · tools/check_demo_show_full.py · tools/vc_click_targets.py · tools/verify_color_dimmer_separation.py · tools/build_demo_show.py · tools/_archiv · tools/README.md · tools/_gen_env.py · BACKLOG.md |
 | TOOL-3 | C | fix/tool3-generator-pfade | 2026-10-01T21:11Z | tools/build_full_show.py · tools/build_spot90_testshow.py · tools/_profil.py · tools/README.md · tests/test_tool3_generator_annahmen.py · BACKLOG.md |
 | DOC-15 | C | fix/doc15-bildbestaende | 2026-10-01T21:21Z | docs/anleitung_vc_widgets/_capture · docs/check_demo_show_full · tests/test_doc15_bildbestaende.py · changelog.d/2026-10-02-DOC-15.md |
-| DOC-18 | A | docs/doc18-bpm-anleitung | 2026-10-01T21:34Z | docs/anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md · docs/anleitung_bpm_manager/img |
 | PROC-08 | C | fix/proc08-blocker-verfall | 2026-10-01T21:24Z | tools/session_claim.py · COORDINATION.md · tests/test_proc08_blocker_verfall.py · changelog.d/2026-10-02-PROC-08.md |
 | ENG-27 | C | fix/eng27-open-value | 2026-10-01T21:27Z | src/core/app_state.py · src/core/all_white.py · src/core/engine/efx.py |
 | FM-46 | C | docs/fm46-befund | 2026-10-01T21:35Z | BACKLOG.md |
@@ -176,7 +175,6 @@
 
 ## Verlauf
 
-- 2026-10-01T19:33Z A claim XPLAT-41
 - 2026-10-01T19:42Z A done PROC-09
 - 2026-10-01T19:47Z A claim PROC-17
 - 2026-10-01T19:49Z B done FUNKTIONSTEST-B
@@ -206,3 +204,4 @@
 - 2026-10-01T21:48Z A done UI-68
 - 2026-10-01T21:56Z A claim DOC-19
 - 2026-10-01T22:01Z A done VCB-11
+- 2026-10-01T22:13Z A done DOC-18
