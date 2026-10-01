@@ -18,6 +18,7 @@
 | VCB-11 | A | - | 2026-10-01T21:03Z | src/ui/widgets/vc_button.py · src/core/dmx/output_manager.py |
 | TOOL-1 | C | fix/tool1-verwaiste-werkzeuge | 2026-10-01T21:08Z | tools/build_komplette_animierte_show.py · tools/build_uxtest3_full.py · tools/build_validated_demo.py · tools/check_demo_show_full.py · tools/vc_click_targets.py · tools/verify_color_dimmer_separation.py · tools/build_demo_show.py · tools/_archiv · tools/README.md · tools/_gen_env.py · BACKLOG.md |
 | TOOL-3 | C | fix/tool3-generator-pfade | 2026-10-01T21:11Z | tools/build_full_show.py · tools/build_spot90_testshow.py · tools/_profil.py · tools/README.md · tests/test_tool3_generator_annahmen.py · BACKLOG.md |
+| DOC-15 | C | fix/doc15-bildbestaende | 2026-10-01T21:21Z | docs/anleitung_vc_widgets/_capture · docs/check_demo_show_full · tests/test_doc15_bildbestaende.py · changelog.d/2026-10-02-DOC-15.md |
 
 ## Blocker & Fallen
 
@@ -168,7 +169,6 @@
 
 ## Verlauf
 
-- 2026-10-01T16:18Z B done UI-67
 - 2026-10-01T16:25Z B claim BPM-20
 - 2026-10-01T16:25Z B claim BPM-23
 - 2026-10-01T16:35Z A done DOC-17
@@ -198,3 +198,4 @@
 - 2026-10-01T21:08Z C claim TOOL-1
 - 2026-10-01T21:10Z A done OUT-57
 - 2026-10-01T21:11Z C claim TOOL-3
+- 2026-10-01T21:21Z C claim DOC-15
