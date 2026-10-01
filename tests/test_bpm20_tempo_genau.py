@@ -116,3 +116,46 @@ def test_feinlage_bei_kurzem_fenster_ohne_oberwelle():
     tr = TempoTracker(SR)
     ac = _acf_mit_gipfeln(40.375, m=60)
     assert tr._feinlage(ac, 41, ac.size) == pytest.approx(40.375, abs=0.05)
+
+
+def test_oberwelle_ohne_ueberlappung_zaehlt_nicht():
+    """Review BPM-20: beim Einrasten (Fenster ~3,5 s = 301 Frames) liegt die 4. Oberwelle von
+    75 BPM (Periode 69) bei Lag 276 — gemittelt ueber nur 25 Paare, also Zufall. Eine Stoerspitze
+    dort darf die Feinlage nicht ziehen (vorher: ±0,5-Toleranz liess sie durch -> 69,3)."""
+    tr = TempoTracker(SR)
+    ac = _acf_mit_gipfeln(69.0, m=301)
+    lag = np.arange(301, dtype=np.float64)
+    ac += 2.0 * np.exp(-0.5 * ((lag - 277.2) / 1.4) ** 2)      # zufaellige Spitze bei der 4. Oberwelle
+    assert tr._feinlage(ac, 69, ac.size) == pytest.approx(69.0, abs=0.05)
+
+
+def test_feinlage_nicht_endlich_faellt_auf_kamm_lag():
+    """Review BPM-20: NaN in der ACF (z. B. NaN im Eingang) -> Kamm-Lag statt Exception im
+    Capture-Thread (``round(nan)`` warf ValueError)."""
+    tr = TempoTracker(SR)
+    ac = np.full(300, np.nan)
+    assert tr._feinlage(ac, 40, ac.size) == 40.0
+
+
+def _kickzug(bpm: float, seconds: float) -> np.ndarray:
+    return _beat(bpm, seconds)
+
+
+@pytest.mark.parametrize("bpm", [75.0, 128.0, 174.0])
+def test_genau_schon_beim_einrasten(bpm):
+    """Review BPM-20: die Tests oben messen ab 10 s; beim Einrasten uebernimmt der Lock die
+    Roh-Schaetzung direkt. Erste 3 s nach dem Lock: alt bis 0,64 BPM daneben (174 -> 173,36),
+    jetzt hoechstens ~0,2."""
+    sig = _kickzug(bpm, 9.0)
+    det = BeatDetector(sample_rate=SR)
+    lock_t, werte = None, []
+    for p in range(0, sig.size - CH + 1, CH):
+        det.process_chunk(sig[p:p + CH])
+        s = det.snapshot()
+        if s.state == "locked":
+            t = (p + CH) / SR
+            lock_t = t if lock_t is None else lock_t
+            if t <= lock_t + 3.0:
+                werte.append(s.bpm)
+    assert werte, "nie eingerastet"
+    assert max(abs(w - bpm) for w in werte) < 0.25, (min(werte), max(werte))

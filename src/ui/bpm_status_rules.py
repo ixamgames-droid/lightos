@@ -461,7 +461,7 @@ def _r_unsicher(cap, det, m, o, now):
     return StatusLine(
         "hinweis", "Takt unsicher",
         f"Konfidenz {konf * 100:.0f} %, das Tempo {_bpm(float(_g(det, 'bpm', 0.0)))} läuft noch weiter",
-        "kommt kein klarer Beat zurück, gibt die Erkennung es nach ~2 s frei",
+        "kommt der Beat nicht zurück: TAP im Takt setzt das Tempo neu",
         None, key="unsicher")
 
 
@@ -485,8 +485,10 @@ def _r_halbtempo(cap, det, m, o, now):
 def _r_pause(cap, det, m, o, now):
     if m.kind not in AUDIO_KINDS or not _pausiert(det):
         return None
-    return StatusLine("ok", "Pause", f"Tempo {_bpm(float(_g(det, 'bpm', 0.0)))} gehalten, Beats laufen weiter",
-                      "nichts zu tun", None, key="pause")
+    # Review BPM-23: in der Pause feuert der Detektor KEINE Beats (beat_due: hold_stage != 0),
+    # und im AUTO-Audio-Modus ist er die einzige Beat-Quelle — „Beats laufen weiter" stimmte nie.
+    return StatusLine("ok", "Pause", f"Tempo {_bpm(float(_g(det, 'bpm', 0.0)))} gehalten, die Beats "
+                      "pausieren, bis die Musik zurückkommt", "nichts zu tun", None, key="pause")
 
 
 def _r_kein_takt(cap, det, m, o, now):
@@ -564,11 +566,21 @@ _RULES = (
 # Stoerungen, die ABWESENHEIT von Signal melden -> Schwelle (RMS), ueber der sie widerlegt sind
 ABWESENHEIT_SCHWELLE = {"kein_signal": KEIN_SIGNAL_DBFS, "leise": LEISE_DBFS}
 UEBERSCHUSS_KEYS = ("clip",)
-# Stoerungen, deren Voraussetzung ein Detektor-ZUSTAND ist -> dieser Zustand (BPM-22). Der
-# Zustandsautomat entprellt selbst (Lock: 3 stabile Schaetzungen, Lock-Verlust: 2 s); verlaesst
-# der Detektor den Zustand, ist die Stoerung widerlegt — „Kein Takt" stand sonst noch die
-# 3 s Aus-Hysterese neben EINGERASTET.
-ZUSTAND_PRAEMISSE = {"kein_takt": "searching"}
+# Stoerungen, deren Voraussetzung ein Detektor-ZUSTAND ist -> Pruefung dieser Voraussetzung.
+# Der Zustandsautomat entprellt selbst (Lock: 3 stabile Schaetzungen, Lock-Verlust: 2 s);
+# faellt die Voraussetzung weg, ist die Stoerung widerlegt. BPM-22: „Kein Takt" stand sonst
+# noch die 3 s Aus-Hysterese neben EINGERASTET. BPM-23 (Review): die Halbtempo-Zeile beginnt
+# mit „Eingerastet — …" und stand sonst bis 3 s neben SUCHT, wenn der Takt unsicher wurde.
+ZUSTAND_PRAEMISSE = {
+    "kein_takt": lambda det: _g(det, "state", "") == "searching",
+    "halbtempo": lambda det: (_g(det, "state", "") == "locked" and not _pausiert(det)
+                              and not unsicher(det)),
+}
+# Angezeigte Statuszeilen, bei denen das Zustandswort „KEIN SIGNAL" heisst (BPM-23, Review):
+# das Wort folgt der ENTPRELLTEN Zeile statt eines eigenen Pegelvergleichs — sonst blitzte
+# bei jeder Musikpause KEIN SIGNAL zwischen EINGERASTET und PAUSE auf.
+KEIN_SIGNAL_KEYS = ("kein_signal", "wartet", "capture_gestoppt", "capture_fehler", "capture_haengt",
+                    "audio_fehlt", "audio_server", "audio_bibliothek", "monitor_als_eingang")
 _CHIP_KEY = {"LEISE": "leise", "CLIP": "clip"}
 
 
@@ -577,10 +589,10 @@ def aufgeloest(key: str, cap_snap, det_snap=None) -> bool:
     Abwesenheit (kein_signal, leise) bei RMS 300 ms > Schwelle + ``KLAR_UEBER_DB``,
     Ueberschuss (clip) bei RMS 300 ms < ``KEIN_SIGNAL_DBFS``. Ohne laufenden
     Capture-Snapshot nie — dann gilt die normale Aus-Hysterese. Zustands-Stoerungen
-    (``ZUSTAND_PRAEMISSE``, BPM-22) widerlegt der Detektor-Snapshot ``det_snap``, sobald
-    er ihren Zustand verlassen hat; ohne ``det_snap`` nie."""
+    (``ZUSTAND_PRAEMISSE``, BPM-22/23) widerlegt der Detektor-Snapshot ``det_snap``, sobald
+    ihre Voraussetzung nicht mehr gilt; ohne ``det_snap`` nie."""
     if key in ZUSTAND_PRAEMISSE:
-        return det_snap is not None and _g(det_snap, "state", "") != ZUSTAND_PRAEMISSE[key]
+        return det_snap is not None and not ZUSTAND_PRAEMISSE[key](det_snap)
     if cap_snap is None or not bool(_g(cap_snap, "running", True)):
         return False
     rms = float(_g(cap_snap, "rms_dbfs_300ms", -120.0))
@@ -728,5 +740,5 @@ class ChipHysterese:
         self._sichtbar.clear()
 
 
-__all__ = ["zahl", "aufgeloest", "unsicher", "StatusLine", "MgrState", "Os2lState", "status_line", "StatusHysterese", "chips",
+__all__ = ["zahl", "aufgeloest", "unsicher", "KEIN_SIGNAL_KEYS", "StatusLine", "MgrState", "Os2lState", "status_line", "StatusHysterese", "chips",
            "ChipHysterese", "ereignis_oktave", "ereignis_aufnahme", "ereignis"]

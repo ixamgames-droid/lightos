@@ -194,6 +194,7 @@ class TempoTracker:
         self._cand_since = 0.0
         self._stable: list[float] = []
         self._unlock_s = 0.0
+        self._leer_s = 0.0      # BPM-23: im Lock Sekunden in Folge mit LEERER Schaetzung (nur Anzeige)
         self.silent_s = 0.0
         self.signal_s = 0.0
         self.search_s = 0.0     # BPM-22: Suche mit Signal seit Suchbeginn (Snapshot-Feld)
@@ -376,15 +377,30 @@ class TempoTracker:
             return float(q)
         return q + float(np.clip(0.5 * (y0 - y2) / den, -0.5, 0.5))
 
+    OBERWELLE_UEBERLAPP = 2.0   # Oberwelle nur, wenn ihr ACF-Wert mind. so viele Perioden Paare hat
+    OBERWELLE_HOEHE = 0.3       # ... und ihr Gipfel mind. so hoch ist wie dieser Teil des Grundgipfels
+    OBERWELLE_TOL = 0.2         # ... und sie hoechstens so viele Frames vom Grundwert abweicht
+
     def _feinlage(self, ac: np.ndarray, a: int, M: int) -> float:
-        """Periode in Frames (Sub-Lag-genau) zum Kamm-Lag ``a``; siehe Block oben."""
-        p0 = self._interp(ac, self._gipfel(ac, a, M), M)
+        """Periode in Frames (Sub-Lag-genau) zum Kamm-Lag ``a``; siehe Block oben.
+
+        Review BPM-20: eine Oberwelle zaehlt nur mit genug Ueberlappung (die unbiased-ACF bei
+        Lag q mittelt ueber M−q Paare — unter zwei Perioden ist ihr Gipfel Zufall, beim Einrasten
+        mit ~3,5 s Fenster lag die 4. Oberwelle von 75 BPM fast am Rand), mit echtem Gipfel und
+        enger Toleranz (±0,5 Frames liess jeden Nachbarn durch). Nicht endliche ACF -> Kamm-Lag."""
+        g0 = self._gipfel(ac, a, M)
+        p0 = self._interp(ac, g0, M)
+        if not np.isfinite(p0):
+            return float(a)
         for h in (4, 3, 2):
             q = int(round(h * p0))
-            if q + 2 >= M:
+            if q + 2 >= M or M - q < self.OBERWELLE_UEBERLAPP * p0:
                 continue
-            p = self._interp(ac, self._gipfel(ac, q, M), M) / h
-            if abs(p - p0) < 0.5:          # Oberwelle gehoert zur selben Periode
+            gq = self._gipfel(ac, q, M)
+            if not ac[gq] >= self.OBERWELLE_HOEHE * ac[g0]:
+                continue
+            p = self._interp(ac, gq, M) / h
+            if np.isfinite(p) and abs(p - p0) < self.OBERWELLE_TOL:
                 return p
         return p0
 
@@ -411,7 +427,9 @@ class TempoTracker:
         if not self.BASS_OCT or self.tempo_hint:    # Hinweis entscheidet selbst: Entscheidung verwerfen
             self.bass_dbl, self._bass_run = False, 0
             return False
-        if a < 4 or self._fold(bpm) * 2.0 > self.max_bpm:
+        # Review BPM-20: Toleranz wie ``_fold`` (klemmt bis max*(1+DEADBAND) auf max) — seit die
+        # Feinlage exakt ist, war ein echter Backbeat bei genau max_bpm sonst ein Muenzwurf 100/200.
+        if a < 4 or self._fold(bpm) * 2.0 > self.max_bpm * (1.0 + self.DEADBAND):
             return False                    # x2 nicht moeglich (Flux steht schon oben): Entscheidung bleibt
         raw = self._bass_raw(M, a, s_dbl)
         if raw != self.bass_dbl:
@@ -533,6 +551,7 @@ class TempoTracker:
             self.alt_bpm, self.alt_score = 0.0, 0.0
             self.next_beat_sample = 0
             self.search_s = 0.0
+            self._unlock_s = self._leer_s = 0.0
             self._stable.clear()
             self._cand_bpm, self._cand_since = 0.0, 0.0
             return
@@ -562,12 +581,15 @@ class TempoTracker:
         min_frames = self.MIN_WINDOW_S * self.fps
         self.conf = conf if self.frames_filled >= min_frames else conf * (self.frames_filled / min_frames)
         if raw <= 0:
-            # BPM-23: eine LEERE Schaetzung (kein Gipfel, flache Huellkurve) ist Konfidenz 0 —
-            # sie darf die Entrast-Hysterese nicht ueberspringen. Vorher stand der Lock bei
-            # einem Dauerton so 16,7 s statt ~6 s, mit „EINGERASTET 0 %" in der Anzeige.
+            # BPM-23: eine LEERE Schaetzung (flache Huellkurve, kein Gipfel — z. B. eine Flaeche
+            # ohne jeden Anschlag im Breakdown) haelt den Lock wie bisher: so laeuft das Tempo
+            # bis zum Drop durch (Entrasten hiesse ~4 s ohne Beats nach dem Drop). Ehrlich
+            # ANGEZEIGT wird es trotzdem: ``_leer_s`` fliesst in ``unsicher_s``. Ob Breakdowns
+            # halten oder loslassen sollen, klaert BPM-24 mit echten Aufnahmen.
             if self.state == "locked":
-                self._entrast_hysterese(est_dt)
+                self._leer_s += est_dt
             return
+        self._leer_s = 0.0
         # --- Suche -> Lock
         if self.state != "locked":
             self._stable.append(self.bpm_raw)
@@ -577,6 +599,7 @@ class TempoTracker:
                     and max(self._stable) - min(self._stable) <= self.DEADBAND * self.bpm_raw):
                 self.state = "locked"
                 self.search_s = 0.0
+                self._unlock_s = 0.0    # Review BPM-23: kein Rest-Countdown aus einem frueheren Lock
                 self.bpm = self.bpm_raw
                 self._set_period(self.bpm)
                 self._fit_phase(force=True)
@@ -606,9 +629,18 @@ class TempoTracker:
                 return
         self._fit_phase()
 
+    @property
+    def unsicher_s(self) -> float:
+        """BPM-23 (Snapshot-Feld): im aktiven Lock die Sekunden in Folge ohne sicheren Takt —
+        Konfidenz unter ``UNLOCK_CONF`` (Entrast-Countdown) oder leere Schaetzungen. In der
+        Stille-Pause und ausserhalb des Locks 0 (dort sagt die Pause bzw. SUCHT genug)."""
+        if self.state != "locked" or self.hold_stage != 0:
+            return 0.0
+        return max(self._unlock_s, self._leer_s)
+
     def _entrast_hysterese(self, est_dt: float) -> bool:
         """Hysterese nach unten (nur im Zustand ``locked``): Konfidenz unter ``UNLOCK_CONF``
-        zaehlt ``_unlock_s`` hoch (im Snapshot ``unsicher_s``), jede Schaetzung darueber setzt
+        zaehlt ``_unlock_s`` hoch (fliesst in ``unsicher_s``), jede Schaetzung darueber setzt
         ihn auf 0; nach ``UNLOCK_S`` -> ``searching``. True = gerade entrastet."""
         if self.conf < self.UNLOCK_CONF:
             self._unlock_s += est_dt
@@ -798,7 +830,7 @@ class TempoTracker:
         Schaetzung es geliefert (Roh ungefaltet, Rastung gefaltet, Konfidenz 1)."""
         self.state, self.hold_stage = "locked", 0
         self.search_s = 0.0
-        self._unlock_s = 0.0
+        self._unlock_s = self._leer_s = 0.0
         self.bpm_raw = float(bpm)
         self.bpm = self._fold(float(bpm))
         self.conf = 1.0

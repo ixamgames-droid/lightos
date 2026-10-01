@@ -126,24 +126,21 @@ def _html(text: str) -> str:
 
 
 def state_word(mode_manual: bool, kind: str | None, snap, os2l_waiting: bool = False,
-               cap_snap=None) -> tuple[str, str]:
+               zeile_key: str | None = None) -> tuple[str, str]:
     """Zustandswort + Farbe aus Manager-Modus, Quelle und Detektor-Snapshot
-    (ui_diagnose 3.1). Reine Funktion — testbar ohne Qt. ``cap_snap`` (optional, BPM-23):
-    unter ``KEIN_SIGNAL_DBFS`` (RMS 300 ms) heisst ein Lock „KEIN SIGNAL" wie die Statuszeile."""
+    (ui_diagnose 3.1). Reine Funktion — testbar ohne Qt. ``zeile_key`` (BPM-23): Key der
+    gerade ANGEZEIGTEN (entprellten) Statuszeile — zeigt sie „Kein Signal", „Wartet auf
+    Signal" oder einen Audio-Fehler (``KEIN_SIGNAL_KEYS``), heisst das Wort KEIN SIGNAL."""
     if mode_manual:
         return "MANUELL", _COL_GREEN
     if kind in AUDIO_KINDS:
-        if snap is None:
+        if snap is None or zeile_key in rules.KEIN_SIGNAL_KEYS:
             return "KEIN SIGNAL", _COL_GREY
         st = getattr(snap, "state", "no_signal")
         if st == "locked":
             if int(getattr(snap, "hold_stage", 0)) in (1, 2):
                 return f"PAUSE · hält {float(getattr(snap, 'bpm', 0.0)):.0f}", "#5fae4a"
-            # BPM-23: EINGERASTET nur mit Mindestpegel und Mindest-Konfidenz — vorher stand es
-            # auch bei Konfidenz 0 % (Mikro, Raumgeraeusch) und neben „Kein Signal"
-            if (cap_snap is not None and bool(getattr(cap_snap, "running", True))
-                    and float(getattr(cap_snap, "rms_dbfs_300ms", -120.0)) < rules.KEIN_SIGNAL_DBFS):
-                return "KEIN SIGNAL", _COL_GREY
+            # BPM-23: EINGERASTET nur mit sicherem Takt — vorher stand es auch bei Konfidenz 0 %
             if rules.unsicher(snap):
                 return "SUCHT", _COL_AMBER
             return "EINGERASTET", _COL_GREEN
@@ -943,11 +940,6 @@ class BpmManagerView(QWidget):
             cap_snap = cap.snapshot() if kind in AUDIO_KINDS else None
         except Exception:
             audio_ok = audio_ok and cap is not None
-        # Zustandswort erst hier: es braucht den Pegel (BPM-23, „KEIN SIGNAL" statt EINGERASTET)
-        word, col = state_word(self._mgr.mode == BpmMode.MANUAL, kind, snap, waiting, cap_snap)
-        if self._lbl_state.text() != word:
-            self._lbl_state.setText(word)
-            self._lbl_state.setStyleSheet(_STATE_STYLE.format(col=col))
         self._level.set_snapshot(cap_snap)
         lt = pegel_text(cap_snap)
         if self._lbl_level.text() != lt:
@@ -970,7 +962,14 @@ class BpmManagerView(QWidget):
             ereignis=self._ereignis, ereignis_bis=self._ereignis_bis,
             aufnahme_s=rec.progress_s() if rec_running else None)
         line = status_line(cap_snap, snap, m, self._os2l_state() if kind == "os2l" else None, now)
-        self._show_status(self._hyst.update(line, now, cap_snap, snap))
+        gezeigt = self._hyst.update(line, now, cap_snap, snap)
+        self._show_status(gezeigt)
+        # Zustandswort NACH der Statuszeile: „KEIN SIGNAL" folgt der entprellten Zeile (BPM-23),
+        # damit Wort und Zeile sich nie widersprechen (auch nicht beim Übergang in die Pause)
+        word, col = state_word(self._mgr.mode == BpmMode.MANUAL, kind, snap, waiting, gezeigt.key)
+        if self._lbl_state.text() != word:
+            self._lbl_state.setText(word)
+            self._lbl_state.setStyleSheet(_STATE_STYLE.format(col=col))
         roh = chips(cap_snap, snap) if kind in AUDIO_KINDS else set()
         self._set_chips(self._chip_hyst.update(roh, now, cap_snap))
         self._update_record_button(rec, rec_running, kind, cap)
