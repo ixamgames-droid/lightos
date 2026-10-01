@@ -60,7 +60,9 @@ from src.ui.virtualconsole.vc_song_info import VCSongInfo
 from src.ui.virtualconsole.vc_effect_editor import VCEffectEditor
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(_ROOT, "shows", "Demo_Show_Full.lshow")
+# TOOL-5: LIGHTOS_GEN_OUT lenkt die Show um (Test faehrt den Generator bis „FERTIG",
+# ohne die mitgelieferte shows/Demo_Show_Full.lshow zu ueberschreiben).
+OUT = os.environ.get("LIGHTOS_GEN_OUT") or os.path.join(_ROOT, "shows", "Demo_Show_Full.lshow")
 MUSIC_DIR = r"C:/Users/X/Desktop/Musik/BP Party"
 BUS = "Global"          # alle Effekte folgen diesem Master-Bus (= globale Musik-BPM)
 PLAYLIST_MAX = 16
@@ -895,9 +897,18 @@ assert len(custom) >= 2, f"Custom-Path-EFX: {len(custom)}"
 # Tempo: alle Effekte folgen dem Master „Global" (der wiederum der Musik folgt)
 bound = [f for f in fm.all() if getattr(f, "tempo_bus_id", "") == BUS]
 assert len(bound) >= 25, f"an Master gekoppelt: {len(bound)}"
-named = {b.bus_id: b for b in get_tempo_bus_manager().named_buses()}
-assert BUS in named, f"Global-Bus fehlt: {list(named)}"
-assert named[BUS].source == "bpm_global", f"Global folgt nicht der Musik: {named[BUS].source}"
+# TOOL-5: „Global" ist seit ENG-26 ein ALIAS des Default-Bus, kein benannter Bus —
+# ensure_bus("Global") legt keinen eigenen an, named_buses() listet ihn deshalb nie
+# (der Default-Bus wird auch nicht gespeichert). Geprueft wird die echte Lage: der
+# Name loest auf den Default-Bus auf, der folgt der Musik, und jeder gekoppelte
+# Effekt liest genau diesen Bus.
+_tbm = get_tempo_bus_manager()
+master = _tbm.get(BUS)
+assert master is not None and master.bus_id == _tbm.DEFAULT_BUS, \
+    f"'{BUS}' loest nicht auf den Default-Bus auf: {getattr(master, 'bus_id', None)}"
+assert master.source == "bpm_global", f"Global folgt nicht der Musik: {master.source}"
+_fremd = [f.name for f in bound if _tbm.bus_for_effect(f.tempo_bus_id) is not master]
+assert not _fremd, f"gekoppelte Effekte lesen nicht den Master-Bus: {_fremd}"
 assert get_tempo_bus_manager().auto_sync is True, "Auto-Sync nicht persistiert"
 assert state.implicit_brightness is False, "strikte Farbe/Dimmer-Trennung nicht persistiert"
 
@@ -988,7 +999,7 @@ assert _a[86] != _b[86], "Spider-Tilt bewegt sich nicht (LINE braucht rotation=9
 
 print(f"Funktionen: {len(fm.all())}  VC-Widgets: {len(vc)}  Max-Y={maxy}")
 print(f"  Farb-Matrizen={len(color_m)}  Dimmer/Strobe={len(dim_m)}  EFX={len(efxs)} (Custom={len(custom)})")
-print(f"  an Master(Global={named[BUS].source}) gekoppelt={len(bound)}  edit_slots={len(slots)}  "
+print(f"  an Master(Global={master.source}) gekoppelt={len(bound)}  edit_slots={len(slots)}  "
       f"Editor-Boxen={len(editor_boxes)}  Playlist={len(state.playlist)}")
 print(f"  Widget-Typen={dict(types)}")
 print("  [OK] 5 Zweck-Baenke · edit_slot-Layering (kein stop_all) · Pro-Effekt-Multiplikator · "
