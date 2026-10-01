@@ -13,6 +13,7 @@
 | OUT-57 | A | fix/out57-blackout-nur-licht | 2026-10-01T20:01Z | src/core/output/output_manager.py,src/core/app_state.py,docs |
 | UI-69 | A | fix/ui69-speichern-beim-beenden | 2026-10-01T20:02Z | src/ui/main_window.py,src/core/show |
 | UI-68 | A | fix/ui68-go-ohne-executor | 2026-10-01T20:41Z | src/ui/views/playback_view.py |
+| BPM-25 | A | fix/bpm25-beats-stumm-anzeigen | 2026-10-01T20:41Z | src/ui/bpm_status_rules.py,src/ui/views/bpm_manager_view.py,src/core/audio/tempo_tracker.py |
 
 ## Blocker & Fallen
 
@@ -162,7 +163,6 @@
 
 ## Verlauf
 
-- 2026-10-01T15:31Z A done UI-65
 - 2026-10-01T15:37Z A claim PRIV-05
 - 2026-10-01T15:41Z A claim PROC-14
 - 2026-10-01T15:41Z A claim XPLAT-40
@@ -192,3 +192,4 @@
 - 2026-10-01T20:16Z A done XPLAT-43
 - 2026-10-01T20:32Z A done XPLAT-41
 - 2026-10-01T20:41Z A claim UI-68
+- 2026-10-01T20:41Z A claim BPM-25
