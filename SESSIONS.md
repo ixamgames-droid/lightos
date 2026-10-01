@@ -12,7 +12,6 @@
 | BPM-25 | A | fix/bpm25-beats-stumm-anzeigen | 2026-10-01T21:34Z | src/ui/bpm_status_rules.py,src/ui/views/bpm_manager_view.py,src/core/audio/tempo_tracker.py |
 | TOOL-5 | C | fix/tool5-demo-global-bus | 2026-10-01T21:00Z | tools/build_demo_show_full.py · tools/capture_hochzeit_tempo_guide.py · tools/_archiv · tools/README.md · tests/test_proc07_werkzeuge.py · tests/test_tool5_demo_global_bus.py · BACKLOG.md · changelog.d/2026-10-02-TOOL-5.md |
 | TOOL-4 | C | fix/tool5-demo-global-bus | 2026-10-01T21:03Z | tools/capture_hochzeit_tempo_guide.py · tools/_archiv · BACKLOG.md |
-| VCB-11 | A | feat/vcb11-blackout-ziel | 2026-10-01T21:34Z | src/ui/widgets/vc_button.py · src/core/dmx/output_manager.py |
 | TOOL-1 | C | fix/tool1-verwaiste-werkzeuge | 2026-10-01T21:08Z | tools/build_komplette_animierte_show.py · tools/build_uxtest3_full.py · tools/build_validated_demo.py · tools/check_demo_show_full.py · tools/vc_click_targets.py · tools/verify_color_dimmer_separation.py · tools/build_demo_show.py · tools/_archiv · tools/README.md · tools/_gen_env.py · BACKLOG.md |
 | TOOL-3 | C | fix/tool3-generator-pfade | 2026-10-01T21:11Z | tools/build_full_show.py · tools/build_spot90_testshow.py · tools/_profil.py · tools/README.md · tests/test_tool3_generator_annahmen.py · BACKLOG.md |
 | DOC-15 | C | fix/doc15-bildbestaende | 2026-10-01T21:21Z | docs/anleitung_vc_widgets/_capture · docs/check_demo_show_full · tests/test_doc15_bildbestaende.py · changelog.d/2026-10-02-DOC-15.md |
@@ -177,7 +176,6 @@
 
 ## Verlauf
 
-- 2026-10-01T19:33Z A done PROC-16
 - 2026-10-01T19:33Z A claim XPLAT-41
 - 2026-10-01T19:42Z A done PROC-09
 - 2026-10-01T19:47Z A claim PROC-17
@@ -207,3 +205,4 @@
 - 2026-10-01T21:37Z C claim DOC-14
 - 2026-10-01T21:48Z A done UI-68
 - 2026-10-01T21:56Z A claim DOC-19
+- 2026-10-01T22:01Z A done VCB-11
