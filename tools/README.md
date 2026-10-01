@@ -78,7 +78,7 @@
 | `linux_audio_input_guard.sh` | Haelt auf Linux-Systemen mit zwei Realtek-Mikrofonbuchsen den Capture-MUX auf |
 | `mh_einmessen.py` | VIZ-60 — Moving Heads am echten Rig einmessen, ohne KI und ohne Rechnerei. |
 | `patch_quarantaene.py` | STAB-DEDUP-OPT: verwaiste Patch-Zeilen anzeigen und (nur auf Ansage) in |
-| `pr_bereit.py` | PROC-03 — ist ein offener PR wirklich pruefbar gruen, oder sieht er nur so aus? |
+| `pr_bereit.py` | PROC-03 — ist ein offener PR wirklich pruefbar gruen, oder sieht er nur so aus? PROC-14: mit PR-Nummern Exit 1 ohne Claim des PR-Zweigs, verfallener Claim nur Warnung (`--ohne-claim "Grund"` uebersteuert) |
 | `pr_ci_status.py` | PROC-10: unterscheidet "alle Checks gruen" von "es gibt gar keine Checks". |
 | `pseudonymisieren.py` | pseudonymisieren.py — Klarnamen im OEFFENTLICHEN Repo durch ein Pseudonym ersetzen. |
 | `render_apc_pages.py` | Rendert jede Seite (VC-Bank) der APC-Test-Show als PNG — fuer die Anleitung. |
