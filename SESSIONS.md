@@ -9,7 +9,7 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| FM-51 | A | fix/fm51b-speicher-scope | 2026-10-01T11:08Z | src/core/app_state.py,src/ui/views/snap_file_panel.py,src/ui/views/snapshots_view.py,src/ui/views/programmer_view.py,src/ui/main_window.py |
+| FM-51 | A | fix/fm51c-anzeige | 2026-10-01T12:14Z | src/core/app_state.py,src/core/show/patch_dedup.py,src/ui/views/live_view.py |
 
 ## Blocker & Fallen
 
@@ -130,7 +130,6 @@
 
 ## Verlauf
 
-- 2026-09-29T00:51Z A done UI-58
 - 2026-09-29T00:56Z A claim FM-39
 - 2026-09-29T01:09Z A done ENG-18
 - 2026-09-29T01:14Z A claim STAB-26
@@ -160,3 +159,4 @@
 - 2026-10-01T10:04Z A claim FM-52
 - 2026-10-01T11:08Z A done FM-52
 - 2026-10-01T11:08Z A aktualisiert FM-51: Branch fix/fm51-weiss-auswahl-ueberall -> fix/fm51b-speicher-scope; Dateien src/ui/widgets/position_tool.py,src/ui/views/programmer_view.py,src/core/app_state.py -> src/core/app_state.py,src/ui/views/snap_file_panel.py,src/ui/views/snapshots_view.py,src/ui/views/programmer_view.py,src/ui/main_window.py
+- 2026-10-01T12:14Z A aktualisiert FM-51: Branch fix/fm51b-speicher-scope -> fix/fm51c-anzeige; Dateien src/core/app_state.py,src/ui/views/snap_file_panel.py,src/ui/views/snapshots_view.py,src/ui/views/programmer_view.py,src/ui/main_window.py -> src/core/app_state.py,src/core/show/patch_dedup.py,src/ui/views/live_view.py
