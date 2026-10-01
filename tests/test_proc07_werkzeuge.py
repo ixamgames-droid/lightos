@@ -65,8 +65,10 @@ class QtPlattformIstPortabelTest(unittest.TestCase):
         """Positivkontrolle: sie erzwingen weiterhin eine NATIVE Plattform —
         ein blosses ``setdefault("offscreen")`` waere die falsche Reparatur
         (schwarze Bilder statt Absturz ist keine Verbesserung)."""
+        # TOOL-5: capture_hochzeit_tempo_guide.py liegt seit 2026-10-02 in
+        # tools/_archiv/ — die Plattformwahl muss dort trotzdem stimmen.
         for name in ("capture_test123_tempo_guide.py",
-                     "capture_hochzeit_tempo_guide.py",
+                     "_archiv/capture_hochzeit_tempo_guide.py",
                      "render_apc_pages.py",
                      "render_neue_demo_pages.py"):
             with self.subTest(werkzeug=name):
