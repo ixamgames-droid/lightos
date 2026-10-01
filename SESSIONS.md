@@ -20,6 +20,7 @@
 | FM-46 | C | docs/fm46-befund | 2026-10-01T21:35Z | BACKLOG.md |
 | DOC-14 | C | fix/doc14-schaukasten-19 | 2026-10-01T21:37Z | tools/build_vc_widgets_showcase.py · docs/anleitung_vc_widgets/README.md · docs/anleitung_vc_widgets/_capture/geometry.json · tests/test_doc14_schaukasten_alle_typen.py · changelog.d/2026-10-02-DOC-14.md |
 | DOC-19 | A | docs/doc19-bilder-neue-funktionen | 2026-10-01T21:56Z | docs/anleitung_vc_widgets · docs/anleitung_playback |
+| DOC-20 | A | docs/doc20-anleitungs-gifs | 2026-10-01T22:24Z | tools/anleitungsbilder · docs/ANLEITUNGSBILDER.md |
 
 ## Blocker & Fallen
 
@@ -176,7 +177,6 @@
 
 ## Verlauf
 
-- 2026-10-01T19:42Z A done PROC-09
 - 2026-10-01T19:47Z A claim PROC-17
 - 2026-10-01T19:49Z B done FUNKTIONSTEST-B
 - 2026-10-01T20:01Z A claim OUT-57
@@ -206,3 +206,4 @@
 - 2026-10-01T21:56Z A claim DOC-19
 - 2026-10-01T22:01Z A done VCB-11
 - 2026-10-01T22:13Z A done DOC-18
+- 2026-10-01T22:24Z A claim DOC-20
