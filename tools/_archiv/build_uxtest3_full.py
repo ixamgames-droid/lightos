@@ -12,6 +12,7 @@ Slider/SpeedDials, Solo-Frame statt globalem stop_all), sowie ein Trassen-Rig mi
 2D+3D-Positionen. Erzeugt shows/UXTEST-3 Full Rig.lshow. Danach LIVE per Computer-Use
 durch alle UI-Bereiche prüfen (Darstellung, Bedienung, Label-Sichtbarkeit).
 """
+import _bootstrap  # noqa: F401  # Repo-Root + tools/ auf sys.path (siehe _bootstrap.py)
 import _gen_env  # noqa: F401  (MUSS erster Import sein — spawn-sichere Env-Switches)
 import os
 import json
@@ -27,7 +28,7 @@ from src.core.stage.scene_graph import NodeKind, SceneNode, Transform
 from src.core.app_state import get_channels_for_patched
 from src.core.engine.chaser import ChaserStep
 
-_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ROOT = _bootstrap.REPO_ROOT
 OUT = os.path.join(_ROOT, "shows", "UXTEST-3 Full Rig.lshow")
 STAGE_NAME = "UXTest3FullRig"
 
