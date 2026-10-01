@@ -15,6 +15,7 @@
 | PRIV-05 | A | fix/priv05-klarnamen-waechter | 2026-10-01T15:37Z | tools/session_claim.py,tests/test_session_claim.py |
 | PROC-14 | A | fix/proc14-claim-pruefung | 2026-10-01T15:41Z | tools/pr_bereit.py,tests/test_pr_bereit.py |
 | XPLAT-40 | A | ci/xplat40-anleitungsbilder-smoke | 2026-10-01T15:41Z | .github/workflows/ci.yml |
+| PROC-16 | A | fix/proc16-claim-ueberschneidung | 2026-10-01T15:41Z | tools/session_claim.py,tests/test_session_claim.py,COORDINATION.md |
 
 ## Blocker & Fallen
 
@@ -142,7 +143,6 @@
 
 ## Verlauf
 
-- 2026-09-29T19:56Z A claim FM-41
 - 2026-09-29T20:46Z A done FM-41
 - 2026-09-30T15:47Z A claim FM-51
 - 2026-09-30T18:57Z A claim DOC-16
@@ -172,3 +172,4 @@
 - 2026-10-01T15:37Z A claim PRIV-05
 - 2026-10-01T15:41Z A claim PROC-14
 - 2026-10-01T15:41Z A claim XPLAT-40
+- 2026-10-01T15:41Z A claim PROC-16
