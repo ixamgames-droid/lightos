@@ -51,7 +51,6 @@
 | TOOL-2 | C | - | 2026-10-02T12:17Z | tools/gource · Code-Film.bat · Code-Film.sh · THIRD_PARTY_NOTICES.md · tests/test_proc18_fremd_lizenzhinweise.py · tests/test_tool2_keine_binaerdateien.py · BACKLOG.md · changelog.d/2026-10-02-TOOL-2.md |
 | DOC-51 | C | - | 2026-10-02T12:23Z | docs/anleitung_grosse_demo_2026/ANLEITUNG_GROSSE_DEMO_2026.md |
 | DOC-52 | C | - | 2026-10-02T12:24Z | docs/anleitung_komplettshow_2026 |
-| VIZ-66 | A | feat/viz66-eigene-modelle | 2026-10-02T17:08Z | src/ui/visualizer/scene_src/fixtures/builders.js · src/ui/visualizer/scene_src/stage/stage_objects.js · src/ui/visualizer/assets/models · THIRD_PARTY_NOTICES.md |
 | FM-56 | A | feat/fm56-eigene-bibliothek | 2026-10-02T17:08Z | fixtures/bibliothek · src/core/database/bibliothek_format.py · src/core/database/fixture_db.py |
 | DOC-53 | C | - | 2026-10-02T12:26Z | docs/anleitung_hochzeit_komplett · tools/build_hochzeit_komplett.py · tests/test_doc53_hochzeit_linie.py · changelog.d/2026-10-02-DOC-53.md |
 | TOOL-10 | C | - | 2026-10-02T12:28Z | BACKLOG.md |
@@ -141,7 +140,6 @@
 
 ## Verlauf
 
-- 2026-10-02T12:01Z C claim DOC-46
 - 2026-10-02T12:04Z C claim DOC-47
 - 2026-10-02T12:06Z C claim DOC-48
 - 2026-10-02T12:07Z C claim DOC-49
@@ -171,3 +169,4 @@
 - 2026-10-02T13:50Z C done FM-33
 - 2026-10-02T16:55Z A done TOOL-9
 - 2026-10-02T17:01Z B uebergeben FUNKTIONSTEST-B2
+- 2026-10-02T17:10Z A done VIZ-66
