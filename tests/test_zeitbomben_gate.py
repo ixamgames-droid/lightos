@@ -595,7 +595,7 @@ class RepoTest(unittest.TestCase):
         dateien = [os.path.join(TESTS, n) for n in QA62_GESUND]
         for pfad in dateien:
             self.assertTrue(os.path.isfile(pfad), pfad)
-        ergebnis = zg.lauf(dateien, zg.SPRUNG_TAGE)
+        ergebnis = zg.lauf_verteilt(dateien, zg.SPRUNG_TAGE)   # XPLAT-34
         self.assertTrue(ergebnis.sprung_wirksam,
                         "ohne wirksamen Sprung beweist gruen hier nichts")
         self.assertEqual(ergebnis.rc, 0,
