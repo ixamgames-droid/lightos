@@ -13,7 +13,6 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | DOC-14 | C | fix/doc14-schaukasten-19 | 2026-10-01T21:37Z | tools/build_vc_widgets_showcase.py · docs/anleitung_vc_widgets/README.md · docs/anleitung_vc_widgets/_capture/geometry.json · tests/test_doc14_schaukasten_alle_typen.py · changelog.d/2026-10-02-DOC-14.md |
-| TOOL-7 | C | fix/tool7-mega-arena-global | 2026-10-02T07:13Z | tools/build_mega_arena_2026.py · tests/test_tool7_global_bus_pruefungen.py · changelog.d/2026-10-02-TOOL-7.md · BACKLOG.md |
 | DOC-22 | A | docs/doc22-bilder-auffrischen | 2026-10-02T07:18Z | docs/anleitung_szenen_cues/img · docs/anleitung_programmer_grundlagen/img · docs/projektseite · docs/anleitung_vc_widgets/img |
 | FM-46 | A | feat/fm46-dimmer-segment | 2026-10-02T07:26Z | src/core/database/models.py · src/core/app_state.py · src/ui/widgets/fixture_editor.py · src/ui/widgets/fixture_generator.py · src/core/database/fixture_db.py |
 | QA-68 | C | fix/qa68-builtin-dubletten | 2026-10-02T07:33Z | tools/library_testreste.py · tools/README.md · tests/test_qa68_builtin_dubletten.py · changelog.d/2026-10-02-QA-68.md · BACKLOG.md |
@@ -79,7 +78,6 @@
 
 ## Verlauf
 
-- 2026-10-01T23:00Z C done DOC-15
 - 2026-10-01T23:12Z A claim VIZ-65
 - 2026-10-01T23:27Z A done BPM-25
 - 2026-10-01T23:41Z A done DOC-19
@@ -109,3 +107,4 @@
 - 2026-10-02T08:03Z A done VIZ-65
 - 2026-10-02T08:17Z A done DOC-20
 - 2026-10-02T08:17Z A done DOC-21
+- 2026-10-02T08:30Z C done TOOL-7
