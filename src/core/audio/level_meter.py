@@ -16,6 +16,12 @@ RMS ueber 300 ms und 1 s, Clip-Zaehler ueber 1 s, Peak-Hold faellt mit
 WANDUHR (Ankunftsabstaende der Chunks, Uhr injizierbar) — Jitter/Aussetzer des
 Treibers.
 
+``luecke()`` (BPM-21) zaehlt Datenluecken, die der Treiber selbst meldet
+(WASAPI ``AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY``: der Aufnahmepuffer lief
+ueber, Audio ging verloren). Die Ankunftsabstaende sehen das NICHT — die
+Chunks kommen danach puenktlich, es fehlt nur Audio dazwischen. Fenster
+``LUECKEN_FENSTER_S`` in Wanduhr-Zeit.
+
 ``netz_linie`` (BPM-11, S6) misst, wie SCHARF die Energie um 50/60 Hz samt
 zwei Oberwellen auf der Netzfrequenz liegt: Leistung in ±``NETZ_LINIE_HZ``
 um k·50 bzw. k·60 Hz geteilt durch die Leistung in ±``NETZ_UMGEBUNG_HZ``,
@@ -30,7 +36,7 @@ from __future__ import annotations
 import math
 import time
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 
@@ -52,6 +58,7 @@ NETZ_ALLE_S = 1.0             # so oft (Audio-Zeit) wird die Netzlinie neu gerec
 NETZ_DEZIMATION = 16          # 44,1 kHz -> 2,76 kHz (Blocksumme, Nullstellen auf fs/16-Vielfachen)
 NETZ_LINIE_HZ = 0.5           # Linienbreite um k·50/60 Hz (Hann-Hauptkeule bei 4 s)
 NETZ_UMGEBUNG_HZ = 4.0        # Vergleichsband um k·50/60 Hz
+LUECKEN_FENSTER_S = 10.0      # Datenluecken des Treibers (BPM-21) zaehlen ueber so viele Sekunden (Wanduhr)
 
 _CLIP_LIN = 10.0 ** (CLIP_SAMPLE_DBFS / 20.0)
 _BODEN_LIN = 10.0 ** (BODEN_DBFS / 20.0)
@@ -81,6 +88,8 @@ class CaptureSnapshot:
     chunks: int = 0                        # verarbeitete Chunks seit reset()
     netz_linie: float = 0.0                # 0..1 Schaerfe der 50/60-Hz-Linie (s. Moduldoku); 0 = unbekannt
     netz_hz: int = 0                       # 50 | 60 (staerkere Linie), 0 = noch nicht gemessen
+    luecken_10s: int = 0                   # BPM-21: vom Treiber gemeldete Datenluecken im Fenster
+    luecken: int = 0                       # BPM-21: Datenluecken seit reset()
     running: bool = False
     device: str | None = None
     source_mode: str | None = None
@@ -131,10 +140,29 @@ class LevelMeter:
         self._netz_win = np.hanning(self._netz_w)
         self._netz_seit = 0                  # Roh-Samples seit der letzten Messung
         self._netz = (0.0, 0)
+        self._luecken_t: deque = deque()     # Wanduhr-Zeitpunkte der Luecken im Fenster
+        self._luecken = 0
         self._snap = CaptureSnapshot(sample_rate=self.sample_rate)
 
     def snapshot(self) -> CaptureSnapshot:
         return self._snap
+
+    def luecke(self) -> None:
+        """BPM-21: der Treiber meldet eine Datenluecke (Audio verloren).
+
+        Aus dem Capture-Thread aufrufen — derselbe Schreiber wie ``on_chunk``.
+        Der Snapshot wird sofort ersetzt, damit die Luecke auch sichtbar ist,
+        wenn danach eine Weile kein Chunk kommt."""
+        now = self._clock()
+        self._luecken += 1
+        self._luecken_t.append(now)
+        self._snap = replace(self._snap, luecken=self._luecken,
+                             luecken_10s=self._luecken_im_fenster(now))
+
+    def _luecken_im_fenster(self, now: float) -> int:
+        while self._luecken_t and now - self._luecken_t[0] > LUECKEN_FENSTER_S:
+            self._luecken_t.popleft()
+        return len(self._luecken_t)
 
     def on_chunk(self, samples) -> None:
         now = self._clock()
@@ -206,6 +234,8 @@ class LevelMeter:
             self._count,
             netz_linie=self._netz[0],
             netz_hz=self._netz[1],
+            luecken_10s=self._luecken_im_fenster(now),
+            luecken=self._luecken,
         )
 
     # ── Netzlinie ────────────────────────────────────────────────────────────

@@ -15,9 +15,11 @@ auf (PulseAudio ``<sink>.monitor``, WASAPI gleiche id). Fehlt ``.id`` oder
 passt nichts, gilt das bisherige Verhalten (Namenssuche von soundcard).
 """
 from __future__ import annotations
+import sys
 import threading
 import numpy as np
 import time
+import warnings
 from dataclasses import replace
 
 from src.core.audio.level_meter import CaptureSnapshot, LevelMeter
@@ -76,6 +78,40 @@ except Exception as exc:
 SAMPLE_RATE = 44100
 CHUNK_SIZE = 1024
 CHANNELS = 1
+# BPM-21: Puffer des Recorders (WASAPI: Laenge des Shared-Mode-Puffers) mit
+# Reserve gegenueber dem Lese-Chunk. Vorher waren beide 1024 Frames (23 ms):
+# schon eine kurze Verzoegerung des Capture-Threads (GIL, Hauptthread zeichnet)
+# liess den Puffer ueberlaufen — gemessen am Windows-Rig bis zu 31 % verlorene
+# Chunks. 4096 Frames = 93 ms Reserve; die Latenz bestimmt weiter der
+# Lese-Chunk, nicht der Puffer.
+# NUR Windows: unter PulseAudio wird blocksize zur Fragmentgroesse
+# (soundcard: bufattr.fragsize) — groesser hiesse dort Chunks im 93-ms-Buendel
+# und damit einen falschen AUSSETZER-Chip; der Puffer selbst ist dort schon
+# unbegrenzt (maxlength).
+RECORDER_BLOCKSIZE = CHUNK_SIZE * 4 if sys.platform == "win32" else CHUNK_SIZE
+
+# BPM-21: soundcard meldet eine Datenluecke des Treibers (WASAPI
+# AUDCLNT_BUFFERFLAGS_DATA_DISCONTINUITY) nur per warnings.warn auf stderr.
+# Der Hook ordnet sie dem Capture des aktuellen Threads zu und zaehlt sie im
+# LevelMeter; Warnungen anderer Threads/Herkunft laufen unveraendert weiter.
+_LUECKE_TEXT = "discontinuity"
+_tls = threading.local()
+
+
+def _luecken_hook_installieren() -> None:
+    alt = warnings.showwarning
+    if getattr(alt, "_bpm21_luecken_hook", False):
+        return
+
+    def _showwarning(message, category, filename, lineno, file=None, line=None):
+        cap = getattr(_tls, "capture", None)
+        if cap is not None and _LUECKE_TEXT in str(message):
+            cap._luecke()
+            return
+        alt(message, category, filename, lineno, file, line)
+
+    _showwarning._bpm21_luecken_hook = True
+    warnings.showwarning = _showwarning
 
 
 class AudioCapture:
@@ -387,8 +423,10 @@ class AudioCapture:
                     raise RuntimeError(f"Eingang nicht gefunden: {self._device_name}") from None
             else:
                 mic = self._loopback_microphone(self._device_name)
+            _luecken_hook_installieren()
+            _tls.capture = self
             with mic.recorder(samplerate=SAMPLE_RATE, channels=CHANNELS,
-                              blocksize=CHUNK_SIZE) as rec:
+                              blocksize=RECORDER_BLOCKSIZE) as rec:
                 # Recorder offen -> letzter Fehler ist obsolet
                 with self._lock:
                     self._error = None
@@ -421,6 +459,12 @@ class AudioCapture:
             with self._lock:
                 self._error = str(e)
             self._running = False
+        finally:
+            _tls.capture = None
+
+    def _luecke(self) -> None:
+        """BPM-21: Datenluecke des Treibers — im LevelMeter zaehlen (AUSSETZER)."""
+        self._meter.luecke()
 
 
 _capture: AudioCapture | None = None
