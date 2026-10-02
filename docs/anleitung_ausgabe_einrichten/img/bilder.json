@@ -1,7 +1,7 @@
 {
   "anleitung": "ausgabe_einrichten",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "3403c9c7",
+  "stand": "07a09e56",
   "schrift": "Noto Sans (statt Roboto Condensed)",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py ausgabe_einrichten'.",
@@ -81,7 +81,7 @@
         900
       ],
       "marken": [],
-      "md5": "99caf5d96cc87f36ef003cbce5f8e9a9"
+      "md5": "21652b08c2c0936e648b9ee0adc4225b"
     },
     {
       "datei": "08_warnungen.png",
@@ -92,7 +92,7 @@
         900
       ],
       "marken": [],
-      "md5": "abb7cd0b9b4ddc67132e58d0409ca47c"
+      "md5": "5b220ec04fa057ce898e6bfd297978f0"
     },
     {
       "datei": "09_blackout_dmx_monitor.png",
