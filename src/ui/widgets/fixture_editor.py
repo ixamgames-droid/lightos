@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from sqlalchemy.orm import Session
 from sqlalchemy import select, delete
-from src.core.database.fixture_db import engine
+from src.core.database.fixture_db import engine, segment_wert
 from src.core.database.models import (
     Manufacturer, FixtureProfile, FixtureMode, FixtureChannel, ChannelRange,
     GEO_MAX,
@@ -22,6 +22,12 @@ from src.core.database.models import (
 # ausgefuellt?" stehen an EINER Stelle — dieselbe, die der Generator
 # benutzt. Begruendung im Modul.
 from src.core.kopfformular import PLATZHALTER_MODELL, kopf_beanstandung
+# FM-46: Zuordnung Dimmer -> Weiss-Segment — Vorschlag, Hinweis-Bedingung und
+# Hinweistext stehen fuer BEIDE Dialoge an einer Stelle.
+from src.core.dimmer_segmente import (HINWEIS_TEXT, SegmentZiele,
+                                      hinweis_fuer, ist_dimmer,
+                                      vorschlag_abweichungen,
+                                      vorschlag_dimmer_segmente)
 
 
 FIXTURE_TYPES = [
@@ -43,7 +49,39 @@ CHANNEL_ATTRS = [
     "reset", "lamp", "raw",
 ]
 
-CHANNEL_COLS = ["#", "Name", "Attribut", "Default", "Highlight"]
+CHANNEL_COLS = ["#", "Name", "Attribut", "Default", "Highlight", "Weiß-Segment"]
+# FM-46: Spalte der Zuordnung Dimmer -> Weiss-Segment.
+SEGMENT_COL = 5
+#: Anzeige fuer „keine Zuordnung" in der Segment-Auswahl.
+KEIN_SEGMENT = "—"
+
+
+def frage_vorschlag_ueberschreiben(parent, abweichend: list[int]) -> bool | None:
+    """FM-46 (Review): Rueckfrage, wenn der Vorschlag Handzuordnungen aendern
+    wuerde. ``True`` = ueberschreiben, ``False`` = nur leere Zellen fuellen,
+    ``None`` = abbrechen. Gemeinsam fuer Editor und Generator."""
+    kanaele = ", ".join(str(i + 1) for i in abweichend)
+    antwort = QMessageBox.question(
+        parent, "Weiß-Segment",
+        f"Der Vorschlag weicht bei Kanal {kanaele} von deiner Eingabe ab.\n\n"
+        "Ja: Vorschlag überall übernehmen\n"
+        "Nein: nur leere Zellen füllen",
+        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        | QMessageBox.StandardButton.Cancel,
+        QMessageBox.StandardButton.No)
+    if antwort == QMessageBox.StandardButton.Yes:
+        return True
+    if antwort == QMessageBox.StandardButton.No:
+        return False
+    return None
+
+
+def segment_auswahl(n_weiss: int, segment) -> list[str]:
+    """Eintraege der Segment-Auswahl: „—“ und 1..n (Anzeige 1-basiert,
+    gespeichert 0-basiert). Ein gespeichertes Segment jenseits der aktuellen
+    Weiss-Zahl bleibt waehlbar, statt beim Anzeigen still zu verschwinden."""
+    n = max(int(n_weiss or 0), (segment + 1) if isinstance(segment, int) else 0)
+    return [KEIN_SEGMENT] + [str(k) for k in range(1, n + 1)]
 
 # FM-23: Obergrenze der Rastereingaben. Sie steht seit FM-26 bei den SPALTEN
 # (``src.core.database.models.GEO_MAX``) und wird hier nur benutzt — die
@@ -62,6 +100,9 @@ class _ModeTab(QWidget):
         # Save eines bestehenden Profils aber unbedingt erhalten.
         self.description = description
         self.channels: list[dict] = []   # [{name, attribute, default, highlight}]
+        # FM-46 (Review): Zuordnungen haengen am Weiss-KANAL, nicht an seiner
+        # Nummer — Loeschen/Verschieben eines `color_w` zieht sie mit.
+        self._ziele = SegmentZiele()
         layout = QVBoxLayout(self)
 
         name_row = QHBoxLayout()
@@ -120,6 +161,18 @@ class _ModeTab(QWidget):
         layout.addLayout(geo_row)
         self.set_geometry(grid, weiss)
 
+        # ── FM-46: Hinweis, wenn die Zuordnung Dimmer -> Weiss-Segment fehlt ──
+        # Sichtbar genau dann, wenn der Modus eine eigene Weiss-Achse UND
+        # mehrere Dimmer hat und keiner davon eine Zuordnung traegt
+        # (``dimmer_segmente.zuordnung_fehlt``). Nicht blockierend — der
+        # Nutzer kann trotzdem speichern; die Matrix treibt diese Dimmer dann
+        # fuer die Weiss-Segmente nur nicht.
+        self._lbl_segment_hinweis = QLabel(HINWEIS_TEXT)
+        self._lbl_segment_hinweis.setWordWrap(True)
+        self._lbl_segment_hinweis.setStyleSheet("color: #d08a00;")
+        self._lbl_segment_hinweis.setHidden(True)
+        layout.addWidget(self._lbl_segment_hinweis)
+
         self._tbl = QTableWidget(0, len(CHANNEL_COLS))
         self._tbl.setHorizontalHeaderLabels(CHANNEL_COLS)
         self._tbl.horizontalHeader().setSectionResizeMode(
@@ -137,7 +190,14 @@ class _ModeTab(QWidget):
         btn_up.clicked.connect(lambda: self._move(-1))
         btn_down = QPushButton("Runter")
         btn_down.clicked.connect(lambda: self._move(1))
-        for b in (btn_add, btn_del, btn_up, btn_down):
+        # FM-46: Vorschlag fuer die Spalte „Weiß-Segment“ aus der Reihenfolge.
+        self._btn_vorschlag = QPushButton("Vorschlag aus Reihenfolge")
+        self._btn_vorschlag.setToolTip(
+            "Füllt die Spalte „Weiß-Segment“ für die Dimmer — nur, wenn die "
+            "Kanalreihenfolge es eindeutig hergibt (z. B. Dimmer direkt vor "
+            "seinem Weiß). Bitte am Gerät oder im Handbuch prüfen.")
+        self._btn_vorschlag.clicked.connect(self._on_vorschlag)
+        for b in (btn_add, btn_del, btn_up, btn_down, self._btn_vorschlag):
             btn_row.addWidget(b)
         btn_row.addStretch(1)
         layout.addLayout(btn_row)
@@ -191,6 +251,7 @@ class _ModeTab(QWidget):
         for r in rows:
             if 0 <= r < len(self.channels):
                 del self.channels[r]
+        self._ziele.nachziehen(self.channels)
         self._rebuild_rows()
 
     def _move(self, dir: int):
@@ -204,6 +265,7 @@ class _ModeTab(QWidget):
             # Name/Default/Highlight aber aus der stale Tabelle rueckgesynct).
             self._sync_from_table()
             self.channels[r], self.channels[nr] = self.channels[nr], self.channels[r]
+            self._ziele.nachziehen(self.channels)
             self._rebuild_rows()
             self._tbl.selectRow(nr)
 
@@ -235,10 +297,112 @@ class _ModeTab(QWidget):
             # Highlight
             self._tbl.setItem(i, 4, QTableWidgetItem(str(ch.get("highlight", 255))))
         self._tbl.blockSignals(False)
+        self._refresh_segment_cells()
+
+    # ── FM-46: Spalte „Weiß-Segment“ ─────────────────────────────────────
+    #
+    # ★ Nur fuer Dimmer-Kanaele editierbar: die Zuordnung sagt „dieser Dimmer
+    #   dimmt Weiss-Segment n", und gelesen wird sie ausschliesslich fuer
+    #   Dimmer-Attribute (``channels_for_axis``). An jedem anderen Kanal waere
+    #   ein Wert eine Angabe ohne Wirkung — darum dort leer und grau.
+    # ★ Diese Zellen werden getrennt von `_rebuild_rows` erneuert: ein
+    #   Attributwechsel aendert die Segmentzahl (neues `color_w`) und ob die
+    #   Zeile ein Dimmer ist. `_rebuild_rows` von dort aus zu rufen, ersetzte
+    #   genau die Attribut-Combo, deren Signal gerade laeuft.
+    def _refresh_segment_cells(self):
+        n_weiss = sum(1 for c in self.channels
+                      if (c.get("attribute") or "").lower() == "color_w")
+        for i, ch in enumerate(self.channels):
+            if i >= self._tbl.rowCount():
+                break
+            if ist_dimmer(ch.get("attribute")):
+                seg = ch.get("segment")
+                cb = QComboBox()
+                cb.addItems(segment_auswahl(n_weiss, seg))
+                cb.setCurrentIndex(seg + 1 if isinstance(seg, int) else 0)
+                cb.setToolTip("Welches Weiß-Segment dimmt dieser Dimmer? "
+                              "„—“ = keine Zuordnung.")
+                cb.currentIndexChanged.connect(
+                    lambda idx, row=i: self._set_segment(row, idx))
+                self._tbl.setCellWidget(i, SEGMENT_COL, cb)
+            else:
+                self._tbl.removeCellWidget(i, SEGMENT_COL)
+                it = QTableWidgetItem("")
+                it.setFlags(Qt.ItemFlag.NoItemFlags)
+                it.setBackground(self.palette().window())
+                self._tbl.setItem(i, SEGMENT_COL, it)
+        self._update_segment_hinweis()
+
+    def _set_segment(self, row: int, combo_index: int):
+        if 0 <= row < len(self.channels):
+            self.channels[row]["segment"] = (combo_index - 1
+                                             if combo_index > 0 else None)
+            self._ziele.setzen(self.channels, self.channels[row])
+            self._update_segment_hinweis()
+
+    def _update_segment_hinweis(self):
+        # FM-46: das Fehlen der Zuordnung ODER ihre Probleme (doppelt
+        # vergeben, Segment gibt es nicht, Dimmer ohne Segment).
+        text = hinweis_fuer(self.channels)
+        self._lbl_segment_hinweis.setText(text)
+        self._lbl_segment_hinweis.setHidden(not text)
+
+    def segment_hinweis_text(self) -> str:
+        return "" if self._lbl_segment_hinweis.isHidden() \
+            else self._lbl_segment_hinweis.text()
+
+    def segment_hinweis_sichtbar(self) -> bool:
+        """Zeigt der Tab den FM-46-Hinweis (unabhaengig davon, ob das Fenster
+        gerade auf dem Bildschirm ist)?"""
+        return not self._lbl_segment_hinweis.isHidden()
+
+    def vorschlag_uebernehmen(self, ueberschreiben: bool | None = None) -> bool | None:
+        """Traegt den Vorschlag aus der Kanalreihenfolge ein. ``False``, wenn
+        die Reihenfolge keinen EINDEUTIGEN Vorschlag hergibt — dann bleibt
+        alles, wie es ist (nie raten).
+
+        FM-46 (Review): eine abweichende HANDzuordnung wird nicht stumm
+        ueberschrieben. ``ueberschreiben=None`` fragt nach (Ja = alles
+        uebernehmen, Nein = nur leere Zellen fuellen, Abbrechen = nichts);
+        ``True``/``False`` beantworten die Frage vorab. Rueckgabe ``None``
+        = abgebrochen."""
+        self._sync_from_table()
+        vorschlag = vorschlag_dimmer_segmente(self.channels)
+        if not vorschlag:
+            return False
+        abweichend = vorschlag_abweichungen(self.channels, vorschlag)
+        if abweichend and ueberschreiben is None:
+            ueberschreiben = frage_vorschlag_ueberschreiben(self, abweichend)
+            if ueberschreiben is None:
+                return None              # abgebrochen: nichts geaendert
+        for idx, seg in vorschlag.items():
+            if idx in abweichend and not ueberschreiben:
+                continue
+            self.channels[idx]["segment"] = seg
+            self._ziele.setzen(self.channels, self.channels[idx])
+        self._refresh_segment_cells()
+        return True
+
+    def _on_vorschlag(self):
+        if self.vorschlag_uebernehmen() is False:
+            QMessageBox.information(
+                self, "Weiß-Segment",
+                "Aus der Kanalreihenfolge ergibt sich kein eindeutiger "
+                "Vorschlag. Bitte im Handbuch nachsehen, welcher Dimmer "
+                "welches Weiß-Segment dimmt, und die Spalte „Weiß-Segment“ "
+                "von Hand ausfüllen.")
 
     def _set_attr(self, row: int, value: str):
         if 0 <= row < len(self.channels):
             self.channels[row]["attribute"] = value
+            # FM-46: eine Zuordnung gibt es nur an einem Dimmer.
+            if not ist_dimmer(value):
+                self.channels[row]["segment"] = None
+                self._ziele.vergessen(self.channels[row])
+            # ... und wird ein Weiss-Kanal zu etwas anderem (oder umgekehrt),
+            # verschieben sich die Segmentnummern der uebrigen.
+            self._ziele.nachziehen(self.channels)
+            self._refresh_segment_cells()
 
     def _sync_from_table(self):
         """Liest Texteingaben (Name, Default, Highlight) aus der Tabelle zurueck."""
@@ -269,6 +433,7 @@ class _ModeTab(QWidget):
         self.description = description
         self._edit_name.setText(name)
         self.channels = [dict(c) for c in channels]
+        self._ziele.merken(self.channels)
         # NUR neu bauen, NICHT syncen: channels sind frisch gesetzt, die Tabelle
         # zeigt noch den ALTEN Mode -> ein Sync wuerde alte Tabellenzeilen per Index
         # in die neuen channels schreiben (Korruption beim Mode-Wechsel).
@@ -491,6 +656,10 @@ class FixtureEditorDialog(QDialog):
                     "name": c.name, "attribute": c.attribute,
                     "default": c.default_value, "highlight": c.highlight_value,
                     "invert": c.invert, "resolution": c.resolution,
+                    # FM-46: die Zuordnung Dimmer -> Weiss-Segment. `_save`
+                    # loescht und baut die Modi neu — was hier nicht
+                    # mitgelesen wird, ist nach dem naechsten Speichern weg.
+                    "segment": c.segment,
                     "ranges": [{
                         "range_from": r.range_from, "range_to": r.range_to,
                         "name": r.name, "kind": r.kind,
@@ -621,6 +790,9 @@ class FixtureEditorDialog(QDialog):
                         highlight_value=int(ch.get("highlight", 255)),
                         invert=bool(ch.get("invert", False)),
                         resolution=str(ch.get("resolution", "8bit") or "8bit"),
+                        # FM-46: nur an Dimmern gespeichert (s. Spalte).
+                        segment=(segment_wert(ch.get("segment"))
+                                 if ist_dimmer(ch.get("attribute")) else None),
                     )
                     s.add(fc)
                     for r in ch.get("ranges", []) or []:

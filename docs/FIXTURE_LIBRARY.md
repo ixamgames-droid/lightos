@@ -103,6 +103,52 @@ ein `<Head>` ist eine Kanalgruppe ohne Ortsangabe.
 > der beiden Dialoge etwas an dieser Zeile aendert, prueft den anderen mit;
 > zwischen FM-23 und FM-26 hatte nur einer von beiden die Felder.
 
+### Mehrere Dimmer und Weiß-Segmente (FM-46)
+
+Hat ein Gerät eine **eigene Weiß-Leiste** (mehr oder weniger `color_w`- als
+`color_r`-Kanäle) und **mehrere Dimmer**, steht in der Kanalliste nicht, welcher
+Dimmer welches Weiß-Segment dimmt. LightOS rät das zur Laufzeit **nie** — ein
+falsch geratener Dimmer ließe ein Segment dunkel oder dimmte das falsche, ohne
+dass es jemand merkt. Ohne Angabe treibt die Matrix diese Dimmer für die
+Weiß-Segmente deshalb nicht (sie dimmt das Weiß dann selbst, FM-54).
+
+Die Angabe macht man im **Fixture-Editor** oder im **Fixture-Generator**, Spalte
+**„Weiß-Segment“** der Kanaltabelle (`FixtureChannel.segment`):
+
+- Die Spalte ist nur an Dimmer-Kanälen (`intensity`, `dimmer`, `master`)
+  wählbar, an allen anderen leer und grau. „—“ heißt *keine Zuordnung*,
+  „1 … n“ ist das n-te Weiß-Segment in Kanalreihenfolge.
+- **„Vorschlag aus Reihenfolge“** füllt die Spalte, wenn die Reihenfolge es
+  eindeutig hergibt: jeder Dimmer steht direkt **vor** seinem Weiß
+  (`Dimmer, Weiß, Dimmer, Weiß`), direkt **nach** ihm, oder die Kanäle bilden
+  **gleich große Blöcke** (`Dimmer, R, G, B, Weiß` je Segment). Gibt es keinen
+  eindeutigen Vorschlag, sagt der Knopf das und ändert nichts. Weicht der
+  Vorschlag von schon eingetragenen Werten ab, fragt er nach (Ja = überall
+  übernehmen, Nein = nur leere Zellen füllen).
+- Die Zuordnung hängt am Weiß-**Kanal**: löscht oder verschiebt man einen
+  Weiß-Kanal oder ändert sein Attribut, ziehen die Segmentnummern mit; ein
+  gelöschtes Segment wird zu „—“.
+- Solange der Modus eigene Weiß-Segmente und mehrere Dimmer hat, aber keine
+  Zuordnung trägt, steht unter der Geometrie-Zeile ein **Hinweis** (im
+  Generator zusätzlich in der Hinweisliste, dort mit dem Vorschlag). Derselbe
+  Platz meldet eine unstimmige Zuordnung: ein Segment ist mehreren Dimmern
+  zugeordnet (dann wirkt es bei keinem), ein Segment gibt es nicht, oder ein
+  Dimmer hat als einziger kein Segment.
+
+**Wie man es im Handbuch erkennt:** in der DMX-Tabelle des Herstellers gehört
+ein Dimmer zu dem Weiß, das im selben Abschnitt steht („Zone 2“, „Segment 2“,
+„Teil B“) oder direkt davor bzw. danach aufgeführt ist. Steht dort nur
+„Dimmer 1“, „Dimmer 2“ ohne Bezug, hilft der Test am Gerät: Weiß-Kanäle auf
+voll, dann einen Dimmer nach dem anderen hochziehen und schauen, welches
+Segment hell wird.
+
+Wirksam wird **nur die gespeicherte** Zuordnung. Mit ihr zieht ein Weiß-Feld der
+Matrix bei „Dimmer mit treiben“ genau den eingetragenen Dimmer auf (derselbe
+Weg gilt für Muster-Chaser, Weiß-Regler und Kommandozeile). Ein einzelner
+Dimmer braucht keine Angabe: er gilt als gemeinsamer Master und fährt ohnehin
+mit. Ältere Bibliotheken bekommen die Spalte beim Start automatisch, ohne
+Zuordnung. Der QLC+-Import kann sie nicht ableiten.
+
 ## 2. Woher Profile kommen
 
 1. **Builtin-Seed** — `fixture_db._seed()` (Generic, Chauvet, Eurolite, ADJ,
