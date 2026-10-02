@@ -7,8 +7,9 @@
 > Show: `shows/Event_Demo_2026.lshow`, **Bank 4 „Moving Heads"** (SCENE-Taste 4 am APC,
 > bzw. Strg+Bild↓ bis „Moving Heads"). Rig: MH Links @ DMX 65, MH Rechts @ 76 — hinter
 > PAR 1 und PAR 8. Die Show liegt nicht im Repo — sie entsteht mit
-> `venv/bin/python tools/build_event_demo_2026.py` (LightOS vorher einmal gestartet, damit die
-> eingebauten Profile da sind).
+> `./venv/bin/python tools/build_event_demo_2026.py` (Windows:
+> `venv\Scripts\python.exe tools\build_event_demo_2026.py`; LightOS vorher einmal gestartet,
+> damit die eingebauten Profile da sind).
 
 ![Bank 4 Übersicht](img/01_bank4_uebersicht.png)
 
