@@ -31,6 +31,7 @@
 | DOC-30 | C | - | 2026-10-02T10:52Z | docs/anleitung_programmer/ANLEITUNG_PROGRAMMER.md |
 | DOC-31 | C | - | 2026-10-02T10:53Z | docs/anleitung_zwei_universen/ANLEITUNG.md |
 | DOC-32 | C | - | 2026-10-02T10:55Z | docs/anleitung_farbmatrix/ANLEITUNG_FARBMATRIX.md |
+| DOC-33 | C | - | 2026-10-02T10:56Z | docs/anleitung_dimmermatrix/ANLEITUNG_DIMMERMATRIX.md |
 
 ## Blocker & Fallen
 
@@ -94,7 +95,6 @@
 
 ## Verlauf
 
-- 2026-10-02T07:42Z C done TOOL-6
 - 2026-10-02T07:57Z A claim UI-70
 - 2026-10-02T07:57Z A claim TOOL-8
 - 2026-10-02T08:03Z A done VIZ-65
@@ -124,3 +124,4 @@
 - 2026-10-02T10:52Z C claim DOC-30
 - 2026-10-02T10:53Z C claim DOC-31
 - 2026-10-02T10:55Z C claim DOC-32
+- 2026-10-02T10:56Z C claim DOC-33
