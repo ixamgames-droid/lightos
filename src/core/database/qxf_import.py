@@ -573,6 +573,107 @@ def _physical_layout(el) -> tuple[int, int]:
     return (rows, cols)
 
 
+def kanal_nummern(ch_refs, model_str: str = "",
+                  mode_name: str = "") -> list[int | None]:
+    """Die 1-basierte Kanalnummer je ``<Channel>``-Referenz eines Modus
+    (gleiche Reihenfolge wie ``ch_refs``) — ``None`` = verworfen.
+
+    Eine Regel fuer BEIDE Importer (Bibliothek und Generator, FM-46 Etappe 3):
+    die ``<Head>``-Eintraege meinen diese Nummer, und zwei Lesarten derselben
+    Datei ergaeben verschiedene Zuordnungen.
+
+    CDX-03 (Review): ZWEI Durchlaeufe. Ein FEHLENDES ``Number`` durfte NIE einen
+    explizit nummerierten Kanal 1 (Number="0") verdraengen — je nach Dokument-
+    Reihenfolge haette der Number-lose Ref den echten Kanal 1 belegt und den
+    expliziten als "Kollision" verworfen (stille DMX-Fehlbelegung). Deshalb:
+    Pass 1 platziert ALLE explizit (gueltig) nummerierten Kanaele; Pass 2 legt
+    die Number-losen auf die jeweils naechste WIRKLICH freie Nummer. Nicht-
+    numerische Number bleibt ein sichtbar gemeldeter Skip; eine echte Nummern-
+    Kollision zwischen zwei EXPLIZITEN Kanaelen ebenfalls (der spaetere faellt).
+    A3D-34: fehlendes *oder* leeres ``Number`` gilt als „ohne Nummer“; negative
+    Nummern werden sichtbar verworfen."""
+    out: list[int | None] = [None] * len(ch_refs)
+    used_numbers: set[int] = set()
+    missing: list[int] = []
+    for i, ch_ref in enumerate(ch_refs):
+        ch_name = (ch_ref.text or "").strip()
+        raw = ch_ref.get("Number")
+        if raw is None or str(raw).strip() == "":
+            missing.append(i)
+            continue
+        try:
+            num = int(raw) + 1   # 0- → 1-basiert
+        except (ValueError, TypeError):
+            print(
+                f"[qxf_import] {model_str}: Mode '{mode_name}' Channel "
+                f"'{ch_name or '?'}' hat ungueltiges Number={raw!r} "
+                f"— Kanal uebersprungen."
+            )
+            continue
+        if num < 1:
+            print(
+                f"[qxf_import] {model_str}: Mode '{mode_name}' Channel "
+                f"'{ch_name or '?'}' Number={raw!r} ist negativ/ungueltig "
+                f"(ergaebe Kanal {num}) — Kanal uebersprungen."
+            )
+            continue
+        if num in used_numbers:
+            print(
+                f"[qxf_import] {model_str}: Mode '{mode_name}' Channel "
+                f"'{ch_name or '?'}' Number={raw!r} kollidiert mit Kanal "
+                f"{num} — Kanal uebersprungen."
+            )
+            continue
+        used_numbers.add(num)
+        out[i] = num
+    # Pass 2: Number-lose Kanaele auf die naechste freie Nummer (verdraengt nie
+    # einen expliziten), in Dokument-Reihenfolge.
+    for i in missing:
+        n = 1
+        while n in used_numbers:
+            n += 1
+        used_numbers.add(n)
+        out[i] = n
+    return out
+
+
+def _head_nummern(mode_el) -> list[list[int]]:
+    """FM-46 (Etappe 3): die Kopf-Gruppen eines ``<Mode>`` als Listen von
+    0-basierten Kanalnummern (``<Head><Channel>n</Channel>…</Head>``; ``n`` ist
+    das ``Number`` des Kanals im Modus). Unlesbare Eintraege fallen still weg —
+    ein kaputter Kopf darf den Import nicht stoppen, er ergibt nur weniger
+    Zuordnung. Ausgewertet von ``dimmer_segmente.segmente_aus_heads``."""
+    out: list[list[int]] = []
+    if mode_el is None:
+        return out
+    for head in _findall(mode_el, "Head"):
+        nummern: list[int] = []
+        for ch in _findall(head, "Channel"):
+            try:
+                n = int((ch.text or "").strip())
+            except (TypeError, ValueError):
+                continue
+            if n >= 0:
+                nummern.append(n)
+        out.append(nummern)
+    return out
+
+
+def segmente_aus_mode(mode_el, nummern: list[int], channels) -> dict[int, int]:
+    """``{position: segment}`` fuer die Kanaele eines importierten Modus.
+
+    ``nummern[p]`` ist die 0-basierte QLC+-Nummer des Kanals an Position ``p``
+    von ``channels`` — die ``<Head>``-Eintraege beziehen sich auf diese
+    Nummer, nicht auf die Position (ein uebersprungener Kanal verschiebt die
+    Positionen). Beide Importer (Bibliothek und Generator) nutzen das."""
+    from src.core.dimmer_segmente import segmente_aus_heads
+    pos = {n: p for p, n in enumerate(nummern)}
+    heads = [[pos[n] for n in h if n in pos] for h in _head_nummern(mode_el)]
+    if not heads:
+        return {}
+    return segmente_aus_heads(channels, heads)
+
+
 def import_qxf_file(path: str, session: Session,
                     mfr_cache: dict[str, Manufacturer]) -> bool:
     """Importiert eine einzelne .qxf-Datei. Gibt True bei Erfolg (neu angelegt)
@@ -650,12 +751,13 @@ def import_qxf_file(path: str, session: Session,
             # faellt der Kanal aus Farb-/Tab-/Render-Logik (galt frueher als "raw").
             attr = _attr_from_name(ch_name)
             default, highlight = _defaults_for(attr, None)
-            session.add(FixtureChannel(
+            ch = FixtureChannel(
                 mode=mode_obj, channel_number=num,
                 name=ch_name or f"CH{num}", attribute=attr,
                 default_value=default, highlight_value=highlight,
-            ))
-            return
+            )
+            session.add(ch)
+            return ch
         # Hat die Definition ein konkretes Attribut (Preset/Group/Name), gilt das
         # — KEIN Namens-Override: PRESET_MAP setzt manche Kanaele bewusst auf
         # "raw" (z. B. *Fine-Farbbytes, ColorCTO/CTB/CTC), deren Name aber ein
@@ -669,6 +771,7 @@ def import_qxf_file(path: str, session: Session,
         )
         session.add(ch)
         _add_ranges(ch, ch_el, session)
+        return ch
 
     modes = _findall(root, "Mode")
     if not modes:
@@ -697,70 +800,24 @@ def import_qxf_file(path: str, session: Session,
                 grid_rows=mode_grid[0], grid_cols=mode_grid[1],
             )
             session.add(mode_obj)
-            # CDX-03 (Review): ZWEI Durchlaeufe. Ein FEHLENDES ``Number`` (frueher
-            # per Default "0" → num=1) durfte NIE einen explizit nummerierten Kanal 1
-            # (Number="0") verdraengen — je nach Dokument-Reihenfolge haette der
-            # Number-lose Ref den echten Kanal 1 belegt und den expliziten als
-            # "Kollision" verworfen (stille DMX-Fehlbelegung). Deshalb: Pass 1 platziert
-            # ALLE explizit (gueltig) nummerierten Kanaele; Pass 2 legt die Number-losen
-            # auf die jeweils naechste WIRKLICH freie Nummer (nicht fix auf 1). Non-
-            # numerische Number bleibt ein sichtbar gemeldeter Skip; eine echte
-            # Nummern-Kollision zwischen zwei EXPLIZITEN Kanaelen ebenfalls.
-            used_numbers: set[int] = set()
-            explicit: list[tuple[int, str, object]] = []   # (num, ch_name, channel_def)
-            missing: list[tuple[str, object]] = []          # (ch_name, channel_def)
+            # CDX-03/A3D-34: Nummerierung in zwei Durchlaeufen (Begruendung an
+            # `kanal_nummern`; dieselbe Funktion nutzt der Generator-Import).
             _mode_name = mode_el.get("Name", "Standard")
-            for ch_ref in ch_refs:
-                ch_name = (ch_ref.text or "").strip()
-                cdef = channel_defs.get(ch_name)
-                raw = ch_ref.get("Number")
-                if raw is None or str(raw).strip() == "":
-                    # A3D-34: FEHLENDES *oder* LEERES ``Number`` gleich behandeln —
-                    # als „ohne Nummer". Pass 2 legt es auf die naechste WIRKLICH
-                    # freie Nummer (statt es via int("") → ValueError still zu
-                    # verwerfen). Ein leeres Attribut ist morally „keine Angabe".
-                    missing.append((ch_name, cdef))
-                    continue
-                try:
-                    num = int(raw) + 1   # 0- → 1-basiert
-                except (ValueError, TypeError):
-                    print(
-                        f"[qxf_import] {model_str}: Mode '{_mode_name}' Channel "
-                        f"'{ch_name or '?'}' hat ungueltiges Number={raw!r} "
-                        f"— Kanal uebersprungen."
-                    )
-                    continue
-                if num < 1:
-                    # A3D-34: negative/zu kleine Number (z. B. "-1" → num=0, "-2" →
-                    # num=-1) ergaebe eine ungueltige channel_number ≤ 0 (der fruehere
-                    # `int(raw)+1` liess das still durch). Sichtbar verwerfen statt
-                    # eine kaputte DMX-Nummer zu patchen.
-                    print(
-                        f"[qxf_import] {model_str}: Mode '{_mode_name}' Channel "
-                        f"'{ch_name or '?'}' Number={raw!r} ist negativ/ungueltig "
-                        f"(ergaebe Kanal {num}) — Kanal uebersprungen."
-                    )
-                    continue
-                if num in used_numbers:
-                    print(
-                        f"[qxf_import] {model_str}: Mode '{_mode_name}' Channel "
-                        f"'{ch_name or '?'}' Number={raw!r} kollidiert mit Kanal "
-                        f"{num} — Kanal uebersprungen."
-                    )
-                    continue
-                used_numbers.add(num)
-                explicit.append((num, ch_name, cdef))
-            # Pass 2: Number-lose Kanaele auf die naechste freie Nummer (verdraengt nie
-            # einen expliziten). Reihenfolge der Number-losen bleibt Dokument-Reihenfolge.
-            for ch_name, cdef in missing:
-                n = 1
-                while n in used_numbers:
-                    n += 1
-                used_numbers.add(n)
-                explicit.append((n, ch_name, cdef))
+            explicit = [(num, (ch_refs[i].text or "").strip(),
+                         channel_defs.get((ch_refs[i].text or "").strip()))
+                        for i, num in enumerate(
+                            kanal_nummern(ch_refs, model_str, _mode_name))
+                        if num is not None]
             # Deterministisch in Kanal-Nummer-Reihenfolge anlegen.
-            for num, ch_name, cdef in sorted(explicit, key=lambda t: t[0]):
-                _make_channel(mode_obj, num, ch_name, cdef)
+            angelegt = [(num, _make_channel(mode_obj, num, ch_name, cdef))
+                        for num, ch_name, cdef
+                        in sorted(explicit, key=lambda t: t[0])]
+            # FM-46 (Etappe 3): Dimmer -> Weiss-Segment aus <Head>, nur wenn
+            # eindeutig (Regel an `dimmer_segmente.segmente_aus_heads`).
+            kanaele = [c for _n, c in angelegt]
+            for p, seg in segmente_aus_mode(
+                    mode_el, [n - 1 for n, _c in angelegt], kanaele).items():
+                kanaele[p].segment = seg
     return True
 
 
