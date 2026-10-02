@@ -16,10 +16,17 @@ der Liste existiert — ein Tippfehler in einem Pfad liesse pytest sonst mit
 
 XPLAT-41 ergaenzt eine Windows-ARM64-Leg (Job ``windows-arm``), die zunaechst
 NICHT blockiert. Der Waechter haelt ihre Eckdaten fest: echter ARM-Runner,
-ARM64-Python (nicht x64 unter Emulation — dann pruefte die Leg nichts), der
-segmentierte Runner mit einem Parameter, den ``tools/verify_segmented.ps1``
+der segmentierte Runner mit einem Parameter, den ``tools/verify_segmented.ps1``
 wirklich kennt, ein Timeout, und ``continue-on-error``, solange die Leg nur
 beobachtet.
+
+XPLAT-45 dreht die Python-Architektur der SUITE um: x64 unter Emulation statt
+nativem ARM64. Die win_arm64-Wheels von PySide6-Addons enthalten kein
+QtWebEngine (gemessen 6.11.2: Leg flaechig rot, ~90 Visualizer-Dateien); der
+echte ARM-Rechner laeuft genau deshalb mit x64-Python. Natives ARM64 bleibt
+als Befund-Schritt (``tools/qt_module_befund.py``) im Job — VOR der x64-Stufe,
+denn die zuletzt eingerichtete Python-Version steht vorne im PATH und baut das
+``venv/`` der Suite.
 
 Zum Parser
 ----------
@@ -251,6 +258,13 @@ def job_schluessel(job_zeilen: list[str], schluessel: str) -> str | None:
 
 def with_werte(job_zeilen: list[str], action: str) -> dict[str, str]:
     """``with:``-Werte des ersten Schritts, der ``action`` benutzt."""
+    alle = alle_with_werte(job_zeilen, action)
+    return alle[0] if alle else {}
+
+
+def alle_with_werte(job_zeilen: list[str], action: str) -> list[dict[str, str]]:
+    """``with:``-Werte JEDES Schritts, der ``action`` benutzt, in Reihenfolge."""
+    ergebnis = []
     for i, z in enumerate(job_zeilen):
         if "uses:" not in z or action not in z:
             continue
@@ -268,8 +282,8 @@ def with_werte(job_zeilen: list[str], action: str) -> dict[str, str]:
             if im_with and t > tiefe:
                 k, _, v = zj.strip().partition(":")
                 werte[k] = v.split(" #", 1)[0].strip().strip("'\"")
-        return werte
-    return {}
+        ergebnis.append(werte)
+    return ergebnis
 
 
 def ps1_parameter(pfad: str = SEGMENT_PS1) -> set[str]:
@@ -347,13 +361,28 @@ class WindowsArmJobTest(unittest.TestCase):
         self.job = ci_jobs(_ci_text()).get(ARM_JOB)
         self.assertIsNotNone(self.job, f"Job '{ARM_JOB}' fehlt in ci.yml")
 
-    def test_laeuft_auf_echtem_arm_runner_mit_arm64_python(self):
+    def test_laeuft_auf_echtem_arm_runner(self):
         self.assertEqual(job_schluessel(self.job, "runs-on"), "windows-11-arm")
-        py = with_werte(self.job, "actions/setup-python")
-        self.assertEqual(py.get("architecture"), "arm64",
-                         "ohne arm64 laeuft x64-Python unter Emulation — die "
-                         "Leg pruefte dann die ARM64-Wheels gar nicht")
-        self.assertTrue(py.get("python-version", "").startswith("3."))
+
+    def test_suite_mit_x64_python_wie_am_rig(self):
+        # XPLAT-45: die ZULETZT eingerichtete Python-Version steht vorne im
+        # PATH und baut venv/ — sie muss x64 sein, sonst fehlt QtWebEngine.
+        stufen = alle_with_werte(self.job, "actions/setup-python")
+        self.assertTrue(stufen, "kein setup-python im Job")
+        self.assertEqual(stufen[-1].get("architecture"), "x64",
+                         "natives ARM64 hat kein QtWebEngine (win_arm64-Wheels) — "
+                         "die Suite waere flaechig rot")
+        for py in stufen:
+            self.assertTrue(py.get("python-version", "").startswith("3."), py)
+
+    def test_natives_arm64_bleibt_als_befund(self):
+        stufen = alle_with_werte(self.job, "actions/setup-python")
+        archs = [py.get("architecture") for py in stufen]
+        self.assertIn("arm64", archs[:-1],
+                      "der Befund zu den nativen ARM64-Wheels fehlt")
+        text = "\n".join(self.job)
+        self.assertIn("tools/qt_module_befund.py", text)
+        self.assertTrue(os.path.isfile(os.path.join(REPO, "tools", "qt_module_befund.py")))
 
     def test_faehrt_den_segmentierten_runner_mit_gueltigen_schaltern(self):
         aufrufe = segment_aufrufe(self.job)

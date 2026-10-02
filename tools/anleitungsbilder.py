@@ -33,7 +33,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import shutil
 import sys
 
 _TOOLS = os.path.dirname(os.path.abspath(__file__))
@@ -194,7 +193,12 @@ def main(argv=None) -> int:
         if args.behalten:
             print(f"[anleitungsbilder] Sandbox bleibt liegen: {sb.basis}", flush=True)
         else:
-            shutil.rmtree(sb.basis, ignore_errors=True)
+            rest = sandbox.aufraeumen(sb)
+            if rest:
+                print(f"[anleitungsbilder] WARNUNG: Sandbox nicht vollstaendig geloescht "
+                      f"({len(rest)} Datei(en) noch offen): {sb.basis}", flush=True)
+                for p in rest[:10]:
+                    print("   " + os.path.relpath(p, sb.basis), flush=True)
     return code
 
 
