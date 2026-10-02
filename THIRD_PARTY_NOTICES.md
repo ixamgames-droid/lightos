@@ -51,9 +51,3 @@ ins Repo kommen.
   die aus QLC+ (Copyright © Heikki Junnila, Massimo Callegari und die QLC+-Beitragenden)
   übernommen und von LightOS überarbeitet wurden. Jede solche Datei nennt ihre Herkunft,
   den Urheber, die Originaldatei und die Änderungen selbst (Feld `herkunft`).
-
-## GNU FreeFont — Schrift für das Gource-Werkzeug
-
-- **Datei:** `tools/gource/data/fonts/FreeSans.ttf` (nur Entwickler-Werkzeug, nicht Teil der App).
-- **Lizenz:** GNU GPL v3 mit Font-Ausnahme — Details in
-  [`tools/gource/data/fonts/README.txt`](tools/gource/data/fonts/README.txt), das der Schrift beiliegt.
