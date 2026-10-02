@@ -66,6 +66,7 @@
 | SAMMEL-DOKU-C | A | sammel/doku-c | 2026-10-02T22:08Z | docs · BACKLOG.md |
 | OUT-59 | B | fix/out59-waisen-windows | 2026-10-02T22:17Z | src/core/dmx/serial_process.py · tests/test_out59_waisen_windows.py · BACKLOG.md |
 | OUT-60 | B | fix/out60-load-null-frame | 2026-10-02T22:22Z | src/core/show/show_file.py · src/core/app_state.py · tests/test_out60_load_kein_null_frame.py · BACKLOG.md |
+| FM-59 | A | feat/fm59-bibliothek-runde3 | 2026-10-02T22:24Z | fixtures/bibliothek |
 
 ## Blocker & Fallen
 
@@ -151,7 +152,6 @@
 
 ## Verlauf
 
-- 2026-10-02T12:42Z B claim FUNKTIONSTEST-B2
 - 2026-10-02T12:45Z B claim XPLAT-42
 - 2026-10-02T12:51Z C claim OUT-58
 - 2026-10-02T12:53Z B claim XPLAT-45
@@ -181,3 +181,4 @@
 - 2026-10-02T22:17Z B claim OUT-60
 - 2026-10-02T22:21Z B uebergeben OUT-60
 - 2026-10-02T22:22Z B claim OUT-60
+- 2026-10-02T22:24Z A claim FM-59
