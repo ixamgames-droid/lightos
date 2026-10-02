@@ -399,6 +399,91 @@ class GifTest(unittest.TestCase):
                     self.assertEqual(im.info.get("loop"), 0, f"{name}: keine Endlosschleife")
                     self.assertGreater(im.n_frames, 1, f"{name}: nur ein Frame")
         self.assertGreater(gefunden, 0)
+# ── TOOL-8: jede Anleitung startet frisch ─────────────────────────────────────
+
+_SZENE_HINTERLASSEN = """
+from anleitungsbilder.runner import Szene
+
+
+def _zustand_hinterlassen(ui):
+    from src.core.engine.bpm_manager import BpmMode, get_bpm_manager
+    pars = ui.info["pars"]
+    ui.wert(pars, "intensity", 255)
+    ui.win._programmer_view._select_fids(pars[:4])
+    mgr = get_bpm_manager()
+    mgr.set_mode(BpmMode.MANUAL)
+    mgr.set_manual_bpm(128.0)
+    ui.pump(0.1)
+
+
+SZENEN = [Szene("t8_hinterlassen", sektion="Programmer", unterreiter="Attribute",
+                vorher=_zustand_hinterlassen, warte_s=0.1)]
+"""
+
+_SZENE_FRISCH = """
+from anleitungsbilder.runner import Szene, SzenenFehler
+
+
+def _frisch(ui):
+    from src.core.engine.bpm_manager import BpmMode, get_bpm_manager
+    pv = ui.win._programmer_view
+    mgr = get_bpm_manager()
+    reste = []
+    if list(ui.state.selected_fids or []):
+        reste.append("Auswahl %r" % list(ui.state.selected_fids))
+    if any(ui.state.programmer.values()):
+        reste.append("Programmer-Werte")
+    if pv._editor_fids or pv._fixture_combo.count():
+        reste.append("Programmer-Ansicht %r" % pv._editor_fids)
+    if mgr.mode == BpmMode.MANUAL and abs(mgr.bpm - 128.0) < 0.01:
+        reste.append("BPM 128 manuell")
+    if reste:
+        raise SzenenFehler("Zustand der vorigen Anleitung: " + ", ".join(reste))
+
+
+SZENEN = [Szene("t8_frisch", sektion="Programmer", unterreiter="Attribute",
+                vorher=_frisch, warte_s=0.1)]
+"""
+
+
+class AlleFrischTest(unittest.TestCase):
+    """TOOL-8: ``--alle`` lief alle Anleitungen im SELBEN Fenster; die zweite
+    sah Auswahl, Programmer-Werte und BPM 128 der ersten. Zwei Test-Anleitungen
+    (ueber ``LIGHTOS_DOKU_SZENEN_ORDNER``, nicht im Paket): die erste
+    hinterlaesst Zustand, die zweite bricht ab, wenn sie ihn sieht."""
+
+    def test_zweite_anleitung_sieht_den_zustand_der_ersten_nicht(self):
+        import shutil
+        ordner = tempfile.mkdtemp(prefix="lightos_abtest_szenen_")
+        ausgabe = tempfile.mkdtemp(prefix="lightos_abtest_")
+        try:
+            for name, text in (("t8a_hinterlassen", _SZENE_HINTERLASSEN),
+                               ("t8b_frisch", _SZENE_FRISCH)):
+                with open(os.path.join(ordner, f"szenen_{name}.py"), "w",
+                          encoding="utf-8") as f:
+                    f.write(text)
+            env = dict(os.environ)
+            env["PYTHONDONTWRITEBYTECODE"] = "1"
+            env["LIGHTOS_DOKU_SZENEN_ORDNER"] = ordner
+            lauf = subprocess.run(
+                [sys.executable, os.path.join(TOOLS, "anleitungsbilder.py"),
+                 "--alle", "--nur", "t8_hinterlassen,t8_frisch",
+                 "--ausgabe", ausgabe],
+                cwd=REPO, env=env, capture_output=True, text=True, timeout=300)
+            log = lauf.stdout[-4000:] + "\n--- stderr ---\n" + lauf.stderr[-3000:]
+            self.assertNotIn("Zustand der vorigen Anleitung", lauf.stdout, log)
+            self.assertEqual(lauf.returncode, 0, log)
+            for name, szene in (("t8a_hinterlassen", "t8_hinterlassen"),
+                                ("t8b_frisch", "t8_frisch")):
+                self.assertTrue(os.path.isfile(
+                    os.path.join(ausgabe, name, f"{szene}.png")), log)
+            # Jede Anleitung hatte ihre eigene Sandbox (= eigenen Prozess).
+            sandboxen = {json.loads(z[len("SANDBOX "):])["cwd"]
+                         for z in lauf.stdout.splitlines() if z.startswith("SANDBOX ")}
+            self.assertEqual(len(sandboxen), 2, log)
+        finally:
+            shutil.rmtree(ordner, ignore_errors=True)
+            shutil.rmtree(ausgabe, ignore_errors=True)
 
 
 if __name__ == "__main__":
