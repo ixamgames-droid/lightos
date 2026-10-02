@@ -109,8 +109,9 @@ Hat ein Gerät eine **eigene Weiß-Leiste** (mehr oder weniger `color_w`- als
 `color_r`-Kanäle) und **mehrere Dimmer**, steht in der Kanalliste nicht, welcher
 Dimmer welches Weiß-Segment dimmt. LightOS rät das zur Laufzeit **nie** — ein
 falsch geratener Dimmer ließe ein Segment dunkel oder dimmte das falsche, ohne
-dass es jemand merkt. Ohne Angabe treibt die Matrix diese Dimmer für die
-Weiß-Segmente deshalb nicht (sie dimmt das Weiß dann selbst, FM-54).
+dass es jemand merkt. Ohne Angabe wählt die Matrix deshalb keinen einzelnen
+Dimmer aus, sondern fährt bei „Dimmer mit treiben“ **alle gemeinsam** (FM-46,
+Etappe 2 — siehe unten „Ohne Zuordnung“).
 
 Die Angabe macht man im **Fixture-Editor** oder im **Fixture-Generator**, Spalte
 **„Weiß-Segment“** der Kanaltabelle (`FixtureChannel.segment`):
@@ -148,6 +149,36 @@ Weg gilt für Muster-Chaser, Weiß-Regler und Kommandozeile). Ein einzelner
 Dimmer braucht keine Angabe: er gilt als gemeinsamer Master und fährt ohnehin
 mit. Ältere Bibliotheken bekommen die Spalte beim Start automatisch, ohne
 Zuordnung. Der QLC+-Import kann sie nicht ableiten.
+
+**Ohne Zuordnung (FM-46, Etappe 2).** Die Matrix soll möglichst immer leuchten,
+und ein Hinweis ist besser als ein stumm dunkles Segment:
+
+- Fährt die Matrix die Dimmer („Dimmer mit treiben“), zieht ein Weiß-Feld ohne
+  gültige Zuordnung **alle freien** Vorkommen des Dimmers auf
+  (`app_state.weiss_rueckfall_dimmer`). Nicht frei ist ein Dimmer, der einem
+  *anderen* Weiß-Segment zugeordnet ist, laut Kopf-Karte einem Farbkopf gehört
+  oder an einen **reinen Farbabschnitt** grenzt: die Kanalliste wird an den
+  Dimmern in Abschnitte geteilt, und ein Dimmer direkt vor oder hinter einem
+  Abschnitt mit R/G/B, aber ohne Weiß (RGB-Ring, Pixelsektion) könnte einen
+  Farbteil aufleuchten lassen. Liegt das Weiß selbst in einem RGBW-Abschnitt,
+  fahren nur die Dimmer an genau diesem Abschnitt. Leitsatz: lieber ein Segment
+  zu wenig öffnen als einen fremden Teil — ein Master direkt vor einer
+  Pixelsektion fährt deshalb ebenfalls nicht. Das ist kein Raten: es wird nicht
+  *ein* Dimmer als „der richtige“ gewählt, sondern bewusst alle freien geöffnet.
+  Die Helligkeit trägt der Weiß-Kanal, die Intensität der Matrix wirkt über die
+  Dimmer (der Merge skaliert alle Dimmer-Adressen) — nicht doppelt. Teilweise
+  Zuordnung: ein Segment mit eigenem Dimmer fährt nur diesen, die übrigen
+  Segmente teilen sich die freien. Ein Segment, das mehreren Dimmern zugeordnet
+  ist, fährt sie alle.
+- Fährt die Matrix die Dimmer nicht, bleibt alles wie bisher: die Dimmer gehören
+  dem Nutzer. ⚠️ Das ist seit dem Umbau der Bedienelemente der Normalfall für
+  **neue** Matrizen (`drive_intensity` hat kein Bedienelement mehr, neue
+  Matrizen stehen auf aus, Matrizen aus älteren Shows ohne den Schlüssel auf an).
+- Der **RGB-Matrix-Editor** zeigt unter der Vorschau einen Hinweis, sobald ein
+  Gerät auf der Weiß-Achse liegt und die Zuordnung fehlt oder unstimmig ist —
+  mit dem Wortlaut passend zu dem, was die Matrix tatsächlich tut.
+  `tools/lint_show.py` meldet denselben Fall als Warnung
+  `WEISS-DIMMER-ZUORDNUNG`.
 
 ## 2. Woher Profile kommen
 
