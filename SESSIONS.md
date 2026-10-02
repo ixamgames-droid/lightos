@@ -14,7 +14,6 @@
 |---|---|---|---|---|
 | DOC-14 | C | fix/doc14-schaukasten-19 | 2026-10-01T21:37Z | tools/build_vc_widgets_showcase.py · docs/anleitung_vc_widgets/README.md · docs/anleitung_vc_widgets/_capture/geometry.json · tests/test_doc14_schaukasten_alle_typen.py · changelog.d/2026-10-02-DOC-14.md |
 | FM-46 | A | feat/fm46-dimmer-segment | 2026-10-02T07:26Z | src/core/database/models.py · src/core/app_state.py · src/ui/widgets/fixture_editor.py · src/ui/widgets/fixture_generator.py · src/core/database/fixture_db.py |
-| QA-68 | C | fix/qa68-builtin-dubletten | 2026-10-02T07:33Z | tools/library_testreste.py · tools/README.md · tests/test_qa68_builtin_dubletten.py · changelog.d/2026-10-02-QA-68.md · BACKLOG.md |
 | XPLAT-37 | C | fix/xplat37-settle-frame | 2026-10-02T07:37Z | src/ui/visualizer/scene_src/interaction/tools.js · src/ui/visualizer/scene_src/app.js · tests/test_viz14_selection_scene.py · changelog.d/2026-10-02-XPLAT-37.md · BACKLOG.md |
 | FM-55 | C | docs/fm55-fixture-quellen | 2026-10-02T07:39Z | docs/recherche/fixture_quellen_2026-10.md · changelog.d/2026-10-02-FM-55.md · BACKLOG.md |
 | UI-70 | A | fix/ui70-leere-auswahl-programmer | 2026-10-02T07:57Z | src/ui/views/programmer_view.py · tools/anleitungsbilder |
@@ -78,7 +77,6 @@
 
 ## Verlauf
 
-- 2026-10-01T23:41Z A done DOC-19
 - 2026-10-01T23:55Z C done ENG-27
 - 2026-10-02T00:10Z C done TOOL-3
 - 2026-10-02T00:24Z C done PROC-08
@@ -108,3 +106,4 @@
 - 2026-10-02T08:30Z C done TOOL-7
 - 2026-10-02T08:42Z A claim PROC-18
 - 2026-10-02T08:45Z A done DOC-22
+- 2026-10-02T08:58Z C done QA-68
