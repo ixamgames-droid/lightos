@@ -73,7 +73,7 @@ frei kombinieren; das Tempo aller Ebenen hängt an Tempo-Buses (siehe
 | Anleitung | Worum geht's | Show |
 |---|---|---|
 | [Virtual Console bauen & designen](anleitung_vc/ANLEITUNG_VC.md) | Eigene Bedienoberfläche: Bänke, Tasten, Fader, Labels, Strobe. | Beispiel-Show nicht im Repo |
-| [VC-Widget-Referenz](anleitung_vc_widgets/README.md) | Eine Seite je Element (Taste, Fader, XY-Pad, Encoder, Matrix-Editor …): Einstellungen, Dialogfelder, Fallstricke. | Generator `build_vc_widgets_showcase.py` → `VC_Widgets_Showcase.lshow` |
+| [VC-Widget-Referenz](anleitung_vc_widgets/README.md) · [English](anleitung_vc_widgets/README.en.md) | Eine Seite je Element (Taste, Fader, XY-Pad, Encoder, Matrix-Editor …): Einstellungen, Dialogfelder, Fallstricke. | Generator `build_vc_widgets_showcase.py` → `VC_Widgets_Showcase.lshow` |
 | [Alle VC-Elemente im Überblick](anleitung_vc_elemente/ANLEITUNG_VC_ELEMENTE.md) | Kurzreferenz aller Bau-Elemente und der Baukasten-Knöpfe. | Generator `build_vc_elements_showcase.py` → `VC_Elemente_Showcase.lshow` |
 | [Effekte einfach aufbauen](anleitung_vc_smartbuild/ANLEITUNG.md) | Effekte per Drag & Drop auf die VC legen und einrichten. | Generator `build_farb_fx_vc_show.py` → `Farb_FX_VC_Show.lshow` |
 | [VC live bearbeiten](anleitung_vc_workflow/ANLEITUNG_VC_WORKFLOW.md) | Elemente löschen und hinzufügen, Effekt an einen Schalter binden, Geschwindigkeit, Submaster, speichern. | Generator `build_event_demo_2026.py` |
