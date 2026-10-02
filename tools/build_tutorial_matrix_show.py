@@ -37,7 +37,8 @@ _app = QApplication.instance() or QApplication([])
 
 from sqlalchemy import select, delete
 from sqlalchemy.orm import Session
-from src.core.app_state import get_state, get_channels_for_patched, open_value_for
+from src.core.app_state import get_state, get_channels_for_patched
+from _shutter import shutter_offen   # ENG-28: Shutter nur mit Beleg
 from src.core.database.fixture_db import engine as fdb_engine
 from src.core.database.models import PatchedFixture, FixtureProfile, FixtureGroup
 from src.core.engine.function_manager import get_function_manager
@@ -102,9 +103,11 @@ base = {}
 for fid in par_fids:
     cm = chan_of[fid]
     base[fid] = {"intensity": 255, "color_r": 255, "color_g": 255, "color_b": 255}
-SHUT_OPEN = open_value_for(fx_of[mh_left], "shutter")
+SHUT_OPEN = shutter_offen(fx_of[mh_left])
 for fid in mh_fids:
-    base[fid] = {"intensity": 255, "pan": 128, "tilt": 128, "shutter": SHUT_OPEN}
+    base[fid] = {"intensity": 255, "pan": 128, "tilt": 128}
+    if SHUT_OPEN is not None:
+        base[fid]["shutter"] = SHUT_OPEN
 state.base_levels = base
 state._rebuild_render_plan()
 
