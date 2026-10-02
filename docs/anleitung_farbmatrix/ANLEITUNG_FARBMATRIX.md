@@ -47,6 +47,24 @@ Mit **Style RGBW** treibt die Matrix zusätzlich den **Weiß-Kanal** (Spider/RGB
 hellere Mischfarben. Ein eigener Weißanteil ist **nicht** einstellbar: RGBW erzeugt echtes Weiß
 automatisch über den W-Kanal.
 
+**Geräte mit eigener Weiß-Leiste und mehreren Dimmern.** Liegen Weiß-Segmente eines solchen
+Geräts im Raster (Weiß-Felder aus dem Fixture-Gruppen-Editor), muss LightOS wissen, welcher
+Dimmer welches Segment dimmt — das trägt man im Fixture-Editor ein (Spalte „Weiß-Segment“,
+siehe `docs/FIXTURE_LIBRARY.md`, Abschnitt „Mehrere Dimmer und Weiß-Segmente“). Fehlt die
+Angabe, steht unter der Vorschau ein gelber Hinweis. Was die Matrix dann tut, hängt davon ab,
+ob sie die Dimmer selbst fährt („Dimmer mit treiben“; heute ohne eigenes Bedienelement —
+**neue Matrizen fahren die Dimmer nicht**, Matrizen aus älteren Shows schon):
+
+- **Matrix fährt die Dimmer** (ältere Shows): ohne Zuordnung werden **alle freien Dimmer des
+  Geräts gemeinsam** aufgezogen — frei heißt: keinem anderen Weiß-Segment und keinem Farbteil
+  zugeordnet (ein Dimmer direkt neben einem reinen RGB-Abschnitt fährt nie). Die Intensität
+  der Matrix wirkt über diese Dimmer. Gibt es keinen freien Dimmer, bleibt das Segment
+  hinter seinem Dimmer so hell, wie dieser steht.
+- **Matrix fährt keine Dimmer** (neue Matrizen): die Dimmer gehören dir. Die Weiß-Segmente
+  leuchten nur, wenn die Dimmer anderweitig offen sind (Programmer, Szene); die Intensität
+  der Matrix dimmt dann das Weiß selbst. Die Zuordnung sorgt hier dafür, dass Weiß-Regler und
+  Kommandozeile den richtigen Dimmer mitziehen.
+
 ## 4. Kombinieren
 
 Farbe (diese Matrix) + Helligkeit (Dimmer-Matrix) + Bewegung (EFX) sind **getrennte Ebenen** über

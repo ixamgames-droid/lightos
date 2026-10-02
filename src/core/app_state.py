@@ -5993,14 +5993,22 @@ def channels_for_axis(channels, achse: str | None, index: int | None) -> dict:
     genau dieses Vorkommen mit. Der Absatz unten gilt fuer Geraete OHNE
     Eintrag unveraendert.
 
-    **Fuer diese 26 gilt:** das Segment wird richtig adressiert, ein etwaiger
-    Dimmer davor bleibt aber unangetastet. Bei ``drive_intensity=False`` ist das
-    genau richtig (der Dimmer gehoert dann dem Nutzer). Bei
-    ``drive_intensity=True`` ist es eine **Luecke**: die Matrix soll den Dimmer
-    treiben und kann es fuer dieses Geraet nicht. Bewusst wird dann NICHTS
-    geschrieben statt geraten — einen von zwei Dimmern zu waehlen waere in der
-    Haelfte der Faelle der falsche, und zwar stumm. Steht als eigenes Item im
-    Backlog (FM-46).
+    **Fuer diese 26 gilt:** die Projektion adressiert das Segment richtig,
+    liefert aber KEINEN der mehrfachen Dimmer — diese Funktion waehlt nie einen
+    von zwei Dimmern aus (in der Haelfte der Faelle der falsche, und zwar
+    stumm). Bei ``drive_intensity=False`` ist das genau richtig (der Dimmer
+    gehoert dann dem Nutzer).
+
+    ★ **Seit FM-46 (Etappe 2)** schliessen die Matrix-Pfade die Luecke bei
+    ``drive_intensity=True`` mit :func:`weiss_rueckfall_dimmer`: dann fahren
+    ALLE freien Vorkommen des Dimmers gemeinsam (Entscheidung des
+    Projektinhabers: die Matrix soll moeglichst immer leuchten). Das ist kein
+    Raten, welches Segment zu welchem Dimmer gehoert — es waehlt gar nicht aus,
+    es oeffnet bewusst alle, die keinem anderen Segment und keinem Farbkopf
+    gehoeren. Der Rueckfall steht ausdruecklich NICHT hier drin: diese Funktion
+    liefert ``{attr: kanal}``, also hoechstens einen Kanal je Attribut, und ihre
+    Antwort lesen auch Programmer-Pfade (``weiss_dimmer_key``), die genau EINEN
+    Dimmer setzen.
 
     ⚠️ **Kein Phantom-Emitter** — dieselbe Grenze wie bei FM-45: gibt es das
     ``index``-te Vorkommen nicht, kommt ``{}`` zurueck und NICHT die geteilten
@@ -6034,14 +6042,17 @@ def channels_for_axis(channels, achse: str | None, index: int | None) -> dict:
     # welches Vorkommen dieses Segment dimmt, steht nicht in der Kanalliste.
     # Hat ein Mensch es im Fixture-Editor/-Generator eingetragen
     # (``FixtureChannel.segment``), faehrt GENAU dieser Dimmer mit. Zur
-    # Laufzeit wird weiterhin NICHT geraten: ohne Eintrag bleibt es beim
-    # Bestandsverhalten, und tragen zwei Vorkommen dasselbe Segment, ist das
-    # widerspruechlich und es faehrt keins.
+    # Laufzeit wird weiterhin NICHT geraten: ohne Eintrag liefert diese
+    # Projektion keinen der Dimmer, und tragen zwei Vorkommen dasselbe Segment,
+    # ist das widerspruechlich und es faehrt hier keins. (Die Matrix-Pfade
+    # oeffnen dann bei ``drive_intensity`` alle freien Vorkommen gemeinsam —
+    # ``weiss_rueckfall_dimmer`` unten, FM-46 Etappe 2.)
     #
-    # Das ist die EINE Lesestelle des Feldes. ``rgb_matrix._weiss_achse_
-    # schreiben`` (FM-54 ``_treibt_dimmer``), ``matrix_pattern.weiss_cell_
-    # values``, ``weiss_dimmer_key`` und ``weiss_programmer_key`` folgen
-    # daraus, ohne das Feld selbst zu kennen. ``segment_von`` ist tolerant
+    # Das ist die Lesestelle des Feldes fuer den EINEN Dimmer eines Segments
+    # (die zweite ist der Rueckfall unten, der nur ausschliesst). ``rgb_matrix.
+    # _weiss_achse_schreiben`` (FM-54 ``_treibt_dimmer``), ``matrix_pattern.
+    # weiss_cell_values``, ``weiss_dimmer_key`` und ``weiss_programmer_key``
+    # folgen daraus, ohne das Feld selbst zu kennen. ``segment_von`` ist tolerant
     # gegen jede Kanalart (ORM, ``_AttrOverrideChannel``, Test-Objekte ohne
     # das Feld -> keine Zuordnung).
     if attribut == "color_w":
@@ -6056,6 +6067,129 @@ def channels_for_axis(channels, achse: str | None, index: int | None) -> dict:
             if len(zugeordnet) == 1:
                 treffer[dim] = zugeordnet[0]
     return treffer
+
+
+def weiss_rueckfall_dimmer(channels, index, proj: dict | None = None) -> list:
+    """Die Dimmer, die ein Weiss-Segment OHNE gespeicherte Zuordnung gemeinsam
+    oeffnet — FM-46, Etappe 2 („alle Dimmer gemeinsam").
+
+    ★ **Entscheidung des Projektinhabers (02.10.):** die Matrix soll moeglichst
+    immer leuchten; ein stumm dunkles Segment ist schlechter als ein Segment,
+    dessen Dimmer zusammen mit einem anderen faehrt. Darum gilt fuer einen
+    MEHRFACHEN Dimmer, den :func:`channels_for_axis` fuer dieses Segment nicht
+    liefert (keine Zuordnung, oder eine widerspruechliche): alle seine
+    Vorkommen fahren mit, AUSSER
+
+    * es ist einem ANDEREN, existierenden Weiss-Segment zugeordnet — dann
+      gehoert es diesem (Teilzuordnung: Segment 1 eingetragen, Segment 2 nicht
+      -> Segment 2 oeffnet nur die uebrigen Dimmer);
+    * es gehoert laut Kopf-Karte (:func:`head_channel_map`, FM-17) einem
+      FARBKOPF — einen RGB-Kopf ueber die Weiss-Achse aufzuziehen hiesse, eine
+      Farbe sichtbar zu machen, die diese Zelle nicht faerbt;
+    * es grenzt an einen reinen FARBABSCHNITT (Review, s. u.).
+
+    ★★ **Farbabschnitte (Review 02.10., am Scan der Bibliothek gefunden).** Die
+    Kopf-Karte greift bei keinem echten Modus: dort steht der Dimmer VOR oder
+    NACH seinem Farbblock, nicht darin. Modus „Fusion Orbit MKII 16 Channel":
+    CH4 Master (Beam), CH6-9 RGBW Beam, CH10 Master (Ring), CH12-14 RGB Ring —
+    die erste Fassung zog CH10 mit auf, und der Ring leuchtete rot, sobald CH12
+    aus einer anderen Quelle stand. Ginamp 36ch umgekehrt: CH25 „Dimmer (RGB)"
+    steht HINTER den 24 Pixelkanaelen. Darum werden die Kanaele an den
+    Dimmer-Vorkommen (jedes Dimmer-Attribut) in Abschnitte geteilt und jeder
+    Abschnitt eingestuft — *farbe* (R/G/B, kein Weiss), *weiss*, *gemischt*,
+    *leer*:
+
+    1. ein Dimmer, der links ODER rechts an einen *farbe*-Abschnitt grenzt,
+       faehrt nie — er kann einen Farbteil dimmen;
+    2. liegt das ``color_w`` des Segments in einem *gemischten* Abschnitt
+       (RGBW-Beam mit eigenem Weiss), fahren nur die Dimmer, die an DIESEN
+       Abschnitt grenzen.
+
+    Leitsatz: lieber ein Segment zu wenig oeffnen als einen fremden Teil
+    aufleuchten lassen. Ein Master vor einem reinen Farbblock (Spiider,
+    Tetra) faehrt deshalb ebenfalls nicht; der Editor-Hinweis nennt den Fall.
+
+    Ein Vorkommen mit einem Segment, das es im Modus nicht gibt, gilt als
+    unzugeordnet (die Zuordnung wirkt nie, ``zuordnung_probleme`` meldet sie).
+
+    ⚠️ **Das ist kein Raten.** Geraten waere, EINEN Dimmer als „den des
+    Segments" auszuwaehlen. Hier wird nicht ausgewaehlt: geoeffnet werden alle,
+    die nicht nachweislich jemand anderem gehoeren — das Segment leuchtet
+    sicher, und es leuchtet hoechstens zu viel (ein anderes, unzugeordnetes
+    Segment bekommt seinen Dimmer mit; dessen Weiss-Kanal steht trotzdem auf
+    seinem eigenen Wert). Die Helligkeit traegt weiter der Weiss-Kanal, die
+    Intensitaet der Matrix skaliert der FunctionManager-Merge ueber ALLE
+    Dimmer-Adressen des Geraets (``_dim_addr_map``) — kein doppeltes Dimmen.
+
+    Nur fuer die Weiss-Achse und nur, wenn es das Segment gibt (FM-45-Grenze:
+    kein Phantom-Emitter). Ob ``drive_intensity`` an ist, prueft der Aufrufer —
+    ohne ihn gehoeren die Dimmer dem Nutzer und dieser Rueckfall greift nicht.
+    ``proj`` darf die schon berechnete Projektion sein (44-Hz-Pfad).
+    """
+    from src.core.dimmer_segmente import segment_von
+    chans = list(channels or ())
+    try:
+        idx = int(index)
+    except (TypeError, ValueError):
+        return []
+    n_weiss = sum(1 for c in chans
+                  if (getattr(c, "attribute", "") or "") == "color_w")
+    if not (0 <= idx < n_weiss):
+        return []
+    if proj is None:
+        from src.core.group_cells import ACHSE_WEISS
+        proj = channels_for_axis(chans, ACHSE_WEISS, idx)
+    if not proj:
+        return []
+    from collections import Counter
+    haeufigkeit = Counter((getattr(c, "attribute", "") or "") for c in chans)
+    if not any(a.lower() in _DIM_INTENSITY_ATTRS and n >= 2 and a not in proj
+               for a, n in haeufigkeit.items()):
+        return []                        # der Normalfall: nichts zu oeffnen
+    # Die Original-Liste reichen, wenn es eine ist: nur sie trifft den Cache
+    # des Kanal-Index (die Kopie oben hat eine neue Identitaet).
+    _positions, hmap = _channel_index(channels if isinstance(channels, list)
+                                      else chans)
+    attrs = [(getattr(c, "attribute", "") or "").lower() for c in chans]
+    dim_pos = [i for i, a in enumerate(attrs) if a in _DIM_INTENSITY_ATTRS]
+    # Abschnitt j = Kanaele zwischen Dimmer j-1 und Dimmer j (0 = vor dem
+    # ersten, len(dim_pos) = nach dem letzten). Dimmer k grenzt an j=k und k+1.
+    grenzen = [-1] + dim_pos + [len(attrs)]
+    typen = []
+    for lo, hi in zip(grenzen, grenzen[1:]):
+        inhalt = set(attrs[lo + 1:hi])
+        farbe = bool(inhalt & _FARB_ATTRS_RGB)
+        weiss = "color_w" in inhalt
+        typen.append("gemischt" if farbe and weiss else "farbe" if farbe
+                     else "weiss" if weiss else "leer")
+    w_pos = [i for i, a in enumerate(attrs) if a == "color_w"][idx]
+    w_abschnitt = next(j for j, (lo, hi) in enumerate(zip(grenzen, grenzen[1:]))
+                       if lo < w_pos < hi)
+    nur_angrenzend = typen[w_abschnitt] == "gemischt"
+    out: list = []
+    for k, i in enumerate(dim_pos):
+        c = chans[i]
+        a = (getattr(c, "attribute", "") or "")
+        if haeufigkeit[a] < 2:
+            continue                     # einmalig = geteilt, kommt mit proj
+        if a in proj:
+            continue                     # Zuordnung wirkt -> kein Rueckfall
+        if i in (hmap.get(a.lower()) or ()):
+            continue                     # Dimmer eines Farbkopfs (FM-17)
+        if "farbe" in (typen[k], typen[k + 1]):
+            continue                     # grenzt an einen Farbabschnitt
+        if nur_angrenzend and w_abschnitt not in (k, k + 1):
+            continue                     # gehoert einem anderen RGBW-Teil
+        seg = segment_von(c)
+        if seg is not None and seg != idx and seg < n_weiss:
+            continue                     # gehoert einem anderen Segment
+        out.append(c)
+    return out
+
+
+#: Die Farbkanaele, an denen :func:`weiss_rueckfall_dimmer` einen
+#: Farbabschnitt erkennt.
+_FARB_ATTRS_RGB = frozenset({"color_r", "color_g", "color_b"})
 
 
 def resolve_attr_channels(channels, values: dict) -> list[tuple[int, str, int]]:

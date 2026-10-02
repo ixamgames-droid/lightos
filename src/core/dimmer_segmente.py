@@ -10,7 +10,10 @@ Weiss-Segments nicht treiben und schrieb bewusst nichts (FM-46, Befund C).
 ★ **Entscheidung des Projektinhabers (02.10.):** die Zuordnung setzt ein
   MENSCH im Fixture-Editor bzw. -Generator (``FixtureChannel.segment``).
   Zur Laufzeit wird NIE geraten — ``channels_for_axis`` liest nur, was
-  gespeichert ist. Dieses Modul liefert die beiden Hilfen fuer die Eingabe:
+  gespeichert ist. Ohne Eintrag oeffnen die Matrix-Pfade bei
+  ``drive_intensity`` alle freien Dimmer gemeinsam (Etappe 2,
+  ``app_state.weiss_rueckfall_dimmer``) — auch das waehlt nichts aus.
+  Dieses Modul liefert die beiden Hilfen fuer die Eingabe:
 
 * :func:`vorschlag_dimmer_segmente` — ein Vorschlag aus der
   Kanalreihenfolge, aber nur, wenn er EINDEUTIG ist; sonst ``{}``.
@@ -38,8 +41,9 @@ HINWEIS_TEXT = (
     "es in der Spalte „Weiß-Segment“ ein (oder „Vorschlag aus Reihenfolge“). "
     "Im Handbuch steht es meist in der DMX-Tabelle: ein Dimmer, der direkt vor "
     "oder nach einem Weiß-Kanal liegt oder im selben Abschnitt („Zone 2“, "
-    "„Segment 2“) steht, gehört zu diesem Weiß. Ohne Eintrag treibt die Matrix "
-    "diese Dimmer für die Weiß-Segmente nicht."
+    "„Segment 2“) steht, gehört zu diesem Weiß. Ohne Eintrag fährt die Matrix "
+    "(wenn sie die Dimmer fährt) alle freien Dimmer gemeinsam — außer denen "
+    "neben einem reinen Farbteil."
 )
 
 
