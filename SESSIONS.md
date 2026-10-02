@@ -54,7 +54,6 @@
 | DOC-53 | C | - | 2026-10-02T12:26Z | docs/anleitung_hochzeit_komplett · tools/build_hochzeit_komplett.py · tests/test_doc53_hochzeit_linie.py · changelog.d/2026-10-02-DOC-53.md |
 | TOOL-10 | C | - | 2026-10-02T12:28Z | BACKLOG.md |
 | OUT-58 | C | - | 2026-10-02T12:51Z | src/ui/widgets/output_config.py · tests/test_out58_universen_tabelle_nachladen.py · BACKLOG.md · changelog.d/2026-10-02-OUT-58.md |
-| XPLAT-45 | B | ci/xplat45-arm-leg-x64 | 2026-10-02T12:53Z | .github/workflows/ci.yml · tests/test_ci_windows_legs.py · BACKLOG.md |
 | VCB-35 | C | - | 2026-10-02T12:53Z | BACKLOG.md |
 | WEB-06 | C | - | 2026-10-02T12:53Z | BACKLOG.md |
 | BPM-21 | B | fix/bpm21-wasapi-aussetzer | 2026-10-02T12:58Z | src/core/audio/capture.py · src/core/audio/level_meter.py · src/ui/bpm_status_rules.py · src/ui/views/bpm_manager_view.py · tests/test_bpm21_wasapi_aussetzer.py · BACKLOG.md |
@@ -149,7 +148,6 @@
 
 ## Verlauf
 
-- 2026-10-02T12:17Z C claim TOOL-2
 - 2026-10-02T12:23Z C claim DOC-51
 - 2026-10-02T12:24Z C claim DOC-52
 - 2026-10-02T12:24Z A claim VIZ-66
@@ -179,3 +177,4 @@
 - 2026-10-02T21:53Z B claim FUNKTIONSTEST-B3
 - 2026-10-02T22:02Z B claim UI-72
 - 2026-10-02T22:02Z B claim UI-73
+- 2026-10-02T22:03Z B done XPLAT-45
