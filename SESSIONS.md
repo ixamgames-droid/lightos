@@ -45,6 +45,7 @@
 | DOC-43 | C | - | 2026-10-02T11:58Z | docs/anleitung_vc_workflow/ANLEITUNG_VC_WORKFLOW.md |
 | FM-46c | A | feat/fm46-qxf-head | 2026-10-02T11:59Z | - |
 | DOC-44 | C | - | 2026-10-02T12:00Z | docs/anleitung_vc/ANLEITUNG_VC.md |
+| DOC-45 | C | - | 2026-10-02T12:00Z | docs/anleitung_vc_elemente/ANLEITUNG_VC_ELEMENTE.md |
 
 ## Blocker & Fallen
 
@@ -110,7 +111,6 @@
 
 ## Verlauf
 
-- 2026-10-02T09:58Z C claim FM-33
 - 2026-10-02T10:01Z C done FM-55
 - 2026-10-02T10:14Z C claim UI-56
 - 2026-10-02T10:20Z C claim DOC-23
@@ -140,3 +140,4 @@
 - 2026-10-02T11:59Z A aktualisiert FM-46: Branch feat/fm46-dimmer-segment -> feat/fm46-rueckfall
 - 2026-10-02T11:59Z A claim FM-46c
 - 2026-10-02T12:00Z C claim DOC-44
+- 2026-10-02T12:00Z C claim DOC-45
