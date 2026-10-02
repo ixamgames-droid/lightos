@@ -16,6 +16,10 @@ Weiss-Segments nicht treiben und schrieb bewusst nichts (FM-46, Befund C).
   Kanalreihenfolge, aber nur, wenn er EINDEUTIG ist; sonst ``{}``.
 * :func:`zuordnung_fehlt` — soll der Editor den Hinweis zeigen?
 
+Ausnahme mit Quelle statt Mensch (Etappe 3): beim QLC+-Import liefert
+:func:`segmente_aus_heads` die Zuordnung aus den ``<Head>``-Gruppen der
+Datei — nur wenn sie eindeutig ist, und gespeichert wie eine Handeingabe.
+
 Reine Funktionen ohne Qt und ohne DB: Kanaele duerfen ORM-Objekte,
 beliebige Objekte mit ``attribute`` oder die Kanal-Dicts der Editoren sein.
 """
@@ -143,6 +147,64 @@ def vorschlag_dimmer_segmente(channels) -> dict[int, int]:
     if len(verschieden) != 1:
         return {}
     return dict(lesarten[0])
+
+
+def segmente_aus_heads(channels, heads) -> dict[int, int]:
+    """Zuordnung ``{kanal_index: segment}`` aus den Kopf-Gruppen einer QLC+-
+    Datei (``<Mode><Head><Channel>n</Channel>…</Head>``) — FM-46, Etappe 3.
+
+    ``heads`` ist eine Liste von Kanal-Index-Listen (0-basiert, Positionen in
+    ``channels``); die Importer rechnen die ``<Head>``-Nummern vorher auf
+    Positionen um. Anders als :func:`vorschlag_dimmer_segmente` ist das kein
+    Raten aus der Reihenfolge: der Hersteller bzw. der Profil-Autor hat den
+    Dimmer und das Weiss in DENSELBEN Kopf gelegt. Trotzdem gilt „nie raten“ —
+    gesetzt wird nur, was eindeutig ist:
+
+    * nur fuer Modi mit EIGENER Weiss-Achse (:func:`weiss_eigen`) und einem
+      mehrfach vorkommenden Dimmer-Attribut — sonst ``{}``;
+    * Koepfe ohne ``color_w`` zaehlen nicht (Pixel-Koepfe, Motor-Koepfe);
+    * ein Kopf mit genau EINEM Dimmer-Kanal und genau EINEM ``color_w``
+      ordnet diesen Dimmer dem Segment k zu, k = Rang dieses ``color_w``
+      unter allen ``color_w`` des Modus;
+    * mehrdeutig -> fuer die betroffenen Dimmer nichts: mehrere Dimmer oder
+      mehrere Weiss in einem Kopf, ein Dimmer in mehreren Weiss-Koepfen, ein
+      Weiss-Segment, das mehrere Dimmer bekaemen;
+    * eine VORHANDENE Zuordnung bleibt: weder wird ein Dimmer mit Segment
+      ueberschrieben noch ein schon vergebenes Segment ein zweites Mal
+      vergeben (Re-Import, Nachtragen in einer bestehenden Bibliothek).
+    """
+    chans = list(channels or ())
+    attrs = [_attr(c) for c in chans]
+    mehrfach = _mehrfache_dimmer(attrs)
+    if not mehrfach or "color_w" not in attrs or not weiss_eigen(chans):
+        return {}
+    zuordbar = {i for pos in mehrfach.values() for i in pos}
+    weiss = [i for i, a in enumerate(attrs) if a == "color_w"]
+    w_rang = {i: k for k, i in enumerate(weiss)}
+
+    kandidat: dict[int, int] = {}
+    in_koepfen: dict[int, int] = {}
+    for head in heads or ():
+        idx = {i for i in head
+               if isinstance(i, int) and not isinstance(i, bool)
+               and 0 <= i < len(chans)}
+        ws = [i for i in idx if i in w_rang]
+        if not ws:
+            continue
+        ds = [i for i in idx if attrs[i] in DIMMER_ATTRS]
+        for d in ds:
+            in_koepfen[d] = in_koepfen.get(d, 0) + 1
+        if len(ws) == 1 and len(ds) == 1 and ds[0] in zuordbar:
+            kandidat[ds[0]] = w_rang[ws[0]]
+
+    out = {d: s for d, s in kandidat.items() if in_koepfen.get(d) == 1}
+    anzahl: dict[int, int] = {}
+    for s in out.values():
+        anzahl[s] = anzahl.get(s, 0) + 1
+    belegt = {segment_von(chans[i]) for i in zuordbar} - {None}
+    return {d: s for d, s in sorted(out.items())
+            if anzahl[s] == 1 and segment_von(chans[d]) is None
+            and s not in belegt}
 
 
 def weiss_eigen(channels) -> bool:
