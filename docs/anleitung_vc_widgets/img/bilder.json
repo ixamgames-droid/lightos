@@ -1,7 +1,7 @@
 {
   "anleitung": "vc_widgets",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "1ebada4f",
+  "stand": "0ea28210",
   "schrift": "Noto Sans (statt Roboto Condensed)",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py vc_widgets'.",
@@ -38,6 +38,48 @@
       ],
       "marken": [],
       "md5": "7ebaf6e0dbb791af0c465fe52dcdad42"
+    },
+    {
+      "datei": "04_blackout_links_ablauf.gif",
+      "szene": "04_blackout_links_ablauf",
+      "titel": "GIF: „Blackout Links“ drücken und loslassen — DMX-Monitor",
+      "groesse": [
+        1600,
+        325
+      ],
+      "marken": [
+        [],
+        [],
+        []
+      ],
+      "md5": "44fbed44694ba9c0127edce89ebcd6af",
+      "frames": 3,
+      "dauern_ms": [
+        1400,
+        1600,
+        1400
+      ]
+    },
+    {
+      "datei": "05_blackout_links_3d.gif",
+      "szene": "05_blackout_links_3d",
+      "titel": "GIF: „Blackout Links“ im 3D-Visualizer (am echten Bildschirm)",
+      "groesse": [
+        1100,
+        768
+      ],
+      "marken": [
+        [],
+        [],
+        []
+      ],
+      "md5": "4e94cdbc387fb84e4fa82a31238f41e8",
+      "frames": 3,
+      "dauern_ms": [
+        1400,
+        1800,
+        1400
+      ]
     }
   ]
 }
