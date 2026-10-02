@@ -55,7 +55,6 @@
 | FM-56 | A | feat/fm56-eigene-bibliothek | 2026-10-02T12:26Z | fixtures/bibliothek · src/core/database/bibliothek_format.py · src/core/database/fixture_db.py |
 | DOC-53 | C | - | 2026-10-02T12:26Z | docs/anleitung_hochzeit_komplett · tools/build_hochzeit_komplett.py · tests/test_doc53_hochzeit_linie.py · changelog.d/2026-10-02-DOC-53.md |
 | TOOL-10 | C | - | 2026-10-02T12:28Z | BACKLOG.md |
-| FUNKTIONSTEST-B2 | B | - | 2026-10-02T12:42Z | - |
 | XPLAT-42 | B | fix/xplat42-sandbox-aufraeumen | 2026-10-02T12:45Z | tools/anleitungsbilder.py · tools/anleitungsbilder/sandbox.py · tests/test_anleitungsbilder.py · BACKLOG.md |
 | OUT-58 | C | - | 2026-10-02T12:51Z | src/ui/widgets/output_config.py · tests/test_out58_universen_tabelle_nachladen.py · BACKLOG.md · changelog.d/2026-10-02-OUT-58.md |
 | XPLAT-45 | B | ci/xplat45-arm-leg-x64 | 2026-10-02T12:53Z | .github/workflows/ci.yml · tests/test_ci_windows_legs.py · BACKLOG.md |
@@ -139,7 +138,6 @@
 
 ## Verlauf
 
-- 2026-10-02T12:00Z C claim DOC-45
 - 2026-10-02T12:01Z C claim DOC-46
 - 2026-10-02T12:04Z C claim DOC-47
 - 2026-10-02T12:06Z C claim DOC-48
@@ -169,3 +167,4 @@
 - 2026-10-02T13:38Z C done XPLAT-34
 - 2026-10-02T13:50Z C done FM-33
 - 2026-10-02T16:55Z A done TOOL-9
+- 2026-10-02T17:01Z B uebergeben FUNKTIONSTEST-B2
