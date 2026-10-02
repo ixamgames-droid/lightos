@@ -4,7 +4,8 @@
 > (8 PAR + 2 Spider) einsetzen — animierte Farb-Looks, die sich übers Raster bewegen.
 >
 > Show: `shows/Event_Demo_2026.lshow`, **Bank 3 „Matrix-Effekte"** (SCENE-Taste 3). Die Datei
-> liegt nicht im Repo — sie entsteht mit `venv/bin/python tools/build_event_demo_2026.py`.
+> liegt nicht im Repo — sie entsteht mit `./venv/bin/python tools/build_event_demo_2026.py`
+> (Windows: `venv\Scripts\python.exe tools\build_event_demo_2026.py`).
 
 ![Bank 3 Übersicht](img/01_bank3_uebersicht.png)
 
