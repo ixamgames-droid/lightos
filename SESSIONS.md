@@ -19,6 +19,7 @@
 | PROC-18 | A | fix/proc18-fremd-lizenzhinweise | 2026-10-02T08:42Z | THIRD_PARTY_NOTICES.md · src/ui/visualizer/assets/models |
 | XPLAT-44 | C | docs/xplat44-data-cwd | 2026-10-02T09:21Z | BACKLOG.md |
 | XPLAT-34 | C | fix/xplat34-verteilter-sammellauf | 2026-10-02T09:25Z | tools/zeitbomben_gate.py · tests/test_zeitbomben_gate.py · tests/test_xplat34_verteilter_sammellauf.py · BACKLOG.md |
+| FM-53 | C | feat/fm53-bibliothek-download | 2026-10-02T09:29Z | src/core/database/bibliothek_download.py · src/ui/widgets/bibliothek_download_dialog.py · src/ui/main_window.py · main.py · tests/test_fm53_bibliothek_download.py · docs/FIXTURE_SOURCES.md · changelog.d/2026-10-02-FM-53.md |
 
 ## Blocker & Fallen
 
@@ -78,7 +79,6 @@
 
 ## Verlauf
 
-- 2026-10-02T04:45Z 107 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-02T04:53Z C claim TOOL-6
 - 2026-10-02T04:58Z C claim FM-54
 - 2026-10-02T06:52Z A claim PROC-18
@@ -108,3 +108,4 @@
 - 2026-10-02T09:25Z C claim XPLAT-34
 - 2026-10-02T09:26Z A done UI-70
 - 2026-10-02T09:26Z A done TOOL-8
+- 2026-10-02T09:29Z C claim FM-53
