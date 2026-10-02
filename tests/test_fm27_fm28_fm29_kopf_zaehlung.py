@@ -387,15 +387,31 @@ class FM28RawBekommtKeinenKopfReglerTest(_Basis):
     """``raw`` ist der Auffangkorb, keine Kopf-Achse."""
 
     def test_kein_pro_kopf_raw_regler(self):
+        """FM-28: ``raw`` wird nicht auf KOEPFE verteilt. Seit FM-33 steht bei
+        EINEM gewaehlten Geraet je Rohkanal ein Regler da — sein Index ist das
+        VORKOMMEN des Kanals, kein Kopf. Deshalb haengt die Reglermenge nicht
+        von der gewaehlten Kopf-Zelle ab, und jeder Regler nennt genau den
+        Kanal, den sein Schluessel trifft."""
+        from src.core.app_state import channel_occurrence_keys, programmer_key_for_head
         self._patch(1, "SPIIDER", 91)
+        chans = get_channels_for_patched(self._fx(1))
+        namen = {k: c.name for c, k in channel_occurrence_keys(chans)}
+        mengen = set()
         for zelle in ("1:0", "1:2", "1:10", "1:19"):
-            koepfe = [kopf for kopf, _f, _s in self._regler([zelle], "raw")]
-            self.assertEqual(
-                [k for k in koepfe if k is not None], [],
-                f"{zelle}: fuer ``raw`` darf kein Pro-Kopf-Regler entstehen")
+            regler = self._regler([zelle], "raw")
+            koepfe = [kopf for kopf, _f, _s in regler]
             self.assertIn(None, koepfe,
                           f"{zelle}: der geraeteweite raw-Regler muss bleiben — "
                           f"sonst waeren die unerkannten Kanaele unbedienbar")
+            for kopf, _f, s in regler:
+                if kopf is not None:
+                    self.assertEqual(
+                        s._display_name,
+                        namen[programmer_key_for_head(chans, "raw", kopf)],
+                        f"{zelle}: ein raw-Regler nennt den Kanal, den er schreibt")
+            mengen.add(tuple(sorted(k for k in koepfe if k is not None)))
+        self.assertEqual(len(mengen), 1,
+                         "die Kopf-Zelle darf die raw-Regler nicht verteilen")
 
     def test_der_geraeteweite_raw_regler_wirkt_wirklich(self):
         """★ Nicht nur „ist da": er muss auch ankommen — sonst haette FM-28 den

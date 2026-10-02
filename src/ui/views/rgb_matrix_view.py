@@ -479,6 +479,95 @@ class RgbMatrixView(QWidget):
                   "in Kopf-Zellen angesteuert. Das Raster gilt — ändere es im "
                   "Fixture-Gruppen-Editor oder stelle die Mehrkopf-Programmierung um.")
 
+    def weiss_dimmer_hint_text(self, m, by_fid, chans_of=None) -> str:
+        """Hinweis, wenn ein Gerät auf der WEISS-Achse mehrere Dimmer hat, aber
+        keine (vollständige) Zuordnung Dimmer → Weiß-Segment trägt (FM-46,
+        Etappe 2). Dieselbe Prüfung wie im Fixture-Editor
+        (``dimmer_segmente.zuordnung_fehlt`` / ``zuordnung_probleme``).
+
+        Der Wortlaut hängt an ``drive_intensity`` — das hat seit dem Umbau der
+        Bedienelemente KEIN UI mehr (neue Matrizen ``False``, Alt-Shows ohne
+        Schlüssel ``True``), der Nutzer kann es hier also weder sehen noch
+        ändern. Darum sagt der Text, was die Matrix tatsächlich tut:
+
+        * an: ohne Zuordnung fahren alle freien Dimmer gemeinsam
+          (``weiss_rueckfall_dimmer``: keinem anderen Segment, keinem Farbkopf
+          und keinem Farbabschnitt zugehörig);
+        * aus: die Matrix fährt gar keinen Dimmer; die Weiß-Segmente leuchten
+          nur, wenn die Dimmer anderweitig offen sind. Die Zuordnung wirkt dann
+          für Weiß-Regler und Kommandozeile.
+
+        Nur bei Stil RGB/RGBW: unter Dimmer/Shutter fährt die Matrix die
+        Weiß-Achse gar nicht (``_weiss_achse_schreiben`` steigt aus) — dort gibt
+        es nichts zu melden (Review FM-46).
+
+        Reine Funktion der übergebenen Daten (``chans_of`` = Kanal-Auflösung,
+        Vorgabe ``get_channels_for_patched``) -> headless testbar."""
+        stil = getattr(getattr(m, "style", "RGB"), "value", getattr(m, "style", "RGB"))
+        if str(stil) not in ("RGB", "RGBW"):
+            return ""
+        try:
+            from src.core.dimmer_segmente import zuordnung_fehlt, zuordnung_probleme
+            if chans_of is None:
+                from src.core.app_state import get_channels_for_patched as chans_of
+        except Exception:
+            return ""
+        fids: list = []
+        for e in list(getattr(m, "weiss_grid", None) or []):
+            if not isinstance(e, (tuple, list)) or len(e) != 2:
+                continue
+            try:
+                f = int(e[0])
+            except (TypeError, ValueError):
+                continue
+            if f not in fids:
+                fids.append(f)
+        fehlt, unstimmig = [], []
+        for fid in fids:
+            fx = by_fid.get(fid)
+            if fx is None:
+                continue
+            try:
+                chans = list(chans_of(fx) or ())
+            except Exception:
+                continue
+            if zuordnung_fehlt(chans):
+                fehlt.append(self._fixture_label(fx, fid))
+            elif zuordnung_probleme(chans):
+                unstimmig.append(self._fixture_label(fx, fid))
+        if not (fehlt or unstimmig):
+            return ""
+        drive = bool(getattr(m, "drive_intensity", False))
+        ort = "Zuordnung im Fixture-Editor setzen (Spalte „Weiß-Segment“)."
+        zeilen = []
+        if fehlt:
+            wer = ", ".join(fehlt)
+            if drive:
+                zeilen.append(f"⚠ Für {wer} sind die Dimmer keinem Weiß-Segment "
+                              f"zugeordnet — alle freien Dimmer (keinem anderen "
+                              f"Segment und keinem Farbteil zugeordnet) werden "
+                              f"gemeinsam gefahren. {ort}")
+            else:
+                zeilen.append(f"⚠ Für {wer} sind die Dimmer keinem Weiß-Segment "
+                              f"zugeordnet. Diese Matrix fährt keine Dimmer — die "
+                              f"Weiß-Segmente leuchten nur, wenn die Dimmer "
+                              f"anderweitig offen sind (Programmer, Szene). {ort}")
+        if unstimmig:
+            wer = ", ".join(unstimmig)
+            if drive:
+                zeilen.append(f"⚠ Für {wer} ist die Zuordnung Dimmer → Weiß-Segment "
+                              f"unvollständig oder widersprüchlich — Segmente ohne "
+                              f"eigenen Dimmer fahren die freien Dimmer (keinem "
+                              f"anderen Segment und keinem Farbteil zugeordnet) "
+                              f"gemeinsam. "
+                              f"Im Fixture-Editor prüfen (Spalte „Weiß-Segment“).")
+            else:
+                zeilen.append(f"⚠ Für {wer} ist die Zuordnung Dimmer → Weiß-Segment "
+                              f"unvollständig oder widersprüchlich. Diese Matrix "
+                              f"fährt keine Dimmer. Im Fixture-Editor prüfen "
+                              f"(Spalte „Weiß-Segment“).")
+        return "\n".join(zeilen)
+
     def _update_assignment_ui(self):
         """Legende + head_mode-Hinweis an den aktuellen Matrix-Zustand anpassen."""
         legend = getattr(self, "_legend", None)
@@ -512,6 +601,13 @@ class RgbMatrixView(QWidget):
         htxt = self.head_mode_conflict_text(order, by_fid, heads)
         hint.setText(htxt)
         hint.setVisible(bool(htxt))
+        # FM-46 (Etappe 2): fehlende Zuordnung Dimmer -> Weiss-Segment. Auch
+        # unabhaengig vom Overlay — sie entscheidet, welche Dimmer fahren.
+        whint = getattr(self, "_weiss_dimmer_hint", None)
+        if whint is not None:
+            wtxt = self.weiss_dimmer_hint_text(m, by_fid) if m is not None else ""
+            whint.setText(wtxt)
+            whint.setVisible(bool(wtxt))
 
     def _update_group_header(self):
         """Aktualisiert die Kopfzeile ueber der Liste: zeigt im Programmer, fuer
@@ -783,6 +879,14 @@ class RgbMatrixView(QWidget):
         self._head_mode_hint.setStyleSheet("color:#d29922; font-size:10px;")
         self._head_mode_hint.setVisible(False)
         pv_l.addWidget(self._head_mode_hint)
+
+        # FM-46 (Etappe 2): Gerät auf der Weiß-Achse mit mehreren Dimmern ohne
+        # Zuordnung — sagen, was die Matrix dann tut, statt still zu bleiben.
+        self._weiss_dimmer_hint = QLabel("")
+        self._weiss_dimmer_hint.setWordWrap(True)
+        self._weiss_dimmer_hint.setStyleSheet("color:#d29922; font-size:10px;")
+        self._weiss_dimmer_hint.setVisible(False)
+        pv_l.addWidget(self._weiss_dimmer_hint)
 
         top = QHBoxLayout()
         top.addWidget(grp_general, 1)
@@ -1188,6 +1292,9 @@ class RgbMatrixView(QWidget):
         if self._current is not None:
             self._load_params_into_widgets(self._current)
         self._param_change()
+        # FM-46 (Review): der Weiss-Dimmer-Hinweis haengt am Stil (nur RGB/RGBW
+        # fahren die Weiss-Achse) — nach dem Wechsel neu bewerten.
+        self._update_assignment_ui()
 
     def _update_tempo_mode_visibility(self):
         """Blendet die bus-spezifischen Tempo-Regler aus, wenn kein Tempo-Bus
