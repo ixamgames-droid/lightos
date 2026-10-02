@@ -40,6 +40,7 @@
 | DOC-39 | C | - | 2026-10-02T11:09Z | docs/anleitung_3d_visualizer_2026/ANLEITUNG_3D_BUEHNE.md |
 | DOC-40 | C | - | 2026-10-02T11:11Z | docs/anleitung_farbchase/ANLEITUNG_FARBCHASE.md |
 | DOC-41 | C | - | 2026-10-02T11:11Z | docs/anleitung_colorfade_vc/ANLEITUNG_COLORFADE_VC.md |
+| DOC-42 | C | - | 2026-10-02T11:11Z | docs/anleitung_ablaeufe/ANLEITUNG_ABLAEUFE_MISCHEN.md |
 
 ## Blocker & Fallen
 
@@ -104,7 +105,6 @@
 
 ## Verlauf
 
-- 2026-10-02T08:58Z C done QA-68
 - 2026-10-02T09:21Z C claim XPLAT-44
 - 2026-10-02T09:25Z C claim XPLAT-34
 - 2026-10-02T09:26Z A done UI-70
@@ -134,3 +134,4 @@
 - 2026-10-02T11:09Z C claim DOC-39
 - 2026-10-02T11:11Z C claim DOC-40
 - 2026-10-02T11:11Z C claim DOC-41
+- 2026-10-02T11:11Z C claim DOC-42
