@@ -49,6 +49,7 @@
 | DOC-46 | C | - | 2026-10-02T12:01Z | docs/anleitung_vc_smartbuild/ANLEITUNG.md |
 | DOC-47 | C | - | 2026-10-02T12:04Z | docs/anleitung_gruppen_matrizen/ANLEITUNG_GRUPPEN_MATRIZEN.md |
 | DOC-48 | C | - | 2026-10-02T12:06Z | docs/anleitung_testshow_liveedit/ANLEITUNG_TESTSHOW_LIVEEDIT.md |
+| DOC-49 | C | - | 2026-10-02T12:07Z | docs/FARB_FX_VC_SHOW.md |
 
 ## Blocker & Fallen
 
@@ -115,7 +116,6 @@
 
 ## Verlauf
 
-- 2026-10-02T10:21Z C claim DOC-24
 - 2026-10-02T10:23Z C claim DOC-25
 - 2026-10-02T10:24Z C claim DOC-26
 - 2026-10-02T10:33Z C claim ENG-29
@@ -145,3 +145,4 @@
 - 2026-10-02T12:01Z C claim DOC-46
 - 2026-10-02T12:04Z C claim DOC-47
 - 2026-10-02T12:06Z C claim DOC-48
+- 2026-10-02T12:07Z C claim DOC-49
