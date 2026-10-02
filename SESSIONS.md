@@ -16,7 +16,6 @@
 | FM-46 | A | feat/fm46-dimmer-segment | 2026-10-02T07:26Z | src/core/database/models.py · src/core/app_state.py · src/ui/widgets/fixture_editor.py · src/ui/widgets/fixture_generator.py · src/core/database/fixture_db.py |
 | XPLAT-37 | C | fix/xplat37-settle-frame | 2026-10-02T07:37Z | src/ui/visualizer/scene_src/interaction/tools.js · src/ui/visualizer/scene_src/app.js · tests/test_viz14_selection_scene.py · changelog.d/2026-10-02-XPLAT-37.md · BACKLOG.md |
 | FM-55 | C | docs/fm55-fixture-quellen | 2026-10-02T07:39Z | docs/recherche/fixture_quellen_2026-10.md · changelog.d/2026-10-02-FM-55.md · BACKLOG.md |
-| UI-70 | A | fix/ui70-leere-auswahl-programmer | 2026-10-02T07:57Z | src/ui/views/programmer_view.py · tools/anleitungsbilder |
 | TOOL-8 | A | fix/ui70-leere-auswahl-programmer | 2026-10-02T07:57Z | tools/anleitungsbilder |
 | PROC-18 | A | fix/proc18-fremd-lizenzhinweise | 2026-10-02T08:42Z | THIRD_PARTY_NOTICES.md · src/ui/visualizer/assets/models |
 | XPLAT-44 | C | docs/xplat44-data-cwd | 2026-10-02T09:21Z | BACKLOG.md |
@@ -80,7 +79,6 @@
 
 ## Verlauf
 
-- 2026-10-02T00:24Z C done PROC-08
 - 2026-10-02T04:45Z C claim ENG-28
 - 2026-10-02T04:45Z 107 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-02T04:53Z C claim TOOL-6
@@ -110,3 +108,4 @@
 - 2026-10-02T08:58Z C done QA-68
 - 2026-10-02T09:21Z C claim XPLAT-44
 - 2026-10-02T09:25Z C claim XPLAT-34
+- 2026-10-02T09:26Z A done UI-70
