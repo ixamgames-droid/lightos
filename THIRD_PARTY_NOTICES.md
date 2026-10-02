@@ -35,9 +35,3 @@ prüft, dass jede Datei in den unten genannten Ordnern aufgeführt ist.
   - `src/ui/visualizer/three_local.js`
   - `src/ui/visualizer/assets/ColladaLoader.js`, `src/ui/visualizer/assets/OBJLoader.js`
     (aus `examples/js/loaders/`)
-
-## GNU FreeFont — Schrift für das Gource-Werkzeug
-
-- **Datei:** `tools/gource/data/fonts/FreeSans.ttf` (nur Entwickler-Werkzeug, nicht Teil der App).
-- **Lizenz:** GNU GPL v3 mit Font-Ausnahme — Details in
-  [`tools/gource/data/fonts/README.txt`](tools/gource/data/fonts/README.txt), das der Schrift beiliegt.

@@ -22,7 +22,6 @@ FREMD_DATEIEN = [
     "src/ui/visualizer/three_local.js",
     "src/ui/visualizer/assets/ColladaLoader.js",
     "src/ui/visualizer/assets/OBJLoader.js",
-    "tools/gource/data/fonts/FreeSans.ttf",
 ]
 
 
