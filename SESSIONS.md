@@ -27,6 +27,7 @@
 | ENG-29 | C | - | 2026-10-02T10:33Z | BACKLOG.md · docs/befunde/eng29_drive_intensity.md |
 | DOC-27 | C | - | 2026-10-02T10:36Z | docs/anleitung_ausgabe_einrichten/ANLEITUNG.en.md · docs/anleitung_ausgabe_einrichten/ANLEITUNG.md · docs/ANLEITUNGEN.md · changelog.d/2026-10-02-DOC-27.md |
 | DOC-28 | C | - | 2026-10-02T10:36Z | docs/anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.en.md · docs/anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md · docs/ANLEITUNGEN.md · changelog.d/2026-10-02-DOC-28.md |
+| DOC-29 | C | - | 2026-10-02T10:51Z | docs/anleitung_patch_gruppen/ANLEITUNG_PATCH_GRUPPEN.md |
 
 ## Blocker & Fallen
 
@@ -90,7 +91,6 @@
 
 ## Verlauf
 
-- 2026-10-02T07:28Z C done ENG-28
 - 2026-10-02T07:33Z C claim QA-68
 - 2026-10-02T07:37Z C claim XPLAT-37
 - 2026-10-02T07:39Z C claim FM-55
@@ -120,3 +120,4 @@
 - 2026-10-02T10:33Z C claim ENG-29
 - 2026-10-02T10:36Z C claim DOC-27
 - 2026-10-02T10:36Z C claim DOC-28
+- 2026-10-02T10:51Z C claim DOC-29
