@@ -47,6 +47,8 @@ NETZ_LINIE_MIN = 0.5         # Schaerfe der 50/60-Hz-Linie (level_meter.netz_lin
                              # 49,6 Hz 0,501 (Netz driftet real ±0,1 Hz). Blind: Bass-Ton genau 50/60/100/120 Hz.
 JITTER_CHUNK_MS = 70.0       # p95 der Chunk-Abstaende darueber (normal 21–43 ms, Briefing G4)
 JITTER_BACKLOG_MS = 250.0    # Detektor-Rueckstand darueber
+JITTER_LUECKEN = 1           # BPM-21: so viele vom Treiber gemeldete Datenluecken in 10 s (CaptureSnapshot.luecken_10s)
+                             # = AUSSETZER. Schon eine heisst: Audio ging verloren, Beats koennen fehlen.
 DC_MAX = 0.02                # |DC-Offset| darueber = Chip DC (Bank: +0,05 als Stoerfall)
 HALBTEMPO_ALT_SCORE = 0.7    # alt_score ab hier = Doppel-/Halbtempo ist aehnlich plausibel
 KEIN_TAKT_S = 15.0           # so lange Suche MIT Signal ohne Lock = „Kein Takt gefunden" (search_s, BPM-22)
@@ -378,10 +380,15 @@ def _r_jitter(cap, det, m, o, now):
         return None
     p95 = float(_g(cap, "chunk_ms_p95", 0.0))
     back = float(_g(det, "backlog_ms", 0.0))
-    if p95 <= JITTER_CHUNK_MS and back <= JITTER_BACKLOG_MS:
+    luecken = int(_g(cap, "luecken_10s", 0) or 0)
+    if p95 <= JITTER_CHUNK_MS and back <= JITTER_BACKLOG_MS and luecken < JITTER_LUECKEN:
         return None
-    wert = (f"Chunk-Abstand p95 {p95:.0f} ms (normal 21–43)" if p95 > JITTER_CHUNK_MS
-            else f"Rückstand {back:.0f} ms")
+    if luecken >= JITTER_LUECKEN:
+        wert = f"{luecken} Datenlücke{'n' if luecken != 1 else ''} in 10 s (Treiber hat Audio verworfen)"
+    elif p95 > JITTER_CHUNK_MS:
+        wert = f"Chunk-Abstand p95 {p95:.0f} ms (normal 21–43)"
+    else:
+        wert = f"Rückstand {back:.0f} ms"
     return StatusLine(
         "hinweis", "Audio kommt stoßweise (Aussetzer)", wert,
         "Rechner ausgelastet? Andere Programme schließen; Beats bleiben im Takt, kommen aber später",
@@ -717,7 +724,8 @@ def chips(cap_snap, det_snap) -> set[str]:
             out.add("CLIP")
         if _leise(cap_snap):
             out.add("LEISE")
-        if float(_g(cap_snap, "chunk_ms_p95", 0.0)) > JITTER_CHUNK_MS:
+        if (float(_g(cap_snap, "chunk_ms_p95", 0.0)) > JITTER_CHUNK_MS
+                or int(_g(cap_snap, "luecken_10s", 0) or 0) >= JITTER_LUECKEN):
             out.add("JITTER")
         if abs(float(_g(cap_snap, "dc_offset", 0.0))) > DC_MAX:
             out.add("DC")
