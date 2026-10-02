@@ -157,7 +157,10 @@ class FixtureChannel(Base):
     #   waehlen waere in der Haelfte der Faelle der falsche, und zwar stumm.
     #   Wirksam ist nur, was ein Mensch im Fixture-Editor/-Generator gesetzt
     #   hat (Vorschlag aus der Kanalreihenfolge: ``core.dimmer_segmente``).
-    #   Gelesen wird es an GENAU einer Stelle: ``app_state.channels_for_axis``.
+    #   Gelesen wird es in ``app_state.channels_for_axis`` (der zugeordnete
+    #   Dimmer) und im Rueckfall daneben, ``weiss_rueckfall_dimmer`` (FM-46
+    #   Etappe 2: ohne Zuordnung fahren die freien Dimmer gemeinsam; ein
+    #   anderem Segment zugeordneter bleibt diesem).
     #
     # Nullable und ohne Default-Wert, damit eine Alt-DB nach der Migration
     # (``migrate_fixtures_db``) fuer jeden Kanal „keine Zuordnung" traegt.
