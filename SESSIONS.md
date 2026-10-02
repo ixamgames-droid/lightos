@@ -14,7 +14,6 @@
 |---|---|---|---|---|
 | DOC-14 | C | fix/doc14-schaukasten-19 | 2026-10-01T21:37Z | tools/build_vc_widgets_showcase.py · docs/anleitung_vc_widgets/README.md · docs/anleitung_vc_widgets/_capture/geometry.json · tests/test_doc14_schaukasten_alle_typen.py · changelog.d/2026-10-02-DOC-14.md |
 | XPLAT-44 | C | docs/xplat44-data-cwd | 2026-10-02T09:21Z | BACKLOG.md |
-| FM-53 | C | feat/fm53-bibliothek-download | 2026-10-02T09:29Z | src/core/database/bibliothek_download.py · src/ui/widgets/bibliothek_download_dialog.py · src/ui/main_window.py · main.py · tests/test_fm53_bibliothek_download.py · docs/FIXTURE_SOURCES.md · changelog.d/2026-10-02-FM-53.md |
 | UI-56 | C | - | 2026-10-02T10:14Z | src/core/attr_groups.py · src/ui/views/snap_file_panel.py · docs/anleitung_szenen_cues/ANLEITUNG.md · tests/test_ui56_optik.py · BACKLOG.md |
 | DOC-23 | C | - | 2026-10-02T10:20Z | docs/anleitung_erste_schritte/ANLEITUNG.en.md · docs/anleitung_erste_schritte/ANLEITUNG.md · docs/ANLEITUNGEN.md · changelog.d/2026-10-02-DOC-23.md |
 | DOC-24 | C | - | 2026-10-02T10:21Z | docs/anleitung_programmer_grundlagen/ANLEITUNG.en.md · docs/anleitung_programmer_grundlagen/ANLEITUNG.md · docs/ANLEITUNGEN.md · changelog.d/2026-10-02-DOC-24.md |
@@ -156,7 +155,6 @@
 
 ## Verlauf
 
-- 2026-10-02T12:53Z B claim XPLAT-45
 - 2026-10-02T12:53Z C claim VCB-35
 - 2026-10-02T12:53Z C claim WEB-06
 - 2026-10-02T12:58Z B claim BPM-21
@@ -186,3 +184,4 @@
 - 2026-10-02T22:24Z A claim FM-59
 - 2026-10-02T22:32Z A done FM-57
 - 2026-10-02T22:44Z B claim UI-72-73-FIX
+- 2026-10-02T22:45Z C done FM-53
