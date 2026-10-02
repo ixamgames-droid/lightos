@@ -138,6 +138,21 @@ def naechste_freie(je_zweig: dict, gruppe: str) -> int:
     return hoechste + 1
 
 
+def ids_aus_text(text: str) -> set:
+    """Alle Item-IDs (``FM-46``, ``DOC-23`` …) in einem freien Text.
+
+    TOOL-9: Fuer Quellen ohne BACKLOG-Tabelle — die Belegungstafel und die
+    Changelog-Fragmente. Dort steht eine ID oft LANGE bevor ihre BACKLOG-Zeile
+    landet (Sitzung C belegte am 02.10. DOC-23 … DOC-50 auf der Tafel; im
+    BACKLOG stand keine davon, und das Werkzeug bot ``DOC-22`` an, obwohl A sie
+    schon gemergt hatte)."""
+    return {m.group(0) for m in _ID_IM_TEXT.finditer(text or "")
+            if zerlege(m.group(0))}
+
+
+_ID_IM_TEXT = re.compile(r"\b[A-Z][A-Z0-9]*-\d+\b")
+
+
 # ── Alles ab hier redet mit git ──────────────────────────────────────────────
 
 def _git(*args: str) -> tuple[int, str]:
@@ -187,6 +202,20 @@ def backlog_je_zweig(refs: list) -> dict:
     return je_zweig
 
 
+def weitere_belegte_ids(refs: list) -> set:
+    """IDs von der Belegungstafel (``origin/sessions:SESSIONS.md``, inkl.
+    Verlauf) und aus den Dateinamen unter ``changelog.d/`` jedes Refs."""
+    ids: set = set()
+    rc, text = _git("show", "origin/sessions:SESSIONS.md")
+    if rc == 0:
+        ids |= ids_aus_text(text)
+    for ref in refs:
+        rc, out = _git("ls-tree", "--name-only", f"{ref}:changelog.d")
+        if rc == 0:
+            ids |= ids_aus_text(out)
+    return ids
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--gruppe", help="Praefix, z. B. FM oder PROC")
@@ -231,6 +260,10 @@ def main(argv=None) -> int:
         refs = ["origin/main"] + [f"origin/{b}" for b in zweige]
 
     je_zweig = backlog_je_zweig(refs)
+    # TOOL-9: Nummern, die nur auf der Tafel oder in einem Changelog-Fragment
+    # stehen, sind ebenfalls vergeben. Sie zaehlen NUR fuer die naechste freie
+    # Nummer, nicht fuer die Titel-Kollisionen (dort gibt es keinen Titel).
+    belegt = weitere_belegte_ids(refs)
     # ★ CDX-57: ein Ref, das nicht lesbar ist, wurde bisher still uebersprungen —
     # das Werkzeug behauptete dann Abdeckung, die es nicht hatte.
     fehlend = [r for r in refs if r not in je_zweig]
@@ -274,7 +307,8 @@ def main(argv=None) -> int:
                   "lueckenhafter Abdeckung koennte auf einem ungelesenen Zweig "
                   "laengst vergeben sein.")
         else:
-            n = naechste_freie(je_zweig, args.gruppe)
+            n = naechste_freie({**je_zweig, "(Tafel/Fragmente)":
+                                dict.fromkeys(belegt, "")}, args.gruppe)
             print(f"\n[ids] naechste freie Nummer der Gruppe {args.gruppe}: "
                   f"{args.gruppe}-{n}")
     if luecken:
