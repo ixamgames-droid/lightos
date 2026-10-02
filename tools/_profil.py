@@ -32,7 +32,8 @@ def profil_id(hersteller: str, modell: str, *, modus: str | None = None,
     from sqlalchemy.orm import Session
 
     from src.core.database.fixture_db import engine
-    from src.core.database.models import FixtureMode, FixtureProfile, Manufacturer
+    from src.core.database.models import (FixtureMode, FixtureProfile, Manufacturer,
+                                          MITGELIEFERT_QUELLEN)
 
     geraet = f"{hersteller} / {modell}"
     with Session(engine()) as s:
@@ -40,7 +41,9 @@ def profil_id(hersteller: str, modell: str, *, modus: str | None = None,
             select(FixtureProfile.id)
             .join(Manufacturer, FixtureProfile.manufacturer_id == Manufacturer.id)
             .where(Manufacturer.name == hersteller, FixtureProfile.name == modell)
-            .order_by(FixtureProfile.source != "builtin", FixtureProfile.id)
+            # FM-56: `lightos` (eigene Bibliothek) zaehlt wie builtin.
+            .order_by(FixtureProfile.source.not_in(MITGELIEFERT_QUELLEN),
+                      FixtureProfile.id)
         ).scalars().all()
         if not treffer:
             raise SystemExit(
