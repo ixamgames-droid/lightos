@@ -223,5 +223,54 @@ class AbdeckungTest(unittest.TestCase):
         self.assertGreaterEqual(_PR_LIMIT, 200)
 
 
+class TafelUndFragmenteTest(unittest.TestCase):
+    """TOOL-9: Nummern, die nur auf der Tafel oder in einem Changelog-Fragment
+    stehen, gelten als vergeben (02.10.: Tafel hatte DOC-23..50, das Werkzeug
+    bot DOC-22 an, die A schon gemergt hatte)."""
+
+    def test_ids_aus_tafeltext(self):
+        import backlog_ids as B
+        text = ("DOC-43           C    -   seit 2026-10-02\n"
+                "  - (C) C AN A — Stand: NEU #869 DOC-23, FM-33 fertig")
+        self.assertEqual(B.ids_aus_text(text), {"DOC-43", "DOC-23", "FM-33"})
+
+    def test_ids_aus_fragment_dateinamen(self):
+        import backlog_ids as B
+        self.assertEqual(B.ids_aus_text("2026-10-02-DOC-22.md\nREADME.md\n"),
+                         {"DOC-22"})
+
+    def test_belegte_ids_heben_die_naechste_freie(self):
+        nur_backlog = {"origin/main": {"DOC-21": "x"}}
+        self.assertEqual(naechste_freie(nur_backlog, "DOC"), 22)
+        mit_tafel = {**nur_backlog,
+                     "(Tafel/Fragmente)": dict.fromkeys({"DOC-22", "DOC-50"}, "")}
+        self.assertEqual(naechste_freie(mit_tafel, "DOC"), 51)
+
+    def test_main_nutzt_die_weiteren_quellen(self):
+        import backlog_ids as B
+        orig = (B._git, B.offene_pr_zweige)
+        tabelle_main = tabelle("| DOC-21 | P3 | todo | **T** | d |")
+
+        def git(*args):
+            if args[:1] == ("show",) and args[1].endswith(":BACKLOG.md"):
+                return 0, tabelle_main
+            if args[:1] == ("show",) and "SESSIONS.md" in args[1]:
+                return 0, "DOC-43  C  -  seit 2026-10-02"
+            if args[:1] == ("ls-tree",):
+                return 0, "2026-10-02-DOC-22.md\n"
+            return 0, ""
+        B._git = git
+        B.offene_pr_zweige = lambda: ([], None)
+        try:
+            import io
+            from contextlib import redirect_stdout
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                B.main(["--gruppe", "DOC", "--kein-fetch"])
+        finally:
+            B._git, B.offene_pr_zweige = orig
+        self.assertIn("DOC-44", buf.getvalue())
+
+
 if __name__ == "__main__":
     unittest.main()

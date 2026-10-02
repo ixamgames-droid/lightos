@@ -61,6 +61,19 @@ Dimmer-Packs mit vier Dimmern. Jeder dieser Kanäle bekommt einen **eigenen Regl
 Namen aus dem Profil („Gobo 1", „Gobo 2", „Gobo 2 Rotation"). Die Kacheln oben beziehen
 sich auf den ersten Kanal; den zweiten stellst du am Regler ein.
 
+**Unerkannte Kanäle.** Kanäle, denen das Profil keine Funktion zuordnet (etwa „Grundfarbe
+Shutter" oder „Zoom Fein" am Spiider), stehen im Reiter **Weitere**:
+
+- Ist **genau ein Gerät** gewählt, hat jeder dieser Kanäle einen eigenen Regler mit seinem
+  Namen aus dem Profil. Sind es mehr als 8, liegen sie in der eingeklappten Sektion
+  **Einzelne Kanäle (N)** — ein Klick klappt sie auf.
+- Darüber steht der Regler **Unerkannte Kanäle (N)**: er setzt alle diese Kanäle auf
+  denselben Wert, auch die vorher einzeln eingestellten.
+- Sind **mehrere Geräte** gewählt, gibt es nur diesen Sammelregler. Derselbe Platz in der
+  Kanalliste ist dort je Gerät eine andere Funktion — ein Einzelregler mit dem Namen des
+  einen Geräts würde am anderen etwas Fremdes verstellen.
+- Hat ein Gerät nur einen unerkannten Kanal, steht dort genau ein Regler mit dessen Namen.
+
 ## 4. Mehrkopf-Geräte und Pixel-Balken
 
 ![Farbe am Mehrkopf-Mover](img/05_mehrkopf_farbe.png)
