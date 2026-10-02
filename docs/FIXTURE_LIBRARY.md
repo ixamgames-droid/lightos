@@ -109,8 +109,9 @@ Hat ein Gerät eine **eigene Weiß-Leiste** (mehr oder weniger `color_w`- als
 `color_r`-Kanäle) und **mehrere Dimmer**, steht in der Kanalliste nicht, welcher
 Dimmer welches Weiß-Segment dimmt. LightOS rät das zur Laufzeit **nie** — ein
 falsch geratener Dimmer ließe ein Segment dunkel oder dimmte das falsche, ohne
-dass es jemand merkt. Ohne Angabe treibt die Matrix diese Dimmer für die
-Weiß-Segmente deshalb nicht (sie dimmt das Weiß dann selbst, FM-54).
+dass es jemand merkt. Ohne Angabe wählt die Matrix deshalb keinen einzelnen
+Dimmer aus, sondern fährt bei „Dimmer mit treiben“ **alle gemeinsam** (FM-46,
+Etappe 2 — siehe unten „Ohne Zuordnung“).
 
 Die Angabe macht man im **Fixture-Editor** oder im **Fixture-Generator**, Spalte
 **„Weiß-Segment“** der Kanaltabelle (`FixtureChannel.segment`):
@@ -147,7 +148,61 @@ Matrix bei „Dimmer mit treiben“ genau den eingetragenen Dimmer auf (derselbe
 Weg gilt für Muster-Chaser, Weiß-Regler und Kommandozeile). Ein einzelner
 Dimmer braucht keine Angabe: er gilt als gemeinsamer Master und fährt ohnehin
 mit. Ältere Bibliotheken bekommen die Spalte beim Start automatisch, ohne
-Zuordnung. Der QLC+-Import kann sie nicht ableiten.
+Zuordnung.
+
+**Beim QLC+-Import** (Bibliothek und „QLC+ importieren“ im Generator) wird die
+Zuordnung aus den Kopf-Gruppen der `.qxf` gelesen (`<Head>` je Modus) — aber nur,
+wenn die Datei sie eindeutig sagt:
+
+- Ein Kopf mit **genau einem** Dimmer und **genau einem** Weiß-Kanal ordnet
+  diesen Dimmer dem Segment dieses Weiß zu (n-tes Weiß in Kanalreihenfolge).
+- Köpfe ohne Weiß zählen nicht. Mehrere Dimmer oder mehrere Weiß in einem Kopf,
+  ein Dimmer in mehreren Weiß-Köpfen (typisch: ein Master-Dimmer, den die Datei
+  in jeden Kopf legt) oder ein Segment, das mehrere Dimmer bekämen, ergeben für
+  diese Dimmer **keine** Zuordnung.
+- Nur Modi mit eigener Weiß-Leiste und mehreren Dimmern; eine schon gespeicherte
+  Zuordnung wird nicht überschrieben.
+
+Gemessen an den QLC+-Dateien der 26 betroffenen Modi einer großen Bibliothek
+bekommen 13 so eine Zuordnung; bei den übrigen sagt die Datei es nicht (keine
+Köpfe, Dimmer außerhalb der Köpfe oder in mehreren). Dort bleibt der Hinweis
+im Editor stehen. Bereits importierte Profile ändern sich nicht von selbst,
+und ein erneuter Bibliotheks-Import hilft nicht: er überspringt ein Profil,
+dessen Hersteller und Modell schon in der Bibliothek stehen. Für ein solches
+Profil trägt man die Zuordnung im **Fixture-Editor** ein. („QLC+ importieren“
+im Generator liest sie zwar mit, legt beim Speichern aber ein **zusätzliches**
+eigenes Profil an — das vorhandene und die damit gepatchten Geräte bleiben, wie
+sie sind.)
+
+**Ohne Zuordnung (FM-46, Etappe 2).** Die Matrix soll möglichst immer leuchten,
+und ein Hinweis ist besser als ein stumm dunkles Segment:
+
+- Fährt die Matrix die Dimmer („Dimmer mit treiben“), zieht ein Weiß-Feld ohne
+  gültige Zuordnung **alle freien** Vorkommen des Dimmers auf
+  (`app_state.weiss_rueckfall_dimmer`). Nicht frei ist ein Dimmer, der einem
+  *anderen* Weiß-Segment zugeordnet ist, laut Kopf-Karte einem Farbkopf gehört
+  oder an einen **reinen Farbabschnitt** grenzt: die Kanalliste wird an den
+  Dimmern in Abschnitte geteilt, und ein Dimmer direkt vor oder hinter einem
+  Abschnitt mit R/G/B, aber ohne Weiß (RGB-Ring, Pixelsektion) könnte einen
+  Farbteil aufleuchten lassen. Liegt das Weiß selbst in einem RGBW-Abschnitt,
+  fahren nur die Dimmer an genau diesem Abschnitt. Leitsatz: lieber ein Segment
+  zu wenig öffnen als einen fremden Teil — ein Master direkt vor einer
+  Pixelsektion fährt deshalb ebenfalls nicht. Das ist kein Raten: es wird nicht
+  *ein* Dimmer als „der richtige“ gewählt, sondern bewusst alle freien geöffnet.
+  Die Helligkeit trägt der Weiß-Kanal, die Intensität der Matrix wirkt über die
+  Dimmer (der Merge skaliert alle Dimmer-Adressen) — nicht doppelt. Teilweise
+  Zuordnung: ein Segment mit eigenem Dimmer fährt nur diesen, die übrigen
+  Segmente teilen sich die freien. Ein Segment, das mehreren Dimmern zugeordnet
+  ist, fährt sie alle.
+- Fährt die Matrix die Dimmer nicht, bleibt alles wie bisher: die Dimmer gehören
+  dem Nutzer. ⚠️ Das ist seit dem Umbau der Bedienelemente der Normalfall für
+  **neue** Matrizen (`drive_intensity` hat kein Bedienelement mehr, neue
+  Matrizen stehen auf aus, Matrizen aus älteren Shows ohne den Schlüssel auf an).
+- Der **RGB-Matrix-Editor** zeigt unter der Vorschau einen Hinweis, sobald ein
+  Gerät auf der Weiß-Achse liegt und die Zuordnung fehlt oder unstimmig ist —
+  mit dem Wortlaut passend zu dem, was die Matrix tatsächlich tut.
+  `tools/lint_show.py` meldet denselben Fall als Warnung
+  `WEISS-DIMMER-ZUORDNUNG`.
 
 ## 2. Woher Profile kommen
 
@@ -165,6 +220,55 @@ Zuordnung. Der QLC+-Import kann sie nicht ableiten.
    `source != "builtin"` — werden von ensure_builtins nie angefasst).
 4. **Beispiel-Skripte** (`examples/add_zq0*.py`) — delegieren inzwischen an
    `ensure_builtins()`, die Definition lebt nur noch an einer Stelle.
+5. **Eigene Bibliothek** (`fixtures/bibliothek/*.json`, `source = "lightos"`) — siehe
+   „Eigene Bibliothek (LightOS-Profile)“ unten.
+
+### Eigene Bibliothek (LightOS-Profile)
+
+Seit FM-56 können mitgelieferte Geräte als **Datei** statt als Python-Tupel vorliegen:
+eine JSON-Datei je Gerät unter `fixtures/bibliothek/<hersteller>/<modell>.json`. Das
+Format („LightOS-Profil“) ist in [`fixtures/bibliothek/SCHEMA.md`](../fixtures/bibliothek/SCHEMA.md)
+beschrieben; Prüfung und Einspielen stehen in `src/core/database/bibliothek_format.py`.
+
+- **Herkunft ist Pflicht.** Jede Datei trägt `quelle` (Handbuch-Titel/Version/Datum/URL)
+  und `herkunft` (`art`: `lightos` · `hersteller-handbuch` · `qlcplus` · `ofl`, mit
+  `lizenz`). Umgebaute QLC+- (Apache-2.0) und OFL-Profile (MIT) nennen zusätzlich
+  Urheber, Originaldatei und die Änderungen; die Lizenztexte deckt der Abschnitt
+  „Geräte-Bibliothek“ in `THIRD_PARTY_NOTICES.md`.
+- **Einspielen:** `ensure_builtins()` spielt die Dateien mit `source = "lightos"` ein —
+  je Datei nur, wenn sie neu ist, sich geändert hat oder ihr Profil in der DB fehlt
+  (Stempel je Datei in `bibliothek_stempel`). Eine kaputte Datei bricht den Start nie ab.
+  Neu → anlegen; geändert → Kopf und Modi aus der Datei neu aufbauen, die Profil-ID
+  bleibt; ungültig → gemeldet und übersprungen. Gibt es Hersteller + Modell schon mit
+  anderer Herkunft (Builtin, eigenes Profil, QLC+-Import), bleibt die Datei draußen —
+  sonst stünde das Gerät doppelt in der Bibliothek (FM-43). `user`- und
+  `qlcplus`-Profile werden nie angefasst.
+- **Die Herkunft geht nie verloren.** Beim Einspielen und beim Import einer Datei
+  steht die vollständige Herkunft (quelle, herkunft, geprueft, autor) auch in der DB
+  (`FixtureProfile.herkunft`, JSON). Der Export — Werkzeug wie Editor — liest sie von
+  dort; ein QLC+-Import bleibt Apache-2.0, ein im Editor bearbeitetes fremdes Profil
+  bekommt den Vermerk in `geaendert`. Lässt sich die Herkunft nicht belegen, bricht
+  der Export ab, statt „eigen“ einzutragen.
+- **`lightos` zählt wie `builtin`** überall, wo „mitgeliefert vor importiert“ entschieden
+  wird: Show-Laden bei nicht passender ID (FM-43), Showbuilder, `tools/_profil.py`,
+  Dubletten-Meldung (QA-68). Die Konstante dafür ist `models.MITGELIEFERT_QUELLEN`.
+  Der FM-50-Abgleich und die Signatur-Migrationen bleiben bei `builtin` — die Dateien
+  haben ihren eigenen Abgleich.
+- **Eigene Profile im eigenen Format:** Fixture-Editor → „Als LightOS-Profil
+  exportieren…“ / „LightOS-Profil importieren…“ (Import legt ein eigenes Profil,
+  `source = "user"`, an). Dasselbe auf der Kommandozeile:
+  `tools/bibliothek_profil.py export|import`.
+- **QLC+-Datei umbauen:** `tools/bibliothek_profil.py qxf <datei.qxf> --bibliothek` —
+  läuft über den vorhandenen QXF-Import (Attribute, Bereichs-Arten, Rasterform,
+  Weiß-Segmente aus `<Head>`) und setzt `herkunft` selbst. Ein OFL-Konverter ist
+  vorgesehen (`ofl_zu_daten`), aber noch nicht gebaut.
+- **Prüfen:** `tools/bibliothek_profil.py pruefen`; Wächter-Test
+  `tests/test_fm56_bibliothek_waechter.py`.
+- **Builtins bleiben vorerst Tupel.** Der Round-trip Tupel → Datei → DB ist für alle
+  eingebauten Profile feldgleich nachgewiesen (`tests/test_fm56_bibliothek_format.py`);
+  die Überführung selbst ist ein eigener Schritt, weil sie bestehende Installationen von
+  `builtin` auf `lightos` umstellen muss. Bis dahin liegen drei Muster unter
+  `fixtures/bibliothek/_beispiele/` (werden nicht eingespielt).
 
 ## 3. Modi sauber abbilden
 
