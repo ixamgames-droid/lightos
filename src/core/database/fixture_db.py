@@ -3584,9 +3584,17 @@ def ensure_builtins():
             # FM-56: die eigene Bibliothek (fixtures/bibliothek/*.json) als
             # source='lightos'. Einmal je Engine, und auch dann nur, wenn sich
             # eine Datei seit dem letzten Lauf in dieser DB geaendert hat.
+            # Review FM-56: eine kaputte Datei darf den Start nie abbrechen —
+            # `einspielen` verbucht Fehler je Datei; das hier ist das Netz
+            # fuer alles darueber (Stempel-Tabelle, Dateisystem).
             from .bibliothek_format import einspielen_wenn_noetig
-            if einspielen_wenn_noetig(s):
-                changed = True
+            try:
+                with s.begin_nested():
+                    if einspielen_wenn_noetig(s):
+                        changed = True
+            except Exception as e:
+                print(f"[fixture_db] Geraete-Bibliothek nicht eingespielt: "
+                      f"{type(e).__name__}: {e}")
         if changed:
             s.commit()
 

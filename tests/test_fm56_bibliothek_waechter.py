@@ -56,8 +56,12 @@ class BibliothekWaechterTest(unittest.TestCase):
         self.assertIn("licenses/Apache-2.0.txt", abschnitt)
         self.assertIn("fixtures/bibliothek", abschnitt)
         lizenzen = {d["herkunft"]["lizenz"] for d in self.daten.values()}
-        if "Apache-2.0" in lizenzen:
-            self.assertTrue((ROOT / "licenses" / "Apache-2.0.txt").is_file())
+        # Unbedingt, nicht erst mit der ersten QLC+-Datei: der Konverter
+        # (`bibliothek_profil.py qxf`) erzeugt Apache-2.0-Profile, und der
+        # Abschnitt verweist auf den Text. Faellt er weg (z. B. weil keine
+        # QLC+-3D-Modelle mehr mitkommen), muss das hier auffallen.
+        self.assertTrue((ROOT / "licenses" / "Apache-2.0.txt").is_file(),
+                        "licenses/Apache-2.0.txt fehlt — die Geraete-Bibliothek braucht ihn")
         if "MIT" in lizenzen:
             links = re.findall(r"licenses/[\w.-]+", abschnitt)
             ofl = [l for l in links if "ofl" in l.lower() or "open-fixture" in l.lower()]

@@ -198,8 +198,9 @@ class RoundTripTest(unittest.TestCase, _TempBibliothek):
                                    .where(FixtureProfile.source == source)):
                     p = BF._profil_laden(s, p.id)
                     form = BF._vergleichsform(p)
-                    # provenance (Index 6) sagt beim lightos-Profil „LightOS-Profil v1“
-                    out[p.short_name] = (p.manufacturer.name,) + form[:6] + form[7:]
+                    # provenance/herkunft (Index 6/7) beschreiben beim lightos-
+                    # Profil die Datei — beim Builtin sind sie leer
+                    out[p.short_name] = (p.manufacturer.name,) + form[:6] + form[8:]
                 return out
 
         self.assertEqual(alle(ziel, "lightos"), alle(quelle, "builtin"))
@@ -276,9 +277,12 @@ class EinspielenTest(unittest.TestCase, _TempBibliothek):
             s.commit()
         self._spielen(self._bib(_minimal()))
         p = self._profile()
-        self.assertEqual([x[1] for x in p], ["user", "qlcplus", "lightos"])
+        # Review FM-56: daneben wird auch KEIN lightos-Profil angelegt
+        # (Dublette, FM-43) — die Datei ist verdeckt.
+        self.assertEqual([x[1] for x in p], ["user", "qlcplus"])
         self.assertEqual(p[0][2], [])          # Nutzerprofil: keine Modi dazu
         self.assertEqual(p[1][2], [])
+        self.assertEqual(BF.LETZTES_EINSPIELEN["verdeckt"], ["Testwerk / Par 7"])
 
     def test_builtin_verdeckt_die_datei(self):
         with Session(self.eng) as s:
@@ -473,7 +477,8 @@ class WerkzeugTest(unittest.TestCase):
         with open(ziel, encoding="utf-8") as fh:
             d = json.load(fh)
         self.assertEqual(d["modi"][0]["name"], "5-Kanal")
-        self.assertEqual(d["herkunft"], {"art": "lightos", "lizenz": "eigen"})
+        # Review FM-56: die Herkunft der importierten Datei bleibt erhalten
+        self.assertEqual(d["herkunft"], _minimal()["herkunft"])
 
 
 if __name__ == "__main__":

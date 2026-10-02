@@ -236,11 +236,19 @@ beschrieben; Prüfung und Einspielen stehen in `src/core/database/bibliothek_for
   Urheber, Originaldatei und die Änderungen; die Lizenztexte deckt der Abschnitt
   „Geräte-Bibliothek“ in `THIRD_PARTY_NOTICES.md`.
 - **Einspielen:** `ensure_builtins()` spielt die Dateien mit `source = "lightos"` ein —
-  nur wenn sich seit dem letzten Lauf etwas geändert hat (Stempel `bibliothek_stand`).
+  je Datei nur, wenn sie neu ist, sich geändert hat oder ihr Profil in der DB fehlt
+  (Stempel je Datei in `bibliothek_stempel`). Eine kaputte Datei bricht den Start nie ab.
   Neu → anlegen; geändert → Kopf und Modi aus der Datei neu aufbauen, die Profil-ID
-  bleibt; ungültig → gemeldet und übersprungen. Gibt es Hersteller + Modell schon als
-  Builtin, bleibt die Datei draußen (sonst stünde das Gerät doppelt als mitgeliefert da).
-  `user`- und `qlcplus`-Profile werden nie angefasst.
+  bleibt; ungültig → gemeldet und übersprungen. Gibt es Hersteller + Modell schon mit
+  anderer Herkunft (Builtin, eigenes Profil, QLC+-Import), bleibt die Datei draußen —
+  sonst stünde das Gerät doppelt in der Bibliothek (FM-43). `user`- und
+  `qlcplus`-Profile werden nie angefasst.
+- **Die Herkunft geht nie verloren.** Beim Einspielen und beim Import einer Datei
+  steht die vollständige Herkunft (quelle, herkunft, geprueft, autor) auch in der DB
+  (`FixtureProfile.herkunft`, JSON). Der Export — Werkzeug wie Editor — liest sie von
+  dort; ein QLC+-Import bleibt Apache-2.0, ein im Editor bearbeitetes fremdes Profil
+  bekommt den Vermerk in `geaendert`. Lässt sich die Herkunft nicht belegen, bricht
+  der Export ab, statt „eigen“ einzutragen.
 - **`lightos` zählt wie `builtin`** überall, wo „mitgeliefert vor importiert“ entschieden
   wird: Show-Laden bei nicht passender ID (FM-43), Showbuilder, `tools/_profil.py`,
   Dubletten-Meldung (QA-68). Die Konstante dafür ist `models.MITGELIEFERT_QUELLEN`.

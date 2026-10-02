@@ -54,6 +54,9 @@ class EditorLightosProfilTest(unittest.TestCase):
                               side_effect=lambda *a, **k: self.warnungen.append(a[2]))
         w.start()
         self.addCleanup(w.stop)
+        i = mock.patch.object(QMessageBox, "information")
+        i.start()
+        self.addCleanup(i.stop)
 
     def _dialog(self):
         dlg = editor_module.FixtureEditorDialog()

@@ -28,6 +28,7 @@ Was hier steht:
 """
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import os
@@ -185,6 +186,13 @@ def dateiname(hersteller: str, modell: str) -> str:
 
 # ── Pruefen ──────────────────────────────────────────────────────────────────
 
+def _in(v, menge) -> bool:
+    """``v in menge`` — aber nur fuer Texte. Eine Liste oder ein Objekt an
+    dieser Stelle waere sonst ein TypeError (nicht hashbar), und eine einzige
+    kaputte Datei braeche ``ensure_builtins`` beim Start ab."""
+    return isinstance(v, str) and v in menge
+
+
 def _ist_int(v) -> bool:
     return isinstance(v, int) and not isinstance(v, bool)
 
@@ -237,7 +245,7 @@ def pruefe(daten, datei: str = "") -> list[str]:
         hk = daten["hersteller_kurz"]
         if not isinstance(hk, str) or not hk.strip() or len(hk) > 20:
             out.append(f"{p}hersteller_kurz: Text mit 1..20 Zeichen erwartet")
-    if daten.get("typ") not in TYPEN:
+    if not _in(daten.get("typ"), TYPEN):
         out.append(f"{p}typ: unbekannt {daten.get('typ')!r} "
                    f"(erlaubt: {', '.join(TYPEN)})")
     lw = daten.get("leistung_w", 0)
@@ -266,10 +274,10 @@ def pruefe(daten, datei: str = "") -> list[str]:
         else:
             _unbekannt(h, _HERKUNFT_FELDER, f"{p}herkunft.", out)
             art = h.get("art")
-            if art not in HERKUNFT_ARTEN:
+            if not _in(art, HERKUNFT_ARTEN):
                 out.append(f"{p}herkunft.art: unbekannt {art!r} "
                            f"(erlaubt: {', '.join(HERKUNFT_ARTEN)})")
-            elif h.get("lizenz") not in HERKUNFT_ARTEN[art]:
+            elif not _in(h.get("lizenz"), HERKUNFT_ARTEN[art]):
                 out.append(f"{p}herkunft.lizenz: bei art {art!r} nur "
                            f"{' / '.join(HERKUNFT_ARTEN[art])} (ist {h.get('lizenz')!r})")
             if art in FREMD_ARTEN:
@@ -324,7 +332,7 @@ def pruefe(daten, datei: str = "") -> list[str]:
                 continue
             _unbekannt(c, _KANAL_FELDER, wk + ".", out)
             _text_pflicht(c, "name", wk + ".", out, 80)
-            if c.get("attribut") not in ATTRIBUTE:
+            if not _in(c.get("attribut"), ATTRIBUTE):
                 out.append(f"{wk}.attribut: unbekannt {c.get('attribut')!r} "
                            f"(Liste in SCHEMA.md)")
             for f in ("default", "highlight"):
@@ -333,14 +341,15 @@ def pruefe(daten, datei: str = "") -> list[str]:
                     out.append(f"{wk}.{f}: Pflichtfeld, ganze Zahl 0..255 (ist {v!r})")
             if "invert" in c and not isinstance(c["invert"], bool):
                 out.append(f"{wk}.invert: true/false erwartet")
-            if "aufloesung" in c and c["aufloesung"] not in AUFLOESUNGEN:
+            if "aufloesung" in c and not _in(c["aufloesung"], AUFLOESUNGEN):
                 out.append(f"{wk}.aufloesung: {' / '.join(AUFLOESUNGEN)} erwartet")
             if "segment" in c:
                 s = c["segment"]
                 if not _ist_int(s) or s < 0:
                     out.append(f"{wk}.segment: ganze Zahl >= 0 erwartet (0 = erstes "
                                f"Weiss-Segment)")
-                elif not ist_dimmer(c.get("attribut")):
+                elif not (isinstance(c.get("attribut"), str)
+                          and ist_dimmer(c["attribut"])):
                     out.append(f"{wk}.segment: nur an Dimmer-Kanaelen erlaubt")
                 elif s >= n_weiss:
                     out.append(f"{wk}.segment: Weiss-Segment {s} gibt es nicht "
@@ -363,7 +372,7 @@ def pruefe(daten, datei: str = "") -> list[str]:
                     out.append(f"{wb}.name: Pflichtfeld (Text)")
                 elif len(b["name"]) > 80:
                     out.append(f"{wb}.name: hoechstens 80 Zeichen")
-                if "art" in b and b["art"] not in RANGE_ARTEN:
+                if "art" in b and not _in(b["art"], RANGE_ARTEN):
                     out.append(f"{wb}.art: unbekannt {b['art']!r} "
                                f"(erlaubt: {', '.join(repr(a) for a in RANGE_ARTEN)})")
     return out
@@ -377,7 +386,10 @@ def lade_datei(pfad: str) -> dict:
     except json.JSONDecodeError as e:
         raise ProfilFehler([f"{pfad}: kein gueltiges JSON (Zeile {e.lineno}, "
                             f"Spalte {e.colno}: {e.msg})"])
-    except OSError as e:
+    except UnicodeDecodeError as e:
+        raise ProfilFehler([f"{pfad}: nicht in UTF-8 gespeichert ({e.reason} "
+                            f"an Byte {e.start})"])
+    except (OSError, ValueError) as e:
         raise ProfilFehler([f"{pfad}: nicht lesbar ({e})"])
     befunde = pruefe(daten, pfad)
     if befunde:
@@ -462,45 +474,109 @@ def _modus_zu_daten(m) -> dict:
     return d
 
 
-def _standard_herkunft(prof) -> tuple[dict, dict, dict, str]:
-    """quelle, herkunft, geprueft, autor fuer ein Profil ohne eigene Datei."""
+_QLC_URHEBER = "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.)"
+
+
+def herkunft_fuer(prof) -> dict:
+    """``{"quelle", "herkunft", "geprueft", "autor"}`` eines Profils aus der DB.
+
+    Reihenfolge: gespeicherte Angabe (``FixtureProfile.herkunft``, gesetzt
+    beim Einspielen/Importieren) -> Bibliotheksdatei (``lightos``) ->
+    abgeleitet aus ``source`` (QLC+-Import = Apache-2.0, Builtin = eigen,
+    Editor-/Generator-Profil = eigen).
+
+    ★ Laesst sich die Herkunft nicht belegen, gibt es einen
+    :class:`ProfilFehler` — NIE ein erfundenes „eigen“. Bei einer QLC+-/OFL-
+    Vorlage waere das eine verlorene Lizenzangabe (Apache-2.0 §4, MIT)."""
+    gespeichert = gespeicherte_herkunft(prof)
+    if gespeichert:
+        return gespeichert
     src = (prof.source or "").lower()
+    if src == SOURCE_LIGHTOS:
+        pfad = os.path.join(BIBLIOTHEK_DIR, dateiname(prof.manufacturer.name, prof.name))
+        try:
+            alt = lade_datei(pfad)
+            return {k: alt[k] for k in HERKUNFT_SCHLUESSEL}
+        except ProfilFehler:
+            raise ProfilFehler([
+                f"{prof.manufacturer.name} / {prof.name}: Herkunft unbekannt — das "
+                f"Profil stammt aus der Bibliothek, aber weder die DB noch eine Datei "
+                f"sagt, woher (Angabe: {prof.provenance or 'keine'}). Bitte die "
+                f"Bibliotheksdatei verwenden."])
     if src == "qlcplus":
-        urheber = "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.)"
+        urheber = _QLC_URHEBER
         if prof.provenance:
             urheber += f"; Datei: {prof.provenance}"
-        return ({"titel": f"QLC+-Geraetedefinition {prof.manufacturer.name} / {prof.name}"},
-                {"art": "qlcplus", "lizenz": "Apache-2.0", "urheber": urheber,
-                 "original": "unbekannt (aus der lokalen Bibliothek exportiert)",
-                 "geaendert": "durch den LightOS-QXF-Import ins LightOS-Format umgebaut "
-                              "(Attribute, Bereichs-Arten, Rasterform)"},
-                {"ok": False, "wie": "nicht geprueft (QLC+-Import)"},
-                "LightOS (Export)")
+        return {"quelle": {"titel": f"QLC+-Geraetedefinition {prof.manufacturer.name} / "
+                                    f"{prof.name}"},
+                "herkunft": {"art": "qlcplus", "lizenz": "Apache-2.0", "urheber": urheber,
+                             "original": "unbekannt (aus der lokalen Bibliothek exportiert)",
+                             "geaendert": "durch den LightOS-QXF-Import ins LightOS-Format "
+                                          "umgebaut (Attribute, Bereichs-Arten, Rasterform)"},
+                "geprueft": {"ok": False, "wie": "nicht geprueft (QLC+-Import)"},
+                "autor": "LightOS (Export)"}
     if src == "builtin":
-        return ({"titel": "LightOS-Bestand (fixture_db.py)"},
-                {"art": "lightos", "lizenz": "eigen"},
-                {"ok": False, "wie": "aus dem eingebauten Bestand uebernommen"},
-                "LightOS")
-    return ({"titel": "eigenes Profil"},
-            {"art": "lightos", "lizenz": "eigen"},
-            {"ok": False, "wie": "eigenes Profil, nicht geprueft"},
-            "eigenes Profil")
+        return {"quelle": {"titel": "LightOS-Bestand (fixture_db.py)"},
+                "herkunft": {"art": "lightos", "lizenz": "eigen"},
+                "geprueft": {"ok": False, "wie": "aus dem eingebauten Bestand uebernommen"},
+                "autor": "LightOS"}
+    if src == "user":
+        return {"quelle": {"titel": "eigenes Profil"},
+                "herkunft": {"art": "lightos", "lizenz": "eigen"},
+                "geprueft": {"ok": False, "wie": "eigenes Profil, nicht geprueft"},
+                "autor": "eigenes Profil"}
+    raise ProfilFehler([f"{prof.manufacturer.name} / {prof.name}: Herkunft unbekannt "
+                        f"(source {prof.source!r})"])
+
+
+def _kuerze(text: str, n: int) -> str:
+    return text if len(text) <= n else text[:n - 1].rstrip() + "…"
+
+
+def fuer_format_anpassen(daten: dict) -> list[str]:
+    """Fremddaten an die Grenzen des Formats anpassen — IN-PLACE. Liefert, was
+    geaendert wurde (fuer ``herkunft.geaendert``). Echte QLC+-Dateien haben
+    Bereichsnamen bis ~110 Zeichen und vereinzelt doppelte Modusnamen."""
+    gekuerzt = 0
+    doppelt = 0
+    namen: set[str] = set()
+    for m in daten.get("modi", ()):
+        if len(m["name"]) > 80:
+            m["name"] = _kuerze(m["name"], 80)
+            gekuerzt += 1
+        if m["name"] in namen:
+            n = 2
+            while _kuerze(m["name"], 74) + f" ({n})" in namen:
+                n += 1
+            m["name"] = _kuerze(m["name"], 74) + f" ({n})"
+            doppelt += 1
+        namen.add(m["name"])
+        for c in m["kanaele"]:
+            if len(c["name"]) > 80:
+                c["name"] = _kuerze(c["name"], 80)
+                gekuerzt += 1
+            for b in c.get("bereiche", ()):
+                if len(b["name"]) > 80:
+                    b["name"] = _kuerze(b["name"], 80)
+                    gekuerzt += 1
+    out = []
+    if gekuerzt:
+        out.append(f"{gekuerzt} Namen auf 80 Zeichen gekuerzt")
+    if doppelt:
+        out.append(f"{doppelt} doppelte Modusnamen eindeutig gemacht (Suffix „(n)“)")
+    return out
 
 
 def profil_zu_daten(prof, *, quelle: dict | None = None,
                     herkunft: dict | None = None, geprueft: dict | None = None,
                     autor: str | None = None) -> dict:
     """Ein ``FixtureProfile`` (mit geladenen Modi/Kanaelen/Bereichen) als
-    LightOS-Profil. Fehlende Herkunftsangaben werden aus ``source`` abgeleitet;
-    ein ``lightos``-Profil nimmt sie aus seiner Bibliotheksdatei."""
-    q, h, g, a = _standard_herkunft(prof)
-    if (prof.source or "") == SOURCE_LIGHTOS:
-        pfad = os.path.join(BIBLIOTHEK_DIR, dateiname(prof.manufacturer.name, prof.name))
-        try:
-            alt = lade_datei(pfad)
-            q, h, g, a = alt["quelle"], alt["herkunft"], alt["geprueft"], alt["autor"]
-        except ProfilFehler:
-            pass
+    LightOS-Profil. Nicht uebergebene Herkunftsangaben kommen aus
+    :func:`herkunft_fuer` (wirft, wenn sie sich nicht belegen lassen)."""
+    if None in (quelle, herkunft, geprueft, autor):
+        basis = herkunft_fuer(prof)
+    else:
+        basis = {}
     d: dict = {
         "format_version": FORMAT_VERSION,
         "hersteller": prof.manufacturer.name,
@@ -518,17 +594,24 @@ def profil_zu_daten(prof, *, quelle: dict | None = None,
     if prof.viz_model:
         d["viz_model"] = prof.viz_model
     d.update({
-        "quelle": quelle or q,
-        "herkunft": herkunft or h,
-        "autor": autor or a,
-        "geprueft": geprueft or g,
+        "quelle": dict(quelle or basis["quelle"]),
+        "herkunft": dict(herkunft or basis["herkunft"]),
+        "autor": autor or basis["autor"],
+        "geprueft": dict(geprueft or basis["geprueft"]),
         "modi": [_modus_zu_daten(m) for m in prof.modes],
     })
+    if d["herkunft"].get("art") in FREMD_ARTEN:
+        anpassungen = fuer_format_anpassen(d)
+        if anpassungen:
+            d["herkunft"]["geaendert"] = "; ".join(
+                [d["herkunft"].get("geaendert", "")] + anpassungen).strip("; ")
     return d
 
 
 def daten_aus_feldern(*, hersteller: str, modell: str, kurzname: str, typ: str,
-                      leistung_w: int, modi) -> dict:
+                      leistung_w: int, modi, hersteller_kurz: str = "",
+                      notizen: str = "", viz_model: str = "",
+                      herkunft: dict | None = None) -> dict:
     """LightOS-Profil aus dem, was der Fixture-Editor gerade zeigt (auch
     ungespeichert). ``modi`` = ``[(name, kanaele, beschreibung, raster, weiss)]``
     mit Kanaelen wie in ``_ModeTab.channels`` (``attribute``/``default``/
@@ -568,16 +651,38 @@ def daten_aus_feldern(*, hersteller: str, modell: str, kurzname: str, typ: str,
             ks.append(k)
         m["kanaele"] = ks
         md.append(m)
-    return {
-        "format_version": FORMAT_VERSION, "hersteller": hersteller.strip(),
-        "modell": modell.strip(), "kurzname": (kurzname or modell[:8].upper()).strip(),
-        "typ": typ, "leistung_w": int(leistung_w),
+    d: dict = {"format_version": FORMAT_VERSION, "hersteller": hersteller.strip()}
+    if (hersteller_kurz or "").strip():
+        d["hersteller_kurz"] = hersteller_kurz.strip()[:20]
+    d.update({"modell": modell.strip(),
+              "kurzname": (kurzname or modell[:8].upper()).strip(),
+              "typ": typ, "leistung_w": int(leistung_w)})
+    if notizen:
+        d["notizen"] = notizen
+    if viz_model:
+        d["viz_model"] = viz_model
+    # ``herkunft`` = die vier Herkunftsfelder des GELADENEN Profils
+    # (:func:`herkunft_fuer`). Ohne geladenes Profil ist der Editor-Inhalt ein
+    # eigenes Profil. Eine fremde Vorlage bleibt fremd — nur mit dem Vermerk,
+    # dass sie im Editor bearbeitet wurde.
+    h = copy.deepcopy(herkunft) if herkunft else {
         "quelle": {"titel": "eigenes Profil"},
         "herkunft": {"art": "lightos", "lizenz": "eigen"},
-        "autor": "eigenes Profil",
         "geprueft": {"ok": False, "wie": "eigenes Profil, nicht geprueft"},
-        "modi": md,
-    }
+        "autor": "eigenes Profil"}
+    if h["herkunft"].get("art") in FREMD_ARTEN:
+        vermerk = "im LightOS-Fixture-Editor bearbeitet"
+        alt = h["herkunft"].get("geaendert", "")
+        if vermerk not in alt:
+            h["herkunft"]["geaendert"] = f"{alt}; {vermerk}".strip("; ")
+    d.update({k: h[k] for k in ("quelle", "herkunft", "autor", "geprueft")})
+    d["modi"] = md
+    if h["herkunft"].get("art") in FREMD_ARTEN:
+        anpassungen = fuer_format_anpassen(d)
+        if anpassungen:
+            d["herkunft"]["geaendert"] = "; ".join(
+                [d["herkunft"]["geaendert"]] + anpassungen)
+    return d
 
 
 def _profil_laden(s, profil_id: int):
@@ -742,6 +847,31 @@ def _kopf_setzen(prof, daten: dict) -> None:
     prof.notes = daten.get("notizen", "")
     prof.viz_model = daten.get("viz_model", "")
     prof.provenance = _provenance(daten)
+    prof.herkunft = _herkunft_json(daten)
+
+
+HERKUNFT_SCHLUESSEL = ("quelle", "herkunft", "geprueft", "autor")
+
+
+def _herkunft_json(daten: dict) -> str:
+    """Die vollstaendige Herkunft fuer ``FixtureProfile.herkunft``."""
+    return json.dumps({k: daten[k] for k in HERKUNFT_SCHLUESSEL}, ensure_ascii=False,
+                      sort_keys=True)
+
+
+def gespeicherte_herkunft(prof) -> dict | None:
+    """``{"quelle", "herkunft", "geprueft", "autor"}`` aus der DB — oder None,
+    wenn keine (gueltige) Angabe gespeichert ist."""
+    try:
+        d = json.loads(getattr(prof, "herkunft", "") or "")
+    except ValueError:
+        return None
+    if not isinstance(d, dict) or any(k not in d for k in HERKUNFT_SCHLUESSEL):
+        return None
+    probe = {"format_version": FORMAT_VERSION, **{k: d[k] for k in HERKUNFT_SCHLUESSEL}}
+    if any(f.startswith(k) for f in pruefe(probe) for k in HERKUNFT_SCHLUESSEL):
+        return None
+    return {k: d[k] for k in HERKUNFT_SCHLUESSEL}
 
 
 def _anlegen(s, daten: dict, source: str):
@@ -759,6 +889,7 @@ def _vergleichsform(prof) -> tuple:
     """Alles, was eine Datei ueber ein Profil sagt — fuer „hat sich etwas geaendert?“."""
     return (prof.name, prof.short_name, prof.fixture_type, int(prof.power_w or 0),
             prof.notes or "", prof.viz_model or "", prof.provenance or "",
+            prof.herkunft or "",
             tuple((m.name, m.description or "", m.grid_rows or 0, m.grid_cols or 0,
                    m.white_rows or 0, m.white_cols or 0, m.channel_count,
                    tuple((c.channel_number, c.name, c.attribute, c.default_value,
@@ -774,77 +905,129 @@ def _vergleichsform(prof) -> tuple:
 LETZTES_EINSPIELEN: dict = {"neu": [], "aktualisiert": [], "verdeckt": [], "fehler": []}
 
 
-def einspielen(s, verzeichnis: str | None = None) -> bool:
-    """Alle Dateien der Bibliothek in die DB (``source='lightos'``).
+def _abgleichen(s, daten: dict) -> str:
+    """Eine gepruefte Datei gegen die DB: ``neu`` / ``aktualisiert`` /
+    ``gleich`` / ``verdeckt``.
 
     * neu -> anlegen;
-    * vorhanden (gleicher Hersteller + Modell + ``source='lightos'``) und
-      anders -> Kopf aktualisieren und die Modi aus der Datei neu aufbauen. Die
-      Profil-ID bleibt stabil; gepatchte Geraete haengen an ID + Modusname.
-      Die Datei ist hier die Wahrheit: eine Korrektur in der Datei ist eine
-      bewusste Entscheidung (wie die Signatur-Migrationen der Builtins);
-    * gibt es Hersteller + Modell schon als **Builtin**, bleibt die Datei
-      draussen (``verdeckt``) — sonst stuende das Geraet zweimal als
-      mitgeliefert da (QA-68). Die Uebernahme eines Builtins in eine Datei ist
-      ein eigener Migrationsschritt;
-    * ungueltige Dateien werden gemeldet und uebersprungen, nie halb eingespielt.
-
-    Eigene Profile (``user``) und QLC+-Importe fasst die Funktion nie an.
-    Liefert, ob etwas geaendert wurde."""
+    * vorhanden (gleicher Hersteller + Modell, ``source='lightos'``) und anders
+      -> Kopf aktualisieren und die Modi aus der Datei neu aufbauen. Die
+      Profil-ID bleibt stabil; gepatchte Geraete haengen an ID + Modusname. Die
+      Datei ist hier die Wahrheit (wie die Signatur-Migrationen der Builtins);
+    * gibt es Hersteller + Modell schon mit ANDERER Herkunft — Builtin, eigenes
+      Profil, QLC+-Import —, bleibt die Datei draussen (``verdeckt``). Sonst
+      stuende das Geraet zweimal in der Bibliothek, und eine Show von einem
+      anderen Rechner loeste mehrdeutig auf (FM-43). Die Uebernahme eines
+      Builtins in eine Datei ist ein eigener Migrationsschritt."""
     from sqlalchemy import select
     from sqlalchemy.orm import selectinload
-    from .models import (FixtureChannel, FixtureMode, FixtureProfile, Manufacturer)
-    bericht = {"neu": [], "aktualisiert": [], "verdeckt": [], "fehler": []}
+    from .models import FixtureChannel, FixtureMode, FixtureProfile, Manufacturer
+    name_h, modell = daten["hersteller"].strip(), daten["modell"].strip()
+    vorhanden = s.execute(
+        select(FixtureProfile)
+        .join(Manufacturer, FixtureProfile.manufacturer_id == Manufacturer.id)
+        .options(selectinload(FixtureProfile.modes)
+                 .selectinload(FixtureMode.channels)
+                 .selectinload(FixtureChannel.ranges))
+        .where(Manufacturer.name == name_h, FixtureProfile.name == modell)
+        .order_by(FixtureProfile.id)).scalars().all()
+    if any(p.source != SOURCE_LIGHTOS for p in vorhanden):
+        return "verdeckt"
+    if not vorhanden:
+        _anlegen(s, daten, SOURCE_LIGHTOS)
+        return "neu"
+    prof = vorhanden[0]
+    ist = _vergleichsform(prof)
+    # Soll ueber DENSELBEN Weg bauen wie das Anlegen (Savepoint, danach
+    # zurueckgerollt) — eine zweite Normalisierung der Datei koennte von
+    # `_add_modes` abweichen (abgeleitete Bereichs-Arten) und dann bei jedem
+    # Lauf „aktualisieren“. Laeuft nur fuer GEAENDERTE Dateien (Stempel).
+    sp = s.begin_nested()
+    soll = _vergleichsform(_anlegen(s, daten, SOURCE_LIGHTOS))
+    sp.rollback()
+    if soll == ist:
+        return "gleich"
+    _kopf_setzen(prof, daten)
+    prof.modes.clear()          # cascade loescht Kanaele + Ranges
+    s.flush()
+    _modi_anlegen(s, prof, daten)
+    s.flush()
+    return "aktualisiert"
+
+
+def _datei_hash(roh: bytes) -> str:
+    return hashlib.sha256(f"v{FORMAT_VERSION}:".encode() + roh).hexdigest()[:16]
+
+
+def einspielen(s, verzeichnis: str | None = None,
+               stempel: dict[str, str] | None = None) -> bool:
+    """Die Dateien der Bibliothek in die DB (``source='lightos'``), je Datei
+    ueber :func:`_abgleichen`.
+
+    ``stempel`` = ``{relativer Pfad: Hash}`` des letzten Laufs. Eine Datei mit
+    unveraendertem Hash, deren Profil noch in der DB steht, wird nicht noch
+    einmal angefasst — sonst baute jede einzelne geaenderte Datei beim Start
+    alle Profile zur Probe neu auf (gemessen 300 Profile: 8–56 s). Der neue
+    Stand steht danach in ``LETZTES_EINSPIELEN["stempel"]``.
+
+    Ungueltige oder unlesbare Dateien — und jeder andere Fehler beim Einspielen
+    EINER Datei — werden gemeldet und uebersprungen, nie halb eingespielt; die
+    uebrigen Dateien laufen weiter. Liefert, ob die DB geaendert wurde."""
+    from sqlalchemy import select
+    from .models import FixtureProfile, Manufacturer
+    wurzel = verzeichnis or BIBLIOTHEK_DIR
+    stempel = stempel or {}
+    bericht: dict = {"neu": [], "aktualisiert": [], "verdeckt": [], "fehler": [],
+                     "stempel": {}}
+    da = {(m.casefold(), n.casefold()) for m, n in s.execute(
+        select(Manufacturer.name, FixtureProfile.name)
+        .join(FixtureProfile, FixtureProfile.manufacturer_id == Manufacturer.id)
+        .where(FixtureProfile.source == SOURCE_LIGHTOS))}
     geaendert = False
-    gesehen: set[tuple[str, str]] = set()
-    for pfad in bibliothek_dateien(verzeichnis):
+    gesehen: dict[tuple[str, str], str] = {}
+    for pfad in bibliothek_dateien(wurzel):
+        rel = os.path.relpath(pfad, wurzel).replace(os.sep, "/")
         try:
-            daten = lade_datei(pfad)
+            with open(pfad, "rb") as fh:
+                h = _datei_hash(fh.read())
+            if stempel.get(rel) == h:
+                with open(pfad, encoding="utf-8") as fh:
+                    daten = json.load(fh)      # war beim Stempeln gueltig
+            else:
+                daten = lade_datei(pfad)
+            name_h, modell = daten["hersteller"].strip(), daten["modell"].strip()
+            schluessel = (name_h.casefold(), modell.casefold())
+            if schluessel in gesehen:
+                bericht["fehler"].append(f"{pfad}: {name_h} / {modell} doppelt in der "
+                                         f"Bibliothek (schon in {gesehen[schluessel]})")
+                continue
+            gesehen[schluessel] = rel
+            if stempel.get(rel) == h and schluessel in da:
+                bericht["stempel"][rel] = h
+                continue
+            if stempel.get(rel) == h:
+                daten = lade_datei(pfad)       # Profil fehlt in der DB: voll pruefen
+            sp = s.begin_nested()
+            try:
+                status = _abgleichen(s, daten)
+            except Exception:
+                sp.rollback()
+                raise
+            sp.commit()
         except ProfilFehler as e:
             bericht["fehler"] += e.befunde
             continue
-        name_h, modell = daten["hersteller"].strip(), daten["modell"].strip()
-        schluessel = (name_h.casefold(), modell.casefold())
-        if schluessel in gesehen:
-            bericht["fehler"].append(f"{pfad}: {name_h} / {modell} doppelt in der Bibliothek")
+        except Exception as e:                 # Netz: der Start bricht nie ab
+            bericht["fehler"].append(f"{pfad}: nicht eingespielt "
+                                     f"({type(e).__name__}: {e})")
             continue
-        gesehen.add(schluessel)
-        vorhanden = s.execute(
-            select(FixtureProfile)
-            .join(Manufacturer, FixtureProfile.manufacturer_id == Manufacturer.id)
-            .options(selectinload(FixtureProfile.modes)
-                     .selectinload(FixtureMode.channels)
-                     .selectinload(FixtureChannel.ranges))
-            .where(Manufacturer.name == name_h, FixtureProfile.name == modell,
-                   FixtureProfile.source.in_(("builtin", SOURCE_LIGHTOS)))
-            .order_by(FixtureProfile.id)).scalars().all()
-        if any(p.source == "builtin" for p in vorhanden):
+        if status == "verdeckt":
             bericht["verdeckt"].append(f"{name_h} / {modell}")
             continue
-        if not vorhanden:
-            with s.begin_nested():
-                _anlegen(s, daten, SOURCE_LIGHTOS)
-            bericht["neu"].append(f"{name_h} / {modell}")
+        bericht["stempel"][rel] = h
+        if status in ("neu", "aktualisiert"):
+            bericht[status].append(f"{name_h} / {modell}")
             geaendert = True
-            continue
-        prof = vorhanden[0]
-        ist = _vergleichsform(prof)
-        # Soll ueber DENSELBEN Weg bauen wie das Anlegen (Savepoint, danach
-        # zurueckgerollt) — eine zweite Normalisierung der Datei koennte von
-        # `_add_modes` abweichen (abgeleitete Bereichs-Arten) und dann bei jedem
-        # Start „aktualisieren“.
-        sp = s.begin_nested()
-        soll = _vergleichsform(_anlegen(s, daten, SOURCE_LIGHTOS))
-        sp.rollback()
-        if soll == ist:
-            continue
-        _kopf_setzen(prof, daten)
-        prof.modes.clear()          # cascade loescht Kanaele + Ranges
-        s.flush()
-        _modi_anlegen(s, prof, daten)
-        s.flush()
-        bericht["aktualisiert"].append(f"{name_h} / {modell}")
-        geaendert = True
     LETZTES_EINSPIELEN.clear()
     LETZTES_EINSPIELEN.update(bericht)
     if bericht["fehler"]:
@@ -852,39 +1035,27 @@ def einspielen(s, verzeichnis: str | None = None) -> bool:
               f"Bibliothek, Dateien uebersprungen:\n  " + "\n  ".join(bericht["fehler"]))
     if bericht["neu"] or bericht["aktualisiert"] or bericht["verdeckt"]:
         print(f"[bibliothek] LightOS-Profile: neu {len(bericht['neu'])}, "
-              f"aktualisiert {bericht['aktualisiert']}, von Builtins verdeckt "
-              f"{bericht['verdeckt']}")
+              f"aktualisiert {bericht['aktualisiert']}, verdeckt (gibt es schon mit "
+              f"anderer Herkunft) {bericht['verdeckt']}")
     return geaendert
 
 
-def bibliothek_stand(verzeichnis: str | None = None) -> str:
-    """Fingerabdruck aller Dateien (Pfad + Inhalt) — aendert sich eine Datei,
-    laeuft :func:`einspielen` beim naechsten Start einmal."""
-    wurzel = verzeichnis or BIBLIOTHEK_DIR
-    h = hashlib.sha256(f"v{FORMAT_VERSION}".encode())
-    for pfad in bibliothek_dateien(wurzel):
-        h.update(os.path.relpath(pfad, wurzel).replace(os.sep, "/").encode())
-        try:
-            with open(pfad, "rb") as fh:
-                h.update(fh.read())
-        except OSError:
-            pass
-    return h.hexdigest()[:16]
-
-
 def einspielen_wenn_noetig(s, verzeichnis: str | None = None) -> bool:
-    """:func:`einspielen`, aber nur wenn sich die Bibliothek seit dem letzten
-    Lauf in DIESER DB geaendert hat (Stempel in ``bibliothek_stand``)."""
+    """:func:`einspielen` mit dem Stempel DIESER DB (Tabelle
+    ``bibliothek_stempel``: relativer Pfad -> Hash). Nur neue, geaenderte und
+    aus der DB verschwundene Dateien werden angefasst."""
     from sqlalchemy import text
-    soll = bibliothek_stand(verzeichnis)
-    s.execute(text("CREATE TABLE IF NOT EXISTS bibliothek_stand (stand TEXT)"))
-    row = s.execute(text("SELECT stand FROM bibliothek_stand LIMIT 1")).first()
-    if row and row[0] == soll:
-        return False
-    einspielen(s, verzeichnis)
-    s.execute(text("DELETE FROM bibliothek_stand"))
-    s.execute(text("INSERT INTO bibliothek_stand (stand) VALUES (:s)"), {"s": soll})
-    return True
+    s.execute(text("CREATE TABLE IF NOT EXISTS bibliothek_stempel "
+                   "(pfad TEXT PRIMARY KEY, hash TEXT)"))
+    alt = {p: h for p, h in s.execute(text("SELECT pfad, hash FROM bibliothek_stempel"))}
+    geaendert = einspielen(s, verzeichnis, alt)
+    neu = LETZTES_EINSPIELEN["stempel"]
+    if neu != alt:
+        s.execute(text("DELETE FROM bibliothek_stempel"))
+        for p, h in sorted(neu.items()):
+            s.execute(text("INSERT INTO bibliothek_stempel (pfad, hash) VALUES (:p, :h)"),
+                      {"p": p, "h": h})
+    return geaendert
 
 
 def importiere(pfad_oder_daten, *, engine=None) -> int:
@@ -972,6 +1143,12 @@ def qxf_zu_daten(pfad: str, original: str | None = None) -> dict:
                 geaendert.append(f"{n_bereiche} Wertebereiche mit Art (kind) versehen")
             if n_raster:
                 geaendert.append(f"Rasterform in {n_raster} Modus/Modi aus <Physical> uebernommen")
+            from .qxf_import import QXF_NS
+            n_lang = sum(1 for cap in root.iter(f"{{{QXF_NS}}}Capability")
+                         if len((cap.text or "").strip()) > 80)
+            if n_lang:
+                # der QXF-Import schneidet sie selbst ab — hier nur vermerken
+                geaendert.append(f"{n_lang} Bereichsnamen auf 80 Zeichen gekuerzt")
             if n_seg:
                 geaendert.append(f"{n_seg} Dimmer-Weiss-Segment-Zuordnung(en) aus <Head> abgeleitet")
             daten = profil_zu_daten(

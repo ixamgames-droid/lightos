@@ -599,15 +599,42 @@ class FixtureEditorDialog(QDialog):
     # ── FM-56: LightOS-Profil (JSON) ─────────────────────────────────────
 
     def _lightos_daten(self) -> dict:
-        from src.core.database.bibliothek_format import daten_aus_feldern
+        """Editor-Inhalt als LightOS-Profil. Ist ein Profil geladen, kommen
+        Herkunft (Review FM-56: eine QLC+-Vorlage bleibt Apache-2.0), Notizen,
+        3D-Modell und Herstellerkuerzel aus der DB — der Editor zeigt sie
+        nicht, verlieren darf der Export sie trotzdem nicht. Wirft
+        ``ProfilFehler``, wenn sich die Herkunft nicht belegen laesst."""
+        from src.core.database import bibliothek_format as BF
         modi = []
         for i in range(self._tabs.count()):
             modi.append(self._tabs.widget(i).get_data())
-        return daten_aus_feldern(
-            hersteller=self._cb_manufacturer.currentText(),
+        hersteller = self._cb_manufacturer.currentText()
+        extra: dict = {}
+        with Session(engine()) as s:
+            mfr = s.execute(select(Manufacturer).where(
+                Manufacturer.name == hersteller.strip())).scalar_one_or_none()
+            if mfr is not None and mfr.short_name:
+                extra["hersteller_kurz"] = mfr.short_name
+            if self._fixture_id is not None:
+                prof = BF._profil_laden(s, self._fixture_id)
+                if prof is not None:
+                    extra["herkunft"] = BF.herkunft_fuer(prof)
+                    extra["notizen"] = prof.notes or ""
+                    extra["viz_model"] = prof.viz_model or ""
+        return BF.daten_aus_feldern(
+            hersteller=hersteller,
             modell=self._edit_name.text(), kurzname=self._edit_short.text(),
             typ=self._cb_type.currentText(), leistung_w=self._spin_power.value(),
-            modi=modi)
+            modi=modi, **extra)
+
+    def _hat_inhalt(self) -> bool:
+        """Steht im Editor etwas, das ein Import verwerfen wuerde?"""
+        if self._fixture_id is not None:
+            return False                   # gespeichertes Profil: nichts geht verloren
+        name = self._edit_name.text().strip()
+        if name and name != PLATZHALTER_MODELL:
+            return True
+        return any(self._tabs.widget(i).get_data()[1] for i in range(self._tabs.count()))
 
     def _lightos_export(self, pfad: str | None = None) -> str | None:
         """Editor-Inhalt als LightOS-Profil schreiben. ``pfad`` (Tests) spart
@@ -618,7 +645,12 @@ class FixtureEditorDialog(QDialog):
         if beanstandung:
             QMessageBox.warning(self, "LightOS-Profil", beanstandung)
             return None
-        daten = self._lightos_daten()
+        try:
+            daten = self._lightos_daten()
+        except BF.ProfilFehler as e:
+            QMessageBox.warning(self, "LightOS-Profil",
+                                "Export abgebrochen:\n\n" + "\n".join(e.befunde[:15]))
+            return None
         if pfad is None:
             from PySide6.QtWidgets import QFileDialog
             vorschlag = BF.dateiname(daten["hersteller"], daten["modell"]).split("/")[-1]
@@ -643,6 +675,16 @@ class FixtureEditorDialog(QDialog):
         """LightOS-Profil-Datei als eigenes Profil anlegen und den Dialog
         schliessen (wie Speichern: ``saved_id`` traegt die neue ID)."""
         from src.core.database import bibliothek_format as BF
+        if self._hat_inhalt():
+            antwort = QMessageBox.question(
+                self, "LightOS-Profil importieren",
+                "Der Import legt das Profil aus der Datei an und schliesst den "
+                "Editor. Was hier eingetragen und nicht gespeichert ist, geht "
+                "verloren.\n\nTrotzdem importieren?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No)
+            if antwort != QMessageBox.StandardButton.Yes:
+                return None
         if pfad is None:
             from PySide6.QtWidgets import QFileDialog
             pfad, _ = QFileDialog.getOpenFileName(
@@ -660,6 +702,13 @@ class FixtureEditorDialog(QDialog):
             QMessageBox.warning(self, "LightOS-Profil", str(e))
             return None
         self._saved_id = self.saved_id = pid
+        try:
+            daten = BF.lade_datei(pfad)
+            was = f"„{daten['hersteller']} / {daten['modell']}“"
+        except BF.ProfilFehler:
+            was = "Das Profil"
+        QMessageBox.information(self, "LightOS-Profil",
+                                f"{was} ist als eigenes Profil angelegt (ID {pid}).")
         self.accept()
         return pid
 

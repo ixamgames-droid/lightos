@@ -47,9 +47,13 @@ def _ausgabe(daten: dict, args) -> int:
             return 1
     else:
         pfad = args.o
+    befunde = BF.pruefe(daten)
+    if pfad and befunde:
+        for b in befunde:
+            print(f"FEHLER: {b}", file=sys.stderr)
+        return 1
     if not pfad:
         sys.stdout.write(BF.als_json(daten))
-        befunde = BF.pruefe(daten)
         for b in befunde:
             print(f"BEFUND: {b}", file=sys.stderr)
         return 1 if befunde else 0
@@ -63,6 +67,26 @@ def _engine(args):
     # Bewusst get_engine statt engine(): kein ensure_builtins-Lauf, das
     # Werkzeug schreibt beim Lesen nichts in die Bibliothek.
     return get_engine(args.db or DB_PATH)
+
+
+def _schreib_engine(args):
+    """Engine fuer den EINEN schreibenden Befehl (``import``).
+
+    ★ Review FM-56: eine neue, leere fixtures.db darf nicht mit nur dem
+    importierten Profil entstehen — beim naechsten App-Start saehe
+    ``_seed_if_empty`` einen Hersteller und liesse die Erstbefuellung aus (16
+    Builtins fehlten dauerhaft). Deshalb wird eine leere DB hier zuerst
+    befuellt, genau wie beim ersten Start der App."""
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+    from src.core.database import fixture_db as FDB
+    from src.core.database.models import Manufacturer
+    eng = _engine(args)
+    with Session(eng) as s:
+        if s.execute(select(Manufacturer)).first() is None:
+            FDB._seed(s)
+            s.commit()
+    return eng
 
 
 def cmd_pruefen(args) -> int:
@@ -116,12 +140,17 @@ def cmd_export(args) -> int:
                   file=sys.stderr)
             return 1
         pid = treffer[0]
-    return _ausgabe(BF.exportiere(pid, engine=eng), args)
+    try:
+        daten = BF.exportiere(pid, engine=eng)
+    except (BF.ProfilFehler, ValueError) as e:
+        print(f"FEHLER: {e}", file=sys.stderr)
+        return 1
+    return _ausgabe(daten, args)
 
 
 def cmd_import(args) -> int:
     try:
-        pid = BF.importiere(args.datei, engine=_engine(args))
+        pid = BF.importiere(args.datei, engine=_schreib_engine(args))
     except (BF.ProfilFehler, ValueError) as e:
         print(f"FEHLER: {e}", file=sys.stderr)
         return 1

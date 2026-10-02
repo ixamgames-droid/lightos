@@ -57,6 +57,14 @@ class FixtureProfile(Base):
     # FM-12: expliziter 3D-Modell-Override fuer den Visualizer ("" = Automatik:
     # Kanal-Heuristik viz_model_for bzw. fixture_type entscheidet).
     viz_model: Mapped[str] = mapped_column(String(40), default="")
+    # FM-56: vollstaendige Herkunft eines LightOS-Profils als JSON —
+    # ``{"quelle", "herkunft", "geprueft", "autor"}`` wie in der Datei. Steht an
+    # Profilen, die aus einer Bibliotheksdatei eingespielt oder als Datei
+    # importiert wurden. ★ Nicht nur in `provenance` (200 Zeichen, Kurzform):
+    # beim Export darf die Herkunft — bei QLC+/OFL-Vorlagen die Lizenzangabe
+    # nach Apache-2.0 §4 bzw. MIT — nie verloren gehen oder zu „eigen“ werden.
+    # Leer = keine Angabe (Builtins, Editor-/Generator-Profile, QLC+-Importe).
+    herkunft: Mapped[str] = mapped_column(Text, default="")
 
     manufacturer: Mapped[Manufacturer] = relationship(back_populates="fixtures")
     modes: Mapped[list[FixtureMode]] = relationship(
@@ -418,6 +426,10 @@ def migrate_fixtures_db(engine) -> None:
             if fcols and "provenance" not in fcols:
                 conn.execute(text(
                     "ALTER TABLE fixtures ADD COLUMN provenance VARCHAR(200) DEFAULT ''"))
+            # FM-56: vollstaendige Herkunft eines LightOS-Profils (JSON).
+            if fcols and "herkunft" not in fcols:
+                conn.execute(text(
+                    "ALTER TABLE fixtures ADD COLUMN herkunft TEXT DEFAULT ''"))
             # VIZ-50a: physische Rasterform eines Pixel-Panels (0 = nicht
             # hinterlegt -> der Renderer raet wie bisher). Dieselbe Falle wie bei
             # `pixel_order` (PR #514): ohne ALTER TABLE waere jede bestehende

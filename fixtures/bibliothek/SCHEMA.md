@@ -260,7 +260,9 @@ Herkunft einer aus QLC+ umgebauten Datei (vom Konverter
 
 `fixture_db.ensure_builtins()` spielt alle Dateien (ohne `_beispiele/`) mit
 `source = "lightos"` in die Fixture-DB — nur wenn sich eine Datei seit dem letzten
-Lauf geändert hat. Neu → anlegen; geändert → Kopf und Modi aus der Datei neu
-aufbauen (Profil-ID bleibt); ungültig → gemeldet, übersprungen. Eigene Profile und
-QLC+-Importe werden nie angefasst; gibt es Hersteller + Modell schon als
-eingebautes Profil, bleibt die Datei draußen. Code: `src/core/database/bibliothek_format.py`.
+Lauf geändert hat (Stempel je Datei). Neu → anlegen; geändert → Kopf und Modi aus
+der Datei neu aufbauen (Profil-ID bleibt); ungültig → gemeldet, übersprungen, der
+Start läuft weiter. Gibt es Hersteller + Modell schon mit anderer Herkunft
+(eingebaut, eigenes Profil, QLC+-Import), bleibt die Datei draußen — nichts wird
+doppelt angelegt, nichts überschrieben. Die vollständige Herkunft steht danach auch
+in der DB (`FixtureProfile.herkunft`); ein Export erfindet nie „eigen“. Code: `src/core/database/bibliothek_format.py`.
