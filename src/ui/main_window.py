@@ -685,6 +685,9 @@ class MainWindow(QMainWindow):
         # Datenbank
         dbm = mb.addMenu("&Datenbank")
         dbm.addAction("Fixtures importieren (XML)...").triggered.connect(self._open_qxf_import)
+        # FM-53: freie Geraete-Bibliothek laden (QLC+/OFL) — nur nach Zustimmung
+        dbm.addAction("Geräte-Bibliothek herunterladen...").triggered.connect(
+            self._open_bibliothek_download)
         dbm.addSeparator()
         dbm.addAction("Neues Fixture-Profil...").triggered.connect(self._open_fixture_editor)
 
@@ -2533,6 +2536,10 @@ class MainWindow(QMainWindow):
     def _open_qxf_import(self):
         from src.ui.widgets.qxf_import_dialog import QxfImportDialog
         QxfImportDialog(self).exec()
+
+    def _open_bibliothek_download(self, erststart: bool = False):
+        from src.ui.widgets.bibliothek_download_dialog import BibliothekDownloadDialog
+        BibliothekDownloadDialog(self, erststart=erststart).exec()
 
     def _open_fixture_editor(self):
         try:

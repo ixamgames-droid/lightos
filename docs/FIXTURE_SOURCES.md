@@ -30,10 +30,29 @@ Builtins wie ZQ02001) werden **nie** überschrieben.
 - DMX-Kanalbelegungen aus Bedienungsanleitungen sind Faktendaten und dürfen
   als eigenes Fixture-Profil erfasst werden (Fixture-Editor in LightOS).
 
-## Was du manuell bereitstellen musst
+## Bibliothek herunterladen (FM-53)
 
-LightOS lädt bewusst **nichts automatisch aus dem Netz**. Für eine
-Massen-Erweiterung der Bibliothek:
+Beim **ersten Start** fragt LightOS, ob eine freie Geräte-Bibliothek geladen
+werden soll — aber nur, solange die Bibliothek nichts außer den eingebauten
+Profilen enthält. Ohne Zustimmung wird **nichts** heruntergeladen. Später geht
+es jederzeit über **Datenbank → Geräte-Bibliothek herunterladen...**
+
+- **Quellen:** QLC+-Fixtures einer festen Version (Apache-2.0, GitHub-Archiv)
+  oder die Open Fixture Library als QLC+-Export (MIT). Lizenz und Link stehen
+  im Dialog, **bevor** geladen wird; die Größe auch, sofern die Gegenstelle sie
+  nennt.
+- **Was passiert:** Download mit SHA-256-Prüfsumme → nur die `.qxf`-Dateien
+  werden ausgepackt → Import über den vorhandenen QLC+-Import. Vorhandene und
+  eigene Profile bleiben unverändert, Doppelte werden übersprungen.
+- **Herkunft je Profil:** Quelle, Lizenz, Lizenz-Link, Archiv-Adresse,
+  Prüfsumme und Zeitpunkt stehen in `fixtures.db` (Tabelle `profil_herkunft`).
+- **Abbrechen** ist jederzeit möglich. **Ohne Netz** meldet der Dialog das,
+  ändert nichts und fragt beim nächsten Start erneut; „Nicht jetzt“ dagegen
+  zählt als Antwort.
+
+## Was du manuell bereitstellen kannst
+
+Ohne den Download-Dialog, z. B. ohne Internet am Rechner:
 
 1. QLC+ herunterladen/installieren **oder** das QLC+-Repo als ZIP laden,
 2. den Ordner `resources/fixtures` (bzw. `Fixtures` der Installation)
