@@ -14,7 +14,6 @@
 |---|---|---|---|---|
 | DOC-14 | C | fix/doc14-schaukasten-19 | 2026-10-01T21:37Z | tools/build_vc_widgets_showcase.py · docs/anleitung_vc_widgets/README.md · docs/anleitung_vc_widgets/_capture/geometry.json · tests/test_doc14_schaukasten_alle_typen.py · changelog.d/2026-10-02-DOC-14.md |
 | FM-46 | A | feat/fm46-dimmer-segment | 2026-10-02T07:26Z | src/core/database/models.py · src/core/app_state.py · src/ui/widgets/fixture_editor.py · src/ui/widgets/fixture_generator.py · src/core/database/fixture_db.py |
-| XPLAT-37 | C | fix/xplat37-settle-frame | 2026-10-02T07:37Z | src/ui/visualizer/scene_src/interaction/tools.js · src/ui/visualizer/scene_src/app.js · tests/test_viz14_selection_scene.py · changelog.d/2026-10-02-XPLAT-37.md · BACKLOG.md |
 | FM-55 | C | docs/fm55-fixture-quellen | 2026-10-02T07:39Z | docs/recherche/fixture_quellen_2026-10.md · changelog.d/2026-10-02-FM-55.md · BACKLOG.md |
 | PROC-18 | A | fix/proc18-fremd-lizenzhinweise | 2026-10-02T08:42Z | THIRD_PARTY_NOTICES.md · src/ui/visualizer/assets/models |
 | XPLAT-44 | C | docs/xplat44-data-cwd | 2026-10-02T09:21Z | BACKLOG.md |
@@ -79,7 +78,6 @@
 
 ## Verlauf
 
-- 2026-10-02T04:53Z C claim TOOL-6
 - 2026-10-02T04:58Z C claim FM-54
 - 2026-10-02T06:52Z A claim PROC-18
 - 2026-10-02T06:53Z A done PROC-18
@@ -109,3 +107,4 @@
 - 2026-10-02T09:26Z A done UI-70
 - 2026-10-02T09:26Z A done TOOL-8
 - 2026-10-02T09:29Z C claim FM-53
+- 2026-10-02T09:49Z C done XPLAT-37
