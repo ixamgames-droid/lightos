@@ -17,7 +17,7 @@ Zielverzeichnis: `src/ui/visualizer/scene_src/` (Quellmodule, ES-`.js`). Der ~35
 | `scene/renderer.js` | Renderer + Tone-Mapping/PixelRatio (184–196), `scene`/Fog/Background (180–182) | `scene`, `renderer`, `applyBrightness` (258) |
 | `scene/lights.js` | Ambient/Hemi/Edit-Light + `applyBrightness` (248–278) | Licht-Handles |
 | `scene/grid_floor.js` | `buildGridAndFloor` (317), `disposeObj` (291), `clearPreset`/`trackPreset` (300–315) | Grid/Floor-Builder |
-| `scene/model_loader.js` | `loadModel` + Cache (342–~430) | `loadModel` |
+| `scene/model_loader.js` | `loadModel` + Cache (342–~430) | `loadModel` — *mit VIZ-66 entfernt; geteilte, im Code erzeugte Geometrie liegt in `scene/geteilte_geometrie.js`* |
 | `camera/cameras.js` | `perspectiveCam` (199), `orthoCam` (205), `activeCam`/`viewMode` (212–213), `resizeOrtho` (2195), `updateCamera` (3260), `panCamera3D` (3269), `resetCameraView` (3279) | Kamera-Handles + Preset-API (3b erweitert) |
 | `stage/stage_objects.js` | `createStageObject` (558), `updateStageObjectProps` (600), `removeStageObject` (749), `updateStageObject2D`/`_setMeshMat2D` (704–715), Resize-Handles | Stage-Object-CRUD |
 | `stage/docking.js` | `findDockTarget`/`applyDockHighlight`/`clearDockHighlight`/`showDockBadge`/`_dockNameFor` (2434–2491), `moveDockedFixtures` (2492) | Docking-Cluster (**MUSS erhalten**) |
