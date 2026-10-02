@@ -68,6 +68,18 @@ ATTR_GROUPS: dict[str, set[str]] = {
 ATTR_GROUP_ORDER: list[str] = ["Intensity", "Color", "Position", "Beam",
                                "Gobo", "Effect", "Other"]
 
+# UI-56 (entschieden 2026-10-02, Projektinhaber): was der Nutzer im
+# Speichern-Dialog als Gruppe LIEST. Fokus/Zoom/Prisma/Iris/Frost heissen dort
+# „Optik" — „Beam" wurde als „Weiteres" gelesen und nicht gesucht. Nur die
+# Anzeige: der Schluessel bleibt "Beam" (``ATTR_GROUPS``, ``classify_attr``,
+# ``get_selected_groups``), weil Aufrufer und gespeicherte Daten ihn tragen.
+ATTR_GROUP_LABELS: dict[str, str] = {"Beam": "Optik"}
+
+
+def group_label(group: str) -> str:
+    """Anzeigename einer Attribut-Gruppe; unbekannte Gruppen unveraendert."""
+    return ATTR_GROUP_LABELS.get(group, group)
+
 # Menschenlesbare Labels fuer einzelne Attribute (Kanal-Ebene). Wird vom
 # Kanal-Auswahl-Dialog (Snap/Szene speichern) und vom Snap-Editor genutzt, damit
 # beide dieselben Bezeichnungen zeigen. Unbekannte Attribute fallen auf den rohen
