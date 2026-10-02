@@ -302,6 +302,9 @@ der 3D-Visualizer startet mit `--no-sandbox` (abschaltbar über
 ## Status und Grenzen
 
 LightOS ist ein privates Projekt in aktiver Entwicklung — ohne Garantie, ohne Lizenz, ohne Support.
+Mitgelieferte fremde Komponenten (three.js, eine Schrift im Gource-Werkzeug) stehen unter ihren eigenen
+Lizenzen — siehe [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Die 3D-Modelle im Visualizer
+sind eigene, im Code erzeugte Geometrie.
 
 | | Stand |
 |---|---|
