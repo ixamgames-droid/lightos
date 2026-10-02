@@ -44,22 +44,25 @@ if TOOLS not in sys.path:
 REPO_ORDNER = ("shows", "data", "docs", "fixtures", "assets")
 
 #: TOOL-6: Aufrufe, die ihren Pfad direkt im Dateisystem benutzen —
-#: ``{Aufruf: Position des Pfad-Arguments}``. Bis TOOL-6 kannte der Waechter
+#: ``{Aufruf: Positionen der Pfad-Argumente}``. Bis TOOL-6 kannte der Waechter
 #: nur ``os.path.join``; ``Path("shows")``, ``open("data/...")`` und ein
 #: relativer Pfad, der ueber eine Konstante an ``build_and_verify`` ging,
-#: rutschten durch.
+#: rutschten durch. Bei Quelle -> Ziel (umbenennen, kopieren, verschieben)
+#: zaehlen BEIDE Pfade — das Ziel ist der, der woanders landet (Review #849).
+_EIN = (0,)
+_ZWEI = (0, 1)
 _PFAD_AUFRUFE = {
-    "os.path.join": 0, "open": 0, "io.open": 0,
-    "Path": 0, "pathlib.Path": 0, "PurePath": 0, "pathlib.PurePath": 0,
-    "os.listdir": 0, "os.scandir": 0, "os.makedirs": 0, "os.mkdir": 0,
-    "os.remove": 0, "os.unlink": 0, "os.rename": 0, "os.replace": 0,
-    "os.path.exists": 0, "os.path.isfile": 0, "os.path.isdir": 0,
-    "os.path.getsize": 0, "os.path.getmtime": 0,
-    "os.path.abspath": 0, "os.path.realpath": 0,
-    "shutil.copy": 0, "shutil.copy2": 0, "shutil.copyfile": 0,
-    "shutil.copytree": 0, "shutil.move": 0, "shutil.rmtree": 0,
-    "glob.glob": 0, "glob.iglob": 0, "sqlite3.connect": 0,
-    "save_show": 0, "load_show": 0, "build_and_verify": 1,
+    "os.path.join": _EIN, "open": _EIN, "io.open": _EIN,
+    "Path": _EIN, "pathlib.Path": _EIN, "PurePath": _EIN, "pathlib.PurePath": _EIN,
+    "os.listdir": _EIN, "os.scandir": _EIN, "os.makedirs": _EIN, "os.mkdir": _EIN,
+    "os.remove": _EIN, "os.unlink": _EIN, "os.rename": _ZWEI, "os.replace": _ZWEI,
+    "os.path.exists": _EIN, "os.path.isfile": _EIN, "os.path.isdir": _EIN,
+    "os.path.getsize": _EIN, "os.path.getmtime": _EIN,
+    "os.path.abspath": _EIN, "os.path.realpath": _EIN,
+    "shutil.copy": _ZWEI, "shutil.copy2": _ZWEI, "shutil.copyfile": _ZWEI,
+    "shutil.copytree": _ZWEI, "shutil.move": _ZWEI, "shutil.rmtree": _EIN,
+    "glob.glob": _EIN, "glob.iglob": _EIN, "sqlite3.connect": _EIN,
+    "save_show": _EIN, "load_show": _EIN, "build_and_verify": (1,),
 }
 
 #: Bewusst CWD-relativ — ``(Datei relativ zu tools/, Aufruf)`` -> Grund.
@@ -110,10 +113,9 @@ def _cwd_relative_pfade(pfad, ausnahmen=None):
     for k in ast.walk(baum):
         if not isinstance(k, ast.Call):
             continue
-        stelle = _PFAD_AUFRUFE.get(ast.unparse(k.func))
-        if stelle is None or len(k.args) <= stelle:
-            continue
-        if not _relativer_anfang(k.args[stelle], konstanten):
+        stellen = _PFAD_AUFRUFE.get(ast.unparse(k.func), ())
+        if not any(s < len(k.args) and _relativer_anfang(k.args[s], konstanten)
+                   for s in stellen):
             continue
         if (rel, ast.unparse(k)) in ausnahmen:
             continue
@@ -154,7 +156,7 @@ class KeinWerkzeugBautCwdRelativePfade(unittest.TestCase):
         """TOOL-6: die Formen, die der erste Waechter nicht sah — und ihre
         repo-relativen Gegenstuecke, die er nicht melden darf."""
         quelle = (
-            'import os, json, pathlib\n'
+            'import os, json, pathlib, shutil\n'
             'from pathlib import Path\n'
             'OUT = "shows/X.lshow"\n'                          # 3  ueber Konstante
             'ROOT = Path(__file__).resolve().parent.parent\n'
@@ -165,6 +167,9 @@ class KeinWerkzeugBautCwdRelativePfade(unittest.TestCase):
             'build_and_verify(b, OUT, name="X")\n'             # 9
             'build_and_verify(b, "docs/a.lshow")\n'            # 10
             'e = os.path.exists("fixtures/" + "x")\n'          # 11
+            'os.rename(tmp, "data/ergebnis.json")\n'           # 12 Ziel
+            'shutil.copy(quelle, f"shows/{OUT}")\n'            # 13 Ziel
+            'shutil.move("data/alt.json", ziel)\n'             # 14 Quelle
             'f = ROOT / "shows" / "X.lshow"\n'                 # ok
             'g = open(os.path.join(ROOT, "data", "m.json"))\n'  # ok
             'h = Path(ROOT, "shows")\n'                        # ok
@@ -176,7 +181,7 @@ class KeinWerkzeugBautCwdRelativePfade(unittest.TestCase):
                 f.write(quelle)
             zeilen = sorted(int(t.split(":")[1].split()[0])
                             for t in _cwd_relative_pfade(probe, ausnahmen={}))
-        self.assertEqual(zeilen, [5, 6, 7, 8, 9, 10, 11])
+        self.assertEqual(zeilen, [5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
 
     def test_ausnahmen_gibt_es_noch(self):
         """Eine Ausnahme, deren Aufruf verschwunden ist, gehoert gestrichen."""
