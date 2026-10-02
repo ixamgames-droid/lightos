@@ -281,6 +281,58 @@
         }
       ],
       "md5": "aac19ae7fbd5317ab5119a1460efa804"
+    },
+    {
+      "datei": "13_go_ohne_executor_ablauf.gif",
+      "szene": "13_go_ohne_executor_ablauf",
+      "titel": "GIF: GO ohne Executor — Liste landet auf Ex 1, Cue 1, dann Cue 2",
+      "groesse": [
+        1200,
+        675
+      ],
+      "marken": [
+        [
+          {
+            "nummer": 1,
+            "beschriftung": "GO"
+          }
+        ],
+        [
+          {
+            "nummer": 1,
+            "beschriftung": "GO"
+          },
+          {
+            "nummer": 2,
+            "beschriftung": "Cue 1"
+          },
+          {
+            "nummer": 3,
+            "beschriftung": "Hinweis"
+          },
+          {
+            "nummer": 4,
+            "beschriftung": "Executor 1"
+          }
+        ],
+        [
+          {
+            "nummer": 1,
+            "beschriftung": "GO"
+          },
+          {
+            "nummer": 2,
+            "beschriftung": "Cue 2"
+          }
+        ]
+      ],
+      "md5": "1fb539876b70f3efd5d01b96f227d642",
+      "frames": 3,
+      "dauern_ms": [
+        1500,
+        2200,
+        1800
+      ]
     }
   ]
 }
