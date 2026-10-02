@@ -26,6 +26,14 @@ ins Repo kommen.
   - `assets/vendor/three.min.js`
   - `src/ui/visualizer/three_local.js`
 
+## Apache License 2.0 — für Geräteprofile auf QLC+-Basis
+
+- **Lizenztext:** [`licenses/Apache-2.0.txt`](licenses/Apache-2.0.txt).
+- **Wofür:** Die eigene Geräte-Bibliothek (FM-56, `fixtures/bibliothek/`) darf Profile enthalten,
+  die aus QLC+ (Copyright © Heikki Junnila, Massimo Callegari und die QLC+-Beitragenden)
+  übernommen und von LightOS überarbeitet wurden. Jede solche Datei nennt ihre Herkunft,
+  den Urheber, die Originaldatei und die Änderungen selbst (Feld `herkunft`).
+
 ## GNU FreeFont — Schrift für das Gource-Werkzeug
 
 - **Datei:** `tools/gource/data/fonts/FreeSans.ttf` (nur Entwickler-Werkzeug, nicht Teil der App).
