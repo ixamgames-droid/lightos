@@ -1,0 +1,395 @@
+{
+  "format_version": 1,
+  "hersteller": "Showtec",
+  "hersteller_kurz": "Showtec",
+  "modell": "LED Pixel Bar 12 RGBW",
+  "kurzname": "PIXELBAR12",
+  "typ": "led_bar",
+  "leistung_w": 45,
+  "notizen": "Ohne Handbuch nachbearbeitet. Farbpresets (12-Kanal-Modus) nur als 'Color N' bekannt.",
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Showtec-Pixel-Bar-12-RGBW.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Showtec/Showtec-Pixel-Bar-12-RGBW.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.3 GIT · Paul Misset",
+    "original": "resources/fixtures/Showtec/Showtec-Pixel-Bar-12-RGBW.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 126 Wertebereiche mit Art (kind) versehen; Rasterform in 7 Modus/Modi aus <Physical> uebernommen; LightOS-Nachbearbeitung (FM-57): kurzname PIXELBAR12; Raster je Modus nach Zahl der Farbzonen (48-Kanal 1x12, 18-Kanal 1x4, 10-Kanal 1x2, Einzonen-Modi 1x1; 4-Kanal-Programmmodus ohne Raster) statt pauschal 1x12; Random Strobe als strobe statt zweitem shutter; Farblauf-/Pixelprogramme als macro statt color_wheel; Tempo-Kanaele als effect_speed; Sound-Bereich mit art sound; Programmnummern benannt"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "aus QLC+ konvertiert und von LightOS nach Kanalnamen/Bereichen nachbearbeitet; kein Herstellerhandbuch verfuegbar (Hersteller-Website hinter Bot-Sperre) — nicht Kanal fuer Kanal gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "4 Channel",
+      "kanaele": [
+        {
+          "name": "Built-in Programs",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 6, "name": "No function", "art": ""},
+            {"von": 7, "bis": 13, "name": "Programm 1", "art": ""},
+            {"von": 14, "bis": 20, "name": "Programm 2", "art": ""},
+            {"von": 21, "bis": 27, "name": "Programm 3", "art": ""},
+            {"von": 28, "bis": 34, "name": "Programm 4", "art": ""},
+            {"von": 35, "bis": 41, "name": "Programm 5", "art": ""},
+            {"von": 42, "bis": 48, "name": "Programm 6", "art": ""},
+            {"von": 49, "bis": 55, "name": "Programm 7", "art": ""},
+            {"von": 56, "bis": 62, "name": "Programm 8", "art": ""},
+            {"von": 63, "bis": 69, "name": "Programm 9", "art": ""},
+            {"von": 70, "bis": 76, "name": "Programm 10", "art": ""},
+            {"von": 77, "bis": 83, "name": "Programm 11", "art": ""},
+            {"von": 84, "bis": 90, "name": "Programm 12", "art": ""},
+            {"von": 91, "bis": 97, "name": "Programm 13", "art": ""},
+            {"von": 98, "bis": 104, "name": "Programm 14", "art": ""},
+            {"von": 105, "bis": 111, "name": "Programm 15", "art": ""},
+            {"von": 112, "bis": 118, "name": "Programm 16", "art": ""},
+            {"von": 119, "bis": 125, "name": "Programm 17", "art": ""},
+            {"von": 126, "bis": 132, "name": "Programm 18", "art": ""},
+            {"von": 133, "bis": 139, "name": "Programm 19", "art": ""},
+            {"von": 140, "bis": 146, "name": "Programm 20", "art": ""},
+            {"von": 147, "bis": 153, "name": "Programm 21", "art": ""},
+            {"von": 154, "bis": 160, "name": "Programm 22", "art": ""},
+            {"von": 161, "bis": 167, "name": "Programm 23", "art": ""},
+            {"von": 168, "bis": 174, "name": "Programm 24", "art": ""},
+            {"von": 175, "bis": 181, "name": "Programm 25", "art": ""},
+            {"von": 182, "bis": 188, "name": "Programm 26", "art": ""},
+            {"von": 189, "bis": 195, "name": "Programm 27", "art": ""},
+            {"von": 196, "bis": 202, "name": "Programm 28", "art": ""},
+            {"von": 203, "bis": 209, "name": "Programm 29", "art": ""},
+            {"von": 210, "bis": 216, "name": "Programm 30", "art": ""},
+            {"von": 217, "bis": 223, "name": "Programm 31", "art": ""},
+            {"von": 224, "bis": 230, "name": "Programm 32", "art": ""},
+            {"von": 231, "bis": 237, "name": "Programm 33", "art": ""},
+            {"von": 238, "bis": 244, "name": "Programm 34", "art": ""},
+            {"von": 245, "bis": 251, "name": "Programm 35", "art": ""},
+            {"von": 252, "bis": 255, "name": "Sound active", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Color running programs",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 1, "name": "No function", "art": ""},
+            {"von": 2, "bis": 35, "name": "Program 1", "art": ""},
+            {"von": 36, "bis": 53, "name": "Program 2", "art": ""},
+            {"von": 54, "bis": 71, "name": "Program 3", "art": ""},
+            {"von": 72, "bis": 89, "name": "Program 4", "art": ""},
+            {"von": 90, "bis": 107, "name": "Program 5", "art": ""},
+            {"von": 108, "bis": 125, "name": "Program 6", "art": ""},
+            {"von": 126, "bis": 143, "name": "Program 7", "art": ""},
+            {"von": 144, "bis": 161, "name": "Program 8", "art": ""},
+            {"von": 162, "bis": 179, "name": "Program 9", "art": ""},
+            {"von": 180, "bis": 197, "name": "Program 10", "art": ""},
+            {"von": 198, "bis": 215, "name": "Program 11", "art": ""},
+            {"von": 216, "bis": 233, "name": "Program 12", "art": ""},
+            {"von": 234, "bis": 251, "name": "Program 13", "art": ""},
+            {"von": 252, "bis": 255, "name": "Program 14", "art": ""}
+          ]
+        },
+        {
+          "name": "Speed/Audio Sensitivity",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "From slow to fast/From less sensitive to highly sensitive", "art": ""}
+          ]
+        },
+        {
+          "name": "Linear Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 1, "name": "Strobe off", "art": "open"},
+            {"von": 2, "bis": 255, "name": "Strobe from slow to fast", "art": "strobe"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6 Channel",
+      "raster": {"rows": 1, "cols": 1},
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Linear Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 1, "name": "Strobe off", "art": "open"},
+            {"von": 2, "bis": 255, "name": "Strobe from slow to fast", "art": "strobe"}
+          ]
+        },
+        {"name": "Red Section 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green Section 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue Section 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White Section 1", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "18 Channel",
+      "raster": {"rows": 1, "cols": 4},
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Linear Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 1, "name": "Strobe off", "art": "open"},
+            {"von": 2, "bis": 255, "name": "Strobe from slow to fast", "art": "strobe"}
+          ]
+        },
+        {"name": "Red Section 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green Section 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue Section 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White Section 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red Section 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green Section 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue Section 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White Section 2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red Section 3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green Section 3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue Section 3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White Section 3", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red Section 4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green Section 4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue Section 4", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White Section 4", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "48 Channel",
+      "raster": {"rows": 1, "cols": 12},
+      "kanaele": [
+        {"name": "Red Section 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green Section 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue Section 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White Section 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red Section 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green Section 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue Section 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White Section 2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red Section 3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green Section 3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue Section 3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White Section 3", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red Section 4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green Section 4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue Section 4", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White Section 4", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red Section 5", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green Section 5", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue Section 5", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White Section 5", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red Section 6", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green Section 6", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue Section 6", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White Section 6", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red Section 7", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green Section 7", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue Section 7", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White Section 7", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red Section 8", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green Section 8", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue Section 8", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White Section 8", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red Section 9", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green Section 9", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue Section 9", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White Section 9", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red Section 10", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green Section 10", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue Section 10", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White Section 10", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red Section 11", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green Section 11", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue Section 11", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White Section 11", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red Section 12", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green Section 12", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue Section 12", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White Section 12", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "10 Channel",
+      "raster": {"rows": 1, "cols": 2},
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Linear Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 1, "name": "Strobe off", "art": "open"},
+            {"von": 2, "bis": 255, "name": "Strobe from slow to fast", "art": "strobe"}
+          ]
+        },
+        {"name": "Red Section 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green Section 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue Section 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White Section 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red Section 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green Section 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue Section 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White Section 2", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "4 Channel RGBW",
+      "raster": {"rows": 1, "cols": 1},
+      "kanaele": [
+        {"name": "Red Section 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green Section 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue Section 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White Section 1", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "12 Channel",
+      "raster": {"rows": 1, "cols": 1},
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Linear Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 1, "name": "Strobe off", "art": "open"},
+            {"von": 2, "bis": 255, "name": "Strobe from slow to fast", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Random Strobe",
+          "attribut": "strobe",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Zufalls-Strobe"}
+          ]
+        },
+        {
+          "name": "Color presets",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 6, "name": "Color 1", "art": "color"},
+            {"von": 7, "bis": 13, "name": "Color 2", "art": "color"},
+            {"von": 14, "bis": 20, "name": "Color 3", "art": "color"},
+            {"von": 21, "bis": 27, "name": "Color 4", "art": "color"},
+            {"von": 28, "bis": 34, "name": "Color 5", "art": "color"},
+            {"von": 35, "bis": 41, "name": "Color 6", "art": "color"},
+            {"von": 42, "bis": 48, "name": "Color 7", "art": "color"},
+            {"von": 49, "bis": 55, "name": "Color 8", "art": "color"},
+            {"von": 56, "bis": 62, "name": "Color 9", "art": "color"},
+            {"von": 63, "bis": 69, "name": "Color 10", "art": "color"},
+            {"von": 70, "bis": 76, "name": "Color 11", "art": "color"},
+            {"von": 77, "bis": 83, "name": "Color 12", "art": "color"},
+            {"von": 84, "bis": 90, "name": "Color 13", "art": "color"},
+            {"von": 91, "bis": 97, "name": "Color 14", "art": "color"},
+            {"von": 98, "bis": 104, "name": "Color 15", "art": "color"},
+            {"von": 105, "bis": 111, "name": "Color 16", "art": "color"},
+            {"von": 112, "bis": 118, "name": "Color 17", "art": "color"},
+            {"von": 119, "bis": 125, "name": "Color 18", "art": "color"},
+            {"von": 126, "bis": 132, "name": "Color 19", "art": "color"},
+            {"von": 133, "bis": 139, "name": "Color 20", "art": "color"},
+            {"von": 140, "bis": 146, "name": "Color 21", "art": "color"},
+            {"von": 147, "bis": 153, "name": "Color 22", "art": "color"},
+            {"von": 154, "bis": 160, "name": "Color 23", "art": "color"},
+            {"von": 161, "bis": 167, "name": "Color 24", "art": "color"},
+            {"von": 168, "bis": 174, "name": "Color 25", "art": "color"},
+            {"von": 175, "bis": 181, "name": "Color 26", "art": "color"},
+            {"von": 182, "bis": 188, "name": "Color 27", "art": "color"},
+            {"von": 189, "bis": 195, "name": "Color 28", "art": "color"},
+            {"von": 196, "bis": 202, "name": "Color 29", "art": "color"},
+            {"von": 203, "bis": 209, "name": "Color 30", "art": "color"},
+            {"von": 210, "bis": 216, "name": "Color 31", "art": "color"},
+            {"von": 217, "bis": 223, "name": "Color 32", "art": "color"},
+            {"von": 224, "bis": 255, "name": "Color 33", "art": "color"}
+          ]
+        },
+        {
+          "name": "Pixel Programs",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 24, "name": "Program 1", "art": ""},
+            {"von": 25, "bis": 49, "name": "Program 2", "art": ""},
+            {"von": 50, "bis": 74, "name": "Program 3", "art": ""},
+            {"von": 75, "bis": 99, "name": "Program 4", "art": ""},
+            {"von": 100, "bis": 124, "name": "Program 5", "art": ""},
+            {"von": 125, "bis": 149, "name": "Program 6", "art": ""},
+            {"von": 150, "bis": 174, "name": "Program 7", "art": ""},
+            {"von": 175, "bis": 199, "name": "Program 8", "art": ""},
+            {"von": 200, "bis": 224, "name": "Program 9", "art": ""},
+            {"von": 225, "bis": 249, "name": "Program 10", "art": ""},
+            {"von": 250, "bis": 255, "name": "Program 11", "art": ""}
+          ]
+        },
+        {
+          "name": "Color running programs",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 1, "name": "No function", "art": ""},
+            {"von": 2, "bis": 35, "name": "Program 1", "art": ""},
+            {"von": 36, "bis": 53, "name": "Program 2", "art": ""},
+            {"von": 54, "bis": 71, "name": "Program 3", "art": ""},
+            {"von": 72, "bis": 89, "name": "Program 4", "art": ""},
+            {"von": 90, "bis": 107, "name": "Program 5", "art": ""},
+            {"von": 108, "bis": 125, "name": "Program 6", "art": ""},
+            {"von": 126, "bis": 143, "name": "Program 7", "art": ""},
+            {"von": 144, "bis": 161, "name": "Program 8", "art": ""},
+            {"von": 162, "bis": 179, "name": "Program 9", "art": ""},
+            {"von": 180, "bis": 197, "name": "Program 10", "art": ""},
+            {"von": 198, "bis": 215, "name": "Program 11", "art": ""},
+            {"von": 216, "bis": 233, "name": "Program 12", "art": ""},
+            {"von": 234, "bis": 251, "name": "Program 13", "art": ""},
+            {"von": 252, "bis": 255, "name": "Program 14", "art": ""}
+          ]
+        },
+        {
+          "name": "Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Gradual speed adjustment (slow to fast)", "art": ""}
+          ]
+        },
+        {
+          "name": "Sound mode",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 50, "name": "Keine Funktion"},
+            {"von": 51, "bis": 255, "name": "Musiksteuerung, Empfindlichkeit", "art": "sound"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    }
+  ]
+}

@@ -9,23 +9,24 @@
 
 ### Reihe 1 — Misch-Collections (alles auf einen Tipp)
 **Mix: Party / Drop / Chill / Spider+Gobo** — jede Kachel startet **mehrere** Effekte gleichzeitig
-(Farbe + Dimmer + Bewegung) als fertigen Moment. Eine Kachel = ein kompletter Look.
+(Farbe + Dimmer + Bewegung) als fertigen Moment. Eine Kachel = ein kompletter Look. **Achtung:** jede
+Mix-Kachel stoppt vorher **alle** laufenden Effekte und leert den Programmer.
 
 ### Reihe 2 — Chaser (Schritt für Schritt)
 **Chase Voll-Looks / MH-Farben / Spider-Themes / Auto-Farbschema / Drop** — spielen eine **Liste von
 Szenen** nacheinander ab (mit Überblendung). „Auto-Farbschema" und „Drop" laufen **auf den Beat**.
 
 ### Reihe 3 — GO Cuelisten (geplante Abfolge)
-**GO Aufwärmen / Drop-Sequenz / Farb-Reise** — starten eine **Cueliste**: definierte Schritte (Cues)
+**„GO Aufwärm“ / „GO Drop-Se“ / „GO Farb-Re“** (Aufwärmen / Drop-Sequenz / Farb-Reise) — starten eine **Cueliste**: definierte Schritte (Cues)
 mit Fade-Zeiten. „Aufwärmen" läuft mit **Auto-Follow** weiter, „Drop"/„Farb-Reise" springen **auf den Beat**.
-Rechts siehst du die Cueliste mit ihren Schritten.
+Rechts siehst du die Cuelisten „Aufwärmen“ und „Drop-Sequenz“ mit ihren Schritten.
 
 ---
 
 ### Schritt-für-Schritt (Beispiel: Party-Moment)
 1. **Bank 6** → **„Mix: Party"** → Regenbogen-Farbe + Lauflicht + Kreis-Bewegung starten gemeinsam.
 2. Reicht das nicht? **„GO Drop-Sequenz"** dazu → harte Farbwechsel auf den Beat.
-3. Beenden: oben **„Stop All"** (universelle Leiste) oder die Kachel erneut tippen.
+3. Beenden: unten **„Stop All“** (universelle Leiste) oder die Kachel erneut tippen.
 
 ### Begriffe kurz
 - **Szene** = ein fester Licht-Zustand. **Chaser** = Szenen nacheinander. **Collection** = mehrere Effekte zusammen.

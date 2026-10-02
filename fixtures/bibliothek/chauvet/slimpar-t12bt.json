@@ -1,0 +1,71 @@
+{
+  "format_version": 1,
+  "hersteller": "Chauvet",
+  "hersteller_kurz": "CHAUVET",
+  "modell": "SlimPAR T12BT",
+  "kurzname": "SlimPAR T12BT",
+  "typ": "par",
+  "leistung_w": 42,
+  "quelle": {
+    "titel": "SlimPAR T12BT User Manual",
+    "version": "Rev. 4",
+    "url": "https://www.chauvetdj.com/wp-content/uploads/2018/03/SlimPAR_T12BT_UM_Rev4.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.7 GIT · Andrew Pavlin",
+    "original": "resources/fixtures/Chauvet/Chauvet-SlimPAR-T12BT.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 7 Wertebereiche mit Art (kind) versehen; danach von LightOS gegen das Herstellerhandbuch (SlimPAR T12BT User Manual) Kanal fuer Kanal ueberarbeitet: CH4 Strobe als strobe (reine Frequenz 0-20 Hz, Handbuch ohne Offen-Bereich) statt shutter; CH6 Programmgeschwindigkeit mit Sound-Bereich 251-255 nach Handbuch; Leistung nach Handbuch (42 W bei 230 V); Kanalnamen und Bereichsnamen auf Deutsch; Default/Highlight nach LightOS-Regeln (Pan/Tilt 128, Dimmer 0, Shutter offen)"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanalbelegung, Wertebereiche und Modi aller DMX-Modi Kanal fuer Kanal gegen das Herstellerhandbuch geprueft (nicht am echten Geraet)"
+  },
+  "modi": [
+    {
+      "name": "7 Channel",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Strobe (0-20 Hz)", "attribut": "strobe", "default": 0, "highlight": 0},
+        {
+          "name": "Auto-Programme",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Keine Funktion", "art": ""},
+            {"von": 6, "bis": 55, "name": "Programm 1", "art": ""},
+            {"von": 56, "bis": 106, "name": "Programm 2", "art": ""},
+            {"von": 107, "bis": 157, "name": "Programm 3", "art": ""},
+            {"von": 158, "bis": 208, "name": "Programm 4", "art": ""},
+            {"von": 209, "bis": 255, "name": "Programm 5", "art": ""}
+          ]
+        },
+        {
+          "name": "Programmgeschwindigkeit",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 250, "name": "Geschwindigkeit langsam -> schnell", "art": ""},
+            {"von": 251, "bis": 255, "name": "Sound-Modus", "art": "sound"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "3 Channel",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    }
+  ],
+  "notizen": "12x Tri-LED RGB, Bluetooth (BT Air). Strobe-Kanal laut Handbuch 000-255 = 0-20 Hz ohne eigenen Aus-Bereich; 0 = kein Strobe."
+}

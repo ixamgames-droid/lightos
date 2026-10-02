@@ -1,0 +1,122 @@
+{
+  "format_version": 1,
+  "hersteller": "Cameo",
+  "hersteller_kurz": "Cameo",
+  "modell": "Studio PAR 64 RGBWA UV 12W",
+  "kurzname": "Studio PAR 64 RGBWA UV 12W",
+  "typ": "par",
+  "leistung_w": 110,
+  "notizen": "Strobe-Kanal in QLC+ ohne Wertebereiche hinterlegt (0 = aus angenommen).",
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Cameo-Studio-PAR-64-RGBWA-UV-12W.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Cameo/Cameo-Studio-PAR-64-RGBWA-UV-12W.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.10.6 GIT · Piotr Nowik",
+    "original": "resources/fixtures/Cameo/Cameo-Studio-PAR-64-RGBWA-UV-12W.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 25 Wertebereiche mit Art (kind) versehen; Farbmakro 9/3-Kanal: 0-4 (Farbmischung ueber Kanal 3-8) als 'open' statt 'closed', Makros 'color', Farbwechsel/-ueberblendung 'rotate' statt 'color', Musiksteuerung 'sound'; Tippfehler korrigiert (Torquoise)"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Datei und die LightOS-Attributliste geprueft (Attribute, Bereichs-Arten, Defaults); Herstellerhandbuch mit DMX-Tabelle war nicht abrufbar, daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "9 channel",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Stroboscope", "attribut": "shutter", "default": 0, "highlight": 0},
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {
+          "name": "Color macros",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Blackout / colors ch3 - ch8", "art": "open"},
+            {"von": 5, "bis": 80, "name": "Macros", "art": "color"},
+            {"von": 81, "bis": 150, "name": "Color change", "art": "rotate"},
+            {"von": 151, "bis": 220, "name": "Color blending", "art": "rotate"},
+            {"von": 221, "bis": 255, "name": "Music control (mic sensitivity)", "art": "sound"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2 channel",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Color macros 2ch",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 16, "name": "Red", "art": "color"},
+            {"von": 17, "bis": 33, "name": "Green", "art": "color"},
+            {"von": 34, "bis": 50, "name": "Blue", "art": "color"},
+            {"von": 51, "bis": 67, "name": "White", "art": "color"},
+            {"von": 68, "bis": 84, "name": "Amber", "art": "color"},
+            {"von": 85, "bis": 101, "name": "UV", "art": "color"},
+            {"von": 102, "bis": 118, "name": "Yellow", "art": "color"},
+            {"von": 119, "bis": 135, "name": "Cyan", "art": "color"},
+            {"von": 136, "bis": 152, "name": "Lavender", "art": "color"},
+            {"von": 153, "bis": 169, "name": "Light green", "art": "color"},
+            {"von": 170, "bis": 186, "name": "Magenta", "art": "color"},
+            {"von": 187, "bis": 203, "name": "Turquoise", "art": "color"},
+            {"von": 204, "bis": 220, "name": "Orange", "art": "color"},
+            {"von": 221, "bis": 237, "name": "Cold white", "art": "color"},
+            {"von": 238, "bis": 255, "name": "Warm white", "art": "color"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3 channel mode 1",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Stroboscope", "attribut": "shutter", "default": 0, "highlight": 0},
+        {
+          "name": "Color macros",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Blackout / colors ch3 - ch8", "art": "open"},
+            {"von": 5, "bis": 80, "name": "Macros", "art": "color"},
+            {"von": 81, "bis": 150, "name": "Color change", "art": "rotate"},
+            {"von": 151, "bis": 220, "name": "Color blending", "art": "rotate"},
+            {"von": 221, "bis": 255, "name": "Music control (mic sensitivity)", "art": "sound"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3 channel mode 2",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "6 channel",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255}
+      ]
+    }
+  ]
+}

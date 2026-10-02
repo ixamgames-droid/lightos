@@ -607,6 +607,26 @@ def _open_show_at_startup(window, pfad: str):
     QTimer.singleShot(0, lambda: window._open_show_path(pfad))
 
 
+def _bibliothek_beim_erststart(window) -> None:
+    """FM-53: beim ersten Start fragen, ob eine freie Geraete-Bibliothek geladen
+    werden soll — nur solange die Bibliothek nichts ausser den eingebauten
+    Profilen enthaelt und die Frage nie beantwortet wurde.
+
+    Bewusst HIER und nicht im ``MainWindow``-Konstruktor: die Tests bauen das
+    Fenster hundertfach, und ein modaler Dialog dort blockierte jeden davon.
+    Im Kiosk-Modus wird nicht gefragt."""
+    from PySide6.QtCore import QTimer
+    try:
+        from src.core.database import bibliothek_download as _bd
+        from src.core.database.fixture_db import engine as _fdb_engine
+        if not _bd.beim_start_fragen(_fdb_engine()):
+            return
+    except Exception as e:
+        print(f"[main] Bibliothek-Erststart uebersprungen: {e}")
+        return
+    QTimer.singleShot(800, lambda: window._open_bibliothek_download(erststart=True))
+
+
 def main():
     # argparse ZUERST: es hat keine Nebenwirkungen auf native Ressourcen.
     # Frueher lag die Einzelinstanz-Sperre davor — dann beantwortete ein
@@ -698,6 +718,8 @@ def main():
 
     if args.show:
         _open_show_at_startup(window, args.show)
+    if not args.kiosk:
+        _bibliothek_beim_erststart(window)
 
     _finalize_and_exit(app.exec())
 

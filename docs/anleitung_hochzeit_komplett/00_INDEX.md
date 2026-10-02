@@ -13,7 +13,10 @@
 
 ## Laden & loslegen
 - **Datei → Öffnen** (`Strg+O`) → `shows/Hochzeit_Komplett_2026.lshow`.
-  (Fehlt sie: `venv\Scripts\python.exe tools\build_hochzeit_komplett.py` baut sie selbstprüfend neu.)
+  (Fehlt sie: `venv\Scripts\python.exe tools\build_hochzeit_komplett.py` bzw. unter Linux
+  `./venv/bin/python tools/build_hochzeit_komplett.py` baut sie selbstprüfend neu. **Voraussetzung:** das
+  lokal importierte Spider-Profil **„Speider“** (U-King, 14ch) — es gehört nicht zu den eingebauten
+  Geräten; fehlt es, bricht der Generator mit „Profil 'Speider' fehlt“ ab.)
 - Die **6 Bänke** liegen auf der **Virtual Console** (`Strg+4`). Blättern: **`Strg+Bild↓` / `Strg+Bild↑`**.
   Mit **APC mini**: **SCENE-Tasten = Bank 1–6**.
 
@@ -38,7 +41,7 @@
 | **5** | Live-Editor | Effekte im Nachhinein regeln (Tempo/Lauflichter/Dichte/Farben) | [Bild](img/bank5_editor.png) |
 | **6** | Abläufe & Musik | Chaser, Cuelisten, Collections, Playlist, Auto-Show | [Bild](img/bank6_ablaeufe.png) |
 
-Die **universelle Leiste** (unten, immer sichtbar): Clear · Stop All · Blackout · Tap · ◀ Lied · ▶/⏸ · Lied ▶ · Musik-BPM,
+Die **universelle Leiste** (unten, immer sichtbar): Clear · Stop All · Blackout · Tap · << Lied · >/|| · Lied >> · Musik-BPM,
 dazu die Fader **Dimmer (F6)** · **Speed (F7)** · **Master (F9)**.
 
 ## 📖 Minianleitungen (kinderleicht, Schritt für Schritt)

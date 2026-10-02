@@ -1,0 +1,150 @@
+{
+  "format_version": 1,
+  "hersteller": "Chauvet",
+  "hersteller_kurz": "CHAUVET",
+  "modell": "Freedom Par Hex 4",
+  "kurzname": "Freedom Par Hex 4",
+  "typ": "par",
+  "leistung_w": 34,
+  "quelle": {
+    "titel": "Freedom Par Hex-4 User Manual",
+    "version": "Rev. 3",
+    "url": "https://www.chauvetdj.com/wp-content/uploads/2015/12/Freedom_Par_Hex-4_UM_Rev3_WO.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.1.0 GIT · Yestalgia",
+    "original": "resources/fixtures/Chauvet/Chauvet-Freedom-Par-Hex-4.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 33 Wertebereiche mit Art (kind) versehen; danach von LightOS gegen das Herstellerhandbuch (Freedom Par Hex-4 User Manual) Kanal fuer Kanal ueberarbeitet: CH8 Strobe mit Bereichen nach Handbuch (000-010 kein Strobe = open, 011-255 Strobe); CH9 Manuelle Farbe als macro statt color_wheel; Mischbereiche nach Handbuch korrigiert (u. a. 071-090 B 100 %, 091-110 R 0-100 %/B 100 %, 111-130 B 100-0 %), 201-255 als Farbtemperatur 1-11; CH10 Sound-Bereich 241-255 nach Handbuch; CH11 Programmgeschwindigkeit/Soundempfindlichkeit nach Handbuch benannt; CH12 Dimmerkurve als raw statt speed, falsche Art reset an 000-051 entfernt; Leistung nach Handbuch (34 W bei 230 V); Kanalnamen und Bereichsnamen auf Deutsch; Default/Highlight nach LightOS-Regeln (Pan/Tilt 128, Dimmer 0, Shutter offen)"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanalbelegung, Wertebereiche und Modi aller DMX-Modi Kanal fuer Kanal gegen das Herstellerhandbuch geprueft (nicht am echten Geraet)"
+  },
+  "modi": [
+    {
+      "name": "6 Channel",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "8 Channel",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Kein Strobe", "art": "open"},
+            {"von": 11, "bis": 255, "name": "Strobe langsam -> schnell", "art": "strobe"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "12 Channel",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Kein Strobe", "art": "open"},
+            {"von": 11, "bis": 255, "name": "Strobe langsam -> schnell", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Manuelle Farbe",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Keine Funktion", "art": ""},
+            {"von": 11, "bis": 30, "name": "R 100 %, G 0-100 %, B 0", "art": ""},
+            {"von": 31, "bis": 50, "name": "R 100-0 %, G 100 %, B 0", "art": ""},
+            {"von": 51, "bis": 70, "name": "R 0, G 100 %, B 0-100 %", "art": ""},
+            {"von": 71, "bis": 90, "name": "R 0, G 100-0 %, B 100 %", "art": ""},
+            {"von": 91, "bis": 110, "name": "R 0-100 %, G 0, B 100 %", "art": ""},
+            {"von": 111, "bis": 130, "name": "R 100 %, G 0, B 100-0 %", "art": ""},
+            {"von": 131, "bis": 150, "name": "R 100 %, G 0-100 %, B 0-100 %", "art": ""},
+            {"von": 151, "bis": 170, "name": "R 100-0 %, G 100-0 %, B 100 %", "art": ""},
+            {"von": 171, "bis": 200, "name": "R/G/B/A 100 %", "art": ""},
+            {"von": 201, "bis": 205, "name": "Farbtemperatur 1", "art": ""},
+            {"von": 206, "bis": 210, "name": "Farbtemperatur 2", "art": ""},
+            {"von": 211, "bis": 215, "name": "Farbtemperatur 3", "art": ""},
+            {"von": 216, "bis": 220, "name": "Farbtemperatur 4", "art": ""},
+            {"von": 221, "bis": 225, "name": "Farbtemperatur 5", "art": ""},
+            {"von": 226, "bis": 230, "name": "Farbtemperatur 6", "art": ""},
+            {"von": 231, "bis": 235, "name": "Farbtemperatur 7", "art": ""},
+            {"von": 236, "bis": 240, "name": "Farbtemperatur 8", "art": ""},
+            {"von": 241, "bis": 245, "name": "Farbtemperatur 9", "art": ""},
+            {"von": 246, "bis": 250, "name": "Farbtemperatur 10", "art": ""},
+            {"von": 251, "bis": 255, "name": "Farbtemperatur 11", "art": ""}
+          ]
+        },
+        {
+          "name": "Auto-/Sound-Programme",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Keine Funktion", "art": ""},
+            {"von": 11, "bis": 60, "name": "Auto-Programm 1", "art": ""},
+            {"von": 61, "bis": 120, "name": "Auto-Programm 2", "art": ""},
+            {"von": 121, "bis": 180, "name": "Auto-Programm 3", "art": ""},
+            {"von": 181, "bis": 240, "name": "Auto-Programm 4", "art": ""},
+            {"von": 241, "bis": 255, "name": "Sound-Modus", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Programmgeschwindigkeit / Soundempfindlichkeit",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Tempo (CH10 000-240) / Sound aus (CH10 241-255)", "art": ""},
+            {"von": 11, "bis": 255, "name": "Tempo langsam -> schnell / Soundempf. niedrig -> hoch", "art": ""}
+          ]
+        },
+        {
+          "name": "Dimmerkurve",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 51, "name": "Dimmerkurve aus dem Menue", "art": ""},
+            {"von": 52, "bis": 101, "name": "Dimmerkurve aus (linear)", "art": ""},
+            {"von": 102, "bis": 152, "name": "Dimmerkurve 1 (schnell)", "art": ""},
+            {"von": 153, "bis": 203, "name": "Dimmerkurve 2 (mittel)", "art": ""},
+            {"von": 204, "bis": 255, "name": "Dimmerkurve 3 (langsam)", "art": ""}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Akku-PAR mit 4x Hex-LED RGBAW+UV, D-Fi-Funk-DMX."
+}

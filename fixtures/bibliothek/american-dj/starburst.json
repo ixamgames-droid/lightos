@@ -1,0 +1,118 @@
+{
+  "format_version": 1,
+  "hersteller": "American DJ",
+  "hersteller_kurz": "ADJ",
+  "modell": "Starburst",
+  "kurzname": "STARBURST",
+  "typ": "other",
+  "leistung_w": 55,
+  "quelle": {
+    "titel": "ADJ Starburst User Instructions (rev. 9/15)",
+    "url": "https://r2.gear4music.com/media/16/168367/download_168367.pdf",
+    "version": "9/15",
+    "datum": "2015-09"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.5 GIT · Robert Box",
+    "original": "resources/fixtures/American_DJ/American-DJ-Starburst.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 36 Wertebereiche mit Art (kind) versehen; danach von LightOS gegen das Herstellerhandbuch ueberarbeitet: Shutter-Bereiche nach Handbuch klassifiziert (aus=closed, LED an=open, alle Strobe-/Puls-/Random-/Rampen-Bereiche=strobe), Default/Highlight auf Mitte des ersten Offen-Bereichs; irrefuehrende Bereichs-Arten (color/gobo/rotate/closed) an Programm-/Makro-/Funktionskanaelen entfernt; Modus 'DMX Values & Traits' in '12 Channel' umbenannt; Gelb/Lila-LEDs als raw statt cmy_y/cmy_m (keine CMY-Filter, LightOS kennt keine Gelb-/Lila-Emitter); Rotation als speed mit rotate-Bereichen statt macro; Farbwechsel-Bereich ohne Farb-Art; typ other statt par"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanalbelegung gegen die DMX-Tabelle (S. 13-14) im ADJ-Handbuch geprueft; das Handbuch nennt fuer CH10 nur '26-205 Farbmakros' - die Einzelfarben stammen aus QLC+ und sind nicht belegt"
+  },
+  "modi": [
+    {
+      "name": "12 Channel",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Gelb", "attribut": "raw", "default": 0, "highlight": 255},
+        {"name": "Lila", "attribut": "raw", "default": 0, "highlight": 255},
+        {
+          "name": "Strobing",
+          "attribut": "shutter",
+          "default": 11,
+          "highlight": 11,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Off", "art": "closed"},
+            {"von": 8, "bis": 15, "name": "LED on", "art": "open"},
+            {"von": 16, "bis": 131, "name": "Slow - fast", "art": "strobe"},
+            {"von": 132, "bis": 139, "name": "LED on", "art": "open"},
+            {"von": 140, "bis": 181, "name": "Slow open - fast close", "art": "strobe"},
+            {"von": 182, "bis": 189, "name": "LED on", "art": "open"},
+            {"von": 190, "bis": 231, "name": "Fast open - slow close", "art": "strobe"},
+            {"von": 232, "bis": 239, "name": "LED on", "art": "open"},
+            {"von": 240, "bis": 247, "name": "Random", "art": "strobe"},
+            {"von": 248, "bis": 255, "name": "LED on", "art": "open"}
+          ]
+        },
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Rotation",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 30, "name": "Keine Rotation", "art": ""},
+            {"von": 31, "bis": 140, "name": "Rechtsdrehung schnell-langsam", "art": "rotate"},
+            {"von": 141, "bis": 145, "name": "Stopp", "art": ""},
+            {"von": 146, "bis": 255, "name": "Linksdrehung langsam-schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Color Macros",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 25, "name": "No function", "art": ""},
+            {"von": 26, "bis": 45, "name": "Red", "art": "color"},
+            {"von": 46, "bis": 65, "name": "Green", "art": "color"},
+            {"von": 66, "bis": 85, "name": "Blue", "art": "color"},
+            {"von": 86, "bis": 105, "name": "White", "art": "color"},
+            {"von": 106, "bis": 125, "name": "Yellow", "art": "color"},
+            {"von": 126, "bis": 145, "name": "Green", "art": "color"},
+            {"von": 146, "bis": 165, "name": "White", "art": "color"},
+            {"von": 166, "bis": 185, "name": "Yellow (Red/Green)", "art": "color"},
+            {"von": 186, "bis": 205, "name": "Purple (Red/Blue)", "art": "color"},
+            {"von": 206, "bis": 255, "name": "Color changing fast - slow", "art": ""}
+          ]
+        },
+        {
+          "name": "Dreh-/Farbprogramme",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 55, "name": "No function", "art": ""},
+            {"von": 56, "bis": 75, "name": "Sound active", "art": "sound"},
+            {"von": 76, "bis": 105, "name": "Red clockwise rotation", "art": ""},
+            {"von": 106, "bis": 135, "name": "Blue counterclockwise", "art": ""},
+            {"von": 136, "bis": 165, "name": "7 color change clockwise rotation", "art": ""},
+            {"von": 166, "bis": 195, "name": "7 color change counterclockwise rotation", "art": ""},
+            {"von": 196, "bis": 225, "name": "7 color change with strobe clockwise rotation", "art": ""},
+            {"von": 226, "bis": 255, "name": "7 color change with strobe counterclockwise rotation", "art": ""}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 69, "name": "No function", "art": ""},
+            {"von": 70, "bis": 85, "name": "Reset", "art": "reset"},
+            {"von": 86, "bis": 255, "name": "No function", "art": ""}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Rotierende LED-Kugel (RGBWYP). Gelb/Lila sind eigene LED-Farben (raw)."
+}
