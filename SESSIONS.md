@@ -61,6 +61,7 @@
 | FUNKTIONSTEST-B2 | B | - | 2026-10-02T12:42Z | - |
 | XPLAT-42 | B | fix/xplat42-sandbox-aufraeumen | 2026-10-02T12:45Z | tools/anleitungsbilder.py · tools/anleitungsbilder/sandbox.py · tests/test_anleitungsbilder.py · BACKLOG.md |
 | OUT-58 | C | - | 2026-10-02T12:51Z | src/ui/widgets/output_config.py · tests/test_out58_universen_tabelle_nachladen.py · BACKLOG.md · changelog.d/2026-10-02-OUT-58.md |
+| XPLAT-45 | B | ci/xplat45-arm-leg-x64 | 2026-10-02T12:53Z | .github/workflows/ci.yml · tests/test_ci_windows_legs.py · BACKLOG.md |
 
 ## Blocker & Fallen
 
@@ -129,7 +130,6 @@
 
 ## Verlauf
 
-- 2026-10-02T11:09Z C claim DOC-39
 - 2026-10-02T11:11Z C claim DOC-40
 - 2026-10-02T11:11Z C claim DOC-41
 - 2026-10-02T11:11Z C claim DOC-42
@@ -159,3 +159,4 @@
 - 2026-10-02T12:42Z B claim FUNKTIONSTEST-B2
 - 2026-10-02T12:45Z B claim XPLAT-42
 - 2026-10-02T12:51Z C claim OUT-58
+- 2026-10-02T12:53Z B claim XPLAT-45
