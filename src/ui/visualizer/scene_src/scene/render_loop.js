@@ -49,7 +49,6 @@ const _loggedTickErrors = new Set();
 //   6. Brightness/Settings -> lights.js#applyBrightness + bridge.js#
 //                           applySettings
 //   7. Kontinuierlich    -> Live-Probes (unten) statt Flag
-//   +  Async-Nachlader   -> model_loader.js#onLoaded (DAE/OBJ-Callbacks)
 //   +  Bridge-Direktpfade-> bridge.js jsApplyFixtureTransform/jsAlign/
 //                           jsDistribute; tools.js#setEditTool (Gizmo-Gate)
 //   +  Sicherheitsnetz   -> state.js view-Setter (Neuzuweisungen; In-Place-

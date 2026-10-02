@@ -36,12 +36,9 @@
 // braucht nichts weiter zu tun; wer unten etwas BENUTZT ohne es hier
 // einzutragen, wird rot.
 //
-// OBJLoader/ColladaLoader haengen sich (wie die
-// Kernklassen) an `window.THREE` - sie werden als eigene klassische
-// Scripts VOR three_local.js... nein, NACH three_local.js aber weiterhin
-// klassisch (nicht als Modul) geladen (assets/OBJLoader.js,
-// assets/ColladaLoader.js, siehe stage_scene.html <head>) und sind daher
-// zum Zeitpunkt des ersten Modul-Imports ebenfalls bereits vorhanden.
+// VIZ-66: OBJLoader/ColladaLoader sind entfernt — LightOS liefert keine fremden
+// 3D-Modelldateien mehr mit, alle Koerper entstehen im Code
+// (scene/geteilte_geometrie.js, fixtures/builders.js, stage/stage_objects.js).
 export default window.THREE;
 
 export const {
@@ -55,26 +52,28 @@ export const {
   BufferGeometry,
   CanvasTexture,
   CircleGeometry,
-  ColladaLoader,
   Color,
   ConeGeometry,
   CylinderGeometry,
   DirectionalLight,
   DoubleSide,
   EdgesGeometry,
+  Euler,
+  Float32BufferAttribute,
   FogExp2,
   GridHelper,
   Group,
   HemisphereLight,
+  LatheGeometry,
   Line,
   LineBasicMaterial,
   LineLoop,
   LineSegments,
   MathUtils,
+  Matrix4,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
-  OBJLoader,
   Object3D,
   OrthographicCamera,
   PCFShadowMap,
@@ -90,6 +89,7 @@ export const {
   SpotLight,
   Sprite,
   SpriteMaterial,
+  TorusGeometry,
   Vector2,
   Vector3,
   WebGLRenderer,
