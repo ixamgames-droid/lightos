@@ -33,6 +33,7 @@
 | DOC-32 | C | - | 2026-10-02T10:55Z | docs/anleitung_farbmatrix/ANLEITUNG_FARBMATRIX.md |
 | DOC-33 | C | - | 2026-10-02T10:56Z | docs/anleitung_dimmermatrix/ANLEITUNG_DIMMERMATRIX.md |
 | DOC-34 | C | - | 2026-10-02T10:56Z | docs/anleitung_matrix_effekte/ANLEITUNG_MATRIX_EFFEKTE.md |
+| DOC-35 | C | - | 2026-10-02T10:57Z | docs/anleitung_efx/ANLEITUNG_EFX.md |
 
 ## Blocker & Fallen
 
@@ -96,7 +97,6 @@
 
 ## Verlauf
 
-- 2026-10-02T07:57Z A claim TOOL-8
 - 2026-10-02T08:03Z A done VIZ-65
 - 2026-10-02T08:17Z A done DOC-20
 - 2026-10-02T08:17Z A done DOC-21
@@ -126,3 +126,4 @@
 - 2026-10-02T10:55Z C claim DOC-32
 - 2026-10-02T10:56Z C claim DOC-33
 - 2026-10-02T10:56Z C claim DOC-34
+- 2026-10-02T10:57Z C claim DOC-35
