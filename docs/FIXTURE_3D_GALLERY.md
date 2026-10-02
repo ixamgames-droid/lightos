@@ -29,9 +29,10 @@ Die Maße jeder Klasse sind gegen ein recherchiertes Referenzgerät dimensionier
 Fixture bekommt, entscheidet die **automatische Zuordnung** (siehe unten) — in Gruppen
 behält jedes Fixture sein Modell.
 
-> Hinweis: Für PAR/Strobe/Nebel/Hazer legt das Programm zur Laufzeit zusätzlich ein
-> detailliertes `.dae`-Overlay über die prozedurale Basis; hier ist die reproduzierbare
-> Basis-Geometrie gezeigt.
+> Alle Modelle — auch PAR, Strobe, Nebelmaschine, Hazer und die Traversen — sind **eigene,
+> im Code erzeugte Geometrie** (**VIZ-66**). LightOS liefert keine fremden 3D-Modelldateien
+> mit; gleiche Formen werden einmal gebaut und von allen Geräten geteilt
+> (`scene_src/scene/geteilte_geometrie.js`).
 
 ---
 
@@ -76,7 +77,7 @@ Projektor-Body + Fächerstrahlen
 <img src="img/fixture_gallery/par.png" width="330"><br>
 <b>PAR-Kanne</b> · <code>par</code><br>
 PAR-64 · Ø 0,23 m · Doppelbügel<br>
-(Live-`.dae`-Overlay im Programm)
+Kühlrippen, Frontring, Klemmknebel
 </td>
 <td align="center" width="50%">
 <img src="img/fixture_gallery/led_bar.png" width="330"><br>
@@ -109,7 +110,7 @@ Balken mit beweglichen Köpfen
 <img src="img/fixture_gallery/strobe.png" width="330"><br>
 <b>Strobe</b> · <code>strobe</code><br>
 Superstrobe-Klasse · 0,46 × 0,14 × 0,24 m<br>
-(Live-`.dae`-Overlay im Programm)
+Reflektorwanne mit Blitzröhre, Seitenbügel
 </td>
 <td align="center" width="50%">
 <img src="img/fixture_gallery/dimmer.png" width="330"><br>
@@ -138,14 +139,14 @@ Fallback für unklassifizierte Geräte
 <td align="center" width="50%">
 <img src="img/fixture_gallery/smoke.png" width="330"><br>
 <b>Nebelmaschine</b> · <code>smoke</code><br>
-N-10-Klasse · Düse + Bügel<br>
-(Live-`.dae`-Overlay im Programm)
+N-10-Klasse · 0,20 × 0,17 × 0,33 m<br>
+Düse, Tragegriff, Tankdeckel
 </td>
 <td align="center" width="50%">
 <img src="img/fixture_gallery/hazer.png" width="330"><br>
 <b>Hazer</b> · <code>hazer</code><br>
-HZ-100-Klasse · hochkant + Griff + Ausblasgitter<br>
-(Live-`.dae`-Overlay im Programm)
+HZ-100-Klasse · 0,25 × 0,28 × 0,48 m<br>
+Ausblasgitter, Tragegriff, Bedienfeld
 </td>
 </tr>
 </table>
