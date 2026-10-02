@@ -95,10 +95,79 @@ def _relativer_anfang(knoten, konstanten):
     return False
 
 
+#: Aufrufe, deren blosser Name (ohne Modul) schon eindeutig ist — sie werden
+#: auch erkannt, wenn sie unter anderem Namen importiert sind.
+_NACKTE_NAMEN = {n for n in _PFAD_AUFRUFE if "." not in n}
+
+_BEREICHE = (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda,
+             ast.ClassDef)
+
+
+def _import_aliase(baum):
+    """``{lokaler Name: voller Name}`` aus ``import``/``from … import``.
+
+    Review A zu #849: ``import os.path as osp`` / ``from shutil import copy``
+    machten aus ``os.path.join`` ein ``osp.join``, aus ``shutil.copy`` ein
+    ``copy`` — der Waechter kannte beide Schreibweisen nicht."""
+    aliase = {}
+    for k in ast.walk(baum):
+        if isinstance(k, ast.Import):
+            for a in k.names:
+                if a.asname:
+                    aliase[a.asname] = a.name
+        elif isinstance(k, ast.ImportFrom) and k.module and not k.level:
+            for a in k.names:
+                aliase[a.asname or a.name] = f"{k.module}.{a.name}"
+    return aliase
+
+
+def _pfad_stellen(func, aliase):
+    """Positionen der Pfad-Argumente dieses Aufrufs — ``()`` wenn er keiner
+    aus ``_PFAD_AUFRUFE`` ist (auch unter einem Import-Alias)."""
+    roh = ast.unparse(func)
+    kopf, _, rest = roh.partition(".")
+    voll = aliase.get(kopf)
+    aufgeloest = (f"{voll}.{rest}" if rest else voll) if voll else roh
+    for name in (aufgeloest, roh, aufgeloest.rsplit(".", 1)[-1]):
+        if name in _PFAD_AUFRUFE and ("." in name or name in _NACKTE_NAMEN):
+            return _PFAD_AUFRUFE[name]
+    return ()
+
+
+def _namen_im_bereich(bereich):
+    """``(relativ, alle)`` — Namen, die IN DIESEM Bereich (ohne verschachtelte
+    Funktionen) zugewiesen werden, und welche davon einen nackten Repo-Pfad
+    bekommen. Parameter zaehlen mit (ein Vorgabewert ``"shows/…"`` ist relativ)."""
+    relativ, alle = set(), set()
+    if isinstance(bereich, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+        a = bereich.args
+        params = a.posonlyargs + a.args + a.kwonlyargs
+        alle.update(x.arg for x in params)
+        vorgaben = list(zip(reversed(a.posonlyargs + a.args), reversed(a.defaults)))
+        vorgaben += [(x, d) for x, d in zip(a.kwonlyargs, a.kw_defaults) if d is not None]
+        relativ.update(x.arg for x, d in vorgaben if _relativer_anfang(d, set()))
+    stapel = list(ast.iter_child_nodes(bereich))
+    while stapel:
+        k = stapel.pop()
+        if isinstance(k, _BEREICHE):
+            continue                     # eigener Bereich, eigene Namen
+        if isinstance(k, (ast.Assign, ast.AnnAssign)) and k.value is not None:
+            ziele = k.targets if isinstance(k, ast.Assign) else [k.target]
+            for z in ziele:
+                if isinstance(z, ast.Name):
+                    alle.add(z.id)
+                    if _relativer_anfang(k.value, set()):
+                        relativ.add(z.id)
+        stapel.extend(ast.iter_child_nodes(k))
+    return relativ, alle
+
+
 def _cwd_relative_pfade(pfad, ausnahmen=None):
     """Pfade, die ein Werkzeug relativ zum Arbeitsverzeichnis baut: ein
-    Dateisystem-Aufruf (``_PFAD_AUFRUFE``), dessen Pfad mit einem nackten
-    Repo-Ordner beginnt statt mit einem Repo-Root."""
+    Dateisystem-Aufruf (``_PFAD_AUFRUFE``, auch unter Import-Alias), dessen
+    Pfad mit einem nackten Repo-Ordner beginnt statt mit einem Repo-Root —
+    direkt oder ueber eine Variable des eigenen oder eines umgebenden
+    Bereichs (Modul, Funktion)."""
     with open(pfad, encoding="utf-8", errors="replace") as f:
         try:
             baum = ast.parse(f.read(), filename=pfad)
@@ -106,21 +175,32 @@ def _cwd_relative_pfade(pfad, ausnahmen=None):
             return []
     rel = os.path.relpath(pfad, TOOLS).replace(os.sep, "/")
     ausnahmen = _AUSNAHMEN if ausnahmen is None else ausnahmen
-    konstanten = {t.id for k in baum.body if isinstance(k, ast.Assign)
-                  for t in k.targets if isinstance(t, ast.Name)
-                  and _relativer_anfang(k.value, set())}
+    aliase = _import_aliase(baum)
     treffer = []
-    for k in ast.walk(baum):
-        if not isinstance(k, ast.Call):
-            continue
-        stellen = _PFAD_AUFRUFE.get(ast.unparse(k.func), ())
-        if not any(s < len(k.args) and _relativer_anfang(k.args[s], konstanten)
-                   for s in stellen):
-            continue
-        if (rel, ast.unparse(k)) in ausnahmen:
-            continue
-        treffer.append(f"{rel}:{k.lineno}  {ast.unparse(k)}")
-    return treffer
+
+    def ist_relativ(name, kette):
+        for relativ, alle in reversed(kette):
+            if name in alle:             # innerster Bereich, der ihn setzt
+                return name in relativ
+        return False
+
+    def besuche(knoten, kette):
+        if isinstance(knoten, _BEREICHE):
+            kette = kette + [_namen_im_bereich(knoten)]
+        if isinstance(knoten, ast.Call):
+            stellen = _pfad_stellen(knoten.func, aliase)
+            sichtbar = {n.id for s in stellen if s < len(knoten.args)
+                        for n in ast.walk(knoten.args[s])
+                        if isinstance(n, ast.Name) and ist_relativ(n.id, kette)}
+            if (any(s < len(knoten.args) and _relativer_anfang(knoten.args[s], sichtbar)
+                    for s in stellen)
+                    and (rel, ast.unparse(knoten)) not in ausnahmen):
+                treffer.append(f"{rel}:{knoten.lineno}  {ast.unparse(knoten)}")
+        for kind in ast.iter_child_nodes(knoten):
+            besuche(kind, kette)
+
+    besuche(baum, [])
+    return sorted(treffer, key=lambda z: int(z.split(":")[1].split()[0]))
 
 
 def _werkzeuge():
@@ -182,6 +262,38 @@ class KeinWerkzeugBautCwdRelativePfade(unittest.TestCase):
             zeilen = sorted(int(t.split(":")[1].split()[0])
                             for t in _cwd_relative_pfade(probe, ausnahmen={}))
         self.assertEqual(zeilen, [5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
+
+    def test_lokale_variablen_und_import_aliase(self):
+        """Review A zu #849: der Waechter las Variablen nur auf Modulebene und
+        kannte keine Import-Aliase. Jetzt je Bereich (mit Verdeckung) und
+        ueber ``import … as`` / ``from … import``."""
+        quelle = (
+            'import os.path as osp\n'                          # 1
+            'from shutil import copy as kopiere\n'             # 2
+            'from pathlib import Path as P\n'                  # 3
+            'from os.path import join\n'                       # 4
+            'OUT = "shows/a.lshow"\n'                          # 5
+            'def bauen():\n'                                   # 6
+            '    ziel = "shows/X.lshow"\n'                     # 7
+            '    return open(ziel)\n'                          # 8  lokal
+            'def mit_vorgabe(out="data/m.json"):\n'            # 9
+            '    return open(out)\n'                           # 10 Parameter
+            'def verdeckt():\n'                                # 11
+            '    ziel = osp.join(ROOT, "shows")\n'             # 12 ok: gerootet
+            '    OUT = osp.join(ROOT, "shows", "a.lshow")\n'   # 13 ok
+            '    open(ziel); save_show(OUT)\n'                 # 14 ok: verdeckt
+            'osp.join("shows", "x")\n'                         # 15 Alias
+            'kopiere(quelle, "data/x")\n'                      # 16 Alias, Ziel
+            'P("docs")\n'                                      # 17 Alias
+            'join("fixtures", "y")\n'                          # 18 from-import
+            'save_show(OUT)\n')                                # 19 Modul-Konstante
+        with tempfile.TemporaryDirectory() as tmp:
+            probe = os.path.join(tmp, "probe.py")
+            with open(probe, "w", encoding="utf-8") as f:
+                f.write(quelle)
+            zeilen = [int(t.split(":")[1].split()[0])
+                      for t in _cwd_relative_pfade(probe, ausnahmen={})]
+        self.assertEqual(zeilen, [8, 10, 15, 16, 17, 18, 19])
 
     def test_ausnahmen_gibt_es_noch(self):
         """Eine Ausnahme, deren Aufruf verschwunden ist, gehoert gestrichen."""
