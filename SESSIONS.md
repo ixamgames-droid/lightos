@@ -62,6 +62,7 @@
 | DOC-54 | C | - | 2026-10-02T13:02Z | docs/anleitung_speed_bpm/ANLEITUNG_SPEED_BPM.md |
 | DOC-55 | C | - | 2026-10-02T13:04Z | docs/anleitung_einmessen/ANLEITUNG_EINMESSEN.md |
 | DOC-56 | C | - | 2026-10-02T13:05Z | docs/anleitung_web_remote/ANLEITUNG.md |
+| FM-57 | A | feat/fm57-bibliothek-runde1 | 2026-10-02T17:50Z | fixtures/bibliothek |
 
 ## Blocker & Fallen
 
@@ -142,7 +143,6 @@
 
 ## Verlauf
 
-- 2026-10-02T12:06Z C claim DOC-48
 - 2026-10-02T12:07Z C claim DOC-49
 - 2026-10-02T12:08Z C claim UI-71
 - 2026-10-02T12:09Z C claim DOC-50
@@ -172,3 +172,4 @@
 - 2026-10-02T17:01Z B uebergeben FUNKTIONSTEST-B2
 - 2026-10-02T17:10Z A done VIZ-66
 - 2026-10-02T17:50Z A done FM-56
+- 2026-10-02T17:50Z A claim FM-57
