@@ -37,6 +37,7 @@ import {
   applyStageEmissive, wireToolsLateBindings,
   applySelectionPulse, selectionPulseActive,   // VIZ-14 Slice 1c: Identify-Flash
   expireSelectionPulseForTest,                 // VIZ-14 Slice 1c: Test-Seam (Flash beenden)
+  holdSelectionPulseForTest,                   // XPLAT-37: Test-Seam (Flash offen halten)
 } from './interaction/tools.js';
 import {
   wirePointerLateBindings, resolveDockOnGestureEnd,
@@ -178,6 +179,8 @@ window.__lightos = {
   requestRender, renderStats, __renderTick: renderTick,
   // VIZ-14 Slice 1c: Test-Seam — Identify-Flash-Fenster deterministisch beenden.
   __expireSelectionPulse: expireSelectionPulseForTest,
+  // XPLAT-37: Gegenstueck — Fenster offen halten, bis __expireSelectionPulse es schliesst.
+  __holdSelectionPulse: holdSelectionPulseForTest,
   // VIZ-LABELS: Test-Seam — das Label-Zoom/Toggle-Gate deterministisch treiben
   // (offscreen drosselt Post-Load-Signale, daher direkter Aufruf statt push).
   updateLabelZoomVisibility,
