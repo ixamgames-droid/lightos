@@ -62,7 +62,6 @@
 | DOC-56 | C | - | 2026-10-02T13:05Z | docs/anleitung_web_remote/ANLEITUNG.md |
 | FM-57 | A | feat/fm57-bibliothek-runde1 | 2026-10-02T17:50Z | fixtures/bibliothek |
 | FM-58 | A | feat/fm58-bibliothek-runde2 | 2026-10-02T18:20Z | fixtures/bibliothek |
-| FUNKTIONSTEST-B3 | B | - | 2026-10-02T21:53Z | - |
 | UI-72 | B | docs/ui72-ui73-befunde | 2026-10-02T22:02Z | BACKLOG.md |
 | UI-73 | B | docs/ui72-ui73-befunde | 2026-10-02T22:02Z | BACKLOG.md |
 
@@ -149,7 +148,6 @@
 
 ## Verlauf
 
-- 2026-10-02T12:23Z C claim DOC-51
 - 2026-10-02T12:24Z C claim DOC-52
 - 2026-10-02T12:24Z A claim VIZ-66
 - 2026-10-02T12:26Z A claim FM-56
@@ -179,3 +177,4 @@
 - 2026-10-02T22:02Z B claim UI-72
 - 2026-10-02T22:02Z B claim UI-73
 - 2026-10-02T22:03Z B done XPLAT-45
+- 2026-10-02T22:03Z B done FUNKTIONSTEST-B3
