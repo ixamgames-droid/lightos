@@ -4,7 +4,7 @@
 // ehemaligen updateFixture-Monolithen) — build + updateDmx desselben Typs
 // leben bewusst beisammen; registry.js bleibt die deklarative Map.
 import * as THREE from '../three/three.js';
-import { loadModel, fitModelToSize } from '../scene/model_loader.js';
+import { geteilteGeometrie, platziere, verschmelzen } from '../scene/geteilte_geometrie.js';  // VIZ-66
 import { settings, view } from '../state.js';
 import { tintTopDownIcon } from './topdown_icons.js';
 import { isLowSpec } from '../scene/renderer.js';
@@ -266,46 +266,71 @@ export function buildPixelHead(nBaenke, basisBaenke) {
            ringPixels, pixelBase: basis, isPixelHead: true };
 }
 
+// VIZ-66: Kurzhelfer fuer die eigenen Geraetekoerper. Jede Form wird EINMAL
+// gebaut und von allen Geraeten desselben Typs geteilt (geteilte_geometrie.js);
+// `segs()` steckt im Schluessel, weil Low-Tier weniger Segmente baut.
+const _box = (b, h, t, pos, rot) => platziere(new THREE.BoxGeometry(b, h, t), pos, rot);
+const _zyl = (r1, r2, h, n, pos, rot, offen) =>
+  platziere(new THREE.CylinderGeometry(r1, r2, h, n, 1, !!offen), pos, rot);
+const _geo = (name, bauen) => geteilteGeometrie(`${name}|${segs(24)}`, bauen);
+
 export function buildPar() {
   // Reale Referenz (FM-Runde 2): PAR-64-Dose, z.B. Eurolite LED PAR-64 short
   // (280 x 265 x 320 mm inkl. Buegel, Tubus Ø ~0,23 m) — vorher Ø 0,44 m.
+  // VIZ-66: eigene Form statt des frueheren .dae-Overlays (QLC+). Gedrehtes
+  // Profil (Lathe): gewoelbter Ruecken, Ø 0,23-m-Tubus, leicht ausgestellte
+  // Front; dazu Kuehlrippen am Ruecken, Frontring, Doppelbuegel mit Klemmknebeln.
+  // Lichtausgang -Y, Buegel oben (+Y) — wie bisher.
   const group = new THREE.Group();
   const bodyMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.5, roughness: 0.5 });
-  const body = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.115, 0.115, 0.30, segs(16)),
-    bodyMat
-  );
+  const trimMat = new THREE.MeshStandardMaterial({ color: 0x3a3a40, metalness: 0.75, roughness: 0.3 });
+  const bracketMat = new THREE.MeshStandardMaterial({ color: 0x18181a, metalness: 0.55, roughness: 0.5 });
+
+  // Profil von der Front (unten) nach hinten (oben): steigende y-Werte, sonst
+  // zeigen die Lathe-Normalen nach innen und die Dose waere von aussen hohl.
+  const body = new THREE.Mesh(_geo('par-body', () => new THREE.LatheGeometry([
+    new THREE.Vector2(0.100, -0.150), new THREE.Vector2(0.124, -0.148),
+    new THREE.Vector2(0.121, -0.134), new THREE.Vector2(0.115, -0.118),
+    new THREE.Vector2(0.115, 0.108), new THREE.Vector2(0.108, 0.126),
+    new THREE.Vector2(0.090, 0.140), new THREE.Vector2(0.055, 0.148),
+    new THREE.Vector2(0.0, 0.150),
+  ], segs(24))), bodyMat);
   body.name = 'par-body';
   body.castShadow = true;
   group.add(body);
+
+  // Kuehlrippen (umlaufende Ringe am hinteren Tubus) + Frontring in EINEM Mesh.
+  const trim = new THREE.Mesh(_geo('par-trim', () => {
+    const teile = [];
+    for (let i = 0; i < 5; i++) teile.push(_zyl(0.122, 0.122, 0.008, segs(24), [0, 0.092 - i * 0.022, 0]));
+    teile.push(platziere(new THREE.TorusGeometry(0.114, 0.010, 6, segs(24)), [0, -0.150, 0], [Math.PI / 2, 0, 0]));
+    return verschmelzen(teile);
+  }), trimMat);
+  trim.castShadow = true;
+  group.add(trim);
+
+  // Haengebuegel (Doppelbuegel wie am echten PAR): zwei Arme, Querjoch,
+  // Drehachsen + Klemmknebel aussen, Haken-/Schellenblock oben.
+  const bracket = new THREE.Mesh(_geo('par-buegel', () => verschmelzen([
+    _box(0.018, 0.17, 0.045, [-0.135, 0.075, 0]),
+    _box(0.018, 0.17, 0.045, [0.135, 0.075, 0]),
+    _box(0.288, 0.020, 0.045, [0, 0.170, 0]),
+    _zyl(0.012, 0.012, 0.030, 10, [-0.122, 0, 0], [0, 0, Math.PI / 2]),
+    _zyl(0.012, 0.012, 0.030, 10, [0.122, 0, 0], [0, 0, Math.PI / 2]),
+    _zyl(0.022, 0.022, 0.016, 12, [-0.152, 0, 0], [0, 0, Math.PI / 2]),
+    _zyl(0.022, 0.022, 0.016, 12, [0.152, 0, 0], [0, 0, Math.PI / 2]),
+    _zyl(0.016, 0.020, 0.030, 12, [0, 0.195, 0]),
+  ])), bracketMat);
+  bracket.castShadow = true;
+  group.add(bracket);
+
+  // Linse/Frontscheibe: bleibt das Teil, das leuchtet (f.lens -> Emissive).
   const front = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.115, 0.115, 0.03, segs(16)),
+    _geo('par-linse', () => new THREE.CylinderGeometry(0.106, 0.106, 0.012, segs(24))),
     new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.95, roughness: 0.05 })
   );
-  front.position.y = -0.165;
+  front.position.y = -0.152;
   group.add(front);
-  // Haengebuegel (Doppelbuegel wie am echten PAR): zwei Arme + Querjoch.
-  const bracketParts = [];
-  [-0.13, 0.13].forEach(x => {
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.16, 0.05), bodyMat);
-    arm.position.set(x, 0.09, 0);
-    group.add(arm);
-    bracketParts.push(arm);
-  });
-  const yokeBar = new THREE.Mesh(new THREE.BoxGeometry(0.29, 0.028, 0.05), bodyMat);
-  yokeBar.position.y = 0.175;
-  group.add(yokeBar);
-  bracketParts.push(yokeBar);
-  // Try to overlay a real PAR model. If loaded, hide procedural body (incl.
-  // Buegel — das .dae bringt seine eigene Silhouette mit), keep lens emissive.
-  loadModel('assets/models/fixtures/par.dae', (model) => {
-    if (!model) return;
-    fitModelToSize(model, { x: 0.26, y: 0.32, z: 0.26 });
-    model.traverse(c => { if (c.isMesh) { c.castShadow = true; } });
-    body.visible = false;
-    bracketParts.forEach(p => { p.visible = false; });
-    group.add(model);
-  });
   return { group, head: group, lens: front };
 }
 
@@ -338,27 +363,64 @@ export function buildLedBar() {
 export function buildStrobe() {
   // Reale Referenz (FM-Runde 2): Eurolite Superstrobe 2700 — 460 x 240 x 140 mm
   // (B x T x H). Vorher 0,6 x 0,5 m Grundflaeche (fast doppelt zu tief).
+  // VIZ-66: eigene Form statt des frueheren .dae-Overlays (QLC+): flacher
+  // Kasten mit Seitenkappen und Kuehlrippen oben, unten eine Reflektorwanne mit
+  // Blitzroehre hinter einem Rahmen, seitlicher Haltebuegel. Lichtausgang -Y.
   const group = new THREE.Group();
-  const body = new THREE.Mesh(
-    new THREE.BoxGeometry(0.46, 0.14, 0.24),
-    new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.4, roughness: 0.5 })
-  );
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.4, roughness: 0.5 });
+  const trimMat = new THREE.MeshStandardMaterial({ color: 0x2c2c30, metalness: 0.7, roughness: 0.35 });
+
+  const body = new THREE.Mesh(_geo('strobe-gehaeuse', () => {
+    const teile = [
+      _box(0.44, 0.08, 0.24, [0, 0.03, 0]),
+      // Unterteil als offener Rahmen: hier sitzt die Reflektorwanne, ein
+      // geschlossener Boden wuerde sie verdecken.
+      _box(0.44, 0.04, 0.035, [0, -0.03, -0.1025]),
+      _box(0.44, 0.04, 0.035, [0, -0.03, 0.1025]),
+      _box(0.03, 0.04, 0.24, [-0.205, -0.03, 0]),
+      _box(0.03, 0.04, 0.24, [0.205, -0.03, 0]),
+      _box(0.02, 0.14, 0.25, [-0.23, 0, 0]),       // Seitenkappen
+      _box(0.02, 0.14, 0.25, [0.23, 0, 0]),
+    ];
+    for (let i = 0; i < 9; i++) teile.push(_box(0.010, 0.012, 0.19, [-0.16 + i * 0.04, 0.076, 0]));
+    return verschmelzen(teile);
+  }), bodyMat);
+  body.name = 'strobe-body';
   body.castShadow = true;
   group.add(body);
-  // Breite Blitzroehren-Wanne an der Unterseite (Lichtausgang -Y wie bisher).
-  const lamp = new THREE.Mesh(
-    new THREE.BoxGeometry(0.38, 0.03, 0.17),
-    new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.1 })
+
+  // Rahmen um den Lichtaustritt + seitlicher U-Buegel mit Knebeln.
+  const trim = new THREE.Mesh(_geo('strobe-rahmen', () => verschmelzen([
+    _box(0.42, 0.012, 0.022, [0, -0.056, -0.099]),
+    _box(0.42, 0.012, 0.022, [0, -0.056, 0.099]),
+    _box(0.022, 0.012, 0.22, [-0.199, -0.056, 0]),
+    _box(0.022, 0.012, 0.22, [0.199, -0.056, 0]),
+    _box(0.014, 0.15, 0.05, [-0.247, 0.055, 0]),
+    _box(0.014, 0.15, 0.05, [0.247, 0.055, 0]),
+    _box(0.508, 0.016, 0.05, [0, 0.13, 0]),
+    _zyl(0.02, 0.02, 0.014, 12, [-0.261, 0, 0], [0, 0, Math.PI / 2]),
+    _zyl(0.02, 0.02, 0.014, 12, [0.261, 0, 0], [0, 0, Math.PI / 2]),
+  ])), trimMat);
+  trim.castShadow = true;
+  group.add(trim);
+
+  // Blitzroehre (Glas) quer in der Wanne.
+  const roehre = new THREE.Mesh(
+    _geo('strobe-roehre', () => _zyl(0.011, 0.011, 0.36, 10, [0, -0.03, 0], [0, 0, Math.PI / 2])),
+    new THREE.MeshStandardMaterial({ color: 0xdde4ee, metalness: 0.1, roughness: 0.15 })
   );
-  lamp.position.y = -0.075;
+  group.add(roehre);
+
+  // Reflektorwanne (halber Zylinder, offen nach -Y) — das Teil, das leuchtet
+  // (f.lamp -> Emissive): beim Blitz strahlt die ganze Wanne.
+  const lamp = new THREE.Mesh(
+    _geo('strobe-reflektor', () => platziere(
+      new THREE.CylinderGeometry(0.085, 0.085, 0.38, segs(16), 1, true, 0, Math.PI),
+      [0, -0.05, 0], [0, 0, Math.PI / 2], [0.45, 1, 1]
+    )),
+    new THREE.MeshStandardMaterial({ color: 0xeeeeee, metalness: 0.6, roughness: 0.1, side: THREE.DoubleSide })
+  );
   group.add(lamp);
-  loadModel('assets/models/fixtures/strobe.dae', (model) => {
-    if (!model) return;
-    fitModelToSize(model, { x: 0.48, y: 0.18, z: 0.26 });
-    model.traverse(c => { if (c.isMesh) { c.castShadow = true; } });
-    body.visible = false;
-    group.add(model);
-  });
   return { group, head: group, lamp };
 }
 
@@ -600,42 +662,54 @@ export function buildSmoke() {
   // Reale Referenz (FM-Runde 2): kompakte DJ-Nebelmaschine (Eurolite N-10:
   // 145 x 170 x 265 mm; Antari-Z-Klasse etwas groesser) — flacher laenglicher
   // Kasten mit vorstehender Duese. Vorher ein 0,55-m-Klotz.
+  // VIZ-66: eigene Form statt des frueheren .dae-Overlays (QLC+): Gehaeuse mit
+  // abgesetztem Deckel, Frontblende, Tragegriff, Tankdeckel, Lueftungsschlitze
+  // und Fuesse. Ausstoss nach -Z.
   const group = new THREE.Group();
   const baseMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, metalness: 0.4, roughness: 0.6 });
-  const body = new THREE.Mesh(
-    new THREE.BoxGeometry(0.20, 0.17, 0.33),
-    baseMat
-  );
+  const trimMat = new THREE.MeshStandardMaterial({ color: 0x151517, metalness: 0.5, roughness: 0.5 });
+
+  const body = new THREE.Mesh(_geo('smoke-gehaeuse', () => verschmelzen([
+    _box(0.20, 0.15, 0.33, [0, -0.01, 0]),
+    _box(0.19, 0.02, 0.31, [0, 0.075, 0]),        // abgesetzter Deckel
+  ])), baseMat);
+  body.name = 'smoke-body';
   body.castShadow = true;
   group.add(body);
+
+  const trim = new THREE.Mesh(_geo('smoke-teile', () => {
+    const teile = [
+      _box(0.17, 0.12, 0.006, [0, 0.0, -0.166]),   // Frontblende
+      _box(0.02, 0.045, 0.02, [0, 0.105, -0.09]),  // Griff-Stuetzen
+      _box(0.02, 0.045, 0.02, [0, 0.105, 0.09]),
+      _zyl(0.011, 0.011, 0.20, 10, [0, 0.128, 0], [Math.PI / 2, 0, 0]),
+      _zyl(0.02, 0.02, 0.015, 12, [0.05, 0.092, 0.11]),   // Tankdeckel
+    ];
+    for (const x of [-0.08, 0.08]) {
+      for (const z of [-0.14, 0.14]) teile.push(_zyl(0.015, 0.015, 0.012, 10, [x, -0.091, z]));
+    }
+    for (const x of [-0.101, 0.101]) {
+      for (let i = 0; i < 5; i++) teile.push(_box(0.004, 0.07, 0.008, [x, 0.0, 0.03 + i * 0.022]));
+    }
+    return verschmelzen(teile);
+  }), trimMat);
+  trim.castShadow = true;
+  group.add(trim);
+
   // Vorstehende Ausstoss-Duese (Zylinder) an der Front.
   const spout = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.028, 0.034, 0.05, segs(12)),
+    _geo('smoke-duese', () => _zyl(0.028, 0.034, 0.05, segs(12), [0, 0.02, -0.185], [Math.PI / 2, 0, 0])),
     new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.7, roughness: 0.3 })
   );
-  spout.rotation.x = Math.PI / 2;
-  spout.position.set(0, 0.02, -0.185);
   group.add(spout);
-  // Haengebuegel oben (die Klasse wird oft an der Traverse montiert).
-  const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.02, 0.05), baseMat);
-  bracket.position.y = 0.10;
-  group.add(bracket);
-  // Nozzle / emissive mesh (small circle at front)
+  // Duesenoeffnung — das Teil, das leuchtet (f.lamp -> Emissive).
   const nozzle = new THREE.Mesh(
-    new THREE.CircleGeometry(0.026, segs(12)),
+    _geo('smoke-oeffnung', () => new THREE.CircleGeometry(0.026, segs(12))),
     new THREE.MeshStandardMaterial({ color: 0xcccccc, emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.2, side: THREE.DoubleSide })
   );
   nozzle.position.set(0, 0.02, -0.211);
   nozzle.rotation.x = Math.PI / 2;
   group.add(nozzle);
-  // Load real model
-  loadModel('assets/models/fixtures/smoke.dae', (model) => {
-    if (!model) return;
-    fitModelToSize(model, { x: 0.22, y: 0.18, z: 0.36 });
-    model.traverse(c => { if (c.isMesh) { c.castShadow = true; } });
-    body.visible = false;
-    group.add(model);
-  });
   return { group, head: group, lamp: nozzle };
 }
 
@@ -643,41 +717,57 @@ export function buildHazer() {
   // Reale Referenz (FM-Runde 2): Kompressor-Hazer der Antari-HZ-100-Klasse —
   // 250 x 294 x 490 mm: laenglicher, leicht hochkantiger Kasten (hoeher als
   // breit), Ausblasgitter vorn oben, Tragegriff. Vorher 0,55-m-Wuerfel.
+  // VIZ-66: eigene Form statt des frueheren .dae-Overlays (QLC+): Gehaeuse mit
+  // Deckel, Tragegriff, Ausblasgitter mit Lamellen, seitliche Griffmulden,
+  // Bedienfeld hinten, Fuesse. Ausstoss nach -Z.
   const group = new THREE.Group();
   const baseMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.45, roughness: 0.55 });
-  const body = new THREE.Mesh(
-    new THREE.BoxGeometry(0.25, 0.28, 0.48),
-    baseMat
-  );
+  const trimMat = new THREE.MeshStandardMaterial({ color: 0x3a3a3a, metalness: 0.6, roughness: 0.4 });
+
+  const body = new THREE.Mesh(_geo('hazer-gehaeuse', () => verschmelzen([
+    _box(0.25, 0.26, 0.48, [0, -0.01, 0]),
+    _box(0.24, 0.02, 0.46, [0, 0.13, 0]),          // abgesetzter Deckel
+  ])), baseMat);
+  body.name = 'hazer-body';
   body.castShadow = true;
   group.add(body);
-  // Tragegriff oben (Buegel).
-  const handle = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.025, 0.24), baseMat);
-  handle.position.y = 0.165;
-  group.add(handle);
-  // Ausblasgitter-Rahmen vorn oben (die Duese sitzt beim Hazer hoch).
-  const grille = new THREE.Mesh(
-    new THREE.BoxGeometry(0.16, 0.09, 0.015),
-    new THREE.MeshStandardMaterial({ color: 0x3a3a3a, metalness: 0.6, roughness: 0.4 })
-  );
-  grille.position.set(0, 0.08, -0.243);
-  group.add(grille);
-  // Lamp / indicator mesh on front face
+
+  const trim = new THREE.Mesh(_geo('hazer-teile', () => {
+    const teile = [
+      // Ausblasgitter: Rahmen + Lamellen vor der Oeffnung
+      _box(0.17, 0.012, 0.015, [0, 0.131 - 0.006, -0.243]),
+      _box(0.17, 0.012, 0.015, [0, 0.029, -0.243]),
+      _box(0.012, 0.10, 0.015, [-0.079, 0.08, -0.243]),
+      _box(0.012, 0.10, 0.015, [0.079, 0.08, -0.243]),
+      // Tragegriff
+      _box(0.03, 0.04, 0.03, [0, 0.16, -0.11]),
+      _box(0.03, 0.04, 0.03, [0, 0.16, 0.11]),
+      _zyl(0.013, 0.013, 0.25, 10, [0, 0.183, 0], [Math.PI / 2, 0, 0]),
+      // Griffmulden seitlich
+      _box(0.008, 0.035, 0.14, [-0.127, 0.06, 0]),
+      _box(0.008, 0.035, 0.14, [0.127, 0.06, 0]),
+      // Bedienfeld hinten + zwei Knoepfe
+      _box(0.15, 0.08, 0.006, [0, 0.03, 0.243]),
+      _zyl(0.012, 0.012, 0.014, 10, [-0.035, 0.03, 0.25], [Math.PI / 2, 0, 0]),
+      _zyl(0.012, 0.012, 0.014, 10, [0.035, 0.03, 0.25], [Math.PI / 2, 0, 0]),
+    ];
+    for (let i = 0; i < 4; i++) teile.push(_box(0.15, 0.006, 0.004, [0, 0.05 + i * 0.02, -0.256]));
+    for (const x of [-0.10, 0.10]) {
+      for (const z of [-0.20, 0.20]) teile.push(_zyl(0.018, 0.018, 0.012, 10, [x, -0.146, z]));
+    }
+    return verschmelzen(teile);
+  }), trimMat);
+  trim.castShadow = true;
+  group.add(trim);
+
+  // Ausblasoeffnung hinter den Lamellen — das Teil, das leuchtet (f.lamp).
   const lamp = new THREE.Mesh(
-    new THREE.CircleGeometry(0.045, segs(12)),
+    _geo('hazer-oeffnung', () => new THREE.CircleGeometry(0.045, segs(12))),
     new THREE.MeshStandardMaterial({ color: 0xaaaaaa, emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.15, side: THREE.DoubleSide })
   );
   lamp.position.set(0, 0.08, -0.252);
   lamp.rotation.x = Math.PI / 2;
   group.add(lamp);
-  // Load real model
-  loadModel('assets/models/fixtures/hazer.dae', (model) => {
-    if (!model) return;
-    fitModelToSize(model, { x: 0.26, y: 0.30, z: 0.50 });
-    model.traverse(c => { if (c.isMesh) { c.castShadow = true; } });
-    body.visible = false;
-    group.add(model);
-  });
   return { group, head: group, lamp };
 }
 

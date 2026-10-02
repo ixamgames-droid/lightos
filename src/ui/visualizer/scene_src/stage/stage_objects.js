@@ -3,7 +3,7 @@
 import * as THREE from '../three/three.js';
 import { scene } from '../scene/renderer.js';
 import { disposeObj } from '../scene/grid_floor.js';
-import { loadModel } from '../scene/model_loader.js';
+import { geteilteGeometrie, rohr, verschmelzen } from '../scene/geteilte_geometrie.js';
 import { fixtures, stageObjects, view } from '../state.js';
 import { raycaster, mouse } from '../interaction/picking.js';
 import { requestRender } from '../scene/render_loop.js';  // VIZ-13 3c-2
@@ -13,36 +13,73 @@ import { updateEmptyState } from '../empty_state.js';
 // Dokument "Kern-Gotcha" - nur von createStageObject genutzt).
 let stageObjIdCounter = 1;
 
-// Das Blender-Asset `truss_square_2m.obj` liegt mit seiner 2-m-Laengsachse
-// auf lokal Z (Bounds ca. 0.302 x 0.300 x 2.000 m). Erst das Kind ausrichten,
-// dann einen aeusseren Wrapper in den Weltachsen skalieren. Direktes
-// fitModelToSize() auf dem ungedrehten Modell machte bisher aus dem 30-cm-
-// Querschnitt die 4-m-Laengsachse und stauchte die echten Gurte/Diagonalen.
-function prepareTrussModel(model, size, targetAxis) {
-  const fitted = new THREE.Group();
-  fitted.userData.isFittedTrussModel = true;
-  fitted.userData.sourceLongAxis = 'z';
-  fitted.userData.targetLongAxis = targetAxis;
-  fitted.add(model);
+// VIZ-66: Vierpunkt-Traverse als EIGENE Geometrie (vorher ein mitgeliefertes
+// OBJ aus QLC+). Vorbild ist die verbreitete 290-mm-Klasse (F34-artig):
+// vier Gurtrohre Ø 50 mm, Diagonalen Ø ~20 mm, Feldteilung ~0,5 m, an beiden
+// Enden ein Rahmen. Gebaut wird direkt in den Zielmassen — kein Strecken eines
+// Modells, also auch keine verzerrten Rohre (die Falle aus VIZ-TRUSS-GEOMETRY).
+//
+// Laengsachse ist `achse` ('x' = horizontal, 'y' = senkrecht). Die
+// Bounding-Box entspricht exakt `size`: Gurte sitzen um ihren Radius nach innen
+// versetzt, die Streben liegen dazwischen. Gleiche Masse teilen sich EINE
+// Geometrie (Cache-Schluessel auf mm gerundet).
+const _mm = (v) => Math.round(Math.max(Number(v) || 0, 0.01) * 1000) / 1000;
 
-  if (targetAxis === 'x') model.rotation.y = Math.PI / 2;       // Z -> X
-  else if (targetAxis === 'y') model.rotation.x = -Math.PI / 2; // Z -> Y
+function trussGeometrie(size, achse) {
+  const laenge = _mm(achse === 'y' ? size.y : size.x);
+  const quer = _mm(achse === 'y' ? size.x : size.y);   // vor dem Drehen: lokal Y
+  const tiefe = _mm(size.z);
+  return geteilteGeometrie(`truss|${achse}|${laenge}|${quer}|${tiefe}`, () => {
+    const rG = Math.min(0.025, quer / 6, tiefe / 6);    // Gurtrohr
+    const rS = rG * 0.38;                               // Strebe
+    const hy = quer / 2 - rG;
+    const hz = tiefe / 2 - rG;
+    const x0 = -laenge / 2;
+    const felder = Math.max(1, Math.round(laenge / 0.5));
+    // Knoten um den Gurtradius nach innen: sonst ragt das Strebenende ueber
+    // das Traversenende hinaus und die Bounding-Box waere groesser als `size`.
+    const innen = laenge - 2 * rG;
+    const schritt = innen / felder;
+    const teile = [];
+    // 4 Gurte, je mit Deckeln (sichtbare Rohrenden).
+    const gurte = [[hy, hz], [hy, -hz], [-hy, -hz], [-hy, hz]];
+    // 12 Segmente (Vielfaches von 4): die Polygon-Ecken liegen genau auf den
+    // Aussenkanten, die Bounding-Box trifft `size` also exakt.
+    for (const [y, z] of gurte) teile.push(rohr([x0, y, z], [x0 + laenge, y, z], rG, 12, false));
+    // Je Seitenflaeche: Zickzack-Diagonalen + Endsprossen. Die Flaechen sind die
+    // vier Paare benachbarter Gurte (oben, vorn, unten, hinten).
+    for (let k = 0; k < 4; k++) {
+      const A = gurte[k], B = gurte[(k + 1) % 4];
+      for (let i = 0; i < felder; i++) {
+        const xa = x0 + rG + i * schritt, xb = xa + schritt;
+        const [von, nach] = (i % 2 === 0) ? [A, B] : [B, A];
+        teile.push(rohr([xa, von[0], von[1]], [xb, nach[0], nach[1]], rS, 6, true));
+      }
+      for (const x of [x0 + rG, x0 + laenge - rG]) {
+        teile.push(rohr([x, A[0], A[1]], [x, B[0], B[1]], rS, 6, true));
+      }
+    }
+    const geo = verschmelzen(teile);
+    if (achse === 'y') geo.rotateZ(Math.PI / 2);        // X -> Y (lokal Y -> -X)
+    return geo;
+  });
+}
 
-  fitted.updateMatrixWorld(true);
-  let bbox = new THREE.Box3().setFromObject(model);
-  const center = bbox.getCenter(new THREE.Vector3());
-  // `fitted` ist hier noch identisch zu den Weltachsen; der Box-Mittelpunkt
-  // kann daher direkt als lokale Kind-Translation abgezogen werden.
-  model.position.sub(center);
-  fitted.updateMatrixWorld(true);
-  bbox = new THREE.Box3().setFromObject(model);
-  const measured = bbox.getSize(new THREE.Vector3());
-  fitted.scale.set(
-    size.x / Math.max(measured.x, 1e-6),
-    size.y / Math.max(measured.y, 1e-6),
-    size.z / Math.max(measured.z, 1e-6)
+function buildTruss(size, color, achse) {
+  const group = new THREE.Group();
+  const mesh = new THREE.Mesh(
+    trussGeometrie(size, achse),
+    new THREE.MeshStandardMaterial({ color: color, metalness: 0.7, roughness: 0.4 })
   );
-  return fitted;
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.userData.trussGeometrie = true;
+  mesh.userData.laengsAchse = achse;
+  group.add(mesh);
+  group.userData.isTrussGroup = true;
+  group.userData.color = color;
+  group.userData.size = { x: size.x, y: size.y, z: size.z };
+  return group;
 }
 
 export const STAGE_BLUEPRINTS = {
@@ -72,72 +109,13 @@ export const STAGE_BLUEPRINTS = {
     label: 'Truss horizontal',
     defaultSize: { x: 4, y: 0.3, z: 0.3 },
     defaultColor: '#999999',
-    build: (size, color) => {
-      const group = new THREE.Group();
-      const placeholder = new THREE.Mesh(
-        new THREE.BoxGeometry(size.x, size.y, size.z),
-        new THREE.MeshStandardMaterial({ color: color, metalness: 0.7, roughness: 0.4 })
-      );
-      placeholder.castShadow = true;
-      placeholder.receiveShadow = true;
-      group.add(placeholder);
-      group.userData.isTrussGroup = true;
-      group.userData.color = color;
-      group.userData.size = { x: size.x, y: size.y, z: size.z };
-      loadModel('assets/models/stage/truss_square_2m.obj', (model) => {
-        if (!model) return;
-        model.traverse(c => {
-          if (c.isMesh) {
-            c.material = new THREE.MeshStandardMaterial({ color: color, metalness: 0.7, roughness: 0.4 });
-            c.castShadow = true;
-            c.receiveShadow = true;
-          }
-        });
-        group.remove(placeholder);
-        if (placeholder.geometry) placeholder.geometry.dispose();
-        if (placeholder.material) placeholder.material.dispose();
-        group.add(prepareTrussModel(model, size, 'x'));
-        // 3c-2: ASYNCHRONER Modell-Tausch (Platzhalter -> OBJ) kommt NACH dem
-        // createStageObject-Frame an — ohne eigenen requestRender bliebe der
-        // Platzhalter-Quader bis zum naechsten fremden Render sichtbar.
-        requestRender();
-      });
-      return group;
-    },
+    build: (size, color) => buildTruss(size, color, 'x'),
   },
   truss_v: {
     label: 'Truss vertical',
     defaultSize: { x: 0.3, y: 4, z: 0.3 },
     defaultColor: '#999999',
-    build: (size, color) => {
-      const group = new THREE.Group();
-      const placeholder = new THREE.Mesh(
-        new THREE.BoxGeometry(size.x, size.y, size.z),
-        new THREE.MeshStandardMaterial({ color: color, metalness: 0.7, roughness: 0.4 })
-      );
-      placeholder.castShadow = true;
-      placeholder.receiveShadow = true;
-      group.add(placeholder);
-      group.userData.isTrussGroup = true;
-      group.userData.color = color;
-      group.userData.size = { x: size.x, y: size.y, z: size.z };
-      loadModel('assets/models/stage/truss_square_2m.obj', (model) => {
-        if (!model) return;
-        model.traverse(c => {
-          if (c.isMesh) {
-            c.material = new THREE.MeshStandardMaterial({ color: color, metalness: 0.7, roughness: 0.4 });
-            c.castShadow = true;
-            c.receiveShadow = true;
-          }
-        });
-        group.remove(placeholder);
-        if (placeholder.geometry) placeholder.geometry.dispose();
-        if (placeholder.material) placeholder.material.dispose();
-        group.add(prepareTrussModel(model, size, 'y'));
-        requestRender();  // 3c-2: asynchroner Modell-Tausch (s. truss_h)
-      });
-      return group;
-    },
+    build: (size, color) => buildTruss(size, color, 'y'),
   },
   wall: {
     label: 'Wall / Backdrop',
@@ -246,7 +224,7 @@ export function updateStageObjectProps(id, props) {
       so.mesh.geometry.dispose();
       so.mesh.geometry = new THREE.BoxGeometry(data.size.x, data.size.y, data.size.z);
     } else if (so.mesh.isGroup) {
-      // Rebuild the group entirely (cheap - blueprint creates placeholder + reloads cached model)
+      // Rebuild the group entirely (cheap - Traversen-Geometrie kommt aus dem Cache)
       const type = data.type;
       const bp = STAGE_BLUEPRINTS[type];
       if (bp) {
@@ -441,7 +419,9 @@ export function removeStageObject(id) {
   // 3c-1: Grundriss-Umriss mit-disposen (disposeObj traversiert nicht)
   _syncFootprintOutline(so, false);
   scene.remove(so.mesh);
-  disposeObj(so.mesh);
+  // VIZ-66: traversieren, sonst bliebe das Material des Traversen-Kinds
+  // liegen (geteilte Geometrie ueberspringt disposeObj selbst).
+  so.mesh.traverse(disposeObj);
   delete stageObjects[id];
   updateEmptyState();   // VIZ-14
   if (view.selectedStageId === id) {

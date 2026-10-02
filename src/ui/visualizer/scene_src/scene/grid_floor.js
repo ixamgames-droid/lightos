@@ -14,7 +14,9 @@ export let floorMesh = null;
 
 export function disposeObj(o) {
   if (!o) return;
-  if (o.geometry) o.geometry.dispose();
+  // VIZ-66: geteilte Geometrie (scene/geteilte_geometrie.js) gehoert keinem
+  // einzelnen Objekt — sie freizugeben traefe alle anderen Geraete/Traversen.
+  if (o.geometry && !(o.geometry.userData && o.geometry.userData.geteilt)) o.geometry.dispose();
   if (o.material) {
     if (Array.isArray(o.material)) o.material.forEach(m => m.dispose());
     else o.material.dispose();
