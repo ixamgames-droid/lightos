@@ -55,6 +55,7 @@
 | TOOL-2 | C | - | 2026-10-02T12:17Z | tools/gource · Code-Film.bat · Code-Film.sh · THIRD_PARTY_NOTICES.md · tests/test_proc18_fremd_lizenzhinweise.py · tests/test_tool2_keine_binaerdateien.py · BACKLOG.md · changelog.d/2026-10-02-TOOL-2.md |
 | DOC-51 | C | - | 2026-10-02T12:23Z | docs/anleitung_grosse_demo_2026/ANLEITUNG_GROSSE_DEMO_2026.md |
 | DOC-52 | C | - | 2026-10-02T12:24Z | docs/anleitung_komplettshow_2026 |
+| VIZ-66 | A | feat/viz66-eigene-modelle | 2026-10-02T12:24Z | src/ui/visualizer/scene_src/fixtures/builders.js · src/ui/visualizer/scene_src/stage/stage_objects.js · src/ui/visualizer/assets/models · THIRD_PARTY_NOTICES.md |
 
 ## Blocker & Fallen
 
@@ -122,7 +123,6 @@
 
 ## Verlauf
 
-- 2026-10-02T10:53Z C claim DOC-31
 - 2026-10-02T10:55Z C claim DOC-32
 - 2026-10-02T10:56Z C claim DOC-33
 - 2026-10-02T10:56Z C claim DOC-34
@@ -152,3 +152,4 @@
 - 2026-10-02T12:17Z C claim TOOL-2
 - 2026-10-02T12:23Z C claim DOC-51
 - 2026-10-02T12:24Z C claim DOC-52
+- 2026-10-02T12:24Z A claim VIZ-66
