@@ -1,0 +1,208 @@
+{
+  "format_version": 1,
+  "hersteller": "Varytec",
+  "hersteller_kurz": "Varytec",
+  "modell": "Hero Wash 340FX RGBW Zoom",
+  "kurzname": "HEROWASH340FX",
+  "typ": "moving_head",
+  "leistung_w": 134,
+  "quelle": {
+    "titel": "Varytec Hero Wash 340FX RGBW Zoom – Bedienungsanleitung (EN)",
+    "version": "V6, FW V1.1",
+    "datum": "2026-02-23",
+    "url": "https://images.static-thomann.de/pics/atg/atgdata/document/manual/449223_v6_en_online.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.0.0 Beta 2 · Thomas Dral",
+    "original": "resources/fixtures/Varytec/Varytec-Hero-Wash-340FX-RGBW-Zoom.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 81 Wertebereiche mit Art (kind) versehen; gegen Herstellerhandbuch V6 (2026-02-23) abgeglichen; Kanal- und Bereichsnamen deutsch; Shutter-Default/Highlight 0 (offen); Farbmakros von color_wheel auf macro (LED-Wash ohne Farbrad, wie Builtin-Konvention) und ohne color-Art; Strahleffekt von prism auf effect, Rotationsrichtungen laut Handbuch (134–194 links, 195–255 rechts) korrigiert; Kurzname, Notizen"
+  },
+  "autor": "LightOS (QXF-Konverter, nachbearbeitet FM-57)",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal für Kanal gegen die Bedienungsanleitung V6 (Kap. 7.3/7.4 DMX-Tabellen 8/16 Kanäle) geprüft; nicht am Gerät"
+  },
+  "modi": [
+    {
+      "name": "8 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe/Shutter",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Offen", "art": "open"},
+            {"von": 10, "bis": 250, "name": "Strobe, Tempo steigend (0–20 Hz)", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Offen", "art": "open"}
+          ]
+        },
+        {
+          "name": "Farbmakros (Shutter 251–255)",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Keine Funktion", "art": ""},
+            {"von": 11, "bis": 20, "name": "Rot", "art": ""},
+            {"von": 21, "bis": 30, "name": "Grün", "art": ""},
+            {"von": 31, "bis": 40, "name": "Blau", "art": ""},
+            {"von": 41, "bis": 50, "name": "Weiß", "art": ""},
+            {"von": 51, "bis": 60, "name": "Rot + Weiß", "art": ""},
+            {"von": 61, "bis": 70, "name": "Grün + Weiß", "art": ""},
+            {"von": 71, "bis": 80, "name": "Blau + Weiß", "art": ""},
+            {"von": 81, "bis": 90, "name": "Rot + Grün", "art": ""},
+            {"von": 91, "bis": 100, "name": "Grün + Blau", "art": ""},
+            {"von": 101, "bis": 110, "name": "Rot + Blau", "art": ""},
+            {"von": 111, "bis": 120, "name": "Rot + Grün + Blau", "art": ""},
+            {"von": 121, "bis": 130, "name": "Grün + Blau + Weiß", "art": ""},
+            {"von": 131, "bis": 140, "name": "Rot + Blau + Weiß", "art": ""},
+            {"von": 141, "bis": 150, "name": "Rot + Grün + Blau + Weiß", "art": ""},
+            {"von": 151, "bis": 200, "name": "Farbwechsel, Tempo steigend", "art": ""},
+            {"von": 201, "bis": 255, "name": "Farbüberblendung (Fade), Tempo steigend", "art": ""}
+          ]
+        },
+        {"name": "Zoom", "attribut": "zoom", "default": 0, "highlight": 0},
+        {
+          "name": "Strahleffekt (FX-Klappen)",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 100, "name": "Strahlwinkel geschlossen → offen (0°–90°)", "art": ""},
+            {"von": 101, "bis": 133, "name": "Jo-Jo-Effekt, Tempo steigend", "art": ""},
+            {"von": 134, "bis": 194, "name": "Rotation links, Tempo fallend", "art": "rotate"},
+            {"von": 195, "bis": 255, "name": "Rotation rechts, Tempo steigend", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Automatik-Programme / Reset",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Keine Funktion", "art": ""},
+            {"von": 11, "bis": 20, "name": "Automatik-Show 1", "art": ""},
+            {"von": 21, "bis": 30, "name": "Automatik-Show 2", "art": ""},
+            {"von": 31, "bis": 40, "name": "Automatik-Show 3", "art": ""},
+            {"von": 41, "bis": 50, "name": "Automatik-Show 4", "art": ""},
+            {"von": 51, "bis": 60, "name": "Automatik-Show 5", "art": ""},
+            {"von": 61, "bis": 70, "name": "Automatik-Show 6", "art": ""},
+            {"von": 71, "bis": 80, "name": "Automatik-Show 7", "art": ""},
+            {"von": 81, "bis": 90, "name": "Automatik-Show 8", "art": ""},
+            {"von": 91, "bis": 230, "name": "Musiksteuerung (Mikrofon-Empfindlichkeit aus → hoch)", "art": "sound"},
+            {"von": 231, "bis": 240, "name": "Reset (mind. 3 s senden)", "art": "reset"},
+            {"von": 241, "bis": 255, "name": "Keine Funktion", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "16 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fein", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fein", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt-Tempo (0 = schnell, 255 = langsam)", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Shutter",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Offen", "art": "open"},
+            {"von": 10, "bis": 250, "name": "Strobe, Tempo steigend (0–20 Hz)", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Offen", "art": "open"}
+          ]
+        },
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Grün", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiß", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Farbtemperatur",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Keine Funktion", "art": ""},
+            {"von": 1, "bis": 31, "name": "2400 K", "art": ""},
+            {"von": 32, "bis": 63, "name": "3600 K", "art": ""},
+            {"von": 64, "bis": 95, "name": "4800 K", "art": ""},
+            {"von": 96, "bis": 127, "name": "6000 K", "art": ""},
+            {"von": 128, "bis": 159, "name": "7200 K", "art": ""},
+            {"von": 160, "bis": 191, "name": "8400 K", "art": ""},
+            {"von": 192, "bis": 223, "name": "9600 K", "art": ""},
+            {"von": 224, "bis": 255, "name": "10800 K", "art": ""}
+          ]
+        },
+        {
+          "name": "Farbmakros",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Keine Funktion", "art": ""},
+            {"von": 11, "bis": 20, "name": "Rot", "art": ""},
+            {"von": 21, "bis": 30, "name": "Grün", "art": ""},
+            {"von": 31, "bis": 40, "name": "Blau", "art": ""},
+            {"von": 41, "bis": 50, "name": "Weiß", "art": ""},
+            {"von": 51, "bis": 60, "name": "Rot + Weiß", "art": ""},
+            {"von": 61, "bis": 70, "name": "Grün + Weiß", "art": ""},
+            {"von": 71, "bis": 80, "name": "Blau + Weiß", "art": ""},
+            {"von": 81, "bis": 90, "name": "Rot + Grün", "art": ""},
+            {"von": 91, "bis": 100, "name": "Grün + Blau", "art": ""},
+            {"von": 101, "bis": 110, "name": "Rot + Blau", "art": ""},
+            {"von": 111, "bis": 120, "name": "Rot + Grün + Blau", "art": ""},
+            {"von": 121, "bis": 130, "name": "Grün + Blau + Weiß", "art": ""},
+            {"von": 131, "bis": 140, "name": "Rot + Blau + Weiß", "art": ""},
+            {"von": 141, "bis": 150, "name": "Rot + Grün + Blau + Weiß", "art": ""},
+            {"von": 151, "bis": 200, "name": "Farbwechsel, Tempo steigend", "art": ""},
+            {"von": 201, "bis": 255, "name": "Farbüberblendung (Fade), Tempo steigend", "art": ""}
+          ]
+        },
+        {"name": "Zoom", "attribut": "zoom", "default": 0, "highlight": 0},
+        {
+          "name": "Strahleffekt (FX-Klappen)",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 100, "name": "Strahlwinkel geschlossen → offen (0°–90°)", "art": ""},
+            {"von": 101, "bis": 133, "name": "Jo-Jo-Effekt, Tempo steigend", "art": ""},
+            {"von": 134, "bis": 194, "name": "Rotation links, Tempo fallend", "art": "rotate"},
+            {"von": 195, "bis": 255, "name": "Rotation rechts, Tempo steigend", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Automatik-Programme / Reset",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Keine Funktion", "art": ""},
+            {"von": 11, "bis": 20, "name": "Automatik-Show 1", "art": ""},
+            {"von": 21, "bis": 30, "name": "Automatik-Show 2", "art": ""},
+            {"von": 31, "bis": 40, "name": "Automatik-Show 3", "art": ""},
+            {"von": 41, "bis": 50, "name": "Automatik-Show 4", "art": ""},
+            {"von": 51, "bis": 60, "name": "Automatik-Show 5", "art": ""},
+            {"von": 61, "bis": 70, "name": "Automatik-Show 6", "art": ""},
+            {"von": 71, "bis": 80, "name": "Automatik-Show 7", "art": ""},
+            {"von": 81, "bis": 90, "name": "Automatik-Show 8", "art": ""},
+            {"von": 91, "bis": 230, "name": "Musiksteuerung (Mikrofon-Empfindlichkeit aus → hoch)", "art": "sound"},
+            {"von": 231, "bis": 240, "name": "Reset (mind. 3 s senden)", "art": "reset"},
+            {"von": 241, "bis": 255, "name": "Keine Funktion", "art": ""}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Wash-Moving-Head 3 × 40 W RGBW mit Zoom und Strahleffekt (bewegliche Klappen). Farbmakros nur bei offenem Dimmer und Shutter 251–255."
+}

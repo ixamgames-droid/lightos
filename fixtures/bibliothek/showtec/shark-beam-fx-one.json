@@ -1,0 +1,197 @@
+{
+  "format_version": 1,
+  "hersteller": "Showtec",
+  "hersteller_kurz": "Showtec",
+  "modell": "Shark Beam FX One",
+  "kurzname": "SHARKBEAMFX1",
+  "typ": "moving_head",
+  "leistung_w": 135,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Showtec-Shark-Beam-FX-One.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Showtec/Showtec-Shark-Beam-FX-One.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.3 GIT · Mats Lourenco",
+    "original": "resources/fixtures/Showtec/Showtec-Shark-Beam-FX-One.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 73 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): kurzname SHARKBEAMFX1; Shutter-Default 0 (offen); Kanal 'Beam' (Linsenrotation) als effect statt zweitem zoom, Rotationsbereiche mit art rotate; Farbtemperatur-Kanal als raw statt intensity (war zweiter Dimmer); Farbmakros: 'No function' und Switch/Flow-Programme ohne art"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "aus QLC+ konvertiert und von LightOS nach Kanalnamen/Bereichen nachbearbeitet; kein Herstellerhandbuch verfuegbar (Hersteller-Website hinter Bot-Sperre) — nicht Kanal fuer Kanal gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "8 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe/Shutter",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Offen", "art": "open"},
+            {"von": 10, "bis": 250, "name": "Strobe langsam -> schnell", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Offen", "art": "open"}
+          ]
+        },
+        {
+          "name": "Color Macros",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "No function"},
+            {"von": 11, "bis": 20, "name": "Red", "art": "color"},
+            {"von": 21, "bis": 30, "name": "Green", "art": "color"},
+            {"von": 31, "bis": 40, "name": "Blue", "art": "color"},
+            {"von": 41, "bis": 50, "name": "White", "art": "color"},
+            {"von": 51, "bis": 60, "name": "Red + White", "art": "color"},
+            {"von": 61, "bis": 70, "name": "Green + White", "art": "color"},
+            {"von": 71, "bis": 80, "name": "Blue + White", "art": "color"},
+            {"von": 81, "bis": 90, "name": "Red + Green", "art": "color"},
+            {"von": 91, "bis": 100, "name": "Green + Blue", "art": "color"},
+            {"von": 101, "bis": 110, "name": "Red + Blue", "art": "color"},
+            {"von": 111, "bis": 120, "name": "Red + Green + Blue", "art": "color"},
+            {"von": 121, "bis": 130, "name": "Green + Blue + White", "art": "color"},
+            {"von": 131, "bis": 140, "name": "Red + Blue + White", "art": "color"},
+            {"von": 141, "bis": 150, "name": "Red + Green + Blue + White", "art": "color"},
+            {"von": 151, "bis": 200, "name": "Switch, Slow to Fast"},
+            {"von": 201, "bis": 255, "name": "Flow, Slow to Fast"}
+          ]
+        },
+        {"name": "Zoom", "attribut": "zoom", "default": 0, "highlight": 0},
+        {
+          "name": "Linsen-Effekt (Rotation)",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 100, "name": "Effekt geschlossen -> offen"},
+            {"von": 101, "bis": 133, "name": "Bounce langsam -> schnell"},
+            {"von": 134, "bis": 194, "name": "Rotation gegen Uhrzeigersinn schnell -> langsam", "art": "rotate"},
+            {"von": 195, "bis": 255, "name": "Rotation im Uhrzeigersinn langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Functions",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Keine Funktion", "art": ""},
+            {"von": 11, "bis": 20, "name": "Built-in program 1", "art": ""},
+            {"von": 21, "bis": 30, "name": "Built-in program 2", "art": ""},
+            {"von": 31, "bis": 40, "name": "Built-in program 3", "art": ""},
+            {"von": 41, "bis": 50, "name": "Built-in program 4", "art": ""},
+            {"von": 51, "bis": 60, "name": "Built-in program 5", "art": ""},
+            {"von": 61, "bis": 70, "name": "Built-in program 6", "art": ""},
+            {"von": 71, "bis": 80, "name": "Built-in program 7", "art": ""},
+            {"von": 81, "bis": 90, "name": "Built-in program 8", "art": ""},
+            {"von": 91, "bis": 230, "name": "Sound-controlled Off to High", "art": "sound"},
+            {"von": 231, "bis": 240, "name": "Reset after 3 seconds", "art": "reset"},
+            {"von": 241, "bis": 255, "name": "Keine Funktion", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "16 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe/Shutter",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Offen", "art": "open"},
+            {"von": 10, "bis": 250, "name": "Strobe langsam -> schnell", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Offen", "art": "open"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Color Temperature",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Farbtemperatur"}
+          ]
+        },
+        {
+          "name": "Color Macros",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "No function"},
+            {"von": 11, "bis": 20, "name": "Red", "art": "color"},
+            {"von": 21, "bis": 30, "name": "Green", "art": "color"},
+            {"von": 31, "bis": 40, "name": "Blue", "art": "color"},
+            {"von": 41, "bis": 50, "name": "White", "art": "color"},
+            {"von": 51, "bis": 60, "name": "Red + White", "art": "color"},
+            {"von": 61, "bis": 70, "name": "Green + White", "art": "color"},
+            {"von": 71, "bis": 80, "name": "Blue + White", "art": "color"},
+            {"von": 81, "bis": 90, "name": "Red + Green", "art": "color"},
+            {"von": 91, "bis": 100, "name": "Green + Blue", "art": "color"},
+            {"von": 101, "bis": 110, "name": "Red + Blue", "art": "color"},
+            {"von": 111, "bis": 120, "name": "Red + Green + Blue", "art": "color"},
+            {"von": 121, "bis": 130, "name": "Green + Blue + White", "art": "color"},
+            {"von": 131, "bis": 140, "name": "Red + Blue + White", "art": "color"},
+            {"von": 141, "bis": 150, "name": "Red + Green + Blue + White", "art": "color"},
+            {"von": 151, "bis": 200, "name": "Switch, Slow to Fast"},
+            {"von": 201, "bis": 255, "name": "Flow, Slow to Fast"}
+          ]
+        },
+        {"name": "Zoom", "attribut": "zoom", "default": 0, "highlight": 0},
+        {
+          "name": "Linsen-Effekt (Rotation)",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 100, "name": "Effekt geschlossen -> offen"},
+            {"von": 101, "bis": 133, "name": "Bounce langsam -> schnell"},
+            {"von": 134, "bis": 194, "name": "Rotation gegen Uhrzeigersinn schnell -> langsam", "art": "rotate"},
+            {"von": 195, "bis": 255, "name": "Rotation im Uhrzeigersinn langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Functions",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Keine Funktion", "art": ""},
+            {"von": 11, "bis": 20, "name": "Built-in program 1", "art": ""},
+            {"von": 21, "bis": 30, "name": "Built-in program 2", "art": ""},
+            {"von": 31, "bis": 40, "name": "Built-in program 3", "art": ""},
+            {"von": 41, "bis": 50, "name": "Built-in program 4", "art": ""},
+            {"von": 51, "bis": 60, "name": "Built-in program 5", "art": ""},
+            {"von": 61, "bis": 70, "name": "Built-in program 6", "art": ""},
+            {"von": 71, "bis": 80, "name": "Built-in program 7", "art": ""},
+            {"von": 81, "bis": 90, "name": "Built-in program 8", "art": ""},
+            {"von": 91, "bis": 230, "name": "Sound-controlled Off to High", "art": "sound"},
+            {"von": 231, "bis": 240, "name": "Reset after 3 seconds", "art": "reset"},
+            {"von": 241, "bis": 255, "name": "Keine Funktion", "art": ""}
+          ]
+        }
+      ]
+    }
+  ]
+}

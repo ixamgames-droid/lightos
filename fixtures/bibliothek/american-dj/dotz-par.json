@@ -1,0 +1,170 @@
+{
+  "format_version": 1,
+  "hersteller": "American DJ",
+  "hersteller_kurz": "ADJ",
+  "modell": "Dotz Par",
+  "kurzname": "DOTZPAR",
+  "typ": "par",
+  "leistung_w": 36,
+  "quelle": {"titel": "ADJ Dotz Par User Manual", "url": "https://r2.gear4music.com/media/13/139087/download_139087_1.pdf"},
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.1 GIT · Zeph",
+    "original": "resources/fixtures/American_DJ/American-DJ-Dotz-Par.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 55 Wertebereiche mit Art (kind) versehen; Rasterform in 4 Modus/Modi aus <Physical> uebernommen; danach von LightOS gegen das Herstellerhandbuch ueberarbeitet: Dimmerkurven-Kanal als raw (Default 0, Highlight 0) statt intensity/macro; irrefuehrende Bereichs-Arten (color/gobo/rotate/closed) an Programm-/Makro-/Funktionskanaelen entfernt; Raster 1x4 entfernt (eine 36-W-TRI-COB-LED, keine getrennten Zellen); Farbmakros 224-247 laut Handbuch Voll Rot/Gruen/Blau (QLC+: Full CTB/Half CTB/Dark Blue); Programmgeschwindigkeit als effect_speed statt speed; Strobe-Kanal mit Bereichen versehen (0 = kein Strobe, Annahme)"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal fuer Kanal gegen die DMX-Tabellen (3/4/5/9 Kanal) im ADJ-Handbuch Dotz Par geprueft; Strobe-Nullwert im Handbuch nicht ausgewiesen; nicht am Geraet getestet"
+  },
+  "modi": [
+    {
+      "name": "3 Channel",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "4 Channel",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "5 Channel",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Dimmer curves",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 41, "name": "Standard", "art": ""},
+            {"von": 42, "bis": 84, "name": "Stage", "art": ""},
+            {"von": 85, "bis": 127, "name": "TV", "art": ""},
+            {"von": 128, "bis": 170, "name": "Architectural", "art": ""},
+            {"von": 171, "bis": 213, "name": "Theater", "art": ""},
+            {"von": 214, "bis": 255, "name": "Default to curve setting", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "9 Channel",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Farbmakros",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Aus (RGB direkt)", "art": ""},
+            {"von": 1, "bis": 7, "name": "Bastard Amber", "art": "color"},
+            {"von": 8, "bis": 15, "name": "Medium Amber", "art": "color"},
+            {"von": 16, "bis": 23, "name": "Pale Amber Gold", "art": "color"},
+            {"von": 24, "bis": 31, "name": "Gallo Gold", "art": "color"},
+            {"von": 32, "bis": 39, "name": "Golden Amber", "art": "color"},
+            {"von": 40, "bis": 47, "name": "Light Red", "art": "color"},
+            {"von": 48, "bis": 55, "name": "Medium Red", "art": "color"},
+            {"von": 56, "bis": 63, "name": "Medium Pink", "art": "color"},
+            {"von": 64, "bis": 71, "name": "Broadway Pink", "art": "color"},
+            {"von": 72, "bis": 79, "name": "Follies Pink", "art": "color"},
+            {"von": 80, "bis": 87, "name": "Light Lavender", "art": "color"},
+            {"von": 88, "bis": 95, "name": "Special Lavender", "art": "color"},
+            {"von": 96, "bis": 103, "name": "Lavender", "art": "color"},
+            {"von": 104, "bis": 111, "name": "Indigo", "art": "color"},
+            {"von": 112, "bis": 119, "name": "Hemsley Blue", "art": "color"},
+            {"von": 120, "bis": 127, "name": "Tipton Blue", "art": "color"},
+            {"von": 128, "bis": 135, "name": "Light Steel Blue", "art": "color"},
+            {"von": 136, "bis": 143, "name": "Light Sky Blue", "art": "color"},
+            {"von": 144, "bis": 151, "name": "Sky Blue", "art": "color"},
+            {"von": 152, "bis": 159, "name": "Brilliant Blue", "art": "color"},
+            {"von": 160, "bis": 167, "name": "Light Green Blue", "art": "color"},
+            {"von": 168, "bis": 175, "name": "Bright Blue", "art": "color"},
+            {"von": 176, "bis": 183, "name": "Primary Blue", "art": "color"},
+            {"von": 184, "bis": 191, "name": "Congo Blue", "art": "color"},
+            {"von": 192, "bis": 199, "name": "Pale Yellow Green", "art": "color"},
+            {"von": 200, "bis": 207, "name": "Moss Green", "art": "color"},
+            {"von": 208, "bis": 215, "name": "Primary Green", "art": "color"},
+            {"von": 216, "bis": 223, "name": "Double CTB", "art": "color"},
+            {"von": 224, "bis": 231, "name": "Voll Rot", "art": "color"},
+            {"von": 232, "bis": 239, "name": "Voll Gruen", "art": "color"},
+            {"von": 240, "bis": 247, "name": "Voll Blau", "art": "color"},
+            {"von": 248, "bis": 255, "name": "White", "art": "color"}
+          ]
+        },
+        {
+          "name": "Programs",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Off", "art": ""},
+            {"von": 1, "bis": 20, "name": "Color fade/change", "art": ""},
+            {"von": 21, "bis": 40, "name": "7 color change", "art": ""},
+            {"von": 41, "bis": 60, "name": "7 color fade", "art": ""},
+            {"von": 61, "bis": 80, "name": "3 color change", "art": ""},
+            {"von": 81, "bis": 100, "name": "3 color fade", "art": ""},
+            {"von": 101, "bis": 120, "name": "Sound active color fade", "art": "sound"},
+            {"von": 121, "bis": 140, "name": "Sound active color change", "art": "sound"},
+            {"von": 141, "bis": 255, "name": "Keine Funktion", "art": ""}
+          ]
+        },
+        {
+          "name": "Program Speed/Sound Sense",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {
+              "von": 0,
+              "bis": 255,
+              "name": "Programmgeschwindigkeit langsam-schnell / Sound-Empfindlichkeit gering-hoch",
+              "art": ""
+            }
+          ]
+        },
+        {
+          "name": "Strobing",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Kein Strobe (Annahme, Handbuch: 0-255 langsam-schnell)", "art": "open"},
+            {"von": 1, "bis": 255, "name": "Strobe langsam-schnell", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Dimmer curves",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 41, "name": "Standard", "art": ""},
+            {"von": 42, "bis": 84, "name": "Stage", "art": ""},
+            {"von": 85, "bis": 127, "name": "TV", "art": ""},
+            {"von": 128, "bis": 170, "name": "Architectural", "art": ""},
+            {"von": 171, "bis": 213, "name": "Theater", "art": ""},
+            {"von": 214, "bis": 255, "name": "Default to curve setting", "art": ""}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "1x 36 W TRI-COB (RGB). Bei aktivem Farbmakro (CH5) sind CH1-3 ohne Wirkung."
+}

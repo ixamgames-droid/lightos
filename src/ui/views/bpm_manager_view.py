@@ -200,6 +200,9 @@ def diag_line(snap, cap_snap=None) -> str:
     cap_teil = ""
     if cap_snap is not None:
         cap_teil = f" · Chunk p95 {z(getattr(cap_snap, 'chunk_ms_p95', 0.0))} ms"
+        luecken = int(getattr(cap_snap, "luecken", 0) or 0)
+        if luecken:   # BPM-21: vom Treiber gemeldete Datenluecken seit Start
+            cap_teil += f" · Lücken {luecken}"
     if snap is None:
         if cap_snap is not None:
             return f"kein Detektor · DC {z(getattr(cap_snap, 'dc_offset', 0.0), '+.3f')}" + cap_teil

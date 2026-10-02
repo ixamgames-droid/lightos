@@ -232,6 +232,7 @@ class AudioRecorder:
             snap = cap.snapshot()
             info["geraet"] = getattr(snap, "device", None)
             info["chunk_ms_p95"] = round(float(getattr(snap, "chunk_ms_p95", 0.0)), 2)
+            info["luecken"] = int(getattr(snap, "luecken", 0) or 0)   # BPM-21
         except Exception:
             info["geraet"] = getattr(cap, "_device_name", None)
         det = self._detector()

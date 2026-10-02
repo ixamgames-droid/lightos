@@ -1,0 +1,160 @@
+{
+  "format_version": 1,
+  "hersteller": "American DJ",
+  "hersteller_kurz": "ADJ",
+  "modell": "COB Cannon Wash DW",
+  "kurzname": "COBCANNONDW",
+  "typ": "par",
+  "leistung_w": 135,
+  "quelle": {
+    "titel": "ADJ COB Cannon Wash DW User Manual (rev. 09/18/2023)",
+    "url": "https://assets.centryngroup.com/dl/files/COB500__DL__004.pdf",
+    "version": "09/18/2023",
+    "datum": "2023-09-18"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.2 · Florian Gerstenlauer",
+    "original": "resources/fixtures/American_DJ/American-DJ-COB-Cannon-Wash-DW.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 30 Wertebereiche mit Art (kind) versehen; danach von LightOS gegen das Herstellerhandbuch ueberarbeitet: Dimmerkurven-Kanal als raw (Default 0, Highlight 0) statt intensity/macro; Shutter-Bereiche nach Handbuch klassifiziert (aus=closed, LED an=open, alle Strobe-/Puls-/Random-/Rampen-Bereiche=strobe), Default/Highlight auf Mitte des ersten Offen-Bereichs; irrefuehrende Bereichs-Arten (color/gobo/rotate/closed) an Programm-/Makro-/Funktionskanaelen entfernt; Farbtemperatur-Kanal: falsche Art color entfernt, Bereiche nach Handbuch"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal fuer Kanal gegen die DMX-Traits (S. 17) im ADJ-Handbuch (rev. 09/18/2023) geprueft; nicht am Geraet getestet"
+  },
+  "modi": [
+    {
+      "name": "1 Channel",
+      "kanaele": [
+        {
+          "name": "Farbtemperatur",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Aus (CW/WW direkt)", "art": ""},
+            {"von": 1, "bis": 255, "name": "3200 K - 6400 K linear", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2 Channel",
+      "kanaele": [
+        {"name": "Kaltweiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Warmweiss", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "3 Channel",
+      "kanaele": [
+        {"name": "Kaltweiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Warmweiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "4 Channel",
+      "kanaele": [
+        {"name": "Kaltweiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Warmweiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Farbtemperatur",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Aus (CW/WW direkt)", "art": ""},
+            {"von": 1, "bis": 255, "name": "3200 K - 6400 K linear", "art": ""}
+          ]
+        },
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "5 Channel",
+      "kanaele": [
+        {"name": "Kaltweiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Warmweiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Farbtemperatur",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Aus (CW/WW direkt)", "art": ""},
+            {"von": 1, "bis": 255, "name": "3200 K - 6400 K linear", "art": ""}
+          ]
+        },
+        {
+          "name": "Shutter/Strobe",
+          "attribut": "shutter",
+          "default": 47,
+          "highlight": 47,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "OFF", "art": "closed"},
+            {"von": 32, "bis": 63, "name": "ON", "art": "open"},
+            {"von": 64, "bis": 95, "name": "Strobe Slow - Fast", "art": "strobe"},
+            {"von": 96, "bis": 127, "name": "ON", "art": "open"},
+            {"von": 128, "bis": 159, "name": "Strobe-Pulse Slow - Fast", "art": "strobe"},
+            {"von": 160, "bis": 191, "name": "ON", "art": "open"},
+            {"von": 192, "bis": 223, "name": "Random-Strobe Slow - Fast", "art": "strobe"},
+            {"von": 224, "bis": 255, "name": "ON", "art": "open"}
+          ]
+        },
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "6 Channel",
+      "kanaele": [
+        {"name": "Kaltweiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Warmweiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Farbtemperatur",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Aus (CW/WW direkt)", "art": ""},
+            {"von": 1, "bis": 255, "name": "3200 K - 6400 K linear", "art": ""}
+          ]
+        },
+        {
+          "name": "Shutter/Strobe",
+          "attribut": "shutter",
+          "default": 47,
+          "highlight": 47,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "OFF", "art": "closed"},
+            {"von": 32, "bis": 63, "name": "ON", "art": "open"},
+            {"von": 64, "bis": 95, "name": "Strobe Slow - Fast", "art": "strobe"},
+            {"von": 96, "bis": 127, "name": "ON", "art": "open"},
+            {"von": 128, "bis": 159, "name": "Strobe-Pulse Slow - Fast", "art": "strobe"},
+            {"von": 160, "bis": 191, "name": "ON", "art": "open"},
+            {"von": 192, "bis": 223, "name": "Random-Strobe Slow - Fast", "art": "strobe"},
+            {"von": 224, "bis": 255, "name": "ON", "art": "open"}
+          ]
+        },
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Dimmer Curves",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 20, "name": "Standard", "art": ""},
+            {"von": 21, "bis": 40, "name": "Stage", "art": ""},
+            {"von": 41, "bis": 60, "name": "TV", "art": ""},
+            {"von": 61, "bis": 80, "name": "Architecture", "art": ""},
+            {"von": 81, "bis": 100, "name": "Theatre", "art": ""},
+            {"von": 101, "bis": 255, "name": "Default to unit setting", "art": ""}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "1x 150 W COB Kalt-/Warmweiss. Beide Weisskanaele sind color_w (eine Lichtquelle)."
+}

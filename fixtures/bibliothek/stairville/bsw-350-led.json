@@ -1,0 +1,654 @@
+{
+  "format_version": 1,
+  "hersteller": "Stairville",
+  "hersteller_kurz": "STAIR",
+  "modell": "BSW-350 LED",
+  "kurzname": "BSW350",
+  "typ": "moving_head",
+  "leistung_w": 370,
+  "quelle": {
+    "titel": "Stairville BSW-350 LED Moving Head, User Manual (Thomann, Art. 549467, v2)",
+    "url": "https://fast-images.static-thomann.de/pics/atg/atgdata/document/manual/549467_v2_en_online.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.14.2 GIT · Theodor Hein",
+    "original": "resources/fixtures/Stairville/Stairville-BSW-350-LED.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 242 Wertebereiche mit Art (kind) versehen; Modi aufsteigend sortiert, umbenannt (26-/32-Kanal); Kanal CTO laut Handbuch (QLC+: 'Amber' als color_a) jetzt raw 'CTO'; CRI-Filter als raw statt zweitem color_wheel; falsche Arten closed/open entfernt; Feinkanaele Zoom/Fokus/Gobo-Rotation als raw statt doppeltem zoom/focus/gobo_rotation (sonst als zweiter Kopf gelesen); Goborad 2 als gobo_wheel2, Prisma-Rotation als prism_rotation statt prism; Farbrad/Goboraeder: Offen-Bereiche art open, Split-Farben color, Stopp ohne Art; Gobo-Position ohne rotate; Prisma mit art open/prism, Frost-Bereiche, Sonderfunktionen als reset (nur Reset-Bereiche art reset; falsche closed/rotate entfernt); CMY/CTO-Highlight 0 statt 255 (sonst wird Highlight dunkel), Strobe-Default/Highlight 0 (offen) statt 2, Zoom/Fokus-Default 128; Kanal-/Bereichsnamen deutsch; Kurzname; hersteller_kurz STAIR; Quelle auf Herstellerhandbuch gesetzt"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal fuer Kanal gegen das Handbuch (Kap. 7.6 26 Kanaele, 7.7 32 Kanaele) geprueft; die Strobe-Tabelle im 32-Kanal-Abschnitt des Handbuchs ist um eine Zeile verrutscht — uebernommen sind die Werte aus dem 26-Kanal-Abschnitt (deckungsgleich mit QLC+)"
+  },
+  "modi": [
+    {
+      "name": "26-Kanal",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fein", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fein", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Dimmer",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dimmer 0 % → 100 %"}
+          ]
+        },
+        {"name": "Dimmer fein", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Offen", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Geschlossen", "art": "closed"},
+            {"von": 11, "bis": 33, "name": "Zufallsimpulse, schneller werdend", "art": "strobe"},
+            {"von": 34, "bis": 56, "name": "Zufaellig heller werdend"},
+            {"von": 57, "bis": 79, "name": "Zufaellig dunkler werdend"},
+            {"von": 80, "bis": 102, "name": "Zufalls-Strobe, schneller werdend", "art": "strobe"},
+            {"von": 103, "bis": 127, "name": "Pausen-Effekt 5 s → 1 s"},
+            {"von": 128, "bis": 250, "name": "Strobe langsam → schnell", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Offen", "art": "open"}
+          ]
+        },
+        {
+          "name": "Cyan",
+          "attribut": "cmy_c",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Cyan 0 % → 100 %"}
+          ]
+        },
+        {
+          "name": "Magenta",
+          "attribut": "cmy_m",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Magenta 0 % → 100 %"}
+          ]
+        },
+        {
+          "name": "Gelb",
+          "attribut": "cmy_y",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Gelb 0 % → 100 %"}
+          ]
+        },
+        {
+          "name": "CTO",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "CTO 0 % → 100 %"}
+          ]
+        },
+        {
+          "name": "Farbrad",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Offen (weiss)", "art": "open"},
+            {"von": 6, "bis": 15, "name": "Offen / Dunkelrot", "art": "color"},
+            {"von": 16, "bis": 25, "name": "Dunkelrot", "art": "color"},
+            {"von": 26, "bis": 35, "name": "Dunkelrot / Dunkelorange", "art": "color"},
+            {"von": 36, "bis": 45, "name": "Dunkelorange", "art": "color"},
+            {"von": 46, "bis": 55, "name": "Dunkelorange / Dunkelblau", "art": "color"},
+            {"von": 56, "bis": 65, "name": "Dunkelblau", "art": "color"},
+            {"von": 66, "bis": 75, "name": "Dunkelblau / Gelb", "art": "color"},
+            {"von": 76, "bis": 85, "name": "Gelb", "art": "color"},
+            {"von": 86, "bis": 95, "name": "Gelb / Dunkelgruen", "art": "color"},
+            {"von": 96, "bis": 105, "name": "Dunkelgruen", "art": "color"},
+            {"von": 106, "bis": 115, "name": "Dunkelgruen / Lavendel", "art": "color"},
+            {"von": 116, "bis": 125, "name": "Lavendel", "art": "color"},
+            {"von": 126, "bis": 135, "name": "Lavendel / Cyan", "art": "color"},
+            {"von": 136, "bis": 145, "name": "Cyan", "art": "color"},
+            {"von": 146, "bis": 185, "name": "Offen (weiss)", "art": "open"},
+            {"von": 186, "bis": 218, "name": "Farbrad-Durchlauf im Uhrzeigersinn, langsamer werdend", "art": "rotate"},
+            {"von": 219, "bis": 222, "name": "Stopp"},
+            {
+              "von": 223,
+              "bis": 255,
+              "name": "Farbrad-Durchlauf gegen den Uhrzeigersinn, schneller werdend",
+              "art": "rotate"
+            }
+          ]
+        },
+        {
+          "name": "CRI-Filter",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "CRI-Filter aus"},
+            {"von": 6, "bis": 255, "name": "CRI-Filter ein"}
+          ]
+        },
+        {
+          "name": "Goborad 1",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Offen", "art": "open"},
+            {"von": 6, "bis": 17, "name": "Gobo 1", "art": "gobo"},
+            {"von": 18, "bis": 29, "name": "Gobo 2", "art": "gobo"},
+            {"von": 30, "bis": 41, "name": "Gobo 3", "art": "gobo"},
+            {"von": 42, "bis": 53, "name": "Gobo 4", "art": "gobo"},
+            {"von": 54, "bis": 65, "name": "Gobo 5", "art": "gobo"},
+            {"von": 66, "bis": 77, "name": "Gobo 6", "art": "gobo"},
+            {"von": 78, "bis": 89, "name": "Gobo 7", "art": "gobo"},
+            {"von": 90, "bis": 101, "name": "Gobo 1 Shake, schneller werdend", "art": "shake"},
+            {"von": 102, "bis": 113, "name": "Gobo 2 Shake, schneller werdend", "art": "shake"},
+            {"von": 114, "bis": 125, "name": "Gobo 3 Shake, schneller werdend", "art": "shake"},
+            {"von": 126, "bis": 137, "name": "Gobo 4 Shake, schneller werdend", "art": "shake"},
+            {"von": 138, "bis": 149, "name": "Gobo 5 Shake, schneller werdend", "art": "shake"},
+            {"von": 150, "bis": 161, "name": "Gobo 6 Shake, schneller werdend", "art": "shake"},
+            {"von": 162, "bis": 173, "name": "Gobo 7 Shake, schneller werdend", "art": "shake"},
+            {"von": 174, "bis": 185, "name": "Offen", "art": "open"},
+            {"von": 186, "bis": 218, "name": "Goborad-Durchlauf im Uhrzeigersinn, langsamer werdend", "art": "rotate"},
+            {"von": 219, "bis": 222, "name": "Stopp"},
+            {
+              "von": 223,
+              "bis": 255,
+              "name": "Goborad-Durchlauf gegen den Uhrzeigersinn, schneller werdend",
+              "art": "rotate"
+            }
+          ]
+        },
+        {
+          "name": "Gobo-Rotation",
+          "attribut": "gobo_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Gobo-Rotation aus"},
+            {"von": 6, "bis": 128, "name": "Gobo-Position 0° → 540°"},
+            {"von": 129, "bis": 191, "name": "Rotation im Uhrzeigersinn, langsamer werdend", "art": "rotate"},
+            {"von": 192, "bis": 192, "name": "Stopp"},
+            {"von": 193, "bis": 255, "name": "Rotation gegen den Uhrzeigersinn, schneller werdend", "art": "rotate"}
+          ]
+        },
+        {"name": "Gobo-Rotation fein", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Goborad 2",
+          "attribut": "gobo_wheel2",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Offen", "art": "open"},
+            {"von": 6, "bis": 13, "name": "Gobo 1", "art": "gobo"},
+            {"von": 14, "bis": 21, "name": "Gobo 2", "art": "gobo"},
+            {"von": 22, "bis": 29, "name": "Gobo 3", "art": "gobo"},
+            {"von": 30, "bis": 37, "name": "Gobo 4", "art": "gobo"},
+            {"von": 38, "bis": 45, "name": "Gobo 5", "art": "gobo"},
+            {"von": 46, "bis": 53, "name": "Gobo 6", "art": "gobo"},
+            {"von": 54, "bis": 61, "name": "Gobo 7", "art": "gobo"},
+            {"von": 62, "bis": 69, "name": "Gobo 8", "art": "gobo"},
+            {"von": 70, "bis": 77, "name": "Gobo 9", "art": "gobo"},
+            {"von": 78, "bis": 85, "name": "Gobo 10", "art": "gobo"},
+            {"von": 86, "bis": 93, "name": "Gobo 11", "art": "gobo"},
+            {"von": 94, "bis": 101, "name": "Offen Shake", "art": "shake"},
+            {"von": 102, "bis": 109, "name": "Gobo 1 Shake, schneller werdend", "art": "shake"},
+            {"von": 110, "bis": 117, "name": "Gobo 2 Shake, schneller werdend", "art": "shake"},
+            {"von": 118, "bis": 125, "name": "Gobo 3 Shake, schneller werdend", "art": "shake"},
+            {"von": 126, "bis": 133, "name": "Gobo 4 Shake, schneller werdend", "art": "shake"},
+            {"von": 134, "bis": 141, "name": "Gobo 5 Shake, schneller werdend", "art": "shake"},
+            {"von": 142, "bis": 149, "name": "Gobo 6 Shake, schneller werdend", "art": "shake"},
+            {"von": 150, "bis": 157, "name": "Gobo 7 Shake, schneller werdend", "art": "shake"},
+            {"von": 158, "bis": 165, "name": "Gobo 8 Shake, schneller werdend", "art": "shake"},
+            {"von": 166, "bis": 173, "name": "Gobo 9 Shake, schneller werdend", "art": "shake"},
+            {"von": 174, "bis": 181, "name": "Gobo 10 Shake, schneller werdend", "art": "shake"},
+            {"von": 182, "bis": 189, "name": "Gobo 11 Shake, schneller werdend", "art": "shake"},
+            {"von": 190, "bis": 197, "name": "Offen", "art": "open"},
+            {"von": 198, "bis": 225, "name": "Goborad-Rotation im Uhrzeigersinn", "art": "rotate"},
+            {"von": 226, "bis": 227, "name": "Stopp"},
+            {"von": 228, "bis": 255, "name": "Goborad-Rotation gegen den Uhrzeigersinn", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Zoom",
+          "attribut": "zoom",
+          "default": 128,
+          "highlight": 128,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Zoom eng → weit"}
+          ]
+        },
+        {
+          "name": "Fokus",
+          "attribut": "focus",
+          "default": 128,
+          "highlight": 128,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Fokus 0 % → 100 %"}
+          ]
+        },
+        {
+          "name": "Prisma",
+          "attribut": "prism",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Kein Prisma", "art": "open"},
+            {"von": 6, "bis": 255, "name": "Prisma (5-fach)", "art": "prism"}
+          ]
+        },
+        {
+          "name": "Prisma-Rotation",
+          "attribut": "prism_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Prisma-Rotation aus"},
+            {"von": 6, "bis": 128, "name": "Prisma-Position 0° → 540°"},
+            {"von": 129, "bis": 191, "name": "Prisma-Rotation (Richtung 1)", "art": "rotate"},
+            {"von": 192, "bis": 192, "name": "Stopp"},
+            {"von": 193, "bis": 255, "name": "Prisma-Rotation (Richtung 2)", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Frost",
+          "attribut": "frost",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Kein Frost", "art": "open"},
+            {"von": 1, "bis": 255, "name": "Frost 0 % → 100 %", "art": "frost"}
+          ]
+        },
+        {
+          "name": "Pan/Tilt-Makro",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Aus"},
+            {"von": 6, "bis": 40, "name": "Pan (klein → gross)"},
+            {"von": 41, "bis": 75, "name": "Tilt (klein → gross)"},
+            {"von": 76, "bis": 110, "name": "Pan + Tilt (klein → gross)"},
+            {"von": 111, "bis": 145, "name": "Pan + Tilt invertiert (klein → gross)"},
+            {"von": 146, "bis": 180, "name": "Kreis (klein → gross)"},
+            {"von": 181, "bis": 215, "name": "Kreis invertiert (klein → gross)"},
+            {"von": 216, "bis": 255, "name": "Zufall (klein → gross)"}
+          ]
+        },
+        {
+          "name": "Pan/Tilt-Speed",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Pan/Tilt-Geschwindigkeit schnell → langsam"}
+          ]
+        },
+        {
+          "name": "Dimmerkurve",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Keine Funktion"},
+            {"von": 6, "bis": 63, "name": "Dimmerkurve linear"},
+            {"von": 64, "bis": 127, "name": "Dimmerkurve exponentiell"},
+            {"von": 128, "bis": 191, "name": "Dimmerkurve logarithmisch"},
+            {"von": 192, "bis": 255, "name": "Dimmerkurve S-foermig"}
+          ]
+        },
+        {
+          "name": "Sonderfunktionen / Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Keine Funktion"},
+            {"von": 6, "bis": 20, "name": "Blackout bei Bewegung (3 s halten)"},
+            {"von": 21, "bis": 35, "name": "Blackout bei Bewegung (5 s halten, laut Handbuch)"},
+            {"von": 36, "bis": 50, "name": "Pan invertiert an (3 s halten)"},
+            {"von": 51, "bis": 65, "name": "Pan invertiert aus (5 s halten)"},
+            {"von": 66, "bis": 80, "name": "Tilt invertiert an (3 s halten)"},
+            {"von": 81, "bis": 95, "name": "Tilt invertiert aus (5 s halten)"},
+            {"von": 96, "bis": 110, "name": "Luefter automatisch (3 s halten)"},
+            {"von": 111, "bis": 125, "name": "Luefter leise (5 s halten)"},
+            {"von": 126, "bis": 140, "name": "LED-PWM 800 Hz (3 s halten)"},
+            {"von": 141, "bis": 155, "name": "LED-PWM 1200 Hz (3 s halten)"},
+            {"von": 156, "bis": 170, "name": "LED-PWM 2000 Hz (3 s halten)"},
+            {"von": 171, "bis": 185, "name": "LED-PWM 3600 Hz (3 s halten)"},
+            {"von": 186, "bis": 200, "name": "LED-PWM 25 kHz (3 s halten)"},
+            {"von": 201, "bis": 215, "name": "Pan/Tilt-Reset (3 s halten)", "art": "reset"},
+            {"von": 216, "bis": 230, "name": "Kopf-Reset (3 s halten)", "art": "reset"},
+            {"von": 231, "bis": 255, "name": "Komplett-Reset (3 s halten)", "art": "reset"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "32-Kanal",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fein", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fein", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Dimmer",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dimmer 0 % → 100 %"}
+          ]
+        },
+        {"name": "Dimmer fein", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Offen", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Geschlossen", "art": "closed"},
+            {"von": 11, "bis": 33, "name": "Zufallsimpulse, schneller werdend", "art": "strobe"},
+            {"von": 34, "bis": 56, "name": "Zufaellig heller werdend"},
+            {"von": 57, "bis": 79, "name": "Zufaellig dunkler werdend"},
+            {"von": 80, "bis": 102, "name": "Zufalls-Strobe, schneller werdend", "art": "strobe"},
+            {"von": 103, "bis": 127, "name": "Pausen-Effekt 5 s → 1 s"},
+            {"von": 128, "bis": 250, "name": "Strobe langsam → schnell", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Offen", "art": "open"}
+          ]
+        },
+        {
+          "name": "Cyan",
+          "attribut": "cmy_c",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Cyan 0 % → 100 %"}
+          ]
+        },
+        {"name": "Cyan fein", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Magenta",
+          "attribut": "cmy_m",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Magenta 0 % → 100 %"}
+          ]
+        },
+        {"name": "Magenta fein", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Gelb",
+          "attribut": "cmy_y",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Gelb 0 % → 100 %"}
+          ]
+        },
+        {"name": "Gelb fein", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "CTO",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "CTO 0 % → 100 %"}
+          ]
+        },
+        {"name": "CTO fein", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Farbrad",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Offen (weiss)", "art": "open"},
+            {"von": 6, "bis": 15, "name": "Offen / Dunkelrot", "art": "color"},
+            {"von": 16, "bis": 25, "name": "Dunkelrot", "art": "color"},
+            {"von": 26, "bis": 35, "name": "Dunkelrot / Dunkelorange", "art": "color"},
+            {"von": 36, "bis": 45, "name": "Dunkelorange", "art": "color"},
+            {"von": 46, "bis": 55, "name": "Dunkelorange / Dunkelblau", "art": "color"},
+            {"von": 56, "bis": 65, "name": "Dunkelblau", "art": "color"},
+            {"von": 66, "bis": 75, "name": "Dunkelblau / Gelb", "art": "color"},
+            {"von": 76, "bis": 85, "name": "Gelb", "art": "color"},
+            {"von": 86, "bis": 95, "name": "Gelb / Dunkelgruen", "art": "color"},
+            {"von": 96, "bis": 105, "name": "Dunkelgruen", "art": "color"},
+            {"von": 106, "bis": 115, "name": "Dunkelgruen / Lavendel", "art": "color"},
+            {"von": 116, "bis": 125, "name": "Lavendel", "art": "color"},
+            {"von": 126, "bis": 135, "name": "Lavendel / Cyan", "art": "color"},
+            {"von": 136, "bis": 145, "name": "Cyan", "art": "color"},
+            {"von": 146, "bis": 185, "name": "Offen (weiss)", "art": "open"},
+            {"von": 186, "bis": 218, "name": "Farbrad-Durchlauf im Uhrzeigersinn, langsamer werdend", "art": "rotate"},
+            {"von": 219, "bis": 222, "name": "Stopp"},
+            {
+              "von": 223,
+              "bis": 255,
+              "name": "Farbrad-Durchlauf gegen den Uhrzeigersinn, schneller werdend",
+              "art": "rotate"
+            }
+          ]
+        },
+        {
+          "name": "CRI-Filter",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "CRI-Filter aus"},
+            {"von": 6, "bis": 255, "name": "CRI-Filter ein"}
+          ]
+        },
+        {
+          "name": "Goborad 1",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Offen", "art": "open"},
+            {"von": 6, "bis": 17, "name": "Gobo 1", "art": "gobo"},
+            {"von": 18, "bis": 29, "name": "Gobo 2", "art": "gobo"},
+            {"von": 30, "bis": 41, "name": "Gobo 3", "art": "gobo"},
+            {"von": 42, "bis": 53, "name": "Gobo 4", "art": "gobo"},
+            {"von": 54, "bis": 65, "name": "Gobo 5", "art": "gobo"},
+            {"von": 66, "bis": 77, "name": "Gobo 6", "art": "gobo"},
+            {"von": 78, "bis": 89, "name": "Gobo 7", "art": "gobo"},
+            {"von": 90, "bis": 101, "name": "Gobo 1 Shake, schneller werdend", "art": "shake"},
+            {"von": 102, "bis": 113, "name": "Gobo 2 Shake, schneller werdend", "art": "shake"},
+            {"von": 114, "bis": 125, "name": "Gobo 3 Shake, schneller werdend", "art": "shake"},
+            {"von": 126, "bis": 137, "name": "Gobo 4 Shake, schneller werdend", "art": "shake"},
+            {"von": 138, "bis": 149, "name": "Gobo 5 Shake, schneller werdend", "art": "shake"},
+            {"von": 150, "bis": 161, "name": "Gobo 6 Shake, schneller werdend", "art": "shake"},
+            {"von": 162, "bis": 173, "name": "Gobo 7 Shake, schneller werdend", "art": "shake"},
+            {"von": 174, "bis": 185, "name": "Offen", "art": "open"},
+            {"von": 186, "bis": 218, "name": "Goborad-Durchlauf im Uhrzeigersinn, langsamer werdend", "art": "rotate"},
+            {"von": 219, "bis": 222, "name": "Stopp"},
+            {
+              "von": 223,
+              "bis": 255,
+              "name": "Goborad-Durchlauf gegen den Uhrzeigersinn, schneller werdend",
+              "art": "rotate"
+            }
+          ]
+        },
+        {
+          "name": "Gobo-Rotation",
+          "attribut": "gobo_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Gobo-Rotation aus"},
+            {"von": 6, "bis": 128, "name": "Gobo-Position 0° → 540°"},
+            {"von": 129, "bis": 191, "name": "Rotation im Uhrzeigersinn, langsamer werdend", "art": "rotate"},
+            {"von": 192, "bis": 192, "name": "Stopp"},
+            {"von": 193, "bis": 255, "name": "Rotation gegen den Uhrzeigersinn, schneller werdend", "art": "rotate"}
+          ]
+        },
+        {"name": "Gobo-Rotation fein", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Goborad 2",
+          "attribut": "gobo_wheel2",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Offen", "art": "open"},
+            {"von": 6, "bis": 13, "name": "Gobo 1", "art": "gobo"},
+            {"von": 14, "bis": 21, "name": "Gobo 2", "art": "gobo"},
+            {"von": 22, "bis": 29, "name": "Gobo 3", "art": "gobo"},
+            {"von": 30, "bis": 37, "name": "Gobo 4", "art": "gobo"},
+            {"von": 38, "bis": 45, "name": "Gobo 5", "art": "gobo"},
+            {"von": 46, "bis": 53, "name": "Gobo 6", "art": "gobo"},
+            {"von": 54, "bis": 61, "name": "Gobo 7", "art": "gobo"},
+            {"von": 62, "bis": 69, "name": "Gobo 8", "art": "gobo"},
+            {"von": 70, "bis": 77, "name": "Gobo 9", "art": "gobo"},
+            {"von": 78, "bis": 85, "name": "Gobo 10", "art": "gobo"},
+            {"von": 86, "bis": 93, "name": "Gobo 11", "art": "gobo"},
+            {"von": 94, "bis": 101, "name": "Offen Shake", "art": "shake"},
+            {"von": 102, "bis": 109, "name": "Gobo 1 Shake, schneller werdend", "art": "shake"},
+            {"von": 110, "bis": 117, "name": "Gobo 2 Shake, schneller werdend", "art": "shake"},
+            {"von": 118, "bis": 125, "name": "Gobo 3 Shake, schneller werdend", "art": "shake"},
+            {"von": 126, "bis": 133, "name": "Gobo 4 Shake, schneller werdend", "art": "shake"},
+            {"von": 134, "bis": 141, "name": "Gobo 5 Shake, schneller werdend", "art": "shake"},
+            {"von": 142, "bis": 149, "name": "Gobo 6 Shake, schneller werdend", "art": "shake"},
+            {"von": 150, "bis": 157, "name": "Gobo 7 Shake, schneller werdend", "art": "shake"},
+            {"von": 158, "bis": 165, "name": "Gobo 8 Shake, schneller werdend", "art": "shake"},
+            {"von": 166, "bis": 173, "name": "Gobo 9 Shake, schneller werdend", "art": "shake"},
+            {"von": 174, "bis": 181, "name": "Gobo 10 Shake, schneller werdend", "art": "shake"},
+            {"von": 182, "bis": 189, "name": "Gobo 11 Shake, schneller werdend", "art": "shake"},
+            {"von": 190, "bis": 197, "name": "Offen", "art": "open"},
+            {"von": 198, "bis": 225, "name": "Goborad-Rotation im Uhrzeigersinn", "art": "rotate"},
+            {"von": 226, "bis": 227, "name": "Stopp"},
+            {"von": 228, "bis": 255, "name": "Goborad-Rotation gegen den Uhrzeigersinn", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Zoom",
+          "attribut": "zoom",
+          "default": 128,
+          "highlight": 128,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Zoom eng → weit"}
+          ]
+        },
+        {"name": "Zoom fein", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Fokus",
+          "attribut": "focus",
+          "default": 128,
+          "highlight": 128,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Fokus 0 % → 100 %"}
+          ]
+        },
+        {"name": "Fokus fein", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Prisma",
+          "attribut": "prism",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Kein Prisma", "art": "open"},
+            {"von": 6, "bis": 255, "name": "Prisma (5-fach)", "art": "prism"}
+          ]
+        },
+        {
+          "name": "Prisma-Rotation",
+          "attribut": "prism_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Prisma-Rotation aus"},
+            {"von": 6, "bis": 128, "name": "Prisma-Position 0° → 540°"},
+            {"von": 129, "bis": 191, "name": "Prisma-Rotation (Richtung 1)", "art": "rotate"},
+            {"von": 192, "bis": 192, "name": "Stopp"},
+            {"von": 193, "bis": 255, "name": "Prisma-Rotation (Richtung 2)", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Frost",
+          "attribut": "frost",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Kein Frost", "art": "open"},
+            {"von": 1, "bis": 255, "name": "Frost 0 % → 100 %", "art": "frost"}
+          ]
+        },
+        {
+          "name": "Pan/Tilt-Makro",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Aus"},
+            {"von": 6, "bis": 40, "name": "Pan (klein → gross)"},
+            {"von": 41, "bis": 75, "name": "Tilt (klein → gross)"},
+            {"von": 76, "bis": 110, "name": "Pan + Tilt (klein → gross)"},
+            {"von": 111, "bis": 145, "name": "Pan + Tilt invertiert (klein → gross)"},
+            {"von": 146, "bis": 180, "name": "Kreis (klein → gross)"},
+            {"von": 181, "bis": 215, "name": "Kreis invertiert (klein → gross)"},
+            {"von": 216, "bis": 255, "name": "Zufall (klein → gross)"}
+          ]
+        },
+        {
+          "name": "Pan/Tilt-Speed",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Pan/Tilt-Geschwindigkeit schnell → langsam"}
+          ]
+        },
+        {
+          "name": "Dimmerkurve",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Keine Funktion"},
+            {"von": 6, "bis": 63, "name": "Dimmerkurve linear"},
+            {"von": 64, "bis": 127, "name": "Dimmerkurve exponentiell"},
+            {"von": 128, "bis": 191, "name": "Dimmerkurve logarithmisch"},
+            {"von": 192, "bis": 255, "name": "Dimmerkurve S-foermig"}
+          ]
+        },
+        {
+          "name": "Sonderfunktionen / Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Keine Funktion"},
+            {"von": 6, "bis": 20, "name": "Blackout bei Bewegung (3 s halten)"},
+            {"von": 21, "bis": 35, "name": "Blackout bei Bewegung (5 s halten, laut Handbuch)"},
+            {"von": 36, "bis": 50, "name": "Pan invertiert an (3 s halten)"},
+            {"von": 51, "bis": 65, "name": "Pan invertiert aus (5 s halten)"},
+            {"von": 66, "bis": 80, "name": "Tilt invertiert an (3 s halten)"},
+            {"von": 81, "bis": 95, "name": "Tilt invertiert aus (5 s halten)"},
+            {"von": 96, "bis": 110, "name": "Luefter automatisch (3 s halten)"},
+            {"von": 111, "bis": 125, "name": "Luefter leise (5 s halten)"},
+            {"von": 126, "bis": 140, "name": "LED-PWM 800 Hz (3 s halten)"},
+            {"von": 141, "bis": 155, "name": "LED-PWM 1200 Hz (3 s halten)"},
+            {"von": 156, "bis": 170, "name": "LED-PWM 2000 Hz (3 s halten)"},
+            {"von": 171, "bis": 185, "name": "LED-PWM 3600 Hz (3 s halten)"},
+            {"von": 186, "bis": 200, "name": "LED-PWM 25 kHz (3 s halten)"},
+            {"von": 201, "bis": 215, "name": "Pan/Tilt-Reset (3 s halten)", "art": "reset"},
+            {"von": 216, "bis": 230, "name": "Kopf-Reset (3 s halten)", "art": "reset"},
+            {"von": 231, "bis": 255, "name": "Komplett-Reset (3 s halten)", "art": "reset"}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "350-W-LED-Hybrid (Beam/Spot/Wash), Zoom 5°–35°, Pan 540°, Tilt 270°, CMY + CTO, 2 Goboraeder, 5-fach-Prisma, Frost. Sonderfunktionen wirken erst nach 3 bzw. 5 s Halten."
+}

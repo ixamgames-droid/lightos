@@ -1,0 +1,249 @@
+{
+  "format_version": 1,
+  "hersteller": "Chauvet",
+  "hersteller_kurz": "CHAUVET",
+  "modell": "Intimidator Beam Q60",
+  "kurzname": "Intimidator Beam Q60",
+  "typ": "moving_head",
+  "leistung_w": 89,
+  "quelle": {
+    "titel": "Intimidator Beam Q60 User Manual",
+    "version": "Rev. 3",
+    "url": "https://www.chauvetdj.com/wp-content/uploads/2020/10/Intimidator_Beam_Q60_UM_Rev3.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.0.0 Beta 3 · Nathan",
+    "original": "resources/fixtures/Chauvet/Chauvet-Intimidator-Beam-Q60.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 92 Wertebereiche mit Art (kind) versehen; danach von LightOS gegen das Herstellerhandbuch (Intimidator Beam Q60 User Manual) Kanal fuer Kanal ueberarbeitet: Endlos-Pan/-Tilt als effect statt macro; Virtuelles Farbrad: Bereiche nach Handbuch ergaenzt (QLC+: 'Not active' 0-255); Steuerkanal ohne Art color; Steuerkanal als reset statt raw; Blackout-/Sound-Optionen ohne Art closed/sound; Leistung nach Handbuch (89 W bei 230 V); Kanalnamen und Bereichsnamen auf Deutsch; Default/Highlight nach LightOS-Regeln (Pan/Tilt 128, Dimmer 0, Shutter offen)"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanalbelegung, Wertebereiche und Modi aller DMX-Modi Kanal fuer Kanal gegen das Herstellerhandbuch geprueft (nicht am echten Geraet)"
+  },
+  "modi": [
+    {
+      "name": "16 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fein", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fein", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Pan Endlosdrehung",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 3, "name": "Keine Funktion", "art": ""},
+            {"von": 4, "bis": 127, "name": "Pan-Rotation schnell -> langsam", "art": "rotate"},
+            {"von": 128, "bis": 131, "name": "Stop", "art": ""},
+            {"von": 132, "bis": 255, "name": "Pan-Rotation rueckwaerts langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Tilt Endlosdrehung",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 3, "name": "Keine Funktion", "art": ""},
+            {"von": 4, "bis": 127, "name": "Tilt-Rotation schnell -> langsam", "art": "rotate"},
+            {"von": 128, "bis": 131, "name": "Stop", "art": ""},
+            {"von": 132, "bis": 255, "name": "Tilt-Rotation rueckwaerts langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {"name": "Pan/Tilt-Geschwindigkeit (schnell -> langsam)", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Shutter",
+          "attribut": "shutter",
+          "default": 47,
+          "highlight": 47,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "Geschlossen", "art": "closed"},
+            {"von": 32, "bis": 63, "name": "Offen", "art": "open"},
+            {"von": 64, "bis": 95, "name": "Strobe langsam -> schnell", "art": "strobe"},
+            {"von": 96, "bis": 127, "name": "Offen", "art": "open"},
+            {"von": 128, "bis": 159, "name": "Puls-Strobe langsam -> schnell", "art": "strobe"},
+            {"von": 160, "bis": 191, "name": "Offen", "art": "open"},
+            {"von": 192, "bis": 223, "name": "Zufalls-Strobe langsam -> schnell", "art": "strobe"},
+            {"von": 224, "bis": 255, "name": "Offen", "art": "open"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Virtuelles Farbrad Steuerung",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Keine Funktion", "art": ""},
+            {"von": 16, "bis": 31, "name": "Farbtemperatur (CTC)", "art": ""},
+            {"von": 32, "bis": 47, "name": "Regenbogen", "art": ""},
+            {"von": 48, "bis": 63, "name": "Regenbogen rueckwaerts", "art": ""},
+            {"von": 64, "bis": 79, "name": "Kontinuierlich", "art": ""},
+            {"von": 80, "bis": 111, "name": "Farb-Bounce", "art": ""},
+            {"von": 112, "bis": 255, "name": "Reserviert", "art": ""}
+          ]
+        },
+        {
+          "name": "Virtuelles Farbrad",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Blackout (bei Steuerung 064-111)", "art": ""},
+            {"von": 1, "bis": 1, "name": "Rot", "art": ""},
+            {"von": 2, "bis": 2, "name": "Gruen", "art": ""},
+            {"von": 3, "bis": 3, "name": "Blau", "art": ""},
+            {"von": 4, "bis": 4, "name": "Weiss", "art": ""},
+            {"von": 5, "bis": 46, "name": "Farbverlauf Blau -> Cyan", "art": ""},
+            {"von": 47, "bis": 88, "name": "Farbverlauf Cyan -> Gruen", "art": ""},
+            {"von": 89, "bis": 130, "name": "Farbverlauf Gruen -> Gelb", "art": ""},
+            {"von": 131, "bis": 172, "name": "Farbverlauf Gelb -> Rot", "art": ""},
+            {"von": 173, "bis": 214, "name": "Farbverlauf Rot -> Magenta", "art": ""},
+            {"von": 215, "bis": 255, "name": "Farbverlauf Magenta -> Blau", "art": ""}
+          ]
+        },
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Steuerung",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Keine Funktion", "art": ""},
+            {"von": 8, "bis": 15, "name": "Reset alles", "art": "reset"},
+            {"von": 16, "bis": 23, "name": "Blackout bei Pan/Tilt-Bewegung an (5 s)", "art": ""},
+            {"von": 24, "bis": 31, "name": "Blackout bei Pan/Tilt-Bewegung aus (5 s)", "art": ""},
+            {"von": 32, "bis": 39, "name": "Sound Pan/Tilt an (5 s)", "art": ""},
+            {"von": 40, "bis": 47, "name": "Sound Pan/Tilt aus (5 s)", "art": ""},
+            {"von": 48, "bis": 55, "name": "Sound Farbe an (5 s)", "art": ""},
+            {"von": 56, "bis": 63, "name": "Sound Farbe aus (5 s)", "art": ""},
+            {"von": 64, "bis": 71, "name": "Display aus", "art": ""},
+            {"von": 72, "bis": 79, "name": "Display an", "art": ""},
+            {"von": 80, "bis": 87, "name": "Luefter Auto", "art": ""},
+            {"von": 88, "bis": 95, "name": "Luefter voll", "art": ""},
+            {"von": 96, "bis": 103, "name": "Dimmerkurve linear", "art": ""},
+            {"von": 104, "bis": 111, "name": "Dimmerkurve langsam", "art": ""},
+            {"von": 112, "bis": 119, "name": "Dimmerkurve mittel", "art": ""},
+            {"von": 120, "bis": 127, "name": "Dimmerkurve schnell", "art": ""},
+            {"von": 128, "bis": 135, "name": "Blackout bei Bewegung", "art": ""},
+            {"von": 136, "bis": 143, "name": "Pan-Endlosdrehung vorwaerts", "art": ""},
+            {"von": 144, "bis": 151, "name": "Pan-Endlosdrehung rueckwaerts", "art": ""},
+            {"von": 152, "bis": 159, "name": "Tilt-Endlosdrehung vorwaerts", "art": ""},
+            {"von": 160, "bis": 167, "name": "Tilt-Endlosdrehung rueckwaerts", "art": ""},
+            {"von": 168, "bis": 175, "name": "Pan + Tilt vorwaerts", "art": ""},
+            {"von": 176, "bis": 183, "name": "Pan + Tilt rueckwaerts", "art": ""},
+            {"von": 184, "bis": 191, "name": "Pan vorwaerts, Tilt rueckwaerts", "art": ""},
+            {"von": 192, "bis": 199, "name": "Pan rueckwaerts, Tilt vorwaerts", "art": ""},
+            {"von": 200, "bis": 255, "name": "Reserviert", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "12 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Pan/Tilt-Geschwindigkeit (schnell -> langsam)", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Shutter",
+          "attribut": "shutter",
+          "default": 47,
+          "highlight": 47,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "Geschlossen", "art": "closed"},
+            {"von": 32, "bis": 63, "name": "Offen", "art": "open"},
+            {"von": 64, "bis": 95, "name": "Strobe langsam -> schnell", "art": "strobe"},
+            {"von": 96, "bis": 127, "name": "Offen", "art": "open"},
+            {"von": 128, "bis": 159, "name": "Puls-Strobe langsam -> schnell", "art": "strobe"},
+            {"von": 160, "bis": 191, "name": "Offen", "art": "open"},
+            {"von": 192, "bis": 223, "name": "Zufalls-Strobe langsam -> schnell", "art": "strobe"},
+            {"von": 224, "bis": 255, "name": "Offen", "art": "open"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Virtuelles Farbrad Steuerung",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Keine Funktion", "art": ""},
+            {"von": 16, "bis": 31, "name": "Farbtemperatur (CTC)", "art": ""},
+            {"von": 32, "bis": 47, "name": "Regenbogen", "art": ""},
+            {"von": 48, "bis": 63, "name": "Regenbogen rueckwaerts", "art": ""},
+            {"von": 64, "bis": 79, "name": "Kontinuierlich", "art": ""},
+            {"von": 80, "bis": 111, "name": "Farb-Bounce", "art": ""},
+            {"von": 112, "bis": 255, "name": "Reserviert", "art": ""}
+          ]
+        },
+        {
+          "name": "Virtuelles Farbrad",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Blackout (bei Steuerung 064-111)", "art": ""},
+            {"von": 1, "bis": 1, "name": "Rot", "art": ""},
+            {"von": 2, "bis": 2, "name": "Gruen", "art": ""},
+            {"von": 3, "bis": 3, "name": "Blau", "art": ""},
+            {"von": 4, "bis": 4, "name": "Weiss", "art": ""},
+            {"von": 5, "bis": 46, "name": "Farbverlauf Blau -> Cyan", "art": ""},
+            {"von": 47, "bis": 88, "name": "Farbverlauf Cyan -> Gruen", "art": ""},
+            {"von": 89, "bis": 130, "name": "Farbverlauf Gruen -> Gelb", "art": ""},
+            {"von": 131, "bis": 172, "name": "Farbverlauf Gelb -> Rot", "art": ""},
+            {"von": 173, "bis": 214, "name": "Farbverlauf Rot -> Magenta", "art": ""},
+            {"von": 215, "bis": 255, "name": "Farbverlauf Magenta -> Blau", "art": ""}
+          ]
+        },
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Steuerung",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Keine Funktion", "art": ""},
+            {"von": 8, "bis": 15, "name": "Reset alles", "art": "reset"},
+            {"von": 16, "bis": 23, "name": "Blackout bei Pan/Tilt-Bewegung an (5 s)", "art": ""},
+            {"von": 24, "bis": 31, "name": "Blackout bei Pan/Tilt-Bewegung aus (5 s)", "art": ""},
+            {"von": 32, "bis": 39, "name": "Sound Pan/Tilt an (5 s)", "art": ""},
+            {"von": 40, "bis": 47, "name": "Sound Pan/Tilt aus (5 s)", "art": ""},
+            {"von": 48, "bis": 55, "name": "Sound Farbe an (5 s)", "art": ""},
+            {"von": 56, "bis": 63, "name": "Sound Farbe aus (5 s)", "art": ""},
+            {"von": 64, "bis": 71, "name": "Display aus", "art": ""},
+            {"von": 72, "bis": 79, "name": "Display an", "art": ""},
+            {"von": 80, "bis": 87, "name": "Luefter Auto", "art": ""},
+            {"von": 88, "bis": 95, "name": "Luefter voll", "art": ""},
+            {"von": 96, "bis": 103, "name": "Dimmerkurve linear", "art": ""},
+            {"von": 104, "bis": 111, "name": "Dimmerkurve langsam", "art": ""},
+            {"von": 112, "bis": 119, "name": "Dimmerkurve mittel", "art": ""},
+            {"von": 120, "bis": 127, "name": "Dimmerkurve schnell", "art": ""},
+            {"von": 128, "bis": 135, "name": "Blackout bei Bewegung", "art": ""},
+            {"von": 136, "bis": 143, "name": "Pan-Endlosdrehung vorwaerts", "art": ""},
+            {"von": 144, "bis": 151, "name": "Pan-Endlosdrehung rueckwaerts", "art": ""},
+            {"von": 152, "bis": 159, "name": "Tilt-Endlosdrehung vorwaerts", "art": ""},
+            {"von": 160, "bis": 167, "name": "Tilt-Endlosdrehung rueckwaerts", "art": ""},
+            {"von": 168, "bis": 175, "name": "Pan + Tilt vorwaerts", "art": ""},
+            {"von": 176, "bis": 183, "name": "Pan + Tilt rueckwaerts", "art": ""},
+            {"von": 184, "bis": 191, "name": "Pan vorwaerts, Tilt rueckwaerts", "art": ""},
+            {"von": 192, "bis": 199, "name": "Pan rueckwaerts, Tilt vorwaerts", "art": ""},
+            {"von": 200, "bis": 255, "name": "Reserviert", "art": ""}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Beam-Moving-Head mit 60-W-RGBW-LED. Pan 540 Grad, Tilt 260 Grad, Endlos-Pan/-Tilt. Das virtuelle Farbrad wechselt die Bedeutung mit dem Steuerkanal (CTC 2000-8000 K, Regenbogen-Geschwindigkeit oder Farbe)."
+}

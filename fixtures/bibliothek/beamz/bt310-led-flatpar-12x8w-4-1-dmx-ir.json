@@ -1,0 +1,296 @@
+{
+  "format_version": 1,
+  "hersteller": "BeamZ",
+  "hersteller_kurz": "BEAMZ",
+  "modell": "BT310 LED FlatPAR 12x8W 4-1 DMX IR",
+  "kurzname": "BT310",
+  "typ": "par",
+  "leistung_w": 30,
+  "quelle": {
+    "titel": "BeamZ LED Flat Par RGBW 4-in-1 (BT270 / BT310) - Bedienungsanleitung (Ref. 151.306 / 151.313)",
+    "version": "V2.0",
+    "url": "https://www.beamzlighting.com/wp-content/uploads/2026/03/151.306_-151.313-LED-Flat-Par-RGBW-4-1_manual-V2.0.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.3 GIT · Mark",
+    "original": "resources/fixtures/beamZ/beamZ-BT310-LED-FlatPAR.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 28 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): Herstellername 'beamZ' -> 'BeamZ'; kurzname BT310; Modi 8 Channel, 4-1 Channel, 4 Channel, 3 Channel, 2 Channel nach aktuellem Handbuch (RGBW) neu angelegt; QLC+-Modi (RGBA-Ausfuehrung) als '8 Channel (alte Version RGBA)' und '4 Channel (alte Version RGBA)' erhalten; alte Modi: Strobe-Default 0 (im Offen-Bereich), Festfarben 210-255 als color, Speed als effect_speed, Auto-Bereich ohne art, Speed-Bereich ohne sound; Strobe der aktuellen Modi als Attribut strobe (kein Offen-Bereich im Handbuch); leistung_w 30 laut Handbuch (QLC+: 72, alte Ausfuehrung); Kanalnamen deutsch, Modusbeschreibungen ergaenzt"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": false,
+    "wie": "die 5 aktuellen Modi Kanal fuer Kanal gegen das Herstellerhandbuch 151.306/151.313 V2.0 geprueft; die zwei '(alte Version RGBA)'-Modi stammen ungeprueft aus QLC+"
+  },
+  "modi": [
+    {
+      "name": "8 Channel",
+      "beschreibung": "8 Kanaele laut Handbuch 151.306/151.313 V2.0",
+      "kanaele": [
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "strobe",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Strobe langsam -> schnell (Handbuch: 000-255)", "art": ""}
+          ]
+        },
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Festfarbe",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Keine Funktion", "art": ""},
+            {"von": 10, "bis": 19, "name": "Rot", "art": "color"},
+            {"von": 20, "bis": 29, "name": "Gruen", "art": "color"},
+            {"von": 30, "bis": 39, "name": "Blau", "art": "color"},
+            {"von": 40, "bis": 49, "name": "Weiss", "art": "color"},
+            {"von": 50, "bis": 59, "name": "Gelb", "art": "color"},
+            {"von": 60, "bis": 69, "name": "Magenta", "art": "color"},
+            {"von": 70, "bis": 79, "name": "Cyan", "art": "color"},
+            {"von": 80, "bis": 89, "name": "Dunkelorange", "art": "color"},
+            {"von": 90, "bis": 99, "name": "Gruengelb", "art": "color"},
+            {"von": 100, "bis": 109, "name": "Lachs", "art": "color"},
+            {"von": 110, "bis": 119, "name": "Tuerkis", "art": "color"},
+            {"von": 120, "bis": 129, "name": "Hellgruen", "art": "color"},
+            {"von": 130, "bis": 139, "name": "Orange", "art": "color"},
+            {"von": 140, "bis": 149, "name": "Lavendel", "art": "color"},
+            {"von": 150, "bis": 159, "name": "Hellblau", "art": "color"},
+            {"von": 160, "bis": 169, "name": "Dunkelblau", "art": "color"},
+            {"von": 170, "bis": 255, "name": "Rosa", "art": "color"}
+          ]
+        },
+        {
+          "name": "Farbmakro / Sound",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Keine Funktion", "art": ""},
+            {"von": 10, "bis": 69, "name": "Auto Farbuebergang (Tempo im Wert)", "art": ""},
+            {"von": 70, "bis": 129, "name": "Auto Farbwechsel (Tempo im Wert)", "art": ""},
+            {"von": 130, "bis": 189, "name": "Sound Farbuebergang", "art": "sound"},
+            {"von": 190, "bis": 255, "name": "Sound Farbwechsel", "art": "sound"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4-1 Channel",
+      "beschreibung": "4 Kanaele: Dimmer, Strobe, Festfarbe, Auto/Sound",
+      "kanaele": [
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "strobe",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Strobe langsam -> schnell (Handbuch: 000-255)", "art": ""}
+          ]
+        },
+        {
+          "name": "Festfarbe",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Keine Funktion", "art": ""},
+            {"von": 10, "bis": 19, "name": "Rot", "art": "color"},
+            {"von": 20, "bis": 29, "name": "Gruen", "art": "color"},
+            {"von": 30, "bis": 39, "name": "Blau", "art": "color"},
+            {"von": 40, "bis": 49, "name": "Weiss", "art": "color"},
+            {"von": 50, "bis": 59, "name": "Gelb", "art": "color"},
+            {"von": 60, "bis": 69, "name": "Magenta", "art": "color"},
+            {"von": 70, "bis": 79, "name": "Cyan", "art": "color"},
+            {"von": 80, "bis": 89, "name": "Dunkelorange", "art": "color"},
+            {"von": 90, "bis": 99, "name": "Gruengelb", "art": "color"},
+            {"von": 100, "bis": 109, "name": "Lachs", "art": "color"},
+            {"von": 110, "bis": 119, "name": "Tuerkis", "art": "color"},
+            {"von": 120, "bis": 129, "name": "Hellgruen", "art": "color"},
+            {"von": 130, "bis": 139, "name": "Orange", "art": "color"},
+            {"von": 140, "bis": 149, "name": "Lavendel", "art": "color"},
+            {"von": 150, "bis": 159, "name": "Hellblau", "art": "color"},
+            {"von": 160, "bis": 169, "name": "Dunkelblau", "art": "color"},
+            {"von": 170, "bis": 255, "name": "Rosa", "art": "color"}
+          ]
+        },
+        {
+          "name": "Auto / Sound",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Keine Funktion", "art": ""},
+            {"von": 10, "bis": 69, "name": "Auto Farbuebergang (Tempo im Wert)", "art": ""},
+            {"von": 70, "bis": 129, "name": "Auto Farbwechsel (Tempo im Wert)", "art": ""},
+            {"von": 130, "bis": 189, "name": "Sound Farbuebergang", "art": "sound"},
+            {"von": 190, "bis": 255, "name": "Sound Farbwechsel", "art": "sound"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4 Channel",
+      "beschreibung": "4 Kanaele RGBW",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "3 Channel",
+      "beschreibung": "3 Kanaele RGB",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "2 Channel",
+      "beschreibung": "2 Kanaele: Dimmer, Festfarbe",
+      "kanaele": [
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Festfarbe",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Keine Funktion", "art": ""},
+            {"von": 10, "bis": 19, "name": "Rot", "art": "color"},
+            {"von": 20, "bis": 29, "name": "Gruen", "art": "color"},
+            {"von": 30, "bis": 39, "name": "Blau", "art": "color"},
+            {"von": 40, "bis": 49, "name": "Weiss", "art": "color"},
+            {"von": 50, "bis": 59, "name": "Gelb", "art": "color"},
+            {"von": 60, "bis": 69, "name": "Magenta", "art": "color"},
+            {"von": 70, "bis": 79, "name": "Cyan", "art": "color"},
+            {"von": 80, "bis": 89, "name": "Dunkelorange", "art": "color"},
+            {"von": 90, "bis": 99, "name": "Gruengelb", "art": "color"},
+            {"von": 100, "bis": 109, "name": "Lachs", "art": "color"},
+            {"von": 110, "bis": 119, "name": "Tuerkis", "art": "color"},
+            {"von": 120, "bis": 129, "name": "Hellgruen", "art": "color"},
+            {"von": 130, "bis": 139, "name": "Orange", "art": "color"},
+            {"von": 140, "bis": 149, "name": "Lavendel", "art": "color"},
+            {"von": 150, "bis": 159, "name": "Hellblau", "art": "color"},
+            {"von": 160, "bis": 169, "name": "Dunkelblau", "art": "color"},
+            {"von": 170, "bis": 255, "name": "Rosa", "art": "color"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8 Channel (alte Version RGBA)",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "Dimming", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe from slow to fast", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Auto / Sound",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": ""},
+            {"von": 10, "bis": 199, "name": "Auto", "art": ""},
+            {"von": 200, "bis": 255, "name": "Sound", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Programm-Tempo",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Auto/Sound Speed from slow to fast", "art": ""}
+          ]
+        }
+      ],
+      "beschreibung": "aeltere Geraete 12x8W RGBA laut QLC+ (nicht gegen Handbuch geprueft)"
+    },
+    {
+      "name": "4 Channel (alte Version RGBA)",
+      "kanaele": [
+        {
+          "name": "Festfarbe",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": ""},
+            {"von": 10, "bis": 29, "name": "Red", "art": "color"},
+            {"von": 30, "bis": 49, "name": "Green", "art": "color"},
+            {"von": 50, "bis": 69, "name": "Blue", "art": "color"},
+            {"von": 70, "bis": 89, "name": "Amber", "art": "color"},
+            {"von": 90, "bis": 109, "name": "Red + Green", "art": "color"},
+            {"von": 110, "bis": 129, "name": "Red + Blue", "art": "color"},
+            {"von": 130, "bis": 149, "name": "Red + Amber", "art": "color"},
+            {"von": 150, "bis": 169, "name": "Green + Blue", "art": "color"},
+            {"von": 170, "bis": 189, "name": "Green + Amber", "art": "color"},
+            {"von": 190, "bis": 209, "name": "Blue + Amber", "art": "color"},
+            {"von": 210, "bis": 219, "name": "Red + Green + Blue", "art": "color"},
+            {"von": 220, "bis": 229, "name": "Red + Green + Amber", "art": "color"},
+            {"von": 230, "bis": 239, "name": "Red + Blue + Amber", "art": "color"},
+            {"von": 240, "bis": 249, "name": "Green + Blue + Amber", "art": "color"},
+            {"von": 250, "bis": 255, "name": "Red + Green + Blue + Amber", "art": "color"}
+          ]
+        },
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe from slow to fast", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Auto / Sound",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": ""},
+            {"von": 10, "bis": 199, "name": "Auto", "art": ""},
+            {"von": 200, "bis": 255, "name": "Sound", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Programm-Tempo",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Auto/Sound Speed from slow to fast", "art": ""}
+          ]
+        }
+      ],
+      "beschreibung": "aeltere Geraete 12x8W RGBA laut QLC+ (nicht gegen Handbuch geprueft)"
+    }
+  ],
+  "notizen": "Aktuelle Ausfuehrung: Flat-Par 12x6W RGBW 4-in-1 (Handbuch 151.313). Die QLC+-Datei beschreibt eine aeltere 12x8W-RGBA-Ausfuehrung; deren Modi sind als '(alte Version RGBA)' erhalten. Modellname wie in QLC+ belassen, damit ein QLC+-Import als Dublette erkannt wird."
+}

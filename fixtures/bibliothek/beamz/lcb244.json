@@ -1,0 +1,794 @@
+{
+  "format_version": 1,
+  "hersteller": "BeamZ",
+  "hersteller_kurz": "BEAMZ",
+  "modell": "LCB244",
+  "kurzname": "LCB244",
+  "typ": "led_bar",
+  "leistung_w": 160,
+  "quelle": {
+    "titel": "BeamZ LCB244 LED Bar 24x 4W RGBW - Bedienungsanleitung (Ref. 150.575)",
+    "version": "V1.1",
+    "url": "https://www.beamzlighting.com/wp-content/uploads/2026/03/150.575-LCB244_manual_V1.1.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.8 GIT · Bjorn Roesbeke",
+    "original": "resources/fixtures/beamZ/beamZ-LCB244.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 125 Wertebereiche mit Art (kind) versehen; Rasterform in 5 Modus/Modi aus <Physical> uebernommen; LightOS-Nachbearbeitung (FM-57): Herstellername 'beamZ' -> 'BeamZ'; kurzname LCB244; Modi 4/6/9/32/36 Channel nach Handbuch 150.575 V1.1 neu angelegt (Strobe 0-9 offen/10-255 Strobe, Effekt 0-3 aus, 55 Musterprogramme je 4 Werte, 224-227/228-255 Sound, Effekt-Tempo, Hintergrundfarbe); Raster 1x8 in den Segment-Modi, 1x1 in den Ein-Zonen-Modi; QLC+-Modi als '... (alte Version)' erhalten; dort Raster aus der Zahl der Rot-Kanaele (1, 2, 4, 8) statt pauschal 1x24, Strobe ohne Bereiche als strobe statt shutter, Auto-/Chase-Tempo als effect_speed, Farbeffekt-Bereiche ohne art color; Kanalnamen deutsch, Modusbeschreibungen ergaenzt"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": false,
+    "wie": "die 5 aktuellen Modi Kanal fuer Kanal gegen das Herstellerhandbuch 150.575 V1.1 geprueft; die '(alte Version)'-Modi stammen ungeprueft aus QLC+"
+  },
+  "modi": [
+    {
+      "name": "4 Channel",
+      "beschreibung": "RGBW (ganzer Balken)",
+      "raster": {"rows": 1, "cols": 1},
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "6 Channel",
+      "beschreibung": "Dimmer, Strobe, RGBW (ganzer Balken)",
+      "raster": {"rows": 1, "cols": 1},
+      "kanaele": [
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe langsam -> schnell", "art": "strobe"}
+          ]
+        },
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "9 Channel",
+      "beschreibung": "Dimmer, RGBW, Strobe, Effekt, Tempo, Hintergrundfarbe",
+      "raster": {"rows": 1, "cols": 1},
+      "kanaele": [
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe langsam -> schnell", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Effekt",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 3, "name": "Keine Funktion", "art": ""},
+            {"von": 4, "bis": 7, "name": "Musterprogramm 1", "art": ""},
+            {"von": 8, "bis": 11, "name": "Musterprogramm 2", "art": ""},
+            {"von": 12, "bis": 15, "name": "Musterprogramm 3", "art": ""},
+            {"von": 16, "bis": 19, "name": "Musterprogramm 4", "art": ""},
+            {"von": 20, "bis": 23, "name": "Musterprogramm 5", "art": ""},
+            {"von": 24, "bis": 27, "name": "Musterprogramm 6", "art": ""},
+            {"von": 28, "bis": 31, "name": "Musterprogramm 7", "art": ""},
+            {"von": 32, "bis": 35, "name": "Musterprogramm 8", "art": ""},
+            {"von": 36, "bis": 39, "name": "Musterprogramm 9", "art": ""},
+            {"von": 40, "bis": 43, "name": "Musterprogramm 10", "art": ""},
+            {"von": 44, "bis": 47, "name": "Musterprogramm 11", "art": ""},
+            {"von": 48, "bis": 51, "name": "Musterprogramm 12", "art": ""},
+            {"von": 52, "bis": 55, "name": "Musterprogramm 13", "art": ""},
+            {"von": 56, "bis": 59, "name": "Musterprogramm 14", "art": ""},
+            {"von": 60, "bis": 63, "name": "Musterprogramm 15", "art": ""},
+            {"von": 64, "bis": 67, "name": "Musterprogramm 16", "art": ""},
+            {"von": 68, "bis": 71, "name": "Musterprogramm 17", "art": ""},
+            {"von": 72, "bis": 75, "name": "Musterprogramm 18", "art": ""},
+            {"von": 76, "bis": 79, "name": "Musterprogramm 19", "art": ""},
+            {"von": 80, "bis": 83, "name": "Musterprogramm 20", "art": ""},
+            {"von": 84, "bis": 87, "name": "Musterprogramm 21", "art": ""},
+            {"von": 88, "bis": 91, "name": "Musterprogramm 22", "art": ""},
+            {"von": 92, "bis": 95, "name": "Musterprogramm 23", "art": ""},
+            {"von": 96, "bis": 99, "name": "Musterprogramm 24", "art": ""},
+            {"von": 100, "bis": 103, "name": "Musterprogramm 25", "art": ""},
+            {"von": 104, "bis": 107, "name": "Musterprogramm 26", "art": ""},
+            {"von": 108, "bis": 111, "name": "Musterprogramm 27", "art": ""},
+            {"von": 112, "bis": 115, "name": "Musterprogramm 28", "art": ""},
+            {"von": 116, "bis": 119, "name": "Musterprogramm 29", "art": ""},
+            {"von": 120, "bis": 123, "name": "Musterprogramm 30", "art": ""},
+            {"von": 124, "bis": 127, "name": "Musterprogramm 31", "art": ""},
+            {"von": 128, "bis": 131, "name": "Musterprogramm 32", "art": ""},
+            {"von": 132, "bis": 135, "name": "Musterprogramm 33", "art": ""},
+            {"von": 136, "bis": 139, "name": "Musterprogramm 34", "art": ""},
+            {"von": 140, "bis": 143, "name": "Musterprogramm 35", "art": ""},
+            {"von": 144, "bis": 147, "name": "Musterprogramm 36", "art": ""},
+            {"von": 148, "bis": 151, "name": "Musterprogramm 37", "art": ""},
+            {"von": 152, "bis": 155, "name": "Musterprogramm 38", "art": ""},
+            {"von": 156, "bis": 159, "name": "Musterprogramm 39", "art": ""},
+            {"von": 160, "bis": 163, "name": "Musterprogramm 40", "art": ""},
+            {"von": 164, "bis": 167, "name": "Musterprogramm 41", "art": ""},
+            {"von": 168, "bis": 171, "name": "Musterprogramm 42", "art": ""},
+            {"von": 172, "bis": 175, "name": "Musterprogramm 43", "art": ""},
+            {"von": 176, "bis": 179, "name": "Musterprogramm 44", "art": ""},
+            {"von": 180, "bis": 183, "name": "Musterprogramm 45", "art": ""},
+            {"von": 184, "bis": 187, "name": "Musterprogramm 46", "art": ""},
+            {"von": 188, "bis": 191, "name": "Musterprogramm 47", "art": ""},
+            {"von": 192, "bis": 195, "name": "Musterprogramm 48", "art": ""},
+            {"von": 196, "bis": 199, "name": "Musterprogramm 49", "art": ""},
+            {"von": 200, "bis": 203, "name": "Musterprogramm 50", "art": ""},
+            {"von": 204, "bis": 207, "name": "Musterprogramm 51", "art": ""},
+            {"von": 208, "bis": 211, "name": "Musterprogramm 52", "art": ""},
+            {"von": 212, "bis": 215, "name": "Musterprogramm 53", "art": ""},
+            {"von": 216, "bis": 219, "name": "Musterprogramm 54", "art": ""},
+            {"von": 220, "bis": 223, "name": "Musterprogramm 55", "art": ""},
+            {"von": 224, "bis": 227, "name": "Sound-Programm 1", "art": "sound"},
+            {"von": 228, "bis": 255, "name": "Sound-Programm 2", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Effekt-Tempo",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "langsam -> schnell", "art": ""}
+          ]
+        },
+        {
+          "name": "Hintergrundfarbe",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Hintergrundfarbe fuer Effekte", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "32 Channel",
+      "beschreibung": "8 Segmente RGBW",
+      "raster": {"rows": 1, "cols": 8},
+      "kanaele": [
+        {"name": "Rot 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss 2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot 3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss 3", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot 4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 4", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss 4", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot 5", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 5", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 5", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss 5", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot 6", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 6", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 6", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss 6", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot 7", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 7", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 7", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss 7", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot 8", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 8", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 8", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss 8", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "36 Channel",
+      "beschreibung": "8 Segmente RGBW + Strobe, Effekt, Tempo, Hintergrundfarbe",
+      "raster": {"rows": 1, "cols": 8},
+      "kanaele": [
+        {"name": "Rot 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss 2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot 3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss 3", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot 4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 4", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss 4", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot 5", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 5", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 5", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss 5", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot 6", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 6", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 6", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss 6", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot 7", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 7", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 7", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss 7", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot 8", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 8", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 8", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss 8", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe langsam -> schnell", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Effekt",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 3, "name": "Keine Funktion", "art": ""},
+            {"von": 4, "bis": 7, "name": "Musterprogramm 1", "art": ""},
+            {"von": 8, "bis": 11, "name": "Musterprogramm 2", "art": ""},
+            {"von": 12, "bis": 15, "name": "Musterprogramm 3", "art": ""},
+            {"von": 16, "bis": 19, "name": "Musterprogramm 4", "art": ""},
+            {"von": 20, "bis": 23, "name": "Musterprogramm 5", "art": ""},
+            {"von": 24, "bis": 27, "name": "Musterprogramm 6", "art": ""},
+            {"von": 28, "bis": 31, "name": "Musterprogramm 7", "art": ""},
+            {"von": 32, "bis": 35, "name": "Musterprogramm 8", "art": ""},
+            {"von": 36, "bis": 39, "name": "Musterprogramm 9", "art": ""},
+            {"von": 40, "bis": 43, "name": "Musterprogramm 10", "art": ""},
+            {"von": 44, "bis": 47, "name": "Musterprogramm 11", "art": ""},
+            {"von": 48, "bis": 51, "name": "Musterprogramm 12", "art": ""},
+            {"von": 52, "bis": 55, "name": "Musterprogramm 13", "art": ""},
+            {"von": 56, "bis": 59, "name": "Musterprogramm 14", "art": ""},
+            {"von": 60, "bis": 63, "name": "Musterprogramm 15", "art": ""},
+            {"von": 64, "bis": 67, "name": "Musterprogramm 16", "art": ""},
+            {"von": 68, "bis": 71, "name": "Musterprogramm 17", "art": ""},
+            {"von": 72, "bis": 75, "name": "Musterprogramm 18", "art": ""},
+            {"von": 76, "bis": 79, "name": "Musterprogramm 19", "art": ""},
+            {"von": 80, "bis": 83, "name": "Musterprogramm 20", "art": ""},
+            {"von": 84, "bis": 87, "name": "Musterprogramm 21", "art": ""},
+            {"von": 88, "bis": 91, "name": "Musterprogramm 22", "art": ""},
+            {"von": 92, "bis": 95, "name": "Musterprogramm 23", "art": ""},
+            {"von": 96, "bis": 99, "name": "Musterprogramm 24", "art": ""},
+            {"von": 100, "bis": 103, "name": "Musterprogramm 25", "art": ""},
+            {"von": 104, "bis": 107, "name": "Musterprogramm 26", "art": ""},
+            {"von": 108, "bis": 111, "name": "Musterprogramm 27", "art": ""},
+            {"von": 112, "bis": 115, "name": "Musterprogramm 28", "art": ""},
+            {"von": 116, "bis": 119, "name": "Musterprogramm 29", "art": ""},
+            {"von": 120, "bis": 123, "name": "Musterprogramm 30", "art": ""},
+            {"von": 124, "bis": 127, "name": "Musterprogramm 31", "art": ""},
+            {"von": 128, "bis": 131, "name": "Musterprogramm 32", "art": ""},
+            {"von": 132, "bis": 135, "name": "Musterprogramm 33", "art": ""},
+            {"von": 136, "bis": 139, "name": "Musterprogramm 34", "art": ""},
+            {"von": 140, "bis": 143, "name": "Musterprogramm 35", "art": ""},
+            {"von": 144, "bis": 147, "name": "Musterprogramm 36", "art": ""},
+            {"von": 148, "bis": 151, "name": "Musterprogramm 37", "art": ""},
+            {"von": 152, "bis": 155, "name": "Musterprogramm 38", "art": ""},
+            {"von": 156, "bis": 159, "name": "Musterprogramm 39", "art": ""},
+            {"von": 160, "bis": 163, "name": "Musterprogramm 40", "art": ""},
+            {"von": 164, "bis": 167, "name": "Musterprogramm 41", "art": ""},
+            {"von": 168, "bis": 171, "name": "Musterprogramm 42", "art": ""},
+            {"von": 172, "bis": 175, "name": "Musterprogramm 43", "art": ""},
+            {"von": 176, "bis": 179, "name": "Musterprogramm 44", "art": ""},
+            {"von": 180, "bis": 183, "name": "Musterprogramm 45", "art": ""},
+            {"von": 184, "bis": 187, "name": "Musterprogramm 46", "art": ""},
+            {"von": 188, "bis": 191, "name": "Musterprogramm 47", "art": ""},
+            {"von": 192, "bis": 195, "name": "Musterprogramm 48", "art": ""},
+            {"von": 196, "bis": 199, "name": "Musterprogramm 49", "art": ""},
+            {"von": 200, "bis": 203, "name": "Musterprogramm 50", "art": ""},
+            {"von": 204, "bis": 207, "name": "Musterprogramm 51", "art": ""},
+            {"von": 208, "bis": 211, "name": "Musterprogramm 52", "art": ""},
+            {"von": 212, "bis": 215, "name": "Musterprogramm 53", "art": ""},
+            {"von": 216, "bis": 219, "name": "Musterprogramm 54", "art": ""},
+            {"von": 220, "bis": 223, "name": "Musterprogramm 55", "art": ""},
+            {"von": 224, "bis": 227, "name": "Sound-Programm 1", "art": "sound"},
+            {"von": 228, "bis": 255, "name": "Sound-Programm 2", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Effekt-Tempo",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "langsam -> schnell", "art": ""}
+          ]
+        },
+        {
+          "name": "Hintergrundfarbe",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Hintergrundfarbe fuer Effekte", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6 Channel (alte Version)",
+      "raster": {"rows": 1, "cols": 1},
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Chase and Sound",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "No function", "art": ""},
+            {"von": 8, "bis": 22, "name": "Colour effect 1", "art": ""},
+            {"von": 23, "bis": 37, "name": "Colour effect 2", "art": ""},
+            {"von": 38, "bis": 52, "name": "Colour effect 3", "art": ""},
+            {"von": 53, "bis": 67, "name": "Colour effect 4", "art": ""},
+            {"von": 68, "bis": 82, "name": "Colour effect 5", "art": ""},
+            {"von": 83, "bis": 97, "name": "Colour effect 6", "art": ""},
+            {"von": 98, "bis": 112, "name": "Colour effect 7", "art": ""},
+            {"von": 113, "bis": 127, "name": "Colour effect 8", "art": ""},
+            {"von": 128, "bis": 142, "name": "Colour effect 9", "art": ""},
+            {"von": 143, "bis": 157, "name": "Colour effect 10", "art": ""},
+            {"von": 158, "bis": 172, "name": "Colour effect 11", "art": ""},
+            {"von": 173, "bis": 187, "name": "Colour effect 12", "art": ""},
+            {"von": 188, "bis": 202, "name": "Colour effect 13", "art": ""},
+            {"von": 203, "bis": 217, "name": "Colour effect 14", "art": ""},
+            {"von": 218, "bis": 232, "name": "Colour effect 15", "art": ""},
+            {"von": 233, "bis": 247, "name": "Colour effect 16", "art": ""},
+            {"von": 248, "bis": 255, "name": "Sound effect 1-16", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Chase speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Speed intensity (0 - 100%)", "art": ""}
+          ]
+        }
+      ],
+      "beschreibung": "aeltere Firmware laut QLC+ (nicht gegen das aktuelle Handbuch geprueft)"
+    },
+    {
+      "name": "9 Channel (alte Version)",
+      "raster": {"rows": 1, "cols": 1},
+      "kanaele": [
+        {"name": "Dimming", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Strobe", "attribut": "strobe", "default": 0, "highlight": 0},
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Auto program",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Disabled", "art": ""},
+            {"von": 16, "bis": 255, "name": "Speed", "art": ""}
+          ]
+        },
+        {
+          "name": "Chase and Sound",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "No function", "art": ""},
+            {"von": 8, "bis": 22, "name": "Colour effect 1", "art": ""},
+            {"von": 23, "bis": 37, "name": "Colour effect 2", "art": ""},
+            {"von": 38, "bis": 52, "name": "Colour effect 3", "art": ""},
+            {"von": 53, "bis": 67, "name": "Colour effect 4", "art": ""},
+            {"von": 68, "bis": 82, "name": "Colour effect 5", "art": ""},
+            {"von": 83, "bis": 97, "name": "Colour effect 6", "art": ""},
+            {"von": 98, "bis": 112, "name": "Colour effect 7", "art": ""},
+            {"von": 113, "bis": 127, "name": "Colour effect 8", "art": ""},
+            {"von": 128, "bis": 142, "name": "Colour effect 9", "art": ""},
+            {"von": 143, "bis": 157, "name": "Colour effect 10", "art": ""},
+            {"von": 158, "bis": 172, "name": "Colour effect 11", "art": ""},
+            {"von": 173, "bis": 187, "name": "Colour effect 12", "art": ""},
+            {"von": 188, "bis": 202, "name": "Colour effect 13", "art": ""},
+            {"von": 203, "bis": 217, "name": "Colour effect 14", "art": ""},
+            {"von": 218, "bis": 232, "name": "Colour effect 15", "art": ""},
+            {"von": 233, "bis": 247, "name": "Colour effect 16", "art": ""},
+            {"von": 248, "bis": 255, "name": "Sound effect 1-16", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Chase speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Speed intensity (0 - 100%)", "art": ""}
+          ]
+        }
+      ],
+      "beschreibung": "aeltere Firmware laut QLC+ (nicht gegen das aktuelle Handbuch geprueft)"
+    },
+    {
+      "name": "16 Channel (alte Version)",
+      "raster": {"rows": 1, "cols": 2},
+      "kanaele": [
+        {"name": "All dimming 1", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Strobe 1", "attribut": "strobe", "default": 0, "highlight": 0},
+        {"name": "Red 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Auto program 1",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "No function", "art": ""},
+            {"von": 16, "bis": 255, "name": "Speed", "art": ""}
+          ]
+        },
+        {"name": "All dimming 2", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Strobe 2", "attribut": "strobe", "default": 0, "highlight": 0},
+        {"name": "Red 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Auto program 2",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "No function", "art": ""},
+            {"von": 16, "bis": 255, "name": "Speed", "art": ""}
+          ]
+        },
+        {
+          "name": "Chase and Sound",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "No function", "art": ""},
+            {"von": 8, "bis": 22, "name": "Colour effect 1", "art": ""},
+            {"von": 23, "bis": 37, "name": "Colour effect 2", "art": ""},
+            {"von": 38, "bis": 52, "name": "Colour effect 3", "art": ""},
+            {"von": 53, "bis": 67, "name": "Colour effect 4", "art": ""},
+            {"von": 68, "bis": 82, "name": "Colour effect 5", "art": ""},
+            {"von": 83, "bis": 97, "name": "Colour effect 6", "art": ""},
+            {"von": 98, "bis": 112, "name": "Colour effect 7", "art": ""},
+            {"von": 113, "bis": 127, "name": "Colour effect 8", "art": ""},
+            {"von": 128, "bis": 142, "name": "Colour effect 9", "art": ""},
+            {"von": 143, "bis": 157, "name": "Colour effect 10", "art": ""},
+            {"von": 158, "bis": 172, "name": "Colour effect 11", "art": ""},
+            {"von": 173, "bis": 187, "name": "Colour effect 12", "art": ""},
+            {"von": 188, "bis": 202, "name": "Colour effect 13", "art": ""},
+            {"von": 203, "bis": 217, "name": "Colour effect 14", "art": ""},
+            {"von": 218, "bis": 232, "name": "Colour effect 15", "art": ""},
+            {"von": 233, "bis": 247, "name": "Colour effect 16", "art": ""},
+            {"von": 248, "bis": 255, "name": "Sound effect 1-16", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Chase speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Speed intensity (0 - 100%)", "art": ""}
+          ]
+        }
+      ],
+      "beschreibung": "aeltere Firmware laut QLC+ (nicht gegen das aktuelle Handbuch geprueft)"
+    },
+    {
+      "name": "30 Channel (alte Version)",
+      "raster": {"rows": 1, "cols": 4},
+      "kanaele": [
+        {"name": "All dimming 1", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Strobe 1", "attribut": "strobe", "default": 0, "highlight": 0},
+        {"name": "Red 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Auto program 1",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "No function", "art": ""},
+            {"von": 16, "bis": 255, "name": "Speed", "art": ""}
+          ]
+        },
+        {"name": "All dimming 2", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Strobe 2", "attribut": "strobe", "default": 0, "highlight": 0},
+        {"name": "Red 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Auto program 2",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "No function", "art": ""},
+            {"von": 16, "bis": 255, "name": "Speed", "art": ""}
+          ]
+        },
+        {"name": "All dimming 3", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Strobe 3", "attribut": "strobe", "default": 0, "highlight": 0},
+        {"name": "Red 3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 3", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Auto program 3",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "No function", "art": ""},
+            {"von": 16, "bis": 255, "name": "Speed", "art": ""}
+          ]
+        },
+        {"name": "All dimming 4", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Strobe 4", "attribut": "strobe", "default": 0, "highlight": 0},
+        {"name": "Red 4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 4", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 4", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Auto program 4",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "No function", "art": ""},
+            {"von": 16, "bis": 255, "name": "Speed", "art": ""}
+          ]
+        },
+        {
+          "name": "Chase and Sound",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "No function", "art": ""},
+            {"von": 8, "bis": 22, "name": "Colour effect 1", "art": ""},
+            {"von": 23, "bis": 37, "name": "Colour effect 2", "art": ""},
+            {"von": 38, "bis": 52, "name": "Colour effect 3", "art": ""},
+            {"von": 53, "bis": 67, "name": "Colour effect 4", "art": ""},
+            {"von": 68, "bis": 82, "name": "Colour effect 5", "art": ""},
+            {"von": 83, "bis": 97, "name": "Colour effect 6", "art": ""},
+            {"von": 98, "bis": 112, "name": "Colour effect 7", "art": ""},
+            {"von": 113, "bis": 127, "name": "Colour effect 8", "art": ""},
+            {"von": 128, "bis": 142, "name": "Colour effect 9", "art": ""},
+            {"von": 143, "bis": 157, "name": "Colour effect 10", "art": ""},
+            {"von": 158, "bis": 172, "name": "Colour effect 11", "art": ""},
+            {"von": 173, "bis": 187, "name": "Colour effect 12", "art": ""},
+            {"von": 188, "bis": 202, "name": "Colour effect 13", "art": ""},
+            {"von": 203, "bis": 217, "name": "Colour effect 14", "art": ""},
+            {"von": 218, "bis": 232, "name": "Colour effect 15", "art": ""},
+            {"von": 233, "bis": 247, "name": "Colour effect 16", "art": ""},
+            {"von": 248, "bis": 255, "name": "Sound effect 1-16", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Chase speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Speed intensity (0 - 100%)", "art": ""}
+          ]
+        }
+      ],
+      "beschreibung": "aeltere Firmware laut QLC+ (nicht gegen das aktuelle Handbuch geprueft)"
+    },
+    {
+      "name": "58 Channel (alte Version)",
+      "raster": {"rows": 1, "cols": 8},
+      "kanaele": [
+        {"name": "All dimming 1", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Strobe 1", "attribut": "strobe", "default": 0, "highlight": 0},
+        {"name": "Red 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Auto program 1",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "No function", "art": ""},
+            {"von": 16, "bis": 255, "name": "Speed", "art": ""}
+          ]
+        },
+        {"name": "All dimming 2", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Strobe 2", "attribut": "strobe", "default": 0, "highlight": 0},
+        {"name": "Red 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Auto program 2",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "No function", "art": ""},
+            {"von": 16, "bis": 255, "name": "Speed", "art": ""}
+          ]
+        },
+        {"name": "All dimming 3", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Strobe 3", "attribut": "strobe", "default": 0, "highlight": 0},
+        {"name": "Red 3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 3", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Auto program 3",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "No function", "art": ""},
+            {"von": 16, "bis": 255, "name": "Speed", "art": ""}
+          ]
+        },
+        {"name": "All dimming 4", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Strobe 4", "attribut": "strobe", "default": 0, "highlight": 0},
+        {"name": "Red 4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 4", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 4", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Auto program 4",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "No function", "art": ""},
+            {"von": 16, "bis": 255, "name": "Speed", "art": ""}
+          ]
+        },
+        {"name": "All dimming 5", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Strobe 5", "attribut": "strobe", "default": 0, "highlight": 0},
+        {"name": "Red 5", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 5", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 5", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 5", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Auto program 5",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "No function", "art": ""},
+            {"von": 16, "bis": 255, "name": "Speed", "art": ""}
+          ]
+        },
+        {"name": "All dimming 6", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Strobe 6", "attribut": "strobe", "default": 0, "highlight": 0},
+        {"name": "Red 6", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 6", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 6", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 6", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Auto program 6",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "No function", "art": ""},
+            {"von": 16, "bis": 255, "name": "Speed", "art": ""}
+          ]
+        },
+        {"name": "All dimming 7", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Strobe 7", "attribut": "strobe", "default": 0, "highlight": 0},
+        {"name": "Red 7", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 7", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 7", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 7", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Auto program 7",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "No function", "art": ""},
+            {"von": 16, "bis": 255, "name": "Speed", "art": ""}
+          ]
+        },
+        {"name": "All dimming 8", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Strobe 8", "attribut": "strobe", "default": 0, "highlight": 0},
+        {"name": "Red 8", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 8", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 8", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 8", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Auto program 8",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "No function", "art": ""},
+            {"von": 16, "bis": 255, "name": "Speed", "art": ""}
+          ]
+        },
+        {
+          "name": "Chase and Sound",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "No function", "art": ""},
+            {"von": 8, "bis": 22, "name": "Colour effect 1", "art": ""},
+            {"von": 23, "bis": 37, "name": "Colour effect 2", "art": ""},
+            {"von": 38, "bis": 52, "name": "Colour effect 3", "art": ""},
+            {"von": 53, "bis": 67, "name": "Colour effect 4", "art": ""},
+            {"von": 68, "bis": 82, "name": "Colour effect 5", "art": ""},
+            {"von": 83, "bis": 97, "name": "Colour effect 6", "art": ""},
+            {"von": 98, "bis": 112, "name": "Colour effect 7", "art": ""},
+            {"von": 113, "bis": 127, "name": "Colour effect 8", "art": ""},
+            {"von": 128, "bis": 142, "name": "Colour effect 9", "art": ""},
+            {"von": 143, "bis": 157, "name": "Colour effect 10", "art": ""},
+            {"von": 158, "bis": 172, "name": "Colour effect 11", "art": ""},
+            {"von": 173, "bis": 187, "name": "Colour effect 12", "art": ""},
+            {"von": 188, "bis": 202, "name": "Colour effect 13", "art": ""},
+            {"von": 203, "bis": 217, "name": "Colour effect 14", "art": ""},
+            {"von": 218, "bis": 232, "name": "Colour effect 15", "art": ""},
+            {"von": 233, "bis": 247, "name": "Colour effect 16", "art": ""},
+            {"von": 248, "bis": 255, "name": "Sound effect 1-16", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Chase speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Speed intensity (0 - 100%)", "art": ""}
+          ]
+        }
+      ],
+      "beschreibung": "aeltere Firmware laut QLC+ (nicht gegen das aktuelle Handbuch geprueft)"
+    }
+  ],
+  "notizen": "24x4W RGBW in 8 Segmenten zu je 3 LEDs. Das aktuelle Handbuch V1.1 kennt 4/6/9/32/36 Kanaele; die QLC+-Datei beschreibt eine aeltere Firmware (6/9/16/30/58 Kanaele), deren Modi als '(alte Version)' erhalten sind."
+}

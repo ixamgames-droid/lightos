@@ -1,0 +1,179 @@
+{
+  "format_version": 1,
+  "hersteller": "Showtec",
+  "hersteller_kurz": "Showtec",
+  "modell": "Kanjo Spot 60",
+  "kurzname": "KANJOSPOT60",
+  "typ": "moving_head",
+  "leistung_w": 70,
+  "notizen": "Strobe/Shutter wirkt nur bei geoeffnetem Dimmer; 0-7 'Off' = kein Strobe. Pan/Tilt-Tempo: 0 = schnellste Bewegung.",
+  "quelle": {
+    "titel": "Showtec Kanjo Spot 60 — User Manual (Ordercode 45011)",
+    "url": "https://images.static-thomann.de/pics/atg/atgdata/document/manual/388148_kanjo_spot_60_uk.pdf",
+    "version": "V1"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.3 GIT · Flo Edelmann",
+    "original": "resources/fixtures/Showtec/Showtec-Kanjo-Spot-60.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 66 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): gegen Handbuch V1 abgeglichen; kurzname KANJOSPOT60; Leistung 70 W laut Handbuch; Farbrad: Weiss als open, Magenta -> Lila (Handbuch 'Purple'), Rotation als rotate statt gobo; 10-Kanal 128-255 laut Handbuch 'Color shake effect'; Goborad: Offen als open, Rad-Rotation rotate, Keine-Funktion ohne art; Strobe 0-7 'Off' als kein Strobe (open) statt closed; Funktionskanal als reset statt raw; Werkseinstellung nicht als reset; Kanalnamen deutsch"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal fuer Kanal gegen das Herstellerhandbuch V1 (ueber Thomann) geprueft: 8- und 10-Kanal-Modus"
+  },
+  "modi": [
+    {
+      "name": "8 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Pan/Tilt-Tempo (0 = schnell, 255 = langsam)", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Farbrad",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Weiss (offen)", "art": "open"},
+            {"von": 16, "bis": 31, "name": "Rot", "art": "color"},
+            {"von": 32, "bis": 47, "name": "Gruen", "art": "color"},
+            {"von": 48, "bis": 63, "name": "Blau", "art": "color"},
+            {"von": 64, "bis": 79, "name": "Gelb", "art": "color"},
+            {"von": 80, "bis": 95, "name": "Lila", "art": "color"},
+            {"von": 96, "bis": 111, "name": "Cyan", "art": "color"},
+            {"von": 112, "bis": 127, "name": "Orange", "art": "color"},
+            {"von": 128, "bis": 255, "name": "Farbrad-Rotation langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Goborad",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Offen", "art": "open"},
+            {"von": 8, "bis": 15, "name": "Gobo 1", "art": "gobo"},
+            {"von": 16, "bis": 23, "name": "Gobo 2", "art": "gobo"},
+            {"von": 24, "bis": 31, "name": "Gobo 3", "art": "gobo"},
+            {"von": 32, "bis": 39, "name": "Gobo 4", "art": "gobo"},
+            {"von": 40, "bis": 47, "name": "Gobo 5", "art": "gobo"},
+            {"von": 48, "bis": 55, "name": "Gobo 6", "art": "gobo"},
+            {"von": 56, "bis": 63, "name": "Gobo 7", "art": "gobo"},
+            {"von": 64, "bis": 127, "name": "Rad-Rotation langsam -> schnell", "art": "rotate"},
+            {"von": 128, "bis": 143, "name": "Keine Funktion"},
+            {"von": 144, "bis": 159, "name": "Gobo 1 Shake langsam -> schnell", "art": "shake"},
+            {"von": 160, "bis": 175, "name": "Gobo 2 Shake langsam -> schnell", "art": "shake"},
+            {"von": 176, "bis": 191, "name": "Gobo 3 Shake langsam -> schnell", "art": "shake"},
+            {"von": 192, "bis": 207, "name": "Gobo 4 Shake langsam -> schnell", "art": "shake"},
+            {"von": 208, "bis": 223, "name": "Gobo 5 Shake langsam -> schnell", "art": "shake"},
+            {"von": 224, "bis": 239, "name": "Gobo 6 Shake langsam -> schnell", "art": "shake"},
+            {"von": 240, "bis": 255, "name": "Gobo 7 Shake langsam -> schnell", "art": "shake"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe / Shutter",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Aus (kein Strobe)", "art": "open"},
+            {"von": 8, "bis": 127, "name": "Puls-Strobe langsam -> schnell", "art": "strobe"},
+            {"von": 128, "bis": 255, "name": "Zufalls-Strobe langsam -> schnell", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Funktionen",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 93, "name": "Keine Funktion"},
+            {"von": 94, "bis": 94, "name": "Reset", "art": "reset"},
+            {"von": 95, "bis": 95, "name": "Werkseinstellungen"},
+            {"von": 96, "bis": 255, "name": "Musiksteuerung", "art": "sound"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "10 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fein", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fein", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt-Tempo (0 = schnell, 255 = langsam)", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Farbrad",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Weiss (offen)", "art": "open"},
+            {"von": 16, "bis": 31, "name": "Rot", "art": "color"},
+            {"von": 32, "bis": 47, "name": "Gruen", "art": "color"},
+            {"von": 48, "bis": 63, "name": "Blau", "art": "color"},
+            {"von": 64, "bis": 79, "name": "Gelb", "art": "color"},
+            {"von": 80, "bis": 95, "name": "Lila", "art": "color"},
+            {"von": 96, "bis": 111, "name": "Cyan", "art": "color"},
+            {"von": 112, "bis": 127, "name": "Orange", "art": "color"},
+            {"von": 128, "bis": 255, "name": "Farb-Shake-Effekt"}
+          ]
+        },
+        {
+          "name": "Goborad",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Offen", "art": "open"},
+            {"von": 8, "bis": 15, "name": "Gobo 1", "art": "gobo"},
+            {"von": 16, "bis": 23, "name": "Gobo 2", "art": "gobo"},
+            {"von": 24, "bis": 31, "name": "Gobo 3", "art": "gobo"},
+            {"von": 32, "bis": 39, "name": "Gobo 4", "art": "gobo"},
+            {"von": 40, "bis": 47, "name": "Gobo 5", "art": "gobo"},
+            {"von": 48, "bis": 55, "name": "Gobo 6", "art": "gobo"},
+            {"von": 56, "bis": 63, "name": "Gobo 7", "art": "gobo"},
+            {"von": 64, "bis": 127, "name": "Rad-Rotation langsam -> schnell", "art": "rotate"},
+            {"von": 128, "bis": 143, "name": "Keine Funktion"},
+            {"von": 144, "bis": 159, "name": "Gobo 1 Shake langsam -> schnell", "art": "shake"},
+            {"von": 160, "bis": 175, "name": "Gobo 2 Shake langsam -> schnell", "art": "shake"},
+            {"von": 176, "bis": 191, "name": "Gobo 3 Shake langsam -> schnell", "art": "shake"},
+            {"von": 192, "bis": 207, "name": "Gobo 4 Shake langsam -> schnell", "art": "shake"},
+            {"von": 208, "bis": 223, "name": "Gobo 5 Shake langsam -> schnell", "art": "shake"},
+            {"von": 224, "bis": 239, "name": "Gobo 6 Shake langsam -> schnell", "art": "shake"},
+            {"von": 240, "bis": 255, "name": "Gobo 7 Shake langsam -> schnell", "art": "shake"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe / Shutter",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Aus (kein Strobe)", "art": "open"},
+            {"von": 8, "bis": 127, "name": "Puls-Strobe langsam -> schnell", "art": "strobe"},
+            {"von": 128, "bis": 255, "name": "Zufalls-Strobe langsam -> schnell", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Funktionen",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 93, "name": "Keine Funktion"},
+            {"von": 94, "bis": 94, "name": "Reset", "art": "reset"},
+            {"von": 95, "bis": 95, "name": "Werkseinstellungen"},
+            {"von": 96, "bis": 255, "name": "Musiksteuerung", "art": "sound"}
+          ]
+        }
+      ]
+    }
+  ]
+}

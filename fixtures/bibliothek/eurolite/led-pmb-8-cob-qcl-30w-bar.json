@@ -1,0 +1,545 @@
+{
+  "format_version": 1,
+  "hersteller": "Eurolite",
+  "hersteller_kurz": "Eurolite",
+  "modell": "LED PMB-8 COB QCL 30W Bar",
+  "kurzname": "LED PMB-8 COB QCL 30W Bar",
+  "typ": "led_bar",
+  "leistung_w": 240,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Eurolite-LED-PMB-8-COB-QCL-30W-Bar.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Eurolite/Eurolite-LED-PMB-8-COB-QCL-30W-Bar.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.2.2 GIT · saimyx",
+    "original": "resources/fixtures/Eurolite/Eurolite-LED-PMB-8-COB-QCL-30W-Bar.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 244 Wertebereiche mit Art (kind) versehen; Rasterform in 7 Modus/Modi aus <Physical> uebernommen; Farbvoreinstellungen: 'Full ON' als 'open' (volles Weiss); Sound/Strobe-Kanal (6-Kanal): 0 und 6-10 als 'open'; Strobe-Defaults 0 (offen)"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Datei und die LightOS-Attributliste geprueft (Attribute, Bereichs-Arten, Defaults, Raster); Herstellerhandbuch mit DMX-Tabelle war nicht abrufbar (Steinigke liefert nur Datenblaetter ohne DMX-Protokoll), daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "3 Channel",
+      "raster": {"rows": 1, "cols": 8},
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "4 Channel",
+      "raster": {"rows": 1, "cols": 8},
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "5 Channel",
+      "raster": {"rows": 1, "cols": 8},
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Strobe OFF", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe (Slow to fast)", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Preset Colors",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": ""},
+            {"von": 10, "bis": 19, "name": "Red", "art": "color"},
+            {"von": 20, "bis": 29, "name": "Green", "art": "color"},
+            {"von": 30, "bis": 39, "name": "Blue", "art": "color"},
+            {"von": 40, "bis": 49, "name": "White", "art": "color"},
+            {"von": 50, "bis": 59, "name": "Yellow", "art": "color"},
+            {"von": 60, "bis": 69, "name": "Magenta", "art": "color"},
+            {"von": 70, "bis": 79, "name": "Cyan", "art": "color"},
+            {"von": 80, "bis": 89, "name": "Dark orange", "art": "color"},
+            {"von": 90, "bis": 99, "name": "Green yellow", "art": "color"},
+            {"von": 100, "bis": 109, "name": "Salmon", "art": "color"},
+            {"von": 110, "bis": 119, "name": "Turquoise", "art": "color"},
+            {"von": 120, "bis": 129, "name": "Light green", "art": "color"},
+            {"von": 130, "bis": 139, "name": "Orange", "art": "color"},
+            {"von": 140, "bis": 149, "name": "Straw", "art": "color"},
+            {"von": 150, "bis": 159, "name": "Lavender", "art": "color"},
+            {"von": 160, "bis": 169, "name": "Light blue", "art": "color"},
+            {"von": 170, "bis": 179, "name": "Dark blue", "art": "color"},
+            {"von": 180, "bis": 189, "name": "Pink", "art": "color"},
+            {"von": 190, "bis": 255, "name": "Full ON", "art": "open"}
+          ]
+        },
+        {
+          "name": "Programs",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": ""},
+            {"von": 10, "bis": 39, "name": "Auto program 1, with increasing speed", "art": ""},
+            {"von": 40, "bis": 69, "name": "Auto program 2, with increasing speed", "art": ""},
+            {"von": 70, "bis": 99, "name": "Auto program 3, with increasing speed", "art": ""},
+            {"von": 100, "bis": 129, "name": "Auto program 4, with increasing speed", "art": ""},
+            {"von": 130, "bis": 159, "name": "Sound program 1, with increasing speed", "art": "sound"},
+            {"von": 160, "bis": 189, "name": "Sound program 2, with increasing speed", "art": "sound"},
+            {"von": 190, "bis": 219, "name": "Sound program 3, with increasing speed", "art": "sound"},
+            {"von": 220, "bis": 255, "name": "Sound program 4, with increasing speed", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Farbtemperatur (Presets)",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": ""},
+            {"von": 10, "bis": 39, "name": "1800K", "art": ""},
+            {"von": 40, "bis": 69, "name": "2200K", "art": ""},
+            {"von": 70, "bis": 99, "name": "2700K", "art": ""},
+            {"von": 100, "bis": 129, "name": "3200K", "art": ""},
+            {"von": 130, "bis": 159, "name": "4300K", "art": ""},
+            {"von": 160, "bis": 189, "name": "5600K", "art": ""},
+            {"von": 190, "bis": 219, "name": "6500K", "art": ""},
+            {"von": 220, "bis": 255, "name": "8000K", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6 Channel",
+      "raster": {"rows": 1, "cols": 8},
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Sound control/Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Kein Strobe", "art": "open"},
+            {"von": 1, "bis": 5, "name": "Sound-controlled mode (15 colors)", "art": "sound"},
+            {"von": 6, "bis": 10, "name": "Kein Strobe", "art": "open"},
+            {"von": 11, "bis": 255, "name": "Strobe with increasing speed", "art": "strobe"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "12 Channel",
+      "raster": {"rows": 1, "cols": 8},
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Strobe OFF", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe (Slow to fast)", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Preset Colors LED 1",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": ""},
+            {"von": 10, "bis": 19, "name": "Red", "art": "color"},
+            {"von": 20, "bis": 29, "name": "Green", "art": "color"},
+            {"von": 30, "bis": 39, "name": "Blue", "art": "color"},
+            {"von": 40, "bis": 49, "name": "White", "art": "color"},
+            {"von": 50, "bis": 59, "name": "Yellow", "art": "color"},
+            {"von": 60, "bis": 69, "name": "Magenta", "art": "color"},
+            {"von": 70, "bis": 79, "name": "Cyan", "art": "color"},
+            {"von": 80, "bis": 89, "name": "Dark orange", "art": "color"},
+            {"von": 90, "bis": 99, "name": "Green yellow", "art": "color"},
+            {"von": 100, "bis": 109, "name": "Salmon", "art": "color"},
+            {"von": 110, "bis": 119, "name": "Turquoise", "art": "color"},
+            {"von": 120, "bis": 129, "name": "Light green", "art": "color"},
+            {"von": 130, "bis": 139, "name": "Orange", "art": "color"},
+            {"von": 140, "bis": 149, "name": "Straw", "art": "color"},
+            {"von": 150, "bis": 159, "name": "Lavender", "art": "color"},
+            {"von": 160, "bis": 169, "name": "Light blue", "art": "color"},
+            {"von": 170, "bis": 179, "name": "Dark blue", "art": "color"},
+            {"von": 180, "bis": 189, "name": "Pink", "art": "color"},
+            {"von": 190, "bis": 255, "name": "Full ON", "art": "open"}
+          ]
+        },
+        {
+          "name": "Preset Colors LED 2",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": ""},
+            {"von": 10, "bis": 19, "name": "Red", "art": "color"},
+            {"von": 20, "bis": 29, "name": "Green", "art": "color"},
+            {"von": 30, "bis": 39, "name": "Blue", "art": "color"},
+            {"von": 40, "bis": 49, "name": "White", "art": "color"},
+            {"von": 50, "bis": 59, "name": "Yellow", "art": "color"},
+            {"von": 60, "bis": 69, "name": "Magenta", "art": "color"},
+            {"von": 70, "bis": 79, "name": "Cyan", "art": "color"},
+            {"von": 80, "bis": 89, "name": "Dark orange", "art": "color"},
+            {"von": 90, "bis": 99, "name": "Green yellow", "art": "color"},
+            {"von": 100, "bis": 109, "name": "Salmon", "art": "color"},
+            {"von": 110, "bis": 119, "name": "Turquoise", "art": "color"},
+            {"von": 120, "bis": 129, "name": "Light green", "art": "color"},
+            {"von": 130, "bis": 139, "name": "Orange", "art": "color"},
+            {"von": 140, "bis": 149, "name": "Straw", "art": "color"},
+            {"von": 150, "bis": 159, "name": "Lavender", "art": "color"},
+            {"von": 160, "bis": 169, "name": "Light blue", "art": "color"},
+            {"von": 170, "bis": 179, "name": "Dark blue", "art": "color"},
+            {"von": 180, "bis": 189, "name": "Pink", "art": "color"},
+            {"von": 190, "bis": 255, "name": "Full ON", "art": "open"}
+          ]
+        },
+        {
+          "name": "Preset Colors LED 3",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": ""},
+            {"von": 10, "bis": 19, "name": "Red", "art": "color"},
+            {"von": 20, "bis": 29, "name": "Green", "art": "color"},
+            {"von": 30, "bis": 39, "name": "Blue", "art": "color"},
+            {"von": 40, "bis": 49, "name": "White", "art": "color"},
+            {"von": 50, "bis": 59, "name": "Yellow", "art": "color"},
+            {"von": 60, "bis": 69, "name": "Magenta", "art": "color"},
+            {"von": 70, "bis": 79, "name": "Cyan", "art": "color"},
+            {"von": 80, "bis": 89, "name": "Dark orange", "art": "color"},
+            {"von": 90, "bis": 99, "name": "Green yellow", "art": "color"},
+            {"von": 100, "bis": 109, "name": "Salmon", "art": "color"},
+            {"von": 110, "bis": 119, "name": "Turquoise", "art": "color"},
+            {"von": 120, "bis": 129, "name": "Light green", "art": "color"},
+            {"von": 130, "bis": 139, "name": "Orange", "art": "color"},
+            {"von": 140, "bis": 149, "name": "Straw", "art": "color"},
+            {"von": 150, "bis": 159, "name": "Lavender", "art": "color"},
+            {"von": 160, "bis": 169, "name": "Light blue", "art": "color"},
+            {"von": 170, "bis": 179, "name": "Dark blue", "art": "color"},
+            {"von": 180, "bis": 189, "name": "Pink", "art": "color"},
+            {"von": 190, "bis": 255, "name": "Full ON", "art": "open"}
+          ]
+        },
+        {
+          "name": "Preset Colors LED 4",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": ""},
+            {"von": 10, "bis": 19, "name": "Red", "art": "color"},
+            {"von": 20, "bis": 29, "name": "Green", "art": "color"},
+            {"von": 30, "bis": 39, "name": "Blue", "art": "color"},
+            {"von": 40, "bis": 49, "name": "White", "art": "color"},
+            {"von": 50, "bis": 59, "name": "Yellow", "art": "color"},
+            {"von": 60, "bis": 69, "name": "Magenta", "art": "color"},
+            {"von": 70, "bis": 79, "name": "Cyan", "art": "color"},
+            {"von": 80, "bis": 89, "name": "Dark orange", "art": "color"},
+            {"von": 90, "bis": 99, "name": "Green yellow", "art": "color"},
+            {"von": 100, "bis": 109, "name": "Salmon", "art": "color"},
+            {"von": 110, "bis": 119, "name": "Turquoise", "art": "color"},
+            {"von": 120, "bis": 129, "name": "Light green", "art": "color"},
+            {"von": 130, "bis": 139, "name": "Orange", "art": "color"},
+            {"von": 140, "bis": 149, "name": "Straw", "art": "color"},
+            {"von": 150, "bis": 159, "name": "Lavender", "art": "color"},
+            {"von": 160, "bis": 169, "name": "Light blue", "art": "color"},
+            {"von": 170, "bis": 179, "name": "Dark blue", "art": "color"},
+            {"von": 180, "bis": 189, "name": "Pink", "art": "color"},
+            {"von": 190, "bis": 255, "name": "Full ON", "art": "open"}
+          ]
+        },
+        {
+          "name": "Preset Colors LED 5",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": ""},
+            {"von": 10, "bis": 19, "name": "Red", "art": "color"},
+            {"von": 20, "bis": 29, "name": "Green", "art": "color"},
+            {"von": 30, "bis": 39, "name": "Blue", "art": "color"},
+            {"von": 40, "bis": 49, "name": "White", "art": "color"},
+            {"von": 50, "bis": 59, "name": "Yellow", "art": "color"},
+            {"von": 60, "bis": 69, "name": "Magenta", "art": "color"},
+            {"von": 70, "bis": 79, "name": "Cyan", "art": "color"},
+            {"von": 80, "bis": 89, "name": "Dark orange", "art": "color"},
+            {"von": 90, "bis": 99, "name": "Green yellow", "art": "color"},
+            {"von": 100, "bis": 109, "name": "Salmon", "art": "color"},
+            {"von": 110, "bis": 119, "name": "Turquoise", "art": "color"},
+            {"von": 120, "bis": 129, "name": "Light green", "art": "color"},
+            {"von": 130, "bis": 139, "name": "Orange", "art": "color"},
+            {"von": 140, "bis": 149, "name": "Straw", "art": "color"},
+            {"von": 150, "bis": 159, "name": "Lavender", "art": "color"},
+            {"von": 160, "bis": 169, "name": "Light blue", "art": "color"},
+            {"von": 170, "bis": 179, "name": "Dark blue", "art": "color"},
+            {"von": 180, "bis": 189, "name": "Pink", "art": "color"},
+            {"von": 190, "bis": 255, "name": "Full ON", "art": "open"}
+          ]
+        },
+        {
+          "name": "Preset Colors LED 6",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": ""},
+            {"von": 10, "bis": 19, "name": "Red", "art": "color"},
+            {"von": 20, "bis": 29, "name": "Green", "art": "color"},
+            {"von": 30, "bis": 39, "name": "Blue", "art": "color"},
+            {"von": 40, "bis": 49, "name": "White", "art": "color"},
+            {"von": 50, "bis": 59, "name": "Yellow", "art": "color"},
+            {"von": 60, "bis": 69, "name": "Magenta", "art": "color"},
+            {"von": 70, "bis": 79, "name": "Cyan", "art": "color"},
+            {"von": 80, "bis": 89, "name": "Dark orange", "art": "color"},
+            {"von": 90, "bis": 99, "name": "Green yellow", "art": "color"},
+            {"von": 100, "bis": 109, "name": "Salmon", "art": "color"},
+            {"von": 110, "bis": 119, "name": "Turquoise", "art": "color"},
+            {"von": 120, "bis": 129, "name": "Light green", "art": "color"},
+            {"von": 130, "bis": 139, "name": "Orange", "art": "color"},
+            {"von": 140, "bis": 149, "name": "Straw", "art": "color"},
+            {"von": 150, "bis": 159, "name": "Lavender", "art": "color"},
+            {"von": 160, "bis": 169, "name": "Light blue", "art": "color"},
+            {"von": 170, "bis": 179, "name": "Dark blue", "art": "color"},
+            {"von": 180, "bis": 189, "name": "Pink", "art": "color"},
+            {"von": 190, "bis": 255, "name": "Full ON", "art": "open"}
+          ]
+        },
+        {
+          "name": "Preset Colors LED 7",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": ""},
+            {"von": 10, "bis": 19, "name": "Red", "art": "color"},
+            {"von": 20, "bis": 29, "name": "Green", "art": "color"},
+            {"von": 30, "bis": 39, "name": "Blue", "art": "color"},
+            {"von": 40, "bis": 49, "name": "White", "art": "color"},
+            {"von": 50, "bis": 59, "name": "Yellow", "art": "color"},
+            {"von": 60, "bis": 69, "name": "Magenta", "art": "color"},
+            {"von": 70, "bis": 79, "name": "Cyan", "art": "color"},
+            {"von": 80, "bis": 89, "name": "Dark orange", "art": "color"},
+            {"von": 90, "bis": 99, "name": "Green yellow", "art": "color"},
+            {"von": 100, "bis": 109, "name": "Salmon", "art": "color"},
+            {"von": 110, "bis": 119, "name": "Turquoise", "art": "color"},
+            {"von": 120, "bis": 129, "name": "Light green", "art": "color"},
+            {"von": 130, "bis": 139, "name": "Orange", "art": "color"},
+            {"von": 140, "bis": 149, "name": "Straw", "art": "color"},
+            {"von": 150, "bis": 159, "name": "Lavender", "art": "color"},
+            {"von": 160, "bis": 169, "name": "Light blue", "art": "color"},
+            {"von": 170, "bis": 179, "name": "Dark blue", "art": "color"},
+            {"von": 180, "bis": 189, "name": "Pink", "art": "color"},
+            {"von": 190, "bis": 255, "name": "Full ON", "art": "open"}
+          ]
+        },
+        {
+          "name": "Preset Colors LED 8",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": ""},
+            {"von": 10, "bis": 19, "name": "Red", "art": "color"},
+            {"von": 20, "bis": 29, "name": "Green", "art": "color"},
+            {"von": 30, "bis": 39, "name": "Blue", "art": "color"},
+            {"von": 40, "bis": 49, "name": "White", "art": "color"},
+            {"von": 50, "bis": 59, "name": "Yellow", "art": "color"},
+            {"von": 60, "bis": 69, "name": "Magenta", "art": "color"},
+            {"von": 70, "bis": 79, "name": "Cyan", "art": "color"},
+            {"von": 80, "bis": 89, "name": "Dark orange", "art": "color"},
+            {"von": 90, "bis": 99, "name": "Green yellow", "art": "color"},
+            {"von": 100, "bis": 109, "name": "Salmon", "art": "color"},
+            {"von": 110, "bis": 119, "name": "Turquoise", "art": "color"},
+            {"von": 120, "bis": 129, "name": "Light green", "art": "color"},
+            {"von": 130, "bis": 139, "name": "Orange", "art": "color"},
+            {"von": 140, "bis": 149, "name": "Straw", "art": "color"},
+            {"von": 150, "bis": 159, "name": "Lavender", "art": "color"},
+            {"von": 160, "bis": 169, "name": "Light blue", "art": "color"},
+            {"von": 170, "bis": 179, "name": "Dark blue", "art": "color"},
+            {"von": 180, "bis": 189, "name": "Pink", "art": "color"},
+            {"von": 190, "bis": 255, "name": "Full ON", "art": "open"}
+          ]
+        },
+        {
+          "name": "Programs",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": ""},
+            {"von": 10, "bis": 39, "name": "Auto program 1, with increasing speed", "art": ""},
+            {"von": 40, "bis": 69, "name": "Auto program 2, with increasing speed", "art": ""},
+            {"von": 70, "bis": 99, "name": "Auto program 3, with increasing speed", "art": ""},
+            {"von": 100, "bis": 129, "name": "Auto program 4, with increasing speed", "art": ""},
+            {"von": 130, "bis": 159, "name": "Sound program 1, with increasing speed", "art": "sound"},
+            {"von": 160, "bis": 189, "name": "Sound program 2, with increasing speed", "art": "sound"},
+            {"von": 190, "bis": 219, "name": "Sound program 3, with increasing speed", "art": "sound"},
+            {"von": 220, "bis": 255, "name": "Sound program 4, with increasing speed", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Farbtemperatur (Presets)",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": ""},
+            {"von": 10, "bis": 39, "name": "1800K", "art": ""},
+            {"von": 40, "bis": 69, "name": "2200K", "art": ""},
+            {"von": 70, "bis": 99, "name": "2700K", "art": ""},
+            {"von": 100, "bis": 129, "name": "3200K", "art": ""},
+            {"von": 130, "bis": 159, "name": "4300K", "art": ""},
+            {"von": 160, "bis": 189, "name": "5600K", "art": ""},
+            {"von": 190, "bis": 219, "name": "6500K", "art": ""},
+            {"von": 220, "bis": 255, "name": "8000K", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "32 Channel",
+      "raster": {"rows": 1, "cols": 8},
+      "kanaele": [
+        {"name": "Red 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 3", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 4", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 4", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 5", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 5", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 5", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 5", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 6", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 6", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 6", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 6", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 7", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 7", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 7", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 7", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 8", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 8", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 8", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 8", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "36 Channel",
+      "raster": {"rows": 1, "cols": 8},
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Strobe OFF", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe (Slow to fast)", "art": "strobe"}
+          ]
+        },
+        {"name": "Red 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 3", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 4", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 4", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 5", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 5", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 5", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 5", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 6", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 6", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 6", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 6", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 7", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 7", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 7", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 7", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 8", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 8", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 8", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 8", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Programs",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": ""},
+            {"von": 10, "bis": 39, "name": "Auto program 1, with increasing speed", "art": ""},
+            {"von": 40, "bis": 69, "name": "Auto program 2, with increasing speed", "art": ""},
+            {"von": 70, "bis": 99, "name": "Auto program 3, with increasing speed", "art": ""},
+            {"von": 100, "bis": 129, "name": "Auto program 4, with increasing speed", "art": ""},
+            {"von": 130, "bis": 159, "name": "Sound program 1, with increasing speed", "art": "sound"},
+            {"von": 160, "bis": 189, "name": "Sound program 2, with increasing speed", "art": "sound"},
+            {"von": 190, "bis": 219, "name": "Sound program 3, with increasing speed", "art": "sound"},
+            {"von": 220, "bis": 255, "name": "Sound program 4, with increasing speed", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Farbtemperatur (Presets)",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": ""},
+            {"von": 10, "bis": 39, "name": "1800K", "art": ""},
+            {"von": 40, "bis": 69, "name": "2200K", "art": ""},
+            {"von": 70, "bis": 99, "name": "2700K", "art": ""},
+            {"von": 100, "bis": 129, "name": "3200K", "art": ""},
+            {"von": 130, "bis": 159, "name": "4300K", "art": ""},
+            {"von": 160, "bis": 189, "name": "5600K", "art": ""},
+            {"von": 190, "bis": 219, "name": "6500K", "art": ""},
+            {"von": 220, "bis": 255, "name": "8000K", "art": ""}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "8 COB-Segmente RGBW (Raster 1x8)."
+}
