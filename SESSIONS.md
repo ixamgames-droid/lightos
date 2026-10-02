@@ -20,6 +20,7 @@
 | ENG-28 | C | fix/eng28-generator-shutter | 2026-10-02T04:45Z | tools/_shutter.py · tools/build_demo_show_full.py · tools/build_event_demo_2026.py · tools/build_farb_fx_vc_show.py · tools/build_hochzeit_komplett.py · tools/build_mega_arena_2026.py · tools/build_musik_show_2026.py · tools/build_neue_demo_show.py · tools/build_party_demo_show.py · tools/build_testshow_2026.py · tools/build_tutorial_matrix_show.py · tools/README.md · tests/test_eng28_generator_shutter.py · changelog.d/2026-10-02-ENG-28.md · BACKLOG.md |
 | TOOL-6 | C | fix/tool6-cwd-waechter | 2026-10-02T04:53Z | tests/test_tool3_generator_annahmen.py · tools/build_dimmer_farbe_combo.py · tools/build_neuheiten_demo.py · tools/build_zq06121_demo.py · tools/_builder.py · changelog.d/2026-10-02-TOOL-6.md · BACKLOG.md |
 | FM-54 | C | fix/fm54-weiss-intensitaet | 2026-10-02T04:58Z | src/core/engine/rgb_matrix.py · tests/test_fm54_weiss_intensitaet.py · changelog.d/2026-10-02-FM-54.md · BACKLOG.md |
+| PROC-18 | A | docs/backlog-status-0210 | 2026-10-02T06:52Z | BACKLOG.md |
 
 ## Blocker & Fallen
 
@@ -73,7 +74,6 @@
 
 ## Verlauf
 
-- 2026-10-01T21:21Z C claim DOC-15
 - 2026-10-01T21:22Z A claim DOC-18
 - 2026-10-01T21:24Z C claim PROC-08
 - 2026-10-01T21:24Z B done BPM-26
@@ -103,3 +103,4 @@
 - 2026-10-02T04:45Z 107 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-02T04:53Z C claim TOOL-6
 - 2026-10-02T04:58Z C claim FM-54
+- 2026-10-02T06:52Z A claim PROC-18
