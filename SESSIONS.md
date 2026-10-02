@@ -58,6 +58,7 @@
 | FM-56 | A | feat/fm56-eigene-bibliothek | 2026-10-02T12:26Z | fixtures/bibliothek · src/core/database/bibliothek_format.py · src/core/database/fixture_db.py |
 | DOC-53 | C | - | 2026-10-02T12:26Z | docs/anleitung_hochzeit_komplett · tools/build_hochzeit_komplett.py · tests/test_doc53_hochzeit_linie.py · changelog.d/2026-10-02-DOC-53.md |
 | TOOL-10 | C | - | 2026-10-02T12:28Z | BACKLOG.md |
+| FUNKTIONSTEST-B2 | B | - | 2026-10-02T12:42Z | - |
 
 ## Blocker & Fallen
 
@@ -126,7 +127,6 @@
 
 ## Verlauf
 
-- 2026-10-02T10:58Z C claim DOC-36
 - 2026-10-02T10:59Z C claim DOC-37
 - 2026-10-02T11:07Z C claim DOC-38
 - 2026-10-02T11:09Z C claim DOC-39
@@ -156,3 +156,4 @@
 - 2026-10-02T12:26Z C claim DOC-53
 - 2026-10-02T12:27Z A done FM-46
 - 2026-10-02T12:28Z C claim TOOL-10
+- 2026-10-02T12:42Z B claim FUNKTIONSTEST-B2
