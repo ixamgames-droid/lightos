@@ -312,6 +312,12 @@ jobs:
         shell: pwsh
         env:
           LIGHTOS_HARDEN_EXIT_ALL: "1"
+          # XPLAT-45: der Runner hat keine GPU — ohne Software-WebGL (ANGLE/
+          # SwiftShader) wird keine 3D-Szene bereit (CI-Lauf zu #891: 32 rote
+          # Segmente, alle „Szene wurde nicht bereit"). Wie in der Linux-Leg.
+          QTWEBENGINE_CHROMIUM_FLAGS: >-
+            --disable-gpu-sandbox --enable-unsafe-swiftshader
+            --use-gl=angle --use-angle=swiftshader --in-process-gpu
         run: |
           pwsh tools/verify_segmented.ps1 -j 4
 
