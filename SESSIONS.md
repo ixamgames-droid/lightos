@@ -43,6 +43,7 @@
 | DOC-42 | C | - | 2026-10-02T11:57Z | docs/anleitung_ablaeufe/ANLEITUNG_ABLAEUFE_MISCHEN.md · tools/build_event_demo_2026.py · tests/test_doc42_bank7_beschriftung.py · changelog.d/2026-10-02-DOC-42.md |
 | QA-82 | C | - | 2026-10-02T11:14Z | tests/test_qa58_bibliothek_schema_unberuehrt.py · BACKLOG.md |
 | DOC-43 | C | - | 2026-10-02T11:58Z | docs/anleitung_vc_workflow/ANLEITUNG_VC_WORKFLOW.md |
+| FM-46c | A | feat/fm46-qxf-head | 2026-10-02T11:59Z | - |
 
 ## Blocker & Fallen
 
@@ -107,7 +108,6 @@
 
 ## Verlauf
 
-- 2026-10-02T09:29Z C claim FM-53
 - 2026-10-02T09:49Z C done XPLAT-37
 - 2026-10-02T09:58Z C claim FM-33
 - 2026-10-02T10:01Z C done FM-55
@@ -137,3 +137,4 @@
 - 2026-10-02T11:57Z C aktualisiert DOC-42: Dateien docs/anleitung_ablaeufe/ANLEITUNG_ABLAEUFE_MISCHEN.md -> docs/anleitung_ablaeufe/ANLEITUNG_ABLAEUFE_MISCHEN.md · tools/build_event_demo_2026.py · tests/test_doc42_bank7_beschriftung.py · changelog.d/2026-10-02-DOC-42.md
 - 2026-10-02T11:58Z C claim DOC-43
 - 2026-10-02T11:59Z A aktualisiert FM-46: Branch feat/fm46-dimmer-segment -> feat/fm46-rueckfall
+- 2026-10-02T11:59Z A claim FM-46c
