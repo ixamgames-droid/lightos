@@ -163,8 +163,8 @@ Eine Cue speichert alle Werte, die gerade im Programmer stehen, unabhängig von 
 Auswahl. Löschst du zwischen den Cues nicht, trägt die nächste Cue die alten Werte mit.
 
 Über das Menü **Show → Cue aufnehmen** (Taste **R**) geht es auch ohne Playback-Seite.
-Achtung: Das nimmt immer in die **erste** Cueliste der Show auf, nicht in die gerade
-gewählte.
+Das nimmt in die Cueliste auf, die auf der Playback-Seite gewählt ist. Ist keine
+gewählt, landet die Cue in der **ersten** Cueliste der Show.
 
 ## 8. Die Cueliste auf einen Executor legen
 
@@ -262,7 +262,7 @@ Alle Einstellungen im Detail:
 | Leertaste, `go`, Tablet oder OSC: kein Licht | Die Cueliste liegt auf keinem Executor (diese Wege legen sie nicht automatisch hin) | Schritt 8: im Executor „— Leer —“ die Cueliste wählen oder einmal **GO** auf der Playback-Seite |
 | Die Cues wirken nicht, das Licht bleibt wie eingestellt | Der Programmer hat Vorrang | **Esc** bzw. **Alles löschen** |
 | Cue 2 enthält noch Werte aus Cue 1 | Zwischen den Aufnahmen nicht gelöscht | vor jeder Aufnahme **Alles löschen**, dann neu aufnehmen |
-| **R** hat in die falsche Cueliste aufgenommen | **Show → Cue aufnehmen** nimmt immer in die erste Cueliste auf | in **Playback** mit **+ Cue aufnehmen** aufnehmen |
+| **R** hat in die falsche Cueliste aufgenommen | **Show → Cue aufnehmen** nimmt in die auf der Playback-Seite gewählte Cueliste auf (ohne Wahl: die erste) | vorher in **Playback** im Feld **Cueliste:** die richtige wählen |
 | Die VC-Cueliste bleibt leer | Falscher **Executor-Slot** (zählt ab 0) oder andere Page | Slot = Ex-Nummer − 1, Page prüfen |
 | Ein Snap speichert zu wenig | Nur die **gewählten** Geräte kommen hinein | vor **Speichern** alle betroffenen Geräte wählen |
 | Die Szene läuft, ist aber nicht zu sehen | Programmer-Werte liegen darüber | **Alles löschen** |
