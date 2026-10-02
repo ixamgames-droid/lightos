@@ -1,0 +1,381 @@
+{
+  "format_version": 1,
+  "hersteller": "Cameo",
+  "hersteller_kurz": "Cameo",
+  "modell": "Movo Beam 100",
+  "kurzname": "Movo Beam 100",
+  "typ": "moving_head",
+  "leistung_w": 130,
+  "notizen": "Der Z 100 hat laut Handbuch zusaetzlich einen 21-Kanal-Modus; ob der MOVO BEAM 100 einen 20-Kanal-Modus hat, ist ungeprueft (QLC+ kennt nur 4/15/35). LED-Ring: eigener Dimmer, Strobe und 1 bzw. 4 RGB-Segmente — LightOS liest die doppelten Dimmer-/Farbkanaele als weitere Koepfe (Ring).",
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Cameo-Movo-Beam-100.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Cameo/Cameo-Movo-Beam-100.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.2 GIT · Felix Hartnagel",
+    "original": "resources/fixtures/Cameo/Cameo-Movo-Beam-100.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 146 Wertebereiche mit Art (kind) versehen; Endlos-Pan/Tilt-Rotation pan/tilt -> raw (Rotationsrichtung/-tempo, Bereiche 'rotate'; speed bleibt dem Pan/Tilt-Speed-Kanal), Default 0 = keine Rotation (vorher zweiter Pan-/Tilt-Kanal mit Default 128 = Drehung!); Colour-Ring-Makro color_wheel -> effect (in Modi mit Pan/Tilt-Makro -> raw) (Lauflicht-/Sprungmakros des LED-Rings, keine Festfarben), Bereiche ohne Farb-Art; Ring-Makro-Geschwindigkeit speed -> effect_speed; Farbmakro (override RGBW): 'Colour off' als 'open', Festfarben 'color', Sprung/Fade-Geschwindigkeit 'rotate', Stopp ohne Art; Pan/Tilt-Makro pan -> effect mit Default 0 (vorher dritter Pan-Kanal, Default 128 = Makro aktiv); Dimmerkurve macro -> raw; Geraeteeinstellungen: 4 falsche Arten ('closed' bei 'Blackout while Moving') entfernt, Reset-Bereich bleibt 'reset'; Shutter-Default/-Highlight auf 0 (Offen-Bereich) in 4 Kanaelen"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Datei und die LightOS-Attributliste geprueft; Aufbau mit dem Handbuch des Schwestermodells MOVO BEAM Z 100 (CLMBZ100) verglichen (gleiche Bereiche, ohne Zoom). Handbuch CLMB100 selbst war nicht abrufbar, daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "4 Channel",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 255, "name": "Strobe slow -> fast <1Hz - 20Hz", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Auto Program",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "off", "art": ""},
+            {"von": 6, "bis": 36, "name": "Auto Program 1", "art": ""},
+            {"von": 37, "bis": 67, "name": "Auto Program 2", "art": ""},
+            {"von": 68, "bis": 98, "name": "Auto Program 3", "art": ""},
+            {"von": 99, "bis": 129, "name": "Auto Program 4", "art": ""},
+            {"von": 130, "bis": 160, "name": "Auto Program 5", "art": ""},
+            {"von": 161, "bis": 191, "name": "Auto Program 6", "art": ""},
+            {"von": 192, "bis": 222, "name": "Auto Program 7", "art": ""},
+            {"von": 223, "bis": 255, "name": "Auto Program 8", "art": ""}
+          ]
+        },
+        {"name": "Pan/Tilt Speed (Set Speed Auto Programs)", "attribut": "speed", "default": 0, "highlight": 0}
+      ]
+    },
+    {
+      "name": "15 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Endless Pan rotation",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "no function", "art": ""},
+            {"von": 6, "bis": 126, "name": "clockwise pan rotation (fast to slow)", "art": "rotate"},
+            {"von": 127, "bis": 128, "name": "no movement", "art": ""},
+            {"von": 129, "bis": 255, "name": "counter clockwise pan rotation (slow to fast)", "art": "rotate"}
+          ]
+        },
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Endless Tilt rotation",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "no function", "art": ""},
+            {"von": 6, "bis": 126, "name": "clockwise tilt rotation (fast to slow)", "art": "rotate"},
+            {"von": 127, "bis": 128, "name": "no movement", "art": ""},
+            {"von": 129, "bis": 255, "name": "counter clockwise tilt rotation (slow to fast)", "art": "rotate"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe functions",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Strobe closed", "art": "closed"},
+            {"von": 11, "bis": 33, "name": "Pulse Random, slow -> fast", "art": "strobe"},
+            {"von": 34, "bis": 56, "name": "Ramp up Random, slow -> fast", "art": "strobe"},
+            {"von": 57, "bis": 79, "name": "Ramp down Random, slow -> fast", "art": "strobe"},
+            {"von": 80, "bis": 102, "name": "Random Strobe Effect, slow -> fast", "art": "strobe"},
+            {"von": 103, "bis": 127, "name": "Strobe Break Effect, 5s.....1s (Short burst with break)", "art": "strobe"},
+            {"von": 128, "bis": 250, "name": "Strobe slow -> fast <1Hz -20 Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Device settings",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "no function", "art": ""},
+            {"von": 6, "bis": 32, "name": "Blackout while Moving on (Hold 3s)", "art": ""},
+            {"von": 33, "bis": 59, "name": "Blackout while Moving off (Hold 5s)", "art": ""},
+            {"von": 60, "bis": 86, "name": "Invert Pan on (Hold 3s)", "art": ""},
+            {"von": 87, "bis": 113, "name": "Invert Pan off(Hold 5s)", "art": ""},
+            {"von": 114, "bis": 140, "name": "Invert Tilt on (Hold 3s)", "art": ""},
+            {"von": 141, "bis": 167, "name": "Invert Tilt off (Hold 5s)", "art": ""},
+            {"von": 168, "bis": 194, "name": "Silent Fan on (Hold 3s)", "art": ""},
+            {"von": 195, "bis": 221, "name": "Silent Fan off (Hold 5s)", "art": ""},
+            {"von": 222, "bis": 255, "name": "Reset All Functions (Hold 3s)", "art": "reset"}
+          ]
+        },
+        {
+          "name": "Colour Ring Macro (override RGB)",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Colour off", "art": ""},
+            {"von": 6, "bis": 13, "name": "Colour Macro 1 (Colour Jump)", "art": ""},
+            {"von": 14, "bis": 21, "name": "Colour Macro 2 (Red 1 Step)", "art": ""},
+            {"von": 22, "bis": 29, "name": "Colour Macro 3 (Green 1 Step)", "art": ""},
+            {"von": 30, "bis": 37, "name": "Colour Macro 4 (Blue 1 Step)", "art": ""},
+            {"von": 38, "bis": 45, "name": "Colour Macro 5 (Yellow 1 Step)", "art": ""},
+            {"von": 46, "bis": 53, "name": "Colour Macro 6 (Cyan 1 Step)", "art": ""},
+            {"von": 54, "bis": 61, "name": "Colour Macro 7 (Magenta 1 Step)", "art": ""},
+            {"von": 62, "bis": 69, "name": "Colour Macro 8 (2step Magenta Yellow)", "art": ""},
+            {"von": 70, "bis": 77, "name": "Colour Macro 9 (2step Red Green)", "art": ""},
+            {"von": 78, "bis": 85, "name": "Colour Macro 10 (2step Red Blue)", "art": ""},
+            {"von": 86, "bis": 93, "name": "Colour Macro 11 (2step Blue Yellow)", "art": ""},
+            {"von": 94, "bis": 101, "name": "Colour Macro 12 (2step Green Blue)", "art": ""},
+            {"von": 102, "bis": 109, "name": "Colour Macro 13 (2step Magenta Blue)", "art": ""},
+            {"von": 110, "bis": 117, "name": "Colour Macro 14 (2step Green Yellow)", "art": ""},
+            {"von": 118, "bis": 125, "name": "Colour Macro 15 (2step Cyan Magenta)", "art": ""},
+            {"von": 126, "bis": 133, "name": "Colour Macro 16 (2step Cyan Red)", "art": ""},
+            {"von": 134, "bis": 255, "name": "No function", "art": ""}
+          ]
+        },
+        {
+          "name": "Colour Ring Macro Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "slow > fast", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "35 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Endless Pan rotation",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "no function", "art": ""},
+            {"von": 6, "bis": 126, "name": "clockwise pan rotation (fast to slow)", "art": "rotate"},
+            {"von": 127, "bis": 128, "name": "no movement", "art": ""},
+            {"von": 129, "bis": 255, "name": "counter clockwise pan rotation (slow to fast)", "art": "rotate"}
+          ]
+        },
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Endless Tilt rotation",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "no function", "art": ""},
+            {"von": 6, "bis": 126, "name": "clockwise tilt rotation (fast to slow)", "art": "rotate"},
+            {"von": 127, "bis": 128, "name": "no movement", "art": ""},
+            {"von": 129, "bis": 255, "name": "counter clockwise tilt rotation (slow to fast)", "art": "rotate"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Dimmer fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Strobe functions",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Strobe closed", "art": "closed"},
+            {"von": 11, "bis": 33, "name": "Pulse Random, slow -> fast", "art": "strobe"},
+            {"von": 34, "bis": 56, "name": "Ramp up Random, slow -> fast", "art": "strobe"},
+            {"von": 57, "bis": 79, "name": "Ramp down Random, slow -> fast", "art": "strobe"},
+            {"von": 80, "bis": 102, "name": "Random Strobe Effect, slow -> fast", "art": "strobe"},
+            {"von": 103, "bis": 127, "name": "Strobe Break Effect, 5s.....1s (Short burst with break)", "art": "strobe"},
+            {"von": 128, "bis": 250, "name": "Strobe slow -> fast <1Hz -20 Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Colour Macro (override RGBW)",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Colour off", "art": "open"},
+            {"von": 6, "bis": 13, "name": "Red", "art": "color"},
+            {"von": 14, "bis": 21, "name": "Amber", "art": "color"},
+            {"von": 22, "bis": 29, "name": "Yellow warm", "art": "color"},
+            {"von": 30, "bis": 37, "name": "Yellow", "art": "color"},
+            {"von": 38, "bis": 45, "name": "Green", "art": "color"},
+            {"von": 46, "bis": 53, "name": "Turquoise", "art": "color"},
+            {"von": 54, "bis": 61, "name": "Cyan", "art": "color"},
+            {"von": 62, "bis": 69, "name": "Blue", "art": "color"},
+            {"von": 70, "bis": 77, "name": "Lavender", "art": "color"},
+            {"von": 78, "bis": 85, "name": "Mauve", "art": "color"},
+            {"von": 86, "bis": 93, "name": "Magenta", "art": "color"},
+            {"von": 94, "bis": 101, "name": "Pink", "art": "color"},
+            {"von": 102, "bis": 109, "name": "Warm White", "art": "color"},
+            {"von": 110, "bis": 117, "name": "White", "art": "color"},
+            {"von": 118, "bis": 125, "name": "Cold White", "art": "color"},
+            {"von": 126, "bis": 127, "name": "Colour Jumping Stop", "art": ""},
+            {"von": 128, "bis": 191, "name": "Colour Jumping Speed slow -> fast / Colour 1 -> 12", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "Colour Fading Speed slow -> fast / Colour 1 -> 12", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Auto Program",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "off", "art": ""},
+            {"von": 6, "bis": 36, "name": "Auto Program 1", "art": ""},
+            {"von": 37, "bis": 67, "name": "Auto Program 2", "art": ""},
+            {"von": 68, "bis": 98, "name": "Auto Program 3", "art": ""},
+            {"von": 99, "bis": 129, "name": "Auto Program 4", "art": ""},
+            {"von": 130, "bis": 160, "name": "Auto Program 5", "art": ""},
+            {"von": 161, "bis": 191, "name": "Auto Program 6", "art": ""},
+            {"von": 192, "bis": 222, "name": "Auto Program 7", "art": ""},
+            {"von": 223, "bis": 255, "name": "Auto Program 8", "art": ""}
+          ]
+        },
+        {
+          "name": "Pan/Tilt Macro",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "off", "art": ""},
+            {"von": 6, "bis": 40, "name": "PAN \"small > big\"", "art": ""},
+            {"von": 41, "bis": 75, "name": "TILT \"small > big\"", "art": ""},
+            {"von": 76, "bis": 110, "name": "PAN / TILT \"small > big\"", "art": ""},
+            {"von": 111, "bis": 145, "name": "PAN / TILT (invers) \"small > big\"", "art": ""},
+            {"von": 146, "bis": 180, "name": "Circle \"small > big\"", "art": ""},
+            {"von": 181, "bis": 215, "name": "Circle (invers) \"small > big\"", "art": ""},
+            {"von": 216, "bis": 255, "name": "Random \"small > big\"", "art": ""}
+          ]
+        },
+        {
+          "name": "Set dimmer curve",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "no function", "art": ""},
+            {"von": 6, "bis": 63, "name": "Linear Dimmer Curve", "art": ""},
+            {"von": 64, "bis": 127, "name": "Exponential Dimmer Curve", "art": ""},
+            {"von": 128, "bis": 191, "name": "Logarithmic Dimmer Curve", "art": ""},
+            {"von": 192, "bis": 255, "name": "S-Curve Dimmer Curve", "art": ""}
+          ]
+        },
+        {
+          "name": "Pan/Tilt Speed (Set Speed of Pan&Tilt / Auto Programs / Pan&Tilt Macros)",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0
+        },
+        {
+          "name": "Device settings",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "no function", "art": ""},
+            {"von": 6, "bis": 32, "name": "Blackout while Moving on (Hold 3s)", "art": ""},
+            {"von": 33, "bis": 59, "name": "Blackout while Moving off (Hold 5s)", "art": ""},
+            {"von": 60, "bis": 86, "name": "Invert Pan on (Hold 3s)", "art": ""},
+            {"von": 87, "bis": 113, "name": "Invert Pan off(Hold 5s)", "art": ""},
+            {"von": 114, "bis": 140, "name": "Invert Tilt on (Hold 3s)", "art": ""},
+            {"von": 141, "bis": 167, "name": "Invert Tilt off (Hold 5s)", "art": ""},
+            {"von": 168, "bis": 194, "name": "Silent Fan on (Hold 3s)", "art": ""},
+            {"von": 195, "bis": 221, "name": "Silent Fan off (Hold 5s)", "art": ""},
+            {"von": 222, "bis": 255, "name": "Reset All Functions (Hold 3s)", "art": "reset"}
+          ]
+        },
+        {"name": "Dimmer Colour Ring", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe Colour Ring",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 255, "name": "Strobe slow -> fast <1Hz - 20 Hz", "art": "strobe"}
+          ]
+        },
+        {"name": "Red1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue4", "attribut": "color_b", "default": 0, "highlight": 255},
+        {
+          "name": "Colour Ring Macro (override RGB)",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Colour off", "art": ""},
+            {"von": 6, "bis": 13, "name": "Colour Macro 1 (Colour Jump)", "art": ""},
+            {"von": 14, "bis": 21, "name": "Colour Macro 2 (Red 1 Step)", "art": ""},
+            {"von": 22, "bis": 29, "name": "Colour Macro 3 (Green 1 Step)", "art": ""},
+            {"von": 30, "bis": 37, "name": "Colour Macro 4 (Blue 1 Step)", "art": ""},
+            {"von": 38, "bis": 45, "name": "Colour Macro 5 (Yellow 1 Step)", "art": ""},
+            {"von": 46, "bis": 53, "name": "Colour Macro 6 (Cyan 1 Step)", "art": ""},
+            {"von": 54, "bis": 61, "name": "Colour Macro 7 (Magenta 1 Step)", "art": ""},
+            {"von": 62, "bis": 69, "name": "Colour Macro 8 (2step Magenta Yellow)", "art": ""},
+            {"von": 70, "bis": 77, "name": "Colour Macro 9 (2step Red Green)", "art": ""},
+            {"von": 78, "bis": 85, "name": "Colour Macro 10 (2step Red Blue)", "art": ""},
+            {"von": 86, "bis": 93, "name": "Colour Macro 11 (2step Blue Yellow)", "art": ""},
+            {"von": 94, "bis": 101, "name": "Colour Macro 12 (2step Green Blue)", "art": ""},
+            {"von": 102, "bis": 109, "name": "Colour Macro 13 (2step Magenta Blue)", "art": ""},
+            {"von": 110, "bis": 117, "name": "Colour Macro 14 (2step Green Yellow)", "art": ""},
+            {"von": 118, "bis": 125, "name": "Colour Macro 15 (2step Cyan Magenta)", "art": ""},
+            {"von": 126, "bis": 133, "name": "Colour Macro 16 (2step Cyan Red)", "art": ""},
+            {"von": 134, "bis": 255, "name": "No function", "art": ""}
+          ]
+        },
+        {
+          "name": "Colour Ring Macro Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "slow > fast", "art": ""}
+          ]
+        }
+      ]
+    }
+  ]
+}

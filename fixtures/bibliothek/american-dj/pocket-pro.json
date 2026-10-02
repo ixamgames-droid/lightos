@@ -1,0 +1,353 @@
+{
+  "format_version": 1,
+  "hersteller": "American DJ",
+  "hersteller_kurz": "ADJ",
+  "modell": "Pocket Pro",
+  "kurzname": "POCKETPRO",
+  "typ": "moving_head",
+  "leistung_w": 53,
+  "quelle": {
+    "titel": "ADJ Pocket Pro & Pocket Pro Pearl User Manual (2023)",
+    "url": "https://assets.centryngroup.com/dl/files/POC723__DL__002.pdf",
+    "datum": "2023"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.4 GIT · Justin Hornsby",
+    "original": "resources/fixtures/American_DJ/American-DJ-Pocket-Pro.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 192 Wertebereiche mit Art (kind) versehen; danach von LightOS gegen das Herstellerhandbuch ueberarbeitet: Dimmerkurven-Kanal als raw (Default 0, Highlight 0) statt intensity/macro; Shutter-Bereiche nach Handbuch klassifiziert (aus=closed, LED an=open, alle Strobe-/Puls-/Random-/Rampen-Bereiche=strobe), Default/Highlight auf Mitte des ersten Offen-Bereichs; irrefuehrende Bereichs-Arten (color/gobo/rotate/closed) an Programm-/Makro-/Funktionskanaelen entfernt; Farbrad: Weiss als open, 43-49 'Hellblau' laut Handbuch (QLC+: Blue); Gobo-Rad: Open als open; Pan/Tilt-Makro-Speed als effect_speed statt macro; Sonderfunktionen als reset (nur 'Reset All' mit Art reset)"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal fuer Kanal gegen die DMX-Tabellen (11/13 Kanal, S. 20-27) im ADJ-Handbuch geprueft; nicht am Geraet getestet"
+  },
+  "modi": [
+    {
+      "name": "11 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {
+          "name": "Farbrad",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Weiss (offen)", "art": "open"},
+            {"von": 8, "bis": 14, "name": "Red", "art": "color"},
+            {"von": 15, "bis": 21, "name": "Orange", "art": "color"},
+            {"von": 22, "bis": 28, "name": "Yellow", "art": "color"},
+            {"von": 29, "bis": 35, "name": "Green", "art": "color"},
+            {"von": 36, "bis": 42, "name": "UV", "art": "color"},
+            {"von": 43, "bis": 49, "name": "Hellblau", "art": "color"},
+            {"von": 50, "bis": 56, "name": "Pink", "art": "color"},
+            {"von": 57, "bis": 66, "name": "White & Red", "art": "color"},
+            {"von": 67, "bis": 76, "name": "Red & Orange", "art": "color"},
+            {"von": 77, "bis": 86, "name": "Orange & Yellow", "art": "color"},
+            {"von": 87, "bis": 96, "name": "Yellow & Green", "art": "color"},
+            {"von": 97, "bis": 106, "name": "Green & UV", "art": "color"},
+            {"von": 107, "bis": 116, "name": "UV & Light Blue", "art": "color"},
+            {"von": 117, "bis": 127, "name": "Light Blue & Pink", "art": "color"},
+            {"von": 128, "bis": 189, "name": "Colour Scroll Slow To Fast", "art": "rotate"},
+            {"von": 190, "bis": 193, "name": "Stop", "art": ""},
+            {"von": 194, "bis": 255, "name": "Colour Scroll Fast To Slow", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo-Rad",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Open", "art": "open"},
+            {"von": 8, "bis": 15, "name": "Gobo 1", "art": "gobo"},
+            {"von": 16, "bis": 23, "name": "Gobo 2", "art": "gobo"},
+            {"von": 24, "bis": 31, "name": "Gobo 3", "art": "gobo"},
+            {"von": 32, "bis": 39, "name": "Gobo 4", "art": "gobo"},
+            {"von": 40, "bis": 47, "name": "Gobo 5", "art": "gobo"},
+            {"von": 48, "bis": 55, "name": "Gobo 6", "art": "gobo"},
+            {"von": 56, "bis": 63, "name": "Gobo 7", "art": "gobo"},
+            {"von": 64, "bis": 71, "name": "Open Shake", "art": "shake"},
+            {"von": 72, "bis": 79, "name": "Gobo 1 Shake", "art": "shake"},
+            {"von": 80, "bis": 87, "name": "Gobo 2 Shake", "art": "shake"},
+            {"von": 88, "bis": 95, "name": "Gobo 3 Shake", "art": "shake"},
+            {"von": 96, "bis": 103, "name": "Gobo 4 Shake", "art": "shake"},
+            {"von": 104, "bis": 111, "name": "Gobo 5 Shake", "art": "shake"},
+            {"von": 112, "bis": 119, "name": "Gobo 6 Shake", "art": "shake"},
+            {"von": 120, "bis": 127, "name": "Gobo 7 Shake", "art": "shake"},
+            {"von": 128, "bis": 189, "name": "Gobo Scroll Fast to Slow", "art": "rotate"},
+            {"von": 190, "bis": 193, "name": "Offen / Stopp", "art": ""},
+            {"von": 194, "bis": 255, "name": "Gobo Scroll Slow to Fast", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Shutter",
+          "attribut": "shutter",
+          "default": 11,
+          "highlight": 11,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Blackout", "art": "closed"},
+            {"von": 8, "bis": 15, "name": "Shutter Open", "art": "open"},
+            {"von": 16, "bis": 131, "name": "Strobing Slow to Fast", "art": "strobe"},
+            {"von": 132, "bis": 139, "name": "Shutter Open", "art": "open"},
+            {"von": 140, "bis": 181, "name": "Shutter Slow Open - Fast Close", "art": "strobe"},
+            {"von": 182, "bis": 189, "name": "Shutter Open", "art": "open"},
+            {"von": 190, "bis": 231, "name": "Shutter Fast Open - Slow Close", "art": "strobe"},
+            {"von": 232, "bis": 239, "name": "Shutter Open", "art": "open"},
+            {"von": 240, "bis": 247, "name": "Random Strobe", "art": "strobe"},
+            {"von": 248, "bis": 255, "name": "Shutter Open", "art": "open"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Pan/Tilt Macro",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "No function", "art": ""},
+            {"von": 8, "bis": 15, "name": "Macro 1", "art": ""},
+            {"von": 16, "bis": 23, "name": "Macro 2", "art": ""},
+            {"von": 24, "bis": 31, "name": "Macro 3", "art": ""},
+            {"von": 32, "bis": 39, "name": "Macro 4", "art": ""},
+            {"von": 40, "bis": 47, "name": "Macro 5", "art": ""},
+            {"von": 48, "bis": 55, "name": "Macro 6", "art": ""},
+            {"von": 56, "bis": 63, "name": "Macro 7", "art": ""},
+            {"von": 64, "bis": 71, "name": "Macro 8", "art": ""},
+            {"von": 72, "bis": 79, "name": "Macro 9", "art": ""},
+            {"von": 80, "bis": 87, "name": "Macro 10", "art": ""},
+            {"von": 88, "bis": 95, "name": "Macro 11", "art": ""},
+            {"von": 96, "bis": 103, "name": "Macro 12", "art": ""},
+            {"von": 104, "bis": 111, "name": "Macro 13", "art": ""},
+            {"von": 112, "bis": 119, "name": "Macro 14", "art": ""},
+            {"von": 120, "bis": 127, "name": "Macro 15", "art": ""},
+            {"von": 128, "bis": 135, "name": "Macro 16", "art": ""},
+            {"von": 136, "bis": 143, "name": "Macro 17", "art": ""},
+            {"von": 144, "bis": 151, "name": "Macro 18", "art": ""},
+            {"von": 152, "bis": 159, "name": "Macro 19", "art": ""},
+            {"von": 160, "bis": 167, "name": "Macro 20", "art": ""},
+            {"von": 168, "bis": 175, "name": "Macro 21", "art": ""},
+            {"von": 176, "bis": 183, "name": "Macro 22", "art": ""},
+            {"von": 184, "bis": 191, "name": "Macro 23", "art": ""},
+            {"von": 192, "bis": 199, "name": "Macro 24", "art": ""},
+            {"von": 200, "bis": 207, "name": "Macro 25", "art": ""},
+            {"von": 208, "bis": 215, "name": "Macro 26", "art": ""},
+            {"von": 216, "bis": 223, "name": "Macro 27", "art": ""},
+            {"von": 224, "bis": 231, "name": "Macro 28", "art": ""},
+            {"von": 232, "bis": 239, "name": "Macro 29", "art": ""},
+            {"von": 240, "bis": 247, "name": "Macro 30", "art": ""},
+            {"von": 248, "bis": 255, "name": "Macro 31", "art": ""}
+          ]
+        },
+        {
+          "name": "Pan/Tilt Macro Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Slow to Fast", "art": ""}
+          ]
+        },
+        {
+          "name": "Dimmer Curve",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 20, "name": "Standard", "art": ""},
+            {"von": 21, "bis": 40, "name": "Stage", "art": ""},
+            {"von": 41, "bis": 60, "name": "TV", "art": ""},
+            {"von": 61, "bis": 80, "name": "Architectural", "art": ""},
+            {"von": 81, "bis": 100, "name": "Theatre", "art": ""},
+            {"von": 101, "bis": 255, "name": "Default To Unit Dimmer Setting", "art": ""}
+          ]
+        },
+        {"name": "Pan / Tilt Speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Special Functions",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 69, "name": "No function", "art": ""},
+            {"von": 70, "bis": 79, "name": "Enable Blackout w pan/tilt", "art": ""},
+            {"von": 80, "bis": 89, "name": "Disable Blackout w pan/tilt", "art": ""},
+            {"von": 90, "bis": 99, "name": "Target Mode 1 (0-180 deg)", "art": ""},
+            {"von": 100, "bis": 109, "name": "Target Mode 2 (90 deg - 270 deg)", "art": ""},
+            {"von": 110, "bis": 119, "name": "Target Mode 3 (180 deg - 360 deg)", "art": ""},
+            {"von": 120, "bis": 129, "name": "Target Mode 4 (270 deg - 540 deg)", "art": ""},
+            {"von": 130, "bis": 199, "name": "No function", "art": ""},
+            {"von": 200, "bis": 209, "name": "Reset All", "art": "reset"},
+            {"von": 210, "bis": 255, "name": "No function", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "13 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan Fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt Fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Farbrad",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Weiss (offen)", "art": "open"},
+            {"von": 8, "bis": 14, "name": "Red", "art": "color"},
+            {"von": 15, "bis": 21, "name": "Orange", "art": "color"},
+            {"von": 22, "bis": 28, "name": "Yellow", "art": "color"},
+            {"von": 29, "bis": 35, "name": "Green", "art": "color"},
+            {"von": 36, "bis": 42, "name": "UV", "art": "color"},
+            {"von": 43, "bis": 49, "name": "Hellblau", "art": "color"},
+            {"von": 50, "bis": 56, "name": "Pink", "art": "color"},
+            {"von": 57, "bis": 66, "name": "White & Red", "art": "color"},
+            {"von": 67, "bis": 76, "name": "Red & Orange", "art": "color"},
+            {"von": 77, "bis": 86, "name": "Orange & Yellow", "art": "color"},
+            {"von": 87, "bis": 96, "name": "Yellow & Green", "art": "color"},
+            {"von": 97, "bis": 106, "name": "Green & UV", "art": "color"},
+            {"von": 107, "bis": 116, "name": "UV & Light Blue", "art": "color"},
+            {"von": 117, "bis": 127, "name": "Light Blue & Pink", "art": "color"},
+            {"von": 128, "bis": 189, "name": "Colour Scroll Slow To Fast", "art": "rotate"},
+            {"von": 190, "bis": 193, "name": "Stop", "art": ""},
+            {"von": 194, "bis": 255, "name": "Colour Scroll Fast To Slow", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo-Rad",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Open", "art": "open"},
+            {"von": 8, "bis": 15, "name": "Gobo 1", "art": "gobo"},
+            {"von": 16, "bis": 23, "name": "Gobo 2", "art": "gobo"},
+            {"von": 24, "bis": 31, "name": "Gobo 3", "art": "gobo"},
+            {"von": 32, "bis": 39, "name": "Gobo 4", "art": "gobo"},
+            {"von": 40, "bis": 47, "name": "Gobo 5", "art": "gobo"},
+            {"von": 48, "bis": 55, "name": "Gobo 6", "art": "gobo"},
+            {"von": 56, "bis": 63, "name": "Gobo 7", "art": "gobo"},
+            {"von": 64, "bis": 71, "name": "Open Shake", "art": "shake"},
+            {"von": 72, "bis": 79, "name": "Gobo 1 Shake", "art": "shake"},
+            {"von": 80, "bis": 87, "name": "Gobo 2 Shake", "art": "shake"},
+            {"von": 88, "bis": 95, "name": "Gobo 3 Shake", "art": "shake"},
+            {"von": 96, "bis": 103, "name": "Gobo 4 Shake", "art": "shake"},
+            {"von": 104, "bis": 111, "name": "Gobo 5 Shake", "art": "shake"},
+            {"von": 112, "bis": 119, "name": "Gobo 6 Shake", "art": "shake"},
+            {"von": 120, "bis": 127, "name": "Gobo 7 Shake", "art": "shake"},
+            {"von": 128, "bis": 189, "name": "Gobo Scroll Fast to Slow", "art": "rotate"},
+            {"von": 190, "bis": 193, "name": "Offen / Stopp", "art": ""},
+            {"von": 194, "bis": 255, "name": "Gobo Scroll Slow to Fast", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Shutter",
+          "attribut": "shutter",
+          "default": 11,
+          "highlight": 11,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Blackout", "art": "closed"},
+            {"von": 8, "bis": 15, "name": "Shutter Open", "art": "open"},
+            {"von": 16, "bis": 131, "name": "Strobing Slow to Fast", "art": "strobe"},
+            {"von": 132, "bis": 139, "name": "Shutter Open", "art": "open"},
+            {"von": 140, "bis": 181, "name": "Shutter Slow Open - Fast Close", "art": "strobe"},
+            {"von": 182, "bis": 189, "name": "Shutter Open", "art": "open"},
+            {"von": 190, "bis": 231, "name": "Shutter Fast Open - Slow Close", "art": "strobe"},
+            {"von": 232, "bis": 239, "name": "Shutter Open", "art": "open"},
+            {"von": 240, "bis": 247, "name": "Random Strobe", "art": "strobe"},
+            {"von": 248, "bis": 255, "name": "Shutter Open", "art": "open"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Pan/Tilt Macro",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "No function", "art": ""},
+            {"von": 8, "bis": 15, "name": "Macro 1", "art": ""},
+            {"von": 16, "bis": 23, "name": "Macro 2", "art": ""},
+            {"von": 24, "bis": 31, "name": "Macro 3", "art": ""},
+            {"von": 32, "bis": 39, "name": "Macro 4", "art": ""},
+            {"von": 40, "bis": 47, "name": "Macro 5", "art": ""},
+            {"von": 48, "bis": 55, "name": "Macro 6", "art": ""},
+            {"von": 56, "bis": 63, "name": "Macro 7", "art": ""},
+            {"von": 64, "bis": 71, "name": "Macro 8", "art": ""},
+            {"von": 72, "bis": 79, "name": "Macro 9", "art": ""},
+            {"von": 80, "bis": 87, "name": "Macro 10", "art": ""},
+            {"von": 88, "bis": 95, "name": "Macro 11", "art": ""},
+            {"von": 96, "bis": 103, "name": "Macro 12", "art": ""},
+            {"von": 104, "bis": 111, "name": "Macro 13", "art": ""},
+            {"von": 112, "bis": 119, "name": "Macro 14", "art": ""},
+            {"von": 120, "bis": 127, "name": "Macro 15", "art": ""},
+            {"von": 128, "bis": 135, "name": "Macro 16", "art": ""},
+            {"von": 136, "bis": 143, "name": "Macro 17", "art": ""},
+            {"von": 144, "bis": 151, "name": "Macro 18", "art": ""},
+            {"von": 152, "bis": 159, "name": "Macro 19", "art": ""},
+            {"von": 160, "bis": 167, "name": "Macro 20", "art": ""},
+            {"von": 168, "bis": 175, "name": "Macro 21", "art": ""},
+            {"von": 176, "bis": 183, "name": "Macro 22", "art": ""},
+            {"von": 184, "bis": 191, "name": "Macro 23", "art": ""},
+            {"von": 192, "bis": 199, "name": "Macro 24", "art": ""},
+            {"von": 200, "bis": 207, "name": "Macro 25", "art": ""},
+            {"von": 208, "bis": 215, "name": "Macro 26", "art": ""},
+            {"von": 216, "bis": 223, "name": "Macro 27", "art": ""},
+            {"von": 224, "bis": 231, "name": "Macro 28", "art": ""},
+            {"von": 232, "bis": 239, "name": "Macro 29", "art": ""},
+            {"von": 240, "bis": 247, "name": "Macro 30", "art": ""},
+            {"von": 248, "bis": 255, "name": "Macro 31", "art": ""}
+          ]
+        },
+        {
+          "name": "Pan/Tilt Macro Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Slow to Fast", "art": ""}
+          ]
+        },
+        {
+          "name": "Dimmer Curve",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 20, "name": "Standard", "art": ""},
+            {"von": 21, "bis": 40, "name": "Stage", "art": ""},
+            {"von": 41, "bis": 60, "name": "TV", "art": ""},
+            {"von": 61, "bis": 80, "name": "Architectural", "art": ""},
+            {"von": 81, "bis": 100, "name": "Theatre", "art": ""},
+            {"von": 101, "bis": 255, "name": "Default To Unit Dimmer Setting", "art": ""}
+          ]
+        },
+        {"name": "Pan / Tilt Speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Special Functions",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 69, "name": "No function", "art": ""},
+            {"von": 70, "bis": 79, "name": "Enable Blackout w pan/tilt", "art": ""},
+            {"von": 80, "bis": 89, "name": "Disable Blackout w pan/tilt", "art": ""},
+            {"von": 90, "bis": 99, "name": "Target Mode 1 (0-180 deg)", "art": ""},
+            {"von": 100, "bis": 109, "name": "Target Mode 2 (90 deg - 270 deg)", "art": ""},
+            {"von": 110, "bis": 119, "name": "Target Mode 3 (180 deg - 360 deg)", "art": ""},
+            {"von": 120, "bis": 129, "name": "Target Mode 4 (270 deg - 540 deg)", "art": ""},
+            {"von": 130, "bis": 199, "name": "No function", "art": ""},
+            {"von": 200, "bis": 209, "name": "Reset All", "art": "reset"},
+            {"von": 210, "bis": 255, "name": "No function", "art": ""}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Mini-Spot 25 W LED. Handbuch zaehlt das offene Gobo als 'Gobo 1' und die Gobos als 2-8; hier fortlaufend Gobo 1-7."
+}

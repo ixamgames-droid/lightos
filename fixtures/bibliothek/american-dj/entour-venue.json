@@ -1,0 +1,114 @@
+{
+  "format_version": 1,
+  "hersteller": "American DJ",
+  "hersteller_kurz": "ADJ",
+  "modell": "Entour Venue",
+  "kurzname": "ENTOURVENUE",
+  "typ": "smoke",
+  "leistung_w": 1500,
+  "quelle": {
+    "titel": "ADJ Entour Venue Instruction Manual (2016)",
+    "url": "https://assets.centryngroup.com/dl/files/ENT610__DL__002.pdf",
+    "datum": "2016"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.0 GIT · Massimo Callegari",
+    "original": "resources/fixtures/American_DJ/American-DJ-Entour-Venue.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 14 Wertebereiche mit Art (kind) versehen; danach von LightOS gegen das Herstellerhandbuch ueberarbeitet: Ausstoss als dimmer (wie eingebaute Nebelmaschine: Blackout stoppt Nebel), Highlight 0 (kein Nebel beim Highlight); Luefter als fan statt speed; Dauer/Intervall als raw statt speed"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal fuer Kanal gegen die DMX-Tabellen (1/2/4 Kanal, S. 14) im ADJ-Handbuch geprueft; nicht am Geraet getestet"
+  },
+  "modi": [
+    {
+      "name": "1 Channel",
+      "kanaele": [
+        {
+          "name": "Nebelausstoss + Luefter",
+          "attribut": "dimmer",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Aus (Luefter 5 %)", "art": "closed"},
+            {"von": 5, "bis": 255, "name": "5-100 % Ausstoss, Luefter 100 %", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2 Channel",
+      "kanaele": [
+        {
+          "name": "Nebelausstoss",
+          "attribut": "dimmer",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Aus", "art": "closed"},
+            {"von": 5, "bis": 255, "name": "5-100 % Ausstoss", "art": ""}
+          ]
+        },
+        {
+          "name": "Luefter",
+          "attribut": "fan",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "5 %", "art": ""},
+            {"von": 16, "bis": 255, "name": "6-100 %", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4 Channel",
+      "kanaele": [
+        {
+          "name": "Nebelausstoss",
+          "attribut": "dimmer",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Aus", "art": "closed"},
+            {"von": 5, "bis": 255, "name": "5-100 % Ausstoss", "art": ""}
+          ]
+        },
+        {
+          "name": "Luefter",
+          "attribut": "fan",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "5 %", "art": ""},
+            {"von": 16, "bis": 255, "name": "6-100 %", "art": ""}
+          ]
+        },
+        {
+          "name": "Dauer",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "3 s", "art": ""},
+            {"von": 8, "bis": 255, "name": "3-250 s", "art": ""}
+          ]
+        },
+        {
+          "name": "Intervall",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "0 s", "art": ""},
+            {"von": 10, "bis": 255, "name": "5-250 s", "art": ""}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Nebelmaschine 1500 W mit Luefter. Im 2-/4-Kanal-Modus Luefter-Default 30 %, wenn nur CH1 genutzt wird."
+}

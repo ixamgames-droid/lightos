@@ -1,0 +1,442 @@
+{
+  "format_version": 1,
+  "hersteller": "BeamZ",
+  "hersteller_kurz": "BEAMZ",
+  "modell": "Panther 25 LED Spot",
+  "kurzname": "PANTHER25",
+  "typ": "moving_head",
+  "leistung_w": 40,
+  "quelle": {
+    "titel": "BeamZ Panther 25 LED Spot Moving Head - Bedienungsanleitung (Ref. 150.460)",
+    "version": "V3.3",
+    "url": "https://www.beamzlighting.com/wp-content/uploads/2026/03/150.460-Panther-25-Led-Spot-Moving-Head_manual_V3.3.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.2 GIT · David Ellis",
+    "original": "resources/fixtures/beamZ/beamz-Panther-25-LED-Spot.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 63 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): Herstellername 'beamZ' -> 'BeamZ'; kurzname PANTHER25; Modi 11 Channel und 9 Channel nach Handbuch 150.460 V3.3 neu angelegt (Farbrad, Goborad, Shutter, Dimmer, Pan/Tilt-Tempo, Funktion/Reset, Dimmerkurve); Farbrad-Slots nach Handbuch benannt (Weiss=open, 7 Farben, 7 Halbfarben, Rotation rechts/links, Stopp); Goborad: Offen, Gobo 1-7, Gobo 1-7 Shake, Rotation; Shutter mit allen Zu/Offen/Strobe/Puls-Bereichen, Default/Highlight 12 (offen); Funktionskanal als reset (Reset alles 200-209), Dimmerkurve als raw; QLC+-Modi als '... (alte Version)' erhalten; dort Farbslots mit art (Weiss=open), Gobo-Shake als shake, Szenen-Bereiche ohne art, Programm-Tempo als effect_speed; Kanalnamen deutsch, Modusbeschreibungen ergaenzt"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": false,
+    "wie": "die 2 aktuellen Modi Kanal fuer Kanal gegen das Herstellerhandbuch 150.460 V3.3 geprueft; die '(alte Version)'-Modi stammen ungeprueft aus QLC+"
+  },
+  "modi": [
+    {
+      "name": "11 Channel",
+      "beschreibung": "11 Kanaele (16 bit Pan/Tilt)",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fein", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fein", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Farbrad",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Weiss (offen)", "art": "open"},
+            {"von": 8, "bis": 14, "name": "Rot", "art": "color"},
+            {"von": 15, "bis": 21, "name": "Gelb", "art": "color"},
+            {"von": 22, "bis": 28, "name": "Cyan", "art": "color"},
+            {"von": 29, "bis": 35, "name": "Gruen", "art": "color"},
+            {"von": 36, "bis": 42, "name": "Rosa", "art": "color"},
+            {"von": 43, "bis": 49, "name": "Orange", "art": "color"},
+            {"von": 50, "bis": 56, "name": "Blau", "art": "color"},
+            {"von": 57, "bis": 66, "name": "Weiss (offen) / Rot (halb)", "art": "color"},
+            {"von": 67, "bis": 76, "name": "Rot / Gelb (halb)", "art": "color"},
+            {"von": 77, "bis": 86, "name": "Gelb / Cyan (halb)", "art": "color"},
+            {"von": 87, "bis": 96, "name": "Cyan / Gruen (halb)", "art": "color"},
+            {"von": 97, "bis": 106, "name": "Gruen / Rosa (halb)", "art": "color"},
+            {"von": 107, "bis": 116, "name": "Rosa / Orange (halb)", "art": "color"},
+            {"von": 117, "bis": 127, "name": "Orange / Blau (halb)", "art": "color"},
+            {"von": 128, "bis": 189, "name": "Farbrad-Rotation rechts langsam -> schnell", "art": "rotate"},
+            {"von": 190, "bis": 193, "name": "Farbrad-Rotation Stopp", "art": ""},
+            {"von": 194, "bis": 255, "name": "Farbrad-Rotation links langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Goborad",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Offen", "art": "open"},
+            {"von": 8, "bis": 15, "name": "Gobo 1", "art": "gobo"},
+            {"von": 16, "bis": 23, "name": "Gobo 2", "art": "gobo"},
+            {"von": 24, "bis": 31, "name": "Gobo 3", "art": "gobo"},
+            {"von": 32, "bis": 39, "name": "Gobo 4", "art": "gobo"},
+            {"von": 40, "bis": 47, "name": "Gobo 5", "art": "gobo"},
+            {"von": 48, "bis": 55, "name": "Gobo 6", "art": "gobo"},
+            {"von": 56, "bis": 63, "name": "Gobo 7", "art": "gobo"},
+            {"von": 64, "bis": 71, "name": "Offen", "art": "open"},
+            {"von": 72, "bis": 79, "name": "Gobo 1 Shake", "art": "shake"},
+            {"von": 80, "bis": 87, "name": "Gobo 2 Shake", "art": "shake"},
+            {"von": 88, "bis": 95, "name": "Gobo 3 Shake", "art": "shake"},
+            {"von": 96, "bis": 103, "name": "Gobo 4 Shake", "art": "shake"},
+            {"von": 104, "bis": 111, "name": "Gobo 5 Shake", "art": "shake"},
+            {"von": 112, "bis": 119, "name": "Gobo 6 Shake", "art": "shake"},
+            {"von": 120, "bis": 127, "name": "Gobo 7 Shake", "art": "shake"},
+            {"von": 128, "bis": 189, "name": "Goborad-Rotation rechts langsam -> schnell", "art": "rotate"},
+            {"von": 190, "bis": 193, "name": "Goborad-Rotation Stopp", "art": ""},
+            {"von": 194, "bis": 255, "name": "Goborad-Rotation links langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Shutter",
+          "attribut": "shutter",
+          "default": 12,
+          "highlight": 12,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Shutter zu", "art": "closed"},
+            {"von": 8, "bis": 15, "name": "Shutter offen", "art": "open"},
+            {"von": 16, "bis": 131, "name": "Strobe langsam -> schnell", "art": "strobe"},
+            {"von": 132, "bis": 139, "name": "Shutter offen", "art": "open"},
+            {"von": 140, "bis": 181, "name": "Puls: schnell zu, langsam auf", "art": "strobe"},
+            {"von": 182, "bis": 189, "name": "Shutter offen", "art": "open"},
+            {"von": 190, "bis": 231, "name": "Puls: schnell auf, langsam zu", "art": "strobe"},
+            {"von": 232, "bis": 239, "name": "Shutter offen", "art": "open"},
+            {"von": 240, "bis": 247, "name": "Zufalls-Strobe", "art": "strobe"},
+            {"von": 248, "bis": 255, "name": "Shutter offen", "art": "open"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Pan/Tilt-Tempo",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Tempo 0-100%", "art": ""}
+          ]
+        },
+        {
+          "name": "Funktion / Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 69, "name": "Keine Funktion", "art": ""},
+            {"von": 70, "bis": 79, "name": "Blackout bei Pan/Tilt-Bewegung", "art": ""},
+            {"von": 80, "bis": 89, "name": "Keine Funktion", "art": ""},
+            {"von": 90, "bis": 99, "name": "Blackout bei Farbwechsel", "art": ""},
+            {"von": 100, "bis": 109, "name": "Keine Funktion", "art": ""},
+            {"von": 110, "bis": 119, "name": "Blackout bei Gobowechsel", "art": ""},
+            {"von": 120, "bis": 199, "name": "Keine Funktion", "art": ""},
+            {"von": 200, "bis": 209, "name": "Reset alles", "art": "reset"},
+            {"von": 210, "bis": 249, "name": "Keine Funktion", "art": ""},
+            {"von": 250, "bis": 255, "name": "Sound-Modus", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Dimmerkurve",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 20, "name": "Standard", "art": ""},
+            {"von": 21, "bis": 40, "name": "Stage", "art": ""},
+            {"von": 41, "bis": 60, "name": "TV", "art": ""},
+            {"von": 61, "bis": 80, "name": "Architektur", "art": ""},
+            {"von": 81, "bis": 100, "name": "Theater", "art": ""},
+            {"von": 101, "bis": 255, "name": "Standard", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "9 Channel",
+      "beschreibung": "9 Kanaele (8 bit Pan/Tilt)",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {
+          "name": "Farbrad",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Weiss (offen)", "art": "open"},
+            {"von": 8, "bis": 14, "name": "Rot", "art": "color"},
+            {"von": 15, "bis": 21, "name": "Gelb", "art": "color"},
+            {"von": 22, "bis": 28, "name": "Cyan", "art": "color"},
+            {"von": 29, "bis": 35, "name": "Gruen", "art": "color"},
+            {"von": 36, "bis": 42, "name": "Rosa", "art": "color"},
+            {"von": 43, "bis": 49, "name": "Orange", "art": "color"},
+            {"von": 50, "bis": 56, "name": "Blau", "art": "color"},
+            {"von": 57, "bis": 66, "name": "Weiss (offen) / Rot (halb)", "art": "color"},
+            {"von": 67, "bis": 76, "name": "Rot / Gelb (halb)", "art": "color"},
+            {"von": 77, "bis": 86, "name": "Gelb / Cyan (halb)", "art": "color"},
+            {"von": 87, "bis": 96, "name": "Cyan / Gruen (halb)", "art": "color"},
+            {"von": 97, "bis": 106, "name": "Gruen / Rosa (halb)", "art": "color"},
+            {"von": 107, "bis": 116, "name": "Rosa / Orange (halb)", "art": "color"},
+            {"von": 117, "bis": 127, "name": "Orange / Blau (halb)", "art": "color"},
+            {"von": 128, "bis": 189, "name": "Farbrad-Rotation rechts langsam -> schnell", "art": "rotate"},
+            {"von": 190, "bis": 193, "name": "Farbrad-Rotation Stopp", "art": ""},
+            {"von": 194, "bis": 255, "name": "Farbrad-Rotation links langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Goborad",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Offen", "art": "open"},
+            {"von": 8, "bis": 15, "name": "Gobo 1", "art": "gobo"},
+            {"von": 16, "bis": 23, "name": "Gobo 2", "art": "gobo"},
+            {"von": 24, "bis": 31, "name": "Gobo 3", "art": "gobo"},
+            {"von": 32, "bis": 39, "name": "Gobo 4", "art": "gobo"},
+            {"von": 40, "bis": 47, "name": "Gobo 5", "art": "gobo"},
+            {"von": 48, "bis": 55, "name": "Gobo 6", "art": "gobo"},
+            {"von": 56, "bis": 63, "name": "Gobo 7", "art": "gobo"},
+            {"von": 64, "bis": 71, "name": "Offen", "art": "open"},
+            {"von": 72, "bis": 79, "name": "Gobo 1 Shake", "art": "shake"},
+            {"von": 80, "bis": 87, "name": "Gobo 2 Shake", "art": "shake"},
+            {"von": 88, "bis": 95, "name": "Gobo 3 Shake", "art": "shake"},
+            {"von": 96, "bis": 103, "name": "Gobo 4 Shake", "art": "shake"},
+            {"von": 104, "bis": 111, "name": "Gobo 5 Shake", "art": "shake"},
+            {"von": 112, "bis": 119, "name": "Gobo 6 Shake", "art": "shake"},
+            {"von": 120, "bis": 127, "name": "Gobo 7 Shake", "art": "shake"},
+            {"von": 128, "bis": 189, "name": "Goborad-Rotation rechts langsam -> schnell", "art": "rotate"},
+            {"von": 190, "bis": 193, "name": "Goborad-Rotation Stopp", "art": ""},
+            {"von": 194, "bis": 255, "name": "Goborad-Rotation links langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Shutter",
+          "attribut": "shutter",
+          "default": 12,
+          "highlight": 12,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Shutter zu", "art": "closed"},
+            {"von": 8, "bis": 15, "name": "Shutter offen", "art": "open"},
+            {"von": 16, "bis": 131, "name": "Strobe langsam -> schnell", "art": "strobe"},
+            {"von": 132, "bis": 139, "name": "Shutter offen", "art": "open"},
+            {"von": 140, "bis": 181, "name": "Puls: schnell zu, langsam auf", "art": "strobe"},
+            {"von": 182, "bis": 189, "name": "Shutter offen", "art": "open"},
+            {"von": 190, "bis": 231, "name": "Puls: schnell auf, langsam zu", "art": "strobe"},
+            {"von": 232, "bis": 239, "name": "Shutter offen", "art": "open"},
+            {"von": 240, "bis": 247, "name": "Zufalls-Strobe", "art": "strobe"},
+            {"von": 248, "bis": 255, "name": "Shutter offen", "art": "open"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Pan/Tilt-Tempo",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Tempo 0-100%", "art": ""}
+          ]
+        },
+        {
+          "name": "Funktion / Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 69, "name": "Keine Funktion", "art": ""},
+            {"von": 70, "bis": 79, "name": "Blackout bei Pan/Tilt-Bewegung", "art": ""},
+            {"von": 80, "bis": 89, "name": "Keine Funktion", "art": ""},
+            {"von": 90, "bis": 99, "name": "Blackout bei Farbwechsel", "art": ""},
+            {"von": 100, "bis": 109, "name": "Keine Funktion", "art": ""},
+            {"von": 110, "bis": 119, "name": "Blackout bei Gobowechsel", "art": ""},
+            {"von": 120, "bis": 199, "name": "Keine Funktion", "art": ""},
+            {"von": 200, "bis": 209, "name": "Reset alles", "art": "reset"},
+            {"von": 210, "bis": 249, "name": "Keine Funktion", "art": ""},
+            {"von": 250, "bis": 255, "name": "Sound-Modus", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Dimmerkurve",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 20, "name": "Standard", "art": ""},
+            {"von": 21, "bis": 40, "name": "Stage", "art": ""},
+            {"von": 41, "bis": 60, "name": "TV", "art": ""},
+            {"von": 61, "bis": 80, "name": "Architektur", "art": ""},
+            {"von": 81, "bis": 100, "name": "Theater", "art": ""},
+            {"von": 101, "bis": 255, "name": "Standard", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5 Channel (alte Version)",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Colour",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "White", "art": "open"},
+            {"von": 11, "bis": 21, "name": "Red", "art": "color"},
+            {"von": 22, "bis": 32, "name": "Orange", "art": "color"},
+            {"von": 33, "bis": 43, "name": "Yellow", "art": "color"},
+            {"von": 44, "bis": 54, "name": "Green", "art": "color"},
+            {"von": 55, "bis": 65, "name": "Blue", "art": "color"},
+            {"von": 66, "bis": 76, "name": "Cyan", "art": "color"},
+            {"von": 77, "bis": 87, "name": "Purple", "art": "color"},
+            {"von": 88, "bis": 175, "name": "Colour selection 6+", "art": "color"},
+            {"von": 176, "bis": 255, "name": "Colour wheel rotation", "art": "rotate"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255}
+      ],
+      "beschreibung": "aeltere Firmware laut QLC+ (nicht gegen das aktuelle Handbuch geprueft)"
+    },
+    {
+      "name": "9 Channel (alte Version)",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Colour",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "White", "art": "open"},
+            {"von": 11, "bis": 21, "name": "Red", "art": "color"},
+            {"von": 22, "bis": 32, "name": "Orange", "art": "color"},
+            {"von": 33, "bis": 43, "name": "Yellow", "art": "color"},
+            {"von": 44, "bis": 54, "name": "Green", "art": "color"},
+            {"von": 55, "bis": 65, "name": "Blue", "art": "color"},
+            {"von": 66, "bis": 76, "name": "Cyan", "art": "color"},
+            {"von": 77, "bis": 87, "name": "Purple", "art": "color"},
+            {"von": 88, "bis": 175, "name": "Colour selection 6+", "art": "color"},
+            {"von": 176, "bis": 255, "name": "Colour wheel rotation", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 124, "name": "Gobo selection", "art": "gobo"},
+            {"von": 125, "bis": 249, "name": "Gobo shaking", "art": "shake"},
+            {"von": 250, "bis": 255, "name": "Gobo wheel rotation", "art": "rotate"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 4,
+          "highlight": 4,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Open", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe slow to fast", "art": "strobe"}
+          ]
+        }
+      ],
+      "beschreibung": "aeltere Firmware laut QLC+ (nicht gegen das aktuelle Handbuch geprueft)"
+    },
+    {
+      "name": "11 Channel (alte Version)",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Colour",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "White", "art": "open"},
+            {"von": 11, "bis": 21, "name": "Red", "art": "color"},
+            {"von": 22, "bis": 32, "name": "Orange", "art": "color"},
+            {"von": 33, "bis": 43, "name": "Yellow", "art": "color"},
+            {"von": 44, "bis": 54, "name": "Green", "art": "color"},
+            {"von": 55, "bis": 65, "name": "Blue", "art": "color"},
+            {"von": 66, "bis": 76, "name": "Cyan", "art": "color"},
+            {"von": 77, "bis": 87, "name": "Purple", "art": "color"},
+            {"von": 88, "bis": 175, "name": "Colour selection 6+", "art": "color"},
+            {"von": 176, "bis": 255, "name": "Colour wheel rotation", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 124, "name": "Gobo selection", "art": "gobo"},
+            {"von": 125, "bis": 249, "name": "Gobo shaking", "art": "shake"},
+            {"von": 250, "bis": 255, "name": "Gobo wheel rotation", "art": "rotate"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 4,
+          "highlight": 4,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Open", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe slow to fast", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Scene and Programs",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 49, "name": "No function", "art": ""},
+            {"von": 50, "bis": 59, "name": "White", "art": ""},
+            {"von": 60, "bis": 69, "name": "Scene 2 (empty)", "art": ""},
+            {"von": 70, "bis": 79, "name": "Scene 3 (empty)", "art": ""},
+            {"von": 80, "bis": 89, "name": "Scene 4 (empty)", "art": ""},
+            {"von": 90, "bis": 99, "name": "Scene 5 (empty)", "art": ""},
+            {"von": 100, "bis": 109, "name": "Scene 6 (empty)", "art": ""},
+            {"von": 110, "bis": 119, "name": "Scene 7 (empty)", "art": ""},
+            {"von": 120, "bis": 129, "name": "Scene 8 (empty)", "art": ""},
+            {"von": 130, "bis": 139, "name": "Scene 9 (empty)", "art": ""},
+            {"von": 140, "bis": 149, "name": "Program 1", "art": ""},
+            {"von": 150, "bis": 159, "name": "Program 2", "art": ""},
+            {"von": 160, "bis": 169, "name": "Program 3", "art": ""},
+            {"von": 170, "bis": 179, "name": "Program 4", "art": ""},
+            {"von": 180, "bis": 189, "name": "Program 5", "art": ""},
+            {"von": 190, "bis": 199, "name": "Program 6", "art": ""},
+            {"von": 200, "bis": 209, "name": "Program 7", "art": ""},
+            {"von": 210, "bis": 219, "name": "Program 8 (empty)", "art": ""},
+            {"von": 220, "bis": 229, "name": "Program 9 (empty)", "art": ""},
+            {"von": 230, "bis": 239, "name": "(Empty)", "art": ""},
+            {"von": 240, "bis": 249, "name": "(Empty)", "art": ""},
+            {"von": 250, "bis": 255, "name": "Sound mode", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Program Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Speed slow to fast", "art": ""}
+          ]
+        }
+      ],
+      "beschreibung": "aeltere Firmware laut QLC+ (nicht gegen das aktuelle Handbuch geprueft)"
+    }
+  ],
+  "notizen": "20W-LED-Spot, 7 Farben + Weiss, 7 Gobos + offen, Pan 540 Grad. Das aktuelle Handbuch V3.3 kennt 9/11 Kanaele mit anderer Reihenfolge als die QLC+-Datei; deren Modi (5/9/11) sind als '(alte Version)' erhalten."
+}

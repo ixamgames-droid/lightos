@@ -1,0 +1,278 @@
+{
+  "format_version": 1,
+  "hersteller": "Showtec",
+  "hersteller_kurz": "Showtec",
+  "modell": "Infinity XPLO-15 LED Strobe",
+  "kurzname": "XPLO15",
+  "typ": "strobe",
+  "leistung_w": 132,
+  "notizen": "Ohne Handbuch nachbearbeitet. Dimmer fein bleibt raw (LightOS hat kein Attribut fuer Dimmer-Feinkanal).",
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Showtec-Infinity-XPLO-15-LED-Strobe.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Showtec/Showtec-Infinity-XPLO-15-LED-Strobe.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.10.6 GIT · Daniele Fogale",
+    "original": "resources/fixtures/Showtec/Showtec-Infinity-XPLO-15-LED-Strobe.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 70 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): kurzname XPLO15; Strobe-Kanaele ohne Bereiche als strobe (Rate) statt shutter; Blitzdauer als duration statt speed, Bereich ohne falsche art strobe; Effekt-Kanal als effect, Dimmkurven als raw; 28-Kanal-Modus: Raster 1x8 (8 Zonen)"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "aus QLC+ konvertiert und von LightOS nach Kanalnamen/Bereichen nachbearbeitet; kein Herstellerhandbuch verfuegbar (Hersteller-Website hinter Bot-Sperre) — nicht Kanal fuer Kanal gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "1 channel",
+      "kanaele": [
+        {"name": "Strobe (Rate)", "attribut": "strobe", "default": 0, "highlight": 0}
+      ]
+    },
+    {
+      "name": "3 channel",
+      "kanaele": [
+        {"name": "Dimmer intensity", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe duration",
+          "attribut": "duration",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Blitzdauer kurz -> lang"}
+          ]
+        },
+        {"name": "Strobe (Rate)", "attribut": "strobe", "default": 0, "highlight": 0}
+      ]
+    },
+    {
+      "name": "4 channel",
+      "kanaele": [
+        {"name": "Dimmer intensity", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe duration",
+          "attribut": "duration",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Blitzdauer kurz -> lang"}
+          ]
+        },
+        {"name": "Strobe (Rate)", "attribut": "strobe", "default": 0, "highlight": 0},
+        {
+          "name": "Effects",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Not functional", "art": ""},
+            {"von": 6, "bis": 42, "name": "Ramp up (fade in)", "art": ""},
+            {"von": 43, "bis": 85, "name": "Ramp down (fade out)", "art": ""},
+            {"von": 86, "bis": 128, "name": "Ramp up/down (fade in/out)", "art": ""},
+            {"von": 129, "bis": 171, "name": "Random effects", "art": ""},
+            {"von": 172, "bis": 173, "name": "Left zone", "art": ""},
+            {"von": 174, "bis": 175, "name": "Center zone", "art": ""},
+            {"von": 176, "bis": 178, "name": "Right zone", "art": ""},
+            {"von": 179, "bis": 180, "name": "Pattern A", "art": ""},
+            {"von": 181, "bis": 182, "name": "Pattern B", "art": ""},
+            {"von": 183, "bis": 184, "name": "Pattern C", "art": ""},
+            {"von": 185, "bis": 186, "name": "Pattern D", "art": ""},
+            {"von": 187, "bis": 214, "name": "Random patterns", "art": ""},
+            {"von": 215, "bis": 235, "name": "Chase 1 - from left to right, from slow to fast", "art": ""},
+            {"von": 236, "bis": 255, "name": "Chase 2 - from right to left, from slow to fast", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6 channel",
+      "kanaele": [
+        {"name": "Dimmer intensity", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Dimmer fein (16 bit)", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Effects",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Not functional", "art": ""},
+            {"von": 6, "bis": 42, "name": "Ramp up (fade in)", "art": ""},
+            {"von": 43, "bis": 85, "name": "Ramp down (fade out)", "art": ""},
+            {"von": 86, "bis": 128, "name": "Ramp up/down (fade in/out)", "art": ""},
+            {"von": 129, "bis": 171, "name": "Random effects", "art": ""},
+            {"von": 172, "bis": 173, "name": "Left zone", "art": ""},
+            {"von": 174, "bis": 175, "name": "Center zone", "art": ""},
+            {"von": 176, "bis": 178, "name": "Right zone", "art": ""},
+            {"von": 179, "bis": 180, "name": "Pattern A", "art": ""},
+            {"von": 181, "bis": 182, "name": "Pattern B", "art": ""},
+            {"von": 183, "bis": 184, "name": "Pattern C", "art": ""},
+            {"von": 185, "bis": 186, "name": "Pattern D", "art": ""},
+            {"von": 187, "bis": 214, "name": "Random patterns", "art": ""},
+            {"von": 215, "bis": 235, "name": "Chase 1 - from left to right, from slow to fast", "art": ""},
+            {"von": 236, "bis": 255, "name": "Chase 2 - from right to left, from slow to fast", "art": ""}
+          ]
+        },
+        {
+          "name": "Dimming curves",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Default", "art": ""},
+            {"von": 5, "bis": 29, "name": "Not functional", "art": ""},
+            {"von": 30, "bis": 34, "name": "Linear dimming curve", "art": ""},
+            {"von": 35, "bis": 39, "name": "Square dimming curve", "art": ""},
+            {"von": 40, "bis": 44, "name": "S-Curve dimming curve", "art": ""},
+            {"von": 45, "bis": 49, "name": "PL-Curve dimming curve", "art": ""},
+            {"von": 50, "bis": 255, "name": "Not functional", "art": ""}
+          ]
+        },
+        {
+          "name": "Strobe duration",
+          "attribut": "duration",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Blitzdauer kurz -> lang"}
+          ]
+        },
+        {"name": "Strobe (Rate)", "attribut": "strobe", "default": 0, "highlight": 0}
+      ]
+    },
+    {
+      "name": "28 channel",
+      "kanaele": [
+        {"name": "Dimmer intensity", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Dimmer fein (16 bit)", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Effects",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Not functional", "art": ""},
+            {"von": 6, "bis": 42, "name": "Ramp up (fade in)", "art": ""},
+            {"von": 43, "bis": 85, "name": "Ramp down (fade out)", "art": ""},
+            {"von": 86, "bis": 128, "name": "Ramp up/down (fade in/out)", "art": ""},
+            {"von": 129, "bis": 171, "name": "Random effects", "art": ""},
+            {"von": 172, "bis": 173, "name": "Left zone", "art": ""},
+            {"von": 174, "bis": 175, "name": "Center zone", "art": ""},
+            {"von": 176, "bis": 178, "name": "Right zone", "art": ""},
+            {"von": 179, "bis": 180, "name": "Pattern A", "art": ""},
+            {"von": 181, "bis": 182, "name": "Pattern B", "art": ""},
+            {"von": 183, "bis": 184, "name": "Pattern C", "art": ""},
+            {"von": 185, "bis": 186, "name": "Pattern D", "art": ""},
+            {"von": 187, "bis": 214, "name": "Random patterns", "art": ""},
+            {"von": 215, "bis": 235, "name": "Chase 1 - from left to right, from slow to fast", "art": ""},
+            {"von": 236, "bis": 255, "name": "Chase 2 - from right to left, from slow to fast", "art": ""}
+          ]
+        },
+        {
+          "name": "Dimming curves",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Default", "art": ""},
+            {"von": 5, "bis": 29, "name": "Not functional", "art": ""},
+            {"von": 30, "bis": 34, "name": "Linear dimming curve", "art": ""},
+            {"von": 35, "bis": 39, "name": "Square dimming curve", "art": ""},
+            {"von": 40, "bis": 44, "name": "S-Curve dimming curve", "art": ""},
+            {"von": 45, "bis": 49, "name": "PL-Curve dimming curve", "art": ""},
+            {"von": 50, "bis": 255, "name": "Not functional", "art": ""}
+          ]
+        },
+        {"name": "Zone 1 - Dimmer intensity", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Zone 1 - Strobe duration",
+          "attribut": "duration",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Blitzdauer kurz -> lang"}
+          ]
+        },
+        {"name": "Zone 1 - Strobe (Rate)", "attribut": "strobe", "default": 0, "highlight": 0},
+        {"name": "Zone 2 - Dimmer intensity", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Zone 2 - Strobe duration",
+          "attribut": "duration",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Blitzdauer kurz -> lang"}
+          ]
+        },
+        {"name": "Zone 2 - Strobe (Rate)", "attribut": "strobe", "default": 0, "highlight": 0},
+        {"name": "Zone 3 - Dimmer intensity", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Zone 3 - Strobe duration",
+          "attribut": "duration",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Blitzdauer kurz -> lang"}
+          ]
+        },
+        {"name": "Zone 3 - Strobe (Rate)", "attribut": "strobe", "default": 0, "highlight": 0},
+        {"name": "Zone 4 - Dimmer intensity", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Zone 4 - Strobe duration",
+          "attribut": "duration",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Blitzdauer kurz -> lang"}
+          ]
+        },
+        {"name": "Zone 4 - Strobe (Rate)", "attribut": "strobe", "default": 0, "highlight": 0},
+        {"name": "Zone 5 - Dimmer intensity", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Zone 5 - Strobe duration",
+          "attribut": "duration",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Blitzdauer kurz -> lang"}
+          ]
+        },
+        {"name": "Zone 5 - Strobe (Rate)", "attribut": "strobe", "default": 0, "highlight": 0},
+        {"name": "Zone 6 - Dimmer intensity", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Zone 6 - Strobe duration",
+          "attribut": "duration",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Blitzdauer kurz -> lang"}
+          ]
+        },
+        {"name": "Zone 6 - Strobe (Rate)", "attribut": "strobe", "default": 0, "highlight": 0},
+        {"name": "Zone 7 - Dimmer intensity", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Zone 7 - Strobe duration",
+          "attribut": "duration",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Blitzdauer kurz -> lang"}
+          ]
+        },
+        {"name": "Zone 7 - Strobe (Rate)", "attribut": "strobe", "default": 0, "highlight": 0},
+        {"name": "Zone 8 - Dimmer intensity", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Zone 8 - Strobe duration",
+          "attribut": "duration",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Blitzdauer kurz -> lang"}
+          ]
+        },
+        {"name": "Zone 8 - Strobe (Rate)", "attribut": "strobe", "default": 0, "highlight": 0}
+      ],
+      "raster": {"rows": 1, "cols": 8}
+    }
+  ]
+}

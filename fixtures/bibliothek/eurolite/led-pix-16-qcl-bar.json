@@ -1,0 +1,594 @@
+{
+  "format_version": 1,
+  "hersteller": "Eurolite",
+  "hersteller_kurz": "Eurolite",
+  "modell": "LED PIX-16 QCL Bar",
+  "kurzname": "LED PIX-16 QCL Bar",
+  "typ": "led_bar",
+  "leistung_w": 70,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Eurolite-LED-PIX-16-QCL-Bar.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Eurolite/Eurolite-LED-PIX-16-QCL-Bar.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.0.0 Beta 3 · Cédric Monféfoul",
+    "original": "resources/fixtures/Eurolite/Eurolite-LED-PIX-16-QCL-Bar.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 86 Wertebereiche mit Art (kind) versehen; Rasterform in 6 Modus/Modi aus <Physical> uebernommen; 21-Kanal-Modi: 16 Farbkanaele waren alle 'intensity' -> color_r/g/b/w je Farbe (sonst kein Farbmischen moeglich); 21-1: Raster 1x4 (je 4 benachbarte Pixel); 21-2: Raster entfernt (Gruppen verschachtelt 1/5/9/13, keine zusammenhaengende Form); 11-Kanal: Hintergrund-Helligkeit und Laufrichtung intensity -> raw (kein Dimmer); Hintergrundfarben als 'color'; Effekt-/Programmgeschwindigkeit -> effect_speed; Tippfehler (R6->R8, Backards, white) korrigiert, Strobe-Default 0"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Datei und die LightOS-Attributliste geprueft (Attribute, Bereichs-Arten, Defaults, Raster); Herstellerhandbuch mit DMX-Tabelle war nicht abrufbar (Steinigke liefert nur Datenblaetter ohne DMX-Protokoll), daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "3 Channel",
+      "raster": {"rows": 1, "cols": 16},
+      "kanaele": [
+        {"name": "Red 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 1", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "4 Channel",
+      "raster": {"rows": 1, "cols": 16},
+      "kanaele": [
+        {"name": "Red 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 1", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "11 Channel",
+      "raster": {"rows": 1, "cols": 16},
+      "kanaele": [
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 8, "name": "No Function", "art": "open"},
+            {"von": 9, "bis": 255, "name": "Strobe (Slow to fast)", "art": "strobe"}
+          ]
+        },
+        {"name": "Red 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Color Effects",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "No Function", "art": ""},
+            {"von": 8, "bis": 19, "name": "Effect 1", "art": ""},
+            {"von": 20, "bis": 31, "name": "Effect 2", "art": ""},
+            {"von": 32, "bis": 43, "name": "Effect 3", "art": ""},
+            {"von": 44, "bis": 55, "name": "Effect 4", "art": ""},
+            {"von": 56, "bis": 67, "name": "Effect 5", "art": ""},
+            {"von": 68, "bis": 79, "name": "Effect 6", "art": ""},
+            {"von": 80, "bis": 91, "name": "Effect 7", "art": ""},
+            {"von": 92, "bis": 103, "name": "Effect 8", "art": ""},
+            {"von": 104, "bis": 115, "name": "Effect 9", "art": ""},
+            {"von": 116, "bis": 127, "name": "Effect 10", "art": ""},
+            {"von": 128, "bis": 139, "name": "Effect 11", "art": ""},
+            {"von": 140, "bis": 151, "name": "Effect 12", "art": ""},
+            {"von": 152, "bis": 163, "name": "Effect 13", "art": ""},
+            {"von": 164, "bis": 175, "name": "Effect 14", "art": ""},
+            {"von": 176, "bis": 187, "name": "Effect 15", "art": ""},
+            {"von": 188, "bis": 199, "name": "Effect 16", "art": ""},
+            {"von": 200, "bis": 211, "name": "Effect 17", "art": ""},
+            {"von": 212, "bis": 223, "name": "Effect 18", "art": ""},
+            {"von": 224, "bis": 235, "name": "Effect 19", "art": ""},
+            {"von": 236, "bis": 255, "name": "Effect 20", "art": ""}
+          ]
+        },
+        {
+          "name": "Color Effects Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Speed of the color effects, increasing", "art": ""}
+          ]
+        },
+        {
+          "name": "Background Colors",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "No Function", "art": ""},
+            {"von": 8, "bis": 26, "name": "Red", "art": "color"},
+            {"von": 27, "bis": 45, "name": "Green", "art": "color"},
+            {"von": 46, "bis": 64, "name": "Blue", "art": "color"},
+            {"von": 65, "bis": 83, "name": "White", "art": "color"},
+            {"von": 84, "bis": 102, "name": "Red + Green", "art": "color"},
+            {"von": 103, "bis": 121, "name": "Red + Blue", "art": "color"},
+            {"von": 122, "bis": 140, "name": "Red + White", "art": "color"},
+            {"von": 141, "bis": 159, "name": "Green + Blue", "art": "color"},
+            {"von": 160, "bis": 178, "name": "Green + White", "art": "color"},
+            {"von": 179, "bis": 197, "name": "Blue + White", "art": "color"},
+            {"von": 198, "bis": 216, "name": "Red + Green + Blue", "art": "color"},
+            {"von": 217, "bis": 235, "name": "Red + Green + White", "art": "color"},
+            {"von": 236, "bis": 254, "name": "Red + Blue + White", "art": "color"},
+            {"von": 255, "bis": 255, "name": "Green + Blue + White", "art": "color"}
+          ]
+        },
+        {
+          "name": "Background Effect Color",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Background Effect Color from Bright to Dark", "art": ""}
+          ]
+        },
+        {
+          "name": "Laufrichtung",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Run Direction Forwards", "art": ""},
+            {"von": 128, "bis": 255, "name": "Run Direction Backwards", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "21-1 Channel",
+      "raster": {"rows": 1, "cols": 4},
+      "kanaele": [
+        {
+          "name": "R1/R2/R3/R4",
+          "attribut": "color_r",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "R1/R2/R3/R4 Dimmer (0 - 100%)", "art": ""}
+          ]
+        },
+        {
+          "name": "G1/G2/G3/G4",
+          "attribut": "color_g",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "G1/G2/G3/G4 Dimmer (0 - 100%)", "art": ""}
+          ]
+        },
+        {
+          "name": "B1/B2/B3/B4",
+          "attribut": "color_b",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "B1/B2/B3/B4 Dimmer (0 - 100%)", "art": ""}
+          ]
+        },
+        {
+          "name": "W1/W2/W3/W4",
+          "attribut": "color_w",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "W1/W2/W3/W4 Dimmer (0 - 100%)", "art": ""}
+          ]
+        },
+        {
+          "name": "R5/R6/R7/R8",
+          "attribut": "color_r",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "R5/R6/R7/R8 Dimmer (0 - 100%)", "art": ""}
+          ]
+        },
+        {
+          "name": "G5/G6/G7/G8",
+          "attribut": "color_g",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "G5/G6/G7/G8 Dimmer (0 - 100%)", "art": ""}
+          ]
+        },
+        {
+          "name": "B5/B6/B7/B8",
+          "attribut": "color_b",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "B5/B6/B7/B8 Dimmer (0 - 100%)", "art": ""}
+          ]
+        },
+        {
+          "name": "W5/W6/W7/W8",
+          "attribut": "color_w",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "W5/W6/W7/W8 Dimmer (0 - 100%)", "art": ""}
+          ]
+        },
+        {
+          "name": "R9/R10/R11/R12",
+          "attribut": "color_r",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "R9/R10/R11/R12 Dimmer (0 - 100%)", "art": ""}
+          ]
+        },
+        {
+          "name": "G9/G10/G11/G12",
+          "attribut": "color_g",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "G9/G10/G11/G12 Dimmer (0 - 100%)", "art": ""}
+          ]
+        },
+        {
+          "name": "B9/B10/B11/B12",
+          "attribut": "color_b",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "B9/B10/B11/B12 Dimmer (0 - 100%)", "art": ""}
+          ]
+        },
+        {
+          "name": "W9/W10/W11/W12",
+          "attribut": "color_w",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "W9/W10/W11/W12 Dimmer (0 - 100%)", "art": ""}
+          ]
+        },
+        {
+          "name": "R13/R14/R15/R16",
+          "attribut": "color_r",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "R13/R14/R15/R16 Dimmer (0 - 100%)", "art": ""}
+          ]
+        },
+        {
+          "name": "G13/G14/G15/G16",
+          "attribut": "color_g",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "G13/G14/G15/G16 Dimmer (0 - 100%)", "art": ""}
+          ]
+        },
+        {
+          "name": "B13/B14/B15/B16",
+          "attribut": "color_b",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "B13/B14/B15/B16 Dimmer (0 - 100%)", "art": ""}
+          ]
+        },
+        {
+          "name": "W13/W14/W15/W16",
+          "attribut": "color_w",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "W13/W14/W15/W16 Dimmer (0 - 100%)", "art": ""}
+          ]
+        },
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 8, "name": "No Function", "art": "open"},
+            {"von": 9, "bis": 255, "name": "Strobe (Slow to fast)", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Internals Programs",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Internal programs (See 11CH mode, Channel 7 for overview)", "art": ""}
+          ]
+        },
+        {
+          "name": "Micro Sensitivity and Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Speed and microphone sensitivity for internal programs", "art": ""}
+          ]
+        },
+        {
+          "name": "Auto / Sound",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Auto Program", "art": ""},
+            {"von": 128, "bis": 255, "name": "Sound Controlled Program", "art": "sound"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "21-2 Channel",
+      "kanaele": [
+        {
+          "name": "R1/R5/R9/R13",
+          "attribut": "color_r",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "R1/R5/R9/R13 Dimmer (0 - 100%)", "art": ""}
+          ]
+        },
+        {
+          "name": "G1/G5/G9/G13",
+          "attribut": "color_g",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "G1/G5/G9/G13 Dimmer (0 - 100%)", "art": ""}
+          ]
+        },
+        {
+          "name": "B1/B5/B9/B13",
+          "attribut": "color_b",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "B1/B5/B9/B13 Dimmer (0 - 100%)", "art": ""}
+          ]
+        },
+        {
+          "name": "W1/W5/W9/W13",
+          "attribut": "color_w",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "W1/W5/W9/W13 Dimmer (0 - 100%)", "art": ""}
+          ]
+        },
+        {
+          "name": "R2/R6/R10/R14",
+          "attribut": "color_r",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "R2/R6/R10/R14 Dimmer (0 - 100%)", "art": ""}
+          ]
+        },
+        {
+          "name": "G2/G6/G10/G14",
+          "attribut": "color_g",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "G2/G6/G10/G14 Dimmer (0 - 100%)", "art": ""}
+          ]
+        },
+        {
+          "name": "B2/B6/B10/B14",
+          "attribut": "color_b",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "B2/B6/B10/B14 Dimmer (0 - 100%)", "art": ""}
+          ]
+        },
+        {
+          "name": "W2/W6/W10/W14",
+          "attribut": "color_w",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "W2/W6/W10/W14 Dimmer (0 - 100%)", "art": ""}
+          ]
+        },
+        {
+          "name": "R3/R7/R11/R15",
+          "attribut": "color_r",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "R3/R7/R11/R15 Dimmer (0 - 100%)", "art": ""}
+          ]
+        },
+        {
+          "name": "G3/G7/G11/G15",
+          "attribut": "color_g",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "G3/G7/G11/G15 Dimmer (0 - 100%)", "art": ""}
+          ]
+        },
+        {
+          "name": "B3/B7/B11/B15",
+          "attribut": "color_b",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "B3/B7/B11/B15 Dimmer (0 - 100%)", "art": ""}
+          ]
+        },
+        {
+          "name": "W3/W7/W11/W15",
+          "attribut": "color_w",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "W3/W7/W11/W15 Dimmer (0 - 100%)", "art": ""}
+          ]
+        },
+        {
+          "name": "R4/R8/R12/R16",
+          "attribut": "color_r",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "R4/R8/R12/R16 Dimmer (0 - 100%)", "art": ""}
+          ]
+        },
+        {
+          "name": "G4/G8/G12/G16",
+          "attribut": "color_g",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "G4/G8/G12/G16 Dimmer (0 - 100%)", "art": ""}
+          ]
+        },
+        {
+          "name": "B4/B8/B12/B16",
+          "attribut": "color_b",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "B4/B8/B12/B16 Dimmer (0 - 100%)", "art": ""}
+          ]
+        },
+        {
+          "name": "W4/W8/W12/W16",
+          "attribut": "color_w",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "W4/W8/W12/W16 Dimmer (0 - 100%)", "art": ""}
+          ]
+        },
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 8, "name": "No Function", "art": "open"},
+            {"von": 9, "bis": 255, "name": "Strobe (Slow to fast)", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Internals Programs",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Internal programs (See 11CH mode, Channel 7 for overview)", "art": ""}
+          ]
+        },
+        {
+          "name": "Micro Sensitivity and Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Speed and microphone sensitivity for internal programs", "art": ""}
+          ]
+        },
+        {
+          "name": "Auto / Sound",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Auto Program", "art": ""},
+            {"von": 128, "bis": 255, "name": "Sound Controlled Program", "art": "sound"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "64 Channel",
+      "raster": {"rows": 1, "cols": 16},
+      "kanaele": [
+        {"name": "Red 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 3", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 4", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 4", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 5", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 5", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 5", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 5", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 6", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 6", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 6", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 6", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 7", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 7", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 7", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 7", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 8", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 8", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 8", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 8", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 9", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 9", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 9", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 9", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 10", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 10", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 10", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 10", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 11", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 11", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 11", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 11", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 12", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 12", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 12", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 12", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 13", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 13", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 13", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 13", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 14", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 14", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 14", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 14", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 15", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 15", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 15", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 15", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 16", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 16", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 16", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 16", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    }
+  ]
+}
