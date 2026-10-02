@@ -3580,8 +3580,29 @@ def ensure_builtins():
                 changed = True
             if _qlc_korrektur(s):
                 changed = True
+        if _bibliothek_faellig():
+            # FM-56: die eigene Bibliothek (fixtures/bibliothek/*.json) als
+            # source='lightos'. Einmal je Engine, und auch dann nur, wenn sich
+            # eine Datei seit dem letzten Lauf in dieser DB geaendert hat.
+            from .bibliothek_format import einspielen_wenn_noetig
+            if einspielen_wenn_noetig(s):
+                changed = True
         if changed:
             s.commit()
+
+
+_BIBLIOTHEK_FUER: object = None
+
+
+def _bibliothek_faellig() -> bool:
+    """Wie ``_abgleich_faellig``, aber eigener Merker: der FM-50-Gate hat ihn
+    in diesem Aufruf schon verbraucht."""
+    global _BIBLIOTHEK_FUER
+    aktuell = _engine
+    if aktuell is None or aktuell is _BIBLIOTHEK_FUER:
+        return False
+    _BIBLIOTHEK_FUER = aktuell
+    return True
 
 
 # ── FM-49: Attribut-Korrektur der schon importierten QLC+-Profile ─────────────

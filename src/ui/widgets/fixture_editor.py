@@ -521,6 +521,22 @@ class FixtureEditorDialog(QDialog):
 
         root.addWidget(modes_box, 1)
 
+        # FM-56: eigenes Profil im eigenen Format (LightOS-Profil, JSON) —
+        # Austausch zwischen Rechnern, Grundlage der Geraete-Bibliothek.
+        lightos_row = QHBoxLayout()
+        btn_lightos_import = QPushButton("LightOS-Profil importieren…")
+        btn_lightos_import.setToolTip(
+            "Eine LightOS-Profil-Datei (.json) als eigenes Profil anlegen")
+        btn_lightos_import.clicked.connect(lambda: self._lightos_import())
+        btn_lightos_export = QPushButton("Als LightOS-Profil exportieren…")
+        btn_lightos_export.setToolTip(
+            "Den Inhalt dieses Editors als LightOS-Profil-Datei (.json) speichern")
+        btn_lightos_export.clicked.connect(lambda: self._lightos_export())
+        lightos_row.addWidget(btn_lightos_import)
+        lightos_row.addWidget(btn_lightos_export)
+        lightos_row.addStretch(1)
+        root.addLayout(lightos_row)
+
         # Save/Cancel
         btn_box = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
@@ -579,6 +595,73 @@ class FixtureEditorDialog(QDialog):
                 e.accept()
                 return
         super().keyPressEvent(e)
+
+    # ── FM-56: LightOS-Profil (JSON) ─────────────────────────────────────
+
+    def _lightos_daten(self) -> dict:
+        from src.core.database.bibliothek_format import daten_aus_feldern
+        modi = []
+        for i in range(self._tabs.count()):
+            modi.append(self._tabs.widget(i).get_data())
+        return daten_aus_feldern(
+            hersteller=self._cb_manufacturer.currentText(),
+            modell=self._edit_name.text(), kurzname=self._edit_short.text(),
+            typ=self._cb_type.currentText(), leistung_w=self._spin_power.value(),
+            modi=modi)
+
+    def _lightos_export(self, pfad: str | None = None) -> str | None:
+        """Editor-Inhalt als LightOS-Profil schreiben. ``pfad`` (Tests) spart
+        den Dateidialog. Gibt den Pfad zurueck oder None."""
+        from src.core.database import bibliothek_format as BF
+        beanstandung = kopf_beanstandung(self._cb_manufacturer.currentText().strip(),
+                                         self._edit_name.text().strip())
+        if beanstandung:
+            QMessageBox.warning(self, "LightOS-Profil", beanstandung)
+            return None
+        daten = self._lightos_daten()
+        if pfad is None:
+            from PySide6.QtWidgets import QFileDialog
+            vorschlag = BF.dateiname(daten["hersteller"], daten["modell"]).split("/")[-1]
+            pfad, _ = QFileDialog.getSaveFileName(
+                self, "Als LightOS-Profil exportieren", vorschlag,
+                "LightOS-Profil (*.json)")
+            if not pfad:
+                return None
+        try:
+            BF.schreibe(daten, pfad)
+        except BF.ProfilFehler as e:
+            QMessageBox.warning(self, "LightOS-Profil",
+                                "Das Profil ist so noch nicht gueltig:\n\n"
+                                + "\n".join(e.befunde[:15]))
+            return None
+        except OSError as e:
+            QMessageBox.warning(self, "LightOS-Profil", f"Schreiben fehlgeschlagen: {e}")
+            return None
+        return pfad
+
+    def _lightos_import(self, pfad: str | None = None) -> int | None:
+        """LightOS-Profil-Datei als eigenes Profil anlegen und den Dialog
+        schliessen (wie Speichern: ``saved_id`` traegt die neue ID)."""
+        from src.core.database import bibliothek_format as BF
+        if pfad is None:
+            from PySide6.QtWidgets import QFileDialog
+            pfad, _ = QFileDialog.getOpenFileName(
+                self, "LightOS-Profil importieren", "", "LightOS-Profil (*.json)")
+            if not pfad:
+                return None
+        try:
+            pid = BF.importiere(pfad, engine=engine())
+        except BF.ProfilFehler as e:
+            QMessageBox.warning(self, "LightOS-Profil",
+                                "Die Datei ist kein gueltiges LightOS-Profil:\n\n"
+                                + "\n".join(e.befunde[:15]))
+            return None
+        except ValueError as e:
+            QMessageBox.warning(self, "LightOS-Profil", str(e))
+            return None
+        self._saved_id = self.saved_id = pid
+        self.accept()
+        return pid
 
     def _refresh_manufacturers(self):
         with Session(engine()) as s:

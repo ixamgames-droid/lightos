@@ -12,6 +12,14 @@ class Base(DeclarativeBase):
     pass
 
 
+#: FM-56: ``FixtureProfile.source``-Werte, die als MITGELIEFERT gelten —
+#: ``builtin`` (Python-Tupel in ``fixture_db.py``) und ``lightos`` (Dateien der
+#: eigenen Bibliothek, ``fixtures/bibliothek/``). Ueberall, wo „mitgeliefert vor
+#: importiert/eigen“ entschieden wird (FM-43, Showbuilder, ``tools/_profil.py``,
+#: QA-68), zaehlen beide gleich.
+MITGELIEFERT_QUELLEN: tuple[str, ...] = ("builtin", "lightos")
+
+
 class Manufacturer(Base):
     __tablename__ = "manufacturers"
 
