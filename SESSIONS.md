@@ -35,6 +35,7 @@
 | DOC-34 | C | - | 2026-10-02T10:56Z | docs/anleitung_matrix_effekte/ANLEITUNG_MATRIX_EFFEKTE.md |
 | DOC-35 | C | - | 2026-10-02T10:57Z | docs/anleitung_efx/ANLEITUNG_EFX.md |
 | DOC-36 | C | - | 2026-10-02T10:58Z | docs/anleitung_moving_heads/ANLEITUNG_MOVING_HEADS.md |
+| DOC-37 | C | - | 2026-10-02T10:59Z | docs/anleitung_spider/ANLEITUNG_SPIDER.md · tools/build_event_demo_2026.py · tests/test_doc37_spider_wippe.py · changelog.d/2026-10-02-DOC-37.md |
 
 ## Blocker & Fallen
 
@@ -98,7 +99,6 @@
 
 ## Verlauf
 
-- 2026-10-02T08:17Z A done DOC-20
 - 2026-10-02T08:17Z A done DOC-21
 - 2026-10-02T08:30Z C done TOOL-7
 - 2026-10-02T08:42Z A claim PROC-18
@@ -128,3 +128,4 @@
 - 2026-10-02T10:56Z C claim DOC-34
 - 2026-10-02T10:57Z C claim DOC-35
 - 2026-10-02T10:58Z C claim DOC-36
+- 2026-10-02T10:59Z C claim DOC-37
