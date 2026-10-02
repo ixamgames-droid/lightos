@@ -21,6 +21,17 @@ Default zeigt nur an, was gefunden wurde.
 
 Erkannt wird, was den Test-Praefix traegt — bewusst eng: ein Hersteller, der
 zufaellig „Test" heisst, ist ein Nutzerprofil und geht dieses Werkzeug nichts an.
+
+QA-68: Daneben meldet es **Dubletten eines Builtin-Profils** — dasselbe
+Modellkuerzel zweimal beim selben Hersteller, beide ``source='builtin'``. So lag
+der ZQ06121 auf dem Windows-Rechner doppelt in der Bibliothek (Rest aus der Zeit
+vor QA-54/QA-58), und vier Tests rissen an ``MultipleResultsFound``; einen
+Test-Praefix trug keiner der beiden Eintraege. Eine frisch gebaute Bibliothek
+legt jedes Builtin genau einmal an. Gleiches Kuerzel bei VERSCHIEDENEN
+Herstellern (Martin/Showtec „Acrobat") ist keine Dublette.
+Dubletten werden nur angezeigt, auch mit ``--entfernen``: welcher Eintrag bleibt,
+entscheidet ein Mensch — Shows verweisen ueber ``fixture_profile_id`` auf genau
+einen davon.
 """
 from __future__ import annotations
 
@@ -53,6 +64,34 @@ def finde(engine):
     return hersteller, profile
 
 
+def builtin_dubletten(engine):
+    """QA-68: ``[(hersteller, kuerzel, [(id, name, modi, raster), ...]), ...]``
+    — je Hersteller und Modellkuerzel alle Builtin-Profile, sobald es mehr als
+    eines sind. ``raster`` sagt, ob ein Modus eine Rastergeometrie traegt (der
+    Rest auf dem Windows-Rechner war der Eintrag OHNE)."""
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session, selectinload
+    from src.core.database.models import FixtureProfile
+
+    gruppen: dict = {}
+    with Session(engine) as s:
+        abfrage = (select(FixtureProfile)
+                   .where(FixtureProfile.source == "builtin")
+                   .options(selectinload(FixtureProfile.manufacturer),
+                            selectinload(FixtureProfile.modes))
+                   .order_by(FixtureProfile.id))
+        for p in s.scalars(abfrage):
+            kuerzel = (p.short_name or p.name or "").strip()
+            hersteller = p.manufacturer.name if p.manufacturer else "?"
+            raster = any((m.grid_rows or 0) > 0 and (m.grid_cols or 0) > 0
+                         for m in p.modes)
+            gruppen.setdefault((p.manufacturer_id, kuerzel.casefold()),
+                               (hersteller, kuerzel, []))[2].append(
+                (p.id, p.name, len(p.modes), raster))
+    return sorted((g for g in gruppen.values() if len(g[2]) > 1),
+                  key=lambda g: (g[0].casefold(), g[1].casefold()))
+
+
 def entferne(engine, hersteller, profile) -> int:
     from sqlalchemy.orm import Session
     from src.core.database.models import Manufacturer, FixtureProfile
@@ -75,17 +114,28 @@ def entferne(engine, hersteller, profile) -> int:
     return n
 
 
-def main() -> int:
+def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--entfernen", action="store_true",
-                   help="die gefundenen Reste wirklich loeschen")
-    args = p.parse_args()
+                   help="die gefundenen Test-Reste wirklich loeschen "
+                        "(Builtin-Dubletten nie)")
+    args = p.parse_args(argv)
 
     from src.core.database.fixture_db import engine as fdb_engine, DB_PATH
     eng = fdb_engine()
     hersteller, profile = finde(eng)
+    dubletten = builtin_dubletten(eng)
 
     print(f"Bibliothek: {DB_PATH}")
+    if dubletten:
+        print(f"{len(dubletten)} Builtin-Profil(e) mehrfach beim selben Hersteller "
+              f"(QA-68) — nur angezeigt, nie automatisch entfernt:")
+        for name_h, kuerzel, eintraege in dubletten:
+            print(f"  {name_h} / {kuerzel}:")
+            for pid, name, modi, raster in eintraege:
+                print(f"    Profil  id={pid}  {name!r}  {modi} Modi"
+                      f"{'  mit Raster' if raster else ''}")
+        print("  Vor dem Loeschen pruefen, welche id die Shows benutzen.\n")
     if not hersteller and not profile:
         print("Keine Test-Rueckstaende gefunden.")
         return 0
