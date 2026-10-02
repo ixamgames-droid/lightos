@@ -38,10 +38,12 @@ Profilen enthält. Ohne Zustimmung wird **nichts** heruntergeladen. Später geht
 es jederzeit über **Datenbank → Geräte-Bibliothek herunterladen...**
 
 - **Quellen:** QLC+-Fixtures einer festen Version (Apache-2.0, GitHub-Archiv)
-  oder die Open Fixture Library als QLC+-Export (MIT). Lizenz und Link stehen
-  im Dialog, **bevor** geladen wird; die Größe auch, sofern die Gegenstelle sie
-  nennt.
-- **Was passiert:** Download mit SHA-256-Prüfsumme → nur die `.qxf`-Dateien
+  oder die Open Fixture Library als QLC+-Export (MIT). Lizenz, Link und
+  ungefähre Größe (QLC+ ca. 12,7 MB, OFL ca. 2,7 MB) stehen im Dialog, **bevor**
+  geladen wird. Bis zum Klick auf **Herunterladen** geht keine Anfrage ins Netz.
+- **Was passiert:** Download mit SHA-256-Prüfsumme (bei QLC+ gegen die geprüfte
+  Fassung; weicht die Datei ab, wird nichts importiert und der Dialog sagt
+  warum) → nur die `.qxf`-Dateien
   werden ausgepackt → Import über den vorhandenen QLC+-Import. Vorhandene und
   eigene Profile bleiben unverändert, Doppelte werden übersprungen.
 - **Herkunft je Profil:** Quelle, Lizenz, Lizenz-Link, Archiv-Adresse,
@@ -50,7 +52,7 @@ es jederzeit über **Datenbank → Geräte-Bibliothek herunterladen...**
   war; im Import bleiben die schon eingelesenen Profile (mit Herkunft) stehen.
   **Ohne Netz** meldet der Dialog das,
   ändert nichts und fragt beim nächsten Start erneut; „Nicht jetzt“ dagegen
-  zählt als Antwort.
+  zählt als Antwort, ebenso das Schließen per X oder Esc.
 
 ## Was du manuell bereitstellen kannst
 

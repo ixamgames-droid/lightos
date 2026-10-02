@@ -9,7 +9,9 @@ ausliefert. Geprueft wird, was der Projektinhaber verlangt hat:
 * Soll-Pruefsumme falsch -> nichts importiert;
 * offline -> lesbarer Fehler, Bibliothek unveraendert, beim naechsten Start
   wird wieder gefragt;
-* abbrechbar; keine Datei ausserhalb des Arbeitsordners; nur ``.qxf``.
+* abbrechbar; keine Datei ausserhalb des Arbeitsordners; nur ``.qxf``;
+* vor der Zustimmung geht nichts ins Netz (auch kein HEAD), die Groesse steht
+  fest; X/Esc beim ersten Start gilt wie „Nicht jetzt“ (Review #866).
 """
 import hashlib
 import io
@@ -21,6 +23,7 @@ import tempfile
 import unittest
 import urllib.error
 import zipfile
+from unittest import mock
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -142,7 +145,9 @@ def _netz(daten=None, fehler=None, laenge=True):
     return oeffnen
 
 
-QUELLE = BD.QUELLEN["qlcplus"]
+#: Die Test-Archive sind selbst gebaut — ohne die Soll-Pruefsumme der echten
+#: QLC+-Fassung, die sonst (richtig) jedes von ihnen abweist.
+QUELLE = BD.QUELLEN["qlcplus"]._replace(sha256=None)
 
 
 class _Basis(unittest.TestCase):
@@ -241,9 +246,13 @@ class NichtsOhneGuteDaten(_Basis):
     def test_falsche_pruefsumme_importiert_nichts(self):
         vorher = self._profile()
         quelle = QUELLE._replace(sha256="0" * 64)
-        with self.assertRaises(BD.PruefsummeFalsch):
+        with self.assertRaises(BD.PruefsummeFalsch) as fang:
             self._laden(quelle)
         self.assertEqual(self._profile(), vorher)
+        meldung = str(fang.exception)
+        self.assertIn("weicht von der geprüften Fassung ab", meldung)
+        self.assertIn("nicht immer bytegleich", meldung, "sagt, warum das passieren kann")
+        self.assertIn("nichts importiert", meldung)
 
     def test_richtige_pruefsumme_geht_durch(self):
         quelle = QUELLE._replace(sha256=hashlib.sha256(self.archiv).hexdigest().upper())
@@ -257,8 +266,6 @@ class NichtsOhneGuteDaten(_Basis):
         self.assertEqual(self._profile(), vorher)
         self.assertTrue(BD.beim_start_fragen(self.motor),
                         "ohne Netz gilt die Frage nicht als beantwortet")
-        with self.assertRaises(BD.OfflineFehler):
-            BD.groesse_ermitteln(QUELLE, oeffnen=_netz(fehler=TimeoutError("zeit")))
 
     def test_abbruch_im_download(self):
         vorher = self._profile()
@@ -316,11 +323,15 @@ class ErststartFrage(_Basis):
         os.remove(BD.merker_pfad())
         self.assertFalse(BD.beim_start_fragen(self.motor))
 
-    def test_groesse_vorab(self):
-        self.assertEqual(BD.groesse_ermitteln(QUELLE, oeffnen=_netz(self.archiv)),
-                         len(self.archiv))
-        self.assertIsNone(BD.groesse_ermitteln(QUELLE, oeffnen=_netz(self.archiv, laenge=False)))
-
+    def test_groesse_und_pruefsumme_stehen_fest(self):
+        """Review #866: die Groesse kommt aus der Quelle, nicht aus dem Netz;
+        die QLC+-Fassung traegt ihre Soll-Pruefsumme."""
+        qlc, ofl = BD.QUELLEN["qlcplus"], BD.QUELLEN["ofl"]
+        self.assertEqual(qlc.sha256,
+                         "f90165e00f9a203fb871f50fa4ffc2ed236dce2a836208de22d63cfdbd8090c1")
+        self.assertEqual(qlc.groesse_ca, 12_703_615)
+        self.assertTrue(2_000_000 < ofl.groesse_ca < 4_000_000)
+        self.assertFalse(hasattr(BD, "groesse_ermitteln"), "keine Netz-Anfrage vorab")
 
 
 class Dialog(_Basis):
@@ -342,12 +353,64 @@ class Dialog(_Basis):
             time.sleep(0.02)
         self.fail("Zeitlimit im Dialog-Test")
 
+    def setUp(self):
+        super().setUp()
+        # Der Dialog liest BD.QUELLEN selbst — fuer die Test-Archive ohne Soll-Pruefsumme.
+        quellen = dict(BD.QUELLEN, qlcplus=QUELLE)
+        patcher = mock.patch.object(BD, "QUELLEN", quellen)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def _dialog(self, **kw):
         from src.ui.widgets.bibliothek_download_dialog import BibliothekDownloadDialog
         kw.setdefault("oeffnen", _netz(self.archiv))
         d = BibliothekDownloadDialog(None, engine=self.motor, **kw)
         self.addCleanup(d.deleteLater)
         return d
+
+    def test_vor_der_zustimmung_geht_nichts_ins_netz(self):
+        """Review #866: Dialog bauen und Quelle wechseln fragt NICHTS an — die
+        Groesse steht fest je Quelle."""
+        netz = _netz(self.archiv)
+        d = self._dialog(oeffnen=netz)
+        self.app.processEvents()
+        self.assertIn("ca. 12,7 MB", d._status.text())
+        d._wahl["ofl"].setChecked(True)
+        self.app.processEvents()
+        self.assertIn("ca. 2,7 MB", d._status.text())
+        d._wahl["qlcplus"].setChecked(True)
+        self.app.processEvents()
+        self.assertEqual(netz.aufrufe, [], "vor dem Klick keine Anfrage, auch kein HEAD")
+        d.btn_laden.click()
+        self._warten(lambda: d.ergebnis is not None)
+        self.assertEqual(netz.aufrufe, [("GET", QUELLE.url)])
+
+    def test_esc_beim_erststart_wie_nicht_jetzt(self):
+        d = self._dialog(erststart=True)
+        d.reject()
+        self.assertFalse(BD.beim_start_fragen(self.motor))
+
+    def test_x_beim_erststart_wie_nicht_jetzt(self):
+        d = self._dialog(erststart=True)
+        d.show()
+        self.app.processEvents()
+        d.close()
+        self.assertFalse(BD.beim_start_fragen(self.motor))
+
+    def test_esc_ueber_das_menue_merkt_nichts(self):
+        d = self._dialog()
+        d.reject()
+        self.assertTrue(BD.beim_start_fragen(self.motor))
+
+    def test_abweichende_pruefsumme_sagt_es_verstaendlich(self):
+        vorher = self._profile()
+        with mock.patch.object(BD, "QUELLEN",
+                               dict(BD.QUELLEN, qlcplus=QUELLE._replace(sha256="0" * 64))):
+            d = self._dialog()
+            d.btn_laden.click()
+            self._warten(lambda: not d.laeuft() and d.btn_laden.isEnabled())
+        self.assertIn("weicht von der geprüften Fassung ab", d._status.text())
+        self.assertEqual(self._profile(), vorher)
 
     def test_herunterladen_nach_klick(self):
         d = self._dialog()
@@ -370,7 +433,6 @@ class Dialog(_Basis):
         „Schließen“ — der darf die Frage nicht als beantwortet merken."""
         d = self._dialog(erststart=True,
                          oeffnen=_netz(fehler=urllib.error.URLError("kein Netz")))
-        self._warten(lambda: "Keine Verbindung" in d._status.text())
         d.btn_laden.click()
         self._warten(lambda: not d.laeuft() and d.btn_spaeter.text() == "Schließen"
                      and d.btn_spaeter.isEnabled())
@@ -381,7 +443,6 @@ class Dialog(_Basis):
     def test_offline_sagt_es_und_importiert_nichts(self):
         vorher = self._profile()
         d = self._dialog(oeffnen=_netz(fehler=urllib.error.URLError("kein Netz")))
-        self._warten(lambda: "Keine Verbindung" in d._status.text())
         d.btn_laden.click()
         self._warten(lambda: not d.laeuft() and "Keine Verbindung" in d._status.text()
                      and d.btn_laden.isEnabled())

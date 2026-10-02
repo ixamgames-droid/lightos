@@ -16,9 +16,11 @@ Regeln, die dieses Modul garantiert:
   Frage stellt der Dialog (``src/ui/widgets/bibliothek_download_dialog.py``).
   Ob schon gefragt wurde, steht in ``bibliothek_download.json`` im
   App-Datenordner.
-* **Groesse vorher, Pruefsumme nachher.** ``groesse_ermitteln`` fragt die
-  Gegenstelle, ``herunterladen`` rechnet beim Lesen SHA-256 mit. Traegt die
-  Quelle eine Soll-Pruefsumme, wird bei Abweichung NICHTS importiert.
+* **Groesse vorher, Pruefsumme nachher.** Die Groesse steht fest je Quelle
+  (``Quelle.groesse_ca``) — VOR der Zustimmung geht keine einzige Anfrage ins
+  Netz, auch kein HEAD (Review #866). ``herunterladen`` rechnet beim Lesen
+  SHA-256 mit. Traegt die Quelle eine Soll-Pruefsumme, wird bei Abweichung
+  NICHTS importiert.
 * **Bestand bleibt unangetastet.** Der QXF-Import legt nur neue Profile an
   (gleicher Hersteller + Modell wird uebersprungen, Builtins und eigene Profile
   nie ueberschrieben).
@@ -67,6 +69,7 @@ class Quelle(NamedTuple):
     unterordner: str = ""          # nur .qxf unter diesem Pfad im Archiv
     sha256: Optional[str] = None   # Soll-Pruefsumme, falls bekannt
     hinweis: str = ""
+    groesse_ca: int = 0            # Bytes, ungefaehr — steht VOR dem Download im Dialog
 
 
 #: Feste QLC+-Version statt ``master``: gleiche Eingabe bei jedem Download.
@@ -82,12 +85,13 @@ QUELLEN = {
         lizenz_url="https://github.com/mcallegari/qlcplus/blob/master/COPYING",
         format="tar.gz",
         unterordner="resources/fixtures/",
-        # Die Soll-Pruefsumme des Archivs konnte in der Sitzung, die das hier
-        # gebaut hat, nicht ermittelt werden (codeload.github.com gesperrt).
-        # Bis jemand sie eintraegt, wird sie nach dem Download berechnet und je
-        # Profil gespeichert.
-        sha256=None,
+        # Gemessen am 2026-10-02 (12 703 615 Bytes). GitHub erzeugt die
+        # /archive/-Dateien bei Bedarf neu und sagt keine bytegleichen Archive
+        # zu — weicht eine Datei einmal ab, meldet ``PruefsummeFalsch`` das
+        # verstaendlich, und es wird nichts importiert.
+        sha256="f90165e00f9a203fb871f50fa4ffc2ed236dce2a836208de22d63cfdbd8090c1",
         hinweis="Das ganze QLC+-Quellarchiv; verwendet werden nur die .qxf-Dateien.",
+        groesse_ca=12_703_615,
     ),
     "ofl": Quelle(
         schluessel="ofl",
@@ -98,6 +102,9 @@ QUELLEN = {
                     "open-fixture-library/blob/master/LICENSE"),
         format="zip",
         hinweis="Einige OFL-Profile stammen ihrerseits aus QLC+ (Apache-2.0).",
+        # Keine feste Fassung: der Export waechst mit der Bibliothek, deshalb
+        # weder Soll-Pruefsumme noch genaue Groesse (Stand 2026-10: ~2,7 MB).
+        groesse_ca=2_700_000,
     ),
 }
 
@@ -177,23 +184,8 @@ _NETZFEHLER = (urllib.error.URLError, socket.timeout, ConnectionError,
                http.client.HTTPException)
 
 
-def _anfrage(url: str, methode: str = "GET"):
-    return urllib.request.Request(url, method=methode, headers={"User-Agent": _AGENT})
-
-
-def groesse_ermitteln(quelle: Quelle, oeffnen=urllib.request.urlopen) -> Optional[int]:
-    """Groesse laut Gegenstelle in Bytes, ``None`` wenn unbekannt.
-
-    Ohne Netz ``OfflineFehler`` — der Dialog sagt das, bevor er fragt."""
-    try:
-        with oeffnen(_anfrage(quelle.url, "HEAD"), timeout=ZEITLIMIT_S) as antwort:
-            wert = antwort.headers.get("Content-Length")
-    except _NETZFEHLER as e:
-        raise OfflineFehler(f"Keine Verbindung zu {quelle.url}: {e}") from e
-    try:
-        return int(wert) if wert is not None else None
-    except ValueError:
-        return None
+def _anfrage(url: str):
+    return urllib.request.Request(url, headers={"User-Agent": _AGENT})
 
 
 def herunterladen(quelle: Quelle, ziel: str,
@@ -238,7 +230,10 @@ def herunterladen(quelle: Quelle, ziel: str,
     if quelle.sha256 and summe.lower() != quelle.sha256.lower():
         _weg(ziel)
         raise PruefsummeFalsch(
-            f"Pruefsumme stimmt nicht: erwartet {quelle.sha256}, erhalten {summe}")
+            f"Die heruntergeladene Datei weicht von der geprüften Fassung ab "
+            f"({gelesen} Bytes, SHA-256 {summe[:16]}… statt {quelle.sha256[:16]}…). "
+            f"GitHub erzeugt solche Archive nicht immer bytegleich. Es wurde nichts "
+            f"importiert — bitte später erneut versuchen oder die andere Quelle wählen.")
     return summe, gelesen
 
 

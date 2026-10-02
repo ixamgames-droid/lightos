@@ -4,8 +4,12 @@ Minimal: Quelle waehlen, Groesse und Lizenz VOR dem Download sehen, zustimmen,
 Fortschritt, abbrechen. Die Arbeit macht ``src/core/database/bibliothek_download``
 in einem Hintergrund-Thread; der Dialog zeigt nur an.
 
+* Vor dem Klick auf „Herunterladen“ geht NICHTS ins Netz — auch keine
+  HEAD-Anfrage nach der Groesse (Review #866). Die Groesse steht fest je
+  Quelle (``Quelle.groesse_ca``).
 * „Nicht jetzt“ beim ersten Start zaehlt als Antwort — die Frage kommt nicht
   wieder (ueber das Menue Datenbank bleibt der Download jederzeit erreichbar).
+  Schliessen per X oder Esc gilt dort genauso.
 * Ohne Netz zaehlt sie NICHT als Antwort: beim naechsten Start wird erneut
   gefragt. Das gilt fuer jeden Versuch, der nicht fertig wurde (offline,
   Fehler, Abbruch): danach heisst der Knopf „Schließen“ und schreibt keinen
@@ -25,11 +29,10 @@ from src.core.database import bibliothek_download as BD
 
 
 def _mb(n):
-    return f"{n / 1_000_000:.1f} MB"
+    return f"{n / 1_000_000:.1f} MB".replace(".", ",")
 
 
 class _Signale(QObject):
-    groesse = Signal(str, object)          # schluessel, Bytes oder Fehlertext
     fortschritt = Signal(str, int, object)  # phase, wert, gesamt
     fertig = Signal(object)                 # BD.Ergebnis
     fehler = Signal(str, str)               # art, meldung
@@ -49,7 +52,6 @@ class BibliothekDownloadDialog(QDialog):
         self._versucht = False
         self.ergebnis = None
         self._s = _Signale()
-        self._s.groesse.connect(self._groesse_da)
         self._s.fortschritt.connect(self._fortschritt)
         self._s.fertig.connect(self._fertig)
         self._s.fehler.connect(self._fehler)
@@ -66,7 +68,7 @@ class BibliothekDownloadDialog(QDialog):
         for i, quelle in enumerate(BD.QUELLEN.values()):
             knopf = QRadioButton(quelle.name)
             knopf.setChecked(i == 0)
-            knopf.toggled.connect(lambda an, q=quelle: an and self._groesse_fragen(q))
+            knopf.toggled.connect(lambda an, q=quelle: an and self._groesse_zeigen(q))
             lay.addWidget(knopf)
             info = QLabel(
                 f'Lizenz: <a href="{quelle.lizenz_url}">{quelle.lizenz}</a>'
@@ -99,7 +101,7 @@ class BibliothekDownloadDialog(QDialog):
             knoepfe.addWidget(b)
         lay.addLayout(knoepfe)
 
-        self._groesse_fragen(self.quelle())
+        self._groesse_zeigen(self.quelle())
 
     # ── Zustand ───────────────────────────────────────────────────────────────
     def quelle(self) -> BD.Quelle:
@@ -111,28 +113,14 @@ class BibliothekDownloadDialog(QDialog):
     def laeuft(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
 
-    # ── Groesse vorab ─────────────────────────────────────────────────────────
-    def _groesse_fragen(self, quelle):
-        self._status.setText("Größe wird ermittelt …")
-
-        def arbeit():
-            try:
-                wert = BD.groesse_ermitteln(quelle, oeffnen=self._oeffnen)
-            except BD.OfflineFehler as e:
-                wert = f"offline: {e}"
-            self._s.groesse.emit(quelle.schluessel, wert)
-        threading.Thread(target=arbeit, daemon=True).start()
-
-    def _groesse_da(self, schluessel, wert):
-        if self.laeuft() or schluessel != self.quelle().schluessel:
+    # ── Groesse vorab — fest je Quelle, ohne Netz ─────────────────────────────
+    def _groesse_zeigen(self, quelle):
+        if self.laeuft():
             return
-        if isinstance(wert, str):
-            self._status.setText("Keine Verbindung — der Download ist später über "
-                                 "Datenbank → Geräte-Bibliothek herunterladen möglich.")
-        elif wert:
-            self._status.setText(f"Download: {_mb(wert)}.")
+        if quelle.groesse_ca:
+            self._status.setText(f"Download: ca. {_mb(quelle.groesse_ca)}.")
         else:
-            self._status.setText("Größe unbekannt (die Gegenstelle nennt keine).")
+            self._status.setText("")
 
     # ── Download ──────────────────────────────────────────────────────────────
     def starten(self):
@@ -200,15 +188,20 @@ class BibliothekDownloadDialog(QDialog):
         for knopf in self._wahl.values():
             knopf.setEnabled(True)
 
-    def _spaeter(self):
+    def _nicht_jetzt_merken(self):
         if self._erststart and not self._versucht and self.ergebnis is None:
             BD.merker_schreiben(gefragt=True, antwort="nicht jetzt")
+
+    def _spaeter(self):
+        self._nicht_jetzt_merken()
         self.accept()
 
     def reject(self):
+        """Esc und X (``QDialog.closeEvent`` ruft ``reject``)."""
         if self.laeuft():
             self._stopp.set()
             return                       # erst schliessen, wenn der Thread steht
+        self._nicht_jetzt_merken()       # beim Erststart wie „Nicht jetzt“ (Review #866)
         super().reject()
 
     def closeEvent(self, ev):
