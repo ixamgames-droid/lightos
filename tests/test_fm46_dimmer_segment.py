@@ -223,8 +223,11 @@ class MatrixMitZuordnungTest(_MatrixBasis):
         self.assertEqual(weiss, [255, 255])
 
     def test_teilweise_zuordnung(self):
-        """Segment 1 hat seinen Dimmer (CH2), Segment 2 keinen: dort dimmt
-        weiter die Matrix selbst (FM-54)."""
+        """Segment 1 hat seinen Dimmer (CH2), Segment 2 keinen. Der Rueckfall
+        (FM-46 Etappe 2) oeffnet fuer Segment 2 nur Dimmer, die an den
+        Abschnitt seines Weiss grenzen — das ist allein CH2, und der gehoert
+        Segment 1. Also faehrt dort keiner, und die Matrix dimmt das Weiss
+        selbst (FM-54) — lieber zu wenig als einen fremden Dimmer."""
         dimmer, weiss = self._lauf((None, 0), drive=True)
         self.assertEqual(dimmer, [0, 127])
         self.assertEqual(weiss, [255, 127])
@@ -234,11 +237,15 @@ class MatrixMitZuordnungTest(_MatrixBasis):
         self.assertEqual(dimmer, [0, 0])
         self.assertEqual(weiss, [127, 127])
 
-    def test_ohne_zuordnung_bestand(self):
-        """Gegenprobe = ``test_fm54::test_zwei_dimmer_dimmer_mit_treiben``."""
+    def test_ohne_zuordnung_rueckfall(self):
+        """Gegenprobe = ``test_fm54::test_zwei_dimmer_dimmer_mit_treiben``.
+        Seit FM-46 Etappe 2 faehrt ohne Zuordnung der freie Dimmer, der an
+        den Abschnitt des Weiss grenzt (CH2; CH1 grenzt nur an Leeres und an
+        CH2). Vorher ``[0, 0]`` / ``[127, 127]`` — am Geraet dunkel, sobald
+        die Dimmer auf 0 stehen."""
         dimmer, weiss = self._lauf((None, None), drive=True)
-        self.assertEqual(dimmer, [0, 0])
-        self.assertEqual(weiss, [127, 127])
+        self.assertEqual(dimmer, [0, 127])
+        self.assertEqual(weiss, [255, 255])
 
 
 class FolgestellenTest(unittest.TestCase):
@@ -266,9 +273,15 @@ class FolgestellenTest(unittest.TestCase):
                                               drive_intensity=False))
 
     def test_weiss_cell_values_ohne_zuordnung(self):
+        """FM-46 Etappe 2: ohne Zuordnung der angrenzende freie Dimmer —
+        derselbe Rueckfall wie im Renderer; ohne ``drive_intensity`` keiner."""
         from src.core.matrix_pattern import weiss_cell_values
         self.kanaele = _geraet()
         werte = weiss_cell_values(self.fx, 0, (255, 255, 255))
+        self.assertEqual(werte.get(2), 255)
+        self.assertNotIn(1, werte)
+        werte = weiss_cell_values(self.fx, 0, (255, 255, 255),
+                                  drive_intensity=False)
         self.assertNotIn(1, werte)
         self.assertNotIn(2, werte)
 
