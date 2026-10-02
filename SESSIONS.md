@@ -9,7 +9,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| TOOL-3 | C | fix/tool3-generator-pfade | 2026-10-01T21:11Z | tools/build_full_show.py · tools/build_spot90_testshow.py · tools/_profil.py · tools/README.md · tests/test_tool3_generator_annahmen.py · BACKLOG.md |
 | PROC-08 | C | fix/proc08-blocker-verfall | 2026-10-01T21:24Z | tools/session_claim.py · COORDINATION.md · tests/test_proc08_blocker_verfall.py · changelog.d/2026-10-02-PROC-08.md |
 | FM-46 | C | docs/fm46-befund | 2026-10-01T21:35Z | BACKLOG.md |
 | DOC-14 | C | fix/doc14-schaukasten-19 | 2026-10-01T21:37Z | tools/build_vc_widgets_showcase.py · docs/anleitung_vc_widgets/README.md · docs/anleitung_vc_widgets/_capture/geometry.json · tests/test_doc14_schaukasten_alle_typen.py · changelog.d/2026-10-02-DOC-14.md |
@@ -175,7 +174,6 @@
 
 ## Verlauf
 
-- 2026-10-01T21:00Z C claim TOOL-5
 - 2026-10-01T21:03Z C claim TOOL-4
 - 2026-10-01T21:03Z A claim VCB-11
 - 2026-10-01T21:08Z C claim TOOL-1
@@ -205,3 +203,4 @@
 - 2026-10-01T23:27Z A done BPM-25
 - 2026-10-01T23:41Z A done DOC-19
 - 2026-10-01T23:55Z C done ENG-27
+- 2026-10-02T00:10Z C done TOOL-3
