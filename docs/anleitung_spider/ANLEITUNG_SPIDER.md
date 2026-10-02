@@ -4,7 +4,8 @@
 > pro Bar**, **Tilt-Bewegung (Scheren/Wippe)** und die Spider-Fader.
 >
 > Show: `shows/Event_Demo_2026.lshow`, **Bank 5 „Spider"** (SCENE-Taste 5). Rig: Spider Links
-> @ DMX 87, Spider Rechts @ 101 — vorne vor PAR 1 und PAR 8.
+> @ DMX 87, Spider Rechts @ 101 — vorne vor PAR 1 und PAR 8. Die Show liegt nicht im Repo — sie
+> entsteht mit `venv/bin/python tools/build_event_demo_2026.py`.
 
 ![Bank 5 Übersicht](img/01_bank5_uebersicht.png)
 
@@ -16,7 +17,9 @@
 
 ## 1. Farb-Themes (Reihe 0)
 
-Ein **Theme** färbt die linke und rechte Bar **unterschiedlich** (exklusiv):
+Ein **Theme** färbt die linke und rechte Bar **unterschiedlich**. Exklusiv heißt hier: eine
+Theme-Taste stoppt beim Einschalten **alle** laufenden Funktionen und leert den Programmer —
+eine laufende Bewegung danach neu starten:
 
 | Taste | Bar Links | Bar Rechts |
 |---|---|---|
@@ -34,27 +37,28 @@ sofort. Die zweifarbigen Themes geben den klassischen „Spider-Flower"-Look.
 | Taste | Wirkung |
 |---|---|
 | **Spider Schere** | beide Bars schwenken gegenphasig auf/zu (Scheren-Effekt) |
-| **Spider Wippe** | versetzte Tilt-Wippe |
+| **Spider Wippe** | beide Bars wippen auf der Tilt-Achse (Linie, senkrecht gestellt) |
 | **Alle Mover Fächer** | EFX über **alle** Mover (MH + Spider) gemeinsam |
 | **Spider Strobe** (rote Taste, Flash) | Blitz, solange gehalten |
 
-> Beim Schwenken wird der zweite Tilt-Kopf automatisch gegenphasig gesetzt (255 − Tilt) —
-> deshalb fahren die Bars sauber auf- und zueinander.
+> Der zweite Tilt-Kopf fährt dieselbe Figur um eine halbe Periode versetzt (EFX-Wert
+> „Kopf-Welle" = 100 %) — beim Kreis ergibt das die gegenphasige Schere, die Bars fahren sauber
+> auf- und zueinander.
 
 ## 3. Bewegung anpassen (Reihe 2) & Gruppe (Reihe 3)
 
 | Taste | Wirkung |
 |---|---|
-| **Richtung** | Laufrichtung der Spider-Bewegung umkehren |
-| **Neustart** | Bewegung neu starten |
+| **Richtung** | kehrt die Laufrichtung von **Spider Schere** um (nur diese Bewegung) |
+| **Neustart** | startet **Spider Schere** neu — nur bei freiem Lauf sichtbar; läuft eine BPM, bestimmt der Takt die Phase |
 | **Spider wählen** | Gruppe „Spider" selektieren (für Programmer/Fader) |
 
 ## 4. Die Spider-Fader
 
 | Fader | Funktion |
 |---|---|
-| **Spider-Speed** | Tempo der Tilt-Bewegung |
-| **Spider-Größe** | Auslenkung (Tilt-Hub) |
+| **Spider-Speed** | Tempo-Faktor von Spider Schere/Wippe — wirkt nur, solange **keine BPM** läuft (sonst ein Umlauf pro Beat) |
+| **Spider-Größe** | Auslenkung (Tilt-Hub) von Spider Schere/Wippe |
 | **Spider-Dim** | Helligkeit der Gruppe „Spider" |
 
 ---

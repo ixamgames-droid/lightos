@@ -401,7 +401,7 @@ FX_MATRICES = [fx_fire, fx_rain, fx_radar, fx_spiral, fx_wipe, fx_wave]
 # ── EFX (Bewegung) ──────────────────────────────────────────────────────────────────
 def efx(name, algo, fids, phase_mode="fan", spread=1.0, counter=False, mirror=False,
         x=128.0, y=128.0, size=150.0, speed_hz=0.45, xf=3.0, yf=2.0, direction="forward",
-        bus="", mult=1.0):
+        bus="", mult=1.0, rotation=0.0):
     e = fm.new_efx(name)
     e.algorithm = algo
     e.fixtures = [EfxFixture(fid=f) for f in fids]
@@ -411,6 +411,7 @@ def efx(name, algo, fids, phase_mode="fan", spread=1.0, counter=False, mirror=Fa
     e.phase_mode, e.counter_rotate, e.mirror = phase_mode, counter, mirror
     e.x_freq, e.y_freq = xf, yf
     e.direction = direction
+    e.rotation = rotation
     if bus:
         e.tempo_bus_id = bus
         e.tempo_multiplier = mult
@@ -424,7 +425,11 @@ efx_mh_eight = efx("MH Acht", EfxAlgorithm.EIGHT, mh_fids, phase_mode="sync", si
 efx_mh_lissa = efx("MH Lissajous", EfxAlgorithm.LISSAJOUS, mh_fids, phase_mode="fan", size=170, speed_hz=0.4, xf=3.0, yf=2.0)
 efx_mh_square = efx("MH Rechteck", EfxAlgorithm.SQUARE, mh_fids, phase_mode="sync", size=150, speed_hz=0.35)
 efx_spider_scissor = efx("Spider Schere", EfxAlgorithm.CIRCLE, spider_fids, phase_mode="sync", size=200, speed_hz=0.6)
-efx_spider_line = efx("Spider Wippe", EfxAlgorithm.LINE, spider_fids, phase_mode="offset", size=220, speed_hz=0.7)
+# DOC-37: LINE laeuft auf der Pan-Achse — der Spider hat keine, ohne rotation=90
+# blieb die Wippe stehen (gemessen: beide Tilts konstant 128). Wie in
+# build_demo_show_full.py („Spider Schere"): senkrecht auf die Tilt-Achse drehen.
+efx_spider_line = efx("Spider Wippe", EfxAlgorithm.LINE, spider_fids, phase_mode="offset",
+                      size=220, speed_hz=0.7, rotation=90.0)
 efx_all = efx("Alle Mover Fächer", EfxAlgorithm.CIRCLE, mover_fids, phase_mode="fan", counter=True, size=150, speed_hz=0.5)
 EFX_MH = [efx_mh_circle, efx_mh_fan, efx_mh_eight, efx_mh_lissa, efx_mh_square]
 EFX_SPIDER = [efx_spider_scissor, efx_spider_line]
