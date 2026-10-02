@@ -209,6 +209,43 @@ _HTML_PATH = os.path.normpath(os.path.join(
     os.path.dirname(__file__), "..", "src", "ui", "visualizer", "stage_scene.html"))
 
 
+class StartstatusLesenTest(unittest.TestCase):
+    """VIZ-65: PySide 6.11 reicht ein JS-Array als ``''`` durch — der Waechter
+    hielt dadurch jede gesunde Szene fuer tot. Die Abfrage liefert jetzt einen
+    JSON-String; ``lese_startstatus`` nimmt beides."""
+
+    def test_json_string_wird_gelesen(self):
+        self.assertEqual(VW.lese_startstatus('[true, ""]'), (True, ""))
+        self.assertEqual(VW.lese_startstatus('[false, "WebGL weg"]'),
+                         (False, "WebGL weg"))
+
+    def test_liste_alter_qt_versionen_bleibt_gueltig(self):
+        self.assertEqual(VW.lese_startstatus([True, ""]), (True, ""))
+
+    def test_leere_oder_kaputte_antwort_ist_nicht_bereit(self):
+        for r in ("", None, "kein json", "[]", 7):
+            self.assertEqual(VW.lese_startstatus(r), (False, ""), repr(r))
+
+    def test_abfrage_liefert_einen_string(self):
+        self.assertTrue(VW.SCENE_START_JS.startswith("JSON.stringify("))
+
+    def test_gesunde_szene_mit_string_antwort_laedt_nichts_neu(self):
+        reloads = []
+        orig = VW.load_stage_html
+        VW.load_stage_html = lambda v: reloads.append(v)
+        try:
+            view = _FakeView('[true, ""]')
+            meldungen = []
+            VW.install_scene_start_guard(view, status_cb=meldungen.append,
+                                         schedule=lambda ms, fn: fn())
+            view.loadFinished.emit(True)
+            view.loadFinished.emit(True)
+        finally:
+            VW.load_stage_html = orig
+        self.assertEqual(reloads, [], "gesunde Szene darf nicht neu laden")
+        self.assertEqual(meldungen, [])
+
+
 class SceneErrorListenerTest(unittest.TestCase):
     """Der error-Listener in der AUSGELIEFERTEN stage_scene.html.
 
@@ -262,6 +299,23 @@ class SceneErrorListenerTest(unittest.TestCase):
             time.sleep(0.05)
         self.assertTrue(box, f"runJavaScript-Callback blieb aus: {js}")
         return box[0]
+
+    def test_startabfrage_kommt_von_der_echten_seite_lesbar_an(self):
+        """VIZ-65: gegen echtes QtWebEngine — die Antwort muss sich lesen
+        lassen (vorher kam das Array als ``''`` an)."""
+        from PySide6.QtCore import QUrl
+        url = QUrl.fromLocalFile(_HTML_PATH)
+        url.setQuery(f"v={int(time.time() * 1000)}")
+        self._view.load(url)
+        ende = time.monotonic() + 40.0
+        while not self._loaded and time.monotonic() < ende:
+            self._app.processEvents()
+            time.sleep(0.05)
+        self.assertTrue(self._loaded and self._loaded[-1], "Page nicht geladen")
+        self._eval("window.__lightosAppReady = true; 1")
+        r = self._eval(VW.SCENE_START_JS)
+        self.assertIsInstance(r, str)
+        self.assertEqual(VW.lese_startstatus(r), (True, ""))
 
     def test_listener_faengt_den_ersten_fehler_und_haelt_ihn_fest(self):
         from PySide6.QtCore import QUrl
