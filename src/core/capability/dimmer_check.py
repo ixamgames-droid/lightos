@@ -308,8 +308,89 @@ def statische_befunde(show: dict) -> list[Finding]:
     return befunde
 
 
+def weiss_zuordnung_befunde(show: dict) -> list[Finding]:
+    """FM-46 (Etappe 2): Geraete auf der WEISS-Achse einer Matrix, deren
+    mehrere Dimmer keinem Weiss-Segment zugeordnet sind (oder unstimmig).
+
+    ★ Bewusst NICHT in :func:`statische_befunde`: dort steht die Frage „bleibt
+    das Geraet dunkel" mit ihren eigenen Schweigeregeln (unlesbare
+    Funktionsarten, hebende Regler). Diese Frage ist eine andere — „weiss die
+    Bibliothek, welcher Dimmer welches Segment dimmt" — und haengt allein an
+    Patch + Profil. Ohne Zuordnung leuchtet die Matrix trotzdem (bei
+    ``drive_intensity`` fahren alle freien Dimmer gemeinsam,
+    ``app_state.weiss_rueckfall_dimmer``), darum eine WARNUNG.
+
+    Dieselbe Pruefung wie Fixture-Editor und RGB-Matrix-Editor
+    (``dimmer_segmente.zuordnung_fehlt`` / ``zuordnung_probleme``). Ein Profil,
+    das die Bibliothek dieses Rechners nicht kennt, liefert keine Kanaele und
+    damit keinen Befund (schweigen statt raten, wie oben).
+    """
+    patch = show.get("patch")
+    if not isinstance(patch, list):
+        return []
+    weiss_fids: dict[int, list[str]] = {}
+    for f in _funktionen(show):
+        if f.get("type") != "RGBMatrix":
+            continue
+        # Nur Farb-Stile fahren die Weiss-Achse (``_weiss_achse_schreiben``
+        # steigt unter Dimmer/Shutter aus) — sonst gibt es nichts zu melden.
+        if str(f.get("style", "RGB")) not in ("RGB", "RGBW"):
+            continue
+        for sub in (f.get("weiss_grid") or []):
+            if not isinstance(sub, (tuple, list)) or len(sub) != 2:
+                continue
+            fid = _zahl(sub[0], -1)
+            namen = weiss_fids.setdefault(fid, [])
+            name = f"'{f.get('name', '?')}'"
+            if name not in namen:
+                namen.append(name)
+    weiss_fids.pop(-1, None)
+    if not weiss_fids:
+        return []
+    from types import SimpleNamespace
+    try:
+        from src.core.app_state import get_channels_for_patched
+        from src.core.dimmer_segmente import zuordnung_fehlt, zuordnung_probleme
+    except Exception:
+        return []
+    befunde: list[Finding] = []
+    for i, pf in enumerate(patch):
+        if not isinstance(pf, dict):
+            continue
+        fid = _zahl(pf.get("fid"), -1)
+        if fid not in weiss_fids:
+            continue
+        fake = SimpleNamespace(
+            fixture_profile_id=_zahl(pf.get("fixture_profile_id"), 0),
+            mode_name=str(pf.get("mode_name") or ""),
+            channel_count=_zahl(pf.get("channel_count"), 1),
+            address=_zahl(pf.get("address"), 1),
+            spider_dual_tilt=bool(pf.get("spider_dual_tilt", False)))
+        try:
+            chans = list(get_channels_for_patched(fake) or ())
+        except Exception:
+            continue
+        if zuordnung_fehlt(chans):
+            was = "keinem Weiss-Segment zugeordnet"
+        elif zuordnung_probleme(chans):
+            was = "unvollstaendig oder widerspruechlich zugeordnet"
+        else:
+            continue
+        label = str(pf.get("label") or f"fid {fid}")
+        befunde.append(Finding(
+            WARNING, "WEISS-DIMMER-ZUORDNUNG", f"patch[{i}] '{label}'",
+            f"liegt auf der Weiss-Achse von {', '.join(weiss_fids[fid])}, hat "
+            f"mehrere Dimmer, und die sind {was}. Mit drive_intensity fahren "
+            f"dann alle freien Dimmer (keinem anderen Segment und keinem "
+            f"Farbteil zugeordnet) gemeinsam; ohne bleibt es beim Nutzer. "
+            f"Zuordnung im Fixture-Editor setzen (Spalte 'Weiß-Segment').",
+            "app_state.weiss_rueckfall_dimmer (FM-46)"))
+    return befunde
+
+
 def befunde_lshow(path: str) -> list[Finding]:
-    """:func:`statische_befunde` fuer eine ``.lshow``/``show.json``-Datei.
+    """:func:`statische_befunde` und :func:`weiss_zuordnung_befunde` fuer eine
+    ``.lshow``/``show.json``-Datei.
 
     Ein Fehler beim Lesen ist hier KEIN Befund: ``validate_lshow`` laeuft im
     Linter vorher ueber dieselbe Datei und meldet das bereits — zweimal
@@ -317,9 +398,16 @@ def befunde_lshow(path: str) -> list[Finding]:
     """
     try:
         from .validate import _load_show_json
-        return statische_befunde(_load_show_json(path))
+        show = _load_show_json(path)
     except Exception:
         return []
+    out: list[Finding] = []
+    for pruefung in (statische_befunde, weiss_zuordnung_befunde):
+        try:
+            out.extend(pruefung(show))
+        except Exception:
+            continue
+    return out
 
 
 def _basiswert_auf_dimmer(show: dict, fid: int) -> bool:
