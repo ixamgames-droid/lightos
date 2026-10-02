@@ -56,7 +56,6 @@
 | OUT-58 | C | - | 2026-10-02T12:51Z | src/ui/widgets/output_config.py · tests/test_out58_universen_tabelle_nachladen.py · BACKLOG.md · changelog.d/2026-10-02-OUT-58.md |
 | VCB-35 | C | - | 2026-10-02T12:53Z | BACKLOG.md |
 | WEB-06 | C | - | 2026-10-02T12:53Z | BACKLOG.md |
-| BPM-21 | B | fix/bpm21-wasapi-aussetzer | 2026-10-02T12:58Z | src/core/audio/capture.py · src/core/audio/level_meter.py · src/ui/bpm_status_rules.py · src/ui/views/bpm_manager_view.py · tests/test_bpm21_wasapi_aussetzer.py · BACKLOG.md |
 | DOC-54 | C | - | 2026-10-02T13:02Z | docs/anleitung_speed_bpm/ANLEITUNG_SPEED_BPM.md |
 | DOC-55 | C | - | 2026-10-02T13:04Z | docs/anleitung_einmessen/ANLEITUNG_EINMESSEN.md |
 | DOC-56 | C | - | 2026-10-02T13:05Z | docs/anleitung_web_remote/ANLEITUNG.md |
@@ -149,7 +148,6 @@
 
 ## Verlauf
 
-- 2026-10-02T12:24Z A claim VIZ-66
 - 2026-10-02T12:26Z A claim FM-56
 - 2026-10-02T12:26Z C claim DOC-53
 - 2026-10-02T12:27Z A done FM-46
@@ -179,3 +177,4 @@
 - 2026-10-02T22:03Z B done XPLAT-45
 - 2026-10-02T22:03Z B done FUNKTIONSTEST-B3
 - 2026-10-02T22:08Z A claim SAMMEL-DOKU-C
+- 2026-10-02T22:11Z B done BPM-21
