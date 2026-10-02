@@ -38,6 +38,7 @@
 | DOC-37 | C | - | 2026-10-02T10:59Z | docs/anleitung_spider/ANLEITUNG_SPIDER.md · tools/build_event_demo_2026.py · tests/test_doc37_spider_wippe.py · changelog.d/2026-10-02-DOC-37.md |
 | DOC-38 | C | - | 2026-10-02T11:07Z | docs/anleitung_3d_geraete_ohne_rgb/ANLEITUNG_3D_GERAETE_OHNE_RGB.md |
 | DOC-39 | C | - | 2026-10-02T11:09Z | docs/anleitung_3d_visualizer_2026/ANLEITUNG_3D_BUEHNE.md |
+| DOC-40 | C | - | 2026-10-02T11:11Z | docs/anleitung_farbchase/ANLEITUNG_FARBCHASE.md |
 
 ## Blocker & Fallen
 
@@ -102,7 +103,6 @@
 
 ## Verlauf
 
-- 2026-10-02T08:42Z A claim PROC-18
 - 2026-10-02T08:45Z A done DOC-22
 - 2026-10-02T08:58Z C done QA-68
 - 2026-10-02T09:21Z C claim XPLAT-44
@@ -132,3 +132,4 @@
 - 2026-10-02T10:59Z C claim DOC-37
 - 2026-10-02T11:07Z C claim DOC-38
 - 2026-10-02T11:09Z C claim DOC-39
+- 2026-10-02T11:11Z C claim DOC-40
