@@ -5,21 +5,32 @@
 > Zelle). Sie schreibt nur **Farbe** (kombinierbar mit einer Dimmer-Matrix als Helligkeits-Ebene).
 > Für den konkreten *Blau-Weiß-Chase* siehe die Anleitung **Farbchase** — hier das allgemeine Prinzip.
 
+> **Wichtig – Helligkeit:** Eine Farb-Matrix schreibt nur R/G/B(/W) und lässt den
+> **Dimmer-Kanal** in Ruhe. Geräte mit eigenem Dimmer, der standardmäßig auf 0 steht (z. B.
+> Generic „LED PAR Dimmer+RGB 4ch"), bleiben deshalb **dunkel**, bis etwas den Dimmer öffnet:
+> der Menüschalter **Programmer → „Farbe macht automatisch hell"** (bei neuen Shows aus), eine
+> **Dimmer-Matrix** (Stil *Dimmer*) oder ein Wert im Programmer-Reiter **Intensity**. Geräte
+> ohne Dimmer-Kanal leuchten sofort.
+
 ---
 
 ## 1. Anlegen
 
-Programmer → Tab **Matrix** → **+ Neu** → in **Grundeinstellungen**:
+Erst die **Gruppe** in der Gruppen-Liste wählen (z. B. *Farb-Matrix (10)* = alle PAR + Spider),
+dann Programmer → Tab **Matrix** → **+ Neu** → in **Grundeinstellungen**:
 
 - **Stil: RGB** (reine Farbe) oder **RGBW** (mit Weiß-Kanal — z. B. Spider/RGBW-PAR).
-- **Spalten:** so viele wie Geräte, **Reihen: 1** (oder ein echtes 2D-Raster für Flächen).
 - **Algorithmus** wählen (siehe unten).
+- **💾 Speichern**, dann in der Liste links **▶ Start**. Gestartet wird immer die
+  **gespeicherte** Fassung — ungespeicherte Änderungen (Hinweis „● ungespeicherte Änderungen")
+  wirken nicht auf den laufenden Effekt.
 
-Das **Raster folgt der Programmer-Auswahl**: erst die Gruppe wählen (z. B. *Farb-Matrix (10)* =
-alle PAR + Spider), dann deckt die Matrix genau diese Geräte ab. Steht „0 Fixtures", die Gruppe in
-der Gruppen-Liste **neu anklicken**.
+**Spalten/Zeilen** stellst du nicht von Hand ein: das **Raster folgt der Programmer-Auswahl** —
+bei einer Gruppe deren Raster (auch 2D), bei loser Auswahl eine Zeile mit allen Geräten. Die
+neue Matrix gehört zu der Gruppe, die beim **+ Neu** aktiv war, und erscheint nur unter ihr in der
+Liste. Steht „0 Fixtures", die Gruppe in der Gruppen-Liste **neu anklicken**.
 
-![Farb-Matrix im Editor (Style RGB, Chase)](img/01_matrix_rgb.png)
+![Farb-Matrix im Editor (Stil RGB, Chase)](img/01_matrix_rgb.png)
 
 ## 2. Algorithmen (Auswahl)
 
@@ -35,23 +46,26 @@ ihre Farben selbst — dort blendet der Editor die Farbauswahl aus.
 > jetzt ein **Chase** mit Schweif (Regler „Schweif (%)"), ein Ripple ist eine **Wave** mit
 > Ursprung *radial*. Alte Shows mit diesen Namen laden weiterhin (Legacy-Migration).
 
-- **„Farbe pro Runde wechseln" (color_cycle):** schaltet von Einzelfarbe auf eine ganze
-  **Farbfolge** (Color Sequence) um — dann läuft z. B. ein Chase Blau→Weiß→Grün.
+- **„Farbe pro Runde wechseln" (color_cycle)** — nur bei Algorithmus **Chase**, in der Gruppe
+  **Farben**: schaltet von Einzelfarbe auf eine ganze **Farbfolge** (Color Sequence) um — dann
+  läuft der Chase z. B. Blau→Weiß→Grün.
 - **Läufer-Anzahl / Schweif (%):** mehr/dichtere Läufer bzw. weicher Übergang hinter dem
   Läufer (0 % = harter Wechsel, 100 % = langer weicher Übergang). Beides nur bei Chase mit
   Bewegung *normal*.
 
-## 3. Style RGBW (Weiß-Kanal)
+## 3. Stil RGBW (Weiß-Kanal)
 
-Mit **Style RGBW** treibt die Matrix zusätzlich den **Weiß-Kanal** (Spider/RGBW-PAR) — sattere,
-hellere Mischfarben. Ein eigener Weißanteil ist **nicht** einstellbar: RGBW erzeugt echtes Weiß
-automatisch über den W-Kanal.
+Mit **Stil RGBW** legt die Matrix den **gemeinsamen Weißanteil** einer Farbe auf die weiße LED
+(Spider/RGBW-PAR): Reines Weiß kommt nur aus dem W-Kanal, Pastelltöne werden sauberer, reine
+Farben (Rot, Grün, Blau …) bleiben unverändert. Ein eigener Weißanteil ist **nicht**
+einstellbar.
 
 ## 4. Kombinieren
 
 Farbe (diese Matrix) + Helligkeit (Dimmer-Matrix) + Bewegung (EFX) sind **getrennte Ebenen** über
-denselben Geräten — siehe *Dimmer-Matrix* (relative Geschwindigkeit) und *EFX*. So sieht eine
-laufende Farb-Matrix aus:
+denselben Geräten — siehe *Dimmer-Matrix* (relative Geschwindigkeit) und *EFX*. Stehen im
+Programmer noch Farbwerte für diese Geräte, überdecken sie die Matrix — vorher **Programmer
+leeren**. So sieht eine laufende Farb-Matrix aus:
 
 ![Farb-Matrix](../tutorial_matrix/gif/farb_matrix.gif)
 
@@ -59,6 +73,7 @@ laufende Farb-Matrix aus:
 
 ---
 
-**Kurz:** Matrix-Tab → **+ Neu** → **Style RGB/RGBW** + Algorithmus → Spalten = Geräte → Gruppe
-auswählen (Raster folgt) → optional „Farbe pro Runde wechseln" + Color Sequence. Kombinierbar mit
+**Kurz:** Gruppe wählen → Matrix-Tab → **+ Neu** → **Stil RGB/RGBW** + Algorithmus (Raster folgt
+der Gruppe) → optional „Farbe pro Runde wechseln" + Color Sequence → **💾 Speichern** →
+**▶ Start**. Bleiben Geräte dunkel: Dimmer öffnen (siehe Kasten oben). Kombinierbar mit
 Dimmer-Matrix (Helligkeit) und EFX (Bewegung).
