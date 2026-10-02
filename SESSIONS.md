@@ -22,6 +22,7 @@
 | UI-56 | C | - | 2026-10-02T10:14Z | src/core/attr_groups.py · src/ui/views/snap_file_panel.py · docs/anleitung_szenen_cues/ANLEITUNG.md · tests/test_ui56_optik.py · BACKLOG.md |
 | DOC-23 | C | - | 2026-10-02T10:20Z | docs/anleitung_erste_schritte/ANLEITUNG.en.md · docs/anleitung_erste_schritte/ANLEITUNG.md · docs/ANLEITUNGEN.md · changelog.d/2026-10-02-DOC-23.md |
 | DOC-24 | C | - | 2026-10-02T10:21Z | docs/anleitung_programmer_grundlagen/ANLEITUNG.en.md · docs/anleitung_programmer_grundlagen/ANLEITUNG.md · docs/ANLEITUNGEN.md · changelog.d/2026-10-02-DOC-24.md |
+| DOC-25 | C | - | 2026-10-02T10:23Z | docs/anleitung_szenen_cues/ANLEITUNG.en.md · docs/anleitung_szenen_cues/ANLEITUNG.md · docs/ANLEITUNGEN.md · changelog.d/2026-10-02-DOC-25.md |
 
 ## Blocker & Fallen
 
@@ -84,7 +85,6 @@
 
 ## Verlauf
 
-- 2026-10-02T07:13Z C claim TOOL-7
 - 2026-10-02T07:15Z C done FM-54
 - 2026-10-02T07:18Z A claim DOC-22
 - 2026-10-02T07:26Z A uebernimmt FM-46 von C (Claim verfallen)
@@ -114,3 +114,4 @@
 - 2026-10-02T10:14Z C claim UI-56
 - 2026-10-02T10:20Z C claim DOC-23
 - 2026-10-02T10:21Z C claim DOC-24
+- 2026-10-02T10:23Z C claim DOC-25
