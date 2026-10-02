@@ -1,0 +1,246 @@
+{
+  "format_version": 1,
+  "hersteller": "Eurolite",
+  "hersteller_kurz": "Eurolite",
+  "modell": "LED Theatre COB 200 RGB+WW",
+  "kurzname": "LED Theatre COB 200 RGB+WW",
+  "typ": "par",
+  "leistung_w": 140,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Eurolite-LED-Theatre-COB-200-RGB+WW.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Eurolite/Eurolite-LED-Theatre-COB-200-RGB+WW.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.8 GIT · Florian Faber",
+    "original": "resources/fixtures/Eurolite/Eurolite-LED-Theatre-COB-200-RGB+WW.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 95 Wertebereiche mit Art (kind) versehen; Weiss-Kanal als Warmweiss benannt (RGB+WW); Farbvoreinstellung 'Full on' als 'color'; Programmgeschwindigkeit speed -> effect_speed"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Datei und die LightOS-Attributliste geprueft (Attribute, Bereichs-Arten, Defaults, Raster); Herstellerhandbuch mit DMX-Tabelle war nicht abrufbar (Steinigke liefert nur Datenblaetter ohne DMX-Protokoll), daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "6 Channel",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Warmweiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Sound Control", "art": "sound"},
+            {"von": 10, "bis": 255, "name": "Strobe", "art": "strobe"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4 Channel",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Warmweiss", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "10 Channel",
+      "kanaele": [
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Sound Control", "art": "sound"},
+            {"von": 10, "bis": 255, "name": "Strobe", "art": "strobe"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Warmweiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Preset Colors",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": ""},
+            {"von": 10, "bis": 19, "name": "Red", "art": "color"},
+            {"von": 20, "bis": 29, "name": "Green", "art": "color"},
+            {"von": 30, "bis": 39, "name": "Blue", "art": "color"},
+            {"von": 40, "bis": 49, "name": "Warm white", "art": "color"},
+            {"von": 50, "bis": 59, "name": "Yellow", "art": "color"},
+            {"von": 60, "bis": 69, "name": "Magenta", "art": "color"},
+            {"von": 70, "bis": 79, "name": "Cyan", "art": "color"},
+            {"von": 80, "bis": 89, "name": "Dark orange", "art": "color"},
+            {"von": 90, "bis": 99, "name": "Green yellow", "art": "color"},
+            {"von": 100, "bis": 109, "name": "Salmon", "art": "color"},
+            {"von": 110, "bis": 119, "name": "Turquoise", "art": "color"},
+            {"von": 120, "bis": 129, "name": "Light green", "art": "color"},
+            {"von": 130, "bis": 139, "name": "Orange", "art": "color"},
+            {"von": 140, "bis": 149, "name": "Straw", "art": "color"},
+            {"von": 150, "bis": 159, "name": "Lavender", "art": "color"},
+            {"von": 160, "bis": 169, "name": "Light blue", "art": "color"},
+            {"von": 170, "bis": 179, "name": "Dark blue", "art": "color"},
+            {"von": 180, "bis": 189, "name": "Pink", "art": "color"},
+            {"von": 190, "bis": 255, "name": "Full on", "art": "color"}
+          ]
+        },
+        {
+          "name": "Internal programs",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": ""},
+            {"von": 10, "bis": 19, "name": "Auto program 1", "art": ""},
+            {"von": 20, "bis": 29, "name": "Auto program 2", "art": ""},
+            {"von": 30, "bis": 39, "name": "Auto program 3", "art": ""},
+            {"von": 40, "bis": 49, "name": "Auto program 4", "art": ""},
+            {"von": 50, "bis": 59, "name": "Auto program 5", "art": ""},
+            {"von": 60, "bis": 69, "name": "Auto program 6", "art": ""},
+            {"von": 70, "bis": 79, "name": "Auto program 7", "art": ""},
+            {"von": 80, "bis": 89, "name": "Auto program 8", "art": ""},
+            {"von": 90, "bis": 99, "name": "Auto program 9", "art": ""},
+            {"von": 100, "bis": 109, "name": "Sound control program 1", "art": "sound"},
+            {"von": 110, "bis": 119, "name": "Sound control program 2", "art": "sound"},
+            {"von": 120, "bis": 129, "name": "Sound control program 3", "art": "sound"},
+            {"von": 130, "bis": 139, "name": "Sound control program 4", "art": "sound"},
+            {"von": 140, "bis": 149, "name": "Sound control program 5", "art": "sound"},
+            {"von": 150, "bis": 159, "name": "Sound control program 6", "art": "sound"},
+            {"von": 160, "bis": 169, "name": "Sound control program 7", "art": "sound"},
+            {"von": 170, "bis": 179, "name": "Sound control program 8", "art": "sound"},
+            {"von": 180, "bis": 255, "name": "Sound control program 9", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Speed Internal programs",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Speed internal programs, increasing", "art": ""}
+          ]
+        },
+        {
+          "name": "Farbtemperatur (Presets)",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": ""},
+            {"von": 10, "bis": 39, "name": "1800K", "art": ""},
+            {"von": 40, "bis": 69, "name": "2200K", "art": ""},
+            {"von": 70, "bis": 99, "name": "2700K", "art": ""},
+            {"von": 100, "bis": 129, "name": "3200K", "art": ""},
+            {"von": 130, "bis": 159, "name": "4300K", "art": ""},
+            {"von": 160, "bis": 189, "name": "5600K", "art": ""},
+            {"von": 190, "bis": 219, "name": "6500K", "art": ""},
+            {"von": 220, "bis": 255, "name": "8000K", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3 Channel",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "5 Channel",
+      "kanaele": [
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Sound Control", "art": "sound"},
+            {"von": 10, "bis": 255, "name": "Strobe", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Preset Colors",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": ""},
+            {"von": 10, "bis": 19, "name": "Red", "art": "color"},
+            {"von": 20, "bis": 29, "name": "Green", "art": "color"},
+            {"von": 30, "bis": 39, "name": "Blue", "art": "color"},
+            {"von": 40, "bis": 49, "name": "Warm white", "art": "color"},
+            {"von": 50, "bis": 59, "name": "Yellow", "art": "color"},
+            {"von": 60, "bis": 69, "name": "Magenta", "art": "color"},
+            {"von": 70, "bis": 79, "name": "Cyan", "art": "color"},
+            {"von": 80, "bis": 89, "name": "Dark orange", "art": "color"},
+            {"von": 90, "bis": 99, "name": "Green yellow", "art": "color"},
+            {"von": 100, "bis": 109, "name": "Salmon", "art": "color"},
+            {"von": 110, "bis": 119, "name": "Turquoise", "art": "color"},
+            {"von": 120, "bis": 129, "name": "Light green", "art": "color"},
+            {"von": 130, "bis": 139, "name": "Orange", "art": "color"},
+            {"von": 140, "bis": 149, "name": "Straw", "art": "color"},
+            {"von": 150, "bis": 159, "name": "Lavender", "art": "color"},
+            {"von": 160, "bis": 169, "name": "Light blue", "art": "color"},
+            {"von": 170, "bis": 179, "name": "Dark blue", "art": "color"},
+            {"von": 180, "bis": 189, "name": "Pink", "art": "color"},
+            {"von": 190, "bis": 255, "name": "Full on", "art": "color"}
+          ]
+        },
+        {
+          "name": "Internal programs",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": ""},
+            {"von": 10, "bis": 19, "name": "Auto program 1", "art": ""},
+            {"von": 20, "bis": 29, "name": "Auto program 2", "art": ""},
+            {"von": 30, "bis": 39, "name": "Auto program 3", "art": ""},
+            {"von": 40, "bis": 49, "name": "Auto program 4", "art": ""},
+            {"von": 50, "bis": 59, "name": "Auto program 5", "art": ""},
+            {"von": 60, "bis": 69, "name": "Auto program 6", "art": ""},
+            {"von": 70, "bis": 79, "name": "Auto program 7", "art": ""},
+            {"von": 80, "bis": 89, "name": "Auto program 8", "art": ""},
+            {"von": 90, "bis": 99, "name": "Auto program 9", "art": ""},
+            {"von": 100, "bis": 109, "name": "Sound control program 1", "art": "sound"},
+            {"von": 110, "bis": 119, "name": "Sound control program 2", "art": "sound"},
+            {"von": 120, "bis": 129, "name": "Sound control program 3", "art": "sound"},
+            {"von": 130, "bis": 139, "name": "Sound control program 4", "art": "sound"},
+            {"von": 140, "bis": 149, "name": "Sound control program 5", "art": "sound"},
+            {"von": 150, "bis": 159, "name": "Sound control program 6", "art": "sound"},
+            {"von": 160, "bis": 169, "name": "Sound control program 7", "art": "sound"},
+            {"von": 170, "bis": 179, "name": "Sound control program 8", "art": "sound"},
+            {"von": 180, "bis": 255, "name": "Sound control program 9", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Speed Internal programs",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Speed internal programs, increasing", "art": ""}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Strobe-Kanal laut QLC+: 0-9 = Musiksteuerung, 10-255 = Strobe; ein Offen-Bereich ist dort nicht hinterlegt - am Geraet pruefen."
+}

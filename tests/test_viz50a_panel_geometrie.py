@@ -293,11 +293,18 @@ class NachtragTest(_LibraryCase):
         Geraet geprueft, sondern die MENGE: was ein frischer Seed an Formen
         anlegt, muss der Nachtrag in einer geleerten DB wiederherstellen."""
         from src.core.database.fixture_db import ensure_builtins
+        # FM-57: nur ``source='builtin'``. Die LightOS-Profile aus
+        # ``fixtures/bibliothek/`` tragen ihre Form ueber die Datei samt
+        # Stempel nach (siehe ``LightosFormKommtAusDerDateiTest``), nicht
+        # ueber die Liste in ``ensure_builtins``.
         with Session(self._eng) as s:
             soll = {(m.fixture.short_name, m.name): (m.grid_rows, m.grid_cols)
                     for m in s.execute(
                         select(FixtureMode)
+                        .join(FixtureProfile,
+                              FixtureMode.fixture_id == FixtureProfile.id)
                         .options(selectinload(FixtureMode.fixture))
+                        .where(FixtureProfile.source == "builtin")
                         .where(FixtureMode.grid_rows > 0)).scalars().all()}
         self.assertTrue(soll, "der Seed legt gar keine Formen an (Vorbedingung)")
         self._geometrie_loeschen()
@@ -306,7 +313,10 @@ class NachtragTest(_LibraryCase):
             ist = {(m.fixture.short_name, m.name): (m.grid_rows, m.grid_cols)
                    for m in s.execute(
                        select(FixtureMode)
+                       .join(FixtureProfile,
+                             FixtureMode.fixture_id == FixtureProfile.id)
                        .options(selectinload(FixtureMode.fixture))
+                       .where(FixtureProfile.source == "builtin")
                        .where(FixtureMode.grid_rows > 0)).scalars().all()}
         self.assertEqual(
             ist, soll,
@@ -377,6 +387,72 @@ class NachtragTest(_LibraryCase):
                 s, "ZQ06121", FDB._zq06121_modes_data()) is False,
                 "der Nachtrag meldet Arbeit, obwohl die Form schon steht")
             self.assertIsNotNone(prof)
+
+
+
+class LightosFormKommtAusDerDateiTest(_LibraryCase):
+    """★★ FM-57: Gegenstueck zu ``test_JEDE_geseedete_form_wird_nachgetragen``
+    fuer die mitgelieferten LightOS-Profile (``source='lightos'``).
+
+    Deren Rasterform steht in der Datei (``"raster"`` je Modus). In eine
+    bestehende Bibliothek kommt sie NICHT ueber die Liste in
+    ``ensure_builtins``, sondern ueber den Datei-Stempel: aendert sich die
+    Datei, spielt ``einspielen`` sie neu ein, und ``_vergleichsform`` sieht
+    die Form. Bewacht wird hier beides — die eingespielte Form ist die der
+    Datei, und ein Einspielen ohne Stempel stellt eine fehlende wieder her.
+    """
+
+    def setUp(self):
+        # Der Seed legt nur die Builtins an; die Dateien spielt der erste
+        # ``ensure_builtins`` je Engine ein — wie beim Programmstart.
+        super().setUp()
+        from src.core.database.fixture_db import ensure_builtins
+        ensure_builtins()
+
+    @staticmethod
+    def _aus_dateien():
+        from src.core.database import bibliothek_format as BF
+        soll = {}
+        for pfad in BF.bibliothek_dateien():
+            d = BF.lade_datei(pfad)
+            for m in d["modi"]:
+                r = m.get("raster") or {}
+                if r.get("rows") or r.get("cols"):
+                    soll[(d["hersteller"], d["modell"], m["name"])] = (
+                        int(r.get("rows") or 0), int(r.get("cols") or 0))
+        return soll
+
+    def _ist(self):
+        from src.core.database.models import Manufacturer
+        with Session(self._eng) as s:
+            return {(h, p, m): (gr, gc) for h, p, m, gr, gc in s.execute(
+                select(Manufacturer.name, FixtureProfile.name, FixtureMode.name,
+                       FixtureMode.grid_rows, FixtureMode.grid_cols)
+                .join(FixtureProfile, FixtureMode.fixture_id == FixtureProfile.id)
+                .join(Manufacturer,
+                      FixtureProfile.manufacturer_id == Manufacturer.id)
+                .where(FixtureProfile.source == "lightos")
+                .where((FixtureMode.grid_rows > 0)
+                       | (FixtureMode.grid_cols > 0)))}
+
+    def test_eingespielte_formen_sind_die_der_dateien(self):
+        soll = self._aus_dateien()
+        self.assertTrue(soll, "keine Datei der Bibliothek traegt eine "
+                              "Rasterform (Vorbedingung)")
+        self.assertEqual(self._ist(), soll)
+
+    def test_einspielen_stellt_eine_fehlende_form_wieder_her(self):
+        """Ein Einspielen ohne passenden Stempel (= die Datei hat sich
+        geaendert) muss die Form aus der Datei zurueckbringen — der Weg, auf
+        dem eine nachgereichte Form jede bestehende Bibliothek erreicht."""
+        from src.core.database import bibliothek_format as BF
+        soll = self._aus_dateien()
+        self._geometrie_loeschen()
+        self.assertEqual(self._ist(), {}, "Vorbedingung")
+        with Session(self._eng) as s:
+            BF.einspielen(s)
+            s.commit()
+        self.assertEqual(self._ist(), soll)
 
 
 class BibliotheksGeometrieTest(_LibraryCase):

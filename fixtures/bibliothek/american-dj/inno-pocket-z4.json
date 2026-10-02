@@ -1,0 +1,341 @@
+{
+  "format_version": 1,
+  "hersteller": "American DJ",
+  "hersteller_kurz": "ADJ",
+  "modell": "Inno Pocket Z4",
+  "kurzname": "INNOPOCKETZ4",
+  "typ": "moving_head",
+  "leistung_w": 67,
+  "quelle": {
+    "titel": "ADJ Inno Pocket Z4 User Manual (rev. 05/20/2022)",
+    "url": "https://assets.centryngroup.com/dl/files/INN119__DL__004.pdf",
+    "version": "05/20/2022",
+    "datum": "2022-05-20"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.3 GIT · Robert Box",
+    "original": "resources/fixtures/American_DJ/American-DJ-Inno-Pocket-Z4.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 145 Wertebereiche mit Art (kind) versehen; danach von LightOS gegen das Herstellerhandbuch ueberarbeitet: Dimmerkurven-Kanal als raw (Default 0, Highlight 0) statt intensity/macro; Shutter-Bereiche nach Handbuch klassifiziert (aus=closed, LED an=open, alle Strobe-/Puls-/Random-/Rampen-Bereiche=strobe), Default/Highlight auf Mitte des ersten Offen-Bereichs; irrefuehrende Bereichs-Arten (color/gobo/rotate/closed) an Programm-/Makro-/Funktionskanaelen entfernt; Farbmakros 1-32 mit Art color, Wechsel/Fade ohne Farb-Art; Farbwechsel- und Pan/Tilt-Makro-Speed als effect_speed statt speed; Sonderfunktionen als reset; Raster 1x2 (zwei RGBW-Zonen)"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal fuer Kanal gegen die DMX-Traits (16/19/22 Kanal, S. 19-21) im ADJ-Handbuch geprueft; nicht am Geraet getestet"
+  },
+  "modi": [
+    {
+      "name": "16 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan Fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt Fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Red 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Zoom", "attribut": "zoom", "default": 0, "highlight": 0},
+        {
+          "name": "Shutter/Strobe",
+          "attribut": "shutter",
+          "default": 11,
+          "highlight": 11,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Closed", "art": "closed"},
+            {"von": 8, "bis": 15, "name": "Open", "art": "open"},
+            {"von": 16, "bis": 131, "name": "Strobing slow - fast", "art": "strobe"},
+            {"von": 132, "bis": 139, "name": "Open", "art": "open"},
+            {"von": 140, "bis": 181, "name": "Fast close - slow open", "art": "strobe"},
+            {"von": 182, "bis": 189, "name": "Open", "art": "open"},
+            {"von": 190, "bis": 231, "name": "Slow close - fast open", "art": "strobe"},
+            {"von": 232, "bis": 239, "name": "Open", "art": "open"},
+            {"von": 240, "bis": 247, "name": "Random strobing", "art": "strobe"},
+            {"von": 248, "bis": 255, "name": "Open", "art": "open"}
+          ]
+        },
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Special Functions",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 69, "name": "No function", "art": ""},
+            {"von": 70, "bis": 79, "name": "Blackout with pan/tilt movement", "art": ""},
+            {"von": 80, "bis": 89, "name": "Disable blackout with pan/tilt movement", "art": ""},
+            {"von": 90, "bis": 199, "name": "No function", "art": ""},
+            {"von": 200, "bis": 209, "name": "Reset all", "art": "reset"},
+            {"von": 210, "bis": 255, "name": "No function", "art": ""}
+          ]
+        }
+      ],
+      "raster": {"rows": 1, "cols": 2}
+    },
+    {
+      "name": "19 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan Fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt Fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Red 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Farbmakros",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "No function", "art": ""},
+            {"von": 8, "bis": 11, "name": "Farbmakro 1", "art": "color"},
+            {"von": 12, "bis": 15, "name": "Farbmakro 2", "art": "color"},
+            {"von": 16, "bis": 19, "name": "Farbmakro 3", "art": "color"},
+            {"von": 20, "bis": 22, "name": "Farbmakro 4", "art": "color"},
+            {"von": 23, "bis": 26, "name": "Farbmakro 5", "art": "color"},
+            {"von": 27, "bis": 30, "name": "Farbmakro 6", "art": "color"},
+            {"von": 31, "bis": 34, "name": "Farbmakro 7", "art": "color"},
+            {"von": 35, "bis": 37, "name": "Farbmakro 8", "art": "color"},
+            {"von": 38, "bis": 41, "name": "Farbmakro 9", "art": "color"},
+            {"von": 42, "bis": 45, "name": "Farbmakro 10", "art": "color"},
+            {"von": 46, "bis": 48, "name": "Farbmakro 11", "art": "color"},
+            {"von": 49, "bis": 52, "name": "Farbmakro 12", "art": "color"},
+            {"von": 53, "bis": 56, "name": "Farbmakro 13", "art": "color"},
+            {"von": 57, "bis": 60, "name": "Farbmakro 14", "art": "color"},
+            {"von": 61, "bis": 63, "name": "Farbmakro 15", "art": "color"},
+            {"von": 64, "bis": 67, "name": "Farbmakro 16", "art": "color"},
+            {"von": 68, "bis": 71, "name": "Farbmakro 17", "art": "color"},
+            {"von": 72, "bis": 75, "name": "Farbmakro 18", "art": "color"},
+            {"von": 76, "bis": 79, "name": "Farbmakro 19", "art": "color"},
+            {"von": 80, "bis": 82, "name": "Farbmakro 20", "art": "color"},
+            {"von": 83, "bis": 85, "name": "Farbmakro 21", "art": "color"},
+            {"von": 86, "bis": 89, "name": "Farbmakro 22", "art": "color"},
+            {"von": 90, "bis": 93, "name": "Farbmakro 23", "art": "color"},
+            {"von": 94, "bis": 97, "name": "Farbmakro 24", "art": "color"},
+            {"von": 98, "bis": 101, "name": "Farbmakro 25", "art": "color"},
+            {"von": 102, "bis": 104, "name": "Farbmakro 26", "art": "color"},
+            {"von": 105, "bis": 108, "name": "Farbmakro 27", "art": "color"},
+            {"von": 109, "bis": 112, "name": "Farbmakro 28", "art": "color"},
+            {"von": 113, "bis": 115, "name": "Farbmakro 29", "art": "color"},
+            {"von": 116, "bis": 119, "name": "Farbmakro 30", "art": "color"},
+            {"von": 120, "bis": 123, "name": "Farbmakro 31", "art": "color"},
+            {"von": 124, "bis": 127, "name": "Farbmakro 32", "art": "color"},
+            {"von": 128, "bis": 191, "name": "Color changing", "art": ""},
+            {"von": 192, "bis": 255, "name": "Color fading", "art": ""}
+          ]
+        },
+        {
+          "name": "Color Change/Fade Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Slow - fast", "art": ""}
+          ]
+        },
+        {"name": "Zoom", "attribut": "zoom", "default": 0, "highlight": 0},
+        {
+          "name": "Shutter/Strobe",
+          "attribut": "shutter",
+          "default": 11,
+          "highlight": 11,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Closed", "art": "closed"},
+            {"von": 8, "bis": 15, "name": "Open", "art": "open"},
+            {"von": 16, "bis": 131, "name": "Strobing slow - fast", "art": "strobe"},
+            {"von": 132, "bis": 139, "name": "Open", "art": "open"},
+            {"von": 140, "bis": 181, "name": "Fast close - slow open", "art": "strobe"},
+            {"von": 182, "bis": 189, "name": "Open", "art": "open"},
+            {"von": 190, "bis": 231, "name": "Slow close - fast open", "art": "strobe"},
+            {"von": 232, "bis": 239, "name": "Open", "art": "open"},
+            {"von": 240, "bis": 247, "name": "Random strobing", "art": "strobe"},
+            {"von": 248, "bis": 255, "name": "Open", "art": "open"}
+          ]
+        },
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Special Functions",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 69, "name": "No function", "art": ""},
+            {"von": 70, "bis": 79, "name": "Blackout with pan/tilt movement", "art": ""},
+            {"von": 80, "bis": 89, "name": "Disable blackout with pan/tilt movement", "art": ""},
+            {"von": 90, "bis": 199, "name": "No function", "art": ""},
+            {"von": 200, "bis": 209, "name": "Reset all", "art": "reset"},
+            {"von": 210, "bis": 255, "name": "No function", "art": ""}
+          ]
+        },
+        {
+          "name": "Dimmer Curves",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 20, "name": "Standard", "art": ""},
+            {"von": 21, "bis": 40, "name": "Stage", "art": ""},
+            {"von": 41, "bis": 60, "name": "TV", "art": ""},
+            {"von": 61, "bis": 80, "name": "Architectural", "art": ""},
+            {"von": 81, "bis": 100, "name": "Theatre", "art": ""},
+            {"von": 101, "bis": 255, "name": "Default setting", "art": ""}
+          ]
+        }
+      ],
+      "raster": {"rows": 1, "cols": 2}
+    },
+    {
+      "name": "22 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan Fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt Fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Red 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Farbmakros",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "No function", "art": ""},
+            {"von": 8, "bis": 11, "name": "Farbmakro 1", "art": "color"},
+            {"von": 12, "bis": 15, "name": "Farbmakro 2", "art": "color"},
+            {"von": 16, "bis": 19, "name": "Farbmakro 3", "art": "color"},
+            {"von": 20, "bis": 22, "name": "Farbmakro 4", "art": "color"},
+            {"von": 23, "bis": 26, "name": "Farbmakro 5", "art": "color"},
+            {"von": 27, "bis": 30, "name": "Farbmakro 6", "art": "color"},
+            {"von": 31, "bis": 34, "name": "Farbmakro 7", "art": "color"},
+            {"von": 35, "bis": 37, "name": "Farbmakro 8", "art": "color"},
+            {"von": 38, "bis": 41, "name": "Farbmakro 9", "art": "color"},
+            {"von": 42, "bis": 45, "name": "Farbmakro 10", "art": "color"},
+            {"von": 46, "bis": 48, "name": "Farbmakro 11", "art": "color"},
+            {"von": 49, "bis": 52, "name": "Farbmakro 12", "art": "color"},
+            {"von": 53, "bis": 56, "name": "Farbmakro 13", "art": "color"},
+            {"von": 57, "bis": 60, "name": "Farbmakro 14", "art": "color"},
+            {"von": 61, "bis": 63, "name": "Farbmakro 15", "art": "color"},
+            {"von": 64, "bis": 67, "name": "Farbmakro 16", "art": "color"},
+            {"von": 68, "bis": 71, "name": "Farbmakro 17", "art": "color"},
+            {"von": 72, "bis": 75, "name": "Farbmakro 18", "art": "color"},
+            {"von": 76, "bis": 79, "name": "Farbmakro 19", "art": "color"},
+            {"von": 80, "bis": 82, "name": "Farbmakro 20", "art": "color"},
+            {"von": 83, "bis": 85, "name": "Farbmakro 21", "art": "color"},
+            {"von": 86, "bis": 89, "name": "Farbmakro 22", "art": "color"},
+            {"von": 90, "bis": 93, "name": "Farbmakro 23", "art": "color"},
+            {"von": 94, "bis": 97, "name": "Farbmakro 24", "art": "color"},
+            {"von": 98, "bis": 101, "name": "Farbmakro 25", "art": "color"},
+            {"von": 102, "bis": 104, "name": "Farbmakro 26", "art": "color"},
+            {"von": 105, "bis": 108, "name": "Farbmakro 27", "art": "color"},
+            {"von": 109, "bis": 112, "name": "Farbmakro 28", "art": "color"},
+            {"von": 113, "bis": 115, "name": "Farbmakro 29", "art": "color"},
+            {"von": 116, "bis": 119, "name": "Farbmakro 30", "art": "color"},
+            {"von": 120, "bis": 123, "name": "Farbmakro 31", "art": "color"},
+            {"von": 124, "bis": 127, "name": "Farbmakro 32", "art": "color"},
+            {"von": 128, "bis": 191, "name": "Color changing", "art": ""},
+            {"von": 192, "bis": 255, "name": "Color fading", "art": ""}
+          ]
+        },
+        {
+          "name": "Color Change/Fade Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Slow - fast", "art": ""}
+          ]
+        },
+        {
+          "name": "Pan/Tilt Macros",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "No function", "art": ""},
+            {"von": 16, "bis": 35, "name": "Macro 1", "art": ""},
+            {"von": 36, "bis": 55, "name": "Macro 2", "art": ""},
+            {"von": 56, "bis": 75, "name": "Macro 3", "art": ""},
+            {"von": 76, "bis": 95, "name": "Macro 4", "art": ""},
+            {"von": 96, "bis": 115, "name": "Macro 5", "art": ""},
+            {"von": 116, "bis": 135, "name": "Macro 6", "art": ""},
+            {"von": 136, "bis": 155, "name": "Macro 7", "art": ""},
+            {"von": 156, "bis": 175, "name": "Macro 8", "art": ""},
+            {"von": 176, "bis": 195, "name": "Macro 9", "art": ""},
+            {"von": 196, "bis": 215, "name": "Macro 10", "art": ""},
+            {"von": 216, "bis": 235, "name": "Macro 11", "art": ""},
+            {"von": 236, "bis": 255, "name": "Macro 12", "art": ""}
+          ]
+        },
+        {"name": "Pan/Tilt Macro Speed", "attribut": "effect_speed", "default": 0, "highlight": 0},
+        {"name": "Zoom", "attribut": "zoom", "default": 0, "highlight": 0},
+        {
+          "name": "Shutter/Strobe",
+          "attribut": "shutter",
+          "default": 11,
+          "highlight": 11,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Closed", "art": "closed"},
+            {"von": 8, "bis": 15, "name": "Open", "art": "open"},
+            {"von": 16, "bis": 131, "name": "Strobing slow - fast", "art": "strobe"},
+            {"von": 132, "bis": 139, "name": "Open", "art": "open"},
+            {"von": 140, "bis": 181, "name": "Fast close - slow open", "art": "strobe"},
+            {"von": 182, "bis": 189, "name": "Open", "art": "open"},
+            {"von": 190, "bis": 231, "name": "Slow close - fast open", "art": "strobe"},
+            {"von": 232, "bis": 239, "name": "Open", "art": "open"},
+            {"von": 240, "bis": 247, "name": "Random strobing", "art": "strobe"},
+            {"von": 248, "bis": 255, "name": "Open", "art": "open"}
+          ]
+        },
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Pan/Tilt Movement Speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Special Functions",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 69, "name": "No function", "art": ""},
+            {"von": 70, "bis": 79, "name": "Blackout with pan/tilt movement", "art": ""},
+            {"von": 80, "bis": 89, "name": "Disable blackout with pan/tilt movement", "art": ""},
+            {"von": 90, "bis": 199, "name": "No function", "art": ""},
+            {"von": 200, "bis": 209, "name": "Reset all", "art": "reset"},
+            {"von": 210, "bis": 255, "name": "No function", "art": ""}
+          ]
+        },
+        {
+          "name": "Dimmer Curves",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 20, "name": "Standard", "art": ""},
+            {"von": 21, "bis": 40, "name": "Stage", "art": ""},
+            {"von": 41, "bis": 60, "name": "TV", "art": ""},
+            {"von": 61, "bis": 80, "name": "Architectural", "art": ""},
+            {"von": 81, "bis": 100, "name": "Theatre", "art": ""},
+            {"von": 101, "bis": 255, "name": "Default setting", "art": ""}
+          ]
+        }
+      ],
+      "raster": {"rows": 1, "cols": 2}
+    }
+  ],
+  "notizen": "Mini-Wash 4x 10 W RGBW mit Zoom, zwei RGBW-Zonen."
+}

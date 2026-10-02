@@ -239,13 +239,20 @@ class NachtragTest(_LibraryCase):
         — und merkt es nie, weil eine frische DB sie ja hat."""
         from src.core.database.fixture_db import ensure_builtins
 
+        # FM-57: nur ``source='builtin'``. Die LightOS-Profile aus
+        # ``fixtures/bibliothek/`` haben einen EIGENEN Nachtragsweg — die Datei
+        # samt Stempel (siehe ``LightosLeisteKommtAusDerDateiTest``) — und
+        # gehoeren nicht in die Liste von ``ensure_builtins``.
         def _ist():
             with Session(self._eng) as s:
                 return {(m.fixture.short_name, m.name):
                         (m.white_rows, m.white_cols)
                         for m in s.execute(
                             select(FixtureMode)
+                            .join(FixtureProfile,
+                                  FixtureMode.fixture_id == FixtureProfile.id)
                             .options(selectinload(FixtureMode.fixture))
+                            .where(FixtureProfile.source == "builtin")
                             .where((FixtureMode.white_rows > 0)
                                    | (FixtureMode.white_cols > 0))).scalars()}
 
@@ -321,6 +328,75 @@ class NachtragTest(_LibraryCase):
 # ════════════════════════════════════════════════════════════════════════════
 # 3. Auflesen: white_grid_for
 # ════════════════════════════════════════════════════════════════════════════
+
+
+class LightosLeisteKommtAusDerDateiTest(_LibraryCase):
+    """★★ FM-57: Gegenstueck zu ``test_JEDE_geseedete_leiste_wird_nachgetragen``
+    fuer die mitgelieferten LightOS-Profile (``source='lightos'``).
+
+    Deren Weiss-Leiste steht in der Datei (``"weiss"`` je Modus). In eine
+    bestehende Bibliothek kommt sie NICHT ueber die Liste in
+    ``ensure_builtins``, sondern ueber den Datei-Stempel: aendert sich die
+    Datei, spielt ``einspielen`` sie neu ein, und ``_vergleichsform`` sieht
+    die Leiste. Bewacht wird hier beides — die eingespielte Leiste ist die
+    der Datei, und ein Einspielen ohne Stempel stellt eine fehlende wieder her.
+    """
+
+    def setUp(self):
+        # Der Seed legt nur die Builtins an; die Dateien spielt der erste
+        # ``ensure_builtins`` je Engine ein — wie beim Programmstart.
+        super().setUp()
+        from src.core.database.fixture_db import ensure_builtins
+        ensure_builtins()
+
+    @staticmethod
+    def _aus_dateien():
+        from src.core.database import bibliothek_format as BF
+        soll = {}
+        for pfad in BF.bibliothek_dateien():
+            d = BF.lade_datei(pfad)
+            for m in d["modi"]:
+                w = m.get("weiss") or {}
+                if w.get("rows") or w.get("cols"):
+                    soll[(d["hersteller"], d["modell"], m["name"])] = (
+                        int(w.get("rows") or 0), int(w.get("cols") or 0))
+        return soll
+
+    def _ist(self):
+        from src.core.database.models import Manufacturer
+        with Session(self._eng) as s:
+            return {(h, p, m): (wr, wc) for h, p, m, wr, wc in s.execute(
+                select(Manufacturer.name, FixtureProfile.name, FixtureMode.name,
+                       FixtureMode.white_rows, FixtureMode.white_cols)
+                .join(FixtureProfile, FixtureMode.fixture_id == FixtureProfile.id)
+                .join(Manufacturer,
+                      FixtureProfile.manufacturer_id == Manufacturer.id)
+                .where(FixtureProfile.source == "lightos")
+                .where((FixtureMode.white_rows > 0)
+                       | (FixtureMode.white_cols > 0)))}
+
+    def test_eingespielte_leisten_sind_die_der_dateien(self):
+        soll = self._aus_dateien()
+        self.assertTrue(soll, "keine Datei der Bibliothek traegt eine Weiss-"
+                              "Leiste (Vorbedingung)")
+        self.assertEqual(self._ist(), soll)
+
+    def test_einspielen_stellt_eine_fehlende_leiste_wieder_her(self):
+        """Ein Einspielen ohne passenden Stempel (= die Datei hat sich
+        geaendert) muss die Leiste aus der Datei zurueckbringen — der Weg,
+        auf dem eine nachgereichte Leiste jede bestehende Bibliothek erreicht."""
+        from src.core.database import bibliothek_format as BF
+        soll = self._aus_dateien()
+        with Session(self._eng) as s:
+            s.execute(text("UPDATE fixture_modes SET white_rows = 0, "
+                           "white_cols = 0"))
+            s.commit()
+        self.assertEqual(self._ist(), {}, "Vorbedingung")
+        with Session(self._eng) as s:
+            BF.einspielen(s)
+            s.commit()
+        self.assertEqual(self._ist(), soll)
+
 
 class WhiteGridForTest(_LibraryCase):
 

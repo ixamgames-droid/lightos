@@ -1,0 +1,486 @@
+{
+  "format_version": 1,
+  "hersteller": "EuroLite",
+  "hersteller_kurz": "EuroLite",
+  "modell": "LED Super Strobe ABL",
+  "kurzname": "LED Super Strobe ABL",
+  "typ": "strobe",
+  "leistung_w": 130,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition EuroLite-LED-Super-Strobe-ABL.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Eurolite/EuroLite-LED-Super-Strobe-ABL.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.0.0 Beta 3 · Don Sebastiano",
+    "original": "resources/fixtures/Eurolite/EuroLite-LED-Super-Strobe-ABL.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 108 Wertebereiche mit Art (kind) versehen; Blitzdauer shutter -> duration; Programmauswahl macro -> effect, Programm-Farbvoreinstellung color_wheel -> macro (enthaelt keine Farben, nur Programme); Programmgeschwindigkeit -> effect_speed, Laufrichtung macro -> raw; Hintergrundfarben als 'color'; Strobe-Defaults 0 (offen)"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Datei und die LightOS-Attributliste geprueft (Attribute, Bereichs-Arten, Defaults, Raster); Herstellerhandbuch mit DMX-Tabelle war nicht abrufbar (Steinigke liefert nur Datenblaetter ohne DMX-Protokoll), daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "7 Channel",
+      "kanaele": [
+        {"name": "Dimmer SMD 5730", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe SMD 5730",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 8, "name": "No function", "art": "open"},
+            {"von": 9, "bis": 255, "name": "Strobe effect with increasing speed 0-100%", "art": "strobe"}
+          ]
+        },
+        {"name": "Dimmer SMD 5050", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe SMD 5050",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 8, "name": "No function", "art": "open"},
+            {"von": 9, "bis": 255, "name": "Strobe effect with increasing speed 0-100%", "art": "strobe"}
+          ]
+        },
+        {"name": "SMD 5050 Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "13 Channel",
+      "kanaele": [
+        {"name": "Dimmer SMD 5730", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe SMD 5730",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 8, "name": "No function", "art": "open"},
+            {"von": 9, "bis": 255, "name": "Strobe effect with increasing speed 0-100%", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "SMD 5730 Flash duration",
+          "attribut": "duration",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Flash duration", "art": ""}
+          ]
+        },
+        {"name": "Dimmer SMD 5050", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe SMD 5050",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 8, "name": "No function", "art": "open"},
+            {"von": 9, "bis": 255, "name": "Strobe effect with increasing speed 0-100%", "art": "strobe"}
+          ]
+        },
+        {"name": "SMD 5050 Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {
+          "name": "Automatic programs 16 effects SMD 5050",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "No function", "art": ""},
+            {"von": 8, "bis": 22, "name": "program 1", "art": ""},
+            {"von": 23, "bis": 37, "name": "program 2", "art": ""},
+            {"von": 38, "bis": 52, "name": "program 3", "art": ""},
+            {"von": 53, "bis": 82, "name": "program 4", "art": ""},
+            {"von": 83, "bis": 97, "name": "program 5", "art": ""},
+            {"von": 98, "bis": 112, "name": "program 6", "art": ""},
+            {"von": 113, "bis": 127, "name": "program 7", "art": ""},
+            {"von": 128, "bis": 142, "name": "program 8", "art": ""},
+            {"von": 143, "bis": 157, "name": "program 9", "art": ""},
+            {"von": 158, "bis": 172, "name": "program 10", "art": ""},
+            {"von": 173, "bis": 187, "name": "program 11", "art": ""},
+            {"von": 188, "bis": 202, "name": "program 12", "art": ""},
+            {"von": 203, "bis": 217, "name": "program 13", "art": ""},
+            {"von": 218, "bis": 232, "name": "program 14", "art": ""},
+            {"von": 233, "bis": 247, "name": "program 15", "art": ""},
+            {"von": 248, "bis": 255, "name": "program 16", "art": ""}
+          ]
+        },
+        {
+          "name": "SMD 5050 automatic programs",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Automatic programs with increasing speed", "art": ""}
+          ]
+        },
+        {
+          "name": "Color presets SMD 5050 16 automatic programs",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "No function", "art": ""},
+            {"von": 8, "bis": 22, "name": "program 1", "art": ""},
+            {"von": 23, "bis": 37, "name": "program 2", "art": ""},
+            {"von": 38, "bis": 52, "name": "program 3", "art": ""},
+            {"von": 53, "bis": 82, "name": "program 4", "art": ""},
+            {"von": 83, "bis": 97, "name": "program 5", "art": ""},
+            {"von": 98, "bis": 112, "name": "program 6", "art": ""},
+            {"von": 113, "bis": 127, "name": "program 7", "art": ""},
+            {"von": 128, "bis": 142, "name": "program 8", "art": ""},
+            {"von": 143, "bis": 157, "name": "program 9", "art": ""},
+            {"von": 158, "bis": 172, "name": "program 10", "art": ""},
+            {"von": 173, "bis": 187, "name": "program 11", "art": ""},
+            {"von": 188, "bis": 202, "name": "program 12", "art": ""},
+            {"von": 203, "bis": 217, "name": "program 13", "art": ""},
+            {"von": 218, "bis": 232, "name": "program 14", "art": ""},
+            {"von": 233, "bis": 247, "name": "program 15", "art": ""},
+            {"von": 248, "bis": 255, "name": "program 16", "art": ""}
+          ]
+        },
+        {
+          "name": "SMD 5050 Background color",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Automatic program", "art": ""},
+            {"von": 16, "bis": 50, "name": "R", "art": "color"},
+            {"von": 51, "bis": 84, "name": "G", "art": "color"},
+            {"von": 85, "bis": 118, "name": "B", "art": "color"},
+            {"von": 119, "bis": 152, "name": "RG", "art": "color"},
+            {"von": 153, "bis": 186, "name": "RB", "art": "color"},
+            {"von": 187, "bis": 220, "name": "GB", "art": "color"},
+            {"von": 221, "bis": 255, "name": "RGB", "art": "color"}
+          ]
+        },
+        {
+          "name": "SMD 5050 Direction",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Change of direction (down to up)", "art": ""},
+            {"von": 128, "bis": 255, "name": "Change of direction (up to down)", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "22 Channel",
+      "kanaele": [
+        {"name": "Dimmer SMD 5730", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe SMD 5730",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 8, "name": "No function", "art": "open"},
+            {"von": 9, "bis": 255, "name": "Strobe effect with increasing speed 0-100%", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "SMD 5730 Flash duration",
+          "attribut": "duration",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Flash duration", "art": ""}
+          ]
+        },
+        {"name": "Dimmer SMD 5050", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe SMD 5050",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 8, "name": "No function", "art": "open"},
+            {"von": 9, "bis": 255, "name": "Strobe effect with increasing speed 0-100%", "art": "strobe"}
+          ]
+        },
+        {"name": "SMD 5050 Red Segment 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Segment 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Segment 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Segment 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Segment 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Segment 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Segment 3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Segment 3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Segment 3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Segment 4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Segment 4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Segment 4", "attribut": "color_b", "default": 0, "highlight": 255},
+        {
+          "name": "Automatic programs 16 effects SMD 5050",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "No function", "art": ""},
+            {"von": 8, "bis": 22, "name": "program 1", "art": ""},
+            {"von": 23, "bis": 37, "name": "program 2", "art": ""},
+            {"von": 38, "bis": 52, "name": "program 3", "art": ""},
+            {"von": 53, "bis": 82, "name": "program 4", "art": ""},
+            {"von": 83, "bis": 97, "name": "program 5", "art": ""},
+            {"von": 98, "bis": 112, "name": "program 6", "art": ""},
+            {"von": 113, "bis": 127, "name": "program 7", "art": ""},
+            {"von": 128, "bis": 142, "name": "program 8", "art": ""},
+            {"von": 143, "bis": 157, "name": "program 9", "art": ""},
+            {"von": 158, "bis": 172, "name": "program 10", "art": ""},
+            {"von": 173, "bis": 187, "name": "program 11", "art": ""},
+            {"von": 188, "bis": 202, "name": "program 12", "art": ""},
+            {"von": 203, "bis": 217, "name": "program 13", "art": ""},
+            {"von": 218, "bis": 232, "name": "program 14", "art": ""},
+            {"von": 233, "bis": 247, "name": "program 15", "art": ""},
+            {"von": 248, "bis": 255, "name": "program 16", "art": ""}
+          ]
+        },
+        {
+          "name": "SMD 5050 automatic programs",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Automatic programs with increasing speed", "art": ""}
+          ]
+        },
+        {
+          "name": "Color presets SMD 5050 16 automatic programs",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "No function", "art": ""},
+            {"von": 8, "bis": 22, "name": "program 1", "art": ""},
+            {"von": 23, "bis": 37, "name": "program 2", "art": ""},
+            {"von": 38, "bis": 52, "name": "program 3", "art": ""},
+            {"von": 53, "bis": 82, "name": "program 4", "art": ""},
+            {"von": 83, "bis": 97, "name": "program 5", "art": ""},
+            {"von": 98, "bis": 112, "name": "program 6", "art": ""},
+            {"von": 113, "bis": 127, "name": "program 7", "art": ""},
+            {"von": 128, "bis": 142, "name": "program 8", "art": ""},
+            {"von": 143, "bis": 157, "name": "program 9", "art": ""},
+            {"von": 158, "bis": 172, "name": "program 10", "art": ""},
+            {"von": 173, "bis": 187, "name": "program 11", "art": ""},
+            {"von": 188, "bis": 202, "name": "program 12", "art": ""},
+            {"von": 203, "bis": 217, "name": "program 13", "art": ""},
+            {"von": 218, "bis": 232, "name": "program 14", "art": ""},
+            {"von": 233, "bis": 247, "name": "program 15", "art": ""},
+            {"von": 248, "bis": 255, "name": "program 16", "art": ""}
+          ]
+        },
+        {
+          "name": "SMD 5050 Background color",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Automatic program", "art": ""},
+            {"von": 16, "bis": 50, "name": "R", "art": "color"},
+            {"von": 51, "bis": 84, "name": "G", "art": "color"},
+            {"von": 85, "bis": 118, "name": "B", "art": "color"},
+            {"von": 119, "bis": 152, "name": "RG", "art": "color"},
+            {"von": 153, "bis": 186, "name": "RB", "art": "color"},
+            {"von": 187, "bis": 220, "name": "GB", "art": "color"},
+            {"von": 221, "bis": 255, "name": "RGB", "art": "color"}
+          ]
+        },
+        {
+          "name": "SMD 5050 Direction",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Change of direction (down to up)", "art": ""},
+            {"von": 128, "bis": 255, "name": "Change of direction (up to down)", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "148 Channel",
+      "kanaele": [
+        {"name": "Dimmer SMD 5730", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe SMD 5730",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 8, "name": "No function", "art": "open"},
+            {"von": 9, "bis": 255, "name": "Strobe effect with increasing speed 0-100%", "art": "strobe"}
+          ]
+        },
+        {"name": "Dimmer SMD 5050", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe SMD 5050",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 8, "name": "No function", "art": "open"},
+            {"von": 9, "bis": 255, "name": "Strobe effect with increasing speed 0-100%", "art": "strobe"}
+          ]
+        },
+        {"name": "SMD 5050 Red Group 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 4", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 5", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 5", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 5", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 6", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 6", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 6", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 7", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 7", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 7", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 8", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 8", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 8", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 9", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 9", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 9", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 10", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 10", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 10", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 11", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 11", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 11", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 12", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 12", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 12", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 13", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 13", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 13", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 14", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 14", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 14", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 15", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 15", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 15", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 16", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 16", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 16", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 17", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 17", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 17", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 18", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 18", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 18", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 19", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 19", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 19", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 20", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 20", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 20", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 21", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 21", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 21", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 22", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 22", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 22", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 23", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 23", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 23", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 24", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 24", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 24", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 25", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 25", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 25", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 26", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 26", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 26", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 27", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 27", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 27", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 28", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 28", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 28", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 29", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 29", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 29", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 30", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 30", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 30", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 31", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 31", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 31", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 32", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 32", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 32", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 33", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 33", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 33", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 34", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 34", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 34", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 35", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 35", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 35", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 36", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 36", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 36", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 37", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 37", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 37", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 38", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 38", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 38", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 39", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 39", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 39", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 40", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 40", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 40", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 41", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 41", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 41", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 42", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 42", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 42", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 43", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 43", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 43", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 44", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 44", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 44", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 45", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 45", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 45", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 46", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 46", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 46", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 47", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 47", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 47", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Red Group 48", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Green Group 48", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "SMD 5050 Blue Group 48", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    }
+  ],
+  "notizen": "Weisse SMD-5730-Blitzflaeche (eigener Dimmer/Strobe) plus RGB-SMD-5050-Hintergrund; Pixelanordnung der 48 RGB-Gruppen nicht belegt, daher kein Raster."
+}
