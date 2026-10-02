@@ -146,6 +146,23 @@ class FixtureChannel(Base):
     highlight_value: Mapped[int] = mapped_column(Integer, default=255)
     invert: Mapped[bool] = mapped_column(Boolean, default=False)
     resolution: Mapped[str] = mapped_column(String(20), default="8bit")
+    # FM-46: welches EIGENE Weiss-Segment dieser Dimmer-Kanal dimmt — Index
+    # des ``color_w``-Vorkommens, 0-basiert (in den Editoren als 1..n
+    # angezeigt). ``NULL`` = keine Zuordnung, und das ist der Normalfall.
+    #
+    # ★ Warum es das Feld braucht: hat ein Geraet mit eigener Weiss-Achse
+    #   MEHRERE Dimmer, steht in der Kanalliste nicht, welcher davon welches
+    #   Segment dimmt (Acme Ginamp [36 Channel]: ``intensity`` auf CH25 UND
+    #   CH32). Zur Laufzeit wird das NIE geraten — einen von zwei Dimmern zu
+    #   waehlen waere in der Haelfte der Faelle der falsche, und zwar stumm.
+    #   Wirksam ist nur, was ein Mensch im Fixture-Editor/-Generator gesetzt
+    #   hat (Vorschlag aus der Kanalreihenfolge: ``core.dimmer_segmente``).
+    #   Gelesen wird es an GENAU einer Stelle: ``app_state.channels_for_axis``.
+    #
+    # Nullable und ohne Default-Wert, damit eine Alt-DB nach der Migration
+    # (``migrate_fixtures_db``) fuer jeden Kanal „keine Zuordnung" traegt.
+    segment: Mapped[int | None] = mapped_column(Integer, nullable=True,
+                                                default=None)
 
     mode: Mapped[FixtureMode] = relationship(back_populates="channels")
     ranges: Mapped[list[ChannelRange]] = relationship(
@@ -403,6 +420,13 @@ def migrate_fixtures_db(engine) -> None:
                 if mcols and _gcol not in mcols:
                     conn.execute(text(
                         f"ALTER TABLE fixture_modes ADD COLUMN {_gcol} INTEGER DEFAULT 0"))
+            # FM-46: Zuordnung Dimmer -> Weiss-Segment. Dieselbe Falle wie oben:
+            # das ORM fragt ALLE Modell-Spalten ab, eine fixtures.db ohne
+            # `channels.segment` waere sonst unladbar. Bewusst OHNE Default —
+            # NULL heisst „keine Zuordnung", also exakt das Verhalten vorher.
+            ccols = {row[1] for row in conn.execute(text("PRAGMA table_info(channels)"))}
+            if ccols and "segment" not in ccols:
+                conn.execute(text("ALTER TABLE channels ADD COLUMN segment INTEGER"))
     except Exception as e:
         print(f"[models] migrate_fixtures_db error: {e}")
 

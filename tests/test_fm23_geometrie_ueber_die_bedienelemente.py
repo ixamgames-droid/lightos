@@ -136,6 +136,12 @@ def _geo_eingaben(tab: QWidget) -> dict[str, QSpinBox]:
     for w in _in_layout_reihenfolge(tab):
         if isinstance(w, QLabel):
             text = w.text().casefold()
+            # FM-46: eine AUFSCHRIFT endet mit Doppelpunkt („Weiß-Leiste:").
+            # Der Hinweistext unter der Rasterzeile erwaehnt die Weiss-Leiste
+            # auch — als Fliesstext darf er keine neue Feldzuordnung beginnen,
+            # sonst griffe er sich das naechste Zahlenfeld im Tab.
+            if not text.rstrip().endswith(":"):
+                continue
             for stichwort, neue_rollen in _UEBERSCHRIFTEN:
                 if stichwort in text:
                     rollen, gefunden = neue_rollen, 0
