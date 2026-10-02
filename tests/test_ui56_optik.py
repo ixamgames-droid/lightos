@@ -50,6 +50,37 @@ class OptikImSpeichernDialog(unittest.TestCase):
                          set())
 
 
+class OptikImSnapEditor(unittest.TestCase):
+    """Der Snap-Editor zeigt die Gruppe an zwei Stellen: Spalte „Gruppe" der
+    Wertetabelle und „➕ Kanal" (Kanal nachtragen). Beide liefen roh ueber
+    ``classify_attr`` und zeigten weiter „Beam" (Review A, 02.10.)."""
+
+    def setUp(self):
+        _app()
+
+    def test_spalte_gruppe_zeigt_optik(self):
+        from PySide6.QtWidgets import QTableWidget
+        from src.core.engine.snap_library import get_snap_library
+        from src.ui.views.snap_editor import SnapEditor
+        lib = get_snap_library()
+        snap = lib.add_snap("UI-56 Optik", "", {1: {"zoom": 10, "intensity": 255}})
+        self.addCleanup(lib.remove_snap, snap.id)
+        ed = SnapEditor(snap)
+        self.addCleanup(ed.deleteLater)
+        gruppen = [t.item(r, 2).text()
+                   for t in ed.findChildren(QTableWidget) for r in range(t.rowCount())]
+        self.assertIn("Optik", gruppen)
+        self.assertNotIn("Beam", gruppen)
+
+    def test_kanal_nachtragen_zeigt_optik(self):
+        from src.ui.views.snap_editor import _AddChannelDialog
+        dlg = _AddChannelDialog("Spot", ["zoom", "focus"], 2)
+        self.addCleanup(dlg.deleteLater)
+        texte = [cb.text() for cb in dlg._checks.values()]
+        self.assertTrue(texte)
+        self.assertTrue(all(t.endswith("·  Optik") for t in texte), texte)
+
+
 class Anzeigename(unittest.TestCase):
 
     def test_nur_beam_wird_umbenannt(self):
