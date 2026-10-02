@@ -1,5 +1,7 @@
 # Ausgabe einrichten: ENTTEC USB Pro, Art-Net und sACN
 
+> **English:** [Setting up output: ENTTEC USB Pro, Art-Net and sACN](ANLEITUNG.en.md)
+
 > LightOS rechnet für jedes Universum 512 DMX-Kanäle. Damit sie bei deinen Geräten
 > ankommen, braucht jedes Universum einen **Ausgang**: einen **ENTTEC DMX USB Pro** am
 > USB-Anschluss oder einen **Art-Net**- bzw. **sACN (E1.31)**-Empfänger im Netzwerk.

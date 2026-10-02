@@ -9,7 +9,9 @@
 > Das ist die „manuelle Mischpult"-Ebene neben den Effekten. (In dieser Bank wirken Kacheln und
 > Fader auf **alle** Fixtures — siehe „Reichweite beachten" unten.)
 >
-> Show: `shows/Event_Demo_2026.lshow`, **Bank 8 „Programmer"** (SCENE-Taste 8).
+> Show: `shows/Event_Demo_2026.lshow`, **Bank 8 „Programmer"** (SCENE-Taste 8). Die Datei liegt
+> nicht im Repo — sie entsteht mit `./venv/bin/python tools/build_event_demo_2026.py`
+> (Windows: `venv\Scripts\python.exe tools\build_event_demo_2026.py`).
 >
 > **Wichtig:** Gemeint ist die **vorgebaute VC-Bank** namens „Programmer" (die 8. Seite der
 > Virtual Console dieser Show) — **nicht** die App-Sektion „Programmer" oben in der Reiter-Leiste.
@@ -32,6 +34,12 @@ auf alle Fixtures, wenn der Programmer leer ist). „Gruppe wählen" (Reihe 0) s
 für andere Werkzeuge und befüllt den Programmer **nicht** — die Bedienung hier trifft daher nicht nur
 die gewählte Gruppe. Die einzige gruppen-gebundene Bedienung ist **„MH Pan"** (Gruppe „Moving Heads").
 Der Programmer hat Vorrang vor den Grundwerten — was du hier setzt, „überschreibt" live.
+**Ausnahme:** Kanäle, die gerade eine **laufende Funktion** treibt (z. B. die Szene „Voll Weiß"
+oder eine Farb-Matrix aus Bank 1), überschreibt der Programmer **nicht**. Geschützt ist dabei
+genau, was die Funktion in diesem Moment von ihrem Grundwert **wegbewegt**: Ein Farbkanal, den die
+Matrix gerade auf 0 hält (z. B. Blau bei einem roten Pixel), nimmt den Programmer-Wert trotzdem
+an — aus Rot wird dann Magenta. Läuft eine Farb-Matrix, erscheinen die Farb-Kacheln dazu
+abgedunkelt mit Schloss 🔒. Für eine saubere Handmischung erst die Funktion stoppen.
 
 ## 1. Gruppe wählen (Reihe 0)
 
@@ -57,7 +65,13 @@ Der Programmer hat Vorrang vor den Grundwerten — was du hier setzt, „übersc
 
 **Rot · Grün · Blau · Gelb · Cyan · Magenta · Weiß · Aus** — setzen die Farbe (Ziel = die
 Fixtures **im Programmer**; die „Gruppe wählen"-Auswahl grenzt sie **nicht** ein). Bei leerem
-Programmer wirken sie auf **alle** Fixtures. „Aus" nimmt die Farbe wieder weg.
+Programmer wirken sie auf **alle** Fixtures. „Aus" setzt Rot/Grün/Blau/Weiß im Programmer auf 0
+(dunkel) — die Werte bleiben stehen, bis du den Programmer leerst. Jede Kachel setzt außerdem
+die **Intensität** wieder auf voll; die Intensität deshalb erst **nach** der Kachel anpassen.
+
+> Die Kacheln folgen dem **Programmer** (leer = alle Fixtures), nicht der Auswahl aus Reihe 0 —
+> so steht es auch in der Kopfzeile der Bank. (Shows, die vor dem 2026-10-02 erzeugt wurden,
+> tragen dort noch die falsche Zeile „R2: Farb-Kacheln auf Selektion".)
 
 ## 4. Die Fader
 
@@ -77,12 +91,15 @@ Programmer wirken sie auf **alle** Fixtures. „Aus" nimmt die Farbe wieder weg.
 
 > **Hinweis – getrennte Hälften:** „linke Hälfte rot, rechte Hälfte blau" lässt sich mit den Fadern
 > dieser Bank **nicht** von Hand bauen (sie wirken immer auf alle Fixtures). Nutze dafür die fertigen
-> **Split-Szenen** der Show (z. B. „Grün links / Blau rechts", „Rot links / Weiß rechts") oder die
+> **Split-Szenen** der Show („Grün links / Blau rechts", „Rot links / Weiß rechts") — sie liegen nur
+> in der Funktions-Bibliothek, nicht als Taste in der VC; starten z. B. per Doppelklick in der
+> App-Sektion **Programmer** → Reiter **Assistent** — oder die
 > App-Sektion **„Programmer"** in der Reiter-Leiste: dort eine Gruppe auswählen und gezielt nur die
 > Auswahl einfärben.
 
-> **Speichern als Look:** Was im Programmer steht, lässt sich als Szene/Snap in die Bibliothek
-> übernehmen (Knopf **„Programmer → Szene"**). Geleert wird der Programmer über den Knopf
+> **Speichern als Look:** Was im Programmer steht, lässt sich als **Szene** in die Bibliothek
+> übernehmen: App-Sektion **Programmer** → Reiter **Assistent** → Knopf **„Programmer → Szene"**
+> (vorher fragt LightOS, welche Kanalgruppen mit hinein sollen). Geleert wird der Programmer über den Knopf
 > **„✖ Clear ▾"** in der oberen Leiste (Lösch-Symbol ✖ + Aufklapp-Pfeil ▾). Ein Klick öffnet
 > ein kleines Menü mit **„Programmer leeren (N)"**, **„Simple Desk leeren (N)"** und
 > **„Alle Nicht-VC-Werte leeren (N)"** — die Zahl in Klammern zeigt jeweils die Anzahl aktiver

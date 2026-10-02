@@ -5,7 +5,9 @@
 > Widget-Auswahl, Schutz vor doppelter Belegung und ein Highlighting, das zeigt,
 > welche Bedien-Elemente denselben Effekt steuern.
 >
-> Alle Screenshots stammen aus der Demo-Show **Farb FX VC Show** (live aufgenommen).
+> Alle Screenshots stammen aus der Demo-Show **Farb FX VC Show** (live aufgenommen). Die Show
+> liegt nicht im Repository; erzeugen mit `./venv/bin/python tools/build_farb_fx_vc_show.py`
+> (Windows: `venv\Scripts\python.exe tools\build_farb_fx_vc_show.py`).
 
 ---
 
@@ -24,8 +26,9 @@ sinnvoll sind.
 
 ![Einfache Karte](04_drop_card_simple_crop.png)
 
-**Reicher Effekt** (z. B. eine Dimmer-Matrix) → zusätzlich Tempo, Helligkeit und die
-**Tempo-Unterformen** als eigene Zeilen. Beachte: Bei einer **Dimmer**-Matrix gibt es
+**Reicher Effekt** (z. B. eine Dimmer-Matrix) → zusätzlich Tempo, **Dimmer-Pegel** und die
+**Tempo-Unterformen** als eigene Zeilen. (Bei einer RGB-Matrix heißt die Helligkeits-Zeile
+„Farb-Pegel (kein Dimmer)" bzw. „Helligkeit (Farbe + Dimmer)".) Beachte: Bei einer **Dimmer**-Matrix gibt es
 **keine „Farben"-Zeile** (sie nutzt keine Farben) — genau das meint „intelligent".
 
 ![Reiche Karte mit Unterformen](05_drop_card_subforms_crop.png)
@@ -35,11 +38,12 @@ nachträglich umstellen musst:
 
 | Zeile | erzeugt |
 |---|---|
-| **Tempo (Geschwindigkeit)** | Speed-Rad / Fader für die direkte Effekt-Geschwindigkeit |
+| **Tempo (Geschwindigkeit)** | Speed-Rad / Fader für die direkte Effekt-Geschwindigkeit — wirkt nur, solange keine BPM läuft (bzw. bei Tempo-Bus „Frei") |
 | **Tempo-Bus zuweisen…** | Bus-Auswahl (A/B/C/D) |
 | **Tempo-Multiplikator (×½ ×2)…** | Speed-Rad direkt im Multiplikator-Modus (relativ zum Bus) |
 
-Selten gebrauchte Parameter liegen aufgeklappt unter **„Mehr Parameter"**.
+Selten gebrauchte Parameter liegen im **zugeklappten** Bereich **„Mehr Parameter (N)"** — zum
+Öffnen anklicken.
 
 ---
 
@@ -47,13 +51,13 @@ Selten gebrauchte Parameter liegen aufgeklappt unter **„Mehr Parameter"**.
 
 Hat ein Aspekt mehrere passende Bedien-Elemente (z. B. **Tempo** = Speed-Rad **oder**
 Fader), steht in der Zeile **„Widget: … ▸ ändern"**. Ein Klick öffnet die **grafische
-Galerie als eigenes Fenster** — du siehst die Möglichkeiten als Kacheln und tippst
-eine an:
+Galerie als eigenes Fenster** — du siehst die Möglichkeiten als Kacheln, tippst eine an
+und bestätigst mit **OK** (oder tippst sie doppelt an):
 
 ![Widget-Galerie](06_widget_gallery_crop.png)
 
-Dieselbe Galerie erreichst du auf **jedem vorhandenen Widget** per **Rechtsklick →
-„↔ Widget ändern…"**. Der Typ wird getauscht, die Effekt-Bindung (Effekt, Beschriftung,
+Dieselbe Galerie erreichst du bei **effektgebundenen Widgets**, für deren Aspekt mehrere
+Bedien-Typen passen, per **Rechtsklick → „↔ Widget ändern…"**. Der Typ wird getauscht, die Effekt-Bindung (Effekt, Beschriftung,
 Position) bleibt erhalten.
 
 ---

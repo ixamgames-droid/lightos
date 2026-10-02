@@ -8,8 +8,9 @@
 
 In Bank 1 sind die Muster nach **Gerätegruppe** angeordnet:
 - **Reihe 2–3 links:** Paarlichter-Farbe (Feste Farbe, Farbwechsel, Regenbogen, …)
-- **Reihe 3 mitte:** Spider-Farbe (Spider Feste Farbe / Farbwechsel / Regenbogen + Spider-Themes)
-- **Reihe 4:** Moving-Head-Farbrad (MH Rot/Grün/Blau/Weiß/Gelb/Rotation)
+- **Reihe 3 mitte:** Spider-Farbe (Spider Feste Farbe / Farbwechsel / Regenbogen)
+- **Reihe 4 links:** Spider-Themes · **Reihe 4 rechts + Reihe 5 links:** Moving-Head-Farbrad
+  (MH Rot/Grün/Blau/Weiß · Gelb/Farbrotation)
 
 ---
 
@@ -37,4 +38,5 @@ So kannst du jede Gruppe unabhängig einfärben (und in **Bank 2** sogar unabhä
 ### Sofort weiterprobieren
 - **Mit Bewegung kombinieren:** in **Bank 2** je Gruppe eine Dimmer-Bewegung dazu (z. B. Paarlichter „Lauflicht", Spider „Puls") → rotes Lauflicht + blauer Spider-Puls gleichzeitig.
 - **Farbwechsel statt fest:** statt „Feste Farbe" das **„Farbwechsel"** der Gruppe → die Gruppe zykelt Farben (auf den Beat, siehe Bank 4).
-- **Alles auf einmal:** unten rechts **„Alles"** als Gruppe wählen und eine Farbe tippen → ein gemeinsamer Look.
+- **Alles auf einmal:** für einen gemeinsamen Look „Reines Weiß (RGBW)“ oder einen Chaser/Mix (Bank 6) nehmen —
+  die Farb-Kacheln färben unabhängig von der Gruppenwahl immer nur den zuletzt gestarteten Effekt um.
