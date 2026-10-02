@@ -1,0 +1,142 @@
+{
+  "format_version": 1,
+  "hersteller": "Martin",
+  "hersteller_kurz": "Martin",
+  "modell": "Rush MH6 Wash",
+  "kurzname": "RUSHMH6W",
+  "typ": "moving_head",
+  "leistung_w": 155,
+  "quelle": {
+    "titel": "RUSH MH 6 Wash User Manual",
+    "version": "Rev. D",
+    "datum": "2018-05",
+    "url": "https://www.martin.com/en/site_elements/rush-mh-6-wash-user-manual-86188b7a-e2b6-4e95-8a61-13fa5199720c"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.3 GIT · Thierry Rodolfo/Piotr Nowik",
+    "original": "resources/fixtures/Martin/Martin-Rush-MH6-Wash.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 38 Wertebereiche mit Art (kind) versehen; gegen Martin-Handbuch Rev. D abgeglichen (Kanallage stimmt; leistung_w 300 -> 155 laut Handbuch); Shutter: Puls-Bereiche 'strobe' statt 'open', Default/Highlight 12 (Handbuch-Default); Farbpresets: 36 Einzelfarben statt eines Sammelbereichs mit falscher Art 'reset', Farbdurchlauf 'rotate' statt 'gobo', Zufall ohne Art; Zoom-Default/-Highlight 128 (Handbuch-Default); Steuerkanal raw -> reset, Blackout-Option nicht 'closed'; deutsche Beschriftung; kurzname RUSHMH6W"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": true,
+    "wie": "14-Kanal-Modus Kanal fuer Kanal gegen die DMX-Tabelle im Martin-Handbuch (RUSH MH 6 Wash User Manual, Rev. D, S. 26-28) geprueft, inkl. Default-Werte; nicht am Geraet"
+  },
+  "modi": [
+    {
+      "name": "Standard",
+      "kanaele": [
+        {
+          "name": "Shutter/Strobe/Puls",
+          "attribut": "shutter",
+          "default": 12,
+          "highlight": 12,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Aus (zu)", "art": "closed"},
+            {"von": 8, "bis": 15, "name": "Offen", "art": "open"},
+            {"von": 16, "bis": 131, "name": "Strobe langsam → schnell", "art": "strobe"},
+            {"von": 132, "bis": 139, "name": "Offen", "art": "open"},
+            {"von": 140, "bis": 181, "name": "Puls: schnell zu, langsam auf", "art": "strobe"},
+            {"von": 182, "bis": 189, "name": "Offen", "art": "open"},
+            {"von": 190, "bis": 231, "name": "Puls: schnell auf, langsam zu", "art": "strobe"},
+            {"von": 232, "bis": 239, "name": "Offen", "art": "open"},
+            {"von": 240, "bis": 247, "name": "Zufalls-Strobe", "art": "strobe"},
+            {"von": 248, "bis": 255, "name": "Offen", "art": "open"}
+          ]
+        },
+        {"name": "Dimmer (grob)", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Dimmer (fein)", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Farbpresets (Farbrad-Effekt)",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Offen", "art": "open"},
+            {"von": 11, "bis": 15, "name": "Farbe 1", "art": "color"},
+            {"von": 16, "bis": 20, "name": "Farbe 2", "art": "color"},
+            {"von": 21, "bis": 25, "name": "Farbe 3", "art": "color"},
+            {"von": 26, "bis": 30, "name": "Farbe 4", "art": "color"},
+            {"von": 31, "bis": 35, "name": "Farbe 5", "art": "color"},
+            {"von": 36, "bis": 40, "name": "Farbe 6", "art": "color"},
+            {"von": 41, "bis": 45, "name": "Farbe 7", "art": "color"},
+            {"von": 46, "bis": 50, "name": "Farbe 8", "art": "color"},
+            {"von": 51, "bis": 55, "name": "Farbe 9", "art": "color"},
+            {"von": 56, "bis": 60, "name": "Farbe 10", "art": "color"},
+            {"von": 61, "bis": 65, "name": "Farbe 11", "art": "color"},
+            {"von": 66, "bis": 70, "name": "Farbe 12", "art": "color"},
+            {"von": 71, "bis": 75, "name": "Farbe 13", "art": "color"},
+            {"von": 76, "bis": 80, "name": "Farbe 14", "art": "color"},
+            {"von": 81, "bis": 85, "name": "Farbe 15", "art": "color"},
+            {"von": 86, "bis": 90, "name": "Farbe 16", "art": "color"},
+            {"von": 91, "bis": 95, "name": "Farbe 17", "art": "color"},
+            {"von": 96, "bis": 100, "name": "Farbe 18", "art": "color"},
+            {"von": 101, "bis": 105, "name": "Farbe 19", "art": "color"},
+            {"von": 106, "bis": 110, "name": "Farbe 20", "art": "color"},
+            {"von": 111, "bis": 115, "name": "Farbe 21", "art": "color"},
+            {"von": 116, "bis": 120, "name": "Farbe 22", "art": "color"},
+            {"von": 121, "bis": 125, "name": "Farbe 23", "art": "color"},
+            {"von": 126, "bis": 130, "name": "Farbe 24", "art": "color"},
+            {"von": 131, "bis": 135, "name": "Farbe 25", "art": "color"},
+            {"von": 136, "bis": 140, "name": "Farbe 26", "art": "color"},
+            {"von": 141, "bis": 145, "name": "Farbe 27", "art": "color"},
+            {"von": 146, "bis": 150, "name": "Farbe 28", "art": "color"},
+            {"von": 151, "bis": 155, "name": "Farbe 29", "art": "color"},
+            {"von": 156, "bis": 160, "name": "Farbe 30", "art": "color"},
+            {"von": 161, "bis": 165, "name": "Farbe 31", "art": "color"},
+            {"von": 166, "bis": 170, "name": "Farbe 32", "art": "color"},
+            {"von": 171, "bis": 175, "name": "Farbe 33", "art": "color"},
+            {"von": 176, "bis": 180, "name": "Farbe 34", "art": "color"},
+            {"von": 181, "bis": 185, "name": "Farbe 35", "art": "color"},
+            {"von": 186, "bis": 190, "name": "Farbe 36", "art": "color"},
+            {"von": 191, "bis": 192, "name": "Offen", "art": "open"},
+            {"von": 193, "bis": 214, "name": "Farbdurchlauf vorwaerts, schnell → langsam", "art": "rotate"},
+            {"von": 215, "bis": 221, "name": "Farbdurchlauf Stopp"},
+            {"von": 222, "bis": 243, "name": "Farbdurchlauf rueckwaerts, langsam → schnell", "art": "rotate"},
+            {"von": 244, "bis": 247, "name": "Zufall schnell"},
+            {"von": 248, "bis": 251, "name": "Zufall mittel"},
+            {"von": 252, "bis": 255, "name": "Zufall langsam"}
+          ]
+        },
+        {"name": "Zoom (weit → eng)", "attribut": "zoom", "default": 128, "highlight": 128},
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan Fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt Fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Steuerung/Einstellungen",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Keine Funktion (sperrt Kalibrierung)"},
+            {"von": 10, "bis": 14, "name": "Reset Geraet", "art": "reset"},
+            {"von": 15, "bis": 54, "name": "Keine Funktion"},
+            {"von": 55, "bis": 59, "name": "Kalibrierung freigeben"},
+            {"von": 60, "bis": 74, "name": "Keine Funktion"},
+            {"von": 75, "bis": 79, "name": "Pan/Tilt-Tempo normal"},
+            {"von": 80, "bis": 89, "name": "Pan/Tilt-Tempo schnell (Standard)"},
+            {"von": 90, "bis": 94, "name": "Pan/Tilt-Tempo langsam"},
+            {"von": 95, "bis": 144, "name": "Keine Funktion"},
+            {"von": 145, "bis": 149, "name": "Blackout bei Pan/Tilt an"},
+            {"von": 150, "bis": 154, "name": "Blackout bei Pan/Tilt aus"},
+            {"von": 155, "bis": 159, "name": "Display-Beleuchtung an"},
+            {"von": 160, "bis": 164, "name": "Display-Beleuchtung aus"},
+            {"von": 165, "bis": 229, "name": "Keine Funktion"},
+            {"von": 230, "bis": 234, "name": "Zoom-Kalibrierung speichern"},
+            {"von": 235, "bis": 239, "name": "Pan-Kalibrierung speichern"},
+            {"von": 240, "bis": 244, "name": "Tilt-Kalibrierung speichern"},
+            {"von": 245, "bis": 249, "name": "Alle Kalibrierungen auf Werkseinstellung", "art": "reset"},
+            {"von": 250, "bis": 255, "name": "Keine Funktion"}
+          ]
+        }
+      ]
+    }
+  ]
+}

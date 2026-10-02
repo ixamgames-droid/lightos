@@ -1,0 +1,114 @@
+{
+  "format_version": 1,
+  "hersteller": "Ignition",
+  "hersteller_kurz": "Ignition",
+  "modell": "2bright Blind 3K IP",
+  "kurzname": "2B BLIND 3K",
+  "typ": "led_bar",
+  "leistung_w": 200,
+  "notizen": "2-Zellen-Blinder, 2 x 100 W COB Warmweiss 3000 K, 90 Grad, IP65. Thomann-Artikel ignition_2bright_blind_3k. Zellen von links nach rechts (LED 1, LED 2).",
+  "quelle": {
+    "titel": "Ignition 2bright Blind 3K – Bedienungsanleitung (Thomann, ID 480071)",
+    "datum": "2022-01-24",
+    "url": "https://fast-images.static-thomann.de/pics/atg/atgdata/document/manual/c_480071_r3_en_online.pdf"
+  },
+  "herkunft": {"art": "hersteller-handbuch", "lizenz": "eigen"},
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal fuer Kanal gegen die DMX-Tabellen aller 5 Modi im Thomann-Handbuch (Kap. 7) geschrieben und geprueft; nicht am Geraet getestet"
+  },
+  "modi": [
+    {
+      "name": "1-Kanal",
+      "raster": {"rows": 1, "cols": 1},
+      "kanaele": [
+        {"name": "Dimmer (LED 1+2)", "attribut": "intensity", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "2-Kanal 1",
+      "raster": {"rows": 1, "cols": 2},
+      "kanaele": [
+        {"name": "Dimmer LED 1", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Dimmer LED 2", "attribut": "intensity", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "2-Kanal 2",
+      "raster": {"rows": 1, "cols": 1},
+      "kanaele": [
+        {"name": "Dimmer (LED 1+2)", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Offen", "art": "open"},
+            {"von": 6, "bis": 255, "name": "Strobe, langsam -> schnell", "art": "strobe"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3-Kanal",
+      "raster": {"rows": 1, "cols": 2},
+      "kanaele": [
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Dimmer LED 1", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Dimmer LED 2", "attribut": "intensity", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "6-Kanal",
+      "raster": {"rows": 1, "cols": 2},
+      "kanaele": [
+        {"name": "Dimmer (LED 1+2)", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "LEDs an", "art": "open"},
+            {"von": 6, "bis": 10, "name": "LEDs aus (Blackout)", "art": "closed"},
+            {"von": 11, "bis": 33, "name": "Zufaellige Impulse, langsam -> schnell", "art": "strobe"},
+            {"von": 34, "bis": 56, "name": "Zufaellig ansteigende Helligkeit, langsam -> schnell", "art": "strobe"},
+            {"von": 57, "bis": 79, "name": "Zufaellig abfallende Helligkeit, langsam -> schnell", "art": "strobe"},
+            {"von": 80, "bis": 102, "name": "Zufaelliger Strobe, langsam -> schnell", "art": "strobe"},
+            {"von": 103, "bis": 127, "name": "Strobe-Impulse (Pause 5 s -> 1 s)", "art": "strobe"},
+            {"von": 128, "bis": 250, "name": "Strobe 1 -> 20 Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "LEDs an", "art": "open"}
+          ]
+        },
+        {"name": "Dimmer LED 1", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Dimmer LED 2", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Dimmverhalten",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Ohne Funktion", "art": ""},
+            {"von": 6, "bis": 127, "name": "LED (direkt)", "art": ""},
+            {"von": 128, "bis": 255, "name": "Gluehlampen-Nachbildung", "art": ""}
+          ]
+        },
+        {
+          "name": "Dimmerkurve",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Ohne Funktion", "art": ""},
+            {"von": 6, "bis": 63, "name": "Linear", "art": ""},
+            {"von": 64, "bis": 127, "name": "Exponentiell", "art": ""},
+            {"von": 128, "bis": 191, "name": "Logarithmisch", "art": ""},
+            {"von": 192, "bis": 255, "name": "S-Kurve", "art": ""}
+          ]
+        }
+      ]
+    }
+  ]
+}
