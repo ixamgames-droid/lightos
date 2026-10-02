@@ -13,7 +13,6 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | DOC-14 | C | fix/doc14-schaukasten-19 | 2026-10-01T21:37Z | tools/build_vc_widgets_showcase.py · docs/anleitung_vc_widgets/README.md · docs/anleitung_vc_widgets/_capture/geometry.json · tests/test_doc14_schaukasten_alle_typen.py · changelog.d/2026-10-02-DOC-14.md |
-| FM-46 | A | feat/fm46-rueckfall | 2026-10-02T11:59Z | src/core/database/models.py · src/core/app_state.py · src/ui/widgets/fixture_editor.py · src/ui/widgets/fixture_generator.py · src/core/database/fixture_db.py |
 | XPLAT-44 | C | docs/xplat44-data-cwd | 2026-10-02T09:21Z | BACKLOG.md |
 | XPLAT-34 | C | fix/xplat34-verteilter-sammellauf | 2026-10-02T09:25Z | tools/zeitbomben_gate.py · tests/test_zeitbomben_gate.py · tests/test_xplat34_verteilter_sammellauf.py · BACKLOG.md |
 | FM-53 | C | feat/fm53-bibliothek-download | 2026-10-02T09:29Z | src/core/database/bibliothek_download.py · src/ui/widgets/bibliothek_download_dialog.py · src/ui/main_window.py · main.py · tests/test_fm53_bibliothek_download.py · docs/FIXTURE_SOURCES.md · changelog.d/2026-10-02-FM-53.md |
@@ -125,7 +124,6 @@
 
 ## Verlauf
 
-- 2026-10-02T10:56Z C claim DOC-34
 - 2026-10-02T10:57Z C claim DOC-35
 - 2026-10-02T10:58Z C claim DOC-36
 - 2026-10-02T10:59Z C claim DOC-37
@@ -155,3 +153,4 @@
 - 2026-10-02T12:24Z A claim VIZ-66
 - 2026-10-02T12:26Z A claim FM-56
 - 2026-10-02T12:26Z C claim DOC-53
+- 2026-10-02T12:27Z A done FM-46
