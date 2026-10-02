@@ -21,6 +21,7 @@
 | DOC-22 | A | docs/doc22-bilder-auffrischen | 2026-10-02T07:18Z | docs/anleitung_szenen_cues/img · docs/anleitung_programmer_grundlagen/img · docs/projektseite · docs/anleitung_vc_widgets/img |
 | FM-46 | A | feat/fm46-dimmer-segment | 2026-10-02T07:26Z | src/core/database/models.py · src/core/app_state.py · src/ui/widgets/fixture_editor.py · src/ui/widgets/fixture_generator.py · src/core/database/fixture_db.py |
 | QA-68 | C | fix/qa68-builtin-dubletten | 2026-10-02T07:33Z | tools/library_testreste.py · tools/README.md · tests/test_qa68_builtin_dubletten.py · changelog.d/2026-10-02-QA-68.md · BACKLOG.md |
+| XPLAT-37 | C | fix/xplat37-settle-frame | 2026-10-02T07:37Z | src/ui/visualizer/scene_src/interaction/tools.js · src/ui/visualizer/scene_src/app.js · tests/test_viz14_selection_scene.py · changelog.d/2026-10-02-XPLAT-37.md · BACKLOG.md |
 
 ## Blocker & Fallen
 
@@ -78,7 +79,6 @@
 
 ## Verlauf
 
-- 2026-10-01T21:56Z A claim DOC-19
 - 2026-10-01T22:01Z A done VCB-11
 - 2026-10-01T22:13Z A done DOC-18
 - 2026-10-01T22:24Z A claim DOC-20
@@ -108,3 +108,4 @@
 - 2026-10-02T07:26Z A claim FM-46
 - 2026-10-02T07:28Z C done ENG-28
 - 2026-10-02T07:33Z C claim QA-68
+- 2026-10-02T07:37Z C claim XPLAT-37
