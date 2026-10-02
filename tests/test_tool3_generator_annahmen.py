@@ -11,6 +11,15 @@ Werkzeuge, nicht nur dieses.
 mit einer anders gewachsenen Bibliothek zeigt sie auf ein anderes Geraet oder
 ins Leere — und das Werkzeug merkte es nicht. Jetzt loest
 ``tools/_profil.profil_id`` ueber Hersteller + Modell auf und scheitert laut.
+
+**TOOL-6 (Folgepunkt aus dem Review von #841):** der Waechter zu (a) kannte
+nur ``os.path.join("shows", ...)``. ``Path("shows")``, ``open("data/...")``,
+f-Strings und ein relativer Pfad, der ueber eine Modul-Konstante an einen
+Dateisystem-Aufruf ging, rutschten durch — und genau so schrieben drei
+Generatoren (``build_dimmer_farbe_combo``, ``build_neuheiten_demo``,
+``build_zq06121_demo``) ihre Show ueber ``build_and_verify(b, "shows/...")``
+ab dem Arbeitsverzeichnis. Jetzt prueft er alle Dateisystem-Aufrufe aus
+``_PFAD_AUFRUFE``, auch in Unterordnern von ``tools/``.
 """
 import ast
 import os
@@ -34,32 +43,99 @@ if TOOLS not in sys.path:
 #: Ordner, deren Pfad ein Werkzeug nie relativ zum Arbeitsverzeichnis bauen darf.
 REPO_ORDNER = ("shows", "data", "docs", "fixtures", "assets")
 
+#: TOOL-6: Aufrufe, die ihren Pfad direkt im Dateisystem benutzen —
+#: ``{Aufruf: Position des Pfad-Arguments}``. Bis TOOL-6 kannte der Waechter
+#: nur ``os.path.join``; ``Path("shows")``, ``open("data/...")`` und ein
+#: relativer Pfad, der ueber eine Konstante an ``build_and_verify`` ging,
+#: rutschten durch.
+_PFAD_AUFRUFE = {
+    "os.path.join": 0, "open": 0, "io.open": 0,
+    "Path": 0, "pathlib.Path": 0, "PurePath": 0, "pathlib.PurePath": 0,
+    "os.listdir": 0, "os.scandir": 0, "os.makedirs": 0, "os.mkdir": 0,
+    "os.remove": 0, "os.unlink": 0, "os.rename": 0, "os.replace": 0,
+    "os.path.exists": 0, "os.path.isfile": 0, "os.path.isdir": 0,
+    "os.path.getsize": 0, "os.path.getmtime": 0,
+    "os.path.abspath": 0, "os.path.realpath": 0,
+    "shutil.copy": 0, "shutil.copy2": 0, "shutil.copyfile": 0,
+    "shutil.copytree": 0, "shutil.move": 0, "shutil.rmtree": 0,
+    "glob.glob": 0, "glob.iglob": 0, "sqlite3.connect": 0,
+    "save_show": 0, "load_show": 0, "build_and_verify": 1,
+}
 
-def _cwd_relative_pfade(pfad):
-    """``os.path.join("<repo-ordner>", ...)`` — der erste Teil ein nackter
-    Ordnername statt eines Repo-Roots."""
+#: Bewusst CWD-relativ — ``(Datei relativ zu tools/, Aufruf)`` -> Grund.
+_AUSNAHMEN = {
+    ("anleitungsbilder/sandbox.py", "os.path.join('data', 'midi_mappings.json')"):
+        "spiegelt den Pfad, den die App selbst CWD-relativ benutzt "
+        "(src/ui/views/midi_view.py) — die Sandbox meldet, wo die App schreibt",
+}
+
+
+def _ist_repo_relativ(wert):
+    if not isinstance(wert, str):
+        return False
+    w = wert.replace("\\", "/")
+    return w in REPO_ORDNER or any(w.startswith(o + "/") for o in REPO_ORDNER)
+
+
+def _relativer_anfang(knoten, konstanten):
+    """Der Ausdruck beginnt mit einem nackten Repo-Ordner: Konstante,
+    f-String, ``"shows/" + name`` oder ein Modul-Name, dem so etwas
+    zugewiesen wurde (``OUT = "shows/X.lshow"``)."""
+    if isinstance(knoten, ast.Constant):
+        return _ist_repo_relativ(knoten.value)
+    if isinstance(knoten, ast.JoinedStr) and knoten.values:
+        return _relativer_anfang(knoten.values[0], konstanten)
+    if isinstance(knoten, ast.BinOp) and isinstance(knoten.op, ast.Add):
+        return _relativer_anfang(knoten.left, konstanten)
+    if isinstance(knoten, ast.Name):
+        return knoten.id in konstanten
+    return False
+
+
+def _cwd_relative_pfade(pfad, ausnahmen=None):
+    """Pfade, die ein Werkzeug relativ zum Arbeitsverzeichnis baut: ein
+    Dateisystem-Aufruf (``_PFAD_AUFRUFE``), dessen Pfad mit einem nackten
+    Repo-Ordner beginnt statt mit einem Repo-Root."""
     with open(pfad, encoding="utf-8", errors="replace") as f:
         try:
             baum = ast.parse(f.read(), filename=pfad)
         except SyntaxError:
             return []
+    rel = os.path.relpath(pfad, TOOLS).replace(os.sep, "/")
+    ausnahmen = _AUSNAHMEN if ausnahmen is None else ausnahmen
+    konstanten = {t.id for k in baum.body if isinstance(k, ast.Assign)
+                  for t in k.targets if isinstance(t, ast.Name)
+                  and _relativer_anfang(k.value, set())}
     treffer = []
     for k in ast.walk(baum):
-        if (isinstance(k, ast.Call) and isinstance(k.func, ast.Attribute)
-                and k.func.attr == "join" and ast.unparse(k.func.value) == "os.path"
-                and k.args and isinstance(k.args[0], ast.Constant)
-                and k.args[0].value in REPO_ORDNER):
-            treffer.append(f"{os.path.basename(pfad)}:{k.lineno}  {ast.unparse(k)}")
+        if not isinstance(k, ast.Call):
+            continue
+        stelle = _PFAD_AUFRUFE.get(ast.unparse(k.func))
+        if stelle is None or len(k.args) <= stelle:
+            continue
+        if not _relativer_anfang(k.args[stelle], konstanten):
+            continue
+        if (rel, ast.unparse(k)) in ausnahmen:
+            continue
+        treffer.append(f"{rel}:{k.lineno}  {ast.unparse(k)}")
     return treffer
+
+
+def _werkzeuge():
+    """Alle lebenden Werkzeuge — auch in Unterordnern, ohne ``_archiv``."""
+    for wurzel, ordner, dateien in os.walk(TOOLS):
+        ordner[:] = sorted(o for o in ordner if o not in ("_archiv", "__pycache__"))
+        for d in sorted(dateien):
+            if d.endswith(".py"):
+                yield os.path.join(wurzel, d)
 
 
 class KeinWerkzeugBautCwdRelativePfade(unittest.TestCase):
 
     def test_alle_werkzeuge_repo_relativ(self):
         treffer = []
-        for name in sorted(os.listdir(TOOLS)):
-            if name.endswith(".py"):
-                treffer += _cwd_relative_pfade(os.path.join(TOOLS, name))
+        for pfad in _werkzeuge():
+            treffer += _cwd_relative_pfade(pfad)
         self.assertEqual(treffer, [], (
             "Pfad relativ zum Arbeitsverzeichnis — aus einem anderen Ordner "
             "gestartet landet die Datei woanders. Repo-Root voranstellen:\n  "
@@ -73,6 +149,45 @@ class KeinWerkzeugBautCwdRelativePfade(unittest.TestCase):
                 f.write('import os\nOUT = os.path.join("shows", "X.lshow")\n'
                         '_R = "/r"\nOK = os.path.join(_R, "shows", "X.lshow")\n')
             self.assertEqual(len(_cwd_relative_pfade(probe)), 1)
+
+    def test_der_scanner_erkennt_die_weiteren_formen(self):
+        """TOOL-6: die Formen, die der erste Waechter nicht sah — und ihre
+        repo-relativen Gegenstuecke, die er nicht melden darf."""
+        quelle = (
+            'import os, json, pathlib\n'
+            'from pathlib import Path\n'
+            'OUT = "shows/X.lshow"\n'                          # 3  ueber Konstante
+            'ROOT = Path(__file__).resolve().parent.parent\n'
+            'a = Path("shows") / "X.lshow"\n'                  # 5
+            'b = pathlib.Path("data/midi.json")\n'             # 6
+            'c = open("data/midi.json", encoding="utf-8")\n'   # 7
+            'd = json.load(open(f"shows/{OUT}"))\n'            # 8
+            'build_and_verify(b, OUT, name="X")\n'             # 9
+            'build_and_verify(b, "docs/a.lshow")\n'            # 10
+            'e = os.path.exists("fixtures/" + "x")\n'          # 11
+            'f = ROOT / "shows" / "X.lshow"\n'                 # ok
+            'g = open(os.path.join(ROOT, "data", "m.json"))\n'  # ok
+            'h = Path(ROOT, "shows")\n'                        # ok
+            'i = print("shows/X.lshow")\n'                     # ok: kein Pfad-Aufruf
+            'j = d.get("fixtures")\n')                         # ok
+        with tempfile.TemporaryDirectory() as tmp:
+            probe = os.path.join(tmp, "probe.py")
+            with open(probe, "w", encoding="utf-8") as f:
+                f.write(quelle)
+            zeilen = sorted(int(t.split(":")[1].split()[0])
+                            for t in _cwd_relative_pfade(probe, ausnahmen={}))
+        self.assertEqual(zeilen, [5, 6, 7, 8, 9, 10, 11])
+
+    def test_ausnahmen_gibt_es_noch(self):
+        """Eine Ausnahme, deren Aufruf verschwunden ist, gehoert gestrichen."""
+        gesehen = set()
+        for pfad in _werkzeuge():
+            rel = os.path.relpath(pfad, TOOLS).replace(os.sep, "/")
+            gefunden = _cwd_relative_pfade(pfad, ausnahmen={})
+            for datei, aufruf in _AUSNAHMEN:
+                if datei == rel and any(aufruf in t for t in gefunden):
+                    gesehen.add((datei, aufruf))
+        self.assertEqual(sorted(set(_AUSNAHMEN) - gesehen), [])
 
 
 class KeineRoheProfilId(unittest.TestCase):

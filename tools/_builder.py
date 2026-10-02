@@ -9,7 +9,9 @@ Ein Build-Skript schrumpft damit auf:
     mx = b.matrix("Farbe", algorithm=RgbAlgorithm.CHASE, fixtures=fids,
                   colors=[(255,0,0),(0,0,255)])
     b.button("An/Aus", action=ButtonAction.FUNCTION_TOGGLE, function=mx, bank=0)
-    build_and_verify(b, "shows/Mini.lshow", render=[mx])
+    build_and_verify(b, os.path.join(REPO, "shows", "Mini.lshow"), render=[mx])
+    # REPO = Repo-Root, nie ein nacktes "shows/..." — das waere ab dem
+    # Arbeitsverzeichnis gerechnet (TOOL-6)
 
 Alles, was ``b`` baut, ist garantiert „nur echte Bausteine" (save() validiert
 statisch + live; jeder fake Algo/Action/Param/Fixture wirft schon am Aufruf).
