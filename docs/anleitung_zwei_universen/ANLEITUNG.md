@@ -82,7 +82,10 @@ ArtNet`. Bedeutung der **Patch**-Spalte je Typ:
 - **Enttec** → COM-Port (z. B. `COM3`).
 - **ArtNet** → Ziel-IP oder Broadcast (leer = `255.255.255.255`). Hat der PC mehrere
   Netzwerkkarten (z. B. WLAN + Lichtnetz), im Tab **Art-Net** unter **Netzwerkkarte:** die Karte
-  des Lichtnetzes wählen — dann geht der Broadcast gezielt dorthin.
+  des Lichtnetzes wählen — dann geht der Broadcast gezielt dorthin. Die Wahl gilt für Art-Net-Sender,
+  die **danach** aufgebaut werden: am besten **vor** dem Speichern der Universen-Tabelle wählen —
+  sonst die Universen danach noch einmal **Speichern** (baut die Ausgaben neu auf) oder LightOS neu
+  starten. Ein schon laufender Sender behält seine alte Karte.
 - **sACN** → Unicast-IP (leer = Multicast).
 
 #### Hinweis „Zwei Universen auf demselben Ziel"
