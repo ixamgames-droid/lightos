@@ -189,6 +189,15 @@ der aktuellen Page gelegt, und unter **Aktive Cue** steht, wohin:
    Statusleiste.
 3. **Executor 1** trägt jetzt die Cueliste, Cue 1 läuft.
 
+Der ganze Ablauf mit zweimal **GO** — erst ohne Executor, dann Cue 1 auf Ex 1, dann Cue 2:
+
+![Ablauf: GO ohne Executor, dann Cue 1 und Cue 2](img/13_go_ohne_executor_ablauf.gif)
+
+1. **GO** — der Knopf, der als Nächstes gedrückt wird.
+2. Die laufende Cue unter **Aktive Cue**: erst Cue 1.0, nach dem zweiten **GO** Cue 2.0.
+3. Der Hinweis *„Meine Show“ liegt jetzt auf Ex 1*.
+4. **Executor 1** mit der Cueliste.
+
 Ein belegter Executor wird dabei nie überschrieben. Auch Executoren mit eigenem Namen
 (**⚙**, Label) und solche, deren Fader auf 0 steht, bleiben frei — dort käme kein Licht,
 und beim Hochziehen spränge die Liste unerwartet an. Ist nur noch so ein Executor frei,
