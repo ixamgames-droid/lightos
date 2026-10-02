@@ -1827,6 +1827,11 @@ class ProgrammerView(QWidget):
                     ziele = rest_fx
                 if not ziele:
                     continue
+                if ch.attribute == "raw":
+                    # FM-33: unerkannte Kanaele — Sammelregler + (bei EINEM
+                    # gewaehlten Geraet) ein Regler je Kanal.
+                    self._add_raw_regler(ilay, ch, ziele, fixtures)
+                    continue
                 for _head, _owners in self._slider_head_buckets(ziele, ch):
                     # FM-14b: dieselbe EINE Quelle wie die Geraeteliste — und
                     # sie nennt nur dort ein Segment, wo der Kopf-Index eines
@@ -2280,6 +2285,76 @@ class ProgrammerView(QWidget):
         # Geraete, die den Kanal WIRKLICH haben; ist das keines, entsteht auch
         # kein Regler (er koennte ohnehin nichts ausgeben).
         return [(None, hat_attr)] if hat_attr else []
+
+    #: FM-33 (b): ab so vielen unerkannten Kanaelen werden die Einzelregler
+    #: eingeklappt — gemessen: 21 am Spiider 91ch, 40 im gewachsenen Bestand.
+    RAW_OFFEN_BIS = 8
+
+    def _raw_kanaele(self, fixture) -> list:
+        try:
+            return [c for c in self._kanaele(fixture)
+                    if (getattr(c, "attribute", "") or "") == "raw"]
+        except Exception:
+            return []
+
+    def _add_raw_regler(self, ilay, ch, owners, auswahl) -> None:
+        """FM-33 — unerkannte Kanaele (``raw``), entschieden 2026-08-30.
+
+        Vorher stand dort EIN geraeteweiter Regler, beschriftet nach einem
+        einzigen Rohkanal (gemessen: „Grundfarbe Shutter") — und ein Zug daran
+        setzte am Spiider 91ch alle 21 Rohkanaele (Shutter, Zoom Fein,
+        Blumeneffekt …). Jetzt:
+
+        (a) **Einzelregler nur bei genau EINEM gewaehlten Geraet**, je Rohkanal
+            einer mit dem Kanalnamen. Der Schluessel ``raw#k`` ist
+            POSITIONSbezogen — bei mehreren Geraeten traefe derselbe Index am
+            Nachbargeraet einen anders benannten Kanal. Darum dort nur der
+            Sammelregler.
+        (b) **Ab mehr als 8 Rohkanaelen eingeklappt** (``CollapsibleSection``).
+        (c) **Der Sammelregler bleibt**, ehrlich beschriftet als „Unerkannte
+            Kanäle (N)", und schreibt auf ALLE Rohkanal-Schluessel — auch auf
+            die einzeln gesetzten (``_RawSammelRegler``).
+
+        Ein Geraet mit genau EINEM Rohkanal behaelt genau einen Regler, mit dem
+        Kanalnamen beschriftet; ein Geraet ohne ``raw`` bekommt keinen (es
+        gelangt gar nicht erst hierher)."""
+        zahlen = {f.fid: len(self._raw_kanaele(f)) for f in owners}
+        owners = [f for f in owners if zahlen.get(f.fid, 0) > 0]
+        if not owners:
+            return
+        einzeln = len(auswahl) == 1 and len(owners) == 1
+        if einzeln and zahlen[owners[0].fid] == 1:
+            nur = self._raw_kanaele(owners[0])[0]
+            ilay.addWidget(AttributeSlider(nur, owners, self._state, owner=self,
+                                           display_name=nur.name))
+            return
+        werte = sorted(set(zahlen[f.fid] for f in owners))
+        anzahl = (str(werte[0]) if len(werte) == 1
+                  else f"je Gerät {werte[0]}–{werte[-1]}")
+        ilay.addWidget(_RawSammelRegler(
+            ch, owners, self._state, owner=self,
+            display_name=f"Unerkannte Kanäle ({anzahl})"))
+        if not einzeln:
+            return
+        fx = owners[0]
+        kanaele = self._raw_kanaele(fx)
+        block = QWidget()
+        blay = QVBoxLayout(block)
+        blay.setContentsMargins(0, 0, 0, 0)
+        blay.setSpacing(4)
+        for k, ck in enumerate(kanaele):
+            regler = _RawKanalRegler(ck, [fx], self._state, owner=self,
+                                     head=k, display_name=ck.name)
+            if k == 0:
+                regler._andere = list(enumerate(kanaele))[1:]
+            blay.addWidget(regler)
+        if len(kanaele) > self.RAW_OFFEN_BIS:
+            from src.ui.widgets.collapsible_section import CollapsibleSection
+            ilay.addWidget(CollapsibleSection(
+                f"Einzelne Kanäle ({len(kanaele)})", block, collapsed=True,
+                prefs_key="programmer_raw_einzeln"))
+        else:
+            ilay.addWidget(block)
 
     def _weitere_gleiche_kanaele(self, owners, ch) -> list:
         """FM-48: weitere Kanaele DESSELBEN Attributs an einem EINKOPF-Geraet —
@@ -3469,6 +3544,97 @@ class AttributeSlider(QWidget):
     def _update_labels(self, value: int, divergent: bool = False):
         self._lbl_val.setText("—" if divergent else str(value))
         self._lbl_pct.setText("" if divergent else f"{int(value / 255 * 100)}%")
+
+
+class _RawKanalRegler(AttributeSlider):
+    """FM-33 (a): Regler fuer EINEN unerkannten Kanal eines Geraets.
+
+    Der erste Rohkanal traegt den Basis-Schluessel ``raw``, und den spiegelt der
+    DMX-Flush auf jeden Rohkanal ohne eigenen ``raw#k``. Sein Regler verankert
+    darum VOR dem ersten Schreiben die anderen auf dem Wert, den sie GERADE
+    AUSGEBEN — sonst zoege er sie mit. Quelle ist das Live-Universe (was der
+    letzte Frame aus Grundwerten, Szenen, Cues und Programmer gerechnet hat;
+    Review #867: ein Profil-Standard liesse einen Kanal springen, den eine
+    laufende Szene gerade treibt). Ohne Live-Wert: ``raw``, sonst
+    ``default_value``.
+
+    Bewusst erst beim Zug und nicht beim Aufbau des Reiters (anders als
+    ``_seed_separate_head`` bei den Farbkoepfen): ein Anker ist ein
+    Programmer-Wert und uebersteuert, was eine laufende Szene auf dem Kanal
+    ausgibt. Das Oeffnen des Reiters darf 20 Kanaele nicht still an sich
+    ziehen. Das Verankern laeuft im selben Verlaufsschritt wie der Zug (FM-52),
+    ein Rueckgaengig nimmt beides zurueck."""
+
+    _andere: list = []
+
+    def _ausgabe(self, fid: int, kanal, ersatz: int) -> int:
+        """Was ``kanal`` dieses Geraets gerade ausgibt — ``ersatz`` ohne Live-Wert."""
+        try:
+            fx = next(f for f in self._fixtures if f.fid == fid)
+            uni = self._state.universes.get(int(fx.universe))
+            adr = int(fx.address) + int(kanal.channel_number) - 1
+            if uni is not None and 1 <= adr <= 512:
+                return int(uni.get_channel(adr))
+        except Exception:
+            pass
+        return int(ersatz)
+
+    def _apply_value(self, fid: int, value: int):
+        if self._andere:
+            basis = self._state.get_programmer_value(fid, "raw")
+            # ERST alle Live-Werte lesen, DANN schreiben: jedes
+            # set_programmer_value spuelt das Geraet sofort neu und setzt dabei
+            # die noch nicht verankerten Kanaele im Live-Universe bis zum
+            # naechsten Frame auf ihren Grundwert zurueck — der zweite Anker
+            # laese sonst schon den Grundwert statt der Szene.
+            anker = [(k, self._ausgabe(fid, ck, ck.default_value if basis is None
+                                       else basis))
+                     for k, ck in self._andere
+                     if self._state.get_programmer_value(fid, "raw", head=k) is None]
+            for k, wert in anker:
+                self._state.set_programmer_value(fid, "raw", wert, head=k)
+        super()._apply_value(fid, value)
+
+
+class _RawSammelRegler(AttributeSlider):
+    """FM-33 (c): „Unerkannte Kanäle (N)" — EIN Zug setzt alle Rohkanaele.
+
+    Ein schlichter geraeteweiter Regler schriebe nur den Basis-Schluessel
+    ``raw`` (= erster Rohkanal); die einzeln gesetzten ``raw#k`` behielten ihren
+    Wert, der Sammelregler waere also keiner mehr. Darum setzt er zusaetzlich
+    jeden vorhandenen ``raw#k`` mit. Ein noch nie einzeln gesetzter Rohkanal
+    folgt ``raw`` ohnehin ueber den DMX-Flush."""
+
+    def _apply_value(self, fid: int, value: int):
+        super()._apply_value(fid, value)
+        for key in [k for k in self._state.programmer.get(fid, {})
+                    if k.startswith("raw#")]:
+            self._state.set_programmer_value(fid, key, value)
+
+    def _load_current_value(self):
+        super()._load_current_value()
+        # Stehen die Rohkanaele eines Geraets verschieden, zeigt der Regler
+        # „—" statt den Wert des ersten Kanals als den aller auszugeben.
+        # Gezaehlt wird JEDER Rohkanal mit dem Wert, den der Flush schreiben
+        # wuerde (eigener ``raw#k``, sonst ``raw``, sonst ``default_value``) —
+        # nicht nur die gesetzten Schluessel (Review #867: ein einzeln gesetztes
+        # ``raw#5`` neben lauter ungesetzten waere sonst „einheitlich").
+        for f in self._fixtures:
+            prog = self._state.programmer.get(f.fid, {})
+            werte = set()
+            try:
+                kanaele = [c for c in get_channels_for_patched(f)
+                           if (getattr(c, "attribute", "") or "") == "raw"]
+            except Exception:
+                kanaele = []
+            for k, c in enumerate(kanaele):
+                v = prog.get("raw" if k == 0 else f"raw#{k}")
+                if v is None:
+                    v = prog.get("raw", c.default_value)
+                werte.add(int(v))
+            if len(werte) > 1:
+                self._update_labels(self._slider.value(), True)
+                return
 
 
 class WeissSegmentBlock(QGroupBox):

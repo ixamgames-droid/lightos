@@ -197,13 +197,19 @@ class GemeldeteSymptomeTest(_Basis):
         ★ FM-24 hat die Aufschrift auf den wirklich geschriebenen Kanal
         umgestellt („Grundfarbe Grün Fein · K3") — wahr, aber sinnlos: ein
         „Kopf 3", der ein Feinbyte einer Grundfarbe verstellt, ist kein Kopf.
-        Seit FM-28 (2026-08-24) entsteht dieser Regler gar nicht mehr; ``raw``
-        wird ausschliesslich geraeteweit bedient."""
+        Seit FM-28 (2026-08-24) entsteht dieser Regler gar nicht mehr. Seit
+        FM-33 gibt es bei EINEM gewaehlten Geraet wieder einen Regler je
+        Rohkanal — aber beschriftet mit dem Kanal, den er schreibt, ohne
+        Kopf-Anhang: ``raw#2`` heisst „Grundfarbe Grün Fein", nicht „· K3"."""
         self._patch(1, "SPIIDER", 91)
         regler = self._regler(["1:2"])
-        self.assertEqual(
-            [(a, h, t) for a, h, t, _d, _f in regler if a == "raw" and h is not None],
-            [], "fuer ``raw`` darf kein Pro-Kopf-Regler gebaut werden")
+        fx = next(f for f in self.state.get_patched_fixtures() if f.fid == 1)
+        roh = [(h, t) for a, h, t, _d, _f in regler if a == "raw" and h is not None]
+        self.assertTrue(roh, "FM-33: Einzelregler je Rohkanal bei einem Geraet")
+        for h, t in roh:
+            self.assertEqual(t, self._kanalname(fx, "raw", h),
+                             "ein raw-Regler nennt den Kanal, den er schreibt")
+            self.assertNotIn(" · ", t)
         self.assertTrue(
             [a for a, h, _t, _d, _f in regler if a == "raw" and h is None],
             "der geraeteweite raw-Regler muss bleiben — sonst waeren die "

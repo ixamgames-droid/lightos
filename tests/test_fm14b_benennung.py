@@ -911,6 +911,14 @@ class KanalnameStattSegmentnameTest(_RigFall):
                 w._slider.setValue(7 if w._slider.value() != 7 else 9)
                 nachher = dict(self.state.programmer.get(1, {}))
                 geaendert = [k for k, v in nachher.items() if vorher.get(k) != v]
+                if w._channel.attribute == "raw" and w._head == 0:
+                    # FM-33: der Regler des ERSTEN Rohkanals verankert vor dem
+                    # ersten Schreiben die anderen Rohkanaele (neue ``raw#k``) —
+                    # sonst zoege der gespiegelte Basis-Schluessel sie mit.
+                    # Dass das die Ausgabe nicht aendert, misst
+                    # tests/test_fm33_raw_einzelregler.py am Universe.
+                    geaendert = [k for k in geaendert
+                                 if not (k.startswith("raw#") and k not in vorher)]
                 self.assertEqual(len(geaendert), 1, f"{w._display_name!r} schrieb {geaendert}")
                 kanal = next(c for c, k in channel_occurrence_keys(chans)
                              if k == geaendert[0])
@@ -918,17 +926,24 @@ class KanalnameStattSegmentnameTest(_RigFall):
                 self.assertNotIn(" · ", w._display_name)
 
     def test_rohkanaele_haben_keine_pro_kopf_regler(self):
-        """Der heutige Stand der Flaeche (FM-28): am Spiider-Pixelkopf entsteht
-        fuer ``raw`` kein Regler je Kopf — der Griff daneben ist dort also gar
-        nicht moeglich. Kommt ein solcher Regler zurueck, faengt die Beschriftung
-        oben ihn ab; dieser Test sagt dann Bescheid, dass die Flaeche sich
-        geaendert hat."""
+        """Der Stand der Flaeche seit FM-28: am Spiider-Pixelkopf entsteht fuer
+        ``raw`` kein Regler je KOPF. Seit FM-33 steht bei einem gewaehlten
+        Geraet ein Regler je Rohkanal da — auch einer mit Index 1. Der traegt
+        dann aber den Namen des Kanals, den ``raw#1`` trifft (DMX 9
+        „Grundfarbe Rot Fein"), und keinen Pixel-/Kopf-Anhang: genau der Griff
+        daneben, den FM-14b gemeldet hatte, bleibt damit unmoeglich."""
+        from src.core.app_state import channel_occurrence_keys
         from src.ui.views.programmer_view import AttributeSlider
         view, _ = self._programmer_auf(1, 1)
         roh = [w for w in view.findChildren(AttributeSlider)
                if w._head == 1 and (getattr(getattr(w, "_channel", None),
                                             "attribute", "") or "") == "raw"]
-        self.assertEqual([], roh)
+        self.assertEqual(len(roh), 1)
+        fx = next(f for f in self.state.get_patched_fixtures() if f.fid == 1)
+        kanal = next(c for c, k in channel_occurrence_keys(self._channels(fx))
+                     if k == "raw#1")
+        self.assertEqual(roh[0]._display_name, kanal.name)
+        self.assertNotIn(" · ", roh[0]._display_name)
 
     def test_baenke_und_rohkanaele_sind_ZWEI_zahlen(self):
         """★★ Die Praemisse von ``attr_head_is_segment``, als Messung statt als
