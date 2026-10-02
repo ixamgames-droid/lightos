@@ -3551,8 +3551,12 @@ class _RawKanalRegler(AttributeSlider):
 
     Der erste Rohkanal traegt den Basis-Schluessel ``raw``, und den spiegelt der
     DMX-Flush auf jeden Rohkanal ohne eigenen ``raw#k``. Sein Regler verankert
-    darum VOR dem ersten Schreiben die anderen auf ihrem jetzigen
-    Programmer-Wert (``raw``, sonst ``default_value``) — sonst zoege er sie mit.
+    darum VOR dem ersten Schreiben die anderen auf dem Wert, den sie GERADE
+    AUSGEBEN — sonst zoege er sie mit. Quelle ist das Live-Universe (was der
+    letzte Frame aus Grundwerten, Szenen, Cues und Programmer gerechnet hat;
+    Review #867: ein Profil-Standard liesse einen Kanal springen, den eine
+    laufende Szene gerade treibt). Ohne Live-Wert: ``raw``, sonst
+    ``default_value``.
 
     Bewusst erst beim Zug und nicht beim Aufbau des Reiters (anders als
     ``_seed_separate_head`` bei den Farbkoepfen): ein Anker ist ein
@@ -3563,14 +3567,32 @@ class _RawKanalRegler(AttributeSlider):
 
     _andere: list = []
 
+    def _ausgabe(self, fid: int, kanal, ersatz: int) -> int:
+        """Was ``kanal`` dieses Geraets gerade ausgibt — ``ersatz`` ohne Live-Wert."""
+        try:
+            fx = next(f for f in self._fixtures if f.fid == fid)
+            uni = self._state.universes.get(int(fx.universe))
+            adr = int(fx.address) + int(kanal.channel_number) - 1
+            if uni is not None and 1 <= adr <= 512:
+                return int(uni.get_channel(adr))
+        except Exception:
+            pass
+        return int(ersatz)
+
     def _apply_value(self, fid: int, value: int):
         if self._andere:
             basis = self._state.get_programmer_value(fid, "raw")
-            for k, ck in self._andere:
-                if self._state.get_programmer_value(fid, "raw", head=k) is None:
-                    self._state.set_programmer_value(
-                        fid, "raw", ck.default_value if basis is None else basis,
-                        head=k)
+            # ERST alle Live-Werte lesen, DANN schreiben: jedes
+            # set_programmer_value spuelt das Geraet sofort neu und setzt dabei
+            # die noch nicht verankerten Kanaele im Live-Universe bis zum
+            # naechsten Frame auf ihren Grundwert zurueck — der zweite Anker
+            # laese sonst schon den Grundwert statt der Szene.
+            anker = [(k, self._ausgabe(fid, ck, ck.default_value if basis is None
+                                       else basis))
+                     for k, ck in self._andere
+                     if self._state.get_programmer_value(fid, "raw", head=k) is None]
+            for k, wert in anker:
+                self._state.set_programmer_value(fid, "raw", wert, head=k)
         super()._apply_value(fid, value)
 
 
@@ -3593,9 +3615,23 @@ class _RawSammelRegler(AttributeSlider):
         super()._load_current_value()
         # Stehen die Rohkanaele eines Geraets verschieden, zeigt der Regler
         # „—" statt den Wert des ersten Kanals als den aller auszugeben.
+        # Gezaehlt wird JEDER Rohkanal mit dem Wert, den der Flush schreiben
+        # wuerde (eigener ``raw#k``, sonst ``raw``, sonst ``default_value``) —
+        # nicht nur die gesetzten Schluessel (Review #867: ein einzeln gesetztes
+        # ``raw#5`` neben lauter ungesetzten waere sonst „einheitlich").
         for f in self._fixtures:
             prog = self._state.programmer.get(f.fid, {})
-            werte = {v for k, v in prog.items() if k == "raw" or k.startswith("raw#")}
+            werte = set()
+            try:
+                kanaele = [c for c in get_channels_for_patched(f)
+                           if (getattr(c, "attribute", "") or "") == "raw"]
+            except Exception:
+                kanaele = []
+            for k, c in enumerate(kanaele):
+                v = prog.get("raw" if k == 0 else f"raw#{k}")
+                if v is None:
+                    v = prog.get("raw", c.default_value)
+                werte.add(int(v))
             if len(werte) > 1:
                 self._update_labels(self._slider.value(), True)
                 return

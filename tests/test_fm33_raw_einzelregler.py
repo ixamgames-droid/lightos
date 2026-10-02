@@ -138,6 +138,7 @@ class EinGeraet(_Basis):
         self._patch(1, SPIIDER)
         self.state.set_programmer_value(1, "raw", 120)
         regler = self._einzeln(self._raw_regler(self._view([1])))
+        self.state._render_frame(0.02)      # wie im Betrieb: der Frame laeuft
         erster = next(s for s in regler if s._head == 0)
         erster._slider.setValue(99)
         _app().processEvents()
@@ -145,9 +146,59 @@ class EinGeraet(_Basis):
         self.assertEqual(nachher.pop(self._name(erster)), 99)
         self.assertEqual(set(nachher.values()), {120})
 
+    def test_anker_ist_die_laufende_ausgabe_nicht_der_standard(self):
+        """Review #867: treibt eine Szene die anderen Rohkanaele, darf der Zug
+        am ersten sie nicht auf den Profil-Standard springen lassen — verankert
+        wird, was das Live-Universe gerade ausgibt."""
+        self._patch(1, SPIIDER)
+        regler = self._einzeln(self._raw_regler(self._view([1])))
+        fm = self.state.function_manager
+        szene = fm.new_scene("Rohkanaele 77")
+        szene.fade_in = 0
+        for c in self._raw_kanaele(1)[1:]:   # eine Szene treibt alle anderen
+            szene.set_value(1, c.channel_number, 77)
+        fm.start(szene.id)
+        self.addCleanup(fm.stop, szene.id)
+        for _ in range(3):
+            self.state._render_frame(0.05)
+        erster = next(s for s in regler if s._head == 0)
+        erster._slider.setValue(99)
+        _app().processEvents()
+        prog = self.state.programmer.get(1, {})
+        self.assertEqual({prog.get(f"raw#{k}") for k in range(1, 21)}, {77})
+        nachher = self._dmx(1)
+        self.assertEqual(nachher.pop(self._name(erster)), 99)
+        self.assertEqual(set(nachher.values()), {77})
+
+    def test_sammelregler_zeigt_strich_sobald_ein_kanal_abweicht(self):
+        """Review #867: nur ``raw#5`` gesetzt, alle anderen ungesetzt — die
+        Rohkanaele stehen verschieden, also „—“ statt einer Zahl."""
+        self._patch(1, SPIIDER)
+        regler = self._raw_regler(self._view([1]))
+        sammel = self._sammel(regler)[0]
+        for k, c in enumerate(self._raw_kanaele(1)):
+            self.state.set_programmer_value(1, "raw", 0, head=k)
+        sammel._load_current_value()
+        self.assertNotEqual(sammel._lbl_val.text(), "—", "alle gleich -> Zahl")
+        fuenf = next(s for s in self._einzeln(regler) if s._head == 5)
+        fuenf._slider.setValue(200)
+        self.state.clear_programmer_value(1, "raw#3")
+        sammel._load_current_value()
+        self.assertEqual(sammel._lbl_val.text(), "—")
+
+    def test_sammelregler_strich_auch_ohne_gesetzte_basis(self):
+        self._patch(1, SPIIDER)
+        regler = self._raw_regler(self._view([1]))
+        sammel = self._sammel(regler)[0]
+        self.state.programmer.pop(1, None)
+        self.state.set_programmer_value(1, "raw", 200, head=5)
+        sammel._load_current_value()
+        self.assertEqual(sammel._lbl_val.text(), "—")
+
     def test_ohne_vorwert_verankert_der_erste_auf_dem_standard(self):
         self._patch(1, SPIIDER)
         regler = self._einzeln(self._raw_regler(self._view([1])))
+        self.state._render_frame(0.02)
         erster = next(s for s in regler if s._head == 0)
         erster._slider.setValue(99)
         _app().processEvents()
