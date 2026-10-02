@@ -48,7 +48,6 @@
 | DOC-49 | C | - | 2026-10-02T12:07Z | docs/FARB_FX_VC_SHOW.md |
 | UI-71 | C | - | 2026-10-02T12:08Z | src/ui/widgets/controller_browser.py · tests/test_ui71_controller_vorlage_hinweis.py · tests/test_doc_removed_ui.py · BACKLOG.md · changelog.d/2026-10-02-UI-71.md |
 | DOC-50 | C | - | 2026-10-02T12:09Z | docs/LIVE_EDIT_FENSTER.md |
-| TOOL-9 | A | fix/tool9-ids-tafel | 2026-10-02T12:11Z | tools/backlog_ids.py · tests/test_backlog_ids.py |
 | TOOL-2 | C | - | 2026-10-02T12:17Z | tools/gource · Code-Film.bat · Code-Film.sh · THIRD_PARTY_NOTICES.md · tests/test_proc18_fremd_lizenzhinweise.py · tests/test_tool2_keine_binaerdateien.py · BACKLOG.md · changelog.d/2026-10-02-TOOL-2.md |
 | DOC-51 | C | - | 2026-10-02T12:23Z | docs/anleitung_grosse_demo_2026/ANLEITUNG_GROSSE_DEMO_2026.md |
 | DOC-52 | C | - | 2026-10-02T12:24Z | docs/anleitung_komplettshow_2026 |
@@ -139,7 +138,6 @@
 
 ## Verlauf
 
-- 2026-10-02T12:00Z C claim DOC-44
 - 2026-10-02T12:00Z C claim DOC-45
 - 2026-10-02T12:01Z C claim DOC-46
 - 2026-10-02T12:04Z C claim DOC-47
@@ -169,3 +167,4 @@
 - 2026-10-02T13:05Z C claim DOC-56
 - 2026-10-02T13:38Z C done XPLAT-34
 - 2026-10-02T13:50Z C done FM-33
+- 2026-10-02T16:55Z A done TOOL-9
