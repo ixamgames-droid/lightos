@@ -1,0 +1,207 @@
+{
+  "format_version": 1,
+  "hersteller": "Lixada",
+  "hersteller_kurz": "Lixada",
+  "modell": "Triangle Spider Beam",
+  "kurzname": "TRIANGLE SPIDER",
+  "typ": "moving_head",
+  "leistung_w": 90,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Lixada-Triangle-Spider-Beam.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Lixada/Lixada-Triangle-Spider-Beam.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.3 GIT · Daniel",
+    "original": "resources/fixtures/Lixada/Lixada-Triangle-Spider-Beam.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 32 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung: Rasterform 3x3 im 48-Kanal-Modus (3 Arme mit je 3 RGBW-LEDs); Strobe-Kanal mit Bereich (QLC+-Preset schnell->langsam) versehen; Programmtempo speed -> effect_speed; Kanalname '10 Auto/Sound Control' bereinigt; Reset-Bereich 0-250 nicht mehr als art reset (QLC+-Angabe vermutlich vertauscht; mit Default 0 haette LightOS sonst dauerhaft Reset gesendet)"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Quelldatei und auf innere Stimmigkeit geprueft; kein Herstellerhandbuch oeffentlich auffindbar, nicht am Geraet geprueft"
+  },
+  "modi": [
+    {
+      "name": "48 Channel",
+      "kanaele": [
+        {"name": "X Pan Fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "X Pan Coarse", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Head 1 Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Head 2 Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Head 3 Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt/Pan Speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Dimming", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Strobe schnell → langsam (laut QLC+)", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Effects",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "No function", "art": ""},
+            {"von": 1, "bis": 7, "name": "Slow Effect", "art": ""},
+            {"von": 8, "bis": 140, "name": "Auto Effect", "art": ""},
+            {"von": 141, "bis": 255, "name": "Sound Effect", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Auto/Sound-Programm",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "No Effect", "art": ""},
+            {"von": 16, "bis": 44, "name": "Auto Effect 0", "art": ""},
+            {"von": 45, "bis": 74, "name": "Auto Effect 1", "art": ""},
+            {"von": 75, "bis": 104, "name": "Auto Effect 2", "art": ""},
+            {"von": 105, "bis": 128, "name": "Auto Effect 3", "art": ""},
+            {"von": 129, "bis": 157, "name": "Sound Effect 0", "art": "sound"},
+            {"von": 158, "bis": 187, "name": "Sound Effect 1", "art": "sound"},
+            {"von": 188, "bis": 217, "name": "Sound Effect 2", "art": "sound"},
+            {"von": 218, "bis": 255, "name": "Sound Effect 3", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Sound Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Speed / Sound", "art": ""}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 3", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 4", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 4", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 5", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 5", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 5", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 5", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 6", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 6", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 6", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 6", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 7", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 7", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 7", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 7", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 8", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 8", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 8", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 8", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 9", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 9", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 9", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 9", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 250, "name": "Reset", "art": ""},
+            {"von": 251, "bis": 255, "name": "No function", "art": ""}
+          ]
+        }
+      ],
+      "raster": {"rows": 3, "cols": 3}
+    },
+    {
+      "name": "16 Channel",
+      "kanaele": [
+        {"name": "X Pan Fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "X Pan Coarse", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Head 1 Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Head 2 Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Head 3 Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt/Pan Speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Dimming", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Strobe schnell → langsam (laut QLC+)", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Effects",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "No function", "art": ""},
+            {"von": 1, "bis": 7, "name": "Slow Effect", "art": ""},
+            {"von": 8, "bis": 140, "name": "Auto Effect", "art": ""},
+            {"von": 141, "bis": 255, "name": "Sound Effect", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Auto/Sound-Programm",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "No Effect", "art": ""},
+            {"von": 16, "bis": 44, "name": "Auto Effect 0", "art": ""},
+            {"von": 45, "bis": 74, "name": "Auto Effect 1", "art": ""},
+            {"von": 75, "bis": 104, "name": "Auto Effect 2", "art": ""},
+            {"von": 105, "bis": 128, "name": "Auto Effect 3", "art": ""},
+            {"von": 129, "bis": 157, "name": "Sound Effect 0", "art": "sound"},
+            {"von": 158, "bis": 187, "name": "Sound Effect 1", "art": "sound"},
+            {"von": 188, "bis": 217, "name": "Sound Effect 2", "art": "sound"},
+            {"von": 218, "bis": 255, "name": "Sound Effect 3", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Sound Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Speed / Sound", "art": ""}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 250, "name": "Reset", "art": ""},
+            {"von": 251, "bis": 255, "name": "No function", "art": ""}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Dreiarmiger Spider (gemeinsamer Pan, Tilt je Arm). Achtung: QLC+ gibt Reset auf 0-250 an — vor Nutzung am Geraet pruefen. Strobe-Offen-Wert unbekannt."
+}

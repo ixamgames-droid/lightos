@@ -1,0 +1,164 @@
+{
+  "format_version": 1,
+  "hersteller": "Shehds",
+  "hersteller_kurz": "Shehds",
+  "modell": "LED Beam 8x12W RGBW",
+  "kurzname": "SH-BAR8X12",
+  "typ": "led_bar",
+  "leistung_w": 100,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Shehds-LED-Beam-8x12W-RGBW.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Shehds/Shehds-LED-Beam-8x12W-RGBW.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.14.2 GIT · Maurizio",
+    "original": "resources/fixtures/Shehds/Shehds-LED-Beam-8x12W-RGBW.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 50 Wertebereiche mit Art (kind) versehen; Rasterform in 2 Modus/Modi aus <Physical> uebernommen; LightOS-Nachbearbeitung (FM-57): kurzname SH-BAR8X12; Bereichs-Arten korrigiert (u. a. „Preset“ nicht als Reset, Farben/Offen auf Farbrad, Open/Shake/Rotation auf Goborad, Prisma/Frost, keine Farb-/Dreh-Kacheln auf Makro-/Speed-Kanaelen, Sound-Bereiche); Programm-/Effekt-Geschwindigkeiten als effect_speed statt speed (speed = Bewegung)"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": false,
+    "wie": "nicht gegen ein Herstellerhandbuch geprueft (kein oeffentliches Shehds-Handbuch zu diesem Modell auffindbar); Kanalbelegung und Wertebereiche aus der QLC+-Vorlage, Attribute, Bereichs-Arten und Defaults von LightOS plausibilisiert"
+  },
+  "modi": [
+    {
+      "name": "38 Channel",
+      "raster": {"rows": 1, "cols": 8},
+      "kanaele": [
+        {"name": "Horizontal operation", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Horizontal speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Effect",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "no effect", "art": ""},
+            {"von": 11, "bis": 20, "name": "built-in effect 1", "art": ""},
+            {"von": 21, "bis": 31, "name": "built-in effect 2", "art": ""},
+            {"von": 32, "bis": 42, "name": "built-in effect 3", "art": ""},
+            {"von": 43, "bis": 53, "name": "built-in effect 4", "art": ""},
+            {"von": 54, "bis": 64, "name": "built-in effect 5", "art": ""},
+            {"von": 65, "bis": 75, "name": "built-in effect 6", "art": ""},
+            {"von": 76, "bis": 86, "name": "built-in effect 7", "art": ""},
+            {"von": 87, "bis": 97, "name": "built-in effect 8", "art": ""},
+            {"von": 98, "bis": 108, "name": "built-in effect 9", "art": ""},
+            {"von": 109, "bis": 119, "name": "built-in effect 10", "art": ""},
+            {"von": 120, "bis": 130, "name": "built-in effect 11", "art": ""},
+            {"von": 131, "bis": 141, "name": "built-in effect 12", "art": ""},
+            {"von": 142, "bis": 152, "name": "built-in effect 13", "art": ""},
+            {"von": 153, "bis": 163, "name": "built-in effect 14", "art": ""},
+            {"von": 164, "bis": 174, "name": "built-in effect 15", "art": ""},
+            {"von": 175, "bis": 185, "name": "built-in effect 16", "art": ""},
+            {"von": 186, "bis": 196, "name": "built-in effect 17", "art": ""},
+            {"von": 197, "bis": 207, "name": "built-in effect 18", "art": ""},
+            {"von": 208, "bis": 218, "name": "built-in effect 19", "art": ""},
+            {"von": 219, "bis": 229, "name": "built-in effect 20", "art": ""},
+            {"von": 230, "bis": 240, "name": "built-in effect 21", "art": ""},
+            {"von": 241, "bis": 250, "name": "built-in effect 22", "art": ""},
+            {"von": 251, "bis": 255, "name": "Voice control effect", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Built-in effect speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Built-in effect speed", "art": ""}
+          ]
+        },
+        {"name": "Total dimming", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Strobe", "attribut": "shutter", "default": 0, "highlight": 0},
+        {"name": "Bar1 R dimming", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Bar1 G dimming", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Bar1 B dimming", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Bar1 W dimming", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Bar2 R dimming", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Bar2 G dimming", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Bar2 B dimming", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Bar2 W dimming", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Bar3 R dimming", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Bar3 G dimming", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Bar3 B dimming", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Bar3 W dimming", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Bar4 R dimming", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Bar4 G dimming", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Bar4 B dimming", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Bar4 W dimming", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Bar5 R dimming", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Bar5 G dimming", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Bar5 B dimming", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Bar5 W dimming", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Bar6 R dimming", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Bar6 G dimming", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Bar6 B dimming", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Bar6 W dimming", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Bar7 R dimming", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Bar7 G dimming", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Bar7 B dimming", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Bar7 W dimming", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Bar8 R dimming", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Bar8 G dimming", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Bar8 B dimming", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Bar8 W dimming", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "9 Channel",
+      "raster": {"rows": 1, "cols": 8},
+      "kanaele": [
+        {"name": "Horizontal operation", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Horizontal speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Effect",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "no effect", "art": ""},
+            {"von": 11, "bis": 20, "name": "built-in effect 1", "art": ""},
+            {"von": 21, "bis": 31, "name": "built-in effect 2", "art": ""},
+            {"von": 32, "bis": 42, "name": "built-in effect 3", "art": ""},
+            {"von": 43, "bis": 53, "name": "built-in effect 4", "art": ""},
+            {"von": 54, "bis": 64, "name": "built-in effect 5", "art": ""},
+            {"von": 65, "bis": 75, "name": "built-in effect 6", "art": ""},
+            {"von": 76, "bis": 86, "name": "built-in effect 7", "art": ""},
+            {"von": 87, "bis": 97, "name": "built-in effect 8", "art": ""},
+            {"von": 98, "bis": 108, "name": "built-in effect 9", "art": ""},
+            {"von": 109, "bis": 119, "name": "built-in effect 10", "art": ""},
+            {"von": 120, "bis": 130, "name": "built-in effect 11", "art": ""},
+            {"von": 131, "bis": 141, "name": "built-in effect 12", "art": ""},
+            {"von": 142, "bis": 152, "name": "built-in effect 13", "art": ""},
+            {"von": 153, "bis": 163, "name": "built-in effect 14", "art": ""},
+            {"von": 164, "bis": 174, "name": "built-in effect 15", "art": ""},
+            {"von": 175, "bis": 185, "name": "built-in effect 16", "art": ""},
+            {"von": 186, "bis": 196, "name": "built-in effect 17", "art": ""},
+            {"von": 197, "bis": 207, "name": "built-in effect 18", "art": ""},
+            {"von": 208, "bis": 218, "name": "built-in effect 19", "art": ""},
+            {"von": 219, "bis": 229, "name": "built-in effect 20", "art": ""},
+            {"von": 230, "bis": 240, "name": "built-in effect 21", "art": ""},
+            {"von": 241, "bis": 250, "name": "built-in effect 22", "art": ""},
+            {"von": 251, "bis": 255, "name": "Voice control effect", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Built-in effect speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Built-in effect speed", "art": ""}
+          ]
+        },
+        {"name": "Total dimming", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Red dimming", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green dimming", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue dimming", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White dimming", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    }
+  ]
+}

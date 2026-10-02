@@ -1,0 +1,81 @@
+{
+  "format_version": 1,
+  "hersteller": "Betopper",
+  "hersteller_kurz": "Betopper",
+  "modell": "LPC-120",
+  "kurzname": "LPC120",
+  "typ": "par",
+  "leistung_w": 120,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Betopper-LPC-120.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Betopper/Betopper-LPC-120.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.14.2 GIT · Loris Mercier",
+    "original": "resources/fixtures/Betopper/Betopper-LPC-120.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 8 Wertebereiche mit Art (kind) versehen; 1 Bereichsnamen auf 80 Zeichen gekuerzt; LightOS-Nachbearbeitung: Strobe-Kanal: Bereiche 0 = offen, 1-255 = Strobe ergaenzt; Color-Macro color_wheel -> macro; Kanal 8 speed -> raw mit verstaendlichem Bereichsnamen statt abgeschnittenem Text"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Quelldatei und auf innere Stimmigkeit geprueft; kein Herstellerhandbuch oeffentlich auffindbar, nicht am Geraet geprueft"
+  },
+  "modi": [
+    {
+      "name": "4 Channel",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "8 Channel",
+      "kanaele": [
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 1, "bis": 255, "name": "Strobe langsam → schnell", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Farbmakro / Modus",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "DMX dimmer", "art": ""},
+            {"von": 11, "bis": 50, "name": "High CRI output of 7 colors", "art": ""},
+            {"von": 51, "bis": 100, "name": "Output of 16 colors", "art": ""},
+            {"von": 101, "bis": 150, "name": "Jump change 16 colors", "art": ""},
+            {"von": 151, "bis": 200, "name": "Multicoloured gradient color changing", "art": ""},
+            {"von": 201, "bis": 250, "name": "Pulse change of multicoloured", "art": ""},
+            {"von": 251, "bis": 255, "name": "Sound control effect of 9 colors", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Auswahl/Tempo fuer Kanal 7",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Farbtemperatur/Farbe bzw. Tempo je nach Kanal 7", "art": ""}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Kanal 8 wirkt abhaengig von Kanal 7 (High-CRI: Farbtemperatur in Stufen von je 37 Werten)."
+}

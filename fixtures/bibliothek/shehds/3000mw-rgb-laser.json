@@ -1,0 +1,623 @@
+{
+  "format_version": 1,
+  "hersteller": "Shehds",
+  "hersteller_kurz": "Shehds",
+  "modell": "3000mW RGB Laser",
+  "kurzname": "SH-LASER3W",
+  "typ": "laser",
+  "leistung_w": 50,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Shehds-3000mW-RGB-Laser.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Shehds/Shehds-3000mW-RGB-Laser.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.14.2 GIT · Bram Janssen",
+    "original": "resources/fixtures/Shehds/Shehds-3000mW-RGB-Laser.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 214 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): Betriebsart-Kanal als shutter (0-41 Laser aus = closed, 42-83 manuell = open, Default 0 = Laser aus, Highlight 60); Laser-Attribute statt Moving-Head-Attributen: Gruppe -> laser_bank, Muster -> gobo_wheel (art gobo), Rotation -> gobo_rotation, Flip -> laser_twist, Bewegung -> laser_x/laser_y (Default 64 = Mitte des Positionsbereichs), Groesse -> zoom, Zeichnen -> laser_draw, Scan -> laser_scan_rate; kurzname SH-LASER3W; typ laser statt moving_head; Bereichs-Arten korrigiert (u. a. „Preset“ nicht als Reset, Farben/Offen auf Farbrad, Open/Shake/Rotation auf Goborad, Prisma/Frost, keine Farb-/Dreh-Kacheln auf Makro-/Speed-Kanaelen, Sound-Bereiche); zweites Goborad als gobo_wheel2"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": false,
+    "wie": "nicht gegen ein Herstellerhandbuch geprueft (kein oeffentliches Shehds-Handbuch zu diesem Modell auffindbar); Kanalbelegung und Wertebereiche aus der QLC+-Vorlage, Attribute, Bereichs-Arten und Defaults von LightOS plausibilisiert"
+  },
+  "modi": [
+    {
+      "name": "25 Channel",
+      "kanaele": [
+        {
+          "name": "Off / Auto / Sound",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 60,
+          "bereiche": [
+            {"von": 0, "bis": 41, "name": "Laser off", "art": "closed"},
+            {"von": 42, "bis": 83, "name": "Manual Control", "art": "open"},
+            {"von": 84, "bis": 125, "name": "Auto run animation effect"},
+            {"von": 126, "bis": 167, "name": "Auto run beam effect"},
+            {"von": 168, "bis": 209, "name": "Sound active beam effect", "art": "sound"},
+            {"von": 210, "bis": 251, "name": "Sound active animation effect", "art": "sound"},
+            {"von": 252, "bis": 255, "name": "Manual Control", "art": "open"}
+          ]
+        },
+        {
+          "name": "Pattern A 1",
+          "attribut": "laser_bank",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "Capability 1", "art": ""},
+            {"von": 32, "bis": 63, "name": "Capability 2", "art": ""},
+            {"von": 64, "bis": 95, "name": "Capability 3", "art": ""},
+            {"von": 96, "bis": 127, "name": "Capability 4", "art": ""},
+            {"von": 128, "bis": 159, "name": "Capability 5", "art": ""},
+            {"von": 160, "bis": 191, "name": "Capability 6", "art": ""},
+            {"von": 192, "bis": 223, "name": "Capability 7", "art": ""},
+            {"von": 224, "bis": 255, "name": "Capability 8", "art": ""}
+          ]
+        },
+        {
+          "name": "Pattern A 2",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Capability 1", "art": "gobo"},
+            {"von": 16, "bis": 31, "name": "Capability 2", "art": "gobo"},
+            {"von": 32, "bis": 47, "name": "Capability 3", "art": "gobo"},
+            {"von": 48, "bis": 63, "name": "Capability 4", "art": "gobo"},
+            {"von": 64, "bis": 79, "name": "Capability 5", "art": "gobo"},
+            {"von": 80, "bis": 95, "name": "Capability 6", "art": "gobo"},
+            {"von": 96, "bis": 111, "name": "Capability 7", "art": "gobo"},
+            {"von": 112, "bis": 127, "name": "Capability 8", "art": "gobo"},
+            {"von": 128, "bis": 143, "name": "Capability 9", "art": "gobo"},
+            {"von": 144, "bis": 159, "name": "Capability 10", "art": "gobo"},
+            {"von": 160, "bis": 175, "name": "Capability 11", "art": "gobo"},
+            {"von": 176, "bis": 191, "name": "Capability 12", "art": "gobo"},
+            {"von": 192, "bis": 207, "name": "Capability 13", "art": "gobo"},
+            {"von": 208, "bis": 223, "name": "Capability 14", "art": "gobo"},
+            {"von": 224, "bis": 239, "name": "Capability 15", "art": "gobo"},
+            {"von": 240, "bis": 255, "name": "Capability 16", "art": "gobo"}
+          ]
+        },
+        {
+          "name": "Pattern A Rotation",
+          "attribut": "gobo_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Rotate angle", "art": "rotate"},
+            {"von": 128, "bis": 191, "name": "Inverse rotation", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "Positive phase rotation", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Pattern A Horizontal Flip",
+          "attribut": "laser_twist",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Horizontal flip position", "art": ""},
+            {"von": 128, "bis": 255, "name": "Horizontal flip Rotation speed"}
+          ]
+        },
+        {
+          "name": "Pattern A Vertical Flip",
+          "attribut": "laser_twist",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Vertical flip position", "art": ""},
+            {"von": 128, "bis": 255, "name": "Vertical flip Rotation speed"}
+          ]
+        },
+        {
+          "name": "Pattern A Horizontal Move",
+          "attribut": "laser_x",
+          "default": 64,
+          "highlight": 64,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Horizontal move position", "art": ""},
+            {"von": 128, "bis": 255, "name": "Horizontal move speed", "art": ""}
+          ]
+        },
+        {
+          "name": "Pattern A Vertical Move",
+          "attribut": "laser_y",
+          "default": 64,
+          "highlight": 64,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Vertical move position", "art": ""},
+            {"von": 128, "bis": 255, "name": "Vertical move speed", "art": ""}
+          ]
+        },
+        {"name": "Pattern A scale", "attribut": "zoom", "default": 0, "highlight": 0},
+        {
+          "name": "Pattern A Painting",
+          "attribut": "laser_draw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Painting speed", "art": ""}
+          ]
+        },
+        {
+          "name": "Pattern A Scan",
+          "attribut": "laser_scan_rate",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Scan speed", "art": ""},
+            {"von": 128, "bis": 255, "name": "Pattern Lattice", "art": ""}
+          ]
+        },
+        {
+          "name": "Pattern A Color",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "No custom color"},
+            {"von": 8, "bis": 15, "name": "White", "art": "open"},
+            {"von": 16, "bis": 23, "name": "Red", "art": "color"},
+            {"von": 24, "bis": 31, "name": "Yellow", "art": "color"},
+            {"von": 32, "bis": 39, "name": "Green", "art": "color"},
+            {"von": 40, "bis": 47, "name": "Cyan", "art": "color"},
+            {"von": 48, "bis": 55, "name": "Blue", "art": "color"},
+            {"von": 56, "bis": 63, "name": "Purple", "art": "color"},
+            {"von": 64, "bis": 127, "name": "Color auto change speed", "art": "rotate"},
+            {"von": 128, "bis": 191, "name": "Line Rainbow color speed", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "Painting speed"}
+          ]
+        },
+        {
+          "name": "Pattern A maximize",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Set the largest pattern when zooming fromlarge to small", "art": ""}
+          ]
+        },
+        {
+          "name": "Pattern B 1",
+          "attribut": "laser_bank",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "Capability 1", "art": ""},
+            {"von": 32, "bis": 63, "name": "Capability 2", "art": ""},
+            {"von": 64, "bis": 95, "name": "Capability 3", "art": ""},
+            {"von": 96, "bis": 127, "name": "Capability 4", "art": ""},
+            {"von": 128, "bis": 159, "name": "Capability 5", "art": ""},
+            {"von": 160, "bis": 191, "name": "Capability 6", "art": ""},
+            {"von": 192, "bis": 223, "name": "Capability 7", "art": ""},
+            {"von": 224, "bis": 255, "name": "Capability 8", "art": ""}
+          ]
+        },
+        {
+          "name": "Pattern B 2",
+          "attribut": "gobo_wheel2",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Capability 1", "art": "gobo"},
+            {"von": 16, "bis": 31, "name": "Capability 2", "art": "gobo"},
+            {"von": 32, "bis": 47, "name": "Capability 3", "art": "gobo"},
+            {"von": 48, "bis": 63, "name": "Capability 4", "art": "gobo"},
+            {"von": 64, "bis": 79, "name": "Capability 5", "art": "gobo"},
+            {"von": 80, "bis": 95, "name": "Capability 6", "art": "gobo"},
+            {"von": 96, "bis": 111, "name": "Capability 7", "art": "gobo"},
+            {"von": 112, "bis": 127, "name": "Capability 8", "art": "gobo"},
+            {"von": 128, "bis": 143, "name": "Capability 9", "art": "gobo"},
+            {"von": 144, "bis": 159, "name": "Capability 10", "art": "gobo"},
+            {"von": 160, "bis": 175, "name": "Capability 11", "art": "gobo"},
+            {"von": 176, "bis": 191, "name": "Capability 12", "art": "gobo"},
+            {"von": 192, "bis": 207, "name": "Capability 13", "art": "gobo"},
+            {"von": 208, "bis": 223, "name": "Capability 14", "art": "gobo"},
+            {"von": 224, "bis": 239, "name": "Capability 15", "art": "gobo"},
+            {"von": 240, "bis": 255, "name": "Capability 16", "art": "gobo"}
+          ]
+        },
+        {
+          "name": "Pattern B Rotation",
+          "attribut": "gobo_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Rotate angle", "art": "rotate"},
+            {"von": 128, "bis": 191, "name": "Inverse rotation", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "Positive phase rotation", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Pattern B Horizontal Flip",
+          "attribut": "laser_twist",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Horizontal flip position", "art": ""},
+            {"von": 128, "bis": 255, "name": "Horizontal flip Rotation speed"}
+          ]
+        },
+        {
+          "name": "Pattern B Vertical Flip",
+          "attribut": "laser_twist",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Vertical flip position", "art": ""},
+            {"von": 128, "bis": 255, "name": "Vertical flip Rotation speed"}
+          ]
+        },
+        {
+          "name": "Pattern B Horizontal Move",
+          "attribut": "laser_x",
+          "default": 64,
+          "highlight": 64,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Horizontal move position", "art": ""},
+            {"von": 128, "bis": 255, "name": "Horizontal move speed", "art": ""}
+          ]
+        },
+        {
+          "name": "Pattern B Vertical Move",
+          "attribut": "laser_y",
+          "default": 64,
+          "highlight": 64,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Vertical move position", "art": ""},
+            {"von": 128, "bis": 255, "name": "Vertical move speed", "art": ""}
+          ]
+        },
+        {"name": "Pattern B scale", "attribut": "zoom", "default": 0, "highlight": 0},
+        {
+          "name": "Pattern B Painting",
+          "attribut": "laser_draw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Painting speed", "art": ""}
+          ]
+        },
+        {
+          "name": "Pattern B Scan",
+          "attribut": "laser_scan_rate",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Scan speed", "art": ""},
+            {"von": 128, "bis": 255, "name": "Pattern Lattice", "art": ""}
+          ]
+        },
+        {
+          "name": "Pattern B Color",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "No custom color"},
+            {"von": 8, "bis": 15, "name": "White", "art": "open"},
+            {"von": 16, "bis": 23, "name": "Red", "art": "color"},
+            {"von": 24, "bis": 31, "name": "Yellow", "art": "color"},
+            {"von": 32, "bis": 39, "name": "Green", "art": "color"},
+            {"von": 40, "bis": 47, "name": "Cyan", "art": "color"},
+            {"von": 48, "bis": 55, "name": "Blue", "art": "color"},
+            {"von": 56, "bis": 63, "name": "Purple", "art": "color"},
+            {"von": 64, "bis": 127, "name": "Color auto change speed", "art": "rotate"},
+            {"von": 128, "bis": 191, "name": "Line Rainbow color speed", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "Painting speed"}
+          ]
+        },
+        {
+          "name": "Pattern B maximize",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Set the largest pattern when zooming fromlarge to small", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "25 Channel enhanced",
+      "kanaele": [
+        {
+          "name": "Off / Auto / Sound",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 60,
+          "bereiche": [
+            {"von": 0, "bis": 41, "name": "Laser off", "art": "closed"},
+            {"von": 42, "bis": 83, "name": "Manual Control", "art": "open"},
+            {"von": 84, "bis": 125, "name": "Auto run animation effect"},
+            {"von": 126, "bis": 167, "name": "Auto run beam effect"},
+            {"von": 168, "bis": 209, "name": "Sound active beam effect", "art": "sound"},
+            {"von": 210, "bis": 251, "name": "Sound active animation effect", "art": "sound"},
+            {"von": 252, "bis": 255, "name": "Manual Control", "art": "open"}
+          ]
+        },
+        {
+          "name": "Pattern A Group",
+          "attribut": "laser_bank",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "Capability 1", "art": ""},
+            {"von": 32, "bis": 63, "name": "Capability 2", "art": ""},
+            {"von": 64, "bis": 95, "name": "Capability 3", "art": ""},
+            {"von": 96, "bis": 127, "name": "Capability 4", "art": ""},
+            {"von": 128, "bis": 159, "name": "Capability 5", "art": ""},
+            {"von": 160, "bis": 191, "name": "Capability 6", "art": ""},
+            {"von": 192, "bis": 223, "name": "Capability 7", "art": ""},
+            {"von": 224, "bis": 255, "name": "Capability 8", "art": ""}
+          ]
+        },
+        {
+          "name": "Pattern A 2",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Capability 1", "art": "gobo"},
+            {"von": 16, "bis": 31, "name": "Capability 2", "art": "gobo"},
+            {"von": 32, "bis": 47, "name": "Capability 3", "art": "gobo"},
+            {"von": 48, "bis": 63, "name": "Capability 4", "art": "gobo"},
+            {"von": 64, "bis": 79, "name": "Capability 5", "art": "gobo"},
+            {"von": 80, "bis": 95, "name": "Capability 6", "art": "gobo"},
+            {"von": 96, "bis": 111, "name": "Capability 7", "art": "gobo"},
+            {"von": 112, "bis": 127, "name": "Capability 8", "art": "gobo"},
+            {"von": 128, "bis": 143, "name": "Capability 9", "art": "gobo"},
+            {"von": 144, "bis": 159, "name": "Capability 10", "art": "gobo"},
+            {"von": 160, "bis": 175, "name": "Capability 11", "art": "gobo"},
+            {"von": 176, "bis": 191, "name": "Capability 12", "art": "gobo"},
+            {"von": 192, "bis": 207, "name": "Capability 13", "art": "gobo"},
+            {"von": 208, "bis": 223, "name": "Capability 14", "art": "gobo"},
+            {"von": 224, "bis": 239, "name": "Capability 15", "art": "gobo"},
+            {"von": 240, "bis": 255, "name": "Capability 16", "art": "gobo"}
+          ]
+        },
+        {
+          "name": "Pattern A Rotation",
+          "attribut": "gobo_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Rotate angle", "art": "rotate"},
+            {"von": 128, "bis": 191, "name": "Inverse rotation", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "Positive phase rotation", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Pattern A Horizontal Flip",
+          "attribut": "laser_twist",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Horizontal flip position", "art": ""},
+            {"von": 128, "bis": 255, "name": "Horizontal flip Rotation speed"}
+          ]
+        },
+        {
+          "name": "Pattern A Vertical Flip",
+          "attribut": "laser_twist",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Vertical flip position", "art": ""},
+            {"von": 128, "bis": 255, "name": "Vertical flip Rotation speed"}
+          ]
+        },
+        {
+          "name": "Pattern A Horizontal Move",
+          "attribut": "laser_x",
+          "default": 64,
+          "highlight": 64,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Horizontal move position", "art": ""},
+            {"von": 128, "bis": 255, "name": "Horizontal move speed", "art": ""}
+          ]
+        },
+        {
+          "name": "Pattern A Vertical Move",
+          "attribut": "laser_y",
+          "default": 64,
+          "highlight": 64,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Vertical move position", "art": ""},
+            {"von": 128, "bis": 255, "name": "Vertical move speed", "art": ""}
+          ]
+        },
+        {"name": "Pattern A scale", "attribut": "zoom", "default": 0, "highlight": 0},
+        {
+          "name": "Pattern A Painting",
+          "attribut": "laser_draw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Painting speed", "art": ""}
+          ]
+        },
+        {
+          "name": "Pattern A Scan",
+          "attribut": "laser_scan_rate",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Scan speed", "art": ""},
+            {"von": 128, "bis": 255, "name": "Pattern Lattice", "art": ""}
+          ]
+        },
+        {
+          "name": "Pattern A Color",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "No custom color"},
+            {"von": 8, "bis": 15, "name": "White", "art": "open"},
+            {"von": 16, "bis": 23, "name": "Red", "art": "color"},
+            {"von": 24, "bis": 31, "name": "Yellow", "art": "color"},
+            {"von": 32, "bis": 39, "name": "Green", "art": "color"},
+            {"von": 40, "bis": 47, "name": "Cyan", "art": "color"},
+            {"von": 48, "bis": 55, "name": "Blue", "art": "color"},
+            {"von": 56, "bis": 63, "name": "Purple", "art": "color"},
+            {"von": 64, "bis": 127, "name": "Color auto change speed", "art": "rotate"},
+            {"von": 128, "bis": 191, "name": "Line Rainbow color speed", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "Painting speed"}
+          ]
+        },
+        {
+          "name": "Pattern A maximize",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Set the largest pattern when zooming fromlarge to small", "art": ""}
+          ]
+        },
+        {
+          "name": "Pattern B 1",
+          "attribut": "laser_bank",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "Capability 1", "art": ""},
+            {"von": 32, "bis": 63, "name": "Capability 2", "art": ""},
+            {"von": 64, "bis": 95, "name": "Capability 3", "art": ""},
+            {"von": 96, "bis": 127, "name": "Capability 4", "art": ""},
+            {"von": 128, "bis": 159, "name": "Capability 5", "art": ""},
+            {"von": 160, "bis": 191, "name": "Capability 6", "art": ""},
+            {"von": 192, "bis": 223, "name": "Capability 7", "art": ""},
+            {"von": 224, "bis": 255, "name": "Capability 8", "art": ""}
+          ]
+        },
+        {
+          "name": "Pattern B 2",
+          "attribut": "gobo_wheel2",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Capability 1", "art": "gobo"},
+            {"von": 16, "bis": 31, "name": "Capability 2", "art": "gobo"},
+            {"von": 32, "bis": 47, "name": "Capability 3", "art": "gobo"},
+            {"von": 48, "bis": 63, "name": "Capability 4", "art": "gobo"},
+            {"von": 64, "bis": 79, "name": "Capability 5", "art": "gobo"},
+            {"von": 80, "bis": 95, "name": "Capability 6", "art": "gobo"},
+            {"von": 96, "bis": 111, "name": "Capability 7", "art": "gobo"},
+            {"von": 112, "bis": 127, "name": "Capability 8", "art": "gobo"},
+            {"von": 128, "bis": 143, "name": "Capability 9", "art": "gobo"},
+            {"von": 144, "bis": 159, "name": "Capability 10", "art": "gobo"},
+            {"von": 160, "bis": 175, "name": "Capability 11", "art": "gobo"},
+            {"von": 176, "bis": 191, "name": "Capability 12", "art": "gobo"},
+            {"von": 192, "bis": 207, "name": "Capability 13", "art": "gobo"},
+            {"von": 208, "bis": 223, "name": "Capability 14", "art": "gobo"},
+            {"von": 224, "bis": 239, "name": "Capability 15", "art": "gobo"},
+            {"von": 240, "bis": 255, "name": "Capability 16", "art": "gobo"}
+          ]
+        },
+        {
+          "name": "Pattern B Rotation",
+          "attribut": "gobo_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Rotate angle", "art": "rotate"},
+            {"von": 128, "bis": 191, "name": "Inverse rotation", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "Positive phase rotation", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Pattern B Horizontal Flip",
+          "attribut": "laser_twist",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Horizontal flip position", "art": ""},
+            {"von": 128, "bis": 255, "name": "Horizontal flip Rotation speed"}
+          ]
+        },
+        {
+          "name": "Pattern B Vertical Flip",
+          "attribut": "laser_twist",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Vertical flip position", "art": ""},
+            {"von": 128, "bis": 255, "name": "Vertical flip Rotation speed"}
+          ]
+        },
+        {
+          "name": "Pattern B Horizontal Move",
+          "attribut": "laser_x",
+          "default": 64,
+          "highlight": 64,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Horizontal move position", "art": ""},
+            {"von": 128, "bis": 255, "name": "Horizontal move speed", "art": ""}
+          ]
+        },
+        {
+          "name": "Pattern B Vertical Move",
+          "attribut": "laser_y",
+          "default": 64,
+          "highlight": 64,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Vertical move position", "art": ""},
+            {"von": 128, "bis": 255, "name": "Vertical move speed", "art": ""}
+          ]
+        },
+        {"name": "Pattern B scale", "attribut": "zoom", "default": 0, "highlight": 0},
+        {
+          "name": "Pattern B Painting",
+          "attribut": "laser_draw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Painting speed", "art": ""}
+          ]
+        },
+        {
+          "name": "Pattern B Scan",
+          "attribut": "laser_scan_rate",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Scan speed", "art": ""},
+            {"von": 128, "bis": 255, "name": "Pattern Lattice", "art": ""}
+          ]
+        },
+        {
+          "name": "Pattern B Color",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "No custom color"},
+            {"von": 8, "bis": 15, "name": "White", "art": "open"},
+            {"von": 16, "bis": 23, "name": "Red", "art": "color"},
+            {"von": 24, "bis": 31, "name": "Yellow", "art": "color"},
+            {"von": 32, "bis": 39, "name": "Green", "art": "color"},
+            {"von": 40, "bis": 47, "name": "Cyan", "art": "color"},
+            {"von": 48, "bis": 55, "name": "Blue", "art": "color"},
+            {"von": 56, "bis": 63, "name": "Purple", "art": "color"},
+            {"von": 64, "bis": 127, "name": "Color auto change speed", "art": "rotate"},
+            {"von": 128, "bis": 191, "name": "Line Rainbow color speed", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "Painting speed"}
+          ]
+        },
+        {
+          "name": "Pattern B maximize",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Set the largest pattern when zooming fromlarge to small", "art": ""}
+          ]
+        }
+      ]
+    }
+  ]
+}

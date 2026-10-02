@@ -1,0 +1,314 @@
+{
+  "format_version": 1,
+  "hersteller": "Cameo",
+  "hersteller_kurz": "Cameo",
+  "modell": "Hydrabeam 400 W",
+  "kurzname": "HYDRABEAM 400 W",
+  "typ": "moving_head",
+  "leistung_w": 100,
+  "quelle": {
+    "titel": "Cameo HYDRABEAM 400 (CLHB400W / CLHB400RGBW) – User's Manual, DMX Control S. 22–28, Technische Daten S. 36",
+    "url": "https://www.manualslib.com/manual/1043596/Cameo-Hydrabeam-400-Clhb400w.html?page=22"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.3 GIT · Massimo Callegari, Andres Robles",
+    "original": "resources/fixtures/Cameo/Cameo-Hydrabeam-400-Series.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 234 Wertebereiche mit Art (kind) versehen; Rasterform in 8 Modus/Modi aus <Physical> uebernommen; QLC+-Sammeldatei 'Hydrabeam 400 Series' in zwei Profile geteilt (hier nur die CLHB400W-Modi, Modusnamen ohne Modellzusatz); Strobe-Default/-Highlight 0 statt 5 (0-10 = kein Strobe); Show mode: Bereiche ohne Art, 'sound control mode' = 'sound'; Show-mode-Speed speed -> effect_speed, Art 'sound' entfernt; Sound mode / Reset macro -> reset; Sound sensitivity macro -> raw (Art entfernt); Kopf-Speed 0-10 der Koepfe 2-4 nach Handbuch 'use speed value from head 1' benannt; Heads speed als 'fast to slow' benannt; Light control Default/Highlight 255 (= full on), sonst bleibt das Geraet trotz Master-Dimmer dunkel (0-31 = blackout); Light control: 'blackout' ohne Art 'closed' (Makrokanal, kein Shutter); Lighting pattern speed speed -> effect_speed; kurzname/notizen/quelle gesetzt"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": true,
+    "wie": "Alle CLHB400W-Modi Kanal fuer Kanal gegen die DMX-Tabellen im Handbuch (via ManualsLib, S. 22–28) geprueft"
+  },
+  "modi": [
+    {
+      "name": "6-CH",
+      "raster": {"rows": 1, "cols": 4},
+      "kanaele": [
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "No strobe", "art": "open"},
+            {"von": 11, "bis": 255, "name": "Strobe (slow to fast)", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Show mode",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "No movement", "art": ""},
+            {"von": 8, "bis": 22, "name": "Show mode 1", "art": ""},
+            {"von": 23, "bis": 37, "name": "Show mode 2", "art": ""},
+            {"von": 38, "bis": 52, "name": "Show mode 3", "art": ""},
+            {"von": 53, "bis": 67, "name": "Show mode 4", "art": ""},
+            {"von": 68, "bis": 82, "name": "Show mode 5", "art": ""},
+            {"von": 83, "bis": 97, "name": "Show mode 6", "art": ""},
+            {"von": 98, "bis": 112, "name": "Show mode 7", "art": ""},
+            {"von": 113, "bis": 127, "name": "Show mode 8", "art": ""},
+            {"von": 128, "bis": 142, "name": "Show mode 9", "art": ""},
+            {"von": 143, "bis": 157, "name": "Show mode 10", "art": ""},
+            {"von": 158, "bis": 172, "name": "Show mode 11", "art": ""},
+            {"von": 173, "bis": 187, "name": "Show mode 12", "art": ""},
+            {"von": 188, "bis": 202, "name": "Show mode 13", "art": ""},
+            {"von": 203, "bis": 217, "name": "Show mode 14", "art": ""},
+            {"von": 218, "bis": 232, "name": "Show mode 15", "art": ""},
+            {"von": 233, "bis": 247, "name": "Show mode 16", "art": ""},
+            {"von": 248, "bis": 255, "name": "Sound control mode", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Show mode speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Show mode speed (slow to fast) / sound sensitivity", "art": ""}
+          ]
+        },
+        {
+          "name": "Light control",
+          "attribut": "macro",
+          "default": 255,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "Blackout", "art": ""},
+            {"von": 32, "bis": 63, "name": "Lighting pattern 1", "art": ""},
+            {"von": 64, "bis": 95, "name": "Lighting pattern 2", "art": ""},
+            {"von": 96, "bis": 127, "name": "Lighting pattern 3", "art": ""},
+            {"von": 128, "bis": 159, "name": "Lighting pattern 4", "art": ""},
+            {"von": 160, "bis": 191, "name": "Lighting pattern 5", "art": ""},
+            {"von": 192, "bis": 223, "name": "Lighting pattern 6", "art": ""},
+            {"von": 224, "bis": 255, "name": "Full on", "art": ""}
+          ]
+        },
+        {
+          "name": "Lighting pattern speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Lighting pattern speed", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "10-CH",
+      "raster": {"rows": 1, "cols": 4},
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "No strobe", "art": "open"},
+            {"von": 11, "bis": 255, "name": "Strobe (slow to fast)", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Show mode",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "No movement", "art": ""},
+            {"von": 8, "bis": 22, "name": "Show mode 1", "art": ""},
+            {"von": 23, "bis": 37, "name": "Show mode 2", "art": ""},
+            {"von": 38, "bis": 52, "name": "Show mode 3", "art": ""},
+            {"von": 53, "bis": 67, "name": "Show mode 4", "art": ""},
+            {"von": 68, "bis": 82, "name": "Show mode 5", "art": ""},
+            {"von": 83, "bis": 97, "name": "Show mode 6", "art": ""},
+            {"von": 98, "bis": 112, "name": "Show mode 7", "art": ""},
+            {"von": 113, "bis": 127, "name": "Show mode 8", "art": ""},
+            {"von": 128, "bis": 142, "name": "Show mode 9", "art": ""},
+            {"von": 143, "bis": 157, "name": "Show mode 10", "art": ""},
+            {"von": 158, "bis": 172, "name": "Show mode 11", "art": ""},
+            {"von": 173, "bis": 187, "name": "Show mode 12", "art": ""},
+            {"von": 188, "bis": 202, "name": "Show mode 13", "art": ""},
+            {"von": 203, "bis": 217, "name": "Show mode 14", "art": ""},
+            {"von": 218, "bis": 232, "name": "Show mode 15", "art": ""},
+            {"von": 233, "bis": 247, "name": "Show mode 16", "art": ""},
+            {"von": 248, "bis": 255, "name": "Sound control mode", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Show mode speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Show mode speed (slow to fast) / sound sensitivity", "art": ""}
+          ]
+        },
+        {
+          "name": "Light control",
+          "attribut": "macro",
+          "default": 255,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "Blackout", "art": ""},
+            {"von": 32, "bis": 63, "name": "Lighting pattern 1", "art": ""},
+            {"von": 64, "bis": 95, "name": "Lighting pattern 2", "art": ""},
+            {"von": 96, "bis": 127, "name": "Lighting pattern 3", "art": ""},
+            {"von": 128, "bis": 159, "name": "Lighting pattern 4", "art": ""},
+            {"von": 160, "bis": 191, "name": "Lighting pattern 5", "art": ""},
+            {"von": 192, "bis": 223, "name": "Lighting pattern 6", "art": ""},
+            {"von": 224, "bis": 255, "name": "Full on", "art": ""}
+          ]
+        },
+        {
+          "name": "Lighting pattern speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Lighting pattern speed", "art": ""}
+          ]
+        },
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0}
+      ]
+    },
+    {
+      "name": "15-CH",
+      "raster": {"rows": 1, "cols": 4},
+      "kanaele": [
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "No strobe", "art": "open"},
+            {"von": 11, "bis": 255, "name": "Strobe (slow to fast)", "art": "strobe"}
+          ]
+        },
+        {"name": "Pan (Head 1)", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt (Head 1)", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Dimmer (Head 1)", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Pan (Head 2)", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt (Head 2)", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Dimmer (Head 2)", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Pan (Head 3)", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt (Head 3)", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Dimmer (Head 3)", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Pan (Head 4)", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt (Head 4)", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Dimmer (Head 4)", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Heads speed (fast to slow)", "attribut": "speed", "default": 0, "highlight": 0}
+      ]
+    },
+    {
+      "name": "28-CH",
+      "raster": {"rows": 1, "cols": 4},
+      "kanaele": [
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "No strobe", "art": "open"},
+            {"von": 11, "bis": 255, "name": "Strobe (slow to fast)", "art": "strobe"}
+          ]
+        },
+        {"name": "Pan (Head 1)", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine (Head 1)", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt (Head 1)", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine (Head 1)", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Speed (Head 1)",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "fastest value (until 011 is reached)", "art": ""},
+            {"von": 11, "bis": 255, "name": "Head 1 speed (fast to slow)", "art": ""}
+          ]
+        },
+        {"name": "Dimmer (Head 1)", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Pan (Head 2)", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine (Head 2)", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt (Head 2)", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine (Head 2)", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Speed (Head 2)",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "use speed value from head 1", "art": ""},
+            {"von": 11, "bis": 255, "name": "Head 2 speed (fast to slow)", "art": ""}
+          ]
+        },
+        {"name": "Dimmer (Head 2)", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Pan (Head 3)", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine (Head 3)", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt (Head 3)", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine (Head 3)", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Speed (Head 3)",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "use speed value from head 1", "art": ""},
+            {"von": 11, "bis": 255, "name": "Head 3 speed (fast to slow)", "art": ""}
+          ]
+        },
+        {"name": "Dimmer (Head 3)", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Pan (Head 4)", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine (Head 4)", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt (Head 4)", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine (Head 4)", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Speed (Head 4)",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "use speed value from head 1", "art": ""},
+            {"von": 11, "bis": 255, "name": "Head 4 speed (fast to slow)", "art": ""}
+          ]
+        },
+        {"name": "Dimmer (Head 4)", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Sound mode / Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 199, "name": "No function", "art": ""},
+            {"von": 200, "bis": 209, "name": "Reset", "art": "reset"},
+            {"von": 210, "bis": 240, "name": "No function", "art": ""},
+            {"von": 241, "bis": 255, "name": "Sound control mode", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Sound sensitivity",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Sound sensitivity in sound mode", "art": ""}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "4-Kopf-Moving-Head-Bar, 4 x 10 W weiss, Koepfe in einer Reihe. Kopf-Pan/Tilt in 15/28-CH."
+}
