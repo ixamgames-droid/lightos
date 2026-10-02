@@ -72,12 +72,15 @@ def builtin_dubletten(engine):
     Rest auf dem Windows-Rechner war der Eintrag OHNE)."""
     from sqlalchemy import select
     from sqlalchemy.orm import Session, selectinload
-    from src.core.database.models import FixtureProfile
+    from src.core.database.models import FixtureProfile, MITGELIEFERT_QUELLEN
 
     gruppen: dict = {}
     with Session(engine) as s:
+        # FM-56: auch ein `lightos`-Profil (eigene Bibliothek) ist mitgeliefert —
+        # dasselbe Kuerzel als builtin UND als lightos beim selben Hersteller
+        # ist genauso eine Dublette.
         abfrage = (select(FixtureProfile)
-                   .where(FixtureProfile.source == "builtin")
+                   .where(FixtureProfile.source.in_(MITGELIEFERT_QUELLEN))
                    .options(selectinload(FixtureProfile.manufacturer),
                             selectinload(FixtureProfile.modes))
                    .order_by(FixtureProfile.id))

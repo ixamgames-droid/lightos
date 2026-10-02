@@ -127,7 +127,7 @@ class ShowBuilder:
             from sqlalchemy import select, case
             from sqlalchemy.orm import Session
             from src.core.database.fixture_db import engine as fdb_engine
-            from src.core.database.models import FixtureProfile
+            from src.core.database.models import FixtureProfile, MITGELIEFERT_QUELLEN
             with Session(fdb_engine()) as s:
                 from src.core.database.models import Manufacturer
                 rows = s.execute(
@@ -138,7 +138,9 @@ class ShowBuilder:
                           Manufacturer.id == FixtureProfile.manufacturer_id)
                     .where(FixtureProfile.short_name == short_name)
                     .order_by(
-                        case((FixtureProfile.source == "builtin", 0), else_=1),
+                        # FM-56: `lightos` (eigene Bibliothek) zaehlt wie builtin.
+                        case((FixtureProfile.source.in_(MITGELIEFERT_QUELLEN), 0),
+                             else_=1),
                         FixtureProfile.id.asc(),
                     )
                 ).all()
