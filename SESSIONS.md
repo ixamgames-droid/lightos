@@ -24,6 +24,7 @@
 | DOC-24 | C | - | 2026-10-02T10:21Z | docs/anleitung_programmer_grundlagen/ANLEITUNG.en.md · docs/anleitung_programmer_grundlagen/ANLEITUNG.md · docs/ANLEITUNGEN.md · changelog.d/2026-10-02-DOC-24.md |
 | DOC-25 | C | - | 2026-10-02T10:23Z | docs/anleitung_szenen_cues/ANLEITUNG.en.md · docs/anleitung_szenen_cues/ANLEITUNG.md · docs/ANLEITUNGEN.md · changelog.d/2026-10-02-DOC-25.md |
 | DOC-26 | C | - | 2026-10-02T10:24Z | docs/anleitung_vc_widgets/*.en.md · docs/anleitung_vc_widgets/README.md · docs/ANLEITUNGEN.md · changelog.d/2026-10-02-DOC-26.md |
+| ENG-29 | C | - | 2026-10-02T10:33Z | BACKLOG.md · docs/befunde/eng29_drive_intensity.md |
 
 ## Blocker & Fallen
 
@@ -87,7 +88,6 @@
 
 ## Verlauf
 
-- 2026-10-02T07:18Z A claim DOC-22
 - 2026-10-02T07:26Z A uebernimmt FM-46 von C (Claim verfallen)
 - 2026-10-02T07:26Z A claim FM-46
 - 2026-10-02T07:28Z C done ENG-28
@@ -117,3 +117,4 @@
 - 2026-10-02T10:21Z C claim DOC-24
 - 2026-10-02T10:23Z C claim DOC-25
 - 2026-10-02T10:24Z C claim DOC-26
+- 2026-10-02T10:33Z C claim ENG-29
