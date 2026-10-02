@@ -15,7 +15,7 @@
 | FM-46 | C | docs/fm46-befund | 2026-10-01T21:35Z | BACKLOG.md |
 | DOC-14 | C | fix/doc14-schaukasten-19 | 2026-10-01T21:37Z | tools/build_vc_widgets_showcase.py · docs/anleitung_vc_widgets/README.md · docs/anleitung_vc_widgets/_capture/geometry.json · tests/test_doc14_schaukasten_alle_typen.py · changelog.d/2026-10-02-DOC-14.md |
 | DOC-20 | A | docs/doc20-anleitungs-gifs | 2026-10-01T22:24Z | tools/anleitungsbilder · docs/ANLEITUNGSBILDER.md |
-| DOC-21 | A | docs/doc21-3d-gif | 2026-10-01T22:51Z | tools/anleitungsbilder · docs/anleitung_vc_widgets |
+| DOC-21 | A | docs/doc21-3d-gif | 2026-10-02T07:18Z | tools/anleitungsbilder · docs/anleitung_vc_widgets |
 | VIZ-65 | A | fix/viz65-startwaechter | 2026-10-01T23:12Z | src/ui/visualizer/visualizer_window.py |
 | ENG-28 | C | fix/eng28-generator-shutter | 2026-10-02T04:45Z | tools/_shutter.py · tools/build_demo_show_full.py · tools/build_event_demo_2026.py · tools/build_farb_fx_vc_show.py · tools/build_hochzeit_komplett.py · tools/build_mega_arena_2026.py · tools/build_musik_show_2026.py · tools/build_neue_demo_show.py · tools/build_party_demo_show.py · tools/build_testshow_2026.py · tools/build_tutorial_matrix_show.py · tools/README.md · tests/test_eng28_generator_shutter.py · changelog.d/2026-10-02-ENG-28.md · BACKLOG.md |
 | TOOL-6 | C | fix/tool6-cwd-waechter | 2026-10-02T04:53Z | tests/test_tool3_generator_annahmen.py · tools/build_dimmer_farbe_combo.py · tools/build_neuheiten_demo.py · tools/build_zq06121_demo.py · tools/_builder.py · changelog.d/2026-10-02-TOOL-6.md · BACKLOG.md |
