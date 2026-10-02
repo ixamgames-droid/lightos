@@ -69,8 +69,9 @@ Programmer wirken sie auf **alle** Fixtures. „Aus" setzt Rot/Grün/Blau/Weiß 
 (dunkel) — die Werte bleiben stehen, bis du den Programmer leerst. Jede Kachel setzt außerdem
 die **Intensität** wieder auf voll; die Intensität deshalb erst **nach** der Kachel anpassen.
 
-> Die Beschriftung der Bank sagt „R2: Farb-Kacheln auf Selektion" — das stimmt nicht: die
-> Kacheln folgen dem **Programmer** (leer = alle Fixtures), nicht der Auswahl aus Reihe 0.
+> Die Kacheln folgen dem **Programmer** (leer = alle Fixtures), nicht der Auswahl aus Reihe 0 —
+> so steht es auch in der Kopfzeile der Bank. (Shows, die vor dem 2026-10-02 erzeugt wurden,
+> tragen dort noch die falsche Zeile „R2: Farb-Kacheln auf Selektion".)
 
 ## 4. Die Fader
 

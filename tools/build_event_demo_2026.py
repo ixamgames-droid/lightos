@@ -1008,7 +1008,7 @@ for fid in color_fids:
 func_flash(fixt_strobe, note_rc(1, 1), B_PROG, "#551111")
 COLORS_PROG = [("Rot", 255, 0, 0, 0), ("Grün", 0, 255, 0, 0), ("Blau", 0, 0, 255, 0), ("Gelb", 255, 220, 0, 0),
                ("Cyan", 0, 255, 255, 0), ("Magenta", 255, 0, 255, 0), ("Weiß", 255, 255, 255, 255), ("Aus", 0, 0, 0, 0)]
-for i, (nm, r, g, b, w) in enumerate(COLORS_PROG):                        # R2 = Farb-Kacheln auf Selektion
+for i, (nm, r, g, b, w) in enumerate(COLORS_PROG):                        # R2 = Farb-Kacheln ueber den Programmer
     color_tile(nm, note_rc(2, i), B_PROG, r, g, b, w, target=ColorTarget.PROGRAMMER)
 fader("Rot", 0, B_PROG, SliderMode.PROGRAMMER, programmer_attr="color_r", midi_cc=48, value=0)
 fader("Grün", 1, B_PROG, SliderMode.PROGRAMMER, programmer_attr="color_g", midi_cc=49, value=0)
@@ -1017,8 +1017,11 @@ fader("Weiß", 3, B_PROG, SliderMode.PROGRAMMER, programmer_attr="color_w", midi
 fader("Intensität", 4, B_PROG, SliderMode.PROGRAMMER, programmer_attr="intensity", midi_cc=52, value=255)
 fader("MH Pan", 7, B_PROG, SliderMode.PROGRAMMER, programmer_attr="pan", programmer_scope="group",
       programmer_group="Moving Heads", midi_cc=55, value=128)
-label("BANK 8  PROGRAMMER  —  R0: Gruppe wählen. R1: Voll Weiß / Fixture-Strobe. R2: Farb-Kacheln "
-      "auf Selektion. Fader: R/G/B/W/Intensität + MH-Pan (Pan/Tilt sonst via XY-Pad in Bank 4).",
+# DOC-30: die Kacheln zielen auf den PROGRAMMER (leer = alle Geraete), nicht auf
+# die Auswahl aus Reihe 0 — die Kopfzeile sagte bis 2026-10-02 „auf Selektion".
+label("BANK 8  PROGRAMMER  —  R0: Auswahl (für andere Werkzeuge). R1: Voll Weiß / Fixture-Strobe. "
+      "R2: Farb-Kacheln über den Programmer (leer = alle Geräte). Fader R/G/B/W/Intensität: alle "
+      "Geräte; MH-Pan nur Moving Heads (Pan/Tilt sonst via XY-Pad in Bank 4).",
       X0, 28, 1250, B_PROG)
 
 
