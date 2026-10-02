@@ -14,7 +14,6 @@
 |---|---|---|---|---|
 | DOC-14 | C | fix/doc14-schaukasten-19 | 2026-10-01T21:37Z | tools/build_vc_widgets_showcase.py · docs/anleitung_vc_widgets/README.md · docs/anleitung_vc_widgets/_capture/geometry.json · tests/test_doc14_schaukasten_alle_typen.py · changelog.d/2026-10-02-DOC-14.md |
 | XPLAT-44 | C | docs/xplat44-data-cwd | 2026-10-02T09:21Z | BACKLOG.md |
-| XPLAT-34 | C | fix/xplat34-verteilter-sammellauf | 2026-10-02T09:25Z | tools/zeitbomben_gate.py · tests/test_zeitbomben_gate.py · tests/test_xplat34_verteilter_sammellauf.py · BACKLOG.md |
 | FM-53 | C | feat/fm53-bibliothek-download | 2026-10-02T09:29Z | src/core/database/bibliothek_download.py · src/ui/widgets/bibliothek_download_dialog.py · src/ui/main_window.py · main.py · tests/test_fm53_bibliothek_download.py · docs/FIXTURE_SOURCES.md · changelog.d/2026-10-02-FM-53.md |
 | FM-33 | C | feat/fm33-raw-einzelregler | 2026-10-02T09:58Z | src/ui/views/programmer_view.py · tests/test_fm33_raw_einzelregler.py · changelog.d/2026-10-02-FM-33.md · BACKLOG.md |
 | UI-56 | C | - | 2026-10-02T10:14Z | src/core/attr_groups.py · src/ui/views/snap_file_panel.py · docs/anleitung_szenen_cues/ANLEITUNG.md · tests/test_ui56_optik.py · BACKLOG.md |
@@ -140,7 +139,6 @@
 
 ## Verlauf
 
-- 2026-10-02T11:59Z A aktualisiert FM-46: Branch feat/fm46-dimmer-segment -> feat/fm46-rueckfall
 - 2026-10-02T11:59Z A claim FM-46c
 - 2026-10-02T12:00Z C claim DOC-44
 - 2026-10-02T12:00Z C claim DOC-45
@@ -170,3 +168,4 @@
 - 2026-10-02T13:02Z C claim DOC-54
 - 2026-10-02T13:04Z C claim DOC-55
 - 2026-10-02T13:05Z C claim DOC-56
+- 2026-10-02T13:38Z C done XPLAT-34
