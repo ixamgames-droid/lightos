@@ -113,9 +113,7 @@ _POLL_FIXTURES = json.dumps({"fixtures": _FIXTURES_JSON})
 _POLL_FIXTURES_UND_AUSWAHL = json.dumps(
     {"fixtures": _FIXTURES_JSON, "selection": "[2, 4]"})
 
-# tools.js: Basis-Deckkraft der beiden Auswahl-Ringe (der Identify-Puls
-# moduliert sie mit k in [0.25, 1.0] — deshalb wird auf > 0 geprueft, nicht auf
-# Gleichheit, ausser nach dem Settle).
+
 def _pulsfenster_s():
     """``SELECTION_PULSE_MS`` aus ``interaction/tools.js`` in Sekunden (XPLAT-37):
     die Wartezeit im Settle-Test muss UEBER dem Fenster liegen, auch wenn es
@@ -126,6 +124,9 @@ def _pulsfenster_s():
     return int(treffer.group(1)) / 1000.0
 
 
+# tools.js: Basis-Deckkraft der beiden Auswahl-Ringe (der Identify-Puls
+# moduliert sie mit k in [0.25, 1.0] — deshalb wird auf > 0 geprueft, nicht auf
+# Gleichheit, ausser nach dem Settle).
 _SELBORDER_BASIS = 0.85
 _ICON_RING_BASIS = 1.0
 
