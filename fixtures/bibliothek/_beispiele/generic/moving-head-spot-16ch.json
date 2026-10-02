@@ -1,0 +1,78 @@
+{
+  "format_version": 1,
+  "hersteller": "Generic",
+  "hersteller_kurz": "GEN",
+  "modell": "Moving Head Spot 16ch",
+  "kurzname": "MH16",
+  "typ": "moving_head",
+  "leistung_w": 150,
+  "quelle": {"titel": "LightOS-Bestand: generisches Profil (kein bestimmtes Geraet)"},
+  "herkunft": {"art": "lightos", "lizenz": "eigen"},
+  "autor": "LightOS",
+  "geprueft": {"ok": false, "wie": "generisches Profil, Farb-/Gobo-Rad gleichmaessig aufgeteilt"},
+  "modi": [
+    {
+      "name": "16-Kanal",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan Fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt Fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Offen (kein Strobe)", "art": "open"},
+            {"von": 10, "bis": 250, "name": "Strobe langsam → schnell", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Offen", "art": "open"}
+          ]
+        },
+        {
+          "name": "Farbe",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Weiß / Offen", "art": "open"},
+            {"von": 16, "bis": 31, "name": "Rot", "art": "color"},
+            {"von": 32, "bis": 47, "name": "Orange", "art": "color"},
+            {"von": 48, "bis": 63, "name": "Gelb", "art": "color"},
+            {"von": 64, "bis": 79, "name": "Grün", "art": "color"},
+            {"von": 80, "bis": 95, "name": "Cyan", "art": "color"},
+            {"von": 96, "bis": 111, "name": "Blau", "art": "color"},
+            {"von": 112, "bis": 127, "name": "Magenta", "art": "color"},
+            {"von": 128, "bis": 255, "name": "Farbwechsel langsam → schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Offen / kein Gobo", "art": "open"},
+            {"von": 16, "bis": 31, "name": "Gobo 1", "art": "gobo"},
+            {"von": 32, "bis": 47, "name": "Gobo 2", "art": "gobo"},
+            {"von": 48, "bis": 63, "name": "Gobo 3", "art": "gobo"},
+            {"von": 64, "bis": 79, "name": "Gobo 4", "art": "gobo"},
+            {"von": 80, "bis": 95, "name": "Gobo 5", "art": "gobo"},
+            {"von": 96, "bis": 111, "name": "Gobo 6", "art": "gobo"},
+            {"von": 112, "bis": 127, "name": "Gobo 7", "art": "gobo"},
+            {"von": 128, "bis": 255, "name": "Gobo-Wechsel langsam → schnell", "art": "rotate"}
+          ]
+        },
+        {"name": "Gobo Rotation", "attribut": "gobo_rotation", "default": 0, "highlight": 0},
+        {"name": "Prisma", "attribut": "prism", "default": 0, "highlight": 0},
+        {"name": "Prisma Rot.", "attribut": "prism_rotation", "default": 0, "highlight": 0},
+        {"name": "Frost", "attribut": "frost", "default": 0, "highlight": 0},
+        {"name": "Zoom", "attribut": "zoom", "default": 128, "highlight": 128},
+        {"name": "Fokus", "attribut": "focus", "default": 128, "highlight": 128},
+        {"name": "Makro", "attribut": "macro", "default": 0, "highlight": 0}
+      ]
+    }
+  ]
+}
