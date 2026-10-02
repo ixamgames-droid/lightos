@@ -42,6 +42,7 @@
 | DOC-41 | C | - | 2026-10-02T11:11Z | docs/anleitung_colorfade_vc/ANLEITUNG_COLORFADE_VC.md |
 | DOC-42 | C | - | 2026-10-02T11:57Z | docs/anleitung_ablaeufe/ANLEITUNG_ABLAEUFE_MISCHEN.md · tools/build_event_demo_2026.py · tests/test_doc42_bank7_beschriftung.py · changelog.d/2026-10-02-DOC-42.md |
 | QA-82 | C | - | 2026-10-02T11:14Z | tests/test_qa58_bibliothek_schema_unberuehrt.py · BACKLOG.md |
+| DOC-43 | C | - | 2026-10-02T11:58Z | docs/anleitung_vc_workflow/ANLEITUNG_VC_WORKFLOW.md |
 
 ## Blocker & Fallen
 
@@ -106,7 +107,6 @@
 
 ## Verlauf
 
-- 2026-10-02T09:26Z A done UI-70
 - 2026-10-02T09:26Z A done TOOL-8
 - 2026-10-02T09:29Z C claim FM-53
 - 2026-10-02T09:49Z C done XPLAT-37
@@ -136,3 +136,4 @@
 - 2026-10-02T11:11Z C claim DOC-42
 - 2026-10-02T11:14Z C claim QA-82
 - 2026-10-02T11:57Z C aktualisiert DOC-42: Dateien docs/anleitung_ablaeufe/ANLEITUNG_ABLAEUFE_MISCHEN.md -> docs/anleitung_ablaeufe/ANLEITUNG_ABLAEUFE_MISCHEN.md · tools/build_event_demo_2026.py · tests/test_doc42_bank7_beschriftung.py · changelog.d/2026-10-02-DOC-42.md
+- 2026-10-02T11:58Z C claim DOC-43
