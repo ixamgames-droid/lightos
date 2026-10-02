@@ -39,13 +39,21 @@ from src.ui.virtualconsole.vc_label import VCLabel
 from src.ui.virtualconsole.vc_slider import VCSlider, SliderMode
 from src.ui.virtualconsole.vc_xypad import VCXYPad
 
+from _profil import profil_id
+
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(_ROOT, "shows", "Spot90_Testshow.lshow")
+# LIGHTOS_GEN_OUT lenkt die Show um (Test, ohne shows/ anzufassen).
+OUT = os.environ.get("LIGHTOS_GEN_OUT") or os.path.join(_ROOT, "shows", "Spot90_Testshow.lshow")
 
 # ── Geraet ───────────────────────────────────────────────────────────────────
-# Profil 1698 = Varytec "Hero Spot 90" (Quelle qlcplus). Bewusst der GROESSTE
-# Modus: 16-Bit-Pan/Tilt zahlt sich beim Zielen unmittelbar aus.
-PROFIL, MODUS, N_KANAELE = 1698, "16 Channel", 16
+# Varytec "Hero Spot 90" (Quelle qlcplus). Bewusst der GROESSTE Modus:
+# 16-Bit-Pan/Tilt zahlt sich beim Zielen unmittelbar aus.
+# TOOL-3: ueber den NAMEN aufgeloest, nicht ueber eine rohe Profil-ID — die ist
+# rechnerabhaengig (hier stand 1698) und zeigte auf jeder anders gewachsenen
+# Bibliothek auf ein anderes Geraet. Fehlt Profil oder Modus, endet der Lauf laut.
+HERSTELLER, MODELL = "Varytec", "Hero Spot 90"
+MODUS, N_KANAELE = "16 Channel", 16
+PROFIL = profil_id(HERSTELLER, MODELL, modus=MODUS, kanaele=N_KANAELE)
 # Physischer Bewegungsbereich. 540/270 ist der uebliche Wert dieser Klasse und
 # zugleich der Repo-Default (app_state: pan_range_deg=540). Stimmt er am Geraet
 # nicht, sieht man es SOFORT an dieser Show — die absoluten Ziele treffen dann
@@ -141,7 +149,7 @@ for fid, name in ((1, "MH Links"), (2, "MH Rechts")):
     state.add_fixture(PatchedFixture(
         fid=fid, label=name, fixture_profile_id=PROFIL, mode_name=MODUS,
         universe=UNIVERSUM, address=adr, channel_count=N_KANAELE,
-        manufacturer_name="Varytec", fixture_name="Hero Spot 90",
+        manufacturer_name=HERSTELLER, fixture_name=MODELL,
         fixture_type="moving_head",
         pan_range_deg=int(PAN_RANGE), tilt_range_deg=int(TILT_RANGE),
         pan_zero_dmx=int(PAN_ZERO), tilt_zero_dmx=int(TILT_ZERO),

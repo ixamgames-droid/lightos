@@ -13,6 +13,7 @@
 | `_gate_webengine.ps1` | tools/_gate_webengine.ps1 - rechnerweite WebEngine-Absicherung des Windows-Gates. |
 | `_gate_webengine.sh` | tools/_gate_webengine.sh — gemeinsame WebEngine-Absicherung der Linux-Gate-Runner. |
 | `_gen_env.py` | Spawn-sichere Bootstrap-Schicht fuer alle ``tools/build_*.py``-Generatoren (DEMO-02). |
+| `_profil.py` | TOOL-3: Geraeteprofil ueber Hersteller + Modell aufloesen — nie ueber eine rohe ID. |
 | `_run_showcase_app.py` | Wegwerf-Launcher fuer die Doku-Captures: startet LightOS UND laedt direkt die |
 | `_showpath.py` | Show-Datei-Aufloesung fuer tools/-Skripte: shows/ mit Fallback shows/_archiv/. |
 | `anleitungsbilder.py` | DOC-16: Anleitungsbilder reproduzierbar aus dem Code erzeugen. |
