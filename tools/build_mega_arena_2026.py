@@ -54,7 +54,8 @@ _app = QApplication.instance() or QApplication([])
 
 from sqlalchemy import select, delete
 from sqlalchemy.orm import Session
-from src.core.app_state import get_state, get_channels_for_patched, open_value_for
+from src.core.app_state import get_state, get_channels_for_patched
+from _shutter import shutter_offen   # ENG-28: Shutter nur mit Beleg
 from src.core.database.fixture_db import engine as fdb_engine, ensure_builtins
 from src.core.database.models import PatchedFixture, FixtureProfile, FixtureGroup
 from src.core.engine.function_manager import get_function_manager
@@ -163,8 +164,9 @@ def dim_ch(fid):
 # ── Safety-Defaults: Mover-Shutter offen (emittieren, sobald Intensitaet kommt),
 #    LASER bleibt aus (Shutter 0 = Rig-Safety-Default) bis Arm/Muster. Keine
 #    implizite Grundhelligkeit (strikte Farbe/Dimmer-Trennung wie Davids Shows). ──
-state.base_levels = {fid: {"shutter": open_value_for(fx_of[fid], "shutter")}
-                     for fid in mover_fids if attr_chs(fid, "shutter")}
+state.base_levels = {fid: {"shutter": wert} for fid in mover_fids
+                     if attr_chs(fid, "shutter")
+                     and (wert := shutter_offen(fx_of[fid])) is not None}
 state.implicit_brightness = False
 state._rebuild_render_plan()
 

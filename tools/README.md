@@ -16,6 +16,7 @@
 | `_profil.py` | TOOL-3: Geraeteprofil ueber Hersteller + Modell aufloesen — nie ueber eine rohe ID. |
 | `_run_showcase_app.py` | Wegwerf-Launcher fuer die Doku-Captures: startet LightOS UND laedt direkt die |
 | `_showpath.py` | Show-Datei-Aufloesung fuer tools/-Skripte: shows/ mit Fallback shows/_archiv/. |
+| `_shutter.py` | ENG-28: Shutter in Generatoren nur mit Beleg oeffnen — nie mit dem Vorgabewert 255. |
 | `anleitungsbilder.py` | DOC-16: Anleitungsbilder reproduzierbar aus dem Code erzeugen. |
 | `app.ps1` | LightOS App-Treiber — App starten/stoppen/warten/screenshotten aus EINEM Skript. |
 | `app.sh` | tools/app.sh — Linux-Pendant zu tools/app.ps1 (App-Steuerung fuer UI-Verifikation). |
