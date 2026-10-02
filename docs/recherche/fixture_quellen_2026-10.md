@@ -14,7 +14,7 @@ dabei. Die Entscheidungen trifft der Projektinhaber.
 | | Geräteprofile | 3D-Modelle |
 |---|---|---|
 | **Mitliefern** (erst nach PROC-11, s. u.) | Open Fixture Library (MIT), QLC+-Fixtures (Apache-2.0) | GDTF-Default-Meshes (ausdrücklich frei), QLC+-Meshes (Apache-2.0, **liegen schon im Repo**) |
-| **Download zur Laufzeit** (nur nach Zustimmung) | OFL (ohne Konto) und QLC+ (GitHub-Archiv): beide direkt mit dem **vorhandenen** QXF-Import lesbar. GDTF-Share nur mit dem **eigenen Konto des Nutzers** | Modelle aus `.gdtf`-Dateien, die der Nutzer selbst lädt oder importiert |
+| **Download zur Laufzeit** (nur nach Zustimmung) | OFL als QLC+-Export (ohne Konto) und QLC+ (GitHub-Archiv): beide direkt mit dem **vorhandenen** QXF-Import lesbar. GDTF-Share **nicht ohne Klärung**: das eigene Konto des Nutzers ist keine Nutzungslizenz (Abschnitt 1.3) | Modelle aus `.gdtf`-Dateien, die der Nutzer selbst lädt oder importiert |
 | **Gar nicht** | Hersteller-Downloads ohne Lizenz, Konsolen-Bibliotheken (grandMA, Avolites, Onyx, ChamSys, Martin M-Series), Freestyler, SoundSwitch, Lightkey, DMXIS | Hersteller-CAD, TurboSquid/CGTrader, BlenderKit „Royalty Free", aus Visualizern extrahierte Bibliotheken |
 
 ### ★ Befund vorab: LightOS verteilt schon heute fremde Dateien ohne Lizenzhinweis
@@ -62,7 +62,7 @@ vorziehen, bevor irgendeine weitere fremde Datei hinzukommt (s. „Nächste Item
 | Quelle | Format | Umfang | Lizenz | Mitliefern? | Aktualität | Weg |
 |---|---|---|---|---|---|---|
 | [QLC+ `resources/fixtures`](https://github.com/mcallegari/qlcplus/tree/master/resources/fixtures) | `.qxf` (XML) | 1781 Geräte / 143 Hersteller laut `FixturesMap.xml` [gelesen]; ~1850 Dateien laut GitHub-Codesuche | Apache-2.0 | **ja** (Lizenztext + Hinweise) | sehr aktiv, Fixture-Commits bis 2026-09-26 | GitHub-Archiv, `raw.githubusercontent.com` |
-| [Open Fixture Library](https://github.com/OpenLightingProject/open-fixture-library) | eigenes JSON; Export u. a. als QLC+ `.qxf` | 134 Hersteller [gelesen]; ~660 Geräte | MIT | **ja** (Copyright-Hinweis) | sehr aktiv, Commits bis 2026-10-02 | REST-API ohne Konto, Sammel-Download je Format, GitHub-Archiv |
+| [Open Fixture Library](https://github.com/OpenLightingProject/open-fixture-library) | eigenes JSON; Export u. a. als QLC+ `.qxf` | 134 Hersteller [gelesen]; ~660 Geräte | MIT | **ja** (Copyright-Hinweis) | sehr aktiv, Commits bis 2026-10-02 | REST-API ohne Konto, Sammel-Download je Format; GitHub-Archiv nur als OFL-JSON |
 | GDTF-Share (gdtf-share.com) | `.gdtf` (ZIP: XML + Modelle + Gobos) | ~3000 Dateien [Auszug] | keine Weitergabe-Lizenz; Rechte beim jeweiligen Inhaber [Auszug] | **nein**; nur Download mit Konto des Nutzers | laufend (Hersteller laden selbst hoch) | öffentliche API mit Login [gelesen] |
 | Hersteller-Downloads | meist PDF-Anleitungen; teils GDTF (über GDTF-Share) | – | keine offene Lizenz gefunden | **nein** | – | – |
 | Konsolen-Bibliotheken | proprietär | – | keine Weitergabe-Lizenz | **nein** | – | – |
@@ -126,8 +126,15 @@ vorziehen, bevor irgendeine weitere fremde Datei hinzukommt (s. „Nächste Item
   und „it is not intended to be used as a replacement for the GDTF Share website." Endpunkte:
   `login.php` (Session-Cookie), `getList.php`, `downloadFile.php?rid=…`.
 - **Vorbild:** BlenderDMX (GPL-3.0) nutzt genau diese API mit den Zugangsdaten des Nutzers.
-- **Mitliefern: nein.** **Zur Laufzeit: ja, aber nur nutzer-ausgelöst mit dessen eigenem Konto,
-  kein Massen-Download.**
+- **Mitliefern: nein.**
+- **Zur Laufzeit: nur nach Klärung, nicht als fertige Empfehlung.** Ein eigenes Konto regelt den
+  Zugang, nicht die Nutzung: die Rechte bleiben laut Bedingungen beim jeweiligen Inhaber, und die
+  kommerzielle Nutzung ist ohne Lizenz ausgeschlossen [Auszug]. Wer LightOS für bezahlte
+  Veranstaltungen nutzt, wäre damit nicht abgedeckt. Vor einem Bau also klären (Wortlaut am
+  Original prüfen, ggf. beim Betreiber VPLT oder den Herstellern nachfragen), ob Hersteller-Dateien
+  dort eigene, freiere Bedingungen tragen. Bis dahin höchstens: nutzer-ausgelöster Einzel-Download
+  mit sichtbarem Hinweis auf die Bedingungen, kein Massen-Download, nichts weitergeben oder
+  zwischenspeichern.
 
 ### 1.4 Hersteller
 
@@ -223,7 +230,11 @@ belegt ist („Faktendaten … dürfen"). Eine verbindliche Aussage kann nur ein
   - **GDTF, OFL-JSON, MA, Avolites:** kein Importer. GDTF steht nur als Notiz in
     `docs/OPEN_POINTS_OVERVIEW.md`.
 - **Folge für OFL:** OFL exportiert QLC+-`.qxf`. Damit liest LightOS OFL **schon heute ohne neuen
-  Code**, nur der Download fehlt.
+  Code**, nur der Download fehlt — aber **nur über den Export** (`/download.qlcplus_4.12.2` bzw. je
+  Gerät). Das GitHub-Archiv des OFL-Repos enthält OFL-**JSON**; `import_all_qxf` nimmt nur
+  `.qxf` und fände darin nichts. Dafür bräuchte es entweder den Export-Schritt des OFL-Projekts
+  (Node.js, `npm run export`, s. `docs/FIXTURE_SOURCES.md`) oder einen eigenen OFL-JSON-Import
+  (Abschnitt 5, Punkt 7).
 - **Kein Netzzugriff:** In `src/` gibt es keinen Download- oder Update-Mechanismus, und
   `docs/FIXTURE_SOURCES.md` sagt ausdrücklich: LightOS lädt „nichts automatisch aus dem Netz".
   Ein Download beim ersten Start **ändert diese Regel**; das ist eine Entscheidung für den
@@ -254,10 +265,10 @@ belegt ist („Faktendaten … dürfen"). Eine verbindliche Aussage kann nur ein
    eigenen prozeduralen Körper. Fremde **Profile** eher nicht ins Repo legen (Größe, laufende
    Aktualisierung), sondern auf Knopfdruck holen.
 3. **Download zur Laufzeit, nur nach ausdrücklicher Zustimmung:**
-   - OFL als QLC+-Export (`/download.qlcplus_4.12.2`) oder als GitHub-Archiv → vorhandener
-     QXF-Import. Kein Konto nötig.
+   - OFL als QLC+-Export (`/download.qlcplus_4.12.2`) → vorhandener QXF-Import. Kein Konto nötig.
+     (Das GitHub-Archiv enthält OFL-JSON und geht erst mit Export-Schritt oder eigenem Importer.)
    - QLC+-Fixtures als GitHub-Archiv → vorhandener QXF-Import.
-   - GDTF-Share nur nutzer-ausgelöst mit dessen eigenem Konto; nie im Repo.
+   - GDTF-Share: **erst nach Klärung der Nutzungsrechte** (Abschnitt 1.3); nie im Repo.
 4. **Gar nicht:** Hersteller-CAD und -Bibliotheken ohne Lizenz, Konsolen-Bibliotheken,
    TurboSquid/CGTrader, BlenderKit RF, extrahierte Visualizer-Bibliotheken.
 
