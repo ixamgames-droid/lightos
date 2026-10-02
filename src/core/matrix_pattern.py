@@ -270,7 +270,11 @@ def weiss_cell_values(fx, segment, color, *, drive_intensity: bool = True) -> di
        ``_pixel_brightness`` sie im Renderer bildet — ein Weiss-Emitter kann
        nichts anderes darstellen als Helligkeit;
     4. ein GETEILTER Master-Dimmer kommt nur bei ``drive_intensity`` mit, sonst
-       gehoert er dem Nutzer bzw. dem Merge.
+       gehoert er dem Nutzer bzw. dem Merge;
+    5. FM-46 (Etappe 2): ein MEHRFACHER Dimmer ohne Zuordnung fuer dieses
+       Segment faehrt bei ``drive_intensity`` mit allen freien Vorkommen
+       gemeinsam (``weiss_rueckfall_dimmer``) — dieselbe Antwort wie der
+       Renderer.
 
     ⚠️ **Nicht zu verwechseln mit dem Vorbehalt in** :func:`cell_channel_values`:
     dort wird ``color_w`` bewusst NICHT bedient, weil Weiss bei FARB-Effekten
@@ -283,6 +287,7 @@ def weiss_cell_values(fx, segment, color, *, drive_intensity: bool = True) -> di
     try:
         from src.core.app_state import (get_channels_for_patched,
                                         channels_for_axis,
+                                        weiss_rueckfall_dimmer,
                                         weiss_ist_eigene_achse_for_channels)
         from src.core.group_cells import ACHSE_WEISS
         chans = list(get_channels_for_patched(fx))
@@ -298,6 +303,12 @@ def weiss_cell_values(fx, segment, color, *, drive_intensity: bool = True) -> di
         return {}                        # Segment gibt es nicht (FM-45-Grenze)
     hell = max(0, min(255, max(int(color[0]), int(color[1]), int(color[2]))))
     out: dict = {}
+    if drive_intensity:
+        for ch in weiss_rueckfall_dimmer(chans, int(segment), proj):
+            try:
+                out[int(ch.channel_number)] = 255
+            except (TypeError, ValueError):
+                continue
     for attr, ch in proj.items():
         a = (attr or "").lower()
         if a == "color_w":
