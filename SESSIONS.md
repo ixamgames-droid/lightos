@@ -20,7 +20,6 @@
 | ENG-28 | C | fix/eng28-generator-shutter | 2026-10-02T04:45Z | tools/_shutter.py · tools/build_demo_show_full.py · tools/build_event_demo_2026.py · tools/build_farb_fx_vc_show.py · tools/build_hochzeit_komplett.py · tools/build_mega_arena_2026.py · tools/build_musik_show_2026.py · tools/build_neue_demo_show.py · tools/build_party_demo_show.py · tools/build_testshow_2026.py · tools/build_tutorial_matrix_show.py · tools/README.md · tests/test_eng28_generator_shutter.py · changelog.d/2026-10-02-ENG-28.md · BACKLOG.md |
 | TOOL-6 | C | fix/tool6-cwd-waechter | 2026-10-02T04:53Z | tests/test_tool3_generator_annahmen.py · tools/build_dimmer_farbe_combo.py · tools/build_neuheiten_demo.py · tools/build_zq06121_demo.py · tools/_builder.py · changelog.d/2026-10-02-TOOL-6.md · BACKLOG.md |
 | FM-54 | C | fix/fm54-weiss-intensitaet | 2026-10-02T04:58Z | src/core/engine/rgb_matrix.py · tests/test_fm54_weiss_intensitaet.py · changelog.d/2026-10-02-FM-54.md · BACKLOG.md |
-| BL-0210 | A | docs/backlog-status-0210 | 2026-10-02T06:53Z | BACKLOG.md |
 
 ## Blocker & Fallen
 
@@ -75,7 +74,6 @@
 
 ## Verlauf
 
-- 2026-10-01T21:24Z B done BPM-26
 - 2026-10-01T21:27Z C claim ENG-27
 - 2026-10-01T21:34Z A done UI-69
 - 2026-10-01T21:34Z A aktualisiert VCB-11: Branch - -> feat/vcb11-blackout-ziel
@@ -105,3 +103,4 @@
 - 2026-10-02T06:52Z A claim PROC-18
 - 2026-10-02T06:53Z A done PROC-18
 - 2026-10-02T06:53Z A claim BL-0210
+- 2026-10-02T07:01Z A done BL-0210
