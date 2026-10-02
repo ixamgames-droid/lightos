@@ -72,7 +72,7 @@
 | `hw5_longrun.py` | HW-5 — Enttec-Ausgang im Langzeitbetrieb (>8 h) messen. |
 | `import_qlc_input_profile.py` | CLI-Wrapper: QLC+-Inputprofil (.qxi) → LightOS-Controller-Profil (JSON). |
 | `janitor.py` | Worktree-, Branch- und Artefakt-Hygiene fuer den LightOS-Loop (report-first). |
-| `library_testreste.py` | Findet (und entfernt auf Wunsch) Test-Rueckstaende in der Fixture-Bibliothek. |
+| `library_testreste.py` | Findet (und entfernt auf Wunsch) Test-Rueckstaende in der Fixture-Bibliothek; meldet doppelte Builtin-Profile (QA-68, nur Anzeige). |
 | `lint_show.py` | CLI: prüft eine oder mehrere .lshow (oder show.json) gegen die echten |
 | `linux_audio_input_guard.sh` | Haelt auf Linux-Systemen mit zwei Realtek-Mikrofonbuchsen den Capture-MUX auf |
 | `mh_einmessen.py` | VIZ-60 — Moving Heads am echten Rig einmessen, ohne KI und ohne Rechnerei. |
