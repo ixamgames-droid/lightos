@@ -63,6 +63,7 @@
 | DOC-56 | C | - | 2026-10-02T13:05Z | docs/anleitung_web_remote/ANLEITUNG.md |
 | FM-57 | A | feat/fm57-bibliothek-runde1 | 2026-10-02T17:50Z | fixtures/bibliothek |
 | FM-58 | A | feat/fm58-bibliothek-runde2 | 2026-10-02T18:20Z | fixtures/bibliothek |
+| FUNKTIONSTEST-B3 | B | - | 2026-10-02T21:53Z | - |
 
 ## Blocker & Fallen
 
@@ -146,7 +147,6 @@
 
 ## Verlauf
 
-- 2026-10-02T12:09Z C claim DOC-50
 - 2026-10-02T12:11Z A claim TOOL-9
 - 2026-10-02T12:14Z A done PROC-18
 - 2026-10-02T12:17Z C claim TOOL-2
@@ -176,3 +176,4 @@
 - 2026-10-02T17:50Z A claim FM-57
 - 2026-10-02T18:20Z A claim FM-58
 - 2026-10-02T19:08Z B done XPLAT-42
+- 2026-10-02T21:53Z B claim FUNKTIONSTEST-B3
