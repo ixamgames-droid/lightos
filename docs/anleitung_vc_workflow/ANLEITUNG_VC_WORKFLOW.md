@@ -7,6 +7,9 @@
 >
 > Diese Anleitung wurde am **2026-06-17** Schritt für Schritt in der laufenden App
 > durchgeklickt und gefilmt (Show `shows/Event_Demo_2026.lshow`, Bank 3 „Matrix-Effekte").
+> Die Show liegt nicht im Repository; erzeugen mit
+> `./venv/bin/python tools/build_event_demo_2026.py` (Windows:
+> `venv\Scripts\python.exe tools\build_event_demo_2026.py`).
 > Alle Bilder zeigen echte Klicks, keine Montage.
 
 ---
@@ -63,7 +66,7 @@ verdrahteten Knopfes führt LightOS dann durch den Aufbau:
   (z. B. an/aus, Geschwindigkeit, Helligkeit …); je Häkchen kann über **„Widget: … ▸
   ändern"** das Bedien-Element gewählt werden. Über die Kachel-Galerie **„Widget
   wählen"** (*„Bedien-Element wählen — tippe eine Kachel an"*) lässt sich der Widget-Typ
-  grafisch aussuchen. Mit **„Erstellen"** entsteht für **jeden** Haken ein fertig
+  grafisch aussuchen: Kachel antippen und mit **OK** übernehmen (oder doppelt antippen). Mit **„Erstellen"** entsteht für **jeden** Haken ein fertig
   vorverdrahtetes Widget — alles in **einem** Schritt (ein Undo).
 - **Drop auf einen schon belegten Fader** → die Erklär-Karte **„Regler ist schon belegt"**
   fragt nach: **„Ersetzen"** (Regler steuert nur noch den neuen Effekt), **„Dazu koppeln"**
@@ -93,14 +96,20 @@ verdrahteten Knopfes führt LightOS dann durch den Aufbau:
 
 ![Aktion: Funktion an/aus](img/06_aktion_funktion_anaus.png)
 
-4. Feld **„Funktion / Chase (Name):"** aufklappen und den Effekt wählen (hier
-   *Effekt Feuer*). Die Funktions-ID (12) wird automatisch eingetragen.
+4. Im Abschnitt **„Ziel und Verhalten"** bei **„Ziele:"** (Liste „Schaltet mit") auf
+   **„+ Funktion/Effekt hinzufügen"** klicken und in der neuen Zeile den Effekt wählen
+   (hier *Effekt Feuer*).
+   > ⚠ Nicht über das Feld **„Funktion / Chase (Name):"** im zugeklappten Bereich
+   > **„Erweitert (Roh-ID / Executor-Slot)"**: Bei „Funktion an/aus" überschreibt die
+   > Liste „Ziele:" beim **OK** diese Wahl — bleibt sie leer, ist die Taste danach
+   > **ungebunden**.
 
 ![Effekt gebunden](img/07_button_gebunden_feuer.png)
 
 5. Oben bei **„Beschriftung:"** einen Namen vergeben (hier *Feuer An/Aus*), dann **OK**.
 
-Ergebnis — eine Taste mit **grünem Balken** (= an eine Funktion gebunden):
+Ergebnis — eine Taste mit **grünem Balken**. Der Balken zeigt die Aktion „Funktion …"
+an, nicht, ob wirklich ein Effekt gebunden ist; das siehst du an „Ziele:" (Zähler > 0):
 
 ![Feuer An/Aus](img/08_button_feuer_anaus.png)
 
@@ -121,8 +130,11 @@ Ergebnis — eine Taste mit **grünem Balken** (= an eine Funktion gebunden):
 
 ![Speed-Fader](img/10_fader_speed.png)
 
-> Dieser Fader skaliert das Tempo **aller** laufenden zeitbasierten Effekte
-> (unten = langsam, oben = schnell).
+> Dieser Fader skaliert das Tempo der laufenden zeitbasierten Effekte (unten = langsam,
+> oben = schnell) — aber nur, solange **keine BPM** läuft, und bei Effekten auf
+> Tempo-Bus „Frei". Neue Effekte hängen standardmäßig am Bus **„Global"**; sobald eine
+> BPM läuft (Tap, Musik-BPM, BPM-Fader), folgen sie der Bus-BPM und ignorieren diesen
+> Fader.
 
 ---
 
@@ -154,11 +166,13 @@ Genauso: **„Fader"** → doppelklicken → **„Modus:" = „Submaster"** → 
 > *Sync MH-Kreis >Bus A* (Bank 6 selbst enthält die Tempo-/BPM-**Bedienwidgets**).
 > Dieser eine Fader steuert jetzt die BPM von **Bus A** — und damit **alle** daran
 > hängenden Effekte gleichzeitig und phasensynchron. Einen **eigenen** Effekt hängt man
-> so an denselben Bus: Effekt aus der Bibliothek auf die VC **ziehen** und in der
-> Drop-Karte den Aspekt **„Tempo-Bus zuweisen…"** ankreuzen — **oder** per **Rechtsklick**
-> auf ein schon gebundenes Widget → **„⚡ Live-Parameter…"** das Feld **„Tempo-Bus"** als
-> Bedienelement erzeugen. (Ein eigenes „Tempo-Bus"-Feld im EFX-/Matrix-Editor gibt es
-> nicht.)
+> so an denselben Bus — am direktesten im **EFX-, Matrix- oder Chaser-Editor** über das
+> Feld **„Tempo-Bus:"** → **„Bus A"**. Auf der VC geht es auch: Effekt aus der Bibliothek
+> **ziehen**, in der Drop-Karte **„Tempo-Bus zuweisen…"** ankreuzen → **Erstellen** →
+> Bearbeiten aus → in der neuen Bus-Auswahl den Chip **„A"** antippen. Oder per
+> **Rechtsklick** auf ein gebundenes Widget → **„⚡ Live-Parameter…"** → im Live-Editor
+> „Tempo-Bus (tempo_bus_id)" ankreuzen → **Erzeugen** → mit dem neuen +/−-Regler auf
+> **„A"** schalten.
 
 Die drei neuen Fader (Speed · Submaster · Tempo Bus A) sauber **nebeneinander in der
 unteren Fader-Reihe** — gleiche Höhe und Größe wie die übrigen Fader der Show. (Neu
@@ -200,12 +214,12 @@ ausgerichtet in der unteren Fader-Reihe neben den vorhandenen Fadern.
 | Auf belegten Regler droppen | Karte „Regler ist schon belegt" → „Ersetzen" / „Dazu koppeln" / „Neues Widget daneben" |
 | Element hinzufügen (manuell) | Toolbar „Button" / „Fader" / … (landet in der Mitte → ziehen) |
 | Konfigurieren (manuell) | Widget **doppelklicken** → Einstellungen-Dialog |
-| Effekt an/aus-Taste | Aktion „Funktion an/aus" + Funktion/Chase wählen |
-| Speed | Fader-Modus „Speed (alle Effekte)" |
+| Effekt an/aus-Taste | Aktion „Funktion an/aus" + unter „Ziele:" den Effekt hinzufügen |
+| Speed | Fader-Modus „Speed (alle Effekte)" — wirkt nur ohne laufende BPM bzw. bei Bus „Frei" |
 | Submaster | Fader-Modus „Submaster" |
-| Mehrere Effekte / 1 BPM | Fader-Modus „Tempo-Bus (BPM)" + Bus A · eigene Effekte auf den Bus legen: beim Drop Aspekt „Tempo-Bus zuweisen…" ODER Rechtsklick → „⚡ Live-Parameter…" → Feld „Tempo-Bus" |
+| Mehrere Effekte / 1 BPM | Fader-Modus „Tempo-Bus (BPM)" + Bus A · eigene Effekte auf den Bus legen: im Effekt-Editor Feld „Tempo-Bus:" → „Bus A" (oder auf der VC über „Tempo-Bus zuweisen…" bzw. „⚡ Live-Parameter…") |
 | Speichern | Strg+S (bzw. Datei → Speichern unter…) |
 
-> **Hinweis:** Das Ergebnis dieser Demo liegt als `shows/Event_Demo_2026_WorkflowDemo.lshow`
-> (Sicherung). Die Haupt-Show `shows/Event_Demo_2026.lshow` wurde wieder auf die
-> unveränderte Voll-Version zurückgesetzt (Generator `tools/build_event_demo_2026.py`).
+> **Hinweis:** Das Ergebnis dieser Demo liegt nicht im Repository. Die Haupt-Show
+> `shows/Event_Demo_2026.lshow` lässt sich jederzeit mit `tools/build_event_demo_2026.py`
+> neu erzeugen.
