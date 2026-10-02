@@ -19,6 +19,7 @@
 | UI-70 | A | fix/ui70-leere-auswahl-programmer | 2026-10-02T07:57Z | src/ui/views/programmer_view.py · tools/anleitungsbilder |
 | TOOL-8 | A | fix/ui70-leere-auswahl-programmer | 2026-10-02T07:57Z | tools/anleitungsbilder |
 | PROC-18 | A | fix/proc18-fremd-lizenzhinweise | 2026-10-02T08:42Z | THIRD_PARTY_NOTICES.md · src/ui/visualizer/assets/models |
+| XPLAT-44 | C | docs/xplat44-data-cwd | 2026-10-02T09:21Z | BACKLOG.md |
 
 ## Blocker & Fallen
 
@@ -78,7 +79,6 @@
 
 ## Verlauf
 
-- 2026-10-01T23:55Z C done ENG-27
 - 2026-10-02T00:10Z C done TOOL-3
 - 2026-10-02T00:24Z C done PROC-08
 - 2026-10-02T04:45Z C claim ENG-28
@@ -108,3 +108,4 @@
 - 2026-10-02T08:42Z A claim PROC-18
 - 2026-10-02T08:45Z A done DOC-22
 - 2026-10-02T08:58Z C done QA-68
+- 2026-10-02T09:21Z C claim XPLAT-44
