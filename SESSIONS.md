@@ -20,6 +20,7 @@
 | TOOL-8 | A | fix/ui70-leere-auswahl-programmer | 2026-10-02T07:57Z | tools/anleitungsbilder |
 | PROC-18 | A | fix/proc18-fremd-lizenzhinweise | 2026-10-02T08:42Z | THIRD_PARTY_NOTICES.md · src/ui/visualizer/assets/models |
 | XPLAT-44 | C | docs/xplat44-data-cwd | 2026-10-02T09:21Z | BACKLOG.md |
+| XPLAT-34 | C | fix/xplat34-verteilter-sammellauf | 2026-10-02T09:25Z | tools/zeitbomben_gate.py · tests/test_zeitbomben_gate.py · tests/test_xplat34_verteilter_sammellauf.py · BACKLOG.md |
 
 ## Blocker & Fallen
 
@@ -79,7 +80,6 @@
 
 ## Verlauf
 
-- 2026-10-02T00:10Z C done TOOL-3
 - 2026-10-02T00:24Z C done PROC-08
 - 2026-10-02T04:45Z C claim ENG-28
 - 2026-10-02T04:45Z 107 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
@@ -109,3 +109,4 @@
 - 2026-10-02T08:45Z A done DOC-22
 - 2026-10-02T08:58Z C done QA-68
 - 2026-10-02T09:21Z C claim XPLAT-44
+- 2026-10-02T09:25Z C claim XPLAT-34
