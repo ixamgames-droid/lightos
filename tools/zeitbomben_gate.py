@@ -70,6 +70,12 @@ from typing import NamedTuple
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHIM = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_zeitsprung")
+#: XPLAT-34: Plugin, das ein Kind nur jeden n-ten Test fahren laesst — eigener
+#: Ordner, damit es nie an einem (absichtlich kaputten) Uhr-Vorspann haengt.
+SCHEIBE_ORDNER = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                              "_zeitbomben_scheibe")
+SCHEIBE_PLUGIN = "zeitbomben_scheibe"
+SCHEIBE_VAR = "LIGHTOS_ZEITBOMBEN_SCHEIBE"
 KANARIE_PLUGIN = "zeitsprung_kanarie"
 MARKE_OK = "ZEITSPRUNG-WIRKSAM"
 MARKE_FEHLT = "ZEITSPRUNG-UNWIRKSAM"
@@ -342,7 +348,7 @@ def _wurzel_fuer(dateien) -> str | None:
         return None
 
 
-def _befehl_fuer(dateien, tage: int) -> list:
+def _befehl_fuer(dateien, tage: int, scheibe=None) -> list:
     """Der Kind-Befehl an EINER Stelle -- damit pruefbar ist, was er traegt.
 
     Herausgezogen fuer XPLAT-38: dass das ``--rootdir`` gesetzt wird, laesst
@@ -356,6 +362,8 @@ def _befehl_fuer(dateien, tage: int) -> list:
               "-p", "no:cacheprovider"]
     if tage:
         befehl += ["-p", KANARIE_PLUGIN]
+    if scheibe:
+        befehl += ["-p", SCHEIBE_PLUGIN]
     wurzel = _wurzel_fuer(dateien)
     if wurzel:
         befehl += ["--rootdir", wurzel]
@@ -364,7 +372,7 @@ def _befehl_fuer(dateien, tage: int) -> list:
 
 
 def lauf(dateien, tage: int, shim: str = SHIM, zeitlimit: int = 480,
-         uhr: str = SPRUNG_UHR) -> Ergebnis:
+         uhr: str = SPRUNG_UHR, scheibe=None) -> Ergebnis:
     """pytest im Kindprozess ueber ``dateien``, Uhr um ``tage`` vorgerueckt.
 
     Der Kindprozess bekommt eigene Datenpfade (``LIGHTOS_SHOW_DB``): mehrere
@@ -380,7 +388,11 @@ def lauf(dateien, tage: int, shim: str = SHIM, zeitlimit: int = 480,
     with tempfile.TemporaryDirectory(prefix="zeitbomben_") as tmp:
         env = sprung_umgebung(tage, shim=shim, uhr=uhr)
         env["LIGHTOS_SHOW_DB"] = os.path.join(tmp, "show.db")
-        befehl = _befehl_fuer(dateien, tage)
+        if scheibe:
+            # XPLAT-34: nur jeden n-ten Test (``scheibe`` = ``(i, n)``).
+            env[SCHEIBE_VAR] = "%d/%d" % scheibe
+            env["PYTHONPATH"] = os.pathsep.join([SCHEIBE_ORDNER, env["PYTHONPATH"]])
+        befehl = _befehl_fuer(dateien, tage, scheibe)
         fertig = subprocess.run(befehl, cwd=REPO, env=env, text=True, encoding="utf-8",
                                 capture_output=True, timeout=zeitlimit)
     ausgabe = (fertig.stdout or "") + (fertig.stderr or "")
@@ -388,12 +400,62 @@ def lauf(dateien, tage: int, shim: str = SHIM, zeitlimit: int = 480,
     return Ergebnis(fertig.returncode, ausgabe, wirksam)
 
 
+#: XPLAT-34: auf so viele Kindprozesse verteilt ``pruefe`` den Sammellauf.
+#: Die Dauer von ``tests/test_zeitbomben_gate.py`` war die SUMME der Laufzeiten
+#: aller Kandidaten — fremder Testdateien mit festem Datum — und wuchs mit jeder
+#: neuen davon (gemessen 2026-10-02, Linux: Sammellauf 44,6 s von 76 s der
+#: ganzen Datei; Windows 145–169 s nach XPLAT-38, bei 300 s Segment-Limit).
+#: Mehr als drei lohnt nicht: das Gate faehrt selbst schon parallel, und jedes
+#: Kind bezahlt Prozessstart, conftest und das Sammeln aller Kandidaten einzeln
+#: (Windows ~6,5 s je Prozess).
+KINDER = 3
+
+#: pytest: "keine Tests gelaufen" — fuer eine Scheibe ohne Tests kein Fehler.
+_KEINE_TESTS = 5
+
+
+def lauf_verteilt(dateien, tage: int, shim: str = SHIM, zeitlimit: int = 480,
+                  uhr: str = SPRUNG_UHR, kinder: int = KINDER) -> Ergebnis:
+    """Wie ``lauf``, aber auf ``kinder`` gleichzeitige Kindprozesse verteilt
+    (XPLAT-34): JEDES Kind sammelt alle ``dateien`` und faehrt nur jeden
+    ``kinder``-ten Test (``SCHEIBE_PLUGIN``).
+
+    Nach Tests statt nach Dateien, weil EINE Datei den Lauf beherrschte
+    (``test_qa58_bibliothek_schema_unberuehrt.py``: ~31 s von ~47 s, gemessen
+    2026-10-02) — nach Dateien verteilt war das Ergebnis 58 % statt ein Drittel.
+
+    Zusammengefasst wird streng: rot, sobald EIN Kind rot ist, und der Sprung
+    gilt nur als wirksam, wenn JEDES Kind die Marke ``MARKE_OK`` geschrieben hat
+    — ein einziges stummes Kind macht das ganze Ergebnis wertlos, genau wie
+    vorher ein stummer Sammellauf. Ein Zeitlimit eines Kindes wird nach dem Ende
+    aller Kinder weitergereicht, keines bleibt verwaist zurueck. Ohne Sprung,
+    mit nur einer Datei oder ``kinder <= 1``: ein einziger ``lauf`` wie bisher.
+    """
+    dateien = list(dateien)
+    n = int(kinder or 1)
+    if n <= 1 or len(dateien) < 2 or not tage:
+        return lauf(dateien, tage, shim=shim, zeitlimit=zeitlimit, uhr=uhr)
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=n) as pool:
+        laeufe = [pool.submit(lauf, dateien, tage, shim=shim, zeitlimit=zeitlimit,
+                              uhr=uhr, scheibe=(i, n)) for i in range(n)]
+    teile = [f.result() for f in laeufe]       # wirft z. B. TimeoutExpired weiter
+    rcs = [t.rc for t in teile]
+    if all(r == _KEINE_TESTS for r in rcs):
+        rc = _KEINE_TESTS
+    else:
+        rc = next((r for r in rcs if r not in (0, _KEINE_TESTS)), 0)
+    ausgabe = "\n".join(f"── Kind {i + 1}/{n} (jeder {n}. Test ab {i + 1}) ──\n{t.ausgabe}"
+                        for i, t in enumerate(teile))
+    return Ergebnis(rc, ausgabe, all(t.sprung_wirksam for t in teile))
+
+
 class SprungUnwirksam(RuntimeError):
     """Der Uhr-Vorspann hat nicht gegriffen — das Ergebnis beweist nichts."""
 
 
 def pruefe(wurzel: str, tage: int = SPRUNG_TAGE, shim: str = SHIM,
-           dateien=None, uhr: str = SPRUNG_UHR) -> Bericht:
+           dateien=None, uhr: str = SPRUNG_UHR, kinder: int = KINDER) -> Bericht:
     """Der ganze Waechter: Kandidaten suchen, Sprung fahren, Urteil faellen."""
     kand = kandidaten(wurzel) if dateien is None else [
         (d, _funde(d)) for d in dateien]
@@ -401,7 +463,7 @@ def pruefe(wurzel: str, tage: int = SPRUNG_TAGE, shim: str = SHIM,
     if not fahren:
         return Bericht(kand, [], [], tage, "keine Kandidaten")
 
-    gesamt = lauf(fahren, tage, shim=shim, uhr=uhr)
+    gesamt = lauf_verteilt(fahren, tage, shim=shim, uhr=uhr, kinder=kinder)
     if not gesamt.sprung_wirksam:
         raise SprungUnwirksam(
             f"Die Zeile '{MARKE_OK}' fehlt in der Ausgabe — der Uhr-Vorspann "
@@ -576,6 +638,9 @@ def main(argv=None) -> int:
     p.add_argument("--uhr", choices=("datum", "alle"), default=SPRUNG_UHR,
                    help="welche Uhren verschoben werden; 'alle' zieht time.time "
                         "mit und erzeugt gemessen drei Fehlalarme (Dateialter)")
+    p.add_argument("--kinder", type=int, default=KINDER,
+                   help=f"auf so viele Kindprozesse wird der Sammellauf verteilt "
+                        f"(Vorgabe {KINDER}; 1 = ein Sammellauf wie vor XPLAT-34)")
     a = p.parse_args(argv)
 
     tests = os.path.join(REPO, "tests")
@@ -591,7 +656,7 @@ def main(argv=None) -> int:
         return 0
 
     try:
-        bericht = pruefe(tests, tage=a.tage, uhr=a.uhr)
+        bericht = pruefe(tests, tage=a.tage, uhr=a.uhr, kinder=a.kinder)
     except SprungUnwirksam as e:
         print(f"\nFEHLER: {e}")
         return 2
