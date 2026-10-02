@@ -1,10 +1,14 @@
 """PROC-18: Fremde Dateien im Repo brauchen Lizenztext und Urheberhinweis.
 
 LightOS selbst hat keine Lizenz (Entscheidung des Projektinhabers), liefert aber
-QLC+-Modelle (Apache-2.0) und three.js (MIT) mit. Beide Lizenzen verlangen, dass
-der Lizenztext beiliegt. Befund aus FM-55: die Modelle lagen ohne jeden Hinweis
-im Repo. Dieser Waechter haelt fest, dass jede Datei in den Fremd-Ordnern in
-THIRD_PARTY_NOTICES.md steht und die Lizenztexte da sind.
+three.js (MIT) mit; die Lizenz verlangt, dass der Lizenztext beiliegt. Befund aus
+FM-55: fremde Dateien lagen ohne jeden Hinweis im Repo. Dieser Waechter haelt
+fest, dass jede Datei in den Fremd-Ordnern in THIRD_PARTY_NOTICES.md steht und
+die Lizenztexte da sind.
+
+VIZ-66: die frueheren QLC+-Modelle (Apache-2.0) sind durch eigene Geometrie
+ersetzt und mitsamt Apache-Lizenztext entfernt. Dass keine Modelldateien
+zurueckkommen, prueft ``test_viz66_keine_fremden_modelle.py``.
 """
 import pathlib
 import unittest
@@ -14,14 +18,11 @@ NOTICES = ROOT / "THIRD_PARTY_NOTICES.md"
 
 #: Ordner, deren Inhalt komplett fremd ist -> jede Datei muss genannt sein.
 FREMD_ORDNER = [
-    ROOT / "src/ui/visualizer/assets/models",
     ROOT / "assets/vendor",
 ]
 #: Einzelne fremde Dateien ausserhalb dieser Ordner.
 FREMD_DATEIEN = [
     "src/ui/visualizer/three_local.js",
-    "src/ui/visualizer/assets/ColladaLoader.js",
-    "src/ui/visualizer/assets/OBJLoader.js",
 ]
 
 
@@ -49,16 +50,22 @@ class FremdLizenzhinweiseTest(unittest.TestCase):
         for ordner in FREMD_ORDNER:
             self.assertTrue(any(p.is_file() for p in ordner.rglob("*")), ordner)
 
+    def test_fremd_dateien_existieren(self):
+        # Gegenprobe: eine umbenannte Datei liesse ihren Eintrag ins Leere zeigen.
+        for rel in FREMD_DATEIEN:
+            self.assertTrue((ROOT / rel).is_file(), rel)
+
     def test_lizenztexte_liegen_bei(self):
-        apache = (ROOT / "licenses/Apache-2.0.txt").read_text(encoding="utf-8")
-        self.assertIn("Apache License", apache)
-        self.assertIn("Version 2.0, January 2004", apache)
-        self.assertIn("4. Redistribution.", apache)
         mit = (ROOT / "licenses/MIT-three.js.txt").read_text(encoding="utf-8")
         self.assertIn("Permission is hereby granted", mit)
         self.assertIn("three.js authors", mit)
-        for link in ("licenses/Apache-2.0.txt", "licenses/MIT-three.js.txt"):
-            self.assertIn(link, self.text)
+        self.assertIn("licenses/MIT-three.js.txt", self.text)
+
+    def test_jeder_lizenztext_gehoert_zu_einem_eintrag(self):
+        # VIZ-66: ein Lizenztext ohne Komponente (z. B. Apache-2.0 nach dem
+        # Entfernen der QLC+-Modelle) behauptete eine Fremd-Datei, die es nicht gibt.
+        for p in sorted((ROOT / "licenses").iterdir()):
+            self.assertIn(f"licenses/{p.name}", self.text, p.name)
 
 
 if __name__ == "__main__":
