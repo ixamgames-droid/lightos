@@ -39,7 +39,8 @@ _app = QApplication.instance() or QApplication([])
 
 from sqlalchemy import select, delete
 from sqlalchemy.orm import Session
-from src.core.app_state import get_state, get_channels_for_patched, open_value_for
+from src.core.app_state import get_state, get_channels_for_patched
+from _shutter import shutter_offen   # ENG-28: Shutter nur mit Beleg
 from src.core.database.fixture_db import engine as fdb_engine
 from src.core.database.models import PatchedFixture, FixtureProfile, FixtureGroup
 from src.core.engine.function_manager import get_function_manager
@@ -125,7 +126,7 @@ with state._session() as s:
                        positions_json=json.dumps({f"{i},0": (par_fids + mh_fids)[i] for i in range(10)})))
     s.commit()
 
-SHUT_OPEN = open_value_for(fx_of[mh_left], "shutter")   # offener Shutter (ZQ02001 = 4)
+SHUT_OPEN = shutter_offen(fx_of[mh_left])   # offener Shutter (ZQ02001 = 4)
 
 
 # ════════════════════════════════════════════════════════════════════════════════
@@ -305,7 +306,7 @@ def mh_vals(pan, tilt, inten=255):
             v["tilt"] = tilt
         if "intensity" in cm:
             v["intensity"] = inten
-        if "shutter" in cm:
+        if "shutter" in cm and SHUT_OPEN is not None:
             v["shutter"] = SHUT_OPEN
         out[fid] = v
     return out

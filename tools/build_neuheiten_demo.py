@@ -32,7 +32,9 @@ import _gen_env  # noqa: F401,E402  (setzt QT_QPA_PLATFORM u. a.)
 from _builder import (ButtonAction, build_and_verify,  # noqa: E402
                       ShowBuilder)
 
-OUT = "shows/Neuheiten Demo.lshow"
+#: TOOL-6: ab Repo-Root, nicht ab Arbeitsverzeichnis.
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+OUT = os.path.join(_ROOT, "shows", "Neuheiten Demo.lshow")
 
 # Universum 1, damit die Show ohne Enttec-Hardware am Bildschirm laeuft.
 UNIVERSUM = 1
