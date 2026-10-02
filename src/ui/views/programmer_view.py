@@ -482,7 +482,8 @@ class ProgrammerView(QWidget):
             mode_row.addWidget(rb)
         self._fixture_combo = QComboBox()
         self._fixture_combo.setToolTip("Aktives Fixture im Einzelmodus")
-        self._fixture_combo.setEnabled(self._group_mode == "individual")
+        # UI-70: leer (noch keine Auswahl) -> aus, s. _update_fixture_combo.
+        self._fixture_combo.setEnabled(False)
         self._fixture_combo.currentIndexChanged.connect(self._on_active_fixture_changed)
         mode_row.addWidget(self._fixture_combo, stretch=1)
         al.addLayout(mode_row)
@@ -1471,6 +1472,13 @@ class ProgrammerView(QWidget):
             fixtures = {f.fid: f for f in self._state.get_patched_fixtures()}
             selected = [fixtures[fid] for fid in self._editor_fids if fid in fixtures]
             if not selected:
+                # UI-70: Einzelgeraete-Combo und Reiter ZUERST in den Grundzustand
+                # (wie ein frisch geoeffneter Programmer ohne Auswahl). Vorher
+                # blieb die Combo mit dem zuletzt gewaehlten Geraet („[1] PARD")
+                # stehen — im Einzelmodus zielte sie damit auf ein Geraet, das
+                # gar nicht mehr gewaehlt ist — und der Laser-Reiter blieb offen.
+                self._update_fixture_combo([])
+                self._tabs_grundzustand()
                 self._lbl_selection.setText(_EMPTY_SELECTION_MSG)
                 self._color_preview.set_fixtures([])
                 self._template_channels = []
@@ -1479,18 +1487,6 @@ class ProgrammerView(QWidget):
                     hint.setObjectName("label_hint")
                     hint.setWordWrap(True)
                     _clear(cont).addWidget(hint)
-                if getattr(self, "_gobo_tab_index", -1) >= 0:
-                    self._main_tabs.setTabVisible(self._gobo_tab_index, False)
-                if getattr(self, "_mapping_tab_index", -1) >= 0:
-                    self._main_tabs.setTabVisible(self._mapping_tab_index, False)
-                if getattr(self, "_position_tab_index", -1) >= 0:
-                    self._main_tabs.setTabVisible(self._position_tab_index, False)
-                if getattr(self, "_efx_tab_index", -1) >= 0:
-                    self._main_tabs.setTabVisible(self._efx_tab_index, False)
-                for key in ("Color", "Weitere"):     # Hinweis „erst waehlen" zeigen
-                    idx = self._main_tabs.indexOf(self._attr_group_tabs[key])
-                    if idx >= 0:
-                        self._main_tabs.setTabVisible(idx, True)
                 return
 
             # FM-HEADLAYOUT Slice 5: Ist die Auswahl auf Köpfe eingeschränkt, muss
@@ -1618,6 +1614,24 @@ class ProgrammerView(QWidget):
                 self._main_tabs.setTabVisible(self._laser_tab_index, has_laser)
         except RuntimeError:
             pass  # Widgets beim Layout-Wechsel zwischenzeitlich geloescht
+
+    def _tabs_grundzustand(self):
+        """UI-70: Reiter-Sichtbarkeit wie beim Aufbau ohne Auswahl.
+
+        Faehigkeits-Reiter (Gobo, Position, Mapping, EFX, Laser) aus, Color und
+        Weitere AN — dort steht der Hinweis „erst ein Geraet waehlen". Eine
+        Quelle fuer den Leer-Zweig von ``_rebuild_attr_editor``; ein Reiter, der
+        hier fehlt, bliebe nach dem Leeren mit dem Stand der alten Auswahl offen.
+        """
+        for name in ("_gobo_tab_index", "_mapping_tab_index", "_position_tab_index",
+                     "_efx_tab_index", "_laser_tab_index"):
+            idx = getattr(self, name, -1)
+            if idx >= 0:
+                self._main_tabs.setTabVisible(idx, False)
+        for key in ("Color", "Weitere"):     # Hinweis „erst waehlen" zeigen
+            idx = self._main_tabs.indexOf(self._attr_group_tabs[key])
+            if idx >= 0:
+                self._main_tabs.setTabVisible(idx, True)
 
     def _build_group_tab(self, group_name: str,
                          channels: list[FixtureChannel],
@@ -1862,7 +1876,8 @@ class ProgrammerView(QWidget):
     def _set_group_mode(self, key: str):
         self._group_mode = key
         if hasattr(self, "_fixture_combo"):
-            self._fixture_combo.setEnabled(key == "individual")
+            self._fixture_combo.setEnabled(
+                key == "individual" and self._fixture_combo.count() > 0)
         try:
             prefs = _load_prefs()
             prefs["programmer_group_mode"] = key
@@ -1889,7 +1904,8 @@ class ProgrammerView(QWidget):
         if self._active_fixture_idx >= len(selected):
             self._active_fixture_idx = 0
         combo.setCurrentIndex(self._active_fixture_idx if selected else -1)
-        combo.setEnabled(self.group_mode() == "individual")
+        # UI-70: ohne Auswahl gibt es kein Geraet zu waehlen -> Combo aus.
+        combo.setEnabled(self.group_mode() == "individual" and bool(selected))
         combo.blockSignals(False)
 
     def _is_touch(self) -> bool:
