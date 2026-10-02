@@ -52,6 +52,7 @@
 | UI-71 | C | - | 2026-10-02T12:08Z | src/ui/widgets/controller_browser.py · tests/test_ui71_controller_vorlage_hinweis.py · tests/test_doc_removed_ui.py · BACKLOG.md · changelog.d/2026-10-02-UI-71.md |
 | DOC-50 | C | - | 2026-10-02T12:09Z | docs/LIVE_EDIT_FENSTER.md |
 | TOOL-9 | A | fix/tool9-ids-tafel | 2026-10-02T12:11Z | tools/backlog_ids.py · tests/test_backlog_ids.py |
+| TOOL-2 | C | - | 2026-10-02T12:17Z | tools/gource · Code-Film.bat · Code-Film.sh · THIRD_PARTY_NOTICES.md · tests/test_proc18_fremd_lizenzhinweise.py · tests/test_tool2_keine_binaerdateien.py · BACKLOG.md · changelog.d/2026-10-02-TOOL-2.md |
 
 ## Blocker & Fallen
 
@@ -119,7 +120,6 @@
 
 ## Verlauf
 
-- 2026-10-02T10:36Z C claim DOC-28
 - 2026-10-02T10:51Z C claim DOC-29
 - 2026-10-02T10:52Z C claim DOC-30
 - 2026-10-02T10:53Z C claim DOC-31
@@ -149,3 +149,4 @@
 - 2026-10-02T12:09Z C claim DOC-50
 - 2026-10-02T12:11Z A claim TOOL-9
 - 2026-10-02T12:14Z A done PROC-18
+- 2026-10-02T12:17Z C claim TOOL-2
