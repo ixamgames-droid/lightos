@@ -5,13 +5,14 @@ Neu erzeugen: ``venv/bin/python tools/anleitungsbilder.py szenen_cues``.
 Die Szenen laufen der Reihe nach im SELBEN Fenster. Was hier angelegt wird
 (Snap „PAR Rot", Snapshot-Slot 1, Cueliste „Meine Show", Executor 1, eine
 VC-Cueliste), raeumt Szene 10 wieder ab; die Szenen 11/12 (GO ohne Executor,
-UI-68) legen sich ihren Stand selbst an und raeumen ihn ebenso ab — bei
+UI-68) und das GIF 13 (DOC-20, derselbe Ablauf mit zweimal GO) legen sich
+ihren Stand selbst an und raeumen ihn ebenso ab — bei
 ``--alle`` sollen nachfolgende Anleitungen die Doku-Demo unveraendert sehen.
 
 Die Hilfen fuer Rahmen ueber Listeneintraegen und fuer Dialoge ueber dem
 Fenster stammen aus ``szenen_programmer_grundlagen`` (dort beschrieben).
 """
-from anleitungsbilder.runner import Szene
+from anleitungsbilder.runner import Frame, Szene
 from anleitungsbilder.szenen_programmer_grundlagen import (
     _RAHMEN, _hilfsrahmen, _im_dialog, _leeren, _pv, _ueber_fenster)
 
@@ -393,6 +394,26 @@ def _fader_zurueck(ui):
     _alles_abraeumen(ui)
 
 
+# ── 13: GO ohne Executor als Ablauf (GIF, DOC-20) ──────────────────────────
+
+def _liste_ohne_executor(ui):
+    """Drei Cues, Liste ausgewaehlt, aber auf keinem Executor; nichts laeuft."""
+    _alles_abraeumen(ui)
+    _cues_aufnehmen(ui)
+    _stack(ui).stop()
+    _pb(ui)._stop()
+    ui.pump(0.2)
+
+
+def _laufende_cue(ui):
+    return _pb(ui)._lbl_current                     # „▶ Cue 1.0 — …"
+
+
+def _go_klick(ui):
+    _pb(ui)._go()
+    ui.pump(0.3)
+
+
 SZENEN = [
     Szene("01_speichern", sektion="Programmer", unterreiter="Attribute",
           titel="Programmer-Stand: acht PARs rot, Bibliothek",
@@ -463,4 +484,17 @@ SZENEN = [
           vorher=_fader_null, nachher=_fader_zurueck,
           marken=[(_hinweis, 1, "Hinweis"),
                   (_executor(1), 2, "Executor 1")]),
+    Szene("13_go_ohne_executor_ablauf", sektion="Playback", unterreiter="Playback",
+          titel="GIF: GO ohne Executor — Liste landet auf Ex 1, Cue 1, dann Cue 2",
+          vorher=_liste_ohne_executor, nachher=_alles_abraeumen,
+          gif_breite=1200,
+          frames=[
+              Frame(dauer_s=1.5, marken=[("GO", 1, "GO")]),
+              Frame(dauer_s=2.2, schritt=_go_klick,
+                    marken=[("GO", 1, "GO"), (_laufende_cue, 2, "Cue 1"),
+                            (_hinweis, 3, "Hinweis"),
+                            (_executor(1), 4, "Executor 1")]),
+              Frame(dauer_s=1.8, schritt=_go_klick,
+                    marken=[("GO", 1, "GO"), (_laufende_cue, 2, "Cue 2")]),
+          ]),
 ]
