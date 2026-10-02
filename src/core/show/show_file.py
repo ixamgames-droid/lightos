@@ -424,7 +424,8 @@ def _resolve_fixture_profile_id(profile_id: int, manufacturer_name: str,
         from sqlalchemy import select
         from sqlalchemy.orm import Session, joinedload
         from src.core.database.fixture_db import engine
-        from src.core.database.models import FixtureProfile, Manufacturer
+        from src.core.database.models import (FixtureProfile, Manufacturer,
+                                              MITGELIEFERT_QUELLEN)
 
         with Session(engine()) as session:
             current = session.execute(
@@ -448,8 +449,10 @@ def _resolve_fixture_profile_id(profile_id: int, manufacturer_name: str,
             # FM-43: `builtin` zuerst, dann wie bisher nach ID. Der zweite
             # Schluessel bleibt drin, damit die Wahl bei gleicher Herkunft
             # deterministisch ist — sonst entschiede die Zeilenreihenfolge.
+            # FM-56: die Dateien der eigenen Bibliothek (`lightos`) sind
+            # genauso mitgeliefert und zaehlen wie `builtin`.
             treffer = session.execute(
-                query.order_by((FixtureProfile.source != "builtin"),
+                query.order_by(FixtureProfile.source.not_in(MITGELIEFERT_QUELLEN),
                                FixtureProfile.id)
             ).all()
             _geraet = f"{manufacturer_name} / {fixture_name}".strip(" /")
