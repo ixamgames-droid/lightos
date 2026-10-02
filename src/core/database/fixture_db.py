@@ -355,6 +355,24 @@ def _geo_wert(v) -> int:
     return 0 if n < 0 else GEO_MAX if n > GEO_MAX else n
 
 
+def segment_wert(v) -> int | None:
+    """Eine Segment-Zuordnung (FM-46) auf ``None`` oder ``0..``.
+
+    ``None``, leere Zeichenkette, negative Zahlen und alles Unlesbare werden
+    zu ``None`` = keine Zuordnung. Bewusst NICHT auf 0 geklemmt wie die
+    Rasterzahlen (``_geo_wert``): 0 ist hier ein echtes Segment, das erste.
+    Eine Fehlangabe stillschweigend zum ersten Segment zu machen waere genau
+    das Raten, das die Zuordnung vermeiden soll. ``bool`` zaehlt nicht als
+    Zahl (``True`` waere sonst Segment 1)."""
+    if v is None or isinstance(v, bool):
+        return None
+    try:
+        n = int(v)
+    except (TypeError, ValueError):
+        return None
+    return n if n >= 0 else None
+
+
 def create_user_profile(payload: dict, *, engine=None) -> int:
     """Speichert ein vom Fixture-Generator erzeugtes Payload als neues
     FixtureProfile (source="user") in der DB und gibt die neue Profil-ID zurueck.
@@ -364,7 +382,8 @@ def create_user_profile(payload: dict, *, engine=None) -> int:
     (Default: globale Fixture-DB). Das Payload-Format entspricht
     ``fixture_generator.build_profile_payload`` (Modi → Kanaele → Ranges) und
     haelt sich an das gleiche Speicher-Muster wie ``_add_modes``: pro Kanal
-    werden ``attribute``/``invert``/``resolution`` und je Bereich
+    werden ``attribute``/``invert``/``resolution`` (seit FM-46 auch die
+    Zuordnung ``segment`` eines Dimmers zu einem Weiss-Segment) und je Bereich
     ``range_from/to``/``name``/``kind`` uebernommen — und je MODUS seit FM-26
     die physische Rasterform (``grid_rows``/``grid_cols``/``white_rows``/
     ``white_cols``), damit ein ueber den Generator angelegtes Panel dieselbe
@@ -421,6 +440,10 @@ def create_user_profile(payload: dict, *, engine=None) -> int:
                     highlight_value=int(ch.get("highlight_value", 255)),
                     invert=bool(ch.get("invert", False)),
                     resolution=ch.get("resolution", "8bit") or "8bit",
+                    # FM-46: Zuordnung Dimmer -> Weiss-Segment (0-basiert).
+                    # Fehlt der Schluessel (aeltere Payloads, Handbau), ist
+                    # das „keine Zuordnung" — dasselbe wie NULL.
+                    segment=segment_wert(ch.get("segment")),
                 )
                 s.add(fc)
                 s.flush()
