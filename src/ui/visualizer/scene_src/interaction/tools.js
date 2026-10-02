@@ -361,6 +361,13 @@ export function selectionPulseActive() { return Date.now() < _pulseUntil; }
 // pruefen. Reiner Deadline-Reset, keine Szenen-Seiteneffekte.
 export function expireSelectionPulseForTest() { _pulseUntil = 0; }
 
+// XPLAT-37: Gegenstueck — das Fenster OFFEN halten, bis expireSelectionPulseForTest
+// es schliesst. Sonst endet es nach 1.5s ECHTZEIT: unter Last brauchten die
+// Messrunden des Tests laenger, das Fenster lief mittendrin von selbst ab, und
+// einer ihrer Ticks verbrauchte den Settle-Frame, den der Test danach pruefen
+// wollte („7 not greater than 7"). Reiner Deadline-Reset wie oben.
+export function holdSelectionPulseForTest() { _pulseUntil = Infinity; }
+
 // Pro-Frame-Modulation der Selektions-Ringe (aus app.js#perFrameUpdate, laeuft
 // jeden rAF-Tick). Mutiert NUR Material-Deckkraft IN PLACE — NIE view.selectedFids,
 // NIE updateOutlines(notify=true) (das waere ein Echo an Python -> Loop, s. 1b).
