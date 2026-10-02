@@ -19,6 +19,11 @@ dabei. Die Entscheidungen trifft der Projektinhaber.
 
 ### ★ Befund vorab: LightOS verteilt schon heute fremde Dateien ohne Lizenzhinweis
 
+> **Nachtrag 2026-10-02 (VIZ-66):** erledigt — die 19 QLC+-Dateien sind entfernt und durch
+> eigene, im Code erzeugte Geometrie ersetzt (Entscheidung Projektinhaber). Mit ihnen sind
+> `scene/model_loader.js`, `OBJLoader` und `ColladaLoader` entfallen. Der folgende Abschnitt
+> beschreibt den Stand vor dieser Änderung.
+
 Alle 19 Modelldateien unter `src/ui/visualizer/assets/models/` sind **byte-gleich** mit
 `resources/meshes/` aus QLC+ (SHA-256 einzeln verglichen am 2026-10-02):
 

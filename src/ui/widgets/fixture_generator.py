@@ -1670,10 +1670,15 @@ def model_from_qxf(path: str) -> GeneratorModel:
     fixture-weite, genau wie im Bibliotheks-Import.
 
     Was NICHT abgeleitet werden kann, ist die Weiss-Leiste (CDX-52): das
-    QLC+-Format kennt sie nicht (Begruendung an ``_physical_layout``)."""
+    QLC+-Format kennt sie nicht (Begruendung an ``_physical_layout``).
+
+    FM-46 (Etappe 3): die Zuordnung Dimmer -> Weiss-Segment
+    (``GenChannel.segment``) kommt aus ``<Head>``, wenn sie eindeutig ist —
+    dieselbe Funktion wie im Bibliotheks-Import."""
     import xml.etree.ElementTree as ET
     from src.core.database.qxf_import import (
-        QXF_NS, TYPE_MAP, _resolve_attribute, _tag, _physical_layout)
+        QXF_NS, TYPE_MAP, _resolve_attribute, _tag, _physical_layout,
+        kanal_nummern, segmente_aus_mode)
 
     tree = ET.parse(path)
     root = tree.getroot()
@@ -1728,13 +1733,24 @@ def model_from_qxf(path: str) -> GeneratorModel:
         for mode_el in mode_els:
             mname = mode_el.get("Name", "Standard")
             chans: list[GenChannel] = []
-            for ref in mode_el.findall(_tag("Channel")):
+            refs = mode_el.findall(_tag("Channel"))
+            # FM-46 (Etappe 3): <Head> nennt die QLC+-Nummer des Kanals. Die
+            # Nummern kommen aus DERSELBEN Funktion wie im Bibliotheks-Import
+            # (fehlende -> naechste freie, Kollision/ungueltig -> -1 = in
+            # keinem Kopf), sonst bekaemen beide Wege verschiedene Dimmer.
+            nummern = [n - 1 if n is not None else -1
+                       for n in kanal_nummern(refs, model_name, mname)]
+            for ref in refs:
                 nm = ref.text.strip() if ref.text else ""
                 el = channel_defs.get(nm)
                 if el is None:
                     chans.append(GenChannel(name=nm or "Kanal", attribute="raw"))
                 else:
                     chans.append(_build_channel(el, nm))
+            # FM-46 (Etappe 3): Dimmer -> Weiss-Segment aus <Head> — dieselbe
+            # Regel wie der Bibliotheks-Import (`segmente_aus_mode`).
+            for p, seg in segmente_aus_mode(mode_el, nummern, chans).items():
+                chans[p].segment = seg
             # Die eigene Angabe des Modus schlaegt die fixture-weite.
             # `(0, 0)` ist ein wahres Tupel — deshalb explizit vergleichen.
             mode_grid = _physical_layout(mode_el)

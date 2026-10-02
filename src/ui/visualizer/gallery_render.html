@@ -17,8 +17,6 @@
   #label { position: fixed; left: 12px; bottom: 10px; color: #cdd3dd; font: 15px system-ui, sans-serif; z-index: 9; }
 </style>
 <script src="three_local.js"></script>
-<script src="assets/OBJLoader.js"></script>
-<script src="assets/ColladaLoader.js"></script>
 </head>
 <body>
 <div id="err"></div>
@@ -86,7 +84,7 @@
         } catch (e) { window.__log.push(type + ': build-ERR ' + e.message); continue; }
         current = model;
         scene.add(model);
-        await sleep(2600);                      // async .dae-Overlays laden (bis ~62 KB, ColladaLoader-Parse)
+        await sleep(300);                       // VIZ-66: alles synchron gebaut, nur ein Frame Luft
         frame(model);
         renderer.render(scene, cam);
         const png = renderer.domElement.toDataURL('image/png');
