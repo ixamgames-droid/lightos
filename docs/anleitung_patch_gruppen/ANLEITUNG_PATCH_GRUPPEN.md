@@ -58,7 +58,8 @@ oben rechts (Felder **Spalten:** und **Zeilen:**) bestimmst du die Anordnung.
 **Wichtig — Speichern:** Geänderte Platzierungen und Rastergröße werden **nicht** automatisch
 persistiert. Klick zum Sichern auf **Speichern** (LightOS bestätigt mit *„Gruppe … gespeichert."*).
 Ungespeicherte Änderungen gehen **ohne Rückfrage** verloren, sobald du die Gruppe wechselst,
-**Umbenennen**, **Ordner…**, **+ Neu** oder **Bearbeiten…** benutzt oder sich der Patch ändert —
+**Umbenennen**, **Ordner…**, **+ Neu**, **⧉ Matrizen zusammenlegen…** oder **Bearbeiten…** benutzt
+oder sich der Patch ändert —
 also vorher **Speichern**. (**Bearbeiten…** speichert seine eigenen Änderungen sofort.)
 
 ![Fixture-Gruppe „Alle Mover" mit Raster](img/02_gruppen.png)
