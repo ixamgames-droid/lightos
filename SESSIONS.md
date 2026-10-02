@@ -20,6 +20,7 @@
 | FM-55 | C | docs/fm55-fixture-quellen | 2026-10-02T07:39Z | docs/recherche/fixture_quellen_2026-10.md · changelog.d/2026-10-02-FM-55.md · BACKLOG.md |
 | UI-70 | A | fix/ui70-leere-auswahl-programmer | 2026-10-02T07:57Z | src/ui/views/programmer_view.py · tools/anleitungsbilder |
 | TOOL-8 | A | fix/ui70-leere-auswahl-programmer | 2026-10-02T07:57Z | tools/anleitungsbilder |
+| PROC-18 | A | fix/proc18-fremd-lizenzhinweise | 2026-10-02T08:42Z | THIRD_PARTY_NOTICES.md · src/ui/visualizer/assets/models |
 
 ## Blocker & Fallen
 
@@ -78,7 +79,6 @@
 
 ## Verlauf
 
-- 2026-10-01T23:12Z A claim VIZ-65
 - 2026-10-01T23:27Z A done BPM-25
 - 2026-10-01T23:41Z A done DOC-19
 - 2026-10-01T23:55Z C done ENG-27
@@ -108,3 +108,4 @@
 - 2026-10-02T08:17Z A done DOC-20
 - 2026-10-02T08:17Z A done DOC-21
 - 2026-10-02T08:30Z C done TOOL-7
+- 2026-10-02T08:42Z A claim PROC-18
