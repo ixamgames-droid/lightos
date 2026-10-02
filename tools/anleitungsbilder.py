@@ -65,6 +65,51 @@ def _argumente(argv):
     return ap.parse_args(argv)
 
 
+def _je_anleitung_ein_prozess(args, auftraege, nur) -> int:
+    """TOOL-8: jede Anleitung in einem eigenen Unterprozess dieses Werkzeugs.
+
+    Der Unterprozess bekommt genau EINE Anleitung und laeuft damit den
+    gewohnten Einzelweg (eigene Sandbox, Selbstpruefung, Abgleich der echten
+    Datenorte). Anleitungen ohne eine der ``--nur``-Szenen werden ausgelassen.
+    Rueckgabe: der schlechteste Exit-Code (0 < 1 Szene nicht baubar < 2 Fehler
+    < 3 echte Datenorte veraendert).
+    """
+    import subprocess
+    import time
+    skript = os.path.abspath(__file__)
+    ausgabe = args.ausgabe
+    if ausgabe and not os.path.isabs(ausgabe):
+        ausgabe = os.path.abspath(os.path.join(sandbox.REPO, ausgabe))
+    code = 0
+    t0 = time.time()
+    for name, szenen, _ziel in auftraege:
+        eigene = sorted(s.name for s in szenen if s.name in nur) if nur else []
+        if nur and not eigene:
+            continue
+        befehl = [sys.executable, skript, name]
+        if args.pruefen:
+            befehl.append("--pruefen")
+        if ausgabe:
+            befehl += ["--ausgabe", ausgabe]
+        if args.behalten:
+            befehl.append("--behalten")
+        if eigene:
+            befehl += ["--nur", ",".join(eigene)]
+        print(f"[anleitungsbilder] == {name} (eigener Prozess) ==", flush=True)
+        t = time.time()
+        rc = subprocess.run(befehl, cwd=sandbox.REPO).returncode
+        print(f"[anleitungsbilder] {name}: Exit {rc} nach {time.time() - t:.1f} s",
+              flush=True)
+        code = max(code, rc if rc in (0, 1, 2, 3) else 2)
+    print(f"[anleitungsbilder] {len(auftraege)} Anleitung(en) in "
+          f"{time.time() - t0:.1f} s", flush=True)
+    if args.pruefen:
+        print("[anleitungsbilder] Pruefung gesamt: " + (
+            "alle Szenen baubar." if code == 0 else "NICHT alles baubar, s. o."),
+            flush=True)
+    return code
+
+
 def main(argv=None) -> int:
     args = _argumente(sys.argv[1:] if argv is None else argv)
     from anleitungsbilder import runner
@@ -95,6 +140,16 @@ def main(argv=None) -> int:
                     extra += f" [GIF, {len(s.frames)} Frames]"
                 print(f"  {s.name:<22} {s.titel}{extra}")
         return 0
+
+    # TOOL-8: mehrere Anleitungen -> je Anleitung ein eigener Prozess (frische
+    # Sandbox, frisches Hauptfenster, frische Demo-Show). Im selben Fenster
+    # nacheinander trug jede Anleitung den Zustand der vorigen weiter
+    # (Programmer-Auswahl, BPM 128, „Wiederholen" aktiv, Combo-Inhalte): die
+    # Bilder zeigten fremden Zustand, ``--pruefen`` meldete falsche
+    # Abweichungen. Ein Zuruecksetzen von Hand haette jeden neuen Zustand
+    # einzeln kennen muessen; der eigene Prozess vergisst nichts.
+    if len(auftraege) > 1:
+        return _je_anleitung_ein_prozess(args, auftraege, nur)
 
     # Echte Datenorte VOR der Umlenkung erfassen, danach nie wieder anfassen.
     orte = sandbox.echte_datenorte()
