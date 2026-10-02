@@ -51,6 +51,7 @@
 | DOC-48 | C | - | 2026-10-02T12:06Z | docs/anleitung_testshow_liveedit/ANLEITUNG_TESTSHOW_LIVEEDIT.md |
 | DOC-49 | C | - | 2026-10-02T12:07Z | docs/FARB_FX_VC_SHOW.md |
 | UI-71 | C | - | 2026-10-02T12:08Z | src/ui/widgets/controller_browser.py · tests/test_ui71_controller_vorlage_hinweis.py · tests/test_doc_removed_ui.py · BACKLOG.md · changelog.d/2026-10-02-UI-71.md |
+| DOC-50 | C | - | 2026-10-02T12:09Z | docs/LIVE_EDIT_FENSTER.md |
 
 ## Blocker & Fallen
 
@@ -118,7 +119,6 @@
 
 ## Verlauf
 
-- 2026-10-02T10:24Z C claim DOC-26
 - 2026-10-02T10:33Z C claim ENG-29
 - 2026-10-02T10:36Z C claim DOC-27
 - 2026-10-02T10:36Z C claim DOC-28
@@ -148,3 +148,4 @@
 - 2026-10-02T12:06Z C claim DOC-48
 - 2026-10-02T12:07Z C claim DOC-49
 - 2026-10-02T12:08Z C claim UI-71
+- 2026-10-02T12:09Z C claim DOC-50
