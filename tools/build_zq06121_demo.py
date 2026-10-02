@@ -39,7 +39,9 @@ from _builder import (build_and_verify, ShowBuilder, RgbAlgorithm,  # noqa: E402
                       ButtonAction, RunOrder)
 from src.core.engine.chaser import ChaserStep                     # noqa: E402
 
-OUT = "shows/ZQ06121 Demo.lshow"
+#: TOOL-6: ab Repo-Root, nicht ab Arbeitsverzeichnis.
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+OUT = os.path.join(_ROOT, "shows", "ZQ06121 Demo.lshow")
 
 # Davids echte Verkabelung — Enttec auf /dev/ttyUSB0 = Universum 3, Adresse 1.
 UNIVERSUM = 3

@@ -20,7 +20,13 @@ Aufruf:  venv/Scripts/python.exe tools/build_dimmer_farbe_combo.py
          (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 Erzeugt: shows/Dimmer_Farbe_Kombinieren.lshow  (selbst-verifizierend, headless)
 """
+import os
+
 from _builder import ShowBuilder, build_and_verify   # noqa: E402
+
+#: TOOL-6: ab Repo-Root, nicht ab Arbeitsverzeichnis.
+OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                   "shows", "Dimmer_Farbe_Kombinieren.lshow")
 
 b = ShowBuilder()
 PARS = b.patch("ZQ01424", count=8, channel_count=8, mode_name="8-Kanal RGBW")
@@ -94,5 +100,5 @@ b_stop.setGeometry(130, 384, 150, 64)
 b_black = b.button("BLACKOUT", "Blackout", bank=BANK)
 b_black.setGeometry(300, 384, 150, 64)
 
-build_and_verify(b, "shows/Dimmer_Farbe_Kombinieren.lshow",
+build_and_verify(b, OUT,
                  name="Dimmer + Farbe kombinieren")
