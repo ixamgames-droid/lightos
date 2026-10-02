@@ -19,6 +19,7 @@ die extern gepushte Auswahl NICHT zurueckechot (Loop-Brecher updateOutlines(fals
 """
 import json
 import os
+import re
 import time
 import unittest
 
@@ -35,6 +36,10 @@ _app = QApplication.instance() or QApplication([])
 
 _HTML_PATH = os.path.normpath(os.path.join(
     os.path.dirname(__file__), "..", "src", "ui", "visualizer", "stage_scene.html"))
+
+_TOOLS_JS = os.path.normpath(os.path.join(
+    os.path.dirname(__file__), "..", "src", "ui", "visualizer", "scene_src",
+    "interaction", "tools.js"))
 
 _LOAD_TIMEOUT_S = 40.0
 _POLL_TIMEOUT_S = 10.0
@@ -107,6 +112,17 @@ _FIXTURES_JSON = json.dumps(_FIXTURES)
 _POLL_FIXTURES = json.dumps({"fixtures": _FIXTURES_JSON})
 _POLL_FIXTURES_UND_AUSWAHL = json.dumps(
     {"fixtures": _FIXTURES_JSON, "selection": "[2, 4]"})
+
+
+def _pulsfenster_s():
+    """``SELECTION_PULSE_MS`` aus ``interaction/tools.js`` in Sekunden (XPLAT-37):
+    die Wartezeit im Settle-Test muss UEBER dem Fenster liegen, auch wenn es
+    jemand verlaengert."""
+    with open(_TOOLS_JS, encoding="utf-8") as fh:
+        treffer = re.search(r"const SELECTION_PULSE_MS = (\d+);", fh.read())
+    assert treffer, "SELECTION_PULSE_MS nicht mehr in interaction/tools.js"
+    return int(treffer.group(1)) / 1000.0
+
 
 # tools.js: Basis-Deckkraft der beiden Auswahl-Ringe (der Identify-Puls
 # moduliert sie mit k in [0.25, 1.0] — deshalb wird auf > 0 geprueft, nicht auf
@@ -374,7 +390,14 @@ class ExternalSelectionSceneTest(unittest.TestCase):
         Basis-Deckkraft GENAU EINMAL gerendert werden — sonst friert der Auswahl-
         Ring bei einer gedimmten Puls-Deckkraft ein (in statischer Szene rendert
         das Gate sonst nicht mehr). Deterministisch via Test-Seam
-        __expireSelectionPulse (kein 1.5s-Echtzeit-Warten, kein rAF-Race)."""
+        __expireSelectionPulse (kein 1.5s-Echtzeit-Warten, kein rAF-Race).
+
+        XPLAT-37: unter Last war der Test rot („7 not greater than 7"). Das
+        Fenster endete nach 1,5 s ECHTZEIT, die Messrunden unten brauchten
+        laenger, und einer ihrer Ticks verbrauchte den Settle-Frame, bevor er
+        gemessen wurde. Jetzt haelt ``__holdSelectionPulse`` das Fenster offen,
+        bis ``__expireSelectionPulse`` es schliesst — und der Test wartet mit
+        Absicht LAENGER als das Fenster, wie ein langsamer Rechner."""
         self._load_and_wait()
         self._poll_until_true("!!window.__lightosAppReady")
         self._geraete_aufbauen()   # ★ ohne Geraete gibt es keinen Ring zum Einfrieren
@@ -383,6 +406,10 @@ class ExternalSelectionSceneTest(unittest.TestCase):
         # Auswahl pushen -> Flash aktiv.
         self._bridge_obj._poll_payload = _POLL_FIXTURES_UND_AUSWAHL
         self._poll_until_true("window.__lightos.renderStats().live === true", timeout_s=8.0)
+        # ★ XPLAT-37: offen halten, dann laenger warten als das Fenster dauert.
+        # Ohne den Seam ist der Puls danach vorbei und die Pruefungen unten rot.
+        self._eval("window.__lightos.__holdSelectionPulse(); true")
+        _pump(_pulsfenster_s() + 0.3)
         # Einmal ticken, damit der Puls laeuft (_pulseDirty=true, Ringe verstellt).
         self._tick()
         self.assertTrue(self._stats()["live"], "Flash sollte noch aktiv sein")
