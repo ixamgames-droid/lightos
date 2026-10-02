@@ -66,6 +66,7 @@
 | OUT-59 | B | fix/out59-waisen-windows | 2026-10-02T22:17Z | src/core/dmx/serial_process.py · tests/test_out59_waisen_windows.py · BACKLOG.md |
 | OUT-60 | B | fix/out60-load-null-frame | 2026-10-02T22:22Z | src/core/show/show_file.py · src/core/app_state.py · tests/test_out60_load_kein_null_frame.py · BACKLOG.md |
 | FM-59 | A | feat/fm59-bibliothek-runde3 | 2026-10-02T22:24Z | fixtures/bibliothek |
+| UI-72-73-FIX | B | fix/ui72-ui73-playback | 2026-10-02T22:44Z | src/ui/views/playback_view.py · src/core/cueliste_ziel.py · tests/test_ui72_ui73_playback.py |
 
 ## Blocker & Fallen
 
@@ -155,7 +156,6 @@
 
 ## Verlauf
 
-- 2026-10-02T12:51Z C claim OUT-58
 - 2026-10-02T12:53Z B claim XPLAT-45
 - 2026-10-02T12:53Z C claim VCB-35
 - 2026-10-02T12:53Z C claim WEB-06
@@ -185,3 +185,4 @@
 - 2026-10-02T22:22Z B claim OUT-60
 - 2026-10-02T22:24Z A claim FM-59
 - 2026-10-02T22:32Z A done FM-57
+- 2026-10-02T22:44Z B claim UI-72-73-FIX
