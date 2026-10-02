@@ -1112,6 +1112,8 @@ class RgbMatrixInstance(Function):
             return
         inten = max(0.0, min(1.0, float(self.intensity)))
         _eigen_cache: dict[int, bool] = {}
+        # FM-54: Geraete, deren Dimmer die Farbschleife dieser Matrix treibt.
+        _farb_fids = {f for f in (self.fixture_grid or ()) if f is not None}
         for idx, eintrag in enumerate(self.weiss_grid):
             # Dieselbe strenge Form wie in `function_manager.affected_fids`:
             # ein missgeformter Eintrag darf die Schleife nicht abreissen —
@@ -1170,9 +1172,23 @@ class RgbMatrixInstance(Function):
             # Weiss-Segment aber schon bei 127 und wurde danach nochmal halbiert
             # — acht Segmente auf einem Viertel, waehrend die 48 Farbzonen
             # desselben Geraets im selben Frame korrekt auf der Haelfte standen.
+            #
+            # ★ FM-54: „treibt die Matrix den Dimmer" heisst nicht schon
+            # `drive_intensity`. Bei einem Geraet mit ZWEI `intensity`-Kanaelen
+            # liefert `channels_for_axis` keinen Dimmer fuer das Weiss-Segment
+            # (welcher es dimmt, steht nicht in der Kanalliste) — die Matrix
+            # schrieb dann keinen, der Merge skaliert bei Geraeten mit Dimmer
+            # nur Dimmer-Adressen, und das Segment blieb bei Master 0,5 auf 255.
+            # Gedimmt wird hier also, sobald die Matrix an DIESEM Geraet keinen
+            # Dimmer treibt: weder ueber die Projektion noch ueber eigene
+            # Farbzellen (die ziehen bei `drive_intensity` die Dimmer auf).
             _hat_dimmer = any((c.attribute or "").lower()
                               in ("intensity", "dimmer", "master") for c in chans)
-            _skalieren = _hat_dimmer and not self.drive_intensity and inten < 0.999
+            _treibt_dimmer = self.drive_intensity and (
+                fid in _farb_fids
+                or any((a or "").lower() in ("intensity", "dimmer", "master")
+                       for a in proj))
+            _skalieren = _hat_dimmer and not _treibt_dimmer and inten < 0.999
             for attr, ch in proj.items():
                 a = (attr or "").lower()
                 if a == "color_w":
