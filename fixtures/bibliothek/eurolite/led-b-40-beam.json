@@ -1,0 +1,81 @@
+{
+  "format_version": 1,
+  "hersteller": "Eurolite",
+  "hersteller_kurz": "Eurolite",
+  "modell": "LED B-40 Beam",
+  "kurzname": "LED B-40 Beam",
+  "typ": "other",
+  "leistung_w": 30,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Eurolite-LED-B-40-Beam.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Eurolite/Eurolite-LED-B-40-Beam.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.3 GIT · Henrik Bauer",
+    "original": "resources/fixtures/Eurolite/Eurolite-LED-B-40-Beam.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 17 Wertebereiche mit Art (kind) versehen; typ moving_head -> other (Beam-Effekt mit Endlosrotation, keine Positionierung); Kanal 1 'Pan/Rotation' pan -> speed (Rotationsrichtung/-tempo, keine Position), Default 0 = keine Rotation; Farbkanal: 0-31 als 'closed' (aus), R+G+B als 'color'; Strobe-Default/Highlight 0 (offen)"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Datei und die LightOS-Attributliste geprueft (Attribute, Bereichs-Arten, Defaults, Raster); Herstellerhandbuch mit DMX-Tabelle war nicht abrufbar (Steinigke liefert nur Datenblaetter ohne DMX-Protokoll), daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "4 channel",
+      "kanaele": [
+        {
+          "name": "Rotation",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No rotation", "art": ""},
+            {"von": 10, "bis": 127, "name": "Backwards PAN-rotation with decreasing speed", "art": "rotate"},
+            {"von": 128, "bis": 137, "name": "No rotation", "art": ""},
+            {"von": 138, "bis": 255, "name": "Forwards PAN-rotation with increasing speed", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "LED colours",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "Aus", "art": "closed"},
+            {"von": 32, "bis": 63, "name": "Red", "art": "color"},
+            {"von": 64, "bis": 95, "name": "Green", "art": "color"},
+            {"von": 96, "bis": 127, "name": "Blue", "art": "color"},
+            {"von": 128, "bis": 159, "name": "Red + Green", "art": "color"},
+            {"von": 160, "bis": 191, "name": "Red + Blue", "art": "color"},
+            {"von": 192, "bis": 223, "name": "Green + Blue", "art": "color"},
+            {"von": 224, "bis": 255, "name": "Red + Green + Blue", "art": "color"}
+          ]
+        },
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe-effect with increasing speed", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Internal program",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "No function", "art": ""},
+            {"von": 11, "bis": 249, "name": "Internal program", "art": ""},
+            {"von": 250, "bis": 255, "name": "Sound mode", "art": "sound"}
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,195 @@
+{
+  "format_version": 1,
+  "hersteller": "Eurolite",
+  "hersteller_kurz": "Eurolite",
+  "modell": "LED TMH-X4",
+  "kurzname": "LED TMH-X4",
+  "typ": "moving_head",
+  "leistung_w": 225,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Eurolite-LED-TMH-X4.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Eurolite/Eurolite-LED-TMH-X4.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.8 GIT · Tolmino Muccitelli",
+    "original": "resources/fixtures/Eurolite/Eurolite-LED-TMH-X4.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 32 Wertebereiche mit Art (kind) versehen; Pan/Tilt-Fein-Kanaele umbenannt; Strobe-Default/Highlight auf 0 (= kein Strobe, offen); Farbvoreinstellungs-Bereich und 'preset colors' im Funktionskanal: Art 'reset' entfernt (war falsch, kein Reset); Farbmakro-Geschwindigkeit speed -> effect_speed (nicht Pan/Tilt-Speed); Funktionskanal 'music control' als sound markiert; 24-Kanal-Modus: Raster 1x3 fuer die drei einzeln ansteuerbaren LED-Segmente"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Datei und die LightOS-Attributliste geprueft (Attribute, Bereichs-Arten, Defaults, Raster); Herstellerhandbuch mit DMX-Tabelle war nicht abrufbar (Steinigke liefert nur Datenblaetter ohne DMX-Protokoll), daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "16 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fein", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fein", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Pan/Tilt Speed",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "no function", "art": ""},
+            {"von": 1, "bis": 212, "name": "decreasing speed", "art": ""},
+            {"von": 213, "bis": 255, "name": "no function", "art": ""}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 3, "name": "no function", "art": "open"},
+            {"von": 4, "bis": 95, "name": "strobe with increasing speed", "art": "strobe"},
+            {"von": 96, "bis": 176, "name": "random strobe effect", "art": "strobe"},
+            {"von": 177, "bis": 255, "name": "pulse effect in sequence (Thunder strobe)", "art": "strobe"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Zoom", "attribut": "zoom", "default": 0, "highlight": 0},
+        {
+          "name": "Preset colors and macros",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Preset colors and color macros", "art": ""}
+          ]
+        },
+        {
+          "name": "Color Macros Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Decreasing speed", "art": ""}
+          ]
+        },
+        {
+          "name": "Function Control",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 49, "name": "channel 1 to 12", "art": ""},
+            {"von": 50, "bis": 99, "name": "preset colors and colors macros", "art": ""},
+            {"von": 100, "bis": 149, "name": "internal program 1", "art": ""},
+            {"von": 150, "bis": 199, "name": "internal program 2", "art": ""},
+            {"von": 200, "bis": 255, "name": "music control", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 250, "name": "no function", "art": ""},
+            {"von": 251, "bis": 255, "name": "reset", "art": "reset"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "24 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fein", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fein", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Pan/Tilt Speed",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "no function", "art": ""},
+            {"von": 1, "bis": 212, "name": "decreasing speed", "art": ""},
+            {"von": 213, "bis": 255, "name": "no function", "art": ""}
+          ]
+        },
+        {"name": "Zoom", "attribut": "zoom", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 3, "name": "no function", "art": "open"},
+            {"von": 4, "bis": 95, "name": "strobe with increasing speed", "art": "strobe"},
+            {"von": 96, "bis": 176, "name": "random strobe effect", "art": "strobe"},
+            {"von": 177, "bis": 255, "name": "pulse effect in sequence (Thunder strobe)", "art": "strobe"}
+          ]
+        },
+        {"name": "Red 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 3", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Preset colors and macros",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Preset colors and color macros", "art": ""}
+          ]
+        },
+        {
+          "name": "Color Macros Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Decreasing speed", "art": ""}
+          ]
+        },
+        {
+          "name": "Function Control",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 49, "name": "channel 1 to 12", "art": ""},
+            {"von": 50, "bis": 99, "name": "preset colors and colors macros", "art": ""},
+            {"von": 100, "bis": 149, "name": "internal program 1", "art": ""},
+            {"von": 150, "bis": 199, "name": "internal program 2", "art": ""},
+            {"von": 200, "bis": 255, "name": "music control", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 250, "name": "no function", "art": ""},
+            {"von": 251, "bis": 255, "name": "reset", "art": "reset"}
+          ]
+        }
+      ],
+      "raster": {"rows": 1, "cols": 3}
+    }
+  ],
+  "notizen": "19x15 W RGBW, 3 Segmente (Ringe) im 24-Kanal-Modus; Zoom 1-40 Grad."
+}

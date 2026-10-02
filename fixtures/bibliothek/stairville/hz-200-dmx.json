@@ -1,0 +1,51 @@
+{
+  "format_version": 1,
+  "hersteller": "Stairville",
+  "hersteller_kurz": "STAIR",
+  "modell": "Hz-200 DMX",
+  "kurzname": "HZ200",
+  "typ": "hazer",
+  "leistung_w": 615,
+  "quelle": {
+    "titel": "Stairville Hz-200 Compact Hazer DMX, User Manual (Thomann, Art. 326263, v7)",
+    "url": "https://fast-images.static-thomann.de/pics/atg/atgdata/document/manual/326263_c_326263_v7_en_online.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.8.2 · Hadley Denton",
+    "original": "resources/fixtures/Stairville/Stairville-Hz-200-DMX.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 2 Wertebereiche mit Art (kind) versehen; Kanal 1 'Haze' → 'Dunst' mit Attribut dimmer statt intensity, Highlight 0; Kanal 2 'Fan Speed' → 'Luefter' mit Attribut fan statt speed (eigener Regler, nicht vom Grand-Master skaliert); Modus 'Default' → '2-Kanal'; Bereichsnamen deutsch; Kurzname HZ200; hersteller_kurz STAIR; Quelle auf Herstellerhandbuch gesetzt"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal fuer Kanal gegen das Handbuch (Kap. 7.3 DMX functions: Kanal 1 Dunstmenge, Kanal 2 Luefter, je 0…255 = 0…100 %) geprueft"
+  },
+  "modi": [
+    {
+      "name": "2-Kanal",
+      "kanaele": [
+        {
+          "name": "Dunst",
+          "attribut": "dimmer",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dunstmenge 0 % → 100 %"}
+          ]
+        },
+        {
+          "name": "Luefter",
+          "attribut": "fan",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Luefter 0 % → 100 %"}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Compact Hazer 615 W, 2 DMX-Kanaele (Adresse per DIP-Schalter). Highlight bewusst 0."
+}

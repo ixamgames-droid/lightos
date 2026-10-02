@@ -1,0 +1,141 @@
+{
+  "format_version": 1,
+  "hersteller": "BeamZ",
+  "hersteller_kurz": "BEAMZ",
+  "modell": "BBP96 Uplight PAR",
+  "kurzname": "BBP96",
+  "typ": "par",
+  "leistung_w": 72,
+  "quelle": {
+    "titel": "BeamZ BBP96 Uplight Par RGBWA-UV 6x12W - Bedienungsanleitung (Ref. 150.592)",
+    "version": "V2.2",
+    "url": "https://www.beamzlighting.com/wp-content/uploads/2026/03/150.592-BBP96-Uplight-Par-RGBWA-UV-6x12W_manual_V2.2.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.14.0 GIT · Jan Fries",
+    "original": "resources/fixtures/beamZ/beamZ-BBP96-Uplight-PAR.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 15 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): Herstellername 'beamZ' -> 'BeamZ'; kurzname BBP96; Modus '10 Channel' nach Handbuch 150.592 V2.2 neu belegt (Dimmer, R, G, B, W, A, UV, Strobe, Programm, Programm-Tempo; Programm-Bereiche 0-8/9-50/51-100/101-150/151-200/201-220/221-240/241-255 nach Handbuch); bisherige QLC+-Belegung (Strobe auf Kanal 2) als Modus '10 Channel (aeltere Version)' erhalten; Strobe als Attribut strobe statt shutter (kein Offen-Bereich im Handbuch); Programm-Tempo als effect_speed statt speed; Farbprogramm-Bereiche ohne art color (keine Farbrad-Farben), Sound-Bereiche als sound; Kanalnamen deutsch, Modusbeschreibungen ergaenzt"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": false,
+    "wie": "Modi '10 Channel' und '6 Channel' Kanal fuer Kanal gegen das Herstellerhandbuch 150.592 V2.2 geprueft; Modus '10 Channel (aeltere Version)' nur aus QLC+ (Kanalreihenfolge per Handbuch 150.589 auf manualslib bestaetigt, Programm-Bereiche nicht) - daher nicht vollstaendig geprueft"
+  },
+  "modi": [
+    {
+      "name": "10 Channel",
+      "beschreibung": "10 Kanaele laut Handbuch 150.592 V2.2 (aktuelle Geraete)",
+      "kanaele": [
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "strobe",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Strobe langsam -> schnell (Handbuch: 000-255)", "art": ""}
+          ]
+        },
+        {
+          "name": "Programm",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 8, "name": "Keine Funktion", "art": ""},
+            {"von": 9, "bis": 50, "name": "Farbauswahl (Farbe ueber Kanal 10)", "art": ""},
+            {"von": 51, "bis": 100, "name": "Farbuebergang (Fade)", "art": ""},
+            {"von": 101, "bis": 150, "name": "Farbsprung", "art": ""},
+            {"von": 151, "bis": 200, "name": "Farbpuls", "art": ""},
+            {"von": 201, "bis": 220, "name": "Sound 1", "art": "sound"},
+            {"von": 221, "bis": 240, "name": "Sound 2", "art": "sound"},
+            {"von": 241, "bis": 255, "name": "Sound 3", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Programm-Tempo",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "langsam -> schnell", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6 Channel",
+      "beschreibung": "6 Kanaele RGBWA+UV (Handbuch und QLC+ gleich)",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "10 Channel (aeltere Version)",
+      "beschreibung": "Belegung der aelteren Geraete (Ref. 150.589) laut QLC+: Strobe auf Kanal 2",
+      "kanaele": [
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "strobe",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Strobe langsam -> schnell (Handbuch: 000-255)", "art": ""}
+          ]
+        },
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {
+          "name": "Programm",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": ""},
+            {"von": 10, "bis": 29, "name": "Color mixing selection", "art": ""},
+            {"von": 30, "bis": 49, "name": "Color auto run", "art": ""},
+            {"von": 50, "bis": 69, "name": "Color gradient", "art": ""},
+            {"von": 70, "bis": 89, "name": "Color mutation", "art": ""},
+            {"von": 90, "bis": 109, "name": "Strobe + Red color", "art": ""},
+            {"von": 110, "bis": 129, "name": "Strobe + Green color", "art": ""},
+            {"von": 130, "bis": 149, "name": "Strobe + Blue color", "art": ""},
+            {"von": 150, "bis": 169, "name": "Strobe + Amber color", "art": ""},
+            {"von": 170, "bis": 189, "name": "Strobe + UV color", "art": ""},
+            {"von": 190, "bis": 209, "name": "No function", "art": ""},
+            {"von": 210, "bis": 229, "name": "Sound 1", "art": "sound"},
+            {"von": 230, "bis": 249, "name": "Sound 2", "art": "sound"},
+            {"von": 250, "bis": 255, "name": "Sound 3", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Programm-Tempo",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "langsam -> schnell", "art": ""}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Akku-Uplight 6x12W RGBWA-UV. Das aktuelle Handbuch (V2.2) legt Strobe auf Kanal 8; die QLC+-Datei beschreibt die aeltere Firmware mit Strobe auf Kanal 2 (eigener Modus '(aeltere Version)'). Strobe-Kanal laut Handbuch 000-255 langsam->schnell ohne Aus-Bereich; Default 0."
+}

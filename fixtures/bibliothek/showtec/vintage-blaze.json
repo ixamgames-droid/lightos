@@ -1,0 +1,170 @@
+{
+  "format_version": 1,
+  "hersteller": "Showtec",
+  "hersteller_kurz": "Showtec",
+  "modell": "Vintage Blaze",
+  "kurzname": "VINTBLAZE",
+  "typ": "par",
+  "leistung_w": 760,
+  "notizen": "Gluehlampe plus RGB-LED-Hintergrund (Leiste und Mitte). Ohne Handbuch nachbearbeitet.",
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Showtec-Vintage-Blaze.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Showtec/Showtec-Vintage-Blaze.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.0 GIT · Piotr Nowik",
+    "original": "resources/fixtures/Showtec/Showtec-Vintage-Blaze.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 76 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): kurzname VINTBLAZE; Strobe-Defaults 0 (Bereich 'keine Funktion' = offen); zweiter Strobe (LED-Mitte) als strobe statt zweitem shutter; Gluehlampen-Kanal benannt"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "aus QLC+ konvertiert und von LightOS nach Kanalnamen/Bereichen nachbearbeitet; kein Herstellerhandbuch verfuegbar (Hersteller-Website hinter Bot-Sperre) — nicht Kanal fuer Kanal gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "1 Channel",
+      "kanaele": [
+        {"name": "Gluehlampe (Warmweiss)", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "2 Channel",
+      "kanaele": [
+        {"name": "Gluehlampe (Warmweiss)", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Preset colors All LEDs",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Keine Funktion", "art": ""},
+            {"von": 5, "bis": 11, "name": "Color 1", "art": "color"},
+            {"von": 12, "bis": 18, "name": "Color 2", "art": "color"},
+            {"von": 19, "bis": 25, "name": "Color 3", "art": "color"},
+            {"von": 26, "bis": 32, "name": "Color 4", "art": "color"},
+            {"von": 33, "bis": 39, "name": "Color 5", "art": "color"},
+            {"von": 40, "bis": 46, "name": "Color 6", "art": "color"},
+            {"von": 47, "bis": 53, "name": "Color 7", "art": "color"},
+            {"von": 54, "bis": 60, "name": "Color 8", "art": "color"},
+            {"von": 61, "bis": 67, "name": "Color 9", "art": "color"},
+            {"von": 68, "bis": 74, "name": "Color 10", "art": "color"},
+            {"von": 75, "bis": 81, "name": "Color 11", "art": "color"},
+            {"von": 82, "bis": 88, "name": "Color 12", "art": "color"},
+            {"von": 89, "bis": 95, "name": "Color 13", "art": "color"},
+            {"von": 96, "bis": 102, "name": "Color 14", "art": "color"},
+            {"von": 103, "bis": 109, "name": "Color 15", "art": "color"},
+            {"von": 110, "bis": 116, "name": "Color 16", "art": "color"},
+            {"von": 117, "bis": 123, "name": "Color 17", "art": "color"},
+            {"von": 124, "bis": 130, "name": "Color 18", "art": "color"},
+            {"von": 131, "bis": 137, "name": "Color 19", "art": "color"},
+            {"von": 138, "bis": 144, "name": "Color 20", "art": "color"},
+            {"von": 145, "bis": 151, "name": "Color 21", "art": "color"},
+            {"von": 152, "bis": 158, "name": "Color 22", "art": "color"},
+            {"von": 159, "bis": 165, "name": "Color 23", "art": "color"},
+            {"von": 166, "bis": 172, "name": "Color 24", "art": "color"},
+            {"von": 173, "bis": 179, "name": "Color 25", "art": "color"},
+            {"von": 180, "bis": 186, "name": "Color 26", "art": "color"},
+            {"von": 187, "bis": 193, "name": "Color 27", "art": "color"},
+            {"von": 194, "bis": 200, "name": "Color 28", "art": "color"},
+            {"von": 201, "bis": 207, "name": "Color 29", "art": "color"},
+            {"von": 208, "bis": 214, "name": "Color 30", "art": "color"},
+            {"von": 215, "bis": 221, "name": "Color 31", "art": "color"},
+            {"von": 222, "bis": 227, "name": "Color 32", "art": "color"},
+            {"von": 228, "bis": 234, "name": "Color 33", "art": "color"},
+            {"von": 235, "bis": 241, "name": "Color 34", "art": "color"},
+            {"von": 242, "bis": 255, "name": "Color 35", "art": "color"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4 Channel",
+      "kanaele": [
+        {"name": "Gluehlampe (Warmweiss)", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red LED strip", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green LED strip", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue LED strip", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "11 Channel",
+      "kanaele": [
+        {"name": "Gluehlampe (Warmweiss)", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red LED strip", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green LED strip", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue LED strip", "attribut": "color_b", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe LED strip",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 3, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 4, "bis": 255, "name": "Strobe langsam -> schnell", "art": "strobe"}
+          ]
+        },
+        {"name": "Red LED center", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green LED center", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue LED center", "attribut": "color_b", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe LED center",
+          "attribut": "strobe",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 3, "name": "Kein Strobe"},
+            {"von": 4, "bis": 255, "name": "Strobe langsam -> schnell", "art": "strobe"}
+          ]
+        },
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Preset colors All LEDs",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Keine Funktion", "art": ""},
+            {"von": 5, "bis": 11, "name": "Color 1", "art": "color"},
+            {"von": 12, "bis": 18, "name": "Color 2", "art": "color"},
+            {"von": 19, "bis": 25, "name": "Color 3", "art": "color"},
+            {"von": 26, "bis": 32, "name": "Color 4", "art": "color"},
+            {"von": 33, "bis": 39, "name": "Color 5", "art": "color"},
+            {"von": 40, "bis": 46, "name": "Color 6", "art": "color"},
+            {"von": 47, "bis": 53, "name": "Color 7", "art": "color"},
+            {"von": 54, "bis": 60, "name": "Color 8", "art": "color"},
+            {"von": 61, "bis": 67, "name": "Color 9", "art": "color"},
+            {"von": 68, "bis": 74, "name": "Color 10", "art": "color"},
+            {"von": 75, "bis": 81, "name": "Color 11", "art": "color"},
+            {"von": 82, "bis": 88, "name": "Color 12", "art": "color"},
+            {"von": 89, "bis": 95, "name": "Color 13", "art": "color"},
+            {"von": 96, "bis": 102, "name": "Color 14", "art": "color"},
+            {"von": 103, "bis": 109, "name": "Color 15", "art": "color"},
+            {"von": 110, "bis": 116, "name": "Color 16", "art": "color"},
+            {"von": 117, "bis": 123, "name": "Color 17", "art": "color"},
+            {"von": 124, "bis": 130, "name": "Color 18", "art": "color"},
+            {"von": 131, "bis": 137, "name": "Color 19", "art": "color"},
+            {"von": 138, "bis": 144, "name": "Color 20", "art": "color"},
+            {"von": 145, "bis": 151, "name": "Color 21", "art": "color"},
+            {"von": 152, "bis": 158, "name": "Color 22", "art": "color"},
+            {"von": 159, "bis": 165, "name": "Color 23", "art": "color"},
+            {"von": 166, "bis": 172, "name": "Color 24", "art": "color"},
+            {"von": 173, "bis": 179, "name": "Color 25", "art": "color"},
+            {"von": 180, "bis": 186, "name": "Color 26", "art": "color"},
+            {"von": 187, "bis": 193, "name": "Color 27", "art": "color"},
+            {"von": 194, "bis": 200, "name": "Color 28", "art": "color"},
+            {"von": 201, "bis": 207, "name": "Color 29", "art": "color"},
+            {"von": 208, "bis": 214, "name": "Color 30", "art": "color"},
+            {"von": 215, "bis": 221, "name": "Color 31", "art": "color"},
+            {"von": 222, "bis": 227, "name": "Color 32", "art": "color"},
+            {"von": 228, "bis": 234, "name": "Color 33", "art": "color"},
+            {"von": 235, "bis": 241, "name": "Color 34", "art": "color"},
+            {"von": 242, "bis": 255, "name": "Color 35", "art": "color"}
+          ]
+        }
+      ]
+    }
+  ]
+}

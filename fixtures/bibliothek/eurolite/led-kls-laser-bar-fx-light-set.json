@@ -1,0 +1,395 @@
+{
+  "format_version": 1,
+  "hersteller": "Eurolite",
+  "hersteller_kurz": "Eurolite",
+  "modell": "LED KLS Laser Bar FX Light Set",
+  "kurzname": "LED KLS Laser Bar FX Light Set",
+  "typ": "other",
+  "leistung_w": 50,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Eurolite-LED-KLS-Laser-Bar-FX-Light-Set.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Eurolite/Eurolite-LED-KLS-Laser-Bar-FX-Light-Set.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.1 GIT · Daniel Schauder",
+    "original": "resources/fixtures/Eurolite/Eurolite-LED-KLS-Laser-Bar-FX-Light-Set.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 102 Wertebereiche mit Art (kind) versehen; Rasterform in 4 Modus/Modi aus <Physical> uebernommen; Modus-Kanal: Blackout 'closed', Sound-Modi 'sound' statt 'strobe'; Dimmer/Strobe der Derbys/Spots: Dimmerbereich und 'All colors on' als 'open', Sound-Strobe als 'sound'; Rotationskanaele (Derbys, Laser) macro -> speed, 'No rotation' ohne Art; Laser rot/gruen macro -> raw mit aus='closed', an='open', Strobe='strobe'; Strobe-LEDs: aus='closed' (war 'strobe'), an='open', Default/Highlight 0; Derby 1/4 Helligkeit/Sound macro -> intensity, Derby Strobe/Rotation und Spot-Rotation macro -> raw; Spot-Strobe 0-9 als 'open'"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Datei und die LightOS-Attributliste geprueft (Attribute, Bereichs-Arten, Defaults, Raster); Herstellerhandbuch mit DMX-Tabelle war nicht abrufbar (Steinigke liefert nur Datenblaetter ohne DMX-Protokoll), daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "3 Channels",
+      "raster": {"rows": 2, "cols": 4},
+      "kanaele": [
+        {
+          "name": "Blackout, Automatic Mode and Sound-Controlled Mode",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Blackout", "art": "closed"},
+            {"von": 10, "bis": 31, "name": "Automatic mode spots and derbies (APxx)", "art": ""},
+            {"von": 32, "bis": 65, "name": "Automatic mode laser (AL0x)", "art": ""},
+            {"von": 66, "bis": 95, "name": "Automatic mode strobe LEDs (AFxx)", "art": ""},
+            {"von": 96, "bis": 127, "name": "Automatic mode derbies, spots, laser and strobe LEDs (AM0x)", "art": ""},
+            {"von": 128, "bis": 159, "name": "Sound-controlled mode spots and derbies (SPxx)", "art": "sound"},
+            {"von": 160, "bis": 191, "name": "Sound-controlled mode laser (SL0x)", "art": "sound"},
+            {"von": 192, "bis": 223, "name": "Sound-controlled mode strobe LEDs (SFxx)", "art": "sound"},
+            {
+              "von": 224,
+              "bis": 255,
+              "name": "Sound-controlled mode derbies, spots, laser and strobe LEDs (SM0x)",
+              "art": "sound"
+            }
+          ]
+        },
+        {
+          "name": "Program Selection for Channel 1",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "xP01/xL01/xF01/xM01", "art": ""},
+            {"von": 10, "bis": 14, "name": "xP02/xL01/xF01/xM01", "art": ""},
+            {"von": 15, "bis": 19, "name": "xP02/xL01/xF02/xM01", "art": ""},
+            {"von": 20, "bis": 29, "name": "xP03/xL01/xF02/xM02", "art": ""},
+            {"von": 30, "bis": 39, "name": "xP04/xL01/xF03/xM02", "art": ""},
+            {"von": 40, "bis": 44, "name": "xP05/xL02/xF03/xM03", "art": ""},
+            {"von": 45, "bis": 49, "name": "xP05/xL02/xF04/xM03", "art": ""},
+            {"von": 50, "bis": 59, "name": "xP06/xL02/xF04/xM03", "art": ""},
+            {"von": 60, "bis": 69, "name": "xP07/xL02/xF05/xM03", "art": ""},
+            {"von": 70, "bis": 74, "name": "xP08/xL02/xF05/xM03", "art": ""},
+            {"von": 75, "bis": 79, "name": "xP08/xL02/xF06/xM03", "art": ""},
+            {"von": 80, "bis": 89, "name": "xP09/xL03/xF06/xM03", "art": ""},
+            {"von": 90, "bis": 99, "name": "xP10/xL03/xF07/xM03", "art": ""},
+            {"von": 100, "bis": 104, "name": "xP11/xL03/xF07/xM03", "art": ""},
+            {"von": 105, "bis": 109, "name": "xP11/xL03/xF08/xM03", "art": ""},
+            {"von": 110, "bis": 119, "name": "xP12/xL03/xF08/xM03", "art": ""},
+            {"von": 120, "bis": 129, "name": "xP13/xL04/xF09/xM03", "art": ""},
+            {"von": 130, "bis": 134, "name": "xP14/xL04/xF09/xM03", "art": ""},
+            {"von": 135, "bis": 139, "name": "xP14/xL04/xF10/xM03", "art": ""},
+            {"von": 140, "bis": 149, "name": "xP15/xL05/xF10/xM03", "art": ""},
+            {"von": 150, "bis": 159, "name": "xP16/xL05/xF10/xM03", "art": ""},
+            {"von": 160, "bis": 169, "name": "xP17/xL06/xF10/xM03", "art": ""},
+            {"von": 170, "bis": 255, "name": "xP18/xL06/xF10/xM03", "art": ""}
+          ]
+        },
+        {
+          "name": "Running Speed (for Channel 1: 010-127)",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Running speed slow → fast", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5 Channels",
+      "raster": {"rows": 2, "cols": 4},
+      "kanaele": [
+        {"name": "Derbies and Spots: Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Derbies and Spots: Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Derbies and Spots: Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {
+          "name": "Derbies and Spots: Dimmer/ Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 191, "name": "Master dimmer 0-100 %", "art": "open"},
+            {"von": 192, "bis": 200, "name": "Sound-controlled strobe effect", "art": "sound"},
+            {"von": 201, "bis": 249, "name": "Strobe effect slow → fast (30 Hz)", "art": "strobe"},
+            {"von": 250, "bis": 255, "name": "All colors on", "art": "open"}
+          ]
+        },
+        {
+          "name": "Derbies and Spots: Rotation",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "No rotation", "art": ""},
+            {"von": 5, "bis": 127, "name": "Clockwise rotation slow → fast", "art": "rotate"},
+            {"von": 128, "bis": 133, "name": "No rotation", "art": ""},
+            {"von": 134, "bis": 255, "name": "Anti-clockwise rotation slow → fast", "art": "rotate"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "9 Channels",
+      "raster": {"rows": 2, "cols": 4},
+      "kanaele": [
+        {"name": "Derbies and Spots: Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Derbies and Spots: Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Derbies and Spots: Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {
+          "name": "Derbies and Spots: Dimmer/ Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 191, "name": "Master dimmer 0-100 %", "art": "open"},
+            {"von": 192, "bis": 200, "name": "Sound-controlled strobe effect", "art": "sound"},
+            {"von": 201, "bis": 249, "name": "Strobe effect slow → fast (30 Hz)", "art": "strobe"},
+            {"von": 250, "bis": 255, "name": "All colors on", "art": "open"}
+          ]
+        },
+        {
+          "name": "Derbies and Spots: Rotation",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "No rotation", "art": ""},
+            {"von": 5, "bis": 127, "name": "Clockwise rotation slow → fast", "art": "rotate"},
+            {"von": 128, "bis": 133, "name": "No rotation", "art": ""},
+            {"von": 134, "bis": 255, "name": "Anti-clockwise rotation slow → fast", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Laser: Red",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Red laser off", "art": "closed"},
+            {"von": 5, "bis": 9, "name": "Red laser on", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Red laser strobe effect slow → fast", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Laser: Green",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Green laser off", "art": "closed"},
+            {"von": 5, "bis": 9, "name": "Green laser on", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Green laser strobe effect slow → fast", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Laser: Rotation",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "No rotation", "art": ""},
+            {"von": 5, "bis": 127, "name": "Clockwise rotation slow → fast", "art": "rotate"},
+            {"von": 128, "bis": 133, "name": "No rotation", "art": ""},
+            {"von": 134, "bis": 255, "name": "Anti-clockwise rotation slow → fast", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Strobe LEDs",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Strobe LEDs off", "art": "closed"},
+            {"von": 5, "bis": 9, "name": "Strobe LEDs on", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe effect slow → fast", "art": "strobe"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "27 Channels",
+      "raster": {"rows": 2, "cols": 4},
+      "kanaele": [
+        {"name": "Derby 1: Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Derby 1: Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Derby 1: Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {
+          "name": "Derby 1: Brightness/Sound-Control",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Brightness red, green and blue 0-100 %", "art": ""},
+            {"von": 10, "bis": 255, "name": "Sound-controlled strobe effect", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Derby 1: Strobe/Rotation",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Strobe effect slow → fast (30 Hz)", "art": "strobe"},
+            {"von": 5, "bis": 127, "name": "All colors on", "art": "color"},
+            {"von": 128, "bis": 133, "name": "No rotation", "art": ""},
+            {"von": 134, "bis": 255, "name": "Clockwise rotation slow → fast", "art": "rotate"}
+          ]
+        },
+        {"name": "Spot 2: Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Spot 2: Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Spot 2: Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {
+          "name": "Spot 2: Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Kein Strobe", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe effect slow → fast (30 Hz)", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Spot 2: Non/Rotation",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {
+              "von": 0,
+              "bis": 255,
+              "name": "No function for spots or rotation when operating a derby at this position",
+              "art": ""
+            }
+          ]
+        },
+        {"name": "Spot 3: Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Spot 3: Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Spot 3: Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {
+          "name": "Spot 3: Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Kein Strobe", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe effect slow → fast (30 Hz)", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Spot 3: Non/Rotation",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {
+              "von": 0,
+              "bis": 255,
+              "name": "No function for spots or rotation when operating a derby at this position",
+              "art": ""
+            }
+          ]
+        },
+        {"name": "Derby 4: Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Derby 4: Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Derby 4: Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {
+          "name": "Derby 4: Brightness/Sound-Control",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Brightness red, green and blue 0-100 %", "art": ""},
+            {"von": 10, "bis": 255, "name": "Sound-controlled strobe effect", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Derby 4: Strobe/Rotation",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Strobe effect slow → fast (30 Hz)", "art": "strobe"},
+            {"von": 5, "bis": 127, "name": "All colors on", "art": "color"},
+            {"von": 128, "bis": 133, "name": "No rotation", "art": ""},
+            {"von": 134, "bis": 255, "name": "Clockwise rotation slow → fast", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Laser: Red",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Red laser off", "art": "closed"},
+            {"von": 5, "bis": 9, "name": "Red laser on", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Red laser strobe effect slow → fast", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Laser: Green",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Green laser off", "art": "closed"},
+            {"von": 5, "bis": 9, "name": "Green laser on", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Green laser strobe effect slow → fast", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Laser: Rotation",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "No rotation", "art": ""},
+            {"von": 5, "bis": 127, "name": "Clockwise rotation slow → fast", "art": "rotate"},
+            {"von": 128, "bis": 133, "name": "No rotation", "art": ""},
+            {"von": 134, "bis": 255, "name": "Anti-clockwise rotation slow → fast", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Strobe LED 1",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Strobe LED off", "art": "closed"},
+            {"von": 5, "bis": 9, "name": "Strobe LED on", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe effect slow → fast", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Strobe LED 2",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Strobe LED off", "art": "closed"},
+            {"von": 5, "bis": 9, "name": "Strobe LED on", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe effect slow → fast", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Strobe LED 3",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Strobe LED off", "art": "closed"},
+            {"von": 5, "bis": 9, "name": "Strobe LED on", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe effect slow → fast", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Strobe LED 4",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Strobe LED off", "art": "closed"},
+            {"von": 5, "bis": 9, "name": "Strobe LED on", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe effect slow → fast", "art": "strobe"}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Lichtset: 2 Derbys, 2 Spots, Laser rot/gruen, 4 Strobe-LEDs. Im 27-Kanal-Modus sind die Bereiche der Derby-Kanaele aus QLC+ uebernommen und wirken vertauscht - am Geraet pruefen."
+}

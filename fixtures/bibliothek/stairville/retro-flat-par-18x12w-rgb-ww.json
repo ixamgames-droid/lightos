@@ -1,0 +1,136 @@
+{
+  "format_version": 1,
+  "hersteller": "Stairville",
+  "hersteller_kurz": "STAIR",
+  "modell": "Retro Flat Par 18x12W RGB WW",
+  "kurzname": "RETROFP1812WW",
+  "typ": "par",
+  "leistung_w": 188,
+  "quelle": {
+    "titel": "Stairville Retro Flat Par 18x10W RGBWA UV / 18x12W RGBW / 18x12W RGB WW, User Manual (Thomann, Art. 508985, v6)",
+    "url": "https://fast-images.static-thomann.de/pics/atg/atgdata/document/manual/c_508985_404358_404364_v6_en_online.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.1.0 GIT · Niels Ott",
+    "original": "resources/fixtures/Stairville/Stairville-Retro-Flat-Par-18x12W-RGB-WW.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 17 Wertebereiche mit Art (kind) versehen; Modusnamen 4-/6-/8-Kanal; 8-Kanal: Programm-Kanal — Wert 0 'Blackout' ohne Art closed (Makrokanal, kein Shutter), Musik art sound; 8-Kanal: Kanal 7 als raw mit den 16 Farbvorgaben (bei Kanal 6 = 1–16) statt speed; sonst Programm-Speed bzw. Mikrofon-Empfindlichkeit; Strobe-Kanaele als strobe (Strobe 0–100 %, kein Offen-Bereich im Handbuch) statt shutter; Weiss als Warmweiss benannt; Leistung 188 W laut Handbuch; Kanal-/Bereichsnamen deutsch; Kurzname; hersteller_kurz STAIR; Quelle auf Herstellerhandbuch gesetzt"
+  },
+  "autor": "LightOS",
+  "geprueft": {"ok": true, "wie": "Kanal fuer Kanal gegen das Handbuch (Kap. 7.16–7.18, Version RGB WW Art. 508985) geprueft"},
+  "modi": [
+    {
+      "name": "4-Kanal",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Warmweiss", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "6-Kanal",
+      "kanaele": [
+        {
+          "name": "Dimmer",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dimmer 0 % → 100 %"}
+          ]
+        },
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Warmweiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "strobe",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Strobe 0 % → 100 %"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8-Kanal",
+      "kanaele": [
+        {
+          "name": "Dimmer",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dimmer 0 % → 100 %"}
+          ]
+        },
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Warmweiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Programm",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Blackout"},
+            {"von": 1, "bis": 16, "name": "Programm 01 (Farbauswahl ueber Kanal 7)"},
+            {"von": 17, "bis": 33, "name": "Programm 02"},
+            {"von": 34, "bis": 50, "name": "Programm 03"},
+            {"von": 51, "bis": 67, "name": "Programm 04"},
+            {"von": 68, "bis": 84, "name": "Programm 05"},
+            {"von": 85, "bis": 101, "name": "Programm 06"},
+            {"von": 102, "bis": 118, "name": "Programm 07"},
+            {"von": 119, "bis": 135, "name": "Programm 08"},
+            {"von": 136, "bis": 152, "name": "Programm 09"},
+            {"von": 153, "bis": 169, "name": "Programm 10"},
+            {"von": 170, "bis": 186, "name": "Programm 11"},
+            {"von": 187, "bis": 203, "name": "Programm 12"},
+            {"von": 204, "bis": 220, "name": "Programm 13"},
+            {"von": 221, "bis": 237, "name": "Programm 14"},
+            {"von": 238, "bis": 255, "name": "Musiksteuerung", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Farbauswahl / Speed / Mikrofon",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Farbe aus (bei Kanal 6 = 1–16)"},
+            {"von": 16, "bis": 31, "name": "Farbe Rot (bei Kanal 6 = 1–16)"},
+            {"von": 32, "bis": 47, "name": "Farbe Gruen (bei Kanal 6 = 1–16)"},
+            {"von": 48, "bis": 63, "name": "Farbe Blau (bei Kanal 6 = 1–16)"},
+            {"von": 64, "bis": 79, "name": "Farbe Warmweiss (bei Kanal 6 = 1–16)"},
+            {"von": 80, "bis": 95, "name": "Farbe R255 G150 (bei Kanal 6 = 1–16)"},
+            {"von": 96, "bis": 111, "name": "Farbe R255 G180 (bei Kanal 6 = 1–16)"},
+            {"von": 112, "bis": 127, "name": "Farbe Gelb (bei Kanal 6 = 1–16)"},
+            {"von": 128, "bis": 143, "name": "Farbe Magenta (bei Kanal 6 = 1–16)"},
+            {"von": 144, "bis": 159, "name": "Farbe R255 B140 (bei Kanal 6 = 1–16)"},
+            {"von": 160, "bis": 175, "name": "Farbe Cyan (bei Kanal 6 = 1–16)"},
+            {"von": 176, "bis": 191, "name": "Farbe Rot + WW210 (bei Kanal 6 = 1–16)"},
+            {"von": 192, "bis": 207, "name": "Farbe Gruen + WW210 (bei Kanal 6 = 1–16)"},
+            {"von": 208, "bis": 223, "name": "Farbe Blau + WW210 (bei Kanal 6 = 1–16)"},
+            {"von": 224, "bis": 239, "name": "Farbe R255 G200 B40 WW90 (bei Kanal 6 = 1–16)"},
+            {"von": 240, "bis": 255, "name": "Farbe Voll RGBWW (bei Kanal 6 = 1–16)"}
+          ]
+        },
+        {
+          "name": "Strobe",
+          "attribut": "strobe",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Strobe 0 % → 100 %"}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "18 x 12 W RGB-WW-LEDs, 25°, PAR-64-Retro-Gehaeuse. 8-Kanal: das Handbuch nennt fuer Kanal 6 = 0 'Blackout' und fuer 1–16 'Programm 01, Farbauswahl ueber Kanal 7'; ob die Kanaele 1–5 bei Kanal 6 = 0 wirken, sagt es nicht — am Geraet pruefen. Fuer reine Direktsteuerung den 4- oder 6-Kanal-Modus nehmen."
+}

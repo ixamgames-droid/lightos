@@ -316,6 +316,60 @@ def vergleiche(vorher: dict, nachher: dict, *, app_laeuft: bool = False) -> list
     return diff
 
 
+def _datenbanken_freigeben() -> None:
+    """XPLAT-42: alle SQLite-Handles des eigenen Prozesses schliessen.
+
+    Windows loescht keine Datei, die ein Prozess noch offen haelt — Linux
+    schon. Ohne das blieben nach jedem Lauf ``arbeit/data/current_show.db``
+    (+ ``-wal``/``-shm``) und ``xdg/data/LightOS/fixtures.db`` liegen, und
+    ``rmtree(ignore_errors=True)`` verschluckte es. Nur Module, die schon
+    geladen sind — das Aufraeumen soll nichts neu importieren.
+    """
+    import gc
+    try:
+        from sqlalchemy.orm import close_all_sessions
+        close_all_sessions()
+    except Exception:
+        pass
+    st = sys.modules.get("src.core.app_state")
+    if st is not None:
+        try:
+            eng = getattr(st.get_state(), "_show_engine", None)
+            if eng is not None:
+                eng.dispose()
+        except Exception:
+            pass
+    fdb = sys.modules.get("src.core.database.fixture_db")
+    if fdb is not None and getattr(fdb, "_engine", None) is not None:
+        try:
+            fdb._engine.dispose()
+        except Exception:
+            pass
+        fdb._engine = None
+    gc.collect()
+
+
+def aufraeumen(sb: Sandbox, versuche: int = 5) -> list[str]:
+    """Sandbox loeschen; Rueckgabe = Dateien, die trotzdem liegen blieben.
+
+    XPLAT-42: erst die eigenen DB-Handles schliessen, dann loeschen — mit
+    kurzen Wiederholungen, weil Windows eine gerade geschlossene Datei
+    (Virenscanner, Indexdienst) gelegentlich noch Millisekunden sperrt. Was
+    danach noch liegt, meldet der Aufrufer, statt es zu verschlucken.
+    """
+    import shutil
+    import time
+    _datenbanken_freigeben()
+    for i in range(versuche):
+        shutil.rmtree(sb.basis, ignore_errors=True)
+        if not os.path.exists(sb.basis):
+            return []
+        if i + 1 < versuche:
+            time.sleep(0.2)
+    return sorted(os.path.join(w, f) for w, _d, dateien in os.walk(sb.basis)
+                  for f in dateien)
+
+
 def nebenwirkungen_abschalten() -> None:
     """Monkeypatches fuer alles ohne Env-Schalter. Nach dem src-Import aufrufen,
     VOR dem Bau des MainWindow (der Autoconnect-Timer startet im Konstruktor)."""

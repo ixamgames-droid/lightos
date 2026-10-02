@@ -393,11 +393,27 @@ class Spot90OhneGeraetBautNichts(unittest.TestCase):
     einem falschen oder leeren Geraet zu speichern."""
 
     def test_bricht_laut_ab_und_schreibt_keine_show(self):
+        """FM-57: der Hero Spot 90 ist seitdem mitgeliefert
+        (``fixtures/bibliothek/varytec/hero-spot-90.json``) und wird beim Start
+        des Generators eingespielt. Ihn nur aus der DB zu loeschen reichte nicht
+        — der Start spielte die Datei sofort wieder ein. Deshalb laeuft der
+        Generator gegen eine KOPIE der Bibliothek ohne genau diese Datei
+        (``LIGHTOS_BIBLIOTHEK_DIR``); alle anderen Geraete bleiben da."""
+        import shutil
+        from src.core.database import bibliothek_format as BF
+        datei = os.path.join("varytec", "hero-spot-90.json")
+        self.assertTrue(os.path.isfile(os.path.join(BF.BIBLIOTHEK_DIR, datei)),
+                        "Vorbedingung: die Bibliothek liefert den Hero Spot 90 — "
+                        "sonst prueft der Test nichts mehr, was er nicht ohnehin saehe")
         motor = frische_library(self)
         with tempfile.TemporaryDirectory(prefix="lightos_tool3_") as tmp:
+            bib = os.path.join(tmp, "bibliothek")
+            shutil.copytree(BF.BIBLIOTHEK_DIR, bib)
+            os.remove(os.path.join(bib, datei))
             ziel = os.path.join(tmp, "Spot90_Testshow.lshow")
             env = dict(os.environ)
             env.update({
+                "LIGHTOS_BIBLIOTHEK_DIR": bib,
                 "LIGHTOS_FIXTURE_DB": motor.url.database,
                 "LIGHTOS_GEN_OUT": ziel,
                 "LIGHTOS_SHOW_DB": os.path.join(tmp, "show.db"),

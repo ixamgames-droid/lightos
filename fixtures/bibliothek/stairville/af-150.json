@@ -1,0 +1,42 @@
+{
+  "format_version": 1,
+  "hersteller": "Stairville",
+  "hersteller_kurz": "STAIR",
+  "modell": "AF-150",
+  "kurzname": "AF150",
+  "typ": "smoke",
+  "leistung_w": 800,
+  "quelle": {
+    "titel": "Stairville AF-150 DMX Fog Machine, User Manual (Thomann, Art. 305148, v7)",
+    "url": "https://fast-images.static-thomann.de/pics/atg/atgdata/document/manual/c_305148_v7_en_online.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.9.0 GIT · Bastien",
+    "original": "resources/fixtures/Stairville/Stairville-AF-150.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 1 Wertebereiche mit Art (kind) versehen; Kanal 1 'Pump' → 'Nebel' mit Attribut dimmer (Blackout stoppt den Ausstoss, wie eingebaute Nebelprofile); Highlight des Nebelkanals 0 statt 255 (Highlight loest keinen Nebel aus); Modus '1ch' → '1-Kanal'; Kurzname AF150; hersteller_kurz STAIR; Quelle auf Herstellerhandbuch gesetzt"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal fuer Kanal gegen das Handbuch (Kap. 7.2 DMX assignment: 1 Kanal, 0…255 = 0…100 % Nebel) geprueft"
+  },
+  "modi": [
+    {
+      "name": "1-Kanal",
+      "kanaele": [
+        {
+          "name": "Nebel",
+          "attribut": "dimmer",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Nebelausstoss 0 % → 100 %"}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Nebelmaschine 800 W, 1 DMX-Kanal (Adresse per DIP-Schalter). Highlight bewusst 0: Highlight soll keinen Nebel ausloesen."
+}

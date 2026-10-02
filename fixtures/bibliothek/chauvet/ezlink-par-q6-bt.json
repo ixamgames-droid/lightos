@@ -1,0 +1,82 @@
+{
+  "format_version": 1,
+  "hersteller": "Chauvet",
+  "hersteller_kurz": "CHAUVET",
+  "modell": "EZLink Par Q6 BT",
+  "kurzname": "EZLink Par Q6 BT",
+  "typ": "par",
+  "leistung_w": 39,
+  "quelle": {
+    "titel": "EZLink Par Q6BT User Manual",
+    "version": "Rev. 5",
+    "url": "https://www.chauvetdj.com/wp-content/uploads/2019/01/EZLink_Par_Q6BT_UM_ML5_Rev5.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.1.0 GIT · Yestalgia",
+    "original": "resources/fixtures/Chauvet/Chauvet-EZLink-Par-Q6-BT.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 4 Wertebereiche mit Art (kind) versehen; danach von LightOS gegen das Herstellerhandbuch (EZLink Par Q6BT User Manual) Kanal fuer Kanal ueberarbeitet: CH5 Strobe mit Bereichen nach Handbuch (000-015 kein Strobe = open, 016-255 Strobe); CH6 laut Handbuch Auto-Programme 1-5 (QLC+: 'Color macros' mit Art gobo) - Bereiche neu; CH7 Programmgeschwindigkeit nach Handbuch: 000-250 Geschwindigkeit, 251-255 Sound-Modus (QLC+: 0-15 keine Funktion); Leistung nach Handbuch (39 W bei 230 V); Kanalnamen und Bereichsnamen auf Deutsch; Default/Highlight nach LightOS-Regeln (Pan/Tilt 128, Dimmer 0, Shutter offen)"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanalbelegung, Wertebereiche und Modi aller DMX-Modi Kanal fuer Kanal gegen das Herstellerhandbuch geprueft (nicht am echten Geraet)"
+  },
+  "modi": [
+    {
+      "name": "8 Channel",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Kein Strobe", "art": "open"},
+            {"von": 16, "bis": 255, "name": "Strobe langsam -> schnell", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Auto-Programme",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Keine Funktion", "art": ""},
+            {"von": 6, "bis": 55, "name": "Auto-Programm 1", "art": ""},
+            {"von": 56, "bis": 106, "name": "Auto-Programm 2", "art": ""},
+            {"von": 107, "bis": 157, "name": "Auto-Programm 3", "art": ""},
+            {"von": 158, "bis": 208, "name": "Auto-Programm 4", "art": ""},
+            {"von": 209, "bis": 255, "name": "Auto-Programm 5", "art": ""}
+          ]
+        },
+        {
+          "name": "Programmgeschwindigkeit",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 250, "name": "Geschwindigkeit langsam -> schnell", "art": ""},
+            {"von": 251, "bis": 255, "name": "Sound-Modus", "art": "sound"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "4 Channel",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255}
+      ]
+    }
+  ],
+  "notizen": "6x Quad-LED RGBA, akku-/netzbetrieben, Bluetooth (BTAir)."
+}
