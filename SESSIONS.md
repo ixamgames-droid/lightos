@@ -23,6 +23,7 @@
 | XPLAT-37 | C | fix/xplat37-settle-frame | 2026-10-02T07:37Z | src/ui/visualizer/scene_src/interaction/tools.js · src/ui/visualizer/scene_src/app.js · tests/test_viz14_selection_scene.py · changelog.d/2026-10-02-XPLAT-37.md · BACKLOG.md |
 | FM-55 | C | docs/fm55-fixture-quellen | 2026-10-02T07:39Z | docs/recherche/fixture_quellen_2026-10.md · changelog.d/2026-10-02-FM-55.md · BACKLOG.md |
 | UI-70 | A | fix/ui70-leere-auswahl-programmer | 2026-10-02T07:57Z | src/ui/views/programmer_view.py · tools/anleitungsbilder |
+| TOOL-8 | A | fix/ui70-leere-auswahl-programmer | 2026-10-02T07:57Z | tools/anleitungsbilder |
 
 ## Blocker & Fallen
 
@@ -80,7 +81,6 @@
 
 ## Verlauf
 
-- 2026-10-01T22:28Z C done TOOL-5
 - 2026-10-01T22:28Z C done TOOL-4
 - 2026-10-01T22:42Z C done TOOL-1
 - 2026-10-01T22:51Z A claim DOC-21
@@ -110,3 +110,4 @@
 - 2026-10-02T07:39Z C claim FM-55
 - 2026-10-02T07:42Z C done TOOL-6
 - 2026-10-02T07:57Z A claim UI-70
+- 2026-10-02T07:57Z A claim TOOL-8
