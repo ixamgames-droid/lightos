@@ -220,6 +220,55 @@ und ein Hinweis ist besser als ein stumm dunkles Segment:
    `source != "builtin"` — werden von ensure_builtins nie angefasst).
 4. **Beispiel-Skripte** (`examples/add_zq0*.py`) — delegieren inzwischen an
    `ensure_builtins()`, die Definition lebt nur noch an einer Stelle.
+5. **Eigene Bibliothek** (`fixtures/bibliothek/*.json`, `source = "lightos"`) — siehe
+   „Eigene Bibliothek (LightOS-Profile)“ unten.
+
+### Eigene Bibliothek (LightOS-Profile)
+
+Seit FM-56 können mitgelieferte Geräte als **Datei** statt als Python-Tupel vorliegen:
+eine JSON-Datei je Gerät unter `fixtures/bibliothek/<hersteller>/<modell>.json`. Das
+Format („LightOS-Profil“) ist in [`fixtures/bibliothek/SCHEMA.md`](../fixtures/bibliothek/SCHEMA.md)
+beschrieben; Prüfung und Einspielen stehen in `src/core/database/bibliothek_format.py`.
+
+- **Herkunft ist Pflicht.** Jede Datei trägt `quelle` (Handbuch-Titel/Version/Datum/URL)
+  und `herkunft` (`art`: `lightos` · `hersteller-handbuch` · `qlcplus` · `ofl`, mit
+  `lizenz`). Umgebaute QLC+- (Apache-2.0) und OFL-Profile (MIT) nennen zusätzlich
+  Urheber, Originaldatei und die Änderungen; die Lizenztexte deckt der Abschnitt
+  „Geräte-Bibliothek“ in `THIRD_PARTY_NOTICES.md`.
+- **Einspielen:** `ensure_builtins()` spielt die Dateien mit `source = "lightos"` ein —
+  je Datei nur, wenn sie neu ist, sich geändert hat oder ihr Profil in der DB fehlt
+  (Stempel je Datei in `bibliothek_stempel`). Eine kaputte Datei bricht den Start nie ab.
+  Neu → anlegen; geändert → Kopf und Modi aus der Datei neu aufbauen, die Profil-ID
+  bleibt; ungültig → gemeldet und übersprungen. Gibt es Hersteller + Modell schon mit
+  anderer Herkunft (Builtin, eigenes Profil, QLC+-Import), bleibt die Datei draußen —
+  sonst stünde das Gerät doppelt in der Bibliothek (FM-43). `user`- und
+  `qlcplus`-Profile werden nie angefasst.
+- **Die Herkunft geht nie verloren.** Beim Einspielen und beim Import einer Datei
+  steht die vollständige Herkunft (quelle, herkunft, geprueft, autor) auch in der DB
+  (`FixtureProfile.herkunft`, JSON). Der Export — Werkzeug wie Editor — liest sie von
+  dort; ein QLC+-Import bleibt Apache-2.0, ein im Editor bearbeitetes fremdes Profil
+  bekommt den Vermerk in `geaendert`. Lässt sich die Herkunft nicht belegen, bricht
+  der Export ab, statt „eigen“ einzutragen.
+- **`lightos` zählt wie `builtin`** überall, wo „mitgeliefert vor importiert“ entschieden
+  wird: Show-Laden bei nicht passender ID (FM-43), Showbuilder, `tools/_profil.py`,
+  Dubletten-Meldung (QA-68). Die Konstante dafür ist `models.MITGELIEFERT_QUELLEN`.
+  Der FM-50-Abgleich und die Signatur-Migrationen bleiben bei `builtin` — die Dateien
+  haben ihren eigenen Abgleich.
+- **Eigene Profile im eigenen Format:** Fixture-Editor → „Als LightOS-Profil
+  exportieren…“ / „LightOS-Profil importieren…“ (Import legt ein eigenes Profil,
+  `source = "user"`, an). Dasselbe auf der Kommandozeile:
+  `tools/bibliothek_profil.py export|import`.
+- **QLC+-Datei umbauen:** `tools/bibliothek_profil.py qxf <datei.qxf> --bibliothek` —
+  läuft über den vorhandenen QXF-Import (Attribute, Bereichs-Arten, Rasterform,
+  Weiß-Segmente aus `<Head>`) und setzt `herkunft` selbst. Ein OFL-Konverter ist
+  vorgesehen (`ofl_zu_daten`), aber noch nicht gebaut.
+- **Prüfen:** `tools/bibliothek_profil.py pruefen`; Wächter-Test
+  `tests/test_fm56_bibliothek_waechter.py`.
+- **Builtins bleiben vorerst Tupel.** Der Round-trip Tupel → Datei → DB ist für alle
+  eingebauten Profile feldgleich nachgewiesen (`tests/test_fm56_bibliothek_format.py`);
+  die Überführung selbst ist ein eigener Schritt, weil sie bestehende Installationen von
+  `builtin` auf `lightos` umstellen muss. Bis dahin liegen drei Muster unter
+  `fixtures/bibliothek/_beispiele/` (werden nicht eingespielt).
 
 ## 3. Modi sauber abbilden
 
