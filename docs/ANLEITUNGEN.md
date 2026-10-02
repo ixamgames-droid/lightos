@@ -91,7 +91,7 @@ frei kombinieren; das Tempo aller Ebenen hängt an Tempo-Buses (siehe
 
 | Anleitung | Worum geht's | Show |
 |---|---|---|
-| [BPM-Manager](anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md) | Quelle wählen, Zustandswort, Pegel und Statuszeile lesen, TAP, Auto/Manuell, „Erweitert“, Hilfe wenn nichts erkannt wird, „Eingang 30 s aufnehmen“. | Keine Show nötig |
+| [BPM-Manager](anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md) · [English](anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.en.md) | Quelle wählen, Zustandswort, Pegel und Statuszeile lesen, TAP, Auto/Manuell, „Erweitert“, Hilfe wenn nichts erkannt wird, „Eingang 30 s aufnehmen“. | Keine Show nötig |
 | [BPM-Generator — ganzes Lied analysieren](anleitung_bpm_generator/ANLEITUNG_BPM_GENERATOR.md) | Lied analysieren, BPM-Verlauf und Beatgrid prüfen, im Player als BPM-Quelle nutzen. | Keine Show nötig |
 | [Tempo & Synchronisierung — Gesamtüberblick](ANLEITUNG_TEMPO_SYNC.md) | BPM, Tempo-Buses, Multiplikatoren, „Taktgleich“, Auto-Sync — das Gedankenmodell mit Rezepten. | Keine Show nötig |
 | [Tempo-Controller](anleitung_tempo_controller/ANLEITUNG_TEMPO_CONTROLLER.md) | Das All-in-One-Tempo-Element der VC: Bus, Quelle, Faktor und mitlaufende Effekte. | Keine Show nötig |
