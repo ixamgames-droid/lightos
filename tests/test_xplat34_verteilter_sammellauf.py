@@ -150,6 +150,30 @@ class EchteScheiben(unittest.TestCase):
         self.assertEqual(sum(zahlen), 7)
         self.assertEqual(sorted(zahlen), [2, 2, 3])
 
+    def test_jeder_test_genau_einmal_auch_bei_anderem_hash_seed(self):
+        """Review #865: ein ``parametrize`` ueber eine Menge sammelt in jedem
+        Kind (eigener Hash-Seed) in anderer Reihenfolge. Verteilt wird deshalb
+        nach der Node-ID — jeder Fall genau einmal, egal welcher Seed."""
+        pfad = os.path.join(self.ordner, "test_menge.py")
+        with open(pfad, "w", encoding="utf-8") as fh:
+            fh.write("import pytest\n"
+                     "@pytest.mark.parametrize('x', set('abcdefghijkl'))\n"
+                     "def test_fall(x):\n    pass\n")
+        gesammelt = []
+        for i, seed in enumerate(("1", "2", "3")):
+            env = dict(os.environ, PYTHONHASHSEED=seed,
+                       PYTHONPATH=os.pathsep.join([zg.SCHEIBE_ORDNER,
+                                                   os.environ.get("PYTHONPATH", "")]))
+            env[zg.SCHEIBE_VAR] = "%d/3" % i
+            fertig = subprocess.run(
+                [sys.executable, "-m", "pytest", "--collect-only", "-q",
+                 "-p", zg.SCHEIBE_PLUGIN, "-p", "no:cacheprovider",
+                 "--rootdir", self.ordner, pfad],
+                cwd=self.ordner, env=env, text=True, capture_output=True, timeout=120)
+            gesammelt += re.findall(r"test_fall\[(\w)\]", fertig.stdout)
+        self.assertEqual(sorted(gesammelt), list("abcdefghijkl"),
+                         "jeder Fall genau einmal ueber alle drei Kinder")
+
     def test_scheibe_ohne_tests_ist_kein_fehler(self):
         dateien = [self._datei("test_c.py", 1), self._datei("test_d.py", 1)]
         ergebnis = zg.lauf_verteilt(dateien, zg.SPRUNG_TAGE)
