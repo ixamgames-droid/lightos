@@ -85,11 +85,23 @@ class _Basis(unittest.TestCase):
 class DerReglerWirktAufDieWeissSegmente(_Basis):
 
     def test_zwei_dimmer_dimmer_mit_treiben(self):
-        """Der Fund: Master 0,5, aber die Weiss-Segmente standen auf 255."""
+        """Der Fund: Master 0,5, aber die Weiss-Segmente standen auf 255.
+
+        ★ Seit FM-46 (Etappe 2) treibt die Matrix hier wieder einen Dimmer:
+        ohne gespeicherte Zuordnung oeffnet sie die freien Vorkommen
+        (``weiss_rueckfall_dimmer``). Bei diesem Geraet liegen RGB und Weiss
+        in EINEM Abschnitt hinter CH2 — nach der Review-Regel faehrt nur der
+        Dimmer, der an diesen Abschnitt grenzt (CH2); CH1 bleibt zu. Damit
+        gilt derselbe Weg wie beim geteilten Master: der Merge halbiert den
+        DIMMER, das Weiss bleibt im Wert voll. Die FM-54-Zusage (der Regler
+        wirkt) bleibt — nur traegt sie jetzt der Dimmer. Vorher erwartete
+        dieser Test ``[0, 0]`` fuer die Dimmer und ``[127, 127]`` fuer das
+        Weiss: ein Segment hinter einem Dimmer auf 0 ist am Geraet dunkel."""
         uni, dimmer, weiss = self._lauf(2, drive=True)
-        self.assertEqual([uni.get_channel(a) for a in dimmer], [0, 0],
-                         "Vorbedingung: die Matrix treibt hier keinen Dimmer")
-        self.assertEqual([uni.get_channel(a) for a in weiss], [127, 127])
+        self.assertEqual([uni.get_channel(a) for a in dimmer], [0, 127],
+                         "der angrenzende Dimmer, vom Merge halbiert")
+        self.assertEqual([uni.get_channel(a) for a in weiss], [255, 255],
+                         "nicht doppelt dimmen")
 
     def test_voller_master_unveraendert(self):
         uni, _dimmer, weiss = self._lauf(2, drive=True, inten=1.0)
