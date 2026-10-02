@@ -407,6 +407,30 @@ SCENE_START_MAX_RELOADS = 1
 SCENE_START_WINDOW_S = 120.0
 
 
+# VIZ-65: Die Abfrage liefert einen JSON-STRING, kein JS-Array. PySide 6.11
+# reicht ein Array-Ergebnis von ``runJavaScript`` als ``''`` durch (gemessen
+# 02.10.2026) — der Waechter hielt dadurch JEDE gesunde Szene fuer tot, lud sie
+# nach 8 s neu und meldete danach „3D-Szene startet nicht (Grafiktreiber?)".
+# Ein String kommt in allen Versionen unversehrt an.
+SCENE_START_JS = ("JSON.stringify([!!window.__lightosAppReady,"
+                  " String(window.__lightosSceneError || '')])")
+
+
+def lese_startstatus(r) -> tuple[bool, str]:
+    """Antwort von :data:`SCENE_START_JS` -> ``(bereit, grund)``.
+
+    Nimmt den JSON-String und — fuer Qt-Versionen, die Arrays durchreichen —
+    auch eine Liste. Alles andere gilt als „nicht bereit, kein Grund"."""
+    if isinstance(r, str):
+        try:
+            r = json.loads(r)
+        except ValueError:
+            return False, ""
+    if isinstance(r, (list, tuple)) and len(r) >= 2:
+        return bool(r[0]), str(r[1] or "")
+    return False, ""
+
+
 def scene_start_verdict(ready: bool, guard, now: float) -> str:
     """``'ok'`` | ``'neu_laden'`` | ``'aufgeben'`` — die ganze Entscheidung des
     Waechters, ohne Qt und ohne Seiteneffekt (ausser dem Zaehler im ``guard``).
@@ -495,12 +519,9 @@ def install_scene_start_guard(view, status_cb=None, on_reloaded=None,
             return
         # Beide Werte in EINEM Aufruf: zwei verschachtelte runJavaScript-
         # Rueckrufe waeren eine zweite Stelle, an der die View wegsterben kann.
-        js = ("[!!window.__lightosAppReady,"
-              " String(window.__lightosSceneError || '')]")
         try:
             v.page().runJavaScript(
-                js, lambda r: _entscheiden(
-                    (r or [False, ""])[0], (r or [False, ""])[1]))
+                SCENE_START_JS, lambda r: _entscheiden(*lese_startstatus(r)))
         except Exception:
             # Kein Page-Objekt mehr (Teardown mitten im Timer) — nichts zu tun.
             pass
