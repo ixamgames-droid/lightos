@@ -23,6 +23,7 @@
 | DOC-23 | C | - | 2026-10-02T10:20Z | docs/anleitung_erste_schritte/ANLEITUNG.en.md · docs/anleitung_erste_schritte/ANLEITUNG.md · docs/ANLEITUNGEN.md · changelog.d/2026-10-02-DOC-23.md |
 | DOC-24 | C | - | 2026-10-02T10:21Z | docs/anleitung_programmer_grundlagen/ANLEITUNG.en.md · docs/anleitung_programmer_grundlagen/ANLEITUNG.md · docs/ANLEITUNGEN.md · changelog.d/2026-10-02-DOC-24.md |
 | DOC-25 | C | - | 2026-10-02T10:23Z | docs/anleitung_szenen_cues/ANLEITUNG.en.md · docs/anleitung_szenen_cues/ANLEITUNG.md · docs/ANLEITUNGEN.md · changelog.d/2026-10-02-DOC-25.md |
+| DOC-26 | C | - | 2026-10-02T10:24Z | docs/anleitung_vc_widgets/*.en.md · docs/anleitung_vc_widgets/README.md · docs/ANLEITUNGEN.md · changelog.d/2026-10-02-DOC-26.md |
 
 ## Blocker & Fallen
 
@@ -85,7 +86,6 @@
 
 ## Verlauf
 
-- 2026-10-02T07:15Z C done FM-54
 - 2026-10-02T07:18Z A claim DOC-22
 - 2026-10-02T07:26Z A uebernimmt FM-46 von C (Claim verfallen)
 - 2026-10-02T07:26Z A claim FM-46
@@ -115,3 +115,4 @@
 - 2026-10-02T10:20Z C claim DOC-23
 - 2026-10-02T10:21Z C claim DOC-24
 - 2026-10-02T10:23Z C claim DOC-25
+- 2026-10-02T10:24Z C claim DOC-26
