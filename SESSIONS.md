@@ -29,6 +29,7 @@
 | DOC-28 | C | - | 2026-10-02T10:36Z | docs/anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.en.md · docs/anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md · docs/ANLEITUNGEN.md · changelog.d/2026-10-02-DOC-28.md |
 | DOC-29 | C | - | 2026-10-02T10:51Z | docs/anleitung_patch_gruppen/ANLEITUNG_PATCH_GRUPPEN.md |
 | DOC-30 | C | - | 2026-10-02T10:52Z | docs/anleitung_programmer/ANLEITUNG_PROGRAMMER.md |
+| DOC-31 | C | - | 2026-10-02T10:53Z | docs/anleitung_zwei_universen/ANLEITUNG.md |
 
 ## Blocker & Fallen
 
@@ -92,7 +93,6 @@
 
 ## Verlauf
 
-- 2026-10-02T07:37Z C claim XPLAT-37
 - 2026-10-02T07:39Z C claim FM-55
 - 2026-10-02T07:42Z C done TOOL-6
 - 2026-10-02T07:57Z A claim UI-70
@@ -122,3 +122,4 @@
 - 2026-10-02T10:36Z C claim DOC-28
 - 2026-10-02T10:51Z C claim DOC-29
 - 2026-10-02T10:52Z C claim DOC-30
+- 2026-10-02T10:53Z C claim DOC-31
