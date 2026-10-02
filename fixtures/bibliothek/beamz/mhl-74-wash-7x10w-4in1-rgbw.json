@@ -1,0 +1,87 @@
+{
+  "format_version": 1,
+  "hersteller": "BeamZ",
+  "hersteller_kurz": "BEAMZ",
+  "modell": "MHL-74 Wash 7x10W 4in1 RGBW",
+  "kurzname": "MHL74",
+  "typ": "moving_head",
+  "leistung_w": 80,
+  "quelle": {
+    "titel": "BeamZ MHL74 LED Wash Moving Head 7x10W - Bedienungsanleitung (Ref. 150.518 / 150.519)",
+    "version": "V2.4",
+    "url": "https://www.beamzlighting.com/wp-content/uploads/2026/03/150.518_150.519-MHL-74_manual_V2.4.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.14.0 GIT · Jan Fries",
+    "original": "resources/fixtures/beamZ/beamZ-MHL-74-Wash-7x10W-4in1-RGBW.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 4 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): Herstellername 'beamZ' -> 'BeamZ'; kurzname MHL74; Farbmakro als macro statt color_wheel (stufenlose Mischfarben, keine Radfarben), Bereiche 0-9 aus / 10-255 nach Handbuch; Sound-Kanal als raw statt macro, 0-127 'Sound aus' ohne art sound; Strobe-Default 0 (im Offen-Bereich 0-9); Kanalnamen deutsch, Modusbeschreibungen ergaenzt"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": true,
+    "wie": "beide DMX-Modi Kanal fuer Kanal gegen das Herstellerhandbuch 150.518/150.519 V2.4 geprueft (nicht am echten Geraet)"
+  },
+  "modi": [
+    {
+      "name": "12 Channel",
+      "beschreibung": "16 bit Pan/Tilt, Farbmakro, Strobe, Sound",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fein", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fein", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Farbmakro",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Aus", "art": ""},
+            {"von": 10, "bis": 255, "name": "Mischfarben-Auswahl", "art": ""}
+          ]
+        },
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe langsam -> schnell", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Sound-Steuerung",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Sound aus", "art": ""},
+            {"von": 128, "bis": 255, "name": "Sound an", "art": "sound"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "7 Channel",
+      "beschreibung": "8 bit Pan/Tilt, Dimmer, RGBW",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    }
+  ],
+  "notizen": "Wash-Mover 7x10W RGBW, Pan 540 Grad, Tilt 180 Grad. Laut Handbuch wirken Dimmer und Farben erst ab Wert 11 (000 = aus)."
+}

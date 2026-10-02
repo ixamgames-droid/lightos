@@ -699,14 +699,31 @@ class NurLokaleGeraeteTest(unittest.TestCase):
         ``search_fixtures``-Weg. Ohne die zweite Haelfte koennte der
         Anzeigenamen-Weg unbemerkt die lokale Bibliothek befragen.
         """
+        from src.core.database import bibliothek_format as BF
         from src.core.database.models import FixtureProfile
         with Session(self.eng) as s:
-            alle = [r[0] for r in s.execute(select(FixtureProfile.short_name))]
+            nach_quelle: dict[str, list[str]] = {}
+            for kurz, quelle in s.execute(select(FixtureProfile.short_name,
+                                                 FixtureProfile.source)):
+                nach_quelle.setdefault(quelle, []).append(kurz)
+        builtins = nach_quelle.pop("builtin", [])
+        lightos = nach_quelle.pop("lightos", [])
         # Die Zahl ist ein STOLPERDRAHT, kein Selbstzweck: sie faellt um, sobald
         # jemand ein Builtin hinzufuegt oder entfernt, und zwingt zu der Frage,
         # ob der Waechter noch die frische Bibliothek misst. 48 -> 49 am
         # 02.09.2026 durch STAIRMB5X5 (Stairville Matrix Blinder 5x5 RGBWW).
-        self.assertEqual(49, len(alle), f"Builtin-Zahl geaendert: {sorted(alle)}")
+        self.assertEqual(49, len(builtins),
+                         f"Builtin-Zahl geaendert: {sorted(builtins)}")
+        # FM-57: dazu kommen die LightOS-Profile aus ``fixtures/bibliothek/``.
+        # Auch sie stehen im Repo (nicht nur lokal) — aber GENAU die Dateien
+        # des Repos, keins mehr: ein Profil darueber hinaus kaeme aus einer
+        # lokalen Bibliothek. Die Zahl haengt deshalb an den Dateien, nicht an
+        # einer festen Zahl, die jede Bibliotheks-Runde umwerfen wuerde.
+        self.assertEqual(len(BF.bibliothek_dateien()), len(lightos),
+                         f"LightOS-Profile != Bibliotheksdateien: {sorted(lightos)}")
+        self.assertEqual({}, nach_quelle,
+                         "Profile anderer Herkunft (Import/eigen) in der frischen "
+                         "Bibliothek — dann misst dieser Test eine lokale Datei")
         self.assertTrue(self.kennt_kurznamen("SPIDER14"))
         self.assertFalse(self.kennt_kurznamen("Speider"),
                          "'Speider' steht in der frischen Bibliothek — dann "

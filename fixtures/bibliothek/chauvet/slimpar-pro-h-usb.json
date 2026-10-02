@@ -1,0 +1,124 @@
+{
+  "format_version": 1,
+  "hersteller": "Chauvet",
+  "hersteller_kurz": "CHAUVET",
+  "modell": "SlimPAR Pro H USB",
+  "kurzname": "SlimPAR Pro H USB",
+  "typ": "par",
+  "leistung_w": 96,
+  "quelle": {
+    "titel": "SlimPAR Pro H USB User Manual",
+    "version": "Rev. 6",
+    "url": "https://www.chauvetdj.com/wp-content/uploads/2020/01/SlimPAR_PRO_H_USB_UM_Rev6.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.3 GIT · Pete Mueller",
+    "original": "resources/fixtures/Chauvet/Chauvet-SlimPAR-Pro-H-USB.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 20 Wertebereiche mit Art (kind) versehen; danach von LightOS gegen das Herstellerhandbuch (SlimPAR Pro H USB User Manual) Kanal fuer Kanal ueberarbeitet: CH8 Strobe: Bereich 000-015 'Keine Funktion' als open statt closed (Konverter-Fehler: Default lag auf 'geschlossen'); CH9 Farbmakros als macro statt color_wheel; CH10 Auto-/Sound-Programme als effect statt raw, Bereichsnamen nach Handbuch (Pulse-Strobe), color-Arten entfernt; CH11 Programmgeschwindigkeit/Soundempfindlichkeit als speed statt macro; CH12 Dimmerkurve als raw statt speed; Leistung nach Handbuch (96 W bei 230 V); Kanalnamen und Bereichsnamen auf Deutsch; Default/Highlight nach LightOS-Regeln (Pan/Tilt 128, Dimmer 0, Shutter offen)"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanalbelegung, Wertebereiche und Modi aller DMX-Modi Kanal fuer Kanal gegen das Herstellerhandbuch geprueft (nicht am echten Geraet)"
+  },
+  "modi": [
+    {
+      "name": "6 Channel",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "7 Channel",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "12 Channel",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Kein Strobe", "art": "open"},
+            {"von": 16, "bis": 255, "name": "Strobe langsam -> schnell", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Farbmakros",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Keine Funktion", "art": ""},
+            {"von": 16, "bis": 255, "name": "Farbmakros (ueberschreibt Farbkanaele)", "art": ""}
+          ]
+        },
+        {
+          "name": "Auto-/Sound-Programme",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "Keine Funktion", "art": ""},
+            {"von": 32, "bis": 63, "name": "Pulse-Strobe 0-100 %", "art": ""},
+            {"von": 64, "bis": 95, "name": "Pulse-Strobe 100-0 %", "art": ""},
+            {"von": 96, "bis": 127, "name": "Pulse-Strobe 0-100-0 %", "art": ""},
+            {"von": 128, "bis": 159, "name": "Auto-Fade", "art": ""},
+            {"von": 160, "bis": 191, "name": "Auto-Snap (6 Farben)", "art": ""},
+            {"von": 192, "bis": 223, "name": "Auto-Snap (32 Farben)", "art": ""},
+            {"von": 224, "bis": 249, "name": "Sound-Modus (6 Farben)", "art": "sound"},
+            {"von": 250, "bis": 255, "name": "Sound-Modus (32 Farben)", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Programmgeschwindigkeit / Soundempfindlichkeit",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Tempo (CH10 032-223) / Sound aus (CH10 224-255)", "art": ""},
+            {"von": 11, "bis": 255, "name": "Tempo langsam -> schnell / Soundempf. niedrig -> hoch", "art": ""}
+          ]
+        },
+        {
+          "name": "Dimmerkurve",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 51, "name": "Dimmerkurve aus dem Menue", "art": ""},
+            {"von": 52, "bis": 101, "name": "Dimmerkurve aus (linear)", "art": ""},
+            {"von": 102, "bis": 152, "name": "Dimmerkurve 1 (schnell)", "art": ""},
+            {"von": 153, "bis": 203, "name": "Dimmerkurve 2 (mittel)", "art": ""},
+            {"von": 204, "bis": 255, "name": "Dimmerkurve 3 (langsam)", "art": ""}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "12x Hex-LED RGBAW+UV. Pulse-Strobe (CH10 032-127) wirkt nur bei aktiven Farbkanaelen."
+}

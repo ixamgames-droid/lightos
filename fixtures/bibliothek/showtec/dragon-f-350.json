@@ -1,0 +1,42 @@
+{
+  "format_version": 1,
+  "hersteller": "Showtec",
+  "hersteller_kurz": "Showtec",
+  "modell": "Dragon F-350",
+  "kurzname": "DRAGONF350",
+  "typ": "hazer",
+  "leistung_w": 1000,
+  "notizen": "Fazer/Hazer, 1000 W, 1 DMX-Kanal. Ohne Handbuch nachbearbeitet.",
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Showtec-Dragon-F-350.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Showtec/Showtec-Dragon-F-350.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.9.1 · Jasper Zevering",
+    "original": "resources/fixtures/Showtec/Showtec-Dragon-F-350.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; LightOS-Nachbearbeitung (FM-57): kurzname DRAGONF350; Kanal als 'Dunst-Ausstoss' mit Attribut dimmer wie die eingebaute Nebelmaschine (Blackout stoppt Ausstoss); Highlight 0 (kein Dunst beim Highlight)"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "aus QLC+ konvertiert und von LightOS nach Kanalnamen/Bereichen nachbearbeitet; kein Herstellerhandbuch verfuegbar (Hersteller-Website hinter Bot-Sperre) — nicht Kanal fuer Kanal gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "Normal",
+      "kanaele": [
+        {
+          "name": "Dunst-Ausstoss",
+          "attribut": "dimmer",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Ausstoss aus -> voll"}
+          ]
+        }
+      ]
+    }
+  ]
+}

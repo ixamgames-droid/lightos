@@ -1,0 +1,383 @@
+{
+  "format_version": 1,
+  "hersteller": "Varytec",
+  "hersteller_kurz": "Varytec",
+  "modell": "Hero Spot Wash 80 2in1 RGBW+W",
+  "kurzname": "HEROSW80",
+  "typ": "moving_head",
+  "leistung_w": 110,
+  "quelle": {
+    "titel": "Varytec Hero Spot Wash 80 2in1 RGBW+W – Bedienungsanleitung (EN)",
+    "version": "V3",
+    "datum": "2022-06-02",
+    "url": "https://images.static-thomann.de/pics/atg/atgdata/document/manual/c_451570_v3_en_online.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.2 · Hans-Jürgen Tappe",
+    "original": "resources/fixtures/Varytec/Varytec-Hero-Spot-Wash-80-2in1-RGBW+W.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 157 Wertebereiche mit Art (kind) versehen; gegen Herstellerhandbuch V3 (2022-06-02) abgeglichen; Kanal- und Bereichsnamen deutsch, Wash-/Spot-Zugehörigkeit im Namen; Shutter-Default/Highlight 0 (offen); Wash-Farbmakros von color_wheel auf macro und ohne color-Art; Farbsequenz-Kanal ohne falsche gobo-Arten, Musik-Bereich als sound; Spot-Farbrad Weiß als open, Goborad Offen als open; Farbtemperatur ohne falschen color-Bereich; Kurzname, Notizen"
+  },
+  "autor": "LightOS (QXF-Konverter, nachbearbeitet FM-57)",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal für Kanal gegen die Bedienungsanleitung V3 (Kap. 7.3–7.5 DMX-Tabellen 8/15/20 Kanäle) geprüft; nicht am Gerät"
+  },
+  "modi": [
+    {
+      "name": "8 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Wash Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Wash Strobe/Shutter",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Offen", "art": "open"},
+            {"von": 10, "bis": 250, "name": "Strobe, Tempo steigend", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Offen", "art": "open"}
+          ]
+        },
+        {"name": "Spot Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Spot Strobe/Shutter",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Offen", "art": "open"},
+            {"von": 10, "bis": 250, "name": "Strobe, Tempo steigend", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Offen", "art": "open"}
+          ]
+        },
+        {
+          "name": "Farbsequenz + Gobos (Spot)",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 24, "name": "Keine Funktion", "art": ""},
+            {"von": 25, "bis": 50, "name": "Auto-Farbwechsel, Gobo 1", "art": ""},
+            {"von": 51, "bis": 75, "name": "Auto-Farbwechsel, Gobo 2", "art": ""},
+            {"von": 76, "bis": 100, "name": "Auto-Farbwechsel, Gobo 3", "art": ""},
+            {"von": 101, "bis": 125, "name": "Auto-Farbwechsel, Gobo 4", "art": ""},
+            {"von": 126, "bis": 150, "name": "Auto-Farbwechsel, Gobo 5", "art": ""},
+            {"von": 151, "bis": 175, "name": "Auto-Farbwechsel, Gobo 6", "art": ""},
+            {"von": 176, "bis": 200, "name": "Auto-Farbwechsel, Gobo 7", "art": ""},
+            {
+              "von": 201,
+              "bis": 255,
+              "name": "Auto-Farbwechsel + Gobo, musikgesteuert (Empfindlichkeit steigend)",
+              "art": "sound"
+            }
+          ]
+        },
+        {
+          "name": "Automatik-Programme / Reset",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Keine Funktion", "art": ""},
+            {"von": 11, "bis": 20, "name": "Automatik-Show 1", "art": ""},
+            {"von": 21, "bis": 30, "name": "Automatik-Show 2", "art": ""},
+            {"von": 31, "bis": 40, "name": "Automatik-Show 3", "art": ""},
+            {"von": 41, "bis": 50, "name": "Automatik-Show 4", "art": ""},
+            {"von": 51, "bis": 60, "name": "Automatik-Show 5", "art": ""},
+            {"von": 61, "bis": 70, "name": "Automatik-Show 6", "art": ""},
+            {"von": 71, "bis": 80, "name": "Automatik-Show 7", "art": ""},
+            {"von": 81, "bis": 90, "name": "Automatik-Show 8", "art": ""},
+            {"von": 91, "bis": 230, "name": "Musiksteuerung (Mikrofon-Empfindlichkeit aus → hoch)", "art": "sound"},
+            {"von": 231, "bis": 240, "name": "Reset (mind. 3 s senden)", "art": "reset"},
+            {"von": 241, "bis": 255, "name": "Keine Funktion", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "15 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Wash Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Wash Strobe/Shutter",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Offen", "art": "open"},
+            {"von": 10, "bis": 250, "name": "Strobe, Tempo steigend", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Offen", "art": "open"}
+          ]
+        },
+        {"name": "Wash Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Wash Grün", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Wash Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Wash Weiß", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Wash Farbmakros",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Keine Funktion", "art": ""},
+            {"von": 11, "bis": 20, "name": "Rot", "art": ""},
+            {"von": 21, "bis": 30, "name": "Grün", "art": ""},
+            {"von": 31, "bis": 40, "name": "Blau", "art": ""},
+            {"von": 41, "bis": 50, "name": "Weiß", "art": ""},
+            {"von": 51, "bis": 60, "name": "Rot + Weiß", "art": ""},
+            {"von": 61, "bis": 70, "name": "Grün + Weiß", "art": ""},
+            {"von": 71, "bis": 80, "name": "Blau + Weiß", "art": ""},
+            {"von": 81, "bis": 90, "name": "Rot + Grün", "art": ""},
+            {"von": 91, "bis": 100, "name": "Grün + Blau", "art": ""},
+            {"von": 101, "bis": 110, "name": "Rot + Blau", "art": ""},
+            {"von": 111, "bis": 120, "name": "Rot + Grün + Weiß", "art": ""},
+            {"von": 121, "bis": 130, "name": "Grün + Blau + Weiß", "art": ""},
+            {"von": 131, "bis": 140, "name": "Rot + Blau + Weiß", "art": ""},
+            {"von": 141, "bis": 150, "name": "Rot + Grün + Blau + Weiß", "art": ""},
+            {"von": 151, "bis": 200, "name": "Farbwechsel, Tempo steigend", "art": ""},
+            {"von": 201, "bis": 255, "name": "Farbüberblendung, Tempo steigend", "art": ""}
+          ]
+        },
+        {"name": "Spot Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Spot Strobe/Shutter",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Offen", "art": "open"},
+            {"von": 10, "bis": 250, "name": "Strobe, Tempo steigend", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Offen", "art": "open"}
+          ]
+        },
+        {
+          "name": "Spot Farbrad",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 24, "name": "Weiß (offen)", "art": "open"},
+            {"von": 25, "bis": 50, "name": "Rot", "art": "color"},
+            {"von": 51, "bis": 75, "name": "Gelb", "art": "color"},
+            {"von": 76, "bis": 100, "name": "Hellblau", "art": "color"},
+            {"von": 101, "bis": 125, "name": "Grün", "art": "color"},
+            {"von": 126, "bis": 150, "name": "Amber", "art": "color"},
+            {"von": 151, "bis": 175, "name": "Lila", "art": "color"},
+            {"von": 176, "bis": 200, "name": "Blau", "art": "color"},
+            {"von": 201, "bis": 255, "name": "Regenbogeneffekt mit Richtungswechsel, Tempo steigend", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Spot Goborad",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Offen", "art": "open"},
+            {"von": 11, "bis": 20, "name": "Gobo 1", "art": "gobo"},
+            {"von": 21, "bis": 30, "name": "Gobo 2", "art": "gobo"},
+            {"von": 31, "bis": 40, "name": "Gobo 3", "art": "gobo"},
+            {"von": 41, "bis": 50, "name": "Gobo 4", "art": "gobo"},
+            {"von": 51, "bis": 60, "name": "Gobo 5", "art": "gobo"},
+            {"von": 61, "bis": 70, "name": "Gobo 6", "art": "gobo"},
+            {"von": 71, "bis": 80, "name": "Gobo 7", "art": "gobo"},
+            {"von": 81, "bis": 90, "name": "Gobo 1 Shake, Tempo steigend", "art": "shake"},
+            {"von": 91, "bis": 100, "name": "Gobo 2 Shake, Tempo steigend", "art": "shake"},
+            {"von": 101, "bis": 110, "name": "Gobo 3 Shake, Tempo steigend", "art": "shake"},
+            {"von": 111, "bis": 120, "name": "Gobo 4 Shake, Tempo steigend", "art": "shake"},
+            {"von": 121, "bis": 130, "name": "Gobo 5 Shake, Tempo steigend", "art": "shake"},
+            {"von": 131, "bis": 140, "name": "Gobo 6 Shake, Tempo steigend", "art": "shake"},
+            {"von": 141, "bis": 150, "name": "Gobo 7 Shake, Tempo steigend", "art": "shake"},
+            {
+              "von": 151,
+              "bis": 255,
+              "name": "Gobo-Durchlauf mit Richtungswechsel (Jo-Jo), schnell → langsam",
+              "art": "rotate"
+            }
+          ]
+        },
+        {"name": "Spot Fokus", "attribut": "focus", "default": 0, "highlight": 0},
+        {
+          "name": "Automatik-Programme / Reset",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Keine Funktion", "art": ""},
+            {"von": 11, "bis": 20, "name": "Automatik-Show 1", "art": ""},
+            {"von": 21, "bis": 30, "name": "Automatik-Show 2", "art": ""},
+            {"von": 31, "bis": 40, "name": "Automatik-Show 3", "art": ""},
+            {"von": 41, "bis": 50, "name": "Automatik-Show 4", "art": ""},
+            {"von": 51, "bis": 60, "name": "Automatik-Show 5", "art": ""},
+            {"von": 61, "bis": 70, "name": "Automatik-Show 6", "art": ""},
+            {"von": 71, "bis": 80, "name": "Automatik-Show 7", "art": ""},
+            {"von": 81, "bis": 90, "name": "Automatik-Show 8", "art": ""},
+            {"von": 91, "bis": 230, "name": "Musiksteuerung (Mikrofon-Empfindlichkeit aus → hoch)", "art": "sound"},
+            {"von": 231, "bis": 240, "name": "Reset (mind. 3 s senden)", "art": "reset"},
+            {"von": 241, "bis": 255, "name": "Keine Funktion", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "20 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fein", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fein", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt-Tempo (0 = schnell, 255 = langsam)", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Wash Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Wash Strobe/Shutter",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Offen", "art": "open"},
+            {"von": 10, "bis": 250, "name": "Strobe, Tempo steigend", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Offen", "art": "open"}
+          ]
+        },
+        {"name": "Wash Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Wash Grün", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Wash Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Wash Weiß", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Wash Farbtemperatur (0–100 %)", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Wash Farbmakros",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Keine Funktion", "art": ""},
+            {"von": 11, "bis": 20, "name": "Rot", "art": ""},
+            {"von": 21, "bis": 30, "name": "Grün", "art": ""},
+            {"von": 31, "bis": 40, "name": "Blau", "art": ""},
+            {"von": 41, "bis": 50, "name": "Weiß", "art": ""},
+            {"von": 51, "bis": 60, "name": "Rot + Weiß", "art": ""},
+            {"von": 61, "bis": 70, "name": "Grün + Weiß", "art": ""},
+            {"von": 71, "bis": 80, "name": "Blau + Weiß", "art": ""},
+            {"von": 81, "bis": 90, "name": "Rot + Grün", "art": ""},
+            {"von": 91, "bis": 100, "name": "Grün + Blau", "art": ""},
+            {"von": 101, "bis": 110, "name": "Rot + Blau", "art": ""},
+            {"von": 111, "bis": 120, "name": "Rot + Grün + Weiß", "art": ""},
+            {"von": 121, "bis": 130, "name": "Grün + Blau + Weiß", "art": ""},
+            {"von": 131, "bis": 140, "name": "Rot + Blau + Weiß", "art": ""},
+            {"von": 141, "bis": 150, "name": "Rot + Grün + Blau + Weiß", "art": ""},
+            {"von": 151, "bis": 200, "name": "Farbwechsel, Tempo steigend", "art": ""},
+            {"von": 201, "bis": 255, "name": "Farbüberblendung, Tempo steigend", "art": ""}
+          ]
+        },
+        {"name": "Spot Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Spot Strobe/Shutter",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Offen", "art": "open"},
+            {"von": 10, "bis": 250, "name": "Strobe, Tempo steigend", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Offen", "art": "open"}
+          ]
+        },
+        {
+          "name": "Spot Farbrad",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 24, "name": "Weiß (offen)", "art": "open"},
+            {"von": 25, "bis": 50, "name": "Rot", "art": "color"},
+            {"von": 51, "bis": 75, "name": "Gelb", "art": "color"},
+            {"von": 76, "bis": 100, "name": "Hellblau", "art": "color"},
+            {"von": 101, "bis": 125, "name": "Grün", "art": "color"},
+            {"von": 126, "bis": 150, "name": "Amber", "art": "color"},
+            {"von": 151, "bis": 175, "name": "Lila", "art": "color"},
+            {"von": 176, "bis": 200, "name": "Blau", "art": "color"},
+            {"von": 201, "bis": 255, "name": "Regenbogeneffekt mit Richtungswechsel, Tempo steigend", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Spot Goborad",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Offen", "art": "open"},
+            {"von": 11, "bis": 20, "name": "Gobo 1", "art": "gobo"},
+            {"von": 21, "bis": 30, "name": "Gobo 2", "art": "gobo"},
+            {"von": 31, "bis": 40, "name": "Gobo 3", "art": "gobo"},
+            {"von": 41, "bis": 50, "name": "Gobo 4", "art": "gobo"},
+            {"von": 51, "bis": 60, "name": "Gobo 5", "art": "gobo"},
+            {"von": 61, "bis": 70, "name": "Gobo 6", "art": "gobo"},
+            {"von": 71, "bis": 80, "name": "Gobo 7", "art": "gobo"},
+            {"von": 81, "bis": 90, "name": "Gobo 1 Shake, Tempo steigend", "art": "shake"},
+            {"von": 91, "bis": 100, "name": "Gobo 2 Shake, Tempo steigend", "art": "shake"},
+            {"von": 101, "bis": 110, "name": "Gobo 3 Shake, Tempo steigend", "art": "shake"},
+            {"von": 111, "bis": 120, "name": "Gobo 4 Shake, Tempo steigend", "art": "shake"},
+            {"von": 121, "bis": 130, "name": "Gobo 5 Shake, Tempo steigend", "art": "shake"},
+            {"von": 131, "bis": 140, "name": "Gobo 6 Shake, Tempo steigend", "art": "shake"},
+            {"von": 141, "bis": 150, "name": "Gobo 7 Shake, Tempo steigend", "art": "shake"},
+            {
+              "von": 151,
+              "bis": 255,
+              "name": "Gobo-Durchlauf mit Richtungswechsel (Jo-Jo), schnell → langsam",
+              "art": "rotate"
+            }
+          ]
+        },
+        {"name": "Spot Fokus", "attribut": "focus", "default": 0, "highlight": 0},
+        {
+          "name": "Farbsequenz + Gobos (Spot)",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 24, "name": "Keine Funktion", "art": ""},
+            {"von": 25, "bis": 50, "name": "Auto-Farbwechsel, Gobo 1", "art": ""},
+            {"von": 51, "bis": 75, "name": "Auto-Farbwechsel, Gobo 2", "art": ""},
+            {"von": 76, "bis": 100, "name": "Auto-Farbwechsel, Gobo 3", "art": ""},
+            {"von": 101, "bis": 125, "name": "Auto-Farbwechsel, Gobo 4", "art": ""},
+            {"von": 126, "bis": 150, "name": "Auto-Farbwechsel, Gobo 5", "art": ""},
+            {"von": 151, "bis": 175, "name": "Auto-Farbwechsel, Gobo 6", "art": ""},
+            {"von": 176, "bis": 200, "name": "Auto-Farbwechsel, Gobo 7", "art": ""},
+            {
+              "von": 201,
+              "bis": 255,
+              "name": "Auto-Farbwechsel + Gobo, musikgesteuert (Empfindlichkeit steigend)",
+              "art": "sound"
+            }
+          ]
+        },
+        {
+          "name": "Automatik-Programme / Reset",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Keine Funktion", "art": ""},
+            {"von": 11, "bis": 20, "name": "Automatik-Show 1", "art": ""},
+            {"von": 21, "bis": 30, "name": "Automatik-Show 2", "art": ""},
+            {"von": 31, "bis": 40, "name": "Automatik-Show 3", "art": ""},
+            {"von": 41, "bis": 50, "name": "Automatik-Show 4", "art": ""},
+            {"von": 51, "bis": 60, "name": "Automatik-Show 5", "art": ""},
+            {"von": 61, "bis": 70, "name": "Automatik-Show 6", "art": ""},
+            {"von": 71, "bis": 80, "name": "Automatik-Show 7", "art": ""},
+            {"von": 81, "bis": 90, "name": "Automatik-Show 8", "art": ""},
+            {"von": 91, "bis": 230, "name": "Musiksteuerung (Mikrofon-Empfindlichkeit aus → hoch)", "art": "sound"},
+            {"von": 231, "bis": 240, "name": "Reset (mind. 3 s senden)", "art": "reset"},
+            {"von": 241, "bis": 255, "name": "Keine Funktion", "art": ""}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Hybrid-Moving-Head: 30-W-Weißlicht-Spot (Farbrad 7 Farben, 7 Gobos, Fokus) + Wash-Ring 6 × 8 W RGBW. Wash und Spot haben je eigenen Dimmer und Shutter."
+}

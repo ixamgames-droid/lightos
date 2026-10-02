@@ -1,0 +1,192 @@
+{
+  "format_version": 1,
+  "hersteller": "Eurolite",
+  "hersteller_kurz": "Eurolite",
+  "modell": "TMH-S90 Moving-Head Spot",
+  "kurzname": "TMH-S90 Moving-Head Spot",
+  "typ": "moving_head",
+  "leistung_w": 140,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Eurolite-TMH-S90-Moving-Head-Spot.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Eurolite/Eurolite-TMH-S90-Moving-Head-Spot.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.14.2 GIT · Nils Hitschke",
+    "original": "resources/fixtures/Eurolite/Eurolite-TMH-S90-Moving-Head-Spot.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 69 Wertebereiche mit Art (kind) versehen; Farbrad: Offen/Weiss als 'open' statt Farbe; statisches Gobo-Rad: Offen als 'open', Gobo-7-Shake als 'shake' (war 'gobo'); rotierendes Gobo-Rad gobo_rotation -> gobo_wheel2 (eigenes Rad, Rotation liegt auf Kanal 11); Offen 'open', Shake-Bereiche 'shake'; Prisma ohne Rotation als 'prism'; Tippfehler 'rando,' -> 'random'"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Datei und die LightOS-Attributliste geprueft (Attribute, Bereichs-Arten, Defaults, Raster); Herstellerhandbuch mit DMX-Tabelle war nicht abrufbar (Steinigke liefert nur Datenblaetter ohne DMX-Protokoll), daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "15 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Shutter, Strobe",
+          "attribut": "shutter",
+          "default": 5,
+          "highlight": 5,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Neutral", "art": "open"},
+            {"von": 11, "bis": 255, "name": "Strobe-effect with increasing speed", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Color",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Offen/Weiss", "art": "open"},
+            {"von": 5, "bis": 9, "name": "White + Red", "art": "color"},
+            {"von": 10, "bis": 14, "name": "Red", "art": "color"},
+            {"von": 15, "bis": 19, "name": "Red + Green", "art": "color"},
+            {"von": 20, "bis": 24, "name": "Green", "art": "color"},
+            {"von": 25, "bis": 29, "name": "Green + Blue", "art": "color"},
+            {"von": 30, "bis": 34, "name": "Blue", "art": "color"},
+            {"von": 35, "bis": 39, "name": "Blue + Yellow", "art": "color"},
+            {"von": 40, "bis": 44, "name": "Yellow", "art": "color"},
+            {"von": 45, "bis": 49, "name": "Yellow + Orange", "art": "color"},
+            {"von": 50, "bis": 54, "name": "Orange", "art": "color"},
+            {"von": 55, "bis": 59, "name": "Orange + Light Blue", "art": "color"},
+            {"von": 60, "bis": 64, "name": "Light Blue", "art": "color"},
+            {"von": 65, "bis": 69, "name": "Light Blue + Magenta", "art": "color"},
+            {"von": 70, "bis": 74, "name": "Magenta", "art": "color"},
+            {"von": 75, "bis": 79, "name": "Magenta + White", "art": "color"},
+            {"von": 80, "bis": 167, "name": "Rainbow Forwards", "art": "rotate"},
+            {"von": 168, "bis": 255, "name": "Rainbow Backwards", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Static gobo",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Open", "art": "open"},
+            {"von": 10, "bis": 19, "name": "Gobo 1", "art": "gobo"},
+            {"von": 20, "bis": 29, "name": "Gobo 2", "art": "gobo"},
+            {"von": 30, "bis": 39, "name": "Gobo 3", "art": "gobo"},
+            {"von": 40, "bis": 49, "name": "Gobo 4", "art": "gobo"},
+            {"von": 50, "bis": 59, "name": "Gobo 5", "art": "gobo"},
+            {"von": 60, "bis": 69, "name": "Gobo 6", "art": "gobo"},
+            {"von": 70, "bis": 79, "name": "Gobo 7", "art": "gobo"},
+            {"von": 80, "bis": 89, "name": "Gobo 1 shake with increasing speed", "art": "shake"},
+            {"von": 90, "bis": 99, "name": "Gobo 2 shake with increasing speed", "art": "shake"},
+            {"von": 100, "bis": 109, "name": "Gobo 3 shake with increasing speed", "art": "shake"},
+            {"von": 110, "bis": 119, "name": "Gobo 4 shake with increasing speed", "art": "shake"},
+            {"von": 120, "bis": 129, "name": "Gobo 5 shake with increasing speed", "art": "shake"},
+            {"von": 130, "bis": 139, "name": "Gobo 6 shake with increasing speed", "art": "shake"},
+            {"von": 140, "bis": 149, "name": "Gobo 7 shake with increasing speed", "art": "shake"},
+            {
+              "von": 150,
+              "bis": 202,
+              "name": "Cont. gobo-wheel forwards rotation with decreasing speed",
+              "art": "rotate"
+            },
+            {
+              "von": 203,
+              "bis": 255,
+              "name": "Cont. gobo-wheel backwards rotation with increasing speed",
+              "art": "rotate"
+            }
+          ]
+        },
+        {
+          "name": "Rotating gobo",
+          "attribut": "gobo_wheel2",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Open", "art": "open"},
+            {"von": 10, "bis": 19, "name": "Rotating gobo 1", "art": "gobo"},
+            {"von": 20, "bis": 29, "name": "Rotating gobo 2", "art": "gobo"},
+            {"von": 30, "bis": 39, "name": "Rotating gobo 3", "art": "gobo"},
+            {"von": 40, "bis": 49, "name": "Rotating gobo 4", "art": "gobo"},
+            {"von": 50, "bis": 59, "name": "Rotating gobo 5", "art": "gobo"},
+            {"von": 60, "bis": 69, "name": "Rotating gobo 6", "art": "gobo"},
+            {"von": 70, "bis": 79, "name": "Gobo 1 shake with increasing speed", "art": "shake"},
+            {"von": 80, "bis": 89, "name": "Gobo 2 shake with increasing speed", "art": "shake"},
+            {"von": 90, "bis": 99, "name": "Gobo 3 shake with increasing speed", "art": "shake"},
+            {"von": 100, "bis": 109, "name": "Gobo 4 shake with increasing speed", "art": "shake"},
+            {"von": 110, "bis": 119, "name": "Gobo 5 shake with increasing speed", "art": "shake"},
+            {"von": 120, "bis": 129, "name": "Gobo 6 shake with increasing speed", "art": "shake"},
+            {
+              "von": 130,
+              "bis": 192,
+              "name": "Cont. gobo-wheel forwards rotation with decreasing speed",
+              "art": "rotate"
+            },
+            {
+              "von": 193,
+              "bis": 255,
+              "name": "Cont. gobo-wheel backwards rotation with increasing speed",
+              "art": "rotate"
+            }
+          ]
+        },
+        {
+          "name": "Gobo rotation",
+          "attribut": "gobo_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "No rotation", "art": ""},
+            {"von": 128, "bis": 190, "name": "Gobo rotation forwards with decreasing speed", "art": "rotate"},
+            {"von": 191, "bis": 192, "name": "Stop", "art": ""},
+            {"von": 193, "bis": 255, "name": "Gobo rotation backwards with increasing speed", "art": "rotate"}
+          ]
+        },
+        {"name": "Focus", "attribut": "focus", "default": 0, "highlight": 0},
+        {
+          "name": "Prism",
+          "attribut": "prism",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Open", "art": "open"},
+            {"von": 128, "bis": 136, "name": "Prism (no rotation)", "art": "prism"},
+            {"von": 137, "bis": 255, "name": "Prism rotation with increasing speed", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Internal programs",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Neutral", "art": ""},
+            {"von": 6, "bis": 55, "name": "Internal program 1", "art": ""},
+            {"von": 56, "bis": 105, "name": "Internal program 2", "art": ""},
+            {"von": 106, "bis": 155, "name": "Internal program 3", "art": ""},
+            {"von": 156, "bis": 205, "name": "Internal program 4", "art": ""},
+            {"von": 206, "bis": 255, "name": "Internal program random", "art": ""}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 25, "name": "Neutral", "art": ""},
+            {"von": 26, "bis": 76, "name": "Reset others", "art": "reset"},
+            {"von": 77, "bis": 127, "name": "Reset Pan/Tilt", "art": "reset"},
+            {"von": 128, "bis": 255, "name": "Reset all", "art": "reset"}
+          ]
+        }
+      ]
+    }
+  ]
+}
