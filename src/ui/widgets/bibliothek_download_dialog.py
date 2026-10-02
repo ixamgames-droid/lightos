@@ -7,7 +7,10 @@ in einem Hintergrund-Thread; der Dialog zeigt nur an.
 * „Nicht jetzt“ beim ersten Start zaehlt als Antwort — die Frage kommt nicht
   wieder (ueber das Menue Datenbank bleibt der Download jederzeit erreichbar).
 * Ohne Netz zaehlt sie NICHT als Antwort: beim naechsten Start wird erneut
-  gefragt.
+  gefragt. Das gilt fuer jeden Versuch, der nicht fertig wurde (offline,
+  Fehler, Abbruch): danach heisst der Knopf „Schließen“ und schreibt keinen
+  Merker (Review #866). Als „nicht jetzt“ zaehlt nur das Ablehnen VOR dem
+  ersten Versuch.
 """
 from __future__ import annotations
 
@@ -43,6 +46,7 @@ class BibliothekDownloadDialog(QDialog):
         self._oeffnen = oeffnen
         self._stopp = threading.Event()
         self._thread = None
+        self._versucht = False
         self.ergebnis = None
         self._s = _Signale()
         self._s.groesse.connect(self._groesse_da)
@@ -135,6 +139,7 @@ class BibliothekDownloadDialog(QDialog):
         if self.laeuft():
             return
         quelle = self.quelle()
+        self._versucht = True
         self._stopp.clear()
         for knopf in self._wahl.values():
             knopf.setEnabled(False)
@@ -196,7 +201,7 @@ class BibliothekDownloadDialog(QDialog):
             knopf.setEnabled(True)
 
     def _spaeter(self):
-        if self._erststart and self.ergebnis is None:
+        if self._erststart and not self._versucht and self.ergebnis is None:
             BD.merker_schreiben(gefragt=True, antwort="nicht jetzt")
         self.accept()
 

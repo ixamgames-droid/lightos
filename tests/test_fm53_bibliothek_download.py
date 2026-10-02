@@ -316,6 +316,19 @@ class Dialog(_Basis):
         d.btn_spaeter.click()
         self.assertFalse(BD.beim_start_fragen(self.motor))
 
+    def test_offline_beim_erststart_dann_schliessen_fragt_wieder(self):
+        """Review #866: nach einem gescheiterten Versuch heisst der Knopf
+        „Schließen“ — der darf die Frage nicht als beantwortet merken."""
+        d = self._dialog(erststart=True,
+                         oeffnen=_netz(fehler=urllib.error.URLError("kein Netz")))
+        self._warten(lambda: "Keine Verbindung" in d._status.text())
+        d.btn_laden.click()
+        self._warten(lambda: not d.laeuft() and d.btn_spaeter.text() == "Schließen"
+                     and d.btn_spaeter.isEnabled())
+        d.btn_spaeter.click()
+        self.assertTrue(BD.beim_start_fragen(self.motor),
+                        "offline gescheitert ist keine Antwort")
+
     def test_offline_sagt_es_und_importiert_nichts(self):
         vorher = self._profile()
         d = self._dialog(oeffnen=_netz(fehler=urllib.error.URLError("kein Netz")))
