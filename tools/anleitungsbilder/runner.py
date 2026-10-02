@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import importlib
+import importlib.util
 import io
 import json
 import os
@@ -116,9 +117,21 @@ GIF_ZIEL = 1024 * 1024               # darueber: Hinweis im Lauf
 
 # ── Szenen-Dateien finden ───────────────────────────────────────────────────
 
+# TOOL-8: zusaetzlicher Ordner mit ``szenen_*.py`` — nur fuer Tests (eine
+# Anleitung, die Zustand hinterlaesst, und eine, die ihn pruefen soll), damit
+# keine Test-Szene im Paket liegt und im echten ``--alle`` mitliefe.
+ENV_SZENEN_ORDNER = "LIGHTOS_DOKU_SZENEN_ORDNER"
+
+
+def _extra_ordner() -> str | None:
+    pfad = os.environ.get(ENV_SZENEN_ORDNER, "").strip()
+    return pfad if pfad and os.path.isdir(pfad) else None
+
+
 def anleitungen() -> list[str]:
-    return sorted(m.name[len("szenen_"):] for m in pkgutil.iter_modules([PAKET])
-                  if m.name.startswith("szenen_"))
+    orte = [PAKET] + ([_extra_ordner()] if _extra_ordner() else [])
+    return sorted({m.name[len("szenen_"):] for m in pkgutil.iter_modules(orte)
+                   if m.name.startswith("szenen_")})
 
 
 def lade_szenen(anleitung: str):
@@ -126,7 +139,16 @@ def lade_szenen(anleitung: str):
     if anleitung not in anleitungen():
         raise SystemExit(f"[anleitungsbilder] Unbekannte Anleitung '{anleitung}'. "
                          f"Vorhanden: {', '.join(anleitungen()) or '-'}")
-    mod = importlib.import_module(f"anleitungsbilder.szenen_{anleitung}")
+    extra = _extra_ordner()
+    datei = os.path.join(extra, f"szenen_{anleitung}.py") if extra else ""
+    if datei and os.path.isfile(datei) and not os.path.isfile(
+            os.path.join(PAKET, f"szenen_{anleitung}.py")):
+        spec = importlib.util.spec_from_file_location(
+            f"anleitungsbilder_extra_szenen_{anleitung}", datei)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+    else:
+        mod = importlib.import_module(f"anleitungsbilder.szenen_{anleitung}")
     szenen = list(getattr(mod, "SZENEN"))
     namen = [s.name for s in szenen]
     doppelt = {n for n in namen if namen.count(n) > 1}
