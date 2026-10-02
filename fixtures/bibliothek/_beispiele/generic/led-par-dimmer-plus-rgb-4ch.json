@@ -1,0 +1,24 @@
+{
+  "format_version": 1,
+  "hersteller": "Generic",
+  "hersteller_kurz": "GEN",
+  "modell": "LED PAR Dimmer+RGB 4ch",
+  "kurzname": "PARD",
+  "typ": "par",
+  "leistung_w": 50,
+  "quelle": {"titel": "LightOS-Bestand: generisches Profil (kein bestimmtes Geraet)"},
+  "herkunft": {"art": "lightos", "lizenz": "eigen"},
+  "autor": "LightOS",
+  "geprueft": {"ok": false, "wie": "generisches Profil, an keinem Geraet gemessen"},
+  "modi": [
+    {
+      "name": "4-Kanal Dimmer+RGB",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Grün", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    }
+  ]
+}
