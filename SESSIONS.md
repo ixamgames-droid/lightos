@@ -64,6 +64,7 @@
 | FM-58 | A | feat/fm58-bibliothek-runde2 | 2026-10-02T18:20Z | fixtures/bibliothek |
 | UI-72 | B | docs/ui72-ui73-befunde | 2026-10-02T22:02Z | BACKLOG.md |
 | UI-73 | B | docs/ui72-ui73-befunde | 2026-10-02T22:02Z | BACKLOG.md |
+| SAMMEL-DOKU-C | A | sammel/doku-c | 2026-10-02T22:08Z | docs · BACKLOG.md |
 
 ## Blocker & Fallen
 
@@ -148,7 +149,6 @@
 
 ## Verlauf
 
-- 2026-10-02T12:24Z C claim DOC-52
 - 2026-10-02T12:24Z A claim VIZ-66
 - 2026-10-02T12:26Z A claim FM-56
 - 2026-10-02T12:26Z C claim DOC-53
@@ -178,3 +178,4 @@
 - 2026-10-02T22:02Z B claim UI-73
 - 2026-10-02T22:03Z B done XPLAT-45
 - 2026-10-02T22:03Z B done FUNKTIONSTEST-B3
+- 2026-10-02T22:08Z A claim SAMMEL-DOKU-C
