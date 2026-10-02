@@ -67,6 +67,7 @@
 | FM-59 | A | feat/fm59-bibliothek-runde3 | 2026-10-02T22:24Z | fixtures/bibliothek |
 | UI-72-73-FIX | B | fix/ui72-ui73-playback | 2026-10-02T22:44Z | src/ui/views/playback_view.py · src/core/cueliste_ziel.py · tests/test_ui72_ui73_playback.py |
 | FM-60 | A | fix/fm60-erststart-frage | 2026-10-02T22:46Z | src/core/database/bibliothek_download.py |
+| FM-61 | A | feat/fm61-bibliothek-china | 2026-10-02T22:51Z | fixtures/bibliothek |
 
 ## Blocker & Fallen
 
@@ -156,7 +157,6 @@
 
 ## Verlauf
 
-- 2026-10-02T12:53Z C claim WEB-06
 - 2026-10-02T12:58Z B claim BPM-21
 - 2026-10-02T13:02Z C claim DOC-54
 - 2026-10-02T13:04Z C claim DOC-55
@@ -186,3 +186,4 @@
 - 2026-10-02T22:44Z B claim UI-72-73-FIX
 - 2026-10-02T22:45Z C done FM-53
 - 2026-10-02T22:46Z A claim FM-60
+- 2026-10-02T22:51Z A claim FM-61
