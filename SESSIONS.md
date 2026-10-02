@@ -51,7 +51,6 @@
 | TOOL-2 | C | - | 2026-10-02T12:17Z | tools/gource · Code-Film.bat · Code-Film.sh · THIRD_PARTY_NOTICES.md · tests/test_proc18_fremd_lizenzhinweise.py · tests/test_tool2_keine_binaerdateien.py · BACKLOG.md · changelog.d/2026-10-02-TOOL-2.md |
 | DOC-51 | C | - | 2026-10-02T12:23Z | docs/anleitung_grosse_demo_2026/ANLEITUNG_GROSSE_DEMO_2026.md |
 | DOC-52 | C | - | 2026-10-02T12:24Z | docs/anleitung_komplettshow_2026 |
-| FM-56 | A | feat/fm56-eigene-bibliothek | 2026-10-02T17:08Z | fixtures/bibliothek · src/core/database/bibliothek_format.py · src/core/database/fixture_db.py |
 | DOC-53 | C | - | 2026-10-02T12:26Z | docs/anleitung_hochzeit_komplett · tools/build_hochzeit_komplett.py · tests/test_doc53_hochzeit_linie.py · changelog.d/2026-10-02-DOC-53.md |
 | TOOL-10 | C | - | 2026-10-02T12:28Z | BACKLOG.md |
 | XPLAT-42 | B | fix/xplat42-sandbox-aufraeumen | 2026-10-02T12:45Z | tools/anleitungsbilder.py · tools/anleitungsbilder/sandbox.py · tests/test_anleitungsbilder.py · BACKLOG.md |
@@ -143,7 +142,6 @@
 
 ## Verlauf
 
-- 2026-10-02T12:04Z C claim DOC-47
 - 2026-10-02T12:06Z C claim DOC-48
 - 2026-10-02T12:07Z C claim DOC-49
 - 2026-10-02T12:08Z C claim UI-71
@@ -173,3 +171,4 @@
 - 2026-10-02T16:55Z A done TOOL-9
 - 2026-10-02T17:01Z B uebergeben FUNKTIONSTEST-B2
 - 2026-10-02T17:10Z A done VIZ-66
+- 2026-10-02T17:50Z A done FM-56
