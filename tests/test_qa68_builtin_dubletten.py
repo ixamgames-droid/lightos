@@ -13,7 +13,9 @@ Gleiches Kuerzel bei VERSCHIEDENEN Herstellern ist erlaubt (Martin/Showtec
 import contextlib
 import io
 import os
+import subprocess
 import sys
+import tempfile
 import unittest
 
 from sqlalchemy import select
@@ -109,7 +111,7 @@ class Kommandozeile(_Basis):
     def _main(self, *argv):
         puffer = io.StringIO()
         with contextlib.redirect_stdout(puffer):
-            rc = LT.main(list(argv))
+            rc = LT.main(["--bibliothek", self.motor.url.database, *argv])
         return rc, puffer.getvalue()
 
     def test_meldet_und_entfernt_nicht(self):
@@ -129,6 +131,50 @@ class Kommandozeile(_Basis):
         self.assertEqual(rc, 0)
         self.assertNotIn("QA-68", text)
         self.assertIn("Keine Test-Rueckstaende gefunden.", text)
+
+    def test_ohne_bibliothek_wird_keine_angelegt(self):
+        with tempfile.TemporaryDirectory(prefix="lightos_qa68_") as tmp:
+            pfad = os.path.join(tmp, "fixtures.db")
+            puffer = io.StringIO()
+            with contextlib.redirect_stdout(puffer):
+                rc = LT.main(["--bibliothek", pfad])
+            self.assertEqual(rc, 0)
+            self.assertIn("Keine Bibliothek an diesem Ort.", puffer.getvalue())
+            self.assertFalse(os.path.exists(pfad))
+
+
+class OeffnetOhneAbgleich(_Basis):
+    """Review #855: ``fixture_db.engine()`` ruft ``ensure_builtins()``, und dessen
+    Abgleich (FM-50) ergaenzt in einer Bibliothek mit altem Stand die Modi JEDES
+    Builtins mit passendem Kuerzel, auch die der Dublette. Gemessen: der leere
+    Rest stand danach mit „2 Modi, mit Raster" da, und das Werkzeug hatte die
+    Bibliothek veraendert. Die frische Bibliothek hier traegt keinen
+    Abgleich-Stempel (nur ``_seed``), ist fuer einen neuen Prozess also genau
+    so eine alte Bibliothek. Darum laeuft das Werkzeug als eigener Prozess."""
+
+    def _modi(self, pid):
+        with Session(self.motor) as s:
+            return len(s.get(FixtureProfile, pid).modes)
+
+    def test_der_rest_bleibt_wie_er_ist(self):
+        rest = self._profil()
+        pfad = self.motor.url.database
+        with tempfile.TemporaryDirectory(prefix="lightos_qa68_") as tmp:
+            env = dict(os.environ)
+            env.update({"LIGHTOS_FIXTURE_DB": pfad,
+                        "LIGHTOS_SHOW_DB": os.path.join(tmp, "show.db"),
+                        "QT_QPA_PLATFORM": "offscreen",
+                        "PYTHONIOENCODING": "utf-8"})
+            lauf = subprocess.run(
+                [sys.executable, os.path.join(REPO, "tools", "library_testreste.py"),
+                 "--bibliothek", pfad],
+                cwd=REPO, env=env, capture_output=True, text=True,
+                encoding="utf-8", errors="replace", timeout=120)
+        self.assertEqual(lauf.returncode, 0, lauf.stdout + lauf.stderr)
+        self.assertIn(f"id={rest}  '{KUERZEL} (Rest)'  0 Modi\n", lauf.stdout,
+                      "der Rest muss so angezeigt werden, wie er in der Datei steht")
+        self.assertEqual(self._modi(rest), 0,
+                         "das Werkzeug hat die Dublette beim Oeffnen aufgefuellt")
 
 
 if __name__ == "__main__":

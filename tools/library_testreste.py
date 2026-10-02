@@ -18,6 +18,7 @@ Default zeigt nur an, was gefunden wurde.
 
     python3 tools/library_testreste.py               # nur anzeigen
     python3 tools/library_testreste.py --entfernen   # wirklich loeschen
+    python3 tools/library_testreste.py --bibliothek PFAD   # eine andere fixtures.db
 
 Erkannt wird, was den Test-Praefix traegt — bewusst eng: ein Hersteller, der
 zufaellig „Test" heisst, ist ein Nutzerprofil und geht dieses Werkzeug nichts an.
@@ -119,14 +120,27 @@ def main(argv=None) -> int:
     p.add_argument("--entfernen", action="store_true",
                    help="die gefundenen Test-Reste wirklich loeschen "
                         "(Builtin-Dubletten nie)")
+    p.add_argument("--bibliothek", metavar="PFAD",
+                   help="diese fixtures.db pruefen statt der eingestellten")
     args = p.parse_args(argv)
 
-    from src.core.database.fixture_db import engine as fdb_engine, DB_PATH
-    eng = fdb_engine()
+    from src.core.database.fixture_db import DB_PATH, get_engine
+    pfad = args.bibliothek or DB_PATH
+    print(f"Bibliothek: {pfad}")
+    if not os.path.isfile(pfad):
+        print("Keine Bibliothek an diesem Ort.")
+        return 0
+    # QA-68 (Review #855): NICHT ueber fixture_db.engine() oeffnen. Das ruft
+    # ensure_builtins(), und dessen Abgleich (FM-50) ergaenzt in einer Bibliothek
+    # mit altem Stand fehlende Modi und Raster an JEDEM Builtin mit passendem
+    # Kuerzel, auch an der Dublette, die hier gezeigt werden soll. Gemessen: ein
+    # leerer ZQ06121-Rest stand danach mit „2 Modi, mit Raster" da wie das echte
+    # Profil, und das Werkzeug hatte die Bibliothek geaendert, bevor es etwas
+    # anzeigte. get_engine() zieht nur fehlende Spalten nach, keine Inhalte.
+    eng = get_engine(pfad)
     hersteller, profile = finde(eng)
     dubletten = builtin_dubletten(eng)
 
-    print(f"Bibliothek: {DB_PATH}")
     if dubletten:
         print(f"{len(dubletten)} Builtin-Profil(e) mehrfach beim selben Hersteller "
               f"(QA-68) — nur angezeigt, nie automatisch entfernt:")
