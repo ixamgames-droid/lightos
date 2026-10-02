@@ -1,0 +1,69 @@
+{
+  "format_version": 1,
+  "hersteller": "BeamZ",
+  "hersteller_kurz": "BEAMZ",
+  "modell": "Blaze 1200",
+  "kurzname": "BLAZE1200",
+  "typ": "smoke",
+  "leistung_w": 1200,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition beamZ-Blaze-1200.qxf (Herstellerhandbuch nicht oeffentlich auffindbar)",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/beamZ/beamZ-Blaze-1200.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.1.0 GIT · Fede79",
+    "original": "resources/fixtures/beamZ/beamZ-Blaze-1200.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 6 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): Herstellername 'beamZ' -> 'BeamZ'; kurzname BLAZE1200; typ smoke statt hazer (vertikale Nebelmaschine, kein Hazer); Nebelkanal als dimmer statt macro, Wert 0 als closed, Highlight 0; Tippfehler 'No Fucntion' behoben, Kanalnamen deutsch, Modusbeschreibung ergaenzt"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": false,
+    "wie": "aus QLC+ konvertiert und von LightOS nach Kanalnamen/Bereichen nachbearbeitet; kein Handbuch fuer die Blaze1200 (Ref. 160.540) auf der Herstellerseite verfuegbar - nicht Kanal fuer Kanal gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "8 ch",
+      "beschreibung": "Nebel, LED-Dimmer, RGBA, Strobe, Makro",
+      "kanaele": [
+        {
+          "name": "Nebel",
+          "attribut": "dimmer",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Kein Nebel", "art": "closed"},
+            {"von": 1, "bis": 255, "name": "Nebelausstoss", "art": ""}
+          ]
+        },
+        {"name": "LED-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Offen", "art": "open"},
+            {"von": 1, "bis": 255, "name": "Strobe", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Makro",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Keine Funktion", "art": ""},
+            {"von": 1, "bis": 255, "name": "Makrofunktion", "art": ""}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Vertikale Nebelmaschine 1200W mit 24x4W-LEDs (RGBA). Nebelkanal als dimmer (eigene Klasse neben dem LED-Dimmer), Highlight 0, damit Highlight keinen Nebel ausloest."
+}

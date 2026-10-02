@@ -1,0 +1,289 @@
+{
+  "format_version": 1,
+  "hersteller": "Chauvet",
+  "hersteller_kurz": "CHAUVET",
+  "modell": "Intimidator Spot 375Z IRC",
+  "kurzname": "Intimidator Spot 375Z IRC",
+  "typ": "moving_head",
+  "leistung_w": 268,
+  "quelle": {
+    "titel": "Intimidator Spot 375Z IRC User Manual",
+    "version": "Rev. 7",
+    "url": "https://www.chauvetdj.com/wp-content/uploads/2017/07/Intimidator_Spot_375Z_IRC_UM_Rev7.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.8 GIT · Andrew Pavlin",
+    "original": "resources/fixtures/Chauvet/Chauvet-Intimidator-Spot-375Z-IRC.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 142 Wertebereiche mit Art (kind) versehen; danach von LightOS gegen das Herstellerhandbuch (Intimidator Spot 375Z IRC User Manual) Kanal fuer Kanal ueberarbeitet: Farbrad: Weiss als open, Farb-Index ohne Art rotate, CH6 224-255 als rueckwaerts (QLC+: vorwaerts); Goborad: Offen als open statt gobo, Stop ohne Art; Gobo-Rotation: Index ohne Art, Bounce als rotate statt gobo; Prisma: 5-/6-fach-Prisma-Bereiche als prism, 'Keine Funktion' als open; CH13 Steuerfunktionen als reset statt raw; 120-127 nach Handbuch 'Reset Goborad' (QLC+: Gobo-Rotation); Blackout-Optionen ohne Art closed; CH14 Bewegungsmakros als macro statt raw; Makro 7/8 in Handbuch-Reihenfolge (QLC+ vertauscht); Zoom-Richtung nach Handbuch (eng -> weit); Leistung nach Handbuch (268 W bei 230 V); Kanalnamen und Bereichsnamen auf Deutsch; Default/Highlight nach LightOS-Regeln (Pan/Tilt 128, Dimmer 0, Shutter offen)"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanalbelegung, Wertebereiche und Modi aller DMX-Modi Kanal fuer Kanal gegen das Herstellerhandbuch geprueft (nicht am echten Geraet)"
+  },
+  "modi": [
+    {
+      "name": "15 channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fein", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fein", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt-Geschwindigkeit (schnell -> langsam)", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Farbrad",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Weiss", "art": "open"},
+            {"von": 8, "bis": 15, "name": "Orange", "art": "color"},
+            {"von": 16, "bis": 23, "name": "Limettengruen", "art": "color"},
+            {"von": 24, "bis": 31, "name": "Cyan", "art": "color"},
+            {"von": 32, "bis": 39, "name": "Rot", "art": "color"},
+            {"von": 40, "bis": 47, "name": "Gruen", "art": "color"},
+            {"von": 48, "bis": 55, "name": "Magenta", "art": "color"},
+            {"von": 56, "bis": 63, "name": "Gelb", "art": "color"},
+            {"von": 64, "bis": 64, "name": "Weiss", "art": "open"},
+            {"von": 65, "bis": 189, "name": "Farb-Index", "art": ""},
+            {"von": 190, "bis": 221, "name": "Farbdurchlauf schnell -> langsam", "art": "rotate"},
+            {"von": 222, "bis": 223, "name": "Stop", "art": ""},
+            {"von": 224, "bis": 255, "name": "Farbdurchlauf rueckwaerts langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Goborad",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Offen", "art": "open"},
+            {"von": 8, "bis": 15, "name": "Gobo 1", "art": "gobo"},
+            {"von": 16, "bis": 23, "name": "Gobo 2", "art": "gobo"},
+            {"von": 24, "bis": 31, "name": "Gobo 3", "art": "gobo"},
+            {"von": 32, "bis": 39, "name": "Gobo 4", "art": "gobo"},
+            {"von": 40, "bis": 47, "name": "Gobo 5", "art": "gobo"},
+            {"von": 48, "bis": 55, "name": "Gobo 6", "art": "gobo"},
+            {"von": 56, "bis": 63, "name": "Gobo 7", "art": "gobo"},
+            {"von": 64, "bis": 71, "name": "Gobo 7 Shake langsam -> schnell", "art": "shake"},
+            {"von": 72, "bis": 79, "name": "Gobo 6 Shake langsam -> schnell", "art": "shake"},
+            {"von": 80, "bis": 87, "name": "Gobo 5 Shake langsam -> schnell", "art": "shake"},
+            {"von": 88, "bis": 95, "name": "Gobo 4 Shake langsam -> schnell", "art": "shake"},
+            {"von": 96, "bis": 103, "name": "Gobo 3 Shake langsam -> schnell", "art": "shake"},
+            {"von": 104, "bis": 111, "name": "Gobo 2 Shake langsam -> schnell", "art": "shake"},
+            {"von": 112, "bis": 119, "name": "Gobo 1 Shake langsam -> schnell", "art": "shake"},
+            {"von": 120, "bis": 127, "name": "Offen", "art": "open"},
+            {"von": 128, "bis": 189, "name": "Gobo-Durchlauf langsam -> schnell", "art": "rotate"},
+            {"von": 190, "bis": 193, "name": "Stop", "art": ""},
+            {"von": 194, "bis": 255, "name": "Gobo-Durchlauf rueckwaerts langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo-Rotation",
+          "attribut": "gobo_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Keine Funktion", "art": ""},
+            {"von": 1, "bis": 63, "name": "Gobo-Index", "art": ""},
+            {"von": 64, "bis": 145, "name": "Rotation langsam -> schnell", "art": "rotate"},
+            {"von": 146, "bis": 149, "name": "Stop", "art": ""},
+            {"von": 150, "bis": 231, "name": "Rotation rueckwaerts langsam -> schnell", "art": "rotate"},
+            {"von": 232, "bis": 255, "name": "Bounce langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Prisma",
+          "attribut": "prism",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 3, "name": "Kein Prisma", "art": "open"},
+            {"von": 4, "bis": 6, "name": "6-fach-Prisma", "art": "prism"},
+            {"von": 7, "bis": 65, "name": "6-fach-Prisma Rotation langsam -> schnell", "art": "rotate"},
+            {"von": 66, "bis": 123, "name": "6-fach-Prisma Rotation rueckwaerts langsam -> schnell", "art": "rotate"},
+            {"von": 124, "bis": 127, "name": "6-fach-Prisma", "art": "prism"},
+            {"von": 128, "bis": 131, "name": "Kein Prisma", "art": "open"},
+            {"von": 132, "bis": 134, "name": "5-fach-Prisma", "art": "prism"},
+            {"von": 135, "bis": 193, "name": "5-fach-Prisma Rotation langsam -> schnell", "art": "rotate"},
+            {"von": 194, "bis": 251, "name": "5-fach-Prisma Rotation rueckwaerts langsam -> schnell", "art": "rotate"},
+            {"von": 252, "bis": 255, "name": "5-fach-Prisma", "art": "prism"}
+          ]
+        },
+        {"name": "Fokus", "attribut": "focus", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Shutter",
+          "attribut": "shutter",
+          "default": 5,
+          "highlight": 5,
+          "bereiche": [
+            {"von": 0, "bis": 3, "name": "Geschlossen", "art": "closed"},
+            {"von": 4, "bis": 7, "name": "Offen", "art": "open"},
+            {"von": 8, "bis": 76, "name": "Strobe langsam -> schnell", "art": "strobe"},
+            {"von": 77, "bis": 145, "name": "Puls-Strobe", "art": "strobe"},
+            {"von": 146, "bis": 215, "name": "Zufalls-Strobe", "art": "strobe"},
+            {"von": 216, "bis": 255, "name": "Offen", "art": "open"}
+          ]
+        },
+        {
+          "name": "Steuerfunktionen",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Keine Funktion", "art": ""},
+            {"von": 8, "bis": 15, "name": "Blackout bei Pan/Tilt-Bewegung", "art": ""},
+            {"von": 16, "bis": 23, "name": "Blackout bei Farbradbewegung", "art": ""},
+            {"von": 24, "bis": 31, "name": "Blackout bei Goboradbewegung", "art": ""},
+            {"von": 32, "bis": 39, "name": "Blackout bei Pan/Tilt-/Farbradbewegung", "art": ""},
+            {"von": 40, "bis": 47, "name": "Blackout bei Pan/Tilt-/Goboradbewegung", "art": ""},
+            {"von": 48, "bis": 55, "name": "Blackout bei Pan/Tilt-/Farb-/Goboradbewegung", "art": ""},
+            {"von": 56, "bis": 95, "name": "Keine Funktion", "art": ""},
+            {"von": 96, "bis": 103, "name": "Reset Pan", "art": "reset"},
+            {"von": 104, "bis": 111, "name": "Reset Tilt", "art": "reset"},
+            {"von": 112, "bis": 119, "name": "Reset Farbrad", "art": "reset"},
+            {"von": 120, "bis": 127, "name": "Reset Goborad", "art": "reset"},
+            {"von": 128, "bis": 135, "name": "Keine Funktion", "art": ""},
+            {"von": 136, "bis": 143, "name": "Reset Prisma", "art": "reset"},
+            {"von": 144, "bis": 151, "name": "Reset Fokus und Zoom", "art": "reset"},
+            {"von": 152, "bis": 159, "name": "Reset alles", "art": "reset"},
+            {"von": 160, "bis": 255, "name": "Keine Funktion", "art": ""}
+          ]
+        },
+        {
+          "name": "Bewegungsmakros",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Keine Funktion", "art": ""},
+            {"von": 8, "bis": 23, "name": "Bewegungsmakro 1", "art": ""},
+            {"von": 24, "bis": 39, "name": "Bewegungsmakro 2", "art": ""},
+            {"von": 40, "bis": 55, "name": "Bewegungsmakro 3", "art": ""},
+            {"von": 56, "bis": 71, "name": "Bewegungsmakro 4", "art": ""},
+            {"von": 72, "bis": 87, "name": "Bewegungsmakro 5", "art": ""},
+            {"von": 88, "bis": 103, "name": "Bewegungsmakro 6", "art": ""},
+            {"von": 104, "bis": 119, "name": "Bewegungsmakro 7", "art": ""},
+            {"von": 120, "bis": 135, "name": "Bewegungsmakro 8", "art": ""},
+            {"von": 136, "bis": 151, "name": "Sound-Bewegungsmakro 1", "art": "sound"},
+            {"von": 152, "bis": 167, "name": "Sound-Bewegungsmakro 2", "art": "sound"},
+            {"von": 168, "bis": 183, "name": "Sound-Bewegungsmakro 3", "art": "sound"},
+            {"von": 184, "bis": 199, "name": "Sound-Bewegungsmakro 4", "art": "sound"},
+            {"von": 200, "bis": 215, "name": "Sound-Bewegungsmakro 5", "art": "sound"},
+            {"von": 216, "bis": 231, "name": "Sound-Bewegungsmakro 6", "art": "sound"},
+            {"von": 232, "bis": 247, "name": "Sound-Bewegungsmakro 7", "art": "sound"},
+            {"von": 248, "bis": 255, "name": "Sound-Bewegungsmakro 8", "art": "sound"}
+          ]
+        },
+        {"name": "Zoom (eng -> weit)", "attribut": "zoom", "default": 0, "highlight": 0}
+      ]
+    },
+    {
+      "name": "9 channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {
+          "name": "Farbrad",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Weiss", "art": "open"},
+            {"von": 8, "bis": 15, "name": "Orange", "art": "color"},
+            {"von": 16, "bis": 23, "name": "Limettengruen", "art": "color"},
+            {"von": 24, "bis": 31, "name": "Cyan", "art": "color"},
+            {"von": 32, "bis": 39, "name": "Rot", "art": "color"},
+            {"von": 40, "bis": 47, "name": "Gruen", "art": "color"},
+            {"von": 48, "bis": 55, "name": "Magenta", "art": "color"},
+            {"von": 56, "bis": 63, "name": "Gelb", "art": "color"},
+            {"von": 64, "bis": 64, "name": "Weiss", "art": "open"},
+            {"von": 65, "bis": 189, "name": "Farb-Index", "art": ""},
+            {"von": 190, "bis": 221, "name": "Farbdurchlauf schnell -> langsam", "art": "rotate"},
+            {"von": 222, "bis": 223, "name": "Stop", "art": ""},
+            {"von": 224, "bis": 255, "name": "Farbdurchlauf rueckwaerts langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Goborad",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Offen", "art": "open"},
+            {"von": 8, "bis": 15, "name": "Gobo 1", "art": "gobo"},
+            {"von": 16, "bis": 23, "name": "Gobo 2", "art": "gobo"},
+            {"von": 24, "bis": 31, "name": "Gobo 3", "art": "gobo"},
+            {"von": 32, "bis": 39, "name": "Gobo 4", "art": "gobo"},
+            {"von": 40, "bis": 47, "name": "Gobo 5", "art": "gobo"},
+            {"von": 48, "bis": 55, "name": "Gobo 6", "art": "gobo"},
+            {"von": 56, "bis": 63, "name": "Gobo 7", "art": "gobo"},
+            {"von": 64, "bis": 71, "name": "Gobo 7 Shake langsam -> schnell", "art": "shake"},
+            {"von": 72, "bis": 79, "name": "Gobo 6 Shake langsam -> schnell", "art": "shake"},
+            {"von": 80, "bis": 87, "name": "Gobo 5 Shake langsam -> schnell", "art": "shake"},
+            {"von": 88, "bis": 95, "name": "Gobo 4 Shake langsam -> schnell", "art": "shake"},
+            {"von": 96, "bis": 103, "name": "Gobo 3 Shake langsam -> schnell", "art": "shake"},
+            {"von": 104, "bis": 111, "name": "Gobo 2 Shake langsam -> schnell", "art": "shake"},
+            {"von": 112, "bis": 119, "name": "Gobo 1 Shake langsam -> schnell", "art": "shake"},
+            {"von": 120, "bis": 127, "name": "Offen", "art": "open"},
+            {"von": 128, "bis": 189, "name": "Gobo-Durchlauf langsam -> schnell", "art": "rotate"},
+            {"von": 190, "bis": 193, "name": "Stop", "art": ""},
+            {"von": 194, "bis": 255, "name": "Gobo-Durchlauf rueckwaerts langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo-Rotation",
+          "attribut": "gobo_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Keine Funktion", "art": ""},
+            {"von": 1, "bis": 63, "name": "Gobo-Index", "art": ""},
+            {"von": 64, "bis": 145, "name": "Rotation langsam -> schnell", "art": "rotate"},
+            {"von": 146, "bis": 149, "name": "Stop", "art": ""},
+            {"von": 150, "bis": 231, "name": "Rotation rueckwaerts langsam -> schnell", "art": "rotate"},
+            {"von": 232, "bis": 255, "name": "Bounce langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Prisma",
+          "attribut": "prism",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 3, "name": "Kein Prisma", "art": "open"},
+            {"von": 4, "bis": 6, "name": "6-fach-Prisma", "art": "prism"},
+            {"von": 7, "bis": 65, "name": "6-fach-Prisma Rotation langsam -> schnell", "art": "rotate"},
+            {"von": 66, "bis": 123, "name": "6-fach-Prisma Rotation rueckwaerts langsam -> schnell", "art": "rotate"},
+            {"von": 124, "bis": 127, "name": "6-fach-Prisma", "art": "prism"},
+            {"von": 128, "bis": 131, "name": "Kein Prisma", "art": "open"},
+            {"von": 132, "bis": 134, "name": "5-fach-Prisma", "art": "prism"},
+            {"von": 135, "bis": 193, "name": "5-fach-Prisma Rotation langsam -> schnell", "art": "rotate"},
+            {"von": 194, "bis": 251, "name": "5-fach-Prisma Rotation rueckwaerts langsam -> schnell", "art": "rotate"},
+            {"von": 252, "bis": 255, "name": "5-fach-Prisma", "art": "prism"}
+          ]
+        },
+        {"name": "Fokus", "attribut": "focus", "default": 0, "highlight": 0},
+        {
+          "name": "Shutter",
+          "attribut": "shutter",
+          "default": 5,
+          "highlight": 5,
+          "bereiche": [
+            {"von": 0, "bis": 3, "name": "Geschlossen", "art": "closed"},
+            {"von": 4, "bis": 7, "name": "Offen", "art": "open"},
+            {"von": 8, "bis": 76, "name": "Strobe langsam -> schnell", "art": "strobe"},
+            {"von": 77, "bis": 145, "name": "Puls-Strobe", "art": "strobe"},
+            {"von": 146, "bis": 215, "name": "Zufalls-Strobe", "art": "strobe"},
+            {"von": 216, "bis": 255, "name": "Offen", "art": "open"}
+          ]
+        },
+        {"name": "Zoom (eng -> weit)", "attribut": "zoom", "default": 0, "highlight": 0}
+      ]
+    }
+  ],
+  "notizen": "LED-Spot 150 W mit Zoom, 7 rotierende Gobos, 5- und 6-fach-Prisma. Pan 540 Grad, Tilt 270 Grad. Der 9-Kanal-Modus hat keinen Dimmer."
+}

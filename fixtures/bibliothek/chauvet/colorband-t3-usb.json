@@ -1,0 +1,239 @@
+{
+  "format_version": 1,
+  "hersteller": "Chauvet",
+  "hersteller_kurz": "CHAUVET",
+  "modell": "COLORband T3 USB",
+  "kurzname": "COLORband T3 USB",
+  "typ": "led_bar",
+  "leistung_w": 26,
+  "quelle": {
+    "titel": "COLORband T3 USB User Manual",
+    "version": "Rev. 2",
+    "url": "https://www.chauvetdj.com/wp-content/uploads/2016/01/COLORband_T3_USB_UM_Rev2_WO.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.3 GIT · Ian Nault",
+    "original": "resources/fixtures/Chauvet/Chauvet-COLORband-T3-USB.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 63 Wertebereiche mit Art (kind) versehen; danach von LightOS gegen das Herstellerhandbuch (COLORband T3 USB User Manual) Kanal fuer Kanal ueberarbeitet: Rasterform 1x3 (3 Zonen) im 14- und 9-Kanal-Modus ergaenzt; Strobe/Geschwindigkeit/Empfindlichkeit als shutter mit Offen-Bereich 000-015 statt speed; Auto-Programm 6 auf 155-162 (Druckfehler 154 im Handbuch, 8-Kanal-Tabelle sagt 155); Dimmerkurve benannt; Leistung nach Handbuch (26 W bei 230 V); Kanalnamen und Bereichsnamen auf Deutsch; Default/Highlight nach LightOS-Regeln (Pan/Tilt 128, Dimmer 0, Shutter offen)"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanalbelegung, Wertebereiche und Modi aller DMX-Modi Kanal fuer Kanal gegen das Herstellerhandbuch geprueft (nicht am echten Geraet)"
+  },
+  "modi": [
+    {
+      "name": "14 Channel",
+      "raster": {"rows": 1, "cols": 3},
+      "kanaele": [
+        {"name": "Rot 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Rot 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Rot 3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {
+          "name": "Farbmakros",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Keine Funktion", "art": ""},
+            {"von": 16, "bis": 255, "name": "Farbmakros (ueberschreibt Farbkanaele)", "art": ""}
+          ]
+        },
+        {
+          "name": "Strobe / Geschwindigkeit / Soundempfindlichkeit",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Kein Strobe", "art": "open"},
+            {
+              "von": 16,
+              "bis": 255,
+              "name": "Strobe (CH12 000-031) / Programmtempo (032-226) / Soundempf. (227-255)",
+              "art": "strobe"
+            }
+          ]
+        },
+        {
+          "name": "Auto-Programme",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "Keine Funktion", "art": ""},
+            {"von": 32, "bis": 63, "name": "Pulseffekt 0-100 %", "art": ""},
+            {"von": 64, "bis": 95, "name": "Pulseffekt 100-0 %", "art": ""},
+            {"von": 96, "bis": 114, "name": "Pulseffekt 100-0-100 %", "art": ""},
+            {"von": 115, "bis": 122, "name": "Auto-Programm 1", "art": ""},
+            {"von": 123, "bis": 130, "name": "Auto-Programm 2", "art": ""},
+            {"von": 131, "bis": 138, "name": "Auto-Programm 3", "art": ""},
+            {"von": 139, "bis": 146, "name": "Auto-Programm 4", "art": ""},
+            {"von": 147, "bis": 154, "name": "Auto-Programm 5", "art": ""},
+            {"von": 155, "bis": 162, "name": "Auto-Programm 6", "art": ""},
+            {"von": 163, "bis": 170, "name": "Auto-Programm 7", "art": ""},
+            {"von": 171, "bis": 178, "name": "Auto-Programm 8", "art": ""},
+            {"von": 179, "bis": 186, "name": "Auto-Programm 9", "art": ""},
+            {"von": 187, "bis": 194, "name": "Auto-Programm 10", "art": ""},
+            {"von": 195, "bis": 202, "name": "Auto-Programm 11", "art": ""},
+            {"von": 203, "bis": 210, "name": "Auto-Programm 12", "art": ""},
+            {"von": 211, "bis": 218, "name": "Auto-Programm 13", "art": ""},
+            {"von": 219, "bis": 226, "name": "Auto-Programm 14", "art": ""},
+            {"von": 227, "bis": 255, "name": "Sound-Programm", "art": "sound"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Dimmerkurve",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 51, "name": "Dimmerkurve aus dem Menue", "art": ""},
+            {"von": 52, "bis": 101, "name": "Dimmerkurve aus (linear)", "art": ""},
+            {"von": 102, "bis": 152, "name": "Dimmerkurve 1 (schnell)", "art": ""},
+            {"von": 153, "bis": 203, "name": "Dimmerkurve 2 (mittel)", "art": ""},
+            {"von": 204, "bis": 255, "name": "Dimmerkurve 3 (langsam)", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "9 Channel",
+      "raster": {"rows": 1, "cols": 3},
+      "kanaele": [
+        {"name": "Rot 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Rot 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Rot 3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 3", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "8 Channel",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {
+          "name": "Farbmakros",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Keine Funktion", "art": ""},
+            {"von": 16, "bis": 255, "name": "Farbmakros (ueberschreibt Farbkanaele)", "art": ""}
+          ]
+        },
+        {
+          "name": "Strobe / Geschwindigkeit / Soundempfindlichkeit",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Kein Strobe", "art": "open"},
+            {
+              "von": 16,
+              "bis": 255,
+              "name": "Strobe (CH6 000-031) / Programmtempo (032-226) / Soundempf. (227-255)",
+              "art": "strobe"
+            }
+          ]
+        },
+        {
+          "name": "Auto-Programme",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "Keine Funktion", "art": ""},
+            {"von": 32, "bis": 63, "name": "Pulseffekt 0-100 %", "art": ""},
+            {"von": 64, "bis": 95, "name": "Pulseffekt 100-0 %", "art": ""},
+            {"von": 96, "bis": 114, "name": "Pulseffekt 100-0-100 %", "art": ""},
+            {"von": 115, "bis": 122, "name": "Auto-Programm 1", "art": ""},
+            {"von": 123, "bis": 130, "name": "Auto-Programm 2", "art": ""},
+            {"von": 131, "bis": 138, "name": "Auto-Programm 3", "art": ""},
+            {"von": 139, "bis": 146, "name": "Auto-Programm 4", "art": ""},
+            {"von": 147, "bis": 154, "name": "Auto-Programm 5", "art": ""},
+            {"von": 155, "bis": 162, "name": "Auto-Programm 6", "art": ""},
+            {"von": 163, "bis": 170, "name": "Auto-Programm 7", "art": ""},
+            {"von": 171, "bis": 178, "name": "Auto-Programm 8", "art": ""},
+            {"von": 179, "bis": 186, "name": "Auto-Programm 9", "art": ""},
+            {"von": 187, "bis": 194, "name": "Auto-Programm 10", "art": ""},
+            {"von": 195, "bis": 202, "name": "Auto-Programm 11", "art": ""},
+            {"von": 203, "bis": 210, "name": "Auto-Programm 12", "art": ""},
+            {"von": 211, "bis": 218, "name": "Auto-Programm 13", "art": ""},
+            {"von": 219, "bis": 226, "name": "Auto-Programm 14", "art": ""},
+            {"von": 227, "bis": 255, "name": "Sound-Programm", "art": "sound"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Dimmerkurve",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 51, "name": "Dimmerkurve aus dem Menue", "art": ""},
+            {"von": 52, "bis": 101, "name": "Dimmerkurve aus (linear)", "art": ""},
+            {"von": 102, "bis": 152, "name": "Dimmerkurve 1 (schnell)", "art": ""},
+            {"von": 153, "bis": 203, "name": "Dimmerkurve 2 (mittel)", "art": ""},
+            {"von": 204, "bis": 255, "name": "Dimmerkurve 3 (langsam)", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6 Channel",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Kein Strobe", "art": "open"},
+            {"von": 16, "bis": 255, "name": "Strobe langsam -> schnell", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Dimmerkurve",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 51, "name": "Dimmerkurve aus dem Menue", "art": ""},
+            {"von": 52, "bis": 101, "name": "Dimmerkurve aus (linear)", "art": ""},
+            {"von": 102, "bis": 152, "name": "Dimmerkurve 1 (schnell)", "art": ""},
+            {"von": 153, "bis": 203, "name": "Dimmerkurve 2 (mittel)", "art": ""},
+            {"von": 204, "bis": 255, "name": "Dimmerkurve 3 (langsam)", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3 Channel",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    }
+  ],
+  "notizen": "LED-Leiste mit 3 RGB-Zonen (Zone 1 = Kanaele 1-3). Pulseffekte wirken nur bei aktiven Farbkanaelen."
+}

@@ -1,0 +1,217 @@
+{
+  "format_version": 1,
+  "hersteller": "American DJ",
+  "hersteller_kurz": "ADJ",
+  "modell": "Fog Fury Jett Pro",
+  "kurzname": "FOGFURYJETTPRO",
+  "typ": "smoke",
+  "leistung_w": 1550,
+  "quelle": {"titel": "ADJ Fog Fury Jett Pro DMX Traits", "url": "https://assets.centryngroup.com/dl/files/FOG639__DL__001.pdf"},
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.2 GIT · Dávid Czirók",
+    "original": "resources/fixtures/American_DJ/American-DJ-Fog-Fury-Jett-Pro.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 82 Wertebereiche mit Art (kind) versehen; danach von LightOS gegen das Herstellerhandbuch ueberarbeitet: Shutter-Bereiche nach Handbuch klassifiziert (aus=closed, LED an=open, alle Strobe-/Puls-/Random-/Rampen-Bereiche=strobe), Default/Highlight auf Mitte des ersten Offen-Bereichs; irrefuehrende Bereichs-Arten (color/gobo/rotate/closed) an Programm-/Makro-/Funktionskanaelen entfernt; Strobe-Bereiche 'Off' = kein Strobe (Handbuch: Off/No Function) als open, Default/Highlight darauf; Nebelkanal als dimmer statt intensity (eigene Klasse neben dem LED-Master), Highlight 0; 1-Kanal-Modus als dimmer statt macro mit Aus=closed"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanalbelegung aller Modi gegen das ADJ-DMX-Traits-Blatt geprueft; die Farbmakro-Tabelle (Farbe 1-29) steht dort nicht und ist aus QLC+ uebernommen"
+  },
+  "modi": [
+    {
+      "name": "1 Channel",
+      "kanaele": [
+        {
+          "name": "Nebel + Zufallsfarbe",
+          "attribut": "dimmer",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "Aus", "art": "closed"},
+            {"von": 32, "bis": 255, "name": "Max. Nebel + Zufallsfarbwechsel", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2 Channel",
+      "kanaele": [
+        {
+          "name": "Nebel",
+          "attribut": "dimmer",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "Aus", "art": "closed"},
+            {"von": 32, "bis": 255, "name": "Max. Nebel", "art": ""}
+          ]
+        },
+        {
+          "name": "Farbmakros",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Aus", "art": ""},
+            {"von": 8, "bis": 15, "name": "color 1", "art": "color"},
+            {"von": 16, "bis": 23, "name": "color 2", "art": "color"},
+            {"von": 24, "bis": 31, "name": "color 3", "art": "color"},
+            {"von": 32, "bis": 39, "name": "color 4", "art": "color"},
+            {"von": 40, "bis": 47, "name": "color 5", "art": "color"},
+            {"von": 48, "bis": 55, "name": "color 6", "art": "color"},
+            {"von": 56, "bis": 63, "name": "color 7", "art": "color"},
+            {"von": 64, "bis": 71, "name": "color 8", "art": "color"},
+            {"von": 72, "bis": 79, "name": "color 9", "art": "color"},
+            {"von": 80, "bis": 87, "name": "color 10", "art": "color"},
+            {"von": 88, "bis": 95, "name": "color 11", "art": "color"},
+            {"von": 96, "bis": 103, "name": "color 12", "art": "color"},
+            {"von": 104, "bis": 111, "name": "color 13", "art": "color"},
+            {"von": 112, "bis": 119, "name": "color 14", "art": "color"},
+            {"von": 120, "bis": 127, "name": "color 15", "art": "color"},
+            {"von": 128, "bis": 135, "name": "color 16", "art": "color"},
+            {"von": 136, "bis": 143, "name": "color 17", "art": "color"},
+            {"von": 144, "bis": 151, "name": "color 18", "art": "color"},
+            {"von": 152, "bis": 159, "name": "color 19", "art": "color"},
+            {"von": 160, "bis": 167, "name": "color 20", "art": "color"},
+            {"von": 168, "bis": 175, "name": "color 21", "art": "color"},
+            {"von": 176, "bis": 183, "name": "color 22", "art": "color"},
+            {"von": 184, "bis": 191, "name": "color 23", "art": "color"},
+            {"von": 192, "bis": 199, "name": "color 24", "art": "color"},
+            {"von": 200, "bis": 207, "name": "color 25", "art": "color"},
+            {"von": 208, "bis": 215, "name": "color 26", "art": "color"},
+            {"von": 216, "bis": 223, "name": "color 27", "art": "color"},
+            {"von": 224, "bis": 231, "name": "color 28", "art": "color"},
+            {"von": 232, "bis": 239, "name": "color 29", "art": "color"},
+            {"von": 240, "bis": 247, "name": "Zufall 1", "art": ""},
+            {"von": 248, "bis": 255, "name": "Zufall 2", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3 Channel",
+      "kanaele": [
+        {
+          "name": "Nebel",
+          "attribut": "dimmer",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "Aus", "art": "closed"},
+            {"von": 32, "bis": 255, "name": "Max. Nebel", "art": ""}
+          ]
+        },
+        {
+          "name": "Farbmakros",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Aus", "art": ""},
+            {"von": 8, "bis": 15, "name": "color 1", "art": "color"},
+            {"von": 16, "bis": 23, "name": "color 2", "art": "color"},
+            {"von": 24, "bis": 31, "name": "color 3", "art": "color"},
+            {"von": 32, "bis": 39, "name": "color 4", "art": "color"},
+            {"von": 40, "bis": 47, "name": "color 5", "art": "color"},
+            {"von": 48, "bis": 55, "name": "color 6", "art": "color"},
+            {"von": 56, "bis": 63, "name": "color 7", "art": "color"},
+            {"von": 64, "bis": 71, "name": "color 8", "art": "color"},
+            {"von": 72, "bis": 79, "name": "color 9", "art": "color"},
+            {"von": 80, "bis": 87, "name": "color 10", "art": "color"},
+            {"von": 88, "bis": 95, "name": "color 11", "art": "color"},
+            {"von": 96, "bis": 103, "name": "color 12", "art": "color"},
+            {"von": 104, "bis": 111, "name": "color 13", "art": "color"},
+            {"von": 112, "bis": 119, "name": "color 14", "art": "color"},
+            {"von": 120, "bis": 127, "name": "color 15", "art": "color"},
+            {"von": 128, "bis": 135, "name": "color 16", "art": "color"},
+            {"von": 136, "bis": 143, "name": "color 17", "art": "color"},
+            {"von": 144, "bis": 151, "name": "color 18", "art": "color"},
+            {"von": 152, "bis": 159, "name": "color 19", "art": "color"},
+            {"von": 160, "bis": 167, "name": "color 20", "art": "color"},
+            {"von": 168, "bis": 175, "name": "color 21", "art": "color"},
+            {"von": 176, "bis": 183, "name": "color 22", "art": "color"},
+            {"von": 184, "bis": 191, "name": "color 23", "art": "color"},
+            {"von": 192, "bis": 199, "name": "color 24", "art": "color"},
+            {"von": 200, "bis": 207, "name": "color 25", "art": "color"},
+            {"von": 208, "bis": 215, "name": "color 26", "art": "color"},
+            {"von": 216, "bis": 223, "name": "color 27", "art": "color"},
+            {"von": 224, "bis": 231, "name": "color 28", "art": "color"},
+            {"von": 232, "bis": 239, "name": "color 29", "art": "color"},
+            {"von": 240, "bis": 247, "name": "Zufall 1", "art": ""},
+            {"von": 248, "bis": 255, "name": "Zufall 2", "art": ""}
+          ]
+        },
+        {
+          "name": "Strobing",
+          "attribut": "shutter",
+          "default": 15,
+          "highlight": 15,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "Kein Strobe", "art": "open"},
+            {"von": 32, "bis": 95, "name": "Strobing slow-fast", "art": "strobe"},
+            {"von": 96, "bis": 159, "name": "Pulse effect", "art": "strobe"},
+            {"von": 160, "bis": 255, "name": "Random strobe slow-fast", "art": "strobe"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "7 Channel",
+      "kanaele": [
+        {
+          "name": "Nebel",
+          "attribut": "dimmer",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "Aus", "art": "closed"},
+            {"von": 32, "bis": 255, "name": "Max. Nebel", "art": ""}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 1 (outer leds)", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "Green 2 (inner leds)", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "9 Channel",
+      "kanaele": [
+        {
+          "name": "Nebel",
+          "attribut": "dimmer",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "Aus", "art": "closed"},
+            {"von": 32, "bis": 255, "name": "Max. Nebel", "art": ""}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 1 (outer leds)", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "Green 2 (inner leds)", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {
+          "name": "Strobing",
+          "attribut": "shutter",
+          "default": 15,
+          "highlight": 15,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "Kein Strobe", "art": "open"},
+            {"von": 32, "bis": 95, "name": "Strobing slow-fast", "art": "strobe"},
+            {"von": 96, "bis": 159, "name": "Pulse effect", "art": "strobe"},
+            {"von": 160, "bis": 255, "name": "Random strobe slow-fast", "art": "strobe"}
+          ]
+        },
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255}
+      ]
+    }
+  ],
+  "notizen": "Vertikaler Nebel-Jet mit RGBA+UV-LEDs (zwei Gruen-Kanaele: aussen/innen). Leistungsangabe aus QLC+ (nicht geprueft)."
+}

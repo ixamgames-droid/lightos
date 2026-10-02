@@ -1,0 +1,98 @@
+{
+  "format_version": 1,
+  "hersteller": "Showtec",
+  "hersteller_kurz": "Showtec",
+  "modell": "Club Par 12-4 RGBW",
+  "kurzname": "CLUBPAR124",
+  "typ": "par",
+  "leistung_w": 78,
+  "notizen": "Strobe 0-12 heisst in der Quelle 'Closed' (wie im Handbuch der Schwester Club Par 12/6); LightOS fuehrt den Bereich als 'kein Strobe' (Licht an) — bei Bedarf am Geraet pruefen.",
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Showtec-Club-Par-12-4-RGBW.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Showtec/Showtec-Club-Par-12-4-RGBW.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.0.0 Beta 3 · Simon Dovicovic",
+    "original": "resources/fixtures/Showtec/Showtec-Club-Par-12-4-RGBW.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 19 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): Leistung 78 W (Herstellerangabe) statt 77 W; kurzname CLUBPAR124; Strobe-Default 0, Bereich 0-12 als 'kein Strobe' (open); Programme mit 'Keine Funktion' ohne art, 140-255 sound; Tempo- und Fade-Kanal als effect_speed, falsche art color am Fade-Kanal entfernt"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "aus QLC+ konvertiert und von LightOS nach Kanalnamen/Bereichen nachbearbeitet; kein Herstellerhandbuch verfuegbar (Hersteller-Website hinter Bot-Sperre) — nicht Kanal fuer Kanal gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "4 Channel",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "9 Channel",
+      "kanaele": [
+        {"name": "Intensity", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 12, "name": "Kein Strobe (Handbuch: 'Closed')", "art": "open"},
+            {"von": 13, "bis": 255, "name": "Strobe langsam -> schnell (0-20 Hz)", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Build in program",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Keine Funktion"},
+            {"von": 10, "bis": 19, "name": "Programm 1"},
+            {"von": 20, "bis": 29, "name": "Programm 2"},
+            {"von": 30, "bis": 39, "name": "Programm 3"},
+            {"von": 40, "bis": 49, "name": "Programm 4"},
+            {"von": 50, "bis": 59, "name": "Programm 5"},
+            {"von": 60, "bis": 69, "name": "Programm 6"},
+            {"von": 70, "bis": 79, "name": "Programm 7"},
+            {"von": 80, "bis": 89, "name": "Programm 8"},
+            {"von": 90, "bis": 99, "name": "Programm 9"},
+            {"von": 100, "bis": 109, "name": "Programm 10"},
+            {"von": 110, "bis": 119, "name": "Programm 11"},
+            {"von": 120, "bis": 129, "name": "Programm 12"},
+            {"von": 130, "bis": 139, "name": "Programm 13"},
+            {"von": 140, "bis": 255, "name": "Musiksteuerung", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Programmtempo langsam -> schnell (CH Programme 10-139)"}
+          ]
+        },
+        {
+          "name": "Fade time",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Ueberblendzeit: Farbsprung -> Farbueberblendung"}
+          ]
+        }
+      ]
+    }
+  ]
+}
