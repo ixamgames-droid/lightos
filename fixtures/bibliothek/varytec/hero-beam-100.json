@@ -1,0 +1,298 @@
+{
+  "format_version": 1,
+  "hersteller": "Varytec",
+  "hersteller_kurz": "Varytec",
+  "modell": "Hero Beam 100",
+  "kurzname": "HEROBEAM100",
+  "typ": "moving_head",
+  "leistung_w": 150,
+  "quelle": {
+    "titel": "Varytec Hero Beam 100 – Bedienungsanleitung (EN)",
+    "version": "V2",
+    "datum": "2022-01-27",
+    "url": "https://images.static-thomann.de/pics/atg/atgdata/document/manual/c_477540_v2_en_online.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.5 GIT · Sebastian Moeckel",
+    "original": "resources/fixtures/Varytec/Varytec-Hero-Beam-100.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 128 Wertebereiche mit Art (kind) versehen; 1 Bereichsnamen auf 80 Zeichen gekuerzt; gegen Herstellerhandbuch V2 (2022-01-27) abgeglichen; Kanal- und Bereichsnamen deutsch; Stroboskop-Default/Highlight 255 (LEDs an, vorher 0 = LEDs aus → dunkel beim Patchen), Bereich 251–255 als open, Pulseffekte als strobe; Farbrad Offen als open; Goborad Offen als open; Prismen/Frost-Bereiche als prism/frost; im Prisma- und Farbrad-Kanal falsche Bezeichnung „Gobo wheel rotation“ (Handbuch-Kopierfehler) korrigiert; Prisma-Rotation 127–128 Stopp ohne rotate; 7-Farben-Effektrad von color_wheel auf effect (sonst zwei Farbräder); Kurzname, Notizen"
+  },
+  "autor": "LightOS (QXF-Konverter, nachbearbeitet FM-57)",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal für Kanal gegen die Bedienungsanleitung V2 (Kap. 7.8/7.9 DMX-Tabellen 6/19 Kanäle) geprüft; nicht am Gerät"
+  },
+  "modi": [
+    {
+      "name": "19 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fein", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fein", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt-Tempo (0 = schnell, 255 = langsam)", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Stroboskop",
+          "attribut": "shutter",
+          "default": 255,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "LEDs aus", "art": "closed"},
+            {"von": 11, "bis": 80, "name": "Puls: langsam hell, schnell dunkel – Tempo steigend", "art": "strobe"},
+            {"von": 81, "bis": 140, "name": "Puls: schnell hell, langsam dunkel – Tempo steigend", "art": "strobe"},
+            {"von": 141, "bis": 200, "name": "Impulseffekt, Tempo steigend", "art": "strobe"},
+            {"von": 201, "bis": 250, "name": "Strobe (0,5–20 Hz)", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "LEDs an (offen)", "art": "open"}
+          ]
+        },
+        {
+          "name": "Farbrad",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Offen (weiß)", "art": "open"},
+            {"von": 5, "bis": 9, "name": "Weiß / Rot", "art": "color"},
+            {"von": 10, "bis": 14, "name": "Rot", "art": "color"},
+            {"von": 15, "bis": 19, "name": "Rot / Orange", "art": "color"},
+            {"von": 20, "bis": 24, "name": "Orange", "art": "color"},
+            {"von": 25, "bis": 29, "name": "Orange / Hellblau", "art": "color"},
+            {"von": 30, "bis": 34, "name": "Hellblau", "art": "color"},
+            {"von": 35, "bis": 39, "name": "Hellblau / Grün", "art": "color"},
+            {"von": 40, "bis": 44, "name": "Grün", "art": "color"},
+            {"von": 45, "bis": 49, "name": "Grün / Gelb", "art": "color"},
+            {"von": 50, "bis": 54, "name": "Gelb", "art": "color"},
+            {"von": 55, "bis": 59, "name": "Gelb / Pink", "art": "color"},
+            {"von": 60, "bis": 64, "name": "Pink", "art": "color"},
+            {"von": 65, "bis": 69, "name": "Pink / Blau", "art": "color"},
+            {"von": 70, "bis": 74, "name": "Blau", "art": "color"},
+            {"von": 75, "bis": 79, "name": "Blau / Pink", "art": "color"},
+            {"von": 80, "bis": 84, "name": "Pink", "art": "color"},
+            {"von": 85, "bis": 89, "name": "Pink / LEE 181 Congo", "art": "color"},
+            {"von": 90, "bis": 94, "name": "LEE 181 Congo", "art": "color"},
+            {"von": 95, "bis": 99, "name": "LEE 181 Congo / 7000-K-Filter", "art": "color"},
+            {"von": 100, "bis": 104, "name": "7000-K-Filter", "art": "color"},
+            {"von": 105, "bis": 109, "name": "7000-K- / 3000-K-Filter", "art": "color"},
+            {"von": 110, "bis": 114, "name": "3000-K-Filter", "art": "color"},
+            {"von": 115, "bis": 119, "name": "3000-K-Filter / Lachs", "art": "color"},
+            {"von": 120, "bis": 124, "name": "Lachs", "art": "color"},
+            {"von": 125, "bis": 129, "name": "Lachs / Lila", "art": "color"},
+            {"von": 130, "bis": 134, "name": "Lila", "art": "color"},
+            {"von": 135, "bis": 139, "name": "Lila / Weiß", "art": "color"},
+            {"von": 140, "bis": 149, "name": "Offen (weiß)", "art": "open"},
+            {"von": 150, "bis": 199, "name": "Farbrad-Rotation rechts, Tempo fallend", "art": "rotate"},
+            {"von": 200, "bis": 205, "name": "Rotation Stopp", "art": ""},
+            {"von": 206, "bis": 255, "name": "Farbrad-Rotation links, Tempo steigend", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Goborad (fest)",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Offen", "art": "open"},
+            {"von": 10, "bis": 19, "name": "Gobo 1", "art": "gobo"},
+            {"von": 20, "bis": 29, "name": "Gobo 2", "art": "gobo"},
+            {"von": 30, "bis": 39, "name": "Gobo 3", "art": "gobo"},
+            {"von": 40, "bis": 49, "name": "Gobo 4", "art": "gobo"},
+            {"von": 50, "bis": 59, "name": "Gobo 5", "art": "gobo"},
+            {"von": 60, "bis": 69, "name": "Gobo 6", "art": "gobo"},
+            {"von": 70, "bis": 79, "name": "Gobo 7", "art": "gobo"},
+            {"von": 80, "bis": 89, "name": "Gobo 8", "art": "gobo"},
+            {"von": 90, "bis": 99, "name": "Gobo 9", "art": "gobo"},
+            {"von": 100, "bis": 109, "name": "Gobo 10", "art": "gobo"},
+            {"von": 110, "bis": 119, "name": "Gobo 11", "art": "gobo"},
+            {"von": 120, "bis": 127, "name": "Gobo 1 Shake, Tempo steigend", "art": "shake"},
+            {"von": 128, "bis": 135, "name": "Gobo 2 Shake, Tempo steigend", "art": "shake"},
+            {"von": 136, "bis": 143, "name": "Gobo 3 Shake, Tempo steigend", "art": "shake"},
+            {"von": 144, "bis": 151, "name": "Gobo 4 Shake, Tempo steigend", "art": "shake"},
+            {"von": 152, "bis": 159, "name": "Gobo 5 Shake, Tempo steigend", "art": "shake"},
+            {"von": 160, "bis": 167, "name": "Gobo 6 Shake, Tempo steigend", "art": "shake"},
+            {"von": 168, "bis": 175, "name": "Gobo 7 Shake, Tempo steigend", "art": "shake"},
+            {"von": 176, "bis": 183, "name": "Gobo 8 Shake, Tempo steigend", "art": "shake"},
+            {"von": 184, "bis": 191, "name": "Gobo 9 Shake, Tempo steigend", "art": "shake"},
+            {"von": 192, "bis": 199, "name": "Gobo 10 Shake, Tempo steigend", "art": "shake"},
+            {"von": 200, "bis": 207, "name": "Gobo 11 Shake, Tempo steigend", "art": "shake"},
+            {"von": 208, "bis": 230, "name": "Goborad-Rotation rechts, Tempo fallend", "art": "rotate"},
+            {"von": 231, "bis": 232, "name": "Rotation Stopp", "art": ""},
+            {"von": 233, "bis": 255, "name": "Goborad-Rotation links, Tempo steigend", "art": "rotate"}
+          ]
+        },
+        {"name": "Fokus (fern → nah)", "attribut": "focus", "default": 0, "highlight": 0},
+        {
+          "name": "Rundprisma",
+          "attribut": "prism",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Keine Funktion", "art": ""},
+            {"von": 128, "bis": 255, "name": "Rundprisma ein", "art": "prism"}
+          ]
+        },
+        {
+          "name": "Rundprisma-Rotation",
+          "attribut": "prism_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 63, "name": "Rundprisma-Position 0–400°", "art": ""},
+            {"von": 64, "bis": 126, "name": "Rotation rechts, Tempo fallend", "art": "rotate"},
+            {"von": 127, "bis": 128, "name": "Rotation Stopp", "art": ""},
+            {"von": 129, "bis": 191, "name": "Rotation links, Tempo steigend", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "Kreisende Rotation, Tempo steigend", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Linearprisma",
+          "attribut": "prism",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Keine Funktion", "art": ""},
+            {"von": 128, "bis": 255, "name": "Linearprisma ein", "art": "prism"}
+          ]
+        },
+        {
+          "name": "Linearprisma-Rotation",
+          "attribut": "prism_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 63, "name": "Linearprisma-Position 0–400°", "art": ""},
+            {"von": 64, "bis": 126, "name": "Rotation rechts, Tempo fallend", "art": "rotate"},
+            {"von": 127, "bis": 128, "name": "Rotation Stopp", "art": ""},
+            {"von": 129, "bis": 191, "name": "Rotation links, Tempo steigend", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "Kreisende Rotation, Tempo steigend", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Frost",
+          "attribut": "frost",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Keine Funktion", "art": ""},
+            {"von": 128, "bis": 255, "name": "Frostfilter ein", "art": "frost"}
+          ]
+        },
+        {
+          "name": "7-Farben-Effektrad",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Keine Funktion", "art": ""},
+            {"von": 1, "bis": 255, "name": "7-Farben-Effektrad ein", "art": ""}
+          ]
+        },
+        {
+          "name": "Automatik-Shows",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Keine Funktion", "art": ""},
+            {"von": 8, "bis": 47, "name": "Automatik-Show 1", "art": ""},
+            {"von": 48, "bis": 87, "name": "Automatik-Show 2", "art": ""},
+            {"von": 88, "bis": 127, "name": "Automatik-Show 3", "art": ""},
+            {"von": 128, "bis": 167, "name": "Automatik-Show 4", "art": ""},
+            {"von": 168, "bis": 207, "name": "Automatik-Show 5", "art": ""},
+            {"von": 208, "bis": 247, "name": "Automatik-Show 6", "art": ""},
+            {"von": 248, "bis": 255, "name": "Musiksteuerung Farbrad", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Pan/Tilt-Programme",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Keine Funktion", "art": ""},
+            {"von": 8, "bis": 32, "name": "Pan/Tilt-Programm 1", "art": ""},
+            {"von": 33, "bis": 58, "name": "Pan/Tilt-Programm 2", "art": ""},
+            {"von": 59, "bis": 84, "name": "Pan/Tilt-Programm 3", "art": ""},
+            {"von": 85, "bis": 110, "name": "Pan/Tilt-Programm 4", "art": ""},
+            {"von": 111, "bis": 136, "name": "Pan/Tilt-Programm 5", "art": ""},
+            {"von": 137, "bis": 162, "name": "Pan/Tilt-Programm 6", "art": ""},
+            {"von": 163, "bis": 188, "name": "Pan/Tilt-Programm 7", "art": ""},
+            {"von": 189, "bis": 214, "name": "Pan/Tilt-Programm 8", "art": ""},
+            {"von": 215, "bis": 255, "name": "Musiksteuerung Pan/Tilt", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 25, "name": "Keine Funktion", "art": ""},
+            {"von": 26, "bis": 76, "name": "Reset Effektmotoren (mind. 3 s)", "art": "reset"},
+            {"von": 77, "bis": 128, "name": "Reset Pan/Tilt (mind. 3 s)", "art": "reset"},
+            {"von": 129, "bis": 255, "name": "Reset komplett (mind. 3 s)", "art": "reset"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Stroboskop",
+          "attribut": "shutter",
+          "default": 255,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "LEDs aus", "art": "closed"},
+            {"von": 11, "bis": 80, "name": "Puls: langsam hell, schnell dunkel – Tempo steigend", "art": "strobe"},
+            {"von": 81, "bis": 140, "name": "Puls: schnell hell, langsam dunkel – Tempo steigend", "art": "strobe"},
+            {"von": 141, "bis": 200, "name": "Impulseffekt, Tempo steigend", "art": "strobe"},
+            {"von": 201, "bis": 250, "name": "Strobe (0,5–20 Hz)", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "LEDs an (offen)", "art": "open"}
+          ]
+        },
+        {
+          "name": "Automatik-Shows",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Keine Funktion", "art": ""},
+            {"von": 8, "bis": 47, "name": "Automatik-Show 1", "art": ""},
+            {"von": 48, "bis": 87, "name": "Automatik-Show 2", "art": ""},
+            {"von": 88, "bis": 127, "name": "Automatik-Show 3", "art": ""},
+            {"von": 128, "bis": 167, "name": "Automatik-Show 4", "art": ""},
+            {"von": 168, "bis": 207, "name": "Automatik-Show 5", "art": ""},
+            {"von": 208, "bis": 247, "name": "Automatik-Show 6", "art": ""},
+            {"von": 248, "bis": 255, "name": "Musiksteuerung Farbrad", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Pan/Tilt-Programme",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Keine Funktion", "art": ""},
+            {"von": 8, "bis": 32, "name": "Pan/Tilt-Programm 1", "art": ""},
+            {"von": 33, "bis": 58, "name": "Pan/Tilt-Programm 2", "art": ""},
+            {"von": 59, "bis": 84, "name": "Pan/Tilt-Programm 3", "art": ""},
+            {"von": 85, "bis": 110, "name": "Pan/Tilt-Programm 4", "art": ""},
+            {"von": 111, "bis": 136, "name": "Pan/Tilt-Programm 5", "art": ""},
+            {"von": 137, "bis": 162, "name": "Pan/Tilt-Programm 6", "art": ""},
+            {"von": 163, "bis": 188, "name": "Pan/Tilt-Programm 7", "art": ""},
+            {"von": 189, "bis": 214, "name": "Pan/Tilt-Programm 8", "art": ""},
+            {"von": 215, "bis": 255, "name": "Musiksteuerung Pan/Tilt", "art": "sound"}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "100-W-LED-Beam (2,5°), Farbrad 14 Farben, 11 feste Gobos, Rund- und Linearprisma, Frost, 7-Farben-Effektrad. Stroboskop 0–10 = LEDs aus, 251–255 = an."
+}

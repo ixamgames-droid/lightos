@@ -1,0 +1,213 @@
+{
+  "format_version": 1,
+  "hersteller": "Eurolite",
+  "hersteller_kurz": "Eurolite",
+  "modell": "LED TMH-17",
+  "kurzname": "LED TMH-17",
+  "typ": "moving_head",
+  "leistung_w": 50,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Eurolite-LED-TMH-17.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Eurolite/Eurolite-LED-TMH-17.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.5 GIT · René Schulze",
+    "original": "resources/fixtures/Eurolite/Eurolite-LED-TMH-17.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 86 Wertebereiche mit Art (kind) versehen; Farbrad: Offen/Weiss als 'open', Regenbogen als 'rotate'; Gobo-Rad: beide Offen-Bereiche als 'open'; Strobe-Default/Highlight 0 (offen); Spezialkanal: Pan/Tilt-Bewegungsprogramme 21-249 waren als 'reset' markiert -> Art entfernt; nur 250-255 bleibt Reset"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Datei und die LightOS-Attributliste geprueft (Attribute, Bereichs-Arten, Defaults, Raster); Herstellerhandbuch mit DMX-Tabelle war nicht abrufbar (Steinigke liefert nur Datenblaetter ohne DMX-Protokoll), daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "9-Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {
+          "name": "Color-Wheel",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Open/White", "art": "open"},
+            {"von": 10, "bis": 19, "name": "Red", "art": "color"},
+            {"von": 20, "bis": 29, "name": "Green", "art": "color"},
+            {"von": 30, "bis": 39, "name": "Blue", "art": "color"},
+            {"von": 40, "bis": 49, "name": "Yellow", "art": "color"},
+            {"von": 50, "bis": 59, "name": "Light Blue", "art": "color"},
+            {"von": 60, "bis": 69, "name": "Orange", "art": "color"},
+            {"von": 70, "bis": 79, "name": "Magenta", "art": "color"},
+            {"von": 80, "bis": 89, "name": "Magenta/Orange", "art": "color"},
+            {"von": 90, "bis": 99, "name": "Orange/Light Blue", "art": "color"},
+            {"von": 100, "bis": 109, "name": "Light Blue/ Yellow", "art": "color"},
+            {"von": 110, "bis": 119, "name": "Yellow/Blue", "art": "color"},
+            {"von": 120, "bis": 129, "name": "Blue/Green", "art": "color"},
+            {"von": 130, "bis": 139, "name": "Green/Red", "art": "color"},
+            {"von": 140, "bis": 255, "name": "Rainbow effect with increasing speed", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Static gobo-wheel, gobo shake",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Open", "art": "open"},
+            {"von": 8, "bis": 15, "name": "Gobo 1", "art": "gobo"},
+            {"von": 16, "bis": 23, "name": "Gobo 2", "art": "gobo"},
+            {"von": 24, "bis": 31, "name": "Gobo 3", "art": "gobo"},
+            {"von": 32, "bis": 39, "name": "Gobo 4", "art": "gobo"},
+            {"von": 40, "bis": 47, "name": "Gobo 5", "art": "gobo"},
+            {"von": 48, "bis": 55, "name": "Gobo 6", "art": "gobo"},
+            {"von": 56, "bis": 63, "name": "Gobo 7", "art": "gobo"},
+            {"von": 64, "bis": 71, "name": "Gobo 7 Shake with increasing speed", "art": "shake"},
+            {"von": 72, "bis": 79, "name": "Gobo 6 Shake with increasing speed", "art": "shake"},
+            {"von": 80, "bis": 87, "name": "Gobo 5 Shake with increasing speed", "art": "shake"},
+            {"von": 88, "bis": 95, "name": "Gobo 4 Shake with increasing speed", "art": "shake"},
+            {"von": 96, "bis": 103, "name": "Gobo 3 Shake with increasing speed", "art": "shake"},
+            {"von": 104, "bis": 111, "name": "Gobo 2 Shake with increasing speed", "art": "shake"},
+            {"von": 112, "bis": 119, "name": "Gobo 1 Shake with increasing speed", "art": "shake"},
+            {"von": 120, "bis": 127, "name": "Open", "art": "open"},
+            {"von": 128, "bis": 255, "name": "Gobo-wheel rotation with increasing speed", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": "open"},
+            {"von": 10, "bis": 249, "name": "Strobe-effect with increasing speed", "art": "strobe"},
+            {"von": 250, "bis": 255, "name": "No function", "art": "open"}
+          ]
+        },
+        {"name": "Dimmer intensity", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Pan/Tilt speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Internal program, sound control",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 59, "name": "No function", "art": ""},
+            {"von": 60, "bis": 159, "name": "Internal Program", "art": ""},
+            {"von": 160, "bis": 255, "name": "Sound Control", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Special functions, reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 20, "name": "No function", "art": ""},
+            {"von": 21, "bis": 100, "name": "PAN movement", "art": ""},
+            {"von": 101, "bis": 200, "name": "TILT movement", "art": ""},
+            {"von": 201, "bis": 249, "name": "PAN/TILT movement", "art": ""},
+            {"von": 250, "bis": 255, "name": "Reset", "art": "reset"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "11-Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Color-Wheel",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Open/White", "art": "open"},
+            {"von": 10, "bis": 19, "name": "Red", "art": "color"},
+            {"von": 20, "bis": 29, "name": "Green", "art": "color"},
+            {"von": 30, "bis": 39, "name": "Blue", "art": "color"},
+            {"von": 40, "bis": 49, "name": "Yellow", "art": "color"},
+            {"von": 50, "bis": 59, "name": "Light Blue", "art": "color"},
+            {"von": 60, "bis": 69, "name": "Orange", "art": "color"},
+            {"von": 70, "bis": 79, "name": "Magenta", "art": "color"},
+            {"von": 80, "bis": 89, "name": "Magenta/Orange", "art": "color"},
+            {"von": 90, "bis": 99, "name": "Orange/Light Blue", "art": "color"},
+            {"von": 100, "bis": 109, "name": "Light Blue/ Yellow", "art": "color"},
+            {"von": 110, "bis": 119, "name": "Yellow/Blue", "art": "color"},
+            {"von": 120, "bis": 129, "name": "Blue/Green", "art": "color"},
+            {"von": 130, "bis": 139, "name": "Green/Red", "art": "color"},
+            {"von": 140, "bis": 255, "name": "Rainbow effect with increasing speed", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Static gobo-wheel, gobo shake",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Open", "art": "open"},
+            {"von": 8, "bis": 15, "name": "Gobo 1", "art": "gobo"},
+            {"von": 16, "bis": 23, "name": "Gobo 2", "art": "gobo"},
+            {"von": 24, "bis": 31, "name": "Gobo 3", "art": "gobo"},
+            {"von": 32, "bis": 39, "name": "Gobo 4", "art": "gobo"},
+            {"von": 40, "bis": 47, "name": "Gobo 5", "art": "gobo"},
+            {"von": 48, "bis": 55, "name": "Gobo 6", "art": "gobo"},
+            {"von": 56, "bis": 63, "name": "Gobo 7", "art": "gobo"},
+            {"von": 64, "bis": 71, "name": "Gobo 7 Shake with increasing speed", "art": "shake"},
+            {"von": 72, "bis": 79, "name": "Gobo 6 Shake with increasing speed", "art": "shake"},
+            {"von": 80, "bis": 87, "name": "Gobo 5 Shake with increasing speed", "art": "shake"},
+            {"von": 88, "bis": 95, "name": "Gobo 4 Shake with increasing speed", "art": "shake"},
+            {"von": 96, "bis": 103, "name": "Gobo 3 Shake with increasing speed", "art": "shake"},
+            {"von": 104, "bis": 111, "name": "Gobo 2 Shake with increasing speed", "art": "shake"},
+            {"von": 112, "bis": 119, "name": "Gobo 1 Shake with increasing speed", "art": "shake"},
+            {"von": 120, "bis": 127, "name": "Open", "art": "open"},
+            {"von": 128, "bis": 255, "name": "Gobo-wheel rotation with increasing speed", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": "open"},
+            {"von": 10, "bis": 249, "name": "Strobe-effect with increasing speed", "art": "strobe"},
+            {"von": 250, "bis": 255, "name": "No function", "art": "open"}
+          ]
+        },
+        {"name": "Dimmer intensity", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Pan/Tilt speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Internal program, sound control",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 59, "name": "No function", "art": ""},
+            {"von": 60, "bis": 159, "name": "Internal Program", "art": ""},
+            {"von": 160, "bis": 255, "name": "Sound Control", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Special functions, reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 20, "name": "No function", "art": ""},
+            {"von": 21, "bis": 100, "name": "PAN movement", "art": ""},
+            {"von": 101, "bis": 200, "name": "TILT movement", "art": ""},
+            {"von": 201, "bis": 249, "name": "PAN/TILT movement", "art": ""},
+            {"von": 250, "bis": 255, "name": "Reset", "art": "reset"}
+          ]
+        }
+      ]
+    }
+  ]
+}
