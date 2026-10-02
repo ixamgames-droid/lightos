@@ -16,7 +16,6 @@
 | DOC-20 | A | docs/doc20-anleitungs-gifs | 2026-10-01T22:24Z | tools/anleitungsbilder · docs/ANLEITUNGSBILDER.md |
 | DOC-21 | A | docs/doc21-3d-gif | 2026-10-02T07:18Z | tools/anleitungsbilder · docs/anleitung_vc_widgets |
 | VIZ-65 | A | fix/viz65-startwaechter | 2026-10-01T23:12Z | src/ui/visualizer/visualizer_window.py |
-| TOOL-6 | C | fix/tool6-cwd-waechter | 2026-10-02T04:53Z | tests/test_tool3_generator_annahmen.py · tools/build_dimmer_farbe_combo.py · tools/build_neuheiten_demo.py · tools/build_zq06121_demo.py · tools/_builder.py · changelog.d/2026-10-02-TOOL-6.md · BACKLOG.md |
 | TOOL-7 | C | fix/tool7-mega-arena-global | 2026-10-02T07:13Z | tools/build_mega_arena_2026.py · tests/test_tool7_global_bus_pruefungen.py · changelog.d/2026-10-02-TOOL-7.md · BACKLOG.md |
 | DOC-22 | A | docs/doc22-bilder-auffrischen | 2026-10-02T07:18Z | docs/anleitung_szenen_cues/img · docs/anleitung_programmer_grundlagen/img · docs/projektseite · docs/anleitung_vc_widgets/img |
 | FM-46 | A | feat/fm46-dimmer-segment | 2026-10-02T07:26Z | src/core/database/models.py · src/core/app_state.py · src/ui/widgets/fixture_editor.py · src/ui/widgets/fixture_generator.py · src/core/database/fixture_db.py |
@@ -80,7 +79,6 @@
 
 ## Verlauf
 
-- 2026-10-01T22:13Z A done DOC-18
 - 2026-10-01T22:24Z A claim DOC-20
 - 2026-10-01T22:28Z C done TOOL-5
 - 2026-10-01T22:28Z C done TOOL-4
@@ -110,3 +108,4 @@
 - 2026-10-02T07:33Z C claim QA-68
 - 2026-10-02T07:37Z C claim XPLAT-37
 - 2026-10-02T07:39Z C claim FM-55
+- 2026-10-02T07:42Z C done TOOL-6
