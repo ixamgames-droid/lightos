@@ -29,7 +29,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from _fixture_quelle import frische_library                        # noqa: E402
 from src.core.database import bibliothek_download as BD              # noqa: E402
-from src.core.database.models import FixtureProfile, Manufacturer    # noqa: E402
+from src.core.database.models import (FixtureChannel, FixtureMode,  # noqa: E402
+                                      FixtureProfile, Manufacturer)
 from src.core.database.qxf_import import QXF_NS                      # noqa: E402
 
 
@@ -47,6 +48,37 @@ def _qxf(hersteller, modell):
   <Channel Number="0">Red</Channel>
   <Channel Number="1">Green</Channel>
   <Channel Number="2">Blue</Channel>
+ </Mode>
+</FixtureDefinition>
+""".encode("utf-8")
+
+
+def _qxf_weissbar():
+    """Leiste mit zwei Dimmern, vier RGB-Koepfen und zwei eigenen Weiss-
+    Segmenten (die Weiss-Achse ist eigen, weil es weniger Weiss als RGB-Koepfe
+    gibt); die ``<Head>``-Gruppen ordnen Dimmer und Weiss UEBER KREUZ zu
+    (Dimmer 0 -> zweites Weiss, Dimmer 1 -> erstes). Eigener, minimaler
+    Nachbau desselben Geraets wie in test_fm46c."""
+    kanaele = ["Dimmer"] * 2 + ["Red", "Green", "Blue"] * 4 + ["White"] * 2
+    preset = {"Dimmer": "IntensityDimmer", "Red": "IntensityRed",
+              "Green": "IntensityGreen", "Blue": "IntensityBlue",
+              "White": "IntensityWhite"}
+    defs = "\n".join(f' <Channel Name="{k}{i}" Preset="{preset[k]}"/>'
+                     for i, k in enumerate(kanaele))
+    refs = "\n".join(f'  <Channel Number="{i}">{k}{i}</Channel>'
+                     for i, k in enumerate(kanaele))
+    koepfe = [[2, 3, 4], [5, 6, 7], [8, 9, 10], [11, 12, 13], [0, 15], [1, 14]]
+    heads = "\n".join("  <Head>" + "".join(f"<Channel>{n}</Channel>" for n in h)
+                      + "</Head>" for h in koepfe)
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+<FixtureDefinition xmlns="{QXF_NS}">
+ <Manufacturer>FM53 Test</Manufacturer>
+ <Model>Weissbar</Model>
+ <Type>LED Bar (Pixels)</Type>
+{defs}
+ <Mode Name="16 Kanal">
+{refs}
+{heads}
  </Mode>
 </FixtureDefinition>
 """.encode("utf-8")
@@ -178,6 +210,23 @@ class LaedtUeberDenVorhandenenImport(_Basis):
         self.assertEqual(self._profile()[("FM53 Test", "Par RGB")], eigen,
                          "das eigene Profil gleichen Namens bleibt, wie es war")
         self.assertEqual(self._laden().neu, 0)
+
+    def test_kopf_zuordnung_dimmer_weiss_kommt_mit(self):
+        """FM-46 Etappe 3 (#864) gilt auch fuer heruntergeladene Profile: der
+        Download geht durch denselben QXF-Import, also traegt jeder Dimmer
+        das Weiss-Segment seines ``<Head>`` — hier ueber Kreuz."""
+        inhalt = {WURZEL + "resources/fixtures/FM53 Test/FM53_Test-Weissbar.qxf":
+                  _qxf_weissbar()}
+        self.assertEqual(self._laden(oeffnen=_netz(_tar_gz(inhalt))).neu, 1)
+        fid = self._profile()[("FM53 Test", "Weissbar")][0]
+        with Session(self.motor) as s:
+            mode = s.scalars(select(FixtureMode)
+                             .where(FixtureMode.fixture_id == fid)).one()
+            segmente = {c.channel_number: c.segment for c in s.scalars(
+                select(FixtureChannel).where(FixtureChannel.mode_id == mode.id))
+                if c.segment is not None}
+        self.assertEqual(segmente, {1: 1, 2: 0},
+                         "CH1 dimmt das zweite Weiss, CH2 das erste")
 
     def test_zip_wie_der_ofl_export(self):
         inhalt = {"fm53-test/FM53_Test-Zip.qxf": _qxf("FM53 Test", "Zip RGB")}
