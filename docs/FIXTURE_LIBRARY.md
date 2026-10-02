@@ -148,7 +148,31 @@ Matrix bei „Dimmer mit treiben“ genau den eingetragenen Dimmer auf (derselbe
 Weg gilt für Muster-Chaser, Weiß-Regler und Kommandozeile). Ein einzelner
 Dimmer braucht keine Angabe: er gilt als gemeinsamer Master und fährt ohnehin
 mit. Ältere Bibliotheken bekommen die Spalte beim Start automatisch, ohne
-Zuordnung. Der QLC+-Import kann sie nicht ableiten.
+Zuordnung.
+
+**Beim QLC+-Import** (Bibliothek und „QLC+ importieren“ im Generator) wird die
+Zuordnung aus den Kopf-Gruppen der `.qxf` gelesen (`<Head>` je Modus) — aber nur,
+wenn die Datei sie eindeutig sagt:
+
+- Ein Kopf mit **genau einem** Dimmer und **genau einem** Weiß-Kanal ordnet
+  diesen Dimmer dem Segment dieses Weiß zu (n-tes Weiß in Kanalreihenfolge).
+- Köpfe ohne Weiß zählen nicht. Mehrere Dimmer oder mehrere Weiß in einem Kopf,
+  ein Dimmer in mehreren Weiß-Köpfen (typisch: ein Master-Dimmer, den die Datei
+  in jeden Kopf legt) oder ein Segment, das mehrere Dimmer bekämen, ergeben für
+  diese Dimmer **keine** Zuordnung.
+- Nur Modi mit eigener Weiß-Leiste und mehreren Dimmern; eine schon gespeicherte
+  Zuordnung wird nicht überschrieben.
+
+Gemessen an den QLC+-Dateien der 26 betroffenen Modi einer großen Bibliothek
+bekommen 13 so eine Zuordnung; bei den übrigen sagt die Datei es nicht (keine
+Köpfe, Dimmer außerhalb der Köpfe oder in mehreren). Dort bleibt der Hinweis
+im Editor stehen. Bereits importierte Profile ändern sich nicht von selbst,
+und ein erneuter Bibliotheks-Import hilft nicht: er überspringt ein Profil,
+dessen Hersteller und Modell schon in der Bibliothek stehen. Für ein solches
+Profil trägt man die Zuordnung im **Fixture-Editor** ein. („QLC+ importieren“
+im Generator liest sie zwar mit, legt beim Speichern aber ein **zusätzliches**
+eigenes Profil an — das vorhandene und die damit gepatchten Geräte bleiben, wie
+sie sind.)
 
 **Ohne Zuordnung (FM-46, Etappe 2).** Die Matrix soll möglichst immer leuchten,
 und ein Hinweis ist besser als ein stumm dunkles Segment:
