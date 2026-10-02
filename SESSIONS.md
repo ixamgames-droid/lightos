@@ -63,6 +63,7 @@
 | DOC-55 | C | - | 2026-10-02T13:04Z | docs/anleitung_einmessen/ANLEITUNG_EINMESSEN.md |
 | DOC-56 | C | - | 2026-10-02T13:05Z | docs/anleitung_web_remote/ANLEITUNG.md |
 | FM-57 | A | feat/fm57-bibliothek-runde1 | 2026-10-02T17:50Z | fixtures/bibliothek |
+| FM-58 | A | feat/fm58-bibliothek-runde2 | 2026-10-02T18:20Z | fixtures/bibliothek |
 
 ## Blocker & Fallen
 
@@ -144,7 +145,6 @@
 
 ## Verlauf
 
-- 2026-10-02T12:07Z C claim DOC-49
 - 2026-10-02T12:08Z C claim UI-71
 - 2026-10-02T12:09Z C claim DOC-50
 - 2026-10-02T12:11Z A claim TOOL-9
@@ -174,3 +174,4 @@
 - 2026-10-02T17:10Z A done VIZ-66
 - 2026-10-02T17:50Z A done FM-56
 - 2026-10-02T17:50Z A claim FM-57
+- 2026-10-02T18:20Z A claim FM-58
