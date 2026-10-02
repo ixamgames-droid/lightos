@@ -12,6 +12,8 @@
 
 ![Bank 7 Übersicht](img/01_bank7_uebersicht.png)
 
+> Hinweis: Das Bild stammt aus einem älteren Stand und zeigt rechts noch das frühere Chase-Builder-Panel (Farbfelder, Speed, Hold). Auf Bank 7 gibt es diese eigene Anzeige der Farbfolge nicht mehr; der Text unten beschreibt den aktuellen Stand. Das Bild wird beim nächsten Bebildern neu aufgenommen.
+
 ---
 
 ## 1. Misch-Abläufe (Reihe 0) — der schnellste Weg zum fertigen Look
