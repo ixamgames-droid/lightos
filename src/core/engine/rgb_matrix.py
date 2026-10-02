@@ -1106,6 +1106,7 @@ class RgbMatrixInstance(Function):
         try:
             from src.core.app_state import (get_channels_for_patched,
                                             channels_for_axis,
+                                            weiss_rueckfall_dimmer,
                                             weiss_ist_eigene_achse_for_channels)
             from src.core.group_cells import ACHSE_WEISS
         except Exception:
@@ -1182,13 +1183,27 @@ class RgbMatrixInstance(Function):
             # Gedimmt wird hier also, sobald die Matrix an DIESEM Geraet keinen
             # Dimmer treibt: weder ueber die Projektion noch ueber eigene
             # Farbzellen (die ziehen bei `drive_intensity` die Dimmer auf).
+            #
+            # ★ FM-46 (Etappe 2): ohne gespeicherte Zuordnung oeffnet die Matrix
+            # bei `drive_intensity` ALLE freien Vorkommen des mehrfachen Dimmers
+            # gemeinsam (`weiss_rueckfall_dimmer` — keine Auswahl, also kein
+            # Raten; Begruendung dort). Dann treibt sie wieder einen Dimmer, und
+            # der Merge dimmt ueber ihn wie beim geteilten Master — das Weiss
+            # bleibt im Wert voll, sonst waere es doppelt gedimmt.
+            _rueckfall = (weiss_rueckfall_dimmer(chans, segment, proj)
+                          if self.drive_intensity else [])
             _hat_dimmer = any((c.attribute or "").lower()
                               in ("intensity", "dimmer", "master") for c in chans)
             _treibt_dimmer = self.drive_intensity and (
                 fid in _farb_fids
+                or bool(_rueckfall)
                 or any((a or "").lower() in ("intensity", "dimmer", "master")
                        for a in proj))
             _skalieren = _hat_dimmer and not _treibt_dimmer and inten < 0.999
+            for ch in _rueckfall:
+                addr = fx.address + ch.channel_number - 1
+                if 1 <= addr <= 512:
+                    universe.set_channel(addr, 255)
             for attr, ch in proj.items():
                 a = (attr or "").lower()
                 if a == "color_w":
