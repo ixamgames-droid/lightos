@@ -49,7 +49,7 @@ def _shim_nutzer():
     """Dateien, die ihr `THREE` aus dem Wrapper-Modul beziehen.
 
     Nur fuer die gilt die Liste: klassische Scripts (three_local.js selbst,
-    assets/OBJLoader.js) sehen das vollstaendige globale `window.THREE`.
+    die Seiten-Scripts) sehen das vollstaendige globale `window.THREE`.
     """
     for pfad in _js_dateien():
         if os.path.abspath(pfad) == os.path.abspath(_SHIM):
