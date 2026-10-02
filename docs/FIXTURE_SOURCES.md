@@ -46,7 +46,9 @@ es jederzeit über **Datenbank → Geräte-Bibliothek herunterladen...**
   eigene Profile bleiben unverändert, Doppelte werden übersprungen.
 - **Herkunft je Profil:** Quelle, Lizenz, Lizenz-Link, Archiv-Adresse,
   Prüfsumme und Zeitpunkt stehen in `fixtures.db` (Tabelle `profil_herkunft`).
-- **Abbrechen** ist jederzeit möglich. **Ohne Netz** meldet der Dialog das,
+- **Abbrechen** ist jederzeit möglich. Während des Downloads bleibt alles, wie es
+  war; im Import bleiben die schon eingelesenen Profile (mit Herkunft) stehen.
+  **Ohne Netz** meldet der Dialog das,
   ändert nichts und fragt beim nächsten Start erneut; „Nicht jetzt“ dagegen
   zählt als Antwort.
 

@@ -150,7 +150,10 @@ class BibliothekDownloadDialog(QDialog):
                     fortschritt=lambda p, w, g: self._s.fortschritt.emit(p, int(w), g),
                     abbrechen=self._stopp.is_set, oeffnen=self._oeffnen)
             except BD.Abgebrochen:
-                self._s.fehler.emit("abbruch", "Abgebrochen — es wurde nichts verändert.")
+                # Im Download/Entpacken ist noch nichts importiert; im Import
+                # bleiben die schon eingelesenen Profile (mit Herkunft) stehen.
+                self._s.fehler.emit("abbruch", "Abgebrochen. Vorhandene und eigene "
+                                    "Profile sind unverändert.")
             except BD.OfflineFehler as e:
                 self._s.fehler.emit("offline", f"Keine Verbindung: {e}")
             except BD.DownloadFehler as e:

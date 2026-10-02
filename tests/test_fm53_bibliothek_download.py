@@ -222,6 +222,21 @@ class NichtsOhneGuteDaten(_Basis):
             self._laden(abbrechen=abbrechen)
         self.assertEqual(self._profile(), vorher)
 
+    def test_abbruch_im_import_behaelt_herkunft_und_bestand(self):
+        """Mitten im Import abgebrochen: was schon eingelesen ist, bleibt — und
+        traegt seine Herkunft; der Bestand ist unberuehrt."""
+        vorher = self._profile()
+
+        def abbrechen():
+            return len(self._profile()) > len(vorher)
+        with self.assertRaises(BD.Abgebrochen):
+            self._laden(abbrechen=abbrechen)
+        nachher = self._profile()
+        self.assertEqual({k: v for k, v in nachher.items() if k in vorher}, vorher)
+        neu = [v[0] for k, v in nachher.items() if k not in vorher]
+        self.assertEqual(len(neu), 1, "abgebrochen nach dem ersten eingelesenen Profil")
+        self.assertEqual(BD.herkunft_lesen(self.motor, neu[0])["lizenz"], "Apache-2.0")
+
     def test_kein_ausbruch_aus_dem_arbeitsordner(self):
         archiv = os.path.join(self.tmp, "a.tar.gz")
         with open(archiv, "wb") as fh:
