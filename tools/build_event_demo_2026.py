@@ -995,7 +995,7 @@ for i, pb in enumerate(PLAYBACKS):
     pb_fader(f"Dim {i+1}", i, B_MIX, slot=i, midi_cc=48 + i, value=255)
 label("BANK 7  ABLÄUFE / MISCHEN  —  R0: Misch-Collections (Party/Drop/Chill/Theme). R1: Chaser. "
       "R2: GO Cuelisten (Beat-Sync). R3: Live-Chase + Leeren/-/+. R4: Farben hinzufügen. "
-      "Rechts: Cuelisten-Anzeige + Chase-Builder.", X0, 28, 1250, B_MIX)
+      "Rechts: Cuelisten-Anzeige.", X0, 28, 1250, B_MIX)
 
 
 # ── BANK 8 — PROGRAMMER ─────────────────────────────────────────────────────────────
