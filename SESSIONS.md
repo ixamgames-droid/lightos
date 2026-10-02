@@ -13,7 +13,7 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | DOC-14 | C | fix/doc14-schaukasten-19 | 2026-10-01T21:37Z | tools/build_vc_widgets_showcase.py · docs/anleitung_vc_widgets/README.md · docs/anleitung_vc_widgets/_capture/geometry.json · tests/test_doc14_schaukasten_alle_typen.py · changelog.d/2026-10-02-DOC-14.md |
-| FM-46 | A | feat/fm46-dimmer-segment | 2026-10-02T07:26Z | src/core/database/models.py · src/core/app_state.py · src/ui/widgets/fixture_editor.py · src/ui/widgets/fixture_generator.py · src/core/database/fixture_db.py |
+| FM-46 | A | feat/fm46-rueckfall | 2026-10-02T11:59Z | src/core/database/models.py · src/core/app_state.py · src/ui/widgets/fixture_editor.py · src/ui/widgets/fixture_generator.py · src/core/database/fixture_db.py |
 | PROC-18 | A | fix/proc18-fremd-lizenzhinweise | 2026-10-02T08:42Z | THIRD_PARTY_NOTICES.md · src/ui/visualizer/assets/models |
 | XPLAT-44 | C | docs/xplat44-data-cwd | 2026-10-02T09:21Z | BACKLOG.md |
 | XPLAT-34 | C | fix/xplat34-verteilter-sammellauf | 2026-10-02T09:25Z | tools/zeitbomben_gate.py · tests/test_zeitbomben_gate.py · tests/test_xplat34_verteilter_sammellauf.py · BACKLOG.md |
@@ -107,7 +107,6 @@
 
 ## Verlauf
 
-- 2026-10-02T09:26Z A done TOOL-8
 - 2026-10-02T09:29Z C claim FM-53
 - 2026-10-02T09:49Z C done XPLAT-37
 - 2026-10-02T09:58Z C claim FM-33
@@ -137,3 +136,4 @@
 - 2026-10-02T11:14Z C claim QA-82
 - 2026-10-02T11:57Z C aktualisiert DOC-42: Dateien docs/anleitung_ablaeufe/ANLEITUNG_ABLAEUFE_MISCHEN.md -> docs/anleitung_ablaeufe/ANLEITUNG_ABLAEUFE_MISCHEN.md · tools/build_event_demo_2026.py · tests/test_doc42_bank7_beschriftung.py · changelog.d/2026-10-02-DOC-42.md
 - 2026-10-02T11:58Z C claim DOC-43
+- 2026-10-02T11:59Z A aktualisiert FM-46: Branch feat/fm46-dimmer-segment -> feat/fm46-rueckfall
