@@ -13,7 +13,11 @@ fest:
   unveraendert (mtime/Groesse/Existenz);
 * die Sandbox verweigert sich, wenn ``src`` schon importiert ist (dann waeren
   die Pfade der Module bereits eingefroren);
-* ein nicht gefundenes Marken-Widget ist ein Fehler, keine stille Luecke.
+* ein nicht gefundenes Marken-Widget ist ein Fehler, keine stille Luecke;
+* DOC-20: Frames -> GIF (Endlosschleife, Dauern, eine Palette), Zuschnitt und
+  Verkleinern, Groessenlimit (Fehler mit Groesse), Stabilitaet (gleiche
+  Eingabe -> byte-gleich, unmerkliche Abweichung -> „unveraendert"), und
+  jedes GIF unter ``docs/`` bleibt unter 2 MB.
 
 Der Mini-Lauf ist ein eigener Prozess (die Sandbox biegt ``os.environ`` und das
 cwd um — das darf die Testsuite nicht erben). Laufzeit ca. 10 s.
@@ -271,6 +275,130 @@ class PlatzierungTest(unittest.TestCase):
         self.assertTrue(gefunden)
         self.assertTrue(all(not self._feld(c).intersects(h) for h in ring))
         self.assertTrue(linie)
+
+
+def _bilder(n=3, groesse=(800, 450)):
+    """UI-artige Testbilder: dunkle Flaeche, Text, ein Feld, das je Frame
+    die Farbe wechselt."""
+    from PIL import Image, ImageDraw
+    aus = []
+    for i in range(n):
+        b = Image.new("RGB", groesse, (30, 33, 40))
+        d = ImageDraw.Draw(b)
+        for k in range(12):
+            d.text((10 + k * 40, 20 + k * 12), f"Kanal {k}", fill=(210, 210, 210))
+        d.rectangle((300, 200, 420, 260), fill=((255, 0, 0), (0, 0, 0), (0, 0, 255))[i % 3])
+        aus.append(b)
+    return aus
+
+
+class GifTest(unittest.TestCase):
+    """DOC-20: GIF-Erzeugung ohne App (reines Pillow)."""
+
+    def setUp(self):
+        from anleitungsbilder import runner
+        self.runner = runner
+
+    def test_frames_werden_gif_mit_endlosschleife(self):
+        import io
+        from PIL import Image
+        daten = self.runner.gif_bytes(_bilder(), [1000, 1500, 1200])
+        self.assertTrue(daten.startswith(b"GIF89a"))
+        with Image.open(io.BytesIO(daten)) as im:
+            self.assertEqual(im.info.get("loop"), 0, "keine Endlosschleife")
+            self.assertEqual(im.n_frames, 3)
+            self.assertEqual(im.size, (800, 450))
+        frames = self.runner.gif_frames(daten)
+        self.assertEqual([d for _f, d in frames], [1000, 1500, 1200])
+        # Frame 2 ist wirklich anders (Feld schwarz statt rot), voll zusammengesetzt.
+        self.assertEqual(frames[0][0].getpixel((350, 230)), (255, 0, 0))
+        self.assertEqual(frames[1][0].getpixel((350, 230)), (0, 0, 0))
+        self.assertEqual(frames[2][0].getpixel((350, 230)), (0, 0, 255))
+        self.assertEqual(frames[1][0].getpixel((5, 5)), (30, 33, 40))
+
+    def test_zuschnitt_und_verkleinern(self):
+        daten = self.runner.gif_bytes(_bilder(2), [500, 500],
+                                      zuschnitt=(100, 50, 600, 300), breite=300)
+        frames = self.runner.gif_frames(daten)
+        self.assertEqual(frames[0][0].size, (300, 150))
+        # Nie vergroessern.
+        daten = self.runner.gif_bytes(_bilder(2), [500, 500], breite=2000)
+        self.assertEqual(self.runner.gif_frames(daten)[0][0].size, (800, 450))
+
+    def test_groessenlimit_ist_fehler_mit_groesse(self):
+        self.assertEqual(self.runner.GIF_LIMIT, 2 * 1024 * 1024)
+        with self.assertRaises(self.runner.GifZuGross) as ctx:
+            self.runner.gif_bytes(_bilder(), [1000] * 3, limit=1000)
+        self.assertIn("MB", str(ctx.exception))
+        self.assertTrue(issubclass(self.runner.GifZuGross, self.runner.SzenenFehler))
+
+    def test_ungleiche_eingaben_sind_fehler(self):
+        with self.assertRaises(self.runner.SzenenFehler):
+            self.runner.gif_bytes([], [])
+        with self.assertRaises(self.runner.SzenenFehler):
+            self.runner.gif_bytes(_bilder(2), [1000])
+        a, b = _bilder(2)
+        with self.assertRaises(self.runner.SzenenFehler):
+            self.runner.gif_bytes([a, b.resize((400, 225))], [1000, 1000])
+
+    def test_stabil_bytegleich_und_unveraendert_erkannt(self):
+        import tempfile as tf
+        eingabe = _bilder()
+        eins = self.runner.gif_bytes(eingabe, [1000, 1500, 1200])
+        zwei = self.runner.gif_bytes(_bilder(), [1000, 1500, 1200])
+        self.assertEqual(eins, zwei, "gleiche Eingabe muss byte-gleich sein")
+        with tf.TemporaryDirectory() as d:
+            pfad = os.path.join(d, "a.gif")
+            with open(pfad, "wb") as f:
+                f.write(eins)
+            self.assertTrue(self.runner.ist_gleich(pfad, zwei))
+            # Ein einzelner anders glimmender Pixel -> gilt als unveraendert.
+            leicht = _bilder()
+            leicht[1].putpixel((700, 400), (255, 255, 255))
+            self.assertTrue(self.runner.gif_fast_gleich(
+                pfad, self.runner.gif_bytes(leicht, [1000, 1500, 1200])))
+            # Andere Dauer, anderer Inhalt, andere Frame-Zahl -> geaendert.
+            self.assertFalse(self.runner.gif_fast_gleich(
+                pfad, self.runner.gif_bytes(_bilder(), [1000, 1500, 900])))
+            anders = _bilder()
+            anders[0].paste((0, 255, 0), (0, 0, 800, 200))
+            self.assertFalse(self.runner.gif_fast_gleich(
+                pfad, self.runner.gif_bytes(anders, [1000, 1500, 1200])))
+            self.assertFalse(self.runner.gif_fast_gleich(
+                pfad, self.runner.gif_bytes(_bilder(2), [1000, 1500])))
+            self.assertFalse(self.runner.gif_fast_gleich(
+                os.path.join(d, "fehlt.gif"), eins))
+
+    def test_szene_mit_frames_wird_gif(self):
+        sz = self.runner.Szene("05_ablauf", frames=[self.runner.Frame(dauer_s=1.0)])
+        self.assertTrue(sz.ist_gif)
+        self.assertEqual(sz.datei, "05_ablauf.gif")
+        self.assertEqual(self.runner.Szene("05_bild").datei, "05_bild.png")
+
+    def test_gifs_in_docs_unter_der_grenze_und_in_schleife(self):
+        """Jedes GIF unter docs/ <= 2 MB; die vom Werkzeug erzeugten (im
+        Manifest ``bilder.json`` gefuehrten) laufen in Endlosschleife."""
+        from PIL import Image
+        gefunden = 0
+        for wurzel, _dirs, dateien in os.walk(os.path.join(REPO, "docs")):
+            werkzeug = set()
+            if "bilder.json" in dateien:
+                with open(os.path.join(wurzel, "bilder.json"), encoding="utf-8") as f:
+                    werkzeug = {b["datei"] for b in json.load(f).get("bilder", [])}
+            for name in dateien:
+                if not name.lower().endswith(".gif"):
+                    continue
+                pfad = os.path.join(wurzel, name)
+                groesse = os.path.getsize(pfad)
+                self.assertLessEqual(groesse, 2 * 1024 * 1024,
+                                     f"{name}: {groesse / 1024 / 1024:.2f} MB > 2 MB")
+                if name not in werkzeug:
+                    continue
+                gefunden += 1
+                with Image.open(pfad) as im:
+                    self.assertEqual(im.info.get("loop"), 0, f"{name}: keine Endlosschleife")
+                    self.assertGreater(im.n_frames, 1, f"{name}: nur ein Frame")
+        self.assertGreater(gefunden, 0)
 
 
 if __name__ == "__main__":

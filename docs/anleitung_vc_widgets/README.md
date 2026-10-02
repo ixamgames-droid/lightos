@@ -10,11 +10,10 @@ echten Screenshots aus der App.
 
 ![Übersicht der VC-Widgets](img/uebersicht_alle_widgets.png)
 
-> Diese Übersicht stammt aus der Vorlage-Show `shows/VC_Widgets_Showcase.lshow`
-> (Generator: `tools/build_vc_widgets_showcase.py`). Die Vorlage-Show legt inzwischen
-> **alle 19** Widget-Typen beschriftet ab; das Bild hier ist noch die ältere Aufnahme mit
-> **17** davon — **Tempo-Controller** und **Live-Edit-Panel** fehlen darauf noch. Beide sind
-> unten einzeln beschrieben ([22](22_tempo_controller.md), [23](23_live_edit.md)).
+> Diese Übersicht zeigt **alle 19** Widget-Typen, jeweils beschriftet. Sie stammt aus der
+> Vorlage-Show `shows/VC_Widgets_Showcase.lshow` (Generator:
+> `tools/build_vc_widgets_showcase.py`). **Tempo-Controller** und **Live-Edit-Panel** stehen
+> unten rechts; beschrieben sind sie in [22](22_tempo_controller.md) und [23](23_live_edit.md).
 
 ---
 

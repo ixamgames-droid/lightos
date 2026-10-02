@@ -1,7 +1,7 @@
 {
   "anleitung": "szenen_cues",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "3403c9c7",
+  "stand": "07a09e56",
   "schrift": "Noto Sans (statt Roboto Condensed)",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py szenen_cues'.",
@@ -24,7 +24,7 @@
           "beschriftung": "Ordner +"
         }
       ],
-      "md5": "6f63f0bc6726a2b6ff406c6952295388"
+      "md5": "e6e088209d1ffb9d8eb0b09ae15308f6"
     },
     {
       "datei": "02_kanaele.png",
@@ -48,7 +48,7 @@
           "beschriftung": "OK"
         }
       ],
-      "md5": "d23a9811ee4d29b5677d4efb88aa881b"
+      "md5": "e195d7bb92eb747bf659a765a6c414f7"
     },
     {
       "datei": "03_snap_abrufen.png",
@@ -72,7 +72,7 @@
           "beschriftung": "Szene"
         }
       ],
-      "md5": "ee0c098cfee9885d8c653be7c049d1bc"
+      "md5": "0f5d655d303771acc3b2fec644c65cc3"
     },
     {
       "datei": "04_assistent.png",
@@ -100,7 +100,7 @@
           "beschriftung": "Stop"
         }
       ],
-      "md5": "a754e5de4af937cfac173b6a677d8611"
+      "md5": "41eb19cf41d031d905344afb6b5c7029"
     },
     {
       "datei": "05_snapshots.png",
@@ -120,7 +120,7 @@
           "beschriftung": "leerer Slot"
         }
       ],
-      "md5": "d9044182e183a7d504a553a45713e237"
+      "md5": "fca2d8f8ce1d2a64f5693519c28c1f00"
     },
     {
       "datei": "06_preset_browser.png",
@@ -144,7 +144,7 @@
           "beschriftung": "Status"
         }
       ],
-      "md5": "7ae61ff316cdf7dfec74b783ad9e1877"
+      "md5": "a765575fbd39648633bc32faf73a4b9b"
     },
     {
       "datei": "07_cueliste_neu.png",
@@ -168,7 +168,7 @@
           "beschriftung": "Quick-Rec"
         }
       ],
-      "md5": "21f8ecc42031ba91e1a3c417a2f9d97b"
+      "md5": "5786286b24a4e8ce3fc0bb2fd85e21cb"
     },
     {
       "datei": "08_executor.png",
@@ -188,7 +188,7 @@
           "beschriftung": "Executor 1"
         }
       ],
-      "md5": "0bebd63ae8beaa057a0df794d385b584"
+      "md5": "79289954ec2a0a419840da8250fe15ed"
     },
     {
       "datei": "09_go.png",
@@ -216,7 +216,7 @@
           "beschriftung": "Aktive Cue"
         }
       ],
-      "md5": "8a7c40c1e0f22441202a8e36e5d1a6f1"
+      "md5": "3d7fc3ef82a0b916fbf5995d80cc309c"
     },
     {
       "datei": "10_vc_cueliste.png",
@@ -236,7 +236,7 @@
           "beschriftung": "GO"
         }
       ],
-      "md5": "358c73af824631eba9c9bf34735ce9aa"
+      "md5": "3403e6023ac12b5faf7036d7571a8262"
     },
     {
       "datei": "11_go_ohne_executor.png",
@@ -281,6 +281,58 @@
         }
       ],
       "md5": "aac19ae7fbd5317ab5119a1460efa804"
+    },
+    {
+      "datei": "13_go_ohne_executor_ablauf.gif",
+      "szene": "13_go_ohne_executor_ablauf",
+      "titel": "GIF: GO ohne Executor — Liste landet auf Ex 1, Cue 1, dann Cue 2",
+      "groesse": [
+        1200,
+        675
+      ],
+      "marken": [
+        [
+          {
+            "nummer": 1,
+            "beschriftung": "GO"
+          }
+        ],
+        [
+          {
+            "nummer": 1,
+            "beschriftung": "GO"
+          },
+          {
+            "nummer": 2,
+            "beschriftung": "Cue 1"
+          },
+          {
+            "nummer": 3,
+            "beschriftung": "Hinweis"
+          },
+          {
+            "nummer": 4,
+            "beschriftung": "Executor 1"
+          }
+        ],
+        [
+          {
+            "nummer": 1,
+            "beschriftung": "GO"
+          },
+          {
+            "nummer": 2,
+            "beschriftung": "Cue 2"
+          }
+        ]
+      ],
+      "md5": "1fb539876b70f3efd5d01b96f227d642",
+      "frames": 3,
+      "dauern_ms": [
+        1500,
+        2200,
+        1800
+      ]
     }
   ]
 }

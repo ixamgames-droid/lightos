@@ -1,7 +1,7 @@
 {
   "anleitung": "projektseite",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "c0ff194d",
+  "stand": "07a09e56",
   "schrift": "Noto Sans (statt Roboto Condensed)",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py projektseite'.",
@@ -59,7 +59,7 @@
           "beschriftung": "Bibliothek"
         }
       ],
-      "md5": "886990aaf94e612bd320dc3afc39fdaf"
+      "md5": "f446a6ca0a6d8b13901914cb0b1e217d"
     },
     {
       "datei": "04_vc.png",
@@ -81,7 +81,7 @@
         900
       ],
       "marken": [],
-      "md5": "2b2ccc9b3460719f051cb5a51661f1d6"
+      "md5": "e3f0674bc806aff2508bd71af79890d5"
     },
     {
       "datei": "06_bpm.png",
@@ -103,7 +103,7 @@
         900
       ],
       "marken": [],
-      "md5": "dad59a6f860286cffd4b7ee5a2529551"
+      "md5": "af0b141f8dbe36f47a9bc1ffa303ed8b"
     }
   ]
 }
