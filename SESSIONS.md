@@ -53,7 +53,6 @@
 | DOC-52 | C | - | 2026-10-02T12:24Z | docs/anleitung_komplettshow_2026 |
 | DOC-53 | C | - | 2026-10-02T12:26Z | docs/anleitung_hochzeit_komplett · tools/build_hochzeit_komplett.py · tests/test_doc53_hochzeit_linie.py · changelog.d/2026-10-02-DOC-53.md |
 | TOOL-10 | C | - | 2026-10-02T12:28Z | BACKLOG.md |
-| XPLAT-42 | B | fix/xplat42-sandbox-aufraeumen | 2026-10-02T12:45Z | tools/anleitungsbilder.py · tools/anleitungsbilder/sandbox.py · tests/test_anleitungsbilder.py · BACKLOG.md |
 | OUT-58 | C | - | 2026-10-02T12:51Z | src/ui/widgets/output_config.py · tests/test_out58_universen_tabelle_nachladen.py · BACKLOG.md · changelog.d/2026-10-02-OUT-58.md |
 | XPLAT-45 | B | ci/xplat45-arm-leg-x64 | 2026-10-02T12:53Z | .github/workflows/ci.yml · tests/test_ci_windows_legs.py · BACKLOG.md |
 | VCB-35 | C | - | 2026-10-02T12:53Z | BACKLOG.md |
@@ -146,7 +145,6 @@
 
 ## Verlauf
 
-- 2026-10-02T12:08Z C claim UI-71
 - 2026-10-02T12:09Z C claim DOC-50
 - 2026-10-02T12:11Z A claim TOOL-9
 - 2026-10-02T12:14Z A done PROC-18
@@ -176,3 +174,4 @@
 - 2026-10-02T17:50Z A done FM-56
 - 2026-10-02T17:50Z A claim FM-57
 - 2026-10-02T18:20Z A claim FM-58
+- 2026-10-02T19:08Z B done XPLAT-42
