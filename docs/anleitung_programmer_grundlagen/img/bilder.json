@@ -1,7 +1,7 @@
 {
   "anleitung": "programmer_grundlagen",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "53659073",
+  "stand": "07a09e56",
   "schrift": "Noto Sans (statt Roboto Condensed)",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py programmer_grundlagen'.",
@@ -136,7 +136,7 @@
           "beschriftung": "Position"
         }
       ],
-      "md5": "dd3c0766c1843dce55534ef46b35409c"
+      "md5": "9817632a5c9340215bacba228083c864"
     },
     {
       "datei": "06_paletten.png",
@@ -184,7 +184,7 @@
           "beschriftung": "Lampen-Vorschau"
         }
       ],
-      "md5": "2d199f742426f7e2547230adc79c6565"
+      "md5": "b1de1b307b6cc754e29758b0c630761f"
     },
     {
       "datei": "08_farbwerkzeug.png",
@@ -232,7 +232,7 @@
           "beschriftung": "Mitte"
         }
       ],
-      "md5": "935cb5d51f9790c36dd8801a26c84f73"
+      "md5": "a3d4b6c75816675eaf6127ea1dc6f92e"
     },
     {
       "datei": "10_faecher.png",
@@ -272,7 +272,7 @@
           "beschriftung": "Wiederholen"
         }
       ],
-      "md5": "560b91668a0d548a28fb8d0456acee35"
+      "md5": "9fa29f9de2f480afbb88f67a7d20c510"
     }
   ]
 }
