@@ -40,6 +40,17 @@ from src.core.database.models import GEO_MAX
 # ausgefuellt?" stehen an EINER Stelle — dieselbe, die der einfache
 # Fixture-Editor benutzt. Begruendung im Modul.
 from src.core.kopfformular import PLATZHALTER_MODELL, kopf_beanstandung
+# FM-46: Zuordnung Dimmer -> Weiss-Segment — dieselben Hilfen und derselbe
+# Wortlaut wie im einfachen Fixture-Editor (zwei Dialoge, eine Angabe).
+from src.core.dimmer_segmente import (HINWEIS_TEXT, SegmentZiele,
+                                      hinweis_fuer, ist_dimmer,
+                                      vorschlag_abweichungen,
+                                      vorschlag_dimmer_segmente,
+                                      zuordnung_fehlt, zuordnung_probleme)
+from src.core.database.fixture_db import segment_wert
+from src.ui.widgets.fixture_editor import (KEIN_SEGMENT,
+                                           frage_vorschlag_ueberschreiben,
+                                           segment_auswahl)
 
 
 # Attribute, die fuer eine 16-bit-Aufloesung (coarse + Fine-Kanal) sinnvoll
@@ -99,6 +110,10 @@ class GenChannel:
     resolution: str = "8bit"        # "8bit" | "16bit"
     fine_channel: str = ""          # Name des gekoppelten Fine-Kanals (16bit)
     ranges: list[GenRange] = field(default_factory=list)
+    # FM-46: welches eigene Weiss-Segment dieser DIMMER dimmt (0-basiert,
+    # ``None`` = keine Zuordnung). Gespeichert als ``FixtureChannel.segment``;
+    # an Nicht-Dimmern verwirft ``build_profile_payload`` den Wert.
+    segment: int | None = None
 
 
 @dataclass
@@ -168,6 +183,11 @@ def build_profile_payload(model: GeneratorModel) -> dict:
                 "highlight_value": _clamp(ch.highlight_value),
                 "invert": bool(ch.invert),
                 "resolution": "16bit" if ch.resolution == "16bit" else "8bit",
+                # FM-46: nur an Dimmern — an jedem anderen Kanal waere es
+                # eine Angabe ohne Wirkung (gelesen wird sie ausschliesslich
+                # fuer Dimmer-Attribute in `channels_for_axis`).
+                "segment": (segment_wert(ch.segment)
+                            if ist_dimmer(ch.attribute) else None),
                 "ranges": [
                     {"range_from": _clamp(r.range_from),
                      "range_to": _clamp(r.range_to),
@@ -293,6 +313,9 @@ def validate_model(model: GeneratorModel) -> list[tuple[str, str]]:
         # Dimmer↔Strobe-Plausibilitaet (Heuristik).
         issues.extend(_check_dimmer_strobe(mode, loc))
 
+        # FM-46: Zuordnung Dimmer -> Weiss-Segment.
+        issues.extend(_check_dimmer_segmente(mode, loc))
+
     # Modus-Vergleich (gleiche Funktionen, andere Reihenfolge).
     issues.extend(_compare_modes(model.modes))
     return issues
@@ -363,6 +386,28 @@ def _check_dimmer_strobe(mode: GenMode, loc: str) -> list[tuple[str, str]]:
                         f"{loc}: Kanal '{c.name}' ist als Strobe deklariert, "
                         f"verhält sich aber wie ein Dimmer (Highlight 255, keine "
                         f"Bereiche) — Dimmer/Strobe vertauscht?"))
+    return out
+
+
+def _check_dimmer_segmente(mode: GenMode, loc: str) -> list[tuple[str, str]]:
+    """FM-46: fehlt die Zuordnung Dimmer -> Weiss-Segment, obwohl der Modus
+    eine eigene Weiss-Achse und mehrere Dimmer hat? Dann ein Hinweis — mit dem
+    Vorschlag aus der Kanalreihenfolge, falls es einen EINDEUTIGEN gibt.
+    Dazu: ein eingetragenes Segment, das es im Modus nicht gibt."""
+    out: list[tuple[str, str]] = []
+    if zuordnung_fehlt(mode.channels):
+        text = f"{loc}: {HINWEIS_TEXT}"
+        vorschlag = vorschlag_dimmer_segmente(mode.channels)
+        if vorschlag:
+            paare = ", ".join(f"Kanal {i + 1} → Segment {seg + 1}"
+                              for i, seg in sorted(vorschlag.items()))
+            text += f" Vorschlag aus der Reihenfolge: {paare}."
+        out.append(("warn", text))
+    # FM-46 (Review): Probleme einer VORHANDENEN Zuordnung — doppelt
+    # vergeben, Segment gibt es nicht, Dimmer ohne Segment. Dieselbe
+    # Pruefung, die beide Editoren unter der Geometrie-Zeile zeigen.
+    for problem in zuordnung_probleme(mode.channels):
+        out.append(("warn", f"{loc}: {problem}"))
     return out
 
 
@@ -493,7 +538,10 @@ def model_to_markdown(model: GeneratorModel) -> str:
 # UI
 # ═════════════════════════════════════════════════════════════════════════════
 
-CHANNEL_COLS = ["#", "Name", "Attribut", "Default", "Highlight", "Invert", "Aufl."]
+CHANNEL_COLS = ["#", "Name", "Attribut", "Default", "Highlight", "Invert", "Aufl.",
+                "Weiß-Segment"]
+# FM-46: Spalte der Zuordnung Dimmer -> Weiss-Segment.
+SEGMENT_COL = 7
 RANGE_COLS = ["Von", "Bis", "Name", "Art"]
 
 
@@ -633,6 +681,10 @@ class _ModeTab(QWidget):
     def __init__(self, mode: GenMode, parent=None):
         super().__init__(parent)
         self.mode = mode
+        # FM-46 (Review): Zuordnungen haengen am Weiss-KANAL, nicht an seiner
+        # Nummer (Begruendung an `dimmer_segmente.SegmentZiele`).
+        self._ziele = SegmentZiele()
+        self._ziele.merken(mode.channels)
         lay = QVBoxLayout(self)
 
         name_row = QHBoxLayout()
@@ -690,6 +742,15 @@ class _ModeTab(QWidget):
         self.set_geometry((mode.grid_rows, mode.grid_cols),
                           (mode.white_rows, mode.white_cols))
 
+        # FM-46: derselbe Hinweis wie im einfachen Editor, an derselben Stelle
+        # (unter der Geometrie-Zeile). Zusaetzlich steht er in der
+        # Hinweisliste des Dialogs (`validate_model`), dort mit Vorschlag.
+        self._lbl_segment_hinweis = QLabel(HINWEIS_TEXT)
+        self._lbl_segment_hinweis.setWordWrap(True)
+        self._lbl_segment_hinweis.setStyleSheet("color: #d08a00;")
+        self._lbl_segment_hinweis.setHidden(True)
+        lay.addWidget(self._lbl_segment_hinweis)
+
         split = QSplitter(Qt.Orientation.Horizontal)
 
         left = QWidget()
@@ -713,6 +774,14 @@ class _ModeTab(QWidget):
             b = QPushButton(label)
             b.clicked.connect(slot)
             row.addWidget(b)
+        # FM-46: Vorschlag fuer die Spalte „Weiß-Segment“.
+        self._btn_vorschlag = QPushButton("Vorschlag aus Reihenfolge")
+        self._btn_vorschlag.setToolTip(
+            "Füllt die Spalte „Weiß-Segment“ für die Dimmer — nur, wenn die "
+            "Kanalreihenfolge es eindeutig hergibt (z. B. Dimmer direkt vor "
+            "seinem Weiß). Bitte am Gerät oder im Handbuch prüfen.")
+        self._btn_vorschlag.clicked.connect(self._on_vorschlag)
+        row.addWidget(self._btn_vorschlag)
         row.addStretch(1)
         ll.addLayout(row)
 
@@ -771,6 +840,7 @@ class _ModeTab(QWidget):
         for r in rows:
             if 0 <= r < len(self.mode.channels):
                 del self.mode.channels[r]
+        self._ziele.nachziehen(self.mode.channels)
         self._refresh()
 
     def _move(self, direction: int):
@@ -783,6 +853,7 @@ class _ModeTab(QWidget):
         if 0 <= nr < len(self.mode.channels):
             ch = self.mode.channels
             ch[r], ch[nr] = ch[nr], ch[r]
+            self._ziele.nachziehen(ch)
             self._refresh()
             self._tbl.selectRow(nr)
 
@@ -818,6 +889,7 @@ class _ModeTab(QWidget):
                 lambda txt, row=i: self._set_res(row, txt))
             self._tbl.setCellWidget(i, 6, cb_res)
         self._tbl.blockSignals(False)
+        self._refresh_segment_cells()
         if self.mode.channels:
             self._tbl.selectRow(min(self._active_row(), len(self.mode.channels) - 1))
         self._sync_fine_combo()
@@ -829,7 +901,101 @@ class _ModeTab(QWidget):
     def _set_attr(self, row: int, value: str):
         if 0 <= row < len(self.mode.channels):
             self.mode.channels[row].attribute = value.strip() or "raw"
+            # FM-46 (Review): die Zuordnung NICHT loeschen — die Combo ist
+            # editierbar und meldet jeden Tipp-Zwischenstand („intens").
+            # An einem Nicht-Dimmer bleibt der Wert grau stehen und wird erst
+            # beim Speichern verworfen (`build_profile_payload`). Wird ein
+            # Weiss-Kanal zwischenzeitlich etwas anderes, ruht seine
+            # Zuordnung und kommt mit `color_w` zurueck (`SegmentZiele`).
+            self._ziele.nachziehen(self.mode.channels)
             self._sync_fine_combo()
+            self._refresh_segment_cells()
+
+    # ── FM-46: Spalte „Weiß-Segment“ ─────────────────────────────────────
+    # Dieselbe Spalte wie im einfachen Editor (Begruendung dort, an
+    # `_ModeTab._refresh_segment_cells`): nur an Dimmern editierbar, sonst
+    # leer und grau; getrennt von `_refresh` erneuert, weil der Aufruf aus
+    # dem Signal der Attribut-Combo kommt.
+    def _refresh_segment_cells(self):
+        chans = self.mode.channels
+        n_weiss = sum(1 for c in chans if (c.attribute or "").lower() == "color_w")
+        for i, ch in enumerate(chans):
+            if i >= self._tbl.rowCount():
+                break
+            if ist_dimmer(ch.attribute):
+                seg = segment_wert(ch.segment)
+                cb = QComboBox()
+                cb.addItems(segment_auswahl(n_weiss, seg))
+                cb.setCurrentIndex(seg + 1 if seg is not None else 0)
+                cb.setToolTip("Welches Weiß-Segment dimmt dieser Dimmer? "
+                              f"„{KEIN_SEGMENT}“ = keine Zuordnung.")
+                cb.currentIndexChanged.connect(
+                    lambda idx, row=i: self._set_segment(row, idx))
+                self._tbl.setCellWidget(i, SEGMENT_COL, cb)
+            else:
+                self._tbl.removeCellWidget(i, SEGMENT_COL)
+                seg = segment_wert(ch.segment)
+                it = QTableWidgetItem("" if seg is None else str(seg + 1))
+                it.setFlags(Qt.ItemFlag.NoItemFlags)
+                it.setBackground(self.palette().window())
+                if seg is not None:
+                    it.setToolTip("Nur an einem Dimmer wirksam — wird beim "
+                                  "Speichern verworfen, wenn der Kanal kein "
+                                  "Dimmer ist.")
+                self._tbl.setItem(i, SEGMENT_COL, it)
+        self._update_segment_hinweis()
+
+    def _set_segment(self, row: int, combo_index: int):
+        if 0 <= row < len(self.mode.channels):
+            self.mode.channels[row].segment = (combo_index - 1
+                                               if combo_index > 0 else None)
+            self._ziele.setzen(self.mode.channels, self.mode.channels[row])
+            self._update_segment_hinweis()
+
+    def _update_segment_hinweis(self):
+        text = hinweis_fuer(self.mode.channels)
+        self._lbl_segment_hinweis.setText(text)
+        self._lbl_segment_hinweis.setHidden(not text)
+
+    def segment_hinweis_sichtbar(self) -> bool:
+        return not self._lbl_segment_hinweis.isHidden()
+
+    def segment_hinweis_text(self) -> str:
+        return "" if self._lbl_segment_hinweis.isHidden() \
+            else self._lbl_segment_hinweis.text()
+
+    def vorschlag_uebernehmen(self, ueberschreiben: bool | None = None) -> bool | None:
+        """Traegt den Vorschlag aus der Kanalreihenfolge ein; ``False``, wenn
+        es keinen eindeutigen gibt (dann bleibt alles, wie es ist), ``None``,
+        wenn die Rueckfrage abgebrochen wurde. Abweichende Handzuordnungen
+        werden nicht stumm ueberschrieben (dieselbe Regel und Rueckfrage wie
+        im einfachen Editor)."""
+        self.sync_from_widgets()
+        chans = self.mode.channels
+        vorschlag = vorschlag_dimmer_segmente(chans)
+        if not vorschlag:
+            return False
+        abweichend = vorschlag_abweichungen(chans, vorschlag)
+        if abweichend and ueberschreiben is None:
+            ueberschreiben = frage_vorschlag_ueberschreiben(self, abweichend)
+            if ueberschreiben is None:
+                return None
+        for idx, seg in vorschlag.items():
+            if idx in abweichend and not ueberschreiben:
+                continue
+            chans[idx].segment = seg
+            self._ziele.setzen(chans, chans[idx])
+        self._refresh_segment_cells()
+        return True
+
+    def _on_vorschlag(self):
+        if self.vorschlag_uebernehmen() is False:
+            QMessageBox.information(
+                self, "Weiß-Segment",
+                "Aus der Kanalreihenfolge ergibt sich kein eindeutiger "
+                "Vorschlag. Bitte im Handbuch nachsehen, welcher Dimmer "
+                "welches Weiß-Segment dimmt, und die Spalte „Weiß-Segment“ "
+                "von Hand ausfüllen.")
 
     def _set_invert(self, row: int, value: bool):
         if 0 <= row < len(self.mode.channels):
