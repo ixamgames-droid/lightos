@@ -49,8 +49,15 @@ Fehlen diese Angaben im Profil, wird **nicht geraten** — das Gerät bleibt sic
 ## Zum Nachstellen: die Probe-Show
 
 ```
-venv/Scripts/python.exe tools/build_farbprobe_3d.py
+venv/Scripts/python.exe tools/build_farbprobe_3d.py     # Windows
+./venv/bin/python tools/build_farbprobe_3d.py           # Linux/macOS
 ```
+
+> **Voraussetzung:** Das Profil **„iMove 5 Series"** gehört **nicht** zu den
+> eingebauten Geräten. Es muss vorher in deiner Bibliothek stehen (Import über
+> **Datenbank → Fixtures importieren (XML)...**). Fehlt es, bricht der Generator
+> ab mit *„Fixture-Profil 'iMove 5 Series' existiert nicht in der Bibliothek"*,
+> und es entsteht keine Show. Blinder und Kontroll-PAR sind eingebaut.
 
 Das erzeugt `shows/Farbprobe_3D.lshow` mit drei Geräten nebeneinander:
 
@@ -60,7 +67,10 @@ Das erzeugt `shows/Farbprobe_3D.lshow` mit drei Geräten nebeneinander:
 | **iMove 5W** (7 Kanäle) | Moving Head mit **Farbrad** statt RGB (12 benannte Slots) |
 | **ZQ01424 RGBW-PAR** (8 Kanäle) | Kontrollgerät **mit** Farbkanälen |
 
-Show öffnen, dann **Visualizer → 3D Visualizer öffnen**.
+Show öffnen, dann **Visualizer → 3D Visualizer öffnen**. In der Virtuellen Konsole
+liegen zwei Knöpfe: **VOLL AN** dreht bei allen drei Geräten nur den Dimmer auf
+(färbt nichts ein), **PAR ROT** färbt das Kontroll-PAR rot. Das Farbrad des Movers
+stellst du im Programmer.
 
 ## Was du siehst
 
