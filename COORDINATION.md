@@ -134,6 +134,17 @@ Sitzung beginnt mit `AN B:` (bzw. `AN A UND B:`, `AN ALLE:`).
 * **Briefe lesen:** `session_claim.py list --fuer B` zeigt ungekuerzt alles an
   `B` (und `AN ALLE`) seit dem letzten eigenen Eintrag von `B` — `list` allein
   zeigt nur die juengsten fuenf Blocker, aeltere Fragen gingen dort unter.
+* **Blocker verfallen nach 7 Tagen (PROC-08).** Bei jedem Schreiben (`claim`,
+  `release`, `blocker`) faellt von der Tafel, was aelter als 7 Tage ist —
+  **ausser** einem Brief, den ein Adressat noch nicht gelesen hat (er hat seither
+  nichts geschrieben; bei `AN ALLE` jede Sitzung, die je auf der Tafel stand),
+  dem **letzten Eintrag jeder Sitzung** (die Lesemarke fuer `list --fuer`) und
+  Eintraegen ohne lesbaren Zeitstempel. Der Verlauf vermerkt, wie viele
+  verfallen sind; der Volltext bleibt in der Historie:
+  `git log -p origin/sessions -- SESSIONS.md`. Wer einen Hinweis laenger
+  braucht (etwa „Rig nicht neu starten"), schreibt ihn neu. Gemessen vor der
+  Regel: 144 Blocker / 253 kB, die Probe danach 37 / 44 kB — und `list --fuer`
+  zeigte jeder Sitzung dieselben Briefe wie vorher.
 
 ---
 
