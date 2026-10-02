@@ -59,7 +59,6 @@
 | DOC-54 | C | - | 2026-10-02T13:02Z | docs/anleitung_speed_bpm/ANLEITUNG_SPEED_BPM.md |
 | DOC-55 | C | - | 2026-10-02T13:04Z | docs/anleitung_einmessen/ANLEITUNG_EINMESSEN.md |
 | DOC-56 | C | - | 2026-10-02T13:05Z | docs/anleitung_web_remote/ANLEITUNG.md |
-| FM-57 | A | feat/fm57-bibliothek-runde1 | 2026-10-02T17:50Z | fixtures/bibliothek |
 | FM-58 | A | feat/fm58-bibliothek-runde2 | 2026-10-02T18:20Z | fixtures/bibliothek |
 | UI-72 | B | docs/ui72-ui73-befunde | 2026-10-02T22:02Z | BACKLOG.md |
 | UI-73 | B | docs/ui72-ui73-befunde | 2026-10-02T22:02Z | BACKLOG.md |
@@ -152,7 +151,6 @@
 
 ## Verlauf
 
-- 2026-10-02T12:45Z B claim XPLAT-42
 - 2026-10-02T12:51Z C claim OUT-58
 - 2026-10-02T12:53Z B claim XPLAT-45
 - 2026-10-02T12:53Z C claim VCB-35
@@ -182,3 +180,4 @@
 - 2026-10-02T22:21Z B uebergeben OUT-60
 - 2026-10-02T22:22Z B claim OUT-60
 - 2026-10-02T22:24Z A claim FM-59
+- 2026-10-02T22:32Z A done FM-57
