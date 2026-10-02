@@ -35,8 +35,11 @@ from src.core.paths import app_data_dir           # XPLAT-10: nicht selbst auflo
 
 APPDIR = app_data_dir()
 SNAP_FILE = os.path.join(APPDIR, "snapshots.json")
-MIDIMAP = os.path.join("data", "midi_mappings.json")
-SHOW_OUT = os.path.join("shows", "APC_Demo_Show.lshow")
+# TOOL-3: repo-relativ wie die anderen Generatoren — CWD-relativ landete die Show
+# woanders, sobald das Skript nicht aus dem Repo-Root gestartet wurde.
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MIDIMAP = os.path.join(_ROOT, "data", "midi_mappings.json")
+SHOW_OUT = os.path.join(_ROOT, "shows", "APC_Demo_Show.lshow")
 
 st = get_state()
 fm = get_function_manager()
