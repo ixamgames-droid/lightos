@@ -4,7 +4,7 @@
 Der ehemalige EINE ``<script>``-Block (~3547 Zeilen, ~95 Funktionen) wurde in
 ES-Module unter ``scene_src/`` zerlegt; ``stage_scene.html`` laedt jetzt nur
 noch ``<script type="module" src="scene_src/app.js">`` (nach den klassischen
-qwebchannel.js/three_local.js/Loader-Scripts).
+qwebchannel.js/three_local.js-Scripts).
 
 Kein Python-Compile-Check haette einen Bruch des Modul-Verdrahtungsvertrags
 gefangen (Design-Dokument, Leitprinzip) - deshalb dieser dedizierte Test:
@@ -450,12 +450,14 @@ class SceneModulesSmokeTest(unittest.TestCase):
             lambda: self._bridge_obj.addStageObjectData.emit(
                 '{"id":"a3d12-1",' + basis), da, timeout_s=5.0)
 
-    def test_truss_obj_uses_its_real_z_long_axis(self):
-        """Das 2-m-OBJ darf nicht aus seinem 30-cm-Querschnitt langgezogen werden.
+    def test_truss_is_own_geometry_in_target_size(self):
+        """VIZ-66: Traverse = eigene Vierpunkt-Geometrie in den Zielmassen.
 
-        Asset-Bounds: ca. 0.302 x 0.300 x 2.000 m (Laengsachse Z). Der alte
-        Builder behandelte X als Laengsachse; seine Aussen-Bounds passten zwar,
-        aber Gurte und Diagonalen waren um bis zu Faktor 13 verzerrt.
+        Vorher ein mitgeliefertes OBJ (QLC+), das in Zielgroesse gestreckt wurde
+        (VIZ-TRUSS-GEOMETRY: Laengsachse Z). Jetzt wird direkt in den Massen
+        gebaut: Bounding-Box == size, ohne Skalierung, synchron (kein
+        Platzhalter-Quader), und zwei gleich grosse Traversen teilen EINE
+        Geometrie. Der Stab ist kein Quader (Gurte + Streben = viele Dreiecke).
         """
         self._load_and_wait()
         import json
@@ -465,6 +467,12 @@ class SceneModulesSmokeTest(unittest.TestCase):
                 "position": {"x": 0, "y": 1, "z": 0},
                 "size": {"x": 4, "y": 0.3, "z": 0.3},
                 "rotation": 0, "color": "#999999",
+            },
+            {
+                "id": "truss-axis-h2", "type": "truss_h", "name": "H2",
+                "position": {"x": 0, "y": 2, "z": 1},
+                "size": {"x": 4, "y": 0.3, "z": 0.3},
+                "rotation": 0, "color": "#aa3333",
             },
             {
                 "id": "truss-axis-v", "type": "truss_v", "name": "V",
@@ -478,9 +486,7 @@ class SceneModulesSmokeTest(unittest.TestCase):
             lambda: self._bridge_obj.stageLoaded.emit(payload),
             "(function(){"
             " const s=window.__lightos.stageObjects;"
-            " const ready=id => s[id] && s[id].mesh.children.some("
-            "   c => c.userData && c.userData.isFittedTrussModel);"
-            " return ready('truss-axis-h') && ready('truss-axis-v');"
+            " return !!(s['truss-axis-h'] && s['truss-axis-h2'] && s['truss-axis-v']);"
             "})()",
             timeout_s=8.0,
         )
@@ -488,23 +494,24 @@ class SceneModulesSmokeTest(unittest.TestCase):
             (function(){
                 function info(id) {
                     const root = window.__lightos.stageObjects[id].mesh;
-                    const fitted = root.children.find(
-                        c => c.userData && c.userData.isFittedTrussModel);
-                    const source = fitted.children[0];
+                    const m = root.children.find(
+                        c => c.userData && c.userData.trussGeometrie);
                     const size = new THREE.Box3().setFromObject(root)
                         .getSize(new THREE.Vector3());
-                    const scales = [fitted.scale.x, fitted.scale.y, fitted.scale.z];
                     return {
                         size: [size.x, size.y, size.z],
-                        target: fitted.userData.targetLongAxis,
-                        source: fitted.userData.sourceLongAxis,
-                        fitScale: scales,
-                        scaleRatio: Math.max(...scales) / Math.min(...scales),
-                        rotation: [source.rotation.x, source.rotation.y, source.rotation.z],
+                        achse: m.userData.laengsAchse,
+                        scale: [m.scale.x, m.scale.y, m.scale.z],
+                        kinder: root.children.length,
+                        dreiecke: m.geometry.attributes.position.count / 3,
+                        geteilt: !!m.geometry.userData.geteilt,
+                        uuid: m.geometry.uuid,
+                        farbe: m.material.color.getHexString(),
                     };
                 }
                 return JSON.stringify({
-                    h: info('truss-axis-h'), v: info('truss-axis-v')
+                    h: info('truss-axis-h'), h2: info('truss-axis-h2'),
+                    v: info('truss-axis-v')
                 });
             })()
         """)
@@ -513,15 +520,32 @@ class SceneModulesSmokeTest(unittest.TestCase):
                                  (d["v"]["size"], [0.3, 4, 0.3])):
             for got, want in zip(actual, expected):
                 self.assertAlmostEqual(got, want, places=3)
-        self.assertEqual((d["h"]["source"], d["h"]["target"]), ("z", "x"))
-        self.assertEqual((d["v"]["source"], d["v"]["target"]), ("z", "y"))
-        # Nur die echte 2-m-Achse wird auf 4 m verdoppelt; kein 13x/.15x-
-        # Extremstretch des Querschnitts mehr.
-        self.assertLess(d["h"]["scaleRatio"], 2.1)
-        self.assertLess(d["v"]["scaleRatio"], 2.1)
-        import math
-        self.assertAlmostEqual(abs(d["h"]["rotation"][1]), math.pi / 2, places=5)
-        self.assertAlmostEqual(abs(d["v"]["rotation"][0]), math.pi / 2, places=5)
+        self.assertEqual(d["h"]["achse"], "x")
+        self.assertEqual(d["v"]["achse"], "y")
+        for key in ("h", "v"):
+            self.assertEqual(d[key]["scale"], [1, 1, 1], "Traverse darf nicht gestreckt werden")
+            self.assertEqual(d[key]["kinder"], 1, "Platzhalter-Quader haengt noch daneben")
+            self.assertGreater(d[key]["dreiecke"], 300, "Traverse ist nur ein Quader")
+            self.assertLess(d[key]["dreiecke"], 4000, "Traverse zu fein (Polygonzahl)")
+            self.assertTrue(d[key]["geteilt"])
+        # Gleiche Masse -> EINE Geometrie; Farbe bleibt trotzdem je Objekt eigen.
+        self.assertEqual(d["h"]["uuid"], d["h2"]["uuid"])
+        self.assertNotEqual(d["h"]["uuid"], d["v"]["uuid"])
+        self.assertEqual(d["h2"]["farbe"], "aa3333")
+        self.assertEqual(d["h"]["farbe"], "999999")
+        # Entfernen einer Traverse darf die geteilte Geometrie der anderen nicht
+        # freigeben (disposeObj ueberspringt `userData.geteilt`).
+        geblieben = self._eval("""
+            (function(){
+                const s = window.__lightos.stageObjects;
+                const g = s['truss-axis-h2'].mesh.children[0].geometry;
+                let freigegeben = false;
+                g.addEventListener('dispose', () => { freigegeben = true; });
+                window.__lightos.disposeObj(s['truss-axis-h'].mesh.children[0]);
+                return !freigegeben;
+            })()
+        """)
+        self.assertTrue(geblieben, "disposeObj hat geteilte Traversen-Geometrie freigegeben")
 
     def test_bulk_stage_load_keeps_every_element(self):
         """Ein kompletter Bühnen-Push darf nicht beim ersten Element enden.
@@ -786,9 +810,10 @@ class SceneModulesSmokeTest(unittest.TestCase):
         housing = self._eval(
             "(function(){ let s = null;"
             " window.__lightos.fixtures['700002'].group.traverse(o => {"
-            "   if (o.name === 'par-body') s = o.geometry.parameters.radialSegments;"
+            "   if (o.name === 'par-body') s = o.geometry.parameters.segments;"
             " }); return s; })()")
-        self.assertEqual(housing, 16, "High-Tier darf Gehaeuse-Segmente nicht reduzieren")
+        # VIZ-66: PAR-Gehaeuse ist ein gedrehtes Profil (LatheGeometry, 24 Segmente).
+        self.assertEqual(housing, 24, "High-Tier darf Gehaeuse-Segmente nicht reduzieren")
         # Dunkel-Culling gilt tier-unabhaengig.
         culled = self._eval(
             "window.__lightos.fixtures['700002'].spot.visible === false")
@@ -910,6 +935,89 @@ class SceneModulesSmokeTest(unittest.TestCase):
         self.assertGreaterEqual(mtx[0], 0.44, "Matrix-Panel unrealistisch geschrumpft")
         self.assertLessEqual(mtx[1], 0.56, "Matrix-Panel hoeher als die 0,5-m-Kachel")
         self.assertLessEqual(mtx[2], 0.12, "Matrix-Panel dicker als eine flache LED-Kachel")
+
+    def test_viz66_eigene_geraetemodelle(self):
+        """VIZ-66: PAR/Strobe/Nebel/Hazer sind eigene Geometrie statt .dae-Overlay.
+
+        Festgehalten: nichts ist mehr ausgeblendet (vorher versteckte das
+        geladene Overlay den Prozedural-Koerper), gleiche Geraete teilen ihre
+        Gehaeuse-Geometrie, behalten aber eigene Materialien, und das leuchtende
+        Teil (Linse/Lampe) folgt weiter dem DMX.
+        """
+        self._load_and_wait()
+        import json
+        rig = json.dumps([
+            {"fid": 6601, "type": "par", "x": 0, "y": 3, "z": 0,
+             "r": 0, "g": 0, "b": 0, "intensity": 0},
+            {"fid": 6602, "type": "par", "x": 1, "y": 3, "z": 0,
+             "r": 0, "g": 0, "b": 0, "intensity": 0},
+            {"fid": 6603, "type": "strobe", "x": 2, "y": 3, "z": 0,
+             "r": 0, "g": 0, "b": 0, "intensity": 0},
+            {"fid": 6604, "type": "smoke", "x": 3, "y": 0, "z": 0,
+             "r": 0, "g": 0, "b": 0, "intensity": 0},
+            {"fid": 6605, "type": "hazer", "x": 4, "y": 0, "z": 0,
+             "r": 0, "g": 0, "b": 0, "intensity": 0},
+        ])
+        built = self._emit_until_true(
+            lambda: self._bridge_obj.allFixtures.emit(rig),
+            "!!window.__lightos.fixtures['6605']", timeout_s=8.0)
+        self.assertTrue(built, "Rig wurde nicht gebaut")
+        raw = self._eval("""
+            (function(){
+                const F = window.__lightos.fixtures;
+                function info(fid) {
+                    const f = F[fid];
+                    f.group.updateMatrixWorld(true);
+                    const box = new THREE.Box3();
+                    let versteckt = 0, meshes = 0;
+                    f.group.traverse(o => {
+                        if (!o.isMesh) return;
+                        if (o.userData && o.userData.excludeFromFit) return;
+                        meshes += 1;
+                        if (o.visible === false) { versteckt += 1; return; }
+                        box.union(new THREE.Box3().setFromObject(o));
+                    });
+                    const s = box.getSize(new THREE.Vector3());
+                    const leucht = f.lens || f.lamp;
+                    return { size: [s.x, s.y, s.z], versteckt, meshes,
+                             leucht: !!(leucht && leucht.material && leucht.material.emissive) };
+                }
+                function koerper(fid, name) {
+                    let m = null;
+                    F[fid].group.traverse(o => { if (o.name === name) m = o; });
+                    return m;
+                }
+                const a = koerper('6601', 'par-body'), b = koerper('6602', 'par-body');
+                return JSON.stringify({
+                    par: info('6601'), strobe: info('6603'),
+                    smoke: info('6604'), hazer: info('6605'),
+                    geoGeteilt: a.geometry === b.geometry,
+                    matEigen: a.material !== b.material
+                        && F['6601'].lens.material !== F['6602'].lens.material,
+                });
+            })()
+        """)
+        d = json.loads(raw)
+        for key in ("par", "strobe", "smoke", "hazer"):
+            self.assertEqual(d[key]["versteckt"], 0, f"{key}: ausgeblendeter Koerper")
+            self.assertGreaterEqual(d[key]["meshes"], 3, f"{key}: zu grob")
+            self.assertTrue(d[key]["leucht"], f"{key}: leuchtendes Teil fehlt")
+        self.assertTrue(d["geoGeteilt"], "zwei PARs bauen ihr Gehaeuse doppelt")
+        self.assertTrue(d["matEigen"], "PARs teilen Materialien (Farbe liefe mit)")
+        # Datenblatt-Groessen (Kommentare in builders.js), Toleranz fuer Buegel.
+        px, py, pz = d["par"]["size"]
+        self.assertTrue(0.22 <= px <= 0.36 and 0.22 <= pz <= 0.30, d["par"])
+        self.assertTrue(0.30 <= py <= 0.42, d["par"])
+        sx, sy, sz = d["strobe"]["size"]
+        self.assertTrue(0.44 <= sx <= 0.56 and sy <= 0.24 and 0.22 <= sz <= 0.28, d["strobe"])
+        hx, hy, hz = d["hazer"]["size"]
+        self.assertTrue(0.24 <= hx <= 0.30 and hy <= 0.40 and 0.46 <= hz <= 0.56, d["hazer"])
+        lit = json.dumps([{"fid": 6603, "r": 255, "g": 255, "b": 255, "intensity": 255}])
+        ok = self._emit_until_true(
+            lambda: self._bridge_obj.dmxBatch.emit(lit),
+            "window.__lightos.fixtures['6603'].lamp.material.emissiveIntensity > 0.5",
+            timeout_s=5.0)
+        self.assertTrue(ok, "Strobe-Reflektor leuchtet nicht mit dem DMX")
 
     def test_matrix_panel_per_pixel_color(self):
         """FM-13: buildMatrixPanel baut rows*cols Pixel-Quads; updateMatrixPanelDmx
