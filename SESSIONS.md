@@ -20,6 +20,7 @@
 | FM-53 | C | feat/fm53-bibliothek-download | 2026-10-02T09:29Z | src/core/database/bibliothek_download.py · src/ui/widgets/bibliothek_download_dialog.py · src/ui/main_window.py · main.py · tests/test_fm53_bibliothek_download.py · docs/FIXTURE_SOURCES.md · changelog.d/2026-10-02-FM-53.md |
 | FM-33 | C | feat/fm33-raw-einzelregler | 2026-10-02T09:58Z | src/ui/views/programmer_view.py · tests/test_fm33_raw_einzelregler.py · changelog.d/2026-10-02-FM-33.md · BACKLOG.md |
 | UI-56 | C | - | 2026-10-02T10:14Z | src/core/attr_groups.py · src/ui/views/snap_file_panel.py · docs/anleitung_szenen_cues/ANLEITUNG.md · tests/test_ui56_optik.py · BACKLOG.md |
+| DOC-23 | C | - | 2026-10-02T10:20Z | docs/anleitung_erste_schritte/ANLEITUNG.en.md · docs/anleitung_erste_schritte/ANLEITUNG.md · docs/ANLEITUNGEN.md · changelog.d/2026-10-02-DOC-23.md |
 
 ## Blocker & Fallen
 
@@ -82,7 +83,6 @@
 
 ## Verlauf
 
-- 2026-10-02T06:53Z A claim BL-0210
 - 2026-10-02T07:01Z A done BL-0210
 - 2026-10-02T07:13Z C claim TOOL-7
 - 2026-10-02T07:15Z C done FM-54
@@ -112,3 +112,4 @@
 - 2026-10-02T09:58Z C claim FM-33
 - 2026-10-02T10:01Z C done FM-55
 - 2026-10-02T10:14Z C claim UI-56
+- 2026-10-02T10:20Z C claim DOC-23
