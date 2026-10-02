@@ -41,6 +41,7 @@
 | DOC-40 | C | - | 2026-10-02T11:11Z | docs/anleitung_farbchase/ANLEITUNG_FARBCHASE.md |
 | DOC-41 | C | - | 2026-10-02T11:11Z | docs/anleitung_colorfade_vc/ANLEITUNG_COLORFADE_VC.md |
 | DOC-42 | C | - | 2026-10-02T11:11Z | docs/anleitung_ablaeufe/ANLEITUNG_ABLAEUFE_MISCHEN.md |
+| QA-82 | C | - | 2026-10-02T11:14Z | tests/test_qa58_bibliothek_schema_unberuehrt.py · BACKLOG.md |
 
 ## Blocker & Fallen
 
@@ -105,7 +106,6 @@
 
 ## Verlauf
 
-- 2026-10-02T09:21Z C claim XPLAT-44
 - 2026-10-02T09:25Z C claim XPLAT-34
 - 2026-10-02T09:26Z A done UI-70
 - 2026-10-02T09:26Z A done TOOL-8
@@ -135,3 +135,4 @@
 - 2026-10-02T11:11Z C claim DOC-40
 - 2026-10-02T11:11Z C claim DOC-41
 - 2026-10-02T11:11Z C claim DOC-42
+- 2026-10-02T11:14Z C claim QA-82
