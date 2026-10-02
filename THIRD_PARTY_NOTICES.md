@@ -41,3 +41,22 @@ prüft, dass jede Datei in den unten genannten Ordnern aufgeführt ist.
 - **Datei:** `tools/gource/data/fonts/FreeSans.ttf` (nur Entwickler-Werkzeug, nicht Teil der App).
 - **Lizenz:** GNU GPL v3 mit Font-Ausnahme — Details in
   [`tools/gource/data/fonts/README.txt`](tools/gource/data/fonts/README.txt), das der Schrift beiliegt.
+
+## Geräte-Bibliothek zum Herunterladen (nicht im Repo, FM-53)
+
+LightOS kann eine freie Fixture-Bibliothek **auf Nachfrage** herunterladen
+(Erststart-Frage bzw. **Datenbank → Geräte-Bibliothek herunterladen...**). Diese Dateien liegen **nicht** im Repo
+und werden nicht mit LightOS weitergegeben; sie kommen direkt von der Quelle auf
+den Rechner des Nutzers.
+
+- **QLC+ Fixture-Bibliothek** — GitHub-Archiv einer festen QLC+-Version
+  (<https://github.com/mcallegari/qlcplus>), verwendet werden nur die `.qxf`-Dateien.
+  Lizenz: Apache License 2.0 — [`licenses/Apache-2.0.txt`](licenses/Apache-2.0.txt).
+- **Open Fixture Library** — QLC+-Export (<https://open-fixture-library.org>).
+  Lizenz: MIT (<https://github.com/OpenLightingProject/open-fixture-library/blob/master/LICENSE>);
+  einzelne Profile stammen ihrerseits aus QLC+ (Apache-2.0).
+
+**Herkunft und Lizenz je Profil** speichert LightOS beim Import in der Tabelle
+`profil_herkunft` der Geräte-Datenbank: Quelle, Lizenz, Lizenz-Link, Archiv-Adresse,
+SHA-256 und Zeitpunkt. Eigene und schon vorhandene Profile bleiben unberührt.
+Details: [`docs/FIXTURE_SOURCES.md`](docs/FIXTURE_SOURCES.md).
