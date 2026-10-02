@@ -665,9 +665,9 @@ class HighlightCommand(Command):
                     segmente += 1
                     # Geteilter Master-Dimmer: ohne ihn bliebe das Segment
                     # dunkel (Farbe macht nicht von selbst hell).
-                    dk = state.weiss_dimmer_key(fid, seg)
-                    if dk:
-                        state.set_programmer_value(fid, dk, 255)
+                    # FM-46: ueber weiss_dimmer_setzen — verankert die
+                    # uebrigen Dimmer, wenn dieser der Basis-Schluessel ist.
+                    state.weiss_dimmer_setzen(fid, seg, 255)
             if segmente:
                 return CommandResult(
                     True, f"Highlight {len(sel)} Fixtures, {segmente} Weiß-Segmente")

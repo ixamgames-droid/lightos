@@ -2895,9 +2895,9 @@ class ProgrammerView(QWidget):
                         continue
                     # Geteilter Master-Dimmer: ohne ihn bliebe das Segment
                     # dunkel (Farbe macht nicht von selbst hell).
-                    dk = st.weiss_dimmer_key(fid, seg)
-                    if dk:
-                        st.set_programmer_value(fid, dk, 255)
+                    # FM-46: ueber weiss_dimmer_setzen — verankert die
+                    # uebrigen Dimmer, wenn dieser der Basis-Schluessel ist.
+                    st.weiss_dimmer_setzen(fid, seg, 255)
                 continue
             self._state.set_programmer_value(fid, "intensity", 255)
             self._state.set_programmer_value(fid, "pan", 127)
@@ -3548,7 +3548,10 @@ class WeissSegmentBlock(QGroupBox):
                     # uebrigen Segmente, sonst faehrt der Basis-Schluessel alle mit.
                     self._state.weiss_setzen(fid, rest[0], int(value))
                 else:
-                    self._state.set_programmer_value(fid, key, int(value))
+                    # Dimmer-Zeile. FM-46: ueber dimmer_key_setzen, damit ein
+                    # zugeordneter Dimmer, der das erste Vorkommen ist, die
+                    # uebrigen nicht ueber den Basis-Schluessel mitzieht.
+                    self._state.dimmer_key_setzen(fid, key, int(value))
         if seg is None:
             # Sammelregler: die Einzelregler optisch nachziehen, ohne erneut zu
             # schreiben.

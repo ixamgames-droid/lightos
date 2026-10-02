@@ -2796,7 +2796,9 @@ class AppState:
         Weiss-Segment mitfaehrt (ZQ06121: Master-Dimmer CH1) — ``None``, wenn es
         keinen gibt. Ohne ihn bliebe ein programmiertes Segment dunkel: seit
         2026-06-24 macht Farbe nicht mehr von selbst hell
-        (``implicit_brightness=False``)."""
+        (``implicit_brightness=False``). Seit FM-46 auch der im Profil dem
+        Segment ZUGEORDNETE Dimmer (``FixtureChannel.segment``) — die Antwort
+        kommt unveraendert aus ``channels_for_axis``."""
         fx = next((f for f in self._patch_cache
                    if getattr(f, "fid", None) == fid), None)
         if fx is None:
@@ -2842,6 +2844,52 @@ class AppState:
             k += 1
         self.set_programmer_value(fid, key, int(value))
         return True
+
+    def weiss_dimmer_anker_keys(self, fid, key) -> list[str]:
+        """FM-46: die Schluessel, die mit dem Dimmer-Schluessel ``key`` eines
+        Weiss-Segments VERANKERT werden muessen.
+
+        ★ Derselbe Spiegel-Fallstrick wie bei ``color_w`` (``weiss_setzen``):
+        ist der zugeordnete Dimmer das ERSTE Vorkommen eines mehrfachen
+        Attributs, heisst sein Schluessel ``intensity`` — und den spiegelt der
+        DMX-Flush (``resolve_attr_channels``) auf jedes weitere Vorkommen ohne
+        eigenen Wert. „Weiss 1 hell" zog so gemessen den Dimmer von Segment 2
+        mit auf 255. Die uebrigen Vorkommen (``intensity#N``) bekommen deshalb
+        einen eigenen Wert. Leer, wenn ``key`` kein Basis-Schluessel ist oder
+        das Attribut nur einmal vorkommt (geteilter Master: der SOLL alle
+        fahren)."""
+        if not key or "#" in key:
+            return []
+        fx = next((f for f in self._patch_cache
+                   if getattr(f, "fid", None) == fid), None)
+        if fx is None:
+            return []
+        try:
+            chans = get_channels_for_patched(fx)
+        except Exception:
+            return []
+        return [k for c, k in channel_occurrence_keys(chans)
+                if (c.attribute or "") == key and k != key]
+
+    def weiss_dimmer_setzen(self, fid, segment, value) -> bool:
+        """FM-46: den Dimmer des Weiss-Segments ``segment`` setzen — mit
+        Verankerung der uebrigen Vorkommen (:meth:`weiss_dimmer_anker_keys`).
+        ``False``, wenn das Segment keinen Dimmer hat."""
+        dk = self.weiss_dimmer_key(fid, segment)
+        if not dk:
+            return False
+        self.dimmer_key_setzen(fid, dk, value)
+        return True
+
+    def dimmer_key_setzen(self, fid, key, value) -> None:
+        """Setzt einen Dimmer-Schluessel aus ``weiss_dimmer_key`` und verankert
+        vorher die Vorkommen, auf die er sonst gespiegelt wuerde (FM-46)."""
+        prog = self.programmer.get(fid, {})
+        for anker in self.weiss_dimmer_anker_keys(fid, key):
+            if anker not in prog:
+                self.set_programmer_value(fid, anker, 0)
+                prog = self.programmer.get(fid, {})
+        self.set_programmer_value(fid, key, int(value))
 
     def weiss_programmer_key(self, fid, segment) -> str | None:
         """FM-41: Programmer-Schluessel des Weiss-Segments ``segment`` von
@@ -2950,6 +2998,10 @@ class AppState:
                 dk = self.weiss_dimmer_key(fid, s)
                 if dk:
                     keys.add(dk)
+                    # FM-46: dieselbe Anker-Regel fuer einen zugeordneten
+                    # Dimmer, der das erste Vorkommen ist — sonst faehrt der
+                    # Abruf des Snapshots alle Dimmer dieses Attributs.
+                    keys.update(self.weiss_dimmer_anker_keys(fid, dk))
         return keys
 
     def _kopf_scope_keys(self, fid, koepfe) -> set:
@@ -5935,6 +5987,12 @@ def channels_for_axis(channels, achse: str | None, index: int | None) -> dict:
     mehrfach vor (2- bis 5-mal) und faellt deshalb weg — z. B. Acme Ginamp
     [36 Channel] mit ``intensity`` auf CH25 und CH32.
 
+    ★ **Seit FM-46 (Etappe 1)** gibt es dafuer eine gespeicherte Zuordnung:
+    traegt ein Vorkommen des mehrfachen Dimmers ``segment == index``
+    (``FixtureChannel.segment``, gesetzt im Fixture-Editor/-Generator), faehrt
+    genau dieses Vorkommen mit. Der Absatz unten gilt fuer Geraete OHNE
+    Eintrag unveraendert.
+
     **Fuer diese 26 gilt:** das Segment wird richtig adressiert, ein etwaiger
     Dimmer davor bleibt aber unangetastet. Bei ``drive_intensity=False`` ist das
     genau richtig (der Dimmer gehoert dann dem Nutzer). Bei
@@ -5971,6 +6029,32 @@ def channels_for_axis(channels, achse: str | None, index: int | None) -> dict:
         a = (getattr(c, "attribute", "") or "")
         if a and a != attribut and haeufigkeit[a] == 1:
             treffer[a] = c
+    # ★ FM-46: die GESPEICHERTE Zuordnung Dimmer -> Weiss-Segment. Kommt ein
+    # Dimmer-Attribut mehrfach vor, faellt es oben als „nicht geteilt" weg —
+    # welches Vorkommen dieses Segment dimmt, steht nicht in der Kanalliste.
+    # Hat ein Mensch es im Fixture-Editor/-Generator eingetragen
+    # (``FixtureChannel.segment``), faehrt GENAU dieser Dimmer mit. Zur
+    # Laufzeit wird weiterhin NICHT geraten: ohne Eintrag bleibt es beim
+    # Bestandsverhalten, und tragen zwei Vorkommen dasselbe Segment, ist das
+    # widerspruechlich und es faehrt keins.
+    #
+    # Das ist die EINE Lesestelle des Feldes. ``rgb_matrix._weiss_achse_
+    # schreiben`` (FM-54 ``_treibt_dimmer``), ``matrix_pattern.weiss_cell_
+    # values``, ``weiss_dimmer_key`` und ``weiss_programmer_key`` folgen
+    # daraus, ohne das Feld selbst zu kennen. ``segment_von`` ist tolerant
+    # gegen jede Kanalart (ORM, ``_AttrOverrideChannel``, Test-Objekte ohne
+    # das Feld -> keine Zuordnung).
+    if attribut == "color_w":
+        from src.core.dimmer_segmente import segment_von
+        idx = int(index)
+        for dim in sorted({(getattr(c, "attribute", "") or "") for c in chans}):
+            if dim.lower() not in _DIM_INTENSITY_ATTRS or haeufigkeit[dim] < 2:
+                continue
+            zugeordnet = [c for c in chans
+                          if (getattr(c, "attribute", "") or "") == dim
+                          and segment_von(c) == idx]
+            if len(zugeordnet) == 1:
+                treffer[dim] = zugeordnet[0]
     return treffer
 
 
