@@ -33,7 +33,8 @@ _app = QApplication.instance() or QApplication([])
 
 from sqlalchemy import select, delete
 from sqlalchemy.orm import Session
-from src.core.app_state import get_state, get_channels_for_patched, open_value_for
+from src.core.app_state import get_state, get_channels_for_patched
+from _shutter import shutter_offen   # ENG-28: Shutter nur mit Beleg
 from src.core.database.fixture_db import engine as fdb_engine
 from src.core.database.models import PatchedFixture, FixtureProfile, FixtureGroup
 from src.core.engine.function_manager import get_function_manager
@@ -248,7 +249,9 @@ def scene_color(sc, fids, rgbw, inten=255):
             for ch in attr_chs(fid, attr):
                 sc.set_value(fid, ch, val)
         for ch in attr_chs(fid, "shutter"):
-            sc.set_value(fid, ch, open_value_for(fx_of[fid], "shutter"))
+            offen = shutter_offen(fx_of[fid])   # ohne Beleg: Shutter bleibt stehen
+            if offen is not None:
+                sc.set_value(fid, ch, offen)
 
 
 def look(name, rgbw, fids=None):
