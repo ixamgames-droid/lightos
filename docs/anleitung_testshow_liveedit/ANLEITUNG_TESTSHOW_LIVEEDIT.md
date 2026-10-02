@@ -14,7 +14,7 @@ Am Ende hast du:
 
 ## 1. Neue Show anlegen
 
-`Datei → Neue Show` (oder `Strg + N`) und mit **Ja** bestätigen. Die aktuelle Show wird verworfen und du startest leer.
+`Datei → Neue Show` (oder `Strg + N`) und mit **Ja** bestätigen. Die aktuelle Show wird verworfen und du startest leer. Hat die aktuelle Show ungespeicherte Änderungen, fragt LightOS stattdessen „Vor dem Leeren speichern?" (**Speichern** / **Verwerfen** / **Abbrechen**).
 
 ## 2. Fixtures patchen
 
@@ -34,7 +34,7 @@ Tab **Programmer → Attribute**. Links die PARs auswählen (auf das erste klick
 - **Algorithmus** (Rainbow, Chase, Wave, Fill, Gradient, Random …) — am schnellsten: Dropdown anklicken, Namen tippen, Enter
 - **Stil: RGB** (für Farbe)
 
-Die **Vorschau** rechts zeigt den Effekt sofort. Mit **Speichern** landet er in der Bibliothek. So legst du 6 Farbeffekte an.
+Die **Vorschau** rechts zeigt den Effekt sofort. **+ Neu** legt den Effekt sofort als „Matrix N" an; mit **💾 Speichern** übernimmst du Name und Einstellungen. So legst du 6 Farbeffekte an.
 
 ![Matrix-Effekt mit Vorschau](bilder/04_matrix_effekt.png)
 
@@ -70,8 +70,9 @@ Der Live-Edit hängt am **Bearbeiten-Modus der Konsole**:
 
 **Bearbeiten aus (Betrieb)** → nur noch die **angehakten Regler**, aufgeräumt, ohne die Häkchen-Liste. Die Regler sind **visuell** und passen zum Parameter:
 
-- **Helligkeit / Ein-/Ausblenden** → Slider
-- **Richtung** → Pfeil-Buttons (`→ vorwärts`, `← rückwärts`, `↔ Ping-Pong`)
+- **Helligkeit / Fade ein (s) / Fade aus (s)** → Slider
+- **Richtung** → Pfeil-Buttons (`→ vorwärts`, `← rückwärts`); bei den Chasern heißen die
+  Knöpfe „Vorwärts"/„Rückwärts", Ping-Pong stellst du dort unter **Modus** ein
 
 ![Betrieb: Slider + Pfeil-Richtung](bilder/N2_runmode_rainbow_slider_arrows.png)
 
@@ -86,7 +87,7 @@ Brauchst du später einen Regler mehr (z. B. „Läufer-Breite"), gehst du kurz 
 
 ## 6. Seite 2 (Dimmer)
 
-Mit **►** neben „Bank 1" auf **Bank 2** wechseln. Genau wie Seite 1: die **Dimmer-Effekte** als Start-Buttons und ein eigenes **Live-Edit-Widget**, in das du die 3 Dimmer-Effekte ziehst.
+Mit **▶** neben „Bank 1" auf **Bank 2** wechseln. Genau wie Seite 1: die **Dimmer-Effekte** als Start-Buttons und ein eigenes **Live-Edit-Widget**, in das du die 3 Dimmer-Effekte ziehst.
 
 ## 7. Seite 3 (BPM/Tempo + Multiplikator)
 
@@ -109,4 +110,5 @@ Dazu passt ein **BPM-Anzeige**-Widget für die Master-BPM.
 - **Gespeichert:** Show, Fixtures, Effekte, die virtuelle Konsole samt Widgets, **welche Effekte** einem Live-Edit-Widget zugewiesen sind und **welche Regler** pro Effekt angehakt sind.
 - **Flüchtig:** die konkret im Live-Edit **gedrehten Werte** (Helligkeit, Richtung, Tempo …). Sie wirken sofort live, werden beim Speichern der Show aber **nicht** übernommen — beim Neuladen fällt der Effekt auf seinen Preset-Stand zurück. Willst du eine Änderung dauerhaft, bearbeite den Effekt im **Programmer**.
 
-Die Beispiel-Show dieser Anleitung liegt als `Testshow_3Seiten.lshow` vor.
+Die fertige Beispiel-Show liegt nicht im Repository — du baust sie mit dieser Anleitung selbst und
+speicherst sie z. B. als `Testshow_3Seiten.lshow`.
