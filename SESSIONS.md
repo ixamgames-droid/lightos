@@ -65,6 +65,7 @@
 | VCB-35 | C | - | 2026-10-02T12:53Z | BACKLOG.md |
 | WEB-06 | C | - | 2026-10-02T12:53Z | BACKLOG.md |
 | BPM-21 | B | fix/bpm21-wasapi-aussetzer | 2026-10-02T12:58Z | src/core/audio/capture.py · src/core/audio/level_meter.py · src/ui/bpm_status_rules.py · src/ui/views/bpm_manager_view.py · tests/test_bpm21_wasapi_aussetzer.py · BACKLOG.md |
+| DOC-54 | C | - | 2026-10-02T13:02Z | docs/anleitung_speed_bpm/ANLEITUNG_SPEED_BPM.md |
 
 ## Blocker & Fallen
 
@@ -134,7 +135,6 @@
 
 ## Verlauf
 
-- 2026-10-02T11:14Z C claim QA-82
 - 2026-10-02T11:57Z C aktualisiert DOC-42: Dateien docs/anleitung_ablaeufe/ANLEITUNG_ABLAEUFE_MISCHEN.md -> docs/anleitung_ablaeufe/ANLEITUNG_ABLAEUFE_MISCHEN.md · tools/build_event_demo_2026.py · tests/test_doc42_bank7_beschriftung.py · changelog.d/2026-10-02-DOC-42.md
 - 2026-10-02T11:58Z C claim DOC-43
 - 2026-10-02T11:59Z A aktualisiert FM-46: Branch feat/fm46-dimmer-segment -> feat/fm46-rueckfall
@@ -164,3 +164,4 @@
 - 2026-10-02T12:53Z C claim VCB-35
 - 2026-10-02T12:53Z C claim WEB-06
 - 2026-10-02T12:58Z B claim BPM-21
+- 2026-10-02T13:02Z C claim DOC-54
