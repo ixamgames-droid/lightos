@@ -16,6 +16,12 @@ venv/bin/python tools/anleitungsbilder.py --liste              # Szenen anzeigen
 
 Ein Lauf dauert rund 12 Sekunden (davon 5–6 Sekunden für Fenster und Demo-Show).
 
+Mehrere Anleitungen (`--alle` oder mehrere Namen) laufen **je in einem eigenen Prozess**:
+jede bekommt eine frische Sandbox, ein frisches Hauptfenster und eine frisch geladene
+Demo-Show. Was eine Anleitung einstellt (Programmer-Auswahl, Tempo, Playback-Optionen …),
+sieht die nächste so nicht mehr. Das kostet je Anleitung die 5–6 Sekunden Aufbau
+zusätzlich; dafür entsprechen Bilder und `--pruefen` genau dem Einzellauf der Anleitung.
+
 ## Was wo liegt
 
 | Datei | Inhalt |
@@ -134,7 +140,10 @@ der Kern den, der am wenigsten verdeckt, und meldet im Lauf
 Die UI-API in `vorher`: `ui.sektion(...)`, `ui.reiter(text)`, `ui.waehle(fids)`,
 `ui.wert(fids, attribut, wert)`, `ui.finde(finder)`, `ui.pump(sekunden)` sowie
 `ui.win` (Hauptfenster), `ui.state` und `ui.info`. Die Szenen laufen der Reihe nach
-im selben Fenster: was eine Szene einstellt, sieht die nächste noch.
+im selben Fenster: was eine Szene einstellt, sieht die nächste *derselben Anleitung*
+noch. Eine andere Anleitung startet dagegen immer frisch (eigener Prozess).
+Zusätzliche `szenen_*.py` außerhalb des Pakets (nur für Tests) liest das Werkzeug aus
+dem Ordner in `LIGHTOS_DOKU_SZENEN_ORDNER`.
 
 Neue Anleitung anlegen, Szenen schreiben, dann:
 
