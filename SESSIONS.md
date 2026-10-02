@@ -12,7 +12,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| FM-46 | C | docs/fm46-befund | 2026-10-01T21:35Z | BACKLOG.md |
 | DOC-14 | C | fix/doc14-schaukasten-19 | 2026-10-01T21:37Z | tools/build_vc_widgets_showcase.py · docs/anleitung_vc_widgets/README.md · docs/anleitung_vc_widgets/_capture/geometry.json · tests/test_doc14_schaukasten_alle_typen.py · changelog.d/2026-10-02-DOC-14.md |
 | DOC-20 | A | docs/doc20-anleitungs-gifs | 2026-10-01T22:24Z | tools/anleitungsbilder · docs/ANLEITUNGSBILDER.md |
 | DOC-21 | A | docs/doc21-3d-gif | 2026-10-02T07:18Z | tools/anleitungsbilder · docs/anleitung_vc_widgets |
@@ -21,6 +20,7 @@
 | TOOL-6 | C | fix/tool6-cwd-waechter | 2026-10-02T04:53Z | tests/test_tool3_generator_annahmen.py · tools/build_dimmer_farbe_combo.py · tools/build_neuheiten_demo.py · tools/build_zq06121_demo.py · tools/_builder.py · changelog.d/2026-10-02-TOOL-6.md · BACKLOG.md |
 | TOOL-7 | C | fix/tool7-mega-arena-global | 2026-10-02T07:13Z | tools/build_mega_arena_2026.py · tests/test_tool7_global_bus_pruefungen.py · changelog.d/2026-10-02-TOOL-7.md · BACKLOG.md |
 | DOC-22 | A | docs/doc22-bilder-auffrischen | 2026-10-02T07:18Z | docs/anleitung_szenen_cues/img · docs/anleitung_programmer_grundlagen/img · docs/projektseite · docs/anleitung_vc_widgets/img |
+| FM-46 | A | feat/fm46-dimmer-segment | 2026-10-02T07:26Z | src/core/database/models.py · src/core/app_state.py · src/ui/widgets/fixture_editor.py · src/ui/widgets/fixture_generator.py · src/core/database/fixture_db.py |
 
 ## Blocker & Fallen
 
@@ -77,8 +77,6 @@
 
 ## Verlauf
 
-- 2026-10-01T21:34Z A aktualisiert DOC-18: Branch - -> docs/doc18-bpm-anleitung
-- 2026-10-01T21:35Z C claim FM-46
 - 2026-10-01T21:37Z C claim DOC-14
 - 2026-10-01T21:48Z A done UI-68
 - 2026-10-01T21:56Z A claim DOC-19
@@ -107,3 +105,5 @@
 - 2026-10-02T07:13Z C claim TOOL-7
 - 2026-10-02T07:15Z C done FM-54
 - 2026-10-02T07:18Z A claim DOC-22
+- 2026-10-02T07:26Z A uebernimmt FM-46 von C (Claim verfallen)
+- 2026-10-02T07:26Z A claim FM-46
