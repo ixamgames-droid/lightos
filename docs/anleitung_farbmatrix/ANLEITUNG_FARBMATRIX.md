@@ -60,6 +60,11 @@ Mit **Stil RGBW** legt die Matrix den **gemeinsamen Weißanteil** einer Farbe au
 Farben (Rot, Grün, Blau …) bleiben unverändert. Ein eigener Weißanteil ist **nicht**
 einstellbar.
 
+**Ausnahme — eigene Weiß-Achse:** Gehören die Weiß-Emitter eines Geräts nicht 1:1 zu den
+Farbzellen (z. B. die Warmweiß-Leiste des ZQ06121), lässt die Matrix diesen Weiß-Kanal in Ruhe
+und gibt Weiß über RGB aus. Diese Weiß-Segmente fährst du über eigene Weiß-Zellen im Raster
+(Gruppen-Editor: „Weiß-Segmente einzeln → Raster ▾“), eine Dimmer-Matrix oder eine Szene.
+
 ## 4. Kombinieren
 
 Farbe (diese Matrix) + Helligkeit (Dimmer-Matrix) + Bewegung (EFX) sind **getrennte Ebenen** über
