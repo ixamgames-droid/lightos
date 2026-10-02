@@ -67,6 +67,7 @@
 | BPM-21 | B | fix/bpm21-wasapi-aussetzer | 2026-10-02T12:58Z | src/core/audio/capture.py · src/core/audio/level_meter.py · src/ui/bpm_status_rules.py · src/ui/views/bpm_manager_view.py · tests/test_bpm21_wasapi_aussetzer.py · BACKLOG.md |
 | DOC-54 | C | - | 2026-10-02T13:02Z | docs/anleitung_speed_bpm/ANLEITUNG_SPEED_BPM.md |
 | DOC-55 | C | - | 2026-10-02T13:04Z | docs/anleitung_einmessen/ANLEITUNG_EINMESSEN.md |
+| DOC-56 | C | - | 2026-10-02T13:05Z | docs/anleitung_web_remote/ANLEITUNG.md |
 
 ## Blocker & Fallen
 
@@ -139,7 +140,6 @@
 
 ## Verlauf
 
-- 2026-10-02T11:58Z C claim DOC-43
 - 2026-10-02T11:59Z A aktualisiert FM-46: Branch feat/fm46-dimmer-segment -> feat/fm46-rueckfall
 - 2026-10-02T11:59Z A claim FM-46c
 - 2026-10-02T12:00Z C claim DOC-44
@@ -169,3 +169,4 @@
 - 2026-10-02T12:58Z B claim BPM-21
 - 2026-10-02T13:02Z C claim DOC-54
 - 2026-10-02T13:04Z C claim DOC-55
+- 2026-10-02T13:05Z C claim DOC-56
