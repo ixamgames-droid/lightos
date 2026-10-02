@@ -10,7 +10,8 @@
 > Fader auf **alle** Fixtures — siehe „Reichweite beachten" unten.)
 >
 > Show: `shows/Event_Demo_2026.lshow`, **Bank 8 „Programmer"** (SCENE-Taste 8). Die Datei liegt
-> nicht im Repo — sie entsteht mit `venv/bin/python tools/build_event_demo_2026.py`.
+> nicht im Repo — sie entsteht mit `./venv/bin/python tools/build_event_demo_2026.py`
+> (Windows: `venv\Scripts\python.exe tools\build_event_demo_2026.py`).
 >
 > **Wichtig:** Gemeint ist die **vorgebaute VC-Bank** namens „Programmer" (die 8. Seite der
 > Virtual Console dieser Show) — **nicht** die App-Sektion „Programmer" oben in der Reiter-Leiste.
@@ -34,9 +35,11 @@ für andere Werkzeuge und befüllt den Programmer **nicht** — die Bedienung hi
 die gewählte Gruppe. Die einzige gruppen-gebundene Bedienung ist **„MH Pan"** (Gruppe „Moving Heads").
 Der Programmer hat Vorrang vor den Grundwerten — was du hier setzt, „überschreibt" live.
 **Ausnahme:** Kanäle, die gerade eine **laufende Funktion** treibt (z. B. die Szene „Voll Weiß"
-oder eine Farb-Matrix aus Bank 1), überschreibt der Programmer **nicht** — die Farbe einer
-laufenden Funktion bleibt stehen. Läuft eine Farb-Matrix, erscheinen die Farb-Kacheln dazu
-abgedunkelt mit Schloss 🔒. Erst die Funktion stoppen, dann von Hand mischen.
+oder eine Farb-Matrix aus Bank 1), überschreibt der Programmer **nicht**. Geschützt ist dabei
+genau, was die Funktion in diesem Moment von ihrem Grundwert **wegbewegt**: Ein Farbkanal, den die
+Matrix gerade auf 0 hält (z. B. Blau bei einem roten Pixel), nimmt den Programmer-Wert trotzdem
+an — aus Rot wird dann Magenta. Läuft eine Farb-Matrix, erscheinen die Farb-Kacheln dazu
+abgedunkelt mit Schloss 🔒. Für eine saubere Handmischung erst die Funktion stoppen.
 
 ## 1. Gruppe wählen (Reihe 0)
 
