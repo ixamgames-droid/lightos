@@ -56,6 +56,7 @@
 | DOC-51 | C | - | 2026-10-02T12:23Z | docs/anleitung_grosse_demo_2026/ANLEITUNG_GROSSE_DEMO_2026.md |
 | DOC-52 | C | - | 2026-10-02T12:24Z | docs/anleitung_komplettshow_2026 |
 | VIZ-66 | A | feat/viz66-eigene-modelle | 2026-10-02T12:24Z | src/ui/visualizer/scene_src/fixtures/builders.js · src/ui/visualizer/scene_src/stage/stage_objects.js · src/ui/visualizer/assets/models · THIRD_PARTY_NOTICES.md |
+| FM-56 | A | feat/fm56-eigene-bibliothek | 2026-10-02T12:26Z | fixtures/bibliothek · src/core/database/bibliothek_format.py · src/core/database/fixture_db.py |
 
 ## Blocker & Fallen
 
@@ -123,7 +124,6 @@
 
 ## Verlauf
 
-- 2026-10-02T10:55Z C claim DOC-32
 - 2026-10-02T10:56Z C claim DOC-33
 - 2026-10-02T10:56Z C claim DOC-34
 - 2026-10-02T10:57Z C claim DOC-35
@@ -153,3 +153,4 @@
 - 2026-10-02T12:23Z C claim DOC-51
 - 2026-10-02T12:24Z C claim DOC-52
 - 2026-10-02T12:24Z A claim VIZ-66
+- 2026-10-02T12:26Z A claim FM-56
