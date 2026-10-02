@@ -1,5 +1,7 @@
 # Programmer-Grundlagen: Geräte wählen und von Hand einstellen
 
+> **English:** [Programmer basics](ANLEITUNG.en.md)
+
 > **Worum geht's:** Im **Programmer** stellst du Licht von Hand ein. Du wählst
 > Geräte aus, ziehst Helligkeit, Farbe und Position auf und siehst das Ergebnis
 > sofort. Was hier steht, hat Vorrang vor laufenden Szenen und Cues, bis du es

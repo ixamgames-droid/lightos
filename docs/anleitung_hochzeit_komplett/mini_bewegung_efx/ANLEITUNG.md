@@ -9,7 +9,8 @@
 ---
 
 ### Die 10 Figuren (Reihe 1–2)
-Tippe eine an — Moving Head + Spider fahren die Figur (Strahl geht automatisch auf):
+Tippe eine an — die Figur läuft, der Strahl geht automatisch auf. **Kreis**, **Zufall** und **Custom-Pfad**
+laufen auf Moving Head + Spider, **Linie** nur auf den Spidern, die übrigen Figuren nur auf dem Moving Head:
 
 **Kreis · Acht · Linie · Raute · Rechteck · Trapez · Dreieck · Lissajous · Zufall · Custom-Pfad**
 
@@ -33,8 +34,9 @@ Tippe eine an — Moving Head + Spider fahren die Figur (Strahl geht automatisch
 
 ### Schritt-für-Schritt (Beispiel: fächernder Kreis)
 1. **Bank 3** → **„Kreis"** antippen. → MH + Spider fahren einen Kreis.
-2. **„Gegenläufig"** antippen → sie laufen auseinander (Fächer-Effekt).
-3. Tempo: Fader **„Mover-Speed"**, Größe: Fader **„Mover-Größe"** (oder Encoder „EFX-Tempo").
+2. **„Kreis“** läuft schon gegenläufig; **„Gegenläufig“** schaltet das aus und wieder ein (wirkt nur auf „Kreis“).
+3. Tempo: Fader **„Mover-Speed“** (oder Encoder „EFX-Tempo“) — wirkt nur, solange **keine BPM** läuft; die
+   Figuren hängen am Tempo-Bus „Global“. Größe: Fader **„Mover-Größe“**.
 4. Dazu Farbe: **„MH Grün"** (Bank 1) bzw. Spider-Farbe → bunte Bewegung.
 
 ### Sofort weiterprobieren

@@ -4,7 +4,7 @@ In dieser Anleitung lernst du, wie du deine Geräte in der Sektion **Bühne** (2
 
 1. Öffne die Sektion **„Bühne"**.
 
-2. Beim Öffnen der Bühne sind bereits **alle 12 Geräte** an ihren fertigen 2D-Positionen platziert — die Show `Komplettshow_2026.lshow` enthält das gespeicherte Layout, du musst also nichts erst aufbauen. Möchtest du etwas anders stellen, ziehst du das jeweilige Gerät per Drag & Drop an die neue Zielposition.
+2. Hast du die Show wie in Anleitung 0–1 gebaut und mit dem Layout gespeichert, sind beim Öffnen der Bühne bereits **alle 12 Geräte** an ihren 2D-Positionen platziert. Sonst ziehst du sie jetzt per Drag & Drop an ihre Position. (Die Show `Komplettshow_2026.lshow` liegt nicht im Repository und wird von keinem Generator erzeugt — du baust sie mit dieser Anleitungsreihe selbst.)
 
 3. Das gespeicherte Layout sieht so aus:
    - Die **8 PAR** stehen nebeneinander in einer Reihe mittig auf der Bühne.
