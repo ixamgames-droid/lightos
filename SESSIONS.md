@@ -65,6 +65,7 @@
 | UI-73 | B | docs/ui72-ui73-befunde | 2026-10-02T22:02Z | BACKLOG.md |
 | SAMMEL-DOKU-C | A | sammel/doku-c | 2026-10-02T22:08Z | docs · BACKLOG.md |
 | OUT-59 | B | fix/out59-waisen-windows | 2026-10-02T22:17Z | src/core/dmx/serial_process.py · tests/test_out59_waisen_windows.py · BACKLOG.md |
+| OUT-60 | B | fix/out59-waisen-windows | 2026-10-02T22:17Z | BACKLOG.md |
 
 ## Blocker & Fallen
 
@@ -149,7 +150,6 @@
 
 ## Verlauf
 
-- 2026-10-02T12:26Z C claim DOC-53
 - 2026-10-02T12:27Z A done FM-46
 - 2026-10-02T12:28Z C claim TOOL-10
 - 2026-10-02T12:42Z B claim FUNKTIONSTEST-B2
@@ -179,3 +179,4 @@
 - 2026-10-02T22:08Z A claim SAMMEL-DOKU-C
 - 2026-10-02T22:11Z B done BPM-21
 - 2026-10-02T22:17Z B claim OUT-59
+- 2026-10-02T22:17Z B claim OUT-60
