@@ -46,6 +46,7 @@
 | FM-46c | A | feat/fm46-qxf-head | 2026-10-02T11:59Z | - |
 | DOC-44 | C | - | 2026-10-02T12:00Z | docs/anleitung_vc/ANLEITUNG_VC.md |
 | DOC-45 | C | - | 2026-10-02T12:00Z | docs/anleitung_vc_elemente/ANLEITUNG_VC_ELEMENTE.md |
+| DOC-46 | C | - | 2026-10-02T12:01Z | docs/anleitung_vc_smartbuild/ANLEITUNG.md |
 
 ## Blocker & Fallen
 
@@ -111,7 +112,6 @@
 
 ## Verlauf
 
-- 2026-10-02T10:01Z C done FM-55
 - 2026-10-02T10:14Z C claim UI-56
 - 2026-10-02T10:20Z C claim DOC-23
 - 2026-10-02T10:21Z C claim DOC-24
@@ -141,3 +141,4 @@
 - 2026-10-02T11:59Z A claim FM-46c
 - 2026-10-02T12:00Z C claim DOC-44
 - 2026-10-02T12:00Z C claim DOC-45
+- 2026-10-02T12:01Z C claim DOC-46
