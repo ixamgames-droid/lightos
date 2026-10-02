@@ -57,6 +57,7 @@
 | VIZ-66 | A | feat/viz66-eigene-modelle | 2026-10-02T12:24Z | src/ui/visualizer/scene_src/fixtures/builders.js · src/ui/visualizer/scene_src/stage/stage_objects.js · src/ui/visualizer/assets/models · THIRD_PARTY_NOTICES.md |
 | FM-56 | A | feat/fm56-eigene-bibliothek | 2026-10-02T12:26Z | fixtures/bibliothek · src/core/database/bibliothek_format.py · src/core/database/fixture_db.py |
 | DOC-53 | C | - | 2026-10-02T12:26Z | docs/anleitung_hochzeit_komplett · tools/build_hochzeit_komplett.py · tests/test_doc53_hochzeit_linie.py · changelog.d/2026-10-02-DOC-53.md |
+| TOOL-10 | C | - | 2026-10-02T12:28Z | BACKLOG.md |
 
 ## Blocker & Fallen
 
@@ -124,7 +125,6 @@
 
 ## Verlauf
 
-- 2026-10-02T10:57Z C claim DOC-35
 - 2026-10-02T10:58Z C claim DOC-36
 - 2026-10-02T10:59Z C claim DOC-37
 - 2026-10-02T11:07Z C claim DOC-38
@@ -154,3 +154,4 @@
 - 2026-10-02T12:26Z A claim FM-56
 - 2026-10-02T12:26Z C claim DOC-53
 - 2026-10-02T12:27Z A done FM-46
+- 2026-10-02T12:28Z C claim TOOL-10
