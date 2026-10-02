@@ -54,7 +54,7 @@
 | `build_testshow_2026.py` | TESTSHOW 2026 — komplette musik-synchrone Show für Davids reales Rig. |
 | `build_tutorial_matrix_show.py` | TUTORIAL_MATRIX — Begleit-Show zur bebilderten Schritt-fuer-Schritt-Anleitung. |
 | `build_vc_elements_showcase.py` | VC-Elemente-Schaukasten: legt JEDEN der 15 VC-Widget-Typen einmal beschriftet |
-| `build_vc_widgets_showcase.py` | VC-Widgets-Schaukasten (Doku) — legt 17 der 19 VC-Widget-Typen einmal |
+| `build_vc_widgets_showcase.py` | VC-Widgets-Schaukasten (Doku) — legt JEDEN der 19 VC-Widget-Typen einmal |
 | `build_zq06121_demo.py` | Demo-/Testshow fuer Davids U-King ZQ06121 LED-Balken (2026-08-05). |
 | `capture_test123_tempo_guide.py` | Reproduzierbare Screenshots fuer die Test123-Tempo-Anleitung. |
 | `capture_vc_widgets.py` | Vollbild der VC-Widget-Showcase aufnehmen — OHNE Desktop, ohne Fotoapparat. |

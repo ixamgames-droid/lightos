@@ -210,6 +210,28 @@
       "wy": 452,
       "ww": 380,
       "wh": 224
+    },
+    "VCTempoBusController": {
+      "title": "Tempo-Controller (VCTempoBusController)",
+      "x": 932,
+      "y": 428,
+      "w": 280,
+      "h": 220,
+      "wx": 932,
+      "wy": 452,
+      "ww": 280,
+      "wh": 196
+    },
+    "VCMultiLiveEditor": {
+      "title": "Live-Edit (VCMultiLiveEditor)",
+      "x": 1236,
+      "y": 428,
+      "w": 320,
+      "h": 424,
+      "wx": 1236,
+      "wy": 452,
+      "ww": 320,
+      "wh": 400
     }
   }
 }
