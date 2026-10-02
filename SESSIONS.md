@@ -30,6 +30,7 @@
 | DOC-29 | C | - | 2026-10-02T10:51Z | docs/anleitung_patch_gruppen/ANLEITUNG_PATCH_GRUPPEN.md |
 | DOC-30 | C | - | 2026-10-02T10:52Z | docs/anleitung_programmer/ANLEITUNG_PROGRAMMER.md |
 | DOC-31 | C | - | 2026-10-02T10:53Z | docs/anleitung_zwei_universen/ANLEITUNG.md |
+| DOC-32 | C | - | 2026-10-02T10:55Z | docs/anleitung_farbmatrix/ANLEITUNG_FARBMATRIX.md |
 
 ## Blocker & Fallen
 
@@ -93,7 +94,6 @@
 
 ## Verlauf
 
-- 2026-10-02T07:39Z C claim FM-55
 - 2026-10-02T07:42Z C done TOOL-6
 - 2026-10-02T07:57Z A claim UI-70
 - 2026-10-02T07:57Z A claim TOOL-8
@@ -123,3 +123,4 @@
 - 2026-10-02T10:51Z C claim DOC-29
 - 2026-10-02T10:52Z C claim DOC-30
 - 2026-10-02T10:53Z C claim DOC-31
+- 2026-10-02T10:55Z C claim DOC-32
