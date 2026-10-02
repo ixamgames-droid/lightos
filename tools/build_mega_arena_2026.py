@@ -83,7 +83,8 @@ from src.ui.virtualconsole.vc_song_info import VCSongInfo
 from src.ui.virtualconsole.vc_effect_editor import VCEffectEditor
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(_ROOT, "shows", "Mega_Arena_2026.lshow")
+# TOOL-7: LIGHTOS_GEN_OUT lenkt die Show um (Test) — wie bei build_demo_show_full.
+OUT = os.environ.get("LIGHTOS_GEN_OUT") or os.path.join(_ROOT, "shows", "Mega_Arena_2026.lshow")
 STAGE_NAME = "MegaArena2026"
 MUSIC_DIR = os.environ.get("LIGHTOS_MEGA_MUSIC_DIR", r"C:/Users/X/Desktop/Musik/BP Party")
 BUS = "Global"            # Master: folgt der globalen Musik-BPM (Tap/Audio)
@@ -1138,8 +1139,18 @@ assert len(imgs) >= 8, f"zu wenige Galerie-Buttons: {len(imgs)}"
 # Master-Kopplung
 bound = [f for f in fm.all() if getattr(f, "tempo_bus_id", "") == BUS]
 assert len(bound) >= 25, f"an Master gekoppelt: {len(bound)}"
-named = {b.bus_id: b for b in get_tempo_bus_manager().named_buses()}
-assert named[BUS].source == "bpm_global", f"Global folgt nicht der Musik: {named[BUS].source}"
+# TOOL-7 (wie TOOL-5): „Global" ist seit ENG-26 ein ALIAS des Default-Bus, kein
+# benannter Bus — named_buses() listet ihn nie, ``named[BUS]`` war ein KeyError,
+# NACHDEM die Show schon gespeichert war. Geprueft wird die echte Lage: der Name
+# loest auf den Default-Bus auf, der folgt der Musik, und jeder gekoppelte
+# Effekt liest genau diesen Bus.
+_tbm = get_tempo_bus_manager()
+master = _tbm.get(BUS)
+assert master is not None and master.bus_id == _tbm.DEFAULT_BUS, \
+    f"'{BUS}' loest nicht auf den Default-Bus auf: {getattr(master, 'bus_id', None)}"
+assert master.source == "bpm_global", f"Global folgt nicht der Musik: {master.source}"
+_fremd = [f.name for f in bound if _tbm.bus_for_effect(f.tempo_bus_id) is not master]
+assert not _fremd, f"gekoppelte Effekte lesen nicht den Master-Bus: {_fremd}"
 assert get_tempo_bus_manager().auto_sync is True, "Auto-Sync nicht persistiert"
 assert state.implicit_brightness is False, "strikte Farbe/Dimmer-Trennung nicht persistiert"
 
