@@ -209,42 +209,67 @@ jobs:
 
   # XPLAT-41: Windows auf ARM64 (Snapdragon) — requirements.txt verspricht das,
   # geprueft hat es bisher keine Automatik. Die Leg faehrt die VOLLE Suite mit
-  # dem segmentierten Windows-Runner auf einem echten ARM-Runner, mit nativem
-  # ARM64-Python (architecture: arm64; ohne das liefe x64-Python unter
-  # Emulation und die ARM64-Wheels blieben ungeprueft).
+  # dem segmentierten Windows-Runner auf einem echten ARM-Runner.
   #
-  # ★ ZUNAECHST NICHT BLOCKIEREND (continue-on-error). Belegt ist nur, dass es
-  # PySide6-Essentials/-Addons als win_arm64-Wheels gibt (cp310-abi3, laeuft
-  # also auch unter 3.14). Offen ist, ob python-rtmidi (C-Extension, ggf. Bau
-  # aus den Quellen) und QtWebEngine ohne GPU auf dem Runner laufen. Auswertung
-  # nach einer Woche Laeufen (BACKLOG XPLAT-41): gruen genug -> scharf schalten
-  # (continue-on-error raus, tests/test_ci_windows_legs.py anpassen), sonst die
-  # Befunde als eigene Items.
+  # ★ XPLAT-45 (02.10.2026): die Suite laeuft mit x64-Python UNTER EMULATION,
+  # nicht mehr mit nativem ARM64-Python. Gemessen, nicht vermutet: mit
+  # `architecture: arm64` war die Leg flaechig rot (630/780 Segmente, 88 rot,
+  # 61 Crashes) — die win_arm64-Wheels von PySide6-Addons (6.11.2, 35,8 MB statt
+  # ~150 MB fuer win_amd64) enthalten KEIN QtWebEngine, und rund 90 Testdateien
+  # importieren den Visualizer. Der echte ARM-Rechner (Rig-PC, Snapdragon,
+  # Windows 11) laeuft genau deshalb mit x64-Python: nur so gibt es dort den
+  # 3D-Visualizer. Die Leg prueft jetzt diese reale Konfiguration. Natives
+  # ARM64 bleibt als eigener Befund-Schritt im Log (welche Qt-Module die Wheels
+  # mitbringen) — sobald QtWebEngine dort auftaucht, meldet der Schritt das.
+  #
+  # ★ ZUNAECHST NICHT BLOCKIEREND (continue-on-error). Auswertung nach einer
+  # Woche Laeufen (BACKLOG XPLAT-41/XPLAT-45): gruen genug -> scharf schalten
+  # (continue-on-error raus, tests/test_ci_windows_legs.py anpassen, Eintrag
+  # aus tools/_ci_beobachtend.py nehmen), sonst die Befunde als eigene Items.
   #
   # Abhaengigkeiten wie in der Linux-Leg ins venv/ (verify_segmented.ps1 sucht
   # genau venv\Scripts\python.exe) und VOLL aus requirements*.txt — nicht die
   # Kernauswahl des x64-Smokes: die volle Suite importiert Flask, python-osc,
   # soundcard usw. python-rtmidi (C-Extension) und die optionalen winrt-Pakete
   # (MIDI 2.0) kommen in einen EIGENEN Schritt, damit ein fehlgeschlagener Bau
-  # die Leg nicht vor dem ersten Test beendet — genau das ist eine der offenen
-  # Fragen, also soll die Antwort im Log stehen.
+  # die Leg nicht vor dem ersten Test beendet.
   windows-arm:
     name: Windows-ARM64 — volle Suite (segmentiert, beobachtend)
     runs-on: windows-11-arm
-    timeout-minutes: 90
+    timeout-minutes: 120
     continue-on-error: true
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 3.14 gibt es fuer win32-arm64 im Manifest von actions/python-versions
-      # (stabil seit 3.14.0) — die neueste stabile Linie.
-      - name: Python 3.14 (ARM64) einrichten
+      # XPLAT-45: ZUERST das native ARM64-Python, nur fuer den Befund. Die
+      # zweite setup-python-Stufe unten legt danach x64 vorne in den PATH.
+      - name: Python 3.14 (natives ARM64, nur Befund) einrichten
+        id: py_arm64
         uses: actions/setup-python@v5
         with:
           python-version: "3.14"
           architecture: arm64
+
+      - name: Natives ARM64 — Qt-Module der Wheels (Befund, darf scheitern)
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          $vpy = "$env:RUNNER_TEMP\venv-arm64\Scripts\python.exe"
+          & "${{ steps.py_arm64.outputs.python-path }}" -m venv "$env:RUNNER_TEMP\venv-arm64"
+          & $vpy -m pip install --upgrade pip
+          & $vpy -m pip install "PySide6>=6.7.0" "PySide6-Addons>=6.7.0"
+          & $vpy tools/qt_module_befund.py
+
+      # 3.14 gibt es fuer win32-x64 und win32-arm64 im Manifest von
+      # actions/python-versions; x64 laeuft auf windows-11-arm per Emulation.
+      - name: Python 3.14 (x64 unter Emulation, wie am Rig) einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          architecture: x64
           cache: pip
 
       - name: venv + Abhaengigkeiten (ohne native Optionale)
@@ -253,7 +278,7 @@ jobs:
           # Ohne das bricht pwsh bei einem fehlgeschlagenen pip NICHT ab, und
           # der Schritt waere gruen, solange nur der LETZTE Befehl klappt.
           $PSNativeCommandUseErrorActionPreference = $true
-          python -c "import platform, sys; print(sys.version); print('Maschine:', platform.machine())"
+          python -c "import platform, sys, sysconfig; print(sys.version); print('Maschine:', platform.machine(), 'Interpreter:', sysconfig.get_platform())"
           python -m venv venv
           venv\Scripts\python.exe -m pip install --upgrade pip
           # python-rtmidi + winrt herausfiltern -> eigener Schritt unten.
@@ -262,7 +287,7 @@ jobs:
           venv\Scripts\python.exe -m pip install -r "$env:RUNNER_TEMP\requirements-kern.txt"
           venv\Scripts\python.exe -m pip install -r requirements-dev.txt
 
-      - name: python-rtmidi + winrt (offene Frage, darf scheitern)
+      - name: python-rtmidi + winrt (darf scheitern)
         shell: pwsh
         continue-on-error: true
         run: |
@@ -272,11 +297,12 @@ jobs:
           venv\Scripts\python.exe -m pip install -r "$env:RUNNER_TEMP\requirements-nativ.txt"
           venv\Scripts\python.exe -c "import rtmidi; print('python-rtmidi OK', rtmidi.__file__)"
 
-      - name: WebEngine-Import gegenpruefen (offene Frage, darf scheitern)
+      - name: Qt-Module des Suite-venv (QtWebEngine erwartet)
         shell: pwsh
         continue-on-error: true
         run: |
-          venv\Scripts\python.exe -c "import PySide6, platform; from PySide6 import QtWebEngineWidgets; print('QtWebEngine OK', PySide6.__version__, platform.machine())"
+          $PSNativeCommandUseErrorActionPreference = $true
+          venv\Scripts\python.exe tools/qt_module_befund.py --erwarte-webengine
 
       # LIGHTOS_HARDEN_EXIT_ALL wie in den anderen Legs (PROC-04): os._exit nach
       # dem echten Ergebnis, ueberspringt den flaky nativen Abbau. Maskiert
