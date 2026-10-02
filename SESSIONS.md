@@ -59,6 +59,7 @@
 | DOC-53 | C | - | 2026-10-02T12:26Z | docs/anleitung_hochzeit_komplett · tools/build_hochzeit_komplett.py · tests/test_doc53_hochzeit_linie.py · changelog.d/2026-10-02-DOC-53.md |
 | TOOL-10 | C | - | 2026-10-02T12:28Z | BACKLOG.md |
 | FUNKTIONSTEST-B2 | B | - | 2026-10-02T12:42Z | - |
+| XPLAT-42 | B | fix/xplat42-sandbox-aufraeumen | 2026-10-02T12:45Z | tools/anleitungsbilder.py · tools/anleitungsbilder/sandbox.py · tests/test_anleitungsbilder.py · BACKLOG.md |
 
 ## Blocker & Fallen
 
@@ -127,7 +128,6 @@
 
 ## Verlauf
 
-- 2026-10-02T10:59Z C claim DOC-37
 - 2026-10-02T11:07Z C claim DOC-38
 - 2026-10-02T11:09Z C claim DOC-39
 - 2026-10-02T11:11Z C claim DOC-40
@@ -157,3 +157,4 @@
 - 2026-10-02T12:27Z A done FM-46
 - 2026-10-02T12:28Z C claim TOOL-10
 - 2026-10-02T12:42Z B claim FUNKTIONSTEST-B2
+- 2026-10-02T12:45Z B claim XPLAT-42
