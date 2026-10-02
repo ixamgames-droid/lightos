@@ -65,6 +65,7 @@
 | FM-58 | A | feat/fm58-bibliothek-runde2 | 2026-10-02T18:20Z | fixtures/bibliothek |
 | FUNKTIONSTEST-B3 | B | - | 2026-10-02T21:53Z | - |
 | UI-72 | B | docs/ui72-ui73-befunde | 2026-10-02T22:02Z | BACKLOG.md |
+| UI-73 | B | docs/ui72-ui73-befunde | 2026-10-02T22:02Z | BACKLOG.md |
 
 ## Blocker & Fallen
 
@@ -148,7 +149,6 @@
 
 ## Verlauf
 
-- 2026-10-02T12:14Z A done PROC-18
 - 2026-10-02T12:17Z C claim TOOL-2
 - 2026-10-02T12:23Z C claim DOC-51
 - 2026-10-02T12:24Z C claim DOC-52
@@ -178,3 +178,4 @@
 - 2026-10-02T19:08Z B done XPLAT-42
 - 2026-10-02T21:53Z B claim FUNKTIONSTEST-B3
 - 2026-10-02T22:02Z B claim UI-72
+- 2026-10-02T22:02Z B claim UI-73
