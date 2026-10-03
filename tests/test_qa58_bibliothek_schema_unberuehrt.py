@@ -186,6 +186,23 @@ def _schema(pfad: str):
         con.close()
 
 
+def _kopien_im(ordner: str) -> set[str]:
+    """Alle Bibliothekskopien im Testordner, egal von wem."""
+    return set(glob.glob(os.path.join(ordner, "lightos_test_fixtures_*.db*")))
+
+
+def _kopien_des_kindes(ordner: str, pid: int, vorher: set[str]) -> list[str]:
+    """Kopien, die das Kind mit ``pid`` liegen gelassen hat.
+
+    ★ QA-82: ``vorher`` ist der Bestand VOR dem Start des Kindes. Der Name
+    traegt die PID, aber PIDs werden wiederverwendet — eine Leiche eines
+    frueheren, hart abgestuerzten Prozesses mit derselben PID ist keine Kopie
+    dieses Kindes.
+    """
+    muster = os.path.join(ordner, f"lightos_test_fixtures_{pid}_*.db*")
+    return sorted(set(glob.glob(muster)) - vorher)
+
+
 class BibliothekSchemaTest(unittest.TestCase):
 
     # ── Werkzeug ────────────────────────────────────────────────────────────
@@ -485,12 +502,39 @@ class BibliothekSchemaTest(unittest.TestCase):
         laufen Nachbarsegmente parallel und legen laufend eigene an, ein
         pauschales Zaehlen waere flatterhaft.
         """
+        ordner = os.path.join(tempfile.gettempdir(), "lightos_tests")
+        vorher = _kopien_im(ordner)
         self._segment(None)
-        muster = os.path.join(tempfile.gettempdir(), "lightos_tests",
-                              f"lightos_test_fixtures_{self._letzte_pid}_*.db*")
-        self.assertEqual([], sorted(glob.glob(muster)),
+        self.assertEqual([], _kopien_des_kindes(ordner, self._letzte_pid, vorher),
                          "das Segment hat seine Kopie der Bibliothek liegen "
                          "gelassen")
+
+    def test_eine_alte_leiche_mit_recycelter_pid_ist_nicht_die_kopie_des_kindes(self):
+        """QA-82: die PID allein identifiziert die Kopie nicht.
+
+        Gemessen am 2026-10-02 im Gate eines reinen Doku-Zweigs: rot mit
+        ``lightos_test_fixtures_16417_1af99835.db`` — Zeitstempel 10:53, das
+        Kind lief um 11:1x. Ein Segment, das hart stirbt, laesst seine Kopie
+        liegen (QA-58, Nebenbefund i); sie bleibt 24 h. In einem Container mit
+        ``pid_max`` 32768 bekommt ein spaeteres Kind dieselbe PID, und das
+        PID-Muster meldete die fremde Leiche als eigene. Was VOR dem Start des
+        Kindes schon dalag, kann nicht seine Kopie sein.
+        """
+        ordner = tempfile.mkdtemp(prefix="qa82_")
+        self.addCleanup(shutil.rmtree, ordner, ignore_errors=True)
+        leiche = os.path.join(ordner, "lightos_test_fixtures_4242_alt00000.db")
+        open(leiche, "wb").close()
+        vorher = _kopien_im(ordner)
+        self.assertEqual([], _kopien_des_kindes(ordner, 4242, vorher),
+                         "eine Leiche von vor dem Start gilt als Kopie des Kindes")
+        # Positivkontrolle: was das Kind wirklich liegen laesst, sieht der Test.
+        eigene = os.path.join(ordner, "lightos_test_fixtures_4242_neu11111.db")
+        open(eigene, "wb").close()
+        self.assertEqual([eigene], _kopien_des_kindes(ordner, 4242, vorher))
+        # ... und nur die mit SEINER PID.
+        open(os.path.join(ordner, "lightos_test_fixtures_4243_nachbar.db"),
+             "wb").close()
+        self.assertEqual([eigene], _kopien_des_kindes(ordner, 4242, vorher))
 
     def test_alte_leichen_werden_weggeraeumt_frische_fremde_nicht(self):
         """Fuer den Fall, dass ein Segment hart abstuerzt und nicht mehr zum
