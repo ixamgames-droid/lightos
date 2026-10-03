@@ -1,0 +1,87 @@
+{
+  "format_version": 1,
+  "hersteller": "U King",
+  "hersteller_kurz": "UKING",
+  "modell": "Mini Double Sided Moving Head",
+  "kurzname": "UKMINIDSMH",
+  "typ": "moving_head",
+  "leistung_w": 30,
+  "notizen": "Kein Herstellerhandbuch abrufbar; Kanalfolge und Wertebereiche aus der QLC+-Datei. Strobe-Kanaele ohne Wertangabe in QLC+: 0 = kein Strobe angenommen (wie bei den eingebauten U-King-Profilen). Doppelseitiger Mini-Mover: Vorderseite RGBW-LED, Rueckseite Laser, dazu LED-Band.",
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition UKing-Mini-Double-Sided-Moving-Head.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/UKing/UKing-Mini-Double-Sided-Moving-Head.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.0.0 Beta 3 · e-shock",
+    "original": "resources/fixtures/UKing/UKing-Mini-Double-Sided-Moving-Head.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 9 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): Hersteller 'UKing' -> 'U King' (wie die eingebauten LightOS-Profile der Marke); Attribute korrigiert (Custom2: macro->effect; Custom3: macro->reset; Laser dimming: intensity->raw); Strobe-Kanal ohne Bereiche (QLC+-Preset ShutterStrobeSlowFast) mit 0 = kein Strobe (open) / 1-255 Strobe versehen (Strobe / flash); 1 Bereichs-Arten nachgezogen (Farb-/Gobo-Slots, Shake/Rotation, Prisma, Sound, Reset; Programm-Bereiche in Makro-Kanaelen ohne Farb-Art); Laser-Dimmer von intensity zu raw mit Highlight 0 (sonst als zweiter Kopf gelesen; Laser beim Highlight aus); Custom2 (LED-Band) als effect, Custom3 als reset; einzelne Kanalnamen deutsch bzw. eindeutiger benannt"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Originaldatei geprueft und nach den LightOS-Regeln (SCHEMA.md) nachbearbeitet; ein Herstellerhandbuch war nicht abrufbar (U'King-Anleitungen nur als Amazon-/manuals.plus-PDF, dort gesperrt; ManualsLib fuehrt das Modell nicht), daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "15 Channel",
+      "kanaele": [
+        {"name": "Horizontal", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Horizontal fine tuning", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Vertical", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Vertical fine tuning", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Total dimming", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe / flash",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 1, "bis": 255, "name": "Strobe langsam → schnell", "art": "strobe"}
+          ]
+        },
+        {"name": "Red dimming", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green dimming", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue dimming", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White dimming", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Laser Helligkeit", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Auto/Sound",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 30, "name": "none", "art": ""},
+            {"von": 31, "bis": 127, "name": "Self-walking1", "art": ""},
+            {"von": 128, "bis": 249, "name": "Self-walking2", "art": ""},
+            {"von": 250, "bis": 255, "name": "sound control", "art": "sound"}
+          ]
+        },
+        {
+          "name": "LED-Band",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Turn of the light belt", "art": ""},
+            {"von": 5, "bis": 109, "name": "Lamp band color selection", "art": ""},
+            {"von": 110, "bis": 255, "name": "Lamp belt self-walking", "art": ""}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 249, "name": "none", "art": ""},
+            {"von": 250, "bis": 255, "name": "reset", "art": "reset"}
+          ]
+        }
+      ]
+    }
+  ]
+}
