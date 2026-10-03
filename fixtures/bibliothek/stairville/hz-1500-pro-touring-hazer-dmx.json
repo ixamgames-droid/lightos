@@ -1,0 +1,51 @@
+{
+  "format_version": 1,
+  "hersteller": "Stairville",
+  "hersteller_kurz": "STAIR",
+  "modell": "HZ-1500 Pro Touring Hazer DMX",
+  "kurzname": "HZ1500PRO",
+  "typ": "hazer",
+  "leistung_w": 1420,
+  "quelle": {
+    "titel": "Stairville HZ-1500 Pro Touring Hazer DMX, User Manual (Thomann, Art. 450663, v3)",
+    "url": "https://fast-images.static-thomann.de/pics/atg/atgdata/document/manual/450663_c_450663_v3_en_online.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.14.4 · Christoph Müllner",
+    "original": "resources/fixtures/Stairville/Stairville-HZ-1500-Pro-Touring-Hazer-DMX.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 2 Wertebereiche mit Art (kind) versehen; Kanal 1 'Haze Amount' → 'Dunst' mit Attribut dimmer statt intensity, Highlight 0; Kanal 2 'Fan Speed' → 'Luefter' mit Attribut fan statt speed; Modus '2 Channel' → '2-Kanal'; Bereichsnamen deutsch; Kurzname HZ1500PRO; hersteller_kurz STAIR; Quelle auf Herstellerhandbuch gesetzt"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal fuer Kanal gegen das Handbuch (DMX assignment: Kanal 1 Dunstmenge 1…100 %, Kanal 2 Luefter 0…100 %) geprueft"
+  },
+  "modi": [
+    {
+      "name": "2-Kanal",
+      "kanaele": [
+        {
+          "name": "Dunst",
+          "attribut": "dimmer",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dunstmenge 1 % → 100 %"}
+          ]
+        },
+        {
+          "name": "Luefter",
+          "attribut": "fan",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Luefterleistung 0 % → 100 %"}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Touring-Hazer 1450 W, 2 DMX-Kanaele, DMX 3- und 5-polig. Highlight bewusst 0."
+}

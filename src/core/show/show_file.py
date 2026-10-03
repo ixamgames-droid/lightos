@@ -424,7 +424,8 @@ def _resolve_fixture_profile_id(profile_id: int, manufacturer_name: str,
         from sqlalchemy import select
         from sqlalchemy.orm import Session, joinedload
         from src.core.database.fixture_db import engine
-        from src.core.database.models import FixtureProfile, Manufacturer
+        from src.core.database.models import (FixtureProfile, Manufacturer,
+                                              MITGELIEFERT_QUELLEN)
 
         with Session(engine()) as session:
             current = session.execute(
@@ -448,8 +449,10 @@ def _resolve_fixture_profile_id(profile_id: int, manufacturer_name: str,
             # FM-43: `builtin` zuerst, dann wie bisher nach ID. Der zweite
             # Schluessel bleibt drin, damit die Wahl bei gleicher Herkunft
             # deterministisch ist — sonst entschiede die Zeilenreihenfolge.
+            # FM-56: die Dateien der eigenen Bibliothek (`lightos`) sind
+            # genauso mitgeliefert und zaehlen wie `builtin`.
             treffer = session.execute(
-                query.order_by((FixtureProfile.source != "builtin"),
+                query.order_by(FixtureProfile.source.not_in(MITGELIEFERT_QUELLEN),
                                FixtureProfile.id)
             ).all()
             _geraet = f"{manufacturer_name} / {fixture_name}".strip(" /")
@@ -1703,7 +1706,7 @@ def read_show_version(path: str | os.PathLike) -> str | None:
         return None
 
 
-def load_show(path: str | os.PathLike):
+def _load_show_impl(path: str | os.PathLike):
     """Load a .lshow file and replace app state. Returns (ok: bool, msg: str)."""
     from src.core.app_state import get_state
     from src.core.engine.palette import get_palette_manager
@@ -2380,3 +2383,19 @@ def load_show(path: str | os.PathLike):
         return True, (f"Show '{state.show_name}' geladen — ABER "
                       f"{len(_ladeprobleme)} Teile konnten nicht gelesen werden.")
     return True, f"Show '{state.show_name}' geladen."
+
+
+def load_show(path: str | os.PathLike):
+    """Load a .lshow file and replace app state. Returns (ok: bool, msg: str).
+
+    OUT-60: der ganze Ladevorgang laeuft unter der Lade-Sperre des
+    OutputManagers — die Ausgabe sendet bis zum Ende den Stand VOR dem Laden,
+    statt mitten im reset-first einen Null-Frame zu rendern (am Rig ein Blitz).
+    Danach rendert der naechste Frame die neue Show.
+    """
+    from src.core.app_state import get_state
+    sperre = getattr(getattr(get_state(), "output_manager", None), "lade_sperre", None)
+    if sperre is None:
+        return _load_show_impl(path)
+    with sperre():
+        return _load_show_impl(path)

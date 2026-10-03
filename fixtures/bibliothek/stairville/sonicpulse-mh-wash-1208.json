@@ -1,0 +1,241 @@
+{
+  "format_version": 1,
+  "hersteller": "Stairville",
+  "hersteller_kurz": "STAIR",
+  "modell": "SonicPulse MH Wash 1208",
+  "kurzname": "SPMHW1208",
+  "typ": "moving_head",
+  "leistung_w": 82,
+  "quelle": {
+    "titel": "Stairville SonicPulse MH Wash 1208, User Manual (Thomann, Art. 589121, v2)",
+    "url": "https://fast-images.static-thomann.de/pics/atg/atgdata/document/manual/589121_v2_en_online.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.14.2 GIT · Jakob Frank",
+    "original": "resources/fixtures/Stairville/Stairville-SonicPulse-MH-Wash-1208.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 92 Wertebereiche mit Art (kind) versehen; 3 Bereichsnamen auf 80 Zeichen gekuerzt; Modusnamen 10-/19-Kanal; 19-Kanal: drei color_wheel-Kanaele entflochten — Farbvorgabe bleibt color_wheel (Vorgaben art color, 0–24 open), Farbwechsel als macro, Farbeffekt-Speed als effect_speed; 19-Kanal: Raster 1x2 fuer die zwei LED-Gruppen (LED 1 / LED 2); Strobe-Default/Highlight 0 (kein Strobe = offen) statt 5; Sonderfunktionen als reset statt raw; falsche Art rotate an Pan normal/invertiert entfernt; Fan- und Dimmerkurven-Bereiche benannt; Kanal-/Bereichsnamen deutsch; Kurzname; hersteller_kurz STAIR; Quelle auf Herstellerhandbuch gesetzt"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal fuer Kanal gegen das Handbuch (Kap. 7.4 10 Kanaele, 7.5 19 Kanaele inkl. 33 Farbvorgaben) geprueft"
+  },
+  "modi": [
+    {
+      "name": "10-Kanal",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {
+          "name": "Pan/Tilt-Speed",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Pan/Tilt-Geschwindigkeit schnell → langsam"}
+          ]
+        },
+        {
+          "name": "Dimmer",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dimmer 0 % → 100 %"}
+          ]
+        },
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 11, "bis": 127, "name": "Strobe linear, schneller werdend", "art": "strobe"},
+            {"von": 128, "bis": 255, "name": "Zufalls-Strobe, schneller werdend", "art": "strobe"}
+          ]
+        },
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Sonderfunktionen / Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Keine Funktion"},
+            {"von": 10, "bis": 14, "name": "Reset (Wert mind. 5 s halten)", "art": "reset"},
+            {"von": 15, "bis": 44, "name": "Keine Funktion"},
+            {"von": 45, "bis": 49, "name": "Luefter automatisch"},
+            {"von": 50, "bis": 54, "name": "Luefter maximal"},
+            {"von": 55, "bis": 59, "name": "Luefter minimal"},
+            {"von": 60, "bis": 64, "name": "Luefter aus"},
+            {"von": 65, "bis": 69, "name": "Dimmerkurve linear"},
+            {"von": 70, "bis": 74, "name": "Dimmerkurve quadratisch (Square Law)"},
+            {"von": 75, "bis": 79, "name": "Dimmerkurve invers quadratisch"},
+            {"von": 80, "bis": 84, "name": "Dimmerkurve S-Kurve"},
+            {"von": 85, "bis": 89, "name": "Dimmerkurve steil"},
+            {"von": 90, "bis": 94, "name": "Dimmerkurve flach"},
+            {"von": 95, "bis": 99, "name": "Pan normal"},
+            {"von": 100, "bis": 104, "name": "Pan invertiert"},
+            {"von": 105, "bis": 109, "name": "Tilt normal"},
+            {"von": 110, "bis": 114, "name": "Tilt invertiert"},
+            {"von": 115, "bis": 255, "name": "Keine Funktion"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "19-Kanal",
+      "raster": {"rows": 1, "cols": 2},
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fein", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fein", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Pan/Tilt-Speed",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Pan/Tilt-Geschwindigkeit schnell → langsam"}
+          ]
+        },
+        {
+          "name": "Dimmer",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dimmer 0 % → 100 %"}
+          ]
+        },
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 11, "bis": 127, "name": "Strobe linear, schneller werdend", "art": "strobe"},
+            {"von": 128, "bis": 255, "name": "Zufalls-Strobe, schneller werdend", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Farbvorgabe",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 24, "name": "Keine Farbvorgabe (RGBW-Kanaele)", "art": "open"},
+            {"von": 25, "bis": 31, "name": "Farbvorgabe R: 255 G: 000 B: 000 W: 000", "art": "color"},
+            {"von": 32, "bis": 38, "name": "Farbvorgabe R: 255 G: 000 B: 000 W: 100", "art": "color"},
+            {"von": 39, "bis": 45, "name": "Farbvorgabe R: 255 G: 000 B: 000 W: 200", "art": "color"},
+            {"von": 46, "bis": 52, "name": "Farbvorgabe R: 255 G: 050 B: 000 W: 000", "art": "color"},
+            {"von": 53, "bis": 59, "name": "Farbvorgabe R: 255 G: 150 B: 000 W: 000", "art": "color"},
+            {"von": 60, "bis": 66, "name": "Farbvorgabe R: 255 G: 255 B: 000 W: 000", "art": "color"},
+            {"von": 67, "bis": 73, "name": "Farbvorgabe R: 255 G: 255 B: 000 W: 075", "art": "color"},
+            {"von": 74, "bis": 80, "name": "Farbvorgabe R: 000 G: 255 B: 000 W: 255", "art": "color"},
+            {"von": 81, "bis": 87, "name": "Farbvorgabe R: 000 G: 255 B: 000 W: 150", "art": "color"},
+            {"von": 88, "bis": 94, "name": "Farbvorgabe R: 000 G: 255 B: 000 W: 050", "art": "color"},
+            {"von": 95, "bis": 101, "name": "Farbvorgabe R: 000 G: 255 B: 000 W: 000", "art": "color"},
+            {"von": 102, "bis": 108, "name": "Farbvorgabe R: 000 G: 255 B: 050 W: 000", "art": "color"},
+            {"von": 109, "bis": 115, "name": "Farbvorgabe R: 000 G: 255 B: 150 W: 000", "art": "color"},
+            {"von": 116, "bis": 122, "name": "Farbvorgabe R: 000 G: 255 B: 255 W: 000", "art": "color"},
+            {"von": 123, "bis": 129, "name": "Farbvorgabe R: 000 G: 255 B: 255 W: 075", "art": "color"},
+            {"von": 130, "bis": 136, "name": "Farbvorgabe R: 000 G: 255 B: 255 W: 150", "art": "color"},
+            {"von": 137, "bis": 143, "name": "Farbvorgabe R: 000 G: 100 B: 255 W: 255", "art": "color"},
+            {"von": 144, "bis": 150, "name": "Farbvorgabe R: 000 G: 000 B: 255 W: 100", "art": "color"},
+            {"von": 151, "bis": 157, "name": "Farbvorgabe R: 000 G: 000 B: 255 W: 050", "art": "color"},
+            {"von": 158, "bis": 164, "name": "Farbvorgabe R: 000 G: 000 B: 255 W: 000", "art": "color"},
+            {"von": 165, "bis": 171, "name": "Farbvorgabe R: 075 G: 000 B: 255 W: 000", "art": "color"},
+            {"von": 172, "bis": 178, "name": "Farbvorgabe R: 160 G: 000 B: 255 W: 000", "art": "color"},
+            {"von": 179, "bis": 185, "name": "Farbvorgabe R: 255 G: 000 B: 255 W: 000", "art": "color"},
+            {"von": 186, "bis": 192, "name": "Farbvorgabe R: 255 G: 000 B: 175 W: 000", "art": "color"},
+            {"von": 193, "bis": 199, "name": "Farbvorgabe R: 255 G: 000 B: 100 W: 000", "art": "color"},
+            {"von": 200, "bis": 206, "name": "Farbvorgabe R: 255 G: 000 B: 100 W: 050", "art": "color"},
+            {"von": 207, "bis": 213, "name": "Farbvorgabe R: 255 G: 000 B: 025 W: 050", "art": "color"},
+            {"von": 214, "bis": 220, "name": "Farbvorgabe R: 255 G: 000 B: 025 W: 025", "art": "color"},
+            {"von": 221, "bis": 227, "name": "Farbvorgabe R: 255 G: 000 B: 025 W: 000", "art": "color"},
+            {"von": 228, "bis": 234, "name": "Farbvorgabe R: 000 G: 000 B: 000 W: 255", "art": "color"},
+            {"von": 235, "bis": 241, "name": "Farbvorgabe R: 075 G: 075 B: 000 W: 255", "art": "color"},
+            {"von": 242, "bis": 248, "name": "Farbvorgabe R: 000 G: 000 B: 100 W: 255", "art": "color"},
+            {"von": 249, "bis": 255, "name": "Farbvorgabe R: 255 G: 255 B: 255 W: 255", "art": "color"}
+          ]
+        },
+        {
+          "name": "Farbwechsel",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 17, "name": "Kein Farbwechsel"},
+            {"von": 18, "bis": 34, "name": "Farbwechsel (Sprung) 1"},
+            {"von": 35, "bis": 51, "name": "Farbwechsel (Sprung) 2"},
+            {"von": 52, "bis": 68, "name": "Farbwechsel (Sprung) 3"},
+            {"von": 69, "bis": 85, "name": "Farbwechsel (Sprung) 4"},
+            {"von": 86, "bis": 102, "name": "Farbwechsel (Sprung) 5"},
+            {"von": 103, "bis": 119, "name": "Farbwechsel (Sprung) 6"},
+            {"von": 120, "bis": 136, "name": "Farbwechsel (Sprung) 7"},
+            {"von": 137, "bis": 153, "name": "Farbverlauf 1"},
+            {"von": 154, "bis": 170, "name": "Farbverlauf 2"},
+            {"von": 171, "bis": 187, "name": "Farbverlauf 3"},
+            {"von": 188, "bis": 204, "name": "Farbverlauf 4"},
+            {"von": 205, "bis": 221, "name": "Farbverlauf 5"},
+            {"von": 222, "bis": 238, "name": "Farbverlauf 6"},
+            {"von": 239, "bis": 255, "name": "Farbverlauf 7"}
+          ]
+        },
+        {
+          "name": "Farbeffekt-Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Farbeffekt, schneller werdend"}
+          ]
+        },
+        {"name": "Rot LED 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen LED 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau LED 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss LED 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot LED 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen LED 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau LED 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss LED 2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Sonderfunktionen / Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Keine Funktion"},
+            {"von": 10, "bis": 14, "name": "Reset (Wert mind. 5 s halten)", "art": "reset"},
+            {"von": 15, "bis": 44, "name": "Keine Funktion"},
+            {"von": 45, "bis": 49, "name": "Luefter automatisch"},
+            {"von": 50, "bis": 54, "name": "Luefter maximal"},
+            {"von": 55, "bis": 59, "name": "Luefter minimal"},
+            {"von": 60, "bis": 64, "name": "Luefter aus"},
+            {"von": 65, "bis": 69, "name": "Dimmerkurve linear"},
+            {"von": 70, "bis": 74, "name": "Dimmerkurve quadratisch (Square Law)"},
+            {"von": 75, "bis": 79, "name": "Dimmerkurve invers quadratisch"},
+            {"von": 80, "bis": 84, "name": "Dimmerkurve S-Kurve"},
+            {"von": 85, "bis": 89, "name": "Dimmerkurve steil"},
+            {"von": 90, "bis": 94, "name": "Dimmerkurve flach"},
+            {"von": 95, "bis": 99, "name": "Pan normal"},
+            {"von": 100, "bis": 104, "name": "Pan invertiert"},
+            {"von": 105, "bis": 109, "name": "Tilt normal"},
+            {"von": 110, "bis": 114, "name": "Tilt invertiert"},
+            {"von": 115, "bis": 255, "name": "Keine Funktion"}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Wash-Moving-Head mit 12 RGBW-LEDs (8 W), 9°, Pan 540°, Tilt 220°. Die 19-Kanal-Steuerung teilt die LEDs in zwei Gruppen (LED 1/LED 2); deren raeumliche Anordnung nennt das Handbuch nicht — Raster 1x2 ist eine Annahme fuer die Darstellung. Sonderfunktionen wirken erst nach 5 s."
+}

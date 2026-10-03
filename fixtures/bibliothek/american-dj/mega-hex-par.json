@@ -1,0 +1,252 @@
+{
+  "format_version": 1,
+  "hersteller": "American DJ",
+  "hersteller_kurz": "ADJ",
+  "modell": "Mega Hex Par",
+  "kurzname": "MEGAHEXPAR",
+  "typ": "par",
+  "leistung_w": 21,
+  "quelle": {
+    "titel": "ADJ Mega HEX Par User Manual (2023)",
+    "url": "https://assets.centryngroup.com/dl/files/MEG600__DL__001.pdf",
+    "datum": "2023"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.3 GIT · Ben C",
+    "original": "resources/fixtures/American_DJ/American-DJ-Mega-Hex-Par.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 87 Wertebereiche mit Art (kind) versehen; danach von LightOS gegen das Herstellerhandbuch ueberarbeitet: Dimmerkurven-Kanal als raw (Default 0, Highlight 0) statt intensity/macro; Shutter-Bereiche nach Handbuch klassifiziert (aus=closed, LED an=open, alle Strobe-/Puls-/Random-/Rampen-Bereiche=strobe), Default/Highlight auf Mitte des ersten Offen-Bereichs; irrefuehrende Bereichs-Arten (color/gobo/rotate/closed) an Programm-/Makro-/Funktionskanaelen entfernt; Modus '9 Channel' entfernt (laut Handbuch nur 6/7/8/11/12 Kanaele); Programmwahl-Kanal: Bereiche ohne Farb-Art, Sound-Bereich als sound; Programm-Kanal neu benannt (16 Programme je Modus laut Handbuch); Programmgeschwindigkeit als effect_speed statt speed"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal fuer Kanal gegen die DMX-Traits im ADJ-Benutzerhandbuch (Mega HEX Par, (c)2023, S. 16-18) geprueft; nicht am Geraet getestet"
+  },
+  "modi": [
+    {
+      "name": "6 Channel",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "7 Channel",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "8 Channel",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobing",
+          "attribut": "shutter",
+          "default": 47,
+          "highlight": 47,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "LED Off", "art": "closed"},
+            {"von": 32, "bis": 63, "name": "LED on", "art": "open"},
+            {"von": 64, "bis": 95, "name": "Strobing slow - fast", "art": "strobe"},
+            {"von": 96, "bis": 127, "name": "LED on", "art": "open"},
+            {"von": 128, "bis": 159, "name": "Strobe pulse slow - fast", "art": "strobe"},
+            {"von": 160, "bis": 191, "name": "LED on", "art": "open"},
+            {"von": 192, "bis": 223, "name": "Random strobe slow - fast", "art": "strobe"},
+            {"von": 224, "bis": 255, "name": "LED on", "art": "open"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "11 Channel",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobing",
+          "attribut": "shutter",
+          "default": 47,
+          "highlight": 47,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "LED Off", "art": "closed"},
+            {"von": 32, "bis": 63, "name": "LED on", "art": "open"},
+            {"von": 64, "bis": 95, "name": "Strobing slow - fast", "art": "strobe"},
+            {"von": 96, "bis": 127, "name": "LED on", "art": "open"},
+            {"von": 128, "bis": 159, "name": "Strobe pulse slow - fast", "art": "strobe"},
+            {"von": 160, "bis": 191, "name": "LED on", "art": "open"},
+            {"von": 192, "bis": 223, "name": "Random strobe slow - fast", "art": "strobe"},
+            {"von": 224, "bis": 255, "name": "LED on", "art": "open"}
+          ]
+        },
+        {
+          "name": "Program selection mode",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 51, "name": "Dimmer-Modus (RGBWA+UV direkt)", "art": ""},
+            {"von": 52, "bis": 102, "name": "Farbmakro-Modus (CH10)", "art": ""},
+            {"von": 103, "bis": 153, "name": "Color-Change-Modus (CH10)", "art": ""},
+            {"von": 154, "bis": 204, "name": "Color-Fade-Modus (CH10)", "art": ""},
+            {"von": 205, "bis": 255, "name": "Sound-Active-Modus (CH10)", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Farbmakro / Programm (je nach CH9)",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Programm 1 (Farbmakro: siehe Handbuch)", "art": ""},
+            {"von": 16, "bis": 31, "name": "Programm 2 (Farbmakro: siehe Handbuch)", "art": ""},
+            {"von": 32, "bis": 47, "name": "Programm 3 (Farbmakro: siehe Handbuch)", "art": ""},
+            {"von": 48, "bis": 63, "name": "Programm 4 (Farbmakro: siehe Handbuch)", "art": ""},
+            {"von": 64, "bis": 79, "name": "Programm 5 (Farbmakro: siehe Handbuch)", "art": ""},
+            {"von": 80, "bis": 95, "name": "Programm 6 (Farbmakro: siehe Handbuch)", "art": ""},
+            {"von": 96, "bis": 111, "name": "Programm 7 (Farbmakro: siehe Handbuch)", "art": ""},
+            {"von": 112, "bis": 127, "name": "Programm 8 (Farbmakro: siehe Handbuch)", "art": ""},
+            {"von": 128, "bis": 143, "name": "Programm 9 (Farbmakro: siehe Handbuch)", "art": ""},
+            {"von": 144, "bis": 159, "name": "Programm 10 (Farbmakro: siehe Handbuch)", "art": ""},
+            {"von": 160, "bis": 175, "name": "Programm 11 (Farbmakro: siehe Handbuch)", "art": ""},
+            {"von": 176, "bis": 191, "name": "Programm 12 (Farbmakro: siehe Handbuch)", "art": ""},
+            {"von": 192, "bis": 207, "name": "Programm 13 (Farbmakro: siehe Handbuch)", "art": ""},
+            {"von": 208, "bis": 223, "name": "Programm 14 (Farbmakro: siehe Handbuch)", "art": ""},
+            {"von": 224, "bis": 239, "name": "Programm 15 (Farbmakro: siehe Handbuch)", "art": ""},
+            {"von": 240, "bis": 255, "name": "Programm 16 (Farbmakro: siehe Handbuch)", "art": ""}
+          ]
+        },
+        {
+          "name": "Program speed/sound sensitive",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {
+              "von": 0,
+              "bis": 255,
+              "name": "Programmgeschwindigkeit langsam-schnell / Sound-Empfindlichkeit gering-hoch",
+              "art": ""
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "12 channel",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobing",
+          "attribut": "shutter",
+          "default": 47,
+          "highlight": 47,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "LED Off", "art": "closed"},
+            {"von": 32, "bis": 63, "name": "LED on", "art": "open"},
+            {"von": 64, "bis": 95, "name": "Strobing slow - fast", "art": "strobe"},
+            {"von": 96, "bis": 127, "name": "LED on", "art": "open"},
+            {"von": 128, "bis": 159, "name": "Strobe pulse slow - fast", "art": "strobe"},
+            {"von": 160, "bis": 191, "name": "LED on", "art": "open"},
+            {"von": 192, "bis": 223, "name": "Random strobe slow - fast", "art": "strobe"},
+            {"von": 224, "bis": 255, "name": "LED on", "art": "open"}
+          ]
+        },
+        {
+          "name": "Program selection mode",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 51, "name": "Dimmer-Modus (RGBWA+UV direkt)", "art": ""},
+            {"von": 52, "bis": 102, "name": "Farbmakro-Modus (CH10)", "art": ""},
+            {"von": 103, "bis": 153, "name": "Color-Change-Modus (CH10)", "art": ""},
+            {"von": 154, "bis": 204, "name": "Color-Fade-Modus (CH10)", "art": ""},
+            {"von": 205, "bis": 255, "name": "Sound-Active-Modus (CH10)", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Farbmakro / Programm (je nach CH9)",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Programm 1 (Farbmakro: siehe Handbuch)", "art": ""},
+            {"von": 16, "bis": 31, "name": "Programm 2 (Farbmakro: siehe Handbuch)", "art": ""},
+            {"von": 32, "bis": 47, "name": "Programm 3 (Farbmakro: siehe Handbuch)", "art": ""},
+            {"von": 48, "bis": 63, "name": "Programm 4 (Farbmakro: siehe Handbuch)", "art": ""},
+            {"von": 64, "bis": 79, "name": "Programm 5 (Farbmakro: siehe Handbuch)", "art": ""},
+            {"von": 80, "bis": 95, "name": "Programm 6 (Farbmakro: siehe Handbuch)", "art": ""},
+            {"von": 96, "bis": 111, "name": "Programm 7 (Farbmakro: siehe Handbuch)", "art": ""},
+            {"von": 112, "bis": 127, "name": "Programm 8 (Farbmakro: siehe Handbuch)", "art": ""},
+            {"von": 128, "bis": 143, "name": "Programm 9 (Farbmakro: siehe Handbuch)", "art": ""},
+            {"von": 144, "bis": 159, "name": "Programm 10 (Farbmakro: siehe Handbuch)", "art": ""},
+            {"von": 160, "bis": 175, "name": "Programm 11 (Farbmakro: siehe Handbuch)", "art": ""},
+            {"von": 176, "bis": 191, "name": "Programm 12 (Farbmakro: siehe Handbuch)", "art": ""},
+            {"von": 192, "bis": 207, "name": "Programm 13 (Farbmakro: siehe Handbuch)", "art": ""},
+            {"von": 208, "bis": 223, "name": "Programm 14 (Farbmakro: siehe Handbuch)", "art": ""},
+            {"von": 224, "bis": 239, "name": "Programm 15 (Farbmakro: siehe Handbuch)", "art": ""},
+            {"von": 240, "bis": 255, "name": "Programm 16 (Farbmakro: siehe Handbuch)", "art": ""}
+          ]
+        },
+        {
+          "name": "Program speed/sound sensitive",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {
+              "von": 0,
+              "bis": 255,
+              "name": "Programmgeschwindigkeit langsam-schnell / Sound-Empfindlichkeit gering-hoch",
+              "art": ""
+            }
+          ]
+        },
+        {
+          "name": "Dimmer curves",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 20, "name": "Standard", "art": ""},
+            {"von": 21, "bis": 40, "name": "Stage", "art": ""},
+            {"von": 41, "bis": 60, "name": "TV", "art": ""},
+            {"von": 61, "bis": 80, "name": "Architectural", "art": ""},
+            {"von": 81, "bis": 100, "name": "Theatre", "art": ""},
+            {"von": 101, "bis": 255, "name": "Default to unit setting", "art": ""}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "5x 6 W RGBWA+UV. Im 11-/12-Kanal-Modus waehlt CH9, was CH10/CH11 tun (Dimmer, Farbmakro, Color Change, Color Fade, Sound)."
+}

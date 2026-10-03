@@ -25,10 +25,15 @@ der Sektionsleiste. Die Abläufe gelten weiter.
 
 | Anleitung | Worum geht's | Show |
 |---|---|---|
-| [Erste Schritte](anleitung_erste_schritte/ANLEITUNG.md) | Hauptfenster und die acht Sektionen, neue Show anlegen, ein Gerät patchen, erster Wert im Programmer, speichern und öffnen. | Keine Show nötig |
+| [Erste Schritte](anleitung_erste_schritte/ANLEITUNG.md) · [English](anleitung_erste_schritte/ANLEITUNG.en.md) | Hauptfenster und die acht Sektionen, neue Show anlegen, ein Gerät patchen, erster Wert im Programmer, speichern und öffnen. | Keine Show nötig |
 | [Ausgabe einrichten: ENTTEC, Art-Net, sACN](anleitung_ausgabe_einrichten/ANLEITUNG.md) | Dialog **Ausgabe → Konfigurieren...**: ENTTEC USB Pro, Art-Net, sACN, Universen verwalten, Kontrolle im Output- und DMX-Monitor, Warnungen verstehen. | Keine Show nötig |
+| [Programmer-Grundlagen](anleitung_programmer_grundlagen/ANLEITUNG.md) · [English](anleitung_programmer_grundlagen/ANLEITUNG.en.md) | Geräte und Gruppen wählen, Reiter Intensity/Color/Position/Paletten, Hervorheben/Abdunkeln, Farb-, Positions- und Fächer-Werkzeug, Löschen und Rückgängig. | Übungs-Rig aus Generic-Profilen, Tabelle zum Nachbauen in der Anleitung |
+| [Erste Schritte](anleitung_erste_schritte/ANLEITUNG.md) | Hauptfenster und die acht Sektionen, neue Show anlegen, ein Gerät patchen, erster Wert im Programmer, speichern und öffnen. | Keine Show nötig |
+| [Ausgabe einrichten: ENTTEC, Art-Net, sACN](anleitung_ausgabe_einrichten/ANLEITUNG.md) · [English](anleitung_ausgabe_einrichten/ANLEITUNG.en.md) | Dialog **Ausgabe → Konfigurieren...**: ENTTEC USB Pro, Art-Net, sACN, Universen verwalten, Kontrolle im Output- und DMX-Monitor, Warnungen verstehen. | Keine Show nötig |
 | [Programmer-Grundlagen](anleitung_programmer_grundlagen/ANLEITUNG.md) | Geräte und Gruppen wählen, Reiter Intensity/Color/Position/Paletten, Hervorheben/Abdunkeln, Farb-, Positions- und Fächer-Werkzeug, Löschen und Rückgängig. | Übungs-Rig aus Generic-Profilen, Tabelle zum Nachbauen in der Anleitung |
 | [Szenen, Snaps & Cue-Listen](anleitung_szenen_cues/ANLEITUNG.md) | Programmer-Stand als Snap, Snapshot oder Szene speichern und abrufen, Preset-Browser, Cue-Liste aufnehmen, auf einen Executor legen, mit GO abfahren und aus der Virtual Console auslösen. | Eigene Show mit Geräten und Gruppen; die Bilder zeigen das Übungs-Rig der Programmer-Grundlagen |
+| [Programmer-Grundlagen](anleitung_programmer_grundlagen/ANLEITUNG.md) | Geräte und Gruppen wählen, Reiter Intensity/Color/Position/Paletten, Hervorheben/Abdunkeln, Farb-, Positions- und Fächer-Werkzeug, Löschen und Rückgängig. | Übungs-Rig aus Generic-Profilen, Tabelle zum Nachbauen in der Anleitung |
+| [Szenen, Snaps & Cue-Listen](anleitung_szenen_cues/ANLEITUNG.md) · [English](anleitung_szenen_cues/ANLEITUNG.en.md) | Programmer-Stand als Snap, Snapshot oder Szene speichern und abrufen, Preset-Browser, Cue-Liste aufnehmen, auf einen Executor legen, mit GO abfahren und aus der Virtual Console auslösen. | Eigene Show mit Geräten und Gruppen; die Bilder zeigen das Übungs-Rig der Programmer-Grundlagen |
 | [Komplettshow von Grund auf](anleitung_komplettshow_2026/ANLEITUNGEN.md) | Acht Kapitel von der neuen Show über Geräte, 3D-Positionen, Gruppen, Farbe, Matrix, Bewegung bis zur Virtual Console. | Die Anleitung baut die Show selbst auf; die fertige Show liegt nicht im Repo |
 | [Lichtshow-Tutorial: Matrix, Chase, Moving-Head-EFX, VC](tutorial_matrix/TUTORIAL_LICHTSHOW.md) | Ein kompletter Durchlauf mit vielen Bildern und GIFs. | Generator `build_tutorial_matrix_show.py` → `Tutorial_Matrix.lshow` |
 
@@ -73,7 +78,7 @@ frei kombinieren; das Tempo aller Ebenen hängt an Tempo-Buses (siehe
 | Anleitung | Worum geht's | Show |
 |---|---|---|
 | [Virtual Console bauen & designen](anleitung_vc/ANLEITUNG_VC.md) | Eigene Bedienoberfläche: Bänke, Tasten, Fader, Labels, Strobe. | Beispiel-Show nicht im Repo |
-| [VC-Widget-Referenz](anleitung_vc_widgets/README.md) | Eine Seite je Element (Taste, Fader, XY-Pad, Encoder, Matrix-Editor …): Einstellungen, Dialogfelder, Fallstricke. | Generator `build_vc_widgets_showcase.py` → `VC_Widgets_Showcase.lshow` |
+| [VC-Widget-Referenz](anleitung_vc_widgets/README.md) · [English](anleitung_vc_widgets/README.en.md) | Eine Seite je Element (Taste, Fader, XY-Pad, Encoder, Matrix-Editor …): Einstellungen, Dialogfelder, Fallstricke. | Generator `build_vc_widgets_showcase.py` → `VC_Widgets_Showcase.lshow` |
 | [Alle VC-Elemente im Überblick](anleitung_vc_elemente/ANLEITUNG_VC_ELEMENTE.md) | Kurzreferenz aller Bau-Elemente und der Baukasten-Knöpfe. | Generator `build_vc_elements_showcase.py` → `VC_Elemente_Showcase.lshow` |
 | [Effekte einfach aufbauen](anleitung_vc_smartbuild/ANLEITUNG.md) | Effekte per Drag & Drop auf die VC legen und einrichten. | Generator `build_farb_fx_vc_show.py` → `Farb_FX_VC_Show.lshow` |
 | [VC live bearbeiten](anleitung_vc_workflow/ANLEITUNG_VC_WORKFLOW.md) | Elemente löschen und hinzufügen, Effekt an einen Schalter binden, Geschwindigkeit, Submaster, speichern. | Generator `build_event_demo_2026.py` |
@@ -86,7 +91,7 @@ frei kombinieren; das Tempo aller Ebenen hängt an Tempo-Buses (siehe
 
 | Anleitung | Worum geht's | Show |
 |---|---|---|
-| [BPM-Manager](anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md) | Quelle wählen, Zustandswort, Pegel und Statuszeile lesen, TAP, Auto/Manuell, „Erweitert“, Hilfe wenn nichts erkannt wird, „Eingang 30 s aufnehmen“. | Keine Show nötig |
+| [BPM-Manager](anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md) · [English](anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.en.md) | Quelle wählen, Zustandswort, Pegel und Statuszeile lesen, TAP, Auto/Manuell, „Erweitert“, Hilfe wenn nichts erkannt wird, „Eingang 30 s aufnehmen“. | Keine Show nötig |
 | [BPM-Generator — ganzes Lied analysieren](anleitung_bpm_generator/ANLEITUNG_BPM_GENERATOR.md) | Lied analysieren, BPM-Verlauf und Beatgrid prüfen, im Player als BPM-Quelle nutzen. | Keine Show nötig |
 | [Tempo & Synchronisierung — Gesamtüberblick](ANLEITUNG_TEMPO_SYNC.md) | BPM, Tempo-Buses, Multiplikatoren, „Taktgleich“, Auto-Sync — das Gedankenmodell mit Rezepten. | Keine Show nötig |
 | [Tempo-Controller](anleitung_tempo_controller/ANLEITUNG_TEMPO_CONTROLLER.md) | Das All-in-One-Tempo-Element der VC: Bus, Quelle, Faktor und mitlaufende Effekte. | Keine Show nötig |

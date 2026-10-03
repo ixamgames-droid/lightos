@@ -26,6 +26,7 @@
 | `backlog_ids.py` | Naechste freie Backlog-ID — ueber ALLE Zweige, nicht nur den eigenen. |
 | `backlog_status_drift.py` | QA-64 — misst, ob der Status im BACKLOG.md noch zum CODE auf `main` passt. |
 | `benchmark_universes.py` | T-8 / RM-Benchmark — Render-Performance fuer mehrere Universen. |
+| `bibliothek_profil.py` | FM-56: Werkzeug fuer die eigene Geraete-Bibliothek (LightOS-Profile). |
 | `build_apc_test_show.py` | KOMPLETTE Test-/Demo-Show fuer Davids reale Hardware: |
 | `build_demo_rgb_par.py` | Demo-Show "Demo RGB PAR" — 4x RGB-PAR mit einer 4-Cue-Cueliste. |
 | `build_demo_show_full.py` | DEMO SHOW FULL — komplette, nach ZWECK organisierte Show auf Davids realem Rig. |
@@ -72,7 +73,7 @@
 | `hw5_longrun.py` | HW-5 — Enttec-Ausgang im Langzeitbetrieb (>8 h) messen. |
 | `import_qlc_input_profile.py` | CLI-Wrapper: QLC+-Inputprofil (.qxi) → LightOS-Controller-Profil (JSON). |
 | `janitor.py` | Worktree-, Branch- und Artefakt-Hygiene fuer den LightOS-Loop (report-first). |
-| `library_testreste.py` | Findet (und entfernt auf Wunsch) Test-Rueckstaende in der Fixture-Bibliothek; meldet doppelte Builtin-Profile (QA-68, nur Anzeige). |
+| `library_testreste.py` | Findet (und entfernt auf Wunsch) Test-Rueckstaende in der Fixture-Bibliothek. |
 | `lint_show.py` | CLI: prüft eine oder mehrere .lshow (oder show.json) gegen die echten |
 | `linux_audio_input_guard.sh` | Haelt auf Linux-Systemen mit zwei Realtek-Mikrofonbuchsen den Capture-MUX auf |
 | `mh_einmessen.py` | VIZ-60 — Moving Heads am echten Rig einmessen, ohne KI und ohne Rechnerei. |
@@ -82,6 +83,7 @@
 | `pseudonymisieren.py` | pseudonymisieren.py — Klarnamen im OEFFENTLICHEN Repo durch ein Pseudonym ersetzen. |
 | `render_apc_pages.py` | Rendert jede Seite (VC-Bank) der APC-Test-Show als PNG — fuer die Anleitung. |
 | `render_neue_demo_pages.py` | Rendert die 5 Banks der Neue_Demo_2026-Show als PNG (für die Doku/Vorschau). |
+| `qt_module_befund.py` | XPLAT-45 — welche Qt-Module (v. a. QtWebEngine) bringt das installierte PySide6 mit? |
 | `session_claim.py` | session_claim.py — Belegzettel fuer parallel arbeitende Claude-Sitzungen. |
 | `ui_verification_checklist.py` | QA-12 UI-Verifikations-Checklisten-Generator/-Checker. |
 | `upgrade_shows.py` | Alt-Shows auf das aktuelle Show-Format (``show_file.SHOW_VERSION``) heben. |

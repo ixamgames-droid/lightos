@@ -1,0 +1,71 @@
+{
+  "format_version": 1,
+  "hersteller": "Showtec",
+  "hersteller_kurz": "Showtec",
+  "modell": "LED Blinder 2 COB",
+  "kurzname": "BLINDER2COB",
+  "typ": "led_bar",
+  "leistung_w": 110,
+  "notizen": "2 x 50 W COB, Warmweiss. Ohne Handbuch nachbearbeitet.",
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Showtec-LED-Blinder-2-COB.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Showtec/Showtec-LED-Blinder-2-COB.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.14.2 GIT · Bram Janssen",
+    "original": "resources/fixtures/Showtec/Showtec-LED-Blinder-2-COB.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 8 Wertebereiche mit Art (kind) versehen; Rasterform in 4 Modus/Modi aus <Physical> uebernommen; LightOS-Nachbearbeitung (FM-57): kurzname BLINDER2COB; typ led_bar statt dimmer (zwei einzeln steuerbare COB-Zellen); Raster 1x2 in Modi mit Einzelzellen, 1x1 im 1-Kanal-Modus; Strobe-Default 0, Bereich 0-15 als offen; Kanalnamen deutsch, nichtssagende Bereiche entfernt"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "aus QLC+ konvertiert und von LightOS nach Kanalnamen/Bereichen nachbearbeitet; kein Herstellerhandbuch verfuegbar (Hersteller-Website hinter Bot-Sperre) — nicht Kanal fuer Kanal gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "1 Channel",
+      "raster": {"rows": 1, "cols": 1},
+      "kanaele": [
+        {"name": "Dimmer intensity", "attribut": "intensity", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "2 Channel",
+      "raster": {"rows": 1, "cols": 2},
+      "kanaele": [
+        {"name": "Dimmer links", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Dimmer rechts", "attribut": "intensity", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "3 Channel",
+      "raster": {"rows": 1, "cols": 2},
+      "kanaele": [
+        {"name": "Dimmer links", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Dimmer rechts", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "4 Channel",
+      "raster": {"rows": 1, "cols": 2},
+      "kanaele": [
+        {"name": "Dimmer links", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Dimmer rechts", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 16, "bis": 255, "name": "Strobe langsam -> schnell", "art": "strobe"}
+          ]
+        },
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255}
+      ]
+    }
+  ]
+}

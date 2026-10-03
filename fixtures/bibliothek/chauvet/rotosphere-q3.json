@@ -1,0 +1,306 @@
+{
+  "format_version": 1,
+  "hersteller": "Chauvet",
+  "hersteller_kurz": "CHAUVET",
+  "modell": "Rotosphere Q3",
+  "kurzname": "Rotosphere Q3",
+  "typ": "other",
+  "leistung_w": 44,
+  "quelle": {
+    "titel": "Rotosphere Q3 User Manual",
+    "version": "Rev. 2",
+    "url": "https://www.chauvetdj.com/wp-content/uploads/2016/12/Rotosphere_Q3_UM_Rev2_WO.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.3 GIT · Eric Sherlock, Massimo Callegari",
+    "original": "resources/fixtures/Chauvet/Chauvet-Rotosphere-Q3.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 125 Wertebereiche mit Art (kind) versehen; danach von LightOS gegen das Herstellerhandbuch (Rotosphere Q3 User Manual) Kanal fuer Kanal ueberarbeitet: Typ other statt moving_head (rotierende LED-Spiegelkugel ohne Pan/Tilt); Motorkanaele als speed mit Default 0 (Stop) statt pan mit Default 128; Strobe-Kanaele nach Handbuch: 000 kein Strobe (open), 001-250 Strobe, 251-255 Sound-Strobe; im 19-Kanal-Modus shutter statt speed; Farbmakros: alle festen Farbbelegungen als color, Programme ohne Art sound; Programmgeschwindigkeit als effect_speed; Rasterform 1x3 (3 Zonen) im 19-Kanal-Modus ergaenzt; Leistung nach Handbuch (44 W bei 230 V); Kanalnamen und Bereichsnamen auf Deutsch; Default/Highlight nach LightOS-Regeln (Pan/Tilt 128, Dimmer 0, Shutter offen)"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanalbelegung, Wertebereiche und Modi aller DMX-Modi Kanal fuer Kanal gegen das Herstellerhandbuch geprueft (nicht am echten Geraet)"
+  },
+  "modi": [
+    {
+      "name": "19 channel",
+      "raster": {"rows": 1, "cols": 3},
+      "kanaele": [
+        {"name": "Rot 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe 1",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Kein Strobe", "art": "open"},
+            {"von": 1, "bis": 250, "name": "Strobe langsam -> schnell", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Sound-Strobe", "art": "sound"}
+          ]
+        },
+        {"name": "Rot 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss 2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe 2",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Kein Strobe", "art": "open"},
+            {"von": 1, "bis": 250, "name": "Strobe langsam -> schnell", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Sound-Strobe", "art": "sound"}
+          ]
+        },
+        {"name": "Rot 3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss 3", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe 3",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Kein Strobe", "art": "open"},
+            {"von": 1, "bis": 250, "name": "Strobe langsam -> schnell", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Sound-Strobe", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Motor (bei CH17 000-005)",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Stop", "art": ""},
+            {"von": 1, "bis": 127, "name": "Linksdrehung langsam -> schnell", "art": "rotate"},
+            {"von": 128, "bis": 128, "name": "Stop", "art": ""},
+            {"von": 129, "bis": 255, "name": "Rechtsdrehung langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Farbmakros / Programme",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Blackout (Motor ueber CH16 bzw. CH6)", "art": "closed"},
+            {"von": 6, "bis": 13, "name": "Rot", "art": "color"},
+            {"von": 14, "bis": 22, "name": "Gruen", "art": "color"},
+            {"von": 23, "bis": 31, "name": "Blau", "art": "color"},
+            {"von": 32, "bis": 40, "name": "Weiss", "art": "color"},
+            {"von": 41, "bis": 49, "name": "Zonen Rot/Gruen/Blau", "art": "color"},
+            {"von": 50, "bis": 58, "name": "Zonen Rot/Gruen/Weiss", "art": "color"},
+            {"von": 59, "bis": 67, "name": "Zonen Rot/Blau/Weiss", "art": "color"},
+            {"von": 68, "bis": 76, "name": "Zonen Gruen/Blau/Weiss", "art": "color"},
+            {"von": 77, "bis": 85, "name": "Zonen RG/RB/RW", "art": "color"},
+            {"von": 86, "bis": 94, "name": "Zonen GR/GB/GW", "art": "color"},
+            {"von": 95, "bis": 103, "name": "Zonen BR/BG/BW", "art": "color"},
+            {"von": 104, "bis": 112, "name": "Zonen WR/WG/BW", "art": "color"},
+            {"von": 113, "bis": 121, "name": "Rot + Gruen", "art": "color"},
+            {"von": 122, "bis": 130, "name": "Rot + Blau", "art": "color"},
+            {"von": 131, "bis": 139, "name": "Rot + Weiss", "art": "color"},
+            {"von": 140, "bis": 148, "name": "Gruen + Blau", "art": "color"},
+            {"von": 149, "bis": 157, "name": "Gruen + Weiss", "art": "color"},
+            {"von": 158, "bis": 166, "name": "Blau + Weiss", "art": "color"},
+            {"von": 167, "bis": 175, "name": "Rot + Gruen + Blau", "art": "color"},
+            {"von": 176, "bis": 184, "name": "Rot + Gruen + Weiss", "art": "color"},
+            {"von": 185, "bis": 193, "name": "Gruen + Blau + Weiss", "art": "color"},
+            {"von": 194, "bis": 202, "name": "Zonen RGB/GBW/RGW", "art": "color"},
+            {"von": 203, "bis": 211, "name": "RGBW", "art": "color"},
+            {"von": 212, "bis": 220, "name": "Programm 1 / Sound 1", "art": ""},
+            {"von": 221, "bis": 229, "name": "Programm 2 / Sound 2", "art": ""},
+            {"von": 230, "bis": 238, "name": "Programm 3 / Sound 3", "art": ""},
+            {"von": 239, "bis": 247, "name": "Programm 4 / Sound 3", "art": ""},
+            {"von": 248, "bis": 255, "name": "Programm 5 / Sound 3", "art": ""}
+          ]
+        },
+        {
+          "name": "Programmgeschwindigkeit",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 250, "name": "Programmgeschwindigkeit langsam -> schnell", "art": ""},
+            {"von": 251, "bis": 255, "name": "Sound-Modus", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Motor (bei CH17 006-255)",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Stop", "art": ""},
+            {"von": 1, "bis": 127, "name": "Linksdrehung langsam -> schnell", "art": "rotate"},
+            {"von": 128, "bis": 128, "name": "Stop", "art": ""},
+            {"von": 129, "bis": 255, "name": "Rechtsdrehung langsam -> schnell", "art": "rotate"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "9 channel",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Kein Strobe", "art": "open"},
+            {"von": 1, "bis": 250, "name": "Strobe langsam -> schnell", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Sound-Strobe", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Motor (bei CH7 000-005)",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Stop", "art": ""},
+            {"von": 1, "bis": 127, "name": "Linksdrehung langsam -> schnell", "art": "rotate"},
+            {"von": 128, "bis": 128, "name": "Stop", "art": ""},
+            {"von": 129, "bis": 255, "name": "Rechtsdrehung langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Farbmakros / Programme",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Blackout (Motor ueber CH16 bzw. CH6)", "art": "closed"},
+            {"von": 6, "bis": 13, "name": "Rot", "art": "color"},
+            {"von": 14, "bis": 22, "name": "Gruen", "art": "color"},
+            {"von": 23, "bis": 31, "name": "Blau", "art": "color"},
+            {"von": 32, "bis": 40, "name": "Weiss", "art": "color"},
+            {"von": 41, "bis": 49, "name": "Zonen Rot/Gruen/Blau", "art": "color"},
+            {"von": 50, "bis": 58, "name": "Zonen Rot/Gruen/Weiss", "art": "color"},
+            {"von": 59, "bis": 67, "name": "Zonen Rot/Blau/Weiss", "art": "color"},
+            {"von": 68, "bis": 76, "name": "Zonen Gruen/Blau/Weiss", "art": "color"},
+            {"von": 77, "bis": 85, "name": "Zonen RG/RB/RW", "art": "color"},
+            {"von": 86, "bis": 94, "name": "Zonen GR/GB/GW", "art": "color"},
+            {"von": 95, "bis": 103, "name": "Zonen BR/BG/BW", "art": "color"},
+            {"von": 104, "bis": 112, "name": "Zonen WR/WG/BW", "art": "color"},
+            {"von": 113, "bis": 121, "name": "Rot + Gruen", "art": "color"},
+            {"von": 122, "bis": 130, "name": "Rot + Blau", "art": "color"},
+            {"von": 131, "bis": 139, "name": "Rot + Weiss", "art": "color"},
+            {"von": 140, "bis": 148, "name": "Gruen + Blau", "art": "color"},
+            {"von": 149, "bis": 157, "name": "Gruen + Weiss", "art": "color"},
+            {"von": 158, "bis": 166, "name": "Blau + Weiss", "art": "color"},
+            {"von": 167, "bis": 175, "name": "Rot + Gruen + Blau", "art": "color"},
+            {"von": 176, "bis": 184, "name": "Rot + Gruen + Weiss", "art": "color"},
+            {"von": 185, "bis": 193, "name": "Gruen + Blau + Weiss", "art": "color"},
+            {"von": 194, "bis": 202, "name": "Zonen RGB/GBW/RGW", "art": "color"},
+            {"von": 203, "bis": 211, "name": "RGBW", "art": "color"},
+            {"von": 212, "bis": 220, "name": "Programm 1 / Sound 1", "art": ""},
+            {"von": 221, "bis": 229, "name": "Programm 2 / Sound 2", "art": ""},
+            {"von": 230, "bis": 238, "name": "Programm 3 / Sound 3", "art": ""},
+            {"von": 239, "bis": 247, "name": "Programm 4 / Sound 3", "art": ""},
+            {"von": 248, "bis": 255, "name": "Programm 5 / Sound 3", "art": ""}
+          ]
+        },
+        {
+          "name": "Programmgeschwindigkeit",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 250, "name": "Programmgeschwindigkeit langsam -> schnell", "art": ""},
+            {"von": 251, "bis": 255, "name": "Sound-Modus", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Motor (bei CH7 006-255)",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Stop", "art": ""},
+            {"von": 1, "bis": 127, "name": "Linksdrehung langsam -> schnell", "art": "rotate"},
+            {"von": 128, "bis": 128, "name": "Stop", "art": ""},
+            {"von": 129, "bis": 255, "name": "Rechtsdrehung langsam -> schnell", "art": "rotate"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3 channel",
+      "kanaele": [
+        {
+          "name": "Farbmakros / Programme",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Blackout (Motor ueber CH16 bzw. CH6)", "art": "closed"},
+            {"von": 6, "bis": 13, "name": "Rot", "art": "color"},
+            {"von": 14, "bis": 22, "name": "Gruen", "art": "color"},
+            {"von": 23, "bis": 31, "name": "Blau", "art": "color"},
+            {"von": 32, "bis": 40, "name": "Weiss", "art": "color"},
+            {"von": 41, "bis": 49, "name": "Zonen Rot/Gruen/Blau", "art": "color"},
+            {"von": 50, "bis": 58, "name": "Zonen Rot/Gruen/Weiss", "art": "color"},
+            {"von": 59, "bis": 67, "name": "Zonen Rot/Blau/Weiss", "art": "color"},
+            {"von": 68, "bis": 76, "name": "Zonen Gruen/Blau/Weiss", "art": "color"},
+            {"von": 77, "bis": 85, "name": "Zonen RG/RB/RW", "art": "color"},
+            {"von": 86, "bis": 94, "name": "Zonen GR/GB/GW", "art": "color"},
+            {"von": 95, "bis": 103, "name": "Zonen BR/BG/BW", "art": "color"},
+            {"von": 104, "bis": 112, "name": "Zonen WR/WG/BW", "art": "color"},
+            {"von": 113, "bis": 121, "name": "Rot + Gruen", "art": "color"},
+            {"von": 122, "bis": 130, "name": "Rot + Blau", "art": "color"},
+            {"von": 131, "bis": 139, "name": "Rot + Weiss", "art": "color"},
+            {"von": 140, "bis": 148, "name": "Gruen + Blau", "art": "color"},
+            {"von": 149, "bis": 157, "name": "Gruen + Weiss", "art": "color"},
+            {"von": 158, "bis": 166, "name": "Blau + Weiss", "art": "color"},
+            {"von": 167, "bis": 175, "name": "Rot + Gruen + Blau", "art": "color"},
+            {"von": 176, "bis": 184, "name": "Rot + Gruen + Weiss", "art": "color"},
+            {"von": 185, "bis": 193, "name": "Gruen + Blau + Weiss", "art": "color"},
+            {"von": 194, "bis": 202, "name": "Zonen RGB/GBW/RGW", "art": "color"},
+            {"von": 203, "bis": 211, "name": "RGBW", "art": "color"},
+            {"von": 212, "bis": 220, "name": "Programm 1 / Sound 1", "art": ""},
+            {"von": 221, "bis": 229, "name": "Programm 2 / Sound 2", "art": ""},
+            {"von": 230, "bis": 238, "name": "Programm 3 / Sound 3", "art": ""},
+            {"von": 239, "bis": 247, "name": "Programm 4 / Sound 3", "art": ""},
+            {"von": 248, "bis": 255, "name": "Programm 5 / Sound 3", "art": ""}
+          ]
+        },
+        {
+          "name": "Programmgeschwindigkeit",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 250, "name": "Programmgeschwindigkeit langsam -> schnell", "art": ""},
+            {"von": 251, "bis": 255, "name": "Sound-Modus", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Motor",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Stop", "art": ""},
+            {"von": 1, "bis": 127, "name": "Linksdrehung langsam -> schnell", "art": "rotate"},
+            {"von": 128, "bis": 128, "name": "Stop", "art": ""},
+            {"von": 129, "bis": 255, "name": "Rechtsdrehung langsam -> schnell", "art": "rotate"}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "LED-Kugeleffekt mit 3 RGBW-Zonen und Motor. Welcher Motorkanal wirkt, haengt vom Farbmakro-Kanal ab."
+}

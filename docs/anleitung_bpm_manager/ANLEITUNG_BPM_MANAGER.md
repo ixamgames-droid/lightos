@@ -1,5 +1,7 @@
 # BPM-Manager — Anleitung
 
+> **English:** [BPM manager — guide](ANLEITUNG_BPM_MANAGER.en.md)
+
 > **Wofür?** Die Sektion **BPM** ist der Taktgeber von LightOS. Sie hört die Musik (oder
 > nimmt das Tempo von der DJ-Software, einem analysierten Lied oder deinem TAP) und liefert
 > die **Beats**, auf die alle tempo-gekoppelten Effekte laufen: Matrix, EFX, Chaser,

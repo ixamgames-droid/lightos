@@ -1,0 +1,238 @@
+{
+  "format_version": 1,
+  "hersteller": "Varytec",
+  "hersteller_kurz": "Varytec",
+  "modell": "Hero Spot 90",
+  "kurzname": "HEROSPOT90",
+  "typ": "moving_head",
+  "leistung_w": 120,
+  "quelle": {
+    "titel": "Varytec Hero Spot 90 / Hero Spot 90 WH – Bedienungsanleitung (EN)",
+    "version": "V7, Firmware V1.1",
+    "datum": "2026-02-23",
+    "url": "https://images.static-thomann.de/pics/atg/atgdata/document/manual/449224_481677_v7_en_online.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.6 GIT · Chris de Rock",
+    "original": "resources/fixtures/Varytec/Varytec-Hero-Spot-90.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 92 Wertebereiche mit Art (kind) versehen; gegen Herstellerhandbuch V7 (2026-02-23) abgeglichen; Kanal- und Bereichsnamen deutsch; Shutter-Default/Highlight 255 (offen, vorher 253 – gleiche Wirkung); zweites Goborad auf gobo_wheel2 (vorher doppelt gobo_wheel), Räder als fest/rotierend benannt; Offen-Bereiche der Räder als open, Prisma als prism; Show-/Programm-Kanäle ohne falsche gobo-Art; Kurzname, Notizen"
+  },
+  "autor": "LightOS (QXF-Konverter, nachbearbeitet FM-57)",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal für Kanal gegen die Bedienungsanleitung V7 (Kap. 7.3/7.4 DMX-Tabellen 6/16 Kanäle) geprüft; nicht am Gerät"
+  },
+  "modi": [
+    {
+      "name": "6 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Shutter",
+          "attribut": "shutter",
+          "default": 255,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Geschlossen", "art": "closed"},
+            {"von": 5, "bis": 250, "name": "Strobe, Tempo steigend (0–20 Hz)", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Offen", "art": "open"}
+          ]
+        },
+        {
+          "name": "Automatik-Shows",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Keine Funktion", "art": ""},
+            {"von": 8, "bis": 47, "name": "Automatik-Show 1", "art": ""},
+            {"von": 48, "bis": 87, "name": "Automatik-Show 2", "art": ""},
+            {"von": 88, "bis": 127, "name": "Automatik-Show 3", "art": ""},
+            {"von": 128, "bis": 167, "name": "Automatik-Show 4", "art": ""},
+            {"von": 168, "bis": 207, "name": "Automatik-Show 5", "art": ""},
+            {"von": 208, "bis": 247, "name": "Automatik-Show 6", "art": ""},
+            {"von": 248, "bis": 255, "name": "Musiksteuerung Farbe/Gobo", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Pan/Tilt-Programme",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Keine Funktion", "art": ""},
+            {"von": 8, "bis": 32, "name": "Pan/Tilt-Programm 1", "art": ""},
+            {"von": 33, "bis": 58, "name": "Pan/Tilt-Programm 2", "art": ""},
+            {"von": 59, "bis": 84, "name": "Pan/Tilt-Programm 3", "art": ""},
+            {"von": 85, "bis": 110, "name": "Pan/Tilt-Programm 4", "art": ""},
+            {"von": 111, "bis": 136, "name": "Pan/Tilt-Programm 5", "art": ""},
+            {"von": 137, "bis": 162, "name": "Pan/Tilt-Programm 6", "art": ""},
+            {"von": 163, "bis": 188, "name": "Pan/Tilt-Programm 7", "art": ""},
+            {"von": 189, "bis": 214, "name": "Pan/Tilt-Programm 8", "art": ""},
+            {"von": 215, "bis": 240, "name": "Pan/Tilt-Programm 9", "art": ""},
+            {"von": 241, "bis": 255, "name": "Musiksteuerung Pan/Tilt", "art": "sound"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "16 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fein", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fein", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt-Tempo (0 = schnell, 255 = langsam)", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Shutter",
+          "attribut": "shutter",
+          "default": 255,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Geschlossen", "art": "closed"},
+            {"von": 5, "bis": 250, "name": "Strobe, Tempo steigend (0–20 Hz)", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Offen", "art": "open"}
+          ]
+        },
+        {
+          "name": "Farbrad",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Weiß (offen)", "art": "open"},
+            {"von": 5, "bis": 13, "name": "Weiß / Rot", "art": "color"},
+            {"von": 14, "bis": 22, "name": "Rot", "art": "color"},
+            {"von": 23, "bis": 31, "name": "Rot / Orange", "art": "color"},
+            {"von": 32, "bis": 40, "name": "Orange", "art": "color"},
+            {"von": 41, "bis": 49, "name": "Orange / Grün", "art": "color"},
+            {"von": 50, "bis": 58, "name": "Grün", "art": "color"},
+            {"von": 59, "bis": 67, "name": "Grün / Blau", "art": "color"},
+            {"von": 68, "bis": 76, "name": "Blau", "art": "color"},
+            {"von": 77, "bis": 85, "name": "Blau / Gelb", "art": "color"},
+            {"von": 86, "bis": 94, "name": "Gelb", "art": "color"},
+            {"von": 95, "bis": 103, "name": "Gelb / Hellblau", "art": "color"},
+            {"von": 104, "bis": 112, "name": "Hellblau", "art": "color"},
+            {"von": 113, "bis": 121, "name": "Hellblau / Lila", "art": "color"},
+            {"von": 122, "bis": 130, "name": "Lila", "art": "color"},
+            {"von": 131, "bis": 139, "name": "Weiß (offen)", "art": "open"},
+            {"von": 140, "bis": 195, "name": "Regenbogen rechts, Tempo fallend", "art": "rotate"},
+            {"von": 196, "bis": 199, "name": "Rotation Stopp", "art": ""},
+            {"von": 200, "bis": 255, "name": "Regenbogen links, Tempo steigend", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Goborad 1 (fest)",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Offen", "art": "open"},
+            {"von": 6, "bis": 21, "name": "Festes Gobo 1", "art": "gobo"},
+            {"von": 22, "bis": 37, "name": "Festes Gobo 2", "art": "gobo"},
+            {"von": 38, "bis": 53, "name": "Festes Gobo 3", "art": "gobo"},
+            {"von": 54, "bis": 69, "name": "Festes Gobo 4", "art": "gobo"},
+            {"von": 70, "bis": 85, "name": "Festes Gobo 5", "art": "gobo"},
+            {"von": 86, "bis": 101, "name": "Festes Gobo 6", "art": "gobo"},
+            {"von": 102, "bis": 117, "name": "Festes Gobo 7", "art": "gobo"},
+            {"von": 118, "bis": 133, "name": "Festes Gobo 8", "art": "gobo"},
+            {"von": 134, "bis": 194, "name": "Goborad-Durchlauf rechts, Tempo fallend", "art": "rotate"},
+            {"von": 195, "bis": 255, "name": "Goborad-Durchlauf links, Tempo steigend", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Goborad 2 (rotierend)",
+          "attribut": "gobo_wheel2",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Offen", "art": "open"},
+            {"von": 8, "bis": 28, "name": "Rotierendes Gobo 1", "art": "gobo"},
+            {"von": 29, "bis": 49, "name": "Rotierendes Gobo 2", "art": "gobo"},
+            {"von": 50, "bis": 70, "name": "Rotierendes Gobo 3", "art": "gobo"},
+            {"von": 71, "bis": 91, "name": "Rotierendes Gobo 4", "art": "gobo"},
+            {"von": 92, "bis": 112, "name": "Rotierendes Gobo 5", "art": "gobo"},
+            {"von": 113, "bis": 133, "name": "Rotierendes Gobo 6", "art": "gobo"},
+            {"von": 134, "bis": 194, "name": "Goborad-Durchlauf rechts, Tempo fallend", "art": "rotate"},
+            {"von": 195, "bis": 255, "name": "Goborad-Durchlauf links, Tempo steigend", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo-Rotation (Rad 2)",
+          "attribut": "gobo_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Stopp", "art": ""},
+            {"von": 10, "bis": 129, "name": "Rotation rechts, Tempo fallend", "art": "rotate"},
+            {"von": 130, "bis": 134, "name": "Stopp", "art": ""},
+            {"von": 135, "bis": 255, "name": "Rotation links, Tempo steigend", "art": "rotate"}
+          ]
+        },
+        {"name": "Fokus", "attribut": "focus", "default": 0, "highlight": 0},
+        {
+          "name": "Prisma",
+          "attribut": "prism",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Offen (kein Prisma)", "art": ""},
+            {"von": 8, "bis": 134, "name": "Prisma", "art": "prism"},
+            {"von": 135, "bis": 255, "name": "Prisma, Rotation rechts, Tempo steigend", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Automatik-Shows",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Keine Funktion", "art": ""},
+            {"von": 8, "bis": 47, "name": "Automatik-Show 1", "art": ""},
+            {"von": 48, "bis": 87, "name": "Automatik-Show 2", "art": ""},
+            {"von": 88, "bis": 127, "name": "Automatik-Show 3", "art": ""},
+            {"von": 128, "bis": 167, "name": "Automatik-Show 4", "art": ""},
+            {"von": 168, "bis": 207, "name": "Automatik-Show 5", "art": ""},
+            {"von": 208, "bis": 247, "name": "Automatik-Show 6", "art": ""},
+            {"von": 248, "bis": 255, "name": "Musiksteuerung Farbe/Gobo", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Pan/Tilt-Programme",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Keine Funktion", "art": ""},
+            {"von": 8, "bis": 32, "name": "Pan/Tilt-Programm 1", "art": ""},
+            {"von": 33, "bis": 58, "name": "Pan/Tilt-Programm 2", "art": ""},
+            {"von": 59, "bis": 84, "name": "Pan/Tilt-Programm 3", "art": ""},
+            {"von": 85, "bis": 110, "name": "Pan/Tilt-Programm 4", "art": ""},
+            {"von": 111, "bis": 136, "name": "Pan/Tilt-Programm 5", "art": ""},
+            {"von": 137, "bis": 162, "name": "Pan/Tilt-Programm 6", "art": ""},
+            {"von": 163, "bis": 188, "name": "Pan/Tilt-Programm 7", "art": ""},
+            {"von": 189, "bis": 214, "name": "Pan/Tilt-Programm 8", "art": ""},
+            {"von": 215, "bis": 240, "name": "Pan/Tilt-Programm 9", "art": ""},
+            {"von": 241, "bis": 255, "name": "Musiksteuerung Pan/Tilt", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 249, "name": "Keine Funktion", "art": ""},
+            {"von": 250, "bis": 255, "name": "Reset (10 s halten)", "art": "reset"}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "90-W-LED-Spot, Farbrad 7 Farben + Halbtöne, festes Goborad (8) + rotierendes Goborad (6), Prisma, Fokus. Shutter 0–4 = geschlossen, 251–255 = offen."
+}

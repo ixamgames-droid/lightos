@@ -9,11 +9,16 @@
 
 ## 1. EFX anlegen & an die Geräte binden
 
-Programmer → Tab **EFX** → **+ Neu**. Der eingebettete EFX **folgt der Programmer-Auswahl LIVE**:
-Sobald du eine Gruppe bzw. Geräte auswählst (z. B. **Moving Heads (2)** bzw. **Alle Mover**), bindet
-sich der gerade angezeigte EFX automatisch an genau diese Geräte. Die Reihenfolge ist dabei egal —
-ob du zuerst die **Gruppe wählst** und dann **+ Neu** drückst oder umgekehrt: Der EFX übernimmt die
-aktuelle Auswahl in jedem Fall sofort.
+Programmer → links unter **Gruppen** die Gruppe wählen (z. B. **Moving Heads (2)** bzw. **Alle
+Mover**). Der Gruppen-Klick springt in den Reiter **Matrix** — wechsle danach selbst in den Reiter
+**EFX** (er erscheint nur, wenn die Auswahl Geräte mit Pan/Tilt enthält) und drücke **+ Neu**. Der
+eingebettete EFX **folgt der Programmer-Auswahl LIVE**: der gerade angezeigte EFX bindet sich
+sofort an genau die ausgewählten Geräte.
+
+**Wichtig — Speichern:** Ein neuer EFX ist zunächst ein **Entwurf** (in der Liste mit **●**
+markiert). Erst **💾 Speichern** macht ihn dauerhaft und bindet ihn an die aktive Gruppe. Einen
+ungespeicherten Entwurf verwirft LightOS ohne Rückfrage, sobald du einen anderen Effekt anklickst,
+eine Gruppe anklickst (Sprung in den Reiter Matrix) oder den Reiter bzw. die Ansicht wechselst.
 
 Dass der EFX der Auswahl folgt, siehst du an der Geräte-Box im Editor: Sie heißt dynamisch
 **„Geräte (folgen der Auswahl)"** und zeigt bei aktiver Auswahl z. B. **„Geräte: 2 Gerät(e)
@@ -26,25 +31,32 @@ In der Gruppe **Form & Geometrie** stellst du ein:
   *Diamond* (Raute), *Square* (Quadrat), *Trapez*, *Lissajous*, *Random* (Zufall), *Triangle*
   (Dreieck) sowie *Custom Path* für eigene, aufgezeichnete Bahnen.
 - **Breite (Pan-Hub)** / **Höhe (Tilt-Hub):** wie weit die Bewegung ausschlägt (0–255, DMX-Wert).
-- **Geschwindigkeit (Hz)** (Tempo) und **Richtung** (in der Gruppe *Tempo & Richtung*).
+- **Geschwindigkeit (Hz)** (Tempo, siehe Abschnitt 4) und **Richtung** (in der Gruppe *Tempo &
+  Richtung*).
+
+Sind **nur Spider** ausgewählt, ersetzt der Editor *Form & Geometrie* durch **Bewegungsmuster
+(Spider)** (Wippe, Welle, Zacken, Flackern, Puls) mit **Schwung (Tilt-Hub)**, **Mitte (Tilt)** und
+**Welle (Versatz)**.
 
 ![EFX-Editor (Algorithmus Circle, Pan/Tilt-Hub)](img/01_efx_editor.png)
 
-> Merke: Immer der **gerade angezeigte** Effekt bindet sich an die aktuelle Auswahl, und zwar
-> sofort. Willst du einen *anderen* Effekt an eine andere Gruppe binden, **erst diesen Effekt in der
-> Liste auswählen** (dann ist er der angezeigte) und die gewünschten Geräte markieren — der Effekt
-> übernimmt die Auswahl umgehend.
+> Merke: Im Programmer zeigt die EFX-Liste nur die Effekte der **aktiven Gruppe**; ein
+> gespeicherter Effekt gehört zu der Gruppe, die beim **💾 Speichern** aktiv war. Der gerade
+> angezeigte Effekt übernimmt sofort die aktuelle Auswahl — einen Effekt anklicken und Geräte
+> markieren heißt also, ihn an diese Geräte zu binden.
 
 ## 2. Die Köpfe „aufmachen" — „Dimmer/Shutter mit öffnen"
 
 Moving Heads haben Shutter + Dimmer. Läuft nur die Bewegung, bleiben sie oft **dunkel**. Lösung:
 in der Gruppe **„Sichtbarkeit & Sonstiges"**, Zeile **„Sichtbarkeit:"**, die Checkbox
 **„Dimmer/Shutter mit öffnen" AN** — dann öffnet der EFX bei Bewegung **Shutter + Dimmer**
-automatisch (setzt sie auf offen/voll). Erst dann sieht man die bewegten Strahlen.
+automatisch (Dimmer auf voll). Erst dann sieht man die bewegten Strahlen. Den **Shutter** öffnet
+er nur, wenn das Geräteprofil einen offenen Bereich belegt; sonst bleibt der Shutter, wie er ist.
 
-> Farbe bekommen die Moving Heads separat — entweder über eine **Farb-Matrix**, die die MH mit
-> abdeckt (siehe *Farbchase*), oder im **Color-Tab**. Bewegung (EFX) + Farbe (Matrix) +
-> „Dimmer/Shutter mit öffnen" ergeben den vollen Look.
+> Farbe bekommen die Moving Heads separat — bei Geräten ohne RGB (z. B. ZQ02001) über das
+> **Farbrad**: im Programmer-Reiter **Color** oder per Farbrad-Taste (siehe *Moving Heads*). Eine
+> Farb-Matrix, die die MH mit abdeckt, kann bei Farbrad-Geräten nur den nächstgelegenen Slot
+> setzen. Bewegung (EFX) + Farbe + „Dimmer/Shutter mit öffnen" ergeben den vollen Look.
 
 ## 3. Verhältnis mehrerer Geräte
 
@@ -70,27 +82,30 @@ So laufen z. B. die beiden Hardstyle-MH gegenläufige Kreise: **Verhältnis** = 
 
 ## 4. Tempo & Musik-Sync
 
-- **Geschwindigkeit (Hz)** stellt die Bahn-Rate als festen Wert ein. Die Gruppe *Tempo & Richtung*
-  enthält außerdem **Tempo-Bus**, **Tempo ×**, **Tempo-Versatz**, **Taktgleich starten**,
-  **Richtung** und **Loop**.
-- Für **musiksynchron** stellst du **Tempo-Bus** direkt im EFX-Editor auf **Global (taktgleich,
-  Standard)** — dann folgt die Bewegung der Master-/Musik-BPM und startet mit **Taktgleich starten**
-  auf dem gemeinsamen Beat-Raster. **Tempo ×** läuft relativ dazu (z. B. ×2 = doppelt so schnell),
-  **Tempo-Versatz** verschiebt die Phase; für bewusst freien Lauf **Frei (nicht taktgebunden)**.
+- Neue EFX stehen bereits auf **Tempo-Bus = Global (taktgleich, Standard)**. Sobald eine BPM läuft
+  (Tap, Musik-BPM, Player), fährt die Figur genau **einen Umlauf pro Beat × Tempo ×** — bei 150 BPM
+  also 2,5 Umläufe pro Sekunde. Für Moving Heads meist **Tempo ×** 0,25 oder 0,5 wählen.
+  **Taktgleich starten** setzt den Start aufs gemeinsame Beat-Raster, **Tempo-Versatz** verschiebt
+  die Phase.
+- **Geschwindigkeit (Hz)** gilt nur bei freiem Lauf — Tempo-Bus **Frei (nicht taktgebunden)** —
+  oder solange noch keine BPM läuft. Läuft eine BPM, wirken Geschwindigkeit (Hz) und die
+  Effekt-Tempo-Fader der VC nicht.
+- Die Gruppe *Tempo & Richtung* enthält außerdem **Richtung**, **Loop**, **Layer-Priorität**,
+  **Einblenden**, **Ausblenden** und **Hüllkurven-Form**.
 - In der **Virtuellen Konsole** lässt sich die Bus-/Faktor-Umschaltung zusätzlich **live** steuern
-  (SpeedDial / Tempo-Bus-Selektor — siehe *Musik-Sync* / *Dimmer-Matrix*).
+  (**SpeedDial** / Element **Tempo-Bus** — siehe *Musik-Sync* / *Dimmer-Matrix*).
 
 ## 5. Starten
 
-Den EFX mit **▶ Start** starten (**■ Stop** daneben). So sieht eine Kreis-Bewegung aus:
+Den EFX **💾 Speichern** und mit **▶ Start** starten (**■ Stop** daneben). So sieht eine Kreis-Bewegung aus:
 
 ![Moving-Head-Kreis](../tutorial_matrix/gif/mh_kreis.gif)
 
 ---
 
-**Kurz:** EFX-Tab → **+ Neu** und Gruppe (Moving Heads) wählen (Reihenfolge egal — der EFX folgt der
-Auswahl live) → Algorithmus (Circle …) + Pan/Tilt-Hub (0–255) + Geschwindigkeit →
-**„Dimmer/Shutter mit öffnen" AN** (sonst dunkel) → Verhältnis der Geräte zueinander (Verhältnis:
-Synchron/Fächer/Versatz, dazu Gegenläufig/Spiegeln) → **▶ Start**. Musik-Sync per **Tempo-Bus**
-direkt im EFX-Editor (Global/Bus A–D + Tempo ×), zusätzlich live über die Virtuelle Konsole. Farbe
-der MH separat über eine Farb-Matrix oder den Color-Tab.
+**Kurz:** Gruppe (Moving Heads) wählen → Reiter **EFX** → **+ Neu** (der EFX folgt der Auswahl
+live) → Algorithmus (Circle …) + Pan/Tilt-Hub (0–255) → **„Dimmer/Shutter mit öffnen" AN** (sonst
+dunkel) → Verhältnis der Geräte zueinander (Verhältnis: Synchron/Fächer/Versatz, dazu
+Gegenläufig/Spiegeln) → **💾 Speichern** → **▶ Start**. Tempo: neue EFX folgen dem Bus **Global**
+(ein Umlauf pro Beat × **Tempo ×**); **Geschwindigkeit (Hz)** nur im Frei-Lauf. Farbe der MH
+separat (Farbrad im Reiter Color).

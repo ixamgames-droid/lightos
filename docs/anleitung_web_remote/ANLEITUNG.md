@@ -2,8 +2,13 @@
 
 > Mit dem eingebauten **Web-Interface** steuerst du LightOS vom Smartphone oder
 > Tablet: GO/BACK/STOP für die Cueliste, ein großer **Blackout**-Schalter und
-> fünf **Executor-Fader** — alles über den Browser, ohne App-Installation.
+> zehn **Executor-Fader** (Ex 1–10) — alles über den Browser, ohne App-Installation.
 > Voraussetzung: Handy und PC hängen im **selben WLAN/LAN**.
+>
+> ⚠ **Derzeit braucht das Handy zusätzlich Internet:** Die Seite lädt ihre
+> Verbindungs-Bibliothek (socket.io) von `cdn.socket.io`. Ohne Internetzugang lädt
+> die Seite zwar, bleibt aber bei **„Verbinde...“** stehen, und keine Taste wirkt
+> (Befund WEB-06). Im reinen Technik-WLAN ohne Internet also vorher testen.
 
 ---
 
@@ -80,9 +85,11 @@ ersten Öffnen merkt sich das Handy die Anmeldung (Cookie); es erscheint die Sei
 
 ## 3. Was die Bedien-Elemente tun
 
-Die Remote-Seite hat drei Blöcke: **Transport**, **Blackout** und
-**Executor-Fader**. Jede Aktion läuft direkt auf die laufende Show (die Befehle
-sind in `src/web/app.py` als Routen/SocketIO-Handler umgesetzt):
+Die Remote-Seite hat die Blöcke **Transport** (mit dem **Blackout**-Schalter),
+**Executor Fader** und **Log**; oben rechts steht der Verbindungsstatus
+(„Verbinde...“, „Verbunden“, „Getrennt“). Jede Aktion läuft direkt auf die
+laufende Show (die Befehle sind in `src/web/app.py` als Routen/SocketIO-Handler
+umgesetzt):
 
 | Element | Wirkung | Route / Handler in `app.py` |
 |---|---|---|
@@ -90,7 +97,7 @@ sind in `src/web/app.py` als Routen/SocketIO-Handler umgesetzt):
 | **◀◀ BACK** | einen Cue zurück (GO-Zielliste) | `POST /api/back` · SocketIO `back` |
 | **■ STOP** | GO-Zielliste anhalten | `POST /api/stop` · SocketIO `stop` |
 | **Blackout** | schaltet die gesamte Ausgabe dunkel und wieder hell (Toggle) — derselbe Blackout wie oben rechts in der App: alles auf 0, nur Positionen/Gobo von Moving Heads bleiben | `POST /api/blackout` · SocketIO `blackout` |
-| **Fader 1–5** | setzen den Pegel der **Executor-Fader** (Slots 1–5, 0–100 %) | `POST /api/executor/<slot>/fader` · SocketIO `fader` |
+| **Fader Ex 1–10** | setzen den Pegel der **Executor-Fader** (Slots 1–10, 0–100 %) | `POST /api/executor/<slot>/fader` · SocketIO `fader` |
 
 **Welche Cueliste trifft GO / BACK / STOP?** Dieselbe wie die Leertaste am Pult:
 
@@ -106,12 +113,11 @@ erste) Cueliste trotzdem weiter — es kommt aber **kein Licht**. Die Antwort vo
 
 Weitere Details:
 
-- **GO/BACK/STOP** wirken auf die **erste Cueliste** der Show. Gibt es keine
-  Cueliste, passiert nichts (kein Fehler).
+- Gibt es gar keine Cueliste, passiert bei **GO/BACK/STOP** nichts (kein Fehler).
 - **Blackout** ist ein Umschalter: erneutes Tippen hebt den Blackout wieder auf.
   Der Button färbt sich, solange Blackout aktiv ist.
 - **Executor-Fader** entsprechen den Playback-Executoren 1–10 in LightOS; die
-  Remote zeigt fünf davon. Beim Öffnen liest die Seite über `GET /api/status`
+  Remote zeigt alle zehn (Ex 1–10). Beim Öffnen liest die Seite über `GET /api/status`
   den **echten** aktuellen Fader-Stand aus und stellt die Regler passend ein
   (nicht pauschal auf 100 %).
 - Neben diesen Buttons kennt der Server noch **weitere** Routen, die das
@@ -156,7 +162,9 @@ Seit 2026-07 ist das Web-Remote **per Default abgesichert** (Design-Entscheidung
 
 > **Offene Follow-ups:** QR-Bild des Direkt-Links, OSC-Source-Allowlist und Token-Rotation pro
 > Start sind bewusst noch offen (siehe Design-Doc). Der OSC-Eingang ist separat nur über den
-> Loopback-/„OSC über Netzwerk"-Toggle (Default AUS) abgesichert.
+> Loopback-/„OSC über Netzwerk"-Schalter (Default AUS) abgesichert. Für diesen Schalter gibt
+> es derzeit keine Oberfläche; er steht als `osc_network_enabled` in `ui_prefs.json` im
+> App-Datenordner (Befund WEB-06).
 
 ---
 
@@ -164,7 +172,7 @@ Seit 2026-07 ist das Web-Remote **per Default abgesichert** (Design-Entscheidung
 
 1. **Ausgabe → „Web-Interface (Port 5000)"** anhaken → Server läuft auf `0.0.0.0:5000`.
 2. PC-LAN-IP per `ipconfig` holen → am Handy `http://<PC-IP>:5000/?k=<token>` öffnen (Token/Direkt-Link aus dem Verbindungs-Dialog, gleiches WLAN).
-3. **GO/BACK/STOP** = Cueliste · **Blackout** = alles dunkel (Toggle) · **Fader 1–5** = Executor-Pegel.
+3. **GO/BACK/STOP** = Cueliste · **Blackout** = alles dunkel (Toggle) · **Fader Ex 1–10** = Executor-Pegel.
 4. **Token-geschützt** (`?k=…`, ohne → 403) + CORS-Allowlist; Token ist ein **geteiltes** Setup-Geheimnis → nur im vertrauenswürdigen Netz nutzen, danach ausschalten.
 
 Zurück zur Übersicht: [../ANLEITUNGEN.md](../ANLEITUNGEN.md)

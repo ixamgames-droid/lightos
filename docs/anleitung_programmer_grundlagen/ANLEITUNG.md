@@ -1,5 +1,7 @@
 # Programmer-Grundlagen: Geräte wählen und von Hand einstellen
 
+> **English:** [Programmer basics](ANLEITUNG.en.md)
+
 > **Worum geht's:** Im **Programmer** stellst du Licht von Hand ein. Du wählst
 > Geräte aus, ziehst Helligkeit, Farbe und Position auf und siehst das Ergebnis
 > sofort. Was hier steht, hat Vorrang vor laufenden Szenen und Cues, bis du es
@@ -149,7 +151,7 @@ Die Reiterleiste zeigt nur, was zur Auswahl passt. Ohne Auswahl stehen dort
 | **Color** | Auswahl hat Farbkanäle | Schnellwahl, Farbregler |
 | **Position** | Auswahl hat Pan/Tilt | siehe Schritt 5 |
 | **Gobo** | Auswahl hat ein Goborad | Gobo-Kacheln, Rotation |
-| **Weitere** | Auswahl hat weitere Kanäle | Beam, Effekt, Programme, alles Übrige |
+| **Weitere** | Auswahl hat weitere Kanäle | Optik (Zoom, Fokus, Prisma, Iris), Effekt, Programme, alles Übrige |
 | **Mapping** | Auswahl hat Pan/Tilt | eine Position auf andere Kanäle abbilden |
 | **Assistent** | immer | Effekt-Assistent, **+ Szene**, **+ Chaser**, **Programmer → Szene**, Liste aller Funktionen mit **Start**/**Stop** |
 | **EFX** | Auswahl hat Pan/Tilt | Bewegungseffekte |

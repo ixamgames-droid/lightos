@@ -1,0 +1,637 @@
+{
+  "format_version": 1,
+  "hersteller": "American DJ",
+  "hersteller_kurz": "ADJ",
+  "modell": "Vizi Hex Wash7",
+  "kurzname": "VIZIHEXWASH7",
+  "typ": "moving_head",
+  "leistung_w": 137,
+  "quelle": {
+    "titel": "ADJ Vizi Hex Wash7 DMX Traits / User Instructions (rev. 8/25/20)",
+    "url": "https://assets.centryngroup.com/dl/files/VIZ614__DL__005.pdf",
+    "version": "8/25/20",
+    "datum": "2020-08-25"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.3 GIT · Georg Müller",
+    "original": "resources/fixtures/American_DJ/American-DJ-Vizi-Hex-Wash7.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 333 Wertebereiche mit Art (kind) versehen; danach von LightOS gegen das Herstellerhandbuch ueberarbeitet: Dimmerkurven-Kanal als raw (Default 0, Highlight 0) statt intensity/macro; Shutter-Bereiche nach Handbuch klassifiziert (aus=closed, LED an=open, alle Strobe-/Puls-/Random-/Rampen-Bereiche=strobe), Default/Highlight auf Mitte des ersten Offen-Bereichs; irrefuehrende Bereichs-Arten (color/gobo/rotate/closed) an Programm-/Makro-/Funktionskanaelen entfernt; CH 'Focus' laut Handbuch Zoom (7-58 Grad) -> zoom; Programm-/Fade-Geschwindigkeit als effect_speed; Blackout-bei-Bewegung ohne Art closed; Programm-/Reset-Kanal als reset (nur Motor-Reset mit Art reset)"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal fuer Kanal gegen die ADJ-DMX-Traits (19/21/27 Kanal) und das Handbuch (rev. 8/25/20) geprueft; Farbmakro-Einzelfarben nur grafisch im Handbuch, Namen aus QLC+; nicht am Geraet getestet"
+  },
+  "modi": [
+    {
+      "name": "19 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "All Red LED", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "All Green LED", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "All Blue LED", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "All White LED", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "All Amber LED", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "All UV LED", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {
+          "name": "Farbmakros",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Aus", "art": ""},
+            {"von": 1, "bis": 4, "name": "Color 1", "art": "color"},
+            {"von": 5, "bis": 8, "name": "Color 2", "art": "color"},
+            {"von": 9, "bis": 12, "name": "Color 3", "art": "color"},
+            {"von": 13, "bis": 16, "name": "Color 4", "art": "color"},
+            {"von": 17, "bis": 20, "name": "Color 5", "art": "color"},
+            {"von": 21, "bis": 24, "name": "Color 6", "art": "color"},
+            {"von": 25, "bis": 28, "name": "Color 7", "art": "color"},
+            {"von": 29, "bis": 32, "name": "Color 8", "art": "color"},
+            {"von": 33, "bis": 36, "name": "Color 9", "art": "color"},
+            {"von": 37, "bis": 40, "name": "Color 10", "art": "color"},
+            {"von": 41, "bis": 44, "name": "Color 11", "art": "color"},
+            {"von": 45, "bis": 48, "name": "Color 12", "art": "color"},
+            {"von": 49, "bis": 52, "name": "Color 13", "art": "color"},
+            {"von": 53, "bis": 56, "name": "Color 14", "art": "color"},
+            {"von": 57, "bis": 60, "name": "Color 15", "art": "color"},
+            {"von": 61, "bis": 64, "name": "Color 16", "art": "color"},
+            {"von": 65, "bis": 68, "name": "Color 17", "art": "color"},
+            {"von": 69, "bis": 72, "name": "Color 18", "art": "color"},
+            {"von": 73, "bis": 76, "name": "Color 19", "art": "color"},
+            {"von": 77, "bis": 80, "name": "Color 20", "art": "color"},
+            {"von": 81, "bis": 84, "name": "Color 21", "art": "color"},
+            {"von": 85, "bis": 88, "name": "Color 22", "art": "color"},
+            {"von": 89, "bis": 92, "name": "Color 23", "art": "color"},
+            {"von": 93, "bis": 96, "name": "Color 24", "art": "color"},
+            {"von": 97, "bis": 100, "name": "Color 25", "art": "color"},
+            {"von": 101, "bis": 104, "name": "Color 26", "art": "color"},
+            {"von": 105, "bis": 108, "name": "Color 27", "art": "color"},
+            {"von": 109, "bis": 112, "name": "Color 28", "art": "color"},
+            {"von": 113, "bis": 116, "name": "Color 29", "art": "color"},
+            {"von": 117, "bis": 120, "name": "Color 30", "art": "color"},
+            {"von": 121, "bis": 124, "name": "Color 31", "art": "color"},
+            {"von": 125, "bis": 128, "name": "Color 32 (RGBW on)", "art": "color"},
+            {"von": 129, "bis": 132, "name": "Color 33", "art": "color"},
+            {"von": 133, "bis": 136, "name": "Color 34", "art": "color"},
+            {"von": 137, "bis": 140, "name": "Color 35", "art": "color"},
+            {"von": 141, "bis": 144, "name": "Color 36", "art": "color"},
+            {"von": 145, "bis": 148, "name": "Color 37", "art": "color"},
+            {"von": 149, "bis": 152, "name": "Color 38", "art": "color"},
+            {"von": 153, "bis": 156, "name": "Color 39", "art": "color"},
+            {"von": 157, "bis": 160, "name": "Color 40", "art": "color"},
+            {"von": 161, "bis": 164, "name": "Color 41", "art": "color"},
+            {"von": 165, "bis": 168, "name": "Color 42", "art": "color"},
+            {"von": 169, "bis": 172, "name": "Color 43", "art": "color"},
+            {"von": 173, "bis": 176, "name": "Color 44", "art": "color"},
+            {"von": 177, "bis": 180, "name": "Color 45", "art": "color"},
+            {"von": 181, "bis": 184, "name": "Color 46", "art": "color"},
+            {"von": 185, "bis": 188, "name": "Color 47", "art": "color"},
+            {"von": 189, "bis": 192, "name": "Color 48", "art": "color"},
+            {"von": 193, "bis": 196, "name": "Color 49", "art": "color"},
+            {"von": 197, "bis": 200, "name": "Color 50", "art": "color"},
+            {"von": 201, "bis": 204, "name": "Color 51", "art": "color"},
+            {"von": 205, "bis": 208, "name": "Color 52", "art": "color"},
+            {"von": 209, "bis": 212, "name": "Color 53", "art": "color"},
+            {"von": 213, "bis": 216, "name": "Color 54", "art": "color"},
+            {"von": 217, "bis": 220, "name": "Color 55", "art": "color"},
+            {"von": 221, "bis": 224, "name": "Color 56", "art": "color"},
+            {"von": 225, "bis": 228, "name": "Color 57", "art": "color"},
+            {"von": 229, "bis": 232, "name": "Color 58", "art": "color"},
+            {"von": 233, "bis": 236, "name": "Color 59 (Red)", "art": "color"},
+            {"von": 237, "bis": 240, "name": "Color 60 (Green)", "art": "color"},
+            {"von": 241, "bis": 244, "name": "Color 61 (Blue)", "art": "color"},
+            {"von": 245, "bis": 248, "name": "Color 62 (White)", "art": "color"},
+            {"von": 249, "bis": 252, "name": "Color 63 (Amber)", "art": "color"},
+            {"von": 253, "bis": 255, "name": "Color 64 (UV)", "art": "color"}
+          ]
+        },
+        {
+          "name": "Shutter / Strobe",
+          "attribut": "shutter",
+          "default": 47,
+          "highlight": 47,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "LED Off", "art": "closed"},
+            {"von": 32, "bis": 63, "name": "LED on", "art": "open"},
+            {"von": 64, "bis": 95, "name": "Strobing Slow - Fast", "art": "strobe"},
+            {"von": 96, "bis": 127, "name": "LED on", "art": "open"},
+            {"von": 128, "bis": 159, "name": "Strobe Pulse Slow - Fast", "art": "strobe"},
+            {"von": 160, "bis": 191, "name": "LED on", "art": "open"},
+            {"von": 192, "bis": 223, "name": "Random Strobe Slow - Fast", "art": "strobe"},
+            {"von": 224, "bis": 255, "name": "LED on", "art": "open"}
+          ]
+        },
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Dimmer Fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Zoom",
+          "attribut": "zoom",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "7 Grad - 58 Grad", "art": ""}
+          ]
+        },
+        {
+          "name": "Auto Programs",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Off", "art": ""},
+            {"von": 1, "bis": 20, "name": "Program 1", "art": ""},
+            {"von": 21, "bis": 40, "name": "Program 2", "art": ""},
+            {"von": 41, "bis": 60, "name": "Program 3", "art": ""},
+            {"von": 61, "bis": 80, "name": "Program 4", "art": ""},
+            {"von": 81, "bis": 100, "name": "Program 5", "art": ""},
+            {"von": 101, "bis": 120, "name": "Program 6", "art": ""},
+            {"von": 121, "bis": 140, "name": "Program 7", "art": ""},
+            {"von": 141, "bis": 160, "name": "Program 8", "art": ""},
+            {"von": 161, "bis": 180, "name": "Program 9", "art": ""},
+            {"von": 181, "bis": 200, "name": "Program 10", "art": ""},
+            {"von": 201, "bis": 220, "name": "Program 11", "art": ""},
+            {"von": 221, "bis": 240, "name": "Program 12", "art": ""},
+            {"von": 241, "bis": 250, "name": "Program 13", "art": ""},
+            {"von": 251, "bis": 255, "name": "Program 14", "art": ""}
+          ]
+        },
+        {
+          "name": "Program Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Slow - Fast", "art": ""}
+          ]
+        },
+        {
+          "name": "Auto Program Fade",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Normal", "art": ""},
+            {"von": 1, "bis": 255, "name": "Slow - Fast", "art": ""}
+          ]
+        },
+        {
+          "name": "Dimmer Mode",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 20, "name": "Standard", "art": ""},
+            {"von": 21, "bis": 40, "name": "Stage", "art": ""},
+            {"von": 41, "bis": 60, "name": "TV", "art": ""},
+            {"von": 61, "bis": 80, "name": "Architectural", "art": ""},
+            {"von": 81, "bis": 100, "name": "Theatre", "art": ""},
+            {"von": 101, "bis": 255, "name": "Default Dimmer Setting", "art": ""}
+          ]
+        },
+        {
+          "name": "Pan / Tilt Speed",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 225, "name": "Fast - Slow", "art": ""},
+            {"von": 226, "bis": 235, "name": "Blackout by Movement", "art": ""},
+            {"von": 236, "bis": 255, "name": "No function", "art": ""}
+          ]
+        },
+        {
+          "name": "Internal Programs",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 79, "name": "Normal", "art": ""},
+            {"von": 80, "bis": 84, "name": "All Motor Reset", "art": "reset"},
+            {"von": 85, "bis": 99, "name": "No function", "art": ""},
+            {"von": 100, "bis": 119, "name": "Internal Program 1", "art": ""},
+            {"von": 120, "bis": 139, "name": "Internal Program 2", "art": ""},
+            {"von": 140, "bis": 159, "name": "Internal Program 3", "art": ""},
+            {"von": 160, "bis": 179, "name": "Internal Program 4", "art": ""},
+            {"von": 180, "bis": 199, "name": "Internal Program 5", "art": ""},
+            {"von": 200, "bis": 219, "name": "Internal Program 6", "art": ""},
+            {"von": 220, "bis": 239, "name": "Internal Program 7", "art": ""},
+            {"von": 240, "bis": 255, "name": "No function", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "21 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan Fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt Fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "All Red LED", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "All Green LED", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "All Blue LED", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "All White LED", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "All Amber LED", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "All UV LED", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {
+          "name": "Farbmakros",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Aus", "art": ""},
+            {"von": 1, "bis": 4, "name": "Color 1", "art": "color"},
+            {"von": 5, "bis": 8, "name": "Color 2", "art": "color"},
+            {"von": 9, "bis": 12, "name": "Color 3", "art": "color"},
+            {"von": 13, "bis": 16, "name": "Color 4", "art": "color"},
+            {"von": 17, "bis": 20, "name": "Color 5", "art": "color"},
+            {"von": 21, "bis": 24, "name": "Color 6", "art": "color"},
+            {"von": 25, "bis": 28, "name": "Color 7", "art": "color"},
+            {"von": 29, "bis": 32, "name": "Color 8", "art": "color"},
+            {"von": 33, "bis": 36, "name": "Color 9", "art": "color"},
+            {"von": 37, "bis": 40, "name": "Color 10", "art": "color"},
+            {"von": 41, "bis": 44, "name": "Color 11", "art": "color"},
+            {"von": 45, "bis": 48, "name": "Color 12", "art": "color"},
+            {"von": 49, "bis": 52, "name": "Color 13", "art": "color"},
+            {"von": 53, "bis": 56, "name": "Color 14", "art": "color"},
+            {"von": 57, "bis": 60, "name": "Color 15", "art": "color"},
+            {"von": 61, "bis": 64, "name": "Color 16", "art": "color"},
+            {"von": 65, "bis": 68, "name": "Color 17", "art": "color"},
+            {"von": 69, "bis": 72, "name": "Color 18", "art": "color"},
+            {"von": 73, "bis": 76, "name": "Color 19", "art": "color"},
+            {"von": 77, "bis": 80, "name": "Color 20", "art": "color"},
+            {"von": 81, "bis": 84, "name": "Color 21", "art": "color"},
+            {"von": 85, "bis": 88, "name": "Color 22", "art": "color"},
+            {"von": 89, "bis": 92, "name": "Color 23", "art": "color"},
+            {"von": 93, "bis": 96, "name": "Color 24", "art": "color"},
+            {"von": 97, "bis": 100, "name": "Color 25", "art": "color"},
+            {"von": 101, "bis": 104, "name": "Color 26", "art": "color"},
+            {"von": 105, "bis": 108, "name": "Color 27", "art": "color"},
+            {"von": 109, "bis": 112, "name": "Color 28", "art": "color"},
+            {"von": 113, "bis": 116, "name": "Color 29", "art": "color"},
+            {"von": 117, "bis": 120, "name": "Color 30", "art": "color"},
+            {"von": 121, "bis": 124, "name": "Color 31", "art": "color"},
+            {"von": 125, "bis": 128, "name": "Color 32 (RGBW on)", "art": "color"},
+            {"von": 129, "bis": 132, "name": "Color 33", "art": "color"},
+            {"von": 133, "bis": 136, "name": "Color 34", "art": "color"},
+            {"von": 137, "bis": 140, "name": "Color 35", "art": "color"},
+            {"von": 141, "bis": 144, "name": "Color 36", "art": "color"},
+            {"von": 145, "bis": 148, "name": "Color 37", "art": "color"},
+            {"von": 149, "bis": 152, "name": "Color 38", "art": "color"},
+            {"von": 153, "bis": 156, "name": "Color 39", "art": "color"},
+            {"von": 157, "bis": 160, "name": "Color 40", "art": "color"},
+            {"von": 161, "bis": 164, "name": "Color 41", "art": "color"},
+            {"von": 165, "bis": 168, "name": "Color 42", "art": "color"},
+            {"von": 169, "bis": 172, "name": "Color 43", "art": "color"},
+            {"von": 173, "bis": 176, "name": "Color 44", "art": "color"},
+            {"von": 177, "bis": 180, "name": "Color 45", "art": "color"},
+            {"von": 181, "bis": 184, "name": "Color 46", "art": "color"},
+            {"von": 185, "bis": 188, "name": "Color 47", "art": "color"},
+            {"von": 189, "bis": 192, "name": "Color 48", "art": "color"},
+            {"von": 193, "bis": 196, "name": "Color 49", "art": "color"},
+            {"von": 197, "bis": 200, "name": "Color 50", "art": "color"},
+            {"von": 201, "bis": 204, "name": "Color 51", "art": "color"},
+            {"von": 205, "bis": 208, "name": "Color 52", "art": "color"},
+            {"von": 209, "bis": 212, "name": "Color 53", "art": "color"},
+            {"von": 213, "bis": 216, "name": "Color 54", "art": "color"},
+            {"von": 217, "bis": 220, "name": "Color 55", "art": "color"},
+            {"von": 221, "bis": 224, "name": "Color 56", "art": "color"},
+            {"von": 225, "bis": 228, "name": "Color 57", "art": "color"},
+            {"von": 229, "bis": 232, "name": "Color 58", "art": "color"},
+            {"von": 233, "bis": 236, "name": "Color 59 (Red)", "art": "color"},
+            {"von": 237, "bis": 240, "name": "Color 60 (Green)", "art": "color"},
+            {"von": 241, "bis": 244, "name": "Color 61 (Blue)", "art": "color"},
+            {"von": 245, "bis": 248, "name": "Color 62 (White)", "art": "color"},
+            {"von": 249, "bis": 252, "name": "Color 63 (Amber)", "art": "color"},
+            {"von": 253, "bis": 255, "name": "Color 64 (UV)", "art": "color"}
+          ]
+        },
+        {
+          "name": "Shutter / Strobe",
+          "attribut": "shutter",
+          "default": 47,
+          "highlight": 47,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "LED Off", "art": "closed"},
+            {"von": 32, "bis": 63, "name": "LED on", "art": "open"},
+            {"von": 64, "bis": 95, "name": "Strobing Slow - Fast", "art": "strobe"},
+            {"von": 96, "bis": 127, "name": "LED on", "art": "open"},
+            {"von": 128, "bis": 159, "name": "Strobe Pulse Slow - Fast", "art": "strobe"},
+            {"von": 160, "bis": 191, "name": "LED on", "art": "open"},
+            {"von": 192, "bis": 223, "name": "Random Strobe Slow - Fast", "art": "strobe"},
+            {"von": 224, "bis": 255, "name": "LED on", "art": "open"}
+          ]
+        },
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Dimmer Fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Zoom",
+          "attribut": "zoom",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "7 Grad - 58 Grad", "art": ""}
+          ]
+        },
+        {
+          "name": "Auto Programs",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Off", "art": ""},
+            {"von": 1, "bis": 20, "name": "Program 1", "art": ""},
+            {"von": 21, "bis": 40, "name": "Program 2", "art": ""},
+            {"von": 41, "bis": 60, "name": "Program 3", "art": ""},
+            {"von": 61, "bis": 80, "name": "Program 4", "art": ""},
+            {"von": 81, "bis": 100, "name": "Program 5", "art": ""},
+            {"von": 101, "bis": 120, "name": "Program 6", "art": ""},
+            {"von": 121, "bis": 140, "name": "Program 7", "art": ""},
+            {"von": 141, "bis": 160, "name": "Program 8", "art": ""},
+            {"von": 161, "bis": 180, "name": "Program 9", "art": ""},
+            {"von": 181, "bis": 200, "name": "Program 10", "art": ""},
+            {"von": 201, "bis": 220, "name": "Program 11", "art": ""},
+            {"von": 221, "bis": 240, "name": "Program 12", "art": ""},
+            {"von": 241, "bis": 250, "name": "Program 13", "art": ""},
+            {"von": 251, "bis": 255, "name": "Program 14", "art": ""}
+          ]
+        },
+        {
+          "name": "Program Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Slow - Fast", "art": ""}
+          ]
+        },
+        {
+          "name": "Auto Program Fade",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Normal", "art": ""},
+            {"von": 1, "bis": 255, "name": "Slow - Fast", "art": ""}
+          ]
+        },
+        {
+          "name": "Dimmer Mode",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 20, "name": "Standard", "art": ""},
+            {"von": 21, "bis": 40, "name": "Stage", "art": ""},
+            {"von": 41, "bis": 60, "name": "TV", "art": ""},
+            {"von": 61, "bis": 80, "name": "Architectural", "art": ""},
+            {"von": 81, "bis": 100, "name": "Theatre", "art": ""},
+            {"von": 101, "bis": 255, "name": "Default Dimmer Setting", "art": ""}
+          ]
+        },
+        {
+          "name": "Pan / Tilt Speed",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 225, "name": "Fast - Slow", "art": ""},
+            {"von": 226, "bis": 235, "name": "Blackout by Movement", "art": ""},
+            {"von": 236, "bis": 255, "name": "No function", "art": ""}
+          ]
+        },
+        {
+          "name": "Internal Programs",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 79, "name": "Normal", "art": ""},
+            {"von": 80, "bis": 84, "name": "All Motor Reset", "art": "reset"},
+            {"von": 85, "bis": 99, "name": "No function", "art": ""},
+            {"von": 100, "bis": 119, "name": "Internal Program 1", "art": ""},
+            {"von": 120, "bis": 139, "name": "Internal Program 2", "art": ""},
+            {"von": 140, "bis": 159, "name": "Internal Program 3", "art": ""},
+            {"von": 160, "bis": 179, "name": "Internal Program 4", "art": ""},
+            {"von": 180, "bis": 199, "name": "Internal Program 5", "art": ""},
+            {"von": 200, "bis": 219, "name": "Internal Program 6", "art": ""},
+            {"von": 220, "bis": 239, "name": "Internal Program 7", "art": ""},
+            {"von": 240, "bis": 255, "name": "No function", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "27 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan Fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt Fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Red Center LED", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green Center LED", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue Center LED", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White Center LED", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber Center LED", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV Center LED", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red Outer LED's", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green Outer LED's", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue Outer LED's", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White Outer LED's", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber Outer LED's", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV Outer LED's", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {
+          "name": "Farbmakros",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Aus", "art": ""},
+            {"von": 1, "bis": 4, "name": "Color 1", "art": "color"},
+            {"von": 5, "bis": 8, "name": "Color 2", "art": "color"},
+            {"von": 9, "bis": 12, "name": "Color 3", "art": "color"},
+            {"von": 13, "bis": 16, "name": "Color 4", "art": "color"},
+            {"von": 17, "bis": 20, "name": "Color 5", "art": "color"},
+            {"von": 21, "bis": 24, "name": "Color 6", "art": "color"},
+            {"von": 25, "bis": 28, "name": "Color 7", "art": "color"},
+            {"von": 29, "bis": 32, "name": "Color 8", "art": "color"},
+            {"von": 33, "bis": 36, "name": "Color 9", "art": "color"},
+            {"von": 37, "bis": 40, "name": "Color 10", "art": "color"},
+            {"von": 41, "bis": 44, "name": "Color 11", "art": "color"},
+            {"von": 45, "bis": 48, "name": "Color 12", "art": "color"},
+            {"von": 49, "bis": 52, "name": "Color 13", "art": "color"},
+            {"von": 53, "bis": 56, "name": "Color 14", "art": "color"},
+            {"von": 57, "bis": 60, "name": "Color 15", "art": "color"},
+            {"von": 61, "bis": 64, "name": "Color 16", "art": "color"},
+            {"von": 65, "bis": 68, "name": "Color 17", "art": "color"},
+            {"von": 69, "bis": 72, "name": "Color 18", "art": "color"},
+            {"von": 73, "bis": 76, "name": "Color 19", "art": "color"},
+            {"von": 77, "bis": 80, "name": "Color 20", "art": "color"},
+            {"von": 81, "bis": 84, "name": "Color 21", "art": "color"},
+            {"von": 85, "bis": 88, "name": "Color 22", "art": "color"},
+            {"von": 89, "bis": 92, "name": "Color 23", "art": "color"},
+            {"von": 93, "bis": 96, "name": "Color 24", "art": "color"},
+            {"von": 97, "bis": 100, "name": "Color 25", "art": "color"},
+            {"von": 101, "bis": 104, "name": "Color 26", "art": "color"},
+            {"von": 105, "bis": 108, "name": "Color 27", "art": "color"},
+            {"von": 109, "bis": 112, "name": "Color 28", "art": "color"},
+            {"von": 113, "bis": 116, "name": "Color 29", "art": "color"},
+            {"von": 117, "bis": 120, "name": "Color 30", "art": "color"},
+            {"von": 121, "bis": 124, "name": "Color 31", "art": "color"},
+            {"von": 125, "bis": 128, "name": "Color 32 (RGBW on)", "art": "color"},
+            {"von": 129, "bis": 132, "name": "Color 33", "art": "color"},
+            {"von": 133, "bis": 136, "name": "Color 34", "art": "color"},
+            {"von": 137, "bis": 140, "name": "Color 35", "art": "color"},
+            {"von": 141, "bis": 144, "name": "Color 36", "art": "color"},
+            {"von": 145, "bis": 148, "name": "Color 37", "art": "color"},
+            {"von": 149, "bis": 152, "name": "Color 38", "art": "color"},
+            {"von": 153, "bis": 156, "name": "Color 39", "art": "color"},
+            {"von": 157, "bis": 160, "name": "Color 40", "art": "color"},
+            {"von": 161, "bis": 164, "name": "Color 41", "art": "color"},
+            {"von": 165, "bis": 168, "name": "Color 42", "art": "color"},
+            {"von": 169, "bis": 172, "name": "Color 43", "art": "color"},
+            {"von": 173, "bis": 176, "name": "Color 44", "art": "color"},
+            {"von": 177, "bis": 180, "name": "Color 45", "art": "color"},
+            {"von": 181, "bis": 184, "name": "Color 46", "art": "color"},
+            {"von": 185, "bis": 188, "name": "Color 47", "art": "color"},
+            {"von": 189, "bis": 192, "name": "Color 48", "art": "color"},
+            {"von": 193, "bis": 196, "name": "Color 49", "art": "color"},
+            {"von": 197, "bis": 200, "name": "Color 50", "art": "color"},
+            {"von": 201, "bis": 204, "name": "Color 51", "art": "color"},
+            {"von": 205, "bis": 208, "name": "Color 52", "art": "color"},
+            {"von": 209, "bis": 212, "name": "Color 53", "art": "color"},
+            {"von": 213, "bis": 216, "name": "Color 54", "art": "color"},
+            {"von": 217, "bis": 220, "name": "Color 55", "art": "color"},
+            {"von": 221, "bis": 224, "name": "Color 56", "art": "color"},
+            {"von": 225, "bis": 228, "name": "Color 57", "art": "color"},
+            {"von": 229, "bis": 232, "name": "Color 58", "art": "color"},
+            {"von": 233, "bis": 236, "name": "Color 59 (Red)", "art": "color"},
+            {"von": 237, "bis": 240, "name": "Color 60 (Green)", "art": "color"},
+            {"von": 241, "bis": 244, "name": "Color 61 (Blue)", "art": "color"},
+            {"von": 245, "bis": 248, "name": "Color 62 (White)", "art": "color"},
+            {"von": 249, "bis": 252, "name": "Color 63 (Amber)", "art": "color"},
+            {"von": 253, "bis": 255, "name": "Color 64 (UV)", "art": "color"}
+          ]
+        },
+        {
+          "name": "Shutter / Strobe",
+          "attribut": "shutter",
+          "default": 47,
+          "highlight": 47,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "LED Off", "art": "closed"},
+            {"von": 32, "bis": 63, "name": "LED on", "art": "open"},
+            {"von": 64, "bis": 95, "name": "Strobing Slow - Fast", "art": "strobe"},
+            {"von": 96, "bis": 127, "name": "LED on", "art": "open"},
+            {"von": 128, "bis": 159, "name": "Strobe Pulse Slow - Fast", "art": "strobe"},
+            {"von": 160, "bis": 191, "name": "LED on", "art": "open"},
+            {"von": 192, "bis": 223, "name": "Random Strobe Slow - Fast", "art": "strobe"},
+            {"von": 224, "bis": 255, "name": "LED on", "art": "open"}
+          ]
+        },
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Dimmer Fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Zoom",
+          "attribut": "zoom",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "7 Grad - 58 Grad", "art": ""}
+          ]
+        },
+        {
+          "name": "Auto Programs",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Off", "art": ""},
+            {"von": 1, "bis": 20, "name": "Program 1", "art": ""},
+            {"von": 21, "bis": 40, "name": "Program 2", "art": ""},
+            {"von": 41, "bis": 60, "name": "Program 3", "art": ""},
+            {"von": 61, "bis": 80, "name": "Program 4", "art": ""},
+            {"von": 81, "bis": 100, "name": "Program 5", "art": ""},
+            {"von": 101, "bis": 120, "name": "Program 6", "art": ""},
+            {"von": 121, "bis": 140, "name": "Program 7", "art": ""},
+            {"von": 141, "bis": 160, "name": "Program 8", "art": ""},
+            {"von": 161, "bis": 180, "name": "Program 9", "art": ""},
+            {"von": 181, "bis": 200, "name": "Program 10", "art": ""},
+            {"von": 201, "bis": 220, "name": "Program 11", "art": ""},
+            {"von": 221, "bis": 240, "name": "Program 12", "art": ""},
+            {"von": 241, "bis": 250, "name": "Program 13", "art": ""},
+            {"von": 251, "bis": 255, "name": "Program 14", "art": ""}
+          ]
+        },
+        {
+          "name": "Program Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Slow - Fast", "art": ""}
+          ]
+        },
+        {
+          "name": "Auto Program Fade",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Normal", "art": ""},
+            {"von": 1, "bis": 255, "name": "Slow - Fast", "art": ""}
+          ]
+        },
+        {
+          "name": "Dimmer Mode",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 20, "name": "Standard", "art": ""},
+            {"von": 21, "bis": 40, "name": "Stage", "art": ""},
+            {"von": 41, "bis": 60, "name": "TV", "art": ""},
+            {"von": 61, "bis": 80, "name": "Architectural", "art": ""},
+            {"von": 81, "bis": 100, "name": "Theatre", "art": ""},
+            {"von": 101, "bis": 255, "name": "Default Dimmer Setting", "art": ""}
+          ]
+        },
+        {
+          "name": "Pan / Tilt Speed",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 225, "name": "Fast - Slow", "art": ""},
+            {"von": 226, "bis": 235, "name": "Blackout by Movement", "art": ""},
+            {"von": 236, "bis": 255, "name": "No function", "art": ""}
+          ]
+        },
+        {
+          "name": "Internal Programs",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 79, "name": "Normal", "art": ""},
+            {"von": 80, "bis": 84, "name": "All Motor Reset", "art": "reset"},
+            {"von": 85, "bis": 99, "name": "No function", "art": ""},
+            {"von": 100, "bis": 119, "name": "Internal Program 1", "art": ""},
+            {"von": 120, "bis": 139, "name": "Internal Program 2", "art": ""},
+            {"von": 140, "bis": 159, "name": "Internal Program 3", "art": ""},
+            {"von": 160, "bis": 179, "name": "Internal Program 4", "art": ""},
+            {"von": 180, "bis": 199, "name": "Internal Program 5", "art": ""},
+            {"von": 200, "bis": 219, "name": "Internal Program 6", "art": ""},
+            {"von": 220, "bis": 239, "name": "Internal Program 7", "art": ""},
+            {"von": 240, "bis": 255, "name": "No function", "art": ""}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Moving-Head-Wash 7x 15 W RGBWA+UV mit Zoom. 27-Kanal-Modus: Mitte und Aussenring getrennt."
+}

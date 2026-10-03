@@ -1,0 +1,182 @@
+{
+  "format_version": 1,
+  "hersteller": "Chauvet",
+  "hersteller_kurz": "CHAUVET",
+  "modell": "Swarm 5 FX",
+  "kurzname": "Swarm 5 FX",
+  "typ": "other",
+  "leistung_w": 66,
+  "quelle": {
+    "titel": "Swarm 5 FX User Manual",
+    "version": "Rev. 5",
+    "url": "https://www.chauvetdj.com/wp-content/uploads/2015/12/Swarm_5_FX_UM_Rev5_ML5.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.3 GIT · Jack Logue",
+    "original": "resources/fixtures/Chauvet/Chauvet-Swarm-5-FX.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 84 Wertebereiche mit Art (kind) versehen; danach von LightOS gegen das Herstellerhandbuch (Swarm 5 FX User Manual) Kanal fuer Kanal ueberarbeitet: Typ other statt laser (Kombi-Effekt aus Derby, Laser und Weiss-Strobes); CH1 Programmwahl: Programme nach Handbuch benannt (Auto/Sound 0-6 mit Bestandteilen); Highlight 255 (DMX-Modus), sonst bleiben CH2-9 wirkungslos; CH2 Derby-Farbe: alle festen Farbkombinationen als color, Automatik als rotate, Highlight Weiss (032); CH5 Weiss-Strobes: Programme ohne Art, 'An' als open; CH6 Laser als laser_color statt macro, Default/Highlight 0 (Laser aus); Bereiche 'Rot an, Gruen Strobe' / 'Rot Strobe, Gruen an' nach Handbuch; Strobe-Kanaele: Sound-Strobe (255) als sound; Strobe-Richtung nach Handbuch (schnell -> langsam); Derby-/Laser-Motor als speed mit Stop-Bereichen ohne Art; Leistung nach Handbuch (66 W bei 230 V); Kanalnamen und Bereichsnamen auf Deutsch; Default/Highlight nach LightOS-Regeln (Pan/Tilt 128, Dimmer 0, Shutter offen)"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanalbelegung, Wertebereiche und Modi aller DMX-Modi Kanal fuer Kanal gegen das Herstellerhandbuch geprueft (nicht am echten Geraet)"
+  },
+  "modi": [
+    {
+      "name": "Standard Mode",
+      "kanaele": [
+        {
+          "name": "Programmwahl / DMX-Modus",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Blackout", "art": "closed"},
+            {"von": 10, "bis": 24, "name": "Auto-Programm 0 (Laser, Derby, Weiss-Strobes)", "art": ""},
+            {"von": 25, "bis": 39, "name": "Auto-Programm 1 (Laser, Derby)", "art": ""},
+            {"von": 40, "bis": 54, "name": "Auto-Programm 2 (Laser, Weiss-Strobes)", "art": ""},
+            {"von": 55, "bis": 69, "name": "Auto-Programm 3 (Derby, Weiss-Strobes)", "art": ""},
+            {"von": 70, "bis": 84, "name": "Auto-Programm 4 (Derby)", "art": ""},
+            {"von": 85, "bis": 99, "name": "Auto-Programm 5 (Laser)", "art": ""},
+            {"von": 100, "bis": 114, "name": "Auto-Programm 6 (Weiss-Strobes)", "art": ""},
+            {"von": 115, "bis": 129, "name": "Sound-Programm 0 (Laser, Derby, Weiss-Strobes)", "art": "sound"},
+            {"von": 130, "bis": 144, "name": "Sound-Programm 1 (Laser, Derby)", "art": "sound"},
+            {"von": 145, "bis": 159, "name": "Sound-Programm 2 (Laser, Weiss-Strobes)", "art": "sound"},
+            {"von": 160, "bis": 174, "name": "Sound-Programm 3 (Derby, Weiss-Strobes)", "art": "sound"},
+            {"von": 175, "bis": 189, "name": "Sound-Programm 4 (Derby)", "art": "sound"},
+            {"von": 190, "bis": 204, "name": "Sound-Programm 5 (Laser)", "art": "sound"},
+            {"von": 205, "bis": 219, "name": "Sound-Programm 6 (Weiss-Strobes)", "art": "sound"},
+            {"von": 220, "bis": 255, "name": "DMX-Modus (manuelle Steuerung)", "art": ""}
+          ]
+        },
+        {
+          "name": "Derby-Farbe",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 32,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Blackout", "art": "closed"},
+            {"von": 10, "bis": 14, "name": "Rot", "art": "color"},
+            {"von": 15, "bis": 19, "name": "Gruen", "art": "color"},
+            {"von": 20, "bis": 24, "name": "Blau", "art": "color"},
+            {"von": 25, "bis": 29, "name": "Amber", "art": "color"},
+            {"von": 30, "bis": 34, "name": "Weiss", "art": "color"},
+            {"von": 35, "bis": 39, "name": "Rot + Weiss", "art": "color"},
+            {"von": 40, "bis": 44, "name": "Rot + Gruen", "art": "color"},
+            {"von": 45, "bis": 49, "name": "Gruen + Blau", "art": "color"},
+            {"von": 50, "bis": 54, "name": "Blau + Amber", "art": "color"},
+            {"von": 55, "bis": 59, "name": "Amber + Weiss", "art": "color"},
+            {"von": 60, "bis": 64, "name": "Gruen + Weiss", "art": "color"},
+            {"von": 65, "bis": 69, "name": "Gruen + Amber", "art": "color"},
+            {"von": 70, "bis": 74, "name": "Rot + Amber", "art": "color"},
+            {"von": 75, "bis": 79, "name": "Rot + Blau", "art": "color"},
+            {"von": 80, "bis": 84, "name": "Blau + Weiss", "art": "color"},
+            {"von": 85, "bis": 89, "name": "Rot, Gruen, Blau", "art": "color"},
+            {"von": 90, "bis": 94, "name": "Rot, Gruen, Amber", "art": "color"},
+            {"von": 95, "bis": 99, "name": "Rot, Gruen, Weiss", "art": "color"},
+            {"von": 100, "bis": 104, "name": "Rot, Blau, Amber", "art": "color"},
+            {"von": 105, "bis": 109, "name": "Rot, Blau, Weiss", "art": "color"},
+            {"von": 110, "bis": 114, "name": "Rot, Amber, Weiss", "art": "color"},
+            {"von": 115, "bis": 119, "name": "Gruen, Blau, Amber", "art": "color"},
+            {"von": 120, "bis": 124, "name": "Gruen, Blau, Weiss", "art": "color"},
+            {"von": 125, "bis": 129, "name": "Gruen, Amber, Weiss", "art": "color"},
+            {"von": 130, "bis": 134, "name": "Blau, Amber, Weiss", "art": "color"},
+            {"von": 135, "bis": 139, "name": "Rot, Gruen, Blau, Amber", "art": "color"},
+            {"von": 140, "bis": 144, "name": "Rot, Gruen, Blau, Weiss", "art": "color"},
+            {"von": 145, "bis": 149, "name": "Gruen, Blau, Amber, Weiss", "art": "color"},
+            {"von": 150, "bis": 154, "name": "Rot, Gruen, Amber, Weiss", "art": "color"},
+            {"von": 155, "bis": 159, "name": "Rot, Blau, Amber, Weiss", "art": "color"},
+            {"von": 160, "bis": 164, "name": "Rot, Gruen, Blau, Amber, Weiss", "art": "color"},
+            {"von": 165, "bis": 209, "name": "Automatik (eine Farbe)", "art": "rotate"},
+            {"von": 210, "bis": 255, "name": "Automatik (zwei Farben)", "art": "rotate"}
+          ]
+        },
+        {"name": "Derby Auto-Geschwindigkeit (CH2 165-255)", "attribut": "effect_speed", "default": 0, "highlight": 0},
+        {
+          "name": "Derby Strobe",
+          "attribut": "shutter",
+          "default": 2,
+          "highlight": 2,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Kein Strobe", "art": "open"},
+            {"von": 5, "bis": 254, "name": "Strobe schnell -> langsam", "art": "strobe"},
+            {"von": 255, "bis": 255, "name": "Sound-Strobe", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Weiss-Strobes",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Blackout", "art": "closed"},
+            {"von": 10, "bis": 19, "name": "Auto-Programm 1 (schnell -> langsam)", "art": ""},
+            {"von": 20, "bis": 29, "name": "Auto-Programm 2 (schnell -> langsam)", "art": ""},
+            {"von": 30, "bis": 39, "name": "Auto-Programm 3 (schnell -> langsam)", "art": ""},
+            {"von": 40, "bis": 49, "name": "Auto-Programm 4 (schnell -> langsam)", "art": ""},
+            {"von": 50, "bis": 59, "name": "Auto-Programm 5 (schnell -> langsam)", "art": ""},
+            {"von": 60, "bis": 69, "name": "Auto-Programm 6 (schnell -> langsam)", "art": ""},
+            {"von": 70, "bis": 79, "name": "Auto-Programm 7 (schnell -> langsam)", "art": ""},
+            {"von": 80, "bis": 89, "name": "Auto-Programm 8 (schnell -> langsam)", "art": ""},
+            {"von": 90, "bis": 99, "name": "Auto-Programm 9 (schnell -> langsam)", "art": ""},
+            {"von": 100, "bis": 109, "name": "Auto-Programm 10 (schnell -> langsam)", "art": ""},
+            {"von": 110, "bis": 255, "name": "An", "art": "open"}
+          ]
+        },
+        {
+          "name": "Laser",
+          "attribut": "laser_color",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Blackout", "art": "closed"},
+            {"von": 10, "bis": 49, "name": "Rot an", "art": ""},
+            {"von": 50, "bis": 89, "name": "Gruen an", "art": ""},
+            {"von": 90, "bis": 129, "name": "Rot + Gruen abwechselnd Strobe", "art": "strobe"},
+            {"von": 130, "bis": 169, "name": "Rot an, Gruen Strobe", "art": "strobe"},
+            {"von": 170, "bis": 209, "name": "Rot Strobe, Gruen an", "art": "strobe"},
+            {"von": 210, "bis": 255, "name": "Rot + Gruen Strobe", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Laser Strobe",
+          "attribut": "shutter",
+          "default": 2,
+          "highlight": 2,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Kein Strobe", "art": "open"},
+            {"von": 5, "bis": 254, "name": "Strobe schnell -> langsam", "art": "strobe"},
+            {"von": 255, "bis": 255, "name": "Sound-Strobe", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Derby Motor",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Stop", "art": ""},
+            {"von": 5, "bis": 127, "name": "Rechtsdrehung langsam -> schnell", "art": "rotate"},
+            {"von": 128, "bis": 133, "name": "Stop", "art": ""},
+            {"von": 134, "bis": 255, "name": "Linksdrehung langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Laser Motor",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Stop", "art": ""},
+            {"von": 5, "bis": 127, "name": "Rechtsdrehung", "art": "rotate"},
+            {"von": 128, "bis": 133, "name": "Stop", "art": ""},
+            {"von": 134, "bis": 255, "name": "Linksdrehung", "art": "rotate"}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Kombi-Effekt: RGBAW-Derby, Laser rot/gruen, Weiss-Strobe-LEDs. Fuer manuelle DMX-Steuerung muss CH1 auf 220-255 stehen; Default 0 = Blackout. Laser-Kanal steht in Default und Highlight auf aus."
+}

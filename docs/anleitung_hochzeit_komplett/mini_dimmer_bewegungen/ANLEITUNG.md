@@ -11,7 +11,7 @@
 
 ---
 
-### Die 7 Paarlichter-Bewegungen (Reihe 1)
+### Die 7 Paarlichter-Bewegungen (Reihe 2)
 Tippe eine an — sie läuft sofort über die gewählte Farbe:
 
 | Kachel | Was passiert |
@@ -24,10 +24,10 @@ Tippe eine an — sie läuft sofort über die gewählte Farbe:
 | **Funkeln** | Zufällige Lampen blitzen kurz auf (Sparkle). |
 | **Blitz** | Alle zusammen schnell an/aus (Stroboskop über den Dimmer). |
 
-### Spider & Moving Head (Reihe 2)
+### Spider & Moving Head (Reihe 3)
 **Spider Puls**, **Spider Welle**, **MH Puls** — dieselben Bewegungen getrennt für die anderen Gruppen.
 
-### Helligkeits-Splits (Reihe 3)
+### Helligkeits-Splits (Reihe 4)
 **Dim Links / Dim Rechts / Dim ungerade / Dim gerade** — feste Hälften/Muster zum schnellen Aufteilen.
 
 ---
@@ -35,7 +35,9 @@ Tippe eine an — sie läuft sofort über die gewählte Farbe:
 ### Schritt-für-Schritt (Beispiel: pulsierendes Warmweiß)
 1. **Bank 1** → **„Feste Farbe"** → eine Farb-Kachel (z. B. **Orange**). Alle Paarlichter orange.
 2. **Bank 2** → **„Puls"**. → Das Orange atmet jetzt.
-3. Tempo: rechts der Fader **„Dimmer-Tempo"** oder global auf den Beat (Bank 4).
+3. Tempo: die Dimmer-Bewegungen hängen an **Bus A** — in **Bank 4** Fader **„Tempo Bus A“** bzw. Dial
+   **„Master A“**. (Der Fader „Dimmer-Tempo“ links unten stellt nur die Eigengeschwindigkeit; bei
+   laufendem Bus A wirkt sie nicht.)
 
 ### Warum das funktioniert
 Dimmer-Effekte schreiben **nur den Dimmerkanal** — die Farbkanäle (aus Bank 1) bleiben unberührt.
@@ -43,5 +45,7 @@ Beide Schichten kombinieren sich automatisch. Darum kannst du jede Farbe mit jed
 
 ### Sofort weiterprobieren
 - **Pro Gruppe verschieden:** Paarlichter „Lauflicht" + Spider „Puls" gleichzeitig (eigene Kacheln).
-- **Tempo koppeln:** in **Bank 4** läuft der Dimmer **doppelt so schnell** wie der Farbwechsel, beide auf demselben Taktschlag (Bus A, „Sync jetzt").
-- **Regler:** **„Dimmer-Master"** (Gesamthelligkeit der Bewegung), **„Dimmer-Lvl"** (Stepper, Mindesthelligkeit).
+- **Tempo koppeln:** der Dimmer läuft **doppelt so schnell** wie der Farbwechsel (die Dimmer-Effekte hängen mit
+  ×2 an Bus A), beide auf demselben Taktschlag; „Sync Bus A“ (Bank 4) setzt sie auf die Eins.
+- **Regler:** **„Dimmer-Master“** (Helligkeit des gerade aktiven Effekts), **„Dimmer-Lvl“** (Stepper,
+  Höchsthelligkeit der Grundfarbe Amber).
