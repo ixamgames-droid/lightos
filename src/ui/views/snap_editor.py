@@ -34,6 +34,7 @@ from src.core.engine.snap_library import get_snap_library
 from src.core.attr_groups import (  # kanonisch, kein Zyklus
     classify_attr as _classify_attr,
     attr_label as _attr_label,
+    group_label as _group_label,
 )
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
 
@@ -230,7 +231,8 @@ class _AddChannelDialog(QDialog):
         else:
             v.addWidget(QLabel("Welche Kanäle nachtragen?"))
             for attr in addable:
-                grp = _classify_attr(attr)
+                # UI-56: Anzeigename der Gruppe („Optik" statt „Beam").
+                grp = _group_label(_classify_attr(attr))
                 cb = QCheckBox(f"{_attr_label_for(attr, self._fixtures)}  ·  {grp}")
                 v.addWidget(cb)
                 self._checks[attr] = cb
@@ -474,7 +476,7 @@ class SnapEditor(QWidget):
             label, chan_name, dmx = self._resolve(fixtures.get(fid), attr)
             tbl.setItem(r, 0, QTableWidgetItem(f"{label}  (FID {fid})"))
             tbl.setItem(r, 1, QTableWidgetItem(chan_name))
-            tbl.setItem(r, 2, QTableWidgetItem(_classify_attr(attr)))
+            tbl.setItem(r, 2, QTableWidgetItem(_group_label(_classify_attr(attr))))
             dmx_item = QTableWidgetItem("—" if dmx is None else str(dmx))
             dmx_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             tbl.setItem(r, 3, dmx_item)

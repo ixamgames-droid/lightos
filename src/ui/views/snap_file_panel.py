@@ -38,6 +38,7 @@ from src.core.attr_groups import (
     ATTR_GROUP_ORDER as _ATTR_GROUP_ORDER,
     classify_attr as _classify_attr,
     attr_label as _attr_label,
+    group_label as _group_label,
 )
 
 
@@ -268,7 +269,8 @@ class ChannelSelectDialog(QDialog):
 
             row = QHBoxLayout()
             row.setSpacing(4)
-            cb = QCheckBox(f"{grp}  ({total} Wert{'e' if total != 1 else ''})")
+            # UI-56: Anzeigename („Optik" statt „Beam"); Schluessel bleibt grp.
+            cb = QCheckBox(f"{_group_label(grp)}  ({total} Wert{'e' if total != 1 else ''})")
             cb.setChecked(True)
             self._checks[grp] = cb
             row.addWidget(cb)
