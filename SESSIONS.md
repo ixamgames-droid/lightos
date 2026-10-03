@@ -35,7 +35,6 @@
 | DOC-40 | C | - | 2026-10-02T11:11Z | docs/anleitung_farbchase/ANLEITUNG_FARBCHASE.md |
 | DOC-41 | C | - | 2026-10-02T11:11Z | docs/anleitung_colorfade_vc/ANLEITUNG_COLORFADE_VC.md |
 | DOC-42 | C | - | 2026-10-02T11:57Z | docs/anleitung_ablaeufe/ANLEITUNG_ABLAEUFE_MISCHEN.md · tools/build_event_demo_2026.py · tests/test_doc42_bank7_beschriftung.py · changelog.d/2026-10-02-DOC-42.md |
-| QA-82 | C | - | 2026-10-02T11:14Z | tests/test_qa58_bibliothek_schema_unberuehrt.py · BACKLOG.md |
 | DOC-43 | C | - | 2026-10-02T11:58Z | docs/anleitung_vc_workflow/ANLEITUNG_VC_WORKFLOW.md |
 | FM-46c | A | feat/fm46-qxf-head | 2026-10-02T11:59Z | - |
 | DOC-44 | C | - | 2026-10-02T12:00Z | docs/anleitung_vc/ANLEITUNG_VC.md |
@@ -158,7 +157,6 @@
 
 ## Verlauf
 
-- 2026-10-02T13:05Z C claim DOC-56
 - 2026-10-02T13:38Z C done XPLAT-34
 - 2026-10-02T13:50Z C done FM-33
 - 2026-10-02T16:55Z A done TOOL-9
@@ -188,3 +186,4 @@
 - 2026-10-02T23:30Z B done OUT-59
 - 2026-10-02T23:57Z B done OUT-60
 - 2026-10-03T00:13Z C done UI-56
+- 2026-10-03T00:33Z C done QA-82
