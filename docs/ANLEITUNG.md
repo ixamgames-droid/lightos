@@ -149,7 +149,7 @@ sowie **Assistent · EFX · Matrix · Paletten**. Pro Kanal ein Fader
 - **Gobo-Tab** (nur bei Gobo-fähigen Geräten sichtbar): Gobo-Kacheln **mit
   grafischer Vorschau**, Shake-Kacheln + Shake-Geschwindigkeit,
   Gobo-Wechsel-Slider, Gobo-FX-Fader.
-- **Weitere-Tab:** restliche Kanäle (Beam/Effect/…) + **„⟳ Moving Head
+- **Weitere-Tab:** restliche Kanäle (Optik wie Zoom/Fokus/Prisma, Effekte, …) + **„⟳ Moving Head
   Reset…"**-Button (mit Sicherheitsabfrage, setzt sich automatisch zurück).
 - **Assistent · EFX · Matrix · Paletten:** hier baust du Effekte und Presets direkt
   im Programmer — **Assistent** („Effekt-Assistent…", „+ Szene", „+ Chaser",

@@ -476,7 +476,7 @@ mh_strobe = mh_scene("MH Strobe", col=MHCOL["weiss"], strobe=True)
 # ── BEWEGUNG (EFX) — alle 10 Figuren ────────────────────────────────────────────────
 def efx(name, algo, fids, phase_mode="fan", spread=1.0, counter=False, mirror=False,
         x=128.0, y=128.0, size=150.0, speed_hz=0.45, xf=3.0, yf=2.0, direction="forward",
-        bus="", mult=1.0):
+        bus="", mult=1.0, rotation=0.0):
     e = fm.new_efx(name)
     e.algorithm = algo
     e.fixtures = [EfxFixture(fid=f) for f in fids]
@@ -486,6 +486,7 @@ def efx(name, algo, fids, phase_mode="fan", spread=1.0, counter=False, mirror=Fa
     e.phase_mode, e.counter_rotate, e.mirror = phase_mode, counter, mirror
     e.x_freq, e.y_freq = xf, yf
     e.direction = direction
+    e.rotation = rotation
     if bus:
         e.tempo_bus_id = bus
         e.tempo_multiplier = mult
@@ -495,7 +496,10 @@ def efx(name, algo, fids, phase_mode="fan", spread=1.0, counter=False, mirror=Fa
 
 efx_circle   = efx("Kreis", EfxAlgorithm.CIRCLE, mover_fids, phase_mode="fan", counter=True, size=150, speed_hz=0.5)
 efx_eight    = efx("Acht", EfxAlgorithm.EIGHT, mh_fids, phase_mode="sync", size=140, speed_hz=0.4)
-efx_line     = efx("Linie (Spider Wippe)", EfxAlgorithm.LINE, spider_fids, phase_mode="offset", size=220, speed_hz=0.7)
+# DOC-53: LINE laeuft auf der Pan-Achse, der Spider hat keinen Pan -> ohne
+# Drehung um 90 Grad stand die Wippe still (wie DOC-37 in der Event-Demo).
+efx_line     = efx("Linie (Spider Wippe)", EfxAlgorithm.LINE, spider_fids, phase_mode="offset", size=220, speed_hz=0.7,
+                   rotation=90.0)
 efx_diamond  = efx("Raute", EfxAlgorithm.DIAMOND, mh_fids, phase_mode="sync", size=150, speed_hz=0.4)
 efx_square   = efx("Rechteck", EfxAlgorithm.SQUARE, mh_fids, phase_mode="sync", size=150, speed_hz=0.35)
 efx_trapez   = efx("Trapez", EfxAlgorithm.TRAPEZ, mh_fids, phase_mode="sync", size=160, speed_hz=0.35)

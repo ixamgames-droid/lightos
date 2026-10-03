@@ -6,7 +6,7 @@ In dieser Anleitung lernst du, wie du in LightOS eine leere Show anlegst und sie
 
 ![Datei-Menü geöffnet mit dem Eintrag "Neue Show / Ctrl+N"](img/01_datei_menue_neue_show.png)
 
-2. Bestätige den Dialog **„Aktuelle Show komplett verwerfen und leer neu beginnen?"** mit **Yes**. Dadurch werden gepatchte Fixtures, Virtual Console, Funktionen, Paletten und Bibliothek geleert.
+2. Bestätige den Dialog **„Aktuelle Show komplett verwerfen und leer neu beginnen?"** mit **Ja**. Dadurch werden gepatchte Fixtures, Virtual Console, Funktionen, Paletten und Bibliothek geleert. Hat die aktuelle Show ungespeicherte Änderungen, fragt LightOS stattdessen **„Vor dem Leeren speichern?"** (Speichern / Verwerfen / Abbrechen).
 
 ![Bestätigungsdialog zum Verwerfen der aktuellen Show mit Yes/No](img/02_neue_show_bestaetigung.png)
 

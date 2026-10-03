@@ -5,16 +5,23 @@
 > spontanen Farbsequenzen-Bauen.
 >
 > Show: `shows/Event_Demo_2026.lshow`, **Bank 7 „Abläufe / Mischen"** (SCENE-Taste 7).
+> Die Show liegt nicht im Repository; erzeugen mit
+> `./venv/bin/python tools/build_event_demo_2026.py` (Windows:
+> `venv\Scripts\python.exe tools\build_event_demo_2026.py`).
 > Diese Anleitung wurde **live in der App durchgeklickt**.
 
 ![Bank 7 Übersicht](img/01_bank7_uebersicht.png)
+
+> Hinweis: Das Bild stammt aus einem älteren Stand und zeigt rechts noch das frühere Chase-Builder-Panel (Farbfelder, Speed, Hold). Auf Bank 7 gibt es diese eigene Anzeige der Farbfolge nicht mehr; der Text unten beschreibt den aktuellen Stand. Das Bild wird beim nächsten Bebildern neu aufgenommen.
 
 ---
 
 ## 1. Misch-Abläufe (Reihe 0) — der schnellste Weg zum fertigen Look
 
 Jede dieser Tasten ist eine **Collection** = mehrere Effekte gleichzeitig (Farbe + Bewegung +
-ggf. Strobo) auf einen Druck. Exklusiv — ein neuer Mix löst den vorigen ab:
+ggf. Strobo) auf einen Druck. **Exklusiv:** Ein Mix-Knopf stoppt beim Drücken **alle**
+laufenden Effekte sofort (auch Chaser, Live-Chase und Effekte anderer Bänke) und leert
+den Programmer — danach läuft nur der neue Mix. Die Cuelisten (GO) laufen weiter.
 
 | Taste | Kombiniert |
 |---|---|
@@ -49,8 +56,9 @@ Laufende Sequenzen, die Szenen/Looks der Reihe nach durchschalten:
 
 ## 3. Beat-Sync-Cuelisten — GO (Reihe 2) + Anzeige rechts
 
-Drei Cuelisten laufen **zur Musik** (zwei beat-genau, eine als Zeit-Fade). Die GO-Tasten starten/stoppen sie, rechts
-zeigen die Cuelisten-Fenster den aktuellen Schritt:
+Drei Cuelisten laufen **zur Musik** (zwei beat-genau, eine als Zeit-Fade). Die GO-Tasten
+starten sie (erster Druck = Cue 1, jeder weitere Druck = nächster Cue); **gestoppt** wird
+mit **■** im Cuelisten-Fenster rechts. Die Fenster zeigen den aktuellen Schritt:
 
 | GO-Taste | Cueliste |
 |---|---|
@@ -64,13 +72,20 @@ Die Fader **Dim 1/2/3** regeln die Helligkeit der jeweiligen Cueliste.
 
 - **Farb-Kacheln (Reihe 4):** Rot/Orange/Gelb/Grün/Cyan/Blau/Magenta/Weiß antippen =
   diese Farbe **zur Live-Sequenz hinzufügen**.
-- **Reihe 3:** **Live-Chase** (Start/Stop) · **Leeren** · **Farbe −/+** (in der Sequenz blättern).
-- Rechts die **Chase-Liste** (`VCColorList`) — sie **zeigt** die gebaute Farbfolge an.
+- **Reihe 3:** **Live-Chase** (Start/Stop) · **Leeren** · **Farbe -/+** (wählt nur den
+  markierten Eintrag der Folge; am Ausgang ändert sich dadurch nichts).
+- Der Live-Chase ist ein **Color Fade**: alle PAR und Spider blenden **gemeinsam** durch
+  die Folge (kein Lauflicht). Ab Werk stehen schon **Grün/Weiß/Blau** drin; angetippte
+  Farben kommen hinten dazu.
+- Eine eigene Anzeige der Farbfolge gibt es auf Bank 7 nicht; die Folge siehst du im
+  Matrix-Editor (**Programmer → Matrix → „Live-Chase"**, Farbfolge) bzw. auf der Bühne.
   > Der frühere **Chase-Builder** ist am 2026-06-30 entfernt worden. Gebaut wird die
-  > Folge seither über die Farb-Kacheln und die Live-Aktionen (Reihe 3/4); Tempo und
-  > Übergang stellt man am Effekt selbst ein (Effekt-Editor-Box oder Tempo-Regler).
+  > Folge seither über die Farb-Kacheln und die Live-Aktionen (Reihe 3/4). Tempo und
+  > Übergang stellt man im Matrix-Editor ein: bei laufender BPM **Tempo ×**, dazu die
+  > **Übergangs-Pause**; ein Speed-Fader wirkt nur, solange keine BPM läuft.
 
-So baust du **während** der Show eine eigene Farbfolge: Farben antippen → „Live-Chase" starten.
+So baust du **während** der Show eine eigene Farbfolge: **Leeren** drücken → Farben
+antippen → **Live-Chase** starten.
 
 ---
 
@@ -78,6 +93,7 @@ So baust du **während** der Show eine eigene Farbfolge: Farben antippen → „
 
 1. Schneller Einstieg: **Mix: Party** (oder Chill/Drop/Theme) drücken → kompletter Look läuft.
 2. Für Spannung: zusätzlich eine **Beat-Sync-Cueliste** mit **GO** dazuschalten.
-3. Eigener Akzent: ein paar **Farb-Kacheln** antippen → **Live-Chase** starten.
+3. Eigener Akzent: **Leeren**, ein paar **Farb-Kacheln** antippen → **Live-Chase** starten
+   (kein Mix-Knopf danach — der würde den Live-Chase wieder stoppen).
 4. Tempo aller Abläufe taktgenau koppeln → siehe
    [Speed/BPM-Anleitung](../anleitung_speed_bpm/ANLEITUNG_SPEED_BPM.md).

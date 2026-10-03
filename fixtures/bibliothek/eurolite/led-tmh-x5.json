@@ -1,0 +1,447 @@
+{
+  "format_version": 1,
+  "hersteller": "Eurolite",
+  "hersteller_kurz": "Eurolite",
+  "modell": "LED TMH-X5",
+  "kurzname": "LED TMH-X5",
+  "typ": "moving_head",
+  "leistung_w": 220,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Eurolite-LED-TMH-X5.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Eurolite/Eurolite-LED-TMH-X5.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.5 GIT · Sebastian Moeckel",
+    "original": "resources/fixtures/Eurolite/Eurolite-LED-TMH-X5.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 164 Wertebereiche mit Art (kind) versehen; Dimmer-Ansprechzeit speed -> raw (keine Bewegungsgeschwindigkeit); Farbvoreinstellungen 1: Grundfarben als 'color', Presets ohne die falsche Art 'reset', Farbueberblendung 'rotate'; Farbvoreinstellungen 2: Farbbereiche als 'color', Tippfehler 'lavander' korrigiert; Helligkeit der Farbvoreinstellungen intensity -> raw (kein Master-Dimmer, laeuft 100->0 %), Highlight 0; Chaser/LED-Muster macro -> effect, Chaser-Geschwindigkeit -> effect_speed mit Default 128 (Stillstand-Mitte), Chaser-Fade -> raw; 28-Kanal-Modus: Raster 1x3 fuer Segmente A/B/C"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Datei und die LightOS-Attributliste geprueft (Attribute, Bereichs-Arten, Defaults, Raster); Herstellerhandbuch mit DMX-Tabelle war nicht abrufbar (Steinigke liefert nur Datenblaetter ohne DMX-Protokoll), daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "20 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Strobe", "attribut": "shutter", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Dimmer speed (step response)",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 49, "name": "Dimmer speed 1", "art": ""},
+            {"von": 50, "bis": 99, "name": "Dimmer speed 2", "art": ""},
+            {"von": 100, "bis": 149, "name": "Dimmer speed 3", "art": ""},
+            {"von": 150, "bis": 255, "name": "Dimmer speed 4", "art": ""}
+          ]
+        },
+        {"name": "Zoom", "attribut": "zoom", "default": 0, "highlight": 0},
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Color presets 1",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "No function", "art": ""},
+            {"von": 5, "bis": 29, "name": "Red", "art": "color"},
+            {"von": 30, "bis": 54, "name": "Green", "art": "color"},
+            {"von": 55, "bis": 79, "name": "Blue", "art": "color"},
+            {"von": 80, "bis": 104, "name": "White", "art": "color"},
+            {"von": 105, "bis": 129, "name": "Color preset 1", "art": ""},
+            {"von": 130, "bis": 154, "name": "Color preset 2", "art": ""},
+            {"von": 155, "bis": 174, "name": "Color preset 3", "art": ""},
+            {"von": 175, "bis": 179, "name": "Color preset 4", "art": ""},
+            {"von": 180, "bis": 184, "name": "Color preset 5", "art": ""},
+            {"von": 185, "bis": 189, "name": "Color preset 6", "art": ""},
+            {"von": 190, "bis": 194, "name": "Color preset 7", "art": ""},
+            {"von": 195, "bis": 199, "name": "Color preset 8", "art": ""},
+            {"von": 200, "bis": 204, "name": "Color preset 9", "art": ""},
+            {"von": 205, "bis": 209, "name": "Color preset 10", "art": ""},
+            {"von": 210, "bis": 210, "name": "No function", "art": ""},
+            {"von": 211, "bis": 255, "name": "Color fade", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Color presets 2",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "No function", "art": ""},
+            {"von": 5, "bis": 9, "name": "White 1", "art": "color"},
+            {"von": 10, "bis": 14, "name": "White 2", "art": "color"},
+            {"von": 15, "bis": 19, "name": "White 3", "art": "color"},
+            {"von": 20, "bis": 24, "name": "White 4", "art": "color"},
+            {"von": 25, "bis": 29, "name": "White 5", "art": "color"},
+            {"von": 30, "bis": 34, "name": "White 6", "art": "color"},
+            {"von": 35, "bis": 39, "name": "Red", "art": "color"},
+            {"von": 40, "bis": 44, "name": "Green", "art": "color"},
+            {"von": 45, "bis": 49, "name": "Blue", "art": "color"},
+            {"von": 50, "bis": 54, "name": "Natural white", "art": "color"},
+            {"von": 55, "bis": 59, "name": "Full white", "art": "color"},
+            {"von": 60, "bis": 64, "name": "Yellow", "art": "color"},
+            {"von": 65, "bis": 69, "name": "Magenta", "art": "color"},
+            {"von": 70, "bis": 74, "name": "Cyan", "art": "color"},
+            {"von": 75, "bis": 79, "name": "Salmon", "art": "color"},
+            {"von": 80, "bis": 84, "name": "Turquoise", "art": "color"},
+            {"von": 85, "bis": 89, "name": "Light green", "art": "color"},
+            {"von": 90, "bis": 94, "name": "Steel blue", "art": "color"},
+            {"von": 95, "bis": 99, "name": "Orange", "art": "color"},
+            {"von": 100, "bis": 104, "name": "Straw", "art": "color"},
+            {"von": 105, "bis": 109, "name": "Pale lavender", "art": "color"},
+            {"von": 110, "bis": 114, "name": "Pink", "art": "color"},
+            {"von": 115, "bis": 119, "name": "Red/white", "art": "color"},
+            {"von": 120, "bis": 124, "name": "Green/red", "art": "color"},
+            {"von": 125, "bis": 129, "name": "Blue/green", "art": "color"},
+            {"von": 130, "bis": 134, "name": "White/red", "art": "color"},
+            {"von": 135, "bis": 139, "name": "Green/pink", "art": "color"},
+            {"von": 140, "bis": 144, "name": "Red/turquoise", "art": "color"},
+            {"von": 145, "bis": 255, "name": "Red/white/blue", "art": "color"}
+          ]
+        },
+        {
+          "name": "Dimmer intensity color presets",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Helligkeit der Farbvoreinstellungen 100 % -> 0 %", "art": ""}
+          ]
+        },
+        {
+          "name": "Chaser, LED patterns",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "No function", "art": ""},
+            {"von": 1, "bis": 14, "name": "LEDs off", "art": ""},
+            {"von": 15, "bis": 30, "name": "Pattern 1", "art": ""},
+            {"von": 31, "bis": 46, "name": "Pattern 2", "art": ""},
+            {"von": 47, "bis": 62, "name": "Pattern 3", "art": ""},
+            {"von": 63, "bis": 78, "name": "Pattern 4", "art": ""},
+            {"von": 79, "bis": 94, "name": "Pattern 5", "art": ""},
+            {"von": 95, "bis": 110, "name": "Pattern 6", "art": ""},
+            {"von": 111, "bis": 126, "name": "Chaser 1", "art": ""},
+            {"von": 127, "bis": 142, "name": "Chaser 2", "art": ""},
+            {"von": 143, "bis": 158, "name": "Chaser 3", "art": ""},
+            {"von": 159, "bis": 174, "name": "Chaser 4", "art": ""},
+            {"von": 175, "bis": 190, "name": "Chaser 5", "art": ""},
+            {"von": 191, "bis": 206, "name": "Chaser 6", "art": ""},
+            {"von": 207, "bis": 222, "name": "Chaser 7", "art": ""},
+            {"von": 223, "bis": 238, "name": "Chaser 8", "art": ""},
+            {"von": 239, "bis": 255, "name": "Chaser 9", "art": ""}
+          ]
+        },
+        {
+          "name": "Chaser speed",
+          "attribut": "effect_speed",
+          "default": 128,
+          "highlight": 128,
+          "bereiche": [
+            {"von": 0, "bis": 125, "name": "With decreasing speed backwards", "art": ""},
+            {"von": 126, "bis": 130, "name": "No function", "art": ""},
+            {"von": 131, "bis": 255, "name": "With increasing speed forwards", "art": ""}
+          ]
+        },
+        {
+          "name": "Chaser fade",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Fading", "art": ""}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 79, "name": "No function", "art": ""},
+            {"von": 80, "bis": 99, "name": "Reset all motors", "art": "reset"},
+            {"von": 100, "bis": 255, "name": "No function", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "28 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Strobe", "attribut": "shutter", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Dimmer speed (step response)",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 49, "name": "Dimmer speed 1", "art": ""},
+            {"von": 50, "bis": 99, "name": "Dimmer speed 2", "art": ""},
+            {"von": 100, "bis": 149, "name": "Dimmer speed 3", "art": ""},
+            {"von": 150, "bis": 255, "name": "Dimmer speed 4", "art": ""}
+          ]
+        },
+        {"name": "Zoom", "attribut": "zoom", "default": 0, "highlight": 0},
+        {
+          "name": "Red segment A",
+          "attribut": "color_r",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Red 0-100% increasing", "art": ""}
+          ]
+        },
+        {
+          "name": "Green segment A",
+          "attribut": "color_g",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Green 0-100% increasing", "art": ""}
+          ]
+        },
+        {
+          "name": "Blue segment A",
+          "attribut": "color_b",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Blue 0-100% increasing", "art": ""}
+          ]
+        },
+        {
+          "name": "White segment A",
+          "attribut": "color_w",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "White 0-100% increasing", "art": ""}
+          ]
+        },
+        {
+          "name": "Red segment B",
+          "attribut": "color_r",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Red 0-100% increasing", "art": ""}
+          ]
+        },
+        {
+          "name": "Green segment B",
+          "attribut": "color_g",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Green 0-100% increasing", "art": ""}
+          ]
+        },
+        {
+          "name": "Blue segment B",
+          "attribut": "color_b",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Blue 0-100% increasing", "art": ""}
+          ]
+        },
+        {
+          "name": "White segment B",
+          "attribut": "color_w",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "White 0-100% increasing", "art": ""}
+          ]
+        },
+        {
+          "name": "Red segment C",
+          "attribut": "color_r",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Red 0-100% increasing", "art": ""}
+          ]
+        },
+        {
+          "name": "Green segment C",
+          "attribut": "color_g",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Green 0-100% increasing", "art": ""}
+          ]
+        },
+        {
+          "name": "Blue segment C",
+          "attribut": "color_b",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Blue 0-100% increasing", "art": ""}
+          ]
+        },
+        {
+          "name": "White segment C",
+          "attribut": "color_w",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "White 0-100% increasing", "art": ""}
+          ]
+        },
+        {
+          "name": "Color presets 1",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "No function", "art": ""},
+            {"von": 5, "bis": 29, "name": "Red", "art": "color"},
+            {"von": 30, "bis": 54, "name": "Green", "art": "color"},
+            {"von": 55, "bis": 79, "name": "Blue", "art": "color"},
+            {"von": 80, "bis": 104, "name": "White", "art": "color"},
+            {"von": 105, "bis": 129, "name": "Color preset 1", "art": ""},
+            {"von": 130, "bis": 154, "name": "Color preset 2", "art": ""},
+            {"von": 155, "bis": 174, "name": "Color preset 3", "art": ""},
+            {"von": 175, "bis": 179, "name": "Color preset 4", "art": ""},
+            {"von": 180, "bis": 184, "name": "Color preset 5", "art": ""},
+            {"von": 185, "bis": 189, "name": "Color preset 6", "art": ""},
+            {"von": 190, "bis": 194, "name": "Color preset 7", "art": ""},
+            {"von": 195, "bis": 199, "name": "Color preset 8", "art": ""},
+            {"von": 200, "bis": 204, "name": "Color preset 9", "art": ""},
+            {"von": 205, "bis": 209, "name": "Color preset 10", "art": ""},
+            {"von": 210, "bis": 210, "name": "No function", "art": ""},
+            {"von": 211, "bis": 255, "name": "Color fade", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Color presets 2",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "No function", "art": ""},
+            {"von": 5, "bis": 9, "name": "White 1", "art": "color"},
+            {"von": 10, "bis": 14, "name": "White 2", "art": "color"},
+            {"von": 15, "bis": 19, "name": "White 3", "art": "color"},
+            {"von": 20, "bis": 24, "name": "White 4", "art": "color"},
+            {"von": 25, "bis": 29, "name": "White 5", "art": "color"},
+            {"von": 30, "bis": 34, "name": "White 6", "art": "color"},
+            {"von": 35, "bis": 39, "name": "Red", "art": "color"},
+            {"von": 40, "bis": 44, "name": "Green", "art": "color"},
+            {"von": 45, "bis": 49, "name": "Blue", "art": "color"},
+            {"von": 50, "bis": 54, "name": "Natural white", "art": "color"},
+            {"von": 55, "bis": 59, "name": "Full white", "art": "color"},
+            {"von": 60, "bis": 64, "name": "Yellow", "art": "color"},
+            {"von": 65, "bis": 69, "name": "Magenta", "art": "color"},
+            {"von": 70, "bis": 74, "name": "Cyan", "art": "color"},
+            {"von": 75, "bis": 79, "name": "Salmon", "art": "color"},
+            {"von": 80, "bis": 84, "name": "Turquoise", "art": "color"},
+            {"von": 85, "bis": 89, "name": "Light green", "art": "color"},
+            {"von": 90, "bis": 94, "name": "Steel blue", "art": "color"},
+            {"von": 95, "bis": 99, "name": "Orange", "art": "color"},
+            {"von": 100, "bis": 104, "name": "Straw", "art": "color"},
+            {"von": 105, "bis": 109, "name": "Pale lavender", "art": "color"},
+            {"von": 110, "bis": 114, "name": "Pink", "art": "color"},
+            {"von": 115, "bis": 119, "name": "Red/white", "art": "color"},
+            {"von": 120, "bis": 124, "name": "Green/red", "art": "color"},
+            {"von": 125, "bis": 129, "name": "Blue/green", "art": "color"},
+            {"von": 130, "bis": 134, "name": "White/red", "art": "color"},
+            {"von": 135, "bis": 139, "name": "Green/pink", "art": "color"},
+            {"von": 140, "bis": 144, "name": "Red/turquoise", "art": "color"},
+            {"von": 145, "bis": 255, "name": "Red/white/blue", "art": "color"}
+          ]
+        },
+        {
+          "name": "Dimmer intensity color presets",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Helligkeit der Farbvoreinstellungen 100 % -> 0 %", "art": ""}
+          ]
+        },
+        {
+          "name": "Chaser, LED patterns",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "No function", "art": ""},
+            {"von": 1, "bis": 14, "name": "LEDs off", "art": ""},
+            {"von": 15, "bis": 30, "name": "Pattern 1", "art": ""},
+            {"von": 31, "bis": 46, "name": "Pattern 2", "art": ""},
+            {"von": 47, "bis": 62, "name": "Pattern 3", "art": ""},
+            {"von": 63, "bis": 78, "name": "Pattern 4", "art": ""},
+            {"von": 79, "bis": 94, "name": "Pattern 5", "art": ""},
+            {"von": 95, "bis": 110, "name": "Pattern 6", "art": ""},
+            {"von": 111, "bis": 126, "name": "Chaser 1", "art": ""},
+            {"von": 127, "bis": 142, "name": "Chaser 2", "art": ""},
+            {"von": 143, "bis": 158, "name": "Chaser 3", "art": ""},
+            {"von": 159, "bis": 174, "name": "Chaser 4", "art": ""},
+            {"von": 175, "bis": 190, "name": "Chaser 5", "art": ""},
+            {"von": 191, "bis": 206, "name": "Chaser 6", "art": ""},
+            {"von": 207, "bis": 222, "name": "Chaser 7", "art": ""},
+            {"von": 223, "bis": 238, "name": "Chaser 8", "art": ""},
+            {"von": 239, "bis": 255, "name": "Chaser 9", "art": ""}
+          ]
+        },
+        {
+          "name": "Chaser speed",
+          "attribut": "effect_speed",
+          "default": 128,
+          "highlight": 128,
+          "bereiche": [
+            {"von": 0, "bis": 125, "name": "With decreasing speed backwards", "art": ""},
+            {"von": 126, "bis": 130, "name": "No function", "art": ""},
+            {"von": 131, "bis": 255, "name": "With increasing speed forwards", "art": ""}
+          ]
+        },
+        {
+          "name": "Chaser fade",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Fading", "art": ""}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 79, "name": "No function", "art": ""},
+            {"von": 80, "bis": 99, "name": "Reset all motors", "art": "reset"},
+            {"von": 100, "bis": 255, "name": "No function", "art": ""}
+          ]
+        }
+      ],
+      "raster": {"rows": 1, "cols": 3}
+    }
+  ],
+  "notizen": "Strobe-Kanal in QLC+ nur als Preset 'Strobe langsam->schnell' ohne Offen-Bereich hinterlegt; Werte ungeprueft."
+}

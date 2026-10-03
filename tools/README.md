@@ -83,6 +83,7 @@
 | `pseudonymisieren.py` | pseudonymisieren.py — Klarnamen im OEFFENTLICHEN Repo durch ein Pseudonym ersetzen. |
 | `render_apc_pages.py` | Rendert jede Seite (VC-Bank) der APC-Test-Show als PNG — fuer die Anleitung. |
 | `render_neue_demo_pages.py` | Rendert die 5 Banks der Neue_Demo_2026-Show als PNG (für die Doku/Vorschau). |
+| `qt_module_befund.py` | XPLAT-45 — welche Qt-Module (v. a. QtWebEngine) bringt das installierte PySide6 mit? |
 | `session_claim.py` | session_claim.py — Belegzettel fuer parallel arbeitende Claude-Sitzungen. |
 | `ui_verification_checklist.py` | QA-12 UI-Verifikations-Checklisten-Generator/-Checker. |
 | `upgrade_shows.py` | Alt-Shows auf das aktuelle Show-Format (``show_file.SHOW_VERSION``) heben. |

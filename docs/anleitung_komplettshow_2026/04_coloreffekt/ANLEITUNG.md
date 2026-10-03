@@ -8,7 +8,7 @@ In dieser Anleitung lernst du, wie du im Programmer über den Color-Tab Farben f
 
 ![Programmer, PAR-Gruppe gewählt, Color-Tab mit Schnellwahl („Schnellwahl:"), RGBW-Slider und Lampen-Vorschau](img/01_color_tab_par_ausgewaehlt.png)
 
-2. Klicke auf die Schnellfarbe **„Rot"**. Alle 8 PAR werden rot, der Rot-Slider steht auf 255.
+2. Klicke auf die Schnellfarbe **„Rot"**. Alle 8 PAR bekommen Rot, der Rot-Slider steht auf 255. Sichtbar wird es erst mit Dimmer: **„Farbe macht automatisch hell"** (Menü **Programmer**) ist standardmäßig aus, und der Dimmer der PAR steht ab Werk auf 0.
 
 ![Alle 8 PAR rot, Rot-Slider auf 255](img/02_alles_rot.png)
 
@@ -16,7 +16,7 @@ In dieser Anleitung lernst du, wie du im Programmer über den Color-Tab Farben f
 
 ![Dialog „Kanäle auswählen", nur „Color (32 Werte)" angehakt](img/03_speichern_nur_color_dialog.png)
 
-4. Nutze das **Fächer-Tool** (Programmer-Toolbar-Button **„Fächer…"** bzw. **„Fächern: PAR…"**), um **ein einzelnes Attribut** über die Geräte zu fächern. Wähle im Dialog unter **„Attribut:"** den Farbkanal (z. B. **„Blau"**) und lass ihn über die PARs ansteigen – ein **„Fächer anwenden"** wirkt immer nur auf **ein** Attribut. (Ein echter Magenta→Blau-Übergang bräuchte mehrere gefächerte Kanäle und ist mit einem einzigen Fächer nicht herstellbar.) Klicke auf **„Fächer anwenden"** und speichere das Ergebnis als **„PAR Verlauf"**.
+4. Nutze das **Fächer-Tool** (Programmer-Toolbar-Button **„Fächer..."** bzw. im Color-Tab **„Fächern: Farbe..."**), um **ein einzelnes Attribut** über die Geräte zu fächern. Wähle im Dialog unter **„Attribut:"** den Farbkanal (z. B. **„Blau"**) und lass ihn über die PARs ansteigen – ein **„Fächer anwenden"** wirkt immer nur auf **ein** Attribut. (Ein echter Magenta→Blau-Übergang bräuchte mehrere gefächerte Kanäle und ist mit einem einzigen Fächer nicht herstellbar.) Klicke auf **„Fächer anwenden"** und speichere das Ergebnis als **„PAR Verlauf"**.
 
 ![Fan Tool Color, Blau-Kanal über die PARs gefächert](img/04_fan_color_verlauf.png)
 
@@ -36,6 +36,6 @@ Das Ergebnis: saubere Farb-Looks in der Bibliothek, die sich frei mit beliebigen
 
 ## Tipps / Fallen
 
-- Drücke vor jedem neuen Farb-Look **„Clear"** in der Programmer-Toolbar. Dann ist nichts Altes mehr scharf.
+- Drücke vor jedem neuen Farb-Look in der Programmer-Toolbar **„Alles löschen"**. Dann ist nichts Altes mehr scharf. (Ist eine Auswahl aktiv, heißt der Knopf **„Auswahl löschen (N)"** und leert nur die gewählten Geräte.)
 - Ein Slider kann **scharf sein und trotzdem 0 % anzeigen**. Verlass dich nicht auf die Optik – prüfe im Zweifel den Speichern-Dialog, welche Kanal-Gruppen wirklich gespeichert werden.
 - Kontrolliere im Dialog „Kanäle auswählen" immer, ob neben „Color" eine **„Intensity"**-Gruppe auftaucht. Wenn ja: abhaken, bevor du speicherst.

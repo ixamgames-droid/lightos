@@ -1,0 +1,192 @@
+{
+  "format_version": 1,
+  "hersteller": "Showtec",
+  "hersteller_kurz": "Showtec",
+  "modell": "Shark Wash One",
+  "kurzname": "SHARKWASH1",
+  "typ": "moving_head",
+  "leistung_w": 100,
+  "notizen": "Weicht von der QLC+-Datei ab (Kanalreihenfolge im 7-Kanal-Modus, Farbmakro-Raster); massgeblich ist Handbuch V1. Neuere Firmware koennte abweichen.",
+  "quelle": {
+    "titel": "Showtec Shark Wash One — User Manual (Ordercode 45020)",
+    "url": "https://images.static-thomann.de/pics/atg/atgdata/document/manual/419421_shark_wash_one_uk.pdf",
+    "version": "V1"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.3 GIT · Georg Müller",
+    "original": "resources/fixtures/Showtec/Showtec-Shark-Wash-One.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 81 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): gegen Handbuch V1 abgeglichen und Modi neu aufgebaut; kurzname SHARKWASH1; 7-Kanal: Reihenfolge korrigiert (Handbuch: Pan, Tilt, P/T-Tempo, Dimmer, Shutter, Farbmakros, Programme; QLC+ hatte Shutter auf Kanal 3); Farbmakro-Bereiche nach Handbuch (je 10 Werte; QLC+ hatte 6er-Raster bis 143); Farbprogramme ohne falsche art gobo, Mischfarben mit art color; Shutter-Default 0 (offen); Kanalnamen deutsch"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal fuer Kanal gegen das Herstellerhandbuch V1 (ueber Thomann) geprueft: 7- und 16-Kanal-Modus"
+  },
+  "modi": [
+    {
+      "name": "7 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Pan/Tilt-Tempo (0 = schnell, 255 = langsam)", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Shutter / Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Shutter offen", "art": "open"},
+            {"von": 10, "bis": 250, "name": "Strobe linear langsam -> schnell (0-20 Hz)", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Shutter offen", "art": "open"}
+          ]
+        },
+        {
+          "name": "Farbmakros",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Keine Funktion"},
+            {"von": 11, "bis": 20, "name": "Rot + 50 % Weiss", "art": "color"},
+            {"von": 21, "bis": 30, "name": "Rot", "art": "color"},
+            {"von": 31, "bis": 40, "name": "Rot + Amber", "art": "color"},
+            {"von": 41, "bis": 50, "name": "Amber", "art": "color"},
+            {"von": 51, "bis": 60, "name": "Rot + 75 % Gruen + Amber", "art": "color"},
+            {"von": 61, "bis": 70, "name": "Rot + Gruen", "art": "color"},
+            {"von": 71, "bis": 80, "name": "Gruen", "art": "color"},
+            {"von": 81, "bis": 90, "name": "Gruen + Weiss", "art": "color"},
+            {"von": 91, "bis": 100, "name": "Gruen + UV", "art": "color"},
+            {"von": 101, "bis": 110, "name": "Gruen + Blau", "art": "color"},
+            {"von": 111, "bis": 120, "name": "Blau + UV", "art": "color"},
+            {"von": 121, "bis": 130, "name": "Blau", "art": "color"},
+            {"von": 131, "bis": 140, "name": "UV", "art": "color"},
+            {"von": 141, "bis": 150, "name": "UV + 50 % Rot", "art": "color"},
+            {"von": 151, "bis": 160, "name": "UV + Amber", "art": "color"},
+            {"von": 161, "bis": 170, "name": "UV + Amber + Rot", "art": "color"},
+            {"von": 171, "bis": 180, "name": "UV + Rot", "art": "color"},
+            {"von": 181, "bis": 190, "name": "Rot + Weiss + Amber", "art": "color"},
+            {"von": 191, "bis": 200, "name": "Weiss + Amber", "art": "color"},
+            {"von": 201, "bis": 210, "name": "Weiss", "art": "color"},
+            {"von": 211, "bis": 220, "name": "Weiss + Blau", "art": "color"},
+            {"von": 221, "bis": 230, "name": "RGBWA+UV (alle)", "art": "color"},
+            {"von": 231, "bis": 240, "name": "Farbsprung-Programm langsam -> schnell"},
+            {"von": 241, "bis": 255, "name": "Farbueberblend-Programm langsam -> schnell"}
+          ]
+        },
+        {
+          "name": "Programme",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Keine Funktion"},
+            {"von": 11, "bis": 20, "name": "Programm 1"},
+            {"von": 21, "bis": 30, "name": "Programm 2"},
+            {"von": 31, "bis": 40, "name": "Programm 3"},
+            {"von": 41, "bis": 50, "name": "Programm 4"},
+            {"von": 51, "bis": 60, "name": "Programm 5"},
+            {"von": 61, "bis": 70, "name": "Programm 6"},
+            {"von": 71, "bis": 80, "name": "Programm 7"},
+            {"von": 81, "bis": 90, "name": "Programm 8"},
+            {"von": 91, "bis": 230, "name": "Musiksteuerung, Empfindlichkeit aus -> hoch", "art": "sound"},
+            {"von": 231, "bis": 240, "name": "Reset nach 3 s", "art": "reset"},
+            {"von": 241, "bis": 255, "name": "Keine Funktion"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "16 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fein", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fein", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt-Tempo (0 = schnell, 255 = langsam)", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Shutter / Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Shutter offen", "art": "open"},
+            {"von": 10, "bis": 250, "name": "Strobe linear langsam -> schnell (0-20 Hz)", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Shutter offen", "art": "open"}
+          ]
+        },
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {
+          "name": "Farbtemperatur",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Stufenlos 0-100 %"}
+          ]
+        },
+        {
+          "name": "Farbmakros",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Keine Funktion"},
+            {"von": 11, "bis": 20, "name": "Rot + 50 % Weiss", "art": "color"},
+            {"von": 21, "bis": 30, "name": "Rot", "art": "color"},
+            {"von": 31, "bis": 40, "name": "Rot + Amber", "art": "color"},
+            {"von": 41, "bis": 50, "name": "Amber", "art": "color"},
+            {"von": 51, "bis": 60, "name": "Rot + 75 % Gruen + Amber", "art": "color"},
+            {"von": 61, "bis": 70, "name": "Rot + Gruen", "art": "color"},
+            {"von": 71, "bis": 80, "name": "Gruen", "art": "color"},
+            {"von": 81, "bis": 90, "name": "Gruen + Weiss", "art": "color"},
+            {"von": 91, "bis": 100, "name": "Gruen + UV", "art": "color"},
+            {"von": 101, "bis": 110, "name": "Gruen + Blau", "art": "color"},
+            {"von": 111, "bis": 120, "name": "Blau + UV", "art": "color"},
+            {"von": 121, "bis": 130, "name": "Blau", "art": "color"},
+            {"von": 131, "bis": 140, "name": "UV", "art": "color"},
+            {"von": 141, "bis": 150, "name": "UV + 50 % Rot", "art": "color"},
+            {"von": 151, "bis": 160, "name": "UV + Amber", "art": "color"},
+            {"von": 161, "bis": 170, "name": "UV + Amber + Rot", "art": "color"},
+            {"von": 171, "bis": 180, "name": "UV + Rot", "art": "color"},
+            {"von": 181, "bis": 190, "name": "Rot + Weiss + Amber", "art": "color"},
+            {"von": 191, "bis": 200, "name": "Weiss + Amber", "art": "color"},
+            {"von": 201, "bis": 210, "name": "Weiss", "art": "color"},
+            {"von": 211, "bis": 220, "name": "Weiss + Blau", "art": "color"},
+            {"von": 221, "bis": 230, "name": "RGBWA+UV (alle)", "art": "color"},
+            {"von": 231, "bis": 240, "name": "Farbsprung-Programm langsam -> schnell"},
+            {"von": 241, "bis": 255, "name": "Farbueberblend-Programm langsam -> schnell"}
+          ]
+        },
+        {
+          "name": "Programme",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Keine Funktion"},
+            {"von": 11, "bis": 20, "name": "Programm 1"},
+            {"von": 21, "bis": 30, "name": "Programm 2"},
+            {"von": 31, "bis": 40, "name": "Programm 3"},
+            {"von": 41, "bis": 50, "name": "Programm 4"},
+            {"von": 51, "bis": 60, "name": "Programm 5"},
+            {"von": 61, "bis": 70, "name": "Programm 6"},
+            {"von": 71, "bis": 80, "name": "Programm 7"},
+            {"von": 81, "bis": 90, "name": "Programm 8"},
+            {"von": 91, "bis": 230, "name": "Musiksteuerung, Empfindlichkeit aus -> hoch", "art": "sound"},
+            {"von": 231, "bis": 240, "name": "Reset nach 3 s", "art": "reset"},
+            {"von": 241, "bis": 255, "name": "Keine Funktion"}
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -13,7 +13,7 @@ Oben in der Toolbar **Virtual Console** wählen. Anfangs ist der Canvas leer (Ra
 
 ![Leere VC](img/01_vc_leer.png)
 
-Klick oben links auf **Bearbeiten** (Schalter wird grün, Beschriftung „Bearbeiten ✓"). Jetzt erscheinen
+Klick oben links auf **Bearbeiten** (Schalter wird blau mit grüner Schrift, Beschriftung „Bearbeiten ✓"). Jetzt erscheinen
 die Widget-Werkzeugleiste und das Raster zum Platzieren. Die Werkzeugleiste hat **16 Schnell-Anlegen-
 Knöpfe** für je einen Widget-Typ:
 
@@ -21,9 +21,9 @@ Knöpfe** für je einen Widget-Typ:
 **Chase-Liste**, **Effekt-Farben**, **Label**, **Frame**, **Musik**, **BPM**, **Tempo-Bus**,
 **Tempo-Controller**, **Live-Edit**.
 
-Rechts daneben **↶ / ↷** (Rückgängig/Wiederholen, Strg+Z / Strg+Y). Fertige Vorlagen — etwa eine
-**Controller-Vorlage** für ein komplettes APC-mini-Layout — lassen sich zusätzlich über die Funktion
-**„Controller-Vorlage einfügen"** einsetzen (siehe *APC mini mappen*).
+Rechts daneben **↶ / ↷** (Rückgängig/Wiederholen, Strg+Z / Strg+Y). Eine fertige
+**Controller-Vorlage** (etwa ein komplettes APC-mini-Layout) lässt sich derzeit **nicht** per Knopf in
+die VC einfügen; den Aufbau übernimmst du Widget für Widget (siehe *APC mini mappen*).
 
 ![Bearbeiten-Modus](img/02_bearbeiten_modus.png)
 
@@ -37,13 +37,14 @@ vorangekreuzt: ein Klick auf **Erstellen** liefert den klassischen Toggle-Button
 Häkchen**, entstehen **mehrere fertig verdrahtete Widgets in EINEM Schritt** (ein einziges **Strg+Z**
 macht alles rückgängig). Die Karte ist intelligent — sie zeigt nur Aspekte, die für genau diesen Effekt
 sinnvoll sind (eine Dimmer-Matrix hat z. B. keine „Farben"-Zeile). Selten gebrauchte Parameter liegen
-aufgeklappt unter **„Mehr Parameter"**.
+im **zugeklappten** Bereich **„Mehr Parameter (N)"** — zum Öffnen anklicken.
 
 ![Drop-Karte „Effekt einrichten"](img/15_drop_karte.png)
 
 Gibt es für einen Aspekt **mehrere passende Bedien-Elemente** (z. B. Tempo = Speed-Rad **oder** Fader),
 steht in der Zeile **„Widget: … ▸ ändern"**. Ein Klick öffnet die **grafische Widget-Galerie**
-(„Widget wählen") als eigenes Fenster — du siehst die Möglichkeiten als Kacheln und tippst eine an:
+(„Widget wählen") als eigenes Fenster — du siehst die Möglichkeiten als Kacheln, tippst eine an und
+bestätigst mit **OK** (oder tippst sie doppelt an):
 
 ![Widget-Galerie „Widget wählen"](img/16_widget_galerie.png)
 
@@ -56,12 +57,15 @@ die Konflikt-Karte **„Regler ist schon belegt"** mit drei Wegen:
 
 ![Konflikt-Karte „Regler ist schon belegt"](img/17_konflikt_karte.png)
 
-**Widget-Typ nachträglich tauschen:** auf jedem vorhandenen Widget **Rechtsklick → „↔ Widget ändern…"** →
-dieselbe Galerie. Der Typ wird getauscht, die Effekt-Bindung (Effekt, Beschriftung, Position) bleibt.
+**Widget-Typ nachträglich tauschen:** bei effektgebundenen Widgets, für deren Aspekt mehrere Bedien-Typen
+passen (z. B. Tempo: Speed-Rad oder Fader), per **Rechtsklick → „↔ Widget ändern…"** → dieselbe Galerie.
+(An/Aus-Tasten, Bus-Auswahl, Effekt-Farben oder XY-Feld haben den Eintrag nicht.) Der Typ wird getauscht, die Effekt-Bindung (Effekt, Beschriftung, Position) bleibt.
 
-**Farb-Snap aus der Bibliothek:** Ein **Farb-Snap** (`blau`) erzeugt beim Ziehen weiterhin **DIREKT eine
-Farb-Kachel** (farbiger Strich) — ohne Drop-Karte. Alternativ **Rechtsklick auf einen Bibliothek-Eintrag
-→ „➡ Auf VC-Taste legen"** (Klick-Alternative zum Ziehen).
+**Farb-Snap aus der Bibliothek:** Ein **Farb-Snap** (`blau`) erzeugt beim Ziehen **direkt eine
+Snap-Taste** (Button mit Aktion „Bibliothek-Farbe/Snap", farbiger Strich) — ohne Drop-Karte. Alternativ
+**Rechtsklick auf einen Bibliothek-Eintrag → „➡ Auf VC-Taste legen"** und danach einen **vorhandenen**
+VC-Button anklicken; er übernimmt Snap bzw. Funktion. (Das Widget **Farbe** — Dialog
+„Farb-Kachel Einstellungen" — ist etwas anderes.)
 
 So ist hier **Bank 1** entstanden — Reihe 1 die drei Looks (Matrix 1 = Farb-Chase, Matrix 2 = Dimmer,
 EFX 1 = Moving-Head-Bewegung), Reihe 2 die Farb-Kacheln blau/grün/rot:
@@ -71,15 +75,19 @@ EFX 1 = Moving-Head-Bewegung), Reihe 2 die Farb-Kacheln blau/grün/rot:
 **Alternativweg — manuell über die Werkzeugleiste** (für Bedienelemente ohne Funktion): Werkzeugleiste →
 **Button** / **Fader** / **Farbe** anklicken → das Widget landet auf dem Raster → **Doppelklick** öffnet
 die Eigenschaften (im Rechtsklick-Menü heißt dieser Eintrag **„Einstellungen..."**):
-- **Button → Aktion:** Funktion an/aus, Flash, Snapshot, Tap-Tempo, Musik-BPM, BPM ±, Blackout, Stop All …
-- **Fader → Modus:** Grand Master, Effekt-Tempo, Effekt-Helligkeit, BPM (30–300), Programmer (z. B. Dimmer) …
+- **Button → Aktion:** z. B. „Funktion an/aus", „Funktion (nur gehalten)", „Snapshot abrufen",
+  „Tap-Tempo", „Musik-BPM", „BPM +1 (Nudge)" / „BPM -1 (Nudge)", „Blackout", „Alles stoppen" …
+- **Fader → Modus:** „Grand Master", „Effekt-Tempo", „Effekt-Helligkeit", „Tempo (BPM)" (30–300 BPM),
+  „Programmer-Attribut" (z. B. Dimmer) …
 - **Farbe → Ziel:** „Programmer/Selektion" / „Alle Fixtures" / „Effekt (aktive Farbe)".
 
 ## 3. Das fertige Layout — 5 Bänke mit Labels
 
 Oben über **◀ / Bank X / ▶** (oder Tastatur **Strg + Bild↑ / Bild↓**) zwischen Bänken wechseln.
 Ein neu angelegtes Widget landet auf der **gerade sichtbaren** Bank. Mit **Label-Widgets** als
-Zonen-Überschriften wird die Konsole übersichtlich. Die Hardstyle-Show nutzt **fünf Bänke**:
+Zonen-Überschriften wird die Konsole übersichtlich. Die Beispiele stammen aus der (archivierten,
+nicht im Repository liegenden) Hardstyle-Show mit **fünf Bänken**; nachbauen lässt sich das Layout mit
+den hier beschriebenen Schritten:
 
 ![Bank 1 fertig aufgebaut (Run-Modus)](img/04_bank1_fertig.png)
 
@@ -149,9 +157,9 @@ wandert):
 
 Es gibt **zwei Wege**, ein VC-Widget auf eine APC-mini-Taste/-Fader zu legen:
 
-**A — Schnell per „MIDI Lernen":** Toolbar **MIDI Lernen** aktivieren (orange) → das gewünschte
-VC-Widget anklicken → am APC mini die Taste **drücken** bzw. den Fader **bewegen** → Bindung wird
-gespeichert (Pads = Note, Fader = CC).
+**A — Schnell per „MIDI Lernen" (nur Buttons):** Toolbar **MIDI Lernen** aktivieren (orange) → einen
+VC-**Button** anklicken → am APC mini die Taste **drücken** → Bindung wird gespeichert (Note). Fader
+(CC) bindest du über Weg B.
 
 **B — Per MIDI-Teach-Dialog (mit APC-Abbild):** im **Bearbeiten**-Modus das Widget **rechtsklicken**
 → **🎹 MIDI Teach...**. Es öffnet sich ein Abbild der APC mini — entweder am Gerät die Taste/den Fader
@@ -163,8 +171,10 @@ betätigen **oder** das Element im Bild direkt anklicken (geht auch **ohne** ang
 (unter dem Grid), **Scene-Tasten 82–89** (rechte Spalte), **Fader CC 48–56** (CC56 = Master). Der
 **mk2** hat dasselbe Eingangs-Layout (RGB-LED-Ausgabe abweichend, wird automatisch erkannt).
 
-**LED-Feedback:** Toolbar **APC LEDs** einschalten → die Pads spiegeln den Zustand zurück (aktiv,
-gedrückt, Farbe der Farb-Kachel; beim mk2 auch Beat-Blitzen am TAP-Pad). Bindungen werden **mit der
+**LED-Feedback:** Toolbar **APC LEDs** einschalten. Beim **APC mini mk2** spiegeln die Pads die
+VC-Tasten zurück (aktiv, gedrückt, Farbe der Farb-Kachel, Beat-Blitzen am TAP-Pad). Die
+**Original-APC-mini** zeigt nur Executor-Zustände (GO-Reihe grün, Flash-Reihe rot, Track-Tasten) und die
+aktive Page (Scene-Tasten gelb), keine VC-Tasten. Bindungen werden **mit der
 Show** gespeichert (auf dem Widget: `midi_data1`/`midi_type` bzw. `midi_cc`). Ohne angeschlossene
 APC funktioniert die Bedienung weiter per Touch/Tastatur — nur ohne LED-Rückmeldung.
 
@@ -175,8 +185,8 @@ APC funktioniert die Bedienung weiter per Touch/Tastatur — nur ohne LED-Rückm
 LightOS bringt fertige BPM-Bausteine mit — einfach als Button/Fader/Widget anlegen und die Aktion wählen:
 - **Tap-Tempo** (TAP), **Musik-BPM** (AUTO-Audio-Erkennung an/aus), **BPM +/−** (Nudge),
   **AUTO/MANUAL-Umschalter**, **BPM-Fader** (30–300) und ein **BPM-Anzeige-Widget** (zeigt Tempo + Quelle).
-- AUTO-Audio aktivierst du in der **Sektion BPM** (Navigations-Button **BPM** → BPM-Tab / BPM-Manager,
-  Quelle: PC-Audio/Loopback) — dann folgen alle
+- AUTO-Audio aktivierst du in der **Sektion BPM** (Navigations-Button **BPM** → Unter-Tab
+  **„Erkennung"**, Quelle **„PC-Audio (Systemstandard)"**) — dann folgen alle
   Beat-Effekte taktgenau der Musik. Die TEMPO-Anzeige auf Bank 2 zeigt die Live-BPM grün an.
 
 ## 7. Musik-Player (Bank 3)
@@ -191,7 +201,7 @@ internen Player direkt aus der VC (siehe Bank 3 oben). Ohne geladene Playlist st
 
 ## 8. Strobe (Bank 3)
 
-Der **STROBE**-Knopf ist ein **gehaltener** Master-Strobe: Aktion **Funktion-Flash** auf eine
+Der **STROBE**-Knopf ist ein **gehaltener** Master-Strobe: Aktion **„Funktion (nur gehalten)"** auf eine
 RGB-Matrix mit Algorithmus **Strobe** (treibt alle PAR + Spider weiß an/aus). Der **Tempo**-
 Fader daneben (Modus **Effekt-Tempo**, fest auf die Strobe-Matrix gebunden) regelt die Blitzrate —
 ideal für Hardstyle-Drops: Knopf halten, Tempo nachziehen.

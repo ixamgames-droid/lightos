@@ -1,0 +1,278 @@
+{
+  "format_version": 1,
+  "hersteller": "Showtec",
+  "hersteller_kurz": "Showtec",
+  "modell": "Spectral M800 IPX",
+  "kurzname": "SPECTRALM800",
+  "typ": "par",
+  "leistung_w": 55,
+  "notizen": "Ohne Handbuch nachbearbeitet. Feinkanaele (TR16) bleiben raw.",
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Showtec-Spectral-M800-IPX.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Showtec/Showtec-Spectral-M800-IPX.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.13.1 · Bram Janssen",
+    "original": "resources/fixtures/Showtec/Showtec-Spectral-M800-IPX.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 106 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): kurzname SPECTRALM800; Strobe-Default 0; Makro-Kanal (Farbverlaeufe, Weisstoene) als macro statt color_wheel; Auto-Tempo als effect_speed; Dimmer-Speed als raw 'Dimmerkurve', Bereich 0-9 ohne falsche art reset; HSV-Modus: Value als intensity"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "aus QLC+ konvertiert und von LightOS nach Kanalnamen/Bereichen nachbearbeitet; kein Herstellerhandbuch verfuegbar (Hersteller-Website hinter Bot-Sperre) — nicht Kanal fuer Kanal gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "AR1.D",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "AR1.S",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {
+          "name": "Classic Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe langsam -> schnell", "art": "strobe"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TOUR",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {
+          "name": "Macros",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Not functional", "art": ""},
+            {"von": 11, "bis": 30, "name": "Red 100% / Green Up / Blue 0%", "art": ""},
+            {"von": 31, "bis": 50, "name": "Red Down / Green 100% / Blue 0%", "art": ""},
+            {"von": 51, "bis": 70, "name": "Red 0% / Green 100% / Blue Up", "art": ""},
+            {"von": 71, "bis": 90, "name": "Red 0% / Green Down / Blue 100%", "art": ""},
+            {"von": 91, "bis": 110, "name": "Red Up / Green 0% / Blue 100%", "art": ""},
+            {"von": 111, "bis": 130, "name": "Red 100% / Green 0% / Blue Down", "art": ""},
+            {"von": 131, "bis": 150, "name": "Red 100% / Green Up / Blue Up", "art": ""},
+            {"von": 151, "bis": 170, "name": "Red Down / Green Down / Blue 100%", "art": ""},
+            {"von": 171, "bis": 200, "name": "Red 100% / Green 100% / Blue 100% / White 100%", "art": ""},
+            {"von": 201, "bis": 205, "name": "White 1: 3200K", "art": ""},
+            {"von": 206, "bis": 210, "name": "White 2: 3400K", "art": ""},
+            {"von": 211, "bis": 215, "name": "White 3: 4200K", "art": ""},
+            {"von": 216, "bis": 220, "name": "White 4: 4900K", "art": ""},
+            {"von": 221, "bis": 225, "name": "White 5: 5600K", "art": ""},
+            {"von": 226, "bis": 230, "name": "White 6: 5900K", "art": ""},
+            {"von": 231, "bis": 235, "name": "White 7: 6500K", "art": ""},
+            {"von": 236, "bis": 240, "name": "White 8: 7200K", "art": ""},
+            {"von": 241, "bis": 245, "name": "White 9: 8000K", "art": ""},
+            {"von": 246, "bis": 250, "name": "White 10: 8500K", "art": ""},
+            {"von": 251, "bis": 255, "name": "White 11 10000K", "art": ""}
+          ]
+        },
+        {
+          "name": "Classic Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe langsam -> schnell", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Build-in programs/Custom programs",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 20, "name": "Not functional", "art": ""},
+            {"von": 21, "bis": 30, "name": "Auto 1", "art": ""},
+            {"von": 31, "bis": 40, "name": "Auto 2", "art": ""},
+            {"von": 41, "bis": 50, "name": "Auto 3", "art": ""},
+            {"von": 51, "bis": 60, "name": "Auto 4", "art": ""},
+            {"von": 61, "bis": 70, "name": "Auto 5", "art": ""},
+            {"von": 71, "bis": 80, "name": "Auto 6", "art": ""},
+            {"von": 81, "bis": 90, "name": "Auto 7", "art": ""},
+            {"von": 91, "bis": 100, "name": "Auto 8", "art": ""},
+            {"von": 101, "bis": 110, "name": "Auto 9", "art": ""},
+            {"von": 111, "bis": 120, "name": "Auto 10", "art": ""},
+            {"von": 121, "bis": 130, "name": "PR.01", "art": ""},
+            {"von": 131, "bis": 140, "name": "PR.02", "art": ""},
+            {"von": 141, "bis": 150, "name": "PR.03", "art": ""},
+            {"von": 151, "bis": 160, "name": "PR.04", "art": ""},
+            {"von": 161, "bis": 170, "name": "PR.05", "art": ""},
+            {"von": 171, "bis": 180, "name": "PR.06", "art": ""},
+            {"von": 181, "bis": 190, "name": "PR.07", "art": ""},
+            {"von": 191, "bis": 200, "name": "PR.08", "art": ""},
+            {"von": 201, "bis": 210, "name": "PR.09", "art": ""},
+            {"von": 211, "bis": 220, "name": "PR.10", "art": ""},
+            {"von": 221, "bis": 255, "name": "Not functional", "art": ""}
+          ]
+        },
+        {
+          "name": "Auto speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Speed adjustment, from slow to fast", "art": ""}
+          ]
+        },
+        {
+          "name": "Dimmerkurve",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Preset dimmer speed from the device's menu"},
+            {"von": 10, "bis": 29, "name": "Linear dimmer", "art": ""},
+            {"von": 30, "bis": 69, "name": "Non-linear dimmer 1 (fastest)", "art": ""},
+            {"von": 70, "bis": 129, "name": "Non-linear dimmer 2", "art": ""},
+            {"von": 130, "bis": 189, "name": "Non-linear dimmer 3", "art": ""},
+            {"von": 190, "bis": 255, "name": "Non-linear dimmer 4 (slowest)", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TR16",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Dimmer fein", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Red fein", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Green fein", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Blue fein", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Macros",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Not functional", "art": ""},
+            {"von": 11, "bis": 30, "name": "Red 100% / Green Up / Blue 0%", "art": ""},
+            {"von": 31, "bis": 50, "name": "Red Down / Green 100% / Blue 0%", "art": ""},
+            {"von": 51, "bis": 70, "name": "Red 0% / Green 100% / Blue Up", "art": ""},
+            {"von": 71, "bis": 90, "name": "Red 0% / Green Down / Blue 100%", "art": ""},
+            {"von": 91, "bis": 110, "name": "Red Up / Green 0% / Blue 100%", "art": ""},
+            {"von": 111, "bis": 130, "name": "Red 100% / Green 0% / Blue Down", "art": ""},
+            {"von": 131, "bis": 150, "name": "Red 100% / Green Up / Blue Up", "art": ""},
+            {"von": 151, "bis": 170, "name": "Red Down / Green Down / Blue 100%", "art": ""},
+            {"von": 171, "bis": 200, "name": "Red 100% / Green 100% / Blue 100% / White 100%", "art": ""},
+            {"von": 201, "bis": 205, "name": "White 1: 3200K", "art": ""},
+            {"von": 206, "bis": 210, "name": "White 2: 3400K", "art": ""},
+            {"von": 211, "bis": 215, "name": "White 3: 4200K", "art": ""},
+            {"von": 216, "bis": 220, "name": "White 4: 4900K", "art": ""},
+            {"von": 221, "bis": 225, "name": "White 5: 5600K", "art": ""},
+            {"von": 226, "bis": 230, "name": "White 6: 5900K", "art": ""},
+            {"von": 231, "bis": 235, "name": "White 7: 6500K", "art": ""},
+            {"von": 236, "bis": 240, "name": "White 8: 7200K", "art": ""},
+            {"von": 241, "bis": 245, "name": "White 9: 8000K", "art": ""},
+            {"von": 246, "bis": 250, "name": "White 10: 8500K", "art": ""},
+            {"von": 251, "bis": 255, "name": "White 11 10000K", "art": ""}
+          ]
+        },
+        {
+          "name": "Classic Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe langsam -> schnell", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Build-in programs/Custom programs",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 20, "name": "Not functional", "art": ""},
+            {"von": 21, "bis": 30, "name": "Auto 1", "art": ""},
+            {"von": 31, "bis": 40, "name": "Auto 2", "art": ""},
+            {"von": 41, "bis": 50, "name": "Auto 3", "art": ""},
+            {"von": 51, "bis": 60, "name": "Auto 4", "art": ""},
+            {"von": 61, "bis": 70, "name": "Auto 5", "art": ""},
+            {"von": 71, "bis": 80, "name": "Auto 6", "art": ""},
+            {"von": 81, "bis": 90, "name": "Auto 7", "art": ""},
+            {"von": 91, "bis": 100, "name": "Auto 8", "art": ""},
+            {"von": 101, "bis": 110, "name": "Auto 9", "art": ""},
+            {"von": 111, "bis": 120, "name": "Auto 10", "art": ""},
+            {"von": 121, "bis": 130, "name": "PR.01", "art": ""},
+            {"von": 131, "bis": 140, "name": "PR.02", "art": ""},
+            {"von": 141, "bis": 150, "name": "PR.03", "art": ""},
+            {"von": 151, "bis": 160, "name": "PR.04", "art": ""},
+            {"von": 161, "bis": 170, "name": "PR.05", "art": ""},
+            {"von": 171, "bis": 180, "name": "PR.06", "art": ""},
+            {"von": 181, "bis": 190, "name": "PR.07", "art": ""},
+            {"von": 191, "bis": 200, "name": "PR.08", "art": ""},
+            {"von": 201, "bis": 210, "name": "PR.09", "art": ""},
+            {"von": 211, "bis": 220, "name": "PR.10", "art": ""},
+            {"von": 221, "bis": 255, "name": "Not functional", "art": ""}
+          ]
+        },
+        {
+          "name": "Auto speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Speed adjustment, from slow to fast", "art": ""}
+          ]
+        },
+        {
+          "name": "Dimmerkurve",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Preset dimmer speed from the device's menu"},
+            {"von": 10, "bis": 29, "name": "Linear dimmer", "art": ""},
+            {"von": 30, "bis": 69, "name": "Non-linear dimmer 1 (fastest)", "art": ""},
+            {"von": 70, "bis": 129, "name": "Non-linear dimmer 2", "art": ""},
+            {"von": 130, "bis": 189, "name": "Non-linear dimmer 3", "art": ""},
+            {"von": 190, "bis": 255, "name": "Non-linear dimmer 4 (slowest)", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ARC.1",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "HSV",
+      "kanaele": [
+        {"name": "Hue (color variations)", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Color saturation", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Value (dimmer)", "attribut": "intensity", "default": 0, "highlight": 255}
+      ]
+    }
+  ]
+}

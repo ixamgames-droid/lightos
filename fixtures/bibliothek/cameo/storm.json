@@ -1,0 +1,189 @@
+{
+  "format_version": 1,
+  "hersteller": "Cameo",
+  "hersteller_kurz": "Cameo",
+  "modell": "Storm",
+  "kurzname": "Storm",
+  "typ": "other",
+  "leistung_w": 50,
+  "quelle": {
+    "titel": "Cameo STORM – DMX Control Table (10-Channel Mode)",
+    "url": "https://www.cameolight.com/en/downloads/file/id/1542507304"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.1 · Henrik Bauer, Jannis Achstetter",
+    "original": "resources/fixtures/Cameo/Cameo-Storm.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 84 Wertebereiche mit Art (kind) versehen; Derby-Farben: 'Blackout' als 'closed', alle Farbkombinationen als 'color' (vorher teils ohne Art), Farbautomatik 'rotate'; Farbwechsel-Geschwindigkeit speed -> effect_speed, falsche Art 'color' entfernt; Derby-Strobe: Musik-Strobe als 'sound'; Derby-Rotation raw -> speed; Weisse LEDs macro -> raw (aus='closed', alle an='open'); Laserfarben macro -> raw (aus='closed', rot/gruen an='open', Blinkmuster 'strobe' statt 'color'); Laser-Strobe shutter -> strobe (kein zweiter Shutter/Kopf), Default 0, Musik-Strobe 'sound'; Laser-Muster-Rotation macro -> raw; Auto-Modus: Musikprogramme als 'sound'; typ moving_head -> other (Derby-/Laser-/Strobe-Effekt ohne Pan/Tilt); Shutter-Default/-Highlight auf 0 (Offen-Bereich) in 1 Kanaelen; Tippfehler korrigiert (Bliue, stobe)"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal fuer Kanal gegen die DMX-Steuertabelle des Herstellers (10-Kanal-Modus) geprueft: Kanalfolge und alle Wertebereiche stimmen mit der QLC+-Datei ueberein; Attribute, Bereichs-Arten, Defaults und typ von LightOS nachgezogen"
+  },
+  "modi": [
+    {
+      "name": "10 Channel",
+      "kanaele": [
+        {"name": "Dimmer (Derby)", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Color (Derby)",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Blackout", "art": "closed"},
+            {"von": 10, "bis": 14, "name": "Red", "art": "color"},
+            {"von": 15, "bis": 19, "name": "Green", "art": "color"},
+            {"von": 20, "bis": 24, "name": "Blue", "art": "color"},
+            {"von": 25, "bis": 29, "name": "Amber", "art": "color"},
+            {"von": 30, "bis": 34, "name": "White", "art": "color"},
+            {"von": 35, "bis": 39, "name": "White Red", "art": "color"},
+            {"von": 40, "bis": 44, "name": "Red Green", "art": "color"},
+            {"von": 45, "bis": 49, "name": "Green Blue", "art": "color"},
+            {"von": 50, "bis": 54, "name": "Blue Amber", "art": "color"},
+            {"von": 55, "bis": 59, "name": "Amber White", "art": "color"},
+            {"von": 60, "bis": 64, "name": "White Green", "art": "color"},
+            {"von": 65, "bis": 69, "name": "Green Amber", "art": "color"},
+            {"von": 70, "bis": 74, "name": "Amber Red", "art": "color"},
+            {"von": 75, "bis": 79, "name": "Red Blue", "art": "color"},
+            {"von": 80, "bis": 84, "name": "Blue White", "art": "color"},
+            {"von": 85, "bis": 89, "name": "Red Green Blue", "art": "color"},
+            {"von": 90, "bis": 94, "name": "Red Green Amber", "art": "color"},
+            {"von": 95, "bis": 99, "name": "Red Green White", "art": "color"},
+            {"von": 100, "bis": 104, "name": "Red Amber Blue", "art": "color"},
+            {"von": 105, "bis": 109, "name": "Red White Blue", "art": "color"},
+            {"von": 110, "bis": 114, "name": "Red Amber White", "art": "color"},
+            {"von": 115, "bis": 119, "name": "Amber Green Blue", "art": "color"},
+            {"von": 120, "bis": 124, "name": "Blue Green White", "art": "color"},
+            {"von": 125, "bis": 129, "name": "Amber Green White", "art": "color"},
+            {"von": 130, "bis": 134, "name": "Amber White Blue", "art": "color"},
+            {"von": 135, "bis": 139, "name": "Red Green Blue Amber", "art": "color"},
+            {"von": 140, "bis": 144, "name": "Red Green Blue White", "art": "color"},
+            {"von": 145, "bis": 149, "name": "Blue Green White Amber", "art": "color"},
+            {"von": 150, "bis": 154, "name": "Red Green Amber White", "art": "color"},
+            {"von": 155, "bis": 159, "name": "White Red Blue Amber", "art": "color"},
+            {"von": 160, "bis": 164, "name": "Red Green Blue Amber White", "art": "color"},
+            {"von": 165, "bis": 209, "name": "Automatic colours (individually)", "art": "rotate"},
+            {"von": 210, "bis": 255, "name": "Automatic colours (two colours)", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Color change Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Color Speed, Slow to fast", "art": ""}
+          ]
+        },
+        {
+          "name": "Strobe Function (Derby)",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "No strobe", "art": "open"},
+            {"von": 5, "bis": 249, "name": "Strobe function, increasing speed", "art": "strobe"},
+            {"von": 250, "bis": 255, "name": "Music controlled strobe", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Rotation (Derby)",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "No movement", "art": ""},
+            {"von": 5, "bis": 127, "name": "Rotation forward (fast - slow)", "art": "rotate"},
+            {"von": 128, "bis": 133, "name": "No movement", "art": ""},
+            {"von": 134, "bis": 255, "name": "Rotation reverse (slow - fast)", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "White LEDs",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "LEDs Off", "art": "closed"},
+            {"von": 10, "bis": 29, "name": "Program 1 with increasing speed", "art": ""},
+            {"von": 30, "bis": 49, "name": "Program 2 with increasing speed", "art": ""},
+            {"von": 50, "bis": 69, "name": "Program 3 with increasing speed", "art": ""},
+            {"von": 70, "bis": 89, "name": "Program 4 with increasing speed", "art": ""},
+            {"von": 90, "bis": 109, "name": "Program 5 with increasing speed", "art": ""},
+            {"von": 110, "bis": 129, "name": "Program 6 with increasing speed", "art": ""},
+            {"von": 130, "bis": 149, "name": "Program 7 with increasing speed", "art": ""},
+            {"von": 150, "bis": 169, "name": "Program 8 with increasing speed", "art": ""},
+            {"von": 170, "bis": 189, "name": "Program 9 with increasing speed", "art": ""},
+            {"von": 190, "bis": 209, "name": "Program 10 with increasing speed", "art": ""},
+            {"von": 210, "bis": 255, "name": "All LEDs on", "art": "open"}
+          ]
+        },
+        {
+          "name": "Laser colours and functions",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Laser off", "art": "closed"},
+            {"von": 10, "bis": 49, "name": "Red Laser", "art": "open"},
+            {"von": 50, "bis": 89, "name": "Green Laser", "art": "open"},
+            {"von": 90, "bis": 129, "name": "Green and Red alternately flashing", "art": "strobe"},
+            {"von": 130, "bis": 169, "name": "Red on, Green flashing", "art": "strobe"},
+            {"von": 170, "bis": 209, "name": "Green on, Red Flashing", "art": "strobe"},
+            {"von": 210, "bis": 255, "name": "Red and Green Flashing", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Laser Strobe",
+          "attribut": "strobe",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "No Strobe", "art": "open"},
+            {"von": 5, "bis": 249, "name": "Strobe function with increasing speed", "art": "strobe"},
+            {"von": 250, "bis": 255, "name": "Music Controlled strobe for laser", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Laser pattern and rotation",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "No movement", "art": ""},
+            {"von": 5, "bis": 127, "name": "Rotation forward fast-slow", "art": "rotate"},
+            {"von": 128, "bis": 133, "name": "No movement", "art": ""},
+            {"von": 134, "bis": 255, "name": "Rotation reverse slow-fast", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Auto Mode",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 24, "name": "DMX mode (control via channels 1-9)", "art": ""},
+            {"von": 25, "bis": 39, "name": "Auto Program 1", "art": ""},
+            {"von": 40, "bis": 54, "name": "Auto Program 2", "art": ""},
+            {"von": 55, "bis": 69, "name": "Auto Program 3", "art": ""},
+            {"von": 70, "bis": 84, "name": "Auto Program 4", "art": ""},
+            {"von": 85, "bis": 99, "name": "Auto Program 5", "art": ""},
+            {"von": 100, "bis": 114, "name": "Auto Program 6", "art": ""},
+            {"von": 115, "bis": 129, "name": "Auto Program 7", "art": ""},
+            {"von": 130, "bis": 144, "name": "Music Program 1", "art": "sound"},
+            {"von": 145, "bis": 159, "name": "Music Program 2", "art": "sound"},
+            {"von": 160, "bis": 174, "name": "Music Program 3", "art": "sound"},
+            {"von": 175, "bis": 189, "name": "Music Program 4", "art": "sound"},
+            {"von": 190, "bis": 204, "name": "Music Program 5", "art": "sound"},
+            {"von": 205, "bis": 219, "name": "Music Program 6", "art": "sound"},
+            {"von": 220, "bis": 234, "name": "Music Program 7", "art": "sound"},
+            {"von": 235, "bis": 255, "name": "Blackout", "art": "closed"}
+          ]
+        }
+      ]
+    }
+  ]
+}

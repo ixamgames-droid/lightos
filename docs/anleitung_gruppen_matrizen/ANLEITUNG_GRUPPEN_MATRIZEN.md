@@ -6,7 +6,7 @@
 > **einer** Zelle zusammenfassen → neben andere Geräte setzen → wieder aufteilen.
 >
 > **Das alles geht heute schon.** Es ist nur schwer zu finden: die Aktionen stecken im
-> **Rechtsklick-Menü** des Rasters und in einem **Knopf-Menü** links neben dem Raster.
+> **Rechtsklick-Menü** des Rasters und in zwei **Knopf-Menüs** links neben dem Raster.
 > Beide Wege stehen hier — sie führen zum selben Ergebnis.
 
 **Lesehilfe:** Beschriftungen, die du wirklich anklickst, stehen in deutschen
@@ -154,10 +154,12 @@ Doppelklick auf die Patch-Zeile öffnet den Dialog. Für Mehrkopf-Geräte gibt e
 
 * **„Mehrkopf-Programmierung:"** — „Automatisch (beim Patchen anlegen)",
   „Köpfe einzeln — Kopf-Matrix (48 Köpfe)" oder „Als EINE Lampe (keine Kopf-Matrix)".
-  Die letzte Einstellung verhindert nur, dass beim Patchen automatisch eine Kopf-Gruppe
-  entsteht. Keine der drei **löscht** je eine vorhandene Gruppe — eine von Hand
+  „Als EINE Lampe" legt keine Kopf-Gruppe an und führt das Gerät auch im **Programmer** als
+  eine Lampe (keine Kopf- oder Weiß-Zeilen, ein gemeinsamer Farbregler). „Köpfe einzeln"
+  legt die fehlende Kopf-Gruppe beim Speichern an und schaltet die Farbregler auf je Kopf.
+  Keine der drei **löscht** je eine vorhandene Gruppe — eine von Hand
   angeordnete oder zusammengelegte Matrix bleibt also unangetastet.
-* **„Kopf-Matrix-Gruppe:"** — Status („vorhanden" / über eine andere Gruppe abgedeckt /
+* **„Kopf-Matrix-Gruppe:"** — Status („vorhanden" / über andere Gruppe abgedeckt /
   fehlt) und der Knopf **„Wiederherstellen"**. Der hilft, wenn die Auto-Gruppe einmal
   gelöscht wurde: er legt sie neu an, ohne das Gerät neu patchen zu müssen, und erzeugt
   kein Duplikat, wenn sie schon existiert.
@@ -172,7 +174,9 @@ Bei **Panels** (Gerätetyp Matrix) kommen drei Angaben zur Geometrie dazu:
 
 ★ **Ehrlich dazu, damit du nicht darauf wartest:** Diese drei Angaben wirken **nicht**
 auf die automatische Kopf-Gruppe — die entsteht immer als 1×N, egal was hier steht. Sie
-wirken beim Aufteilen **„als Block…"** (Abschnitt 3) und in der 3D-Vorschau. Wer sie
+wirken, sobald die Köpfe als **Rechteck** ins Raster gelegt werden — über „als Block…" oder
+„wie im Gerät hinterlegt", per Rechtsklick wie per Knopf (Abschnitte 3 und 4) — und in der
+3D-Vorschau. Wer sie
 umstellt und nur die Auto-Gruppe ansieht, sieht deshalb keinen Unterschied.
 
 ---
@@ -185,7 +189,8 @@ Sektion **Patchen** → Tab **Fixture-Gruppen**.
   „Bearbeiten…", „Löschen", „Speichern", „Ordner…" sowie
   **„⧉ Matrizen zusammenlegen…"** (Abschnitt 6).
 * **Links unten:** der Gerätebaum „Fixtures (drag auf Raster):" und darunter
-  **„Köpfe einzeln → Raster ▾"** (Abschnitt 4), „Alle → Raster",
+  **„Köpfe einzeln → Raster ▾"** (Abschnitt 4), **„Weiß-Segmente einzeln → Raster ▾"**
+  (nur bei Geräten mit eigener Weiß-Leiste, z. B. dem ZQ06121), „Alle → Raster",
   „Fixtures neu laden".
 * **Rechts:** das Raster. Darüber steht
   „Raster (Drag&Drop für Platzierung, Rechtsklick zum Entfernen):" — die Beschriftung
@@ -194,8 +199,11 @@ Sektion **Patchen** → Tab **Fixture-Gruppen**.
 * **Oben rechts:** das schwebende Panel „Rastergröße" mit „Spalten:" und „Zeilen:"
   (verschiebbar, zuklappbar über ▾).
 
-> ⚠️ **Speichern nicht vergessen.** Platzierungen und Rastergröße stehen zunächst nur im
-> Editor. Erst „Speichern" schreibt sie in die Gruppe.
+> ⚠️ **Speichern nicht vergessen — und zwar bevor du etwas anderes anklickst.**
+> Platzierungen und Rastergröße stehen zunächst nur im Editor; erst „Speichern" schreibt sie
+> in die Gruppe. Ungespeichertes verwirft LightOS **ohne Rückfrage**, sobald du eine andere
+> Gruppe wählst, „+ Neu", „Umbenennen", „Ordner…", „⧉ Matrizen zusammenlegen…" oder
+> „Bearbeiten…" (mit OK) benutzt oder sich der Patch ändert.
 
 ---
 
@@ -209,12 +217,14 @@ Sektion **Patchen** → Tab **Fixture-Gruppen**.
      **„wie im Gerät hinterlegt (4×12)"**, „als Zeile", „als Spalte", **„als Block…"**
    * „Alle Zellen von" *…Gerätename…* „entfernen"
 3. **„wie im Gerät hinterlegt (4×12)"** ist der kurze Weg — ein Klick, fertig. Die
-   Form kommt aus dem Fixture-Profil (Feld „Raster" im Fixture-Generator); der
+   Form kommt aus dem Fixture-Profil (Feld *Pixel-Raster:* im Fixture-Generator); der
    Menüpunkt zeigt sie in Klammern und erscheint nur, wenn sie zur Kopfzahl passt.
    Fehlt er, ist für das Gerät keine Form hinterlegt — dann hilft **„als Block…"**:
-   der Dialog „Als Block aufteilen" fragt „Spalten (bei 48 Elementen):" und ist,
-   wenn das Gerät eine Form kennt, damit **vorbelegt** (bei 48 Zonen: 12). Kennt es
-   keine, steht dort ein Teiler nahe der Quadratwurzel (bei 48 also 6).
+   der Dialog „Als Block aufteilen" fragt nach den Spalten und ist, wenn das Gerät eine
+   Form kennt, damit **vorbelegt** — beim ZQ06121 lautet die Frage
+   *Spalten (bei 48 Elementen) — im Gerät hinterlegt: 4×12:* mit 12. Kennt das Gerät
+   keine Form, lautet sie „Spalten (bei 48 Elementen):" mit einem Teiler nahe der
+   Quadratwurzel (bei 48 also 6).
    Für den Balken **12** eintragen.
 
 Ergebnis: **12 Spalten × 4 Zeilen** — auf beiden Wegen.
@@ -234,10 +244,12 @@ Nach „als Block…" mit 12 Spalten (K1 = Kopf 1):
 
 Dabei gilt:
 
-* Das **Raster wächst selbst** auf die nötige Größe — es wird nie kleiner gemacht.
-* Hier — und nur hier — wirken **„Pixel-Reihenfolge:"** und **„Montage-Drehung:"** aus
-  Abschnitt 1: ein Panel, das ab Werk in Schlangenlinien zählt oder hochkant hängt,
-  landet ohne Handarbeit richtig im Raster.
+* Das **Raster wächst selbst** auf die nötige Größe — es wird nie kleiner gemacht
+  (höchstens 64 Spalten bzw. Zeilen).
+* Beim Rechteck — „als Block…" oder „wie im Gerät hinterlegt", per Rechtsklick wie per
+  Knopf — wirken **„Pixel-Reihenfolge:"** und **„Montage-Drehung:"** aus Abschnitt 1: ein
+  Panel, das ab Werk in Schlangenlinien zählt oder hochkant hängt, landet ohne Handarbeit
+  richtig im Raster. „als Zeile", „als Spalte" und die Auto-Gruppe ignorieren sie.
 * Eine Zelle, in der schon ein **anderes** Gerät steht, wird **nicht** überschrieben —
   der betroffene Kopf weicht auf die nächste freie Zelle aus. Ist das Raster voll,
   bleibt der Rest ungesetzt und LightOS sagt, wie viele Elemente untergekommen sind.
@@ -285,8 +297,10 @@ Die 48 Kopf-Zellen werden durch **eine** Zelle ersetzt, und zwar an der Stelle d
 **ersten** bisherigen Kopfes (Raster-Reihenfolge: Zeile, dann Spalte). Alle **anderen**
 Geräte im Raster bleiben unangetastet.
 
-**Danebenlegen:** erst „Spalten:" auf 3 und „Zeilen:" auf 1 stellen, dann die beiden PAR
-aus dem Baum links und rechts neben die Balken-Zelle ziehen, dann „Speichern".
+**Danebenlegen:** Die Balken-Zelle steht nach dem Zusammenfassen dort, wo K1 lag — also
+ganz links. Zieh sie zuerst in die **oberste Zeile, zweite Spalte**. Stell dann „Spalten:"
+auf 3 und „Zeilen:" auf 1, zieh die beiden PAR aus dem Baum in die freien Zellen links und
+rechts und klick „Speichern".
 
 > ⚠️ **Erst die Rastergröße, dann die Geräte** — und zwar aus einem handfesten Grund:
 > **Verkleinern entfernt Zellen außerhalb des neuen Rasters** — ohne Nachfrage. Wer erst
@@ -300,9 +314,12 @@ PAR / Balken / PAR — der Balken als EIN Element:
 └──────────┴──────────┴──────────┘
 ```
 
-**Wieder auseinander:** Rechtsklick auf die Balken-Zelle → „aufteilen (48 Elemente)" →
-„als Block…". Der Rundweg ist verlustfrei in beide Richtungen, und die PAR daneben
-überleben ihn.
+**Wieder auseinander:** Das 12 × 4-Rechteck braucht 48 freie Zellen ab der linken oberen
+Ecke — in der Zeile PAR / Balken / PAR liegen die PAR genau dort. Stell deshalb zuerst
+„Zeilen:" auf 5 und zieh die beiden PAR in die unterste Zeile; dann Rechtsklick auf die
+Balken-Zelle → „aufteilen (48 Elemente)" → „wie im Gerät hinterlegt (4×12)" bzw.
+„als Block…". Sonst weichen Köpfe aus, und zwei bleiben ungesetzt. Die PAR überleben den
+Rundweg in jedem Fall.
 
 ---
 
@@ -323,10 +340,10 @@ mit der Liste „Gruppen wählen (von oben nach unten gestapelt):".
   dasselbe Gerät, und welche davon am Ende auf DMX steht, entscheidet allein die
   Stapelreihenfolge. Die feinere Form kann alles, was die gröbere kann — vier gleiche
   Farben sind auch vier Farben. In den **Quellgruppen** ändert sich nichts.
-* **Das gilt nur für zwei _verschiedene_ Formen.** Liegt dasselbe Gerät in beiden
-  Gruppen in der **gleichen** Form (zweimal als ganzes Gerät oder zweimal kopfweise),
-  bleibt es doppelt im Raster — dann entscheidet weiterhin die Stapelreihenfolge,
-  welche der beiden Zellen das Gerät am Ende fährt.
+* **Gleiche Form zweimal:** Liegt dasselbe Gerät in beiden Gruppen in der **gleichen**
+  Form (zweimal als ganzes Gerät oder zweimal kopfweise), behält nur die weiter oben
+  gestapelte Gruppe die Zelle; im späteren Raster bleibt dort eine Lücke. Doppelt steht es
+  im Ergebnis nicht.
 
 Typischer Fall: zwei Mehrkopf-Geräte mit je 1×4 Köpfen ergeben eine 4×2-Matrix, über die
 ein Effekt dann als Fläche läuft.
@@ -346,11 +363,11 @@ ein Effekt dann als Fläche läuft.
   ohne Nachfrage; heute öffnet er das Menü, „Zelle entfernen" ist der erste Eintrag.
 * **Volles Raster zerstört nichts** — es bleibt nur der Rest ungesetzt. Erst „Spalten:" /
   „Zeilen:" erhöhen, dann erneut aufteilen.
-* **Die Warmweiß-Segmente des Balkens sind keine eigenen Rasterzellen.** Sie hängen
-  intern an den Köpfen 1–8, decken physisch aber je anderthalb Spalten ab und sitzen
-  zwischen den Reihen. Ein Matrix-Effekt, der **auch Weiß** ansteuert, würde deshalb acht
-  willkürliche Zonen weiß färben. Sauber ist: Farbeffekte über die 48 Zonen laufen
-  lassen und Weiß getrennt über Szenen setzen.
+* **Die Warmweiß-Segmente des Balkens sind eine eigene Achse.** Farbeffekte über die 48
+  Zonen lassen sie in Ruhe. Als eigene Zellen legst du sie über „Weiß-Segmente einzeln →
+  Raster ▾" (hinterlegt: 1×8) — neben die Zonen oder in eine eigene Weiß-Gruppe; ein
+  Matrix-Effekt (Stil RGB/RGBW) fährt sie dann mit der Helligkeit der Zelle.
+  „zu einer Zelle zusammenfassen" räumt auch diese Weiß-Zellen mit ab.
 * **Ein Gerät, das nur kopfweise im Raster steht**, gilt trotzdem als Mitglied der
   Gruppe — „Alle → Raster" legt es kein zweites Mal als ganzes Gerät ab.
 
@@ -362,9 +379,9 @@ ein Effekt dann als Fläche läuft.
   **pro Gerät**, nicht pro Gruppe. Solange das Panel *ein* gepatchtes Gerät ist — also im
   Beispielaufbau — reicht das vollständig aus; echte Gruppe-in-Gruppe steht als `FM-20`
   im Backlog.
-* **Die Spaltenzahl beim Blockaufteilen kommt von Hand.** LightOS kennt die physische
-  Anordnung des Panels nicht (12 × 4 steht nirgends), deshalb ist die Vorbelegung nur ein
-  Teiler nahe der Quadratwurzel. Backlog: `FM-21`, `VIZ-50`.
+* **Ohne hinterlegte Form wird geraten.** „wie im Gerät hinterlegt" und die Vorbelegung
+  von „als Block…" gibt es nur, wenn das Profil eine Rasterform trägt (ZQ06121: 4×12).
+  Fehlt sie, trag sie im Fixture-Generator unter *Pixel-Raster:* nach.
 * **Screenshots und GIF dieser Anleitung** — siehe Kasten ganz oben (`DOC-13`).
 
 ---
@@ -373,7 +390,7 @@ ein Effekt dann als Fläche läuft.
 **Fixture-Gruppen** → Gerät als **eine** Zelle ins Raster ziehen → **Rechtsklick** →
 „aufteilen (48 Elemente)" → „als Block…" → 12 Spalten → **12 × 4** → „Speichern".
 Zurück per Rechtsklick → „zu einer Zelle zusammenfassen". Beides geht auch links über
-„Köpfe einzeln → Raster ▾" (dort ohne Block).
+„Köpfe einzeln → Raster ▾" (dort nur in der hinterlegten Form, ohne freie Spaltenwahl).
 
 → Weiter mit: [Farb-Matrix](../anleitung_farbmatrix/ANLEITUNG_FARBMATRIX.md) ·
 [Matrix-Effekte](../anleitung_matrix_effekte/ANLEITUNG_MATRIX_EFFEKTE.md) ·

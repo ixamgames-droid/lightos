@@ -1,0 +1,279 @@
+{
+  "format_version": 1,
+  "hersteller": "Eurolite",
+  "hersteller_kurz": "Eurolite",
+  "modell": "LED Strobe SMD PRO 132 DMX RGB",
+  "kurzname": "LED Strobe SMD PRO 132 DMX RGB",
+  "typ": "strobe",
+  "leistung_w": 30,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Eurolite-LED-Strobe-SMD-PRO-132-DMX-RGB.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Eurolite/Eurolite-LED-Strobe-SMD-PRO-132-DMX-RGB.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.0.0 Beta 3 · Fede79",
+    "original": "resources/fixtures/Eurolite/Eurolite-LED-Strobe-SMD-PRO-132-DMX-RGB.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 94 Wertebereiche mit Art (kind) versehen; 'LED Off' als 'closed'; Farbwechsel/-ueberblendung als 'rotate' statt 'color'; Blitzdauer speed -> duration; Blitz-Effekt (Lightning) als 'strobe'; Sound-Strobe shutter -> raw mit Art 'sound' (zweiter Shutter-Kanal verwirrte die Offen-Erkennung)"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Datei und die LightOS-Attributliste geprueft (Attribute, Bereichs-Arten, Defaults, Raster); Herstellerhandbuch mit DMX-Tabelle war nicht abrufbar (Steinigke liefert nur Datenblaetter ohne DMX-Protokoll), daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "1 Channel",
+      "kanaele": [
+        {
+          "name": "Strobe effect white 1",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "LED Off", "art": "closed"},
+            {"von": 11, "bis": 255, "name": "Strobe effect with increasing speed", "art": "strobe"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2 Channel 1",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Preset colors, color change",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "LED Off", "art": "closed"},
+            {"von": 6, "bis": 13, "name": "Red", "art": "color"},
+            {"von": 14, "bis": 21, "name": "Amber", "art": "color"},
+            {"von": 22, "bis": 29, "name": "Warm yellow", "art": "color"},
+            {"von": 30, "bis": 37, "name": "Yellow", "art": "color"},
+            {"von": 38, "bis": 45, "name": "Green", "art": "color"},
+            {"von": 46, "bis": 53, "name": "Turquoise", "art": "color"},
+            {"von": 54, "bis": 61, "name": "Cyan", "art": "color"},
+            {"von": 62, "bis": 69, "name": "Blue", "art": "color"},
+            {"von": 70, "bis": 77, "name": "Lavender", "art": "color"},
+            {"von": 78, "bis": 85, "name": "Mauve", "art": "color"},
+            {"von": 86, "bis": 93, "name": "Magenta", "art": "color"},
+            {"von": 94, "bis": 101, "name": "Pink", "art": "color"},
+            {"von": 102, "bis": 109, "name": "Warm White", "art": "color"},
+            {"von": 110, "bis": 117, "name": "White", "art": "color"},
+            {"von": 118, "bis": 125, "name": "Cold White", "art": "color"},
+            {"von": 126, "bis": 128, "name": "Stop", "art": ""},
+            {"von": 129, "bis": 192, "name": "Switching colors with increasing speed", "art": "rotate"},
+            {"von": 193, "bis": 255, "name": "Fading colors with increasing speed", "art": "rotate"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2 Channel 2",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe effect white 2",
+          "attribut": "shutter",
+          "default": 2,
+          "highlight": 2,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "LED On", "art": "open"},
+            {"von": 6, "bis": 10, "name": "LED Off", "art": "closed"},
+            {"von": 11, "bis": 250, "name": "Strobe effect with increasing speed", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "LED On", "art": "open"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3 Channel 1",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe effect white 2",
+          "attribut": "shutter",
+          "default": 2,
+          "highlight": 2,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "LED On", "art": "open"},
+            {"von": 6, "bis": 10, "name": "LED Off", "art": "closed"},
+            {"von": 11, "bis": 250, "name": "Strobe effect with increasing speed", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "LED On", "art": "open"}
+          ]
+        },
+        {
+          "name": "Flash duration",
+          "attribut": "duration",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Strobe effect with increasing flash duration (0 - 510 ms)", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3 Channel 2",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe effect white 2",
+          "attribut": "shutter",
+          "default": 2,
+          "highlight": 2,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "LED On", "art": "open"},
+            {"von": 6, "bis": 10, "name": "LED Off", "art": "closed"},
+            {"von": 11, "bis": 250, "name": "Strobe effect with increasing speed", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "LED On", "art": "open"}
+          ]
+        },
+        {
+          "name": "Preset colors, color change",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "LED Off", "art": "closed"},
+            {"von": 6, "bis": 13, "name": "Red", "art": "color"},
+            {"von": 14, "bis": 21, "name": "Amber", "art": "color"},
+            {"von": 22, "bis": 29, "name": "Warm yellow", "art": "color"},
+            {"von": 30, "bis": 37, "name": "Yellow", "art": "color"},
+            {"von": 38, "bis": 45, "name": "Green", "art": "color"},
+            {"von": 46, "bis": 53, "name": "Turquoise", "art": "color"},
+            {"von": 54, "bis": 61, "name": "Cyan", "art": "color"},
+            {"von": 62, "bis": 69, "name": "Blue", "art": "color"},
+            {"von": 70, "bis": 77, "name": "Lavender", "art": "color"},
+            {"von": 78, "bis": 85, "name": "Mauve", "art": "color"},
+            {"von": 86, "bis": 93, "name": "Magenta", "art": "color"},
+            {"von": 94, "bis": 101, "name": "Pink", "art": "color"},
+            {"von": 102, "bis": 109, "name": "Warm White", "art": "color"},
+            {"von": 110, "bis": 117, "name": "White", "art": "color"},
+            {"von": 118, "bis": 125, "name": "Cold White", "art": "color"},
+            {"von": 126, "bis": 128, "name": "Stop", "art": ""},
+            {"von": 129, "bis": 192, "name": "Switching colors with increasing speed", "art": "rotate"},
+            {"von": 193, "bis": 255, "name": "Fading colors with increasing speed", "art": "rotate"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3 Channel 3",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "4 Channel",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe effect",
+          "attribut": "shutter",
+          "default": 2,
+          "highlight": 2,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "LED On", "art": "open"},
+            {"von": 6, "bis": 10, "name": "LED Off", "art": "closed"},
+            {"von": 11, "bis": 33, "name": "Random pulse effect with increasing speed", "art": "strobe"},
+            {"von": 34, "bis": 56, "name": "Random fade in with increasing speed", "art": ""},
+            {"von": 57, "bis": 79, "name": "Random fade out with increasing speed", "art": ""},
+            {"von": 80, "bis": 102, "name": "Random strobe effect with increasing speed", "art": "strobe"},
+            {"von": 103, "bis": 127, "name": "Lightning 5 s to 1 s", "art": "strobe"},
+            {"von": 128, "bis": 250, "name": "Strobe effect with increasing speed", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "LED On", "art": "open"}
+          ]
+        },
+        {
+          "name": "Preset colors, color change",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "LED Off", "art": "closed"},
+            {"von": 6, "bis": 13, "name": "Red", "art": "color"},
+            {"von": 14, "bis": 21, "name": "Amber", "art": "color"},
+            {"von": 22, "bis": 29, "name": "Warm yellow", "art": "color"},
+            {"von": 30, "bis": 37, "name": "Yellow", "art": "color"},
+            {"von": 38, "bis": 45, "name": "Green", "art": "color"},
+            {"von": 46, "bis": 53, "name": "Turquoise", "art": "color"},
+            {"von": 54, "bis": 61, "name": "Cyan", "art": "color"},
+            {"von": 62, "bis": 69, "name": "Blue", "art": "color"},
+            {"von": 70, "bis": 77, "name": "Lavender", "art": "color"},
+            {"von": 78, "bis": 85, "name": "Mauve", "art": "color"},
+            {"von": 86, "bis": 93, "name": "Magenta", "art": "color"},
+            {"von": 94, "bis": 101, "name": "Pink", "art": "color"},
+            {"von": 102, "bis": 109, "name": "Warm White", "art": "color"},
+            {"von": 110, "bis": 117, "name": "White", "art": "color"},
+            {"von": 118, "bis": 125, "name": "Cold White", "art": "color"},
+            {"von": 126, "bis": 128, "name": "Stop", "art": ""},
+            {"von": 129, "bis": 192, "name": "Switching colors with increasing speed", "art": "rotate"},
+            {"von": 193, "bis": 255, "name": "Fading colors with increasing speed", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Sound controlled strobe effect",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "No function", "art": ""},
+            {
+              "von": 6,
+              "bis": 255,
+              "name": "Sound controlled strobe effect with increasing microphone sensitivity",
+              "art": "sound"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6 Channel",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe effect",
+          "attribut": "shutter",
+          "default": 2,
+          "highlight": 2,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "LED On", "art": "open"},
+            {"von": 6, "bis": 10, "name": "LED Off", "art": "closed"},
+            {"von": 11, "bis": 33, "name": "Random pulse effect with increasing speed", "art": "strobe"},
+            {"von": 34, "bis": 56, "name": "Random fade in with increasing speed", "art": ""},
+            {"von": 57, "bis": 79, "name": "Random fade out with increasing speed", "art": ""},
+            {"von": 80, "bis": 102, "name": "Random strobe effect with increasing speed", "art": "strobe"},
+            {"von": 103, "bis": 127, "name": "Lightning 5 s to 1 s", "art": "strobe"},
+            {"von": 128, "bis": 250, "name": "Strobe effect with increasing speed", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "LED On", "art": "open"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {
+          "name": "Sound controlled strobe effect",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "No function", "art": ""},
+            {
+              "von": 6,
+              "bis": 255,
+              "name": "Sound controlled strobe effect with increasing microphone sensitivity",
+              "art": "sound"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

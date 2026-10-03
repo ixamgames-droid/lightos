@@ -1,0 +1,71 @@
+{
+  "format_version": 1,
+  "hersteller": "BeamZ",
+  "hersteller_kurz": "BEAMZ",
+  "modell": "SB400",
+  "kurzname": "SB400",
+  "typ": "matrix",
+  "leistung_w": 200,
+  "quelle": {
+    "titel": "BeamZ SB400 Stage Blinder 4x 50W LED - Bedienungsanleitung (Ref. 150.450)",
+    "version": "V1.3",
+    "url": "https://www.beamzlighting.com/wp-content/uploads/2026/03/150.450-SB400-Stage-Blinder-V1.3.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.13.1 GIT · Dmitry Kolesnikov",
+    "original": "resources/fixtures/beamZ/beamZ-SB400.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 4 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): Herstellername 'beamZ' -> 'BeamZ'; kurzname SB400; typ matrix mit Raster 2x2 statt strobe (Blinder mit vier einzeln dimmbaren COB-Zellen); Strobe-Bereiche nach Handbuch ergaenzt (0-1 offen, 2-255 Strobe); Makro-Tempo als effect_speed statt speed; Kanalnamen deutsch, Modusbeschreibung ergaenzt"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": true,
+    "wie": "einziger DMX-Modus (8 Kanaele) Kanal fuer Kanal gegen das Herstellerhandbuch 150.450 V1.3 geprueft (nicht am echten Geraet); Zellanordnung 2x2 aus Gehaeuseform abgeleitet"
+  },
+  "modi": [
+    {
+      "name": "8 Channel",
+      "beschreibung": "Master, Strobe, Makro, Makro-Tempo, 4 COB-Zellen einzeln (Raster 2x2)",
+      "raster": {"rows": 2, "cols": 2},
+      "kanaele": [
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 1, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 2, "bis": 255, "name": "Strobe langsam -> schnell", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Makro",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 50, "name": "Keine Funktion", "art": ""},
+            {"von": 51, "bis": 200, "name": "Makrofunktion", "art": ""},
+            {"von": 201, "bis": 255, "name": "Keine Funktion", "art": ""}
+          ]
+        },
+        {
+          "name": "Makro-Tempo",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "langsam -> schnell", "art": ""}
+          ]
+        },
+        {"name": "COB 1 Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "COB 2 Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "COB 3 Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "COB 4 Dimmer", "attribut": "intensity", "default": 0, "highlight": 255}
+      ]
+    }
+  ],
+  "notizen": "Vier-Augen-Blinder 4x 50W COB (quadratisches Gehaeuse 275x275 mm, Zellen 2x2). Typ matrix mit Raster 2x2, damit die vier einzeln dimmbaren Zellen dargestellt werden."
+}
