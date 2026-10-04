@@ -1,0 +1,330 @@
+{
+  "format_version": 1,
+  "hersteller": "Fun Generation",
+  "hersteller_kurz": "FUNGEN",
+  "modell": "Mr. Beam 120 W",
+  "kurzname": "MRBEAM120",
+  "typ": "moving_head",
+  "leistung_w": 180,
+  "notizen": "Moving-Bar mit 4 einzeln beweglichen Beam-Koepfen (je 30 W RGBW), Pan 540 / Tilt 230 Grad, Prisma. 26-Kanal-Modus hat keine RGBW-Kanaele, Farbe dort nur ueber das Farbmakro je Kopf (Handbuch nennt keine Einzelwerte). Master-Dimmer und Strobe gelten fuer alle Koepfe.",
+  "quelle": {
+    "titel": "Fun Generation Mr. Beam 120 W Bedienungsanleitung (Thomann, ID 528923, V2)",
+    "version": "V2",
+    "datum": "2023-01-27",
+    "url": "https://images.static-thomann.de/pics/atg/atgdata/document/manual/c_528923_r1_en_online.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.13.1 GIT · Mariano",
+    "original": "resources/fixtures/Fun-Generation/Fun-Generation-Mr.-Beam-120-W.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 92 Wertebereiche mit Art (kind) versehen; danach von LightOS gegen das Herstellerhandbuch ueberarbeitet: Hersteller 'Fun-Generation' -> 'Fun Generation' (Schreibweise des Herstellers), Kurzname/Leistung/Typ nach Handbuch; Prisma-Kanal als prism statt prism_rotation (Handbuch: Prisma-Intensitaet, keine Rotation); Farbeffekt-Kanal als effect statt color_wheel, irrefuehrende Farb-Arten entfernt; Farbeffekt-Speed als effect_speed ohne Farb-Art; Bewegungsmuster als effect statt macro, Muster-Speed als effect_speed; Shutter-Bereiche ergaenzt (0-9 offen, 10-255 Strobe), fehlten in QLC+ (nur Preset); Raster 1x4 (vier Koepfe in einer Reihe) im 46-Kanal-Modus mit RGBW je Kopf; Kanalnamen deutsch nach Handbuch"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal fuer Kanal gegen die DMX-Tabellen (15/16/26/46 Kanaele, Kap. 7.3-7.6) im Thomann-Handbuch V2 (27.01.2023) geprueft; nicht am Geraet getestet"
+  },
+  "modi": [
+    {
+      "name": "15 Channel",
+      "kanaele": [
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Offen (keine Funktion)", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe 1-25 Hz, steigend", "art": "strobe"}
+          ]
+        },
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Motor-Speed (steigend)", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Prisma-Intensitaet", "attribut": "prism", "default": 0, "highlight": 0},
+        {"name": "Farbmakro", "attribut": "macro", "default": 0, "highlight": 0},
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Bewegungsmuster",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Keine Funktion"},
+            {"von": 10, "bis": 69, "name": "Bewegungsmuster 1", "art": ""},
+            {"von": 70, "bis": 129, "name": "Bewegungsmuster 2", "art": ""},
+            {"von": 130, "bis": 189, "name": "Bewegungsmuster 3", "art": ""},
+            {"von": 190, "bis": 255, "name": "Bewegungsmuster 4", "art": ""}
+          ]
+        },
+        {"name": "Bewegungsmuster-Speed (steigend)", "attribut": "effect_speed", "default": 0, "highlight": 0},
+        {
+          "name": "Farbeffekt",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Keine Funktion"},
+            {"von": 10, "bis": 24, "name": "Farbeffekt 1", "art": ""},
+            {"von": 25, "bis": 39, "name": "Farbeffekt 2", "art": ""},
+            {"von": 40, "bis": 54, "name": "Farbeffekt 3", "art": ""},
+            {"von": 55, "bis": 69, "name": "Farbeffekt 4", "art": ""},
+            {"von": 70, "bis": 84, "name": "Farbeffekt 5", "art": ""},
+            {"von": 85, "bis": 99, "name": "Farbeffekt 6", "art": ""},
+            {"von": 100, "bis": 114, "name": "Farbeffekt 7", "art": ""},
+            {"von": 115, "bis": 129, "name": "Farbeffekt 8", "art": ""},
+            {"von": 130, "bis": 144, "name": "Farbeffekt 9", "art": ""},
+            {"von": 145, "bis": 159, "name": "Farbeffekt 10", "art": ""},
+            {"von": 160, "bis": 174, "name": "Farbeffekt 11", "art": ""},
+            {"von": 175, "bis": 189, "name": "Farbeffekt 12", "art": ""},
+            {"von": 190, "bis": 204, "name": "Farbeffekt 13", "art": ""},
+            {"von": 205, "bis": 219, "name": "Farbeffekt 14", "art": ""},
+            {"von": 220, "bis": 255, "name": "Keine Funktion"}
+          ]
+        },
+        {"name": "Farbeffekt-Speed (steigend)", "attribut": "effect_speed", "default": 0, "highlight": 0}
+      ]
+    },
+    {
+      "name": "16 Channel",
+      "kanaele": [
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Offen (keine Funktion)", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe 1-25 Hz, steigend", "art": "strobe"}
+          ]
+        },
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fein", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fein", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Motor-Speed (steigend)", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Prisma-Intensitaet", "attribut": "prism", "default": 0, "highlight": 0},
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Bewegungsmuster",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Keine Funktion"},
+            {"von": 10, "bis": 69, "name": "Bewegungsmuster 1", "art": ""},
+            {"von": 70, "bis": 129, "name": "Bewegungsmuster 2", "art": ""},
+            {"von": 130, "bis": 189, "name": "Bewegungsmuster 3", "art": ""},
+            {"von": 190, "bis": 255, "name": "Bewegungsmuster 4", "art": ""}
+          ]
+        },
+        {"name": "Bewegungsmuster-Speed (steigend)", "attribut": "effect_speed", "default": 0, "highlight": 0},
+        {
+          "name": "Farbeffekt",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Keine Funktion"},
+            {"von": 10, "bis": 24, "name": "Farbeffekt 1", "art": ""},
+            {"von": 25, "bis": 39, "name": "Farbeffekt 2", "art": ""},
+            {"von": 40, "bis": 54, "name": "Farbeffekt 3", "art": ""},
+            {"von": 55, "bis": 69, "name": "Farbeffekt 4", "art": ""},
+            {"von": 70, "bis": 84, "name": "Farbeffekt 5", "art": ""},
+            {"von": 85, "bis": 99, "name": "Farbeffekt 6", "art": ""},
+            {"von": 100, "bis": 114, "name": "Farbeffekt 7", "art": ""},
+            {"von": 115, "bis": 129, "name": "Farbeffekt 8", "art": ""},
+            {"von": 130, "bis": 144, "name": "Farbeffekt 9", "art": ""},
+            {"von": 145, "bis": 159, "name": "Farbeffekt 10", "art": ""},
+            {"von": 160, "bis": 174, "name": "Farbeffekt 11", "art": ""},
+            {"von": 175, "bis": 189, "name": "Farbeffekt 12", "art": ""},
+            {"von": 190, "bis": 204, "name": "Farbeffekt 13", "art": ""},
+            {"von": 205, "bis": 219, "name": "Farbeffekt 14", "art": ""},
+            {"von": 220, "bis": 255, "name": "Keine Funktion"}
+          ]
+        },
+        {"name": "Farbeffekt-Speed (steigend)", "attribut": "effect_speed", "default": 0, "highlight": 0}
+      ]
+    },
+    {
+      "name": "26 Channel",
+      "kanaele": [
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Offen (keine Funktion)", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe 1-25 Hz, steigend", "art": "strobe"}
+          ]
+        },
+        {"name": "Pan Kopf 1", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt Kopf 1", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Motor-Speed Kopf 1", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Prisma-Intensitaet Kopf 1", "attribut": "prism", "default": 0, "highlight": 0},
+        {"name": "Farbmakro Kopf 1", "attribut": "macro", "default": 0, "highlight": 0},
+        {"name": "Pan Kopf 2", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt Kopf 2", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Motor-Speed Kopf 2", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Prisma-Intensitaet Kopf 2", "attribut": "prism", "default": 0, "highlight": 0},
+        {"name": "Farbmakro Kopf 2", "attribut": "macro", "default": 0, "highlight": 0},
+        {"name": "Pan Kopf 3", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt Kopf 3", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Motor-Speed Kopf 3", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Prisma-Intensitaet Kopf 3", "attribut": "prism", "default": 0, "highlight": 0},
+        {"name": "Farbmakro Kopf 3", "attribut": "macro", "default": 0, "highlight": 0},
+        {"name": "Pan Kopf 4", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt Kopf 4", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Motor-Speed Kopf 4", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Prisma-Intensitaet Kopf 4", "attribut": "prism", "default": 0, "highlight": 0},
+        {"name": "Farbmakro Kopf 4", "attribut": "macro", "default": 0, "highlight": 0},
+        {
+          "name": "Bewegungsmuster",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Keine Funktion"},
+            {"von": 10, "bis": 69, "name": "Bewegungsmuster 1", "art": ""},
+            {"von": 70, "bis": 129, "name": "Bewegungsmuster 2", "art": ""},
+            {"von": 130, "bis": 189, "name": "Bewegungsmuster 3", "art": ""},
+            {"von": 190, "bis": 255, "name": "Bewegungsmuster 4", "art": ""}
+          ]
+        },
+        {"name": "Bewegungsmuster-Speed (steigend)", "attribut": "effect_speed", "default": 0, "highlight": 0},
+        {
+          "name": "Farbeffekt",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Keine Funktion"},
+            {"von": 10, "bis": 24, "name": "Farbeffekt 1", "art": ""},
+            {"von": 25, "bis": 39, "name": "Farbeffekt 2", "art": ""},
+            {"von": 40, "bis": 54, "name": "Farbeffekt 3", "art": ""},
+            {"von": 55, "bis": 69, "name": "Farbeffekt 4", "art": ""},
+            {"von": 70, "bis": 84, "name": "Farbeffekt 5", "art": ""},
+            {"von": 85, "bis": 99, "name": "Farbeffekt 6", "art": ""},
+            {"von": 100, "bis": 114, "name": "Farbeffekt 7", "art": ""},
+            {"von": 115, "bis": 129, "name": "Farbeffekt 8", "art": ""},
+            {"von": 130, "bis": 144, "name": "Farbeffekt 9", "art": ""},
+            {"von": 145, "bis": 159, "name": "Farbeffekt 10", "art": ""},
+            {"von": 160, "bis": 174, "name": "Farbeffekt 11", "art": ""},
+            {"von": 175, "bis": 189, "name": "Farbeffekt 12", "art": ""},
+            {"von": 190, "bis": 204, "name": "Farbeffekt 13", "art": ""},
+            {"von": 205, "bis": 219, "name": "Farbeffekt 14", "art": ""},
+            {"von": 220, "bis": 255, "name": "Keine Funktion"}
+          ]
+        },
+        {"name": "Farbeffekt-Speed (steigend)", "attribut": "effect_speed", "default": 0, "highlight": 0}
+      ]
+    },
+    {
+      "name": "46 Channel",
+      "raster": {"rows": 1, "cols": 4},
+      "kanaele": [
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Offen (keine Funktion)", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe 1-25 Hz, steigend", "art": "strobe"}
+          ]
+        },
+        {"name": "Pan Kopf 1", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fein Kopf 1", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt Kopf 1", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fein Kopf 1", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Motor-Speed Kopf 1", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Prisma-Intensitaet Kopf 1", "attribut": "prism", "default": 0, "highlight": 0},
+        {"name": "Rot Kopf 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen Kopf 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau Kopf 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss Kopf 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Pan Kopf 2", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fein Kopf 2", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt Kopf 2", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fein Kopf 2", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Motor-Speed Kopf 2", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Prisma-Intensitaet Kopf 2", "attribut": "prism", "default": 0, "highlight": 0},
+        {"name": "Rot Kopf 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen Kopf 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau Kopf 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss Kopf 2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Pan Kopf 3", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fein Kopf 3", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt Kopf 3", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fein Kopf 3", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Motor-Speed Kopf 3", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Prisma-Intensitaet Kopf 3", "attribut": "prism", "default": 0, "highlight": 0},
+        {"name": "Rot Kopf 3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen Kopf 3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau Kopf 3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss Kopf 3", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Pan Kopf 4", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fein Kopf 4", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt Kopf 4", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fein Kopf 4", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Motor-Speed Kopf 4", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Prisma-Intensitaet Kopf 4", "attribut": "prism", "default": 0, "highlight": 0},
+        {"name": "Rot Kopf 4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen Kopf 4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau Kopf 4", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss Kopf 4", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Bewegungsmuster",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Keine Funktion"},
+            {"von": 10, "bis": 69, "name": "Bewegungsmuster 1", "art": ""},
+            {"von": 70, "bis": 129, "name": "Bewegungsmuster 2", "art": ""},
+            {"von": 130, "bis": 189, "name": "Bewegungsmuster 3", "art": ""},
+            {"von": 190, "bis": 255, "name": "Bewegungsmuster 4", "art": ""}
+          ]
+        },
+        {"name": "Bewegungsmuster-Speed (steigend)", "attribut": "effect_speed", "default": 0, "highlight": 0},
+        {
+          "name": "Farbeffekt",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Keine Funktion"},
+            {"von": 10, "bis": 24, "name": "Farbeffekt 1", "art": ""},
+            {"von": 25, "bis": 39, "name": "Farbeffekt 2", "art": ""},
+            {"von": 40, "bis": 54, "name": "Farbeffekt 3", "art": ""},
+            {"von": 55, "bis": 69, "name": "Farbeffekt 4", "art": ""},
+            {"von": 70, "bis": 84, "name": "Farbeffekt 5", "art": ""},
+            {"von": 85, "bis": 99, "name": "Farbeffekt 6", "art": ""},
+            {"von": 100, "bis": 114, "name": "Farbeffekt 7", "art": ""},
+            {"von": 115, "bis": 129, "name": "Farbeffekt 8", "art": ""},
+            {"von": 130, "bis": 144, "name": "Farbeffekt 9", "art": ""},
+            {"von": 145, "bis": 159, "name": "Farbeffekt 10", "art": ""},
+            {"von": 160, "bis": 174, "name": "Farbeffekt 11", "art": ""},
+            {"von": 175, "bis": 189, "name": "Farbeffekt 12", "art": ""},
+            {"von": 190, "bis": 204, "name": "Farbeffekt 13", "art": ""},
+            {"von": 205, "bis": 219, "name": "Farbeffekt 14", "art": ""},
+            {"von": 220, "bis": 255, "name": "Keine Funktion"}
+          ]
+        },
+        {"name": "Farbeffekt-Speed (steigend)", "attribut": "effect_speed", "default": 0, "highlight": 0}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,418 @@
+{
+  "format_version": 1,
+  "hersteller": "Shehds",
+  "hersteller_kurz": "Shehds",
+  "modell": "JMS WEBB LED Wash Big Bee Eye 19X40W",
+  "kurzname": "SH-JMSBEE19X40",
+  "typ": "moving_head",
+  "leistung_w": 500,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Shehds-JMS-WEBB-LED-Wash-BigBeeEye-19X40W.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Shehds/Shehds-JMS-WEBB-LED-Wash-BigBeeEye-19X40W.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.8 GIT · István Király,  Feiyu Shehds",
+    "original": "resources/fixtures/Shehds/Shehds-JMS-WEBB-LED-Wash-BigBeeEye-19X40W.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 52 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): Kopf-Rotation (Barrel Roll) als raw statt macro; kurzname SH-JMSBEE19X40; Bereichs-Arten korrigiert (u. a. „Preset“ nicht als Reset, Farben/Offen auf Farbrad, Open/Shake/Rotation auf Goborad, Prisma/Frost, keine Farb-/Dreh-Kacheln auf Makro-/Speed-Kanaelen, Sound-Bereiche); Farbmakro-/Programmkanaele ohne einzelne Farbslots als macro statt color_wheel; Programm-/Effekt-Geschwindigkeiten als effect_speed statt speed (speed = Bewegung)"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": false,
+    "wie": "nicht gegen ein Herstellerhandbuch geprueft (kein oeffentliches Shehds-Handbuch zu diesem Modell auffindbar); Kanalbelegung und Wertebereiche aus der QLC+-Vorlage, Attribute, Bereichs-Arten und Defaults von LightOS plausibilisiert"
+  },
+  "modi": [
+    {
+      "name": "23 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Zoom", "attribut": "zoom", "default": 0, "highlight": 0},
+        {
+          "name": "Rotate",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "0~360 Degrees", "art": ""},
+            {"von": 128, "bis": 191, "name": "Counterclockwise from fast to slow unrotation"},
+            {"von": 192, "bis": 255, "name": "Turn clockwise from slow to fast CVT"}
+          ]
+        },
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 1,
+          "highlight": 1,
+          "bereiche": [
+            {"von": 0, "bis": 3, "name": "Light Up", "art": "open"},
+            {"von": 4, "bis": 200, "name": "Strobe speeds from slow to fast", "art": "strobe"},
+            {"von": 201, "bis": 215, "name": "Low speed random flash", "art": "strobe"},
+            {"von": 216, "bis": 234, "name": "Medium speed random flash", "art": "strobe"},
+            {"von": 235, "bis": 255, "name": "High speed random flash", "art": "strobe"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Color temp", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Built-in Color",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Built-in Color gradient"}
+          ]
+        },
+        {
+          "name": "Static effect",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "CH10-13 and CH21-24", "art": ""}
+          ]
+        },
+        {
+          "name": "Dynamic effect",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "5 Number of one effect", "art": ""}
+          ]
+        },
+        {
+          "name": "Dynamic effect speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "The positive direction effect is changed from fast to slow", "art": ""},
+            {"von": 128, "bis": 255, "name": "The reverse direction effect varies from slow to fast", "art": ""}
+          ]
+        },
+        {"name": "Background Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Background Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Background Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Background White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 199, "name": "No function", "art": ""},
+            {"von": 200, "bis": 205, "name": "System reset after 5s", "art": "reset"},
+            {"von": 206, "bis": 255, "name": "No function", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "25 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Zoom", "attribut": "zoom", "default": 0, "highlight": 0},
+        {
+          "name": "Rotate",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "0~360 Degrees", "art": ""},
+            {"von": 128, "bis": 191, "name": "Counterclockwise from fast to slow unrotation"},
+            {"von": 192, "bis": 255, "name": "Turn clockwise from slow to fast CVT"}
+          ]
+        },
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 1,
+          "highlight": 1,
+          "bereiche": [
+            {"von": 0, "bis": 3, "name": "Light Up", "art": "open"},
+            {"von": 4, "bis": 200, "name": "Strobe speeds from slow to fast", "art": "strobe"},
+            {"von": 201, "bis": 215, "name": "Low speed random flash", "art": "strobe"},
+            {"von": 216, "bis": 234, "name": "Medium speed random flash", "art": "strobe"},
+            {"von": 235, "bis": 255, "name": "High speed random flash", "art": "strobe"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Color temp", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Built-in Color",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Built-in Color gradient"}
+          ]
+        },
+        {
+          "name": "Effect fade",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "CH 19 effect", "art": ""}
+          ]
+        },
+        {
+          "name": "Effect Angel",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dynamic effect translation (CH19)", "art": ""}
+          ]
+        },
+        {
+          "name": "Static effect",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "CH10-13 and CH21-24", "art": ""}
+          ]
+        },
+        {
+          "name": "Dynamic effect",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "5 Number of one effect", "art": ""}
+          ]
+        },
+        {
+          "name": "Dynamic effect speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "The positive direction effect is changed from fast to slow", "art": ""},
+            {"von": 128, "bis": 255, "name": "The reverse direction effect varies from slow to fast", "art": ""}
+          ]
+        },
+        {"name": "Background Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Background Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Background Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Background White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 199, "name": "No function", "art": ""},
+            {"von": 200, "bis": 205, "name": "System reset after 5s", "art": "reset"},
+            {"von": 206, "bis": 255, "name": "No function", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "101 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Zoom", "attribut": "zoom", "default": 0, "highlight": 0},
+        {
+          "name": "Rotate",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "0~360 Degrees", "art": ""},
+            {"von": 128, "bis": 191, "name": "Counterclockwise from fast to slow unrotation"},
+            {"von": 192, "bis": 255, "name": "Turn clockwise from slow to fast CVT"}
+          ]
+        },
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 1,
+          "highlight": 1,
+          "bereiche": [
+            {"von": 0, "bis": 3, "name": "Light Up", "art": "open"},
+            {"von": 4, "bis": 200, "name": "Strobe speeds from slow to fast", "art": "strobe"},
+            {"von": 201, "bis": 215, "name": "Low speed random flash", "art": "strobe"},
+            {"von": 216, "bis": 234, "name": "Medium speed random flash", "art": "strobe"},
+            {"von": 235, "bis": 255, "name": "High speed random flash", "art": "strobe"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Color temp", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Built-in Color",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Built-in Color gradient"}
+          ]
+        },
+        {
+          "name": "Effect fade",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "CH 19 effect", "art": ""}
+          ]
+        },
+        {
+          "name": "Effect Angel",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dynamic effect translation (CH19)", "art": ""}
+          ]
+        },
+        {
+          "name": "Static effect",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "CH10-13 and CH21-24", "art": ""}
+          ]
+        },
+        {
+          "name": "Dynamic effect",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "5 Number of one effect", "art": ""}
+          ]
+        },
+        {
+          "name": "Dynamic effect speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "The positive direction effect is changed from fast to slow", "art": ""},
+            {"von": 128, "bis": 255, "name": "The reverse direction effect varies from slow to fast", "art": ""}
+          ]
+        },
+        {"name": "Background Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Background Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Background Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Background White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 199, "name": "No function", "art": ""},
+            {"von": 200, "bis": 205, "name": "System reset after 5s", "art": "reset"},
+            {"von": 206, "bis": 255, "name": "No function", "art": ""}
+          ]
+        },
+        {"name": "Red 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 3", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 4", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 4", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 5", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 5", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 5", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 5", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 6", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 6", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 6", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 6", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 7", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 7", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 7", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 7", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 8", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 8", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 8", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 8", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 9", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 9", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 9", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 9", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 10", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 10", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 10", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 10", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 11", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 11", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 11", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 11", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 12", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 12", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 12", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 12", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 13", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 13", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 13", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 13", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 14", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 14", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 14", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 14", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 15", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 15", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 15", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 15", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 16", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 16", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 16", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 16", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 17", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 17", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 17", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 17", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 18", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 18", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 18", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 18", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 19", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 19", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 19", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 19", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    }
+  ]
+}

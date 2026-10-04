@@ -1,0 +1,313 @@
+{
+  "format_version": 1,
+  "hersteller": "Cameo",
+  "hersteller_kurz": "Cameo",
+  "modell": "Thunderwash 600 RGBW",
+  "kurzname": "THUNDERWASH 600 RGBW",
+  "typ": "strobe",
+  "leistung_w": 160,
+  "quelle": {
+    "titel": "Cameo THUNDERWASH 600 RGBW (CLTW600RGBW) – User's Manual, DMX Control S. 63–66",
+    "url": "https://www.manualslib.com/manual/1714088/Cameo-Thunderwash-600-Rgbw.html?page=63"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.0.0 Beta 1 · Torsten Caninenberg",
+    "original": "resources/fixtures/Cameo/Cameo-Thunderwash-600-RGBW.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 104 Wertebereiche mit Art (kind) versehen; Bereichsname 'Very Slow Flash' -> 'Very Short Flash' und Sound-Kanalname in '7 Channels 1' nach Handbuch; Colour Macro: 'Colour off' als 'open', Festfarben 'color', Jumping/Fading 'rotate', Stopp ohne Art; Strobe-Default/-Highlight 0 statt 2; Duration speed -> duration; Sound-Kanal macro -> raw (Aus ohne Art, An 'sound'); Modus '7 Channels 2': Strobe-Kanal laut Handbuch nur offen/zu/Strobe (QLC+ hatte dort die Zufallseffekte aus Modus 7 Channels 1); kurzname/notizen/quelle ergaenzt"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": true,
+    "wie": "Alle 9 Modi Kanal fuer Kanal gegen die DMX-Tabelle im Handbuch (S. 63–66, via ManualsLib) geprueft"
+  },
+  "modi": [
+    {
+      "name": "1 Channel",
+      "kanaele": [
+        {
+          "name": "Strobe (RGBW Full On)",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Strobe Closed", "art": "closed"},
+            {"von": 11, "bis": 255, "name": "Strobe slow -> fast 1Hz - 30Hz", "art": "strobe"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2 Channels 1",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Colour Macro",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Colour off", "art": "open"},
+            {"von": 6, "bis": 13, "name": "Red", "art": "color"},
+            {"von": 14, "bis": 21, "name": "Amber", "art": "color"},
+            {"von": 22, "bis": 29, "name": "Yellow warm", "art": "color"},
+            {"von": 30, "bis": 37, "name": "Yellow", "art": "color"},
+            {"von": 38, "bis": 45, "name": "Green", "art": "color"},
+            {"von": 46, "bis": 53, "name": "Turquoise", "art": "color"},
+            {"von": 54, "bis": 61, "name": "Cyan", "art": "color"},
+            {"von": 62, "bis": 69, "name": "Blue", "art": "color"},
+            {"von": 70, "bis": 77, "name": "Lavender", "art": "color"},
+            {"von": 78, "bis": 85, "name": "Mauve", "art": "color"},
+            {"von": 86, "bis": 93, "name": "Magenta", "art": "color"},
+            {"von": 94, "bis": 101, "name": "Pink", "art": "color"},
+            {"von": 102, "bis": 109, "name": "Warm White", "art": "color"},
+            {"von": 110, "bis": 117, "name": "White", "art": "color"},
+            {"von": 118, "bis": 125, "name": "Cold White", "art": "color"},
+            {"von": 126, "bis": 128, "name": "Colour Jumping Stop", "art": ""},
+            {"von": 129, "bis": 192, "name": "Colour Jumping Speed slow -> Fast / Colour 1 -> 12", "art": "rotate"},
+            {"von": 193, "bis": 255, "name": "Colour Fading Speed slow -> Fast / Colour 1 -> 12", "art": "rotate"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2 Channels 2",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe (RGBW)",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Strobe closed", "art": "closed"},
+            {"von": 11, "bis": 250, "name": "Strobe slow -> fast 1Hz - 30 Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3 Channels 1",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe (RGBW)",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Strobe closed", "art": "closed"},
+            {"von": 11, "bis": 250, "name": "Strobe slow -> fast 1Hz - 30 Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        },
+        {
+          "name": "Duration",
+          "attribut": "duration",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Flash Duration (1ms to 510ms)", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3 Channels 2",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe (RGBW)",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Strobe closed", "art": "closed"},
+            {"von": 11, "bis": 250, "name": "Strobe slow -> fast 1Hz - 30 Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        },
+        {
+          "name": "Colour Macro",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Colour off", "art": "open"},
+            {"von": 6, "bis": 13, "name": "Red", "art": "color"},
+            {"von": 14, "bis": 21, "name": "Amber", "art": "color"},
+            {"von": 22, "bis": 29, "name": "Yellow warm", "art": "color"},
+            {"von": 30, "bis": 37, "name": "Yellow", "art": "color"},
+            {"von": 38, "bis": 45, "name": "Green", "art": "color"},
+            {"von": 46, "bis": 53, "name": "Turquoise", "art": "color"},
+            {"von": 54, "bis": 61, "name": "Cyan", "art": "color"},
+            {"von": 62, "bis": 69, "name": "Blue", "art": "color"},
+            {"von": 70, "bis": 77, "name": "Lavender", "art": "color"},
+            {"von": 78, "bis": 85, "name": "Mauve", "art": "color"},
+            {"von": 86, "bis": 93, "name": "Magenta", "art": "color"},
+            {"von": 94, "bis": 101, "name": "Pink", "art": "color"},
+            {"von": 102, "bis": 109, "name": "Warm White", "art": "color"},
+            {"von": 110, "bis": 117, "name": "White", "art": "color"},
+            {"von": 118, "bis": 125, "name": "Cold White", "art": "color"},
+            {"von": 126, "bis": 128, "name": "Colour Jumping Stop", "art": ""},
+            {"von": 129, "bis": 192, "name": "Colour Jumping Speed slow -> Fast / Colour 1 -> 12", "art": "rotate"},
+            {"von": 193, "bis": 255, "name": "Colour Fading Speed slow -> Fast / Colour 1 -> 12", "art": "rotate"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4 Channels 1",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "4 Channels 2",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe Mode",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Strobe closed", "art": "closed"},
+            {"von": 11, "bis": 33, "name": "Pulse Random, slow -> fast", "art": "strobe"},
+            {"von": 34, "bis": 56, "name": "Ramp up Random, slow -> fast", "art": "strobe"},
+            {"von": 57, "bis": 79, "name": "Ramp down Random, slow -> fast", "art": "strobe"},
+            {"von": 80, "bis": 102, "name": "Random Strobe Effect slow -> fast", "art": "strobe"},
+            {
+              "von": 103,
+              "bis": 127,
+              "name": "Strobe Break Effect, 5s, .... 1s (Very Short Flash) Random",
+              "art": "strobe"
+            },
+            {"von": 128, "bis": 250, "name": "Strobe slow -> fast 1Hz - 30 Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        },
+        {
+          "name": "Colour Macro",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Colour off", "art": "open"},
+            {"von": 6, "bis": 13, "name": "Red", "art": "color"},
+            {"von": 14, "bis": 21, "name": "Amber", "art": "color"},
+            {"von": 22, "bis": 29, "name": "Yellow warm", "art": "color"},
+            {"von": 30, "bis": 37, "name": "Yellow", "art": "color"},
+            {"von": 38, "bis": 45, "name": "Green", "art": "color"},
+            {"von": 46, "bis": 53, "name": "Turquoise", "art": "color"},
+            {"von": 54, "bis": 61, "name": "Cyan", "art": "color"},
+            {"von": 62, "bis": 69, "name": "Blue", "art": "color"},
+            {"von": 70, "bis": 77, "name": "Lavender", "art": "color"},
+            {"von": 78, "bis": 85, "name": "Mauve", "art": "color"},
+            {"von": 86, "bis": 93, "name": "Magenta", "art": "color"},
+            {"von": 94, "bis": 101, "name": "Pink", "art": "color"},
+            {"von": 102, "bis": 109, "name": "Warm White", "art": "color"},
+            {"von": 110, "bis": 117, "name": "White", "art": "color"},
+            {"von": 118, "bis": 125, "name": "Cold White", "art": "color"},
+            {"von": 126, "bis": 128, "name": "Colour Jumping Stop", "art": ""},
+            {"von": 129, "bis": 192, "name": "Colour Jumping Speed slow -> Fast / Colour 1 -> 12", "art": "rotate"},
+            {"von": 193, "bis": 255, "name": "Colour Fading Speed slow -> Fast / Colour 1 -> 12", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Sound (Colour CH3, set CH2 value 000)",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Sound Control Off", "art": ""},
+            {"von": 6, "bis": 255, "name": "Sound Control On Low -> High (Mic Sensitivity)", "art": "sound"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "7 Channels 1",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe Mode",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Strobe closed", "art": "closed"},
+            {"von": 11, "bis": 33, "name": "Pulse Random, slow -> fast", "art": "strobe"},
+            {"von": 34, "bis": 56, "name": "Ramp up Random, slow -> fast", "art": "strobe"},
+            {"von": 57, "bis": 79, "name": "Ramp down Random, slow -> fast", "art": "strobe"},
+            {"von": 80, "bis": 102, "name": "Random Strobe Effect slow -> fast", "art": "strobe"},
+            {
+              "von": 103,
+              "bis": 127,
+              "name": "Strobe Break Effect, 5s, .... 1s (Very Short Flash) Random",
+              "art": "strobe"
+            },
+            {"von": 128, "bis": 250, "name": "Strobe slow -> fast 1Hz - 30 Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Sound (Colour CH3 - CH6, set CH2 value 000)",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Sound Control Off", "art": ""},
+            {"von": 6, "bis": 255, "name": "Sound Control On Low -> High (Mic Sensitivity)", "art": "sound"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "7 Channels 2",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe (RGBW)",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Strobe closed", "art": "closed"},
+            {"von": 11, "bis": 250, "name": "Strobe slow -> fast 1Hz - 30Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        },
+        {
+          "name": "Duration",
+          "attribut": "duration",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Flash Duration (1ms to 510ms)", "art": ""}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    }
+  ],
+  "notizen": "3-in-1 Strobe/Blinder/Wash (CLTW600RGBW), 648 x 0,2 W RGBW-SMD, eine Zone. Der Sound-Kanal wirkt nur, wenn der Strobe-Kanal auf 000 steht."
+}

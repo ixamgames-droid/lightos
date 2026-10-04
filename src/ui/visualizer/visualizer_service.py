@@ -343,6 +343,9 @@ class VisualizerService:
     """
 
     TICK_MS = 33
+    # VIZ-70: so viele Ticks am Stueck darf das Frame-Gate hoechstens
+    # ueberspringen (30 x 33 ms ~ 1 s), danach wird trotzdem einmal gebaut.
+    GATE_MAX_SKIPS = 30
 
     def __init__(self, state):
         self._state = state
@@ -353,6 +356,17 @@ class VisualizerService:
         self._last_payload: dict[int, dict[str, object]] = {}
         self._timer: Optional[Any] = None
         self._subscribed = False
+        # VIZ-70 Frame-Gate: Signatur des letzten GEBAUTEN Ticks (siehe
+        # ``_frame_signature``). Gleiche Signatur -> der Tick baut keinen
+        # Snapshot. ``_state_rev`` zaehlt JEDES State-Event (Patch, Show-Load,
+        # Programmer, …) — konservativ: lieber einmal zu viel bauen als ein
+        # Geraete-Attribut (Nullpunkt, Bereich, Profil) verpassen, das sich
+        # ohne DMX-Aenderung aendert. ``_gate_skips`` begrenzt das Ueberspringen
+        # zusaetzlich auf ``GATE_MAX_SKIPS`` Ticks am Stueck (Sicherheitsnetz
+        # fuer Aenderungen ganz ohne Event).
+        self._gate_sig: Optional[tuple] = None
+        self._gate_skips = 0
+        self._state_rev = 0
 
     # ── Timer-Lazy-Init (Qt-Objekt erst bei Bedarf, damit Tests ohne
     #    QApplication den Service instanzieren koennen) ─────────────────────
@@ -468,25 +482,77 @@ class VisualizerService:
         Dict-only: liest nur ueber ``get_patched_fixtures``/``universes``/
         ``visualizer_positions`` — nie ``state._scene`` direkt."""
         snapshot: dict[int, dict[str, object]] = {}
+        # VIZ-70: EINMAL je Tick lesen. ``visualizer_positions`` ist am echten
+        # AppState eine Property, die bei JEDEM Zugriff alle Weltpositionen aus
+        # dem SceneGraph neu rechnet — in der Schleife war das O(n^2) und
+        # gemessen gut die Haelfte der Tick-Zeit.
+        placed = self._state.visualizer_positions
+        universes = self._state.universes
+        try:
+            from src.core.app_state import get_channels_for_patched
+        except Exception:
+            get_channels_for_patched = None
         for fixture in self._state.get_patched_fixtures():
-            if fixture.fid not in self._state.visualizer_positions:
+            if fixture.fid not in placed:
                 continue
-            if fixture.universe not in self._state.universes:
+            if fixture.universe not in universes:
                 continue
             attrs = self._collect_attrs(fixture)
             # Kanal-Objekte (gecached) mitgeben: nur so kennt die Payload-
             # Ableitung Farbrad-Slots und Shutter-Semantik (ChannelRange.kind).
             try:
-                from src.core.app_state import get_channels_for_patched
                 channels = get_channels_for_patched(fixture)
             except Exception:
                 channels = None
             snapshot[fixture.fid] = _build_fixture_payload(fixture, attrs, channels)
         return snapshot
 
+    def _frame_signature(self) -> Optional[tuple]:
+        """VIZ-70: billige Signatur aller Eingaben des Snapshots.
+
+        Der Payload eines Geraets haengt nur ab von (a) seinem DMX — gelesen aus
+        dem gesendeten Frame bzw. dem Rohpuffer, genau wie ``_collect_attrs`` —,
+        (b) seinen Patch-/Profil-Daten und (c) davon, ob es im 3D platziert ist.
+        (a) steckt hier als Bytes je Universum drin, (c) als Menge der
+        platzierten fids, (b) ueber den Event-Zaehler ``_state_rev`` (Patch-
+        Aenderungen melden sich als ``patch_changed``). Programmer, Funktionen
+        und Stage wirken alle ueber den DMX-Frame. Kamera und Auswahl laufen
+        gar nicht ueber den Tick (eigene Bridge-Pushes) — sie haengen also
+        nicht an diesem Gate.
+
+        ``None`` = keine verlaessliche Signatur (z. B. Test-Attrappe ohne
+        ``get_all``) -> das Gate bleibt aus, der Tick baut wie bisher."""
+        try:
+            universes = self._state.universes
+            om = getattr(self._state, "output_manager", None)
+            frames = []
+            for u in sorted(universes):
+                frame = om.get_display_frame(u) if om is not None else None
+                if frame is None:
+                    frame = universes[u].get_all()
+                frames.append((u, bytes(frame)))
+            placed = frozenset(self._state.visualizer_positions)
+            n_fix = len(self._state.get_patched_fixtures())
+        except Exception:
+            return None
+        return (self._state_rev, n_fix, placed, tuple(frames))
+
     def _tick(self) -> None:
         if not any(t.active for t in self._targets):
             return
+        # VIZ-70 Frame-Gate: hat sich seit dem letzten gebauten Tick keine
+        # Eingabe geaendert, gibt es auch kein Diff — dann weder Snapshot bauen
+        # noch senden. Gemessen lief der Bau sonst ~31x/s auch bei stehendem
+        # DMX (ein Viertel bis ein Drittel eines Kerns, im UI-Thread). Ein
+        # Target, das den vollen Bestand braucht, geht immer durch.
+        sig = self._frame_signature()
+        needs_full = any(t.active and t.needs_full for t in self._targets)
+        if (sig is not None and sig == self._gate_sig and not needs_full
+                and self._gate_skips < self.GATE_MAX_SKIPS):
+            self._gate_skips += 1
+            return
+        self._gate_sig = sig
+        self._gate_skips = 0
         snapshot = self._build_snapshot()
 
         # Diff ggue. dem service-globalen Cache: nur GEAENDERTE Fixtures.
@@ -518,6 +584,7 @@ class VisualizerService:
         Fensters)."""
         if target is None:
             self._last_payload = {}
+            self._gate_sig = None
             for t in self._targets:
                 t.needs_full = True
         else:
@@ -570,6 +637,9 @@ class VisualizerService:
 
     # ── State-Subscribe (aus der Bridge gehobene Prune-Logik, dict-only) ────
     def _on_state(self, event: str, data) -> None:
+        # VIZ-70: jedes Event macht die Frame-Gate-Signatur ungueltig (siehe
+        # ``_frame_signature``) — auch die, die hier sonst nichts ausloesen.
+        self._state_rev += 1
         if event != "patch_changed":
             return
         current_fids = {f.fid for f in self._state.get_patched_fixtures()}

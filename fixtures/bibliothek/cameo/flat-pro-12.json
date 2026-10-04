@@ -1,0 +1,148 @@
+{
+  "format_version": 1,
+  "hersteller": "Cameo",
+  "hersteller_kurz": "Cameo",
+  "modell": "FLAT PRO 12",
+  "kurzname": "FLAT PRO 12",
+  "typ": "par",
+  "leistung_w": 140,
+  "quelle": {
+    "titel": "Cameo FLAT PRO Outdoor PAR Can CLPFLATPRO7IP65 / 12IP65 / 18IP65 – User's Manual (DMX Control)",
+    "url": "https://www.cameolight.com/en/downloads/file/id/847802507"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.8 GIT · Janosch Frank",
+    "original": "resources/fixtures/Cameo/Cameo-FLAT-PRO-12.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 45 Wertebereiche mit Art (kind) versehen; 3-Kanal-Makro und 8-Kanal: Farbmakro-Kanal neu belegt — QLC+ hatte dort die 2-Kanal-Liste (15 Farben ueber 0-255); laut Cameo-Handbuch der FLAT PRO-Serie liegen die 15 Festfarben bei 5-80, 81-150 Farbwechsel, 151-220 Ueberblendung, 221-255 Sound (Sound-Bereich wie beim eingebauten LightOS-Profil FLAT PRO 7 derselben Serie); 0-4 = Farbmischung ueber RGBWA als 'open'; Tippfehler korrigiert (Stroboscobe); QLC+-Datei FLAT PRO 12 ist kanal- und bereichsgleich mit FLAT PRO 18 (gleiche Serie, gleiches Handbuch) - dieselben LightOS-Anpassungen uebernommen"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": false,
+    "wie": "Wie FLAT PRO 18: Kanal fuer Kanal gegen die QLC+-Datei (identisch mit FLAT PRO 18) und das Cameo-Handbuch der Outdoor-Serie CLPFLATPRO7/12/18IP65 (gleiche Kanalfolge) geprueft; Handbuch der Innenversion nicht abrufbar, daher nicht als geprueft markiert"
+  },
+  "modi": [
+    {
+      "name": "2 Channel Macro",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Colour Macros",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 16, "name": "Red", "art": "color"},
+            {"von": 17, "bis": 33, "name": "Green", "art": "color"},
+            {"von": 34, "bis": 50, "name": "Blue", "art": "color"},
+            {"von": 51, "bis": 67, "name": "White", "art": "color"},
+            {"von": 68, "bis": 84, "name": "Amber", "art": "color"},
+            {"von": 85, "bis": 101, "name": "Yellow", "art": "color"},
+            {"von": 102, "bis": 118, "name": "Cyan", "art": "color"},
+            {"von": 119, "bis": 135, "name": "Lavender", "art": "color"},
+            {"von": 136, "bis": 152, "name": "Pink", "art": "color"},
+            {"von": 153, "bis": 169, "name": "Light Green", "art": "color"},
+            {"von": 170, "bis": 186, "name": "Magenta", "art": "color"},
+            {"von": 187, "bis": 203, "name": "Turquoise", "art": "color"},
+            {"von": 204, "bis": 220, "name": "Orange", "art": "color"},
+            {"von": 221, "bis": 237, "name": "Cool White", "art": "color"},
+            {"von": 238, "bis": 255, "name": "Warm White", "art": "color"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3 Channel Macro",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Stroboscope", "attribut": "shutter", "default": 0, "highlight": 0},
+        {
+          "name": "Colour Macros",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Blackout / Colour mixing CH3-CH7", "art": "open"},
+            {"von": 5, "bis": 10, "name": "Red", "art": "color"},
+            {"von": 11, "bis": 15, "name": "Green", "art": "color"},
+            {"von": 16, "bis": 20, "name": "Blue", "art": "color"},
+            {"von": 21, "bis": 25, "name": "White", "art": "color"},
+            {"von": 26, "bis": 30, "name": "Amber", "art": "color"},
+            {"von": 31, "bis": 35, "name": "Yellow", "art": "color"},
+            {"von": 36, "bis": 40, "name": "Cyan", "art": "color"},
+            {"von": 41, "bis": 45, "name": "Lavender", "art": "color"},
+            {"von": 46, "bis": 50, "name": "Pink", "art": "color"},
+            {"von": 51, "bis": 55, "name": "Light Green", "art": "color"},
+            {"von": 56, "bis": 60, "name": "Magenta", "art": "color"},
+            {"von": 61, "bis": 65, "name": "Turquoise", "art": "color"},
+            {"von": 66, "bis": 70, "name": "Orange", "art": "color"},
+            {"von": 71, "bis": 75, "name": "Cool White", "art": "color"},
+            {"von": 76, "bis": 80, "name": "Warm White", "art": "color"},
+            {"von": 81, "bis": 150, "name": "Colour Change (rate)", "art": "rotate"},
+            {"von": 151, "bis": 220, "name": "Colour Blending (rate)", "art": "rotate"},
+            {"von": 221, "bis": 255, "name": "Sound control", "art": "sound"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3 Channel RGB",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "5 Channel RGBWA",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "8 Channel",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Stroboscope", "attribut": "shutter", "default": 0, "highlight": 0},
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {
+          "name": "Colour Macros",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Blackout / Colour mixing CH3-CH7", "art": "open"},
+            {"von": 5, "bis": 10, "name": "Red", "art": "color"},
+            {"von": 11, "bis": 15, "name": "Green", "art": "color"},
+            {"von": 16, "bis": 20, "name": "Blue", "art": "color"},
+            {"von": 21, "bis": 25, "name": "White", "art": "color"},
+            {"von": 26, "bis": 30, "name": "Amber", "art": "color"},
+            {"von": 31, "bis": 35, "name": "Yellow", "art": "color"},
+            {"von": 36, "bis": 40, "name": "Cyan", "art": "color"},
+            {"von": 41, "bis": 45, "name": "Lavender", "art": "color"},
+            {"von": 46, "bis": 50, "name": "Pink", "art": "color"},
+            {"von": 51, "bis": 55, "name": "Light Green", "art": "color"},
+            {"von": 56, "bis": 60, "name": "Magenta", "art": "color"},
+            {"von": 61, "bis": 65, "name": "Turquoise", "art": "color"},
+            {"von": 66, "bis": 70, "name": "Orange", "art": "color"},
+            {"von": 71, "bis": 75, "name": "Cool White", "art": "color"},
+            {"von": 76, "bis": 80, "name": "Warm White", "art": "color"},
+            {"von": 81, "bis": 150, "name": "Colour Change (rate)", "art": "rotate"},
+            {"von": 151, "bis": 220, "name": "Colour Blending (rate)", "art": "rotate"},
+            {"von": 221, "bis": 255, "name": "Sound control", "art": "sound"}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Farbmakro 151-255: das IP65-Handbuch nennt 151-255 'Colour Blending', die Innenversion (OFL/LightOS FLAT PRO 7) 151-220 + 221-255 Sound — hier die Innenversion uebernommen. Strobe-Kanal: Rate 0-100 %, 0 = aus."
+}

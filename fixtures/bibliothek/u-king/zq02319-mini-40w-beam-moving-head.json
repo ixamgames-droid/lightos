@@ -1,0 +1,75 @@
+{
+  "format_version": 1,
+  "hersteller": "U King",
+  "hersteller_kurz": "UKING",
+  "modell": "ZQ02319 Mini 40W Beam Moving Head",
+  "kurzname": "ZQ02319",
+  "typ": "moving_head",
+  "leistung_w": 40,
+  "notizen": "Kein Herstellerhandbuch abrufbar; Kanalfolge und Wertebereiche aus der QLC+-Datei. Strobe-Kanaele ohne Wertangabe in QLC+: 0 = kein Strobe angenommen (wie bei den eingebauten U-King-Profilen).",
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition UKing-ZQ02319-Mini-40W-Beam-Moving-Head.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/UKing/UKing-ZQ02319-Mini-40W-Beam-Moving-Head.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.13.0 GIT · Mike Ubl",
+    "original": "resources/fixtures/UKing/UKing-ZQ02319-Mini-40W-Beam-Moving-Head.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 6 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): Hersteller 'UKing' -> 'U King' (wie die eingebauten LightOS-Profile der Marke); Modellname 'ZQ-02319' -> 'ZQ02319 Mini 40W Beam Moving Head'; Strobe-Kanal ohne Bereiche (QLC+-Preset ShutterStrobeSlowFast) mit 0 = kein Strobe (open) / 1-255 Strobe versehen (Strobe); Modellname aus der QLC+-Dateibezeichnung vervollstaendigt; einzelne Kanalnamen deutsch bzw. eindeutiger benannt"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Originaldatei geprueft und nach den LightOS-Regeln (SCHEMA.md) nachbearbeitet; ein Herstellerhandbuch war nicht abrufbar (U'King-Anleitungen nur als Amazon-/manuals.plus-PDF, dort gesperrt; ManualsLib fuehrt das Modell nicht), daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "13 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan-Fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt-Fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Dimming", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 1, "bis": 255, "name": "Strobe langsam → schnell", "art": "strobe"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Auto-Modus",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 30, "name": "No effect", "art": ""},
+            {"von": 31, "bis": 127, "name": "Auto Mode 1", "art": ""},
+            {"von": 128, "bis": 249, "name": "Auto Mode 2", "art": ""},
+            {"von": 250, "bis": 255, "name": "Sound Control", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 249, "name": "No Effect", "art": ""},
+            {"von": 250, "bis": 255, "name": "Reset", "art": "reset"}
+          ]
+        }
+      ]
+    }
+  ]
+}

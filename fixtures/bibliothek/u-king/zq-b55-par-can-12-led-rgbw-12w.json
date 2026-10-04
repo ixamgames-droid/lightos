@@ -1,0 +1,89 @@
+{
+  "format_version": 1,
+  "hersteller": "U King",
+  "hersteller_kurz": "UKING",
+  "modell": "ZQ-B55 Par Can 12 LED RGBW 12W",
+  "kurzname": "ZQB55",
+  "typ": "par",
+  "leistung_w": 15,
+  "notizen": "Kein Herstellerhandbuch abrufbar; Kanalfolge und Wertebereiche aus der QLC+-Datei. Strobe-Kanaele ohne Wertangabe in QLC+: 0 = kein Strobe angenommen (wie bei den eingebauten U-King-Profilen). Kanal 3 heisst in QLC+ 'Speed Adjustable' mit Strobe-Preset; als Strobe (0 = aus) uebernommen, kann je nach Firmware auch das Makro-Tempo sein.",
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition UKing-ZQB55-Par-Can-12-LED-RGBW-12W.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/UKing/UKing-ZQB55-Par-Can-12-LED-RGBW-12W.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.5 GIT · Nathan Durnan",
+    "original": "resources/fixtures/UKing/UKing-ZQB55-Par-Can-12-LED-RGBW-12W.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 25 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): Hersteller 'UKing' -> 'U King' (wie die eingebauten LightOS-Profile der Marke); Modellname 'B55 Par Can 12 LED RGBW 12W' -> 'ZQ-B55 Par Can 12 LED RGBW 12W'; Color macro: Farbmakro von macro zu color_wheel, 18 Festfarben als Farb-Kacheln benannt (Tippfehler 'Yello' korrigiert); Attribute korrigiert (Color macro: macro->color_wheel); Strobe-Kanal ohne Bereiche (QLC+-Preset ShutterStrobeSlowFast) mit 0 = kein Strobe (open) / 1-255 Strobe versehen (Speed Adjustable); Modellname mit 'ZQ-' wie die uebrigen ZQ-B-Geraete; einzelne Kanalnamen deutsch bzw. eindeutiger benannt"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Originaldatei geprueft und nach den LightOS-Regeln (SCHEMA.md) nachbearbeitet; ein Herstellerhandbuch war nicht abrufbar (U'King-Anleitungen nur als Amazon-/manuals.plus-PDF, dort gesperrt; ManualsLib fuehrt das Modell nicht), daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "8-Channel",
+      "kanaele": [
+        {
+          "name": "Makro",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "No function", "art": ""},
+            {"von": 11, "bis": 50, "name": "macro A1", "art": ""},
+            {"von": 51, "bis": 100, "name": "macro A2", "art": ""},
+            {"von": 101, "bis": 150, "name": "macro A3", "art": ""},
+            {"von": 151, "bis": 200, "name": "macro A4", "art": ""},
+            {"von": 201, "bis": 255, "name": "macro A5", "art": ""}
+          ]
+        },
+        {
+          "name": "Farbmakro",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 39, "name": "Alle Farben (Mischung ueber Kanal 5-8)", "art": ""},
+            {"von": 40, "bis": 49, "name": "Rot", "art": "color"},
+            {"von": 50, "bis": 59, "name": "Gruen", "art": "color"},
+            {"von": 60, "bis": 69, "name": "Blau", "art": "color"},
+            {"von": 70, "bis": 79, "name": "Gelb", "art": "color"},
+            {"von": 80, "bis": 89, "name": "Cyan", "art": "color"},
+            {"von": 90, "bis": 99, "name": "Lila", "art": "color"},
+            {"von": 100, "bis": 109, "name": "Weiss", "art": "color"},
+            {"von": 110, "bis": 119, "name": "Rot + Gruen", "art": "color"},
+            {"von": 120, "bis": 129, "name": "Rot + Blau", "art": "color"},
+            {"von": 130, "bis": 139, "name": "Rot + Weiss", "art": "color"},
+            {"von": 140, "bis": 149, "name": "Gruen + Blau", "art": "color"},
+            {"von": 150, "bis": 159, "name": "Gruen + Weiss", "art": "color"},
+            {"von": 160, "bis": 169, "name": "Blau + Weiss", "art": "color"},
+            {"von": 170, "bis": 179, "name": "Rot + Gruen + Weiss", "art": "color"},
+            {"von": 180, "bis": 189, "name": "Rot + Blau + Weiss", "art": "color"},
+            {"von": 190, "bis": 199, "name": "Gruen + Blau + Weiss", "art": "color"},
+            {"von": 200, "bis": 209, "name": "Rot + Gruen + Blau", "art": "color"},
+            {"von": 210, "bis": 255, "name": "Rot + Gruen + Blau + Weiss", "art": "color"}
+          ]
+        },
+        {
+          "name": "Strobe / Tempo",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 1, "bis": 255, "name": "Strobe langsam → schnell", "art": "strobe"}
+          ]
+        },
+        {"name": "Master dimming", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Red Dimming", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green dimming", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue dimming", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White dimming", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    }
+  ]
+}

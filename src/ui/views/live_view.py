@@ -118,6 +118,38 @@ def _has_pan_tilt(fixture, render_type: str | None = None) -> bool:
 
 # ── Fixture-Renderer ──────────────────────────────────────────────────────────
 
+# VIZ-70: Schriften fuer FixtureRenderer.draw werden je (Punktgroesse, fett)
+# einmal gebaut statt je Geraet und Bild neu (draw lief bis zu 3x QFont +
+# QFontMetricsF je Geraet). Der Painter kopiert die Schrift bei setFont — die
+# gecachten Objekte werden nie veraendert. Begrenzt, weil die Groesse mit dem
+# (stufenlosen) Zoom variiert.
+_SCHRIFT_CACHE: dict = {}
+_METRIK_CACHE: dict = {}
+
+
+def _schrift(pt: float, bold: bool = False) -> QFont:
+    key = (pt, bold)
+    f = _SCHRIFT_CACHE.get(key)
+    if f is None:
+        if len(_SCHRIFT_CACHE) > 256:
+            _SCHRIFT_CACHE.clear()
+            _METRIK_CACHE.clear()
+        f = QFont("Arial")
+        f.setPointSizeF(pt)
+        if bold:
+            f.setBold(True)
+        _SCHRIFT_CACHE[key] = f
+    return f
+
+
+def _text_breite(pt: float, text: str) -> float:
+    m = _METRIK_CACHE.get(pt)
+    if m is None:
+        m = QFontMetricsF(_schrift(pt))
+        _METRIK_CACHE[pt] = m
+    return m.horizontalAdvance(text)
+
+
 class FixtureRenderer:
     """Zeichnet ein Fixture je nach Typ unterscheidbar."""
 
@@ -499,10 +531,7 @@ class FixtureRenderer:
             painter.setPen(QPen(color.lighter(145), 1))
             painter.drawRoundedRect(
                 QRectF(-size*0.34, -size*0.27, size*0.68, size*0.54), 3, 3)
-            glyph_font = QFont("Arial")
-            glyph_font.setBold(True)
-            glyph_font.setPointSizeF(12 * tscale)
-            painter.setFont(glyph_font)
+            painter.setFont(_schrift(12 * tscale, True))
             painter.setPen(color.lighter(185))
             painter.drawText(
                 QRectF(-size*0.35, -size*0.32, size*0.70, size*0.64),
@@ -520,9 +549,8 @@ class FixtureRenderer:
         # LOD 0 = "PREFIX Name", LOD 1 = nur Kurz-Label (spart Breite bei Dichte),
         # LOD 2 = kein Label (Selektion/Hover bekommt vom Canvas immer LOD 0).
         if lod <= 1:
-            _fl = QFont("Arial"); _fl.setPointSizeF(8 * tscale)
             painter.setPen(QColor("#bbb"))
-            painter.setFont(_fl)
+            painter.setFont(_schrift(8 * tscale))
             text_rect = label_rect(size, tscale)
             if lod == 0:
                 _txt = (f"{label_prefix} {label}" if label else label_prefix)
@@ -536,12 +564,11 @@ class FixtureRenderer:
         # Intensity-Wert oben — nur bei voller Detailstufe (sonst Text-Salat)
         _pct_w = 0.0
         if intensity > 0 and lod == 0:
-            _fi = QFont("Arial"); _fi.setPointSizeF(7 * tscale)
             painter.setPen(QColor("#FFD700") if intensity > 200 else QColor("#aaa"))
-            painter.setFont(_fi)
+            painter.setFont(_schrift(7 * tscale))
             inten_pct = int(intensity / 255 * 100)
             _pct_txt = f"{inten_pct}%"
-            _pct_w = QFontMetricsF(_fi).horizontalAdvance(_pct_txt)
+            _pct_w = _text_breite(7 * tscale, _pct_txt)
             painter.drawText(oben_rect(size, tscale),
                             Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignBottom
                             | Qt.TextFlag.TextDontClip,
@@ -553,9 +580,8 @@ class FixtureRenderer:
             painter.setBrush(QBrush(QColor(60, 130, 255, 200)))
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawRoundedRect(badge_rect, 3 * tscale, 3 * tscale)
-            _fb = QFont("Arial"); _fb.setPointSizeF(6 * tscale); _fb.setBold(True)
             painter.setPen(QColor(210, 230, 255))
-            painter.setFont(_fb)
+            painter.setFont(_schrift(6 * tscale, True))
             painter.drawText(badge_rect,
                              Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextDontClip,
                              f"FX{len(effects)}" if len(effects) > 1 else "FX")
@@ -689,6 +715,10 @@ class StageCanvas(QWidget):
 
         self._apply_canvas_size()
         self.setStyleSheet("background:#0d1117;")
+        # VIZ-70: paintEvent deckt die ganze Flaeche selbst deckend ab
+        # (Hintergrund-Pixmap bzw. fillRect ueber die Welt, Canvas = Welt x Zoom)
+        # -> Qt muss den Stylesheet-Hintergrund vorher nicht extra fuellen.
+        self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, True)
         self.setAcceptDrops(True)
         # Fokus annehmen, damit Tastatur (Esc = Auswahl leeren) ankommt
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
@@ -732,9 +762,20 @@ class StageCanvas(QWidget):
         # Positionen aus der Show laden (eigener 2D-Store, Migration aus 3D-Viz)
         self._load_positions()
 
-        # Live-Update
+        # VIZ-70: Zustand fuer gedrosseltes Neuzeichnen und den Hintergrund-Cache.
+        # ``_paint_sig`` = Signatur der angezeigten Werte beim letzten Takt,
+        # ``_animiert`` = das letzte Bild hatte Pulsringe/Strobe-Blinken (dann
+        # aendert sich das Bild auch ohne neue Werte und jeder Takt zeichnet).
+        self._paint_sig: tuple | None = None
+        self._animiert: bool = True
+        self._takte_ohne_paint: int = 0
+        self._bg_pixmap = None
+        self._bg_key: tuple | None = None
+
+        # Live-Update: der Takt fragt erst, ob sich ueberhaupt etwas zeigt
+        # (siehe _on_render_tick), statt blind update() zu rufen.
         self._update_timer = QTimer(self)
-        self._update_timer.timeout.connect(self.update)
+        self._update_timer.timeout.connect(self._on_render_tick)
         self._update_timer.start(self.RENDER_INTERVAL_MS)
 
         # Bei Show-Load / Refresh die Positionen neu laden
@@ -743,6 +784,11 @@ class StageCanvas(QWidget):
             sync = get_sync()
             sync.subscribe(SyncEvent.SHOW_LOADED, lambda *_: self._reload_positions_safe())
             sync.subscribe(SyncEvent.REFRESH_ALL, lambda *_: self._reload_positions_safe())
+            # VIZ-70: Patch-/Profil-Aenderung (Umadressieren, Mode, Bereiche,
+            # Invert …) -> beim naechsten Takt sofort neu zeichnen, nicht erst
+            # nach dem Sicherheitsnetz. An die Widget-Lebenszeit gebunden.
+            sync.subscribe_widget(SyncEvent.PATCH_CHANGED, self,
+                                  weak_slot(self._patch_geaendert))
         except Exception as e:
             print(f"[live_view] sync subscribe error: {e}")
 
@@ -799,12 +845,180 @@ class StageCanvas(QWidget):
         nicht der sichtbare Tab ist (spart CPU im Hintergrund)."""
         try:
             if on:
+                # Nach dem Wiedereinblenden sofort ein frisches Bild.
+                self._paint_sig = None
                 if not self._update_timer.isActive():
                     self._update_timer.start(self.RENDER_INTERVAL_MS)
             else:
                 self._update_timer.stop()
         except (RuntimeError, AttributeError):
             pass
+
+    # ── VIZ-70: gedrosseltes Neuzeichnen ─────────────────────────────────────
+    # Gemessen am Windows-Rig (Extremfall, 2D-Buehne sichtbar, 3D-Fenster
+    # offen): ~65 % des Hauptthreads in paintEvent/draw — und genau dort setzt
+    # QtWebEngine auch das 3D-Bild zusammen (3,6 FPS statt 57,7). Der Takt
+    # zeichnet deshalb nur noch, wenn (1) die Flaeche ueberhaupt zu sehen ist
+    # und (2) sich die angezeigten Werte geaendert haben oder das Bild animiert
+    # ist. Hoechstens ein Bild je RENDER_INTERVAL_MS bleibt die Obergrenze.
+
+    # Sicherheitsnetz: spaetestens nach so vielen Takten ohne Bild wird doch
+    # gezeichnet (~1 s) — fuer Aenderungen, die die Signatur nicht sieht
+    # (z. B. umbenanntes Geraet ohne Patch-Event).
+    MAX_TAKTE_OHNE_PAINT = 10
+
+    def _darf_zeichnen(self) -> bool:
+        """Ist die Buehnenflaeche gerade irgendwo zu sehen?"""
+        try:
+            if not self.isVisible():
+                return False
+            win = self.window()
+            if win is not None and win.isMinimized():
+                return False
+            if self.visibleRegion().isEmpty():
+                return False
+        except RuntimeError:
+            return False
+        return True
+
+    def _anzeige_signatur(self) -> tuple | None:
+        """Billige Signatur von allem, was paintEvent aus dem State liest:
+        Rohwerte der Universen, laufende Funktionen (Effekt-Badges/Strobe),
+        Programmer-Belegung (Badge „Programmer") und gepatchte Geraete.
+        ``None`` = nicht ermittelbar -> immer zeichnen (altes Verhalten)."""
+        try:
+            st = self._state
+            unis = tuple((u, bytes(uni.get_all()))
+                         for u, uni in sorted(st.universes.items()))
+            running = tuple(st.function_manager.running_ids())
+            with st._prog_lock:
+                prog = frozenset(f for f, v in st.programmer.items() if v)
+            fids = tuple(self._patch_fingerabdruck(f)
+                         for f in st.get_patched_fixtures())
+        except Exception:
+            return None
+        return (unis, running, prog, fids)
+
+    # Alles am gepatchten Geraet, was das 2D-Bild bestimmt (Adresse, Profil/
+    # Mode, Typ, Label, Pan/Tilt-Bereich, Nullpunkte, Einmess-Versatz,
+    # Invert/Swap). Fehlt ein Feld, steht None — die Signatur bleibt billig.
+    _PATCH_FELDER = ("universe", "address", "fixture_profile_id", "mode_name",
+                     "channel_count", "fixture_type", "label",
+                     "pan_range_deg", "tilt_range_deg", "pan_zero_dmx",
+                     "tilt_zero_dmx", "aim_offset_pan", "aim_offset_tilt",
+                     "invert_pan", "invert_tilt", "swap_pan_tilt")
+
+    @classmethod
+    def _patch_fingerabdruck(cls, f) -> tuple:
+        return (f.fid,) + tuple(getattr(f, k, None) for k in cls._PATCH_FELDER)
+
+    def _patch_geaendert(self, *_a) -> None:
+        self._paint_sig = None
+
+    def _on_render_tick(self) -> None:
+        if not self._darf_zeichnen():
+            return
+        sig = self._anzeige_signatur()
+        self._takte_ohne_paint += 1
+        if (not self._animiert and sig is not None and sig == self._paint_sig
+                and self._takte_ohne_paint < self.MAX_TAKTE_OHNE_PAINT):
+            return
+        self._paint_sig = sig
+        self._takte_ohne_paint = 0
+        self.update()
+
+    # ── VIZ-70: statischer Hintergrund als Pixmap ────────────────────────────
+    # Raster (gepunktete, geglaettete Linien), Buehne und Publikum aendern sich
+    # nur mit Welt-/Raster-/Zoom-Einstellung, wurden aber jedes Bild neu
+    # gezeichnet. Ab dieser Pixelzahl wird nicht gecacht (Speicher: 4 Byte je
+    # Pixel; Zoom 4 auf 1200x800 waeren ~61 MB) — dann wie bisher direkt.
+    BG_CACHE_MAX_PIXEL = 6_000_000
+
+    def _zeichne_hintergrund(self, painter: QPainter, tscale: float,
+                             flaechen: bool = True, texte: bool = True) -> None:
+        """Hintergrund, Raster, Buehne, Publikum — Painter ist bereits mit dem
+        Zoom skaliert (Weltkoordinaten). ``flaechen``/``texte`` trennen, was in
+        den Cache darf: die zwei Beschriftungen bekommen auf dem Widget
+        Subpixel-Glaettung, in einem Bild nur Graustufen — sie werden deshalb
+        immer direkt gezeichnet (liegen ueber ihrer Flaeche, nichts darueber)."""
+        stage_rect = QRectF(self.world_w*0.15, 20, self.world_w*0.7, 60)
+        aud_rect = QRectF(self.world_w*0.1, self.world_h - 60, self.world_w*0.8, 40)
+        if not flaechen:
+            self._zeichne_bereichstexte(painter, tscale, stage_rect, aud_rect)
+            return
+        painter.fillRect(QRectF(0, 0, self.world_w, self.world_h), QColor("#0d1117"))
+
+        # Raster (ersetzt Punkt-Raster, wenn grid_visible)
+        if self.grid_visible and self.grid_size > 0:
+            painter.setPen(QPen(QColor("#1a1a25"), 1, Qt.PenStyle.DotLine))
+            gs = self.grid_size
+            x = 0
+            while x <= self.world_w:
+                painter.drawLine(x, 0, x, self.world_h)
+                x += gs
+            y = 0
+            while y <= self.world_h:
+                painter.drawLine(0, y, self.world_w, y)
+                y += gs
+
+        # "Stage"-Bereich oben (vereinfacht)
+        painter.setPen(QPen(QColor("#444"), 2))
+        painter.setBrush(QBrush(QColor("#1a1a2a")))
+        painter.drawRoundedRect(stage_rect, 6, 6)
+
+        # "Publikum"-Bereich unten
+        painter.setPen(QPen(QColor("#333"), 1))
+        painter.setBrush(QBrush(QColor("#0a0a10")))
+        painter.drawRoundedRect(aud_rect, 4, 4)
+        if texte:
+            self._zeichne_bereichstexte(painter, tscale, stage_rect, aud_rect)
+
+    @staticmethod
+    def _zeichne_bereichstexte(painter: QPainter, tscale: float,
+                               stage_rect: QRectF, aud_rect: QRectF) -> None:
+        painter.setPen(QColor("#666"))
+        painter.setFont(_schrift(9 * tscale, True))
+        painter.drawText(stage_rect, Qt.AlignmentFlag.AlignCenter, "BÜHNE")
+        painter.setPen(QColor("#555"))
+        painter.setFont(_schrift(8 * tscale))
+        painter.drawText(aud_rect, Qt.AlignmentFlag.AlignCenter, "PUBLIKUM")
+
+    def _hintergrund_pixmap(self):
+        """Gecachter Hintergrund in Geraetepixeln (oder ``None`` = direkt
+        zeichnen). Neu gebaut nur, wenn sich Welt, Raster, Zoom oder die
+        Pixeldichte des Bildschirms aendern."""
+        try:
+            dpr = float(self.devicePixelRatioF()) or 1.0
+        except Exception:
+            dpr = 1.0
+        w, h = self.width(), self.height()
+        if w <= 0 or h <= 0 or w * h * dpr * dpr > self.BG_CACHE_MAX_PIXEL:
+            return None
+        key = (self.world_w, self.world_h, self.zoom, self.grid_visible,
+               self.grid_size, w, h, dpr)
+        if key == self._bg_key and self._bg_pixmap is not None:
+            return self._bg_pixmap
+        # Deckendes RGB32-Bild; die Beschriftungen kommen NICHT hinein (siehe
+        # _zeichne_hintergrund).
+        from PySide6.QtGui import QImage
+        # Aufrunden: bei gebrochenem DPR (1,25/1,5/1,75) waere round() eine
+        # Geraetepixel-Spalte zu schmal — wegen WA_OpaquePaintEvent bliebe dort
+        # Altes bzw. Schwarz stehen.
+        pm = QImage(max(1, math.ceil(w * dpr)), max(1, math.ceil(h * dpr)),
+                    QImage.Format.Format_RGB32)
+        pm.setDevicePixelRatio(dpr)
+        pm.fill(QColor("#0d1117"))
+        p = QPainter(pm)
+        try:
+            p.setRenderHint(QPainter.RenderHint.Antialiasing)
+            p.scale(self.zoom, self.zoom)
+            self._zeichne_hintergrund(p, 1.0 / self.zoom if self.zoom > 0 else 1.0,
+                                      texte=False)
+        finally:
+            p.end()
+        self._bg_pixmap = pm
+        self._bg_key = key
+        return pm
 
     # ── Koordinaten-Umrechnung Canvas→Welt ───────────────────────────────────
 
@@ -1060,8 +1274,82 @@ class StageCanvas(QWidget):
             pass
         return out
 
-    def _get_strobe_info(self, fid: int, fixture, running=None) -> tuple[float, bool]:
-        """Gibt (freq_hz, is_currently_on) zurück. freq_hz=0 → kein Blinken."""
+    @staticmethod
+    def _menge(seq) -> set:
+        """``set(seq)`` ohne Ausnahme bei nicht hashbaren Elementen (die ohnehin
+        nie gleich einer fid sind) — ``fid in menge`` == ``fid in seq``."""
+        out = set()
+        for x in seq:
+            try:
+                out.add(x)
+            except TypeError:
+                pass
+        return out
+
+    def _effekt_vorab(self, running) -> dict:
+        """VIZ-70: EINMAL je Bild, was bisher je Fixture ueber ALLE laufenden
+        Funktionen und deren Geraetelisten lief (O(Fixtures x Funktionen x
+        Mitglieder)). Liefert dieselben Ergebnisse wie die Schleifen in
+        ``_get_strobe_info``/``_get_active_effects``:
+
+        - ``"namen"``: fid -> Funktionsnamen in Laufreihenfolge
+        - ``"square"``: fid -> Frequenz der ersten SQUARE-Ebene (erste > 0 gewinnt,
+          sonst der zuletzt gefundene Wert — wie dort)
+        - ``"prog"``: fids mit Programmer-Werten"""
+        namen: dict[int, list[str]] = {}
+        square: dict[int, float] = {}
+        prog: set = set()
+        try:
+            from src.core.engine.effect_layers import LayerType
+            _square = LayerType.SQUARE
+        except Exception:
+            _square = None
+        for func in running:
+            try:
+                fixture_ids = getattr(func, 'fixture_ids', None)
+                fixtures = getattr(func, 'fixtures', None)
+                grid = getattr(func, 'fixture_grid', None)
+                vals = getattr(func, '_values', None)
+                hit: set = set()
+                if isinstance(fixture_ids, (list, tuple, set)):
+                    hit |= self._menge(fixture_ids)
+                if isinstance(fixtures, (list, tuple)):
+                    hit |= self._menge(getattr(fx, 'fid', None) for fx in fixtures)
+                if isinstance(grid, (list, tuple)):
+                    hit |= self._menge(grid)
+                if isinstance(vals, (list, tuple)):
+                    hit |= self._menge(getattr(sv, 'fixture_id', None) for sv in vals)
+                for fid in hit:
+                    namen.setdefault(fid, []).append(func.name)
+            except Exception:
+                pass
+            try:
+                if (_square is not None and hasattr(func, 'fixture_ids')
+                        and hasattr(func, 'layers')
+                        and getattr(func, 'target_attribute', '') == 'intensity'):
+                    freq = None
+                    for layer in func.layers:
+                        if layer.type == _square:
+                            freq = layer.frequency
+                            break
+                    if freq is not None:
+                        for fid in self._menge(func.fixture_ids):
+                            if square.get(fid, 0.0) > 0.0:
+                                continue
+                            square[fid] = freq
+            except Exception:
+                pass
+        try:
+            with self._state._prog_lock:
+                prog = {f for f, v in self._state.programmer.items() if v}
+        except Exception:
+            prog = set()
+        return {"namen": namen, "square": square, "prog": prog}
+
+    def _get_strobe_info(self, fid: int, fixture, running=None,
+                         vorab: dict | None = None) -> tuple[float, bool]:
+        """Gibt (freq_hz, is_currently_on) zurück. freq_hz=0 → kein Blinken.
+        ``vorab`` (VIZ-70): Ergebnis von ``_effekt_vorab`` fuer dieses Bild."""
         freq_hz = 0.0
 
         # 1. Shutter/Strobe-DMX-Kanal auslesen
@@ -1078,7 +1366,9 @@ class StageCanvas(QWidget):
             pass
 
         # 2. LayeredEffect mit Square-Wave auf Intensity
-        if freq_hz == 0.0:
+        if freq_hz == 0.0 and vorab is not None:
+            freq_hz = vorab["square"].get(fid, 0.0)
+        elif freq_hz == 0.0:
             try:
                 from src.core.engine.effect_layers import LayerType
                 funcs = running if running is not None else self._running_functions()
@@ -1103,11 +1393,17 @@ class StageCanvas(QWidget):
         return freq_hz, phase < 0.5
 
     def _get_active_effects(self, fid: int, strobe_hz: float = 0.0,
-                            running=None) -> list[str]:
+                            running=None, vorab: dict | None = None) -> list[str]:
         """Gibt Liste der aktiven Effekt-/Funktionsnamen zurück, die dieses Fixture betreffen."""
         effects = []
         if strobe_hz > 0.0:
             effects.append(f"Strobe {strobe_hz:.1f} Hz")
+        if vorab is not None:
+            # VIZ-70: einmal je Bild vorberechnet (gleiche Treffer-Regeln).
+            effects.extend(vorab["namen"].get(fid, ()))
+            if fid in vorab["prog"]:
+                effects.append("Programmer")
+            return effects
         try:
             funcs = running if running is not None else self._running_functions()
             for func in funcs:
@@ -1291,46 +1587,38 @@ class StageCanvas(QWidget):
 
     def paintEvent(self, event):
         painter = QPainter(self)
+        # VIZ-70: statischer Hintergrund aus dem Pixmap-Cache (1:1 in
+        # Geraetepixeln, VOR Skalierung/Antialiasing) — sonst direkt wie bisher.
+        bg = self._hintergrund_pixmap()
+        if bg is not None:
+            painter.drawImage(0, 0, bg)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.scale(self.zoom, self.zoom)
         # Bereichs-Beschriftungen bildschirm-konstant halten (Painter ist skaliert)
         tscale = 1.0 / self.zoom if self.zoom > 0 else 1.0
+        if bg is None:
+            self._zeichne_hintergrund(painter, tscale)
+        else:
+            self._zeichne_hintergrund(painter, tscale, flaechen=False)
 
-        # Hintergrund
-        painter.fillRect(QRectF(0, 0, self.world_w, self.world_h), QColor("#0d1117"))
-
-        # Raster (ersetzt Punkt-Raster, wenn grid_visible)
-        if self.grid_visible and self.grid_size > 0:
-            painter.setPen(QPen(QColor("#1a1a25"), 1, Qt.PenStyle.DotLine))
-            gs = self.grid_size
-            x = 0
-            while x <= self.world_w:
-                painter.drawLine(x, 0, x, self.world_h)
-                x += gs
-            y = 0
-            while y <= self.world_h:
-                painter.drawLine(0, y, self.world_w, y)
-                y += gs
-
-        # "Stage"-Bereich oben (vereinfacht)
-        stage_rect = QRectF(self.world_w*0.15, 20, self.world_w*0.7, 60)
-        painter.setPen(QPen(QColor("#444"), 2))
-        painter.setBrush(QBrush(QColor("#1a1a2a")))
-        painter.drawRoundedRect(stage_rect, 6, 6)
-        _fst = QFont("Arial"); _fst.setBold(True); _fst.setPointSizeF(9 * tscale)
-        painter.setPen(QColor("#666"))
-        painter.setFont(_fst)
-        painter.drawText(stage_rect, Qt.AlignmentFlag.AlignCenter, "BÜHNE")
-
-        # "Publikum"-Bereich unten
-        aud_rect = QRectF(self.world_w*0.1, self.world_h - 60, self.world_w*0.8, 40)
-        painter.setPen(QPen(QColor("#333"), 1))
-        painter.setBrush(QBrush(QColor("#0a0a10")))
-        painter.drawRoundedRect(aud_rect, 4, 4)
-        _fau = QFont("Arial"); _fau.setPointSizeF(8 * tscale)
-        painter.setPen(QColor("#555"))
-        painter.setFont(_fau)
-        painter.drawText(aud_rect, Qt.AlignmentFlag.AlignCenter, "PUBLIKUM")
+        # VIZ-70: nur Geraete im neu zu zeichnenden Bereich bearbeiten (Scroll-
+        # Ausschnitt, Teil-Repaint unter der Minimap). Rand in Weltkoordinaten
+        # grosszuegig: Symbol (<1x size), Ringe, Beam, Label/%/FX (bildschirm-
+        # konstant, daher x tscale). Ausgewaehlte Geraete werden nie
+        # uebersprungen (Info-Box).
+        # Nur ein Bild, das die ganze SICHTBARE Flaeche neu zeichnet, darf
+        # entscheiden, ob noch etwas animiert ist (``_voll``).
+        try:
+            _er = event.rect()
+            _rand = self._fixture_size * 1.5 + 150 * tscale
+            _clip = QRectF(_er.x() / self.zoom - _rand, _er.y() / self.zoom - _rand,
+                           _er.width() / self.zoom + 2 * _rand,
+                           _er.height() / self.zoom + 2 * _rand)
+            _sichtbar = self.visibleRegion().boundingRect()
+            _voll = _sichtbar.isEmpty() or _er.contains(_sichtbar)
+        except Exception:
+            _clip = None
+            _voll = True
 
         # Fixtures
         try:
@@ -1344,12 +1632,17 @@ class StageCanvas(QWidget):
 
         anim_phase = time.time() % 2.0 / 2.0  # 0..1 über 2 Sekunden (0.5 Hz)
         running = self._running_functions()  # einmal pro Frame statt pro Fixture
+        vorab = self._effekt_vorab(running)  # VIZ-70: Effekt-Zuordnung je Bild
+        animiert = False
         info_box_data = None  # (fixture, color, intensity, pan, tilt, effects, x, y)
 
         for fixture in fixtures:
             if fixture.fid not in self._positions:
                 continue
             x, y = self._positions[fixture.fid]
+            if (_clip is not None and not _clip.contains(x, y)
+                    and fixture.fid not in self._selected_fids):
+                continue    # ausserhalb des Neuzeichen-Bereichs
             color, intensity = self._fixture_color_and_intensity(fixture)
             pan = tilt = 128
             try:
@@ -1372,8 +1665,11 @@ class StageCanvas(QWidget):
                         tilt = _pt.get("tilt", 128) + (_pt.get("tilt_fine", 0) or 0) / 256.0
             except Exception:
                 pass
-            strobe_hz, blink_on = self._get_strobe_info(fixture.fid, fixture, running)
-            effects = self._get_active_effects(fixture.fid, strobe_hz, running)
+            strobe_hz, blink_on = self._get_strobe_info(fixture.fid, fixture, running,
+                                                        vorab)
+            effects = self._get_active_effects(fixture.fid, strobe_hz, running, vorab)
+            if effects or strobe_hz != 0.0:
+                animiert = True
             label = f"{fixture.fid}"
             # Verfeinerten Render-Typ berechnen: par_bar/mover_bar/spider werden
             # von moving_head getrennt — dieselbe zentrale Quelle wie das 3D-Modell
@@ -1427,6 +1723,14 @@ class StageCanvas(QWidget):
                 # die die Box schweigt (A3D-21).
                 info_box_data = (fixture, color, intensity, pan, tilt, effects,
                                  x, y, _render_type)
+
+        # VIZ-70: Pulsring/Blinken aendern das Bild ohne neue Werte -> der
+        # Takt muss weiter zeichnen. Ein Teil-Repaint sieht nicht alle
+        # sichtbaren Geraete; dort nur einschalten, nie ausschalten.
+        if _voll:
+            self._animiert = animiert
+        elif animiert:
+            self._animiert = True
 
         # Info-Box über allem zeichnen
         if info_box_data:
@@ -1616,14 +1920,39 @@ class Minimap(QWidget):
         self.setStyleSheet(
             "background: rgba(10, 12, 22, 210); border: 1px solid #334; border-radius: 5px;"
         )
+        # VIZ-70: nur neu zeichnen, wenn sich Inhalt (Positionen, Ausschnitt,
+        # Welt/Zoom) aendert — die halbtransparente Minimap liegt UEBER der
+        # Canvas, jedes Neuzeichnen zieht dort ein Teil-Repaint der Canvas nach.
+        self._last_sig: tuple | None = None
         self._repaint_timer = QTimer(self)
-        self._repaint_timer.timeout.connect(self.update)
+        self._repaint_timer.timeout.connect(self._on_repaint_tick)
         self._repaint_timer.start(200)
+
+    def _on_repaint_tick(self) -> None:
+        try:
+            if not self.isVisible():
+                return
+            win = self.window()
+            if win is not None and win.isMinimized():
+                return
+            c = self._canvas
+            vp = self._scroll.viewport()
+            sig = (tuple(c._positions.items()), c.world_w, c.world_h, c.zoom,
+                   self._scroll.horizontalScrollBar().value(),
+                   self._scroll.verticalScrollBar().value(),
+                   vp.width(), vp.height(), self.width(), self.height())
+        except (RuntimeError, AttributeError):
+            return
+        if sig == self._last_sig:
+            return
+        self._last_sig = sig
+        self.update()
 
     def set_active(self, on: bool) -> None:
         """Startet/stoppt das Repaint-Timer der Minimap (Pause im Hintergrund)."""
         try:
             if on:
+                self._last_sig = None
                 if not self._repaint_timer.isActive():
                     self._repaint_timer.start(200)
             else:

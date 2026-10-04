@@ -1,0 +1,158 @@
+{
+  "format_version": 1,
+  "hersteller": "Betopper",
+  "hersteller_kurz": "Betopper",
+  "modell": "LM70",
+  "kurzname": "LM70",
+  "typ": "moving_head",
+  "leistung_w": 100,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Betopper-LM70.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Betopper/Betopper-LM70.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.0.0 Beta 3 · Maxi",
+    "original": "resources/fixtures/Betopper/Betopper-LM70.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 48 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung: Kanal 'Effects' macro -> intensity: ist der kombinierte Dimmer/Strobe-Kanal (Aus/Dimmer/Strobe/Voll an), Bereiche mit art closed/strobe/open; Farbauswahl color_wheel -> macro (RGBW-Farbvorwahl, kein Rad); Farbsprung ohne art color; Color Speed -> effect_speed"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Quelldatei und auf innere Stimmigkeit geprueft; kein Herstellerhandbuch oeffentlich auffindbar, nicht am Geraet geprueft"
+  },
+  "modi": [
+    {
+      "name": "9 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {
+          "name": "Dimmer / Strobe",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Aus", "art": "closed"},
+            {"von": 8, "bis": 134, "name": "Dimmer 0-100 %", "art": ""},
+            {"von": 135, "bis": 239, "name": "Strobe langsam → schnell", "art": "strobe"},
+            {"von": 240, "bis": 255, "name": "Voll an", "art": "open"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 149, "name": "Nothing", "art": ""},
+            {"von": 150, "bis": 255, "name": "Reset device", "art": "reset"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "14 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan Fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt Fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Dimmer / Strobe",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Aus", "art": "closed"},
+            {"von": 8, "bis": 134, "name": "Dimmer 0-100 %", "art": ""},
+            {"von": 135, "bis": 239, "name": "Strobe langsam → schnell", "art": "strobe"},
+            {"von": 240, "bis": 255, "name": "Voll an", "art": "open"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Color Choose",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Nothing", "art": ""},
+            {"von": 8, "bis": 21, "name": "Yellow", "art": "color"},
+            {"von": 22, "bis": 34, "name": "Amber", "art": "color"},
+            {"von": 35, "bis": 49, "name": "Magenta", "art": "color"},
+            {"von": 50, "bis": 63, "name": "UV", "art": "color"},
+            {"von": 64, "bis": 77, "name": "Indigo", "art": "color"},
+            {"von": 78, "bis": 91, "name": "Violet", "art": "color"},
+            {"von": 92, "bis": 105, "name": "Blue", "art": "color"},
+            {"von": 106, "bis": 119, "name": "Cyan", "art": "color"},
+            {"von": 120, "bis": 134, "name": "Light blue", "art": "color"},
+            {"von": 135, "bis": 147, "name": "Lime", "art": "color"},
+            {"von": 148, "bis": 161, "name": "White", "art": "color"},
+            {"von": 162, "bis": 175, "name": "White RGB Dimming", "art": ""},
+            {"von": 176, "bis": 189, "name": "White RGB Dimming", "art": ""},
+            {"von": 190, "bis": 203, "name": "White RGB Dimming", "art": ""},
+            {"von": 204, "bis": 217, "name": "Indigo White White Dimming", "art": ""},
+            {"von": 218, "bis": 231, "name": "Indigo White White Dimming", "art": ""},
+            {"von": 232, "bis": 255, "name": "Farbsprung (Auto)", "art": ""}
+          ]
+        },
+        {
+          "name": "Color Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Color Speed", "art": ""}
+          ]
+        },
+        {
+          "name": "Movement (Auto & Effect)",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Movement (Auto & Effect)", "art": ""},
+            {"von": 8, "bis": 22, "name": "Auto 1 Random spin fast", "art": ""},
+            {"von": 23, "bis": 37, "name": "Auto 2 Random spin fast", "art": ""},
+            {"von": 38, "bis": 53, "name": "Auto 3 Random spin fast", "art": ""},
+            {"von": 54, "bis": 67, "name": "Auto 4 Random spin fast", "art": ""},
+            {"von": 68, "bis": 82, "name": "Auto 5 Random spin slow", "art": ""},
+            {"von": 83, "bis": 97, "name": "Auto 6 Random spin slow", "art": ""},
+            {"von": 98, "bis": 112, "name": "Auto 7 Random spin slow", "art": ""},
+            {"von": 113, "bis": 127, "name": "Auto 8 Random spin slow", "art": ""},
+            {"von": 128, "bis": 142, "name": "Auto 9 Sound Color Random", "art": "sound"},
+            {"von": 143, "bis": 157, "name": "Auto 10 Sound Color Random", "art": "sound"},
+            {"von": 158, "bis": 172, "name": "Auto 11 Sound Color Random", "art": "sound"},
+            {"von": 173, "bis": 187, "name": "Auto 12 Sound Color Random", "art": "sound"},
+            {"von": 188, "bis": 202, "name": "Auto 13 Sound Color Random spin slow", "art": "sound"},
+            {"von": 203, "bis": 217, "name": "Auto 14 Sound Color Random spin slow", "art": "sound"},
+            {"von": 218, "bis": 232, "name": "Auto 15 Sound Color Random spin slow", "art": "sound"},
+            {"von": 233, "bis": 255, "name": "Auto 16 Sound Color Random spin slow", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 149, "name": "Nothing", "art": ""},
+            {"von": 150, "bis": 255, "name": "Reset device", "art": "reset"}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "7x8 W RGBW Wash (Handelsname auch LM70S/LM70SR). Ohne Dimmer-Wert >= 8 auf 'Dimmer / Strobe' bleibt das Geraet dunkel."
+}

@@ -1,0 +1,184 @@
+{
+  "format_version": 1,
+  "hersteller": "U King",
+  "hersteller_kurz": "UKING",
+  "modell": "ZQ-B243 50W Moving Head with LED Belt",
+  "kurzname": "ZQB243",
+  "typ": "moving_head",
+  "leistung_w": 50,
+  "notizen": "Kein Herstellerhandbuch abrufbar; Kanalfolge und Wertebereiche aus der QLC+-Datei. Strobe-Kanaele ohne Wertangabe in QLC+: 0 = kein Strobe angenommen (wie bei den eingebauten U-King-Profilen). Spot mit LED-Band um den Kopf; Farb- und Gobo-Rad in QLC+ nur als Sammelbereiche (keine Einzel-Slots bekannt).",
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition UKing-ZQB243-50W-Moving-Head-With-LED-Belt.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/UKing/UKing-ZQB243-50W-Moving-Head-With-LED-Belt.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.0.0 Beta 3 · Yestalgia",
+    "original": "resources/fixtures/UKing/UKing-ZQB243-50W-Moving-Head-With-LED-Belt.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 36 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): Hersteller 'UKing' -> 'U King' (wie die eingebauten LightOS-Profile der Marke); Modellname 'ZQ-B243' -> 'ZQ-B243 50W Moving Head with LED Belt'; Attribute korrigiert (Light Strips: color_wheel->macro); Strobe-Kanal ohne Bereiche (QLC+-Preset ShutterStrobeSlowFast) mit 0 = kein Strobe (open) / 1-255 Strobe versehen (Strobe); 18 Bereichs-Arten nachgezogen (Farb-/Gobo-Slots, Shake/Rotation, Prisma, Sound, Reset; Programm-Bereiche in Makro-Kanaelen ohne Farb-Art); Modellname aus der QLC+-Dateibezeichnung vervollstaendigt; LED-Band-Kanal von color_wheel zu macro (zweites Farbrad haette als Kopf 2 gegolten); einzelne Kanalnamen deutsch bzw. eindeutiger benannt"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Originaldatei geprueft und nach den LightOS-Regeln (SCHEMA.md) nachbearbeitet; ein Herstellerhandbuch war nicht abrufbar (U'King-Anleitungen nur als Amazon-/manuals.plus-PDF, dort gesperrt; ManualsLib fuehrt das Modell nicht), daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "12 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan Fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt Fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Color",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 139, "name": "Color Selection", "art": "color"},
+            {"von": 140, "bis": 255, "name": "Automatic Color Change", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 63, "name": "Fixed Gobo", "art": "gobo"},
+            {"von": 64, "bis": 127, "name": "Shaking Gobo", "art": "shake"},
+            {"von": 128, "bis": 255, "name": "Automatic Change Pattern", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 1, "bis": 255, "name": "Strobe langsam → schnell", "art": "strobe"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Motor Speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Auto-/Sound-Modus",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 59, "name": "Other channels function", "art": ""},
+            {"von": 60, "bis": 84, "name": "Automatic Mode 3", "art": ""},
+            {"von": 85, "bis": 109, "name": "Automatic Mode 2", "art": ""},
+            {"von": 110, "bis": 134, "name": "Automatic Mode 1", "art": ""},
+            {"von": 135, "bis": 159, "name": "Automatic Mode 0", "art": ""},
+            {"von": 160, "bis": 184, "name": "Voice Control Mode 3", "art": "sound"},
+            {"von": 185, "bis": 209, "name": "Voice Control Mode2", "art": "sound"},
+            {"von": 210, "bis": 234, "name": "Voice Control Mode 1", "art": "sound"},
+            {"von": 235, "bis": 255, "name": "Voice Control Mode 0", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 234, "name": "No Function", "art": ""},
+            {"von": 235, "bis": 255, "name": "Reset", "art": "reset"}
+          ]
+        },
+        {
+          "name": "LED-Band Farbe / Auto",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 109, "name": "Color Selection", "art": ""},
+            {"von": 110, "bis": 255, "name": "Color Auto Operation", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "10 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {
+          "name": "Color",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 139, "name": "Color Selection", "art": "color"},
+            {"von": 140, "bis": 255, "name": "Automatic Color Change", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 63, "name": "Fixed Gobo", "art": "gobo"},
+            {"von": 64, "bis": 127, "name": "Shaking Gobo", "art": "shake"},
+            {"von": 128, "bis": 255, "name": "Automatic Change Pattern", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 1, "bis": 255, "name": "Strobe langsam → schnell", "art": "strobe"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Motor Speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Auto-/Sound-Modus",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 59, "name": "Other channels function", "art": ""},
+            {"von": 60, "bis": 84, "name": "Automatic Mode 3", "art": ""},
+            {"von": 85, "bis": 109, "name": "Automatic Mode 2", "art": ""},
+            {"von": 110, "bis": 134, "name": "Automatic Mode 1", "art": ""},
+            {"von": 135, "bis": 159, "name": "Automatic Mode 0", "art": ""},
+            {"von": 160, "bis": 184, "name": "Voice Control Mode 3", "art": "sound"},
+            {"von": 185, "bis": 209, "name": "Voice Control Mode2", "art": "sound"},
+            {"von": 210, "bis": 234, "name": "Voice Control Mode 1", "art": "sound"},
+            {"von": 235, "bis": 255, "name": "Voice Control Mode 0", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 234, "name": "No Function", "art": ""},
+            {"von": 235, "bis": 255, "name": "Reset", "art": "reset"}
+          ]
+        },
+        {
+          "name": "LED-Band Farbe / Auto",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 109, "name": "Color Selection", "art": ""},
+            {"von": 110, "bis": 255, "name": "Color Auto Operation", "art": ""}
+          ]
+        }
+      ]
+    }
+  ]
+}

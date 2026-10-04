@@ -759,9 +759,11 @@ class SceneModulesSmokeTest(unittest.TestCase):
         built = self._emit_until_true(
             lambda: self._bridge_obj.allFixtures.emit(dark),
             "(function(){ const f = window.__lightos.fixtures['700001']; "
-            "return !!f && !!f.spot && f.spot.visible === false; })()",
+            "return !!f && !!f.spot && f.spot.intensity === 0 && f.spot.visible === true; })()",
             timeout_s=5.0)
-        self.assertTrue(built, "Dunkler SpotLight wurde nicht aus der Licht-Auswertung genommen")
+        # VIZ-69: dunkel = intensity 0, der Spot bleibt sichtbar — visible gehoert
+        # in three.js r128 zum Shader-Programmschluessel (Umschalten = Neukompilierung).
+        self.assertTrue(built, "Dunkler SpotLight leuchtet noch (intensity muss 0 sein)")
 
         segments = self._eval(
             "window.__lightos.fixtures['700001'].beam.geometry.parameters.radialSegments")
@@ -780,16 +782,17 @@ class SceneModulesSmokeTest(unittest.TestCase):
         lit_batch = json.dumps([{"fid": 700001, "r": 255, "g": 40, "b": 0, "intensity": 255}])
         lit = self._emit_until_true(
             lambda: self._bridge_obj.dmxBatch.emit(lit_batch),
-            "window.__lightos.fixtures['700001'].spot.visible === true",
+            "window.__lightos.fixtures['700001'].spot.intensity > 0",
             timeout_s=5.0)
-        self.assertTrue(lit, "Aufgedrehter SpotLight wurde nicht wieder sichtbar")
-        # Und wieder dunkel -> wieder raus aus der Auswertung.
+        self.assertTrue(lit, "Aufgedrehter SpotLight leuchtet nicht wieder")
+        # Und wieder dunkel -> intensity 0, Sichtbarkeit bleibt (VIZ-69).
         dark_batch = json.dumps([{"fid": 700001, "r": 0, "g": 0, "b": 0, "intensity": 0}])
         dark_again = self._emit_until_true(
             lambda: self._bridge_obj.dmxBatch.emit(dark_batch),
-            "window.__lightos.fixtures['700001'].spot.visible === false",
+            "window.__lightos.fixtures['700001'].spot.intensity === 0"
+            " && window.__lightos.fixtures['700001'].spot.visible === true",
             timeout_s=5.0)
-        self.assertTrue(dark_again, "Abgedunkelter SpotLight blieb in der Licht-Auswertung")
+        self.assertTrue(dark_again, "Abgedunkelter SpotLight leuchtet weiter")
 
     def test_gpu_tier_high_keeps_full_geometry(self):
         """High-Tier behaelt die volle Kegel-Aufloesung (keine Optik-Regression)."""
@@ -816,8 +819,8 @@ class SceneModulesSmokeTest(unittest.TestCase):
         self.assertEqual(housing, 24, "High-Tier darf Gehaeuse-Segmente nicht reduzieren")
         # Dunkel-Culling gilt tier-unabhaengig.
         culled = self._eval(
-            "window.__lightos.fixtures['700002'].spot.visible === false")
-        self.assertTrue(culled, "Dunkel-Culling muss auch im High-Tier greifen")
+            "window.__lightos.fixtures['700002'].spot.intensity === 0")
+        self.assertTrue(culled, "Dunkel = intensity 0 muss auch im High-Tier greifen")
 
     def test_spider_override_without_heads_uses_base_color(self):
         """FM-12-Review-HIGH: 'spider'-Modell ohne Multihead-Banks (z.B. via

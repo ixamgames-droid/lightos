@@ -51,7 +51,8 @@ def _konstante(name: str) -> int:
 class ShadowBudgetCapTest(unittest.TestCase):
 
     def test_es_gibt_ein_absolutes_dach(self):
-        self.assertEqual(_konstante("SHADOW_SPOT_HARD_CAP"), 16)
+        # VIZ-69: von 16 auf 8 gesenkt (Schatten-Durchlauf = groesster Posten).
+        self.assertEqual(_konstante("SHADOW_SPOT_HARD_CAP"), 8)
 
     def test_budget_wendet_das_dach_an(self):
         """Die Rechnung muss `Math.min` gegen das Dach enthalten.
@@ -78,17 +79,21 @@ class ShadowBudgetCapTest(unittest.TestCase):
                              "zu wenig Abstand zur gemessenen Kippgrenze (26)")
 
     def test_reserve_bleibt_fuer_schwache_gpus_wirksam(self):
-        """Auf Davids Surface (maxTextures=16) entscheidet weiter die Reserve.
+        """Auf Davids Surface (maxTextures=16) bleibt die Reserve eine Grenze.
 
-        16 − 6 = 10 liegt unter dem Dach; dort darf sich nichts geaendert haben,
-        sonst haette der Fix auf der schwaecheren Karte Schatten weggenommen,
-        die dort nie ein Problem waren.
+        Bis VIZ-69 entschied dort allein die Reserve (16 − 6 = 10 unter dem
+        Dach von 16). Seit das Dach auf 8 steht, greift es auch auf der
+        schwaecheren Karte — gewollt: der Schatten-Durchlauf ist dort ebenso der
+        groesste Posten. Die Reserve darf aber nie UEBERschritten werden, und
+        eine kuenftig noch kleinere Reserve-Rechnung muss weiter wirken.
         """
         reserve = _konstante("SHADOW_TEXTURE_RESERVE")
         dach = _konstante("SHADOW_SPOT_HARD_CAP")
         surface_budget = min(dach, max(2, 16 - reserve))
-        self.assertEqual(surface_budget, 16 - reserve,
-                         "auf einer 16-Unit-GPU greift jetzt faelschlich das Dach")
+        self.assertLessEqual(surface_budget, 16 - reserve,
+                             "auf einer 16-Unit-GPU wird die Texture-Reserve ueberschritten")
+        self.assertEqual(min(dach, max(2, 12 - reserve)), 12 - reserve,
+                         "auf einer 12-Unit-GPU muss weiter die Reserve entscheiden")
 
     def test_die_messung_steht_im_code(self):
         """Die Zahlen, die das Dach begruenden, muessen auffindbar bleiben.
