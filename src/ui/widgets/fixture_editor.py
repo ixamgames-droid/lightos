@@ -13,7 +13,9 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from sqlalchemy.orm import Session
 from sqlalchemy import select, delete
-from src.core.database.fixture_db import engine, segment_wert
+from src.core.database.fixture_db import (als_bearbeitet_markieren, engine,
+                                          segment_wert)
+from src.core.database.models import ABLOESBARE_QUELLEN
 from src.core.database.models import (
     Manufacturer, FixtureProfile, FixtureMode, FixtureChannel, ChannelRange,
     GEO_MAX,
@@ -851,6 +853,12 @@ class FixtureEditorDialog(QDialog):
                 profile = s.execute(select(FixtureProfile).where(
                     FixtureProfile.id == self._fixture_id)).scalar_one_or_none()
                 if profile:
+                    # FM-63: ein an Ort und Stelle bearbeiteter QLC+-Import ist
+                    # jetzt ein eigenes Profil und wird nie mehr von einem
+                    # LightOS-Profil abgeloest. Marke in `herkunft`, NICHT
+                    # `source` aendern (Spider-Dual-Tilt-Erkennung haengt daran).
+                    if (profile.source or "") in ABLOESBARE_QUELLEN:
+                        als_bearbeitet_markieren(profile)
                     profile.manufacturer_id = mfr.id
                     profile.name = name
                     profile.short_name = self._edit_short.text().strip() or name[:8].upper()

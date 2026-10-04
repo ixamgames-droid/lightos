@@ -155,19 +155,21 @@ class A_LightosLoestImportAb(_Basis):
         ids = self._suche("7")
         self.assertEqual(ids, [neu])
 
-    def test_fixture_browser_bietet_nur_lightos_an(self):
+    def test_fixture_browser_stellt_import_unter_eigenen_knoten(self):
+        """Nachbesserung: der abgeloeste Import ist im Browser nicht weg,
+        sondern unter einem eingeklappten Knoten bewusst waehlbar — mit
+        Hinweis auf das abloesende Profil. Die Suche blendet ihn aus."""
         from PySide6.QtWidgets import QApplication
         _app = QApplication.instance() or QApplication([])  # noqa: F841
-        from src.ui.widgets.fixture_browser import FixtureBrowserDialog
+        from src.ui.widgets.fixture_browser import ABGELOEST_KNOTEN, FixtureBrowserDialog
         from PySide6.QtCore import Qt
         alt = self._profil("Testwerk", "Par 7", "qlcplus")
         anderes = self._profil("Testwerk", "Bar 9", "qlcplus")
         self._spielen(_datei())
         neu = self._lightos_id()
 
-        def ids(d) -> list[int]:
-            out, stack = [], [d._tree.topLevelItem(i)
-                              for i in range(d._tree.topLevelItemCount())]
+        def ids(wurzeln) -> list[int]:
+            out, stack = [], list(wurzeln)
             while stack:
                 it = stack.pop()
                 v = it.data(0, Qt.ItemDataRole.UserRole)
@@ -178,10 +180,37 @@ class A_LightosLoestImportAb(_Basis):
 
         d = FixtureBrowserDialog(1)
         self.addCleanup(d.deleteLater)
-        self.assertEqual(ids(d), sorted([neu, anderes]))
+        oben = [d._tree.topLevelItem(i) for i in range(d._tree.topLevelItemCount())]
+        knoten = [it for it in oben if it.text(0) == ABGELOEST_KNOTEN]
+        self.assertEqual(len(knoten), 1, [it.text(0) for it in oben])
+        (knoten,) = knoten
+        self.assertIs(oben[-1], knoten)                 # ganz unten
+        self.assertFalse(knoten.isExpanded())           # eingeklappt
+        self.assertEqual(ids([knoten]), [alt])
+        self.assertEqual(ids(it for it in oben if it is not knoten),
+                         sorted([neu, anderes]))
+        kind = knoten.child(0)
+        self.assertIn("LightOS-Profil", kind.toolTip(0))
+        self.assertIn(f"Profil {neu}", kind.toolTip(0))
+        # bewusst waehlbar: Auswahl laedt den alten Import samt Modus
+        d._tree.setCurrentItem(kind)
+        self.assertEqual(d._selected_profile.id, alt)
+        self.assertEqual(d._combo_mode.currentText(), "3 Kanal (3ch)")
+        # Suche: nur das LightOS-Profil, kein Knoten
         d._search.setText("Par 7")
-        self.assertEqual(ids(d), [neu])
-        self.assertNotIn(alt, ids(d))
+        oben = [d._tree.topLevelItem(i) for i in range(d._tree.topLevelItemCount())]
+        self.assertEqual(ids(oben), [neu])
+        self.assertNotIn(ABGELOEST_KNOTEN, [it.text(0) for it in oben])
+
+    def test_ohne_abloesung_kein_knoten(self):
+        from PySide6.QtWidgets import QApplication
+        _app = QApplication.instance() or QApplication([])  # noqa: F841
+        from src.ui.widgets.fixture_browser import ABGELOEST_KNOTEN, FixtureBrowserDialog
+        self._profil("Testwerk", "Bar 9", "qlcplus")
+        d = FixtureBrowserDialog(1)
+        self.addCleanup(d.deleteLater)
+        self.assertNotIn(ABGELOEST_KNOTEN, [d._tree.topLevelItem(i).text(0)
+                                            for i in range(d._tree.topLevelItemCount())])
 
     def test_idempotent(self):
         self._profil("Testwerk", "Par 7", "qlcplus")
@@ -219,6 +248,75 @@ class B_EigenesProfilBleibt(_Basis):
         self._spielen(_datei())
         self.assertEqual(self._quellen("Par 7"), [(b, "builtin")])
         self.assertEqual(FDB.abgeloeste_profil_ids(), set())
+
+
+class D_BearbeiteterImportWirdNieAbgeloest(_Basis):
+    """Nachbesserung: speichert der Fixture-Editor einen QLC+-Import an Ort und
+    Stelle, ist der ein eigenes Profil — Marke in ``herkunft``, ``source``
+    bleibt ``qlcplus`` (Spider-Dual-Tilt-Erkennung)."""
+
+    def _im_editor_speichern(self, pid: int) -> None:
+        from unittest import mock
+        from PySide6.QtWidgets import QApplication
+        _app = QApplication.instance() or QApplication([])  # noqa: F841
+        import src.ui.widgets.fixture_editor as ed
+        meldungen: list = []
+        with mock.patch.object(ed, "engine", lambda: self.eng), \
+                mock.patch.object(ed.QMessageBox, "information"), \
+                mock.patch.object(ed.QMessageBox, "warning",
+                                  lambda *a, **k: meldungen.append(a[1:3]) or 0):
+            dlg = ed.FixtureEditorDialog(fixture_id=pid)
+            self.addCleanup(dlg.deleteLater)
+            dlg._save()
+        self.assertEqual(meldungen, [])
+
+    def _herkunft(self, pid: int) -> str:
+        with Session(self.eng) as s:
+            return s.get(FixtureProfile, pid).herkunft or ""
+
+    def test_bearbeiteter_import_bleibt_sichtbar_und_qlcplus(self):
+        alt = self._profil("Testwerk", "Par 7", "qlcplus")
+        self._im_editor_speichern(alt)
+        self.assertTrue(FDB.ist_bearbeitet(self._herkunft(alt)))
+        self._spielen(_datei())
+        neu = self._lightos_id()
+        self.assertEqual(FDB.get_fixture(alt).source, "qlcplus")
+        self.assertEqual(FDB.abgeloeste_profil_ids(), set())
+        self.assertEqual(sorted(self._suche("Par 7")), sorted([alt, neu]))
+
+    def test_unbearbeiteter_import_wird_abgeloest(self):
+        """Gegenprobe: ohne Speichern im Editor greift die Abloesung."""
+        alt = self._profil("Testwerk", "Par 7", "qlcplus")
+        self.assertFalse(FDB.ist_bearbeitet(self._herkunft(alt)))
+        self._spielen(_datei())
+        self.assertEqual(FDB.abgeloeste_profil_ids(), {alt})
+
+    def test_spider_dual_tilt_erkennung_bleibt(self):
+        pid = self._profil("Testwerk", "Spider 2", "qlcplus", modus="Std",
+                           attrs=("pan", "tilt", "color_r", "color_g", "color_r", "color_g"))
+        self._im_editor_speichern(pid)
+        prof = FDB.get_fixture(pid)
+        chans = FDB.get_channels(FDB.get_modes(pid)[0].id)
+        self.assertTrue(FDB.ist_bearbeitet(prof.herkunft))
+        self.assertTrue(FDB.should_auto_mark_dual_tilt(prof, chans))
+
+    def test_marke_erhaelt_vorhandene_herkunft(self):
+        from src.core.database import bibliothek_format as bf
+        d = _datei()
+        voll = {k: d[k] for k in bf.HERKUNFT_SCHLUESSEL}
+        p = FixtureProfile(name="x", source="qlcplus",
+                           herkunft=json_dumps(voll))
+        FDB.als_bearbeitet_markieren(p)
+        self.assertTrue(FDB.ist_bearbeitet(p.herkunft))
+        self.assertEqual(bf.gespeicherte_herkunft(p), voll)
+        q = FixtureProfile(name="y", source="qlcplus", herkunft="")
+        FDB.als_bearbeitet_markieren(q)
+        self.assertIsNone(bf.gespeicherte_herkunft(q))   # Ableitung wie bisher
+
+
+def json_dumps(d) -> str:
+    import json
+    return json.dumps(d, ensure_ascii=False, sort_keys=True)
 
 
 class C_BestehenderPatchLaedtWeiter(_Basis):
