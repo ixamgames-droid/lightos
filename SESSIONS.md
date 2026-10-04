@@ -60,7 +60,7 @@
 | UI-72 | B | docs/ui72-ui73-befunde | 2026-10-02T22:02Z | BACKLOG.md |
 | UI-73 | B | docs/ui72-ui73-befunde | 2026-10-02T22:02Z | BACKLOG.md |
 | SAMMEL-DOKU-C | A | sammel/doku-c | 2026-10-02T22:08Z | docs · BACKLOG.md |
-| FM-59 | A | feat/fm59-bibliothek-runde3 | 2026-10-02T22:24Z | fixtures/bibliothek |
+| FM-59 | A | feat/fm59-bibliothek-runde3 | 2026-10-04T16:47Z | fixtures/bibliothek |
 | UI-72-73-FIX | B | fix/ui72-ui73-playback | 2026-10-02T22:44Z | src/ui/views/playback_view.py · src/core/cueliste_ziel.py · tests/test_ui72_ui73_playback.py |
 | FM-60 | A | fix/fm60-erststart-frage | 2026-10-02T22:46Z | src/core/database/bibliothek_download.py |
 | FM-61 | A | feat/fm61-bibliothek-china | 2026-10-02T22:51Z | fixtures/bibliothek |
