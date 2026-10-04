@@ -784,6 +784,11 @@ class StageCanvas(QWidget):
             sync = get_sync()
             sync.subscribe(SyncEvent.SHOW_LOADED, lambda *_: self._reload_positions_safe())
             sync.subscribe(SyncEvent.REFRESH_ALL, lambda *_: self._reload_positions_safe())
+            # VIZ-70: Patch-/Profil-Aenderung (Umadressieren, Mode, Bereiche,
+            # Invert …) -> beim naechsten Takt sofort neu zeichnen, nicht erst
+            # nach dem Sicherheitsnetz. An die Widget-Lebenszeit gebunden.
+            sync.subscribe_widget(SyncEvent.PATCH_CHANGED, self,
+                                  weak_slot(self._patch_geaendert))
         except Exception as e:
             print(f"[live_view] sync subscribe error: {e}")
 
@@ -888,10 +893,27 @@ class StageCanvas(QWidget):
             running = tuple(st.function_manager.running_ids())
             with st._prog_lock:
                 prog = frozenset(f for f, v in st.programmer.items() if v)
-            fids = tuple(f.fid for f in st.get_patched_fixtures())
+            fids = tuple(self._patch_fingerabdruck(f)
+                         for f in st.get_patched_fixtures())
         except Exception:
             return None
         return (unis, running, prog, fids)
+
+    # Alles am gepatchten Geraet, was das 2D-Bild bestimmt (Adresse, Profil/
+    # Mode, Typ, Label, Pan/Tilt-Bereich, Nullpunkte, Einmess-Versatz,
+    # Invert/Swap). Fehlt ein Feld, steht None — die Signatur bleibt billig.
+    _PATCH_FELDER = ("universe", "address", "fixture_profile_id", "mode_name",
+                     "channel_count", "fixture_type", "label",
+                     "pan_range_deg", "tilt_range_deg", "pan_zero_dmx",
+                     "tilt_zero_dmx", "aim_offset_pan", "aim_offset_tilt",
+                     "invert_pan", "invert_tilt", "swap_pan_tilt")
+
+    @classmethod
+    def _patch_fingerabdruck(cls, f) -> tuple:
+        return (f.fid,) + tuple(getattr(f, k, None) for k in cls._PATCH_FELDER)
+
+    def _patch_geaendert(self, *_a) -> None:
+        self._paint_sig = None
 
     def _on_render_tick(self) -> None:
         if not self._darf_zeichnen():
@@ -979,7 +1001,10 @@ class StageCanvas(QWidget):
         # Deckendes RGB32-Bild; die Beschriftungen kommen NICHT hinein (siehe
         # _zeichne_hintergrund).
         from PySide6.QtGui import QImage
-        pm = QImage(max(1, int(round(w * dpr))), max(1, int(round(h * dpr))),
+        # Aufrunden: bei gebrochenem DPR (1,25/1,5/1,75) waere round() eine
+        # Geraetepixel-Spalte zu schmal — wegen WA_OpaquePaintEvent bliebe dort
+        # Altes bzw. Schwarz stehen.
+        pm = QImage(max(1, math.ceil(w * dpr)), max(1, math.ceil(h * dpr)),
                     QImage.Format.Format_RGB32)
         pm.setDevicePixelRatio(dpr)
         pm.fill(QColor("#0d1117"))

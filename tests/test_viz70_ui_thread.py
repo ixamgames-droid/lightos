@@ -470,3 +470,94 @@ class DauerTakteUnsichtbarTest(unittest.TestCase):
         pv._tick()
         self.assertEqual(calls, [1])
         pv.hide()
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# 5. Review-Befunde: Patch-Aenderung bei gleicher fid, gebrochener DPR
+# ════════════════════════════════════════════════════════════════════════════
+
+class CanvasPatchAenderungTest(_CanvasCase):
+    def _bereit(self):
+        c = self._canvas()
+        c.show()
+        _app.processEvents()
+        c.repaint()
+        calls = []
+        c.update = lambda *a: calls.append(1)
+        c._on_render_tick()                # Signatur steht
+        calls.clear()
+        c._on_render_tick()
+        self.assertEqual(calls, [])
+        return c, calls
+
+    def test_umadressieren_zeichnet_sofort(self):
+        c, calls = self._bereit()
+        self.fixtures[0].address = 101     # gleiche fid, neue Adresse
+        c._on_render_tick()
+        self.assertEqual(len(calls), 1, "Umadressieren muss sofort neu zeichnen")
+
+    def test_bereich_und_invert_zeichnen_sofort(self):
+        c, calls = self._bereit()
+        self.fixtures[1].pan_range_deg = 360
+        c._on_render_tick()
+        self.fixtures[1].invert_pan = True
+        c._on_render_tick()
+        self.assertEqual(len(calls), 2)
+
+    def test_patch_changed_event_zeichnet_sofort(self):
+        c, calls = self._bereit()
+        from src.core.sync import get_sync, SyncEvent
+        get_sync().emit(SyncEvent.PATCH_CHANGED, None)   # z. B. Profil geaendert
+        c._on_render_tick()
+        self.assertEqual(len(calls), 1)
+
+
+_DPR_SKRIPT = r"""
+import os, sys
+sys.path.insert(0, os.getcwd())
+from types import SimpleNamespace
+from PySide6.QtWidgets import QApplication
+app = QApplication([])
+from src.core.app_state import get_state
+from src.ui.views import live_view as lv
+st = get_state()
+st.get_patched_fixtures = lambda: [SimpleNamespace(fid=1, universe=1, address=1,
+                                                   label="A", fixture_type="PAR")]
+c = lv.StageCanvas(); c._update_timer.stop(); c._running_functions = lambda: []
+c.zoom = 1.0; c.world_w, c.world_h = 603, 403; c._fixture_size = 30.0
+c._apply_canvas_size(); c._positions = {1: (150.0, 150.0)}; c._nn_gap = {1: 1e9}
+mit = c.grab().toImage()
+c.BG_CACHE_MAX_PIXEL = 0
+ohne = c.grab().toImage()
+W, H = mit.width(), mit.height()
+innen = sum(1 for y in range(H - 1) for x in range(W - 1)
+            if mit.pixel(x, y) != ohne.pixel(x, y))
+rand = {mit.pixelColor(W - 1, y).name() for y in range(H)}
+rand |= {mit.pixelColor(x, H - 1).name() for x in range(W)}
+print("ERGEBNIS", c.devicePixelRatioF(), W, H, innen, "#000000" in rand)
+"""
+
+
+class HintergrundGebrochenerDprTest(unittest.TestCase):
+    """DPR 1,5 und ungerade Breite: 603 x 1,5 = 904,5 — round() ergab 904
+    Geraetepixel, das Widget hat 905 -> letzte Spalte/Zeile blieb schwarz."""
+
+    def test_dpr_1_5_ungerade_breite(self):
+        import subprocess
+        import sys
+        repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        env = dict(os.environ, QT_QPA_PLATFORM="offscreen", QT_SCALE_FACTOR="1.5",
+                   QT_ENABLE_HIGHDPI_SCALING="1")
+        env.pop("QT_SCREEN_SCALE_FACTORS", None)
+        out = subprocess.run([sys.executable, "-c", _DPR_SKRIPT], cwd=repo, env=env,
+                             capture_output=True, text=True, timeout=120)
+        zeile = [z for z in out.stdout.splitlines() if z.startswith("ERGEBNIS")]
+        self.assertTrue(zeile, out.stdout[-2000:] + out.stderr[-2000:])
+        _, dpr, w, h, innen, schwarz = zeile[0].split()
+        self.assertEqual(float(dpr), 1.5, "Skalierung kam im Subprozess nicht an")
+        self.assertEqual((int(w), int(h)), (905, 605))
+        self.assertEqual(schwarz, "False", "schwarzer Rand: Cache-Bild zu schmal")
+        # Innen pixelgleich zum direkten Zeichnen (die letzte Geraetepixel-
+        # Spalte/Zeile deckt die Welt dort nur halb — direkt also halb geblendet,
+        # aus dem Cache deckend in Hintergrundfarbe).
+        self.assertEqual(int(innen), 0)
