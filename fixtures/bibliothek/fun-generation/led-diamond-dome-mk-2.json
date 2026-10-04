@@ -1,0 +1,76 @@
+{
+  "format_version": 1,
+  "hersteller": "Fun Generation",
+  "hersteller_kurz": "FUNGEN",
+  "modell": "LED Diamond Dome MK 2",
+  "kurzname": "DIAMONDDOME2",
+  "typ": "other",
+  "leistung_w": 25,
+  "notizen": "6 x 1 W RGBWA+UV-6-in-1-LEDs, rotierender Dome-Effekt. Kein Dimmerkanal: Helligkeit nur ueber die Farbkanaele.",
+  "quelle": {
+    "titel": "Fun Generation LED Diamond Dome MK II Bedienungsanleitung (Thomann, ID 542517, V2)",
+    "version": "V2",
+    "datum": "2023-09-28",
+    "url": "https://fast-images.static-thomann.de/pics/atg/atgdata/document/manual/542517_c_542517_v2_en_online.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.14.2 GIT · Peter Schmenger",
+    "original": "resources/fixtures/Fun-Generation/Fun-Generation-LED-Diamond-Dome-MK-2.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 11 Wertebereiche mit Art (kind) versehen; danach von LightOS gegen das Herstellerhandbuch ueberarbeitet: Hersteller 'Fun-Generation' -> 'Fun Generation' (Schreibweise des Herstellers), Kurzname/Leistung/Typ nach Handbuch; Typ other statt moving_head (rotierender Lichteffekt, kein Moving Head); Kanal 8 (Motor) als speed statt pan, Default 0 (statisch) statt 128 (das waere bereits Motordrehung), Bereich ab 128 als rotate; Kanal 9: irrefuehrende Farb-Arten an Effektprogrammen entfernt, Musik-Bereiche als sound; Strobe-Default 0 (offen) statt 4; Kanalnamen deutsch nach Handbuch"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal fuer Kanal gegen die DMX-Tabelle (9 Kanaele, Kap. 7.1) im Thomann-Handbuch V2 (28.09.2023) geprueft; nicht am Geraet getestet"
+  },
+  "modi": [
+    {
+      "name": "9 Channel",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV/Purple", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Offen (keine Funktion)", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe an, Geschwindigkeit steigend", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Motor (Position/Drehung)",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Motor an, statische Position"},
+            {"von": 6, "bis": 127, "name": "Motorposition"},
+            {"von": 128, "bis": 255, "name": "Motordrehung, Geschwindigkeit steigend", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Effekte/Musik",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 50, "name": "Zufallseffekte", "art": ""},
+            {"von": 51, "bis": 100, "name": "Doppelter Farbwechsel, Motor-Speed steigend", "art": ""},
+            {"von": 101, "bis": 150, "name": "Wechsel aller Farben, Motor-Speed steigend", "art": ""},
+            {"von": 151, "bis": 200, "name": "Uebergang aller Farben, Motor-Speed steigend", "art": ""},
+            {"von": 201, "bis": 250, "name": "Musiksteuerung 1", "art": "sound"},
+            {"von": 251, "bis": 255, "name": "Musiksteuerung 2", "art": "sound"}
+          ]
+        }
+      ]
+    }
+  ]
+}
