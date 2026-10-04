@@ -65,6 +65,7 @@
 | VIZ-70 | A | perf/viz70-ui-thread | 2026-10-04T18:00Z | src/ui/visualizer/visualizer_service.py · src/ui/views/live_view.py · src/ui/views/simple_desk.py |
 | BACKLOG-0410 | A | docs/backlog-stand-0410 | 2026-10-04T18:58Z | BACKLOG.md |
 | FM-63 | A | feat/fm63-lightos-profile-vorrang | 2026-10-04T19:01Z | - |
+| OUT-63 | A | fix/out63-estop-maske-klebrig | 2026-10-04T20:44Z | - |
 
 ## Blocker & Fallen
 
@@ -174,7 +175,6 @@
 
 ## Verlauf
 
-- 2026-10-03T00:13Z C done UI-56
 - 2026-10-03T00:33Z C done QA-82
 - 2026-10-04T16:48Z B claim OUT-60-FOLGE
 - 2026-10-04T16:49Z A claim DOC-57
@@ -204,3 +204,4 @@
 - 2026-10-04T19:18Z A done FM-59
 - 2026-10-04T19:43Z A done VIZ-69
 - 2026-10-04T20:23Z A done FM-61
+- 2026-10-04T20:44Z A claim OUT-63
