@@ -66,6 +66,7 @@
 | FM-61 | A | feat/fm61-bibliothek-china | 2026-10-04T16:47Z | fixtures/bibliothek |
 | OUT-60-FOLGE | B | fix/out60-folge-masken | 2026-10-04T16:48Z | src/core/dmx/output_manager.py · src/core/dmx/serial_process.py · tests/test_out60_load_kein_null_frame.py · tests/test_out59_waisen_windows.py |
 | DOC-57 | A | docs/doc57-bilder-bibliothek | 2026-10-04T16:49Z | docs · tools/anleitungsbilder |
+| GATE-B-0410 | B | - | 2026-10-04T16:54Z | - |
 
 ## Blocker & Fallen
 
@@ -160,7 +161,6 @@
 
 ## Verlauf
 
-- 2026-10-02T16:55Z A done TOOL-9
 - 2026-10-02T17:01Z B uebergeben FUNKTIONSTEST-B2
 - 2026-10-02T17:10Z A done VIZ-66
 - 2026-10-02T17:50Z A done FM-56
@@ -190,3 +190,4 @@
 - 2026-10-03T00:33Z C done QA-82
 - 2026-10-04T16:48Z B claim OUT-60-FOLGE
 - 2026-10-04T16:49Z A claim DOC-57
+- 2026-10-04T16:54Z B claim GATE-B-0410
