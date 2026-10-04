@@ -95,6 +95,7 @@ class DmxPushChannel:
         self._send_nr = 0
         self._last_send = float("-inf")
         self._timer_armed = False
+        self._waechter_aktiv = False
         #: hat die Seite einen Push bestaetigt? Bis dahin laeuft der Poll mit.
         self.confirmed = False
         self.stats = {"batches": 0, "bytes": 0, "nicht_bereit": 0,
@@ -225,21 +226,35 @@ class DmxPushChannel:
         # Waechter: bleibt der Rueckruf aus und steht die Szene danach still,
         # kaeme kein Tick mehr, der den Verlust bemerkt — das Bild bliebe auf
         # dem Stand VOR dem verlorenen Batch stehen.
-        self._waechter(nr)
+        self._waechter(self.timeout_s)
 
-    def _waechter(self, nr: int) -> None:
+    def _waechter(self, warten_s: float) -> None:
+        """Hoechstens EIN Waechter-Zeitgeber zur Zeit (bei 44 Hz waeren es
+        sonst gut 20 gleichzeitig). Beim Ausloesen: ist der Batch, der jetzt
+        unterwegs ist, ueberfaellig, behandelt ``_try_flush`` den Verlust; ist
+        er juenger, wird fuer seine Restzeit neu gestellt."""
+        if self._waechter_aktiv:
+            return
+        self._waechter_aktiv = True
         ref = weakref.ref(self)
 
         def _pruefen():
             kanal = ref()
-            if kanal is not None and kanal._inflight is not None \
-                    and kanal._inflight[0] == nr:
+            if kanal is None:
+                return
+            kanal._waechter_aktiv = False
+            if kanal._inflight is None:
+                return
+            rest = kanal.timeout_s - (kanal._clock() - kanal._inflight[1])
+            if rest > 0:
+                kanal._waechter(rest)
+            else:
                 kanal._try_flush()
         schedule = self._schedule
         if schedule is None:
             from PySide6.QtCore import QTimer
             schedule = QTimer.singleShot
-        schedule(int(self.timeout_s * 1000) + 20, _pruefen)
+        schedule(int(warten_s * 1000) + 20, _pruefen)
 
     def _on_result(self, nr: int, r) -> None:
         if self._inflight is None or self._inflight[0] != nr:

@@ -348,6 +348,19 @@ class PushKanalTest(_PushBasis):
         self.assertEqual(len(self._aufrufe()), n)
         self.assertIsNotNone(self.kanal._inflight, "neuer Batch bleibt unterwegs")
 
+    def test_ein_waechter_stellt_sich_fuer_juengere_batches_neu(self):
+        self._aufbau()
+        self.kanal.push([{"fid": 1}], True, 1)
+        self.assertEqual(len(self.geplant), 1, "ein Waechter je Batch-Kette")
+        self._antworten(1)
+        self.uhr.t += 0.4
+        self.kanal.push([{"fid": 1, "r": 1}], False, 2)
+        self.assertEqual(len(self.geplant), 1, "kein zweiter Waechter, solange einer laeuft")
+        self.uhr.t += 0.15                 # alter Batch waere jetzt ueberfaellig
+        self.geplant.pop(0)[1]()
+        self.assertEqual(self.kanal.stats["timeouts"], 0, "juengerer Batch ist nicht verloren")
+        self.assertEqual(len(self.geplant), 1, "Waechter fuer die Restzeit neu gestellt")
+
     def test_reload_setzt_zurueck(self):
         self._aufbau()
         self._tick()

@@ -91,6 +91,7 @@ wirePresetsLateBindings({ getBridge });
 //     aktuell halten (folgt dem Auswahl-Schwerpunkt live, auch im Drag),
 // (c) fpsTick() misst die Frame-Zeiten (No-Op solange Overlay aus).
 function perFrameUpdate() {
+  _rafTick += 1;   // VIZ-71: Tick-Zaehler fuer die Frame-Zeit (s. renderFrame)
   // Pulsierende Emissive-Farbe fuer das selektierte Stage-Element (sehr sichtbar)
   if (view.selectedStageId && stageObjects[view.selectedStageId]) {
     const so = stageObjects[view.selectedStageId];
@@ -135,15 +136,22 @@ registerLiveAnimation(selectionPulseActive);
 // bereits selbst — scene.autoUpdate fuer den render() direkt danach aus, sonst
 // traversiert three.js die ganze Szene ein zweites Mal. Nur HIER, nicht global:
 // fremde render()-Aufrufer (Galerie, Mess-Sonden) behalten das Standardverhalten.
-// VIZ-71 (S6): Abstand zwischen zwei gerenderten Frames -> dynamische
-// Aufloesung (Stufe 'Hoch' senkt nur ab, wenn Frames laenger als 18 ms
-// brauchen). Nur aufeinanderfolgende Frames zaehlen, die Ruhepausen des
-// On-Demand-Renderns filtert noteFrameInterval selbst.
-let _letzterFrame = 0;
+// VIZ-71 (S6): Frame-Zeit fuer die dynamische Aufloesung (Stufe 'Hoch' senkt
+// nur ab, wenn ein Bild laenger als 18 ms braucht). Gemessen wird der Abstand
+// zweier Renders in UNMITTELBAR aufeinanderfolgenden rAF-Ticks — also nur bei
+// Dauer-Rendern (Kamerafahrt, Animation), wo der rAF-Takt die GPU-Last zeigt.
+// Ein Render je DMX-Push (30/s) laege 33 ms auseinander und sagte nur etwas
+// ueber den Push-Takt, nicht ueber die Grafikkarte — er zaehlt deshalb nicht.
+let _rafTick = 0;
+let _letzterRenderTick = -2;
+let _letzterRenderT = 0;
 function renderFrame() {
   const _t = performance.now();
-  if (_letzterFrame) dynamicResolution.noteFrameInterval(_t - _letzterFrame);
-  _letzterFrame = _t;
+  if (_letzterRenderTick === _rafTick - 1) {
+    dynamicResolution.noteFrameInterval(_t - _letzterRenderT);
+  }
+  _letzterRenderTick = _rafTick;
+  _letzterRenderT = _t;
   prepareShadowMap();
   scene.autoUpdate = false;
   try {
