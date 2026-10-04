@@ -272,6 +272,23 @@ export function applySettings(s) {
   requestRender();  // 3c-2 Dirty-Quelle 6 (Settings: Fog/Beam-Sichtbarkeiten)
 }
 
+// VIZ-71 (Live-Pruefung): die VOLLE Geraeteliste ist der Soll-Bestand der
+// Szene. ``addFixture`` baut nur auf — Geraete, die die Liste nicht mehr kennt,
+// sind Reste der vorigen Show. Ohne diesen Abbau standen nach einem Wechsel auf
+// eine Show mit weniger Geraeten die alten weiter im Bild, mit ihrem letzten
+// Licht (Python meldet beim Show-Wechsel kein fixtureRemoved: die neuen
+// Positionen ersetzen die alten im Ganzen). ``fids`` enthaelt wie beim
+// Cache-Aufraeumen auch die fids, die dieselbe Poll-Antwort per fixtureAdded
+// baut (Review B3).
+export function removeFixturesNotIn(fids) {
+  const soll = new Set((fids || []).map(f => String(f)));
+  for (const k of Object.keys(fixtures)) {
+    if (soll.has(k)) continue;
+    try { removeFixture(k); }
+    catch (eR) { console.log('poll: Rest-Geraet nicht entfernt', k, eR); }
+  }
+}
+
 // ============================================================================
 // Qt WebChannel
 // ============================================================================
@@ -293,6 +310,9 @@ export function tryChannel() {
         if (bridge.allFixtures)    bridge.allFixtures.connect(j => {
           const list = JSON.parse(j);
           pruneDmxCache(list.map(f => f.fid));
+          // Bewusst KEIN removeFixturesNotIn hier: das Signal kommt nach dem
+          // Laden nicht an (der Show-Wechsel laeuft ueber den Poll unten), und
+          // Szenen-Tests bauen ueber dieses Signal Geraet fuer Geraet auf.
           list.forEach(f => addFixture(f));
           // VIZ-12: JETZT sind die Fixture-Objekte gebaut — Service um den
           // vollen DMX-Bestand bitten. Ein zeitgesteuerter Push von Python
@@ -449,6 +469,8 @@ export function tryChannel() {
                         }
                       }
                       pruneDmxCache(behalten);
+                      // Reste der vorigen Show aus der Szene nehmen.
+                      removeFixturesNotIn(behalten);
                       // Ein stolperndes Geraet darf die folgenden nicht kosten;
                       // es wird geloggt, nicht wiederholt (sonst Dauer-Neubau).
                       for (const f of list) {

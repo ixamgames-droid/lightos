@@ -221,6 +221,35 @@ class Viz71PollRobustTest(unittest.TestCase):
         i = self._eval("window.__lightos.fixtures['%d'].spot.intensity" % _FID)
         self.assertGreater(i, 0, "frisch platziertes Geraet dunkel (DMX-Cache geraeumt)")
 
+    # ── Live-Pruefung: Show-Wechsel auf eine kleinere Show ───────────────────
+    def test_volle_liste_baut_reste_der_alten_show_ab(self):
+        """Live gefunden (Mega Arena -> Demo-Show): die volle Liste der neuen
+        Show baute nur auf, die 20 Geraete der alten Show blieben im Bild."""
+        self._load_and_wait()
+        alt, bleibt = _FID + 10, _FID + 11
+        self._b.zustand = {"fixtures": (1, json.dumps([_geraet(alt), _geraet(bleibt)]))}
+        self._warte("!!window.__lightos.fixtures['%d'] && !!window.__lightos.fixtures['%d']"
+                    % (alt, bleibt))
+        self._b.zustand = {"fixtures": (2, json.dumps([_geraet(bleibt)]))}
+        self._warte("!window.__lightos.fixtures['%d']" % alt, timeout_s=4.0)
+        self.assertTrue(self._eval("!!window.__lightos.fixtures['%d']" % bleibt),
+                        "Geraet der neuen Show faelschlich entfernt")
+        self.assertEqual(self._eval("Object.keys(window.__lightos.fixtures).length"), 1)
+
+    def test_liste_ohne_frisch_platziertes_entfernt_es_nicht(self):
+        """B3-Gegenstueck zum Abbau: steht das Geraet nur im fixtureAdded
+        DERSELBEN Antwort, bleibt es nach dem Abbau der Reste stehen."""
+        self._load_and_wait()
+        x = _FID + 20
+        self._b.zustand = {"fixtures": (1, json.dumps([_geraet(x)]))}
+        self._warte("!!window.__lightos.fixtures['%d']" % x)
+        self._b.events = [{"t": "fixtureAdded", "j": json.dumps(_geraet(x))}]
+        self._b.zustand = {"fixtures": (2, json.dumps([_geraet(x + 1)]))}
+        self._warte("!!window.__lightos.fixtures['%d']" % (x + 1))
+        _pump(0.4)
+        self.assertTrue(self._eval("!!window.__lightos.fixtures['%d']" % x),
+                        "frisch platziertes Geraet vom Rest-Abbau entfernt")
+
 
 if __name__ == "__main__":
     unittest.main()
