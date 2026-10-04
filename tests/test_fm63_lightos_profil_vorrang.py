@@ -255,7 +255,7 @@ class D_BearbeiteterImportWirdNieAbgeloest(_Basis):
     Stelle, ist der ein eigenes Profil — Marke in ``herkunft``, ``source``
     bleibt ``qlcplus`` (Spider-Dual-Tilt-Erkennung)."""
 
-    def _im_editor_speichern(self, pid: int) -> None:
+    def _im_editor_speichern(self, pid: int, aendern: bool = True) -> None:
         from unittest import mock
         from PySide6.QtWidgets import QApplication
         _app = QApplication.instance() or QApplication([])  # noqa: F841
@@ -267,6 +267,8 @@ class D_BearbeiteterImportWirdNieAbgeloest(_Basis):
                                   lambda *a, **k: meldungen.append(a[1:3]) or 0):
             dlg = ed.FixtureEditorDialog(fixture_id=pid)
             self.addCleanup(dlg.deleteLater)
+            if aendern:
+                dlg._spin_power.setValue(dlg._spin_power.value() + 5)
             dlg._save()
         self.assertEqual(meldungen, [])
 
@@ -274,15 +276,37 @@ class D_BearbeiteterImportWirdNieAbgeloest(_Basis):
         with Session(self.eng) as s:
             return s.get(FixtureProfile, pid).herkunft or ""
 
-    def test_bearbeiteter_import_bleibt_sichtbar_und_qlcplus(self):
+    def test_bearbeiteter_import_verdeckt_die_datei_wie_ein_eigenes(self):
+        """Review FM-63: wie ``user`` — kein LightOS-Profil daneben, sonst
+        stuende das Geraet dauerhaft doppelt in der Bibliothek."""
         alt = self._profil("Testwerk", "Par 7", "qlcplus")
         self._im_editor_speichern(alt)
         self.assertTrue(FDB.ist_bearbeitet(self._herkunft(alt)))
         self._spielen(_datei())
+        self.assertEqual(self._quellen("Par 7"), [(alt, "qlcplus")])
+        self.assertEqual(BF.LETZTES_EINSPIELEN["verdeckt"], ["Testwerk / Par 7"])
+        self.assertEqual(FDB.abgeloeste_profil_ids(), set())
+        self.assertEqual(self._suche("Par 7"), [alt])
+
+    def test_spaeter_bearbeitet_bleibt_sichtbar_lightos_wird_weiter_gepflegt(self):
+        alt = self._profil("Testwerk", "Par 7", "qlcplus")
+        self._spielen(_datei())
         neu = self._lightos_id()
+        self._im_editor_speichern(alt)
         self.assertEqual(FDB.get_fixture(alt).source, "qlcplus")
         self.assertEqual(FDB.abgeloeste_profil_ids(), set())
         self.assertEqual(sorted(self._suche("Par 7")), sorted([alt, neu]))
+        d = _datei(leistung_w=90)
+        self._spielen(d)
+        self.assertEqual(BF.LETZTES_EINSPIELEN["aktualisiert"], ["Testwerk / Par 7"])
+        self.assertEqual(FDB.get_fixture(neu).power_w, 90)
+
+    def test_speichern_ohne_aenderung_setzt_keine_marke(self):
+        alt = self._profil("Testwerk", "Par 7", "qlcplus")
+        self._im_editor_speichern(alt, aendern=False)
+        self.assertFalse(FDB.ist_bearbeitet(self._herkunft(alt)))
+        self._spielen(_datei())
+        self.assertEqual(FDB.abgeloeste_profil_ids(), {alt})
 
     def test_unbearbeiteter_import_wird_abgeloest(self):
         """Gegenprobe: ohne Speichern im Editor greift die Abloesung."""
@@ -346,10 +370,77 @@ class C_BestehenderPatchLaedtWeiter(_Basis):
         self.assertEqual([c.attribute for c in FDB.get_channels(modi["3 Kanal"].id)],
                          ["color_r", "color_g", "color_b"])
 
-    def test_fremde_id_landet_beim_lightos_profil_ohne_dubletten_warnung(self):
-        pf = self.sf._patched_fixture_from_data(self._patch(987654), 1)
+    def _fremd(self, modus: str, kanaele: int):
+        d = self._patch(987654)
+        d.update(mode_name=modus, channel_count=kanaele)
+        return self.sf._patched_fixture_from_data(d, 1)
+
+    def test_fremde_id_mit_modus_des_lightos_profils_landet_dort(self):
+        pf = self._fremd("4-Kanal", 4)
         self.assertEqual(pf.fixture_profile_id, self.neu)
-        self.assertEqual([p for p in self.sf.letzte_ladeprobleme() if "Dublette" in p], [])
+        self.assertEqual(self.sf.letzte_ladeprobleme(), [])
+
+    def test_fremde_id_mit_modus_nur_im_import_landet_beim_import(self):
+        """Review FM-63 (HOCH): das LightOS-Profil hat „3 Kanal“ nicht —
+        blind genommen haette `_resolve_mode` still den 4-Kanal-Modus gefahren."""
+        pf = self._fremd("3 Kanal", 3)
+        self.assertEqual(pf.fixture_profile_id, self.alt)
+        self.assertEqual(self.sf.letzte_ladeprobleme(), [])
+
+    def test_nur_kanalzahl_passt(self):
+        pf = self._fremd("Anders benannt", 3)
+        self.assertEqual(pf.fixture_profile_id, self.alt)
+        self.assertTrue(any("NICHT" in p and "Anders benannt" in p
+                            for p in self.sf.letzte_ladeprobleme()),
+                        self.sf.letzte_ladeprobleme())
+
+    def test_modus_fehlt_ueberall_wird_gemeldet(self):
+        pf = self._fremd("9 Kanal", 9)
+        self.assertEqual(pf.fixture_profile_id, self.neu)
+        self.assertTrue(any("9 Kanal" in p and "NICHT" in p
+                            for p in self.sf.letzte_ladeprobleme()),
+                        self.sf.letzte_ladeprobleme())
+
+    def test_echte_dublette_wird_weiter_gewarnt(self):
+        """Nur das Paar LightOS + abgeloester Import ist ausgenommen."""
+        self._profil("Testwerk", "Par 7", "builtin", modus="4-Kanal",
+                     attrs=("intensity", "color_r", "color_g", "color_b"))
+        pf = self._fremd("4-Kanal", 4)
+        self.assertEqual(pf.fixture_profile_id, self.neu)
+        self.assertTrue(any("Dublette" in p for p in self.sf.letzte_ladeprobleme()),
+                        self.sf.letzte_ladeprobleme())
+
+
+class E_ShowbuilderStrict(_Basis):
+    """Review FM-63 (NIEDRIG): gleicher short_name bei LightOS-Profil und dem
+    Import, den es abloest -> keine Mehrdeutigkeit, auch im strict-Modus."""
+
+    def _builder(self, strict: bool):
+        from src.core.show.showbuilder import ShowBuilder
+        b = object.__new__(ShowBuilder)
+        b._strict_profiles = strict
+        b._ambig_warned = set()
+        return b
+
+    def test_kein_buildfehler_bei_abgeloestem_import(self):
+        alt = self._profil("Testwerk", "Par 7", "qlcplus")
+        with Session(self.eng) as s:
+            s.get(FixtureProfile, alt).short_name = "PAR7LOS"
+            s.commit()
+        self._spielen(_datei())
+        neu = self._lightos_id()
+        pid, *_ = self._builder(strict=True)._lookup_profile("PAR7LOS")
+        self.assertEqual(pid, neu)
+
+    def test_echte_mehrdeutigkeit_bleibt_buildfehler(self):
+        from src.core.show.showbuilder import BuildError
+        self._profil("Testwerk", "Bar 9", "qlcplus")
+        b = self._profil("Testwerk", "Bar 10", "qlcplus")
+        with Session(self.eng) as s:
+            s.get(FixtureProfile, b).short_name = "Bar 9"
+            s.commit()
+        with self.assertRaises(BuildError):
+            self._builder(strict=True)._lookup_profile("Bar 9")
 
 
 if __name__ == "__main__":

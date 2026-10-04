@@ -929,7 +929,9 @@ def _abgleichen(s, daten: dict) -> str:
       Der Import bleibt unveraendert in der DB, damit Shows, die ueber seine
       ID auf ihn zeigen, weiter laden; Auswahl und Suche blenden ihn aus
       (``fixture_db.abgeloeste_profil_ids``), und beim Namens-Rueckfall
-      gewinnt ohnehin das mitgelieferte Profil (FM-43)."""
+      gewinnt das mitgelieferte Profil, wenn es den Modus der Show hat (FM-43).
+      Ein im Fixture-Editor bearbeiteter Import (``fixture_db.ist_bearbeitet``)
+      verdeckt die Datei dagegen wie ein eigenes Profil."""
     from sqlalchemy import select
     from sqlalchemy.orm import selectinload
     from .models import (ABLOESBARE_QUELLEN, FixtureChannel, FixtureMode, FixtureProfile,
@@ -947,6 +949,14 @@ def _abgleichen(s, daten: dict) -> str:
         return "verdeckt"
     eigene = [p for p in vorhanden if p.source == SOURCE_LIGHTOS]
     if not eigene:
+        # FM-63 (Review): ein im Fixture-Editor BEARBEITETER Import zaehlt wie
+        # ein eigenes Profil — er wird nie abgeloest, ein LightOS-Profil
+        # daneben waere also ein dauerhaftes Doppel. Steht das LightOS-Profil
+        # schon in der DB (Import erst danach bearbeitet), wird es weiter
+        # gepflegt statt still zu veralten.
+        from .fixture_db import ist_bearbeitet
+        if any(ist_bearbeitet(p.herkunft) for p in vorhanden):
+            return "verdeckt"
         _anlegen(s, daten, SOURCE_LIGHTOS)
         return "neu"
     prof = eigene[0]
