@@ -59,7 +59,6 @@
 | OUT-61 | B | fix/out61-estop-lade-fenster | 2026-10-04T17:33Z | src/core/dmx/output_manager.py · tests/test_out61_estop_lade_fenster.py · BACKLOG.md |
 | OUT-61-FOLGE | B | fix/out61-folge-atomar | 2026-10-04T17:41Z | src/core/dmx/output_manager.py |
 | VIZ-68 | B | feat/viz68-objekt-bibliothek | 2026-10-04T17:55Z | src/ui/visualizer/scene_src/stage/stage_objects.js · src/ui/visualizer/scene_src/stage/docking.js · src/ui/visualizer/scene_src/interaction/tools.js · src/ui/visualizer/visualizer_window.py · src/core/stage/stage_definition.py · src/core/stage/scene_graph.py · tests/test_viz68_objekt_bibliothek.py · BACKLOG.md |
-| VIZ-70 | A | perf/viz70-ui-thread | 2026-10-04T18:00Z | src/ui/visualizer/visualizer_service.py · src/ui/views/live_view.py · src/ui/views/simple_desk.py |
 | BACKLOG-0410 | A | docs/backlog-stand-0410 | 2026-10-04T18:58Z | BACKLOG.md |
 | FM-63 | A | feat/fm63-lightos-profile-vorrang | 2026-10-04T19:01Z | - |
 | OUT-63 | A | fix/out63-estop-maske-klebrig | 2026-10-04T20:44Z | - |
@@ -174,7 +173,6 @@
 
 ## Verlauf
 
-- 2026-10-04T17:07Z A claim UI-74
 - 2026-10-04T17:15Z B done GATE-B-0410
 - 2026-10-04T17:15Z B claim SICHT-B-0410
 - 2026-10-04T17:18Z B done SICHT-B-0410
@@ -204,3 +202,4 @@
 - 2026-10-04T21:06Z A claim DOC-59
 - 2026-10-04T21:18Z A done VIZ-67
 - 2026-10-04T22:43Z C done TOOL-2
+- 2026-10-04T23:10Z A done VIZ-70
