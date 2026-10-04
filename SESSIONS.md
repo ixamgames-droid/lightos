@@ -56,7 +56,6 @@
 | DOC-56 | C | - | 2026-10-02T13:05Z | docs/anleitung_web_remote/ANLEITUNG.md |
 | FM-58 | A | feat/fm58-bibliothek-runde2 | 2026-10-02T18:20Z | fixtures/bibliothek |
 | SAMMEL-DOKU-C | A | sammel/doku-c | 2026-10-02T22:08Z | docs · BACKLOG.md |
-| DOC-57 | A | docs/doc57-bilder-bibliothek | 2026-10-04T16:49Z | docs · tools/anleitungsbilder |
 | UI-74 | A | fix/ui74-profile-bearbeiten | 2026-10-04T17:07Z | src/ui/widgets/fixture_editor.py · src/ui/widgets/bibliothek_download_dialog.py · fixtures/bibliothek/eurolite |
 | VIZ-67 | A | docs/viz67-import-objekte | 2026-10-04T17:26Z | BACKLOG.md |
 | OUT-61 | B | fix/out61-estop-lade-fenster | 2026-10-04T17:33Z | src/core/dmx/output_manager.py · tests/test_out61_estop_lade_fenster.py · BACKLOG.md |
@@ -176,7 +175,6 @@
 
 ## Verlauf
 
-- 2026-10-04T16:48Z B claim OUT-60-FOLGE
 - 2026-10-04T16:49Z A claim DOC-57
 - 2026-10-04T16:54Z B claim GATE-B-0410
 - 2026-10-04T17:00Z A done FM-60
@@ -206,3 +204,4 @@
 - 2026-10-04T20:23Z A done FM-61
 - 2026-10-04T20:44Z A claim OUT-63
 - 2026-10-04T20:44Z A claim VIZ-71
+- 2026-10-04T20:50Z A done DOC-57
