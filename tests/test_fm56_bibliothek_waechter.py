@@ -84,7 +84,8 @@ class BibliothekWaechterTest(unittest.TestCase):
 
     def test_raster_nur_bei_echten_farbzonen(self):
         """FM-61 (Review): ein ``raster`` behauptet ``rows*cols`` Farbzonen —
-        das muss der Zahl der ``color_r``-Kanaele des Modus entsprechen. Ein
+        das muss einer echten Zonenzahl entsprechen (Farbbaenke, Einzel-Dimmer
+        oder Farbraeder, ggf. plus Master). Ein
         Hydrabeam-Modus mit EINER gemeinsamen RGBW-Bank und Raster 1x3 zeigte
         im 3D drei Zonen, von denen nur die erste Farbe bekam.
 
@@ -99,12 +100,20 @@ class BibliothekWaechterTest(unittest.TestCase):
                 if not r:
                     continue
                 geprueft += 1
-                zonen = sum(1 for c in m["kanaele"] if c.get("attribut") == "color_r")
+                zellen = r["rows"] * r["cols"]
+                # Zonen sind Farbbaenke (color_r), Lampen mit eigenem Dimmer
+                # (intensity, z. B. 2-Lampen-Blinder) oder eigenem Farbrad —
+                # jeweils auch mit einem zusaetzlichen Master-Kanal.
+                erlaubt = {1}
+                for attr in ("color_r", "intensity", "color_wheel"):
+                    n = sum(1 for c in m["kanaele"] if c.get("attribut") == attr)
+                    erlaubt |= {n, n - 1} - {0}
                 with self.subTest(pfad=os.path.relpath(pfad, ROOT), modus=m["name"]):
-                    self.assertEqual(
-                        r["rows"] * r["cols"], zonen,
-                        f"Raster {r['rows']}x{r['cols']} passt nicht zu {zonen} "
-                        f"color_r-Kanaelen — ohne echte Farbzonen kein raster")
+                    self.assertIn(
+                        zellen, erlaubt,
+                        f"Raster {r['rows']}x{r['cols']} passt zu keiner Zonenzahl "
+                        f"{sorted(erlaubt)} (color_r/intensity/color_wheel, ggf. "
+                        f"plus Master) — ohne echte Zonen kein raster")
         self.assertGreater(geprueft, 0, "kein Modus mit raster — Waechter leer")
 
     def test_kanalzahl_im_modusnamen_stimmt(self):
