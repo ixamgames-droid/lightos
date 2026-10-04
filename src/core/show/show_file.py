@@ -433,6 +433,9 @@ def _resolve_fixture_profile_id(profile_id: int, manufacturer_name: str,
     das gewaehlte Profil den Modus der Show nicht, steht IMMER eine Meldung in
     ``_ladeprobleme``. Keine Dubletten-Warnung gibt es nur fuer das Paar
     „LightOS-Profil + der Import, den es abloest“, wenn der Modus passt.
+    Die FM-43-Regel „builtin vor Import“ gilt damit nur noch innerhalb einer
+    Stufe: hat ein Import den Modus der Show und das builtin nicht, gewinnt
+    der Import (die Dubletten-Meldung bleibt).
     """
     if not fixture_name:
         return profile_id
@@ -503,7 +506,8 @@ def _resolve_fixture_profile_id(profile_id: int, manufacturer_name: str,
                 modus_passt = not mode_name or _exakt(gewaehlt)
                 if not modus_passt:
                     _ladeprobleme.append(
-                        f"„{_geraet}“: Profil {profile_id} fehlt in der Geraetebibliothek, "
+                        f"„{_geraet}“: Profil {profile_id} passt nicht zur Show "
+                        f"(fehlt oder traegt einen anderen Namen), "
                         f"genommen wurde Profil {resolved} "
                         f"({gewaehlt[1] or 'ohne Herkunft'}) — es hat den Modus "
                         f"„{mode_name}“ ({channel_count} Kanaele) der Show NICHT. "
