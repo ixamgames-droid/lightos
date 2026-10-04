@@ -46,7 +46,12 @@ class MatrixViewControlsTest(unittest.TestCase):
         self.view._preview.set_matrix(self.view._current)
         self.view._current.matrix_speed = 2.0
         step0 = self.view._current._step
-        self.view._preview._tick()
+        # VIZ-70: die Vorschau tickt nur sichtbar (wie die EFX-Vorschau).
+        self.view.show()
+        try:
+            self.view._preview._tick()
+        finally:
+            self.view.hide()
         self.assertGreater(self.view._current._step, step0)
         self.assertTrue(self.view._preview._grid)          # Vorschau live gefuellt
 

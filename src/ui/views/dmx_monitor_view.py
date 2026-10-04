@@ -284,6 +284,11 @@ class DmxMonitorView(QWidget):
         self._grid.set_highlighted(addrs)
 
     def _refresh(self):
+        # VIZ-70: unsichtbar (anderer Reiter, Fenster minimiert) nichts tun —
+        # der Dauer-Takt lief sonst im UI-Thread weiter; der naechste Takt nach
+        # dem Einblenden holt den Stand nach.
+        if not self.isVisible() or self.window().isMinimized():
+            return
         univ = self._combo_univ.currentData() or 1
         if univ not in self._state.universes:
             return
