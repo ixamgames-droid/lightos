@@ -59,7 +59,6 @@
 | FM-59 | A | feat/fm59-bibliothek-runde3 | 2026-10-04T16:47Z | fixtures/bibliothek |
 | UI-72-73-FIX | B | fix/ui72-ui73-playback | 2026-10-02T22:44Z | src/ui/views/playback_view.py · src/core/cueliste_ziel.py · tests/test_ui72_ui73_playback.py |
 | FM-61 | A | feat/fm61-bibliothek-china | 2026-10-04T16:47Z | fixtures/bibliothek |
-| OUT-60-FOLGE | B | fix/out60-folge-masken | 2026-10-04T17:24Z | src/core/dmx/output_manager.py · src/core/dmx/serial_process.py |
 | DOC-57 | A | docs/doc57-bilder-bibliothek | 2026-10-04T16:49Z | docs · tools/anleitungsbilder |
 | UI-74 | A | fix/ui74-profile-bearbeiten | 2026-10-04T17:07Z | src/ui/widgets/fixture_editor.py · src/ui/widgets/bibliothek_download_dialog.py · fixtures/bibliothek/eurolite |
 | VIZ-67 | A | docs/viz67-import-objekte | 2026-10-04T17:26Z | BACKLOG.md |
@@ -172,7 +171,6 @@
 
 ## Verlauf
 
-- 2026-10-02T22:32Z A done FM-57
 - 2026-10-02T22:44Z B claim UI-72-73-FIX
 - 2026-10-02T22:45Z C done FM-53
 - 2026-10-02T22:46Z A claim FM-60
@@ -202,3 +200,4 @@
 - 2026-10-04T18:00Z A claim VIZ-70
 - 2026-10-04T18:01Z B done UI-72
 - 2026-10-04T18:01Z B done UI-73
+- 2026-10-04T18:39Z B done OUT-60-folge
