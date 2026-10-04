@@ -66,6 +66,7 @@
 | FM-63 | A | feat/fm63-lightos-profile-vorrang | 2026-10-04T19:01Z | - |
 | OUT-63 | A | fix/out63-estop-maske-klebrig | 2026-10-04T20:44Z | - |
 | VIZ-71 | A | perf/viz71-lichtdaten-push | 2026-10-04T20:44Z | - |
+| DOC-59 | A | docs/doc59-3d-bilder | 2026-10-04T21:06Z | - |
 
 ## Blocker & Fallen
 
@@ -175,7 +176,6 @@
 
 ## Verlauf
 
-- 2026-10-04T16:49Z A claim DOC-57
 - 2026-10-04T16:54Z B claim GATE-B-0410
 - 2026-10-04T17:00Z A done FM-60
 - 2026-10-04T17:07Z A claim UI-74
@@ -205,3 +205,4 @@
 - 2026-10-04T20:44Z A claim OUT-63
 - 2026-10-04T20:44Z A claim VIZ-71
 - 2026-10-04T20:50Z A done DOC-57
+- 2026-10-04T21:06Z A claim DOC-59
