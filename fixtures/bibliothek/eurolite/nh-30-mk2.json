@@ -1,0 +1,43 @@
+{
+  "format_version": 1,
+  "hersteller": "Eurolite",
+  "hersteller_kurz": "Eurolite",
+  "modell": "NH-30 MK2",
+  "kurzname": "NH-30 MK2",
+  "typ": "hazer",
+  "leistung_w": 720,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Eurolite-NH-30-MK2.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Eurolite/Eurolite-NH-30-MK2.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.3 GIT · Peter Goderie",
+    "original": "resources/fixtures/Eurolite/Eurolite-NH-30-MK2.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 2 Wertebereiche mit Art (kind) versehen; Ausstosskanal umbenannt, 0-5 als 'closed'; Highlight 0 (Highlight soll keinen Dunst ausloesen)"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Datei und die LightOS-Attributliste geprueft (Attribute, Bereichs-Arten, Defaults, Raster); Herstellerhandbuch mit DMX-Tabelle war nicht abrufbar (Steinigke liefert nur Datenblaetter ohne DMX-Protokoll), daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "1 Channel",
+      "kanaele": [
+        {
+          "name": "Dunstmenge",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Kein Ausstoss", "art": "closed"},
+            {"von": 6, "bis": 255, "name": "Fog output volume (0 - 100%)", "art": ""}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "DMX-Hazer, 1 Kanal. Aufheizzeit beachten."
+}

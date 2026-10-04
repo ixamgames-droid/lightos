@@ -90,16 +90,19 @@ _ENTFERNT = {
     "Audio Input": ("2026-09-14 (BPM-10)",
                     "Sektion BPM → Erkennung: Quelle-Combo (PC-Audio je Ausgabegeraet, "
                     "Eingang je Geraet) und Pegelmeter unter der BPM-Zahl"),
-    # NICHT aufgenommen: „Controller-Vorlage". Die Gegenprobe dieses Gates hat
-    # das zurueckgewiesen, und sie hatte recht — weggefallen ist nur der
-    # gleichnamige BAUKASTEN-BLOCK, die Funktion selbst lebt
-    # (`controller_browser.py`: „Controller-Vorlage einfuegen", Sektion MIDI).
+    # NICHT aufgenommen: „Controller-Vorlage". Weggefallen ist der gleichnamige
+    # BAUKASTEN-BLOCK; der Begriff selbst steht noch in Anleitungen, die
+    # erklaeren, dass es den Weg nicht mehr gibt. ★ UI-71: die Annahme, „die
+    # Funktion selbst lebt" (Hinweis im Controller-Browser), war falsch — der
+    # Hinweis versprach eine Aktion, die es nirgends gab, und ist entfernt.
     # Der Satz in docs/LIVE_EDIT_FENSTER.md, das Panel ersetze
     # „Controller-Vorlage, Color-Chase und Chase-Bereich", ist damit zu grob.
 }
 
 # Erwähnung als GESCHICHTE ist erlaubt — nur die aktive Anweisung ist das Problem.
-_HISTORISCH = re.compile(r"früher|frueher|entfernt|ehemal|bis \d{4}-|seit \d{4}-",
+# DOC-26: seit es englische Fassungen (*.en.md) gibt, auch auf Englisch.
+_HISTORISCH = re.compile(r"früher|frueher|entfernt|ehemal|bis \d{4}-|seit \d{4}-"
+                         r"|\bformer(ly)?\b|\bremoved\b|\buntil \d{4}-|\bsince \d{4}-",
                          re.I)
 
 
@@ -229,6 +232,15 @@ class EntfernteUiTest(unittest.TestCase):
             1)
         self.assertEqual(
             _befunde_in(["Der Chase-Builder wurde 2026 entfernt."], "x"), [])
+
+    def test_erkennt_auch_englische_geschichte(self):
+        """DOC-26: die englischen Fassungen erwähnen Entferntes auf Englisch —
+        als Geschichte erlaubt, als Anweisung weiterhin ein Befund."""
+        self.assertEqual(
+            _befunde_in(["the former *Chase-Builder* has been removed"], "x"), [])
+        self.assertEqual(
+            len(_befunde_in(["1. Open the Chase-Builder in the toolbar."], "x")),
+            1)
 
     def test_keine_anleitung_weist_auf_entferntes_hin(self):
         befunde = []

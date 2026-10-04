@@ -1,5 +1,7 @@
 # Szenen, Snaps & Cue-Listen: Looks speichern und abrufen
 
+> **English:** [Scenes, snaps & cue lists](ANLEITUNG.en.md)
+
 > **Worum geht's:** Einen Look, den du im Programmer eingestellt hast, willst du
 > später mit einem Klick wiederholen oder in einer festen Reihenfolge abfahren.
 > LightOS bietet dafür vier Wege: den **Snap** in der Bibliothek, die **Snapshots**

@@ -1,0 +1,181 @@
+{
+  "format_version": 1,
+  "hersteller": "Showtec",
+  "hersteller_kurz": "Showtec",
+  "modell": "Compact Par 7 Q4",
+  "kurzname": "CPAR7Q4",
+  "typ": "par",
+  "leistung_w": 32,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Showtec-Compact-Par-7-Q4.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Showtec/Showtec-Compact-Par-7-Q4.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.3 GIT · Alexander",
+    "original": "resources/fixtures/Showtec/Showtec-Compact-Par-7-Q4.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 59 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): kurzname CPAR7Q4; Strobe-Default auf 0 (im Bereich 'Kein Strobe'); 11-Kanal: Random-Strobe als Attribut strobe statt zweitem shutter (Kein-Strobe-Bereich ohne art open); Farbpresets mit Farbnamen benannt, 'No function' ohne art color; Farblauf-Tempo als effect_speed; Sound-Kanal: Bereich 51-255 als sound markiert"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "aus QLC+ konvertiert und von LightOS nach Kanalnamen/Bereichen nachbearbeitet; kein Herstellerhandbuch verfuegbar (Hersteller-Website hinter Bot-Sperre) — nicht Kanal fuer Kanal gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "6 Channel",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 11, "bis": 255, "name": "Strobe 0-20 Hz", "art": "strobe"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "4 Channel",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "11 Channel",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 11, "bis": 255, "name": "Strobe 0-20 Hz", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Random Strobe",
+          "attribut": "strobe",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Kein Strobe"},
+            {"von": 11, "bis": 255, "name": "Zufalls-Strobe", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Color Presets",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Keine Funktion"},
+            {"von": 8, "bis": 13, "name": "Farbe 1: Rot (R255; G000; B000; W000)", "art": "color"},
+            {"von": 14, "bis": 20, "name": "Farbe 2: Rot + Weiss 40 % (R255; G000; B000; W100)", "art": "color"},
+            {"von": 21, "bis": 27, "name": "Farbe 3: Rot + Weiss 80 % (R255; G000; B000; W200)", "art": "color"},
+            {"von": 28, "bis": 34, "name": "Farbe 4: Rot-Orange (R255; G050; B000; W000)", "art": "color"},
+            {"von": 35, "bis": 41, "name": "Farbe 5: Orange (R255; G150; B000; W000)", "art": "color"},
+            {"von": 42, "bis": 48, "name": "Farbe 6: Gelb (R255; G255; B000; W000)", "art": "color"},
+            {"von": 49, "bis": 55, "name": "Farbe 7: Gelb + Weiss 30 % (R255; G255; B000; W075)", "art": "color"},
+            {"von": 56, "bis": 62, "name": "Farbe 8: Gelb + Weiss (R255; G255; B000; W255)", "art": "color"},
+            {"von": 63, "bis": 69, "name": "Farbe 9: Gruen + Weiss 60 % (R000; G255; B000; W150)", "art": "color"},
+            {"von": 70, "bis": 76, "name": "Farbe 10: Gruen + Weiss 20 % (R000; G255; B000; W050)", "art": "color"},
+            {"von": 77, "bis": 83, "name": "Farbe 11: Gruen (R000; G255; B000; W000)", "art": "color"},
+            {"von": 84, "bis": 90, "name": "Farbe 12: Gruen + Blau 20 % (R000; G255; B050; W000)", "art": "color"},
+            {"von": 91, "bis": 97, "name": "Farbe 13: Gruen + Blau 60 % (R000; G255; B150; W000)", "art": "color"},
+            {"von": 98, "bis": 104, "name": "Farbe 14: Cyan (R000; G255; B255; W000)", "art": "color"},
+            {"von": 105, "bis": 111, "name": "Farbe 15: Cyan + Weiss 30 % (R000; G255; B255; W075)", "art": "color"},
+            {"von": 112, "bis": 118, "name": "Farbe 16: Cyan + Weiss 60 % (R000; G255; B255; W150)", "art": "color"},
+            {"von": 119, "bis": 125, "name": "Farbe 17: Hellblau + Weiss (R000; G100; B255; W255)", "art": "color"},
+            {"von": 126, "bis": 132, "name": "Farbe 18: Blau + Weiss 40 % (R000; G000; B255; W100)", "art": "color"},
+            {"von": 133, "bis": 139, "name": "Farbe 19: Blau + Weiss 20 % (R000; G000; B255; W050)", "art": "color"},
+            {"von": 140, "bis": 146, "name": "Farbe 20: Blau (R000; G000; B255; W000)", "art": "color"},
+            {"von": 147, "bis": 153, "name": "Farbe 21: Indigo (R075; G000; B255; W000)", "art": "color"},
+            {"von": 154, "bis": 160, "name": "Farbe 22: Violett (R160; G000; B255; W000)", "art": "color"},
+            {"von": 161, "bis": 167, "name": "Farbe 23: Magenta (R255; G000; B255; W000)", "art": "color"},
+            {"von": 168, "bis": 174, "name": "Farbe 24: Pink (R255; G000; B175; W000)", "art": "color"},
+            {"von": 175, "bis": 181, "name": "Farbe 25: Rosa (R255; G000; B100; W000)", "art": "color"},
+            {"von": 182, "bis": 188, "name": "Farbe 26: Rosa + Weiss 20 % (R255; G000; B100; W050)", "art": "color"},
+            {
+              "von": 189,
+              "bis": 195,
+              "name": "Farbe 27: Rot (Hauch Blau) + Weiss 20 % (R255; G000; B025; W050)",
+              "art": "color"
+            },
+            {
+              "von": 196,
+              "bis": 202,
+              "name": "Farbe 28: Rot (Hauch Blau) + Weiss 10 % (R255; G000; B025; W025)",
+              "art": "color"
+            },
+            {"von": 203, "bis": 209, "name": "Farbe 29: Rot (Hauch Blau) (R255; G000; B025; W000)", "art": "color"},
+            {"von": 210, "bis": 216, "name": "Farbe 30: Weiss (R000; G000; B000; W255)", "art": "color"},
+            {"von": 217, "bis": 223, "name": "Farbe 31: Weiss kuehl (R075; G075; B100; W255)", "art": "color"},
+            {"von": 224, "bis": 230, "name": "Farbe 32: Weiss + Blau (R000; G000; B100; W255)", "art": "color"},
+            {"von": 231, "bis": 255, "name": "Farbe 33: Voll (RGBW) (R255; G255; B225; W255)", "art": "color"}
+          ]
+        },
+        {
+          "name": "Color Running",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Keine Funktion", "art": ""},
+            {"von": 16, "bis": 31, "name": "Jump 1", "art": ""},
+            {"von": 32, "bis": 47, "name": "Jump 2", "art": ""},
+            {"von": 48, "bis": 63, "name": "Jump 3", "art": ""},
+            {"von": 64, "bis": 79, "name": "Jump 4", "art": ""},
+            {"von": 80, "bis": 95, "name": "Jump 5", "art": ""},
+            {"von": 96, "bis": 111, "name": "Jump 6", "art": ""},
+            {"von": 112, "bis": 127, "name": "Jump 7", "art": ""},
+            {"von": 128, "bis": 143, "name": "Jump 8", "art": ""},
+            {"von": 144, "bis": 159, "name": "Fade 1", "art": ""},
+            {"von": 160, "bis": 175, "name": "Fade 2", "art": ""},
+            {"von": 176, "bis": 191, "name": "Fade 3", "art": ""},
+            {"von": 192, "bis": 207, "name": "Fade 4", "art": ""},
+            {"von": 208, "bis": 223, "name": "Fade 5", "art": ""},
+            {"von": 224, "bis": 239, "name": "Fade 6", "art": ""},
+            {"von": 240, "bis": 255, "name": "Fade 7", "art": ""}
+          ]
+        },
+        {
+          "name": "Speed color running",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Gradual speed adjustment, from slow to fast", "art": ""}
+          ]
+        },
+        {
+          "name": "Sound mode",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 50, "name": "Keine Funktion"},
+            {"von": 51, "bis": 255, "name": "Musiksteuerung, Empfindlichkeit 1-100 %", "art": "sound"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    }
+  ]
+}

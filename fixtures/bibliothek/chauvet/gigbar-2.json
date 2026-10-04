@@ -1,0 +1,351 @@
+{
+  "format_version": 1,
+  "hersteller": "Chauvet",
+  "hersteller_kurz": "CHAUVET",
+  "modell": "GigBAR 2",
+  "kurzname": "GigBAR 2",
+  "typ": "other",
+  "leistung_w": 64,
+  "quelle": {
+    "titel": "GigBAR 2 User Manual",
+    "version": "Rev. 7",
+    "url": "https://www.chauvetdj.com/wp-content/uploads/2016/09/GigBAR_2_UM_Rev7_ML5.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.3 GIT · Flo Edelmann",
+    "original": "resources/fixtures/Chauvet/Chauvet-GigBAR-2.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 125 Wertebereiche mit Art (kind) versehen; Rasterform in 3 Modus/Modi aus <Physical> uebernommen; danach von LightOS gegen das Herstellerhandbuch (GigBAR 2 User Manual) Kanal fuer Kanal ueberarbeitet: Typ other statt par (Effektsystem aus 2 PARs, 2 Derbys, Laser und Strobe); Rasterform 1x6 aus <Physical> entfernt (keine Pixelreihe); PAR-Steuerkanaele als intensity (000-127 Dimmer) mit Strobe-/Sound-/Voll-Bereichen statt shutter; einheitlicher Default 0; Derby-Farbe: Blackout als closed, Automatik als rotate; Strobe-zur-Musik-Bereiche als sound; Laser-Strobe 000-009 'Keine Funktion' als open statt strobe; Laserfarbe als laser_color statt color_wheel; Laser-Kanaele im 11-Kanal-Modus als shutter (Blackout/An/Strobe) mit Default/Highlight 0 statt intensity; Strobe-Muster als effect statt shutter; Weiss-/UV-Strobe-Dimmer benannt, Strobegeschwindigkeit als strobe; 3-Kanal-Modus: Show-Auswahl als effect, Strobe-/Blackout-Arten entfernt, CH3 'Geschwindigkeit bei CH2 050-099' nach Handbuch; Leistung nach Handbuch (64 W bei 230 V); Kanalnamen und Bereichsnamen auf Deutsch; Default/Highlight nach LightOS-Regeln (Pan/Tilt 128, Dimmer 0, Shutter offen)"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanalbelegung, Wertebereiche und Modi aller DMX-Modi Kanal fuer Kanal gegen das Herstellerhandbuch geprueft (nicht am echten Geraet)"
+  },
+  "modi": [
+    {
+      "name": "23-channel",
+      "kanaele": [
+        {"name": "Rot Par 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen Par 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau Par 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "UV Par 1", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {
+          "name": "Par 1 Dimmer/Strobe",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Dimmer 0-100 %", "art": ""},
+            {"von": 128, "bis": 239, "name": "Strobe langsam -> schnell", "art": "strobe"},
+            {"von": 240, "bis": 249, "name": "Strobe zur Musik", "art": "sound"},
+            {"von": 250, "bis": 255, "name": "RGB 100 %", "art": "open"}
+          ]
+        },
+        {"name": "Rot Par 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen Par 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau Par 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "UV Par 2", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {
+          "name": "Par 2 Dimmer/Strobe",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Dimmer 0-100 %", "art": ""},
+            {"von": 128, "bis": 239, "name": "Strobe langsam -> schnell", "art": "strobe"},
+            {"von": 240, "bis": 249, "name": "Strobe zur Musik", "art": "sound"},
+            {"von": 250, "bis": 255, "name": "RGB 100 %", "art": "open"}
+          ]
+        },
+        {
+          "name": "Derby 1 Farbe",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 24, "name": "Blackout", "art": "closed"},
+            {"von": 25, "bis": 49, "name": "Rot", "art": "color"},
+            {"von": 50, "bis": 74, "name": "Gruen", "art": "color"},
+            {"von": 75, "bis": 99, "name": "Blau", "art": "color"},
+            {"von": 100, "bis": 124, "name": "Rot + Gruen", "art": "color"},
+            {"von": 125, "bis": 149, "name": "Rot + Blau", "art": "color"},
+            {"von": 150, "bis": 174, "name": "Gruen + Blau", "art": "color"},
+            {"von": 175, "bis": 199, "name": "Rot + Gruen + Blau", "art": "color"},
+            {"von": 200, "bis": 224, "name": "Automatik (Einzelfarben)", "art": "rotate"},
+            {"von": 225, "bis": 255, "name": "Automatik (zwei Farben)", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Derby 1 Strobe",
+          "attribut": "shutter",
+          "default": 4,
+          "highlight": 4,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Kein Strobe", "art": "open"},
+            {"von": 10, "bis": 239, "name": "Strobe 0-30 Hz", "art": "strobe"},
+            {"von": 240, "bis": 255, "name": "Strobe zur Musik", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Derby 1 Rotation",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Stop", "art": ""},
+            {"von": 5, "bis": 127, "name": "Rechtsdrehung langsam -> schnell", "art": "rotate"},
+            {"von": 128, "bis": 133, "name": "Stop", "art": ""},
+            {"von": 134, "bis": 255, "name": "Linksdrehung langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Derby 2 Farbe",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 24, "name": "Blackout", "art": "closed"},
+            {"von": 25, "bis": 49, "name": "Rot", "art": "color"},
+            {"von": 50, "bis": 74, "name": "Gruen", "art": "color"},
+            {"von": 75, "bis": 99, "name": "Blau", "art": "color"},
+            {"von": 100, "bis": 124, "name": "Rot + Gruen", "art": "color"},
+            {"von": 125, "bis": 149, "name": "Rot + Blau", "art": "color"},
+            {"von": 150, "bis": 174, "name": "Gruen + Blau", "art": "color"},
+            {"von": 175, "bis": 199, "name": "Rot + Gruen + Blau", "art": "color"},
+            {"von": 200, "bis": 224, "name": "Automatik (Einzelfarben)", "art": "rotate"},
+            {"von": 225, "bis": 255, "name": "Automatik (zwei Farben)", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Derby 2 Strobe",
+          "attribut": "shutter",
+          "default": 4,
+          "highlight": 4,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Kein Strobe", "art": "open"},
+            {"von": 10, "bis": 239, "name": "Strobe 0-30 Hz", "art": "strobe"},
+            {"von": 240, "bis": 255, "name": "Strobe zur Musik", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Derby 2 Rotation",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Stop", "art": ""},
+            {"von": 5, "bis": 127, "name": "Rechtsdrehung langsam -> schnell", "art": "rotate"},
+            {"von": 128, "bis": 133, "name": "Stop", "art": ""},
+            {"von": 134, "bis": 255, "name": "Linksdrehung langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Laserfarbe",
+          "attribut": "laser_color",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 39, "name": "Blackout", "art": "closed"},
+            {"von": 40, "bis": 79, "name": "Rot an", "art": ""},
+            {"von": 80, "bis": 119, "name": "Gruen an", "art": ""},
+            {"von": 120, "bis": 159, "name": "Rot + Gruen an", "art": ""},
+            {"von": 160, "bis": 199, "name": "Rot an + Gruen Strobe", "art": "strobe"},
+            {"von": 200, "bis": 239, "name": "Gruen an + Rot Strobe", "art": "strobe"},
+            {"von": 240, "bis": 255, "name": "Rot + Gruen abwechselnd Strobe", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Laser Strobe",
+          "attribut": "shutter",
+          "default": 4,
+          "highlight": 4,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Kein Strobe", "art": "open"},
+            {"von": 10, "bis": 239, "name": "Strobe langsam -> schnell", "art": "strobe"},
+            {"von": 240, "bis": 255, "name": "Strobe zur Musik", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Laser-Muster Rotation",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Stop", "art": ""},
+            {"von": 5, "bis": 127, "name": "Rechtsdrehung langsam -> schnell", "art": "rotate"},
+            {"von": 128, "bis": 133, "name": "Stop", "art": ""},
+            {"von": 134, "bis": 255, "name": "Linksdrehung langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Strobe-Muster",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Auto-Strobe-Programm 1", "art": ""},
+            {"von": 10, "bis": 29, "name": "Auto-Strobe-Programm 2", "art": ""},
+            {"von": 30, "bis": 49, "name": "Auto-Strobe-Programm 3", "art": ""},
+            {"von": 50, "bis": 69, "name": "Auto-Strobe-Programm 4", "art": ""},
+            {"von": 70, "bis": 89, "name": "Auto-Strobe-Programm 5", "art": ""},
+            {"von": 90, "bis": 109, "name": "Auto-Strobe-Programm 6", "art": ""},
+            {"von": 110, "bis": 129, "name": "Auto-Strobe-Programm 7", "art": ""},
+            {"von": 130, "bis": 149, "name": "Auto-Strobe-Programm 8", "art": ""},
+            {"von": 150, "bis": 169, "name": "Auto-Strobe-Programm 9", "art": ""},
+            {"von": 170, "bis": 189, "name": "Auto-Strobe-Programm 10", "art": ""},
+            {"von": 190, "bis": 209, "name": "Manueller Strobe langsam -> schnell", "art": "strobe"},
+            {"von": 210, "bis": 255, "name": "Strobe zur Musik", "art": "sound"}
+          ]
+        },
+        {"name": "Weiss-Strobe Dimmer", "attribut": "intensity", "default": 0, "highlight": 0},
+        {"name": "UV-Strobe Dimmer", "attribut": "intensity", "default": 0, "highlight": 0},
+        {"name": "Strobe-Geschwindigkeit (CH21/22)", "attribut": "strobe", "default": 0, "highlight": 0}
+      ]
+    },
+    {
+      "name": "11-channel",
+      "kanaele": [
+        {"name": "Rot (PARs + Derbys)", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen (PARs + Derbys)", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau (PARs + Derbys)", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "UV (PARs + Derbys)", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {
+          "name": "Dimmer/Strobe PARs + Derbys",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Alle 0-100 %", "art": ""},
+            {"von": 128, "bis": 239, "name": "Strobe langsam -> schnell", "art": "strobe"},
+            {"von": 240, "bis": 249, "name": "Strobe zur Musik", "art": "sound"},
+            {"von": 250, "bis": 255, "name": "Voll an", "art": "open"}
+          ]
+        },
+        {
+          "name": "Derby Motor",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Keine Bewegung", "art": ""},
+            {"von": 5, "bis": 127, "name": "Rechtsdrehung langsam -> schnell", "art": "rotate"},
+            {"von": 128, "bis": 133, "name": "Bewegung Stop", "art": ""},
+            {"von": 134, "bis": 255, "name": "Linksdrehung langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Roter Laser",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Blackout", "art": "closed"},
+            {"von": 5, "bis": 54, "name": "An", "art": "open"},
+            {"von": 55, "bis": 255, "name": "Strobe langsam -> schnell", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Gruener Laser",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Blackout", "art": "closed"},
+            {"von": 5, "bis": 54, "name": "An", "art": "open"},
+            {"von": 55, "bis": 255, "name": "Strobe langsam -> schnell", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Laser Bewegung",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Keine Bewegung", "art": ""},
+            {"von": 5, "bis": 127, "name": "Rechtsdrehung langsam -> schnell", "art": "rotate"},
+            {"von": 128, "bis": 133, "name": "Bewegung Stop", "art": ""},
+            {"von": 134, "bis": 255, "name": "Linksdrehung langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Weiss-Strobe",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 54, "name": "Weiss-Strobe Dimmer 0-100 %", "art": ""},
+            {"von": 55, "bis": 255, "name": "Strobe langsam -> schnell", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "UV-Strobe",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 54, "name": "UV-Strobe Dimmer 0-100 %", "art": ""},
+            {"von": 55, "bis": 255, "name": "Strobe langsam -> schnell", "art": "strobe"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3-channel",
+      "kanaele": [
+        {
+          "name": "LED-Betrieb",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Keine Funktion", "art": ""},
+            {"von": 10, "bis": 119, "name": "Auto-Mix 1 schnell -> langsam", "art": ""},
+            {"von": 120, "bis": 229, "name": "Auto-Mix 2 schnell -> langsam", "art": ""},
+            {"von": 230, "bis": 234, "name": "Sound-Mix 1", "art": "sound"},
+            {"von": 235, "bis": 239, "name": "Sound-Mix 2", "art": "sound"},
+            {"von": 240, "bis": 255, "name": "Show-Auswahl ueber CH2/CH3", "art": ""}
+          ]
+        },
+        {
+          "name": "Show-Auswahl",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Blackout", "art": "closed"},
+            {"von": 10, "bis": 19, "name": "Nur PARs", "art": ""},
+            {"von": 20, "bis": 29, "name": "Nur Derbys", "art": ""},
+            {"von": 30, "bis": 39, "name": "Nur Laser", "art": ""},
+            {"von": 40, "bis": 49, "name": "Nur Strobes", "art": ""},
+            {"von": 50, "bis": 59, "name": "Auto PARs + Derbys", "art": ""},
+            {"von": 60, "bis": 69, "name": "Auto PARs + Laser", "art": ""},
+            {"von": 70, "bis": 79, "name": "Auto PARs + Strobes", "art": ""},
+            {"von": 80, "bis": 89, "name": "Auto Derbys + Laser", "art": ""},
+            {"von": 90, "bis": 99, "name": "Auto Strobes + Derbys", "art": ""},
+            {"von": 100, "bis": 109, "name": "PARs, Derbys, Laser", "art": ""},
+            {"von": 110, "bis": 119, "name": "PARs, Derbys, Strobes", "art": ""},
+            {"von": 120, "bis": 129, "name": "PARs, Laser, Strobes", "art": ""},
+            {"von": 130, "bis": 139, "name": "Derbys, Laser, Strobes", "art": ""},
+            {"von": 140, "bis": 149, "name": "Sound PARs", "art": "sound"},
+            {"von": 150, "bis": 159, "name": "Sound Derbys", "art": "sound"},
+            {"von": 160, "bis": 169, "name": "Sound Laser", "art": "sound"},
+            {"von": 170, "bis": 179, "name": "Sound Strobes", "art": "sound"},
+            {"von": 180, "bis": 189, "name": "Sound PARs + Derbys", "art": "sound"},
+            {"von": 190, "bis": 199, "name": "Sound PARs + Laser", "art": "sound"},
+            {"von": 200, "bis": 209, "name": "Sound PARs + Strobes", "art": "sound"},
+            {"von": 210, "bis": 219, "name": "Sound Derbys + Laser", "art": "sound"},
+            {"von": 220, "bis": 229, "name": "Sound Derbys + Strobes", "art": "sound"},
+            {"von": 230, "bis": 239, "name": "Sound PARs, Derbys, Laser", "art": "sound"},
+            {"von": 240, "bis": 244, "name": "Sound PARs, Derbys, Strobes", "art": "sound"},
+            {"von": 245, "bis": 249, "name": "Sound PARs, Laser, Strobes", "art": "sound"},
+            {"von": 250, "bis": 255, "name": "Sound Derbys, Laser, Strobes", "art": "sound"}
+          ]
+        },
+        {"name": "Auto-Geschwindigkeit (CH2 050-099)", "attribut": "effect_speed", "default": 0, "highlight": 0}
+      ]
+    }
+  ],
+  "notizen": "Komplettsystem auf Stativ: 2 PARs (RGB+UV), 2 Derbys, Laser (rot/gruen), Weiss-/UV-Strobe. Pro PAR maximal 3 Farben gleichzeitig; Weiss- und UV-Strobe nicht gleichzeitig. Laser-Kanaele mit Default/Highlight 0 (Laser aus)."
+}

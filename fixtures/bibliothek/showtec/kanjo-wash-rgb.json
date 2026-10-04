@@ -1,0 +1,115 @@
+{
+  "format_version": 1,
+  "hersteller": "Showtec",
+  "hersteller_kurz": "Showtec",
+  "modell": "Kanjo Wash RGB",
+  "kurzname": "KANJOWASH",
+  "typ": "moving_head",
+  "leistung_w": 43,
+  "notizen": "Ohne Handbuch nachbearbeitet. Strobe-Kanal: Wertebereiche unbekannt, 0 vermutlich aus.",
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Showtec-Kanjo-Wash-RGB.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Showtec/Showtec-Kanjo-Wash-RGB.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.0.0 Beta 3 · Michel Sliepenbeek",
+    "original": "resources/fixtures/Showtec/Showtec-Kanjo-Wash-RGB.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 27 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): kurzname KANJOWASH; Strobe-Kanal ohne Bereiche als strobe statt shutter (kein bekannter Offen-Wert); Farbmakros: Farbwechsel-Programme 196-255 ohne art color; Farbsprung-Tempo als effect_speed; Werksreset: Normalbetrieb ohne art open"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "aus QLC+ konvertiert und von LightOS nach Kanalnamen/Bereichen nachbearbeitet; kein Herstellerhandbuch verfuegbar (Hersteller-Website hinter Bot-Sperre) — nicht Kanal fuer Kanal gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "14 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt-Tempo", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Strobe (0 = aus)", "attribut": "strobe", "default": 0, "highlight": 0},
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {
+          "name": "Color macros",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Keine Funktion", "art": ""},
+            {"von": 1, "bis": 13, "name": "Cyan", "art": "color"},
+            {"von": 14, "bis": 26, "name": "Purple", "art": "color"},
+            {"von": 27, "bis": 39, "name": "Magenta (Purple / Red)", "art": "color"},
+            {"von": 40, "bis": 52, "name": "Orange", "art": "color"},
+            {"von": 53, "bis": 65, "name": "White", "art": "color"},
+            {"von": 66, "bis": 78, "name": "Bright Pink", "art": "color"},
+            {"von": 79, "bis": 91, "name": "Bright Green (Lime)", "art": "color"},
+            {"von": 92, "bis": 104, "name": "Bright Blue (Brescian Blue)", "art": "color"},
+            {"von": 105, "bis": 117, "name": "Yellow", "art": "color"},
+            {"von": 118, "bis": 130, "name": "Warm White", "art": "color"},
+            {"von": 131, "bis": 143, "name": "Red", "art": "color"},
+            {"von": 144, "bis": 156, "name": "Green", "art": "color"},
+            {"von": 157, "bis": 169, "name": "Blue", "art": "color"},
+            {"von": 170, "bis": 182, "name": "Amber", "art": "color"},
+            {"von": 183, "bis": 195, "name": "White", "art": "color"},
+            {"von": 196, "bis": 223, "name": "Seven Color Gradient"},
+            {"von": 224, "bis": 237, "name": "Seven Color Change"},
+            {"von": 238, "bis": 255, "name": "Seven Color Jump"}
+          ]
+        },
+        {
+          "name": "Color Jumping Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Speed", "art": ""}
+          ]
+        },
+        {
+          "name": "Program",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 2, "name": "No program", "art": ""},
+            {"von": 3, "bis": 101, "name": "Program 1 (Fast)", "art": ""},
+            {"von": 102, "bis": 152, "name": "Program 2 (Gradient and Jump)", "art": ""},
+            {"von": 153, "bis": 203, "name": "Program 3 (Slow)", "art": ""},
+            {"von": 204, "bis": 255, "name": "Program 4 (Sound Controlled)", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Werksreset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 254, "name": "Normalbetrieb"},
+            {"von": 255, "bis": 255, "name": "Werkseinstellungen laden", "art": "reset"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Strobe (0 = aus)", "attribut": "strobe", "default": 0, "highlight": 0},
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Pan/Tilt-Tempo", "attribut": "speed", "default": 0, "highlight": 0}
+      ]
+    }
+  ]
+}

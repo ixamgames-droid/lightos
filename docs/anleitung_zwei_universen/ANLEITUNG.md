@@ -33,6 +33,9 @@ Das **Universe:**-Feld entscheidet, auf welchem Universe das Gerät landet:
 - Geräte, die am Enttec hängen sollen → **Universe: 1**.
 - Geräte, die über Art-Net gehen sollen → **Universe: 2**.
 
+Das Feld ist mit dem Universe des **zuletzt gepatchten** Geräts vorbelegt — nach dem
+U2-Block steht es also auf `2`. Vor jedem Block kurz prüfen.
+
 Mehrere gleiche Geräte auf einmal: Feld **Anzahl:** hochzählen und den
 **Adress-Offset:** setzen (0 = dicht hintereinander). Reicht ein Universe nicht
 mehr aus (über Kanal 512), rollt LightOS automatisch ins nächste — willst du eine
@@ -54,7 +57,7 @@ getrennte Adressräume).
 
 ## 2. Ausgabe pro Universum konfigurieren
 
-Menü **Ausgabe → Konfigurieren…** öffnet den Dialog **„Ausgabe konfigurieren"**
+Menü **Ausgabe → Konfigurieren...** öffnet den Dialog **„Ausgabe konfigurieren"**
 mit mehreren Tabs. Es gibt zwei Wege — der **Universe-Manager** (empfohlen) setzt
 beide Universen in einer Tabelle, die Einzel-Tabs richten je Universe live eine
 Verbindung ein.
@@ -62,7 +65,8 @@ Verbindung ein.
 ### Weg A (empfohlen): Tab „Universen" — beide auf einmal
 
 Tab **Universen**. Die Tabelle hat die Spalten **#** · **Name** · **Output** ·
-**Patch (Port/IP)**. Pro Zeile ein Universe:
+**Patch (Port/IP)** · **Ext-Universe** (optional: die externe Art-Net/sACN-Universe-Nummer,
+leer = Standard, siehe unten). Pro Zeile ein Universe:
 
 1. Zeile 1 → **#** `1`, **Name** z. B. *Bühne*, **Output** = `Enttec`,
    **Patch** = dein COM-Port, z. B. `COM3`.
@@ -76,7 +80,12 @@ Die **Output**-Spalte ist ein Auswahlfeld mit `Disabled / Enttec / sACN /
 ArtNet`. Bedeutung der **Patch**-Spalte je Typ:
 
 - **Enttec** → COM-Port (z. B. `COM3`).
-- **ArtNet** → Ziel-IP oder Broadcast (leer = `255.255.255.255`).
+- **ArtNet** → Ziel-IP oder Broadcast (leer = `255.255.255.255`). Hat der PC mehrere
+  Netzwerkkarten (z. B. WLAN + Lichtnetz), im Tab **Art-Net** unter **Netzwerkkarte:** die Karte
+  des Lichtnetzes wählen — dann geht der Broadcast gezielt dorthin. Die Wahl gilt für Art-Net-Sender,
+  die **danach** aufgebaut werden: am besten **vor** dem Speichern der Universen-Tabelle wählen —
+  sonst die Universen danach noch einmal **Speichern** (baut die Ausgaben neu auf) oder LightOS neu
+  starten. Ein schon laufender Sender behält seine alte Karte.
 - **sACN** → Unicast-IP (leer = Multicast).
 
 #### Hinweis „Zwei Universen auf demselben Ziel"
@@ -96,9 +105,11 @@ kollidieren also auch dann, wenn sie unterschiedlich aussehen:
 - **Art-Net:** ein leeres Patch-Feld und ein ausgeschriebenes
   `255.255.255.255` sind dieselbe Adresse.
 - **Externe Universe-Nummer:** fehlt sie, gilt der Standard des jeweiligen
-  Protokolls — bei **Art-Net** die Zeilennummer **minus 1**, bei **sACN** die
-  **Zeilennummer selbst**. sACN-Zeile 1 ohne Angabe und sACN-Zeile 2 mit
-  ausdrücklicher `1` landen deshalb beide auf Universum 1.
+  Protokolls — bei **Art-Net** die Nummer aus Spalte **#** **minus 1**, bei **sACN**
+  die **#**-Nummer selbst. sACN-Universe #1 ohne Angabe und sACN-Universe #2 mit
+  ausdrücklicher `1` landen deshalb beide auf Universum 1. (Die „Zeile N" im Hinweis
+  ist dagegen die Position in der Tabelle — nach dem Löschen einer Zeile können sich
+  beide unterscheiden.)
 - **Enttec:** hier zählt allein der Port. Zwei Zeilen auf demselben COM-Port
   kollidieren immer, gleich welche Nummern sie tragen.
 
@@ -118,7 +129,9 @@ Alternativ pro Universe direkt eine Verbindung aufbauen:
 - **Tab „Enttec Pro USB":** **COM-Port** wählen (Knopf **Ports aktualisieren**,
   falls das Interface neu angesteckt wurde; ein erkanntes Enttec ist mit
   `[Enttec Pro]` markiert), Feld **Universe:** auf `1` stellen, **Verbinden**.
-  Der Status zeigt `Verbunden: COM… -> Universe 1 (gespeichert)`.
+  Der Status zeigt erst `Eingerichtet: COM3 → Universe 1 (gespeichert), verbinde …` und nach
+  wenigen Sekunden `Verbunden: COM3 → Universe 1 (gespeichert)`. Steht dort „antwortet nicht"
+  oder „Port lässt sich nicht öffnen", Port und Kabel prüfen.
 - **Tab „Art-Net":** **Art-Net aktivieren** anhaken, Feld **Universe:** auf `2`
   stellen, **Ziel-IP / Broadcast** eintragen (z. B. `192.168.0.50`), bei Bedarf
   das **Art-Net Startuniversum** (die *externe* Art-Net-Universe-Nummer am Node)
@@ -130,7 +143,12 @@ Alternativ pro Universe direkt eine Verbindung aufbauen:
 > auf `1`, Art-Net-Tab auf `2`). So überschreibt die Art-Net-Zuweisung nicht die
 > Enttec-Zuweisung — jede Zeile in `data/universes.json` bleibt für sich erhalten.
 
-Beide Wege schreiben in dieselbe `data/universes.json`; du kannst sie mischen.
+Beide Wege schreiben in dieselbe `data/universes.json`; du kannst sie mischen — aber
+**Achtung:** die Tabelle im Tab **Universen** wird nur beim Öffnen des Dialogs (und nach
+Art-Net-**Übernehmen**) geladen. Nach **Verbinden** im Enttec-Tab bzw. **Übernehmen** im
+sACN-Tab den Dialog erst schließen und neu öffnen, bevor du im Tab **Universen** auf
+**Speichern** klickst — sonst schreibt die beim Öffnen geladene Tabelle den alten Stand
+zurück, und die gerade eingerichtete Verbindung ist wieder weg.
 
 > Netzwerk-/Protokoll-Details zu Art-Net (Port 6454, PortAddress, Broadcast):
 > [ARTNET.md](../ARTNET.md). Grundlagen DMX/Universe/Adressraum:
@@ -146,13 +164,16 @@ werden blau/hell). Oben links steht das Feld **Universe:** (Bereich 1–32).
 
 So prüfst du beide Ausgänge:
 
-1. **Universe:** auf `1` stellen → an den Kanälen deiner U1-Geräte (Enttec) müssen
-   Werte erscheinen, sobald du Fader/Effekte/Programmer bewegst. Kommen keine
-   Werte an, ist entweder nichts auf U1 gepatcht oder der Enttec-Port stimmt nicht.
-2. **Universe:** auf `2` stellen → an den Kanälen deiner U2-Geräte (Art-Net)
-   müssen Werte erscheinen. So siehst du, dass der Art-Net-Adapter das getrennte
-   Universe wirklich bespielt.
-3. Zum Gegencheck einen Master/Blackout ziehen: die Werte müssen in **beiden**
+1. **Universe:** auf `1` stellen → an den Kanälen deiner U1-Geräte müssen Werte
+   erscheinen, sobald du Fader/Effekte/Programmer bewegst. Kommen keine Werte an,
+   ist auf U1 nichts gepatcht bzw. nichts aktiv, oder Blackout/Grand Master steht
+   auf 0. Ein falscher Enttec-Port zeigt sich hier **nicht** (siehe unten).
+2. **Universe:** auf `2` stellen → an den Kanälen deiner U2-Geräte müssen Werte
+   erscheinen — damit ist der **Patch** von U2 bestätigt.
+3. **Ob ein Universe wirklich über seinen Adapter rausgeht**, zeigt der Tab
+   **DMX Monitor** („Universe 2 geht raus" bzw. „⚠ Universe 2 hat keinen Ausgang —
+   nur gerechnet") und die Anzeige **„Ausgabe: …"** rechts in der Statusleiste.
+4. Zum Gegencheck einen Master/Blackout ziehen: die Werte müssen in **beiden**
    Universen reagieren.
 
 Zeigt ein Universe im Monitor Werte, aber am realen Gerät kommt nichts an, liegt
@@ -160,14 +181,16 @@ es an der **Ausgabe-Konfig** (Tab „Universen": falscher COM-Port / falsche
 Ziel-IP), nicht am Patch — der Monitor spiegelt den **berechneten** Universe-Inhalt
 vor dem Adapter.
 
-> Ergänzend: Der Tab **DMX Monitor** daneben zeigt dieselben Daten in einer
-> kompakteren Listenform.
+> Ergänzend: Der Tab **DMX Monitor** daneben zeigt dieselben Werte als 32×16-Raster
+> mit markierten gepatchten Kanälen — und meldet zusätzlich, ob das gewählte Universe
+> wirklich ausgegeben wird.
 
 ---
 
 ## Kurz-Checkliste
 
 - [ ] Geräte im **Patch** aufgeteilt: U1-Block auf **Universe 1**, U2-Block auf **Universe 2** (Spalte *Univ.* kontrollieren).
-- [ ] **Ausgabe → Konfigurieren… → Universen:** Zeile 1 = `Enttec` / COM-Port, Zeile 2 = `ArtNet` / Ziel-IP → **Speichern**.
+- [ ] **Ausgabe → Konfigurieren... → Universen:** Zeile 1 = `Enttec` / COM-Port, Zeile 2 = `ArtNet` / Ziel-IP → **Speichern**.
 - [ ] (Alternativ) Einzel-Tabs: **Universe:**-Feld je Tab bewusst auf 1 bzw. 2 gestellt, dann **Verbinden** / **Übernehmen**.
 - [ ] **E/A → Output:** Universe **1** und **2** durchgeschaltet, beide zeigen Live-Werte.
+- [ ] **E/A → DMX Monitor:** für Universe **1** und **2** steht „geht raus".

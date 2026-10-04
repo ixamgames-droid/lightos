@@ -1,0 +1,102 @@
+{
+  "format_version": 1,
+  "hersteller": "Chauvet",
+  "hersteller_kurz": "CHAUVET",
+  "modell": "SlimPAR Q12 USB",
+  "kurzname": "SlimPAR Q12 USB",
+  "typ": "par",
+  "leistung_w": 105,
+  "quelle": {
+    "titel": "SlimPAR Q12 USB User Manual",
+    "version": "Rev. 4",
+    "url": "https://www.chauvetdj.com/wp-content/uploads/2015/12/SlimPAR_Q12_USB_UM_Rev4_WO.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.1 GIT · Ham Sadler",
+    "original": "resources/fixtures/Chauvet/Chauvet-SlimPAR-Q12-USB.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 18 Wertebereiche mit Art (kind) versehen; danach von LightOS gegen das Herstellerhandbuch (SlimPAR Q12 USB User Manual) Kanal fuer Kanal ueberarbeitet: CH5 Farbmakros als macro statt color_wheel (Makro, kein Farbrad); CH6 Strobe/Geschwindigkeit/Empfindlichkeit als shutter mit Offen-Bereich 000-015 statt macro; CH7 Modus als effect statt raw, irrefuehrende color-Arten entfernt; Auto-Snap-Bereiche nach Handbuch: 4 bzw. 19 Farben (QLC+: 3 bzw. 7); CH9 Dimmerkurve als raw statt speed; Leistung nach Handbuch (105 W bei 230 V); Kanalnamen und Bereichsnamen auf Deutsch; Default/Highlight nach LightOS-Regeln (Pan/Tilt 128, Dimmer 0, Shutter offen)"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanalbelegung, Wertebereiche und Modi aller DMX-Modi Kanal fuer Kanal gegen das Herstellerhandbuch geprueft (nicht am echten Geraet)"
+  },
+  "modi": [
+    {
+      "name": "4 Channel",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "9 Channel",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {
+          "name": "Farbmakros",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Keine Funktion", "art": ""},
+            {"von": 16, "bis": 255, "name": "Farbmakros (ueberschreibt Farbkanaele)", "art": ""}
+          ]
+        },
+        {
+          "name": "Strobe / Geschwindigkeit / Soundempfindlichkeit",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Kein Strobe", "art": "open"},
+            {
+              "von": 16,
+              "bis": 255,
+              "name": "Strobe (CH7 000-031) / Programmtempo (032-223) / Soundempf. (224-255)",
+              "art": "strobe"
+            }
+          ]
+        },
+        {
+          "name": "Modus",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "Keine Funktion", "art": ""},
+            {"von": 32, "bis": 63, "name": "Pulseffekt 0-100 %", "art": ""},
+            {"von": 64, "bis": 95, "name": "Pulseffekt 100-0 %", "art": ""},
+            {"von": 96, "bis": 127, "name": "Pulseffekt 100-0-100 %", "art": ""},
+            {"von": 128, "bis": 159, "name": "Auto-Fade", "art": ""},
+            {"von": 160, "bis": 191, "name": "Auto-Snap (4 Farben)", "art": ""},
+            {"von": 192, "bis": 223, "name": "Auto-Snap (19 Farben)", "art": ""},
+            {"von": 224, "bis": 255, "name": "Sound-Modus", "art": "sound"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Dimmerkurve",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 51, "name": "Dimmerkurve aus dem Menue", "art": ""},
+            {"von": 52, "bis": 101, "name": "Dimmerkurve aus (linear)", "art": ""},
+            {"von": 102, "bis": 152, "name": "Dimmerkurve 1 (schnell)", "art": ""},
+            {"von": 153, "bis": 203, "name": "Dimmerkurve 2 (mittel)", "art": ""},
+            {"von": 204, "bis": 255, "name": "Dimmerkurve 3 (langsam)", "art": ""}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "12x Quad-LED RGBA. Pulseffekte (CH7 032-127) wirken nur bei aktiven Farbkanaelen; CH6 wechselt die Bedeutung mit CH7."
+}

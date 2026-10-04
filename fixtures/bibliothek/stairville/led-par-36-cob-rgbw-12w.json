@@ -1,0 +1,125 @@
+{
+  "format_version": 1,
+  "hersteller": "Stairville",
+  "hersteller_kurz": "STAIR",
+  "modell": "LED PAR 36 COB RGBW 12W",
+  "kurzname": "PAR36COBRGBW",
+  "typ": "par",
+  "leistung_w": 12,
+  "quelle": {
+    "titel": "Stairville LED Par 36 COB RGBW 12W / Par 46 / Par 56 / Par 64 COB RGBW, User Manual (Thomann, Art. 334993)",
+    "url": "https://fast-images.static-thomann.de/pics/atg/atgdata/document/manual/334993_c_333906_334993_334994_334995_375066_375060_375059_375061_v3_en_online.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.0 GIT · Jose Coelho",
+    "original": "resources/fixtures/Stairville/Stairville-LED-PAR-36-COB-RGBW-12W.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 20 Wertebereiche mit Art (kind) versehen; 7 Bereichsnamen auf 80 Zeichen gekuerzt; Modusnamen 4-/6-/8-Kanal; falsche Art color an Betriebsart-/Speed-Bereichen entfernt; 6-Kanal: Kanal 6 als effect_speed statt speed; 8-Kanal: Strobe-Default/Highlight 0 (offen) statt 7; 8-Kanal: Betriebsart (Kanal 7) als raw statt zweitem macro; Kanal-/Bereichsnamen deutsch und gekuerzt; Leistung 12 W laut Handbuch statt 20 W; Kurzname; hersteller_kurz STAIR; Quelle auf Herstellerhandbuch gesetzt"
+  },
+  "autor": "LightOS",
+  "geprueft": {"ok": true, "wie": "Kanal fuer Kanal gegen das Handbuch (Kap. 7.4–7.6, 4/6/8 Kanaele) geprueft"},
+  "modi": [
+    {
+      "name": "4-Kanal",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "6-Kanal",
+      "kanaele": [
+        {
+          "name": "Betriebsart",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 63, "name": "Feste Farbe (Kanaele 2–5)"},
+            {"von": 64, "bis": 127, "name": "Farbwechsel 7 Farben"},
+            {"von": 128, "bis": 191, "name": "Farbwechsel 12 Farben"},
+            {"von": 192, "bis": 255, "name": "Farbwechsel 4 Farben"}
+          ]
+        },
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Effekt-Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Kein Farbwechsel"},
+            {"von": 11, "bis": 100, "name": "Farbwechsel schnell → langsam"},
+            {"von": 101, "bis": 150, "name": "Kein Farbwechsel"},
+            {"von": 151, "bis": 255, "name": "Farbwechsel, zufaellige Geschwindigkeit"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8-Kanal",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Farbmuster",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Kein Farbmuster"},
+            {"von": 16, "bis": 255, "name": "Festes Farbmuster 1 … 31"}
+          ]
+        },
+        {
+          "name": "Strobe / Effekt-Speed",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Volle Helligkeit, kein Strobe", "art": "open"},
+            {
+              "von": 16,
+              "bis": 255,
+              "name": "Strobe langsam → schnell (bzw. Effekt-Speed fuer Kanal 7)",
+              "art": "strobe"
+            }
+          ]
+        },
+        {
+          "name": "Betriebsart",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "Feste Farbe (Kanaele 1–4)"},
+            {"von": 32, "bis": 63, "name": "Fade-out"},
+            {"von": 64, "bis": 95, "name": "Fade-in"},
+            {"von": 96, "bis": 127, "name": "Fade-in-out"},
+            {"von": 128, "bis": 159, "name": "Auto-Mix"},
+            {"von": 160, "bis": 191, "name": "Chase 4 Farben"},
+            {"von": 192, "bis": 223, "name": "Chase 12 Farben"},
+            {"von": 224, "bis": 255, "name": "Musiksteuerung (12 Farben)", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Dimmer",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dimmer 0 % → 100 %"}
+          ]
+        }
+      ]
+    }
+  ]
+}
