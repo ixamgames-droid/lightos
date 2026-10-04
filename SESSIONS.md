@@ -44,7 +44,6 @@
 | DOC-48 | C | - | 2026-10-02T12:06Z | docs/anleitung_testshow_liveedit/ANLEITUNG_TESTSHOW_LIVEEDIT.md |
 | DOC-49 | C | - | 2026-10-02T12:07Z | docs/FARB_FX_VC_SHOW.md |
 | DOC-50 | C | - | 2026-10-02T12:09Z | docs/LIVE_EDIT_FENSTER.md |
-| TOOL-2 | C | - | 2026-10-02T12:17Z | tools/gource · Code-Film.bat · Code-Film.sh · THIRD_PARTY_NOTICES.md · tests/test_proc18_fremd_lizenzhinweise.py · tests/test_tool2_keine_binaerdateien.py · BACKLOG.md · changelog.d/2026-10-02-TOOL-2.md |
 | DOC-51 | C | - | 2026-10-02T12:23Z | docs/anleitung_grosse_demo_2026/ANLEITUNG_GROSSE_DEMO_2026.md |
 | DOC-52 | C | - | 2026-10-02T12:24Z | docs/anleitung_komplettshow_2026 |
 | DOC-53 | C | - | 2026-10-02T12:26Z | docs/anleitung_hochzeit_komplett · tools/build_hochzeit_komplett.py · tests/test_doc53_hochzeit_linie.py · changelog.d/2026-10-02-DOC-53.md |
@@ -175,7 +174,6 @@
 
 ## Verlauf
 
-- 2026-10-04T17:00Z A done FM-60
 - 2026-10-04T17:07Z A claim UI-74
 - 2026-10-04T17:15Z B done GATE-B-0410
 - 2026-10-04T17:15Z B claim SICHT-B-0410
@@ -205,3 +203,4 @@
 - 2026-10-04T20:50Z A done DOC-57
 - 2026-10-04T21:06Z A claim DOC-59
 - 2026-10-04T21:18Z A done VIZ-67
+- 2026-10-04T22:43Z C done TOOL-2
