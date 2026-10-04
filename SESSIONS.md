@@ -62,7 +62,6 @@
 | SAMMEL-DOKU-C | A | sammel/doku-c | 2026-10-02T22:08Z | docs · BACKLOG.md |
 | FM-59 | A | feat/fm59-bibliothek-runde3 | 2026-10-04T16:47Z | fixtures/bibliothek |
 | UI-72-73-FIX | B | fix/ui72-ui73-playback | 2026-10-02T22:44Z | src/ui/views/playback_view.py · src/core/cueliste_ziel.py · tests/test_ui72_ui73_playback.py |
-| FM-60 | A | fix/fm60-erststart-frage | 2026-10-04T16:47Z | src/core/database/bibliothek_download.py |
 | FM-61 | A | feat/fm61-bibliothek-china | 2026-10-04T16:47Z | fixtures/bibliothek |
 | OUT-60-FOLGE | B | fix/out60-folge-masken | 2026-10-04T16:48Z | src/core/dmx/output_manager.py · src/core/dmx/serial_process.py · tests/test_out60_load_kein_null_frame.py · tests/test_out59_waisen_windows.py |
 | DOC-57 | A | docs/doc57-bilder-bibliothek | 2026-10-04T16:49Z | docs · tools/anleitungsbilder |
@@ -162,7 +161,6 @@
 
 ## Verlauf
 
-- 2026-10-02T17:01Z B uebergeben FUNKTIONSTEST-B2
 - 2026-10-02T17:10Z A done VIZ-66
 - 2026-10-02T17:50Z A done FM-56
 - 2026-10-02T17:50Z A claim FM-57
@@ -192,3 +190,4 @@
 - 2026-10-04T16:48Z B claim OUT-60-FOLGE
 - 2026-10-04T16:49Z A claim DOC-57
 - 2026-10-04T16:54Z B claim GATE-B-0410
+- 2026-10-04T17:00Z A done FM-60
