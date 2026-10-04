@@ -49,7 +49,6 @@
 | DOC-52 | C | - | 2026-10-02T12:24Z | docs/anleitung_komplettshow_2026 |
 | DOC-53 | C | - | 2026-10-02T12:26Z | docs/anleitung_hochzeit_komplett · tools/build_hochzeit_komplett.py · tests/test_doc53_hochzeit_linie.py · changelog.d/2026-10-02-DOC-53.md |
 | TOOL-10 | C | - | 2026-10-02T12:28Z | BACKLOG.md |
-| OUT-58 | C | - | 2026-10-02T12:51Z | src/ui/widgets/output_config.py · tests/test_out58_universen_tabelle_nachladen.py · BACKLOG.md · changelog.d/2026-10-02-OUT-58.md |
 | VCB-35 | C | - | 2026-10-02T12:53Z | BACKLOG.md |
 | WEB-06 | C | - | 2026-10-02T12:53Z | BACKLOG.md |
 | DOC-54 | C | - | 2026-10-02T13:02Z | docs/anleitung_speed_bpm/ANLEITUNG_SPEED_BPM.md |
@@ -168,7 +167,6 @@
 
 ## Verlauf
 
-- 2026-10-02T22:03Z B done XPLAT-45
 - 2026-10-02T22:03Z B done FUNKTIONSTEST-B3
 - 2026-10-02T22:08Z A claim SAMMEL-DOKU-C
 - 2026-10-02T22:11Z B done BPM-21
@@ -198,3 +196,4 @@
 - 2026-10-04T17:26Z C done UI-71
 - 2026-10-04T17:26Z A claim VIZ-67
 - 2026-10-04T17:33Z B claim OUT-61
+- 2026-10-04T17:40Z C done OUT-58
