@@ -90,10 +90,11 @@ _ENTFERNT = {
     "Audio Input": ("2026-09-14 (BPM-10)",
                     "Sektion BPM → Erkennung: Quelle-Combo (PC-Audio je Ausgabegeraet, "
                     "Eingang je Geraet) und Pegelmeter unter der BPM-Zahl"),
-    # NICHT aufgenommen: „Controller-Vorlage". Die Gegenprobe dieses Gates hat
-    # das zurueckgewiesen, und sie hatte recht — weggefallen ist nur der
-    # gleichnamige BAUKASTEN-BLOCK, die Funktion selbst lebt
-    # (`controller_browser.py`: „Controller-Vorlage einfuegen", Sektion MIDI).
+    # NICHT aufgenommen: „Controller-Vorlage". Weggefallen ist der gleichnamige
+    # BAUKASTEN-BLOCK; der Begriff selbst steht noch in Anleitungen, die
+    # erklaeren, dass es den Weg nicht mehr gibt. ★ UI-71: die Annahme, „die
+    # Funktion selbst lebt" (Hinweis im Controller-Browser), war falsch — der
+    # Hinweis versprach eine Aktion, die es nirgends gab, und ist entfernt.
     # Der Satz in docs/LIVE_EDIT_FENSTER.md, das Panel ersetze
     # „Controller-Vorlage, Color-Chase und Chase-Bereich", ist damit zu grob.
 }

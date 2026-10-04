@@ -191,6 +191,9 @@ class OutputManager:
         # konnten am Sperr-Ende auseinanderlaufen (Review A zu #927).
         self._lade: tuple | None = None
         self._lade_tiefe = 0
+        # OUT-61b: Laser-Adressen unabhaengig vom Latch + ausdruecklicher Latch.
+        self._laser_adressen: dict = {}
+        self._laser_estop_aktiv = False
         # slot → (level 0.0–1.0, target_fids | None). target_fids None = GLOBALER
         # Submaster (wirkt auf ALLE Fixtures, bisheriges Verhalten); ein
         # frozenset[int] beschraenkt den Submaster auf genau diese Fixture-fids
@@ -299,12 +302,27 @@ class OutputManager:
         komplett. Vom AppState aus dem Patch gepflegt."""
         self._blackout_keep_mask = mask or {}
 
-    def set_laser_estop_mask(self, mask: dict[int, frozenset]):
+    def set_laser_estop_mask(self, mask: dict[int, frozenset], aktiv: bool | None = None):
         """A3D-01: Setzt je Universum die Laser-Adressen, die bei aktivem NOT-AUS
         FINAL (nach Channel-Modifier/Grand-Master/Blackout) auf 0 gezwungen werden.
-        Leeres Dict = NOT-AUS inaktiv. Vom AppState gepflegt (spiegelt
-        ``_laser_estop_addrs`` solange ``laser_estop_active``)."""
+        Leeres Dict = keine Adressen. Vom AppState gepflegt (spiegelt
+        ``_laser_estop_addrs`` solange ``laser_estop_active``).
+
+        OUT-61b: ``aktiv`` = Zustand des NOT-AUS-Latches, AUSDRUECKLICH — eine
+        leere Maske heisst nicht „aus“: im Lade-Fenster ist der Plan leer, die
+        Maske also leer, obwohl der Latch gerade ausgeloest wurde. ``None`` =
+        wie bisher aus der Maske ableiten."""
         self._laser_estop_mask = mask or {}
+        self._laser_estop_aktiv = bool(mask) if aktiv is None else bool(aktiv)
+
+    def set_laser_adressen(self, mask: dict[int, frozenset]):
+        """OUT-61b: ALLE Laser-Adressen des aktuellen Patches, unabhaengig vom
+        NOT-AUS-Latch. Die Lade-Sperre haelt sie beim Ladebeginn fest und nullt
+        sie, sobald der Latch WAEHREND des Ladens aktiv wird — dann ist der Plan
+        (und damit die Live-Maske) leer, und ohne diese Adressen sendete der
+        eingefrorene Frame die Laserwerte weiter. Vom AppState beim Plan-Rebuild
+        gepflegt."""
+        self._laser_adressen = mask or {}
 
     # ── Anzeige-Snapshot (WYSIWYG) ───────────────────────────────────────────
 
@@ -557,7 +575,8 @@ class OutputManager:
             # die Referenzen festzuhalten genuegt.
             masken = (self._gm_address_mask, self._blackout_keep_mask,
                       getattr(self, "_ziel_blackout_union", None),
-                      self._laser_estop_mask)
+                      self._laser_estop_mask,
+                      getattr(self, "_laser_adressen", {}) or {})   # OUT-61b
             self._lade = (frames, masken)        # eine Zuweisung = atomar
         self._lade_tiefe += 1
         try:
@@ -1046,10 +1065,11 @@ class OutputManager:
         lade = self._lade                        # EINMAL lesen (Review A zu #927)
         gefroren = lade[0] if lade is not None else self._freeze_frames
         if lade is not None:
-            gm_masken, keep_masken, ziel, estop_start = lade[1]
+            gm_masken, keep_masken, ziel, estop_start, laser_start = lade[1]
         else:
             gm_masken, keep_masken = self._gm_address_mask, self._blackout_keep_mask
             estop_start = None
+            laser_start = None
             ziel = getattr(self, "_ziel_blackout_union", None)
         for univ_num, universe in list(self.universes.items()):
             # Im Freeze den festgehaltenen Stand senden statt des (u. U. direkt
@@ -1124,6 +1144,13 @@ class OutputManager:
             if estop_start:
                 # OUT-61: im Lade-Fenster Start- UND Live-Maske (Vereinigung).
                 vorher = estop_start.get(univ_num)
+                if vorher:
+                    estop_mask = set(vorher) | set(estop_mask or ())
+            if laser_start and self._laser_estop_aktiv:
+                # OUT-61b: Latch erst WAEHREND des Ladens ausgeloest — der Plan ist
+                # leer, die Live-Maske also auch. Die Laser-Adressen vom
+                # Ladebeginn nullen; der eingefrorene Frame traegt deren Werte.
+                vorher = laser_start.get(univ_num)
                 if vorher:
                     estop_mask = set(vorher) | set(estop_mask or ())
             if estop_mask:

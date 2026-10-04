@@ -340,7 +340,14 @@ class PlaybackView(QWidget):
     def _new_stack(self):
         name, ok = QInputDialog.getText(self, "Neue Cueliste", "Name:")
         if ok and name:
-            self._state.new_cue_stack(name)
+            stack = self._state.new_cue_stack(name)
+            # UI-72: die neue Liste AUSWAEHLEN — sonst landete die naechste
+            # „+ Cue aufnehmen“-Aufnahme in der bisher gewaehlten Liste.
+            # (new_cue_stack hat die Combo schon synchron neu gebaut, mit der
+            # alten Auswahl; deshalb hier nachziehen.)
+            if stack is not None and stack in self._state.cue_stacks:
+                self._current_stack = stack
+                self._refresh_stack_combo()
 
     def _delete_stack(self):
         if not self._current_stack:
@@ -434,12 +441,21 @@ class PlaybackView(QWidget):
         (nie einen belegten ueberschreiben) und das gemeldet. Ist keiner frei:
         False -> kein GO, nur der Hinweis. Stop bindet bewusst nicht."""
         from src.core.cueliste_ziel import (binde_an_freien_executor,
-                                            executor_mit_fader_zu,
+                                            executor_mit_fader_zu, executor_von,
                                             liegt_auf_executor, listen_name)
         stack = self._current_stack
         if stack is None:
             return False
         if liegt_auf_executor(self._state, stack):
+            # UI-73: liegt sie auf einer ANDEREN Page, laeuft sie dort — die
+            # Executor-Leiste dieser Page bleibt leer. Sagen, wo.
+            ort = executor_von(self._state, stack)
+            aktuell = getattr(getattr(self._state, "playback_engine", None),
+                              "current_page", None)
+            if ort is not None and ort[0] != aktuell:
+                self._zeige_hinweis(
+                    f"„{listen_name(stack)}“ liegt auf Page {ort[0] + 1}, Ex {ort[1]}",
+                    status=True)
             return True
         # Nur die sichtbaren Slots der Executor-Leiste (Ex 1–10) — eine Liste
         # auf Ex 11+ waere fuer den Bediener nicht zu sehen.
