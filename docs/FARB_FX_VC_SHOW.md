@@ -3,7 +3,9 @@
 Show-Datei: `shows/Farb_FX_VC_Show.lshow` · Generator: `tools/build_farb_fx_vc_show.py`
 Rig: 8 PAR (RGBW) · 2 Moving Heads (Farbrad+Gobo+Pan/Tilt) · 2 Spider (RGBW, 2 Tilt-Köpfe).
 
-Laden: App starten → **Strg+O** → `shows/Farb_FX_VC_Show.lshow`. Bank wechseln: **Strg+Bild↓ / Bild↑**
+Laden: die Show einmal erzeugen (`./venv/bin/python tools/build_farb_fx_vc_show.py`, Windows:
+`venv\Scripts\python.exe tools\build_farb_fx_vc_show.py` — die Datei liegt nicht im Repository),
+dann App starten → **Strg+O** → `shows/Farb_FX_VC_Show.lshow`. Bank wechseln: **Strg+Bild↓ / Bild↑**
 (oder ◀ / ▶ in der VC-Leiste). APC-Pads sind vorab gebunden (mk2 wird automatisch erkannt).
 
 ## Master-Tempo
@@ -34,6 +36,10 @@ Licht** — sie legt nur die Farbe fest. Die Helligkeit kommt ausschließlich vo
   (Lauflicht/Blink/Aufbau), und/oder
 - den **Master-Dimmer-Fadern** auf Bank 4 (Grand/PAR/MH/Spider — regeln die Helligkeit live).
 
+**Ausnahme:** die Bewegungen auf Bank 3 und die Gobo-Tasten auf Bank 2 schalten MH bzw. Spider
+selbst auf volle Helligkeit (Dimmer voll, Shutter offen). Solange sie laufen, haben die
+Dimmer-Effekte auf diesen Geräten keine sichtbare Wirkung.
+
 Typischer Ablauf: erst auf Bank 1 Farbe + Farb-Effekt wählen → dann auf Bank 2 „Dimmer Voll" (oder
 einen Dimmer-Effekt) starten → mit dem Master-Fader (Bank 4) die Helligkeit einstellen. So bleiben
 Farbe und Helligkeit komplett unabhängig (z. B. Farb-Wechsel langsam, Dimmer-Blink schnell).
@@ -52,26 +58,30 @@ schaltet das automatische „Farbe = sichtbar" ab.)*
   durch die im Farb-Editor gewählten Farben.
 
 ## Bank 2 — DIMMER & GOBO  (die Helligkeit; legt sich über die Farbe von Bank 1)
-- Pro Gruppe (PAR/MH/Spider, Reihe 0–3): **Dimmer Voll · Dim-Lauflicht · Dim-Blink · Dim-Aufbau**
+- Pro Gruppe (PAR/MH/Spider, Reihe 0–2): **Dimmer Voll · Dim-Lauflicht · Dim-Blink · Dim-Aufbau**
   (single-select). „Dimmer Voll" = stetig hell (die Grundhelligkeit, damit die Farbe sichtbar wird;
-  per Master-Fader dimmbar). + Multiplikator-Dial. Der **Fade-Fader** setzt die **Ein-/Ausblend-ZEIT**
-  (wirkt beim Start/Stopp des Effekts, nicht live während er läuft).
-- **MH-Gobo** (Reihe 4): offen/G1/G3/G5/G7 (Auswahl) + **Gobo-Wechsel** (wechselt taktsynchron
+  per Master-Fader dimmbar). + Multiplikator-Dial. Der Fader **PAR Dim-Fade** setzt die
+  **Ein-/Ausblend-ZEIT** der PAR-Dimmer-Effekte (wirkt beim Start/Stopp des Effekts, nicht live
+  während er läuft); für MH und Spider gibt es auf Bank 2 keinen Fade-Fader.
+- **MH-Gobo** (Reihe 4): offen/G1/G3/G5/G7 (Auswahl) — jede Gobo-Taste setzt die MH auf volle
+  Helligkeit und das Farbrad auf **Weiß** (die Farbe von Bank 1 ist dann weg) + **Gobo-Wechsel** (wechselt taktsynchron
   zwischen 2 Gobos) + Gobo-Multiplikator.
 
-## Bank 3 — BEWEGUNG  (nur Pan/Tilt)
+## Bank 3 — BEWEGUNG  (Pan/Tilt; öffnet dabei Dimmer/Shutter der MH bzw. Spider)
 - **MH-Formen** (Reihe 0–2): Kreis · Acht · welliger Kreis · Dreieck · Quadrat · Herz · **Eigener Pfad**.
 - **XY-Feld „Bahn zeichnen"**: mit der Maus eine Bahn zeichnen → schreibt sie auf **„MH Eigener Pfad"**;
   diesen dann (wie Kreis/Acht) per Knopf auswählen → die MH fahren die gezeichnete Bahn **im Loop** ab.
-- **XY-Feld „Bereich aufziehen"**: Rechteck ziehen → die MH bewegen sich nur in diesem Bereich.
+- **XY-Feld „MH Bereich (Box aufziehen)"**: Rechteck ziehen → **MH Kreis** fährt seine Figur nur in
+  diesem Bereich (die anderen Formen bleiben unverändert).
 - **Spider** (Reihe 3–4): Ineinander · Auseinander · Wackeln · Außen · Innen · Zufall-3-Positionen.
 - Rechts: Multiplikator-Dials (MH / Spider).
 
 ## Bank 4 — ÜBERSICHT / STROBE / MASTER
 - **Strobe** (Reihe 0, gehalten): Alle · nur PAR · nur MH · nur Spider.
 - **Aktionen** (Reihe 2): **All White** (gehalten = alles weiß 100 %, hochprior) · **Blackout** ·
-  **Effekt-Stop** (Effekte aus, Tempo bleibt) · **Pause** (= Effekt-Stop) · **Freeze** (BPM → 0,
-  alle taktgekoppelten Effekte frieren ein; nochmal drücken taut auf).
+  **Effekt-Stop** (Effekte aus, Tempo bleibt) · **Pause** (= Effekt-Stop) · **Freeze** (hält die
+  komplette Ausgabe an — alle Effekte und der Takt bleiben stehen, Blackout und Grand-Master wirken
+  weiter; nochmal drücken taut auf).
 - **Übersicht**: Master-BPM + Multiplikator-Dials „Farbe ×" / „Bewegung ×" — dieselben Effekte wie
   Bank 1–3, also **live synchron** (hier ändern = überall geändert).
 - **4 Master-Dimmer** ganz rechts (APC-Fader CC53–56): **Spider · MH · PAR · GRAND**.
@@ -83,8 +93,9 @@ schaltet das automatische „Farbe = sichtbar" ab.)*
 
 ## Technik (für Entwickler)
 Masking ist echt: Farb-Effekte sind `RgbMatrix` mit `style=RGB, drive_intensity=False` (nur
-color_r/g/b/w), Dimmer-Effekte `style=DIMMER` (nur Intensity), Bewegung `EFX` (nur Pan/Tilt).
+color_r/g/b/w), Dimmer-Effekte `style=DIMMER` (nur Intensity), Bewegung `EFX` (Pan/Tilt; mit
+`open_beam=True` zusätzlich Dimmer voll + Shutter offen).
 Tempo-Kopplung über `tempo_bus_id="Global"` (= Default-Bus, spiegelt die Master-BPM) +
 `tempo_multiplier` pro Effekt. Neue Features dieser Show: `RgbAlgorithm.CHECKER`, Fade-Params
 `env_fade_in/out`, ButtonActions `ALL_WHITE/FREEZE/STOP_EFFECTS`, `VCXYPad`-Modus `path`,
-Bus-Freeze-Hold (Effekte halten bei BPM 0 wenn `toggle_freeze` aktiv), Tempo-Bus-Option „Global".
+globaler Freeze über `AppState.set_freeze` (Tempo-Bus wird mitgefroren), Tempo-Bus-Option „Global".

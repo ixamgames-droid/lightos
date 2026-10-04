@@ -108,12 +108,44 @@ def _worker_main(port, buf, stop_flag, status, frame_interval=FRAME_INTERVAL):
     # ``PPID = 989 = systemd`` weiter — der Kernel hatte sie beim Tod des
     # Parents an den Subreaper umgehaengt. Genau das faengt der PID-Vergleich.
     _ppid0 = os.getppid()
+    _serial_worker_loop(lambda: EnttecPro(port), buf, stop_flag, status,
+                        frame_interval, parent_alive=_eltern_wache(_ppid0))
+
+
+def _eltern_wache(ppid0: int):
+    """Liefert ``parent_alive()`` fuer den Worker (OUT-53, OUT-59).
+
+    Linux/macOS: der PID-Vergleich — stirbt der Parent, haengt der Kernel das
+    Kind um (``getppid()`` aendert sich).
+
+    ★ OUT-59 (03.10.2026, Windows-Rig-PC): unter **Windows aendert sich
+    ``getppid()`` NIE** — es gibt kein Umhaengen, der Wert bleibt die PID des
+    toten Parents (gemessen: vorher 10528, nach dem Tod 10528). Die Wache griff
+    dort also nie; verwaiste Worker liefen weiter, oeffneten COM3, sobald der
+    Adapter steckte, und die naechste App fand den Port belegt (Ausgabe tot).
+    Deshalb unter Windows ein Prozess-HANDLE auf den Parent, einmal beim Start
+    geoeffnet (haelt die Identitaet fest, keine PID-Wiederverwendung):
+    ``WaitForSingleObject(h, 0) == WAIT_TIMEOUT`` heisst „lebt noch“.
+    """
+    if os.name == "nt":
+        try:
+            import ctypes
+            k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+            k32.OpenProcess.restype = ctypes.c_void_p
+            k32.WaitForSingleObject.argtypes = (ctypes.c_void_p, ctypes.c_uint32)
+            SYNCHRONIZE, WAIT_TIMEOUT = 0x00100000, 0x00000102
+            h = k32.OpenProcess(SYNCHRONIZE, False, int(ppid0))
+            if h:
+                return lambda: k32.WaitForSingleObject(h, 0) == WAIT_TIMEOUT
+        except Exception:
+            pass
+        # Kein Handle: NICHT „tot“ annehmen — das schaltete die Ausgabe ab,
+        # falls nur die Rechte fehlen. Rueckfall auf den PID-Vergleich (wirkt
+        # unter Windows nicht, schadet aber auch nicht).
 
     def _eltern_leben() -> bool:
-        return os.getppid() == _ppid0
-
-    _serial_worker_loop(lambda: EnttecPro(port), buf, stop_flag, status,
-                        frame_interval, parent_alive=_eltern_leben)
+        return os.getppid() == ppid0
+    return _eltern_leben
 
 
 class EnttecProcessProxy:
