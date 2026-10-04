@@ -138,7 +138,6 @@ def messen(repo: str, show: str, dauer: float) -> None:
             elif a in ("pan", "tilt"):
                 pt.append((f.universe, adr, a))
 
-    print(f"Kanaele: Farbe {len(farb)}, Pan/Tilt {len(pt)}")
     svc = VisualizerService(st)
     tick_ms: list = []
     orig_tick = svc._tick
@@ -181,8 +180,9 @@ def messen(repo: str, show: str, dauer: float) -> None:
 
             def page(self):
                 return self._s
+        seite = _View()                  # der Kanal haelt die View nur schwach
         kanal = dmx_push.DmxPushChannel(
-            _View(), on_need_full=lambda: svc.force_full_resync(ziel), poll=bridge)
+            seite, on_need_full=lambda: svc.force_full_resync(ziel), poll=bridge)
         ziel = VisualizerTarget("mess", bridge.dmxBatch.emit, emit_payloads=kanal.push)
         revs: dict = {}
 
