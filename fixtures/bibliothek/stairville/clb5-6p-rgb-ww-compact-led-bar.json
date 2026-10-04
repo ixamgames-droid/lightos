@@ -15,14 +15,13 @@
     "lizenz": "Apache-2.0",
     "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.14.2 GIT · Martin Scherer",
     "original": "resources/fixtures/Stairville/Stairville-CLB5-6P-RGB-WW-Compact-LED-Bar.qxf",
-    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 40 Wertebereiche mit Art (kind) versehen; Rasterform in 5 Modus/Modi aus <Physical> uebernommen; Typ led_bar statt par (Bar mit 6 einzeln steuerbaren Spots); 8-Kanal: Show-Nummerierung nach Handbuch korrigiert (0 = keine Show, 1–5 = Show 01, 6–11 = Show 02 … 222–227 = Show 38; QLC+ war um eins verschoben); 8-Kanal: Kanal 7 als raw mit den 17 Farbvorgaben (bei Kanal 6 = 0) statt speed; sonst Show-Speed bzw. Musik-Show (Notizen); Strobe-Kanaele als strobe (nur Geschwindigkeit, kein Offen-Bereich im Handbuch) statt shutter; Weiss-Kanaele als Warmweiss benannt (RGB-WW-LEDs); Modusnamen 4-/6-/8-/24-/26-Kanal; Kanal-/Bereichsnamen deutsch; Kurzname; hersteller_kurz STAIR; Quelle auf Herstellerhandbuch gesetzt"
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 40 Wertebereiche mit Art (kind) versehen; Rasterform in 2 Modus/Modi aus <Physical> uebernommen; in 3 weiteren Modus/Modi nicht, weil sie nicht zu den color_r-Kanaelen passt (keine echten Farbzonen); Typ led_bar statt par (Bar mit 6 einzeln steuerbaren Spots); 8-Kanal: Show-Nummerierung nach Handbuch korrigiert (0 = keine Show, 1–5 = Show 01, 6–11 = Show 02 … 222–227 = Show 38; QLC+ war um eins verschoben); 8-Kanal: Kanal 7 als raw mit den 17 Farbvorgaben (bei Kanal 6 = 0) statt speed; sonst Show-Speed bzw. Musik-Show (Notizen); Strobe-Kanaele als strobe (nur Geschwindigkeit, kein Offen-Bereich im Handbuch) statt shutter; Weiss-Kanaele als Warmweiss benannt (RGB-WW-LEDs); Modusnamen 4-/6-/8-/24-/26-Kanal; Kanal-/Bereichsnamen deutsch; Kurzname; hersteller_kurz STAIR; Quelle auf Herstellerhandbuch gesetzt"
   },
   "autor": "LightOS",
   "geprueft": {"ok": true, "wie": "Kanal fuer Kanal gegen das Handbuch (Kap. 7.7–7.11, 4/6/8/24/26 Kanaele) geprueft"},
   "modi": [
     {
       "name": "4-Kanal",
-      "raster": {"rows": 1, "cols": 6},
       "kanaele": [
         {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
         {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
@@ -32,7 +31,6 @@
     },
     {
       "name": "6-Kanal",
-      "raster": {"rows": 1, "cols": 6},
       "kanaele": [
         {
           "name": "Dimmer",
@@ -60,7 +58,6 @@
     },
     {
       "name": "8-Kanal",
-      "raster": {"rows": 1, "cols": 6},
       "kanaele": [
         {
           "name": "Dimmer",

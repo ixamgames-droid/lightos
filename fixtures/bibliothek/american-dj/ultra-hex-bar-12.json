@@ -16,7 +16,7 @@
     "lizenz": "Apache-2.0",
     "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.3 GIT · Rhavin",
     "original": "resources/fixtures/American_DJ/American-DJ-Ultra-Hex-Bar-12.qxf",
-    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 109 Wertebereiche mit Art (kind) versehen; Rasterform in 5 Modus/Modi aus <Physical> uebernommen; danach von LightOS gegen das Herstellerhandbuch ueberarbeitet: Dimmerkurven-Kanal als raw (Default 0, Highlight 0) statt intensity/macro; Shutter-Bereiche nach Handbuch klassifiziert (aus=closed, LED an=open, alle Strobe-/Puls-/Random-/Rampen-Bereiche=strobe), Default/Highlight auf Mitte des ersten Offen-Bereichs; Farbmakros nach der Handbuch-Tabelle (Off + 63 Kombinationen, offensichtliche Tippfehler der Tabelle in kanonischer Reihenfolge korrigiert; QLC+ hatte erfundene Farbnamen und eine Doppelung B+W+UV); Programmgeschwindigkeit/Sound als effect_speed; 36-Kanal-Modus Raster 1x6 (Pixelpaare)"
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 109 Wertebereiche mit Art (kind) versehen; Rasterform in 1 Modus/Modi aus <Physical> uebernommen; in 4 weiteren Modus/Modi nicht, weil sie nicht zu den color_r-Kanaelen passt (keine echten Farbzonen); danach von LightOS gegen das Herstellerhandbuch ueberarbeitet: Dimmerkurven-Kanal als raw (Default 0, Highlight 0) statt intensity/macro; Shutter-Bereiche nach Handbuch klassifiziert (aus=closed, LED an=open, alle Strobe-/Puls-/Random-/Rampen-Bereiche=strobe), Default/Highlight auf Mitte des ersten Offen-Bereichs; Farbmakros nach der Handbuch-Tabelle (Off + 63 Kombinationen, offensichtliche Tippfehler der Tabelle in kanonischer Reihenfolge korrigiert; QLC+ hatte erfundene Farbnamen und eine Doppelung B+W+UV); Programmgeschwindigkeit/Sound als effect_speed; 36-Kanal-Modus Raster 1x6 (Pixelpaare)"
   },
   "autor": "LightOS",
   "geprueft": {
@@ -26,7 +26,6 @@
   "modi": [
     {
       "name": "6 Channel",
-      "raster": {"rows": 1, "cols": 12},
       "kanaele": [
         {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
         {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
@@ -38,7 +37,6 @@
     },
     {
       "name": "7 Channel",
-      "raster": {"rows": 1, "cols": 12},
       "kanaele": [
         {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
         {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
@@ -51,7 +49,6 @@
     },
     {
       "name": "8 Channel",
-      "raster": {"rows": 1, "cols": 12},
       "kanaele": [
         {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
         {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
@@ -80,7 +77,6 @@
     },
     {
       "name": "12 Channel",
-      "raster": {"rows": 1, "cols": 12},
       "kanaele": [
         {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
         {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
