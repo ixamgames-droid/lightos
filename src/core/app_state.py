@@ -1733,23 +1733,27 @@ class AppState:
         # einer neu adressierten Laser-Adresse oeffnete den Laser fuer die Rebuild-
         # Frames (dieselbe Ebene-1-vor-Ebene-2-Fehlerklasse wie in set_laser_estop).
         # Extra-(alte)-Adressen dunkel zu halten ist safe; OUT-63: der Push unten
-        # verengt NICHT mehr — die alten bleiben bis zum Loesen in der Maske. Deadlock-frei: KEIN verschachteltes _plan_lock —
-        # dieser Push (nur _estop_lock) laeuft VOR dem _plan_lock-Block.
-        if getattr(self, "laser_estop_active", False):
-            _old_le = getattr(self, "_laser_estop_addrs", {}) or {}
-            if _old_le != new_laser_estop_addrs:
-                _union = {}
-                for _m in (_old_le, new_laser_estop_addrs):
-                    for _u, _s in _m.items():
-                        _union[_u] = _union.get(_u, frozenset()) | frozenset(_s)
-                self._push_laser_estop_mask(target_active=True, target_addrs=_union)
-        with self._get_plan_lock():
-            self._fix_index = fix_index
-            self._default_frame = new_default_frame
-            self._commit_spans = spans
-            self._patched_set = new_patched_set
-            self._laser_estop_addrs = new_laser_estop_addrs
-            self._laser_fids = new_laser_fids
+        # verengt NICHT mehr — die alten bleiben bis zum Loesen in der Maske.
+        # OUT-63 (Review B1): Flag-Check, Union-Push UND Plan-Tausch unter EINEM
+        # _estop_lock — sonst konnte ein fremder Thread (MIDI/OSC/Web) den Latch
+        # zwischen Check und Tausch setzen und nur die ALTEN Adressen maskieren.
+        # Lock-Reihenfolge: _estop_lock vor _plan_lock (kein Pfad nimmt sie umgekehrt).
+        with self._get_estop_lock():
+            if getattr(self, "laser_estop_active", False):
+                _old_le = getattr(self, "_laser_estop_addrs", {}) or {}
+                if _old_le != new_laser_estop_addrs:
+                    _union = {}
+                    for _m in (_old_le, new_laser_estop_addrs):
+                        for _u, _s in _m.items():
+                            _union[_u] = _union.get(_u, frozenset()) | frozenset(_s)
+                    self._push_laser_estop_mask(target_active=True, target_addrs=_union)
+            with self._get_plan_lock():
+                self._fix_index = fix_index
+                self._default_frame = new_default_frame
+                self._commit_spans = spans
+                self._patched_set = new_patched_set
+                self._laser_estop_addrs = new_laser_estop_addrs
+                self._laser_fids = new_laser_fids
         # STAB-14: die zuletzt als Engine-Extra committeten Roh-Kanaele aktiv
         # freigeben, statt das Tracking nur zu leeren (sonst Zombie, s. Helfer).
         self._release_engine_extra()
