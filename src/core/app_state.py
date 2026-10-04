@@ -442,6 +442,9 @@ class AppState:
         # der Renderer zwingt alle Laser-Kanäle als OBERSTE Ebene auf 0.
         self.laser_estop_active: bool = False
         self._laser_estop_addrs: dict[int, frozenset] = {}   # univ -> Laser-Adressen
+        # OUT-63: klebrige Ebene-2-Maske — Vereinigung ALLER Laser-Adressen je
+        # Universum seit der Aktivierung des Latches; erst das Loesen leert sie.
+        self._laser_estop_klebrig: dict[int, frozenset] = {}
         self._laser_fids: frozenset = frozenset()            # fids aller DMX-Laser
         # STAB-15: Der 44-Hz-Renderer (_render_frame) liest den Render-Plan
         # (_fix_index/_default_frame/_commit_spans/_patched_set/_laser_estop_addrs),
@@ -1729,8 +1732,8 @@ class AppState:
         # Adressen, waehrend der Renderer schon die neuen nullt → ein Modifier auf
         # einer neu adressierten Laser-Adresse oeffnete den Laser fuer die Rebuild-
         # Frames (dieselbe Ebene-1-vor-Ebene-2-Fehlerklasse wie in set_laser_estop).
-        # Extra-(alte)-Adressen dunkel zu halten ist safe; der Push unten verengt
-        # danach auf die neuen. Deadlock-frei: KEIN verschachteltes _plan_lock —
+        # Extra-(alte)-Adressen dunkel zu halten ist safe; OUT-63: der Push unten
+        # verengt NICHT mehr — die alten bleiben bis zum Loesen in der Maske. Deadlock-frei: KEIN verschachteltes _plan_lock —
         # dieser Push (nur _estop_lock) laeuft VOR dem _plan_lock-Block.
         if getattr(self, "laser_estop_active", False):
             _old_le = getattr(self, "_laser_estop_addrs", {}) or {}
@@ -2259,7 +2262,11 @@ class AppState:
         erweitern (Ebene 1 schaltet unter ``_plan_lock`` auf die neuen Adressen um,
         Ebene 2 hier unter ``_estop_lock`` — ohne Union deckt die Maske im Rebuild-
         Fenster nur die alten, während der Renderer schon die neuen nullt). ``None``
-        = aus ``_laser_estop_addrs`` lesen (alle Alt-Aufrufer)."""
+        = aus ``_laser_estop_addrs`` lesen (alle Alt-Aufrufer).
+
+        OUT-63: bei aktivem Latch wird die gepushte Maske mit allen seit der
+        Aktivierung gepushten vereinigt (``_laser_estop_klebrig``) — sie wird nie
+        eingeengt, solange der NOT-AUS steht; das Loesen leert sie."""
         with self._get_estop_lock():
             try:
                 om = getattr(self, "output_manager", None)
@@ -2269,13 +2276,36 @@ class AppState:
                           if target_active is None else bool(target_active))
                 addrs = ((getattr(self, "_laser_estop_addrs", {}) or {})
                          if target_addrs is None else target_addrs)
-                maske = {u: frozenset(s) for u, s in addrs.items()} if active else {}
-                try:
-                    om.set_laser_estop_mask(maske, aktiv=active)   # OUT-61b: Latch ausdruecklich
-                except TypeError:
-                    # Aeltere/ersetzte Signatur ohne aktiv (Test-Spione): die
-                    # Maske MUSS trotzdem ankommen.
-                    om.set_laser_estop_mask(maske)
+                if active:
+                    # OUT-63: KLEBRIGE Maske — solange der Latch steht, nur
+                    # WACHSEN, nie einengen. Ein Laser, der bei aktivem NOT-AUS
+                    # aus dem Patch faellt (Show ohne ihn geladen, geloescht,
+                    # umadressiert, anderes Universum), haengt physisch weiter an
+                    # der alten Adresse; ein Rig-Modifier dort (INVERSE -> 255)
+                    # machte ihn sonst nach dem Einengen wieder an. Eingeengt wird
+                    # erst beim Loesen (leere Maske, s. unten).
+                    # Im Lade-Fenster zusaetzlich die Laser-Adressen vom
+                    # Ladebeginn: ein erst nach dem reset-first ausgeloester
+                    # Latch saehe sonst nur den leeren Plan.
+                    lade_fn = getattr(om, "lade_laser_adressen", None)
+                    lade_adr = lade_fn() if callable(lade_fn) else None
+                    if not isinstance(lade_adr, dict):
+                        lade_adr = {}
+                    maske = {}
+                    for quelle in (getattr(self, "_laser_estop_klebrig", None) or {},
+                                   lade_adr, addrs):
+                        for u, s in quelle.items():
+                            if s:
+                                maske[u] = maske.get(u, frozenset()) | frozenset(s)
+                    self._laser_estop_klebrig = maske
+                else:
+                    maske = {}
+                    self._laser_estop_klebrig = {}
+                # OUT-61b: Latch AUSDRUECKLICH. OUT-63: KEIN TypeError-Rueckfall
+                # auf die Ein-Argument-Signatur mehr — der lief bei JEDEM
+                # TypeError im Setter erneut ohne ``aktiv`` und schaltete den
+                # OUT-61b-Schutz (Latch erst waehrend des Ladens) still ab.
+                om.set_laser_estop_mask(maske, aktiv=active)
             except Exception as e:
                 print(f"[AppState] set laser estop mask error: {e}")
 
@@ -2295,6 +2325,11 @@ class AppState:
         # Der Sende-/Renderpfad liest ``laser_estop_active`` roh (ohne _get_estop_lock)
         # und die OutputManager-Maske (Ebene 2) wird separat angewandt.
         with self._get_estop_lock():
+            if active and not getattr(self, "laser_estop_active", False):
+                # OUT-63: frischer Latch -> klebrige Maske neu beginnen (nur
+                # Adressen SEIT dieser Aktivierung; Defensive gegen einen Rest,
+                # falls ein Loesen den Push umgangen hat).
+                self._laser_estop_klebrig = {}
             if active:
                 # AKTIVIEREN: Ebene 2 (OM-Maske) installieren, BEVOR das Flag sichtbar
                 # wird. Setzte man erst das Flag, sähe ein Frame im Fenster Flag=True

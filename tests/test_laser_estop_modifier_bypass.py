@@ -294,9 +294,9 @@ class LaserEstopActivationOrderTest(unittest.TestCase):
         (nicht-leer?, Flag-Zustand-in-diesem-Moment) protokolliert."""
         log = []
         real = self.om.set_laser_estop_mask
-        def spy(mask):
+        def spy(mask, aktiv=None):
             log.append((bool(mask), self.st.laser_estop_active))
-            return real(mask)
+            return real(mask, aktiv=aktiv)
         self.om.set_laser_estop_mask = spy
         return log
 
@@ -356,9 +356,9 @@ class LaserEstopActivationOrderTest(unittest.TestCase):
         self.assertEqual(self.om._laser_estop_mask, {1: frozenset({10, 11, 12, 13})})
         pushes = []
         real = self.om.set_laser_estop_mask
-        def spy(mask):
+        def spy(mask, aktiv=None):
             pushes.append(set().union(*[set(s) for s in mask.values()]) if mask else set())
-            return real(mask)
+            return real(mask, aktiv=aktiv)
         self.om.set_laser_estop_mask = spy
         orig_addr = _LASER.address
         try:
@@ -373,8 +373,12 @@ class LaserEstopActivationOrderTest(unittest.TestCase):
             covered_both,
             "Rebuild pushte keine Union-Maske (alt+neu) → Ebene-2-Lücke für die neu "
             "adressierte Laser-Adresse während aktivem NOT-AUS")
-        # Endzustand: Maske deckt die neuen Adressen.
-        self.assertEqual(self.om._laser_estop_mask, {1: frozenset({30, 31, 32, 33})})
+        # Endzustand: Maske deckt die neuen UND (OUT-63, klebrig) die alten
+        # Adressen — eingeengt wird erst beim Loesen des NOT-AUS.
+        self.assertEqual(self.om._laser_estop_mask,
+                         {1: frozenset({10, 11, 12, 13, 30, 31, 32, 33})})
+        self.st.set_laser_estop(False)
+        self.assertEqual(self.om._laser_estop_mask, {})
 
 
 if __name__ == "__main__":

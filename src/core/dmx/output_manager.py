@@ -324,6 +324,17 @@ class OutputManager:
         gepflegt."""
         self._laser_adressen = mask or {}
 
+    def lade_laser_adressen(self) -> dict:
+        """OUT-63: Laser-Adressen vom Beginn einer laufenden Lade-Sperre, sonst
+        ``{}``. Wird der NOT-AUS erst WAEHREND des Ladens ausgeloest (Plan nach
+        dem reset-first leer), nimmt der AppState sie in die klebrige Maske auf
+        — sonst faellt der Schutz mit dem Ende der Sperre weg, obwohl der Laser
+        physisch weiter an diesen Adressen haengt. Liest ``_lade`` EINMAL."""
+        lade = self._lade
+        if lade is None:
+            return {}
+        return lade[1][4] or {}
+
     # ── Anzeige-Snapshot (WYSIWYG) ───────────────────────────────────────────
 
     def get_display_frame(self, universe: int) -> bytes | None:
