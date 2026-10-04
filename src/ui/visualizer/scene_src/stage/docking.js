@@ -40,6 +40,12 @@ export function findDockTarget(x, z) {
     if (DOCK_HANG_TYPES[t]) {
       return { stageId: sid, y: so.data.position.y - sy / 2 - DOCK_HANG_OFFSET, kind: 'hang' };
     }
+    if (t === 'riser_stairs') {
+      // VIZ-68 (Review A2): Podest mit Treppe ist oben nicht flach — ueber
+      // einer Stufe zaehlt die Hoehe des getroffenen Tritts (Ray-Treffer),
+      // nicht die Podestkante. Gespiegelt in StageElement.top_y_at().
+      return { stageId: sid, y: h.point.y + DOCK_TOP_OFFSET, kind: 'top' };
+    }
     if (DOCK_TOP_TYPES[t]) {
       return { stageId: sid, y: so.data.position.y + sy / 2 + DOCK_TOP_OFFSET, kind: 'top' };
     }

@@ -2294,8 +2294,17 @@ class FixtureDragList(QListWidget):
         return md
 
 
-# VIZ-68 (Review A): ab so vielen Objekten auf einmal fragt der Knopf nach.
-RASTER_RUECKFRAGE_AB = 200
+# VIZ-68 (Review A): bei MEHR als so vielen Objekten auf einmal fragt der
+# Knopf nach (genau 200 laufen ohne Rueckfrage durch).
+RASTER_RUECKFRAGE_UEBER = 200
+# VIZ-68 (Review A2): Bereich der Positionsfelder X/Z (Buehnenelemente UND
+# Fixtures) in Metern. Ein Raster, das darueber hinaus reicht, wird nicht
+# angelegt — das Feld wuerde die Position sonst beim naechsten Bearbeiten
+# still auf den Rand klemmen und das Objekt springen lassen.
+POSITION_GRENZE_M = 200.0
+# Groesster freier Abstand im Raster: so gewaehlt, dass auch 30 x 30 des
+# breitesten Moebels (Bar, 3 m) vom Standardplatz aus in +-200 m bleibt.
+RASTER_ABSTAND_MAX_M = 10.0
 # Nur Moebel werden im Raster angelegt — Boeden, Trassen, Waende usw. immer
 # einzeln (ein 30 x 30-Raster aus 14-m-Boeden ergaebe keinen Sinn und laege
 # ausserhalb jedes Eingabebereichs).
@@ -2319,6 +2328,11 @@ def raster_positionen(x0: float, z0: float, w: float, d: float,
     z_start = z0 - (reihen - 1) * sz / 2
     return [(round(x_start + c * sx, 4), round(z_start + r * sz, 4))
             for r in range(reihen) for c in range(spalten)]
+
+
+def raster_passt(orte, grenze: float = POSITION_GRENZE_M) -> bool:
+    """VIZ-68 (Review A2): liegen alle Mittelpunkte in den Positionsfeldern?"""
+    return all(abs(x) <= grenze and abs(z) <= grenze for x, z in orte)
 
 
 class VisualizerWindow(QMainWindow):
@@ -2806,9 +2820,9 @@ class VisualizerWindow(QMainWindow):
         box = QGroupBox("Position && Ausrichtung")
         form = QFormLayout(box)
         self._pos_form = form          # T-VIZ-06 (B-7): Y-Row im 2D-Modus ausblenden
-        self._spin_x = LocaleTolerantDoubleSpinBox(); self._spin_x.setRange(-50, 50); self._spin_x.setSingleStep(0.5)
+        self._spin_x = LocaleTolerantDoubleSpinBox(); self._spin_x.setRange(-200, 200); self._spin_x.setSingleStep(0.5)
         self._spin_y = LocaleTolerantDoubleSpinBox(); self._spin_y.setRange(0, 25);   self._spin_y.setSingleStep(0.25); self._spin_y.setValue(6.5)
-        self._spin_z = LocaleTolerantDoubleSpinBox(); self._spin_z.setRange(-30, 30); self._spin_z.setSingleStep(0.5)
+        self._spin_z = LocaleTolerantDoubleSpinBox(); self._spin_z.setRange(-200, 200); self._spin_z.setSingleStep(0.5)
         # Multi-Achsen-Ausrichtung (Grad): Drehen (Yaw Y), Kippen (Pitch X,
         # Boden->Decke), Roll (Z). Alle in 3D sinnvoll; Yaw auch im 2D.
         self._spin_rot_y = LocaleTolerantDoubleSpinBox()
@@ -3102,7 +3116,7 @@ class VisualizerWindow(QMainWindow):
         raster.addWidget(self._spin_spalten)
         raster.addWidget(QLabel("Abstand:"))
         self._spin_abstand = LocaleTolerantDoubleSpinBox()
-        self._spin_abstand.setRange(0.0, 20.0)
+        self._spin_abstand.setRange(0.0, RASTER_ABSTAND_MAX_M)
         self._spin_abstand.setSingleStep(0.25)
         self._spin_abstand.setValue(1.0)
         self._spin_abstand.setSuffix(" m")
@@ -4277,7 +4291,20 @@ class VisualizerWindow(QMainWindow):
             reihen = spalten = 1
         abstand = float(_wert("_spin_abstand", 1.0))
         anzahl = reihen * spalten
-        if anzahl > RASTER_RUECKFRAGE_AB:
+        orte = raster_positionen(kwargs.get("x", 0.0), kwargs.get("z", 0.0),
+                                 kwargs.get("w", 1.0), kwargs.get("d", 1.0),
+                                 reihen, spalten, abstand)
+        if not raster_passt(orte):
+            # VIZ-68 (Review A2): nicht still klemmen, sondern ablehnen.
+            eltern = self if isinstance(self, QWidget) else None
+            QMessageBox.warning(
+                eltern, "Raster zu groß",
+                f"{reihen} Reihen × {spalten} Spalten {type_label} mit "
+                f"{abstand:.2f} m Abstand reichen über ±{POSITION_GRENZE_M:.0f} m "
+                "hinaus — so weit gehen die Positionsfelder nicht.\n"
+                "Bitte weniger Reihen/Spalten oder einen kleineren Abstand wählen.")
+            return
+        if anzahl > RASTER_RUECKFRAGE_UEBER:
             # VIZ-68 (Review A): viele Objekte nur nach Rueckfrage.
             eltern = self if isinstance(self, QWidget) else None
             antwort = QMessageBox.question(
@@ -4288,9 +4315,6 @@ class VisualizerWindow(QMainWindow):
                 QMessageBox.StandardButton.No)
             if antwort != QMessageBox.StandardButton.Yes:
                 return
-        orte = raster_positionen(kwargs.get("x", 0.0), kwargs.get("z", 0.0),
-                                 kwargs.get("w", 1.0), kwargs.get("d", 1.0),
-                                 reihen, spalten, abstand)
         neue = []
         for i, (x, z) in enumerate(orte):
             kw = dict(kwargs, x=x, z=z)

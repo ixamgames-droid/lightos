@@ -128,6 +128,23 @@ class SpeichernLadenTest(unittest.TestCase):
         ziel = st.dock_target_for(0.0, 0.0)
         self.assertIsNotNone(ziel, "auf der Bar laesst sich kein Strahler abstellen")
 
+    def test_treppe_ist_keine_flache_top_flaeche(self):
+        """Review A2: ueber einer Stufe steht der Strahler auf der Stufe, nicht
+        schwebend auf Podesthoehe; neben der Treppe ist kein Podest."""
+        st = sd.StageDefinition(name="treppe")
+        # Standardmass 2,0 x 0,6 x 2,8: Deck bis z=0,8, zwei Stufen à 0,3 m
+        # (0,4 m und 0,2 m hoch), Treppe 1,2 m breit.
+        st.add("riser_stairs", id="p", x=0, y=0.3, z=0, w=2.0, h=0.6, d=2.8)
+        off = sd.DOCK_TOP_OFFSET
+        self.assertAlmostEqual(st.dock_target_for(0.0, 0.0)["y"], 0.6 + off)
+        self.assertAlmostEqual(st.dock_target_for(0.0, 0.95)["y"], 0.4 + off)
+        self.assertAlmostEqual(st.dock_target_for(0.0, 1.3)["y"], 0.2 + off)
+        self.assertIsNone(st.dock_target_for(0.9, 1.3), "neben der Treppe angedockt")
+        # Darunter liegender Boden faengt den Strahler neben der Treppe auf.
+        st.add("floor", id="f", x=0, y=0.05, z=0, w=14, h=0.1, d=10)
+        self.assertEqual(st.dock_target_for(0.9, 1.3)["id"], "f")
+        self.assertEqual(st.dock_target_for(0.0, 1.3)["id"], "p")
+
 
 class RasterTest(unittest.TestCase):
     """„Mehrere auf einmal als Reihe/Raster anlegen“ (VIZ-68)."""
@@ -207,7 +224,7 @@ class RasterTest(unittest.TestCase):
         get_undo_stack().redo()
         self.assertEqual(len(fake._current_stage.elements), 12)
 
-    def test_ab_200_nur_nach_rueckfrage(self):
+    def test_ueber_200_nur_nach_rueckfrage(self):
         from unittest import mock
         VW, fake = self._fake(15, 15, 0.5)            # 225 > 200
         with mock.patch.object(VW.QMessageBox, "question",
@@ -230,19 +247,52 @@ class RasterTest(unittest.TestCase):
 
     def test_groesstes_raster_passt_in_die_eingabefelder(self):
         """Review A: 30 Reihen erzeugten Z ausserhalb des alten Feldbereichs
-        (-30..30) — das Feld klemmte die Position."""
+        (-30..30) — das Feld klemmte die Position. Review A2: mit dem
+        GROESSTEN einstellbaren Abstand (vorher 20 m -> bis 340 m)."""
         import inspect
+        import src.ui.visualizer.visualizer_window as VW
         from src.ui.visualizer.visualizer_window import VisualizerWindow, raster_positionen
         quelle = inspect.getsource(VisualizerWindow)
         bx = int(re.search(r"_stage_spin_x\.setRange\(-?(\d+)", quelle).group(1))
         bz = int(re.search(r"_stage_spin_z\.setRange\(-?(\d+)", quelle).group(1))
+        roh = re.search(r"_spin_abstand\.setRange\([^,]+,\s*([^)]+)\)", quelle).group(1).strip()
+        abstand_max = float(getattr(VW, roh)) if hasattr(VW, roh) else float(roh)
         from src.ui.visualizer.visualizer_window import RASTER_TYPEN
         for typ in RASTER_TYPEN:
             d = VisualizerWindow.STAGE_DEFAULTS[typ]
-            orte = raster_positionen(d["x"], d["z"], d["w"], d["d"], 30, 30, 2.0)
+            orte = raster_positionen(d["x"], d["z"], d["w"], d["d"], 30, 30, abstand_max)
             with self.subTest(typ=typ):
                 self.assertLessEqual(max(abs(x) for x, _ in orte), bx)
                 self.assertLessEqual(max(abs(z) for _, z in orte), bz)
+
+    def test_zu_grosses_raster_wird_mit_meldung_abgelehnt(self):
+        """Review A2: ein Raster ueber +-200 m hinaus wird nicht still
+        geklemmt, sondern mit Meldung abgelehnt (nichts angelegt)."""
+        from unittest import mock
+        VW, fake = self._fake(30, 30, 20.0)           # Feld haette 10 m begrenzt
+        with mock.patch.object(VW.QMessageBox, "warning") as warnung, \
+                mock.patch.object(VW.QMessageBox, "question") as frage:
+            VW.VisualizerWindow._add_stage_element(fake, "bar_counter")
+        self.assertEqual(warnung.call_count, 1)
+        self.assertIn("200", warnung.call_args[0][2])
+        frage.assert_not_called()
+        self.assertEqual(fake._current_stage.elements, [], "trotz Meldung angelegt")
+        self.assertFalse(VW.raster_passt([(0.0, 200.5)]))
+        self.assertTrue(VW.raster_passt([(-200.0, 200.0)]))
+
+    def test_fixture_positionsfelder_reichen_so_weit_wie_die_buehne(self):
+        """Review A2: Fixture-X/Z standen bei +-50/+-30 — ein Geraet auf einer
+        entfernten Bar wurde beim Anzeigen/Zurueckschreiben geklemmt."""
+        import inspect
+        import src.ui.visualizer.visualizer_window as VW
+        quelle = inspect.getsource(VW.VisualizerWindow)
+        for achse in ("x", "z"):
+            with self.subTest(achse=achse):
+                m = re.search(rf"self\._spin_{achse}\.setRange\((-?\d+),\s*(\d+)\)", quelle)
+                self.assertEqual((float(m.group(1)), float(m.group(2))),
+                                 (-VW.POSITION_GRENZE_M, VW.POSITION_GRENZE_M))
+                m = re.search(rf"_stage_spin_{achse}\.setRange\((-?\d+),\s*(\d+)\)", quelle)
+                self.assertEqual(float(m.group(2)), VW.POSITION_GRENZE_M)
 
     def test_raster_nur_fuer_moebel(self):
         VW, fake = self._fake(3, 3, 1.0)
@@ -377,6 +427,39 @@ class SzeneTest(unittest.TestCase):
                     self.assertAlmostEqual(c, 0.0, delta=0.01, msg="Form nicht um den Mittelpunkt")
                 if not m["id"].startswith("riser_stairs"):
                     self.assertEqual(m["metall"], 1, "Gestell fehlt bzw. nicht als Metall markiert")
+
+    def test_andocken_auf_der_treppe_nimmt_die_stufenhoehe(self):
+        """Review A2: JS-Raycast und Python-Spiegel liefern ueber Deck und
+        Stufen dieselbe Andock-Hoehe (nicht die Podestkante)."""
+        self._eval("!!(window.__lightos && window.__lightos.__findDockTarget)", 30)
+        st = sd.StageDefinition(name="treppe")
+        el = st.add("riser_stairs", id="p", x=1.0, y=0.5, z=-2.0, w=3.0, h=1.0, d=4.0)
+        payload = json.dumps({"objects": [el.to_js_dict()], "fixtures": [], "_reloadToken": 682})
+        import time
+        ende = time.monotonic() + 15
+        while time.monotonic() < ende:
+            self._bridge_obj.stageLoaded.emit(payload)
+            _pump(0.3)
+            if self._eval("String(Object.keys(window.__lightos.stageObjects).length)", 2) == "1":
+                break
+        self._eval("window.__lightos.__renderTick && window.__lightos.__renderTick(), true", 2)
+        # Deck, dann die vier Stufen (Mitte je Tritt), zuletzt neben der Treppe.
+        punkte = [(1.0, -3.0), (1.0, -1.05), (1.0, -0.75), (1.0, -0.45), (1.0, -0.15),
+                  (2.0, -0.15)]
+        ist = json.loads(self._eval(
+            "(()=>{const so=window.__lightos.stageObjects['p']; so.mesh.updateMatrixWorld(true);"
+            f"return JSON.stringify({json.dumps(punkte)}.map(([x,z])=>{{"
+            "const t=window.__lightos.__findDockTarget(x,z); return t ? t.y : null;}));})()", 5))
+        for (x, z), y_js in zip(punkte, ist):
+            with self.subTest(punkt=(x, z)):
+                soll = st.dock_target_for(x, z)
+                if soll is None:
+                    self.assertIsNone(y_js, "JS dockt neben der Treppe an")
+                else:
+                    self.assertIsNotNone(y_js)
+                    self.assertAlmostEqual(y_js, soll["y"], delta=0.01)
+        self.assertAlmostEqual(ist[0], 1.0 + sd.DOCK_TOP_OFFSET, delta=0.01)
+        self.assertLess(ist[4], ist[0] - 0.5, "Stufe vorn nicht tiefer als das Deck")
 
 
 if __name__ == "__main__":

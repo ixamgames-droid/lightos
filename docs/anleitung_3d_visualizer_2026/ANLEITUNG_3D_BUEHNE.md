@@ -73,7 +73,8 @@ Standardmaße und lassen sich wie jedes Bühnenelement verschieben, drehen, in d
 im Raster, um den Standardplatz zentriert. Die ganze Reihe ist **ein** Undo-Schritt
 (`Strg+Z` nimmt alle zurück). Danach springt die Anzahl von selbst auf `1 × 1` zurück.
 Das Raster gilt nur für die Möbel oben — Böden, Trassen, Wände usw. entstehen immer einzeln.
-Ab 200 Objekten auf einmal fragt LightOS nach (große Mengen machen die 3D-Ansicht langsamer).
+Bei mehr als 200 Objekten auf einmal fragt LightOS nach (große Mengen machen die 3D-Ansicht langsamer).
+Der Abstand geht bis 10 m; ein Raster, das über ±200 m hinausreichen würde, legt LightOS nicht an, sondern meldet es.
 Gespeichert wird mit der Bühne (Teil C) — Typ, Lage, Größe und Farbe bleiben erhalten.
 
 ![Objekt-Bibliothek: 2 × 3 Biertischgarnituren, Bar, Podest mit Treppe, Stehtische](viz68_objekt_bibliothek.png)
