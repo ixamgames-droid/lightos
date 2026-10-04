@@ -1003,6 +1003,19 @@ class VisualizerBridge(QObject):
             print(f"[Visualizer] auto-patch error: {e}")
         fixtures = self._build_fixture_list()
         self.allFixtures.emit(json.dumps(fixtures))
+        # VIZ-71 (S4): nach JEDEM Geraete-Neubau den vollen DMX-Bestand an diese
+        # Seite. Der Service hielt die Werte sonst fuer zugestellt — Show-Wechsel,
+        # Wiedereinblenden und Erst-Laden liefen bisher OHNE Resync (nur der
+        # Signal-Handler von allFixtures rief requestFullResync, und der kommt
+        # nach dem Laden nicht an). JS merkt sich den Stand je fid ohnehin
+        # (dmx_cache.js); der volle Batch (~5 KB) ist die Versicherung fuer
+        # Werte, die die Seite nie gesehen hat.
+        cb = getattr(self, "full_resync_cb", None)
+        if cb is not None:
+            try:
+                cb()
+            except Exception as e:                       # noqa: BLE001
+                print(f"[Visualizer] Voll-Resync nach requestFixtures: {e}")
 
     def _sync_positions_from_live_view(self) -> bool:
         """Auto-Patch: Top-Down-X/Z aus der Live View ins 3D uebernehmen.
@@ -1821,8 +1834,9 @@ class VisualizerBridge(QObject):
         wird beim Anlegen (``_fixture_to_dict``) gemerkt; ein Geraet ohne Eintrag
         (angelegt vor dieser Aenderung) gilt beim ersten Sehen als synchron."""
         gesendet = self.__dict__.setdefault("_gesendete_nullpunkte", {})
+        placed = self._state.visualizer_positions    # VIZ-71: einmal lesen
         for f in self._state.get_patched_fixtures():
-            if f.fid not in self._state.visualizer_positions:
+            if f.fid not in placed:
                 continue
             jetzt = effektive_nullpunkte(f)
             vorher = gesendet.get(f.fid)
@@ -2028,11 +2042,16 @@ class VisualizerBridge(QObject):
         """
         return viz_model_for(f) or f.fixture_type
 
-    def _fixture_to_dict(self, f: PatchedFixture) -> dict:
+    def _fixture_to_dict(self, f: PatchedFixture, positions=None) -> dict:
         # VIZ-55 (Review B4): merken, mit welchem Nullpunkt das Geraet ans 3D geht —
         # sonst verpasste ``_nullpunkte_nachziehen`` die ERSTE Aenderung einer Sitzung.
         self.__dict__.setdefault("_gesendete_nullpunkte", {})[f.fid] = effektive_nullpunkte(f)
-        pos = self._state.visualizer_positions.get(f.fid, (0.0, 6.5, 0.0))
+        # VIZ-71: ``positions`` reicht ``_build_fixture_list`` EINMAL gelesen
+        # herein — ``visualizer_positions`` rechnet am echten AppState bei jedem
+        # Zugriff alle Weltpositionen neu (O(n^2) in der Schleife).
+        if positions is None:
+            positions = self._state.visualizer_positions
+        pos = positions.get(f.fid, (0.0, 6.5, 0.0))
         rot = normalize_rotation(self._state.visualizer_rotations.get(f.fid))
         model = self._viz_model_for(f)
         # VIZ-04: Spider tilten physisch ±90° (Gesamt 180°). Der generische
@@ -2188,10 +2207,13 @@ class VisualizerBridge(QObject):
         }
 
     def _build_fixture_list(self) -> list[dict]:
+        # VIZ-71: EINMAL lesen (s. ``_fixture_to_dict``) — vorher zweimal je
+        # Geraet, gemessen ~9 ms Spitze im UI-Thread bei 32 Geraeten.
+        placed = self._state.visualizer_positions
         return [
-            self._fixture_to_dict(f)
+            self._fixture_to_dict(f, placed)
             for f in self._state.get_patched_fixtures()
-            if f.fid in self._state.visualizer_positions
+            if f.fid in placed
         ]
 
     def _on_state(self, event: str, data):

@@ -704,6 +704,13 @@ class VisualizerService:
         # VIZ-70: jedes Event macht die Frame-Gate-Signatur ungueltig (siehe
         # ``_frame_signature``) — auch die, die hier sonst nichts ausloesen.
         self._state_rev += 1
+        if event == "show_loaded":
+            # VIZ-71 (S4): neue Show -> JEDES Ziel bekommt beim naechsten Tick
+            # den vollen Bestand. Die fids der neuen Show koennen dieselben
+            # Nummern wie in der alten tragen; ein Diff gegen den alten Cache
+            # hielte unveraenderte Werte faelschlich fuer zugestellt.
+            self.force_full_resync()
+            return
         if event != "patch_changed":
             return
         current_fids = {f.fid for f in self._state.get_patched_fixtures()}

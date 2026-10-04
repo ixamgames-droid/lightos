@@ -450,5 +450,62 @@ class WaechterTest(_PushBasis):
                          "Farbe und Dimmer muessen getrennte Felder bleiben")
 
 
+# ── S4: Resync bei Neubau und Show-Wechsel (T4) ──────────────────────────────
+class ResyncTest(_TestBasis):
+    def test_show_loaded_setzt_needs_full_fuer_alle_ziele(self):
+        st = _state()
+        svc = VisualizerService(st)
+        ziele = []
+        for name in ("fenster", "spiegel"):
+            t = VisualizerTarget(name, lambda s: None,
+                                 emit_payloads=lambda a, f, q: None)
+            svc.attach_target(t)
+            svc.set_target_active(t, True)
+            ziele.append(t)
+        svc._tick()
+        self.assertFalse(any(t.needs_full for t in ziele))
+        svc._on_state("show_loaded", None)
+        self.assertTrue(all(t.needs_full for t in ziele),
+                        "Show-Wechsel muss jedes Ziel voll beliefern")
+        self.assertEqual(svc._last_payload, {})
+        svc.shutdown()
+
+    def test_request_fixtures_fordert_den_vollen_bestand_an(self):
+        from src.core.app_state import get_state
+        from src.core.show.show_file import reset_show
+        import src.ui.visualizer.visualizer_window as VW
+        reset_show()
+        bridge = VW.VisualizerBridge(get_state())
+        try:
+            reihenfolge = []
+            bridge.allFixtures.connect(lambda j: reihenfolge.append("liste"))
+            bridge.full_resync_cb = lambda: reihenfolge.append("resync")
+            bridge.requestFixtures()
+            self.assertEqual(reihenfolge, ["liste", "resync"],
+                             "nach dem Geraete-Neubau muss der volle DMX-Bestand folgen")
+        finally:
+            bridge.dispose()
+
+    def test_build_fixture_list_liest_positionen_einmal(self):
+        import src.ui.visualizer.visualizer_window as VW
+
+        class _St:
+            zugriffe = 0
+
+            @property
+            def visualizer_positions(self):
+                _St.zugriffe += 1
+                return {1: (0, 6, 0), 2: (1, 6, 0), 3: (2, 6, 0)}
+
+            def get_patched_fixtures(self):
+                return [SimpleNamespace(fid=i) for i in (1, 2, 3, 4)]
+        fake = SimpleNamespace(
+            _state=_St(),
+            _fixture_to_dict=lambda f, positions=None: {"fid": f.fid, "pos": positions[f.fid]})
+        liste = VW.VisualizerBridge._build_fixture_list(fake)
+        self.assertEqual([d["fid"] for d in liste], [1, 2, 3])
+        self.assertEqual(_St.zugriffe, 1, "visualizer_positions in der Schleife gelesen (O(n^2))")
+
+
 if __name__ == "__main__":
     unittest.main()
