@@ -43,7 +43,6 @@
 | DOC-47 | C | - | 2026-10-02T12:04Z | docs/anleitung_gruppen_matrizen/ANLEITUNG_GRUPPEN_MATRIZEN.md |
 | DOC-48 | C | - | 2026-10-02T12:06Z | docs/anleitung_testshow_liveedit/ANLEITUNG_TESTSHOW_LIVEEDIT.md |
 | DOC-49 | C | - | 2026-10-02T12:07Z | docs/FARB_FX_VC_SHOW.md |
-| UI-71 | C | - | 2026-10-02T12:08Z | src/ui/widgets/controller_browser.py · tests/test_ui71_controller_vorlage_hinweis.py · tests/test_doc_removed_ui.py · BACKLOG.md · changelog.d/2026-10-02-UI-71.md |
 | DOC-50 | C | - | 2026-10-02T12:09Z | docs/LIVE_EDIT_FENSTER.md |
 | TOOL-2 | C | - | 2026-10-02T12:17Z | tools/gource · Code-Film.bat · Code-Film.sh · THIRD_PARTY_NOTICES.md · tests/test_proc18_fremd_lizenzhinweise.py · tests/test_tool2_keine_binaerdateien.py · BACKLOG.md · changelog.d/2026-10-02-TOOL-2.md |
 | DOC-51 | C | - | 2026-10-02T12:23Z | docs/anleitung_grosse_demo_2026/ANLEITUNG_GROSSE_DEMO_2026.md |
@@ -163,7 +162,6 @@
 
 ## Verlauf
 
-- 2026-10-02T21:53Z B claim FUNKTIONSTEST-B3
 - 2026-10-02T22:02Z B claim UI-72
 - 2026-10-02T22:02Z B claim UI-73
 - 2026-10-02T22:03Z B done XPLAT-45
@@ -193,3 +191,4 @@
 - 2026-10-04T17:15Z B claim SICHT-B-0410
 - 2026-10-04T17:18Z B done SICHT-B-0410
 - 2026-10-04T17:24Z B aktualisiert OUT-60-FOLGE: Dateien src/core/dmx/output_manager.py · src/core/dmx/serial_process.py · tests/test_out60_load_kein_null_frame.py · tests/test_out59_waisen_windows.py -> src/core/dmx/output_manager.py · src/core/dmx/serial_process.py
+- 2026-10-04T17:26Z C done UI-71
