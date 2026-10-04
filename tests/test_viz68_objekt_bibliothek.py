@@ -157,7 +157,16 @@ class RasterTest(unittest.TestCase):
             tabs.addTab(QWidget(), name)
         tree = MagicMock()
         tree.topLevelItemCount.return_value = 0
-        wert = lambda v: SimpleNamespace(value=lambda: v)  # noqa: E731
+        class _Feld:
+            def __init__(self, v):
+                self.v = v
+
+            def value(self):
+                return self.v
+
+            def setValue(self, v):
+                self.v = v
+        self.felder = (_Feld(reihen), _Feld(spalten), _Feld(abstand))
         fake = SimpleNamespace(
             _state=SimpleNamespace(), _current_stage=sd.StageDefinition(),
             _tabs=tabs, _stage_tree=tree, _lbl_info=MagicMock(), _bridge=MagicMock(),
@@ -166,7 +175,8 @@ class RasterTest(unittest.TestCase):
             _sync_stage_node_to_scene=MagicMock(), _remove_stage_node_from_scene=MagicMock(),
             _refresh_stage_tree=MagicMock(), _update_status_counts=MagicMock(),
             _set_build_mode=lambda build=True: None,
-            _spin_reihen=wert(reihen), _spin_spalten=wert(spalten), _spin_abstand=wert(abstand),
+            _spin_reihen=self.felder[0], _spin_spalten=self.felder[1],
+            _spin_abstand=self.felder[2],
         )
         return VW, fake
 
@@ -183,12 +193,61 @@ class RasterTest(unittest.TestCase):
         self.assertEqual(len(els), 12)
         self.assertTrue(all(e.type == "beer_table" for e in els))
         self.assertEqual(len({(e.x, e.z) for e in els}), 12, "Objekte liegen aufeinander")
-        self.assertEqual(fake._bridge.push_add_stage_object_data.call_count, 12)
+        # Review A: EIN gebuendelter Push statt je Element.
+        self.assertEqual(fake._bridge.push_add_stage_object_data.call_count, 0)
+        self.assertEqual(fake._bridge.push_add_stage_objects_data.call_count, 1)
+        self.assertEqual(len(fake._bridge.push_add_stage_objects_data.call_args[0][0]), 12)
         self.assertEqual(els[0].name, "Biertischgarnitur 1")
+        # Review A: danach wieder 1 x 1
+        self.assertEqual((self.felder[0].value(), self.felder[1].value()), (1, 1))
         get_undo_stack().undo()
         self.assertEqual(fake._current_stage.elements, [], "Undo nahm nicht die ganze Reihe")
+        self.assertEqual(fake._bridge.push_remove_stage_objects.call_count, 1)
+        self.assertEqual(len(fake._bridge.push_remove_stage_objects.call_args[0][0]), 12)
         get_undo_stack().redo()
         self.assertEqual(len(fake._current_stage.elements), 12)
+
+    def test_ab_200_nur_nach_rueckfrage(self):
+        from unittest import mock
+        VW, fake = self._fake(15, 15, 0.5)            # 225 > 200
+        with mock.patch.object(VW.QMessageBox, "question",
+                               return_value=VW.QMessageBox.StandardButton.No) as frage:
+            VW.VisualizerWindow._add_stage_element(fake, "high_table")
+        self.assertEqual(frage.call_count, 1)
+        self.assertEqual(fake._current_stage.elements, [], "ohne Zustimmung angelegt")
+        with mock.patch.object(VW.QMessageBox, "question",
+                               return_value=VW.QMessageBox.StandardButton.Yes):
+            VW.VisualizerWindow._add_stage_element(fake, "high_table")
+        self.assertEqual(len(fake._current_stage.elements), 225)
+
+    def test_unter_200_keine_rueckfrage(self):
+        from unittest import mock
+        VW, fake = self._fake(10, 20, 0.5)            # genau 200
+        with mock.patch.object(VW.QMessageBox, "question") as frage:
+            VW.VisualizerWindow._add_stage_element(fake, "high_table")
+        frage.assert_not_called()
+        self.assertEqual(len(fake._current_stage.elements), 200)
+
+    def test_groesstes_raster_passt_in_die_eingabefelder(self):
+        """Review A: 30 Reihen erzeugten Z ausserhalb des alten Feldbereichs
+        (-30..30) — das Feld klemmte die Position."""
+        import inspect
+        from src.ui.visualizer.visualizer_window import VisualizerWindow, raster_positionen
+        quelle = inspect.getsource(VisualizerWindow)
+        bx = int(re.search(r"_stage_spin_x\.setRange\(-?(\d+)", quelle).group(1))
+        bz = int(re.search(r"_stage_spin_z\.setRange\(-?(\d+)", quelle).group(1))
+        from src.ui.visualizer.visualizer_window import RASTER_TYPEN
+        for typ in RASTER_TYPEN:
+            d = VisualizerWindow.STAGE_DEFAULTS[typ]
+            orte = raster_positionen(d["x"], d["z"], d["w"], d["d"], 30, 30, 2.0)
+            with self.subTest(typ=typ):
+                self.assertLessEqual(max(abs(x) for x, _ in orte), bx)
+                self.assertLessEqual(max(abs(z) for _, z in orte), bz)
+
+    def test_raster_nur_fuer_moebel(self):
+        VW, fake = self._fake(3, 3, 1.0)
+        VW.VisualizerWindow._add_stage_element(fake, "truss_h")
+        self.assertEqual(len(fake._current_stage.elements), 1, "Trasse im Raster angelegt")
 
     def test_einzelnes_objekt_wie_bisher(self):
         VW, fake = self._fake(1, 1, 1.0)
@@ -295,6 +354,19 @@ class SzeneTest(unittest.TestCase):
                     gruppe: !!so.mesh.isGroup};
           }))"""))
         self.assertEqual(len(messung), len(objekte))
+        # Review A: gebuendelt anlegen/entfernen (Raster) ueber dieselben Kanaele
+        bulk = [{"id": f"bulk-{i}", "type": "high_table", "name": "S",
+                 "position": {"x": i, "y": 0.55, "z": 3}, "size": {"x": 0.8, "y": 1.1, "z": 0.8},
+                 "rotation": 0, "color": "#ffffff"} for i in range(20)]
+        self._bridge_obj.addStageObjectData.emit(json.dumps({"bulk": bulk}))
+        _pump(0.5)
+        self.assertEqual(self._eval("Object.keys(window.__lightos.stageObjects)"
+                                    ".filter(k => k.startsWith('bulk-')).length", 5), 20)
+        self._bridge_obj.removeStageObject.emit(json.dumps([b["id"] for b in bulk]))
+        _pump(0.5)
+        rest = self._eval("String(Object.keys(window.__lightos.stageObjects)"
+                          ".filter(k => k.startsWith('bulk-')).length)", 5)
+        self.assertEqual(rest, "0", "gebuendeltes Entfernen ließ Objekte stehen")
         for m in messung:
             with self.subTest(objekt=m["id"]):
                 self.assertTrue(m["gruppe"])

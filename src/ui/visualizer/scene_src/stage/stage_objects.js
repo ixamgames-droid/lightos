@@ -949,8 +949,23 @@ export function loadStageJson(json) {
   }
 }
 
+// VIZ-68 (Review A): gebuendeltes Anlegen/Entfernen (Raster). Jedes
+// notifyStageListChanged serialisiert die GANZE Liste — je Element einmal war
+// bei einem Raster quadratisch. In `gebuendelt(fn)` meldet nur das Ende.
+let _buendeln = 0;
+export function gebuendelt(fn) {
+  _buendeln++;
+  try {
+    return fn();
+  } finally {
+    _buendeln--;
+    if (_buendeln === 0) notifyStageListChanged();
+  }
+}
+
 export function notifyStageListChanged() {
   if (_isLoadingStage) return;  // unterdrücken während Bulk-Load
+  if (_buendeln) return;        // VIZ-68: Raster meldet einmal am Ende
   const bridge = bridgeRef.get();
   if (bridge && bridge.stageListChanged) {
     const payload = {

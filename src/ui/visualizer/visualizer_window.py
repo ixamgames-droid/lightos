@@ -1908,6 +1908,22 @@ class VisualizerBridge(QObject):
         except Exception as e:
             print(f"[Visualizer] push_add_stage_object_data error: {e}")
 
+    def push_add_stage_objects_data(self, elements: list):
+        """VIZ-68: Raster — ALLE Elemente in EINER Payload ``{"bulk": [...]}``
+        (gleiches Signal, JS legt gebuendelt an und meldet die Liste einmal)."""
+        try:
+            self.addStageObjectData.emit(json.dumps({"bulk": [e.to_js_dict() for e in elements]}))
+        except Exception as e:
+            print(f"[Visualizer] push_add_stage_objects_data error: {e}")
+
+    def push_remove_stage_objects(self, sids: list):
+        """VIZ-68: Raster-Undo — ids als JSON-Liste ueber denselben Kanal
+        (ids beginnen nie mit ``[``)."""
+        try:
+            self.removeStageObject.emit(json.dumps(list(sids)))
+        except Exception as e:
+            print(f"[Visualizer] push_remove_stage_objects error: {e}")
+
     def push_remove_stage_object(self, sid: str):
         try:
             self.removeStageObject.emit(sid)
@@ -2276,6 +2292,14 @@ class FixtureDragList(QListWidget):
         if fids:
             md.setText(f"{FIXTURE_DRAG_PREFIX}{fids[0]}")
         return md
+
+
+# VIZ-68 (Review A): ab so vielen Objekten auf einmal fragt der Knopf nach.
+RASTER_RUECKFRAGE_AB = 200
+# Nur Moebel werden im Raster angelegt — Boeden, Trassen, Waende usw. immer
+# einzeln (ein 30 x 30-Raster aus 14-m-Boeden ergaebe keinen Sinn und laege
+# ausserhalb jedes Eingabebereichs).
+RASTER_TYPEN = frozenset({"beer_table", "high_table", "bar_counter", "riser_stairs", "foh_desk"})
 
 
 def raster_positionen(x0: float, z0: float, w: float, d: float,
@@ -3094,9 +3118,9 @@ class VisualizerWindow(QMainWindow):
         self._stage_name_edit.editingFinished.connect(self._on_stage_property_changed)
         prop_form.addRow("Name:", self._stage_name_edit)
 
-        self._stage_spin_x = LocaleTolerantDoubleSpinBox(); self._stage_spin_x.setRange(-50, 50); self._stage_spin_x.setSingleStep(0.5)
+        self._stage_spin_x = LocaleTolerantDoubleSpinBox(); self._stage_spin_x.setRange(-200, 200); self._stage_spin_x.setSingleStep(0.5)
         self._stage_spin_y = LocaleTolerantDoubleSpinBox(); self._stage_spin_y.setRange(0, 30);   self._stage_spin_y.setSingleStep(0.25)
-        self._stage_spin_z = LocaleTolerantDoubleSpinBox(); self._stage_spin_z.setRange(-30, 30); self._stage_spin_z.setSingleStep(0.5)
+        self._stage_spin_z = LocaleTolerantDoubleSpinBox(); self._stage_spin_z.setRange(-200, 200); self._stage_spin_z.setSingleStep(0.5)
         self._stage_spin_w = LocaleTolerantDoubleSpinBox(); self._stage_spin_w.setRange(0.05, 60); self._stage_spin_w.setSingleStep(0.5); self._stage_spin_w.setValue(4)
         self._stage_spin_h = LocaleTolerantDoubleSpinBox(); self._stage_spin_h.setRange(0.05, 30); self._stage_spin_h.setSingleStep(0.25); self._stage_spin_h.setValue(0.4)
         self._stage_spin_d = LocaleTolerantDoubleSpinBox(); self._stage_spin_d.setRange(0.05, 60); self._stage_spin_d.setSingleStep(0.5); self._stage_spin_d.setValue(4)
@@ -4249,7 +4273,21 @@ class VisualizerWindow(QMainWindow):
             except Exception:
                 return standard
         reihen, spalten = int(_wert("_spin_reihen", 1)), int(_wert("_spin_spalten", 1))
+        if type_ not in RASTER_TYPEN:
+            reihen = spalten = 1
         abstand = float(_wert("_spin_abstand", 1.0))
+        anzahl = reihen * spalten
+        if anzahl > RASTER_RUECKFRAGE_AB:
+            # VIZ-68 (Review A): viele Objekte nur nach Rueckfrage.
+            eltern = self if isinstance(self, QWidget) else None
+            antwort = QMessageBox.question(
+                eltern, "Viele Objekte anlegen?",
+                f"{anzahl} × {type_label} anlegen ({reihen} Reihen × {spalten} Spalten)?\n"
+                "Große Mengen machen die 3D-Ansicht langsamer.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No)
+            if antwort != QMessageBox.StandardButton.Yes:
+                return
         orte = raster_positionen(kwargs.get("x", 0.0), kwargs.get("z", 0.0),
                                  kwargs.get("w", 1.0), kwargs.get("d", 1.0),
                                  reihen, spalten, abstand)
@@ -4272,13 +4310,24 @@ class VisualizerWindow(QMainWindow):
             print(f"[Visualizer] _add_stage_element mode-switch error: {e}")
 
         def _on_add_change():
-            for e in neue:
-                if self._current_stage.get(e.id) is not None:
-                    self._sync_stage_node_to_scene(e)
-                    self._bridge.push_add_stage_object_data(e)
+            da = [e for e in neue if self._current_stage.get(e.id) is not None]
+            weg = [e for e in neue if self._current_stage.get(e.id) is None]
+            for e in da:
+                self._sync_stage_node_to_scene(e)
+            for e in weg:
+                self._remove_stage_node_from_scene(e.id)
+            if len(neue) == 1:
+                if da:
+                    self._bridge.push_add_stage_object_data(da[0])
                 else:
-                    self._remove_stage_node_from_scene(e.id)
-                    self._bridge.push_remove_stage_object(e.id)
+                    self._bridge.push_remove_stage_object(weg[0].id)
+            else:
+                # VIZ-68 (Review A): EIN Push fuer die ganze Reihe statt je
+                # Element (JS serialisierte sonst je Add die ganze Liste).
+                if da:
+                    self._bridge.push_add_stage_objects_data(da)
+                if weg:
+                    self._bridge.push_remove_stage_objects([e.id for e in weg])
             # Kein Voll-Reload: Der würde bei schnell aufeinander folgenden
             # Stage-Adds ein teilweises WebGL-Echo zurück in das Modell holen.
             self._refresh_stage_tree()
@@ -4317,6 +4366,13 @@ class VisualizerWindow(QMainWindow):
         if lbl is not None:
             lbl.setText(f"{type_label} hinzugefügt." if len(neue) == 1
                         else f"{len(neue)}× {type_label} hinzugefügt ({reihen} × {spalten}).")
+        # VIZ-68 (Review A): das Raster gilt fuer EINEN Klick — danach wieder
+        # 1 × 1, sonst legt der naechste Knopf (z. B. eine Trasse) ungewollt
+        # wieder ein ganzes Raster an.
+        for attr in ("_spin_reihen", "_spin_spalten"):
+            w = getattr(self, attr, None)
+            if w is not None and hasattr(w, "setValue"):
+                w.setValue(1)
 
     def _selected_stage_element(self) -> Optional[StageElement]:
         it = self._stage_tree.currentItem()

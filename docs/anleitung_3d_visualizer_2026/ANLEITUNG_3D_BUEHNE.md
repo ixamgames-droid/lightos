@@ -71,7 +71,9 @@ Standardmaße und lassen sich wie jedes Bühnenelement verschieben, drehen, in d
 **Mehrere auf einmal:** In der Zeile **„Anzahl: Reihen × Spalten — Abstand"** z. B.
 `2 × 3`, Abstand `1,00 m` einstellen, dann **„+ Biertischgarnitur"** → sechs Garnituren
 im Raster, um den Standardplatz zentriert. Die ganze Reihe ist **ein** Undo-Schritt
-(`Strg+Z` nimmt alle zurück). Für einzelne Objekte die Anzahl wieder auf `1 × 1` stellen.
+(`Strg+Z` nimmt alle zurück). Danach springt die Anzahl von selbst auf `1 × 1` zurück.
+Das Raster gilt nur für die Möbel oben — Böden, Trassen, Wände usw. entstehen immer einzeln.
+Ab 200 Objekten auf einmal fragt LightOS nach (große Mengen machen die 3D-Ansicht langsamer).
 Gespeichert wird mit der Bühne (Teil C) — Typ, Lage, Größe und Farbe bleiben erhalten.
 
 ![Objekt-Bibliothek: 2 × 3 Biertischgarnituren, Bar, Podest mit Treppe, Stehtische](viz68_objekt_bibliothek.png)
