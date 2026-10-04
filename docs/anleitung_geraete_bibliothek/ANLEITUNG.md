@@ -102,7 +102,10 @@ Was der Download **nicht** tut:
   Quelle, Lizenz und Prüfsumme.
 - **Er fragt nicht ständig.** „Nicht jetzt“ beim ersten Start ist eine Antwort, die
   Frage kommt nicht wieder. Ohne Netz (Meldung `Keine Verbindung: …`) oder nach einem
-  Abbruch fragt LightOS beim nächsten Start erneut.
+  Abbruch fragt LightOS beim nächsten Start erneut — aber nur, solange noch kein
+  heruntergeladenes Gerät eingelesen wurde. Hat ein abgebrochener Download schon Geräte
+  eingelesen, kommt die Frage nicht wieder; den Rest holst du über **Datenbank →
+  Geräte-Bibliothek herunterladen...**
 
 Die geladenen Geräte findest du danach wie jedes andere im Patch-Dialog (Schritt 1).
 
