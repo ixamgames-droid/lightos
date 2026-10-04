@@ -1,0 +1,105 @@
+{
+  "format_version": 1,
+  "hersteller": "Martin",
+  "hersteller_kurz": "Martin",
+  "modell": "Jem Compact Hazer Pro",
+  "kurzname": "JEMCOMPHAZPRO",
+  "typ": "hazer",
+  "leistung_w": 1010,
+  "quelle": {
+    "titel": "JEM Compact Hazer Pro Datenblatt (Martin/HARMAN, Rev. 202003)",
+    "version": "Rev. 202003",
+    "url": "https://goknight.com/content/documentation/Martin_JEM-Compact-Hazer-Pro_Oct21.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.10.6 GIT · Sam Brooks",
+    "original": "resources/fixtures/Martin/Martin-Jem-Compact-Hazer-Pro.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 47 Wertebereiche mit Art (kind) versehen; typ smoke -> hazer; Kanal 2 (Luefter) intensity -> fan (sonst zweiter Dimmer/Kopf); Haze-Kanal: Bereich 210-255 hiess faelschlich 'Fan 100%' -> 'Haze 100 %'; Leerlauf als 'closed'; Tippfehler 'Hater' korrigiert, deutsche Beschriftung; kurzname JEMCOMPHAZPRO, leistung_w 1010 (typische Leistung EU laut Martin-Datenblatt), notizen"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanalzahl und -funktionen (Haze, Luefter, Steuerung) gegen das Martin-Datenblatt geprueft; die Wertebereiche stammen aus der QLC+-Datei und sind nicht gegen ein Herstellerhandbuch geprueft (DMX-Tabelle des abgekuendigten Geraets nicht abrufbar)"
+  },
+  "modi": [
+    {
+      "name": "3 Channel",
+      "kanaele": [
+        {
+          "name": "Haze-Ausstoss",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 19, "name": "Leerlauf (aus)", "art": "closed"},
+            {"von": 20, "bis": 29, "name": "Haze 5 %"},
+            {"von": 30, "bis": 39, "name": "Haze 10 %"},
+            {"von": 40, "bis": 49, "name": "Haze 15 %"},
+            {"von": 50, "bis": 59, "name": "Haze 20 %"},
+            {"von": 60, "bis": 69, "name": "Haze 25 %"},
+            {"von": 70, "bis": 79, "name": "Haze 30 %"},
+            {"von": 80, "bis": 89, "name": "Haze 35 %"},
+            {"von": 90, "bis": 99, "name": "Haze 40 %"},
+            {"von": 100, "bis": 109, "name": "Haze 45 %"},
+            {"von": 110, "bis": 119, "name": "Haze 50 %"},
+            {"von": 120, "bis": 129, "name": "Haze 55 %"},
+            {"von": 130, "bis": 139, "name": "Haze 60 %"},
+            {"von": 140, "bis": 149, "name": "Haze 65 %"},
+            {"von": 150, "bis": 159, "name": "Haze 70 %"},
+            {"von": 160, "bis": 169, "name": "Haze 75 %"},
+            {"von": 170, "bis": 179, "name": "Haze 80 %"},
+            {"von": 180, "bis": 189, "name": "Haze 85 %"},
+            {"von": 190, "bis": 199, "name": "Haze 90 %"},
+            {"von": 200, "bis": 209, "name": "Haze 95 %"},
+            {"von": 210, "bis": 255, "name": "Haze 100 %"}
+          ]
+        },
+        {
+          "name": "Luefter",
+          "attribut": "fan",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 19, "name": "Leerlauf (aus)", "art": "closed"},
+            {"von": 20, "bis": 29, "name": "Luefter 5 %"},
+            {"von": 30, "bis": 39, "name": "Luefter 10 %"},
+            {"von": 40, "bis": 49, "name": "Luefter 15 %"},
+            {"von": 50, "bis": 59, "name": "Luefter 20 %"},
+            {"von": 60, "bis": 69, "name": "Luefter 25 %"},
+            {"von": 70, "bis": 79, "name": "Luefter 30 %"},
+            {"von": 80, "bis": 89, "name": "Luefter 35 %"},
+            {"von": 90, "bis": 99, "name": "Luefter 40 %"},
+            {"von": 100, "bis": 109, "name": "Luefter 45 %"},
+            {"von": 110, "bis": 119, "name": "Luefter 50 %"},
+            {"von": 120, "bis": 129, "name": "Luefter 55 %"},
+            {"von": 130, "bis": 139, "name": "Luefter 60 %"},
+            {"von": 140, "bis": 149, "name": "Luefter 65 %"},
+            {"von": 150, "bis": 159, "name": "Luefter 70 %"},
+            {"von": 160, "bis": 169, "name": "Luefter 75 %"},
+            {"von": 170, "bis": 179, "name": "Luefter 80 %"},
+            {"von": 180, "bis": 189, "name": "Luefter 85 %"},
+            {"von": 190, "bis": 199, "name": "Luefter 90 %"},
+            {"von": 200, "bis": 209, "name": "Luefter 95 %"},
+            {"von": 210, "bis": 255, "name": "Luefter 100 %"}
+          ]
+        },
+        {
+          "name": "Sonderfunktionen (Heizung/Steuerung)",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 50, "name": "Leerlauf (normal)"},
+            {"von": 51, "bis": 100, "name": "Prime (Vorheizen)"},
+            {"von": 101, "bis": 150, "name": "Auto-Luefter-Modus"},
+            {"von": 151, "bis": 200, "name": "Heizung aus und Abschalten"},
+            {"von": 201, "bis": 255, "name": "Heizung an (Normalbetrieb)"}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Wasserbasierter Hazer. Kanal 3 'Prime' und 'Heizung aus' muessen laut QLC+-Beschreibung einige Sekunden anliegen; Heizung bleibt an, wenn Kanal 3 auf 0 zurueckgeht."
+}

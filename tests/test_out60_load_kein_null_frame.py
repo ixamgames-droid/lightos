@@ -74,6 +74,72 @@ class LadeSperreTest(unittest.TestCase):
             self.om.set_freeze(False)
 
 
+class MaskenImLadeFensterTest(unittest.TestCase):
+    """OUT-60-Folge (Review A): der reset-first baut GM-, Blackout-Erhalten- und
+    Ziel-Masken fuer den LEEREN Patch neu. Im Lade-Fenster muessen die Masken
+    vom Start der Sperre gelten — sonst skaliert ein GM < 100 % auch Pan/Tilt
+    (Ruck), und ein aktiver Blackout zieht Pan/Tilt auf 0."""
+
+    PAN, DIM = 10, 12
+
+    def setUp(self):
+        self.om = get_state().output_manager
+        self.u = self.om.universes[1]
+        self._alt = (self.om._gm_address_mask, self.om._blackout_keep_mask,
+                     getattr(self.om, "_ziel_blackout_union", None), self.om.grand_master)
+        self.u.set_channel(self.PAN, 200)
+        self.u.set_channel(self.DIM, 200)
+        self.om._gm_address_mask = {1: frozenset({self.DIM})}
+        self.om._blackout_keep_mask = {1: frozenset({self.PAN})}
+
+    def tearDown(self):
+        (self.om._gm_address_mask, self.om._blackout_keep_mask,
+         self.om._ziel_blackout_union, gm) = self._alt
+        self.om.grand_master = gm
+        self.om.set_blackout(False)
+
+    def _leerer_patch(self):
+        # wie _rebuild_render_plan fuer den leeren Patch: Masken leer ersetzt
+        self.om._gm_address_mask = {}
+        self.om._blackout_keep_mask = {}
+        self.om._ziel_blackout_union = {}
+
+    def test_gm_unter_100_ruckt_pan_nicht(self):
+        self.om.grand_master = 0.5
+        with self.om.lade_sperre():
+            self._leerer_patch()
+            self.om._send_all()
+            f = self.om._display_frame[1]
+            self.assertEqual(f[self.PAN - 1], 200, "Pan vom GM skaliert (Ruck)")
+            self.assertEqual(f[self.DIM - 1], 100, "GM wirkt weiter auf den Dimmer")
+
+    def test_blackout_haelt_pan_im_lade_fenster(self):
+        self.om.set_blackout(True)
+        with self.om.lade_sperre():
+            self._leerer_patch()
+            self.om._send_all()
+            f = self.om._display_frame[1]
+            self.assertEqual(f[self.PAN - 1], 200, "Pan im Blackout auf 0 gefallen")
+            self.assertEqual(f[self.DIM - 1], 0)
+
+    def test_gezielter_blackout_bleibt_im_lade_fenster(self):
+        self.om._ziel_blackout_union = {1: frozenset({self.DIM})}
+        with self.om.lade_sperre():
+            self._leerer_patch()
+            self.om._send_all()
+            self.assertEqual(self.om._display_frame[1][self.DIM - 1], 0,
+                             "gezielter Blackout im Lade-Fenster verloren")
+
+    def test_nach_dem_laden_gelten_die_neuen_masken(self):
+        self.om.grand_master = 0.5
+        with self.om.lade_sperre():
+            self._leerer_patch()
+        self.assertIsNone(self.om._lade_masken)
+        self.om._send_all()
+        # ohne GM-Maske skaliert der GM wieder alles (bisheriges Verhalten)
+        self.assertEqual(self.om._display_frame[1][self.PAN - 1], 100)
+
+
 class LiveLoadTest(unittest.TestCase):
     """Ende zu Ende: dieselbe Show live neu laden."""
 

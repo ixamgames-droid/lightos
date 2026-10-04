@@ -12,6 +12,7 @@ das ``_eltern_wache`` benutzt, und beendet sich dann selbst. Das Kind muss den
 Tod innerhalb weniger Sekunden bemerken — auf jeder Plattform.
 """
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -49,6 +50,7 @@ class WaisenWacheTest(unittest.TestCase):
 
     def test_kind_bemerkt_den_tod_des_parents(self):
         tmp = tempfile.mkdtemp(prefix="out59_")
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
         out = os.path.join(tmp, "ergebnis.txt")
         skript = os.path.join(tmp, "eltern.py")
         with open(skript, "w", encoding="utf-8") as f:
@@ -73,6 +75,20 @@ class WaisenWacheTest(unittest.TestCase):
         quelle = inspect.getsource(serial_process._eltern_wache)
         self.assertIn("OpenProcess", quelle)
         self.assertIn("WaitForSingleObject", quelle)
+
+    @unittest.skipUnless(os.name == "nt", "Windows-Pfad")
+    def test_wait_failed_heisst_nicht_tot(self):
+        """Review A: WAIT_FAILED (hier: Handle geschlossen) ist ein Fehler der
+        Abfrage, kein Beweis fuer den Tod — der Worker darf sich bei lebender
+        App nicht beenden."""
+        import ctypes
+        from src.core.dmx.serial_process import _eltern_wache
+        lebt = _eltern_wache(os.getpid())          # dieser Prozess lebt
+        self.assertTrue(lebt())
+        zellen = dict(zip(lebt.__code__.co_freevars,
+                          (c.cell_contents for c in lebt.__closure__)))
+        ctypes.WinDLL("kernel32").CloseHandle(ctypes.c_void_p(zellen["h"]))
+        self.assertTrue(lebt(), "WAIT_FAILED als 'Parent tot' gewertet")
 
 
 if __name__ == "__main__":

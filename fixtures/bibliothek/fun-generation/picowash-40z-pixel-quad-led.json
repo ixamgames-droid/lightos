@@ -1,0 +1,212 @@
+{
+  "format_version": 1,
+  "hersteller": "Fun Generation",
+  "hersteller_kurz": "FUNGEN",
+  "modell": "PicoWash 40Z Pixel Quad LED",
+  "kurzname": "PICOWASH40Z",
+  "typ": "moving_head",
+  "leistung_w": 67,
+  "notizen": "Wash-Moving-Head mit Zoom 10-60 Grad, 4 x 10 W RGBW-Quad-LEDs (2x2), Pan 540 / Tilt 180 Grad. 26-Kanal-Modus steuert die 4 LEDs einzeln.",
+  "quelle": {
+    "titel": "Fun Generation PicoWash 40Z Pixel Quad LED Bedienungsanleitung (Thomann, ID 412551, V3)",
+    "version": "V3",
+    "datum": "2022-05-10",
+    "url": "https://images.static-thomann.de/pics/atg/atgdata/document/manual/c_412551_v3_en_online.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.0.0 Beta 3 · Kristers D",
+    "original": "resources/fixtures/Fun-Generation/Fun-Generation-PicoWash-40Z-Pixel-Quad-LED.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 80 Wertebereiche mit Art (kind) versehen; Rasterform in 4 Modus/Modi aus <Physical> uebernommen; danach von LightOS gegen das Herstellerhandbuch ueberarbeitet: Hersteller 'Fun-Generation' -> 'Fun Generation' (Schreibweise des Herstellers), Kurzname/Leistung/Typ nach Handbuch; Programmkanal: feste Farbvorwahlen 50-129 als color (in den kleinen Modi einzige Farbwahl), 110-119 Purple laut Handbuch (QLC+: Magenta), Programme ohne Art, Reset als reset, Musik als sound; Speed/Empfindlichkeit als effect_speed statt speed (gehoert zu Programm/Musik, nicht zur Bewegung); Strobe-Default/Highlight 0 (offen) statt 4; Kanalnamen deutsch nach Handbuch; Raster 2x2 nur im Einzel-LED-Modus (dort 4 Farbzonen), in den Modi mit einer Farbzone entfernt (QLC+ setzte es fuer alle Modi)"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal fuer Kanal gegen die DMX-Tabellen (4/9/14/26 Kanaele, Kap. 7.4-7.7) im Thomann-Handbuch V3 (10.05.2022) geprueft; nicht am Geraet getestet"
+  },
+  "modi": [
+    {
+      "name": "4 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Zoom (10-60 Grad)", "attribut": "zoom", "default": 0, "highlight": 0},
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "9 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fein", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fein", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Motor-Speed (schnell -> langsam)", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Zoom (10-60 Grad)", "attribut": "zoom", "default": 0, "highlight": 0},
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Programme/Farbvorwahl",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 49, "name": "Keine Funktion"},
+            {"von": 50, "bis": 59, "name": "Rot", "art": "color"},
+            {"von": 60, "bis": 69, "name": "Gruen", "art": "color"},
+            {"von": 70, "bis": 79, "name": "Blau", "art": "color"},
+            {"von": 80, "bis": 89, "name": "Weiss", "art": "color"},
+            {"von": 90, "bis": 99, "name": "Gelb", "art": "color"},
+            {"von": 100, "bis": 109, "name": "Cyan", "art": "color"},
+            {"von": 110, "bis": 119, "name": "Purple", "art": "color"},
+            {"von": 120, "bis": 129, "name": "Alles weiss", "art": "color"},
+            {"von": 130, "bis": 139, "name": "Leer"},
+            {"von": 140, "bis": 149, "name": "Programm 1", "art": ""},
+            {"von": 150, "bis": 159, "name": "Programm 2", "art": ""},
+            {"von": 160, "bis": 169, "name": "Programm 3", "art": ""},
+            {"von": 170, "bis": 179, "name": "Programm 4", "art": ""},
+            {"von": 180, "bis": 189, "name": "Programm 5", "art": ""},
+            {"von": 190, "bis": 199, "name": "Programm 6", "art": ""},
+            {"von": 200, "bis": 209, "name": "Programm 7", "art": ""},
+            {"von": 210, "bis": 219, "name": "Programm 8", "art": ""},
+            {"von": 220, "bis": 229, "name": "Programm 9", "art": ""},
+            {"von": 230, "bis": 233, "name": "Leer"},
+            {"von": 234, "bis": 236, "name": "Reset", "art": "reset"},
+            {"von": 237, "bis": 249, "name": "Leer"},
+            {"von": 250, "bis": 255, "name": "Musiksteuerung", "art": "sound"}
+          ]
+        },
+        {"name": "Speed/Empfindlichkeit", "attribut": "effect_speed", "default": 0, "highlight": 0}
+      ]
+    },
+    {
+      "name": "14 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fein", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fein", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Motor-Speed (schnell -> langsam)", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Zoom (10-60 Grad)", "attribut": "zoom", "default": 0, "highlight": 0},
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Offen (keine Funktion)", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe langsam -> schnell (1-25 Hz)", "art": "strobe"}
+          ]
+        },
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Programme/Farbvorwahl",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 49, "name": "Keine Funktion"},
+            {"von": 50, "bis": 59, "name": "Rot", "art": "color"},
+            {"von": 60, "bis": 69, "name": "Gruen", "art": "color"},
+            {"von": 70, "bis": 79, "name": "Blau", "art": "color"},
+            {"von": 80, "bis": 89, "name": "Weiss", "art": "color"},
+            {"von": 90, "bis": 99, "name": "Gelb", "art": "color"},
+            {"von": 100, "bis": 109, "name": "Cyan", "art": "color"},
+            {"von": 110, "bis": 119, "name": "Purple", "art": "color"},
+            {"von": 120, "bis": 129, "name": "Alles weiss", "art": "color"},
+            {"von": 130, "bis": 139, "name": "Leer"},
+            {"von": 140, "bis": 149, "name": "Programm 1", "art": ""},
+            {"von": 150, "bis": 159, "name": "Programm 2", "art": ""},
+            {"von": 160, "bis": 169, "name": "Programm 3", "art": ""},
+            {"von": 170, "bis": 179, "name": "Programm 4", "art": ""},
+            {"von": 180, "bis": 189, "name": "Programm 5", "art": ""},
+            {"von": 190, "bis": 199, "name": "Programm 6", "art": ""},
+            {"von": 200, "bis": 209, "name": "Programm 7", "art": ""},
+            {"von": 210, "bis": 219, "name": "Programm 8", "art": ""},
+            {"von": 220, "bis": 229, "name": "Programm 9", "art": ""},
+            {"von": 230, "bis": 233, "name": "Leer"},
+            {"von": 234, "bis": 236, "name": "Reset", "art": "reset"},
+            {"von": 237, "bis": 249, "name": "Leer"},
+            {"von": 250, "bis": 255, "name": "Musiksteuerung", "art": "sound"}
+          ]
+        },
+        {"name": "Speed/Empfindlichkeit", "attribut": "effect_speed", "default": 0, "highlight": 0}
+      ]
+    },
+    {
+      "name": "26 Channel",
+      "raster": {"rows": 2, "cols": 2},
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fein", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fein", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Motor-Speed (schnell -> langsam)", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Zoom (10-60 Grad)", "attribut": "zoom", "default": 0, "highlight": 0},
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Offen (keine Funktion)", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe langsam -> schnell (1-25 Hz)", "art": "strobe"}
+          ]
+        },
+        {"name": "LED 1 Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "LED 1 Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "LED 1 Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "LED 1 Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "LED 2 Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "LED 2 Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "LED 2 Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "LED 2 Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "LED 3 Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "LED 3 Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "LED 3 Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "LED 3 Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "LED 4 Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "LED 4 Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "LED 4 Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "LED 4 Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Programme/Farbvorwahl",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 49, "name": "Keine Funktion"},
+            {"von": 50, "bis": 59, "name": "Rot", "art": "color"},
+            {"von": 60, "bis": 69, "name": "Gruen", "art": "color"},
+            {"von": 70, "bis": 79, "name": "Blau", "art": "color"},
+            {"von": 80, "bis": 89, "name": "Weiss", "art": "color"},
+            {"von": 90, "bis": 99, "name": "Gelb", "art": "color"},
+            {"von": 100, "bis": 109, "name": "Cyan", "art": "color"},
+            {"von": 110, "bis": 119, "name": "Purple", "art": "color"},
+            {"von": 120, "bis": 129, "name": "Alles weiss", "art": "color"},
+            {"von": 130, "bis": 139, "name": "Leer"},
+            {"von": 140, "bis": 149, "name": "Programm 1", "art": ""},
+            {"von": 150, "bis": 159, "name": "Programm 2", "art": ""},
+            {"von": 160, "bis": 169, "name": "Programm 3", "art": ""},
+            {"von": 170, "bis": 179, "name": "Programm 4", "art": ""},
+            {"von": 180, "bis": 189, "name": "Programm 5", "art": ""},
+            {"von": 190, "bis": 199, "name": "Programm 6", "art": ""},
+            {"von": 200, "bis": 209, "name": "Programm 7", "art": ""},
+            {"von": 210, "bis": 219, "name": "Programm 8", "art": ""},
+            {"von": 220, "bis": 229, "name": "Programm 9", "art": ""},
+            {"von": 230, "bis": 233, "name": "Leer"},
+            {"von": 234, "bis": 236, "name": "Reset", "art": "reset"},
+            {"von": 237, "bis": 249, "name": "Leer"},
+            {"von": 250, "bis": 255, "name": "Musiksteuerung", "art": "sound"}
+          ]
+        },
+        {"name": "Speed/Empfindlichkeit", "attribut": "effect_speed", "default": 0, "highlight": 0}
+      ]
+    }
+  ]
+}
