@@ -129,7 +129,7 @@ Neben der Auswahl steht, welche Stufe gerade **aktiv** ist.
 | Stufe | Lichtupdates | Bildschärfe (Pixeldichte) | Schlagschatten | Beim Drehen der Kamera |
 |---|---|---|---|---|
 | **Niedrig** | 15 pro Sekunde | höchstens 1,25-fach | 8, einfach | immer kurz gröber |
-| **Hoch** (Standard) | 30 pro Sekunde | höchstens 2-fach | 8, weich | gröber nur, wenn die Grafikkarte nicht nachkommt (ein Bild braucht länger als 18 ms) |
+| **Hoch** (Standard) | 30 pro Sekunde | höchstens 2-fach | 8, weich | gröber nur, wenn die Grafikkarte nicht nachkommt (sie verpasst regelmäßig Bilder gegenüber dem Bildschirmtakt) |
 | **Maximal** | 44 pro Sekunde | volle Bildschirmdichte | 16, weich | nie gröber |
 
 - **Automatisch (empfohlen)** prüft beim Start die Grafikkarte und wählt
