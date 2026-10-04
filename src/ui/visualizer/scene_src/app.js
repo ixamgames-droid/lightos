@@ -10,6 +10,7 @@
 // Original.
 import { scene, renderer, gpuTier } from './scene/renderer.js';
 import { applyBrightness } from './scene/lights.js';
+import { prepareShadowMap, requestShadowUpdate, shadowUpdateStats } from './scene/shadow_update.js';  // VIZ-69
 import { disposeObj } from './scene/grid_floor.js';
 import { view, fixtures, stageObjects, settings } from './state.js';
 
@@ -125,8 +126,23 @@ registerLiveAnimation(() => !!(view.selectedStageId && stageObjects[view.selecte
 // obwohl die Auswahl (seit 1b persistent) bestehen bleibt. So kein Dauer-rAF.
 registerLiveAnimation(selectionPulseActive);
 
+// VIZ-69: Shadow-Maps nur bei geaenderter Licht-/Objektlage neu zeichnen
+// (scene/shadow_update.js). prepareShadowMap() aktualisiert die Weltmatrizen
+// bereits selbst — scene.autoUpdate fuer den render() direkt danach aus, sonst
+// traversiert three.js die ganze Szene ein zweites Mal. Nur HIER, nicht global:
+// fremde render()-Aufrufer (Galerie, Mess-Sonden) behalten das Standardverhalten.
+function renderFrame() {
+  prepareShadowMap();
+  scene.autoUpdate = false;
+  try {
+    renderer.render(scene, view.activeCam);
+  } finally {
+    scene.autoUpdate = true;
+  }
+}
+
 startRenderLoop({
-  render: () => renderer.render(scene, view.activeCam),
+  render: renderFrame,
   perFrame: perFrameUpdate,
 });
 
@@ -212,6 +228,8 @@ window.__lightos = {
   __resolveDockOnGestureEnd: resolveDockOnGestureEnd,
   // Shadow-Budget (Fix 2026-07-11): Test-Hook fuer die Texture-Unit-Kappung.
   syncSpotShadowBudget,
+  // VIZ-69: Shadow-Map-Neubau nur bei Lage-Aenderung — Test-/Benchmark-Seams.
+  requestShadowUpdate, shadowUpdateStats,
   // Low-Spec-Erkennung (2026-07-11): 'low' | 'high' — Test-/Debug-Hook,
   // Override per ?gputier=low|high in der Page-URL.
   gpuTier,
