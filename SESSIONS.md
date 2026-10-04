@@ -65,6 +65,7 @@
 | OUT-60-FOLGE | B | fix/out60-folge-masken | 2026-10-04T17:24Z | src/core/dmx/output_manager.py · src/core/dmx/serial_process.py |
 | DOC-57 | A | docs/doc57-bilder-bibliothek | 2026-10-04T16:49Z | docs · tools/anleitungsbilder |
 | UI-74 | A | fix/ui74-profile-bearbeiten | 2026-10-04T17:07Z | src/ui/widgets/fixture_editor.py · src/ui/widgets/bibliothek_download_dialog.py · fixtures/bibliothek/eurolite |
+| VIZ-67 | A | docs/viz67-import-objekte | 2026-10-04T17:26Z | BACKLOG.md |
 
 ## Blocker & Fallen
 
@@ -162,7 +163,6 @@
 
 ## Verlauf
 
-- 2026-10-02T22:02Z B claim UI-72
 - 2026-10-02T22:02Z B claim UI-73
 - 2026-10-02T22:03Z B done XPLAT-45
 - 2026-10-02T22:03Z B done FUNKTIONSTEST-B3
@@ -192,3 +192,4 @@
 - 2026-10-04T17:18Z B done SICHT-B-0410
 - 2026-10-04T17:24Z B aktualisiert OUT-60-FOLGE: Dateien src/core/dmx/output_manager.py · src/core/dmx/serial_process.py · tests/test_out60_load_kein_null_frame.py · tests/test_out59_waisen_windows.py -> src/core/dmx/output_manager.py · src/core/dmx/serial_process.py
 - 2026-10-04T17:26Z C done UI-71
+- 2026-10-04T17:26Z A claim VIZ-67
