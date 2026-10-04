@@ -43,7 +43,9 @@ Die **erste Dimmer-Kachel „Lauflicht"** antippen.
 - Beide stören sich nicht (sie schreiben verschiedene Kanäle) und **kombinieren** sich automatisch.
 
 ### Sofort weiterprobieren
-- **Andere Farbe:** einfach eine andere Farb-Kachel tippen (Rot, Blau, …) → die Bewegung läuft sofort in der neuen Farbe.
+- **Andere Farbe:** die Farb-Kacheln färben immer den **zuletzt gestarteten** Effekt um. Nach Schritt 5 ist
+  das die Dimmer-Bewegung — tippe deshalb in Bank 1 erst **„Feste Farbe“** erneut an und dann eine andere
+  Farb-Kachel (Rot, Blau, …).
 - **Andere Bewegung:** in Bank 2 statt „Lauflicht" z. B. **„Innen→Außen"**, **„Puls"** oder **„Welle"** tippen.
 - **Regenbogen-Lauflicht:** in Bank 1 statt „Feste Farbe" das **„Regenbogen"** starten, dann in Bank 2 „Lauflicht" → die Lampen gehen nacheinander an, jede in ihrer Regenbogenfarbe.
 - **Pro Gerätegruppe:** das Gleiche geht getrennt für **Spider** und **Moving Head** (eigene Kacheln in Bank 1/2) — z. B. Paarlichter grünes Lauflicht **und** Spider blauer Puls gleichzeitig.

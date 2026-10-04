@@ -401,7 +401,7 @@ FX_MATRICES = [fx_fire, fx_rain, fx_radar, fx_spiral, fx_wipe, fx_wave]
 # ── EFX (Bewegung) ──────────────────────────────────────────────────────────────────
 def efx(name, algo, fids, phase_mode="fan", spread=1.0, counter=False, mirror=False,
         x=128.0, y=128.0, size=150.0, speed_hz=0.45, xf=3.0, yf=2.0, direction="forward",
-        bus="", mult=1.0):
+        bus="", mult=1.0, rotation=0.0):
     e = fm.new_efx(name)
     e.algorithm = algo
     e.fixtures = [EfxFixture(fid=f) for f in fids]
@@ -411,6 +411,7 @@ def efx(name, algo, fids, phase_mode="fan", spread=1.0, counter=False, mirror=Fa
     e.phase_mode, e.counter_rotate, e.mirror = phase_mode, counter, mirror
     e.x_freq, e.y_freq = xf, yf
     e.direction = direction
+    e.rotation = rotation
     if bus:
         e.tempo_bus_id = bus
         e.tempo_multiplier = mult
@@ -424,7 +425,11 @@ efx_mh_eight = efx("MH Acht", EfxAlgorithm.EIGHT, mh_fids, phase_mode="sync", si
 efx_mh_lissa = efx("MH Lissajous", EfxAlgorithm.LISSAJOUS, mh_fids, phase_mode="fan", size=170, speed_hz=0.4, xf=3.0, yf=2.0)
 efx_mh_square = efx("MH Rechteck", EfxAlgorithm.SQUARE, mh_fids, phase_mode="sync", size=150, speed_hz=0.35)
 efx_spider_scissor = efx("Spider Schere", EfxAlgorithm.CIRCLE, spider_fids, phase_mode="sync", size=200, speed_hz=0.6)
-efx_spider_line = efx("Spider Wippe", EfxAlgorithm.LINE, spider_fids, phase_mode="offset", size=220, speed_hz=0.7)
+# DOC-37: LINE laeuft auf der Pan-Achse — der Spider hat keine, ohne rotation=90
+# blieb die Wippe stehen (gemessen: beide Tilts konstant 128). Wie in
+# build_demo_show_full.py („Spider Schere"): senkrecht auf die Tilt-Achse drehen.
+efx_spider_line = efx("Spider Wippe", EfxAlgorithm.LINE, spider_fids, phase_mode="offset",
+                      size=220, speed_hz=0.7, rotation=90.0)
 efx_all = efx("Alle Mover Fächer", EfxAlgorithm.CIRCLE, mover_fids, phase_mode="fan", counter=True, size=150, speed_hz=0.5)
 EFX_MH = [efx_mh_circle, efx_mh_fan, efx_mh_eight, efx_mh_lissa, efx_mh_square]
 EFX_SPIDER = [efx_spider_scissor, efx_spider_line]
@@ -990,7 +995,7 @@ for i, pb in enumerate(PLAYBACKS):
     pb_fader(f"Dim {i+1}", i, B_MIX, slot=i, midi_cc=48 + i, value=255)
 label("BANK 7  ABLÄUFE / MISCHEN  —  R0: Misch-Collections (Party/Drop/Chill/Theme). R1: Chaser. "
       "R2: GO Cuelisten (Beat-Sync). R3: Live-Chase + Leeren/-/+. R4: Farben hinzufügen. "
-      "Rechts: Cuelisten-Anzeige + Chase-Builder.", X0, 28, 1250, B_MIX)
+      "Rechts: Cuelisten-Anzeige.", X0, 28, 1250, B_MIX)
 
 
 # ── BANK 8 — PROGRAMMER ─────────────────────────────────────────────────────────────
@@ -1008,7 +1013,7 @@ for fid in color_fids:
 func_flash(fixt_strobe, note_rc(1, 1), B_PROG, "#551111")
 COLORS_PROG = [("Rot", 255, 0, 0, 0), ("Grün", 0, 255, 0, 0), ("Blau", 0, 0, 255, 0), ("Gelb", 255, 220, 0, 0),
                ("Cyan", 0, 255, 255, 0), ("Magenta", 255, 0, 255, 0), ("Weiß", 255, 255, 255, 255), ("Aus", 0, 0, 0, 0)]
-for i, (nm, r, g, b, w) in enumerate(COLORS_PROG):                        # R2 = Farb-Kacheln auf Selektion
+for i, (nm, r, g, b, w) in enumerate(COLORS_PROG):                        # R2 = Farb-Kacheln ueber den Programmer
     color_tile(nm, note_rc(2, i), B_PROG, r, g, b, w, target=ColorTarget.PROGRAMMER)
 fader("Rot", 0, B_PROG, SliderMode.PROGRAMMER, programmer_attr="color_r", midi_cc=48, value=0)
 fader("Grün", 1, B_PROG, SliderMode.PROGRAMMER, programmer_attr="color_g", midi_cc=49, value=0)
@@ -1017,8 +1022,11 @@ fader("Weiß", 3, B_PROG, SliderMode.PROGRAMMER, programmer_attr="color_w", midi
 fader("Intensität", 4, B_PROG, SliderMode.PROGRAMMER, programmer_attr="intensity", midi_cc=52, value=255)
 fader("MH Pan", 7, B_PROG, SliderMode.PROGRAMMER, programmer_attr="pan", programmer_scope="group",
       programmer_group="Moving Heads", midi_cc=55, value=128)
-label("BANK 8  PROGRAMMER  —  R0: Gruppe wählen. R1: Voll Weiß / Fixture-Strobe. R2: Farb-Kacheln "
-      "auf Selektion. Fader: R/G/B/W/Intensität + MH-Pan (Pan/Tilt sonst via XY-Pad in Bank 4).",
+# DOC-30: die Kacheln zielen auf den PROGRAMMER (leer = alle Geraete), nicht auf
+# die Auswahl aus Reihe 0 — die Kopfzeile sagte bis 2026-10-02 „auf Selektion".
+label("BANK 8  PROGRAMMER  —  R0: Auswahl (für andere Werkzeuge). R1: Voll Weiß / Fixture-Strobe. "
+      "R2: Farb-Kacheln über den Programmer (leer = alle Geräte). Fader R/G/B/W/Intensität: alle "
+      "Geräte; MH-Pan nur Moving Heads (Pan/Tilt sonst via XY-Pad in Bank 4).",
       X0, 28, 1250, B_PROG)
 
 

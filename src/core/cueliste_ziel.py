@@ -82,6 +82,21 @@ def _pages(state) -> list:
         return []
 
 
+def executor_von(state, stack):
+    """UI-73: ``(page_index, slot)`` des ersten Executors, auf dem ``stack``
+    liegt — oder None. Page-Index 0-basiert wie ``PlaybackEngine.pages``."""
+    if stack is None:
+        return None
+    try:
+        for pi, page in enumerate(_pages(state)):
+            for ex in page:
+                if getattr(ex, "stack", None) is stack:
+                    return pi, getattr(ex, "slot", None)
+    except Exception:
+        pass
+    return None
+
+
 def ziel_cueliste(state):
     """AUFNAHME-Regel (UI-62): gewaehlte Liste, Rueckfall erste (oder None)."""
     stacks = _stacks_snapshot(state)

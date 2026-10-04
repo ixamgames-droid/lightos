@@ -10,8 +10,9 @@
 ---
 
 ### Musik steuern
-In der **universellen Leiste** (unten, auf jeder Bank) bzw. in Bank 6 Reihe 3:
-- **◀ Lied** / **▶/⏸ Play** / **Lied ▶** — vorheriges / Start-Pause / nächstes Lied.
+In der **universellen Leiste** (unten, auf jeder Bank) bzw. in Bank 6 Reihe 4:
+- **„<< Lied“** / **„>/|| Play“** / **„Lied >>“** — vorheriges / Start-Pause / nächstes Lied
+  (in der universellen Leiste heißt die mittlere Taste nur „>/||“).
 - **Musik-BPM** — übernimmt die BPM des laufenden Lieds für die Effekte.
 - Rechts das **Song-Info-Fenster** zeigt Titel + BPM des aktuellen Lieds.
 
@@ -21,7 +22,7 @@ Die Show hat die **Auto-Show eingeschaltet**: Sobald du **▶ Play** drückst, s
 (die beiden Kacheln in Bank 6 Reihe 4).
 
 ### Schritt-für-Schritt
-1. **Bank 6** → **„▶/|| Play"** drücken. → Musik läuft, die Auto-Show startet automatisch das Licht.
+1. **Bank 6** → **„>/|| Play“** drücken. → Musik läuft, die Auto-Show startet automatisch das Licht.
 2. **„Musik-BPM"** tippen → die Effekte laufen auf den Takt des Lieds.
 3. Anderes Lied: **„Lied ▶"**. Auto-Show passt sich an.
 
