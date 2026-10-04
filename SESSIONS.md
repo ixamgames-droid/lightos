@@ -63,7 +63,7 @@
 | FM-59 | A | feat/fm59-bibliothek-runde3 | 2026-10-04T16:47Z | fixtures/bibliothek |
 | UI-72-73-FIX | B | fix/ui72-ui73-playback | 2026-10-02T22:44Z | src/ui/views/playback_view.py · src/core/cueliste_ziel.py · tests/test_ui72_ui73_playback.py |
 | FM-60 | A | fix/fm60-erststart-frage | 2026-10-04T16:47Z | src/core/database/bibliothek_download.py |
-| FM-61 | A | feat/fm61-bibliothek-china | 2026-10-02T22:51Z | fixtures/bibliothek |
+| FM-61 | A | feat/fm61-bibliothek-china | 2026-10-04T16:47Z | fixtures/bibliothek |
 
 ## Blocker & Fallen
 
