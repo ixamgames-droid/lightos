@@ -17,7 +17,7 @@
     "lizenz": "Apache-2.0",
     "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.4 · vidschofelix",
     "original": "resources/fixtures/Varytec/Varytec-Giga-Bar-Pix-8-RGB.qxf",
-    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 10 Wertebereiche mit Art (kind) versehen; Rasterform in 4 Modus/Modi aus <Physical> uebernommen; gegen Herstellerhandbuch V2 (2022-03-24) abgeglichen; Kanal- und Bereichsnamen deutsch, Segmente 1–8 nummeriert; 2-Kanal-Modus: Kanal 2 von raw („No function“) auf effect_speed (Handbuch: Tempo bzw. Mikrofon-Empfindlichkeit je nach Kanal 1), Kanal 1 ohne falsche color-Arten, LEDs aus als closed; 5-Kanal-Modus: Strobe von shutter auf strobe (kein Offen-Bereich im Handbuch); Kurzname, Notizen"
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 10 Wertebereiche mit Art (kind) versehen; Rasterform in 1 Modus/Modi aus <Physical> uebernommen; in 3 weiteren Modus/Modi nicht, weil sie nicht zu den color_r-Kanaelen passt (keine echten Farbzonen); gegen Herstellerhandbuch V2 (2022-03-24) abgeglichen; Kanal- und Bereichsnamen deutsch, Segmente 1–8 nummeriert; 2-Kanal-Modus: Kanal 2 von raw („No function“) auf effect_speed (Handbuch: Tempo bzw. Mikrofon-Empfindlichkeit je nach Kanal 1), Kanal 1 ohne falsche color-Arten, LEDs aus als closed; 5-Kanal-Modus: Strobe von shutter auf strobe (kein Offen-Bereich im Handbuch); Kurzname, Notizen"
   },
   "autor": "LightOS (QXF-Konverter, nachbearbeitet FM-57)",
   "geprueft": {
@@ -27,7 +27,6 @@
   "modi": [
     {
       "name": "2 Channel",
-      "raster": {"rows": 1, "cols": 8},
       "kanaele": [
         {
           "name": "Funktion",
@@ -57,7 +56,6 @@
     },
     {
       "name": "3 Channel",
-      "raster": {"rows": 1, "cols": 8},
       "kanaele": [
         {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
         {"name": "Grün", "attribut": "color_g", "default": 0, "highlight": 255},
@@ -66,7 +64,6 @@
     },
     {
       "name": "5 Channel",
-      "raster": {"rows": 1, "cols": 8},
       "kanaele": [
         {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
         {"name": "Grün", "attribut": "color_g", "default": 0, "highlight": 255},

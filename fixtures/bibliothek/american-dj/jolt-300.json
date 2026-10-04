@@ -16,7 +16,7 @@
     "lizenz": "Apache-2.0",
     "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.7 GIT · David Gouronc + Matt Carter",
     "original": "resources/fixtures/American_DJ/American-DJ-Jolt-300.qxf",
-    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 547 Wertebereiche mit Art (kind) versehen; Rasterform in 8 Modus/Modi aus <Physical> uebernommen; danach von LightOS gegen das Herstellerhandbuch ueberarbeitet: Shutter-Bereiche nach Handbuch klassifiziert (aus=closed, LED an=open, alle Strobe-/Puls-/Random-/Rampen-Bereiche=strobe), Default/Highlight auf Mitte des ersten Offen-Bereichs; Farbmakro-Kanal nach der Handbuch-Tabelle (Farbe 1-64 mit RGBW-Anteilen); Programmgeschwindigkeit als effect_speed; Dimmermodus-/Verzoegerungskanaele als raw; B-Modi: White Master als master (eigener Regler neben dem RGB-Master), in B10 mit segment 0 (dimmt die Weiss-Leiste)"
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 547 Wertebereiche mit Art (kind) versehen; Rasterform in 4 Modus/Modi aus <Physical> uebernommen; in 4 weiteren Modus/Modi nicht, weil sie nicht zu den color_r-Kanaelen passt (keine echten Farbzonen); danach von LightOS gegen das Herstellerhandbuch ueberarbeitet: Shutter-Bereiche nach Handbuch klassifiziert (aus=closed, LED an=open, alle Strobe-/Puls-/Random-/Rampen-Bereiche=strobe), Default/Highlight auf Mitte des ersten Offen-Bereichs; Farbmakro-Kanal nach der Handbuch-Tabelle (Farbe 1-64 mit RGBW-Anteilen); Programmgeschwindigkeit als effect_speed; Dimmermodus-/Verzoegerungskanaele als raw; B-Modi: White Master als master (eigener Regler neben dem RGB-Master), in B10 mit segment 0 (dimmt die Weiss-Leiste)"
   },
   "autor": "LightOS",
   "geprueft": {
@@ -26,7 +26,6 @@
   "modi": [
     {
       "name": "4 Channel",
-      "raster": {"rows": 1, "cols": 3},
       "kanaele": [
         {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
         {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
@@ -36,7 +35,6 @@
     },
     {
       "name": "8 Channel",
-      "raster": {"rows": 1, "cols": 3},
       "kanaele": [
         {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
         {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
@@ -171,7 +169,6 @@
     },
     {
       "name": "A10 Channel",
-      "raster": {"rows": 1, "cols": 3},
       "kanaele": [
         {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
         {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
@@ -358,7 +355,6 @@
     },
     {
       "name": "B10 Channel",
-      "raster": {"rows": 1, "cols": 3},
       "kanaele": [
         {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
         {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},

@@ -412,21 +412,24 @@ class LuminanceCullingJsTest(unittest.TestCase):
             "typeof window.__lightos.fixtures['21'] === 'object'", timeout_s=8.0)
 
         # (a) Dimmer voll offen, Farbe schwarz -> nichts wird emittiert, also
-        #     darf auch kein SpotLight/Beam sichtbar bleiben (A3D-25/A3D-28).
+        #     darf auch kein SpotLight leuchten und kein Beam sichtbar bleiben
+        #     (A3D-25/A3D-28). VIZ-69: der Spot bleibt SICHTBAR mit intensity 0 —
+        #     visible gehoert in r128 zum Shader-Programmschluessel.
         self._emit_until_true(
             lambda: self._push_dmx(0, 0, 0, 255),
-            "window.__lightos.fixtures['21'].spot.visible === false")
+            "window.__lightos.fixtures['21'].spot.intensity === 0")
+        self.assertTrue(self._eval("window.__lightos.fixtures['21'].spot.visible"))
         self.assertFalse(self._eval("window.__lightos.fixtures['21'].beam.visible"))
 
         # (b) Gegenprobe: helle Farbe bei gleichem Dimmer -> sichtbar.
         self._emit_until_true(
             lambda: self._push_dmx(255, 255, 255, 255),
-            "window.__lightos.fixtures['21'].spot.visible === true")
+            "window.__lightos.fixtures['21'].spot.intensity > 0")
 
-        # (c) Farbe hell, Dimmer zu -> weiterhin unsichtbar (Alt-Verhalten).
+        # (c) Farbe hell, Dimmer zu -> weiterhin dunkel (Alt-Verhalten).
         self._emit_until_true(
             lambda: self._push_dmx(255, 255, 255, 0),
-            "window.__lightos.fixtures['21'].spot.visible === false")
+            "window.__lightos.fixtures['21'].spot.intensity === 0")
 
     def test_floor_spot_origin_follows_the_head_not_the_base(self):
         """A3D-26: Der Bodenpool wird ab dem KOPF gerechnet, nicht ab dem Sockel.

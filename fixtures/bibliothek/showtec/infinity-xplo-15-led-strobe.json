@@ -16,7 +16,7 @@
     "lizenz": "Apache-2.0",
     "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.10.6 GIT · Daniele Fogale",
     "original": "resources/fixtures/Showtec/Showtec-Infinity-XPLO-15-LED-Strobe.qxf",
-    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 70 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): kurzname XPLO15; Strobe-Kanaele ohne Bereiche als strobe (Rate) statt shutter; Blitzdauer als duration statt speed, Bereich ohne falsche art strobe; Effekt-Kanal als effect, Dimmkurven als raw; 28-Kanal-Modus: Raster 1x8 (8 Zonen)"
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 70 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): kurzname XPLO15; Strobe-Kanaele ohne Bereiche als strobe (Rate) statt shutter; Blitzdauer als duration statt speed, Bereich ohne falsche art strobe; Effekt-Kanal als effect, Dimmkurven als raw; 28-Kanal-Modus: Raster 1x8 (8 Zonen); Rasterform in 1 Modus/Modi entfernt, weil sie nicht zu den color_r-Kanaelen passt (keine echten Farbzonen)"
   },
   "autor": "LightOS",
   "geprueft": {
@@ -271,8 +271,7 @@
           ]
         },
         {"name": "Zone 8 - Strobe (Rate)", "attribut": "strobe", "default": 0, "highlight": 0}
-      ],
-      "raster": {"rows": 1, "cols": 8}
+      ]
     }
   ]
 }

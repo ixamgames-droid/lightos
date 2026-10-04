@@ -1,0 +1,376 @@
+{
+  "format_version": 1,
+  "hersteller": "Cameo",
+  "hersteller_kurz": "Cameo",
+  "modell": "Pixbar 650 CPRO",
+  "kurzname": "PIXBAR 650 CPRO",
+  "typ": "led_bar",
+  "leistung_w": 0,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Cameo-CLPIXBAR450PRO-CLPIXBAR650PRO.qxf (Teil 650 CPRO)",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Cameo/Cameo-CLPIXBAR450PRO-CLPIXBAR650PRO.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.3 GIT · Jean-Daniel Garcia & Jeremie Odermatt",
+    "original": "resources/fixtures/Cameo/Cameo-CLPIXBAR450PRO-CLPIXBAR650PRO.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 201 Wertebereiche mit Art (kind) versehen; Rasterform in 8 Modus/Modi aus <Physical> uebernommen; QLC+-Sammeldatei fuer 450/650 in zwei Profile geteilt (hier PIXBAR 650 CPRO: gemeinsame Modi 2/3-1/3-2/9 CH plus die 650-CPRO-Pixelmodi, Modusnamen ohne Modellzusatz); Modellname nach Cameo-Artikel CLPIXBAR650CPRO; Raster 1x8 nur in den Pixelmodi (Einzonen-Modi ohne Raster); Strobe-Default/-Highlight 0 statt 2 (Offen-Bereich); Farbmakro: 'Colour off' als 'open', Stopp ohne Art (vorher 'color'), Jumping/Fading 'rotate' statt 'gobo'; im 2-CH-Modus Farbmakro-Highlight 110 (White) statt 0 = Colour off; Sound: 'Sound Control OFF' ohne Art; Tippfehler in Bereichsnamen korrigiert; kurzname/notizen/quelle gesetzt; Leistungsangabe 130 W der Sammeldatei beim 650 CPRO entfernt (gilt fuer das kleinere Modell; 8 x 30 W COB)"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Datei und die LightOS-Attributliste geprueft; Aufbau mit dem Handbuch der Schwesterserie CLPIXBAR200PRO/300PRO/400PRO verglichen (gleiche Farbmakro-, Strobe- und Pattern-Tabellen). Handbuch CLPIXBAR450/650CPRO selbst nicht gefunden, daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "2-CH",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Colour Macro",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 110,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Colour off", "art": "open"},
+            {"von": 6, "bis": 13, "name": "Red", "art": "color"},
+            {"von": 14, "bis": 21, "name": "Amber", "art": "color"},
+            {"von": 22, "bis": 29, "name": "Yellow warm", "art": "color"},
+            {"von": 30, "bis": 37, "name": "Yellow", "art": "color"},
+            {"von": 38, "bis": 45, "name": "Green", "art": "color"},
+            {"von": 46, "bis": 53, "name": "Turquoise", "art": "color"},
+            {"von": 54, "bis": 61, "name": "Cyan", "art": "color"},
+            {"von": 62, "bis": 69, "name": "Blue", "art": "color"},
+            {"von": 70, "bis": 77, "name": "Lavender", "art": "color"},
+            {"von": 78, "bis": 85, "name": "Mauve", "art": "color"},
+            {"von": 86, "bis": 93, "name": "Magenta", "art": "color"},
+            {"von": 94, "bis": 101, "name": "Pink", "art": "color"},
+            {"von": 102, "bis": 109, "name": "Warm white", "art": "color"},
+            {"von": 110, "bis": 117, "name": "White", "art": "color"},
+            {"von": 118, "bis": 125, "name": "Cold White", "art": "color"},
+            {"von": 126, "bis": 128, "name": "Colour Jumping stop", "art": ""},
+            {"von": 129, "bis": 192, "name": "Colour Jumping speed slow -> fast/colour 1 -> 12", "art": "rotate"},
+            {"von": 193, "bis": 255, "name": "Colour Fading speed slow -> fast/Colour 1->12", "art": "rotate"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3-CH Mode 1",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Strobe closed", "art": "closed"},
+            {"von": 11, "bis": 250, "name": "Strobe slow -> fast 0Hz - 20Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        },
+        {
+          "name": "Colour Macro",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Colour off", "art": "open"},
+            {"von": 6, "bis": 13, "name": "Red", "art": "color"},
+            {"von": 14, "bis": 21, "name": "Amber", "art": "color"},
+            {"von": 22, "bis": 29, "name": "Yellow warm", "art": "color"},
+            {"von": 30, "bis": 37, "name": "Yellow", "art": "color"},
+            {"von": 38, "bis": 45, "name": "Green", "art": "color"},
+            {"von": 46, "bis": 53, "name": "Turquoise", "art": "color"},
+            {"von": 54, "bis": 61, "name": "Cyan", "art": "color"},
+            {"von": 62, "bis": 69, "name": "Blue", "art": "color"},
+            {"von": 70, "bis": 77, "name": "Lavender", "art": "color"},
+            {"von": 78, "bis": 85, "name": "Mauve", "art": "color"},
+            {"von": 86, "bis": 93, "name": "Magenta", "art": "color"},
+            {"von": 94, "bis": 101, "name": "Pink", "art": "color"},
+            {"von": 102, "bis": 109, "name": "Warm white", "art": "color"},
+            {"von": 110, "bis": 117, "name": "White", "art": "color"},
+            {"von": 118, "bis": 125, "name": "Cold White", "art": "color"},
+            {"von": 126, "bis": 128, "name": "Colour Jumping stop", "art": ""},
+            {"von": 129, "bis": 192, "name": "Colour Jumping speed slow -> fast/colour 1 -> 12", "art": "rotate"},
+            {"von": 193, "bis": 255, "name": "Colour Fading speed slow -> fast/Colour 1->12", "art": "rotate"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3-CH Mode 2",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "9-CH",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Strobe closed", "art": "closed"},
+            {"von": 11, "bis": 33, "name": "Puls Random, slow -> fast", "art": "strobe"},
+            {"von": 34, "bis": 56, "name": "Ramp up Random, slow -> fast", "art": "strobe"},
+            {"von": 57, "bis": 79, "name": "Ramp down Random, slow -> fast", "art": "strobe"},
+            {"von": 80, "bis": 102, "name": "Random Strobe Effect, slow -> fast", "art": "strobe"},
+            {"von": 103, "bis": 127, "name": "Strobe Break Effect, 5s ...1s (Very short flash)", "art": "strobe"},
+            {"von": 128, "bis": 250, "name": "Strobe slow -> fast 0Hz - 20Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {
+          "name": "Colour Macro",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Colour off", "art": "open"},
+            {"von": 6, "bis": 13, "name": "Red", "art": "color"},
+            {"von": 14, "bis": 21, "name": "Amber", "art": "color"},
+            {"von": 22, "bis": 29, "name": "Yellow warm", "art": "color"},
+            {"von": 30, "bis": 37, "name": "Yellow", "art": "color"},
+            {"von": 38, "bis": 45, "name": "Green", "art": "color"},
+            {"von": 46, "bis": 53, "name": "Turquoise", "art": "color"},
+            {"von": 54, "bis": 61, "name": "Cyan", "art": "color"},
+            {"von": 62, "bis": 69, "name": "Blue", "art": "color"},
+            {"von": 70, "bis": 77, "name": "Lavender", "art": "color"},
+            {"von": 78, "bis": 85, "name": "Mauve", "art": "color"},
+            {"von": 86, "bis": 93, "name": "Magenta", "art": "color"},
+            {"von": 94, "bis": 101, "name": "Pink", "art": "color"},
+            {"von": 102, "bis": 109, "name": "Warm white", "art": "color"},
+            {"von": 110, "bis": 117, "name": "White", "art": "color"},
+            {"von": 118, "bis": 125, "name": "Cold White", "art": "color"},
+            {"von": 126, "bis": 128, "name": "Colour Jumping stop", "art": ""},
+            {"von": 129, "bis": 192, "name": "Colour Jumping speed slow -> fast/colour 1 -> 12", "art": "rotate"},
+            {"von": 193, "bis": 255, "name": "Colour Fading speed slow -> fast/Colour 1->12", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Colour Temperature",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "off", "art": ""},
+            {"von": 6, "bis": 255, "name": "cold to warm", "art": ""}
+          ]
+        },
+        {
+          "name": "Pattern",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Pattern off", "art": ""},
+            {"von": 6, "bis": 23, "name": "Dream", "art": ""},
+            {"von": 24, "bis": 41, "name": "Meteor", "art": ""},
+            {"von": 42, "bis": 59, "name": "Fade", "art": ""},
+            {"von": 60, "bis": 77, "name": "Jump", "art": ""},
+            {"von": 78, "bis": 95, "name": "Flow1", "art": ""},
+            {"von": 96, "bis": 113, "name": "Flow2", "art": ""},
+            {"von": 114, "bis": 131, "name": "Flow3", "art": ""},
+            {"von": 132, "bis": 149, "name": "Flow4", "art": ""},
+            {"von": 150, "bis": 167, "name": "Flow5", "art": ""},
+            {"von": 168, "bis": 185, "name": "Flow6", "art": ""},
+            {"von": 186, "bis": 203, "name": "Flow7", "art": ""},
+            {"von": 204, "bis": 221, "name": "Flow8", "art": ""},
+            {"von": 222, "bis": 239, "name": "Flow9", "art": ""},
+            {"von": 240, "bis": 255, "name": "Empty", "art": ""}
+          ]
+        },
+        {
+          "name": "Sound",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Sound Control OFF (Mic sensitivity)", "art": ""},
+            {"von": 6, "bis": 255, "name": "Sound Control ON Low -> High (Mic sensitivity)", "art": "sound"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "26-CH",
+      "raster": {"rows": 1, "cols": 8},
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Strobe closed", "art": "closed"},
+            {"von": 11, "bis": 33, "name": "Puls Random, slow -> fast", "art": "strobe"},
+            {"von": 34, "bis": 56, "name": "Ramp up Random, slow -> fast", "art": "strobe"},
+            {"von": 57, "bis": 79, "name": "Ramp down Random, slow -> fast", "art": "strobe"},
+            {"von": 80, "bis": 102, "name": "Random Strobe Effect, slow -> fast", "art": "strobe"},
+            {"von": 103, "bis": 127, "name": "Strobe Break Effect, 5s ...1s (Very short flash)", "art": "strobe"},
+            {"von": 128, "bis": 250, "name": "Strobe slow -> fast 0Hz - 20Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        },
+        {"name": "Red 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red 3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red 4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 4", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red 5", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 5", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 5", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red 6", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 6", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 6", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red 7", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 7", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 7", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red 8", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 8", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 8", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "30-CH",
+      "raster": {"rows": 1, "cols": 8},
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Strobe closed", "art": "closed"},
+            {"von": 11, "bis": 33, "name": "Puls Random, slow -> fast", "art": "strobe"},
+            {"von": 34, "bis": 56, "name": "Ramp up Random, slow -> fast", "art": "strobe"},
+            {"von": 57, "bis": 79, "name": "Ramp down Random, slow -> fast", "art": "strobe"},
+            {"von": 80, "bis": 102, "name": "Random Strobe Effect, slow -> fast", "art": "strobe"},
+            {"von": 103, "bis": 127, "name": "Strobe Break Effect, 5s ...1s (Very short flash)", "art": "strobe"},
+            {"von": 128, "bis": 250, "name": "Strobe slow -> fast 0Hz - 20Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        },
+        {"name": "Red 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red 3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red 4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 4", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red 5", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 5", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 5", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red 6", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 6", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 6", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red 7", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 7", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 7", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red 8", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 8", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 8", "attribut": "color_b", "default": 0, "highlight": 255},
+        {
+          "name": "Colour Macro",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Colour off", "art": "open"},
+            {"von": 6, "bis": 13, "name": "Red", "art": "color"},
+            {"von": 14, "bis": 21, "name": "Amber", "art": "color"},
+            {"von": 22, "bis": 29, "name": "Yellow warm", "art": "color"},
+            {"von": 30, "bis": 37, "name": "Yellow", "art": "color"},
+            {"von": 38, "bis": 45, "name": "Green", "art": "color"},
+            {"von": 46, "bis": 53, "name": "Turquoise", "art": "color"},
+            {"von": 54, "bis": 61, "name": "Cyan", "art": "color"},
+            {"von": 62, "bis": 69, "name": "Blue", "art": "color"},
+            {"von": 70, "bis": 77, "name": "Lavender", "art": "color"},
+            {"von": 78, "bis": 85, "name": "Mauve", "art": "color"},
+            {"von": 86, "bis": 93, "name": "Magenta", "art": "color"},
+            {"von": 94, "bis": 101, "name": "Pink", "art": "color"},
+            {"von": 102, "bis": 109, "name": "Warm white", "art": "color"},
+            {"von": 110, "bis": 117, "name": "White", "art": "color"},
+            {"von": 118, "bis": 125, "name": "Cold White", "art": "color"},
+            {"von": 126, "bis": 128, "name": "Colour Jumping stop", "art": ""},
+            {"von": 129, "bis": 192, "name": "Colour Jumping speed slow -> fast/colour 1 -> 12", "art": "rotate"},
+            {"von": 193, "bis": 255, "name": "Colour Fading speed slow -> fast/Colour 1->12", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Colour Temperature",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "off", "art": ""},
+            {"von": 6, "bis": 255, "name": "cold to warm", "art": ""}
+          ]
+        },
+        {
+          "name": "Pattern",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Pattern off", "art": ""},
+            {"von": 6, "bis": 23, "name": "Dream", "art": ""},
+            {"von": 24, "bis": 41, "name": "Meteor", "art": ""},
+            {"von": 42, "bis": 59, "name": "Fade", "art": ""},
+            {"von": 60, "bis": 77, "name": "Jump", "art": ""},
+            {"von": 78, "bis": 95, "name": "Flow1", "art": ""},
+            {"von": 96, "bis": 113, "name": "Flow2", "art": ""},
+            {"von": 114, "bis": 131, "name": "Flow3", "art": ""},
+            {"von": 132, "bis": 149, "name": "Flow4", "art": ""},
+            {"von": 150, "bis": 167, "name": "Flow5", "art": ""},
+            {"von": 168, "bis": 185, "name": "Flow6", "art": ""},
+            {"von": 186, "bis": 203, "name": "Flow7", "art": ""},
+            {"von": 204, "bis": 221, "name": "Flow8", "art": ""},
+            {"von": 222, "bis": 239, "name": "Flow9", "art": ""},
+            {"von": 240, "bis": 255, "name": "Empty", "art": ""}
+          ]
+        },
+        {
+          "name": "Sound",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Sound Control OFF (Mic sensitivity)", "art": ""},
+            {"von": 6, "bis": 255, "name": "Sound Control ON Low -> High (Mic sensitivity)", "art": "sound"}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "COB-LED-Bar CLPIXBAR650CPRO, 8 RGB-COB-Zellen in einer Reihe; Pixelsteuerung nur in den beiden langen Modi."
+}

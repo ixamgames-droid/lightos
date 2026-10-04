@@ -1,0 +1,224 @@
+{
+  "format_version": 1,
+  "hersteller": "U King",
+  "hersteller_kurz": "UKING",
+  "modell": "LED Spot Moving Head 100W",
+  "kurzname": "UKSPOT100",
+  "typ": "moving_head",
+  "leistung_w": 100,
+  "notizen": "Kein Herstellerhandbuch abrufbar; Kanalfolge und Wertebereiche aus der QLC+-Datei. Strobe-Kanaele ohne Wertangabe in QLC+: 0 = kein Strobe angenommen (wie bei den eingebauten U-King-Profilen). Farbrad 14 Positionen + Auto, Goborad 8 Muster (1 = offen) + Shake + Auto.",
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition UKing-LED-Spot-Moving-Head-100W.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/UKing/UKing-LED-Spot-Moving-Head-100W.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.4 · Jay Seaman",
+    "original": "resources/fixtures/UKing/UKing-LED-Spot-Moving-Head-100W.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 92 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): Hersteller 'UKing' -> 'U King' (wie die eingebauten LightOS-Profile der Marke); Attribute korrigiert (Other Mode: macro->reset); Strobe-Kanal ohne Bereiche (QLC+-Preset ShutterStrobeSlowFast) mit 0 = kein Strobe (open) / 1-255 Strobe versehen (Strobe); 26 Bereichs-Arten nachgezogen (Farb-/Gobo-Slots, Shake/Rotation, Prisma, Sound, Reset; Programm-Bereiche in Makro-Kanaelen ohne Farb-Art); Kanal 'Other Mode' (Auto-Bewegung + Reset 250-255) als reset statt zweitem macro; einzelne Kanalnamen deutsch bzw. eindeutiger benannt"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Originaldatei geprueft und nach den LightOS-Regeln (SCHEMA.md) nachbearbeitet; ein Herstellerhandbuch war nicht abrufbar (U'King-Anleitungen nur als Amazon-/manuals.plus-PDF, dort gesperrt; ManualsLib fuehrt das Modell nicht), daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "11 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan Fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt Fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Color Select",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "White", "art": "open"},
+            {"von": 10, "bis": 19, "name": "Red", "art": "color"},
+            {"von": 20, "bis": 29, "name": "Green", "art": "color"},
+            {"von": 30, "bis": 39, "name": "Blue", "art": "color"},
+            {"von": 40, "bis": 49, "name": "Yellow", "art": "color"},
+            {"von": 50, "bis": 59, "name": "Amber", "art": "color"},
+            {"von": 60, "bis": 69, "name": "Cyan", "art": "color"},
+            {"von": 70, "bis": 79, "name": "Magenta", "art": "color"},
+            {"von": 80, "bis": 89, "name": "Magenta / Cyan", "art": "color"},
+            {"von": 90, "bis": 99, "name": "Cyan / Amber", "art": "color"},
+            {"von": 100, "bis": 109, "name": "Amber / Yellow", "art": "color"},
+            {"von": 110, "bis": 119, "name": "Yellow / Blue", "art": "color"},
+            {"von": 120, "bis": 129, "name": "Blue / Green", "art": "color"},
+            {"von": 130, "bis": 139, "name": "Green / Red", "art": "color"},
+            {"von": 140, "bis": 255, "name": "Color Change Automatic Slow to Fast", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Pattern",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Pattern 1 - Clear", "art": "open"},
+            {"von": 8, "bis": 15, "name": "Pattern 2 - Flower", "art": "gobo"},
+            {"von": 16, "bis": 23, "name": "Pattern 3 - Circles", "art": "gobo"},
+            {"von": 24, "bis": 31, "name": "Pattern 4 - Triangle", "art": "gobo"},
+            {"von": 32, "bis": 39, "name": "Pattern 5 - Star", "art": "gobo"},
+            {"von": 40, "bis": 47, "name": "Pattern 6 - Sunburst", "art": "gobo"},
+            {"von": 48, "bis": 55, "name": "Pattern 7 - Spiral", "art": "gobo"},
+            {"von": 56, "bis": 63, "name": "Pattern 8 - Triangle Breakup", "art": "gobo"},
+            {"von": 64, "bis": 71, "name": "Pattern 1 Dither slow to fast", "art": "shake"},
+            {"von": 72, "bis": 79, "name": "Pattern 2 Dither slow to fast", "art": "shake"},
+            {"von": 80, "bis": 87, "name": "Pattern 3 Dither slow to fast", "art": "shake"},
+            {"von": 88, "bis": 95, "name": "Pattern 4 Dither slow to fast", "art": "shake"},
+            {"von": 96, "bis": 103, "name": "Pattern 5 Dither slow to fast", "art": "shake"},
+            {"von": 104, "bis": 111, "name": "Pattern 6 Dither slow to fast", "art": "shake"},
+            {"von": 112, "bis": 119, "name": "Pattern 7 Dither slow to fast", "art": "shake"},
+            {"von": 120, "bis": 127, "name": "Pattern 8 Dither slow to fast", "art": "shake"},
+            {"von": 128, "bis": 255, "name": "Pattern Auto Change slow to fast", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 1, "bis": 255, "name": "Strobe langsam → schnell", "art": "strobe"}
+          ]
+        },
+        {"name": "Brightness", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Tilt/Pan speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Auto-/Sound-Modus",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 59, "name": "Other Mode", "art": ""},
+            {"von": 60, "bis": 84, "name": "Automatic Mode 3", "art": ""},
+            {"von": 85, "bis": 109, "name": "Automatic Mode 2", "art": ""},
+            {"von": 110, "bis": 134, "name": "Automatic Mode 1", "art": ""},
+            {"von": 135, "bis": 159, "name": "Automatic Mode 0", "art": ""},
+            {"von": 160, "bis": 184, "name": "Sound Mode 3", "art": "sound"},
+            {"von": 185, "bis": 209, "name": "Sound Mode 2", "art": "sound"},
+            {"von": 210, "bis": 234, "name": "Sound Mode 1", "art": "sound"},
+            {"von": 235, "bis": 255, "name": "Sound Mode 0", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Auto-Bewegung / Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 20, "name": "Other Mode", "art": ""},
+            {"von": 21, "bis": 100, "name": "X-Motor Auto Mode", "art": ""},
+            {"von": 101, "bis": 200, "name": "Y-Motor Auto Mode", "art": ""},
+            {"von": 201, "bis": 249, "name": "XY Motor Auto Mode", "art": ""},
+            {"von": 250, "bis": 255, "name": "Reset", "art": "reset"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "9 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {
+          "name": "Color Select",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "White", "art": "open"},
+            {"von": 10, "bis": 19, "name": "Red", "art": "color"},
+            {"von": 20, "bis": 29, "name": "Green", "art": "color"},
+            {"von": 30, "bis": 39, "name": "Blue", "art": "color"},
+            {"von": 40, "bis": 49, "name": "Yellow", "art": "color"},
+            {"von": 50, "bis": 59, "name": "Amber", "art": "color"},
+            {"von": 60, "bis": 69, "name": "Cyan", "art": "color"},
+            {"von": 70, "bis": 79, "name": "Magenta", "art": "color"},
+            {"von": 80, "bis": 89, "name": "Magenta / Cyan", "art": "color"},
+            {"von": 90, "bis": 99, "name": "Cyan / Amber", "art": "color"},
+            {"von": 100, "bis": 109, "name": "Amber / Yellow", "art": "color"},
+            {"von": 110, "bis": 119, "name": "Yellow / Blue", "art": "color"},
+            {"von": 120, "bis": 129, "name": "Blue / Green", "art": "color"},
+            {"von": 130, "bis": 139, "name": "Green / Red", "art": "color"},
+            {"von": 140, "bis": 255, "name": "Color Change Automatic Slow to Fast", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Pattern",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Pattern 1 - Clear", "art": "open"},
+            {"von": 8, "bis": 15, "name": "Pattern 2 - Flower", "art": "gobo"},
+            {"von": 16, "bis": 23, "name": "Pattern 3 - Circles", "art": "gobo"},
+            {"von": 24, "bis": 31, "name": "Pattern 4 - Triangle", "art": "gobo"},
+            {"von": 32, "bis": 39, "name": "Pattern 5 - Star", "art": "gobo"},
+            {"von": 40, "bis": 47, "name": "Pattern 6 - Sunburst", "art": "gobo"},
+            {"von": 48, "bis": 55, "name": "Pattern 7 - Spiral", "art": "gobo"},
+            {"von": 56, "bis": 63, "name": "Pattern 8 - Triangle Breakup", "art": "gobo"},
+            {"von": 64, "bis": 71, "name": "Pattern 1 Dither slow to fast", "art": "shake"},
+            {"von": 72, "bis": 79, "name": "Pattern 2 Dither slow to fast", "art": "shake"},
+            {"von": 80, "bis": 87, "name": "Pattern 3 Dither slow to fast", "art": "shake"},
+            {"von": 88, "bis": 95, "name": "Pattern 4 Dither slow to fast", "art": "shake"},
+            {"von": 96, "bis": 103, "name": "Pattern 5 Dither slow to fast", "art": "shake"},
+            {"von": 104, "bis": 111, "name": "Pattern 6 Dither slow to fast", "art": "shake"},
+            {"von": 112, "bis": 119, "name": "Pattern 7 Dither slow to fast", "art": "shake"},
+            {"von": 120, "bis": 127, "name": "Pattern 8 Dither slow to fast", "art": "shake"},
+            {"von": 128, "bis": 255, "name": "Pattern Auto Change slow to fast", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 1, "bis": 255, "name": "Strobe langsam → schnell", "art": "strobe"}
+          ]
+        },
+        {"name": "Brightness", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Tilt/Pan speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Auto-/Sound-Modus",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 59, "name": "Other Mode", "art": ""},
+            {"von": 60, "bis": 84, "name": "Automatic Mode 3", "art": ""},
+            {"von": 85, "bis": 109, "name": "Automatic Mode 2", "art": ""},
+            {"von": 110, "bis": 134, "name": "Automatic Mode 1", "art": ""},
+            {"von": 135, "bis": 159, "name": "Automatic Mode 0", "art": ""},
+            {"von": 160, "bis": 184, "name": "Sound Mode 3", "art": "sound"},
+            {"von": 185, "bis": 209, "name": "Sound Mode 2", "art": "sound"},
+            {"von": 210, "bis": 234, "name": "Sound Mode 1", "art": "sound"},
+            {"von": 235, "bis": 255, "name": "Sound Mode 0", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Auto-Bewegung / Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 20, "name": "Other Mode", "art": ""},
+            {"von": 21, "bis": 100, "name": "X-Motor Auto Mode", "art": ""},
+            {"von": 101, "bis": 200, "name": "Y-Motor Auto Mode", "art": ""},
+            {"von": 201, "bis": 249, "name": "XY Motor Auto Mode", "art": ""},
+            {"von": 250, "bis": 255, "name": "Reset", "art": "reset"}
+          ]
+        }
+      ]
+    }
+  ]
+}

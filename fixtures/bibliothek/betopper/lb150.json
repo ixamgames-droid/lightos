@@ -1,0 +1,166 @@
+{
+  "format_version": 1,
+  "hersteller": "Betopper",
+  "hersteller_kurz": "Betopper",
+  "modell": "LB150",
+  "kurzname": "LB150",
+  "typ": "moving_head",
+  "leistung_w": 150,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Betopper-LB150.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Betopper/Betopper-LB150.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.3.0 GIT · The Ward Studios",
+    "original": "resources/fixtures/Betopper/Betopper-LB150.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 86 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung: Gobo 'Open' art gobo -> open; Farbrad Weiss 0-10 art open; Prisma-Einfahren art prism; Reset-Kanal 'No function' nicht mehr als reset markiert"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Quelldatei und auf innere Stimmigkeit geprueft; kein Herstellerhandbuch oeffentlich auffindbar, nicht am Geraet geprueft"
+  },
+  "modi": [
+    {
+      "name": "12 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan Fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt Fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt Speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Dimming", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 104,
+          "highlight": 104,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Light off", "art": "closed"},
+            {"von": 11, "bis": 99, "name": "Normal strobe (from slow to fast)", "art": "strobe"},
+            {"von": 100, "bis": 109, "name": "Light on", "art": "open"},
+            {"von": 110, "bis": 179, "name": "Pulse strobe (from slow to fast)", "art": "strobe"},
+            {"von": 180, "bis": 189, "name": "Light on", "art": "open"},
+            {"von": 190, "bis": 250, "name": "Random strobe (from slow to fast)", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Light on", "art": "open"}
+          ]
+        },
+        {
+          "name": "Color Wheel",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "White (offen)", "art": "open"},
+            {"von": 11, "bis": 15, "name": "White + Red", "art": "color"},
+            {"von": 16, "bis": 20, "name": "Red", "art": "color"},
+            {"von": 21, "bis": 25, "name": "Red + Green", "art": "color"},
+            {"von": 26, "bis": 30, "name": "Green", "art": "color"},
+            {"von": 31, "bis": 35, "name": "Green + Blue", "art": "color"},
+            {"von": 36, "bis": 40, "name": "Blue", "art": "color"},
+            {"von": 41, "bis": 45, "name": "Blue + Yellow", "art": "color"},
+            {"von": 46, "bis": 50, "name": "Yellow", "art": "color"},
+            {"von": 51, "bis": 55, "name": "Yellow + Orange", "art": "color"},
+            {"von": 56, "bis": 60, "name": "Orange", "art": "color"},
+            {"von": 61, "bis": 65, "name": "Orange + Rose red", "art": "color"},
+            {"von": 66, "bis": 70, "name": "Rose red", "art": "color"},
+            {"von": 71, "bis": 75, "name": "Rose red + Light blue", "art": "color"},
+            {"von": 76, "bis": 80, "name": "Light blue", "art": "color"},
+            {"von": 81, "bis": 85, "name": "Light blue + Grass green", "art": "color"},
+            {"von": 86, "bis": 90, "name": "Grass green", "art": "color"},
+            {"von": 91, "bis": 95, "name": "Grass green + Cyan", "art": "color"},
+            {"von": 96, "bis": 100, "name": "Cyan", "art": "color"},
+            {"von": 101, "bis": 105, "name": "Cyan + 3200K", "art": "color"},
+            {"von": 106, "bis": 110, "name": "3200K", "art": "color"},
+            {"von": 111, "bis": 115, "name": "3200K + 5600K", "art": "color"},
+            {"von": 116, "bis": 120, "name": "5600K", "art": "color"},
+            {"von": 121, "bis": 125, "name": "5600K + White", "art": "color"},
+            {"von": 126, "bis": 130, "name": "White", "art": "color"},
+            {"von": 131, "bis": 191, "name": "Not defined", "art": ""},
+            {"von": 192, "bis": 225, "name": "Clockwise rotation", "art": "rotate"},
+            {"von": 226, "bis": 255, "name": "Counterclockwise rotation", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo Wheel",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Open", "art": "open"},
+            {"von": 11, "bis": 15, "name": "Gobo 1", "art": "gobo"},
+            {"von": 16, "bis": 20, "name": "Gobo 2", "art": "gobo"},
+            {"von": 21, "bis": 25, "name": "Gobo 3", "art": "gobo"},
+            {"von": 26, "bis": 30, "name": "Gobo 4", "art": "gobo"},
+            {"von": 31, "bis": 35, "name": "Gobo 5", "art": "gobo"},
+            {"von": 36, "bis": 40, "name": "Gobo 6", "art": "gobo"},
+            {"von": 41, "bis": 45, "name": "Gobo 7", "art": "gobo"},
+            {"von": 46, "bis": 50, "name": "Gobo 8", "art": "gobo"},
+            {"von": 51, "bis": 55, "name": "Gobo 9", "art": "gobo"},
+            {"von": 56, "bis": 60, "name": "Gobo 10", "art": "gobo"},
+            {"von": 61, "bis": 65, "name": "Gobo 11", "art": "gobo"},
+            {"von": 66, "bis": 70, "name": "Gobo 12", "art": "gobo"},
+            {"von": 71, "bis": 75, "name": "Gobo 13", "art": "gobo"},
+            {"von": 76, "bis": 80, "name": "Open", "art": "open"},
+            {"von": 81, "bis": 87, "name": "Shaking Gobo 1 (slow to fast)", "art": "shake"},
+            {"von": 88, "bis": 94, "name": "Shaking Gobo 2 (slow to fast)", "art": "shake"},
+            {"von": 95, "bis": 101, "name": "Shaking Gobo 3 (slow to fast)", "art": "shake"},
+            {"von": 102, "bis": 108, "name": "Shaking Gobo 4 (slow to fast)", "art": "shake"},
+            {"von": 109, "bis": 115, "name": "Shaking Gobo 5 (slow to fast)", "art": "shake"},
+            {"von": 116, "bis": 122, "name": "Shaking Gobo 6 (slow to fast)", "art": "shake"},
+            {"von": 123, "bis": 129, "name": "Shaking Gobo 7 (slow to fast)", "art": "shake"},
+            {"von": 130, "bis": 136, "name": "Shaking Gobo 8 (slow to fast)", "art": "shake"},
+            {"von": 137, "bis": 143, "name": "Shaking Gobo 9 (slow to fast)", "art": "shake"},
+            {"von": 144, "bis": 150, "name": "Shaking Gobo 10 (slow to fast)", "art": "shake"},
+            {"von": 151, "bis": 157, "name": "Shaking Gobo 11 (slow to fast)", "art": "shake"},
+            {"von": 158, "bis": 164, "name": "Shaking Gobo 12 (slow to fast)", "art": "shake"},
+            {"von": 165, "bis": 171, "name": "Shaking Gobo 13 (slow to fast)", "art": "shake"},
+            {"von": 172, "bis": 180, "name": "Open", "art": "open"},
+            {"von": 181, "bis": 221, "name": "Clockwise rotation (fast to slow)", "art": "rotate"},
+            {"von": 222, "bis": 255, "name": "Counterclockwise rotation (slow to fast)", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Prism",
+          "attribut": "prism",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Prism off", "art": ""},
+            {"von": 11, "bis": 155, "name": "Prism insertion", "art": "prism"},
+            {"von": 156, "bis": 157, "name": "Rotation stop", "art": ""},
+            {"von": 158, "bis": 205, "name": "Counterclockwise rotation (slow to fast)", "art": "rotate"},
+            {"von": 206, "bis": 207, "name": "Rotation stop", "art": ""},
+            {"von": 208, "bis": 255, "name": "Clockwise rotation (fast to slow)", "art": "rotate"}
+          ]
+        },
+        {"name": "Reserved", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Reset/Function",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 40, "name": "No function", "art": ""},
+            {"von": 41, "bis": 50, "name": "600Hz", "art": ""},
+            {"von": 51, "bis": 60, "name": "2000Hz", "art": ""},
+            {"von": 61, "bis": 70, "name": "4000Hz", "art": ""},
+            {"von": 71, "bis": 80, "name": "8000Hz", "art": ""},
+            {"von": 81, "bis": 90, "name": "20000Hz", "art": ""},
+            {"von": 91, "bis": 100, "name": "Dimmer curve: linear", "art": ""},
+            {"von": 101, "bis": 110, "name": "Dimmer curve: square curve", "art": ""},
+            {"von": 111, "bis": 120, "name": "Dimmer curve: inverse square curve", "art": ""},
+            {"von": 121, "bis": 130, "name": "Dimmer curve: S curve", "art": ""},
+            {"von": 131, "bis": 140, "name": "Pan/Tilt reset", "art": "reset"},
+            {"von": 141, "bis": 150, "name": "Effect reset", "art": "reset"},
+            {"von": 151, "bis": 160, "name": "All reset", "art": "reset"},
+            {"von": 161, "bis": 255, "name": "No function", "art": ""}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Beam-Moving-Head; Strobe-Default 104 (Licht an) aus QLC+."
+}
