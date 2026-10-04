@@ -248,6 +248,20 @@ class Viz71ApplyDmxSceneTest(unittest.TestCase):
         self.assertAlmostEqual(self._spot()["r"], 1.0, places=2)
 
     # ── Push-Skript + Aufraeumen ──────────────────────────────────────────────
+    def test_push_skript_meldet_bereitschaft_als_zahl(self):
+        from src.ui.visualizer.dmx_push import push_script
+        self._load_and_wait()
+        self._bauen(_geraet())
+        r = self._eval(push_script([(3, _rot())]))
+        self.assertEqual(r, 1, "Rueckgabe muss eine Zahl sein (Anzahl angewandt)")
+        self.assertAlmostEqual(self._spot()["r"], 1.0, places=2)
+        # Ohne window.__lightos (Seite laedt noch): -1.
+        r = self._eval("(function(){ const L = window.__lightos;"
+                       " delete window.__lightos;"
+                       " const r = (%s); window.__lightos = L; return r; })()"
+                       % push_script([(4, _rot())]))
+        self.assertEqual(r, -1)
+
     def test_entferntes_geraet_vergisst_seinen_stand(self):
         self._load_and_wait()
         self._bauen(_geraet())

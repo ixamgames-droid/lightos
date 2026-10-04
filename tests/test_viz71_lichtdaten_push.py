@@ -171,5 +171,284 @@ class ServiceStrukturiertTest(_TestBasis):
         svc.shutdown()
 
 
+# ── S2: Push-Kanal je Seite ─────────────────────────────────────────────────
+import re  # noqa: E402
+
+from PySide6.QtCore import QObject, Signal  # noqa: E402
+
+from src.ui.visualizer.dmx_push import DmxPushChannel, push_script  # noqa: E402
+
+
+class _Seite(QObject):
+    renderProcessTerminated = Signal(object, int)
+
+    def __init__(self):
+        super().__init__()
+        self.aufrufe = []            # [(skript, rueckruf)]
+
+    def runJavaScript(self, skript, rueckruf=None):
+        self.aufrufe.append((skript, rueckruf))
+
+
+class _View(QObject):
+    loadStarted = Signal()
+
+    def __init__(self):
+        super().__init__()
+        self.seite = _Seite()
+
+    def page(self):
+        return self.seite
+
+
+def _zerlegen(skript):
+    """Push-Skript -> (payloads, seq) — so, wie JS es sieht."""
+    m = re.search(r"L\.applyDmx\((\[.*\]),(\[[^\]]*\]|-?\d+)\):-1", skript)
+    assert m, skript
+    return json.loads(m.group(1)), json.loads(m.group(2))
+
+
+class _Uhr:
+    def __init__(self):
+        self.t = 100.0
+
+    def __call__(self):
+        return self.t
+
+
+class _PushBasis(_TestBasis):
+    def _aufbau(self, n=2, **kanal_kw):
+        self.st = _state(n)
+        self.svc = VisualizerService(self.st)
+        self.view = _View()
+        self.uhr = _Uhr()
+        self.geplant = []
+        self.poll_eintraege = []
+        self.poll_geleert = []
+        poll = SimpleNamespace(
+            _poll_merge_entries=lambda e: self.poll_eintraege.extend(list(e)),
+            _poll_clear_dmx=lambda: self.poll_geleert.append(True))
+        self._poll = poll                  # Kanal haelt ihn nur schwach
+        self.kanal = DmxPushChannel(
+            self.view, on_need_full=lambda: self.svc.force_full_resync(self.ziel),
+            poll=poll, clock=self.uhr,
+            schedule=lambda ms, fn: self.geplant.append((ms, fn)), **kanal_kw)
+        self.ziel = VisualizerTarget("fenster", lambda s: None,
+                                     emit_payloads=self.kanal.push)
+        self.svc.attach_target(self.ziel)
+        self.svc.set_target_active(self.ziel, True)
+        self.svc._timer.stop()             # Ticks treibt der Test selbst
+
+    def _aufrufe(self):
+        return self.view.seite.aufrufe
+
+    def _antworten(self, r=1, i=-1):
+        skript, cb = self._aufrufe()[i]
+        cb(r)
+
+    def _tick(self, dt=0.034):
+        self.uhr.t += dt
+        self.svc._tick()
+
+    def tearDown(self):
+        if getattr(self, "svc", None) is not None:
+            self.svc.shutdown()
+        super().tearDown()
+
+
+class PushKanalTest(_PushBasis):
+    # T1
+    def test_geaenderter_dmx_geht_im_selben_tick_raus(self):
+        self._aufbau()
+        self._tick()
+        self.assertEqual(len(self._aufrufe()), 1, "erster Tick: Vollbatch")
+        self._antworten(2)
+        self.st.universes[1].set_channel(1, 255)
+        vorher = len(self._aufrufe())
+        self._tick()
+        self.assertEqual(len(self._aufrufe()), vorher + 1,
+                         "geaendertes DMX muss im selben Tick per runJavaScript raus")
+        arr, seq = _zerlegen(self._aufrufe()[-1][0])
+        self.assertEqual([d["fid"] for d in arr], [1])
+        self.assertEqual(arr[0]["r"], 255)
+
+    # T2
+    def test_unterwegs_wird_je_geraet_ganz_zusammengefuehrt(self):
+        self._aufbau()
+        self._tick()
+        self._antworten(2)
+        self.st.universes[1].set_channel(1, 10)
+        self._tick()                       # Batch A unterwegs
+        n_a = len(self._aufrufe())
+        self.st.universes[1].set_channel(1, 20)
+        self.st.universes[1].set_channel(11, 30)
+        self._tick()
+        self.st.universes[1].set_channel(1, 40)
+        self._tick()
+        self.assertEqual(len(self._aufrufe()), n_a, "zweiter Batch, obwohl einer unterwegs ist")
+        self._antworten(1)                 # Rueckruf fuer A
+        self.assertEqual(len(self._aufrufe()), n_a + 1, "nach dem Rueckruf genau EIN Batch")
+        arr, seq = _zerlegen(self._aufrufe()[-1][0])
+        werte = {d["fid"]: d["r"] for d in arr}
+        self.assertEqual(werte, {1: 40, 2: 30}, "je Geraet der neueste ganze Eintrag")
+        self.assertIsInstance(seq, list, "Eintraege aus verschiedenen Ticks -> Seq je Eintrag")
+        self.assertEqual(len(seq), 2)
+
+    def test_kopfzahl_faellt_heads_ueberlebt_nicht(self):
+        """A3D-04-Regel im Push-Puffer: ganzer Eintrag, nie dict.update."""
+        self._aufbau()
+        mit = {"fid": 1, "r": 1, "heads": [{"r": 1}, {"r": 2}]}
+        ohne = {"fid": 1, "r": 2}
+        self.kanal.push([{"fid": 9}], True, 1)    # Batch unterwegs
+        self.kanal.push([mit], False, 2)
+        self.kanal.push([ohne], False, 3)
+        self.uhr.t += 0.05
+        self._antworten(1)
+        arr, _seq = _zerlegen(self._aufrufe()[-1][0])
+        self.assertEqual(arr, [ohne])
+
+    def test_voller_batch_ersetzt_den_puffer(self):
+        self._aufbau()
+        self.kanal.push([{"fid": 9}], True, 1)
+        self.kanal.push([{"fid": 5, "r": 1}], False, 2)
+        self.kanal.push([{"fid": 1, "r": 7}], True, 3)
+        self.uhr.t += 0.05
+        self._antworten(1)
+        arr, seq = _zerlegen(self._aufrufe()[-1][0])
+        self.assertEqual(arr, [{"fid": 1, "r": 7}])
+        self.assertEqual(seq, 3)
+
+    # T3
+    def test_minus_eins_fuehrt_zu_vollbatch(self):
+        self._aufbau()
+        self._tick()
+        self._antworten(-1)                # Seite noch nicht bereit
+        self.assertTrue(self.ziel.needs_full)
+        self.assertFalse(self.kanal.confirmed)
+        self._tick()
+        arr, _ = _zerlegen(self._aufrufe()[-1][0])
+        self.assertEqual(sorted(d["fid"] for d in arr), [1, 2], "voller Bestand nach -1")
+
+    def test_kein_rueckruf_timeout_und_spaete_antwort_zaehlt_nicht(self):
+        self._aufbau()
+        self._tick()
+        self._antworten(2)
+        self.st.universes[1].set_channel(1, 99)
+        self._tick()
+        alt_cb = self._aufrufe()[-1][1]
+        self.uhr.t += 0.6                  # > 500 ms ohne Rueckruf
+        # der Waechter (geplant beim Senden) bemerkt den Verlust auch ohne Tick
+        for _ms, fn in list(self.geplant):
+            fn()
+        self.assertTrue(self.ziel.needs_full)
+        self.assertEqual(self.kanal.stats["timeouts"], 1)
+        self._tick()
+        n = len(self._aufrufe())
+        alt_cb(1)                          # verspaetet: darf nichts ausloesen
+        self.assertEqual(len(self._aufrufe()), n)
+        self.assertIsNotNone(self.kanal._inflight, "neuer Batch bleibt unterwegs")
+
+    def test_reload_setzt_zurueck(self):
+        self._aufbau()
+        self._tick()
+        self._antworten(2)
+        self.assertTrue(self.kanal.confirmed)
+        self.st.universes[1].set_channel(1, 5)
+        self._tick()
+        alt_cb = self._aufrufe()[-1][1]
+        self.view.loadStarted.emit()
+        self.assertTrue(self.ziel.needs_full)
+        self.assertFalse(self.kanal.confirmed, "nach Reload laeuft der Poll wieder mit")
+        self.assertIsNone(self.kanal._inflight)
+        alt_cb(1)
+        self.assertFalse(self.kanal.confirmed, "Antwort der alten Seite zaehlt nicht")
+
+    def test_poll_laeuft_bis_zur_bestaetigung_mit(self):
+        self._aufbau()
+        self._tick()
+        self.assertEqual(sorted(d["fid"] for _s, d in self.poll_eintraege), [1, 2])
+        self.assertTrue(all(s is not None for s, _d in self.poll_eintraege),
+                        "Rueckfall-Eintraege tragen die Tick-Nummer")
+        self._antworten(2)
+        self.assertEqual(self.poll_geleert, [True], "Bestaetigung leert den Poll-Puffer")
+        self.poll_eintraege.clear()
+        self.st.universes[1].set_channel(1, 1)
+        self._tick()
+        self.assertEqual(self.poll_eintraege, [], "nach der Bestaetigung kein Poll-DMX mehr")
+
+    def test_takt_der_stufe_wird_eingehalten(self):
+        self._aufbau(min_interval_s=1.0 / 15)
+        self._tick()
+        self._antworten(2)
+        self.st.universes[1].set_channel(1, 1)
+        self._tick(dt=0.034)               # nur 34 ms seit dem letzten Senden
+        n = len(self._aufrufe())
+        self.assertEqual(n, 1, "Niedrig (15 Hz) sendet nicht alle 34 ms")
+        self.assertTrue(self.geplant, "der Rest wartet auf einen Nachlauf")
+        self.uhr.t += 0.04
+        ms, fn = [g for g in self.geplant if g[0] < 500][-1]
+        fn()
+        self.assertEqual(len(self._aufrufe()), 2)
+
+    def test_push_skript_ist_ascii_und_kompakt(self):
+        skript = push_script([(7, {"fid": 1, "gobo": "Blume ä"})])
+        skript.encode("ascii")
+        self.assertIn(",7):-1", skript, "eine gemeinsame Seq als Zahl")
+        self.assertNotIn(", ", skript)
+
+
+# ── Waechter, die schon vor VIZ-71 gruen sein sollten (T7–T9) ─────────────────
+class WaechterTest(_PushBasis):
+    # T7
+    def test_statisches_dmx_kostet_nichts(self):
+        self._aufbau()
+        self._tick()
+        self._antworten(2)
+        gebaut = []
+        orig = self.svc._build_snapshot
+        self.svc._build_snapshot = lambda: (gebaut.append(1), orig())[1]
+        n0 = len(self._aufrufe())
+        for _ in range(100):
+            self._tick()
+        self.assertEqual(len(self._aufrufe()), n0, "statisches DMX darf nichts senden")
+        self.assertLessEqual(len(gebaut), 100 // VisualizerService.GATE_MAX_SKIPS + 1,
+                             "nur das 1-s-Sicherheitsnetz darf bauen")
+
+    # T8
+    def test_gesendet_wird_der_display_frame_nie_der_rohpuffer(self):
+        self._aufbau(n=1)
+        roh = self.st.universes[1]
+        for adr, v in ((1, 255), (2, 255), (3, 255), (4, 255)):
+            roh.set_channel(adr, v)              # Rohpuffer: voll hell, weiss
+        # Display-Frame nach Blackout-Keep/Ziel-Blackout/NOT-AUS: Farbe bleibt
+        # (Keep-Maske), Dimmer zu.
+        frame = bytearray(512)
+        frame[0], frame[1], frame[2], frame[3] = 255, 0, 0, 0
+        self.st.output_manager.frames[1] = bytes(frame)
+        self._tick()
+        arr, _ = _zerlegen(self._aufrufe()[-1][0])
+        erwartet = _build_fixture_payload(
+            self.st._fixtures[0],
+            {"color_r": 255, "color_g": 0, "color_b": 0, "intensity": 0,
+             "pan": 0, "tilt": 0}, _kanaele())
+        self.assertEqual(arr[0], json.loads(json.dumps(erwartet)))
+        self.assertEqual(arr[0]["intensity"], 0, "Rohpuffer-Helligkeit durchgerutscht")
+
+    # T9
+    def test_dimmer_aendert_nur_intensity(self):
+        self._aufbau(n=1)
+        for adr, v in ((1, 200), (2, 100), (3, 50), (4, 255)):
+            self.st.universes[1].set_channel(adr, v)
+        self._tick()
+        self._antworten(1)
+        vorher, _ = _zerlegen(self._aufrufe()[-1][0])
+        self.st.universes[1].set_channel(4, 64)
+        self._tick()
+        nachher, _ = _zerlegen(self._aufrufe()[-1][0])
+        geaendert = {k for k in nachher[0] if nachher[0][k] != vorher[0].get(k)}
+        self.assertEqual(geaendert, {"intensity"},
+                         "Farbe und Dimmer muessen getrennte Felder bleiben")
+
+
 if __name__ == "__main__":
     unittest.main()

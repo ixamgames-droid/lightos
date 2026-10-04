@@ -33,7 +33,7 @@ from src.core.app_state import get_state
 from src.core.stage.stage_definition import resolve_active_stage
 from src.ui.visualizer.visualizer_window import (
     VisualizerBridge, load_stage_html, install_render_crash_guard,
-    install_scene_start_guard, max_beam_range_pref,
+    install_scene_start_guard, max_beam_range_pref, create_dmx_push,
 )
 from src.ui.visualizer.visualizer_service import get_visualizer_service, VisualizerTarget
 from src.ui.weak_slots import weak_slot_fwd
@@ -212,10 +212,14 @@ class Visualizer3DView(QWidget):
         # _target_name (Fake-self-Muster, s. test_viz12_service) — dort gilt der
         # Alt-Name. Echte Instanzen setzen _target_name im __init__.
         target_name = getattr(self, "_target_name", "live_view_mirror")
+        # VIZ-71: eigener Push-Kanal je Seite (s. VisualizerWindow).
+        self._dmx_push = create_dmx_push(self)
         self._target = VisualizerTarget(
             target_name, self._bridge.dmxBatch.emit,
             on_reset_interaction=self._reset_own_interaction_state,
             on_reload=self._reload_own_page,
+            emit_payloads=(self._dmx_push.push if self._dmx_push is not None
+                           else None),
         )
         self._service.attach_target(self._target)
         # VIZ-12 (Live-Befund): JS fordert nach dem Fixture-Bau selbst den

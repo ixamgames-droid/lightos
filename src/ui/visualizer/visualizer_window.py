@@ -540,6 +540,33 @@ def install_scene_start_guard(view, status_cb=None, on_reloaded=None,
     return guard
 
 
+def create_dmx_push(besitzer):
+    """VIZ-71: Push-Kanal fuer ``besitzer._view`` anlegen (Fenster oder
+    Live-View-Spiegel) — ``None`` ohne echte Seite.
+
+    Bewusst eine MODUL-Funktion (wie ``beam_range_value``): Bestandstests
+    fahren ``_setup_service_target`` auf ``SimpleNamespace``-Stubs, und eine
+    neue Methode auf ``self`` schluege dort mit ``AttributeError`` zu.
+
+    ``on_need_full`` haelt den Besitzer nur schwach (STAB-10-Muster)."""
+    view = getattr(besitzer, "_view", None)
+    if view is None or not hasattr(view, "page"):
+        return None
+    from src.ui.visualizer.dmx_push import DmxPushChannel
+    ref = weakref.ref(besitzer)
+
+    def _voll():
+        b = ref()
+        if b is None:
+            return
+        svc = getattr(b, "_service", None)
+        target = getattr(b, "_target", None)
+        if svc is not None and target is not None:
+            svc.force_full_resync(target)
+    return DmxPushChannel(view, on_need_full=_voll,
+                          poll=getattr(besitzer, "_bridge", None))
+
+
 # ============================================================================
 # Bridge
 # ============================================================================
@@ -3434,10 +3461,16 @@ class VisualizerWindow(QMainWindow):
         Service zur Verfuegung stellt, statt dass der Service selbst etwas
         davon kennt."""
         self._service = get_visualizer_service(self._state)
+        # VIZ-71: Lichtdaten per runJavaScript-Push statt 130-ms-Poll. Nur mit
+        # echter Seite — die Fake-Selbst-Objekte der Bestandstests haben keine
+        # (``_view`` fehlt/None) und behalten den alten emit_batch-Weg.
+        self._dmx_push = create_dmx_push(self)
         self._target = VisualizerTarget(
             "window", self._bridge.dmxBatch.emit,
             on_reset_interaction=self._reset_own_interaction_state,
             on_reload=self._reload_own_page,
+            emit_payloads=(self._dmx_push.push if self._dmx_push is not None
+                           else None),
         )
         self._service.attach_target(self._target)
         # VIZ-12 (Live-Befund): JS fordert nach dem Fixture-Bau selbst den
