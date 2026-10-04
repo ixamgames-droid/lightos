@@ -18,7 +18,7 @@ Die Show wird reproduzierbar per Generator gebaut:
 |---|---|---|---|---|
 | 12 | PAR (RGBW) | `ZQ01424` | 8 | Matrix/Chase/ColorFade/Strobe |
 | 6 | Moving Head | `MH16` | 16 | Pan/Tilt-Kreis, Gobo-/Farbrad |
-| 2 | Moving Head | `ZQ02001` | 11 | Davids reale MHs |
+| 2 | Moving Head | `ZQ02001` | 11 | die realen MHs des Rigs |
 | 4 | Spider (Multi-Head) | `SPIDER14` | 14 | gespiegelte Tilt-Wave, Farbe pro Kopf (**kein Pan!**) |
 | 4 | Laser | `L2600LASER` | 6 | Muster-Scene + Arm/NOT-AUS |
 | 2 | Nebel/Hazer | `EURON10` | 1 | Nebel-Scene |
@@ -37,14 +37,16 @@ Nach dem Laden zeigt die **Bühne**-Sektion alle 30 Geräte („30 Geräte im Pa
 ## 2. Virtual Console — 3 Bank-Seiten
 
 Die Effekte sind über **drei Bank-Seiten** verteilt (Umschalten mit den Pfeilen
-`◄ Bank X ►` oben links). Jeder Effekt-Button trägt eine passende **Galerie-Grafik/GIF**
+`◀ Bank X ▶` oben links). Jeder Effekt-Button trägt eine passende **Galerie-Grafik/GIF**
 als Hintergrund (VC-IMG).
 
 **Bank 1 — PARs & Farbe:** Rainbow, Chase, ColorFade, Lauflicht, Strobe, Effekte-Stop, Blackout + Master-Fader.
 
 ![VC Bank 1 mit Bild-Buttons für die PAR-Effekte](img/02_vc_bank1_pars.png)
 
-**Bank 2 — Moving Heads & Spider:** MH Licht, MH Kreis, MH Gobo, MH Farbrad, Spider Wave, Spider Farbe + MH-Speed-Fader & MH-Tempo-Dial.
+**Bank 2 — Moving Heads & Spider:** MH Licht, MH Kreis, MH Gobo, MH Farbrad, Spider Wave, Spider Farbe + MH-Speed-Fader & MH-Tempo-Dial. Beide stellen die eigene Geschwindigkeit von „MH Kreis“ —
+die wirkt nur, solange **keine BPM** läuft: der Effekt hängt am Tempo-Bus „Global“, und bei laufender
+BPM gilt dessen Takt (im EFX-Editor über **„Tempo ×“** zu ändern).
 
 ![VC Bank 2 mit Moving-Head- und Spider-Buttons](img/03_vc_bank2_mh_spider.png)
 

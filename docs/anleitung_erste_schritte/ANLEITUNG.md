@@ -1,5 +1,7 @@
 # Erste Schritte mit LightOS
 
+> **English:** [First steps with LightOS](ANLEITUNG.en.md)
+
 > Du hast LightOS gerade installiert und willst wissen, wo was ist? Diese Anleitung führt
 > einmal durch das Hauptfenster, legt eine neue Show an, patcht ein Gerät, bringt es im
 > Programmer zum Leuchten und speichert das Ganze als Show-Datei. Das dauert etwa zehn

@@ -44,8 +44,12 @@ SOURCE_LIGHTOS = "lightos"
 
 _REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__)))))
-#: Wurzel der mitgelieferten Bibliothek.
-BIBLIOTHEK_DIR = os.path.join(_REPO, "fixtures", "bibliothek")
+#: Wurzel der mitgelieferten Bibliothek. ``LIGHTOS_BIBLIOTHEK_DIR`` (analog
+#: ``LIGHTOS_FIXTURE_DB``) lenkt sie um — fuer Tests, die einen Generator als
+#: eigenen Prozess gegen eine Bibliothek OHNE ein bestimmtes Geraet laufen
+#: lassen (TOOL-3); ein Patch des Modulattributs reicht dort nicht hinueber.
+BIBLIOTHEK_DIR = (os.environ.get("LIGHTOS_BIBLIOTHEK_DIR")
+                  or os.path.join(_REPO, "fixtures", "bibliothek"))
 
 #: Geraetetypen (``FixtureProfile.fixture_type``) — dieselben wie im Editor.
 TYPEN: dict[str, str] = {

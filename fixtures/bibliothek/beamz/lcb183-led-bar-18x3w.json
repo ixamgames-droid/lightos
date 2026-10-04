@@ -1,0 +1,125 @@
+{
+  "format_version": 1,
+  "hersteller": "BeamZ",
+  "hersteller_kurz": "BEAMZ",
+  "modell": "LCB183 LED Bar 18x3W",
+  "kurzname": "LCB183",
+  "typ": "led_bar",
+  "leistung_w": 54,
+  "quelle": {
+    "titel": "BeamZ LCB183 LED Bar 18x 3W RGB 3-in-1 - Bedienungsanleitung (Ref. 150.705)",
+    "version": "V1.2",
+    "url": "https://www.beamzlighting.com/wp-content/uploads/2026/08/150.705-LCB183-LED-BAR-18-x-3W-RGB-3in1_manual_V1.2.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.3.0 GIT · Fede79",
+    "original": "resources/fixtures/beamZ/beamZ-LCB183-LED-Bar-18x3W.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 8 Wertebereiche mit Art (kind) versehen; Rasterform in 3 Modus/Modi aus <Physical> uebernommen; LightOS-Nachbearbeitung (FM-57): Herstellername 'beamZ' -> 'BeamZ'; kurzname LCB183; Raster 1x1 in den 3- und 7-Kanal-Modi (ganzer Balken einfarbig), 1x3 nur im 13-Kanal-Modus (QLC+: ueberall 1x3); Strobe als Attribut strobe statt shutter (kein Offen-Bereich im Handbuch); Tempo als effect_speed statt speed; leistung_w 54 (18x 3W laut Handbuch, QLC+: 100); Kanalnamen deutsch, Modusbeschreibungen ergaenzt"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": true,
+    "wie": "alle 3 DMX-Modi Kanal fuer Kanal gegen das Herstellerhandbuch 150.705 V1.2 geprueft (nicht am echten Geraet)"
+  },
+  "modi": [
+    {
+      "name": "3 Channel",
+      "beschreibung": "RGB (ganzer Balken)",
+      "raster": {"rows": 1, "cols": 1},
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "7 Channel",
+      "beschreibung": "Dimmer, RGB, Strobe, Modus, Tempo",
+      "raster": {"rows": 1, "cols": 1},
+      "kanaele": [
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "strobe",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Strobe langsam -> schnell (Handbuch: 000-255)", "art": ""}
+          ]
+        },
+        {
+          "name": "Modus",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Keine Funktion", "art": ""},
+            {"von": 10, "bis": 249, "name": "Auto-Programme", "art": ""},
+            {"von": 250, "bis": 255, "name": "Sound-Programm", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Programm-Tempo",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Tempo Auto-Programm langsam -> schnell", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "13 Channel",
+      "beschreibung": "3 Segmente RGB, Strobe, Modus, Tempo",
+      "raster": {"rows": 1, "cols": 3},
+      "kanaele": [
+        {"name": "Rot 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Rot 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Rot 3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Keine Funktion", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Strobe",
+          "attribut": "strobe",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Strobe langsam -> schnell (Handbuch: 000-255)", "art": ""}
+          ]
+        },
+        {
+          "name": "Modus",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Keine Funktion", "art": ""},
+            {"von": 10, "bis": 249, "name": "Auto-Programme", "art": ""},
+            {"von": 250, "bis": 255, "name": "Sound-Programm", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Programm-Tempo",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Tempo Auto-Programm langsam -> schnell", "art": ""}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "18x3W RGB in 3 Segmenten. Strobe laut Handbuch 000-255 langsam->schnell ohne Aus-Bereich; Default 0. Das Menue nennt 'CH 12', die Kanaltabelle 13 Kanaele (Kanal 10 ohne Funktion)."
+}

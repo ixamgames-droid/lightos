@@ -1,4 +1,5 @@
 """Output Manager — koordiniert alle DMX-Ausgabegeräte bei 44 Hz."""
+from contextlib import contextmanager
 import os
 import threading
 import time
@@ -184,6 +185,9 @@ class OutputManager:
         self._blackout = False
         # BUG-FBW Slice 3: eingefrorene Frames (None = laeuft normal), s. set_freeze.
         self._freeze_frames: dict[int, bytes] | None = None
+        # OUT-60: Halte-Frames waehrend eines Live-Show-Loads (s. lade_sperre).
+        self._lade_frames: dict[int, bytes] | None = None
+        self._lade_tiefe = 0
         # slot → (level 0.0–1.0, target_fids | None). target_fids None = GLOBALER
         # Submaster (wirkt auf ALLE Fixtures, bisheriges Verhalten); ein
         # frozenset[int] beschraenkt den Submaster auf genau diese Fixture-fids
@@ -505,6 +509,34 @@ class OutputManager:
             return
         self._freeze_frames = {u: universe.get_all()
                                for u, universe in list(self.universes.items())}
+
+    @contextmanager
+    def lade_sperre(self):
+        """OUT-60: waehrend eines Live-Show-Loads den zuletzt gerenderten Stand
+        weitersenden.
+
+        Gemessen am echten Enttec (Windows-Rig-PC, 03.10.2026): beim Neu-Laden
+        derselben Show fiel in 3 von 8 Laeufen fuer GENAU einen Frame (~23 ms)
+        jeder PAR-Dimmer von 255 auf 0 — der 44-Hz-Renderer rechnete mitten im
+        reset-first einen Zustand ohne laufende Wiedergabe. CDX-22 hatte nur die
+        Adress-Freigabe des Patch-Tauschs gebuendelt, nicht diesen Frame.
+
+        Getrennt vom Bediener-Freeze (``_freeze_frames``): den setzt der
+        reset-first selbst zurueck, und ein Freeze des Bedieners darf durch einen
+        Load nicht verloren gehen oder haengen bleiben. Der Schnappschuss liegt
+        wie beim Freeze VOR Channel-Modifier, Grand-Master, Blackout und
+        Laser-NOT-AUS — die greifen also auch waehrend des Ladens. Verschachtelt
+        aufrufbar; erst das aeusserste Ende gibt frei."""
+        if self._lade_tiefe == 0:
+            self._lade_frames = {u: universe.get_all()
+                                 for u, universe in list(self.universes.items())}
+        self._lade_tiefe += 1
+        try:
+            yield
+        finally:
+            self._lade_tiefe -= 1
+            if self._lade_tiefe == 0:
+                self._lade_frames = None
 
     def set_blackout(self, enabled: bool):
         """Blackout an/aus. UI-58: jede Aenderung wird gemeldet — egal ob sie aus
@@ -969,7 +1001,8 @@ class OutputManager:
             # Serie nie zurueckgesetzt.
             self._buche_fehler("Tick", 0, tick_exc, quelle=tick_name)
 
-        gefroren = self._freeze_frames
+        # OUT-60: die Lade-Sperre hat Vorrang vor dem Bediener-Freeze.
+        gefroren = self._lade_frames if self._lade_frames is not None else self._freeze_frames
         for univ_num, universe in list(self.universes.items()):
             # Im Freeze den festgehaltenen Stand senden statt des (u. U. direkt
             # beschriebenen) Live-Universums. Ein Universum, das es beim

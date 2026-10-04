@@ -4,7 +4,7 @@ In dieser Anleitung lernst du, wie du für die Show `shows/Komplettshow_2026.lsh
 
 ## Schritte
 
-1. Öffne die Sektion **Patchen** und wechsle dort in den Sub-Tab **Patch**. Der Patch-Tab ist zu Beginn leer; die Toolbar bietet die Aktionen **+ Gerät hinzufügen**, **Löschen**, **Auto-Patch** und **Gerät erstellen**.
+1. Öffne die Sektion **Patchen** und wechsle dort in den Sub-Tab **Patch**. Der Patch-Tab ist zu Beginn leer; die Toolbar bietet die Aktionen **+ Gerät hinzufügen**, **Löschen**, **Mit Offset kopieren…**, **Auto-Patch** und **Gerät erstellen…**.
 
 ![Patchen-Sektion, Patch-Tab leer mit Toolbar](img/01_patch_tab_leer.png)
 

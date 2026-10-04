@@ -1,0 +1,274 @@
+{
+  "format_version": 1,
+  "hersteller": "Varytec",
+  "hersteller_kurz": "Varytec",
+  "modell": "Hero Spot 230",
+  "kurzname": "HEROSPOT230",
+  "typ": "moving_head",
+  "leistung_w": 250,
+  "quelle": {
+    "titel": "Varytec Hero Spot 230 – Bedienungsanleitung (EN)",
+    "version": "V3",
+    "datum": "2022-03-22",
+    "url": "https://images.static-thomann.de/pics/atg/atgdata/document/manual/c_477539_v3_en_online.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.5 GIT · Sebastian Moeckel",
+    "original": "resources/fixtures/Varytec/Varytec-Hero-Spot-230.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 119 Wertebereiche mit Art (kind) versehen; gegen Herstellerhandbuch V3 (2022-03-22) abgeglichen; Kanal- und Bereichsnamen deutsch; Farbrad-Belegung auf Handbuch V3 umgestellt (QLC+: 3000K/Rot/Dunkelblau/Grün/Magenta/Gelb/Hellblau, Handbuch: Rot/3000K/Grün/Dunkelblau/Gelb/Hellblau/Magenta); Kanal 10 (rotierendes Goborad) von gobo_rotation auf gobo_wheel2 und Kanal 11 (Gobo-Rotation/Index) von speed auf gobo_rotation korrigiert, Gobos 1–7 benannt; Stroboskop-Default/Highlight 255 (LEDs an); Offen-Bereiche als open, Prismen als prism; Kurzname, Notizen"
+  },
+  "autor": "LightOS (QXF-Konverter, nachbearbeitet FM-57)",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal für Kanal gegen die Bedienungsanleitung V3 (Kap. 7.8/7.9 DMX-Tabellen 6/18 Kanäle) geprüft; nicht am Gerät"
+  },
+  "modi": [
+    {
+      "name": "18 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fein", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fein", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt-Tempo (0 = schnell, 255 = langsam)", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Stroboskop",
+          "attribut": "shutter",
+          "default": 255,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "LEDs aus", "art": "closed"},
+            {"von": 11, "bis": 80, "name": "Puls: langsam hell, schnell dunkel – Tempo steigend", "art": "strobe"},
+            {"von": 81, "bis": 140, "name": "Puls: schnell hell, langsam dunkel – Tempo steigend", "art": "strobe"},
+            {"von": 141, "bis": 200, "name": "Impulseffekt, Tempo steigend", "art": "strobe"},
+            {"von": 201, "bis": 250, "name": "Strobe (0,5–20 Hz)", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "LEDs an (offen)", "art": "open"}
+          ]
+        },
+        {
+          "name": "Farbrad",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Offen (weiß)", "art": "open"},
+            {"von": 5, "bis": 13, "name": "Weiß / Rot", "art": "color"},
+            {"von": 14, "bis": 22, "name": "Rot", "art": "color"},
+            {"von": 23, "bis": 31, "name": "Rot / 3000-K-Filter", "art": "color"},
+            {"von": 32, "bis": 40, "name": "3000-K-Filter", "art": "color"},
+            {"von": 41, "bis": 49, "name": "3000-K-Filter / Grün", "art": "color"},
+            {"von": 50, "bis": 58, "name": "Grün", "art": "color"},
+            {"von": 59, "bis": 67, "name": "Grün / Dunkelblau", "art": "color"},
+            {"von": 68, "bis": 76, "name": "Dunkelblau", "art": "color"},
+            {"von": 77, "bis": 85, "name": "Dunkelblau / Gelb", "art": "color"},
+            {"von": 86, "bis": 94, "name": "Gelb", "art": "color"},
+            {"von": 95, "bis": 103, "name": "Gelb / Hellblau", "art": "color"},
+            {"von": 104, "bis": 112, "name": "Hellblau", "art": "color"},
+            {"von": 113, "bis": 121, "name": "Hellblau / Magenta", "art": "color"},
+            {"von": 122, "bis": 130, "name": "Magenta", "art": "color"},
+            {"von": 131, "bis": 139, "name": "Offen (weiß)", "art": "open"},
+            {"von": 140, "bis": 195, "name": "Regenbogen rechts, Tempo fallend", "art": "rotate"},
+            {"von": 196, "bis": 199, "name": "Rotation Stopp", "art": ""},
+            {"von": 200, "bis": 255, "name": "Regenbogen links, Tempo steigend", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Goborad 1 (fest)",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Offen", "art": "open"},
+            {"von": 8, "bis": 17, "name": "Festes Gobo 1", "art": "gobo"},
+            {"von": 18, "bis": 27, "name": "Festes Gobo 2", "art": "gobo"},
+            {"von": 28, "bis": 37, "name": "Festes Gobo 3", "art": "gobo"},
+            {"von": 38, "bis": 47, "name": "Festes Gobo 4", "art": "gobo"},
+            {"von": 48, "bis": 57, "name": "Festes Gobo 5", "art": "gobo"},
+            {"von": 58, "bis": 67, "name": "Festes Gobo 6", "art": "gobo"},
+            {"von": 68, "bis": 77, "name": "Festes Gobo 7", "art": "gobo"},
+            {"von": 78, "bis": 87, "name": "Festes Gobo 1 Shake, Tempo steigend", "art": "shake"},
+            {"von": 88, "bis": 97, "name": "Festes Gobo 2 Shake, Tempo steigend", "art": "shake"},
+            {"von": 98, "bis": 107, "name": "Festes Gobo 3 Shake, Tempo steigend", "art": "shake"},
+            {"von": 108, "bis": 117, "name": "Festes Gobo 4 Shake, Tempo steigend", "art": "shake"},
+            {"von": 118, "bis": 127, "name": "Festes Gobo 5 Shake, Tempo steigend", "art": "shake"},
+            {"von": 128, "bis": 137, "name": "Festes Gobo 6 Shake, Tempo steigend", "art": "shake"},
+            {"von": 138, "bis": 147, "name": "Festes Gobo 7 Shake, Tempo steigend", "art": "shake"},
+            {"von": 148, "bis": 199, "name": "Goborad-Durchlauf rechts, Tempo fallend", "art": "rotate"},
+            {"von": 200, "bis": 203, "name": "Rotation Stopp", "art": ""},
+            {"von": 204, "bis": 255, "name": "Goborad-Durchlauf links, Tempo steigend", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Goborad 2 (rotierend)",
+          "attribut": "gobo_wheel2",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Offen", "art": "open"},
+            {"von": 8, "bis": 17, "name": "Rotierendes Gobo 1", "art": "gobo"},
+            {"von": 18, "bis": 27, "name": "Rotierendes Gobo 2", "art": "gobo"},
+            {"von": 28, "bis": 37, "name": "Rotierendes Gobo 3", "art": "gobo"},
+            {"von": 38, "bis": 47, "name": "Rotierendes Gobo 4", "art": "gobo"},
+            {"von": 48, "bis": 57, "name": "Rotierendes Gobo 5", "art": "gobo"},
+            {"von": 58, "bis": 67, "name": "Rotierendes Gobo 6", "art": "gobo"},
+            {"von": 68, "bis": 77, "name": "Rotierendes Gobo 7", "art": "gobo"},
+            {"von": 78, "bis": 87, "name": "Rotierendes Gobo 1 Shake, Tempo steigend", "art": "shake"},
+            {"von": 88, "bis": 97, "name": "Rotierendes Gobo 2 Shake, Tempo steigend", "art": "shake"},
+            {"von": 98, "bis": 107, "name": "Rotierendes Gobo 3 Shake, Tempo steigend", "art": "shake"},
+            {"von": 108, "bis": 117, "name": "Rotierendes Gobo 4 Shake, Tempo steigend", "art": "shake"},
+            {"von": 118, "bis": 127, "name": "Rotierendes Gobo 5 Shake, Tempo steigend", "art": "shake"},
+            {"von": 128, "bis": 137, "name": "Rotierendes Gobo 6 Shake, Tempo steigend", "art": "shake"},
+            {"von": 138, "bis": 147, "name": "Rotierendes Gobo 7 Shake, Tempo steigend", "art": "shake"},
+            {"von": 148, "bis": 199, "name": "Goborad-Durchlauf rechts, Tempo fallend", "art": "rotate"},
+            {"von": 200, "bis": 203, "name": "Rotation Stopp", "art": ""},
+            {"von": 204, "bis": 255, "name": "Goborad-Durchlauf links, Tempo steigend", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo-Rotation / Index (Rad 2)",
+          "attribut": "gobo_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Rotation Stopp", "art": ""},
+            {"von": 8, "bis": 47, "name": "Gobo-Index (feste Position)", "art": ""},
+            {"von": 48, "bis": 127, "name": "Rotation rechts, Tempo fallend", "art": "rotate"},
+            {"von": 128, "bis": 137, "name": "Rotation Stopp", "art": ""},
+            {"von": 138, "bis": 255, "name": "Rotation links, Tempo steigend", "art": "rotate"}
+          ]
+        },
+        {"name": "Fokus", "attribut": "focus", "default": 0, "highlight": 0},
+        {"name": "Zoom (11°–25°)", "attribut": "zoom", "default": 0, "highlight": 0},
+        {
+          "name": "Prisma",
+          "attribut": "prism",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Offen (kein Prisma)", "art": ""},
+            {"von": 8, "bis": 99, "name": "Rundprisma", "art": "prism"},
+            {"von": 100, "bis": 130, "name": "Offen (kein Prisma)", "art": ""},
+            {"von": 131, "bis": 255, "name": "Linearprisma", "art": "prism"}
+          ]
+        },
+        {
+          "name": "Prisma-Rotation",
+          "attribut": "prism_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Rotation Stopp", "art": ""},
+            {"von": 8, "bis": 129, "name": "Prisma-Rotation rechts, Tempo fallend", "art": "rotate"},
+            {"von": 130, "bis": 133, "name": "Rotation Stopp", "art": ""},
+            {"von": 134, "bis": 255, "name": "Prisma-Rotation links, Tempo steigend", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Automatik-Shows",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Keine Funktion", "art": ""},
+            {"von": 8, "bis": 47, "name": "Automatik-Show 1", "art": ""},
+            {"von": 48, "bis": 87, "name": "Automatik-Show 2", "art": ""},
+            {"von": 88, "bis": 127, "name": "Automatik-Show 3", "art": ""},
+            {"von": 128, "bis": 167, "name": "Automatik-Show 4", "art": ""},
+            {"von": 168, "bis": 207, "name": "Automatik-Show 5", "art": ""},
+            {"von": 208, "bis": 247, "name": "Automatik-Show 6", "art": ""},
+            {"von": 248, "bis": 255, "name": "Musikgesteuerte Show", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Pan/Tilt-Programme",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Keine Funktion", "art": ""},
+            {"von": 8, "bis": 32, "name": "Pan/Tilt-Programm 1", "art": ""},
+            {"von": 33, "bis": 58, "name": "Pan/Tilt-Programm 2", "art": ""},
+            {"von": 59, "bis": 84, "name": "Pan/Tilt-Programm 3", "art": ""},
+            {"von": 85, "bis": 110, "name": "Pan/Tilt-Programm 4", "art": ""},
+            {"von": 111, "bis": 136, "name": "Pan/Tilt-Programm 5", "art": ""},
+            {"von": 137, "bis": 162, "name": "Pan/Tilt-Programm 6", "art": ""},
+            {"von": 163, "bis": 188, "name": "Pan/Tilt-Programm 7", "art": ""},
+            {"von": 189, "bis": 214, "name": "Pan/Tilt-Programm 8", "art": ""},
+            {"von": 215, "bis": 255, "name": "Musiksteuerung Pan/Tilt", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 189, "name": "Keine Funktion", "art": ""},
+            {"von": 190, "bis": 210, "name": "Reset (mind. 10 s senden)", "art": "reset"},
+            {"von": 211, "bis": 255, "name": "Keine Funktion", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Stroboskop",
+          "attribut": "shutter",
+          "default": 255,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "LEDs aus", "art": "closed"},
+            {"von": 11, "bis": 80, "name": "Puls: langsam hell, schnell dunkel – Tempo steigend", "art": "strobe"},
+            {"von": 81, "bis": 140, "name": "Puls: schnell hell, langsam dunkel – Tempo steigend", "art": "strobe"},
+            {"von": 141, "bis": 200, "name": "Impulseffekt, Tempo steigend", "art": "strobe"},
+            {"von": 201, "bis": 250, "name": "Strobe (0,5–20 Hz)", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "LEDs an (offen)", "art": "open"}
+          ]
+        },
+        {
+          "name": "Automatik-Shows",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Keine Funktion", "art": ""},
+            {"von": 8, "bis": 47, "name": "Automatik-Show 1", "art": ""},
+            {"von": 48, "bis": 87, "name": "Automatik-Show 2", "art": ""},
+            {"von": 88, "bis": 127, "name": "Automatik-Show 3", "art": ""},
+            {"von": 128, "bis": 167, "name": "Automatik-Show 4", "art": ""},
+            {"von": 168, "bis": 207, "name": "Automatik-Show 5", "art": ""},
+            {"von": 208, "bis": 247, "name": "Automatik-Show 6", "art": ""},
+            {"von": 248, "bis": 255, "name": "Musikgesteuerte Show", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Pan/Tilt-Programme",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Keine Funktion", "art": ""},
+            {"von": 8, "bis": 32, "name": "Pan/Tilt-Programm 1", "art": ""},
+            {"von": 33, "bis": 58, "name": "Pan/Tilt-Programm 2", "art": ""},
+            {"von": 59, "bis": 84, "name": "Pan/Tilt-Programm 3", "art": ""},
+            {"von": 85, "bis": 110, "name": "Pan/Tilt-Programm 4", "art": ""},
+            {"von": 111, "bis": 136, "name": "Pan/Tilt-Programm 5", "art": ""},
+            {"von": 137, "bis": 162, "name": "Pan/Tilt-Programm 6", "art": ""},
+            {"von": 163, "bis": 188, "name": "Pan/Tilt-Programm 7", "art": ""},
+            {"von": 189, "bis": 214, "name": "Pan/Tilt-Programm 8", "art": ""},
+            {"von": 215, "bis": 255, "name": "Musiksteuerung Pan/Tilt", "art": "sound"}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "230-W-LED-Spot, Zoom 11°–25°, Farbrad 7 Farben + Halbtöne, festes und rotierendes Goborad (je 7), Rund-/Linearprisma. Farbrad-Reihenfolge nach Handbuch V3 – ältere Geräte/QLC+ weichen ab."
+}

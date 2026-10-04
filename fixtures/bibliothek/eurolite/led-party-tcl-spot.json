@@ -1,0 +1,48 @@
+{
+  "format_version": 1,
+  "hersteller": "Eurolite",
+  "hersteller_kurz": "Eurolite",
+  "modell": "LED PARty TCL spot",
+  "kurzname": "LED PARty TCL spot",
+  "typ": "par",
+  "leistung_w": 10,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Eurolite-LED-PARty-TCL-spot.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Eurolite/Eurolite-LED-PARty-TCL-spot.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.13.0 GIT · Christian Prison",
+    "original": "resources/fixtures/Eurolite/Eurolite-LED-PARty-TCL-spot.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 4 Wertebereiche mit Art (kind) versehen; Kanal 5 macro -> shutter (Strobe-/Soundkanal), Bereiche 0 und 6-10 als 'open', Default 0"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Datei und die LightOS-Attributliste geprueft (Attribute, Bereichs-Arten, Defaults, Raster); Herstellerhandbuch mit DMX-Tabelle war nicht abrufbar (Steinigke liefert nur Datenblaetter ohne DMX-Protokoll), daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "5 channels",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe/Sound",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Kein Strobe", "art": "open"},
+            {"von": 1, "bis": 5, "name": "Sound control", "art": "sound"},
+            {"von": 6, "bis": 10, "name": "Kein Strobe", "art": "open"},
+            {"von": 11, "bis": 255, "name": "Strobe (slow to fast)", "art": "strobe"}
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "format_version": 1,
+  "hersteller": "Chauvet",
+  "hersteller_kurz": "CHAUVET",
+  "modell": "Hurricane 1800 Flex",
+  "kurzname": "Hurricane 1800 Flex",
+  "typ": "smoke",
+  "leistung_w": 1190,
+  "quelle": {
+    "titel": "Hurricane 1800 Flex User Manual",
+    "version": "Rev. 3",
+    "url": "https://www.chauvetdj.com/wp-content/uploads/2015/12/Hurricane_1800_Flex_UM_Rev3.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller 3.0.7 · eklynx",
+    "original": "resources/fixtures/Chauvet/Chauvet-Hurricane-1800-Flex.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 2 Wertebereiche mit Art (kind) versehen; danach von LightOS gegen das Herstellerhandbuch (Hurricane 1800 Flex User Manual) Kanal fuer Kanal ueberarbeitet: Nebelkanal als dimmer statt raw (wie die uebrigen Nebelmaschinen der Bibliothek), Aus-Bereich 000-005 als closed, Highlight 0; Leistung nach Handbuch 1190 W (QLC+: 1364 W); Kanalnamen und Bereichsnamen auf Deutsch; Default/Highlight nach LightOS-Regeln (Pan/Tilt 128, Dimmer 0, Shutter offen)"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanalbelegung, Wertebereiche und Modi aller DMX-Modi Kanal fuer Kanal gegen das Herstellerhandbuch geprueft (nicht am echten Geraet)"
+  },
+  "modi": [
+    {
+      "name": "DMX Mode",
+      "kanaele": [
+        {
+          "name": "Nebel",
+          "attribut": "dimmer",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Aus", "art": "closed"},
+            {"von": 6, "bis": 255, "name": "Nebelausstoss 0-100 %", "art": ""}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Nebelmaschine 1190 W mit schwenkbarem Ausstoss; Ausstoss haengt vom Heizzustand ab (Aufheizen 3-4 Minuten)."
+}

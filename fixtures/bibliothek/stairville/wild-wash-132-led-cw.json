@@ -1,0 +1,150 @@
+{
+  "format_version": 1,
+  "hersteller": "Stairville",
+  "hersteller_kurz": "STAIR",
+  "modell": "Wild Wash 132 LED CW",
+  "kurzname": "WW132CW",
+  "typ": "strobe",
+  "leistung_w": 30,
+  "quelle": {
+    "titel": "Stairville Wild Wash 132 LED RGB/White DMX, Wild Wash 648 LED RGB DMX — User Manual (Thomann, Art. 399663, v4)",
+    "url": "https://fast-images.static-thomann.de/pics/atg/atgdata/document/manual/399664_399663_399658_v4_en_online.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.13.2 GIT · e-shock",
+    "original": "resources/fixtures/Stairville/Stairville-Wild-Wash-132-LED-CW.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 22 Wertebereiche mit Art (kind) versehen; Rasterform in 4 Modus/Modi aus <Physical> uebernommen; Modusnamen nach Handbuch (1Ch/2Ch/3Ch1/3Ch2); Strobe-Kanal: Default/Highlight 0 = 'LEDs an' (offen) statt 2; Kanal 'Flash impulse' als duration (Blitzdauer) statt speed; Musiksteuerung: Bereich 'aus' ohne Art sound, nur 6–255 sound; Bereichsnamen deutsch; Kurzname WW132CW; hersteller_kurz STAIR; Quelle auf Herstellerhandbuch gesetzt"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal fuer Kanal gegen das Handbuch (Kap. 7.12, 7.13, 7.16, 7.18; Version White, Art. 399663) geprueft"
+  },
+  "modi": [
+    {
+      "name": "1-Kanal (1Ch)",
+      "beschreibung": "nur Strobe-Kanal",
+      "raster": {"rows": 3, "cols": 44},
+      "kanaele": [
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "LEDs aus (Blackout)", "art": "closed"},
+            {"von": 11, "bis": 255, "name": "Strobe ca. 0 → 30 Hz", "art": "strobe"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2-Kanal (2Ch)",
+      "raster": {"rows": 3, "cols": 44},
+      "kanaele": [
+        {
+          "name": "Dimmer",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dimmer 0 % → 100 %"}
+          ]
+        },
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "LEDs an (offen)", "art": "open"},
+            {"von": 6, "bis": 10, "name": "LEDs aus (Blackout)", "art": "closed"},
+            {"von": 11, "bis": 250, "name": "Strobe ca. 0 → 30 Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "LEDs an (offen)", "art": "open"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3-Kanal (3Ch1)",
+      "raster": {"rows": 3, "cols": 44},
+      "kanaele": [
+        {
+          "name": "Dimmer",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dimmer 0 % → 100 %"}
+          ]
+        },
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "LEDs an (offen)", "art": "open"},
+            {"von": 6, "bis": 10, "name": "LEDs aus (Blackout)", "art": "closed"},
+            {"von": 11, "bis": 250, "name": "Strobe ca. 0 → 30 Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "LEDs an (offen)", "art": "open"}
+          ]
+        },
+        {
+          "name": "Blitzdauer",
+          "attribut": "duration",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Blitzimpuls 0 → 510 ms"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3-Kanal (3Ch2)",
+      "raster": {"rows": 3, "cols": 44},
+      "kanaele": [
+        {
+          "name": "Dimmer",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dimmer 0 % → 100 %"}
+          ]
+        },
+        {
+          "name": "Strobe / Effekte",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "LEDs an, Helligkeit ueber Kanal 1", "art": "open"},
+            {"von": 6, "bis": 10, "name": "LEDs aus (Blackout)", "art": "closed"},
+            {"von": 11, "bis": 33, "name": "Zufallsimpulse, schneller werdend", "art": "strobe"},
+            {"von": 34, "bis": 56, "name": "Zufaellig heller werdend, schneller werdend"},
+            {"von": 57, "bis": 79, "name": "Zufaellig dunkler werdend, schneller werdend"},
+            {"von": 80, "bis": 102, "name": "Zufalls-Strobe, schneller werdend", "art": "strobe"},
+            {"von": 103, "bis": 127, "name": "Unterbrechungseffekt 5 s → 1 s"},
+            {"von": 128, "bis": 250, "name": "Strobe ca. 0 → 30 Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "LEDs an, Helligkeit ueber Kanal 1", "art": "open"}
+          ]
+        },
+        {
+          "name": "Musiksteuerung",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Musiksteuerung aus"},
+            {"von": 6, "bis": 255, "name": "Musiksteuerung an, Empfindlichkeit steigend", "art": "sound"}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Kaltweisse Version (Art. 399663). 132 SMD-LEDs, 3x44 als Raster nur fuer die Darstellung — nicht einzeln ansteuerbar. Im Modus 1Ch gibt es keinen Offen-Bereich (0–10 = Blackout)."
+}

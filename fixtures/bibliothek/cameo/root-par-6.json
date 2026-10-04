@@ -1,0 +1,721 @@
+{
+  "format_version": 1,
+  "hersteller": "Cameo",
+  "hersteller_kurz": "Cameo",
+  "modell": "ROOT PAR 6",
+  "kurzname": "ROOT PAR 6",
+  "typ": "par",
+  "leistung_w": 58,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Cameo-ROOT-Par-6.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Cameo/Cameo-ROOT-Par-6.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.2.2 GIT · Florian Faber, Jakob Frank",
+    "original": "resources/fixtures/Cameo/Cameo-ROOT-Par-6.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 320 Wertebereiche mit Art (kind) versehen; Farbpresets: 'Color off' als 'open', Festfarben/User-Farben/UV als 'color' (vorher ohne Art), Sprung/Fade-Geschwindigkeit 'rotate', Stopp ohne Art; 5/6-Kanal: zweiter Preset-Kanal (Chase-Ziel) color_wheel -> raw (sonst zwei Farbraeder/zweiter Kopf), Chase-Kanal macro -> effect, 'No Chase' ohne die falsche Art 'reset'; Strobe-Funktionen: Rampen/Zufall als 'strobe' (fehlte teilweise); Sound-Kanal macro -> raw, 'Sound Control off' ohne Art; Shutter-Default/-Highlight auf 0 (Offen-Bereich) in 8 Kanaelen"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Datei und die LightOS-Attributliste geprueft (Attribute, Bereichs-Arten, Defaults); Herstellerhandbuch mit DMX-Tabelle war nicht abrufbar, daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "2 Channel",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Color Presets & Color Jumping & Color Fading & User Colors",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Color off", "art": "open"},
+            {"von": 6, "bis": 13, "name": "Red", "art": "color"},
+            {"von": 14, "bis": 21, "name": "Amber", "art": "color"},
+            {"von": 22, "bis": 29, "name": "Yellow warm", "art": "color"},
+            {"von": 30, "bis": 37, "name": "Yellow", "art": "color"},
+            {"von": 38, "bis": 45, "name": "Green", "art": "color"},
+            {"von": 46, "bis": 53, "name": "Turquoise", "art": "color"},
+            {"von": 54, "bis": 61, "name": "Cyan", "art": "color"},
+            {"von": 62, "bis": 69, "name": "Blue", "art": "color"},
+            {"von": 70, "bis": 77, "name": "Lavender", "art": "color"},
+            {"von": 78, "bis": 85, "name": "Mauve", "art": "color"},
+            {"von": 86, "bis": 93, "name": "Magenta", "art": "color"},
+            {"von": 94, "bis": 101, "name": "Pink", "art": "color"},
+            {"von": 102, "bis": 109, "name": "Warm White", "art": "color"},
+            {"von": 110, "bis": 117, "name": "White", "art": "color"},
+            {"von": 118, "bis": 125, "name": "Cold White", "art": "color"},
+            {"von": 126, "bis": 127, "name": "Color Jumping stop", "art": ""},
+            {"von": 128, "bis": 164, "name": "Color Jumping speed slow -> fast / Color 1 -> 12", "art": "rotate"},
+            {"von": 165, "bis": 201, "name": "Color Fading speed slow -> fast / Color 1 -> 12", "art": "rotate"},
+            {"von": 202, "bis": 207, "name": "User Color_1", "art": "color"},
+            {"von": 208, "bis": 213, "name": "User Color_2", "art": "color"},
+            {"von": 214, "bis": 219, "name": "User Color_3", "art": "color"},
+            {"von": 220, "bis": 225, "name": "User Color_4", "art": "color"},
+            {"von": 226, "bis": 255, "name": "UV", "art": "color"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3 Channel with DMX delay",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Color Presets & Color Jumping & Color Fading & User Colors",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Color off", "art": "open"},
+            {"von": 6, "bis": 13, "name": "Red", "art": "color"},
+            {"von": 14, "bis": 21, "name": "Amber", "art": "color"},
+            {"von": 22, "bis": 29, "name": "Yellow warm", "art": "color"},
+            {"von": 30, "bis": 37, "name": "Yellow", "art": "color"},
+            {"von": 38, "bis": 45, "name": "Green", "art": "color"},
+            {"von": 46, "bis": 53, "name": "Turquoise", "art": "color"},
+            {"von": 54, "bis": 61, "name": "Cyan", "art": "color"},
+            {"von": 62, "bis": 69, "name": "Blue", "art": "color"},
+            {"von": 70, "bis": 77, "name": "Lavender", "art": "color"},
+            {"von": 78, "bis": 85, "name": "Mauve", "art": "color"},
+            {"von": 86, "bis": 93, "name": "Magenta", "art": "color"},
+            {"von": 94, "bis": 101, "name": "Pink", "art": "color"},
+            {"von": 102, "bis": 109, "name": "Warm White", "art": "color"},
+            {"von": 110, "bis": 117, "name": "White", "art": "color"},
+            {"von": 118, "bis": 125, "name": "Cold White", "art": "color"},
+            {"von": 126, "bis": 127, "name": "Color Jumping stop", "art": ""},
+            {"von": 128, "bis": 164, "name": "Color Jumping speed slow -> fast / Color 1 -> 12", "art": "rotate"},
+            {"von": 165, "bis": 201, "name": "Color Fading speed slow -> fast / Color 1 -> 12", "art": "rotate"},
+            {"von": 202, "bis": 207, "name": "User Color_1", "art": "color"},
+            {"von": 208, "bis": 213, "name": "User Color_2", "art": "color"},
+            {"von": 214, "bis": 219, "name": "User Color_3", "art": "color"},
+            {"von": 220, "bis": 225, "name": "User Color_4", "art": "color"},
+            {"von": 226, "bis": 255, "name": "UV", "art": "color"}
+          ]
+        },
+        {
+          "name": "DMX Delay",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "No Delay", "art": ""},
+            {"von": 6, "bis": 255, "name": "0,1s -> 2,0s", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4 Channel 1",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe functions",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Strobe closed", "art": "closed"},
+            {"von": 11, "bis": 22, "name": "Ramp up/down, slow -> fast", "art": "strobe"},
+            {"von": 23, "bis": 33, "name": "Ramp up/down random, slow->fast", "art": "strobe"},
+            {"von": 34, "bis": 45, "name": "Ramp up, slow -> fast", "art": "strobe"},
+            {"von": 46, "bis": 56, "name": "Ramp up random, slow -> fast", "art": "strobe"},
+            {"von": 57, "bis": 68, "name": "Ramp down, slow -> fast", "art": "strobe"},
+            {"von": 69, "bis": 79, "name": "Ramp down random, slow -> fast", "art": "strobe"},
+            {"von": 80, "bis": 102, "name": "Random Strobe effect, slow -> fast", "art": "strobe"},
+            {"von": 103, "bis": 127, "name": "Strobe Break effect, 5s.....1s (short burst with break)", "art": "strobe"},
+            {"von": 128, "bis": 250, "name": "Strobe slow -> fast <1Hz - 20Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        },
+        {
+          "name": "Color Presets & Color Jumping & Color Fading & User Colors",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Color off", "art": "open"},
+            {"von": 6, "bis": 13, "name": "Red", "art": "color"},
+            {"von": 14, "bis": 21, "name": "Amber", "art": "color"},
+            {"von": 22, "bis": 29, "name": "Yellow warm", "art": "color"},
+            {"von": 30, "bis": 37, "name": "Yellow", "art": "color"},
+            {"von": 38, "bis": 45, "name": "Green", "art": "color"},
+            {"von": 46, "bis": 53, "name": "Turquoise", "art": "color"},
+            {"von": 54, "bis": 61, "name": "Cyan", "art": "color"},
+            {"von": 62, "bis": 69, "name": "Blue", "art": "color"},
+            {"von": 70, "bis": 77, "name": "Lavender", "art": "color"},
+            {"von": 78, "bis": 85, "name": "Mauve", "art": "color"},
+            {"von": 86, "bis": 93, "name": "Magenta", "art": "color"},
+            {"von": 94, "bis": 101, "name": "Pink", "art": "color"},
+            {"von": 102, "bis": 109, "name": "Warm White", "art": "color"},
+            {"von": 110, "bis": 117, "name": "White", "art": "color"},
+            {"von": 118, "bis": 125, "name": "Cold White", "art": "color"},
+            {"von": 126, "bis": 127, "name": "Color Jumping stop", "art": ""},
+            {"von": 128, "bis": 164, "name": "Color Jumping speed slow -> fast / Color 1 -> 12", "art": "rotate"},
+            {"von": 165, "bis": 201, "name": "Color Fading speed slow -> fast / Color 1 -> 12", "art": "rotate"},
+            {"von": 202, "bis": 207, "name": "User Color_1", "art": "color"},
+            {"von": 208, "bis": 213, "name": "User Color_2", "art": "color"},
+            {"von": 214, "bis": 219, "name": "User Color_3", "art": "color"},
+            {"von": 220, "bis": 225, "name": "User Color_4", "art": "color"},
+            {"von": 226, "bis": 255, "name": "UV", "art": "color"}
+          ]
+        },
+        {
+          "name": "Sound (triggers Strobe, Color Jumping & Fading)",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Sound Control off", "art": ""},
+            {"von": 6, "bis": 255, "name": "Sound Control on, mic sensitivity low -> high", "art": "sound"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5 Channel 1 with DMX delay",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe functions",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Strobe closed", "art": "closed"},
+            {"von": 11, "bis": 22, "name": "Ramp up/down, slow -> fast", "art": "strobe"},
+            {"von": 23, "bis": 33, "name": "Ramp up/down random, slow->fast", "art": "strobe"},
+            {"von": 34, "bis": 45, "name": "Ramp up, slow -> fast", "art": "strobe"},
+            {"von": 46, "bis": 56, "name": "Ramp up random, slow -> fast", "art": "strobe"},
+            {"von": 57, "bis": 68, "name": "Ramp down, slow -> fast", "art": "strobe"},
+            {"von": 69, "bis": 79, "name": "Ramp down random, slow -> fast", "art": "strobe"},
+            {"von": 80, "bis": 102, "name": "Random Strobe effect, slow -> fast", "art": "strobe"},
+            {"von": 103, "bis": 127, "name": "Strobe Break effect, 5s.....1s (short burst with break)", "art": "strobe"},
+            {"von": 128, "bis": 250, "name": "Strobe slow -> fast <1Hz - 20Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        },
+        {
+          "name": "Color Presets & Color Jumping & Color Fading & User Colors",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Color off", "art": "open"},
+            {"von": 6, "bis": 13, "name": "Red", "art": "color"},
+            {"von": 14, "bis": 21, "name": "Amber", "art": "color"},
+            {"von": 22, "bis": 29, "name": "Yellow warm", "art": "color"},
+            {"von": 30, "bis": 37, "name": "Yellow", "art": "color"},
+            {"von": 38, "bis": 45, "name": "Green", "art": "color"},
+            {"von": 46, "bis": 53, "name": "Turquoise", "art": "color"},
+            {"von": 54, "bis": 61, "name": "Cyan", "art": "color"},
+            {"von": 62, "bis": 69, "name": "Blue", "art": "color"},
+            {"von": 70, "bis": 77, "name": "Lavender", "art": "color"},
+            {"von": 78, "bis": 85, "name": "Mauve", "art": "color"},
+            {"von": 86, "bis": 93, "name": "Magenta", "art": "color"},
+            {"von": 94, "bis": 101, "name": "Pink", "art": "color"},
+            {"von": 102, "bis": 109, "name": "Warm White", "art": "color"},
+            {"von": 110, "bis": 117, "name": "White", "art": "color"},
+            {"von": 118, "bis": 125, "name": "Cold White", "art": "color"},
+            {"von": 126, "bis": 127, "name": "Color Jumping stop", "art": ""},
+            {"von": 128, "bis": 164, "name": "Color Jumping speed slow -> fast / Color 1 -> 12", "art": "rotate"},
+            {"von": 165, "bis": 201, "name": "Color Fading speed slow -> fast / Color 1 -> 12", "art": "rotate"},
+            {"von": 202, "bis": 207, "name": "User Color_1", "art": "color"},
+            {"von": 208, "bis": 213, "name": "User Color_2", "art": "color"},
+            {"von": 214, "bis": 219, "name": "User Color_3", "art": "color"},
+            {"von": 220, "bis": 225, "name": "User Color_4", "art": "color"},
+            {"von": 226, "bis": 255, "name": "UV", "art": "color"}
+          ]
+        },
+        {
+          "name": "Sound (triggers Strobe, Color Jumping & Fading)",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Sound Control off", "art": ""},
+            {"von": 6, "bis": 255, "name": "Sound Control on, mic sensitivity low -> high", "art": "sound"}
+          ]
+        },
+        {
+          "name": "DMX Delay",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "No Delay", "art": ""},
+            {"von": 6, "bis": 255, "name": "0,1s -> 2,0s", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4 Channel",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "5 Channel 2 (compatibility for ROOT PAR 4) with DMX delay",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "DMX Delay",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "No Delay", "art": ""},
+            {"von": 6, "bis": 255, "name": "0,1s -> 2,0s", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5 Channel",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 255, "name": "Strobe slow -> fast <1Hz - 20Hz", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Chase of Ch 4 and Ch 5",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "No Chase, Color Preset 1 is on", "art": ""},
+            {"von": 6, "bis": 26, "name": "Jump 10,0s -> 4,0s", "art": ""},
+            {"von": 27, "bis": 127, "name": "Jump 4,0s -> 0,1s", "art": ""},
+            {"von": 128, "bis": 148, "name": "Fade 10,0s -> 4,0s", "art": ""},
+            {"von": 149, "bis": 255, "name": "Fade 4,0s -> 0,1s", "art": ""}
+          ]
+        },
+        {
+          "name": "Color Presets 1 & Color Jumping & Color Fading & User Colors",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Color off", "art": "open"},
+            {"von": 6, "bis": 13, "name": "Red", "art": "color"},
+            {"von": 14, "bis": 21, "name": "Amber", "art": "color"},
+            {"von": 22, "bis": 29, "name": "Yellow warm", "art": "color"},
+            {"von": 30, "bis": 37, "name": "Yellow", "art": "color"},
+            {"von": 38, "bis": 45, "name": "Green", "art": "color"},
+            {"von": 46, "bis": 53, "name": "Turquoise", "art": "color"},
+            {"von": 54, "bis": 61, "name": "Cyan", "art": "color"},
+            {"von": 62, "bis": 69, "name": "Blue", "art": "color"},
+            {"von": 70, "bis": 77, "name": "Lavender", "art": "color"},
+            {"von": 78, "bis": 85, "name": "Mauve", "art": "color"},
+            {"von": 86, "bis": 93, "name": "Magenta", "art": "color"},
+            {"von": 94, "bis": 101, "name": "Pink", "art": "color"},
+            {"von": 102, "bis": 109, "name": "Warm White", "art": "color"},
+            {"von": 110, "bis": 117, "name": "White", "art": "color"},
+            {"von": 118, "bis": 125, "name": "Cold White", "art": "color"},
+            {"von": 126, "bis": 201, "name": "no function", "art": ""},
+            {"von": 202, "bis": 207, "name": "User Color_1", "art": "color"},
+            {"von": 208, "bis": 213, "name": "User Color_2", "art": "color"},
+            {"von": 214, "bis": 219, "name": "User Color_3", "art": "color"},
+            {"von": 220, "bis": 225, "name": "User Color_4", "art": "color"},
+            {"von": 226, "bis": 255, "name": "UV", "art": "color"}
+          ]
+        },
+        {
+          "name": "Color Presets 2 & Color Jumping & Color Fading & User Colors",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Color off", "art": "open"},
+            {"von": 6, "bis": 13, "name": "Red", "art": "color"},
+            {"von": 14, "bis": 21, "name": "Amber", "art": "color"},
+            {"von": 22, "bis": 29, "name": "Yellow warm", "art": "color"},
+            {"von": 30, "bis": 37, "name": "Yellow", "art": "color"},
+            {"von": 38, "bis": 45, "name": "Green", "art": "color"},
+            {"von": 46, "bis": 53, "name": "Turquoise", "art": "color"},
+            {"von": 54, "bis": 61, "name": "Cyan", "art": "color"},
+            {"von": 62, "bis": 69, "name": "Blue", "art": "color"},
+            {"von": 70, "bis": 77, "name": "Lavender", "art": "color"},
+            {"von": 78, "bis": 85, "name": "Mauve", "art": "color"},
+            {"von": 86, "bis": 93, "name": "Magenta", "art": "color"},
+            {"von": 94, "bis": 101, "name": "Pink", "art": "color"},
+            {"von": 102, "bis": 109, "name": "Warm White", "art": "color"},
+            {"von": 110, "bis": 117, "name": "White", "art": "color"},
+            {"von": 118, "bis": 125, "name": "Cold White", "art": "color"},
+            {"von": 126, "bis": 201, "name": "no function", "art": ""},
+            {"von": 202, "bis": 207, "name": "User Color_1", "art": "color"},
+            {"von": 208, "bis": 213, "name": "User Color_2", "art": "color"},
+            {"von": 214, "bis": 219, "name": "User Color_3", "art": "color"},
+            {"von": 220, "bis": 225, "name": "User Color_4", "art": "color"},
+            {"von": 226, "bis": 255, "name": "UV", "art": "color"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6 Channel with DMX delay",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 255, "name": "Strobe slow -> fast <1Hz - 20Hz", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Chase of Ch 4 and Ch 5",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "No Chase, Color Preset 1 is on", "art": ""},
+            {"von": 6, "bis": 26, "name": "Jump 10,0s -> 4,0s", "art": ""},
+            {"von": 27, "bis": 127, "name": "Jump 4,0s -> 0,1s", "art": ""},
+            {"von": 128, "bis": 148, "name": "Fade 10,0s -> 4,0s", "art": ""},
+            {"von": 149, "bis": 255, "name": "Fade 4,0s -> 0,1s", "art": ""}
+          ]
+        },
+        {
+          "name": "Color Presets 1 & Color Jumping & Color Fading & User Colors",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Color off", "art": "open"},
+            {"von": 6, "bis": 13, "name": "Red", "art": "color"},
+            {"von": 14, "bis": 21, "name": "Amber", "art": "color"},
+            {"von": 22, "bis": 29, "name": "Yellow warm", "art": "color"},
+            {"von": 30, "bis": 37, "name": "Yellow", "art": "color"},
+            {"von": 38, "bis": 45, "name": "Green", "art": "color"},
+            {"von": 46, "bis": 53, "name": "Turquoise", "art": "color"},
+            {"von": 54, "bis": 61, "name": "Cyan", "art": "color"},
+            {"von": 62, "bis": 69, "name": "Blue", "art": "color"},
+            {"von": 70, "bis": 77, "name": "Lavender", "art": "color"},
+            {"von": 78, "bis": 85, "name": "Mauve", "art": "color"},
+            {"von": 86, "bis": 93, "name": "Magenta", "art": "color"},
+            {"von": 94, "bis": 101, "name": "Pink", "art": "color"},
+            {"von": 102, "bis": 109, "name": "Warm White", "art": "color"},
+            {"von": 110, "bis": 117, "name": "White", "art": "color"},
+            {"von": 118, "bis": 125, "name": "Cold White", "art": "color"},
+            {"von": 126, "bis": 201, "name": "no function", "art": ""},
+            {"von": 202, "bis": 207, "name": "User Color_1", "art": "color"},
+            {"von": 208, "bis": 213, "name": "User Color_2", "art": "color"},
+            {"von": 214, "bis": 219, "name": "User Color_3", "art": "color"},
+            {"von": 220, "bis": 225, "name": "User Color_4", "art": "color"},
+            {"von": 226, "bis": 255, "name": "UV", "art": "color"}
+          ]
+        },
+        {
+          "name": "Color Presets 2 & Color Jumping & Color Fading & User Colors",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Color off", "art": "open"},
+            {"von": 6, "bis": 13, "name": "Red", "art": "color"},
+            {"von": 14, "bis": 21, "name": "Amber", "art": "color"},
+            {"von": 22, "bis": 29, "name": "Yellow warm", "art": "color"},
+            {"von": 30, "bis": 37, "name": "Yellow", "art": "color"},
+            {"von": 38, "bis": 45, "name": "Green", "art": "color"},
+            {"von": 46, "bis": 53, "name": "Turquoise", "art": "color"},
+            {"von": 54, "bis": 61, "name": "Cyan", "art": "color"},
+            {"von": 62, "bis": 69, "name": "Blue", "art": "color"},
+            {"von": 70, "bis": 77, "name": "Lavender", "art": "color"},
+            {"von": 78, "bis": 85, "name": "Mauve", "art": "color"},
+            {"von": 86, "bis": 93, "name": "Magenta", "art": "color"},
+            {"von": 94, "bis": 101, "name": "Pink", "art": "color"},
+            {"von": 102, "bis": 109, "name": "Warm White", "art": "color"},
+            {"von": 110, "bis": 117, "name": "White", "art": "color"},
+            {"von": 118, "bis": 125, "name": "Cold White", "art": "color"},
+            {"von": 126, "bis": 201, "name": "no function", "art": ""},
+            {"von": 202, "bis": 207, "name": "User Color_1", "art": "color"},
+            {"von": 208, "bis": 213, "name": "User Color_2", "art": "color"},
+            {"von": 214, "bis": 219, "name": "User Color_3", "art": "color"},
+            {"von": 220, "bis": 225, "name": "User Color_4", "art": "color"},
+            {"von": 226, "bis": 255, "name": "UV", "art": "color"}
+          ]
+        },
+        {
+          "name": "DMX Delay",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "No Delay", "art": ""},
+            {"von": 6, "bis": 255, "name": "0,1s -> 2,0s", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6 Channel",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "7 Channel with DMX delay",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {
+          "name": "DMX Delay",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "No Delay", "art": ""},
+            {"von": 6, "bis": 255, "name": "0,1s -> 2,0s", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8 Channel",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 255, "name": "Strobe slow -> fast <1Hz - 20Hz", "art": "strobe"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "9 Channel with DMX delay",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 255, "name": "Strobe slow -> fast <1Hz - 20Hz", "art": "strobe"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {
+          "name": "DMX Delay",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "No Delay", "art": ""},
+            {"von": 6, "bis": 255, "name": "0,1s -> 2,0s", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "11 Channel",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Master dimmer fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Strobe functions",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Strobe closed", "art": "closed"},
+            {"von": 11, "bis": 22, "name": "Ramp up/down, slow -> fast", "art": "strobe"},
+            {"von": 23, "bis": 33, "name": "Ramp up/down random, slow->fast", "art": "strobe"},
+            {"von": 34, "bis": 45, "name": "Ramp up, slow -> fast", "art": "strobe"},
+            {"von": 46, "bis": 56, "name": "Ramp up random, slow -> fast", "art": "strobe"},
+            {"von": 57, "bis": 68, "name": "Ramp down, slow -> fast", "art": "strobe"},
+            {"von": 69, "bis": 79, "name": "Ramp down random, slow -> fast", "art": "strobe"},
+            {"von": 80, "bis": 102, "name": "Random Strobe effect, slow -> fast", "art": "strobe"},
+            {"von": 103, "bis": 127, "name": "Strobe Break effect, 5s.....1s (short burst with break)", "art": "strobe"},
+            {"von": 128, "bis": 250, "name": "Strobe slow -> fast <1Hz - 20Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {
+          "name": "Color Presets & Color Jumping & Color Fading & User Colors (override RGBWA+UV)",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Color off", "art": "open"},
+            {"von": 6, "bis": 13, "name": "Red", "art": "color"},
+            {"von": 14, "bis": 21, "name": "Amber", "art": "color"},
+            {"von": 22, "bis": 29, "name": "Yellow warm", "art": "color"},
+            {"von": 30, "bis": 37, "name": "Yellow", "art": "color"},
+            {"von": 38, "bis": 45, "name": "Green", "art": "color"},
+            {"von": 46, "bis": 53, "name": "Turquoise", "art": "color"},
+            {"von": 54, "bis": 61, "name": "Cyan", "art": "color"},
+            {"von": 62, "bis": 69, "name": "Blue", "art": "color"},
+            {"von": 70, "bis": 77, "name": "Lavender", "art": "color"},
+            {"von": 78, "bis": 85, "name": "Mauve", "art": "color"},
+            {"von": 86, "bis": 93, "name": "Magenta", "art": "color"},
+            {"von": 94, "bis": 101, "name": "Pink", "art": "color"},
+            {"von": 102, "bis": 109, "name": "Warm White", "art": "color"},
+            {"von": 110, "bis": 117, "name": "White", "art": "color"},
+            {"von": 118, "bis": 125, "name": "Cold White", "art": "color"},
+            {"von": 126, "bis": 127, "name": "Color Jumping stop", "art": ""},
+            {"von": 128, "bis": 164, "name": "Color Jumping speed slow -> fast / Color 1 -> 12", "art": "rotate"},
+            {"von": 165, "bis": 201, "name": "Color Fading speed slow -> fast / Color 1 -> 12", "art": "rotate"},
+            {"von": 202, "bis": 207, "name": "User Color_1", "art": "color"},
+            {"von": 208, "bis": 213, "name": "User Color_2", "art": "color"},
+            {"von": 214, "bis": 219, "name": "User Color_3", "art": "color"},
+            {"von": 220, "bis": 225, "name": "User Color_4", "art": "color"},
+            {"von": 226, "bis": 255, "name": "UV", "art": "color"}
+          ]
+        },
+        {
+          "name": "Sound (triggers Strobe, Color Jumping & Fading)",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Sound Control off", "art": ""},
+            {"von": 6, "bis": 255, "name": "Sound Control on, mic sensitivity low -> high", "art": "sound"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "12 Channel with DMX delay",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Master dimmer fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Strobe functions",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Strobe closed", "art": "closed"},
+            {"von": 11, "bis": 22, "name": "Ramp up/down, slow -> fast", "art": "strobe"},
+            {"von": 23, "bis": 33, "name": "Ramp up/down random, slow->fast", "art": "strobe"},
+            {"von": 34, "bis": 45, "name": "Ramp up, slow -> fast", "art": "strobe"},
+            {"von": 46, "bis": 56, "name": "Ramp up random, slow -> fast", "art": "strobe"},
+            {"von": 57, "bis": 68, "name": "Ramp down, slow -> fast", "art": "strobe"},
+            {"von": 69, "bis": 79, "name": "Ramp down random, slow -> fast", "art": "strobe"},
+            {"von": 80, "bis": 102, "name": "Random Strobe effect, slow -> fast", "art": "strobe"},
+            {"von": 103, "bis": 127, "name": "Strobe Break effect, 5s.....1s (short burst with break)", "art": "strobe"},
+            {"von": 128, "bis": 250, "name": "Strobe slow -> fast <1Hz - 20Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {
+          "name": "Color Presets & Color Jumping & Color Fading & User Colors (override RGBWA+UV)",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Color off", "art": "open"},
+            {"von": 6, "bis": 13, "name": "Red", "art": "color"},
+            {"von": 14, "bis": 21, "name": "Amber", "art": "color"},
+            {"von": 22, "bis": 29, "name": "Yellow warm", "art": "color"},
+            {"von": 30, "bis": 37, "name": "Yellow", "art": "color"},
+            {"von": 38, "bis": 45, "name": "Green", "art": "color"},
+            {"von": 46, "bis": 53, "name": "Turquoise", "art": "color"},
+            {"von": 54, "bis": 61, "name": "Cyan", "art": "color"},
+            {"von": 62, "bis": 69, "name": "Blue", "art": "color"},
+            {"von": 70, "bis": 77, "name": "Lavender", "art": "color"},
+            {"von": 78, "bis": 85, "name": "Mauve", "art": "color"},
+            {"von": 86, "bis": 93, "name": "Magenta", "art": "color"},
+            {"von": 94, "bis": 101, "name": "Pink", "art": "color"},
+            {"von": 102, "bis": 109, "name": "Warm White", "art": "color"},
+            {"von": 110, "bis": 117, "name": "White", "art": "color"},
+            {"von": 118, "bis": 125, "name": "Cold White", "art": "color"},
+            {"von": 126, "bis": 127, "name": "Color Jumping stop", "art": ""},
+            {"von": 128, "bis": 164, "name": "Color Jumping speed slow -> fast / Color 1 -> 12", "art": "rotate"},
+            {"von": 165, "bis": 201, "name": "Color Fading speed slow -> fast / Color 1 -> 12", "art": "rotate"},
+            {"von": 202, "bis": 207, "name": "User Color_1", "art": "color"},
+            {"von": 208, "bis": 213, "name": "User Color_2", "art": "color"},
+            {"von": 214, "bis": 219, "name": "User Color_3", "art": "color"},
+            {"von": 220, "bis": 225, "name": "User Color_4", "art": "color"},
+            {"von": 226, "bis": 255, "name": "UV", "art": "color"}
+          ]
+        },
+        {
+          "name": "Sound (triggers Strobe, Color Jumping & Fading)",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Sound Control off", "art": ""},
+            {"von": 6, "bis": 255, "name": "Sound Control on, mic sensitivity low -> high", "art": "sound"}
+          ]
+        },
+        {
+          "name": "DMX Delay",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "No Delay", "art": ""},
+            {"von": 6, "bis": 255, "name": "0,1s -> 2,0s", "art": ""}
+          ]
+        }
+      ]
+    }
+  ]
+}
