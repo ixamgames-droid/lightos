@@ -5,7 +5,7 @@
 //
 //   Stufe   Push   Pixeldichte   Schatten           dynamische Aufloesung
 //   low     15 Hz  hoechstens 1,25   8 Spots, PCF       bei Kamerabewegung immer
-//   high    30 Hz  hoechstens 2      8 Spots, PCFSoft   nur wenn Frame > 18 ms
+//   high    30 Hz  hoechstens 2      8 Spots, PCFSoft   nur wenn Frames verpasst
 //   max     44 Hz  volle devicePixelRatio  16 Spots, PCFSoft  nie
 //
 // `pushHz` liest JS nicht selbst — den Takt setzt Python

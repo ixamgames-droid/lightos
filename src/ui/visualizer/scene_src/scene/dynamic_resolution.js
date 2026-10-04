@@ -10,9 +10,19 @@
 //  * Bewegung = mindestens 2 Kamera-Updates in 120 ms, die in verschiedenen
 //    Frames liegen (>= 8 ms auseinander). Ein einzelner Preset-/Reset-Sprung
 //    (der updateCamera + resizeOrtho im selben Task ruft) senkt nichts ab.
-//  * Stufe `low`: immer absenken. `high`: nur, wenn die gemessene Frame-Zeit
-//    ueber 18 ms liegt (Hysterese: erst unter 14 ms gilt sie wieder als
-//    schnell). `max`: nie.
+//  * Stufe `low`: immer absenken. `high`: nur, wenn die Grafikkarte Frames
+//    verpasst (s. u.). `max`: nie.
+//  * "Verpasst" ist relativ zum Bildschirmtakt, nicht absolut: gemessen wird
+//    der Abstand zweier rAF-Frames, und der faellt bei Vsync nie unter das
+//    Bildschirmintervall (60 Hz: 16,7 ms, 50 Hz: 20 ms, Fernzugriff: 33 ms).
+//    Eine absolute 14-ms-Grenze war auf 60 Hz nie erreichbar — ein einziger
+//    Ausreisser hielt Hoch dann bis zum Neuladen unscharf (Review VIZ-71 B1).
+//    Das Intervall wird als (langsam nachgefuehrtes) Minimum geschaetzt; ein
+//    Frame zaehlt als verpasst ab 1,5 Intervallen. Langsam = gedaempfter
+//    Anteil verpasster Frames > 30 %, schnell wieder < 10 %.
+//  * Die Einstufung "langsam" verfaellt nach 30 s ohne Bestaetigung: die
+//    naechste Fahrt laeuft dann voll aufgeloest als Probe (abgesenkte Frames
+//    werden nicht gemessen, sonst kaeme Hoch aus "langsam" nie heraus).
 //  * Waehrend einer Bewegung wird die Skala nicht neu bewertet (die Frames
 //    werden durch die Absenkung ja schneller — ohne Sperre flackerte es).
 //  * `setPixelRatio` legt den Canvas-Puffer neu an: nur beim WECHSEL rufen.
@@ -25,8 +35,12 @@ export const DYNRES_SCALE = 0.65;
 export const MOTION_WINDOW_MS = 120;
 export const MOTION_MIN_GAP_MS = 8;
 export const REST_MS = 200;
-export const SLOW_FRAME_MS = 18;
-export const FAST_FRAME_MS = 14;
+export const MISSED_FACTOR = 1.5;      // Frame > 1,5 Intervalle = verpasst
+export const SLOW_SHARE = 0.3;         // Anteil verpasst -> langsam
+export const FAST_SHARE = 0.1;         // Anteil verpasst -> wieder schnell
+export const SHARE_ALPHA = 0.1;        // Daempfung des Anteils
+export const VSYNC_CREEP = 0.01;       // Nachfuehren der Intervall-Schaetzung
+export const SLOW_EXPIRE_MS = 30000;   // "langsam" ohne Bestaetigung verfaellt
 
 export function createDynamicResolution({
   now, setTimer, clearTimer, applyScale, requestRender, mode = 'slow',
@@ -37,13 +51,24 @@ export function createDynamicResolution({
   let _lastMotion = -Infinity;
   let _prevMotion = -Infinity;
   let _timer = null;
-  let _frameMs = 0;          // gleitender Mittelwert der Frame-Abstaende
+  let _frameMs = 0;          // gleitender Mittelwert (nur Info)
+  let _vsyncMs = 0;          // geschaetztes Bildschirmintervall
+  let _verpasst = 0;         // gedaempfter Anteil verpasster Frames
   let _langsam = false;      // Hysterese-Zustand fuer 'slow'
+  let _bestaetigt = -Infinity;
+
+  function langsam() {
+    if (_langsam && now() - _bestaetigt > SLOW_EXPIRE_MS) {
+      _langsam = false;
+      _verpasst = 0;          // Probe misst frisch, nicht mit altem Anteil
+    }
+    return _langsam;
+  }
 
   function erlaubt() {
     if (_mode === 'always') return true;
     if (_mode === 'never') return false;
-    return _langsam;
+    return langsam();
   }
 
   function setzen(s) {
@@ -85,8 +110,14 @@ export function createDynamicResolution({
       if (!(ms > 0) || ms > 100) return;
       if (_scale !== 1) return;               // abgesenkte Frames sagen nichts
       _frameMs = _frameMs ? (_frameMs * 0.8 + ms * 0.2) : ms;
-      if (_frameMs > SLOW_FRAME_MS) _langsam = true;
-      else if (_frameMs < FAST_FRAME_MS) _langsam = false;
+      if (!_vsyncMs || ms < _vsyncMs) _vsyncMs = ms;
+      else _vsyncMs += (ms - _vsyncMs) * VSYNC_CREEP;   // z. B. Monitorwechsel
+      const verpasst = ms > _vsyncMs * MISSED_FACTOR ? 1 : 0;
+      _verpasst = _verpasst * (1 - SHARE_ALPHA) + verpasst * SHARE_ALPHA;
+      langsam();                                // ggf. verfallen lassen
+      if (_verpasst > SLOW_SHARE) _langsam = true;
+      else if (_verpasst < FAST_SHARE) _langsam = false;
+      if (_langsam) _bestaetigt = now();
     },
     setMode(m) {
       _mode = m;
@@ -94,7 +125,8 @@ export function createDynamicResolution({
     },
     scale() { return _scale; },
     info() {
-      return { scale: _scale, mode: _mode, frameMs: _frameMs, slow: _langsam };
+      return { scale: _scale, mode: _mode, frameMs: _frameMs, vsyncMs: _vsyncMs,
+               missed: _verpasst, slow: langsam() };
     },
   };
 }

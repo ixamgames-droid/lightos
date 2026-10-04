@@ -137,7 +137,8 @@ registerLiveAnimation(selectionPulseActive);
 // traversiert three.js die ganze Szene ein zweites Mal. Nur HIER, nicht global:
 // fremde render()-Aufrufer (Galerie, Mess-Sonden) behalten das Standardverhalten.
 // VIZ-71 (S6): Frame-Zeit fuer die dynamische Aufloesung (Stufe 'Hoch' senkt
-// nur ab, wenn ein Bild laenger als 18 ms braucht). Gemessen wird der Abstand
+// nur ab, wenn die Grafikkarte Frames gegen den Bildschirmtakt verpasst — s.
+// scene/dynamic_resolution.js, Review B1). Gemessen wird der Abstand
 // zweier Renders in UNMITTELBAR aufeinanderfolgenden rAF-Ticks — also nur bei
 // Dauer-Rendern (Kamerafahrt, Animation), wo der rAF-Takt die GPU-Last zeigt.
 // Ein Render je DMX-Push (30/s) laege 33 ms auseinander und sagte nur etwas

@@ -9,8 +9,9 @@ Quelle fuer die Pixeldichte, Deckel je Stufe) prueft
 Regeln laut Entwurf + Qualitaetsstufen:
   * ein einzelnes Update (Preset/Reset-Sprung) senkt nicht ab, eine Serie schon;
   * 200 ms Ruhe -> volle Aufloesung PLUS ``requestRender`` (scharfes Endbild);
-  * ``always`` (Niedrig) immer, ``slow`` (Hoch) nur bei Frames > 18 ms (mit
-    Hysterese), ``never`` (Maximal) nie.
+  * ``always`` (Niedrig) immer, ``slow`` (Hoch) nur, wenn regelmaessig Frames
+    gegen den Bildschirmtakt verpasst werden (mit Hysterese, verfaellt nach
+    30 s), ``never`` (Maximal) nie.
 """
 import json
 import os
@@ -125,22 +126,42 @@ class DynamischeAufloesungTest(unittest.TestCase):
         self.assertEqual(b["scale"], 1)
         self.assertEqual(b["wechsel"], [a["wechsel"][0], 1])
 
-    def test_hoch_nur_bei_langsamen_frames(self):
-        schnell = [["frame", 10]] * 10
-        (m,) = _fahre(schnell + _serie() + [["messen"]], modus="slow")
-        self.assertEqual(m["scale"], 1, "schnelle GPU: Hoch senkt nicht ab")
-        langsam = [["frame", 26]] * 10
-        (m,) = _fahre(langsam + _serie() + [["messen"]], modus="slow")
-        self.assertLess(m["scale"], 1, "Frames > 18 ms: Hoch senkt ab")
+    # Review B1: realistische Frame-Abstaende. rAF-Abstaende fallen bei Vsync
+    # nie unter das Bildschirmintervall (60 Hz: 16,7 ms) — 10-ms-Frames, wie
+    # sie der erste Entwurf dieses Tests fuetterte, gibt es nicht.
+    def test_hoch_60hz_ein_ausreisser_bleibt_schnell(self):
+        schritte = [["frame", 16.7]] * 10 + [["frame", 33.4]] + [["frame", 16.7]] * 10
+        (m,) = _fahre(schritte + _serie() + [["messen"]], modus="slow")
+        self.assertEqual(m["scale"], 1, "ein verpasster Frame macht keine langsame GPU")
 
-    def test_hoch_hysterese(self):
-        # erst langsam, dann 16 ms (zwischen 14 und 18) -> bleibt "langsam"
-        schritte = [["frame", 26]] * 10 + [["frame", 16]] * 20 + _serie() + [["messen"]]
-        (m,) = _fahre(schritte, modus="slow")
-        self.assertLess(m["scale"], 1)
-        schritte = [["frame", 26]] * 10 + [["frame", 10]] * 20 + _serie() + [["messen"]]
-        (m,) = _fahre(schritte, modus="slow")
-        self.assertEqual(m["scale"], 1, "unter 14 ms gilt die GPU wieder als schnell")
+    def test_hoch_60hz_ausreisser_als_erster_messwert(self):
+        schritte = [["frame", 25]] + [["frame", 16.7]] * 50
+        (m,) = _fahre(schritte + _serie() + [["messen"]], modus="slow")
+        self.assertEqual(m["scale"], 1, "der erste Messwert darf nicht ungedaempft zaehlen")
+
+    def test_hoch_50hz_und_fernzugriff_sind_nicht_langsam(self):
+        for ms in (20, 33.3):
+            (m,) = _fahre([["frame", ms]] * 30 + _serie() + [["messen"]], modus="slow")
+            self.assertEqual(m["scale"], 1, f"gleichmaessige {ms}-ms-Frames sind Bildschirmtakt")
+
+    def test_hoch_regelmaessig_verpasste_frames_senken_ab(self):
+        schritte = [["frame", 16.7], ["frame", 33.4]] * 15
+        (m,) = _fahre(schritte + _serie() + [["messen"]], modus="slow")
+        self.assertLess(m["scale"], 1, "jeder zweite Frame verpasst: Hoch senkt ab")
+
+    def test_hoch_60hz_erholt_sich_wieder(self):
+        schritte = ([["frame", 16.7], ["frame", 33.4]] * 15
+                    + [["frame", 16.7]] * 30)
+        (m,) = _fahre(schritte + _serie() + [["messen"]], modus="slow")
+        self.assertEqual(m["scale"], 1, "wieder ruhige 60 Hz: die GPU gilt als schnell")
+
+    def test_hoch_langsam_verfaellt_ohne_bestaetigung(self):
+        langsam = [["frame", 16.7], ["frame", 33.4]] * 15
+        (m,) = _fahre(langsam + [["warte", 31000]] + _serie() + [["messen"]], modus="slow")
+        self.assertEqual(m["scale"], 1, "nach 30 s ohne Messung: Probe mit voller Aufloesung")
+        (m,) = _fahre(langsam + [["warte", 31000]] + langsam + _serie() + [["messen"]],
+                      modus="slow")
+        self.assertLess(m["scale"], 1, "Probe bestaetigt langsam: wieder absenken")
 
     def test_maximal_senkt_nie_ab(self):
         (m,) = _fahre([["frame", 40]] * 10 + _serie(n=20) + [["messen"]], modus="never")
