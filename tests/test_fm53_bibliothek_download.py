@@ -318,6 +318,17 @@ class ErststartFrage(_Basis):
         BD.merker_schreiben(gefragt=True, antwort="nein")
         self.assertFalse(BD.beim_start_fragen(self.motor))
 
+    def test_eigene_bibliothek_zaehlt_als_mitgeliefert(self):
+        """FM-60: Profile der eigenen Bibliothek (source='lightos') sind
+        mitgeliefert — mit ihnen muss die Frage beim Erststart trotzdem kommen."""
+        from sqlalchemy.orm import Session as _S
+        from src.core.database.models import FixtureProfile
+        with _S(self.motor) as s:
+            prof = s.query(FixtureProfile).first()
+            prof.source = "lightos"
+            s.commit()
+        self.assertTrue(BD.beim_start_fragen(self.motor))
+
     def test_nicht_wenn_schon_fremde_profile_da_sind(self):
         self._laden()
         os.remove(BD.merker_pfad())

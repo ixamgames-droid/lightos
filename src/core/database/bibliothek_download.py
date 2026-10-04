@@ -169,10 +169,13 @@ def beim_start_fragen(engine) -> bool:
     """
     if merker_lesen().get("gefragt"):
         return False
-    from src.core.database.models import FixtureProfile
+    from src.core.database.models import MITGELIEFERT_QUELLEN, FixtureProfile
+    # FM-60: mitgeliefert sind die eingebauten UND die Profile der eigenen
+    # Bibliothek (fixtures/bibliothek/, source='lightos'). Mit nur "builtin"
+    # galten die Bibliotheksdateien als fremd — die Frage kam dann nie.
     with Session(engine) as s:
         fremde = s.scalars(select(FixtureProfile.id).where(
-            FixtureProfile.source != "builtin").limit(1)).first()
+            FixtureProfile.source.notin_(MITGELIEFERT_QUELLEN)).limit(1)).first()
     return fremde is None
 
 
