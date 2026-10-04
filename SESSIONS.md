@@ -69,6 +69,7 @@
 | OUT-61-FOLGE | B | fix/out61-folge-atomar | 2026-10-04T17:41Z | src/core/dmx/output_manager.py |
 | VIZ-68 | B | feat/viz68-objekt-bibliothek | 2026-10-04T17:55Z | src/ui/visualizer/scene_src/stage/stage_objects.js · src/ui/visualizer/scene_src/stage/docking.js · src/ui/visualizer/scene_src/interaction/tools.js · src/ui/visualizer/visualizer_window.py · src/core/stage/stage_definition.py · src/core/stage/scene_graph.py · tests/test_viz68_objekt_bibliothek.py · BACKLOG.md |
 | VIZ-69 | A | perf/viz69-render-ruckler | 2026-10-04T18:00Z | src/ui/visualizer/scene_src/fixtures · src/ui/visualizer/scene_src/scene · tools/viz_render_benchmark.py |
+| VIZ-70 | A | perf/viz70-ui-thread | 2026-10-04T18:00Z | src/ui/visualizer/visualizer_service.py · src/ui/views/live_view.py · src/ui/views/simple_desk.py |
 
 ## Blocker & Fallen
 
@@ -173,7 +174,6 @@
 
 ## Verlauf
 
-- 2026-10-02T22:21Z B uebergeben OUT-60
 - 2026-10-02T22:22Z B claim OUT-60
 - 2026-10-02T22:24Z A claim FM-59
 - 2026-10-02T22:32Z A done FM-57
@@ -203,3 +203,4 @@
 - 2026-10-04T17:54Z B done VIZ-PERF-B
 - 2026-10-04T17:55Z B claim VIZ-68
 - 2026-10-04T18:00Z A claim VIZ-69
+- 2026-10-04T18:00Z A claim VIZ-70
