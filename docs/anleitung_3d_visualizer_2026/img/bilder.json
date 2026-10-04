@@ -1,7 +1,7 @@
 {
   "anleitung": "3d_buehne",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "182ca87f",
+  "stand": "6c7df54b",
   "schrift": "Noto Sans (statt Roboto Condensed)",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py 3d_buehne'.",
@@ -15,7 +15,7 @@
         950
       ],
       "marken": [],
-      "md5": "d2233c025ec3f20f529d190fb078b167"
+      "md5": "8c6ebcb989d11dfc064e38eb631a5930"
     },
     {
       "datei": "02_buehne_bauen.png",
@@ -26,7 +26,7 @@
         950
       ],
       "marken": [],
-      "md5": "5a7c9f4d4c15d036dbfb645f103439a6"
+      "md5": "369c2a3a2e2564bdbee60847f99e142f"
     },
     {
       "datei": "03_geraet_platzieren.png",
@@ -37,7 +37,7 @@
         950
       ],
       "marken": [],
-      "md5": "7d7c3c84f04934369beaf3d12cf4c0dd"
+      "md5": "9e9abe97564f37a537b9856a292320a0"
     },
     {
       "datei": "04_kamera.png",
@@ -48,7 +48,7 @@
         950
       ],
       "marken": [],
-      "md5": "e4d77af8543607cae5192f611f1eae56"
+      "md5": "b1c6ffb81c5e6cb7a4ac54dc9ca34e42"
     },
     {
       "datei": "05_einstellungen.png",
@@ -59,7 +59,7 @@
         950
       ],
       "marken": [],
-      "md5": "c3fd8f4c67c8cd2dcd4407811b51b1e1"
+      "md5": "7b9af39d1da03e265e5b6ed8145a8bd8"
     },
     {
       "datei": "06_top_down.png",
@@ -70,7 +70,7 @@
         950
       ],
       "marken": [],
-      "md5": "b1cbe036c23a8d480019e72ea48400ba"
+      "md5": "5d1dac866e890031b7360b2206c5b294"
     },
     {
       "datei": "07_moving_heads.gif",
@@ -86,7 +86,7 @@
         [],
         []
       ],
-      "md5": "012ae82fba2007a3c5da3f6856007e44",
+      "md5": "c4c33b0be095f46f8084474670323133",
       "frames": 4,
       "dauern_ms": [
         1300,

@@ -73,9 +73,16 @@ def _positionen(ui) -> dict:
     return pos
 
 
+_SPOT_CYAN = 88          # Farbrad des Generic-Spots: 80–95 = Cyan
+
+
 def _farben(ui, pars_rgb=((255, 0, 150), (255, 90, 0)), wash_rgb=(0, 90, 255),
-            spot_rad=0, intens=110):
-    """``pars_rgb``: zwei Farben, abwechselnd auf PAR 1, 2, 3 …"""
+            spot_rad=_SPOT_CYAN, intens=110, spot_intens=50, wash_intens=255):
+    """``pars_rgb``: zwei Farben, abwechselnd auf PAR 1, 2, 3 …
+
+    Die Spots nicht offen-weiss auf Vollgas: ihre beiden Flecken auf der
+    Plattform waren dann reines Weiss, Farbe und Boden darunter nicht zu
+    erkennen (bei 100 noch immer). Deshalb Farbrad Cyan und ``spot_intens`` 50."""
     from anleitungsbilder.szenen_ausgabe_einrichten import frame_wie_ausgabe
     info = ui.info
     ui.wert(info["pars"], "intensity", intens)
@@ -85,11 +92,11 @@ def _farben(ui, pars_rgb=((255, 0, 150), (255, 90, 0)), wash_rgb=(0, 90, 255),
         ui.wert([fid], "color_g", g)
         ui.wert([fid], "color_b", b)
     r, g, b = wash_rgb
-    ui.wert(info["washes"], "intensity", 255)
+    ui.wert(info["washes"], "intensity", wash_intens)
     ui.wert(info["washes"], "color_r", r)
     ui.wert(info["washes"], "color_g", g)
     ui.wert(info["washes"], "color_b", b)
-    ui.wert(info["spots"], "intensity", 255)
+    ui.wert(info["spots"], "intensity", spot_intens)
     ui.wert(info["spots"], "color_wheel", spot_rad)
     frame_wie_ausgabe(ui)
 
@@ -282,6 +289,9 @@ def _einstellung(ui, *, opacity=None, helligkeit=None, kegel=None, nebel=None,
         viz._sld_opacity.setValue(opacity)
     if helligkeit is not None:
         viz._sld_brightness.setValue(helligkeit)
+        # Auch bei unveraendertem Reglerwert als Handwert melden: sonst bliebe
+        # die Auto-Helligkeit eines vorigen Bauen-Bilds stehen.
+        viz._on_brightness_changed(helligkeit)
     for chk, wert in ((viz._chk_cones, kegel), (viz._chk_fog, nebel),
                       (viz._chk_floor, boden)):
         if wert is not None:
@@ -306,6 +316,17 @@ def _geraet_waehlen(ui, fid):
     raise SzenenFehler(f"Gerät {fid} fehlt in der Visualizer-Liste")
 
 
+def _auto_helligkeit(ui):
+    """Wie „Auto-Werte anwenden“: Handwert verwerfen, damit die Szene im
+    Bauen-Modus so hell wird wie bei einem Nutzer mit Standardwerten (65 %).
+    Danach ist die 3D-Auswahl leer (``setEditMode``) — erst dann waehlen."""
+    _viz(ui)._on_auto_brightness_apply()
+    ui.pump(0.6)
+    # Bei 65 % Grundlicht ueberstrahlten PARs (110) und Washes (255) die
+    # Plattform zu weissen Flaechen; zum Bauen reicht weniger.
+    _farben(ui, intens=60, wash_intens=90)
+
+
 def _element_waehlen(ui, name):
     from PySide6.QtCore import Qt
     viz = _viz(ui)
@@ -328,7 +349,10 @@ def _mh_mitte(ui):
 
 
 def _alles_grundstellung(ui):
-    """Ausgangslage aller Bilder: Ansehen, Fixtures-Reiter, 3D, Totale."""
+    """Ausgangslage aller Bilder: Ansehen, Fixtures-Reiter, 3D, Totale.
+
+    Helligkeit 12 % von Hand (Strahlen gut sichtbar); die Bauen-Bilder holen
+    danach die Auto-Helligkeit zurueck (:func:`_auto_helligkeit`)."""
     _viz_auf(ui)
     _ansicht(ui, "3D")
     _modus(ui, False)
@@ -344,8 +368,17 @@ def _alles_grundstellung(ui):
 
 # ── 1: Uebersicht ───────────────────────────────────────────────────────────
 
+def _par1_waehlen(ui):
+    """PAR 1 waehlen: „Position & Ausrichtung“ zeigt sonst Werte ohne Auswahl
+    (Startwert Y 6.50 bzw. die Werte des zuletzt gewaehlten Geraets, VIZ-76).
+    Danach warten, bis der Identify-Puls der Auswahl (1,5 s) verklungen ist."""
+    _geraet_waehlen(ui, ui.info["pars"][0])
+    ui.pump(1.6)
+
+
 def _v01(ui):
     _alles_grundstellung(ui)
+    _par1_waehlen(ui)
     kamera(ui, _KAM_TOTALE)
 
 
@@ -369,6 +402,7 @@ _KAM_BAUEN = {"name": "Doku", "mode": "3D", "theta": 0.45, "phi": 1.12,
 def _v02(ui):
     _alles_grundstellung(ui)
     _modus(ui, True)
+    _auto_helligkeit(ui)
     _reiter(ui, "Bühne")
     _element_waehlen(ui, "Front-Traverse")
     kamera(ui, _KAM_BAUEN)
@@ -396,6 +430,7 @@ def _b02(ui):
 def _v03(ui):
     _alles_grundstellung(ui)
     _modus(ui, True)
+    _auto_helligkeit(ui)
     _reiter(ui, "Fixtures")
     _viz(ui)._act_dock.setChecked(True)
     _geraet_waehlen(ui, ui.info["spots"][0])
@@ -420,6 +455,7 @@ def _n03(ui):
 
 def _v04(ui):
     _alles_grundstellung(ui)
+    _par1_waehlen(ui)
     kamera(ui, "front")
 
 
@@ -473,6 +509,7 @@ def _b05(ui):
 
 def _v06(ui):
     _alles_grundstellung(ui)
+    _par1_waehlen(ui)
     _ansicht(ui, "2D")
     kamera(ui, "fit")
 
@@ -496,7 +533,10 @@ def _gif_schritt(pan_tilt, pars_rgb, wash_rgb, spot_rad):
     def schritt(ui):
         w1, w2 = ui.info["washes"]
         s1, s2 = ui.info["spots"]
-        _farben(ui, pars_rgb=pars_rgb, wash_rgb=wash_rgb, spot_rad=spot_rad)
+        # Spots heller als in den Standbildern: im GIF sollen sie sichtbar
+        # auffaechern und sich kreuzen.
+        _farben(ui, pars_rgb=pars_rgb, wash_rgb=wash_rgb, spot_rad=spot_rad,
+                spot_intens=150)
         werte = dict(zip((w1, w2, s1, s2), pan_tilt))
         _pan_tilt(ui, werte)
     return schritt
@@ -523,8 +563,8 @@ def _b07(ui):
 _MAG, _AMB, _BLAU, _CYAN = (255, 0, 150), (255, 90, 0), (0, 60, 255), (0, 200, 255)
 _GIF_SCHRITTE = [
     # (Wash1, Wash2, Spot1, Spot2) je (pan, tilt), PAR-Farben, Wash-Farbe, Spot-Rad
-    (((128, 95), (128, 95), (110, 100), (146, 100)), (_MAG, _AMB), (0, 90, 255), 0),
-    (((114, 95), (142, 95), (100, 100), (156, 100)), (_MAG, _AMB), (0, 90, 255), 0),
+    (((128, 95), (128, 95), (110, 100), (146, 100)), (_MAG, _AMB), (0, 90, 255), _SPOT_CYAN),
+    (((114, 95), (142, 95), (100, 100), (156, 100)), (_MAG, _AMB), (0, 90, 255), _SPOT_CYAN),
     (((114, 95), (142, 95), (100, 100), (156, 100)), (_BLAU, _CYAN), (255, 90, 0), 20),
     (((142, 95), (114, 95), (156, 100), (100, 100)), (_BLAU, _CYAN), (255, 90, 0), 20),
 ]

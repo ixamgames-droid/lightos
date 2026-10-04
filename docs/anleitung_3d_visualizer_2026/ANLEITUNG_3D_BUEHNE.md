@@ -18,7 +18,9 @@ entstehen aus dem Code am echten Bildschirm
 3. **Bühne** — welche gespeicherte Bühne geladen ist; daneben **Speichern**, **Neu**,
    **Löschen**.
 4. **Reiter** — **Fixtures** (Geräte), **Bühne** (Bühnen-Elemente), **Einstellungen**
-   (Darstellung).
+   (Darstellung). Im Bild ist PAR 1 gewählt (oben in der Ansicht „Selektion: FIXTURE
+   x1“); darunter zeigt **Position & Ausrichtung** seine Werte: Er hängt mit `Y=5.6`
+   an der Front-Traverse.
 
 ## Vorbereitung
 
@@ -205,8 +207,8 @@ die Ansicht stürzte ohne Meldung ab, und kurz davor stand das Bild sekundenlang
 still. Zudem zeichnet jeder schattenwerfende Scheinwerfer die ganze Szene noch
 einmal aus seiner Sicht — mit 16 Schatten war das der größte Einzelposten pro
 Bild und ließ die Ansicht bei großen Rigs ruckeln. Acht Schatten reichen für den
-Raumeindruck; die Grenze gilt auf jedem Rechner gleich, damit die Bühne überall
-gleich aussieht. Neu berechnet werden die Schatten nur, wenn sich etwas bewegt
+Raumeindruck. Die Obergrenze von 8 gilt überall gleich; nur auf sehr schwachen
+Grafikchips (weniger als 14 Textur-Einheiten) werfen noch weniger Geräte Schatten. Neu berechnet werden die Schatten nur, wenn sich etwas bewegt
 (Pan/Tilt, verschobene Geräte oder Bühnenteile) — Kamerafahrten und reine Farb- oder
 Dimmerwechsel kosten keinen Schattendurchlauf.
 
