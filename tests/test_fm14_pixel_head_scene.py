@@ -297,6 +297,10 @@ class PixelHeadSceneTest(unittest.TestCase):
         steht = self._eval(f"typeof window.__lightos.fixtures['{_GROSS}'] "
                            f"=== 'object'")
         if steht:
+            # VIZ-71: ein Neubau uebernimmt bewusst den letzten DMX-Stand aus
+            # dem Cache — fuer die Test-Isolation hier explizit leeren.
+            self._eval("window.__lightos.__dmxCacheLeeren && "
+                       "window.__lightos.__dmxCacheLeeren(); true")
             self._eval(f"window.__lightos.fixtures['{_GROSS}'].__neubau = 1; "
                        f"true")
             fertig = f"!window.__lightos.fixtures['{_GROSS}'].__neubau"

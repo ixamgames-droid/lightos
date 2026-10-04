@@ -27,6 +27,10 @@ Aufruf (Linux)::
 
     ./venv/bin/python -u tools/viz_dmx_latency_bench.py spike
     ./venv/bin/python -u tools/viz_dmx_latency_bench.py messen --show shows/X.lshow
+
+Aufruf (Windows)::
+
+    venv/Scripts/python -u tools/viz_dmx_latency_bench.py spike
 """
 from __future__ import annotations
 

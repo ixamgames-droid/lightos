@@ -27,7 +27,7 @@ from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEngineProfile
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtCore import QObject, QUrl, Signal, Slot
-from _qt_lifecycle import destroy_webengine_view  # XPLAT-09
+from _qt_lifecycle import destroy_webengine_view, destroy_widget  # XPLAT-09
 
 import src.ui.visualizer.visualizer_window as VW
 from src.ui.visualizer import quality_tiers as QT
@@ -156,8 +156,7 @@ class PraeferenzTest(unittest.TestCase):
             self.assertEqual(gespeichert, {"viz_quality_tier": "max"})
             fake._on_reload_scene.assert_called_once()
         finally:
-            combo.deleteLater()
-            _app.processEvents()
+            destroy_widget(combo, _app)
 
     def test_anzeige_der_aktiven_stufe(self):
         lbl = QLabel()
@@ -165,8 +164,7 @@ class PraeferenzTest(unittest.TestCase):
             VW.VisualizerWindow._on_gpu_tier_reported(SimpleNamespace(_lbl_gpu_tier=lbl), "max")
             self.assertEqual(lbl.text(), "aktiv: Maximal")
         finally:
-            lbl.deleteLater()
-            _app.processEvents()
+            destroy_widget(lbl, _app)
 
 
 class PushTaktTest(unittest.TestCase):
