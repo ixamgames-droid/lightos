@@ -1,0 +1,258 @@
+{
+  "format_version": 1,
+  "hersteller": "U King",
+  "hersteller_kurz": "UKING",
+  "modell": "ZQ02255 80W Mini Beam",
+  "kurzname": "ZQ02255",
+  "typ": "moving_head",
+  "leistung_w": 150,
+  "notizen": "Kein Herstellerhandbuch abrufbar; Kanalfolge und Wertebereiche aus der QLC+-Datei. Strobe-Kanaele ohne Wertangabe in QLC+: 0 = kein Strobe angenommen (wie bei den eingebauten U-King-Profilen). '7 Colour lens' ist ein einschwenkbarer Regenbogen-Filter (Effekt).",
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition UKing-ZQ02255-80W-Mini-Beam.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/UKing/UKing-ZQ02255-80W-Mini-Beam.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.3.0 GIT · Steve Fox",
+    "original": "resources/fixtures/UKing/UKing-ZQ02255-80W-Mini-Beam.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 98 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): Hersteller 'UKing' -> 'U King' (wie die eingebauten LightOS-Profile der Marke); Attribute korrigiert (7 Colour lens: macro->effect; Auto sweep and fixture reset: macro->reset); 46 Bereichs-Arten nachgezogen (Farb-/Gobo-Slots, Shake/Rotation, Prisma, Sound, Reset; Programm-Bereiche in Makro-Kanaelen ohne Farb-Art); Reset-Kanal mit Auto-Schwenk als reset statt zweitem macro; Tippfehler in Gobo-Namen korrigiert; einzelne Kanalnamen deutsch bzw. eindeutiger benannt"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Originaldatei geprueft und nach den LightOS-Regeln (SCHEMA.md) nachbearbeitet; ein Herstellerhandbuch war nicht abrufbar (U'King-Anleitungen nur als Amazon-/manuals.plus-PDF, dort gesperrt; ManualsLib fuehrt das Modell nicht), daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "13 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "No function", "art": "open"},
+            {"von": 1, "bis": 255, "name": "Strobe slow to fast (1hz to 25hz)", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Color",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 19, "name": "White", "art": "open"},
+            {"von": 20, "bis": 39, "name": "Red", "art": "color"},
+            {"von": 40, "bis": 59, "name": "Yellow", "art": "color"},
+            {"von": 60, "bis": 79, "name": "Blue", "art": "color"},
+            {"von": 80, "bis": 99, "name": "Green", "art": "color"},
+            {"von": 100, "bis": 119, "name": "Orange", "art": "color"},
+            {"von": 120, "bis": 139, "name": "Purple", "art": "color"},
+            {"von": 140, "bis": 159, "name": "Cyan", "art": "color"},
+            {"von": 160, "bis": 207, "name": "Automatic Change Fast to Slow", "art": "rotate"},
+            {"von": 208, "bis": 255, "name": "Automatic change reversed direction Slow to Fast", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Pattern Gobo",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Spot", "art": "open"},
+            {"von": 10, "bis": 19, "name": "Flower", "art": "gobo"},
+            {"von": 20, "bis": 29, "name": "Asterisk", "art": "gobo"},
+            {"von": 30, "bis": 39, "name": "Three teardrop circle", "art": "gobo"},
+            {"von": 40, "bis": 49, "name": "Star", "art": "gobo"},
+            {"von": 50, "bis": 59, "name": "Four dots", "art": "gobo"},
+            {"von": 60, "bis": 69, "name": "Lens flare", "art": "gobo"},
+            {"von": 70, "bis": 79, "name": "Four curved dash circle", "art": "gobo"},
+            {"von": 80, "bis": 89, "name": "Four curved dash circle dither slow to fast", "art": "shake"},
+            {"von": 90, "bis": 99, "name": "Lens flare dither slow to fast", "art": "shake"},
+            {"von": 100, "bis": 109, "name": "Four dot dither slow to fast", "art": "shake"},
+            {"von": 110, "bis": 119, "name": "Star dither slow to fast", "art": "shake"},
+            {"von": 120, "bis": 129, "name": "Three teardrop circle dither slow to fast", "art": "shake"},
+            {"von": 130, "bis": 139, "name": "Asterisk dither slow to fast", "art": "shake"},
+            {"von": 140, "bis": 149, "name": "Flower dither slow to fast", "art": "shake"},
+            {"von": 150, "bis": 159, "name": "Spot dither slow to fast", "art": "shake"},
+            {"von": 160, "bis": 207, "name": "Automatic swipe right fast to slow", "art": "rotate"},
+            {"von": 208, "bis": 255, "name": "Automatic swipe left slow to fast", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Prism",
+          "attribut": "prism",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 99, "name": "No prism", "art": ""},
+            {"von": 100, "bis": 127, "name": "Static prism", "art": "prism"},
+            {"von": 128, "bis": 255, "name": "Clockwise rotation slow to fast", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "7-Farben-Linse",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 126, "name": "No lens", "art": ""},
+            {"von": 127, "bis": 255, "name": "7 Colour lens active", "art": ""}
+          ]
+        },
+        {
+          "name": "Auto-/Sound-Modus",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 29, "name": "No action", "art": ""},
+            {"von": 30, "bis": 59, "name": "Auto mode 1", "art": ""},
+            {"von": 60, "bis": 89, "name": "Auto mode 2", "art": ""},
+            {"von": 90, "bis": 119, "name": "Auto mode 3", "art": ""},
+            {"von": 120, "bis": 149, "name": "Auto mode 4", "art": ""},
+            {"von": 150, "bis": 179, "name": "Sound activated mode 1", "art": "sound"},
+            {"von": 180, "bis": 209, "name": "Sound activated mode 2", "art": "sound"},
+            {"von": 210, "bis": 239, "name": "Sound activated mode 3", "art": "sound"},
+            {"von": 240, "bis": 255, "name": "Sound activated mode 4", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Auto-Schwenk / Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 20, "name": "No action", "art": ""},
+            {"von": 21, "bis": 100, "name": "Auto pan sweep", "art": ""},
+            {"von": 101, "bis": 200, "name": "Auto tilt sweep", "art": ""},
+            {"von": 201, "bis": 249, "name": "Auto pan + tilt sweep", "art": ""},
+            {"von": 250, "bis": 255, "name": "Fixture reset (held for 5s)", "art": "reset"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "11 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Pan/Tilt speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "No function", "art": "open"},
+            {"von": 1, "bis": 255, "name": "Strobe slow to fast (1hz to 25hz)", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Color",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 19, "name": "White", "art": "open"},
+            {"von": 20, "bis": 39, "name": "Red", "art": "color"},
+            {"von": 40, "bis": 59, "name": "Yellow", "art": "color"},
+            {"von": 60, "bis": 79, "name": "Blue", "art": "color"},
+            {"von": 80, "bis": 99, "name": "Green", "art": "color"},
+            {"von": 100, "bis": 119, "name": "Orange", "art": "color"},
+            {"von": 120, "bis": 139, "name": "Purple", "art": "color"},
+            {"von": 140, "bis": 159, "name": "Cyan", "art": "color"},
+            {"von": 160, "bis": 207, "name": "Automatic Change Fast to Slow", "art": "rotate"},
+            {"von": 208, "bis": 255, "name": "Automatic change reversed direction Slow to Fast", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Pattern Gobo",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Spot", "art": "open"},
+            {"von": 10, "bis": 19, "name": "Flower", "art": "gobo"},
+            {"von": 20, "bis": 29, "name": "Asterisk", "art": "gobo"},
+            {"von": 30, "bis": 39, "name": "Three teardrop circle", "art": "gobo"},
+            {"von": 40, "bis": 49, "name": "Star", "art": "gobo"},
+            {"von": 50, "bis": 59, "name": "Four dots", "art": "gobo"},
+            {"von": 60, "bis": 69, "name": "Lens flare", "art": "gobo"},
+            {"von": 70, "bis": 79, "name": "Four curved dash circle", "art": "gobo"},
+            {"von": 80, "bis": 89, "name": "Four curved dash circle dither slow to fast", "art": "shake"},
+            {"von": 90, "bis": 99, "name": "Lens flare dither slow to fast", "art": "shake"},
+            {"von": 100, "bis": 109, "name": "Four dot dither slow to fast", "art": "shake"},
+            {"von": 110, "bis": 119, "name": "Star dither slow to fast", "art": "shake"},
+            {"von": 120, "bis": 129, "name": "Three teardrop circle dither slow to fast", "art": "shake"},
+            {"von": 130, "bis": 139, "name": "Asterisk dither slow to fast", "art": "shake"},
+            {"von": 140, "bis": 149, "name": "Flower dither slow to fast", "art": "shake"},
+            {"von": 150, "bis": 159, "name": "Spot dither slow to fast", "art": "shake"},
+            {"von": 160, "bis": 207, "name": "Automatic swipe right fast to slow", "art": "rotate"},
+            {"von": 208, "bis": 255, "name": "Automatic swipe left slow to fast", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Prism",
+          "attribut": "prism",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 99, "name": "No prism", "art": ""},
+            {"von": 100, "bis": 127, "name": "Static prism", "art": "prism"},
+            {"von": 128, "bis": 255, "name": "Clockwise rotation slow to fast", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "7-Farben-Linse",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 126, "name": "No lens", "art": ""},
+            {"von": 127, "bis": 255, "name": "7 Colour lens active", "art": ""}
+          ]
+        },
+        {
+          "name": "Auto-/Sound-Modus",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 29, "name": "No action", "art": ""},
+            {"von": 30, "bis": 59, "name": "Auto mode 1", "art": ""},
+            {"von": 60, "bis": 89, "name": "Auto mode 2", "art": ""},
+            {"von": 90, "bis": 119, "name": "Auto mode 3", "art": ""},
+            {"von": 120, "bis": 149, "name": "Auto mode 4", "art": ""},
+            {"von": 150, "bis": 179, "name": "Sound activated mode 1", "art": "sound"},
+            {"von": 180, "bis": 209, "name": "Sound activated mode 2", "art": "sound"},
+            {"von": 210, "bis": 239, "name": "Sound activated mode 3", "art": "sound"},
+            {"von": 240, "bis": 255, "name": "Sound activated mode 4", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Auto-Schwenk / Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 20, "name": "No action", "art": ""},
+            {"von": 21, "bis": 100, "name": "Auto pan sweep", "art": ""},
+            {"von": 101, "bis": 200, "name": "Auto tilt sweep", "art": ""},
+            {"von": 201, "bis": 249, "name": "Auto pan + tilt sweep", "art": ""},
+            {"von": 250, "bis": 255, "name": "Fixture reset (held for 5s)", "art": "reset"}
+          ]
+        }
+      ]
+    }
+  ]
+}

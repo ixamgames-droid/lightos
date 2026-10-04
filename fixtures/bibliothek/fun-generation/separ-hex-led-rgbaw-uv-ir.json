@@ -1,0 +1,118 @@
+{
+  "format_version": 1,
+  "hersteller": "Fun Generation",
+  "hersteller_kurz": "FUNGEN",
+  "modell": "SePar Hex LED RGBAW UV IR",
+  "kurzname": "SEPARHEX",
+  "typ": "par",
+  "leistung_w": 21,
+  "notizen": "Flacher LED-PAR, 5 x 8 W RGBWA+UV-6-in-1, 20 Grad. Strobe-Kanal ohne Offen-Bereich im Handbuch: 0 = aus angenommen.",
+  "quelle": {
+    "titel": "Fun Generation SePar Hex LED RGBAW UV IR Bedienungsanleitung (Thomann, ID 440827, V3)",
+    "version": "V3",
+    "datum": "2022-12-01",
+    "url": "https://fast-images.static-thomann.de/pics/atg/atgdata/document/manual/c_440827_v3_en_online.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.3 GIT · Sergeant Pelzkinn",
+    "original": "resources/fixtures/Fun-Generation/Fun-Generation-SePar-Hex-LED-RGBAW-UV-IR.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 35 Wertebereiche mit Art (kind) versehen; 1 Bereichsnamen auf 80 Zeichen gekuerzt; danach von LightOS gegen das Herstellerhandbuch ueberarbeitet: Hersteller 'Fun-Generation' -> 'Fun Generation' (Schreibweise des Herstellers), Kurzname/Leistung/Typ nach Handbuch; Strobe-Kanal als strobe statt shutter (Handbuch: nur 'Strobe, Geschwindigkeit steigend', kein Offen-Bereich angegeben); Kanal 9 als macro statt color_wheel (Farbmakro nur bei Kanal 8 = 1-14, sonst Show-Speed bzw. Mikrofon-Empfindlichkeit); Farbmakros lesbar benannt, Blackout als closed; Programmkanal: Shows ohne Art, Musik als sound; Kanalnamen deutsch"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal fuer Kanal gegen die DMX-Tabellen (6/8/10 Kanaele, Kap. 7.5-7.7) im Thomann-Handbuch V3 (01.12.2022) geprueft; nicht am Geraet getestet"
+  },
+  "modi": [
+    {
+      "name": "6 Channel",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "8 Channel",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Strobe (Geschwindigkeit steigend)", "attribut": "strobe", "default": 0, "highlight": 0}
+      ]
+    },
+    {
+      "name": "10 Channel",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {
+          "name": "Programmwahl",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Keine Funktion"},
+            {"von": 1, "bis": 14, "name": "Automatikshow 1 (Farbe ueber Kanal 9)", "art": ""},
+            {"von": 15, "bis": 29, "name": "Automatikshow 2", "art": ""},
+            {"von": 30, "bis": 44, "name": "Automatikshow 3", "art": ""},
+            {"von": 45, "bis": 59, "name": "Automatikshow 4", "art": ""},
+            {"von": 60, "bis": 74, "name": "Automatikshow 5", "art": ""},
+            {"von": 75, "bis": 89, "name": "Automatikshow 6", "art": ""},
+            {"von": 90, "bis": 104, "name": "Automatikshow 7", "art": ""},
+            {"von": 105, "bis": 119, "name": "Automatikshow 8", "art": ""},
+            {"von": 120, "bis": 134, "name": "Automatikshow 9", "art": ""},
+            {"von": 135, "bis": 149, "name": "Automatikshow 10", "art": ""},
+            {"von": 150, "bis": 164, "name": "Automatikshow 11", "art": ""},
+            {"von": 165, "bis": 179, "name": "Automatikshow 12", "art": ""},
+            {"von": 180, "bis": 194, "name": "Automatikshow 13", "art": ""},
+            {"von": 195, "bis": 209, "name": "Automatikshow 14", "art": ""},
+            {"von": 210, "bis": 224, "name": "Automatikshow 15", "art": ""},
+            {"von": 225, "bis": 239, "name": "Automatikshow 16", "art": ""},
+            {"von": 240, "bis": 255, "name": "Musiksteuerung", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Farbmakro (Kanal 8 = 1-14) / Show-Speed / Mikrofon",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 14, "name": "LEDs aus (Blackout)", "art": "closed"},
+            {"von": 15, "bis": 29, "name": "Rot", "art": "color"},
+            {"von": 30, "bis": 44, "name": "Gruen", "art": "color"},
+            {"von": 45, "bis": 59, "name": "Blau", "art": "color"},
+            {"von": 60, "bis": 74, "name": "Weiss", "art": "color"},
+            {"von": 75, "bis": 89, "name": "Amber", "art": "color"},
+            {"von": 90, "bis": 104, "name": "UV", "art": "color"},
+            {"von": 105, "bis": 119, "name": "Rot + Amber", "art": "color"},
+            {"von": 120, "bis": 134, "name": "Gelb (R255 G220)", "art": "color"},
+            {"von": 135, "bis": 149, "name": "Pink (R255 B80 UV255)", "art": "color"},
+            {"von": 150, "bis": 164, "name": "Magenta (R255 B70 UV70)", "art": "color"},
+            {"von": 165, "bis": 179, "name": "Cyan (G255 B255)", "art": "color"},
+            {"von": 180, "bis": 194, "name": "Rot + Weiss", "art": "color"},
+            {"von": 195, "bis": 209, "name": "Gruen + Weiss", "art": "color"},
+            {"von": 210, "bis": 224, "name": "Blau + Weiss", "art": "color"},
+            {"von": 225, "bis": 239, "name": "Warmweiss (R255 G180 W130 A255)", "art": "color"},
+            {"von": 240, "bis": 255, "name": "Alle LEDs voll", "art": "color"}
+          ]
+        },
+        {"name": "Strobe (Geschwindigkeit steigend)", "attribut": "strobe", "default": 0, "highlight": 0}
+      ]
+    }
+  ]
+}

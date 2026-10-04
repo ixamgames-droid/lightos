@@ -1,0 +1,177 @@
+{
+  "format_version": 1,
+  "hersteller": "Lixada",
+  "hersteller_kurz": "Lixada",
+  "modell": "5LED 50W Beam Wash Double Sides RGBW",
+  "kurzname": "5LED BEAMWASH",
+  "typ": "moving_head",
+  "leistung_w": 35,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Lixada-5LED-50W-Beam-Wash-Double-Sides-RGBW.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Lixada/Lixada-5LED-50W-Beam-Wash-Double-Sides-RGBW.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.5 GIT · John Yiannikakis",
+    "original": "resources/fixtures/Lixada/Lixada-5LED-50W-Beam-Wash-Double-Sides-RGBW.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 14 Wertebereiche mit Art (kind) versehen; Rasterform in 2 Modus/Modi aus <Physical> uebernommen; LightOS-Nachbearbeitung: Strobe-Kanal: Bereiche 0 = offen, 1-255 = Strobe ergaenzt; Rasterform 2x1 nur im 21-Kanal-Modus (zwei getrennt steuerbare Seiten); Endlos-Tilt-Kanal tilt -> raw, Default 0 (zweiter tilt-Kanal haette die Positionssteuerung verdoppelt); Mikrofon-Empfindlichkeit macro -> raw; Lampen-Autolauf color_wheel -> macro, Tempo -> effect_speed"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Quelldatei und auf innere Stimmigkeit geprueft; kein Herstellerhandbuch oeffentlich auffindbar, nicht am Geraet geprueft"
+  },
+  "modi": [
+    {
+      "name": "15 Channel",
+      "kanaele": [
+        {"name": "X Motor", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Y Motor", "attribut": "tilt", "default": 128, "highlight": 128},
+        {
+          "name": "Y axis infinite rotation",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Y infinite", "art": ""}
+          ]
+        },
+        {"name": "XY Motor speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Dimmer total", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 1, "bis": 255, "name": "Strobe langsam → schnell", "art": "strobe"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Motor/Sound mode",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 128, "name": "Motor auto run", "art": ""},
+            {"von": 129, "bis": 255, "name": "Sound activation mode", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Music Sensitivity",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Sound Sensitivity (less -> more)", "art": "sound"}
+          ]
+        },
+        {"name": "Light bulb auto run", "attribut": "macro", "default": 0, "highlight": 0},
+        {
+          "name": "Light bulb auto run speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Light bulb auto run speed", "art": ""}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 249, "name": "No function", "art": ""},
+            {"von": 250, "bis": 255, "name": "reset 5 seconds", "art": "reset"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "21 Channel",
+      "raster": {"rows": 2, "cols": 1},
+      "kanaele": [
+        {"name": "X Motor", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "X Motor fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Y Motor", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Y Motor fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Y axis infinite rotation",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Y infinite", "art": ""}
+          ]
+        },
+        {"name": "XY Motor speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Dimmer total", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 1, "bis": 255, "name": "Strobe langsam → schnell", "art": "strobe"}
+          ]
+        },
+        {"name": "Red 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Motor/Sound mode",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 128, "name": "Motor auto run", "art": ""},
+            {"von": 129, "bis": 255, "name": "Sound activation mode", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Music Sensitivity",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Sound Sensitivity (less -> more)", "art": "sound"}
+          ]
+        },
+        {"name": "Light bulb auto run", "attribut": "macro", "default": 0, "highlight": 0},
+        {
+          "name": "Light bulb auto run speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Light bulb auto run speed", "art": ""}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 249, "name": "No function", "art": ""},
+            {"von": 250, "bis": 255, "name": "reset 5 seconds", "art": "reset"}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Doppelseitiger Mover (Beam- und Wash-Seite)."
+}

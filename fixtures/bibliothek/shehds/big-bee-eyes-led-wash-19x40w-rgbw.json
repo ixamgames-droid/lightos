@@ -1,0 +1,1518 @@
+{
+  "format_version": 1,
+  "hersteller": "Shehds",
+  "hersteller_kurz": "Shehds",
+  "modell": "Big Bee Eyes LED Wash 19x40W RGBW",
+  "kurzname": "SH-BEE19X40",
+  "typ": "moving_head",
+  "leistung_w": 640,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Shehds-Big-Bee-Eyes-LED-Wash-19x40W-RGBW.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Shehds/Shehds-Big-Bee-Eyes-LED-Wash-19x40W-RGBW.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.13.1 GIT · István Király",
+    "original": "resources/fixtures/Shehds/Shehds-Big-Bee-Eyes-LED-Wash-19x40W-RGBW.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 458 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): Effektfarb-Kanaele (Effect-R/G/B/W) als raw statt weiterer Master-Dimmer; kurzname SH-BEE19X40; Farbmakro-/Programmkanaele ohne einzelne Farbslots als macro statt color_wheel; Bereichs-Arten korrigiert (u. a. „Preset“ nicht als Reset, Farben/Offen auf Farbrad, Open/Shake/Rotation auf Goborad, Prisma/Frost, keine Farb-/Dreh-Kacheln auf Makro-/Speed-Kanaelen, Sound-Bereiche)"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": false,
+    "wie": "nicht gegen ein Herstellerhandbuch geprueft (kein oeffentliches Shehds-Handbuch zu diesem Modell auffindbar); Kanalbelegung und Wertebereiche aus der QLC+-Vorlage, Attribute, Bereichs-Arten und Defaults von LightOS plausibilisiert"
+  },
+  "modi": [
+    {
+      "name": "21 Channel",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Red fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Green fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Blue fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "White fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "CTO", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Macro Color",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "One effect per 10 values", "art": ""}
+          ]
+        },
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 1,
+          "highlight": 1,
+          "bereiche": [
+            {"von": 0, "bis": 3, "name": "Open", "art": "open"},
+            {"von": 4, "bis": 203, "name": "1Hz to 25Hz", "art": "strobe"},
+            {"von": 204, "bis": 255, "name": "Random Strobe", "art": "strobe"}
+          ]
+        },
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Dimmer fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Dim Mode",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dim Mode", "art": ""}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 250, "name": "No function", "art": ""},
+            {"von": 251, "bis": 255, "name": "System reset after 5s", "art": "reset"}
+          ]
+        },
+        {"name": "Zoom", "attribut": "zoom", "default": 0, "highlight": 0},
+        {
+          "name": "Barrel Roll",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 155, "name": "Barrel Roll 0-60°", "art": ""},
+            {"von": 156, "bis": 205, "name": "Clockwise Barrel Roll", "art": ""},
+            {"von": 206, "bis": 255, "name": "Anti-clockwise Barrel Roll", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "23 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "CTO", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 1,
+          "highlight": 1,
+          "bereiche": [
+            {"von": 0, "bis": 3, "name": "Open", "art": "open"},
+            {"von": 4, "bis": 203, "name": "1Hz to 25Hz", "art": "strobe"},
+            {"von": 204, "bis": 255, "name": "Random Strobe", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Macro Color",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "One effect per 10 values", "art": ""}
+          ]
+        },
+        {
+          "name": "Static Effect",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "None", "art": ""},
+            {"von": 10, "bis": 12, "name": "Single Color Effect 1"},
+            {"von": 13, "bis": 15, "name": "Single Color Effect 2"},
+            {"von": 16, "bis": 18, "name": "Single Color Effect 3"},
+            {"von": 19, "bis": 21, "name": "Single Color Effect 4"},
+            {"von": 22, "bis": 24, "name": "Single Color Effect 5"},
+            {"von": 25, "bis": 27, "name": "Single Color Effect 6"},
+            {"von": 28, "bis": 30, "name": "Single Color Effect 7"},
+            {"von": 31, "bis": 33, "name": "Single Color Effect 8"},
+            {"von": 34, "bis": 36, "name": "Single Color Effect 9"},
+            {"von": 37, "bis": 39, "name": "Single Color Effect 10"},
+            {"von": 40, "bis": 42, "name": "Single Color Effect 11"},
+            {"von": 43, "bis": 45, "name": "Single Color Effect 12"},
+            {"von": 46, "bis": 48, "name": "Single Color Effect 13"},
+            {"von": 49, "bis": 51, "name": "Single Color Effect 14"},
+            {"von": 52, "bis": 54, "name": "Single Color Effect 15"},
+            {"von": 55, "bis": 57, "name": "Single Color Effect 16"},
+            {"von": 58, "bis": 60, "name": "Single Color Effect 17"},
+            {"von": 61, "bis": 63, "name": "Single Color Effect 18"},
+            {"von": 64, "bis": 66, "name": "Single Color Effect 19"},
+            {"von": 67, "bis": 69, "name": "Single Color Effect 20"},
+            {"von": 70, "bis": 72, "name": "Single Color Effect 21"},
+            {"von": 73, "bis": 75, "name": "Single Color Effect 22"},
+            {"von": 76, "bis": 78, "name": "Single Color Effect 23"},
+            {"von": 79, "bis": 81, "name": "Single Color Effect 24"},
+            {"von": 82, "bis": 84, "name": "Single Color Effect 25"},
+            {"von": 85, "bis": 87, "name": "Single Color Effect 26"},
+            {"von": 88, "bis": 90, "name": "Single Color Effect 27"},
+            {"von": 91, "bis": 93, "name": "Single Color Effect 28"},
+            {"von": 94, "bis": 96, "name": "Single Color Effect 29"},
+            {"von": 97, "bis": 99, "name": "Single Color Effect 30"},
+            {"von": 100, "bis": 102, "name": "Single Color Effect 31"},
+            {"von": 103, "bis": 105, "name": "Single Color Effect 32"},
+            {"von": 106, "bis": 108, "name": "Single Color Effect 33"},
+            {"von": 109, "bis": 111, "name": "Single Color Effect 34"},
+            {"von": 112, "bis": 114, "name": "Single Color Effect 35"},
+            {"von": 115, "bis": 117, "name": "Single Color Effect 36"},
+            {"von": 118, "bis": 120, "name": "Single Color Effect 37"},
+            {"von": 121, "bis": 123, "name": "Single Color Effect 38"},
+            {"von": 124, "bis": 126, "name": "Single Color Effect 39"},
+            {"von": 127, "bis": 129, "name": "Single Color Effect 40"},
+            {"von": 130, "bis": 132, "name": "Single Color Effect 41"},
+            {"von": 133, "bis": 135, "name": "Single Color Effect 42"},
+            {"von": 136, "bis": 138, "name": "Single Color Effect 43"},
+            {"von": 139, "bis": 141, "name": "Single Color Effect 44"},
+            {"von": 142, "bis": 144, "name": "Single Color Effect 45"},
+            {"von": 145, "bis": 147, "name": "Single Color Effect 46"},
+            {"von": 148, "bis": 150, "name": "Single Color Effect 47"},
+            {"von": 151, "bis": 153, "name": "Single Color Effect 48"},
+            {"von": 154, "bis": 156, "name": "Single Color Effect 49"},
+            {"von": 157, "bis": 159, "name": "Single Color Effect 50"},
+            {"von": 160, "bis": 162, "name": "Single Color Effect 51"},
+            {"von": 163, "bis": 165, "name": "Single Color Effect 52"},
+            {"von": 166, "bis": 168, "name": "Single Color Effect 53"},
+            {"von": 169, "bis": 171, "name": "Single Color Effect 54"},
+            {"von": 172, "bis": 174, "name": "Single Color Effect 55"},
+            {"von": 175, "bis": 177, "name": "Single Color Effect 56"},
+            {"von": 178, "bis": 180, "name": "Single Color Effect 57"},
+            {"von": 181, "bis": 183, "name": "Single Color Effect 58"},
+            {"von": 184, "bis": 186, "name": "Single Color Effect 59"},
+            {"von": 187, "bis": 189, "name": "Single Color Effect 60"},
+            {"von": 190, "bis": 192, "name": "Single Color Effect 61"},
+            {"von": 193, "bis": 195, "name": "Single Color Effect 62"},
+            {"von": 196, "bis": 198, "name": "Single Color Effect 63"},
+            {"von": 199, "bis": 201, "name": "Single Color Effect 64"},
+            {"von": 202, "bis": 204, "name": "Single Color Effect 65"},
+            {"von": 205, "bis": 207, "name": "Single Color Effect 66"},
+            {"von": 208, "bis": 210, "name": "Single Color Effect 67"},
+            {"von": 211, "bis": 213, "name": "Mixing Effect 1", "art": ""},
+            {"von": 214, "bis": 216, "name": "Mixing Effect 2", "art": ""},
+            {"von": 217, "bis": 219, "name": "Mixing Effect 3", "art": ""},
+            {"von": 220, "bis": 222, "name": "Mixing Effect 4", "art": ""},
+            {"von": 223, "bis": 225, "name": "Mixing Effect 5", "art": ""},
+            {"von": 226, "bis": 228, "name": "Mixing Effect 6", "art": ""},
+            {"von": 229, "bis": 231, "name": "Mixing Effect 7", "art": ""},
+            {"von": 232, "bis": 234, "name": "Mixing Effect 8", "art": ""},
+            {"von": 235, "bis": 237, "name": "Mixing Effect 9", "art": ""},
+            {"von": 238, "bis": 240, "name": "Mixing Effect 10", "art": ""},
+            {"von": 241, "bis": 243, "name": "Mixing Effect 11", "art": ""},
+            {"von": 244, "bis": 246, "name": "Mixing Effect 12", "art": ""},
+            {"von": 247, "bis": 249, "name": "Mixing Effect 13", "art": ""},
+            {"von": 250, "bis": 252, "name": "Mixing Effect 14", "art": ""},
+            {"von": 253, "bis": 255, "name": "Mixing Effect 15", "art": ""}
+          ]
+        },
+        {
+          "name": "Dynamic Effect",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "None", "art": ""},
+            {"von": 10, "bis": 14, "name": "Single Color Dynamic Effect 1"},
+            {"von": 15, "bis": 19, "name": "Single Color Dynamic Effect 2"},
+            {"von": 20, "bis": 24, "name": "Single Color Dynamic Effect 3"},
+            {"von": 25, "bis": 29, "name": "Single Color Dynamic Effect 4"},
+            {"von": 30, "bis": 34, "name": "Single Color Dynamic Effect 5"},
+            {"von": 35, "bis": 39, "name": "Single Color Dynamic Effect 6"},
+            {"von": 40, "bis": 44, "name": "Single Color Dynamic Effect 7"},
+            {"von": 45, "bis": 49, "name": "Single Color Dynamic Effect 8"},
+            {"von": 50, "bis": 54, "name": "Single Color Dynamic Effect 9"},
+            {"von": 55, "bis": 59, "name": "Single Color Dynamic Effect 10"},
+            {"von": 60, "bis": 64, "name": "Single Color Dynamic Effect 11"},
+            {"von": 65, "bis": 69, "name": "Single Color Dynamic Effect 12"},
+            {"von": 70, "bis": 74, "name": "Single Color Dynamic Effect 13"},
+            {"von": 75, "bis": 79, "name": "Single Color Dynamic Effect 14"},
+            {"von": 80, "bis": 84, "name": "Single Color Dynamic Effect 15"},
+            {"von": 85, "bis": 89, "name": "Single Color Dynamic Effect 16"},
+            {"von": 90, "bis": 94, "name": "Single Color Dynamic Effect 17"},
+            {"von": 95, "bis": 99, "name": "Single Color Dynamic Effect 18"},
+            {"von": 100, "bis": 104, "name": "Single Color Dynamic Effect 19"},
+            {"von": 105, "bis": 109, "name": "Single Color Dynamic Effect 20"},
+            {"von": 110, "bis": 114, "name": "Single Color Dynamic Effect 21"},
+            {"von": 115, "bis": 119, "name": "Single Color Dynamic Effect 22"},
+            {"von": 120, "bis": 124, "name": "Single Color Dynamic Effect 23"},
+            {"von": 125, "bis": 129, "name": "Single Color Dynamic Effect 24"},
+            {"von": 130, "bis": 134, "name": "Single Color Dynamic Effect 25"},
+            {"von": 135, "bis": 139, "name": "Single Color Dynamic Effect 26"},
+            {"von": 140, "bis": 144, "name": "Single Color Dynamic Effect 27"},
+            {"von": 145, "bis": 149, "name": "Single Color Dynamic Effect 28"},
+            {"von": 150, "bis": 154, "name": "Single Color Dynamic Effect 29"},
+            {"von": 155, "bis": 159, "name": "Single Color Dynamic Effect 30"},
+            {"von": 160, "bis": 164, "name": "Mixing Color Dynamic Effect 1"},
+            {"von": 165, "bis": 169, "name": "Mixing Color Dynamic Effect 2"},
+            {"von": 170, "bis": 174, "name": "Mixing Color Dynamic Effect 3"},
+            {"von": 175, "bis": 179, "name": "Mixing Color Dynamic Effect 4"},
+            {"von": 180, "bis": 184, "name": "Mixing Color Dynamic Effect 5"},
+            {"von": 185, "bis": 189, "name": "Mixing Color Dynamic Effect 6"},
+            {"von": 190, "bis": 194, "name": "Mixing Color Dynamic Effect 7"},
+            {"von": 195, "bis": 199, "name": "Mixing Color Dynamic Effect 8"},
+            {"von": 200, "bis": 204, "name": "Mixing Color Dynamic Effect 9"},
+            {"von": 205, "bis": 209, "name": "Mixing Color Dynamic Effect 10"},
+            {"von": 210, "bis": 214, "name": "Mixing Color Dynamic Effect 11"},
+            {"von": 215, "bis": 219, "name": "Mixing Color Dynamic Effect 12"},
+            {"von": 220, "bis": 224, "name": "Mixing Color Dynamic Effect 13"},
+            {"von": 225, "bis": 255, "name": "Mixing Color Dynamic Effect 14"}
+          ]
+        },
+        {
+          "name": "Dynamic effect speed",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Clockwise", "art": ""},
+            {"von": 128, "bis": 255, "name": "Anti clockwise", "art": ""}
+          ]
+        },
+        {
+          "name": "Effect-R",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Red - CH16/CH17 Effect color"}
+          ]
+        },
+        {
+          "name": "Effect-G",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Green - CH16/CH17 Effect color"}
+          ]
+        },
+        {
+          "name": "Effect-B",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Blue - CH16/CH17 Effect color"}
+          ]
+        },
+        {
+          "name": "Effect-W",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "White - CH16/CH17 Effect color"}
+          ]
+        },
+        {"name": "Zoom", "attribut": "zoom", "default": 0, "highlight": 0},
+        {
+          "name": "Barrel Roll",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 155, "name": "Barrel Roll 0-60°", "art": ""},
+            {"von": 156, "bis": 205, "name": "Clockwise Barrel Roll", "art": ""},
+            {"von": 206, "bis": 255, "name": "Anti-clockwise Barrel Roll", "art": ""}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 250, "name": "No function", "art": ""},
+            {"von": 251, "bis": 255, "name": "System reset after 5s", "art": "reset"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "35 Channel",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Red fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Green fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Blue fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "White fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "CTO", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Macro Color",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "One effect per 10 values", "art": ""}
+          ]
+        },
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 1,
+          "highlight": 1,
+          "bereiche": [
+            {"von": 0, "bis": 3, "name": "Open", "art": "open"},
+            {"von": 4, "bis": 203, "name": "1Hz to 25Hz", "art": "strobe"},
+            {"von": 204, "bis": 255, "name": "Random Strobe", "art": "strobe"}
+          ]
+        },
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Dimmer fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Dim Mode",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dim Mode", "art": ""}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 250, "name": "No function", "art": ""},
+            {"von": 251, "bis": 255, "name": "System reset after 5s", "art": "reset"}
+          ]
+        },
+        {"name": "Zoom", "attribut": "zoom", "default": 0, "highlight": 0},
+        {
+          "name": "Barrel Roll",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 155, "name": "Barrel Roll 0-60°", "art": ""},
+            {"von": 156, "bis": 205, "name": "Clockwise Barrel Roll", "art": ""},
+            {"von": 206, "bis": 255, "name": "Anti-clockwise Barrel Roll", "art": ""}
+          ]
+        },
+        {
+          "name": "Dynamic Effect",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "None", "art": ""},
+            {"von": 10, "bis": 14, "name": "Single Color Dynamic Effect 1"},
+            {"von": 15, "bis": 19, "name": "Single Color Dynamic Effect 2"},
+            {"von": 20, "bis": 24, "name": "Single Color Dynamic Effect 3"},
+            {"von": 25, "bis": 29, "name": "Single Color Dynamic Effect 4"},
+            {"von": 30, "bis": 34, "name": "Single Color Dynamic Effect 5"},
+            {"von": 35, "bis": 39, "name": "Single Color Dynamic Effect 6"},
+            {"von": 40, "bis": 44, "name": "Single Color Dynamic Effect 7"},
+            {"von": 45, "bis": 49, "name": "Single Color Dynamic Effect 8"},
+            {"von": 50, "bis": 54, "name": "Single Color Dynamic Effect 9"},
+            {"von": 55, "bis": 59, "name": "Single Color Dynamic Effect 10"},
+            {"von": 60, "bis": 64, "name": "Single Color Dynamic Effect 11"},
+            {"von": 65, "bis": 69, "name": "Single Color Dynamic Effect 12"},
+            {"von": 70, "bis": 74, "name": "Single Color Dynamic Effect 13"},
+            {"von": 75, "bis": 79, "name": "Single Color Dynamic Effect 14"},
+            {"von": 80, "bis": 84, "name": "Single Color Dynamic Effect 15"},
+            {"von": 85, "bis": 89, "name": "Single Color Dynamic Effect 16"},
+            {"von": 90, "bis": 94, "name": "Single Color Dynamic Effect 17"},
+            {"von": 95, "bis": 99, "name": "Single Color Dynamic Effect 18"},
+            {"von": 100, "bis": 104, "name": "Single Color Dynamic Effect 19"},
+            {"von": 105, "bis": 109, "name": "Single Color Dynamic Effect 20"},
+            {"von": 110, "bis": 114, "name": "Single Color Dynamic Effect 21"},
+            {"von": 115, "bis": 119, "name": "Single Color Dynamic Effect 22"},
+            {"von": 120, "bis": 124, "name": "Single Color Dynamic Effect 23"},
+            {"von": 125, "bis": 129, "name": "Single Color Dynamic Effect 24"},
+            {"von": 130, "bis": 134, "name": "Single Color Dynamic Effect 25"},
+            {"von": 135, "bis": 139, "name": "Single Color Dynamic Effect 26"},
+            {"von": 140, "bis": 144, "name": "Single Color Dynamic Effect 27"},
+            {"von": 145, "bis": 149, "name": "Single Color Dynamic Effect 28"},
+            {"von": 150, "bis": 154, "name": "Single Color Dynamic Effect 29"},
+            {"von": 155, "bis": 159, "name": "Single Color Dynamic Effect 30"},
+            {"von": 160, "bis": 164, "name": "Mixing Color Dynamic Effect 1"},
+            {"von": 165, "bis": 169, "name": "Mixing Color Dynamic Effect 2"},
+            {"von": 170, "bis": 174, "name": "Mixing Color Dynamic Effect 3"},
+            {"von": 175, "bis": 179, "name": "Mixing Color Dynamic Effect 4"},
+            {"von": 180, "bis": 184, "name": "Mixing Color Dynamic Effect 5"},
+            {"von": 185, "bis": 189, "name": "Mixing Color Dynamic Effect 6"},
+            {"von": 190, "bis": 194, "name": "Mixing Color Dynamic Effect 7"},
+            {"von": 195, "bis": 199, "name": "Mixing Color Dynamic Effect 8"},
+            {"von": 200, "bis": 204, "name": "Mixing Color Dynamic Effect 9"},
+            {"von": 205, "bis": 209, "name": "Mixing Color Dynamic Effect 10"},
+            {"von": 210, "bis": 214, "name": "Mixing Color Dynamic Effect 11"},
+            {"von": 215, "bis": 219, "name": "Mixing Color Dynamic Effect 12"},
+            {"von": 220, "bis": 224, "name": "Mixing Color Dynamic Effect 13"},
+            {"von": 225, "bis": 255, "name": "Mixing Color Dynamic Effect 14"}
+          ]
+        },
+        {
+          "name": "Dynamic effect speed",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Clockwise", "art": ""},
+            {"von": 128, "bis": 255, "name": "Anti clockwise", "art": ""}
+          ]
+        },
+        {
+          "name": "Effect Fade",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Effect fade change", "art": ""}
+          ]
+        },
+        {
+          "name": "Effect-R",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Red - CH16/CH17 Effect color"}
+          ]
+        },
+        {
+          "name": "Effect-G",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Green - CH16/CH17 Effect color"}
+          ]
+        },
+        {
+          "name": "Effect-B",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Blue - CH16/CH17 Effect color"}
+          ]
+        },
+        {
+          "name": "Effect-W",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "White - CH16/CH17 Effect color"}
+          ]
+        },
+        {
+          "name": "Effect Dim 1",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Effect-Dim 1", "art": ""}
+          ]
+        },
+        {
+          "name": "Effect Dim 2",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Effect-Dim 2", "art": ""}
+          ]
+        },
+        {
+          "name": "Effect Mix",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Effect color mixing"}
+          ]
+        },
+        {
+          "name": "Effect Move",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "For CH22 effect movement", "art": ""}
+          ]
+        },
+        {
+          "name": "Effect Strobe 1",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Effect Strobe 1"}
+          ]
+        },
+        {
+          "name": "Effect Strobe 2",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Effect Strobe 2"}
+          ]
+        },
+        {
+          "name": "Effect Select",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Effect Select for CH22", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "78 Channel",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Red fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Green fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Blue fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "White fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "CTO", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Macro Color",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "One effect per 10 values", "art": ""}
+          ]
+        },
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 1,
+          "highlight": 1,
+          "bereiche": [
+            {"von": 0, "bis": 3, "name": "Open", "art": "open"},
+            {"von": 4, "bis": 203, "name": "1Hz to 25Hz", "art": "strobe"},
+            {"von": 204, "bis": 255, "name": "Random Strobe", "art": "strobe"}
+          ]
+        },
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Dimmer fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Dim Mode",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dim Mode", "art": ""}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 250, "name": "No function", "art": ""},
+            {"von": 251, "bis": 255, "name": "System reset after 5s", "art": "reset"}
+          ]
+        },
+        {"name": "Zoom", "attribut": "zoom", "default": 0, "highlight": 0},
+        {
+          "name": "Barrel Roll",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 155, "name": "Barrel Roll 0-60°", "art": ""},
+            {"von": 156, "bis": 205, "name": "Clockwise Barrel Roll", "art": ""},
+            {"von": 206, "bis": 255, "name": "Anti-clockwise Barrel Roll", "art": ""}
+          ]
+        },
+        {"name": "R1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B4", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R5", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G5", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B5", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R6", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G6", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B6", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R7", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G7", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B7", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R8", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G8", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B8", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R9", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G9", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B9", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R10", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G10", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B10", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R11", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G11", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B11", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R12", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G12", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B12", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R13", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G13", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B13", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R14", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G14", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B14", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R15", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G15", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B15", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R16", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G16", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B16", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R17", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G17", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B17", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R18", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G18", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B18", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R19", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G19", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B19", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "92 Channel",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Red fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Green fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Blue fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "White fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "CTO", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Macro Color",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "One effect per 10 values", "art": ""}
+          ]
+        },
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 1,
+          "highlight": 1,
+          "bereiche": [
+            {"von": 0, "bis": 3, "name": "Open", "art": "open"},
+            {"von": 4, "bis": 203, "name": "1Hz to 25Hz", "art": "strobe"},
+            {"von": 204, "bis": 255, "name": "Random Strobe", "art": "strobe"}
+          ]
+        },
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Dimmer fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Dim Mode",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dim Mode", "art": ""}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 250, "name": "No function", "art": ""},
+            {"von": 251, "bis": 255, "name": "System reset after 5s", "art": "reset"}
+          ]
+        },
+        {"name": "Zoom", "attribut": "zoom", "default": 0, "highlight": 0},
+        {
+          "name": "Barrel Roll",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 155, "name": "Barrel Roll 0-60°", "art": ""},
+            {"von": 156, "bis": 205, "name": "Clockwise Barrel Roll", "art": ""},
+            {"von": 206, "bis": 255, "name": "Anti-clockwise Barrel Roll", "art": ""}
+          ]
+        },
+        {
+          "name": "Dynamic Effect",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "None", "art": ""},
+            {"von": 10, "bis": 14, "name": "Single Color Dynamic Effect 1"},
+            {"von": 15, "bis": 19, "name": "Single Color Dynamic Effect 2"},
+            {"von": 20, "bis": 24, "name": "Single Color Dynamic Effect 3"},
+            {"von": 25, "bis": 29, "name": "Single Color Dynamic Effect 4"},
+            {"von": 30, "bis": 34, "name": "Single Color Dynamic Effect 5"},
+            {"von": 35, "bis": 39, "name": "Single Color Dynamic Effect 6"},
+            {"von": 40, "bis": 44, "name": "Single Color Dynamic Effect 7"},
+            {"von": 45, "bis": 49, "name": "Single Color Dynamic Effect 8"},
+            {"von": 50, "bis": 54, "name": "Single Color Dynamic Effect 9"},
+            {"von": 55, "bis": 59, "name": "Single Color Dynamic Effect 10"},
+            {"von": 60, "bis": 64, "name": "Single Color Dynamic Effect 11"},
+            {"von": 65, "bis": 69, "name": "Single Color Dynamic Effect 12"},
+            {"von": 70, "bis": 74, "name": "Single Color Dynamic Effect 13"},
+            {"von": 75, "bis": 79, "name": "Single Color Dynamic Effect 14"},
+            {"von": 80, "bis": 84, "name": "Single Color Dynamic Effect 15"},
+            {"von": 85, "bis": 89, "name": "Single Color Dynamic Effect 16"},
+            {"von": 90, "bis": 94, "name": "Single Color Dynamic Effect 17"},
+            {"von": 95, "bis": 99, "name": "Single Color Dynamic Effect 18"},
+            {"von": 100, "bis": 104, "name": "Single Color Dynamic Effect 19"},
+            {"von": 105, "bis": 109, "name": "Single Color Dynamic Effect 20"},
+            {"von": 110, "bis": 114, "name": "Single Color Dynamic Effect 21"},
+            {"von": 115, "bis": 119, "name": "Single Color Dynamic Effect 22"},
+            {"von": 120, "bis": 124, "name": "Single Color Dynamic Effect 23"},
+            {"von": 125, "bis": 129, "name": "Single Color Dynamic Effect 24"},
+            {"von": 130, "bis": 134, "name": "Single Color Dynamic Effect 25"},
+            {"von": 135, "bis": 139, "name": "Single Color Dynamic Effect 26"},
+            {"von": 140, "bis": 144, "name": "Single Color Dynamic Effect 27"},
+            {"von": 145, "bis": 149, "name": "Single Color Dynamic Effect 28"},
+            {"von": 150, "bis": 154, "name": "Single Color Dynamic Effect 29"},
+            {"von": 155, "bis": 159, "name": "Single Color Dynamic Effect 30"},
+            {"von": 160, "bis": 164, "name": "Mixing Color Dynamic Effect 1"},
+            {"von": 165, "bis": 169, "name": "Mixing Color Dynamic Effect 2"},
+            {"von": 170, "bis": 174, "name": "Mixing Color Dynamic Effect 3"},
+            {"von": 175, "bis": 179, "name": "Mixing Color Dynamic Effect 4"},
+            {"von": 180, "bis": 184, "name": "Mixing Color Dynamic Effect 5"},
+            {"von": 185, "bis": 189, "name": "Mixing Color Dynamic Effect 6"},
+            {"von": 190, "bis": 194, "name": "Mixing Color Dynamic Effect 7"},
+            {"von": 195, "bis": 199, "name": "Mixing Color Dynamic Effect 8"},
+            {"von": 200, "bis": 204, "name": "Mixing Color Dynamic Effect 9"},
+            {"von": 205, "bis": 209, "name": "Mixing Color Dynamic Effect 10"},
+            {"von": 210, "bis": 214, "name": "Mixing Color Dynamic Effect 11"},
+            {"von": 215, "bis": 219, "name": "Mixing Color Dynamic Effect 12"},
+            {"von": 220, "bis": 224, "name": "Mixing Color Dynamic Effect 13"},
+            {"von": 225, "bis": 255, "name": "Mixing Color Dynamic Effect 14"}
+          ]
+        },
+        {
+          "name": "Dynamic effect speed",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Clockwise", "art": ""},
+            {"von": 128, "bis": 255, "name": "Anti clockwise", "art": ""}
+          ]
+        },
+        {
+          "name": "Effect Fade",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Effect fade change", "art": ""}
+          ]
+        },
+        {
+          "name": "Effect-R",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Red - CH16/CH17 Effect color"}
+          ]
+        },
+        {
+          "name": "Effect-G",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Green - CH16/CH17 Effect color"}
+          ]
+        },
+        {
+          "name": "Effect-B",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Blue - CH16/CH17 Effect color"}
+          ]
+        },
+        {
+          "name": "Effect-W",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "White - CH16/CH17 Effect color"}
+          ]
+        },
+        {
+          "name": "Effect Dim 1",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Effect-Dim 1", "art": ""}
+          ]
+        },
+        {
+          "name": "Effect Dim 2",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Effect-Dim 2", "art": ""}
+          ]
+        },
+        {
+          "name": "Effect Mix",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Effect color mixing"}
+          ]
+        },
+        {
+          "name": "Effect Move",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "For CH22 effect movement", "art": ""}
+          ]
+        },
+        {
+          "name": "Effect Strobe 1",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Effect Strobe 1"}
+          ]
+        },
+        {
+          "name": "Effect Strobe 2",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Effect Strobe 2"}
+          ]
+        },
+        {
+          "name": "Effect Select",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Effect Select for CH22", "art": ""}
+          ]
+        },
+        {"name": "R1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B4", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R5", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G5", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B5", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R6", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G6", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B6", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R7", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G7", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B7", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R8", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G8", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B8", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R9", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G9", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B9", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R10", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G10", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B10", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R11", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G11", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B11", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R12", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G12", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B12", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R13", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G13", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B13", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R14", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G14", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B14", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R15", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G15", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B15", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R16", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G16", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B16", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R17", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G17", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B17", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R18", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G18", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B18", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "R19", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G19", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B19", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "97 Channel",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Red fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Green fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Blue fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "White fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "CTO", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Macro Color",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "One effect per 10 values", "art": ""}
+          ]
+        },
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 1,
+          "highlight": 1,
+          "bereiche": [
+            {"von": 0, "bis": 3, "name": "Open", "art": "open"},
+            {"von": 4, "bis": 203, "name": "1Hz to 25Hz", "art": "strobe"},
+            {"von": 204, "bis": 255, "name": "Random Strobe", "art": "strobe"}
+          ]
+        },
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Dimmer fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Dim Mode",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dim Mode", "art": ""}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 250, "name": "No function", "art": ""},
+            {"von": 251, "bis": 255, "name": "System reset after 5s", "art": "reset"}
+          ]
+        },
+        {"name": "Zoom", "attribut": "zoom", "default": 0, "highlight": 0},
+        {
+          "name": "Barrel Roll",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 155, "name": "Barrel Roll 0-60°", "art": ""},
+            {"von": 156, "bis": 205, "name": "Clockwise Barrel Roll", "art": ""},
+            {"von": 206, "bis": 255, "name": "Anti-clockwise Barrel Roll", "art": ""}
+          ]
+        },
+        {"name": "R1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W3", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B4", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W4", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R5", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G5", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B5", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W5", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R6", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G6", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B6", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W6", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R7", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G7", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B7", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W7", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R8", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G8", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B8", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W8", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R9", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G9", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B9", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W9", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R10", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G10", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B10", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W10", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R11", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G11", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B11", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W11", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R12", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G12", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B12", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W12", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R13", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G13", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B13", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W13", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R14", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G14", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B14", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W14", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R15", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G15", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B15", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W15", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R16", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G16", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B16", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W16", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R17", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G17", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B17", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W17", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R18", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G18", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B18", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W18", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R19", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G19", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B19", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W19", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "99 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Zoom", "attribut": "zoom", "default": 0, "highlight": 0},
+        {
+          "name": "Barrel Roll",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 155, "name": "Barrel Roll 0-60°", "art": ""},
+            {"von": 156, "bis": 205, "name": "Clockwise Barrel Roll", "art": ""},
+            {"von": 206, "bis": 255, "name": "Anti-clockwise Barrel Roll", "art": ""}
+          ]
+        },
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 1,
+          "highlight": 1,
+          "bereiche": [
+            {"von": 0, "bis": 3, "name": "Open", "art": "open"},
+            {"von": 4, "bis": 203, "name": "1Hz to 25Hz", "art": "strobe"},
+            {"von": 204, "bis": 255, "name": "Random Strobe", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "R Dim",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Red", "art": ""}
+          ]
+        },
+        {
+          "name": "G Dim",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Green", "art": ""}
+          ]
+        },
+        {
+          "name": "B Dim",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Blue", "art": ""}
+          ]
+        },
+        {
+          "name": "W Dim",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "White", "art": ""}
+          ]
+        },
+        {"name": "CTO", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Macro Color",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "One effect per 10 values", "art": ""}
+          ]
+        },
+        {
+          "name": "Static Effect",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "None", "art": ""},
+            {"von": 10, "bis": 12, "name": "Single Color Effect 1"},
+            {"von": 13, "bis": 15, "name": "Single Color Effect 2"},
+            {"von": 16, "bis": 18, "name": "Single Color Effect 3"},
+            {"von": 19, "bis": 21, "name": "Single Color Effect 4"},
+            {"von": 22, "bis": 24, "name": "Single Color Effect 5"},
+            {"von": 25, "bis": 27, "name": "Single Color Effect 6"},
+            {"von": 28, "bis": 30, "name": "Single Color Effect 7"},
+            {"von": 31, "bis": 33, "name": "Single Color Effect 8"},
+            {"von": 34, "bis": 36, "name": "Single Color Effect 9"},
+            {"von": 37, "bis": 39, "name": "Single Color Effect 10"},
+            {"von": 40, "bis": 42, "name": "Single Color Effect 11"},
+            {"von": 43, "bis": 45, "name": "Single Color Effect 12"},
+            {"von": 46, "bis": 48, "name": "Single Color Effect 13"},
+            {"von": 49, "bis": 51, "name": "Single Color Effect 14"},
+            {"von": 52, "bis": 54, "name": "Single Color Effect 15"},
+            {"von": 55, "bis": 57, "name": "Single Color Effect 16"},
+            {"von": 58, "bis": 60, "name": "Single Color Effect 17"},
+            {"von": 61, "bis": 63, "name": "Single Color Effect 18"},
+            {"von": 64, "bis": 66, "name": "Single Color Effect 19"},
+            {"von": 67, "bis": 69, "name": "Single Color Effect 20"},
+            {"von": 70, "bis": 72, "name": "Single Color Effect 21"},
+            {"von": 73, "bis": 75, "name": "Single Color Effect 22"},
+            {"von": 76, "bis": 78, "name": "Single Color Effect 23"},
+            {"von": 79, "bis": 81, "name": "Single Color Effect 24"},
+            {"von": 82, "bis": 84, "name": "Single Color Effect 25"},
+            {"von": 85, "bis": 87, "name": "Single Color Effect 26"},
+            {"von": 88, "bis": 90, "name": "Single Color Effect 27"},
+            {"von": 91, "bis": 93, "name": "Single Color Effect 28"},
+            {"von": 94, "bis": 96, "name": "Single Color Effect 29"},
+            {"von": 97, "bis": 99, "name": "Single Color Effect 30"},
+            {"von": 100, "bis": 102, "name": "Single Color Effect 31"},
+            {"von": 103, "bis": 105, "name": "Single Color Effect 32"},
+            {"von": 106, "bis": 108, "name": "Single Color Effect 33"},
+            {"von": 109, "bis": 111, "name": "Single Color Effect 34"},
+            {"von": 112, "bis": 114, "name": "Single Color Effect 35"},
+            {"von": 115, "bis": 117, "name": "Single Color Effect 36"},
+            {"von": 118, "bis": 120, "name": "Single Color Effect 37"},
+            {"von": 121, "bis": 123, "name": "Single Color Effect 38"},
+            {"von": 124, "bis": 126, "name": "Single Color Effect 39"},
+            {"von": 127, "bis": 129, "name": "Single Color Effect 40"},
+            {"von": 130, "bis": 132, "name": "Single Color Effect 41"},
+            {"von": 133, "bis": 135, "name": "Single Color Effect 42"},
+            {"von": 136, "bis": 138, "name": "Single Color Effect 43"},
+            {"von": 139, "bis": 141, "name": "Single Color Effect 44"},
+            {"von": 142, "bis": 144, "name": "Single Color Effect 45"},
+            {"von": 145, "bis": 147, "name": "Single Color Effect 46"},
+            {"von": 148, "bis": 150, "name": "Single Color Effect 47"},
+            {"von": 151, "bis": 153, "name": "Single Color Effect 48"},
+            {"von": 154, "bis": 156, "name": "Single Color Effect 49"},
+            {"von": 157, "bis": 159, "name": "Single Color Effect 50"},
+            {"von": 160, "bis": 162, "name": "Single Color Effect 51"},
+            {"von": 163, "bis": 165, "name": "Single Color Effect 52"},
+            {"von": 166, "bis": 168, "name": "Single Color Effect 53"},
+            {"von": 169, "bis": 171, "name": "Single Color Effect 54"},
+            {"von": 172, "bis": 174, "name": "Single Color Effect 55"},
+            {"von": 175, "bis": 177, "name": "Single Color Effect 56"},
+            {"von": 178, "bis": 180, "name": "Single Color Effect 57"},
+            {"von": 181, "bis": 183, "name": "Single Color Effect 58"},
+            {"von": 184, "bis": 186, "name": "Single Color Effect 59"},
+            {"von": 187, "bis": 189, "name": "Single Color Effect 60"},
+            {"von": 190, "bis": 192, "name": "Single Color Effect 61"},
+            {"von": 193, "bis": 195, "name": "Single Color Effect 62"},
+            {"von": 196, "bis": 198, "name": "Single Color Effect 63"},
+            {"von": 199, "bis": 201, "name": "Single Color Effect 64"},
+            {"von": 202, "bis": 204, "name": "Single Color Effect 65"},
+            {"von": 205, "bis": 207, "name": "Single Color Effect 66"},
+            {"von": 208, "bis": 210, "name": "Single Color Effect 67"},
+            {"von": 211, "bis": 213, "name": "Mixing Effect 1", "art": ""},
+            {"von": 214, "bis": 216, "name": "Mixing Effect 2", "art": ""},
+            {"von": 217, "bis": 219, "name": "Mixing Effect 3", "art": ""},
+            {"von": 220, "bis": 222, "name": "Mixing Effect 4", "art": ""},
+            {"von": 223, "bis": 225, "name": "Mixing Effect 5", "art": ""},
+            {"von": 226, "bis": 228, "name": "Mixing Effect 6", "art": ""},
+            {"von": 229, "bis": 231, "name": "Mixing Effect 7", "art": ""},
+            {"von": 232, "bis": 234, "name": "Mixing Effect 8", "art": ""},
+            {"von": 235, "bis": 237, "name": "Mixing Effect 9", "art": ""},
+            {"von": 238, "bis": 240, "name": "Mixing Effect 10", "art": ""},
+            {"von": 241, "bis": 243, "name": "Mixing Effect 11", "art": ""},
+            {"von": 244, "bis": 246, "name": "Mixing Effect 12", "art": ""},
+            {"von": 247, "bis": 249, "name": "Mixing Effect 13", "art": ""},
+            {"von": 250, "bis": 252, "name": "Mixing Effect 14", "art": ""},
+            {"von": 253, "bis": 255, "name": "Mixing Effect 15", "art": ""}
+          ]
+        },
+        {
+          "name": "Dynamic Effect",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "None", "art": ""},
+            {"von": 10, "bis": 14, "name": "Single Color Dynamic Effect 1"},
+            {"von": 15, "bis": 19, "name": "Single Color Dynamic Effect 2"},
+            {"von": 20, "bis": 24, "name": "Single Color Dynamic Effect 3"},
+            {"von": 25, "bis": 29, "name": "Single Color Dynamic Effect 4"},
+            {"von": 30, "bis": 34, "name": "Single Color Dynamic Effect 5"},
+            {"von": 35, "bis": 39, "name": "Single Color Dynamic Effect 6"},
+            {"von": 40, "bis": 44, "name": "Single Color Dynamic Effect 7"},
+            {"von": 45, "bis": 49, "name": "Single Color Dynamic Effect 8"},
+            {"von": 50, "bis": 54, "name": "Single Color Dynamic Effect 9"},
+            {"von": 55, "bis": 59, "name": "Single Color Dynamic Effect 10"},
+            {"von": 60, "bis": 64, "name": "Single Color Dynamic Effect 11"},
+            {"von": 65, "bis": 69, "name": "Single Color Dynamic Effect 12"},
+            {"von": 70, "bis": 74, "name": "Single Color Dynamic Effect 13"},
+            {"von": 75, "bis": 79, "name": "Single Color Dynamic Effect 14"},
+            {"von": 80, "bis": 84, "name": "Single Color Dynamic Effect 15"},
+            {"von": 85, "bis": 89, "name": "Single Color Dynamic Effect 16"},
+            {"von": 90, "bis": 94, "name": "Single Color Dynamic Effect 17"},
+            {"von": 95, "bis": 99, "name": "Single Color Dynamic Effect 18"},
+            {"von": 100, "bis": 104, "name": "Single Color Dynamic Effect 19"},
+            {"von": 105, "bis": 109, "name": "Single Color Dynamic Effect 20"},
+            {"von": 110, "bis": 114, "name": "Single Color Dynamic Effect 21"},
+            {"von": 115, "bis": 119, "name": "Single Color Dynamic Effect 22"},
+            {"von": 120, "bis": 124, "name": "Single Color Dynamic Effect 23"},
+            {"von": 125, "bis": 129, "name": "Single Color Dynamic Effect 24"},
+            {"von": 130, "bis": 134, "name": "Single Color Dynamic Effect 25"},
+            {"von": 135, "bis": 139, "name": "Single Color Dynamic Effect 26"},
+            {"von": 140, "bis": 144, "name": "Single Color Dynamic Effect 27"},
+            {"von": 145, "bis": 149, "name": "Single Color Dynamic Effect 28"},
+            {"von": 150, "bis": 154, "name": "Single Color Dynamic Effect 29"},
+            {"von": 155, "bis": 159, "name": "Single Color Dynamic Effect 30"},
+            {"von": 160, "bis": 164, "name": "Mixing Color Dynamic Effect 1"},
+            {"von": 165, "bis": 169, "name": "Mixing Color Dynamic Effect 2"},
+            {"von": 170, "bis": 174, "name": "Mixing Color Dynamic Effect 3"},
+            {"von": 175, "bis": 179, "name": "Mixing Color Dynamic Effect 4"},
+            {"von": 180, "bis": 184, "name": "Mixing Color Dynamic Effect 5"},
+            {"von": 185, "bis": 189, "name": "Mixing Color Dynamic Effect 6"},
+            {"von": 190, "bis": 194, "name": "Mixing Color Dynamic Effect 7"},
+            {"von": 195, "bis": 199, "name": "Mixing Color Dynamic Effect 8"},
+            {"von": 200, "bis": 204, "name": "Mixing Color Dynamic Effect 9"},
+            {"von": 205, "bis": 209, "name": "Mixing Color Dynamic Effect 10"},
+            {"von": 210, "bis": 214, "name": "Mixing Color Dynamic Effect 11"},
+            {"von": 215, "bis": 219, "name": "Mixing Color Dynamic Effect 12"},
+            {"von": 220, "bis": 224, "name": "Mixing Color Dynamic Effect 13"},
+            {"von": 225, "bis": 255, "name": "Mixing Color Dynamic Effect 14"}
+          ]
+        },
+        {
+          "name": "Dynamic effect speed",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Clockwise", "art": ""},
+            {"von": 128, "bis": 255, "name": "Anti clockwise", "art": ""}
+          ]
+        },
+        {
+          "name": "Effect-R",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Red - CH16/CH17 Effect color"}
+          ]
+        },
+        {
+          "name": "Effect-G",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Green - CH16/CH17 Effect color"}
+          ]
+        },
+        {
+          "name": "Effect-B",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Blue - CH16/CH17 Effect color"}
+          ]
+        },
+        {
+          "name": "Effect-W",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "White - CH16/CH17 Effect color"}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 250, "name": "No function", "art": ""},
+            {"von": 251, "bis": 255, "name": "System reset after 5s", "art": "reset"}
+          ]
+        },
+        {"name": "R1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W3", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B4", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W4", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R5", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G5", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B5", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W5", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R6", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G6", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B6", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W6", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R7", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G7", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B7", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W7", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R8", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G8", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B8", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W8", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R9", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G9", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B9", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W9", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R10", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G10", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B10", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W10", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R11", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G11", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B11", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W11", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R12", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G12", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B12", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W12", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R13", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G13", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B13", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W13", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R14", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G14", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B14", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W14", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R15", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G15", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B15", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W15", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R16", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G16", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B16", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W16", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R17", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G17", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B17", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W17", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R18", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G18", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B18", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W18", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "R19", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "G19", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "B19", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "W19", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,132 @@
+{
+  "format_version": 1,
+  "hersteller": "Shehds",
+  "hersteller_kurz": "Shehds",
+  "modell": "LED Flat Par 18x18W RGBWA+UV",
+  "kurzname": "SH-PAR18X18",
+  "typ": "par",
+  "leistung_w": 324,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Shehds-LED-Flat-Par-18x18W-RGBWA+UV.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Shehds/Shehds-LED-Flat-Par-18x18W-RGBWA+UV.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.8 GIT · jms27000, René Bütikofer, Flo Edelmann, Santiago Benejam",
+    "original": "resources/fixtures/Shehds/Shehds-LED-Flat-Par-18x18W-RGBWA+UV.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 30 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): kurzname SH-PAR18X18; Bereichs-Arten korrigiert (u. a. „Preset“ nicht als Reset, Farben/Offen auf Farbrad, Open/Shake/Rotation auf Goborad, Prisma/Frost, keine Farb-/Dreh-Kacheln auf Makro-/Speed-Kanaelen, Sound-Bereiche)"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": false,
+    "wie": "nicht gegen ein Herstellerhandbuch geprueft (kein oeffentliches Shehds-Handbuch zu diesem Modell auffindbar); Kanalbelegung und Wertebereiche aus der QLC+-Vorlage, Attribute, Bereichs-Arten und Defaults von LightOS plausibilisiert"
+  },
+  "modi": [
+    {
+      "name": "6 Channel",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "Violet", "attribut": "color_uv", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "9 Channel",
+      "kanaele": [
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "Violet", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {
+          "name": "Function",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 50, "name": "No function", "art": ""},
+            {"von": 51, "bis": 100, "name": "Static color"},
+            {"von": 101, "bis": 150, "name": "Color jump (Random colors)"},
+            {"von": 151, "bis": 200, "name": "Color fade (Random colors)"},
+            {"von": 201, "bis": 250, "name": "Color fade (Random colors, fade to black)"},
+            {"von": 251, "bis": 255, "name": "Sound Mode (Static color flashing on beat)", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Color Presets",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "Red", "art": "color"},
+            {"von": 32, "bis": 63, "name": "Green", "art": "color"},
+            {"von": 64, "bis": 95, "name": "Blue", "art": "color"},
+            {"von": 96, "bis": 127, "name": "White", "art": "open"},
+            {"von": 128, "bis": 159, "name": "Amber", "art": "color"},
+            {"von": 160, "bis": 191, "name": "UV", "art": "color"},
+            {"von": 192, "bis": 223, "name": "Cyan", "art": "color"},
+            {"von": 224, "bis": 255, "name": "Warm White", "art": "color"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "10 Channel",
+      "kanaele": [
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "Violet", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 2,
+          "highlight": 2,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Shutter open", "art": "open"},
+            {"von": 5, "bis": 255, "name": "Strobe 0…20Hz", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Function",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 50, "name": "No function", "art": ""},
+            {"von": 51, "bis": 100, "name": "Static color"},
+            {"von": 101, "bis": 150, "name": "Color jump (Random colors)"},
+            {"von": 151, "bis": 200, "name": "Color fade (Random colors)"},
+            {"von": 201, "bis": 250, "name": "Color fade (Random colors, fade to black)"},
+            {"von": 251, "bis": 255, "name": "Sound Mode (Static color flashing on beat)", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Color Presets",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "Red", "art": "color"},
+            {"von": 32, "bis": 63, "name": "Green", "art": "color"},
+            {"von": 64, "bis": 95, "name": "Blue", "art": "color"},
+            {"von": 96, "bis": 127, "name": "White", "art": "open"},
+            {"von": 128, "bis": 159, "name": "Amber", "art": "color"},
+            {"von": 160, "bis": 191, "name": "UV", "art": "color"},
+            {"von": 192, "bis": 223, "name": "Cyan", "art": "color"},
+            {"von": 224, "bis": 255, "name": "Warm White", "art": "color"}
+          ]
+        }
+      ]
+    }
+  ]
+}

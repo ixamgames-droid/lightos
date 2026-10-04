@@ -1,0 +1,156 @@
+{
+  "format_version": 1,
+  "hersteller": "Lixada",
+  "hersteller_kurz": "Lixada",
+  "modell": "Mini Wash RGBW",
+  "kurzname": "MINI WASH RGBW",
+  "typ": "moving_head",
+  "leistung_w": 105,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Lixada-Mini-Wash-RGBW.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Lixada/Lixada-Mini-Wash-RGBW.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.3 GIT · Lorenzo Andreani",
+    "original": "resources/fixtures/Lixada/Lixada-Mini-Wash-RGBW.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 46 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung: Dimmer/Strobe: 240-255 art open; Farbvorwahl color_wheel -> macro (RGBW-Vorwahl), Auto-Wechsel ohne art color; Tempo speed -> effect_speed"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Quelldatei und auf innere Stimmigkeit geprueft; kein Herstellerhandbuch oeffentlich auffindbar, nicht am Geraet geprueft"
+  },
+  "modi": [
+    {
+      "name": "14 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan Fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt Fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan Tilt Speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Dimmer / Strobe",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 134, "name": "Dimmer Min > Max", "art": ""},
+            {"von": 135, "bis": 239, "name": "Strobe Slow > Fast", "art": "strobe"},
+            {"von": 240, "bis": 255, "name": "Dimmer 100 % (voll an)", "art": "open"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Color",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "No function", "art": ""},
+            {"von": 8, "bis": 21, "name": "White (Full RGBW)", "art": "color"},
+            {"von": 22, "bis": 34, "name": "Red", "art": "color"},
+            {"von": 35, "bis": 49, "name": "Green", "art": "color"},
+            {"von": 50, "bis": 63, "name": "Blue", "art": "color"},
+            {"von": 64, "bis": 77, "name": "White", "art": "color"},
+            {"von": 78, "bis": 91, "name": "Light Blue", "art": "color"},
+            {"von": 92, "bis": 105, "name": "Light Red", "art": "color"},
+            {"von": 106, "bis": 119, "name": "Yellow", "art": "color"},
+            {"von": 120, "bis": 133, "name": "Blue Violet", "art": "color"},
+            {"von": 134, "bis": 147, "name": "Orange", "art": "color"},
+            {"von": 148, "bis": 161, "name": "Light Green", "art": "color"},
+            {"von": 162, "bis": 175, "name": "Vivid Tangerine", "art": "color"},
+            {"von": 176, "bis": 189, "name": "Crimson", "art": "color"},
+            {"von": 190, "bis": 203, "name": "Amber", "art": "color"},
+            {"von": 204, "bis": 217, "name": "CTO", "art": "color"},
+            {"von": 218, "bis": 231, "name": "Lavender Purple", "art": "color"},
+            {"von": 232, "bis": 255, "name": "Auto Change Colors", "art": ""}
+          ]
+        },
+        {
+          "name": "Speed Auto Change Colors",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Speed Auto Change Colors", "art": ""}
+          ]
+        },
+        {
+          "name": "Auto",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "No function", "art": ""},
+            {"von": 8, "bis": 22, "name": "Auto Program 1", "art": ""},
+            {"von": 23, "bis": 37, "name": "Auto Program 2", "art": ""},
+            {"von": 38, "bis": 53, "name": "Auto Program 3", "art": ""},
+            {"von": 54, "bis": 67, "name": "Auto Program 4", "art": ""},
+            {"von": 68, "bis": 83, "name": "Auto Program 5", "art": ""},
+            {"von": 84, "bis": 97, "name": "Auto Program 6", "art": ""},
+            {"von": 98, "bis": 112, "name": "Auto Program 7", "art": ""},
+            {"von": 113, "bis": 127, "name": "Auto Program 8", "art": ""},
+            {"von": 128, "bis": 142, "name": "Auto Program 1 (Sound Active)", "art": "sound"},
+            {"von": 143, "bis": 157, "name": "Auto Program 2 (Sound Active)", "art": "sound"},
+            {"von": 158, "bis": 172, "name": "Auto Program 3 (Sound Active)", "art": "sound"},
+            {"von": 173, "bis": 187, "name": "Auto Program 4 (Sound Active)", "art": "sound"},
+            {"von": 188, "bis": 202, "name": "Auto Program 5 (Sound Active)", "art": "sound"},
+            {"von": 203, "bis": 217, "name": "Auto Program 6 (Sound Active)", "art": "sound"},
+            {"von": 218, "bis": 232, "name": "Auto Program 7 (Sound Active)", "art": "sound"},
+            {"von": 233, "bis": 255, "name": "Auto Program 8 (Sound Active)", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 149, "name": "No function", "art": ""},
+            {"von": 150, "bis": 255, "name": "All Reset (after 2 seconds)", "art": "reset"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "9 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Pan Tilt Speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Dimmer / Strobe",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 134, "name": "Dimmer Min > Max", "art": ""},
+            {"von": 135, "bis": 239, "name": "Strobe Slow > Fast", "art": "strobe"},
+            {"von": 240, "bis": 255, "name": "Dimmer 100 % (voll an)", "art": "open"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 149, "name": "No function", "art": ""},
+            {"von": 150, "bis": 255, "name": "All Reset (after 2 seconds)", "art": "reset"}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Mini-Wash RGBW; Dimmer und Strobe teilen sich einen Kanal."
+}

@@ -1,0 +1,224 @@
+{
+  "format_version": 1,
+  "hersteller": "Cameo",
+  "hersteller_kurz": "Cameo",
+  "modell": "NanoBeam 300",
+  "kurzname": "NANOBEAM 300",
+  "typ": "moving_head",
+  "leistung_w": 70,
+  "quelle": {
+    "titel": "Cameo NANO BEAM 300 / NANO WASH 400 – User's Manual, DMX Control S. 32–34",
+    "url": "https://www.manualslib.com/manual/1104937/Cameo-Nano-Beam-300.html?page=32"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.0 GIT · Martin",
+    "original": "resources/fixtures/Cameo/Cameo-NanoBeam-300.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 85 Wertebereiche mit Art (kind) versehen; Strobe-Default/-Highlight 0 statt 2 (Offen-Bereich); Pan/Tilt-Speed als 'fast to slow' benannt; Farbmakro: Mischfarben RG...RGBW jetzt 'color', im 8-CH-Modus Highlight 230 (RGBW) statt 0 (manuelle Steuerung ohne Farbkanaele = dunkel); Mode Control (Auto/Sound/Reset) macro -> reset, 'Sync (head goes to mid position and blackout)' ohne Art 'closed'; Sensitivity/Speed macro -> effect_speed; kurzname/notizen/quelle gesetzt"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": true,
+    "wie": "Alle drei Modi (8/11/14 CH) Kanal fuer Kanal und Bereich fuer Bereich gegen die DMX-Tabellen im Handbuch (via ManualsLib, S. 32–34) geprueft"
+  },
+  "modi": [
+    {
+      "name": "8 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Pan/Tilt Speed (fast to slow)", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Strobe closed", "art": "closed"},
+            {"von": 11, "bis": 33, "name": "Pulse random, slow -> fast", "art": "strobe"},
+            {"von": 34, "bis": 56, "name": "Ramp up Random, slow -> fast", "art": "strobe"},
+            {"von": 57, "bis": 79, "name": "Ramp down Random, slow -> fast", "art": "strobe"},
+            {"von": 80, "bis": 102, "name": "Random Strobe Effect, slow -> fast", "art": "strobe"},
+            {"von": 103, "bis": 127, "name": "Strobe Break Effect, 5s.....1s ( Very Short Flash)", "art": "strobe"},
+            {"von": 128, "bis": 250, "name": "Strobe slow -> fast <1Hz - 20Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        },
+        {
+          "name": "Color Macro",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 230,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Manual Control", "art": ""},
+            {"von": 6, "bis": 21, "name": "Red", "art": "color"},
+            {"von": 22, "bis": 37, "name": "Green", "art": "color"},
+            {"von": 38, "bis": 53, "name": "Blue", "art": "color"},
+            {"von": 54, "bis": 69, "name": "White", "art": "color"},
+            {"von": 70, "bis": 85, "name": "RG", "art": "color"},
+            {"von": 86, "bis": 101, "name": "RW", "art": "color"},
+            {"von": 102, "bis": 117, "name": "RB", "art": "color"},
+            {"von": 118, "bis": 133, "name": "GB", "art": "color"},
+            {"von": 134, "bis": 149, "name": "GW", "art": "color"},
+            {"von": 150, "bis": 165, "name": "BW", "art": "color"},
+            {"von": 166, "bis": 181, "name": "RGB", "art": "color"},
+            {"von": 182, "bis": 197, "name": "RGW", "art": "color"},
+            {"von": 198, "bis": 213, "name": "RBW", "art": "color"},
+            {"von": 214, "bis": 229, "name": "GBW", "art": "color"},
+            {"von": 230, "bis": 255, "name": "RGBW", "art": "color"}
+          ]
+        },
+        {
+          "name": "Mode Control",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Manual Control", "art": ""},
+            {"von": 6, "bis": 29, "name": "Show mode 1", "art": ""},
+            {"von": 30, "bis": 53, "name": "Show mode 2", "art": ""},
+            {"von": 54, "bis": 77, "name": "Show mode 3", "art": ""},
+            {"von": 78, "bis": 101, "name": "Show mode 4", "art": ""},
+            {"von": 102, "bis": 125, "name": "Show mode 5", "art": ""},
+            {"von": 126, "bis": 149, "name": "Show mode 6", "art": ""},
+            {"von": 150, "bis": 173, "name": "Show mode 7", "art": ""},
+            {"von": 174, "bis": 197, "name": "Show mode 8", "art": ""},
+            {"von": 198, "bis": 221, "name": "Sound Control Mode", "art": "sound"},
+            {"von": 222, "bis": 245, "name": "Reset", "art": "reset"},
+            {"von": 246, "bis": 255, "name": "Sync (head goes to mid position and blackout)", "art": ""}
+          ]
+        },
+        {
+          "name": "Sensitivity / Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Microphone Sensitivity / Auto Mode Speed", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "11 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan Fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt Fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt Speed (fast to slow)", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Strobe closed", "art": "closed"},
+            {"von": 11, "bis": 33, "name": "Pulse random, slow -> fast", "art": "strobe"},
+            {"von": 34, "bis": 56, "name": "Ramp up Random, slow -> fast", "art": "strobe"},
+            {"von": 57, "bis": 79, "name": "Ramp down Random, slow -> fast", "art": "strobe"},
+            {"von": 80, "bis": 102, "name": "Random Strobe Effect, slow -> fast", "art": "strobe"},
+            {"von": 103, "bis": 127, "name": "Strobe Break Effect, 5s.....1s ( Very Short Flash)", "art": "strobe"},
+            {"von": 128, "bis": 250, "name": "Strobe slow -> fast <1Hz - 20Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "14 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan Fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt Fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt Speed (fast to slow)", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Strobe closed", "art": "closed"},
+            {"von": 11, "bis": 33, "name": "Pulse random, slow -> fast", "art": "strobe"},
+            {"von": 34, "bis": 56, "name": "Ramp up Random, slow -> fast", "art": "strobe"},
+            {"von": 57, "bis": 79, "name": "Ramp down Random, slow -> fast", "art": "strobe"},
+            {"von": 80, "bis": 102, "name": "Random Strobe Effect, slow -> fast", "art": "strobe"},
+            {"von": 103, "bis": 127, "name": "Strobe Break Effect, 5s.....1s ( Very Short Flash)", "art": "strobe"},
+            {"von": 128, "bis": 250, "name": "Strobe slow -> fast <1Hz - 20Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        },
+        {
+          "name": "Color Macro",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Manual Control", "art": ""},
+            {"von": 6, "bis": 21, "name": "Red", "art": "color"},
+            {"von": 22, "bis": 37, "name": "Green", "art": "color"},
+            {"von": 38, "bis": 53, "name": "Blue", "art": "color"},
+            {"von": 54, "bis": 69, "name": "White", "art": "color"},
+            {"von": 70, "bis": 85, "name": "RG", "art": "color"},
+            {"von": 86, "bis": 101, "name": "RW", "art": "color"},
+            {"von": 102, "bis": 117, "name": "RB", "art": "color"},
+            {"von": 118, "bis": 133, "name": "GB", "art": "color"},
+            {"von": 134, "bis": 149, "name": "GW", "art": "color"},
+            {"von": 150, "bis": 165, "name": "BW", "art": "color"},
+            {"von": 166, "bis": 181, "name": "RGB", "art": "color"},
+            {"von": 182, "bis": 197, "name": "RGW", "art": "color"},
+            {"von": 198, "bis": 213, "name": "RBW", "art": "color"},
+            {"von": 214, "bis": 229, "name": "GBW", "art": "color"},
+            {"von": 230, "bis": 255, "name": "RGBW", "art": "color"}
+          ]
+        },
+        {
+          "name": "Mode Control",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Manual Control", "art": ""},
+            {"von": 6, "bis": 29, "name": "Show mode 1", "art": ""},
+            {"von": 30, "bis": 53, "name": "Show mode 2", "art": ""},
+            {"von": 54, "bis": 77, "name": "Show mode 3", "art": ""},
+            {"von": 78, "bis": 101, "name": "Show mode 4", "art": ""},
+            {"von": 102, "bis": 125, "name": "Show mode 5", "art": ""},
+            {"von": 126, "bis": 149, "name": "Show mode 6", "art": ""},
+            {"von": 150, "bis": 173, "name": "Show mode 7", "art": ""},
+            {"von": 174, "bis": 197, "name": "Show mode 8", "art": ""},
+            {"von": 198, "bis": 221, "name": "Sound Control Mode", "art": "sound"},
+            {"von": 222, "bis": 245, "name": "Reset", "art": "reset"},
+            {"von": 246, "bis": 255, "name": "Sync (head goes to mid position and blackout)", "art": ""}
+          ]
+        },
+        {
+          "name": "Sensitivity / Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Microphone Sensitivity / Auto Mode Speed", "art": ""}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    }
+  ],
+  "notizen": "Kompakter RGBW-Beam-Moving-Head (CLNB300RGBW). Im 8-CH-Modus Farbe nur ueber das Farbmakro; im 14-CH-Modus hat das Farbmakro Vorrang vor den RGBW-Kanaelen."
+}

@@ -1,0 +1,251 @@
+{
+  "format_version": 1,
+  "hersteller": "MFL",
+  "hersteller_kurz": "MFL",
+  "modell": "Spot G60",
+  "kurzname": "MFL-SPOTG60",
+  "typ": "moving_head",
+  "leistung_w": 100,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition MFL-Spot-G60.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/MFL/MFL-Spot-G60.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.3 GIT · Nathan Durnan",
+    "original": "resources/fixtures/MFL/MFL-Spot-G60.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 124 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): Pan/Tilt-Makro-Tempo als effect_speed statt speed; kurzname MFL-SPOTG60; Bereichs-Arten korrigiert (u. a. „Preset“ nicht als Reset, Farben/Offen auf Farbrad, Open/Shake/Rotation auf Goborad, Prisma/Frost, keine Farb-/Dreh-Kacheln auf Makro-/Speed-Kanaelen, Sound-Bereiche); Steuerkanal mit Reset-Bereich als reset"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": false,
+    "wie": "nicht gegen ein Herstellerhandbuch geprueft (kein oeffentliches Shehds-Handbuch zu diesem Modell auffindbar); Kanalbelegung und Wertebereiche aus der QLC+-Vorlage, Attribute, Bereichs-Arten und Defaults von LightOS plausibilisiert"
+  },
+  "modi": [
+    {
+      "name": "8 Channel",
+      "kanaele": [
+        {"name": "Pan Position", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt Position", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Pan/Tilt Speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 7,
+          "highlight": 7,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Open", "art": "open"},
+            {"von": 16, "bis": 131, "name": "Fast Strobe From Slow To Fast", "art": "strobe"},
+            {"von": 132, "bis": 139, "name": "Open", "art": "open"},
+            {"von": 140, "bis": 181, "name": "Fast Close Slow Open", "art": "strobe"},
+            {"von": 182, "bis": 189, "name": "Open", "art": "open"},
+            {"von": 190, "bis": 231, "name": "Slow Close Fast Open", "art": "strobe"},
+            {"von": 232, "bis": 239, "name": "Open", "art": "open"},
+            {"von": 240, "bis": 247, "name": "Random", "art": "strobe"},
+            {"von": 248, "bis": 255, "name": "Open", "art": "open"}
+          ]
+        },
+        {
+          "name": "Color Wheel",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Open", "art": "open"},
+            {"von": 8, "bis": 15, "name": "Open+Color1 (White+Red)", "art": "color"},
+            {"von": 16, "bis": 23, "name": "Color1 (Red)", "art": "color"},
+            {"von": 24, "bis": 31, "name": "Color1+Color2 (Red+Green)", "art": "color"},
+            {"von": 32, "bis": 39, "name": "Color2 (Green)", "art": "color"},
+            {"von": 40, "bis": 47, "name": "Color2+Color3 (Green+Blue)", "art": "color"},
+            {"von": 48, "bis": 55, "name": "Color3 (Blue)", "art": "color"},
+            {"von": 56, "bis": 63, "name": "Color3+Color4 (Blue+Yellow)", "art": "color"},
+            {"von": 64, "bis": 71, "name": "Color4 (Yellow)", "art": "color"},
+            {"von": 72, "bis": 79, "name": "Color4+Color5 (Yellow+Magenta)", "art": "color"},
+            {"von": 80, "bis": 87, "name": "Color5 (Magenta)", "art": "color"},
+            {"von": 88, "bis": 95, "name": "Color5+Color6 (Magenta+Cyan)", "art": "color"},
+            {"von": 96, "bis": 103, "name": "Color6 (Cyan)", "art": "color"},
+            {"von": 104, "bis": 111, "name": "Color6+Color7 (Cyan+Amber)", "art": "color"},
+            {"von": 112, "bis": 119, "name": "Color7 (Amber)", "art": "color"},
+            {"von": 120, "bis": 127, "name": "Color7+Open (Amber+White)", "art": "color"},
+            {"von": 128, "bis": 191, "name": "From Fast to Slow Clockwise Rotation", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "From Slow to Fast Counter Clockwise Rotation", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Pattern Plate",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 8, "name": "Open", "art": "open"},
+            {"von": 9, "bis": 17, "name": "Gobo 1", "art": "gobo"},
+            {"von": 18, "bis": 25, "name": "Gobo 2", "art": "gobo"},
+            {"von": 26, "bis": 34, "name": "Gobo 3", "art": "gobo"},
+            {"von": 35, "bis": 42, "name": "Gobo 4", "art": "gobo"},
+            {"von": 43, "bis": 51, "name": "Gobo 5", "art": "gobo"},
+            {"von": 52, "bis": 59, "name": "Gobo 6", "art": "gobo"},
+            {"von": 60, "bis": 68, "name": "Gobo 7", "art": "gobo"},
+            {"von": 69, "bis": 76, "name": "Gobo 7 Shake", "art": "shake"},
+            {"von": 77, "bis": 85, "name": "Gobo 6 Shake", "art": "shake"},
+            {"von": 86, "bis": 93, "name": "Gobo 5 Shake", "art": "shake"},
+            {"von": 94, "bis": 102, "name": "Gobo 4 Shake", "art": "shake"},
+            {"von": 103, "bis": 110, "name": "Gobo 3 Shake", "art": "shake"},
+            {"von": 111, "bis": 119, "name": "Gobo 2 Shake", "art": "shake"},
+            {"von": 120, "bis": 127, "name": "Gobo 1 Shake", "art": "shake"},
+            {"von": 128, "bis": 191, "name": "From Fast to Slow Clockwise Rotation", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "From Slow to Fast Counter Clockwise Rotation", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Function",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 70, "name": "No function", "art": ""},
+            {"von": 71, "bis": 89, "name": "Enable Blackout White Pan/Tilt Move"},
+            {"von": 90, "bis": 109, "name": "Disable Blackout While Pan/Tilt Move"},
+            {"von": 110, "bis": 129, "name": "Enable Blackout While Color Wheel Move"},
+            {"von": 130, "bis": 149, "name": "Disable Blacout While Color Wheel Move"},
+            {"von": 150, "bis": 169, "name": "Enable Blackout While Pattern Plate Move"},
+            {"von": 170, "bis": 189, "name": "Disable Blackout While Pattern Plate Move"},
+            {"von": 190, "bis": 199, "name": "No function", "art": ""},
+            {"von": 200, "bis": 209, "name": "Reset All", "art": "reset"},
+            {"von": 210, "bis": 249, "name": "No function", "art": ""},
+            {"von": 250, "bis": 255, "name": "Stand Alone", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "12 Channel",
+      "kanaele": [
+        {"name": "Pan Position", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan Fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt Position", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt Fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt Speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 7,
+          "highlight": 7,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Open", "art": "open"},
+            {"von": 16, "bis": 131, "name": "Fast Strobe From Slow To Fast", "art": "strobe"},
+            {"von": 132, "bis": 139, "name": "Open", "art": "open"},
+            {"von": 140, "bis": 181, "name": "Fast Close Slow Open", "art": "strobe"},
+            {"von": 182, "bis": 189, "name": "Open", "art": "open"},
+            {"von": 190, "bis": 231, "name": "Slow Close Fast Open", "art": "strobe"},
+            {"von": 232, "bis": 239, "name": "Open", "art": "open"},
+            {"von": 240, "bis": 247, "name": "Random", "art": "strobe"},
+            {"von": 248, "bis": 255, "name": "Open", "art": "open"}
+          ]
+        },
+        {
+          "name": "Color Wheel",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Open", "art": "open"},
+            {"von": 8, "bis": 15, "name": "Open+Color1 (White+Red)", "art": "color"},
+            {"von": 16, "bis": 23, "name": "Color1 (Red)", "art": "color"},
+            {"von": 24, "bis": 31, "name": "Color1+Color2 (Red+Green)", "art": "color"},
+            {"von": 32, "bis": 39, "name": "Color2 (Green)", "art": "color"},
+            {"von": 40, "bis": 47, "name": "Color2+Color3 (Green+Blue)", "art": "color"},
+            {"von": 48, "bis": 55, "name": "Color3 (Blue)", "art": "color"},
+            {"von": 56, "bis": 63, "name": "Color3+Color4 (Blue+Yellow)", "art": "color"},
+            {"von": 64, "bis": 71, "name": "Color4 (Yellow)", "art": "color"},
+            {"von": 72, "bis": 79, "name": "Color4+Color5 (Yellow+Magenta)", "art": "color"},
+            {"von": 80, "bis": 87, "name": "Color5 (Magenta)", "art": "color"},
+            {"von": 88, "bis": 95, "name": "Color5+Color6 (Magenta+Cyan)", "art": "color"},
+            {"von": 96, "bis": 103, "name": "Color6 (Cyan)", "art": "color"},
+            {"von": 104, "bis": 111, "name": "Color6+Color7 (Cyan+Amber)", "art": "color"},
+            {"von": 112, "bis": 119, "name": "Color7 (Amber)", "art": "color"},
+            {"von": 120, "bis": 127, "name": "Color7+Open (Amber+White)", "art": "color"},
+            {"von": 128, "bis": 191, "name": "From Fast to Slow Clockwise Rotation", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "From Slow to Fast Counter Clockwise Rotation", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Pattern Plate",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 8, "name": "Open", "art": "open"},
+            {"von": 9, "bis": 17, "name": "Gobo 1", "art": "gobo"},
+            {"von": 18, "bis": 25, "name": "Gobo 2", "art": "gobo"},
+            {"von": 26, "bis": 34, "name": "Gobo 3", "art": "gobo"},
+            {"von": 35, "bis": 42, "name": "Gobo 4", "art": "gobo"},
+            {"von": 43, "bis": 51, "name": "Gobo 5", "art": "gobo"},
+            {"von": 52, "bis": 59, "name": "Gobo 6", "art": "gobo"},
+            {"von": 60, "bis": 68, "name": "Gobo 7", "art": "gobo"},
+            {"von": 69, "bis": 76, "name": "Gobo 7 Shake", "art": "shake"},
+            {"von": 77, "bis": 85, "name": "Gobo 6 Shake", "art": "shake"},
+            {"von": 86, "bis": 93, "name": "Gobo 5 Shake", "art": "shake"},
+            {"von": 94, "bis": 102, "name": "Gobo 4 Shake", "art": "shake"},
+            {"von": 103, "bis": 110, "name": "Gobo 3 Shake", "art": "shake"},
+            {"von": 111, "bis": 119, "name": "Gobo 2 Shake", "art": "shake"},
+            {"von": 120, "bis": 127, "name": "Gobo 1 Shake", "art": "shake"},
+            {"von": 128, "bis": 191, "name": "From Fast to Slow Clockwise Rotation", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "From Slow to Fast Counter Clockwise Rotation", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Pan/Tilt Macro",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "No Effect", "art": ""},
+            {"von": 16, "bis": 35, "name": "Effect 1", "art": ""},
+            {"von": 36, "bis": 55, "name": "Effect 2", "art": ""},
+            {"von": 56, "bis": 75, "name": "Effect 3", "art": ""},
+            {"von": 76, "bis": 95, "name": "Effect 4", "art": ""},
+            {"von": 96, "bis": 115, "name": "Effect 5", "art": ""},
+            {"von": 116, "bis": 135, "name": "Effect 6", "art": ""},
+            {"von": 136, "bis": 155, "name": "Effect 7", "art": ""},
+            {"von": 156, "bis": 175, "name": "Effect 8", "art": ""},
+            {"von": 176, "bis": 195, "name": "Effect 9", "art": ""},
+            {"von": 196, "bis": 215, "name": "Effect 10", "art": ""},
+            {"von": 216, "bis": 235, "name": "Effect 11", "art": ""},
+            {"von": 236, "bis": 255, "name": "Effect 12", "art": ""}
+          ]
+        },
+        {
+          "name": "Pan/Tilt Macro Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Fast to Slow", "art": ""}
+          ]
+        },
+        {
+          "name": "Function",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 70, "name": "No function", "art": ""},
+            {"von": 71, "bis": 89, "name": "Enable Blackout White Pan/Tilt Move"},
+            {"von": 90, "bis": 109, "name": "Disable Blackout While Pan/Tilt Move"},
+            {"von": 110, "bis": 129, "name": "Enable Blackout While Color Wheel Move"},
+            {"von": 130, "bis": 149, "name": "Disable Blacout While Color Wheel Move"},
+            {"von": 150, "bis": 169, "name": "Enable Blackout While Pattern Plate Move"},
+            {"von": 170, "bis": 189, "name": "Disable Blackout While Pattern Plate Move"},
+            {"von": 190, "bis": 199, "name": "No function", "art": ""},
+            {"von": 200, "bis": 209, "name": "Reset All", "art": "reset"},
+            {"von": 210, "bis": 249, "name": "No function", "art": ""},
+            {"von": 250, "bis": 255, "name": "Stand Alone", "art": ""}
+          ]
+        }
+      ]
+    }
+  ]
+}

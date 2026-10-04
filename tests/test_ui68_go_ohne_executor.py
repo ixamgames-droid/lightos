@@ -153,7 +153,9 @@ class GoOhneExecutorTest(unittest.TestCase):
         self.view._go()
         self.assertIsNone(self._gebunden(1))
         self.assertEqual(self._licht(), 128)
-        self.assertFalse(self._leiste.meldungen)
+        # UI-73: kein Binden, aber ein Hinweis, WO die Liste laeuft (vorher
+        # stumm — die Executor-Leiste der aktuellen Page blieb leer).
+        self.assertEqual(self._leiste.meldungen, ["„Neue Liste“ liegt auf Page 6, Ex 4"])
 
     def test_back_bindet_stop_nicht(self):
         self.view._stop()

@@ -77,9 +77,18 @@ class BenchmarkMessartTest(unittest.TestCase):
         self.assertEqual(js.count("__renderTick()"), 1,
                          "genau ein Renderdurchlauf je Aufruf")
 
-    def test_gl_finish_bleibt(self):
-        """Ohne `gl.finish()` misst man nur das Absetzen der Draw-Calls."""
-        self.assertIn("gl.finish()", _quelle())
+    def test_readpixels_statt_gl_finish(self):
+        """VIZ-69: `gl.finish()` wartet in QtWebEngine/ANGLE nicht auf die GPU.
+
+        Ohne einen echten Abschluss misst man nur das Absetzen der Draw-Calls;
+        ein 1x1-`readPixels` muss das fertige Bild abholen und erzwingt ihn.
+        """
+        quelle = _quelle()
+        js = quelle[quelle.index("_MESSUNG_JS"):quelle.index('"""', quelle.index(
+            "_MESSUNG_JS") + 20)]
+        self.assertIn("gl.readPixels(0, 0, 1, 1", js)
+        self.assertNotIn("gl.finish();", js,
+                         "gl.finish() taeuscht in QtWebEngine eine GPU-Messung vor")
 
 
 class BenchmarkGueltigkeitTest(unittest.TestCase):

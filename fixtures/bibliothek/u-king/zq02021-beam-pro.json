@@ -1,0 +1,124 @@
+{
+  "format_version": 1,
+  "hersteller": "U King",
+  "hersteller_kurz": "UKING",
+  "modell": "ZQ02021 Beam Pro",
+  "kurzname": "ZQ02021",
+  "typ": "moving_head",
+  "leistung_w": 120,
+  "notizen": "Kein Herstellerhandbuch abrufbar; Kanalfolge und Wertebereiche aus der QLC+-Datei. Strobe-Kanaele ohne Wertangabe in QLC+: 0 = kein Strobe angenommen (wie bei den eingebauten U-King-Profilen). Prisma 8-127 heisst in QLC+ 'open' - gemeint ist Prisma eingeschwenkt (statisch).",
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition UKing-ZQ02021-Beam-Pro.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/UKing/UKing-ZQ02021-Beam-Pro.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.14.2 GIT · Peter Schmenger",
+    "original": "resources/fixtures/UKing/UKing-ZQ02021-Beam-Pro.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 37 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): Hersteller 'UKing' -> 'U King' (wie die eingebauten LightOS-Profile der Marke); Attribute korrigiert (Maintenance: raw->reset); 21 Bereichs-Arten nachgezogen (Farb-/Gobo-Slots, Shake/Rotation, Prisma, Sound, Reset; Programm-Bereiche in Makro-Kanaelen ohne Farb-Art); Wartungskanal von raw zu reset; Farbrad 0-15 als Weiss/offen, Prisma 8-127 als Prisma statisch benannt; einzelne Kanalnamen deutsch bzw. eindeutiger benannt"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Originaldatei geprueft und nach den LightOS-Regeln (SCHEMA.md) nachbearbeitet; ein Herstellerhandbuch war nicht abrufbar (U'King-Anleitungen nur als Amazon-/manuals.plus-PDF, dort gesperrt; ManualsLib fuehrt das Modell nicht), daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "12 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "No function", "art": "open"},
+            {"von": 1, "bis": 255, "name": "Strobe flow to fast (1hz to 25hz)", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Color",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Weiss / offen", "art": "open"},
+            {"von": 16, "bis": 31, "name": "Red", "art": "color"},
+            {"von": 32, "bis": 47, "name": "Yellow", "art": "color"},
+            {"von": 48, "bis": 63, "name": "Green", "art": "color"},
+            {"von": 64, "bis": 79, "name": "Orange", "art": "color"},
+            {"von": 80, "bis": 95, "name": "Blue", "art": "color"},
+            {"von": 96, "bis": 111, "name": "Purple", "art": "color"},
+            {"von": 112, "bis": 127, "name": "Light Blue", "art": "color"},
+            {"von": 128, "bis": 255, "name": "Automatic Change Slow to Fast", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Pattern Gobo",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Pattern 1 normal, dot", "art": "open"},
+            {"von": 8, "bis": 15, "name": "Pattern 2 small dot", "art": "gobo"},
+            {"von": 16, "bis": 23, "name": "Pattern 3 s-form", "art": "gobo"},
+            {"von": 24, "bis": 31, "name": "Pattern 4 cross", "art": "gobo"},
+            {"von": 32, "bis": 39, "name": "Pattern 5 flower", "art": "gobo"},
+            {"von": 40, "bis": 47, "name": "Pattern 6 torx", "art": "gobo"},
+            {"von": 48, "bis": 55, "name": "Pattern 7 triangle", "art": "gobo"},
+            {"von": 56, "bis": 63, "name": "Pattern 8 circle of dots", "art": "gobo"},
+            {"von": 64, "bis": 71, "name": "Pattern 1, dithering", "art": "shake"},
+            {"von": 72, "bis": 79, "name": "Pattern 2, dithering", "art": "shake"},
+            {"von": 80, "bis": 87, "name": "Pattern 3, dithering", "art": "shake"},
+            {"von": 88, "bis": 95, "name": "Pattern 4, dithering", "art": "shake"},
+            {"von": 96, "bis": 103, "name": "Pattern 5, dithering", "art": "shake"},
+            {"von": 104, "bis": 111, "name": "Pattern 6, dithering", "art": "shake"},
+            {"von": 112, "bis": 119, "name": "Pattern 7, dithering", "art": "shake"},
+            {"von": 120, "bis": 127, "name": "Pattern 8, dithering", "art": "shake"},
+            {"von": 128, "bis": 255, "name": "Automatic pattern change, slow 2 fast", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Prism",
+          "attribut": "prism",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "no prism", "art": ""},
+            {"von": 8, "bis": 127, "name": "Prisma ein (statisch)", "art": "prism"},
+            {"von": 128, "bis": 255, "name": "Prism rotation, slow to fast", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Auto-/Sound-Modus",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 49, "name": "no function (other modes active)", "art": ""},
+            {"von": 50, "bis": 100, "name": "fast automatic", "art": ""},
+            {"von": 101, "bis": 200, "name": "slow automatic", "art": ""},
+            {"von": 201, "bis": 255, "name": "audio mode", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 249, "name": "no function", "art": ""},
+            {"von": 250, "bis": 255, "name": "Reset in 5 seconds", "art": "reset"}
+          ]
+        }
+      ]
+    }
+  ]
+}
