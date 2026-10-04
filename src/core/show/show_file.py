@@ -462,6 +462,12 @@ def _resolve_fixture_profile_id(profile_id: int, manufacturer_name: str,
                     f"[show_file] Fixture-Profil remapped: {profile_id} -> {resolved} "
                     f"({_geraet})"
                 )
+                # FM-63: ein vom LightOS-Profil abgeloester QLC+-Import ist
+                # keine Dublette, sondern dessen bekannter Vorgaenger — keine
+                # Warnung dafuer (gewonnen hat ohnehin das LightOS-Profil).
+                from src.core.database.fixture_db import abgeloeste_profil_ids
+                _weg = abgeloeste_profil_ids(session) if len(treffer) > 1 else set()
+                treffer = [t for t in treffer if int(t[0]) not in _weg] or treffer
                 if len(treffer) > 1:
                     # Mehrdeutig: gemeldet, nicht verschwiegen. Der Mensch sieht
                     # sonst ein Geraet, das *fast* stimmt, und sucht den Fehler

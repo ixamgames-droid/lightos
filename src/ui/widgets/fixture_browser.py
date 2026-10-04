@@ -235,10 +235,15 @@ class FixtureBrowserDialog(QDialog):
                 item.setData(0, Qt.ItemDataRole.UserRole, f.id)
                 self._tree.addTopLevelItem(item)
         else:
+            # FM-63: von einem LightOS-Profil abgeloeste QLC+-Importe nicht
+            # anbieten (die Suche oben filtert in ``search_fixtures`` selbst).
+            # Einmal fuer den ganzen Baum, nicht je Hersteller.
+            abgeloest = fdb.abgeloeste_profil_ids()
             for mfr in fdb.get_all_manufacturers():
                 mfr_item = QTreeWidgetItem([mfr.name, "", ""])
                 mfr_item.setData(0, Qt.ItemDataRole.UserRole, None)
-                fixtures = fdb.get_fixtures_by_manufacturer(mfr.id)
+                fixtures = [f for f in fdb.get_fixtures_by_manufacturer(mfr.id)
+                            if f.id not in abgeloest]
                 for f in fixtures:
                     ch = str(f.modes[0].channel_count) if f.modes else "?"
                     child = QTreeWidgetItem([f.name, typ_anzeige(f.fixture_type), ch])

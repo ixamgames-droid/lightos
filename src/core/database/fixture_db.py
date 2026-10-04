@@ -136,9 +136,60 @@ def should_auto_mark_dual_tilt(profile, channels) -> bool:
         return False
 
 
+def profil_schluessel(hersteller: str | None, modell: str | None) -> tuple[str, str]:
+    """FM-63: Vergleichsform von Hersteller + Modell — Gross/Klein egal,
+    Leerzeichen an den Raendern und mehrfache Leerzeichen innen zaehlen nicht
+    (``"EuroLite "`` / ``"eurolite"``)."""
+    return (" ".join((hersteller or "").split()).casefold(),
+            " ".join((modell or "").split()).casefold())
+
+
+def abgeloeste_profil_ids(session: Session | None = None) -> set[int]:
+    """FM-63: IDs der QLC+-Importe, die ein mitgeliefertes LightOS-Profil
+    (``source='lightos'``, ``fixtures/bibliothek/``) mit gleichem Hersteller +
+    Modell (:func:`profil_schluessel`) abloest.
+
+    ★ **Abgeloest heisst AUSGEBLENDET, nicht geloescht und nicht umgehaengt.**
+    Gepatchte Geraete stehen in den Show-Dateien mit Profil-ID + Modusname;
+    die Fixture-DB weiss nicht, welche Shows es gibt. Ein Loeschen oder
+    Umhaengen haette jede Show auf einem anderen Rechner/Stick still dunkel
+    gemacht oder auf ein Profil mit anderer Kanalbelegung gesetzt. So laedt
+    eine bestehende Show weiter ueber die ID den alten Import (genau die
+    Kanalbelegung, mit der sie gebaut wurde), und nur NEUE Auswahl (Fixture-
+    Browser, Suche) sieht das LightOS-Profil. Abgeleitet bei jedem Aufruf statt
+    gespeichert: kein Zustand, der veralten kann, idempotent per Konstruktion.
+
+    Eigene (``user``) und eingebaute Profile sind nie dabei
+    (``models.ABLOESBARE_QUELLEN``)."""
+    from .models import ABLOESBARE_QUELLEN
+    from .bibliothek_format import SOURCE_LIGHTOS
+
+    def _lesen(s: Session) -> set[int]:
+        rows = s.execute(
+            select(FixtureProfile.id, FixtureProfile.source, Manufacturer.name,
+                   FixtureProfile.name)
+            .join(Manufacturer, FixtureProfile.manufacturer_id == Manufacturer.id)
+            .where(FixtureProfile.source.in_((SOURCE_LIGHTOS, *ABLOESBARE_QUELLEN)))
+        ).all()
+        lightos = {profil_schluessel(m, n) for _i, src, m, n in rows
+                   if src == SOURCE_LIGHTOS}
+        if not lightos:
+            return set()
+        return {int(i) for i, src, m, n in rows
+                if src != SOURCE_LIGHTOS and profil_schluessel(m, n) in lightos}
+
+    if session is not None:
+        return _lesen(session)
+    with Session(engine()) as s:
+        return _lesen(s)
+
+
 def search_fixtures(query: str) -> list[FixtureProfile]:
+    """Suche ueber Modell, Hersteller und Typ. FM-63: von einem LightOS-Profil
+    abgeloeste QLC+-Importe (:func:`abgeloeste_profil_ids`) fehlen."""
     q = f"%{query}%"
     with Session(engine()) as s:
+        weg = abgeloeste_profil_ids(s)
         result = s.execute(
             select(FixtureProfile)
             .options(
@@ -154,7 +205,7 @@ def search_fixtures(query: str) -> list[FixtureProfile]:
             .order_by(Manufacturer.name, FixtureProfile.name)
         ).scalars().all()
         s.expunge_all()
-        return result
+        return [f for f in result if f.id not in weg]
 
 
 # ── Initiale Daten ────────────────────────────────────────────────────────────

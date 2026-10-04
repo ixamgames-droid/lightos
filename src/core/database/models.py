@@ -19,6 +19,13 @@ class Base(DeclarativeBase):
 #: QA-68), zaehlen beide gleich.
 MITGELIEFERT_QUELLEN: tuple[str, ...] = ("builtin", "lightos")
 
+#: FM-63: ``FixtureProfile.source``-Werte, die ein mitgeliefertes LightOS-
+#: Bibliotheksprofil (``source='lightos'``) gleichen Herstellers + Modells
+#: ABLOEST — heute nur der QLC+-Import (``qxf_import``, auch der Bibliotheks-
+#: Download). ``user``/``builtin`` stehen bewusst NICHT hier: eigene Profile
+#: werden nie angetastet, Builtins haben ihre eigene Pflege (FM-50).
+ABLOESBARE_QUELLEN: tuple[str, ...] = ("qlcplus",)
+
 
 class Manufacturer(Base):
     __tablename__ = "manufacturers"
