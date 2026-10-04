@@ -52,17 +52,33 @@ class VisualizerTarget:
     ``on_reload`` (Schritt 5, optional): Callback ohne Argumente, den
     ``VisualizerService.reload_all_targets()`` pro Target aufruft, um die
     Page mit Cache-Buster neu zu laden (der eigentliche ``load_stage_html``-
-    Aufruf bleibt Sache des Targets/Fensters, s. Design (b) Punkt 3)."""
+    Aufruf bleibt Sache des Targets/Fensters, s. Design (b) Punkt 3).
+
+    ``emit_payloads`` (VIZ-71, optional): strukturierter Empfaenger
+    ``(payloads: list[dict], full: bool, seq: int)``. Ist er gesetzt, ruft der
+    Tick IHN statt ``emit_batch`` — ohne den Umweg ueber einen JSON-String, den
+    der Push-Kanal (``dmx_push.DmxPushChannel``) sonst wieder zerlegen muesste,
+    um je Geraet zusammenzufuehren. Die Payload-Dicts sind GETEILT (Service-
+    Cache und alle Targets) und duerfen vom Empfaenger nicht veraendert werden.
+
+    ``tick_ms`` (VIZ-71): gewuenschter Takt dieses Ziels (Qualitaetsstufe:
+    Niedrig 15 Hz, Hoch 30 Hz, Maximal 44 Hz). Der Service-Timer laeuft im
+    kleinsten Takt aller AKTIVEN Ziele; ein langsameres Ziel drosselt sein
+    Push-Kanal selbst."""
 
     def __init__(self, name: str, emit_batch: Callable[[str], None],
                  on_reset_interaction: Optional[Callable[[], None]] = None,
-                 on_reload: Optional[Callable[[], None]] = None):
+                 on_reload: Optional[Callable[[], None]] = None,
+                 emit_payloads: Optional[Callable[[list, bool, int], None]] = None,
+                 tick_ms: Optional[int] = None):
         self.name = name
         self.emit_batch = emit_batch
+        self.emit_payloads = emit_payloads
         self.on_reset_interaction = on_reset_interaction
         self.on_reload = on_reload
         self.active: bool = False
         self.needs_full: bool = True
+        self.tick_ms: int = int(tick_ms or VisualizerService.TICK_MS)
 
 
 def _has_own_color(attrs: dict[str, int], suffix: str = "") -> bool:
@@ -367,6 +383,12 @@ class VisualizerService:
         self._gate_sig: Optional[tuple] = None
         self._gate_skips = 0
         self._state_rev = 0
+        # VIZ-71: Sequenznummer je GEBAUTEM Tick. Der Push-Kanal reicht sie je
+        # Eintrag an JS weiter; JS verwirft einen Eintrag, der aelter ist als
+        # der zuletzt angewandte derselben fid. Noetig, solange Push und der
+        # Poll-Rueckfall nebeneinander laufen: die Antworten reisen ueber zwei
+        # verschiedene IPC-Wege und koennen sich ueberholen.
+        self._seq = 0
 
     # ── Timer-Lazy-Init (Qt-Objekt erst bei Bedarf, damit Tests ohne
     #    QApplication den Service instanzieren koennen) ─────────────────────
@@ -429,15 +451,33 @@ class VisualizerService:
             target.needs_full = True
         self._update_timer_gate()
 
+    def _tick_interval_ms(self) -> int:
+        """VIZ-71: kleinster gewuenschter Takt aller AKTIVEN Ziele."""
+        werte = [int(getattr(t, "tick_ms", self.TICK_MS) or self.TICK_MS)
+                 for t in self._targets if t.active]
+        return max(10, min(werte)) if werte else self.TICK_MS
+
+    def set_target_tick_ms(self, target: VisualizerTarget, tick_ms: int) -> None:
+        """VIZ-71: Takt eines Ziels aendern (Qualitaetsstufe gemeldet/gewechselt)
+        und den laufenden Timer sofort nachziehen."""
+        target.tick_ms = int(tick_ms)
+        self._update_timer_gate()
+
     def _update_timer_gate(self) -> None:
         """Timer laeuft HART nur bei >=1 aktivem Target (Orchestrator-
         Entscheidung 2). Der State-Patch-Prune haengt NICHT am Timer, sondern
-        am State-Subscribe (bleibt auch bei gestopptem Timer aktiv)."""
+        am State-Subscribe (bleibt auch bei gestopptem Timer aktiv).
+
+        VIZ-71: das Intervall folgt dem schnellsten aktiven Ziel (Maximal 44 Hz,
+        Hoch 30 Hz, Niedrig 15 Hz)."""
         any_active = any(t.active for t in self._targets)
         if any_active:
             self._ensure_timer()
+            soll = self._tick_interval_ms()
             if not self._timer.isActive():
-                self._timer.start(self.TICK_MS)
+                self._timer.start(soll)
+            elif self._timer.interval() != soll:
+                self._timer.setInterval(soll)
         else:
             if self._timer_alive() and self._timer.isActive():
                 self._timer.stop()
@@ -554,6 +594,8 @@ class VisualizerService:
         self._gate_sig = sig
         self._gate_skips = 0
         snapshot = self._build_snapshot()
+        self._seq += 1
+        seq = self._seq
 
         # Diff ggue. dem service-globalen Cache: nur GEAENDERTE Fixtures.
         changed: dict[int, dict[str, object]] = {}
@@ -565,16 +607,38 @@ class VisualizerService:
         # den State-Patch-Prune (_on_state), nicht ueber den Tick.
         self._last_payload = snapshot
 
+        batch_json = None
         for target in self._targets:
             if not target.active:
                 continue
-            if target.needs_full:
+            full = bool(target.needs_full)
+            if full:
                 arr = list(snapshot.values())
                 target.needs_full = False
             else:
                 arr = list(changed.values())
-            if arr:
-                target.emit_batch(json.dumps(arr))
+            if not arr:
+                continue
+            emit_payloads = getattr(target, "emit_payloads", None)
+            if emit_payloads is not None:
+                # VIZ-71: strukturiert an den Push-Kanal. Ein Fehler in EINEM
+                # Ziel darf die anderen nicht um ihren Batch bringen — der
+                # Service-Cache ist oben schon weitergesetzt, ein verlorener
+                # Diff kaeme nie wieder (A3D-04-Klasse). Darum: dieses Ziel
+                # beim naechsten Tick voll beliefern.
+                try:
+                    emit_payloads(arr, full, seq)
+                except Exception as e:                   # noqa: BLE001
+                    target.needs_full = True
+                    print(f"[VisualizerService] ERROR: Push an {target.name}: {e}")
+                continue
+            if full or batch_json is None:
+                js = json.dumps(arr)
+                if not full:
+                    batch_json = js
+            else:
+                js = batch_json
+            target.emit_batch(js)
 
     def force_full_resync(self, target: Optional[VisualizerTarget] = None) -> None:
         """Leert den Dirty-Cache (nach Reload/Stage-Wechsel/Target-Attach), so
