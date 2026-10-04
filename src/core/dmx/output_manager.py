@@ -538,15 +538,26 @@ class OutputManager:
         und gezielter Blackout (VCB-11). Der reset-first baut sie fuer den
         leeren Patch neu; ohne GM-Maske skalierte der Grand-Master dann ALLE
         Kanaele, bei GM < 100 % ruckten Pan/Tilt im Lade-Fenster, und im
-        Blackout fielen sie auf 0. GM-Wert, Blackout-Schalter und Laser-NOT-AUS
-        bleiben live."""
+        Blackout fielen sie auf 0. GM-Wert und Blackout-Schalter bleiben live.
+        Ein Ziel-Blackout (VCB-11), der ERST waehrend des Ladens gedrueckt
+        wird, wirkt im Lade-Fenster noch NICHT — es gilt die Ziel-Maske vom
+        Start; er greift mit dem ersten Frame nach dem Laden.
+
+        ★ OUT-61 (Review A, Sicherheit): auch die Laser-NOT-AUS-Maske wird
+        festgehalten. Der reset-first schob bei aktivem Latch eine LEERE Maske
+        (leerer Patch); Ebene 2 des NOT-AUS fiel weg, und ein INVERSE- oder
+        Range-Lock-Modifier auf der Laser-Adresse machte aus der 0 im Frame
+        eine 255 — Laser AN waehrend des Ladens. Genullt wird die VEREINIGUNG
+        aus Start- und Live-Maske: ein waehrend des Ladens ausgeloester NOT-AUS
+        wirkt sofort, einer vom Start bleibt bis zum Ende stehen."""
         if self._lade_tiefe == 0:
             self._lade_frames = {u: universe.get_all()
                                  for u, universe in list(self.universes.items())}
             # Die Masken werden immer als Ganzes ersetzt, nie veraendert —
             # die Referenzen festzuhalten genuegt.
             self._lade_masken = (self._gm_address_mask, self._blackout_keep_mask,
-                                 getattr(self, "_ziel_blackout_union", None))
+                                 getattr(self, "_ziel_blackout_union", None),
+                                 self._laser_estop_mask)
         self._lade_tiefe += 1
         try:
             yield
@@ -1022,9 +1033,10 @@ class OutputManager:
         # OUT-60: die Lade-Sperre hat Vorrang vor dem Bediener-Freeze.
         gefroren = self._lade_frames if self._lade_frames is not None else self._freeze_frames
         if self._lade_masken is not None:
-            gm_masken, keep_masken, ziel = self._lade_masken
+            gm_masken, keep_masken, ziel, estop_start = self._lade_masken
         else:
             gm_masken, keep_masken = self._gm_address_mask, self._blackout_keep_mask
+            estop_start = None
             ziel = getattr(self, "_ziel_blackout_union", None)
         for univ_num, universe in list(self.universes.items()):
             # Im Freeze den festgehaltenen Stand senden statt des (u. U. direkt
@@ -1096,6 +1108,11 @@ class OutputManager:
             # range_min (Range-Lock) machen -> der DMX-Laser bliebe trotz NOT-AUS an.
             # Muss die letzte Transformation vor Anzeige/Senden sein (auch nach GM).
             estop_mask = self._laser_estop_mask.get(univ_num)
+            if estop_start:
+                # OUT-61: im Lade-Fenster Start- UND Live-Maske (Vereinigung).
+                vorher = estop_start.get(univ_num)
+                if vorher:
+                    estop_mask = set(vorher) | set(estop_mask or ())
             if estop_mask:
                 buf = bytearray(data)
                 for addr in estop_mask:
