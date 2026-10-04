@@ -185,11 +185,11 @@ class OutputManager:
         self._blackout = False
         # BUG-FBW Slice 3: eingefrorene Frames (None = laeuft normal), s. set_freeze.
         self._freeze_frames: dict[int, bytes] | None = None
-        # OUT-60: Halte-Frames waehrend eines Live-Show-Loads (s. lade_sperre).
-        self._lade_frames: dict[int, bytes] | None = None
-        # OUT-60-Folge: die patch-abhaengigen Masken (GM, Blackout-Erhalten,
-        # gezielter Blackout) vom Start der Lade-Sperre — (gm, keep, ziel).
-        self._lade_masken: tuple | None = None
+        # OUT-60 (+Folgen): Zustand der Lade-Sperre als EIN Tupel
+        # ``(frames, (gm, keep, ziel, estop))`` oder None. Ein Tupel, damit der
+        # Sende-Thread Frame und Masken atomar sieht — getrennte Attribute
+        # konnten am Sperr-Ende auseinanderlaufen (Review A zu #927).
+        self._lade: tuple | None = None
         self._lade_tiefe = 0
         # slot → (level 0.0–1.0, target_fids | None). target_fids None = GLOBALER
         # Submaster (wirkt auf ALLE Fixtures, bisheriges Verhalten); ein
@@ -551,21 +551,33 @@ class OutputManager:
         aus Start- und Live-Maske: ein waehrend des Ladens ausgeloester NOT-AUS
         wirkt sofort, einer vom Start bleibt bis zum Ende stehen."""
         if self._lade_tiefe == 0:
-            self._lade_frames = {u: universe.get_all()
-                                 for u, universe in list(self.universes.items())}
+            frames = {u: universe.get_all()
+                      for u, universe in list(self.universes.items())}
             # Die Masken werden immer als Ganzes ersetzt, nie veraendert —
             # die Referenzen festzuhalten genuegt.
-            self._lade_masken = (self._gm_address_mask, self._blackout_keep_mask,
-                                 getattr(self, "_ziel_blackout_union", None),
-                                 self._laser_estop_mask)
+            masken = (self._gm_address_mask, self._blackout_keep_mask,
+                      getattr(self, "_ziel_blackout_union", None),
+                      self._laser_estop_mask)
+            self._lade = (frames, masken)        # eine Zuweisung = atomar
         self._lade_tiefe += 1
         try:
             yield
         finally:
             self._lade_tiefe -= 1
             if self._lade_tiefe == 0:
-                self._lade_frames = None
-                self._lade_masken = None
+                self._lade = None
+
+    @property
+    def _lade_frames(self):
+        """Lesesicht fuer Tests/Diagnose: eingefrorene Frames der Lade-Sperre."""
+        lade = self._lade
+        return lade[0] if lade is not None else None
+
+    @property
+    def _lade_masken(self):
+        """Lesesicht fuer Tests/Diagnose: Masken vom Start der Lade-Sperre."""
+        lade = self._lade
+        return lade[1] if lade is not None else None
 
     def set_blackout(self, enabled: bool):
         """Blackout an/aus. UI-58: jede Aenderung wird gemeldet — egal ob sie aus
@@ -1031,9 +1043,10 @@ class OutputManager:
             self._buche_fehler("Tick", 0, tick_exc, quelle=tick_name)
 
         # OUT-60: die Lade-Sperre hat Vorrang vor dem Bediener-Freeze.
-        gefroren = self._lade_frames if self._lade_frames is not None else self._freeze_frames
-        if self._lade_masken is not None:
-            gm_masken, keep_masken, ziel, estop_start = self._lade_masken
+        lade = self._lade                        # EINMAL lesen (Review A zu #927)
+        gefroren = lade[0] if lade is not None else self._freeze_frames
+        if lade is not None:
+            gm_masken, keep_masken, ziel, estop_start = lade[1]
         else:
             gm_masken, keep_masken = self._gm_address_mask, self._blackout_keep_mask
             estop_start = None

@@ -68,5 +68,25 @@ class EstopImLadeFensterTest(unittest.TestCase):
         self.assertEqual(self.om._display_frame[1][LASER - 1], 255)
 
 
+class AtomarerWechselTest(unittest.TestCase):
+    """Review A zu #927: Frame und Masken der Lade-Sperre muessen atomar
+    wechseln — ``_send_all`` liest den Zustand genau EINMAL."""
+
+    def test_send_all_liest_den_lade_zustand_einmal(self):
+        import inspect
+        import re
+        from src.core.dmx.output_manager import OutputManager
+        quelle = inspect.getsource(OutputManager._send_all)
+        zugriffe = re.findall(r"self\._lade(?:_frames|_masken)?\b", quelle)
+        self.assertEqual(zugriffe, ["self._lade"], zugriffe)
+
+    def test_ende_der_sperre_setzt_beides_zugleich_zurueck(self):
+        om = get_state().output_manager
+        with om.lade_sperre():
+            self.assertIsNotNone(om._lade_frames)
+            self.assertIsNotNone(om._lade_masken)
+        self.assertIsNone(om._lade)
+
+
 if __name__ == "__main__":
     unittest.main()
