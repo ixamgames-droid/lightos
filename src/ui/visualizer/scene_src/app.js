@@ -8,7 +8,9 @@
 // blieb unveraendert - Buttons rufen weiterhin z.B. `setEditTool(...)` als
 // globale Funktion auf) und startet den Render-Loop + Bridge-Poll wie im
 // Original.
-import { scene, renderer, gpuTier } from './scene/renderer.js';
+import { scene, renderer, gpuTier, dynamicResolution, basePixelRatio,
+         PIXEL_RATIO_CAP, tierSettings, setDeviceRatio,
+         noteCameraMotion } from './scene/renderer.js';
 import { applyBrightness } from './scene/lights.js';
 import { prepareShadowMap, requestShadowUpdate, shadowUpdateStats } from './scene/shadow_update.js';  // VIZ-69
 import { disposeObj } from './scene/grid_floor.js';
@@ -51,7 +53,7 @@ import { getBridge, tryChannel, jsAddStageObject } from './bridge/bridge.js';
 import { applyDmx } from './bridge/dmx_apply.js';                  // VIZ-71
 import { dmxCacheInfo } from './fixtures/dmx_cache.js';           // VIZ-71
 import { removeFixture as _removeFixtureForTouch, syncSpotShadowBudget,
-         beamFalloffTexture } from './fixtures/fixtures.js';  // VIZ-15
+         beamFalloffTexture, shadowBudgetInfo } from './fixtures/fixtures.js';  // VIZ-15
 import { updateLabelZoomVisibility } from './fixtures/labels.js';  // VIZ-14: Fixture-Label Zoom-Gate
 import {
   startRenderLoop, requestRender, registerLiveAnimation, renderStats, renderTick,
@@ -133,7 +135,15 @@ registerLiveAnimation(selectionPulseActive);
 // bereits selbst — scene.autoUpdate fuer den render() direkt danach aus, sonst
 // traversiert three.js die ganze Szene ein zweites Mal. Nur HIER, nicht global:
 // fremde render()-Aufrufer (Galerie, Mess-Sonden) behalten das Standardverhalten.
+// VIZ-71 (S6): Abstand zwischen zwei gerenderten Frames -> dynamische
+// Aufloesung (Stufe 'Hoch' senkt nur ab, wenn Frames laenger als 18 ms
+// brauchen). Nur aufeinanderfolgende Frames zaehlen, die Ruhepausen des
+// On-Demand-Renderns filtert noteFrameInterval selbst.
+let _letzterFrame = 0;
 function renderFrame() {
+  const _t = performance.now();
+  if (_letzterFrame) dynamicResolution.noteFrameInterval(_t - _letzterFrame);
+  _letzterFrame = _t;
   prepareShadowMap();
   scene.autoUpdate = false;
   try {
@@ -235,6 +245,13 @@ window.__lightos = {
   // Low-Spec-Erkennung (2026-07-11): 'low' | 'high' — Test-/Debug-Hook,
   // Override per ?gputier=low|high in der Page-URL.
   gpuTier,
+  // VIZ-71: Qualitaetsstufe und Pixeldichte — Test-/Diagnose-Seams.
+  tierSettings, pixelRatioCap: PIXEL_RATIO_CAP, basePixelRatio, setDeviceRatio,
+  pixelRatio: () => renderer.getPixelRatio(),
+  shadowMapType: () => renderer.shadowMap.type,
+  shadowBudgetInfo,
+  dynamicResolutionInfo: () => dynamicResolution.info(),
+  __noteCameraMotion: noteCameraMotion,
   // A3D-41: Test-Seams fuer die NaN-Guards der Zeiger-Mathematik. `mouse` ist
   // absichtlich das GETEILTE Vector2 selbst (nicht eine Kopie) — der Test muss
   // pruefen koennen, dass ein verworfener Aufruf es unangetastet laesst, und

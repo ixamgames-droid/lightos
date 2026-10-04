@@ -800,6 +800,11 @@ class VisualizerBridge(QObject):
         self.cameraPreset.connect(lambda n: self._poll_event({"t": "cameraPreset", "name": n}))
         self.namedCamerasChanged.connect(lambda j: self._poll_event({"t": "namedCameras", "j": j}))
         self.brightnessAutoSignal.connect(lambda: self._poll_event({"t": "brightnessAuto"}))
+        # VIZ-71 (N3): der Bildschirmwechsel war ein reines Push-Signal und kam
+        # nach dem Laden nie an — jetzt fester Poll-Zustand (JS wendet nur bei
+        # Aenderung an, ueber dieselbe Pixeldichte-Quelle wie Resize und die
+        # dynamische Aufloesung).
+        self.pixelRatioSignal.connect(lambda r: self._poll_set("pixelRatio", float(r)))
         # Fixture-Mesh-Signale (VIZ-13 3c-2-Fix Nachtrag 2026-07-07, LIVE gefunden):
         # OHNE diese rendern LIVE platzierte/entfernte Fixtures NICHT — der Mesh
         # taucht erst beim Neu-Laden auf (Connect-Burst). Gleiche Ursache wie bei

@@ -3,6 +3,8 @@
 import * as THREE from '../three/three.js';
 import { settings } from '../state.js';
 import { requestRender } from './render_loop.js';  // VIZ-13 3c-2
+import { tierProfile, pixelRatioCapFor } from './quality_tiers.js';         // VIZ-71
+import { createDynamicResolution } from './dynamic_resolution.js';          // VIZ-71
 
 export const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x080808);
@@ -12,7 +14,9 @@ scene.fog = new THREE.FogExp2(0x080808, 0.025);
 // Davids Surface (Adreno, MAX_TEXTURE_IMAGE_UNITS=16) braucht andere Defaults
 // als eine Desktop-GPU: Antialias ist eine KONSTRUKTOR-Entscheidung des
 // Renderers, daher probt eine Wegwerf-Canvas VOR dem Bau die Limits.
-// Override fuer Tests/Debug: ?gputier=low|high in der Page-URL.
+// Override fuer Tests/Debug/Geraete-Praeferenz: ?gputier=low|high|max in der
+// Page-URL. VIZ-71: 'max' gibt es NUR ueber diesen Weg — die Probe waehlt nie
+// mehr als 'high'.
 function probeGpuTier() {
   // ⚠️ Der Probe-Kontext MUSS wieder freigegeben werden.
   //
@@ -33,7 +37,7 @@ function probeGpuTier() {
   let gl = null;
   try {
     const forced = new URLSearchParams(window.location.search).get('gputier');
-    if (forced === 'low' || forced === 'high') return forced;
+    if (forced === 'low' || forced === 'high' || forced === 'max') return forced;
     const cv = document.createElement('canvas');
     gl = cv.getContext('webgl') || cv.getContext('experimental-webgl');
     if (!gl) return 'low';
@@ -59,6 +63,8 @@ function probeGpuTier() {
 }
 export const gpuTier = probeGpuTier();
 export const isLowSpec = gpuTier === 'low';
+// VIZ-71: alles, was die Stufe im Renderer bedeutet, aus EINER Tabelle.
+export const tierSettings = tierProfile(gpuTier);
 
 export const renderer = new THREE.WebGLRenderer({
   // Low-Spec: MSAA kostet auf fill-rate-limitierten Chips ueberproportional;
@@ -67,20 +73,55 @@ export const renderer = new THREE.WebGLRenderer({
   powerPreference: 'high-performance',
 });
 // Pixel-Ratio ist QUADRATISCHE Fragment-Last: 2.0 auf dem High-DPI-Surface
-// hiess 4x so viele Pixel wie 1.0 — Low-Spec deckelt auf 1.25.
-// Exportiert: der pixelRatioSignal-Handler (bridge.js, screenChanged) MUSS
-// denselben Deckel nutzen, sonst hebt ein Monitor-Wechsel ihn wieder auf.
-export const PIXEL_RATIO_CAP = isLowSpec ? 1.25 : 2;
+// hiess 4x so viele Pixel wie 1.0 — Low-Spec deckelt auf 1.25, Hoch auf 2,
+// Maximal gar nicht (VIZ-71, Tabelle in quality_tiers.js).
+export const PIXEL_RATIO_CAP = pixelRatioCapFor(gpuTier);
+
+// ── Pixeldichte: EINE Quelle (VIZ-71 S6) ────────────────────────────────────
+// Basis = min(Geraete-Pixeldichte, Deckel der Stufe); die dynamische
+// Aufloesung multipliziert ihre Skala darauf. Resize, Bildschirmwechsel
+// (pixelRatioSignal) und die Absenkung laufen ALLE ueber applyPixelRatio —
+// sonst hoebe ein Resize waehrend der Kamerafahrt die Absenkung auf, oder ein
+// Monitorwechsel den Low-Spec-Deckel (das war die Falle am pixelRatioSignal).
+let _deviceRatioOverride = null;
+export function setDeviceRatio(r) {
+  _deviceRatioOverride = (typeof r === 'number' && r > 0) ? r : null;
+  applyPixelRatio();
+}
+export function basePixelRatio() {
+  return Math.min(_deviceRatioOverride || window.devicePixelRatio || 1, PIXEL_RATIO_CAP);
+}
+export const dynamicResolution = createDynamicResolution({
+  now: () => performance.now(),
+  setTimer: (fn, ms) => setTimeout(fn, ms),
+  clearTimer: (h) => clearTimeout(h),
+  applyScale: () => applyPixelRatio(),
+  requestRender,
+  mode: tierSettings.dynamicResolution,
+});
+export function applyPixelRatio() {
+  const soll = basePixelRatio() * dynamicResolution.scale();
+  // setPixelRatio legt den Canvas-Puffer neu an — nur beim WECHSEL.
+  if (Math.abs(renderer.getPixelRatio() - soll) > 1e-6) {
+    renderer.setPixelRatio(soll);
+    requestRender();
+  }
+}
+// Kamera-Hook (camera/cameras.js#updateCamera/resizeOrtho).
+export function noteCameraMotion() { dynamicResolution.noteCameraMotion(); }
+
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, PIXEL_RATIO_CAP));
+renderer.setPixelRatio(basePixelRatio());
 renderer.shadowMap.enabled = true;
 // PCFSoft sampelt deutlich mehr Shadow-Taps pro Pixel als plain PCF.
-renderer.shadowMap.type = isLowSpec ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = tierSettings.softShadows ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
 // console.warn statt .log: Qt spiegelt nur Warning/Error-Konsolenzeilen ins
 // crash.log — so ist die Tier-Entscheidung auch nachtraeglich diagnostizierbar.
 console.warn('[viz] GPU-Tier: ' + gpuTier
   + ' (maxTextures=' + renderer.capabilities.maxTextures
   + ', pixelRatioCap=' + PIXEL_RATIO_CAP
+  + ', schattenDach=' + tierSettings.shadowCap
+  + ', dynAufloesung=' + tierSettings.dynamicResolution
   + ', antialias=' + String(!isLowSpec) + ')');
 // Bundle ist three.js r128 (siehe three_local.js REVISION) - dort heisst die
 // Farbraum-API noch outputEncoding/sRGBEncoding, nicht outputColorSpace.
@@ -101,7 +142,8 @@ export function rad2deg(r) { return (Number(r) || 0) * 180 / Math.PI; }
 window.addEventListener('resize', function() {
   renderer.setSize(window.innerWidth, window.innerHeight);
   // Monitor-Wechsel kann devicePixelRatio aendern (z.B. Fenster auf anderen
-  // Bildschirm mit anderer Skalierung verschoben) - hier mitziehen.
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, PIXEL_RATIO_CAP));
+  // Bildschirm mit anderer Skalierung verschoben) - hier mitziehen. VIZ-71:
+  // ueber die eine Quelle — eine laufende Absenkung bleibt, die Basis ist neu.
+  applyPixelRatio();
   requestRender();  // 3c-2 Dirty-Quelle 5 (Fenster-Resize)
 });

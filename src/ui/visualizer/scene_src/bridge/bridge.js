@@ -3,7 +3,7 @@
 // tryChannel). Reines Verschieben - ALLE 14 Signal-Connects + Slot-Aufrufe
 // 1:1 erhalten (Design-Dokument Leitprinzip).
 import * as THREE from '../three/three.js';
-import { renderer, scene, PIXEL_RATIO_CAP, gpuTier } from '../scene/renderer.js';
+import { scene, gpuTier, setDeviceRatio } from '../scene/renderer.js';
 import { applyBrightness } from '../scene/lights.js';
 import { fixtures, settings, stageObjects, view } from '../state.js';
 import { addFixture, removeFixture } from '../fixtures/fixtures.js';
@@ -340,10 +340,11 @@ export function tryChannel() {
         if (bridge.pixelRatioSignal) bridge.pixelRatioSignal.connect(r => {
           // VIZ-12 Schritt 5: expliziter Bildschirmwechsel (Qt screenChanged)
           // -> Renderer-Pixelratio neu setzen, unabhaengig vom 'resize'-Event
-          // (das feuert nicht garantiert bei jedem Monitorwechsel). Derselbe
-          // Tier-Deckel wie beim Initial-Setup — sonst hebt ein Monitor-
-          // Wechsel die Low-Spec-Drosselung wieder auf.
-          renderer.setPixelRatio(Math.min(r || window.devicePixelRatio || 1, PIXEL_RATIO_CAP));
+          // (das feuert nicht garantiert bei jedem Monitorwechsel). VIZ-71:
+          // ueber die EINE Quelle in renderer.js (Deckel der Stufe +
+          // dynamische Aufloesung). Nach dem Laden kommt das Signal nicht an —
+          // der Poll spiegelt es als Zustand 'pixelRatio' (unten).
+          setDeviceRatio(r);
           requestRender();  // 3c-2 Dirty-Quelle 5 (PixelRatio-Wechsel)
         });
         // VIZ-15: aktive Qualitaetsstufe (Probe- oder ?gputier-Override-
@@ -361,6 +362,7 @@ export function tryChannel() {
           let _pEM = null, _pVM = null, _pSet = null, _pStage = null, _pFix = null, _pSel = null;
           let _pPlace = null;   // VIZ-14: Zahl offener Platzierungen
           let _pBeamsOff = null;   // VIZ-15 (JSON-Signatur, s. Poll unten)
+          let _pPR = null;         // VIZ-71: Pixeldichte des Bildschirms
           // VIZ-71 (S5): zuletzt gesehene Revisionen je Zustands-Schluessel.
           // Python antwortet nur mit Geaendertem (pollControlRev) — vorher ging
           // die volle Geraeteliste und die Buehne bei JEDEM Poll mit.
@@ -395,6 +397,11 @@ export function tryChannel() {
                     }
                   }
                   if (s.viewMode !== undefined && s.viewMode !== _pVM) { _pVM = s.viewMode; setViewMode(s.viewMode); }
+                  // VIZ-71 (N3): Bildschirmwechsel kam bisher nur als Push-Signal —
+                  // nach dem Laden also nie. Jetzt auch als Poll-Zustand.
+                  if (typeof s.pixelRatio === 'number' && s.pixelRatio !== _pPR) {
+                    _pPR = s.pixelRatio; setDeviceRatio(s.pixelRatio);
+                  }
                   if (s.settings && s.settings !== _pSet) { _pSet = s.settings; applySettings(JSON.parse(s.settings)); }
                   if (s.stage && s.stage !== _pStage) { _pStage = s.stage; loadStageJson(s.stage); }
                   // Voll-Fixture-Rebuild (allFixtures): nur bei geaenderter Liste
