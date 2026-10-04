@@ -326,6 +326,18 @@ class Viz69QuelltextTest(unittest.TestCase):
         self.assertRegex(self._js("fixtures", "fixtures.js"),
                          r"(?m)^const SHADOW_SPOT_HARD_CAP = 8;")
 
+    def test_anleitung_nennt_das_dach(self):
+        """Review #930: die 3D-Anleitung erklaert das Schatten-Dach in Zahlen
+        (CDX-33) — sie muss mit dem Code mitgehen."""
+        dach = int(re.search(r"(?m)^const SHADOW_SPOT_HARD_CAP = (\d+);",
+                             self._js("fixtures", "fixtures.js")).group(1))
+        pfad = os.path.join(_REPO, "docs", "anleitung_3d_visualizer_2026",
+                            "ANLEITUNG_3D_BUEHNE.md")
+        with open(pfad, encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn(f"höchstens **{dach} Schlagschatten**", text)
+        self.assertIn(f"Ab dem **{dach + 1}. Gerät im Raum**", text)
+
 
 if __name__ == "__main__":
     unittest.main()
