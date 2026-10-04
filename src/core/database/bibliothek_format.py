@@ -828,13 +828,21 @@ def _provenance(daten: dict) -> str:
 
 
 def _hersteller(s, daten: dict):
-    from sqlalchemy import select
+    from sqlalchemy import func, select
     from .models import Manufacturer
     name = daten["hersteller"].strip()
     # ★ NUR ueber den Namen (der ist eindeutig). ``_get_or_create_mfr`` sucht
     # zuerst das Kuerzel — ein abgeleitetes Kuerzel koennte dort einen fremden
     # Hersteller treffen und das Profil still unter falschem Namen ablegen.
     m = s.execute(select(Manufacturer).where(Manufacturer.name == name)).scalar_one_or_none()
+    if m is None:
+        # ★ UI-74: dann ohne Gross/klein. „EuroLite“ neben „Eurolite“ legte
+        # einen ZWEITEN Hersteller an — in der Geraeteauswahl zwei Ordner
+        # fuer dieselbe Firma, das Geraet im falschen. Die exakte Schreibweise
+        # gewinnt (oben), sonst der aelteste Eintrag.
+        m = s.execute(select(Manufacturer)
+                      .where(func.lower(Manufacturer.name) == name.lower())
+                      .order_by(Manufacturer.id)).scalars().first()
     if m is None:
         kurz = (daten.get("hersteller_kurz") or slug(name).replace("-", "")[:8]).upper()
         m = Manufacturer(name=name, short_name=kurz[:20])
@@ -923,7 +931,7 @@ def _abgleichen(s, daten: dict) -> str:
       stuende das Geraet zweimal in der Bibliothek, und eine Show von einem
       anderen Rechner loeste mehrdeutig auf (FM-43). Die Uebernahme eines
       Builtins in eine Datei ist ein eigener Migrationsschritt."""
-    from sqlalchemy import select
+    from sqlalchemy import func, select
     from sqlalchemy.orm import selectinload
     from .models import FixtureChannel, FixtureMode, FixtureProfile, Manufacturer
     name_h, modell = daten["hersteller"].strip(), daten["modell"].strip()
@@ -933,7 +941,11 @@ def _abgleichen(s, daten: dict) -> str:
         .options(selectinload(FixtureProfile.modes)
                  .selectinload(FixtureMode.channels)
                  .selectinload(FixtureChannel.ranges))
-        .where(Manufacturer.name == name_h, FixtureProfile.name == modell)
+        # UI-74: Hersteller ohne Gross/klein — wie `_hersteller`. Sonst fand
+        # eine korrigierte Schreibweise das schon eingespielte Profil nicht
+        # wieder und legte es ein zweites Mal an.
+        .where(func.lower(Manufacturer.name) == name_h.lower(),
+               FixtureProfile.name == modell)
         .order_by(FixtureProfile.id)).scalars().all()
     if any(p.source != SOURCE_LIGHTOS for p in vorhanden):
         return "verdeckt"
@@ -941,6 +953,13 @@ def _abgleichen(s, daten: dict) -> str:
         _anlegen(s, daten, SOURCE_LIGHTOS)
         return "neu"
     prof = vorhanden[0]
+    # UI-74: stand das Profil unter einer anderen Schreibweise des Herstellers
+    # (alter Datenfehler), zieht es zum richtigen Hersteller um.
+    hersteller = _hersteller(s, daten)
+    umgezogen = prof.manufacturer_id != hersteller.id
+    if umgezogen:
+        prof.manufacturer = hersteller
+        s.flush()
     ist = _vergleichsform(prof)
     # Soll ueber DENSELBEN Weg bauen wie das Anlegen (Savepoint, danach
     # zurueckgerollt) — eine zweite Normalisierung der Datei koennte von
@@ -950,7 +969,7 @@ def _abgleichen(s, daten: dict) -> str:
     soll = _vergleichsform(_anlegen(s, daten, SOURCE_LIGHTOS))
     sp.rollback()
     if soll == ist:
-        return "gleich"
+        return "aktualisiert" if umgezogen else "gleich"
     _kopf_setzen(prof, daten)
     prof.modes.clear()          # cascade loescht Kanaele + Ranges
     s.flush()
@@ -1067,7 +1086,7 @@ def importiere(pfad_oder_daten, *, engine=None) -> int:
     Gibt die neue Profil-ID zurueck. Gibt es Hersteller + Modell schon, wird
     nichts angelegt (``ValueError``) — eine stille Dublette waere beim Laden
     einer Show genau die Mehrdeutigkeit, die FM-43 meldet."""
-    from sqlalchemy import select
+    from sqlalchemy import func, select
     from sqlalchemy.orm import Session
     from . import fixture_db
     from .models import FixtureProfile, Manufacturer
@@ -1083,7 +1102,8 @@ def importiere(pfad_oder_daten, *, engine=None) -> int:
         da = s.execute(
             select(FixtureProfile.id, FixtureProfile.source)
             .join(Manufacturer, FixtureProfile.manufacturer_id == Manufacturer.id)
-            .where(Manufacturer.name == daten["hersteller"].strip(),
+            # UI-74: Hersteller ohne Gross/klein (s. `_hersteller`).
+            .where(func.lower(Manufacturer.name) == daten["hersteller"].strip().lower(),
                    FixtureProfile.name == daten["modell"].strip())).first()
         if da is not None:
             raise ValueError(

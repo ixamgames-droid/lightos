@@ -270,6 +270,35 @@ beschrieben; Prüfung und Einspielen stehen in `src/core/database/bibliothek_for
   `builtin` auf `lightos` umstellen muss. Bis dahin liegen drei Muster unter
   `fixtures/bibliothek/_beispiele/` (werden nicht eingespielt).
 
+### Profil bearbeiten (UI-74)
+
+Ein gespeichertes Profil öffnet man über **Datenbank → „Fixture-Profil bearbeiten…“**
+(Suche nach Hersteller/Modell) oder im Patch per Rechtsklick auf ein Gerät →
+**„Profil bearbeiten…“**.
+
+- **Eigene Profile** (`source = "user"`) werden im Fixture-Editor bearbeitet und an Ort
+  und Stelle gespeichert; die Profil-ID bleibt.
+- **Mitgelieferte** (`builtin`, `lightos`) und **QLC+-Importe** (`qlcplus`) lassen sich
+  nur **ansehen** (Speichern gesperrt) oder **als eigenes Profil kopieren** — die Kopie
+  bekommt den Zusatz „(eigen)“ am Modellnamen und `source = "user"`. Grund: die nächste
+  Bibliotheks-Aktualisierung bzw. `ensure_builtins()` schriebe eine Änderung am Original
+  still zurück.
+- **Gepatchte Profile:** Der Editor baut beim Speichern alle Modi neu (neue Modus-IDs).
+  Das bricht keinen Patch — gepatchte Geräte verweisen auf `fixture_profile_id` +
+  `mode_name` (+ ihre Kanalzahl), nie auf eine Modus-ID. Brechen kann, was man im Editor
+  ändert: einen gepatchten Modus umbenennen oder löschen (das Gerät fiele still auf einen
+  anderen Modus zurück), seine Kanalzahl ändern (der Patch belegt weiter die alte Zahl
+  Adressen) oder Hersteller/Modell umbenennen (die Show trägt die alten Namen). In diesen
+  Fällen zeigt der Editor vor dem Speichern die betroffenen Geräte der geladenen Show und
+  fragt nach; Standard ist „Nein“. Andere Show-Dateien werden nicht geprüft.
+- Ein zweites Profil unter demselben Hersteller + Modell legt der Editor nicht an
+  (FM-43: mehrdeutige Auflösung beim Laden einer Show). Hersteller werden ohne
+  Groß-/Kleinschreibung wiedergefunden — „eurolite“ landet bei „Eurolite“; dasselbe gilt
+  beim Einspielen der Bibliothek.
+- Die Geräteauswahl („Gerät hinzufügen“) zeigt zum gewählten Profil eine Zeile
+  **Herkunft** (z. B. „LightOS-Bibliothek (aus QLC+, überarbeitet) · ungeprüft“);
+  „geprüft ✓“ nur bei `geprueft.ok` der Datei, Einzelheiten im Tooltip.
+
 ## 3. Modi sauber abbilden
 
 Geraete mit mehreren DMX-Modi (z. B. ZQ02001 mit 9 und 11 Kanaelen) bekommen

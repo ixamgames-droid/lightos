@@ -69,6 +69,37 @@ class BibliothekWaechterTest(unittest.TestCase):
             for l in ofl:
                 self.assertTrue((ROOT / l).is_file(), l)
 
+    def test_hersteller_je_ordner_eine_schreibweise(self):
+        """UI-74: ``eurolite/`` enthielt einmal „EuroLite“ neben „Eurolite“ —
+        in der DB wurden daraus zwei Hersteller, in der Geraeteauswahl zwei
+        Ordner fuer dieselbe Firma."""
+        je_ordner: dict[str, set] = {}
+        for pfad, d in self.daten.items():
+            ordner = os.path.relpath(os.path.dirname(pfad), BIB)
+            if ordner.startswith("_beispiele"):
+                continue
+            je_ordner.setdefault(ordner, set()).add(d["hersteller"].strip())
+        for ordner, namen in sorted(je_ordner.items()):
+            with self.subTest(ordner=ordner):
+                self.assertEqual(len(namen), 1, f"{ordner}/: {sorted(namen)}")
+
+    def test_hersteller_bibliotheksweit_eine_schreibweise(self):
+        """UI-74: dieselbe Firma (ohne Gross/klein) heisst ueberall gleich —
+        auch ``hersteller_kurz`` je Hersteller einheitlich."""
+        namen: dict[str, set] = {}
+        kurz: dict[str, set] = {}
+        for d in self.daten.values():
+            h = d["hersteller"].strip()
+            namen.setdefault(h.lower(), set()).add(h)
+            if d.get("hersteller_kurz"):
+                kurz.setdefault(h, set()).add(d["hersteller_kurz"])
+        for schluessel, varianten in sorted(namen.items()):
+            with self.subTest(hersteller=schluessel):
+                self.assertEqual(len(varianten), 1, sorted(varianten))
+        for h, varianten in sorted(kurz.items()):
+            with self.subTest(hersteller_kurz=h):
+                self.assertEqual(len(varianten), 1, sorted(varianten))
+
     def test_schema_kopf_erklaert_quellen_und_herkunftspflicht(self):
         text = SCHEMA.read_text(encoding="utf-8")
         kopf = text.split("\n## ", 1)[0]

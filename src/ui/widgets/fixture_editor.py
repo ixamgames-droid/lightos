@@ -11,8 +11,9 @@ from PySide6.QtWidgets import (
     QDialogButtonBox, QTabWidget, QWidget,
 )
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QBrush, QColor
 from sqlalchemy.orm import Session
-from sqlalchemy import select, delete
+from sqlalchemy import func, select, delete
 from src.core.database.fixture_db import engine, segment_wert
 from src.core.database.models import (
     Manufacturer, FixtureProfile, FixtureMode, FixtureChannel, ChannelRange,
@@ -54,6 +55,72 @@ CHANNEL_COLS = ["#", "Name", "Attribut", "Default", "Highlight", "Weiß-Segment"
 SEGMENT_COL = 5
 #: Anzeige fuer „keine Zuordnung" in der Segment-Auswahl.
 KEIN_SEGMENT = "—"
+#: UI-74: Hintergrund der gesperrten (grauen) Segment-Zellen. Fest der
+#: Fensterton des dunklen Themes (``bgMedium`` in assets/themes/dark.qss) —
+#: NICHT ``palette().window()``: Zeilen, die gebaut werden, bevor das Widget
+#: sichtbar und vom Stylesheet poliert ist, bekamen dort noch die helle
+#: Standardpalette und leuchteten in der dunklen Tabelle weiss auf.
+LEERZELLE_FARBE = "#333333"
+
+
+def leerzelle_hintergrund() -> QBrush:
+    """UI-74: Pinsel der gesperrten Segment-Zellen — fuer Editor UND Generator."""
+    return QBrush(QColor(LEERZELLE_FARBE))
+
+
+def profil_patch_folgen(fixture_id, gepatchte, modi_neu, *,
+                        name_alt: tuple[str, str] | None = None,
+                        name_neu: tuple[str, str] | None = None) -> list[str]:
+    """UI-74: Was das Speichern eines BEARBEITETEN Profils an den Geraeten der
+    geladenen Show aendert — eine Zeile je Befund, leer = nichts betroffen.
+
+    ★ Gepatchte Geraete haengen an **Profil-ID + Modusname** (dazu ihre
+    gespeicherte Kanalzahl), nie an einer Modus-ID. Dass ``_save`` die Modi
+    loescht und neu anlegt (FM-23) — neue Modus-IDs —, bricht sie also NICHT.
+    Brechen kann, was der Mensch im Editor aendert:
+
+    * ein Modus wird umbenannt oder geloescht -> ``_resolve_mode`` faellt still
+      auf einen anderen Modus zurueck (gleiche Kanalzahl oder den ersten);
+    * die Kanalzahl eines gepatchten Modus aendert sich -> der Patch belegt
+      weiter die alte Zahl Adressen, die Kanaele dahinter laufen in das
+      naechste Geraet oder fehlen;
+    * Hersteller/Modell werden umbenannt -> die Show-Datei traegt die alten
+      Namen und meldet beim naechsten Laden ein „anderes Geraet“ (FM-43).
+
+    ``gepatchte``: PatchedFixtures (``fixture_profile_id``, ``mode_name``,
+    ``channel_count``, ``label``); ``modi_neu``: ``[(name, kanalzahl), ...]``."""
+    if fixture_id is None:
+        return []
+    betroffen = [f for f in (gepatchte or [])
+                 if getattr(f, "fixture_profile_id", None) == fixture_id]
+    if not betroffen:
+        return []
+    neu = {str(n): int(k) for n, k in modi_neu}
+    out: list[str] = []
+    for f in betroffen:
+        label = getattr(f, "label", "") or f"Gerät {getattr(f, 'fid', '?')}"
+        modus = getattr(f, "mode_name", "") or ""
+        if modus not in neu:
+            out.append(f"„{label}“: Modus „{modus}“ gibt es nicht mehr — das "
+                       f"Gerät liefe still mit einem anderen Modus.")
+        elif int(getattr(f, "channel_count", 0) or 0) != neu[modus]:
+            out.append(f"„{label}“: Modus „{modus}“ hat jetzt {neu[modus]} statt "
+                       f"{int(getattr(f, 'channel_count', 0) or 0)} Kanäle — "
+                       f"Adressen und Überlappungen im Patch prüfen.")
+    if name_alt and name_neu and tuple(name_alt) != tuple(name_neu):
+        out.append(f"Hersteller/Modell geändert ({' / '.join(name_alt)} → "
+                   f"{' / '.join(name_neu)}): {len(betroffen)} gepatchte(s) Gerät(e) "
+                   f"tragen in der Show noch den alten Namen.")
+    return out
+
+
+def _gepatchte_geraete() -> list:
+    """Gepatchte Geraete der geladenen Show — leer, wenn es keinen AppState gibt."""
+    try:
+        from src.core.app_state import get_state
+        return list(get_state().get_patched_fixtures())
+    except Exception:
+        return []
 
 
 def frage_vorschlag_ueberschreiben(parent, abweichend: list[int]) -> bool | None:
@@ -329,7 +396,7 @@ class _ModeTab(QWidget):
                 self._tbl.removeCellWidget(i, SEGMENT_COL)
                 it = QTableWidgetItem("")
                 it.setFlags(Qt.ItemFlag.NoItemFlags)
-                it.setBackground(self.palette().window())
+                it.setBackground(leerzelle_hintergrund())
                 self._tbl.setItem(i, SEGMENT_COL, it)
         self._update_segment_hinweis()
 
@@ -448,11 +515,21 @@ class _ModeTab(QWidget):
 class FixtureEditorDialog(QDialog):
     """Erstellt ein neues Fixture-Profil mit Modes/Channels in der DB."""
 
-    def __init__(self, parent=None, fixture_id: int | None = None):
+    def __init__(self, parent=None, fixture_id: int | None = None, *,
+                 nur_ansehen: bool = False, als_kopie: bool = False):
         super().__init__(parent)
         self.setWindowTitle("Fixture Editor")
         self.setMinimumSize(720, 560)
         self._fixture_id = fixture_id   # None = neu, sonst bearbeiten
+        # UI-74: mitgelieferte Profile (builtin/lightos) und QLC+-Importe
+        # werden NICHT an Ort und Stelle bearbeitet — die naechste
+        # Bibliotheks-Aktualisierung ueberschriebe die Aenderung. Sie lassen
+        # sich ansehen (Speichern gesperrt) oder als eigenes Profil kopieren
+        # (gleicher Inhalt, neues Profil mit source="user").
+        self._nur_ansehen = bool(nur_ansehen)
+        self._als_kopie = bool(als_kopie)
+        #: (Hersteller, Modell) wie geladen — fuer die Patch-Folgen beim Speichern.
+        self._name_geladen: tuple[str, str] | None = None
         # ★ FM-36: das Ergebnisfeld existiert ab hier — vorher legte es
         # ausschliesslich `_save()` an, und jeder Zugriff nach einem
         # ABGEBROCHENEN Dialog warf einen AttributeError statt None zu geben.
@@ -466,6 +543,22 @@ class FixtureEditorDialog(QDialog):
         self._setup_ui()
         if self._fixture_id is not None:
             self._load_existing()
+            if self._als_kopie:
+                # Die Kopie ist ein NEUES Profil: ohne ID speichert `_save`
+                # ein eigenes daneben. Der Modellname bekommt einen Zusatz,
+                # sonst stuende dasselbe Geraet zweimal in der Bibliothek
+                # (FM-43: mehrdeutige Aufloesung beim Laden einer Show).
+                self._fixture_id = None
+                self._name_geladen = None
+                self._edit_name.setText(f"{self._edit_name.text()} (eigen)")
+                self.setWindowTitle("Fixture Editor — Kopie als eigenes Profil")
+            elif self._nur_ansehen:
+                self.setWindowTitle("Fixture Editor — nur ansehen "
+                                    "(mitgeliefertes Profil)")
+                self._btn_save.setEnabled(False)
+                self._btn_save.setToolTip(
+                    "Mitgelieferte und importierte Profile werden nicht "
+                    "überschrieben — „Als eigenes Profil kopieren“ nutzen.")
         else:
             # Mit einem Default-Mode starten
             self._add_mode(name="Default")
@@ -542,6 +635,7 @@ class FixtureEditorDialog(QDialog):
             QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
         btn_box.accepted.connect(self._save)
         btn_box.rejected.connect(self.reject)
+        self._btn_save = btn_box.button(QDialogButtonBox.StandardButton.Save)
         root.addWidget(btn_box)
 
     # ── FM-30: `Return` speichert nicht mehr das ganze Profil ────────────
@@ -768,6 +862,7 @@ class FixtureEditorDialog(QDialog):
             ).scalar_one_or_none()
             self._cb_manufacturer.setCurrentText(mfr.name if mfr else "")
             self._edit_name.setText(profile.name)
+            self._name_geladen = (mfr.name if mfr else "", profile.name)
             self._edit_short.setText(profile.short_name)
             self._cb_type.setCurrentText(profile.fixture_type)
             self._spin_power.setValue(profile.power_w)
@@ -837,10 +932,55 @@ class FixtureEditorDialog(QDialog):
                 return
             modes_data.append((mname, chans, description, grid, weiss))
 
+        if self._nur_ansehen and self._fixture_id is not None:
+            # UI-74: zweiter Riegel neben dem gesperrten Knopf.
+            return
+
+        # UI-74: kein zweites Profil unter demselben Hersteller + Modell —
+        # beim Laden einer Show waere die Aufloesung mehrdeutig (FM-43).
+        with Session(engine()) as s:
+            gleich = s.execute(
+                select(FixtureProfile.id)
+                .join(Manufacturer, FixtureProfile.manufacturer_id == Manufacturer.id)
+                .where(func.lower(Manufacturer.name) == mfr_name.lower(),
+                       FixtureProfile.name == name)
+            ).scalars().all()
+        if any(pid != self._fixture_id for pid in gleich):
+            QMessageBox.warning(
+                self, "Speichern",
+                f"„{mfr_name} / {name}“ steht schon in der Bibliothek. Bitte "
+                f"einen anderen Modellnamen wählen.")
+            return
+
+        # UI-74: Folgen fuer gepatchte Geraete der geladenen Show — Warnung
+        # mit Rueckfrage statt stiller Beschaedigung (s. profil_patch_folgen).
+        folgen = profil_patch_folgen(
+            self._fixture_id, _gepatchte_geraete(),
+            [(m[0], len(m[1])) for m in modes_data],
+            name_alt=self._name_geladen, name_neu=(mfr_name, name))
+        if folgen:
+            antwort = QMessageBox.question(
+                self, "Profil ist gepatcht",
+                "Dieses Profil ist in der geladenen Show gepatcht. Speichern "
+                "ändert diese Geräte:\n\n• " + "\n• ".join(folgen[:12])
+                + (f"\n… und {len(folgen) - 12} weitere" if len(folgen) > 12 else "")
+                + "\n\nAndere Show-Dateien werden nicht geprüft.\n\n"
+                "Trotzdem speichern?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No)
+            if antwort != QMessageBox.StandardButton.Yes:
+                return
+
         with Session(engine()) as s:
             # Manufacturer get-or-create
             mfr = s.execute(select(Manufacturer).where(
                 Manufacturer.name == mfr_name)).scalar_one_or_none()
+            if not mfr:
+                # UI-74: „eurolite“ getippt -> der vorhandene „Eurolite“, kein
+                # zweiter Hersteller nur wegen der Schreibweise.
+                mfr = s.execute(select(Manufacturer).where(
+                    func.lower(Manufacturer.name) == mfr_name.lower())
+                    .order_by(Manufacturer.id)).scalars().first()
             if not mfr:
                 mfr = Manufacturer(name=mfr_name, short_name=mfr_name[:8].upper())
                 s.add(mfr)

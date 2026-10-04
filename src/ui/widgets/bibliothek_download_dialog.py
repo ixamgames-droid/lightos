@@ -27,6 +27,12 @@ from PySide6.QtWidgets import (QDialog, QHBoxLayout, QLabel, QProgressBar,
 
 from src.core.database import bibliothek_download as BD
 
+#: UI-74: Linkfarbe fuer das dunkle Theme — dieselbe wie die Links im
+#: BPM-Manager. Ohne sie zeichnete Qt den Link in der Palettenfarbe
+#: ``Link`` (dunkelblau), die das Stylesheet nicht erreicht: auf dem dunklen
+#: Dialoggrund kaum lesbar.
+LINK_FARBE = "#58a6ff"
+
 
 def _mb(n):
     return f"{n / 1_000_000:.1f} MB".replace(".", ",")
@@ -71,7 +77,8 @@ class BibliothekDownloadDialog(QDialog):
             knopf.toggled.connect(lambda an, q=quelle: an and self._groesse_zeigen(q))
             lay.addWidget(knopf)
             info = QLabel(
-                f'Lizenz: <a href="{quelle.lizenz_url}">{quelle.lizenz}</a>'
+                f'Lizenz: <a href="{quelle.lizenz_url}" '
+                f'style="color:{LINK_FARBE};">{quelle.lizenz}</a>'
                 + (f" — {quelle.hinweis}" if quelle.hinweis else ""))
             info.setOpenExternalLinks(True)
             info.setWordWrap(True)

@@ -40,6 +40,85 @@ def typ_anzeige(fixture_type: str | None) -> str:
 _UNIVERSE_MAX = 32
 
 
+#: UI-74: ``herkunft.art`` einer Profil-Datei -> Zusatz in der Herkunftszeile.
+_ART_ZUSATZ = {
+    "qlcplus": "aus QLC+, überarbeitet",
+    "ofl": "aus der Open Fixture Library, überarbeitet",
+    "hersteller-handbuch": "nach Herstellerhandbuch",
+    "lightos": "eigene Erstellung",
+}
+
+
+def herkunft_zeile(profil, download: dict | None = None) -> tuple[str, str]:
+    """UI-74: eine kurze Zeile „woher kommt dieses Profil, ist es geprueft?“
+    fuer die Geraeteauswahl — und ein Tooltip mit den Einzelheiten.
+
+    Quellen in dieser Reihenfolge: die gespeicherte Herkunft
+    (``FixtureProfile.herkunft``, FM-56), der Download-Nachweis
+    (``profil_herkunft``, FM-53, als ``download`` hereingereicht) und zuletzt
+    ``source``. „geprüft ✓“ steht nur, wenn die Datei ``geprueft.ok`` sagt —
+    laut SCHEMA.md heisst das: Kanal fuer Kanal am Geraet oder gegen das
+    Handbuch geprueft. Alles andere ist „ungeprüft“, auch ein Builtin."""
+    from src.core.database import bibliothek_format as BF
+    src = (getattr(profil, "source", "") or "").lower()
+    try:
+        gesp = BF.gespeicherte_herkunft(profil)
+    except Exception:
+        gesp = None
+    art = ((gesp or {}).get("herkunft") or {}).get("art", "")
+    zusatz = _ART_ZUSATZ.get(art, "")
+    if src == "lightos":
+        wer = "LightOS-Bibliothek" + (f" ({zusatz})" if zusatz else "")
+    elif src == "builtin":
+        wer = "LightOS (eingebaut)"
+    elif src == "user":
+        wer = "eigenes Profil" + (f" ({zusatz})" if zusatz and art != "lightos" else "")
+    elif src == "qlcplus":
+        if download:
+            wer = (f"QLC+-Bibliothek, heruntergeladen "
+                   f"({download.get('lizenz') or 'Lizenz unbekannt'})")
+        else:
+            wer = "QLC+-Import"
+    else:
+        wer = src or "unbekannt"
+    geprueft = bool(((gesp or {}).get("geprueft") or {}).get("ok"))
+    text = f"Herkunft: {wer} · " + ("geprüft ✓" if geprueft else "ungeprüft")
+    tipp: list[str] = []
+    if gesp:
+        titel = (gesp.get("quelle") or {}).get("titel", "")
+        if titel:
+            tipp.append(f"Quelle: {titel}")
+        lizenz = (gesp.get("herkunft") or {}).get("lizenz", "")
+        if lizenz:
+            tipp.append(f"Lizenz: {lizenz}")
+        wie = (gesp.get("geprueft") or {}).get("wie", "")
+        if wie:
+            tipp.append(f"Prüfung: {wie}")
+    elif download:
+        tipp.append(f"Quelle: {download.get('quelle', '')}")
+        tipp.append(f"Lizenz: {download.get('lizenz', '')}")
+    return text, "\n".join(t for t in tipp if t.split(": ", 1)[-1])
+
+
+def download_herkunft(fixture_id: int, eng=None) -> dict | None:
+    """UI-74: der Download-Nachweis eines Profils (FM-53) — NUR lesend.
+
+    ``bibliothek_download.herkunft_lesen`` legt die Tabelle bei Bedarf an; in
+    einer Auswahlliste darf das Anklicken eines Geraets nicht in die
+    Fixture-DB schreiben. Fehlt die Tabelle, gibt es eben keinen Nachweis."""
+    from sqlalchemy import text as _sql
+    try:
+        if eng is None:
+            eng = fdb.engine()
+        with eng.connect() as conn:
+            zeile = conn.execute(_sql(
+                "SELECT quelle, lizenz FROM profil_herkunft WHERE fixture_id = :i"),
+                {"i": int(fixture_id)}).first()
+    except Exception:
+        return None
+    return {"quelle": zeile[0], "lizenz": zeile[1]} if zeile else None
+
+
 def universum_vorschlag(fixtures) -> int:
     """UI-50: welches Universum der Patch-Dialog vorbelegen soll —
     **das Universum des zuletzt gepatchten Geraets, sonst 1.**
@@ -156,6 +235,12 @@ class FixtureBrowserDialog(QDialog):
         self._lbl_fixture = QLabel("—")
         form.addRow("Hersteller:", self._lbl_manufacturer)
         form.addRow("Gerät:", self._lbl_fixture)
+        # UI-74: Herkunft + Pruefstand des gewaehlten Profils — klein und
+        # grau, Einzelheiten im Tooltip.
+        self._lbl_herkunft = QLabel("")
+        self._lbl_herkunft.setWordWrap(True)
+        self._lbl_herkunft.setStyleSheet("color: #8b949e; font-size: 11px;")
+        form.addRow("", self._lbl_herkunft)
 
         self._combo_mode = QComboBox()
         self._combo_mode.currentIndexChanged.connect(self._on_mode_changed)
@@ -285,6 +370,9 @@ class FixtureBrowserDialog(QDialog):
             profile.manufacturer.name if profile.manufacturer else "—"
         )
         self._lbl_fixture.setText(profile.name)
+        text, tipp = herkunft_zeile(profile, download_herkunft(profile.id))
+        self._lbl_herkunft.setText(text)
+        self._lbl_herkunft.setToolTip(tipp)
         self._combo_mode.clear()
         modes = fdb.get_modes(profile.id)
         for m in modes:
