@@ -31,7 +31,9 @@ seitlich, unten und oben. Sie entstand beim Live-Durchspielen der Demo-Show
 Im Modus **Bauen** mit dem Tab **Bühne** erscheint das gelbe Banner „BÜHNE BEARBEITEN
 – Tippen=Auswählen | Ziehen=Verschieben". Unter
 **„Element hinzufügen"** stehen: Boden/Floor · Plattform · Truss (horizontal) ·
-Truss/Stütze (vertikal) · Wand · LED-Wand · Lautsprecher · Publikumsfläche · DJ-Booth.
+Truss/Stütze (vertikal) · Wand · LED-Wand · Lautsprecher · Publikumsfläche · DJ-Booth
+— und seit VIZ-68 die **Objekt-Bibliothek** für Event-Räume: Biertischgarnitur ·
+Stehtisch · Bar / Theke · Podest mit Treppe · Mischpult-Tisch (s. unten).
 
 1. **Plattform (Bühnenboden):** „**+ Plattform**" → eine Bühnenfläche erscheint mittig
    (Default 6×0,4×4 m). Sie ist sofort in der Szene sichtbar und in der Tabelle
@@ -51,6 +53,28 @@ Truss/Stütze (vertikal) · Wand · LED-Wand · Lautsprecher · Publikumsfläche
 5. **Trassen verbinden / Stützen:** „**+ Truss/Stütze (vertikal)**" für senkrechte
    Stützen (Default 4 m hoch). Über `X`/`Z` an eine Trassen-Ecke setzen (z. B. `X=-4`,
    `Z=-2`) → ergibt ein „Goalpost"-Gerüst.
+
+### Objekt-Bibliothek: Halle mit Biertischen, Bar, Podest (VIZ-68)
+
+Unter „Element hinzufügen" gibt es je Möbel einen Knopf. Die Objekte haben reale
+Standardmaße und lassen sich wie jedes Bühnenelement verschieben, drehen, in der Größe
+ändern und einfärben (nur der Korpus — Beine und Gestelle bleiben metallfarben):
+
+| Knopf | Standardmaß (B × H × T) | Hinweis |
+|---|---|---|
+| **+ Biertischgarnitur** | 2,20 × 0,76 × 1,30 m | Tisch 220 × 50 cm, zwei Bänke |
+| **+ Stehtisch** | 0,80 × 1,10 × 0,80 m | runde Platte, Säule, Fußteller |
+| **+ Bar / Theke** | 3,00 × 1,10 × 0,80 m | Gästeseite vorn (+Z) mit Fußreling; Strahler lassen sich draufstellen |
+| **+ Podest mit Treppe** | 2,00 × 0,60 × 2,80 m | Treppe vorn mittig; Strahler lassen sich draufstellen |
+| **+ Mischpult-Tisch** | 1,80 × 0,90 × 0,90 m | Tisch mit Pult-Aufsatz (FOH) |
+
+**Mehrere auf einmal:** In der Zeile **„Anzahl: Reihen × Spalten — Abstand"** z. B.
+`2 × 3`, Abstand `1,00 m` einstellen, dann **„+ Biertischgarnitur"** → sechs Garnituren
+im Raster, um den Standardplatz zentriert. Die ganze Reihe ist **ein** Undo-Schritt
+(`Strg+Z` nimmt alle zurück). Für einzelne Objekte die Anzahl wieder auf `1 × 1` stellen.
+Gespeichert wird mit der Bühne (Teil C) — Typ, Lage, Größe und Farbe bleiben erhalten.
+
+![Objekt-Bibliothek: 2 × 3 Biertischgarnituren, Bar, Podest mit Treppe, Stehtische](viz68_objekt_bibliothek.png)
 
 ## Teil B — Fixtures an die Trassen hängen (Tab „Fixtures")
 

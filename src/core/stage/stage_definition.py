@@ -27,6 +27,12 @@ SUPPORTED_TYPES = (
     "speaker",
     "audience",
     "dj_booth",
+    # VIZ-68: Objekt-Bibliothek (Event-Moebel)
+    "beer_table",     # Biertischgarnitur (Tisch + 2 Baenke)
+    "high_table",     # Stehtisch
+    "bar_counter",    # Bar / Theke
+    "riser_stairs",   # Podest mit Treppe
+    "foh_desk",       # Mischpult-Tisch (FOH)
     "support",   # Alias fuer truss_v
     "truss",     # Alias fuer truss_h
 )
@@ -36,7 +42,8 @@ SUPPORTED_TYPES = (
 # TOP:  Strahler steht OBEN drauf (Plattform, Boden, Speaker, ...).
 # Andere Typen (Waende, LED-Walls) ziehen keine Strahler an.
 DOCK_HANG_TYPES = frozenset({"truss_h", "truss_v"})
-DOCK_TOP_TYPES = frozenset({"platform", "floor", "dj_booth", "speaker", "audience"})
+DOCK_TOP_TYPES = frozenset({"platform", "floor", "dj_booth", "speaker", "audience",
+                            "bar_counter", "riser_stairs"})   # VIZ-68
 # Laenge des gedachten Clamps unter einer Trasse bzw. Sockel-Versatz auf Flaechen.
 DOCK_HANG_OFFSET = 0.25
 DOCK_TOP_OFFSET = 0.30

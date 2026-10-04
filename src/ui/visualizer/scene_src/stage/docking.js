@@ -10,7 +10,8 @@ import { _stageIdFromObject } from '../interaction/picking.js';
 import { requestRender } from '../scene/render_loop.js';  // VIZ-13 3c-2
 
 export const DOCK_HANG_TYPES = { truss_h: 1, truss_v: 1 };
-export const DOCK_TOP_TYPES  = { platform: 1, floor: 1, dj_booth: 1, speaker: 1, audience: 1 };
+export const DOCK_TOP_TYPES  = { platform: 1, floor: 1, dj_booth: 1, speaker: 1, audience: 1,
+                                  bar_counter: 1, riser_stairs: 1 };   // VIZ-68
 export const DOCK_HANG_OFFSET = 0.25;
 export const DOCK_TOP_OFFSET  = 0.30;
 const _dockRay = new THREE.Raycaster();

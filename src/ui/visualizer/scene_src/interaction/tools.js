@@ -304,7 +304,9 @@ export function updateOutlines(notify = true) {
         floor: 'BODEN',
         platform: 'PLATTFORM', truss_h: 'TRASSE (horizontal)', truss_v: 'TRASSE (vertikal)',
         wall: 'WAND', led_wall: 'LED-WAND', speaker: 'LAUTSPRECHER',
-        audience: 'PUBLIKUM', dj_booth: 'DJ-BOOTH'
+        audience: 'PUBLIKUM', dj_booth: 'DJ-BOOTH',
+        beer_table: 'BIERTISCHGARNITUR', high_table: 'STEHTISCH',
+        bar_counter: 'BAR', riser_stairs: 'PODEST MIT TREPPE', foh_desk: 'MISCHPULT-TISCH'
       };
       const nm = so.data.name || '';
       const tp = typeLabels[so.data.type] || String(so.data.type || '').toUpperCase();
