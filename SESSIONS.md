@@ -66,6 +66,7 @@
 | UI-74 | A | fix/ui74-profile-bearbeiten | 2026-10-04T17:07Z | src/ui/widgets/fixture_editor.py · src/ui/widgets/bibliothek_download_dialog.py · fixtures/bibliothek/eurolite |
 | VIZ-67 | A | docs/viz67-import-objekte | 2026-10-04T17:26Z | BACKLOG.md |
 | OUT-61 | B | fix/out61-estop-lade-fenster | 2026-10-04T17:33Z | src/core/dmx/output_manager.py · tests/test_out61_estop_lade_fenster.py · BACKLOG.md |
+| OUT-61-FOLGE | B | fix/out61-folge-atomar | 2026-10-04T17:41Z | src/core/dmx/output_manager.py |
 
 ## Blocker & Fallen
 
@@ -168,7 +169,6 @@
 
 ## Verlauf
 
-- 2026-10-02T22:03Z B done FUNKTIONSTEST-B3
 - 2026-10-02T22:08Z A claim SAMMEL-DOKU-C
 - 2026-10-02T22:11Z B done BPM-21
 - 2026-10-02T22:17Z B claim OUT-59
@@ -198,3 +198,4 @@
 - 2026-10-04T17:26Z A claim VIZ-67
 - 2026-10-04T17:33Z B claim OUT-61
 - 2026-10-04T17:40Z C done OUT-58
+- 2026-10-04T17:41Z B claim OUT-61-FOLGE
