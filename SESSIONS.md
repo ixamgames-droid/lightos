@@ -67,7 +67,6 @@
 | VIZ-67 | A | docs/viz67-import-objekte | 2026-10-04T17:26Z | BACKLOG.md |
 | OUT-61 | B | fix/out61-estop-lade-fenster | 2026-10-04T17:33Z | src/core/dmx/output_manager.py · tests/test_out61_estop_lade_fenster.py · BACKLOG.md |
 | OUT-61-FOLGE | B | fix/out61-folge-atomar | 2026-10-04T17:41Z | src/core/dmx/output_manager.py |
-| VIZ-PERF-B | B | - | 2026-10-04T17:46Z | - |
 
 ## Blocker & Fallen
 
@@ -171,7 +170,6 @@
 
 ## Verlauf
 
-- 2026-10-02T22:11Z B done BPM-21
 - 2026-10-02T22:17Z B claim OUT-59
 - 2026-10-02T22:17Z B claim OUT-60
 - 2026-10-02T22:21Z B uebergeben OUT-60
@@ -201,3 +199,4 @@
 - 2026-10-04T17:40Z C done OUT-58
 - 2026-10-04T17:41Z B claim OUT-61-FOLGE
 - 2026-10-04T17:46Z B claim VIZ-PERF-B
+- 2026-10-04T17:54Z B done VIZ-PERF-B
