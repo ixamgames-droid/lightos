@@ -361,11 +361,19 @@ export function tryChannel() {
           let _pEM = null, _pVM = null, _pSet = null, _pStage = null, _pFix = null, _pSel = null;
           let _pPlace = null;   // VIZ-14: Zahl offener Platzierungen
           let _pBeamsOff = null;   // VIZ-15 (JSON-Signatur, s. Poll unten)
+          // VIZ-71 (S5): zuletzt gesehene Revisionen je Zustands-Schluessel.
+          // Python antwortet nur mit Geaendertem (pollControlRev) — vorher ging
+          // die volle Geraeteliste und die Buehne bei JEDEM Poll mit.
+          const _revs = {};
+          const _abfragen = (cb) => (bridge.pollControlRev
+            ? bridge.pollControlRev(JSON.stringify(_revs), cb)
+            : bridge.pollControl(cb));
           setInterval(function(){
             try {
-              bridge.pollControl(function(js){
+              _abfragen(function(js){
                 try {
                   const s = JSON.parse(js);
+                  if (s._rev) Object.assign(_revs, s._rev);
                   // Idempotente Zustaende: nur bei Aenderung anwenden.
                   if (s.editMode !== undefined && s.editMode !== _pEM) { _pEM = s.editMode; setEditMode(s.editMode); }
                   // VIZ-14: wie viele Geraete warten auf einen Platz? Steuert

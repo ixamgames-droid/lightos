@@ -507,5 +507,65 @@ class ResyncTest(_TestBasis):
         self.assertEqual(_St.zugriffe, 1, "visualizer_positions in der Schleife gelesen (O(n^2))")
 
 
+# ── S5: schlanke pollControl per Revisionen (T5) ──────────────────────────────
+class PollRevisionTest(unittest.TestCase):
+    def setUp(self):
+        from src.core.app_state import get_state
+        from src.core.show.show_file import reset_show
+        import src.ui.visualizer.visualizer_window as VW
+        reset_show()
+        self.b = VW.VisualizerBridge(get_state())
+        self.b._poll_set("fixtures", json.dumps([{"fid": i, "label": "x" * 200}
+                                                 for i in range(40)]))
+        self.b._poll_set("stage", json.dumps({"elements": ["e" * 100] * 20}))
+        self.b.push_settings({"beamOpacity": 0.4, "showCones": True})
+        self.b._poll_events.clear()
+
+    def tearDown(self):
+        self.b.dispose()
+
+    def _poll(self, revs):
+        return self.b.pollControlRev(json.dumps(revs))
+
+    def test_zweiter_poll_ohne_aenderung_ist_schlank(self):
+        erst = json.loads(self._poll({}))
+        for k in ("fixtures", "stage", "settings", "editMode", "viewMode"):
+            self.assertIn(k, erst, "eine frische Seite bekommt alles")
+        revs = erst["_rev"]
+        zweit_roh = self._poll(revs)
+        zweit = json.loads(zweit_roh)
+        for k in ("fixtures", "stage", "settings"):
+            self.assertNotIn(k, zweit, f"{k} ging ohne Aenderung erneut mit")
+        self.assertLess(len(zweit_roh), 1024, "Leerlauf-Poll muss unter 1 KB bleiben")
+
+    def test_nur_der_geaenderte_schluessel_kommt(self):
+        revs = json.loads(self._poll({}))["_rev"]
+        self.b.push_settings({"beamOpacity": 0.9})
+        out = json.loads(self._poll(revs))
+        self.assertIn("settings", out)
+        self.assertNotIn("fixtures", out)
+        self.assertEqual(set(out["_rev"]), {"settings"})
+
+    def test_gleicher_wert_erhoeht_die_revision_nicht(self):
+        revs = json.loads(self._poll({}))["_rev"]
+        self.b._poll_set("fixtures", self.b._poll_state["fixtures"])
+        self.assertNotIn("fixtures", json.loads(self._poll(revs)))
+
+    def test_events_und_dmx_wie_bisher(self):
+        revs = json.loads(self._poll({}))["_rev"]
+        self.b.cameraReset.emit()
+        self.b._poll_merge_entries([(7, {"fid": 1, "r": 1})])
+        out = json.loads(self._poll(revs))
+        self.assertEqual(out["events"], [{"t": "cameraReset"}])
+        self.assertEqual(json.loads(out["dmx"]), [{"fid": 1, "r": 1}])
+        self.assertEqual(out["dmxSeq"], [7])
+        self.assertNotIn("events", json.loads(self._poll(revs)), "Events nur einmal")
+
+    def test_alter_poll_bleibt_vollstaendig(self):
+        out = json.loads(self.b.pollControl())
+        self.assertIn("fixtures", out)
+        self.assertIn("settings", out)
+
+
 if __name__ == "__main__":
     unittest.main()

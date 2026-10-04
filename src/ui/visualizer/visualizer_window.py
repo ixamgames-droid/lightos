@@ -760,6 +760,11 @@ class VisualizerBridge(QObject):
                             "placeable": 0,
                             # VIZ-15: fids mit ausgeblendetem Lichtkegel.
                             "beamsOff": []}
+        # VIZ-71 (S5): Revision je Zustands-Schluessel. ``pollControlRev``
+        # liefert nur Schluessel, deren Revision die Seite noch nicht kennt —
+        # vorher ging die volle Geraeteliste (~18 KB) und die Buehne mit JEDEM
+        # Poll mit, achtmal je Sekunde.
+        self._poll_rev = {k: 1 for k in self._poll_state}
         self._poll_events = []      # [dict]  Einmal-Events (Kamera/Transform/Stage)
         # A3D-04: pro fid GEMERGTER dmx-Puffer {fid: payload}, NICHT nur der letzte
         # Batch. Der VisualizerService pusht DIFFERENTIELL (nur geaenderte Fixtures)
@@ -851,7 +856,13 @@ class VisualizerBridge(QObject):
             pass
 
     def _poll_set(self, key, value):
-        """Steuer-Zustand fuer den naechsten Poll vormerken."""
+        """Steuer-Zustand fuer den naechsten Poll vormerken.
+
+        VIZ-71: die Revision steigt NUR bei geaendertem Wert — ein erneutes
+        ``requestFixtures`` mit derselben Liste schickt nichts Neues."""
+        revs = self.__dict__.setdefault("_poll_rev", {})
+        if key not in self._poll_state or self._poll_state[key] != value:
+            revs[key] = revs.get(key, 0) + 1
         self._poll_state[key] = value
 
     def _poll_event(self, ev: dict):
@@ -950,6 +961,41 @@ class VisualizerBridge(QObject):
         letzten DMX-Batch als RUECKGABEWERT zurueck. Der einzige zuverlaessige
         Python->JS-Weg an die Post-Load-Seite (s. __init__-Kommentar)."""
         out = dict(self._poll_state)
+        if self._poll_events:
+            out["events"] = self._poll_events
+            self._poll_events = []
+        VisualizerBridge._poll_take_dmx(self, out)
+        try:
+            return json.dumps(out)
+        except Exception:
+            return "{}"
+
+    @Slot(str, result=str)
+    @_bridge_slot_guard
+    def pollControlRev(self, revs_json: str) -> str:
+        """VIZ-71 (S5): wie :meth:`pollControl`, aber nur GEAENDERTER Zustand.
+
+        JS schickt die zuletzt gesehenen Revisionen (``{"fixtures": 3, ...}``);
+        geantwortet wird mit den Schluesseln, deren Revision abweicht, plus
+        ``_rev`` mit deren aktuellen Revisionen. Eine frische Seite startet mit
+        ``{}`` und bekommt alles. Events und DMX wie bisher (Einmal-Lieferung).
+        ``pollControl()`` bleibt fuer Alt-Seiten und Tests."""
+        try:
+            gesehen = json.loads(revs_json or "{}")
+        except (TypeError, ValueError):
+            gesehen = {}
+        if not isinstance(gesehen, dict):
+            gesehen = {}
+        revs = self.__dict__.setdefault("_poll_rev", {})
+        out: dict = {}
+        neu: dict = {}
+        for key, value in self._poll_state.items():
+            rev = revs.get(key, 0)
+            if gesehen.get(key) != rev:
+                out[key] = value
+                neu[key] = rev
+        if neu:
+            out["_rev"] = neu
         if self._poll_events:
             out["events"] = self._poll_events
             self._poll_events = []
