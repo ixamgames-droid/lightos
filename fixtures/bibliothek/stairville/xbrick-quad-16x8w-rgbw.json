@@ -15,14 +15,13 @@
     "lizenz": "Apache-2.0",
     "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.3 GIT · Henrik Bauer, Jannis Achstetter",
     "original": "resources/fixtures/Stairville/Stairville-xBrick-Quad-16x8W-RGBW.qxf",
-    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 41 Wertebereiche mit Art (kind) versehen; Rasterform in 5 Modus/Modi aus <Physical> uebernommen; Modusnamen 4-/6-/8-/16-/18-Kanal; Strobe-Kanaele als strobe (reine Strobe-Staerke 0–100 %, kein Offen-/Zu-Bereich laut Handbuch) statt shutter; 8-Kanal: falsche Art color an den Farbvorgabe-Bereichen entfernt (Makrokanal), Programmbereiche benannt, Musik art sound; 8-Kanal: Hinweis 'nur bei Kanal 7 = 5–233' an Dimmer/Strobe, Kanal 8 als effect_speed; 16/18-Kanal: Kanaele je Segment benannt; Kanal-/Bereichsnamen deutsch; Kurzname; hersteller_kurz STAIR; Quelle auf Herstellerhandbuch gesetzt"
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 41 Wertebereiche mit Art (kind) versehen; Rasterform in 2 Modus/Modi aus <Physical> uebernommen; in 3 weiteren Modus/Modi nicht, weil sie nicht zu den color_r-Kanaelen passt (keine echten Farbzonen); Modusnamen 4-/6-/8-/16-/18-Kanal; Strobe-Kanaele als strobe (reine Strobe-Staerke 0–100 %, kein Offen-/Zu-Bereich laut Handbuch) statt shutter; 8-Kanal: falsche Art color an den Farbvorgabe-Bereichen entfernt (Makrokanal), Programmbereiche benannt, Musik art sound; 8-Kanal: Hinweis 'nur bei Kanal 7 = 5–233' an Dimmer/Strobe, Kanal 8 als effect_speed; 16/18-Kanal: Kanaele je Segment benannt; Kanal-/Bereichsnamen deutsch; Kurzname; hersteller_kurz STAIR; Quelle auf Herstellerhandbuch gesetzt"
   },
   "autor": "LightOS",
   "geprueft": {"ok": true, "wie": "Kanal fuer Kanal gegen das Handbuch (Kap. 7.4.1–7.4.5, 4/6/8/16/18 Kanaele) geprueft"},
   "modi": [
     {
       "name": "4-Kanal",
-      "raster": {"rows": 1, "cols": 4},
       "kanaele": [
         {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
         {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
@@ -32,7 +31,6 @@
     },
     {
       "name": "6-Kanal",
-      "raster": {"rows": 1, "cols": 4},
       "kanaele": [
         {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
         {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
@@ -60,7 +58,6 @@
     },
     {
       "name": "8-Kanal",
-      "raster": {"rows": 1, "cols": 4},
       "kanaele": [
         {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
         {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},

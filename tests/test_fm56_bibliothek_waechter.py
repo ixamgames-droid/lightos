@@ -82,6 +82,46 @@ class BibliothekWaechterTest(unittest.TestCase):
         for name in list(BF.ATTRIBUTE) + list(BF.TYPEN) + [a for a in BF.RANGE_ARTEN if a]:
             self.assertIn(f"`{name}`", text, name)
 
+    def test_raster_nur_bei_echten_farbzonen(self):
+        """FM-61 (Review): ein ``raster`` behauptet ``rows*cols`` Farbzonen —
+        das muss der Zahl der ``color_r``-Kanaele des Modus entsprechen. Ein
+        Hydrabeam-Modus mit EINER gemeinsamen RGBW-Bank und Raster 1x3 zeigte
+        im 3D drei Zonen, von denen nur die erste Farbe bekam.
+
+        Warum ``test_viz50a_panel_geometrie`` das nicht fing: seine frische
+        Library kommt aus ``_seed`` und enthaelt nur die Builtins; die Dateien
+        hier spielt erst ``ensure_builtins`` ein. Darum die Pruefung direkt auf
+        den Dateien."""
+        geprueft = 0
+        for pfad, d in self.daten.items():
+            for m in d.get("modi", ()):
+                r = m.get("raster")
+                if not r:
+                    continue
+                geprueft += 1
+                zonen = sum(1 for c in m["kanaele"] if c.get("attribut") == "color_r")
+                with self.subTest(pfad=os.path.relpath(pfad, ROOT), modus=m["name"]):
+                    self.assertEqual(
+                        r["rows"] * r["cols"], zonen,
+                        f"Raster {r['rows']}x{r['cols']} passt nicht zu {zonen} "
+                        f"color_r-Kanaelen — ohne echte Farbzonen kein raster")
+        self.assertGreater(geprueft, 0, "kein Modus mit raster — Waechter leer")
+
+    def test_kanalzahl_im_modusnamen_stimmt(self):
+        """FM-61 (Review): ein Modus, der eine Kanalzahl im Namen traegt
+        („16 channel“, „26-CH“, „8-Kanal“), muss genau so viele Kanaele haben."""
+        muster = re.compile(r"^\s*(\d+)\s*-?\s*(?:ch|channels?|kanal|kanäle)\b", re.I)
+        geprueft = 0
+        for pfad, d in self.daten.items():
+            for m in d.get("modi", ()):
+                treffer = muster.match(m["name"])
+                if not treffer:
+                    continue
+                geprueft += 1
+                with self.subTest(pfad=os.path.relpath(pfad, ROOT), modus=m["name"]):
+                    self.assertEqual(int(treffer.group(1)), len(m["kanaele"]))
+        self.assertGreater(geprueft, 0)
+
     def test_beispiele_entsprechen_dem_code_stand(self):
         """Die Muster sind aus eingebauten Profilen konvertiert. Aendert sich das
         Builtin, faellt das hier auf — neu erzeugen mit

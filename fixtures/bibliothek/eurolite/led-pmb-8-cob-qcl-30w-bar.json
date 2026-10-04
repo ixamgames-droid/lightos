@@ -15,7 +15,7 @@
     "lizenz": "Apache-2.0",
     "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.2.2 GIT · saimyx",
     "original": "resources/fixtures/Eurolite/Eurolite-LED-PMB-8-COB-QCL-30W-Bar.qxf",
-    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 244 Wertebereiche mit Art (kind) versehen; Rasterform in 7 Modus/Modi aus <Physical> uebernommen; Farbvoreinstellungen: 'Full ON' als 'open' (volles Weiss); Sound/Strobe-Kanal (6-Kanal): 0 und 6-10 als 'open'; Strobe-Defaults 0 (offen)"
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 244 Wertebereiche mit Art (kind) versehen; Rasterform in 2 Modus/Modi aus <Physical> uebernommen; in 5 weiteren Modus/Modi nicht, weil sie nicht zu den color_r-Kanaelen passt (keine echten Farbzonen); Farbvoreinstellungen: 'Full ON' als 'open' (volles Weiss); Sound/Strobe-Kanal (6-Kanal): 0 und 6-10 als 'open'; Strobe-Defaults 0 (offen)"
   },
   "autor": "LightOS",
   "geprueft": {
@@ -25,7 +25,6 @@
   "modi": [
     {
       "name": "3 Channel",
-      "raster": {"rows": 1, "cols": 8},
       "kanaele": [
         {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
         {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
@@ -34,7 +33,6 @@
     },
     {
       "name": "4 Channel",
-      "raster": {"rows": 1, "cols": 8},
       "kanaele": [
         {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
         {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
@@ -44,7 +42,6 @@
     },
     {
       "name": "5 Channel",
-      "raster": {"rows": 1, "cols": 8},
       "kanaele": [
         {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
         {
@@ -123,7 +120,6 @@
     },
     {
       "name": "6 Channel",
-      "raster": {"rows": 1, "cols": 8},
       "kanaele": [
         {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
         {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
@@ -146,7 +142,6 @@
     },
     {
       "name": "12 Channel",
-      "raster": {"rows": 1, "cols": 8},
       "kanaele": [
         {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
         {

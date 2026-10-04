@@ -16,7 +16,7 @@
     "lizenz": "Apache-2.0",
     "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.13.0 GIT · Stefan Lohmann",
     "original": "resources/fixtures/Varytec/Varytec-Blitz-Bar-240.qxf",
-    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 188 Wertebereiche mit Art (kind) versehen; Rasterform in 3 Modus/Modi aus <Physical> uebernommen; gegen Herstellerhandbuch r3 (2023-08-22) abgeglichen; Kanal- und Bereichsnamen deutsch; typ led_bar → strobe; 232-Kanal-Modus: Kanal „Green 2“ von raw auf color_g korrigiert, Raster 2 × 32 (64 RGB-Pixel) + eigene Weiß-Leiste (weiss 1 × 0, 40 Segmente) statt 3 × 32; 8-Kanal: Kanal 4 von shutter auf strobe; 14-Kanal: Strobe Weiß 0–8 als open (Default 0), RGB-Strobe von shutter auf strobe, Hintergrundfarben von color_r/g/b auf raw (nur Show-Hintergrund, keine zweite Farbmischung), Laufrichtung von macro auf raw, Show-Tempi von speed auf effect_speed; RGB-Show-Raster wie QLC+ (Handbuch lässt Zwischenwerte aus, Show 59 = 241–243); überflüssige Einzelbereiche an Farbkanälen entfernt; Kurzname, Notizen"
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 188 Wertebereiche mit Art (kind) versehen; Rasterform in 1 Modus/Modi aus <Physical> uebernommen; in 2 weiteren Modus/Modi nicht, weil sie nicht zu den color_r-Kanaelen passt (keine echten Farbzonen); gegen Herstellerhandbuch r3 (2023-08-22) abgeglichen; Kanal- und Bereichsnamen deutsch; typ led_bar → strobe; 232-Kanal-Modus: Kanal „Green 2“ von raw auf color_g korrigiert, Raster 2 × 32 (64 RGB-Pixel) + eigene Weiß-Leiste (weiss 1 × 0, 40 Segmente) statt 3 × 32; 8-Kanal: Kanal 4 von shutter auf strobe; 14-Kanal: Strobe Weiß 0–8 als open (Default 0), RGB-Strobe von shutter auf strobe, Hintergrundfarben von color_r/g/b auf raw (nur Show-Hintergrund, keine zweite Farbmischung), Laufrichtung von macro auf raw, Show-Tempi von speed auf effect_speed; RGB-Show-Raster wie QLC+ (Handbuch lässt Zwischenwerte aus, Show 59 = 241–243); überflüssige Einzelbereiche an Farbkanälen entfernt; Kurzname, Notizen"
   },
   "autor": "LightOS (QXF-Konverter, nachbearbeitet FM-57)",
   "geprueft": {
@@ -265,7 +265,6 @@
     },
     {
       "name": "8 Channel",
-      "raster": {"rows": 2, "cols": 32},
       "kanaele": [
         {"name": "Ambient Rot", "attribut": "color_r", "default": 0, "highlight": 255},
         {"name": "Ambient Grün", "attribut": "color_g", "default": 0, "highlight": 255},
@@ -377,7 +376,6 @@
     },
     {
       "name": "14 Channel",
-      "raster": {"rows": 2, "cols": 32},
       "weiss": {"rows": 1, "cols": 0},
       "kanaele": [
         {"name": "Ambient Rot", "attribut": "color_r", "default": 0, "highlight": 255},

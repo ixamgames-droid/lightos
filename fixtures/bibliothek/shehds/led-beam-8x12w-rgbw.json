@@ -15,7 +15,7 @@
     "lizenz": "Apache-2.0",
     "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.14.2 GIT · Maurizio",
     "original": "resources/fixtures/Shehds/Shehds-LED-Beam-8x12W-RGBW.qxf",
-    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 50 Wertebereiche mit Art (kind) versehen; Rasterform in 2 Modus/Modi aus <Physical> uebernommen; LightOS-Nachbearbeitung (FM-57): kurzname SH-BAR8X12; Bereichs-Arten korrigiert (u. a. „Preset“ nicht als Reset, Farben/Offen auf Farbrad, Open/Shake/Rotation auf Goborad, Prisma/Frost, keine Farb-/Dreh-Kacheln auf Makro-/Speed-Kanaelen, Sound-Bereiche); Programm-/Effekt-Geschwindigkeiten als effect_speed statt speed (speed = Bewegung)"
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 50 Wertebereiche mit Art (kind) versehen; Rasterform in 1 Modus/Modi aus <Physical> uebernommen; in 1 weiteren Modus/Modi nicht, weil sie nicht zu den color_r-Kanaelen passt (keine echten Farbzonen); LightOS-Nachbearbeitung (FM-57): kurzname SH-BAR8X12; Bereichs-Arten korrigiert (u. a. „Preset“ nicht als Reset, Farben/Offen auf Farbrad, Open/Shake/Rotation auf Goborad, Prisma/Frost, keine Farb-/Dreh-Kacheln auf Makro-/Speed-Kanaelen, Sound-Bereiche); Programm-/Effekt-Geschwindigkeiten als effect_speed statt speed (speed = Bewegung)"
   },
   "autor": "LightOS (QXF-Konverter)",
   "geprueft": {
@@ -108,7 +108,6 @@
     },
     {
       "name": "9 Channel",
-      "raster": {"rows": 1, "cols": 8},
       "kanaele": [
         {"name": "Horizontal operation", "attribut": "tilt", "default": 128, "highlight": 128},
         {"name": "Horizontal speed", "attribut": "speed", "default": 0, "highlight": 0},

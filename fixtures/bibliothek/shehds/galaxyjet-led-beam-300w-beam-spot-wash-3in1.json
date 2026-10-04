@@ -15,7 +15,7 @@
     "lizenz": "Apache-2.0",
     "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.0.0 Beta 3 · Tóth János",
     "original": "resources/fixtures/Shehds/Shehds-GalaxyJet-LED-Beam-300W-Beam&Spot&Wash-3in1.qxf",
-    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 71 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): „Auto Move“ als macro statt zweitem Pan-Kanal (Default 0); Auto-Zoom als macro statt raw; kurzname SH-GJ300; Bereichs-Arten korrigiert (u. a. „Preset“ nicht als Reset, Farben/Offen auf Farbrad, Open/Shake/Rotation auf Goborad, Prisma/Frost, keine Farb-/Dreh-Kacheln auf Makro-/Speed-Kanaelen, Sound-Bereiche); zweites Goborad als gobo_wheel2; Prisma-Rotation als prism_rotation statt zweitem prism"
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 71 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): „Auto Move“ als macro statt zweitem Pan-Kanal (Default 0); Auto-Zoom als macro statt raw; kurzname SH-GJ300; Bereichs-Arten korrigiert (u. a. „Preset“ nicht als Reset, Farben/Offen auf Farbrad, Open/Shake/Rotation auf Goborad, Prisma/Frost, keine Farb-/Dreh-Kacheln auf Makro-/Speed-Kanaelen, Sound-Bereiche); zweites Goborad als gobo_wheel2; Prisma-Rotation als prism_rotation statt zweitem prism; Modus „16 channel“ der Vorlage in „19 channel“ umbenannt, weil er 19 Kanaele belegt"
   },
   "autor": "LightOS (QXF-Konverter)",
   "geprueft": {
@@ -24,7 +24,8 @@
   },
   "modi": [
     {
-      "name": "16 channel",
+      "name": "19 channel",
+      "beschreibung": "In der QLC+-Vorlage „16 channel“ genannt, belegt aber 19 Kanaele (CH1-CH19); nach Kanalzahl benannt.",
       "kanaele": [
         {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
         {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},

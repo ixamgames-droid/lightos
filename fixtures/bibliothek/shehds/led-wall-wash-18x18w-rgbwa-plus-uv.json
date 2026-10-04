@@ -15,7 +15,7 @@
     "lizenz": "Apache-2.0",
     "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.13.2 GIT · Fede79",
     "original": "resources/fixtures/Shehds/Shehds-LED-Wall-Wash-18x18W-RGBWA+UV.qxf",
-    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 48 Wertebereiche mit Art (kind) versehen; Rasterform in 4 Modus/Modi aus <Physical> uebernommen; LightOS-Nachbearbeitung (FM-57): Farbmakro/Lauflicht-Programmwahl als macro statt color_wheel; kurzname SH-WALL18X18; Bereichs-Arten korrigiert (u. a. „Preset“ nicht als Reset, Farben/Offen auf Farbrad, Open/Shake/Rotation auf Goborad, Prisma/Frost, keine Farb-/Dreh-Kacheln auf Makro-/Speed-Kanaelen, Sound-Bereiche); Programm-/Effekt-Geschwindigkeiten als effect_speed statt speed (speed = Bewegung); Farbmakro-/Programmkanaele ohne einzelne Farbslots als macro statt color_wheel"
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 48 Wertebereiche mit Art (kind) versehen; Rasterform in 2 Modus/Modi aus <Physical> uebernommen; in 2 weiteren Modus/Modi nicht, weil sie nicht zu den color_r-Kanaelen passt (keine echten Farbzonen); LightOS-Nachbearbeitung (FM-57): Farbmakro/Lauflicht-Programmwahl als macro statt color_wheel; kurzname SH-WALL18X18; Bereichs-Arten korrigiert (u. a. „Preset“ nicht als Reset, Farben/Offen auf Farbrad, Open/Shake/Rotation auf Goborad, Prisma/Frost, keine Farb-/Dreh-Kacheln auf Makro-/Speed-Kanaelen, Sound-Bereiche); Programm-/Effekt-Geschwindigkeiten als effect_speed statt speed (speed = Bewegung); Farbmakro-/Programmkanaele ohne einzelne Farbslots als macro statt color_wheel"
   },
   "autor": "LightOS (QXF-Konverter)",
   "geprueft": {
@@ -25,7 +25,6 @@
   "modi": [
     {
       "name": "11 Channel",
-      "raster": {"rows": 1, "cols": 18},
       "kanaele": [
         {"name": "Total Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
         {"name": "Total Strobe/Flash", "attribut": "shutter", "default": 0, "highlight": 0},
@@ -73,7 +72,6 @@
     },
     {
       "name": "29 Channel",
-      "raster": {"rows": 1, "cols": 18},
       "kanaele": [
         {"name": "Total Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
         {"name": "Total Strobe/Flash", "attribut": "shutter", "default": 0, "highlight": 0},

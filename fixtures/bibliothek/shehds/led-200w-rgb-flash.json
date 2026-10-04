@@ -15,7 +15,7 @@
     "lizenz": "Apache-2.0",
     "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.0.0 Beta 3 · Tóth János",
     "original": "resources/fixtures/Shehds/Shehds-LED-200W-RGB-FLASH.qxf",
-    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 2 Wertebereiche mit Art (kind) versehen; Rasterform in 3 Modus/Modi aus <Physical> uebernommen; LightOS-Nachbearbeitung (FM-57): typ strobe statt led_bar (200-W-RGB-Stroboskop mit 8 Segmenten; Raster 1x8 bleibt); kurzname SH-FLASH200; Bereichs-Arten korrigiert (u. a. „Preset“ nicht als Reset, Farben/Offen auf Farbrad, Open/Shake/Rotation auf Goborad, Prisma/Frost, keine Farb-/Dreh-Kacheln auf Makro-/Speed-Kanaelen, Sound-Bereiche); Farbmakro-/Programmkanaele ohne einzelne Farbslots als macro statt color_wheel; Programm-/Effekt-Geschwindigkeiten als effect_speed statt speed (speed = Bewegung)"
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 2 Wertebereiche mit Art (kind) versehen; Rasterform in 1 Modus/Modi aus <Physical> uebernommen; in 2 weiteren Modus/Modi nicht, weil sie nicht zu den color_r-Kanaelen passt (keine echten Farbzonen); LightOS-Nachbearbeitung (FM-57): typ strobe statt led_bar (200-W-RGB-Stroboskop mit 8 Segmenten; Raster 1x8 bleibt); kurzname SH-FLASH200; Bereichs-Arten korrigiert (u. a. „Preset“ nicht als Reset, Farben/Offen auf Farbrad, Open/Shake/Rotation auf Goborad, Prisma/Frost, keine Farb-/Dreh-Kacheln auf Makro-/Speed-Kanaelen, Sound-Bereiche); Farbmakro-/Programmkanaele ohne einzelne Farbslots als macro statt color_wheel; Programm-/Effekt-Geschwindigkeiten als effect_speed statt speed (speed = Bewegung)"
   },
   "autor": "LightOS (QXF-Konverter)",
   "geprueft": {
@@ -25,7 +25,6 @@
   "modi": [
     {
       "name": "9 channels",
-      "raster": {"rows": 1, "cols": 8},
       "kanaele": [
         {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
         {"name": "Strobe", "attribut": "shutter", "default": 0, "highlight": 0},
@@ -56,7 +55,6 @@
     },
     {
       "name": "3 Channel",
-      "raster": {"rows": 1, "cols": 8},
       "kanaele": [
         {"name": "Red dimmer", "attribut": "color_r", "default": 0, "highlight": 255},
         {"name": "Green dimmer", "attribut": "color_g", "default": 0, "highlight": 255},

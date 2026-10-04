@@ -160,7 +160,6 @@
     },
     {
       "name": "16-CH",
-      "raster": {"rows": 1, "cols": 3},
       "kanaele": [
         {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
         {
@@ -191,7 +190,6 @@
     },
     {
       "name": "26-CH",
-      "raster": {"rows": 1, "cols": 3},
       "kanaele": [
         {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
         {

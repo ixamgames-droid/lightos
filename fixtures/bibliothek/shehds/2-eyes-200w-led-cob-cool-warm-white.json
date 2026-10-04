@@ -15,7 +15,7 @@
     "lizenz": "Apache-2.0",
     "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.13.2 GIT · Devsider",
     "original": "resources/fixtures/Shehds/Shehds-2-Eyes-200W-LED-COB-Cool-Warm-White.qxf",
-    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 7 Wertebereiche mit Art (kind) versehen; Rasterform in 2 Modus/Modi aus <Physical> uebernommen; LightOS-Nachbearbeitung (FM-57): Kalt-/Warmweiss-Zellen als color_w statt vier gleichrangigen Master-Dimmern (Total Dimmer bleibt intensity); typ led_bar statt strobe (2-Augen-Blinder mit einzeln steuerbaren Zellen, Raster 1x2); kurzname SH-BLIND2EYE; Bereichs-Arten korrigiert (u. a. „Preset“ nicht als Reset, Farben/Offen auf Farbrad, Open/Shake/Rotation auf Goborad, Prisma/Frost, keine Farb-/Dreh-Kacheln auf Makro-/Speed-Kanaelen, Sound-Bereiche); Programm-/Effekt-Geschwindigkeiten als effect_speed statt speed (speed = Bewegung)"
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 7 Wertebereiche mit Art (kind) versehen; Rasterform aus <Physical> in 2 Modus/Modi nicht uebernommen, weil sie nicht zu den color_r-Kanaelen passt (keine echten Farbzonen); LightOS-Nachbearbeitung (FM-57): Kalt-/Warmweiss-Zellen als color_w statt vier gleichrangigen Master-Dimmern (Total Dimmer bleibt intensity); typ led_bar statt strobe (2-Augen-Blinder mit einzeln steuerbaren Zellen, Raster 1x2); kurzname SH-BLIND2EYE; Bereichs-Arten korrigiert (u. a. „Preset“ nicht als Reset, Farben/Offen auf Farbrad, Open/Shake/Rotation auf Goborad, Prisma/Frost, keine Farb-/Dreh-Kacheln auf Makro-/Speed-Kanaelen, Sound-Bereiche); Programm-/Effekt-Geschwindigkeiten als effect_speed statt speed (speed = Bewegung)"
   },
   "autor": "LightOS (QXF-Konverter)",
   "geprueft": {
@@ -25,7 +25,6 @@
   "modi": [
     {
       "name": "4 Channel (d001)",
-      "raster": {"rows": 1, "cols": 2},
       "kanaele": [
         {"name": "#1 Cool Light Dimmer", "attribut": "color_w", "default": 0, "highlight": 255},
         {"name": "#2 Cool Light Dimmer", "attribut": "color_w", "default": 0, "highlight": 255},
@@ -35,7 +34,6 @@
     },
     {
       "name": "8 Channel (a001)",
-      "raster": {"rows": 1, "cols": 2},
       "kanaele": [
         {"name": "Total Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
         {"name": "#1 Cool Light Dimmer", "attribut": "color_w", "default": 0, "highlight": 255},

@@ -15,7 +15,7 @@
     "lizenz": "Apache-2.0",
     "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.3 GIT · Massimo Callegari, Andres Robles",
     "original": "resources/fixtures/Cameo/Cameo-Hydrabeam-400-Series.qxf",
-    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 234 Wertebereiche mit Art (kind) versehen; Rasterform in 8 Modus/Modi aus <Physical> uebernommen; QLC+-Sammeldatei 'Hydrabeam 400 Series' in zwei Profile geteilt (hier nur die CLHB400RGBW-Modi, Modusnamen ohne Modellzusatz); Strobe-Default/-Highlight 0 statt 5 (0-10 = kein Strobe); Show mode: Bereiche ohne Art, 'sound control mode' = 'sound'; Show-mode-Speed speed -> effect_speed, Art 'sound' entfernt; Sound mode / Reset macro -> reset; Sound sensitivity macro -> raw (Art entfernt); Kopf-Speed 0-10 der Koepfe 2-4 nach Handbuch 'use speed value from head 1' benannt; Heads speed als 'fast to slow' benannt; Colour macros (6/10-CH): Highlight 241 = RGBW (weiss) statt 0 = Farbwechsel-Automatik; Colour macros: 'Automatic colour change' = 'rotate', Mischfarben (RGB/RGW/RBW/GBW/RGBW) jetzt auch 'color', 'use CH29-CH32' ohne Art; Auto-Colour-Speed speed -> effect_speed; Modus 19-CH: Kanalreihenfolge nach Handbuch korrigiert (CH3-6 = Rot/Gruen/Blau/Weiss, CH7-18 = Koepfe 1-4, CH19 = Kopf-Speed; QLC+ hatte RGBW auf 15-18); kurzname/notizen/quelle gesetzt"
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 234 Wertebereiche mit Art (kind) versehen; Rasterform aus <Physical> in 4 Modus/Modi nicht uebernommen, weil sie nicht zu den color_r-Kanaelen passt (keine echten Farbzonen); QLC+-Sammeldatei 'Hydrabeam 400 Series' in zwei Profile geteilt (hier nur die CLHB400RGBW-Modi, Modusnamen ohne Modellzusatz); Strobe-Default/-Highlight 0 statt 5 (0-10 = kein Strobe); Show mode: Bereiche ohne Art, 'sound control mode' = 'sound'; Show-mode-Speed speed -> effect_speed, Art 'sound' entfernt; Sound mode / Reset macro -> reset; Sound sensitivity macro -> raw (Art entfernt); Kopf-Speed 0-10 der Koepfe 2-4 nach Handbuch 'use speed value from head 1' benannt; Heads speed als 'fast to slow' benannt; Colour macros (6/10-CH): Highlight 241 = RGBW (weiss) statt 0 = Farbwechsel-Automatik; Colour macros: 'Automatic colour change' = 'rotate', Mischfarben (RGB/RGW/RBW/GBW/RGBW) jetzt auch 'color', 'use CH29-CH32' ohne Art; Auto-Colour-Speed speed -> effect_speed; Modus 19-CH: Kanalreihenfolge nach Handbuch korrigiert (CH3-6 = Rot/Gruen/Blau/Weiss, CH7-18 = Koepfe 1-4, CH19 = Kopf-Speed; QLC+ hatte RGBW auf 15-18); kurzname/notizen/quelle gesetzt"
   },
   "autor": "LightOS (QXF-Konverter)",
   "geprueft": {
@@ -25,7 +25,6 @@
   "modi": [
     {
       "name": "6-CH",
-      "raster": {"rows": 1, "cols": 4},
       "kanaele": [
         {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
         {
@@ -110,7 +109,6 @@
     },
     {
       "name": "10-CH",
-      "raster": {"rows": 1, "cols": 4},
       "kanaele": [
         {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
         {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
@@ -199,7 +197,6 @@
     },
     {
       "name": "19-CH",
-      "raster": {"rows": 1, "cols": 4},
       "kanaele": [
         {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
         {
@@ -233,7 +230,6 @@
     },
     {
       "name": "32-CH",
-      "raster": {"rows": 1, "cols": 4},
       "kanaele": [
         {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
         {

@@ -16,7 +16,7 @@
     "lizenz": "Apache-2.0",
     "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.14.2 GIT · Patrick Kosubke",
     "original": "resources/fixtures/UKing/UKing-ZQB20-Mini-Spider.qxf",
-    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 64 Wertebereiche mit Art (kind) versehen; Rasterform in 2 Modus/Modi aus <Physical> uebernommen; LightOS-Nachbearbeitung (FM-57): Hersteller 'UKing' -> 'U King' (wie die eingebauten LightOS-Profile der Marke); Modus '7 Channel': Raster entfernt (nur eine Farbgruppe); Modus '15 Channel': Raster 2x4; Attribute korrigiert (Effect Speed: speed->effect_speed); Shutter-Default/Highlight auf den Offen-Wert (Strobe 4->0); Rasterform 4x1 (geraten) durch 2x4 ersetzt (zwei Leisten zu je 4 LEDs), im 7-Kanal-Modus ohne Einzel-LEDs entfernt; einzelne Kanalnamen deutsch bzw. eindeutiger benannt"
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 64 Wertebereiche mit Art (kind) versehen; Rasterform aus <Physical> in 1 Modus/Modi nicht uebernommen, weil sie nicht zu den color_r-Kanaelen passt (keine echten Farbzonen); LightOS-Nachbearbeitung (FM-57): Hersteller 'UKing' -> 'U King' (wie die eingebauten LightOS-Profile der Marke); Modus '7 Channel': Raster entfernt (nur eine Farbgruppe); Modus '15 Channel': Raster 2x4; Attribute korrigiert (Effect Speed: speed->effect_speed); Shutter-Default/Highlight auf den Offen-Wert (Strobe 4->0); Rasterform 4x1 (geraten) durch 2x4 ersetzt (zwei Leisten zu je 4 LEDs), im 7-Kanal-Modus ohne Einzel-LEDs entfernt; einzelne Kanalnamen deutsch bzw. eindeutiger benannt"
   },
   "autor": "LightOS",
   "geprueft": {
@@ -98,7 +98,6 @@
     },
     {
       "name": "15 Channel",
-      "raster": {"rows": 2, "cols": 4},
       "kanaele": [
         {"name": "Tilt Leiste 1", "attribut": "tilt", "default": 128, "highlight": 128},
         {"name": "Tilt Leiste 2", "attribut": "tilt", "default": 128, "highlight": 128},
