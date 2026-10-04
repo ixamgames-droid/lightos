@@ -367,6 +367,8 @@ export function tryChannel() {
           // Python antwortet nur mit Geaendertem (pollControlRev) — vorher ging
           // die volle Geraeteliste und die Buehne bei JEDEM Poll mit.
           const _revs = {};
+          const _versuche = {};        // Review B2: Fehlschlaege je Schluessel
+          const _MAX_VERSUCHE = 3;
           const _abfragen = (cb) => (bridge.pollControlRev
             ? bridge.pollControlRev(JSON.stringify(_revs), cb)
             : bridge.pollControl(cb));
@@ -375,13 +377,31 @@ export function tryChannel() {
               _abfragen(function(js){
                 try {
                   const s = JSON.parse(js);
-                  if (s._rev) Object.assign(_revs, s._rev);
-                  // Idempotente Zustaende: nur bei Aenderung anwenden.
-                  if (s.editMode !== undefined && s.editMode !== _pEM) { _pEM = s.editMode; setEditMode(s.editMode); }
+                  // Review B2: Revisionen erst NACH dem Anwenden uebernehmen und
+                  // jeden Zustands-Block einzeln absichern. Vorher wurde _rev vor
+                  // allen Handlern quittiert, und ein Wurf (z. B. defekte Buehne)
+                  // liess alle spaeteren Schluessel derselben Antwort dauerhaft
+                  // fallen — Python schickt sie erst bei geaendertem Wert wieder.
+                  // Ein gescheiterter Schluessel bleibt unquittiert (kommt beim
+                  // naechsten Poll erneut), nach _MAX_VERSUCHE Fehlschlaegen wird
+                  // er aufgegeben (kein Dauer-Neubau 8x pro Sekunde).
+                  const _fehl = {};
+                  const _block = (key, fn) => {
+                    try { fn(); }
+                    catch (eB) {
+                      _fehl[key] = true;
+                      console.log('poll: Zustand ' + key + ' nicht angewandt', eB);
+                    }
+                  };
+                  // Idempotente Zustaende: nur bei Aenderung anwenden. Der
+                  // Vergleichswert (_pX) wird erst nach Erfolg gesetzt.
+                  if (s.editMode !== undefined && s.editMode !== _pEM) {
+                    _block('editMode', () => { setEditMode(s.editMode); _pEM = s.editMode; });
+                  }
                   // VIZ-14: wie viele Geraete warten auf einen Platz? Steuert
                   // den Platzier-Geist (0 = kein Geist).
                   if (s.placeable !== undefined && s.placeable !== _pPlace) {
-                    _pPlace = s.placeable; setPlaceableCount(s.placeable);
+                    _block('placeable', () => { setPlaceableCount(s.placeable); _pPlace = s.placeable; });
                   }
                   // VIZ-15: welche Geraete haben ihren Lichtkegel ausgeblendet?
                   // Als JSON-String vergleichen, nicht als Array — ein Array ist
@@ -390,36 +410,70 @@ export function tryChannel() {
                   if (s.beamsOff !== undefined) {
                     const sig = JSON.stringify(s.beamsOff);
                     if (sig !== _pBeamsOff) {
-                      _pBeamsOff = sig;
-                      setBeamsOff(s.beamsOff);
-                      for (const k in fixtures) resyncBeamVisibility(fixtures[k]);
-                      requestRender();
+                      _block('beamsOff', () => {
+                        setBeamsOff(s.beamsOff);
+                        for (const k in fixtures) resyncBeamVisibility(fixtures[k]);
+                        requestRender();
+                        _pBeamsOff = sig;
+                      });
                     }
                   }
-                  if (s.viewMode !== undefined && s.viewMode !== _pVM) { _pVM = s.viewMode; setViewMode(s.viewMode); }
+                  if (s.viewMode !== undefined && s.viewMode !== _pVM) {
+                    _block('viewMode', () => { setViewMode(s.viewMode); _pVM = s.viewMode; });
+                  }
                   // VIZ-71 (N3): Bildschirmwechsel kam bisher nur als Push-Signal —
                   // nach dem Laden also nie. Jetzt auch als Poll-Zustand.
                   if (typeof s.pixelRatio === 'number' && s.pixelRatio !== _pPR) {
-                    _pPR = s.pixelRatio; setDeviceRatio(s.pixelRatio);
+                    _block('pixelRatio', () => { setDeviceRatio(s.pixelRatio); _pPR = s.pixelRatio; });
                   }
-                  if (s.settings && s.settings !== _pSet) { _pSet = s.settings; applySettings(JSON.parse(s.settings)); }
-                  if (s.stage && s.stage !== _pStage) { _pStage = s.stage; loadStageJson(s.stage); }
+                  if (s.settings && s.settings !== _pSet) {
+                    _block('settings', () => { applySettings(JSON.parse(s.settings)); _pSet = s.settings; });
+                  }
+                  if (s.stage && s.stage !== _pStage) {
+                    _block('stage', () => { loadStageJson(s.stage); _pStage = s.stage; });
+                  }
                   // Voll-Fixture-Rebuild (allFixtures): nur bei geaenderter Liste
                   // anwenden. addFixture ist idempotent (ersetzt vorhandene fid).
                   if (s.fixtures && s.fixtures !== _pFix) {
-                    _pFix = s.fixtures;
-                    try {
+                    _block('fixtures', () => {
                       const list = JSON.parse(s.fixtures);
-                      pruneDmxCache(list.map(f => f.fid));   // VIZ-71: Reste alter Shows
-                      list.forEach(f => addFixture(f));
-                    } catch (eF) {}
+                      // VIZ-71: Reste alter Shows aus dem DMX-Cache raeumen.
+                      // Review B3: fids, die DIESELBE Antwort per fixtureAdded
+                      // baut, bleiben drin — sonst wirft eine noch alte Liste
+                      // den DMX-Stand eines frisch platzierten Geraets weg, und
+                      // es bliebe dunkel, bis sich sein DMX aendert.
+                      const behalten = list.map(f => f.fid);
+                      for (const ev of (s.events || [])) {
+                        if (ev && ev.t === 'fixtureAdded') {
+                          try { behalten.push(JSON.parse(ev.j).fid); } catch (eJ) {}
+                        }
+                      }
+                      pruneDmxCache(behalten);
+                      // Ein stolperndes Geraet darf die folgenden nicht kosten;
+                      // es wird geloggt, nicht wiederholt (sonst Dauer-Neubau).
+                      for (const f of list) {
+                        try { addFixture(f); }
+                        catch (eF) { console.log('poll: Geraet nicht gebaut', f && f.fid, eF); }
+                      }
+                      _pFix = s.fixtures;
+                    });
                   }
                   // VIZ-14 (Slice 1b): globale/Programmer-Auswahl -> Outlines im
                   // 3D. Idempotent (nur bei geaenderter Liste), OHNE Echo zurueck
                   // (jsApplyExternalSelection ruft updateOutlines(false)).
                   if (s.selection !== undefined && s.selection !== _pSel) {
-                    _pSel = s.selection;
-                    jsApplyExternalSelection(s.selection);
+                    _block('selection', () => { jsApplyExternalSelection(s.selection); _pSel = s.selection; });
+                  }
+                  if (s._rev) {
+                    for (const k in s._rev) {
+                      if (_fehl[k]) {
+                        const n = (_versuche[k] || 0) + 1;
+                        _versuche[k] = n;
+                        if (n < _MAX_VERSUCHE) continue;      // naechster Poll: erneut
+                      }
+                      delete _versuche[k];
+                      _revs[k] = s._rev[k];
+                    }
                   }
                   if (s.dmx) {
                     // A3D-04: eigenes try/catch. Ein Wurf hier (defektes JSON, ein
