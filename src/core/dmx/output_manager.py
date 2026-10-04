@@ -187,6 +187,9 @@ class OutputManager:
         self._freeze_frames: dict[int, bytes] | None = None
         # OUT-60: Halte-Frames waehrend eines Live-Show-Loads (s. lade_sperre).
         self._lade_frames: dict[int, bytes] | None = None
+        # OUT-60-Folge: die patch-abhaengigen Masken (GM, Blackout-Erhalten,
+        # gezielter Blackout) vom Start der Lade-Sperre — (gm, keep, ziel).
+        self._lade_masken: tuple | None = None
         self._lade_tiefe = 0
         # slot → (level 0.0–1.0, target_fids | None). target_fids None = GLOBALER
         # Submaster (wirkt auf ALLE Fixtures, bisheriges Verhalten); ein
@@ -522,14 +525,28 @@ class OutputManager:
         Adress-Freigabe des Patch-Tauschs gebuendelt, nicht diesen Frame.
 
         Getrennt vom Bediener-Freeze (``_freeze_frames``): den setzt der
-        reset-first selbst zurueck, und ein Freeze des Bedieners darf durch einen
-        Load nicht verloren gehen oder haengen bleiben. Der Schnappschuss liegt
-        wie beim Freeze VOR Channel-Modifier, Grand-Master, Blackout und
-        Laser-NOT-AUS — die greifen also auch waehrend des Ladens. Verschachtelt
-        aufrufbar; erst das aeusserste Ende gibt frei."""
+        reset-first selbst zurueck — ein Freeze des Bedieners UEBERSTEHT einen
+        Load also NICHT (nach dem Laden laeuft die Ausgabe wieder live). Die
+        Sperre darf deshalb nicht am Freeze haengen, sonst fiele sie mitten im
+        Load weg. Der Schnappschuss liegt wie beim Freeze VOR Channel-Modifier,
+        Grand-Master, Blackout und Laser-NOT-AUS — die greifen also auch
+        waehrend des Ladens. Verschachtelt aufrufbar; erst das aeusserste Ende
+        gibt frei.
+
+        ★ OUT-60-Folge (Review A): mit eingefroren werden auch die
+        PATCH-ABHAENGIGEN Masken — GM-Adressen, Blackout-Erhalten (Pan/Tilt …)
+        und gezielter Blackout (VCB-11). Der reset-first baut sie fuer den
+        leeren Patch neu; ohne GM-Maske skalierte der Grand-Master dann ALLE
+        Kanaele, bei GM < 100 % ruckten Pan/Tilt im Lade-Fenster, und im
+        Blackout fielen sie auf 0. GM-Wert, Blackout-Schalter und Laser-NOT-AUS
+        bleiben live."""
         if self._lade_tiefe == 0:
             self._lade_frames = {u: universe.get_all()
                                  for u, universe in list(self.universes.items())}
+            # Die Masken werden immer als Ganzes ersetzt, nie veraendert —
+            # die Referenzen festzuhalten genuegt.
+            self._lade_masken = (self._gm_address_mask, self._blackout_keep_mask,
+                                 getattr(self, "_ziel_blackout_union", None))
         self._lade_tiefe += 1
         try:
             yield
@@ -537,6 +554,7 @@ class OutputManager:
             self._lade_tiefe -= 1
             if self._lade_tiefe == 0:
                 self._lade_frames = None
+                self._lade_masken = None
 
     def set_blackout(self, enabled: bool):
         """Blackout an/aus. UI-58: jede Aenderung wird gemeldet — egal ob sie aus
@@ -1003,6 +1021,11 @@ class OutputManager:
 
         # OUT-60: die Lade-Sperre hat Vorrang vor dem Bediener-Freeze.
         gefroren = self._lade_frames if self._lade_frames is not None else self._freeze_frames
+        if self._lade_masken is not None:
+            gm_masken, keep_masken, ziel = self._lade_masken
+        else:
+            gm_masken, keep_masken = self._gm_address_mask, self._blackout_keep_mask
+            ziel = getattr(self, "_ziel_blackout_union", None)
         for univ_num, universe in list(self.universes.items()):
             # Im Freeze den festgehaltenen Stand senden statt des (u. U. direkt
             # beschriebenen) Live-Universums. Ein Universum, das es beim
@@ -1030,7 +1053,7 @@ class OutputManager:
                 # Adressen, raw-/Fine-Kanaele und unbekannte Attribute sicher dunkel
                 # werden. Der Grand-Master braucht hier nicht mehr zu laufen: seine
                 # Adressen sind nie in der Erhalten-Maske (dort steht ohnehin 0).
-                keep = self._blackout_keep_mask.get(univ_num)
+                keep = keep_masken.get(univ_num)
                 buf = bytearray(512)
                 if keep:
                     for addr in keep:
@@ -1039,7 +1062,7 @@ class OutputManager:
                 data = bytes(buf)
             elif self.grand_master < 0.999:
                 gm = self.grand_master
-                mask = self._gm_address_mask.get(univ_num)
+                mask = gm_masken.get(univ_num)
                 if mask is None:
                     # Ungepatchtes/rohes Universum: kein Adresswissen -> global
                     # dimmen wie bisher (Roh-DMX-Setups behalten ihren GM).
@@ -1058,7 +1081,6 @@ class OutputManager:
             # weiter. Beim globalen Blackout ist ohnehin alles ausser der
             # Erhalten-Maske 0; die Ziel-Masken enthalten nie Erhalten-Adressen.
             # getattr: Tests bauen den Manager teils per __new__ ohne __init__.
-            ziel = getattr(self, "_ziel_blackout_union", None)
             ziel_mask = ziel.get(univ_num) if ziel else None
             if ziel_mask and not self._blackout:
                 buf = bytearray(data)

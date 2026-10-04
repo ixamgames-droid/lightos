@@ -125,7 +125,8 @@ def _eltern_wache(ppid0: int):
     Adapter steckte, und die naechste App fand den Port belegt (Ausgabe tot).
     Deshalb unter Windows ein Prozess-HANDLE auf den Parent, einmal beim Start
     geoeffnet (haelt die Identitaet fest, keine PID-Wiederverwendung):
-    ``WaitForSingleObject(h, 0) == WAIT_TIMEOUT`` heisst „lebt noch“.
+    Nur ``WaitForSingleObject(h, 0) == WAIT_OBJECT_0`` (Handle signalisiert)
+    heisst „tot“; ``WAIT_TIMEOUT`` und ``WAIT_FAILED`` gelten als „lebt“.
     """
     if os.name == "nt":
         try:
@@ -133,10 +134,17 @@ def _eltern_wache(ppid0: int):
             k32 = ctypes.WinDLL("kernel32", use_last_error=True)
             k32.OpenProcess.restype = ctypes.c_void_p
             k32.WaitForSingleObject.argtypes = (ctypes.c_void_p, ctypes.c_uint32)
-            SYNCHRONIZE, WAIT_TIMEOUT = 0x00100000, 0x00000102
+            # Rueckgabe ist ein DWORD: ohne restype kaeme WAIT_FAILED
+            # (0xFFFFFFFF) als -1 an.
+            k32.WaitForSingleObject.restype = ctypes.c_uint32
+            SYNCHRONIZE, WAIT_OBJECT_0 = 0x00100000, 0x00000000
             h = k32.OpenProcess(SYNCHRONIZE, False, int(ppid0))
             if h:
-                return lambda: k32.WaitForSingleObject(h, 0) == WAIT_TIMEOUT
+                # NUR „signalisiert“ (WAIT_OBJECT_0) heisst „Parent tot“.
+                # WAIT_FAILED (Review A) ist ein Fehler der Abfrage, kein
+                # Beweis — sonst beendete sich der Worker bei lebender App
+                # und die Ausgabe waere weg.
+                return lambda: k32.WaitForSingleObject(h, 0) != WAIT_OBJECT_0
         except Exception:
             pass
         # Kein Handle: NICHT „tot“ annehmen — das schaltete die Ausgabe ab,

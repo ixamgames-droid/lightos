@@ -92,8 +92,8 @@ einen Status: `[ ]` = nicht in Szene, `[X]` = platziert.
 
 ## Was bei grossen Rigs anders aussieht
 
-Ab dem **17. Gerät im Raum** wirft nicht mehr jeder Scheinwerfer einen eigenen
-Schlagschatten. Die Ansicht vergibt höchstens **16 Schlagschatten**, und zwar an
+Ab dem **9. Gerät im Raum** wirft nicht mehr jeder Scheinwerfer einen eigenen
+Schlagschatten. Die Ansicht vergibt höchstens **8 Schlagschatten**, und zwar an
 die Geräte mit den niedrigsten Fixture-Nummern; alle übrigen leuchten normal
 weiter, werfen aber keinen Schatten auf Boden und Bühnenelemente. Wird ein Gerät
 entfernt, rückt das nächste nach.
@@ -102,8 +102,11 @@ entfernt, rückt das nächste nach.
 Textur, sondern auch Platz im Beleuchtungs-Programm. Ohne diese Grenze scheiterte
 auf Rechnern mit stärkerer Grafik ab 26 Schatten das Übersetzen dieses Programms —
 die Ansicht stürzte ohne Meldung ab, und kurz davor stand das Bild sekundenlang
-still. Die Grenze ist bewusst dieselbe Zahl, die schwächere Geräte ohnehin
-erreichen, damit die Bühne überall gleich aussieht.
+still. Zudem zeichnet jeder schattenwerfende Scheinwerfer die ganze Szene noch
+einmal aus seiner Sicht — mit 16 Schatten war das der größte Einzelposten pro
+Bild und ließ die Ansicht bei großen Rigs ruckeln. Acht Schatten reichen für den
+Raumeindruck; die Grenze gilt auf jedem Rechner gleich, damit die Bühne überall
+gleich aussieht.
 
 **Wenn Schatten für eine bestimmte Stelle wichtig sind:** die Vergabe folgt der
 Fixture-Nummer. Ein Gerät, dessen Schatten man sehen will, sollte also eine

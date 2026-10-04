@@ -1,0 +1,491 @@
+{
+  "format_version": 1,
+  "hersteller": "Martin",
+  "hersteller_kurz": "Martin",
+  "modell": "ERA 400 Performance",
+  "kurzname": "ERA400PERF",
+  "typ": "moving_head",
+  "leistung_w": 442,
+  "quelle": {
+    "titel": "ERA 400 Performance User Manual",
+    "version": "Rev. A",
+    "url": "https://www.martin.com/en/site_elements/era-400-performance-user-manual"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.7 GIT · Yestalgia",
+    "original": "resources/fixtures/Martin/Martin-ERA-400-Performance.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 208 Wertebereiche mit Art (kind) versehen; Kanaele nach Martin-Handbuch Rev. A neu aufgebaut (Namen deutsch, Reihenfolge wie QLC+); Dimmer fein intensity -> raw (war ein zweiter Dimmer/Kopf, Highlight 255); Zoom fein/Fokus fein (32-Kanal) zoom/focus -> raw; Blenden (Framing) shutter -> raw (9 Kanaele trugen faelschlich das Shutter-Attribut); Blende 1: Position/Winkel laut Handbuch getauscht (QLC+: Winkel zuerst); Winkel- und Rotations-Default 127 (parallel/nicht gedreht) laut Handbuch; Goborad 1 gobo_rotation -> gobo_wheel, Goborad 2 gobo_rotation -> gobo_wheel2 mit 9 Gobos laut Handbuch; Shake 'shake', Raddrehung 'rotate'; Farbrad: Slot 7 CTO/CTB je nach CLD/WRM, Index ohne Art, Raddrehung 'rotate'; Prisma 'open'/'prism', Prisma-Rotation prism -> prism_rotation; Sonderfunktionen raw -> reset, Blackout-Optionen ohne Art 'closed'; kurzname ERA400PERF, leistung_w 442 (230 V) laut Handbuch, notizen"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": false,
+    "wie": "30-Kanal-Modus Kanal fuer Kanal gegen die DMX-Tabelle im Martin-Handbuch (ERA 400 Performance User Manual, Rev. A, S. 26-29) geprueft, inkl. Default-Werten; der 32-Kanal-Modus steht nicht im Handbuch und ist nur aus QLC+ uebernommen, daher nicht als geprueft markiert"
+  },
+  "modi": [
+    {
+      "name": "Std. 30 channel",
+      "kanaele": [
+        {
+          "name": "Shutter",
+          "attribut": "shutter",
+          "default": 22,
+          "highlight": 22,
+          "bereiche": [
+            {"von": 0, "bis": 19, "name": "Blackout", "art": "closed"},
+            {"von": 20, "bis": 24, "name": "Offen", "art": "open"},
+            {"von": 25, "bis": 64, "name": "Strobe 1 schnell → langsam", "art": "strobe"},
+            {"von": 65, "bis": 69, "name": "Offen", "art": "open"},
+            {"von": 70, "bis": 84, "name": "Strobe 2: oeffnender Puls, schnell → langsam", "art": "strobe"},
+            {"von": 85, "bis": 89, "name": "Offen", "art": "open"},
+            {"von": 90, "bis": 104, "name": "Strobe 3: schliessender Puls, schnell → langsam", "art": "strobe"},
+            {"von": 105, "bis": 109, "name": "Offen", "art": "open"},
+            {"von": 110, "bis": 124, "name": "Strobe 4: Zufalls-Strobe, schnell → langsam", "art": "strobe"},
+            {"von": 125, "bis": 129, "name": "Offen", "art": "open"},
+            {"von": 130, "bis": 144, "name": "Strobe 5: Zufalls-Puls oeffnend, schnell → langsam", "art": "strobe"},
+            {"von": 145, "bis": 255, "name": "Offen", "art": "open"}
+          ]
+        },
+        {"name": "Dimmer (grob)", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Dimmer (fein)", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Cyan", "attribut": "cmy_c", "default": 0, "highlight": 255},
+        {"name": "Magenta", "attribut": "cmy_m", "default": 0, "highlight": 255},
+        {"name": "Gelb", "attribut": "cmy_y", "default": 0, "highlight": 255},
+        {
+          "name": "Farbrad",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 6, "name": "Offen", "art": "open"},
+            {"von": 7, "bis": 12, "name": "Farbe 1: Hellblau", "art": "color"},
+            {"von": 13, "bis": 18, "name": "Farbe 2: Dunkelgruen", "art": "color"},
+            {"von": 19, "bis": 25, "name": "Farbe 3: Pink", "art": "color"},
+            {"von": 26, "bis": 31, "name": "Farbe 4: Orange", "art": "color"},
+            {"von": 32, "bis": 37, "name": "Farbe 5: Hellgruen", "art": "color"},
+            {"von": 38, "bis": 44, "name": "Farbe 6: Magenta", "art": "color"},
+            {"von": 45, "bis": 50, "name": "Farbe 7: CTO 3200 K (CLD) / CTB 6000 K (WRM)", "art": "color"},
+            {"von": 51, "bis": 56, "name": "Farbe 8: Dunkelblau", "art": "color"},
+            {"von": 57, "bis": 63, "name": "Farbe 9: Dunkelrot", "art": "color"},
+            {"von": 64, "bis": 127, "name": "Farbrad-Index"},
+            {"von": 128, "bis": 190, "name": "Raddrehung gegen Uhrzeigersinn, schnell → langsam", "art": "rotate"},
+            {"von": 191, "bis": 192, "name": "Stopp"},
+            {"von": 193, "bis": 255, "name": "Raddrehung im Uhrzeigersinn, langsam → schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Goborad 1 (rotierend)",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Offen", "art": "open"},
+            {"von": 8, "bis": 15, "name": "Gobo 1", "art": "gobo"},
+            {"von": 16, "bis": 23, "name": "Gobo 2", "art": "gobo"},
+            {"von": 24, "bis": 31, "name": "Gobo 3", "art": "gobo"},
+            {"von": 32, "bis": 39, "name": "Gobo 4", "art": "gobo"},
+            {"von": 40, "bis": 47, "name": "Gobo 5", "art": "gobo"},
+            {"von": 48, "bis": 55, "name": "Gobo 6", "art": "gobo"},
+            {"von": 56, "bis": 63, "name": "Gobo 7", "art": "gobo"},
+            {"von": 64, "bis": 72, "name": "Gobo 1 Shake", "art": "shake"},
+            {"von": 73, "bis": 81, "name": "Gobo 2 Shake", "art": "shake"},
+            {"von": 82, "bis": 90, "name": "Gobo 3 Shake", "art": "shake"},
+            {"von": 91, "bis": 99, "name": "Gobo 4 Shake", "art": "shake"},
+            {"von": 100, "bis": 108, "name": "Gobo 5 Shake", "art": "shake"},
+            {"von": 109, "bis": 117, "name": "Gobo 6 Shake", "art": "shake"},
+            {"von": 118, "bis": 127, "name": "Gobo 7 Shake", "art": "shake"},
+            {"von": 128, "bis": 190, "name": "Raddrehung gegen Uhrzeigersinn, schnell → langsam", "art": "rotate"},
+            {"von": 191, "bis": 192, "name": "Stopp"},
+            {"von": 193, "bis": 255, "name": "Raddrehung im Uhrzeigersinn, langsam → schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Goborad 1: Index/Rotation",
+          "attribut": "gobo_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Index 0° → 360°"},
+            {"von": 128, "bis": 190, "name": "Rotation gegen Uhrzeigersinn, schnell → langsam", "art": "rotate"},
+            {"von": 191, "bis": 192, "name": "Stopp"},
+            {"von": 193, "bis": 255, "name": "Rotation im Uhrzeigersinn, langsam → schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Goborad 2",
+          "attribut": "gobo_wheel2",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 6, "name": "Offen", "art": "open"},
+            {"von": 7, "bis": 12, "name": "Gobo 1", "art": "gobo"},
+            {"von": 13, "bis": 18, "name": "Gobo 2", "art": "gobo"},
+            {"von": 19, "bis": 25, "name": "Gobo 3", "art": "gobo"},
+            {"von": 26, "bis": 31, "name": "Gobo 4", "art": "gobo"},
+            {"von": 32, "bis": 37, "name": "Gobo 5", "art": "gobo"},
+            {"von": 38, "bis": 44, "name": "Gobo 6", "art": "gobo"},
+            {"von": 45, "bis": 50, "name": "Gobo 7", "art": "gobo"},
+            {"von": 51, "bis": 56, "name": "Gobo 8", "art": "gobo"},
+            {"von": 57, "bis": 63, "name": "Gobo 9", "art": "gobo"},
+            {"von": 64, "bis": 70, "name": "Gobo 1 Shake", "art": "shake"},
+            {"von": 71, "bis": 77, "name": "Gobo 2 Shake", "art": "shake"},
+            {"von": 78, "bis": 84, "name": "Gobo 3 Shake", "art": "shake"},
+            {"von": 85, "bis": 91, "name": "Gobo 4 Shake", "art": "shake"},
+            {"von": 92, "bis": 98, "name": "Gobo 5 Shake", "art": "shake"},
+            {"von": 99, "bis": 105, "name": "Gobo 6 Shake", "art": "shake"},
+            {"von": 106, "bis": 112, "name": "Gobo 7 Shake", "art": "shake"},
+            {"von": 113, "bis": 119, "name": "Gobo 8 Shake", "art": "shake"},
+            {"von": 120, "bis": 127, "name": "Gobo 9 Shake", "art": "shake"},
+            {"von": 128, "bis": 190, "name": "Raddrehung im Uhrzeigersinn, schnell → langsam", "art": "rotate"},
+            {"von": 191, "bis": 192, "name": "Stopp"},
+            {"von": 193, "bis": 255, "name": "Raddrehung gegen Uhrzeigersinn, langsam → schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Prisma",
+          "attribut": "prism",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Kein Prisma", "art": "open"},
+            {"von": 11, "bis": 127, "name": "Prisma ein", "art": "prism"},
+            {"von": 128, "bis": 255, "name": "Prisma-Makro 1 – 32", "art": "prism"}
+          ]
+        },
+        {
+          "name": "Prisma-Rotation",
+          "attribut": "prism_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Index 0° → 360°"},
+            {"von": 128, "bis": 190, "name": "Rotation im Uhrzeigersinn, schnell → langsam", "art": "rotate"},
+            {"von": 191, "bis": 192, "name": "Stopp"},
+            {"von": 193, "bis": 255, "name": "Rotation gegen Uhrzeigersinn, langsam → schnell", "art": "rotate"}
+          ]
+        },
+        {"name": "Iris (gross → klein)", "attribut": "iris", "default": 0, "highlight": 0},
+        {"name": "Zoom (eng → weit)", "attribut": "zoom", "default": 0, "highlight": 0},
+        {"name": "Fokus (fern → nah)", "attribut": "focus", "default": 0, "highlight": 0},
+        {"name": "Blende 1 Position (aus → ein)", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Blende 1 Winkel",
+          "attribut": "raw",
+          "default": 127,
+          "highlight": 127,
+          "bereiche": [
+            {"von": 0, "bis": 126, "name": "Min.-Winkel → parallel"},
+            {"von": 127, "bis": 128, "name": "Parallel"},
+            {"von": 129, "bis": 255, "name": "Parallel → Max.-Winkel"}
+          ]
+        },
+        {"name": "Blende 2 Position (aus → ein)", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Blende 2 Winkel",
+          "attribut": "raw",
+          "default": 127,
+          "highlight": 127,
+          "bereiche": [
+            {"von": 0, "bis": 126, "name": "Min.-Winkel → parallel"},
+            {"von": 127, "bis": 128, "name": "Parallel"},
+            {"von": 129, "bis": 255, "name": "Parallel → Max.-Winkel"}
+          ]
+        },
+        {"name": "Blende 3 Position (aus → ein)", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Blende 3 Winkel",
+          "attribut": "raw",
+          "default": 127,
+          "highlight": 127,
+          "bereiche": [
+            {"von": 0, "bis": 126, "name": "Min.-Winkel → parallel"},
+            {"von": 127, "bis": 128, "name": "Parallel"},
+            {"von": 129, "bis": 255, "name": "Parallel → Max.-Winkel"}
+          ]
+        },
+        {"name": "Blende 4 Position (aus → ein)", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Blende 4 Winkel",
+          "attribut": "raw",
+          "default": 127,
+          "highlight": 127,
+          "bereiche": [
+            {"von": 0, "bis": 126, "name": "Min.-Winkel → parallel"},
+            {"von": 127, "bis": 128, "name": "Parallel"},
+            {"von": 129, "bis": 255, "name": "Parallel → Max.-Winkel"}
+          ]
+        },
+        {
+          "name": "Blendensystem-Rotation",
+          "attribut": "raw",
+          "default": 127,
+          "highlight": 127,
+          "bereiche": [
+            {"von": 0, "bis": 126, "name": "45° gegen Uhrzeigersinn → 0°"},
+            {"von": 127, "bis": 128, "name": "Nicht gedreht (quadratisch)"},
+            {"von": 129, "bis": 255, "name": "0° → 45° im Uhrzeigersinn"}
+          ]
+        },
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fein", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fein", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt-Geschwindigkeit (schnell → langsam)", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Sonderfunktionen",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 69, "name": "Keine Funktion"},
+            {"von": 70, "bis": 79, "name": "Blackout bei Pan/Tilt an"},
+            {"von": 80, "bis": 89, "name": "Blackout bei Pan/Tilt aus"},
+            {"von": 90, "bis": 99, "name": "Blackout bei Farbwechsel an"},
+            {"von": 100, "bis": 109, "name": "Blackout bei Farbwechsel aus"},
+            {"von": 110, "bis": 119, "name": "Blackout bei Gobowechsel an"},
+            {"von": 120, "bis": 129, "name": "Blackout bei Gobowechsel aus"},
+            {"von": 130, "bis": 199, "name": "Keine Funktion"},
+            {"von": 200, "bis": 209, "name": "Reset alles", "art": "reset"},
+            {"von": 210, "bis": 219, "name": "Reset Effekte", "art": "reset"},
+            {"von": 220, "bis": 229, "name": "Reset Pan/Tilt", "art": "reset"},
+            {"von": 230, "bis": 255, "name": "Keine Funktion"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "EXT 32 channel",
+      "kanaele": [
+        {
+          "name": "Shutter",
+          "attribut": "shutter",
+          "default": 22,
+          "highlight": 22,
+          "bereiche": [
+            {"von": 0, "bis": 19, "name": "Blackout", "art": "closed"},
+            {"von": 20, "bis": 24, "name": "Offen", "art": "open"},
+            {"von": 25, "bis": 64, "name": "Strobe 1 schnell → langsam", "art": "strobe"},
+            {"von": 65, "bis": 69, "name": "Offen", "art": "open"},
+            {"von": 70, "bis": 84, "name": "Strobe 2: oeffnender Puls, schnell → langsam", "art": "strobe"},
+            {"von": 85, "bis": 89, "name": "Offen", "art": "open"},
+            {"von": 90, "bis": 104, "name": "Strobe 3: schliessender Puls, schnell → langsam", "art": "strobe"},
+            {"von": 105, "bis": 109, "name": "Offen", "art": "open"},
+            {"von": 110, "bis": 124, "name": "Strobe 4: Zufalls-Strobe, schnell → langsam", "art": "strobe"},
+            {"von": 125, "bis": 129, "name": "Offen", "art": "open"},
+            {"von": 130, "bis": 144, "name": "Strobe 5: Zufalls-Puls oeffnend, schnell → langsam", "art": "strobe"},
+            {"von": 145, "bis": 255, "name": "Offen", "art": "open"}
+          ]
+        },
+        {"name": "Dimmer (grob)", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Dimmer (fein)", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Cyan", "attribut": "cmy_c", "default": 0, "highlight": 255},
+        {"name": "Magenta", "attribut": "cmy_m", "default": 0, "highlight": 255},
+        {"name": "Gelb", "attribut": "cmy_y", "default": 0, "highlight": 255},
+        {
+          "name": "Farbrad",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 6, "name": "Offen", "art": "open"},
+            {"von": 7, "bis": 12, "name": "Farbe 1: Hellblau", "art": "color"},
+            {"von": 13, "bis": 18, "name": "Farbe 2: Dunkelgruen", "art": "color"},
+            {"von": 19, "bis": 25, "name": "Farbe 3: Pink", "art": "color"},
+            {"von": 26, "bis": 31, "name": "Farbe 4: Orange", "art": "color"},
+            {"von": 32, "bis": 37, "name": "Farbe 5: Hellgruen", "art": "color"},
+            {"von": 38, "bis": 44, "name": "Farbe 6: Magenta", "art": "color"},
+            {"von": 45, "bis": 50, "name": "Farbe 7: CTO 3200 K (CLD) / CTB 6000 K (WRM)", "art": "color"},
+            {"von": 51, "bis": 56, "name": "Farbe 8: Dunkelblau", "art": "color"},
+            {"von": 57, "bis": 63, "name": "Farbe 9: Dunkelrot", "art": "color"},
+            {"von": 64, "bis": 127, "name": "Farbrad-Index"},
+            {"von": 128, "bis": 190, "name": "Raddrehung gegen Uhrzeigersinn, schnell → langsam", "art": "rotate"},
+            {"von": 191, "bis": 192, "name": "Stopp"},
+            {"von": 193, "bis": 255, "name": "Raddrehung im Uhrzeigersinn, langsam → schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Goborad 1 (rotierend)",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Offen", "art": "open"},
+            {"von": 8, "bis": 15, "name": "Gobo 1", "art": "gobo"},
+            {"von": 16, "bis": 23, "name": "Gobo 2", "art": "gobo"},
+            {"von": 24, "bis": 31, "name": "Gobo 3", "art": "gobo"},
+            {"von": 32, "bis": 39, "name": "Gobo 4", "art": "gobo"},
+            {"von": 40, "bis": 47, "name": "Gobo 5", "art": "gobo"},
+            {"von": 48, "bis": 55, "name": "Gobo 6", "art": "gobo"},
+            {"von": 56, "bis": 63, "name": "Gobo 7", "art": "gobo"},
+            {"von": 64, "bis": 72, "name": "Gobo 1 Shake", "art": "shake"},
+            {"von": 73, "bis": 81, "name": "Gobo 2 Shake", "art": "shake"},
+            {"von": 82, "bis": 90, "name": "Gobo 3 Shake", "art": "shake"},
+            {"von": 91, "bis": 99, "name": "Gobo 4 Shake", "art": "shake"},
+            {"von": 100, "bis": 108, "name": "Gobo 5 Shake", "art": "shake"},
+            {"von": 109, "bis": 117, "name": "Gobo 6 Shake", "art": "shake"},
+            {"von": 118, "bis": 127, "name": "Gobo 7 Shake", "art": "shake"},
+            {"von": 128, "bis": 190, "name": "Raddrehung gegen Uhrzeigersinn, schnell → langsam", "art": "rotate"},
+            {"von": 191, "bis": 192, "name": "Stopp"},
+            {"von": 193, "bis": 255, "name": "Raddrehung im Uhrzeigersinn, langsam → schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Goborad 1: Index/Rotation",
+          "attribut": "gobo_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Index 0° → 360°"},
+            {"von": 128, "bis": 190, "name": "Rotation gegen Uhrzeigersinn, schnell → langsam", "art": "rotate"},
+            {"von": 191, "bis": 192, "name": "Stopp"},
+            {"von": 193, "bis": 255, "name": "Rotation im Uhrzeigersinn, langsam → schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Goborad 2",
+          "attribut": "gobo_wheel2",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 6, "name": "Offen", "art": "open"},
+            {"von": 7, "bis": 12, "name": "Gobo 1", "art": "gobo"},
+            {"von": 13, "bis": 18, "name": "Gobo 2", "art": "gobo"},
+            {"von": 19, "bis": 25, "name": "Gobo 3", "art": "gobo"},
+            {"von": 26, "bis": 31, "name": "Gobo 4", "art": "gobo"},
+            {"von": 32, "bis": 37, "name": "Gobo 5", "art": "gobo"},
+            {"von": 38, "bis": 44, "name": "Gobo 6", "art": "gobo"},
+            {"von": 45, "bis": 50, "name": "Gobo 7", "art": "gobo"},
+            {"von": 51, "bis": 56, "name": "Gobo 8", "art": "gobo"},
+            {"von": 57, "bis": 63, "name": "Gobo 9", "art": "gobo"},
+            {"von": 64, "bis": 70, "name": "Gobo 1 Shake", "art": "shake"},
+            {"von": 71, "bis": 77, "name": "Gobo 2 Shake", "art": "shake"},
+            {"von": 78, "bis": 84, "name": "Gobo 3 Shake", "art": "shake"},
+            {"von": 85, "bis": 91, "name": "Gobo 4 Shake", "art": "shake"},
+            {"von": 92, "bis": 98, "name": "Gobo 5 Shake", "art": "shake"},
+            {"von": 99, "bis": 105, "name": "Gobo 6 Shake", "art": "shake"},
+            {"von": 106, "bis": 112, "name": "Gobo 7 Shake", "art": "shake"},
+            {"von": 113, "bis": 119, "name": "Gobo 8 Shake", "art": "shake"},
+            {"von": 120, "bis": 127, "name": "Gobo 9 Shake", "art": "shake"},
+            {"von": 128, "bis": 190, "name": "Raddrehung im Uhrzeigersinn, schnell → langsam", "art": "rotate"},
+            {"von": 191, "bis": 192, "name": "Stopp"},
+            {"von": 193, "bis": 255, "name": "Raddrehung gegen Uhrzeigersinn, langsam → schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Prisma",
+          "attribut": "prism",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Kein Prisma", "art": "open"},
+            {"von": 11, "bis": 127, "name": "Prisma ein", "art": "prism"},
+            {"von": 128, "bis": 255, "name": "Prisma-Makro 1 – 32", "art": "prism"}
+          ]
+        },
+        {
+          "name": "Prisma-Rotation",
+          "attribut": "prism_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Index 0° → 360°"},
+            {"von": 128, "bis": 190, "name": "Rotation im Uhrzeigersinn, schnell → langsam", "art": "rotate"},
+            {"von": 191, "bis": 192, "name": "Stopp"},
+            {"von": 193, "bis": 255, "name": "Rotation gegen Uhrzeigersinn, langsam → schnell", "art": "rotate"}
+          ]
+        },
+        {"name": "Iris (gross → klein)", "attribut": "iris", "default": 0, "highlight": 0},
+        {"name": "Zoom (eng → weit)", "attribut": "zoom", "default": 0, "highlight": 0},
+        {"name": "Zoom fein", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Fokus (fern → nah)", "attribut": "focus", "default": 0, "highlight": 0},
+        {"name": "Fokus fein", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Blende 1 Position (aus → ein)", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Blende 1 Winkel",
+          "attribut": "raw",
+          "default": 127,
+          "highlight": 127,
+          "bereiche": [
+            {"von": 0, "bis": 126, "name": "Min.-Winkel → parallel"},
+            {"von": 127, "bis": 128, "name": "Parallel"},
+            {"von": 129, "bis": 255, "name": "Parallel → Max.-Winkel"}
+          ]
+        },
+        {"name": "Blende 2 Position (aus → ein)", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Blende 2 Winkel",
+          "attribut": "raw",
+          "default": 127,
+          "highlight": 127,
+          "bereiche": [
+            {"von": 0, "bis": 126, "name": "Min.-Winkel → parallel"},
+            {"von": 127, "bis": 128, "name": "Parallel"},
+            {"von": 129, "bis": 255, "name": "Parallel → Max.-Winkel"}
+          ]
+        },
+        {"name": "Blende 3 Position (aus → ein)", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Blende 3 Winkel",
+          "attribut": "raw",
+          "default": 127,
+          "highlight": 127,
+          "bereiche": [
+            {"von": 0, "bis": 126, "name": "Min.-Winkel → parallel"},
+            {"von": 127, "bis": 128, "name": "Parallel"},
+            {"von": 129, "bis": 255, "name": "Parallel → Max.-Winkel"}
+          ]
+        },
+        {"name": "Blende 4 Position (aus → ein)", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Blende 4 Winkel",
+          "attribut": "raw",
+          "default": 127,
+          "highlight": 127,
+          "bereiche": [
+            {"von": 0, "bis": 126, "name": "Min.-Winkel → parallel"},
+            {"von": 127, "bis": 128, "name": "Parallel"},
+            {"von": 129, "bis": 255, "name": "Parallel → Max.-Winkel"}
+          ]
+        },
+        {
+          "name": "Blendensystem-Rotation",
+          "attribut": "raw",
+          "default": 127,
+          "highlight": 127,
+          "bereiche": [
+            {"von": 0, "bis": 126, "name": "45° gegen Uhrzeigersinn → 0°"},
+            {"von": 127, "bis": 128, "name": "Nicht gedreht (quadratisch)"},
+            {"von": 129, "bis": 255, "name": "0° → 45° im Uhrzeigersinn"}
+          ]
+        },
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fein", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fein", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt-Geschwindigkeit (schnell → langsam)", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Sonderfunktionen",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 69, "name": "Keine Funktion"},
+            {"von": 70, "bis": 79, "name": "Blackout bei Pan/Tilt an"},
+            {"von": 80, "bis": 89, "name": "Blackout bei Pan/Tilt aus"},
+            {"von": 90, "bis": 99, "name": "Blackout bei Farbwechsel an"},
+            {"von": 100, "bis": 109, "name": "Blackout bei Farbwechsel aus"},
+            {"von": 110, "bis": 119, "name": "Blackout bei Gobowechsel an"},
+            {"von": 120, "bis": 129, "name": "Blackout bei Gobowechsel aus"},
+            {"von": 130, "bis": 199, "name": "Keine Funktion"},
+            {"von": 200, "bis": 209, "name": "Reset alles", "art": "reset"},
+            {"von": 210, "bis": 219, "name": "Reset Effekte", "art": "reset"},
+            {"von": 220, "bis": 229, "name": "Reset Pan/Tilt", "art": "reset"},
+            {"von": 230, "bis": 255, "name": "Keine Funktion"}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Gilt fuer ERA 400 Performance CLD und WRM (Farbrad-Slot 7: CTO 3200 K beim CLD, CTB 6000 K beim WRM). Der 30-Kanal-Modus folgt dem Handbuch Rev. A; der 32-Kanal-Modus (Zoom/Fokus fein) stammt nur aus der QLC+-Datei."
+}

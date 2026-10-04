@@ -93,17 +93,25 @@ const SHADOW_TEXTURE_RESERVE = 6;
 // Geraeten eine sekundenlange Blockade gesehen, ohne dass irgendwo ein Fehler
 // auftaucht.
 //
-// Deshalb zusaetzlich ein ABSOLUTES Dach. Es ist bewusst 16 — der Wert, den
+// Deshalb zusaetzlich ein ABSOLUTES Dach. Es war zuerst 16 (seit VIZ-69: 8, s. unten) — der Wert, den
 // Davids Surface ohnehin als `maxTextures` meldet: damit verhaelt sich die
 // Szene auf beiden Geraeten gleich, statt auf der staerkeren GPU in einen
 // Fehler zu laufen, den die schwaechere nie sieht. Der Abstand zur gemessenen
 // Kippgrenze (24 gut / 26 kaputt) ist Absicht — sie wurde auf EINER GPU
 // ermittelt, und ein Dach, das erst kurz vor dem Abgrund greift, ist keins.
 //
-// Grosse Rigs verlieren dadurch Schlagschatten jenseits des 16. Geraets. Das
+// Grosse Rigs verlieren dadurch Schlagschatten jenseits des N. Geraets. Das
 // ist der Preis; die Alternative war ein Absturz. Wer das Dach anhebt, misst
 // vorher mit dem Benchmark nach — und zwar auf beiden Geraeten.
-const SHADOW_SPOT_HARD_CAP = 16;
+//
+// VIZ-69 (2026-10-04): Dach von 16 auf 8. Der Schatten-Durchlauf war in der
+// Messung der groesste Einzelposten (rund 30 % eines Frames, s. Docstring von
+// tools/viz_render_benchmark.py), und er waechst linear mit der Zahl der
+// Schatten-Spots: jeder zeichnet die ganze Szene noch einmal aus seiner Sicht,
+// und jeder kostet im Lit-Shader 16 PCF-Abtastungen pro Pixel. Acht
+// schattenwerfende Lichter reichen fuer den Raumeindruck; die uebrigen leuchten
+// voll, nur ohne Schlagschatten.
+const SHADOW_SPOT_HARD_CAP = 8;
 let _shadowSpotBudget = null;
 
 function shadowSpotBudget() {
@@ -132,6 +140,11 @@ export function shadowBudgetInfo() {
 // Idempotent: verteilt das Budget deterministisch (fid-Reihenfolge) auf alle
 // vorhandenen Spots. three.js r128 erkennt den castShadow-Wechsel ueber die
 // lightsStateVersion selbst und kompiliert betroffene Programme neu.
+// ⚠️ VIZ-69: deshalb NUR beim Patchen (addFixture/removeFixture) rufen, nie pro
+// Frame oder pro DMX-Wert — die Zahl der Schatten-Spots gehoert zum
+// Programmschluessel, jede Umverteilung kostet eine Neukompilierung aller
+// Lit-Shader (Sekunden, nicht Millisekunden). Dunkle Spots behalten ihren
+// Schatten-Slot (dunkel = intensity 0, s. builders.js#applyGenericColor).
 export function syncSpotShadowBudget() {
   const budget = shadowSpotBudget();
   let used = 0;
@@ -396,11 +409,12 @@ export function addFixture(data) {
     // castShadow vergibt syncSpotShadowBudget() nach der Registrierung —
     // ein hartes `true` je Fixture sprengt auf 16-Unit-GPUs das Shader-Limit.
     spot.castShadow = false;
-    // Dunkle Lampen kosten sonst trotzdem Shading in JEDEM beleuchteten Pixel
-    // (three.js wertet alle sichtbaren Lichter aus) — applyGenericColor haelt
-    // die Sichtbarkeit synchron zur effektiven Leuchtdichte. Gleiches Mass schon
-    // beim Anlegen (A3D-25/A3D-28): Dimmer offen + Farbe schwarz ist dunkel.
-    spot.visible = intensity * Math.max(color.r, color.g, color.b) > 0.01;
+    // VIZ-69: der Spot bleibt IMMER sichtbar — dunkel heisst intensity 0
+    // (Begruendung in builders.js#applyGenericColor: visible gehoert in r128
+    // zum Shader-Programmschluessel, jedes Umschalten kompilierte neu).
+    // Gleiches Mass wie dort schon beim Anlegen (A3D-25/A3D-28): Dimmer offen
+    // + Farbe schwarz ist dunkel.
+    if (intensity * Math.max(color.r, color.g, color.b) <= 0.01) spot.intensity = 0;
     const shadowRes = isLowSpec ? 256 : 512;
     spot.shadow.mapSize.width = shadowRes;
     spot.shadow.mapSize.height = shadowRes;

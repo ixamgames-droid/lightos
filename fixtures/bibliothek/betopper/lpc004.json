@@ -1,0 +1,70 @@
+{
+  "format_version": 1,
+  "hersteller": "Betopper",
+  "hersteller_kurz": "Betopper",
+  "modell": "LPC004",
+  "kurzname": "LPC004",
+  "typ": "par",
+  "leistung_w": 180,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Betopper-LPC-004.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Betopper/Betopper-LPC-004.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.0.0 Beta 3 · Jungle Jim",
+    "original": "resources/fixtures/Betopper/Betopper-LPC-004.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 6 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung: Strobe-Kanal: Bereiche 0 = offen, 1-255 = Strobe ergaenzt (QLC+-Preset ohne Bereiche); Transitions-Kanal: Auto-Programme nicht mehr als Einzelfarbe (art color) markiert; Programmgeschwindigkeit speed -> effect_speed (keine Bewegungsgeschwindigkeit)"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Quelldatei und auf innere Stimmigkeit geprueft; kein Herstellerhandbuch oeffentlich auffindbar, nicht am Geraet geprueft"
+  },
+  "modi": [
+    {
+      "name": "8 Channel",
+      "kanaele": [
+        {"name": "Intensity", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 1, "bis": 255, "name": "Strobe langsam → schnell", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Farbprogramme (Transitions)",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 50, "name": "Nothing", "art": ""},
+            {"von": 51, "bis": 100, "name": "Auto Snap Transition (13 colors)", "art": ""},
+            {"von": 101, "bis": 150, "name": "Auto Fade Transition (13 colors)", "art": ""},
+            {"von": 151, "bis": 200, "name": "Auto Pulse Transition (13 colors)", "art": ""},
+            {"von": 201, "bis": 255, "name": "Nothing", "art": ""}
+          ]
+        },
+        {
+          "name": "Speed for Transitions (ch 3)",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Speed for channel 3 mode", "art": ""}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    }
+  ],
+  "notizen": "Strobe-Schwelle (0 = offen) aus QLC+-Preset abgeleitet; genaue Grenze nicht handbuchgeprueft."
+}

@@ -1,0 +1,125 @@
+{
+  "format_version": 1,
+  "hersteller": "Expolite",
+  "hersteller_kurz": "Expolite",
+  "modell": "TourStick 72 RGBWA",
+  "kurzname": "TOURSTICK 72",
+  "typ": "led_bar",
+  "leistung_w": 87,
+  "quelle": {"titel": "QLC+-Geraetedefinition Expolite-TourStick-72-RGBWA.qxf", "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Expolite/Expolite-TourStick-72-RGBWA.qxf"},
+  "herkunft": {"art": "qlcplus", "lizenz": "Apache-2.0", "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.11.2 GIT · Dirk J", "original": "resources/fixtures/Expolite/Expolite-TourStick-72-RGBWA.qxf", "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 2 Wertebereiche mit Art (kind) versehen; LightOS-Nacharbeit: typ par -> led_bar (Leiste mit 3 Bloecken); Rasterform 1x3 in den Block-Modi, 1x1 sonst; 'Strobe' macro -> shutter mit Kein Strobe (open) / Strobe (strobe)"},
+  "autor": "LightOS",
+  "geprueft": {"ok": false, "wie": "QLC+-Datei Kanal fuer Kanal durchgesehen und logisch korrigiert; ein vollstaendiges Herstellerhandbuch war nicht abrufbar, daher nicht gegen das Handbuch geprueft"},
+  "modi": [
+    {
+      "name": "ARC2+S",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Kein Strobe", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe 1-20 Hz", "art": "strobe"}
+          ]
+        }
+      ],
+      "raster": {"rows": 1, "cols": 1}
+    },
+    {
+      "name": "ARC1+D",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255}
+      ],
+      "raster": {"rows": 1, "cols": 1}
+    },
+    {
+      "name": "ARC2",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255}
+      ],
+      "raster": {"rows": 1, "cols": 1}
+    },
+    {
+      "name": "ARC2+D",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255}
+      ],
+      "raster": {"rows": 1, "cols": 1}
+    },
+    {
+      "name": "HSV",
+      "kanaele": [
+        {"name": "Hue", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Saturation", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Value", "attribut": "raw", "default": 0, "highlight": 0}
+      ],
+      "raster": {"rows": 1, "cols": 1}
+    },
+    {
+      "name": "ARC1",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255}
+      ],
+      "raster": {"rows": 1, "cols": 1}
+    },
+    {
+      "name": "Block1",
+      "kanaele": [
+        {"name": "Block 1 Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Block 1 Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Block 1 Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Block 2 Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Block 2 Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Block 2 Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Block 3 Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Block 3 Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Block 3 Blue", "attribut": "color_b", "default": 0, "highlight": 255}
+      ],
+      "raster": {"rows": 1, "cols": 3}
+    },
+    {
+      "name": "Block2",
+      "kanaele": [
+        {"name": "Block 1 Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Block 1 Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Block 1 Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Block 1 White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Block 1 Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "Block 2 Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Block 2 Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Block 2 Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Block 2 White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Block 2 Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "Block 3 Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Block 3 Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Block 3 Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Block 3 White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Block 3 Amber", "attribut": "color_a", "default": 0, "highlight": 255}
+      ],
+      "raster": {"rows": 1, "cols": 3}
+    }
+  ],
+  "notizen": "LED-Leiste RGBWA mit 3 steuerbaren Bloecken (Modi Block1/Block2)."
+}

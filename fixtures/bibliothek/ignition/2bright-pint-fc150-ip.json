@@ -1,0 +1,213 @@
+{
+  "format_version": 1,
+  "hersteller": "Ignition",
+  "hersteller_kurz": "Ignition",
+  "modell": "2bright Pint FC150 IP",
+  "kurzname": "2B PINT FC150",
+  "typ": "par",
+  "leistung_w": 135,
+  "notizen": "Kompakter COB-Scheinwerfer IP65, 1 x 150 W RGBW-COB. Thomann-Artikel '2bright Pint FC150 IP' (URL ignition_2bright_pint_150_ip). Blinder-Modus-Kanal: Handbuch nennt keine Wertebereiche; im 1-Kanal-Modus einziger Helligkeitsregler (intensity), sonst raw. Farbmakro 8-255: 46 Makros ohne Einzelwerte im Handbuch.",
+  "quelle": {
+    "titel": "Ignition 2bright Pint FC150 IP – Bedienungsanleitung (Thomann, ID 481586)",
+    "version": "V2",
+    "datum": "2022-03-24",
+    "url": "https://fast-images.static-thomann.de/pics/atg/atgdata/document/manual/c_481586_v2_r1_en_online.pdf"
+  },
+  "herkunft": {"art": "hersteller-handbuch", "lizenz": "eigen"},
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal fuer Kanal gegen die DMX-Tabellen aller 6 Modi im Thomann-Handbuch (Kap. 7) geschrieben und geprueft; nicht am Geraet getestet"
+  },
+  "modi": [
+    {
+      "name": "1-Kanal",
+      "kanaele": [
+        {"name": "Blinder-Modus", "attribut": "intensity", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "2-Kanal",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Farbmakros",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Ohne Funktion", "art": ""},
+            {"von": 8, "bis": 255, "name": "Farbmakro 1 ... 46 (Handbuch nennt keine Einzelwerte)", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4-Kanal",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "6-Kanal",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "LED an", "art": "open"},
+            {"von": 11, "bis": 20, "name": "LED aus", "art": "closed"},
+            {"von": 21, "bis": 30, "name": "Einzelblitz", "art": "strobe"},
+            {"von": 31, "bis": 90, "name": "Strobe, langsam -> schnell", "art": "strobe"},
+            {"von": 91, "bis": 100, "name": "LED an", "art": "open"},
+            {"von": 101, "bis": 170, "name": "Strobe-Impulse (Burst mit Pause), langsam -> schnell", "art": "strobe"},
+            {"von": 171, "bis": 180, "name": "LED an", "art": "open"},
+            {"von": 181, "bis": 240, "name": "Zufaelliger Strobe, langsam -> schnell", "art": "strobe"},
+            {"von": 241, "bis": 255, "name": "LED an", "art": "open"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8-Kanal",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Dimmer fein", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "LED an", "art": "open"},
+            {"von": 11, "bis": 20, "name": "LED aus", "art": "closed"},
+            {"von": 21, "bis": 30, "name": "Einzelblitz", "art": "strobe"},
+            {"von": 31, "bis": 90, "name": "Strobe, langsam -> schnell", "art": "strobe"},
+            {"von": 91, "bis": 100, "name": "LED an", "art": "open"},
+            {"von": 101, "bis": 170, "name": "Strobe-Impulse (Burst mit Pause), langsam -> schnell", "art": "strobe"},
+            {"von": 171, "bis": 180, "name": "LED an", "art": "open"},
+            {"von": 181, "bis": 240, "name": "Zufaelliger Strobe, langsam -> schnell", "art": "strobe"},
+            {"von": 241, "bis": 255, "name": "LED an", "art": "open"}
+          ]
+        },
+        {"name": "Blinder-Modus (Warmweiss-Blinder)", "attribut": "raw", "default": 0, "highlight": 0}
+      ]
+    },
+    {
+      "name": "11-Kanal",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Dimmer fein", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "LED an", "art": "open"},
+            {"von": 11, "bis": 20, "name": "LED aus", "art": "closed"},
+            {"von": 21, "bis": 30, "name": "Einzelblitz", "art": "strobe"},
+            {"von": 31, "bis": 90, "name": "Strobe, langsam -> schnell", "art": "strobe"},
+            {"von": 91, "bis": 100, "name": "LED an", "art": "open"},
+            {"von": 101, "bis": 170, "name": "Strobe-Impulse (Burst mit Pause), langsam -> schnell", "art": "strobe"},
+            {"von": 171, "bis": 180, "name": "LED an", "art": "open"},
+            {"von": 181, "bis": 240, "name": "Zufaelliger Strobe, langsam -> schnell", "art": "strobe"},
+            {"von": 241, "bis": 255, "name": "LED an", "art": "open"}
+          ]
+        },
+        {"name": "Blinder-Modus (Warmweiss-Blinder)", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Farbmakros",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Ohne Funktion", "art": ""},
+            {"von": 8, "bis": 255, "name": "Farbmakro 1 ... 46 (Handbuch nennt keine Einzelwerte)", "art": ""}
+          ]
+        },
+        {
+          "name": "Dimmerkurve / Verzoegerung",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Geraete-Einstellung", "art": ""},
+            {"von": 11, "bis": 20, "name": "Dimmerkurve Linear", "art": ""},
+            {"von": 21, "bis": 40, "name": "Dimmerkurve Stage", "art": ""},
+            {"von": 41, "bis": 60, "name": "Dimmerkurve TV", "art": ""},
+            {"von": 61, "bis": 80, "name": "Dimmerkurve Architectural", "art": ""},
+            {"von": 81, "bis": 100, "name": "Dimmerkurve Theatre", "art": ""},
+            {"von": 101, "bis": 120, "name": "Dimmerkurve Stage2", "art": ""},
+            {"von": 121, "bis": 121, "name": "Verzoegerung 0.1 s", "art": ""},
+            {"von": 122, "bis": 122, "name": "Verzoegerung 0.2 s", "art": ""},
+            {"von": 123, "bis": 123, "name": "Verzoegerung 0.3 s", "art": ""},
+            {"von": 124, "bis": 124, "name": "Verzoegerung 0.4 s", "art": ""},
+            {"von": 125, "bis": 125, "name": "Verzoegerung 0.5 s", "art": ""},
+            {"von": 126, "bis": 126, "name": "Verzoegerung 0.6 s", "art": ""},
+            {"von": 127, "bis": 127, "name": "Verzoegerung 0.7 s", "art": ""},
+            {"von": 128, "bis": 128, "name": "Verzoegerung 0.8 s", "art": ""},
+            {"von": 129, "bis": 129, "name": "Verzoegerung 0.9 s", "art": ""},
+            {"von": 130, "bis": 130, "name": "Verzoegerung 1.0 s", "art": ""},
+            {"von": 131, "bis": 131, "name": "Verzoegerung 1.5 s", "art": ""},
+            {"von": 132, "bis": 132, "name": "Verzoegerung 2.0 s", "art": ""},
+            {"von": 133, "bis": 133, "name": "Verzoegerung 3.0 s", "art": ""},
+            {"von": 134, "bis": 134, "name": "Verzoegerung 4.0 s", "art": ""},
+            {"von": 135, "bis": 135, "name": "Verzoegerung 5.0 s", "art": ""},
+            {"von": 136, "bis": 136, "name": "Verzoegerung 6.0 s", "art": ""},
+            {"von": 137, "bis": 137, "name": "Verzoegerung 7.0 s", "art": ""},
+            {"von": 138, "bis": 138, "name": "Verzoegerung 8.0 s", "art": ""},
+            {"von": 139, "bis": 139, "name": "Verzoegerung 9.0 s", "art": ""},
+            {"von": 140, "bis": 140, "name": "Verzoegerung 10 s", "art": ""},
+            {"von": 141, "bis": 255, "name": "Geraete-Einstellung", "art": ""}
+          ]
+        },
+        {
+          "name": "LED-Frequenz / Luefter",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Ohne Funktion", "art": ""},
+            {"von": 11, "bis": 20, "name": "LED-Frequenz 900 Hz", "art": ""},
+            {"von": 21, "bis": 30, "name": "LED-Frequenz 1000 Hz", "art": ""},
+            {"von": 31, "bis": 40, "name": "LED-Frequenz 1100 Hz", "art": ""},
+            {"von": 41, "bis": 50, "name": "LED-Frequenz 1200 Hz", "art": ""},
+            {"von": 51, "bis": 60, "name": "LED-Frequenz 1300 Hz", "art": ""},
+            {"von": 61, "bis": 70, "name": "LED-Frequenz 1400 Hz", "art": ""},
+            {"von": 71, "bis": 80, "name": "LED-Frequenz 1500 Hz", "art": ""},
+            {"von": 81, "bis": 90, "name": "LED-Frequenz 2500 Hz", "art": ""},
+            {"von": 91, "bis": 100, "name": "LED-Frequenz 4000 Hz", "art": ""},
+            {"von": 101, "bis": 110, "name": "LED-Frequenz 5000 Hz", "art": ""},
+            {"von": 111, "bis": 120, "name": "LED-Frequenz 6000 Hz", "art": ""},
+            {"von": 121, "bis": 130, "name": "LED-Frequenz 10000 Hz", "art": ""},
+            {"von": 131, "bis": 140, "name": "Geraete-Einstellung", "art": ""},
+            {"von": 141, "bis": 150, "name": "Luefter 'Silent'", "art": ""},
+            {"von": 151, "bis": 160, "name": "Luefter 'Smart'", "art": ""},
+            {"von": 161, "bis": 170, "name": "Luefter 'Max'", "art": ""},
+            {"von": 171, "bis": 180, "name": "Geraete-Einstellung (Luefter)", "art": ""},
+            {"von": 181, "bis": 255, "name": "Ohne Funktion", "art": ""}
+          ]
+        }
+      ]
+    }
+  ]
+}

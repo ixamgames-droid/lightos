@@ -1,0 +1,86 @@
+{
+  "format_version": 1,
+  "hersteller": "Betopper",
+  "hersteller_kurz": "Betopper",
+  "modell": "LPC-007",
+  "kurzname": "LPC007",
+  "typ": "par",
+  "leistung_w": 180,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Betopper-LPC-007.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Betopper/Betopper-LPC-007.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.0.0 Beta 3 · Romil Barticulo",
+    "original": "resources/fixtures/Betopper/Betopper-LPC-007.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 17 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung: Color-Macro-Kanal color_wheel -> macro (Programmwahl, kein Farbrad); Programm-Bereiche ohne art color; Kanal 7 (Auswahl fuer Kanal 6) speed -> raw: Farbauswahl bzw. Tempo je nach Kanal 6, keine Bewegungsgeschwindigkeit"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Quelldatei und auf innere Stimmigkeit geprueft; kein Herstellerhandbuch oeffentlich auffindbar, nicht am Geraet geprueft"
+  },
+  "modi": [
+    {
+      "name": "3 Channel",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "7 Channel",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "No Function", "art": "open"},
+            {"von": 1, "bis": 255, "name": "Slow to Fast", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Farbmakro / Modus",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 50, "name": "DMX Dimming", "art": ""},
+            {"von": 51, "bis": 100, "name": "Color Output (8 type)", "art": ""},
+            {"von": 101, "bis": 150, "name": "Color Shade", "art": ""},
+            {"von": 151, "bis": 200, "name": "Color Transform", "art": ""},
+            {"von": 201, "bis": 250, "name": "Color Pulse", "art": ""},
+            {"von": 251, "bis": 255, "name": "Sound Trigger", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Auswahl/Tempo fuer Kanal 6",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 30, "name": "Red", "art": ""},
+            {"von": 31, "bis": 60, "name": "Green", "art": ""},
+            {"von": 61, "bis": 92, "name": "Blue", "art": ""},
+            {"von": 93, "bis": 123, "name": "White", "art": ""},
+            {"von": 124, "bis": 154, "name": "Yellow", "art": ""},
+            {"von": 155, "bis": 185, "name": "Violet", "art": ""},
+            {"von": 186, "bis": 216, "name": "Color Change", "art": ""},
+            {"von": 217, "bis": 247, "name": "White 2", "art": ""},
+            {"von": 248, "bis": 255, "name": "Color Change 2", "art": ""}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Kanal 7 wirkt abhaengig von Kanal 6 (Farbe bei 51-100, sonst Tempo)."
+}

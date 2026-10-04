@@ -1,0 +1,272 @@
+{
+  "format_version": 1,
+  "hersteller": "Shehds",
+  "hersteller_kurz": "Shehds",
+  "modell": "Constellaser 12W Waterproof Scan Laser",
+  "kurzname": "SH-CONSTELLASER",
+  "typ": "laser",
+  "leistung_w": 250,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Shehds-Constellaser-12W-Waterproof-Scan-Laser.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Shehds/Shehds-Constellaser-12W-Waterproof-Scan-Laser.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.0.0 Beta 3 · Tóth János",
+    "original": "resources/fixtures/Shehds/Shehds-Constellaser-12W-Waterproof-Scan-Laser.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 53 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): Laser-Attribute statt Pan/Tilt/Makro: X/Y-Koordinate -> laser_x/laser_y, Bibliothek -> laser_bank, Muster/Animation -> gobo_wheel (art gobo), Z-Rotation -> gobo_rotation, Zeichnen -> laser_draw, Wellen -> laser_twist, Scanmodus -> laser_draw_mode, X/Y-Achsen-Bewegung als raw (keine doppelten Positionskanaele); Farbwechsel-Bereiche ohne Farbkachel; kurzname SH-CONSTELLASER; Bereichs-Arten korrigiert (u. a. „Preset“ nicht als Reset, Farben/Offen auf Farbrad, Open/Shake/Rotation auf Goborad, Prisma/Frost, keine Farb-/Dreh-Kacheln auf Makro-/Speed-Kanaelen, Sound-Bereiche); Farbmakro-/Programmkanaele ohne einzelne Farbslots als macro statt color_wheel"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": false,
+    "wie": "nicht gegen ein Herstellerhandbuch geprueft (kein oeffentliches Shehds-Handbuch zu diesem Modell auffindbar); Kanalbelegung und Wertebereiche aus der QLC+-Vorlage, Attribute, Bereichs-Arten und Defaults von LightOS plausibilisiert"
+  },
+  "modi": [
+    {
+      "name": "18 Channel",
+      "kanaele": [
+        {"name": "Laser source on", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Strobe", "attribut": "shutter", "default": 0, "highlight": 0},
+        {"name": "Linear Pattern Size", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "X coordinate",
+          "attribut": "laser_x",
+          "default": 128,
+          "highlight": 128,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "X", "art": ""}
+          ]
+        },
+        {
+          "name": "Y coordinate",
+          "attribut": "laser_y",
+          "default": 128,
+          "highlight": 128,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Y", "art": ""}
+          ]
+        },
+        {
+          "name": "Color",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 63, "name": "Color select"},
+            {"von": 64, "bis": 95, "name": "Change color speed slow to fast"},
+            {"von": 96, "bis": 127, "name": "Changing color effect mode 1 (slow to fast)"},
+            {"von": 128, "bis": 159, "name": "Changing color effect mode 2 (slow to fast)"},
+            {"von": 160, "bis": 191, "name": "Changing color effect mode 3 (slow to fast)"},
+            {"von": 192, "bis": 223, "name": "Changing color effect mode 4 (slow to fast)"},
+            {"von": 224, "bis": 255, "name": "Changing color effect mode 5 (slow to fast)"}
+          ]
+        },
+        {
+          "name": "Scan Mode",
+          "attribut": "laser_draw_mode",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Line", "art": ""},
+            {"von": 128, "bis": 255, "name": "Point", "art": ""}
+          ]
+        },
+        {
+          "name": "Library select",
+          "attribut": "laser_bank",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Library Select", "art": ""}
+          ]
+        },
+        {
+          "name": "Pattern Animation library",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Animation Library 1", "art": "gobo"},
+            {"von": 8, "bis": 15, "name": "Animation library 2", "art": "gobo"},
+            {"von": 16, "bis": 23, "name": "Animation library 3", "art": "gobo"},
+            {"von": 24, "bis": 255, "name": "Pattern library", "art": "gobo"}
+          ]
+        },
+        {
+          "name": "Play Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 27, "name": "Animation playback speed (default)", "art": ""},
+            {"von": 28, "bis": 127, "name": "Animation playback speed (slow to fast)", "art": ""},
+            {"von": 128, "bis": 255, "name": "Sound mode (sound sensitivity slow to high)", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Z rotation",
+          "attribut": "gobo_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Pattern Z axis rotating 360", "art": "rotate"},
+            {"von": 128, "bis": 255, "name": "rotating slow to fast", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "X rotation",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Pattern X axis rotating 360"},
+            {"von": 128, "bis": 255, "name": "Rotating slow to fast"}
+          ]
+        },
+        {
+          "name": "Y rotation",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Pattern Y axis rotating 360"},
+            {"von": 128, "bis": 255, "name": "rotating speed slow to fast"}
+          ]
+        },
+        {
+          "name": "X axis move",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Pattern or animation X-axis movement", "art": ""},
+            {"von": 128, "bis": 255, "name": "X-axis left to right move (slow to fast)", "art": ""}
+          ]
+        },
+        {
+          "name": "Y axis move",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Pattern or animation Y-axis movement", "art": ""},
+            {"von": 128, "bis": 255, "name": "Y-axis left to right move (slow to fast)", "art": ""}
+          ]
+        },
+        {
+          "name": "Zoom",
+          "attribut": "zoom",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Pattern or animation zoom", "art": ""},
+            {"von": 128, "bis": 255, "name": "Zoom in&out slow to fast", "art": ""}
+          ]
+        },
+        {
+          "name": "Draw Effect",
+          "attribut": "laser_draw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "pattern draw effect slow to fast", "art": ""}
+          ]
+        },
+        {
+          "name": "Twisted Waves",
+          "attribut": "laser_twist",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "X axis twisted Waves", "art": ""},
+            {"von": 128, "bis": 255, "name": "Y axis twisted waves", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "10 Channel",
+      "kanaele": [
+        {"name": "Laser source on", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Strobe", "attribut": "shutter", "default": 0, "highlight": 0},
+        {"name": "Linear Pattern Size", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "X coordinate",
+          "attribut": "laser_x",
+          "default": 128,
+          "highlight": 128,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "X", "art": ""}
+          ]
+        },
+        {
+          "name": "Y coordinate",
+          "attribut": "laser_y",
+          "default": 128,
+          "highlight": 128,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Y", "art": ""}
+          ]
+        },
+        {
+          "name": "Color",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 63, "name": "Color select"},
+            {"von": 64, "bis": 95, "name": "Change color speed slow to fast"},
+            {"von": 96, "bis": 127, "name": "Changing color effect mode 1 (slow to fast)"},
+            {"von": 128, "bis": 159, "name": "Changing color effect mode 2 (slow to fast)"},
+            {"von": 160, "bis": 191, "name": "Changing color effect mode 3 (slow to fast)"},
+            {"von": 192, "bis": 223, "name": "Changing color effect mode 4 (slow to fast)"},
+            {"von": 224, "bis": 255, "name": "Changing color effect mode 5 (slow to fast)"}
+          ]
+        },
+        {
+          "name": "Scan Mode",
+          "attribut": "laser_draw_mode",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Line", "art": ""},
+            {"von": 128, "bis": 255, "name": "Point", "art": ""}
+          ]
+        },
+        {
+          "name": "Library select",
+          "attribut": "laser_bank",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Library Select", "art": ""}
+          ]
+        },
+        {
+          "name": "Pattern Animation library",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Animation Library 1", "art": "gobo"},
+            {"von": 8, "bis": 15, "name": "Animation library 2", "art": "gobo"},
+            {"von": 16, "bis": 23, "name": "Animation library 3", "art": "gobo"},
+            {"von": 24, "bis": 255, "name": "Pattern library", "art": "gobo"}
+          ]
+        },
+        {
+          "name": "Play Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 27, "name": "Animation playback speed (default)", "art": ""},
+            {"von": 28, "bis": 127, "name": "Animation playback speed (slow to fast)", "art": ""},
+            {"von": 128, "bis": 255, "name": "Sound mode (sound sensitivity slow to high)", "art": "sound"}
+          ]
+        }
+      ]
+    }
+  ]
+}
