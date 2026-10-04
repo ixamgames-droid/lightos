@@ -1,0 +1,110 @@
+{
+  "format_version": 1,
+  "hersteller": "Expolite",
+  "hersteller_kurz": "Expolite",
+  "modell": "TourSpot 60",
+  "kurzname": "TOURSPOT 60",
+  "typ": "moving_head",
+  "leistung_w": 60,
+  "quelle": {"titel": "QLC+-Geraetedefinition Expolite-TourSpot-60.qxf", "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Expolite/Expolite-TourSpot-60.qxf"},
+  "herkunft": {"art": "qlcplus", "lizenz": "Apache-2.0", "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.3 GIT · Dirk J", "original": "resources/fixtures/Expolite/Expolite-TourSpot-60.qxf", "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 35 Wertebereiche mit Art (kind) versehen; LightOS-Nacharbeit: Kanal 1 war als iris abgebildet, ist aber Shutter/Strobe -> shutter, Default/Highlight 20 (offen); Bereiche deutsch benannt; Farbrad: Open/White als open, Regenbogen-Bereiche als rotate (statt gobo bzw. ohne Art); Gobo-Rad: Open als open (statt gobo), Rad-Durchlauf als rotate; 'Gobo Rotation' macro -> gobo_rotation, Index-Bereich ohne Rotate-Art; Prisma: Prisma ein und Winkelverstellung als prism"},
+  "autor": "LightOS",
+  "geprueft": {"ok": false, "wie": "QLC+-Datei Kanal fuer Kanal durchgesehen und logisch korrigiert; ein vollstaendiges Herstellerhandbuch war nicht abrufbar, daher nicht gegen das Handbuch geprueft"},
+  "modi": [
+    {
+      "name": "12 Channel",
+      "kanaele": [
+        {
+          "name": "Shutter / Strobe",
+          "attribut": "shutter",
+          "default": 20,
+          "highlight": 20,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Shutter zu", "art": "closed"},
+            {"von": 11, "bis": 39, "name": "Shutter offen", "art": "open"},
+            {"von": 40, "bis": 240, "name": "Strobe langsam → schnell", "art": "strobe"},
+            {"von": 241, "bis": 245, "name": "Shutter offen", "art": "open"},
+            {"von": 246, "bis": 250, "name": "Reset", "art": "reset"},
+            {"von": 251, "bis": 255, "name": "Shutter offen", "art": "open"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Farbrad",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 18, "name": "Open / White", "art": "open"},
+            {"von": 19, "bis": 37, "name": "Red", "art": "color"},
+            {"von": 38, "bis": 56, "name": "Blue", "art": "color"},
+            {"von": 57, "bis": 75, "name": "Yellow", "art": "color"},
+            {"von": 76, "bis": 94, "name": "Green", "art": "color"},
+            {"von": 95, "bis": 113, "name": "Orange", "art": "color"},
+            {"von": 114, "bis": 127, "name": "Violet", "art": "color"},
+            {"von": 128, "bis": 191, "name": "Rainbow Effect, CW, fast to slow", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "Rainbow Effect, counter CW, slow to fast", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo-Rad",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Open", "art": "open"},
+            {"von": 16, "bis": 31, "name": "Gobo 1", "art": "gobo"},
+            {"von": 32, "bis": 47, "name": "Gobo 2", "art": "gobo"},
+            {"von": 48, "bis": 63, "name": "Gobo 3", "art": "gobo"},
+            {"von": 64, "bis": 79, "name": "Gobo 4", "art": "gobo"},
+            {"von": 80, "bis": 95, "name": "Gobo 5", "art": "gobo"},
+            {"von": 96, "bis": 111, "name": "Gobo 6", "art": "gobo"},
+            {"von": 112, "bis": 127, "name": "Gobo 7", "art": "gobo"},
+            {"von": 128, "bis": 191, "name": "Gobo-Rad-Durchlauf, CW, fast to slow", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "Gobo-Rad-Durchlauf, counter CW, slow to fast", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo Rotation",
+          "attribut": "gobo_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Gobo-Index (Winkel)", "art": ""},
+            {"von": 128, "bis": 191, "name": "Clockwise Rotating, slow to fast", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "Counterclockwise Rotating, slow to fast", "art": "rotate"}
+          ]
+        },
+        {"name": "Focus", "attribut": "focus", "default": 0, "highlight": 0},
+        {
+          "name": "Prism + Rotating",
+          "attribut": "prism",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "No prism", "art": ""},
+            {"von": 5, "bis": 19, "name": "Prism", "art": "prism"},
+            {"von": 20, "bis": 139, "name": "Prism angle adjustment", "art": "prism"},
+            {"von": 140, "bis": 197, "name": "Clockwise rotating, fast to slow", "art": "rotate"},
+            {"von": 198, "bis": 255, "name": "Counterclockwise rotating, slow to fast", "art": "rotate"}
+          ]
+        },
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan Fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt Fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Pan & Tilt Speed + Vector Mode",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 251, "name": "Fast to Slow", "art": ""},
+            {"von": 252, "bis": 255, "name": "Vector Mode", "art": ""}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Kanalreihenfolge der Vorlage (Shutter zuerst, Pan/Tilt ab Kanal 8) beibehalten; am Geraet pruefen."
+}

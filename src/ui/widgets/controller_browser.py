@@ -204,9 +204,12 @@ class ControllerBrowserDialog(QDialog):
             for f in p.features:
                 rows.append(f"<li>{esc(f)}</li>")
             rows.append("</ul>")
-        if p.vc_template:
-            rows.append("<p style='color:#3fb950'>✔ VC-Vorlage verfügbar — in der "
-                        "Virtual Console über „Controller-Vorlage einfügen“ nutzbar.</p>")
+        # UI-71: hier stand „✔ VC-Vorlage verfügbar — in der Virtual Console über
+        # „Controller-Vorlage einfügen“ nutzbar“. Diese Aktion gibt es seit dem
+        # Abbau der Baukasten-Bloecke (2026-07) nirgends mehr; `vc_template`
+        # wird von keinem Bedienweg gelesen. Der Hinweis schickte Robin auf die
+        # Suche nach einem Knopf, den es nicht gibt — er entfaellt, bis es den
+        # Weg wieder gibt.
         rows.append("<hr>")
         rows.append(f"<p style='color:#8b949e; font-size:10px'><b>Quelle:</b> {esc(p.source)}<br>"
                     f"<b>Lizenz:</b> {esc(p.license)}<br>"
