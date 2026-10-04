@@ -1,0 +1,99 @@
+{
+  "anleitung": "3d_buehne",
+  "werkzeug": "tools/anleitungsbilder.py",
+  "stand": "182ca87f",
+  "schrift": "Noto Sans (statt Roboto Condensed)",
+  "qt": "6.11.1",
+  "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py 3d_buehne'.",
+  "bilder": [
+    {
+      "datei": "01_uebersicht.png",
+      "szene": "01_uebersicht",
+      "titel": "3D-Visualizer: Doku-Bühne mit Traversen, PARs und Moving Heads im Nebel",
+      "groesse": [
+        1800,
+        950
+      ],
+      "marken": [],
+      "md5": "d2233c025ec3f20f529d190fb078b167"
+    },
+    {
+      "datei": "02_buehne_bauen.png",
+      "szene": "02_buehne_bauen",
+      "titel": "Modus Bauen, Reiter Bühne: Front-Traverse gewählt, Eigenschaften",
+      "groesse": [
+        1800,
+        950
+      ],
+      "marken": [],
+      "md5": "5a7c9f4d4c15d036dbfb645f103439a6"
+    },
+    {
+      "datei": "03_geraet_platzieren.png",
+      "szene": "03_geraet_platzieren",
+      "titel": "Modus Bauen, Reiter Fixtures: Gerät wählen, platzieren, Andocken",
+      "groesse": [
+        1800,
+        950
+      ],
+      "marken": [],
+      "md5": "7d7c3c84f04934369beaf3d12cf4c0dd"
+    },
+    {
+      "datei": "04_kamera.png",
+      "szene": "04_kamera",
+      "titel": "Kamera-Menü mit Presets, Ansicht Front",
+      "groesse": [
+        1800,
+        950
+      ],
+      "marken": [],
+      "md5": "e4d77af8543607cae5192f611f1eae56"
+    },
+    {
+      "datei": "05_einstellungen.png",
+      "szene": "05_einstellungen",
+      "titel": "Reiter Einstellungen: Qualitätsstufe, Helligkeit, Strahl-Optionen",
+      "groesse": [
+        1800,
+        950
+      ],
+      "marken": [],
+      "md5": "c3fd8f4c67c8cd2dcd4407811b51b1e1"
+    },
+    {
+      "datei": "06_top_down.png",
+      "szene": "06_top_down",
+      "titel": "Ansicht 2D Top-Down",
+      "groesse": [
+        1800,
+        950
+      ],
+      "marken": [],
+      "md5": "b1cbe036c23a8d480019e72ea48400ba"
+    },
+    {
+      "datei": "07_moving_heads.gif",
+      "szene": "07_moving_heads",
+      "titel": "GIF: Moving Heads fahren, Farben wechseln",
+      "groesse": [
+        900,
+        491
+      ],
+      "marken": [
+        [],
+        [],
+        [],
+        []
+      ],
+      "md5": "012ae82fba2007a3c5da3f6856007e44",
+      "frames": 4,
+      "dauern_ms": [
+        1300,
+        1300,
+        1300,
+        1300
+      ]
+    }
+  ]
+}
