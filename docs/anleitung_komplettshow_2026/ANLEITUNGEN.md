@@ -24,7 +24,7 @@ Anleitung steht für sich und hat ein klares Lernziel.
 ## Zwei zentrale Lehren (deine Fragen)
 - **„Color speichert meine Dimmer-Schnitte mit"** → gelöst in Anleitung 5: Der Programmer merkt
   sich jeden angefassten Kanal; im Speicher-Dialog **„Kanäle auswählen"** die Gruppe
-  **Intensity/Dimmer abhaken** → es wird nur die Farbe gespeichert. Vorher **Clear** drücken.
+  **Intensity/Dimmer abhaken** → es wird nur die Farbe gespeichert. Vorher **„Alles löschen"** drücken.
 - **„Alles rot + Dimmer-Matrix soll ablaufen"** → Anleitung 6: Farbe als eigene **RGB-Matrix**
   und Helligkeit als eigene **Dimmer-Matrix** über dieselben Geräte legen — beide schreiben
   unterschiedliche Kanäle und überlagern sich sauber (rotes Lauflicht).

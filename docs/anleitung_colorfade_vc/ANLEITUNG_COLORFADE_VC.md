@@ -3,7 +3,9 @@
 Diese Anleitung zeigt, wie eine RGB-/RGBW-Matrix **weich zwischen mehreren Farben
 überblendet**, ohne dass der Tempo-Sync verloren geht.
 
-Die Beispielkonfiguration ist bereits in `shows/test1234.lshow` eingerichtet:
+Die Beispielwerte stammen aus einer privaten Show, die nicht im Repository liegt und
+von keinem Generator erzeugt wird. Lege den Effekt wie unten beschrieben selbst an;
+die Zielwerte sind:
 
 - Effekt: **Farb wechsel**
 - Algorithmus: **Color Fade**
@@ -26,7 +28,9 @@ verwendet. Der Start-/Stop-Fade ist davon unabhängig.
 
 ## 1. Matrix auf „Color Fade“ stellen
 
-1. Öffne **Programmer → Matrix**.
+1. Öffne **Programmer → Matrix**. Drücke vorher im Programmer **Keine** (Auswahl
+   leeren): Die eingebettete Matrix folgt der Programmer-Auswahl und übernimmt
+   gewählte Geräte **sofort** als Raster der markierten Matrix, auch ohne Speichern.
 2. Wähle den vorhandenen Effekt, beispielsweise **Farb wechsel**.
 3. Stelle **Algorithmus** auf **Color Fade**.
 4. Lasse den Stil auf **RGB** oder **RGBW**.
@@ -45,7 +49,7 @@ verwendet. Der Start-/Stop-Fade ist davon unabhängig.
 3. Verwende diese Werte:
    - **Beschriftung:** `Übergangs-Pause (0 = weich)`
    - **Modus:** `Effekt-Parameter`
-   - **Parameter:** `Übergangs-Pause (crossfade_hold)`
+   - **Parameter (Effekt-Parameter):** `Übergangs-Pause (crossfade_hold)`
    - **Steuert:** der gewünschte Matrix-Effekt, hier `Farb wechsel [RGBMatrix #6]`
    - **Invertieren:** aus
    - **Wert min/max:** `0` / `255`
@@ -62,15 +66,16 @@ verwendet. Der Start-/Stop-Fade ist davon unabhängig.
 - **0 % Übergangs-Pause:** durchgehender, weicher Crossfade.
 - **25–50 %:** Farben bleiben kurz stehen, der Übergang wird kompakter.
 - **nahe 100 %:** lange Haltephase und kurzer, beinahe harter Farbwechsel.
-- Das **Speed-Rad** bestimmt weiterhin die Geschwindigkeit relativ zum
-  Global-Tempo.
+- Ein **Speed-Rad im Multiplikator-Modus** (Tasten ¼ ½ 1× 2× 4×, wie im Bild)
+  bestimmt die Geschwindigkeit relativ zum Global-Tempo. Ein Speed-Rad im
+  Funktions-Modus stellt dagegen nur „Geschwindigkeit" — das wirkt bei laufender
+  BPM nicht.
 - **SYNC** setzt nur die Phase neu; die Übergangs-Pause und Farbreihenfolge bleiben erhalten.
 - Der An/Aus-Schalter auf einer anderen Bank darf denselben Effekt steuern.
 
 ## Start-/Stop-Fade zusätzlich verwenden
 
-Der Effekt in `test1234.lshow` besitzt weiterhin **10 Sekunden Ein- und
-Ausblendzeit**. Das bedeutet:
+Hat der Effekt eine Ein- und Ausblendzeit (im Beispiel **10 Sekunden**), gilt:
 
 - Beim Einschalten wird der gesamte Color-Fade-Effekt über 10 Sekunden sichtbar.
 - Beim Ausschalten wird seine komplette Ausgabe über 10 Sekunden ausgeblendet.
@@ -81,11 +86,14 @@ sollen, setze im Matrix-Editor **Einblenden** und **Ausblenden** auf `0,00 s`.
 
 ## Für neue Effekte merken
 
-Beim Ziehen einer Farbmatrix auf die virtuelle Konsole:
-
-1. **Color Fade** als Matrix-Algorithmus wählen.
-2. **Farben ändern** und **Tempo** als Bedienelemente hinzufügen.
-3. Unter **Mehr Parameter** den Parameter **Übergangs-Pause** hinzufügen.
-4. **Fade ein+aus (s)** nur zusätzlich wählen, wenn auch das Starten und Stoppen
-   des gesamten Effekts weich erfolgen soll.
+1. Im Matrix-Editor **Color Fade** als Algorithmus wählen und **💾 Speichern**.
+   (Das Fenster beim Ziehen auf die VC hat keine Algorithmus-Wahl.)
+2. Die Matrix auf die virtuelle Konsole ziehen und im Fenster **„Effekt einrichten"**
+   **„Farben ändern…"** und **„Tempo-Multiplikator (×½ ×2)…"** ankreuzen. Nicht
+   **„Tempo (Geschwindigkeit)"**: dieses Rad stellt nur „Geschwindigkeit", und die
+   wirkt bei laufender BPM nicht.
+3. Den zugeklappten Bereich **„Mehr Parameter (N)"** aufklappen und
+   **„Parameter: Übergangs-Pause"** ankreuzen.
+4. **„Parameter: Fade ein+aus (s)"** nur zusätzlich wählen, wenn auch das Starten und
+   Stoppen des gesamten Effekts weich erfolgen soll.
 
