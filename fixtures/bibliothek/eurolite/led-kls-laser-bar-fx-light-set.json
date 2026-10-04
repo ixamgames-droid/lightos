@@ -15,7 +15,7 @@
     "lizenz": "Apache-2.0",
     "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.1 GIT · Daniel Schauder",
     "original": "resources/fixtures/Eurolite/Eurolite-LED-KLS-Laser-Bar-FX-Light-Set.qxf",
-    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 102 Wertebereiche mit Art (kind) versehen; Rasterform in 4 Modus/Modi aus <Physical> uebernommen; Modus-Kanal: Blackout 'closed', Sound-Modi 'sound' statt 'strobe'; Dimmer/Strobe der Derbys/Spots: Dimmerbereich und 'All colors on' als 'open', Sound-Strobe als 'sound'; Rotationskanaele (Derbys, Laser) macro -> speed, 'No rotation' ohne Art; Laser rot/gruen macro -> raw mit aus='closed', an='open', Strobe='strobe'; Strobe-LEDs: aus='closed' (war 'strobe'), an='open', Default/Highlight 0; Derby 1/4 Helligkeit/Sound macro -> intensity, Derby Strobe/Rotation und Spot-Rotation macro -> raw; Spot-Strobe 0-9 als 'open'"
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 102 Wertebereiche mit Art (kind) versehen; Rasterform aus <Physical> in 4 Modus/Modi nicht uebernommen, weil sie nicht zu den color_r-Kanaelen passt (keine echten Farbzonen); Modus-Kanal: Blackout 'closed', Sound-Modi 'sound' statt 'strobe'; Dimmer/Strobe der Derbys/Spots: Dimmerbereich und 'All colors on' als 'open', Sound-Strobe als 'sound'; Rotationskanaele (Derbys, Laser) macro -> speed, 'No rotation' ohne Art; Laser rot/gruen macro -> raw mit aus='closed', an='open', Strobe='strobe'; Strobe-LEDs: aus='closed' (war 'strobe'), an='open', Default/Highlight 0; Derby 1/4 Helligkeit/Sound macro -> intensity, Derby Strobe/Rotation und Spot-Rotation macro -> raw; Spot-Strobe 0-9 als 'open'"
   },
   "autor": "LightOS",
   "geprueft": {
@@ -25,7 +25,6 @@
   "modi": [
     {
       "name": "3 Channels",
-      "raster": {"rows": 2, "cols": 4},
       "kanaele": [
         {
           "name": "Blackout, Automatic Mode and Sound-Controlled Mode",
@@ -93,7 +92,6 @@
     },
     {
       "name": "5 Channels",
-      "raster": {"rows": 2, "cols": 4},
       "kanaele": [
         {"name": "Derbies and Spots: Red", "attribut": "color_r", "default": 0, "highlight": 255},
         {"name": "Derbies and Spots: Green", "attribut": "color_g", "default": 0, "highlight": 255},
@@ -126,7 +124,6 @@
     },
     {
       "name": "9 Channels",
-      "raster": {"rows": 2, "cols": 4},
       "kanaele": [
         {"name": "Derbies and Spots: Red", "attribut": "color_r", "default": 0, "highlight": 255},
         {"name": "Derbies and Spots: Green", "attribut": "color_g", "default": 0, "highlight": 255},
@@ -204,7 +201,6 @@
     },
     {
       "name": "27 Channels",
-      "raster": {"rows": 2, "cols": 4},
       "kanaele": [
         {"name": "Derby 1: Red", "attribut": "color_r", "default": 0, "highlight": 255},
         {"name": "Derby 1: Green", "attribut": "color_g", "default": 0, "highlight": 255},

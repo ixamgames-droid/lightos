@@ -1,0 +1,361 @@
+{
+  "format_version": 1,
+  "hersteller": "Cameo",
+  "hersteller_kurz": "Cameo",
+  "modell": "Zenit B200",
+  "kurzname": "ZENIT B200",
+  "typ": "par",
+  "leistung_w": 180,
+  "quelle": {
+    "titel": "Cameo ZENIT B200 – User's Manual, DMX Control S. 110–114",
+    "url": "https://www.manualslib.com/manual/1686432/Cameo-Zenit-B200.html?page=110"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.7 GIT · ikr",
+    "original": "resources/fixtures/Cameo/Cameo-Zenit-B200.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 152 Wertebereiche mit Art (kind) versehen; Strobe-Default/-Highlight 0 statt 2 (Offen-Bereich); Strobe-Bereich 128-250 nach Handbuch 'Strobe slow -> fast <1Hz - 20Hz' (QLC+ hatte dort den Namen von 103-127 doppelt); Farbmakro: 'Color off' als 'open', Stopp ohne Art, Jumping/Fading 'rotate'; Dimmerkurve macro -> raw, Bereich 128-191 nach Handbuch 'Logarithmic' (QLC+: zweimal 'Exponential'); Modus '2 Channel CCT': Kanal 2 nach Handbuch 'Color Temperature' 0-255 kalt -> warm ohne Aus-Bereich (QLC+ hatte den Korrektur-Kanal des 15-CH-Modus); kurzname/notizen/quelle gesetzt"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": true,
+    "wie": "Alle acht Modi Kanal fuer Kanal und Bereich fuer Bereich gegen die DMX-Tabellen im Handbuch (via ManualsLib, S. 110–114) geprueft"
+  },
+  "modi": [
+    {
+      "name": "15 Channel",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Dimmer fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Strobe functions",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Strobe close", "art": "closed"},
+            {"von": 11, "bis": 33, "name": "Pulse random slow -> fast", "art": "strobe"},
+            {"von": 34, "bis": 56, "name": "Ramp up random slow -> fast", "art": "strobe"},
+            {"von": 57, "bis": 79, "name": "Ramp down random slow -> fast", "art": "strobe"},
+            {"von": 80, "bis": 102, "name": "Random strobe effect slow -> fast", "art": "strobe"},
+            {"von": 103, "bis": 127, "name": "Strobe break effect, 5s.....1s (short burst with break)", "art": "strobe"},
+            {"von": 128, "bis": 250, "name": "Strobe slow -> fast <1Hz - 20Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Red fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Green fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Blue fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "White fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Color Macros (override RGBW)",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Color off", "art": "open"},
+            {"von": 6, "bis": 13, "name": "Red", "art": "color"},
+            {"von": 14, "bis": 21, "name": "Amber", "art": "color"},
+            {"von": 22, "bis": 29, "name": "Yellow warm", "art": "color"},
+            {"von": 30, "bis": 37, "name": "Yellow", "art": "color"},
+            {"von": 38, "bis": 45, "name": "Green", "art": "color"},
+            {"von": 46, "bis": 53, "name": "Turquoise", "art": "color"},
+            {"von": 54, "bis": 61, "name": "Cyan", "art": "color"},
+            {"von": 62, "bis": 69, "name": "Blue", "art": "color"},
+            {"von": 70, "bis": 77, "name": "Lavender", "art": "color"},
+            {"von": 78, "bis": 85, "name": "Mauve", "art": "color"},
+            {"von": 86, "bis": 93, "name": "Magenta", "art": "color"},
+            {"von": 94, "bis": 101, "name": "Pink", "art": "color"},
+            {"von": 102, "bis": 109, "name": "Warm White", "art": "color"},
+            {"von": 110, "bis": 117, "name": "White", "art": "color"},
+            {"von": 118, "bis": 125, "name": "Cold White", "art": "color"},
+            {"von": 126, "bis": 127, "name": "Color Jumping stop", "art": ""},
+            {"von": 128, "bis": 191, "name": "Color Jumping speed slow -> fast / color 1 -> 12", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "Color Fading speed slow -> fast / color 1 -> 12", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Color Temperature Correction (affects RGBW & Color Macros)",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Off", "art": ""},
+            {"von": 6, "bis": 255, "name": "Cold -> warm", "art": ""}
+          ]
+        },
+        {
+          "name": "Set dimmer curve",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "No function", "art": ""},
+            {"von": 6, "bis": 63, "name": "Linear dimmer curve", "art": ""},
+            {"von": 64, "bis": 127, "name": "Exponential dimmer curve", "art": ""},
+            {"von": 128, "bis": 191, "name": "Logarithmic dimmer curve", "art": ""},
+            {"von": 192, "bis": 255, "name": "S-Curve dimmer curve", "art": ""}
+          ]
+        },
+        {
+          "name": "Device settings",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 77, "name": "No function", "art": ""},
+            {"von": 78, "bis": 79, "name": "Dimmer response LED (hold 1,5 s)", "art": ""},
+            {"von": 80, "bis": 81, "name": "Dimmer response halogen (hold 1,5s)", "art": ""},
+            {"von": 82, "bis": 101, "name": "No function", "art": ""},
+            {"von": 102, "bis": 103, "name": "Silent fan (hold 3s)", "art": ""},
+            {"von": 104, "bis": 105, "name": "Auto fan (hold 3s)", "art": ""},
+            {"von": 106, "bis": 123, "name": "No function", "art": ""},
+            {"von": 124, "bis": 125, "name": "PWM 1 (800 Hz) (hold 3s)", "art": ""},
+            {"von": 126, "bis": 127, "name": "PWM 2 (1200 Hz) (hold 3s)", "art": ""},
+            {"von": 128, "bis": 129, "name": "PWM 3 (2000 Hz) (hold 3s)", "art": ""},
+            {"von": 130, "bis": 131, "name": "PWM 4 (3600 Hz) (hold 3s)", "art": ""},
+            {"von": 132, "bis": 133, "name": "PWM 5 (12 kHz) (hold 3s)", "art": ""},
+            {"von": 134, "bis": 135, "name": "PWM 6 (25 kHz) (hold 3s)", "art": ""},
+            {"von": 136, "bis": 143, "name": "No function", "art": ""},
+            {"von": 144, "bis": 145, "name": "Display on (hold 3s)", "art": ""},
+            {"von": 146, "bis": 147, "name": "Display off (hold 3s)", "art": ""},
+            {"von": 148, "bis": 195, "name": "No function", "art": ""},
+            {"von": 196, "bis": 197, "name": "No runtime / full LED power (hold 3s)", "art": ""},
+            {"von": 198, "bis": 199, "name": "Set runtime 8h (hold 3S)", "art": ""},
+            {"von": 200, "bis": 201, "name": "Set runtime 12h (hold 3S)", "art": ""},
+            {"von": 202, "bis": 203, "name": "Set runtime 16h (hold 3S)", "art": ""},
+            {"von": 204, "bis": 205, "name": "Set runtime 20h (hold 3S)", "art": ""},
+            {"von": 206, "bis": 207, "name": "Raw mode (hold 3s)", "art": ""},
+            {"von": 208, "bis": 209, "name": "Factory calibrated mode (hold 3s)", "art": ""},
+            {"von": 210, "bis": 211, "name": "User calibrated mode (hold 3s)", "art": ""},
+            {"von": 212, "bis": 255, "name": "No function", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "10 Channel Full Access 8 Bit",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe functions",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Strobe close", "art": "closed"},
+            {"von": 11, "bis": 33, "name": "Pulse random slow -> fast", "art": "strobe"},
+            {"von": 34, "bis": 56, "name": "Ramp up random slow -> fast", "art": "strobe"},
+            {"von": 57, "bis": 79, "name": "Ramp down random slow -> fast", "art": "strobe"},
+            {"von": 80, "bis": 102, "name": "Random strobe effect slow -> fast", "art": "strobe"},
+            {"von": 103, "bis": 127, "name": "Strobe break effect, 5s.....1s (short burst with break)", "art": "strobe"},
+            {"von": 128, "bis": 250, "name": "Strobe slow -> fast <1Hz - 20Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Color Macros (override RGBW)",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Color off", "art": "open"},
+            {"von": 6, "bis": 13, "name": "Red", "art": "color"},
+            {"von": 14, "bis": 21, "name": "Amber", "art": "color"},
+            {"von": 22, "bis": 29, "name": "Yellow warm", "art": "color"},
+            {"von": 30, "bis": 37, "name": "Yellow", "art": "color"},
+            {"von": 38, "bis": 45, "name": "Green", "art": "color"},
+            {"von": 46, "bis": 53, "name": "Turquoise", "art": "color"},
+            {"von": 54, "bis": 61, "name": "Cyan", "art": "color"},
+            {"von": 62, "bis": 69, "name": "Blue", "art": "color"},
+            {"von": 70, "bis": 77, "name": "Lavender", "art": "color"},
+            {"von": 78, "bis": 85, "name": "Mauve", "art": "color"},
+            {"von": 86, "bis": 93, "name": "Magenta", "art": "color"},
+            {"von": 94, "bis": 101, "name": "Pink", "art": "color"},
+            {"von": 102, "bis": 109, "name": "Warm White", "art": "color"},
+            {"von": 110, "bis": 117, "name": "White", "art": "color"},
+            {"von": 118, "bis": 125, "name": "Cold White", "art": "color"},
+            {"von": 126, "bis": 127, "name": "Color Jumping stop", "art": ""},
+            {"von": 128, "bis": 191, "name": "Color Jumping speed slow -> fast / color 1 -> 12", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "Color Fading speed slow -> fast / color 1 -> 12", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Color Temperature Correction (affects RGBW & Color Macros)",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Off", "art": ""},
+            {"von": 6, "bis": 255, "name": "Cold -> warm", "art": ""}
+          ]
+        },
+        {
+          "name": "Set dimmer curve",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "No function", "art": ""},
+            {"von": 6, "bis": 63, "name": "Linear dimmer curve", "art": ""},
+            {"von": 64, "bis": 127, "name": "Exponential dimmer curve", "art": ""},
+            {"von": 128, "bis": 191, "name": "Logarithmic dimmer curve", "art": ""},
+            {"von": 192, "bis": 255, "name": "S-Curve dimmer curve", "art": ""}
+          ]
+        },
+        {
+          "name": "Device settings",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 77, "name": "No function", "art": ""},
+            {"von": 78, "bis": 79, "name": "Dimmer response LED (hold 1,5 s)", "art": ""},
+            {"von": 80, "bis": 81, "name": "Dimmer response halogen (hold 1,5s)", "art": ""},
+            {"von": 82, "bis": 101, "name": "No function", "art": ""},
+            {"von": 102, "bis": 103, "name": "Silent fan (hold 3s)", "art": ""},
+            {"von": 104, "bis": 105, "name": "Auto fan (hold 3s)", "art": ""},
+            {"von": 106, "bis": 123, "name": "No function", "art": ""},
+            {"von": 124, "bis": 125, "name": "PWM 1 (800 Hz) (hold 3s)", "art": ""},
+            {"von": 126, "bis": 127, "name": "PWM 2 (1200 Hz) (hold 3s)", "art": ""},
+            {"von": 128, "bis": 129, "name": "PWM 3 (2000 Hz) (hold 3s)", "art": ""},
+            {"von": 130, "bis": 131, "name": "PWM 4 (3600 Hz) (hold 3s)", "art": ""},
+            {"von": 132, "bis": 133, "name": "PWM 5 (12 kHz) (hold 3s)", "art": ""},
+            {"von": 134, "bis": 135, "name": "PWM 6 (25 kHz) (hold 3s)", "art": ""},
+            {"von": 136, "bis": 143, "name": "No function", "art": ""},
+            {"von": 144, "bis": 145, "name": "Display on (hold 3s)", "art": ""},
+            {"von": 146, "bis": 147, "name": "Display off (hold 3s)", "art": ""},
+            {"von": 148, "bis": 195, "name": "No function", "art": ""},
+            {"von": 196, "bis": 197, "name": "No runtime / full LED power (hold 3s)", "art": ""},
+            {"von": 198, "bis": 199, "name": "Set runtime 8h (hold 3S)", "art": ""},
+            {"von": 200, "bis": 201, "name": "Set runtime 12h (hold 3S)", "art": ""},
+            {"von": 202, "bis": 203, "name": "Set runtime 16h (hold 3S)", "art": ""},
+            {"von": 204, "bis": 205, "name": "Set runtime 20h (hold 3S)", "art": ""},
+            {"von": 206, "bis": 207, "name": "Raw mode (hold 3s)", "art": ""},
+            {"von": 208, "bis": 209, "name": "Factory calibrated mode (hold 3s)", "art": ""},
+            {"von": 210, "bis": 211, "name": "User calibrated mode (hold 3s)", "art": ""},
+            {"von": 212, "bis": 255, "name": "No function", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8 Channel User-Calibrated 16 Bit",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Red fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Green fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Blue fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "White fine", "attribut": "raw", "default": 0, "highlight": 0}
+      ]
+    },
+    {
+      "name": "6 Channel Factory-Calibrated 16 Bit",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Red fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Green fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Blue fine", "attribut": "raw", "default": 0, "highlight": 0}
+      ]
+    },
+    {
+      "name": "4 Channel User-Calibrated 8 Bit",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "3 Channel Factory-Calibrated 8 Bit",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "3 Channel Color Macros",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe functions",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Strobe close", "art": "closed"},
+            {"von": 11, "bis": 33, "name": "Pulse random slow -> fast", "art": "strobe"},
+            {"von": 34, "bis": 56, "name": "Ramp up random slow -> fast", "art": "strobe"},
+            {"von": 57, "bis": 79, "name": "Ramp down random slow -> fast", "art": "strobe"},
+            {"von": 80, "bis": 102, "name": "Random strobe effect slow -> fast", "art": "strobe"},
+            {"von": 103, "bis": 127, "name": "Strobe break effect, 5s.....1s (short burst with break)", "art": "strobe"},
+            {"von": 128, "bis": 250, "name": "Strobe slow -> fast <1Hz - 20Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        },
+        {
+          "name": "Color Macros (override RGBW)",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Color off", "art": "open"},
+            {"von": 6, "bis": 13, "name": "Red", "art": "color"},
+            {"von": 14, "bis": 21, "name": "Amber", "art": "color"},
+            {"von": 22, "bis": 29, "name": "Yellow warm", "art": "color"},
+            {"von": 30, "bis": 37, "name": "Yellow", "art": "color"},
+            {"von": 38, "bis": 45, "name": "Green", "art": "color"},
+            {"von": 46, "bis": 53, "name": "Turquoise", "art": "color"},
+            {"von": 54, "bis": 61, "name": "Cyan", "art": "color"},
+            {"von": 62, "bis": 69, "name": "Blue", "art": "color"},
+            {"von": 70, "bis": 77, "name": "Lavender", "art": "color"},
+            {"von": 78, "bis": 85, "name": "Mauve", "art": "color"},
+            {"von": 86, "bis": 93, "name": "Magenta", "art": "color"},
+            {"von": 94, "bis": 101, "name": "Pink", "art": "color"},
+            {"von": 102, "bis": 109, "name": "Warm White", "art": "color"},
+            {"von": 110, "bis": 117, "name": "White", "art": "color"},
+            {"von": 118, "bis": 125, "name": "Cold White", "art": "color"},
+            {"von": 126, "bis": 127, "name": "Color Jumping stop", "art": ""},
+            {"von": 128, "bis": 191, "name": "Color Jumping speed slow -> fast / color 1 -> 12", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "Color Fading speed slow -> fast / color 1 -> 12", "art": "rotate"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2 Channel CCT Factory-Calibrated",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Color Temperature",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Cold -> warm", "art": ""}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "IP65-RGBW-Wash/Blinder (CLZB200), eine Zone. Device settings nach dem Einstellen wieder auf 000 setzen (Handbuch, Anm. 1)."
+}

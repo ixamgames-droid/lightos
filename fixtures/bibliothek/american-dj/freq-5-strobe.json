@@ -15,7 +15,7 @@
     "lizenz": "Apache-2.0",
     "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.1 GIT · Martin Bochenek",
     "original": "resources/fixtures/American_DJ/American-DJ-FREQ-5-Strobe.qxf",
-    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 25 Wertebereiche mit Art (kind) versehen; Rasterform in 4 Modus/Modi aus <Physical> uebernommen; danach von LightOS gegen das Herstellerhandbuch ueberarbeitet: Shutter-Bereiche nach Handbuch klassifiziert (aus=closed, LED an=open, alle Strobe-/Puls-/Random-/Rampen-Bereiche=strobe), Default/Highlight auf Mitte des ersten Offen-Bereichs; Strobe-Bereiche 'Off' = kein Strobe (Handbuch: Off/No Function) als open, Default/Highlight darauf; Modi aufsteigend sortiert (1/2/5/7 Kanal wie im Handbuch); Zonen-Dimmer als dimmer (5 Zellen), Master als intensity, damit der Master nicht als sechste Zelle zaehlt; typ strobe statt led_bar; Show-Kanal 0-7 = Blackout (closed); Strobe-Kanal im 2-Kanal-Modus mit Offen-Bereich"
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 25 Wertebereiche mit Art (kind) versehen; Rasterform aus <Physical> in 4 Modus/Modi nicht uebernommen, weil sie nicht zu den color_r-Kanaelen passt (keine echten Farbzonen); danach von LightOS gegen das Herstellerhandbuch ueberarbeitet: Shutter-Bereiche nach Handbuch klassifiziert (aus=closed, LED an=open, alle Strobe-/Puls-/Random-/Rampen-Bereiche=strobe), Default/Highlight auf Mitte des ersten Offen-Bereichs; Strobe-Bereiche 'Off' = kein Strobe (Handbuch: Off/No Function) als open, Default/Highlight darauf; Modi aufsteigend sortiert (1/2/5/7 Kanal wie im Handbuch); Zonen-Dimmer als dimmer (5 Zellen), Master als intensity, damit der Master nicht als sechste Zelle zaehlt; typ strobe statt led_bar; Show-Kanal 0-7 = Blackout (closed); Strobe-Kanal im 2-Kanal-Modus mit Offen-Bereich"
   },
   "autor": "LightOS",
   "geprueft": {
@@ -25,7 +25,6 @@
   "modi": [
     {
       "name": "1 Channel",
-      "raster": {"rows": 1, "cols": 5},
       "kanaele": [
         {
           "name": "Shows",
@@ -53,7 +52,6 @@
     },
     {
       "name": "2 Channels",
-      "raster": {"rows": 1, "cols": 5},
       "kanaele": [
         {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
         {
@@ -70,7 +68,6 @@
     },
     {
       "name": "5 Channels",
-      "raster": {"rows": 1, "cols": 5},
       "kanaele": [
         {"name": "Zone 1 Dimmer", "attribut": "dimmer", "default": 0, "highlight": 255},
         {"name": "Zone 2 Dimmer", "attribut": "dimmer", "default": 0, "highlight": 255},
@@ -81,7 +78,6 @@
     },
     {
       "name": "7 Channels",
-      "raster": {"rows": 1, "cols": 5},
       "kanaele": [
         {"name": "Zone 1 Dimmer", "attribut": "dimmer", "default": 0, "highlight": 255},
         {"name": "Zone 2 Dimmer", "attribut": "dimmer", "default": 0, "highlight": 255},

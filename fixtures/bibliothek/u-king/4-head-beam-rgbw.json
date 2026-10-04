@@ -1,0 +1,161 @@
+{
+  "format_version": 1,
+  "hersteller": "U King",
+  "hersteller_kurz": "UKING",
+  "modell": "4 Head Beam RGBW",
+  "kurzname": "UK4HEADBEAM",
+  "typ": "moving_head",
+  "leistung_w": 80,
+  "notizen": "Kein Herstellerhandbuch abrufbar; Kanalfolge und Wertebereiche aus der QLC+-Datei. Strobe-Kanaele ohne Wertangabe in QLC+: 0 = kein Strobe angenommen (wie bei den eingebauten U-King-Profilen). Vier Koepfe auf einer Pan-Achse, jeder mit eigenem Tilt. Kanal 2 ist die Endlos-Rotation der Pan-Achse (kein zweites Pan). Im 16-Kanal-Modus steuert eine RGBW-Gruppe alle Koepfe.",
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition UKing-4-Head-Beam-RGBW.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/UKing/UKing-4-Head-Beam-RGBW.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.3 GIT · Donny Lockart",
+    "original": "resources/fixtures/UKing/UKing-4-Head-Beam-RGBW.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 18 Wertebereiche mit Art (kind) versehen; Rasterform in 2 Modus/Modi aus <Physical> uebernommen; LightOS-Nachbearbeitung (FM-57): Hersteller 'UKing' -> 'U King' (wie die eingebauten LightOS-Profile der Marke); X-axis: zweites 'pan' (Endlosrotation) zu raw mit Grundwert 0 (128 haette die Rotation gestartet), sonst haette LightOS es als Pan von Kopf 2 gelesen; Modus '16 Channel': Raster entfernt (nur eine Farbgruppe); Attribute korrigiert (X-axis: pan->raw); Strobe-Kanal ohne Bereiche (QLC+-Preset ShutterStrobeSlowFast) mit 0 = kein Strobe (open) / 1-255 Strobe versehen (Strobe); einzelne Kanalnamen deutsch bzw. eindeutiger benannt"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Originaldatei geprueft und nach den LightOS-Regeln (SCHEMA.md) nachbearbeitet; ein Herstellerhandbuch war nicht abrufbar (U'King-Anleitungen nur als Amazon-/manuals.plus-PDF, dort gesperrt; ManualsLib fuehrt das Modell nicht), daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "28 Channel",
+      "raster": {"rows": 1, "cols": 4},
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {
+          "name": "Pan-Endlosrotation",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Keine Rotation", "art": ""},
+            {"von": 128, "bis": 191, "name": "Rotation rechts", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "Rotation links", "art": "rotate"}
+          ]
+        },
+        {"name": "X-axis Speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Tilt Head 1", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt Head 2", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt Head 3", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt Head 4", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Y-axis speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 1, "bis": 255, "name": "Strobe langsam → schnell", "art": "strobe"}
+          ]
+        },
+        {"name": "Red H1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green H1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue H1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White H1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red H2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green H2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue H2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White H2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red H3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green H3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue H3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White H3", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red H4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green H4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue H4", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White H4", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Auto-Programm",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 50, "name": "No Program", "art": ""},
+            {"von": 51, "bis": 100, "name": "Auto Prog 1", "art": ""},
+            {"von": 101, "bis": 200, "name": "Auto Prog 2", "art": ""},
+            {"von": 201, "bis": 255, "name": "Sound Active", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 240, "name": "No function", "art": ""},
+            {"von": 241, "bis": 255, "name": "Reset (Hold 5 sec)", "art": "reset"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "16 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {
+          "name": "Pan-Endlosrotation",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Keine Rotation", "art": ""},
+            {"von": 128, "bis": 191, "name": "Rotation rechts", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "Rotation links", "art": "rotate"}
+          ]
+        },
+        {"name": "X-axis Speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Tilt Head 1", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt Head 2", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt Head 3", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt Head 4", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Y-axis speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 1, "bis": 255, "name": "Strobe langsam → schnell", "art": "strobe"}
+          ]
+        },
+        {"name": "Red H1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green H1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue H1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White H1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Auto-Programm",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 50, "name": "No Program", "art": ""},
+            {"von": 51, "bis": 100, "name": "Auto Prog 1", "art": ""},
+            {"von": 101, "bis": 200, "name": "Auto Prog 2", "art": ""},
+            {"von": 201, "bis": 255, "name": "Sound Active", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 240, "name": "No function", "art": ""},
+            {"von": 241, "bis": 255, "name": "Reset (Hold 5 sec)", "art": "reset"}
+          ]
+        }
+      ]
+    }
+  ]
+}

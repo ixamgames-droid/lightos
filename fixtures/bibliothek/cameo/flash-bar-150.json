@@ -15,7 +15,7 @@
     "lizenz": "Apache-2.0",
     "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.11.3 GIT · Kevin Wimmer",
     "original": "resources/fixtures/Cameo/Cameo-Flash-Bar-150.qxf",
-    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 31 Wertebereiche mit Art (kind) versehen; Blitzdauer speed -> duration; 5/20-Kanal: Auto-Programm-Kanal laut Herstellertabelle korrigiert — Programm 5 nur 202-250, 251-255 'Sound Mode' (QLC+: Programm 5 bis 255); Auto-Speed/Mikrofonempfindlichkeit macro -> effect_speed; 15/20-Kanal: 15 Einzel-LED-Dimmer als Raster 1x15; Namen wie im Handbuch ('Dimmer LED n'); Strobe-Default/-Highlight auf 0 (Strobe aus) in 4 Kanaelen"
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 31 Wertebereiche mit Art (kind) versehen; Blitzdauer speed -> duration; 5/20-Kanal: Auto-Programm-Kanal laut Herstellertabelle korrigiert — Programm 5 nur 202-250, 251-255 'Sound Mode' (QLC+: Programm 5 bis 255); Auto-Speed/Mikrofonempfindlichkeit macro -> effect_speed; 15/20-Kanal: 15 Einzel-LED-Dimmer als Raster 1x15; Namen wie im Handbuch ('Dimmer LED n'); Strobe-Default/-Highlight auf 0 (Strobe aus) in 4 Kanaelen; Rasterform in 2 Modus/Modi entfernt, weil sie nicht zu den color_r-Kanaelen passt (keine echten Farbzonen)"
   },
   "autor": "LightOS",
   "geprueft": {
@@ -150,8 +150,7 @@
         {"name": "Dimmer LED 13", "attribut": "color_w", "default": 0, "highlight": 255},
         {"name": "Dimmer LED 14", "attribut": "color_w", "default": 0, "highlight": 255},
         {"name": "Dimmer LED 15", "attribut": "color_w", "default": 0, "highlight": 255}
-      ],
-      "raster": {"rows": 1, "cols": 15}
+      ]
     },
     {
       "name": "20 Channel",
@@ -215,8 +214,7 @@
         {"name": "Dimmer LED 13", "attribut": "color_w", "default": 0, "highlight": 255},
         {"name": "Dimmer LED 14", "attribut": "color_w", "default": 0, "highlight": 255},
         {"name": "Dimmer LED 15", "attribut": "color_w", "default": 0, "highlight": 255}
-      ],
-      "raster": {"rows": 1, "cols": 15}
+      ]
     }
   ]
 }

@@ -109,6 +109,11 @@ class OutputView(QWidget):
         self._cells[universe] = cells
 
     def _refresh(self):
+        # VIZ-70: unsichtbar (anderer Reiter, Fenster minimiert) nichts tun —
+        # der Dauer-Takt lief sonst im UI-Thread weiter; der naechste Takt nach
+        # dem Einblenden holt den Stand nach.
+        if not self.isVisible() or self.window().isMinimized():
+            return
         univ_num = self._spin_univ.value()
         if univ_num not in self._state.universes:
             return

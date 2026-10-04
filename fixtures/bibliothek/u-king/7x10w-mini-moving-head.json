@@ -1,0 +1,133 @@
+{
+  "format_version": 1,
+  "hersteller": "U King",
+  "hersteller_kurz": "UKING",
+  "modell": "7x10W Mini Moving Head",
+  "kurzname": "UK7X10WMH",
+  "typ": "moving_head",
+  "leistung_w": 70,
+  "notizen": "Kein Herstellerhandbuch abrufbar; Kanalfolge und Wertebereiche aus der QLC+-Datei. Strobe-Kanaele ohne Wertangabe in QLC+: 0 = kein Strobe angenommen (wie bei den eingebauten U-King-Profilen). Kein eigener Dimmer-Kanal: Kanal 'Dimmer / Strobe' vereint Aus, Dimmer (8-134), Strobe und Offen. Grundwert 240 = offen, die Helligkeit kommt dann aus RGBW.",
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition UKing-7x10W-Mini-Moving-Head.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/UKing/UKing-7x10W-Mini-Moving-Head.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.4 · Peter Crowther",
+    "original": "resources/fixtures/UKing/UKing-7x10W-Mini-Moving-Head.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 23 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): Hersteller 'UKing' -> 'U King' (wie die eingebauten LightOS-Profile der Marke); Off / Master Dimmer / Strobe / Open: Kombikanal von macro zu shutter (0-7 closed, 8-134 Dimmer, 135-239 strobe, 240-255 open; Default/Highlight 240; QLC+ hatte 'Off' als Farbe markiert); Attribute korrigiert (Color jumping speed: speed->effect_speed; Off / Master Dimmer / Strobe / Open: macro->shutter); Shutter-Default/Highlight auf den Offen-Wert (Off / Master Dimmer / Strobe / Open 0->240); 4 Bereichs-Arten nachgezogen (Farb-/Gobo-Slots, Shake/Rotation, Prisma, Sound, Reset; Programm-Bereiche in Makro-Kanaelen ohne Farb-Art); einzelne Kanalnamen deutsch bzw. eindeutiger benannt"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Originaldatei geprueft und nach den LightOS-Regeln (SCHEMA.md) nachbearbeitet; ein Herstellerhandbuch war nicht abrufbar (U'King-Anleitungen nur als Amazon-/manuals.plus-PDF, dort gesperrt; ManualsLib fuehrt das Modell nicht), daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "9 channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {
+          "name": "Dimmer / Strobe",
+          "attribut": "shutter",
+          "default": 240,
+          "highlight": 240,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Aus (Blackout)", "art": "closed"},
+            {"von": 8, "bis": 134, "name": "Dimmer 0 → 100 %", "art": ""},
+            {"von": 135, "bis": 239, "name": "Strobe langsam → schnell", "art": "strobe"},
+            {"von": 240, "bis": 255, "name": "Offen (volle Helligkeit)", "art": "open"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "XY Speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 149, "name": "No function", "art": ""},
+            {"von": 150, "bis": 200, "name": "Reset", "art": "reset"},
+            {"von": 201, "bis": 255, "name": "No function", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "14 channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan Fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt Fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "XY Speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Dimmer / Strobe",
+          "attribut": "shutter",
+          "default": 240,
+          "highlight": 240,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Aus (Blackout)", "art": "closed"},
+            {"von": 8, "bis": 134, "name": "Dimmer 0 → 100 %", "art": ""},
+            {"von": 135, "bis": 239, "name": "Strobe langsam → schnell", "art": "strobe"},
+            {"von": 240, "bis": 255, "name": "Offen (volle Helligkeit)", "art": "open"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Farbquelle",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Mix color depend on 7CH-10CH", "art": ""},
+            {"von": 8, "bis": 231, "name": "Macro color", "art": ""},
+            {"von": 232, "bis": 255, "name": "Color jumping", "art": ""}
+          ]
+        },
+        {
+          "name": "Color jumping speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Color jumping speed", "art": ""}
+          ]
+        },
+        {
+          "name": "Betriebsart / Auto",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Control freely depend on 1CH-12CH", "art": ""},
+            {"von": 8, "bis": 63, "name": "Fast running", "art": ""},
+            {"von": 64, "bis": 127, "name": "Slow running", "art": ""},
+            {"von": 128, "bis": 191, "name": "Sound 1", "art": "sound"},
+            {"von": 192, "bis": 255, "name": "Sound 2", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 149, "name": "No function", "art": ""},
+            {"von": 150, "bis": 200, "name": "Reset", "art": "reset"},
+            {"von": 201, "bis": 255, "name": "No function", "art": ""}
+          ]
+        }
+      ]
+    }
+  ]
+}

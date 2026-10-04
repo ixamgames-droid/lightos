@@ -1,0 +1,424 @@
+{
+  "format_version": 1,
+  "hersteller": "Ignition",
+  "hersteller_kurz": "Ignition",
+  "modell": "Co6 V2 LED Flood RGBW",
+  "kurzname": "CO6 V2",
+  "typ": "par",
+  "leistung_w": 250,
+  "notizen": "LED-Fluter, 18 x 15 W RGBW in 3 LED-Reihen (Pixelmodi 12/26 Kanal: je Reihe RGBW, Raster 3 x 1 angenommen, Reihe 1 oben). 14/26-Kanal-Modus mit Dimmer fein. Im 26-Kanal-Modus mischen Gesamt-RGBW und Reihen-Kanaele — wie im Handbuch.",
+  "quelle": {
+    "titel": "Ignition Co6 V2 LED Flood RGBW – Bedienungsanleitung (Thomann, ID 477575)",
+    "version": "V3",
+    "datum": "2024-09-13",
+    "url": "https://fast-images.static-thomann.de/pics/atg/atgdata/document/manual/477575_v3_en_online.pdf"
+  },
+  "herkunft": {"art": "hersteller-handbuch", "lizenz": "eigen"},
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal fuer Kanal gegen die DMX-Tabellen aller 7 Modi im Thomann-Handbuch (Kap. 7) geschrieben und geprueft; nicht am Geraet getestet"
+  },
+  "modi": [
+    {
+      "name": "2-Kanal",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Farbmakros",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Blackout", "art": ""},
+            {"von": 6, "bis": 13, "name": "Rot", "art": "color"},
+            {"von": 14, "bis": 21, "name": "Amber", "art": "color"},
+            {"von": 22, "bis": 29, "name": "Gelb-Amber", "art": "color"},
+            {"von": 30, "bis": 37, "name": "Gelb", "art": "color"},
+            {"von": 38, "bis": 45, "name": "Gruen", "art": "color"},
+            {"von": 46, "bis": 53, "name": "Tuerkis", "art": "color"},
+            {"von": 54, "bis": 61, "name": "Cyan", "art": "color"},
+            {"von": 62, "bis": 69, "name": "Blau", "art": "color"},
+            {"von": 70, "bis": 77, "name": "Lavendel", "art": "color"},
+            {"von": 78, "bis": 85, "name": "Mauve", "art": "color"},
+            {"von": 86, "bis": 93, "name": "Magenta", "art": "color"},
+            {"von": 94, "bis": 101, "name": "Pink", "art": "color"},
+            {"von": 102, "bis": 109, "name": "Warmweiss 3200 K", "art": "color"},
+            {"von": 110, "bis": 117, "name": "Weiss 5600 K", "art": "color"},
+            {"von": 118, "bis": 125, "name": "Kaltweiss 7200 K", "art": "color"},
+            {"von": 126, "bis": 127, "name": "Farbwechsel angehalten", "art": ""},
+            {"von": 128, "bis": 191, "name": "Farbwechsel (Sprung), langsam -> schnell", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "Farbueberblendung, langsam -> schnell", "art": "rotate"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3-Kanal 1",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Offen", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Geschlossen", "art": "closed"},
+            {"von": 11, "bis": 250, "name": "Strobe, langsam -> schnell", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Offen", "art": "open"}
+          ]
+        },
+        {
+          "name": "Farbmakros",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Blackout", "art": ""},
+            {"von": 6, "bis": 13, "name": "Rot", "art": "color"},
+            {"von": 14, "bis": 21, "name": "Amber", "art": "color"},
+            {"von": 22, "bis": 29, "name": "Gelb-Amber", "art": "color"},
+            {"von": 30, "bis": 37, "name": "Gelb", "art": "color"},
+            {"von": 38, "bis": 45, "name": "Gruen", "art": "color"},
+            {"von": 46, "bis": 53, "name": "Tuerkis", "art": "color"},
+            {"von": 54, "bis": 61, "name": "Cyan", "art": "color"},
+            {"von": 62, "bis": 69, "name": "Blau", "art": "color"},
+            {"von": 70, "bis": 77, "name": "Lavendel", "art": "color"},
+            {"von": 78, "bis": 85, "name": "Mauve", "art": "color"},
+            {"von": 86, "bis": 93, "name": "Magenta", "art": "color"},
+            {"von": 94, "bis": 101, "name": "Pink", "art": "color"},
+            {"von": 102, "bis": 109, "name": "Warmweiss 3200 K", "art": "color"},
+            {"von": 110, "bis": 117, "name": "Weiss 5600 K", "art": "color"},
+            {"von": 118, "bis": 125, "name": "Kaltweiss 7200 K", "art": "color"},
+            {"von": 126, "bis": 127, "name": "Farbwechsel angehalten", "art": ""},
+            {"von": 128, "bis": 191, "name": "Farbwechsel (Sprung), langsam -> schnell", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "Farbueberblendung, langsam -> schnell", "art": "rotate"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3-Kanal 2",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "4-Kanal",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "6-Kanal",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Offen", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Geschlossen", "art": "closed"},
+            {"von": 11, "bis": 250, "name": "Strobe, langsam -> schnell", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Offen", "art": "open"}
+          ]
+        },
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "12-Kanal",
+      "raster": {"rows": 3, "cols": 1},
+      "kanaele": [
+        {"name": "Rot Reihe 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen Reihe 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau Reihe 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss Reihe 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot Reihe 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen Reihe 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau Reihe 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss Reihe 2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot Reihe 3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen Reihe 3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau Reihe 3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss Reihe 3", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "14-Kanal",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Dimmer fein", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Offen", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Geschlossen", "art": "closed"},
+            {"von": 11, "bis": 33, "name": "Zufaellige Pulse, langsam -> schnell", "art": "strobe"},
+            {"von": 34, "bis": 56, "name": "Zufaelliges Aufdimmen (Ramp-up), langsam -> schnell", "art": "strobe"},
+            {"von": 57, "bis": 79, "name": "Zufaelliges Abdimmen (Ramp-down), langsam -> schnell", "art": "strobe"},
+            {"von": 80, "bis": 102, "name": "Zufaelliger Strobe, langsam -> schnell", "art": "strobe"},
+            {"von": 103, "bis": 127, "name": "Strobe mit kuerzer werdenden Pausen", "art": "strobe"},
+            {"von": 128, "bis": 250, "name": "Strobe, langsam -> schnell", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Offen", "art": "open"}
+          ]
+        },
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Farbmakros",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Blackout", "art": ""},
+            {"von": 6, "bis": 13, "name": "Rot", "art": "color"},
+            {"von": 14, "bis": 21, "name": "Amber", "art": "color"},
+            {"von": 22, "bis": 29, "name": "Gelb-Amber", "art": "color"},
+            {"von": 30, "bis": 37, "name": "Gelb", "art": "color"},
+            {"von": 38, "bis": 45, "name": "Gruen", "art": "color"},
+            {"von": 46, "bis": 53, "name": "Tuerkis", "art": "color"},
+            {"von": 54, "bis": 61, "name": "Cyan", "art": "color"},
+            {"von": 62, "bis": 69, "name": "Blau", "art": "color"},
+            {"von": 70, "bis": 77, "name": "Lavendel", "art": "color"},
+            {"von": 78, "bis": 85, "name": "Mauve", "art": "color"},
+            {"von": 86, "bis": 93, "name": "Magenta", "art": "color"},
+            {"von": 94, "bis": 101, "name": "Pink", "art": "color"},
+            {"von": 102, "bis": 109, "name": "Warmweiss 3200 K", "art": "color"},
+            {"von": 110, "bis": 117, "name": "Weiss 5600 K", "art": "color"},
+            {"von": 118, "bis": 125, "name": "Kaltweiss 7200 K", "art": "color"},
+            {"von": 126, "bis": 127, "name": "Farbwechsel angehalten", "art": ""},
+            {"von": 128, "bis": 191, "name": "Farbwechsel (Sprung), langsam -> schnell", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "Farbueberblendung, langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Regenbogen-Effekt",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Effekt aus", "art": ""},
+            {"von": 6, "bis": 21, "name": "Regenbogen-Effekt 1", "art": ""},
+            {"von": 22, "bis": 37, "name": "Regenbogen-Effekt 2", "art": ""},
+            {"von": 38, "bis": 53, "name": "Regenbogen-Effekt 3", "art": ""},
+            {"von": 54, "bis": 69, "name": "Regenbogen-Effekt 4", "art": ""},
+            {"von": 70, "bis": 85, "name": "Regenbogen-Effekt 5", "art": ""},
+            {"von": 86, "bis": 101, "name": "Regenbogen-Effekt 6", "art": ""},
+            {"von": 102, "bis": 117, "name": "Regenbogen-Effekt 7", "art": ""},
+            {"von": 118, "bis": 133, "name": "Regenbogen-Effekt 8", "art": ""},
+            {"von": 134, "bis": 149, "name": "Regenbogen-Effekt 9", "art": ""},
+            {"von": 150, "bis": 165, "name": "Regenbogen-Effekt 10", "art": ""},
+            {"von": 166, "bis": 181, "name": "Regenbogen-Effekt 11", "art": ""},
+            {"von": 182, "bis": 197, "name": "Regenbogen-Effekt 12", "art": ""},
+            {"von": 198, "bis": 213, "name": "Regenbogen-Effekt 13", "art": ""},
+            {"von": 214, "bis": 229, "name": "Regenbogen-Effekt 14", "art": ""},
+            {"von": 230, "bis": 255, "name": "Regenbogen-Effekt 15", "art": ""}
+          ]
+        },
+        {
+          "name": "Automatikshow",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Keine Automatikshow", "art": ""},
+            {"von": 6, "bis": 30, "name": "Automatikshow 1", "art": ""},
+            {"von": 31, "bis": 55, "name": "Automatikshow 2", "art": ""},
+            {"von": 56, "bis": 80, "name": "Automatikshow 3", "art": ""},
+            {"von": 81, "bis": 105, "name": "Automatikshow 4", "art": ""},
+            {"von": 106, "bis": 130, "name": "Automatikshow 5", "art": ""},
+            {"von": 131, "bis": 155, "name": "Automatikshow 6", "art": ""},
+            {"von": 156, "bis": 180, "name": "Automatikshow 7", "art": ""},
+            {"von": 181, "bis": 205, "name": "Automatikshow 8", "art": ""},
+            {"von": 206, "bis": 230, "name": "Automatikshow 9", "art": ""},
+            {"von": 231, "bis": 255, "name": "Automatikshow 10", "art": ""}
+          ]
+        },
+        {"name": "Automatikshow-Geschwindigkeit", "attribut": "effect_speed", "default": 0, "highlight": 0},
+        {"name": "Automatik-Fade", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Dimmerkurve",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Ohne Funktion", "art": ""},
+            {"von": 6, "bis": 63, "name": "Linear", "art": ""},
+            {"von": 64, "bis": 127, "name": "Exponentiell", "art": ""},
+            {"von": 128, "bis": 191, "name": "Logarithmisch", "art": ""},
+            {"von": 192, "bis": 255, "name": "S-Kurve", "art": ""}
+          ]
+        },
+        {
+          "name": "Sonderfunktionen (5 s halten)",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Ohne Funktion", "art": ""},
+            {"von": 6, "bis": 63, "name": "Dimmverhalten LED", "art": ""},
+            {"von": 64, "bis": 127, "name": "Dimmverhalten Halogen", "art": ""},
+            {"von": 128, "bis": 191, "name": "Luefter 'Silent' ein (3 s)", "art": ""},
+            {"von": 192, "bis": 255, "name": "Luefter 'Silent' aus (3 s)", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "26-Kanal",
+      "raster": {"rows": 3, "cols": 1},
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Dimmer fein", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Offen", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Geschlossen", "art": "closed"},
+            {"von": 11, "bis": 33, "name": "Zufaellige Pulse, langsam -> schnell", "art": "strobe"},
+            {"von": 34, "bis": 56, "name": "Zufaelliges Aufdimmen (Ramp-up), langsam -> schnell", "art": "strobe"},
+            {"von": 57, "bis": 79, "name": "Zufaelliges Abdimmen (Ramp-down), langsam -> schnell", "art": "strobe"},
+            {"von": 80, "bis": 102, "name": "Zufaelliger Strobe, langsam -> schnell", "art": "strobe"},
+            {"von": 103, "bis": 127, "name": "Strobe mit kuerzer werdenden Pausen", "art": "strobe"},
+            {"von": 128, "bis": 250, "name": "Strobe, langsam -> schnell", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Offen", "art": "open"}
+          ]
+        },
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Farbmakros",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Blackout", "art": ""},
+            {"von": 6, "bis": 13, "name": "Rot", "art": "color"},
+            {"von": 14, "bis": 21, "name": "Amber", "art": "color"},
+            {"von": 22, "bis": 29, "name": "Gelb-Amber", "art": "color"},
+            {"von": 30, "bis": 37, "name": "Gelb", "art": "color"},
+            {"von": 38, "bis": 45, "name": "Gruen", "art": "color"},
+            {"von": 46, "bis": 53, "name": "Tuerkis", "art": "color"},
+            {"von": 54, "bis": 61, "name": "Cyan", "art": "color"},
+            {"von": 62, "bis": 69, "name": "Blau", "art": "color"},
+            {"von": 70, "bis": 77, "name": "Lavendel", "art": "color"},
+            {"von": 78, "bis": 85, "name": "Mauve", "art": "color"},
+            {"von": 86, "bis": 93, "name": "Magenta", "art": "color"},
+            {"von": 94, "bis": 101, "name": "Pink", "art": "color"},
+            {"von": 102, "bis": 109, "name": "Warmweiss 3200 K", "art": "color"},
+            {"von": 110, "bis": 117, "name": "Weiss 5600 K", "art": "color"},
+            {"von": 118, "bis": 125, "name": "Kaltweiss 7200 K", "art": "color"},
+            {"von": 126, "bis": 127, "name": "Farbwechsel angehalten", "art": ""},
+            {"von": 128, "bis": 191, "name": "Farbwechsel (Sprung), langsam -> schnell", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "Farbueberblendung, langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Regenbogen-Effekt",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Effekt aus", "art": ""},
+            {"von": 6, "bis": 21, "name": "Regenbogen-Effekt 1", "art": ""},
+            {"von": 22, "bis": 37, "name": "Regenbogen-Effekt 2", "art": ""},
+            {"von": 38, "bis": 53, "name": "Regenbogen-Effekt 3", "art": ""},
+            {"von": 54, "bis": 69, "name": "Regenbogen-Effekt 4", "art": ""},
+            {"von": 70, "bis": 85, "name": "Regenbogen-Effekt 5", "art": ""},
+            {"von": 86, "bis": 101, "name": "Regenbogen-Effekt 6", "art": ""},
+            {"von": 102, "bis": 117, "name": "Regenbogen-Effekt 7", "art": ""},
+            {"von": 118, "bis": 133, "name": "Regenbogen-Effekt 8", "art": ""},
+            {"von": 134, "bis": 149, "name": "Regenbogen-Effekt 9", "art": ""},
+            {"von": 150, "bis": 165, "name": "Regenbogen-Effekt 10", "art": ""},
+            {"von": 166, "bis": 181, "name": "Regenbogen-Effekt 11", "art": ""},
+            {"von": 182, "bis": 197, "name": "Regenbogen-Effekt 12", "art": ""},
+            {"von": 198, "bis": 213, "name": "Regenbogen-Effekt 13", "art": ""},
+            {"von": 214, "bis": 229, "name": "Regenbogen-Effekt 14", "art": ""},
+            {"von": 230, "bis": 255, "name": "Regenbogen-Effekt 15", "art": ""}
+          ]
+        },
+        {
+          "name": "Automatikshow",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Keine Automatikshow", "art": ""},
+            {"von": 6, "bis": 30, "name": "Automatikshow 1", "art": ""},
+            {"von": 31, "bis": 55, "name": "Automatikshow 2", "art": ""},
+            {"von": 56, "bis": 80, "name": "Automatikshow 3", "art": ""},
+            {"von": 81, "bis": 105, "name": "Automatikshow 4", "art": ""},
+            {"von": 106, "bis": 130, "name": "Automatikshow 5", "art": ""},
+            {"von": 131, "bis": 155, "name": "Automatikshow 6", "art": ""},
+            {"von": 156, "bis": 180, "name": "Automatikshow 7", "art": ""},
+            {"von": 181, "bis": 205, "name": "Automatikshow 8", "art": ""},
+            {"von": 206, "bis": 230, "name": "Automatikshow 9", "art": ""},
+            {"von": 231, "bis": 255, "name": "Automatikshow 10", "art": ""}
+          ]
+        },
+        {"name": "Automatikshow-Geschwindigkeit", "attribut": "effect_speed", "default": 0, "highlight": 0},
+        {"name": "Automatik-Fade", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Dimmerkurve",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Ohne Funktion", "art": ""},
+            {"von": 6, "bis": 63, "name": "Linear", "art": ""},
+            {"von": 64, "bis": 127, "name": "Exponentiell", "art": ""},
+            {"von": 128, "bis": 191, "name": "Logarithmisch", "art": ""},
+            {"von": 192, "bis": 255, "name": "S-Kurve", "art": ""}
+          ]
+        },
+        {
+          "name": "Sonderfunktionen (5 s halten)",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Ohne Funktion", "art": ""},
+            {"von": 6, "bis": 63, "name": "Dimmverhalten LED", "art": ""},
+            {"von": 64, "bis": 127, "name": "Dimmverhalten Halogen", "art": ""},
+            {"von": 128, "bis": 191, "name": "Luefter 'Silent' ein (3 s)", "art": ""},
+            {"von": 192, "bis": 255, "name": "Luefter 'Silent' aus (3 s)", "art": ""}
+          ]
+        },
+        {"name": "Rot Reihe 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen Reihe 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau Reihe 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss Reihe 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot Reihe 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen Reihe 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau Reihe 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss Reihe 2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot Reihe 3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen Reihe 3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau Reihe 3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss Reihe 3", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    }
+  ]
+}

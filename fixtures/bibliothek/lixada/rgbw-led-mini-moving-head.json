@@ -1,0 +1,133 @@
+{
+  "format_version": 1,
+  "hersteller": "Lixada",
+  "hersteller_kurz": "Lixada",
+  "modell": "RGBW LED Mini Moving Head",
+  "kurzname": "MINI MH RGBW",
+  "typ": "moving_head",
+  "leistung_w": 70,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Lixada-RGBW-LED-Mini-Moving-Head.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Lixada/Lixada-RGBW-LED-Mini-Moving-Head.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.14.2 GIT · David Thomas",
+    "original": "resources/fixtures/Lixada/Lixada-RGBW-LED-Mini-Moving-Head.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 23 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung: Dimmer: 240-255 art open; Farbwahl raw -> macro, Farbsprung-Tempo color_wheel -> effect_speed (beide ohne Farb-art); Programmkanal raw -> macro"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Quelldatei und auf innere Stimmigkeit geprueft; kein Herstellerhandbuch oeffentlich auffindbar, nicht am Geraet geprueft"
+  },
+  "modi": [
+    {
+      "name": "14 Channels",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt Speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Dimmer",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Aus", "art": "closed"},
+            {"von": 8, "bis": 134, "name": "Dimmer 0-100 %", "art": ""},
+            {"von": 135, "bis": 239, "name": "Strobe from slow to fast", "art": "strobe"},
+            {"von": 240, "bis": 255, "name": "Voll an", "art": "open"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Color selector",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Select color", "art": ""},
+            {"von": 8, "bis": 231, "name": "Built in color", "art": ""},
+            {"von": 232, "bis": 255, "name": "Seven colors Jumping", "art": ""}
+          ]
+        },
+        {
+          "name": "Color jumps",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Seven colors jumping (speed from slow to fast)", "art": ""}
+          ]
+        },
+        {
+          "name": "Custom controls",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Custom control", "art": ""},
+            {"von": 8, "bis": 63, "name": "Moving head light working in fast", "art": ""},
+            {"von": 64, "bis": 127, "name": "Moving head light working in slow", "art": ""},
+            {"von": 128, "bis": 191, "name": "Moving head light working in Sound1Active", "art": "sound"},
+            {"von": 192, "bis": 255, "name": "Moving head light working in Sound2Active", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 149, "name": "No Function", "art": ""},
+            {"von": 150, "bis": 200, "name": "Reset", "art": "reset"},
+            {"von": 201, "bis": 255, "name": "No Function", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "9 Channels",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {
+          "name": "Dimmer",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Aus", "art": "closed"},
+            {"von": 8, "bis": 134, "name": "Dimmer 0-100 %", "art": ""},
+            {"von": 135, "bis": 239, "name": "Strobe from slow to fast", "art": "strobe"},
+            {"von": 240, "bis": 255, "name": "Voll an", "art": "open"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Pan/Tilt Speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 149, "name": "No Function", "art": ""},
+            {"von": 150, "bis": 200, "name": "Reset", "art": "reset"},
+            {"von": 201, "bis": 255, "name": "No Function", "art": ""}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Mini-Moving-Head RGBW; Dimmer und Strobe teilen sich einen Kanal."
+}

@@ -1,0 +1,198 @@
+{
+  "format_version": 1,
+  "hersteller": "Lixada",
+  "hersteller_kurz": "Lixada",
+  "modell": "Mini Gobo Moving Head",
+  "kurzname": "MINI GOBO MH",
+  "typ": "moving_head",
+  "leistung_w": 25,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Lixada-Mini-Gobo-Moving-Head.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Lixada/Lixada-Mini-Gobo-Moving-Head.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.3 GIT · Daniel",
+    "original": "resources/fixtures/Lixada/Lixada-Mini-Gobo-Moving-Head.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 70 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung: Lampensteuerung intensity -> shutter (Aus/An/Strobe/Fade-Bereiche, kein stufenloser Dimmer), Default/Highlight 8 = Lampe an, 0-7 art closed; Funktionskanal shutter -> reset, Default 34 -> 0; 'Lampe aus waehrend Bewegung' nicht mehr als Shutter-zu markiert; Gobo-Jitter art shake; Rotations-Stopp ohne art rotate"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Quelldatei und auf innere Stimmigkeit geprueft; kein Herstellerhandbuch oeffentlich auffindbar, nicht am Geraet geprueft"
+  },
+  "modi": [
+    {
+      "name": "11 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Color Control",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Color Selection", "art": "color"},
+            {"von": 128, "bis": 189, "name": "Color Rotation Fast to Slow", "art": "rotate"},
+            {"von": 190, "bis": 193, "name": "Rotation Stop", "art": ""},
+            {"von": 194, "bis": 255, "name": "Color Rotation Slow to Fast", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo Selection",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 63, "name": "Gobo Selection", "art": "gobo"},
+            {"von": 64, "bis": 127, "name": "Gobo Jitter", "art": "shake"},
+            {"von": 128, "bis": 189, "name": "Gobo Rotation Fast to Slow", "art": "rotate"},
+            {"von": 190, "bis": 193, "name": "Gobo Rotation Stop", "art": ""},
+            {"von": 194, "bis": 255, "name": "Gobo Rotation Slow to Fast", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Lamp Control",
+          "attribut": "shutter",
+          "default": 8,
+          "highlight": 8,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Lamp Off", "art": "closed"},
+            {"von": 8, "bis": 15, "name": "Lamp On", "art": "open"},
+            {"von": 16, "bis": 131, "name": "Lamp Strobe Speed - Slow to Fast", "art": "strobe"},
+            {"von": 132, "bis": 139, "name": "Lamp On", "art": "open"},
+            {"von": 140, "bis": 181, "name": "Fade On Fast, Fade Off Slow", "art": ""},
+            {"von": 182, "bis": 189, "name": "Lamp On", "art": "open"},
+            {"von": 190, "bis": 231, "name": "Lamp on Fast, Lamp off Slow", "art": ""},
+            {"von": 232, "bis": 239, "name": "Lamp On", "art": "open"},
+            {"von": 240, "bis": 247, "name": "Random Strobe Control", "art": "strobe"},
+            {"von": 248, "bis": 255, "name": "Lamp On", "art": "open"}
+          ]
+        },
+        {"name": "Master dimmer fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Function Controls",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 69, "name": "No function", "art": ""},
+            {"von": 70, "bis": 79, "name": "Lamp Off During X/Y Rotation", "art": ""},
+            {"von": 80, "bis": 89, "name": "No function", "art": ""},
+            {"von": 90, "bis": 99, "name": "Lamp Off During Color Wheel Rotation", "art": ""},
+            {"von": 100, "bis": 109, "name": "No function", "art": ""},
+            {"von": 110, "bis": 119, "name": "Lamp Off During Gobo Rotation", "art": ""},
+            {"von": 120, "bis": 199, "name": "No function", "art": ""},
+            {"von": 200, "bis": 209, "name": "Reset", "art": "reset"},
+            {"von": 210, "bis": 249, "name": "No function", "art": ""},
+            {"von": 250, "bis": 255, "name": "Sound Mode On/Off", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Effects",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 20, "name": "Standard Lighting Effects", "art": ""},
+            {"von": 21, "bis": 40, "name": "Stage Lighting Effects", "art": ""},
+            {"von": 41, "bis": 60, "name": "TV Lighting Effects", "art": ""},
+            {"von": 61, "bis": 80, "name": "Architectural Lighting Effects", "art": ""},
+            {"von": 81, "bis": 100, "name": "Theater Lighting Effects", "art": ""},
+            {"von": 101, "bis": 255, "name": "Default Lamp Effect", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "9 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {
+          "name": "Color Control",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Color Selection", "art": "color"},
+            {"von": 128, "bis": 189, "name": "Color Rotation Fast to Slow", "art": "rotate"},
+            {"von": 190, "bis": 193, "name": "Rotation Stop", "art": ""},
+            {"von": 194, "bis": 255, "name": "Color Rotation Slow to Fast", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo Selection",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 63, "name": "Gobo Selection", "art": "gobo"},
+            {"von": 64, "bis": 127, "name": "Gobo Jitter", "art": "shake"},
+            {"von": 128, "bis": 189, "name": "Gobo Rotation Fast to Slow", "art": "rotate"},
+            {"von": 190, "bis": 193, "name": "Gobo Rotation Stop", "art": ""},
+            {"von": 194, "bis": 255, "name": "Gobo Rotation Slow to Fast", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Lamp Control",
+          "attribut": "shutter",
+          "default": 8,
+          "highlight": 8,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Lamp Off", "art": "closed"},
+            {"von": 8, "bis": 15, "name": "Lamp On", "art": "open"},
+            {"von": 16, "bis": 131, "name": "Lamp Strobe Speed - Slow to Fast", "art": "strobe"},
+            {"von": 132, "bis": 139, "name": "Lamp On", "art": "open"},
+            {"von": 140, "bis": 181, "name": "Fade On Fast, Fade Off Slow", "art": ""},
+            {"von": 182, "bis": 189, "name": "Lamp On", "art": "open"},
+            {"von": 190, "bis": 231, "name": "Lamp on Fast, Lamp off Slow", "art": ""},
+            {"von": 232, "bis": 239, "name": "Lamp On", "art": "open"},
+            {"von": 240, "bis": 247, "name": "Random Strobe Control", "art": "strobe"},
+            {"von": 248, "bis": 255, "name": "Lamp On", "art": "open"}
+          ]
+        },
+        {"name": "Master dimmer fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Function Controls",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 69, "name": "No function", "art": ""},
+            {"von": 70, "bis": 79, "name": "Lamp Off During X/Y Rotation", "art": ""},
+            {"von": 80, "bis": 89, "name": "No function", "art": ""},
+            {"von": 90, "bis": 99, "name": "Lamp Off During Color Wheel Rotation", "art": ""},
+            {"von": 100, "bis": 109, "name": "No function", "art": ""},
+            {"von": 110, "bis": 119, "name": "Lamp Off During Gobo Rotation", "art": ""},
+            {"von": 120, "bis": 199, "name": "No function", "art": ""},
+            {"von": 200, "bis": 209, "name": "Reset", "art": "reset"},
+            {"von": 210, "bis": 249, "name": "No function", "art": ""},
+            {"von": 250, "bis": 255, "name": "Sound Mode On/Off", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Effects",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 20, "name": "Standard Lighting Effects", "art": ""},
+            {"von": 21, "bis": 40, "name": "Stage Lighting Effects", "art": ""},
+            {"von": 41, "bis": 60, "name": "TV Lighting Effects", "art": ""},
+            {"von": 61, "bis": 80, "name": "Architectural Lighting Effects", "art": ""},
+            {"von": 81, "bis": 100, "name": "Theater Lighting Effects", "art": ""},
+            {"von": 101, "bis": 255, "name": "Default Lamp Effect", "art": ""}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Farb- und Gobo-Rad nur als Sammelbereich in der QLC+-Quelle (keine Einzelslots bekannt). Kanal 'Master dimmer fine' laut QLC+ — Zuordnung nicht handbuchgeprueft."
+}

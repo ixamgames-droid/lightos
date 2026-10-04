@@ -1,0 +1,165 @@
+{
+  "format_version": 1,
+  "hersteller": "U King",
+  "hersteller_kurz": "UKING",
+  "modell": "Wall Washer 24x3W",
+  "kurzname": "UKWW24X3",
+  "typ": "led_bar",
+  "leistung_w": 72,
+  "notizen": "Kein Herstellerhandbuch abrufbar; Kanalfolge und Wertebereiche aus der QLC+-Datei. Strobe-Kanaele ohne Wertangabe in QLC+: 0 = kein Strobe angenommen (wie bei den eingebauten U-King-Profilen). 24 x 3 W RGB in 8 Segmenten; 24-Kanal = 8 Segmente, 12-Kanal = 4, 6-Kanal = 2 (je RGB).",
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition UKing-Wall-Washer-24x3W.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/UKing/UKing-Wall-Washer-24x3W.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.5 GIT · Jürgen Froeschlin",
+    "original": "resources/fixtures/UKing/UKing-Wall-Washer-24x3W.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 25 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): Hersteller 'UKing' -> 'U King' (wie die eingebauten LightOS-Profile der Marke); Modus '24 Channel': Raster 1x8; Modus '12 Channel': Raster 1x4; Modus '6 Channel': Raster 1x2; Strobe-Kanal ohne Bereiche (QLC+-Preset ShutterStrobeSlowFast) mit 0 = kein Strobe (open) / 1-255 Strobe versehen (Strobe); 12 Bereichs-Arten nachgezogen (Farb-/Gobo-Slots, Shake/Rotation, Prisma, Sound, Reset; Programm-Bereiche in Makro-Kanaelen ohne Farb-Art); einzelne Kanalnamen deutsch bzw. eindeutiger benannt"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Originaldatei geprueft und nach den LightOS-Regeln (SCHEMA.md) nachbearbeitet; ein Herstellerhandbuch war nicht abrufbar (U'King-Anleitungen nur als Amazon-/manuals.plus-PDF, dort gesperrt; ManualsLib fuehrt das Modell nicht), daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "7 Channel",
+      "kanaele": [
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 1, "bis": 255, "name": "Strobe langsam → schnell", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Effekt / Programm",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "No function", "art": ""},
+            {"von": 6, "bis": 16, "name": "Red", "art": ""},
+            {"von": 17, "bis": 27, "name": "Green", "art": ""},
+            {"von": 28, "bis": 38, "name": "Blue", "art": ""},
+            {"von": 39, "bis": 49, "name": "Yellow", "art": ""},
+            {"von": 50, "bis": 60, "name": "Magenta", "art": ""},
+            {"von": 61, "bis": 71, "name": "Cyan", "art": ""},
+            {"von": 72, "bis": 82, "name": "White", "art": ""},
+            {"von": 83, "bis": 93, "name": "Point-to-Point-1", "art": ""},
+            {"von": 94, "bis": 104, "name": "Point-to-Point-2", "art": ""},
+            {"von": 105, "bis": 115, "name": "Point-to-Point-3", "art": ""},
+            {"von": 116, "bis": 126, "name": "Point-to-Point-4", "art": ""},
+            {"von": 127, "bis": 137, "name": "Point-to-Point-5", "art": ""},
+            {"von": 138, "bis": 148, "name": "Point-to-Point-6", "art": ""},
+            {"von": 149, "bis": 159, "name": "Point-to-Point-7", "art": ""},
+            {"von": 160, "bis": 170, "name": "Point-to-Point-8", "art": ""},
+            {"von": 171, "bis": 181, "name": "Point-to-Point-9", "art": ""},
+            {"von": 182, "bis": 192, "name": "Red gradient", "art": ""},
+            {"von": 193, "bis": 203, "name": "Green gradient", "art": ""},
+            {"von": 204, "bis": 214, "name": "Blue gradient", "art": ""},
+            {"von": 215, "bis": 225, "name": "Purple gradient", "art": ""},
+            {"von": 226, "bis": 236, "name": "Yellow gradient", "art": ""},
+            {"von": 237, "bis": 247, "name": "Cyclic gradient", "art": ""},
+            {"von": 248, "bis": 255, "name": "Sound", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Speed",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Speed, slow to fast", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3 Channel",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "24 Channel",
+      "kanaele": [
+        {"name": "Red1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue4", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red5", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green5", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue5", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red6", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green6", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue6", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red7", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green7", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue7", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red8", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green8", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue8", "attribut": "color_b", "default": 0, "highlight": 255}
+      ],
+      "raster": {"rows": 1, "cols": 8}
+    },
+    {
+      "name": "4 Channel",
+      "kanaele": [
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "12 Channel",
+      "kanaele": [
+        {"name": "Red1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue4", "attribut": "color_b", "default": 0, "highlight": 255}
+      ],
+      "raster": {"rows": 1, "cols": 4}
+    },
+    {
+      "name": "6 Channel",
+      "kanaele": [
+        {"name": "Red1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue2", "attribut": "color_b", "default": 0, "highlight": 255}
+      ],
+      "raster": {"rows": 1, "cols": 2}
+    }
+  ]
+}
