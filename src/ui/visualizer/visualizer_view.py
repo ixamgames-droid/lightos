@@ -34,6 +34,7 @@ from src.core.stage.stage_definition import resolve_active_stage
 from src.ui.visualizer.visualizer_window import (
     VisualizerBridge, load_stage_html, install_render_crash_guard,
     install_scene_start_guard, max_beam_range_pref, create_dmx_push,
+    apply_push_tier, quality_tier_pref,
 )
 from src.ui.visualizer.visualizer_service import get_visualizer_service, VisualizerTarget
 from src.ui.weak_slots import weak_slot_fwd
@@ -222,6 +223,9 @@ class Visualizer3DView(QWidget):
                            else None),
         )
         self._service.attach_target(self._target)
+        if self._dmx_push is not None:
+            # VIZ-71: Takt der Qualitaetsstufe, bis die Seite ihre meldet.
+            apply_push_tier(self, quality_tier_pref())
         # VIZ-12 (Live-Befund): JS fordert nach dem Fixture-Bau selbst den
         # vollen DMX-Bestand an (requestFullResync-Slot der Bridge). getattr:
         # SimpleNamespace-Test-Fakes haben die gebundene Methode nicht.

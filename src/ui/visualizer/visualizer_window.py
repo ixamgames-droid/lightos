@@ -231,16 +231,19 @@ def _render_status_name(status) -> str:
 
 
 def quality_tier_pref() -> str:
-    """Geräte-gebundene Qualitätsstufe aus ui_prefs.json: 'auto'|'high'|'low'.
+    """Geräte-gebundene Qualitätsstufe aus ui_prefs.json:
+    'auto'|'low'|'high'|'max'.
 
     Bewusst in den Geräte-Prefs statt in der Show: die Stufe hängt an der
     GPU dieses Rechners, eine Show wandert dagegen zwischen Maschinen.
-    'auto' = die JS-seitige Probe (renderer.js#probeGpuTier) entscheidet.
+    'auto' = die JS-seitige Probe (renderer.js#probeGpuTier) entscheidet
+    zwischen 'low' und 'high'; 'max' (VIZ-71) gibt es nur von Hand.
+    Was die Stufen bedeuten: ``quality_tiers.py`` / ``quality_tiers.js``.
     """
     try:
         from src.ui.views.programmer_view import _load_prefs
         val = str(_load_prefs().get("viz_quality_tier", "auto")).lower()
-        return val if val in ("auto", "high", "low") else "auto"
+        return val if val in ("auto", "high", "low", "max") else "auto"
     except Exception:
         return "auto"
 
@@ -563,8 +566,37 @@ def create_dmx_push(besitzer):
         target = getattr(b, "_target", None)
         if svc is not None and target is not None:
             svc.force_full_resync(target)
-    return DmxPushChannel(view, on_need_full=_voll,
-                          poll=getattr(besitzer, "_bridge", None))
+    kanal = DmxPushChannel(view, on_need_full=_voll,
+                           poll=getattr(besitzer, "_bridge", None))
+    # Die Seite meldet ihre AKTIVE Stufe (Probe- oder Override-Ergebnis) —
+    # erst dann steht bei 'Automatisch' fest, ob 15 oder 30 Hz.
+    bridge = getattr(besitzer, "_bridge", None)
+    sig = getattr(bridge, "pyGpuTierReported", None)
+    if sig is not None:
+        def _gemeldet(tier):
+            b = ref()
+            if b is not None:
+                apply_push_tier(b, tier)
+        try:
+            sig.connect(_gemeldet)
+        except Exception:                                # noqa: BLE001
+            pass
+    return kanal
+
+
+def apply_push_tier(besitzer, tier) -> None:
+    """VIZ-71: Push-Takt der Lichtdaten an die Qualitaetsstufe anpassen
+    (Niedrig 15 Hz, Hoch 30 Hz, Maximal 44 Hz = DMX-Ausgabetakt). Setzt den
+    Mindestabstand des Push-Kanals und den gewuenschten Takt des Service-Ziels
+    (der Timer laeuft im Takt des schnellsten aktiven Ziels)."""
+    from src.ui.visualizer.quality_tiers import push_interval_s, push_tick_ms
+    kanal = getattr(besitzer, "_dmx_push", None)
+    if kanal is not None:
+        kanal.min_interval_s = push_interval_s(tier)
+    svc = getattr(besitzer, "_service", None)
+    target = getattr(besitzer, "_target", None)
+    if svc is not None and target is not None:
+        svc.set_target_tick_ms(target, push_tick_ms(tier))
 
 
 # ============================================================================
@@ -697,7 +729,7 @@ class VisualizerBridge(QObject):
     pyFixtureDeleted        = Signal(int)
     pyStageListChanged      = Signal(list, bool)  # items, is_stale_echo (Stage-Echo-Race-Fix)
     pyStageObjectDeleted    = Signal(str)
-    pyGpuTierReported       = Signal(str)     # VIZ-15: aktive Qualitätsstufe der Szene ('low'|'high')
+    pyGpuTierReported       = Signal(str)     # VIZ-15: aktive Qualitätsstufe der Szene ('low'|'high'|'max')
     pyStageSelection        = Signal(str)
     pyStageSaved            = Signal(dict)
     pyBrightnessChanged     = Signal(float)   # JS meldet Auto-Brightness an Slider
@@ -3255,16 +3287,23 @@ class VisualizerWindow(QMainWindow):
         self._combo_quality.addItem("Automatisch (empfohlen)", "auto")
         self._combo_quality.addItem("Hoch (Desktop-GPU)", "high")
         self._combo_quality.addItem("Niedrig (schwache/mobile GPU)", "low")
+        # VIZ-71: nur von Hand — die Automatik waehlt nie mehr als Hoch.
+        self._combo_quality.addItem("Maximal (starke Desktop-GPU)", "max")
         self._combo_quality.setToolTip(
             "Automatisch: beim Start wird die Grafikkarte geprüft und die Stufe\n"
             "passend gewählt (schwache Chips wie im Surface → Niedrig).\n"
             "Manuell überschreiben, falls die Erkennung danebenliegt.\n\n"
-            "Niedrig = ohne Kantenglättung, reduzierte Auflösung/Schatten/Kegel\n"
-            "(flüssiger), Hoch = volle Optik. Gilt für dieses Gerät, nicht pro Show."
+            "Niedrig = 15 Lichtupdates/s, Pixeldichte höchstens 1,25, 8 Schatten\n"
+            "(einfach), ohne Kantenglättung; beim Drehen der Kamera kurz gröber.\n"
+            "Hoch = 30 Lichtupdates/s, Pixeldichte höchstens 2, 8 weiche Schatten;\n"
+            "gröber beim Drehen nur, wenn die Grafikkarte nicht nachkommt.\n"
+            "Maximal = 44 Lichtupdates/s (so schnell wie die DMX-Ausgabe), volle\n"
+            "Pixeldichte, 16 weiche Schatten, nie gröber — nur für starke GPUs.\n\n"
+            "Gilt für dieses Gerät, nicht pro Show."
         )
         tier_pref = quality_tier_pref()
         self._combo_quality.setCurrentIndex(
-            {"auto": 0, "high": 1, "low": 2}.get(tier_pref, 0))
+            {"auto": 0, "high": 1, "low": 2, "max": 3}.get(tier_pref, 0))
         self._combo_quality.currentIndexChanged.connect(self._on_quality_tier_changed)
         q_row.addWidget(self._combo_quality, 1)
         # Wird über den Bridge-Slot reportGpuTier befüllt — zeigt die AKTIVE
@@ -3546,6 +3585,9 @@ class VisualizerWindow(QMainWindow):
                            else None),
         )
         self._service.attach_target(self._target)
+        if self._dmx_push is not None:
+            # Bis die Seite ihre Stufe meldet: die gewaehlte ('auto' -> Hoch).
+            apply_push_tier(self, quality_tier_pref())
         # VIZ-12 (Live-Befund): JS fordert nach dem Fixture-Bau selbst den
         # vollen DMX-Bestand an (requestFullResync-Slot) — ereignisgesteuert
         # statt Timing-Raten. getattr: SimpleNamespace-Test-Fakes haben die
@@ -5188,7 +5230,8 @@ class VisualizerWindow(QMainWindow):
         lbl = getattr(self, "_lbl_gpu_tier", None)
         if lbl is None:
             return
-        name = {"low": "Niedrig", "high": "Hoch"}.get(str(tier), str(tier))
+        name = {"low": "Niedrig", "high": "Hoch",
+                "max": "Maximal"}.get(str(tier), str(tier))
         try:
             lbl.setText(f"aktiv: {name}")
         except RuntimeError:

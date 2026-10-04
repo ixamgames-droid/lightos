@@ -106,7 +106,9 @@ still. Zudem zeichnet jeder schattenwerfende Scheinwerfer die ganze Szene noch
 einmal aus seiner Sicht — mit 16 Schatten war das der größte Einzelposten pro
 Bild und ließ die Ansicht bei großen Rigs ruckeln. Acht Schatten reichen für den
 Raumeindruck; die Grenze gilt auf jedem Rechner gleich, damit die Bühne überall
-gleich aussieht.
+gleich aussieht. Einzige Ausnahme ist die Qualitätsstufe **Maximal** (siehe
+unten): sie erlaubt bis zu 16 Schlagschatten und ist für starke Grafikkarten
+gedacht.
 
 **Wenn Schatten für eine bestimmte Stelle wichtig sind:** die Vergabe folgt der
 Fixture-Nummer. Ein Gerät, dessen Schatten man sehen will, sollte also eine
@@ -116,6 +118,32 @@ Patch.
 Wie lange die Ansicht je Bild braucht, lässt sich messen:
 `./venv/bin/python tools/viz_render_benchmark.py 12 32 48` (echtes Fenster
 nötig, misst auf der echten Grafikkarte).
+
+## Qualitätsstufe (Tab „Einstellungen" → „Render-Qualität")
+
+Die Stufe gilt für **dieses Gerät**, nicht für die Show — sie hängt an der
+Grafikkarte des Rechners. Sie wirkt auf das Vollfenster und die 3D-Ansicht in
+der Live View gleichermaßen; nach dem Umstellen lädt die Szene einmal neu.
+Neben der Auswahl steht, welche Stufe gerade **aktiv** ist.
+
+| Stufe | Lichtupdates | Bildschärfe (Pixeldichte) | Schlagschatten | Beim Drehen der Kamera |
+|---|---|---|---|---|
+| **Niedrig** | 15 pro Sekunde | höchstens 1,25-fach | 8, einfach | immer kurz gröber |
+| **Hoch** (Standard) | 30 pro Sekunde | höchstens 2-fach | 8, weich | gröber nur, wenn die Grafikkarte nicht nachkommt (ein Bild braucht länger als 18 ms) |
+| **Maximal** | 44 pro Sekunde | volle Bildschirmdichte | 16, weich | nie gröber |
+
+- **Automatisch (empfohlen)** prüft beim Start die Grafikkarte und wählt
+  **Niedrig** oder **Hoch**. **Maximal** wählt die Automatik nie — nur von Hand.
+- **Lichtupdates** heißt: so oft pro Sekunde kommen Farbe, Dimmer und Pan/Tilt
+  in der 3D-Ansicht an. 44 entspricht der DMX-Ausgabe selbst; schneller gibt es
+  nichts Neues. Ein Blackout ist auch auf Niedrig sofort dunkel — es kommen nur
+  weniger Zwischenschritte eines Effekts an.
+- **Gröber beim Drehen:** während die Kamera fährt, rechnet die Ansicht mit
+  etwas weniger Bildpunkten und wird dadurch flüssiger. Etwa 0,2 Sekunden nach
+  dem Loslassen ist das Bild wieder voll scharf. Ein Sprung auf eine
+  Kamera-Ansicht (Oben, Vorne, …) zählt nicht als Fahrt.
+- **Maximal** nur auf einer starken Desktop-Grafikkarte wählen. Ruckelt die
+  Ansicht, zurück auf **Hoch**.
 
 ## Früher bekannte Macken (alle erledigt)
 Ältere Fassungen dieser Anleitung nannten hier offene Punkte. Sie sind behoben bzw. ließen

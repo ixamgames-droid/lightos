@@ -6,7 +6,7 @@
 // dispatcht per registry.js#updateFixtureDmx auf die pro-Typ-Handler in
 // builders.js — belegt durch tests/test_viz13c_updatedmx_registry.py.
 import * as THREE from '../three/three.js';
-import { scene, renderer, isLowSpec } from '../scene/renderer.js';
+import { scene, renderer, isLowSpec, tierSettings } from '../scene/renderer.js';
 import { disposeObj } from '../scene/grid_floor.js';
 // VIZ-13 3c Teil 2: build UND DMX-Update dispatchen ueber die FixtureType-
 // Registry; die pro-Typ-Handler leben bei ihren Buildern (builders.js), wo
@@ -113,14 +113,25 @@ const SHADOW_TEXTURE_RESERVE = 6;
 // schattenwerfende Lichter reichen fuer den Raumeindruck; die uebrigen leuchten
 // voll, nur ohne Schlagschatten.
 const SHADOW_SPOT_HARD_CAP = 8;
+// VIZ-71: die Qualitaetsstufe 'Maximal' (nur von Hand waehlbar) hebt das Dach
+// auf den Wert vor VIZ-69 — 16, mit Abstand unter der gemessenen Kippgrenze
+// (24 gut / 26 Absturz). Hoeher geht es auf keiner Stufe; die Reserve
+// darunter gilt weiter (auf einer 16-Unit-GPU bleiben es 10).
+const SHADOW_SPOT_HARD_CAP_MAX = 16;
 let _shadowSpotBudget = null;
+
+function schattenDach() {
+  // Dach der Stufe aus scene/quality_tiers.js, nie ueber das Maximal-Dach.
+  return Math.min(SHADOW_SPOT_HARD_CAP_MAX,
+                  (tierSettings && tierSettings.shadowCap) || SHADOW_SPOT_HARD_CAP);
+}
 
 function shadowSpotBudget() {
   if (_shadowSpotBudget === null) {
     const maxTex = (renderer && renderer.capabilities
       && renderer.capabilities.maxTextures) || 16;
     _shadowSpotBudget = Math.min(
-      SHADOW_SPOT_HARD_CAP,
+      schattenDach(),   // SHADOW_SPOT_HARD_CAP je Stufe
       Math.max(2, maxTex - SHADOW_TEXTURE_RESERVE));
   }
   return _shadowSpotBudget;
@@ -133,7 +144,7 @@ export function shadowBudgetInfo() {
   return {
     maxTextures: maxTex,
     reserve: SHADOW_TEXTURE_RESERVE,
-    hardCap: SHADOW_SPOT_HARD_CAP,
+    hardCap: schattenDach(),
     budget: shadowSpotBudget(),
   };
 }
