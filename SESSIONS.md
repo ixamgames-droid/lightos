@@ -55,7 +55,6 @@
 | DOC-55 | C | - | 2026-10-02T13:04Z | docs/anleitung_einmessen/ANLEITUNG_EINMESSEN.md |
 | DOC-56 | C | - | 2026-10-02T13:05Z | docs/anleitung_web_remote/ANLEITUNG.md |
 | FM-58 | A | feat/fm58-bibliothek-runde2 | 2026-10-02T18:20Z | fixtures/bibliothek |
-| UI-73 | B | docs/ui72-ui73-befunde | 2026-10-02T22:02Z | BACKLOG.md |
 | SAMMEL-DOKU-C | A | sammel/doku-c | 2026-10-02T22:08Z | docs · BACKLOG.md |
 | FM-59 | A | feat/fm59-bibliothek-runde3 | 2026-10-04T16:47Z | fixtures/bibliothek |
 | UI-72-73-FIX | B | fix/ui72-ui73-playback | 2026-10-02T22:44Z | src/ui/views/playback_view.py · src/core/cueliste_ziel.py · tests/test_ui72_ui73_playback.py |
@@ -173,7 +172,6 @@
 
 ## Verlauf
 
-- 2026-10-02T22:24Z A claim FM-59
 - 2026-10-02T22:32Z A done FM-57
 - 2026-10-02T22:44Z B claim UI-72-73-FIX
 - 2026-10-02T22:45Z C done FM-53
@@ -203,3 +201,4 @@
 - 2026-10-04T18:00Z A claim VIZ-69
 - 2026-10-04T18:00Z A claim VIZ-70
 - 2026-10-04T18:01Z B done UI-72
+- 2026-10-04T18:01Z B done UI-73
