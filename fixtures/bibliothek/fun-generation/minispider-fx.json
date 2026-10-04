@@ -1,0 +1,146 @@
+{
+  "format_version": 1,
+  "hersteller": "Fun Generation",
+  "hersteller_kurz": "FUNGEN",
+  "modell": "MiniSpider FX",
+  "kurzname": "MINISPIDERFX",
+  "typ": "moving_head",
+  "leistung_w": 35,
+  "notizen": "Zwei schwenkbare LED-Leisten mit je 4 x 3 W RGBW. Das Handbuch beschriftet die 17-Kanal-Farbkanaele verwirrend als 'Pixel 1-8'; hier wie in QLC+ als RGBW je Leiste gedeutet (unbestaetigt). Kundenbewertungen melden Abweichungen zwischen Handbuch und Geraet - am Geraet pruefen.",
+  "quelle": {
+    "titel": "Fun Generation MiniSpider FX 8 x 3 W RGBW Bedienungsanleitung (Thomann, ID 435515, V2)",
+    "version": "V2",
+    "datum": "2022-03-09",
+    "url": "https://images.static-thomann.de/pics/atg/atgdata/document/manual/c_435515_v2_en_online.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.0.0 Beta 2 · Klaus Muth",
+    "original": "resources/fixtures/Fun-Generation/Fun-Generation-MiniSpider-FX.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 21 Wertebereiche mit Art (kind) versehen; Rasterform in 3 Modus/Modi aus <Physical> uebernommen; danach von LightOS gegen das Herstellerhandbuch ueberarbeitet: Hersteller 'Fun-Generation' -> 'Fun Generation' (Schreibweise des Herstellers), Kurzname/Leistung/Typ nach Handbuch; Typ moving_head statt other (zwei schwenkbare Leisten, wie der eingebaute Spider), keine Rasterform (QLC+ 2x4 = LED-Zahl, nicht die Farbzonen; Leisten als Koepfe ueber die wiederholten Tilt-/RGBW-Kanaele); Shutter-Bereiche ergaenzt (0-9 offen, 10-255 Strobe 1-20 Hz), fehlten in QLC+; Empfindlichkeit/Speed als effect_speed statt speed; Automatikprogramm ohne Art, Musik als sound, Reset als reset; Kanalnamen deutsch; 17-Kanal-Farbkanaele als Leiste 1/2 benannt (QLC+: Pixel 1/2)"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal fuer Kanal gegen die DMX-Tabellen (7/11/17 Kanaele, Kap. 7.2.1-7.2.3) im Thomann-Handbuch V2 (09.03.2022) geprueft; Zuordnung der 17-Kanal-Farbkanaele zu den Leisten aus der Handbuch-Beschriftung nicht eindeutig; nicht am Geraet getestet"
+  },
+  "modi": [
+    {
+      "name": "7 Channel",
+      "kanaele": [
+        {"name": "Tilt Leiste 1", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt Leiste 2", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Motor-Speed (schnell -> langsam)", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Offen (keine Funktion)", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe langsam -> schnell (1-20 Hz)", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Automatik/Reset/Musik",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 139, "name": "Keine Funktion"},
+            {"von": 140, "bis": 229, "name": "Automatikprogramm", "art": ""},
+            {"von": 230, "bis": 233, "name": "Keine Funktion"},
+            {"von": 234, "bis": 236, "name": "Reset", "art": "reset"},
+            {"von": 237, "bis": 249, "name": "Keine Funktion"},
+            {"von": 250, "bis": 255, "name": "Musiksteuerung", "art": "sound"}
+          ]
+        },
+        {"name": "Empfindlichkeit/Speed (niedrig -> hoch)", "attribut": "effect_speed", "default": 0, "highlight": 0}
+      ]
+    },
+    {
+      "name": "11 Channel",
+      "kanaele": [
+        {"name": "Tilt Leiste 1", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt Leiste 2", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Motor-Speed (schnell -> langsam)", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Offen (keine Funktion)", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe langsam -> schnell (1-20 Hz)", "art": "strobe"}
+          ]
+        },
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Automatik/Reset/Musik",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 139, "name": "Keine Funktion"},
+            {"von": 140, "bis": 229, "name": "Automatikprogramm", "art": ""},
+            {"von": 230, "bis": 233, "name": "Keine Funktion"},
+            {"von": 234, "bis": 236, "name": "Reset", "art": "reset"},
+            {"von": 237, "bis": 249, "name": "Keine Funktion"},
+            {"von": 250, "bis": 255, "name": "Musiksteuerung", "art": "sound"}
+          ]
+        },
+        {"name": "Empfindlichkeit/Speed (niedrig -> hoch)", "attribut": "effect_speed", "default": 0, "highlight": 0}
+      ]
+    },
+    {
+      "name": "17 Channel",
+      "kanaele": [
+        {"name": "Tilt Leiste 1", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt Leiste 1 fein", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt Leiste 2", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt Leiste 2 fein", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Motor-Speed (schnell -> langsam)", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Offen (keine Funktion)", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe langsam -> schnell (1-20 Hz)", "art": "strobe"}
+          ]
+        },
+        {"name": "Rot Leiste 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen Leiste 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau Leiste 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss Leiste 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot Leiste 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen Leiste 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau Leiste 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss Leiste 2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Automatik/Reset/Musik",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 139, "name": "Keine Funktion"},
+            {"von": 140, "bis": 229, "name": "Automatikprogramm", "art": ""},
+            {"von": 230, "bis": 233, "name": "Keine Funktion"},
+            {"von": 234, "bis": 236, "name": "Reset", "art": "reset"},
+            {"von": 237, "bis": 249, "name": "Keine Funktion"},
+            {"von": 250, "bis": 255, "name": "Musiksteuerung", "art": "sound"}
+          ]
+        },
+        {"name": "Empfindlichkeit/Speed (niedrig -> hoch)", "attribut": "effect_speed", "default": 0, "highlight": 0}
+      ]
+    }
+  ]
+}

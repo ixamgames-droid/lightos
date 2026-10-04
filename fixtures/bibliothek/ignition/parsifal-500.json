@@ -1,0 +1,379 @@
+{
+  "format_version": 1,
+  "hersteller": "Ignition",
+  "hersteller_kurz": "Ignition",
+  "modell": "Parsifal 500",
+  "kurzname": "PARSIFAL 500",
+  "typ": "moving_head",
+  "leistung_w": 490,
+  "notizen": "Beam-Spot-Wash-Hybrid, 1 x 400 W LED 8500 K, 12-23 Grad, 540/270 Grad. Farbrad 7 Farben + offen (Festpositionen 64-111 mit Zwischenstellungen). Gobo-Rad 1 statisch (9), Gobo-Rad 2 rotierend (7) mit eigener Rotation; 6-fach-Prisma rotierend. Frost-Kanal laut Handbuch: 8-128 'Zoom', 129-255 Frost — so uebernommen. Prisma 0-7 heisst im Handbuch 'Closed' (= Prisma aus).",
+  "quelle": {
+    "titel": "Ignition Parsifal 500 – Bedienungsanleitung (Thomann, ID 554505)",
+    "version": "V3",
+    "datum": "2023-07-27",
+    "url": "https://fast-images.static-thomann.de/pics/atg/atgdata/document/manual/c_554505_v3_en_online.pdf"
+  },
+  "herkunft": {"art": "hersteller-handbuch", "lizenz": "eigen"},
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal fuer Kanal gegen die DMX-Tabellen beider Modi (17/18 Kanal) im Thomann-Handbuch (Kap. 7) geschrieben und geprueft; nicht am Geraet getestet"
+  },
+  "modi": [
+    {
+      "name": "17-Kanal",
+      "kanaele": [
+        {"name": "Pan (540 Grad)", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fein", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt (270 Grad)", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fein", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt-Geschwindigkeit (schnell -> langsam)", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Farbrad",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Offen (Weiss)", "art": "open"},
+            {"von": 8, "bis": 15, "name": "Rot", "art": "color"},
+            {"von": 16, "bis": 23, "name": "Blau", "art": "color"},
+            {"von": 24, "bis": 31, "name": "Magenta", "art": "color"},
+            {"von": 32, "bis": 39, "name": "Gelb", "art": "color"},
+            {"von": 40, "bis": 47, "name": "Orange", "art": "color"},
+            {"von": 48, "bis": 55, "name": "Gruen", "art": "color"},
+            {"von": 56, "bis": 63, "name": "Cyan", "art": "color"},
+            {"von": 64, "bis": 66, "name": "Festposition offen", "art": "open"},
+            {"von": 67, "bis": 69, "name": "Festposition Offen / Rot", "art": ""},
+            {"von": 70, "bis": 72, "name": "Festposition Rot", "art": "color"},
+            {"von": 73, "bis": 75, "name": "Festposition Rot / Blau", "art": ""},
+            {"von": 76, "bis": 78, "name": "Festposition Blau", "art": "color"},
+            {"von": 79, "bis": 81, "name": "Festposition Blau / Magenta", "art": ""},
+            {"von": 82, "bis": 84, "name": "Festposition Magenta", "art": "color"},
+            {"von": 85, "bis": 87, "name": "Festposition Magenta / Gelb", "art": ""},
+            {"von": 88, "bis": 90, "name": "Festposition Gelb", "art": "color"},
+            {"von": 91, "bis": 93, "name": "Festposition Gelb / Orange", "art": ""},
+            {"von": 94, "bis": 96, "name": "Festposition Orange", "art": "color"},
+            {"von": 97, "bis": 99, "name": "Festposition Orange / Gruen", "art": ""},
+            {"von": 100, "bis": 102, "name": "Festposition Gruen", "art": "color"},
+            {"von": 103, "bis": 105, "name": "Festposition Gruen / Cyan", "art": ""},
+            {"von": 106, "bis": 108, "name": "Festposition Cyan", "art": "color"},
+            {"von": 109, "bis": 111, "name": "Festposition Cyan / Offen", "art": ""},
+            {"von": 112, "bis": 127, "name": "Offen", "art": "open"},
+            {"von": 128, "bis": 189, "name": "Raddurchlauf gegen Uhrzeigersinn, schnell -> langsam", "art": "rotate"},
+            {"von": 190, "bis": 193, "name": "Stopp", "art": ""},
+            {"von": 194, "bis": 255, "name": "Raddurchlauf im Uhrzeigersinn, langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo-Rad 1 (statisch, 9 Gobos)",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Offen", "art": "open"},
+            {"von": 8, "bis": 13, "name": "Gobo 1-1", "art": "gobo"},
+            {"von": 14, "bis": 19, "name": "Gobo 1-2", "art": "gobo"},
+            {"von": 20, "bis": 25, "name": "Gobo 1-3", "art": "gobo"},
+            {"von": 26, "bis": 31, "name": "Gobo 1-4", "art": "gobo"},
+            {"von": 32, "bis": 37, "name": "Gobo 1-5", "art": "gobo"},
+            {"von": 38, "bis": 43, "name": "Gobo 1-6", "art": "gobo"},
+            {"von": 44, "bis": 49, "name": "Gobo 1-7", "art": "gobo"},
+            {"von": 50, "bis": 55, "name": "Gobo 1-8", "art": "gobo"},
+            {"von": 56, "bis": 63, "name": "Gobo 1-9", "art": "gobo"},
+            {"von": 64, "bis": 70, "name": "Gobo 1-1 Shake", "art": "shake"},
+            {"von": 71, "bis": 77, "name": "Gobo 1-2 Shake", "art": "shake"},
+            {"von": 78, "bis": 84, "name": "Gobo 1-3 Shake", "art": "shake"},
+            {"von": 85, "bis": 91, "name": "Gobo 1-4 Shake", "art": "shake"},
+            {"von": 92, "bis": 98, "name": "Gobo 1-5 Shake", "art": "shake"},
+            {"von": 99, "bis": 105, "name": "Gobo 1-6 Shake", "art": "shake"},
+            {"von": 106, "bis": 112, "name": "Gobo 1-7 Shake", "art": "shake"},
+            {"von": 113, "bis": 119, "name": "Gobo 1-8 Shake", "art": "shake"},
+            {"von": 120, "bis": 127, "name": "Gobo 1-9 Shake", "art": "shake"},
+            {"von": 128, "bis": 189, "name": "Raddurchlauf gegen Uhrzeigersinn, schnell -> langsam", "art": "rotate"},
+            {"von": 190, "bis": 193, "name": "Stopp", "art": ""},
+            {"von": 194, "bis": 255, "name": "Raddurchlauf im Uhrzeigersinn, langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo-Rad 2 (rotierend, 7 Gobos)",
+          "attribut": "gobo_wheel2",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Offen", "art": "open"},
+            {"von": 8, "bis": 15, "name": "Gobo 2-1", "art": "gobo"},
+            {"von": 16, "bis": 23, "name": "Gobo 2-2", "art": "gobo"},
+            {"von": 24, "bis": 31, "name": "Gobo 2-3", "art": "gobo"},
+            {"von": 32, "bis": 39, "name": "Gobo 2-4", "art": "gobo"},
+            {"von": 40, "bis": 47, "name": "Gobo 2-5", "art": "gobo"},
+            {"von": 48, "bis": 55, "name": "Gobo 2-6", "art": "gobo"},
+            {"von": 56, "bis": 63, "name": "Gobo 2-7", "art": "gobo"},
+            {"von": 64, "bis": 72, "name": "Gobo 2-1 Shake", "art": "shake"},
+            {"von": 73, "bis": 81, "name": "Gobo 2-2 Shake", "art": "shake"},
+            {"von": 82, "bis": 90, "name": "Gobo 2-3 Shake", "art": "shake"},
+            {"von": 91, "bis": 99, "name": "Gobo 2-4 Shake", "art": "shake"},
+            {"von": 100, "bis": 108, "name": "Gobo 2-5 Shake", "art": "shake"},
+            {"von": 109, "bis": 117, "name": "Gobo 2-6 Shake", "art": "shake"},
+            {"von": 118, "bis": 127, "name": "Gobo 2-7 Shake", "art": "shake"},
+            {"von": 128, "bis": 189, "name": "Raddurchlauf gegen Uhrzeigersinn, schnell -> langsam", "art": "rotate"},
+            {"von": 190, "bis": 193, "name": "Stopp", "art": ""},
+            {"von": 194, "bis": 255, "name": "Raddurchlauf im Uhrzeigersinn, langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo 2 Rotation",
+          "attribut": "gobo_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Festposition (Index)", "art": ""},
+            {"von": 128, "bis": 189, "name": "Rotation gegen Uhrzeigersinn, schnell -> langsam", "art": "rotate"},
+            {"von": 190, "bis": 193, "name": "Stopp", "art": ""},
+            {"von": 194, "bis": 255, "name": "Rotation im Uhrzeigersinn, langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Prisma (6-fach)",
+          "attribut": "prism",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Prisma aus", "art": ""},
+            {"von": 8, "bis": 255, "name": "Prisma ein", "art": "prism"}
+          ]
+        },
+        {
+          "name": "Prisma Rotation",
+          "attribut": "prism_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Index (Festposition)", "art": ""},
+            {"von": 128, "bis": 189, "name": "Rotation im Uhrzeigersinn, schnell -> langsam", "art": "rotate"},
+            {"von": 190, "bis": 193, "name": "Stopp", "art": ""},
+            {"von": 194, "bis": 255, "name": "Rotation gegen Uhrzeigersinn, langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Frost",
+          "attribut": "frost",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Aus", "art": ""},
+            {"von": 8, "bis": 128, "name": "'Zoom' (laut Handbuch)", "art": ""},
+            {"von": 129, "bis": 255, "name": "Frost", "art": "frost"}
+          ]
+        },
+        {"name": "Fokus (100 % -> 0 %)", "attribut": "focus", "default": 128, "highlight": 128},
+        {
+          "name": "Shutter",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Offen", "art": "open"},
+            {"von": 16, "bis": 131, "name": "Strobe, langsam -> schnell", "art": "strobe"},
+            {"von": 132, "bis": 139, "name": "Offen", "art": "open"},
+            {"von": 140, "bis": 181, "name": "Pulse-Effekt oeffnend, langsam -> schnell", "art": "strobe"},
+            {"von": 182, "bis": 189, "name": "Offen", "art": "open"},
+            {"von": 190, "bis": 231, "name": "Pulse-Effekt schliessend, langsam -> schnell", "art": "strobe"},
+            {"von": 232, "bis": 239, "name": "Offen", "art": "open"},
+            {"von": 240, "bis": 247, "name": "Zufaelliger Strobe", "art": "strobe"},
+            {"von": 248, "bis": 255, "name": "Offen", "art": "open"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Dimmer fein", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Nullstellung (keine Funktion)", "art": ""},
+            {"von": 128, "bis": 255, "name": "Reset", "art": "reset"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "18-Kanal",
+      "kanaele": [
+        {"name": "Pan (540 Grad)", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fein", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt (270 Grad)", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fein", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt-Geschwindigkeit (schnell -> langsam)", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Farbrad",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Offen (Weiss)", "art": "open"},
+            {"von": 8, "bis": 15, "name": "Rot", "art": "color"},
+            {"von": 16, "bis": 23, "name": "Blau", "art": "color"},
+            {"von": 24, "bis": 31, "name": "Magenta", "art": "color"},
+            {"von": 32, "bis": 39, "name": "Gelb", "art": "color"},
+            {"von": 40, "bis": 47, "name": "Orange", "art": "color"},
+            {"von": 48, "bis": 55, "name": "Gruen", "art": "color"},
+            {"von": 56, "bis": 63, "name": "Cyan", "art": "color"},
+            {"von": 64, "bis": 66, "name": "Festposition offen", "art": "open"},
+            {"von": 67, "bis": 69, "name": "Festposition Offen / Rot", "art": ""},
+            {"von": 70, "bis": 72, "name": "Festposition Rot", "art": "color"},
+            {"von": 73, "bis": 75, "name": "Festposition Rot / Blau", "art": ""},
+            {"von": 76, "bis": 78, "name": "Festposition Blau", "art": "color"},
+            {"von": 79, "bis": 81, "name": "Festposition Blau / Magenta", "art": ""},
+            {"von": 82, "bis": 84, "name": "Festposition Magenta", "art": "color"},
+            {"von": 85, "bis": 87, "name": "Festposition Magenta / Gelb", "art": ""},
+            {"von": 88, "bis": 90, "name": "Festposition Gelb", "art": "color"},
+            {"von": 91, "bis": 93, "name": "Festposition Gelb / Orange", "art": ""},
+            {"von": 94, "bis": 96, "name": "Festposition Orange", "art": "color"},
+            {"von": 97, "bis": 99, "name": "Festposition Orange / Gruen", "art": ""},
+            {"von": 100, "bis": 102, "name": "Festposition Gruen", "art": "color"},
+            {"von": 103, "bis": 105, "name": "Festposition Gruen / Cyan", "art": ""},
+            {"von": 106, "bis": 108, "name": "Festposition Cyan", "art": "color"},
+            {"von": 109, "bis": 111, "name": "Festposition Cyan / Offen", "art": ""},
+            {"von": 112, "bis": 127, "name": "Offen", "art": "open"},
+            {"von": 128, "bis": 189, "name": "Raddurchlauf gegen Uhrzeigersinn, schnell -> langsam", "art": "rotate"},
+            {"von": 190, "bis": 193, "name": "Stopp", "art": ""},
+            {"von": 194, "bis": 255, "name": "Raddurchlauf im Uhrzeigersinn, langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo-Rad 1 (statisch, 9 Gobos)",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Offen", "art": "open"},
+            {"von": 8, "bis": 13, "name": "Gobo 1-1", "art": "gobo"},
+            {"von": 14, "bis": 19, "name": "Gobo 1-2", "art": "gobo"},
+            {"von": 20, "bis": 25, "name": "Gobo 1-3", "art": "gobo"},
+            {"von": 26, "bis": 31, "name": "Gobo 1-4", "art": "gobo"},
+            {"von": 32, "bis": 37, "name": "Gobo 1-5", "art": "gobo"},
+            {"von": 38, "bis": 43, "name": "Gobo 1-6", "art": "gobo"},
+            {"von": 44, "bis": 49, "name": "Gobo 1-7", "art": "gobo"},
+            {"von": 50, "bis": 55, "name": "Gobo 1-8", "art": "gobo"},
+            {"von": 56, "bis": 63, "name": "Gobo 1-9", "art": "gobo"},
+            {"von": 64, "bis": 70, "name": "Gobo 1-1 Shake", "art": "shake"},
+            {"von": 71, "bis": 77, "name": "Gobo 1-2 Shake", "art": "shake"},
+            {"von": 78, "bis": 84, "name": "Gobo 1-3 Shake", "art": "shake"},
+            {"von": 85, "bis": 91, "name": "Gobo 1-4 Shake", "art": "shake"},
+            {"von": 92, "bis": 98, "name": "Gobo 1-5 Shake", "art": "shake"},
+            {"von": 99, "bis": 105, "name": "Gobo 1-6 Shake", "art": "shake"},
+            {"von": 106, "bis": 112, "name": "Gobo 1-7 Shake", "art": "shake"},
+            {"von": 113, "bis": 119, "name": "Gobo 1-8 Shake", "art": "shake"},
+            {"von": 120, "bis": 127, "name": "Gobo 1-9 Shake", "art": "shake"},
+            {"von": 128, "bis": 189, "name": "Raddurchlauf gegen Uhrzeigersinn, schnell -> langsam", "art": "rotate"},
+            {"von": 190, "bis": 193, "name": "Stopp", "art": ""},
+            {"von": 194, "bis": 255, "name": "Raddurchlauf im Uhrzeigersinn, langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo-Rad 2 (rotierend, 7 Gobos)",
+          "attribut": "gobo_wheel2",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Offen", "art": "open"},
+            {"von": 8, "bis": 15, "name": "Gobo 2-1", "art": "gobo"},
+            {"von": 16, "bis": 23, "name": "Gobo 2-2", "art": "gobo"},
+            {"von": 24, "bis": 31, "name": "Gobo 2-3", "art": "gobo"},
+            {"von": 32, "bis": 39, "name": "Gobo 2-4", "art": "gobo"},
+            {"von": 40, "bis": 47, "name": "Gobo 2-5", "art": "gobo"},
+            {"von": 48, "bis": 55, "name": "Gobo 2-6", "art": "gobo"},
+            {"von": 56, "bis": 63, "name": "Gobo 2-7", "art": "gobo"},
+            {"von": 64, "bis": 72, "name": "Gobo 2-1 Shake", "art": "shake"},
+            {"von": 73, "bis": 81, "name": "Gobo 2-2 Shake", "art": "shake"},
+            {"von": 82, "bis": 90, "name": "Gobo 2-3 Shake", "art": "shake"},
+            {"von": 91, "bis": 99, "name": "Gobo 2-4 Shake", "art": "shake"},
+            {"von": 100, "bis": 108, "name": "Gobo 2-5 Shake", "art": "shake"},
+            {"von": 109, "bis": 117, "name": "Gobo 2-6 Shake", "art": "shake"},
+            {"von": 118, "bis": 127, "name": "Gobo 2-7 Shake", "art": "shake"},
+            {"von": 128, "bis": 189, "name": "Raddurchlauf gegen Uhrzeigersinn, schnell -> langsam", "art": "rotate"},
+            {"von": 190, "bis": 193, "name": "Stopp", "art": ""},
+            {"von": 194, "bis": 255, "name": "Raddurchlauf im Uhrzeigersinn, langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo 2 Rotation",
+          "attribut": "gobo_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Festposition (Index)", "art": ""},
+            {"von": 128, "bis": 189, "name": "Rotation gegen Uhrzeigersinn, schnell -> langsam", "art": "rotate"},
+            {"von": 190, "bis": 193, "name": "Stopp", "art": ""},
+            {"von": 194, "bis": 255, "name": "Rotation im Uhrzeigersinn, langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Prisma (6-fach)",
+          "attribut": "prism",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Prisma aus", "art": ""},
+            {"von": 8, "bis": 255, "name": "Prisma ein", "art": "prism"}
+          ]
+        },
+        {
+          "name": "Prisma Rotation",
+          "attribut": "prism_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Index (Festposition)", "art": ""},
+            {"von": 128, "bis": 189, "name": "Rotation im Uhrzeigersinn, schnell -> langsam", "art": "rotate"},
+            {"von": 190, "bis": 193, "name": "Stopp", "art": ""},
+            {"von": 194, "bis": 255, "name": "Rotation gegen Uhrzeigersinn, langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Frost",
+          "attribut": "frost",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Aus", "art": ""},
+            {"von": 8, "bis": 128, "name": "'Zoom' (laut Handbuch)", "art": ""},
+            {"von": 129, "bis": 255, "name": "Frost", "art": "frost"}
+          ]
+        },
+        {"name": "Fokus (100 % -> 0 %)", "attribut": "focus", "default": 128, "highlight": 128},
+        {"name": "Fokus fein", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Shutter",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Offen", "art": "open"},
+            {"von": 16, "bis": 131, "name": "Strobe, langsam -> schnell", "art": "strobe"},
+            {"von": 132, "bis": 139, "name": "Offen", "art": "open"},
+            {"von": 140, "bis": 181, "name": "Pulse-Effekt oeffnend, langsam -> schnell", "art": "strobe"},
+            {"von": 182, "bis": 189, "name": "Offen", "art": "open"},
+            {"von": 190, "bis": 231, "name": "Pulse-Effekt schliessend, langsam -> schnell", "art": "strobe"},
+            {"von": 232, "bis": 239, "name": "Offen", "art": "open"},
+            {"von": 240, "bis": 247, "name": "Zufaelliger Strobe", "art": "strobe"},
+            {"von": 248, "bis": 255, "name": "Offen", "art": "open"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Dimmer fein", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Nullstellung (keine Funktion)", "art": ""},
+            {"von": 128, "bis": 255, "name": "Reset", "art": "reset"}
+          ]
+        }
+      ]
+    }
+  ]
+}

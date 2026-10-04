@@ -1,0 +1,155 @@
+{
+  "format_version": 1,
+  "hersteller": "Shehds",
+  "hersteller_kurz": "Shehds",
+  "modell": "LED Beam+Wash 19x15W RGBW Zoom Lighting",
+  "kurzname": "SH-BW19X15",
+  "typ": "moving_head",
+  "leistung_w": 285,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Shehds-LED-Beam+Wash-19x15W-RGBW-Zoom.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Shehds/Shehds-LED-Beam+Wash-19x15W-RGBW-Zoom.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.13.0 GIT · Paul Schuh",
+    "original": "resources/fixtures/Shehds/Shehds-LED-Beam+Wash-19x15W-RGBW-Zoom.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 22 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): kurzname SH-BW19X15; Bereichs-Arten korrigiert (u. a. „Preset“ nicht als Reset, Farben/Offen auf Farbrad, Open/Shake/Rotation auf Goborad, Prisma/Frost, keine Farb-/Dreh-Kacheln auf Makro-/Speed-Kanaelen, Sound-Bereiche); Programm-/Effekt-Geschwindigkeiten als effect_speed statt speed (speed = Bewegung)"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": false,
+    "wie": "nicht gegen ein Herstellerhandbuch geprueft (kein oeffentliches Shehds-Handbuch zu diesem Modell auffindbar); Kanalbelegung und Wertebereiche aus der QLC+-Vorlage, Attribute, Bereichs-Arten und Defaults von LightOS plausibilisiert"
+  },
+  "modi": [
+    {
+      "name": "16 Channel",
+      "kanaele": [
+        {"name": "X axis rotation", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "X-axis fine-tuning", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Y axis rotation", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Y-axis fine-tuning", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "XY speed adjustment", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Strobe", "attribut": "shutter", "default": 0, "highlight": 0},
+        {"name": "Red Dimmer", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green Dimmer", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue Dimmer", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White Dimmer", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Focus", "attribut": "focus", "default": 0, "highlight": 0},
+        {
+          "name": "Program Selection",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 175, "name": "Preset Color"},
+            {"von": 176, "bis": 200, "name": "Program Jump", "art": ""},
+            {"von": 201, "bis": 224, "name": "Program Gradient", "art": ""},
+            {"von": 225, "bis": 255, "name": "Program Pulse", "art": ""}
+          ]
+        },
+        {
+          "name": "Program Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Program Speed Adjustment", "art": ""}
+          ]
+        },
+        {
+          "name": "Program Activation",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 49, "name": "No Function", "art": ""},
+            {"von": 50, "bis": 99, "name": "Program Activation", "art": ""},
+            {"von": 100, "bis": 150, "name": "Self-propelled mode (1)", "art": ""},
+            {"von": 151, "bis": 199, "name": "Self-propelled mode (2)", "art": ""},
+            {"von": 200, "bis": 255, "name": "Audio control mode", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Reset", "art": "reset"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "24 Channel",
+      "kanaele": [
+        {"name": "X axis rotation", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "X-axis fine-tuning", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Y axis rotation", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Y-axis fine-tuning", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "XY speed adjustment", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Focus", "attribut": "focus", "default": 0, "highlight": 0},
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Strobe", "attribut": "shutter", "default": 0, "highlight": 0},
+        {"name": "Red 1 Dimmer", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 1 Dimmer", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 1 Dimmer", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 1 Dimmer", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 2 Dimmer", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 2 Dimmer", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 2 Dimmer", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 2 Dimmer", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Red 3 Dimmer", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 3 Dimmer", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 3 Dimmer", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 3 Dimmer", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Program Selection",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 175, "name": "Preset Color"},
+            {"von": 176, "bis": 200, "name": "Program Jump", "art": ""},
+            {"von": 201, "bis": 224, "name": "Program Gradient", "art": ""},
+            {"von": 225, "bis": 255, "name": "Program Pulse", "art": ""}
+          ]
+        },
+        {
+          "name": "Program Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Program Speed Adjustment", "art": ""}
+          ]
+        },
+        {
+          "name": "Program Activation",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 49, "name": "No Function", "art": ""},
+            {"von": 50, "bis": 99, "name": "Program Activation", "art": ""},
+            {"von": 100, "bis": 150, "name": "Self-propelled mode (1)", "art": ""},
+            {"von": 151, "bis": 199, "name": "Self-propelled mode (2)", "art": ""},
+            {"von": 200, "bis": 255, "name": "Audio control mode", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Reset", "art": "reset"}
+          ]
+        }
+      ]
+    }
+  ]
+}

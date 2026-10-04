@@ -1,0 +1,224 @@
+{
+  "format_version": 1,
+  "hersteller": "Expolite",
+  "hersteller_kurz": "Expolite",
+  "modell": "TourSpot 50 Mini",
+  "kurzname": "TOURSPOT 50 MINI",
+  "typ": "moving_head",
+  "leistung_w": 50,
+  "quelle": {"titel": "QLC+-Geraetedefinition Expolite-TourSpot-50-Mini.qxf", "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Expolite/Expolite-TourSpot-50-Mini.qxf"},
+  "herkunft": {"art": "qlcplus", "lizenz": "Apache-2.0", "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.13.0 GIT · Christian Prison", "original": "resources/fixtures/Expolite/Expolite-TourSpot-50-Mini.qxf", "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 90 Wertebereiche mit Art (kind) versehen; LightOS-Nacharbeit: 'Prism & Rotating': Bereich 'ON' von open auf prism, Aus ohne Art, Rotation als rotate; 'Special Function' (Resets + interne Programme) raw -> reset; Rotation-Stopp-Bereiche ohne Art (keine Rotation); Farbrad-Kanal deutsch benannt"},
+  "autor": "LightOS",
+  "geprueft": {"ok": false, "wie": "QLC+-Datei Kanal fuer Kanal durchgesehen und logisch korrigiert; ein vollstaendiges Herstellerhandbuch war nicht abrufbar, daher nicht gegen das Handbuch geprueft; das Gobo-Rad enthaelt in der Vorlage keine Bereiche (nur QLC+-Preset) und bleibt ohne Gobo-Kacheln"},
+  "modi": [
+    {
+      "name": "13 Channel 16bit",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Speed pan/tilt",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 225, "name": "speed (min to max)", "art": ""},
+            {"von": 226, "bis": 235, "name": "blackout by movement", "art": "closed"},
+            {"von": 236, "bis": 245, "name": "blackout by all wheel changing", "art": "closed"},
+            {"von": 246, "bis": 255, "name": "no function", "art": ""}
+          ]
+        },
+        {
+          "name": "Farbrad",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Open / white", "art": "open"},
+            {"von": 16, "bis": 31, "name": "Red", "art": "color"},
+            {"von": 32, "bis": 47, "name": "Cyan", "art": "color"},
+            {"von": 48, "bis": 63, "name": "Green", "art": "color"},
+            {"von": 64, "bis": 79, "name": "Yellow", "art": "color"},
+            {"von": 80, "bis": 95, "name": "Rose carmine", "art": "color"},
+            {"von": 96, "bis": 111, "name": "Blue", "art": "color"},
+            {"von": 112, "bis": 127, "name": "Orange", "art": "color"},
+            {"von": 128, "bis": 189, "name": "Forward rainbow effect (fast..slow)", "art": "rotate"},
+            {"von": 190, "bis": 193, "name": "Color rotation stop", "art": ""},
+            {"von": 194, "bis": 255, "name": "Backwards rainbow effect (slow..fast)", "art": "rotate"}
+          ]
+        },
+        {"name": "Gobo wheel", "attribut": "gobo_wheel", "default": 0, "highlight": 0},
+        {
+          "name": "Gobo rotation",
+          "attribut": "gobo_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 3, "name": "No function", "art": ""},
+            {"von": 4, "bis": 127, "name": "Forward gobo rotation (fast to slow)", "art": "rotate"},
+            {"von": 128, "bis": 131, "name": "Gobo rotation stop", "art": ""},
+            {"von": 132, "bis": 255, "name": "Backward gobo rotation (slow to fast)", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Shutter",
+          "attribut": "shutter",
+          "default": 47,
+          "highlight": 47,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "Shutter closed", "art": "closed"},
+            {"von": 32, "bis": 63, "name": "Shutter open", "art": "open"},
+            {"von": 64, "bis": 95, "name": "Strobe effect (slow to fast)", "art": "strobe"},
+            {"von": 96, "bis": 127, "name": "Shutter open", "art": "open"},
+            {"von": 128, "bis": 159, "name": "Pulse-effect in sequences (slow to fast)", "art": "strobe"},
+            {"von": 160, "bis": 191, "name": "Shutter open", "art": "open"},
+            {"von": 192, "bis": 223, "name": "Random strobe effect (slow to fast)", "art": "strobe"},
+            {"von": 224, "bis": 255, "name": "Shutter open", "art": "open"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Focus", "attribut": "focus", "default": 0, "highlight": 0},
+        {
+          "name": "Prism & Rotating",
+          "attribut": "prism",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Prisma aus", "art": ""},
+            {"von": 6, "bis": 127, "name": "Prisma ein", "art": "prism"},
+            {"von": 128, "bis": 255, "name": "Prisma-Rotation (langsam → schnell)", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Special Function",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 79, "name": "no function", "art": ""},
+            {"von": 80, "bis": 84, "name": "reset all motors", "art": "reset"},
+            {"von": 85, "bis": 87, "name": "reset scan motor", "art": "reset"},
+            {"von": 88, "bis": 90, "name": "reset color motor", "art": "reset"},
+            {"von": 91, "bis": 93, "name": "reset gobo motor", "art": "reset"},
+            {"von": 94, "bis": 96, "name": "reset shutter&dimmer motor", "art": "reset"},
+            {"von": 97, "bis": 99, "name": "reset other motors", "art": "reset"},
+            {"von": 100, "bis": 119, "name": "internal program 1", "art": ""},
+            {"von": 120, "bis": 139, "name": "internal program 2", "art": ""},
+            {"von": 140, "bis": 159, "name": "internal program 3", "art": ""},
+            {"von": 160, "bis": 179, "name": "internal program 4", "art": ""},
+            {"von": 180, "bis": 199, "name": "internal program 5", "art": ""},
+            {"von": 200, "bis": 219, "name": "internal program 6", "art": ""},
+            {"von": 220, "bis": 239, "name": "internal program 7", "art": ""},
+            {"von": 240, "bis": 255, "name": "internal sound program 1", "art": "sound"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "11 Channel 8bit",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {
+          "name": "Speed pan/tilt",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 225, "name": "speed (min to max)", "art": ""},
+            {"von": 226, "bis": 235, "name": "blackout by movement", "art": "closed"},
+            {"von": 236, "bis": 245, "name": "blackout by all wheel changing", "art": "closed"},
+            {"von": 246, "bis": 255, "name": "no function", "art": ""}
+          ]
+        },
+        {
+          "name": "Farbrad",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Open / white", "art": "open"},
+            {"von": 16, "bis": 31, "name": "Red", "art": "color"},
+            {"von": 32, "bis": 47, "name": "Cyan", "art": "color"},
+            {"von": 48, "bis": 63, "name": "Green", "art": "color"},
+            {"von": 64, "bis": 79, "name": "Yellow", "art": "color"},
+            {"von": 80, "bis": 95, "name": "Rose carmine", "art": "color"},
+            {"von": 96, "bis": 111, "name": "Blue", "art": "color"},
+            {"von": 112, "bis": 127, "name": "Orange", "art": "color"},
+            {"von": 128, "bis": 189, "name": "Forward rainbow effect (fast..slow)", "art": "rotate"},
+            {"von": 190, "bis": 193, "name": "Color rotation stop", "art": ""},
+            {"von": 194, "bis": 255, "name": "Backwards rainbow effect (slow..fast)", "art": "rotate"}
+          ]
+        },
+        {"name": "Gobo wheel", "attribut": "gobo_wheel", "default": 0, "highlight": 0},
+        {
+          "name": "Gobo rotation",
+          "attribut": "gobo_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 3, "name": "No function", "art": ""},
+            {"von": 4, "bis": 127, "name": "Forward gobo rotation (fast to slow)", "art": "rotate"},
+            {"von": 128, "bis": 131, "name": "Gobo rotation stop", "art": ""},
+            {"von": 132, "bis": 255, "name": "Backward gobo rotation (slow to fast)", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Shutter",
+          "attribut": "shutter",
+          "default": 47,
+          "highlight": 47,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "Shutter closed", "art": "closed"},
+            {"von": 32, "bis": 63, "name": "Shutter open", "art": "open"},
+            {"von": 64, "bis": 95, "name": "Strobe effect (slow to fast)", "art": "strobe"},
+            {"von": 96, "bis": 127, "name": "Shutter open", "art": "open"},
+            {"von": 128, "bis": 159, "name": "Pulse-effect in sequences (slow to fast)", "art": "strobe"},
+            {"von": 160, "bis": 191, "name": "Shutter open", "art": "open"},
+            {"von": 192, "bis": 223, "name": "Random strobe effect (slow to fast)", "art": "strobe"},
+            {"von": 224, "bis": 255, "name": "Shutter open", "art": "open"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Focus", "attribut": "focus", "default": 0, "highlight": 0},
+        {
+          "name": "Prism & Rotating",
+          "attribut": "prism",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Prisma aus", "art": ""},
+            {"von": 6, "bis": 127, "name": "Prisma ein", "art": "prism"},
+            {"von": 128, "bis": 255, "name": "Prisma-Rotation (langsam → schnell)", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Special Function",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 79, "name": "no function", "art": ""},
+            {"von": 80, "bis": 84, "name": "reset all motors", "art": "reset"},
+            {"von": 85, "bis": 87, "name": "reset scan motor", "art": "reset"},
+            {"von": 88, "bis": 90, "name": "reset color motor", "art": "reset"},
+            {"von": 91, "bis": 93, "name": "reset gobo motor", "art": "reset"},
+            {"von": 94, "bis": 96, "name": "reset shutter&dimmer motor", "art": "reset"},
+            {"von": 97, "bis": 99, "name": "reset other motors", "art": "reset"},
+            {"von": 100, "bis": 119, "name": "internal program 1", "art": ""},
+            {"von": 120, "bis": 139, "name": "internal program 2", "art": ""},
+            {"von": 140, "bis": 159, "name": "internal program 3", "art": ""},
+            {"von": 160, "bis": 179, "name": "internal program 4", "art": ""},
+            {"von": 180, "bis": 199, "name": "internal program 5", "art": ""},
+            {"von": 200, "bis": 219, "name": "internal program 6", "art": ""},
+            {"von": 220, "bis": 239, "name": "internal program 7", "art": ""},
+            {"von": 240, "bis": 255, "name": "internal sound program 1", "art": "sound"}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Gobo-Rad ohne Bereiche: die Vorlage nennt keine Werte, im Handbuch nachtragen."
+}

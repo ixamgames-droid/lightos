@@ -15,7 +15,7 @@
     "lizenz": "Apache-2.0",
     "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.13.2 GIT · e-shock",
     "original": "resources/fixtures/Stairville/Stairville-Wild-Wash-132-LED-CW.qxf",
-    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 22 Wertebereiche mit Art (kind) versehen; Rasterform in 4 Modus/Modi aus <Physical> uebernommen; Modusnamen nach Handbuch (1Ch/2Ch/3Ch1/3Ch2); Strobe-Kanal: Default/Highlight 0 = 'LEDs an' (offen) statt 2; Kanal 'Flash impulse' als duration (Blitzdauer) statt speed; Musiksteuerung: Bereich 'aus' ohne Art sound, nur 6–255 sound; Bereichsnamen deutsch; Kurzname WW132CW; hersteller_kurz STAIR; Quelle auf Herstellerhandbuch gesetzt"
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 22 Wertebereiche mit Art (kind) versehen; Rasterform aus <Physical> in 4 Modus/Modi nicht uebernommen, weil sie nicht zu den color_r-Kanaelen passt (keine echten Farbzonen); Modusnamen nach Handbuch (1Ch/2Ch/3Ch1/3Ch2); Strobe-Kanal: Default/Highlight 0 = 'LEDs an' (offen) statt 2; Kanal 'Flash impulse' als duration (Blitzdauer) statt speed; Musiksteuerung: Bereich 'aus' ohne Art sound, nur 6–255 sound; Bereichsnamen deutsch; Kurzname WW132CW; hersteller_kurz STAIR; Quelle auf Herstellerhandbuch gesetzt"
   },
   "autor": "LightOS",
   "geprueft": {
@@ -26,7 +26,6 @@
     {
       "name": "1-Kanal (1Ch)",
       "beschreibung": "nur Strobe-Kanal",
-      "raster": {"rows": 3, "cols": 44},
       "kanaele": [
         {
           "name": "Strobe",
@@ -42,7 +41,6 @@
     },
     {
       "name": "2-Kanal (2Ch)",
-      "raster": {"rows": 3, "cols": 44},
       "kanaele": [
         {
           "name": "Dimmer",
@@ -69,7 +67,6 @@
     },
     {
       "name": "3-Kanal (3Ch1)",
-      "raster": {"rows": 3, "cols": 44},
       "kanaele": [
         {
           "name": "Dimmer",
@@ -105,7 +102,6 @@
     },
     {
       "name": "3-Kanal (3Ch2)",
-      "raster": {"rows": 3, "cols": 44},
       "kanaele": [
         {
           "name": "Dimmer",

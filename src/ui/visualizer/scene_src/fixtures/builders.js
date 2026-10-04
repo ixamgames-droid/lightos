@@ -1509,12 +1509,17 @@ function applyGenericColor(f, dmx) {
   }
   if (f.spot) {
     f.spot.color = color;
-    f.spot.intensity = intNorm * 3.0;
-    // Dunkle Lichter komplett aus der Licht-Auswertung nehmen: ein SpotLight
-    // mit intensity 0 kostet sonst weiterhin Shading in JEDEM beleuchteten
-    // Pixel (three.js wertet alle sichtbaren Lichter pro Fragment aus) —
-    // bei 48 Fixtures der groesste laufende Kostenblock auf schwachen GPUs.
-    f.spot.visible = lum > 0.01;
+    // VIZ-69: dunkel = intensity 0, NICHT visible=false. In three.js r128
+    // gehoeren die Zahl der sichtbaren SpotLights und der sichtbaren
+    // Schatten-Spots zum Programmschluessel JEDES beleuchteten Materials —
+    // jede neue Hell/Dunkel-Kombination kompilierte saemtliche Lit-Shader neu
+    // (gemessen 0,3-2,2 s Standbild je neuer Kombination, Bierpong-Show mit
+    // 24 Spots). Ein Licht mit intensity 0 traegt nichts bei, der Shader bleibt
+    // derselbe. Der Preis: dunkle Spots werden pro Fragment weiter mitgerechnet
+    // — ein konstanter Anteil statt sekundenlanger Ruckler.
+    // A3D-25/A3D-28 gilt weiter: gemessen wird an der EFFEKTIVEN Leuchtdichte,
+    // offener Dimmer + Farbe schwarz ist dunkel.
+    f.spot.intensity = lum > 0.01 ? intNorm * 3.0 : 0;
   }
   if (f.floorSpot) {
     f.floorSpot.material.color = color;

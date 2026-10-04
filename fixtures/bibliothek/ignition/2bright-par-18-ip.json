@@ -1,0 +1,215 @@
+{
+  "format_version": 1,
+  "hersteller": "Ignition",
+  "hersteller_kurz": "Ignition",
+  "modell": "2bright Par 18 IP",
+  "kurzname": "2B PAR18 IP",
+  "typ": "par",
+  "leistung_w": 200,
+  "notizen": "Outdoor-Flat-PAR IP65, 18 x 12 W 6in1 RGBWA+UV, 25 Grad. Farbmakro: das Handbuch listet nur Farbe 1-3 und 33-35 mit Werten, dazwischen '...' — Farbe 4-32 als ein Bereich. 3-Kanal-Modus: Farbmakro 0-5 = volles Licht, im 9/11-Kanal-Modus ohne Funktion.",
+  "quelle": {
+    "titel": "Ignition 2bright Par 18 IP – Bedienungsanleitung (Thomann, ID 481058)",
+    "version": "V3",
+    "datum": "2022-07-04",
+    "url": "https://fast-images.static-thomann.de/pics/atg/atgdata/document/manual/c_481058_v3_r1_en_online.pdf"
+  },
+  "herkunft": {"art": "hersteller-handbuch", "lizenz": "eigen"},
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal fuer Kanal gegen die DMX-Tabellen aller 5 Modi im Thomann-Handbuch (Kap. 7) geschrieben und geprueft; nicht am Geraet getestet"
+  },
+  "modi": [
+    {
+      "name": "2-Kanal",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Farbtemperatur",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Ohne Funktion", "art": ""},
+            {"von": 6, "bis": 255, "name": "Farbtemperatur 3200 K -> 7200 K", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3-Kanal",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "LEDs an", "art": "open"},
+            {"von": 6, "bis": 10, "name": "LEDs aus (Blackout)", "art": "closed"},
+            {"von": 11, "bis": 33, "name": "Zufaellige Impulse, langsam -> schnell", "art": "strobe"},
+            {"von": 34, "bis": 56, "name": "Zufaellig ansteigende Helligkeit, langsam -> schnell", "art": "strobe"},
+            {"von": 57, "bis": 79, "name": "Zufaellig abfallende Helligkeit, langsam -> schnell", "art": "strobe"},
+            {"von": 80, "bis": 102, "name": "Zufaelliger Strobe, langsam -> schnell", "art": "strobe"},
+            {"von": 103, "bis": 127, "name": "Strobe-Impulse (Pause 5 s -> 1 s)", "art": "strobe"},
+            {"von": 128, "bis": 250, "name": "Strobe 1 -> 20 Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "LEDs an", "art": "open"}
+          ]
+        },
+        {
+          "name": "Farbmakros",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Volles Licht (alle LEDs)", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Blackout", "art": ""},
+            {"von": 11, "bis": 13, "name": "Farbe 1", "art": "color"},
+            {"von": 14, "bis": 16, "name": "Farbe 2", "art": "color"},
+            {"von": 17, "bis": 19, "name": "Farbe 3", "art": "color"},
+            {"von": 20, "bis": 110, "name": "Farbe 4 ... 32 (Werte im Handbuch nicht einzeln aufgefuehrt)", "art": ""},
+            {"von": 111, "bis": 115, "name": "Farbe 33", "art": "color"},
+            {"von": 116, "bis": 120, "name": "Farbe 34", "art": "color"},
+            {"von": 121, "bis": 125, "name": "Farbe 35", "art": "color"},
+            {"von": 126, "bis": 127, "name": "Farbwechsel Stopp", "art": ""},
+            {"von": 128, "bis": 191, "name": "Farbwechsel Farbe 1-12, langsam -> schnell", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "Farbueberblendung Farbe 1-12, langsam -> schnell", "art": "rotate"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6-Kanal",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "9-Kanal",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "LEDs an", "art": "open"},
+            {"von": 6, "bis": 10, "name": "LEDs aus (Blackout)", "art": "closed"},
+            {"von": 11, "bis": 33, "name": "Zufaellige Impulse, langsam -> schnell", "art": "strobe"},
+            {"von": 34, "bis": 56, "name": "Zufaellig ansteigende Helligkeit, langsam -> schnell", "art": "strobe"},
+            {"von": 57, "bis": 79, "name": "Zufaellig abfallende Helligkeit, langsam -> schnell", "art": "strobe"},
+            {"von": 80, "bis": 102, "name": "Zufaelliger Strobe, langsam -> schnell", "art": "strobe"},
+            {"von": 103, "bis": 127, "name": "Strobe-Impulse (Pause 5 s -> 1 s)", "art": "strobe"},
+            {"von": 128, "bis": 250, "name": "Strobe 1 -> 20 Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "LEDs an", "art": "open"}
+          ]
+        },
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {
+          "name": "Farbmakros",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Ohne Funktion (Farbmischung ueber RGBWA+UV)", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Blackout", "art": ""},
+            {"von": 11, "bis": 13, "name": "Farbe 1", "art": "color"},
+            {"von": 14, "bis": 16, "name": "Farbe 2", "art": "color"},
+            {"von": 17, "bis": 19, "name": "Farbe 3", "art": "color"},
+            {"von": 20, "bis": 110, "name": "Farbe 4 ... 32 (Werte im Handbuch nicht einzeln aufgefuehrt)", "art": ""},
+            {"von": 111, "bis": 115, "name": "Farbe 33", "art": "color"},
+            {"von": 116, "bis": 120, "name": "Farbe 34", "art": "color"},
+            {"von": 121, "bis": 125, "name": "Farbe 35", "art": "color"},
+            {"von": 126, "bis": 127, "name": "Farbwechsel Stopp", "art": ""},
+            {"von": 128, "bis": 191, "name": "Farbwechsel Farbe 1-12, langsam -> schnell", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "Farbueberblendung Farbe 1-12, langsam -> schnell", "art": "rotate"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "11-Kanal",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "LEDs an", "art": "open"},
+            {"von": 6, "bis": 10, "name": "LEDs aus (Blackout)", "art": "closed"},
+            {"von": 11, "bis": 33, "name": "Zufaellige Impulse, langsam -> schnell", "art": "strobe"},
+            {"von": 34, "bis": 56, "name": "Zufaellig ansteigende Helligkeit, langsam -> schnell", "art": "strobe"},
+            {"von": 57, "bis": 79, "name": "Zufaellig abfallende Helligkeit, langsam -> schnell", "art": "strobe"},
+            {"von": 80, "bis": 102, "name": "Zufaelliger Strobe, langsam -> schnell", "art": "strobe"},
+            {"von": 103, "bis": 127, "name": "Strobe-Impulse (Pause 5 s -> 1 s)", "art": "strobe"},
+            {"von": 128, "bis": 250, "name": "Strobe 1 -> 20 Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "LEDs an", "art": "open"}
+          ]
+        },
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {
+          "name": "Farbmakros",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Ohne Funktion (Farbmischung ueber RGBWA+UV)", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Blackout", "art": ""},
+            {"von": 11, "bis": 13, "name": "Farbe 1", "art": "color"},
+            {"von": 14, "bis": 16, "name": "Farbe 2", "art": "color"},
+            {"von": 17, "bis": 19, "name": "Farbe 3", "art": "color"},
+            {"von": 20, "bis": 110, "name": "Farbe 4 ... 32 (Werte im Handbuch nicht einzeln aufgefuehrt)", "art": ""},
+            {"von": 111, "bis": 115, "name": "Farbe 33", "art": "color"},
+            {"von": 116, "bis": 120, "name": "Farbe 34", "art": "color"},
+            {"von": 121, "bis": 125, "name": "Farbe 35", "art": "color"},
+            {"von": 126, "bis": 127, "name": "Farbwechsel Stopp", "art": ""},
+            {"von": 128, "bis": 191, "name": "Farbwechsel Farbe 1-12, langsam -> schnell", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "Farbueberblendung Farbe 1-12, langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Farbtemperatur",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Ohne Funktion", "art": ""},
+            {"von": 6, "bis": 255, "name": "Farbtemperatur 3200 K -> 7200 K", "art": ""}
+          ]
+        },
+        {
+          "name": "Dimmerkurve",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Ohne Funktion", "art": ""},
+            {"von": 6, "bis": 63, "name": "Linear", "art": ""},
+            {"von": 64, "bis": 127, "name": "Exponentiell", "art": ""},
+            {"von": 128, "bis": 191, "name": "Logarithmisch", "art": ""},
+            {"von": 192, "bis": 255, "name": "S-Kurve", "art": ""}
+          ]
+        }
+      ]
+    }
+  ]
+}

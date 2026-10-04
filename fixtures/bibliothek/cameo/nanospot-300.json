@@ -1,0 +1,211 @@
+{
+  "format_version": 1,
+  "hersteller": "Cameo",
+  "hersteller_kurz": "Cameo",
+  "modell": "NanoSpot 300",
+  "kurzname": "NANOSPOT 300",
+  "typ": "moving_head",
+  "leistung_w": 100,
+  "quelle": {
+    "titel": "Cameo NANOSPOT 300 – User's Manual, DMX Control S. 57–59",
+    "url": "https://www.manualslib.com/manual/2688638/Cameo-Nanospot-300.html?page=57"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.3.0 GIT · Fede79",
+    "original": "resources/fixtures/Cameo/Cameo-NanoSpot-300.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 80 Wertebereiche mit Art (kind) versehen; Strobe-Default/-Highlight 0 statt 4 (0-9 = kein Strobe); Pan/Tilt-Speed als 'fast to slow' benannt; Farbrad: 'White' (offen) als 'open', stufenlose Farbwahl ohne Art; Goborad: 'Gobo open' als 'open' statt 'gobo'; Sound/Auto-Mode macro -> reset (Shows ohne Art, Sound 'sound', Reset 'reset', Sync ohne Art 'closed'); Speed/Sensitivity speed -> effect_speed; kurzname/notizen/quelle gesetzt"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": true,
+    "wie": "Alle drei Modi (5/9/11 CH) Kanal fuer Kanal und Bereich fuer Bereich gegen die DMX-Tabellen im Handbuch (via ManualsLib, S. 57–59) geprueft"
+  },
+  "modi": [
+    {
+      "name": "5 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Pan/Tilt speed (fast to slow)", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Colour",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "White", "art": "open"},
+            {"von": 11, "bis": 21, "name": "Red", "art": "color"},
+            {"von": 22, "bis": 32, "name": "Orange", "art": "color"},
+            {"von": 33, "bis": 43, "name": "Yellow", "art": "color"},
+            {"von": 44, "bis": 54, "name": "Green", "art": "color"},
+            {"von": 55, "bis": 65, "name": "Blue", "art": "color"},
+            {"von": 66, "bis": 76, "name": "Cyan", "art": "color"},
+            {"von": 77, "bis": 87, "name": "Purple", "art": "color"},
+            {"von": 88, "bis": 175, "name": "Colour selection (smooth shift)", "art": ""},
+            {"von": 176, "bis": 255, "name": "Colour wheel rotation (slow to fast)", "art": "rotate"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "9 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt speed (fast to slow)", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Colour",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "White", "art": "open"},
+            {"von": 11, "bis": 21, "name": "Red", "art": "color"},
+            {"von": 22, "bis": 32, "name": "Orange", "art": "color"},
+            {"von": 33, "bis": 43, "name": "Yellow", "art": "color"},
+            {"von": 44, "bis": 54, "name": "Green", "art": "color"},
+            {"von": 55, "bis": 65, "name": "Blue", "art": "color"},
+            {"von": 66, "bis": 76, "name": "Cyan", "art": "color"},
+            {"von": 77, "bis": 87, "name": "Purple", "art": "color"},
+            {"von": 88, "bis": 175, "name": "Colour selection (smooth shift)", "art": ""},
+            {"von": 176, "bis": 255, "name": "Colour wheel rotation (slow to fast)", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Gobo open", "art": "open"},
+            {"von": 16, "bis": 31, "name": "Gobo 1", "art": "gobo"},
+            {"von": 32, "bis": 46, "name": "Gobo 2", "art": "gobo"},
+            {"von": 47, "bis": 62, "name": "Gobo 3", "art": "gobo"},
+            {"von": 63, "bis": 78, "name": "Gobo 4", "art": "gobo"},
+            {"von": 79, "bis": 93, "name": "Gobo 5", "art": "gobo"},
+            {"von": 94, "bis": 109, "name": "Gobo 6", "art": "gobo"},
+            {"von": 110, "bis": 124, "name": "Gobo 7", "art": "gobo"},
+            {"von": 125, "bis": 140, "name": "Shake Gobo 7 (slow to fast)", "art": "shake"},
+            {"von": 141, "bis": 156, "name": "Shake Gobo 6 (slow to fast)", "art": "shake"},
+            {"von": 157, "bis": 171, "name": "Shake Gobo 5 (slow to fast)", "art": "shake"},
+            {"von": 172, "bis": 187, "name": "Shake Gobo 4 (slow to fast)", "art": "shake"},
+            {"von": 188, "bis": 203, "name": "Shake Gobo 3 (slow to fast)", "art": "shake"},
+            {"von": 204, "bis": 218, "name": "Shake Gobo 2 (slow to fast)", "art": "shake"},
+            {"von": 219, "bis": 234, "name": "Shake Gobo 1 (slow to fast)", "art": "shake"},
+            {"von": 235, "bis": 249, "name": "Gobo open", "art": "open"},
+            {"von": 250, "bis": 255, "name": "Gobo wheel rotation", "art": "rotate"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No Strobe", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe speed (slow to fast)", "art": "strobe"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "11 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt speed (fast to slow)", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Colour",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "White", "art": "open"},
+            {"von": 11, "bis": 21, "name": "Red", "art": "color"},
+            {"von": 22, "bis": 32, "name": "Orange", "art": "color"},
+            {"von": 33, "bis": 43, "name": "Yellow", "art": "color"},
+            {"von": 44, "bis": 54, "name": "Green", "art": "color"},
+            {"von": 55, "bis": 65, "name": "Blue", "art": "color"},
+            {"von": 66, "bis": 76, "name": "Cyan", "art": "color"},
+            {"von": 77, "bis": 87, "name": "Purple", "art": "color"},
+            {"von": 88, "bis": 175, "name": "Colour selection (smooth shift)", "art": ""},
+            {"von": 176, "bis": 255, "name": "Colour wheel rotation (slow to fast)", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Gobo open", "art": "open"},
+            {"von": 16, "bis": 31, "name": "Gobo 1", "art": "gobo"},
+            {"von": 32, "bis": 46, "name": "Gobo 2", "art": "gobo"},
+            {"von": 47, "bis": 62, "name": "Gobo 3", "art": "gobo"},
+            {"von": 63, "bis": 78, "name": "Gobo 4", "art": "gobo"},
+            {"von": 79, "bis": 93, "name": "Gobo 5", "art": "gobo"},
+            {"von": 94, "bis": 109, "name": "Gobo 6", "art": "gobo"},
+            {"von": 110, "bis": 124, "name": "Gobo 7", "art": "gobo"},
+            {"von": 125, "bis": 140, "name": "Shake Gobo 7 (slow to fast)", "art": "shake"},
+            {"von": 141, "bis": 156, "name": "Shake Gobo 6 (slow to fast)", "art": "shake"},
+            {"von": 157, "bis": 171, "name": "Shake Gobo 5 (slow to fast)", "art": "shake"},
+            {"von": 172, "bis": 187, "name": "Shake Gobo 4 (slow to fast)", "art": "shake"},
+            {"von": 188, "bis": 203, "name": "Shake Gobo 3 (slow to fast)", "art": "shake"},
+            {"von": 204, "bis": 218, "name": "Shake Gobo 2 (slow to fast)", "art": "shake"},
+            {"von": 219, "bis": 234, "name": "Shake Gobo 1 (slow to fast)", "art": "shake"},
+            {"von": 235, "bis": 249, "name": "Gobo open", "art": "open"},
+            {"von": 250, "bis": 255, "name": "Gobo wheel rotation", "art": "rotate"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No Strobe", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe speed (slow to fast)", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Sound Auto Mode",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 29, "name": "Manual Mode", "art": ""},
+            {"von": 30, "bis": 55, "name": "Auto Mode show 1", "art": ""},
+            {"von": 56, "bis": 81, "name": "Auto Mode show 2", "art": ""},
+            {"von": 82, "bis": 107, "name": "Auto Mode show 3", "art": ""},
+            {"von": 108, "bis": 133, "name": "Auto Mode show 4", "art": ""},
+            {"von": 134, "bis": 159, "name": "Auto Mode show 5", "art": ""},
+            {"von": 160, "bis": 185, "name": "Auto Mode show 6", "art": ""},
+            {"von": 186, "bis": 211, "name": "Auto Mode show 7", "art": ""},
+            {"von": 212, "bis": 237, "name": "Sound Mode", "art": "sound"},
+            {"von": 238, "bis": 250, "name": "Reset", "art": "reset"},
+            {"von": 251, "bis": 255, "name": "Sync (Head goes to mid position and blackout)", "art": ""}
+          ]
+        },
+        {
+          "name": "Speed/Sensitivity",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Speed/Sensitivity (slow to fast / low to high)", "art": ""}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Kompakter LED-Spot-Moving-Head (CLNS300) mit Farbrad (8 Farben) und Goborad (7 Gobos + Shake)."
+}

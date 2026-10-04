@@ -1,0 +1,93 @@
+{
+  "format_version": 1,
+  "hersteller": "Ignition",
+  "hersteller_kurz": "Ignition",
+  "modell": "2bright Profile 3K 26",
+  "kurzname": "2B PROFILE 3K",
+  "typ": "par",
+  "leistung_w": 230,
+  "notizen": "LED-Profilscheinwerfer, 1 x 200 W Warmweiss, Linse 26 Grad (Thomann-Artikel '2bright Profile 3K 26°'). Strobe-Kanal laut Handbuch (EN und DE gleich): 0-5 'LEDs aus', im 4-Kanal-Modus 6-10 'LEDs an' und 251-255 'LEDs aus' — abweichend von den anderen 2bright-Geraeten; im 2-Kanal-Modus gibt es laut Handbuch keinen Offen-Bereich (6-255 Strobe). Wie dokumentiert uebernommen, am Geraet pruefen.",
+  "quelle": {
+    "titel": "Ignition 2bright Profile 3K 26° – Bedienungsanleitung (Thomann, ID 477600)",
+    "version": "V2",
+    "datum": "2022-03-24",
+    "url": "https://fast-images.static-thomann.de/pics/atg/atgdata/document/manual/c_477600_v2_r2_en_online.pdf"
+  },
+  "herkunft": {"art": "hersteller-handbuch", "lizenz": "eigen"},
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal fuer Kanal gegen die DMX-Tabellen aller 3 Modi im Thomann-Handbuch (Kap. 7) geschrieben und geprueft; nicht am Geraet getestet; Strobe-Kanal zusaetzlich gegen die deutsche Ausgabe abgeglichen"
+  },
+  "modi": [
+    {
+      "name": "1-Kanal",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "2-Kanal",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "LEDs aus (laut Handbuch)", "art": "closed"},
+            {"von": 6, "bis": 255, "name": "Strobe 1 -> 20 Hz", "art": "strobe"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4-Kanal",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 8,
+          "highlight": 8,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "LEDs aus", "art": "closed"},
+            {"von": 6, "bis": 10, "name": "LEDs an", "art": "open"},
+            {"von": 11, "bis": 33, "name": "Zufaellige Impulse, langsam -> schnell", "art": "strobe"},
+            {"von": 34, "bis": 56, "name": "Zufaellig ansteigende Helligkeit, langsam -> schnell", "art": "strobe"},
+            {"von": 57, "bis": 79, "name": "Zufaellig abfallende Helligkeit, langsam -> schnell", "art": "strobe"},
+            {"von": 80, "bis": 102, "name": "Zufaelliger Strobe, langsam -> schnell", "art": "strobe"},
+            {"von": 103, "bis": 127, "name": "Strobe-Break (5 s -> 1 s)", "art": "strobe"},
+            {"von": 128, "bis": 250, "name": "Strobe 1 -> 20 Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "LEDs aus (laut Handbuch)", "art": "closed"}
+          ]
+        },
+        {
+          "name": "Dimmverhalten",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Ohne Funktion", "art": ""},
+            {"von": 6, "bis": 127, "name": "LED (direkt)", "art": ""},
+            {"von": 128, "bis": 255, "name": "Halogen-Nachbildung", "art": ""}
+          ]
+        },
+        {
+          "name": "Dimmerkurve",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Ohne Funktion", "art": ""},
+            {"von": 6, "bis": 63, "name": "Linear", "art": ""},
+            {"von": 64, "bis": 127, "name": "Exponentiell", "art": ""},
+            {"von": 128, "bis": 191, "name": "Logarithmisch", "art": ""},
+            {"von": 192, "bis": 255, "name": "S-Kurve", "art": ""}
+          ]
+        }
+      ]
+    }
+  ]
+}

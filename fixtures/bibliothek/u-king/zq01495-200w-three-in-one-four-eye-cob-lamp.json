@@ -1,0 +1,190 @@
+{
+  "format_version": 1,
+  "hersteller": "U King",
+  "hersteller_kurz": "UKING",
+  "modell": "ZQ01495 200W Three-in-one Four-eye COB Lamp",
+  "kurzname": "ZQ01495",
+  "typ": "matrix",
+  "leistung_w": 150,
+  "notizen": "Kein Herstellerhandbuch abrufbar; Kanalfolge und Wertebereiche aus der QLC+-Datei. Strobe-Kanaele ohne Wertangabe in QLC+: 0 = kein Strobe angenommen (wie bei den eingebauten U-King-Profilen). Vier RGB-COB-Augen 2x2; Raster nur in den Modi mit Einzelsteuerung (12/14 Kanal).",
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition UKing-ZQ01495-200W-Three-in-one-Four-eye-COB-Lamp.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/UKing/UKing-ZQ01495-200W-Three-in-one-Four-eye-COB-Lamp.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.14.0 GIT · Mario Rempfer",
+    "original": "resources/fixtures/UKing/UKing-ZQ01495-200W-Three-in-one-Four-eye-COB-Lamp.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 45 Wertebereiche mit Art (kind) versehen; Rasterform in 5 Modus/Modi aus <Physical> uebernommen; LightOS-Nachbearbeitung (FM-57): Hersteller 'UKing' -> 'U King' (wie die eingebauten LightOS-Profile der Marke); Typ led_bar -> matrix; Modus '3 Channel': Raster entfernt (nur eine Farbgruppe, keine Einzelsteuerung); Modus '5 Channel': Raster entfernt (nur eine Farbgruppe, keine Einzelsteuerung); Modus '8 Channel': Raster entfernt (nur eine Farbgruppe, keine Einzelsteuerung); Strobe-Kanal ohne Bereiche (QLC+-Preset ShutterStrobeSlowFast) mit 0 = kein Strobe (open) / 1-255 Strobe versehen (Strobe); 30 Bereichs-Arten nachgezogen (Farb-/Gobo-Slots, Shake/Rotation, Prisma, Sound, Reset; Programm-Bereiche in Makro-Kanaelen ohne Farb-Art); Typ led_bar -> matrix (2x2-Augen); einzelne Kanalnamen deutsch bzw. eindeutiger benannt"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Originaldatei geprueft und nach den LightOS-Regeln (SCHEMA.md) nachbearbeitet; ein Herstellerhandbuch war nicht abrufbar (U'King-Anleitungen nur als Amazon-/manuals.plus-PDF, dort gesperrt; ManualsLib fuehrt das Modell nicht), daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "3 Channel",
+      "kanaele": [
+        {"name": "Red1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue1", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "5 Channel",
+      "kanaele": [
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 1, "bis": 255, "name": "Strobe langsam → schnell", "art": "strobe"}
+          ]
+        },
+        {"name": "Red1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue1", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "8 Channel",
+      "kanaele": [
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 1, "bis": 255, "name": "Strobe langsam → schnell", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Macro Function",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "RGB CH6-8 static dimming", "art": ""},
+            {"von": 10, "bis": 19, "name": "Color Macro CH4", "art": ""},
+            {"von": 20, "bis": 29, "name": "Breathing effect, CH5 Select color", "art": ""},
+            {"von": 30, "bis": 39, "name": "Jump change effect", "art": ""},
+            {"von": 40, "bis": 49, "name": "Gradient change effect", "art": ""},
+            {"von": 50, "bis": 59, "name": "Pulse change effect, CH5 Select color", "art": ""},
+            {"von": 60, "bis": 65, "name": "Autorun1, CH5 Color", "art": ""},
+            {"von": 66, "bis": 71, "name": "Autorun2, CH5 Color", "art": ""},
+            {"von": 72, "bis": 77, "name": "Autorun3, CH5 Color", "art": ""},
+            {"von": 78, "bis": 83, "name": "Autorun4, CH5 Color", "art": ""},
+            {"von": 84, "bis": 89, "name": "Autorun5, CH5 Color", "art": ""},
+            {"von": 90, "bis": 95, "name": "Autorun6, CH5 Color", "art": ""},
+            {"von": 96, "bis": 101, "name": "Autorun7, CH5 Color", "art": ""},
+            {"von": 102, "bis": 107, "name": "Autorun8, CH5 Color", "art": ""},
+            {"von": 108, "bis": 113, "name": "Autorun9, CH5 Color", "art": ""},
+            {"von": 114, "bis": 119, "name": "Autorun10, CH5 Color", "art": ""},
+            {"von": 120, "bis": 125, "name": "Autorun11, CH5 Color", "art": ""},
+            {"von": 126, "bis": 131, "name": "Autorun12, CH5 Color", "art": ""},
+            {"von": 132, "bis": 137, "name": "Autorun13, CH5 Color", "art": ""},
+            {"von": 138, "bis": 143, "name": "Autorun14, CH5 Color", "art": ""},
+            {"von": 144, "bis": 149, "name": "Autorun15, CH5 Color", "art": ""},
+            {"von": 150, "bis": 155, "name": "Autorun16, CH5 Color", "art": ""},
+            {"von": 156, "bis": 161, "name": "Autorun17, CH5 Color", "art": ""},
+            {"von": 162, "bis": 167, "name": "Autorun18, CH5 Color", "art": ""},
+            {"von": 168, "bis": 173, "name": "Autorun19, CH5 Color", "art": ""},
+            {"von": 174, "bis": 179, "name": "Autorun20, CH5 Color", "art": ""},
+            {"von": 180, "bis": 185, "name": "Autorun21, CH5 Color", "art": ""},
+            {"von": 186, "bis": 191, "name": "Autorun22, CH5 Color", "art": ""},
+            {"von": 192, "bis": 197, "name": "Autorun23, CH5 Color", "art": ""},
+            {"von": 198, "bis": 203, "name": "Autorun24, CH5 Color", "art": ""},
+            {"von": 204, "bis": 209, "name": "Autorun25, CH5 Color", "art": ""},
+            {"von": 210, "bis": 229, "name": "Autorun26, CH5 Color", "art": ""},
+            {"von": 230, "bis": 235, "name": "Sound Mode1, CH5 Color", "art": "sound"},
+            {"von": 236, "bis": 241, "name": "Sound Mode2, CH5 Color", "art": "sound"},
+            {"von": 242, "bis": 247, "name": "Sound Mode3, CH5 Color", "art": "sound"},
+            {"von": 248, "bis": 255, "name": "Sound Mode4, CH5 Color", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Multi-function",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Multi-function (see Manual)", "art": ""}
+          ]
+        },
+        {
+          "name": "Farbmakro",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "Default Color", "art": ""},
+            {"von": 32, "bis": 63, "name": "Red", "art": "color"},
+            {"von": 64, "bis": 95, "name": "Green", "art": "color"},
+            {"von": 96, "bis": 127, "name": "Blue", "art": "color"},
+            {"von": 128, "bis": 159, "name": "Yellow", "art": "color"},
+            {"von": 160, "bis": 191, "name": "Purple", "art": "color"},
+            {"von": 192, "bis": 223, "name": "Cyan", "art": "color"},
+            {"von": 224, "bis": 255, "name": "White", "art": "color"}
+          ]
+        },
+        {"name": "Red1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue1", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "12 Channel",
+      "raster": {"rows": 2, "cols": 2},
+      "kanaele": [
+        {"name": "Red1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue4", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "14 Channel",
+      "raster": {"rows": 2, "cols": 2},
+      "kanaele": [
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 1, "bis": 255, "name": "Strobe langsam → schnell", "art": "strobe"}
+          ]
+        },
+        {"name": "Red1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue4", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    }
+  ]
+}

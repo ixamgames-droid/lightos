@@ -1,0 +1,84 @@
+{
+  "format_version": 1,
+  "hersteller": "Betopper",
+  "hersteller_kurz": "Betopper",
+  "modell": "LPC-1218",
+  "kurzname": "LPC1218",
+  "typ": "par",
+  "leistung_w": 216,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Betopper-LPC-1218.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Betopper/Betopper-LPC-1218.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.2.2 GIT · Michael",
+    "original": "resources/fixtures/Betopper/Betopper-LPC-1218.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 7 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung: Strobe-Kanal: Bereiche 0 = offen, 1-255 = Strobe ergaenzt; Lime (kein eigenes LightOS-Attribut, bleibt raw) mit highlight 255; Funktionswahl: 'Open DMX' nicht mehr als Shutter-offen (art open) markiert, Musikmodus art sound; Function Speed speed -> raw (Doppelfunktion Tempo/Farbe)"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Quelldatei und auf innere Stimmigkeit geprueft; kein Herstellerhandbuch oeffentlich auffindbar, nicht am Geraet geprueft"
+  },
+  "modi": [
+    {
+      "name": "6 Channel (d001)",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Lime", "attribut": "raw", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "10 Channel (A001)",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Lime", "attribut": "raw", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 1, "bis": 255, "name": "Strobe langsam → schnell", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Funktionswahl",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 19, "name": "Open DMX", "art": ""},
+            {"von": 20, "bis": 35, "name": "CT Open (CH10 Color Selection)", "art": ""},
+            {"von": 36, "bis": 149, "name": "Color Selection", "art": ""},
+            {"von": 150, "bis": 200, "name": "Jump", "art": ""},
+            {"von": 201, "bis": 249, "name": "Pulse Change", "art": ""},
+            {"von": 250, "bis": 255, "name": "Music Mode 2", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Tempo / Farbauswahl",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Speed or Color Selection when CH9=20-35", "art": ""}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "RGBLAU-PAR (Rot, Gruen, Blau, Lime, Amber, UV); Lime als raw."
+}

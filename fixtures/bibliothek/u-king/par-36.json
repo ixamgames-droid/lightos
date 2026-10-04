@@ -1,0 +1,80 @@
+{
+  "format_version": 1,
+  "hersteller": "U King",
+  "hersteller_kurz": "UKING",
+  "modell": "Par 36",
+  "kurzname": "UKPAR36",
+  "typ": "par",
+  "leistung_w": 36,
+  "notizen": "Kein Herstellerhandbuch abrufbar; Kanalfolge und Wertebereiche aus der QLC+-Datei. Strobe-Kanaele ohne Wertangabe in QLC+: 0 = kein Strobe angenommen (wie bei den eingebauten U-King-Profilen). Kanal 7 ist je nach Programm in Kanal 6 Farbauswahl oder Geschwindigkeit, daher raw.",
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition UKing-Par-36.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/UKing/UKing-Par-36.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.1 GIT · castilga",
+    "original": "resources/fixtures/UKing/UKing-Par-36.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 9 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): Hersteller 'UKing' -> 'U King' (wie die eingebauten LightOS-Profile der Marke); Color Selection: Ein-Bereich-'Farbrad' (art color ueber 0-255) zu raw ohne Farb-Kachel; Attribute korrigiert (Color Selection: color_wheel->raw; Mode: raw->macro); Shutter-Default/Highlight auf den Offen-Wert (Strobe 3->0); 4 Bereichs-Arten nachgezogen (Farb-/Gobo-Slots, Shake/Rotation, Prisma, Sound, Reset; Programm-Bereiche in Makro-Kanaelen ohne Farb-Art); Tippfehler 'contorted' in Bereichsnamen belassen (Originaltext), Kanalnamen deutsch; einzelne Kanalnamen deutsch bzw. eindeutiger benannt"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Originaldatei geprueft und nach den LightOS-Regeln (SCHEMA.md) nachbearbeitet; ein Herstellerhandbuch war nicht abrufbar (U'King-Anleitungen nur als Amazon-/manuals.plus-PDF, dort gesperrt; ManualsLib fuehrt das Modell nicht), daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "7 Channel",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "No Strobe", "art": "open"},
+            {"von": 8, "bis": 255, "name": "Strobe Slow to Fast", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Programm",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Manual Control", "art": ""},
+            {"von": 11, "bis": 60, "name": "Colors Selection (Colors contorted by CH7)", "art": ""},
+            {"von": 61, "bis": 110, "name": "Colors Shade (Colors contorted by CH7, bigger values faster)", "art": ""},
+            {
+              "von": 111,
+              "bis": 160,
+              "name": "Colors Pulse transform (speed contorted by CH7, bigger values faster)",
+              "art": ""
+            },
+            {
+              "von": 161,
+              "bis": 210,
+              "name": "Colors transition (speed contorted by CH7, bigger values faster)",
+              "art": ""
+            },
+            {"von": 211, "bis": 255, "name": "Sound Control", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Farbauswahl / Tempo (zu Kanal 6)",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Farbe bzw. Tempo je nach Programm in Kanal 6", "art": ""}
+          ]
+        }
+      ]
+    }
+  ]
+}
