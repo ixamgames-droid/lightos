@@ -23,7 +23,6 @@ FREMD_ORDNER = [
 #: Einzelne fremde Dateien ausserhalb dieser Ordner.
 FREMD_DATEIEN = [
     "src/ui/visualizer/three_local.js",
-    "tools/gource/data/fonts/FreeSans.ttf",
 ]
 
 

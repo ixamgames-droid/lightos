@@ -1,0 +1,188 @@
+{
+  "format_version": 1,
+  "hersteller": "Betopper",
+  "hersteller_kurz": "Betopper",
+  "modell": "LPC-017",
+  "kurzname": "LPC017",
+  "typ": "par",
+  "leistung_w": 15,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Betopper-LPC-017.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Betopper/Betopper-LPC-017.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.0.0 Beta 3 · Michel Sliepenbeek",
+    "original": "resources/fixtures/Betopper/Betopper-LPC-017.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 62 Wertebereiche mit Art (kind) versehen; Rasterform in 3 Modus/Modi aus <Physical> uebernommen; LightOS-Nachbearbeitung: Strobe-Kanal: Bereiche 0 = offen, 1-255 = Strobe ergaenzt; Rasterform 2x2 nur im 16-Kanal-Modus (4 RGB-Zonen); 4/7-Kanal-Modi steuern eine Farbe; Auto Speed speed -> effect_speed; Makro-Bereiche (Jump/Snap/Fade/Ring-Effekte/Strobe-Programm) ohne Farb-/Strobe-art"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Quelldatei und auf innere Stimmigkeit geprueft; kein Herstellerhandbuch oeffentlich auffindbar, nicht am Geraet geprueft"
+  },
+  "modi": [
+    {
+      "name": "4 Channel",
+      "kanaele": [
+        {"name": "Red 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 1, "bis": 255, "name": "Strobe langsam → schnell", "art": "strobe"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "7 Channel",
+      "kanaele": [
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 1, "bis": 255, "name": "Strobe langsam → schnell", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Auto Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Auto Speed", "art": ""}
+          ]
+        },
+        {
+          "name": "Macro",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Blackout", "art": "closed"},
+            {"von": 5, "bis": 9, "name": "Red", "art": "color"},
+            {"von": 10, "bis": 14, "name": "Green", "art": "color"},
+            {"von": 15, "bis": 19, "name": "Blue", "art": "color"},
+            {"von": 20, "bis": 24, "name": "Grass green", "art": "color"},
+            {"von": 25, "bis": 29, "name": "Amber", "art": "color"},
+            {"von": 30, "bis": 34, "name": "Orange", "art": "color"},
+            {"von": 35, "bis": 39, "name": "Yellow", "art": "color"},
+            {"von": 40, "bis": 44, "name": "Cyan", "art": "color"},
+            {"von": 45, "bis": 49, "name": "Lavender", "art": "color"},
+            {"von": 50, "bis": 54, "name": "Pink", "art": "color"},
+            {"von": 55, "bis": 59, "name": "Rosiness", "art": "color"},
+            {"von": 60, "bis": 64, "name": "Magenta", "art": "color"},
+            {"von": 65, "bis": 69, "name": "Pea green", "art": "color"},
+            {"von": 70, "bis": 74, "name": "Orange", "art": "color"},
+            {"von": 75, "bis": 79, "name": "White", "art": "color"},
+            {"von": 80, "bis": 84, "name": "Ring control color", "art": "color"},
+            {"von": 85, "bis": 89, "name": "Ring control color", "art": "color"},
+            {"von": 90, "bis": 94, "name": "Ring control color", "art": "color"},
+            {"von": 95, "bis": 99, "name": "Ring control color", "art": "color"},
+            {"von": 100, "bis": 104, "name": "Ring control color", "art": "color"},
+            {"von": 105, "bis": 109, "name": "Ring control color", "art": "color"},
+            {"von": 110, "bis": 129, "name": "Colour jumping", "art": ""},
+            {"von": 130, "bis": 149, "name": "Colour snap", "art": ""},
+            {"von": 150, "bis": 169, "name": "Colour strobe", "art": ""},
+            {"von": 170, "bis": 189, "name": "Colour fade", "art": ""},
+            {"von": 190, "bis": 209, "name": "Ring control effect 1", "art": ""},
+            {"von": 210, "bis": 229, "name": "Ring control effect 1", "art": ""},
+            {"von": 230, "bis": 249, "name": "color jumping+mutation+strobe+ring control", "art": "strobe"},
+            {"von": 250, "bis": 255, "name": "Sound Control", "art": "sound"}
+          ]
+        },
+        {"name": "Red 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 1", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "16 Channel",
+      "raster": {"rows": 2, "cols": 2},
+      "kanaele": [
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 1, "bis": 255, "name": "Strobe langsam → schnell", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Auto Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Auto Speed", "art": ""}
+          ]
+        },
+        {
+          "name": "Macro",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Blackout", "art": "closed"},
+            {"von": 5, "bis": 9, "name": "Red", "art": "color"},
+            {"von": 10, "bis": 14, "name": "Green", "art": "color"},
+            {"von": 15, "bis": 19, "name": "Blue", "art": "color"},
+            {"von": 20, "bis": 24, "name": "Grass green", "art": "color"},
+            {"von": 25, "bis": 29, "name": "Amber", "art": "color"},
+            {"von": 30, "bis": 34, "name": "Orange", "art": "color"},
+            {"von": 35, "bis": 39, "name": "Yellow", "art": "color"},
+            {"von": 40, "bis": 44, "name": "Cyan", "art": "color"},
+            {"von": 45, "bis": 49, "name": "Lavender", "art": "color"},
+            {"von": 50, "bis": 54, "name": "Pink", "art": "color"},
+            {"von": 55, "bis": 59, "name": "Rosiness", "art": "color"},
+            {"von": 60, "bis": 64, "name": "Magenta", "art": "color"},
+            {"von": 65, "bis": 69, "name": "Pea green", "art": "color"},
+            {"von": 70, "bis": 74, "name": "Orange", "art": "color"},
+            {"von": 75, "bis": 79, "name": "White", "art": "color"},
+            {"von": 80, "bis": 84, "name": "Ring control color", "art": "color"},
+            {"von": 85, "bis": 89, "name": "Ring control color", "art": "color"},
+            {"von": 90, "bis": 94, "name": "Ring control color", "art": "color"},
+            {"von": 95, "bis": 99, "name": "Ring control color", "art": "color"},
+            {"von": 100, "bis": 104, "name": "Ring control color", "art": "color"},
+            {"von": 105, "bis": 109, "name": "Ring control color", "art": "color"},
+            {"von": 110, "bis": 129, "name": "Colour jumping", "art": ""},
+            {"von": 130, "bis": 149, "name": "Colour snap", "art": ""},
+            {"von": 150, "bis": 169, "name": "Colour strobe", "art": ""},
+            {"von": 170, "bis": 189, "name": "Colour fade", "art": ""},
+            {"von": 190, "bis": 209, "name": "Ring control effect 1", "art": ""},
+            {"von": 210, "bis": 229, "name": "Ring control effect 1", "art": ""},
+            {"von": 230, "bis": 249, "name": "color jumping+mutation+strobe+ring control", "art": "strobe"},
+            {"von": 250, "bis": 255, "name": "Sound Control", "art": "sound"}
+          ]
+        },
+        {"name": "Red 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red 3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Red 4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 4", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    }
+  ],
+  "notizen": "Strobe-Schwelle aus QLC+-Preset abgeleitet; Zonen-Anordnung (2x2) aus QLC+ <Physical>."
+}

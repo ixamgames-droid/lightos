@@ -17,7 +17,7 @@
     "lizenz": "Apache-2.0",
     "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.0.0 Beta 2 · Niklas Larsson",
     "original": "resources/fixtures/Varytec/Varytec-Giga-Bar-HEX-3.qxf",
-    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 11 Wertebereiche mit Art (kind) versehen; Rasterform in 5 Modus/Modi aus <Physical> uebernommen; gegen Herstellerhandbuch r3 (2022-06-01) abgeglichen; Kanal- und Bereichsnamen deutsch; Strobe-Kanal von shutter auf strobe (Handbuch nennt nur „Strobe master“ 0…255, keinen Offen-Bereich); Funktionskanal von raw auf macro, Farbwechsel ohne falsche color-Art; Tempo-Kanal von speed auf effect_speed; Farbmakro-Kanal von color_wheel auf macro (kein Farbrad); Kurzname, Notizen"
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 11 Wertebereiche mit Art (kind) versehen; Rasterform aus <Physical> in 5 Modus/Modi nicht uebernommen, weil sie nicht zu den color_r-Kanaelen passt (keine echten Farbzonen); gegen Herstellerhandbuch r3 (2022-06-01) abgeglichen; Kanal- und Bereichsnamen deutsch; Strobe-Kanal von shutter auf strobe (Handbuch nennt nur „Strobe master“ 0…255, keinen Offen-Bereich); Funktionskanal von raw auf macro, Farbwechsel ohne falsche color-Art; Tempo-Kanal von speed auf effect_speed; Farbmakro-Kanal von color_wheel auf macro (kein Farbrad); Kurzname, Notizen"
   },
   "autor": "LightOS (QXF-Konverter, nachbearbeitet FM-57)",
   "geprueft": {
@@ -27,7 +27,6 @@
   "modi": [
     {
       "name": "3 Channel",
-      "raster": {"rows": 1, "cols": 3},
       "kanaele": [
         {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
         {"name": "Grün", "attribut": "color_g", "default": 0, "highlight": 255},
@@ -36,7 +35,6 @@
     },
     {
       "name": "4 Channel",
-      "raster": {"rows": 1, "cols": 3},
       "kanaele": [
         {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
         {"name": "Grün", "attribut": "color_g", "default": 0, "highlight": 255},
@@ -46,7 +44,6 @@
     },
     {
       "name": "6 Channel",
-      "raster": {"rows": 1, "cols": 3},
       "kanaele": [
         {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
         {"name": "Grün", "attribut": "color_g", "default": 0, "highlight": 255},
@@ -58,7 +55,6 @@
     },
     {
       "name": "9 Channel",
-      "raster": {"rows": 1, "cols": 3},
       "kanaele": [
         {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
         {"name": "Grün", "attribut": "color_g", "default": 0, "highlight": 255},
@@ -84,7 +80,6 @@
     },
     {
       "name": "11 Channel",
-      "raster": {"rows": 1, "cols": 3},
       "kanaele": [
         {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
         {"name": "Grün", "attribut": "color_g", "default": 0, "highlight": 255},

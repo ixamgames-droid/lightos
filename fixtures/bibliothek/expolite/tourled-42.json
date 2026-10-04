@@ -1,0 +1,236 @@
+{
+  "format_version": 1,
+  "hersteller": "Expolite",
+  "hersteller_kurz": "Expolite",
+  "modell": "TourLed 42",
+  "kurzname": "TOURLED 42",
+  "typ": "par",
+  "leistung_w": 52,
+  "quelle": {"titel": "QLC+-Geraetedefinition Expolite-TourLed-42.qxf", "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Expolite/Expolite-TourLed-42.qxf"},
+  "herkunft": {"art": "qlcplus", "lizenz": "Apache-2.0", "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.7.0 RC1 · Janosch Frank", "original": "resources/fixtures/Expolite/Expolite-TourLed-42.qxf", "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 128 Wertebereiche mit Art (kind) versehen; LightOS-Nacharbeit: 'Red | Step Time' / 'Green | Fade Time' waren als intensity abgebildet -> color_r / color_g (Farb-Bereichs-Art entfernt); 'Color Macro' color_wheel -> macro (Ueberblend-Makros, keine festen Farben); 'Strobe' macro -> shutter mit Kein Strobe (open) / Strobe (strobe); Kanal 5 im Modus Ar1.S ('Store', Tippfehler der Vorlage) als Strobe (shutter) gedeutet, Bereiche wie im Tour-Modus; 'Auto Speed Adjustment' macro -> effect_speed; 'Dimmer Speed' macro -> raw, Bereich 0-9 nicht mehr als reset markiert"},
+  "autor": "LightOS",
+  "geprueft": {"ok": false, "wie": "QLC+-Datei Kanal fuer Kanal durchgesehen und logisch korrigiert; ein vollstaendiges Herstellerhandbuch war nicht abrufbar, daher nicht gegen das Handbuch geprueft"},
+  "modi": [
+    {
+      "name": "Tour",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Red | Step Time", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green | Fade Time", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {
+          "name": "Color Macro",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "No function", "art": ""},
+            {"von": 11, "bis": 30, "name": "Red 100% / Green Up / Blue 0%", "art": ""},
+            {"von": 31, "bis": 50, "name": "Red Down / Green 100% / Blue 0%", "art": ""},
+            {"von": 51, "bis": 70, "name": "Red 0% / Green 100% / Blue Up", "art": ""},
+            {"von": 71, "bis": 90, "name": "Red 0% / Green Down / Blue 100%", "art": ""},
+            {"von": 91, "bis": 110, "name": "Red Up / Green 0% / Blue 100%", "art": ""},
+            {"von": 111, "bis": 130, "name": "Red 100% / Green 0% / Blue Down", "art": ""},
+            {"von": 131, "bis": 150, "name": "Red 100% / Green Up / Blue Up", "art": ""},
+            {"von": 151, "bis": 170, "name": "Red Down / Green Down / Blue 100%", "art": ""},
+            {"von": 171, "bis": 200, "name": "Red 100% / Green 100% / Blue 100% / White 100% / Amber 100%", "art": ""},
+            {"von": 201, "bis": 205, "name": "White 1: 3200k", "art": ""},
+            {"von": 206, "bis": 210, "name": "White 2: 3400k", "art": ""},
+            {"von": 211, "bis": 215, "name": "White 3: 4200k", "art": ""},
+            {"von": 216, "bis": 220, "name": "White 4: 4900k", "art": ""},
+            {"von": 221, "bis": 225, "name": "White 5: 5600k", "art": ""},
+            {"von": 226, "bis": 230, "name": "White 6: 5900k", "art": ""},
+            {"von": 231, "bis": 235, "name": "White 7: 6500k", "art": ""},
+            {"von": 236, "bis": 240, "name": "White 8: 7200k", "art": ""},
+            {"von": 241, "bis": 245, "name": "White 9: 8000k", "art": ""},
+            {"von": 246, "bis": 250, "name": "White 10: 8500k", "art": ""},
+            {"von": 251, "bis": 255, "name": "White 11: 10000k", "art": ""}
+          ]
+        },
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Kein Strobe", "art": "open"},
+            {"von": 11, "bis": 255, "name": "Strobe 1-20Hz", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Auto",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 20, "name": "No function", "art": ""},
+            {"von": 21, "bis": 30, "name": "Auto 1", "art": ""},
+            {"von": 31, "bis": 40, "name": "Auto 2", "art": ""},
+            {"von": 41, "bis": 50, "name": "Auto 3", "art": ""},
+            {"von": 51, "bis": 60, "name": "Auto 4", "art": ""},
+            {"von": 61, "bis": 70, "name": "Auto 5", "art": ""},
+            {"von": 71, "bis": 80, "name": "Auto 6", "art": ""},
+            {"von": 81, "bis": 90, "name": "Auto 7", "art": ""},
+            {"von": 91, "bis": 100, "name": "Auto 8", "art": ""},
+            {"von": 101, "bis": 110, "name": "Auto 9", "art": ""},
+            {"von": 111, "bis": 120, "name": "Auto 10", "art": ""},
+            {"von": 121, "bis": 130, "name": "Custom 1", "art": ""},
+            {"von": 131, "bis": 140, "name": "Custom 2", "art": ""},
+            {"von": 141, "bis": 150, "name": "Custom 3", "art": ""},
+            {"von": 151, "bis": 160, "name": "Custom 4", "art": ""},
+            {"von": 161, "bis": 170, "name": "Custom 5", "art": ""},
+            {"von": 171, "bis": 180, "name": "Custom 6", "art": ""},
+            {"von": 181, "bis": 190, "name": "Custom 7", "art": ""},
+            {"von": 191, "bis": 200, "name": "Custom 8", "art": ""},
+            {"von": 201, "bis": 210, "name": "Custom 9", "art": ""},
+            {"von": 211, "bis": 220, "name": "Custom 10", "art": ""},
+            {"von": 221, "bis": 255, "name": "No function", "art": ""}
+          ]
+        },
+        {
+          "name": "Auto Speed Adjustment",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "When using CH7,AUTO01-AUTO10, this function is activated", "art": ""}
+          ]
+        },
+        {
+          "name": "Dimmer Speed",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Preset dimmer speed from display menu", "art": ""},
+            {"von": 10, "bis": 29, "name": "Linear dimmer", "art": ""},
+            {"von": 30, "bis": 69, "name": "Non linear dimmer 1 (fastest)", "art": ""},
+            {"von": 70, "bis": 129, "name": "Non linear dimmer 2", "art": ""},
+            {"von": 130, "bis": 189, "name": "Non linear dimmer 3", "art": ""},
+            {"von": 190, "bis": 255, "name": "Non linear dimmer 4 (slowest)", "art": ""}
+          ]
+        },
+        {
+          "name": "ID",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "ID 1 ~ 66 (all IDs)", "art": ""},
+            {"von": 10, "bis": 19, "name": "ID 1", "art": ""},
+            {"von": 20, "bis": 29, "name": "ID 2", "art": ""},
+            {"von": 30, "bis": 39, "name": "ID 3", "art": ""},
+            {"von": 40, "bis": 49, "name": "ID 4", "art": ""},
+            {"von": 50, "bis": 59, "name": "ID 5", "art": ""},
+            {"von": 60, "bis": 69, "name": "ID 6", "art": ""},
+            {"von": 70, "bis": 79, "name": "ID 7", "art": ""},
+            {"von": 80, "bis": 89, "name": "ID 8", "art": ""},
+            {"von": 90, "bis": 99, "name": "ID 9", "art": ""},
+            {"von": 100, "bis": 109, "name": "ID 10", "art": ""},
+            {"von": 110, "bis": 119, "name": "ID 11", "art": ""},
+            {"von": 120, "bis": 129, "name": "ID 12", "art": ""},
+            {"von": 130, "bis": 139, "name": "ID 13", "art": ""},
+            {"von": 140, "bis": 149, "name": "ID 14", "art": ""},
+            {"von": 150, "bis": 159, "name": "ID 15", "art": ""},
+            {"von": 160, "bis": 169, "name": "ID 16", "art": ""},
+            {"von": 170, "bis": 179, "name": "ID 17", "art": ""},
+            {"von": 180, "bis": 189, "name": "ID 18", "art": ""},
+            {"von": 190, "bis": 199, "name": "ID 19", "art": ""},
+            {"von": 200, "bis": 209, "name": "ID 20", "art": ""},
+            {"von": 210, "bis": 210, "name": "ID 21", "art": ""},
+            {"von": 211, "bis": 211, "name": "ID 22", "art": ""},
+            {"von": 212, "bis": 212, "name": "ID 23", "art": ""},
+            {"von": 213, "bis": 213, "name": "ID 24", "art": ""},
+            {"von": 214, "bis": 214, "name": "ID 25", "art": ""},
+            {"von": 215, "bis": 215, "name": "ID 26", "art": ""},
+            {"von": 216, "bis": 216, "name": "ID 27", "art": ""},
+            {"von": 217, "bis": 217, "name": "ID 28", "art": ""},
+            {"von": 218, "bis": 218, "name": "ID 29", "art": ""},
+            {"von": 219, "bis": 219, "name": "ID 30", "art": ""},
+            {"von": 220, "bis": 220, "name": "ID 31", "art": ""},
+            {"von": 221, "bis": 221, "name": "ID 32", "art": ""},
+            {"von": 222, "bis": 222, "name": "ID 33", "art": ""},
+            {"von": 223, "bis": 223, "name": "ID 34", "art": ""},
+            {"von": 224, "bis": 224, "name": "ID 35", "art": ""},
+            {"von": 225, "bis": 225, "name": "ID 36", "art": ""},
+            {"von": 226, "bis": 226, "name": "ID 37", "art": ""},
+            {"von": 227, "bis": 227, "name": "ID 38", "art": ""},
+            {"von": 228, "bis": 228, "name": "ID 39", "art": ""},
+            {"von": 229, "bis": 229, "name": "ID 40", "art": ""},
+            {"von": 230, "bis": 230, "name": "ID 41", "art": ""},
+            {"von": 231, "bis": 231, "name": "ID 42", "art": ""},
+            {"von": 232, "bis": 232, "name": "ID 43", "art": ""},
+            {"von": 233, "bis": 233, "name": "ID 44", "art": ""},
+            {"von": 234, "bis": 234, "name": "ID 45", "art": ""},
+            {"von": 235, "bis": 235, "name": "ID 46", "art": ""},
+            {"von": 236, "bis": 236, "name": "ID 47", "art": ""},
+            {"von": 237, "bis": 237, "name": "ID 48", "art": ""},
+            {"von": 238, "bis": 238, "name": "ID 49", "art": ""},
+            {"von": 239, "bis": 239, "name": "ID 50", "art": ""},
+            {"von": 240, "bis": 240, "name": "ID 51", "art": ""},
+            {"von": 241, "bis": 241, "name": "ID 52", "art": ""},
+            {"von": 242, "bis": 242, "name": "ID 53", "art": ""},
+            {"von": 243, "bis": 243, "name": "ID 54", "art": ""},
+            {"von": 244, "bis": 244, "name": "ID 55", "art": ""},
+            {"von": 245, "bis": 245, "name": "ID 56", "art": ""},
+            {"von": 246, "bis": 246, "name": "ID 57", "art": ""},
+            {"von": 247, "bis": 247, "name": "ID 58", "art": ""},
+            {"von": 248, "bis": 248, "name": "ID 59", "art": ""},
+            {"von": 249, "bis": 249, "name": "ID 60", "art": ""},
+            {"von": 250, "bis": 250, "name": "ID 61", "art": ""},
+            {"von": 251, "bis": 251, "name": "ID 62", "art": ""},
+            {"von": 252, "bis": 252, "name": "ID 63", "art": ""},
+            {"von": 253, "bis": 253, "name": "ID 64", "art": ""},
+            {"von": 254, "bis": 254, "name": "ID 65", "art": ""},
+            {"von": 255, "bis": 255, "name": "ID 66", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Arc.1",
+      "kanaele": [
+        {"name": "Red | Step Time", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green | Fade Time", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "Ar1.d",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Red | Step Time", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green | Fade Time", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "Ar1.S",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Red | Step Time", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green | Fade Time", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Kein Strobe", "art": "open"},
+            {"von": 11, "bis": 255, "name": "Strobe 1-20 Hz", "art": "strobe"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "HSV",
+      "kanaele": [
+        {"name": "Hue", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Saturation", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Value", "attribut": "raw", "default": 0, "highlight": 0}
+      ]
+    }
+  ],
+  "notizen": "Kanal 2/3 dienen bei aktivem Custom-Programm (Kanal 7) als Schritt-/Ueberblendzeit. Modus Ar1.S Kanal 5 als Strobe angenommen (Vorlage: 'Store')."
+}

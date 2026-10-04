@@ -1,0 +1,338 @@
+{
+  "format_version": 1,
+  "hersteller": "U King",
+  "hersteller_kurz": "UKING",
+  "modell": "ZQ02115 140W Moving Head",
+  "kurzname": "ZQ02115",
+  "typ": "moving_head",
+  "leistung_w": 140,
+  "notizen": "Kein Herstellerhandbuch abrufbar; Kanalfolge und Wertebereiche aus der QLC+-Datei. Strobe-Kanaele ohne Wertangabe in QLC+: 0 = kein Strobe angenommen (wie bei den eingebauten U-King-Profilen). Bienenaugen-Wash: Vordergrund-RGBW (Kopf 1) und Hintergrund-RGBW (Kopf 2), im 49-Kanal-Modus zusaetzlich 7 LEDs einzeln.",
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition UKing-ZQ02115-140W-Moving-Head.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/UKing/UKing-ZQ02115-140W-Moving-Head.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.3.0 GIT · Fede79",
+    "original": "resources/fixtures/UKing/UKing-ZQ02115-140W-Moving-Head.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 91 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): Hersteller 'UKing' -> 'U King' (wie die eingebauten LightOS-Profile der Marke); Attribute korrigiert (Bee Eye: macro->effect; LED Effect Speed: speed->effect_speed); Shutter-Default/Highlight auf den Offen-Wert (Strobe 4->0); 4 Bereichs-Arten nachgezogen (Farb-/Gobo-Slots, Shake/Rotation, Prisma, Sound, Reset; Programm-Bereiche in Makro-Kanaelen ohne Farb-Art); Bienenaugen-Drehung von macro zu effect; Farbauswahl 0-9 als offen (RGBW-Mischung); einzelne Kanalnamen deutsch bzw. eindeutiger benannt"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Originaldatei geprueft und nach den LightOS-Regeln (SCHEMA.md) nachbearbeitet; ein Herstellerhandbuch war nicht abrufbar (U'King-Anleitungen nur als Amazon-/manuals.plus-PDF, dort gesperrt; ManualsLib fuehrt das Modell nicht), daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "15 Channel",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Farbtemperatur",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": ""},
+            {"von": 10, "bis": 255, "name": "Color temperature selection", "art": ""}
+          ]
+        },
+        {
+          "name": "Farbauswahl",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Color selection", "art": "color"}
+          ]
+        },
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe slow to fast", "art": "strobe"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Zoom", "attribut": "zoom", "default": 0, "highlight": 0},
+        {
+          "name": "Bienenauge Drehung",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "0 to 360 degrees", "art": ""},
+            {"von": 128, "bis": 192, "name": "Rotate CCW Fast to slow", "art": "rotate"},
+            {"von": 193, "bis": 255, "name": "Rotate CW Slow to fast", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 249, "name": "No function", "art": ""},
+            {"von": 250, "bis": 255, "name": "Reset", "art": "reset"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "21 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Zoom", "attribut": "zoom", "default": 0, "highlight": 0},
+        {
+          "name": "Bienenauge Drehung",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "0 to 360 degrees", "art": ""},
+            {"von": 128, "bis": 192, "name": "Rotate CCW Fast to slow", "art": "rotate"},
+            {"von": 193, "bis": 255, "name": "Rotate CW Slow to fast", "art": "rotate"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe slow to fast", "art": "strobe"}
+          ]
+        },
+        {"name": "Foreground Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Foreground Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Foreground Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Foreground White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Farbtemperatur",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": ""},
+            {"von": 10, "bis": 255, "name": "Color temperature selection", "art": ""}
+          ]
+        },
+        {
+          "name": "LED Effect",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 3, "name": "No fucntion", "art": ""},
+            {"von": 4, "bis": 7, "name": "LED Effect 1", "art": ""},
+            {"von": 8, "bis": 11, "name": "LED Effect 2", "art": ""},
+            {"von": 12, "bis": 15, "name": "LED Effect 3", "art": ""},
+            {"von": 16, "bis": 19, "name": "LED Effect 4", "art": ""},
+            {"von": 20, "bis": 23, "name": "LED Effect 5", "art": ""},
+            {"von": 24, "bis": 27, "name": "LED Effect 6", "art": ""},
+            {"von": 28, "bis": 31, "name": "LED Effect 7", "art": ""},
+            {"von": 32, "bis": 35, "name": "LED Effect 8", "art": ""},
+            {"von": 36, "bis": 39, "name": "LED Effect 9", "art": ""},
+            {"von": 40, "bis": 43, "name": "LED Effect 10", "art": ""},
+            {"von": 44, "bis": 47, "name": "LED Effect 11", "art": ""},
+            {"von": 48, "bis": 51, "name": "LED Effect 12", "art": ""},
+            {"von": 52, "bis": 55, "name": "LED Effect 13", "art": ""},
+            {"von": 56, "bis": 59, "name": "LED Effect 14", "art": ""},
+            {"von": 60, "bis": 63, "name": "LED Effect 15", "art": ""},
+            {"von": 64, "bis": 67, "name": "LED Effect 16", "art": ""},
+            {"von": 68, "bis": 71, "name": "LED Effect 17", "art": ""},
+            {"von": 72, "bis": 75, "name": "LED Effect 18", "art": ""},
+            {"von": 76, "bis": 79, "name": "LED Effect 19", "art": ""},
+            {"von": 80, "bis": 83, "name": "LED Effect 20", "art": ""},
+            {"von": 84, "bis": 87, "name": "LED Effect 21", "art": ""},
+            {"von": 88, "bis": 91, "name": "LED Effect 22", "art": ""},
+            {"von": 92, "bis": 95, "name": "LED Effect 23", "art": ""},
+            {"von": 96, "bis": 99, "name": "LED Effect 24", "art": ""},
+            {"von": 100, "bis": 103, "name": "LED Effect 25", "art": ""},
+            {"von": 104, "bis": 107, "name": "LED Effect 26", "art": ""},
+            {"von": 108, "bis": 111, "name": "LED Effect 27", "art": ""},
+            {"von": 112, "bis": 255, "name": "LED Effect auto", "art": ""}
+          ]
+        },
+        {
+          "name": "LED Effect Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Effect forward slow to fast", "art": ""},
+            {"von": 128, "bis": 255, "name": "Effect reverse slow to fast", "art": ""}
+          ]
+        },
+        {"name": "Background Color Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Background Color Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Background Color Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Background Color White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 249, "name": "No function", "art": ""},
+            {"von": 250, "bis": 255, "name": "Reset", "art": "reset"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "49 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Zoom", "attribut": "zoom", "default": 0, "highlight": 0},
+        {
+          "name": "Bienenauge Drehung",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "0 to 360 degrees", "art": ""},
+            {"von": 128, "bis": 192, "name": "Rotate CCW Fast to slow", "art": "rotate"},
+            {"von": 193, "bis": 255, "name": "Rotate CW Slow to fast", "art": "rotate"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe slow to fast", "art": "strobe"}
+          ]
+        },
+        {"name": "Foreground Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Foreground Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Foreground Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Foreground White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Farbtemperatur",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": ""},
+            {"von": 10, "bis": 255, "name": "Color temperature selection", "art": ""}
+          ]
+        },
+        {
+          "name": "LED Effect",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 3, "name": "No fucntion", "art": ""},
+            {"von": 4, "bis": 7, "name": "LED Effect 1", "art": ""},
+            {"von": 8, "bis": 11, "name": "LED Effect 2", "art": ""},
+            {"von": 12, "bis": 15, "name": "LED Effect 3", "art": ""},
+            {"von": 16, "bis": 19, "name": "LED Effect 4", "art": ""},
+            {"von": 20, "bis": 23, "name": "LED Effect 5", "art": ""},
+            {"von": 24, "bis": 27, "name": "LED Effect 6", "art": ""},
+            {"von": 28, "bis": 31, "name": "LED Effect 7", "art": ""},
+            {"von": 32, "bis": 35, "name": "LED Effect 8", "art": ""},
+            {"von": 36, "bis": 39, "name": "LED Effect 9", "art": ""},
+            {"von": 40, "bis": 43, "name": "LED Effect 10", "art": ""},
+            {"von": 44, "bis": 47, "name": "LED Effect 11", "art": ""},
+            {"von": 48, "bis": 51, "name": "LED Effect 12", "art": ""},
+            {"von": 52, "bis": 55, "name": "LED Effect 13", "art": ""},
+            {"von": 56, "bis": 59, "name": "LED Effect 14", "art": ""},
+            {"von": 60, "bis": 63, "name": "LED Effect 15", "art": ""},
+            {"von": 64, "bis": 67, "name": "LED Effect 16", "art": ""},
+            {"von": 68, "bis": 71, "name": "LED Effect 17", "art": ""},
+            {"von": 72, "bis": 75, "name": "LED Effect 18", "art": ""},
+            {"von": 76, "bis": 79, "name": "LED Effect 19", "art": ""},
+            {"von": 80, "bis": 83, "name": "LED Effect 20", "art": ""},
+            {"von": 84, "bis": 87, "name": "LED Effect 21", "art": ""},
+            {"von": 88, "bis": 91, "name": "LED Effect 22", "art": ""},
+            {"von": 92, "bis": 95, "name": "LED Effect 23", "art": ""},
+            {"von": 96, "bis": 99, "name": "LED Effect 24", "art": ""},
+            {"von": 100, "bis": 103, "name": "LED Effect 25", "art": ""},
+            {"von": 104, "bis": 107, "name": "LED Effect 26", "art": ""},
+            {"von": 108, "bis": 111, "name": "LED Effect 27", "art": ""},
+            {"von": 112, "bis": 255, "name": "LED Effect auto", "art": ""}
+          ]
+        },
+        {
+          "name": "LED Effect Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Effect forward slow to fast", "art": ""},
+            {"von": 128, "bis": 255, "name": "Effect reverse slow to fast", "art": ""}
+          ]
+        },
+        {"name": "Background Color Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Background Color Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Background Color Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Background Color White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 249, "name": "No function", "art": ""},
+            {"von": 250, "bis": 255, "name": "Reset", "art": "reset"}
+          ]
+        },
+        {"name": "LED 1 Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "LED 1 Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "LED 1 Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "LED 1 White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "LED 2 Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "LED 2 Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "LED 2 Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "LED 2 White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "LED 3 Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "LED 3 Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "LED 3 Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "LED 3 White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "LED 4 Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "LED 4 Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "LED 4 Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "LED 4 White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "LED 5 Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "LED 5 Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "LED 5 Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "LED 5 White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "LED 6 Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "LED 6 Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "LED 6 Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "LED 6 White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "LED 7 Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "LED 7 Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "LED 7 Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "LED 7 White", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    }
+  ]
+}

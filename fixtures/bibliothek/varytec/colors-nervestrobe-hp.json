@@ -16,7 +16,7 @@
     "lizenz": "Apache-2.0",
     "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.14.0 GIT · Giacomo & Michel",
     "original": "resources/fixtures/Varytec/Varytec-Colors-NerveStrobe-HP.qxf",
-    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 267 Wertebereiche mit Art (kind) versehen; Rasterform in 6 Modus/Modi aus <Physical> uebernommen; gegen Herstellerhandbuch r2 (2022-07-06) abgeglichen; Kanal- und Bereichsnamen deutsch; typ led_bar → strobe; Strobe-Kanäle mit vollständigen Bereichen (offen/Blackout/Effekte), Default/Highlight 0 = LEDs an (vorher 2); Blitzdauer-Kanal von shutter auf duration; Farbmakros von color_wheel auf macro, 15 Farben benannt; Muster-Kanäle mit 16 Mustern, Tempo von speed auf effect_speed; Raster 2 × 6 laut Segmentbild statt 1 × 6, 16-Kanal-Modus 2 × 1 (zwei Segmentgruppen); Kurzname, Notizen"
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 267 Wertebereiche mit Art (kind) versehen; Rasterform in 3 Modus/Modi aus <Physical> uebernommen; in 3 weiteren Modus/Modi nicht, weil sie nicht zu den color_r-Kanaelen passt (keine echten Farbzonen); gegen Herstellerhandbuch r2 (2022-07-06) abgeglichen; Kanal- und Bereichsnamen deutsch; typ led_bar → strobe; Strobe-Kanäle mit vollständigen Bereichen (offen/Blackout/Effekte), Default/Highlight 0 = LEDs an (vorher 2); Blitzdauer-Kanal von shutter auf duration; Farbmakros von color_wheel auf macro, 15 Farben benannt; Muster-Kanäle mit 16 Mustern, Tempo von speed auf effect_speed; Raster 2 × 6 laut Segmentbild statt 1 × 6, 16-Kanal-Modus 2 × 1 (zwei Segmentgruppen); Kurzname, Notizen"
   },
   "autor": "LightOS (QXF-Konverter, nachbearbeitet FM-57)",
   "geprueft": {
@@ -26,7 +26,6 @@
   "modi": [
     {
       "name": "3 Channel",
-      "raster": {"rows": 2, "cols": 6},
       "kanaele": [
         {"name": "Weißleiste Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
         {
@@ -77,7 +76,6 @@
     },
     {
       "name": "6 Channel",
-      "raster": {"rows": 2, "cols": 6},
       "kanaele": [
         {"name": "Weißleiste Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
         {
@@ -156,7 +154,6 @@
     },
     {
       "name": "12 Channel",
-      "raster": {"rows": 2, "cols": 6},
       "kanaele": [
         {"name": "Weißleiste Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
         {
