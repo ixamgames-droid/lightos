@@ -56,7 +56,6 @@
 | FM-58 | A | feat/fm58-bibliothek-runde2 | 2026-10-02T18:20Z | fixtures/bibliothek |
 | SAMMEL-DOKU-C | A | sammel/doku-c | 2026-10-02T22:08Z | docs · BACKLOG.md |
 | UI-74 | A | fix/ui74-profile-bearbeiten | 2026-10-04T17:07Z | src/ui/widgets/fixture_editor.py · src/ui/widgets/bibliothek_download_dialog.py · fixtures/bibliothek/eurolite |
-| OUT-61 | B | fix/out61-estop-lade-fenster | 2026-10-04T17:33Z | src/core/dmx/output_manager.py · tests/test_out61_estop_lade_fenster.py · BACKLOG.md |
 | OUT-61-FOLGE | B | fix/out61-folge-atomar | 2026-10-04T17:41Z | src/core/dmx/output_manager.py |
 | VIZ-68 | B | feat/viz68-objekt-bibliothek | 2026-10-04T17:55Z | src/ui/visualizer/scene_src/stage/stage_objects.js · src/ui/visualizer/scene_src/stage/docking.js · src/ui/visualizer/scene_src/interaction/tools.js · src/ui/visualizer/visualizer_window.py · src/core/stage/stage_definition.py · src/core/stage/scene_graph.py · tests/test_viz68_objekt_bibliothek.py · BACKLOG.md |
 | BACKLOG-0410 | A | docs/backlog-stand-0410 | 2026-10-04T18:58Z | BACKLOG.md |
@@ -173,7 +172,6 @@
 
 ## Verlauf
 
-- 2026-10-04T17:15Z B done GATE-B-0410
 - 2026-10-04T17:15Z B claim SICHT-B-0410
 - 2026-10-04T17:18Z B done SICHT-B-0410
 - 2026-10-04T17:24Z B aktualisiert OUT-60-FOLGE: Dateien src/core/dmx/output_manager.py · src/core/dmx/serial_process.py · tests/test_out60_load_kein_null_frame.py · tests/test_out59_waisen_windows.py -> src/core/dmx/output_manager.py · src/core/dmx/serial_process.py
@@ -203,3 +201,4 @@
 - 2026-10-04T21:18Z A done VIZ-67
 - 2026-10-04T22:43Z C done TOOL-2
 - 2026-10-04T23:10Z A done VIZ-70
+- 2026-10-04T23:30Z B done OUT-61
