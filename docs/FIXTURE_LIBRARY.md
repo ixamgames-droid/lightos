@@ -276,13 +276,20 @@ Ein gespeichertes Profil öffnet man über **Datenbank → „Fixture-Profil bea
 (Suche nach Hersteller/Modell) oder im Patch per Rechtsklick auf ein Gerät →
 **„Profil bearbeiten…“**.
 
-- **Eigene Profile** (`source = "user"`) werden im Fixture-Editor bearbeitet und an Ort
-  und Stelle gespeichert; die Profil-ID bleibt.
-- **Mitgelieferte** (`builtin`, `lightos`) und **QLC+-Importe** (`qlcplus`) lassen sich
-  nur **ansehen** (Speichern gesperrt) oder **als eigenes Profil kopieren** — die Kopie
-  bekommt den Zusatz „(eigen)“ am Modellnamen und `source = "user"`. Grund: die nächste
+- **Eigene Profile** (`source = "user"`) und **QLC+-Importe** (`qlcplus`) werden im
+  Fixture-Editor bearbeitet und an Ort und Stelle gespeichert; die Profil-ID bleibt. Der
+  QLC+-Download überspringt ein Profil, das es unter Hersteller + Modell schon gibt — die
+  Änderung bleibt also stehen.
+- **Mitgelieferte** (`builtin`, `lightos`) lassen sich nur **ansehen** (Speichern, Import
+  und die Modus-/Kanal-Knöpfe gesperrt) oder **als eigenes Profil kopieren** — die Kopie
+  bekommt den Zusatz „(eigen)“ am Modellnamen und `source = "user"`; Herkunft (Lizenz),
+  Notizen und 3D-Modell übernimmt sie vom Original. Grund: die nächste
   Bibliotheks-Aktualisierung bzw. `ensure_builtins()` schriebe eine Änderung am Original
-  still zurück.
+  still zurück. Der Editor prüft die Quelle selbst, auch ohne „nur ansehen“ vom Aufrufer.
+- **Kopie aus dem Patch:** Wird ein mitgeliefertes Profil per Rechtsklick im Patch
+  kopiert, fragt LightOS danach, ob die gepatchten Geräte auf die Kopie umgehängt werden
+  sollen — nur Geräte, deren Modus (Name und Kanalzahl) es in der Kopie gibt; die übrigen
+  bleiben beim Original, mit Hinweis. Das Umhängen ist **ein** Rückgängig-Schritt.
 - **Gepatchte Profile:** Der Editor baut beim Speichern alle Modi neu (neue Modus-IDs).
   Das bricht keinen Patch — gepatchte Geräte verweisen auf `fixture_profile_id` +
   `mode_name` (+ ihre Kanalzahl), nie auf eine Modus-ID. Brechen kann, was man im Editor
@@ -291,6 +298,8 @@ Ein gespeichertes Profil öffnet man über **Datenbank → „Fixture-Profil bea
   Adressen) oder Hersteller/Modell umbenennen (die Show trägt die alten Namen). In diesen
   Fällen zeigt der Editor vor dem Speichern die betroffenen Geräte der geladenen Show und
   fragt nach; Standard ist „Nein“. Andere Show-Dateien werden nicht geprüft.
+- Modusnamen müssen eindeutig sein — der Editor speichert keine zwei Modi gleichen Namens
+  (gepatchte Geräte finden ihren Modus über Profil + Modusname).
 - Ein zweites Profil unter demselben Hersteller + Modell legt der Editor nicht an
   (FM-43: mehrdeutige Auflösung beim Laden einer Show). Hersteller werden ohne
   Groß-/Kleinschreibung wiedergefunden — „eurolite“ landet bei „Eurolite“; dasselbe gilt

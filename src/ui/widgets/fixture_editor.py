@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QBrush, QColor
 from sqlalchemy.orm import Session
-from sqlalchemy import func, select, delete
+from sqlalchemy import select, delete
 from src.core.database.fixture_db import engine, segment_wert
 from src.core.database.models import (
     Manufacturer, FixtureProfile, FixtureMode, FixtureChannel, ChannelRange,
@@ -95,7 +95,12 @@ def profil_patch_folgen(fixture_id, gepatchte, modi_neu, *,
                  if getattr(f, "fixture_profile_id", None) == fixture_id]
     if not betroffen:
         return []
-    neu = {str(n): int(k) for n, k in modi_neu}
+    # UI-74 (Review): je Name ALLE Kanalzahlen — ein dict ``{name: zahl}``
+    # fasste doppelte Modusnamen still zusammen (der letzte gewann), und die
+    # Meldung beschrieb einen Modus, den es so nicht gab.
+    neu: dict[str, list[int]] = {}
+    for n, k in modi_neu:
+        neu.setdefault(str(n), []).append(int(k))
     out: list[str] = []
     for f in betroffen:
         label = getattr(f, "label", "") or f"Gerät {getattr(f, 'fid', '?')}"
@@ -103,8 +108,11 @@ def profil_patch_folgen(fixture_id, gepatchte, modi_neu, *,
         if modus not in neu:
             out.append(f"„{label}“: Modus „{modus}“ gibt es nicht mehr — das "
                        f"Gerät liefe still mit einem anderen Modus.")
-        elif int(getattr(f, "channel_count", 0) or 0) != neu[modus]:
-            out.append(f"„{label}“: Modus „{modus}“ hat jetzt {neu[modus]} statt "
+        elif len(neu[modus]) > 1:
+            out.append(f"„{label}“: Modus „{modus}“ gibt es {len(neu[modus])}-mal "
+                       f"— welcher gilt, wäre Zufall.")
+        elif int(getattr(f, "channel_count", 0) or 0) != neu[modus][0]:
+            out.append(f"„{label}“: Modus „{modus}“ hat jetzt {neu[modus][0]} statt "
                        f"{int(getattr(f, 'channel_count', 0) or 0)} Kanäle — "
                        f"Adressen und Überlappungen im Patch prüfen.")
     if name_alt and name_neu and tuple(name_alt) != tuple(name_neu):
@@ -264,10 +272,17 @@ class _ModeTab(QWidget):
             "Kanalreihenfolge es eindeutig hergibt (z. B. Dimmer direkt vor "
             "seinem Weiß). Bitte am Gerät oder im Handbuch prüfen.")
         self._btn_vorschlag.clicked.connect(self._on_vorschlag)
-        for b in (btn_add, btn_del, btn_up, btn_down, self._btn_vorschlag):
+        #: UI-74: die Kanal-Knoepfe — im Ansehen-Modus gesperrt.
+        self._kanal_knoepfe = (btn_add, btn_del, btn_up, btn_down, self._btn_vorschlag)
+        for b in self._kanal_knoepfe:
             btn_row.addWidget(b)
         btn_row.addStretch(1)
         layout.addLayout(btn_row)
+
+    def nur_ansehen(self) -> None:
+        """UI-74: Kanal-Knoepfe sperren (Profil wird nur angesehen)."""
+        for b in self._kanal_knoepfe:
+            b.setEnabled(False)
 
     @staticmethod
     def _geo_spin(tooltip: str) -> QSpinBox:
@@ -521,13 +536,19 @@ class FixtureEditorDialog(QDialog):
         self.setWindowTitle("Fixture Editor")
         self.setMinimumSize(720, 560)
         self._fixture_id = fixture_id   # None = neu, sonst bearbeiten
-        # UI-74: mitgelieferte Profile (builtin/lightos) und QLC+-Importe
-        # werden NICHT an Ort und Stelle bearbeitet — die naechste
-        # Bibliotheks-Aktualisierung ueberschriebe die Aenderung. Sie lassen
-        # sich ansehen (Speichern gesperrt) oder als eigenes Profil kopieren
-        # (gleicher Inhalt, neues Profil mit source="user").
+        # UI-74: mitgelieferte Profile (builtin/lightos) werden NICHT an Ort
+        # und Stelle bearbeitet — die naechste Bibliotheks-Aktualisierung
+        # ueberschriebe die Aenderung. Sie lassen sich ansehen (Speichern
+        # gesperrt) oder als eigenes Profil kopieren (gleicher Inhalt, neues
+        # Profil mit source="user"). Eigene Profile und QLC+-Importe sind
+        # direkt bearbeitbar (``profil_bearbeitbar``).
         self._nur_ansehen = bool(nur_ansehen)
         self._als_kopie = bool(als_kopie)
+        #: UI-74: ``source`` des geladenen Profils (None = neues Profil).
+        self._source_geladen: str | None = None
+        #: UI-74 (Review): Original einer Kopie — Herkunft (Lizenz), Notizen
+        #: und 3D-Modell reisen beim Speichern mit.
+        self._kopie_von: int | None = None
         #: (Hersteller, Modell) wie geladen — fuer die Patch-Folgen beim Speichern.
         self._name_geladen: tuple[str, str] | None = None
         # ★ FM-36: das Ergebnisfeld existiert ab hier — vorher legte es
@@ -548,20 +569,38 @@ class FixtureEditorDialog(QDialog):
                 # ein eigenes daneben. Der Modellname bekommt einen Zusatz,
                 # sonst stuende dasselbe Geraet zweimal in der Bibliothek
                 # (FM-43: mehrdeutige Aufloesung beim Laden einer Show).
+                self._kopie_von = self._fixture_id
                 self._fixture_id = None
                 self._name_geladen = None
                 self._edit_name.setText(f"{self._edit_name.text()} (eigen)")
                 self.setWindowTitle("Fixture Editor — Kopie als eigenes Profil")
-            elif self._nur_ansehen:
-                self.setWindowTitle("Fixture Editor — nur ansehen "
-                                    "(mitgeliefertes Profil)")
-                self._btn_save.setEnabled(False)
-                self._btn_save.setToolTip(
-                    "Mitgelieferte und importierte Profile werden nicht "
-                    "überschrieben — „Als eigenes Profil kopieren“ nutzen.")
+            else:
+                # UI-74 (Review): der Editor prueft die Quelle SELBST — ein
+                # Aufrufer ohne Flag ueberschrieb sonst ein mitgeliefertes
+                # Profil, das die naechste Aktualisierung still zuruecksetzt.
+                from src.ui.widgets.profil_auswahl_dialog import profil_bearbeitbar
+                if (self._source_geladen is not None
+                        and not profil_bearbeitbar(self._source_geladen)):
+                    self._nur_ansehen = True
+                if self._nur_ansehen:
+                    self._sperren_zum_ansehen()
         else:
             # Mit einem Default-Mode starten
             self._add_mode(name="Default")
+
+    def _sperren_zum_ansehen(self) -> None:
+        """UI-74: Ansehen-Modus — Speichern, Import und alle Knoepfe, die Modi
+        oder Kanaele aendern, sind gesperrt. Export bleibt offen."""
+        self.setWindowTitle("Fixture Editor — nur ansehen (mitgeliefertes Profil)")
+        self._btn_save.setEnabled(False)
+        self._btn_save.setToolTip(
+            "Mitgelieferte Profile werden nicht überschrieben — "
+            "„Als eigenes Profil kopieren“ nutzen.")
+        for b in (self._btn_lightos_import, self._btn_add_mode,
+                  self._btn_rename_mode, self._btn_del_mode):
+            b.setEnabled(False)
+        for i in range(self._tabs.count()):
+            self._tabs.widget(i).nur_ansehen()
 
     def _setup_ui(self):
         root = QVBoxLayout(self)
@@ -600,15 +639,15 @@ class FixtureEditorDialog(QDialog):
         mb_layout.addWidget(self._tabs)
 
         mode_btn_row = QHBoxLayout()
-        btn_add_mode = QPushButton("+ Mode")
-        btn_add_mode.clicked.connect(lambda: self._add_mode())
-        btn_rename_mode = QPushButton("Umbenennen")
-        btn_rename_mode.clicked.connect(self._rename_mode)
-        btn_del_mode = QPushButton("- Mode")
-        btn_del_mode.clicked.connect(self._del_mode)
-        mode_btn_row.addWidget(btn_add_mode)
-        mode_btn_row.addWidget(btn_rename_mode)
-        mode_btn_row.addWidget(btn_del_mode)
+        self._btn_add_mode = QPushButton("+ Mode")
+        self._btn_add_mode.clicked.connect(lambda: self._add_mode())
+        self._btn_rename_mode = QPushButton("Umbenennen")
+        self._btn_rename_mode.clicked.connect(self._rename_mode)
+        self._btn_del_mode = QPushButton("- Mode")
+        self._btn_del_mode.clicked.connect(self._del_mode)
+        mode_btn_row.addWidget(self._btn_add_mode)
+        mode_btn_row.addWidget(self._btn_rename_mode)
+        mode_btn_row.addWidget(self._btn_del_mode)
         mode_btn_row.addStretch(1)
         mb_layout.addLayout(mode_btn_row)
 
@@ -617,7 +656,8 @@ class FixtureEditorDialog(QDialog):
         # FM-56: eigenes Profil im eigenen Format (LightOS-Profil, JSON) —
         # Austausch zwischen Rechnern, Grundlage der Geraete-Bibliothek.
         lightos_row = QHBoxLayout()
-        btn_lightos_import = QPushButton("LightOS-Profil importieren…")
+        self._btn_lightos_import = btn_lightos_import = QPushButton(
+            "LightOS-Profil importieren…")
         btn_lightos_import.setToolTip(
             "Eine LightOS-Profil-Datei (.json) als eigenes Profil anlegen")
         btn_lightos_import.clicked.connect(lambda: self._lightos_import())
@@ -709,8 +749,12 @@ class FixtureEditorDialog(QDialog):
                 Manufacturer.name == hersteller.strip())).scalar_one_or_none()
             if mfr is not None and mfr.short_name:
                 extra["hersteller_kurz"] = mfr.short_name
-            if self._fixture_id is not None:
-                prof = BF._profil_laden(s, self._fixture_id)
+            # UI-74 (Review): auch die noch ungespeicherte Kopie traegt die
+            # Herkunft ihres Originals (eine QLC+-Vorlage bleibt Apache-2.0).
+            quelle_id = (self._fixture_id if self._fixture_id is not None
+                         else self._kopie_von)
+            if quelle_id is not None:
+                prof = BF._profil_laden(s, quelle_id)
                 if prof is not None:
                     extra["herkunft"] = BF.herkunft_fuer(prof)
                     extra["notizen"] = prof.notes or ""
@@ -769,6 +813,8 @@ class FixtureEditorDialog(QDialog):
         """LightOS-Profil-Datei als eigenes Profil anlegen und den Dialog
         schliessen (wie Speichern: ``saved_id`` traegt die neue ID)."""
         from src.core.database import bibliothek_format as BF
+        if self._nur_ansehen:
+            return None            # UI-74: zweiter Riegel neben dem Knopf
         if self._hat_inhalt():
             antwort = QMessageBox.question(
                 self, "LightOS-Profil importieren",
@@ -863,6 +909,7 @@ class FixtureEditorDialog(QDialog):
             self._cb_manufacturer.setCurrentText(mfr.name if mfr else "")
             self._edit_name.setText(profile.name)
             self._name_geladen = (mfr.name if mfr else "", profile.name)
+            self._source_geladen = profile.source or ""
             self._edit_short.setText(profile.short_name)
             self._cb_type.setCurrentText(profile.fixture_type)
             self._spin_power.setValue(profile.power_w)
@@ -904,6 +951,36 @@ class FixtureEditorDialog(QDialog):
             if self._tabs.count() == 0:
                 self._add_mode()
 
+    def _neues_profil(self, s, mfr, name: str) -> FixtureProfile:
+        """Neues eigenes Profil (``source='user'``). Ist es die Kopie eines
+        anderen Profils, uebernimmt es dessen Herkunft (Lizenz!), Notizen und
+        3D-Modell — der Editor zeigt die Felder nicht, verlieren darf die
+        Kopie sie trotzdem nicht (UI-74, Review)."""
+        profile = FixtureProfile(
+            manufacturer_id=mfr.id, name=name,
+            short_name=self._edit_short.text().strip() or name[:8].upper(),
+            fixture_type=self._cb_type.currentText(),
+            power_w=self._spin_power.value(), source="user",
+        )
+        orig = (s.get(FixtureProfile, self._kopie_von)
+                if self._kopie_von is not None else None)
+        if orig is not None:
+            from src.core.database import bibliothek_format as BF
+            herkunft = orig.herkunft or ""
+            if not herkunft:
+                # Nicht gespeichert (aeltere Importe): aus der Quelle des
+                # Originals ableiten — als „user“ ginge sie sonst als „eigen“.
+                try:
+                    herkunft = BF._herkunft_json(BF.herkunft_fuer(orig))
+                except BF.ProfilFehler:
+                    herkunft = ""
+            profile.herkunft = herkunft
+            profile.notes = orig.notes or ""
+            profile.viz_model = orig.viz_model or ""
+        s.add(profile)
+        s.flush()
+        return profile
+
     def _save(self):
         mfr_name = self._cb_manufacturer.currentText().strip()
         name = self._edit_name.text().strip()
@@ -932,17 +1009,31 @@ class FixtureEditorDialog(QDialog):
                 return
             modes_data.append((mname, chans, description, grid, weiss))
 
+        # UI-74 (Review): zwei Modi gleichen Namens sind nicht aufloesbar —
+        # gepatchte Geraete finden ihren Modus ueber Profil + Modusname.
+        namen = [m[0] for m in modes_data]
+        doppelt = sorted({n for n in namen if namen.count(n) > 1})
+        if doppelt:
+            QMessageBox.warning(
+                self, "Speichern",
+                "Modusnamen müssen eindeutig sein — doppelt: "
+                + ", ".join(f"„{n}“" for n in doppelt) + ".")
+            return
+
         if self._nur_ansehen and self._fixture_id is not None:
             # UI-74: zweiter Riegel neben dem gesperrten Knopf.
             return
 
         # UI-74: kein zweites Profil unter demselben Hersteller + Modell —
         # beim Laden einer Show waere die Aufloesung mehrdeutig (FM-43).
+        # Hersteller per ``casefold`` in Python, nicht SQL ``lower()`` (das
+        # faltet in SQLite nur ASCII, s. ``hersteller_ohne_gross_klein``).
+        from src.core.database.bibliothek_format import hersteller_ohne_gross_klein
         with Session(engine()) as s:
             gleich = s.execute(
                 select(FixtureProfile.id)
-                .join(Manufacturer, FixtureProfile.manufacturer_id == Manufacturer.id)
-                .where(func.lower(Manufacturer.name) == mfr_name.lower(),
+                .where(FixtureProfile.manufacturer_id.in_(
+                           [m.id for m in hersteller_ohne_gross_klein(s, mfr_name)]),
                        FixtureProfile.name == name)
             ).scalars().all()
         if any(pid != self._fixture_id for pid in gleich):
@@ -978,9 +1069,8 @@ class FixtureEditorDialog(QDialog):
             if not mfr:
                 # UI-74: „eurolite“ getippt -> der vorhandene „Eurolite“, kein
                 # zweiter Hersteller nur wegen der Schreibweise.
-                mfr = s.execute(select(Manufacturer).where(
-                    func.lower(Manufacturer.name) == mfr_name.lower())
-                    .order_by(Manufacturer.id)).scalars().first()
+                gleich_h = hersteller_ohne_gross_klein(s, mfr_name)
+                mfr = gleich_h[0] if gleich_h else None
             if not mfr:
                 mfr = Manufacturer(name=mfr_name, short_name=mfr_name[:8].upper())
                 s.add(mfr)
@@ -1007,23 +1097,9 @@ class FixtureEditorDialog(QDialog):
                         s.delete(_m)
                     s.flush()
                 else:
-                    profile = FixtureProfile(
-                        manufacturer_id=mfr.id, name=name,
-                        short_name=self._edit_short.text().strip() or name[:8].upper(),
-                        fixture_type=self._cb_type.currentText(),
-                        power_w=self._spin_power.value(), source="user",
-                    )
-                    s.add(profile)
-                    s.flush()
+                    profile = self._neues_profil(s, mfr, name)
             else:
-                profile = FixtureProfile(
-                    manufacturer_id=mfr.id, name=name,
-                    short_name=self._edit_short.text().strip() or name[:8].upper(),
-                    fixture_type=self._cb_type.currentText(),
-                    power_w=self._spin_power.value(), source="user",
-                )
-                s.add(profile)
-                s.flush()
+                profile = self._neues_profil(s, mfr, name)
 
             for mname, chans, description, grid, weiss in modes_data:
                 mode = FixtureMode(

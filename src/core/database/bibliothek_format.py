@@ -827,8 +827,24 @@ def _provenance(daten: dict) -> str:
     return " · ".join(teile)[:200]
 
 
+def hersteller_ohne_gross_klein(s, name: str) -> list:
+    """UI-74: alle Hersteller, deren Name ohne Gross/klein ``name`` ist —
+    aeltester zuerst.
+
+    ★ Verglichen wird in PYTHON (``casefold``), NICHT ueber SQL ``lower()``:
+    SQLite faltet dort nur ASCII. ``lower('Ölwerk')`` bleibt „Ölwerk“, Pythons
+    ``'Ölwerk'.lower()`` ist „ölwerk“ — der Vergleich fand den Hersteller nie,
+    auch nicht in exakt gleicher Schreibweise, und jeder Abgleich legte das
+    Profil ein weiteres Mal an. Dieselbe Faltung wie ``einspielen``."""
+    from sqlalchemy import select
+    from .models import Manufacturer
+    ziel = (name or "").strip().casefold()
+    return [m for m in s.execute(select(Manufacturer).order_by(Manufacturer.id)).scalars()
+            if (m.name or "").strip().casefold() == ziel]
+
+
 def _hersteller(s, daten: dict):
-    from sqlalchemy import func, select
+    from sqlalchemy import select
     from .models import Manufacturer
     name = daten["hersteller"].strip()
     # ★ NUR ueber den Namen (der ist eindeutig). ``_get_or_create_mfr`` sucht
@@ -840,9 +856,8 @@ def _hersteller(s, daten: dict):
         # einen ZWEITEN Hersteller an — in der Geraeteauswahl zwei Ordner
         # fuer dieselbe Firma, das Geraet im falschen. Die exakte Schreibweise
         # gewinnt (oben), sonst der aelteste Eintrag.
-        m = s.execute(select(Manufacturer)
-                      .where(func.lower(Manufacturer.name) == name.lower())
-                      .order_by(Manufacturer.id)).scalars().first()
+        gleich = hersteller_ohne_gross_klein(s, name)
+        m = gleich[0] if gleich else None
     if m is None:
         kurz = (daten.get("hersteller_kurz") or slug(name).replace("-", "")[:8]).upper()
         m = Manufacturer(name=name, short_name=kurz[:20])
@@ -931,7 +946,7 @@ def _abgleichen(s, daten: dict) -> str:
       stuende das Geraet zweimal in der Bibliothek, und eine Show von einem
       anderen Rechner loeste mehrdeutig auf (FM-43). Die Uebernahme eines
       Builtins in eine Datei ist ein eigener Migrationsschritt."""
-    from sqlalchemy import func, select
+    from sqlalchemy import select
     from sqlalchemy.orm import selectinload
     from .models import FixtureChannel, FixtureMode, FixtureProfile, Manufacturer
     name_h, modell = daten["hersteller"].strip(), daten["modell"].strip()
@@ -944,7 +959,8 @@ def _abgleichen(s, daten: dict) -> str:
         # UI-74: Hersteller ohne Gross/klein — wie `_hersteller`. Sonst fand
         # eine korrigierte Schreibweise das schon eingespielte Profil nicht
         # wieder und legte es ein zweites Mal an.
-        .where(func.lower(Manufacturer.name) == name_h.lower(),
+        .where(Manufacturer.id.in_(
+                   [m.id for m in hersteller_ohne_gross_klein(s, name_h)]),
                FixtureProfile.name == modell)
         .order_by(FixtureProfile.id)).scalars().all()
     if any(p.source != SOURCE_LIGHTOS for p in vorhanden):
@@ -1086,7 +1102,7 @@ def importiere(pfad_oder_daten, *, engine=None) -> int:
     Gibt die neue Profil-ID zurueck. Gibt es Hersteller + Modell schon, wird
     nichts angelegt (``ValueError``) — eine stille Dublette waere beim Laden
     einer Show genau die Mehrdeutigkeit, die FM-43 meldet."""
-    from sqlalchemy import func, select
+    from sqlalchemy import select
     from sqlalchemy.orm import Session
     from . import fixture_db
     from .models import FixtureProfile, Manufacturer
@@ -1103,7 +1119,8 @@ def importiere(pfad_oder_daten, *, engine=None) -> int:
             select(FixtureProfile.id, FixtureProfile.source)
             .join(Manufacturer, FixtureProfile.manufacturer_id == Manufacturer.id)
             # UI-74: Hersteller ohne Gross/klein (s. `_hersteller`).
-            .where(func.lower(Manufacturer.name) == daten["hersteller"].strip().lower(),
+            .where(Manufacturer.id.in_(
+                       [m.id for m in hersteller_ohne_gross_klein(s, daten["hersteller"])]),
                    FixtureProfile.name == daten["modell"].strip())).first()
         if da is not None:
             raise ValueError(

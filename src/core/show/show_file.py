@@ -436,7 +436,7 @@ def _resolve_fixture_profile_id(profile_id: int, manufacturer_name: str,
             if current is not None:
                 current_mfr = getattr(current.manufacturer, "name", "") or ""
                 if (current.name == fixture_name and
-                        (not manufacturer_name or current_mfr == manufacturer_name)):
+                        (not manufacturer_name or current_mfr.casefold() == manufacturer_name.casefold())):
                     return profile_id
 
             query = (

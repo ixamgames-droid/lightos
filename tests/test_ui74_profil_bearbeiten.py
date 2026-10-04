@@ -1,8 +1,8 @@
 """UI-74: fuenf Befunde aus dem Bebildern der Geraete-Bibliothek (DOC-57).
 
 1. Ein gespeichertes eigenes Profil laesst sich wieder oeffnen: Menue
-   Datenbank -> „Fixture-Profil bearbeiten...“ (Suche, nur ``source='user'``
-   editierbar, sonst ansehen / als eigenes Profil kopieren) und im Patch ein
+   Datenbank -> „Fixture-Profil bearbeiten...“ (Suche, ``source`` 'user' und
+   'qlcplus' editierbar, sonst ansehen / als eigenes Profil kopieren) und im Patch ein
    Kontextmenue „Profil bearbeiten“. Bearbeiten eines GEPATCHTEN Profils
    warnt, wenn Modusname, Kanalzahl oder Name sich aendern — gepatchte
    Geraete haengen an Profil-ID + Modusname, nicht an Modus-IDs.
@@ -141,10 +141,10 @@ class AuswahlDialogTest(_TempDB, unittest.TestCase):
                          ["Eigenbau Par"])
         self.assertEqual(auswahl_module.profile_suchen("gibtsnicht"), [])
 
-    def test_nur_eigene_profile_sind_bearbeitbar(self):
+    def test_eigene_und_importierte_profile_sind_bearbeitbar(self):
         dlg = auswahl_module.ProfilAuswahlDialog()
         erwartet = {"Eigenbau Par": (True, False), "Bibliothek Par": (False, True),
-                    "Import Par": (False, True)}
+                    "Import Par": (True, False)}
         for i in range(dlg._liste.topLevelItemCount()):
             it = dlg._liste.topLevelItem(i)
             dlg._liste.setCurrentItem(it)
@@ -420,6 +420,286 @@ class HerstellerSchreibweiseTest(unittest.TestCase):
             self.assertEqual(len(s.scalars(select(FixtureProfile)).all()), 1)
         self.assertIn(("Eurolite", ["Par 7"]), self._hersteller())
         self.assertIn(("EuroLite", []), self._hersteller())
+
+
+# ── Review-Befunde ─────────────────────────────────────────────────────────
+
+class DoppelteModiTest(_TempDB, unittest.TestCase):
+    """Doppelte oder umbenannte Modi duerfen nicht zum Absturz fuehren."""
+
+    def _patch(self, modus="4-Kanal", n=4):
+        return PatchedFixture(fid=1, label="Par links", fixture_profile_id=self.pid_user,
+                              mode_name=modus, universe=1, address=1, channel_count=n)
+
+    def test_editor_lehnt_doppelten_modusnamen_ab(self):
+        dlg = editor_module.FixtureEditorDialog(fixture_id=self.pid_user)
+        dlg._tabs.widget(1).mode_name = "4-Kanal"
+        dlg._save()
+        self.assertIsNone(dlg.saved_id)
+        editor_module.QMessageBox.warning.assert_called()
+        self.assertIn("4-Kanal", editor_module.QMessageBox.warning.call_args[0][2])
+        self.assertEqual(self._modi(self.pid_user), [("4-Kanal", 4), ("6-Kanal", 6)])
+
+    def test_folgen_fassen_doppelte_namen_nicht_zusammen(self):
+        folgen = editor_module.profil_patch_folgen(
+            self.pid_user, [self._patch()], [("4-Kanal", 4), ("4-Kanal", 6)])
+        self.assertEqual(len(folgen), 1)
+        self.assertIn("2-mal", folgen[0])
+
+    def test_resolve_mode_mit_gleicher_kanalzahl_wirft_nicht(self):
+        from src.core import app_state
+        with Session(self.engine) as s:
+            pid = _profil(s, s.get(FixtureProfile, self.pid_user).manufacturer, "Zwilling",
+                          "user", modi=(("A", 4), ("B", 4)))
+            s.commit()
+            erst = s.scalars(select(FixtureMode.id).where(
+                FixtureMode.fixture_id == pid).order_by(FixtureMode.id)).first()
+            weg = SimpleNamespace(fixture_profile_id=pid, mode_name="weg", channel_count=4)
+            self.assertEqual(app_state._resolve_mode(s, weg).id, erst)
+
+    def test_resolve_mode_mit_doppeltem_namen_wirft_nicht(self):
+        from src.core import app_state
+        with Session(self.engine) as s:
+            pid = _profil(s, s.get(FixtureProfile, self.pid_user).manufacturer, "Doppel",
+                          "user", modi=(("A", 4), ("A", 6)))
+            s.commit()
+            f = SimpleNamespace(fixture_profile_id=pid, mode_name="A", channel_count=6)
+            self.assertEqual(app_state._resolve_mode(s, f).channel_count, 4)
+
+
+class NichtAsciiHerstellerTest(_TempDB, unittest.TestCase):
+    """SQLite ``lower()`` faltet nur ASCII — „Ölwerk“ fand sich nie wieder."""
+
+    def setUp(self):
+        super().setUp()
+        with Session(self.engine) as s:
+            _profil(s, Manufacturer(name="Ölwerk", short_name="OW"), "Par", "lightos")
+            s.commit()
+
+    def _hersteller(self):
+        with Session(self.engine) as s:
+            return sorted(m.name for m in s.scalars(select(Manufacturer)))
+
+    def test_abgleich_legt_keine_dublette_an(self):
+        daten = _datei(hersteller="Ölwerk", modell="Lib")
+        ergebnisse = []
+        for _ in range(3):
+            with Session(self.engine) as s:
+                ergebnisse.append(BF._abgleichen(s, daten))
+                s.commit()
+        self.assertEqual(ergebnisse, ["neu", "gleich", "gleich"])
+        self.assertEqual(sum(1 for n, _s in self._profile() if n == "Lib"), 1)
+
+    def test_editor_riegel_findet_nicht_ascii_hersteller(self):
+        dlg = editor_module.FixtureEditorDialog()
+        dlg._cb_manufacturer.setCurrentText("ölwerk")
+        dlg._edit_name.setText("Par")
+        dlg._tabs.widget(0)._add_channel()
+        dlg._save()
+        self.assertIsNone(dlg.saved_id)
+        self.assertEqual(sum(1 for n, _s in self._profile() if n == "Par"), 1)
+
+    def test_editor_hersteller_suche_ohne_gross_klein(self):
+        for getippt, modell in (("ölwerk", "Neu 1"), ("ÖLWERK", "Neu 2"),
+                                ("testwerk", "Neu 3")):
+            dlg = editor_module.FixtureEditorDialog()
+            dlg._cb_manufacturer.setCurrentText(getippt)
+            dlg._edit_name.setText(modell)
+            dlg._tabs.widget(0)._add_channel()
+            dlg._save()
+            self.assertIsNotNone(dlg.saved_id, getippt)
+        self.assertEqual(self._hersteller(), ["Testwerk", "Ölwerk"])
+        with Session(self.engine) as s:
+            self.assertEqual(s.get(FixtureProfile, dlg.saved_id).manufacturer.name,
+                             "Testwerk")
+
+    def test_importiere_riegel_ohne_gross_klein(self):
+        for hersteller, modell in (("ölwerk", "Par"), ("ÖLWERK", "Par"),
+                                   ("TESTWERK", "Eigenbau Par")):
+            with self.subTest(hersteller=hersteller):
+                with self.assertRaises(ValueError):
+                    BF.importiere(_datei(hersteller=hersteller, modell=modell),
+                                  engine=self.engine)
+        self.assertEqual(self._hersteller(), ["Testwerk", "Ölwerk"])
+
+
+class KopieTraegtHerkunftTest(_TempDB, unittest.TestCase):
+
+    def test_herkunft_notizen_und_3d_modell_reisen_mit(self):
+        h = _herkunft_json()
+        with Session(self.engine) as s:
+            p = s.get(FixtureProfile, self.pid_qlc)
+            p.herkunft, p.notes, p.viz_model = h, "wichtige Notiz", "par_can"
+            s.commit()
+        dlg = editor_module.FixtureEditorDialog(fixture_id=self.pid_qlc, als_kopie=True)
+        dlg._save()
+        with Session(self.engine) as s:
+            k = s.get(FixtureProfile, dlg.saved_id)
+            self.assertEqual((k.source, k.herkunft, k.notes, k.viz_model),
+                             ("user", h, "wichtige Notiz", "par_can"))
+
+    def test_ohne_gespeicherte_herkunft_bleibt_die_lizenz(self):
+        dlg = editor_module.FixtureEditorDialog(fixture_id=self.pid_qlc, als_kopie=True)
+        dlg._save()
+        with Session(self.engine) as s:
+            k = s.get(FixtureProfile, dlg.saved_id)
+            self.assertEqual(BF.herkunft_fuer(k)["herkunft"]["lizenz"], "Apache-2.0")
+
+
+class _State:
+    """Ersatz fuer den AppState: gepatchte Geraete + ``update_fixture``."""
+
+    def __init__(self, geraete):
+        self.geraete = {f.fid: f for f in geraete}
+
+    def get_patched_fixtures(self):
+        return list(self.geraete.values())
+
+    def update_fixture(self, fid, undoable=True, **werte):
+        for k, v in werte.items():
+            setattr(self.geraete[fid], k, v)
+        return True
+
+
+class UmhaengenTest(_TempDB, unittest.TestCase):
+    """Kopie aus dem Patch: gepatchte Geraete auf die Kopie umhaengen."""
+
+    def setUp(self):
+        super().setUp()
+        with Session(self.engine) as s:
+            m = s.get(FixtureProfile, self.pid_lightos).manufacturer
+            self.pid_kopie = _profil(s, m, "Bibliothek Par (eigen)", "user")
+            s.commit()
+        self.passt = PatchedFixture(
+            fid=1, label="Par 1", fixture_profile_id=self.pid_lightos, mode_name="4-Kanal",
+            universe=1, address=1, channel_count=4, manufacturer_name="Testwerk",
+            fixture_name="Bibliothek Par")
+        self.passt_nicht = PatchedFixture(
+            fid=2, label="Par 2", fixture_profile_id=self.pid_lightos, mode_name="8-Kanal",
+            universe=1, address=5, channel_count=8, manufacturer_name="Testwerk",
+            fixture_name="Bibliothek Par")
+        self.fremd = PatchedFixture(
+            fid=3, label="Eigen", fixture_profile_id=self.pid_user, mode_name="4-Kanal",
+            universe=1, address=20, channel_count=4)
+        self.state = _State([self.passt, self.passt_nicht, self.fremd])
+        from src.core.undo import UndoStack
+        self.stack = UndoStack()
+        p = mock.patch("src.core.undo.get_undo_stack", lambda: self.stack)
+        p.start()
+        self.addCleanup(p.stop)
+
+    def _umhaengen(self, antwort):
+        with mock.patch.object(auswahl_module.QMessageBox, "question",
+                               return_value=antwort) as frage, \
+                mock.patch.object(auswahl_module.QMessageBox, "information") as info:
+            n = auswahl_module.geraete_auf_kopie_umhaengen(
+                None, self.pid_lightos, self.pid_kopie, state=self.state)
+        return n, frage, info
+
+    def test_ja_haengt_nur_passende_um_und_ist_ein_undo_schritt(self):
+        n, frage, _info = self._umhaengen(QMessageBox.StandardButton.Yes)
+        self.assertEqual(n, 1)
+        self.assertIn("Par 1", frage.call_args[0][2])
+        self.assertEqual((self.passt.fixture_profile_id, self.passt.fixture_name),
+                         (self.pid_kopie, "Bibliothek Par (eigen)"))
+        self.assertEqual(self.passt_nicht.fixture_profile_id, self.pid_lightos)
+        self.assertEqual(self.fremd.fixture_profile_id, self.pid_user)
+        self.assertTrue(self.stack.undo())
+        self.assertEqual((self.passt.fixture_profile_id, self.passt.fixture_name),
+                         (self.pid_lightos, "Bibliothek Par"))
+        self.assertFalse(self.stack.can_undo())
+
+    def test_nein_aendert_nichts(self):
+        n, _frage, _info = self._umhaengen(QMessageBox.StandardButton.No)
+        self.assertEqual(n, 0)
+        self.assertEqual(self.passt.fixture_profile_id, self.pid_lightos)
+        self.assertFalse(self.stack.can_undo())
+
+    def test_ohne_passenden_modus_nur_hinweis(self):
+        del self.state.geraete[1]
+        n, frage, info = self._umhaengen(QMessageBox.StandardButton.Yes)
+        self.assertEqual(n, 0)
+        frage.assert_not_called()
+        info.assert_called_once()
+        self.assertEqual(self.passt_nicht.fixture_profile_id, self.pid_lightos)
+
+    def test_patch_einstieg_bietet_umhaengen_nach_kopie_an(self):
+        aufrufe = []
+        with mock.patch.object(auswahl_module, "profil_oeffnen",
+                               lambda _p, pid, wie: self.pid_kopie), \
+                mock.patch.object(auswahl_module, "geraete_auf_kopie_umhaengen",
+                                  lambda _p, alt, neu: aufrufe.append((alt, neu))), \
+                mock.patch.object(auswahl_module.QMessageBox, "exec"), \
+                mock.patch.object(auswahl_module.QMessageBox, "clickedButton") as geklickt:
+            geklickt.side_effect = lambda: geklickt._box_knopf
+            orig_add = auswahl_module.QMessageBox.addButton
+
+            def add(box, *a, **kw):
+                b = orig_add(box, *a, **kw)
+                if a and a[0] == "Als eigenes Profil kopieren…":
+                    geklickt._box_knopf = b
+                return b
+            with mock.patch.object(auswahl_module.QMessageBox, "addButton", add):
+                auswahl_module.profil_bearbeiten_fuer(None, self.pid_lightos)
+        self.assertEqual(aufrufe, [(self.pid_lightos, self.pid_kopie)])
+
+
+class QuelleUndAnsehenTest(_TempDB, unittest.TestCase):
+
+    def test_qlcplus_direkt_bearbeitbar_mitgelieferte_nicht(self):
+        f = auswahl_module.profil_bearbeitbar
+        self.assertEqual([f(q) for q in ("user", "qlcplus", "QLCPLUS", "lightos",
+                                         "builtin", "", None)],
+                         [True, True, True, False, False, False, False])
+
+    def test_qlcplus_import_speichert_an_ort_und_stelle(self):
+        dlg = editor_module.FixtureEditorDialog(fixture_id=self.pid_qlc)
+        self.assertTrue(dlg._btn_save.isEnabled())
+        dlg._edit_short.setText("NEU")
+        dlg._save()
+        self.assertEqual(dlg.saved_id, self.pid_qlc)
+        with Session(self.engine) as s:
+            p = s.get(FixtureProfile, self.pid_qlc)
+            self.assertEqual((p.source, p.short_name), ("qlcplus", "NEU"))
+
+    def test_editor_ohne_flag_sperrt_mitgeliefertes_profil(self):
+        dlg = editor_module.FixtureEditorDialog(fixture_id=self.pid_lightos)
+        self.assertFalse(dlg._btn_save.isEnabled())
+        dlg._edit_short.setText("HACK")
+        dlg._save()
+        self.assertIsNone(dlg.saved_id)
+        with Session(self.engine) as s:
+            self.assertNotEqual(s.get(FixtureProfile, self.pid_lightos).short_name, "HACK")
+
+    def test_ansehen_sperrt_import_modus_und_kanal_knoepfe(self):
+        dlg = editor_module.FixtureEditorDialog(fixture_id=self.pid_lightos,
+                                                nur_ansehen=True)
+        for b in (dlg._btn_lightos_import, dlg._btn_add_mode, dlg._btn_rename_mode,
+                  dlg._btn_del_mode, *dlg._tabs.widget(0)._kanal_knoepfe):
+            with self.subTest(knopf=b.text()):
+                self.assertFalse(b.isEnabled())
+        pfad = os.path.join(tempfile.mkdtemp(prefix="lightos_ui74_"), "p.json")
+        self.addCleanup(shutil.rmtree, os.path.dirname(pfad), True)
+        BF.schreibe(_datei(hersteller="Fremd", modell="Neu"), pfad)
+        self.assertIsNone(dlg._lightos_import(pfad))         # zweiter Riegel
+        self.assertNotIn(("Neu", "user"), self._profile())
+
+    def test_bearbeiten_laesst_knoepfe_offen(self):
+        dlg = editor_module.FixtureEditorDialog(fixture_id=self.pid_user)
+        for b in (dlg._btn_lightos_import, dlg._btn_add_mode,
+                  *dlg._tabs.widget(0)._kanal_knoepfe):
+            self.assertTrue(b.isEnabled(), b.text())
+
+
+class ShowHerstellerSchreibweiseTest(_TempDB, unittest.TestCase):
+
+    def test_andere_schreibweise_warnt_nicht(self):
+        from src.core.show import show_file as SF
+        SF._ladeprobleme.clear()
+        self.addCleanup(SF._ladeprobleme.clear)
+        self.assertEqual(SF._resolve_fixture_profile_id(self.pid_user, "TESTWERK",
+                                                        "Eigenbau Par"), self.pid_user)
+        self.assertEqual(SF._ladeprobleme, [])
 
 
 if __name__ == "__main__":
