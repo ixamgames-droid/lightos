@@ -67,6 +67,7 @@
 | VIZ-69 | A | perf/viz69-render-ruckler | 2026-10-04T18:00Z | src/ui/visualizer/scene_src/fixtures · src/ui/visualizer/scene_src/scene · tools/viz_render_benchmark.py |
 | VIZ-70 | A | perf/viz70-ui-thread | 2026-10-04T18:00Z | src/ui/visualizer/visualizer_service.py · src/ui/views/live_view.py · src/ui/views/simple_desk.py |
 | BACKLOG-0410 | A | docs/backlog-stand-0410 | 2026-10-04T18:58Z | BACKLOG.md |
+| FM-63 | A | feat/fm63-lightos-profile-vorrang | 2026-10-04T19:01Z | - |
 
 ## Blocker & Fallen
 
@@ -174,7 +175,6 @@
 
 ## Verlauf
 
-- 2026-10-02T22:46Z A claim FM-60
 - 2026-10-02T22:51Z A claim FM-61
 - 2026-10-02T23:30Z B done OUT-59
 - 2026-10-02T23:57Z B done OUT-60
@@ -204,3 +204,4 @@
 - 2026-10-04T18:39Z B done OUT-60-folge
 - 2026-10-04T18:43Z B done UI-72-73-FIX
 - 2026-10-04T18:58Z A claim BACKLOG-0410
+- 2026-10-04T19:01Z A claim FM-63
