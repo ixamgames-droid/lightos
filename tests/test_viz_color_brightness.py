@@ -269,6 +269,7 @@ from PySide6.QtWebEngineCore import (QWebEngineProfile,          # noqa: E402
 from PySide6.QtWebEngineWidgets import QWebEngineView            # noqa: E402
 from PySide6.QtWidgets import QApplication                       # noqa: E402
 from _qt_lifecycle import destroy_webengine_view  # XPLAT-09
+from _viz_dmx import dmx_push as _dmx_push  # VIZ-71: DMX per runJavaScript wie die Produktion
 
 _app = QApplication.instance() or QApplication([])
 
@@ -403,7 +404,7 @@ class LuminanceCullingJsTest(unittest.TestCase):
     def _push_dmx(self, r, g, b, intensity, fid=21, pan=128, tilt=128):
         payload = json.dumps([{"fid": fid, "r": r, "g": g, "b": b,
                                "intensity": intensity, "pan": pan, "tilt": tilt}])
-        self._bridge_obj.dmxBatch.emit(payload)
+        _dmx_push(self._view, payload)
 
     def test_black_at_full_dimmer_is_culled_bright_color_is_visible(self):
         self._load_and_wait()

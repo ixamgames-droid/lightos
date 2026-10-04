@@ -22,6 +22,7 @@ import { deg2rad } from '../scene/renderer.js';
 import { requestRender } from '../scene/render_loop.js';
 import { makeFixtureLabel, disposeFixtureLabel } from './labels.js';  // VIZ-14
 import { updateEmptyState } from '../empty_state.js';
+import { cachedDmx } from './dmx_cache.js';   // VIZ-71
 
 // fixtureMeshes: Raycast-Cache, kein geteilter Modul-State laut Design-
 // Dokument "Kern-Gotcha" (ehem. stage_scene.html:1026).
@@ -523,7 +524,12 @@ export function addFixture(data) {
   syncSpotShadowBudget();
   rebuildFixtureMeshList();
   updateEmptyState();   // VIZ-14: erstes Geraet da -> Hinweis weg
-  updateFixture(fid, data.r||0, data.g||0, data.b||0, data.intensity||0, data.pan||128, data.tilt||128, data.heads||null);
+  // VIZ-71 (N1/N2): mit dem zuletzt angekommenen DMX-Stand bauen, nicht mit
+  // den festen Nullen aus der Geraeteliste — sonst blieb ein neu gebautes
+  // Geraet dunkel bzw. in Mittelstellung, bis sich sein DMX wieder aenderte.
+  const src = cachedDmx(fid) || data;
+  updateFixture(fid, src.r ?? 0, src.g ?? 0, src.b ?? 0, src.intensity ?? 0,
+                src.pan ?? 128, src.tilt ?? 128, src.heads || null);
 }
 
 export function removeFixture(fid) {

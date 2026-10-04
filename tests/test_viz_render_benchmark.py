@@ -25,7 +25,7 @@ import unittest
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _WERKZEUG = os.path.join(_REPO, "tools", "viz_render_benchmark.py")
 _BRIDGE_JS = os.path.join(_REPO, "src", "ui", "visualizer", "scene_src",
-                          "bridge", "bridge.js")
+                          "bridge", "dmx_apply.js")  # VIZ-71
 
 
 def _quelle() -> str:
@@ -42,20 +42,20 @@ class BenchmarkNutzlastTest(unittest.TestCase):
         Genau so entstand die zurueckgezogene Baseline vom 2026-08-03.
         """
         quelle = _quelle()
-        stelle = quelle.index("dmxBatch.emit")
+        stelle = quelle.index("applyDmx(")
         umgebung = quelle[stelle:stelle + 400]
         self.assertIn("json.dumps([", umgebung,
-                      "dmxBatch bekommt keine LISTE — der Handler iteriert aber")
+                      "applyDmx bekommt keine LISTE — die Szene iteriert aber")
 
     def test_dmxbatch_nutzt_die_feldnamen_der_bruecke(self):
         """`d.fid`, `d.r/g/b`, `d.intensity` — nicht `red`/`green`/`blue`."""
         handler = open(_BRIDGE_JS, encoding="utf-8").read()
-        stelle = handler.index("dmxBatch")
+        stelle = handler.index("export function applyDmxEntry")
         felder = re.findall(r"d\.([a-zA-Z]+)", handler[stelle:stelle + 400])
         self.assertIn("fid", felder, "Testannahme kaputt: Bruecke liest kein d.fid")
 
         quelle = _quelle()
-        block = quelle[quelle.index("dmxBatch.emit"):][:400]
+        block = quelle[quelle.index("applyDmx("):][:400]
         for feld in ("fid", "r", "g", "b", "intensity"):
             self.assertIn(f'"{feld}"', block,
                           f"die Nutzlast nennt kein {feld!r} — die Bruecke liest es")

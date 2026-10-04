@@ -6,7 +6,9 @@ import * as THREE from '../three/three.js';
 import { renderer, scene, PIXEL_RATIO_CAP, gpuTier } from '../scene/renderer.js';
 import { applyBrightness } from '../scene/lights.js';
 import { fixtures, settings, stageObjects, view } from '../state.js';
-import { addFixture, removeFixture, updateFixture } from '../fixtures/fixtures.js';
+import { addFixture, removeFixture } from '../fixtures/fixtures.js';
+import { applyDmx } from './dmx_apply.js';                                // VIZ-71
+import { forgetDmx, pruneDmxCache } from '../fixtures/dmx_cache.js';      // VIZ-71
 import { resyncBeamVisibility } from '../fixtures/builders.js';
 import { setBeamsOff } from '../state.js';   // VIZ-15
 import { setViewMode } from '../stage/view_mode.js';
@@ -281,18 +283,16 @@ export function tryChannel() {
       bridge = channel.objects.bridge;
       if (bridge) {
         if (bridge.fixtureAdded)   bridge.fixtureAdded.connect(j => { addFixture(JSON.parse(j)); });
-        if (bridge.fixtureRemoved) bridge.fixtureRemoved.connect(fid => { removeFixture(fid); });
-        // VIZ-13 3c-4: Legacy-Einzel-Handler bridge.dmxUpdated ENTFERNT — der
-        // Service pusht ausschliesslich als Batch-Array ueber dmxBatch (der Body
-        // ruft dasselbe updateFixture pro Element auf).
-        if (bridge.dmxBatch)       bridge.dmxBatch.connect(j => {
-          const arr = JSON.parse(j);
-          for (const d of arr) {
-            updateFixture(d.fid, d.r, d.g, d.b, d.intensity, d.pan||128, d.tilt||128, d.heads||null);
-          }
-        });
+        if (bridge.fixtureRemoved) bridge.fixtureRemoved.connect(fid => { removeFixture(fid); forgetDmx(fid); });
+        // VIZ-71: KEIN dmxBatch-Handler mehr. Die DMX-Werte schiebt Python per
+        // runJavaScript direkt an window.__lightos.applyDmx (visualizer/
+        // dmx_push.py); der Rueckfall laeuft ueber den Poll unten. Ein hier
+        // verbundenes Signal liesse den QWebChannel-Publisher jedes Senden
+        // serialisieren — Arbeit fuer einen Weg, der nach dem Laden ohnehin
+        // nicht zustellt (s. Poll-Kommentar).
         if (bridge.allFixtures)    bridge.allFixtures.connect(j => {
           const list = JSON.parse(j);
+          pruneDmxCache(list.map(f => f.fid));
           list.forEach(f => addFixture(f));
           // VIZ-12: JETZT sind die Fixture-Objekte gebaut — Service um den
           // vollen DMX-Bestand bitten. Ein zeitgesteuerter Push von Python
@@ -393,7 +393,11 @@ export function tryChannel() {
                   // anwenden. addFixture ist idempotent (ersetzt vorhandene fid).
                   if (s.fixtures && s.fixtures !== _pFix) {
                     _pFix = s.fixtures;
-                    try { JSON.parse(s.fixtures).forEach(f => addFixture(f)); } catch (eF) {}
+                    try {
+                      const list = JSON.parse(s.fixtures);
+                      pruneDmxCache(list.map(f => f.fid));   // VIZ-71: Reste alter Shows
+                      list.forEach(f => addFixture(f));
+                    } catch (eF) {}
                   }
                   // VIZ-14 (Slice 1b): globale/Programmer-Auswahl -> Outlines im
                   // 3D. Idempotent (nur bei geaenderter Liste), OHNE Echo zurueck
@@ -408,11 +412,10 @@ export function tryChannel() {
                     // und uebersprunge den DANACH folgenden events-Block - waehrend
                     // Python die Event-Queue beim Ausliefern schon geleert hat. Ein
                     // DMX-Problem darf keine Kamera-/Transform-/Stage-Events fressen.
+                    // VIZ-71: derselbe Weg wie der Push (Sequenznummern je
+                    // Eintrag in s.dmxSeq; unbekannte fids landen im Cache).
                     try {
-                      const arr = JSON.parse(s.dmx);
-                      for (const d of arr) {
-                        updateFixture(d.fid, d.r, d.g, d.b, d.intensity, d.pan||128, d.tilt||128, d.heads||null);
-                      }
+                      applyDmx(JSON.parse(s.dmx), s.dmxSeq);
                     } catch (e) { console.log('poll dmx: Batch uebersprungen', e); }
                   }
                   // Einmal-Events: genau einmal ausfuehren (Python leert die Queue).
@@ -435,7 +438,7 @@ export function tryChannel() {
                         else if (ev.t === 'cameraPreset') setCameraPreset(ev.name);
                         else if (ev.t === 'namedCameras') setNamedCameras(JSON.parse(ev.j));
                         else if (ev.t === 'fixtureAdded') { try { addFixture(JSON.parse(ev.j)); } catch (eA) {} }
-                        else if (ev.t === 'fixtureRemoved') removeFixture(ev.fid);
+                        else if (ev.t === 'fixtureRemoved') { removeFixture(ev.fid); forgetDmx(ev.fid); }
                       } catch (e2) {}
                     }
                   }

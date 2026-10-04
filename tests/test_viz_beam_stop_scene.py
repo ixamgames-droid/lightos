@@ -28,6 +28,7 @@ from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEngineProfile
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtCore import QObject, QUrl, Signal, Slot
 from _qt_lifecycle import destroy_webengine_view  # XPLAT-09
+from _viz_dmx import dmx_push as _dmx_push  # VIZ-71: DMX per runJavaScript wie die Produktion
 
 _app = QApplication.instance() or QApplication([])
 
@@ -184,7 +185,7 @@ class BeamStopSceneTest(unittest.TestCase):
         self._poll_until_true(f"!!window.__lightos.stageObjects['{sid}']")
 
     def _dmx(self, fid, intensity=255):
-        self._bridge_obj.dmxBatch.emit(json.dumps([{
+        _dmx_push(self._view, json.dumps([{
             "fid": fid, "intensity": intensity, "r": 255, "g": 255, "b": 255,
             "pan": 128, "tilt": 128,
         }]))

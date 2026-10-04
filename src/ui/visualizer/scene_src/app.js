@@ -48,6 +48,8 @@ import { setMouseFromCoords, intersectGround, mouse } from './interaction/pickin
 import { fabDelete, fabRotate, fabPlace, wireTouchLateBindings } from './interaction/touch.js';
 
 import { getBridge, tryChannel, jsAddStageObject } from './bridge/bridge.js';
+import { applyDmx } from './bridge/dmx_apply.js';                  // VIZ-71
+import { dmxCacheInfo } from './fixtures/dmx_cache.js';           // VIZ-71
 import { removeFixture as _removeFixtureForTouch, syncSpotShadowBudget,
          beamFalloffTexture } from './fixtures/fixtures.js';  // VIZ-15
 import { updateLabelZoomVisibility } from './fixtures/labels.js';  // VIZ-14: Fixture-Label Zoom-Gate
@@ -258,6 +260,9 @@ window.__lightos = {
   dragDropAllowed: dropAllowed, pendingDragFid,
   __handlePointerDown: handlePointerDown,
   __handlePointerUp: handlePointerUp,
+  // VIZ-71: Ziel des DMX-Pushs (Python ruft das per runJavaScript; Rueckgabe
+  // ist eine ZAHL — Arrays kommen in PySide 6.11 als '' an) und Test-Seam.
+  applyDmx, dmxCacheInfo,
 };
 
 // Init-Flag fuer den Smoke-Test (VIZ-13 3a-4): belegt, dass app.js komplett

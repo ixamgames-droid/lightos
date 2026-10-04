@@ -33,6 +33,7 @@ from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEngineProfile
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtCore import QObject, QUrl, Signal, Slot
 from _qt_lifecycle import destroy_webengine_view  # XPLAT-09
+from _viz_dmx import dmx_push as _dmx_push  # VIZ-71: DMX per runJavaScript wie die Produktion
 
 _app = QApplication.instance() or QApplication([])
 
@@ -314,7 +315,7 @@ class TopDownPolishTest(unittest.TestCase):
             ],
         }])
         self._emit_until_true(
-            lambda: self._bridge_obj.dmxBatch.emit(batch_on),
+            lambda: _dmx_push(self._view, batch_on),
             "window.__lightos.fixtures['12'].icon.userData.cells[0]"
             ".material.color.getHex() === 0xff0000", timeout_s=8.0)
         raw = self._eval("""
@@ -336,19 +337,19 @@ class TopDownPolishTest(unittest.TestCase):
             "heads": [{"r": 255, "g": 0, "b": 0}],
         }])
         self._emit_until_true(
-            lambda: self._bridge_obj.dmxBatch.emit(batch_off),
+            lambda: _dmx_push(self._view, batch_off),
             f"window.__lightos.fixtures['12'].icon.userData.cells[0]"
             f".material.color.getHex() === {ICON_UNLIT_FILL}", timeout_s=8.0)
 
         # Single-Body (PAR): Ausgabefarbe an, Unlit-Fill aus.
         par_on = json.dumps([{"fid": 11, "r": 255, "g": 0, "b": 0, "intensity": 255}])
         self._emit_until_true(
-            lambda: self._bridge_obj.dmxBatch.emit(par_on),
+            lambda: _dmx_push(self._view, par_on),
             "window.__lightos.fixtures['11'].icon.userData.body"
             ".material.color.getHex() === 0xff0000", timeout_s=8.0)
         par_off = json.dumps([{"fid": 11, "r": 255, "g": 0, "b": 0, "intensity": 0}])
         self._emit_until_true(
-            lambda: self._bridge_obj.dmxBatch.emit(par_off),
+            lambda: _dmx_push(self._view, par_off),
             f"window.__lightos.fixtures['11'].icon.userData.body"
             f".material.color.getHex() === {ICON_UNLIT_FILL}", timeout_s=8.0)
 
@@ -358,7 +359,7 @@ class TopDownPolishTest(unittest.TestCase):
             "fid": 16, "r": 40, "g": 120, "b": 255, "intensity": 200,
         }])
         self._emit_until_true(
-            lambda: self._bridge_obj.dmxBatch.emit(other_on),
+            lambda: _dmx_push(self._view, other_on),
             "window.__lightos.fixtures['16'].lamp.material.emissive.getHex() "
             "=== 0x2878ff", timeout_s=8.0)
         self.assertEqual(

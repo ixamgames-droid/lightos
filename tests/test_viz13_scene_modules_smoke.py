@@ -51,6 +51,7 @@ from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEngineProfile
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtCore import QObject, QUrl, Signal, Slot
 from _qt_lifecycle import destroy_webengine_view  # XPLAT-09
+from _viz_dmx import dmx_push as _dmx_push  # VIZ-71: DMX per runJavaScript wie die Produktion
 
 _app = QApplication.instance() or QApplication([])
 
@@ -781,14 +782,14 @@ class SceneModulesSmokeTest(unittest.TestCase):
         # Aufdrehen ueber den echten dmxBatch-Pfad -> Licht wird wieder aktiv.
         lit_batch = json.dumps([{"fid": 700001, "r": 255, "g": 40, "b": 0, "intensity": 255}])
         lit = self._emit_until_true(
-            lambda: self._bridge_obj.dmxBatch.emit(lit_batch),
+            lambda: _dmx_push(self._view, lit_batch),
             "window.__lightos.fixtures['700001'].spot.intensity > 0",
             timeout_s=5.0)
         self.assertTrue(lit, "Aufgedrehter SpotLight leuchtet nicht wieder")
         # Und wieder dunkel -> intensity 0, Sichtbarkeit bleibt (VIZ-69).
         dark_batch = json.dumps([{"fid": 700001, "r": 0, "g": 0, "b": 0, "intensity": 0}])
         dark_again = self._emit_until_true(
-            lambda: self._bridge_obj.dmxBatch.emit(dark_batch),
+            lambda: _dmx_push(self._view, dark_batch),
             "window.__lightos.fixtures['700001'].spot.intensity === 0"
             " && window.__lightos.fixtures['700001'].spot.visible === true",
             timeout_s=5.0)
@@ -837,7 +838,7 @@ class SceneModulesSmokeTest(unittest.TestCase):
             "!!window.__lightos.fixtures['810']", timeout_s=5.0)
         lit = json.dumps([{"fid": 810, "r": 255, "g": 0, "b": 0, "intensity": 255}])
         ok = self._emit_until_true(
-            lambda: self._bridge_obj.dmxBatch.emit(lit),
+            lambda: _dmx_push(self._view, lit),
             "(function(){ const f = window.__lightos.fixtures['810'];"
             " if (!f || !f.bars) return false;"
             " return f.bars.some(bar => bar.lenses.some("
@@ -1017,7 +1018,7 @@ class SceneModulesSmokeTest(unittest.TestCase):
         self.assertTrue(0.24 <= hx <= 0.30 and hy <= 0.40 and 0.46 <= hz <= 0.56, d["hazer"])
         lit = json.dumps([{"fid": 6603, "r": 255, "g": 255, "b": 255, "intensity": 255}])
         ok = self._emit_until_true(
-            lambda: self._bridge_obj.dmxBatch.emit(lit),
+            lambda: _dmx_push(self._view, lit),
             "window.__lightos.fixtures['6603'].lamp.material.emissiveIntensity > 0.5",
             timeout_s=5.0)
         self.assertTrue(ok, "Strobe-Reflektor leuchtet nicht mit dem DMX")
@@ -1042,7 +1043,7 @@ class SceneModulesSmokeTest(unittest.TestCase):
         lit = json.dumps([{"fid": 820, "r": 0, "g": 0, "b": 0,
                            "intensity": 255, "heads": heads}])
         ok = self._emit_until_true(
-            lambda: self._bridge_obj.dmxBatch.emit(lit),
+            lambda: _dmx_push(self._view, lit),
             "(function(){const f=window.__lightos.fixtures['820'];"
             " if(!f||!f.pixels||f.pixels.length!==64) return false;"
             " const p40=f.pixels[40].mesh.material, p0=f.pixels[0].mesh.material;"
@@ -1361,7 +1362,7 @@ class SceneModulesSmokeTest(unittest.TestCase):
             timeout_s=8.0)
         lit = json.dumps([{"fid": 555001, "r": 255, "g": 40, "b": 0, "intensity": 255}])
         all_lit = self._emit_until_true(
-            lambda: self._bridge_obj.dmxBatch.emit(lit),
+            lambda: _dmx_push(self._view, lit),
             "(function(){ const hs = window.__lightos.fixtures['555001'].parHeads;"
             " return hs.every(ph => ph.beam && ph.beam.visible === true"
             "                  && ph.beam.material.opacity > 0.01); })()",

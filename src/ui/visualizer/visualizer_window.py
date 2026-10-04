@@ -858,20 +858,63 @@ class VisualizerBridge(QObject):
             arr = json.loads(batch_json)
             if not isinstance(arr, list):
                 return
-            for d in arr:
-                fid = d.get("fid") if isinstance(d, dict) else None
-                if fid is None:
-                    continue
-                self._poll_dmx[fid] = d
-            over = len(self._poll_dmx) - self._poll_dmx_max
-            if over > 0:
-                # dicts halten Einfuegereihenfolge -> die aeltesten fids fallen.
-                for k in list(self._poll_dmx)[:over]:
-                    del self._poll_dmx[k]
+            self._poll_merge_entries((None, d) for d in arr)
         except Exception as e:
             # Ein defekter Batch darf weder werfen noch den bereits gesammelten
             # Puffer verwerfen.
             print(f"[Visualizer] _poll_set_dmx: Batch verworfen ({e})")
+
+    def _poll_merge_entries(self, entries) -> None:
+        """VIZ-71: ``(seq, payload)``-Paare in den Poll-Puffer mergen — der
+        Rueckfall des Push-Kanals (``dmx_push.DmxPushChannel``), solange die
+        Seite den Push noch nicht bestaetigt hat. ``seq`` ist die Tick-Nummer
+        des Service (``None`` = ohne Nummer, alter ``dmxBatch``-Weg); JS
+        verwirft damit einen Eintrag, den der Push schon ueberholt hat.
+
+        Gleiche Merge-Regel wie A3D-04: der Eintrag einer fid wird GANZ
+        ersetzt, nie per ``dict.update``."""
+        seqs = self.__dict__.setdefault("_poll_dmx_seq", {})
+        for seq, d in entries:
+            fid = d.get("fid") if isinstance(d, dict) else None
+            if fid is None:
+                continue
+            # pop + setzen: Einfuegereihenfolge = Aktualitaet, damit der
+            # Deckel unten wirklich die aeltesten fids wirft.
+            self._poll_dmx.pop(fid, None)
+            self._poll_dmx[fid] = d
+            seqs[fid] = seq
+        over = len(self._poll_dmx) - self._poll_dmx_max
+        if over > 0:
+            # dicts halten Einfuegereihenfolge -> die aeltesten fids fallen.
+            for k in list(self._poll_dmx)[:over]:
+                del self._poll_dmx[k]
+                seqs.pop(k, None)
+
+    def _poll_clear_dmx(self) -> None:
+        """VIZ-71: der Push ist bestaetigt — der Poll-Puffer hat ausgedient."""
+        self._poll_dmx = {}
+        self.__dict__["_poll_dmx_seq"] = {}
+
+    def _poll_take_dmx(self, out: dict) -> None:
+        """Aufgelaufene DMX-Eintraege in die Poll-Antwort legen und leeren.
+
+        A3D-04: ``out["dmx"]`` MUSS ein JSON-STRING bleiben — JS macht
+        `JSON.parse(s.dmx)`. Legte man hier die Liste selbst hinein, wuerfe
+        JSON.parse auf "[object Object]"; der Wurf landete im aeusseren catch
+        des Poll-Handlers und uebersprunge damit den DANACH folgenden
+        events-Block, waehrend Python die Event-Queue bereits geleert hat ->
+        stiller Totalverlust aller Einmal-Events in jedem Poll mit DMX.
+        VIZ-71: ``dmxSeq`` (Liste, gleiche Reihenfolge) nur, wenn mindestens ein
+        Eintrag eine Nummer traegt."""
+        if not self._poll_dmx:
+            return
+        seqs = self.__dict__.get("_poll_dmx_seq") or {}
+        out["dmx"] = json.dumps(list(self._poll_dmx.values()))
+        liste = [seqs.get(fid) for fid in self._poll_dmx]
+        if any(x is not None for x in liste):
+            out["dmxSeq"] = liste
+        self._poll_dmx = {}
+        self.__dict__["_poll_dmx_seq"] = {}
 
     @Slot(result=str)
     @_bridge_slot_guard
@@ -883,15 +926,7 @@ class VisualizerBridge(QObject):
         if self._poll_events:
             out["events"] = self._poll_events
             self._poll_events = []
-        if self._poll_dmx:
-            # A3D-04: ``out["dmx"]`` MUSS ein JSON-STRING bleiben — JS macht
-            # `JSON.parse(s.dmx)`. Legte man hier die Liste selbst hinein, wuerfe
-            # JSON.parse auf "[object Object]"; der Wurf landete im aeusseren catch
-            # des Poll-Handlers und uebersprunge damit den DANACH folgenden
-            # events-Block, waehrend Python die Event-Queue unten bereits geleert
-            # hat -> stiller Totalverlust aller Einmal-Events in jedem Poll mit DMX.
-            out["dmx"] = json.dumps(list(self._poll_dmx.values()))
-            self._poll_dmx = {}
+        VisualizerBridge._poll_take_dmx(self, out)
         try:
             return json.dumps(out)
         except Exception:

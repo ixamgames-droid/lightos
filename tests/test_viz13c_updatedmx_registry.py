@@ -42,6 +42,7 @@ from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEngineProfile
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtCore import QObject, QUrl, Signal, Slot
 from _qt_lifecycle import destroy_webengine_view  # XPLAT-09
+from _viz_dmx import dmx_push as _dmx_push  # VIZ-71: DMX per runJavaScript wie die Produktion
 
 _app = QApplication.instance() or QApplication([])
 
@@ -388,13 +389,13 @@ class UpdateDmxGoldenParityTest(unittest.TestCase):
 
         # ON-Batch anwenden (Wartekriterium: MH-Yoke hat rotiert).
         self._emit_until_true(
-            lambda: self._bridge_obj.dmxBatch.emit(_BATCH_ON),
+            lambda: _dmx_push(self._view, _BATCH_ON),
             "window.__lightos.fixtures['21'].yoke.rotation.y !== 0", timeout_s=8.0)
         actual_on = self._dump()
 
         # OFF-Batch anwenden (Wartekriterium: MH-Beam-Opacity auf 0).
         self._emit_until_true(
-            lambda: self._bridge_obj.dmxBatch.emit(_BATCH_OFF),
+            lambda: _dmx_push(self._view, _BATCH_OFF),
             "window.__lightos.fixtures['21'].beam.material.opacity === 0", timeout_s=8.0)
         actual_off = self._dump()
 
