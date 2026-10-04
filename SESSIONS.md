@@ -63,7 +63,7 @@
 | FM-59 | A | feat/fm59-bibliothek-runde3 | 2026-10-04T16:47Z | fixtures/bibliothek |
 | UI-72-73-FIX | B | fix/ui72-ui73-playback | 2026-10-02T22:44Z | src/ui/views/playback_view.py · src/core/cueliste_ziel.py · tests/test_ui72_ui73_playback.py |
 | FM-61 | A | feat/fm61-bibliothek-china | 2026-10-04T16:47Z | fixtures/bibliothek |
-| OUT-60-FOLGE | B | fix/out60-folge-masken | 2026-10-04T16:48Z | src/core/dmx/output_manager.py · src/core/dmx/serial_process.py · tests/test_out60_load_kein_null_frame.py · tests/test_out59_waisen_windows.py |
+| OUT-60-FOLGE | B | fix/out60-folge-masken | 2026-10-04T17:24Z | src/core/dmx/output_manager.py · src/core/dmx/serial_process.py |
 | DOC-57 | A | docs/doc57-bilder-bibliothek | 2026-10-04T16:49Z | docs · tools/anleitungsbilder |
 | UI-74 | A | fix/ui74-profile-bearbeiten | 2026-10-04T17:07Z | src/ui/widgets/fixture_editor.py · src/ui/widgets/bibliothek_download_dialog.py · fixtures/bibliothek/eurolite |
 
@@ -162,7 +162,6 @@
 
 ## Verlauf
 
-- 2026-10-02T19:08Z B done XPLAT-42
 - 2026-10-02T21:53Z B claim FUNKTIONSTEST-B3
 - 2026-10-02T22:02Z B claim UI-72
 - 2026-10-02T22:02Z B claim UI-73
@@ -192,3 +191,4 @@
 - 2026-10-04T17:15Z B done GATE-B-0410
 - 2026-10-04T17:15Z B claim SICHT-B-0410
 - 2026-10-04T17:18Z B done SICHT-B-0410
+- 2026-10-04T17:24Z B aktualisiert OUT-60-FOLGE: Dateien src/core/dmx/output_manager.py · src/core/dmx/serial_process.py · tests/test_out60_load_kein_null_frame.py · tests/test_out59_waisen_windows.py -> src/core/dmx/output_manager.py · src/core/dmx/serial_process.py
