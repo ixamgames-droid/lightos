@@ -1,0 +1,217 @@
+{
+  "format_version": 1,
+  "hersteller": "Stairville",
+  "hersteller_kurz": "STAIR",
+  "modell": "CLB2.4 Compact LED PAR System",
+  "kurzname": "CLB24",
+  "typ": "led_bar",
+  "leistung_w": 50,
+  "quelle": {
+    "titel": "Stairville CLB2.4 Compact LED PAR System, User Manual (Thomann, Art. 349574, v7)",
+    "url": "https://fast-images.static-thomann.de/pics/atg/atgdata/document/manual/349574_c_349574_v7_en_online.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.1 GIT · Patrick Rabl/Klaus Muth",
+    "original": "resources/fixtures/Stairville/Stairville-CLB2.4-CompactLED.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 46 Wertebereiche mit Art (kind) versehen; Rasterform in 2 Modus/Modi aus <Physical> uebernommen; in 4 weiteren Modus/Modi nicht, weil sie nicht zu den color_r-Kanaelen passt (keine echten Farbzonen); Typ led_bar statt par (Bar mit 4 einzeln steuerbaren PARs); Modi aufsteigend sortiert und umbenannt (2-/3-/4-/7-/8-/14-Kanal); 8-Kanal: Raster 1x2 statt 1x4 (je zwei PARs gemeinsam laut Handbuch); Strobe-Kanaele als strobe (nur Geschwindigkeit, kein Offen-Bereich im Handbuch) statt shutter; 2-Kanal: Festfarbe 'LEDs aus' ohne Art color, Weiss als open; Hinweis, dass Kanal 2 bei Show 02–14 die Geschwindigkeit ist; 7-Kanal: Kanal 6 als effect_speed statt speed, falsche Art sound entfernt; Kanal-/Bereichsnamen deutsch; Kurzname; hersteller_kurz STAIR; Quelle auf Herstellerhandbuch gesetzt"
+  },
+  "autor": "LightOS",
+  "geprueft": {"ok": true, "wie": "Kanal fuer Kanal gegen das Handbuch (Kap. 7.3–7.8, 2/3/4/7/8/14 Kanaele) geprueft"},
+  "modi": [
+    {
+      "name": "2-Kanal",
+      "kanaele": [
+        {
+          "name": "Automatik-Show",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 17, "name": "Automatik-Show 01"},
+            {"von": 18, "bis": 35, "name": "Automatik-Show 02"},
+            {"von": 36, "bis": 53, "name": "Automatik-Show 03"},
+            {"von": 54, "bis": 71, "name": "Automatik-Show 04"},
+            {"von": 72, "bis": 89, "name": "Automatik-Show 05"},
+            {"von": 90, "bis": 107, "name": "Automatik-Show 06"},
+            {"von": 108, "bis": 125, "name": "Automatik-Show 07"},
+            {"von": 126, "bis": 143, "name": "Automatik-Show 08"},
+            {"von": 144, "bis": 161, "name": "Automatik-Show 09"},
+            {"von": 162, "bis": 179, "name": "Automatik-Show 10"},
+            {"von": 180, "bis": 197, "name": "Automatik-Show 11"},
+            {"von": 198, "bis": 215, "name": "Automatik-Show 12"},
+            {"von": 216, "bis": 233, "name": "Automatik-Show 13"},
+            {"von": 234, "bis": 251, "name": "Automatik-Show 14"},
+            {"von": 252, "bis": 255, "name": "Musiksteuerung", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Festfarbe / Programm-Speed",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 17, "name": "Festfarbe LEDs aus"},
+            {"von": 18, "bis": 35, "name": "Festfarbe Cyan", "art": "color"},
+            {"von": 36, "bis": 53, "name": "Festfarbe Lila", "art": "color"},
+            {"von": 54, "bis": 71, "name": "Festfarbe Pink", "art": "color"},
+            {"von": 72, "bis": 89, "name": "Festfarbe Orange", "art": "color"},
+            {"von": 90, "bis": 107, "name": "Festfarbe Weiss", "art": "open"},
+            {"von": 108, "bis": 125, "name": "Festfarbe Hellrot", "art": "color"},
+            {"von": 126, "bis": 143, "name": "Festfarbe Hellgruen", "art": "color"},
+            {"von": 144, "bis": 161, "name": "Festfarbe Hellblau", "art": "color"},
+            {"von": 162, "bis": 179, "name": "Festfarbe Gelb", "art": "color"},
+            {"von": 180, "bis": 197, "name": "Festfarbe Warmweiss", "art": "color"},
+            {"von": 198, "bis": 215, "name": "Festfarbe Rot", "art": "color"},
+            {"von": 216, "bis": 233, "name": "Festfarbe Gruen", "art": "color"},
+            {"von": 234, "bis": 251, "name": "Festfarbe Blau", "art": "color"},
+            {"von": 252, "bis": 255, "name": "Festfarbe Amber", "art": "color"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3-Kanal",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "4-Kanal",
+      "kanaele": [
+        {
+          "name": "Dimmer",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dimmer 0 % → 100 %"}
+          ]
+        },
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "7-Kanal",
+      "kanaele": [
+        {
+          "name": "Dimmer",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dimmer 0 % → 100 %"}
+          ]
+        },
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {
+          "name": "Automatik-Show",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 17, "name": "Automatik-Show 01"},
+            {"von": 18, "bis": 35, "name": "Automatik-Show 02"},
+            {"von": 36, "bis": 53, "name": "Automatik-Show 03"},
+            {"von": 54, "bis": 71, "name": "Automatik-Show 04"},
+            {"von": 72, "bis": 89, "name": "Automatik-Show 05"},
+            {"von": 90, "bis": 107, "name": "Automatik-Show 06"},
+            {"von": 108, "bis": 125, "name": "Automatik-Show 07"},
+            {"von": 126, "bis": 143, "name": "Automatik-Show 08"},
+            {"von": 144, "bis": 161, "name": "Automatik-Show 09"},
+            {"von": 162, "bis": 179, "name": "Automatik-Show 10"},
+            {"von": 180, "bis": 197, "name": "Automatik-Show 11"},
+            {"von": 198, "bis": 215, "name": "Automatik-Show 12"},
+            {"von": 216, "bis": 233, "name": "Automatik-Show 13"},
+            {"von": 234, "bis": 251, "name": "Automatik-Show 14"},
+            {"von": 252, "bis": 255, "name": "Musiksteuerung", "art": "sound"}
+          ]
+        },
+        {"name": "Programm-Speed", "attribut": "effect_speed", "default": 0, "highlight": 0},
+        {
+          "name": "Strobe",
+          "attribut": "strobe",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Strobe, Geschwindigkeit steigend"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8-Kanal",
+      "raster": {"rows": 1, "cols": 2},
+      "kanaele": [
+        {
+          "name": "Dimmer",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dimmer 0 % → 100 %"}
+          ]
+        },
+        {"name": "Rot PAR 1+2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen PAR 1+2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau PAR 1+2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Rot PAR 3+4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen PAR 3+4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau PAR 3+4", "attribut": "color_b", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "strobe",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Strobe, Geschwindigkeit steigend"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "14-Kanal",
+      "raster": {"rows": 1, "cols": 4},
+      "kanaele": [
+        {
+          "name": "Dimmer",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dimmer 0 % → 100 %"}
+          ]
+        },
+        {"name": "Rot PAR 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen PAR 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau PAR 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Rot PAR 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen PAR 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau PAR 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Rot PAR 3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen PAR 3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau PAR 3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Rot PAR 4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen PAR 4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau PAR 4", "attribut": "color_b", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "strobe",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Strobe, Geschwindigkeit steigend"}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "LED-Bar mit 4 RGB-PARs (je 108 x 10 mm LEDs). 2-Kanal: Kanal 2 ist Festfarbe nur bei Kanal 1 = 0–17 (Show 01), sonst Programm-Geschwindigkeit. 7-Kanal: Shows (Kanal 5) nur, wenn Kanal 2–4 = 0."
+}

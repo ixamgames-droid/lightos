@@ -1,0 +1,466 @@
+{
+  "format_version": 1,
+  "hersteller": "Martin",
+  "hersteller_kurz": "Martin",
+  "modell": "Atomic 3000 LED",
+  "kurzname": "ATOMIC3000LED",
+  "typ": "strobe",
+  "leistung_w": 740,
+  "quelle": {
+    "titel": "Atomic 3000 LED User Manual",
+    "url": "https://www.martin.com/en/site_elements/martin-manuals-atomic-3000-led-user-manual"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.8 GIT · Yestalgia",
+    "original": "resources/fixtures/Martin/Martin-Atomic-3000-LED.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 231 Wertebereiche mit Art (kind) versehen; 10 Bereichsnamen auf 80 Zeichen gekuerzt; gegen Martin-Handbuch abgeglichen (alle Kanaele aller drei Modi stimmen in Lage und Bereichen); Blitzdauer speed -> duration, Blitzrate shutter -> strobe (kein Offen-Bereich; wie das eingebaute Atomic-3000-DMX-Profil), Intensitaet Wert 0 als Blackout ('closed'); Beam-Spezialeffekte macro -> effect; FX-Anpassung speed -> effect_speed mit Default 128 (Handbuch); Steuerkanal raw -> reset; Effektarten 'strobe'/'shake' aus der FX-Liste entfernt (sind Makros, keine Shutter-Bereiche); Aura-Shutter-Default 30 und Aura-RGB-Default 255 laut Handbuch; Aura-Farbrad-Stopp und Zufallsfarben ohne Art; deutsche Beschriftung; kurzname ATOMIC3000LED, leistung_w 740 (max. laut Handbuch), notizen; FX-Liste (Kanal 6) laut Handbuch-Tabelle 5 korrigiert: 96 Fire/97 Water (QLC+ vertauscht), 151 keine Funktion, 152-157 Thunderstorm/Welding/3 Step strobe/Tick Tock/Aura ramp beam flash/Beam ramp aura flash (QLC+ um einen Wert verschoben)"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": true,
+    "wie": "3-/4-Kanal- und Extended-Modus Kanal fuer Kanal gegen die DMX-Tabellen im Martin-Handbuch (Atomic 3000 LED User Manual, Tabellen 2-5) geprueft, inkl. Default-Werte; nicht am Geraet"
+  },
+  "modi": [
+    {
+      "name": "3-Channel",
+      "kanaele": [
+        {
+          "name": "Beam-Blitzintensitaet",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Blackout", "art": "closed"},
+            {"von": 1, "bis": 255, "name": "Minimum → Maximum"}
+          ]
+        },
+        {"name": "Beam-Blitzdauer (7 → 650 ms)", "attribut": "duration", "default": 0, "highlight": 0},
+        {
+          "name": "Beam-Blitzrate (0,289 → 16,67 Hz)",
+          "attribut": "strobe",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Blitzrate langsam → schnell", "art": "strobe"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4-Channel",
+      "kanaele": [
+        {
+          "name": "Beam-Blitzintensitaet",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Blackout", "art": "closed"},
+            {"von": 1, "bis": 255, "name": "Minimum → Maximum"}
+          ]
+        },
+        {"name": "Beam-Blitzdauer (7 → 650 ms)", "attribut": "duration", "default": 0, "highlight": 0},
+        {
+          "name": "Beam-Blitzrate (0,289 → 16,67 Hz)",
+          "attribut": "strobe",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Blitzrate langsam → schnell", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Beam-Spezialeffekte",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Kein Effekt"},
+            {"von": 6, "bis": 42, "name": "Rampe auf"},
+            {"von": 43, "bis": 85, "name": "Rampe ab"},
+            {"von": 86, "bis": 128, "name": "Rampe auf/ab"},
+            {"von": 129, "bis": 171, "name": "Zufall", "art": "strobe"},
+            {"von": 172, "bis": 214, "name": "Blitz (Lightning)", "art": "strobe"},
+            {"von": 215, "bis": 255, "name": "Spikes (Blitz ueber Grundlicht)", "art": "strobe"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Extended",
+      "kanaele": [
+        {
+          "name": "Beam-Blitzintensitaet",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Blackout", "art": "closed"},
+            {"von": 1, "bis": 255, "name": "Minimum → Maximum"}
+          ]
+        },
+        {"name": "Beam-Blitzdauer (7 → 650 ms)", "attribut": "duration", "default": 0, "highlight": 0},
+        {
+          "name": "Beam-Blitzrate (0,289 → 16,67 Hz)",
+          "attribut": "strobe",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Blitzrate langsam → schnell", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Beam-Spezialeffekte",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Kein Effekt"},
+            {"von": 6, "bis": 42, "name": "Rampe auf"},
+            {"von": 43, "bis": 85, "name": "Rampe ab"},
+            {"von": 86, "bis": 128, "name": "Rampe auf/ab"},
+            {"von": 129, "bis": 171, "name": "Zufall", "art": "strobe"},
+            {"von": 172, "bis": 214, "name": "Blitz (Lightning)", "art": "strobe"},
+            {"von": 215, "bis": 255, "name": "Spikes (Blitz ueber Grundlicht)", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Steuerung/Einstellungen",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": ""},
+            {"von": 10, "bis": 14, "name": "Reset entire fixture - 5 sec.", "art": "reset"},
+            {"von": 15, "bis": 22, "name": "No function", "art": ""},
+            {
+              "von": 23,
+              "bis": 23,
+              "name": "Linear dimming curve - 1 sec. (menu override, setting unaffected by power off/on",
+              "art": ""
+            },
+            {
+              "von": 24,
+              "bis": 24,
+              "name": "Square law dimming curve - 1 sec. (menu override, factory default setting, setti",
+              "art": ""
+            },
+            {
+              "von": 25,
+              "bis": 25,
+              "name": "Inverse square law dimming curve - 1 sec. (menu override, setting unaffected by ",
+              "art": ""
+            },
+            {
+              "von": 26,
+              "bis": 26,
+              "name": "S-curve dimming curve - 1 sec. (menu override, setting unaffected by power off/o",
+              "art": ""
+            },
+            {"von": 27, "bis": 35, "name": "No function", "art": ""},
+            {"von": 36, "bis": 36, "name": "Enable video tracking", "art": ""},
+            {"von": 37, "bis": 37, "name": "Disable video tracking", "art": ""},
+            {"von": 38, "bis": 51, "name": "No function", "art": ""},
+            {"von": 52, "bis": 52, "name": "Turn on control panel display - 1 sec.", "art": ""},
+            {"von": 53, "bis": 53, "name": "Turn off control panel display - 1 sec.", "art": ""},
+            {
+              "von": 54,
+              "bis": 54,
+              "name": "Regulated fans speed, fixed light output intensity = full (default setting, menu",
+              "art": ""
+            },
+            {
+              "von": 55,
+              "bis": 55,
+              "name": "Fixed fan speed = full, regulated light output intensity (menu override, setting",
+              "art": ""
+            },
+            {
+              "von": 56,
+              "bis": 56,
+              "name": "Fixed fan speed = medium, regulated light output intensity (menu override, setti",
+              "art": ""
+            },
+            {
+              "von": 57,
+              "bis": 57,
+              "name": "Fixed fan speed = low, regulated light output intensity (menu override, setting ",
+              "art": ""
+            },
+            {
+              "von": 58,
+              "bis": 58,
+              "name": "Fixed fan speed = ultra low, regulated light output intensity (menu override, se",
+              "art": ""
+            },
+            {
+              "von": 59,
+              "bis": 59,
+              "name": "Strobe behavior = LED (menu override, setting unaffected by power off/on)",
+              "art": "strobe"
+            },
+            {
+              "von": 60,
+              "bis": 60,
+              "name": "Strobe behavior = Xenon (menu override, setting unaffected by power off/on)",
+              "art": "strobe"
+            },
+            {"von": 61, "bis": 255, "name": "No function", "art": ""}
+          ]
+        },
+        {
+          "name": "FX-Auswahl (vorprogrammierte Effekte)",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "No function"},
+            {"von": 1, "bis": 1, "name": "Wave (sine wave)"},
+            {"von": 2, "bis": 2, "name": "Step (50/50 on/off)"},
+            {"von": 3, "bis": 3, "name": "Pulse"},
+            {"von": 4, "bis": 5, "name": "No function"},
+            {"von": 6, "bis": 6, "name": "Double strobe"},
+            {"von": 7, "bis": 7, "name": "Triple strobe"},
+            {"von": 8, "bis": 10, "name": "No function"},
+            {"von": 11, "bis": 11, "name": "Up, down, flash"},
+            {"von": 12, "bis": 12, "name": "Up, flash, down, flash"},
+            {"von": 13, "bis": 13, "name": "Random levels"},
+            {"von": 14, "bis": 19, "name": "No function"},
+            {"von": 20, "bis": 20, "name": "House light"},
+            {"von": 21, "bis": 50, "name": "No function"},
+            {"von": 51, "bis": 51, "name": "Aura pulse"},
+            {"von": 52, "bis": 53, "name": "No function"},
+            {"von": 54, "bis": 54, "name": "Aura ramp"},
+            {"von": 55, "bis": 55, "name": "No function"},
+            {"von": 56, "bis": 56, "name": "Rainbow wave"},
+            {"von": 57, "bis": 57, "name": "Rainbow step"},
+            {"von": 58, "bis": 58, "name": "Rainbow pulse"},
+            {"von": 59, "bis": 60, "name": "No function"},
+            {"von": 61, "bis": 61, "name": "RGB wave"},
+            {"von": 62, "bis": 62, "name": "RGB step"},
+            {"von": 63, "bis": 63, "name": "RGB pulse"},
+            {"von": 64, "bis": 65, "name": "No function"},
+            {"von": 66, "bis": 66, "name": "CMY wave"},
+            {"von": 67, "bis": 67, "name": "CMY step"},
+            {"von": 68, "bis": 68, "name": "CMY pulse"},
+            {"von": 69, "bis": 70, "name": "No function"},
+            {"von": 71, "bis": 71, "name": "Mix to white wave"},
+            {"von": 72, "bis": 72, "name": "Mix to white step"},
+            {"von": 73, "bis": 73, "name": "Mix to white pulse"},
+            {"von": 74, "bis": 75, "name": "No function"},
+            {"von": 76, "bis": 76, "name": "Random mix wave"},
+            {"von": 77, "bis": 77, "name": "Random mix step"},
+            {"von": 78, "bis": 78, "name": "Random mix pulse"},
+            {"von": 79, "bis": 80, "name": "No function"},
+            {"von": 81, "bis": 81, "name": "Random subtle wave"},
+            {"von": 82, "bis": 83, "name": "No function"},
+            {"von": 84, "bis": 84, "name": "Red white blue fade"},
+            {"von": 85, "bis": 85, "name": "Red white blue snaps"},
+            {"von": 86, "bis": 95, "name": "No function"},
+            {"von": 96, "bis": 96, "name": "Fire"},
+            {"von": 97, "bis": 97, "name": "Water"},
+            {"von": 98, "bis": 98, "name": "Ice"},
+            {"von": 99, "bis": 99, "name": "Hot and cold"},
+            {"von": 100, "bis": 100, "name": "Warm and fuzzy"},
+            {"von": 101, "bis": 101, "name": "Silver and gold"},
+            {"von": 102, "bis": 102, "name": "Gold and silver"},
+            {"von": 103, "bis": 103, "name": "No function"},
+            {"von": 104, "bis": 104, "name": "Circular chase slim"},
+            {"von": 105, "bis": 105, "name": "Circular chase wide"},
+            {"von": 106, "bis": 107, "name": "No function"},
+            {"von": 108, "bis": 108, "name": "Double circular chase slim"},
+            {"von": 109, "bis": 109, "name": "Double circular chase wide"},
+            {"von": 110, "bis": 111, "name": "No function"},
+            {"von": 112, "bis": 112, "name": "Vertical scroll"},
+            {"von": 113, "bis": 113, "name": "Horizontal scroll (L/R)"},
+            {"von": 114, "bis": 115, "name": "No function"},
+            {"von": 116, "bis": 116, "name": "Knight Rider slim"},
+            {"von": 117, "bis": 117, "name": "Knight Rider wide"},
+            {"von": 118, "bis": 118, "name": "Knight Rider slim with CW surface"},
+            {"von": 119, "bis": 119, "name": "No function"},
+            {"von": 120, "bis": 120, "name": "4 segments scroll"},
+            {"von": 121, "bis": 121, "name": "6 segments scroll"},
+            {"von": 122, "bis": 123, "name": "No function"},
+            {"von": 124, "bis": 124, "name": "Police car 1"},
+            {"von": 125, "bis": 125, "name": "Police car 2"},
+            {"von": 126, "bis": 126, "name": "Police car 3"},
+            {"von": 127, "bis": 129, "name": "No function"},
+            {"von": 130, "bis": 130, "name": "Full bumps"},
+            {"von": 131, "bis": 131, "name": "Split bumps CW vertical"},
+            {"von": 132, "bis": 132, "name": "Split bumps CW horizontal"},
+            {"von": 133, "bis": 133, "name": "Random split bumps CW vertical"},
+            {"von": 134, "bis": 134, "name": "Random split bumps CW horizontal"},
+            {"von": 135, "bis": 135, "name": "Color shaker CW vertical"},
+            {"von": 136, "bis": 136, "name": "Color shaker CW horizontal"},
+            {"von": 137, "bis": 137, "name": "Color shaker CW vertical and no black frame"},
+            {"von": 138, "bis": 138, "name": "Color shaker CW horizontal and no black frame"},
+            {"von": 139, "bis": 143, "name": "No function"},
+            {"von": 144, "bis": 144, "name": "Swimming pool"},
+            {"von": 145, "bis": 145, "name": "Electric arc"},
+            {"von": 146, "bis": 150, "name": "No function"},
+            {"von": 151, "bis": 151, "name": "No function"},
+            {"von": 152, "bis": 152, "name": "Thunderstorm"},
+            {"von": 153, "bis": 153, "name": "Welding"},
+            {"von": 154, "bis": 154, "name": "3 Step strobe"},
+            {"von": 155, "bis": 155, "name": "Tick Tock"},
+            {"von": 156, "bis": 156, "name": "Aura ramp beam flash"},
+            {"von": 157, "bis": 157, "name": "Beam ramp aura flash"},
+            {"von": 158, "bis": 160, "name": "No function"},
+            {"von": 161, "bis": 161, "name": "Police Car 4"},
+            {"von": 162, "bis": 162, "name": "Police Car 5"},
+            {"von": 163, "bis": 163, "name": "Police Car 6"},
+            {"von": 164, "bis": 164, "name": "Police Car 7"},
+            {"von": 165, "bis": 165, "name": "Police Car 8"},
+            {"von": 166, "bis": 166, "name": "Police Car 9"},
+            {"von": 167, "bis": 255, "name": "No function"}
+          ]
+        },
+        {
+          "name": "FX-Anpassung (Tempo)",
+          "attribut": "effect_speed",
+          "default": 128,
+          "highlight": 128,
+          "bereiche": [
+            {"von": 0, "bis": 126, "name": "Effekt rueckwaerts schnell → langsam"},
+            {"von": 127, "bis": 128, "name": "Effekt steht"},
+            {"von": 129, "bis": 255, "name": "Effekt langsam → schnell"}
+          ]
+        },
+        {
+          "name": "FX-Synchronisation",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "No sync", "art": ""},
+            {"von": 1, "bis": 1, "name": "Offset shift 10°", "art": ""},
+            {"von": 2, "bis": 2, "name": "Offset shift 20°", "art": ""},
+            {"von": 3, "bis": 3, "name": "Offset shift 30°", "art": ""},
+            {"von": 4, "bis": 4, "name": "Offset shift 40°", "art": ""},
+            {"von": 5, "bis": 5, "name": "Offset shift 50°", "art": ""},
+            {"von": 6, "bis": 6, "name": "Offset shift 60°", "art": ""},
+            {"von": 7, "bis": 7, "name": "Offset shift 70°", "art": ""},
+            {"von": 8, "bis": 8, "name": "Offset shift 80°", "art": ""},
+            {"von": 9, "bis": 9, "name": "Offset shift 90°", "art": ""},
+            {"von": 10, "bis": 10, "name": "Offset shift 100°", "art": ""},
+            {"von": 11, "bis": 11, "name": "Offset shift 110°", "art": ""},
+            {"von": 12, "bis": 12, "name": "Offset shift 120°", "art": ""},
+            {"von": 13, "bis": 13, "name": "Offset shift 130°", "art": ""},
+            {"von": 14, "bis": 14, "name": "Offset shift 140°", "art": ""},
+            {"von": 15, "bis": 15, "name": "Offset shift 150°", "art": ""},
+            {"von": 16, "bis": 16, "name": "Offset shift 160°", "art": ""},
+            {"von": 17, "bis": 17, "name": "Offset shift 170°", "art": ""},
+            {"von": 18, "bis": 18, "name": "Offset shift 180°", "art": ""},
+            {"von": 19, "bis": 19, "name": "Offset shift 190°", "art": ""},
+            {"von": 20, "bis": 20, "name": "Offset shift 200°", "art": ""},
+            {"von": 21, "bis": 21, "name": "Offset shift 210°", "art": ""},
+            {"von": 22, "bis": 22, "name": "Offset shift 220°", "art": ""},
+            {"von": 23, "bis": 23, "name": "Offset shift 230°", "art": ""},
+            {"von": 24, "bis": 24, "name": "Offset shift 240°", "art": ""},
+            {"von": 25, "bis": 25, "name": "Offset shift 250°", "art": ""},
+            {"von": 26, "bis": 26, "name": "Offset shift 260°", "art": ""},
+            {"von": 27, "bis": 27, "name": "Offset shift 270°", "art": ""},
+            {"von": 28, "bis": 28, "name": "Offset shift 280°", "art": ""},
+            {"von": 29, "bis": 29, "name": "Offset shift 290°", "art": ""},
+            {"von": 30, "bis": 30, "name": "Offset shift 300°", "art": ""},
+            {"von": 31, "bis": 31, "name": "Offset shift 310°", "art": ""},
+            {"von": 32, "bis": 32, "name": "Offset shift 320°", "art": ""},
+            {"von": 33, "bis": 33, "name": "Offset shift 330°", "art": ""},
+            {"von": 34, "bis": 34, "name": "Offset shift 340°", "art": ""},
+            {"von": 35, "bis": 35, "name": "Offset shift 350°", "art": ""},
+            {"von": 36, "bis": 36, "name": "Synchronized: all fixtures start FX cycles at same time", "art": ""},
+            {"von": 37, "bis": 100, "name": "No function", "art": ""},
+            {"von": 101, "bis": 120, "name": "Random start", "art": ""},
+            {"von": 121, "bis": 140, "name": "Random duration", "art": ""},
+            {"von": 141, "bis": 255, "name": "No function", "art": ""}
+          ]
+        },
+        {
+          "name": "Aura Shutter/Strobe",
+          "attribut": "shutter",
+          "default": 30,
+          "highlight": 30,
+          "bereiche": [
+            {"von": 0, "bis": 19, "name": "Shutter closed", "art": "closed"},
+            {"von": 20, "bis": 49, "name": "Shutter open", "art": "open"},
+            {"von": 50, "bis": 200, "name": "Strobe, slow → fast", "art": "strobe"},
+            {"von": 201, "bis": 210, "name": "Shutter open", "art": "open"},
+            {"von": 211, "bis": 255, "name": "Random strobe, slow → fast", "art": "strobe"}
+          ]
+        },
+        {"name": "Aura Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Aura Rot", "attribut": "color_r", "default": 255, "highlight": 255},
+        {"name": "Aura Gruen", "attribut": "color_g", "default": 255, "highlight": 255},
+        {"name": "Aura Blau", "attribut": "color_b", "default": 255, "highlight": 255},
+        {
+          "name": "Aura Farbpresets (Farbrad-Effekt)",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Open. RGB Color Mixing Enabled", "art": "open"},
+            {"von": 11, "bis": 15, "name": "Color 1 - LEE 790 - Moroccan pink", "art": "color"},
+            {"von": 16, "bis": 20, "name": "Color 2- LEE 157 - Pink", "art": "color"},
+            {"von": 21, "bis": 25, "name": "Color 3 - LEE 332 - Special rose pink", "art": "color"},
+            {"von": 26, "bis": 30, "name": "Color 4 - LEE 328 - Follies pink", "art": "color"},
+            {"von": 31, "bis": 35, "name": "Color 5 - LEE 345 - Fuchsia pink", "art": "color"},
+            {"von": 36, "bis": 40, "name": "Color 6 - LEE 194 - Surprise pink", "art": "color"},
+            {"von": 41, "bis": 45, "name": "Color 7 - LEE 181 - Congo Blue", "art": "color"},
+            {"von": 46, "bis": 50, "name": "Color 8 - LEE 071 - Tokyo Blue", "art": "color"},
+            {"von": 51, "bis": 55, "name": "Color 9 - LEE 120 - Deep Blue", "art": "color"},
+            {"von": 56, "bis": 60, "name": "Color 10 - LEE 079 - Just Blue", "art": "color"},
+            {"von": 61, "bis": 65, "name": "Color 11 - LEE 132 - Medium Blue", "art": "color"},
+            {"von": 66, "bis": 70, "name": "Color 12 - LEE 200 - Double CT Blue", "art": "color"},
+            {"von": 71, "bis": 75, "name": "Color 13 - LEE 161 - Slate Blue", "art": "color"},
+            {"von": 76, "bis": 80, "name": "Color 14 - LEE 201 - Full CT Blue", "art": "color"},
+            {"von": 81, "bis": 85, "name": "Color 15 - LEE 202 - Half CT Blue", "art": "color"},
+            {"von": 86, "bis": 90, "name": "Color 16 - LEE 117 - Steel Blue", "art": "color"},
+            {"von": 91, "bis": 95, "name": "Color 17 - LEE 353 - Lighter Blue", "art": "color"},
+            {"von": 96, "bis": 100, "name": "Color 18 - LEE 118 - Light Blue", "art": "color"},
+            {"von": 101, "bis": 105, "name": "Color 19 - LEE 116 - Medium Blue Green", "art": "color"},
+            {"von": 106, "bis": 110, "name": "Color 20 - LEE 124 - Dark Green", "art": "color"},
+            {"von": 111, "bis": 115, "name": "Color 21 - LEE 139 - Primary Green", "art": "color"},
+            {"von": 116, "bis": 120, "name": "Color 22 - LEE 089 - Moss Green", "art": "color"},
+            {"von": 121, "bis": 125, "name": "Color 23 - LEE 122 - Fern Green", "art": "color"},
+            {"von": 126, "bis": 130, "name": "Color 24 - LEE 738 - JAS Green", "art": "color"},
+            {"von": 131, "bis": 135, "name": "Color 25 - LEE 088 - Lime Green", "art": "color"},
+            {"von": 136, "bis": 140, "name": "Color 26 - LEE 100 - Spring Yellow", "art": "color"},
+            {"von": 141, "bis": 145, "name": "Color 27 - LEE 104 - Deep Amber", "art": "color"},
+            {"von": 146, "bis": 150, "name": "Color 28 - LEE 179 - Chrome Orange", "art": "color"},
+            {"von": 151, "bis": 155, "name": "Color 29 - LEE 105 - Orange", "art": "color"},
+            {"von": 156, "bis": 160, "name": "Color 30 - LEE 021 - Gold Amber", "art": "color"},
+            {"von": 161, "bis": 165, "name": "Color 31 - LEE 778 - Millennium Gold", "art": "color"},
+            {"von": 166, "bis": 170, "name": "Color 32 - LEE 135 - Deep Golden Amber", "art": "color"},
+            {"von": 171, "bis": 175, "name": "Color 33 - LEE 164 - Flame Red", "art": "color"},
+            {"von": 176, "bis": 180, "name": "Color 34 - Magenta", "art": "color"},
+            {"von": 181, "bis": 185, "name": "Color 35 - Medium Lavender", "art": "color"},
+            {"von": 186, "bis": 190, "name": "Color 36 - White", "art": "color"},
+            {
+              "von": 191,
+              "bis": 214,
+              "name": "Aura ‘color wheel rotation’ effect - Clockwise, fast → slow",
+              "art": "rotate"
+            },
+            {
+              "von": 215,
+              "bis": 219,
+              "name": "Aura ‘color wheel rotation’ effect - Stop (this will stop wherever the color is "
+            },
+            {
+              "von": 220,
+              "bis": 243,
+              "name": "Aura ‘color wheel rotation’ effect - Counter-clockwise, slow → fast",
+              "art": "rotate"
+            },
+            {"von": 244, "bis": 247, "name": "Aura random colors - Fast"},
+            {"von": 248, "bis": 251, "name": "Aura random colors - Medium"},
+            {"von": 252, "bis": 255, "name": "Aura random colors - Slow"}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "LED-Nachfolger der Xenon-Atomic 3000: weisse Beam-Strobe-Flaeche plus RGB-'Aura'-Flaeche (nur im Extended-Modus). 3-/4-Kanal-Modus kompatibel zur Atomic 3000 DMX. Kanal 1 Wert 0 = Blackout; Blitzrate ohne Offen-Bereich. Extended-Modus hat zwei Dimmer: Kanal 1 (Beam) und Kanal 10 (Aura, dimmt die RGB-Flaeche)."
+}

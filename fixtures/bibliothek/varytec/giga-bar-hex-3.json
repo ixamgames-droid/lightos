@@ -1,0 +1,124 @@
+{
+  "format_version": 1,
+  "hersteller": "Varytec",
+  "hersteller_kurz": "Varytec",
+  "modell": "Giga Bar HEX 3",
+  "kurzname": "GIGABARHEX3",
+  "typ": "led_bar",
+  "leistung_w": 36,
+  "quelle": {
+    "titel": "Varytec Giga Bar HEX 3 / Giga Bar HEX 3 BAT – Bedienungsanleitung (EN)",
+    "version": "r3",
+    "datum": "2022-06-01",
+    "url": "https://images.static-thomann.de/pics/atg/atgdata/document/manual/c_472654_472655_r3_en_online.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.0.0 Beta 2 · Niklas Larsson",
+    "original": "resources/fixtures/Varytec/Varytec-Giga-Bar-HEX-3.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 11 Wertebereiche mit Art (kind) versehen; Rasterform aus <Physical> in 5 Modus/Modi nicht uebernommen, weil sie nicht zu den color_r-Kanaelen passt (keine echten Farbzonen); gegen Herstellerhandbuch r3 (2022-06-01) abgeglichen; Kanal- und Bereichsnamen deutsch; Strobe-Kanal von shutter auf strobe (Handbuch nennt nur „Strobe master“ 0…255, keinen Offen-Bereich); Funktionskanal von raw auf macro, Farbwechsel ohne falsche color-Art; Tempo-Kanal von speed auf effect_speed; Farbmakro-Kanal von color_wheel auf macro (kein Farbrad); Kurzname, Notizen"
+  },
+  "autor": "LightOS (QXF-Konverter, nachbearbeitet FM-57)",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal für Kanal gegen die Bedienungsanleitung r3 (Kap. 7.4–7.8 DMX-Tabellen 3/4/6/9/11 Kanäle) geprüft; nicht am Gerät"
+  },
+  "modi": [
+    {
+      "name": "3 Channel",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Grün", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "4 Channel",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Grün", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiß", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "6 Channel",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Grün", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiß", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "9 Channel",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Grün", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiß", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Strobe (Master)", "attribut": "strobe", "default": 0, "highlight": 0},
+        {
+          "name": "Funktion",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Keine Funktion", "art": ""},
+            {"von": 11, "bis": 100, "name": "Fade-Effekt, Tempo steigend", "art": ""},
+            {"von": 101, "bis": 200, "name": "Farbwechsel, Tempo steigend", "art": ""},
+            {"von": 201, "bis": 255, "name": "Musiksteuerung", "art": "sound"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "11 Channel",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Grün", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiß", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Strobe (Master)", "attribut": "strobe", "default": 0, "highlight": 0},
+        {
+          "name": "Funktion",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Keine Funktion", "art": ""},
+            {"von": 11, "bis": 100, "name": "Fade-Effekt, Tempo steigend", "art": ""},
+            {"von": 101, "bis": 200, "name": "Farbwechsel, Tempo steigend", "art": ""},
+            {"von": 201, "bis": 255, "name": "Musiksteuerung", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Tempo / Mikrofon-Empfindlichkeit (wenn Funktion 11–200)",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0
+        },
+        {
+          "name": "Farbmakros",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 14, "name": "Keine Funktion", "art": ""},
+            {"von": 15, "bis": 255, "name": "Farbmakros", "art": ""}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Kompakte LED-Leiste 3 × 12 W RGBAW+UV (6-in-1); alle drei LEDs werden gemeinsam gesteuert (kein Pixelmodus). Raster 1 × 3 nur für die Darstellung. Strobe-Kanal ohne Bereichsangabe im Handbuch (0 = kein Strobe angenommen)."
+}

@@ -1,0 +1,207 @@
+{
+  "format_version": 1,
+  "hersteller": "Stairville",
+  "hersteller_kurz": "STAIR",
+  "modell": "xBrick Quad 16x8W RGBW",
+  "kurzname": "XBRICKQUAD",
+  "typ": "par",
+  "leistung_w": 125,
+  "quelle": {
+    "titel": "Stairville xBrick Quad 16x8W RGBW, User Manual (Thomann, Art. 385641, v5)",
+    "url": "https://fast-images.static-thomann.de/pics/atg/atgdata/document/manual/c_385641_v5_en_online.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.3 GIT · Henrik Bauer, Jannis Achstetter",
+    "original": "resources/fixtures/Stairville/Stairville-xBrick-Quad-16x8W-RGBW.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 41 Wertebereiche mit Art (kind) versehen; Rasterform in 2 Modus/Modi aus <Physical> uebernommen; in 3 weiteren Modus/Modi nicht, weil sie nicht zu den color_r-Kanaelen passt (keine echten Farbzonen); Modusnamen 4-/6-/8-/16-/18-Kanal; Strobe-Kanaele als strobe (reine Strobe-Staerke 0–100 %, kein Offen-/Zu-Bereich laut Handbuch) statt shutter; 8-Kanal: falsche Art color an den Farbvorgabe-Bereichen entfernt (Makrokanal), Programmbereiche benannt, Musik art sound; 8-Kanal: Hinweis 'nur bei Kanal 7 = 5–233' an Dimmer/Strobe, Kanal 8 als effect_speed; 16/18-Kanal: Kanaele je Segment benannt; Kanal-/Bereichsnamen deutsch; Kurzname; hersteller_kurz STAIR; Quelle auf Herstellerhandbuch gesetzt"
+  },
+  "autor": "LightOS",
+  "geprueft": {"ok": true, "wie": "Kanal fuer Kanal gegen das Handbuch (Kap. 7.4.1–7.4.5, 4/6/8/16/18 Kanaele) geprueft"},
+  "modi": [
+    {
+      "name": "4-Kanal",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "6-Kanal",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Dimmer",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dimmer 0 % → 100 %"}
+          ]
+        },
+        {
+          "name": "Strobe",
+          "attribut": "strobe",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Strobe 0 % → 100 %"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8-Kanal",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Dimmer",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dimmer 0 % → 100 % (nur bei Kanal 7 = 5–233)"}
+          ]
+        },
+        {
+          "name": "Strobe",
+          "attribut": "strobe",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Strobe 0 % → 100 % (nur bei Kanal 7 = 5–233)"}
+          ]
+        },
+        {
+          "name": "Farbe / Programm",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Keine Funktion (RGBW ueber Kanaele 1–4)"},
+            {"von": 5, "bis": 9, "name": "Farbe Cyan (Helligkeit ueber den Bereich)"},
+            {"von": 10, "bis": 14, "name": "Farbe Lila (Helligkeit ueber den Bereich)"},
+            {"von": 15, "bis": 19, "name": "Farbe Pink (Helligkeit ueber den Bereich)"},
+            {"von": 20, "bis": 24, "name": "Farbe Orange (Helligkeit ueber den Bereich)"},
+            {"von": 25, "bis": 29, "name": "Farbe Kaltweiss (Helligkeit ueber den Bereich)"},
+            {"von": 30, "bis": 34, "name": "Farbe Hellrot (Helligkeit ueber den Bereich)"},
+            {"von": 35, "bis": 39, "name": "Farbe Hellgruen (Helligkeit ueber den Bereich)"},
+            {"von": 40, "bis": 44, "name": "Farbe Hellblau (Helligkeit ueber den Bereich)"},
+            {"von": 45, "bis": 49, "name": "Farbe Gelb (Helligkeit ueber den Bereich)"},
+            {"von": 50, "bis": 54, "name": "Farbe Warmweiss (Helligkeit ueber den Bereich)"},
+            {"von": 55, "bis": 59, "name": "Farbe Rot (Helligkeit ueber den Bereich)"},
+            {"von": 60, "bis": 64, "name": "Farbe Gruen (Helligkeit ueber den Bereich)"},
+            {"von": 65, "bis": 69, "name": "Farbe Blau (Helligkeit ueber den Bereich)"},
+            {"von": 70, "bis": 74, "name": "Farbe Amber (Helligkeit ueber den Bereich)"},
+            {"von": 75, "bis": 79, "name": "Alle"},
+            {"von": 80, "bis": 86, "name": "Programm 02"},
+            {"von": 87, "bis": 93, "name": "Programm 03"},
+            {"von": 94, "bis": 100, "name": "Programm 04"},
+            {"von": 101, "bis": 107, "name": "Programm 05"},
+            {"von": 108, "bis": 114, "name": "Programm 06"},
+            {"von": 115, "bis": 121, "name": "Programm 07"},
+            {"von": 122, "bis": 128, "name": "Programm 08"},
+            {"von": 129, "bis": 135, "name": "Programm 09"},
+            {"von": 136, "bis": 142, "name": "Programm 10"},
+            {"von": 143, "bis": 149, "name": "Programm 11"},
+            {"von": 150, "bis": 156, "name": "Programm 12"},
+            {"von": 157, "bis": 163, "name": "Programm 13"},
+            {"von": 164, "bis": 170, "name": "Programm 14"},
+            {"von": 171, "bis": 177, "name": "Programm 15"},
+            {"von": 178, "bis": 184, "name": "Programm 16"},
+            {"von": 185, "bis": 191, "name": "Programm 17"},
+            {"von": 192, "bis": 198, "name": "Programm 18"},
+            {"von": 199, "bis": 205, "name": "Programm 19"},
+            {"von": 206, "bis": 212, "name": "Programm 20"},
+            {"von": 213, "bis": 219, "name": "Programm 21"},
+            {"von": 220, "bis": 226, "name": "Programm 22"},
+            {"von": 227, "bis": 233, "name": "Programm 23"},
+            {"von": 234, "bis": 240, "name": "Musiksteuerung, langsamer Wechsel Programme 02–23", "art": "sound"},
+            {"von": 241, "bis": 255, "name": "Musiksteuerung, schneller Wechsel Programme 02–23", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Programm-Speed / Mikrofon",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Programm-Speed (Kanal 7 = 80–233) bzw. Mikrofon-Empfindlichkeit (234–255)"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "16-Kanal",
+      "raster": {"rows": 1, "cols": 4},
+      "kanaele": [
+        {"name": "Rot 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss 2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot 3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss 3", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot 4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 4", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss 4", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "18-Kanal",
+      "raster": {"rows": 1, "cols": 4},
+      "kanaele": [
+        {"name": "Rot 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss 2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot 3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss 3", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot 4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen 4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 4", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss 4", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Dimmer",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dimmer 0 % → 100 %"}
+          ]
+        },
+        {
+          "name": "Strobe",
+          "attribut": "strobe",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Strobe 0 % → 100 %"}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "16 Quad-LEDs in 4 einzeln steuerbaren Segmenten (Raster 1x4 aus QLC+; Segmentreihenfolge laut Handbuch 1–4, die Lage am Geraet nennt das Handbuch nicht). Im 8-Kanal-Modus wirken Dimmer und Strobe nur bei Kanal 7 = 5–233."
+}

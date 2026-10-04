@@ -1,0 +1,80 @@
+{
+  "format_version": 1,
+  "hersteller": "U King",
+  "hersteller_kurz": "UKING",
+  "modell": "ZQ-B117 Par Can 4in1 RGBW",
+  "kurzname": "ZQB117",
+  "typ": "par",
+  "leistung_w": 200,
+  "notizen": "Kein Herstellerhandbuch abrufbar; Kanalfolge und Wertebereiche aus der QLC+-Datei. Strobe-Kanaele ohne Wertangabe in QLC+: 0 = kein Strobe angenommen (wie bei den eingebauten U-King-Profilen). Kanal 7 waehlt Programme (0-50 = DMX-Steuerung), Kanal 8 ist deren Geschwindigkeit.",
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition UKing-ZQB117-Par-Can-4in1-RGBW.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/UKing/UKing-ZQB117-Par-Can-4in1-RGBW.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.7 · Turning Point",
+    "original": "resources/fixtures/UKing/UKing-ZQB117-Par-Can-4in1-RGBW.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 7 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): Hersteller 'UKing' -> 'U King' (wie die eingebauten LightOS-Profile der Marke); Attribute korrigiert (Speed function: speed->effect_speed); Strobe-Kanal ohne Bereiche (QLC+-Preset ShutterStrobeSlowFast) mit 0 = kein Strobe (open) / 1-255 Strobe versehen (Strobe); 4 Bereichs-Arten nachgezogen (Farb-/Gobo-Slots, Shake/Rotation, Prisma, Sound, Reset; Programm-Bereiche in Makro-Kanaelen ohne Farb-Art); Tippfehler 'Funtion' im Kanalnamen korrigiert; einzelne Kanalnamen deutsch bzw. eindeutiger benannt"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Originaldatei geprueft und nach den LightOS-Regeln (SCHEMA.md) nachbearbeitet; ein Herstellerhandbuch war nicht abrufbar (U'King-Anleitungen nur als Amazon-/manuals.plus-PDF, dort gesperrt; ManualsLib fuehrt das Modell nicht), daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "8 Channel",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 1, "bis": 255, "name": "Strobe langsam → schnell", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Funktion / Programm",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 50, "name": "DMX 8CH Control", "art": ""},
+            {"von": 51, "bis": 100, "name": "Different Color Output", "art": ""},
+            {"von": 101, "bis": 150, "name": "Colors Jump Change", "art": ""},
+            {"von": 151, "bis": 200, "name": "Colors Gradate", "art": ""},
+            {"von": 201, "bis": 250, "name": "Colors Pulse Change", "art": ""},
+            {"von": 251, "bis": 255, "name": "Sound-Active", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Speed function",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Speed function, from slow to fast", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4 Channel",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    }
+  ]
+}

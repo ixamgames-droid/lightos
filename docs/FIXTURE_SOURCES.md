@@ -30,10 +30,34 @@ Builtins wie ZQ02001) werden **nie** überschrieben.
 - DMX-Kanalbelegungen aus Bedienungsanleitungen sind Faktendaten und dürfen
   als eigenes Fixture-Profil erfasst werden (Fixture-Editor in LightOS).
 
-## Was du manuell bereitstellen musst
+## Bibliothek herunterladen (FM-53)
 
-LightOS lädt bewusst **nichts automatisch aus dem Netz**. Für eine
-Massen-Erweiterung der Bibliothek:
+Beim **ersten Start** fragt LightOS, ob eine freie Geräte-Bibliothek geladen
+werden soll — aber nur, solange die Bibliothek nichts außer den mitgelieferten
+Profilen enthält (den eingebauten und denen der LightOS-Bibliothek unter
+`fixtures/bibliothek/`, FM-60). Ohne Zustimmung wird **nichts** heruntergeladen. Später geht
+es jederzeit über **Datenbank → Geräte-Bibliothek herunterladen...**
+
+- **Quellen:** QLC+-Fixtures einer festen Version (Apache-2.0, GitHub-Archiv)
+  oder die Open Fixture Library als QLC+-Export (MIT). Lizenz, Link und
+  ungefähre Größe (QLC+ ca. 12,7 MB, OFL ca. 2,7 MB) stehen im Dialog, **bevor**
+  geladen wird. Bis zum Klick auf **Herunterladen** geht keine Anfrage ins Netz.
+- **Was passiert:** Download mit SHA-256-Prüfsumme (bei QLC+ gegen die geprüfte
+  Fassung; weicht die Datei ab, wird nichts importiert und der Dialog sagt
+  warum) → nur die `.qxf`-Dateien
+  werden ausgepackt → Import über den vorhandenen QLC+-Import. Vorhandene und
+  eigene Profile bleiben unverändert, Doppelte werden übersprungen.
+- **Herkunft je Profil:** Quelle, Lizenz, Lizenz-Link, Archiv-Adresse,
+  Prüfsumme und Zeitpunkt stehen in `fixtures.db` (Tabelle `profil_herkunft`).
+- **Abbrechen** ist jederzeit möglich. Während des Downloads bleibt alles, wie es
+  war; im Import bleiben die schon eingelesenen Profile (mit Herkunft) stehen.
+  **Ohne Netz** meldet der Dialog das,
+  ändert nichts und fragt beim nächsten Start erneut; „Nicht jetzt“ dagegen
+  zählt als Antwort, ebenso das Schließen per X oder Esc.
+
+## Was du manuell bereitstellen kannst
+
+Ohne den Download-Dialog, z. B. ohne Internet am Rechner:
 
 1. QLC+ herunterladen/installieren **oder** das QLC+-Repo als ZIP laden,
 2. den Ordner `resources/fixtures` (bzw. `Fixtures` der Installation)

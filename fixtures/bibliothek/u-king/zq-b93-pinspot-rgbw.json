@@ -1,0 +1,73 @@
+{
+  "format_version": 1,
+  "hersteller": "U King",
+  "hersteller_kurz": "UKING",
+  "modell": "ZQ-B93 Pinspot RGBW",
+  "kurzname": "ZQB93",
+  "typ": "par",
+  "leistung_w": 17,
+  "notizen": "Kein Herstellerhandbuch abrufbar; Kanalfolge und Wertebereiche aus der QLC+-Datei. Strobe-Kanaele ohne Wertangabe in QLC+: 0 = kein Strobe angenommen (wie bei den eingebauten U-King-Profilen). Kanal 1 vereint Aus / Weiss-Dimmer / RGBW-Strobe / RGBW an; Grundwert 255 (RGBW an) wie in der QLC+-Datei.",
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition UKing-ZQB93-Pinspot-RGBW.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/UKing/UKing-ZQB93-Pinspot-RGBW.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.7 GIT · Jarosław Biernacki",
+    "original": "resources/fixtures/UKing/UKing-ZQB93-Pinspot-RGBW.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 20 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): Hersteller 'UKing' -> 'U King' (wie die eingebauten LightOS-Profile der Marke); Total function control: Gesamtfunktions-Kanal von macro zu shutter (Aus closed, Strobe strobe, RGBW an open; Default/Highlight 255); Attribute korrigiert (Total function control: macro->shutter); Shutter-Default/Highlight auf den Offen-Wert (Total function control 0->255); einzelne Kanalnamen deutsch bzw. eindeutiger benannt"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Originaldatei geprueft und nach den LightOS-Regeln (SCHEMA.md) nachbearbeitet; ein Herstellerhandbuch war nicht abrufbar (U'King-Anleitungen nur als Amazon-/manuals.plus-PDF, dort gesperrt; ManualsLib fuehrt das Modell nicht), daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "6-channel",
+      "kanaele": [
+        {
+          "name": "Gesamtfunktion (Aus/Dimmer/Strobe/An)",
+          "attribut": "shutter",
+          "default": 255,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 8, "name": "Aus", "art": "closed"},
+            {"von": 9, "bis": 134, "name": "Nur Weiss, Dimmer", "art": ""},
+            {"von": 135, "bis": 239, "name": "RGBW-Strobe langsam → schnell", "art": "strobe"},
+            {"von": 240, "bis": 255, "name": "RGBW an (offen)", "art": "open"}
+          ]
+        },
+        {"name": "Red LED Dimming", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green LED Dimming", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue LED Dimming", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White LED Dimming", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Auto FX",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 8, "name": "No operation", "art": ""},
+            {"von": 9, "bis": 31, "name": "Mode 1", "art": ""},
+            {"von": 32, "bis": 63, "name": "Mode 2", "art": ""},
+            {"von": 64, "bis": 79, "name": "Mode 3", "art": ""},
+            {"von": 80, "bis": 95, "name": "Mode 4", "art": ""},
+            {"von": 96, "bis": 111, "name": "Mode 5", "art": ""},
+            {"von": 112, "bis": 127, "name": "Mode 6", "art": ""},
+            {"von": 128, "bis": 143, "name": "Mode 7", "art": ""},
+            {"von": 144, "bis": 159, "name": "Mode 8", "art": ""},
+            {"von": 160, "bis": 175, "name": "Mode 9", "art": ""},
+            {"von": 176, "bis": 191, "name": "Mode 10", "art": ""},
+            {"von": 192, "bis": 207, "name": "Mode 11", "art": ""},
+            {"von": 208, "bis": 223, "name": "Mode 12", "art": ""},
+            {"von": 224, "bis": 239, "name": "Sound Mode 1", "art": "sound"},
+            {"von": 240, "bis": 249, "name": "Sound Mode 2", "art": "sound"},
+            {"von": 250, "bis": 255, "name": "Sound Mode 3", "art": "sound"}
+          ]
+        }
+      ]
+    }
+  ]
+}

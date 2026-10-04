@@ -1,0 +1,137 @@
+{
+  "format_version": 1,
+  "hersteller": "Stairville",
+  "hersteller_kurz": "STAIR",
+  "modell": "LED Flood Panel 150",
+  "kurzname": "FLOOD150",
+  "typ": "par",
+  "leistung_w": 18,
+  "quelle": {
+    "titel": "Stairville LED Flood Panel 150 20° / 40°, User Manual (Thomann, Art. 253358/253359)",
+    "url": "https://fast-images.static-thomann.de/pics/atg/atgdata/document/manual/c_253358_253359_v5_en_online.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.10.4 · Ralf Herold",
+    "original": "resources/fixtures/Stairville/Stairville-LED-Flood-Panel-150.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 125 Wertebereiche mit Art (kind) versehen; 3-/4-Kanal: Kanal Rot als reiner Rotkanal (color_r) statt intensity mit Farbvorgabe-Bereichen — laut Handbuch gibt es dort keine Farbvorgaben; 8-Kanal: Kanal 2 als color_r statt intensity; die 29 Farbvorgaben (nur aktiv bei Kanal 6 = 1–24) stehen in den Notizen statt als Farb-Bereiche, damit der Rotkanal ein normaler Fader bleibt; 8-Kanal: Strobe als shutter mit Offen-Bereich 0–9 statt speed; 8-Kanal: falsche Art color an Programmbereichen entfernt, Musiksteuerung art sound; 8-Kanal: ID- und Ansprechverhalten-Kanal als raw statt zweitem/drittem macro; Modusnamen 3-/4-/8-Kanal; Kanal-/Bereichsnamen deutsch; Kurzname; hersteller_kurz STAIR; Quelle auf Herstellerhandbuch gesetzt"
+  },
+  "autor": "LightOS",
+  "geprueft": {"ok": true, "wie": "Kanal fuer Kanal gegen das Handbuch (Kap. 7.3, 3/4/8 Kanaele) geprueft"},
+  "modi": [
+    {
+      "name": "3-Kanal",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "4-Kanal",
+      "kanaele": [
+        {
+          "name": "Dimmer",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dimmer 0 % → 100 %"}
+          ]
+        },
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "8-Kanal",
+      "kanaele": [
+        {
+          "name": "Dimmer",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dimmer 0 % → 100 %"}
+          ]
+        },
+        {"name": "Rot / Farbvorgabe / Speed", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Kein Strobe", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe langsam → schnell", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Betriebsart",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "RGB-Mischung (Kanaele 2–4)"},
+            {"von": 1, "bis": 24, "name": "Feste Farbe, Auswahl ueber Kanal 2"},
+            {"von": 25, "bis": 49, "name": "Pr02 Fade 7 Farben"},
+            {"von": 50, "bis": 74, "name": "Pr03 Fade 3 Farben"},
+            {"von": 75, "bis": 99, "name": "Pr04 Sprung 7 Farben"},
+            {"von": 100, "bis": 124, "name": "Pr05 Sprung 3 Farben"},
+            {"von": 125, "bis": 149, "name": "Pr06 Zufall 1"},
+            {"von": 150, "bis": 174, "name": "Pr07 Zufall 2"},
+            {"von": 175, "bis": 199, "name": "Pr08 Fade nur Rot"},
+            {"von": 200, "bis": 224, "name": "Pr09 Fade nur Gruen"},
+            {"von": 225, "bis": 249, "name": "Pr10 Fade nur Blau"},
+            {"von": 250, "bis": 255, "name": "Musiksteuerung", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Geraete-ID",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Alle IDs (ID1 … ID66)"},
+            {"von": 10, "bis": 19, "name": "ID1"},
+            {"von": 20, "bis": 29, "name": "ID2"},
+            {"von": 30, "bis": 39, "name": "ID3"},
+            {"von": 40, "bis": 49, "name": "ID4"},
+            {"von": 50, "bis": 59, "name": "ID5"},
+            {"von": 60, "bis": 69, "name": "ID6"},
+            {"von": 70, "bis": 79, "name": "ID7"},
+            {"von": 80, "bis": 89, "name": "ID8"},
+            {"von": 90, "bis": 99, "name": "ID9"},
+            {"von": 100, "bis": 109, "name": "ID10"},
+            {"von": 110, "bis": 119, "name": "ID11"},
+            {"von": 120, "bis": 129, "name": "ID12"},
+            {"von": 130, "bis": 139, "name": "ID13"},
+            {"von": 140, "bis": 149, "name": "ID14"},
+            {"von": 150, "bis": 159, "name": "ID15"},
+            {"von": 160, "bis": 169, "name": "ID16"},
+            {"von": 170, "bis": 179, "name": "ID17"},
+            {"von": 180, "bis": 189, "name": "ID18"},
+            {"von": 190, "bis": 199, "name": "ID19"},
+            {"von": 200, "bis": 209, "name": "ID20"},
+            {"von": 210, "bis": 255, "name": "ID21 … ID66 (je ein Wert)"}
+          ]
+        },
+        {
+          "name": "LED-Ansprechverhalten",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 250, "name": "Keine Funktion"},
+            {"von": 251, "bis": 255, "name": "Verzoegertes Hochfahren der LEDs"}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Gilt fuer 20°- und 40°-Version. 8-Kanal: Ist Kanal 6 = 1–24, waehlt Kanal 2 eine von 29 Farbvorgaben (je 9 Werte: 0–8 Rot, 9–17 Rot+Gruen 50, … 252–255 Weiss); bei Kanal 6 = 25–249 ist Kanal 2 die Programm-Geschwindigkeit, bei 250–255 die Mikrofon-Empfindlichkeit. Kanal 7 adressiert Geraete-Gruppen ueber die im Menue gesetzte ID."
+}

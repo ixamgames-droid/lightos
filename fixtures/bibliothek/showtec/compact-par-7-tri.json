@@ -1,0 +1,132 @@
+{
+  "format_version": 1,
+  "hersteller": "Showtec",
+  "hersteller_kurz": "Showtec",
+  "modell": "Compact Par 7 Tri",
+  "kurzname": "CPAR7TRI",
+  "typ": "par",
+  "leistung_w": 50,
+  "notizen": "Im 8-Kanal-Modus haengt CH2 von CH6 ab: CH6 = 0 -> Rot; 1-24 -> RGB-Makro (29 Farben); 25-249 -> Programmtempo; 250-255 -> Sound-Empfindlichkeit.",
+  "quelle": {
+    "titel": "Showtec Compact Par 7 Tri — User Manual (Ordercode 42580)",
+    "url": "https://images.static-thomann.de/pics/atg/atgdata/document/manual/300407_compact_par_7_uk.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.0 GIT · sonozikloc",
+    "original": "resources/fixtures/Showtec/Showtec-Compact-Par-7-Tri.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 46 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): gegen Handbuch abgeglichen; kurzname CPAR7TRI; Leistung 50 W (Dauerleistung laut Handbuch); Modusname '8  Channel' -> '8 Channel' (doppeltes Leerzeichen); CH2 im 8-Kanal-Modus als Mehrfachkanal benannt; Strobe-Default 0; Farbprogramme als macro statt color_wheel, Programme ohne falsche art color; ID-Kanal als raw, Bereich 213-250 korrigiert (QLC+: 'ID 63'); Fader-Response-Bereiche deutsch"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal fuer Kanal gegen das Herstellerhandbuch (Highlite/Showtec, ueber Thomann) geprueft: 3-, 4- und 8-Kanal-Modus"
+  },
+  "modi": [
+    {
+      "name": "4 Channel",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "8 Channel",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Red / RGB-Makro / Tempo / Sound (je nach CH6)", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe langsam -> schnell (0-20 Blitze/s)", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Color programs",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Keine Funktion"},
+            {"von": 1, "bis": 24, "name": "Statische Farbe: 29 RGB-Makros ueber CH2"},
+            {"von": 25, "bis": 49, "name": "Programm 2 (7 Farben, weicher Wechsel)"},
+            {"von": 50, "bis": 74, "name": "Programm 3 (3 Farben, weicher Wechsel)"},
+            {"von": 75, "bis": 99, "name": "Programm 4 (7 Farben, harter Wechsel)"},
+            {"von": 100, "bis": 124, "name": "Programm 5 (3 Farben, harter Wechsel)"},
+            {"von": 125, "bis": 149, "name": "Programm 6 (Fantasy 1)"},
+            {"von": 150, "bis": 174, "name": "Programm 7 (Fantasy 2)"},
+            {"von": 175, "bis": 199, "name": "Programm 8 (Rot-Verlauf)"},
+            {"von": 200, "bis": 224, "name": "Programm 9 (Gruen-Verlauf)"},
+            {"von": 225, "bis": 249, "name": "Programm 10 (Blau-Verlauf)"},
+            {"von": 250, "bis": 255, "name": "Musiksteuerung", "art": "sound"}
+          ]
+        },
+        {
+          "name": "ID Adresse",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "ID 1-66 (alle)"},
+            {"von": 10, "bis": 19, "name": "ID 1"},
+            {"von": 20, "bis": 29, "name": "ID 2"},
+            {"von": 30, "bis": 39, "name": "ID 3"},
+            {"von": 40, "bis": 49, "name": "ID 4"},
+            {"von": 50, "bis": 59, "name": "ID 5"},
+            {"von": 60, "bis": 69, "name": "ID 6"},
+            {"von": 70, "bis": 79, "name": "ID 7"},
+            {"von": 80, "bis": 89, "name": "ID 8"},
+            {"von": 90, "bis": 99, "name": "ID 9"},
+            {"von": 100, "bis": 109, "name": "ID 10"},
+            {"von": 110, "bis": 119, "name": "ID 11"},
+            {"von": 120, "bis": 129, "name": "ID 12"},
+            {"von": 130, "bis": 139, "name": "ID 13"},
+            {"von": 140, "bis": 149, "name": "ID 14"},
+            {"von": 150, "bis": 159, "name": "ID 15"},
+            {"von": 160, "bis": 169, "name": "ID 16"},
+            {"von": 170, "bis": 179, "name": "ID 17"},
+            {"von": 180, "bis": 189, "name": "ID 18"},
+            {"von": 190, "bis": 199, "name": "ID 19"},
+            {"von": 200, "bis": 209, "name": "ID 20"},
+            {"von": 210, "bis": 210, "name": "ID 21"},
+            {"von": 211, "bis": 211, "name": "ID 22"},
+            {"von": 212, "bis": 212, "name": "ID 23"},
+            {"von": 213, "bis": 250, "name": "ID 24-61 (je Wert eine ID)"},
+            {"von": 251, "bis": 251, "name": "ID 62"},
+            {"von": 252, "bis": 252, "name": "ID 63"},
+            {"von": 253, "bis": 253, "name": "ID 64"},
+            {"von": 254, "bis": 254, "name": "ID 65"},
+            {"von": 255, "bis": 255, "name": "ID 66"}
+          ]
+        },
+        {
+          "name": "Fader response",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 250, "name": "CH1-CH4 sofortige Reaktion"},
+            {"von": 251, "bis": 255, "name": "CH1-CH4 verzoegerte Reaktion"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3 Channel",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    }
+  ]
+}

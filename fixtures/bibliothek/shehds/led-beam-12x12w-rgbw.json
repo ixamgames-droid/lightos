@@ -1,0 +1,86 @@
+{
+  "format_version": 1,
+  "hersteller": "Shehds",
+  "hersteller_kurz": "Shehds",
+  "modell": "LED Beam 12x12W RGBW",
+  "kurzname": "SH-BEAM12X12",
+  "typ": "moving_head",
+  "leistung_w": 144,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Shehds-LED-Beam-12x12W-RGBW.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Shehds/Shehds-LED-Beam-12x12W-RGBW.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.13.2 GIT · Lukas Hanisch",
+    "original": "resources/fixtures/Shehds/Shehds-LED-Beam-12x12W-RGBW.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 4 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): RGB-Mixer (Farbprogramm) als macro, Mixer-Tempo als effect_speed statt color_wheel; kurzname SH-BEAM12X12; Programm-/Effekt-Geschwindigkeiten als effect_speed statt speed (speed = Bewegung)"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": false,
+    "wie": "nicht gegen ein Herstellerhandbuch geprueft (kein oeffentliches Shehds-Handbuch zu diesem Modell auffindbar); Kanalbelegung und Wertebereiche aus der QLC+-Vorlage, Attribute, Bereichs-Arten und Defaults von LightOS plausibilisiert"
+  },
+  "modi": [
+    {
+      "name": "9 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Strobe", "attribut": "shutter", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt speed", "attribut": "speed", "default": 0, "highlight": 0}
+      ]
+    },
+    {
+      "name": "16 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Strobe", "attribut": "shutter", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "RGB mixer", "attribut": "macro", "default": 0, "highlight": 0},
+        {"name": "RGB Mixer Speed Control", "attribut": "effect_speed", "default": 0, "highlight": 0},
+        {
+          "name": "Default",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "No function", "art": ""}
+          ]
+        },
+        {
+          "name": "Default Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "No function", "art": ""}
+          ]
+        },
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Reset", "art": "reset"}
+          ]
+        }
+      ]
+    }
+  ]
+}

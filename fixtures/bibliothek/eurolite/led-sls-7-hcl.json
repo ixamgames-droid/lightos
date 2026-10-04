@@ -1,0 +1,200 @@
+{
+  "format_version": 1,
+  "hersteller": "Eurolite",
+  "hersteller_kurz": "Eurolite",
+  "modell": "LED SLS-7 HCL",
+  "kurzname": "LED SLS-7 HCL",
+  "typ": "par",
+  "leistung_w": 20,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Eurolite-LED-SLS-7-HCL.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Eurolite/Eurolite-LED-SLS-7-HCL.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.5 GIT · René Schulze",
+    "original": "resources/fixtures/Eurolite/Eurolite-LED-SLS-7-HCL.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 74 Wertebereiche mit Art (kind) versehen; Strobe 0-10 als 'open'; Programme: Farbueberblendung/-wechsel als 'rotate' statt 'color'; Modusname-Tippfehler '4-Cannnel' -> '4-Channel'"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Datei und die LightOS-Attributliste geprueft (Attribute, Bereichs-Arten, Defaults, Raster); Herstellerhandbuch mit DMX-Tabelle war nicht abrufbar (Steinigke liefert nur Datenblaetter ohne DMX-Protokoll), daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "2-channel",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Color Presets",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": ""},
+            {"von": 10, "bis": 19, "name": "Red", "art": "color"},
+            {"von": 20, "bis": 29, "name": "Green", "art": "color"},
+            {"von": 30, "bis": 39, "name": "Blue", "art": "color"},
+            {"von": 40, "bis": 49, "name": "White", "art": "color"},
+            {"von": 50, "bis": 59, "name": "Amber", "art": "color"},
+            {"von": 60, "bis": 69, "name": "UV", "art": "color"},
+            {"von": 70, "bis": 79, "name": "Yellow", "art": "color"},
+            {"von": 80, "bis": 89, "name": "Magenta", "art": "color"},
+            {"von": 90, "bis": 99, "name": "Cyan", "art": "color"},
+            {"von": 100, "bis": 109, "name": "Dark Orange", "art": "color"},
+            {"von": 110, "bis": 119, "name": "Green Yellow", "art": "color"},
+            {"von": 120, "bis": 129, "name": "Salmon", "art": "color"},
+            {"von": 130, "bis": 139, "name": "Ice Blue", "art": "color"},
+            {"von": 140, "bis": 149, "name": "Light Green", "art": "color"},
+            {"von": 150, "bis": 159, "name": "Orange", "art": "color"},
+            {"von": 160, "bis": 169, "name": "Lavender", "art": "color"},
+            {"von": 170, "bis": 179, "name": "Steel Blue", "art": "color"},
+            {"von": 180, "bis": 189, "name": "Dark Blue", "art": "color"},
+            {"von": 190, "bis": 255, "name": "Pink", "art": "color"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3-channel",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "4-Channel",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Kein Strobe", "art": "open"},
+            {"von": 11, "bis": 255, "name": "Strobe with increasing speed", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Color Presets",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": ""},
+            {"von": 10, "bis": 19, "name": "Red", "art": "color"},
+            {"von": 20, "bis": 29, "name": "Green", "art": "color"},
+            {"von": 30, "bis": 39, "name": "Blue", "art": "color"},
+            {"von": 40, "bis": 49, "name": "White", "art": "color"},
+            {"von": 50, "bis": 59, "name": "Amber", "art": "color"},
+            {"von": 60, "bis": 69, "name": "UV", "art": "color"},
+            {"von": 70, "bis": 79, "name": "Yellow", "art": "color"},
+            {"von": 80, "bis": 89, "name": "Magenta", "art": "color"},
+            {"von": 90, "bis": 99, "name": "Cyan", "art": "color"},
+            {"von": 100, "bis": 109, "name": "Dark Orange", "art": "color"},
+            {"von": 110, "bis": 119, "name": "Green Yellow", "art": "color"},
+            {"von": 120, "bis": 129, "name": "Salmon", "art": "color"},
+            {"von": 130, "bis": 139, "name": "Ice Blue", "art": "color"},
+            {"von": 140, "bis": 149, "name": "Light Green", "art": "color"},
+            {"von": 150, "bis": 159, "name": "Orange", "art": "color"},
+            {"von": 160, "bis": 169, "name": "Lavender", "art": "color"},
+            {"von": 170, "bis": 179, "name": "Steel Blue", "art": "color"},
+            {"von": 180, "bis": 189, "name": "Dark Blue", "art": "color"},
+            {"von": 190, "bis": 255, "name": "Pink", "art": "color"}
+          ]
+        },
+        {
+          "name": "Internal Programs",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": ""},
+            {"von": 10, "bis": 69, "name": "Color fade with increasing speed", "art": "rotate"},
+            {"von": 70, "bis": 129, "name": "Color change with increasing speed", "art": "rotate"},
+            {"von": 130, "bis": 189, "name": "Sound mode color fade with increasing speed", "art": "sound"},
+            {"von": 190, "bis": 255, "name": "Sound mode color change with increasing speed", "art": "sound"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6-Channel",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "10-Channel",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Kein Strobe", "art": "open"},
+            {"von": 11, "bis": 255, "name": "Strobe with increasing speed", "art": "strobe"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {
+          "name": "Color Presets",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": ""},
+            {"von": 10, "bis": 19, "name": "Red", "art": "color"},
+            {"von": 20, "bis": 29, "name": "Green", "art": "color"},
+            {"von": 30, "bis": 39, "name": "Blue", "art": "color"},
+            {"von": 40, "bis": 49, "name": "White", "art": "color"},
+            {"von": 50, "bis": 59, "name": "Amber", "art": "color"},
+            {"von": 60, "bis": 69, "name": "UV", "art": "color"},
+            {"von": 70, "bis": 79, "name": "Yellow", "art": "color"},
+            {"von": 80, "bis": 89, "name": "Magenta", "art": "color"},
+            {"von": 90, "bis": 99, "name": "Cyan", "art": "color"},
+            {"von": 100, "bis": 109, "name": "Dark Orange", "art": "color"},
+            {"von": 110, "bis": 119, "name": "Green Yellow", "art": "color"},
+            {"von": 120, "bis": 129, "name": "Salmon", "art": "color"},
+            {"von": 130, "bis": 139, "name": "Ice Blue", "art": "color"},
+            {"von": 140, "bis": 149, "name": "Light Green", "art": "color"},
+            {"von": 150, "bis": 159, "name": "Orange", "art": "color"},
+            {"von": 160, "bis": 169, "name": "Lavender", "art": "color"},
+            {"von": 170, "bis": 179, "name": "Steel Blue", "art": "color"},
+            {"von": 180, "bis": 189, "name": "Dark Blue", "art": "color"},
+            {"von": 190, "bis": 255, "name": "Pink", "art": "color"}
+          ]
+        },
+        {
+          "name": "Internal Programs",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function", "art": ""},
+            {"von": 10, "bis": 69, "name": "Color fade with increasing speed", "art": "rotate"},
+            {"von": 70, "bis": 129, "name": "Color change with increasing speed", "art": "rotate"},
+            {"von": 130, "bis": 189, "name": "Sound mode color fade with increasing speed", "art": "sound"},
+            {"von": 190, "bis": 255, "name": "Sound mode color change with increasing speed", "art": "sound"}
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,109 @@
+{
+  "format_version": 1,
+  "hersteller": "American DJ",
+  "hersteller_kurz": "ADJ",
+  "modell": "FREQ 5 Strobe",
+  "kurzname": "FREQ5",
+  "typ": "strobe",
+  "leistung_w": 28,
+  "quelle": {
+    "titel": "American DJ FREQ 5 Strobe Instruction Manual",
+    "url": "https://static.rapidonline.com/pdf/591612_an_en_01.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.1 GIT · Martin Bochenek",
+    "original": "resources/fixtures/American_DJ/American-DJ-FREQ-5-Strobe.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 25 Wertebereiche mit Art (kind) versehen; Rasterform aus <Physical> in 4 Modus/Modi nicht uebernommen, weil sie nicht zu den color_r-Kanaelen passt (keine echten Farbzonen); danach von LightOS gegen das Herstellerhandbuch ueberarbeitet: Shutter-Bereiche nach Handbuch klassifiziert (aus=closed, LED an=open, alle Strobe-/Puls-/Random-/Rampen-Bereiche=strobe), Default/Highlight auf Mitte des ersten Offen-Bereichs; Strobe-Bereiche 'Off' = kein Strobe (Handbuch: Off/No Function) als open, Default/Highlight darauf; Modi aufsteigend sortiert (1/2/5/7 Kanal wie im Handbuch); Zonen-Dimmer als dimmer (5 Zellen), Master als intensity, damit der Master nicht als sechste Zelle zaehlt; typ strobe statt led_bar; Show-Kanal 0-7 = Blackout (closed); Strobe-Kanal im 2-Kanal-Modus mit Offen-Bereich"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal fuer Kanal gegen die DMX-Tabellen (1/2/5/7 Kanal, S. 15-16) im American-DJ-Handbuch geprueft; nicht am Geraet getestet"
+  },
+  "modi": [
+    {
+      "name": "1 Channel",
+      "kanaele": [
+        {
+          "name": "Shows",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Blackout", "art": "closed"},
+            {"von": 8, "bis": 27, "name": "Show 1", "art": ""},
+            {"von": 28, "bis": 47, "name": "Show 2", "art": ""},
+            {"von": 48, "bis": 67, "name": "Show 3", "art": ""},
+            {"von": 68, "bis": 87, "name": "Show 4", "art": ""},
+            {"von": 88, "bis": 107, "name": "Show 5", "art": ""},
+            {"von": 108, "bis": 127, "name": "Show 6", "art": ""},
+            {"von": 128, "bis": 147, "name": "Show 7", "art": ""},
+            {"von": 148, "bis": 167, "name": "Show 8", "art": ""},
+            {"von": 168, "bis": 187, "name": "Show 9", "art": ""},
+            {"von": 188, "bis": 207, "name": "Show 10", "art": ""},
+            {"von": 208, "bis": 227, "name": "Show 11", "art": ""},
+            {"von": 228, "bis": 247, "name": "Show 12", "art": ""},
+            {"von": 248, "bis": 255, "name": "Random Show", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2 Channels",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobing",
+          "attribut": "shutter",
+          "default": 4,
+          "highlight": 4,
+          "bereiche": [
+            {"von": 0, "bis": 8, "name": "Kein Strobe", "art": "open"},
+            {"von": 9, "bis": 255, "name": "Strobe langsam-schnell", "art": "strobe"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5 Channels",
+      "kanaele": [
+        {"name": "Zone 1 Dimmer", "attribut": "dimmer", "default": 0, "highlight": 255},
+        {"name": "Zone 2 Dimmer", "attribut": "dimmer", "default": 0, "highlight": 255},
+        {"name": "Zone 3 Dimmer", "attribut": "dimmer", "default": 0, "highlight": 255},
+        {"name": "Zone 4 Dimmer", "attribut": "dimmer", "default": 0, "highlight": 255},
+        {"name": "Zone 5 Dimmer", "attribut": "dimmer", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "7 Channels",
+      "kanaele": [
+        {"name": "Zone 1 Dimmer", "attribut": "dimmer", "default": 0, "highlight": 255},
+        {"name": "Zone 2 Dimmer", "attribut": "dimmer", "default": 0, "highlight": 255},
+        {"name": "Zone 3 Dimmer", "attribut": "dimmer", "default": 0, "highlight": 255},
+        {"name": "Zone 4 Dimmer", "attribut": "dimmer", "default": 0, "highlight": 255},
+        {"name": "Zone 5 Dimmer", "attribut": "dimmer", "default": 0, "highlight": 255},
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobing",
+          "attribut": "shutter",
+          "default": 4,
+          "highlight": 4,
+          "bereiche": [
+            {"von": 0, "bis": 8, "name": "Kein Strobe", "art": "open"},
+            {"von": 9, "bis": 131, "name": "Strobing Slow - Fast", "art": "strobe"},
+            {"von": 132, "bis": 139, "name": "Kein Strobe", "art": "open"},
+            {"von": 140, "bis": 181, "name": "Slow Open - Fast Close", "art": "strobe"},
+            {"von": 182, "bis": 189, "name": "Kein Strobe", "art": "open"},
+            {"von": 190, "bis": 231, "name": "Fast Open - Slow Close", "art": "strobe"},
+            {"von": 232, "bis": 239, "name": "Kein Strobe", "art": "open"},
+            {"von": 240, "bis": 247, "name": "Sound Active", "art": "sound"},
+            {"von": 248, "bis": 255, "name": "Kein Strobe", "art": "open"}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "5-Zonen-LED-Strobe. Leistungsangabe aus QLC+."
+}

@@ -1,0 +1,220 @@
+{
+  "format_version": 1,
+  "hersteller": "Cameo",
+  "hersteller_kurz": "Cameo",
+  "modell": "Flash Bar 150",
+  "kurzname": "Flash Bar 150",
+  "typ": "strobe",
+  "leistung_w": 90,
+  "quelle": {
+    "titel": "Cameo FLASH BAR 150 – DMX Control Table",
+    "url": "https://www.cameolight.com/en/downloads/file/id/486222390"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.11.3 GIT · Kevin Wimmer",
+    "original": "resources/fixtures/Cameo/Cameo-Flash-Bar-150.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 31 Wertebereiche mit Art (kind) versehen; Blitzdauer speed -> duration; 5/20-Kanal: Auto-Programm-Kanal laut Herstellertabelle korrigiert — Programm 5 nur 202-250, 251-255 'Sound Mode' (QLC+: Programm 5 bis 255); Auto-Speed/Mikrofonempfindlichkeit macro -> effect_speed; 15/20-Kanal: 15 Einzel-LED-Dimmer als Raster 1x15; Namen wie im Handbuch ('Dimmer LED n'); Strobe-Default/-Highlight auf 0 (Strobe aus) in 4 Kanaelen; Rasterform in 2 Modus/Modi entfernt, weil sie nicht zu den color_r-Kanaelen passt (keine echten Farbzonen)"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal fuer Kanal gegen die DMX-Steuertabelle des Herstellers (1/2/3/5/15/20 CH) geprueft: Kanalfolge stimmt, Auto-Programm-Bereich 5/Sound im 5- und 20-Kanal-Modus nach der Tabelle korrigiert; Attribute, Bereichs-Arten, Raster und Defaults von LightOS nachgezogen"
+  },
+  "modi": [
+    {
+      "name": "1 Channel",
+      "kanaele": [
+        {
+          "name": "Auto Programs",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Auto Programs off", "art": ""},
+            {"von": 6, "bis": 54, "name": "Auto Program 1", "art": ""},
+            {"von": 55, "bis": 103, "name": "Auto Program 2", "art": ""},
+            {"von": 104, "bis": 152, "name": "Auto Program 3", "art": ""},
+            {"von": 153, "bis": 201, "name": "Auto Program 4", "art": ""},
+            {"von": 202, "bis": 255, "name": "Auto Program 5", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2 Channel",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe off", "art": "open"},
+            {"von": 6, "bis": 255, "name": "Strobe Speed (slow to fast)", "art": "strobe"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3 Channel",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe off", "art": "open"},
+            {"von": 6, "bis": 255, "name": "Strobe Speed (slow to fast)", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Duration",
+          "attribut": "duration",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Flash Duration (0ms to 510ms)", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5 Channel",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe off", "art": "open"},
+            {"von": 6, "bis": 255, "name": "Strobe Speed (slow to fast)", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Duration",
+          "attribut": "duration",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Flash Duration (0ms to 510ms)", "art": ""}
+          ]
+        },
+        {
+          "name": "Auto Programs (override CH1-3)",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Auto Programs off", "art": ""},
+            {"von": 6, "bis": 54, "name": "Auto Program 1", "art": ""},
+            {"von": 55, "bis": 103, "name": "Auto Program 2", "art": ""},
+            {"von": 104, "bis": 152, "name": "Auto Program 3", "art": ""},
+            {"von": 153, "bis": 201, "name": "Auto Program 4", "art": ""},
+            {"von": 202, "bis": 250, "name": "Auto Program 5", "art": ""},
+            {"von": 251, "bis": 255, "name": "Sound Mode", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Auto Speed / Sound Sensitivity",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Auto Speed (slow to fast) / Sound Sensitivity", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "15 Channel",
+      "kanaele": [
+        {"name": "Dimmer LED 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Dimmer LED 2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Dimmer LED 3", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Dimmer LED 4", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Dimmer LED 5", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Dimmer LED 6", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Dimmer LED 7", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Dimmer LED 8", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Dimmer LED 9", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Dimmer LED 10", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Dimmer LED 11", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Dimmer LED 12", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Dimmer LED 13", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Dimmer LED 14", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Dimmer LED 15", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "20 Channel",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe off", "art": "open"},
+            {"von": 6, "bis": 255, "name": "Strobe Speed (slow to fast)", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Duration",
+          "attribut": "duration",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Flash Duration (0ms to 510ms)", "art": ""}
+          ]
+        },
+        {
+          "name": "Auto Programs (override CH1-3)",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Auto Programs off", "art": ""},
+            {"von": 6, "bis": 54, "name": "Auto Program 1", "art": ""},
+            {"von": 55, "bis": 103, "name": "Auto Program 2", "art": ""},
+            {"von": 104, "bis": 152, "name": "Auto Program 3", "art": ""},
+            {"von": 153, "bis": 201, "name": "Auto Program 4", "art": ""},
+            {"von": 202, "bis": 250, "name": "Auto Program 5", "art": ""},
+            {"von": 251, "bis": 255, "name": "Sound Mode", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Auto Speed / Sound Sensitivity",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Auto Speed (slow to fast) / Sound Sensitivity", "art": ""}
+          ]
+        },
+        {"name": "Dimmer LED 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Dimmer LED 2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Dimmer LED 3", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Dimmer LED 4", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Dimmer LED 5", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Dimmer LED 6", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Dimmer LED 7", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Dimmer LED 8", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Dimmer LED 9", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Dimmer LED 10", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Dimmer LED 11", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Dimmer LED 12", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Dimmer LED 13", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Dimmer LED 14", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Dimmer LED 15", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    }
+  ]
+}

@@ -4,7 +4,7 @@
 
 ## Wozu & was es steuert
 
-Das Live-Edit-Panel fügst du wie jedes andere VC-Element über den Schnell-Button **„Live-Edit"** in der virtuellen Konsole hinzu. Es ist **ein Widget auf der Canvas** (kein separates Fenster): Du platzierst und skalierst es im Bearbeiten-Modus wie einen Fader oder Button, und es bleibt dort verankert. Du kannst mehrere Panels anlegen. Es ersetzt die früheren Baukasten-Bausteine **Controller-Vorlage**, **Color-Chase** und **Chase-Bereich** (siehe [`docs/anleitung_vc_widgets/21_baukasten.md`](anleitung_vc_widgets/21_baukasten.md)).
+Das Live-Edit-Panel fügst du wie jedes andere VC-Element über den Schnell-Button **„Live-Edit"** in der virtuellen Konsole hinzu. Es ist **ein Widget auf der Canvas** (kein separates Fenster): Du platzierst und skalierst es im Bearbeiten-Modus wie einen Fader oder Button, und es bleibt dort verankert. Du kannst mehrere Panels anlegen. Es ersetzt die früheren Baukasten-Bausteine **Color-Chase** und **Chase-Bereich** (siehe [`docs/anleitung_vc_widgets/21_baukasten.md`](anleitung_vc_widgets/21_baukasten.md)). Für die frühere **Controller-Vorlage** gibt es derzeit keinen Ersatz; ein Controller-Layout baust du Widget für Widget nach.
 
 **Wichtig — was gespeichert wird und was nicht:** Das Panel selbst (Größe, Position) und **welche Effekte** du ihm zugewiesen hast, werden mit der Show gespeichert. Die **konkreten Parameter-Änderungen** dagegen sind **flüchtig**: Sie wirken sofort auf den laufenden Effekt, werden aber **nicht** in die Show geschrieben. Speicherst du die Show, sichert LightOS die ursprünglichen Preset-Werte der Effekte — nicht deine Live-Anpassungen. Das Panel ist damit ein Werkzeug zum **Ausprobieren und Feintunen während der Show**, nicht zum dauerhaften Bearbeiten.
 
@@ -46,9 +46,9 @@ Brauchst du später einen Regler mehr, gehst du kurz zurück in den Bearbeiten-M
 
 Die Regler sind **visuell** und passen zum Parameter-Typ:
 
-- **Helligkeit, Ein-/Ausblenden, Schweif** → **Slider**
+- **Helligkeit, Fade ein (s) / Fade aus (s), Schweif** → **Slider**
 - **Läufer-Anzahl, Läufer-Breite** → **−/+ ‑Stepper**
-- **Richtung** → **Pfeil-Buttons** (`→ vorwärts`, `← rückwärts`, `↔ Ping-Pong`, `Mitte↔außen`)
+- **Richtung** → **Pfeil-Buttons**, je nach Effekt-Typ: Matrix `→ vorwärts` / `← rückwärts`, EFX zusätzlich `↔ Ping-Pong`; beim Chaser heißen die Knöpfe „Vorwärts"/„Rückwärts", Ping-Pong steht dort unter **Modus**
 - **Bewegung / andere Auswahl** → **Segment-Buttons** (bei vielen Optionen ein Dropdown)
 - **An/Aus-Parameter** → **Schalter**
 - **Farben / Dimmer-Stufen** → das Sequenz-Feld (siehe oben)
@@ -93,4 +93,4 @@ Alle Live-Änderungen im Panel — Parameter-Werte, Tempo-Modus, BPM/Faktor — 
 - **Flüchtig heißt flüchtig:** Lädst du die Show neu, sind alle Live-Edit-Parameterwerte weg — nur der Programmer-Stand zählt. Das Panel und die Liste der zugewiesenen Effekte kommen aber wieder.
 - **Mehrere Effekte gleichzeitig:** Du kannst beliebig viele Effekte in ein Panel ziehen und über Dropdown/„−"/„+" zwischen ihnen wechseln.
 - **Tap-Bus ist gemeinsam:** Der Tap-Modus nutzt einen der vier festen Tempo-Busse (A–D) — Effekte am selben Bus teilen sich dasselbe getappte Tempo.
-- **Ersatz für die alten Baukasten-Blöcke:** Brauchst du, was früher Controller-Vorlage/Color-Chase/Chase-Bereich geleistet haben, ist das Live-Edit-Panel der aktuelle Weg dazu — siehe die Hinweis-Box in [`21_baukasten.md`](anleitung_vc_widgets/21_baukasten.md).
+- **Ersatz für die alten Baukasten-Blöcke:** Brauchst du, was früher Color-Chase/Chase-Bereich geleistet haben, ist das Live-Edit-Panel der aktuelle Weg dazu (für die Controller-Vorlage gibt es keinen) — siehe die Hinweis-Box in [`21_baukasten.md`](anleitung_vc_widgets/21_baukasten.md).

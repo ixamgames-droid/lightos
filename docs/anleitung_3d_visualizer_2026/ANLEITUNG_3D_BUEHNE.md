@@ -39,12 +39,12 @@ Truss/Stütze (vertikal) · Wand · LED-Wand · Lautsprecher · Publikumsfläche
 2. **Trasse:** „**+ Truss (horizontal)**" legt eine Trasse an (Default 4 m breit, Höhe
    Y=8). Auswählen → im **„Eigenschaften (Selektion)"**-Panel positionieren.
 3. **Positionieren (zuverlässig über Zahlenfelder):** Feld anklicken → `Strg+A` → Wert
-   tippen → **TAB** (committet + springt ins nächste Feld). Beispiel Front-Trasse:
-   `X=0`, `Y=6`, `Z=-2`, `Breite=8`. Zweite Trasse für hinten analog mit `Z=+2`.
-   > **Fallen (siehe BACKLOG VIZ-STAGE-PANEL):** ENTER committet NICHT — immer **TAB**
-   > benutzen. Der „Größe anpassen"-Modus sperrt die Größen-Felder (dann klemmen
-   > Breite/Höhe) → vor dem Tippen ausschalten. Weicht die Panel-Auswahl von der Szene
-   > ab, das Element **in der Szene anklicken** — das re-synchronisiert.
+   tippen. Der Wert gilt **schon beim Tippen**, das Element wandert sofort mit; ENTER
+   oder TAB sind nicht nötig (TAB springt nur ins nächste Feld). Beispiel
+   Front-Trasse: `X=0`, `Y=6`, `Z=-2`, `Breite=8`. Zweite Trasse für hinten analog mit
+   `Z=+2`.
+   > **„Größe anpassen"** schaltet nur die Ziehgriffe am Element in der Szene ein
+   > (Knopf zeigt dann „Größe anpassen: AN"); die Größen-Felder bleiben dabei frei.
 4. **Verschieben per Maus:** Trasse in der Szene anfassen und ziehen — sie bewegt sich in
    der Bodenebene (X/Z ändern sich, Panel aktualisiert live). Präzise Höhe (Y) besser
    über das Zahlenfeld.
@@ -66,7 +66,7 @@ einen Status: `[ ]` = nicht in Szene, `[X]` = platziert.
    > hier nichts abgelegt werden kann — der Drop verpufft nicht still.
 2. **Platzieren per Knopf:** Fixture in der Liste wählen → **„Im Raum platzieren"** →
    der Mesh erscheint sofort in der Szene. Mit **„Entfernen"** verschwindet er wieder.
-2. **Hängen (unten/oben/seitlich)** über „Position & Ausrichtung":
+3. **Hängen (unten/oben/seitlich)** über „Position & Ausrichtung":
    - **Unten an die Trasse (bottom-hung):** `Y` knapp unter die Trassen-Höhe (Trasse
      Y=6 → Fixture `Y=5`), `Z` = Trassen-Z, `X` entlang der Trasse verteilen.
    - **Oben auf die Trasse (top-mount):** `Y` knapp über die Trasse (z. B. `Y=6.5`).
@@ -74,7 +74,7 @@ einen Status: `[ ]` = nicht in Szene, `[X]` = platziert.
      mit **Drehen (Hochachse Y)** zur Seite ausrichten.
    > **Hinweis (Fix VIZ-FIX-DECIMAL erledigt):** Die Positions-/Ausrichtungsfelder akzeptieren
    > Punkt UND Komma — „5.7" und „5,7" werden beide korrekt als 5,7 übernommen.
-3. **Ausrichten:** **Drehen (Hochachse Y)** / **Kippen (auf/ab X)** / **Roll (seitlich Z)**
+4. **Ausrichten:** **Drehen (Hochachse Y)** / **Kippen (auf/ab X)** / **Roll (seitlich Z)**
    je Fixture; Moving Heads folgen zusätzlich ihren Pan/Tilt-DMX-Werten live.
 
 ## Teil C — Speichern
@@ -85,15 +85,15 @@ einen Status: `[ ]` = nicht in Szene, `[X]` = platziert.
 
 ## Verifikation
 - **Lint-Gate:** `./venv/Scripts/python.exe tools/lint_show.py --strict <show>.lshow`
-  muss „0 Fehler, 0 Warnungen" melden (nur echte Widgets/Enums/Params). ✅ für
+  (Linux/macOS: `./venv/bin/python tools/lint_show.py --strict <show>.lshow`) muss „0 Fehler, 0 Warnungen" melden (nur echte Widgets/Enums/Params). ✅ für
   `demo_komplett_2026.lshow`.
 - **Live geprüft:** Stage-Elemente hinzufügen/verschieben/bearbeiten, Modus-Wechsel,
   Kamera-Reset und Fixture-Platzieren/-Entfernen sind sofort in der Szene sichtbar.
 
 ## Was bei grossen Rigs anders aussieht
 
-Ab dem **17. Gerät im Raum** wirft nicht mehr jeder Scheinwerfer einen eigenen
-Schlagschatten. Die Ansicht vergibt höchstens **16 Schlagschatten**, und zwar an
+Ab dem **9. Gerät im Raum** wirft nicht mehr jeder Scheinwerfer einen eigenen
+Schlagschatten. Die Ansicht vergibt höchstens **8 Schlagschatten**, und zwar an
 die Geräte mit den niedrigsten Fixture-Nummern; alle übrigen leuchten normal
 weiter, werfen aber keinen Schatten auf Boden und Bühnenelemente. Wird ein Gerät
 entfernt, rückt das nächste nach.
@@ -102,8 +102,11 @@ entfernt, rückt das nächste nach.
 Textur, sondern auch Platz im Beleuchtungs-Programm. Ohne diese Grenze scheiterte
 auf Rechnern mit stärkerer Grafik ab 26 Schatten das Übersetzen dieses Programms —
 die Ansicht stürzte ohne Meldung ab, und kurz davor stand das Bild sekundenlang
-still. Die Grenze ist bewusst dieselbe Zahl, die schwächere Geräte ohnehin
-erreichen, damit die Bühne überall gleich aussieht.
+still. Zudem zeichnet jeder schattenwerfende Scheinwerfer die ganze Szene noch
+einmal aus seiner Sicht — mit 16 Schatten war das der größte Einzelposten pro
+Bild und ließ die Ansicht bei großen Rigs ruckeln. Acht Schatten reichen für den
+Raumeindruck; die Grenze gilt auf jedem Rechner gleich, damit die Bühne überall
+gleich aussieht.
 
 **Wenn Schatten für eine bestimmte Stelle wichtig sind:** die Vergabe folgt der
 Fixture-Nummer. Ein Gerät, dessen Schatten man sehen will, sollte also eine
@@ -114,13 +117,14 @@ Wie lange die Ansicht je Bild braucht, lässt sich messen:
 `./venv/bin/python tools/viz_render_benchmark.py 12 32 48` (echtes Fenster
 nötig, misst auf der echten Grafikkarte).
 
-## Bekannte offene Punkte (im BACKLOG erfasst)
-- **VIZ-TRUSS-ADD:** „+ Truss" legt bei bereits geladenen Fixtures manchmal kein Element
-  an (Plattform/Boden gehen; Truss lädt async ein OBJ-Modell). Workaround: erneut
-  versuchen / Szene neu laden; Nagelung per CDP offen.
-- **VIZ-STAGE-PANEL:** ENTER committet nicht (TAB nutzen); Größen-Felder unter „Größe
-  anpassen" gesperrt; gelegentliche Panel↔Szene-Selektions-Desync.
-- **VC-WIDGET-DRAG:** VC-Widgets lassen sich (noch) nicht per Drag umplatzieren.
+## Früher bekannte Macken (alle erledigt)
+Ältere Fassungen dieser Anleitung nannten hier offene Punkte. Sie sind behoben bzw. ließen
+sich nicht mehr nachstellen (Details im BACKLOG-Archiv):
+- **VIZ-TRUSS-ADD:** „+ Truss (horizontal)" legt die Trasse auch bei geladenen Fixtures
+  zuverlässig an.
+- **VIZ-STAGE-PANEL:** Felder übernehmen den Wert beim Tippen, „Größe anpassen" sperrt
+  keine Felder, Auswahl in Tabelle und Szene bleibt gleich.
+- **VC-WIDGET-DRAG:** VC-Widgets lassen sich im Bearbeiten-Modus per Ziehen umplatzieren.
 
 Die überlappenden Grundschritte (Patch, Gruppen, Farb-/Dimmer-/EFX-Effekte, Virtuelle
 Konsole) sind bereits bebildert in

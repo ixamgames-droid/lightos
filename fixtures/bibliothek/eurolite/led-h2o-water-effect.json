@@ -1,0 +1,49 @@
+{
+  "format_version": 1,
+  "hersteller": "Eurolite",
+  "hersteller_kurz": "Eurolite",
+  "modell": "LED H2O Water Effect",
+  "kurzname": "LED H2O Water Effect",
+  "typ": "other",
+  "leistung_w": 26,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Eurolite-LED-H2O-Water-Effect.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Eurolite/Eurolite-LED-H2O-Water-Effect.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.6 GIT · Rami Toivola",
+    "original": "resources/fixtures/Eurolite/Eurolite-LED-H2O-Water-Effect.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 4 Wertebereiche mit Art (kind) versehen; Strobe-Bereich verstaendlich benannt, Default/Highlight 0 (offen) bestaetigt"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Datei und die LightOS-Attributliste geprueft (Attribute, Bereichs-Arten, Defaults, Raster); Herstellerhandbuch mit DMX-Tabelle war nicht abrufbar (Steinigke liefert nur Datenblaetter ohne DMX-Protokoll), daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "5 Channel",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "On", "art": "open"},
+            {"von": 1, "bis": 5, "name": "Off", "art": "closed"},
+            {"von": 6, "bis": 10, "name": "On", "art": "open"},
+            {"von": 11, "bis": 255, "name": "Strobe langsam -> schnell", "art": "strobe"}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Wassereffekt (rotierendes Wellenrad); Rad dreht dauerhaft, kein eigener DMX-Kanal."
+}

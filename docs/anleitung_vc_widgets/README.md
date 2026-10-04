@@ -1,5 +1,7 @@
 # Virtuelle Konsole — Widget-Liste & Referenz
 
+> **English:** [Virtual Console — widget list & reference](README.en.md)
+
 Die **Virtuelle Konsole (VC)** von LightOS ist eine frei gestaltbare Bedienoberfläche:
 Du legst Tasten, Fader, Farb-Kacheln, Anzeigen usw. auf eine Fläche und steuerst damit
 deine Show — per Maus/Touch, MIDI-Controller (z. B. APC mini) oder Tastatur.

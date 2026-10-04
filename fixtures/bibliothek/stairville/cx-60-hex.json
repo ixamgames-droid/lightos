@@ -1,0 +1,129 @@
+{
+  "format_version": 1,
+  "hersteller": "Stairville",
+  "hersteller_kurz": "STAIR",
+  "modell": "CX-60 HEX",
+  "kurzname": "CX60HEX",
+  "typ": "par",
+  "leistung_w": 170,
+  "quelle": {
+    "titel": "Stairville CX-60 HEX / CX-60 HEX BRS / CX-60 HEX WH, User Manual (Thomann, Art. 469039)",
+    "url": "https://fast-images.static-thomann.de/pics/atg/atgdata/document/manual/c_469039_469040_469056_469058_523399_v2_en_online.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.3.0 GIT · Daniel Toplak",
+    "original": "resources/fixtures/Stairville/Stairville-CX-60-HEX.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 14 Wertebereiche mit Art (kind) versehen; 3 Bereichsnamen auf 80 Zeichen gekuerzt; Modusnamen 6-/8-/10-Kanal; 10-Kanal: Betriebsart (Kanal 9) nach Handbuch korrigiert — QLC+ hatte die Werte des 8-Kanal-Modus; jetzt 0–31 feste Farbe, Fade-out/-in/-in-out, Auto-Mix, Chase 4/12, 224–255 Musik; Attribut raw statt zweitem macro; 10-Kanal: Kanal 7 als macro statt color_wheel (31 vorprogrammierte Farben ohne Werteliste); 10-Kanal: Strobe-Default/Highlight 0 (offen) statt 7; 8-Kanal: Kanal 8 als effect_speed, falsche Arten color/sound entfernt; 192–255 auf Kanal 1 als Musik (sound); falsche Art color an Betriebsart-Bereichen entfernt; Kanal-/Bereichsnamen deutsch; Kurzname; hersteller_kurz STAIR; Quelle auf Herstellerhandbuch gesetzt"
+  },
+  "autor": "LightOS",
+  "geprueft": {"ok": true, "wie": "Kanal fuer Kanal gegen das Handbuch (Kap. 7.3–7.5, 6/8/10 Kanaele) geprueft"},
+  "modi": [
+    {
+      "name": "6-Kanal",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "8-Kanal",
+      "kanaele": [
+        {
+          "name": "Betriebsart",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 63, "name": "Feste Farbe (Kanaele 2–7)"},
+            {"von": 64, "bis": 127, "name": "Farbwechsel 14 Farben"},
+            {"von": 128, "bis": 191, "name": "Farbwechsel 24 Farben"},
+            {"von": 192, "bis": 255, "name": "Farbwechsel 6 Farben / Musiksteuerung", "art": "sound"}
+          ]
+        },
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {
+          "name": "Effekt-Speed / Mikrofon",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Kein Farbwechsel"},
+            {"von": 11, "bis": 255, "name": "Farbwechsel-Speed bzw. Mikrofon-Empfindlichkeit (je nach Kanal 1)"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "10-Kanal",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {
+          "name": "Farbvorgabe",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Keine Farbvorgabe"},
+            {"von": 16, "bis": 255, "name": "Vorprogrammierte Farbe 1 … 31"}
+          ]
+        },
+        {
+          "name": "Strobe / Effekt-Speed",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 15, "name": "Volle Helligkeit, kein Strobe", "art": "open"},
+            {
+              "von": 16,
+              "bis": 255,
+              "name": "Strobe langsam → schnell (bzw. Effekt-Speed fuer Kanal 9)",
+              "art": "strobe"
+            }
+          ]
+        },
+        {
+          "name": "Betriebsart",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 31, "name": "Feste Farbe (Kanaele 1–6)"},
+            {"von": 32, "bis": 63, "name": "Fade-out"},
+            {"von": 64, "bis": 95, "name": "Fade-in"},
+            {"von": 96, "bis": 127, "name": "Fade-in-out"},
+            {"von": 128, "bis": 159, "name": "Auto-Mix"},
+            {"von": 160, "bis": 191, "name": "Chase 4 Farben"},
+            {"von": 192, "bis": 223, "name": "Chase 12 Farben"},
+            {"von": 224, "bis": 255, "name": "Musiksteuerung", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Dimmer",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dimmer 0 % → 100 %"}
+          ]
+        }
+      ]
+    }
+  ]
+}

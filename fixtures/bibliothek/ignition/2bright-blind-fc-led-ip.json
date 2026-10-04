@@ -1,0 +1,216 @@
+{
+  "format_version": 1,
+  "hersteller": "Ignition",
+  "hersteller_kurz": "Ignition",
+  "modell": "2bright Blind FC LED IP",
+  "kurzname": "2B BLIND FC",
+  "typ": "led_bar",
+  "leistung_w": 200,
+  "notizen": "2-Zellen-Blinder, 2 x 100 W RGBW-COB, IP65. Zellen LED 1 / LED 2. Blinder-Modus-Kanal: Handbuch nennt keine Bereiche (0-100 %); im 1-Kanal-Modus einziger Helligkeitsregler (intensity), sonst raw. Farbmakro 8-255: 46 Makros ohne Einzelwerte im Handbuch.",
+  "quelle": {
+    "titel": "Ignition 2bright Blind FC LED IP – Bedienungsanleitung (Thomann, ID 547282)",
+    "datum": "2022-11-24",
+    "url": "https://fast-images.static-thomann.de/pics/atg/atgdata/document/manual/c_547282_r1_en_online.pdf"
+  },
+  "herkunft": {"art": "hersteller-handbuch", "lizenz": "eigen"},
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal fuer Kanal gegen die DMX-Tabellen aller 8 Modi im Thomann-Handbuch (Kap. 7) geschrieben und geprueft; nicht am Geraet getestet"
+  },
+  "modi": [
+    {
+      "name": "1-Kanal",
+      "raster": {"rows": 1, "cols": 1},
+      "kanaele": [
+        {"name": "Blinder-Modus", "attribut": "intensity", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "3-Kanal",
+      "raster": {"rows": 1, "cols": 1},
+      "kanaele": [
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Blinder-Modus (Warmweiss-Blinder)", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Farbmakros",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Ohne Funktion", "art": ""},
+            {"von": 8, "bis": 255, "name": "Farbmakro 1 ... 46 (Handbuch nennt keine Einzelwerte)", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4-Kanal 1",
+      "raster": {"rows": 1, "cols": 2},
+      "kanaele": [
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Blinder-Modus (Warmweiss-Blinder)", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Farbmakros LED 1",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Ohne Funktion", "art": ""},
+            {"von": 8, "bis": 255, "name": "Farbmakro 1 ... 46 (Handbuch nennt keine Einzelwerte)", "art": ""}
+          ]
+        },
+        {
+          "name": "Farbmakros LED 2",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Ohne Funktion", "art": ""},
+            {"von": 8, "bis": 255, "name": "Farbmakro 1 ... 46 (Handbuch nennt keine Einzelwerte)", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4-Kanal 2",
+      "raster": {"rows": 1, "cols": 1},
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "6-Kanal",
+      "raster": {"rows": 1, "cols": 1},
+      "kanaele": [
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "LEDs an", "art": "open"},
+            {"von": 6, "bis": 10, "name": "LEDs aus (Blackout)", "art": "closed"},
+            {"von": 11, "bis": 33, "name": "Zufaellige Impulse, langsam -> schnell", "art": "strobe"},
+            {"von": 34, "bis": 56, "name": "Zufaellig ansteigende Helligkeit, langsam -> schnell", "art": "strobe"},
+            {"von": 57, "bis": 79, "name": "Zufaellig abfallende Helligkeit, langsam -> schnell", "art": "strobe"},
+            {"von": 80, "bis": 102, "name": "Zufaelliger Strobe, langsam -> schnell", "art": "strobe"},
+            {"von": 103, "bis": 127, "name": "Strobe-Impulse (Pause 5 s -> 1 s)", "art": "strobe"},
+            {"von": 128, "bis": 250, "name": "Strobe 1 -> 20 Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "LEDs an", "art": "open"}
+          ]
+        },
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "8-Kanal",
+      "raster": {"rows": 1, "cols": 2},
+      "kanaele": [
+        {"name": "Rot LED 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen LED 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau LED 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss LED 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot LED 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen LED 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau LED 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss LED 2", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "10-Kanal",
+      "raster": {"rows": 1, "cols": 2},
+      "kanaele": [
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "LEDs an", "art": "open"},
+            {"von": 6, "bis": 10, "name": "LEDs aus (Blackout)", "art": "closed"},
+            {"von": 11, "bis": 33, "name": "Zufaellige Impulse, langsam -> schnell", "art": "strobe"},
+            {"von": 34, "bis": 56, "name": "Zufaellig ansteigende Helligkeit, langsam -> schnell", "art": "strobe"},
+            {"von": 57, "bis": 79, "name": "Zufaellig abfallende Helligkeit, langsam -> schnell", "art": "strobe"},
+            {"von": 80, "bis": 102, "name": "Zufaelliger Strobe, langsam -> schnell", "art": "strobe"},
+            {"von": 103, "bis": 127, "name": "Strobe-Impulse (Pause 5 s -> 1 s)", "art": "strobe"},
+            {"von": 128, "bis": 250, "name": "Strobe 1 -> 20 Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "LEDs an", "art": "open"}
+          ]
+        },
+        {"name": "Rot LED 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen LED 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau LED 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss LED 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot LED 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen LED 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau LED 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss LED 2", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "12-Kanal",
+      "raster": {"rows": 1, "cols": 2},
+      "kanaele": [
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "LEDs an", "art": "open"},
+            {"von": 6, "bis": 10, "name": "LEDs aus (Blackout)", "art": "closed"},
+            {"von": 11, "bis": 33, "name": "Zufaellige Impulse, langsam -> schnell", "art": "strobe"},
+            {"von": 34, "bis": 56, "name": "Zufaellig ansteigende Helligkeit, langsam -> schnell", "art": "strobe"},
+            {"von": 57, "bis": 79, "name": "Zufaellig abfallende Helligkeit, langsam -> schnell", "art": "strobe"},
+            {"von": 80, "bis": 102, "name": "Zufaelliger Strobe, langsam -> schnell", "art": "strobe"},
+            {"von": 103, "bis": 127, "name": "Strobe-Impulse (Pause 5 s -> 1 s)", "art": "strobe"},
+            {"von": 128, "bis": 250, "name": "Strobe 1 -> 20 Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "LEDs an", "art": "open"}
+          ]
+        },
+        {"name": "Rot LED 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen LED 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau LED 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss LED 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot LED 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen LED 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau LED 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss LED 2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Dimmverhalten",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Ohne Funktion", "art": ""},
+            {"von": 6, "bis": 127, "name": "LED (direkt)", "art": ""},
+            {"von": 128, "bis": 255, "name": "Halogen-Nachbildung", "art": ""}
+          ]
+        },
+        {
+          "name": "Dimmerkurve",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Ohne Funktion", "art": ""},
+            {"von": 6, "bis": 63, "name": "Linear", "art": ""},
+            {"von": 64, "bis": 127, "name": "Exponentiell", "art": ""},
+            {"von": 128, "bis": 191, "name": "Logarithmisch", "art": ""},
+            {"von": 192, "bis": 255, "name": "S-Kurve", "art": ""}
+          ]
+        }
+      ]
+    }
+  ]
+}

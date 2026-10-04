@@ -4,7 +4,7 @@ In dieser Anleitung lernst du, wie du in der Show `shows/Komplettshow_2026.lshow
 
 ## Schritte
 
-1. Öffne den **Programmer** und wähle die Gruppe **"PAR"** aus. Wechsle in den Tab **"Matrix"**. Im eingebetteten Programmer ist meist schon eine Standard-Matrix (**"Matrix 1"**) vorhanden, die du direkt verwenden kannst – mit **"+ Neu"** legst du eine weitere Matrix an.
+1. Öffne den **Programmer** und wähle die Gruppe **"PAR"** aus. Wechsle in den Tab **"Matrix"**. Klicke auf **"+ Neu"** – es entsteht **"Matrix 1"** (an die gewählte Gruppe gebunden); für jede weitere Matrix wieder **"+ Neu"**.
 
 ![Programmer mit Matrix-Tab: Grundeinstellungen für Name, Algorithmus, Style, Spalten und Reihen, Vorschau sowie die Schaltflächen +Neu, ▶ Start und ■ Stop](img/01_matrix_tab.png)
 
@@ -38,10 +38,10 @@ In dieser Anleitung lernst du, wie du in der Show `shows/Komplettshow_2026.lshow
 ## So funktioniert das Mischen (Kern-Architektur)
 
 - Die **Farb-Matrix** (Style `RGB`) schreibt **nur die Farbkanäle**, die **Dimmer-Matrix** (Style `Dimmer`) schreibt **nur den Dimmer-Kanal**. Weil beide unterschiedliche Kanäle ansteuern, überlagern sie sich sauber und stören sich nicht.
-- Das ist **besser, als die Farbe live im Programmer** zu setzen: Der Programmer setzt eine **implizite Grundhelligkeit** und zwingt den Dimmer auf voll. Dadurch würde er die Dimmer-Matrix überschreiben, und das Lauflicht ginge verloren.
+- Das ist **besser, als die Farbe live im Programmer** zu setzen: Eine eigene RGB-Matrix läuft mit der Show und ist per Virtueller Konsole schaltbar. (Seit 2026-06-24 gilt strikte Trennung: eine Farbe im Programmer zieht den Dimmer nicht mehr hoch — „Farbe macht automatisch hell" ist aus. Selbst eingeschaltet lässt es Geräte in Ruhe, deren Dimmer eine Funktion treibt.)
 
 ## Tipps und Fallen
 
 - **Fixture-Bindung – richtige Gruppe wählen:** Eine Matrix **folgt der Programmer-Auswahl** und übernimmt die aktuell gewählte Gruppe als ihre Geräte. Lass beim Bauen also die richtige Gruppe (hier "PAR") ausgewählt. Das gespeicherte Geräte-Raster bleibt erhalten und wird auch beim Auslösen über die Virtuelle Konsole genutzt.
-- **Farbe nicht im Programmer setzen:** Setze Farbe immer über eine eigene RGB-Matrix, nicht live im Programmer – sonst überschreibt die implizite Grundhelligkeit den Dimmer-Effekt.
+- **Farbe als eigene Ebene:** Setze Farbe über eine eigene RGB-Matrix statt live im Programmer — so bleibt sie Teil der Show und lässt den Dimmer-Effekt unberührt.
 - **Style "Dimmer" – früherer Absturz-Bug:** Beim Umstellen auf Style `Dimmer` gab es einen Absturz wegen eines fehlenden UI-Labels. Dieser Fehler wurde behoben.

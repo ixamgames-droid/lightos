@@ -1,0 +1,273 @@
+{
+  "format_version": 1,
+  "hersteller": "BeamZ",
+  "hersteller_kurz": "BEAMZ",
+  "modell": "Panther 70",
+  "kurzname": "PANTHER70",
+  "typ": "moving_head",
+  "leistung_w": 70,
+  "quelle": {
+    "titel": "BeamZ Panther 70 LED Spot Moving Head IRC - Bedienungsanleitung (Ref. 150.430)",
+    "version": "V1.1",
+    "url": "https://www.beamzlighting.com/wp-content/uploads/2026/03/150.430-Panther-70-Led-Spot-Moving-Head-IRC-V1.1.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.14.2 GIT · Patrick",
+    "original": "resources/fixtures/beamZ/beamZ-Panther-70.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 106 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): Herstellername 'beamZ' -> 'BeamZ'; kurzname PANTHER70; Shutter-Kanal: fehlende Bereiche nach Handbuch ergaenzt (zu/offen/Strobe/Puls/Zufall), Default/Highlight 12 (offen); Farbrad: Offen als open, Halbfarben benannt, Rotations-Stopp ohne art; Goborad: Shake als shake, Rotations-Stopp ohne art; Funktionskanal als reset statt raw (Blackout-Bereiche ohne art closed, Reset 200-209, Sound 250-255), Dimmerkurve als raw statt macro; Kanalnamen deutsch, Modusbeschreibungen (11/9 Kanaele) ergaenzt"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": true,
+    "wie": "beide DMX-Modi Kanal fuer Kanal gegen das Herstellerhandbuch 150.430 V1.1 geprueft (nicht am echten Geraet); Farbnamen nicht im Handbuch, aus QLC+"
+  },
+  "modi": [
+    {
+      "name": "16 Bits",
+      "beschreibung": "11 Kanaele (16 bit Pan/Tilt)",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fein", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fein", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Farbrad",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Offen", "art": "open"},
+            {"von": 8, "bis": 14, "name": "Gelb", "art": "color"},
+            {"von": 15, "bis": 21, "name": "Rot", "art": "color"},
+            {"von": 22, "bis": 28, "name": "Blau", "art": "color"},
+            {"von": 29, "bis": 35, "name": "Gruen", "art": "color"},
+            {"von": 36, "bis": 42, "name": "Magenta", "art": "color"},
+            {"von": 43, "bis": 49, "name": "Tiefblau", "art": "color"},
+            {"von": 50, "bis": 56, "name": "Orange", "art": "color"},
+            {"von": 57, "bis": 66, "name": "Offen / Gelb (halb)", "art": "color"},
+            {"von": 67, "bis": 76, "name": "Gelb / Rot (halb)", "art": "color"},
+            {"von": 77, "bis": 86, "name": "Rot / Blau (halb)", "art": "color"},
+            {"von": 87, "bis": 96, "name": "Blau / Gruen (halb)", "art": "color"},
+            {"von": 97, "bis": 106, "name": "Gruen / Magenta (halb)", "art": "color"},
+            {"von": 107, "bis": 116, "name": "Magenta / Tiefblau (halb)", "art": "color"},
+            {"von": 117, "bis": 127, "name": "Tiefblau / Orange (halb)", "art": "color"},
+            {"von": 128, "bis": 189, "name": "Farbrad-Rotation rechts langsam -> schnell", "art": "rotate"},
+            {"von": 190, "bis": 193, "name": "Farbrad-Rotation Stopp", "art": ""},
+            {"von": 194, "bis": 255, "name": "Farbrad-Rotation links langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Goborad",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Offen", "art": "open"},
+            {"von": 8, "bis": 15, "name": "Gobo 1", "art": "gobo"},
+            {"von": 16, "bis": 23, "name": "Gobo 2", "art": "gobo"},
+            {"von": 24, "bis": 31, "name": "Gobo 3", "art": "gobo"},
+            {"von": 32, "bis": 39, "name": "Gobo 4", "art": "gobo"},
+            {"von": 40, "bis": 47, "name": "Gobo 5", "art": "gobo"},
+            {"von": 48, "bis": 55, "name": "Gobo 6", "art": "gobo"},
+            {"von": 56, "bis": 63, "name": "Gobo 7", "art": "gobo"},
+            {"von": 64, "bis": 71, "name": "Offen", "art": "open"},
+            {"von": 72, "bis": 79, "name": "Gobo 1 Shake", "art": "shake"},
+            {"von": 80, "bis": 87, "name": "Gobo 2 Shake", "art": "shake"},
+            {"von": 88, "bis": 95, "name": "Gobo 3 Shake", "art": "shake"},
+            {"von": 96, "bis": 103, "name": "Gobo 4 Shake", "art": "shake"},
+            {"von": 104, "bis": 111, "name": "Gobo 5 Shake", "art": "shake"},
+            {"von": 112, "bis": 119, "name": "Gobo 6 Shake", "art": "shake"},
+            {"von": 120, "bis": 127, "name": "Gobo 7 Shake", "art": "shake"},
+            {"von": 128, "bis": 189, "name": "Goborad-Rotation rechts langsam -> schnell", "art": "rotate"},
+            {"von": 190, "bis": 193, "name": "Goborad-Rotation Stopp", "art": ""},
+            {"von": 194, "bis": 255, "name": "Goborad-Rotation links langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Shutter",
+          "attribut": "shutter",
+          "default": 12,
+          "highlight": 12,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Shutter zu", "art": "closed"},
+            {"von": 8, "bis": 15, "name": "Shutter offen", "art": "open"},
+            {"von": 16, "bis": 131, "name": "Strobe langsam -> schnell", "art": "strobe"},
+            {"von": 132, "bis": 139, "name": "Shutter offen", "art": "open"},
+            {"von": 140, "bis": 181, "name": "Puls: schnell zu, langsam auf", "art": "strobe"},
+            {"von": 182, "bis": 189, "name": "Shutter offen", "art": "open"},
+            {"von": 190, "bis": 231, "name": "Puls: schnell auf, langsam zu", "art": "strobe"},
+            {"von": 232, "bis": 239, "name": "Shutter offen", "art": "open"},
+            {"von": 240, "bis": 247, "name": "Zufalls-Strobe", "art": "strobe"},
+            {"von": 248, "bis": 255, "name": "Shutter offen", "art": "open"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Pan/Tilt-Tempo",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Tempo schnell -> langsam", "art": ""}
+          ]
+        },
+        {
+          "name": "Funktion / Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 69, "name": "Keine Funktion", "art": ""},
+            {"von": 70, "bis": 79, "name": "Blackout bei Pan/Tilt-Bewegung", "art": ""},
+            {"von": 80, "bis": 89, "name": "Keine Funktion", "art": ""},
+            {"von": 90, "bis": 99, "name": "Blackout bei Farbwechsel", "art": ""},
+            {"von": 100, "bis": 109, "name": "Keine Funktion", "art": ""},
+            {"von": 110, "bis": 119, "name": "Blackout bei Gobowechsel", "art": ""},
+            {"von": 120, "bis": 199, "name": "Keine Funktion", "art": ""},
+            {"von": 200, "bis": 209, "name": "Reset alles", "art": "reset"},
+            {"von": 210, "bis": 249, "name": "Keine Funktion", "art": ""},
+            {"von": 250, "bis": 255, "name": "Sound-Modus", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Dimmerkurve",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 20, "name": "Standard", "art": ""},
+            {"von": 21, "bis": 40, "name": "Stage", "art": ""},
+            {"von": 41, "bis": 60, "name": "TV", "art": ""},
+            {"von": 61, "bis": 80, "name": "Architektur", "art": ""},
+            {"von": 81, "bis": 100, "name": "Theater", "art": ""},
+            {"von": 101, "bis": 255, "name": "Standard", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8 Bits",
+      "beschreibung": "9 Kanaele (8 bit Pan/Tilt)",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {
+          "name": "Farbrad",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Offen", "art": "open"},
+            {"von": 8, "bis": 14, "name": "Gelb", "art": "color"},
+            {"von": 15, "bis": 21, "name": "Rot", "art": "color"},
+            {"von": 22, "bis": 28, "name": "Blau", "art": "color"},
+            {"von": 29, "bis": 35, "name": "Gruen", "art": "color"},
+            {"von": 36, "bis": 42, "name": "Magenta", "art": "color"},
+            {"von": 43, "bis": 49, "name": "Tiefblau", "art": "color"},
+            {"von": 50, "bis": 56, "name": "Orange", "art": "color"},
+            {"von": 57, "bis": 66, "name": "Offen / Gelb (halb)", "art": "color"},
+            {"von": 67, "bis": 76, "name": "Gelb / Rot (halb)", "art": "color"},
+            {"von": 77, "bis": 86, "name": "Rot / Blau (halb)", "art": "color"},
+            {"von": 87, "bis": 96, "name": "Blau / Gruen (halb)", "art": "color"},
+            {"von": 97, "bis": 106, "name": "Gruen / Magenta (halb)", "art": "color"},
+            {"von": 107, "bis": 116, "name": "Magenta / Tiefblau (halb)", "art": "color"},
+            {"von": 117, "bis": 127, "name": "Tiefblau / Orange (halb)", "art": "color"},
+            {"von": 128, "bis": 189, "name": "Farbrad-Rotation rechts langsam -> schnell", "art": "rotate"},
+            {"von": 190, "bis": 193, "name": "Farbrad-Rotation Stopp", "art": ""},
+            {"von": 194, "bis": 255, "name": "Farbrad-Rotation links langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Goborad",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Offen", "art": "open"},
+            {"von": 8, "bis": 15, "name": "Gobo 1", "art": "gobo"},
+            {"von": 16, "bis": 23, "name": "Gobo 2", "art": "gobo"},
+            {"von": 24, "bis": 31, "name": "Gobo 3", "art": "gobo"},
+            {"von": 32, "bis": 39, "name": "Gobo 4", "art": "gobo"},
+            {"von": 40, "bis": 47, "name": "Gobo 5", "art": "gobo"},
+            {"von": 48, "bis": 55, "name": "Gobo 6", "art": "gobo"},
+            {"von": 56, "bis": 63, "name": "Gobo 7", "art": "gobo"},
+            {"von": 64, "bis": 71, "name": "Offen", "art": "open"},
+            {"von": 72, "bis": 79, "name": "Gobo 1 Shake", "art": "shake"},
+            {"von": 80, "bis": 87, "name": "Gobo 2 Shake", "art": "shake"},
+            {"von": 88, "bis": 95, "name": "Gobo 3 Shake", "art": "shake"},
+            {"von": 96, "bis": 103, "name": "Gobo 4 Shake", "art": "shake"},
+            {"von": 104, "bis": 111, "name": "Gobo 5 Shake", "art": "shake"},
+            {"von": 112, "bis": 119, "name": "Gobo 6 Shake", "art": "shake"},
+            {"von": 120, "bis": 127, "name": "Gobo 7 Shake", "art": "shake"},
+            {"von": 128, "bis": 189, "name": "Goborad-Rotation rechts langsam -> schnell", "art": "rotate"},
+            {"von": 190, "bis": 193, "name": "Goborad-Rotation Stopp", "art": ""},
+            {"von": 194, "bis": 255, "name": "Goborad-Rotation links langsam -> schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Shutter",
+          "attribut": "shutter",
+          "default": 12,
+          "highlight": 12,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Shutter zu", "art": "closed"},
+            {"von": 8, "bis": 15, "name": "Shutter offen", "art": "open"},
+            {"von": 16, "bis": 131, "name": "Strobe langsam -> schnell", "art": "strobe"},
+            {"von": 132, "bis": 139, "name": "Shutter offen", "art": "open"},
+            {"von": 140, "bis": 181, "name": "Puls: schnell zu, langsam auf", "art": "strobe"},
+            {"von": 182, "bis": 189, "name": "Shutter offen", "art": "open"},
+            {"von": 190, "bis": 231, "name": "Puls: schnell auf, langsam zu", "art": "strobe"},
+            {"von": 232, "bis": 239, "name": "Shutter offen", "art": "open"},
+            {"von": 240, "bis": 247, "name": "Zufalls-Strobe", "art": "strobe"},
+            {"von": 248, "bis": 255, "name": "Shutter offen", "art": "open"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Pan/Tilt-Tempo",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Tempo schnell -> langsam", "art": ""}
+          ]
+        },
+        {
+          "name": "Funktion / Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 69, "name": "Keine Funktion", "art": ""},
+            {"von": 70, "bis": 79, "name": "Blackout bei Pan/Tilt-Bewegung", "art": ""},
+            {"von": 80, "bis": 89, "name": "Keine Funktion", "art": ""},
+            {"von": 90, "bis": 99, "name": "Blackout bei Farbwechsel", "art": ""},
+            {"von": 100, "bis": 109, "name": "Keine Funktion", "art": ""},
+            {"von": 110, "bis": 119, "name": "Blackout bei Gobowechsel", "art": ""},
+            {"von": 120, "bis": 199, "name": "Keine Funktion", "art": ""},
+            {"von": 200, "bis": 209, "name": "Reset alles", "art": "reset"},
+            {"von": 210, "bis": 249, "name": "Keine Funktion", "art": ""},
+            {"von": 250, "bis": 255, "name": "Sound-Modus", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Dimmerkurve",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 20, "name": "Standard", "art": ""},
+            {"von": 21, "bis": 40, "name": "Stage", "art": ""},
+            {"von": 41, "bis": 60, "name": "TV", "art": ""},
+            {"von": 61, "bis": 80, "name": "Architektur", "art": ""},
+            {"von": 81, "bis": 100, "name": "Theater", "art": ""},
+            {"von": 101, "bis": 255, "name": "Standard", "art": ""}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "70W-LED-Spot, 7 Farben + offen, 7 Gobos + offen, Pan 540 Grad. Das Handbuch nennt die Farben nur 'Colour 1-7'; die Farbnamen stammen aus der QLC+-Datei."
+}

@@ -1,0 +1,107 @@
+{
+  "format_version": 1,
+  "hersteller": "Varytec",
+  "hersteller_kurz": "Varytec",
+  "modell": "Giga Bar Pix 8 RGB",
+  "kurzname": "GIGABARPIX8",
+  "typ": "led_bar",
+  "leistung_w": 25,
+  "quelle": {
+    "titel": "Varytec Giga Bar Pix 8 RGB – Bedienungsanleitung (EN)",
+    "version": "V2",
+    "datum": "2022-03-24",
+    "url": "https://images.static-thomann.de/pics/atg/atgdata/document/manual/c_460683_460684_v2_en_online.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.4 · vidschofelix",
+    "original": "resources/fixtures/Varytec/Varytec-Giga-Bar-Pix-8-RGB.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 10 Wertebereiche mit Art (kind) versehen; Rasterform in 1 Modus/Modi aus <Physical> uebernommen; in 3 weiteren Modus/Modi nicht, weil sie nicht zu den color_r-Kanaelen passt (keine echten Farbzonen); gegen Herstellerhandbuch V2 (2022-03-24) abgeglichen; Kanal- und Bereichsnamen deutsch, Segmente 1–8 nummeriert; 2-Kanal-Modus: Kanal 2 von raw („No function“) auf effect_speed (Handbuch: Tempo bzw. Mikrofon-Empfindlichkeit je nach Kanal 1), Kanal 1 ohne falsche color-Arten, LEDs aus als closed; 5-Kanal-Modus: Strobe von shutter auf strobe (kein Offen-Bereich im Handbuch); Kurzname, Notizen"
+  },
+  "autor": "LightOS (QXF-Konverter, nachbearbeitet FM-57)",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal für Kanal gegen die Bedienungsanleitung V2 (Kap. 7.4–7.7 DMX-Tabellen 2/3/5/24 Kanäle) geprüft; nicht am Gerät"
+  },
+  "modi": [
+    {
+      "name": "2 Channel",
+      "kanaele": [
+        {
+          "name": "Funktion",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "LEDs aus", "art": "closed"},
+            {"von": 8, "bis": 15, "name": "Statisch Rot", "art": ""},
+            {"von": 16, "bis": 23, "name": "Statisch Rot + Grün", "art": ""},
+            {"von": 24, "bis": 31, "name": "Statisch Grün", "art": ""},
+            {"von": 32, "bis": 39, "name": "Statisch Blau + Grün", "art": ""},
+            {"von": 40, "bis": 47, "name": "Statisch Blau", "art": ""},
+            {"von": 48, "bis": 55, "name": "Statisch Blau + Rot", "art": ""},
+            {"von": 56, "bis": 63, "name": "Statisch Rot + Grün + Blau", "art": ""},
+            {"von": 64, "bis": 231, "name": "Eingebaute Automatik-Shows", "art": ""},
+            {"von": 232, "bis": 255, "name": "Musikgesteuerte Show", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Tempo / Mikrofon-Empfindlichkeit (je nach Kanal 1)",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0
+        }
+      ]
+    },
+    {
+      "name": "3 Channel",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Grün", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "5 Channel",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Grün", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Strobe, Tempo steigend", "attribut": "strobe", "default": 0, "highlight": 0}
+      ]
+    },
+    {
+      "name": "24 Channel",
+      "raster": {"rows": 1, "cols": 8},
+      "kanaele": [
+        {"name": "Rot 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Grün 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Rot 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Grün 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Rot 3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Grün 3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Rot 4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Grün 4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 4", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Rot 5", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Grün 5", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 5", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Rot 6", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Grün 6", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 6", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Rot 7", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Grün 7", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 7", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Rot 8", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Grün 8", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau 8", "attribut": "color_b", "default": 0, "highlight": 255}
+      ]
+    }
+  ],
+  "notizen": "LED-Leiste mit 8 RGB-Segmenten (240 SMD-LEDs); 24-Kanal-Modus = Pixelsteuerung je Segment, sonst alle Segmente gemeinsam."
+}

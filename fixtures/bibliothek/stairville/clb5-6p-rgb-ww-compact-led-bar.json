@@ -1,0 +1,239 @@
+{
+  "format_version": 1,
+  "hersteller": "Stairville",
+  "hersteller_kurz": "STAIR",
+  "modell": "CLB5 6P RGB WW Compact LED Bar",
+  "kurzname": "CLB56P",
+  "typ": "led_bar",
+  "leistung_w": 120,
+  "quelle": {
+    "titel": "Stairville CLB5 6P RGB WW Compact LED Bar, User Manual (Thomann, Art. 460583, v5)",
+    "url": "https://fast-images.static-thomann.de/pics/atg/atgdata/document/manual/c_460583_v5_en_online.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.14.2 GIT · Martin Scherer",
+    "original": "resources/fixtures/Stairville/Stairville-CLB5-6P-RGB-WW-Compact-LED-Bar.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 40 Wertebereiche mit Art (kind) versehen; Rasterform in 2 Modus/Modi aus <Physical> uebernommen; in 3 weiteren Modus/Modi nicht, weil sie nicht zu den color_r-Kanaelen passt (keine echten Farbzonen); Typ led_bar statt par (Bar mit 6 einzeln steuerbaren Spots); 8-Kanal: Show-Nummerierung nach Handbuch korrigiert (0 = keine Show, 1–5 = Show 01, 6–11 = Show 02 … 222–227 = Show 38; QLC+ war um eins verschoben); 8-Kanal: Kanal 7 als raw mit den 17 Farbvorgaben (bei Kanal 6 = 0) statt speed; sonst Show-Speed bzw. Musik-Show (Notizen); Strobe-Kanaele als strobe (nur Geschwindigkeit, kein Offen-Bereich im Handbuch) statt shutter; Weiss-Kanaele als Warmweiss benannt (RGB-WW-LEDs); Modusnamen 4-/6-/8-/24-/26-Kanal; Kanal-/Bereichsnamen deutsch; Kurzname; hersteller_kurz STAIR; Quelle auf Herstellerhandbuch gesetzt"
+  },
+  "autor": "LightOS",
+  "geprueft": {"ok": true, "wie": "Kanal fuer Kanal gegen das Handbuch (Kap. 7.7–7.11, 4/6/8/24/26 Kanaele) geprueft"},
+  "modi": [
+    {
+      "name": "4-Kanal",
+      "kanaele": [
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Warmweiss", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "6-Kanal",
+      "kanaele": [
+        {
+          "name": "Dimmer",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dimmer 0 % → 100 %"}
+          ]
+        },
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Warmweiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "strobe",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Strobe, Geschwindigkeit steigend"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8-Kanal",
+      "kanaele": [
+        {
+          "name": "Dimmer",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dimmer 0 % → 100 %"}
+          ]
+        },
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Warmweiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Automatik-Show",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Keine Show (Farbe ueber Kanaele 2–5 bzw. Kanal 7)"},
+            {"von": 1, "bis": 5, "name": "Automatik-Show 01"},
+            {"von": 6, "bis": 11, "name": "Automatik-Show 02"},
+            {"von": 12, "bis": 17, "name": "Automatik-Show 03"},
+            {"von": 18, "bis": 23, "name": "Automatik-Show 04"},
+            {"von": 24, "bis": 29, "name": "Automatik-Show 05"},
+            {"von": 30, "bis": 35, "name": "Automatik-Show 06"},
+            {"von": 36, "bis": 41, "name": "Automatik-Show 07"},
+            {"von": 42, "bis": 47, "name": "Automatik-Show 08"},
+            {"von": 48, "bis": 53, "name": "Automatik-Show 09"},
+            {"von": 54, "bis": 59, "name": "Automatik-Show 10"},
+            {"von": 60, "bis": 65, "name": "Automatik-Show 11"},
+            {"von": 66, "bis": 71, "name": "Automatik-Show 12"},
+            {"von": 72, "bis": 77, "name": "Automatik-Show 13"},
+            {"von": 78, "bis": 83, "name": "Automatik-Show 14"},
+            {"von": 84, "bis": 89, "name": "Automatik-Show 15"},
+            {"von": 90, "bis": 95, "name": "Automatik-Show 16"},
+            {"von": 96, "bis": 101, "name": "Automatik-Show 17"},
+            {"von": 102, "bis": 107, "name": "Automatik-Show 18"},
+            {"von": 108, "bis": 113, "name": "Automatik-Show 19"},
+            {"von": 114, "bis": 119, "name": "Automatik-Show 20"},
+            {"von": 120, "bis": 125, "name": "Automatik-Show 21"},
+            {"von": 126, "bis": 131, "name": "Automatik-Show 22"},
+            {"von": 132, "bis": 137, "name": "Automatik-Show 23"},
+            {"von": 138, "bis": 143, "name": "Automatik-Show 24"},
+            {"von": 144, "bis": 149, "name": "Automatik-Show 25"},
+            {"von": 150, "bis": 155, "name": "Automatik-Show 26"},
+            {"von": 156, "bis": 161, "name": "Automatik-Show 27"},
+            {"von": 162, "bis": 167, "name": "Automatik-Show 28"},
+            {"von": 168, "bis": 173, "name": "Automatik-Show 29"},
+            {"von": 174, "bis": 179, "name": "Automatik-Show 30"},
+            {"von": 180, "bis": 185, "name": "Automatik-Show 31"},
+            {"von": 186, "bis": 191, "name": "Automatik-Show 32"},
+            {"von": 192, "bis": 197, "name": "Automatik-Show 33"},
+            {"von": 198, "bis": 203, "name": "Automatik-Show 34"},
+            {"von": 204, "bis": 209, "name": "Automatik-Show 35"},
+            {"von": 210, "bis": 215, "name": "Automatik-Show 36"},
+            {"von": 216, "bis": 221, "name": "Automatik-Show 37"},
+            {"von": 222, "bis": 227, "name": "Automatik-Show 38"},
+            {"von": 228, "bis": 255, "name": "Musiksteuerung (Show 01–38)", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Farbvorgabe / Show-Speed",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 14, "name": "Farbvorgabe aus (bei Kanal 6 = 0)"},
+            {"von": 15, "bis": 29, "name": "Farbvorgabe Rot (bei Kanal 6 = 0)"},
+            {"von": 30, "bis": 44, "name": "Farbvorgabe Gruen (bei Kanal 6 = 0)"},
+            {"von": 45, "bis": 59, "name": "Farbvorgabe Blau (bei Kanal 6 = 0)"},
+            {"von": 60, "bis": 74, "name": "Farbvorgabe Weiss (bei Kanal 6 = 0)"},
+            {"von": 75, "bis": 89, "name": "Farbvorgabe R255 G120 (bei Kanal 6 = 0)"},
+            {"von": 90, "bis": 104, "name": "Farbvorgabe R255 G180 (bei Kanal 6 = 0)"},
+            {"von": 105, "bis": 119, "name": "Farbvorgabe Gelb (bei Kanal 6 = 0)"},
+            {"von": 120, "bis": 134, "name": "Farbvorgabe Magenta (bei Kanal 6 = 0)"},
+            {"von": 135, "bis": 149, "name": "Farbvorgabe R255 B120 (bei Kanal 6 = 0)"},
+            {"von": 150, "bis": 164, "name": "Farbvorgabe Cyan (bei Kanal 6 = 0)"},
+            {"von": 165, "bis": 179, "name": "Farbvorgabe Gelb + W80 (bei Kanal 6 = 0)"},
+            {"von": 180, "bis": 194, "name": "Farbvorgabe Rot + W200 (bei Kanal 6 = 0)"},
+            {"von": 195, "bis": 209, "name": "Farbvorgabe Gruen + W200 (bei Kanal 6 = 0)"},
+            {"von": 210, "bis": 224, "name": "Farbvorgabe Blau + W200 (bei Kanal 6 = 0)"},
+            {"von": 225, "bis": 239, "name": "Farbvorgabe R255 G180 B20 W80 (bei Kanal 6 = 0)"},
+            {"von": 240, "bis": 255, "name": "Farbvorgabe Voll RGBW (bei Kanal 6 = 0)"}
+          ]
+        },
+        {
+          "name": "Strobe",
+          "attribut": "strobe",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Strobe, Geschwindigkeit steigend"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "24-Kanal",
+      "raster": {"rows": 1, "cols": 6},
+      "kanaele": [
+        {"name": "Rot Spot 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen Spot 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau Spot 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Warmweiss Spot 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot Spot 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen Spot 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau Spot 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Warmweiss Spot 2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot Spot 3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen Spot 3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau Spot 3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Warmweiss Spot 3", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot Spot 4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen Spot 4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau Spot 4", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Warmweiss Spot 4", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot Spot 5", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen Spot 5", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau Spot 5", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Warmweiss Spot 5", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot Spot 6", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen Spot 6", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau Spot 6", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Warmweiss Spot 6", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "26-Kanal",
+      "raster": {"rows": 1, "cols": 6},
+      "kanaele": [
+        {
+          "name": "Dimmer",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dimmer 0 % → 100 %"}
+          ]
+        },
+        {"name": "Rot Spot 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen Spot 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau Spot 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Warmweiss Spot 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot Spot 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen Spot 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau Spot 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Warmweiss Spot 2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot Spot 3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen Spot 3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau Spot 3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Warmweiss Spot 3", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot Spot 4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen Spot 4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau Spot 4", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Warmweiss Spot 4", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot Spot 5", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen Spot 5", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau Spot 5", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Warmweiss Spot 5", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Rot Spot 6", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen Spot 6", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau Spot 6", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Warmweiss Spot 6", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "strobe",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Strobe, Geschwindigkeit steigend"}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "6 Flat-PARs mit je 7 RGB-WW-Quad-LEDs (4 W). 8-Kanal: Kanal 7 = Farbvorgabe bei Kanal 6 = 0, Programm-Speed bei 1–227, Musik-Show-Auswahl bei 228–255."
+}

@@ -1,0 +1,242 @@
+{
+  "format_version": 1,
+  "hersteller": "Stairville",
+  "hersteller_kurz": "STAIR",
+  "modell": "MH-x30 LED Beam",
+  "kurzname": "MHX30BEAM",
+  "typ": "moving_head",
+  "leistung_w": 68,
+  "quelle": {
+    "titel": "Stairville MH-x30 LED Beam Moving Head, User Manual (Thomann, Art. 398850, v4)",
+    "url": "https://fast-images.static-thomann.de/pics/atg/atgdata/document/manual/c_398850_v4_en_online.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.3 GIT · Andres Robles",
+    "original": "resources/fixtures/Stairville/Stairville-MH-x30-LED-Beam.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 109 Wertebereiche mit Art (kind) versehen; 4 Bereichsnamen auf 80 Zeichen gekuerzt; Modi aufsteigend sortiert und umbenannt (7-/10-Kanal); Strobe: Default/Highlight 0 (Strobe aus = offen) statt 5; Farbrad: Weiss als open, Split-Farben als color, Regenbogen-Bereiche als rotate statt gobo; Goborad: Offen als open, Gobos als gobo, Shake-Bereiche als shake, Rotation als rotate (QLC+-Konvertierung hatte color); Sonderfunktionen-Kanal als reset mit Reset-Bereich 10–20; Leistung 68 W laut Handbuch; Kanal-/Bereichsnamen deutsch; Kurzname; hersteller_kurz STAIR; Quelle auf Herstellerhandbuch gesetzt"
+  },
+  "autor": "LightOS",
+  "geprueft": {"ok": true, "wie": "Kanal fuer Kanal gegen das Handbuch (Kap. 7.4 und 7.5, 7/10 Kanaele) geprueft"},
+  "modi": [
+    {
+      "name": "7-Kanal",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {
+          "name": "Pan/Tilt-Speed",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Pan/Tilt-Geschwindigkeit schnell → langsam"}
+          ]
+        },
+        {
+          "name": "Dimmer",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dimmer 0 % → 100 %"}
+          ]
+        },
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Strobe aus (offen)", "art": "open"},
+            {"von": 11, "bis": 128, "name": "Zufalls-Strobe, schneller werdend", "art": "strobe"},
+            {"von": 129, "bis": 255, "name": "Strobe, langsamer werdend", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Farbrad",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 11, "name": "Weiss (offen)", "art": "open"},
+            {"von": 12, "bis": 23, "name": "Rot", "art": "color"},
+            {"von": 24, "bis": 35, "name": "Gruen", "art": "color"},
+            {"von": 36, "bis": 47, "name": "Hellblau", "art": "color"},
+            {"von": 48, "bis": 59, "name": "Lila", "art": "color"},
+            {"von": 60, "bis": 71, "name": "Gelb", "art": "color"},
+            {"von": 72, "bis": 83, "name": "Blau", "art": "color"},
+            {"von": 84, "bis": 95, "name": "Orange", "art": "color"},
+            {"von": 96, "bis": 107, "name": "Weiss + Rot", "art": "color"},
+            {"von": 108, "bis": 119, "name": "Rot + Gruen", "art": "color"},
+            {"von": 120, "bis": 131, "name": "Gruen + Hellblau", "art": "color"},
+            {"von": 132, "bis": 143, "name": "Hellblau + Lila", "art": "color"},
+            {"von": 144, "bis": 155, "name": "Lila + Gelb", "art": "color"},
+            {"von": 156, "bis": 167, "name": "Gelb + Blau", "art": "color"},
+            {"von": 168, "bis": 179, "name": "Blau + Orange", "art": "color"},
+            {"von": 180, "bis": 191, "name": "Orange + Weiss", "art": "color"},
+            {"von": 192, "bis": 223, "name": "Regenbogen-Effekt vorwaerts, langsamer werdend", "art": "rotate"},
+            {"von": 224, "bis": 255, "name": "Regenbogen-Effekt rueckwaerts, schneller werdend", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Goborad",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Offen", "art": "open"},
+            {"von": 6, "bis": 11, "name": "Gobo 1", "art": "gobo"},
+            {"von": 12, "bis": 17, "name": "Gobo 2", "art": "gobo"},
+            {"von": 18, "bis": 23, "name": "Gobo 3", "art": "gobo"},
+            {"von": 24, "bis": 29, "name": "Gobo 4", "art": "gobo"},
+            {"von": 30, "bis": 35, "name": "Gobo 5", "art": "gobo"},
+            {"von": 36, "bis": 41, "name": "Gobo 6", "art": "gobo"},
+            {"von": 42, "bis": 47, "name": "Gobo 7", "art": "gobo"},
+            {"von": 48, "bis": 53, "name": "Gobo 8", "art": "gobo"},
+            {"von": 54, "bis": 59, "name": "Gobo 9", "art": "gobo"},
+            {"von": 60, "bis": 65, "name": "Gobo 10", "art": "gobo"},
+            {"von": 66, "bis": 71, "name": "Gobo 11", "art": "gobo"},
+            {"von": 72, "bis": 77, "name": "Gobo 12", "art": "gobo"},
+            {"von": 78, "bis": 83, "name": "Gobo 13", "art": "gobo"},
+            {"von": 84, "bis": 89, "name": "Gobo 14", "art": "gobo"},
+            {"von": 90, "bis": 95, "name": "Gobo 14 Shake, schneller werdend", "art": "shake"},
+            {"von": 96, "bis": 101, "name": "Gobo 13 Shake, schneller werdend", "art": "shake"},
+            {"von": 102, "bis": 107, "name": "Gobo 12 Shake, schneller werdend", "art": "shake"},
+            {"von": 108, "bis": 113, "name": "Gobo 11 Shake, schneller werdend", "art": "shake"},
+            {"von": 114, "bis": 119, "name": "Gobo 10 Shake, schneller werdend", "art": "shake"},
+            {"von": 120, "bis": 125, "name": "Gobo 9 Shake, schneller werdend", "art": "shake"},
+            {"von": 126, "bis": 131, "name": "Gobo 8 Shake, schneller werdend", "art": "shake"},
+            {"von": 132, "bis": 137, "name": "Gobo 7 Shake, schneller werdend", "art": "shake"},
+            {"von": 138, "bis": 143, "name": "Gobo 6 Shake, schneller werdend", "art": "shake"},
+            {"von": 144, "bis": 149, "name": "Gobo 5 Shake, schneller werdend", "art": "shake"},
+            {"von": 150, "bis": 155, "name": "Gobo 4 Shake, schneller werdend", "art": "shake"},
+            {"von": 156, "bis": 161, "name": "Gobo 3 Shake, schneller werdend", "art": "shake"},
+            {"von": 162, "bis": 167, "name": "Gobo 2 Shake, schneller werdend", "art": "shake"},
+            {"von": 168, "bis": 173, "name": "Gobo 1 Shake, schneller werdend", "art": "shake"},
+            {"von": 174, "bis": 179, "name": "Offen", "art": "open"},
+            {"von": 180, "bis": 217, "name": "Goborad-Rotation vorwaerts, langsamer werdend", "art": "rotate"},
+            {"von": 218, "bis": 255, "name": "Goborad-Rotation rueckwaerts, schneller werdend", "art": "rotate"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "10-Kanal",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fein", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fein", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Pan/Tilt-Speed",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Pan/Tilt-Geschwindigkeit schnell → langsam"}
+          ]
+        },
+        {
+          "name": "Dimmer",
+          "attribut": "intensity",
+          "default": 0,
+          "highlight": 255,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dimmer 0 % → 100 %"}
+          ]
+        },
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Strobe aus (offen)", "art": "open"},
+            {"von": 11, "bis": 128, "name": "Zufalls-Strobe, schneller werdend", "art": "strobe"},
+            {"von": 129, "bis": 255, "name": "Strobe, langsamer werdend", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Farbrad",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 11, "name": "Weiss (offen)", "art": "open"},
+            {"von": 12, "bis": 23, "name": "Rot", "art": "color"},
+            {"von": 24, "bis": 35, "name": "Gruen", "art": "color"},
+            {"von": 36, "bis": 47, "name": "Hellblau", "art": "color"},
+            {"von": 48, "bis": 59, "name": "Lila", "art": "color"},
+            {"von": 60, "bis": 71, "name": "Gelb", "art": "color"},
+            {"von": 72, "bis": 83, "name": "Blau", "art": "color"},
+            {"von": 84, "bis": 95, "name": "Orange", "art": "color"},
+            {"von": 96, "bis": 107, "name": "Weiss + Rot", "art": "color"},
+            {"von": 108, "bis": 119, "name": "Rot + Gruen", "art": "color"},
+            {"von": 120, "bis": 131, "name": "Gruen + Hellblau", "art": "color"},
+            {"von": 132, "bis": 143, "name": "Hellblau + Lila", "art": "color"},
+            {"von": 144, "bis": 155, "name": "Lila + Gelb", "art": "color"},
+            {"von": 156, "bis": 167, "name": "Gelb + Blau", "art": "color"},
+            {"von": 168, "bis": 179, "name": "Blau + Orange", "art": "color"},
+            {"von": 180, "bis": 191, "name": "Orange + Weiss", "art": "color"},
+            {"von": 192, "bis": 223, "name": "Regenbogen-Effekt vorwaerts, langsamer werdend", "art": "rotate"},
+            {"von": 224, "bis": 255, "name": "Regenbogen-Effekt rueckwaerts, schneller werdend", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Goborad",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Offen", "art": "open"},
+            {"von": 6, "bis": 11, "name": "Gobo 1", "art": "gobo"},
+            {"von": 12, "bis": 17, "name": "Gobo 2", "art": "gobo"},
+            {"von": 18, "bis": 23, "name": "Gobo 3", "art": "gobo"},
+            {"von": 24, "bis": 29, "name": "Gobo 4", "art": "gobo"},
+            {"von": 30, "bis": 35, "name": "Gobo 5", "art": "gobo"},
+            {"von": 36, "bis": 41, "name": "Gobo 6", "art": "gobo"},
+            {"von": 42, "bis": 47, "name": "Gobo 7", "art": "gobo"},
+            {"von": 48, "bis": 53, "name": "Gobo 8", "art": "gobo"},
+            {"von": 54, "bis": 59, "name": "Gobo 9", "art": "gobo"},
+            {"von": 60, "bis": 65, "name": "Gobo 10", "art": "gobo"},
+            {"von": 66, "bis": 71, "name": "Gobo 11", "art": "gobo"},
+            {"von": 72, "bis": 77, "name": "Gobo 12", "art": "gobo"},
+            {"von": 78, "bis": 83, "name": "Gobo 13", "art": "gobo"},
+            {"von": 84, "bis": 89, "name": "Gobo 14", "art": "gobo"},
+            {"von": 90, "bis": 95, "name": "Gobo 14 Shake, schneller werdend", "art": "shake"},
+            {"von": 96, "bis": 101, "name": "Gobo 13 Shake, schneller werdend", "art": "shake"},
+            {"von": 102, "bis": 107, "name": "Gobo 12 Shake, schneller werdend", "art": "shake"},
+            {"von": 108, "bis": 113, "name": "Gobo 11 Shake, schneller werdend", "art": "shake"},
+            {"von": 114, "bis": 119, "name": "Gobo 10 Shake, schneller werdend", "art": "shake"},
+            {"von": 120, "bis": 125, "name": "Gobo 9 Shake, schneller werdend", "art": "shake"},
+            {"von": 126, "bis": 131, "name": "Gobo 8 Shake, schneller werdend", "art": "shake"},
+            {"von": 132, "bis": 137, "name": "Gobo 7 Shake, schneller werdend", "art": "shake"},
+            {"von": 138, "bis": 143, "name": "Gobo 6 Shake, schneller werdend", "art": "shake"},
+            {"von": 144, "bis": 149, "name": "Gobo 5 Shake, schneller werdend", "art": "shake"},
+            {"von": 150, "bis": 155, "name": "Gobo 4 Shake, schneller werdend", "art": "shake"},
+            {"von": 156, "bis": 161, "name": "Gobo 3 Shake, schneller werdend", "art": "shake"},
+            {"von": 162, "bis": 167, "name": "Gobo 2 Shake, schneller werdend", "art": "shake"},
+            {"von": 168, "bis": 173, "name": "Gobo 1 Shake, schneller werdend", "art": "shake"},
+            {"von": 174, "bis": 179, "name": "Offen", "art": "open"},
+            {"von": 180, "bis": 217, "name": "Goborad-Rotation vorwaerts, langsamer werdend", "art": "rotate"},
+            {"von": 218, "bis": 255, "name": "Goborad-Rotation rueckwaerts, schneller werdend", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Sonderfunktionen / Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Keine Funktion"},
+            {"von": 10, "bis": 20, "name": "Reset nach 5 Sekunden", "art": "reset"},
+            {"von": 21, "bis": 255, "name": "Keine Funktion"}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "30-W-LED-Beam (6000 K, 2,8°), Pan 540°, Tilt 270°. Pan/Tilt-Speed: 0 = schnell."
+}
