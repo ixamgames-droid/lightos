@@ -57,7 +57,6 @@
 | FM-58 | A | feat/fm58-bibliothek-runde2 | 2026-10-02T18:20Z | fixtures/bibliothek |
 | SAMMEL-DOKU-C | A | sammel/doku-c | 2026-10-02T22:08Z | docs · BACKLOG.md |
 | FM-59 | A | feat/fm59-bibliothek-runde3 | 2026-10-04T16:47Z | fixtures/bibliothek |
-| UI-72-73-FIX | B | fix/ui72-ui73-playback | 2026-10-02T22:44Z | src/ui/views/playback_view.py · src/core/cueliste_ziel.py · tests/test_ui72_ui73_playback.py |
 | FM-61 | A | feat/fm61-bibliothek-china | 2026-10-04T16:47Z | fixtures/bibliothek |
 | DOC-57 | A | docs/doc57-bilder-bibliothek | 2026-10-04T16:49Z | docs · tools/anleitungsbilder |
 | UI-74 | A | fix/ui74-profile-bearbeiten | 2026-10-04T17:07Z | src/ui/widgets/fixture_editor.py · src/ui/widgets/bibliothek_download_dialog.py · fixtures/bibliothek/eurolite |
@@ -173,7 +172,6 @@
 
 ## Verlauf
 
-- 2026-10-02T22:44Z B claim UI-72-73-FIX
 - 2026-10-02T22:45Z C done FM-53
 - 2026-10-02T22:46Z A claim FM-60
 - 2026-10-02T22:51Z A claim FM-61
@@ -203,3 +201,4 @@
 - 2026-10-04T18:01Z B done UI-72
 - 2026-10-04T18:01Z B done UI-73
 - 2026-10-04T18:39Z B done OUT-60-folge
+- 2026-10-04T18:43Z B done UI-72-73-FIX
