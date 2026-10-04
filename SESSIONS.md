@@ -63,7 +63,6 @@
 | OUT-61 | B | fix/out61-estop-lade-fenster | 2026-10-04T17:33Z | src/core/dmx/output_manager.py · tests/test_out61_estop_lade_fenster.py · BACKLOG.md |
 | OUT-61-FOLGE | B | fix/out61-folge-atomar | 2026-10-04T17:41Z | src/core/dmx/output_manager.py |
 | VIZ-68 | B | feat/viz68-objekt-bibliothek | 2026-10-04T17:55Z | src/ui/visualizer/scene_src/stage/stage_objects.js · src/ui/visualizer/scene_src/stage/docking.js · src/ui/visualizer/scene_src/interaction/tools.js · src/ui/visualizer/visualizer_window.py · src/core/stage/stage_definition.py · src/core/stage/scene_graph.py · tests/test_viz68_objekt_bibliothek.py · BACKLOG.md |
-| VIZ-69 | A | perf/viz69-render-ruckler | 2026-10-04T18:00Z | src/ui/visualizer/scene_src/fixtures · src/ui/visualizer/scene_src/scene · tools/viz_render_benchmark.py |
 | VIZ-70 | A | perf/viz70-ui-thread | 2026-10-04T18:00Z | src/ui/visualizer/visualizer_service.py · src/ui/views/live_view.py · src/ui/views/simple_desk.py |
 | BACKLOG-0410 | A | docs/backlog-stand-0410 | 2026-10-04T18:58Z | BACKLOG.md |
 | FM-63 | A | feat/fm63-lightos-profile-vorrang | 2026-10-04T19:01Z | - |
@@ -176,7 +175,6 @@
 
 ## Verlauf
 
-- 2026-10-02T23:30Z B done OUT-59
 - 2026-10-02T23:57Z B done OUT-60
 - 2026-10-03T00:13Z C done UI-56
 - 2026-10-03T00:33Z C done QA-82
@@ -206,3 +204,4 @@
 - 2026-10-04T18:58Z A claim BACKLOG-0410
 - 2026-10-04T19:01Z A claim FM-63
 - 2026-10-04T19:18Z A done FM-59
+- 2026-10-04T19:43Z A done VIZ-69
