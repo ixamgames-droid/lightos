@@ -333,6 +333,28 @@ class SicherheitsnetzTest(_Basis):
                  for _ in range(VisualizerService.GATE_MAX_SKIPS + 1)]
         self.assertEqual(werte[-1], soll)
 
+    def test_leerlauf_netz_der_sperre_leert_auch_den_cache(self):
+        """Bei stehendem DMX laesst die Frame-Sperre nur jeden
+        (GATE_MAX_SKIPS+1)-ten Tick bauen. Ein In-place-Edit muss trotzdem
+        nach rund GATE_MAX_SKIPS Ticks sichtbar sein, nicht erst nach
+        GATE_MAX_SKIPS solcher Bauten."""
+        gesehen = []
+        t = VisualizerTarget("t", lambda js: None,
+                             emit_payloads=lambda arr, full, seq: gesehen.extend(arr))
+        self.svc._targets.append(t)
+        t.active = True
+        self._setze(10 + 7, 50)
+        self.svc._tick()
+        gesehen.clear()
+        self.kanaele[2][7].ranges[1].name = "Offen"
+        soll = _gobo_style(self.svc._collect_attrs(self.fx[1]), self.kanaele[2])
+        n = 0
+        while not gesehen and n < 40 * (VisualizerService.GATE_MAX_SKIPS + 1):
+            self.svc._tick()
+            n += 1
+        self.assertLessEqual(n, VisualizerService.GATE_MAX_SKIPS + 1)
+        self.assertEqual(gesehen[-1]["gobo"], soll)
+
 
 class GegenprobeTest(_Basis):
     def test_zufalls_frames_identisch_zum_ungecachten_bau(self):

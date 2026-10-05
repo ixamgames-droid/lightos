@@ -498,7 +498,8 @@ class VisualizerService:
         # Kanal-Cache und liefert eine NEUE Liste), dieselben Geraete-Felder
         # (``_fixture_ident``) und Byte-gleichen Ausschnitt des Display-Frames.
         # Geleert wird er bei jedem nicht-neutralen State-Event
-        # (``_payload_rev``) und spaetestens nach ``GATE_MAX_SKIPS`` Bauten.
+        # (``_payload_rev``), spaetestens nach ``GATE_MAX_SKIPS`` Bauten und
+        # bei jedem Bau, den nur das Sicherheitsnetz der Frame-Sperre erzwingt.
         self._payload_cache: dict[int, tuple] = {}
         self._payload_rev = 0
         # -1: der erste Bau gilt als voller Bau (Alter 0).
@@ -766,6 +767,12 @@ class VisualizerService:
                 and self._gate_skips < self.GATE_MAX_SKIPS):
             self._gate_skips += 1
             return
+        if sig is not None and sig == self._gate_sig and not needs_full:
+            # VIZ-77: dieser Bau kommt NUR vom Sicherheitsnetz der Sperre
+            # (GATE_MAX_SKIPS Ticks ohne Aenderung). Dann auch den Payload-
+            # Cache verwerfen — sonst wuerde er im Leerlauf erst nach
+            # GATE_MAX_SKIPS solcher Bauten (rund 30 s statt 1 s) geleert.
+            self._payload_cache_age = self.GATE_MAX_SKIPS
         self._gate_sig = sig
         self._gate_skips = 0
         snapshot = self._build_snapshot()
