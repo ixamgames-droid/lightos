@@ -576,7 +576,34 @@ class SqliteUebernahme(_TmpFall):
         self.schreibe(self.basis, "locks",
                       "1: POSIX  ADVISORY  READ 1234 08:02:5678 128 128\n"
                       "2: -> POSIX  ADVISORY  WRITE 99 fd:01:42 0 EOF\n")
-        self.assertEqual(dz._linux_gesperrte_inodes(p), {5678, 42})
+        self.assertEqual(dz._linux_gesperrte_dateien(p),
+                         {(8, 2, 5678), (0xfd, 1, 42)})
+
+    def test_lock_mit_gleichem_inode_auf_anderem_geraet_zaehlt_nicht(self):
+        """B5: vorher zaehlte nur der Inode — ein Lock auf 08:02:5678 machte
+        die Datei 08:03:5678 "in Benutzung"."""
+        gesperrt = {(8, 2, 5678), (8, 3, 99)}
+        self.assertFalse(dz._lock_trifft(os.makedev(8, 3), 5678, gesperrt))
+        self.assertTrue(dz._lock_trifft(os.makedev(8, 2), 5678, gesperrt))
+
+    def test_inode_rueckfall_nur_wenn_das_geraet_nicht_vorkommt(self):
+        """btrfs/overlayfs: ``stat`` meldet ein anderes Geraet als
+        /proc/locks — dann (und nur dann) entscheidet der Inode."""
+        gesperrt = {(0, 0x2f, 5678)}
+        self.assertTrue(dz._lock_trifft(os.makedev(0, 0x31), 5678, gesperrt))
+        self.assertFalse(dz._lock_trifft(os.makedev(0, 0x31), 77, gesperrt))
+
+    @unittest.skipUnless(os.path.exists("/proc/locks"), "nur mit /proc/locks")
+    def test_echter_lock_ist_mit_geraet_auffindbar(self):
+        """Gegenprobe gegen den Kernel: der Eintrag in /proc/locks trifft die
+        Datei ueber Geraet+Inode (sonst waere der Abgleich nutzlos streng)."""
+        import fcntl
+        pfad = os.path.join(self.basis, "x.lock")
+        with open(pfad, "w") as f:
+            fcntl.lockf(f, fcntl.LOCK_EX)
+            st = os.stat(pfad)
+            self.assertTrue(dz._lock_trifft(st.st_dev, st.st_ino,
+                                            dz._linux_gesperrte_dateien()))
 
 
 # ── main.py / Start ───────────────────────────────────────────────────────────
@@ -602,7 +629,7 @@ class StartVerdrahtung(unittest.TestCase):
 
     def test_meldung_gesperrte_show_db_und_konflikte(self):
         """Befund 1: gesperrte Show-DB -> Rueckfrage (Nein = beenden);
-        Konflikte -> Hinweis + Quittung, nicht nur eine Log-Zeile."""
+        Konflikte -> Frage je Datei + Quittung, nicht nur eine Log-Zeile."""
         import main as M
         from PySide6.QtWidgets import QMessageBox
         erg = dz.Ergebnis(offen=[("current_show.db", "/alt/current_show.db",
@@ -613,11 +640,59 @@ class StartVerdrahtung(unittest.TestCase):
         w.assert_called_once()
         erg2 = dz.Ergebnis(konflikte=[("universes.json", "/alt/universes.json")],
                            ziel_dir="/app")
-        with mock.patch.object(QMessageBox, "information") as i, \
+        with mock.patch.object(M, "_datenumzug_frage", return_value=0) as f, \
                 mock.patch.object(dz, "quittiere_konflikte") as q:
             self.assertTrue(M._datenumzug_melden(erg2))
+        f.assert_called_once()
+        self.assertIn("Alten Stand übernehmen", f.call_args.args[2])
+        self.assertIn("Neuen Stand behalten", f.call_args.args[2])
+        q.assert_called_once()
+        self.assertEqual(q.call_args.args[0].konflikte, erg2.konflikte)
+
+    def test_jeder_offene_show_db_grund_wird_gemeldet(self):
+        """B4: nicht nur "in Benutzung" — auch Platte voll, Rechte, ein
+        geoeffnetes Ziel fuehren sonst still zu einer leeren Show."""
+        import main as M
+        from PySide6.QtWidgets import QMessageBox
+        for grund in ("[Errno 28] No space left on device",
+                      "[Errno 13] Permission denied", "Ziel in Benutzung"):
+            erg = dz.Ergebnis(offen=[("current_show.db", "/alt/current_show.db",
+                                      grund)])
+            with mock.patch.object(QMessageBox, "warning",
+                                   return_value=QMessageBox.StandardButton.No) as w:
+                self.assertFalse(M._datenumzug_melden(erg), grund)
+            w.assert_called_once()
+            self.assertIn(grund, w.call_args.args[2])
+
+    def test_override_der_show_db_ist_keine_warnung(self):
+        import main as M
+        from PySide6.QtWidgets import QMessageBox
+        erg = dz.Ergebnis(offen=[("current_show.db", "/alt/current_show.db",
+                                  "LIGHTOS_SHOW_DB gesetzt")])
+        with mock.patch.object(QMessageBox, "warning") as w:
+            self.assertTrue(M._datenumzug_melden(erg))
+        w.assert_not_called()
+
+    def test_ersetzte_leere_ziele_werden_angezeigt(self):
+        """B3: die Sicherung eines ersetzten leeren Ziels nennt der Dialog."""
+        import main as M
+        from PySide6.QtWidgets import QMessageBox
+        erg = dz.Ergebnis(ersetzt=[("current_show.db",
+                                    "/app/current_show.db.vor-xplat44")],
+                          ziel_dir="/app")
+        with mock.patch.object(QMessageBox, "information") as i:
+            self.assertTrue(M._datenumzug_melden(erg))
         i.assert_called_once()
-        q.assert_called_once_with(erg2)
+        self.assertIn("/app/current_show.db.vor-xplat44", i.call_args.args[2])
+
+    def test_handkopie_nennt_alle_show_dateien(self):
+        """B1: die Rueckfall-Anleitung darf nie "nur die .db" sagen."""
+        import main as M
+        text = M._datenumzug_handkopie("current_show.db", "/alt/current_show.db",
+                                       "/app")
+        for teil in ("ALLE current_show.db*", "beenden", "current_show.db-wal",
+                     "current_show.db-shm", "entfernen"):
+            self.assertIn(teil, text)
 
     def test_get_state_uebernimmt_vor_dem_oeffnen_der_show_db(self):
         """Befund 1 (b): Werkzeuge ohne main.py rufen get_state() — die
@@ -673,6 +748,242 @@ class NutzerDoku(unittest.TestCase):
                     if muster.search(z):
                         funde.append(f"{os.path.relpath(p, _REPO)}:{i}")
         self.assertEqual(funde, [])
+
+
+def _wal_show(pfad_ohne_endung: str, gruppe: str) -> None:
+    """Show-DB, deren Inhalt NUR in der -wal steht (Abbild bei offener
+    Verbindung, wie nach einem Absturz) — samt -shm."""
+    import shutil
+    with tempfile.TemporaryDirectory() as td:
+        db = os.path.join(td, "s.db")
+        con = sqlite3.connect(db)
+        con.execute("pragma journal_mode=wal")
+        con.execute("pragma wal_autocheckpoint=0")
+        con.execute("create table fixture_groups(name)")
+        con.execute("insert into fixture_groups values (?)", (gruppe,))
+        con.commit()
+        os.makedirs(os.path.dirname(pfad_ohne_endung), exist_ok=True)
+        for e in ("", "-wal", "-shm"):
+            shutil.copy2(db + e, pfad_ohne_endung + e)
+        con.close()
+
+
+def _gruppen(db: str) -> list:
+    """Gruppen einer DB samt -wal, gelesen auf einer Kopie."""
+    import shutil
+    with tempfile.TemporaryDirectory() as td:
+        k = os.path.join(td, "k.db")
+        shutil.copy2(db, k)
+        for e in ("-wal", "-journal"):
+            if os.path.exists(db + e):
+                shutil.copy2(db + e, k + e)
+        con = sqlite3.connect(k)
+        try:
+            return con.execute("select name from fixture_groups").fetchall()
+        finally:
+            con.close()
+
+
+class Review2(_TmpFall):
+    """Zweites Review (Datenverlust), Befunde B1–B5 + Leerraum im JSON."""
+
+    def _konflikt_show(self):
+        _wal_show(os.path.join(self.alt, "current_show.db"), "ALT")
+        _wal_show(os.path.join(self.ziel, "current_show.db"), "NEU")
+        erg = self.lauf(dateien=["current_show.db"])
+        self.assertEqual([n for n, _ in erg.konflikte], ["current_show.db"])
+        return erg
+
+    # B1 ─────────────────────────────────────────────────────────────────────
+    def test_knopf_alten_stand_uebernehmen_bringt_die_ganze_show(self):
+        """B1: "Alten Stand uebernehmen" sichert das Ziel samt -wal/-shm und
+        kopiert die Quelle samt -wal — die Show (nur in der -wal) ist da."""
+        import main as M
+        erg = self._konflikt_show()
+        vorher = _stand(self.alt)
+        with mock.patch.object(M, "_datenumzug_frage", return_value=1):
+            self.assertTrue(M._datenumzug_melden(erg))
+        neu = os.path.join(self.ziel, "current_show.db")
+        self.assertEqual(_gruppen(neu), [("ALT",)])
+        for e in ("", "-wal", "-shm"):
+            self.assertTrue(os.path.exists(
+                os.path.join(self.ziel, "current_show.db" + e + dz.SICHERUNG)), e)
+        self.assertEqual(_gruppen(self._sicherung_als_db()), [("NEU",)])
+        self.assertEqual(_stand(self.alt), vorher, "Quelle veraendert")
+        erg2 = self.lauf(dateien=["current_show.db"])
+        self.assertEqual(erg2.uebersprungen, "bereits erledigt")
+
+    def _sicherung_als_db(self) -> str:
+        import shutil
+        d = os.path.join(self.basis, "sich")
+        os.makedirs(d, exist_ok=True)
+        for e in ("", "-wal"):
+            shutil.copy2(os.path.join(self.ziel, "current_show.db" + e + dz.SICHERUNG),
+                         os.path.join(d, "s.db" + e))
+        return os.path.join(d, "s.db")
+
+    def test_knopf_neuen_stand_behalten_quittiert(self):
+        import main as M
+        erg = self._konflikt_show()
+        with mock.patch.object(M, "_datenumzug_frage", return_value=0):
+            self.assertTrue(M._datenumzug_melden(erg))
+        self.assertEqual(_gruppen(os.path.join(self.ziel, "current_show.db")),
+                         [("NEU",)])
+        self.assertEqual(self.lauf(dateien=["current_show.db"]).uebersprungen,
+                         "bereits erledigt")
+
+    def test_gescheiterter_knopf_zeigt_handkopie_und_fragt_wieder(self):
+        import main as M
+        from PySide6.QtWidgets import QMessageBox
+        erg = self._konflikt_show()
+        with mock.patch.object(M, "_datenumzug_frage", return_value=1), \
+                mock.patch.object(dz, "alten_stand_uebernehmen",
+                                  side_effect=OSError(28, "No space left")), \
+                mock.patch.object(QMessageBox, "warning") as w:
+            self.assertTrue(M._datenumzug_melden(erg))
+        w.assert_called_once()
+        self.assertIn("ALLE current_show.db*", w.call_args.args[2])
+        erg2 = self.lauf(dateien=["current_show.db"])
+        self.assertEqual([n for n, _ in erg2.konflikte], ["current_show.db"])
+
+    def test_alten_stand_uebernehmen_rollt_bei_fehler_zurueck(self):
+        self._konflikt_show()
+        vorher = _stand(self.ziel)
+        with mock.patch.object(dz, "_kopiere_ohne_ueberschreiben",
+                               side_effect=OSError(28, "voll")):
+            with self.assertRaises(OSError):
+                dz.alten_stand_uebernehmen(
+                    self.ziel, "current_show.db",
+                    os.path.join(self.alt, "current_show.db"),
+                    log=self.log.append, in_benutzung=lambda p: False)
+        nachher = {k: v for k, v in _stand(self.ziel).items()
+                   if not k.endswith(".lock")}
+        vorher = {k: v for k, v in vorher.items() if not k.endswith(".lock")}
+        self.assertEqual(nachher, vorher)
+
+    def test_alten_stand_uebernehmen_nicht_bei_offener_quelle(self):
+        self._konflikt_show()
+        with self.assertRaises(RuntimeError):
+            dz.alten_stand_uebernehmen(
+                self.ziel, "current_show.db",
+                os.path.join(self.alt, "current_show.db"),
+                log=self.log.append, in_benutzung=lambda p: p.startswith(self.alt))
+        self.assertEqual(_gruppen(os.path.join(self.ziel, "current_show.db")),
+                         [("NEU",)])
+
+    # B2 ─────────────────────────────────────────────────────────────────────
+    _RENNER = r"""
+import json, os, sys, time
+sys.path.insert(0, sys.argv[5])
+from src.core import datenumzug as dz
+ziel, quelle, rolle, sync = sys.argv[1:5]
+echt = dz.shutil.copy2
+def langsam(a, b, *k, **kw):
+    if rolle == "A":
+        open(sync, "w").close()
+        time.sleep(1.5)
+    return echt(a, b, *k, **kw)
+dz.shutil.copy2 = langsam
+if rolle == "B":
+    ende = time.time() + 30
+    while not os.path.exists(sync) and time.time() < ende:
+        time.sleep(0.01)
+erg = dz.uebernehme_alte_daten(ziel, [quelle], in_benutzung=lambda p: False,
+                               log=lambda m: None)
+print(json.dumps({"kopiert": [n for n, _ in erg.kopiert],
+                  "konflikte": [n for n, _ in erg.konflikte],
+                  "offen": [list(o) for o in erg.offen],
+                  "ersetzt": [n for n, _ in erg.ersetzt],
+                  "uebersprungen": erg.uebersprungen}))
+"""
+
+    def test_zwei_prozesse_gleichzeitig_kopieren_nicht_ineinander(self):
+        """B2: App und Werkzeug starten gleichzeitig. Ohne Sperre kopierten
+        beide in denselben Temp-Namen; einer scheiterte mit FileExistsError
+        ("offen") bzw. ein Marker-Update ging verloren."""
+        _wal_show(os.path.join(self.alt, "current_show.db"), "G")
+        self.schreibe(self.alt, "universes.json", '[{"u": 1}]')
+        skript = os.path.join(self.basis, "renner.py")
+        with open(skript, "w", encoding="utf-8") as f:
+            f.write(self._RENNER)
+        sync = os.path.join(self.basis, "a_kopiert")
+        env = dict(os.environ)
+        env.pop(dz.ENV_AUS, None)
+        prozesse = [subprocess.Popen(
+            [sys.executable, skript, self.ziel, self.alt, rolle, sync, _REPO],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env,
+            cwd=self.basis) for rolle in ("A", "B")]
+        aus = []
+        for p in prozesse:
+            o, e = p.communicate(timeout=120)
+            self.assertEqual(p.returncode, 0, e)
+            aus.append(json.loads(o.strip().splitlines()[-1]))
+        kopiert = sorted(aus[0]["kopiert"] + aus[1]["kopiert"])
+        self.assertEqual(kopiert, ["current_show.db", "universes.json"], aus)
+        for a in aus:
+            self.assertEqual((a["offen"], a["konflikte"], a["ersetzt"]),
+                             ([], [], []), aus)
+        self.assertEqual(aus[1]["uebersprungen"], "bereits erledigt", aus)
+        self.assertEqual(_gruppen(os.path.join(self.ziel, "current_show.db")),
+                         [("G",)])
+        self.assertFalse([n for n in os.listdir(self.ziel) if n.endswith("-tmp")])
+        with open(os.path.join(self.ziel, dz.MARKER_NAME), encoding="utf-8") as f:
+            marker = json.load(f)
+        self.assertEqual(sorted(marker["kopiert"]),
+                         ["current_show.db", "universes.json"])
+
+    def test_fremde_tmp_datei_am_ziel_bleibt_unberuehrt(self):
+        """B2: der Temp-Name ist eindeutig — eine liegengebliebene/fremde
+        ``*.xplat44-tmp`` wird weder ueberschrieben noch geloescht."""
+        self.schreibe(self.alt, "universes.json", '["alt"]')
+        self.schreibe(self.ziel, "universes.json.xplat44-tmp", "fremd")
+        erg = self.lauf()
+        self.assertEqual([n for n, _ in erg.kopiert], ["universes.json"])
+        with open(os.path.join(self.ziel, "universes.json.xplat44-tmp"),
+                  encoding="utf-8") as f:
+            self.assertEqual(f.read(), "fremd")
+
+    # B3 ─────────────────────────────────────────────────────────────────────
+    def test_geleerte_uebernommene_show_wird_nicht_ersetzt(self):
+        """B3: einmal uebernommen, dann bewusst geleert -> Nutzerstand. Ein
+        weiterer alter Ordner (CWD/data) meldet einen Konflikt statt die
+        leere Show still zu ersetzen."""
+        _wal_show(os.path.join(self.alt, "current_show.db"), "G")
+        self.assertEqual([n for n, _ in self.lauf().kopiert], ["current_show.db"])
+        db = os.path.join(self.ziel, "current_show.db")
+        con = sqlite3.connect(db)
+        con.execute("delete from fixture_groups")
+        con.commit()
+        con.close()
+        zweite = os.path.join(self.basis, "cwd", "data")
+        _wal_show(os.path.join(zweite, "current_show.db"), "X")
+        erg = self.lauf([self.alt, zweite])
+        self.assertEqual(erg.ersetzt, [])
+        self.assertEqual([n for n, _ in erg.konflikte], ["current_show.db"])
+        self.assertEqual(_gruppen(db), [])
+
+    def test_git_worktree_kopie_ist_keine_quelle(self):
+        """B3: in einem zusaetzlichen Git-Worktree ist ``.git`` eine Datei —
+        dessen data/ ist ein Abzug, kein Betriebsstand (Programmordner wie CWD)."""
+        repo = os.path.join(self.basis, "repo")
+        wt = os.path.join(self.basis, "wt")
+        os.makedirs(os.path.join(repo, ".git"))
+        self.schreibe(wt, ".git", "gitdir: /irgendwo/.git/worktrees/wt\n")
+        self.assertEqual(dz.alte_quellen(cwd=wt, repo_root=repo),
+                         [os.path.join(repo, "data")])
+        self.assertEqual(dz.alte_quellen(cwd=repo, repo_root=wt),
+                         [os.path.join(repo, "data")])
+        self.assertEqual(dz.alte_quellen(cwd=wt, repo_root=wt), [])
+
+    # Kosmetik ───────────────────────────────────────────────────────────────
+    def test_json_leerraum_loest_keine_sicherung_aus(self):
+        self.schreibe(self.alt, "channel_groups.json", "[]")
+        self.schreibe(self.ziel, "channel_groups.json", "[]\n")
+        erg = self.lauf()
+        self.assertEqual((erg.kopiert, erg.ersetzt, erg.konflikte), ([], [], []))
+        self.assertFalse(os.path.exists(
+            os.path.join(self.ziel, "channel_groups.json" + dz.SICHERUNG)))
+        self.assertEqual(self.lauf().uebersprungen, "bereits erledigt")
 
 
 class Deinstallation(unittest.TestCase):

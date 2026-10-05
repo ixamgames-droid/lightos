@@ -18,6 +18,19 @@ Regeln (bewusst konservativ — es geht um die Daten eines laufenden Betriebs):
   eine LEERE Show-DB (kein Patch, keine Gruppen) bzw. ein JSON ``[]``/``{}``.
   Das ist kein Nutzerstand: es wird nach ``<name>.vor-xplat44`` gesichert und
   der alte Stand kopiert. Ebenso verwaiste SQLite-Nebendateien ohne Hauptdatei.
+  Das gilt nur, solange die Datei NOCH NIE uebernommen wurde (``kopiert`` im
+  Marker): eine einmal uebernommene und dann bewusst geleerte Show ist ein
+  Nutzerstand, ein weiterer alter Ordner meldet dann einen Konflikt.
+* **Konflikt aufloesen** (``alten_stand_uebernehmen``): auf Wunsch aus dem
+  Dialog wird das Ziel samt ``-wal``/``-shm``/``-journal`` gesichert und der
+  alte Stand samt Begleitdateien kopiert — nie nur die Hauptdatei (die echte
+  Show steckt oft noch in der ``-wal``).
+* **Sperre:** ``uebernehme_alte_daten``, ``quittiere_konflikte`` und
+  ``alten_stand_uebernehmen`` laufen unter einer Dateisperre im App-Ordner
+  (``datenumzug_xplat44.lock``); zwei gleichzeitig startende Prozesse
+  (App + Werkzeug) kopieren also nicht ineinander, und der Marker wird unter
+  der Sperre neu gelesen (kein verlorenes Update). Temp-Dateien bekommen
+  eindeutige Namen.
 * **Override-Variablen** (``LIGHTOS_SHOW_DB``, ``LIGHTOS_UNIVERSES_JSON``):
   ist eine gesetzt, wird die Datei NICHT in den (dann ungelesenen) App-Ordner
   kopiert; die Quelle bleibt fuer einen Start ohne Override offen.
@@ -25,7 +38,9 @@ Regeln (bewusst konservativ — es geht um die Daten eines laufenden Betriebs):
   Oeffnen der Show-DB — auch Werkzeuge/Beispiele uebernehmen also zuerst.
 * **Quellen:** ``<Repo/Programmordner>/data`` zuerst (dorthin schrieben die
   Startskripte, die vorher in den Programmordner wechselten), danach
-  ``<CWD>/data``. Gleiche Ordner werden nur einmal betrachtet.
+  ``<CWD>/data``. Gleiche Ordner werden nur einmal betrachtet. Ein Ordner, der
+  eine Git-Worktree-KOPIE ist (``.git`` ist dort eine Datei), ist nie Quelle:
+  sein ``data/`` ist ein Entwicklungs-/Testabzug, kein Betriebsstand.
 * **Einmal je Quellordner.** Die Marker-Datei ``datenumzug_xplat44.json`` im
   App-Ordner haelt fest, welche Quellordner erledigt sind. Ohne Marker kaeme
   eine bewusst im App-Ordner GELOESCHTE Datei (etwa "MIDI-Zuordnungen
@@ -54,12 +69,18 @@ import shutil
 import sqlite3
 import sys
 import tempfile
+import time
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Callable, Iterable
 
 from .paths import USER_DATA_FILES, app_data_dir
 
 MARKER_NAME = "datenumzug_xplat44.json"
+#: Sperrdatei im App-Ordner (zwischen Prozessen, s. ``_sperre``).
+SPERRE_NAME = "datenumzug_xplat44.lock"
+#: Wie lange auf die Sperre eines anderen Prozesses gewartet wird.
+SPERRE_TIMEOUT = 300.0
 #: Abschalter fuer Werkzeuge/Sandkaesten, die NIE echte Daten lesen sollen.
 ENV_AUS = "LIGHTOS_NO_DATENUMZUG"
 #: SQLite-Nebendateien, die mit der DB wandern (``-shm`` s. Modul-Doku).
@@ -92,6 +113,14 @@ class Ergebnis:
         return any(n == "current_show.db" and g == "in Benutzung"
                    for n, _q, g in self.offen)
 
+    def show_db_offen(self) -> list[tuple[str, str]]:
+        """``[(quelle, grund)]`` fuer jede NICHT uebernommene Show-DB — egal
+        warum (in Benutzung, Platte voll, Rechte, Ziel geoeffnet). Ein
+        gesetzter Override (``LIGHTOS_SHOW_DB``) ist Absicht und fehlt hier."""
+        var = USER_DATA_FILES.get("current_show.db") or ""
+        return [(q, g) for n, q, g in self.offen
+                if n == "current_show.db" and not (var and g == f"{var} gesetzt")]
+
 
 def _schluessel(pfad: str) -> str:
     """Vergleichsschluessel fuer Ordner: absolut, aufgeloest, auf Windows ohne
@@ -103,16 +132,28 @@ def _schluessel(pfad: str) -> str:
     return os.path.normcase(p)
 
 
+def _ist_worktree_kopie(ordner: str) -> bool:
+    """``ordner`` ist ein zusaetzlicher Git-Worktree: dort ist ``.git`` eine
+    DATEI (Verweis auf das Haupt-Repo), kein Ordner. Dessen ``data/`` ist ein
+    Entwicklungs-/Testabzug und darf den Betriebsstand nie fuellen."""
+    try:
+        return os.path.isfile(os.path.join(ordner, ".git"))
+    except (OSError, ValueError):
+        return False
+
+
 def alte_quellen(cwd: str | None = None, repo_root: str | None = None) -> list[str]:
-    """Die alten ``data/``-Ordner in Prioritaetsreihenfolge, ohne Dubletten."""
+    """Die alten ``data/``-Ordner in Prioritaetsreihenfolge, ohne Dubletten
+    und ohne Git-Worktree-Kopien (``_ist_worktree_kopie``)."""
     if cwd is None:
         try:
             cwd = os.getcwd()
         except OSError:          # CWD geloescht/unlesbar -> nur der Programmordner
             cwd = None
-    kandidaten = [os.path.join(repo_root or _REPO_ROOT, "data")]
-    if cwd:
-        kandidaten.append(os.path.join(cwd, "data"))
+    kandidaten = []
+    for basis in (repo_root or _REPO_ROOT, cwd):
+        if basis and not _ist_worktree_kopie(basis):
+            kandidaten.append(os.path.join(basis, "data"))
     aus: list[str] = []
     gesehen: set[str] = set()
     for k in kandidaten:
@@ -144,23 +185,38 @@ def _windows_offen(pfad: str) -> bool:
     return False
 
 
-_LOCK_FELD = re.compile(r"^[0-9a-fA-F]+:[0-9a-fA-F]+:(\d+)$")
+_LOCK_FELD = re.compile(r"^([0-9a-fA-F]+):([0-9a-fA-F]+):(\d+)$")
 
 
-def _linux_gesperrte_inodes(quelle: str = "/proc/locks") -> set[int]:
-    """Inodes mit aktiver Dateisperre laut ``/proc/locks`` (SQLite sperrt per
-    POSIX-Lock). Verglichen wird nur der Inode — das Geraet steht dort je nach
-    Dateisystem (btrfs-Subvolumes) anders als in ``stat``; ein seltener
-    Fehlalarm verschiebt die Uebernahme nur auf den naechsten Start."""
-    inodes: set[int] = set()
+def _linux_gesperrte_dateien(quelle: str = "/proc/locks") -> set[tuple[int, int, int]]:
+    """``(major, minor, inode)`` jeder Datei mit aktiver Sperre laut
+    ``/proc/locks`` (SQLite sperrt per POSIX-Lock). Der Kernel schreibt das
+    Geraet hexadezimal, den Inode dezimal."""
+    aus: set[tuple[int, int, int]] = set()
     with open(quelle, encoding="ascii", errors="replace") as f:
         for zeile in f:
             for teil in zeile.split():
                 m = _LOCK_FELD.match(teil)
                 if m:
-                    inodes.add(int(m.group(1)))
+                    aus.add((int(m.group(1), 16), int(m.group(2), 16),
+                             int(m.group(3))))
                     break
-    return inodes
+    return aus
+
+
+def _lock_trifft(st_dev: int, st_ino: int,
+                 gesperrt: set[tuple[int, int, int]]) -> bool:
+    """Gleicht Geraet UND Inode ab. Nur wenn das Geraet der Datei in
+    ``/proc/locks`` gar nicht vorkommt (btrfs-Subvolumes, overlayfs: dort
+    zaehlt der Kernel das Geraet anders als ``stat``), reicht der Inode —
+    ein seltener Fehlalarm verschiebt die Uebernahme nur auf den naechsten
+    Start, ein uebersehener Lock kopierte eine halbe DB."""
+    geraet = (os.major(st_dev), os.minor(st_dev))
+    if (*geraet, st_ino) in gesperrt:
+        return True
+    if any((ma, mi) == geraet for ma, mi, _ in gesperrt):
+        return False            # Geraetezaehlung passt -> kein Inode-Rueckfall
+    return any(ino == st_ino for _ma, _mi, ino in gesperrt)
 
 
 def sqlite_in_benutzung(db: str) -> bool:
@@ -178,14 +234,85 @@ def sqlite_in_benutzung(db: str) -> bool:
     if plat == "win32":
         return any(_windows_offen(p) for p in dateien)
     if os.path.exists("/proc/locks"):
-        gesperrt = _linux_gesperrte_inodes()
+        gesperrt = _linux_gesperrte_dateien()
         for p in dateien:
             try:
-                if os.stat(p).st_ino in gesperrt:
+                st = os.stat(p)
+                if _lock_trifft(st.st_dev, st.st_ino, gesperrt):
                     return True
             except OSError:
                 continue
     return False
+
+
+# ── Sperre zwischen Prozessen ─────────────────────────────────────────────────
+
+def _sperre_nehmen(fd: int) -> bool:
+    """Ein Versuch, ``fd`` exklusiv zu sperren (nicht blockierend)."""
+    try:
+        if os.name == "nt":
+            import msvcrt
+            os.lseek(fd, 0, os.SEEK_SET)
+            msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return True
+    except OSError:
+        return False
+
+
+def _sperre_freigeben(fd: int) -> None:
+    try:
+        if os.name == "nt":
+            import msvcrt
+            os.lseek(fd, 0, os.SEEK_SET)
+            msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(fd, fcntl.LOCK_UN)
+    except OSError:
+        pass
+
+
+@contextmanager
+def _sperre(ziel_dir: str, timeout: float | None = None):
+    """Exklusive Dateisperre ``SPERRE_NAME`` im App-Ordner, plattformneutral
+    (``fcntl.flock`` bzw. ``msvcrt.locking``). Wartet hoechstens ``timeout``
+    Sekunden auf einen anderen Prozess, dann ``TimeoutError`` (der Start
+    bricht daran nicht ab, s. ``einmal_je_prozess``)."""
+    timeout = SPERRE_TIMEOUT if timeout is None else timeout
+    try:
+        fd = os.open(os.path.join(ziel_dir, SPERRE_NAME),
+                     os.O_RDWR | os.O_CREAT, 0o644)
+    except OSError:
+        # Sperrdatei nicht anlegbar (Schreibschutz): dann kann auch niemand
+        # sonst dort kopieren — ohne Sperre weiter; jede Datei scheitert
+        # einzeln, wird gemeldet und beim naechsten Start wiederholt.
+        yield
+        return
+    try:
+        ende = time.monotonic() + timeout
+        while not _sperre_nehmen(fd):
+            if time.monotonic() >= ende:
+                raise TimeoutError(f"Sperre {SPERRE_NAME} in {ziel_dir!r} belegt")
+            time.sleep(0.05)
+        try:
+            yield
+        finally:
+            _sperre_freigeben(fd)
+    finally:
+        os.close(fd)
+
+
+def _eindeutige_tmp(ziel: str) -> str:
+    """Freier, eindeutiger Temp-Name neben ``ziel`` (gleiches Dateisystem ->
+    ``os.replace`` bleibt atomar)."""
+    fd, tmp = tempfile.mkstemp(prefix=os.path.basename(ziel) + ".",
+                               suffix=".xplat44-tmp",
+                               dir=os.path.dirname(ziel) or ".")
+    os.close(fd)
+    return tmp
 
 
 # ── Kopieren ──────────────────────────────────────────────────────────────────
@@ -206,9 +333,9 @@ def _kopiere_ohne_ueberschreiben(paare: list[tuple[str, str]]) -> None:
     umbenannt: list[str] = []
     try:
         for quelle, ziel in paare:
-            tmp = ziel + ".xplat44-tmp"
-            shutil.copy2(quelle, tmp)
+            tmp = _eindeutige_tmp(ziel)
             temps.append((tmp, ziel))
+            shutil.copy2(quelle, tmp)
         for tmp, ziel in temps:
             if os.path.exists(ziel):
                 raise FileExistsError(ziel)
@@ -276,7 +403,11 @@ def _db_ohne_show_inhalt(db: str) -> bool:
 
 def _gleicher_stand(alt: str, neu: str, begleiter: tuple) -> bool:
     """Ziel ist byte-gleich mit der Quelle (samt -wal/-journal) — etwa nach
-    einem Lauf mit verlorenem Marker. Dann nichts tun, auch nichts sichern."""
+    einem Lauf mit verlorenem Marker. Dann nichts tun, auch nichts sichern.
+    JSON (ohne Begleiter) gilt auch bei anderem Leerraum als gleich
+    (``"[]\\n"`` == ``"[]"``)."""
+    if not begleiter and _gleiches_json(alt, neu):
+        return True
     try:
         for b in ("",) + tuple(begleiter):
             a, z = os.path.isfile(alt + b), os.path.isfile(neu + b)
@@ -287,20 +418,43 @@ def _gleicher_stand(alt: str, neu: str, begleiter: tuple) -> bool:
         return False
 
 
-def _sichere(pfade: list[str]) -> str:
+def _gleiches_json(alt: str, neu: str) -> bool:
+    """Beide Dateien sind JSON mit gleichem Inhalt — Leerraum zaehlt nicht."""
+    try:
+        with open(alt, encoding="utf-8") as f:
+            a = f.read()
+        with open(neu, encoding="utf-8") as f:
+            z = f.read()
+    except (OSError, ValueError):
+        return False
+    if "".join(a.split()) == "".join(z.split()):
+        return True
+    try:
+        return json.loads(a) == json.loads(z)
+    except ValueError:
+        return False
+
+
+def _sichere_paare(pfade: list[str]) -> list[tuple[str, str]]:
     """Benennt die vorhandenen ``pfade`` nach ``<pfad>.vor-xplat44`` (bei
-    Belegung ``.vor-xplat44.2`` …) um; liefert die Sicherung der ersten Datei."""
+    Belegung ``.vor-xplat44.2`` …) um; liefert ``[(pfad, sicherung), …]``."""
     zusatz = SICHERUNG
     n = 1
     while any(os.path.exists(p + zusatz) for p in pfade):
         n += 1
         zusatz = f"{SICHERUNG}.{n}"
-    erste = ""
+    aus = []
     for p in pfade:
         if os.path.exists(p):
             os.replace(p, p + zusatz)
-            erste = erste or p + zusatz
-    return erste
+            aus.append((p, p + zusatz))
+    return aus
+
+
+def _sichere(pfade: list[str]) -> str:
+    """Wie ``_sichere_paare``; liefert die Sicherung der ersten Datei."""
+    paare = _sichere_paare(pfade)
+    return paare[0][1] if paare else ""
 
 
 def _marker_lesen(pfad: str) -> dict:
@@ -316,12 +470,18 @@ def _marker_schreiben(marker_pfad: str, marker: dict, log: Callable[[str], None]
     marker = dict(marker)
     marker["version"] = 1
     marker["zuletzt"] = datetime.datetime.now().isoformat(timespec="seconds")
+    tmp = ""
     try:
-        tmp = marker_pfad + ".tmp"
+        tmp = _eindeutige_tmp(marker_pfad)
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(marker, f, indent=2, ensure_ascii=False)
         os.replace(tmp, marker_pfad)
     except OSError as e:
+        if tmp and os.path.exists(tmp):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
         log(f"[datenumzug] Marker {marker_pfad!r} nicht schreibbar ({e}) — "
             "die Pruefung laeuft beim naechsten Start erneut (kopiert wird "
             "trotzdem nichts doppelt: vorhandene Dateien gewinnen)")
@@ -344,6 +504,11 @@ def _abschliessen(marker: dict, quellen_namen: dict[str, list[str]]) -> list[str
     return fertig
 
 
+def _teil_lesen(marker: dict) -> dict[str, list[str]]:
+    return {k: list(v) for k, v in (marker.get("teil_erledigt") or {}).items()
+            if isinstance(v, list)}
+
+
 def uebernehme_alte_daten(
     ziel_dir: str | None = None,
     quellen: Iterable[str] | None = None,
@@ -362,22 +527,13 @@ def uebernehme_alte_daten(
     erg.ziel_dir, erg.namen = ziel_dir, list(namen)
     quellen = list(quellen) if quellen is not None else alte_quellen()
     marker_pfad = os.path.join(ziel_dir, MARKER_NAME)
-    marker = _marker_lesen(marker_pfad)
-    erledigt = set(marker.get("quellen_erledigt") or [])
-    teil = {k: list(v) for k, v in (marker.get("teil_erledigt") or {}).items()
-            if isinstance(v, list)}
 
-    offene_quellen = [q for q in quellen if _schluessel(q) not in erledigt]
-    if not offene_quellen:
+    # Schneller Weg ohne Sperre (und ohne den App-Ordner anzulegen): alles
+    # erledigt. Unter der Sperre wird der Marker unten NEU gelesen.
+    erledigt = set(_marker_lesen(marker_pfad).get("quellen_erledigt") or [])
+    if not [q for q in quellen if _schluessel(q) not in erledigt]:
         erg.uebersprungen = "bereits erledigt"
         return erg
-
-    # Quellordner ohne eine einzige bekannte Datei sind sofort erledigt — und
-    # brauchen keinen App-Ordner (ein frischer Start legt ihn nicht deswegen an).
-    vorhanden: dict[str, list[str]] = {}
-    for q in offene_quellen:
-        vorhanden[q] = [n for n in namen if os.path.isfile(os.path.join(q, n))]
-    erg.quellen = list(offene_quellen)
 
     try:
         os.makedirs(ziel_dir, exist_ok=True)
@@ -386,6 +542,33 @@ def uebernehme_alte_daten(
             "Uebernahme beim naechsten Start erneut")
         erg.uebersprungen = "App-Datenordner nicht anlegbar"
         return erg
+
+    with _sperre(ziel_dir):
+        _uebernehme_unter_sperre(erg, ziel_dir, quellen, namen, marker_pfad,
+                                 log, in_benutzung)
+    return erg
+
+
+def _uebernehme_unter_sperre(erg: Ergebnis, ziel_dir: str, quellen: list[str],
+                             namen: list[str], marker_pfad: str,
+                             log: Callable[[str], None],
+                             in_benutzung: Callable[[str], bool]) -> None:
+    # Marker unter der Sperre lesen: ein zweiter Prozess, der eben fertig
+    # wurde, ist damit sichtbar (kein doppeltes Kopieren, kein verlorenes Update).
+    marker = _marker_lesen(marker_pfad)
+    erledigt = set(marker.get("quellen_erledigt") or [])
+    teil = _teil_lesen(marker)
+    schon_kopiert = set(marker.get("kopiert") or [])
+
+    offene_quellen = [q for q in quellen if _schluessel(q) not in erledigt]
+    if not offene_quellen:
+        erg.uebersprungen = "bereits erledigt"
+        return
+
+    vorhanden: dict[str, list[str]] = {}
+    for q in offene_quellen:
+        vorhanden[q] = [n for n in namen if os.path.isfile(os.path.join(q, n))]
+    erg.quellen = list(offene_quellen)
 
     for q, dort in vorhanden.items():
         schon = teil.setdefault(_schluessel(q), [])
@@ -416,7 +599,10 @@ def uebernehme_alte_daten(
                     if _gleicher_stand(alt, neu, begleiter):
                         schon.append(name)          # schon derselbe Stand
                         continue
-                    if not _ziel_ist_leer(neu, sqlite):
+                    # Leer ersetzen NUR, solange der Name nie uebernommen
+                    # wurde: eine uebernommene und dann bewusst geleerte Show
+                    # ist ein Nutzerstand, kein frisch angelegtes Ziel.
+                    if name in schon_kopiert or not _ziel_ist_leer(neu, sqlite):
                         erg.konflikte.append((name, alt))
                         log(f"[datenumzug] {name}: im App-Ordner schon vorhanden — "
                             f"der bleibt gueltig; alter Stand {alt!r} unangetastet")
@@ -450,11 +636,31 @@ def uebernehme_alte_daten(
                     f"({e}) — beim naechsten Start erneut")
 
     marker["teil_erledigt"] = {k: v for k, v in teil.items() if v}
-    marker["kopiert"] = sorted({*marker.get("kopiert", []),
-                                *(n for n, _ in erg.kopiert)})
+    marker["kopiert"] = sorted(schon_kopiert | {n for n, _ in erg.kopiert})
     _abschliessen(marker, vorhanden)
     _marker_schreiben(marker_pfad, marker, log)
-    return erg
+
+
+def _quittiere_unter_sperre(ziel_dir: str, namen: list[str],
+                            konflikte: list[tuple[str, str]],
+                            log: Callable[[str], None],
+                            kopiert: Iterable[str] = ()) -> None:
+    marker_pfad = os.path.join(ziel_dir, MARKER_NAME)
+    marker = _marker_lesen(marker_pfad)      # unter der Sperre NEU gelesen
+    teil = _teil_lesen(marker)
+    quellen_namen: dict[str, list[str]] = {}
+    for name, alt in konflikte:
+        q = os.path.dirname(alt)
+        s = _schluessel(q)
+        if name not in teil.setdefault(s, []):
+            teil[s].append(name)
+        quellen_namen[q] = [n for n in namen
+                            if os.path.isfile(os.path.join(q, n))]
+    marker["teil_erledigt"] = teil
+    if kopiert:
+        marker["kopiert"] = sorted({*(marker.get("kopiert") or []), *kopiert})
+    _abschliessen(marker, quellen_namen)
+    _marker_schreiben(marker_pfad, marker, log)
 
 
 def quittiere_konflikte(erg: Ergebnis, log: Callable[[str], None] = print) -> None:
@@ -463,21 +669,58 @@ def quittiere_konflikte(erg: Ergebnis, log: Callable[[str], None] = print) -> No
     nicht mehr erneut gemeldet."""
     if not erg.konflikte or not erg.ziel_dir:
         return
-    marker_pfad = os.path.join(erg.ziel_dir, MARKER_NAME)
-    marker = _marker_lesen(marker_pfad)
-    teil = {k: list(v) for k, v in (marker.get("teil_erledigt") or {}).items()
-            if isinstance(v, list)}
-    quellen_namen: dict[str, list[str]] = {}
-    for name, alt in erg.konflikte:
-        q = os.path.dirname(alt)
-        s = _schluessel(q)
-        if name not in teil.setdefault(s, []):
-            teil[s].append(name)
-        quellen_namen[q] = [n for n in erg.namen
-                            if os.path.isfile(os.path.join(q, n))]
-    marker["teil_erledigt"] = teil
-    _abschliessen(marker, quellen_namen)
-    _marker_schreiben(marker_pfad, marker, log)
+    with _sperre(erg.ziel_dir):
+        _quittiere_unter_sperre(erg.ziel_dir, erg.namen, erg.konflikte, log)
+
+
+def alten_stand_uebernehmen(
+    ziel_dir: str,
+    name: str,
+    alt: str,
+    *,
+    namen: Iterable[str] | None = None,
+    log: Callable[[str], None] = print,
+    in_benutzung: Callable[[str], bool] = sqlite_in_benutzung,
+) -> list[tuple[str, str]]:
+    """Konflikt zugunsten des ALTEN Stands aufloesen (Knopf im Dialog).
+
+    Sichert das Ziel samt ``-wal``/``-shm``/``-journal`` nach
+    ``<datei>.vor-xplat44`` und kopiert die Quelle samt ``-wal``/``-journal``
+    (nie nur die Hauptdatei: die echte Show steckt oft noch in der ``-wal``).
+    Scheitert das Kopieren, werden die Sicherungen zurueckbenannt.
+    Liefert ``[(datei, sicherung), …]``; wirft bei jedem Fehler (Aufrufer
+    zeigt dann die Anleitung zum Handkopieren)."""
+    neu = os.path.join(ziel_dir, name)
+    sqlite = _ist_sqlite(name)
+    begleiter = SQLITE_BEGLEITER if sqlite else ()
+    namen = list(namen) if namen is not None else list(USER_DATA_FILES)
+    with _sperre(ziel_dir):
+        if not os.path.isfile(alt):
+            raise FileNotFoundError(alt)
+        if sqlite and in_benutzung(alt):
+            raise RuntimeError(f"{alt} ist von einem anderen Programm geoeffnet")
+        if sqlite and in_benutzung(neu):
+            raise RuntimeError(f"{neu} ist von einem anderen Programm geoeffnet")
+        am_ziel = [neu + b for b in ("",) + (("-wal", "-shm", "-journal")
+                                             if sqlite else ())]
+        gesichert = _sichere_paare(am_ziel)
+        paare = [(alt + b, neu + b) for b in begleiter if os.path.isfile(alt + b)]
+        paare.append((alt, neu))
+        try:
+            _kopiere_ohne_ueberschreiben(paare)
+        except BaseException:
+            for orig, sich in gesichert:
+                try:
+                    if not os.path.exists(orig):
+                        os.replace(sich, orig)
+                except OSError:
+                    pass
+            raise
+        log(f"[datenumzug] {name}: alter Stand {alt!r} auf Wunsch uebernommen; "
+            f"bisheriger Stand gesichert: {[s for _o, s in gesichert]!r}")
+        _quittiere_unter_sperre(ziel_dir, namen, [(name, alt)], log,
+                                kopiert=[name])
+    return gesichert
 
 
 _PROZESS_ERGEBNIS: Ergebnis | None = None
