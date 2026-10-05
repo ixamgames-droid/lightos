@@ -56,6 +56,7 @@
 | FM-58 | A | feat/fm58-bibliothek-runde2 | 2026-10-02T18:20Z | fixtures/bibliothek |
 | SAMMEL-DOKU-C | A | sammel/doku-c | 2026-10-02T22:08Z | docs · BACKLOG.md |
 | VIZ-77 | A | perf/viz77-payload-cache | 2026-10-05T13:31Z | - |
+| BACKLOG-0505 | A | docs/backlog-stand-0510 | 2026-10-05T14:03Z | BACKLOG.md |
 
 ## Blocker & Fallen
 
@@ -165,7 +166,6 @@
 
 ## Verlauf
 
-- 2026-10-04T18:00Z A claim VIZ-69
 - 2026-10-04T18:00Z A claim VIZ-70
 - 2026-10-04T18:01Z B done UI-72
 - 2026-10-04T18:01Z B done UI-73
@@ -195,3 +195,4 @@
 - 2026-10-05T13:31Z A claim VIZ-77
 - 2026-10-05T14:03Z A done VIZ-71
 - 2026-10-05T14:03Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-05T14:03Z A claim BACKLOG-0505
