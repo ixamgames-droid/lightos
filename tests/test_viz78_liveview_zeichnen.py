@@ -405,6 +405,16 @@ def _ch(n, attr, **kw):
     return SimpleNamespace(channel_number=n, attribute=attr, ranges=kw.get("ranges", []))
 
 
+class _OmAttrappe:
+    """Output-Manager mit ``get_display_frame`` (``None`` = nichts gesendet)."""
+
+    def __init__(self):
+        self.frames = {}
+
+    def get_display_frame(self, u):
+        return self.frames.get(u)
+
+
 def _fixture(fid=1, address=1, **kw):
     f = SimpleNamespace(fid=fid, universe=1, address=address, label=f"F{fid}",
                         fixture_type="moving_head", pan_range_deg=540,
@@ -439,6 +449,11 @@ class SteckbriefTest(unittest.TestCase):
         self.addCleanup(setattr, LV, "get_channels_for_patched", orig)
         self.alt = self.c._state.universes
         self.addCleanup(setattr, self.c._state, "universes", self.alt)
+        # Display-Frames anderer Tests duerfen hier nicht hineinlesen.
+        self.om = _OmAttrappe()
+        self.alt_om = self.c._state.output_manager
+        self.c._state.output_manager = self.om
+        self.addCleanup(setattr, self.c._state, "output_manager", self.alt_om)
 
     def _vorab(self):
         return {"namen": {}, "square": {}, "prog": set()}
@@ -503,6 +518,25 @@ class SteckbriefTest(unittest.TestCase):
         fx.spider_dual_tilt = True
         self.c._steckbrief(fx)
         self.assertEqual(self.aufrufe, [1, 1])
+
+    def test_wysiwyg_blackout_aus_display_frame(self):
+        """Review VIZ-78 #7: die 2D-Ansicht zeigt, was rausgeht — Blackout/
+        Grand Master/NOT-AUS-Masken aus dem Display-Frame, nicht den Rohpuffer."""
+        fx = _fixture()
+        self.c._state.universes = {1: _UniGetAll({1: 255, 2: 255})}
+        sb = self.c._steckbrief(fx)
+        _farbe, inten = self.c._farbe_aus_steckbrief(sb, self.c._wert_leser())
+        self.assertEqual(inten, 255)               # noch kein Frame -> Rohpuffer
+        self.om.frames[1] = bytes(512)             # Blackout gesendet
+        _farbe, inten = self.c._farbe_aus_steckbrief(sb, self.c._wert_leser())
+        self.assertEqual(inten, 0)
+
+    def test_wysiwyg_blackout_loest_neuzeichnen_aus(self):
+        self.c._state.universes = {1: _UniGetAll({1: 255, 2: 255})}
+        vorher = self.c._anzeige_signatur()
+        self.assertIsNotNone(vorher)
+        self.om.frames[1] = bytes(512)             # Rohpuffer unveraendert
+        self.assertNotEqual(self.c._anzeige_signatur(), vorher)
 
     def test_paint_fragt_kanalliste_nicht_je_bild(self):
         """Rot ohne Steckbrief: jedes Bild fragte die Kanalliste mehrfach je Geraet."""

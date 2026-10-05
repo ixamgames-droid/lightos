@@ -1133,8 +1133,12 @@ class StageCanvas(QWidget):
         ``None`` = nicht ermittelbar -> immer zeichnen (altes Verhalten)."""
         try:
             st = self._state
-            unis = tuple((u, bytes(uni.get_all()))
-                         for u, uni in sorted(st.universes.items()))
+            om = getattr(st, "output_manager", None)
+            # WYSIWYG: dieselbe Quelle wie _wert_leser (Display-Frame, sonst
+            # Rohpuffer) — sonst loest ein Blackout kein Neuzeichnen aus.
+            unis = tuple(
+                (u, bytes(self._display_frame(om, u) or uni.get_all()))
+                for u, uni in sorted(st.universes.items()))
             running = tuple(st.function_manager.running_ids())
             with st._prog_lock:
                 prog = frozenset(f for f, v in st.programmer.items() if v)
@@ -1898,11 +1902,28 @@ class StageCanvas(QWidget):
         self._steckbriefe[fixture.fid] = sb
         return sb
 
+    @staticmethod
+    def _display_frame(om, u):
+        """WYSIWYG: zuletzt gesendeter Frame (nach Grand Master/Blackout/
+        NOT-AUS-Masken) oder ``None`` (kein Output-Manager/noch nichts
+        gesendet) -> der Aufrufer faellt auf den Rohpuffer zurueck."""
+        if om is None:
+            return None
+        try:
+            f = om.get_display_frame(u)
+        except Exception:
+            return None
+        return f if isinstance(f, (bytes, bytearray)) and f else None
+
     def _wert_leser(self):
-        """Liest DMX-Werte EINES Bilds: je Universum einmal ``get_all()``
-        (ein Lock statt einer je Kanal), sonst ``get_channel``. Liefert
-        ``None``, wenn es das Universum nicht gibt."""
+        """Liest DMX-Werte EINES Bilds — WYSIWYG aus dem Display-Frame des
+        Output-Managers (was wirklich rausgeht: Blackout, Grand Master,
+        NOT-AUS-Masken), solange noch keiner gesendet wurde aus dem Rohpuffer:
+        je Universum einmal ``get_all()`` (ein Lock statt einer je Kanal),
+        sonst ``get_channel``. Liefert ``None``, wenn es das Universum nicht
+        gibt."""
         unis = self._state.universes
+        om = getattr(self._state, "output_manager", None)
         puffer: dict = {}
 
         def lese(u, addr):
@@ -1911,8 +1932,10 @@ class StageCanvas(QWidget):
                 uni = unis.get(u)
                 if not uni:
                     return None
-                ga = getattr(uni, "get_all", None)
-                b = ga() if ga is not None else uni
+                b = self._display_frame(om, u)
+                if b is None:
+                    ga = getattr(uni, "get_all", None)
+                    b = ga() if ga is not None else uni
                 puffer[u] = b
             if isinstance(b, (bytes, bytearray)):
                 return b[addr - 1]
