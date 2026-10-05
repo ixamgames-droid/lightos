@@ -56,17 +56,30 @@ Version übernimmt `src/core/datenumzug.py` sie einmalig (s. unten).
 | `channel_groups.json` | JSON-Array von Gruppen `{"name", "universe", "channels": [int], "value": 0-255}`. | Channel-Groups-View (`src/ui/views/channel_groups_view.py`, `_PERSIST_PATH`). |
 | `channel_modifiers.json` | JSON der Kanal-Modifikatoren (Kurven/Invert je Kanal). | Gespeichert vom Channel-Modifier-Dialog (`src/ui/widgets/channel_modifier_dialog.py`), geladen beim Start (`AppState.__init__`, seit XPLAT-44). |
 
-**Übernahme alter `data/`-Dateien (XPLAT-44).** Beim Start (nach der
-Einzelinstanz-Sperre, vor dem ersten App-State) kopiert `main.py` über
-`datenumzug.uebernehme_alte_daten()` jede der fünf Dateien, die im App-Ordner
-FEHLT, aus `<Programmordner>/data` bzw. `<Arbeitsverzeichnis>/data`. Es wird
-nur kopiert — nie verschoben, gelöscht oder überschrieben; liegt die Datei im
-App-Ordner schon, gewinnt sie (Hinweis im Log). Die Show-DB wird samt `-wal`
-/`-journal` kopiert und nur, wenn kein anderer Prozess sie offen hält. Die
-Marker-Datei `datenumzug_xplat44.json` im App-Ordner merkt sich je Quellordner,
-dass die Übernahme erledigt ist — eine dort bewusst gelöschte Datei kommt also
-nicht aus dem alten `data/` zurück. Der alte `data/`-Ordner bleibt als
-Rückfall liegen; die App liest ihn danach nicht mehr.
+**Übernahme alter `data/`-Dateien (XPLAT-44).** Vor dem ersten Öffnen der
+Show-DB — in `main.py` nach der Einzelinstanz-Sperre und zentral in
+`get_state()` (also auch für Werkzeuge), je Prozess einmal über
+`datenumzug.einmal_je_prozess()` — wird jede der fünf Dateien aus
+`<Programmordner>/data` bzw. `<Arbeitsverzeichnis>/data` in den App-Ordner
+kopiert. Es wird nur kopiert — nie verschoben, gelöscht oder überschrieben:
+
+- Fehlt die Datei im App-Ordner, wird sie kopiert. Die Show-DB samt `-wal`
+  /`-journal` und nur, wenn kein anderer Prozess sie offen hält (sonst fragt
+  `main.py`, ob LightOS beendet werden soll).
+- Liegt dort nur ein frisch angelegter, LEERER Stand (Show-DB ohne Patch,
+  Gruppen und Quarantäne; JSON `[]`/`{}`) oder eine verwaiste `-wal` ohne
+  DB, wird er nach `<name>.vor-xplat44` gesichert und durch den alten Stand
+  ersetzt.
+- Liegt dort ein Stand mit Inhalt, gewinnt er (Konflikt). `main.py` meldet
+  das einmal per Dialog; erst danach gilt der Konflikt als erledigt.
+- Ist eine Override-Variable (`LIGHTOS_SHOW_DB`, `LIGHTOS_UNIVERSES_JSON`)
+  gesetzt, wird die betreffende Datei nicht kopiert; ein späterer Start ohne
+  Override holt sie nach.
+
+Die Marker-Datei `datenumzug_xplat44.json` im App-Ordner merkt sich je
+Quellordner (und je Datei), was erledigt ist — eine dort bewusst gelöschte
+Datei kommt also nicht aus dem alten `data/` zurück. Der alte `data/`-Ordner
+bleibt als Rückfall liegen; die App liest ihn danach nicht mehr.
 
 ## (b2) Mitgelieferte Daten unter `data/` (Repo)
 
