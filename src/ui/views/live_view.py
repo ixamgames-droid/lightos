@@ -42,7 +42,8 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
 from PySide6.QtCore import Qt, QTimer, QPointF, QRectF, Signal, QByteArray, QMimeData
 from PySide6.QtGui import (QPainter, QColor, QBrush, QPen, QFont, QPolygonF,
                             QLinearGradient, QRadialGradient, QMouseEvent,
-                            QDrag, QFontMetricsF, QImage, QTransform)
+                            QDrag, QFontMetricsF, QImage, QTransform,
+                            QPaintEngine)
 from src.core.app_state import (
     get_state, get_channels_for_patched, pixel_ring_segments, viz_model_for,
     unapply_pan_tilt_orientation)
@@ -164,8 +165,12 @@ def _text_breite(pt: float, text: str) -> float:
 # Durchgaenge gezeichnet (genau das tut Qt intern auch: erst fuellen, dann
 # konturieren). Die Kachel liegt um eine GANZE Zahl Geraetepixel verschoben;
 # Matrix-Skalierung und Nachkomma-Anteil der Verschiebung sind Teil des
-# Schluessels. Gedrehte/gescherte Painter, Deckkraft != 1, nicht ganzzahlige
-# Umlenkung (gebrochene Pixeldichte) -> direkt wie bisher.
+# Schluessels. Gedrehte/gescherte Painter, Deckkraft != 1, anderer
+# Zeichenmodus als „Source Over", skalierte oder nicht ganzzahlige Umlenkung
+# (JEDE Pixeldichte != 1, also auch 2,0 / Retina / 200 %-Windows) und Ziele,
+# die nicht 8 Bit je Kanal vormultipliziert speichern (10-Bit-X11, RGBA64,
+# ARGB32 ohne Vormultiplikation, RGB16 — dort rundet das Aufblenden anders),
+# -> direkt wie bisher. Bitgleich ist der Cache also nur auf 8-Bit-Zielen.
 #
 # Eine Kachel entsteht erst, wenn derselbe Schluessel ZUM DRITTEN Mal kommt
 # (``KACHEL_AB``). Einzelstuecke und Paare kosten so nichts extra — z. B. ein
@@ -202,12 +207,40 @@ def _form_direkt(painter: QPainter, art: str, geo: tuple, pen, brush) -> None:
         painter.drawRoundedRect(QRectF(*geo[:4]), geo[4], geo[5])
 
 
+# Zielformate, auf denen das Aufblenden einer Kachel bitgleich zum direkten
+# Zeichnen ist (8 Bit je Kanal, vormultipliziert bzw. ohne Alpha).
+_KACHEL_FORMATE = frozenset((
+    QImage.Format.Format_RGB32, QImage.Format.Format_ARGB32_Premultiplied,
+    QImage.Format.Format_RGBX8888, QImage.Format.Format_RGBA8888_Premultiplied,
+    QImage.Format.Format_RGB888))
+_SOURCE_OVER = QPainter.CompositionMode.CompositionMode_SourceOver
+
+
+def _kachel_ziel_ok(painter: QPainter) -> bool:
+    """Rastert der Painter in ein 8-Bit-Ziel? Nur Raster-Engine (kein Druck/
+    SVG/OpenGL); Bild -> Format aus der Erlaubt-Liste; Widget/Pixmap -> Tiefe
+    24/32 (ein 10-Bit-Bildschirm meldet 30, RGB16 meldet 16)."""
+    eng = painter.paintEngine()
+    if eng is None or eng.type() != QPaintEngine.Type.Raster:
+        return False
+    dev = painter.device()
+    if isinstance(dev, QImage):
+        return dev.format() in _KACHEL_FORMATE
+    try:
+        return dev.depth() in (24, 32)
+    except Exception:
+        return False
+
+
 def _kachel_kontext(painter: QPainter):
     """Einmal je Geraet (nach ``translate``): Matrix, Umlenkung und Hinweise
     fuer :func:`_form`. ``None`` = Kachel-Cache hier nicht anwendbar (gedreht,
-    Deckkraft != 1, Umlenkung nicht ganzzahlig, z. B. gebrochene Pixeldichte)."""
+    Deckkraft != 1, Zeichenmodus != Source Over, Ziel nicht 8 Bit, Umlenkung
+    skaliert oder nicht ganzzahlig — jede Pixeldichte != 1)."""
     t = painter.deviceTransform()
-    if t.isRotating() or painter.opacity() != 1.0:
+    if (t.isRotating() or painter.opacity() != 1.0
+            or painter.compositionMode() != _SOURCE_OVER
+            or not _kachel_ziel_ok(painter)):
         return None
     wt = painter.worldTransform()
     painter.setWorldTransform(_IDENTITAET)
@@ -263,7 +296,7 @@ def _form_durchgang(painter: QPainter, kx, art: str, geo: tuple, pen, brush,
     # Zweierpotenz, Ergebnis kleiner) -> gleiche Kachel fuer jede Lage mit
     # demselben Nachkomma-Anteil.
     tdx, tdy = dx - ox, dy - oy
-    key = (art, geo, schluessel, m11, m22, tdx, tdy, bw, bh)
+    key = (art, geo, schluessel, m11, m22, tdx, tdy, bw, bh, hints.value)
     img = _KACHELN.get(key)
     if img is None:
         n = _GESEHEN.get(key, 0) + 1

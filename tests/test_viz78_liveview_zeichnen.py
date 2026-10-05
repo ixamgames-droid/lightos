@@ -256,6 +256,74 @@ class KachelSchwelleTest(unittest.TestCase):
         self.assertEqual(LV._KACHEL_STATS["treffer"], treffer + 1)
 
 
+
+class KachelKontextGrenzenTest(unittest.TestCase):
+    """Review VIZ-78 #3/#4: Zeichenmodus, Render-Hinweise, Zielformat."""
+
+    def setUp(self):
+        LV._kacheln_leeren()
+
+    def _kontext(self, fmt=QImage.Format.Format_RGB32, modus=None):
+        img = QImage(40, 40, fmt)
+        p = QPainter(img)
+        try:
+            if modus is not None:
+                p.setCompositionMode(modus)
+            return LV._kachel_kontext(p)
+        finally:
+            p.end()
+
+    def test_nur_source_over(self):
+        CM = QPainter.CompositionMode
+        self.assertIsNotNone(self._kontext(modus=CM.CompositionMode_SourceOver))
+        for m in (CM.CompositionMode_Plus, CM.CompositionMode_Source,
+                  CM.CompositionMode_Multiply):
+            with self.subTest(modus=m):
+                self.assertIsNone(self._kontext(modus=m))
+
+    def test_nur_8bit_ziele(self):
+        F = QImage.Format
+        for fmt in (F.Format_RGB32, F.Format_ARGB32_Premultiplied,
+                    F.Format_RGBA8888_Premultiplied, F.Format_RGBX8888,
+                    F.Format_RGB888):
+            with self.subTest(fmt=fmt):
+                self.assertIsNotNone(self._kontext(fmt))
+        for fmt in (F.Format_ARGB32, F.Format_RGB30,
+                    F.Format_A2RGB30_Premultiplied,
+                    F.Format_RGBA64_Premultiplied, F.Format_RGB16):
+            with self.subTest(fmt=fmt):
+                self.assertIsNone(self._kontext(fmt))
+
+    def test_render_hinweise_teilen_keine_kachel(self):
+        br, bk = LV._pinsel(QColor(30, 140, 250, 170))
+
+        def male(aa):
+            img = _bg().copy()
+            p = QPainter(img)
+            try:
+                p.setRenderHint(QPainter.RenderHint.Antialiasing, aa)
+                p.translate(60.3, 70.6)
+                LV._form(p, LV._kachel_kontext(p), "e",
+                         LV._ellipse(0, 0, 11, 11), None, br, None, bk)
+            finally:
+                p.end()
+            return img
+
+        for _ in range(LV.KACHEL_AB + 1):
+            male(True)
+        img = QImage(_bg().copy())
+        p = QPainter(img)
+        try:
+            p.translate(60.3, 70.6)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(br)
+            p.drawEllipse(QRectF(*LV._ellipse(0, 0, 11, 11)))
+        finally:
+            p.end()
+        self.assertTrue(male(False) == img,
+                        "ohne Antialiasing darf keine AA-Kachel kommen")
+
+
 _TYPEN = ("par", "moving_head", "pixel_head", "par_bar", "mover_bar", "matrix",
           "led_bar", "strobe", "dimmer", "spider", "scanner", "laser", "hazer",
           "other", "unbekannt")
