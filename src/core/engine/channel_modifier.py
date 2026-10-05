@@ -113,6 +113,10 @@ class ChannelModifierManager:
                 "range_min": m.range_min,
                 "range_max": m.range_max,
             })
+        import os
+        parent = os.path.dirname(path)
+        if parent:
+            os.makedirs(parent, exist_ok=True)   # XPLAT-44: App-Ordner evtl. neu
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
 

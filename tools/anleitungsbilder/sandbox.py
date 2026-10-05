@@ -3,9 +3,9 @@
 Das Werkzeug baut ein volles ``MainWindow``. Das greift beim Aufbau auf eine
 ganze Reihe von Nutzerdateien zu: Fixture-Bibliothek (wird beim Oeffnen
 migriert), ``recent.json``, ``auto_save.lshow``, ``crash.log``, die sACN-CID,
-``ui_prefs.json`` und — **relativ zum Arbeitsverzeichnis** — ``data/``
+``ui_prefs.json`` und die frueher CWD-relativen ``data/``-Dateien
 (``midi_mappings.json``, ``channel_groups.json``, ``universes.json``, die
-Show-DB). ``tools/_gen_env.py`` lenkt davon nur die Show-DB um; fuer ein
+Show-DB — seit XPLAT-44 im App-Datenordner). ``tools/_gen_env.py`` lenkt davon nur die Show-DB um; fuer ein
 Werkzeug, das die ganze App startet, reicht das nicht (Befund aus der
 Machbarkeitsprobe, ``capture_*_tempo_guide.py`` haben genau diese Luecke).
 
@@ -43,6 +43,7 @@ _SCHALTER = (
     "LIGHTOS_NO_AUDIO_AUTOSTART",   # keine Audio-Aufnahme beim Start
     "LIGHTOS_SERIAL_INPROC",        # kein multiprocessing-spawn fuer Enttec
     "LIGHTOS_NO_RECOVERY_PROMPT",   # keine Autosave-Wiederherstellungsfrage
+    "LIGHTOS_NO_DATENUMZUG",        # XPLAT-44: kein Kopieren echter data/-Dateien
 )
 
 # Variablen, die Ausgabe/Netz in eine bestimmte Richtung lenken wuerden —
@@ -180,8 +181,9 @@ def einrichten(basis: str | None = None, *, bildschirm: bool = False) -> Sandbox
     sys.dont_write_bytecode = True
     # Kein Chromium-Sandbox-Zwang fuer die (hier ohnehin schwarze) WebEngine.
     os.environ["LIGHTOS_WEBENGINE_NO_SANDBOX"] = "1"
-    # Arbeitsverzeichnis: data/*.json sind cwd-relativ (midi_mappings,
-    # channel_groups, channel_modifiers) — die Sandbox wird zum "Repo-Root".
+    # Arbeitsverzeichnis: bis XPLAT-44 waren data/*.json cwd-relativ; heute
+    # liegen sie im (umgelenkten) App-Datenordner. Der Wechsel in die Sandbox
+    # bleibt als zweite Sicherung fuer alles, was noch relativ aufloest.
     arbeit = os.path.join(basis, "arbeit")
     os.makedirs(os.path.join(arbeit, "data"), exist_ok=True)
     os.chdir(arbeit)
@@ -219,7 +221,7 @@ def aufgeloeste_pfade() -> dict:
         "ui_prefs": os.path.abspath(remote_settings._prefs_path()),
         "recent_json": os.path.abspath(main_window._recent_files_path()),
         "channel_groups": os.path.abspath(channel_groups_view._PERSIST_PATH),
-        "midi_mappings": os.path.abspath(os.path.join("data", "midi_mappings.json")),
+        "midi_mappings": os.path.abspath(paths.user_data_file("midi_mappings.json")),
         "home": os.path.expanduser("~"),
         "cwd": os.getcwd(),
     }

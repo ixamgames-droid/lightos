@@ -5,9 +5,12 @@ sonst Fallback auf bekannte Pfade.
 
 Was wird entfernt (optional pro Bereich abfragbar):
 - venv/                  (Virtual Environment)
-- data/                  (lokale Show-DB, Mappings, Modifier)
+- data/                  (nur noch der Datenstand von VOR dem Datenumzug XPLAT-44
+                          und mitgelieferte Controller-Vorlagen)
 - shows/                 (eigene Shows - per Default ERHALTEN, --shows zum Loeschen)
-- %APPDATA%/LightOS/     (Snapshots, Stages, Profile, Auto-Save)
+- App-Datenordner        (%APPDATA%/LightOS bzw. ~/.local/share/LightOS: ALLE
+                          Nutzerdaten - Show-DB, Universen, MIDI-Mappings, Gruppen,
+                          Modifier, Snapshots, Stages, Profile, Auto-Save)
 - Desktop\LightOS.lnk
 - install_manifest.json
 
@@ -36,6 +39,19 @@ from src.core.paths import app_data_dir            # noqa: E402
 
 APPDATA_DIR = Path(app_data_dir())
 VENV_DIR = ROOT / "venv"
+
+# XPLAT-44: die Nutzerdaten (Show-DB, Universen, MIDI, Gruppen, Modifier) liegen
+# im App-Datenordner, nicht mehr in data/. Die Fragen muessen das sagen — sonst
+# loescht, wer den App-Ordner fuer "nur Snapshots" haelt, ungewarnt die Show.
+DATA_FRAGE = ("data/ loeschen? (nur der alte Datenstand von VOR dem Update und "
+              "mitgelieferte Controller-Vorlagen - die aktuellen Nutzerdaten "
+              "liegen im App-Datenordner)")
+
+
+def appdata_frage() -> str:
+    return (f"{APPDATA_DIR}/ loeschen? (ALLE Nutzerdaten: Show-DB, Universen, "
+            "MIDI-Mappings, Gruppen, Modifier, Snapshots, Stages, Profile, "
+            "Auto-Save!)")
 
 
 def info(msg: str):
@@ -139,7 +155,7 @@ def main():
             targets.append(("venv", VENV_DIR))
 
     # 2. data/
-    if args.yes or confirm(f"data/ loeschen? (Show-DB, MIDI-Mappings, Modifier)"):
+    if args.yes or confirm(DATA_FRAGE):
         targets.append(("data", ROOT / "data"))
 
     # 3. shows/
@@ -153,7 +169,7 @@ def main():
 
     # 4. AppData
     if not args.keep_appdata:
-        if args.yes or confirm(f"{APPDATA_DIR}/ loeschen? (Snapshots, Stages, Profile, Auto-Save)"):
+        if args.yes or confirm(appdata_frage(), default=False):
             targets.append(("appdata", APPDATA_DIR))
 
     # 5. Shortcut

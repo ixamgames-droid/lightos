@@ -49,8 +49,8 @@ The dialog **Ausgabe konfigurieren** has five tabs: **Enttec Pro USB**, **Art-Ne
 - **Universen tab** (step 5): all universes in one table, saved and applied with one
   click.
 
-Both write to the same file `data/universes.json` in the LightOS folder, so you can mix
-them. On the next start LightOS automatically sets up the outputs saved there again.
+Both write to the same file `universes.json` in the LightOS data folder
+(Windows `%APPDATA%\LightOS`, Linux `~/.local/share/LightOS`), so you can mix them. On the next start LightOS automatically sets up the outputs saved there again.
 **Schließen** (close) ends the dialog; afterwards LightOS updates the status bar.
 
 The **DMX Input** tab is not part of the output: there LightOS receives DMX from
@@ -146,7 +146,7 @@ Each row is one universe: **#** (1–32), **Name** (free to choose) and:
 4. **+ Universe hinzufügen** (add universe) — new row (32 at most). **Löschen** (delete)
    removes the selected rows from the table; this only takes effect with **Speichern**
    (save).
-5. **Speichern** — writes `data/universes.json` and applies the configuration
+5. **Speichern** — writes `universes.json` (in the LightOS data folder) and applies the configuration
    **immediately**, without a restart. As confirmation LightOS shows the path of the
    file.
 

@@ -47,7 +47,7 @@ def diagnose_port(configured: str) -> str | None:
     sonst ein fertiger, dem Nutzer zeigbarer Satz mit konkretem Vorschlag.
 
     ★ Warum es das braucht (HW-5b): nach dem Umzug von Windows auf Linux stand in
-    ``data/universes.json`` fuer das Enttec-Universe weiter ``"COM_FAKE"``. Auf
+    ``universes.json`` (damals noch unter ``data/``) fuer das Enttec-Universe weiter ``"COM_FAKE"``. Auf
     Linux heisst dasselbe Geraet ``/dev/ttyUSB0``. ``EnttecPro("COM_FAKE")`` konnte
     also nur werfen, die Exception verschwand im ``except`` von
     ``apply_output_config`` — und der Statusbalken meldete trotzdem gruen

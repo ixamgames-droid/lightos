@@ -137,10 +137,10 @@ class ChannelModifierDialog(QDialog):
         mod.curve = combo.currentData()
 
     def _save(self):
-        import os
-        os.makedirs("data", exist_ok=True)
+        from src.core.paths import ensure_parent_dir, user_data_file
+        pfad = user_data_file("channel_modifiers.json")
         try:
-            self._mgr.save("data/channel_modifiers.json")
-            QMessageBox.information(self, "Gespeichert", "data/channel_modifiers.json")
+            self._mgr.save(ensure_parent_dir(pfad))
+            QMessageBox.information(self, "Gespeichert", pfad)
         except Exception as e:
             QMessageBox.warning(self, "Fehler", f"Speichern fehlgeschlagen: {e}")

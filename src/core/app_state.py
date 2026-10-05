@@ -21,7 +21,9 @@ from .stage.scene_adapters import _DockView, _LiveViewDict, _SceneBackedDict, _V
 
 # Show-Datenbank. Per LIGHTOS_SHOW_DB umlenkbar — so können Tests (conftest setzt
 # eine Temp-DB) laufen, ohne die echte Show-DB der laufenden App anzufassen.
-SHOW_DB_PATH = os.environ.get("LIGHTOS_SHOW_DB", "data/current_show.db")
+# XPLAT-44: Standard ist der App-Datenordner, nicht mehr ``data/`` ab CWD.
+from .paths import user_data_file as _user_data_file  # noqa: E402
+SHOW_DB_PATH = _user_data_file("current_show.db")
 
 
 # STAB-CURSHOW: Bekannte Cloud-Sync-Ordner-Marker. Liegt die Show-DB in einem
@@ -586,9 +588,18 @@ class AppState:
         from .midi.midi_mapper import get_midi_mapper
         self.midi_mapper = get_midi_mapper(self)
         try:
-            self.midi_mapper and self.midi_mapper.load("data/midi_mappings.json")
+            self.midi_mapper and self.midi_mapper.load(
+                _user_data_file("midi_mappings.json"))
         except Exception as e:
             debug_swallow("app_state.midi_load", e)
+        # XPLAT-44 (Nebenbefund Review #863): die Kanal-Modifier wurden nur
+        # GESPEICHERT, beim Start aber nie geladen — nach einem Neustart waren
+        # sie weg. Fehlende Datei = keine Modifier (load() ist dann ein No-op).
+        try:
+            from .engine.channel_modifier import get_modifier_manager
+            get_modifier_manager().load(_user_data_file("channel_modifiers.json"))
+        except Exception as e:
+            debug_swallow("app_state.modifier_load", e)
         # Zentraler StateSync Event-Bus
         from .sync import get_sync
         self.sync = get_sync()
@@ -2018,8 +2029,8 @@ class AppState:
         - sACN:   ``patch`` = Unicast-IP (leer = Multicast)
         Fehler pro Universe werden geloggt, brechen den Start aber nicht ab.
 
-        ``path=None`` nimmt ``LIGHTOS_UNIVERSES_JSON``, sonst
-        ``data/universes.json``. **Lese- und Schreibseite muessen dieselbe
+        ``path=None`` nimmt ``paths.user_data_file("universes.json")`` —
+        ``LIGHTOS_UNIVERSES_JSON``, sonst der App-Datenordner (XPLAT-44). **Lese- und Schreibseite muessen dieselbe
         Datei sehen** — der Dialog schreibt ueber ``output_config._UNIV_CONFIG_PATH``,
         und stuenden die beiden auseinander, richtete die App beim naechsten
         Start eine andere Konfiguration ein als die gerade gespeicherte.
@@ -2028,8 +2039,7 @@ class AppState:
         import json
         import os
         if path is None:
-            path = (os.environ.get("LIGHTOS_UNIVERSES_JSON")
-                    or os.path.join("data", "universes.json"))
+            path = _user_data_file("universes.json")
         if not os.path.exists(path):
             return
         try:
@@ -7036,6 +7046,16 @@ _state: AppState | None = None
 def get_state() -> AppState:
     global _state
     if _state is None:
+        # XPLAT-44: die Uebernahme alter data/-Dateien MUSS vor dem ersten
+        # Oeffnen der Show-DB laufen — sonst legt open_show() im App-Ordner eine
+        # leere DB an, die den alten Stand verdraengt. Hier zentral, damit auch
+        # Werkzeuge/Beispiele (ohne main.py) zuerst uebernehmen; je Prozess nur
+        # einmal (main.py ruft es schon frueher, mit Dialog).
+        try:
+            from .datenumzug import einmal_je_prozess
+            einmal_je_prozess()
+        except Exception as e:
+            print(f"[datenumzug] uebersprungen: {e}")
         _state = AppState()
         _state.open_show()
         _state.apply_output_config()

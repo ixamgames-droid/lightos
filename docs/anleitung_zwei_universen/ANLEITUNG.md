@@ -73,7 +73,7 @@ leer = Standard, siehe unten). Pro Zeile ein Universe:
 2. **+ Universe hinzufügen** → neue Zeile. **#** `2`, **Name** z. B. *Art-Net*,
    **Output** = `ArtNet`, **Patch** = Ziel-IP oder Broadcast, z. B.
    `192.168.0.50` (leer = Standard-Broadcast `255.255.255.255`).
-3. **Speichern**. LightOS schreibt die Konfiguration nach `data/universes.json`
+3. **Speichern**. LightOS schreibt die Konfiguration nach `universes.json` im Datenordner
    **und** wendet sie **sofort ohne Neustart** an (Bestätigung mit dem Pfad).
 
 Die **Output**-Spalte ist ein Auswahlfeld mit `Disabled / Enttec / sACN /
@@ -119,7 +119,8 @@ könnte im schlechtesten Fall das falsche Rig dunkel schalten. Ist die
 Doppelbelegung Absicht (z. B. bewusst zwei Empfänger am selben Universum),
 klick den Hinweis einfach weg.
 
-Weil die Konfiguration in `data/universes.json` persistiert wird, richtet LightOS
+Weil die Konfiguration in `universes.json` im LightOS-Datenordner
+(Windows `%APPDATA%\LightOS`, Linux `~/.local/share/LightOS`) persistiert wird, richtet LightOS
 beide Adapter beim **nächsten Start automatisch** wieder ein.
 
 ### Weg B: Einzel-Tabs (live verbinden)
@@ -141,9 +142,9 @@ Alternativ pro Universe direkt eine Verbindung aufbauen:
 > Knöpfe wirken **nur** auf das Universe, das im **„Universe:"**-Feld desselben
 > Tabs steht. Stelle das Feld also **vor** jedem Klick bewusst ein (Enttec-Tab
 > auf `1`, Art-Net-Tab auf `2`). So überschreibt die Art-Net-Zuweisung nicht die
-> Enttec-Zuweisung — jede Zeile in `data/universes.json` bleibt für sich erhalten.
+> Enttec-Zuweisung — jede Zeile in `universes.json` bleibt für sich erhalten.
 
-Beide Wege schreiben in dieselbe `data/universes.json`; du kannst sie mischen — aber
+Beide Wege schreiben in dieselbe `universes.json`; du kannst sie mischen — aber
 **Achtung:** die Tabelle im Tab **Universen** wird nur beim Öffnen des Dialogs (und nach
 Art-Net-**Übernehmen**) geladen. Nach **Verbinden** im Enttec-Tab bzw. **Übernehmen** im
 sACN-Tab den Dialog erst schließen und neu öffnen, bevor du im Tab **Universen** auf
