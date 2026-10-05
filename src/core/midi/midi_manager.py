@@ -5,6 +5,7 @@ Backend-Priorität:
   2. WinMM via ctypes  (Windows ARM64 / kein Compiler nötig)
 """
 from __future__ import annotations
+import sys
 import threading
 import queue
 import time
@@ -46,6 +47,39 @@ _AUX_RETRY_S = 5.0
 # Darum werden alle Scans eines Managers serialisiert und Fehler kurz gecacht.
 _RTMIDI_RETRY_SECONDS = 10.0
 _manager_lock = threading.Lock()
+
+
+# MIDI-1: ALSA-Clientname ALLER eigenen RtMidi-Ausgaenge. Unter ALSA legt ein
+# geoeffneter Ausgang einen eigenen LESBAREN Sequencer-Port an; der tauchte in
+# list_inputs() auf, open_all_inputs() oeffnete ihn, und jede LED-/Feedback-
+# Meldung an den Controller kam als Eingabe zurueck (Eigen-Echo). Mit festem
+# Clientnamen lassen sich die eigenen Ports sicher erkennen und ausschliessen.
+# Unter Windows (WinMM/RtMidi-WinMM) erscheinen Ausgaenge nie als Eingang; der
+# Name passt dort auf kein Geraet, der Filter ist wirkungslos und harmlos.
+OWN_OUTPUT_CLIENT = "LightOS Out"
+
+
+def is_own_port(port_name: str) -> bool:
+    """True fuer einen Port, den LightOS selbst als AUSGANG angelegt hat."""
+    return str(port_name or "").startswith(OWN_OUTPUT_CLIENT + ":")
+
+
+def _new_rtmidi_out():
+    """Neuer RtMidi-Ausgang mit dem eigenen Clientnamen (s. ``OWN_OUTPUT_CLIENT``).
+
+    ``set_client_name`` statt ``MidiOut(name=...)``: so bleiben Test-Fakes und
+    Backends ohne Namensunterstuetzung kompatibel. Unter Windows wird der Name
+    gar nicht erst gesetzt — WinMM kennt keine Clientnamen und meldete sonst
+    nur eine Warnung."""
+    m = rtmidi.MidiOut()
+    if not sys.platform.startswith("win"):
+        setter = getattr(m, "set_client_name", None)
+        if callable(setter):
+            try:
+                setter(OWN_OUTPUT_CLIENT)
+            except Exception:
+                pass
+    return m
 
 
 @dataclass
@@ -159,12 +193,15 @@ class MidiManager:
                 # liefern. Dafuer keinen weiteren ALSA-Client konstruieren.
                 handle = self._output if output and self._output is not None else getattr(self, attr)
                 if handle is None:
-                    handle = rtmidi.MidiOut() if output else rtmidi.MidiIn()
+                    handle = _new_rtmidi_out() if output else rtmidi.MidiIn()
                     setattr(self, attr, handle)
                 ports = [
                     handle.get_port_name(i)
                     for i in range(handle.get_port_count())
                 ]
+                if not output:
+                    # MIDI-1: eigene Ausgaenge sind keine Eingabegeraete.
+                    ports = [p for p in ports if not is_own_port(p)]
                 self._rtmidi_retry_after = 0.0
                 self._rtmidi_error = ""
                 return ports
@@ -213,6 +250,10 @@ class MidiManager:
         UI-65: ein fehlerhaftes ALSA-Backend (``rtmidi.MidiIn()`` wirft) darf
         den Klick in der MIDI-Ansicht nicht als unbehandelte Exception enden
         lassen — der Fehler landet im MIDI-Log, das Ergebnis ist False."""
+        if is_own_port(port_name):
+            # MIDI-1: ein eigener Ausgang als Eingang = Eigen-Echo.
+            self._log(f"MIDI Input übersprungen (eigener Ausgang): {port_name}")
+            return False
         existing = self._inputs.get(port_name)
         if (existing is not None and not _USE_WINMM
                 and time.monotonic() < self._rtmidi_retry_after):
@@ -369,7 +410,7 @@ class MidiManager:
                     m = self._scan_output
                     if m is None:
                         try:
-                            m = rtmidi.MidiOut()
+                            m = _new_rtmidi_out()
                         except Exception as exc:
                             # NUR die Ausgangsseite sperren. Frueher setzte das
                             # hier den GEMEINSAMEN Breaker auf float("inf") und
@@ -459,7 +500,7 @@ class MidiManager:
         if not RTMIDI_OK:
             return False
         try:
-            m = rtmidi.MidiOut()
+            m = _new_rtmidi_out()
             m.open_virtual_port(name)
             self._virtual_out = m
             self._log(f"Virtueller MIDI-Ausgang erstellt: {name}")
@@ -623,7 +664,7 @@ class MidiManager:
         if self._rtmidi_out_blocked:
             return None
         try:
-            m = rtmidi.MidiOut()
+            m = _new_rtmidi_out()
             ports = [m.get_port_name(i) for i in range(m.get_port_count())]
             if port_name not in ports:
                 try:
