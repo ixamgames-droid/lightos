@@ -42,7 +42,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
 from PySide6.QtCore import Qt, QTimer, QPointF, QRectF, Signal, QByteArray, QMimeData
 from PySide6.QtGui import (QPainter, QColor, QBrush, QPen, QFont, QPolygonF,
                             QLinearGradient, QRadialGradient, QMouseEvent,
-                            QDrag, QFontMetricsF)
+                            QDrag, QFontMetricsF, QImage, QTransform)
 from src.core.app_state import (
     get_state, get_channels_for_patched, pixel_ring_segments, viz_model_for,
     unapply_pan_tilt_orientation)
@@ -150,6 +150,230 @@ def _text_breite(pt: float, text: str) -> float:
     return m.horizontalAdvance(text)
 
 
+# ── VIZ-78: Kachel-Cache fuer einzelne Zeichen-Durchgaenge ───────────────────
+# Gemessen (headless, Mega-Arena, 32 Geraete mit Effekten): ~2/3 eines Bilds
+# steckten in ``drawEllipse`` — geglaettete Ringe, Verlaufs-Kreise, Gehaeuse,
+# jedes Bild fuer jedes Geraet neu gerastert, obwohl z. B. der Pulsring in
+# einem Bild bei ALLEN Geraeten gleich aussieht.
+#
+# Pixelgleich, weil EIN Durchgang (nur Fuellung ODER nur Kontur) jedes Pixel
+# genau einmal mit „Source Over" mischt: auf eine durchsichtige Kachel gemalt
+# steht dort exakt die vormultiplizierte Quellfarbe s' (s' + 0·…), und das
+# Aufblenden der Kachel rechnet danach dieselbe Formel s' + d·(1−a') wie das
+# direkte Zeichnen. Eine Form mit Fuellung UND Kontur wird deshalb als zwei
+# Durchgaenge gezeichnet (genau das tut Qt intern auch: erst fuellen, dann
+# konturieren). Die Kachel liegt um eine GANZE Zahl Geraetepixel verschoben;
+# Matrix-Skalierung und Nachkomma-Anteil der Verschiebung sind Teil des
+# Schluessels. Gedrehte/gescherte Painter, Deckkraft != 1, nicht ganzzahlige
+# Umlenkung (gebrochene Pixeldichte) -> direkt wie bisher.
+#
+# Eine Kachel entsteht erst, wenn derselbe Schluessel ZUM ZWEITEN Mal kommt —
+# Einzelstuecke (z. B. eine Farbe, die es nur einmal gibt) kosten so nichts
+# extra.
+_KACHELN: dict = {}
+_GESEHEN: set = set()
+GESEHEN_MAX = 20_000
+_KACHEL_PIXEL = [0]
+KACHEL_MAX_PIXEL = 4_000_000          # Summe aller Kacheln (~16 MB), dann leeren
+KACHEL_MAX_FLAECHE = 160_000          # groessere Einzelform -> direkt
+_IDENTITAET = QTransform()
+_KACHEL_STATS = {"treffer": 0, "gebaut": 0, "direkt": 0}
+
+
+def _ck(c: QColor) -> tuple:
+    """Hashbarer Schluessel einer Farbe in der Genauigkeit, mit der Qt sie
+    rastert (16 Bit je Kanal — ``lighter()``/``darker()`` landen dazwischen)."""
+    r = c.rgba64()
+    return (r.red(), r.green(), r.blue(), r.alpha())
+
+
+def _form_direkt(painter: QPainter, art: str, geo: tuple, pen, brush) -> None:
+    painter.setPen(pen if pen is not None else Qt.PenStyle.NoPen)
+    painter.setBrush(brush if brush is not None else Qt.BrushStyle.NoBrush)
+    if art == "e":
+        painter.drawEllipse(QRectF(*geo))
+    elif art == "r":
+        painter.drawRect(QRectF(*geo[:4]))
+    else:
+        painter.drawRoundedRect(QRectF(*geo[:4]), geo[4], geo[5])
+
+
+def _kachel_kontext(painter: QPainter):
+    """Einmal je Geraet (nach ``translate``): Matrix, Umlenkung und Hinweise
+    fuer :func:`_form`. ``None`` = Kachel-Cache hier nicht anwendbar (gedreht,
+    Deckkraft != 1, Umlenkung nicht ganzzahlig, z. B. gebrochene Pixeldichte)."""
+    t = painter.deviceTransform()
+    if t.isRotating() or painter.opacity() != 1.0:
+        return None
+    wt = painter.worldTransform()
+    painter.setWorldTransform(_IDENTITAET)
+    r = painter.deviceTransform()
+    painter.setWorldTransform(wt)
+    rdx, rdy = r.dx(), r.dy()
+    if r.isScaling() or r.isRotating() or rdx != int(rdx) or rdy != int(rdy):
+        return None
+    return (t.m11(), t.m22(), t.dx(), t.dy(), rdx, rdy, wt, painter.renderHints())
+
+
+def _form_durchgang(painter: QPainter, kx, art: str, geo: tuple, pen, brush,
+                    schluessel) -> None:
+    """Ein Durchgang (pen ODER brush) ueber den Kachel-Cache."""
+    # Rechtecke rastert Qt mit einem eigenen Rasterer, der Kanten per floor()
+    # in 1/65536 Pixel setzt: liegt eine Kante (rechnerisch) genau auf einer
+    # Pixelgrenze, entscheidet das letzte Bit der Gleitkommarechnung — und das
+    # faellt in der Kachel (kleinere Koordinaten) anders. Rechtecke sind
+    # ohnehin billig -> immer direkt.
+    if kx is None or schluessel is None or art == "r":
+        _KACHEL_STATS["direkt"] += 1
+        _form_direkt(painter, art, geo, pen, brush)
+        return
+    m11, m22, dx, dy, rdx, rdy, wt, hints = kx
+    # Verlaeufe rechnet Qt je Pixel ueber die INVERSE Matrix zurueck; nur ohne
+    # Skalierung (Zoom 1) ist das in der Kachel bitgleich (reine, exakte
+    # Verschiebung um ganze Pixel). Sonst direkt.
+    if schluessel[1][0] == "g" and (m11 != 1.0 or m22 != 1.0):
+        _KACHEL_STATS["direkt"] += 1
+        _form_direkt(painter, art, geo, pen, brush)
+        return
+    # Duenne Stifte (<= 1 Geraetepixel) zeichnet Qt mit dem Kosmetik-Stroker,
+    # der Pixel an Stossstellen mehrfach mischt -> nicht kachelbar.
+    if pen is not None and pen.widthF() * max(abs(m11), abs(m22)) <= 1.0:
+        _KACHEL_STATS["direkt"] += 1
+        _form_direkt(painter, art, geo, pen, brush)
+        return
+    x, y, w, h = geo[0], geo[1], geo[2], geo[3]
+    rand = (pen.widthF() + 2.0) if pen is not None else 1.0
+    x0, x1 = m11 * (x - rand) + dx, m11 * (x + w + rand) + dx
+    y0, y1 = m22 * (y - rand) + dy, m22 * (y + h + rand) + dy
+    if x0 > x1:
+        x0, x1 = x1, x0
+    if y0 > y1:
+        y0, y1 = y1, y0
+    ox, oy = math.floor(x0) - 2, math.floor(y0) - 2
+    bw, bh = math.ceil(x1) - ox + 2, math.ceil(y1) - oy + 2
+    if bw * bh > KACHEL_MAX_FLAECHE or bw <= 0 or bh <= 0:
+        _KACHEL_STATS["direkt"] += 1
+        _form_direkt(painter, art, geo, pen, brush)
+        return
+    # Ganzzahlige Verschiebung: dx - ox ist exakt (beide Vielfache derselben
+    # Zweierpotenz, Ergebnis kleiner) -> gleiche Kachel fuer jede Lage mit
+    # demselben Nachkomma-Anteil.
+    tdx, tdy = dx - ox, dy - oy
+    key = (art, geo, schluessel, m11, m22, tdx, tdy, bw, bh)
+    img = _KACHELN.get(key)
+    if img is None:
+        if key not in _GESEHEN:
+            # Erst beim zweiten Mal bauen; die Merkliste waechst mit jeder
+            # neuen Farbe (Chase) und wird deshalb eigenstaendig geleert.
+            if len(_GESEHEN) > GESEHEN_MAX:
+                _GESEHEN.clear()
+            _GESEHEN.add(key)
+            _KACHEL_STATS["direkt"] += 1
+            _form_direkt(painter, art, geo, pen, brush)
+            return
+        if _KACHEL_PIXEL[0] + bw * bh > KACHEL_MAX_PIXEL:
+            _kacheln_leeren()
+        img = QImage(bw, bh, QImage.Format.Format_ARGB32_Premultiplied)
+        img.fill(0)
+        kp = QPainter(img)
+        try:
+            kp.setRenderHints(hints)
+            kp.setTransform(QTransform(m11, 0.0, 0.0, m22, tdx, tdy))
+            _form_direkt(kp, art, geo, pen, brush)
+        finally:
+            kp.end()
+        _KACHELN[key] = img
+        _GESEHEN.discard(key)
+        _KACHEL_PIXEL[0] += bw * bh
+        _KACHEL_STATS["gebaut"] += 1
+    else:
+        _KACHEL_STATS["treffer"] += 1
+    painter.setWorldTransform(_IDENTITAET)
+    painter.drawImage(QPointF(ox - rdx, oy - rdy), img)
+    painter.setWorldTransform(wt)
+
+
+def _kacheln_leeren() -> None:
+    _KACHELN.clear()
+    _GESEHEN.clear()
+    _KACHEL_PIXEL[0] = 0
+
+
+def _form(painter: QPainter, kx, art: str, geo: tuple, pen=None, brush=None,
+          pen_key=None, brush_key=None) -> None:
+    """Zeichnet eine Form wie ``drawEllipse``/``drawRect``/``drawRoundedRect``
+    mit ``pen``/``brush`` — Fuellung und Kontur je als eigener Durchgang ueber
+    den Kachel-Cache. ``art``: ``"e"`` Ellipse, ``"r"`` Rechteck, ``"rr"``
+    abgerundet; ``geo`` = (x, y, w, h[, rx, ry]) in lokalen Koordinaten;
+    ``kx`` = :func:`_kachel_kontext` des Painters in genau diesem Zustand.
+    ``*_key`` beschreibt Stift/Pinsel vollstaendig (``None`` = nicht cachen)."""
+    if brush is not None:
+        _form_durchgang(painter, kx, art, geo, None, brush,
+                        None if brush_key is None else ("b", brush_key))
+    if pen is not None:
+        _form_durchgang(painter, kx, art, geo, pen, None,
+                        None if pen_key is None else ("p", pen_key))
+
+
+def _ellipse(cx: float, cy: float, rx: float, ry: float) -> tuple:
+    """Geometrie wie ``QPainter.drawEllipse(QPointF(cx, cy), rx, ry)``."""
+    return (cx - rx, cy - ry, 2 * rx, 2 * ry)
+
+
+_SOLID = Qt.PenStyle.SolidLine
+_STIL_NR = {Qt.PenStyle.SolidLine: 1, Qt.PenStyle.DashLine: 2}
+
+
+def _stift(color: QColor, breite: float, stil=_SOLID):
+    """(QPen, Schluessel) — gleicher Konstruktor wie ``QPen(color, breite[, stil])``."""
+    return QPen(color, breite, stil), (_ck(color), breite, _STIL_NR[stil])
+
+
+def _pinsel(color: QColor):
+    return QBrush(color), ("s", _ck(color))
+
+
+def _verlauf(cx: float, cy: float, r: float, stops):
+    """Radialer Verlauf wie ``QRadialGradient(cx, cy, r)`` + ``setColorAt``.
+
+    Ein durchgehend DECKENDER Verlauf bekommt keinen Schluessel: Qt mischt ihn
+    als „Source" mit Abdeckung (eine Rundung: s·c + d·(1−c)), die Kachel
+    rechnet zweimal gerundet — bis zu 2 Stufen Unterschied an den Kanten.
+    Sobald ein Stop durchscheint (Glow), mischt Qt „Source Over" wie die
+    Kachel."""
+    g = QRadialGradient(cx, cy, r)
+    keys = []
+    for pos, c in stops:
+        g.setColorAt(pos, c)
+        keys.append((pos, _ck(c)))
+    if all(k[1][3] == 0xFFFF for k in keys):
+        return QBrush(g), None
+    return QBrush(g), ("g", cx, cy, r, tuple(keys))
+
+
+def _pb(brush_hex: str, pen_hex: str, breite: float) -> tuple:
+    """(pen, brush, pen_key, brush_key) fuer ``_form(painter, _kx, art, geo, *…)``."""
+    pen, pk = _stift(QColor(pen_hex), breite)
+    br, bk = _pinsel(QColor(brush_hex))
+    return (pen, br, pk, bk)
+
+
+# Feste Gehaeuse-Stifte/-Pinsel einmal statt je Bild und Geraet.
+_PB_161616_555_15 = _pb("#161616", "#555", 1.5)
+_PB_222_666_15 = _pb("#222", "#666", 1.5)
+_PB_2a2a2a_666_1 = _pb("#2a2a2a", "#666", 1)
+_PB_1c1c22_888_15 = _pb("#1c1c22", "#888", 1.5)
+_PB_1a1a1a_555_2 = _pb("#1a1a1a", "#555", 2)
+_PB_1a1a1a_555_15 = _pb("#1a1a1a", "#555", 1.5)
+_PB_1a1a1a_888_1 = _pb("#1a1a1a", "#888", 1)
+_PB_1e1e28_555_15 = _pb("#1e1e28", "#555", 1.5)
+_PB_333_777_1 = _pb("#333", "#777", 1)
+_P_222_1 = _stift(QColor("#222"), 1)
+_P_888_15 = _stift(QColor("#888"), 1.5)
+_P_444_1 = _stift(QColor("#444"), 1)
+_B_FX = _pinsel(QColor(60, 130, 255, 200))
+
+
 class FixtureRenderer:
     """Zeichnet ein Fixture je nach Typ unterscheidbar."""
 
@@ -174,6 +398,7 @@ class FixtureRenderer:
         effects = effects or []
         painter.save()
         painter.translate(x, y)
+        _kx = _kachel_kontext(painter)      # VIZ-78
         # Texte in konstanter Bildschirmgroesse: der Painter ist global mit dem
         # Zoom skaliert, also Punktgroessen/Badge-Geometrie mit 1/Zoom
         # gegenrechnen, damit Labels bei kleinem Zoom lesbar bleiben und bei
@@ -202,9 +427,9 @@ class FixtureRenderer:
             pulse = 0.5 + 0.5 * math.sin(anim_phase * 2 * math.pi)
             ring_alpha = int(60 + 160 * pulse)
             ring_color = QColor(80, 160, 255, ring_alpha)
-            painter.setPen(QPen(ring_color, 2, Qt.PenStyle.DashLine))
-            painter.setBrush(Qt.BrushStyle.NoBrush)
-            painter.drawEllipse(QPointF(0, 0), size * 0.72, size * 0.72)
+            _pen, _pk = _stift(ring_color, 2, Qt.PenStyle.DashLine)
+            _form(painter, _kx, "e", _ellipse(0, 0, size * 0.72, size * 0.72),
+                  pen=_pen, pen_key=_pk)
 
         # Highlight-Ring (cyan, dicker Ring) — Gruppen-Hervorhebung
         if highlighted:
@@ -228,30 +453,25 @@ class FixtureRenderer:
             # PAR-Bar (FM-3): Gehaeuse-Balken mit N einzelnen PAR-Zellen
             # (grandMA3-Lichtplan-Stil). Exakter Match VOR "par"/"bar", sonst
             # faengt der PAR- bzw. LED-Bar-Zweig es ab.
-            painter.setBrush(QBrush(QColor("#161616")))
-            painter.setPen(QPen(QColor("#555"), 1.5))
-            painter.drawRoundedRect(QRectF(-size*0.95, -size*0.30, size*1.9, size*0.6), 4, 4)
+            _form(painter, _kx, "rr", (-size*0.95, -size*0.30, size*1.9, size*0.6, 4, 4),
+                  *_PB_161616_555_15)
             n_cells = 4
             step = size*1.7 / n_cells
             cell_r = min(size*0.20, step*0.42)
+            _stops = ((0, color.lighter(180)), (0.6, color), (1, glow_color))
             for i in range(n_cells):
                 cx = -size*0.85 + step*(i+0.5)
-                grad = QRadialGradient(cx, 0, cell_r)
-                grad.setColorAt(0, color.lighter(180))
-                grad.setColorAt(0.6, color)
-                grad.setColorAt(1, glow_color)
-                painter.setBrush(QBrush(grad))
-                painter.setPen(QPen(QColor("#222"), 1))
-                painter.drawEllipse(QPointF(cx, 0), cell_r, cell_r)
+                _br, _bk = _verlauf(cx, 0, cell_r, _stops)
+                _form(painter, _kx, "e", _ellipse(cx, 0, cell_r, cell_r),
+                      _P_222_1[0], _br, _P_222_1[1], _bk)
             label_prefix = "PARBAR"
 
         elif ft == "mover_bar":
             # Mover-Bar (FM-4): Gehaeuse-Balken mit N kleinen Moving-Heads, je mit
             # Beam-Richtung (gemeinsamer Pan im 2D; Pro-Kopf-Pan nur 3D/DMX).
             from math import cos, sin
-            painter.setBrush(QBrush(QColor("#222")))
-            painter.setPen(QPen(QColor("#666"), 1.5))
-            painter.drawRoundedRect(QRectF(-size*0.95, -size*0.24, size*1.9, size*0.48), 4, 4)
+            _form(painter, _kx, "rr", (-size*0.95, -size*0.24, size*1.9, size*0.48, 4, 4),
+                  *_PB_222_666_15)
             n_cells = 4
             step = size*1.7 / n_cells
             head_r = min(size*0.16, step*0.36)
@@ -284,12 +504,13 @@ class FixtureRenderer:
             x0 = -inner/2 + step*0.5
             lit = intensity > 12
             painter.setPen(Qt.PenStyle.NoPen)
+            _br, _bk = _pinsel(color if lit else QColor("#3a3a44"))
             for r in range(n):
                 for c in range(n):
-                    painter.setBrush(QBrush(color if lit else QColor("#3a3a44")))
                     cx = x0 + c*step
                     cy = x0 + r*step
-                    painter.drawRoundedRect(QRectF(cx - cw/2, cy - cw/2, cw, cw), 1.5, 1.5)
+                    _form(painter, _kx, "rr", (cx - cw/2, cy - cw/2, cw, cw, 1.5, 1.5),
+                          brush=_br, brush_key=_bk)
             label_prefix = "MTX"
 
         elif ft == "pixel_head":
@@ -300,29 +521,25 @@ class FixtureRenderer:
             # 3D-Top-Down-Icon laengst seinen Ring zeigte.
             from math import cos, sin
             # Yoke wie beim Moving Head (es IST einer).
-            painter.setBrush(QBrush(QColor("#2a2a2a")))
-            painter.setPen(QPen(QColor("#666"), 1))
-            painter.drawRect(QRectF(-size*0.5, -size*0.15, size*0.15, size*0.3))
-            painter.drawRect(QRectF(size*0.35, -size*0.15, size*0.15, size*0.3))
+            _form(painter, _kx, "r", (-size*0.5, -size*0.15, size*0.15, size*0.3),
+                  *_PB_2a2a2a_666_1)
+            _form(painter, _kx, "r", (size*0.35, -size*0.15, size*0.15, size*0.3),
+                  *_PB_2a2a2a_666_1)
             # Kopf-Gehaeuse dunkel: die Farbe tragen die Segmente, nicht die
             # geschlossene Linse des gewoehnlichen Kopfes.
-            painter.setBrush(QBrush(QColor("#1c1c22")))
-            painter.setPen(QPen(QColor("#888"), 1.5))
-            painter.drawEllipse(QRectF(-size*0.42, -size*0.42, size*0.84, size*0.84))
+            _form(painter, _kx, "e", (-size*0.42, -size*0.42, size*0.84, size*0.84),
+                  *_PB_1c1c22_888_15)
             # Die Segmente: so viele, wie das Geraet hat — dieselbe Zahl, die
             # das 3D bekommt (`app_state.pixel_ring_segments`), und dieselbe
             # Kranz-Geometrie wie das Listen-Icon (`mini_icons.ring_offsets`).
             painter.setPen(Qt.PenStyle.NoPen)
+            _stops = ((0, color.lighter(160)), (0.7, color), (1, glow_color))
             for dx, dy, cell_r in _mini.ring_offsets(
                     ring_segments or _mini.RING_SCHEMA_SEGMENTE,
                     size*0.27, size*0.10):
-                grad = QRadialGradient(dx, dy, max(0.5, cell_r))
-                grad.setColorAt(0, color.lighter(160))
-                grad.setColorAt(0.7, color)
-                grad.setColorAt(1, glow_color)
-                painter.setBrush(QBrush(grad))
-                painter.drawEllipse(QRectF(dx - cell_r, dy - cell_r,
-                                           cell_r*2, cell_r*2))
+                _br, _bk = _verlauf(dx, dy, max(0.5, cell_r), _stops)
+                _form(painter, _kx, "e", (dx - cell_r, dy - cell_r, cell_r*2, cell_r*2),
+                      brush=_br, brush_key=_bk)
             # Beam-Richtung (Pan) wie beim Moving Head — der Kopf bewegt sich.
             pan_rad = math.radians(dmx_to_angle_deg(pan, pan_zero_dmx, pan_range_deg))
             painter.setPen(QPen(color, 2))
@@ -333,19 +550,16 @@ class FixtureRenderer:
 
         elif "moving" in ft or "head" in ft:
             # Moving Head: Diamant + Yoke
-            painter.setBrush(QBrush(QColor("#2a2a2a")))
-            painter.setPen(QPen(QColor("#666"), 1))
             # Yoke (2 Arme links/rechts)
-            painter.drawRect(QRectF(-size*0.5, -size*0.15, size*0.15, size*0.3))
-            painter.drawRect(QRectF(size*0.35, -size*0.15, size*0.15, size*0.3))
+            _form(painter, _kx, "r", (-size*0.5, -size*0.15, size*0.15, size*0.3),
+                  *_PB_2a2a2a_666_1)
+            _form(painter, _kx, "r", (size*0.35, -size*0.15, size*0.15, size*0.3),
+                  *_PB_2a2a2a_666_1)
             # Head (Kreis)
-            grad = QRadialGradient(0, 0, size*0.4)
-            grad.setColorAt(0, color.lighter(140))
-            grad.setColorAt(0.7, color)
-            grad.setColorAt(1, color.darker(120))
-            painter.setBrush(QBrush(grad))
-            painter.setPen(QPen(QColor("#888"), 1.5))
-            painter.drawEllipse(QPointF(0, 0), size*0.4, size*0.4)
+            _br, _bk = _verlauf(0, 0, size*0.4, ((0, color.lighter(140)), (0.7, color),
+                                                 (1, color.darker(120))))
+            _form(painter, _kx, "e", _ellipse(0, 0, size*0.4, size*0.4),
+                  _P_888_15[0], _br, _P_888_15[1], _bk)
             # Beam-Richtung (Pan) — Winkel ueber den ECHTEN Pan-Bereich, damit
             # 2D-Glyph, Info-Box und 3D-Visualizer uebereinstimmen.
             from math import cos, sin
@@ -358,32 +572,27 @@ class FixtureRenderer:
 
         elif any(_t.startswith("par") for _t in ft.split()):  # nicht bloss "par" in ft (sonst matcht z.B. "Sparkular")
             # PAR: Kreis (von oben gesehen)
-            painter.setBrush(QBrush(QColor("#1a1a1a")))
-            painter.setPen(QPen(QColor("#555"), 2))
-            painter.drawEllipse(QPointF(0, 0), size*0.5, size*0.5)
+            _form(painter, _kx, "e", _ellipse(0, 0, size*0.5, size*0.5),
+                  *_PB_1a1a1a_555_2)
             # Innen-Glow (LED-Farbe)
-            grad = QRadialGradient(0, 0, size*0.45)
-            grad.setColorAt(0, color.lighter(180))
-            grad.setColorAt(0.6, color)
-            grad.setColorAt(1, glow_color)
-            painter.setBrush(QBrush(grad))
-            painter.setPen(QPen(QColor("#222"), 1))
-            painter.drawEllipse(QPointF(0, 0), size*0.4, size*0.4)
+            _br, _bk = _verlauf(0, 0, size*0.45, ((0, color.lighter(180)), (0.6, color),
+                                                  (1, glow_color)))
+            _form(painter, _kx, "e", _ellipse(0, 0, size*0.4, size*0.4),
+                  _P_222_1[0], _br, _P_222_1[1], _bk)
             label_prefix = "PAR"
 
         elif "bar" in ft:
             # LED Bar: langes Rechteck horizontal
-            painter.setBrush(QBrush(QColor("#1a1a1a")))
-            painter.setPen(QPen(QColor("#555"), 1.5))
-            painter.drawRoundedRect(QRectF(-size*0.9, -size*0.15, size*1.8, size*0.3), 3, 3)
+            _form(painter, _kx, "rr", (-size*0.9, -size*0.15, size*1.8, size*0.3, 3, 3),
+                  *_PB_1a1a1a_555_15)
             # Pixel-Segments
             n_seg = 8
             seg_w = size*1.7 / n_seg
+            _br, _bk = _pinsel(color)
             for i in range(n_seg):
                 px = -size*0.85 + i*seg_w
-                painter.setBrush(QBrush(color))
-                painter.setPen(Qt.PenStyle.NoPen)
-                painter.drawRect(QRectF(px+1, -size*0.1, seg_w-2, size*0.2))
+                _form(painter, _kx, "r", (px+1, -size*0.1, seg_w-2, size*0.2),
+                      brush=_br, brush_key=_bk)
             label_prefix = "BAR"
 
         elif "strobe" in ft:
@@ -395,16 +604,16 @@ class FixtureRenderer:
             painter.drawPolygon(pts)
             # Inner glow (weiss bei Strobe)
             white_glow = QColor(255, 255, 255, intensity_alpha)
-            painter.setBrush(QBrush(white_glow))
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.drawEllipse(QPointF(0, 0), size*0.3, size*0.3)
+            _br, _bk = _pinsel(white_glow)
+            _form(painter, _kx, "e", _ellipse(0, 0, size*0.3, size*0.3),
+                  brush=_br, brush_key=_bk)
             label_prefix = "STR"
 
         elif "dimmer" in ft:
             # Dimmer: einfacher Kreis
-            painter.setBrush(QBrush(color))
-            painter.setPen(QPen(QColor("#444"), 1))
-            painter.drawEllipse(QPointF(0, 0), size*0.35, size*0.35)
+            _br, _bk = _pinsel(color)
+            _form(painter, _kx, "e", _ellipse(0, 0, size*0.35, size*0.35),
+                  _P_444_1[0], _br, _P_444_1[1], _bk)
             label_prefix = "DIM"
 
         elif "spider" in ft:
@@ -426,18 +635,15 @@ class FixtureRenderer:
             painter.drawRoundedRect(QRectF(-bw*0.5, size*0.27, bw, bh), 2, 2)
             painter.restore()
             # Verbindungs-Mittelstreifen (Gehaeuse)
-            painter.setBrush(QBrush(QColor("#2a2a2a")))
-            painter.setPen(QPen(QColor("#666"), 1))
-            painter.drawRoundedRect(QRectF(-size*0.18, -size*0.22, size*0.36, size*0.44), 3, 3)
+            _form(painter, _kx, "rr", (-size*0.18, -size*0.22, size*0.36, size*0.44, 3, 3),
+                  *_PB_2a2a2a_666_1)
             # Glow-Punkte an Balken-Enden
             glow_c = QColor(color)
             glow_c.setAlpha(intensity_alpha)
-            painter.setBrush(QBrush(glow_c))
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.drawEllipse(QPointF(-size*0.38, -size*0.35), size*0.07, size*0.07)
-            painter.drawEllipse(QPointF(size*0.38, -size*0.35), size*0.07, size*0.07)
-            painter.drawEllipse(QPointF(-size*0.38, size*0.35), size*0.07, size*0.07)
-            painter.drawEllipse(QPointF(size*0.38, size*0.35), size*0.07, size*0.07)
+            _br, _bk = _pinsel(glow_c)
+            for _gx, _gy in ((-0.38, -0.35), (0.38, -0.35), (-0.38, 0.35), (0.38, 0.35)):
+                _form(painter, _kx, "e", _ellipse(size*_gx, size*_gy, size*0.07, size*0.07),
+                      brush=_br, brush_key=_bk)
             label_prefix = "SPI"
 
         elif "scanner" in ft:
@@ -467,13 +673,12 @@ class FixtureRenderer:
             # Laser: kleines Emitter-Gehaeuse + Faecher aus 4 Strahlen
             from math import cos, sin, pi
             # Emitter-Box
-            painter.setBrush(QBrush(QColor("#1a1a1a")))
-            painter.setPen(QPen(QColor("#888"), 1))
-            painter.drawRoundedRect(QRectF(-size*0.2, -size*0.2, size*0.4, size*0.4), 3, 3)
+            _form(painter, _kx, "rr", (-size*0.2, -size*0.2, size*0.4, size*0.4, 3, 3),
+                  *_PB_1a1a1a_888_1)
             # Emitter-Punkt
-            painter.setBrush(QBrush(color.lighter(160)))
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.drawEllipse(QPointF(0, 0), size*0.09, size*0.09)
+            _br, _bk = _pinsel(color.lighter(160))
+            _form(painter, _kx, "e", _ellipse(0, 0, size*0.09, size*0.09),
+                  brush=_br, brush_key=_bk)
             # Strahlen-Faecher (4 Strahlen, symmetrisch aufgefaechert)
             n_beams = 4
             spread = 1.2  # Gesamtwinkel in Rad
@@ -493,13 +698,11 @@ class FixtureRenderer:
             # Smoke/Hazer/Fog: Maschinen-Box + Duese + Puff-Boegen
             from math import cos, sin, pi
             # Geraete-Box
-            painter.setBrush(QBrush(QColor("#1e1e28")))
-            painter.setPen(QPen(QColor("#555"), 1.5))
-            painter.drawRoundedRect(QRectF(-size*0.35, -size*0.25, size*0.7, size*0.5), 4, 4)
+            _form(painter, _kx, "rr", (-size*0.35, -size*0.25, size*0.7, size*0.5, 4, 4),
+                  *_PB_1e1e28_555_15)
             # Duese oben
-            painter.setBrush(QBrush(QColor("#333")))
-            painter.setPen(QPen(QColor("#777"), 1))
-            painter.drawRoundedRect(QRectF(-size*0.08, -size*0.45, size*0.16, size*0.22), 2, 2)
+            _form(painter, _kx, "rr", (-size*0.08, -size*0.45, size*0.16, size*0.22, 2, 2),
+                  *_PB_333_777_1)
             # Puff-Arcs (helle Boegen ueber der Duese)
             fog_col = QColor(color)
             fog_col.setAlpha(max(30, intensity_alpha // 2))
@@ -577,9 +780,9 @@ class FixtureRenderer:
         # FX-Badge oben rechts (Geometrie + Schrift bildschirm-konstant) — nur LOD 0
         if effects and lod == 0:
             badge_rect = fx_badge_rect(size, tscale, _pct_w)
-            painter.setBrush(QBrush(QColor(60, 130, 255, 200)))
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.drawRoundedRect(badge_rect, 3 * tscale, 3 * tscale)
+            _form(painter, _kx, "rr", (badge_rect.x(), badge_rect.y(), badge_rect.width(),
+                                  badge_rect.height(), 3 * tscale, 3 * tscale),
+                  brush=_B_FX[0], brush_key=_B_FX[1])
             painter.setPen(QColor(210, 230, 255))
             painter.setFont(_schrift(6 * tscale, True))
             painter.drawText(badge_rect,
@@ -771,6 +974,10 @@ class StageCanvas(QWidget):
         self._takte_ohne_paint: int = 0
         self._bg_pixmap = None
         self._bg_key: tuple | None = None
+        # VIZ-78: Geraete-Steckbriefe (siehe _steckbrief).
+        self._steckbriefe: dict = {}
+        self._tick_fp: dict | None = None
+        self._steckbrief_zeit: float = time.monotonic()
 
         # Live-Update: der Takt fragt erst, ob sich ueberhaupt etwas zeigt
         # (siehe _on_render_tick), statt blind update() zu rufen.
@@ -914,6 +1121,7 @@ class StageCanvas(QWidget):
 
     def _patch_geaendert(self, *_a) -> None:
         self._paint_sig = None
+        self._steckbriefe.clear()
 
     def _on_render_tick(self) -> None:
         if not self._darf_zeichnen():
@@ -925,6 +1133,9 @@ class StageCanvas(QWidget):
             return
         self._paint_sig = sig
         self._takte_ohne_paint = 0
+        # VIZ-78: die Fingerabdruecke hat die Signatur eben schon gelesen —
+        # das gleich folgende Bild nimmt sie, statt sie erneut abzufragen.
+        self._tick_fp = ({fp[0]: fp for fp in sig[3]} if sig is not None else None)
         self.update()
 
     # ── VIZ-70: statischer Hintergrund als Pixmap ────────────────────────────
@@ -1152,6 +1363,7 @@ class StageCanvas(QWidget):
 
     def _reload_positions_safe(self):
         try:
+            self._steckbriefe.clear()
             self._load_positions()
             self._apply_meta_from_state()
             self.update()
@@ -1583,6 +1795,123 @@ class StageCanvas(QWidget):
         except Exception:
             return QColor(60, 60, 60), 0
 
+    # ── VIZ-78: Geraete-Steckbrief (was sich nur mit dem Patch aendert) ──────
+    # Bis hierher fragte jedes Bild je Geraet Kanalliste, Render-Typ, Ring-
+    # Segmente, Pan/Tilt-Bereich und Nullpunkte neu ab — ~140 ORM-Attribut-
+    # zugriffe je Geraet und Bild. Der Steckbrief haelt das, gueltig solange
+    # der Patch-Fingerabdruck gleich bleibt; Patch-Event, Show-Laden und
+    # spaetestens STECKBRIEF_MAX_ALTER_S verwerfen ihn (Profil-Bearbeitung
+    # ohne Fingerabdruck-Aenderung).
+    STECKBRIEF_MAX_ALTER_S = 1.0
+
+    def _steckbriefe_verwerfen(self) -> None:
+        self._steckbriefe.clear()
+
+    def _steckbrief(self, fixture, fp_map=None) -> dict:
+        fp = fp_map.get(fixture.fid) if fp_map else None
+        if fp is None:
+            fp = self._patch_fingerabdruck(fixture)
+        sb = self._steckbriefe.get(fixture.fid)
+        if sb is not None and sb["fp"] == fp:
+            return sb
+        sb = {"fp": fp, "uni": fixture.universe, "label": f"{fixture.fid}",
+              "farbe": [], "kanaele": [], "pt": [], "strobe": [], "ok": True}
+        try:
+            channels = get_channels_for_patched(fixture)
+            sb["kanaele"] = channels
+            gesehen = set()
+            for ch in channels:
+                addr = fixture.address + ch.channel_number - 1
+                if not (1 <= addr <= 512):
+                    continue
+                attr = ch.attribute
+                if attr not in gesehen:     # nur das ERSTE Vorkommen = Kopf 0
+                    gesehen.add(attr)
+                    sb["farbe"].append((attr, addr))
+                if attr in _PT_ATTRS:
+                    sb["pt"].append((attr, addr))
+                if attr in ("shutter", "strobe"):
+                    sb["strobe"].append((ch, addr, {}))
+        except Exception:
+            sb["ok"] = False
+        # Verfeinerter Render-Typ: par_bar/mover_bar/spider werden von
+        # moving_head getrennt — dieselbe zentrale Quelle wie das 3D-Modell
+        # (viz_model_for), damit 2D-Symbol und 3D-Render nicht driften (FM-6/7).
+        _base_type = fixture.fixture_type or "par"
+        try:
+            sb["render_type"] = viz_model_for(fixture) or _base_type
+        except Exception:
+            sb["render_type"] = _base_type
+        # VIZ-53: Ring-Segmente eines Pixel-Kopfs stehen in den Kanaelen des
+        # GEPATCHTEN Geraets — dieselbe Funktion beliefert die 3D-Nutzlast.
+        sb["ring"] = 0
+        if sb["render_type"] == "pixel_head":
+            try:
+                sb["ring"] = pixel_ring_segments(fixture)
+            except Exception:
+                sb["ring"] = 0
+        sb["pr"] = float(getattr(fixture, "pan_range_deg", 540) or 540)
+        sb["tr"] = float(getattr(fixture, "tilt_range_deg", 270) or 270)
+        # VIZ-55: effektiver Nullpunkt (inkl. Einmess-Versatz), dieselbe Quelle
+        # wie Zielen und 3D.
+        sb["pz"], sb["tz"] = effektive_nullpunkte(fixture)
+        self._steckbriefe[fixture.fid] = sb
+        return sb
+
+    def _wert_leser(self):
+        """Liest DMX-Werte EINES Bilds: je Universum einmal ``get_all()``
+        (ein Lock statt einer je Kanal), sonst ``get_channel``. Liefert
+        ``None``, wenn es das Universum nicht gibt."""
+        unis = self._state.universes
+        puffer: dict = {}
+
+        def lese(u, addr):
+            b = puffer.get(u)
+            if b is None:
+                uni = unis.get(u)
+                if not uni:
+                    return None
+                ga = getattr(uni, "get_all", None)
+                b = ga() if ga is not None else uni
+                puffer[u] = b
+            if isinstance(b, (bytes, bytearray)):
+                return b[addr - 1]
+            return b.get_channel(addr)
+        return lese
+
+    def _farbe_aus_steckbrief(self, sb: dict, lese) -> tuple[QColor, int]:
+        """Wie :meth:`_fixture_color_and_intensity`, aus dem Steckbrief."""
+        try:
+            if not sb["ok"] or lese(sb["uni"], 1) is None:
+                return QColor(60, 60, 60), 0
+            uni = sb["uni"]
+            attrs = {a: lese(uni, addr) for a, addr in sb["farbe"]}
+            r, g, b = visual_rgb(attrs, sb["kanaele"])
+            return QColor(r, g, b), visual_intensity(attrs, sb["kanaele"])
+        except Exception:
+            return QColor(60, 60, 60), 0
+
+    def _strobe_aus_steckbrief(self, sb: dict, lese, vorab) -> tuple[float, bool]:
+        """Wie :meth:`_get_strobe_info` mit ``vorab``, aus dem Steckbrief;
+        ``_strobe_hz`` je Kanal und Wert gemerkt."""
+        freq_hz = 0.0
+        try:
+            if sb["strobe"] and lese(sb["uni"], 1) is not None:
+                for ch, addr, memo in sb["strobe"]:
+                    val = lese(sb["uni"], addr)
+                    hz = memo.get(val)
+                    if hz is None:
+                        hz = memo[val] = _strobe_hz(ch, val)
+                    freq_hz = max(freq_hz, hz)
+        except Exception:
+            pass
+        if freq_hz == 0.0:
+            freq_hz = vorab["square"].get(sb["fp"][0], 0.0)
+        if freq_hz == 0.0:
+            return 0.0, True
+        phase = (time.time() * freq_hz) % 1.0
+        return freq_hz, phase < 0.5
+
     # ── Paint ─────────────────────────────────────────────────────────────────
 
     def paintEvent(self, event):
@@ -1636,6 +1965,12 @@ class StageCanvas(QWidget):
         animiert = False
         info_box_data = None  # (fixture, color, intensity, pan, tilt, effects, x, y)
 
+        lese = self._wert_leser()
+        fp_map, self._tick_fp = self._tick_fp, None
+        jetzt_t = time.monotonic()
+        if jetzt_t - self._steckbrief_zeit > self.STECKBRIEF_MAX_ALTER_S:
+            self._steckbriefe.clear()
+            self._steckbrief_zeit = jetzt_t
         for fixture in fixtures:
             if fixture.fid not in self._positions:
                 continue
@@ -1643,58 +1978,31 @@ class StageCanvas(QWidget):
             if (_clip is not None and not _clip.contains(x, y)
                     and fixture.fid not in self._selected_fids):
                 continue    # ausserhalb des Neuzeichen-Bereichs
-            color, intensity = self._fixture_color_and_intensity(fixture)
+            sb = self._steckbrief(fixture, fp_map)
+            color, intensity = self._farbe_aus_steckbrief(sb, lese)
             pan = tilt = 128
             try:
-                universe = self._state.universes.get(fixture.universe)
-                if universe:
-                    channels = get_channels_for_patched(fixture)
-                    _pt = {}
-                    for ch in channels:
-                        addr = fixture.address + ch.channel_number - 1
-                        if 1 <= addr <= 512 and ch.attribute in _PT_ATTRS:
-                            _pt[ch.attribute] = universe.get_channel(addr)
+                if sb["pt"] and lese(sb["uni"], 1) is not None:
+                    _pt = {a: lese(sb["uni"], addr) for a, addr in sb["pt"]}
                     # VIZ-55: DRAHT -> MODELL wie im 3D (visualizer_service): die
                     # Ausgabestufe hat invert/swap angewandt, die 2D-Winkelformel
                     # kennt sie nicht — ohne Ruecknahme stand der Beam bei solchen
                     # Geraeten gespiegelt, und der Einmess-Versatz (Modellraum)
                     # bekam das falsche Vorzeichen. Feinkanal wie im 3D mit.
-                    if _pt:
-                        _pt = unapply_pan_tilt_orientation(fixture, _pt)
-                        pan = _pt.get("pan", 128) + (_pt.get("pan_fine", 0) or 0) / 256.0
-                        tilt = _pt.get("tilt", 128) + (_pt.get("tilt_fine", 0) or 0) / 256.0
+                    _pt = unapply_pan_tilt_orientation(fixture, _pt)
+                    pan = _pt.get("pan", 128) + (_pt.get("pan_fine", 0) or 0) / 256.0
+                    tilt = _pt.get("tilt", 128) + (_pt.get("tilt_fine", 0) or 0) / 256.0
             except Exception:
                 pass
-            strobe_hz, blink_on = self._get_strobe_info(fixture.fid, fixture, running,
-                                                        vorab)
+            strobe_hz, blink_on = self._strobe_aus_steckbrief(sb, lese, vorab)
             effects = self._get_active_effects(fixture.fid, strobe_hz, running, vorab)
             if effects or strobe_hz != 0.0:
                 animiert = True
-            label = f"{fixture.fid}"
-            # Verfeinerten Render-Typ berechnen: par_bar/mover_bar/spider werden
-            # von moving_head getrennt — dieselbe zentrale Quelle wie das 3D-Modell
-            # (viz_model_for), damit 2D-Symbol und 3D-Render nicht driften (FM-6/7).
-            _base_type = fixture.fixture_type or "par"
-            try:
-                _render_type = viz_model_for(fixture) or _base_type
-            except Exception:
-                _render_type = _base_type
-            # VIZ-53: Wie viele Ring-Segmente hat dieser Pixel-Kopf? Die Zahl
-            # steht in den Kanaelen des GEPATCHTEN Geraets, nicht am Modell —
-            # sie muss also hier ermittelt und mitgegeben werden. Dieselbe
-            # Funktion beliefert die 3D-Nutzlast, sonst zeigten 2D und 3D
-            # verschieden viele Segmente (der Riss aus VIZ-51/52, neuer Typ).
-            _ring = 0
-            if _render_type == "pixel_head":
-                try:
-                    _ring = pixel_ring_segments(fixture)
-                except Exception:
-                    _ring = 0
-            _pr = float(getattr(fixture, "pan_range_deg", 540) or 540)
-            _tr = float(getattr(fixture, "tilt_range_deg", 270) or 270)
-            # VIZ-55: effektiver Nullpunkt (inkl. Einmess-Versatz), dieselbe Quelle
-            # wie Zielen und 3D.
-            _pz, _tz = effektive_nullpunkte(fixture)
+            label = sb["label"]
+            _render_type = sb["render_type"]
+            _ring = sb["ring"]
+            _pr, _tr = sb["pr"], sb["tr"]
+            _pz, _tz = sb["pz"], sb["tz"]
             # UI-26: Label-Detailgrad aus dem Bildschirm-Nachbarabstand. Selektierte
             # oder hervorgehobene Fixtures bekommen IMMER das volle Label (der Nutzer
             # will genau die sehen), unabhaengig von der Dichte.
