@@ -38,7 +38,9 @@ SNAP_FILE = os.path.join(APPDIR, "snapshots.json")
 # TOOL-3: repo-relativ wie die anderen Generatoren — CWD-relativ landete die Show
 # woanders, sobald das Skript nicht aus dem Repo-Root gestartet wurde.
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MIDIMAP = os.path.join(_ROOT, "data", "midi_mappings.json")
+# XPLAT-44: die globalen MIDI-Zuordnungen liegen im App-Datenordner.
+from src.core.paths import user_data_file  # noqa: E402
+MIDIMAP = user_data_file("midi_mappings.json")
 SHOW_OUT = os.path.join(_ROOT, "shows", "APC_Demo_Show.lshow")
 
 st = get_state()
@@ -52,9 +54,9 @@ if not fixtures:
         "Kein Fixture gepatcht (isolierte Wegwerf-DB ist leer).\n"
         "Dieses Alt-Skript baut auf dem Bestands-Patch auf. Bewusster Lauf gegen die "
         "echte DB (App vorher schliessen!):\n"
-        "  Windows:     $env:LIGHTOS_SHOW_DB='data/current_show.db'; "
+        "  Windows:     $env:LIGHTOS_SHOW_DB=\"$env:APPDATA/LightOS/current_show.db\"; "
         "venv/Scripts/python.exe tools/build_full_show.py" + "\n" +
-        "  Linux/macOS: LIGHTOS_SHOW_DB=data/current_show.db "
+        "  Linux:       LIGHTOS_SHOW_DB=~/.local/share/LightOS/current_show.db "
         "./venv/bin/python tools/build_full_show.py"
     )
 fids = [f.fid for f in fixtures]

@@ -128,7 +128,7 @@ am Bildschirm direkt, welche Hardware‑Taste was tut.
 Die mitgelieferte Show ist auf **mk2** eingestellt (Generator‑Konstante
 `DEVICE = "mk2"` → Track‑Tasten 100–107). Für ein **Original** auf `"original"`
 stellen und neu bauen. Die Seitenumschaltung (`page_select`) steckt global in
-`data/midi_mappings.json` und ist auf die **mk2‑Scene‑Tasten 112–119** gemappt.
+`midi_mappings.json` (App-Datenordner) und ist auf die **mk2‑Scene‑Tasten 112–119** gemappt.
 
 **Seitenwechsel (bidirektional):** Die **Scene‑Tasten rechts (Notes 112–119)**
 schalten Seite 1–8 — und zwar **gleichzeitig auf der Hardware und im VC**:
@@ -376,6 +376,6 @@ RGB‑Matrix, Virtual Console, Snapshots und Visualizer‑Positionen.
 | `docs/APC_SEITEN_UEBERSICHT.md` | Seiten‑Bilder + „welche Taste tut was" |
 | `docs/images/apc_page_*.png` | gerenderte Seiten‑Screenshots |
 | `src/ui/virtualconsole/controller_templates.py` | Editor‑Bausteine (Controller‑Vorlage, Color‑Chase‑Kit) |
-| `data/midi_mappings.json` | globale MIDI‑Bindungen (Seitenwechsel) |
+| `midi_mappings.json` (App-Datenordner) | globale MIDI‑Bindungen (Seitenwechsel) |
 
 *Stand: 2026‑06‑08*

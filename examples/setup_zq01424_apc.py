@@ -212,7 +212,8 @@ for m in mappings:
 print(f"  {len(mappings)} Mappings hinzugefuegt (alle nur fuer Port mit 'APC' im Namen)")
 
 # Speichern
-mapping_path = os.path.join("data", "midi_mappings.json")
+from src.core.paths import user_data_file   # XPLAT-44: App-Datenordner
+mapping_path = user_data_file("midi_mappings.json")
 os.makedirs(os.path.dirname(mapping_path), exist_ok=True)
 mapper.save(mapping_path)
 print(f"  Gespeichert: {mapping_path}")

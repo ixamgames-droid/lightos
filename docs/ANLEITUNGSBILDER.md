@@ -39,8 +39,10 @@ zusätzlich; dafür entsprechen Bilder und `--pruefen` genau dem Einzellauf der 
 ## Datenschutz: die Sandbox
 
 Das Werkzeug baut ein volles Hauptfenster. Das würde sonst die echte
-Fixture-Bibliothek, `recent.json`, `auto_save.lshow`, die sACN-Kennung und – relativ
-zum Arbeitsverzeichnis – `data/` im Repo anfassen. Deshalb gilt:
+Fixture-Bibliothek, `recent.json`, `auto_save.lshow`, die sACN-Kennung, die
+Nutzerdateien im App-Datenordner (Show-DB, `universes.json`, MIDI-Zuordnungen …) und
+– über die einmalige Übernahme alter Stände (XPLAT-44, hier per
+`LIGHTOS_NO_DATENUMZUG` abgeschaltet) – `data/` im Repo anfassen. Deshalb gilt:
 
 1. **Vor dem ersten `src`-Import** werden `HOME`, `XDG_DATA_HOME`, `XDG_CONFIG_HOME`,
    `XDG_CACHE_HOME`, `XDG_STATE_HOME`, `XDG_RUNTIME_DIR`, `APPDATA`,
@@ -50,7 +52,7 @@ zum Arbeitsverzeichnis – `data/` im Repo anfassen. Deshalb gilt:
    Enttec-Prozess und die Wiederherstellungsfrage sind abgeschaltet.
 2. **Selbstprüfung:** Vor dem ersten Bild fragt das Werkzeug die Pfade ab, die die
    geladenen Module *tatsächlich* benutzen (Fixture-DB, Show-DB, Datenordner,
-   `universes.json`, `ui_prefs.json`, `recent.json`, `data/*.json`, Qt-Standardpfade).
+   `universes.json`, `ui_prefs.json`, `recent.json`, MIDI-Zuordnungen, Kanalgruppen, Qt-Standardpfade).
    Liegt einer außerhalb der Sandbox, bricht es ab.
 3. Wofür es keinen Schalter gibt, wird abgeschaltet: MIDI-Autoconnect (öffnete sonst
    echte ALSA-Ports), Web-Remote, Autosave-Timer und die Suche nach seriellen Ports

@@ -10,10 +10,12 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 from src.core.app_state import get_state
+from src.core.paths import user_data_file
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
 
 
-_PERSIST_PATH = os.path.join("data", "channel_groups.json")
+# XPLAT-44: App-Datenordner statt ``data/`` ab CWD.
+_PERSIST_PATH = user_data_file("channel_groups.json")
 
 
 @dataclass

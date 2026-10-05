@@ -124,10 +124,11 @@ fm = get_function_manager()
 # blieben stumm, obwohl Adapter, Rechte und Geraeteauswahl alle stimmten. Ein
 # Patch auf einem Universum ohne Ausgang sieht in der App voellig normal aus;
 # man merkt es erst am schweigenden Rig. Deshalb nimmt der Bauer das erste
-# Universum, das in data/universes.json wirklich einen Ausgang hat.
+# Universum, das in der universes.json (App-Datenordner) wirklich einen Ausgang hat.
 def _universum_mit_ausgang(vorgabe: int = 1) -> int:
     import json as _j
-    pfad = os.path.join(_ROOT, "data", "universes.json")
+    from src.core.paths import user_data_file   # XPLAT-44: App-Datenordner
+    pfad = user_data_file("universes.json")
     try:
         with open(pfad, encoding="utf-8") as fh:
             mit = [int(u["num"]) for u in (_j.load(fh) or []) if u.get("output")]
@@ -400,7 +401,8 @@ print(f"  VC-Positionen: {len(plaetze)} verschiedene, "
 # Universum ohne Ausgang sieht in der App voellig normal aus — nur am Rig
 # passiert nichts.
 import json as _json
-_konf = os.path.join(_ROOT, "data", "universes.json")
+from src.core.paths import user_data_file   # noqa: E402  (XPLAT-44)
+_konf = user_data_file("universes.json")
 _ausgaenge = []
 try:
     with open(_konf, encoding="utf-8") as fh:
