@@ -455,7 +455,7 @@ def _resolve_fixture_profile_id(profile_id: int, manufacturer_name: str,
             if current is not None:
                 current_mfr = getattr(current.manufacturer, "name", "") or ""
                 if (current.name == fixture_name and
-                        (not manufacturer_name or current_mfr == manufacturer_name)):
+                        (not manufacturer_name or current_mfr.casefold() == manufacturer_name.casefold())):
                     return profile_id
 
             query = (
@@ -464,7 +464,13 @@ def _resolve_fixture_profile_id(profile_id: int, manufacturer_name: str,
                 .where(FixtureProfile.name == fixture_name)
             )
             if manufacturer_name:
-                query = query.where(Manufacturer.name == manufacturer_name)
+                # UI-74/FM-63: Hersteller ohne Gross/klein — wie der ID-Treffer
+                # oben und ``fixture_db.profil_schluessel``. Sonst fand eine Show
+                # mit „EuroLite“ das zu „Eurolite“ umgezogene Profil nicht mehr.
+                from src.core.database.bibliothek_format import (
+                    hersteller_ohne_gross_klein)
+                query = query.where(Manufacturer.id.in_(
+                    [m.id for m in hersteller_ohne_gross_klein(session, manufacturer_name)]))
             # FM-43: `builtin` zuerst, dann wie bisher nach ID. Der zweite
             # Schluessel bleibt drin, damit die Wahl bei gleicher Herkunft
             # deterministisch ist — sonst entschiede die Zeilenreihenfolge.

@@ -772,6 +772,9 @@ class PatchView(QWidget):
         for col in [0, 5, 6, 7, 8]:
             hdr.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
         self._table.doubleClicked.connect(self._on_double_click)
+        # UI-74: Rechtsklick -> „Profil bearbeiten" fuer das Geraet der Zeile.
+        self._table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._table.customContextMenuRequested.connect(self._kontextmenue)
         layout.addWidget(self._table)
 
         # Universe-Leiste mit Universe-Umschalter (zeigt nicht mehr nur Univ 1)
@@ -1003,6 +1006,32 @@ class PatchView(QWidget):
                         self._state.create_head_matrix_group(fresh)
                     except Exception as e:
                         print(f"[patch] Kopf-Matrix-Gruppe anlegen: {e}")
+
+    def _profil_id_an_zeile(self, row: int) -> int | None:
+        """UI-74: Profil-ID des gepatchten Geraets in Zeile ``row``."""
+        fid = self._fid_at_row(row)
+        fixture = next((f for f in self._state.get_patched_fixtures()
+                        if f.fid == fid), None)
+        pid = getattr(fixture, "fixture_profile_id", None)
+        return int(pid) if pid else None
+
+    def _kontextmenue(self, pos):
+        row = self._table.rowAt(pos.y())
+        if row < 0:
+            return
+        pid = self._profil_id_an_zeile(row)
+        if pid is None:
+            return
+        from PySide6.QtWidgets import QMenu
+        menu = QMenu(self)
+        act = menu.addAction("Profil bearbeiten…")
+        if menu.exec(self._table.viewport().mapToGlobal(pos)) is act:
+            self._profil_bearbeiten(pid)
+
+    def _profil_bearbeiten(self, profil_id: int):
+        from src.ui.widgets.profil_auswahl_dialog import profil_bearbeiten_fuer
+        if profil_bearbeiten_fuer(self, profil_id) is not None:
+            self._refresh_table()
 
     def _on_univ_select(self, _idx):
         sel = self._univ_select.currentData()

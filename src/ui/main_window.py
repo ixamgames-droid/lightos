@@ -690,6 +690,10 @@ class MainWindow(QMainWindow):
             self._open_bibliothek_download)
         dbm.addSeparator()
         dbm.addAction("Neues Fixture-Profil...").triggered.connect(self._open_fixture_editor)
+        # UI-74: ein gespeichertes Profil wieder oeffnen — vorher gab es nur
+        # „Neu", ein Tippfehler im eigenen Profil war nicht mehr zu beheben.
+        dbm.addAction("Fixture-Profil bearbeiten...").triggered.connect(
+            self._open_profil_auswahl)
 
         # Ausgabe
         om = mb.addMenu("&Ausgabe")
@@ -2548,6 +2552,13 @@ class MainWindow(QMainWindow):
             dlg.exec()
         except Exception as e:
             QMessageBox.warning(self, "Fixture Editor", str(e))
+
+    def _open_profil_auswahl(self):
+        try:
+            from src.ui.widgets.profil_auswahl_dialog import ProfilAuswahlDialog
+            ProfilAuswahlDialog(self).exec()
+        except Exception as e:
+            QMessageBox.warning(self, "Fixture-Profil bearbeiten", str(e))
 
     # ── Command-Line (T1.1) ──────────────────────────────────────────────────
 

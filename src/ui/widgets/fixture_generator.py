@@ -50,6 +50,7 @@ from src.core.dimmer_segmente import (HINWEIS_TEXT, SegmentZiele,
 from src.core.database.fixture_db import segment_wert
 from src.ui.widgets.fixture_editor import (KEIN_SEGMENT,
                                            frage_vorschlag_ueberschreiben,
+                                           leerzelle_hintergrund,
                                            segment_auswahl)
 
 
@@ -937,7 +938,8 @@ class _ModeTab(QWidget):
                 seg = segment_wert(ch.segment)
                 it = QTableWidgetItem("" if seg is None else str(seg + 1))
                 it.setFlags(Qt.ItemFlag.NoItemFlags)
-                it.setBackground(self.palette().window())
+                # UI-74: feste Farbe statt palette().window() (s. Editor).
+                it.setBackground(leerzelle_hintergrund())
                 if seg is not None:
                     it.setToolTip("Nur an einem Dimmer wirksam — wird beim "
                                   "Speichern verworfen, wenn der Kanal kein "
