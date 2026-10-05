@@ -42,6 +42,12 @@ class NodeKind(str, Enum):
     LED_WALL = "led_wall"
     SPEAKER = "speaker"
     AUDIENCE = "audience"
+    # VIZ-68: Objekt-Bibliothek
+    BEER_TABLE = "beer_table"
+    HIGH_TABLE = "high_table"
+    BAR_COUNTER = "bar_counter"
+    RISER_STAIRS = "riser_stairs"
+    FOH_DESK = "foh_desk"
     DJ_BOOTH = "dj_booth"
     FLOOR = "floor"
 
