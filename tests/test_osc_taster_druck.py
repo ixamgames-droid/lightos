@@ -128,3 +128,10 @@ def test_pressed_hilfsfunktion():
     assert p((1.0,)) and p((0.5,)) and p((50,)) and p((64,)) and p((255,))
     assert not p((0.0,)) and not p((0.49,)) and not p((0,)) and not p((49,))
     assert not p(("off",)) and p(("on",))
+
+
+def test_nil_argument_loest_aus_nan_nicht():
+    """OSC-Nil (",N") kommt als None an und ist ein "Bang" wie ohne Argument."""
+    p = OscServer._is_pressed
+    assert p((None,)) is True
+    assert p((float("nan"),)) is False

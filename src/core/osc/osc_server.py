@@ -97,6 +97,9 @@ class OscServer:
         if not args:
             return True
         raw = args[0]
+        if raw is None:
+            # OSC-Nil (",N") als "Bang" von manchen Sendern: wie ohne Argument.
+            return True
         if isinstance(raw, str):
             try:
                 raw = float(raw.strip())
@@ -106,6 +109,8 @@ class OscServer:
             v = float(raw)
         except (TypeError, ValueError):
             return bool(raw)
+        if v != v:   # NaN: kein gueltiger Druckwert
+            return False
         if v <= 1.0:
             return v >= 0.5
         if v <= 100.0:
