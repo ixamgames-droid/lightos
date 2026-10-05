@@ -57,6 +57,7 @@
 | XPLAT-44 | A | fix/xplat44-datenort | 2026-10-05T16:00Z | - |
 | DOC-60 | A | docs/doc60-buehnenshow-effekte | 2026-10-05T16:18Z | - |
 | VIZ-79 | A | fix/viz79-laserstrahlen-3d | 2026-10-05T16:59Z | - |
+| BACKLOG-KONSOLEN | A | docs/backlog-konsolen | 2026-10-05T18:14Z | BACKLOG.md |
 
 ## Blocker & Fallen
 
@@ -165,7 +166,6 @@
 
 ## Verlauf
 
-- 2026-10-04T20:50Z A done DOC-57
 - 2026-10-04T21:06Z A claim DOC-59
 - 2026-10-04T21:18Z A done VIZ-67
 - 2026-10-04T22:43Z C done TOOL-2
@@ -195,3 +195,4 @@
 - 2026-10-05T16:59Z A claim VIZ-79
 - 2026-10-05T17:27Z A done BACKLOG-0510b
 - 2026-10-05T18:13Z A done VIZ-78
+- 2026-10-05T18:14Z A claim BACKLOG-KONSOLEN
