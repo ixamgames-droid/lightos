@@ -56,7 +56,6 @@
 | FM-58 | A | feat/fm58-bibliothek-runde2 | 2026-10-02T18:20Z | fixtures/bibliothek |
 | SAMMEL-DOKU-C | A | sammel/doku-c | 2026-10-02T22:08Z | docs · BACKLOG.md |
 | UI-74 | A | fix/ui74-profile-bearbeiten | 2026-10-04T17:07Z | src/ui/widgets/fixture_editor.py · src/ui/widgets/bibliothek_download_dialog.py · fixtures/bibliothek/eurolite |
-| OUT-63 | A | fix/out63-estop-maske-klebrig | 2026-10-04T20:44Z | - |
 | VIZ-71 | A | perf/viz71-lichtdaten-push | 2026-10-04T20:44Z | - |
 | DOC-59 | A | docs/doc59-3d-bilder | 2026-10-04T21:06Z | - |
 
@@ -169,7 +168,6 @@
 
 ## Verlauf
 
-- 2026-10-04T17:26Z A claim VIZ-67
 - 2026-10-04T17:33Z B claim OUT-61
 - 2026-10-04T17:40Z C done OUT-58
 - 2026-10-04T17:41Z B claim OUT-61-FOLGE
@@ -199,3 +197,4 @@
 - 2026-10-04T23:59Z A done BACKLOG-0410
 - 2026-10-05T00:16Z B done VIZ-68
 - 2026-10-05T00:43Z A done FM-63
+- 2026-10-05T01:18Z A done OUT-63
