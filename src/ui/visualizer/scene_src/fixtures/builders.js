@@ -14,6 +14,7 @@ import { applyPrism, syncPrismToBeam } from './prism.js';   // VIZ-PRISMA-3D
 import { syncPoolSize } from './floor_pool.js';               // VIZ-15
 import { beamsOff } from '../state.js';                       // VIZ-15
 import { applyGobo } from './gobo_textures.js';   // VIZ-GOBO-3D
+import { buildLaserRig, applyLaser, noteLaserAnimation, LASER_BEAM_OPACITY } from './laser.js';   // VIZ-79
 import { stageObjects } from '../state.js';                   // VIZ-BEAM-OCCLUSION
 import { auftreffFlaeche } from './beam_stop.js';             // VIZ-BEAM-OCCLUSION
 
@@ -128,7 +129,11 @@ export function resyncBeamVisibility(f) {
   // stehen, waehrend der Hauptstrahl schon weg ist (genau die Klasse Stale, die
   // diese Funktion ueberhaupt erst noetig gemacht hat).
   syncPrismToBeam(f);
-  if (f.laserBeams) for (const bm of f.laserBeams) set(bm);
+  // VIZ-79: vom Muster nicht benutzte Laserstrahlen bleiben aus.
+  if (f.laserBeams) for (const bm of f.laserBeams) {
+    set(bm);
+    if (bm.userData.aktiv === false) bm.visible = false;
+  }
   if (f.parHeads) for (const ph of f.parHeads) set(ph.beam);
   if (f.moverHeads) for (const mh of f.moverHeads) set(mh.beam);
   if (f.bars) for (const bar of f.bars) { if (bar.beams) for (const bm of bar.beams) set(bm); }
@@ -771,16 +776,6 @@ export function buildHazer() {
   return { group, head: group, lamp };
 }
 
-// VIZ-79: Laserstrahl-Masse. 25 m reichen von einer Rueckwand-Traverse ueber
-// Buehne und Publikum; 1,5 cm Radius sind auf ~20 m Kameraabstand etwa ein bis
-// zwei Pixel breit (WebGL-Linien waeren fest 1 px und skalierten nicht).
-// Die Deckkraft ist eine EIGENE Konstante: Laser haengen bewusst NICHT an
-// „Beam Opacity", die die Lichtkegel regelt (dort sind 15-25 % ueblich).
-export const LASER_BEAM_LENGTH = 25.0;
-export const LASER_BEAM_RADIUS = 0.015;
-export const LASER_BEAM_OPACITY = 0.9;
-const LASER_PITCH = 0.06;   // rad (~3,5°) nach unten
-
 export function buildLaser() {
   // Reale Referenz (FM-Runde 2): Ehaho L2600 Partylaser — 201 x 155 x 66 mm
   // flaches Alu-Gehaeuse mit Frontfenster und Haltebuegel. Vorher ein zu
@@ -825,51 +820,14 @@ export function buildLaser() {
   // VIZ-79: CircleGeometry liegt in XY, ihre Normale ist schon +Z — die
   // fruehere Drehung um X legte die Lampe flach, sie war von vorn nicht zu sehen.
   group.add(lamp);
-  // VIZ-79: Faecher aus fuenf duennen, additiven Strahlen, die ueber die Buehne
-  // bis ins Publikum reichen. Bis VIZ-79 waren es 1,8-m-Stummel mit 5 mm Radius,
-  // die nach lokal -Z zeigten — also von der Kamera (Publikum bei +Z) weg in
-  // die Rueckwand. Aus Publikumsentfernung sah man davon praktisch nichts.
-  //
-  // Jeder Strahl ist ein Zylinder, dessen Geometrie am FUSS verankert ist
-  // (Ursprung = Austrittsfenster) und per Quaternion in seine Richtung gedreht
-  // wird — so stimmen Startpunkt und Richtung ohne Euler-Akrobatik.
-  //
-  // Laenge: fest LASER_BEAM_LENGTH. Die globale „Max. Strahllaenge" (VIZ-15)
-  // deckelt BEWUSST nur Lichtkegel — ein Laserstrahl faechert nicht auf und
-  // laeuft real bis zur naechsten Wand. Ueber die Wand hinaus wird er von der
-  // Raumhuelle verdeckt (depthTest bleibt an).
-  // fog:false — der Distanznebel der Szene wuerde die Strahlen zum Hintergrund
-  // hin wegmischen; real sind Laser im Dunst eher heller als dunkler.
-  const beamMat = new THREE.MeshBasicMaterial({
-    color: 0x00ff00,
-    transparent: true,
-    opacity: LASER_BEAM_OPACITY,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-    fog: false,
-  });
-  const FAN_ANGLES = [-0.35, -0.175, 0, 0.175, 0.35];  // Faecher-Spreizung (rad, um Y)
-  const AUFWAERTS = new THREE.Vector3(0, 1, 0);
-  const geo = new THREE.CylinderGeometry(LASER_BEAM_RADIUS, LASER_BEAM_RADIUS,
-                                         LASER_BEAM_LENGTH, 4, 1, true);
-  geo.translate(0, LASER_BEAM_LENGTH / 2, 0);   // Fuss am Ursprung
-  const laserBeams = [];
-  FAN_ANGLES.forEach((angle) => {
-    // Richtung: nach vorn (+Z, Publikum), leicht nach unten geneigt, damit der
-    // Faecher ueber den Koepfen bleibt statt in die Decke zu laufen.
-    const dir = new THREE.Vector3(Math.sin(angle), -Math.tan(LASER_PITCH), Math.cos(angle))
-      .normalize();
-    const beam = new THREE.Mesh(geo, beamMat.clone());
-    beam.position.set(0, 0, 0.088);   // Austrittsfenster
-    beam.quaternion.setFromUnitVectors(AUFWAERTS, dir);
-    // Ein Strahl ist duenn und lang: die Bounding-Sphere des Zylinders liegt
-    // sauber, Frustum-Culling darf bleiben.
-    group.add(beam);
-    laserBeams.push(beam);
-  });
+  // VIZ-79: Strahlen-Rig (fixtures/laser.js) — bis zu acht duenne, additive
+  // 25-m-Strahlen plus eine Lichtflaeche, die ueber die Buehne ins Publikum
+  // (+Z) reichen. Bis VIZ-79 waren es fuenf 1,8-m-Stummel, die nach -Z in die
+  // Rueckwand zeigten. Muster, Groesse und Position setzt applyLaser aus DMX.
+  const { rig, laserBeams } = buildLaserRig(group, 0.088);
   // laserBeams zurueckgeben, damit updateFixture sie per DMX faerbt/dimmt
   // (vorher fix gruen 0x00ff00 / opacity 0.6, unabhaengig von Farbe/Intensitaet).
-  return { group, head: group, lamp, laserBeams };
+  return { group, head: group, lamp, laserBeams, laserRig: rig };
 }
 
 // ── Spider (Doppel-Bar Moving Head) ─────────────────────────────────────────
@@ -1510,7 +1468,9 @@ export function updatePixelHeadDmx(f, dmx) {
 // smoke/hazer bekommen BEWUSST keinen No-Op-Handler: ihr Indikator-Lamp
 // (f.lamp) und ihr Icon folgen im Monolith der DMX-Farbe — das bleibt so.
 export function updateGenericDmx(f, dmx) {
+  applyLaser(f, dmx);       // VIZ-79: vor der Farbe — legt fest, welche Strahlen aktiv sind
   applyGenericColor(f, dmx);
+  noteLaserAnimation(f);    // VIZ-79: nach der Farbe — erst dann steht „leuchtet" fest
   applyOptics(f, dmx);      // auch feste Scheinwerfer haben Zoom/Iris
   applyPrism(f, dmx);       // ... und manche ein Prisma
   applyGobo(f, dmx);        // ... und manche ein Gobo-Rad
@@ -1572,8 +1532,11 @@ function applyGenericColor(f, dmx) {
     for (const bm of f.laserBeams) {
       if (!bm.material) continue;
       bm.material.color = color;
-      bm.material.opacity = Math.max(0.0, intNorm * LASER_BEAM_OPACITY);
-      bm.visible = laserVis;
+      // VIZ-79: eigene Deckkraft (Strahl bzw. Flaeche), NICHT Beam Opacity.
+      const deck = (bm.userData.deckkraft !== undefined) ? bm.userData.deckkraft : LASER_BEAM_OPACITY;
+      bm.material.opacity = Math.max(0.0, intNorm * deck);
+      // Vom Muster nicht benutzte Strahlen bleiben aus (applyLaser).
+      bm.visible = laserVis && bm.userData.aktiv !== false;
     }
   }
   // Top-down icon color reflects active output color (only when bright)

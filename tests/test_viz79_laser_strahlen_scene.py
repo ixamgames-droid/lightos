@@ -111,11 +111,15 @@ def _laser(fid=_FID, **extra):
     return d
 
 
-def _gruen(fid=_FID, intensity=255):
+def _gruen(fid=_FID, intensity=255, laser=None):
     """Typischer Laser-Payload: Farbrad auf Gruen, Shutter im Muster-Bereich
-    (``visual_intensity`` -> 255)."""
-    return {"fid": fid, "r": 0, "g": 255, "b": 0, "intensity": intensity,
-            "pan": 128, "tilt": 128}
+    (``visual_intensity`` -> 255). ``laser`` = normierter Laser-Block, wie ihn
+    ``visualizer_service._laser_payload`` baut."""
+    d = {"fid": fid, "r": 0, "g": 255, "b": 0, "intensity": intensity,
+         "pan": 128, "tilt": 128}
+    if laser is not None:
+        d["laser"] = laser
+    return d
 
 
 # Strahlen in Weltkoordinaten vermessen. Die Geometrie wird ueber ihre
@@ -136,6 +140,7 @@ _MISS_JS = """
     const b = bm.position.clone().set(0, bb.max.y, 0);
     bm.localToWorld(a); bm.localToWorld(b);
     out.beams.push({ visible: bm.visible, opacity: bm.material.opacity,
+                     flaeche: !!bm.userData.flaeche,
                      additive: bm.material.blending === 2,
                      a: [a.x, a.y, a.z], b: [b.x, b.y, b.z],
                      len: a.distanceTo(b) });
@@ -246,8 +251,9 @@ class Viz79LaserStrahlenSceneTest(unittest.TestCase):
         self.assertEqual(self._apply([_gruen()], 1), 1)
         m = self._miss()
 
-        self.assertGreaterEqual(len(m["beams"]), 3, "kein Laser-Faecher gebaut")
-        for i, bm in enumerate(m["beams"]):
+        strahlen = [bm for bm in m["beams"] if bm["visible"] and not bm["flaeche"]]
+        self.assertGreaterEqual(len(strahlen), 3, "kein Laser-Faecher sichtbar")
+        for i, bm in enumerate(strahlen):
             self.assertTrue(bm["visible"], f"Strahl {i} unsichtbar")
             self.assertTrue(bm["additive"], f"Strahl {i} nicht additiv")
             # Beam Opacity 15 % darf den Laser NICHT mitdimmen.
@@ -301,6 +307,120 @@ class Viz79LaserStrahlenSceneTest(unittest.TestCase):
         m = self._miss()
         for bm in m["beams"]:
             self.assertFalse(bm["visible"])
+
+
+class Viz79LaserMusterSceneTest(Viz79LaserStrahlenSceneTest):
+    """VIZ-79 Teil 2: Position, Groesse, Muster und Eigenbewegung aus DMX."""
+
+    # Die geerbten Tests laufen schon in der Basisklasse.
+    test_laser_schiesst_lange_sichtbare_strahlen_ins_publikum = None
+    test_laser_hat_keinen_scheinwerferkegel = None
+    test_dunkel_heisst_unsichtbar = None
+    test_kegel_aus_schaltet_auch_laser_aus = None
+
+    def _setze(self, seq, **laser):
+        self.assertEqual(self._apply([_gruen(laser=laser)], seq), 1)
+        return self._miss()
+
+    @staticmethod
+    def _sichtbar(m):
+        return [bm for bm in m["beams"] if bm["visible"] and not bm["flaeche"]]
+
+    def _enden(self, m):
+        return [_fern(bm, m["start"]) for bm in self._sichtbar(m)]
+
+    def test_laser_x_schwenkt_den_faecher(self):
+        self._load_and_wait()
+        self._bauen(_laser())
+        mitte = sum(e[0] for e in self._enden(self._setze(1, x=0))) / 5
+        links = sum(e[0] for e in self._enden(self._setze(2, x=-1))) / 5
+        rechts = sum(e[0] for e in self._enden(self._setze(3, x=1))) / 5
+        self.assertAlmostEqual(mitte, 0.0, delta=0.5)
+        self.assertGreater(abs(rechts - links), 10.0,
+                           "laser_x dreht den Faecher nicht (Enden %.2f / %.2f)" % (links, rechts))
+        self.assertLess(links, mitte)
+        self.assertGreater(rechts, mitte)
+
+    def test_laser_y_neigt_den_faecher(self):
+        self._load_and_wait()
+        self._bauen(_laser())
+        hoch = sum(e[1] for e in self._enden(self._setze(1, y=-1))) / 5
+        tief = sum(e[1] for e in self._enden(self._setze(2, y=1))) / 5
+        self.assertGreater(hoch - tief, 5.0, "laser_y neigt den Faecher nicht")
+
+    def test_zoom_aendert_die_faecherbreite(self):
+        self._load_and_wait()
+        self._bauen(_laser())
+        def breite(m):
+            xs = [e[0] for e in self._enden(m)]
+            return max(xs) - min(xs)
+        schmal = breite(self._setze(1, sx=0.2))
+        voll = breite(self._setze(2, sx=1.0))
+        self.assertGreater(voll, 2.5 * schmal,
+                           f"Groesse wirkt nicht (Breite {schmal:.2f} -> {voll:.2f} m)")
+
+    def test_muster_aendert_strahlzahl_und_form(self):
+        self._load_and_wait()
+        self._bauen(_laser())
+        faecher = self._setze(1, form=0)
+        self.assertEqual(len(self._sichtbar(faecher)), 5)
+        einzel = self._setze(2, form=1)
+        self.assertEqual(len(self._sichtbar(einzel)), 1)
+        kranz = self._setze(3, form=2)
+        self.assertEqual(len(self._sichtbar(kranz)), 8)
+        flaeche = self._setze(4, form=3)
+        self.assertEqual(len(self._sichtbar(flaeche)), 0)
+        self.assertTrue(any(bm["flaeche"] and bm["visible"] for bm in flaeche["beams"]),
+                        "Flaeche nicht sichtbar")
+        # Zurueck zum Faecher: die Flaeche geht wieder aus.
+        zurueck = self._setze(5, form=0)
+        self.assertFalse(any(bm["flaeche"] and bm["visible"] for bm in zurueck["beams"]))
+        self.assertEqual(len(self._sichtbar(zurueck)), 5)
+        # Dunkel: auch Kranz und Flaeche verschwinden.
+        self._apply([_gruen(intensity=0, laser={"form": 3})], 6)
+        self.assertFalse(any(bm["visible"] for bm in self._miss()["beams"]))
+
+    def _info(self, t=None):
+        arg = "" if t is None else ", %r" % t
+        return json.loads(self._eval(
+            "JSON.stringify(window.__lightos.laserInfo(%d%s))" % (_FID, arg)))
+
+    def test_eigenbewegung_laeuft_zeitgesteuert(self):
+        """dx = Bewegung laeuft im Geraet (dynamischer Bereich bzw. Auto-
+        Programm mit Tempo): der Faecher schwenkt, ohne neues DMX."""
+        self._load_and_wait()
+        self._bauen(_laser())
+        self._setze(1, x=0, dx=True, tempo=0.2)
+        a = self._info(0.0)
+        b = self._info(2.0)
+        self.assertTrue(a["bewegt"], "bewegter, leuchtender Laser nicht als animiert gemeldet")
+        self.assertGreater(abs(a["yaw"] - b["yaw"]), 0.1, "kein Schwenk ueber die Zeit")
+        # Ohne Eigenbewegung haengt die Pose nicht an der Zeit.
+        self._setze(2, x=0.5)
+        c = self._info(0.0)
+        d = self._info(2.0)
+        self.assertFalse(c["bewegt"])
+        self.assertAlmostEqual(c["yaw"], d["yaw"], places=6)
+        # Dunkel: keine Animation, der Render-Loop darf schlafen.
+        self._apply([_gruen(intensity=0, laser={"dx": True})], 3)
+        self.assertFalse(self._info()["bewegt"])
+
+    def test_dmx_updates_bauen_keine_geometrie_neu(self):
+        """Leistung: ein DMX-Update setzt nur Drehung/Skalierung/Sichtbarkeit."""
+        self._load_and_wait()
+        self._bauen(_laser())
+        js = ("(function(){ const f = window.__lightos.fixtures['%d']; const ids = [];"
+              " f.group.traverse(o => { if (o.geometry) ids.push(o.geometry.uuid);"
+              " if (o.material) ids.push(o.material.uuid); });"
+              " return ids.sort().join(','); })()" % _FID)
+        vorher = self._eval(js)
+        seq = 1
+        for form in range(4):
+            for x in (-1, 0, 1):
+                self._apply([_gruen(laser={"form": form, "x": x, "sx": 0.5, "dx": True})], seq)
+                seq += 1
+        self.assertEqual(vorher, self._eval(js),
+                         "DMX-Updates haben Geometrien/Materialien neu angelegt")
 
 
 if __name__ == "__main__":

@@ -64,6 +64,7 @@ import { dropAllowed, pendingDragFid } from './interaction/drag_drop.js';  // VI
 import { opticsSoftness, applyOptics } from './fixtures/optics.js';   // VIZ-MH-OPTICS
 import { prismFacetCount, applyPrism } from './fixtures/prism.js';    // VIZ-PRISMA-3D
 import { beamLengthScale } from './fixtures/builders.js';             // VIZ-15
+import { laserAnimationAktiv, tickLaserAnimation, laserInfo } from './fixtures/laser.js';   // VIZ-79
 import { floorPoolScale, poolFalloffTexture } from './fixtures/floor_pool.js';  // VIZ-15
 
 // ── Spaet-Bindungen verdrahten (Design-Dokument "Kern-Gotcha") ─────────────
@@ -118,6 +119,9 @@ function perFrameUpdate() {
   // Position/Skala pro Frame — folgt so live dem Schwerpunkt, auch waehrend des
   // Drags, und haelt konstante Bildschirmgroesse).
   attachGizmoToSelection();
+  // VIZ-79: Laser mit Eigenbewegung (dynamische Kanalbereiche, Auto-Programm)
+  // zeitgesteuert weiterdrehen — reine Transformation, keine neuen Objekte.
+  tickLaserAnimation();
   fpsTick();
 }
 
@@ -130,6 +134,8 @@ registerLiveAnimation(() => !!(view.selectedStageId && stageObjects[view.selecte
 // Fensters live (nach Auswahl-Aenderung), danach faellt er in Idle zurueck —
 // obwohl die Auswahl (seit 1b persistent) bestehen bleibt. So kein Dauer-rAF.
 registerLiveAnimation(selectionPulseActive);
+// VIZ-79: nur solange ein bewegter Laser sichtbar leuchtet.
+registerLiveAnimation(laserAnimationAktiv);
 
 // VIZ-69: Shadow-Maps nur bei geaenderter Licht-/Objektlage neu zeichnen
 // (scene/shadow_update.js). prepareShadowMap() aktualisiert die Weltmatrizen
@@ -230,6 +236,8 @@ window.__lightos = {
   // VIZ-15: rein — drei Grenzen (Grundlaenge, Bodenauftreffpunkt, globale
   // Obergrenze) treffen aufeinander, und welche gewinnt IST die Aussage.
   beamLengthScale,
+  // VIZ-79: Laser-Zustand/Pose als Zahlen; optional zu einer festen Zeit t (s).
+  laserInfo,
   // VIZ-15 Boden-Pools: die Groessen-Rechnung ist rein (Abstand + Zoom-Winkel
   // rein, Skalierung raus), die Textur-Funktion belegt den Grauverlauf —
   // ein 'weiss mit fallendem Alpha' waere im Gruenkanal konstant und der
