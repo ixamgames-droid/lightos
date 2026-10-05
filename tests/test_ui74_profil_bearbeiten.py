@@ -523,6 +523,22 @@ class NichtAsciiHerstellerTest(_TempDB, unittest.TestCase):
         self.assertEqual(self._hersteller(), ["Testwerk", "Ölwerk"])
 
 
+    def test_editor_riegel_hersteller_mit_mehrfach_leerzeichen(self):
+        """Review: der Riegel verglich den Hersteller ohne Gross/klein, aber
+        MIT Innen-Leerzeichen — anders als ``profil_schluessel``."""
+        with Session(self.engine) as s:
+            _profil(s, Manufacturer(name="Euro Lite", short_name="EL"), "Spot", "lightos")
+            s.commit()
+        dlg = editor_module.FixtureEditorDialog()
+        dlg._cb_manufacturer.setCurrentText("Euro  Lite")
+        dlg._edit_name.setText("Spot")
+        dlg._tabs.widget(0)._add_channel()
+        dlg._save()
+        self.assertIsNone(dlg.saved_id)
+        self.assertEqual(sum(1 for n, _s in self._profile() if n == "Spot"), 1)
+        self.assertNotIn("Euro  Lite", self._hersteller())
+
+
 class KopieTraegtHerkunftTest(_TempDB, unittest.TestCase):
 
     def test_herkunft_notizen_und_3d_modell_reisen_mit(self):

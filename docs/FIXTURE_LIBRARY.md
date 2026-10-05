@@ -321,7 +321,8 @@ Ein gespeichertes Profil öffnet man über **Datenbank → „Fixture-Profil bea
   ohne Groß-/Kleinschreibung (`fixture_db.profil_schluessel`). Gesperrt werden nur
   **neue** Dubletten: behält ein geladenes Profil Hersteller + Modell, darf es speichern,
   auch wenn ein gleichnamiges daneben steht (abgelöster Import neben seinem
-  LightOS-Profil). Hersteller werden ohne Groß-/Kleinschreibung wiedergefunden —
+  LightOS-Profil). Hersteller werden ohne Groß-/Kleinschreibung und ohne Mehrfach-Leerzeichen
+  wiedergefunden (`bibliothek_format.hersteller_ohne_gross_klein`, wie `profil_schluessel`) —
   „eurolite“ landet bei „Eurolite“; dasselbe gilt beim Einspielen der Bibliothek und beim
   Namens-Rückfall beim Laden einer Show.
 - Die Geräteauswahl („Gerät hinzufügen“) zeigt zum gewählten Profil eine Zeile

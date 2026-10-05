@@ -838,9 +838,15 @@ def hersteller_ohne_gross_klein(s, name: str) -> list:
     Profil ein weiteres Mal an. Dieselbe Faltung wie ``einspielen``."""
     from sqlalchemy import select
     from .models import Manufacturer
-    ziel = (name or "").strip().casefold()
+    # Review: Mehrfach-Leerzeichen innen zaehlen ebenfalls nicht — dieselbe
+    # Gleichheit wie ``fixture_db.profil_schluessel`` (FM-63), sonst umging
+    # „Euro  Lite“ den Dubletten-Riegel des Editors.
+    def _form(n):
+        return " ".join((n or "").split()).casefold()
+
+    ziel = _form(name)
     return [m for m in s.execute(select(Manufacturer).order_by(Manufacturer.id)).scalars()
-            if (m.name or "").strip().casefold() == ziel]
+            if _form(m.name) == ziel]
 
 
 def _hersteller(s, daten: dict):
