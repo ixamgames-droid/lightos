@@ -231,16 +231,19 @@ def _render_status_name(status) -> str:
 
 
 def quality_tier_pref() -> str:
-    """Geräte-gebundene Qualitätsstufe aus ui_prefs.json: 'auto'|'high'|'low'.
+    """Geräte-gebundene Qualitätsstufe aus ui_prefs.json:
+    'auto'|'low'|'high'|'max'.
 
     Bewusst in den Geräte-Prefs statt in der Show: die Stufe hängt an der
     GPU dieses Rechners, eine Show wandert dagegen zwischen Maschinen.
-    'auto' = die JS-seitige Probe (renderer.js#probeGpuTier) entscheidet.
+    'auto' = die JS-seitige Probe (renderer.js#probeGpuTier) entscheidet
+    zwischen 'low' und 'high'; 'max' (VIZ-71) gibt es nur von Hand.
+    Was die Stufen bedeuten: ``quality_tiers.py`` / ``quality_tiers.js``.
     """
     try:
         from src.ui.views.programmer_view import _load_prefs
         val = str(_load_prefs().get("viz_quality_tier", "auto")).lower()
-        return val if val in ("auto", "high", "low") else "auto"
+        return val if val in ("auto", "high", "low", "max") else "auto"
     except Exception:
         return "auto"
 
@@ -540,6 +543,62 @@ def install_scene_start_guard(view, status_cb=None, on_reloaded=None,
     return guard
 
 
+def create_dmx_push(besitzer):
+    """VIZ-71: Push-Kanal fuer ``besitzer._view`` anlegen (Fenster oder
+    Live-View-Spiegel) — ``None`` ohne echte Seite.
+
+    Bewusst eine MODUL-Funktion (wie ``beam_range_value``): Bestandstests
+    fahren ``_setup_service_target`` auf ``SimpleNamespace``-Stubs, und eine
+    neue Methode auf ``self`` schluege dort mit ``AttributeError`` zu.
+
+    ``on_need_full`` haelt den Besitzer nur schwach (STAB-10-Muster)."""
+    view = getattr(besitzer, "_view", None)
+    if view is None or not hasattr(view, "page"):
+        return None
+    from src.ui.visualizer.dmx_push import DmxPushChannel
+    ref = weakref.ref(besitzer)
+
+    def _voll():
+        b = ref()
+        if b is None:
+            return
+        svc = getattr(b, "_service", None)
+        target = getattr(b, "_target", None)
+        if svc is not None and target is not None:
+            svc.force_full_resync(target)
+    kanal = DmxPushChannel(view, on_need_full=_voll,
+                           poll=getattr(besitzer, "_bridge", None))
+    # Die Seite meldet ihre AKTIVE Stufe (Probe- oder Override-Ergebnis) —
+    # erst dann steht bei 'Automatisch' fest, ob 15 oder 30 Hz.
+    bridge = getattr(besitzer, "_bridge", None)
+    sig = getattr(bridge, "pyGpuTierReported", None)
+    if sig is not None:
+        def _gemeldet(tier):
+            b = ref()
+            if b is not None:
+                apply_push_tier(b, tier)
+        try:
+            sig.connect(_gemeldet)
+        except Exception:                                # noqa: BLE001
+            pass
+    return kanal
+
+
+def apply_push_tier(besitzer, tier) -> None:
+    """VIZ-71: Push-Takt der Lichtdaten an die Qualitaetsstufe anpassen
+    (Niedrig 15 Hz, Hoch 30 Hz, Maximal 44 Hz = DMX-Ausgabetakt). Setzt den
+    Mindestabstand des Push-Kanals und den gewuenschten Takt des Service-Ziels
+    (der Timer laeuft im Takt des schnellsten aktiven Ziels)."""
+    from src.ui.visualizer.quality_tiers import push_interval_s, push_tick_ms
+    kanal = getattr(besitzer, "_dmx_push", None)
+    if kanal is not None:
+        kanal.min_interval_s = push_interval_s(tier)
+    svc = getattr(besitzer, "_service", None)
+    target = getattr(besitzer, "_target", None)
+    if svc is not None and target is not None:
+        svc.set_target_tick_ms(target, push_tick_ms(tier))
+
+
 # ============================================================================
 # Bridge
 # ============================================================================
@@ -670,7 +729,7 @@ class VisualizerBridge(QObject):
     pyFixtureDeleted        = Signal(int)
     pyStageListChanged      = Signal(list, bool)  # items, is_stale_echo (Stage-Echo-Race-Fix)
     pyStageObjectDeleted    = Signal(str)
-    pyGpuTierReported       = Signal(str)     # VIZ-15: aktive Qualitätsstufe der Szene ('low'|'high')
+    pyGpuTierReported       = Signal(str)     # VIZ-15: aktive Qualitätsstufe der Szene ('low'|'high'|'max')
     pyStageSelection        = Signal(str)
     pyStageSaved            = Signal(dict)
     pyBrightnessChanged     = Signal(float)   # JS meldet Auto-Brightness an Slider
@@ -732,7 +791,16 @@ class VisualizerBridge(QObject):
                             # keine 3D-Position? Steuert den Platzier-Geist.
                             "placeable": 0,
                             # VIZ-15: fids mit ausgeblendetem Lichtkegel.
-                            "beamsOff": []}
+                            "beamsOff": [],
+                            # Review VIZ-71: Show-Generation, s.
+                            # ``_neue_show_generation``.
+                            "showGen": 0}
+        self._show_gen = 0
+        # VIZ-71 (S5): Revision je Zustands-Schluessel. ``pollControlRev``
+        # liefert nur Schluessel, deren Revision die Seite noch nicht kennt —
+        # vorher ging die volle Geraeteliste (~18 KB) und die Buehne mit JEDEM
+        # Poll mit, achtmal je Sekunde.
+        self._poll_rev = {k: 1 for k in self._poll_state}
         self._poll_events = []      # [dict]  Einmal-Events (Kamera/Transform/Stage)
         # A3D-04: pro fid GEMERGTER dmx-Puffer {fid: payload}, NICHT nur der letzte
         # Batch. Der VisualizerService pusht DIFFERENTIELL (nur geaenderte Fixtures)
@@ -768,6 +836,11 @@ class VisualizerBridge(QObject):
         self.cameraPreset.connect(lambda n: self._poll_event({"t": "cameraPreset", "name": n}))
         self.namedCamerasChanged.connect(lambda j: self._poll_event({"t": "namedCameras", "j": j}))
         self.brightnessAutoSignal.connect(lambda: self._poll_event({"t": "brightnessAuto"}))
+        # VIZ-71 (N3): der Bildschirmwechsel war ein reines Push-Signal und kam
+        # nach dem Laden nie an — jetzt fester Poll-Zustand (JS wendet nur bei
+        # Aenderung an, ueber dieselbe Pixeldichte-Quelle wie Resize und die
+        # dynamische Aufloesung).
+        self.pixelRatioSignal.connect(lambda r: self._poll_set("pixelRatio", float(r)))
         # Fixture-Mesh-Signale (VIZ-13 3c-2-Fix Nachtrag 2026-07-07, LIVE gefunden):
         # OHNE diese rendern LIVE platzierte/entfernte Fixtures NICHT — der Mesh
         # taucht erst beim Neu-Laden auf (Connect-Burst). Gleiche Ursache wie bei
@@ -824,7 +897,13 @@ class VisualizerBridge(QObject):
             pass
 
     def _poll_set(self, key, value):
-        """Steuer-Zustand fuer den naechsten Poll vormerken."""
+        """Steuer-Zustand fuer den naechsten Poll vormerken.
+
+        VIZ-71: die Revision steigt NUR bei geaendertem Wert — ein erneutes
+        ``requestFixtures`` mit derselben Liste schickt nichts Neues."""
+        revs = self.__dict__.setdefault("_poll_rev", {})
+        if key not in self._poll_state or self._poll_state[key] != value:
+            revs[key] = revs.get(key, 0) + 1
         self._poll_state[key] = value
 
     def _poll_event(self, ev: dict):
@@ -858,20 +937,105 @@ class VisualizerBridge(QObject):
             arr = json.loads(batch_json)
             if not isinstance(arr, list):
                 return
-            for d in arr:
-                fid = d.get("fid") if isinstance(d, dict) else None
-                if fid is None:
-                    continue
-                self._poll_dmx[fid] = d
-            over = len(self._poll_dmx) - self._poll_dmx_max
-            if over > 0:
-                # dicts halten Einfuegereihenfolge -> die aeltesten fids fallen.
-                for k in list(self._poll_dmx)[:over]:
-                    del self._poll_dmx[k]
+            self._poll_merge_entries((None, d) for d in arr)
         except Exception as e:
             # Ein defekter Batch darf weder werfen noch den bereits gesammelten
             # Puffer verwerfen.
             print(f"[Visualizer] _poll_set_dmx: Batch verworfen ({e})")
+
+    def _poll_merge_entries(self, entries) -> None:
+        """VIZ-71: ``(seq, payload)``-Paare in den Poll-Puffer mergen — der
+        Rueckfall des Push-Kanals (``dmx_push.DmxPushChannel``), solange die
+        Seite den Push noch nicht bestaetigt hat. ``seq`` ist die Tick-Nummer
+        des Service (``None`` = ohne Nummer, alter ``dmxBatch``-Weg); JS
+        verwirft damit einen Eintrag, den der Push schon ueberholt hat.
+
+        Gleiche Merge-Regel wie A3D-04: der Eintrag einer fid wird GANZ
+        ersetzt, nie per ``dict.update``."""
+        seqs = self.__dict__.setdefault("_poll_dmx_seq", {})
+        for seq, d in entries:
+            fid = d.get("fid") if isinstance(d, dict) else None
+            if fid is None:
+                continue
+            # pop + setzen: Einfuegereihenfolge = Aktualitaet, damit der
+            # Deckel unten wirklich die aeltesten fids wirft.
+            self._poll_dmx.pop(fid, None)
+            self._poll_dmx[fid] = d
+            seqs[fid] = seq
+        over = len(self._poll_dmx) - self._poll_dmx_max
+        if over > 0:
+            # dicts halten Einfuegereihenfolge -> die aeltesten fids fallen.
+            for k in list(self._poll_dmx)[:over]:
+                del self._poll_dmx[k]
+                seqs.pop(k, None)
+
+    def _poll_clear_dmx(self) -> None:
+        """VIZ-71: der Push ist bestaetigt — der Poll-Puffer hat ausgedient."""
+        self._poll_dmx = {}
+        self.__dict__["_poll_dmx_seq"] = {}
+
+    def _poll_take_dmx(self, out: dict) -> None:
+        """Aufgelaufene DMX-Eintraege in die Poll-Antwort legen und leeren.
+
+        A3D-04: ``out["dmx"]`` MUSS ein JSON-STRING bleiben — JS macht
+        `JSON.parse(s.dmx)`. Legte man hier die Liste selbst hinein, wuerfe
+        JSON.parse auf "[object Object]"; der Wurf landete im aeusseren catch
+        des Poll-Handlers und uebersprunge damit den DANACH folgenden
+        events-Block, waehrend Python die Event-Queue bereits geleert hat ->
+        stiller Totalverlust aller Einmal-Events in jedem Poll mit DMX.
+        VIZ-71: ``dmxSeq`` (Liste, gleiche Reihenfolge) nur, wenn mindestens ein
+        Eintrag eine Nummer traegt."""
+        if not self._poll_dmx:
+            return
+        seqs = self.__dict__.get("_poll_dmx_seq") or {}
+        out["dmx"] = json.dumps(list(self._poll_dmx.values()))
+        # Review VIZ-71: Generation der Show, zu der diese Werte gehoeren (der
+        # Puffer wird beim Show-Wechsel geleert, enthaelt also nur die aktuelle).
+        gen = self.__dict__.get("_show_gen")
+        if gen is not None:
+            out["dmxGen"] = gen
+        liste = [seqs.get(fid) for fid in self._poll_dmx]
+        if any(x is not None for x in liste):
+            out["dmxSeq"] = liste
+        self._poll_dmx = {}
+        self.__dict__["_poll_dmx_seq"] = {}
+
+    def _neue_show_generation(self) -> int:
+        """Review VIZ-71: eine andere Show ist geladen -> Generation hochzaehlen.
+
+        fids beginnen je Show bei 1. Die Seite merkt sich den letzten DMX-Stand
+        je fid (``dmx_cache.js``); ohne Generation hielt die volle Liste der
+        neuen Show den Eintrag einer wiederverwendeten fid fest, und das neue
+        Geraet startete kurz mit dem Licht der alten Show. Die Generation reist
+        als Poll-Zustand ``showGen`` und an jedem DMX-Batch (Push und Poll);
+        JS leert den Cache, sobald eine neuere ankommt, und verwirft Batches
+        einer aelteren. Der Poll-Puffer haelt nur noch Werte der alten Show —
+        weg damit, der Service liefert den vollen Bestand der neuen.
+
+        Ungebunden aufrufen (Stub-Falle, s. ``beam_range_value``)."""
+        gen = int(self.__dict__.get("_show_gen") or 0) + 1
+        self._show_gen = gen
+        VisualizerBridge._poll_clear_dmx(self)
+        VisualizerBridge._poll_set(self, "showGen", gen)
+        return gen
+
+    def _poll_antwort_abschliessen(self, out: dict) -> str:
+        """Gemeinsamer Schluss von :meth:`pollControl` und
+        :meth:`pollControlRev`: Einmal-Events dazulegen und die Queue leeren,
+        aufgelaufenes DMX dazulegen, als JSON zurueckgeben (``"{}"``, wenn sich
+        etwas nicht serialisieren laesst).
+
+        Ungebunden aufrufen (``VisualizerBridge._poll_antwort_abschliessen(self,
+        out)``) wie ``_poll_take_dmx``: Bestandstests fahren die Poll-Handler
+        auf ``SimpleNamespace``-Stubs, die diese Methode nicht tragen."""
+        if self._poll_events:
+            out["events"] = self._poll_events
+            self._poll_events = []
+        VisualizerBridge._poll_take_dmx(self, out)
+        try:
+            return json.dumps(out)
+        except Exception:
+            return "{}"
 
     @Slot(result=str)
     @_bridge_slot_guard
@@ -880,22 +1044,35 @@ class VisualizerBridge(QObject):
         letzten DMX-Batch als RUECKGABEWERT zurueck. Der einzige zuverlaessige
         Python->JS-Weg an die Post-Load-Seite (s. __init__-Kommentar)."""
         out = dict(self._poll_state)
-        if self._poll_events:
-            out["events"] = self._poll_events
-            self._poll_events = []
-        if self._poll_dmx:
-            # A3D-04: ``out["dmx"]`` MUSS ein JSON-STRING bleiben — JS macht
-            # `JSON.parse(s.dmx)`. Legte man hier die Liste selbst hinein, wuerfe
-            # JSON.parse auf "[object Object]"; der Wurf landete im aeusseren catch
-            # des Poll-Handlers und uebersprunge damit den DANACH folgenden
-            # events-Block, waehrend Python die Event-Queue unten bereits geleert
-            # hat -> stiller Totalverlust aller Einmal-Events in jedem Poll mit DMX.
-            out["dmx"] = json.dumps(list(self._poll_dmx.values()))
-            self._poll_dmx = {}
+        return VisualizerBridge._poll_antwort_abschliessen(self, out)
+
+    @Slot(str, result=str)
+    @_bridge_slot_guard
+    def pollControlRev(self, revs_json: str) -> str:
+        """VIZ-71 (S5): wie :meth:`pollControl`, aber nur GEAENDERTER Zustand.
+
+        JS schickt die zuletzt gesehenen Revisionen (``{"fixtures": 3, ...}``);
+        geantwortet wird mit den Schluesseln, deren Revision abweicht, plus
+        ``_rev`` mit deren aktuellen Revisionen. Eine frische Seite startet mit
+        ``{}`` und bekommt alles. Events und DMX wie bisher (Einmal-Lieferung).
+        ``pollControl()`` bleibt fuer Alt-Seiten und Tests."""
         try:
-            return json.dumps(out)
-        except Exception:
-            return "{}"
+            gesehen = json.loads(revs_json or "{}")
+        except (TypeError, ValueError):
+            gesehen = {}
+        if not isinstance(gesehen, dict):
+            gesehen = {}
+        revs = self.__dict__.setdefault("_poll_rev", {})
+        out: dict = {}
+        neu: dict = {}
+        for key, value in self._poll_state.items():
+            rev = revs.get(key, 0)
+            if gesehen.get(key) != rev:
+                out[key] = value
+                neu[key] = rev
+        if neu:
+            out["_rev"] = neu
+        return VisualizerBridge._poll_antwort_abschliessen(self, out)
 
     # ── Lebenszyklus: State-Subscription ────────────────────────────────────
     # Die Bridge abonniert den AppState (``_on_state`` prunt bei ``patch_changed``
@@ -941,6 +1118,19 @@ class VisualizerBridge(QObject):
             print(f"[Visualizer] auto-patch error: {e}")
         fixtures = self._build_fixture_list()
         self.allFixtures.emit(json.dumps(fixtures))
+        # VIZ-71 (S4): nach JEDEM Geraete-Neubau den vollen DMX-Bestand an diese
+        # Seite. Der Service hielt die Werte sonst fuer zugestellt — Show-Wechsel,
+        # Wiedereinblenden und Erst-Laden liefen bisher OHNE Resync (nur der
+        # Signal-Handler von allFixtures rief requestFullResync, und der kommt
+        # nach dem Laden nicht an). JS merkt sich den Stand je fid ohnehin
+        # (dmx_cache.js); der volle Batch (~5 KB) ist die Versicherung fuer
+        # Werte, die die Seite nie gesehen hat.
+        cb = getattr(self, "full_resync_cb", None)
+        if cb is not None:
+            try:
+                cb()
+            except Exception as e:                       # noqa: BLE001
+                print(f"[Visualizer] Voll-Resync nach requestFixtures: {e}")
 
     def _sync_positions_from_live_view(self) -> bool:
         """Auto-Patch: Top-Down-X/Z aus der Live View ins 3D uebernehmen.
@@ -1759,8 +1949,9 @@ class VisualizerBridge(QObject):
         wird beim Anlegen (``_fixture_to_dict``) gemerkt; ein Geraet ohne Eintrag
         (angelegt vor dieser Aenderung) gilt beim ersten Sehen als synchron."""
         gesendet = self.__dict__.setdefault("_gesendete_nullpunkte", {})
+        placed = self._state.visualizer_positions    # VIZ-71: einmal lesen
         for f in self._state.get_patched_fixtures():
-            if f.fid not in self._state.visualizer_positions:
+            if f.fid not in placed:
                 continue
             jetzt = effektive_nullpunkte(f)
             vorher = gesendet.get(f.fid)
@@ -1982,11 +2173,16 @@ class VisualizerBridge(QObject):
         """
         return viz_model_for(f) or f.fixture_type
 
-    def _fixture_to_dict(self, f: PatchedFixture) -> dict:
+    def _fixture_to_dict(self, f: PatchedFixture, positions=None) -> dict:
         # VIZ-55 (Review B4): merken, mit welchem Nullpunkt das Geraet ans 3D geht —
         # sonst verpasste ``_nullpunkte_nachziehen`` die ERSTE Aenderung einer Sitzung.
         self.__dict__.setdefault("_gesendete_nullpunkte", {})[f.fid] = effektive_nullpunkte(f)
-        pos = self._state.visualizer_positions.get(f.fid, (0.0, 6.5, 0.0))
+        # VIZ-71: ``positions`` reicht ``_build_fixture_list`` EINMAL gelesen
+        # herein — ``visualizer_positions`` rechnet am echten AppState bei jedem
+        # Zugriff alle Weltpositionen neu (O(n^2) in der Schleife).
+        if positions is None:
+            positions = self._state.visualizer_positions
+        pos = positions.get(f.fid, (0.0, 6.5, 0.0))
         rot = normalize_rotation(self._state.visualizer_rotations.get(f.fid))
         model = self._viz_model_for(f)
         # VIZ-04: Spider tilten physisch ±90° (Gesamt 180°). Der generische
@@ -2142,14 +2338,23 @@ class VisualizerBridge(QObject):
         }
 
     def _build_fixture_list(self) -> list[dict]:
+        # VIZ-71: EINMAL lesen (s. ``_fixture_to_dict``) — vorher zweimal je
+        # Geraet, gemessen ~9 ms Spitze im UI-Thread bei 32 Geraeten.
+        placed = self._state.visualizer_positions
         return [
-            self._fixture_to_dict(f)
+            self._fixture_to_dict(f, placed)
             for f in self._state.get_patched_fixtures()
-            if f.fid in self._state.visualizer_positions
+            if f.fid in placed
         ]
 
     def _on_state(self, event: str, data):
         if event == "show_loaded":
+            # Review VIZ-71: zuerst die Show-Generation, damit schon der erste
+            # Batch der neuen Show sie traegt.
+            try:
+                VisualizerBridge._neue_show_generation(self)
+            except Exception as e:                       # noqa: BLE001
+                print(f"[Visualizer] Show-Generation: {e}")
             # VIZ-59: nur MELDEN, nicht selbst nachziehen. Was zu tun ist, weiss
             # der Besitzer der Bridge: das Vollfenster macht es laengst in seinem
             # eigenen _on_state, die Visualizer3DView haengt sich an dieses
@@ -3226,16 +3431,23 @@ class VisualizerWindow(QMainWindow):
         self._combo_quality.addItem("Automatisch (empfohlen)", "auto")
         self._combo_quality.addItem("Hoch (Desktop-GPU)", "high")
         self._combo_quality.addItem("Niedrig (schwache/mobile GPU)", "low")
+        # VIZ-71: nur von Hand — die Automatik waehlt nie mehr als Hoch.
+        self._combo_quality.addItem("Maximal (starke Desktop-GPU)", "max")
         self._combo_quality.setToolTip(
             "Automatisch: beim Start wird die Grafikkarte geprüft und die Stufe\n"
             "passend gewählt (schwache Chips wie im Surface → Niedrig).\n"
             "Manuell überschreiben, falls die Erkennung danebenliegt.\n\n"
-            "Niedrig = ohne Kantenglättung, reduzierte Auflösung/Schatten/Kegel\n"
-            "(flüssiger), Hoch = volle Optik. Gilt für dieses Gerät, nicht pro Show."
+            "Niedrig = 15 Lichtupdates/s, Pixeldichte höchstens 1,25, 8 Schatten\n"
+            "(einfach), ohne Kantenglättung; beim Drehen der Kamera kurz gröber.\n"
+            "Hoch = 30 Lichtupdates/s, Pixeldichte höchstens 2, 8 weiche Schatten;\n"
+            "gröber beim Drehen nur, wenn die Grafikkarte nicht nachkommt.\n"
+            "Maximal = 44 Lichtupdates/s (so schnell wie die DMX-Ausgabe), volle\n"
+            "Pixeldichte, 16 weiche Schatten, nie gröber — nur für starke GPUs.\n\n"
+            "Gilt für dieses Gerät, nicht pro Show."
         )
         tier_pref = quality_tier_pref()
         self._combo_quality.setCurrentIndex(
-            {"auto": 0, "high": 1, "low": 2}.get(tier_pref, 0))
+            {"auto": 0, "high": 1, "low": 2, "max": 3}.get(tier_pref, 0))
         self._combo_quality.currentIndexChanged.connect(self._on_quality_tier_changed)
         q_row.addWidget(self._combo_quality, 1)
         # Wird über den Bridge-Slot reportGpuTier befüllt — zeigt die AKTIVE
@@ -3505,12 +3717,21 @@ class VisualizerWindow(QMainWindow):
         Service zur Verfuegung stellt, statt dass der Service selbst etwas
         davon kennt."""
         self._service = get_visualizer_service(self._state)
+        # VIZ-71: Lichtdaten per runJavaScript-Push statt 130-ms-Poll. Nur mit
+        # echter Seite — die Fake-Selbst-Objekte der Bestandstests haben keine
+        # (``_view`` fehlt/None) und behalten den alten emit_batch-Weg.
+        self._dmx_push = create_dmx_push(self)
         self._target = VisualizerTarget(
             "window", self._bridge.dmxBatch.emit,
             on_reset_interaction=self._reset_own_interaction_state,
             on_reload=self._reload_own_page,
+            emit_payloads=(self._dmx_push.push if self._dmx_push is not None
+                           else None),
         )
         self._service.attach_target(self._target)
+        if self._dmx_push is not None:
+            # Bis die Seite ihre Stufe meldet: die gewaehlte ('auto' -> Hoch).
+            apply_push_tier(self, quality_tier_pref())
         # VIZ-12 (Live-Befund): JS fordert nach dem Fixture-Bau selbst den
         # vollen DMX-Bestand an (requestFullResync-Slot) — ereignisgesteuert
         # statt Timing-Raten. getattr: SimpleNamespace-Test-Fakes haben die
@@ -5217,7 +5438,8 @@ class VisualizerWindow(QMainWindow):
         lbl = getattr(self, "_lbl_gpu_tier", None)
         if lbl is None:
             return
-        name = {"low": "Niedrig", "high": "Hoch"}.get(str(tier), str(tier))
+        name = {"low": "Niedrig", "high": "Hoch",
+                "max": "Maximal"}.get(str(tier), str(tier))
         try:
             lbl.setText(f"aktiv: {name}")
         except RuntimeError:

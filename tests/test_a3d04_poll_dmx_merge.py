@@ -125,5 +125,59 @@ class PollDmxMergeTest(unittest.TestCase):
                          "die juengsten fids ueberleben, die aeltesten fallen")
 
 
+class PollAntwortAbschlussTest(unittest.TestCase):
+    """VIZ-71 Review: ``pollControl`` und ``pollControlRev`` teilen ihren
+    Schluss (Events leeren, DMX dazulegen, serialisieren) ueber EINEN Helfer —
+    vorher stand derselbe Block wortgleich zweimal da. Beide Handler muessen
+    auch auf einem ``SimpleNamespace``-Stub laufen (Bestandstests fahren sie
+    ungebunden), der Helfer wird also nie ueber ``self`` aufgerufen."""
+
+    @classmethod
+    def setUpClass(cls):
+        _app()
+
+    def _stub(self):
+        from types import SimpleNamespace
+        return SimpleNamespace(
+            _poll_state={"editMode": "view"}, _poll_rev={"editMode": 1},
+            _poll_events=[{"t": "cameraReset"}],
+            _poll_dmx={1: _payload(1, r=255)}, _poll_dmx_max=2048)
+
+    def _roh(self, name):
+        fn = getattr(VW.VisualizerBridge, name)
+        return getattr(fn, "__wrapped__", fn)
+
+    def test_helfer_gibt_es(self):
+        self.assertTrue(callable(getattr(VW.VisualizerBridge,
+                                         "_poll_antwort_abschliessen", None)))
+
+    def test_beide_handler_teilen_den_schluss(self):
+        import inspect
+        for name in ("pollControl", "pollControlRev"):
+            quelle = inspect.getsource(self._roh(name))
+            self.assertIn("VisualizerBridge._poll_antwort_abschliessen(self, out)", quelle, name)
+            self.assertNotIn("json.dumps(out)", quelle, name + ": Schluss doppelt")
+
+    def test_beide_handler_laufen_auf_einem_stub(self):
+        b = self._stub()
+        out = json.loads(self._roh("pollControl")(b))
+        self.assertEqual(out["events"], [{"t": "cameraReset"}])
+        self.assertIn("dmx", out)
+        self.assertEqual(b._poll_events, [])
+        self.assertEqual(b._poll_dmx, {})
+        b = self._stub()
+        out = json.loads(self._roh("pollControlRev")(b, "{}"))
+        self.assertEqual(out["events"], [{"t": "cameraReset"}])
+        self.assertIn("dmx", out)
+        self.assertEqual(out["_rev"], {"editMode": 1})
+        self.assertEqual(b._poll_events, [])
+
+    def test_unserialisierbares_ergibt_leeres_objekt(self):
+        b = self._stub()
+        b._poll_state = {"kaputt": object()}
+        self.assertEqual(self._roh("pollControl")(b), "{}")
+        self.assertEqual(self._roh("pollControlRev")(b, "{}"), "{}")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -8,7 +8,9 @@
 // blieb unveraendert - Buttons rufen weiterhin z.B. `setEditTool(...)` als
 // globale Funktion auf) und startet den Render-Loop + Bridge-Poll wie im
 // Original.
-import { scene, renderer, gpuTier } from './scene/renderer.js';
+import { scene, renderer, gpuTier, dynamicResolution, basePixelRatio,
+         PIXEL_RATIO_CAP, tierSettings, setDeviceRatio,
+         noteCameraMotion } from './scene/renderer.js';
 import { applyBrightness } from './scene/lights.js';
 import { prepareShadowMap, requestShadowUpdate, shadowUpdateStats } from './scene/shadow_update.js';  // VIZ-69
 import { disposeObj } from './scene/grid_floor.js';
@@ -48,8 +50,10 @@ import { setMouseFromCoords, intersectGround, mouse } from './interaction/pickin
 import { fabDelete, fabRotate, fabPlace, wireTouchLateBindings } from './interaction/touch.js';
 
 import { getBridge, tryChannel, jsAddStageObject } from './bridge/bridge.js';
+import { applyDmx } from './bridge/dmx_apply.js';                  // VIZ-71
+import { dmxCacheInfo, resetDmxCache } from './fixtures/dmx_cache.js';           // VIZ-71
 import { removeFixture as _removeFixtureForTouch, syncSpotShadowBudget,
-         beamFalloffTexture } from './fixtures/fixtures.js';  // VIZ-15
+         beamFalloffTexture, shadowBudgetInfo } from './fixtures/fixtures.js';  // VIZ-15
 import { updateLabelZoomVisibility } from './fixtures/labels.js';  // VIZ-14: Fixture-Label Zoom-Gate
 import {
   startRenderLoop, requestRender, registerLiveAnimation, renderStats, renderTick,
@@ -87,6 +91,7 @@ wirePresetsLateBindings({ getBridge });
 //     aktuell halten (folgt dem Auswahl-Schwerpunkt live, auch im Drag),
 // (c) fpsTick() misst die Frame-Zeiten (No-Op solange Overlay aus).
 function perFrameUpdate() {
+  _rafTick += 1;   // VIZ-71: Tick-Zaehler fuer die Frame-Zeit (s. renderFrame)
   // Pulsierende Emissive-Farbe fuer das selektierte Stage-Element (sehr sichtbar)
   if (view.selectedStageId && stageObjects[view.selectedStageId]) {
     const so = stageObjects[view.selectedStageId];
@@ -131,7 +136,23 @@ registerLiveAnimation(selectionPulseActive);
 // bereits selbst — scene.autoUpdate fuer den render() direkt danach aus, sonst
 // traversiert three.js die ganze Szene ein zweites Mal. Nur HIER, nicht global:
 // fremde render()-Aufrufer (Galerie, Mess-Sonden) behalten das Standardverhalten.
+// VIZ-71 (S6): Frame-Zeit fuer die dynamische Aufloesung (Stufe 'Hoch' senkt
+// nur ab, wenn die Grafikkarte Frames gegen den Bildschirmtakt verpasst — s.
+// scene/dynamic_resolution.js, Review B1). Gemessen wird der Abstand
+// zweier Renders in UNMITTELBAR aufeinanderfolgenden rAF-Ticks — also nur bei
+// Dauer-Rendern (Kamerafahrt, Animation), wo der rAF-Takt die GPU-Last zeigt.
+// Ein Render je DMX-Push (30/s) laege 33 ms auseinander und sagte nur etwas
+// ueber den Push-Takt, nicht ueber die Grafikkarte — er zaehlt deshalb nicht.
+let _rafTick = 0;
+let _letzterRenderTick = -2;
+let _letzterRenderT = 0;
 function renderFrame() {
+  const _t = performance.now();
+  if (_letzterRenderTick === _rafTick - 1) {
+    dynamicResolution.noteFrameInterval(_t - _letzterRenderT);
+  }
+  _letzterRenderTick = _rafTick;
+  _letzterRenderT = _t;
   prepareShadowMap();
   scene.autoUpdate = false;
   try {
@@ -236,6 +257,13 @@ window.__lightos = {
   // Low-Spec-Erkennung (2026-07-11): 'low' | 'high' — Test-/Debug-Hook,
   // Override per ?gputier=low|high in der Page-URL.
   gpuTier,
+  // VIZ-71: Qualitaetsstufe und Pixeldichte — Test-/Diagnose-Seams.
+  tierSettings, pixelRatioCap: PIXEL_RATIO_CAP, basePixelRatio, setDeviceRatio,
+  pixelRatio: () => renderer.getPixelRatio(),
+  shadowMapType: () => renderer.shadowMap.type,
+  shadowBudgetInfo,
+  dynamicResolutionInfo: () => dynamicResolution.info(),
+  __noteCameraMotion: noteCameraMotion,
   // A3D-41: Test-Seams fuer die NaN-Guards der Zeiger-Mathematik. `mouse` ist
   // absichtlich das GETEILTE Vector2 selbst (nicht eine Kopie) — der Test muss
   // pruefen koennen, dass ein verworfener Aufruf es unangetastet laesst, und
@@ -261,6 +289,13 @@ window.__lightos = {
   dragDropAllowed: dropAllowed, pendingDragFid,
   __handlePointerDown: handlePointerDown,
   __handlePointerUp: handlePointerUp,
+  // VIZ-71: Ziel des DMX-Pushs (Python ruft das per runJavaScript; Rueckgabe
+  // ist eine ZAHL — Arrays kommen in PySide 6.11 als '' an) und Test-Seam.
+  applyDmx, dmxCacheInfo,
+  // Test-Seam: Szenen-Tests, die eine geteilte Seite zwischen Tests neu
+  // aufbauen (XPLAT-33), leeren den DMX-Cache, damit der Vortest nicht
+  // nachwirkt — im Betrieb behaelt ein Neubau seinen Stand bewusst (VIZ-71).
+  __dmxCacheLeeren: () => { resetDmxCache(); return true; },
 };
 
 // Init-Flag fuer den Smoke-Test (VIZ-13 3a-4): belegt, dass app.js komplett

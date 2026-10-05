@@ -44,6 +44,12 @@ _BRIDGE_JS_PATH = os.path.join(
 )
 
 
+_DMX_APPLY_JS_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "src", "ui", "visualizer", "scene_src", "bridge", "dmx_apply.js",
+)
+
+
 class DmxBatchSignalExistsTest(unittest.TestCase):
     def setUp(self):
         reset_show()
@@ -98,28 +104,30 @@ class JsBatchHandlerBraceBalanceTest(unittest.TestCase):
         with open(_BRIDGE_JS_PATH, encoding="utf-8") as f:
             self.bridge_js_content = f.read()
 
-    def test_dmx_batch_handler_present_and_legacy_removed(self):
-        self.assertIn("bridge.dmxBatch", self.bridge_js_content,
-                       "JS muss bridge.dmxBatch verbinden")
+    def test_dmx_batch_handler_removed_and_legacy_removed(self):
+        """VIZ-71: JS verbindet ``bridge.dmxBatch`` NICHT mehr. Die DMX-Werte
+        schiebt Python per ``runJavaScript`` an ``window.__lightos.applyDmx``
+        (``visualizer/dmx_push.py``); ein verbundenes Signal liesse nur den
+        QWebChannel-Publisher jedes Senden serialisieren."""
+        self.assertNotIn("bridge.dmxBatch.connect", self.bridge_js_content,
+                         "dmxBatch-Handler muss entfernt sein (VIZ-71)")
         # VIZ-13 3c-4: der Legacy-Einzel-Handler bridge.dmxUpdated wurde entfernt.
         self.assertNotIn("bridge.dmxUpdated.connect", self.bridge_js_content,
                           "Legacy dmxUpdated-Handler muss entfernt sein")
+        # Der Poll-Rueckfall laeuft ueber denselben applyDmx wie der Push.
+        # Review VIZ-71: mit der Show-Generation des Poll-Puffers.
+        self.assertIn("applyDmx(JSON.parse(s.dmx), s.dmxSeq, s.dmxGen)", self.bridge_js_content)
 
-    def test_dmx_batch_handler_calls_unmodified_update_fixture(self):
-        match = re.search(
-            r"bridge\.dmxBatch\.connect\(j => \{(.*?)\}\);",
-            self.bridge_js_content, re.DOTALL,
-        )
-        self.assertIsNotNone(match, "dmxBatch-Handler-Block nicht gefunden")
-        body = match.group(1)
-        self.assertIn("JSON.parse(j)", body)
-        self.assertIn("for (const d of arr)", body)
+    def test_apply_dmx_calls_update_fixture_with_nullish_defaults(self):
+        """Frueher byte-identisch ``d.pan||128`` — das machte aus Pan 0 (ganz
+        links) die Mitte. VIZ-71: ``??`` (nur fehlende Werte bekommen den
+        Default), dieselben Felder wie bisher."""
+        with open(_DMX_APPLY_JS_PATH, encoding="utf-8") as f:
+            apply_js = f.read()
         self.assertIn(
-            "updateFixture(d.fid, d.r, d.g, d.b, d.intensity, d.pan||128, "
-            "d.tilt||128, d.heads||null)",
-            body,
-            "updateFixture-Aufruf muss byte-identisch zum dmxUpdated-Handler sein",
-        )
+            "updateFixture(d.fid, d.r ?? 0, d.g ?? 0, d.b ?? 0, d.intensity ?? 0,\n"
+            "                d.pan ?? 128, d.tilt ?? 128, d.heads || null)",
+            apply_js)
 
     def test_all_script_blocks_are_brace_and_paren_balanced(self):
         # stage_scene.html: seit 3a-4 nur noch klassische Loader-Scripts +

@@ -55,6 +55,7 @@ from PySide6.QtWebEngineCore import (QWebEngineSettings,         # noqa: E402
 from PySide6.QtWebChannel import QWebChannel                     # noqa: E402
 from PySide6.QtCore import QObject, QUrl, Signal, Slot           # noqa: E402
 from _qt_lifecycle import destroy_webengine_view                 # noqa: E402
+from _viz_dmx import dmx_push as _dmx_push  # VIZ-71: DMX per runJavaScript wie die Produktion
 
 _app = QApplication.instance() or QApplication([])
 
@@ -296,6 +297,10 @@ class PixelHeadSceneTest(unittest.TestCase):
         steht = self._eval(f"typeof window.__lightos.fixtures['{_GROSS}'] "
                            f"=== 'object'")
         if steht:
+            # VIZ-71: ein Neubau uebernimmt bewusst den letzten DMX-Stand aus
+            # dem Cache — fuer die Test-Isolation hier explizit leeren.
+            self._eval("window.__lightos.__dmxCacheLeeren && "
+                       "window.__lightos.__dmxCacheLeeren(); true")
             self._eval(f"window.__lightos.fixtures['{_GROSS}'].__neubau = 1; "
                        f"true")
             fertig = f"!window.__lightos.fixtures['{_GROSS}'].__neubau"
@@ -321,7 +326,7 @@ class PixelHeadSceneTest(unittest.TestCase):
         """Batch schicken, bis die Wirkung da ist (WebChannel ist deferred)."""
         ende = time.monotonic() + _POLL_TIMEOUT_S
         while time.monotonic() < ende:
-            self._bridge.dmxBatch.emit(batch)
+            _dmx_push(self._view, batch)
             if self._eval(pruefung):
                 return True
             time.sleep(_POLL_INTERVAL_S)

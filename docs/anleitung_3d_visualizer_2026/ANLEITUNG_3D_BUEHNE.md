@@ -170,8 +170,9 @@ und schwenkst/zoomst mit zwei.
 ![Reiter Einstellungen: Render-Qualität, Szenen-Helligkeit und Strahl-Optionen](img/05_einstellungen.png)
 
 1. **Render-Qualität — Stufe:** „Automatisch (empfohlen)" prüft beim Start die
-   Grafikkarte und wählt passend; „Hoch (Desktop-GPU)" bzw. „Niedrig (schwache/mobile
-   GPU)" überschreiben das. Niedrig rechnet ohne Kantenglättung, mit weniger Auflösung,
+   Grafikkarte und wählt passend; „Hoch (Desktop-GPU)", „Niedrig (schwache/mobile
+   GPU)" bzw. „Maximal (starke Desktop-GPU)" überschreiben das — Details und Tabelle in
+   [Qualitätsstufe](#qualitätsstufe-tab-einstellungen--render-qualität). Niedrig rechnet ohne Kantenglättung, mit weniger Auflösung,
    Schatten und Kegeldetail — flüssiger auf schwachen Chips. Die Wahl gilt für diesen
    Rechner, nicht für die Show; die Szene lädt danach neu.
 2. **Szenen-Helligkeit:** Grundlicht der Szene. Niedrig = dunkel, Strahlen gut sichtbar;
@@ -234,7 +235,9 @@ still. Zudem zeichnet jeder schattenwerfende Scheinwerfer die ganze Szene noch
 einmal aus seiner Sicht — mit 16 Schatten war das der größte Einzelposten pro
 Bild und ließ die Ansicht bei großen Rigs ruckeln. Acht Schatten reichen für den
 Raumeindruck. Die Obergrenze von 8 gilt überall gleich; nur auf sehr schwachen
-Grafikchips (weniger als 14 Textur-Einheiten) werfen noch weniger Geräte Schatten. Neu berechnet werden die Schatten nur, wenn sich etwas bewegt
+Grafikchips (weniger als 14 Textur-Einheiten) werfen noch weniger Geräte Schatten.
+Einzige Ausnahme nach oben ist die Qualitätsstufe **Maximal** (siehe unten): sie
+erlaubt bis zu 16 Schlagschatten und ist für starke Grafikkarten gedacht. Neu berechnet werden die Schatten nur, wenn sich etwas bewegt
 (Pan/Tilt, verschobene Geräte oder Bühnenteile) — Kamerafahrten und reine Farb- oder
 Dimmerwechsel kosten keinen Schattendurchlauf.
 
@@ -246,6 +249,32 @@ Patch.
 Wie lange die Ansicht je Bild braucht, lässt sich messen:
 `./venv/bin/python tools/viz_render_benchmark.py 12 32 48` (echtes Fenster
 nötig, misst auf der echten Grafikkarte).
+
+## Qualitätsstufe (Tab „Einstellungen" → „Render-Qualität")
+
+Die Stufe gilt für **dieses Gerät**, nicht für die Show — sie hängt an der
+Grafikkarte des Rechners. Sie wirkt auf das Vollfenster und die 3D-Ansicht in
+der Live View gleichermaßen; nach dem Umstellen lädt die Szene einmal neu.
+Neben der Auswahl steht, welche Stufe gerade **aktiv** ist.
+
+| Stufe | Lichtupdates | Bildschärfe (Pixeldichte) | Schlagschatten | Beim Drehen der Kamera |
+|---|---|---|---|---|
+| **Niedrig** | 15 pro Sekunde | höchstens 1,25-fach | 8, einfach | immer kurz gröber |
+| **Hoch** (Standard) | 30 pro Sekunde | höchstens 2-fach | 8, weich | gröber nur, wenn die Grafikkarte nicht nachkommt (sie verpasst regelmäßig Bilder gegenüber dem Bildschirmtakt) |
+| **Maximal** | 44 pro Sekunde | volle Bildschirmdichte | 16, weich | nie gröber |
+
+- **Automatisch (empfohlen)** prüft beim Start die Grafikkarte und wählt
+  **Niedrig** oder **Hoch**. **Maximal** wählt die Automatik nie — nur von Hand.
+- **Lichtupdates** heißt: so oft pro Sekunde kommen Farbe, Dimmer und Pan/Tilt
+  in der 3D-Ansicht an. 44 entspricht der DMX-Ausgabe selbst; schneller gibt es
+  nichts Neues. Ein Blackout ist auch auf Niedrig sofort dunkel — es kommen nur
+  weniger Zwischenschritte eines Effekts an.
+- **Gröber beim Drehen:** während die Kamera fährt, rechnet die Ansicht mit
+  etwas weniger Bildpunkten und wird dadurch flüssiger. Etwa 0,2 Sekunden nach
+  dem Loslassen ist das Bild wieder voll scharf. Ein Sprung auf eine
+  Kamera-Ansicht (Oben, Vorne, …) zählt nicht als Fahrt.
+- **Maximal** nur auf einer starken Desktop-Grafikkarte wählen. Ruckelt die
+  Ansicht, zurück auf **Hoch**.
 
 ## Tastenkürzel im Visualizer
 

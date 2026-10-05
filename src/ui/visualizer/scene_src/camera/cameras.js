@@ -14,6 +14,9 @@ import { view } from '../state.js';
 // orthoCam.position OHNE diese Helfer — dort ist die Quelle separat
 // verdrahtet.)
 import { requestRender } from '../scene/render_loop.js';
+// VIZ-71 (S6): dieselben zwei Flaschenhaelse melden Kamerabewegung an die
+// dynamische Aufloesung (renderer.js). Ein einzelner Sprung senkt nichts ab.
+import { noteCameraMotion } from '../scene/renderer.js';
 
 // A3D-41: Seitenverhaeltnis des Viewports, NIE nicht-endlich.
 //
@@ -65,6 +68,7 @@ export function resizeOrtho() {
   orthoCam.bottom = -_orthoSize;
   orthoCam.updateProjectionMatrix();
   requestRender();  // 3c-2 Dirty-Quelle 2 (Kamera: Ortho-Zoom/Fit/Resize)
+  noteCameraMotion();
 }
 
 // ============================================================================
@@ -80,6 +84,7 @@ export function updateCamera() {
   perspectiveCam.position.z = camTarget.z + view.radius * Math.sin(view.phi) * Math.cos(view.theta);
   perspectiveCam.lookAt(camTarget);
   requestRender();  // 3c-2 Dirty-Quelle 2 (Kamera: Orbit/Pan/Zoom/Preset/Fit)
+  noteCameraMotion();
 }
 updateCamera();
 

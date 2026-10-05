@@ -34,6 +34,7 @@ from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEngineProfile
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtCore import QObject, QUrl, Signal, Slot
 from _qt_lifecycle import destroy_webengine_view  # XPLAT-09
+from _viz_dmx import dmx_push as _dmx_push  # VIZ-71: DMX per runJavaScript wie die Produktion
 
 _app = QApplication.instance() or QApplication([])
 
@@ -216,7 +217,7 @@ class Viz69RenderRucklerTest(unittest.TestCase):
 
         # Dimmer offen, Farbe schwarz (A3D-25/A3D-28) -> dunkel.
         self._emit_until_true(
-            lambda: self._bridge_obj.dmxBatch.emit(_batch(0, 0, 0, 255)),
+            lambda: _dmx_push(self._view, _batch(0, 0, 0, 255)),
             "Object.values(window.__lightos.fixtures)"
             ".every(f => f.spot && f.spot.intensity === 0)")
         dunkel = self._spot_zustand()
@@ -230,7 +231,7 @@ class Viz69RenderRucklerTest(unittest.TestCase):
 
         # Wieder hell -> Licht kommt zurueck, ohne Sichtbarkeitswechsel.
         self._emit_until_true(
-            lambda: self._bridge_obj.dmxBatch.emit(_batch(255, 80, 0, 255)),
+            lambda: _dmx_push(self._view, _batch(255, 80, 0, 255)),
             "Object.values(window.__lightos.fixtures)"
             ".every(f => f.spot && f.spot.intensity > 0)")
         self.assertTrue(all(v for v, _c, _i in self._spot_zustand()))
@@ -255,7 +256,7 @@ class Viz69RenderRucklerTest(unittest.TestCase):
             "shadowMap.autoUpdate ist an — three.js zeichnet dann jeden Frame neu")
         # Einschwingen: Aufbau + erster DMX-Stand duerfen neu zeichnen.
         self._emit_until_true(
-            lambda: self._bridge_obj.dmxBatch.emit(_batch(255, 255, 255, 255)),
+            lambda: _dmx_push(self._view, _batch(255, 255, 255, 255)),
             "Object.values(window.__lightos.fixtures).every(f => f.spot.intensity > 0)")
         self._tick()
         n0 = self._tick()
@@ -271,17 +272,17 @@ class Viz69RenderRucklerTest(unittest.TestCase):
 
         # Reine Farb-/Dimmerwechsel inkl. 0 -> hell: Map speichert Tiefe, nicht Licht.
         self._emit_until_true(
-            lambda: self._bridge_obj.dmxBatch.emit(_batch(0, 0, 0, 0)),
+            lambda: _dmx_push(self._view, _batch(0, 0, 0, 0)),
             "Object.values(window.__lightos.fixtures).every(f => f.spot.intensity === 0)")
         self.assertEqual(self._tick(), n0, "Abdunkeln hat die Shadow-Map neu gezeichnet")
         self._emit_until_true(
-            lambda: self._bridge_obj.dmxBatch.emit(_batch(255, 0, 120, 255)),
+            lambda: _dmx_push(self._view, _batch(255, 0, 120, 255)),
             "Object.values(window.__lightos.fixtures).every(f => f.spot.intensity > 0)")
         self.assertEqual(self._tick(), n0, "Aufhellen hat die Shadow-Map neu gezeichnet")
 
         # Pan/Tilt bewegt Kopf + Lichtrichtung -> Schatten MUSS neu.
         self._emit_until_true(
-            lambda: self._bridge_obj.dmxBatch.emit(_batch(255, 0, 120, 255, pan=20, tilt=200)),
+            lambda: _dmx_push(self._view, _batch(255, 0, 120, 255, pan=20, tilt=200)),
             "(function(){ const f = window.__lightos.fixtures['%d'];"
             " return Math.abs(f._lastPanRad || 0) > 0.1; })()" % _FIDS[0])
         self.assertGreater(self._tick(), n0, "Pan/Tilt-Aenderung ohne Schatten-Neubau")

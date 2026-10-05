@@ -22,7 +22,8 @@ dem teuersten Fixture-Typ (Beam-Kegel, SpotLight, Bodenfleck).
 
 Dieses Werkzeug hat zweimal das Falsche gemessen, beide Male ueberzeugend:
 
-1. **Die Szene war dunkel.** Das `dmxBatch`-Signal will ein ARRAY
+1. **Die Szene war dunkel.** Das `dmxBatch`-Signal (seit VIZ-71:
+   `window.__lightos.applyDmx`) will ein ARRAY
    `[{fid, r, g, b, intensity}]`, bekam aber ein Objekt `{fid: {...}}`; der
    Handler lief ins Leere. Gemessen wurde reine Gehaeuse-Geometrie. Die Werte
    stiegen trotzdem mit der Fixture-Zahl, waren reproduzierbar und deckten sich
@@ -356,17 +357,19 @@ def messen(stufen, runden=40, still=False, zerlegen=False, kumulativ=False,
             print(f"ABBRUCH: nur {da} von {anzahl} Fixtures in der Szene", file=sys.stderr)
             break
 
-        # ⚠️ Das Signal erwartet ein ARRAY von {fid, r, g, b, intensity, pan, tilt}
-        # (bridge.js: `for (const d of arr)`), NICHT ein Objekt {fid: {...}}.
+        # ⚠️ applyDmx erwartet ein ARRAY von {fid, r, g, b, intensity, pan, tilt}
+        # (bridge/dmx_apply.js: Schleife ueber arr), NICHT ein Objekt {fid: {...}}.
+        # VIZ-71: frueher das Signal `dmxBatch` — JS verbindet es nicht mehr, die
+        # Werte kommen wie in der App per runJavaScript an.
         # Die erste Fassung schickte ein Objekt — der Handler lief ins Leere, die
         # Fixtures blieben DUNKEL, und die Messung erfasste nur Gehaeuse-Geometrie
         # ohne Beams, Bodenflecken und Lichter. Gemeldet hat das nicht die Messung
         # (die lieferte plausible Zahlen), sondern die Wirkungs-Kontrolle der
         # Zerlegung: "0 sichtbare Kegel" bei angeblich voll aufgedrehten Movern.
-        bridge.dmxBatch.emit(json.dumps([
+        ev("window.__lightos.applyDmx(" + json.dumps([
             {"fid": 1000 + i, "r": 255, "g": 180, "b": 90,
              "intensity": 255, "pan": 128, "tilt": 200}
-            for i in range(anzahl)]))
+            for i in range(anzahl)]) + ")", 5.0)
         pumpe(0.8)
 
         # Und die Gegenprobe dazu: leuchten sie wirklich? Eine Messung an einer

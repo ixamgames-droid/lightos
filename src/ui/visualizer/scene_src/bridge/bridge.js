@@ -3,10 +3,12 @@
 // tryChannel). Reines Verschieben - ALLE 14 Signal-Connects + Slot-Aufrufe
 // 1:1 erhalten (Design-Dokument Leitprinzip).
 import * as THREE from '../three/three.js';
-import { renderer, scene, PIXEL_RATIO_CAP, gpuTier } from '../scene/renderer.js';
+import { scene, gpuTier, setDeviceRatio } from '../scene/renderer.js';
 import { applyBrightness } from '../scene/lights.js';
 import { fixtures, settings, stageObjects, view } from '../state.js';
-import { addFixture, removeFixture, updateFixture } from '../fixtures/fixtures.js';
+import { addFixture, removeFixture } from '../fixtures/fixtures.js';
+import { applyDmx } from './dmx_apply.js';                                // VIZ-71
+import { forgetDmx, noteShowGen, pruneDmxCache } from '../fixtures/dmx_cache.js';      // VIZ-71
 import { resyncBeamVisibility } from '../fixtures/builders.js';
 import { setBeamsOff } from '../state.js';   // VIZ-15
 import { setViewMode } from '../stage/view_mode.js';
@@ -282,6 +284,23 @@ export function applySettings(s) {
   requestRender();  // 3c-2 Dirty-Quelle 6 (Settings: Fog/Beam-Sichtbarkeiten)
 }
 
+// VIZ-71 (Live-Pruefung): die VOLLE Geraeteliste ist der Soll-Bestand der
+// Szene. ``addFixture`` baut nur auf — Geraete, die die Liste nicht mehr kennt,
+// sind Reste der vorigen Show. Ohne diesen Abbau standen nach einem Wechsel auf
+// eine Show mit weniger Geraeten die alten weiter im Bild, mit ihrem letzten
+// Licht (Python meldet beim Show-Wechsel kein fixtureRemoved: die neuen
+// Positionen ersetzen die alten im Ganzen). ``fids`` enthaelt wie beim
+// Cache-Aufraeumen auch die fids, die dieselbe Poll-Antwort per fixtureAdded
+// baut (Review B3).
+export function removeFixturesNotIn(fids) {
+  const soll = new Set((fids || []).map(f => String(f)));
+  for (const k of Object.keys(fixtures)) {
+    if (soll.has(k)) continue;
+    try { removeFixture(k); }
+    catch (eR) { console.log('poll: Rest-Geraet nicht entfernt', k, eR); }
+  }
+}
+
 // ============================================================================
 // Qt WebChannel
 // ============================================================================
@@ -293,18 +312,19 @@ export function tryChannel() {
       bridge = channel.objects.bridge;
       if (bridge) {
         if (bridge.fixtureAdded)   bridge.fixtureAdded.connect(j => { addFixture(JSON.parse(j)); });
-        if (bridge.fixtureRemoved) bridge.fixtureRemoved.connect(fid => { removeFixture(fid); });
-        // VIZ-13 3c-4: Legacy-Einzel-Handler bridge.dmxUpdated ENTFERNT — der
-        // Service pusht ausschliesslich als Batch-Array ueber dmxBatch (der Body
-        // ruft dasselbe updateFixture pro Element auf).
-        if (bridge.dmxBatch)       bridge.dmxBatch.connect(j => {
-          const arr = JSON.parse(j);
-          for (const d of arr) {
-            updateFixture(d.fid, d.r, d.g, d.b, d.intensity, d.pan||128, d.tilt||128, d.heads||null);
-          }
-        });
+        if (bridge.fixtureRemoved) bridge.fixtureRemoved.connect(fid => { removeFixture(fid); forgetDmx(fid); });
+        // VIZ-71: KEIN dmxBatch-Handler mehr. Die DMX-Werte schiebt Python per
+        // runJavaScript direkt an window.__lightos.applyDmx (visualizer/
+        // dmx_push.py); der Rueckfall laeuft ueber den Poll unten. Ein hier
+        // verbundenes Signal liesse den QWebChannel-Publisher jedes Senden
+        // serialisieren — Arbeit fuer einen Weg, der nach dem Laden ohnehin
+        // nicht zustellt (s. Poll-Kommentar).
         if (bridge.allFixtures)    bridge.allFixtures.connect(j => {
           const list = JSON.parse(j);
+          pruneDmxCache(list.map(f => f.fid));
+          // Bewusst KEIN removeFixturesNotIn hier: das Signal kommt nach dem
+          // Laden nicht an (der Show-Wechsel laeuft ueber den Poll unten), und
+          // Szenen-Tests bauen ueber dieses Signal Geraet fuer Geraet auf.
           list.forEach(f => addFixture(f));
           // VIZ-12: JETZT sind die Fixture-Objekte gebaut — Service um den
           // vollen DMX-Bestand bitten. Ein zeitgesteuerter Push von Python
@@ -352,10 +372,11 @@ export function tryChannel() {
         if (bridge.pixelRatioSignal) bridge.pixelRatioSignal.connect(r => {
           // VIZ-12 Schritt 5: expliziter Bildschirmwechsel (Qt screenChanged)
           // -> Renderer-Pixelratio neu setzen, unabhaengig vom 'resize'-Event
-          // (das feuert nicht garantiert bei jedem Monitorwechsel). Derselbe
-          // Tier-Deckel wie beim Initial-Setup — sonst hebt ein Monitor-
-          // Wechsel die Low-Spec-Drosselung wieder auf.
-          renderer.setPixelRatio(Math.min(r || window.devicePixelRatio || 1, PIXEL_RATIO_CAP));
+          // (das feuert nicht garantiert bei jedem Monitorwechsel). VIZ-71:
+          // ueber die EINE Quelle in renderer.js (Deckel der Stufe +
+          // dynamische Aufloesung). Nach dem Laden kommt das Signal nicht an —
+          // der Poll spiegelt es als Zustand 'pixelRatio' (unten).
+          setDeviceRatio(r);
           requestRender();  // 3c-2 Dirty-Quelle 5 (PixelRatio-Wechsel)
         });
         // VIZ-15: aktive Qualitaetsstufe (Probe- oder ?gputier-Override-
@@ -373,17 +394,53 @@ export function tryChannel() {
           let _pEM = null, _pVM = null, _pSet = null, _pStage = null, _pFix = null, _pSel = null;
           let _pPlace = null;   // VIZ-14: Zahl offener Platzierungen
           let _pBeamsOff = null;   // VIZ-15 (JSON-Signatur, s. Poll unten)
+          let _pPR = null;         // VIZ-71: Pixeldichte des Bildschirms
+          // VIZ-71 (S5): zuletzt gesehene Revisionen je Zustands-Schluessel.
+          // Python antwortet nur mit Geaendertem (pollControlRev) — vorher ging
+          // die volle Geraeteliste und die Buehne bei JEDEM Poll mit.
+          const _revs = {};
+          const _versuche = {};        // Review B2: Fehlschlaege je Schluessel
+          const _MAX_VERSUCHE = 3;
+          const _abfragen = (cb) => (bridge.pollControlRev
+            ? bridge.pollControlRev(JSON.stringify(_revs), cb)
+            : bridge.pollControl(cb));
           setInterval(function(){
             try {
-              bridge.pollControl(function(js){
+              _abfragen(function(js){
                 try {
                   const s = JSON.parse(js);
-                  // Idempotente Zustaende: nur bei Aenderung anwenden.
-                  if (s.editMode !== undefined && s.editMode !== _pEM) { _pEM = s.editMode; setEditMode(s.editMode); }
+                  // Review B2: Revisionen erst NACH dem Anwenden uebernehmen und
+                  // jeden Zustands-Block einzeln absichern. Vorher wurde _rev vor
+                  // allen Handlern quittiert, und ein Wurf (z. B. defekte Buehne)
+                  // liess alle spaeteren Schluessel derselben Antwort dauerhaft
+                  // fallen — Python schickt sie erst bei geaendertem Wert wieder.
+                  // Ein gescheiterter Schluessel bleibt unquittiert (kommt beim
+                  // naechsten Poll erneut), nach _MAX_VERSUCHE Fehlschlaegen wird
+                  // er aufgegeben (kein Dauer-Neubau 8x pro Sekunde).
+                  const _fehl = {};
+                  const _block = (key, fn) => {
+                    try { fn(); }
+                    catch (eB) {
+                      _fehl[key] = true;
+                      console.log('poll: Zustand ' + key + ' nicht angewandt', eB);
+                    }
+                  };
+                  // Review VIZ-71: neue Show -> DMX-Cache leeren, BEVOR unten
+                  // die Geraeteliste baut (fids beginnen je Show bei 1; sonst
+                  // startete ein Geraet der neuen Show mit dem Licht der
+                  // alten). Idempotent: dieselbe Generation leert nichts.
+                  if (typeof s.showGen === 'number') {
+                    _block('showGen', () => { noteShowGen(s.showGen); });
+                  }
+                  // Idempotente Zustaende: nur bei Aenderung anwenden. Der
+                  // Vergleichswert (_pX) wird erst nach Erfolg gesetzt.
+                  if (s.editMode !== undefined && s.editMode !== _pEM) {
+                    _block('editMode', () => { setEditMode(s.editMode); _pEM = s.editMode; });
+                  }
                   // VIZ-14: wie viele Geraete warten auf einen Platz? Steuert
                   // den Platzier-Geist (0 = kein Geist).
                   if (s.placeable !== undefined && s.placeable !== _pPlace) {
-                    _pPlace = s.placeable; setPlaceableCount(s.placeable);
+                    _block('placeable', () => { setPlaceableCount(s.placeable); _pPlace = s.placeable; });
                   }
                   // VIZ-15: welche Geraete haben ihren Lichtkegel ausgeblendet?
                   // Als JSON-String vergleichen, nicht als Array — ein Array ist
@@ -392,27 +449,72 @@ export function tryChannel() {
                   if (s.beamsOff !== undefined) {
                     const sig = JSON.stringify(s.beamsOff);
                     if (sig !== _pBeamsOff) {
-                      _pBeamsOff = sig;
-                      setBeamsOff(s.beamsOff);
-                      for (const k in fixtures) resyncBeamVisibility(fixtures[k]);
-                      requestRender();
+                      _block('beamsOff', () => {
+                        setBeamsOff(s.beamsOff);
+                        for (const k in fixtures) resyncBeamVisibility(fixtures[k]);
+                        requestRender();
+                        _pBeamsOff = sig;
+                      });
                     }
                   }
-                  if (s.viewMode !== undefined && s.viewMode !== _pVM) { _pVM = s.viewMode; setViewMode(s.viewMode); }
-                  if (s.settings && s.settings !== _pSet) { _pSet = s.settings; applySettings(JSON.parse(s.settings)); }
-                  if (s.stage && s.stage !== _pStage) { _pStage = s.stage; loadStageJson(s.stage); }
+                  if (s.viewMode !== undefined && s.viewMode !== _pVM) {
+                    _block('viewMode', () => { setViewMode(s.viewMode); _pVM = s.viewMode; });
+                  }
+                  // VIZ-71 (N3): Bildschirmwechsel kam bisher nur als Push-Signal —
+                  // nach dem Laden also nie. Jetzt auch als Poll-Zustand.
+                  if (typeof s.pixelRatio === 'number' && s.pixelRatio !== _pPR) {
+                    _block('pixelRatio', () => { setDeviceRatio(s.pixelRatio); _pPR = s.pixelRatio; });
+                  }
+                  if (s.settings && s.settings !== _pSet) {
+                    _block('settings', () => { applySettings(JSON.parse(s.settings)); _pSet = s.settings; });
+                  }
+                  if (s.stage && s.stage !== _pStage) {
+                    _block('stage', () => { loadStageJson(s.stage); _pStage = s.stage; });
+                  }
                   // Voll-Fixture-Rebuild (allFixtures): nur bei geaenderter Liste
                   // anwenden. addFixture ist idempotent (ersetzt vorhandene fid).
                   if (s.fixtures && s.fixtures !== _pFix) {
-                    _pFix = s.fixtures;
-                    try { JSON.parse(s.fixtures).forEach(f => addFixture(f)); } catch (eF) {}
+                    _block('fixtures', () => {
+                      const list = JSON.parse(s.fixtures);
+                      // VIZ-71: Reste alter Shows aus dem DMX-Cache raeumen.
+                      // Review B3: fids, die DIESELBE Antwort per fixtureAdded
+                      // baut, bleiben drin — sonst wirft eine noch alte Liste
+                      // den DMX-Stand eines frisch platzierten Geraets weg, und
+                      // es bliebe dunkel, bis sich sein DMX aendert.
+                      const behalten = list.map(f => f.fid);
+                      for (const ev of (s.events || [])) {
+                        if (ev && ev.t === 'fixtureAdded') {
+                          try { behalten.push(JSON.parse(ev.j).fid); } catch (eJ) {}
+                        }
+                      }
+                      pruneDmxCache(behalten);
+                      // Reste der vorigen Show aus der Szene nehmen.
+                      removeFixturesNotIn(behalten);
+                      // Ein stolperndes Geraet darf die folgenden nicht kosten;
+                      // es wird geloggt, nicht wiederholt (sonst Dauer-Neubau).
+                      for (const f of list) {
+                        try { addFixture(f); }
+                        catch (eF) { console.log('poll: Geraet nicht gebaut', f && f.fid, eF); }
+                      }
+                      _pFix = s.fixtures;
+                    });
                   }
                   // VIZ-14 (Slice 1b): globale/Programmer-Auswahl -> Outlines im
                   // 3D. Idempotent (nur bei geaenderter Liste), OHNE Echo zurueck
                   // (jsApplyExternalSelection ruft updateOutlines(false)).
                   if (s.selection !== undefined && s.selection !== _pSel) {
-                    _pSel = s.selection;
-                    jsApplyExternalSelection(s.selection);
+                    _block('selection', () => { jsApplyExternalSelection(s.selection); _pSel = s.selection; });
+                  }
+                  if (s._rev) {
+                    for (const k in s._rev) {
+                      if (_fehl[k]) {
+                        const n = (_versuche[k] || 0) + 1;
+                        _versuche[k] = n;
+                        if (n < _MAX_VERSUCHE) continue;      // naechster Poll: erneut
+                      }
+                      delete _versuche[k];
+                      _revs[k] = s._rev[k];
+                    }
                   }
                   if (s.dmx) {
                     // A3D-04: eigenes try/catch. Ein Wurf hier (defektes JSON, ein
@@ -420,11 +522,10 @@ export function tryChannel() {
                     // und uebersprunge den DANACH folgenden events-Block - waehrend
                     // Python die Event-Queue beim Ausliefern schon geleert hat. Ein
                     // DMX-Problem darf keine Kamera-/Transform-/Stage-Events fressen.
+                    // VIZ-71: derselbe Weg wie der Push (Sequenznummern je
+                    // Eintrag in s.dmxSeq; unbekannte fids landen im Cache).
                     try {
-                      const arr = JSON.parse(s.dmx);
-                      for (const d of arr) {
-                        updateFixture(d.fid, d.r, d.g, d.b, d.intensity, d.pan||128, d.tilt||128, d.heads||null);
-                      }
+                      applyDmx(JSON.parse(s.dmx), s.dmxSeq, s.dmxGen);
                     } catch (e) { console.log('poll dmx: Batch uebersprungen', e); }
                   }
                   // Einmal-Events: genau einmal ausfuehren (Python leert die Queue).
@@ -447,7 +548,7 @@ export function tryChannel() {
                         else if (ev.t === 'cameraPreset') setCameraPreset(ev.name);
                         else if (ev.t === 'namedCameras') setNamedCameras(JSON.parse(ev.j));
                         else if (ev.t === 'fixtureAdded') { try { addFixture(JSON.parse(ev.j)); } catch (eA) {} }
-                        else if (ev.t === 'fixtureRemoved') removeFixture(ev.fid);
+                        else if (ev.t === 'fixtureRemoved') { removeFixture(ev.fid); forgetDmx(ev.fid); }
                       } catch (e2) {}
                     }
                   }
