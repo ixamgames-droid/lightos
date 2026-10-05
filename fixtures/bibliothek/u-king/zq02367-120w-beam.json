@@ -1,0 +1,160 @@
+{
+  "format_version": 1,
+  "hersteller": "U King",
+  "hersteller_kurz": "UKING",
+  "modell": "ZQ02367 120W Beam",
+  "kurzname": "ZQ02367",
+  "typ": "moving_head",
+  "leistung_w": 150,
+  "notizen": "Kein Herstellerhandbuch abrufbar; Kanalfolge und Wertebereiche aus der QLC+-Datei. Strobe-Kanaele ohne Wertangabe in QLC+: 0 = kein Strobe angenommen (wie bei den eingebauten U-King-Profilen). Farbrad 9 Farben + Halbfarben, Goborad 13 Gobos + Shake + Rotation, 18-fach-Prisma, Regenbogen-Effekt.",
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition UKing-ZQ02367-120W-Beam.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/UKing/UKing-ZQ02367-120W-Beam.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.3.0 GIT · Whopper",
+    "original": "resources/fixtures/UKing/UKing-ZQ02367-120W-Beam.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 64 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): Hersteller 'UKing' -> 'U King' (wie die eingebauten LightOS-Profile der Marke); Modellname '120W Beam ZQ02367' -> 'ZQ02367 120W Beam'; Attribute korrigiert (Rainbow Effect: macro->effect); Shutter-Default/Highlight auf den Offen-Wert (Strobe 4->0); 4 Bereichs-Arten nachgezogen (Farb-/Gobo-Slots, Shake/Rotation, Prisma, Sound, Reset; Programm-Bereiche in Makro-Kanaelen ohne Farb-Art); Modellname mit Artikelnummer vorn; einzelne Kanalnamen deutsch bzw. eindeutiger benannt"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Originaldatei geprueft und nach den LightOS-Regeln (SCHEMA.md) nachbearbeitet; ein Herstellerhandbuch war nicht abrufbar (U'King-Anleitungen nur als Amazon-/manuals.plus-PDF, dort gesperrt; ManualsLib fuehrt das Modell nicht), daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "14 Channel",
+      "kanaele": [
+        {
+          "name": "Colour",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "White", "art": "open"},
+            {"von": 8, "bis": 15, "name": "Color 1 (Red)", "art": "color"},
+            {"von": 16, "bis": 23, "name": "Color 2 (Yellow)", "art": "color"},
+            {"von": 24, "bis": 31, "name": "Color 3 (Blue)", "art": "color"},
+            {"von": 32, "bis": 39, "name": "Color 4 (Green)", "art": "color"},
+            {"von": 40, "bis": 47, "name": "Color 5 (Amber)", "art": "color"},
+            {"von": 48, "bis": 55, "name": "Color 6 (Magenta)", "art": "color"},
+            {"von": 56, "bis": 63, "name": "Color 7 (Light Blue)", "art": "color"},
+            {"von": 64, "bis": 71, "name": "Color 8 (Light Green)", "art": "color"},
+            {"von": 72, "bis": 79, "name": "Color 9 (Pink)", "art": "color"},
+            {"von": 80, "bis": 87, "name": "Green-Pink", "art": "color"},
+            {"von": 88, "bis": 95, "name": "Light Blue-Green", "art": "color"},
+            {"von": 96, "bis": 103, "name": "Magenta-Light Blue", "art": "color"},
+            {"von": 104, "bis": 111, "name": "Amber-Pink", "art": "color"},
+            {"von": 112, "bis": 119, "name": "Green-Amber", "art": "color"},
+            {"von": 120, "bis": 127, "name": "Blue-Green", "art": "color"},
+            {"von": 128, "bis": 135, "name": "Yellow-Blue", "art": "color"},
+            {"von": 136, "bis": 143, "name": "Red-Yellow", "art": "color"},
+            {"von": 144, "bis": 151, "name": "Color Loop", "art": "rotate"},
+            {"von": 152, "bis": 207, "name": "Color Wheel Rotate CW (fast→slow)", "art": "rotate"},
+            {"von": 208, "bis": 255, "name": "Color Wheel Rotate CCW (slow→fast)", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Strobe Off", "art": "open"},
+            {"von": 10, "bis": 249, "name": "Strobe (slow→fast) 1-25Hz", "art": "strobe"},
+            {"von": 250, "bis": 255, "name": "Strobe Off", "art": "open"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Gobo",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Open (Circular)", "art": "open"},
+            {"von": 6, "bis": 11, "name": "Gobo 1", "art": "gobo"},
+            {"von": 12, "bis": 17, "name": "Gobo 2", "art": "gobo"},
+            {"von": 18, "bis": 23, "name": "Gobo 3", "art": "gobo"},
+            {"von": 24, "bis": 29, "name": "Gobo 4", "art": "gobo"},
+            {"von": 30, "bis": 35, "name": "Gobo 5", "art": "gobo"},
+            {"von": 36, "bis": 41, "name": "Gobo 6", "art": "gobo"},
+            {"von": 42, "bis": 47, "name": "Gobo 7", "art": "gobo"},
+            {"von": 48, "bis": 53, "name": "Gobo 8", "art": "gobo"},
+            {"von": 54, "bis": 59, "name": "Gobo 9", "art": "gobo"},
+            {"von": 60, "bis": 65, "name": "Gobo 10", "art": "gobo"},
+            {"von": 66, "bis": 71, "name": "Gobo 11", "art": "gobo"},
+            {"von": 72, "bis": 77, "name": "Gobo 12", "art": "gobo"},
+            {"von": 78, "bis": 83, "name": "Gobo 13", "art": "gobo"},
+            {"von": 84, "bis": 89, "name": "Gobo 13 Shake (slow→fast)", "art": "shake"},
+            {"von": 90, "bis": 95, "name": "Gobo 12 Shake (slow→fast)", "art": "shake"},
+            {"von": 96, "bis": 101, "name": "Gobo 11 Shake (slow→fast)", "art": "shake"},
+            {"von": 102, "bis": 107, "name": "Gobo 10 Shake (slow→fast)", "art": "shake"},
+            {"von": 108, "bis": 113, "name": "Gobo 9 Shake (slow→fast)", "art": "shake"},
+            {"von": 114, "bis": 119, "name": "Gobo 8 Shake (slow→fast)", "art": "shake"},
+            {"von": 120, "bis": 125, "name": "Gobo 7 Shake (slow→fast)", "art": "shake"},
+            {"von": 126, "bis": 131, "name": "Gobo 6 Shake (slow→fast)", "art": "shake"},
+            {"von": 132, "bis": 137, "name": "Gobo 5 Shake (slow→fast)", "art": "shake"},
+            {"von": 138, "bis": 143, "name": "Gobo 4 Shake (slow→fast)", "art": "shake"},
+            {"von": 144, "bis": 149, "name": "Gobo 3 Shake (slow→fast)", "art": "shake"},
+            {"von": 150, "bis": 155, "name": "Gobo 2 Shake (slow→fast)", "art": "shake"},
+            {"von": 156, "bis": 161, "name": "Gobo 1 Shake (slow→fast)", "art": "shake"},
+            {"von": 162, "bis": 207, "name": "Gobo Rotate CW (fast→slow)", "art": "rotate"},
+            {"von": 208, "bis": 255, "name": "Gobo Rotate CCW (slow→fast)", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Prism",
+          "attribut": "prism",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 99, "name": "Prism Off", "art": ""},
+            {"von": 100, "bis": 127, "name": "Prism On (18-facet)", "art": "prism"},
+            {"von": 128, "bis": 255, "name": "Prism Rotate 360° (slow→fast)", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Regenbogen-Effekt",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 126, "name": "Rainbow Off", "art": ""},
+            {"von": 127, "bis": 255, "name": "Rainbow On (6-colour plate)", "art": ""}
+          ]
+        },
+        {"name": "Focus", "attribut": "focus", "default": 0, "highlight": 0},
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan Fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt Fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt Speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Auto-/Sound-Modus",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "DMX Control (other channels active)", "art": ""},
+            {"von": 10, "bis": 104, "name": "Auto Program Fast", "art": ""},
+            {"von": 105, "bis": 194, "name": "Auto Program Slow", "art": ""},
+            {"von": 195, "bis": 255, "name": "Sound Control", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 249, "name": "No Function", "art": ""},
+            {"von": 250, "bis": 255, "name": "Auto Reset (after 5s)", "art": "reset"}
+          ]
+        }
+      ]
+    }
+  ]
+}

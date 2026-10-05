@@ -6,6 +6,8 @@
 > Verwandt: [MOVING_HEADS.md](MOVING_HEADS.md) ·
 > [FUTURE_FIXTURE_GENERATOR.md](FUTURE_FIXTURE_GENERATOR.md) ·
 > [FIXTURE_3D_GALLERY.md](FIXTURE_3D_GALLERY.md) (gerenderte 3D-Modelle aller Klassen)
+>
+> Bebilderte Anleitung für Anwender: [Geräte-Bibliothek & eigene Profile](anleitung_geraete_bibliothek/ANLEITUNG.md)
 
 ---
 
@@ -135,6 +137,9 @@ Die Angabe macht man im **Fixture-Editor** oder im **Fixture-Generator**, Spalte
   Platz meldet eine unstimmige Zuordnung: ein Segment ist mehreren Dimmern
   zugeordnet (dann wirkt es bei keinem), ein Segment gibt es nicht, oder ein
   Dimmer hat als einziger kein Segment.
+
+Mit Bildern Schritt für Schritt:
+[Geräte-Bibliothek & eigene Profile, Schritt 4](anleitung_geraete_bibliothek/ANLEITUNG.md#4-mehrere-dimmer-und-weiß-segmente).
 
 **Wie man es im Handbuch erkennt:** in der DMX-Tabelle des Herstellers gehört
 ein Dimmer zu dem Weiß, das im selben Abschnitt steht („Zone 2“, „Segment 2“,

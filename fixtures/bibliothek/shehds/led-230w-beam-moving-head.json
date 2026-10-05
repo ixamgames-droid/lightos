@@ -1,0 +1,199 @@
+{
+  "format_version": 1,
+  "hersteller": "Shehds",
+  "hersteller_kurz": "Shehds",
+  "modell": "LED 230W Beam Moving Head",
+  "kurzname": "SH-BEAM230",
+  "typ": "moving_head",
+  "leistung_w": 260,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Shehds-230W-LED-Beam-Moving-Head.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Shehds/Shehds-230W-LED-Beam-Moving-Head.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.8 GIT · István Király",
+    "original": "resources/fixtures/Shehds/Shehds-230W-LED-Beam-Moving-Head.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 68 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): kurzname SH-BEAM230; Bereichs-Arten korrigiert (u. a. „Preset“ nicht als Reset, Farben/Offen auf Farbrad, Open/Shake/Rotation auf Goborad, Prisma/Frost, keine Farb-/Dreh-Kacheln auf Makro-/Speed-Kanaelen, Sound-Bereiche); zweites Goborad als gobo_wheel2; Prisma-Rotation als prism_rotation statt zweitem prism; Farbmakro-/Programmkanaele ohne einzelne Farbslots als macro statt color_wheel"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": false,
+    "wie": "nicht gegen ein Herstellerhandbuch geprueft (kein oeffentliches Shehds-Handbuch zu diesem Modell auffindbar); Kanalbelegung und Wertebereiche aus der QLC+-Vorlage, Attribute, Bereichs-Arten und Defaults von LightOS plausibilisiert"
+  },
+  "modi": [
+    {
+      "name": "6 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "18 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 2,
+          "highlight": 2,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "No function", "art": "open"},
+            {"von": 5, "bis": 250, "name": "Strobe from slow to fast", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Open light", "art": "open"}
+          ]
+        },
+        {
+          "name": "Color",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Color macro presets"},
+            {"von": 5, "bis": 13, "name": "White", "art": "open"},
+            {"von": 14, "bis": 22, "name": "White / Red", "art": "color"},
+            {"von": 23, "bis": 31, "name": "Red", "art": "color"},
+            {"von": 32, "bis": 40, "name": "Red / Yellow", "art": "color"},
+            {"von": 41, "bis": 49, "name": "Yellow", "art": "color"},
+            {"von": 50, "bis": 58, "name": "Yellow / Green", "art": "color"},
+            {"von": 59, "bis": 67, "name": "Green", "art": "color"},
+            {"von": 68, "bis": 76, "name": "Green / Blue", "art": "color"},
+            {"von": 77, "bis": 85, "name": "Blue / Lemon yellow", "art": "color"},
+            {"von": 86, "bis": 94, "name": "Lemon yellow", "art": "color"},
+            {"von": 95, "bis": 103, "name": "Lemon yellow / Sky blue", "art": "color"},
+            {"von": 104, "bis": 112, "name": "Sky blue", "art": "color"},
+            {"von": 113, "bis": 121, "name": "Sky blue / Pink", "art": "color"},
+            {"von": 122, "bis": 130, "name": "Pink", "art": "color"},
+            {"von": 131, "bis": 139, "name": "White", "art": "open"},
+            {"von": 140, "bis": 195, "name": "Clockwise from slow to fast", "art": ""},
+            {"von": 196, "bis": 255, "name": "Counter-clockwise from slow to fast", "art": ""}
+          ]
+        },
+        {
+          "name": "Gobo #1",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Solid", "art": "open"},
+            {"von": 8, "bis": 17, "name": "Wave", "art": "gobo"},
+            {"von": 18, "bis": 27, "name": "Woven square", "art": "gobo"},
+            {"von": 28, "bis": 37, "name": "Circle", "art": "gobo"},
+            {"von": 38, "bis": 47, "name": "Darts", "art": "gobo"},
+            {"von": 48, "bis": 57, "name": "Circular", "art": "gobo"},
+            {"von": 58, "bis": 67, "name": "Weaving circle", "art": "gobo"},
+            {"von": 68, "bis": 77, "name": "Snowflake", "art": "gobo"},
+            {"von": 78, "bis": 87, "name": "Wave shaking", "art": "shake"},
+            {"von": 88, "bis": 97, "name": "Woven square shaking", "art": "shake"},
+            {"von": 98, "bis": 107, "name": "Circle shaking", "art": "shake"},
+            {"von": 108, "bis": 117, "name": "Darts shaking", "art": "shake"},
+            {"von": 118, "bis": 127, "name": "Circular shaking", "art": "shake"},
+            {"von": 128, "bis": 137, "name": "Weaving circle shaking", "art": "shake"},
+            {"von": 138, "bis": 147, "name": "Snowflake shaking", "art": "shake"},
+            {"von": 148, "bis": 200, "name": "Clockwise from slow to fast", "art": "rotate"},
+            {"von": 201, "bis": 255, "name": "Counter-clockwise from slow to fast", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo #2",
+          "attribut": "gobo_wheel2",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Solid", "art": "open"},
+            {"von": 8, "bis": 17, "name": "Knot", "art": "gobo"},
+            {"von": 18, "bis": 27, "name": "Machete", "art": "gobo"},
+            {"von": 28, "bis": 37, "name": "Sunshine", "art": "gobo"},
+            {"von": 38, "bis": 47, "name": "Star", "art": "gobo"},
+            {"von": 48, "bis": 57, "name": "Bar circle", "art": "gobo"},
+            {"von": 58, "bis": 67, "name": "Darts", "art": "gobo"},
+            {"von": 68, "bis": 77, "name": "Lollipop", "art": "gobo"},
+            {"von": 78, "bis": 87, "name": "Knot shaking", "art": "shake"},
+            {"von": 88, "bis": 97, "name": "Machete shaking", "art": "shake"},
+            {"von": 98, "bis": 107, "name": "Sunshine shaking", "art": "shake"},
+            {"von": 108, "bis": 117, "name": "Star shaking", "art": "shake"},
+            {"von": 118, "bis": 127, "name": "Bar circle shaking", "art": "shake"},
+            {"von": 128, "bis": 137, "name": "Darts shaking", "art": "shake"},
+            {"von": 138, "bis": 147, "name": "Lollipop shaking", "art": "shake"},
+            {"von": 148, "bis": 199, "name": "Forward rotate", "art": "rotate"},
+            {"von": 200, "bis": 255, "name": "Reverse rotate", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo #2 rotation",
+          "attribut": "gobo_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 130, "name": "Forward flow", "art": "rotate"},
+            {"von": 131, "bis": 255, "name": "Reverse flow", "art": "rotate"}
+          ]
+        },
+        {"name": "Zoom", "attribut": "zoom", "default": 0, "highlight": 0},
+        {"name": "Focus", "attribut": "focus", "default": 0, "highlight": 0},
+        {
+          "name": "Prism",
+          "attribut": "prism",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Off", "art": ""},
+            {"von": 8, "bis": 99, "name": "Insert circular prism", "art": "prism"},
+            {"von": 100, "bis": 255, "name": "Insert bar prism", "art": "prism"}
+          ]
+        },
+        {
+          "name": "Prism rotate",
+          "attribut": "prism_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 129, "name": "Slow to fast", "art": "rotate"},
+            {"von": 130, "bis": 255, "name": "Reverse fast to slow", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Macro function",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "No function", "art": ""},
+            {"von": 8, "bis": 255, "name": "Macro gobo and color auto run"}
+          ]
+        },
+        {
+          "name": "Motor auto",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "No function", "art": ""},
+            {"von": 8, "bis": 255, "name": "Macro motor ato run", "art": ""}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 249, "name": "No function", "art": ""},
+            {"von": 250, "bis": 255, "name": "Reset system", "art": "reset"}
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -14,7 +14,9 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QBrush, QColor
 from sqlalchemy.orm import Session
 from sqlalchemy import select, delete
-from src.core.database.fixture_db import engine, segment_wert
+from src.core.database.fixture_db import (als_bearbeitet_markieren, engine,
+                                          segment_wert)
+from src.core.database.models import ABLOESBARE_QUELLEN
 from src.core.database.models import (
     Manufacturer, FixtureProfile, FixtureMode, FixtureChannel, ChannelRange,
     GEO_MAX,
@@ -562,8 +564,14 @@ class FixtureEditorDialog(QDialog):
         self._saved_id: int | None = None
         self.saved_id: int | None = None
         self._setup_ui()
+        # FM-63: Stand direkt nach dem Laden — `_save` setzt die Bearbeitet-
+        # Marke nur, wenn sich daran wirklich etwas geaendert hat.
+        self._geladener_stand: str | None = None
         if self._fixture_id is not None:
             self._load_existing()
+            # FM-63: VOR der Kopie-Umbenennung — der Stand ist der des
+            # geladenen Profils, nicht der des umbenannten Dialogs.
+            self._geladener_stand = self._editor_stand()
             if self._als_kopie:
                 # Die Kopie ist ein NEUES Profil: ohne ID speichert `_save`
                 # ein eigenes daneben. Der Modellname bekommt einen Zusatz,
@@ -981,6 +989,24 @@ class FixtureEditorDialog(QDialog):
         s.flush()
         return profile
 
+    def _editor_stand(self) -> str:
+        """FM-63: Kopf + Modi + Kanaele, wie der Dialog sie gerade zeigt, als
+        vergleichbarer Text. Beide Seiten des Vergleichs kommen aus derselben
+        Quelle (den Widgets) — eine Normalisierung beim Laden kann also nicht
+        als „geaendert“ durchschlagen."""
+        import json as _json
+        modi = []
+        for i in range(self._tabs.count()):
+            try:
+                modi.append(self._tabs.widget(i).get_data())
+            except Exception:
+                modi.append(None)
+        return _json.dumps([
+            self._cb_manufacturer.currentText().strip(),
+            self._edit_name.text().strip(), self._edit_short.text().strip(),
+            self._cb_type.currentText(), self._spin_power.value(), modi,
+        ], sort_keys=True, default=str, ensure_ascii=False)
+
     def _save(self):
         mfr_name = self._cb_manufacturer.currentText().strip()
         name = self._edit_name.text().strip()
@@ -1081,6 +1107,13 @@ class FixtureEditorDialog(QDialog):
                 profile = s.execute(select(FixtureProfile).where(
                     FixtureProfile.id == self._fixture_id)).scalar_one_or_none()
                 if profile:
+                    # FM-63: ein an Ort und Stelle bearbeiteter QLC+-Import ist
+                    # jetzt ein eigenes Profil und wird nie mehr von einem
+                    # LightOS-Profil abgeloest. Marke in `herkunft`, NICHT
+                    # `source` aendern (Spider-Dual-Tilt-Erkennung haengt daran).
+                    if ((profile.source or "") in ABLOESBARE_QUELLEN
+                            and self._editor_stand() != self._geladener_stand):
+                        als_bearbeitet_markieren(profile)
                     profile.manufacturer_id = mfr.id
                     profile.name = name
                     profile.short_name = self._edit_short.text().strip() or name[:8].upper()

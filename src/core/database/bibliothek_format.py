@@ -941,14 +941,24 @@ def _abgleichen(s, daten: dict) -> str:
       -> Kopf aktualisieren und die Modi aus der Datei neu aufbauen. Die
       Profil-ID bleibt stabil; gepatchte Geraete haengen an ID + Modusname. Die
       Datei ist hier die Wahrheit (wie die Signatur-Migrationen der Builtins);
-    * gibt es Hersteller + Modell schon mit ANDERER Herkunft — Builtin, eigenes
-      Profil, QLC+-Import —, bleibt die Datei draussen (``verdeckt``). Sonst
-      stuende das Geraet zweimal in der Bibliothek, und eine Show von einem
-      anderen Rechner loeste mehrdeutig auf (FM-43). Die Uebernahme eines
-      Builtins in eine Datei ist ein eigener Migrationsschritt."""
+    * gibt es Hersteller + Modell schon als Builtin oder eigenes Profil,
+      bleibt die Datei draussen (``verdeckt``). Sonst stuende das Geraet
+      zweimal in der Bibliothek, und eine Show von einem anderen Rechner loeste
+      mehrdeutig auf (FM-43). Die Uebernahme eines Builtins in eine Datei ist
+      ein eigener Migrationsschritt;
+    * ★ FM-63: ein QLC+-Import gleichen Namens (``models.ABLOESBARE_QUELLEN``)
+      verdeckt die Datei NICHT mehr — das LightOS-Profil wird daneben angelegt
+      und LOEST den Import AB (Entscheidung des Projektinhabers 2026-10-04).
+      Der Import bleibt unveraendert in der DB, damit Shows, die ueber seine
+      ID auf ihn zeigen, weiter laden; Auswahl und Suche blenden ihn aus
+      (``fixture_db.abgeloeste_profil_ids``), und beim Namens-Rueckfall
+      gewinnt das mitgelieferte Profil, wenn es den Modus der Show hat (FM-43).
+      Ein im Fixture-Editor bearbeiteter Import (``fixture_db.ist_bearbeitet``)
+      verdeckt die Datei dagegen wie ein eigenes Profil."""
     from sqlalchemy import select
     from sqlalchemy.orm import selectinload
-    from .models import FixtureChannel, FixtureMode, FixtureProfile, Manufacturer
+    from .models import (ABLOESBARE_QUELLEN, FixtureChannel, FixtureMode, FixtureProfile,
+                         Manufacturer)
     name_h, modell = daten["hersteller"].strip(), daten["modell"].strip()
     vorhanden = s.execute(
         select(FixtureProfile)
@@ -963,12 +973,21 @@ def _abgleichen(s, daten: dict) -> str:
                    [m.id for m in hersteller_ohne_gross_klein(s, name_h)]),
                FixtureProfile.name == modell)
         .order_by(FixtureProfile.id)).scalars().all()
-    if any(p.source != SOURCE_LIGHTOS for p in vorhanden):
+    if any(p.source not in (SOURCE_LIGHTOS, *ABLOESBARE_QUELLEN) for p in vorhanden):
         return "verdeckt"
-    if not vorhanden:
+    eigene = [p for p in vorhanden if p.source == SOURCE_LIGHTOS]
+    if not eigene:
+        # FM-63 (Review): ein im Fixture-Editor BEARBEITETER Import zaehlt wie
+        # ein eigenes Profil — er wird nie abgeloest, ein LightOS-Profil
+        # daneben waere also ein dauerhaftes Doppel. Steht das LightOS-Profil
+        # schon in der DB (Import erst danach bearbeitet), wird es weiter
+        # gepflegt statt still zu veralten.
+        from .fixture_db import ist_bearbeitet
+        if any(ist_bearbeitet(p.herkunft) for p in vorhanden):
+            return "verdeckt"
         _anlegen(s, daten, SOURCE_LIGHTOS)
         return "neu"
-    prof = vorhanden[0]
+    prof = eigene[0]
     # UI-74: stand das Profil unter einer anderen Schreibweise des Herstellers
     # (alter Datenfehler), zieht es zum richtigen Hersteller um.
     hersteller = _hersteller(s, daten)

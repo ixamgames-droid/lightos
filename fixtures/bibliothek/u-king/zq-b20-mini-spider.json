@@ -1,0 +1,180 @@
+{
+  "format_version": 1,
+  "hersteller": "U King",
+  "hersteller_kurz": "UKING",
+  "modell": "ZQ-B20 Mini Spider",
+  "kurzname": "ZQB20",
+  "typ": "moving_head",
+  "leistung_w": 48,
+  "notizen": "Kein Herstellerhandbuch abrufbar; Kanalfolge und Wertebereiche aus der QLC+-Datei. Strobe-Kanaele ohne Wertangabe in QLC+: 0 = kein Strobe angenommen (wie bei den eingebauten U-King-Profilen). Zwei Leisten mit je eigenem Tilt und je 4 LEDs; LED 1-4 = Leiste 1, LED 5-8 = Leiste 2 (angenommen, Farben der LEDs in QLC+ nicht angegeben).",
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition UKing-ZQB20-Mini-Spider.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/UKing/UKing-ZQB20-Mini-Spider.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.14.2 GIT · Patrick Kosubke",
+    "original": "resources/fixtures/UKing/UKing-ZQB20-Mini-Spider.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 64 Wertebereiche mit Art (kind) versehen; Rasterform aus <Physical> in 1 Modus/Modi nicht uebernommen, weil sie nicht zu den color_r-Kanaelen passt (keine echten Farbzonen); LightOS-Nachbearbeitung (FM-57): Hersteller 'UKing' -> 'U King' (wie die eingebauten LightOS-Profile der Marke); Modus '7 Channel': Raster entfernt (nur eine Farbgruppe); Modus '15 Channel': Raster 2x4; Attribute korrigiert (Effect Speed: speed->effect_speed); Shutter-Default/Highlight auf den Offen-Wert (Strobe 4->0); Rasterform 4x1 (geraten) durch 2x4 ersetzt (zwei Leisten zu je 4 LEDs), im 7-Kanal-Modus ohne Einzel-LEDs entfernt; einzelne Kanalnamen deutsch bzw. eindeutiger benannt"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Originaldatei geprueft und nach den LightOS-Regeln (SCHEMA.md) nachbearbeitet; ein Herstellerhandbuch war nicht abrufbar (U'King-Anleitungen nur als Amazon-/manuals.plus-PDF, dort gesperrt; ManualsLib fuehrt das Modell nicht), daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "7 Channel",
+      "kanaele": [
+        {"name": "Tilt Leiste 1", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt Leiste 2", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No Strobe", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe Speed (Slow to fast)", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Effekt",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "No Effect", "art": ""},
+            {"von": 8, "bis": 17, "name": "Effect 1", "art": ""},
+            {"von": 18, "bis": 27, "name": "Effect 2", "art": ""},
+            {"von": 28, "bis": 37, "name": "Effect 3", "art": ""},
+            {"von": 38, "bis": 47, "name": "Effect 4", "art": ""},
+            {"von": 48, "bis": 57, "name": "Effect 5", "art": ""},
+            {"von": 58, "bis": 67, "name": "Effect 6", "art": ""},
+            {"von": 68, "bis": 77, "name": "Effect 7", "art": ""},
+            {"von": 78, "bis": 87, "name": "Effect 8", "art": ""},
+            {"von": 88, "bis": 97, "name": "Effect 9", "art": ""},
+            {"von": 98, "bis": 107, "name": "Effect 10", "art": ""},
+            {"von": 108, "bis": 117, "name": "Effect 11", "art": ""},
+            {"von": 118, "bis": 127, "name": "Effect 12", "art": ""},
+            {"von": 128, "bis": 136, "name": "Effect 13", "art": ""},
+            {"von": 137, "bis": 146, "name": "Effect 14", "art": ""},
+            {"von": 147, "bis": 156, "name": "Effect 15", "art": ""},
+            {"von": 157, "bis": 166, "name": "Effect 16", "art": ""},
+            {"von": 167, "bis": 176, "name": "Effect 17", "art": ""},
+            {"von": 177, "bis": 186, "name": "Effect 18", "art": ""},
+            {"von": 187, "bis": 196, "name": "Effect 19", "art": ""},
+            {"von": 197, "bis": 206, "name": "Effect 20", "art": ""},
+            {"von": 207, "bis": 216, "name": "Effect 21", "art": ""},
+            {"von": 217, "bis": 226, "name": "Effect 22", "art": ""},
+            {"von": 227, "bis": 236, "name": "Effect 23", "art": ""},
+            {"von": 237, "bis": 246, "name": "Effect 24 MultiEffect", "art": ""},
+            {"von": 247, "bis": 255, "name": "Effect 25 Sound", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Effect Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Effect (Fast to Slow)", "art": ""}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 240, "name": "No function", "art": ""},
+            {"von": 241, "bis": 250, "name": "5 seconds to reset", "art": "reset"},
+            {"von": 251, "bis": 255, "name": "No function", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "15 Channel",
+      "kanaele": [
+        {"name": "Tilt Leiste 1", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt Leiste 2", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No Strobe", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe Speed (Slow to fast)", "art": "strobe"}
+          ]
+        },
+        {"name": "LED1", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "LED2", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "LED3", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "LED4", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "LED5", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "LED6", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "LED7", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "LED8", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Effekt",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "No Effect", "art": ""},
+            {"von": 8, "bis": 17, "name": "Effect 1", "art": ""},
+            {"von": 18, "bis": 27, "name": "Effect 2", "art": ""},
+            {"von": 28, "bis": 37, "name": "Effect 3", "art": ""},
+            {"von": 38, "bis": 47, "name": "Effect 4", "art": ""},
+            {"von": 48, "bis": 57, "name": "Effect 5", "art": ""},
+            {"von": 58, "bis": 67, "name": "Effect 6", "art": ""},
+            {"von": 68, "bis": 77, "name": "Effect 7", "art": ""},
+            {"von": 78, "bis": 87, "name": "Effect 8", "art": ""},
+            {"von": 88, "bis": 97, "name": "Effect 9", "art": ""},
+            {"von": 98, "bis": 107, "name": "Effect 10", "art": ""},
+            {"von": 108, "bis": 117, "name": "Effect 11", "art": ""},
+            {"von": 118, "bis": 127, "name": "Effect 12", "art": ""},
+            {"von": 128, "bis": 136, "name": "Effect 13", "art": ""},
+            {"von": 137, "bis": 146, "name": "Effect 14", "art": ""},
+            {"von": 147, "bis": 156, "name": "Effect 15", "art": ""},
+            {"von": 157, "bis": 166, "name": "Effect 16", "art": ""},
+            {"von": 167, "bis": 176, "name": "Effect 17", "art": ""},
+            {"von": 177, "bis": 186, "name": "Effect 18", "art": ""},
+            {"von": 187, "bis": 196, "name": "Effect 19", "art": ""},
+            {"von": 197, "bis": 206, "name": "Effect 20", "art": ""},
+            {"von": 207, "bis": 216, "name": "Effect 21", "art": ""},
+            {"von": 217, "bis": 226, "name": "Effect 22", "art": ""},
+            {"von": 227, "bis": 236, "name": "Effect 23", "art": ""},
+            {"von": 237, "bis": 246, "name": "Effect 24 MultiEffect", "art": ""},
+            {"von": 247, "bis": 255, "name": "Effect 25 Sound", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Effect Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Effect (Fast to Slow)", "art": ""}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 240, "name": "No function", "art": ""},
+            {"von": 241, "bis": 250, "name": "5 seconds to reset", "art": "reset"},
+            {"von": 251, "bis": 255, "name": "No function", "art": ""}
+          ]
+        }
+      ]
+    }
+  ]
+}

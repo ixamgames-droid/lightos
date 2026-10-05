@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (
     QTabWidget, QTreeWidget, QTreeWidgetItem,
     QColorDialog, QInputDialog, QMessageBox, QLineEdit, QSizePolicy,
     QAbstractSpinBox, QToolButton, QMenu, QAbstractItemView, QGridLayout,
-    QScrollArea, QFrame,
+    QScrollArea, QFrame, QSpinBox,
 )
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEngineProfile, QWebEnginePage
@@ -1908,6 +1908,22 @@ class VisualizerBridge(QObject):
         except Exception as e:
             print(f"[Visualizer] push_add_stage_object_data error: {e}")
 
+    def push_add_stage_objects_data(self, elements: list):
+        """VIZ-68: Raster — ALLE Elemente in EINER Payload ``{"bulk": [...]}``
+        (gleiches Signal, JS legt gebuendelt an und meldet die Liste einmal)."""
+        try:
+            self.addStageObjectData.emit(json.dumps({"bulk": [e.to_js_dict() for e in elements]}))
+        except Exception as e:
+            print(f"[Visualizer] push_add_stage_objects_data error: {e}")
+
+    def push_remove_stage_objects(self, sids: list):
+        """VIZ-68: Raster-Undo — ids als JSON-Liste ueber denselben Kanal
+        (ids beginnen nie mit ``[``)."""
+        try:
+            self.removeStageObject.emit(json.dumps(list(sids)))
+        except Exception as e:
+            print(f"[Visualizer] push_remove_stage_objects error: {e}")
+
     def push_remove_stage_object(self, sid: str):
         try:
             self.removeStageObject.emit(sid)
@@ -2278,6 +2294,47 @@ class FixtureDragList(QListWidget):
         return md
 
 
+# VIZ-68 (Review A): bei MEHR als so vielen Objekten auf einmal fragt der
+# Knopf nach (genau 200 laufen ohne Rueckfrage durch).
+RASTER_RUECKFRAGE_UEBER = 200
+# VIZ-68 (Review A2): Bereich der Positionsfelder X/Z (Buehnenelemente UND
+# Fixtures) in Metern. Ein Raster, das darueber hinaus reicht, wird nicht
+# angelegt — das Feld wuerde die Position sonst beim naechsten Bearbeiten
+# still auf den Rand klemmen und das Objekt springen lassen.
+POSITION_GRENZE_M = 200.0
+# Groesster freier Abstand im Raster: so gewaehlt, dass auch 30 x 30 des
+# breitesten Moebels (Bar, 3 m) vom Standardplatz aus in +-200 m bleibt.
+RASTER_ABSTAND_MAX_M = 10.0
+# Nur Moebel werden im Raster angelegt — Boeden, Trassen, Waende usw. immer
+# einzeln (ein 30 x 30-Raster aus 14-m-Boeden ergaebe keinen Sinn und laege
+# ausserhalb jedes Eingabebereichs).
+RASTER_TYPEN = frozenset({"beer_table", "high_table", "bar_counter", "riser_stairs", "foh_desk"})
+
+
+def raster_positionen(x0: float, z0: float, w: float, d: float,
+                      reihen: int, spalten: int, abstand: float) -> list[tuple[float, float]]:
+    """VIZ-68: Mittelpunkte fuer ``reihen`` x ``spalten`` gleiche Objekte.
+
+    Spalten laufen entlang X, Reihen entlang Z; Schrittweite = Objektmass +
+    ``abstand``. Das Raster ist um (x0, z0) zentriert — ein einzelnes Objekt
+    landet also genau dort, wo es ohne Raster laege. Reine Funktion (testbar
+    ohne Fenster).
+    """
+    reihen = max(1, int(reihen))
+    spalten = max(1, int(spalten))
+    sx = float(w) + max(0.0, float(abstand))
+    sz = float(d) + max(0.0, float(abstand))
+    x_start = x0 - (spalten - 1) * sx / 2
+    z_start = z0 - (reihen - 1) * sz / 2
+    return [(round(x_start + c * sx, 4), round(z_start + r * sz, 4))
+            for r in range(reihen) for c in range(spalten)]
+
+
+def raster_passt(orte, grenze: float = POSITION_GRENZE_M) -> bool:
+    """VIZ-68 (Review A2): liegen alle Mittelpunkte in den Positionsfeldern?"""
+    return all(abs(x) <= grenze and abs(z) <= grenze for x, z in orte)
+
+
 class VisualizerWindow(QMainWindow):
 
     STAGE_TYPES = [
@@ -2290,7 +2347,33 @@ class VisualizerWindow(QMainWindow):
         ("speaker",   "Lautsprecher"),
         ("audience",  "Publikumsfläche"),
         ("dj_booth",  "DJ-Booth"),
+        # VIZ-68: Objekt-Bibliothek — je Typ ein Knopf im Bühnen-Tab.
+        ("beer_table",   "Biertischgarnitur"),
+        ("high_table",   "Stehtisch"),
+        ("bar_counter",  "Bar / Theke"),
+        ("riser_stairs", "Podest mit Treppe"),
+        ("foh_desk",     "Mischpult-Tisch"),
     ]
+
+    # Standard-Position/-Groesse je Typ beim Anlegen (Mittelpunkt; y = halbe
+    # Hoehe, damit das Objekt auf dem Boden steht). VIZ-68: als Klassen-
+    # konstante, damit ein Test jeden Knopf-Typ gegen diese Tabelle pruefen kann.
+    STAGE_DEFAULTS = {
+        "floor":     dict(x=0, y=0.05, z=0, w=14, h=0.1, d=10, color="#1c1c1c"),
+        "platform":  dict(x=0, y=0.2, z=0, w=6, h=0.4, d=4, color="#332520"),
+        "truss_h":   dict(x=0, y=8, z=0, w=4, h=0.3, d=0.3, color="#999999"),
+        "truss_v":   dict(x=0, y=2, z=0, w=0.3, h=4, d=0.3, color="#999999"),
+        "wall":      dict(x=0, y=3, z=-5, w=10, h=6, d=0.2, color="#222230"),
+        "led_wall":  dict(x=0, y=4, z=-5, w=8, h=4.5, d=0.15, color="#080820"),
+        "speaker":   dict(x=-5, y=2.3, z=4, w=1.4, h=4.5, d=1.4, color="#111111"),
+        "audience":  dict(x=0, y=0.05, z=8, w=12, h=0.1, d=8, color="#0c0c10"),
+        "dj_booth":  dict(x=0, y=0.6, z=0, w=2.4, h=1.2, d=1.0, color="#1a1a25"),
+        "beer_table":   dict(x=0, y=0.38, z=6, w=2.2, h=0.76, d=1.3, color="#4a3624"),
+        "high_table":   dict(x=5.5, y=0.55, z=3, w=0.8, h=1.1, d=0.8, color="#d8d2c4"),
+        "bar_counter":  dict(x=-6.5, y=0.55, z=3, w=3.0, h=1.1, d=0.8, color="#3a2a20"),
+        "riser_stairs": dict(x=0, y=0.3, z=0, w=2.0, h=0.6, d=2.8, color="#332520"),
+        "foh_desk":     dict(x=0, y=0.45, z=12, w=1.8, h=0.9, d=0.9, color="#222226"),
+    }
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -2737,9 +2820,9 @@ class VisualizerWindow(QMainWindow):
         box = QGroupBox("Position && Ausrichtung")
         form = QFormLayout(box)
         self._pos_form = form          # T-VIZ-06 (B-7): Y-Row im 2D-Modus ausblenden
-        self._spin_x = LocaleTolerantDoubleSpinBox(); self._spin_x.setRange(-50, 50); self._spin_x.setSingleStep(0.5)
+        self._spin_x = LocaleTolerantDoubleSpinBox(); self._spin_x.setRange(-200, 200); self._spin_x.setSingleStep(0.5)
         self._spin_y = LocaleTolerantDoubleSpinBox(); self._spin_y.setRange(0, 25);   self._spin_y.setSingleStep(0.25); self._spin_y.setValue(6.5)
-        self._spin_z = LocaleTolerantDoubleSpinBox(); self._spin_z.setRange(-30, 30); self._spin_z.setSingleStep(0.5)
+        self._spin_z = LocaleTolerantDoubleSpinBox(); self._spin_z.setRange(-200, 200); self._spin_z.setSingleStep(0.5)
         # Multi-Achsen-Ausrichtung (Grad): Drehen (Yaw Y), Kippen (Pitch X,
         # Boden->Decke), Roll (Z). Alle in 3D sinnvoll; Yaw auch im 2D.
         self._spin_rot_y = LocaleTolerantDoubleSpinBox()
@@ -3017,6 +3100,29 @@ class VisualizerWindow(QMainWindow):
                 col_count = 0
         if col_count > 0:
             add_grid.addLayout(row)
+        # VIZ-68: mehrere gleiche Objekte auf einmal (z. B. eine Halle voller
+        # Biertischgarnituren) — gilt fuer den naechsten Klick auf „+ Typ“.
+        raster = QHBoxLayout()
+        raster.setSpacing(4)
+        raster.addWidget(QLabel("Anzahl:"))
+        self._spin_reihen = QSpinBox()
+        self._spin_reihen.setRange(1, 30)
+        self._spin_reihen.setToolTip("Reihen (hintereinander, entlang der Tiefe)")
+        raster.addWidget(self._spin_reihen)
+        raster.addWidget(QLabel("×"))
+        self._spin_spalten = QSpinBox()
+        self._spin_spalten.setRange(1, 30)
+        self._spin_spalten.setToolTip("Spalten (nebeneinander, entlang der Breite)")
+        raster.addWidget(self._spin_spalten)
+        raster.addWidget(QLabel("Abstand:"))
+        self._spin_abstand = LocaleTolerantDoubleSpinBox()
+        self._spin_abstand.setRange(0.0, RASTER_ABSTAND_MAX_M)
+        self._spin_abstand.setSingleStep(0.25)
+        self._spin_abstand.setValue(1.0)
+        self._spin_abstand.setSuffix(" m")
+        self._spin_abstand.setToolTip("Freier Abstand zwischen den Objekten")
+        raster.addWidget(self._spin_abstand)
+        add_grid.addLayout(raster)
         layout.addWidget(add_box)
 
         # Properties
@@ -3026,9 +3132,9 @@ class VisualizerWindow(QMainWindow):
         self._stage_name_edit.editingFinished.connect(self._on_stage_property_changed)
         prop_form.addRow("Name:", self._stage_name_edit)
 
-        self._stage_spin_x = LocaleTolerantDoubleSpinBox(); self._stage_spin_x.setRange(-50, 50); self._stage_spin_x.setSingleStep(0.5)
+        self._stage_spin_x = LocaleTolerantDoubleSpinBox(); self._stage_spin_x.setRange(-200, 200); self._stage_spin_x.setSingleStep(0.5)
         self._stage_spin_y = LocaleTolerantDoubleSpinBox(); self._stage_spin_y.setRange(0, 30);   self._stage_spin_y.setSingleStep(0.25)
-        self._stage_spin_z = LocaleTolerantDoubleSpinBox(); self._stage_spin_z.setRange(-30, 30); self._stage_spin_z.setSingleStep(0.5)
+        self._stage_spin_z = LocaleTolerantDoubleSpinBox(); self._stage_spin_z.setRange(-200, 200); self._stage_spin_z.setSingleStep(0.5)
         self._stage_spin_w = LocaleTolerantDoubleSpinBox(); self._stage_spin_w.setRange(0.05, 60); self._stage_spin_w.setSingleStep(0.5); self._stage_spin_w.setValue(4)
         self._stage_spin_h = LocaleTolerantDoubleSpinBox(); self._stage_spin_h.setRange(0.05, 30); self._stage_spin_h.setSingleStep(0.25); self._stage_spin_h.setValue(0.4)
         self._stage_spin_d = LocaleTolerantDoubleSpinBox(); self._stage_spin_d.setRange(0.05, 60); self._stage_spin_d.setSingleStep(0.5); self._stage_spin_d.setValue(4)
@@ -4145,6 +4251,10 @@ class VisualizerWindow(QMainWindow):
                 "truss_v":   "Truss vert.", "wall":    "Wand",
                 "led_wall":  "LED-Wand",   "speaker":  "Speaker",
                 "audience":  "Publikum",   "dj_booth": "DJ-Booth",
+                # VIZ-68
+                "beer_table": "Biertisch", "high_table": "Stehtisch",
+                "bar_counter": "Bar",      "riser_stairs": "Podest+Treppe",
+                "foh_desk": "Mischpult-Tisch",
             }
             for el in self._current_stage.elements:
                 label_name = el.name or el.id
@@ -4164,22 +4274,54 @@ class VisualizerWindow(QMainWindow):
             self._stage_tree.setUpdatesEnabled(True)
 
     def _add_stage_element(self, type_: str):
-        # Pick reasonable defaults per type
-        defaults = {
-            "floor":     dict(x=0, y=0.05, z=0, w=14, h=0.1, d=10, color="#1c1c1c"),
-            "platform":  dict(x=0, y=0.2, z=0, w=6, h=0.4, d=4, color="#332520"),
-            "truss_h":   dict(x=0, y=8, z=0, w=4, h=0.3, d=0.3, color="#999999"),
-            "truss_v":   dict(x=0, y=2, z=0, w=0.3, h=4, d=0.3, color="#999999"),
-            "wall":      dict(x=0, y=3, z=-5, w=10, h=6, d=0.2, color="#222230"),
-            "led_wall":  dict(x=0, y=4, z=-5, w=8, h=4.5, d=0.15, color="#080820"),
-            "speaker":   dict(x=-5, y=2.3, z=4, w=1.4, h=4.5, d=1.4, color="#111111"),
-            "audience":  dict(x=0, y=0.05, z=8, w=12, h=0.1, d=8, color="#0c0c10"),
-            "dj_booth":  dict(x=0, y=0.6, z=0, w=2.4, h=1.2, d=1.0, color="#1a1a25"),
-        }
-        kwargs = defaults.get(type_, {})
+        # Standardwerte je Typ (VIZ-68: Klassenkonstante STAGE_DEFAULTS)
+        kwargs = dict(VisualizerWindow.STAGE_DEFAULTS.get(type_, {}))
         type_label = dict(self.STAGE_TYPES).get(type_, type_)
         kwargs.setdefault("name", type_label)
-        el = self._current_stage.add(type_, **kwargs)
+        # VIZ-68: Reihe/Raster. Ohne die Felder (aeltere Tests bauen das
+        # Fenster nicht) gilt 1 x 1.
+        def _wert(attr, standard):
+            w = getattr(self, attr, None)
+            try:
+                return w.value() if w is not None else standard
+            except Exception:
+                return standard
+        reihen, spalten = int(_wert("_spin_reihen", 1)), int(_wert("_spin_spalten", 1))
+        if type_ not in RASTER_TYPEN:
+            reihen = spalten = 1
+        abstand = float(_wert("_spin_abstand", 1.0))
+        anzahl = reihen * spalten
+        orte = raster_positionen(kwargs.get("x", 0.0), kwargs.get("z", 0.0),
+                                 kwargs.get("w", 1.0), kwargs.get("d", 1.0),
+                                 reihen, spalten, abstand)
+        if not raster_passt(orte):
+            # VIZ-68 (Review A2): nicht still klemmen, sondern ablehnen.
+            eltern = self if isinstance(self, QWidget) else None
+            QMessageBox.warning(
+                eltern, "Raster zu groß",
+                f"{reihen} Reihen × {spalten} Spalten {type_label} mit "
+                f"{abstand:.2f} m Abstand reichen über ±{POSITION_GRENZE_M:.0f} m "
+                "hinaus — so weit gehen die Positionsfelder nicht.\n"
+                "Bitte weniger Reihen/Spalten oder einen kleineren Abstand wählen.")
+            return
+        if anzahl > RASTER_RUECKFRAGE_UEBER:
+            # VIZ-68 (Review A): viele Objekte nur nach Rueckfrage.
+            eltern = self if isinstance(self, QWidget) else None
+            antwort = QMessageBox.question(
+                eltern, "Viele Objekte anlegen?",
+                f"{anzahl} × {type_label} anlegen ({reihen} Reihen × {spalten} Spalten)?\n"
+                "Große Mengen machen die 3D-Ansicht langsamer.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No)
+            if antwort != QMessageBox.StandardButton.Yes:
+                return
+        neue = []
+        for i, (x, z) in enumerate(orte):
+            kw = dict(kwargs, x=x, z=z)
+            if len(orte) > 1:
+                kw["name"] = f"{kwargs['name']} {i + 1}"
+            neue.append(self._current_stage.add(type_, **kw))
+        el = neue[0]
         self._stage_dirty = True   # VIZ-10: neues Element -> ungespeichert
         # Sicherstellen, dass der Nutzer das neue Element direkt anfassen kann.
         # VIZ-14: das sind jetzt ZWEI Achsen — Bauen-Modus UND Bühnen-Tab. Wer
@@ -4192,12 +4334,24 @@ class VisualizerWindow(QMainWindow):
             print(f"[Visualizer] _add_stage_element mode-switch error: {e}")
 
         def _on_add_change():
-            if self._current_stage.get(el.id) is not None:
-                self._sync_stage_node_to_scene(el)
-                self._bridge.push_add_stage_object_data(el)
+            da = [e for e in neue if self._current_stage.get(e.id) is not None]
+            weg = [e for e in neue if self._current_stage.get(e.id) is None]
+            for e in da:
+                self._sync_stage_node_to_scene(e)
+            for e in weg:
+                self._remove_stage_node_from_scene(e.id)
+            if len(neue) == 1:
+                if da:
+                    self._bridge.push_add_stage_object_data(da[0])
+                else:
+                    self._bridge.push_remove_stage_object(weg[0].id)
             else:
-                self._remove_stage_node_from_scene(el.id)
-                self._bridge.push_remove_stage_object(el.id)
+                # VIZ-68 (Review A): EIN Push fuer die ganze Reihe statt je
+                # Element (JS serialisierte sonst je Add die ganze Liste).
+                if da:
+                    self._bridge.push_add_stage_objects_data(da)
+                if weg:
+                    self._bridge.push_remove_stage_objects([e.id for e in weg])
             # Kein Voll-Reload: Der würde bei schnell aufeinander folgenden
             # Stage-Adds ein teilweises WebGL-Echo zurück in das Modell holen.
             self._refresh_stage_tree()
@@ -4205,11 +4359,19 @@ class VisualizerWindow(QMainWindow):
 
         # VIZ-11 (Schritt 6): AddNode-Undo — Element ist bereits angelegt
         # (execute=False), Undo entfernt es wieder (inkl. Graph-Knoten).
-        _scmd.push_add_stage_element(
-            self._state, self._current_stage, el,
-            label=f"{type_label} hinzufügen",
-            on_change=_on_add_change,
-        )
+        if len(neue) == 1:
+            _scmd.push_add_stage_element(
+                self._state, self._current_stage, el,
+                label=f"{type_label} hinzufügen",
+                on_change=_on_add_change,
+            )
+        else:
+            # VIZ-68: die ganze Reihe ist EIN Undo-Schritt.
+            _scmd.push_add_stage_elements(
+                self._state, self._current_stage, neue,
+                label=f"{len(neue)}× {type_label} hinzufügen",
+                on_change=_on_add_change,
+            )
         _on_add_change()
         # Auto-Selektion (sowohl im Tree als auch im JS) -> Drag/Resize sofort moeglich
         self._selected_stage_id = el.id
@@ -4226,7 +4388,15 @@ class VisualizerWindow(QMainWindow):
         # Modus-Wechsel oben unbemerkt blieb.
         lbl = getattr(self, "_lbl_info", None)
         if lbl is not None:
-            lbl.setText(f"{type_label} hinzugefügt.")
+            lbl.setText(f"{type_label} hinzugefügt." if len(neue) == 1
+                        else f"{len(neue)}× {type_label} hinzugefügt ({reihen} × {spalten}).")
+        # VIZ-68 (Review A): das Raster gilt fuer EINEN Klick — danach wieder
+        # 1 × 1, sonst legt der naechste Knopf (z. B. eine Trasse) ungewollt
+        # wieder ein ganzes Raster an.
+        for attr in ("_spin_reihen", "_spin_spalten"):
+            w = getattr(self, attr, None)
+            if w is not None and hasattr(w, "setValue"):
+                w.setValue(1)
 
     def _selected_stage_element(self) -> Optional[StageElement]:
         it = self._stage_tree.currentItem()

@@ -1,0 +1,62 @@
+{
+  "format_version": 1,
+  "hersteller": "U King",
+  "hersteller_kurz": "UKING",
+  "modell": "ZQ01087 36W UV PAR",
+  "kurzname": "ZQ01087",
+  "typ": "par",
+  "leistung_w": 72,
+  "notizen": "Kein Herstellerhandbuch abrufbar; Kanalfolge und Wertebereiche aus der QLC+-Datei. Strobe-Kanaele ohne Wertangabe in QLC+: 0 = kein Strobe angenommen (wie bei den eingebauten U-King-Profilen). Drei UV-LED-Baenke einzeln dimmbar (3x color_uv). Kanal 7 ist die Geschwindigkeit fuer die Programme aus Kanal 6. QLC+ nennt 72 W Leistungsaufnahme.",
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition UKing-36W-UV-PAR.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/UKing/UKing-36W-UV-PAR.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.0.0 Beta 3 · Lance Moore",
+    "original": "resources/fixtures/UKing/UKing-36W-UV-PAR.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 6 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): Hersteller 'UKing' -> 'U King' (wie die eingebauten LightOS-Profile der Marke); Modellname '36W PAR UV ZQ01087' -> 'ZQ01087 36W UV PAR'; Attribute korrigiert (Effect Speed (Ch6): speed->effect_speed); Strobe-Kanal ohne Bereiche (QLC+-Preset ShutterStrobeSlowFast) mit 0 = kein Strobe (open) / 1-255 Strobe versehen (Strobe); 4 Bereichs-Arten nachgezogen (Farb-/Gobo-Slots, Shake/Rotation, Prisma, Sound, Reset; Programm-Bereiche in Makro-Kanaelen ohne Farb-Art); Modellname mit Artikelnummer vorn; Kanalnamen der UV-Baenke gekuerzt; einzelne Kanalnamen deutsch bzw. eindeutiger benannt"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Originaldatei geprueft und nach den LightOS-Regeln (SCHEMA.md) nachbearbeitet; ein Herstellerhandbuch war nicht abrufbar (U'King-Anleitungen nur als Amazon-/manuals.plus-PDF, dort gesperrt; ManualsLib fuehrt das Modell nicht), daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "7 Channel",
+      "kanaele": [
+        {"name": "Master dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "UV Bank 1", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "UV Bank 2", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "UV Bank 3", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Kein Strobe (offen)", "art": "open"},
+            {"von": 1, "bis": 255, "name": "Strobe langsam → schnell", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Programme / Sound",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Manual Control (Ch1 - 5)", "art": ""},
+            {"von": 11, "bis": 60, "name": "Colors Selection (By Ch7)", "art": ""},
+            {"von": 61, "bis": 110, "name": "Colors Shade (By Ch7)", "art": ""},
+            {"von": 111, "bis": 160, "name": "Colors Pulse Transform (By Ch7)", "art": ""},
+            {"von": 161, "bis": 210, "name": "Colors Transition (By Ch7)", "art": ""},
+            {"von": 211, "bis": 255, "name": "Sound Active Mode", "art": "sound"}
+          ]
+        },
+        {"name": "Effect Speed (Ch6)", "attribut": "effect_speed", "default": 0, "highlight": 0}
+      ]
+    }
+  ]
+}

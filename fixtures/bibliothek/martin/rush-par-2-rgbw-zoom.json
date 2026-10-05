@@ -1,0 +1,120 @@
+{
+  "format_version": 1,
+  "hersteller": "Martin",
+  "hersteller_kurz": "Martin",
+  "modell": "RUSH Par 2 RGBW Zoom",
+  "kurzname": "RUSHPAR2Z",
+  "typ": "par",
+  "leistung_w": 151,
+  "quelle": {
+    "titel": "RUSH PAR 2 RGBW Zoom User Manual",
+    "version": "Rev. I",
+    "url": "https://www.martin.com/en/site_elements/martin-rush-par-2-rgbw-zoom-user-manual"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.0.0 Beta 3 · jeremy-AMMD, Giacomo Gorini",
+    "original": "resources/fixtures/Martin/Martin-RUSH-Par-2-RGBW-Zoom.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 54 Wertebereiche mit Art (kind) versehen; gegen Martin-Handbuch Rev. I abgeglichen: Zoom-Default/-Highlight 128 (Handbuch-Default), Shutter-Default/-Highlight 12 (Handbuch-Default, offen); Zufallsfarben ohne Art 'color' (sind keine Festfarbe), deutsche Beschriftung der Bereiche; kurzname RUSHPAR2Z, leistung_w 151 laut Handbuch"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": true,
+    "wie": "Beide Modi Kanal fuer Kanal gegen die DMX-Tabelle im Martin-Handbuch (RUSH PAR 2 RGBW Zoom User Manual, Rev. I, S. 25-26) geprueft, inkl. Default-Werte; nicht am Geraet"
+  },
+  "modi": [
+    {
+      "name": "5 Channel",
+      "kanaele": [
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Zoom (weit → eng)", "attribut": "zoom", "default": 128, "highlight": 128}
+      ]
+    },
+    {
+      "name": "9 Channel",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Dimmer fein", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Shutter/Strobe",
+          "attribut": "shutter",
+          "default": 12,
+          "highlight": 12,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Aus (zu)", "art": "closed"},
+            {"von": 8, "bis": 15, "name": "Offen", "art": "open"},
+            {"von": 16, "bis": 131, "name": "Strobe langsam → schnell", "art": "strobe"},
+            {"von": 132, "bis": 139, "name": "Offen", "art": "open"},
+            {"von": 140, "bis": 181, "name": "Puls: schnell zu, langsam auf", "art": "strobe"},
+            {"von": 182, "bis": 189, "name": "Offen", "art": "open"},
+            {"von": 190, "bis": 231, "name": "Puls: schnell auf, langsam zu", "art": "strobe"},
+            {"von": 232, "bis": 239, "name": "Offen", "art": "open"},
+            {"von": 240, "bis": 247, "name": "Zufalls-Strobe", "art": "strobe"},
+            {"von": 248, "bis": 255, "name": "Offen", "art": "open"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Farbpresets (Farbrad-Effekt)",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Offen (Weiss)", "art": "open"},
+            {"von": 11, "bis": 15, "name": "Farbe 1", "art": "color"},
+            {"von": 16, "bis": 20, "name": "Farbe 2", "art": "color"},
+            {"von": 21, "bis": 25, "name": "Farbe 3", "art": "color"},
+            {"von": 26, "bis": 30, "name": "Farbe 4", "art": "color"},
+            {"von": 31, "bis": 35, "name": "Farbe 5", "art": "color"},
+            {"von": 36, "bis": 40, "name": "Farbe 6", "art": "color"},
+            {"von": 41, "bis": 45, "name": "Farbe 7", "art": "color"},
+            {"von": 46, "bis": 50, "name": "Farbe 8", "art": "color"},
+            {"von": 51, "bis": 55, "name": "Farbe 9", "art": "color"},
+            {"von": 56, "bis": 60, "name": "Farbe 10", "art": "color"},
+            {"von": 61, "bis": 65, "name": "Farbe 11", "art": "color"},
+            {"von": 66, "bis": 70, "name": "Farbe 12", "art": "color"},
+            {"von": 71, "bis": 75, "name": "Farbe 13", "art": "color"},
+            {"von": 76, "bis": 80, "name": "Farbe 14", "art": "color"},
+            {"von": 81, "bis": 85, "name": "Farbe 15", "art": "color"},
+            {"von": 86, "bis": 90, "name": "Farbe 16", "art": "color"},
+            {"von": 91, "bis": 95, "name": "Farbe 17", "art": "color"},
+            {"von": 96, "bis": 100, "name": "Farbe 18", "art": "color"},
+            {"von": 101, "bis": 105, "name": "Farbe 19", "art": "color"},
+            {"von": 106, "bis": 110, "name": "Farbe 20", "art": "color"},
+            {"von": 111, "bis": 115, "name": "Farbe 21", "art": "color"},
+            {"von": 116, "bis": 120, "name": "Farbe 22", "art": "color"},
+            {"von": 121, "bis": 125, "name": "Farbe 23", "art": "color"},
+            {"von": 126, "bis": 130, "name": "Farbe 24", "art": "color"},
+            {"von": 131, "bis": 135, "name": "Farbe 25", "art": "color"},
+            {"von": 136, "bis": 140, "name": "Farbe 26", "art": "color"},
+            {"von": 141, "bis": 145, "name": "Farbe 27", "art": "color"},
+            {"von": 146, "bis": 150, "name": "Farbe 28", "art": "color"},
+            {"von": 151, "bis": 155, "name": "Farbe 29", "art": "color"},
+            {"von": 156, "bis": 160, "name": "Farbe 30", "art": "color"},
+            {"von": 161, "bis": 165, "name": "Farbe 31", "art": "color"},
+            {"von": 166, "bis": 170, "name": "Farbe 32", "art": "color"},
+            {"von": 171, "bis": 175, "name": "Farbe 33", "art": "color"},
+            {"von": 176, "bis": 180, "name": "Farbe 34", "art": "color"},
+            {"von": 181, "bis": 185, "name": "Farbe 35", "art": "color"},
+            {"von": 186, "bis": 190, "name": "Farbe 36", "art": "color"},
+            {"von": 191, "bis": 192, "name": "Offen (Weiss)", "art": "open"},
+            {"von": 193, "bis": 214, "name": "Farbdurchlauf vorwaerts, schnell → langsam", "art": "rotate"},
+            {"von": 215, "bis": 221, "name": "Farbdurchlauf Stopp"},
+            {"von": 222, "bis": 243, "name": "Farbdurchlauf rueckwaerts, langsam → schnell", "art": "rotate"},
+            {"von": 244, "bis": 247, "name": "Zufallsfarbe schnell"},
+            {"von": 248, "bis": 251, "name": "Zufallsfarbe mittel"},
+            {"von": 252, "bis": 255, "name": "Zufallsfarbe langsam"}
+          ]
+        },
+        {"name": "Zoom (weit → eng)", "attribut": "zoom", "default": 128, "highlight": 128}
+      ]
+    }
+  ]
+}

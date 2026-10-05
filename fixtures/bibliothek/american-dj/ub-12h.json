@@ -16,7 +16,7 @@
     "lizenz": "Apache-2.0",
     "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.3 GIT · Jason R Johnston",
     "original": "resources/fixtures/American_DJ/American-DJ-UB-12H.qxf",
-    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 182 Wertebereiche mit Art (kind) versehen; Rasterform in 4 Modus/Modi aus <Physical> uebernommen; danach von LightOS gegen das Herstellerhandbuch ueberarbeitet: Dimmerkurven-Kanal als raw (Default 0, Highlight 0) statt intensity/macro; Shutter-Bereiche nach Handbuch klassifiziert (aus=closed, LED an=open, alle Strobe-/Puls-/Random-/Rampen-Bereiche=strobe), Default/Highlight auf Mitte des ersten Offen-Bereichs; Farbmakros einheitlich mit Art color (QLC+ hatte ab 3er-Kombinationen keine Art); Programmgeschwindigkeit als effect_speed statt macro (Bereich war faelschlich sound); 36-Kanal-Modus Raster 1x6 (6 Sektionen je 2 LEDs)"
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 182 Wertebereiche mit Art (kind) versehen; Rasterform in 1 Modus/Modi aus <Physical> uebernommen; in 3 weiteren Modus/Modi nicht, weil sie nicht zu den color_r-Kanaelen passt (keine echten Farbzonen); danach von LightOS gegen das Herstellerhandbuch ueberarbeitet: Dimmerkurven-Kanal als raw (Default 0, Highlight 0) statt intensity/macro; Shutter-Bereiche nach Handbuch klassifiziert (aus=closed, LED an=open, alle Strobe-/Puls-/Random-/Rampen-Bereiche=strobe), Default/Highlight auf Mitte des ersten Offen-Bereichs; Farbmakros einheitlich mit Art color (QLC+ hatte ab 3er-Kombinationen keine Art); Programmgeschwindigkeit als effect_speed statt macro (Bereich war faelschlich sound); 36-Kanal-Modus Raster 1x6 (6 Sektionen je 2 LEDs)"
   },
   "autor": "LightOS",
   "geprueft": {
@@ -26,7 +26,6 @@
   "modi": [
     {
       "name": "6 Channel",
-      "raster": {"rows": 1, "cols": 12},
       "kanaele": [
         {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
         {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
@@ -38,7 +37,6 @@
     },
     {
       "name": "10 Channel",
-      "raster": {"rows": 1, "cols": 12},
       "kanaele": [
         {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
         {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
@@ -153,7 +151,6 @@
     },
     {
       "name": "12 Channel",
-      "raster": {"rows": 1, "cols": 12},
       "kanaele": [
         {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
         {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},

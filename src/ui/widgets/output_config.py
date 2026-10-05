@@ -933,6 +933,7 @@ class OutputConfigDialog(QDialog):
             om.add_enttec(univ, port)
             # QA-50: „(gespeichert)" nur sagen, wenn es auch gespeichert ist.
             gespeichert = _persist_output(univ, "Enttec", port)
+            self._univ_tabelle_nachladen()   # OUT-58, wie A3D-15 beim Art-Net
             # ★ OUT-51: NICHT „Verbunden" melden. `add_enttec` startet den
             # Serial-Worker, mehr weiss es in diesem Moment nicht — der Port
             # kann tot sein, und dann stand hier trotzdem gruen „Verbunden".
@@ -1074,10 +1075,7 @@ class OutputConfigDialog(QDialog):
         # „Speichern" im Universen-Tab wuerde sie aus der (stalen, leeren) Ext-Zelle
         # ueberschreiben. Tabelle neu laden, damit die Ext-Zelle den aktuellen Stand
         # zeigt und Tab und Datei konsistent bleiben.
-        try:
-            self._univ_load_table()
-        except Exception:
-            pass
+        self._univ_tabelle_nachladen()
         _ext_txt = f" → Art-Net-Universe {start}" if out_u is not None else ""
         # QA-50: „(gespeichert)" nur, wenn die Datei wirklich geschrieben wurde.
         self._lbl_artnet_status.setText(
@@ -1085,6 +1083,17 @@ class OutputConfigDialog(QDialog):
             f"{'(gespeichert)' if gespeichert else '(NICHT gespeichert!)'}")
 
     # ── Universe Manager ─────────────────────────────────────────────────────
+
+    def _univ_tabelle_nachladen(self):
+        """Universen-Tab nach einem „Übernehmen"/„Verbinden" neu aus der Datei
+        laden. Die Tabelle wird sonst nur beim Dialogbau gefuellt; ein spaeteres
+        „Speichern" dort schrieb die alte Zeile zurueck und loeschte damit, was
+        der Ausgabe-Tab eben gespeichert hatte. A3D-15 tat das nur fuer Art-Net;
+        Enttec-„Verbinden" und sACN-„Übernehmen" liessen die Tabelle stehen (OUT-58)."""
+        try:
+            self._univ_load_table()
+        except Exception as e:
+            print(f"[output_config] ERROR: Universen-Tabelle nicht neu geladen: {e}")
 
     def _univ_load_table(self):
         rows = _load_universe_config()
@@ -1278,6 +1287,7 @@ class OutputConfigDialog(QDialog):
             state.output_manager.add_sacn(univ, target_ip)
             self._sacn_active_univ = univ   # MU-02: fuer korrektes Abwaehlen merken
             gespeichert = _persist_output(univ, "sACN", target_ip or "")
+            self._univ_tabelle_nachladen()   # OUT-58, wie A3D-15 beim Art-Net
             mode = "Multicast (239.255.0.x)" if target_ip is None else f"Unicast → {target_ip}"
             # QA-50: Der Adapter laeuft — aber ob die Zeile auf der Platte steht,
             # ist eine zweite Frage. Vorher stand „(gespeichert)" auch dann da,

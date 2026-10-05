@@ -1,0 +1,127 @@
+{
+  "format_version": 1,
+  "hersteller": "U King",
+  "hersteller_kurz": "UKING",
+  "modell": "ZQ-B370 Laser",
+  "kurzname": "ZQB370",
+  "typ": "laser",
+  "leistung_w": 30,
+  "notizen": "Kein Herstellerhandbuch abrufbar; Kanalfolge und Wertebereiche aus der QLC+-Datei. Strobe-Kanaele ohne Wertangabe in QLC+: 0 = kein Strobe angenommen (wie bei den eingebauten U-King-Profilen). Pan/Tilt verschieben das Laserbild (X/Y), keine Motoren.",
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition UKing-ZQB370-Laser.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/UKing/UKing-ZQB370-Laser.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.6 GIT · Sidde Persson",
+    "original": "resources/fixtures/UKing/UKing-ZQB370-Laser.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 59 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): Hersteller 'UKing' -> 'U King' (wie die eingebauten LightOS-Profile der Marke); Modellname 'ZQ-B370' -> 'ZQ-B370 Laser'; Attribute korrigiert (Dynamic Pattern Play Speed: speed->effect_speed; Pan: pan->laser_x; Pattern Selection: macro->laser_bank; Scanning Speed: speed->laser_scan_rate; Static Pattern Size: raw->zoom; Tilt: tilt->laser_y); Laser-Kanaele auf Laser-Attribute (laser_bank/laser_x/laser_y/laser_scan_rate) statt macro/pan/tilt/speed; einzelne Kanalnamen deutsch bzw. eindeutiger benannt"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": false,
+    "wie": "Kanal fuer Kanal gegen die QLC+-Originaldatei geprueft und nach den LightOS-Regeln (SCHEMA.md) nachbearbeitet; ein Herstellerhandbuch war nicht abrufbar (U'King-Anleitungen nur als Amazon-/manuals.plus-PDF, dort gesperrt; ManualsLib fuehrt das Modell nicht), daher nicht gegen das Handbuch geprueft"
+  },
+  "modi": [
+    {
+      "name": "Standard",
+      "kanaele": [
+        {
+          "name": "Betriebsart",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 49, "name": "Laser Off", "art": ""},
+            {"von": 50, "bis": 99, "name": "Static Pattern", "art": ""},
+            {"von": 100, "bis": 149, "name": "Dynamic Pattern", "art": ""},
+            {"von": 150, "bis": 199, "name": "Sound active", "art": "sound"},
+            {"von": 200, "bis": 255, "name": "Auto mode", "art": ""}
+          ]
+        },
+        {
+          "name": "Muster",
+          "attribut": "laser_bank",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 4, "name": "Circle", "art": ""},
+            {"von": 5, "bis": 9, "name": "Dot Circle 1", "art": ""},
+            {"von": 10, "bis": 14, "name": "Dot Circle 2", "art": ""},
+            {"von": 15, "bis": 19, "name": "Scan Circle", "art": ""},
+            {"von": 20, "bis": 24, "name": "Horizontal line", "art": ""},
+            {"von": 25, "bis": 29, "name": "Horizontal dot line", "art": ""},
+            {"von": 30, "bis": 34, "name": "Vertical line", "art": ""},
+            {"von": 35, "bis": 39, "name": "Vertical dot line", "art": ""},
+            {"von": 40, "bis": 44, "name": "45' diagonal", "art": ""},
+            {"von": 45, "bis": 49, "name": "Dot Diagonal 1", "art": ""},
+            {"von": 50, "bis": 54, "name": "135' Diagonal", "art": ""},
+            {"von": 55, "bis": 59, "name": "Dot Diagonal 2", "art": ""},
+            {"von": 60, "bis": 64, "name": "V Line 1", "art": ""},
+            {"von": 65, "bis": 69, "name": "V Dot Line 1", "art": ""},
+            {"von": 70, "bis": 74, "name": "V line 2", "art": ""},
+            {"von": 75, "bis": 79, "name": "V Dot line 2", "art": ""},
+            {"von": 80, "bis": 84, "name": "Triangle 1", "art": ""},
+            {"von": 85, "bis": 89, "name": "Dot triangle 1", "art": ""},
+            {"von": 90, "bis": 94, "name": "Triangle 2", "art": ""},
+            {"von": 95, "bis": 99, "name": "Dot Triangle 2", "art": ""},
+            {"von": 100, "bis": 104, "name": "Square", "art": ""},
+            {"von": 105, "bis": 109, "name": "Dot Square", "art": ""},
+            {"von": 110, "bis": 114, "name": "Rectangle 1", "art": ""},
+            {"von": 115, "bis": 119, "name": "Dot Rectangle 1", "art": ""},
+            {"von": 120, "bis": 124, "name": "Rectangle 2", "art": ""},
+            {"von": 125, "bis": 129, "name": "Dot Rectangle 2", "art": ""},
+            {"von": 130, "bis": 134, "name": "Christcross", "art": ""},
+            {"von": 135, "bis": 139, "name": "Chiasma Line", "art": ""},
+            {"von": 140, "bis": 144, "name": "Horizontal Extend Line", "art": ""},
+            {"von": 145, "bis": 149, "name": "Horizontal Shrink Line", "art": ""},
+            {"von": 150, "bis": 154, "name": "Horizontal Flex Line", "art": ""},
+            {"von": 155, "bis": 159, "name": "Horizontal Flex Dot Line", "art": ""},
+            {"von": 160, "bis": 164, "name": "Vertical Extend Line", "art": ""},
+            {"von": 165, "bis": 169, "name": "Vertical Shrink Line", "art": ""},
+            {"von": 170, "bis": 174, "name": "Vertical Flex Line", "art": ""},
+            {"von": 175, "bis": 179, "name": "Vertical Flex Dot Line", "art": ""},
+            {"von": 180, "bis": 184, "name": "Ladder Line 1", "art": ""},
+            {"von": 185, "bis": 189, "name": "Ladder Line 2", "art": ""},
+            {"von": 190, "bis": 194, "name": "Ladder Line 3", "art": ""},
+            {"von": 195, "bis": 199, "name": "Ladder Line 4", "art": ""},
+            {"von": 200, "bis": 204, "name": "Tetragon 1", "art": ""},
+            {"von": 205, "bis": 209, "name": "Tetragon 2", "art": ""},
+            {"von": 210, "bis": 214, "name": "Pentagon 1", "art": ""},
+            {"von": 215, "bis": 219, "name": "Pentagon 2", "art": ""},
+            {"von": 220, "bis": 224, "name": "Pentagon 3", "art": ""},
+            {"von": 225, "bis": 229, "name": "Pentagon 4", "art": ""},
+            {"von": 230, "bis": 234, "name": "Wave Line", "art": ""},
+            {"von": 235, "bis": 239, "name": "Wave Dot Line", "art": ""},
+            {"von": 240, "bis": 244, "name": "Spirality line", "art": ""},
+            {"von": 245, "bis": 249, "name": "Many Dot 1", "art": ""},
+            {"von": 250, "bis": 254, "name": "Many Dot 2", "art": ""},
+            {"von": 255, "bis": 255, "name": "Square Dot", "art": ""}
+          ]
+        },
+        {"name": "Bild X", "attribut": "laser_x", "default": 128, "highlight": 128},
+        {"name": "Bild Y", "attribut": "laser_y", "default": 128, "highlight": 128},
+        {
+          "name": "Scan-Geschwindigkeit",
+          "attribut": "laser_scan_rate",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Speed", "art": ""}
+          ]
+        },
+        {
+          "name": "Tempo dynamische Muster",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Dynamic Speed", "art": ""}
+          ]
+        },
+        {"name": "Mustergroesse", "attribut": "zoom", "default": 0, "highlight": 0}
+      ]
+    }
+  ]
+}

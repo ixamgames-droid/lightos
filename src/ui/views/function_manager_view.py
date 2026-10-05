@@ -309,6 +309,11 @@ class FunctionManagerView(QWidget):
 
     def _refresh_running_state(self):
         """Make bold the items whose function is currently running."""
+        # VIZ-70: unsichtbar (anderer Reiter, Fenster minimiert) nichts tun —
+        # der Dauer-Takt lief sonst im UI-Thread weiter; der naechste Takt nach
+        # dem Einblenden holt den Stand nach.
+        if not self.isVisible() or self.window().isMinimized():
+            return
         bold_font = QFont()
         bold_font.setBold(True)
         normal_font = QFont()

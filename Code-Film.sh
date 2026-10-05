@@ -7,11 +7,10 @@
 #  Bedienung:  Esc = beenden, Leertaste = Pause,
 #              Mausrad = Zoom, Ziehen = Kamera, Tab = Dateien
 #
-#  Linux-Pendant zu Code-Film.bat. WARUM getrennt statt gemeinsam:
-#  unter Windows liegt Gource mitgeliefert in tools/gource/ (PE32+ —
-#  auf Linux nicht ausfuehrbar), hier kommt es aus der Distribution.
-#  Dieselben Parameter, damit beide Seiten denselben Film erzeugen —
-#  wer einen aendert, aendert bitte beide.
+#  Linux-Pendant zu Code-Film.bat. Gource kommt hier aus der
+#  Distribution (seit TOOL-2 liegt auch fuer Windows keine Fassung mehr
+#  im Repo). Dieselben Parameter, damit beide Seiten denselben Film
+#  erzeugen — wer einen aendert, aendert bitte beide.
 # ============================================================
 set -u
 cd "$(dirname "$0")" || exit 2
@@ -21,9 +20,6 @@ if ! command -v gource >/dev/null 2>&1; then
     echo "            Debian/Ubuntu/Mint:  sudo apt install gource"
     echo "            Fedora:              sudo dnf install gource"
     echo "            Arch:                sudo pacman -S gource"
-    echo
-    echo "            (Die mitgelieferte tools/gource/ ist die WINDOWS-Fassung"
-    echo "             und laeuft hier nicht — deshalb der Paketmanager.)"
     exit 1
 fi
 

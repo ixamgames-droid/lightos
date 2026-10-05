@@ -1,0 +1,348 @@
+{
+  "format_version": 1,
+  "hersteller": "Tomshine",
+  "hersteller_kurz": "Tomshine",
+  "modell": "Mini Gobo Moving Head",
+  "kurzname": "TS-MINIGOBO",
+  "typ": "moving_head",
+  "leistung_w": 80,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Tomshine-Mini-Gobo-Moving-Head.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Tomshine/Tomshine-Mini-Gobo-Moving-Head.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.5 GIT · Gaudig",
+    "original": "resources/fixtures/Tomshine/Tomshine-Mini-Gobo-Moving-Head.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 170 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): kurzname TS-MINIGOBO; Bereichs-Arten korrigiert (u. a. „Preset“ nicht als Reset, Farben/Offen auf Farbrad, Open/Shake/Rotation auf Goborad, Prisma/Frost, keine Farb-/Dreh-Kacheln auf Makro-/Speed-Kanaelen, Sound-Bereiche); Steuerkanal mit Reset-Bereich als reset; Shutter-Default/Highlight auf den Offen-Wert gesetzt"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": false,
+    "wie": "nicht gegen ein Herstellerhandbuch geprueft (kein oeffentliches Shehds-Handbuch zu diesem Modell auffindbar); Kanalbelegung und Wertebereiche aus der QLC+-Vorlage, Attribute, Bereichs-Arten und Defaults von LightOS plausibilisiert"
+  },
+  "modi": [
+    {
+      "name": "Normal",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 3,
+          "highlight": 3,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "No function", "art": "open"},
+            {"von": 8, "bis": 99, "name": "Slow to fast", "art": "strobe"},
+            {"von": 100, "bis": 149, "name": "Fast to slow", "art": "strobe"},
+            {"von": 150, "bis": 199, "name": "Strobe Effect 1", "art": "strobe"},
+            {"von": 200, "bis": 245, "name": "Strobe Effect 2", "art": "strobe"},
+            {"von": 246, "bis": 255, "name": "Fastest Strobe Effect", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Color wheel",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "White", "art": "open"},
+            {"von": 8, "bis": 15, "name": "Red", "art": "color"},
+            {"von": 16, "bis": 23, "name": "Green", "art": "color"},
+            {"von": 24, "bis": 31, "name": "Blue", "art": "color"},
+            {"von": 32, "bis": 39, "name": "Yellow", "art": "color"},
+            {"von": 40, "bis": 47, "name": "Orange", "art": "color"},
+            {"von": 48, "bis": 55, "name": "Light Blue", "art": "color"},
+            {"von": 56, "bis": 63, "name": "Cyan", "art": "color"},
+            {"von": 64, "bis": 71, "name": "White/Red", "art": "color"},
+            {"von": 72, "bis": 79, "name": "Red/Green", "art": "color"},
+            {"von": 80, "bis": 87, "name": "Green/Blue", "art": "color"},
+            {"von": 88, "bis": 95, "name": "Blue/Yellow", "art": "color"},
+            {"von": 96, "bis": 103, "name": "Yellow/Orange", "art": "color"},
+            {"von": 104, "bis": 111, "name": "Orange/LightBlue", "art": "color"},
+            {"von": 112, "bis": 119, "name": "LightBlue/Cyan", "art": "color"},
+            {"von": 120, "bis": 127, "name": "Cyan/White", "art": "color"},
+            {"von": 128, "bis": 191, "name": "Color Change FWD"},
+            {"von": 192, "bis": 255, "name": "Color Change REV"}
+          ]
+        },
+        {
+          "name": "Gobo wheel",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Open", "art": "open"},
+            {"von": 8, "bis": 15, "name": "Double Lines Star", "art": "gobo"},
+            {"von": 16, "bis": 23, "name": "Square Arrows", "art": "gobo"},
+            {"von": 24, "bis": 31, "name": "Fan", "art": "gobo"},
+            {"von": 32, "bis": 39, "name": "Star", "art": "gobo"},
+            {"von": 40, "bis": 47, "name": "Stones", "art": "gobo"},
+            {"von": 48, "bis": 55, "name": "Eliptic", "art": "gobo"},
+            {"von": 56, "bis": 63, "name": "Caro Flower", "art": "gobo"},
+            {"von": 64, "bis": 71, "name": "Open Shake", "art": "shake"},
+            {"von": 72, "bis": 79, "name": "Double Lines Star Shake", "art": "shake"},
+            {"von": 80, "bis": 87, "name": "Square Arrows Shake", "art": "shake"},
+            {"von": 88, "bis": 95, "name": "Fan Shake", "art": "shake"},
+            {"von": 96, "bis": 103, "name": "Star Shake", "art": "shake"},
+            {"von": 104, "bis": 111, "name": "Stones Shake", "art": "shake"},
+            {"von": 112, "bis": 119, "name": "Eliptic Shake", "art": "shake"},
+            {"von": 120, "bis": 127, "name": "Caro Flower Shake", "art": "shake"},
+            {"von": 128, "bis": 191, "name": "Gobo Switch FWD", "art": "gobo"},
+            {"von": 192, "bis": 255, "name": "Gobo Switch REV", "art": "gobo"}
+          ]
+        },
+        {
+          "name": "Sound Mode",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Manual", "art": ""},
+            {"von": 128, "bis": 255, "name": "Auto Mode", "art": ""}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 240, "name": "No function", "art": ""},
+            {"von": 241, "bis": 255, "name": "RESET", "art": "reset"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "9 Channel (2022)",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {
+          "name": "Color wheel",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "White", "art": "open"},
+            {"von": 8, "bis": 15, "name": "Red", "art": "color"},
+            {"von": 16, "bis": 23, "name": "Green", "art": "color"},
+            {"von": 24, "bis": 31, "name": "Blue", "art": "color"},
+            {"von": 32, "bis": 39, "name": "Yellow", "art": "color"},
+            {"von": 40, "bis": 47, "name": "Orange", "art": "color"},
+            {"von": 48, "bis": 55, "name": "Light Blue", "art": "color"},
+            {"von": 56, "bis": 63, "name": "Cyan", "art": "color"},
+            {"von": 64, "bis": 71, "name": "White/Red", "art": "color"},
+            {"von": 72, "bis": 79, "name": "Red/Green", "art": "color"},
+            {"von": 80, "bis": 87, "name": "Green/Blue", "art": "color"},
+            {"von": 88, "bis": 95, "name": "Blue/Yellow", "art": "color"},
+            {"von": 96, "bis": 103, "name": "Yellow/Orange", "art": "color"},
+            {"von": 104, "bis": 111, "name": "Orange/LightBlue", "art": "color"},
+            {"von": 112, "bis": 119, "name": "LightBlue/Cyan", "art": "color"},
+            {"von": 120, "bis": 127, "name": "Cyan/White", "art": "color"},
+            {"von": 128, "bis": 191, "name": "Color Change FWD"},
+            {"von": 192, "bis": 255, "name": "Color Change REV"}
+          ]
+        },
+        {
+          "name": "Gobo wheel",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Open", "art": "open"},
+            {"von": 8, "bis": 15, "name": "Double Lines Star", "art": "gobo"},
+            {"von": 16, "bis": 23, "name": "Square Arrows", "art": "gobo"},
+            {"von": 24, "bis": 31, "name": "Fan", "art": "gobo"},
+            {"von": 32, "bis": 39, "name": "Star", "art": "gobo"},
+            {"von": 40, "bis": 47, "name": "Stones", "art": "gobo"},
+            {"von": 48, "bis": 55, "name": "Eliptic", "art": "gobo"},
+            {"von": 56, "bis": 63, "name": "Caro Flower", "art": "gobo"},
+            {"von": 64, "bis": 71, "name": "Open Shake", "art": "shake"},
+            {"von": 72, "bis": 79, "name": "Double Lines Star Shake", "art": "shake"},
+            {"von": 80, "bis": 87, "name": "Square Arrows Shake", "art": "shake"},
+            {"von": 88, "bis": 95, "name": "Fan Shake", "art": "shake"},
+            {"von": 96, "bis": 103, "name": "Star Shake", "art": "shake"},
+            {"von": 104, "bis": 111, "name": "Stones Shake", "art": "shake"},
+            {"von": 112, "bis": 119, "name": "Eliptic Shake", "art": "shake"},
+            {"von": 120, "bis": 127, "name": "Caro Flower Shake", "art": "shake"},
+            {"von": 128, "bis": 191, "name": "Gobo Switch FWD", "art": "gobo"},
+            {"von": 192, "bis": 255, "name": "Gobo Switch REV", "art": "gobo"}
+          ]
+        },
+        {
+          "name": "Strobe (2022)",
+          "attribut": "shutter",
+          "default": 11,
+          "highlight": 11,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Control light is off, the light is off", "art": "closed"},
+            {"von": 8, "bis": 15, "name": "Turn on the light", "art": "open"},
+            {"von": 16, "bis": 131, "name": "Control the light strobe speed, from fast to slow", "art": "strobe"},
+            {"von": 132, "bis": 139, "name": "Turn on the light", "art": "open"},
+            {"von": 140, "bis": 181, "name": "Control light quickly closed, slowly open", "art": "strobe"},
+            {"von": 182, "bis": 189, "name": "Turn on the light", "art": "open"},
+            {"von": 190, "bis": 231, "name": "The control light turns on quickly, turns off slowly", "art": "strobe"},
+            {"von": 232, "bis": 239, "name": "Turn on the light", "art": "open"},
+            {"von": 240, "bis": 247, "name": "Control light random stroboscopic", "art": "strobe"},
+            {"von": 248, "bis": 255, "name": "Turn on the light", "art": "open"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Pan/Tilt speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Function",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 69, "name": "No function", "art": ""},
+            {"von": 70, "bis": 79, "name": "The light is shut off when the X/Y axis is rotated"},
+            {"von": 80, "bis": 89, "name": "No function", "art": ""},
+            {"von": 90, "bis": 99, "name": "Lights turn off then the color wheel is turned"},
+            {"von": 100, "bis": 109, "name": "No function", "art": ""},
+            {"von": 110, "bis": 119, "name": "The light shut off when the gobo is turned"},
+            {"von": 120, "bis": 199, "name": "No function", "art": ""},
+            {"von": 200, "bis": 209, "name": "Reset", "art": "reset"},
+            {"von": 210, "bis": 249, "name": "No function", "art": ""},
+            {"von": 250, "bis": 255, "name": "Voice control function", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Effects",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 20, "name": "Standard lighting effects", "art": ""},
+            {"von": 21, "bis": 40, "name": "Stage lighting effects", "art": ""},
+            {"von": 41, "bis": 60, "name": "TV lighting effects", "art": ""},
+            {"von": 61, "bis": 80, "name": "Architectural lighting effects", "art": ""},
+            {"von": 81, "bis": 100, "name": "Theater lighting effects", "art": ""},
+            {"von": 101, "bis": 255, "name": "Default standard lamp effect", "art": ""}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "11 Channel (2022)",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Color wheel",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "White", "art": "open"},
+            {"von": 8, "bis": 15, "name": "Red", "art": "color"},
+            {"von": 16, "bis": 23, "name": "Green", "art": "color"},
+            {"von": 24, "bis": 31, "name": "Blue", "art": "color"},
+            {"von": 32, "bis": 39, "name": "Yellow", "art": "color"},
+            {"von": 40, "bis": 47, "name": "Orange", "art": "color"},
+            {"von": 48, "bis": 55, "name": "Light Blue", "art": "color"},
+            {"von": 56, "bis": 63, "name": "Cyan", "art": "color"},
+            {"von": 64, "bis": 71, "name": "White/Red", "art": "color"},
+            {"von": 72, "bis": 79, "name": "Red/Green", "art": "color"},
+            {"von": 80, "bis": 87, "name": "Green/Blue", "art": "color"},
+            {"von": 88, "bis": 95, "name": "Blue/Yellow", "art": "color"},
+            {"von": 96, "bis": 103, "name": "Yellow/Orange", "art": "color"},
+            {"von": 104, "bis": 111, "name": "Orange/LightBlue", "art": "color"},
+            {"von": 112, "bis": 119, "name": "LightBlue/Cyan", "art": "color"},
+            {"von": 120, "bis": 127, "name": "Cyan/White", "art": "color"},
+            {"von": 128, "bis": 191, "name": "Color Change FWD"},
+            {"von": 192, "bis": 255, "name": "Color Change REV"}
+          ]
+        },
+        {
+          "name": "Gobo wheel",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Open", "art": "open"},
+            {"von": 8, "bis": 15, "name": "Double Lines Star", "art": "gobo"},
+            {"von": 16, "bis": 23, "name": "Square Arrows", "art": "gobo"},
+            {"von": 24, "bis": 31, "name": "Fan", "art": "gobo"},
+            {"von": 32, "bis": 39, "name": "Star", "art": "gobo"},
+            {"von": 40, "bis": 47, "name": "Stones", "art": "gobo"},
+            {"von": 48, "bis": 55, "name": "Eliptic", "art": "gobo"},
+            {"von": 56, "bis": 63, "name": "Caro Flower", "art": "gobo"},
+            {"von": 64, "bis": 71, "name": "Open Shake", "art": "shake"},
+            {"von": 72, "bis": 79, "name": "Double Lines Star Shake", "art": "shake"},
+            {"von": 80, "bis": 87, "name": "Square Arrows Shake", "art": "shake"},
+            {"von": 88, "bis": 95, "name": "Fan Shake", "art": "shake"},
+            {"von": 96, "bis": 103, "name": "Star Shake", "art": "shake"},
+            {"von": 104, "bis": 111, "name": "Stones Shake", "art": "shake"},
+            {"von": 112, "bis": 119, "name": "Eliptic Shake", "art": "shake"},
+            {"von": 120, "bis": 127, "name": "Caro Flower Shake", "art": "shake"},
+            {"von": 128, "bis": 191, "name": "Gobo Switch FWD", "art": "gobo"},
+            {"von": 192, "bis": 255, "name": "Gobo Switch REV", "art": "gobo"}
+          ]
+        },
+        {
+          "name": "Strobe (2022)",
+          "attribut": "shutter",
+          "default": 11,
+          "highlight": 11,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "Control light is off, the light is off", "art": "closed"},
+            {"von": 8, "bis": 15, "name": "Turn on the light", "art": "open"},
+            {"von": 16, "bis": 131, "name": "Control the light strobe speed, from fast to slow", "art": "strobe"},
+            {"von": 132, "bis": 139, "name": "Turn on the light", "art": "open"},
+            {"von": 140, "bis": 181, "name": "Control light quickly closed, slowly open", "art": "strobe"},
+            {"von": 182, "bis": 189, "name": "Turn on the light", "art": "open"},
+            {"von": 190, "bis": 231, "name": "The control light turns on quickly, turns off slowly", "art": "strobe"},
+            {"von": 232, "bis": 239, "name": "Turn on the light", "art": "open"},
+            {"von": 240, "bis": 247, "name": "Control light random stroboscopic", "art": "strobe"},
+            {"von": 248, "bis": 255, "name": "Turn on the light", "art": "open"}
+          ]
+        },
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Pan/Tilt speed", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Function",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 69, "name": "No function", "art": ""},
+            {"von": 70, "bis": 79, "name": "The light is shut off when the X/Y axis is rotated"},
+            {"von": 80, "bis": 89, "name": "No function", "art": ""},
+            {"von": 90, "bis": 99, "name": "Lights turn off then the color wheel is turned"},
+            {"von": 100, "bis": 109, "name": "No function", "art": ""},
+            {"von": 110, "bis": 119, "name": "The light shut off when the gobo is turned"},
+            {"von": 120, "bis": 199, "name": "No function", "art": ""},
+            {"von": 200, "bis": 209, "name": "Reset", "art": "reset"},
+            {"von": 210, "bis": 249, "name": "No function", "art": ""},
+            {"von": 250, "bis": 255, "name": "Voice control function", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Effects",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 20, "name": "Standard lighting effects", "art": ""},
+            {"von": 21, "bis": 40, "name": "Stage lighting effects", "art": ""},
+            {"von": 41, "bis": 60, "name": "TV lighting effects", "art": ""},
+            {"von": 61, "bis": 80, "name": "Architectural lighting effects", "art": ""},
+            {"von": 81, "bis": 100, "name": "Theater lighting effects", "art": ""},
+            {"von": 101, "bis": 255, "name": "Default standard lamp effect", "art": ""}
+          ]
+        }
+      ]
+    }
+  ]
+}

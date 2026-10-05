@@ -16,7 +16,7 @@
     "lizenz": "Apache-2.0",
     "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.1 GIT · Julien Poilvilain",
     "original": "resources/fixtures/Showtec/Showtec-Sunstrip-Active.qxf",
-    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; Rasterform in 4 Modus/Modi aus <Physical> uebernommen; LightOS-Nachbearbeitung (FM-57): kurzname SUNSTRIP; Leistung 500 W (10 x GU10 50 W) statt 750 W; Raster je Modus nach Kanalzahl (1x1, 1x2, 1x5, 1x10) statt pauschal 1x10; Kanalnamen als Lampe/Lampengruppe"
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; Rasterform aus <Physical> in 4 Modus/Modi nicht uebernommen, weil sie nicht zu den color_r-Kanaelen passt (keine echten Farbzonen); LightOS-Nachbearbeitung (FM-57): kurzname SUNSTRIP; Leistung 500 W (10 x GU10 50 W) statt 750 W; Raster je Modus nach Kanalzahl (1x1, 1x2, 1x5, 1x10) statt pauschal 1x10; Kanalnamen als Lampe/Lampengruppe"
   },
   "autor": "LightOS",
   "geprueft": {
@@ -26,14 +26,12 @@
   "modi": [
     {
       "name": "1 Channel Mode",
-      "raster": {"rows": 1, "cols": 1},
       "kanaele": [
         {"name": "Alle Lampen", "attribut": "intensity", "default": 0, "highlight": 255}
       ]
     },
     {
       "name": "2 Channels Mode",
-      "raster": {"rows": 1, "cols": 2},
       "kanaele": [
         {"name": "Lampengruppe 1 (5 Lampen)", "attribut": "intensity", "default": 0, "highlight": 255},
         {"name": "Lampengruppe 2 (5 Lampen)", "attribut": "intensity", "default": 0, "highlight": 255}
@@ -41,7 +39,6 @@
     },
     {
       "name": "5 Channels Mode",
-      "raster": {"rows": 1, "cols": 5},
       "kanaele": [
         {"name": "Lampengruppe 1 (2 Lampen)", "attribut": "intensity", "default": 0, "highlight": 255},
         {"name": "Lampengruppe 2 (2 Lampen)", "attribut": "intensity", "default": 0, "highlight": 255},
@@ -52,7 +49,6 @@
     },
     {
       "name": "10 Channels Mode",
-      "raster": {"rows": 1, "cols": 10},
       "kanaele": [
         {"name": "Lampe 1", "attribut": "intensity", "default": 0, "highlight": 255},
         {"name": "Lampe 2", "attribut": "intensity", "default": 0, "highlight": 255},
