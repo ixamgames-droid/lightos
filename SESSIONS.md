@@ -59,6 +59,7 @@
 | BACKLOG-KONSOLEN | A | docs/backlog-konsolen | 2026-10-05T18:14Z | BACKLOG.md |
 | VIZ-80 | A | fix/viz80-optik-gobo-3d | 2026-10-05T18:15Z | - |
 | MIDI-1 | A | fix/controller-p1 | 2026-10-05T18:52Z | - |
+| MIDI-2 | A | fix/controller-p1 | 2026-10-05T18:52Z | - |
 
 ## Blocker & Fallen
 
@@ -169,7 +170,6 @@
 
 ## Verlauf
 
-- 2026-10-04T23:10Z A done VIZ-70
 - 2026-10-04T23:30Z B done OUT-61
 - 2026-10-04T23:30Z B done OUT-61-folge
 - 2026-10-04T23:59Z A done BACKLOG-0410
@@ -199,3 +199,4 @@
 - 2026-10-05T18:15Z A claim VIZ-80
 - 2026-10-05T18:41Z A done XPLAT-44
 - 2026-10-05T18:52Z A claim MIDI-1
+- 2026-10-05T18:52Z A claim MIDI-2
