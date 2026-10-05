@@ -1,58 +1,91 @@
-# 3D-Visualizer: Bühne bauen & Fixtures hängen (Session 2026-07-07)
+# 3D-Visualizer: Bühne bauen & Fixtures hängen
 
 Diese Anleitung zeigt **Schritt für Schritt**, wie im LightOS-3D-Visualizer eine Bühne
-gebaut wird (Trassen, Stützen, Plattform) und wie Fixtures daran gehängt werden —
-seitlich, unten und oben. Sie entstand beim Live-Durchspielen der Demo-Show
-`shows/demo_komplett_2026.lshow` (Demo-Show, selbst aufzubauen — nicht mitgeliefert).
+gebaut wird (Traversen, Stützen, Plattform, Rückwand), wie Geräte daran gehängt werden,
+wie du die Kamera führst und wie du die Darstellung der Lichtstrahlen einstellst.
 
-> **Wichtiger Kontext — der 3D-Bearbeiten-Fix:** Bis 2026-07-07 war das Bearbeiten im 3D
-> komplett tot (Hinzufügen/Verschieben/Drehen/Kamera-Reset reagierten nicht, Fixtures
-> luden nur beim Neustart). Ursache: QtWebEngine stellte Python→JS-Signale an die
-> eingebettete Seite nicht zu. Fix (Branch `fix/viz3d-qwebchannel-pull-delivery`): die
-> JS-Seite **pollt** jetzt periodisch `pollControl()` und wendet Zustand + Events an —
-> inkl. der Fixture-Meshes (`allFixtures`/`fixtureAdded`/`fixtureRemoved`). Seither
-> funktionieren Hinzufügen, Verschieben, Bearbeiten und Live-Platzieren sofort sichtbar.
+Die Bilder zeigen die Doku-Demo des Bild-Werkzeugs: acht PARs an einer Front-Traverse,
+zwei Wash- und zwei Spot-Moving-Heads an einer Back-Traverse, eine LED-Leiste vorn auf
+der Bühnenkante. Die Schritte gelten für jede Show mit gepatchten Geräten. Die Bilder
+entstehen aus dem Code am echten Bildschirm
+(`tools/anleitungsbilder/szenen_3d_buehne.py`, siehe
+[Anleitungsbilder](../ANLEITUNGSBILDER.md)).
+
+![3D-Visualizer mit Doku-Bühne: Traversen, Stützen, PARs und Moving Heads im Nebel](img/01_uebersicht.png)
+
+1. **Ansicht** — „3D Perspective" oder „2D Top-Down" (Taste `V`).
+2. **Modus** — „Ansehen" oder „Bauen" (Taste `E`).
+3. **Bühne** — welche gespeicherte Bühne geladen ist; daneben **Speichern**, **Neu**,
+   **Löschen**.
+4. **Reiter** — **Fixtures** (Geräte), **Bühne** (Bühnen-Elemente), **Einstellungen**
+   (Darstellung). Im Bild ist PAR 1 gewählt (oben in der Ansicht „Selektion: FIXTURE
+   x1“); darunter zeigt **Position & Ausrichtung** seine Werte: Er hängt mit `Y=5.6`
+   an der Front-Traverse.
 
 ## Vorbereitung
-1. Show mit gepatchten Fixtures öffnen (hier: 8 PAR ZQ01424, 2 MH ZQ02001, 2 Spider
-   SPIDER14, 1 Laser Ehaho L2600 = 13 Geräte).
-2. Menü **Visualizer → 3D Visualizer öffnen**. Alle gepatchten Fixtures erscheinen als
-   Liste rechts (Tab **Fixtures**) und werden — dank Auto-Patch aus der 2D-Bühne (Sektion **Bühne**) —
-   direkt im Raum gerendert (Statuszeile unten: „N Fixture(s) in Szene").
 
-## Teil A — Bühne/Trassen bauen (Tab „Bühne")
+1. Show mit gepatchten Geräten öffnen.
+2. Menü **Visualizer → 3D Visualizer öffnen**. Das Fenster öffnet sich neben dem
+   Hauptfenster; beim ersten Öffnen dauert es einige Sekunden, bis die 3D-Szene steht.
+   Alle gepatchten Geräte stehen im Reiter **Fixtures** in der Liste, z. B.
+   `[X] [001] PAR 1 (par)`. Geräte, die in der 2D-Bühne (Sektion **Bühne**) schon
+   eine Lage haben, erscheinen sofort im Raum. Die Statuszeile unten zählt mit:
+   „13 Fixture(s) in Szene | 8 Bühnen-Elemente".
 
-> **Seit 2026-08-02 (VIZ-14):** Der Visualizer hat **zwei Modi** — „Ansehen" und
-> „Bauen". Erst **Modus → Bauen** stellen; *dann* entscheidet der Tab, **woran** du
-> arbeitest. Ein Tab-Klick allein schaltet den Modus **nicht** mehr um (vorher tat er
-> das, und wer nur die Liste ansehen wollte, machte damit ungewollt alles anfassbar).
-> Der Rahmen um die Ansicht zeigt beides an: „BAUEN · Bühne" bzw. „BAUEN · Fixtures".
+## Ansehen und Bauen
 
-Im Modus **Bauen** mit dem Tab **Bühne** erscheint das gelbe Banner „BÜHNE BEARBEITEN
-– Tippen=Auswählen | Ziehen=Verschieben". Unter
-**„Element hinzufügen"** stehen: Boden/Floor · Plattform · Truss (horizontal) ·
-Truss/Stütze (vertikal) · Wand · LED-Wand · Lautsprecher · Publikumsfläche · DJ-Booth
-— und seit VIZ-68 die **Objekt-Bibliothek** für Event-Räume: Biertischgarnitur ·
-Stehtisch · Bar / Theke · Podest mit Treppe · Mischpult-Tisch (s. unten).
+Der Visualizer hat **zwei Modi**:
 
-1. **Plattform (Bühnenboden):** „**+ Plattform**" → eine Bühnenfläche erscheint mittig
-   (Default 6×0,4×4 m). Sie ist sofort in der Szene sichtbar und in der Tabelle
-   „Bühnen-Elemente" gelistet.
-2. **Trasse:** „**+ Truss (horizontal)**" legt eine Trasse an (Default 4 m breit, Höhe
-   Y=8). Auswählen → im **„Eigenschaften (Selektion)"**-Panel positionieren.
-3. **Positionieren (zuverlässig über Zahlenfelder):** Feld anklicken → `Strg+A` → Wert
-   tippen. Der Wert gilt **schon beim Tippen**, das Element wandert sofort mit; ENTER
-   oder TAB sind nicht nötig (TAB springt nur ins nächste Feld). Beispiel
-   Front-Trasse: `X=0`, `Y=6`, `Z=-2`, `Breite=8`. Zweite Trasse für hinten analog mit
-   `Z=+2`.
-   > **„Größe anpassen"** schaltet nur die Ziehgriffe am Element in der Szene ein
-   > (Knopf zeigt dann „Größe anpassen: AN"); die Größen-Felder bleiben dabei frei.
-4. **Verschieben per Maus:** Trasse in der Szene anfassen und ziehen — sie bewegt sich in
-   der Bodenebene (X/Z ändern sich, Panel aktualisiert live). Präzise Höhe (Y) besser
-   über das Zahlenfeld.
-5. **Trassen verbinden / Stützen:** „**+ Truss/Stütze (vertikal)**" für senkrechte
-   Stützen (Default 4 m hoch). Über `X`/`Z` an eine Trassen-Ecke setzen (z. B. `X=-4`,
-   `Z=-2`) → ergibt ein „Goalpost"-Gerüst.
+- **Ansehen** — nichts ist anfassbar; Ziehen mit der Maus dreht die Kamera. Rechts
+  oben in der 3D-Ansicht steht „ANSEHEN".
+- **Bauen** — erst jetzt lassen sich Geräte und Bühnen-Elemente anfassen. *Welche*,
+  entscheidet der Reiter rechts: **Fixtures** oder **Bühne**. Der orange Rahmen um die
+  Ansicht zeigt beides an: „BAUEN · Fixtures" bzw. „BAUEN · Bühne".
+
+Ein Klick auf einen Reiter schaltet den Modus **nicht** um. Wer im Ansehen-Modus nur
+die Liste ansehen will, macht damit nichts versehentlich anfassbar. Im Bauen-Modus
+hellt **Auto-Helligkeit** die Szene auf (siehe [Teil D](#teil-d--darstellung-reiter-einstellungen)).
+
+## Teil A — Bühne bauen (Reiter „Bühne")
+
+![Modus Bauen, Reiter Bühne: die Front-Traverse ist gewählt und gelb hervorgehoben](img/02_buehne_bauen.png)
+
+1. **Modus → Bauen** stellen.
+2. Reiter **Bühne** wählen (Taste `S`). Oben in der Ansicht erscheint das gelbe Banner
+   „BÜHNE BEARBEITEN – Tippen=Auswählen | Ziehen=Verschieben | ↻ / 🗑 unten rechts";
+   die runden Knöpfe unten rechts drehen bzw. löschen das gewählte Element.
+3. **Element hinzufügen:** Boden / Floor · Plattform · Truss (horizontal) ·
+   Truss/Stütze (vertikal) · Wand / Backdrop · LED-Wand · Lautsprecher ·
+   Publikumsfläche · DJ-Booth, dazu die **Objekt-Bibliothek** (Biertischgarnitur · Stehtisch ·
+   Bar / Theke · Podest mit Treppe · Mischpult-Tisch, s. unten). Ein neues Element erscheint sofort in der Szene und in
+   der Liste „Bühnen-Elemente" darüber und ist gleich gewählt.
+4. **Eigenschaften (Selektion):** Name, Position `X`/`Y`/`Z` (Mittelpunkt des
+   Elements, in Metern), Größe `Breite (W)`/`Höhe (H)`/`Tiefe (D)`, Rotation und Farbe.
+   Das gewählte Element leuchtet in der Szene gelb, oben steht z. B.
+   „Selektion: TRASSE (horizontal) - Front-Traverse".
+
+So entsteht die Bühne im Bild:
+
+1. **Plattform (Bühnenboden):** „**+ Plattform**" legt eine Fläche von 6 × 0,4 × 4 m an.
+   Im Bild: `Breite=11`, `Höhe=1`, `Tiefe=7`, `Y=0.5` (Mittelpunkt auf halber Höhe —
+   die Oberkante liegt damit bei 1 m).
+2. **Traverse:** „**+ Truss (horizontal)**" legt eine 4 m lange Traverse auf 8 m Höhe
+   an. Im Bild die Front-Traverse: `X=0`, `Y=6`, `Z=2.5`, `Breite=12`; die
+   Back-Traverse genauso mit `Z=-2.5`. Positiv `Z` ist vorn (zum Publikum).
+3. **Werte eingeben:** Feld anklicken → `Strg+A` → Wert tippen. Der Wert gilt **schon
+   beim Tippen**, das Element wandert sofort mit; ENTER oder TAB sind nicht nötig.
+   Punkt und Komma gehen beide („5.7" und „5,7").
+4. **Verschieben per Maus:** Element in der Szene anfassen und ziehen — es bewegt sich
+   in der Bodenebene (`X`/`Z` ändern sich, die Felder ziehen mit). Die Höhe (`Y`)
+   stellst du über das Feld ein.
+5. **Stützen:** „**+ Truss/Stütze (vertikal)**" (4 m hoch). Über `X`/`Z` an die Enden
+   der Traversen setzen — im Bild `X=±6`, `Z=±2.5`, `Höhe=6`, `Y=3` — ergibt zwei
+   „Goalposts".
+6. **Rückwand:** „**+ Wand / Backdrop**" hinter die Back-Traverse (`Z=-3.6`).
+
+> **„Größe anpassen"** schaltet nur die Ziehgriffe am Element in der Szene ein (der Knopf
+> wird gelb); die Größen-Felder bleiben dabei frei. **Element LÖSCHEN** entfernt das
+> gewählte Element.
 
 ### Objekt-Bibliothek: Halle mit Biertischen, Bar, Podest (VIZ-68)
 
@@ -75,49 +108,118 @@ im Raster, um den Standardplatz zentriert. Die ganze Reihe ist **ein** Undo-Schr
 Das Raster gilt nur für die Möbel oben — Böden, Trassen, Wände usw. entstehen immer einzeln.
 Bei mehr als 200 Objekten auf einmal fragt LightOS nach (große Mengen machen die 3D-Ansicht langsamer).
 Der Abstand geht bis 10 m; ein Raster, das über ±200 m hinausreichen würde, legt LightOS nicht an, sondern meldet es.
-Gespeichert wird mit der Bühne (Teil C) — Typ, Lage, Größe und Farbe bleiben erhalten.
+Gespeichert wird mit der Bühne ([Teil F](#teil-f--speichern)) — Typ, Lage, Größe und Farbe bleiben erhalten.
 
 ![Objekt-Bibliothek: 2 × 3 Biertischgarnituren, Bar, Podest mit Treppe, Stehtische](viz68_objekt_bibliothek.png)
 
-## Teil B — Fixtures an die Trassen hängen (Tab „Fixtures")
+## Teil B — Geräte platzieren und hängen (Reiter „Fixtures")
 
-Im Modus **Bauen** mit dem Tab **Fixtures** arbeitest du an den Geräten. Jede Zeile hat
-einen Status: `[ ]` = nicht in Szene, `[X]` = platziert.
+![Modus Bauen, Reiter Fixtures: Spot 1 ist gewählt, Andocken ist an](img/03_geraet_platzieren.png)
 
-1. **Platzieren — am schnellsten per Ziehen (seit 2026-08-02):** Gerät aus der Liste in
-   die 3D-Ansicht **ziehen**. Während des Ziehens zeigt ein halbtransparenter Geist,
-   wo es landet; färbt er sich **grün**, dockt es beim Loslassen an die Trasse darunter
-   an. Losgelassen landet **genau dieses** Gerät dort. Ein bereits platziertes Gerät
-   lässt sich auf demselben Weg verschieben.
-   > Ziehen wirkt nur im **Bauen**-Modus. Im Ansehen-Modus zeigt der Mauszeiger, dass
-   > hier nichts abgelegt werden kann — der Drop verpufft nicht still.
-2. **Platzieren per Knopf:** Fixture in der Liste wählen → **„Im Raum platzieren"** →
-   der Mesh erscheint sofort in der Szene. Mit **„Entfernen"** verschwindet er wieder.
-3. **Hängen (unten/oben/seitlich)** über „Position & Ausrichtung":
-   - **Unten an die Trasse (bottom-hung):** `Y` knapp unter die Trassen-Höhe (Trasse
-     Y=6 → Fixture `Y=5`), `Z` = Trassen-Z, `X` entlang der Trasse verteilen.
-   - **Oben auf die Trasse (top-mount):** `Y` knapp über die Trasse (z. B. `Y=6.5`).
-   - **Seitlich:** an eine vertikale Stütze setzen (Stützen-`X`/`Z`, mittlere `Y`) und
-     mit **Drehen (Hochachse Y)** zur Seite ausrichten.
-   > **Hinweis (Fix VIZ-FIX-DECIMAL erledigt):** Die Positions-/Ausrichtungsfelder akzeptieren
-   > Punkt UND Komma — „5.7" und „5,7" werden beide korrekt als 5,7 übernommen.
-4. **Ausrichten:** **Drehen (Hochachse Y)** / **Kippen (auf/ab X)** / **Roll (seitlich Z)**
-   je Fixture; Moving Heads folgen zusätzlich ihren Pan/Tilt-DMX-Werten live.
+1. **Gerät wählen** — in der Liste (`[X]` = im Raum, `[ ]` = noch nicht platziert) oder
+   in der Szene antippen. Mehrere Geräte wählst du in der Liste mit `Strg`/`Umschalt`
+   oder in der Szene mit einem Rahmen.
+2. **Im Raum platzieren** setzt das gewählte Gerät in die Szene; **Entfernen** nimmt
+   es wieder heraus. Schneller geht es per **Ziehen**: Gerät aus der Liste in die
+   3D-Ansicht ziehen. Ein halbtransparenter Geist zeigt, wo es landet; färbt er sich
+   **grün**, dockt es beim Loslassen an die Traverse darunter an. Ziehen wirkt nur im
+   Bauen-Modus — im Ansehen-Modus zeigt der Mauszeiger, dass hier nichts abgelegt werden
+   kann.
+3. **Andocken** (Taste `D`): an, rasten Geräte beim Platzieren und Ziehen an Traversen
+   ein (sie hängen darunter) bzw. stehen oben auf Plattform, Boden, Lautsprecher,
+   Publikumsfläche oder DJ-Booth — und wandern mit, wenn du das Element verschiebst.
+   Aus, platzierst du frei auf fester Höhe. Die Statuszeile meldet den Zustand.
+4. **Position & Ausrichtung** — die Felder des gewählten Geräts:
+   - **Unten an die Traverse:** `Y` = Unterkante der Traverse minus 0,25 m. Im Bild hängt
+     Spot 1 an der Back-Traverse (`Y=6`, 0,3 m hoch): `Y=5.6`, `Z=-2.5`, `X` entlang
+     der Traverse verteilen. Genau diese Höhe setzt auch das Andocken.
+   - **Oben auf die Traverse:** `Y` knapp über die Traverse (z. B. `Y=6.5`).
+   - **Seitlich:** an eine Stütze setzen (deren `X`/`Z`, mittlere `Y`) und mit **Drehen
+     (Hochachse Y)** zur Seite ausrichten.
+   - **Ausrichten:** **Drehen (Hochachse Y)**, **Kippen (auf/ab X)**, **Roll (seitlich
+     Z)**. Moving Heads folgen zusätzlich live ihren Pan/Tilt-Werten.
 
-## Teil C — Speichern
-- **Bühne** (Trassen/Plattform) über den **„Speichern"**-Button in der Visualizer-Toolbar
-  (fragt beim Schließen „Bühne speichern?" nach).
-- **Show** (Fixtures, Positionen, Gruppen, Effekte, VC) im Hauptfenster über
-  **Datei → Speichern** bzw. **Speichern unter…**.
+Ist ein Gerät gewählt, zeigt die Szene oben die Werkzeugleiste **Bewegen · Zielen ·
+Nachfahren** und am Gerät ein Gizmo: am Boden ziehen verschiebt in `X`/`Z`, die Pfeile
+verschieben je Achse bzw. in der Höhe, die Ringe drehen (mit `Strg` frei, ohne Raster).
+**Zielen** richtet gewählte Strahler auf einen angetippten Punkt aus — wie du das an den
+echten Aufbau angleichst, steht in [Moving Heads einmessen](../anleitung_einmessen/ANLEITUNG_EINMESSEN.md).
+Mehrere gewählte Geräte lassen sich über **⬄ Ausrichten** auf eine Linie legen,
+gleichmäßig verteilen oder als Reihe, Raster oder Kreis anordnen.
 
-## Verifikation
-- **Lint-Gate:** `./venv/Scripts/python.exe tools/lint_show.py --strict <show>.lshow`
-  (Linux/macOS: `./venv/bin/python tools/lint_show.py --strict <show>.lshow`) muss „0 Fehler, 0 Warnungen" melden (nur echte Widgets/Enums/Params). ✅ für
-  `demo_komplett_2026.lshow`.
-- **Live geprüft:** Stage-Elemente hinzufügen/verschieben/bearbeiten, Modus-Wechsel,
-  Kamera-Reset und Fixture-Platzieren/-Entfernen sind sofort in der Szene sichtbar.
+## Teil C — Kamera
 
-## Was bei grossen Rigs anders aussieht
+![Kamera-Menü geöffnet, Ansicht von vorn](img/04_kamera.png)
+
+Das Menü **⌖ Kamera** hält alles zur Kamera an einer Stelle:
+
+- **Presets:** Top (von oben) · Front · Seite · Perspektive · Frei. Das Bild zeigt die
+  Bühne nach **Front**.
+- **Fit (alle)** rückt alle Geräte ins Bild, **Fit Auswahl (F)** nur die gewählten
+  (`F` wirkt so, wenn die 3D-Ansicht den Fokus hat; sonst springt `F` auf den Reiter
+  Fixtures).
+- **Zurücksetzen** — Startansicht (auch: Doppel-Tipp in die Ansicht).
+- **Kamera speichern…** fragt nach einem Namen. Gespeicherte Kameras gehören zur Show
+  und stehen danach unten im Menü (`↦ Name`) zum Abruf.
+
+Mit der Maus: Ziehen dreht, Mausrad zoomt; am Touchscreen drehst du mit einem Finger
+und schwenkst/zoomst mit zwei.
+
+## Teil D — Darstellung (Reiter „Einstellungen")
+
+![Reiter Einstellungen: Render-Qualität, Szenen-Helligkeit und Strahl-Optionen](img/05_einstellungen.png)
+
+1. **Render-Qualität — Stufe:** „Automatisch (empfohlen)" prüft beim Start die
+   Grafikkarte und wählt passend; „Hoch (Desktop-GPU)", „Niedrig (schwache/mobile
+   GPU)" bzw. „Maximal (starke Desktop-GPU)" überschreiben das — Details und Tabelle in
+   [Qualitätsstufe](#qualitätsstufe-tab-einstellungen--render-qualität). Niedrig rechnet ohne Kantenglättung, mit weniger Auflösung,
+   Schatten und Kegeldetail — flüssiger auf schwachen Chips. Die Wahl gilt für diesen
+   Rechner, nicht für die Show; die Szene lädt danach neu.
+2. **Szenen-Helligkeit:** Grundlicht der Szene. Niedrig = dunkel, Strahlen gut sichtbar;
+   hoch = Bühne gut sichtbar zum Bauen. Schnellwahl Konzert (10 %) · Standard (20 %) ·
+   Probe (50 %) · Bearbeiten (75 %) · Vollhell (100 %). **Auto-Helligkeit im
+   Bauen-Modus** springt beim Wechsel auf Bauen auf 65 % und zurück auf 20 % im
+   Ansehen-Modus. Der ☀-Regler in der Werkzeugleiste ist derselbe Regler.
+3. **Strahlen:**
+   - **Beam Opacity** — wie deckend die Lichtkegel sind (im Bild 35 %).
+   - **Max. Strahllänge** — deckelt die sichtbare Länge der Kegel (0 = aus). Hilft bei
+     waagerecht oder nach oben zeigenden Köpfen, deren Strahl nie auf den Boden trifft.
+     Ändert nichts an der DMX-Ausgabe.
+   - **Lichtkegel**, **Bodenpunkte** und **Nebel/Haze** einzeln ein- und ausschalten.
+     Einzelne Geräte nimmst du über das Rechtsklick-Menü der Fixture-Liste aus der
+     Kegel-Anzeige.
+
+Darunter: **Fixture-Namen (Labels)** an den Geräten, **Snap to Grid** mit
+**Grid-Schritt**, **Raum-Hülle** (eine neutrale Wand-/Deckenfläche als
+Größen-Orientierung, aus in der 2D-Draufsicht) und **FPS anzeigen** zur Fehlersuche.
+
+Die Szene zeigt live, was die Ausgabe sendet — Farbe, Dimmer, Pan/Tilt, Farbrad:
+
+![GIF: Moving Heads fahren auseinander und kreuzen sich, PARs und Washes wechseln die Farbe](img/07_moving_heads.gif)
+
+## Teil E — Draufsicht (2D Top-Down)
+
+![Ansicht 2D Top-Down: Traversen, Geräte als Kreise, Lichtflecken am Boden](img/06_top_down.png)
+
+**Ansicht → 2D Top-Down** (Taste `V` schaltet hin und zurück) zeigt den Plan von oben:
+Traversen und Bühnen-Elemente als Umrisse, Geräte als farbige Kreise, die Lichtflecken am
+Boden. Im Plan zoomt das Mausrad, ein Doppel-Tipp setzt die Ansicht zurück; im
+Ansehen-Modus schwenkt Ziehen den Plan, im Bauen-Modus verschiebt es Geräte. Das Feld
+`Y (Höhe)` ist hier ausgeblendet — von oben gibt es keine Höhe. Ist das Bild zu klein,
+hilft **Kamera → Fit (alle)**.
+
+## Teil F — Speichern
+
+- **Bühne** (Elemente aus Teil A) über **💾 Speichern** in der Visualizer-Werkzeugleiste
+  unter einem Namen. Sie steht danach in der Auswahl **Bühne:**; beim Schließen mit
+  ungespeicherten Änderungen fragt der Visualizer nach. **✚ Neu** beginnt eine leere
+  Bühne, **🗑 Löschen** entfernt die gewählte.
+- **Show** (Geräte, Positionen, gespeicherte Kameras, Gruppen, Effekte, VC) im
+  Hauptfenster über **Datei → Speichern** bzw. **Speichern unter…**.
+
+Rückgängig/Wiederholen (`Strg+Z`/`Strg+Y`) wirkt auch im Visualizer-Fenster.
+
+## Was bei großen Rigs anders aussieht
 
 Ab dem **9. Gerät im Raum** wirft nicht mehr jeder Scheinwerfer einen eigenen
 Schlagschatten. Die Ansicht vergibt höchstens **8 Schlagschatten**, und zwar an
@@ -132,10 +234,12 @@ die Ansicht stürzte ohne Meldung ab, und kurz davor stand das Bild sekundenlang
 still. Zudem zeichnet jeder schattenwerfende Scheinwerfer die ganze Szene noch
 einmal aus seiner Sicht — mit 16 Schatten war das der größte Einzelposten pro
 Bild und ließ die Ansicht bei großen Rigs ruckeln. Acht Schatten reichen für den
-Raumeindruck; die Grenze gilt auf jedem Rechner gleich, damit die Bühne überall
-gleich aussieht. Einzige Ausnahme ist die Qualitätsstufe **Maximal** (siehe
-unten): sie erlaubt bis zu 16 Schlagschatten und ist für starke Grafikkarten
-gedacht.
+Raumeindruck. Die Obergrenze von 8 gilt überall gleich; nur auf sehr schwachen
+Grafikchips (weniger als 14 Textur-Einheiten) werfen noch weniger Geräte Schatten.
+Einzige Ausnahme nach oben ist die Qualitätsstufe **Maximal** (siehe unten): sie
+erlaubt bis zu 16 Schlagschatten und ist für starke Grafikkarten gedacht. Neu berechnet werden die Schatten nur, wenn sich etwas bewegt
+(Pan/Tilt, verschobene Geräte oder Bühnenteile) — Kamerafahrten und reine Farb- oder
+Dimmerwechsel kosten keinen Schattendurchlauf.
 
 **Wenn Schatten für eine bestimmte Stelle wichtig sind:** die Vergabe folgt der
 Fixture-Nummer. Ein Gerät, dessen Schatten man sehen will, sollte also eine
@@ -172,15 +276,31 @@ Neben der Auswahl steht, welche Stufe gerade **aktiv** ist.
 - **Maximal** nur auf einer starken Desktop-Grafikkarte wählen. Ruckelt die
   Ansicht, zurück auf **Hoch**.
 
+## Tastenkürzel im Visualizer
+
+| Taste | Wirkung |
+|---|---|
+| `V` | 3D ↔ 2D Top-Down |
+| `E` | Ansehen ↔ Bauen |
+| `F` | Fokus in der 3D-Ansicht: Fit Auswahl; sonst Reiter Fixtures |
+| `S` | Reiter Bühne |
+| `D` | Andocken an/aus |
+| `Strg+Z` / `Strg+Y` | Rückgängig / Wiederholen |
+
 ## Früher bekannte Macken (alle erledigt)
+
 Ältere Fassungen dieser Anleitung nannten hier offene Punkte. Sie sind behoben bzw. ließen
 sich nicht mehr nachstellen (Details im BACKLOG-Archiv):
-- **VIZ-TRUSS-ADD:** „+ Truss (horizontal)" legt die Trasse auch bei geladenen Fixtures
+- **3D-Bearbeiten reagierte nicht** (bis 2026-07-07): Hinzufügen, Verschieben, Drehen und
+  Kamera-Reset blieben ohne Wirkung, Geräte erschienen erst nach einem Neustart. Die
+  3D-Seite holt sich Zustand und Ereignisse seither selbst ab.
+- **VIZ-TRUSS-ADD:** „+ Truss (horizontal)" legt die Traverse auch bei geladenen Geräten
   zuverlässig an.
 - **VIZ-STAGE-PANEL:** Felder übernehmen den Wert beim Tippen, „Größe anpassen" sperrt
   keine Felder, Auswahl in Tabelle und Szene bleibt gleich.
+- **VIZ-FIX-DECIMAL:** Positionsfelder nehmen Punkt und Komma.
 - **VC-WIDGET-DRAG:** VC-Widgets lassen sich im Bearbeiten-Modus per Ziehen umplatzieren.
 
-Die überlappenden Grundschritte (Patch, Gruppen, Farb-/Dimmer-/EFX-Effekte, Virtuelle
-Konsole) sind bereits bebildert in
-[`../anleitung_komplettshow_2026/ANLEITUNGEN.md`](../anleitung_komplettshow_2026/ANLEITUNGEN.md).
+Die Grundschritte davor (Patch, Gruppen, Effekte, Virtuelle Konsole) zeigen
+[Erste Schritte](../anleitung_erste_schritte/ANLEITUNG.md) und
+[Programmer-Grundlagen](../anleitung_programmer_grundlagen/ANLEITUNG.md).
