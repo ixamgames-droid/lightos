@@ -55,7 +55,6 @@
 | DOC-56 | C | - | 2026-10-02T13:05Z | docs/anleitung_web_remote/ANLEITUNG.md |
 | FM-58 | A | feat/fm58-bibliothek-runde2 | 2026-10-02T18:20Z | fixtures/bibliothek |
 | SAMMEL-DOKU-C | A | sammel/doku-c | 2026-10-02T22:08Z | docs · BACKLOG.md |
-| VIZ-77 | A | perf/viz77-payload-cache | 2026-10-05T13:31Z | - |
 | VIZ-78 | A | perf/viz78-liveview-zeichnen | 2026-10-05T14:32Z | - |
 | BACKLOG-0510b | A | docs/entscheidungen-0510 | 2026-10-05T15:47Z | BACKLOG.md |
 
@@ -166,7 +165,6 @@
 
 ## Verlauf
 
-- 2026-10-04T18:58Z A claim BACKLOG-0410
 - 2026-10-04T19:01Z A claim FM-63
 - 2026-10-04T19:18Z A done FM-59
 - 2026-10-04T19:43Z A done VIZ-69
@@ -196,3 +194,4 @@
 - 2026-10-05T15:13Z A done BACKLOG-0505
 - 2026-10-05T15:13Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-05T15:47Z A claim BACKLOG-0510b
+- 2026-10-05T16:00Z A done VIZ-77
