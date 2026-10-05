@@ -827,6 +827,28 @@ def _provenance(daten: dict) -> str:
     return " · ".join(teile)[:200]
 
 
+def hersteller_ohne_gross_klein(s, name: str) -> list:
+    """UI-74: alle Hersteller, deren Name ohne Gross/klein ``name`` ist —
+    aeltester zuerst.
+
+    ★ Verglichen wird in PYTHON (``casefold``), NICHT ueber SQL ``lower()``:
+    SQLite faltet dort nur ASCII. ``lower('Ölwerk')`` bleibt „Ölwerk“, Pythons
+    ``'Ölwerk'.lower()`` ist „ölwerk“ — der Vergleich fand den Hersteller nie,
+    auch nicht in exakt gleicher Schreibweise, und jeder Abgleich legte das
+    Profil ein weiteres Mal an. Dieselbe Faltung wie ``einspielen``."""
+    from sqlalchemy import select
+    from .models import Manufacturer
+    # Review: Mehrfach-Leerzeichen innen zaehlen ebenfalls nicht — dieselbe
+    # Gleichheit wie ``fixture_db.profil_schluessel`` (FM-63), sonst umging
+    # „Euro  Lite“ den Dubletten-Riegel des Editors.
+    def _form(n):
+        return " ".join((n or "").split()).casefold()
+
+    ziel = _form(name)
+    return [m for m in s.execute(select(Manufacturer).order_by(Manufacturer.id)).scalars()
+            if _form(m.name) == ziel]
+
+
 def _hersteller(s, daten: dict):
     from sqlalchemy import select
     from .models import Manufacturer
@@ -835,6 +857,13 @@ def _hersteller(s, daten: dict):
     # zuerst das Kuerzel — ein abgeleitetes Kuerzel koennte dort einen fremden
     # Hersteller treffen und das Profil still unter falschem Namen ablegen.
     m = s.execute(select(Manufacturer).where(Manufacturer.name == name)).scalar_one_or_none()
+    if m is None:
+        # ★ UI-74: dann ohne Gross/klein. „EuroLite“ neben „Eurolite“ legte
+        # einen ZWEITEN Hersteller an — in der Geraeteauswahl zwei Ordner
+        # fuer dieselbe Firma, das Geraet im falschen. Die exakte Schreibweise
+        # gewinnt (oben), sonst der aelteste Eintrag.
+        gleich = hersteller_ohne_gross_klein(s, name)
+        m = gleich[0] if gleich else None
     if m is None:
         kurz = (daten.get("hersteller_kurz") or slug(name).replace("-", "")[:8]).upper()
         m = Manufacturer(name=name, short_name=kurz[:20])
@@ -943,7 +972,12 @@ def _abgleichen(s, daten: dict) -> str:
         .options(selectinload(FixtureProfile.modes)
                  .selectinload(FixtureMode.channels)
                  .selectinload(FixtureChannel.ranges))
-        .where(Manufacturer.name == name_h, FixtureProfile.name == modell)
+        # UI-74: Hersteller ohne Gross/klein — wie `_hersteller`. Sonst fand
+        # eine korrigierte Schreibweise das schon eingespielte Profil nicht
+        # wieder und legte es ein zweites Mal an.
+        .where(Manufacturer.id.in_(
+                   [m.id for m in hersteller_ohne_gross_klein(s, name_h)]),
+               FixtureProfile.name == modell)
         .order_by(FixtureProfile.id)).scalars().all()
     if any(p.source not in (SOURCE_LIGHTOS, *ABLOESBARE_QUELLEN) for p in vorhanden):
         return "verdeckt"
@@ -960,6 +994,13 @@ def _abgleichen(s, daten: dict) -> str:
         _anlegen(s, daten, SOURCE_LIGHTOS)
         return "neu"
     prof = eigene[0]
+    # UI-74: stand das Profil unter einer anderen Schreibweise des Herstellers
+    # (alter Datenfehler), zieht es zum richtigen Hersteller um.
+    hersteller = _hersteller(s, daten)
+    umgezogen = prof.manufacturer_id != hersteller.id
+    if umgezogen:
+        prof.manufacturer = hersteller
+        s.flush()
     ist = _vergleichsform(prof)
     # Soll ueber DENSELBEN Weg bauen wie das Anlegen (Savepoint, danach
     # zurueckgerollt) — eine zweite Normalisierung der Datei koennte von
@@ -969,7 +1010,7 @@ def _abgleichen(s, daten: dict) -> str:
     soll = _vergleichsform(_anlegen(s, daten, SOURCE_LIGHTOS))
     sp.rollback()
     if soll == ist:
-        return "gleich"
+        return "aktualisiert" if umgezogen else "gleich"
     _kopf_setzen(prof, daten)
     prof.modes.clear()          # cascade loescht Kanaele + Ranges
     s.flush()
@@ -1102,7 +1143,9 @@ def importiere(pfad_oder_daten, *, engine=None) -> int:
         da = s.execute(
             select(FixtureProfile.id, FixtureProfile.source)
             .join(Manufacturer, FixtureProfile.manufacturer_id == Manufacturer.id)
-            .where(Manufacturer.name == daten["hersteller"].strip(),
+            # UI-74: Hersteller ohne Gross/klein (s. `_hersteller`).
+            .where(Manufacturer.id.in_(
+                       [m.id for m in hersteller_ohne_gross_klein(s, daten["hersteller"])]),
                    FixtureProfile.name == daten["modell"].strip())).first()
         if da is not None:
             raise ValueError(
