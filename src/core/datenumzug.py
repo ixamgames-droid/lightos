@@ -9,8 +9,20 @@ Regeln (bewusst konservativ — es geht um die Daten eines laufenden Betriebs):
 
 * **Nur KOPIEREN.** Der alte Stand wird nie verschoben, geloescht oder
   veraendert; er bleibt als Rueckfall liegen.
-* **Nie ueberschreiben.** Liegt die Datei im App-Ordner schon, gewinnt sie; der
-  alte Stand bleibt unangetastet, ins Log kommt ein Hinweis (Konflikt).
+* **Nie ueberschreiben.** Liegt die Datei im App-Ordner schon MIT INHALT,
+  gewinnt sie; der alte Stand bleibt unangetastet (Konflikt). Ein Konflikt
+  gilt erst als erledigt, wenn ``main.py`` ihn dem Nutzer SICHTBAR gemeldet hat
+  (``quittiere_konflikte``) — ein Werkzeug ohne Fenster erledigt ihn nie.
+* **Frisch angelegte, leere Ziele zaehlen nicht.** Startete LightOS (oder ein
+  Werkzeug ueber ``get_state()``) einmal ohne Uebernahme, liegt im App-Ordner
+  eine LEERE Show-DB (kein Patch, keine Gruppen) bzw. ein JSON ``[]``/``{}``.
+  Das ist kein Nutzerstand: es wird nach ``<name>.vor-xplat44`` gesichert und
+  der alte Stand kopiert. Ebenso verwaiste SQLite-Nebendateien ohne Hauptdatei.
+* **Override-Variablen** (``LIGHTOS_SHOW_DB``, ``LIGHTOS_UNIVERSES_JSON``):
+  ist eine gesetzt, wird die Datei NICHT in den (dann ungelesenen) App-Ordner
+  kopiert; die Quelle bleibt fuer einen Start ohne Override offen.
+* **Zentral:** ``get_state()`` ruft ``einmal_je_prozess()`` VOR dem ersten
+  Oeffnen der Show-DB — auch Werkzeuge/Beispiele uebernehmen also zuerst.
 * **Quellen:** ``<Repo/Programmordner>/data`` zuerst (dorthin schrieben die
   Startskripte, die vorher in den Programmordner wechselten), danach
   ``<CWD>/data``. Gleiche Ordner werden nur einmal betrachtet.
@@ -34,11 +46,14 @@ Importiert nur die Standardbibliothek + ``paths`` (kein Qt, kein App-State).
 from __future__ import annotations
 
 import datetime
+import filecmp
 import json
 import os
 import re
 import shutil
+import sqlite3
 import sys
+import tempfile
 from dataclasses import dataclass, field
 from typing import Callable, Iterable
 
@@ -50,6 +65,12 @@ ENV_AUS = "LIGHTOS_NO_DATENUMZUG"
 #: SQLite-Nebendateien, die mit der DB wandern (``-shm`` s. Modul-Doku).
 SQLITE_BEGLEITER = ("-wal", "-journal")
 _SQLITE_ENDUNGEN = (".db", ".sqlite", ".sqlite3")
+#: Endung der Sicherung eines ersetzten frischen/leeren Ziels.
+SICHERUNG = ".vor-xplat44"
+#: Tabellen, die eine Show-DB zu einem NUTZERSTAND machen. Eine frisch von
+#: ``AppState.open_show`` angelegte DB hat hier (und ueberall) 0 Zeilen.
+_SHOW_INHALT_TABELLEN = ("patched_fixtures", "fixture_groups",
+                         "quarantined_fixtures")
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -61,6 +82,15 @@ class Ergebnis:
     offen: list = field(default_factory=list)        # [(name, quelle_pfad, grund)]
     quellen: list = field(default_factory=list)      # betrachtete Quellordner
     uebersprungen: str = ""                          # Grund, wenn gar nichts lief
+    ersetzt: list = field(default_factory=list)      # [(name, sicherung)] leere Ziele
+    ziel_dir: str = ""
+    namen: list = field(default_factory=list)
+
+    def show_db_in_benutzung(self) -> bool:
+        """Die Show-DB konnte wegen einer offenen Verbindung nicht uebernommen
+        werden — legte die App jetzt eine neue an, fehlte die Show."""
+        return any(n == "current_show.db" and g == "in Benutzung"
+                   for n, _q, g in self.offen)
 
 
 def _schluessel(pfad: str) -> str:
@@ -173,6 +203,7 @@ def _kopiere_ohne_ueberschreiben(paare: list[tuple[str, str]]) -> None:
     nicht ueberschrieben.
     """
     temps: list[tuple[str, str]] = []
+    umbenannt: list[str] = []
     try:
         for quelle, ziel in paare:
             tmp = ziel + ".xplat44-tmp"
@@ -182,6 +213,16 @@ def _kopiere_ohne_ueberschreiben(paare: list[tuple[str, str]]) -> None:
             if os.path.exists(ziel):
                 raise FileExistsError(ziel)
             os.replace(tmp, ziel)
+            umbenannt.append(ziel)
+    except BaseException:
+        # Rollback: schon umbenannte Begleiter (-wal) DIESES Laufs wieder weg —
+        # sonst laege eine verwaiste -wal ohne Hauptdatei am Ziel.
+        for ziel in umbenannt:
+            try:
+                os.remove(ziel)
+            except OSError:
+                pass
+        raise
     finally:
         for tmp, _ in temps:
             if os.path.exists(tmp):
@@ -191,6 +232,77 @@ def _kopiere_ohne_ueberschreiben(paare: list[tuple[str, str]]) -> None:
                     pass
 
 
+def _ziel_ist_leer(neu: str, sqlite: bool) -> bool:
+    """True, wenn am Ziel KEIN Nutzerstand liegt: fehlende Hauptdatei (nur
+    verwaiste Nebendateien), eine Show-DB ohne Patch/Gruppen/Quarantaene oder
+    ein JSON ``[]``/``{}``/``null``/leer. Im Zweifel (unlesbar, kaputt) False —
+    dann bleibt es beim Konflikt, ersetzt wird nichts."""
+    if not os.path.exists(neu):
+        return True
+    try:
+        if sqlite:
+            # Auf einer KOPIE pruefen: so faellt keine Recovery/Checkpoint am
+            # Ziel an, und eine -wal ohne -shm stoert nicht (read-only-Oeffnen
+            # scheitert daran je nach SQLite-Version).
+            with tempfile.TemporaryDirectory(prefix="xplat44_pruef_") as td:
+                kopie = os.path.join(td, "pruef.db")
+                shutil.copy2(neu, kopie)
+                for b in SQLITE_BEGLEITER:
+                    if os.path.isfile(neu + b):
+                        shutil.copy2(neu + b, kopie + b)
+                return _db_ohne_show_inhalt(kopie)
+        with open(neu, encoding="utf-8") as f:
+            text = f.read()
+        if not text.strip():
+            return True
+        return json.loads(text) in ([], {}, None)
+    except Exception:
+        return False
+
+
+def _db_ohne_show_inhalt(db: str) -> bool:
+    con = sqlite3.connect(db, timeout=1.0)
+    try:
+        tabellen = {t for (t,) in con.execute(
+            "select name from sqlite_master where type='table'")}
+        for t in _SHOW_INHALT_TABELLEN:
+            if t in tabellen and con.execute(
+                    f'select 1 from "{t}" limit 1').fetchone():
+                return False
+        return True
+    finally:
+        con.close()
+
+
+def _gleicher_stand(alt: str, neu: str, begleiter: tuple) -> bool:
+    """Ziel ist byte-gleich mit der Quelle (samt -wal/-journal) — etwa nach
+    einem Lauf mit verlorenem Marker. Dann nichts tun, auch nichts sichern."""
+    try:
+        for b in ("",) + tuple(begleiter):
+            a, z = os.path.isfile(alt + b), os.path.isfile(neu + b)
+            if a != z or (a and not filecmp.cmp(alt + b, neu + b, shallow=False)):
+                return False
+        return True
+    except OSError:
+        return False
+
+
+def _sichere(pfade: list[str]) -> str:
+    """Benennt die vorhandenen ``pfade`` nach ``<pfad>.vor-xplat44`` (bei
+    Belegung ``.vor-xplat44.2`` …) um; liefert die Sicherung der ersten Datei."""
+    zusatz = SICHERUNG
+    n = 1
+    while any(os.path.exists(p + zusatz) for p in pfade):
+        n += 1
+        zusatz = f"{SICHERUNG}.{n}"
+    erste = ""
+    for p in pfade:
+        if os.path.exists(p):
+            os.replace(p, p + zusatz)
+            erste = erste or p + zusatz
+    return erste
+
+
 def _marker_lesen(pfad: str) -> dict:
     try:
         with open(pfad, encoding="utf-8") as f:
@@ -198,6 +310,38 @@ def _marker_lesen(pfad: str) -> dict:
         return d if isinstance(d, dict) else {}
     except (OSError, ValueError):
         return {}
+
+
+def _marker_schreiben(marker_pfad: str, marker: dict, log: Callable[[str], None]) -> None:
+    marker = dict(marker)
+    marker["version"] = 1
+    marker["zuletzt"] = datetime.datetime.now().isoformat(timespec="seconds")
+    try:
+        tmp = marker_pfad + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(marker, f, indent=2, ensure_ascii=False)
+        os.replace(tmp, marker_pfad)
+    except OSError as e:
+        log(f"[datenumzug] Marker {marker_pfad!r} nicht schreibbar ({e}) — "
+            "die Pruefung laeuft beim naechsten Start erneut (kopiert wird "
+            "trotzdem nichts doppelt: vorhandene Dateien gewinnen)")
+
+
+def _abschliessen(marker: dict, quellen_namen: dict[str, list[str]]) -> list[str]:
+    """Traegt jeden Quellordner, dessen vorhandene Dateien ALLE erledigt sind,
+    in ``quellen_erledigt`` ein (und raeumt seine Teil-Liste weg)."""
+    erledigt = set(marker.get("quellen_erledigt") or [])
+    teil = dict(marker.get("teil_erledigt") or {})
+    fertig = []
+    for q, vorhanden in quellen_namen.items():
+        s = _schluessel(q)
+        if set(vorhanden) <= set(teil.get(s) or []):
+            erledigt.add(s)
+            teil.pop(s, None)
+            fertig.append(q)
+    marker["quellen_erledigt"] = sorted(erledigt)
+    marker["teil_erledigt"] = teil
+    return fertig
 
 
 def uebernehme_alte_daten(
@@ -215,10 +359,13 @@ def uebernehme_alte_daten(
         return erg
     ziel_dir = ziel_dir or app_data_dir()
     namen = list(dateien) if dateien is not None else list(USER_DATA_FILES)
+    erg.ziel_dir, erg.namen = ziel_dir, list(namen)
     quellen = list(quellen) if quellen is not None else alte_quellen()
     marker_pfad = os.path.join(ziel_dir, MARKER_NAME)
     marker = _marker_lesen(marker_pfad)
     erledigt = set(marker.get("quellen_erledigt") or [])
+    teil = {k: list(v) for k, v in (marker.get("teil_erledigt") or {}).items()
+            if isinstance(v, list)}
 
     offene_quellen = [q for q in quellen if _schluessel(q) not in erledigt]
     if not offene_quellen:
@@ -227,10 +374,9 @@ def uebernehme_alte_daten(
 
     # Quellordner ohne eine einzige bekannte Datei sind sofort erledigt — und
     # brauchen keinen App-Ordner (ein frischer Start legt ihn nicht deswegen an).
-    mit_daten = []
+    vorhanden: dict[str, list[str]] = {}
     for q in offene_quellen:
-        if any(os.path.isfile(os.path.join(q, n)) for n in namen):
-            mit_daten.append(q)
+        vorhanden[q] = [n for n in namen if os.path.isfile(os.path.join(q, n))]
     erg.quellen = list(offene_quellen)
 
     try:
@@ -241,63 +387,111 @@ def uebernehme_alte_daten(
         erg.uebersprungen = "App-Datenordner nicht anlegbar"
         return erg
 
-    fertig: list[str] = [q for q in offene_quellen if q not in mit_daten]
-    for q in mit_daten:
-        quelle_offen = False
-        for name in namen:
-            alt = os.path.join(q, name)
-            if not os.path.isfile(alt):
+    for q, dort in vorhanden.items():
+        schon = teil.setdefault(_schluessel(q), [])
+        for name in dort:
+            if name in schon:
                 continue
+            alt = os.path.join(q, name)
             neu = os.path.join(ziel_dir, name)
-            begleiter = SQLITE_BEGLEITER if _ist_sqlite(name) else ()
+            sqlite = _ist_sqlite(name)
+            begleiter = SQLITE_BEGLEITER if sqlite else ()
+            var = USER_DATA_FILES.get(name)
+            if var and os.environ.get(var):
+                # Die App liest gerade eine andere Datei — dorthin zu kopieren
+                # waere fuer diesen Lauf wirkungslos und fuer einen spaeteren
+                # ueberraschend. Offen lassen: ein Start ohne Override holt nach.
+                erg.offen.append((name, alt, f"{var} gesetzt"))
+                log(f"[datenumzug] {name}: {var} gesetzt — Uebernahme aus "
+                    f"{alt!r} beim naechsten Start ohne Override")
+                continue
             # Bei SQLite zaehlen auch verwaiste Nebendateien am Ziel als "schon
             # da": eine fremde -wal neben einer frisch kopierten DB spielte
             # SQLite beim Oeffnen in diese ein.
-            pruefen = [neu] + [neu + b for b in begleiter + ("-shm",)
-                               if begleiter]
-            schon_da = any(os.path.exists(p) for p in pruefen)
-            if schon_da:
-                erg.konflikte.append((name, alt))
-                log(f"[datenumzug] {name}: im App-Ordner schon vorhanden — der "
-                    f"bleibt gueltig; alter Stand {alt!r} unangetastet")
-                continue
+            am_ziel = [p for p in [neu] + [neu + b for b in begleiter + ("-shm",)
+                                           if begleiter]
+                       if os.path.exists(p)]
             try:
+                if am_ziel:
+                    if _gleicher_stand(alt, neu, begleiter):
+                        schon.append(name)          # schon derselbe Stand
+                        continue
+                    if not _ziel_ist_leer(neu, sqlite):
+                        erg.konflikte.append((name, alt))
+                        log(f"[datenumzug] {name}: im App-Ordner schon vorhanden — "
+                            f"der bleibt gueltig; alter Stand {alt!r} unangetastet")
+                        continue
+                    if sqlite and in_benutzung(neu):
+                        erg.offen.append((name, alt, "Ziel in Benutzung"))
+                        log(f"[datenumzug] {name}: leere Ziel-DB ist geoeffnet — "
+                            "Uebernahme beim naechsten Start")
+                        continue
                 if begleiter and in_benutzung(alt):
-                    quelle_offen = True
                     erg.offen.append((name, alt, "in Benutzung"))
                     log(f"[datenumzug] {name}: {alt!r} ist von einem anderen "
                         "Prozess geoeffnet — Uebernahme beim naechsten Start")
                     continue
+                if am_ziel:
+                    gesichert = _sichere(am_ziel)
+                    erg.ersetzt.append((name, gesichert))
+                    log(f"[datenumzug] {name}: frisches/leeres Ziel nach "
+                        f"{gesichert!r} gesichert")
                 paare = [(alt + b, neu + b) for b in begleiter
                          if os.path.isfile(alt + b)]
                 paare.append((alt, neu))
                 _kopiere_ohne_ueberschreiben(paare)
                 erg.kopiert.append((name, alt))
+                schon.append(name)
                 log(f"[datenumzug] {name}: aus {alt!r} uebernommen (kopiert; "
                     "der alte Stand bleibt liegen)")
             except Exception as e:   # Rechte, gesperrt, Platte voll, …
-                quelle_offen = True
                 erg.offen.append((name, alt, str(e)))
                 log(f"[datenumzug] {name}: Kopie aus {alt!r} fehlgeschlagen "
                     f"({e}) — beim naechsten Start erneut")
-        if not quelle_offen:
-            fertig.append(q)
 
-    if fertig:
-        neu_marker = {
-            "version": 1,
-            "quellen_erledigt": sorted(erledigt | {_schluessel(q) for q in fertig}),
-            "zuletzt": datetime.datetime.now().isoformat(timespec="seconds"),
-            "kopiert": sorted({*marker.get("kopiert", []),
-                               *(n for n, _ in erg.kopiert)}),
-        }
-        try:
-            tmp = marker_pfad + ".tmp"
-            with open(tmp, "w", encoding="utf-8") as f:
-                json.dump(neu_marker, f, indent=2, ensure_ascii=False)
-            os.replace(tmp, marker_pfad)
-        except OSError as e:
-            log(f"[datenumzug] Marker {marker_pfad!r} nicht schreibbar ({e}) — "
-                "die Pruefung laeuft beim naechsten Start erneut (kopiert wird "
-                "trotzdem nichts doppelt: vorhandene Dateien gewinnen)")
+    marker["teil_erledigt"] = {k: v for k, v in teil.items() if v}
+    marker["kopiert"] = sorted({*marker.get("kopiert", []),
+                                *(n for n, _ in erg.kopiert)})
+    _abschliessen(marker, vorhanden)
+    _marker_schreiben(marker_pfad, marker, log)
     return erg
+
+
+def quittiere_konflikte(erg: Ergebnis, log: Callable[[str], None] = print) -> None:
+    """Nach der SICHTBAREN Meldung (Dialog in ``main.py``): die Konflikte aus
+    ``erg`` gelten als entschieden (App-Ordner gewinnt), ihr Quellordner wird
+    nicht mehr erneut gemeldet."""
+    if not erg.konflikte or not erg.ziel_dir:
+        return
+    marker_pfad = os.path.join(erg.ziel_dir, MARKER_NAME)
+    marker = _marker_lesen(marker_pfad)
+    teil = {k: list(v) for k, v in (marker.get("teil_erledigt") or {}).items()
+            if isinstance(v, list)}
+    quellen_namen: dict[str, list[str]] = {}
+    for name, alt in erg.konflikte:
+        q = os.path.dirname(alt)
+        s = _schluessel(q)
+        if name not in teil.setdefault(s, []):
+            teil[s].append(name)
+        quellen_namen[q] = [n for n in erg.namen
+                            if os.path.isfile(os.path.join(q, n))]
+    marker["teil_erledigt"] = teil
+    _abschliessen(marker, quellen_namen)
+    _marker_schreiben(marker_pfad, marker, log)
+
+
+_PROZESS_ERGEBNIS: Ergebnis | None = None
+
+
+def einmal_je_prozess(log: Callable[[str], None] = print) -> Ergebnis:
+    """Die Uebernahme hoechstens EINMAL je Prozess — von ``main.py`` (frueh,
+    mit Dialog) und von ``get_state()`` (vor dem ersten Oeffnen der Show-DB,
+    damit auch Werkzeuge erst uebernehmen, bevor eine leere DB entsteht)."""
+    global _PROZESS_ERGEBNIS
+    if _PROZESS_ERGEBNIS is None:
+        try:
+            _PROZESS_ERGEBNIS = uebernehme_alte_daten(log=log)
+        except Exception as e:     # der Start bricht daran nie ab
+            log(f"[datenumzug] uebersprungen: {e}")
+            _PROZESS_ERGEBNIS = Ergebnis(uebersprungen=f"Fehler: {e}")
+    return _PROZESS_ERGEBNIS

@@ -627,6 +627,50 @@ def _bibliothek_beim_erststart(window) -> None:
     QTimer.singleShot(800, lambda: window._open_bibliothek_download(erststart=True))
 
 
+def _datenumzug_melden(erg) -> bool:
+    """XPLAT-44: Ergebnis der Erststart-Uebernahme dem Nutzer zeigen.
+
+    * Show-DB am alten Ort von einem anderen Programm geoeffnet: Fragen, ob
+      LightOS beendet werden soll (empfohlen) — sonst legte die App jetzt eine
+      neue Show-DB an. Rueckgabe False = beenden.
+    * Konflikte (im App-Ordner liegt schon ein Stand MIT Inhalt): einmal
+      melden, dass der App-Ordner gilt und wo der alte Stand liegt; danach
+      gelten sie als entschieden (``quittiere_konflikte``).
+    """
+    from PySide6.QtWidgets import QMessageBox
+    from src.core.datenumzug import quittiere_konflikte
+    if erg.show_db_in_benutzung():
+        pfad = next(q for n, q, g in erg.offen
+                    if n == "current_show.db" and g == "in Benutzung")
+        antwort = QMessageBox.warning(
+            None, "LightOS – Show-Daten in Benutzung",
+            "Die bisherige Show-Datenbank\n\n"
+            f"{pfad}\n\n"
+            "ist gerade von einem anderen Programm geöffnet (läuft noch eine "
+            "ältere LightOS-Version?). Sie kann deshalb jetzt nicht in den "
+            "neuen Datenordner übernommen werden.\n\n"
+            "Empfohlen: LightOS beenden, das andere Programm schließen und "
+            "neu starten.\n\nTrotzdem starten? Die Show ist dann bis zum "
+            "nächsten Start leer.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No)
+        if antwort != QMessageBox.StandardButton.Yes:
+            return False
+    if erg.konflikte:
+        zeilen = "\n".join(f"• {n}  (alt: {q})" for n, q in erg.konflikte)
+        QMessageBox.information(
+            None, "LightOS – Datenordner",
+            "Im LightOS-Datenordner\n\n"
+            f"{erg.ziel_dir}\n\n"
+            "liegen schon eigene Stände dieser Dateien. Sie bleiben gültig; "
+            "die älteren Stände wurden NICHT übernommen und liegen unverändert "
+            f"am alten Ort:\n\n{zeilen}\n\n"
+            "Wer den alten Stand braucht: LightOS beenden und die Datei von "
+            "Hand in den Datenordner kopieren.")
+        quittiere_konflikte(erg)
+    return True
+
+
 def main():
     # argparse ZUERST: es hat keine Nebenwirkungen auf native Ressourcen.
     # Frueher lag die Einzelinstanz-Sperre davor — dann beantwortete ein
@@ -666,11 +710,14 @@ def main():
     # hat, wird hier EINMALIG kopiert — nach der Einzelinstanz-Sperre (kein
     # zweites LightOS haelt die Show-DB offen) und VOR dem ersten App-State.
     # Kopiert nur, verschiebt/ueberschreibt nie; Fehler brechen den Start nicht ab.
+    # Konflikte und eine gesperrte Show-DB meldet _datenumzug_melden() sichtbar,
+    # sobald die QApplication steht (vor dem ersten get_state()).
     try:
-        from src.core.datenumzug import uebernehme_alte_daten
-        uebernehme_alte_daten()
+        from src.core.datenumzug import einmal_je_prozess
+        _umzug = einmal_je_prozess()
     except Exception as _e:
         print(f"[datenumzug] uebersprungen: {_e}")
+        _umzug = None
 
     os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "1")
 
@@ -709,6 +756,11 @@ def main():
     _install_crash_dialog()
     # STAB-01: Qt-Warnungen/-Fehler ebenfalls ins crash.log (Vorboten nativer Crashes).
     _install_qt_message_handler()
+
+    # XPLAT-44: Ergebnis der Datenuebernahme sichtbar machen — VOR MainWindow
+    # (dort oeffnet get_state() die Show-DB).
+    if _umzug is not None and not _datenumzug_melden(_umzug):
+        return
 
     # App-/Fenster-Icon (assets/icons/lightos.png, .ico fuer den Installer-Shortcut)
     try:

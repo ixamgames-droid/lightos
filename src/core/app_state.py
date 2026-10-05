@@ -7046,6 +7046,16 @@ _state: AppState | None = None
 def get_state() -> AppState:
     global _state
     if _state is None:
+        # XPLAT-44: die Uebernahme alter data/-Dateien MUSS vor dem ersten
+        # Oeffnen der Show-DB laufen — sonst legt open_show() im App-Ordner eine
+        # leere DB an, die den alten Stand verdraengt. Hier zentral, damit auch
+        # Werkzeuge/Beispiele (ohne main.py) zuerst uebernehmen; je Prozess nur
+        # einmal (main.py ruft es schon frueher, mit Dialog).
+        try:
+            from .datenumzug import einmal_je_prozess
+            einmal_je_prozess()
+        except Exception as e:
+            print(f"[datenumzug] uebersprungen: {e}")
         _state = AppState()
         _state.open_show()
         _state.apply_output_config()

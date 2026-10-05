@@ -60,6 +60,9 @@ class _TmpFall(unittest.TestCase):
         p.start()
         self.addCleanup(p.stop)
         os.environ.pop(dz.ENV_AUS, None)
+        for var in paths.USER_DATA_FILES.values():
+            if var:
+                os.environ.pop(var, None)
 
     def schreibe(self, ordner, name, inhalt):
         os.makedirs(ordner, exist_ok=True)
@@ -173,6 +176,86 @@ class StartAusFremdemOrdner(unittest.TestCase):
                              "im fremden Arbeitsverzeichnis entstand ein data/")
 
 
+_PROBE_STATE = r"""
+import os, sys
+sys.path.insert(0, sys.argv[1])
+from src.core import datenumzug as dz
+if len(sys.argv) > 2:
+    dz._REPO_ROOT = sys.argv[2]          # Quelle = Wegwerf-"Repo", nie das echte
+from src.core.app_state import get_state
+get_state()
+sys.stdout.flush()
+os._exit(0)
+"""
+
+
+class GetStateZuerst(unittest.TestCase):
+    """Befund 1 Ende zu Ende mit der ECHTEN Show-DB-Anlage von ``get_state()``."""
+
+    def setUp(self):
+        self._td = tempfile.TemporaryDirectory(prefix="xplat44_gs_")
+        self.addCleanup(self._td.cleanup)
+        td = self._td.name
+        self.repo = os.path.join(td, "repo")
+        self.alt = os.path.join(self.repo, "data")
+        self.cwd = os.path.join(td, "cwd")
+        self.xdg = os.path.join(td, "xdg")
+        self.app = os.path.join(self.xdg, "LightOS")
+        os.makedirs(self.alt)
+        os.makedirs(self.cwd)
+        self.env = dict(os.environ, XDG_DATA_HOME=self.xdg, APPDATA=self.xdg,
+                        HOME=os.path.join(td, "home"), QT_QPA_PLATFORM="offscreen",
+                        LIGHTOS_NO_OUTPUT_THREAD="1", LIGHTOS_NO_AUDIO_AUTOSTART="1")
+        for var in ("LIGHTOS_SHOW_DB", "LIGHTOS_UNIVERSES_JSON"):
+            self.env.pop(var, None)
+        # Quelle: eine von der App angelegte Show-DB mit einer Gruppe.
+        self._probe(dict(self.env, LIGHTOS_NO_DATENUMZUG="1",
+                         LIGHTOS_SHOW_DB=os.path.join(self.alt, "current_show.db")))
+        con = sqlite3.connect(os.path.join(self.alt, "current_show.db"))
+        con.execute("insert into fixture_groups(name, cols, rows, positions_json, "
+                    "folder) values ('Alt', 1, 1, '{}', '')")
+        con.commit()
+        con.close()
+
+    def _probe(self, env, *extra):
+        r = subprocess.run([sys.executable, "-c", _PROBE_STATE, _REPO, *extra],
+                           cwd=self.cwd, env=env, capture_output=True, text=True,
+                           timeout=180)
+        self.assertEqual(r.returncode, 0, r.stderr[-2000:])
+
+    def _gruppen(self):
+        con = sqlite3.connect(os.path.join(self.app, "current_show.db"))
+        try:
+            return [n for (n,) in con.execute("select name from fixture_groups")]
+        finally:
+            con.close()
+
+    def test_werkzeug_mit_get_state_uebernimmt_zuerst(self):
+        env = dict(self.env)
+        env.pop(dz.ENV_AUS, None)
+        self._probe(env, self.repo)
+        self.assertEqual(self._gruppen(), ["Alt"])
+
+    def test_erst_get_state_ohne_uebernahme_dann_uebernahme(self):
+        """Der Review-Fall: ein Start ohne Uebernahme (z. B. aus einem
+        Worktree) legt die leere DB an; die spaetere Uebernahme holt die Show
+        trotzdem."""
+        self._probe(dict(self.env, LIGHTOS_NO_DATENUMZUG="1"))
+        self.assertEqual(self._gruppen(), [])
+        with mock.patch.dict(os.environ):
+            os.environ.pop(dz.ENV_AUS, None)
+            os.environ.pop("LIGHTOS_SHOW_DB", None)
+            erg = dz.uebernehme_alte_daten(self.app, [self.alt],
+                                           dateien=["current_show.db"],
+                                           log=lambda m: None,
+                                           in_benutzung=lambda p: False)
+        self.assertEqual(erg.konflikte, [])
+        self.assertEqual([n for n, _ in erg.kopiert], ["current_show.db"])
+        self.assertEqual(self._gruppen(), ["Alt"])
+        self.assertTrue(os.path.exists(
+            os.path.join(self.app, "current_show.db" + dz.SICHERUNG)))
+
+
 # ── (2) Uebernahme ────────────────────────────────────────────────────────────
 
 class Uebernahme(_TmpFall):
@@ -225,6 +308,43 @@ class Uebernahme(_TmpFall):
         self.assertEqual(_stand(self.alt), vorher)
         self.assertTrue(any("universes.json" in z and "unangetastet" in z
                             for z in self.log), self.log)
+
+    def test_leeres_json_ziel_wird_ersetzt(self):
+        self.schreibe(self.alt, "midi_mappings.json", '[{"cc": 1}]')
+        self.schreibe(self.ziel, "midi_mappings.json", "[]")
+        erg = self.lauf()
+        self.assertEqual([n for n, _ in erg.kopiert], ["midi_mappings.json"])
+        with open(os.path.join(self.ziel, "midi_mappings.json"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), '[{"cc": 1}]')
+        with open(os.path.join(self.ziel, "midi_mappings.json" + dz.SICHERUNG),
+                  encoding="utf-8") as f:
+            self.assertEqual(f.read(), "[]")
+
+    def test_konflikt_bleibt_offen_bis_er_gemeldet_ist(self):
+        """Befund 1: ein Konflikt wird nicht stillschweigend erledigt — erst
+        die sichtbare Meldung (main.py) quittiert ihn."""
+        self._alles_anlegen()
+        self.schreibe(self.ziel, "universes.json", '["neu"]')
+        erg = self.lauf()
+        self.assertEqual([n for n, _ in erg.konflikte], ["universes.json"])
+        erg2 = self.lauf()
+        self.assertEqual([n for n, _ in erg2.konflikte], ["universes.json"])
+        self.assertEqual(erg2.kopiert, [], "schon Kopiertes kam doppelt")
+        dz.quittiere_konflikte(erg2, log=self.log.append)
+        erg3 = self.lauf()
+        self.assertEqual(erg3.uebersprungen, "bereits erledigt")
+
+    def test_override_kopiert_nicht_in_den_ungelesenen_app_ordner(self):
+        """Befund 5: bei gesetztem LIGHTOS_UNIVERSES_JSON nicht kopieren, aber
+        fuer einen Start ohne Override offen lassen."""
+        self.schreibe(self.alt, "universes.json", '["alt"]')
+        os.environ["LIGHTOS_UNIVERSES_JSON"] = os.path.join(self.basis, "x.json")
+        erg = self.lauf()
+        self.assertEqual(erg.kopiert, [])
+        self.assertFalse(os.path.exists(os.path.join(self.ziel, "universes.json")))
+        del os.environ["LIGHTOS_UNIVERSES_JSON"]
+        erg2 = self.lauf()
+        self.assertEqual([n for n, _ in erg2.kopiert], ["universes.json"])
 
     def test_fehlende_quelle(self):
         erg = self.lauf([os.path.join(self.basis, "gibt", "es", "nicht")])
@@ -340,15 +460,102 @@ class SqliteUebernahme(_TmpFall):
         self.assertFalse(os.path.exists(os.path.join(self.ziel, "current_show.db")))
         erg2 = self.lauf()
         self.assertEqual([n for n, _ in erg2.kopiert], ["current_show.db"])
-        self.assertIn("universes.json", [n for n, _ in erg2.konflikte])
+        # Im ersten Lauf schon Uebernommenes ist kein Konflikt (Teil-Marker).
+        self.assertEqual(erg2.konflikte, [])
+        self.assertEqual(self.lauf().uebersprungen, "bereits erledigt")
 
-    def test_verwaiste_wal_am_ziel_ist_ein_konflikt(self):
-        sqlite3.connect(os.path.join(self.alt, "current_show.db")).close()
+    def _quelle_mit_show(self):
+        con = sqlite3.connect(os.path.join(self.alt, "current_show.db"))
+        con.execute("create table fixture_groups(name)")
+        con.execute("insert into fixture_groups values ('G')")
+        con.commit()
+        con.close()
+
+    def _gruppen_am_ziel(self):
+        con = sqlite3.connect(os.path.join(self.ziel, "current_show.db"))
+        try:
+            return con.execute("select name from fixture_groups").fetchall()
+        finally:
+            con.close()
+
+    def test_verwaiste_wal_am_ziel_wird_gesichert_und_uebernommen(self):
+        """Befund 2: eine -wal ohne Hauptdatei ist kein Nutzerstand. Vorher:
+        Konflikt, Quelle erledigt, die Show nie uebernommen."""
+        self._quelle_mit_show()
         self.schreibe(self.ziel, "current_show.db-wal", "fremd")
         erg = self.lauf()
+        self.assertEqual([n for n, _ in erg.kopiert], ["current_show.db"])
+        self.assertEqual(erg.konflikte, [])
+        self.assertFalse(os.path.exists(os.path.join(self.ziel, "current_show.db-wal")))
+        self.assertTrue(os.path.exists(
+            os.path.join(self.ziel, "current_show.db-wal" + dz.SICHERUNG)))
+        self.assertEqual(self._gruppen_am_ziel(), [("G",)])
+
+    def test_abbruch_beim_letzten_umbenennen_hinterlaesst_keine_wal(self):
+        """Befund 2: -wal schon umbenannt, Hauptdatei scheitert (Virenscanner)
+        -> Rollback; der naechste Start uebernimmt."""
+        self._quelle_mit_show()
+        self.schreibe(self.alt, "current_show.db-wal", "")
+        echt = os.replace
+
+        def zickig(a, b):
+            if b.endswith("current_show.db"):
+                raise PermissionError("gesperrt")
+            return echt(a, b)
+
+        with mock.patch.object(dz.os, "replace", zickig):
+            erg = self.lauf(dateien=["current_show.db"])
         self.assertEqual(erg.kopiert, [])
-        self.assertIn("current_show.db", [n for n, _ in erg.konflikte])
-        self.assertFalse(os.path.exists(os.path.join(self.ziel, "current_show.db")))
+        self.assertEqual([o[0] for o in erg.offen], ["current_show.db"])
+        self.assertEqual(
+            sorted(n for n in os.listdir(self.ziel) if n.startswith("current_show")),
+            [], "Reste am Ziel")
+        erg2 = self.lauf(dateien=["current_show.db"])
+        self.assertEqual([n for n, _ in erg2.kopiert], ["current_show.db"])
+        self.assertEqual(self._gruppen_am_ziel(), [("G",)])
+
+    def test_leere_ziel_db_wird_gesichert_und_ersetzt(self):
+        """Befund 1 (Kern): eine LEERE Show-DB im App-Ordner (App/Werkzeug lief
+        einmal ohne Uebernahme) verdraengt den alten Stand nicht mehr."""
+        self._quelle_mit_show()
+        os.makedirs(self.ziel)
+        con = sqlite3.connect(os.path.join(self.ziel, "current_show.db"))
+        con.execute("pragma journal_mode=wal")
+        con.execute("create table fixture_groups(name)")
+        con.execute("create table patched_fixtures(id)")
+        con.commit()
+        con.close()
+        erg = self.lauf()
+        self.assertEqual(erg.konflikte, [])
+        self.assertEqual([n for n, _ in erg.kopiert], ["current_show.db"])
+        self.assertEqual([n for n, _ in erg.ersetzt], ["current_show.db"])
+        self.assertTrue(os.path.exists(
+            os.path.join(self.ziel, "current_show.db" + dz.SICHERUNG)))
+        self.assertEqual(self._gruppen_am_ziel(), [("G",)])
+
+    def test_ziel_db_mit_inhalt_bleibt_konflikt(self):
+        self._quelle_mit_show()
+        os.makedirs(self.ziel)
+        con = sqlite3.connect(os.path.join(self.ziel, "current_show.db"))
+        con.execute("create table fixture_groups(name)")
+        con.execute("insert into fixture_groups values ('NEU')")
+        con.commit()
+        con.close()
+        erg = self.lauf()
+        self.assertEqual([n for n, _ in erg.konflikte], ["current_show.db"])
+        self.assertEqual(erg.kopiert, [])
+        self.assertEqual(self._gruppen_am_ziel(), [("NEU",)])
+
+    def test_offen_dann_leere_db_angelegt_wird_beim_naechsten_start_nachgeholt(self):
+        """Befund 1 (c): "offen, naechster Start" griff nie — im selben Lauf
+        legte die App die Ziel-DB frisch an, der naechste sah einen Konflikt."""
+        self._quelle_mit_show()
+        erg = self.lauf(in_benutzung=lambda p: True)
+        self.assertTrue(erg.show_db_in_benutzung())
+        sqlite3.connect(os.path.join(self.ziel, "current_show.db")).close()
+        erg2 = self.lauf()
+        self.assertEqual([n for n, _ in erg2.kopiert], ["current_show.db"])
+        self.assertEqual(self._gruppen_am_ziel(), [("G",)])
 
     @unittest.skipUnless(os.path.exists("/proc/locks"), "nur mit /proc/locks")
     def test_echte_offene_wal_verbindung_wird_erkannt(self):
@@ -381,10 +588,46 @@ class StartVerdrahtung(unittest.TestCase):
             quelle = f.read()
         rumpf = quelle[quelle.index("def main():"):]
         i_sperre = rumpf.index("acquire_instance_lock(")
-        i_umzug = rumpf.index("uebernehme_alte_daten()")
+        i_umzug = rumpf.index("einmal_je_prozess()")
         i_fenster = rumpf.index("MainWindow(")
         self.assertLess(i_sperre, i_umzug)
         self.assertLess(i_umzug, i_fenster)
+
+    def test_main_meldet_vor_dem_fenster(self):
+        with open(os.path.join(_REPO, "main.py"), encoding="utf-8") as f:
+            quelle = f.read()
+        rumpf = quelle[quelle.index("def main():"):]
+        self.assertLess(rumpf.index("_datenumzug_melden(_umzug)"),
+                        rumpf.index("MainWindow("))
+
+    def test_meldung_gesperrte_show_db_und_konflikte(self):
+        """Befund 1: gesperrte Show-DB -> Rueckfrage (Nein = beenden);
+        Konflikte -> Hinweis + Quittung, nicht nur eine Log-Zeile."""
+        import main as M
+        from PySide6.QtWidgets import QMessageBox
+        erg = dz.Ergebnis(offen=[("current_show.db", "/alt/current_show.db",
+                                  "in Benutzung")])
+        with mock.patch.object(QMessageBox, "warning",
+                               return_value=QMessageBox.StandardButton.No) as w:
+            self.assertFalse(M._datenumzug_melden(erg))
+        w.assert_called_once()
+        erg2 = dz.Ergebnis(konflikte=[("universes.json", "/alt/universes.json")],
+                           ziel_dir="/app")
+        with mock.patch.object(QMessageBox, "information") as i, \
+                mock.patch.object(dz, "quittiere_konflikte") as q:
+            self.assertTrue(M._datenumzug_melden(erg2))
+        i.assert_called_once()
+        q.assert_called_once_with(erg2)
+
+    def test_get_state_uebernimmt_vor_dem_oeffnen_der_show_db(self):
+        """Befund 1 (b): Werkzeuge ohne main.py rufen get_state() — die
+        Uebernahme muss dort laufen, bevor open_show() eine leere DB anlegt."""
+        with open(os.path.join(_REPO, "src", "core", "app_state.py"),
+                  encoding="utf-8") as f:
+            quelle = f.read()
+        rumpf = quelle[quelle.index("def get_state()"):]
+        self.assertLess(rumpf.index("einmal_je_prozess()"),
+                        rumpf.index("AppState()"))
 
     def test_kanal_modifier_werden_beim_start_geladen(self):
         """Nebenbefund Review #863: gespeichert wurde, geladen nie."""
