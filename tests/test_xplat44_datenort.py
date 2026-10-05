@@ -650,6 +650,31 @@ class StartVerdrahtung(unittest.TestCase):
             os.remove(pfad)
 
 
+class NutzerDoku(unittest.TestCase):
+    """Befund 4: aktuelle Anleitungen/Referenzen nennen nicht mehr ``data/…``
+    als Ort der Nutzerdaten (datierte Audits/Changelog bleiben historisch)."""
+
+    _DATEIEN = ("docs/SHOW_FILE_FORMAT.md", "docs/APC_TEST_SHOW.md",
+                "docs/components/input/midi_mapper.md")
+
+    def test_keine_alten_datenpfade_in_der_nutzerdoku(self):
+        muster = re.compile(r"data[/\\](" + "|".join(
+            re.escape(n) for n in _NAMEN) + ")")
+        pfade = [os.path.join(_REPO, p) for p in self._DATEIEN]
+        docs = os.path.join(_REPO, "docs")
+        for n in os.listdir(docs):
+            if n.startswith("anleitung_"):
+                d = os.path.join(docs, n)
+                pfade += [os.path.join(d, f) for f in os.listdir(d) if f.endswith(".md")]
+        funde = []
+        for p in pfade:
+            with open(p, encoding="utf-8") as f:
+                for i, z in enumerate(f, 1):
+                    if muster.search(z):
+                        funde.append(f"{os.path.relpath(p, _REPO)}:{i}")
+        self.assertEqual(funde, [])
+
+
 class Deinstallation(unittest.TestCase):
     """Befund 3: die Rueckfragen von uninstall.py nennen die richtigen Orte."""
 

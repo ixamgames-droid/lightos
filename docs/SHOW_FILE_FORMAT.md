@@ -60,11 +60,11 @@ den State **und nullt die DMX-Puffer** (keine Artefakte nach „Neue Show").
 ## Hinweise
 
 - **Fixture-Profile sind NICHT in der Show enthalten** — sie liegen in der
-  SQLite-DB (`data/current_show.db`); der Patch referenziert sie. Builtin-Profile
+  SQLite-DB (`current_show.db` im App-Datenordner, `app_data_dir()`); der Patch referenziert sie. Builtin-Profile
   werden beim Start per `ensure_builtins()` aktuell gehalten.
-- **Nicht in der Show**: Output-Verbindungen (`data/universes.json`), globale
-  MIDI-Mappings (`data/midi_mappings.json`), UI-Präferenzen
-  (`%APPDATA%\LightOS\ui_prefs.json`).
+- **Nicht in der Show**: Output-Verbindungen (`universes.json`), globale
+  MIDI-Mappings (`midi_mappings.json`), UI-Präferenzen (`ui_prefs.json`) —
+  alle im App-Datenordner (`%APPDATA%\LightOS` bzw. `~/.local/share/LightOS`).
 - Abwärtskompatibilität: ältere Shows mit gefüllten `efx`-/`rgb_matrix`-Blöcken
   werden beim Laden migriert (Legacy-Algorithmus-Namen über
   `_LEGACY_ALGO_MAP` in rgb_matrix.py).
