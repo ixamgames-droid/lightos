@@ -62,6 +62,7 @@
 | MIDI-2 | A | fix/controller-p1 | 2026-10-05T18:52Z | - |
 | OSC-05 | A | fix/controller-p1 | 2026-10-05T18:52Z | - |
 | LAS-23 | A | fix/las23-efx-achsen-gm | 2026-10-05T19:34Z | - |
+| LAS-24 | A | fix/las23-efx-achsen-gm | 2026-10-05T19:34Z | - |
 
 ## Blocker & Fallen
 
@@ -172,7 +173,6 @@
 
 ## Verlauf
 
-- 2026-10-04T23:59Z A done BACKLOG-0410
 - 2026-10-05T00:16Z B done VIZ-68
 - 2026-10-05T00:43Z A done FM-63
 - 2026-10-05T01:18Z A done OUT-63
@@ -202,3 +202,4 @@
 - 2026-10-05T18:52Z A claim MIDI-2
 - 2026-10-05T18:52Z A claim OSC-05
 - 2026-10-05T19:34Z A claim LAS-23
+- 2026-10-05T19:34Z A claim LAS-24
