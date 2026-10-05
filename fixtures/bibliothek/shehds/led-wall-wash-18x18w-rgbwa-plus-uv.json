@@ -1,0 +1,553 @@
+{
+  "format_version": 1,
+  "hersteller": "Shehds",
+  "hersteller_kurz": "Shehds",
+  "modell": "LED Wall Wash 18x18W RGBWA+UV",
+  "kurzname": "SH-WALL18X18",
+  "typ": "led_bar",
+  "leistung_w": 324,
+  "quelle": {
+    "titel": "QLC+-Geraetedefinition Shehds-LED-Wall-Wash-18x18W-RGBWA+UV.qxf",
+    "url": "https://github.com/mcallegari/qlcplus/blob/master/resources/fixtures/Shehds/Shehds-LED-Wall-Wash-18x18W-RGBWA+UV.qxf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.13.2 GIT · Fede79",
+    "original": "resources/fixtures/Shehds/Shehds-LED-Wall-Wash-18x18W-RGBWA+UV.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 48 Wertebereiche mit Art (kind) versehen; Rasterform in 2 Modus/Modi aus <Physical> uebernommen; in 2 weiteren Modus/Modi nicht, weil sie nicht zu den color_r-Kanaelen passt (keine echten Farbzonen); LightOS-Nachbearbeitung (FM-57): Farbmakro/Lauflicht-Programmwahl als macro statt color_wheel; kurzname SH-WALL18X18; Bereichs-Arten korrigiert (u. a. „Preset“ nicht als Reset, Farben/Offen auf Farbrad, Open/Shake/Rotation auf Goborad, Prisma/Frost, keine Farb-/Dreh-Kacheln auf Makro-/Speed-Kanaelen, Sound-Bereiche); Programm-/Effekt-Geschwindigkeiten als effect_speed statt speed (speed = Bewegung); Farbmakro-/Programmkanaele ohne einzelne Farbslots als macro statt color_wheel"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": false,
+    "wie": "nicht gegen ein Herstellerhandbuch geprueft (kein oeffentliches Shehds-Handbuch zu diesem Modell auffindbar); Kanalbelegung und Wertebereiche aus der QLC+-Vorlage, Attribute, Bereichs-Arten und Defaults von LightOS plausibilisiert"
+  },
+  "modi": [
+    {
+      "name": "11 Channel",
+      "kanaele": [
+        {"name": "Total Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Total Strobe/Flash", "attribut": "shutter", "default": 0, "highlight": 0},
+        {
+          "name": "Color Macro",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 25, "name": "No function", "art": ""},
+            {"von": 26, "bis": 35, "name": "White color"},
+            {"von": 36, "bis": 55, "name": "Run horse mode1(Color control by CH5-10)"},
+            {"von": 56, "bis": 65, "name": "Color select (Color control by CH5)"},
+            {"von": 66, "bis": 75, "name": "Color Jump mode"},
+            {"von": 76, "bis": 85, "name": "Color Gradual change mode"},
+            {"von": 86, "bis": 245, "name": "Run horse mode", "art": ""},
+            {"von": 246, "bis": 255, "name": "Sound control", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Run horse mode direction",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Run horse mode direction", "art": ""}
+          ]
+        },
+        {
+          "name": "Program Speed adjustment",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Program Speed adjustment", "art": ""}
+          ]
+        },
+        {"name": "Total Red Dimmer", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Total Green Dimmer", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Total Blue Dimmer", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Total White Dimmer", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Total Amber Dimmer", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "Total Violet Dimmer", "attribut": "color_uv", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "29 Channel",
+      "kanaele": [
+        {"name": "Total Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Total Strobe/Flash", "attribut": "shutter", "default": 0, "highlight": 0},
+        {
+          "name": "Color Macro",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 25, "name": "No function", "art": ""},
+            {"von": 26, "bis": 35, "name": "White color"},
+            {"von": 36, "bis": 55, "name": "Run horse mode1(Color control by CH5-10)"},
+            {"von": 56, "bis": 65, "name": "Color select (Color control by CH5)"},
+            {"von": 66, "bis": 75, "name": "Color Jump mode"},
+            {"von": 76, "bis": 85, "name": "Color Gradual change mode"},
+            {"von": 86, "bis": 245, "name": "Run horse mode", "art": ""},
+            {"von": 246, "bis": 255, "name": "Sound control", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Run horse mode direction",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Run horse mode direction", "art": ""}
+          ]
+        },
+        {
+          "name": "Program Speed adjustment",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Program Speed adjustment", "art": ""}
+          ]
+        },
+        {"name": "Total Red Dim", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Total Green Dim", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Total Blue Dim", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Total White Dim", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Total Amber Dim", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Total UV Dim", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "LED color select 1",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "LED color select"}
+          ]
+        },
+        {
+          "name": "LED color select 2",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "LED color select"}
+          ]
+        },
+        {
+          "name": "LED color select 3",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "LED color select"}
+          ]
+        },
+        {
+          "name": "LED color select 4",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "LED color select"}
+          ]
+        },
+        {
+          "name": "LED color select 5",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "LED color select"}
+          ]
+        },
+        {
+          "name": "LED color select 6",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "LED color select"}
+          ]
+        },
+        {
+          "name": "LED color select 7",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "LED color select"}
+          ]
+        },
+        {
+          "name": "LED color select 8",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "LED color select"}
+          ]
+        },
+        {
+          "name": "LED color select 9",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "LED color select"}
+          ]
+        },
+        {
+          "name": "LED color select 10",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "LED color select"}
+          ]
+        },
+        {
+          "name": "LED color select 11",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "LED color select"}
+          ]
+        },
+        {
+          "name": "LED color select 12",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "LED color select"}
+          ]
+        },
+        {
+          "name": "LED color select 13",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "LED color select"}
+          ]
+        },
+        {
+          "name": "LED color select 14",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "LED color select"}
+          ]
+        },
+        {
+          "name": "LED color select 15",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "LED color select"}
+          ]
+        },
+        {
+          "name": "LED color select 16",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "LED color select"}
+          ]
+        },
+        {
+          "name": "LED color select 17",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "LED color select"}
+          ]
+        },
+        {
+          "name": "LED color select 18",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "LED color select"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "108 Channel",
+      "raster": {"rows": 1, "cols": 18},
+      "kanaele": [
+        {"name": "Red 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 1", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 1", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 2", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 2", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red 3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 3", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 3", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 3", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red 4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 4", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 4", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 4", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 4", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red 5", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 5", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 5", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 5", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 5", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 5", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red 6", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 6", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 6", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 6", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 6", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 6", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red 7", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 7", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 7", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 7", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 7", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 7", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red 8", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 8", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 8", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 8", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 8", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 8", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red 9", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 9", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 9", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 9", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 9", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 9", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red 10", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 10", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 10", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 10", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 10", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 10", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red 11", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 11", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 11", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 11", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 11", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 11", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red 12", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 12", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 12", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 12", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 12", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 12", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red 13", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 13", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 13", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 13", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 13", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 13", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red 14", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 14", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 14", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 14", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 14", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 14", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red 15", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 15", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 15", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 15", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 15", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 15", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red 16", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 16", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 16", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 16", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 16", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 16", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red 17", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 17", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 17", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 17", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 17", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 17", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red 18", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 18", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 18", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 18", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 18", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 18", "attribut": "color_uv", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "119 Channel",
+      "raster": {"rows": 1, "cols": 18},
+      "kanaele": [
+        {"name": "Total Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Total Strobe/Flash", "attribut": "shutter", "default": 0, "highlight": 0},
+        {
+          "name": "Color Macro",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 25, "name": "No function", "art": ""},
+            {"von": 26, "bis": 35, "name": "White color"},
+            {"von": 36, "bis": 55, "name": "Run horse mode1(Color control by CH5-10)"},
+            {"von": 56, "bis": 65, "name": "Color select (Color control by CH5)"},
+            {"von": 66, "bis": 75, "name": "Color Jump mode"},
+            {"von": 76, "bis": 85, "name": "Color Gradual change mode"},
+            {"von": 86, "bis": 245, "name": "Run horse mode", "art": ""},
+            {"von": 246, "bis": 255, "name": "Sound control", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Run horse mode direction",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Run horse mode direction", "art": ""}
+          ]
+        },
+        {
+          "name": "Program Speed adjustment",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Program Speed adjustment", "art": ""}
+          ]
+        },
+        {"name": "Total Red Dim", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Total Green Dim", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Total Blue Dim", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Total White Dim", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Total Amber Dim", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Total UV Dim", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Red 1", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 1", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 1", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 1", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 1", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 1", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red 2", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 2", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 2", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 2", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 2", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 2", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red 3", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 3", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 3", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 3", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 3", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 3", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red 4", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 4", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 4", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 4", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 4", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 4", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red 5", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 5", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 5", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 5", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 5", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 5", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red 6", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 6", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 6", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 6", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 6", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 6", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red 7", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 7", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 7", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 7", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 7", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 7", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red 8", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 8", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 8", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 8", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 8", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 8", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red 9", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 9", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 9", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 9", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 9", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 9", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red 10", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 10", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 10", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 10", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 10", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 10", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red 11", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 11", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 11", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 11", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 11", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 11", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red 12", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 12", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 12", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 12", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 12", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 12", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red 13", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 13", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 13", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 13", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 13", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 13", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red 14", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 14", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 14", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 14", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 14", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 14", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red 15", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 15", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 15", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 15", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 15", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 15", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red 16", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 16", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 16", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 16", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 16", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 16", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red 17", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 17", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 17", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 17", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 17", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 17", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Red 18", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green 18", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue 18", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White 18", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "Amber 18", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "UV 18", "attribut": "color_uv", "default": 0, "highlight": 255}
+      ]
+    }
+  ]
+}

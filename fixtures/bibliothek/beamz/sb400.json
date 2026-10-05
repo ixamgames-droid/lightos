@@ -16,7 +16,7 @@
     "lizenz": "Apache-2.0",
     "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.13.1 GIT · Dmitry Kolesnikov",
     "original": "resources/fixtures/beamZ/beamZ-SB400.qxf",
-    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 4 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): Herstellername 'beamZ' -> 'BeamZ'; kurzname SB400; typ matrix mit Raster 2x2 statt strobe (Blinder mit vier einzeln dimmbaren COB-Zellen); Strobe-Bereiche nach Handbuch ergaenzt (0-1 offen, 2-255 Strobe); Makro-Tempo als effect_speed statt speed; Kanalnamen deutsch, Modusbeschreibung ergaenzt"
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 4 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): Herstellername 'beamZ' -> 'BeamZ'; kurzname SB400; typ matrix mit Raster 2x2 statt strobe (Blinder mit vier einzeln dimmbaren COB-Zellen); Strobe-Bereiche nach Handbuch ergaenzt (0-1 offen, 2-255 Strobe); Makro-Tempo als effect_speed statt speed; Kanalnamen deutsch, Modusbeschreibung ergaenzt; Rasterform in 1 Modus/Modi entfernt, weil sie nicht zu den color_r-Kanaelen passt (keine echten Farbzonen)"
   },
   "autor": "LightOS (QXF-Konverter)",
   "geprueft": {
@@ -27,7 +27,6 @@
     {
       "name": "8 Channel",
       "beschreibung": "Master, Strobe, Makro, Makro-Tempo, 4 COB-Zellen einzeln (Raster 2x2)",
-      "raster": {"rows": 2, "cols": 2},
       "kanaele": [
         {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
         {

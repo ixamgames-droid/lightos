@@ -1,0 +1,773 @@
+{
+  "format_version": 1,
+  "hersteller": "Cameo",
+  "hersteller_kurz": "Cameo",
+  "modell": "Multi FX Bar EZ",
+  "kurzname": "MULTI FX BAR EZ",
+  "typ": "other",
+  "leistung_w": 110,
+  "quelle": {
+    "titel": "Cameo MULTI FX BAR EZ (CLMFXBAREZ) – User's Manual 10-2021, DMX Control S. 75–80",
+    "url": "https://www.cameolight.com/en/downloads/file/id/1746240921"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.0.0 Beta 1 · Jan Peter Dohle",
+    "original": "resources/fixtures/Cameo/Cameo-Multi-FX-Bar-EZ.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 299 Wertebereiche mit Art (kind) versehen; Rasterform in 7 Modus/Modi aus <Physical> uebernommen; typ par -> other (Effektleiste: 4 PARs, 2 Derbys, 4 Blitz-LEDs); Blitz-LEDs (Flash) shutter -> raw mit Default/Highlight 0 = Blackout (vorher 253 = Dauerlicht), 'Blackout' ohne Art 'closed'; Strobe der PARs/Derbys Default/Highlight 0 statt 2 (Offen-Bereich); Farbmakros: 'Colour off' als 'open', Stopp ohne Art, Jumping/Fading 'rotate', Highlight 110 (White) statt 0 = Colour off; Derby-Rotation speed -> raw (Drehrichtung/-tempo, Bereiche 'rotate'; speed ist Pan/Tilt-Tempo); Programm-/Chase-Speed/Sound speed -> effect_speed; Auto-Programme: 'Blackout' ohne Art 'closed'; Chase 'Off' ohne Art 'color'; Raster 2x4 aus <Physical> ersetzt: 1x4 nur im 28-CH-Modus (4 PARs einzeln), sonst ohne Raster; kurzname/notizen/quelle gesetzt"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": true,
+    "wie": "Alle sieben Modi (5-1/5-2/7/10/25/28/36 CH) Kanal fuer Kanal und Bereich fuer Bereich gegen die DMX-Tabellen im Handbuch CLMFXBAREZ 10-2021 (S. 75–80, cameolight.com) geprueft"
+  },
+  "modi": [
+    {
+      "name": "5 Channel 1",
+      "kanaele": [
+        {"name": "Master Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Auto Program LED PAR",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Blackout", "art": ""},
+            {"von": 6, "bis": 30, "name": "Auto PAR 1", "art": ""},
+            {"von": 31, "bis": 55, "name": "Auto PAR 2", "art": ""},
+            {"von": 56, "bis": 80, "name": "Auto PAR 3", "art": ""},
+            {"von": 81, "bis": 105, "name": "Auto PAR 4", "art": ""},
+            {"von": 106, "bis": 130, "name": "Auto PAR 5", "art": ""},
+            {"von": 131, "bis": 155, "name": "Auto PAR 6", "art": ""},
+            {"von": 156, "bis": 180, "name": "Auto PAR 7", "art": ""},
+            {"von": 181, "bis": 205, "name": "Auto PAR 8", "art": ""},
+            {"von": 206, "bis": 230, "name": "Auto PAR 9", "art": ""},
+            {"von": 231, "bis": 255, "name": "Auto PAR 10", "art": ""}
+          ]
+        },
+        {
+          "name": "Auto Program Derby",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Blackout", "art": ""},
+            {"von": 6, "bis": 30, "name": "Auto Derby 1", "art": ""},
+            {"von": 31, "bis": 55, "name": "Auto Derby 2", "art": ""},
+            {"von": 56, "bis": 80, "name": "Auto Derby 3", "art": ""},
+            {"von": 81, "bis": 105, "name": "Auto Derby 4", "art": ""},
+            {"von": 106, "bis": 130, "name": "Auto Derby 5", "art": ""},
+            {"von": 131, "bis": 155, "name": "Auto Derby 6", "art": ""},
+            {"von": 156, "bis": 180, "name": "Auto Derby 7", "art": ""},
+            {"von": 181, "bis": 205, "name": "Auto Derby 8", "art": ""},
+            {"von": 206, "bis": 230, "name": "Auto Derby 9", "art": ""},
+            {"von": 231, "bis": 255, "name": "Auto Derby 10", "art": ""}
+          ]
+        },
+        {
+          "name": "Auto Program Flash Lights",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Blackout", "art": ""},
+            {"von": 6, "bis": 30, "name": "Auto Flash Lights 1", "art": ""},
+            {"von": 31, "bis": 55, "name": "Auto Flash Lights 2", "art": ""},
+            {"von": 56, "bis": 80, "name": "Auto Flash Lights 3", "art": ""},
+            {"von": 81, "bis": 105, "name": "Auto Flash Lights 4", "art": ""},
+            {"von": 106, "bis": 130, "name": "Auto Flash Lights 5", "art": ""},
+            {"von": 131, "bis": 155, "name": "Auto Flash Lights 6", "art": ""},
+            {"von": 156, "bis": 180, "name": "Auto Flash Lights 7", "art": ""},
+            {"von": 181, "bis": 205, "name": "Auto Flash Lights 8", "art": ""},
+            {"von": 206, "bis": 230, "name": "Auto Flash Lights 9", "art": ""},
+            {"von": 231, "bis": 255, "name": "Auto Flash Lights 10", "art": ""}
+          ]
+        },
+        {
+          "name": "Program Speed/Sound",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Program Speed slow -> fast", "art": ""},
+            {"von": 128, "bis": 255, "name": "Sound Control", "art": "sound"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5 Channel 2",
+      "kanaele": [
+        {"name": "PAR Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "PAR Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 255, "name": "Strobe slow -> fast <1Hz - 20Hz", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "PAR 1+4 Colour",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 110,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Colour off", "art": "open"},
+            {"von": 6, "bis": 13, "name": "Red", "art": "color"},
+            {"von": 14, "bis": 21, "name": "Amber", "art": "color"},
+            {"von": 22, "bis": 29, "name": "Yellow warm", "art": "color"},
+            {"von": 30, "bis": 37, "name": "Yellow", "art": "color"},
+            {"von": 38, "bis": 45, "name": "Green", "art": "color"},
+            {"von": 46, "bis": 53, "name": "Turquoise", "art": "color"},
+            {"von": 54, "bis": 61, "name": "Cyan", "art": "color"},
+            {"von": 62, "bis": 69, "name": "Blue", "art": "color"},
+            {"von": 70, "bis": 77, "name": "Lavender", "art": "color"},
+            {"von": 78, "bis": 85, "name": "Mauve", "art": "color"},
+            {"von": 86, "bis": 93, "name": "Magenta", "art": "color"},
+            {"von": 94, "bis": 101, "name": "Pink", "art": "color"},
+            {"von": 102, "bis": 109, "name": "Warm White", "art": "color"},
+            {"von": 110, "bis": 117, "name": "White", "art": "color"},
+            {"von": 118, "bis": 125, "name": "Cold White", "art": "color"},
+            {"von": 126, "bis": 127, "name": "Colour Jumping Stop", "art": ""},
+            {"von": 128, "bis": 191, "name": "Colour Jumping Speed slow -> fast / Colour 1 -> 12", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "Colour Fading Speed slow -> fast / Colour 1 -> 12", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "PAR 2+3 Colour",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 110,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Colour off", "art": "open"},
+            {"von": 6, "bis": 13, "name": "Red", "art": "color"},
+            {"von": 14, "bis": 21, "name": "Amber", "art": "color"},
+            {"von": 22, "bis": 29, "name": "Yellow warm", "art": "color"},
+            {"von": 30, "bis": 37, "name": "Yellow", "art": "color"},
+            {"von": 38, "bis": 45, "name": "Green", "art": "color"},
+            {"von": 46, "bis": 53, "name": "Turquoise", "art": "color"},
+            {"von": 54, "bis": 61, "name": "Cyan", "art": "color"},
+            {"von": 62, "bis": 69, "name": "Blue", "art": "color"},
+            {"von": 70, "bis": 77, "name": "Lavender", "art": "color"},
+            {"von": 78, "bis": 85, "name": "Mauve", "art": "color"},
+            {"von": 86, "bis": 93, "name": "Magenta", "art": "color"},
+            {"von": 94, "bis": 101, "name": "Pink", "art": "color"},
+            {"von": 102, "bis": 109, "name": "Warm White", "art": "color"},
+            {"von": 110, "bis": 117, "name": "White", "art": "color"},
+            {"von": 118, "bis": 125, "name": "Cold White", "art": "color"},
+            {"von": 126, "bis": 127, "name": "Colour Jumping Stop", "art": ""},
+            {"von": 128, "bis": 191, "name": "Colour Jumping Speed slow -> fast / Colour 1 -> 12", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "Colour Fading Speed slow -> fast / Colour 1 -> 12", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Flash 1-4",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Blackout", "art": ""},
+            {"von": 6, "bis": 250, "name": "Strobe speed slow-> fast <1Hz-20Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "7 Channel",
+      "kanaele": [
+        {"name": "PAR+Derby Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Chase",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 13, "name": "Off (Colour 1= PAR; Colour2 = Derby)", "art": ""},
+            {"von": 14, "bis": 35, "name": "PAR only 1", "art": ""},
+            {"von": 36, "bis": 57, "name": "PAR only 2", "art": ""},
+            {"von": 58, "bis": 79, "name": "PAR only 3", "art": ""},
+            {"von": 80, "bis": 101, "name": "PAR only 4", "art": ""},
+            {"von": 102, "bis": 123, "name": "Derby only 1", "art": ""},
+            {"von": 124, "bis": 145, "name": "Derby only 2", "art": ""},
+            {"von": 146, "bis": 167, "name": "PAR + Derby 1", "art": ""},
+            {"von": 168, "bis": 189, "name": "PAR + Derby 2", "art": ""},
+            {"von": 190, "bis": 211, "name": "PAR + Derby 3", "art": ""},
+            {"von": 212, "bis": 233, "name": "PAR + Derby 4", "art": ""},
+            {"von": 234, "bis": 255, "name": "PAR + Derby 5", "art": ""}
+          ]
+        },
+        {
+          "name": "Chase Speed/Sound",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Chase Speed slow -> fast", "art": ""},
+            {"von": 128, "bis": 255, "name": "Sound Control", "art": "sound"}
+          ]
+        },
+        {
+          "name": "Colour 1",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 110,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Colour off", "art": "open"},
+            {"von": 6, "bis": 13, "name": "Red", "art": "color"},
+            {"von": 14, "bis": 21, "name": "Amber", "art": "color"},
+            {"von": 22, "bis": 29, "name": "Yellow warm", "art": "color"},
+            {"von": 30, "bis": 37, "name": "Yellow", "art": "color"},
+            {"von": 38, "bis": 45, "name": "Green", "art": "color"},
+            {"von": 46, "bis": 53, "name": "Turquoise", "art": "color"},
+            {"von": 54, "bis": 61, "name": "Cyan", "art": "color"},
+            {"von": 62, "bis": 69, "name": "Blue", "art": "color"},
+            {"von": 70, "bis": 77, "name": "Lavender", "art": "color"},
+            {"von": 78, "bis": 85, "name": "Mauve", "art": "color"},
+            {"von": 86, "bis": 93, "name": "Magenta", "art": "color"},
+            {"von": 94, "bis": 101, "name": "Pink", "art": "color"},
+            {"von": 102, "bis": 109, "name": "Warm White", "art": "color"},
+            {"von": 110, "bis": 117, "name": "White", "art": "color"},
+            {"von": 118, "bis": 125, "name": "Cold White", "art": "color"},
+            {"von": 126, "bis": 127, "name": "Colour Jumping Stop", "art": ""},
+            {"von": 128, "bis": 191, "name": "Colour Jumping Speed slow -> fast / Colour 1 -> 12", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "Colour Fading Speed slow -> fast / Colour 1 -> 12", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Colour 2",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 110,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Colour off", "art": "open"},
+            {"von": 6, "bis": 13, "name": "Red", "art": "color"},
+            {"von": 14, "bis": 21, "name": "Amber", "art": "color"},
+            {"von": 22, "bis": 29, "name": "Yellow warm", "art": "color"},
+            {"von": 30, "bis": 37, "name": "Yellow", "art": "color"},
+            {"von": 38, "bis": 45, "name": "Green", "art": "color"},
+            {"von": 46, "bis": 53, "name": "Turquoise", "art": "color"},
+            {"von": 54, "bis": 61, "name": "Cyan", "art": "color"},
+            {"von": 62, "bis": 69, "name": "Blue", "art": "color"},
+            {"von": 70, "bis": 77, "name": "Lavender", "art": "color"},
+            {"von": 78, "bis": 85, "name": "Mauve", "art": "color"},
+            {"von": 86, "bis": 93, "name": "Magenta", "art": "color"},
+            {"von": 94, "bis": 101, "name": "Pink", "art": "color"},
+            {"von": 102, "bis": 109, "name": "Warm White", "art": "color"},
+            {"von": 110, "bis": 117, "name": "White", "art": "color"},
+            {"von": 118, "bis": 125, "name": "Cold White", "art": "color"},
+            {"von": 126, "bis": 127, "name": "Colour Jumping Stop", "art": ""},
+            {"von": 128, "bis": 191, "name": "Colour Jumping Speed slow -> fast / Colour 1 -> 12", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "Colour Fading Speed slow -> fast / Colour 1 -> 12", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Derby 1-2",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "no function", "art": ""},
+            {"von": 6, "bis": 126, "name": "clockwise rotation (slow to fast)", "art": "rotate"},
+            {"von": 127, "bis": 128, "name": "no movement", "art": ""},
+            {"von": 129, "bis": 255, "name": "counter clockwise rotation (fast to slow)", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Flash 1-4",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Blackout", "art": ""},
+            {"von": 6, "bis": 250, "name": "Strobe speed slow-> fast <1Hz-20Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "10 Channel",
+      "kanaele": [
+        {"name": "PAR+Derby Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "PAR+Derby Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 255, "name": "Strobe slow -> fast <1Hz - 20Hz", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "PAR 1-4 Colour",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 110,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Colour off", "art": "open"},
+            {"von": 6, "bis": 13, "name": "Red", "art": "color"},
+            {"von": 14, "bis": 21, "name": "Amber", "art": "color"},
+            {"von": 22, "bis": 29, "name": "Yellow warm", "art": "color"},
+            {"von": 30, "bis": 37, "name": "Yellow", "art": "color"},
+            {"von": 38, "bis": 45, "name": "Green", "art": "color"},
+            {"von": 46, "bis": 53, "name": "Turquoise", "art": "color"},
+            {"von": 54, "bis": 61, "name": "Cyan", "art": "color"},
+            {"von": 62, "bis": 69, "name": "Blue", "art": "color"},
+            {"von": 70, "bis": 77, "name": "Lavender", "art": "color"},
+            {"von": 78, "bis": 85, "name": "Mauve", "art": "color"},
+            {"von": 86, "bis": 93, "name": "Magenta", "art": "color"},
+            {"von": 94, "bis": 101, "name": "Pink", "art": "color"},
+            {"von": 102, "bis": 109, "name": "Warm White", "art": "color"},
+            {"von": 110, "bis": 117, "name": "White", "art": "color"},
+            {"von": 118, "bis": 125, "name": "Cold White", "art": "color"},
+            {"von": 126, "bis": 127, "name": "Colour Jumping Stop", "art": ""},
+            {"von": 128, "bis": 191, "name": "Colour Jumping Speed slow -> fast / Colour 1 -> 12", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "Colour Fading Speed slow -> fast / Colour 1 -> 12", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Derby 1-2 Colour",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 110,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Colour off", "art": "open"},
+            {"von": 6, "bis": 13, "name": "Red", "art": "color"},
+            {"von": 14, "bis": 21, "name": "Amber", "art": "color"},
+            {"von": 22, "bis": 29, "name": "Yellow warm", "art": "color"},
+            {"von": 30, "bis": 37, "name": "Yellow", "art": "color"},
+            {"von": 38, "bis": 45, "name": "Green", "art": "color"},
+            {"von": 46, "bis": 53, "name": "Turquoise", "art": "color"},
+            {"von": 54, "bis": 61, "name": "Cyan", "art": "color"},
+            {"von": 62, "bis": 69, "name": "Blue", "art": "color"},
+            {"von": 70, "bis": 77, "name": "Lavender", "art": "color"},
+            {"von": 78, "bis": 85, "name": "Mauve", "art": "color"},
+            {"von": 86, "bis": 93, "name": "Magenta", "art": "color"},
+            {"von": 94, "bis": 101, "name": "Pink", "art": "color"},
+            {"von": 102, "bis": 109, "name": "Warm White", "art": "color"},
+            {"von": 110, "bis": 117, "name": "White", "art": "color"},
+            {"von": 118, "bis": 125, "name": "Cold White", "art": "color"},
+            {"von": 126, "bis": 127, "name": "Colour Jumping Stop", "art": ""},
+            {"von": 128, "bis": 191, "name": "Colour Jumping Speed slow -> fast / Colour 1 -> 12", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "Colour Fading Speed slow -> fast / Colour 1 -> 12", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Derby 1-2",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "no function", "art": ""},
+            {"von": 6, "bis": 126, "name": "clockwise rotation (slow to fast)", "art": "rotate"},
+            {"von": 127, "bis": 128, "name": "no movement", "art": ""},
+            {"von": 129, "bis": 255, "name": "counter clockwise rotation (fast to slow)", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Flash 1-4",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Blackout", "art": ""},
+            {"von": 6, "bis": 250, "name": "Strobe speed slow-> fast <1Hz-20Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        },
+        {
+          "name": "Auto Program LED PAR",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Blackout", "art": ""},
+            {"von": 6, "bis": 30, "name": "Auto PAR 1", "art": ""},
+            {"von": 31, "bis": 55, "name": "Auto PAR 2", "art": ""},
+            {"von": 56, "bis": 80, "name": "Auto PAR 3", "art": ""},
+            {"von": 81, "bis": 105, "name": "Auto PAR 4", "art": ""},
+            {"von": 106, "bis": 130, "name": "Auto PAR 5", "art": ""},
+            {"von": 131, "bis": 155, "name": "Auto PAR 6", "art": ""},
+            {"von": 156, "bis": 180, "name": "Auto PAR 7", "art": ""},
+            {"von": 181, "bis": 205, "name": "Auto PAR 8", "art": ""},
+            {"von": 206, "bis": 230, "name": "Auto PAR 9", "art": ""},
+            {"von": 231, "bis": 255, "name": "Auto PAR 10", "art": ""}
+          ]
+        },
+        {
+          "name": "Auto Program Derby",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Blackout", "art": ""},
+            {"von": 6, "bis": 30, "name": "Auto Derby 1", "art": ""},
+            {"von": 31, "bis": 55, "name": "Auto Derby 2", "art": ""},
+            {"von": 56, "bis": 80, "name": "Auto Derby 3", "art": ""},
+            {"von": 81, "bis": 105, "name": "Auto Derby 4", "art": ""},
+            {"von": 106, "bis": 130, "name": "Auto Derby 5", "art": ""},
+            {"von": 131, "bis": 155, "name": "Auto Derby 6", "art": ""},
+            {"von": 156, "bis": 180, "name": "Auto Derby 7", "art": ""},
+            {"von": 181, "bis": 205, "name": "Auto Derby 8", "art": ""},
+            {"von": 206, "bis": 230, "name": "Auto Derby 9", "art": ""},
+            {"von": 231, "bis": 255, "name": "Auto Derby 10", "art": ""}
+          ]
+        },
+        {
+          "name": "Auto Program Flash Lights",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Blackout", "art": ""},
+            {"von": 6, "bis": 30, "name": "Auto Flash Lights 1", "art": ""},
+            {"von": 31, "bis": 55, "name": "Auto Flash Lights 2", "art": ""},
+            {"von": 56, "bis": 80, "name": "Auto Flash Lights 3", "art": ""},
+            {"von": 81, "bis": 105, "name": "Auto Flash Lights 4", "art": ""},
+            {"von": 106, "bis": 130, "name": "Auto Flash Lights 5", "art": ""},
+            {"von": 131, "bis": 155, "name": "Auto Flash Lights 6", "art": ""},
+            {"von": 156, "bis": 180, "name": "Auto Flash Lights 7", "art": ""},
+            {"von": 181, "bis": 205, "name": "Auto Flash Lights 8", "art": ""},
+            {"von": 206, "bis": 230, "name": "Auto Flash Lights 9", "art": ""},
+            {"von": 231, "bis": 255, "name": "Auto Flash Lights 10", "art": ""}
+          ]
+        },
+        {
+          "name": "Program Speed/Sound",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Program Speed slow -> fast", "art": ""},
+            {"von": 128, "bis": 255, "name": "Sound Control", "art": "sound"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "25 Channel",
+      "kanaele": [
+        {"name": "PAR+Derby Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "PAR 1+4 - Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "PAR 1+4 - Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "PAR 1+4 - Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "PAR 1+4 - White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "PAR 1+4 - Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "PAR 1+4 - UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {
+          "name": "PAR 1+4 Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 255, "name": "Strobe slow -> fast <1Hz - 20Hz", "art": "strobe"}
+          ]
+        },
+        {"name": "PAR 2+3 - Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "PAR 2+3 - Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "PAR 2+3 - Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "PAR 2+3 - White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "PAR 2+3 - Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "PAR 2+3 - UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {
+          "name": "PAR 2+3 Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 255, "name": "Strobe slow -> fast <1Hz - 20Hz", "art": "strobe"}
+          ]
+        },
+        {"name": "Derby 1-2 - Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Derby 1-2 - Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Derby 1-2 - Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {
+          "name": "Derby 1-2 Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 255, "name": "Strobe slow -> fast <1Hz - 20Hz", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Derby 1-2",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "no function", "art": ""},
+            {"von": 6, "bis": 126, "name": "clockwise rotation (slow to fast)", "art": "rotate"},
+            {"von": 127, "bis": 128, "name": "no movement", "art": ""},
+            {"von": 129, "bis": 255, "name": "counter clockwise rotation (fast to slow)", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Flash 1-4",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Blackout", "art": ""},
+            {"von": 6, "bis": 250, "name": "Strobe speed slow-> fast <1Hz-20Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        },
+        {
+          "name": "Auto Program LED PAR",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Blackout", "art": ""},
+            {"von": 6, "bis": 30, "name": "Auto PAR 1", "art": ""},
+            {"von": 31, "bis": 55, "name": "Auto PAR 2", "art": ""},
+            {"von": 56, "bis": 80, "name": "Auto PAR 3", "art": ""},
+            {"von": 81, "bis": 105, "name": "Auto PAR 4", "art": ""},
+            {"von": 106, "bis": 130, "name": "Auto PAR 5", "art": ""},
+            {"von": 131, "bis": 155, "name": "Auto PAR 6", "art": ""},
+            {"von": 156, "bis": 180, "name": "Auto PAR 7", "art": ""},
+            {"von": 181, "bis": 205, "name": "Auto PAR 8", "art": ""},
+            {"von": 206, "bis": 230, "name": "Auto PAR 9", "art": ""},
+            {"von": 231, "bis": 255, "name": "Auto PAR 10", "art": ""}
+          ]
+        },
+        {
+          "name": "Auto Program Derby",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Blackout", "art": ""},
+            {"von": 6, "bis": 30, "name": "Auto Derby 1", "art": ""},
+            {"von": 31, "bis": 55, "name": "Auto Derby 2", "art": ""},
+            {"von": 56, "bis": 80, "name": "Auto Derby 3", "art": ""},
+            {"von": 81, "bis": 105, "name": "Auto Derby 4", "art": ""},
+            {"von": 106, "bis": 130, "name": "Auto Derby 5", "art": ""},
+            {"von": 131, "bis": 155, "name": "Auto Derby 6", "art": ""},
+            {"von": 156, "bis": 180, "name": "Auto Derby 7", "art": ""},
+            {"von": 181, "bis": 205, "name": "Auto Derby 8", "art": ""},
+            {"von": 206, "bis": 230, "name": "Auto Derby 9", "art": ""},
+            {"von": 231, "bis": 255, "name": "Auto Derby 10", "art": ""}
+          ]
+        },
+        {
+          "name": "Auto Program Flash Lights",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Blackout", "art": ""},
+            {"von": 6, "bis": 30, "name": "Auto Flash Lights 1", "art": ""},
+            {"von": 31, "bis": 55, "name": "Auto Flash Lights 2", "art": ""},
+            {"von": 56, "bis": 80, "name": "Auto Flash Lights 3", "art": ""},
+            {"von": 81, "bis": 105, "name": "Auto Flash Lights 4", "art": ""},
+            {"von": 106, "bis": 130, "name": "Auto Flash Lights 5", "art": ""},
+            {"von": 131, "bis": 155, "name": "Auto Flash Lights 6", "art": ""},
+            {"von": 156, "bis": 180, "name": "Auto Flash Lights 7", "art": ""},
+            {"von": 181, "bis": 205, "name": "Auto Flash Lights 8", "art": ""},
+            {"von": 206, "bis": 230, "name": "Auto Flash Lights 9", "art": ""},
+            {"von": 231, "bis": 255, "name": "Auto Flash Lights 10", "art": ""}
+          ]
+        },
+        {
+          "name": "Program Speed/Sound",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 127, "name": "Program Speed slow -> fast", "art": ""},
+            {"von": 128, "bis": 255, "name": "Sound Control", "art": "sound"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "28 Channel",
+      "raster": {"rows": 1, "cols": 4},
+      "kanaele": [
+        {"name": "PAR 1 - Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "PAR 1 - Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "PAR 1 - Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "PAR 1 - White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "PAR 1 - Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "PAR 1 - UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "PAR 2 - Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "PAR 2 - Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "PAR 2 - Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "PAR 2 - White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "PAR 2 - Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "PAR 2 - UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "PAR 3 - Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "PAR 3 - Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "PAR 3 - Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "PAR 3 - White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "PAR 3 - Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "PAR 3 - UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "PAR 4 - Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "PAR 4 - Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "PAR 4 - Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "PAR 4 - White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "PAR 4 - Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "PAR 4 - UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {
+          "name": "Flash 1",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Blackout", "art": ""},
+            {"von": 6, "bis": 250, "name": "Strobe speed slow-> fast <1Hz-20Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        },
+        {
+          "name": "Flash 2",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Blackout", "art": ""},
+            {"von": 6, "bis": 250, "name": "Strobe speed slow-> fast <1Hz-20Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        },
+        {
+          "name": "Flash 3",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Blackout", "art": ""},
+            {"von": 6, "bis": 250, "name": "Strobe speed slow-> fast <1Hz-20Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        },
+        {
+          "name": "Flash 4",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Blackout", "art": ""},
+            {"von": 6, "bis": 250, "name": "Strobe speed slow-> fast <1Hz-20Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "36 Channel",
+      "kanaele": [
+        {"name": "PAR 1 - Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "PAR 1 - Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "PAR 1 - Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "PAR 1 - White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "PAR 1 - Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "PAR 1 - UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "PAR 2 - Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "PAR 2 - Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "PAR 2 - Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "PAR 2 - White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "PAR 2 - Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "PAR 2 - UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "PAR 3 - Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "PAR 3 - Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "PAR 3 - Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "PAR 3 - White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "PAR 3 - Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "PAR 3 - UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "PAR 4 - Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "PAR 4 - Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "PAR 4 - Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "PAR 4 - White", "attribut": "color_w", "default": 0, "highlight": 255},
+        {"name": "PAR 4 - Amber", "attribut": "color_a", "default": 0, "highlight": 255},
+        {"name": "PAR 4 - UV", "attribut": "color_uv", "default": 0, "highlight": 255},
+        {"name": "Derby 1 - Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Derby 1 - Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Derby 1 - Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {
+          "name": "Derby 1 - Rotate",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "no function", "art": ""},
+            {"von": 6, "bis": 126, "name": "clockwise rotation (slow to fast)", "art": "rotate"},
+            {"von": 127, "bis": 128, "name": "no movement", "art": ""},
+            {"von": 129, "bis": 255, "name": "counter clockwise rotation (fast to slow)", "art": "rotate"}
+          ]
+        },
+        {"name": "Derby 2 - Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Derby 2 - Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Derby 2 - Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {
+          "name": "Derby 2 - Rotate",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "no function", "art": ""},
+            {"von": 6, "bis": 126, "name": "clockwise rotation (slow to fast)", "art": "rotate"},
+            {"von": 127, "bis": 128, "name": "no movement", "art": ""},
+            {"von": 129, "bis": 255, "name": "counter clockwise rotation (fast to slow)", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Flash 1",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Blackout", "art": ""},
+            {"von": 6, "bis": 250, "name": "Strobe speed slow-> fast <1Hz-20Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        },
+        {
+          "name": "Flash 2",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Blackout", "art": ""},
+            {"von": 6, "bis": 250, "name": "Strobe speed slow-> fast <1Hz-20Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        },
+        {
+          "name": "Flash 3",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Blackout", "art": ""},
+            {"von": 6, "bis": 250, "name": "Strobe speed slow-> fast <1Hz-20Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        },
+        {
+          "name": "Flash 4",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Blackout", "art": ""},
+            {"von": 6, "bis": 250, "name": "Strobe speed slow-> fast <1Hz-20Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Effektleiste (CLMFXBAREZ): 4 RGBWA+UV-PARs (paarweise 1+4 / 2+3), 2 RGB-Derbys, 4 Blitz-LEDs. Die Auto-Kanaele ueberschreiben die Direktkanaele. Raster nur im 28-CH-Modus (4 PARs); in den uebrigen Modi sind die Kanaele nach Gruppen, nicht nach Lage geordnet."
+}

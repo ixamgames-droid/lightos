@@ -1,0 +1,228 @@
+{
+  "format_version": 1,
+  "hersteller": "Cameo",
+  "hersteller_kurz": "Cameo",
+  "modell": "Hydrabeam 100 RGBW",
+  "kurzname": "HYDRABEAM 100 RGBW",
+  "typ": "moving_head",
+  "leistung_w": 20,
+  "notizen": "Einkopf-Moving-Head (CLHB100RGBW), 10 W RGBW-Quad-LED. Im 6-CH-Modus Farbe nur ueber das Farbmakro (0-30 = blackout); in 12/14-CH hat das Farbmakro ab 31 Vorrang vor den RGBW-Kanaelen.",
+  "quelle": {
+    "titel": "Cameo HYDRABEAM 100 (CLHB100RGBW) – User's Manual, DMX Control S. 22–23, Technische Daten",
+    "url": "https://www.manualslib.com/manual/3196023/Cameo-Hydrabeam-100.html?page=22"
+  },
+  "herkunft": {"art": "hersteller-handbuch", "lizenz": "eigen"},
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Aus den DMX-Tabellen des Herstellerhandbuchs (S. 22–23) Kanal fuer Kanal und Bereich fuer Bereich abgeschrieben und gegengelesen; nur Fakten (Kanalfolge, Wertebereiche) uebernommen"
+  },
+  "modi": [
+    {
+      "name": "3-CH",
+      "kanaele": [
+        {
+          "name": "Auto mode / sound mode / reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "no function", "art": ""},
+            {"von": 8, "bis": 30, "name": "show mode 1", "art": ""},
+            {"von": 31, "bis": 53, "name": "show mode 2", "art": ""},
+            {"von": 54, "bis": 76, "name": "show mode 3", "art": ""},
+            {"von": 77, "bis": 99, "name": "show mode 4", "art": ""},
+            {"von": 100, "bis": 122, "name": "sound control mode", "art": "sound"},
+            {"von": 123, "bis": 199, "name": "no function", "art": ""},
+            {"von": 200, "bis": 224, "name": "reset", "art": "reset"},
+            {"von": 225, "bis": 255, "name": "no function", "art": ""}
+          ]
+        },
+        {"name": "Sound sensitivity / auto mode speed", "attribut": "effect_speed", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "6-CH",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Head speed (slow to fast)", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "no function (open)", "art": "open"},
+            {"von": 11, "bis": 255, "name": "strobe slow to fast", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Colour macro",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 241,
+          "bereiche": [
+            {"von": 0, "bis": 30, "name": "blackout", "art": ""},
+            {"von": 31, "bis": 45, "name": "R (Red)", "art": "color"},
+            {"von": 46, "bis": 60, "name": "G (Green)", "art": "color"},
+            {"von": 61, "bis": 75, "name": "B (Blue)", "art": "color"},
+            {"von": 76, "bis": 90, "name": "W (White)", "art": "color"},
+            {"von": 91, "bis": 105, "name": "RG", "art": "color"},
+            {"von": 106, "bis": 120, "name": "RB", "art": "color"},
+            {"von": 121, "bis": 135, "name": "RW", "art": "color"},
+            {"von": 136, "bis": 150, "name": "GB", "art": "color"},
+            {"von": 151, "bis": 165, "name": "GW", "art": "color"},
+            {"von": 166, "bis": 180, "name": "BW", "art": "color"},
+            {"von": 181, "bis": 195, "name": "RGB", "art": "color"},
+            {"von": 196, "bis": 210, "name": "RGW", "art": "color"},
+            {"von": 211, "bis": 225, "name": "RBW", "art": "color"},
+            {"von": 226, "bis": 240, "name": "GBW", "art": "color"},
+            {"von": 241, "bis": 255, "name": "RGBW", "art": "color"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "9-CH",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Head speed (slow to fast)", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "no function (open)", "art": "open"},
+            {"von": 11, "bis": 255, "name": "strobe slow to fast", "art": "strobe"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "12-CH",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Head speed (slow to fast)", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "no function (open)", "art": "open"},
+            {"von": 11, "bis": 255, "name": "strobe slow to fast", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Colour macro",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 30, "name": "use CH9-CH12 to control colour", "art": ""},
+            {"von": 31, "bis": 45, "name": "R (Red)", "art": "color"},
+            {"von": 46, "bis": 60, "name": "G (Green)", "art": "color"},
+            {"von": 61, "bis": 75, "name": "B (Blue)", "art": "color"},
+            {"von": 76, "bis": 90, "name": "W (White)", "art": "color"},
+            {"von": 91, "bis": 105, "name": "RG", "art": "color"},
+            {"von": 106, "bis": 120, "name": "RB", "art": "color"},
+            {"von": 121, "bis": 135, "name": "RW", "art": "color"},
+            {"von": 136, "bis": 150, "name": "GB", "art": "color"},
+            {"von": 151, "bis": 165, "name": "GW", "art": "color"},
+            {"von": 166, "bis": 180, "name": "BW", "art": "color"},
+            {"von": 181, "bis": 195, "name": "RGB", "art": "color"},
+            {"von": 196, "bis": 210, "name": "RGW", "art": "color"},
+            {"von": 211, "bis": 225, "name": "RBW", "art": "color"},
+            {"von": 226, "bis": 240, "name": "GBW", "art": "color"},
+            {"von": 241, "bis": 255, "name": "RGBW", "art": "color"}
+          ]
+        },
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    },
+    {
+      "name": "14-CH",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Head speed (slow to fast)", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "no function (open)", "art": "open"},
+            {"von": 11, "bis": 255, "name": "strobe slow to fast", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Colour macro",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 30, "name": "use CH11-CH14 to control colour", "art": ""},
+            {"von": 31, "bis": 45, "name": "R (Red)", "art": "color"},
+            {"von": 46, "bis": 60, "name": "G (Green)", "art": "color"},
+            {"von": 61, "bis": 75, "name": "B (Blue)", "art": "color"},
+            {"von": 76, "bis": 90, "name": "W (White)", "art": "color"},
+            {"von": 91, "bis": 105, "name": "RG", "art": "color"},
+            {"von": 106, "bis": 120, "name": "RB", "art": "color"},
+            {"von": 121, "bis": 135, "name": "RW", "art": "color"},
+            {"von": 136, "bis": 150, "name": "GB", "art": "color"},
+            {"von": 151, "bis": 165, "name": "GW", "art": "color"},
+            {"von": 166, "bis": 180, "name": "BW", "art": "color"},
+            {"von": 181, "bis": 195, "name": "RGB", "art": "color"},
+            {"von": 196, "bis": 210, "name": "RGW", "art": "color"},
+            {"von": 211, "bis": 225, "name": "RBW", "art": "color"},
+            {"von": 226, "bis": 240, "name": "GBW", "art": "color"},
+            {"von": 241, "bis": 255, "name": "RGBW", "art": "color"}
+          ]
+        },
+        {
+          "name": "Auto mode / sound mode / reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 7, "name": "no function", "art": ""},
+            {"von": 8, "bis": 30, "name": "show mode 1", "art": ""},
+            {"von": 31, "bis": 53, "name": "show mode 2", "art": ""},
+            {"von": 54, "bis": 76, "name": "show mode 3", "art": ""},
+            {"von": 77, "bis": 99, "name": "show mode 4", "art": ""},
+            {"von": 100, "bis": 122, "name": "sound control mode", "art": "sound"},
+            {"von": 123, "bis": 199, "name": "no function", "art": ""},
+            {"von": 200, "bis": 224, "name": "reset", "art": "reset"},
+            {"von": 225, "bis": 255, "name": "no function", "art": ""}
+          ]
+        },
+        {"name": "Sound sensitivity / show mode speed", "attribut": "effect_speed", "default": 0, "highlight": 0},
+        {"name": "Red", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Green", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blue", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "White", "attribut": "color_w", "default": 0, "highlight": 255}
+      ]
+    }
+  ]
+}

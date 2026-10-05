@@ -1,0 +1,663 @@
+{
+  "format_version": 1,
+  "hersteller": "Martin",
+  "hersteller_kurz": "Martin",
+  "modell": "MAC Viper Performance",
+  "kurzname": "MACVIPERPERF",
+  "typ": "moving_head",
+  "leistung_w": 1200,
+  "quelle": {
+    "titel": "MAC Viper Performance User Guide",
+    "version": "Rev. C (Firmware 1.0.0)",
+    "url": "https://www.martin.com/en/site_elements/mac-viper-performance-user-guide"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.3 GIT · Thierry Rodolfo",
+    "original": "resources/fixtures/Martin/Martin-MAC-Viper-Performance.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 318 Wertebereiche mit Art (kind) versehen; 3 Bereichsnamen auf 80 Zeichen gekuerzt; beide Modi nach Martin-Handbuch (MAC Viper Performance User Guide Rev. C, Firmware 1.0.0) neu beschriftet und abgeglichen; Kanallage wie QLC+; CTO intensity -> raw (war ein zweiter Dimmer/Kopf mit Highlight 255); Framing-Winkel und Framing-Rotation zoom -> raw (fuenf falsche Zoom-Kanaele), Default 127 (parallel/0°) laut Handbuch; Shutter-Default 30 (Handbuch; 0-19 schaltet die Lampe in den 800-W-Modus); Farbrad: Scroll-Uebergaenge ohne Art 'color', Offen 'open'; Goborad gobo_rotation -> gobo_wheel (Gobos indiziert/rotierend, Shake 'shake', Scroll 'rotate'); 'Gobo indexing'/'Gobo Rotation' sind MSB/LSB eines 16-bit-Parameters: grob gobo_rotation Default 128 (32768 = 0°), fein -> raw; Animationsrad macro -> animation, Index/Rotation macro -> raw mit Default 127 (Handbuch); Prisma mit 'open'/'prism'-Bereichen, Prisma-Index/-Rotation prism -> prism_rotation mit Default 128 (Handbuch); Zoom/Fokus-Default 128 (Handbuch 32768), Zoom/Fokus fein -> raw; Steuerkanal raw -> reset, Lampe an/aus und Auto-Blackout ohne Arten 'open'/'closed'; deutsche Kanalnamen; kurzname MACVIPERPERF, notizen"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": true,
+    "wie": "Basic- (32) und Extended-Modus (40) Kanal fuer Kanal gegen Tabelle 1 (DMX-Protokoll) im Martin-Handbuch MAC Viper Performance User Guide Rev. C geprueft, inkl. Default-Werten; nicht am Geraet"
+  },
+  "modi": [
+    {
+      "name": "Extended",
+      "kanaele": [
+        {
+          "name": "Shutter/Strobe",
+          "attribut": "shutter",
+          "default": 30,
+          "highlight": 30,
+          "bereiche": [
+            {"von": 0, "bis": 19, "name": "Shutter zu (Lampe nach 10 s auf 800 W)", "art": "closed"},
+            {"von": 20, "bis": 49, "name": "Shutter offen", "art": "open"},
+            {"von": 50, "bis": 200, "name": "Strobe langsam → schnell", "art": "strobe"},
+            {"von": 201, "bis": 210, "name": "Shutter offen", "art": "open"},
+            {"von": 211, "bis": 255, "name": "Zufalls-Strobe langsam → schnell", "art": "strobe"}
+          ]
+        },
+        {"name": "Dimmer (grob)", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Dimmer (fein)", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Cyan", "attribut": "cmy_c", "default": 0, "highlight": 255},
+        {"name": "Magenta", "attribut": "cmy_m", "default": 0, "highlight": 255},
+        {"name": "Gelb", "attribut": "cmy_y", "default": 0, "highlight": 255},
+        {"name": "CTO (6000 K → 3200 K)", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Farbrad",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Offen (Scroll)", "art": "open"},
+            {"von": 1, "bis": 14, "name": "Offen → Slot 1 (Scroll)"},
+            {"von": 15, "bis": 15, "name": "Slot 1 (Scroll)", "art": "color"},
+            {"von": 16, "bis": 29, "name": "Slot 1 → Slot 2 (Scroll)"},
+            {"von": 30, "bis": 30, "name": "Slot 2 (Scroll)", "art": "color"},
+            {"von": 31, "bis": 44, "name": "Slot 2 → Slot 3 (Scroll)"},
+            {"von": 45, "bis": 45, "name": "Slot 3 (Scroll)", "art": "color"},
+            {"von": 46, "bis": 59, "name": "Slot 3 → Slot 4 (Scroll)"},
+            {"von": 60, "bis": 60, "name": "Slot 4 (Scroll)", "art": "color"},
+            {"von": 61, "bis": 74, "name": "Slot 4 → Slot 5 (Scroll)"},
+            {"von": 75, "bis": 75, "name": "Slot 5 (Scroll)", "art": "color"},
+            {"von": 76, "bis": 89, "name": "Slot 5 → Slot 6 (Scroll)"},
+            {"von": 90, "bis": 90, "name": "Slot 6 (Scroll)", "art": "color"},
+            {"von": 91, "bis": 104, "name": "Slot 6 → Slot 7 (Scroll)"},
+            {"von": 105, "bis": 105, "name": "Slot 7 (Scroll)", "art": "color"},
+            {"von": 106, "bis": 119, "name": "Slot 7 → Offen (Scroll)"},
+            {"von": 120, "bis": 160, "name": "Offen", "art": "open"},
+            {"von": 161, "bis": 163, "name": "Slot 1", "art": "color"},
+            {"von": 164, "bis": 166, "name": "Slot 2", "art": "color"},
+            {"von": 167, "bis": 169, "name": "Slot 3", "art": "color"},
+            {"von": 170, "bis": 172, "name": "Slot 4", "art": "color"},
+            {"von": 173, "bis": 175, "name": "Slot 5", "art": "color"},
+            {"von": 176, "bis": 178, "name": "Slot 6", "art": "color"},
+            {"von": 179, "bis": 181, "name": "Slot 7", "art": "color"},
+            {"von": 182, "bis": 192, "name": "Offen", "art": "open"},
+            {"von": 193, "bis": 214, "name": "Rotation im Uhrzeigersinn, schnell → langsam", "art": "rotate"},
+            {"von": 215, "bis": 221, "name": "Stopp an aktueller Position"},
+            {"von": 222, "bis": 243, "name": "Rotation gegen Uhrzeigersinn, langsam → schnell", "art": "rotate"},
+            {"von": 244, "bis": 247, "name": "Zufallsfarbe schnell"},
+            {"von": 248, "bis": 251, "name": "Zufallsfarbe mittel"},
+            {"von": 252, "bis": 255, "name": "Zufallsfarbe langsam"}
+          ]
+        },
+        {
+          "name": "Goborad: Auswahl/Shake/Scroll",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Offen", "art": "open"},
+            {"von": 10, "bis": 14, "name": "Gobo 1, indiziert", "art": "gobo"},
+            {"von": 15, "bis": 19, "name": "Gobo 2, indiziert", "art": "gobo"},
+            {"von": 20, "bis": 24, "name": "Gobo 3, indiziert", "art": "gobo"},
+            {"von": 25, "bis": 29, "name": "Gobo 4, indiziert", "art": "gobo"},
+            {"von": 30, "bis": 34, "name": "Gobo 5, indiziert", "art": "gobo"},
+            {"von": 35, "bis": 39, "name": "Gobo 1, rotierend", "art": "gobo"},
+            {"von": 40, "bis": 44, "name": "Gobo 2, rotierend", "art": "gobo"},
+            {"von": 45, "bis": 49, "name": "Gobo 3, rotierend", "art": "gobo"},
+            {"von": 50, "bis": 54, "name": "Gobo 4, rotierend", "art": "gobo"},
+            {"von": 55, "bis": 59, "name": "Gobo 5, rotierend", "art": "gobo"},
+            {"von": 60, "bis": 89, "name": "Gobo 1 Shake, 360° langsam → 10° schnell", "art": "shake"},
+            {"von": 90, "bis": 119, "name": "Gobo 2 Shake, 360° langsam → 10° schnell", "art": "shake"},
+            {"von": 120, "bis": 149, "name": "Gobo 3 Shake, 360° langsam → 10° schnell", "art": "shake"},
+            {"von": 150, "bis": 179, "name": "Gobo 4 Shake, 360° langsam → 10° schnell", "art": "shake"},
+            {"von": 180, "bis": 209, "name": "Gobo 5 Shake, 360° langsam → 10° schnell", "art": "shake"},
+            {"von": 210, "bis": 232, "name": "Raddrehung im Uhrzeigersinn, schnell → langsam", "art": "rotate"},
+            {"von": 233, "bis": 255, "name": "Raddrehung gegen Uhrzeigersinn, langsam → schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo-Index/-Rotation (grob)",
+          "attribut": "gobo_rotation",
+          "default": 128,
+          "highlight": 128,
+          "bereiche": [
+            {"von": 0, "bis": 2, "name": "Index −197,5° bzw. keine Rotation (0°)"},
+            {
+              "von": 3,
+              "bis": 125,
+              "name": "Index −197,5° → 0° bzw. Rotation im Uhrzeigersinn schnell → langsam",
+              "art": "rotate"
+            },
+            {"von": 126, "bis": 128, "name": "0° bzw. Stopp"},
+            {
+              "von": 129,
+              "bis": 251,
+              "name": "Index 0° → +197,5° bzw. Rotation gegen Uhrzeigersinn langsam → schnell",
+              "art": "rotate"
+            },
+            {"von": 252, "bis": 255, "name": "Index +197,5° bzw. 90° fest"}
+          ]
+        },
+        {"name": "Gobo-Index/-Rotation (fein)", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Animationsrad",
+          "attribut": "animation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Offen", "art": "open"},
+            {"von": 11, "bis": 20, "name": "Indiziert (Winkel auf Folgekanal)"},
+            {"von": 21, "bis": 30, "name": "Offen", "art": "open"},
+            {"von": 31, "bis": 40, "name": "Dauerrotation (Tempo/Richtung auf Folgekanal)", "art": "rotate"},
+            {"von": 41, "bis": 50, "name": "Position 1"},
+            {"von": 51, "bis": 60, "name": "Position 2"},
+            {"von": 61, "bis": 70, "name": "Position 3"},
+            {"von": 71, "bis": 80, "name": "Position 4"},
+            {"von": 81, "bis": 90, "name": "Position 5"},
+            {"von": 91, "bis": 100, "name": "Position 6"},
+            {"von": 101, "bis": 110, "name": "Position 7"},
+            {"von": 111, "bis": 255, "name": "Offen", "art": "open"}
+          ]
+        },
+        {
+          "name": "Animationsrad Index/Rotation",
+          "attribut": "raw",
+          "default": 127,
+          "highlight": 127,
+          "bereiche": [
+            {"von": 0, "bis": 2, "name": "Stopp, indiziert 0°"},
+            {"von": 3, "bis": 126, "name": "Rotation im Uhrzeigersinn, schnell → langsam", "art": "rotate"},
+            {"von": 127, "bis": 129, "name": "Stopp an aktueller Position"},
+            {"von": 130, "bis": 253, "name": "Rotation gegen Uhrzeigersinn, schnell → langsam", "art": "rotate"},
+            {"von": 254, "bis": 255, "name": "Stopp, indiziert 90°"}
+          ]
+        },
+        {"name": "Blende 1 Position (aus → ein)", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Blende 1 Winkel",
+          "attribut": "raw",
+          "default": 127,
+          "highlight": 127,
+          "bereiche": [
+            {"von": 0, "bis": 126, "name": "Winkel −"},
+            {"von": 127, "bis": 128, "name": "Parallel"},
+            {"von": 129, "bis": 255, "name": "Winkel +"}
+          ]
+        },
+        {"name": "Blende 2 Position (aus → ein)", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Blende 2 Winkel",
+          "attribut": "raw",
+          "default": 127,
+          "highlight": 127,
+          "bereiche": [
+            {"von": 0, "bis": 126, "name": "Winkel −"},
+            {"von": 127, "bis": 128, "name": "Parallel"},
+            {"von": 129, "bis": 255, "name": "Winkel +"}
+          ]
+        },
+        {"name": "Blende 3 Position (aus → ein)", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Blende 3 Winkel",
+          "attribut": "raw",
+          "default": 127,
+          "highlight": 127,
+          "bereiche": [
+            {"von": 0, "bis": 126, "name": "Winkel −"},
+            {"von": 127, "bis": 128, "name": "Parallel"},
+            {"von": 129, "bis": 255, "name": "Winkel +"}
+          ]
+        },
+        {"name": "Blende 4 Position (aus → ein)", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Blende 4 Winkel",
+          "attribut": "raw",
+          "default": 127,
+          "highlight": 127,
+          "bereiche": [
+            {"von": 0, "bis": 126, "name": "Winkel −"},
+            {"von": 127, "bis": 128, "name": "Parallel"},
+            {"von": 129, "bis": 255, "name": "Winkel +"}
+          ]
+        },
+        {
+          "name": "Framing-Rotation (±55°)",
+          "attribut": "raw",
+          "default": 127,
+          "highlight": 127,
+          "bereiche": [
+            {"von": 0, "bis": 126, "name": "Minimum (−55°) → 0°"},
+            {"von": 127, "bis": 128, "name": "0°"},
+            {"von": 129, "bis": 255, "name": "0° → Maximum (+55°)"}
+          ]
+        },
+        {"name": "Frost", "attribut": "frost", "default": 0, "highlight": 0},
+        {
+          "name": "Prisma",
+          "attribut": "prism",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Prisma aus", "art": "open"},
+            {"von": 11, "bis": 138, "name": "Prisma, indiziert (Winkel auf Folgekanal)", "art": "prism"},
+            {"von": 139, "bis": 255, "name": "Prisma, rotierend (Folgekanal)", "art": "prism"}
+          ]
+        },
+        {
+          "name": "Prisma Index/Rotation",
+          "attribut": "prism_rotation",
+          "default": 128,
+          "highlight": 128,
+          "bereiche": [
+            {"von": 0, "bis": 2, "name": "Stopp, indiziert 0°"},
+            {"von": 3, "bis": 126, "name": "Rotation im Uhrzeigersinn, schnell → langsam", "art": "rotate"},
+            {"von": 127, "bis": 129, "name": "Stopp an aktueller Position"},
+            {"von": 130, "bis": 253, "name": "Rotation gegen Uhrzeigersinn, langsam → schnell", "art": "rotate"},
+            {"von": 254, "bis": 255, "name": "Stopp, indiziert 45°"}
+          ]
+        },
+        {"name": "Iris (offen → zu)", "attribut": "iris", "default": 0, "highlight": 0},
+        {"name": "Zoom (Flood → Spot)", "attribut": "zoom", "default": 128, "highlight": 128},
+        {"name": "Zoom (fein)", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Fokus (unendlich → nah)", "attribut": "focus", "default": 128, "highlight": 128},
+        {"name": "Fokus (fein)", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fein", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fein", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Steuerung/Einstellungen",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function"},
+            {"von": 10, "bis": 14, "name": "Reset entire fixture – 5 sec", "art": "reset"},
+            {"von": 15, "bis": 19, "name": "Reset dimmer and shutter only – 5 sec", "art": "reset"},
+            {"von": 20, "bis": 24, "name": "Reset CMY, CTO and color wheel only – 5 sec", "art": "reset"},
+            {
+              "von": 25,
+              "bis": 29,
+              "name": "Reset effects (gobo and animation wheels, iris, prism, frost, zoom, focus) only ",
+              "art": "reset"
+            },
+            {"von": 30, "bis": 34, "name": "Reset pan and tilt only – 5 sec.", "art": "reset"},
+            {"von": 35, "bis": 39, "name": "Reset framing – 5 sec", "art": "reset"},
+            {"von": 40, "bis": 44, "name": "Lamp on"},
+            {"von": 45, "bis": 49, "name": "Lamp off – 5 sec."},
+            {"von": 50, "bis": 54, "name": "No function"},
+            {"von": 55, "bis": 59, "name": "Enable calibration – 5 sec."},
+            {
+              "von": 60,
+              "bis": 64,
+              "name": "Linear dimming curve – 1 sec. (menu override, setting unaffected by power off/on"
+            },
+            {
+              "von": 65,
+              "bis": 69,
+              "name": "Square law dimming curve – 1 sec. (menu override, factory default setting, setti"
+            },
+            {"von": 70, "bis": 74, "name": "Inverse square law dimming curve – 1 sec"},
+            {"von": 75, "bis": 79, "name": "S-curve dimming curve– 1 sec"},
+            {"von": 80, "bis": 84, "name": "Normal pan and tilt speed – 1 sec"},
+            {"von": 85, "bis": 89, "name": "Fast pan and tilt speed – 1 sec"},
+            {"von": 90, "bis": 94, "name": "Slow pan and tilt speed – 1 sec"},
+            {"von": 95, "bis": 99, "name": "Effect shortcuts = ON – 1 sec."},
+            {"von": 100, "bis": 104, "name": "Effect shortcuts = OFF – 1 sec"},
+            {"von": 105, "bis": 109, "name": "Disable zoom/focus linking– 1 sec."},
+            {"von": 110, "bis": 114, "name": "Enable zoom/focus linking, near distance – 1 sec"},
+            {"von": 115, "bis": 119, "name": "Enable zoom/focus linking, medium distance (default setting) – 1 sec."},
+            {"von": 120, "bis": 124, "name": "Enable zoom/focus linking, far distance – 1 sec."},
+            {"von": 125, "bis": 126, "name": "Ballast output full, set to 100% (default setting)"},
+            {"von": 127, "bis": 128, "name": "Ballast output reduced to 90%"},
+            {"von": 129, "bis": 130, "name": "Ballast output reduced to 80%"},
+            {"von": 131, "bis": 132, "name": "Ballast output reduced to 70%"},
+            {"von": 133, "bis": 134, "name": "Ballast output reduced to 60%"},
+            {"von": 135, "bis": 144, "name": "No function"},
+            {"von": 145, "bis": 149, "name": "Auto blackout = ON – 1 sec"},
+            {"von": 150, "bis": 154, "name": "Auto blackout = OFF – 1 sec. (default setting)"},
+            {"von": 155, "bis": 159, "name": "Turn on display – 1 sec."},
+            {"von": 160, "bis": 164, "name": "Turn off display – 1 sec."},
+            {"von": 165, "bis": 169, "name": "Store pan and tilt calibration – 5 sec."},
+            {"von": 170, "bis": 174, "name": "Store dimmer calibration – 5 sec."},
+            {"von": 175, "bis": 179, "name": "Store cyan calibration – 5 sec."},
+            {"von": 180, "bis": 184, "name": "Store magenta calibration – 5 sec."},
+            {"von": 185, "bis": 189, "name": "Store yellow calibration – 5 sec."},
+            {"von": 190, "bis": 194, "name": "Store CTC calibration – 5 sec."},
+            {"von": 195, "bis": 199, "name": "Store all CMY and CTC calibration – 5 sec."},
+            {"von": 200, "bis": 204, "name": "Store gobo wheel current slot index calibration – 5 sec."},
+            {"von": 205, "bis": 214, "name": "No function"},
+            {"von": 215, "bis": 219, "name": "Store prism calibration – 5 sec"},
+            {"von": 220, "bis": 224, "name": "Store iris calibration – 5 sec."},
+            {"von": 225, "bis": 229, "name": "Store focus calibration – 5 sec."},
+            {"von": 230, "bis": 234, "name": "Store zoom calibration – 5 sec."},
+            {"von": 235, "bis": 239, "name": "Store pan calibration – 5 sec."},
+            {"von": 240, "bis": 244, "name": "Store tilt calibration – 5 sec."},
+            {
+              "von": 245,
+              "bis": 249,
+              "name": "Reset all calibration values to factory defaults – 5 sec.",
+              "art": "reset"
+            },
+            {"von": 250, "bis": 255, "name": "No function"}
+          ]
+        },
+        {"name": "Reserviert 1", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Reserviert 2", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Reserviert 3", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Reserviert 4", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Reserviert 5", "attribut": "raw", "default": 0, "highlight": 0}
+      ]
+    },
+    {
+      "name": "Basic",
+      "kanaele": [
+        {
+          "name": "Shutter/Strobe",
+          "attribut": "shutter",
+          "default": 30,
+          "highlight": 30,
+          "bereiche": [
+            {"von": 0, "bis": 19, "name": "Shutter zu (Lampe nach 10 s auf 800 W)", "art": "closed"},
+            {"von": 20, "bis": 49, "name": "Shutter offen", "art": "open"},
+            {"von": 50, "bis": 200, "name": "Strobe langsam → schnell", "art": "strobe"},
+            {"von": 201, "bis": 210, "name": "Shutter offen", "art": "open"},
+            {"von": 211, "bis": 255, "name": "Zufalls-Strobe langsam → schnell", "art": "strobe"}
+          ]
+        },
+        {"name": "Dimmer (grob)", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Cyan", "attribut": "cmy_c", "default": 0, "highlight": 255},
+        {"name": "Magenta", "attribut": "cmy_m", "default": 0, "highlight": 255},
+        {"name": "Gelb", "attribut": "cmy_y", "default": 0, "highlight": 255},
+        {"name": "CTO (6000 K → 3200 K)", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Farbrad",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 0, "name": "Offen (Scroll)", "art": "open"},
+            {"von": 1, "bis": 14, "name": "Offen → Slot 1 (Scroll)"},
+            {"von": 15, "bis": 15, "name": "Slot 1 (Scroll)", "art": "color"},
+            {"von": 16, "bis": 29, "name": "Slot 1 → Slot 2 (Scroll)"},
+            {"von": 30, "bis": 30, "name": "Slot 2 (Scroll)", "art": "color"},
+            {"von": 31, "bis": 44, "name": "Slot 2 → Slot 3 (Scroll)"},
+            {"von": 45, "bis": 45, "name": "Slot 3 (Scroll)", "art": "color"},
+            {"von": 46, "bis": 59, "name": "Slot 3 → Slot 4 (Scroll)"},
+            {"von": 60, "bis": 60, "name": "Slot 4 (Scroll)", "art": "color"},
+            {"von": 61, "bis": 74, "name": "Slot 4 → Slot 5 (Scroll)"},
+            {"von": 75, "bis": 75, "name": "Slot 5 (Scroll)", "art": "color"},
+            {"von": 76, "bis": 89, "name": "Slot 5 → Slot 6 (Scroll)"},
+            {"von": 90, "bis": 90, "name": "Slot 6 (Scroll)", "art": "color"},
+            {"von": 91, "bis": 104, "name": "Slot 6 → Slot 7 (Scroll)"},
+            {"von": 105, "bis": 105, "name": "Slot 7 (Scroll)", "art": "color"},
+            {"von": 106, "bis": 119, "name": "Slot 7 → Offen (Scroll)"},
+            {"von": 120, "bis": 160, "name": "Offen", "art": "open"},
+            {"von": 161, "bis": 163, "name": "Slot 1", "art": "color"},
+            {"von": 164, "bis": 166, "name": "Slot 2", "art": "color"},
+            {"von": 167, "bis": 169, "name": "Slot 3", "art": "color"},
+            {"von": 170, "bis": 172, "name": "Slot 4", "art": "color"},
+            {"von": 173, "bis": 175, "name": "Slot 5", "art": "color"},
+            {"von": 176, "bis": 178, "name": "Slot 6", "art": "color"},
+            {"von": 179, "bis": 181, "name": "Slot 7", "art": "color"},
+            {"von": 182, "bis": 192, "name": "Offen", "art": "open"},
+            {"von": 193, "bis": 214, "name": "Rotation im Uhrzeigersinn, schnell → langsam", "art": "rotate"},
+            {"von": 215, "bis": 221, "name": "Stopp an aktueller Position"},
+            {"von": 222, "bis": 243, "name": "Rotation gegen Uhrzeigersinn, langsam → schnell", "art": "rotate"},
+            {"von": 244, "bis": 247, "name": "Zufallsfarbe schnell"},
+            {"von": 248, "bis": 251, "name": "Zufallsfarbe mittel"},
+            {"von": 252, "bis": 255, "name": "Zufallsfarbe langsam"}
+          ]
+        },
+        {
+          "name": "Goborad: Auswahl/Shake/Scroll",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Offen", "art": "open"},
+            {"von": 10, "bis": 14, "name": "Gobo 1, indiziert", "art": "gobo"},
+            {"von": 15, "bis": 19, "name": "Gobo 2, indiziert", "art": "gobo"},
+            {"von": 20, "bis": 24, "name": "Gobo 3, indiziert", "art": "gobo"},
+            {"von": 25, "bis": 29, "name": "Gobo 4, indiziert", "art": "gobo"},
+            {"von": 30, "bis": 34, "name": "Gobo 5, indiziert", "art": "gobo"},
+            {"von": 35, "bis": 39, "name": "Gobo 1, rotierend", "art": "gobo"},
+            {"von": 40, "bis": 44, "name": "Gobo 2, rotierend", "art": "gobo"},
+            {"von": 45, "bis": 49, "name": "Gobo 3, rotierend", "art": "gobo"},
+            {"von": 50, "bis": 54, "name": "Gobo 4, rotierend", "art": "gobo"},
+            {"von": 55, "bis": 59, "name": "Gobo 5, rotierend", "art": "gobo"},
+            {"von": 60, "bis": 89, "name": "Gobo 1 Shake, 360° langsam → 10° schnell", "art": "shake"},
+            {"von": 90, "bis": 119, "name": "Gobo 2 Shake, 360° langsam → 10° schnell", "art": "shake"},
+            {"von": 120, "bis": 149, "name": "Gobo 3 Shake, 360° langsam → 10° schnell", "art": "shake"},
+            {"von": 150, "bis": 179, "name": "Gobo 4 Shake, 360° langsam → 10° schnell", "art": "shake"},
+            {"von": 180, "bis": 209, "name": "Gobo 5 Shake, 360° langsam → 10° schnell", "art": "shake"},
+            {"von": 210, "bis": 232, "name": "Raddrehung im Uhrzeigersinn, schnell → langsam", "art": "rotate"},
+            {"von": 233, "bis": 255, "name": "Raddrehung gegen Uhrzeigersinn, langsam → schnell", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo-Index/-Rotation (grob)",
+          "attribut": "gobo_rotation",
+          "default": 128,
+          "highlight": 128,
+          "bereiche": [
+            {"von": 0, "bis": 2, "name": "Index −197,5° bzw. keine Rotation (0°)"},
+            {
+              "von": 3,
+              "bis": 125,
+              "name": "Index −197,5° → 0° bzw. Rotation im Uhrzeigersinn schnell → langsam",
+              "art": "rotate"
+            },
+            {"von": 126, "bis": 128, "name": "0° bzw. Stopp"},
+            {
+              "von": 129,
+              "bis": 251,
+              "name": "Index 0° → +197,5° bzw. Rotation gegen Uhrzeigersinn langsam → schnell",
+              "art": "rotate"
+            },
+            {"von": 252, "bis": 255, "name": "Index +197,5° bzw. 90° fest"}
+          ]
+        },
+        {"name": "Gobo-Index/-Rotation (fein)", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Animationsrad",
+          "attribut": "animation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Offen", "art": "open"},
+            {"von": 11, "bis": 20, "name": "Indiziert (Winkel auf Folgekanal)"},
+            {"von": 21, "bis": 30, "name": "Offen", "art": "open"},
+            {"von": 31, "bis": 40, "name": "Dauerrotation (Tempo/Richtung auf Folgekanal)", "art": "rotate"},
+            {"von": 41, "bis": 50, "name": "Position 1"},
+            {"von": 51, "bis": 60, "name": "Position 2"},
+            {"von": 61, "bis": 70, "name": "Position 3"},
+            {"von": 71, "bis": 80, "name": "Position 4"},
+            {"von": 81, "bis": 90, "name": "Position 5"},
+            {"von": 91, "bis": 100, "name": "Position 6"},
+            {"von": 101, "bis": 110, "name": "Position 7"},
+            {"von": 111, "bis": 255, "name": "Offen", "art": "open"}
+          ]
+        },
+        {
+          "name": "Animationsrad Index/Rotation",
+          "attribut": "raw",
+          "default": 127,
+          "highlight": 127,
+          "bereiche": [
+            {"von": 0, "bis": 2, "name": "Stopp, indiziert 0°"},
+            {"von": 3, "bis": 126, "name": "Rotation im Uhrzeigersinn, schnell → langsam", "art": "rotate"},
+            {"von": 127, "bis": 129, "name": "Stopp an aktueller Position"},
+            {"von": 130, "bis": 253, "name": "Rotation gegen Uhrzeigersinn, schnell → langsam", "art": "rotate"},
+            {"von": 254, "bis": 255, "name": "Stopp, indiziert 90°"}
+          ]
+        },
+        {"name": "Blende 1 Position (aus → ein)", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Blende 1 Winkel",
+          "attribut": "raw",
+          "default": 127,
+          "highlight": 127,
+          "bereiche": [
+            {"von": 0, "bis": 126, "name": "Winkel −"},
+            {"von": 127, "bis": 128, "name": "Parallel"},
+            {"von": 129, "bis": 255, "name": "Winkel +"}
+          ]
+        },
+        {"name": "Blende 2 Position (aus → ein)", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Blende 2 Winkel",
+          "attribut": "raw",
+          "default": 127,
+          "highlight": 127,
+          "bereiche": [
+            {"von": 0, "bis": 126, "name": "Winkel −"},
+            {"von": 127, "bis": 128, "name": "Parallel"},
+            {"von": 129, "bis": 255, "name": "Winkel +"}
+          ]
+        },
+        {"name": "Blende 3 Position (aus → ein)", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Blende 3 Winkel",
+          "attribut": "raw",
+          "default": 127,
+          "highlight": 127,
+          "bereiche": [
+            {"von": 0, "bis": 126, "name": "Winkel −"},
+            {"von": 127, "bis": 128, "name": "Parallel"},
+            {"von": 129, "bis": 255, "name": "Winkel +"}
+          ]
+        },
+        {"name": "Blende 4 Position (aus → ein)", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Blende 4 Winkel",
+          "attribut": "raw",
+          "default": 127,
+          "highlight": 127,
+          "bereiche": [
+            {"von": 0, "bis": 126, "name": "Winkel −"},
+            {"von": 127, "bis": 128, "name": "Parallel"},
+            {"von": 129, "bis": 255, "name": "Winkel +"}
+          ]
+        },
+        {
+          "name": "Framing-Rotation (±55°)",
+          "attribut": "raw",
+          "default": 127,
+          "highlight": 127,
+          "bereiche": [
+            {"von": 0, "bis": 126, "name": "Minimum (−55°) → 0°"},
+            {"von": 127, "bis": 128, "name": "0°"},
+            {"von": 129, "bis": 255, "name": "0° → Maximum (+55°)"}
+          ]
+        },
+        {"name": "Frost", "attribut": "frost", "default": 0, "highlight": 0},
+        {
+          "name": "Prisma",
+          "attribut": "prism",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Prisma aus", "art": "open"},
+            {"von": 11, "bis": 138, "name": "Prisma, indiziert (Winkel auf Folgekanal)", "art": "prism"},
+            {"von": 139, "bis": 255, "name": "Prisma, rotierend (Folgekanal)", "art": "prism"}
+          ]
+        },
+        {
+          "name": "Prisma Index/Rotation",
+          "attribut": "prism_rotation",
+          "default": 128,
+          "highlight": 128,
+          "bereiche": [
+            {"von": 0, "bis": 2, "name": "Stopp, indiziert 0°"},
+            {"von": 3, "bis": 126, "name": "Rotation im Uhrzeigersinn, schnell → langsam", "art": "rotate"},
+            {"von": 127, "bis": 129, "name": "Stopp an aktueller Position"},
+            {"von": 130, "bis": 253, "name": "Rotation gegen Uhrzeigersinn, langsam → schnell", "art": "rotate"},
+            {"von": 254, "bis": 255, "name": "Stopp, indiziert 45°"}
+          ]
+        },
+        {"name": "Iris (offen → zu)", "attribut": "iris", "default": 0, "highlight": 0},
+        {"name": "Zoom (Flood → Spot)", "attribut": "zoom", "default": 128, "highlight": 128},
+        {"name": "Fokus (unendlich → nah)", "attribut": "focus", "default": 128, "highlight": 128},
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fein", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fein", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {
+          "name": "Steuerung/Einstellungen",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "No function"},
+            {"von": 10, "bis": 14, "name": "Reset entire fixture – 5 sec", "art": "reset"},
+            {"von": 15, "bis": 19, "name": "Reset dimmer and shutter only – 5 sec", "art": "reset"},
+            {"von": 20, "bis": 24, "name": "Reset CMY, CTO and color wheel only – 5 sec", "art": "reset"},
+            {
+              "von": 25,
+              "bis": 29,
+              "name": "Reset effects (gobo and animation wheels, iris, prism, frost, zoom, focus) only ",
+              "art": "reset"
+            },
+            {"von": 30, "bis": 34, "name": "Reset pan and tilt only – 5 sec.", "art": "reset"},
+            {"von": 35, "bis": 39, "name": "Reset framing – 5 sec", "art": "reset"},
+            {"von": 40, "bis": 44, "name": "Lamp on"},
+            {"von": 45, "bis": 49, "name": "Lamp off – 5 sec."},
+            {"von": 50, "bis": 54, "name": "No function"},
+            {"von": 55, "bis": 59, "name": "Enable calibration – 5 sec."},
+            {
+              "von": 60,
+              "bis": 64,
+              "name": "Linear dimming curve – 1 sec. (menu override, setting unaffected by power off/on"
+            },
+            {
+              "von": 65,
+              "bis": 69,
+              "name": "Square law dimming curve – 1 sec. (menu override, factory default setting, setti"
+            },
+            {"von": 70, "bis": 74, "name": "Inverse square law dimming curve – 1 sec"},
+            {"von": 75, "bis": 79, "name": "S-curve dimming curve– 1 sec"},
+            {"von": 80, "bis": 84, "name": "Normal pan and tilt speed – 1 sec"},
+            {"von": 85, "bis": 89, "name": "Fast pan and tilt speed – 1 sec"},
+            {"von": 90, "bis": 94, "name": "Slow pan and tilt speed – 1 sec"},
+            {"von": 95, "bis": 99, "name": "Effect shortcuts = ON – 1 sec."},
+            {"von": 100, "bis": 104, "name": "Effect shortcuts = OFF – 1 sec"},
+            {"von": 105, "bis": 109, "name": "Disable zoom/focus linking– 1 sec."},
+            {"von": 110, "bis": 114, "name": "Enable zoom/focus linking, near distance – 1 sec"},
+            {"von": 115, "bis": 119, "name": "Enable zoom/focus linking, medium distance (default setting) – 1 sec."},
+            {"von": 120, "bis": 124, "name": "Enable zoom/focus linking, far distance – 1 sec."},
+            {"von": 125, "bis": 126, "name": "Ballast output full, set to 100% (default setting)"},
+            {"von": 127, "bis": 128, "name": "Ballast output reduced to 90%"},
+            {"von": 129, "bis": 130, "name": "Ballast output reduced to 80%"},
+            {"von": 131, "bis": 132, "name": "Ballast output reduced to 70%"},
+            {"von": 133, "bis": 134, "name": "Ballast output reduced to 60%"},
+            {"von": 135, "bis": 144, "name": "No function"},
+            {"von": 145, "bis": 149, "name": "Auto blackout = ON – 1 sec"},
+            {"von": 150, "bis": 154, "name": "Auto blackout = OFF – 1 sec. (default setting)"},
+            {"von": 155, "bis": 159, "name": "Turn on display – 1 sec."},
+            {"von": 160, "bis": 164, "name": "Turn off display – 1 sec."},
+            {"von": 165, "bis": 169, "name": "Store pan and tilt calibration – 5 sec."},
+            {"von": 170, "bis": 174, "name": "Store dimmer calibration – 5 sec."},
+            {"von": 175, "bis": 179, "name": "Store cyan calibration – 5 sec."},
+            {"von": 180, "bis": 184, "name": "Store magenta calibration – 5 sec."},
+            {"von": 185, "bis": 189, "name": "Store yellow calibration – 5 sec."},
+            {"von": 190, "bis": 194, "name": "Store CTC calibration – 5 sec."},
+            {"von": 195, "bis": 199, "name": "Store all CMY and CTC calibration – 5 sec."},
+            {"von": 200, "bis": 204, "name": "Store gobo wheel current slot index calibration – 5 sec."},
+            {"von": 205, "bis": 214, "name": "No function"},
+            {"von": 215, "bis": 219, "name": "Store prism calibration – 5 sec"},
+            {"von": 220, "bis": 224, "name": "Store iris calibration – 5 sec."},
+            {"von": 225, "bis": 229, "name": "Store focus calibration – 5 sec."},
+            {"von": 230, "bis": 234, "name": "Store zoom calibration – 5 sec."},
+            {"von": 235, "bis": 239, "name": "Store pan calibration – 5 sec."},
+            {"von": 240, "bis": 244, "name": "Store tilt calibration – 5 sec."},
+            {
+              "von": 245,
+              "bis": 249,
+              "name": "Reset all calibration values to factory defaults – 5 sec.",
+              "art": "reset"
+            },
+            {"von": 250, "bis": 255, "name": "No function"}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "Entladungslampen-Profilspot mit CMY+CTO, Farbrad, rotierendem Goborad, Animationsrad, Framing-Modul, Iris, Prisma, Frost. Shutter 0-19 = zu; nach 10 s zu schaltet die Lampe in den 800-W-Modus, daher Default 30 (offen). Gobo-Index/-Rotation ist ein 16-bit-Parameter (Default 32768 = 0°). Lampe per Steuerkanal (40-44 an, 45-49 aus)."
+}

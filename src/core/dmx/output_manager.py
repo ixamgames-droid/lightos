@@ -185,12 +185,15 @@ class OutputManager:
         self._blackout = False
         # BUG-FBW Slice 3: eingefrorene Frames (None = laeuft normal), s. set_freeze.
         self._freeze_frames: dict[int, bytes] | None = None
-        # OUT-60: Halte-Frames waehrend eines Live-Show-Loads (s. lade_sperre).
-        self._lade_frames: dict[int, bytes] | None = None
-        # OUT-60-Folge: die patch-abhaengigen Masken (GM, Blackout-Erhalten,
-        # gezielter Blackout) vom Start der Lade-Sperre — (gm, keep, ziel).
-        self._lade_masken: tuple | None = None
+        # OUT-60 (+Folgen): Zustand der Lade-Sperre als EIN Tupel
+        # ``(frames, (gm, keep, ziel, estop))`` oder None. Ein Tupel, damit der
+        # Sende-Thread Frame und Masken atomar sieht — getrennte Attribute
+        # konnten am Sperr-Ende auseinanderlaufen (Review A zu #927).
+        self._lade: tuple | None = None
         self._lade_tiefe = 0
+        # OUT-61b: Laser-Adressen unabhaengig vom Latch + ausdruecklicher Latch.
+        self._laser_adressen: dict = {}
+        self._laser_estop_aktiv = False
         # slot → (level 0.0–1.0, target_fids | None). target_fids None = GLOBALER
         # Submaster (wirkt auf ALLE Fixtures, bisheriges Verhalten); ein
         # frozenset[int] beschraenkt den Submaster auf genau diese Fixture-fids
@@ -299,12 +302,27 @@ class OutputManager:
         komplett. Vom AppState aus dem Patch gepflegt."""
         self._blackout_keep_mask = mask or {}
 
-    def set_laser_estop_mask(self, mask: dict[int, frozenset]):
+    def set_laser_estop_mask(self, mask: dict[int, frozenset], aktiv: bool | None = None):
         """A3D-01: Setzt je Universum die Laser-Adressen, die bei aktivem NOT-AUS
         FINAL (nach Channel-Modifier/Grand-Master/Blackout) auf 0 gezwungen werden.
-        Leeres Dict = NOT-AUS inaktiv. Vom AppState gepflegt (spiegelt
-        ``_laser_estop_addrs`` solange ``laser_estop_active``)."""
+        Leeres Dict = keine Adressen. Vom AppState gepflegt (spiegelt
+        ``_laser_estop_addrs`` solange ``laser_estop_active``).
+
+        OUT-61b: ``aktiv`` = Zustand des NOT-AUS-Latches, AUSDRUECKLICH — eine
+        leere Maske heisst nicht „aus“: im Lade-Fenster ist der Plan leer, die
+        Maske also leer, obwohl der Latch gerade ausgeloest wurde. ``None`` =
+        wie bisher aus der Maske ableiten."""
         self._laser_estop_mask = mask or {}
+        self._laser_estop_aktiv = bool(mask) if aktiv is None else bool(aktiv)
+
+    def set_laser_adressen(self, mask: dict[int, frozenset]):
+        """OUT-61b: ALLE Laser-Adressen des aktuellen Patches, unabhaengig vom
+        NOT-AUS-Latch. Die Lade-Sperre haelt sie beim Ladebeginn fest und nullt
+        sie, sobald der Latch WAEHREND des Ladens aktiv wird — dann ist der Plan
+        (und damit die Live-Maske) leer, und ohne diese Adressen sendete der
+        eingefrorene Frame die Laserwerte weiter. Vom AppState beim Plan-Rebuild
+        gepflegt."""
+        self._laser_adressen = mask or {}
 
     # ── Anzeige-Snapshot (WYSIWYG) ───────────────────────────────────────────
 
@@ -538,23 +556,47 @@ class OutputManager:
         und gezielter Blackout (VCB-11). Der reset-first baut sie fuer den
         leeren Patch neu; ohne GM-Maske skalierte der Grand-Master dann ALLE
         Kanaele, bei GM < 100 % ruckten Pan/Tilt im Lade-Fenster, und im
-        Blackout fielen sie auf 0. GM-Wert, Blackout-Schalter und Laser-NOT-AUS
-        bleiben live."""
+        Blackout fielen sie auf 0. GM-Wert und Blackout-Schalter bleiben live.
+        Ein Ziel-Blackout (VCB-11), der ERST waehrend des Ladens gedrueckt
+        wird, wirkt im Lade-Fenster noch NICHT — es gilt die Ziel-Maske vom
+        Start; er greift mit dem ersten Frame nach dem Laden.
+
+        ★ OUT-61 (Review A, Sicherheit): auch die Laser-NOT-AUS-Maske wird
+        festgehalten. Der reset-first schob bei aktivem Latch eine LEERE Maske
+        (leerer Patch); Ebene 2 des NOT-AUS fiel weg, und ein INVERSE- oder
+        Range-Lock-Modifier auf der Laser-Adresse machte aus der 0 im Frame
+        eine 255 — Laser AN waehrend des Ladens. Genullt wird die VEREINIGUNG
+        aus Start- und Live-Maske: ein waehrend des Ladens ausgeloester NOT-AUS
+        wirkt sofort, einer vom Start bleibt bis zum Ende stehen."""
         if self._lade_tiefe == 0:
-            self._lade_frames = {u: universe.get_all()
-                                 for u, universe in list(self.universes.items())}
+            frames = {u: universe.get_all()
+                      for u, universe in list(self.universes.items())}
             # Die Masken werden immer als Ganzes ersetzt, nie veraendert —
             # die Referenzen festzuhalten genuegt.
-            self._lade_masken = (self._gm_address_mask, self._blackout_keep_mask,
-                                 getattr(self, "_ziel_blackout_union", None))
+            masken = (self._gm_address_mask, self._blackout_keep_mask,
+                      getattr(self, "_ziel_blackout_union", None),
+                      self._laser_estop_mask,
+                      getattr(self, "_laser_adressen", {}) or {})   # OUT-61b
+            self._lade = (frames, masken)        # eine Zuweisung = atomar
         self._lade_tiefe += 1
         try:
             yield
         finally:
             self._lade_tiefe -= 1
             if self._lade_tiefe == 0:
-                self._lade_frames = None
-                self._lade_masken = None
+                self._lade = None
+
+    @property
+    def _lade_frames(self):
+        """Lesesicht fuer Tests/Diagnose: eingefrorene Frames der Lade-Sperre."""
+        lade = self._lade
+        return lade[0] if lade is not None else None
+
+    @property
+    def _lade_masken(self):
+        """Lesesicht fuer Tests/Diagnose: Masken vom Start der Lade-Sperre."""
+        lade = self._lade
+        return lade[1] if lade is not None else None
 
     def set_blackout(self, enabled: bool):
         """Blackout an/aus. UI-58: jede Aenderung wird gemeldet — egal ob sie aus
@@ -1020,11 +1062,14 @@ class OutputManager:
             self._buche_fehler("Tick", 0, tick_exc, quelle=tick_name)
 
         # OUT-60: die Lade-Sperre hat Vorrang vor dem Bediener-Freeze.
-        gefroren = self._lade_frames if self._lade_frames is not None else self._freeze_frames
-        if self._lade_masken is not None:
-            gm_masken, keep_masken, ziel = self._lade_masken
+        lade = self._lade                        # EINMAL lesen (Review A zu #927)
+        gefroren = lade[0] if lade is not None else self._freeze_frames
+        if lade is not None:
+            gm_masken, keep_masken, ziel, estop_start, laser_start = lade[1]
         else:
             gm_masken, keep_masken = self._gm_address_mask, self._blackout_keep_mask
+            estop_start = None
+            laser_start = None
             ziel = getattr(self, "_ziel_blackout_union", None)
         for univ_num, universe in list(self.universes.items()):
             # Im Freeze den festgehaltenen Stand senden statt des (u. U. direkt
@@ -1096,6 +1141,18 @@ class OutputManager:
             # range_min (Range-Lock) machen -> der DMX-Laser bliebe trotz NOT-AUS an.
             # Muss die letzte Transformation vor Anzeige/Senden sein (auch nach GM).
             estop_mask = self._laser_estop_mask.get(univ_num)
+            if estop_start:
+                # OUT-61: im Lade-Fenster Start- UND Live-Maske (Vereinigung).
+                vorher = estop_start.get(univ_num)
+                if vorher:
+                    estop_mask = set(vorher) | set(estop_mask or ())
+            if laser_start and self._laser_estop_aktiv:
+                # OUT-61b: Latch erst WAEHREND des Ladens ausgeloest — der Plan ist
+                # leer, die Live-Maske also auch. Die Laser-Adressen vom
+                # Ladebeginn nullen; der eingefrorene Frame traegt deren Werte.
+                vorher = laser_start.get(univ_num)
+                if vorher:
+                    estop_mask = set(vorher) | set(estop_mask or ())
             if estop_mask:
                 buf = bytearray(data)
                 for addr in estop_mask:
