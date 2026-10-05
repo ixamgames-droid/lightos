@@ -15,7 +15,7 @@ nach durch.
   gelten trotzdem für jedes Rig; Namen von Tasten und Gruppen weichen dann ab.
 
 Die neuen Anleitungen (Erste Schritte, Ausgabe, Programmer-Grundlagen, Szenen & Cues,
-Geräte-Bibliothek) zeigen
+Geräte-Bibliothek, 3D-Bühne) zeigen
 die aktuelle Oberfläche; ihre Bilder entstehen aus dem Code ([so geht das](ANLEITUNGSBILDER.md)).
 Ältere Anleitungen zeigen teils eine frühere Oberfläche — etwa „Live View“ statt **Bühne** in
 der Sektionsleiste. Die Abläufe gelten weiter.
@@ -107,7 +107,7 @@ frei kombinieren; das Tempo aller Ebenen hängt an Tempo-Buses (siehe
 
 | Anleitung | Worum geht's | Show |
 |---|---|---|
-| [3D-Bühne bauen & Geräte hängen](anleitung_3d_visualizer_2026/ANLEITUNG_3D_BUEHNE.md) | Traversen, Stützen, Plattform bauen und Geräte daran hängen. | Beispiel-Show nicht im Repo |
+| [3D-Bühne bauen & Geräte hängen](anleitung_3d_visualizer_2026/ANLEITUNG_3D_BUEHNE.md) | Ansehen/Bauen, Traversen, Stützen, Plattform bauen, Geräte platzieren und andocken, Kamera-Presets, Strahl- und Qualitäts-Einstellungen, 2D-Draufsicht. | Eigene Show mit gepatchten Geräten; die Bilder zeigen die Doku-Demo des Bild-Werkzeugs |
 | [Moving Heads einmessen](anleitung_einmessen/ANLEITUNG_EINMESSEN.md) | Zielen im 3D-Visualizer an den echten Aufbau angleichen; ab vier Punkten rechnet LightOS die echte Position. | Keine Show nötig |
 | [Woher der 3D-Visualizer seine Farbe nimmt](anleitung_3d_geraete_ohne_rgb/ANLEITUNG_3D_GERAETE_OHNE_RGB.md) | Geräte ohne RGB — Blinder, Farbrad-Mover, Dimmer-PAR: welche Farbe und Helligkeit der Visualizer ableitet. | Generator `build_farbprobe_3d.py` → `Farbprobe_3D.lshow` |
 | [Laser bedienen](anleitung_laser/ANLEITUNG_LASER.md) | Muster wählen und speichern, Werksmuster-Kacheln, VC-Knopf und Tempo-Fader; Netzwerk-Laser mit Zeichen-Studio und Sicherheit. | Keine Show nötig |
