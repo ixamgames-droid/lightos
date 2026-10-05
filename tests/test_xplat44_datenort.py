@@ -650,5 +650,32 @@ class StartVerdrahtung(unittest.TestCase):
             os.remove(pfad)
 
 
+class Deinstallation(unittest.TestCase):
+    """Befund 3: die Rueckfragen von uninstall.py nennen die richtigen Orte."""
+
+    def test_fragen_nennen_die_show_db_beim_app_ordner(self):
+        import uninstall as U
+        fragen: list[tuple[str, bool]] = []
+
+        def merke(prompt, default=True):
+            fragen.append((prompt, default))
+            return False
+
+        with mock.patch.object(U, "confirm", merke), \
+                mock.patch.object(U, "remove_path"), \
+                mock.patch.object(U, "remove_shortcut"), \
+                mock.patch.object(sys, "argv",
+                                  ["uninstall.py", "--dry-run", "--keep-venv"]):
+            U.main()
+        data = [f for f in fragen if f[0].startswith("data/")]
+        app = [f for f in fragen if f[0].startswith(str(U.APPDATA_DIR))]
+        self.assertEqual(len(data), 1, fragen)
+        self.assertEqual(len(app), 1, fragen)
+        self.assertNotIn("Show-DB", data[0][0])
+        for wort in ("Show-DB", "Universen", "MIDI"):
+            self.assertIn(wort, app[0][0])
+        self.assertFalse(app[0][1], "App-Ordner darf nicht per Enter weg sein")
+
+
 if __name__ == "__main__":
     unittest.main()
