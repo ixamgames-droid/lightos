@@ -535,8 +535,10 @@ class KopieTraegtHerkunftTest(_TempDB, unittest.TestCase):
         dlg._save()
         with Session(self.engine) as s:
             k = s.get(FixtureProfile, dlg.saved_id)
-            self.assertEqual((k.source, k.herkunft, k.notes, k.viz_model),
-                             ("user", h, "wichtige Notiz", "par_can"))
+            # Inhalt, nicht Schreibweise: die Kopie schreibt die Herkunft
+            # ueber ``BF._herkunft_json`` (sortierte Schluessel).
+            self.assertEqual((k.source, json.loads(k.herkunft), k.notes, k.viz_model),
+                             ("user", json.loads(h), "wichtige Notiz", "par_can"))
 
     def test_ohne_gespeicherte_herkunft_bleibt_die_lizenz(self):
         dlg = editor_module.FixtureEditorDialog(fixture_id=self.pid_qlc, als_kopie=True)
@@ -544,6 +546,25 @@ class KopieTraegtHerkunftTest(_TempDB, unittest.TestCase):
         with Session(self.engine) as s:
             k = s.get(FixtureProfile, dlg.saved_id)
             self.assertEqual(BF.herkunft_fuer(k)["herkunft"]["lizenz"], "Apache-2.0")
+
+    def test_kopie_eines_bearbeiteten_imports_behaelt_die_lizenz(self):
+        """Review: nach FM-63 traegt ein bearbeiteter Import nur die
+        Bearbeitet-Marke in ``herkunft`` — die Kopie uebernahm sie woertlich,
+        ``herkunft_fuer`` fiel auf ``source='user'`` zurueck und erfand „eigen“."""
+        dlg = editor_module.FixtureEditorDialog(fixture_id=self.pid_qlc)
+        dlg._spin_power.setValue(dlg._spin_power.value() + 5)
+        dlg._save()
+        self.assertEqual(dlg.saved_id, self.pid_qlc)
+        with Session(self.engine) as s:
+            self.assertTrue(fdb.ist_bearbeitet(s.get(FixtureProfile, self.pid_qlc).herkunft))
+        dlg = editor_module.FixtureEditorDialog(fixture_id=self.pid_qlc, als_kopie=True)
+        dlg._save()
+        with Session(self.engine) as s:
+            k = s.get(FixtureProfile, dlg.saved_id)
+            self.assertEqual(k.source, "user")
+            self.assertEqual(BF.herkunft_fuer(k)["herkunft"]["lizenz"], "Apache-2.0")
+            # Die Marke gehoert zum Original, nicht zur Kopie.
+            self.assertFalse(fdb.ist_bearbeitet(k.herkunft))
 
 
 class _State:
@@ -782,7 +803,8 @@ class AbgeloesterImportUeberUiWegTest(_TempDB, unittest.TestCase):
 
     def test_kopie_des_lightos_profils_wird_nicht_abgeloest(self):
         with Session(self.engine) as s:
-            s.get(FixtureProfile, self.pid_lightos).herkunft = _herkunft_json("lightos", ok=True)
+            s.get(FixtureProfile, self.pid_lightos).herkunft = _herkunft_json(
+                "lightos", ok=True, lizenz="eigen")
             s.commit()
         dlg = auswahl_module.ProfilAuswahlDialog()
         dlg._liste.setCurrentItem(self._zeile(dlg, self.pid_lightos))
@@ -793,7 +815,7 @@ class AbgeloesterImportUeberUiWegTest(_TempDB, unittest.TestCase):
                 FixtureProfile.name == "Bibliothek Par (eigen)")).one()
             kid, quelle, herkunft = kopie.id, kopie.source, kopie.herkunft
         self.assertEqual(quelle, "user")
-        self.assertEqual(herkunft, self._herkunft(self.pid_lightos))
+        self.assertEqual(json.loads(herkunft), json.loads(self._herkunft(self.pid_lightos)))
         self.assertNotIn(kid, fdb.abgeloeste_profil_ids())
         self.assertEqual(fdb.abgeloeste_profil_ids(), {self.pid_alt})
         # Suche und Fixture-Browser blenden genau `abgeloeste_profile` aus.

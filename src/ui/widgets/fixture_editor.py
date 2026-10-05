@@ -974,14 +974,15 @@ class FixtureEditorDialog(QDialog):
                 if self._kopie_von is not None else None)
         if orig is not None:
             from src.core.database import bibliothek_format as BF
-            herkunft = orig.herkunft or ""
-            if not herkunft:
-                # Nicht gespeichert (aeltere Importe): aus der Quelle des
-                # Originals ableiten — als „user“ ginge sie sonst als „eigen“.
-                try:
-                    herkunft = BF._herkunft_json(BF.herkunft_fuer(orig))
-                except BF.ProfilFehler:
-                    herkunft = ""
+            # ``herkunft_fuer`` nimmt eine GUELTIGE gespeicherte Herkunft und
+            # leitet sonst aus der Quelle des Originals ab (aeltere Importe,
+            # oder nur die FM-63-Bearbeitet-Marke) — als „user“ ginge die
+            # Kopie sonst als „eigen“. ``_herkunft_json`` schreibt nur die
+            # Herkunftsschluessel: die Bearbeitet-Marke bleibt beim Original.
+            try:
+                herkunft = BF._herkunft_json(BF.herkunft_fuer(orig))
+            except BF.ProfilFehler:
+                herkunft = ""
             profile.herkunft = herkunft
             profile.notes = orig.notes or ""
             profile.viz_model = orig.viz_model or ""
