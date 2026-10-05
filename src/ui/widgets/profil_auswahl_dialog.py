@@ -15,6 +15,13 @@ Regel, welches Profil wie geoeffnet wird (``oeffnen_als``):
   ``ensure_builtins`` schriebe eine Aenderung an Ort und Stelle wieder
   zurueck — still, und mit ihr waere die Arbeit weg.
 
+FM-63: ein von einem LightOS-Profil ABGELOESTER QLC+-Import steht weiter in
+der Liste (bestehende Shows nutzen ihn, und nur hier laesst er sich noch
+korrigieren), aber klar markiert — wie im Fixture-Browser unter „Aeltere
+QLC+-Importe“. Wird er geaendert gespeichert, setzt der Editor die
+Bearbeitet-Marke; ab dann gilt er als eigenes Profil und wird nie mehr
+abgeloest.
+
 Wird ein mitgeliefertes Profil aus dem Patch heraus kopiert, bietet
 :func:`geraete_auf_kopie_umhaengen` an, die gepatchten Geraete auf die Kopie
 umzuhaengen (ein Undo-Schritt).
@@ -22,6 +29,7 @@ umzuhaengen (ein Undo-Schritt).
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (
     QDialog, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton,
     QTreeWidget, QTreeWidgetItem, QVBoxLayout,
@@ -29,7 +37,7 @@ from PySide6.QtWidgets import (
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from src.core.database.fixture_db import engine
+from src.core.database.fixture_db import abgeloeste_profile, engine
 from src.core.database.models import FixtureProfile, Manufacturer
 
 #: Anzeige der ``source``-Werte in der Liste.
@@ -39,6 +47,9 @@ QUELLE_ANZEIGE = {
     "builtin": "eingebaut",
     "qlcplus": "QLC+-Import",
 }
+
+#: FM-63: Zusatz in der Herkunft-Spalte fuer abgeloeste QLC+-Importe.
+ABGELOEST_ANZEIGE = "abgelöst durch LightOS-Profil"
 
 BEARBEITEN = "bearbeiten"
 ANSEHEN = "ansehen"
@@ -72,6 +83,18 @@ def profile_suchen(text: str = "", eng=None) -> list[tuple[int, str, str, str]]:
         if all(w in heu for w in woerter):
             out.append((int(pid), hersteller or "", modell or "", source or ""))
     return out
+
+
+def abgeloest_in_auswahl(eng=None) -> dict[int, tuple[int, str, str]]:
+    """FM-63: ``{Import-ID: (LightOS-Profil-ID, Hersteller, Modell)}`` der
+    abgeloesten QLC+-Importe — die Auswahl zeigt sie markiert, nicht versteckt."""
+    eng = eng if eng is not None else engine()
+    try:
+        with Session(eng) as s:
+            return abgeloeste_profile(s)
+    except Exception as e:                       # Anzeige-Zusatz, nie ein Abbruch
+        print(f"[UI-74] abgeloeste Importe nicht lesbar: {e}")
+        return {}
 
 
 def profil_oeffnen(parent, fixture_id: int, wie: str) -> int | None:
@@ -269,10 +292,21 @@ class ProfilAuswahlDialog(QDialog):
 
     def _laden(self, text: str) -> None:
         self._liste.clear()
+        self._abgeloest = abgeloest_in_auswahl()
         for pid, hersteller, modell, source in profile_suchen(text):
-            it = QTreeWidgetItem([hersteller, modell,
-                                  QUELLE_ANZEIGE.get(source, source)])
+            herkunft = QUELLE_ANZEIGE.get(source, source)
+            ziel = self._abgeloest.get(pid)
+            if ziel is not None:
+                herkunft = f"{herkunft} · {ABGELOEST_ANZEIGE}"
+            it = QTreeWidgetItem([hersteller, modell, herkunft])
             it.setData(0, Qt.ItemDataRole.UserRole, (pid, source))
+            if ziel is not None:
+                tip = (f"Abgelöst durch das LightOS-Profil „{ziel[1]} — {ziel[2]}“ "
+                       f"(Profil {ziel[0]}). Bestehende Shows nutzen diesen Import weiter.")
+                grau = QBrush(QColor("#8b949e"))
+                for spalte in range(3):
+                    it.setToolTip(spalte, tip)
+                    it.setForeground(spalte, grau)
             self._liste.addTopLevelItem(it)
         if self._liste.topLevelItemCount():
             self._liste.setCurrentItem(self._liste.topLevelItem(0))
@@ -290,9 +324,18 @@ class ProfilAuswahlDialog(QDialog):
         self.btn_kopieren.setEnabled(bool(wahl))
         if not wahl:
             self._hinweis.setText("Kein Profil gefunden.")
+        elif wahl[0] in getattr(self, "_abgeloest", {}):
+            z = self._abgeloest[wahl[0]]
+            self._hinweis.setText(
+                f"Älterer QLC+-Import, abgelöst durch das LightOS-Profil "
+                f"„{z[1]} — {z[2]}“. Wird er geändert gespeichert, gilt er als "
+                f"eigenes Profil und wird nicht mehr abgelöst.")
         elif eigen:
-            self._hinweis.setText("Eigenes oder importiertes Profil — kann "
-                                  "bearbeitet werden.")
+            text = "Eigenes oder importiertes Profil — kann bearbeitet werden."
+            if (wahl[1] or "").lower() == "qlcplus":
+                text += (" Ein geänderter QLC+-Import gilt danach als eigenes "
+                         "Profil und wird nie von einem LightOS-Profil abgelöst.")
+            self._hinweis.setText(text)
         else:
             self._hinweis.setText(
                 "Mitgelieferte Profile werden nicht überschrieben (die nächste "

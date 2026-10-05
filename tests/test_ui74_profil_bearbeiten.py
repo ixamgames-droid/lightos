@@ -702,5 +702,116 @@ class ShowHerstellerSchreibweiseTest(_TempDB, unittest.TestCase):
         self.assertEqual(SF._ladeprobleme, [])
 
 
+# ── FM-63 x UI-74: abgeloeste QLC+-Importe ueber den UI-Weg ───────────────
+
+class AbgeloesterImportUeberUiWegTest(_TempDB, unittest.TestCase):
+    """Nach dem Merge mit FM-63: neben dem LightOS-Profil „Bibliothek Par“
+    steht ein gleichnamiger QLC+-Import — FM-63 loest ihn ab. Er bleibt im
+    Dialog „Fixture-Profil bearbeiten…“ waehlbar (markiert), und Bearbeiten
+    ueber den echten UI-Weg setzt die Bearbeitet-Marke."""
+
+    def setUp(self):
+        super().setUp()
+        with Session(self.engine) as s:
+            m = s.scalars(select(Manufacturer)).first()
+            self.pid_alt = _profil(s, m, "Bibliothek Par", "qlcplus")
+            s.commit()
+        self.assertEqual(fdb.abgeloeste_profil_ids(), {self.pid_alt})
+
+    def _herkunft(self, pid):
+        with Session(self.engine) as s:
+            return s.get(FixtureProfile, pid).herkunft or ""
+
+    def _exec_mit(self, aendern: bool):
+        def exec_(dlg):
+            if aendern:
+                dlg._spin_power.setValue(dlg._spin_power.value() + 5)
+            dlg._save()
+            return 1
+        return mock.patch.object(editor_module.FixtureEditorDialog, "exec", exec_)
+
+    def _zeile(self, dlg, pid):
+        for i in range(dlg._liste.topLevelItemCount()):
+            it = dlg._liste.topLevelItem(i)
+            if it.data(0, Qt.ItemDataRole.UserRole)[0] == pid:
+                return it
+        self.fail(f"Profil {pid} fehlt im Auswahl-Dialog")
+
+    def test_abgeloester_import_steht_markiert_in_der_auswahl(self):
+        dlg = auswahl_module.ProfilAuswahlDialog()
+        it = self._zeile(dlg, self.pid_alt)
+        self.assertIn(auswahl_module.ABGELOEST_ANZEIGE, it.text(2))
+        self.assertIn("Bibliothek Par", it.toolTip(1))
+        dlg._liste.setCurrentItem(it)
+        self.assertTrue(dlg.btn_bearbeiten.isEnabled())
+        self.assertIn("abgelöst", dlg._hinweis.text())
+        # das ablösende LightOS-Profil selbst ist nicht markiert
+        self.assertNotIn(auswahl_module.ABGELOEST_ANZEIGE,
+                         self._zeile(dlg, self.pid_lightos).text(2))
+
+    def test_bearbeiten_ueber_menue_dialog_setzt_marke(self):
+        dlg = auswahl_module.ProfilAuswahlDialog()
+        dlg._liste.setCurrentItem(self._zeile(dlg, self.pid_alt))
+        with self._exec_mit(aendern=True):
+            dlg._oeffnen(auswahl_module.BEARBEITEN)
+        self.assertTrue(fdb.ist_bearbeitet(self._herkunft(self.pid_alt)))
+        self.assertEqual(fdb.abgeloeste_profil_ids(), set())
+        # nach dem Neuladen nicht mehr als abgeloest markiert
+        self.assertNotIn(auswahl_module.ABGELOEST_ANZEIGE,
+                         self._zeile(dlg, self.pid_alt).text(2))
+
+    def test_bearbeiten_ueber_patch_einstieg_setzt_marke(self):
+        with self._exec_mit(aendern=True):
+            self.assertEqual(auswahl_module.profil_bearbeiten_fuer(None, self.pid_alt),
+                             self.pid_alt)
+        self.assertTrue(fdb.ist_bearbeitet(self._herkunft(self.pid_alt)))
+        self.assertEqual(fdb.abgeloeste_profil_ids(), set())
+
+    def test_speichern_ohne_aenderung_bleibt_abgeloest(self):
+        with self._exec_mit(aendern=False):
+            auswahl_module.profil_bearbeiten_fuer(None, self.pid_alt)
+        self.assertFalse(fdb.ist_bearbeitet(self._herkunft(self.pid_alt)))
+        self.assertEqual(fdb.abgeloeste_profil_ids(), {self.pid_alt})
+
+    def test_umbenennen_in_fremden_namen_bleibt_gesperrt(self):
+        """Der gelockerte Riegel gilt nur fuer den UNVERAENDERTEN Namen."""
+        dlg = editor_module.FixtureEditorDialog(fixture_id=self.pid_qlc)
+        dlg._edit_name.setText("bibliothek par")
+        dlg._save()
+        self.assertIsNone(dlg.saved_id)
+
+    def test_kopie_des_lightos_profils_wird_nicht_abgeloest(self):
+        with Session(self.engine) as s:
+            s.get(FixtureProfile, self.pid_lightos).herkunft = _herkunft_json("lightos", ok=True)
+            s.commit()
+        dlg = auswahl_module.ProfilAuswahlDialog()
+        dlg._liste.setCurrentItem(self._zeile(dlg, self.pid_lightos))
+        with self._exec_mit(aendern=False):
+            dlg._oeffnen(auswahl_module.KOPIEREN)
+        with Session(self.engine) as s:
+            kopie = s.scalars(select(FixtureProfile).where(
+                FixtureProfile.name == "Bibliothek Par (eigen)")).one()
+            kid, quelle, herkunft = kopie.id, kopie.source, kopie.herkunft
+        self.assertEqual(quelle, "user")
+        self.assertEqual(herkunft, self._herkunft(self.pid_lightos))
+        self.assertNotIn(kid, fdb.abgeloeste_profil_ids())
+        self.assertEqual(fdb.abgeloeste_profil_ids(), {self.pid_alt})
+        # Suche und Fixture-Browser blenden genau `abgeloeste_profile` aus.
+        self.assertNotIn(auswahl_module.ABGELOEST_ANZEIGE,
+                         self._zeile(dlg, kid).text(2))
+
+
+class ShowRueckfallOhneGrossKleinTest(_TempDB, unittest.TestCase):
+
+    def test_namens_rueckfall_findet_hersteller_ohne_gross_klein(self):
+        from src.core.show import show_file as SF
+        SF._ladeprobleme.clear()
+        self.addCleanup(SF._ladeprobleme.clear)
+        with mock.patch("src.core.database.fixture_db.engine", lambda: self.engine):
+            self.assertEqual(SF._resolve_fixture_profile_id(
+                999_999, "TESTWERK", "Eigenbau Par", mode_name="4-Kanal",
+                channel_count=4), self.pid_user)
+
+
 if __name__ == "__main__":
     unittest.main()

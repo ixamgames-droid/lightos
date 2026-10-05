@@ -1055,14 +1055,26 @@ class FixtureEditorDialog(QDialog):
         # Hersteller per ``casefold`` in Python, nicht SQL ``lower()`` (das
         # faltet in SQLite nur ASCII, s. ``hersteller_ohne_gross_klein``).
         from src.core.database.bibliothek_format import hersteller_ohne_gross_klein
+        # FM-63 (Merge): auch das MODELL ohne Gross/klein und Mehrfach-
+        # Leerzeichen (``profil_schluessel``) — dieselbe Gleichheit, nach der
+        # ein LightOS-Profil einen Import abloest.
+        from src.core.database.fixture_db import profil_schluessel
         with Session(engine()) as s:
-            gleich = s.execute(
-                select(FixtureProfile.id)
+            gleich = [pid for pid, pname in s.execute(
+                select(FixtureProfile.id, FixtureProfile.name)
                 .where(FixtureProfile.manufacturer_id.in_(
-                           [m.id for m in hersteller_ohne_gross_klein(s, mfr_name)]),
-                       FixtureProfile.name == name)
-            ).scalars().all()
-        if any(pid != self._fixture_id for pid in gleich):
+                           [m.id for m in hersteller_ohne_gross_klein(s, mfr_name)])))
+                if profil_schluessel("", pname)[1] == profil_schluessel("", name)[1]]
+        # FM-63 (Merge mit UI-74): der Riegel verhindert nur NEUE Dubletten.
+        # Behaelt ein geladenes Profil Hersteller + Modell (Vergleich wie
+        # ``profil_schluessel``), entsteht durch das Speichern keine — so
+        # bleibt ein von einem LightOS-Profil abgeloester QLC+-Import (beide
+        # tragen denselben Namen) bearbeitbar und bekommt die Bearbeitet-Marke.
+        name_bleibt = (self._fixture_id is not None
+                       and self._name_geladen is not None
+                       and profil_schluessel(*self._name_geladen)
+                       == profil_schluessel(mfr_name, name))
+        if not name_bleibt and any(pid != self._fixture_id for pid in gleich):
             QMessageBox.warning(
                 self, "Speichern",
                 f"„{mfr_name} / {name}“ steht schon in der Bibliothek. Bitte "

@@ -44,8 +44,9 @@ geprüft ist:
   Bei den übrigen steht `"ok": false` — die Kanalbelegung stammt dann ungeprüft aus
   der Vorlage. Vergleiche sie vor der ersten Show kurz mit dem Handbuch deines Geräts.
 
-Im Patch-Dialog siehst du diese Angaben nicht. Sie stehen in der Datei
-(`fixtures/bibliothek/<hersteller>/<modell>.json`); das Format beschreibt
+Im Patch-Dialog steht unter dem gewählten Gerät eine kurze Zeile **Herkunft**, z. B.
+„LightOS-Bibliothek (aus QLC+, überarbeitet) · ungeprüft“. Alle Angaben stehen in der
+Datei (`fixtures/bibliothek/<hersteller>/<modell>.json`); das Format beschreibt
 [fixtures/bibliothek/SCHEMA.md](../../fixtures/bibliothek/SCHEMA.md).
 
 ### Ein Bibliotheksgerät patchen
@@ -64,6 +65,12 @@ Wechsle in **Patchen → Patch** und klicke auf **+ Gerät hinzufügen**.
 
 Danach geht es weiter wie bei jedem Gerät: Universe, DMX-Adresse, **Hinzufügen**.
 
+**Ältere QLC+-Importe.** Hast du früher die QLC+-Bibliothek geladen und gibt es dasselbe
+Gerät (gleicher Hersteller, gleiches Modell) inzwischen als LightOS-Profil, bietet die
+Suche nur noch das LightOS-Profil an. Der alte Import steht ganz unten im eingeklappten
+Knoten **Ältere QLC+-Importe (abgelöst durch LightOS-Profil)** und bleibt wählbar;
+bestehende Shows nutzen ihn unverändert weiter.
+
 ---
 
 ## 2. Eine größere freie Bibliothek herunterladen
@@ -76,6 +83,9 @@ Fehlt dein Gerät, kann LightOS eine freie Bibliothek aus dem Internet laden. Be
 
 1. **Geräte-Bibliothek herunterladen...** — öffnet den Dialog unten.
 2. **Neues Fixture-Profil...** — öffnet den Fixture-Editor (Schritt 3).
+
+Darunter steht (im Bild noch nicht zu sehen) **Fixture-Profil bearbeiten...** — öffnet
+ein schon gespeichertes Profil wieder (Schritt 3, „Ein gespeichertes Profil ändern“).
 
 ![Dialog Geräte-Bibliothek herunterladen?](img/03_download_dialog.png)
 
@@ -138,9 +148,27 @@ Tabelle „DMX-Kanäle“ oder „DMX chart“.
 
 > Dasselbe — mit mehr Komfort, Bereichen (Farbrad, Gobos, Strobe) und Live-Test am
 > echten Gerät — kann der **Fixture-Generator**: **Patchen → Patch → Gerät erstellen…**.
-> Ein schon gespeichertes Profil lässt sich in beiden Dialogen derzeit nicht wieder
-> öffnen. Exportiere es deshalb vor dem Speichern als LightOS-Profil (unten), dann hast
-> du eine Datei zum Nachbessern.
+
+### Ein gespeichertes Profil ändern
+
+Öffne **Datenbank → Fixture-Profil bearbeiten...** und suche nach Hersteller oder
+Modell — oder klicke im Patch mit der rechten Maustaste auf ein Gerät und wähle
+**Profil bearbeiten…**. Die Spalte **Herkunft** sagt, was mit dem Profil geht:
+
+- **eigenes Profil** und **QLC+-Import** — **Bearbeiten…** öffnet den Fixture-Editor,
+  **Speichern** ändert das Profil an Ort und Stelle. Ein QLC+-Import, den du geändert
+  speicherst, gilt danach als dein eigenes Profil: ein LightOS-Profil gleichen Namens
+  löst ihn nie ab.
+- **QLC+-Import · abgelöst durch LightOS-Profil** — ein älterer Import (Schritt 1). Er
+  bleibt hier wählbar, damit du ihn für bestehende Shows noch korrigieren kannst.
+- **LightOS-Bibliothek** und **eingebaut** — nur **Ansehen…** oder **Als eigenes Profil
+  kopieren…**. Die Kopie heißt „… (eigen)“ und gehört dir; das Original würde die
+  nächste Aktualisierung der Bibliothek wieder zurücksetzen. Kopierst du aus dem Patch
+  heraus, fragt LightOS, ob die gepatchten Geräte auf die Kopie umgehängt werden sollen.
+
+Ist das Profil in der geladenen Show gepatcht und würde das Speichern einen gepatchten
+Modus umbenennen, entfernen oder seine Kanalzahl ändern, nennt der Editor die
+betroffenen Geräte und fragt vorher nach.
 
 ### Als LightOS-Profil exportieren und importieren
 

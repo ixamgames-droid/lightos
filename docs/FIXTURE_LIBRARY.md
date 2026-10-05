@@ -244,10 +244,15 @@ beschrieben; Prüfung und Einspielen stehen in `src/core/database/bibliothek_for
   je Datei nur, wenn sie neu ist, sich geändert hat oder ihr Profil in der DB fehlt
   (Stempel je Datei in `bibliothek_stempel`). Eine kaputte Datei bricht den Start nie ab.
   Neu → anlegen; geändert → Kopf und Modi aus der Datei neu aufbauen, die Profil-ID
-  bleibt; ungültig → gemeldet und übersprungen. Gibt es Hersteller + Modell schon mit
-  anderer Herkunft (Builtin, eigenes Profil, QLC+-Import), bleibt die Datei draußen —
-  sonst stünde das Gerät doppelt in der Bibliothek (FM-43). `user`- und
-  `qlcplus`-Profile werden nie angefasst.
+  bleibt; ungültig → gemeldet und übersprungen. Gibt es Hersteller + Modell schon als
+  Builtin oder eigenes Profil, bleibt die Datei draußen — sonst stünde das Gerät doppelt
+  in der Bibliothek (FM-43). Ein gleichnamiger **QLC+-Import** verdeckt die Datei nicht
+  mehr: das LightOS-Profil kommt dazu und **löst den Import ab** (FM-63) — der Import
+  bleibt in der DB (Shows laden ihn weiter über seine ID), Suche und Auswahl bieten das
+  LightOS-Profil an, der Fixture-Browser den Import unter „Ältere QLC+-Importe“. Ein im
+  Fixture-Editor geändert gespeicherter Import (Bearbeitet-Marke in `herkunft`) zählt wie
+  ein eigenes Profil und wird nie abgelöst. `user`- und `qlcplus`-Profile werden nie
+  angefasst.
 - **Die Herkunft geht nie verloren.** Beim Einspielen und beim Import einer Datei
   steht die vollständige Herkunft (quelle, herkunft, geprueft, autor) auch in der DB
   (`FixtureProfile.herkunft`, JSON). Der Export — Werkzeug wie Editor — liest sie von
@@ -284,7 +289,13 @@ Ein gespeichertes Profil öffnet man über **Datenbank → „Fixture-Profil bea
 - **Eigene Profile** (`source = "user"`) und **QLC+-Importe** (`qlcplus`) werden im
   Fixture-Editor bearbeitet und an Ort und Stelle gespeichert; die Profil-ID bleibt. Der
   QLC+-Download überspringt ein Profil, das es unter Hersteller + Modell schon gibt — die
-  Änderung bleibt also stehen.
+  Änderung bleibt also stehen. Ein QLC+-Import, der dabei **wirklich geändert** wird,
+  bekommt die FM-63-Bearbeitet-Marke (`source` bleibt `qlcplus`) und wird danach nie mehr
+  von einem LightOS-Profil abgelöst; Speichern ohne Änderung setzt sie nicht.
+- **Abgelöste QLC+-Importe** (FM-63) stehen in „Fixture-Profil bearbeiten…“ weiter in
+  der Liste — markiert als „QLC+-Import · abgelöst durch LightOS-Profil“, der Tooltip nennt
+  das ablösende Profil —, damit Shows, die sie nutzen, korrigierbar bleiben. Wie im
+  Fixture-Browser: wählbar, aber nicht verwechselbar.
 - **Mitgelieferte** (`builtin`, `lightos`) lassen sich nur **ansehen** (Speichern, Import
   und die Modus-/Kanal-Knöpfe gesperrt) oder **als eigenes Profil kopieren** — die Kopie
   bekommt den Zusatz „(eigen)“ am Modellnamen und `source = "user"`; Herkunft (Lizenz),
@@ -306,9 +317,13 @@ Ein gespeichertes Profil öffnet man über **Datenbank → „Fixture-Profil bea
 - Modusnamen müssen eindeutig sein — der Editor speichert keine zwei Modi gleichen Namens
   (gepatchte Geräte finden ihren Modus über Profil + Modusname).
 - Ein zweites Profil unter demselben Hersteller + Modell legt der Editor nicht an
-  (FM-43: mehrdeutige Auflösung beim Laden einer Show). Hersteller werden ohne
-  Groß-/Kleinschreibung wiedergefunden — „eurolite“ landet bei „Eurolite“; dasselbe gilt
-  beim Einspielen der Bibliothek.
+  (FM-43: mehrdeutige Auflösung beim Laden einer Show); verglichen wird wie bei FM-63
+  ohne Groß-/Kleinschreibung (`fixture_db.profil_schluessel`). Gesperrt werden nur
+  **neue** Dubletten: behält ein geladenes Profil Hersteller + Modell, darf es speichern,
+  auch wenn ein gleichnamiges daneben steht (abgelöster Import neben seinem
+  LightOS-Profil). Hersteller werden ohne Groß-/Kleinschreibung wiedergefunden —
+  „eurolite“ landet bei „Eurolite“; dasselbe gilt beim Einspielen der Bibliothek und beim
+  Namens-Rückfall beim Laden einer Show.
 - Die Geräteauswahl („Gerät hinzufügen“) zeigt zum gewählten Profil eine Zeile
   **Herkunft** (z. B. „LightOS-Bibliothek (aus QLC+, überarbeitet) · ungeprüft“);
   „geprüft ✓“ nur bei `geprueft.ok` der Datei, Einzelheiten im Tooltip.
