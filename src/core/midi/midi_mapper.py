@@ -39,13 +39,34 @@ def _parse_effect_param(param: str) -> tuple[str, int | None]:
 BUTTON_TOGGLE = "toggle"
 BUTTON_FLASH = "flash"
 BUTTON_CONTINUOUS = "continuous"
+# MIDI-2: reine Druck-Aktion. Jeder Druck loest genau einmal aus, Loslassen tut
+# nichts. Fuer GO/BACK der einzige zulaessige Modus — frueher war ``toggle`` die
+# Vorgabe, und jeder ZWEITE GO-Druck schaltete den Toggle aus und loeste BACK
+# aus (im Flash-Modus schon das Loslassen).
+BUTTON_PRESS = "press"
+
+# Aktionen, die nur auf das Druecken reagieren — unabhaengig vom gespeicherten
+# Modus (Altbestand mit toggle/flash wird beim Laden normalisiert).
+_PRESS_ONLY_ACTIONS = (ACTION_EXECUTOR_GO, ACTION_EXECUTOR_BACK)
 
 
 def _clamp_7bit(value: int) -> int:
     return max(0, min(127, int(value)))
 
 
+def normalize_button_mode(action: str, mode: str) -> str:
+    """GO/BACK sind immer Druck-Aktionen; alle anderen Modi bleiben wie sie sind."""
+    if action in _PRESS_ONLY_ACTIONS:
+        return BUTTON_PRESS
+    return mode
+
+
+_normalize_button_mode = normalize_button_mode
+
+
 def _infer_button_mode(action: str) -> str:
+    if action in _PRESS_ONLY_ACTIONS:
+        return BUTTON_PRESS
     if action in (ACTION_EXECUTOR_FADER, ACTION_PROGRAMMER_VAL, ACTION_GRAND_MASTER,
                   ACTION_EFFECT_PARAM):
         return BUTTON_CONTINUOUS
@@ -262,6 +283,10 @@ class MidiMapping:
 
         if not self.button_mode:
             self.button_mode = _infer_button_mode(self.action)
+        # MIDI-2-Migration: gespeicherte GO/BACK-Mappings mit toggle/flash
+        # (alte Vorgabe) werden hier auf Druck normalisiert — gilt fuer
+        # Konstruktor, from_config_dict und das flache Legacy-Format.
+        self.button_mode = _normalize_button_mode(self.action, self.button_mode)
 
         # Legacy -> structured sync (kept for editor compatibility).
         legacy_binding_type = "cc" if self.msg_type == "cc" else "note"
@@ -486,7 +511,9 @@ class MidiMapper:
             self._handle_inbound_mapping(mapping, msg)
 
     def _handle_inbound_mapping(self, mapping: MidiMapping, msg: MidiMessage):
-        mode = (mapping.button_mode or _infer_button_mode(mapping.action)).lower()
+        mode = _normalize_button_mode(
+            mapping.action,
+            (mapping.button_mode or _infer_button_mode(mapping.action)).lower())
         if mode == BUTTON_CONTINUOUS:
             value = msg.data2 / 127.0
             self._execute_continuous(mapping, value)
@@ -502,6 +529,14 @@ class MidiMapper:
             or (msg.msg_type == "note_on" and msg.data2 == 0)
             or (msg.msg_type == "cc" and msg.data2 < 64)
         )
+
+        if mode == BUTTON_PRESS:
+            # Nur der Druck zaehlt; Loslassen (Note-Off/Velocity 0/CC < 64)
+            # tut nichts. Die LED folgt dem echten Zustand (Poll).
+            if is_pressed:
+                self._execute_binary(mapping, True)
+                self._emit_mapping_state(mapping, self._read_mapping_state(mapping))
+            return
 
         if mode == BUTTON_FLASH:
             if is_pressed:
@@ -526,11 +561,11 @@ class MidiMapper:
         action = mapping.action
 
         if action == ACTION_EXECUTOR_GO and pe:
-            slot = int(mapping.param or "1")
+            # MIDI-2: GO loest NIE BACK aus. Frueher rief ``state_on=False``
+            # (zweiter Toggle-Druck bzw. Flash-Loslassen) ``press_btn(1)``.
             if state_on:
+                slot = int(mapping.param or "1")
                 pe.get_executor(slot).press_btn(0)
-            else:
-                pe.get_executor(slot).press_btn(1)
             return
 
         if action == ACTION_EXECUTOR_BACK and pe and state_on:

@@ -14,7 +14,8 @@ from PySide6.QtWidgets import QTabWidget
 from src.core.midi.midi_manager import get_midi_manager, MidiMessage, RTMIDI_OK
 from src.core.midi.midi_mapper import (
     MidiMapping, MidiOutFeedback, get_midi_mapper,
-    BUTTON_TOGGLE, BUTTON_FLASH, BUTTON_CONTINUOUS,
+    BUTTON_TOGGLE, BUTTON_FLASH, BUTTON_CONTINUOUS, BUTTON_PRESS,
+    normalize_button_mode,
     ACTION_EXECUTOR_GO, ACTION_EXECUTOR_BACK, ACTION_EXECUTOR_FLASH,
     ACTION_EXECUTOR_FADER, ACTION_PROGRAMMER_VAL, ACTION_GRAND_MASTER, ACTION_NONE
 )
@@ -415,7 +416,7 @@ class MidiView(QWidget):
             action=ACTION_EXECUTOR_GO,
             param="1",
             port_filter="",
-            button_mode=BUTTON_TOGGLE,
+            button_mode=BUTTON_PRESS,
             midi_out=MidiOutFeedback(state_off=5, state_on=3, trigger_id=0),
         )
         self._mapper.add_mapping(m)
@@ -488,6 +489,16 @@ class MidiView(QWidget):
                 m.midi_out.state_off = max(0, min(127, int(txt or "0")))
             elif col == 8:
                 m.port_filter = txt
+            # MIDI-2: GO/BACK bieten kein Toggle/Flash mehr an — ein getipptes
+            # "toggle" (oder ein Zielwechsel auf GO/BACK) wird zu "press".
+            normalisiert = normalize_button_mode(m.action, m.button_mode)
+            if normalisiert != m.button_mode:
+                m.button_mode = normalisiert
+                zelle = self._map_table.item(row, 5)
+                if zelle is not None:
+                    self._map_table.blockSignals(True)
+                    zelle.setText(normalisiert)
+                    self._map_table.blockSignals(False)
             m.midi_in.device = m.port_filter
             m.midi_in.channel = m.channel
             m.midi_in.trigger_id = m.data1
@@ -589,7 +600,7 @@ class MidiView(QWidget):
                 action=ACTION_EXECUTOR_GO,
                 param=str(i),
                 port_filter="",
-                button_mode=BUTTON_TOGGLE,
+                button_mode=BUTTON_PRESS,
                 midi_out=MidiOutFeedback(trigger_id=i - 1, state_off=5, state_on=3),
             )
             self._mapper.add_mapping(m)
