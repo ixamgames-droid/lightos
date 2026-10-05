@@ -1,0 +1,233 @@
+{
+  "anleitung": "buehnen_show",
+  "werkzeug": "tools/anleitungsbilder.py",
+  "stand": "a5443398",
+  "schrift": "Noto Sans (statt Roboto Condensed)",
+  "qt": "6.11.1",
+  "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py buehnen_show'.",
+  "bilder": [
+    {
+      "datei": "01_vc_seite.png",
+      "szene": "01_vc_seite",
+      "titel": "VC-Seite der Bühnen-Show: PAR-Dimmer/-Farbe, Moving Heads, Strobe + Laser, Show-Looks, Grand Master",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "ae3f2fabf46f4b38bfd29216abd9c89f"
+    },
+    {
+      "datei": "02_aufbau.png",
+      "szene": "02_aufbau",
+      "titel": "Aufbau: 20-m-Bühne, drei Traversen-Ebenen, PAR-Türme, LED-Wand",
+      "groesse": [
+        1900,
+        877
+      ],
+      "marken": [],
+      "md5": "7cee4f3caae332df64624bebc68efc03"
+    },
+    {
+      "datei": "03_intro.png",
+      "szene": "03_intro",
+      "titel": "Look Intro: blaue Dimmer-Welle, Tilt-Welle der Moving Heads, Laser",
+      "groesse": [
+        1900,
+        877
+      ],
+      "marken": [],
+      "md5": "9c6273aa565a177a86a21c7ab914992f"
+    },
+    {
+      "datei": "04_drop.png",
+      "szene": "04_drop",
+      "titel": "Look Drop: Lauflicht innen → außen, Schwenker A/B, Strobe-Lauf",
+      "groesse": [
+        1900,
+        877
+      ],
+      "marken": [],
+      "md5": "5c9f4bff901666088b6579978a38a1d6"
+    },
+    {
+      "datei": "05_breakdown.png",
+      "szene": "05_breakdown",
+      "titel": "Look Breakdown: Amber-Welle, blaue Moving Heads mit Gobo + Prisma, Acht",
+      "groesse": [
+        1900,
+        877
+      ],
+      "marken": [],
+      "md5": "123492895d59a0b477f29cb2befb3600"
+    },
+    {
+      "datei": "06_finale.png",
+      "szene": "06_finale",
+      "titel": "Look Finale: Farbwechsel, Strobe, Kreis-Welle",
+      "groesse": [
+        1900,
+        877
+      ],
+      "marken": [],
+      "md5": "c1ddf20814ed73cdbe7ce277095aaa98"
+    },
+    {
+      "datei": "07_wellen_orbit.gif",
+      "szene": "07_wellen_orbit",
+      "titel": "GIF: Dimmer-/Farbwelle über 40 PARs + Pan-Welle der Moving Heads, Kamera kreist langsam um die Bühne",
+      "groesse": [
+        720,
+        384
+      ],
+      "marken": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "md5": "f49e73500748054ea24359af14126794",
+      "frames": 20,
+      "dauern_ms": [
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200
+      ]
+    },
+    {
+      "datei": "08_schwenker_dolly.gif",
+      "szene": "08_schwenker_dolly",
+      "titel": "GIF: Schwenker A/B im Wechsel, Kamera fährt von weit hinten im Publikum nach vorn",
+      "groesse": [
+        720,
+        384
+      ],
+      "marken": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "md5": "1d56e2832f78dd8cc075de9c6e1307d3",
+      "frames": 18,
+      "dauern_ms": [
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200
+      ]
+    },
+    {
+      "datei": "09_lauflicht_strobe.gif",
+      "szene": "09_lauflicht_strobe",
+      "titel": "GIF: Lauflicht innen → außen, Strobes, Laser-Lauf — Schwenk",
+      "groesse": [
+        720,
+        384
+      ],
+      "marken": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "md5": "5fc834710366482545d298a9e2871e7d",
+      "frames": 18,
+      "dauern_ms": [
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120
+      ]
+    }
+  ]
+}
