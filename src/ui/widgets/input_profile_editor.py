@@ -331,9 +331,8 @@ class InputProfileEditor(QDialog):
                 state.midi_mapper = get_midi_mapper(state)
             mapper = state.midi_mapper
             mapper.replace_mappings(list(self._profile.mappings))
-            import os
-            os.makedirs("data", exist_ok=True)
-            mapper.save("data/midi_mappings.json")
+            from src.core.paths import user_data_file
+            mapper.save(user_data_file("midi_mappings.json"))
             QMessageBox.information(
                 self, "Aktiviert",
                 f"{len(self._profile.mappings)} Mappings aktiv. Auto-Load beim nächsten Start."

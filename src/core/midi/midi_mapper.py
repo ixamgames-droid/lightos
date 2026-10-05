@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import queue
 import threading
 import time
@@ -875,6 +876,10 @@ class MidiMapper:
         """
         try:
             data = [mapping.to_config_dict() for mapping in self._mappings]
+            # XPLAT-44: der App-Datenordner existiert nicht zwingend schon.
+            parent = os.path.dirname(path)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
             return True

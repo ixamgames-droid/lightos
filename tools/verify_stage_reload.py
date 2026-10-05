@@ -64,12 +64,15 @@ if os.path.isdir(_echte_stages):
 
 # DMX-Sicherheit UNMITTELBAR vor dem Start pruefen — ein pytest-Lauf schreibt
 # data/universes.json nachweislich zurueck (Lehre 2026-07-28).
-_cfg_path = os.path.join(REPO, "data", "universes.json")
+# XPLAT-44: gelesen wird die Datei, die die gestartete App WIRKLICH benutzt —
+# mit dem umgelenkten XDG_DATA_HOME oben also die der Wegwerf-Umgebung.
+from src.core.paths import user_data_file                          # noqa: E402
+_cfg_path = user_data_file("universes.json")
 _cfg = open(_cfg_path, encoding="utf-8").read() if os.path.exists(_cfg_path) else "[]"
 for _bad in ("255.255.255.255", "192.168.", "10.0.", "COM", "/dev/tty"):
     if _bad in _cfg:
         raise SystemExit(
-            f"ABBRUCH: data/universes.json enthaelt {_bad!r} — das wuerde ins "
+            f"ABBRUCH: {_cfg_path} enthaelt {_bad!r} — das wuerde ins "
             f"echte Rig senden. Fuer diesen Lauf EIN Art-Net auf 127.0.0.1 "
             f"eintragen.\n{_cfg}")
 

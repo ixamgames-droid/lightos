@@ -661,6 +661,17 @@ def main():
 
     _setup_crash_logging()
 
+    # XPLAT-44: Nutzerdaten liegen im App-Datenordner. Was ein aelterer Stand
+    # noch unter ``data/`` (Programmordner bzw. Arbeitsverzeichnis) abgelegt
+    # hat, wird hier EINMALIG kopiert — nach der Einzelinstanz-Sperre (kein
+    # zweites LightOS haelt die Show-DB offen) und VOR dem ersten App-State.
+    # Kopiert nur, verschiebt/ueberschreibt nie; Fehler brechen den Start nicht ab.
+    try:
+        from src.core.datenumzug import uebernehme_alte_daten
+        uebernehme_alte_daten()
+    except Exception as _e:
+        print(f"[datenumzug] uebersprungen: {_e}")
+
     os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "1")
 
     # Eigene AppUserModelID -> Windows zeigt in der Taskleiste das LightOS-Icon
