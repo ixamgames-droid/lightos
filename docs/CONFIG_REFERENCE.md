@@ -61,17 +61,32 @@ Show-DB — in `main.py` nach der Einzelinstanz-Sperre und zentral in
 `get_state()` (also auch für Werkzeuge), je Prozess einmal über
 `datenumzug.einmal_je_prozess()` — wird jede der fünf Dateien aus
 `<Programmordner>/data` bzw. `<Arbeitsverzeichnis>/data` in den App-Ordner
-kopiert. Es wird nur kopiert — nie verschoben, gelöscht oder überschrieben:
+kopiert. Ein Ordner, der ein zusätzlicher Git-Worktree ist (`.git` ist dort
+eine Datei), ist nie Quelle. Es wird nur kopiert — nie verschoben, gelöscht
+oder überschrieben:
 
 - Fehlt die Datei im App-Ordner, wird sie kopiert. Die Show-DB samt `-wal`
-  /`-journal` und nur, wenn kein anderer Prozess sie offen hält (sonst fragt
-  `main.py`, ob LightOS beendet werden soll).
+  /`-journal` und nur, wenn kein anderer Prozess sie offen hält. Konnte sie
+  aus irgendeinem Grund nicht übernommen werden (in Benutzung, Platte voll,
+  fehlende Rechte), nennt `main.py` den Grund und fragt, ob LightOS beendet
+  werden soll.
 - Liegt dort nur ein frisch angelegter, LEERER Stand (Show-DB ohne Patch,
   Gruppen und Quarantäne; JSON `[]`/`{}`) oder eine verwaiste `-wal` ohne
   DB, wird er nach `<name>.vor-xplat44` gesichert und durch den alten Stand
-  ersetzt.
-- Liegt dort ein Stand mit Inhalt, gewinnt er (Konflikt). `main.py` meldet
-  das einmal per Dialog; erst danach gilt der Konflikt als erledigt.
+  ersetzt — aber nur, solange diese Datei noch NIE übernommen wurde (eine
+  übernommene und danach bewusst geleerte Show ist ein Nutzerstand). Der
+  Start-Dialog nennt die Sicherung. JSON, das sich nur im Leerraum
+  unterscheidet (`[]` vs. `[]\n`), gilt als gleich.
+- Liegt dort ein Stand mit Inhalt, ist das ein Konflikt. `main.py` fragt je
+  Datei: **„Neuen Stand behalten“** (App-Ordner gilt) oder **„Alten Stand
+  übernehmen“** (`datenumzug.alten_stand_uebernehmen`: das Ziel wird samt
+  `-wal`/`-shm`/`-journal` nach `…vor-xplat44` gesichert, der alte Stand
+  samt `-wal`/`-journal` kopiert). Erst nach der Entscheidung gilt der
+  Konflikt als erledigt. Scheitert der Knopf, zeigt der Dialog die Anleitung
+  zum Handkopieren und fragt beim nächsten Start erneut. **Von Hand nie nur
+  `current_show.db` kopieren:** die echte Show steckt oft noch in der
+  `-wal`. LightOS vorher beenden, am Ziel vorhandene `current_show.db-wal`
+  /`-shm` entfernen und ALLE `current_show.db*`-Dateien zusammen kopieren.
 - Ist eine Override-Variable (`LIGHTOS_SHOW_DB`, `LIGHTOS_UNIVERSES_JSON`)
   gesetzt, wird die betreffende Datei nicht kopiert; ein späterer Start ohne
   Override holt sie nach.
@@ -80,6 +95,15 @@ Die Marker-Datei `datenumzug_xplat44.json` im App-Ordner merkt sich je
 Quellordner (und je Datei), was erledigt ist — eine dort bewusst gelöschte
 Datei kommt also nicht aus dem alten `data/` zurück. Der alte `data/`-Ordner
 bleibt als Rückfall liegen; die App liest ihn danach nicht mehr.
+
+Übernahme, Quittung und „Alten Stand übernehmen“ laufen unter einer
+Dateisperre `datenumzug_xplat44.lock` im App-Ordner (`fcntl.flock` bzw.
+`msvcrt.locking`): starten App und Werkzeug gleichzeitig, wartet der zweite
+Prozess und liest den Marker danach neu. Kopiert wird über eindeutige
+Temp-Namen (`*.xplat44-tmp`) und erst am Ende umbenannt. Ob die alte Show-DB
+offen ist, prüft Linux über `/proc/locks` (Gerät und Inode; nur der Inode,
+wenn das Gerät dort anders gezählt wird, etwa bei btrfs), Windows über einen
+exklusiven Öffnungsversuch.
 
 ## (b2) Mitgelieferte Daten unter `data/` (Repo)
 
