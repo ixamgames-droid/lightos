@@ -410,6 +410,12 @@ export function addFixture(data) {
     // Nebel/Hazer sind KEINE Licht-Fixtures -> kein Beam/SpotLight/Floor-Spot
     // (nur der emissive Indikator-Lamp aus dem build); vorher bekamen sie
     // faelschlich einen Lichtkegel + schattenwerfenden SpotLight.
+  } else if (rtype === 'laser') {
+    // VIZ-79: Laser strahlen ueber ihren eigenen Faecher (model.laserBeams aus
+    // buildLaser) — KEIN Lichtkegel, kein SpotLight, kein Bodenfleck. Bis VIZ-79
+    // bekam jeder Laser zusaetzlich den senkrecht nach unten zeigenden PAR-Kegel;
+    // der war das einzig Grosse, was man sah, und hing an Beam Opacity und
+    // Max. Strahllaenge — Laserstrahlen sah man dagegen praktisch nicht.
   } else {
     const headHost = model.head || model.group;
     const beamLength = rtype === 'led_bar' ? 6.0 : 8.0;

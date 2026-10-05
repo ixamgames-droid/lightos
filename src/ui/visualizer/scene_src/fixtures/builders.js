@@ -771,6 +771,16 @@ export function buildHazer() {
   return { group, head: group, lamp };
 }
 
+// VIZ-79: Laserstrahl-Masse. 25 m reichen von einer Rueckwand-Traverse ueber
+// Buehne und Publikum; 1,5 cm Radius sind auf ~20 m Kameraabstand etwa ein bis
+// zwei Pixel breit (WebGL-Linien waeren fest 1 px und skalierten nicht).
+// Die Deckkraft ist eine EIGENE Konstante: Laser haengen bewusst NICHT an
+// „Beam Opacity", die die Lichtkegel regelt (dort sind 15-25 % ueblich).
+export const LASER_BEAM_LENGTH = 25.0;
+export const LASER_BEAM_RADIUS = 0.015;
+export const LASER_BEAM_OPACITY = 0.9;
+const LASER_PITCH = 0.06;   // rad (~3,5°) nach unten
+
 export function buildLaser() {
   // Reale Referenz (FM-Runde 2): Ehaho L2600 Partylaser — 201 x 155 x 66 mm
   // flaches Alu-Gehaeuse mit Frontfenster und Haltebuegel. Vorher ein zu
@@ -788,7 +798,7 @@ export function buildLaser() {
     new THREE.BoxGeometry(0.12, 0.045, 0.008),
     new THREE.MeshStandardMaterial({ color: 0x101418, metalness: 0.3, roughness: 0.15 })
   );
-  windowPane.position.set(0, 0, -0.082);
+  windowPane.position.set(0, 0, 0.082);   // VIZ-79: Front zum Publikum (+Z)
   group.add(windowPane);
   // Haltebuegel (die Klasse haengt am Buegel oder steht auf ihm).
   [-0.115, 0.115].forEach(x => {
@@ -811,27 +821,49 @@ export function buildLaser() {
     new THREE.CircleGeometry(0.025, segs(10)),
     new THREE.MeshStandardMaterial({ color: 0x00ff00, emissive: 0x00ff00, emissiveIntensity: 1.0, roughness: 0.05, side: THREE.DoubleSide })
   );
-  lamp.position.set(0, 0, -0.088);
-  lamp.rotation.x = Math.PI / 2;
+  lamp.position.set(0, 0, 0.088);
+  // VIZ-79: CircleGeometry liegt in XY, ihre Normale ist schon +Z — die
+  // fruehere Drehung um X legte die Lampe flach, sie war von vorn nicht zu sehen.
   group.add(lamp);
-  // Fan of ~5 thin emissive beam lines radiating forward (downward in world-Y when hung)
+  // VIZ-79: Faecher aus fuenf duennen, additiven Strahlen, die ueber die Buehne
+  // bis ins Publikum reichen. Bis VIZ-79 waren es 1,8-m-Stummel mit 5 mm Radius,
+  // die nach lokal -Z zeigten — also von der Kamera (Publikum bei +Z) weg in
+  // die Rueckwand. Aus Publikumsentfernung sah man davon praktisch nichts.
+  //
+  // Jeder Strahl ist ein Zylinder, dessen Geometrie am FUSS verankert ist
+  // (Ursprung = Austrittsfenster) und per Quaternion in seine Richtung gedreht
+  // wird — so stimmen Startpunkt und Richtung ohne Euler-Akrobatik.
+  //
+  // Laenge: fest LASER_BEAM_LENGTH. Die globale „Max. Strahllaenge" (VIZ-15)
+  // deckelt BEWUSST nur Lichtkegel — ein Laserstrahl faechert nicht auf und
+  // laeuft real bis zur naechsten Wand. Ueber die Wand hinaus wird er von der
+  // Raumhuelle verdeckt (depthTest bleibt an).
+  // fog:false — der Distanznebel der Szene wuerde die Strahlen zum Hintergrund
+  // hin wegmischen; real sind Laser im Dunst eher heller als dunkler.
   const beamMat = new THREE.MeshBasicMaterial({
     color: 0x00ff00,
     transparent: true,
-    opacity: 0.6,
+    opacity: LASER_BEAM_OPACITY,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
+    fog: false,
   });
-  const FAN_ANGLES = [-0.35, -0.175, 0, 0.175, 0.35];  // radians spread in X
+  const FAN_ANGLES = [-0.35, -0.175, 0, 0.175, 0.35];  // Faecher-Spreizung (rad, um Y)
+  const AUFWAERTS = new THREE.Vector3(0, 1, 0);
+  const geo = new THREE.CylinderGeometry(LASER_BEAM_RADIUS, LASER_BEAM_RADIUS,
+                                         LASER_BEAM_LENGTH, 4, 1, true);
+  geo.translate(0, LASER_BEAM_LENGTH / 2, 0);   // Fuss am Ursprung
   const laserBeams = [];
   FAN_ANGLES.forEach((angle) => {
-    const beamLen = 1.8;
-    const geo = new THREE.CylinderGeometry(0.005, 0.005, beamLen, 4);
+    // Richtung: nach vorn (+Z, Publikum), leicht nach unten geneigt, damit der
+    // Faecher ueber den Koepfen bleibt statt in die Decke zu laufen.
+    const dir = new THREE.Vector3(Math.sin(angle), -Math.tan(LASER_PITCH), Math.cos(angle))
+      .normalize();
     const beam = new THREE.Mesh(geo, beamMat.clone());
-    // Position: start just below emitter, fan out along Z (forward) with X spread
-    beam.position.set(Math.sin(angle) * beamLen * 0.5, 0, -0.1 - Math.cos(angle) * beamLen * 0.5);
-    beam.rotation.x = Math.PI / 2 - angle * 0.6;  // tilt so beam fans outward
-    beam.rotation.z = angle;
+    beam.position.set(0, 0, 0.088);   // Austrittsfenster
+    beam.quaternion.setFromUnitVectors(AUFWAERTS, dir);
+    // Ein Strahl ist duenn und lang: die Bounding-Sphere des Zylinders liegt
+    // sauber, Frustum-Culling darf bleiben.
     group.add(beam);
     laserBeams.push(beam);
   });
@@ -1540,7 +1572,7 @@ function applyGenericColor(f, dmx) {
     for (const bm of f.laserBeams) {
       if (!bm.material) continue;
       bm.material.color = color;
-      bm.material.opacity = Math.max(0.0, intNorm * 0.6);
+      bm.material.opacity = Math.max(0.0, intNorm * LASER_BEAM_OPACITY);
       bm.visible = laserVis;
     }
   }

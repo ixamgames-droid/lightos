@@ -1,0 +1,307 @@
+"""VIZ-79: Laser schiessen im 3D-Visualizer lange, sichtbare Strahlen.
+
+Ausgangsfrage: In der 3D-Ansicht einer grossen Show mit vielen Lasern waren
+keine richtigen Laserstrahlen zu sehen. Gemessen (bis VIZ-79):
+
+  * Der Laser-Faecher bestand aus fuenf Zylindern mit **1,8 m** Laenge und
+    5 mm Radius — aus Publikumsentfernung ein kurzer Stummel an der Traverse.
+  * Der Faecher zeigte nach lokal **-Z**, also von der Kamera (Publikum bei
+    +Z) weg nach hinten in die Rueckwand.
+  * Zusaetzlich bekam jeder Laser denselben senkrecht nach unten gerichteten
+    PAR-Kegel samt SpotLight und Bodenfleck wie ein Scheinwerfer — der war
+    das einzige Grosse, was man sah, und er hing an „Beam Opacity" und
+    „Max. Strahllaenge". Ein Laser macht keinen Lichtkegel und keinen
+    Bodenfleck.
+
+Der Test baut einen Laser in der ECHTEN Produktiv-Seite (offscreen
+QtWebEngine), schickt typische DMX-Werte ueber ``applyDmx`` (derselbe Weg wie
+der Service) und misst die Strahlen in Weltkoordinaten.
+"""
+import json
+import os
+import time
+import unittest
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+from PySide6.QtWidgets import QApplication
+from PySide6.QtWebEngineWidgets import QWebEngineView
+from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEngineProfile
+from PySide6.QtWebChannel import QWebChannel
+from PySide6.QtCore import QObject, QUrl, Signal, Slot
+from _qt_lifecycle import destroy_webengine_view  # XPLAT-09
+
+_app = QApplication.instance() or QApplication([])
+
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_HTML_PATH = os.path.join(_REPO, "src", "ui", "visualizer", "stage_scene.html")
+
+_LOAD_TIMEOUT_S = 40.0
+_POLL_TIMEOUT_S = 10.0
+_POLL_INTERVAL_S = 0.05
+
+# Mindestlaenge eines Laserstrahls: ueber die Buehne bis ins Publikum.
+_MIN_LAENGE_M = 15.0
+# Mindest-Deckkraft: ein additiver Strahl darunter ist auf dunklem Grund kaum
+# noch vom Hintergrund zu unterscheiden.
+_MIN_OPACITY = 0.5
+
+_SIGNAL_SPECS = [
+    ("fixtureAdded", (str,)), ("fixtureRemoved", (int,)),
+    ("allFixtures", (str,)), ("settingsChanged", (str,)),
+    ("viewModeChanged", (str,)), ("editModeChanged", (str,)),
+    ("stageLoaded", (str,)), ("addStageObject", (str,)),
+    ("addStageObjectData", (str,)), ("removeStageObject", (str,)),
+    ("selectStageObject", (str,)), ("applyFixtureTransform", (str,)),
+    ("alignSelected", (str,)), ("distributeSelected", (str,)),
+    ("cameraReset", ()), ("brightnessSignal", (float,)),
+    ("brightnessAutoSignal", ()), ("updateStageObject", (str,)),
+    ("resizeModeSignal", (bool,)), ("pixelRatioSignal", (float,)),
+]
+
+
+def _make_mock_bridge_class():
+    attrs = {name: Signal(*types) for name, types in _SIGNAL_SPECS}
+
+    @Slot()
+    def requestFixtures(self):
+        pass
+
+    @Slot(result=str)
+    def pollControl(self):
+        return "{}"
+
+    attrs["requestFixtures"] = requestFixtures
+    attrs["pollControl"] = pollControl
+    attrs["requestFullResync"] = Signal()
+    return type("MockVisualizerBridgeViz79", (QObject,), attrs)
+
+
+_MockBridge = _make_mock_bridge_class()
+
+
+def _pump(seconds):
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        _app.processEvents()
+        time.sleep(_POLL_INTERVAL_S)
+
+
+import pytest as _pytest_xplat15                      # noqa: E402
+from _qt_lifecycle import destroy_all_top_level_widgets  # noqa: E402  XPLAT-15
+
+
+@_pytest_xplat15.fixture(autouse=True)
+def _xplat15_no_leaked_widgets():
+    yield
+    from PySide6.QtWidgets import QApplication as _QApp
+    destroy_all_top_level_widgets(_QApp.instance())
+
+
+_FID = 790001
+
+
+def _laser(fid=_FID, **extra):
+    """Laser an der hinteren Traverse, wie in den Demo-Shows (hinter den
+    Movern, Publikum vorne bei +Z)."""
+    d = {"fid": fid, "type": "laser", "model": "laser",
+         "x": 0, "y": 5.9, "z": -4.6, "r": 0, "g": 0, "b": 0, "intensity": 0,
+         "pan": 128, "tilt": 128}
+    d.update(extra)
+    return d
+
+
+def _gruen(fid=_FID, intensity=255):
+    """Typischer Laser-Payload: Farbrad auf Gruen, Shutter im Muster-Bereich
+    (``visual_intensity`` -> 255)."""
+    return {"fid": fid, "r": 0, "g": 255, "b": 0, "intensity": intensity,
+            "pan": 128, "tilt": 128}
+
+
+# Strahlen in Weltkoordinaten vermessen. Die Geometrie wird ueber ihre
+# Bounding-Box entlang der lokalen Y-Achse (Zylinderachse) abgegriffen — das
+# gilt fuer mittig wie fuer am Fuss verankerte Zylinder.
+_MISS_JS = """
+(function(){
+  const f = window.__lightos.fixtures['%d'];
+  if (!f) return 'null';
+  f.group.updateMatrixWorld(true);
+  const out = { beams: [], cone: !!f.beam, spot: !!f.spot, floor: !!f.floorSpot,
+                start: [f.group.position.x, f.group.position.y, f.group.position.z] };
+  for (const bm of (f.laserBeams || [])) {
+    const g = bm.geometry;
+    g.computeBoundingBox();
+    const bb = g.boundingBox;
+    const a = bm.position.clone().set(0, bb.min.y, 0);
+    const b = bm.position.clone().set(0, bb.max.y, 0);
+    bm.localToWorld(a); bm.localToWorld(b);
+    out.beams.push({ visible: bm.visible, opacity: bm.material.opacity,
+                     additive: bm.material.blending === 2,
+                     a: [a.x, a.y, a.z], b: [b.x, b.y, b.z],
+                     len: a.distanceTo(b) });
+  }
+  return JSON.stringify(out);
+})()
+"""
+
+
+def _fern(beam, start):
+    """Der vom Geraet weiter entfernte Endpunkt."""
+    def d2(p):
+        return sum((p[i] - start[i]) ** 2 for i in range(3))
+    return beam["a"] if d2(beam["a"]) > d2(beam["b"]) else beam["b"]
+
+
+class Viz79LaserStrahlenSceneTest(unittest.TestCase):
+    def setUp(self):
+        self._view = QWebEngineView()
+        try:
+            self._view.page().profile().setHttpCacheType(
+                QWebEngineProfile.HttpCacheType.NoCache)
+        except Exception:
+            pass
+        s = self._view.settings()
+        s.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls, True)
+        s.setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled, True)
+        self._bridge_obj = _MockBridge()
+        self._channel = QWebChannel(self._view)
+        self._channel.registerObject("bridge", self._bridge_obj)
+        self._view.page().setWebChannel(self._channel)
+        self._loaded_ok = []
+        self._view.loadFinished.connect(self._loaded_ok.append)
+
+    def tearDown(self):
+        destroy_webengine_view(self._view, _pump)
+        self._view = None
+
+    # ── Helfer ───────────────────────────────────────────────────────────────
+    def _load_and_wait(self):
+        url = QUrl.fromLocalFile(_HTML_PATH)
+        url.setQuery(f"v={int(time.time() * 1000)}")
+        self._view.load(url)
+        deadline = time.monotonic() + _LOAD_TIMEOUT_S
+        while not self._loaded_ok and time.monotonic() < deadline:
+            _app.processEvents()
+            time.sleep(_POLL_INTERVAL_S)
+        self.assertTrue(self._loaded_ok and self._loaded_ok[-1], "Seite nicht geladen")
+        self._poll_until_true("!!window.__lightosAppReady")
+
+    def _eval(self, js_expr):
+        box = []
+        self._view.page().runJavaScript(js_expr, lambda result: box.append(result))
+        deadline = time.monotonic() + _POLL_TIMEOUT_S
+        while not box and time.monotonic() < deadline:
+            _app.processEvents()
+            time.sleep(0.01)
+        self.assertTrue(box, f"runJavaScript-Callback nie ausgeloest fuer: {js_expr}")
+        return box[0]
+
+    def _poll_until_true(self, js_expr, timeout_s=_POLL_TIMEOUT_S):
+        deadline = time.monotonic() + timeout_s
+        last = None
+        while time.monotonic() < deadline:
+            last = self._eval(js_expr)
+            if last:
+                return last
+            time.sleep(_POLL_INTERVAL_S)
+        self.fail(f"Timeout beim Warten auf '{js_expr}' (letzter Wert: {last!r})")
+
+    def _emit_until_true(self, emit_fn, js_expr, timeout_s=_POLL_TIMEOUT_S):
+        deadline = time.monotonic() + timeout_s
+        last = None
+        while time.monotonic() < deadline:
+            emit_fn()
+            last = self._eval(js_expr)
+            if last:
+                return last
+            time.sleep(_POLL_INTERVAL_S)
+        self.fail(f"Timeout nach wiederholtem Emit: '{js_expr}' (letzter Wert: {last!r})")
+
+    def _apply(self, arr, seq):
+        return self._eval("window.__lightos.applyDmx(%s, %s)"
+                          % (json.dumps(arr), json.dumps(seq)))
+
+    def _bauen(self, data):
+        self._emit_until_true(
+            lambda: self._bridge_obj.allFixtures.emit(json.dumps([data])),
+            "!!window.__lightos.fixtures['%d']" % data["fid"])
+
+    def _miss(self, fid=_FID):
+        res = json.loads(self._eval(_MISS_JS % fid))
+        self.assertIsNotNone(res, "Laser wurde nicht gebaut")
+        return res
+
+    def _show_einstellungen(self, beam_opacity, max_range):
+        """Die Einstellungen einer grossen Show: Kegel-Deckkraft niedrig
+        (15 %), globale Strahllaengen-Obergrenze gesetzt."""
+        self._eval("(function(){ const s = window.__lightos.settings;"
+                   " s.beamOpacity = %r; s.maxBeamRange = %r; s.showCones = true;"
+                   " return true; })()" % (beam_opacity, max_range))
+
+    # ── Tests ────────────────────────────────────────────────────────────────
+    def test_laser_schiesst_lange_sichtbare_strahlen_ins_publikum(self):
+        self._load_and_wait()
+        self._show_einstellungen(0.15, 5)
+        self._bauen(_laser())
+        self.assertEqual(self._apply([_gruen()], 1), 1)
+        m = self._miss()
+
+        self.assertGreaterEqual(len(m["beams"]), 3, "kein Laser-Faecher gebaut")
+        for i, bm in enumerate(m["beams"]):
+            self.assertTrue(bm["visible"], f"Strahl {i} unsichtbar")
+            self.assertTrue(bm["additive"], f"Strahl {i} nicht additiv")
+            # Beam Opacity 15 % darf den Laser NICHT mitdimmen.
+            self.assertGreaterEqual(
+                bm["opacity"], _MIN_OPACITY,
+                f"Strahl {i}: Deckkraft {bm['opacity']:.2f} — Laser fast unsichtbar")
+            # Max. Strahllaenge 5 m gilt fuer Kegel, nicht fuer Laser.
+            self.assertGreaterEqual(
+                bm["len"], _MIN_LAENGE_M,
+                f"Strahl {i}: nur {bm['len']:.2f} m lang — Stummel statt Laserstrahl")
+            fern = _fern(bm, m["start"])
+            # Richtung Publikum (+Z), nicht in die Rueckwand.
+            self.assertGreater(fern[2], m["start"][2] + 10.0,
+                               f"Strahl {i} zeigt nicht ins Publikum: Ende {fern}")
+            # Ueber den Koepfen bleiben, nicht in den Boden.
+            self.assertGreater(fern[1], 2.0,
+                               f"Strahl {i} endet zu tief (Ende {fern})")
+
+    def test_laser_hat_keinen_scheinwerferkegel(self):
+        """Ein Laser macht keinen Lichtkegel, kein Raumlicht und keinen
+        Bodenfleck — der PAR-Kegel war das Einzige, was man sah, und er hing
+        an Beam Opacity und Max. Strahllaenge."""
+        self._load_and_wait()
+        self._bauen(_laser())
+        self._apply([_gruen()], 1)
+        m = self._miss()
+        self.assertFalse(m["cone"], "Laser bekommt einen PAR-Kegel")
+        self.assertFalse(m["spot"], "Laser bekommt ein SpotLight")
+        self.assertFalse(m["floor"], "Laser bekommt einen Bodenfleck")
+
+    def test_dunkel_heisst_unsichtbar(self):
+        """Gegenprobe: Intensitaet 0 (Shutter zu oder Laser-NOT-AUS — der
+        Latch nullt die Kanaele, der Payload traegt dann intensity 0)."""
+        self._load_and_wait()
+        self._bauen(_laser())
+        self._apply([_gruen()], 1)
+        self._apply([_gruen(intensity=0)], 2)
+        m = self._miss()
+        self.assertTrue(m["beams"])
+        for bm in m["beams"]:
+            self.assertFalse(bm["visible"], "dunkler Laser zeigt Strahlen")
+
+    def test_kegel_aus_schaltet_auch_laser_aus(self):
+        """„Kegel anzeigen" bleibt der gemeinsame Schalter fuer alle Strahlen
+        (beamsSichtbar) — bewusst, dokumentiert in der Anleitung."""
+        self._load_and_wait()
+        self._bauen(_laser())
+        self._apply([_gruen()], 1)
+        self._eval("window.__lightos.settings.showCones = false")
+        self._apply([_gruen()], 2)
+        m = self._miss()
+        for bm in m["beams"]:
+            self.assertFalse(bm["visible"])
+
+
+if __name__ == "__main__":
+    unittest.main()

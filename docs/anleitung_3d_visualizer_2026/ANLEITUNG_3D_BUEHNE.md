@@ -185,6 +185,13 @@ und schwenkst/zoomst mit zwei.
    - **Max. Strahllänge** — deckelt die sichtbare Länge der Kegel (0 = aus). Hilft bei
      waagerecht oder nach oben zeigenden Köpfen, deren Strahl nie auf den Boden trifft.
      Ändert nichts an der DMX-Ausgabe.
+   - **Laser** zeichnen keinen Kegel, sondern einen Fächer aus fünf dünnen Strahlen,
+     die 25 m weit nach vorn über die Bühne ins Publikum reichen. Sie folgen Farbe und
+     Helligkeit aus dem DMX, hängen aber bewusst **nicht** an Beam Opacity und Max.
+     Strahllänge — ein Laserstrahl fächert nicht auf und läuft bis zur Wand. Muster,
+     Größe und Bewegung des Lasers zeigt die 3D-Ansicht nicht; der Fächer steht immer
+     gleich. Ist der Laser-NOT-AUS gedrückt oder der Shutter zu, bleiben die Strahlen
+     dunkel.
    - **Lichtkegel**, **Bodenpunkte** und **Nebel/Haze** einzeln ein- und ausschalten.
      Einzelne Geräte nimmst du über das Rechtsklick-Menü der Fixture-Liste aus der
      Kegel-Anzeige.
