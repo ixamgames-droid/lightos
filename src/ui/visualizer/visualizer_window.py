@@ -991,13 +991,15 @@ class VisualizerBridge(QObject):
         self._poll_dmx = {}
         self.__dict__["_poll_dmx_seq"] = {}
 
-    @Slot(result=str)
-    @_bridge_slot_guard
-    def pollControl(self) -> str:
-        """JS-Poll (Heartbeat MIT Callback): gibt den Steuer-Zustand + Events +
-        letzten DMX-Batch als RUECKGABEWERT zurueck. Der einzige zuverlaessige
-        Python->JS-Weg an die Post-Load-Seite (s. __init__-Kommentar)."""
-        out = dict(self._poll_state)
+    def _poll_antwort_abschliessen(self, out: dict) -> str:
+        """Gemeinsamer Schluss von :meth:`pollControl` und
+        :meth:`pollControlRev`: Einmal-Events dazulegen und die Queue leeren,
+        aufgelaufenes DMX dazulegen, als JSON zurueckgeben (``"{}"``, wenn sich
+        etwas nicht serialisieren laesst).
+
+        Ungebunden aufrufen (``VisualizerBridge._poll_antwort_abschliessen(self,
+        out)``) wie ``_poll_take_dmx``: Bestandstests fahren die Poll-Handler
+        auf ``SimpleNamespace``-Stubs, die diese Methode nicht tragen."""
         if self._poll_events:
             out["events"] = self._poll_events
             self._poll_events = []
@@ -1006,6 +1008,15 @@ class VisualizerBridge(QObject):
             return json.dumps(out)
         except Exception:
             return "{}"
+
+    @Slot(result=str)
+    @_bridge_slot_guard
+    def pollControl(self) -> str:
+        """JS-Poll (Heartbeat MIT Callback): gibt den Steuer-Zustand + Events +
+        letzten DMX-Batch als RUECKGABEWERT zurueck. Der einzige zuverlaessige
+        Python->JS-Weg an die Post-Load-Seite (s. __init__-Kommentar)."""
+        out = dict(self._poll_state)
+        return VisualizerBridge._poll_antwort_abschliessen(self, out)
 
     @Slot(str, result=str)
     @_bridge_slot_guard
@@ -1033,14 +1044,7 @@ class VisualizerBridge(QObject):
                 neu[key] = rev
         if neu:
             out["_rev"] = neu
-        if self._poll_events:
-            out["events"] = self._poll_events
-            self._poll_events = []
-        VisualizerBridge._poll_take_dmx(self, out)
-        try:
-            return json.dumps(out)
-        except Exception:
-            return "{}"
+        return VisualizerBridge._poll_antwort_abschliessen(self, out)
 
     # ── Lebenszyklus: State-Subscription ────────────────────────────────────
     # Die Bridge abonniert den AppState (``_on_state`` prunt bei ``patch_changed``
