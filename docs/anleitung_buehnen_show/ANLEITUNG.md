@@ -138,7 +138,7 @@ Dimmer auf 255.
 > **Achtung, der angezeigte EFX folgt der Auswahl.** Wer bei offenem Reiter **EFX** auf
 > **Keine** klickt oder eine andere Gruppe wählt, bindet den gerade angezeigten EFX an die neue
 > Auswahl — auch einen schon gespeicherten. Vor dem Wechsel der Auswahl erst auf einen anderen
-> Reiter gehen (zum Beispiel **Intensity**). Siehe Backlog UI-77.
+> Reiter gehen (zum Beispiel **Intensity**). Siehe Backlog UI-79.
 
 ## 3. Schwenker, die sich abwechseln (EFX, 180° Versatz)
 
@@ -240,7 +240,7 @@ wieder zurück, bei allen zehn Lasern gleich.
 
 > **Grenze der 3D-Ansicht:** Der Visualizer zeichnet Laser als feste Kegel. Er zeigt An/Aus
 > und Farbe, aber keine X-/Y-Bewegung — im GIF steht der Laser still, obwohl der DMX-Wert
-> wandert (Backlog VIZ-81). Am echten Gerät ist die Bewegung zu sehen.
+> wandert (behoben mit VIZ-79). Am echten Gerät ist die Bewegung zu sehen.
 
 ## 6. Effekte auf eigene Knöpfe legen (Virtual Console)
 
