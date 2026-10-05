@@ -193,5 +193,103 @@ class AppStatePushTest(unittest.TestCase):
             A.get_channels_for_patched = orig
 
 
+# ── Review-Befunde M1/M2/N1 ─────────────────────────────────────────────────
+
+def _chn(attr, num, name, ranges=()):
+    ch = _Ch(attr, num, ranges)
+    ch.name = name
+    return ch
+
+
+# DJ Lase BlueStar MK-II LED (Auszug): Dimmer (Kanal 6) nur fuer die LED,
+# Laser rot/gruen per „Laser off“ an Macro-Kanaelen.
+_BLUESTAR = [
+    _chn("macro", 1, "Operating mode selection",
+         [_Rg(0, 51, "Laser off"), _Rg(52, 102, "Automatic show")]),
+    _chn("macro", 2, "Red laser",
+         [_Rg(0, 4, "Laser off"), _Rg(5, 127, "Laser is constantly on")]),
+    _chn("macro", 3, "Green laser",
+         [_Rg(0, 4, "Laser off"), _Rg(5, 127, "Laser is constantly on")]),
+    _chn("intensity", 6, "Dimmer of the blue LED background illumination"),
+    _chn("shutter", 7, "Strobe effect of the blue LED",
+         [_Rg(0, 4, "Background illumination off"), _Rg(5, 127, "on")]),
+]
+
+
+class ReviewMaskTest(unittest.TestCase):
+    def test_m2_laser_with_led_dimmer_gets_explicit_laser_off(self):
+        """M2: der Dimmer gilt nur fuer die LED -> GM 0 muss die Laser per
+        „Laser off“ ausschalten; das bloße „off“ am LED-Shutter zaehlt bei
+        Lasern mit Dimmer nicht."""
+        m = _st()._build_gm_laser_aus_mask({1: (_Fx(1, 1, 1, "laser"), _BLUESTAR)})
+        self.assertEqual(m, {1: {1: 0, 2: 0, 3: 0}})
+
+    def test_m2_dimmer_laser_closed_kind_alone_not_used(self):
+        """„closed“ kann bei Lasern mit Dimmer eine Teil-Abdunklung sein
+        (DS-1000RGB „Safety zone intensity“) -> nur Namen zaehlen."""
+        chans = [_chn("intensity", 1, "Intensity"),
+                 _chn("macro", 2, "Safety zone intensity",
+                      [_Rg(0, 0, "No reduction"),
+                       _Rg(129, 255, "Decrease brightness up to blackout", "closed")]),
+                 _chn("laser_x", 3, "X")]
+        self.assertEqual(_st()._build_gm_laser_aus_mask(
+            {1: (_Fx(1, 1, 1, "laser"), chans)}), {})
+
+    def test_n1_bare_off_on_macro_is_not_laser_off(self):
+        """N1: „Macros: Off“ (Galaxian 3D) und „Off, original pattern“
+        (CS-1000RGB Mk II) heissen nicht Laser aus."""
+        chans = [_chn("macro", 5, "Macros",
+                      [_Rg(0, 7, "Off"), _Rg(8, 23, "Macro 1")]),
+                 _chn("macro", 9, "Pattern Buildup (drawing)",
+                      [_Rg(0, 0, "Off, original pattern"), _Rg(1, 127, "Auto")]),
+                 _chn("macro", 8, "Strobe", [_Rg(0, 9, "Strobe OFF", "strobe")]),
+                 _chn("laser_x", 2, "X")]
+        self.assertEqual(_st()._build_gm_laser_aus_mask(
+            {1: (_Fx(1, 1, 1, "laser"), chans)}), {})
+
+    def test_n1_bare_off_on_mode_channel_and_black_out_still_count(self):
+        chans = [_chn("macro", 1, "Mode",
+                      [_Rg(0, 9, "Laser Black out"), _Rg(10, 60, "Auto")]),
+                 _chn("macro", 2, "Betriebsart",
+                      [_Rg(0, 20, "Aus"), _Rg(21, 255, "Auto")]),
+                 _chn("shutter", 3, "Laser", [_Rg(0, 5, "Off"), _Rg(6, 255, "On")])]
+        self.assertEqual(_st()._build_gm_laser_aus_mask(
+            {1: (_Fx(1, 1, 1, "laser"), chans)}), {1: {1: 0, 2: 0, 3: 0}})
+
+
+class ReviewTextTest(unittest.TestCase):
+    """M1: Tooltip und „Erste Schritte“ duerfen nicht pauschal versprechen,
+    dass GM 0 jeden Laser ohne Dimmer ausschaltet."""
+
+    _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    def _lesen(self, rel):
+        with open(os.path.join(self._ROOT, rel), encoding="utf-8") as f:
+            return f.read()
+
+    def _gm_absatz(self, text, start):
+        i = text.index(start)
+        return text[i:text.index("4. **TAP**", i)]
+
+    def test_tooltip_restricts_and_points_to_estop(self):
+        src = self._lesen("src/ui/main_window.py")
+        i = src.index("Grand Master (0–100 %)")
+        tip = src[i:src.index("self._slider_gm.valueChanged", i)]
+        self.assertIn("Aus-Wert", tip)
+        self.assertIn("NOT-AUS", tip)
+
+    def test_erste_schritte_de_restricts_and_points_to_estop(self):
+        gm = self._gm_absatz(self._lesen(
+            "docs/anleitung_erste_schritte/ANLEITUNG.md"), "3. **GM**")
+        self.assertIn("Aus-Wert", gm)
+        self.assertIn("NOT-AUS", gm)
+
+    def test_erste_schritte_en_restricts_and_points_to_estop(self):
+        gm = self._gm_absatz(self._lesen(
+            "docs/anleitung_erste_schritte/ANLEITUNG.en.md"), "3. **GM**")
+        self.assertIn("off value", gm)
+        self.assertIn("emergency stop", gm)
+
+
 if __name__ == "__main__":
     unittest.main()
