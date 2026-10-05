@@ -332,15 +332,17 @@ def _patched_fixture_from_data(d: dict, fallback_fid: int):
     fixture_profile_id = _to_int(
         d.get("fixture_profile_id", d.get("profile_id", 0)), 0
     )
-    fixture_profile_id = _resolve_fixture_profile_id(
-        fixture_profile_id,
-        str(d.get("manufacturer_name", "") or ""),
-        str(d.get("fixture_name", "") or ""),
-    )
     mode_name = str(d.get("mode_name", d.get("mode", "")) or "")
     universe = max(1, _to_int(d.get("universe", 1), 1))
     address = min(512, max(1, _to_int(d.get("address", 1), 1)))
     channel_count = min(512, max(1, _to_int(d.get("channel_count", 1), 1)))
+    fixture_profile_id = _resolve_fixture_profile_id(
+        fixture_profile_id,
+        str(d.get("manufacturer_name", "") or ""),
+        str(d.get("fixture_name", "") or ""),
+        # Kanalzahl nur, wenn die Show sie traegt (sonst klemmt sie oben auf 1).
+        mode_name=mode_name, channel_count=channel_count if "channel_count" in d else 0,
+    )
     return PatchedFixture(
         fid=fid,
         label=label,
@@ -375,7 +377,8 @@ def _patched_fixture_from_data(d: dict, fallback_fid: int):
 
 
 def _resolve_fixture_profile_id(profile_id: int, manufacturer_name: str,
-                                fixture_name: str) -> int:
+                                fixture_name: str, *, mode_name: str = "",
+                                channel_count: int = 0) -> int:
     """Stabile Show-Referenz ueber Rechner/Fixture-DBs hinweg.
 
     SQLite-Auto-IDs sind keine portablen Fixture-IDs: eine frisch aufgebaute DB
@@ -417,6 +420,22 @@ def _resolve_fixture_profile_id(profile_id: int, manufacturer_name: str,
     lokaler Import existiert womoeglich nur hier. Wer bewusst das importierte
     Profil wollte, hat dessen ID in der Show — und die kommt oben durch, ohne
     diesen Zweig zu beruehren.
+
+    ★★ **FM-63: beim Namens-Rueckfall entscheidet zuerst der MODUS.** Seit ein
+    LightOS-Profil einen gleichnamigen QLC+-Import abloesen kann, stehen beide
+    nebeneinander — mit womoeglich ANDEREN Modi. Gewinnt blind das mitgelieferte
+    Profil, nimmt ``app_state._resolve_mode`` dort irgendeinen Modus: falsche
+    Kanalbelegung, still. Deshalb (``mode_name``/``channel_count`` aus der Show):
+    1. ein Treffer mit Modusname UND passender Kanalzahl, 2. einer mit
+    passender Kanalzahl, 3. wie bisher. Innerhalb jeder Stufe gilt die alte
+    Reihenfolge (mitgeliefert vor Import, dann ID) — das LightOS-Profil gewinnt
+    also nur, wenn es den Modus der Show hat, sonst der abgeloeste Import. Hat
+    das gewaehlte Profil den Modus der Show nicht, steht IMMER eine Meldung in
+    ``_ladeprobleme``. Keine Dubletten-Warnung gibt es nur fuer das Paar
+    „LightOS-Profil + der Import, den es abloest“, wenn der Modus passt.
+    Die FM-43-Regel „builtin vor Import“ gilt damit nur noch innerhalb einer
+    Stufe: hat ein Import den Modus der Show und das builtin nicht, gewinnt
+    der Import (die Dubletten-Meldung bleibt).
     """
     if not fixture_name:
         return profile_id
@@ -457,19 +476,59 @@ def _resolve_fixture_profile_id(profile_id: int, manufacturer_name: str,
             ).all()
             _geraet = f"{manufacturer_name} / {fixture_name}".strip(" /")
             if treffer:
-                resolved = int(treffer[0][0])
+                from src.core.database.fixture_db import abgeloeste_profile
+                from src.core.database.models import FixtureMode
+                modi: dict[int, list[tuple[str, int]]] = {}
+                for fid_, mname, mcount in session.execute(
+                        select(FixtureMode.fixture_id, FixtureMode.name,
+                               FixtureMode.channel_count)
+                        .where(FixtureMode.fixture_id.in_([int(t[0]) for t in treffer]))):
+                    modi.setdefault(int(fid_), []).append((mname, int(mcount or 0)))
+
+                def _exakt(t) -> bool:
+                    return any(n == mode_name and (not channel_count or c == channel_count)
+                               for n, c in modi.get(int(t[0]), []))
+
+                def _kanalzahl(t) -> bool:
+                    return bool(channel_count) and any(
+                        c == channel_count for _n, c in modi.get(int(t[0]), []))
+
+                gewaehlt = treffer[0]
+                if mode_name or channel_count:
+                    gewaehlt = (next((t for t in treffer if mode_name and _exakt(t)), None)
+                                or next((t for t in treffer if _kanalzahl(t)), None)
+                                or treffer[0])
+                resolved = int(gewaehlt[0])
                 print(
                     f"[show_file] Fixture-Profil remapped: {profile_id} -> {resolved} "
                     f"({_geraet})"
                 )
-                if len(treffer) > 1:
+                modus_passt = not mode_name or _exakt(gewaehlt)
+                if not modus_passt:
+                    _ladeprobleme.append(
+                        f"„{_geraet}“: Profil {profile_id} passt nicht zur Show "
+                        f"(fehlt oder traegt einen anderen Namen), "
+                        f"genommen wurde Profil {resolved} "
+                        f"({gewaehlt[1] or 'ohne Herkunft'}) — es hat den Modus "
+                        f"„{mode_name}“ ({channel_count} Kanaele) der Show NICHT. "
+                        f"Kanalbelegung am Geraet pruefen.")
+                # FM-63: das Paar „LightOS-Profil + der Import, den es abloest“
+                # ist keine Dublette — aber nur, wenn der Modus passt.
+                andere = [t for t in treffer if int(t[0]) != resolved]
+                if modus_passt and andere:
+                    abl = abgeloeste_profile(session)
+                    paar = {i for i, ziel in abl.items() if ziel[0] == resolved}
+                    if resolved in abl:
+                        paar.add(abl[resolved][0])
+                    andere = [t for t in andere if int(t[0]) not in paar]
+                if andere:
                     # Mehrdeutig: gemeldet, nicht verschwiegen. Der Mensch sieht
                     # sonst ein Geraet, das *fast* stimmt, und sucht den Fehler
                     # ueberall — nur nicht in der Bibliothek.
                     _ladeprobleme.append(
-                        f"„{_geraet}“ steht {len(treffer)}× in der Geraetebibliothek — "
+                        f"„{_geraet}“ steht {len(andere) + 1}× in der Geraetebibliothek — "
                         f"genommen wurde Profil {resolved} "
-                        f"({treffer[0][1] or 'ohne Herkunft'}). Wenn das Geraet falsch "
+                        f"({gewaehlt[1] or 'ohne Herkunft'}). Wenn das Geraet falsch "
                         f"aussieht, liegt es an der Dublette, nicht an der Show.")
                 return resolved
             # FM-43: ab hier ist das Geraet NICHT aufloesbar. Bis 2026-09-03

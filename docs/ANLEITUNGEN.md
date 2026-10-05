@@ -14,7 +14,8 @@ nach durch.
 - **Beispiel-Show nicht im Repo** — die Bilder stammen aus einer privaten Show. Die Schritte
   gelten trotzdem für jedes Rig; Namen von Tasten und Gruppen weichen dann ab.
 
-Die neuen Anleitungen (Erste Schritte, Ausgabe, Programmer-Grundlagen, Szenen & Cues) zeigen
+Die neuen Anleitungen (Erste Schritte, Ausgabe, Programmer-Grundlagen, Szenen & Cues,
+Geräte-Bibliothek) zeigen
 die aktuelle Oberfläche; ihre Bilder entstehen aus dem Code ([so geht das](ANLEITUNGSBILDER.md)).
 Ältere Anleitungen zeigen teils eine frühere Oberfläche — etwa „Live View“ statt **Bühne** in
 der Sektionsleiste. Die Abläufe gelten weiter.
@@ -43,6 +44,7 @@ der Sektionsleiste. Die Abläufe gelten weiter.
 |---|---|---|
 | [Patchen & Gruppen](anleitung_patch_gruppen/ANLEITUNG_PATCH_GRUPPEN.md) | Geräte auf DMX-Adressen legen, Fixture-Gruppen und ihr Raster anlegen. | Beispiel-Show nicht im Repo |
 | [Gruppen und Matrizen anlegen](anleitung_gruppen_matrizen/ANLEITUNG_GRUPPEN_MATRIZEN.md) | Mehrkopf-Geräte und Panels: Kopf-Gruppe beim Patchen, Köpfe als Raster oder Block, zu einer Zelle zusammenfassen, Matrizen zusammenlegen. | Keine Show nötig |
+| [Geräte-Bibliothek & eigene Profile](anleitung_geraete_bibliothek/ANLEITUNG.md) | Mitgelieferte Profile und LightOS-Bibliothek (Herkunft, „geprüft“), Gerät aus der Bibliothek patchen, freie Bibliothek herunterladen, eigenes Profil im Fixture-Editor, LightOS-Profil exportieren/importieren, Zuordnung Dimmer → Weiß-Segment, die neuen 3D-Modelle. | Keine Show nötig |
 | [Programmer: jedes Gerät richtig bedienen](anleitung_geraete_bedienen/ANLEITUNG_GERAETE_BEDIENEN.md) | Was der Programmer je Gerät zeigt: Shutter-/Strobe-Knöpfe, Programm-Kacheln, zweite gleiche Kanäle, Mehrkopf-Umschalter, Nebel und Laser. | Keine Show nötig |
 | [Moving Heads steuern](anleitung_moving_heads/ANLEITUNG_MOVING_HEADS.md) | Farbrad, Gobo, Bewegung und gezieltes Pan/Tilt über die Virtual Console. | Generator `build_event_demo_2026.py` → `Event_Demo_2026.lshow` |
 | [Spider steuern](anleitung_spider/ANLEITUNG_SPIDER.md) | Farb-Themes je Bar und Tilt-Bewegung (Schere, Wippe). | Generator `build_event_demo_2026.py` |

@@ -27,6 +27,12 @@ SUPPORTED_TYPES = (
     "speaker",
     "audience",
     "dj_booth",
+    # VIZ-68: Objekt-Bibliothek (Event-Moebel)
+    "beer_table",     # Biertischgarnitur (Tisch + 2 Baenke)
+    "high_table",     # Stehtisch
+    "bar_counter",    # Bar / Theke
+    "riser_stairs",   # Podest mit Treppe
+    "foh_desk",       # Mischpult-Tisch (FOH)
     "support",   # Alias fuer truss_v
     "truss",     # Alias fuer truss_h
 )
@@ -36,7 +42,8 @@ SUPPORTED_TYPES = (
 # TOP:  Strahler steht OBEN drauf (Plattform, Boden, Speaker, ...).
 # Andere Typen (Waende, LED-Walls) ziehen keine Strahler an.
 DOCK_HANG_TYPES = frozenset({"truss_h", "truss_v"})
-DOCK_TOP_TYPES = frozenset({"platform", "floor", "dj_booth", "speaker", "audience"})
+DOCK_TOP_TYPES = frozenset({"platform", "floor", "dj_booth", "speaker", "audience",
+                            "bar_counter", "riser_stairs"})   # VIZ-68
 # Laenge des gedachten Clamps unter einer Trasse bzw. Sockel-Versatz auf Flaechen.
 DOCK_HANG_OFFSET = 0.25
 DOCK_TOP_OFFSET = 0.30
@@ -110,27 +117,65 @@ class StageElement:
         des Elements zuruecktransformieren und gegen die halbe Breite/Tiefe
         pruefen. `margin` weitet die Flaeche fuer touch-tolerantes Andocken.
         """
+        local_x, local_z = self._lokal(px, pz)
+        return (abs(local_x) <= self.w / 2.0 + margin and
+                abs(local_z) <= self.d / 2.0 + margin)
+
+    def _lokal(self, px: float, pz: float) -> tuple[float, float]:
+        """Punkt (px, pz) ins lokale, ungedrehte Koordinatensystem."""
         import math
         dx = px - self.x
         dz = pz - self.z
         c = math.cos(-self.rotation)
         s = math.sin(-self.rotation)
-        local_x = dx * c - dz * s
-        local_z = dx * s + dz * c
-        return (abs(local_x) <= self.w / 2.0 + margin and
-                abs(local_z) <= self.d / 2.0 + margin)
+        return dx * c - dz * s, dx * s + dz * c
+
+    def top_y_at(self, px: float, pz: float) -> Optional[float]:
+        """Oberkante GENAU ueber (px, pz) — oder None, wenn dort nichts ist.
+
+        Fuer Quader gleich ``top_y``. VIZ-68 (Review A2): Das Podest mit
+        Treppe ist oben NICHT flach — ueber einer Stufe liegt die Oberkante
+        tiefer, neben der Treppe (vorn) ist gar nichts. Spiegelt den
+        Bauplan ``buildPodestTreppe`` in scene_src/stage/stage_objects.js;
+        das JS nimmt beim Andocken die Hoehe direkt aus dem Ray-Treffer.
+        """
+        if self.type != "riser_stairs":
+            return self.top_y
+        import math
+        W, H, D = self.w, self.h, self.d
+        lx, lz = self._lokal(px, pz)
+        # Rand-Toleranz (margin) auf die Grundflaeche zurueckholen.
+        lx = max(-W / 2.0, min(W / 2.0, lx))
+        lz = max(-D / 2.0, min(D / 2.0, lz))
+        n = max(1, int(math.floor(H / 0.2 + 0.5)) - 1)   # wie Math.round
+        tritt = min(0.3, (D * 0.5) / n)
+        tt = n * tritt
+        boden = self.y - H / 2.0
+        if lz <= D / 2.0 - tt:
+            return boden + H                                  # Podest-Deck
+        if abs(lx) > min(1.2, W * 0.6) / 2.0:
+            return None                                       # neben der Treppe
+        j = min(n - 1, int((lz - (D / 2.0 - tt)) / tritt))    # 0 = hinterste Stufe
+        k = n - j                                             # k = 1 vorderste
+        return boden + H * k / (n + 1)
 
     @property
     def top_y(self) -> float:
         """Oberkante des Elements (fuer Raycast-Sortierung von oben)."""
         return self.y + self.h / 2.0
 
-    def dock_y(self) -> Optional[float]:
-        """Montagehoehe fuer einen daran angedockten Strahler, oder None."""
+    def dock_y(self, px: Optional[float] = None,
+               pz: Optional[float] = None) -> Optional[float]:
+        """Montagehoehe fuer einen daran angedockten Strahler, oder None.
+
+        Mit (px, pz) zaehlt bei TOP-Typen die Oberkante an genau dieser
+        Stelle (Treppe des Podests, VIZ-68)."""
         if self.type in DOCK_HANG_TYPES:
             return self.y - self.h / 2.0 - DOCK_HANG_OFFSET
         if self.type in DOCK_TOP_TYPES:
-            return self.y + self.h / 2.0 + DOCK_TOP_OFFSET
+            top = (self.top_y if px is None or pz is None
+                   else self.top_y_at(px, pz))
+            return None if top is None else top + DOCK_TOP_OFFSET
         return None
 
 
@@ -186,16 +231,20 @@ class StageDefinition:
         Rueckgabe: {"id", "kind", "y"} oder None.
         """
         best: Optional[StageElement] = None
+        best_top = 0.0
         for el in self.elements:
             if el.type not in DOCK_HANG_TYPES and el.type not in DOCK_TOP_TYPES:
                 continue
             if not el.contains_xz(px, pz, margin):
                 continue
-            if best is None or el.top_y > best.top_y:
-                best = el
+            top = el.top_y_at(px, pz)   # VIZ-68: Treppe ist nicht flach
+            if top is None:
+                continue
+            if best is None or top > best_top:
+                best, best_top = el, top
         if best is None:
             return None
-        y = best.dock_y()
+        y = best.dock_y(px, pz)
         if y is None:
             return None
         kind = "hang" if best.type in DOCK_HANG_TYPES else "top"

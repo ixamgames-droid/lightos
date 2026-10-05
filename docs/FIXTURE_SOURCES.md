@@ -33,8 +33,9 @@ Builtins wie ZQ02001) werden **nie** überschrieben.
 ## Bibliothek herunterladen (FM-53)
 
 Beim **ersten Start** fragt LightOS, ob eine freie Geräte-Bibliothek geladen
-werden soll — aber nur, solange die Bibliothek nichts außer den eingebauten
-Profilen enthält. Ohne Zustimmung wird **nichts** heruntergeladen. Später geht
+werden soll — aber nur, solange die Bibliothek nichts außer den mitgelieferten
+Profilen enthält (den eingebauten und denen der LightOS-Bibliothek unter
+`fixtures/bibliothek/`, FM-60). Ohne Zustimmung wird **nichts** heruntergeladen. Später geht
 es jederzeit über **Datenbank → Geräte-Bibliothek herunterladen...**
 
 - **Quellen:** QLC+-Fixtures einer festen Version (Apache-2.0, GitHub-Archiv)

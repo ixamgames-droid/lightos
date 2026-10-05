@@ -144,6 +144,12 @@ class ShowBuilder:
                         FixtureProfile.id.asc(),
                     )
                 ).all()
+                if len(rows) > 1:
+                    # FM-63: vom LightOS-Profil abgeloeste QLC+-Importe sind
+                    # keine Mehrdeutigkeit (das LightOS-Profil steht vorn).
+                    from src.core.database.fixture_db import abgeloeste_profil_ids
+                    weg = abgeloeste_profil_ids(s)
+                    rows = [r for r in rows if r[0] not in weg] or rows
         except Exception as exc:
             raise BuildError(f"Fixture-DB nicht lesbar: {exc}")
         # AUSSERHALB des try/except: ein hier (strict) geworfener BuildError darf NICHT

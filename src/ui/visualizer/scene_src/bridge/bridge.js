@@ -16,7 +16,7 @@ import { setEditMode, setBrightnessManual, resetBrightnessAuto, updateOutlines, 
 import { setFpsVisible } from '../camera/presets.js';
 import {
   loadStageJson, createStageObject, removeStageObject, updateStageObjectProps,
-  setResizeModeEnabled, isUserRemoved,
+  setResizeModeEnabled, isUserRemoved, gebuendelt,
 } from '../stage/stage_objects.js';
 import { hideTooltip } from '../interaction/pointer.js';
 import { resetCameraView } from '../camera/cameras.js';
@@ -39,6 +39,11 @@ export function jsAddStageObject(type) {
 export function jsAddStageObjectData(json) {
   try {
     const d = typeof json === 'string' ? JSON.parse(json) : json;
+    // VIZ-68: Raster — {bulk: [element, ...]} legt alle an und meldet die Liste
+    // EINMAL (statt je Element die ganze Liste zu serialisieren).
+    if (d && Array.isArray(d.bulk)) {
+      return gebuendelt(() => d.bulk.map(e => jsAddStageObjectData(e)));
+    }
     if (!d || !d.type) return null;
     // A3D-12/A3D-30: eine automatische Wiederherstellung (`reassert`) darf ein
     // vom Nutzer geloeschtes Element NICHT reanimieren. Der Repair-Loop in
@@ -63,6 +68,13 @@ export function jsAddStageObjectData(json) {
 }
 
 export function jsRemoveStageObject(id) {
+  // VIZ-68: Raster-Undo — eine JSON-Liste von ids entfernt gebuendelt.
+  if (typeof id === 'string' && id.charAt(0) === '[') {
+    let ids = [];
+    try { ids = JSON.parse(id); } catch (e) { ids = []; }
+    gebuendelt(() => ids.forEach(i => removeStageObject(i)));
+    return;
+  }
   removeStageObject(id);
 }
 
