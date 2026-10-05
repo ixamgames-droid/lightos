@@ -402,7 +402,10 @@ def befunde_lshow(path: str) -> list[Finding]:
     except Exception:
         return []
     out: list[Finding] = []
-    for pruefung in (statische_befunde, weiss_zuordnung_befunde):
+    # LAS-23: EFX-Ziele ohne passende Achse gehoeren mit in den Show-Lint.
+    from .efx_achsen_check import efx_achsen_befunde
+    for pruefung in (statische_befunde, weiss_zuordnung_befunde,
+                     efx_achsen_befunde):
         try:
             out.extend(pruefung(show))
         except Exception:
