@@ -1771,6 +1771,15 @@ class AppState:
                 {u: frozenset(s) for u, s in self._build_blackout_keep_mask(fix_index).items()})
         except Exception as e:
             print(f"[AppState] set blackout mask error: {e}")
+        # OUT-61b: alle Laser-Adressen (unabhaengig vom NOT-AUS-Latch) — die
+        # Lade-Sperre braucht sie, falls der Latch erst waehrend eines Loads
+        # ausgeloest wird (dann ist der Plan schon leer).
+        try:
+            setze = getattr(self.output_manager, "set_laser_adressen", None)
+            if setze is not None:
+                setze(dict(new_laser_estop_addrs))
+        except Exception as e:
+            print(f"[AppState] set laser addrs error: {e}")
         # VCB-11: aktive gezielte Blackouts auf den neuen Patch umrechnen.
         self._refresh_target_blackouts()
         # A3D-01: die Laser-Estop-Maske am OutputManager mitpflegen (Adressen
@@ -2260,8 +2269,13 @@ class AppState:
                           if target_active is None else bool(target_active))
                 addrs = ((getattr(self, "_laser_estop_addrs", {}) or {})
                          if target_addrs is None else target_addrs)
-                om.set_laser_estop_mask(
-                    {u: frozenset(s) for u, s in addrs.items()} if active else {})
+                maske = {u: frozenset(s) for u, s in addrs.items()} if active else {}
+                try:
+                    om.set_laser_estop_mask(maske, aktiv=active)   # OUT-61b: Latch ausdruecklich
+                except TypeError:
+                    # Aeltere/ersetzte Signatur ohne aktiv (Test-Spione): die
+                    # Maske MUSS trotzdem ankommen.
+                    om.set_laser_estop_mask(maske)
             except Exception as e:
                 print(f"[AppState] set laser estop mask error: {e}")
 

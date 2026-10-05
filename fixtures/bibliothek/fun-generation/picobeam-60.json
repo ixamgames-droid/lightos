@@ -1,0 +1,130 @@
+{
+  "format_version": 1,
+  "hersteller": "Fun Generation",
+  "hersteller_kurz": "FUNGEN",
+  "modell": "PicoBeam 60",
+  "kurzname": "PICOBEAM60",
+  "typ": "moving_head",
+  "leistung_w": 65,
+  "notizen": "Beam-Moving-Head, 1 x 60 W RGBW-COB, 4 Grad, Pan 540 / Tilt 180 Grad. Im 3- und 8-Kanal-Modus keine RGBW-Kanaele (8 Kanal: Farbe nur ueber Programmkanal).",
+  "quelle": {
+    "titel": "Fun Generation PicoBeam 60 COB RGBW Bedienungsanleitung (Thomann, ID 442853, V4)",
+    "version": "V4",
+    "datum": "2022-05-11",
+    "url": "https://images.static-thomann.de/pics/atg/atgdata/document/manual/c_442853_v4_en_online.pdf"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.5 GIT · Sebastian Moeckel",
+    "original": "resources/fixtures/Fun-Generation/Fun-Generation-PicoBeam-60.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 42 Wertebereiche mit Art (kind) versehen; danach von LightOS gegen das Herstellerhandbuch ueberarbeitet: Hersteller 'Fun-Generation' -> 'Fun Generation' (Schreibweise des Herstellers), Kurzname/Leistung/Typ nach Handbuch; Programmkanal: feste Farbvorwahlen 50-129 als color (im 8-Kanal-Modus einzige Farbwahl), Programme ohne Art, Reset als reset, Musik als sound; 8-Kanal-Modus: 130-139 'Dunkel' laut Handbuch (QLC+: No function); Speed/Empfindlichkeit als effect_speed statt speed (gehoert zu Programm/Musik, nicht zur Bewegung); Strobe-Default/Highlight 0 (offen) statt 4; Kanalnamen deutsch nach Handbuch"
+  },
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal fuer Kanal gegen die DMX-Tabellen (3/8/13 Kanaele, Kap. 7.3-7.5) im Thomann-Handbuch V4 (11.05.2022) geprueft; nicht am Geraet getestet"
+  },
+  "modi": [
+    {
+      "name": "13 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fein", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fein", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt-Speed (schnell -> langsam)", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 9, "name": "Offen (keine Funktion)", "art": "open"},
+            {"von": 10, "bis": 255, "name": "Strobe 1-25 Hz", "art": "strobe"}
+          ]
+        },
+        {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
+        {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
+        {"name": "Blau", "attribut": "color_b", "default": 0, "highlight": 255},
+        {"name": "Weiss", "attribut": "color_w", "default": 0, "highlight": 255},
+        {
+          "name": "Programme/Farbvorwahl",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 49, "name": "Keine Funktion"},
+            {"von": 50, "bis": 59, "name": "Rot", "art": "color"},
+            {"von": 60, "bis": 69, "name": "Gruen", "art": "color"},
+            {"von": 70, "bis": 79, "name": "Blau", "art": "color"},
+            {"von": 80, "bis": 89, "name": "Weiss", "art": "color"},
+            {"von": 90, "bis": 99, "name": "Gelb", "art": "color"},
+            {"von": 100, "bis": 109, "name": "Cyan", "art": "color"},
+            {"von": 110, "bis": 119, "name": "Purple", "art": "color"},
+            {"von": 120, "bis": 129, "name": "Alles weiss", "art": "color"},
+            {"von": 130, "bis": 139, "name": "Keine Funktion"},
+            {"von": 140, "bis": 149, "name": "Programm 1", "art": ""},
+            {"von": 150, "bis": 159, "name": "Programm 2", "art": ""},
+            {"von": 160, "bis": 169, "name": "Programm 3", "art": ""},
+            {"von": 170, "bis": 179, "name": "Programm 4", "art": ""},
+            {"von": 180, "bis": 189, "name": "Programm 5", "art": ""},
+            {"von": 190, "bis": 233, "name": "Keine Funktion"},
+            {"von": 234, "bis": 236, "name": "Reset", "art": "reset"},
+            {"von": 237, "bis": 249, "name": "Keine Funktion"},
+            {"von": 250, "bis": 255, "name": "Musiksteuerung", "art": "sound"}
+          ]
+        },
+        {"name": "Speed/Empfindlichkeit", "attribut": "effect_speed", "default": 0, "highlight": 0}
+      ]
+    },
+    {
+      "name": "8 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fein", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fein", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Pan/Tilt-Speed (schnell -> langsam)", "attribut": "speed", "default": 0, "highlight": 0},
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Programme/Farbvorwahl",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 49, "name": "Keine Funktion"},
+            {"von": 50, "bis": 59, "name": "Rot", "art": "color"},
+            {"von": 60, "bis": 69, "name": "Gruen", "art": "color"},
+            {"von": 70, "bis": 79, "name": "Blau", "art": "color"},
+            {"von": 80, "bis": 89, "name": "Weiss", "art": "color"},
+            {"von": 90, "bis": 99, "name": "Gelb", "art": "color"},
+            {"von": 100, "bis": 109, "name": "Cyan", "art": "color"},
+            {"von": 110, "bis": 119, "name": "Purple", "art": "color"},
+            {"von": 120, "bis": 129, "name": "Alles weiss", "art": "color"},
+            {"von": 130, "bis": 139, "name": "Dunkel"},
+            {"von": 140, "bis": 149, "name": "Programm 1", "art": ""},
+            {"von": 150, "bis": 159, "name": "Programm 2", "art": ""},
+            {"von": 160, "bis": 169, "name": "Programm 3", "art": ""},
+            {"von": 170, "bis": 179, "name": "Programm 4", "art": ""},
+            {"von": 180, "bis": 189, "name": "Programm 5", "art": ""},
+            {"von": 190, "bis": 233, "name": "Keine Funktion"},
+            {"von": 234, "bis": 236, "name": "Reset", "art": "reset"},
+            {"von": 237, "bis": 249, "name": "Keine Funktion"},
+            {"von": 250, "bis": 255, "name": "Musiksteuerung", "art": "sound"}
+          ]
+        },
+        {"name": "Speed/Empfindlichkeit", "attribut": "effect_speed", "default": 0, "highlight": 0}
+      ]
+    },
+    {
+      "name": "3 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Master-Dimmer", "attribut": "intensity", "default": 0, "highlight": 255}
+      ]
+    }
+  ]
+}

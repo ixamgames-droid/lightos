@@ -16,7 +16,7 @@
     "lizenz": "Apache-2.0",
     "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.0.0 Beta 1 · Aurelien",
     "original": "resources/fixtures/Cameo/Cameo-Multi-FX-Bar.qxf",
-    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 167 Wertebereiche mit Art (kind) versehen; Rasterform in 3 Modus/Modi aus <Physical> uebernommen; Laser rot/gruen und Blitz-LEDs 1-4 shutter -> raw (eigene Effekte, kein Shutter der Farbkoepfe), Default/Highlight 0 = aus (Laser nie per Highlight an); Laser-Rotation prism -> raw (kein Prisma); Auto-Programm-Geschwindigkeit/Sound macro -> effect_speed, Sound-Bereich 'sound'; Shutter der Derbys/PARs: Default/Highlight auf 0 (Offen-Bereich) in 4 Kanaelen; typ par -> other (Effektleiste: 2 Derbys, 2 PARs, Laser, 4 Blitz-LEDs)"
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 167 Wertebereiche mit Art (kind) versehen; Rasterform in 1 Modus/Modi aus <Physical> uebernommen; in 2 weiteren Modus/Modi nicht, weil sie nicht zu den color_r-Kanaelen passt (keine echten Farbzonen); Laser rot/gruen und Blitz-LEDs 1-4 shutter -> raw (eigene Effekte, kein Shutter der Farbkoepfe), Default/Highlight 0 = aus (Laser nie per Highlight an); Laser-Rotation prism -> raw (kein Prisma); Auto-Programm-Geschwindigkeit/Sound macro -> effect_speed, Sound-Bereich 'sound'; Shutter der Derbys/PARs: Default/Highlight auf 0 (Offen-Bereich) in 4 Kanaelen; typ par -> other (Effektleiste: 2 Derbys, 2 PARs, Laser, 4 Blitz-LEDs)"
   },
   "autor": "LightOS",
   "geprueft": {
@@ -253,7 +253,6 @@
     },
     {
       "name": "5 Channel",
-      "raster": {"rows": 1, "cols": 4},
       "kanaele": [
         {
           "name": "Auto Program LED Par",
@@ -330,7 +329,6 @@
     },
     {
       "name": "2 Channel",
-      "raster": {"rows": 1, "cols": 4},
       "kanaele": [
         {
           "name": "Auto Program",

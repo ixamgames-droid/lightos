@@ -15,14 +15,13 @@
     "lizenz": "Apache-2.0",
     "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.1 GIT · Patrick Rabl/Klaus Muth",
     "original": "resources/fixtures/Stairville/Stairville-CLB2.4-CompactLED.qxf",
-    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 46 Wertebereiche mit Art (kind) versehen; Rasterform in 6 Modus/Modi aus <Physical> uebernommen; Typ led_bar statt par (Bar mit 4 einzeln steuerbaren PARs); Modi aufsteigend sortiert und umbenannt (2-/3-/4-/7-/8-/14-Kanal); 8-Kanal: Raster 1x2 statt 1x4 (je zwei PARs gemeinsam laut Handbuch); Strobe-Kanaele als strobe (nur Geschwindigkeit, kein Offen-Bereich im Handbuch) statt shutter; 2-Kanal: Festfarbe 'LEDs aus' ohne Art color, Weiss als open; Hinweis, dass Kanal 2 bei Show 02–14 die Geschwindigkeit ist; 7-Kanal: Kanal 6 als effect_speed statt speed, falsche Art sound entfernt; Kanal-/Bereichsnamen deutsch; Kurzname; hersteller_kurz STAIR; Quelle auf Herstellerhandbuch gesetzt"
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 46 Wertebereiche mit Art (kind) versehen; Rasterform in 2 Modus/Modi aus <Physical> uebernommen; in 4 weiteren Modus/Modi nicht, weil sie nicht zu den color_r-Kanaelen passt (keine echten Farbzonen); Typ led_bar statt par (Bar mit 4 einzeln steuerbaren PARs); Modi aufsteigend sortiert und umbenannt (2-/3-/4-/7-/8-/14-Kanal); 8-Kanal: Raster 1x2 statt 1x4 (je zwei PARs gemeinsam laut Handbuch); Strobe-Kanaele als strobe (nur Geschwindigkeit, kein Offen-Bereich im Handbuch) statt shutter; 2-Kanal: Festfarbe 'LEDs aus' ohne Art color, Weiss als open; Hinweis, dass Kanal 2 bei Show 02–14 die Geschwindigkeit ist; 7-Kanal: Kanal 6 als effect_speed statt speed, falsche Art sound entfernt; Kanal-/Bereichsnamen deutsch; Kurzname; hersteller_kurz STAIR; Quelle auf Herstellerhandbuch gesetzt"
   },
   "autor": "LightOS",
   "geprueft": {"ok": true, "wie": "Kanal fuer Kanal gegen das Handbuch (Kap. 7.3–7.8, 2/3/4/7/8/14 Kanaele) geprueft"},
   "modi": [
     {
       "name": "2-Kanal",
-      "raster": {"rows": 1, "cols": 4},
       "kanaele": [
         {
           "name": "Automatik-Show",
@@ -74,7 +73,6 @@
     },
     {
       "name": "3-Kanal",
-      "raster": {"rows": 1, "cols": 4},
       "kanaele": [
         {"name": "Rot", "attribut": "color_r", "default": 0, "highlight": 255},
         {"name": "Gruen", "attribut": "color_g", "default": 0, "highlight": 255},
@@ -83,7 +81,6 @@
     },
     {
       "name": "4-Kanal",
-      "raster": {"rows": 1, "cols": 4},
       "kanaele": [
         {
           "name": "Dimmer",
@@ -101,7 +98,6 @@
     },
     {
       "name": "7-Kanal",
-      "raster": {"rows": 1, "cols": 4},
       "kanaele": [
         {
           "name": "Dimmer",

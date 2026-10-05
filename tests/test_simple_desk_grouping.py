@@ -171,7 +171,9 @@ class GroupingTest(unittest.TestCase):
 class TimerVisibilityTest(unittest.TestCase):
     def test_timer_pauses_when_hidden(self):
         view = SimpleDeskView()
-        self.assertTrue(view._sync_timer.isActive())
+        # VIZ-70: nie gezeigt -> kein Takt (vorher lief er ab dem Bau, und ohne
+        # showEvent kam auch nie das hideEvent, das ihn anhaelt).
+        self.assertFalse(view._sync_timer.isActive())
         view.show()
         _app.processEvents()
         self.assertTrue(view._sync_timer.isActive())

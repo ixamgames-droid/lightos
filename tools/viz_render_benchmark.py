@@ -77,6 +77,8 @@ sich am Code etwas geaendert haette.
 
 ## Ergebnis 2026-08-04 (Intel UHD 630, Linux Mint, 32 leuchtende Mover)
 
+> CPU-seitig gemessen (`gl.finish()`, s. Messfalle 1) — keine GPU-Zeiten.
+
 n=12 Prozesse je Variante, 200 Frames nach 100 Aufwaermframes, zwei
 Zeitfenster, jeweils gegen die Basis DES EIGENEN Fensters verglichen:
 
@@ -96,7 +98,10 @@ die reine Beleuchtungsrechnung liegt also bei rund 4,1 ms.
 **Rangfolge fuer jede Optimierung: Schatten (30 %), danach lange nichts.** Das
 Schatten-Dach von 16 ist bereits gesetzt (VIZ-PERF); es weiter zu senken ist der
 einzige gemessene Hebel — und eine Entscheidung mit optischem Preis, keine reine
-Technikfrage.
+Technikfrage. **VIZ-69 hat beides gezogen:** Dach auf 8, und die Shadow-Maps
+werden nur noch bei Lage-Aenderung neu gezeichnet (Kamera-Orbit und reine
+Farb-/Dimmer-Wechsel kosten keinen Schatten-Durchlauf mehr). Dieses Werkzeug
+erzwingt den Neubau je Frame weiterhin, misst also den teuren Fall.
 
 > ⚠️ **Was sich damit gegenueber dem 2026-08-03 geaendert hat.** Die erste
 > Fassung dieser Tabelle nannte die **Lichtkegel als zweitgroessten Posten
@@ -114,8 +119,17 @@ in eine Entscheidung eingehen, ist es der falsche Modus.
 
 1. **`performance.now()` um `render()` misst die falsche Sache.** WebGL ist
    asynchron: der Aufruf setzt Draw-Calls ab und kehrt zurueck, die GPU rechnet
-   danach. Deshalb steht hier `gl.finish()` dahinter — das zwingt die Pipeline
-   leer, und erst dann ist die Zeit die echte Arbeit.
+   danach. Bis VIZ-69 stand hier `gl.finish()` dahinter — das sollte die
+   Pipeline leeren. **Tut es in QtWebEngine nicht:** WebGL laeuft dort ueber
+   ANGLE im GPU-Prozess, und `gl.finish()` kehrt zurueck, ohne auf die GPU zu
+   warten. Jetzt holt ein `readPixels` von 1x1 Pixel das fertige Bild ab; das
+   geht nur, wenn alle Draw-Calls davor wirklich abgearbeitet sind.
+
+   ⚠️ **Alle Zahlen in diesem Docstring vor VIZ-69 (2026-10-04) sind deshalb
+   CPU-seitig** — Absetzen der Draw-Calls plus was ANGLE synchron erledigt,
+   NICHT die GPU-Zeit. Die Rangfolge der Anteile (Schatten vor Beleuchtung)
+   bestaetigte die VIZ-69-Messung mit readPixels; die absoluten Millisekunden
+   sind mit neuen Laeufen nicht direkt vergleichbar.
 
 2. **Der rAF-Takt taugt in QtWebEngine nicht als Messgroesse.** Gemessen ergab er
    konstant 50 ms (20 Hz) — bei 12, 32 UND 48 Fixtures identisch. Das ist die
@@ -168,7 +182,8 @@ sys.path.insert(0, _REPO)
 #
 # ⚠️ Diese 99 % sind die NACHGEMESSENE Zahl vom 2026-08-04 (p95, eingeschwungen,
 # n=4). Zuerst standen hier 90 % — gemessen an der Rampe, s. "Die Rampe" oben.
-# Eingeschwungen sieht die Treppe so aus (p95 je Frame, Anteil am 33-ms-Budget):
+# Eingeschwungen sieht die Treppe so aus (p95 je Frame, Anteil am 33-ms-Budget;
+# CPU-seitig mit `gl.finish()` gemessen, s. Messfalle 1 im Docstring):
 #
 #     12 Fixtures   11,1 ms    34 %      (vorher gemeldet: 14,0 ms = 42 %)
 #     32 Fixtures   32,6 ms    99 %      (vorher gemeldet: 29,6 ms = 90 %)
@@ -221,9 +236,17 @@ _MESSUNG_JS = """
   const gl = c && (c.getContext('webgl2') || c.getContext('webgl'));
   if (!gl) return JSON.stringify({fehler: 'kein GL-Kontext'});
   L.requestRender();
+  // VIZ-69: die App zeichnet Shadow-Maps nur noch bei Lage-Aenderung neu.
+  // Gemessen wird weiter der teure Fall (Kopf schwenkt -> Schatten neu), damit
+  // die Zahlen mit den aelteren vergleichbar bleiben.
+  if (L.requestShadowUpdate) L.requestShadowUpdate();
   const t0 = performance.now();
   L.__renderTick();
-  gl.finish();                        // ohne das misst man nur die Submission
+  // VIZ-69: readPixels statt gl.finish(). In QtWebEngine laeuft WebGL ueber
+  // ANGLE/GPU-Prozess; gl.finish() kehrt dort zurueck, ohne auf die GPU zu
+  // warten. Ein 1x1-readPixels MUSS das fertige Bild abholen und erzwingt
+  // damit wirklich den Abschluss aller Draw-Calls davor.
+  gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));
   return JSON.stringify({ms: +(performance.now() - t0).toFixed(2)});
 })()
 """

@@ -1,0 +1,556 @@
+{
+  "format_version": 1,
+  "hersteller": "Cameo",
+  "hersteller_kurz": "Cameo",
+  "modell": "OPUS S5",
+  "kurzname": "OPUS S5",
+  "typ": "moving_head",
+  "leistung_w": 380,
+  "quelle": {
+    "titel": "Cameo OPUS S5 – User's Manual, DMX Control S. 90–96",
+    "url": "https://www.manualslib.com/manual/1742027/Cameo-Opus-S5.html?page=90"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 5.1.0 GIT · Tim Nelles",
+    "original": "resources/fixtures/Cameo/Cameo-OPUS-S5.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 255 Wertebereiche mit Art (kind) versehen; Strobe-Default/-Highlight 0 statt 2 (Offen-Bereich); Cyan/Magenta/Gelb Highlight 0 statt 255 (Highlight = weiss, nicht volle Farbsaettigung); Farbrad: 'Colour off (open)' als 'open', Stopp ohne Art; Goborad 1/2: 'Open' als 'open' statt 'gobo', Stopp ohne Art; Goborad 2 gobo_wheel -> gobo_wheel2; Gobo-Indexposition ohne Art; Gobo-Rotation fein gobo_rotation -> raw; Zoom fein/Fokus fein -> raw (sonst als zweiter Kopf gelesen); Iris: Art 'open' auf 'Open -> Close' entfernt; Prisma: 'Prism Off' ohne Art statt 'open', Prisma 1/2 'prism'; Prisma-Rotation prism -> prism_rotation, Index ohne Art; Effektrad macro -> animation, Position ohne Art; Pan/Tilt-Makro macro -> effect; Pan/Tilt-Speed als 'fast -> slow' benannt; Dimmerkurve macro -> raw; Geraeteeinstellungen: 'closed'-Arten entfernt, Reset-Bereiche 'reset'; kurzname/notizen/quelle gesetzt"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": true,
+    "wie": "Beide Modi (33 CH Extended, 27 CH Standard) Kanal fuer Kanal und Bereich fuer Bereich gegen die DMX-Tabellen im Handbuch (via ManualsLib, S. 90–96) geprueft; die Ueberlappung 162-187/175-190 (Gobo 6/7 shake) im Handbuch ist ein Druckfehler, QLC+ (162-174/175-190) uebernommen"
+  },
+  "modi": [
+    {
+      "name": "33 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Dimmer fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Strobe closed", "art": "closed"},
+            {"von": 11, "bis": 33, "name": "Pulse Random, slow -> fast", "art": "strobe"},
+            {"von": 34, "bis": 56, "name": "Ramp up Random, slow -> fast", "art": "strobe"},
+            {"von": 57, "bis": 79, "name": "Ramp down Random, slow -> fast", "art": "strobe"},
+            {"von": 80, "bis": 102, "name": "Random Strobe Effect, slow -> fast", "art": "strobe"},
+            {"von": 103, "bis": 127, "name": "Strobe Break Effect, 5s...1s (Short burst with break)", "art": "strobe"},
+            {"von": 128, "bis": 250, "name": "Strobe slow -> fast, <1Hz - 20Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        },
+        {"name": "Cyan", "attribut": "cmy_c", "default": 0, "highlight": 0},
+        {"name": "Cyan fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Magenta", "attribut": "cmy_m", "default": 0, "highlight": 0},
+        {"name": "Magenta fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Yellow", "attribut": "cmy_y", "default": 0, "highlight": 0},
+        {"name": "Yellow fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "CTO", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "CTO fine",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "CTO fine", "art": ""}
+          ]
+        },
+        {
+          "name": "Colour Wheel",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Colour off (open)", "art": "open"},
+            {"von": 6, "bis": 17, "name": "Open / Deep Red", "art": "color"},
+            {"von": 18, "bis": 29, "name": "Deep Red", "art": "color"},
+            {"von": 30, "bis": 41, "name": "Deep Red / Medium Blue", "art": "color"},
+            {"von": 42, "bis": 53, "name": "Medium Blue", "art": "color"},
+            {"von": 54, "bis": 65, "name": "Medium Blue / Deep Green", "art": "color"},
+            {"von": 66, "bis": 77, "name": "Deep Green", "art": "color"},
+            {"von": 78, "bis": 89, "name": "Deep Green / Lavender", "art": "color"},
+            {"von": 90, "bis": 101, "name": "Lavender", "art": "color"},
+            {"von": 102, "bis": 113, "name": "Lavender / Amber", "art": "color"},
+            {"von": 114, "bis": 125, "name": "Amber", "art": "color"},
+            {"von": 126, "bis": 137, "name": "Amber / CTO", "art": "color"},
+            {"von": 138, "bis": 149, "name": "CTO", "art": "color"},
+            {"von": 150, "bis": 161, "name": "CTO / Congo Blue", "art": "color"},
+            {"von": 162, "bis": 173, "name": "Congo Blue", "art": "color"},
+            {"von": 174, "bis": 185, "name": "Congo Blue / Open", "art": "color"},
+            {"von": 186, "bis": 192, "name": "Colour off (open)", "art": "open"},
+            {"von": 193, "bis": 223, "name": "Colour Wheel Rotation slow -> fast, CW", "art": "rotate"},
+            {"von": 224, "bis": 224, "name": "Colour Wheel Rotation stop", "art": ""},
+            {"von": 225, "bis": 255, "name": "Colour Wheel Rotation fast -> slow, CCW", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo Wheel 1",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Open", "art": "open"},
+            {"von": 6, "bis": 18, "name": "Gobo 1", "art": "gobo"},
+            {"von": 19, "bis": 31, "name": "Gobo 2", "art": "gobo"},
+            {"von": 32, "bis": 44, "name": "Gobo 3", "art": "gobo"},
+            {"von": 45, "bis": 57, "name": "Gobo 4", "art": "gobo"},
+            {"von": 58, "bis": 70, "name": "Gobo 5", "art": "gobo"},
+            {"von": 71, "bis": 83, "name": "Gobo 6", "art": "gobo"},
+            {"von": 84, "bis": 96, "name": "Gobo 7", "art": "gobo"},
+            {"von": 97, "bis": 109, "name": "Gobo 1 shake, Slow -> Fast", "art": "shake"},
+            {"von": 110, "bis": 122, "name": "Gobo 2 shake, Slow -> Fast", "art": "shake"},
+            {"von": 123, "bis": 135, "name": "Gobo 3 shake, Slow -> Fast", "art": "shake"},
+            {"von": 136, "bis": 148, "name": "Gobo 4 shake, Slow -> Fast", "art": "shake"},
+            {"von": 149, "bis": 161, "name": "Gobo 5 shake, Slow -> Fast", "art": "shake"},
+            {"von": 162, "bis": 174, "name": "Gobo 6 shake, Slow -> Fast", "art": "shake"},
+            {"von": 175, "bis": 190, "name": "Gobo 7 shake, Slow -> Fast", "art": "shake"},
+            {"von": 191, "bis": 192, "name": "Open", "art": "open"},
+            {"von": 193, "bis": 223, "name": "Gobo Wheel Rotation slow -> fast, CW", "art": "rotate"},
+            {"von": 224, "bis": 224, "name": "Gobo Wheel Stop", "art": ""},
+            {"von": 225, "bis": 255, "name": "Gobo Wheel Rotation, Fast -> Slow, CCW", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo Wheel 1 Rotation",
+          "attribut": "gobo_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Gobo Rot. Off", "art": ""},
+            {"von": 6, "bis": 128, "name": "Gobo Position 0°...540°", "art": ""},
+            {"von": 129, "bis": 191, "name": "Gobo Rotation, Slow -> Fast, CW", "art": "rotate"},
+            {"von": 192, "bis": 192, "name": "Gobo Rotation Stop", "art": ""},
+            {"von": 193, "bis": 255, "name": "Gobo Rotation, Fast -> Slow, CCW", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo Wheel 1 Rotation fine",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Gobo wheel rotation fine", "art": ""}
+          ]
+        },
+        {
+          "name": "Gobo Wheel 2",
+          "attribut": "gobo_wheel2",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Open", "art": "open"},
+            {"von": 6, "bis": 17, "name": "Gobo 1", "art": "gobo"},
+            {"von": 18, "bis": 29, "name": "Gobo 2", "art": "gobo"},
+            {"von": 30, "bis": 41, "name": "Gobo 3", "art": "gobo"},
+            {"von": 42, "bis": 53, "name": "Gobo 4", "art": "gobo"},
+            {"von": 54, "bis": 65, "name": "Gobo 5", "art": "gobo"},
+            {"von": 66, "bis": 77, "name": "Gobo 6", "art": "gobo"},
+            {"von": 78, "bis": 89, "name": "Gobo 7", "art": "gobo"},
+            {"von": 90, "bis": 101, "name": "Gobo 8", "art": "gobo"},
+            {"von": 102, "bis": 113, "name": "Gobo 1 shake, Slow -> Fast", "art": "shake"},
+            {"von": 114, "bis": 125, "name": "Gobo 2 shake, Slow -> Fast", "art": "shake"},
+            {"von": 126, "bis": 137, "name": "Gobo 3 shake, Slow -> Fast", "art": "shake"},
+            {"von": 138, "bis": 149, "name": "Gobo 4 shake, Slow -> Fast", "art": "shake"},
+            {"von": 150, "bis": 161, "name": "Gobo 5 shake, Slow -> Fast", "art": "shake"},
+            {"von": 162, "bis": 173, "name": "Gobo 6 shake, Slow -> Fast", "art": "shake"},
+            {"von": 174, "bis": 185, "name": "Gobo 7 shake, Slow -> Fast", "art": "shake"},
+            {"von": 186, "bis": 191, "name": "Gobo 8 shake, Slow -> Fast", "art": "shake"},
+            {"von": 192, "bis": 192, "name": "Open", "art": "open"},
+            {"von": 193, "bis": 223, "name": "Gobo Wheel Rotation, Slow -> Fast, CW", "art": "rotate"},
+            {"von": 224, "bis": 224, "name": "Gobo Wheel Stop", "art": ""},
+            {"von": 225, "bis": 255, "name": "Gobo Wheel Rotation, Fast -> Slow, CCW", "art": "rotate"}
+          ]
+        },
+        {"name": "Zoom", "attribut": "zoom", "default": 0, "highlight": 0},
+        {"name": "Zoom fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {"name": "Focus", "attribut": "focus", "default": 0, "highlight": 0},
+        {"name": "Focus fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Iris",
+          "attribut": "iris",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 192, "name": "Open -> Close", "art": ""},
+            {"von": 193, "bis": 201, "name": "Pulse slow -> fast (with Dim)", "art": ""},
+            {"von": 202, "bis": 210, "name": "Pulse slow -> fast (no Dim)", "art": ""},
+            {"von": 211, "bis": 219, "name": "Random slow -> fast (no Dim)", "art": ""},
+            {"von": 220, "bis": 228, "name": "Ramp Up slow -> fast (with Dim)", "art": ""},
+            {"von": 229, "bis": 237, "name": "Ramp Up slow -> fast (no Dim)", "art": ""},
+            {"von": 238, "bis": 246, "name": "Ramp Down slow -> fast (with Dim)", "art": ""},
+            {"von": 247, "bis": 255, "name": "Ramp Down slow -> fast (no Dim)", "art": ""}
+          ]
+        },
+        {
+          "name": "Prism Wheel",
+          "attribut": "prism",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Prism Off (Open)", "art": ""},
+            {"von": 6, "bis": 130, "name": "Prism 1 (3 Facet)", "art": "prism"},
+            {"von": 131, "bis": 255, "name": "Prism 2 (6 Facet)", "art": "prism"}
+          ]
+        },
+        {
+          "name": "Prism Rotation",
+          "attribut": "prism_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Rotation Off", "art": ""},
+            {"von": 6, "bis": 128, "name": "Index 0°...540°", "art": ""},
+            {"von": 129, "bis": 191, "name": "Rotate CW Slow -> Fast", "art": "rotate"},
+            {"von": 192, "bis": 192, "name": "Rotate Stop", "art": ""},
+            {"von": 193, "bis": 255, "name": "Rotate CCW Fast -> Slow", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Frost",
+          "attribut": "frost",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Frost Intensity 0% -> 100%", "art": ""}
+          ]
+        },
+        {
+          "name": "Effect Wheel",
+          "attribut": "animation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Wheel Rot. Off", "art": ""},
+            {"von": 6, "bis": 128, "name": "Wheel Position 0°...540°", "art": ""},
+            {"von": 129, "bis": 191, "name": "Wheel Rot. Slow -> Fast, CW", "art": "rotate"},
+            {"von": 192, "bis": 192, "name": "Wheel Rot. Stop", "art": ""},
+            {"von": 193, "bis": 255, "name": "Wheel Rot. Fast -> Slow, CCW", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Pan/Tilt Macro",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Off", "art": ""},
+            {"von": 6, "bis": 40, "name": "Pan small -> big", "art": ""},
+            {"von": 41, "bis": 75, "name": "Tilt small -> big", "art": ""},
+            {"von": 76, "bis": 110, "name": "Pan/Tilt small -> big", "art": ""},
+            {"von": 111, "bis": 145, "name": "Pan/Tilt (inverse) small -> big", "art": ""},
+            {"von": 146, "bis": 180, "name": "Circle small -> big", "art": ""},
+            {"von": 181, "bis": 215, "name": "Circle (inverse) small -> big", "art": ""},
+            {"von": 216, "bis": 255, "name": "Random small -> big", "art": ""}
+          ]
+        },
+        {"name": "Pan/Tilt Speed (fast -> slow)", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Set Dimmer Curve",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "No function", "art": ""},
+            {"von": 6, "bis": 63, "name": "Linear", "art": ""},
+            {"von": 64, "bis": 127, "name": "Exponential", "art": ""},
+            {"von": 128, "bis": 191, "name": "Logarithmic", "art": ""},
+            {"von": 192, "bis": 255, "name": "S-Curve", "art": ""}
+          ]
+        },
+        {
+          "name": "Device Settings",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "No function", "art": ""},
+            {"von": 6, "bis": 20, "name": "Blackout while Moving ON (hold 3s)", "art": ""},
+            {"von": 21, "bis": 35, "name": "Blackout while Moving OFF (hold 5s)", "art": ""},
+            {"von": 36, "bis": 50, "name": "Invert Pan ON (hold 3s)", "art": ""},
+            {"von": 51, "bis": 65, "name": "Invert Pan OFF (hold 5s)", "art": ""},
+            {"von": 66, "bis": 80, "name": "Invert Tilt ON (hold 3s)", "art": ""},
+            {"von": 81, "bis": 95, "name": "Invert Tilt OFF (hold 5s)", "art": ""},
+            {"von": 96, "bis": 110, "name": "Fan Auto (hold 3s)", "art": ""},
+            {"von": 111, "bis": 125, "name": "Fan Silent (hold 5s)", "art": ""},
+            {"von": 126, "bis": 140, "name": "LED PWM 650 Hz (hold 3s)", "art": ""},
+            {"von": 141, "bis": 155, "name": "LED PWM 1530 Hz (hold 3s)", "art": ""},
+            {"von": 156, "bis": 170, "name": "LED PWM 3600 Hz (hold 3s)", "art": ""},
+            {"von": 171, "bis": 185, "name": "LED PWM 12000 Hz (hold 3s)", "art": ""},
+            {"von": 186, "bis": 200, "name": "LED PWM 25000 Hz (hold 3s)", "art": ""},
+            {"von": 201, "bis": 215, "name": "Reset Pan/Tilt (hold 3s)", "art": "reset"},
+            {"von": 216, "bis": 230, "name": "Reset Head (hold 3s)", "art": "reset"},
+            {"von": 231, "bis": 255, "name": "Reset All (hold 3s)", "art": "reset"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "27 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Dimmer fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Strobe closed", "art": "closed"},
+            {"von": 11, "bis": 33, "name": "Pulse Random, slow -> fast", "art": "strobe"},
+            {"von": 34, "bis": 56, "name": "Ramp up Random, slow -> fast", "art": "strobe"},
+            {"von": 57, "bis": 79, "name": "Ramp down Random, slow -> fast", "art": "strobe"},
+            {"von": 80, "bis": 102, "name": "Random Strobe Effect, slow -> fast", "art": "strobe"},
+            {"von": 103, "bis": 127, "name": "Strobe Break Effect, 5s...1s (Short burst with break)", "art": "strobe"},
+            {"von": 128, "bis": 250, "name": "Strobe slow -> fast, <1Hz - 20Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        },
+        {"name": "Cyan", "attribut": "cmy_c", "default": 0, "highlight": 0},
+        {"name": "Magenta", "attribut": "cmy_m", "default": 0, "highlight": 0},
+        {"name": "Yellow", "attribut": "cmy_y", "default": 0, "highlight": 0},
+        {"name": "CTO", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Colour Wheel",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Colour off (open)", "art": "open"},
+            {"von": 6, "bis": 17, "name": "Open / Deep Red", "art": "color"},
+            {"von": 18, "bis": 29, "name": "Deep Red", "art": "color"},
+            {"von": 30, "bis": 41, "name": "Deep Red / Medium Blue", "art": "color"},
+            {"von": 42, "bis": 53, "name": "Medium Blue", "art": "color"},
+            {"von": 54, "bis": 65, "name": "Medium Blue / Deep Green", "art": "color"},
+            {"von": 66, "bis": 77, "name": "Deep Green", "art": "color"},
+            {"von": 78, "bis": 89, "name": "Deep Green / Lavender", "art": "color"},
+            {"von": 90, "bis": 101, "name": "Lavender", "art": "color"},
+            {"von": 102, "bis": 113, "name": "Lavender / Amber", "art": "color"},
+            {"von": 114, "bis": 125, "name": "Amber", "art": "color"},
+            {"von": 126, "bis": 137, "name": "Amber / CTO", "art": "color"},
+            {"von": 138, "bis": 149, "name": "CTO", "art": "color"},
+            {"von": 150, "bis": 161, "name": "CTO / Congo Blue", "art": "color"},
+            {"von": 162, "bis": 173, "name": "Congo Blue", "art": "color"},
+            {"von": 174, "bis": 185, "name": "Congo Blue / Open", "art": "color"},
+            {"von": 186, "bis": 192, "name": "Colour off (open)", "art": "open"},
+            {"von": 193, "bis": 223, "name": "Colour Wheel Rotation slow -> fast, CW", "art": "rotate"},
+            {"von": 224, "bis": 224, "name": "Colour Wheel Rotation stop", "art": ""},
+            {"von": 225, "bis": 255, "name": "Colour Wheel Rotation fast -> slow, CCW", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo Wheel 1",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Open", "art": "open"},
+            {"von": 6, "bis": 18, "name": "Gobo 1", "art": "gobo"},
+            {"von": 19, "bis": 31, "name": "Gobo 2", "art": "gobo"},
+            {"von": 32, "bis": 44, "name": "Gobo 3", "art": "gobo"},
+            {"von": 45, "bis": 57, "name": "Gobo 4", "art": "gobo"},
+            {"von": 58, "bis": 70, "name": "Gobo 5", "art": "gobo"},
+            {"von": 71, "bis": 83, "name": "Gobo 6", "art": "gobo"},
+            {"von": 84, "bis": 96, "name": "Gobo 7", "art": "gobo"},
+            {"von": 97, "bis": 109, "name": "Gobo 1 shake, Slow -> Fast", "art": "shake"},
+            {"von": 110, "bis": 122, "name": "Gobo 2 shake, Slow -> Fast", "art": "shake"},
+            {"von": 123, "bis": 135, "name": "Gobo 3 shake, Slow -> Fast", "art": "shake"},
+            {"von": 136, "bis": 148, "name": "Gobo 4 shake, Slow -> Fast", "art": "shake"},
+            {"von": 149, "bis": 161, "name": "Gobo 5 shake, Slow -> Fast", "art": "shake"},
+            {"von": 162, "bis": 174, "name": "Gobo 6 shake, Slow -> Fast", "art": "shake"},
+            {"von": 175, "bis": 190, "name": "Gobo 7 shake, Slow -> Fast", "art": "shake"},
+            {"von": 191, "bis": 192, "name": "Open", "art": "open"},
+            {"von": 193, "bis": 223, "name": "Gobo Wheel Rotation slow -> fast, CW", "art": "rotate"},
+            {"von": 224, "bis": 224, "name": "Gobo Wheel Stop", "art": ""},
+            {"von": 225, "bis": 255, "name": "Gobo Wheel Rotation, Fast -> Slow, CCW", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo Wheel 1 Rotation",
+          "attribut": "gobo_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Gobo Rot. Off", "art": ""},
+            {"von": 6, "bis": 128, "name": "Gobo Position 0°...540°", "art": ""},
+            {"von": 129, "bis": 191, "name": "Gobo Rotation, Slow -> Fast, CW", "art": "rotate"},
+            {"von": 192, "bis": 192, "name": "Gobo Rotation Stop", "art": ""},
+            {"von": 193, "bis": 255, "name": "Gobo Rotation, Fast -> Slow, CCW", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo Wheel 1 Rotation fine",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Gobo wheel rotation fine", "art": ""}
+          ]
+        },
+        {
+          "name": "Gobo Wheel 2",
+          "attribut": "gobo_wheel2",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Open", "art": "open"},
+            {"von": 6, "bis": 17, "name": "Gobo 1", "art": "gobo"},
+            {"von": 18, "bis": 29, "name": "Gobo 2", "art": "gobo"},
+            {"von": 30, "bis": 41, "name": "Gobo 3", "art": "gobo"},
+            {"von": 42, "bis": 53, "name": "Gobo 4", "art": "gobo"},
+            {"von": 54, "bis": 65, "name": "Gobo 5", "art": "gobo"},
+            {"von": 66, "bis": 77, "name": "Gobo 6", "art": "gobo"},
+            {"von": 78, "bis": 89, "name": "Gobo 7", "art": "gobo"},
+            {"von": 90, "bis": 101, "name": "Gobo 8", "art": "gobo"},
+            {"von": 102, "bis": 113, "name": "Gobo 1 shake, Slow -> Fast", "art": "shake"},
+            {"von": 114, "bis": 125, "name": "Gobo 2 shake, Slow -> Fast", "art": "shake"},
+            {"von": 126, "bis": 137, "name": "Gobo 3 shake, Slow -> Fast", "art": "shake"},
+            {"von": 138, "bis": 149, "name": "Gobo 4 shake, Slow -> Fast", "art": "shake"},
+            {"von": 150, "bis": 161, "name": "Gobo 5 shake, Slow -> Fast", "art": "shake"},
+            {"von": 162, "bis": 173, "name": "Gobo 6 shake, Slow -> Fast", "art": "shake"},
+            {"von": 174, "bis": 185, "name": "Gobo 7 shake, Slow -> Fast", "art": "shake"},
+            {"von": 186, "bis": 191, "name": "Gobo 8 shake, Slow -> Fast", "art": "shake"},
+            {"von": 192, "bis": 192, "name": "Open", "art": "open"},
+            {"von": 193, "bis": 223, "name": "Gobo Wheel Rotation, Slow -> Fast, CW", "art": "rotate"},
+            {"von": 224, "bis": 224, "name": "Gobo Wheel Stop", "art": ""},
+            {"von": 225, "bis": 255, "name": "Gobo Wheel Rotation, Fast -> Slow, CCW", "art": "rotate"}
+          ]
+        },
+        {"name": "Zoom", "attribut": "zoom", "default": 0, "highlight": 0},
+        {"name": "Focus", "attribut": "focus", "default": 0, "highlight": 0},
+        {
+          "name": "Iris",
+          "attribut": "iris",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 192, "name": "Open -> Close", "art": ""},
+            {"von": 193, "bis": 201, "name": "Pulse slow -> fast (with Dim)", "art": ""},
+            {"von": 202, "bis": 210, "name": "Pulse slow -> fast (no Dim)", "art": ""},
+            {"von": 211, "bis": 219, "name": "Random slow -> fast (no Dim)", "art": ""},
+            {"von": 220, "bis": 228, "name": "Ramp Up slow -> fast (with Dim)", "art": ""},
+            {"von": 229, "bis": 237, "name": "Ramp Up slow -> fast (no Dim)", "art": ""},
+            {"von": 238, "bis": 246, "name": "Ramp Down slow -> fast (with Dim)", "art": ""},
+            {"von": 247, "bis": 255, "name": "Ramp Down slow -> fast (no Dim)", "art": ""}
+          ]
+        },
+        {
+          "name": "Prism Wheel",
+          "attribut": "prism",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Prism Off (Open)", "art": ""},
+            {"von": 6, "bis": 130, "name": "Prism 1 (3 Facet)", "art": "prism"},
+            {"von": 131, "bis": 255, "name": "Prism 2 (6 Facet)", "art": "prism"}
+          ]
+        },
+        {
+          "name": "Prism Rotation",
+          "attribut": "prism_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Rotation Off", "art": ""},
+            {"von": 6, "bis": 128, "name": "Index 0°...540°", "art": ""},
+            {"von": 129, "bis": 191, "name": "Rotate CW Slow -> Fast", "art": "rotate"},
+            {"von": 192, "bis": 192, "name": "Rotate Stop", "art": ""},
+            {"von": 193, "bis": 255, "name": "Rotate CCW Fast -> Slow", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Frost",
+          "attribut": "frost",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Frost Intensity 0% -> 100%", "art": ""}
+          ]
+        },
+        {
+          "name": "Effect Wheel",
+          "attribut": "animation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Wheel Rot. Off", "art": ""},
+            {"von": 6, "bis": 128, "name": "Wheel Position 0°...540°", "art": ""},
+            {"von": 129, "bis": 191, "name": "Wheel Rot. Slow -> Fast, CW", "art": "rotate"},
+            {"von": 192, "bis": 192, "name": "Wheel Rot. Stop", "art": ""},
+            {"von": 193, "bis": 255, "name": "Wheel Rot. Fast -> Slow, CCW", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Pan/Tilt Macro",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Off", "art": ""},
+            {"von": 6, "bis": 40, "name": "Pan small -> big", "art": ""},
+            {"von": 41, "bis": 75, "name": "Tilt small -> big", "art": ""},
+            {"von": 76, "bis": 110, "name": "Pan/Tilt small -> big", "art": ""},
+            {"von": 111, "bis": 145, "name": "Pan/Tilt (inverse) small -> big", "art": ""},
+            {"von": 146, "bis": 180, "name": "Circle small -> big", "art": ""},
+            {"von": 181, "bis": 215, "name": "Circle (inverse) small -> big", "art": ""},
+            {"von": 216, "bis": 255, "name": "Random small -> big", "art": ""}
+          ]
+        },
+        {"name": "Pan/Tilt Speed (fast -> slow)", "attribut": "speed", "default": 0, "highlight": 0},
+        {
+          "name": "Set Dimmer Curve",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "No function", "art": ""},
+            {"von": 6, "bis": 63, "name": "Linear", "art": ""},
+            {"von": 64, "bis": 127, "name": "Exponential", "art": ""},
+            {"von": 128, "bis": 191, "name": "Logarithmic", "art": ""},
+            {"von": 192, "bis": 255, "name": "S-Curve", "art": ""}
+          ]
+        },
+        {
+          "name": "Device Settings",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "No function", "art": ""},
+            {"von": 6, "bis": 20, "name": "Blackout while Moving ON (hold 3s)", "art": ""},
+            {"von": 21, "bis": 35, "name": "Blackout while Moving OFF (hold 5s)", "art": ""},
+            {"von": 36, "bis": 50, "name": "Invert Pan ON (hold 3s)", "art": ""},
+            {"von": 51, "bis": 65, "name": "Invert Pan OFF (hold 5s)", "art": ""},
+            {"von": 66, "bis": 80, "name": "Invert Tilt ON (hold 3s)", "art": ""},
+            {"von": 81, "bis": 95, "name": "Invert Tilt OFF (hold 5s)", "art": ""},
+            {"von": 96, "bis": 110, "name": "Fan Auto (hold 3s)", "art": ""},
+            {"von": 111, "bis": 125, "name": "Fan Silent (hold 5s)", "art": ""},
+            {"von": 126, "bis": 140, "name": "LED PWM 650 Hz (hold 3s)", "art": ""},
+            {"von": 141, "bis": 155, "name": "LED PWM 1530 Hz (hold 3s)", "art": ""},
+            {"von": 156, "bis": 170, "name": "LED PWM 3600 Hz (hold 3s)", "art": ""},
+            {"von": 171, "bis": 185, "name": "LED PWM 12000 Hz (hold 3s)", "art": ""},
+            {"von": 186, "bis": 200, "name": "LED PWM 25000 Hz (hold 3s)", "art": ""},
+            {"von": 201, "bis": 215, "name": "Reset Pan/Tilt (hold 3s)", "art": "reset"},
+            {"von": 216, "bis": 230, "name": "Reset Head (hold 3s)", "art": "reset"},
+            {"von": 231, "bis": 255, "name": "Reset All (hold 3s)", "art": "reset"}
+          ]
+        }
+      ]
+    }
+  ],
+  "notizen": "LED-Profil-Spot (CLOS5) mit CMY + CTO, Farbrad, 2 Goboraedern, Iris, 2 Prismen, Frost und Animationsrad."
+}

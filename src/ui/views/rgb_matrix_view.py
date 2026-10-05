@@ -197,6 +197,11 @@ class MatrixPreview(QWidget):
     def _tick(self):
         if self._matrix is None:
             return
+        # VIZ-70: unsichtbar (anderer Reiter, Fenster minimiert) nichts tun —
+        # der Dauer-Takt lief sonst im UI-Thread weiter; der naechste Takt nach
+        # dem Einblenden holt den Stand nach.
+        if not self.isVisible() or self.window().isMinimized():
+            return
         # Vorschau treibt die Phase selbst (Draft laeuft nicht im Manager).
         self._matrix._step = (
             getattr(self._matrix, "_step", 0.0)

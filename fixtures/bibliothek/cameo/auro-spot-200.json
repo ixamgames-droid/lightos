@@ -1,0 +1,436 @@
+{
+  "format_version": 1,
+  "hersteller": "Cameo",
+  "hersteller_kurz": "Cameo",
+  "modell": "Auro Spot 200",
+  "kurzname": "AURO SPOT 200",
+  "typ": "moving_head",
+  "leistung_w": 220,
+  "quelle": {
+    "titel": "Cameo AURO SPOT CLAS100 / CLAS200 – User's Manual (Abschnitt DMX Control)",
+    "url": "https://www.cameolight.com/en/downloads/file/id/526390154"
+  },
+  "herkunft": {
+    "art": "qlcplus",
+    "lizenz": "Apache-2.0",
+    "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.12.4 · István Király",
+    "original": "resources/fixtures/Cameo/Cameo-Auro-Spot-200.qxf",
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 179 Wertebereiche mit Art (kind) versehen; Farbrad: 'Colour off (open)' als 'open', Split-Farben/Farben als 'color', Rotations-Stopp ohne Art, Radrotation 'rotate'; Goborad: 'Gobo 0 (open)' als 'open', Gobos 1-6 als 'gobo', Stopp ohne Art; Gobo-Rotation: Aus/Stopp/Indexposition ohne Art (keine Rotation), nur echte Rotation 'rotate'; Prisma: 'Prism off' ohne Art, Prisma ein/Position/Stopp als 'prism', Rotation 'rotate'; Fokus fein focus -> raw (sonst als zweiter Kopf gelesen); Auto-Programm-Geschwindigkeit speed -> effect_speed; Pan/Tilt-Makro raw -> effect, Makro-Geschwindigkeit -> raw (effect_speed belegt die Auto-Programm-Geschwindigkeit); Pan/Tilt-Speed raw -> speed; Geraeteeinstellungen/Dimmerkurve: 2 falsche Arten ('closed' bei 'Blackout while Moving') entfernt; Gobo-Shake gobo_wheel -> gobo_fx (zweites gobo_wheel waere als zweites Rad/Kopf gelesen worden), Shake-Stufen als 'shake'; Shutter-Default/-Highlight auf 0 (Offen-Bereich) in 3 Kanaelen; Tippfehler korrigiert (Fast -> , CCW); QLC+-Datei Auro Spot 200 ist kanal- und bereichsgleich mit Auro Spot 100 (gleiches Handbuch CLAS100/CLAS200) - dieselben LightOS-Anpassungen uebernommen"
+  },
+  "autor": "LightOS (QXF-Konverter)",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal fuer Kanal gegen die DMX-Tabellen (5/13/22 CH, S. 41-45) im gemeinsamen Cameo-Handbuch CLAS100/CLAS200 geprueft (ManualsLib 2255740; eine Tabelle fuer beide Modelle); QLC+-Datei Auro Spot 200 stimmt Bereich fuer Bereich mit Auro Spot 100 ueberein"
+  },
+  "modi": [
+    {
+      "name": "5 Channel",
+      "kanaele": [
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 10, "name": "Strobe open", "art": "open"},
+            {"von": 11, "bis": 255, "name": "Strobe slow -> fast <1Hz - 20Hz", "art": "strobe"}
+          ]
+        },
+        {
+          "name": "Auto Program",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "no function", "art": ""},
+            {"von": 6, "bis": 38, "name": "Program 1", "art": ""},
+            {"von": 39, "bis": 70, "name": "Program 2", "art": ""},
+            {"von": 71, "bis": 102, "name": "Program 3", "art": ""},
+            {"von": 103, "bis": 134, "name": "Program 4", "art": ""},
+            {"von": 135, "bis": 166, "name": "Program 5", "art": ""},
+            {"von": 167, "bis": 198, "name": "Program 6", "art": ""},
+            {"von": 199, "bis": 230, "name": "Program 7", "art": ""},
+            {"von": 231, "bis": 255, "name": "Program 8", "art": ""}
+          ]
+        },
+        {
+          "name": "Auto Program Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Program Speed", "art": ""}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "no function", "art": ""},
+            {"von": 6, "bis": 127, "name": "Reset Pan / Tilt", "art": "reset"},
+            {"von": 128, "bis": 191, "name": "Reset Effects (Prism, Gobo…)", "art": "reset"},
+            {"von": 192, "bis": 255, "name": "Reset All Functions", "art": "reset"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "13 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {
+          "name": "Strobe functions",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Strobe closed", "art": "closed"},
+            {"von": 11, "bis": 33, "name": "Pulse Random, slow -> fast", "art": "strobe"},
+            {"von": 34, "bis": 56, "name": "Ramp up Random, slow -> fast", "art": "strobe"},
+            {"von": 57, "bis": 79, "name": "Ramp down Random, slow -> fast", "art": "strobe"},
+            {"von": 80, "bis": 102, "name": "Random Strobe Effect, slow -> fast", "art": "strobe"},
+            {"von": 103, "bis": 127, "name": "Strobe Break Effect, 5s…..1s (Short burst with break)", "art": "strobe"},
+            {"von": 128, "bis": 250, "name": "Strobe slow -> fast <1Hz - 20Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        },
+        {
+          "name": "Colour Wheel",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Colour off (open)", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Split Colour Open - Red", "art": "color"},
+            {"von": 11, "bis": 15, "name": "Red", "art": "color"},
+            {"von": 16, "bis": 20, "name": "Split Colour Red - Orange", "art": "color"},
+            {"von": 21, "bis": 28, "name": "Orange", "art": "color"},
+            {"von": 29, "bis": 35, "name": "Split Colour Orange - Yellow", "art": "color"},
+            {"von": 36, "bis": 43, "name": "Yellow", "art": "color"},
+            {"von": 44, "bis": 50, "name": "Split Colour Yellow - Green", "art": "color"},
+            {"von": 51, "bis": 58, "name": "Green", "art": "color"},
+            {"von": 59, "bis": 65, "name": "Split Colour Green - Cyan", "art": "color"},
+            {"von": 66, "bis": 73, "name": "Cyan", "art": "color"},
+            {"von": 74, "bis": 80, "name": "Split Colour Cyan - Blue", "art": "color"},
+            {"von": 81, "bis": 88, "name": "Blue", "art": "color"},
+            {"von": 89, "bis": 95, "name": "Split Colour Blue - Lavender", "art": "color"},
+            {"von": 96, "bis": 103, "name": "Lavender", "art": "color"},
+            {"von": 104, "bis": 110, "name": "Split Colour Lavender - Magenta", "art": "color"},
+            {"von": 111, "bis": 118, "name": "Magenta", "art": "color"},
+            {"von": 119, "bis": 125, "name": "Split Colour Magenta - Open", "art": "color"},
+            {"von": 126, "bis": 128, "name": "Colour Wheel Rotation Stop", "art": ""},
+            {"von": 129, "bis": 255, "name": "Colour Wheel Rotation Speed slow -> fast", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo Wheel",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Gobo 0 (open)", "art": "open"},
+            {"von": 6, "bis": 25, "name": "Gobo 1", "art": "gobo"},
+            {"von": 26, "bis": 45, "name": "Gobo 2", "art": "gobo"},
+            {"von": 46, "bis": 65, "name": "Gobo 3", "art": "gobo"},
+            {"von": 66, "bis": 85, "name": "Gobo 4", "art": "gobo"},
+            {"von": 86, "bis": 105, "name": "Gobo 5", "art": "gobo"},
+            {"von": 106, "bis": 127, "name": "Gobo 6", "art": "gobo"},
+            {"von": 128, "bis": 128, "name": "Gobo Wheel Rotation Stop", "art": ""},
+            {"von": 129, "bis": 191, "name": "Gobo Wheel Rotation, Slow -> Fast, CW", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "Gobo Wheel Rotation, Fast -> Slow, CCW", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo Rotation",
+          "attribut": "gobo_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Gobo Rotation off", "art": ""},
+            {"von": 6, "bis": 127, "name": "Gobo Position 0° ... 360°", "art": ""},
+            {"von": 128, "bis": 128, "name": "Gobo Rotation Stop", "art": ""},
+            {"von": 129, "bis": 191, "name": "Gobo Rotation, Slow -> Fast, CW", "art": "rotate"},
+            {"von": 192, "bis": 250, "name": "Gobo Rotation, Fast -> Slow, CCW", "art": "rotate"},
+            {"von": 251, "bis": 255, "name": "Gobo Rotation Stop", "art": ""}
+          ]
+        },
+        {
+          "name": "Gobo Wheel Shake",
+          "attribut": "gobo_fx",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Gobo Shake for Gobo Wheel off", "art": ""},
+            {"von": 6, "bis": 37, "name": "Speed 1", "art": "shake"},
+            {"von": 38, "bis": 69, "name": "Speed 2", "art": "shake"},
+            {"von": 70, "bis": 101, "name": "Speed 3", "art": "shake"},
+            {"von": 102, "bis": 133, "name": "Speed 4", "art": "shake"},
+            {"von": 134, "bis": 165, "name": "Speed 5", "art": "shake"},
+            {"von": 166, "bis": 197, "name": "Speed 6", "art": "shake"},
+            {"von": 198, "bis": 229, "name": "Speed 7", "art": "shake"},
+            {"von": 230, "bis": 255, "name": "Speed 8", "art": "shake"}
+          ]
+        },
+        {
+          "name": "Prism",
+          "attribut": "prism",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Prism off", "art": ""},
+            {"von": 6, "bis": 10, "name": "Prism in", "art": "prism"},
+            {"von": 11, "bis": 127, "name": "Prism Position 0° ... 360°", "art": "prism"},
+            {"von": 128, "bis": 128, "name": "Prism Rotation Stop", "art": "prism"},
+            {"von": 129, "bis": 191, "name": "Prism Rotation, Slow -> Fast, CW", "art": "rotate"},
+            {"von": 192, "bis": 250, "name": "Prism Rotation, Fast -> Slow, CCW", "art": "rotate"},
+            {"von": 251, "bis": 255, "name": "Prism Rotation Stop", "art": "prism"}
+          ]
+        },
+        {"name": "Focus", "attribut": "focus", "default": 0, "highlight": 0},
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "no function", "art": ""},
+            {"von": 6, "bis": 127, "name": "Reset Pan / Tilt", "art": "reset"},
+            {"von": 128, "bis": 191, "name": "Reset Effects (Prism, Gobo…)", "art": "reset"},
+            {"von": 192, "bis": 255, "name": "Reset All Functions", "art": "reset"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "22 Channel",
+      "kanaele": [
+        {"name": "Pan", "attribut": "pan", "default": 128, "highlight": 128},
+        {"name": "Pan fine", "attribut": "pan_fine", "default": 0, "highlight": 0},
+        {"name": "Tilt", "attribut": "tilt", "default": 128, "highlight": 128},
+        {"name": "Tilt fine", "attribut": "tilt_fine", "default": 0, "highlight": 0},
+        {"name": "Dimmer", "attribut": "intensity", "default": 0, "highlight": 255},
+        {"name": "Dimmer fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Strobe functions",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Strobe open", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Strobe closed", "art": "closed"},
+            {"von": 11, "bis": 33, "name": "Pulse Random, slow -> fast", "art": "strobe"},
+            {"von": 34, "bis": 56, "name": "Ramp up Random, slow -> fast", "art": "strobe"},
+            {"von": 57, "bis": 79, "name": "Ramp down Random, slow -> fast", "art": "strobe"},
+            {"von": 80, "bis": 102, "name": "Random Strobe Effect, slow -> fast", "art": "strobe"},
+            {"von": 103, "bis": 127, "name": "Strobe Break Effect, 5s…..1s (Short burst with break)", "art": "strobe"},
+            {"von": 128, "bis": 250, "name": "Strobe slow -> fast <1Hz - 20Hz", "art": "strobe"},
+            {"von": 251, "bis": 255, "name": "Strobe open", "art": "open"}
+          ]
+        },
+        {
+          "name": "Colour Wheel",
+          "attribut": "color_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Colour off (open)", "art": "open"},
+            {"von": 6, "bis": 10, "name": "Split Colour Open - Red", "art": "color"},
+            {"von": 11, "bis": 15, "name": "Red", "art": "color"},
+            {"von": 16, "bis": 20, "name": "Split Colour Red - Orange", "art": "color"},
+            {"von": 21, "bis": 28, "name": "Orange", "art": "color"},
+            {"von": 29, "bis": 35, "name": "Split Colour Orange - Yellow", "art": "color"},
+            {"von": 36, "bis": 43, "name": "Yellow", "art": "color"},
+            {"von": 44, "bis": 50, "name": "Split Colour Yellow - Green", "art": "color"},
+            {"von": 51, "bis": 58, "name": "Green", "art": "color"},
+            {"von": 59, "bis": 65, "name": "Split Colour Green - Cyan", "art": "color"},
+            {"von": 66, "bis": 73, "name": "Cyan", "art": "color"},
+            {"von": 74, "bis": 80, "name": "Split Colour Cyan - Blue", "art": "color"},
+            {"von": 81, "bis": 88, "name": "Blue", "art": "color"},
+            {"von": 89, "bis": 95, "name": "Split Colour Blue - Lavender", "art": "color"},
+            {"von": 96, "bis": 103, "name": "Lavender", "art": "color"},
+            {"von": 104, "bis": 110, "name": "Split Colour Lavender - Magenta", "art": "color"},
+            {"von": 111, "bis": 118, "name": "Magenta", "art": "color"},
+            {"von": 119, "bis": 125, "name": "Split Colour Magenta - Open", "art": "color"},
+            {"von": 126, "bis": 128, "name": "Colour Wheel Rotation Stop", "art": ""},
+            {"von": 129, "bis": 255, "name": "Colour Wheel Rotation Speed slow -> fast", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo Wheel",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Gobo 0 (open)", "art": "open"},
+            {"von": 6, "bis": 25, "name": "Gobo 1", "art": "gobo"},
+            {"von": 26, "bis": 45, "name": "Gobo 2", "art": "gobo"},
+            {"von": 46, "bis": 65, "name": "Gobo 3", "art": "gobo"},
+            {"von": 66, "bis": 85, "name": "Gobo 4", "art": "gobo"},
+            {"von": 86, "bis": 105, "name": "Gobo 5", "art": "gobo"},
+            {"von": 106, "bis": 127, "name": "Gobo 6", "art": "gobo"},
+            {"von": 128, "bis": 128, "name": "Gobo Wheel Rotation Stop", "art": ""},
+            {"von": 129, "bis": 191, "name": "Gobo Wheel Rotation, Slow -> Fast, CW", "art": "rotate"},
+            {"von": 192, "bis": 255, "name": "Gobo Wheel Rotation, Fast -> Slow, CCW", "art": "rotate"}
+          ]
+        },
+        {
+          "name": "Gobo Rotation",
+          "attribut": "gobo_rotation",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Gobo Rotation off", "art": ""},
+            {"von": 6, "bis": 127, "name": "Gobo Position 0° ... 360°", "art": ""},
+            {"von": 128, "bis": 128, "name": "Gobo Rotation Stop", "art": ""},
+            {"von": 129, "bis": 191, "name": "Gobo Rotation, Slow -> Fast, CW", "art": "rotate"},
+            {"von": 192, "bis": 250, "name": "Gobo Rotation, Fast -> Slow, CCW", "art": "rotate"},
+            {"von": 251, "bis": 255, "name": "Gobo Rotation Stop", "art": ""}
+          ]
+        },
+        {
+          "name": "Gobo Wheel Shake",
+          "attribut": "gobo_fx",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Gobo Shake for Gobo Wheel off", "art": ""},
+            {"von": 6, "bis": 37, "name": "Speed 1", "art": "shake"},
+            {"von": 38, "bis": 69, "name": "Speed 2", "art": "shake"},
+            {"von": 70, "bis": 101, "name": "Speed 3", "art": "shake"},
+            {"von": 102, "bis": 133, "name": "Speed 4", "art": "shake"},
+            {"von": 134, "bis": 165, "name": "Speed 5", "art": "shake"},
+            {"von": 166, "bis": 197, "name": "Speed 6", "art": "shake"},
+            {"von": 198, "bis": 229, "name": "Speed 7", "art": "shake"},
+            {"von": 230, "bis": 255, "name": "Speed 8", "art": "shake"}
+          ]
+        },
+        {
+          "name": "Prism",
+          "attribut": "prism",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "Prism off", "art": ""},
+            {"von": 6, "bis": 10, "name": "Prism in", "art": "prism"},
+            {"von": 11, "bis": 127, "name": "Prism Position 0° ... 360°", "art": "prism"},
+            {"von": 128, "bis": 128, "name": "Prism Rotation Stop", "art": "prism"},
+            {"von": 129, "bis": 191, "name": "Prism Rotation, Slow -> Fast, CW", "art": "rotate"},
+            {"von": 192, "bis": 250, "name": "Prism Rotation, Fast -> Slow, CCW", "art": "rotate"},
+            {"von": 251, "bis": 255, "name": "Prism Rotation Stop", "art": "prism"}
+          ]
+        },
+        {"name": "Focus", "attribut": "focus", "default": 0, "highlight": 0},
+        {"name": "Focus fine", "attribut": "raw", "default": 0, "highlight": 0},
+        {
+          "name": "Auto Program",
+          "attribut": "macro",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "no function", "art": ""},
+            {"von": 6, "bis": 38, "name": "Program 1", "art": ""},
+            {"von": 39, "bis": 70, "name": "Program 2", "art": ""},
+            {"von": 71, "bis": 102, "name": "Program 3", "art": ""},
+            {"von": 103, "bis": 134, "name": "Program 4", "art": ""},
+            {"von": 135, "bis": 166, "name": "Program 5", "art": ""},
+            {"von": 167, "bis": 198, "name": "Program 6", "art": ""},
+            {"von": 199, "bis": 230, "name": "Program 7", "art": ""},
+            {"von": 231, "bis": 255, "name": "Program 8", "art": ""}
+          ]
+        },
+        {
+          "name": "Auto Program Speed",
+          "attribut": "effect_speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Program Speed", "art": ""}
+          ]
+        },
+        {
+          "name": "Pan/Tilt Macro",
+          "attribut": "effect",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "off", "art": ""},
+            {"von": 6, "bis": 47, "name": "PAN „small > big“", "art": ""},
+            {"von": 48, "bis": 89, "name": "TILT „small > big“", "art": ""},
+            {"von": 90, "bis": 131, "name": "PAN / TILT „small > big“", "art": ""},
+            {"von": 132, "bis": 173, "name": "PAN / TILT (invers) „small > big“", "art": ""},
+            {"von": 174, "bis": 215, "name": "Ellipse „small > big“", "art": ""},
+            {"von": 216, "bis": 255, "name": "Random „small > big“", "art": ""}
+          ]
+        },
+        {
+          "name": "Pan/Tilt Macro Speed",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Slow -> Fast", "art": ""}
+          ]
+        },
+        {
+          "name": "Set dimmer curve",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "no function", "art": ""},
+            {"von": 6, "bis": 63, "name": "Linear Dimmer Curve", "art": ""},
+            {"von": 64, "bis": 127, "name": "Exponential Dimmer Curve", "art": ""},
+            {"von": 128, "bis": 191, "name": "Logarithmic Dimmer Curve", "art": ""},
+            {"von": 192, "bis": 255, "name": "S-Curve Dimmer Curve", "art": ""}
+          ]
+        },
+        {
+          "name": "Pan/Tilt Speed",
+          "attribut": "speed",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 255, "name": "Pan/Tilt Fast -> Slow", "art": ""}
+          ]
+        },
+        {
+          "name": "Device settings",
+          "attribut": "raw",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "no function", "art": ""},
+            {"von": 6, "bis": 37, "name": "Blackout while Moving on (Hold 3s)", "art": ""},
+            {"von": 38, "bis": 69, "name": "Blackout while Moving off (Hold 5s)", "art": ""},
+            {"von": 70, "bis": 101, "name": "Invert Pan on (Hold 3s)", "art": ""},
+            {"von": 102, "bis": 133, "name": "Invert Pan off (Hold 5s)", "art": ""},
+            {"von": 134, "bis": 165, "name": "Invert Tilt on (Hold 3s)", "art": ""},
+            {"von": 166, "bis": 197, "name": "Invert Tilt off (Hold 5s)", "art": ""},
+            {"von": 198, "bis": 229, "name": "silent Fan on (Hold 3s)", "art": ""},
+            {"von": 230, "bis": 255, "name": "silent Fan off (Hold 5s)", "art": ""}
+          ]
+        },
+        {
+          "name": "Reset",
+          "attribut": "reset",
+          "default": 0,
+          "highlight": 0,
+          "bereiche": [
+            {"von": 0, "bis": 5, "name": "no function", "art": ""},
+            {"von": 6, "bis": 127, "name": "Reset Pan / Tilt", "art": "reset"},
+            {"von": 128, "bis": 191, "name": "Reset Effects (Prism, Gobo…)", "art": "reset"},
+            {"von": 192, "bis": 255, "name": "Reset All Functions", "art": "reset"}
+          ]
+        }
+      ]
+    }
+  ]
+}

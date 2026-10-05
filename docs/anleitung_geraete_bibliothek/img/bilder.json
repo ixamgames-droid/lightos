@@ -1,0 +1,109 @@
+{
+  "anleitung": "geraete_bibliothek",
+  "werkzeug": "tools/anleitungsbilder.py",
+  "stand": "4355a3ee",
+  "schrift": "Noto Sans (statt Roboto Condensed)",
+  "qt": "6.11.1",
+  "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py geraete_bibliothek'.",
+  "bilder": [
+    {
+      "datei": "01_patch_bibliothek.png",
+      "szene": "01_patch_bibliothek",
+      "titel": "Gerät hinzufügen: Stairville-Gerät aus der LightOS-Bibliothek",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "724a1bce14e98748c7a55c3994819102"
+    },
+    {
+      "datei": "02_menue_datenbank.png",
+      "szene": "02_menue_datenbank",
+      "titel": "Menü Datenbank: Bibliothek herunterladen, neues Profil",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "ab6085301106de90638998a3e6e25fea"
+    },
+    {
+      "datei": "03_download_dialog.png",
+      "szene": "03_download_dialog",
+      "titel": "Dialog „Geräte-Bibliothek herunterladen?“ (nur gezeigt, ohne Netz)",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "37ea5b1aa53104a7aa1a489ca0b904a9"
+    },
+    {
+      "datei": "04_fixture_editor.png",
+      "szene": "04_fixture_editor",
+      "titel": "Fixture-Editor mit eigenem Profil",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "e9cc26d3cb5218918fef5c73cc4c3ca7"
+    },
+    {
+      "datei": "05_lightos_profil.png",
+      "szene": "05_lightos_profil",
+      "titel": "Fixture-Editor: als LightOS-Profil exportieren/importieren",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "3b645780616229e9a6471da6009963c3"
+    },
+    {
+      "datei": "06_weiss_segment_hinweis.png",
+      "szene": "06_weiss_segment_hinweis",
+      "titel": "Weiß-Segment: Hinweis bei fehlender Zuordnung",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "ab902005efa424995217fbd663adb6fc"
+    },
+    {
+      "datei": "07_weiss_segment_gesetzt.png",
+      "szene": "07_weiss_segment_gesetzt",
+      "titel": "Weiß-Segment: Zuordnung aus dem Vorschlag",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "bb0fa10873005df34bd9cbf7ac226424"
+    },
+    {
+      "datei": "08_matrix_hinweis.png",
+      "szene": "08_matrix_hinweis",
+      "titel": "RGB-Matrix-Editor: Hinweis zur fehlenden Weiß-Zuordnung",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "46ad042406c60d84e535b15bc727bf0c"
+    },
+    {
+      "datei": "09_3d_modelle.png",
+      "szene": "09_3d_modelle",
+      "titel": "3D-Visualizer: PAR, Strobe, Nebelmaschine und Traverse",
+      "groesse": [
+        1113,
+        777
+      ],
+      "marken": [],
+      "md5": "95696f4fd6ad8dc41fd063bf0d287eef"
+    }
+  ]
+}
