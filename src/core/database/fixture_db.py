@@ -1,5 +1,6 @@
 """Fixture-Datenbank — CRUD und initiale Befüllung."""
 from __future__ import annotations
+import json
 import os
 from src.core.paths import app_data_dir
 from sqlalchemy import create_engine, select
@@ -136,9 +137,113 @@ def should_auto_mark_dual_tilt(profile, channels) -> bool:
         return False
 
 
+def profil_schluessel(hersteller: str | None, modell: str | None) -> tuple[str, str]:
+    """FM-63: Vergleichsform von Hersteller + Modell — Gross/Klein egal,
+    Leerzeichen an den Raendern und mehrfache Leerzeichen innen zaehlen nicht
+    (``"EuroLite "`` / ``"eurolite"``)."""
+    return (" ".join((hersteller or "").split()).casefold(),
+            " ".join((modell or "").split()).casefold())
+
+
+#: FM-63: Schluessel in ``FixtureProfile.herkunft`` (JSON), mit dem der
+#: Fixture-Editor einen an Ort und Stelle gespeicherten Import als BEARBEITET
+#: markiert. ``source`` bleibt dabei ``qlcplus`` — davon haengt die Spider-
+#: Dual-Tilt-Erkennung ab (``should_auto_mark_dual_tilt``).
+BEARBEITET_SCHLUESSEL = "bearbeitet"
+
+
+def ist_bearbeitet(herkunft: str | None) -> bool:
+    """FM-63: traegt ``FixtureProfile.herkunft`` die Bearbeitet-Marke?"""
+    try:
+        d = json.loads(herkunft or "")
+    except ValueError:
+        return False
+    return isinstance(d, dict) and bool(d.get(BEARBEITET_SCHLUESSEL))
+
+
+def als_bearbeitet_markieren(prof, wo: str = "fixture-editor") -> None:
+    """FM-63: Marke in ``prof.herkunft`` setzen, ohne Vorhandenes zu verlieren.
+
+    ★ Warum ``herkunft`` und keine neue Spalte/Tabelle: die Spalte ist bei
+    QLC+-Importen leer (die Herkunft wird dort aus ``source`` abgeleitet), und
+    ``bibliothek_format.gespeicherte_herkunft`` liest nur die vier Herkunfts-
+    schluessel — ein weiterer Schluessel aendert dort nichts. Die Marke sitzt
+    damit an der Zeile selbst: wird das Profil geloescht, ist sie mit weg und
+    kann nie an einer wiederverwendeten ID haengen bleiben. Kein Schema-Schritt."""
+    roh = getattr(prof, "herkunft", "") or ""
+    try:
+        d = json.loads(roh) if roh else {}
+    except ValueError:
+        d = None
+    if not isinstance(d, dict):
+        d = {"frueher": roh}
+    d[BEARBEITET_SCHLUESSEL] = {"wo": wo}
+    prof.herkunft = json.dumps(d, ensure_ascii=False, sort_keys=True)
+
+
+def abgeloeste_profile(session: Session | None = None) -> dict[int, tuple[int, str, str]]:
+    """FM-63: ``{Import-ID: (LightOS-Profil-ID, Hersteller, Modell)}`` — die
+    QLC+-Importe, die ein mitgeliefertes LightOS-Profil (``source='lightos'``,
+    ``fixtures/bibliothek/``) mit gleichem Hersteller + Modell
+    (:func:`profil_schluessel`) abloest, jeweils mit dem abloesenden Profil.
+
+    ★ **Abgeloest heisst AUSGEBLENDET, nicht geloescht und nicht umgehaengt.**
+    Gepatchte Geraete stehen in den Show-Dateien mit Profil-ID + Modusname;
+    die Fixture-DB weiss nicht, welche Shows es gibt. Ein Loeschen oder
+    Umhaengen haette jede Show auf einem anderen Rechner/Stick still dunkel
+    gemacht oder auf ein Profil mit anderer Kanalbelegung gesetzt. So laedt
+    eine bestehende Show weiter ueber die ID den alten Import (genau die
+    Kanalbelegung, mit der sie gebaut wurde); die Suche bietet nur das
+    LightOS-Profil an, der Fixture-Browser den Import nur noch unter einem
+    eigenen, eingeklappten Knoten. Abgeleitet bei jedem Aufruf statt
+    gespeichert: kein Zustand, der veralten kann, idempotent per Konstruktion.
+
+    Nie dabei: eigene (``user``) und eingebaute Profile
+    (``models.ABLOESBARE_QUELLEN``) und ein im Fixture-Editor BEARBEITETER
+    Import (:func:`ist_bearbeitet`) — der ist inzwischen ein eigenes Profil."""
+    from .models import ABLOESBARE_QUELLEN
+    from .bibliothek_format import SOURCE_LIGHTOS
+
+    def _lesen(s: Session) -> dict[int, tuple[int, str, str]]:
+        rows = s.execute(
+            select(FixtureProfile.id, FixtureProfile.source, Manufacturer.name,
+                   FixtureProfile.name, FixtureProfile.herkunft)
+            .join(Manufacturer, FixtureProfile.manufacturer_id == Manufacturer.id)
+            .where(FixtureProfile.source.in_((SOURCE_LIGHTOS, *ABLOESBARE_QUELLEN)))
+            .order_by(FixtureProfile.id)
+        ).all()
+        lightos: dict[tuple[str, str], tuple[int, str, str]] = {}
+        for i, src, m, n, _h in rows:
+            if src == SOURCE_LIGHTOS:
+                lightos.setdefault(profil_schluessel(m, n), (int(i), m, n))
+        if not lightos:
+            return {}
+        out = {}
+        for i, src, m, n, h in rows:
+            if src == SOURCE_LIGHTOS or ist_bearbeitet(h):
+                continue
+            ziel = lightos.get(profil_schluessel(m, n))
+            if ziel is not None:
+                out[int(i)] = ziel
+        return out
+
+    if session is not None:
+        return _lesen(session)
+    with Session(engine()) as s:
+        return _lesen(s)
+
+
+def abgeloeste_profil_ids(session: Session | None = None) -> set[int]:
+    """FM-63: nur die IDs aus :func:`abgeloeste_profile`."""
+    return set(abgeloeste_profile(session))
+
+
 def search_fixtures(query: str) -> list[FixtureProfile]:
+    """Suche ueber Modell, Hersteller und Typ. FM-63: von einem LightOS-Profil
+    abgeloeste QLC+-Importe (:func:`abgeloeste_profil_ids`) fehlen."""
     q = f"%{query}%"
     with Session(engine()) as s:
+        weg = abgeloeste_profil_ids(s)
         result = s.execute(
             select(FixtureProfile)
             .options(
@@ -154,7 +259,7 @@ def search_fixtures(query: str) -> list[FixtureProfile]:
             .order_by(Manufacturer.name, FixtureProfile.name)
         ).scalars().all()
         s.expunge_all()
-        return result
+        return [f for f in result if f.id not in weg]
 
 
 # ── Initiale Daten ────────────────────────────────────────────────────────────

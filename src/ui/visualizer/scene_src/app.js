@@ -25,7 +25,7 @@ import {
   updateResizeHandles, resizeHandles, getStageJson, loadStageJson,
   clearStageObjects, wireStageObjectsLateBindings,
 } from './stage/stage_objects.js';
-import { dockHighlight, wireDockingLateBindings } from './stage/docking.js';
+import { dockHighlight, wireDockingLateBindings, findDockTarget } from './stage/docking.js';
 
 import {
   setEditMode, setEditTool, setTraceShape, onTraceRadius, onTraceSpeed,
@@ -226,6 +226,9 @@ window.__lightos = {
   // echte Pointer-Events erreichbar — pointer.js hatte deshalb null
   // Verhaltensabdeckung, obwohl hier Nutzerdaten (Andockungen) geloescht werden.
   __resolveDockOnGestureEnd: resolveDockOnGestureEnd,
+  // VIZ-68 (Review A2): Test-Seam — Andock-Hoehe ueber der Podest-Treppe
+  // (Ray-Treffer statt Podestkante) gegen StageElement.top_y_at() pruefen.
+  __findDockTarget: findDockTarget,
   // Shadow-Budget (Fix 2026-07-11): Test-Hook fuer die Texture-Unit-Kappung.
   syncSpotShadowBudget,
   // VIZ-69: Shadow-Map-Neubau nur bei Lage-Aenderung — Test-/Benchmark-Seams.

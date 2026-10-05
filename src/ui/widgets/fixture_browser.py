@@ -11,6 +11,10 @@ from src.core.database.models import FixtureProfile, PatchedFixture
 
 _UNIVERSE_MIN = 1
 
+#: FM-63: Knoten im Fixture-Browser fuer QLC+-Importe, die ein mitgeliefertes
+#: LightOS-Profil abloest (``fixture_db.abgeloeste_profile``).
+ABGELOEST_KNOTEN = "Ältere QLC+-Importe (abgelöst durch LightOS-Profil)"
+
 #: UI-64(e): lesbare Typnamen fuer die „Typ"-Spalte. Die Datenbank fuehrt
 #: Bezeichner wie ``moving_head`` — in einer 80-px-Spalte wurde daraus
 #: „moving_h…". Unbekannte Typen bekommen per ``typ_anzeige`` einen
@@ -235,10 +239,22 @@ class FixtureBrowserDialog(QDialog):
                 item.setData(0, Qt.ItemDataRole.UserRole, f.id)
                 self._tree.addTopLevelItem(item)
         else:
+            # FM-63: von einem LightOS-Profil abgeloeste QLC+-Importe stehen
+            # NICHT beim Hersteller, sondern gesammelt unter einem eigenen,
+            # eingeklappten Knoten am Ende — bewusst waehlbar, aber nicht
+            # mehr die erste Wahl. (Die Suche blendet sie ganz aus, siehe
+            # ``search_fixtures``.) Einmal fuer den ganzen Baum berechnet.
+            abgeloest = fdb.abgeloeste_profile()
+            alt_items: list[QTreeWidgetItem] = []
             for mfr in fdb.get_all_manufacturers():
                 mfr_item = QTreeWidgetItem([mfr.name, "", ""])
                 mfr_item.setData(0, Qt.ItemDataRole.UserRole, None)
-                fixtures = fdb.get_fixtures_by_manufacturer(mfr.id)
+                fixtures = []
+                for f in fdb.get_fixtures_by_manufacturer(mfr.id):
+                    if f.id in abgeloest:
+                        alt_items.append(self._abgeloest_item(mfr.name, f, abgeloest[f.id]))
+                    else:
+                        fixtures.append(f)
                 for f in fixtures:
                     ch = str(f.modes[0].channel_count) if f.modes else "?"
                     child = QTreeWidgetItem([f.name, typ_anzeige(f.fixture_type), ch])
@@ -248,7 +264,29 @@ class FixtureBrowserDialog(QDialog):
                 if fixtures:
                     self._tree.addTopLevelItem(mfr_item)
             self._tree.expandAll()
+            if alt_items:
+                knoten = QTreeWidgetItem([ABGELOEST_KNOTEN, "", str(len(alt_items))])
+                knoten.setData(0, Qt.ItemDataRole.UserRole, None)
+                knoten.setToolTip(0, "Diese Geräte gibt es inzwischen als gepflegtes "
+                                     "LightOS-Profil. Bestehende Shows nutzen den alten "
+                                     "Import weiter; für neue Geräte das LightOS-Profil "
+                                     "wählen.")
+                knoten.addChildren(alt_items)
+                self._tree.addTopLevelItem(knoten)
+                knoten.setExpanded(False)
         self._typ_spalte_anpassen()
+
+    @staticmethod
+    def _abgeloest_item(mfr_name: str, f, ziel) -> QTreeWidgetItem:
+        """FM-63: Eintrag unter dem Knoten der abgeloesten Importe."""
+        ch = str(f.modes[0].channel_count) if f.modes else "?"
+        item = QTreeWidgetItem([f"{mfr_name} — {f.name}", typ_anzeige(f.fixture_type), ch])
+        item.setData(0, Qt.ItemDataRole.UserRole, f.id)
+        z_id, z_mfr, z_name = ziel
+        item.setToolTip(0, f"Abgelöst durch das LightOS-Profil „{z_mfr} — {z_name}“ "
+                           f"(Profil {z_id}).")
+        item.setToolTip(1, f.fixture_type or "")
+        return item
 
     def _typ_spalte_anpassen(self):
         """UI-64(e): Typ-Spalte so breit wie ihr laengster Eintrag (nie
