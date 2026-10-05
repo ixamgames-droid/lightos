@@ -410,6 +410,12 @@ export function addFixture(data) {
     // Nebel/Hazer sind KEINE Licht-Fixtures -> kein Beam/SpotLight/Floor-Spot
     // (nur der emissive Indikator-Lamp aus dem build); vorher bekamen sie
     // faelschlich einen Lichtkegel + schattenwerfenden SpotLight.
+  } else if (rtype === 'laser') {
+    // VIZ-79: Laser strahlen ueber ihren eigenen Faecher (model.laserBeams aus
+    // buildLaser) — KEIN Lichtkegel, kein SpotLight, kein Bodenfleck. Bis VIZ-79
+    // bekam jeder Laser zusaetzlich den senkrecht nach unten zeigenden PAR-Kegel;
+    // der war das einzig Grosse, was man sah, und hing an Beam Opacity und
+    // Max. Strahllaenge — Laserstrahlen sah man dagegen praktisch nicht.
   } else {
     const headHost = model.head || model.group;
     const beamLength = rtype === 'led_bar' ? 6.0 : 8.0;
@@ -487,6 +493,7 @@ export function addFixture(data) {
     lens: model.lens || null,
     lamp: model.lamp || null,
     laserBeams: model.laserBeams || null,
+    laserRig: model.laserRig || null,   // VIZ-79: Strahlen-Rig (fixtures/laser.js)
     bars: model.bars || null,
     isSpider: !!model.isSpider,
     parHeads: model.parHeads || null,   // FM-3: PAR-Bar-Koepfe (je {lens, beam})
@@ -540,7 +547,7 @@ export function addFixture(data) {
   // Geraet dunkel bzw. in Mittelstellung, bis sich sein DMX wieder aenderte.
   const src = cachedDmx(fid) || data;
   updateFixture(fid, src.r ?? 0, src.g ?? 0, src.b ?? 0, src.intensity ?? 0,
-                src.pan ?? 128, src.tilt ?? 128, src.heads || null);
+                src.pan ?? 128, src.tilt ?? 128, src.heads || null, src);
 }
 
 export function removeFixture(fid) {
@@ -571,7 +578,9 @@ export function removeFixture(fid) {
   requestRender();  // 3c-2: Objekt aus der Szene entfernt
 }
 
-export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads) {
+// `extra` (VIZ-79, optional): der ganze Payload-Eintrag. Daraus wandert nur,
+// was ein Handler ausdruecklich braucht — derzeit der Laser-Block.
+export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads, extra) {
   const f = fixtures[fid];
   if (!f) return;
   const color = new THREE.Color(r/255, g/255, b/255);
@@ -584,6 +593,7 @@ export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads) {
   // die Handler WEISEN sie den Materialien ZU (kein .copy()) — exakt die
   // Instanz-Sharing-Semantik des Monolithen.
   const dmx = { r, g, b, intensity, pan, tilt, heads, color, intNorm, skipBeam };
+  if (extra && extra.laser) dmx.laser = extra.laser;   // VIZ-79
 
   if (heads) f.lastHeads = heads;
 
