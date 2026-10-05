@@ -32,8 +32,10 @@
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-Persistenz daneben: `.lshow`-ZIPs (Shows), `data/*.json` (Output/MIDI/Gruppen),
-`data/current_show.db` (SQLite-Fixture-DB), `%APPDATA%\LightOS\ui_prefs.json`.
+Persistenz daneben: `.lshow`-ZIPs (Shows) und der App-Datenordner
+(`paths.app_data_dir()`: `current_show.db`, `universes.json`, `midi_mappings.json`,
+`channel_groups.json`, `channel_modifiers.json`, `ui_prefs.json` …; seit XPLAT-44
+nichts mehr relativ zum Arbeitsverzeichnis).
 
 ---
 
@@ -42,7 +44,7 @@ Persistenz daneben: `.lshow`-ZIPs (Shows), `data/*.json` (Output/MIDI/Gruppen),
 Singleton über `get_state()`. Hält:
 
 - **Patch**: `_patch_cache` (Liste `PatchedFixture`), Fixture-Profile aus der
-  SQLite-DB (`data/current_show.db`, `fixture_db.ensure_builtins()` hält
+  SQLite-DB (`<App-Datenordner>/current_show.db`, `fixture_db.ensure_builtins()` hält
   Builtin-Profile per Signatur-Vergleich in-place aktuell).
 - **Programmer**: `state.programmer` = `{fid: {attr: val}}`, geschützt durch
   `_prog_lock`. Wird vom Programmer-UI **und** Matrix-Programmer geteilt.
@@ -171,7 +173,7 @@ Auto-Follow). `compute_merged()` tickt alle Stacks und liefert
 - `OutputManager`: hält Universen + Geräte je Universum
   (`add_enttec/add_artnet/add_sacn`), `_io_lock` gegen Close/Send-Races,
   Grand Master + Blackout + Submaster, 44-Hz-Loop. Verbindungen persistieren in
-  `data/universes.json` (`apply_output_config`).
+  `<App-Datenordner>/universes.json` (`apply_output_config`).
 - Treiber: `enttec_pro.py` (USB-seriell, mit `write_timeout` gegen Freezes),
   `artnet.py` (UDP 6454), `sacn.py` (E1.31, 2026-06-08 spec-konform neu —
   Hardwaretest steht aus, open-points B-1).
@@ -183,7 +185,7 @@ Auto-Follow). `compute_merged()` tickt alle Stacks und liefert
 - `MidiManager` (midi/midi_manager.py): unter Windows **WinMM-Backend**
   (midi_backend_winmm.py), rtmidi optional; RX-Thread → Subscriber.
 - `MidiMapper` (midi_mapper.py): **globale** Mappings in
-  `data/midi_mappings.json` (nicht pro Show! → Konfliktquelle mit
+  `<App-Datenordner>/midi_mappings.json` (nicht pro Show! → Konfliktquelle mit
   VC-Bindings, siehe Memory „VC-Seiten-Fix" 2026-06-02). Aktionen: Executor
   Go/Back/Flash/Fader, Programmer-Wert, Grand Master, Page-Select/Next/Prev,
   Funktion Start/Stop, Effekt-Param/-Action. Learn-Modus + Feedback-Loop.
@@ -228,12 +230,19 @@ Locks: `_prog_lock` (Programmer), `_sd_lock` (Simple Desk),
 | Ort | Inhalt |
 |-----|--------|
 | `shows/*.lshow` | ZIP mit **einem** `show.json` (Version 1.1): Patch, Programmer, base_levels, Cue-Stacks, Executoren, Paletten, Kurven, **Funktionen** (inkl. EFX/Matrix), VC-Layout, Visualizer-/Live-View-Positionen, Snapshots, Channel-/Fixture-Gruppen, Bibliothek. Details: [docs/SHOW_FILE_FORMAT.md](docs/SHOW_FILE_FORMAT.md) |
-| `data/current_show.db` | SQLite: Fixture-Profile (Builtins via `ensure_builtins` in-place aktualisiert) + aktueller Patch |
-| `data/universes.json` | Output-Verbindungen (Enttec/Art-Net/sACN je Universum) |
-| `data/midi_mappings.json` | globale MIDI-Mappings (+ `.bak`) |
-| `data/channel_groups.json` | Kanal-Gruppen |
+| `<App-Datenordner>/current_show.db` | SQLite: Fixture-Profile (Builtins via `ensure_builtins` in-place aktualisiert) + aktueller Patch |
+| `<App-Datenordner>/universes.json` | Output-Verbindungen (Enttec/Art-Net/sACN je Universum) |
+| `<App-Datenordner>/midi_mappings.json` | globale MIDI-Mappings |
+| `<App-Datenordner>/channel_groups.json` | Kanal-Gruppen |
+| `<App-Datenordner>/channel_modifiers.json` | Kanal-Modifier (Kurven je Kanal; beim Start geladen) |
 | `%APPDATA%\LightOS\ui_prefs.json` | UI-Präferenzen (Programmer-Zonen-Layout, Live-View) |
 | `crash.log` | Crash-Ausgaben des Starters |
+
+`<App-Datenordner>` = `src/core/paths.py:app_data_dir()` (Windows `%APPDATA%\LightOS`,
+Linux `~/.local/share/LightOS`). Die Liste der Nutzerdateien steht in
+`paths.USER_DATA_FILES`; den Pfad liefert `paths.user_data_file()`. Alte
+`data/`-Dateien (vor XPLAT-44) übernimmt `src/core/datenumzug.py` beim ersten
+Start einmalig per Kopie (Details: `docs/CONFIG_REFERENCE.md`).
 
 ## Tests & Werkzeuge
 

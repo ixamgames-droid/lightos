@@ -1,7 +1,7 @@
 # Config-Referenz — Env-Flags & Config-Dateien
 
 Nachschlagewerk für die Konfiguration von LightOS über die Umgebung (Environment-
-Variablen) und die persistenten Config-Dateien unter `data/`. Alle Angaben sind aus
+Variablen) und die persistenten Config-Dateien im App-Datenordner (bis XPLAT-44: `data/`). Alle Angaben sind aus
 dem tatsächlichen Code recherchiert (Fundstellen als `datei:zeile`).
 
 > Boolesche Flags werten „gesetzt = an" — außer wo eine explizite Wahrheitsmenge
@@ -14,7 +14,7 @@ dem tatsächlichen Code recherchiert (Fundstellen als `datei:zeile`).
 |---|---|---|---|---|
 | `LIGHTOS_DEBUG` | Aktiviert `debug_swallow()` — sonst still verschluckte `except`-Fehler werden (dedupliziert, je Kombination genau einmal) auf stdout geloggt. Werte: `1/true/yes/on`. | aus | `src/core/debug_log.py:22` | Debug-Hilfe; `set_debug()`/`reset()` steuern es in Tests direkt. |
 | `LIGHTOS_STRICT` | Strict-Show-Loader: kaputte Subsysteme/Funktionen werden beim Laden NICHT still übersprungen, sondern re-raisen mit vollem Traceback. Werte: `1/true/yes/on/y/ja`. | aus (tolerant) | `src/core/strict.py:27`, verwendet in `src/core/engine/function_manager.py:532`, `src/core/show/show_file.py:61` | Von `tests/test_strict_loader.py` gezielt gesetzt. |
-| `LIGHTOS_SHOW_DB` | Pfad der Show-Datenbank (SQLite). Lenkt Lese-/Schreibzugriff auf eine andere DB um, ohne die echte App-DB anzufassen. | `data/current_show.db` | `src/core/app_state.py:20` | `tests/conftest.py:26` setzt eine Temp-DB pro Session. |
+| `LIGHTOS_SHOW_DB` | Pfad der Show-Datenbank (SQLite). Lenkt Lese-/Schreibzugriff auf eine andere DB um, ohne die echte App-DB anzufassen. | `app_data_dir()/current_show.db` (bis XPLAT-44 `data/current_show.db` ab Arbeitsverzeichnis) | `src/core/paths.py` (`user_data_file`), `src/core/app_state.py` (`SHOW_DB_PATH`) | `tests/conftest.py:26` setzt eine Temp-DB pro Session. |
 | `LIGHTOS_NO_OUTPUT_THREAD` | Unterbindet den Autostart des 44-Hz-DMX-Output-Threads (und des Laser-Streaming-Threads) — verhindert Cross-Thread-Qt-Marshalling gegen den pytest-Teardown. | nicht gesetzt (Thread startet) | `src/core/app_state.py:1248`, `:1266`, `:2509`; `src/ui/main_window.py:87` | `tests/conftest.py:75` setzt es global; von vielen `tools/`-Skripten genutzt. |
 | `LIGHTOS_NO_AUDIO_AUTOSTART` | Unterdrückt den Auto-Start der Audio-/BPM-Erkennung (WASAPI-Loopback-Capture). | nicht gesetzt (Auto an) | `src/core/audio/bpm_settings.py:281`; `src/ui/main_window.py:715` | `tests/conftest.py:78` setzt es; kein Test fährt echten Audio-Capture hoch. |
 | `LIGHTOS_SERIAL_INPROC` | Enttec-Serial-Ausgabe direkt in-process (`EnttecPro`) statt prozess-isoliertem Proxy (`EnttecProcessProxy`, STAB-08). | nicht gesetzt (Proxy) | `src/core/dmx/output_manager.py:24` | `tests/conftest.py:83` setzt es (kein `multiprocessing`-spawn je Test). |
@@ -31,25 +31,53 @@ dem tatsächlichen Code recherchiert (Fundstellen als `datei:zeile`).
 | `LIGHTOS_OUTPUT_IFACE` | IP der Ausgangs-NIC für DMX-über-Netzwerk (XPLAT-06): sACN setzt darauf `IP_MULTICAST_IF`, Art-Net bindet daran. Auf Multi-NIC-Rechnern (WLAN + LAN) sonst evtl. das falsche Interface. | leer (Betriebssystem entscheidet) | `src/core/dmx/output_iface.py:22` | `tests/test_output_iface.py`. |
 | `LIGHTOS_STRICT_PROFILES` | Show-Builder bricht bei unbekanntem Fixture-Profil ab, statt still auf einen Ersatz auszuweichen. | aus (tolerant) | `src/core/show/showbuilder/builder.py:74` | Von Show-Bau-Skripten in `tools/` gesetzt. |
 | `LIGHTOS_VC_ASSET_CACHE_MB` | Obergrenze des VC-Asset-Caches (Bilder/GIFs auf VC-Tasten) in MB. | eingebauter Default | `src/core/show/vc_assets.py:194` | `tests/test_vc_asset_cache.py`. |
+| `LIGHTOS_UNIVERSES_JSON` | Pfad der Ausgabe-Konfiguration `universes.json`. | `app_data_dir()/universes.json` | `src/core/paths.py` (`user_data_file`) | `tests/conftest.py` setzt eine Temp-Datei; Wächter `tests/test_universes_json_isolation.py`. |
+| `LIGHTOS_NO_DATENUMZUG` | Schaltet die einmalige Übernahme alter `data/`-Dateien beim Start ab (XPLAT-44) — für Sandkästen/Werkzeuge, die nie echte Daten lesen sollen. | nicht gesetzt (Übernahme läuft) | `src/core/datenumzug.py` | `tools/anleitungsbilder/sandbox.py` setzt es; `tests/test_xplat44_datenort.py`. |
 | `LIGHTOS_WEBENGINE_NO_SANDBOX` | Opt-out der QtWebEngine-Sandbox-Abschaltung auf Linux (XPLAT-01). | nicht gesetzt | `main.py:235` | — |
 
 `main.py:197` liest `LIGHTOS_WEBENGINE_FLAGS` referenziell im Docstring; die
 tatsächliche Verwendung steht auf Zeile 210.
 
-## (b) Config-Dateien unter `data/`
+## (b) Nutzer-Config-Dateien im App-Datenordner
 
-Alle Pfade sind relativ zum Repo-Root (dem Arbeitsverzeichnis der App).
+Seit XPLAT-44 liegen ALLE Nutzerdaten im App-Datenordner (`app_data_dir()`:
+Windows `%APPDATA%/LightOS`, Linux `~/.local/share/LightOS`, macOS
+`~/Library/Application Support/LightOS`) — unabhängig vom Arbeitsverzeichnis.
+Die verbindliche Liste steht in `src/core/paths.py` (`USER_DATA_FILES`), den
+Pfad liefert `paths.user_data_file(name)`. Bis XPLAT-44 lagen diese Dateien
+unter `data/` relativ zum Arbeitsverzeichnis; beim ersten Start einer neueren
+Version übernimmt `src/core/datenumzug.py` sie einmalig (s. unten).
 
 | Datei | Schema (Kurzform) | Gelesen/geschrieben von (Subsystem) |
 |---|---|---|
-| `data/current_show.db` | SQLite-Show-Datenbank (Patch, Funktionen, Gruppen usw.); Pfad via `LIGHTOS_SHOW_DB` überschreibbar. | Show-/App-State (`src/core/app_state.py:20`), Migrationen `src/core/database/models.py`. |
-| `data/universes.json` | JSON-Array von Zeilen `{"num", "name", "output", "patch"}` — `output` ∈ `Enttec`/`ArtNet`/`sACN`/`Disabled`, `patch` = COM-Port bzw. Ziel-IP. | Ausgabe-Konfiguration: gelesen beim Start (`src/core/app_state.py:744`, `apply_output_config`), geschrieben vom Dialog (`src/ui/widgets/output_config.py:16`). |
-| `data/midi_mappings.json` | JSON-Array von Mapping-Objekten `{"id", "name", "target", "midi_in", "button_mode", "midi_out", "continuous_min", "continuous_max"}`. | MIDI-Mapping-Engine: geladen beim Start (`src/core/app_state.py:273`), gespeichert u. a. aus `src/ui/views/midi_view.py:557`. |
-| `data/channel_groups.json` | JSON-Array von Gruppen `{"name", "universe", "channels": [int], "value": 0-255}`. | Channel-Groups-View (`src/ui/views/channel_groups_view.py:16`). |
-| `data/channel_modifiers.json` | JSON der Kanal-Modifikatoren (Kurven/Invert je Kanal). | Channel-Modifier-Dialog (`src/ui/widgets/channel_modifier_dialog.py:143`). |
+| `current_show.db` | SQLite-Show-Datenbank (Patch, Funktionen, Gruppen usw.); Pfad via `LIGHTOS_SHOW_DB` überschreibbar. | Show-/App-State (`src/core/app_state.py`, `SHOW_DB_PATH`), Migrationen `src/core/database/models.py`. |
+| `universes.json` | JSON-Array von Zeilen `{"num", "name", "output", "patch"}` — `output` ∈ `Enttec`/`ArtNet`/`sACN`/`Disabled`, `patch` = COM-Port bzw. Ziel-IP. Pfad via `LIGHTOS_UNIVERSES_JSON` überschreibbar. | Ausgabe-Konfiguration: gelesen beim Start (`AppState.apply_output_config`), geschrieben vom Dialog (`src/ui/widgets/output_config.py`, `_UNIV_CONFIG_PATH`). |
+| `midi_mappings.json` | JSON-Array von Mapping-Objekten `{"id", "name", "target", "midi_in", "button_mode", "midi_out", "continuous_min", "continuous_max"}`. | MIDI-Mapping-Engine: geladen beim Start (`AppState.__init__`), gespeichert u. a. aus `src/ui/views/midi_view.py`. |
+| `channel_groups.json` | JSON-Array von Gruppen `{"name", "universe", "channels": [int], "value": 0-255}`. | Channel-Groups-View (`src/ui/views/channel_groups_view.py`, `_PERSIST_PATH`). |
+| `channel_modifiers.json` | JSON der Kanal-Modifikatoren (Kurven/Invert je Kanal). | Gespeichert vom Channel-Modifier-Dialog (`src/ui/widgets/channel_modifier_dialog.py`), geladen beim Start (`AppState.__init__`, seit XPLAT-44). |
+
+**Übernahme alter `data/`-Dateien (XPLAT-44).** Beim Start (nach der
+Einzelinstanz-Sperre, vor dem ersten App-State) kopiert `main.py` über
+`datenumzug.uebernehme_alte_daten()` jede der fünf Dateien, die im App-Ordner
+FEHLT, aus `<Programmordner>/data` bzw. `<Arbeitsverzeichnis>/data`. Es wird
+nur kopiert — nie verschoben, gelöscht oder überschrieben; liegt die Datei im
+App-Ordner schon, gewinnt sie (Hinweis im Log). Die Show-DB wird samt `-wal`
+/`-journal` kopiert und nur, wenn kein anderer Prozess sie offen hält. Die
+Marker-Datei `datenumzug_xplat44.json` im App-Ordner merkt sich je Quellordner,
+dass die Übernahme erledigt ist — eine dort bewusst gelöschte Datei kommt also
+nicht aus dem alten `data/` zurück. Der alte `data/`-Ordner bleibt als
+Rückfall liegen; die App liest ihn danach nicht mehr.
+
+## (b2) Mitgelieferte Daten unter `data/` (Repo)
+
+Unter `data/` im Programmordner liegt nur noch Mitgeliefertes; es wird
+repo-relativ (über `__file__`), nicht über das Arbeitsverzeichnis aufgelöst.
+
+| Datei | Schema (Kurzform) | Gelesen/geschrieben von (Subsystem) |
+|---|---|---|
 | `data/controller_library/*.json` | Ein Controller-Profil je Datei, `{"schema", "id", "manufacturer", "model", "device_type", "controls": [...]}`; siehe `data/controller_library/README.md`. Nutzer-Importe (QLC+ `.qxi`) landen unter `app_data_dir()/controller_library/` (Windows `%APPDATA%/LightOS`, Linux `~/.local/share/LightOS`, macOS `~/Library/Application Support/LightOS` — s. `src/core/paths.py`). | Controller-Library (`src/core/controllers/controller_library.py:30`), UI: `src/ui/widgets/controller_browser.py`. |
 
-Weitere JSON-Ablagen liegen NICHT unter `data/`, sondern im Nutzer-Profil
+Weitere JSON-Ablagen liegen ebenfalls im Nutzer-Profil
 (`app_data_dir()`, plattformabhaengig — s. `src/core/paths.py`; z. B. `ui_prefs.json`, `recent.json`, `snapshots.json`,
 Stage-/Input-Profile) und sind hier bewusst nicht als globale Config gelistet.
 
