@@ -14,6 +14,9 @@ Profilen.
 Der Generator überschreibt nie eine vorhandene Show und legt die Bühne
 „Bühnen-Show 2026" im LightOS-Datenordner an.
 
+Wie man solche Effekte selbst baut — Klick für Klick in der Oberfläche —, zeigt
+[Große Bühnen-Show: Effekte selbst bauen](ANLEITUNG.md).
+
 ## Rig (80 Geräte)
 
 | Universum | Geräte | Profil | Ort |
