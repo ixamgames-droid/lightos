@@ -58,6 +58,7 @@
 | BACKLOG-0510b | A | docs/entscheidungen-0510 | 2026-10-05T15:47Z | BACKLOG.md |
 | XPLAT-44 | A | fix/xplat44-datenort | 2026-10-05T16:00Z | - |
 | DOC-60 | A | docs/doc60-buehnenshow-effekte | 2026-10-05T16:18Z | - |
+| VIZ-79 | A | fix/viz79-laserstrahlen-3d | 2026-10-05T16:59Z | - |
 
 ## Blocker & Fallen
 
@@ -166,7 +167,6 @@
 
 ## Verlauf
 
-- 2026-10-04T20:23Z A done FM-61
 - 2026-10-04T20:44Z A claim OUT-63
 - 2026-10-04T20:44Z A claim VIZ-71
 - 2026-10-04T20:50Z A done DOC-57
@@ -196,3 +196,4 @@
 - 2026-10-05T16:00Z A uebernimmt XPLAT-44 von C (Claim verfallen)
 - 2026-10-05T16:00Z A claim XPLAT-44
 - 2026-10-05T16:18Z A claim DOC-60
+- 2026-10-05T16:59Z A claim VIZ-79
