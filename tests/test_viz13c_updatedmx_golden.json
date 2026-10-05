@@ -30,6 +30,16 @@
     "emInt": 0
    },
    "moverHeads": null,
+   "optik": {
+    "beamX": 1.5873,
+    "gobo": false,
+    "goboRot": 0,
+    "penumbra": 0.6,
+    "prismN": 0,
+    "prismRot": null,
+    "prismVis": null,
+    "spotAngle": 0.5984
+   },
    "parHeads": null,
    "spot": {
     "hex": 13132850,
@@ -68,6 +78,20 @@
     "emInt": 0
    },
    "moverHeads": null,
+   "optik": {
+    "beamX": 0.6339,
+    "gobo": true,
+    "goboRot": 1.577,
+    "penumbra": 0.5915,
+    "prismN": 3,
+    "prismRot": 2.464,
+    "prismVis": [
+     false,
+     false,
+     false
+    ],
+    "spotAngle": 0.239
+   },
    "parHeads": null,
    "spot": {
     "hex": 13132850,
@@ -716,6 +740,16 @@
     "emInt": 1.0588
    },
    "moverHeads": null,
+   "optik": {
+    "beamX": 1.5873,
+    "gobo": false,
+    "goboRot": 0,
+    "penumbra": 0.6,
+    "prismN": 0,
+    "prismRot": null,
+    "prismVis": null,
+    "spotAngle": 0.5984
+   },
    "parHeads": null,
    "spot": {
     "hex": 13132850,
@@ -754,6 +788,20 @@
     "emInt": 1.0588
    },
    "moverHeads": null,
+   "optik": {
+    "beamX": 0.6339,
+    "gobo": true,
+    "goboRot": 1.577,
+    "penumbra": 0.5915,
+    "prismN": 3,
+    "prismRot": 2.464,
+    "prismVis": [
+     true,
+     true,
+     true
+    ],
+    "spotAngle": 0.239
+   },
    "parHeads": null,
    "spot": {
     "hex": 13132850,
