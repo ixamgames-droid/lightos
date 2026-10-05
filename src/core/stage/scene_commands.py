@@ -337,6 +337,40 @@ def push_add_stage_element(
     )
 
 
+def push_add_stage_elements(
+    state,
+    stage_def,
+    elements: list,
+    *,
+    label: str = "Bühnen-Elemente hinzufügen",
+    on_change: Callable[[], None],
+) -> None:
+    """VIZ-68: EIN AddNode-Command fuer mehrere auf einmal angelegte Elemente
+    (Reihe/Raster) — ein Strg+Z nimmt die ganze Reihe zurueck. Dasselbe
+    Muster wie ``push_transform_and_dock_fixtures`` („Multi = EIN Command ueber
+    eine Liste“, docs/VIZ11_SCENEGRAPH_DESIGN.md). Die Elemente sind bereits
+    per ``stage_def.add(...)`` angelegt."""
+    els = list(elements or [])
+    if not els:
+        return
+
+    def _do() -> None:
+        for el in els:
+            if stage_def.get(el.id) is None:
+                stage_def.elements.append(el)
+        on_change()
+
+    def _undo() -> None:
+        for el in els:
+            stage_def.remove(el.id)
+        on_change()
+
+    get_undo_stack().push(
+        Command(label=label, do=_do, undo=_undo, redo=_do),
+        execute=False,
+    )
+
+
 def push_remove_stage_element(
     state,
     stage_def,

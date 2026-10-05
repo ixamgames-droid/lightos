@@ -56,7 +56,8 @@ hellt **Auto-Helligkeit** die Szene auf (siehe [Teil D](#teil-d--darstellung-rei
    die runden Knöpfe unten rechts drehen bzw. löschen das gewählte Element.
 3. **Element hinzufügen:** Boden / Floor · Plattform · Truss (horizontal) ·
    Truss/Stütze (vertikal) · Wand / Backdrop · LED-Wand · Lautsprecher ·
-   Publikumsfläche · DJ-Booth. Ein neues Element erscheint sofort in der Szene und in
+   Publikumsfläche · DJ-Booth, dazu die **Objekt-Bibliothek** (Biertischgarnitur · Stehtisch ·
+   Bar / Theke · Podest mit Treppe · Mischpult-Tisch, s. unten). Ein neues Element erscheint sofort in der Szene und in
    der Liste „Bühnen-Elemente" darüber und ist gleich gewählt.
 4. **Eigenschaften (Selektion):** Name, Position `X`/`Y`/`Z` (Mittelpunkt des
    Elements, in Metern), Größe `Breite (W)`/`Höhe (H)`/`Tiefe (D)`, Rotation und Farbe.
@@ -85,6 +86,31 @@ So entsteht die Bühne im Bild:
 > **„Größe anpassen"** schaltet nur die Ziehgriffe am Element in der Szene ein (der Knopf
 > wird gelb); die Größen-Felder bleiben dabei frei. **Element LÖSCHEN** entfernt das
 > gewählte Element.
+
+### Objekt-Bibliothek: Halle mit Biertischen, Bar, Podest (VIZ-68)
+
+Unter „Element hinzufügen" gibt es je Möbel einen Knopf. Die Objekte haben reale
+Standardmaße und lassen sich wie jedes Bühnenelement verschieben, drehen, in der Größe
+ändern und einfärben (nur der Korpus — Beine und Gestelle bleiben metallfarben):
+
+| Knopf | Standardmaß (B × H × T) | Hinweis |
+|---|---|---|
+| **+ Biertischgarnitur** | 2,20 × 0,76 × 1,30 m | Tisch 220 × 50 cm, zwei Bänke |
+| **+ Stehtisch** | 0,80 × 1,10 × 0,80 m | runde Platte, Säule, Fußteller |
+| **+ Bar / Theke** | 3,00 × 1,10 × 0,80 m | Gästeseite vorn (+Z) mit Fußreling; Strahler lassen sich draufstellen |
+| **+ Podest mit Treppe** | 2,00 × 0,60 × 2,80 m | Treppe vorn mittig; Strahler lassen sich draufstellen |
+| **+ Mischpult-Tisch** | 1,80 × 0,90 × 0,90 m | Tisch mit Pult-Aufsatz (FOH) |
+
+**Mehrere auf einmal:** In der Zeile **„Anzahl: Reihen × Spalten — Abstand"** z. B.
+`2 × 3`, Abstand `1,00 m` einstellen, dann **„+ Biertischgarnitur"** → sechs Garnituren
+im Raster, um den Standardplatz zentriert. Die ganze Reihe ist **ein** Undo-Schritt
+(`Strg+Z` nimmt alle zurück). Danach springt die Anzahl von selbst auf `1 × 1` zurück.
+Das Raster gilt nur für die Möbel oben — Böden, Trassen, Wände usw. entstehen immer einzeln.
+Bei mehr als 200 Objekten auf einmal fragt LightOS nach (große Mengen machen die 3D-Ansicht langsamer).
+Der Abstand geht bis 10 m; ein Raster, das über ±200 m hinausreichen würde, legt LightOS nicht an, sondern meldet es.
+Gespeichert wird mit der Bühne ([Teil F](#teil-f--speichern)) — Typ, Lage, Größe und Farbe bleiben erhalten.
+
+![Objekt-Bibliothek: 2 × 3 Biertischgarnituren, Bar, Podest mit Treppe, Stehtische](viz68_objekt_bibliothek.png)
 
 ## Teil B — Geräte platzieren und hängen (Reiter „Fixtures")
 

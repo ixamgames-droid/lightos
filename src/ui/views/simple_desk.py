@@ -641,9 +641,11 @@ class SimpleDeskView(QWidget):
         self._override_cb.setChecked(_initial_override)
         self._apply_override_ui(_initial_override)
 
+        # VIZ-70: der Takt startet erst in showEvent. Vorher lief er ab dem Bau
+        # — und ein Pult, das nie gezeigt wurde, bekam auch nie ein hideEvent,
+        # das ihn haette anhalten koennen (512 Fader 5x/s im UI-Thread).
         self._sync_timer = QTimer(self)
         self._sync_timer.timeout.connect(self._sync_from_output)
-        self._sync_timer.start(200)
 
         # Zentraler StateSync
         try:
@@ -1029,6 +1031,16 @@ class SimpleDeskView(QWidget):
 
     def _sync_from_output(self):
         import time
+        # VIZ-70: unsichtbar (anderer Reiter, Fenster minimiert) gibt es nichts
+        # nachzuziehen — showEvent holt den Stand beim Zurueckkehren nach.
+        try:
+            if not self.isVisible():
+                return
+            win = self.window()
+            if win is not None and win.isMinimized():
+                return
+        except RuntimeError:
+            return
         try:
             from src.core.app_state import get_state
             state = get_state()
@@ -1043,6 +1055,9 @@ class SimpleDeskView(QWidget):
                 ch = i + 1
                 # User-Bewegung kuerzlich -> nicht ueberschreiben
                 if self._user_active_until.get(ch, 0) > now:
+                    continue
+                # VIZ-70: nur geaenderte Fader anfassen (Frame-Diff je Kanal).
+                if f._value == data[i]:
                     continue
                 f.set_value_silent(data[i])
         except Exception as e:

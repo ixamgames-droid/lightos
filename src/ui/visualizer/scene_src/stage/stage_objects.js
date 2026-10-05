@@ -3,7 +3,7 @@
 import * as THREE from '../three/three.js';
 import { scene } from '../scene/renderer.js';
 import { disposeObj } from '../scene/grid_floor.js';
-import { geteilteGeometrie, rohr, verschmelzen } from '../scene/geteilte_geometrie.js';
+import { geteilteGeometrie, platziere, rohr, verschmelzen } from '../scene/geteilte_geometrie.js';
 import { fixtures, stageObjects, view } from '../state.js';
 import { raycaster, mouse } from '../interaction/picking.js';
 import { requestRender } from '../scene/render_loop.js';  // VIZ-13 3c-2
@@ -82,6 +82,161 @@ function buildTruss(size, color, achse) {
   return group;
 }
 
+
+// ── VIZ-68: Objekt-Bibliothek (Event-Moebel) ────────────────────────────────
+// Wie VIZ-66 komplett im Code gebaut, keine Modelldateien. Jede Form fuellt
+// ihre Bounding-Box EXAKT (`size` = Breite x Hoehe x Tiefe, Mittelpunkt im
+// Ursprung) und skaliert mit ihr — das Groesse-Aendern baut neu (Group-Pfad in
+// updateStageObjectProps). Je Objekt hoechstens ZWEI Meshes: Korpus in der
+// Objektfarbe, Gestell als Metall mit `userData.eigeneFarbe` (eine
+// Farbaenderung faerbt nur den Korpus). Gleiche Masse teilen sich die
+// Geometrie (geteilteGeometrie, Schluessel auf mm gerundet) — dreissig
+// Biertische kosten EINE Form.
+
+const _metall = () => new THREE.MeshStandardMaterial({ color: 0x8a8f96, metalness: 0.75, roughness: 0.35 });
+
+/** Quader w x h x d mit Mittelpunkt (x, y, z) — Baustein der Moebel. */
+function _quader(w, h, d, x, y, z) {
+  return new THREE.BoxGeometry(Math.max(w, 0.005), Math.max(h, 0.005), Math.max(d, 0.005))
+    .translate(x, y, z);
+}
+
+/** Zylinder (Achse Y), elliptisch auf rx/rz gestreckt, Mittelpunkt y. */
+function _scheibe(rx, rz, h, y, segmente) {
+  const g = new THREE.CylinderGeometry(1, 1, Math.max(h, 0.005), segmente || 32);
+  return platziere(g, [0, y, 0], null, [Math.max(rx, 0.005), 1, Math.max(rz, 0.005)]);
+}
+
+function _moebel(typ, size, color, teileKorpus, teileGestell) {
+  const sx = _mm(size.x), sy = _mm(size.y), sz = _mm(size.z);
+  const key = typ + '|' + sx + '|' + sy + '|' + sz;
+  const korpus = geteilteGeometrie(key + '|k', () => verschmelzen(teileKorpus(sx, sy, sz)));
+  const group = new THREE.Group();
+  const mk = new THREE.Mesh(korpus, new THREE.MeshStandardMaterial({ color: color, roughness: 0.8, metalness: 0.05 }));
+  mk.castShadow = true; mk.receiveShadow = true;
+  group.add(mk);
+  if (teileGestell) {
+    const gestell = geteilteGeometrie(key + '|g', () => verschmelzen(teileGestell(sx, sy, sz)));
+    const mg = new THREE.Mesh(gestell, _metall());
+    mg.userData.eigeneFarbe = true;
+    mg.castShadow = true;
+    group.add(mg);
+  }
+  group.userData.color = color;
+  group.userData.size = { x: size.x, y: size.y, z: size.z };
+  group.userData.moebel = typ;
+  return group;
+}
+
+// Biertischgarnitur: Tisch in der Mitte, zwei Baenke laengs davor/dahinter.
+function buildBiertischgarnitur(size, color) {
+  return _moebel('beer_table', size, color,
+    (L, H, D) => {
+      const t = Math.min(0.035, H * 0.05);                  // Plattenstaerke
+      const tisch = D * 0.38, bank = D * 0.19, hb = H * 0.62;
+      return [
+        _quader(L, t, tisch, 0, H / 2 - t / 2, 0),
+        _quader(L, t, bank, 0, -H / 2 + hb - t / 2, D / 2 - bank / 2),
+        _quader(L, t, bank, 0, -H / 2 + hb - t / 2, -(D / 2 - bank / 2)),
+      ];
+    },
+    (L, H, D) => {
+      const t = Math.min(0.035, H * 0.05);
+      const tisch = D * 0.38, bank = D * 0.19, hb = H * 0.62, s = 0.03;
+      const rand = Math.min(0.25, L * 0.12);
+      const teile = [];
+      for (const x of [-(L / 2 - rand), L / 2 - rand]) {
+        for (const z of [-tisch * 0.32, tisch * 0.32]) {          // Tischbeine
+          teile.push(_quader(s, H - t, s, x, -t / 2, z));
+        }
+        for (const z of [D / 2 - bank / 2, -(D / 2 - bank / 2)]) {  // Bankbeine
+          teile.push(_quader(s, hb - t, s, x, -H / 2 + (hb - t) / 2, z));
+        }
+      }
+      return teile;
+    });
+}
+
+// Stehtisch: runde (bzw. elliptische) Platte, Saeule, Fussteller.
+function buildStehtisch(size, color) {
+  return _moebel('high_table', size, color,
+    (W, H, D) => {
+      const t = Math.min(0.03, H * 0.05);
+      return [_scheibe(W / 2, D / 2, t, H / 2 - t / 2)];
+    },
+    (W, H, D) => {
+      const t = Math.min(0.03, H * 0.05), fuss = Math.min(0.02, H * 0.03);
+      const r = Math.min(W, D) * 0.06;
+      return [
+        _scheibe(r, r, H - t - fuss, -H / 2 + fuss + (H - t - fuss) / 2, 16),
+        _scheibe(W * 0.32, D * 0.32, fuss, -H / 2 + fuss / 2, 32),
+      ];
+    });
+}
+
+// Bar / Theke: Korpus mit ueberstehender Platte (Gaesteseite +Z), Fussreling.
+function buildBar(size, color) {
+  return _moebel('bar_counter', size, color,
+    (L, H, D) => {
+      const t = Math.min(0.05, H * 0.06);
+      const korpusTiefe = D * 0.78;
+      return [
+        _quader(L, t, D, 0, H / 2 - t / 2, 0),
+        _quader(L, H - t, korpusTiefe, 0, -t / 2, -(D - korpusTiefe) / 2),
+      ];
+    },
+    (L, H, D) => {
+      const r = Math.min(0.025, D * 0.04);
+      const z = D / 2 - r - 0.0001, y = -H / 2 + Math.min(0.22, H * 0.2);
+      const x0 = -L / 2 + 0.06, x1 = L / 2 - 0.06;
+      return [rohr([x0, y, z], [x1, y, z], r, 12, false)];
+    });
+}
+
+// Podest mit Treppe: Podest hinten (-Z), Treppe mittig zur Vorderseite (+Z).
+function buildPodestTreppe(size, color) {
+  return _moebel('riser_stairs', size, color,
+    (W, H, D) => {
+      const n = Math.max(1, Math.round(H / 0.2) - 1);       // Stufen unter der Podestkante
+      const tritt = Math.min(0.3, (D * 0.5) / n);
+      const tt = n * tritt;
+      const breite = Math.min(1.2, W * 0.6);
+      const teile = [_quader(W, H, D - tt, 0, 0, -tt / 2)];
+      for (let k = 1; k <= n; k++) {
+        const h = H * k / (n + 1);
+        // k = 1 vorderste/niedrigste Stufe; jede Stufe reicht bis zum Boden.
+        teile.push(_quader(breite, h, tritt, 0, -H / 2 + h / 2, D / 2 - tt + (n - k + 0.5) * tritt));
+      }
+      return teile;
+    },
+    null);
+}
+
+// Mischpult-Tisch (FOH): Tisch mit flachem, nach vorn geneigt gedachtem
+// Pult-Aufsatz (als Stufe angenaehert), Metallbeine.
+function buildMischpultTisch(size, color) {
+  return _moebel('foh_desk', size, color,
+    (L, H, D) => {
+      const t = Math.min(0.04, H * 0.05);
+      const tischH = H * 0.82;                       // Tischkante
+      const pult = H - tischH;                       // Pult-Aufsatz
+      return [
+        _quader(L, t, D, 0, -H / 2 + tischH - t / 2, 0),
+        _quader(L * 0.86, pult, D * 0.62, 0, -H / 2 + tischH + pult / 2, -D * 0.12),
+      ];
+    },
+    (L, H, D) => {
+      const t = Math.min(0.04, H * 0.05), tischH = H * 0.82, s = 0.04;
+      const teile = [];
+      for (const x of [-(L / 2 - s / 2), L / 2 - s / 2]) {
+        for (const z of [-(D / 2 - s / 2), D / 2 - s / 2]) {
+          teile.push(_quader(s, tischH - t, s, x, -H / 2 + (tischH - t) / 2, z));
+        }
+      }
+      return teile;
+    });
+}
+
 export const STAGE_BLUEPRINTS = {
   floor: {
     label: 'Boden / Floor',
@@ -152,6 +307,37 @@ export const STAGE_BLUEPRINTS = {
       new THREE.BoxGeometry(size.x, size.y, size.z),
       new THREE.MeshStandardMaterial({ color: color, roughness: 1.0 })
     ),
+  },
+  // VIZ-68: Objekt-Bibliothek
+  beer_table: {
+    label: 'Biertischgarnitur',
+    defaultSize: { x: 2.2, y: 0.76, z: 1.3 },
+    defaultColor: '#4a3624',
+    build: (size, color) => buildBiertischgarnitur(size, color),
+  },
+  high_table: {
+    label: 'Stehtisch',
+    defaultSize: { x: 0.8, y: 1.1, z: 0.8 },
+    defaultColor: '#d8d2c4',
+    build: (size, color) => buildStehtisch(size, color),
+  },
+  bar_counter: {
+    label: 'Bar / Theke',
+    defaultSize: { x: 3.0, y: 1.1, z: 0.8 },
+    defaultColor: '#3a2a20',
+    build: (size, color) => buildBar(size, color),
+  },
+  riser_stairs: {
+    label: 'Podest mit Treppe',
+    defaultSize: { x: 2.0, y: 0.6, z: 2.8 },
+    defaultColor: '#332520',
+    build: (size, color) => buildPodestTreppe(size, color),
+  },
+  foh_desk: {
+    label: 'Mischpult-Tisch',
+    defaultSize: { x: 1.8, y: 0.9, z: 0.9 },
+    defaultColor: '#222226',
+    build: (size, color) => buildMischpultTisch(size, color),
   },
   dj_booth: {
     label: 'DJ Booth',
@@ -270,7 +456,8 @@ export function updateStageObjectProps(id, props) {
       so.mesh.material.color = col;
     } else if (so.mesh.isGroup) {
       so.mesh.traverse(c => {
-        if (c.isMesh && c.material && c.material.color) {
+        // VIZ-68: Gestell/Metall behaelt seine Farbe.
+        if (c.isMesh && c.material && c.material.color && !c.userData.eigeneFarbe) {
           c.material.color = col.clone();
         }
       });
@@ -312,6 +499,11 @@ export const STAGE_2D_COLORS = {
   speaker:   { fill: 0x1a1a1a, edge: 0xff8800, label: 'SPK' },
   audience:  { fill: 0x4a3a2a, edge: 0xb89060, label: 'AUDIENCE' },
   dj_booth:  { fill: 0x2a2a4a, edge: 0x60a0ff, label: 'DJ' },
+  beer_table:   { fill: 0x5a4430, edge: 0xc89a60, label: 'BIERTISCH' },
+  high_table:   { fill: 0x5a5650, edge: 0xd8d2c4, label: 'STEHTISCH' },
+  bar_counter:  { fill: 0x3a2a20, edge: 0xb07040, label: 'BAR' },
+  riser_stairs: { fill: 0x6b4a3a, edge: 0xc7906a, label: 'PODEST' },
+  foh_desk:     { fill: 0x26262c, edge: 0x9090a0, label: 'FOH' },
 };
 
 export function updateStageObject2D(id) {
@@ -757,8 +949,23 @@ export function loadStageJson(json) {
   }
 }
 
+// VIZ-68 (Review A): gebuendeltes Anlegen/Entfernen (Raster). Jedes
+// notifyStageListChanged serialisiert die GANZE Liste — je Element einmal war
+// bei einem Raster quadratisch. In `gebuendelt(fn)` meldet nur das Ende.
+let _buendeln = 0;
+export function gebuendelt(fn) {
+  _buendeln++;
+  try {
+    return fn();
+  } finally {
+    _buendeln--;
+    if (_buendeln === 0) notifyStageListChanged();
+  }
+}
+
 export function notifyStageListChanged() {
   if (_isLoadingStage) return;  // unterdrücken während Bulk-Load
+  if (_buendeln) return;        // VIZ-68: Raster meldet einmal am Ende
   const bridge = bridgeRef.get();
   if (bridge && bridge.stageListChanged) {
     const payload = {
