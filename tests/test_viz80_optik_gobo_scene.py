@@ -390,6 +390,70 @@ class Viz80OptikGoboPrismaSceneTest(unittest.TestCase):
         self.assertLess(z["beamX"], 0.6)
         self.assertTrue(z["mapIstSpirale"])
 
+    # ── Prisma-Kegel fangen keinen Klick (Review VIZ-80, L1) ────────────────
+    def _pick_auf_poolkegel(self, i, nur_pool):
+        """Bildpunkt mitten auf Pool-Kegel ``i`` durch denselben Fixture-Pick
+        wie Klick/Hover/Zug schicken. ``nur_pool``: alle anderen Meshes des
+        Geraets (Gehaeuse, Hauptstrahl, …) fuer diesen einen Pick stumm
+        schalten, damit ein Treffer NUR vom Pool-Kegel kommen kann."""
+        r = self._eval("""
+        (function(){
+          const L = window.__lightos;
+          const f = L.fixtures['%d'];
+          const k = f.prismPool.kegel[%d];
+          const pool = new Set(f.prismPool.kegel);
+          const gemerkt = [];
+          if (%s) {
+            f.group.traverse(o => {
+              if (o.isMesh && !pool.has(o)) {
+                gemerkt.push([o, Object.prototype.hasOwnProperty.call(o, 'raycast'), o.raycast]);
+                o.raycast = () => {};
+              }
+            });
+          }
+          f.group.updateMatrixWorld(true);
+          L.view.activeCam.updateMatrixWorld();
+          if (!k.geometry.boundingBox) k.geometry.computeBoundingBox();
+          const p = k.geometry.boundingBox.getCenter(k.position.clone());
+          k.localToWorld(p);
+          p.project(L.view.activeCam);
+          L.__mouse.set(p.x, p.y);
+          const fid = L.__pickFixture();
+          for (const [o, eigen, fn] of gemerkt) {
+            if (eigen) o.raycast = fn; else delete o.raycast;
+          }
+          return (fid === null || fid === undefined) ? 'null' : String(fid);
+        })()""" % (_FID, i, "true" if nur_pool else "false"))
+        return None if r == "null" else int(r)
+
+    def test_prisma_kegel_fangen_keinen_klick(self):
+        """three r128 prueft `visible` beim Raycast nicht: nach 6-fach -> 3-fach
+        bleiben drei Pool-Kegel unsichtbar eingehaengt und duerfen keinen
+        Klick abfangen. Die Kegel sind reine Deko — auch die sichtbaren."""
+        self._load_and_wait()
+        self._eval("window.__lightos.setViewMode('3D'); true")
+        self._push(_payload(prism=50))      # 6-fach -> 5 Pool-Kegel
+        self._push(_payload(prism=200))     # 3-fach -> 2 aktiv, 3 unsichtbar
+        self.assertEqual(self._z()["prismN"], 2)
+        n_pool = int(self._eval(
+            "window.__lightos.fixtures['%d'].prismPool.kegel.length" % _FID))
+        self.assertEqual(n_pool, 5)
+        for i in range(n_pool):
+            self.assertIsNone(self._pick_auf_poolkegel(i, nur_pool=True),
+                              f"Prisma-Kegel {i} faengt einen Klick ab")
+        # Gegenprobe: das Geraet selbst bleibt anklickbar.
+        r = self._eval("""
+        (function(){
+          const L = window.__lightos;
+          const f = L.fixtures['%d'];
+          f.group.updateMatrixWorld(true);
+          L.view.activeCam.updateMatrixWorld();
+          const p = f.group.position.clone().project(L.view.activeCam);
+          L.__mouse.set(p.x, p.y);
+          return String(L.__pickFixture());
+        })()""" % _FID)
+        self.assertEqual(r, str(_FID), "Geraet nicht mehr anklickbar")
+
 
 if __name__ == "__main__":
     unittest.main()

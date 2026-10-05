@@ -101,6 +101,12 @@ function _bauePrisma(f, n) {
     // Wie der Hauptstrahl aus der Fit-Bounding-Box heraushalten, sonst zoomt
     // "Auswahl einpassen" wegen der Faecher-Kegel viel zu weit raus.
     m.userData.excludeFromFit = true;
+    // Reine Deko, kein Koerper: three r128 prueft `visible` beim Raycast
+    // NICHT. Ohne No-Op fingen ueberzaehlige (unsichtbare) Pool-Kegel nach
+    // 6-fach -> 3-fach weiter Klicks ab und waehlten das Geraet statt Boden
+    // oder Buehnenobjekt (Review VIZ-80, L1; dieselbe Regel wie laser.js).
+    // Getroffen wird ueber Gehaeuse und Hauptstrahl.
+    m.raycast = () => {};
     gelenk.add(m);
     pool.grp.add(gelenk);
     pool.gelenke.push(gelenk);
