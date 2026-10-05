@@ -57,7 +57,6 @@
 | SAMMEL-DOKU-C | A | sammel/doku-c | 2026-10-02T22:08Z | docs · BACKLOG.md |
 | UI-74 | A | fix/ui74-profile-bearbeiten | 2026-10-04T17:07Z | src/ui/widgets/fixture_editor.py · src/ui/widgets/bibliothek_download_dialog.py · fixtures/bibliothek/eurolite |
 | VIZ-71 | A | perf/viz71-lichtdaten-push | 2026-10-04T20:44Z | - |
-| DOC-59 | A | docs/doc59-3d-bilder | 2026-10-04T21:06Z | - |
 
 ## Blocker & Fallen
 
@@ -168,7 +167,6 @@
 
 ## Verlauf
 
-- 2026-10-04T17:33Z B claim OUT-61
 - 2026-10-04T17:40Z C done OUT-58
 - 2026-10-04T17:41Z B claim OUT-61-FOLGE
 - 2026-10-04T17:46Z B claim VIZ-PERF-B
@@ -198,3 +196,4 @@
 - 2026-10-05T00:16Z B done VIZ-68
 - 2026-10-05T00:43Z A done FM-63
 - 2026-10-05T01:18Z A done OUT-63
+- 2026-10-05T12:29Z A done DOC-59
