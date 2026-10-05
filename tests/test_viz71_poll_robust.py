@@ -251,5 +251,87 @@ class Viz71PollRobustTest(unittest.TestCase):
                         "frisch platziertes Geraet vom Rest-Abbau entfernt")
 
 
+    # ── Review: Show-Wechsel mit wiederverwendeten fids ──────────────────────
+    # fids beginnen je Show bei 1. Der DMX-Cache hatte nur die fid als
+    # Schluessel; die volle Liste der neuen Show behielt deshalb den Eintrag
+    # der alten Show, und das neue Geraet startete mit deren Licht. Python
+    # zaehlt jetzt eine Show-Generation hoch (Poll-Zustand ``showGen``, dazu
+    # an jedem DMX-Batch); JS leert den Cache, sobald eine neuere kommt.
+    def _show(self, gen, fid, **ort):
+        g = _geraet(fid)
+        g.update(ort)
+        self._b.zustand = {"showGen": (gen, gen),
+                           "fixtures": (gen, json.dumps([g]))}
+
+    def _neu_gebaut(self, fid):
+        self._warte("(function(){ const f = window.__lightos.fixtures['%d'];"
+                    " return !!f && !f.__alt; })()" % fid)
+
+    def _licht(self, fid):
+        return json.loads(self._eval(
+            "(function(){ const f = window.__lightos.fixtures['%d'];"
+            " return JSON.stringify({i: f.spot.intensity, r: f.spot.color.r,"
+            " b: f.spot.color.b}); })()" % fid))
+
+    def _anwenden(self, eintrag, seq, gen):
+        return self._eval("window.__lightos.applyDmx(%s, %d, %d)"
+                          % (json.dumps([eintrag]), seq, gen))
+
+    def test_show_wechsel_uebernimmt_keinen_dmx_stand_der_alten_show(self):
+        self._load_and_wait()
+        fid = 1
+        self._show(1, fid)                               # Show A
+        self._warte("!!window.__lightos.fixtures['%d']" % fid)
+        rot = {"fid": fid, "r": 255, "g": 0, "b": 0, "intensity": 255,
+               "pan": 128, "tilt": 128}
+        self.assertEqual(self._anwenden(rot, 5, 1), 1)
+        self.assertGreater(self._licht(fid)["i"], 0)
+        # Show B: fid 1 ist dort ein anderes Geraet an anderer Stelle.
+        self._eval("window.__lightos.fixtures['%d'].__alt = true" % fid)
+        self._show(2, fid, x=3, z=-2)
+        self._neu_gebaut(fid)
+        self.assertEqual(self._licht(fid)["i"], 0,
+                         "neues Geraet startet mit dem DMX-Stand der alten Show")
+
+    def test_neuer_show_stand_vor_der_liste_bleibt_und_alter_verfaellt(self):
+        """Nach dem Show-Wechsel schiebt der Service sofort den vollen Bestand —
+        der Push ist meist VOR dem naechsten Poll mit der neuen Liste da. Dieser
+        Stand darf beim Leeren nicht verloren gehen; ein verspaeteter Batch der
+        alten Show dagegen schon."""
+        self._load_and_wait()
+        fid = 1
+        self._show(1, fid)
+        self._warte("!!window.__lightos.fixtures['%d']" % fid)
+        rot = {"fid": fid, "r": 255, "g": 0, "b": 0, "intensity": 255,
+               "pan": 128, "tilt": 128}
+        blau = dict(rot, r=0, b=255)
+        self._anwenden(rot, 5, 1)
+        self._anwenden(blau, 6, 2)                       # neue Show, vor der Liste
+        self._eval("window.__lightos.fixtures['%d'].__alt = true" % fid)
+        self._show(2, fid, x=3, z=-2)
+        self._neu_gebaut(fid)
+        l = self._licht(fid)
+        self.assertGreater(l["i"], 0, "Stand der neuen Show beim Leeren verloren")
+        self.assertAlmostEqual(l["b"], 1.0, places=2)
+        # Ein spaeter Batch der alten Show (hoehere Seq, alte Generation).
+        self.assertEqual(self._anwenden(rot, 7, 1), 0, "Batch der alten Show angewandt")
+        self.assertAlmostEqual(self._licht(fid)["b"], 1.0, places=2)
+
+    def test_neubau_in_derselben_show_behaelt_den_stand(self):
+        """N2 auch mit Generation: Einmessen/refresh_fixture baut EIN Geraet
+        neu, die Generation bleibt — der Stand bleibt."""
+        self._load_and_wait()
+        fid = 1
+        self._show(1, fid)
+        self._warte("!!window.__lightos.fixtures['%d']" % fid)
+        rot = {"fid": fid, "r": 255, "g": 0, "b": 0, "intensity": 255,
+               "pan": 128, "tilt": 128}
+        self._anwenden(rot, 5, 1)
+        self._eval("window.__lightos.fixtures['%d'].__alt = true" % fid)
+        self._b.events = [{"t": "fixtureAdded", "j": json.dumps(_geraet(fid))}]
+        self._neu_gebaut(fid)
+        self.assertGreater(self._licht(fid)["i"], 0, "Neubau in derselben Show dunkel")
+
+
 if __name__ == "__main__":
     unittest.main()

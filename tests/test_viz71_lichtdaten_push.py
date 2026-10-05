@@ -580,5 +580,85 @@ class PollRevisionTest(unittest.TestCase):
         self.assertIn("settings", out)
 
 
+# ── Review: Show-Generation gegen wiederverwendete fids ──────────────────────
+class ShowGenerationTest(unittest.TestCase):
+    """fids beginnen je Show bei 1; der DMX-Cache der Seite kannte nur die
+    fid. Python zaehlt beim Show-Laden eine Generation hoch und schickt sie
+    als Poll-Zustand und an jedem DMX-Batch mit (Szenen-Seite:
+    ``test_viz71_poll_robust.py``)."""
+
+    def setUp(self):
+        from src.core.app_state import get_state
+        from src.core.show.show_file import reset_show
+        import src.ui.visualizer.visualizer_window as VW
+        self.VW = VW
+        reset_show()
+        self.bridge = VW.VisualizerBridge(get_state())
+
+    def tearDown(self):
+        self.bridge.dispose()
+
+    def _rev_poll(self, revs):
+        return json.loads(self.bridge.pollControlRev(json.dumps(revs)))
+
+    def test_show_laden_zaehlt_die_generation_hoch(self):
+        erst = self._rev_poll({})
+        self.assertEqual(erst["showGen"], 0)
+        self.bridge._on_state("show_loaded", None)
+        out = self._rev_poll(erst["_rev"])
+        self.assertEqual(out.get("showGen"), 1, "neue Show nicht gemeldet")
+        self.bridge._on_state("show_loaded", None)
+        self.assertEqual(self._rev_poll(erst["_rev"]).get("showGen"), 2)
+
+    def test_poll_puffer_der_alten_show_faellt_weg(self):
+        self.bridge._poll_merge_entries([(4, {"fid": 1, "r": 255})])
+        self.bridge._on_state("show_loaded", None)
+        self.assertNotIn("dmx", self._rev_poll({}),
+                         "DMX der alten Show ueberlebte den Show-Wechsel")
+
+    def test_poll_dmx_traegt_die_generation(self):
+        self.bridge._on_state("show_loaded", None)
+        self.bridge._poll_merge_entries([(5, {"fid": 1, "r": 255})])
+        out = self._rev_poll({})
+        self.assertEqual(out["dmxGen"], 1)
+        self.assertEqual(json.loads(out["dmx"])[0]["fid"], 1)
+
+    def test_on_state_auf_einem_stub_wirft_nicht(self):
+        # Bestandstests fahren _on_state mit SimpleNamespace-self.
+        self.VW.VisualizerBridge._on_state(SimpleNamespace(), "show_loaded", None)
+
+    def test_push_skript_traegt_die_generation(self):
+        self.assertIn("L.applyDmx([{\"fid\":1}],3,2):-1",
+                      push_script([(3, {"fid": 1})], 2))
+        self.assertIn("L.applyDmx([{\"fid\":1}],3):-1",
+                      push_script([(3, {"fid": 1})]))
+
+    def test_kanal_stempelt_beim_eingang_und_verwirft_alte_show(self):
+        view = _View()
+        poll = SimpleNamespace(_show_gen=1, _poll_merge_entries=lambda e: list(e),
+                               _poll_clear_dmx=lambda: None)
+        geplant = []
+        uhr = _Uhr()
+        kanal = DmxPushChannel(view, on_need_full=lambda: None, poll=poll,
+                               clock=uhr, schedule=lambda ms, fn: geplant.append(fn))
+        kanal.push([{"fid": 1, "r": 1}], True, 1)
+        skript, cb = view.seite.aufrufe[-1]
+        self.assertIn(",1,1):-1", skript, "erster Batch ohne Generation")
+        cb(1)
+        # Noch im Takt-Abstand: wartet im Puffer ...
+        kanal.push([{"fid": 1, "r": 2}], False, 2)
+        self.assertEqual(len(view.seite.aufrufe), 1)
+        # ... dann wird eine andere Show geladen. Der wartende Wert der alten
+        # Show darf weder mit der neuen Generation gestempelt noch spaeter
+        # ueberhaupt gesendet werden.
+        poll._show_gen = 2
+        kanal.push([{"fid": 7, "r": 9}], False, 3)
+        uhr.t += 1.0
+        kanal._try_flush()
+        skript = view.seite.aufrufe[-1][0]
+        self.assertIn(",3,2):-1", skript)
+        self.assertNotIn('"fid":1,', skript, "Wert der alten Show mitgeschickt")
+
+
 if __name__ == "__main__":
     unittest.main()

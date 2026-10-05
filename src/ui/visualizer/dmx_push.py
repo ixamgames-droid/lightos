@@ -46,8 +46,9 @@ PUSH_TIMEOUT_S = 0.5
 _TAKT_TOLERANZ_S = 0.008
 
 
-def push_script(entries) -> str:
-    """Skript fuer ``runJavaScript``. ``entries``: ``[(seq, payload), ...]``.
+def push_script(entries, gen=None) -> str:
+    """Skript fuer ``runJavaScript``. ``entries``: ``[(seq, payload), ...]``,
+    ``gen``: Show-Generation der Werte (``None`` = ohne, Alt-Aufrufer).
 
     Das JSON steht direkt als JS-Literal im Skript (kein zweites
     ``JSON.parse``), mit ``ensure_ascii`` — Geraete- und Gobo-Namen koennen
@@ -60,6 +61,8 @@ def push_script(entries) -> str:
         seq = json.dumps(seqs[0])
     else:
         seq = json.dumps(seqs, separators=(",", ":"))
+    if gen is not None:
+        seq = "%s,%d" % (seq, int(gen))
     return ("(function(){var L=window.__lightos;"
             "return(L&&L.applyDmx)?L.applyDmx(%s,%s):-1;})()" % (arr, seq))
 
@@ -88,6 +91,10 @@ class DmxPushChannel:
         self._schedule = schedule
         self.timeout_s = float(timeout_s)
         self._pending: dict = {}          # fid -> (seq, payload)
+        # Show-Generation der Werte in ``_pending`` (Review VIZ-71). Gelesen
+        # beim Eingang, nicht beim Senden: ein Nachlauf-Timer koennte sonst
+        # Werte der alten Show mit der neuen Generation stempeln.
+        self._gen = None
         # (Sendenummer, gesendet_um). Die Nummer steckt im Rueckruf: eine
         # verspaetete Antwort auf einen schon als verloren gewerteten Batch
         # (Timeout) oder auf die alte Seite (Reload) passt nicht mehr.
@@ -138,9 +145,17 @@ class DmxPushChannel:
             print(f"[DmxPush] ERROR: Voll-Resync anfordern: {e}")
 
     # ── Eingang (Service-Tick) ───────────────────────────────────────────────
+    def _show_gen(self):
+        poll = self._poll_ref() if self._poll_ref is not None else None
+        gen = getattr(poll, "_show_gen", None) if poll is not None else None
+        return gen if isinstance(gen, int) else None
+
     def push(self, payloads: list, full: bool, seq: int) -> None:
-        if full:
+        gen = self._show_gen()
+        if full or gen != self._gen:
+            # Neue Show: was noch wartet, gehoert zur alten.
             self._pending = {}
+            self._gen = gen
         for d in payloads:
             fid = d.get("fid") if isinstance(d, dict) else None
             if fid is None:
@@ -202,7 +217,7 @@ class DmxPushChannel:
             return
         eintraege = list(self._pending.values())
         self._pending = {}
-        skript = push_script(eintraege)
+        skript = push_script(eintraege, self._gen)
         self._send_nr += 1
         nr = self._send_nr
         self._inflight = (nr, jetzt)

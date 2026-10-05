@@ -115,7 +115,8 @@ class JsBatchHandlerBraceBalanceTest(unittest.TestCase):
         self.assertNotIn("bridge.dmxUpdated.connect", self.bridge_js_content,
                           "Legacy dmxUpdated-Handler muss entfernt sein")
         # Der Poll-Rueckfall laeuft ueber denselben applyDmx wie der Push.
-        self.assertIn("applyDmx(JSON.parse(s.dmx), s.dmxSeq)", self.bridge_js_content)
+        # Review VIZ-71: mit der Show-Generation des Poll-Puffers.
+        self.assertIn("applyDmx(JSON.parse(s.dmx), s.dmxSeq, s.dmxGen)", self.bridge_js_content)
 
     def test_apply_dmx_calls_update_fixture_with_nullish_defaults(self):
         """Frueher byte-identisch ``d.pan||128`` — das machte aus Pan 0 (ganz

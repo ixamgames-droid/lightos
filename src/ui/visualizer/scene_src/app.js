@@ -51,7 +51,7 @@ import { fabDelete, fabRotate, fabPlace, wireTouchLateBindings } from './interac
 
 import { getBridge, tryChannel, jsAddStageObject } from './bridge/bridge.js';
 import { applyDmx } from './bridge/dmx_apply.js';                  // VIZ-71
-import { dmxCacheInfo, pruneDmxCache } from './fixtures/dmx_cache.js';           // VIZ-71
+import { dmxCacheInfo, resetDmxCache } from './fixtures/dmx_cache.js';           // VIZ-71
 import { removeFixture as _removeFixtureForTouch, syncSpotShadowBudget,
          beamFalloffTexture, shadowBudgetInfo } from './fixtures/fixtures.js';  // VIZ-15
 import { updateLabelZoomVisibility } from './fixtures/labels.js';  // VIZ-14: Fixture-Label Zoom-Gate
@@ -295,7 +295,7 @@ window.__lightos = {
   // Test-Seam: Szenen-Tests, die eine geteilte Seite zwischen Tests neu
   // aufbauen (XPLAT-33), leeren den DMX-Cache, damit der Vortest nicht
   // nachwirkt — im Betrieb behaelt ein Neubau seinen Stand bewusst (VIZ-71).
-  __dmxCacheLeeren: () => { pruneDmxCache([]); return true; },
+  __dmxCacheLeeren: () => { resetDmxCache(); return true; },
 };
 
 // Init-Flag fuer den Smoke-Test (VIZ-13 3a-4): belegt, dass app.js komplett

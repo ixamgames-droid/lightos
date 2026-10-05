@@ -8,7 +8,7 @@ import { applyBrightness } from '../scene/lights.js';
 import { fixtures, settings, stageObjects, view } from '../state.js';
 import { addFixture, removeFixture } from '../fixtures/fixtures.js';
 import { applyDmx } from './dmx_apply.js';                                // VIZ-71
-import { forgetDmx, pruneDmxCache } from '../fixtures/dmx_cache.js';      // VIZ-71
+import { forgetDmx, noteShowGen, pruneDmxCache } from '../fixtures/dmx_cache.js';      // VIZ-71
 import { resyncBeamVisibility } from '../fixtures/builders.js';
 import { setBeamsOff } from '../state.js';   // VIZ-15
 import { setViewMode } from '../stage/view_mode.js';
@@ -425,6 +425,13 @@ export function tryChannel() {
                       console.log('poll: Zustand ' + key + ' nicht angewandt', eB);
                     }
                   };
+                  // Review VIZ-71: neue Show -> DMX-Cache leeren, BEVOR unten
+                  // die Geraeteliste baut (fids beginnen je Show bei 1; sonst
+                  // startete ein Geraet der neuen Show mit dem Licht der
+                  // alten). Idempotent: dieselbe Generation leert nichts.
+                  if (typeof s.showGen === 'number') {
+                    _block('showGen', () => { noteShowGen(s.showGen); });
+                  }
                   // Idempotente Zustaende: nur bei Aenderung anwenden. Der
                   // Vergleichswert (_pX) wird erst nach Erfolg gesetzt.
                   if (s.editMode !== undefined && s.editMode !== _pEM) {
@@ -518,7 +525,7 @@ export function tryChannel() {
                     // VIZ-71: derselbe Weg wie der Push (Sequenznummern je
                     // Eintrag in s.dmxSeq; unbekannte fids landen im Cache).
                     try {
-                      applyDmx(JSON.parse(s.dmx), s.dmxSeq);
+                      applyDmx(JSON.parse(s.dmx), s.dmxSeq, s.dmxGen);
                     } catch (e) { console.log('poll dmx: Batch uebersprungen', e); }
                   }
                   // Einmal-Events: genau einmal ausfuehren (Python leert die Queue).

@@ -22,6 +22,36 @@ export const DMX_CACHE_MAX = 2048;
 // fid (String) -> { seq: number|null, d: payload }
 export const dmxCache = new Map();
 
+// Show-Generation, zu der der Cache gehoert (Review VIZ-71). fids beginnen je
+// Show bei 1 — ohne Generation behielt die volle Liste der neuen Show den
+// Eintrag einer wiederverwendeten fid, und das neue Geraet startete kurz mit
+// dem Licht der alten Show. Python zaehlt die Generation beim Show-Laden hoch
+// und schickt sie als Poll-Zustand ``showGen`` UND an jedem DMX-Batch mit:
+// der volle Bestand der neuen Show kommt per Push meist VOR der neuen Liste
+// an und darf beim Leeren nicht verloren gehen. Ein Neubau EINES Geraets in
+// derselben Show (Einmessen, refresh_fixture) aendert die Generation nicht
+// und behaelt seinen Stand (N1/N2).
+let cacheGen = null;
+
+// Rueckgabe false: ``gen`` ist aelter als der Cache — ein verspaeteter Batch
+// der alten Show, der nichts mehr anrichten darf. Ohne Zahl (Alt-Aufrufer,
+// Tests) gilt alles.
+export function noteShowGen(gen) {
+  if (typeof gen !== 'number' || !Number.isFinite(gen)) return true;
+  if (cacheGen === null || gen > cacheGen) {
+    dmxCache.clear();
+    cacheGen = gen;
+    return true;
+  }
+  return gen === cacheGen;
+}
+
+// Test-Seam: Szenen-Tests auf einer geteilten Seite starten ohne Vorlauf.
+export function resetDmxCache() {
+  dmxCache.clear();
+  cacheGen = null;
+}
+
 export function cachedDmx(fid) {
   const e = dmxCache.get(String(fid));
   return e ? e.d : null;
@@ -65,5 +95,5 @@ export function pruneDmxCache(fids) {
 }
 
 export function dmxCacheInfo() {
-  return { size: dmxCache.size, max: DMX_CACHE_MAX };
+  return { size: dmxCache.size, max: DMX_CACHE_MAX, gen: cacheGen };
 }

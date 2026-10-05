@@ -11,7 +11,7 @@
 // `??` statt `||`: `d.pan||128` machte aus Pan 0 (ganz links!) die Mitte 128.
 import { fixtures } from '../state.js';
 import { updateFixture } from '../fixtures/fixtures.js';
-import { cachedSeq, rememberDmx } from '../fixtures/dmx_cache.js';
+import { cachedSeq, noteShowGen, rememberDmx } from '../fixtures/dmx_cache.js';
 
 export function applyDmxEntry(d) {
   updateFixture(d.fid, d.r ?? 0, d.g ?? 0, d.b ?? 0, d.intensity ?? 0,
@@ -19,11 +19,16 @@ export function applyDmxEntry(d) {
 }
 
 // arr: Payload-Liste; seq: Zahl (gilt fuer alle), Liste (je Eintrag) oder
-// nichts. Rueckgabe: Zahl der Eintraege, die ein vorhandenes Geraet erreicht
-// haben (unbekannte fids landen nur im Cache). Python liest die ZAHL — ein
-// Array kaeme in PySide 6.11 als '' an.
-export function applyDmx(arr, seq) {
+// nichts; gen: Show-Generation des Batches (s. dmx_cache.js) oder nichts.
+// Rueckgabe: Zahl der Eintraege, die ein vorhandenes Geraet erreicht haben
+// (unbekannte fids landen nur im Cache). Python liest die ZAHL — ein Array
+// kaeme in PySide 6.11 als '' an.
+export function applyDmx(arr, seq, gen) {
   if (!Array.isArray(arr)) return 0;
+  // Neuere Generation: Cache der alten Show leeren, BEVOR dieser Batch ihn
+  // fuellt. Aeltere: verspaeteter Batch der alten Show -> verwerfen (0 ist
+  // eine gueltige Antwort, kein "nicht bereit").
+  if (!noteShowGen(gen)) return 0;
   let n = 0;
   for (let i = 0; i < arr.length; i++) {
     const d = arr[i];

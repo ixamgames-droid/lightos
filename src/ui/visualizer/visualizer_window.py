@@ -791,7 +791,11 @@ class VisualizerBridge(QObject):
                             # keine 3D-Position? Steuert den Platzier-Geist.
                             "placeable": 0,
                             # VIZ-15: fids mit ausgeblendetem Lichtkegel.
-                            "beamsOff": []}
+                            "beamsOff": [],
+                            # Review VIZ-71: Show-Generation, s.
+                            # ``_neue_show_generation``.
+                            "showGen": 0}
+        self._show_gen = 0
         # VIZ-71 (S5): Revision je Zustands-Schluessel. ``pollControlRev``
         # liefert nur Schluessel, deren Revision die Seite noch nicht kennt —
         # vorher ging die volle Geraeteliste (~18 KB) und die Buehne mit JEDEM
@@ -985,11 +989,35 @@ class VisualizerBridge(QObject):
             return
         seqs = self.__dict__.get("_poll_dmx_seq") or {}
         out["dmx"] = json.dumps(list(self._poll_dmx.values()))
+        # Review VIZ-71: Generation der Show, zu der diese Werte gehoeren (der
+        # Puffer wird beim Show-Wechsel geleert, enthaelt also nur die aktuelle).
+        gen = self.__dict__.get("_show_gen")
+        if gen is not None:
+            out["dmxGen"] = gen
         liste = [seqs.get(fid) for fid in self._poll_dmx]
         if any(x is not None for x in liste):
             out["dmxSeq"] = liste
         self._poll_dmx = {}
         self.__dict__["_poll_dmx_seq"] = {}
+
+    def _neue_show_generation(self) -> int:
+        """Review VIZ-71: eine andere Show ist geladen -> Generation hochzaehlen.
+
+        fids beginnen je Show bei 1. Die Seite merkt sich den letzten DMX-Stand
+        je fid (``dmx_cache.js``); ohne Generation hielt die volle Liste der
+        neuen Show den Eintrag einer wiederverwendeten fid fest, und das neue
+        Geraet startete kurz mit dem Licht der alten Show. Die Generation reist
+        als Poll-Zustand ``showGen`` und an jedem DMX-Batch (Push und Poll);
+        JS leert den Cache, sobald eine neuere ankommt, und verwirft Batches
+        einer aelteren. Der Poll-Puffer haelt nur noch Werte der alten Show —
+        weg damit, der Service liefert den vollen Bestand der neuen.
+
+        Ungebunden aufrufen (Stub-Falle, s. ``beam_range_value``)."""
+        gen = int(self.__dict__.get("_show_gen") or 0) + 1
+        self._show_gen = gen
+        VisualizerBridge._poll_clear_dmx(self)
+        VisualizerBridge._poll_set(self, "showGen", gen)
+        return gen
 
     def _poll_antwort_abschliessen(self, out: dict) -> str:
         """Gemeinsamer Schluss von :meth:`pollControl` und
@@ -2321,6 +2349,12 @@ class VisualizerBridge(QObject):
 
     def _on_state(self, event: str, data):
         if event == "show_loaded":
+            # Review VIZ-71: zuerst die Show-Generation, damit schon der erste
+            # Batch der neuen Show sie traegt.
+            try:
+                VisualizerBridge._neue_show_generation(self)
+            except Exception as e:                       # noqa: BLE001
+                print(f"[Visualizer] Show-Generation: {e}")
             # VIZ-59: nur MELDEN, nicht selbst nachziehen. Was zu tun ist, weiss
             # der Besitzer der Bridge: das Vollfenster macht es laengst in seinem
             # eigenen _on_state, die Visualizer3DView haengt sich an dieses
