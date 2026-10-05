@@ -13,7 +13,6 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | DOC-14 | C | fix/doc14-schaukasten-19 | 2026-10-01T21:37Z | tools/build_vc_widgets_showcase.py · docs/anleitung_vc_widgets/README.md · docs/anleitung_vc_widgets/_capture/geometry.json · tests/test_doc14_schaukasten_alle_typen.py · changelog.d/2026-10-02-DOC-14.md |
-| XPLAT-44 | C | docs/xplat44-data-cwd | 2026-10-02T09:21Z | BACKLOG.md |
 | DOC-23 | C | - | 2026-10-02T10:20Z | docs/anleitung_erste_schritte/ANLEITUNG.en.md · docs/anleitung_erste_schritte/ANLEITUNG.md · docs/ANLEITUNGEN.md · changelog.d/2026-10-02-DOC-23.md |
 | DOC-24 | C | - | 2026-10-02T10:21Z | docs/anleitung_programmer_grundlagen/ANLEITUNG.en.md · docs/anleitung_programmer_grundlagen/ANLEITUNG.md · docs/ANLEITUNGEN.md · changelog.d/2026-10-02-DOC-24.md |
 | DOC-25 | C | - | 2026-10-02T10:23Z | docs/anleitung_szenen_cues/ANLEITUNG.en.md · docs/anleitung_szenen_cues/ANLEITUNG.md · docs/ANLEITUNGEN.md · changelog.d/2026-10-02-DOC-25.md |
@@ -57,6 +56,7 @@
 | SAMMEL-DOKU-C | A | sammel/doku-c | 2026-10-02T22:08Z | docs · BACKLOG.md |
 | VIZ-78 | A | perf/viz78-liveview-zeichnen | 2026-10-05T14:32Z | - |
 | BACKLOG-0510b | A | docs/entscheidungen-0510 | 2026-10-05T15:47Z | BACKLOG.md |
+| XPLAT-44 | A | fix/xplat44-datenort | 2026-10-05T16:00Z | - |
 
 ## Blocker & Fallen
 
@@ -165,8 +165,6 @@
 
 ## Verlauf
 
-- 2026-10-04T19:01Z A claim FM-63
-- 2026-10-04T19:18Z A done FM-59
 - 2026-10-04T19:43Z A done VIZ-69
 - 2026-10-04T20:23Z A done FM-61
 - 2026-10-04T20:44Z A claim OUT-63
@@ -195,3 +193,5 @@
 - 2026-10-05T15:13Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-05T15:47Z A claim BACKLOG-0510b
 - 2026-10-05T16:00Z A done VIZ-77
+- 2026-10-05T16:00Z A uebernimmt XPLAT-44 von C (Claim verfallen)
+- 2026-10-05T16:00Z A claim XPLAT-44
