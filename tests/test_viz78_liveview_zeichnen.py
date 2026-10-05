@@ -493,6 +493,17 @@ class SteckbriefTest(unittest.TestCase):
         self.c._steckbrief(fx)
         self.assertEqual(self.aufrufe, [1, 1, 1])
 
+    def test_spider_dual_tilt_umschalten_verwirft_steckbrief(self):
+        """Review VIZ-78 #6: get_channels_for_patched haengt auch an
+        ``spider_dual_tilt`` — Umschalten muss sofort wirken (wie vorher),
+        nicht erst nach dem Hoechstalter."""
+        self.c._state.universes = {1: _UniGetAll({})}
+        fx = _fixture(spider_dual_tilt=False)
+        self.c._steckbrief(fx)
+        fx.spider_dual_tilt = True
+        self.c._steckbrief(fx)
+        self.assertEqual(self.aufrufe, [1, 1])
+
     def test_paint_fragt_kanalliste_nicht_je_bild(self):
         """Rot ohne Steckbrief: jedes Bild fragte die Kanalliste mehrfach je Geraet."""
         fx = _fixture()

@@ -1151,7 +1151,9 @@ class StageCanvas(QWidget):
                      "channel_count", "fixture_type", "label",
                      "pan_range_deg", "tilt_range_deg", "pan_zero_dmx",
                      "tilt_zero_dmx", "aim_offset_pan", "aim_offset_tilt",
-                     "invert_pan", "invert_tilt", "swap_pan_tilt")
+                     "invert_pan", "invert_tilt", "swap_pan_tilt",
+                     # get_channels_for_patched schluesselt auch danach
+                     "spider_dual_tilt")
 
     @classmethod
     def _patch_fingerabdruck(cls, f) -> tuple:
