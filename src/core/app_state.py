@@ -5330,17 +5330,23 @@ def _resolve_mode(s, fixture):
     zeigte das 3D-Panel die Form des einen Modus mit den Pixeln des anderen."""
     from sqlalchemy import select
     from .database.models import FixtureMode
+    # ★ UI-74 (Review): Stufe 1 und 2 nehmen den ERSTEN Treffer (nach ID),
+    # nicht ``scalar_one_or_none``. Zwei Modi gleicher Kanalzahl sind normal,
+    # und ein doppelter Modusname liess sich im Editor speichern — beides warf
+    # ``MultipleResultsFound`` mitten im Renderpfad.
     mode = s.execute(
         select(FixtureMode)
         .where(FixtureMode.fixture_id == fixture.fixture_profile_id)
         .where(FixtureMode.name == fixture.mode_name)
-    ).scalar_one_or_none()
+        .order_by(FixtureMode.id)
+    ).scalars().first()
     if not mode:
         mode = s.execute(
             select(FixtureMode)
             .where(FixtureMode.fixture_id == fixture.fixture_profile_id)
             .where(FixtureMode.channel_count == fixture.channel_count)
-        ).scalar_one_or_none()
+            .order_by(FixtureMode.id)
+        ).scalars().first()
     if not mode:
         mode = s.execute(
             select(FixtureMode)
