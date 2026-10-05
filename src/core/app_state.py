@@ -1781,6 +1781,13 @@ class AppState:
                 {u: frozenset(s) for u, s in gm_mask.items()})
         except Exception as e:
             print(f"[AppState] set gm mask error: {e}")
+        # LAS-24: Laser ohne Dimmer/Farbe — bei GM 0 Betriebsart auf „aus“.
+        try:
+            setze_aus = getattr(self.output_manager, "set_gm_laser_aus_mask", None)
+            if setze_aus is not None:
+                setze_aus(self._build_gm_laser_aus_mask(fix_index))
+        except Exception as e:
+            print(f"[AppState] set gm laser mask error: {e}")
         # OUT-57: Blackout-ERHALTEN-Maske — nur Position/Gobo/Prisma/Optik gepatchter
         # Lampen mit echtem Dimmer bleiben beim Blackout stehen, alles andere geht
         # auf 0 (auch ungepatchte Roh-Adressen im selben Universum).
@@ -4704,6 +4711,81 @@ class AppState:
             for addr in self._fixture_intensity_addrs(fx, chans):
                 addrs.add(addr)
         return gm_mask
+
+    # LAS-24: Kanaele, ueber die ein Laser OHNE Dimmer-/Farbkanal „aus“ geht —
+    # die Betriebsart (``shutter``: SH-LASER3W „Laser off“, L2600 „Aus“) bzw.
+    # ein Programmwahl-Kanal (``macro``), sofern das Profil dort einen
+    # Aus-Bereich belegt.
+    _GM_LASER_AUS_ATTRS = ("shutter", "macro")
+    _GM_LASER_AUS_WOERTER = ("laser off", "laser aus", "blackout", "aus", "off")
+
+    @classmethod
+    def _laser_aus_wert(cls, ch) -> int | None:
+        """LAS-24: der „aus“-Wert EINES Kanals aus den Profil-Bereichen.
+
+        1. ein Bereich der Art ``closed`` -> dessen Untergrenze;
+        2. sonst ein Bereich, dessen NAME „aus/off/blackout“ sagt (ZQB370:
+           „Laser Off“ ohne Art) -> Untergrenze;
+        3. ohne jede Bereichsangabe: am ``shutter`` 0 (Laser-Konvention, wie der
+           NOT-AUS), am ``macro`` NICHTS (dort ist 0 oft ein Auto-Programm).
+        """
+        attr = (getattr(ch, "attribute", "") or "").lower()
+        ranges = list(getattr(ch, "ranges", None) or ())
+        def _von(rg):
+            try:
+                return max(0, min(255, int(rg.range_from)))
+            except (TypeError, ValueError):
+                return None
+        for rg in ranges:
+            if (getattr(rg, "kind", "") or "").lower() == "closed":
+                v = _von(rg)
+                if v is not None:
+                    return v
+        import re
+        for rg in ranges:
+            name = (getattr(rg, "name", "") or "").lower()
+            if any(re.search(r"\b" + re.escape(w) + r"\b", name)
+                   for w in cls._GM_LASER_AUS_WOERTER):
+                v = _von(rg)
+                if v is not None:
+                    return v
+        if not ranges and attr == "shutter":
+            return 0
+        return None
+
+    def _build_gm_laser_aus_mask(self, fix_index) -> dict[int, dict[int, int]]:
+        """LAS-24: ``{universum: {adresse: aus_wert}}`` fuer DMX-Laser, die der
+        Grand Master sonst gar nicht erreicht (kein Dimmer, keine additive Farbe
+        -> leere Eintraege in :meth:`_build_gm_mask`).
+
+        Ein Laser laesst sich ueber seine Betriebsart nicht stufenlos dimmen —
+        bei GM ~0 zieht der Sende-Pfad diese Adressen deshalb auf ihren
+        „aus“-Wert (``OutputManager.GM_LASER_AUS_SCHWELLE``), darueber bleiben
+        sie unveraendert. Laser MIT Dimmer/Farbe dimmt der GM schon regulaer.
+        Kein belegbarer Aus-Kanal -> kein Eintrag (nicht raten)."""
+        out: dict[int, dict[int, int]] = {}
+        for _fid, (fx, chans) in fix_index.items():
+            if not fixture_uses_dmx(fx):
+                continue
+            is_laser = ((getattr(fx, "fixture_type", "") or "").lower() == "laser"
+                        or any((getattr(ch, "attribute", "") or "").startswith("laser_")
+                               for ch in chans))
+            if not is_laser or self._fixture_intensity_addrs(fx, chans):
+                continue
+            for ch in chans:
+                attr = (getattr(ch, "attribute", "") or "").lower()
+                if attr not in self._GM_LASER_AUS_ATTRS:
+                    continue
+                wert = self._laser_aus_wert(ch)
+                if wert is None:
+                    continue
+                try:
+                    addr = int(fx.address) + int(ch.channel_number) - 1
+                except (TypeError, ValueError):
+                    continue
+                if 1 <= addr <= 512:
+                    out.setdefault(fx.universe, {})[addr] = wert
+        return out
 
     def _build_blackout_keep_mask(self, fix_index) -> dict[int, set]:
         """OUT-57: Blackout-ERHALTEN-Maske pro gepatchtem DMX-Universum — die

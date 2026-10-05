@@ -167,6 +167,11 @@ def _kopf_schluessel(h):
 
 
 class OutputManager:
+    #: LAS-24: unterhalb dieses Grand-Master-Werts gelten Laser ohne Dimmer als
+    #: „aus“ (Betriebsart auf den Aus-Wert). Darueber sind sie unveraendert an —
+    #: eine Betriebsart laesst sich nicht stufenlos skalieren.
+    GM_LASER_AUS_SCHWELLE = 0.01
+
     def __init__(self):
         self.universes: dict[int, Universe] = {}
         self._enttec_outputs: dict[int, EnttecPro] = {}   # universe → device
@@ -216,6 +221,11 @@ class OutputManager:
         # fallen auf "alle Kanaele" zurueck, damit reine Roh-DMX-Setups weiter
         # global dimmen. {universe:int -> frozenset[addr 1..512]}
         self._gm_address_mask: dict[int, frozenset] = {}
+        # LAS-24: DMX-Laser ohne Dimmer/Farbe erreicht die GM-Skalierung nicht.
+        # {universe -> {addr: aus_wert}} — bei GM unter GM_LASER_AUS_SCHWELLE
+        # wird jede Adresse auf ihren „aus“-Wert (Betriebsart „Laser off“)
+        # gezogen. Vom AppState aus dem Patch gepflegt.
+        self._gm_laser_aus_mask: dict[int, dict] = {}
         # OUT-57: Adressen je Universum, die der BLACKOUT STEHEN LAESST (Erhalten-
         # Maske) — nur Pan/Tilt/Gobo/Prisma/Optik gepatchter Lampen mit echtem
         # Dimmer (s. AppState._build_blackout_keep_mask), damit Moving Heads beim
@@ -294,6 +304,14 @@ class OutputManager:
         (Intensitaet/Farbe). Pan/Tilt/Gobo etc. bleiben unberuehrt. Vom AppState
         aus dem Patch gepflegt."""
         self._gm_address_mask = mask or {}
+
+    def set_gm_laser_aus_mask(self, mask: dict[int, dict]):
+        """LAS-24: je Universum ``{adresse: aus_wert}`` der Laser ohne Dimmer-/
+        Farbkanal. Bei Grand Master < ``GM_LASER_AUS_SCHWELLE`` setzt der
+        Sende-Pfad diese Adressen NACH Channel-Modifier und GM-Skalierung auf
+        ihren Aus-Wert (ein INVERSE-Modifier kann den Laser so nicht wieder
+        einschalten). Vom AppState aus dem Patch gepflegt."""
+        self._gm_laser_aus_mask = {u: dict(m) for u, m in (mask or {}).items()}
 
     def set_blackout_keep_mask(self, mask: dict[int, frozenset]):
         """OUT-57: Setzt je Universum die Adressen, die der Blackout STEHEN LAESST
@@ -587,7 +605,8 @@ class OutputManager:
             masken = (self._gm_address_mask, self._blackout_keep_mask,
                       getattr(self, "_ziel_blackout_union", None),
                       self._laser_estop_mask,
-                      getattr(self, "_laser_adressen", {}) or {})   # OUT-61b
+                      getattr(self, "_laser_adressen", {}) or {},   # OUT-61b
+                      getattr(self, "_gm_laser_aus_mask", {}) or {})  # LAS-24
             self._lade = (frames, masken)        # eine Zuweisung = atomar
         self._lade_tiefe += 1
         try:
@@ -1076,9 +1095,15 @@ class OutputManager:
         lade = self._lade                        # EINMAL lesen (Review A zu #927)
         gefroren = lade[0] if lade is not None else self._freeze_frames
         if lade is not None:
-            gm_masken, keep_masken, ziel, estop_start, laser_start = lade[1]
+            gm_masken, keep_masken, ziel, estop_start, laser_start = lade[1][:5]
+            # LAS-24: Laser-Aus-Maske vom Ladebeginn (im Lade-Fenster ist der
+            # Plan leer, die Live-Maske also auch) — vereinigt mit der Live-Maske.
+            laser_aus_masken = dict(lade[1][5]) if len(lade[1]) > 5 else {}
+            for _u, _m in (getattr(self, "_gm_laser_aus_mask", {}) or {}).items():
+                laser_aus_masken[_u] = {**laser_aus_masken.get(_u, {}), **_m}
         else:
             gm_masken, keep_masken = self._gm_address_mask, self._blackout_keep_mask
+            laser_aus_masken = getattr(self, "_gm_laser_aus_mask", {}) or {}
             estop_start = None
             laser_start = None
             ziel = getattr(self, "_ziel_blackout_union", None)
@@ -1131,6 +1156,17 @@ class OutputManager:
                     for addr in mask:
                         if 1 <= addr <= 512:
                             buf[addr - 1] = min(255, int(buf[addr - 1] * gm + 0.5))
+                    data = bytes(buf)
+                # LAS-24: Laser ohne Dimmer/Farbe kennt keine Zwischenstufe —
+                # bei GM ~0 Betriebsart/Shutter auf „aus“. Laeuft NACH dem
+                # Channel-Modifier (ein INVERSE darf den Laser nicht oeffnen).
+                aus = laser_aus_masken.get(univ_num)
+                if aus and gm < self.GM_LASER_AUS_SCHWELLE:
+                    buf = bytearray(data)
+                    n = len(buf)
+                    for addr, wert in aus.items():
+                        if 1 <= addr <= n:
+                            buf[addr - 1] = wert
                     data = bytes(buf)
             # VCB-11: gezielte Blackouts (VC-Tasten mit Ziel) NACH dem Grand-Master
             # — nur die Licht-Kanaele ihrer Ziel-Geraete auf 0, der Rest laeuft

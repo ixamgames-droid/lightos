@@ -152,6 +152,26 @@ Hat dein Laser eine Netzwerk-Ausgabe (Ether Dream / IDN), erscheint zusätzlich:
   bereithalten.
 - Ein Show-Load schaltet automatisch auf **unscharf** zurück.
 
+### Grand Master und Laser
+
+- Ein Laser **mit** Dimmer- oder Farbkanal wird vom **Grand Master** ganz
+  normal mitgedimmt.
+- Ein Laser **ohne** Dimmer (z. B. SH-LASER3W, ZQB370 — nur ein Kanal
+  „Betriebsart“ bzw. „Laser An/Aus“) lässt sich **nicht stufenlos dimmen**.
+  Der Grand Master **schaltet ihn bei 0 % aus**: die Betriebsart geht auf den
+  Wert „Laser aus“ aus dem Geräteprofil. Zwischen 1 % und 100 % läuft der Laser
+  unverändert weiter.
+- Kennt das Profil keinen Aus-Wert (keine Bereiche am Betriebsart-Kanal), wird
+  der Shutter-Kanal auf 0 gezogen; ein Programmwahl-Kanal ohne „Aus“-Bereich
+  bleibt unangetastet. Verlässlich aus ist ein Laser nur mit dem **NOT-AUS**.
+
+### Laser-EFX (Bewegung)
+
+- Ein EFX bewegt bei Lasern die Achsen **„X-Bewegung“/„Y-Bewegung“**
+  (`laser_x`/`laser_y`) statt Pan/Tilt. Diese Zuordnung wird in der Show-Datei
+  mitgespeichert; der Show-Check (`tools/lint_show.py`) warnt, wenn ein EFX auf
+  ein Gerät zeigt, das keine der beiden Achsen hat.
+
 ---
 
 ### Siehe auch

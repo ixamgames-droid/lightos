@@ -36,6 +36,7 @@ After starting, LightOS opens in the **Bühne** (stage) section. From top to bot
    `Hilfe` (Help). Saving and opening (step 7) and the output settings live here.
 2. **Section bar** — the eight work areas of LightOS, see step 2.
 3. **GM** — the grand master. It controls the overall brightness from 0 to 100 %.
+   Lasers without a dimmer channel are not dimmed gradually; they are switched off at 0 %.
 4. **TAP** — tap the tempo. According to its tooltip: one tap sets the beat to "now", four
    taps in time set the tempo.
 5. **STOP ALL** — stops everything that is running: cue lists on all pages and all started
