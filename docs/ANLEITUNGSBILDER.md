@@ -255,6 +255,10 @@ venv/bin/python -c "import sys; sys.path.insert(0, 'tools'); from anleitungsbild
   anderen bleiben offscreen gebaut und unverändert. Das 3D-Fenster braucht beim Start
   rund 20 s, bis die Szene steht. Beispiel: `05_blackout_links_3d.gif` in
   `szenen_vc_widgets.py` (Visualizer öffnen, Kamera setzen, nur die 3D-Fläche aufnehmen).
+  Eine ganze Anleitung nur aus 3D-Szenen ist `szenen_3d_buehne.py`: sie baut eine
+  Doku-Bühne in der Sandbox, öffnet den Visualizer einmal und nimmt den Inhalt des
+  Visualizer-Fensters ohne Fensterrahmen auf (`QWidget.grab`, die WebGL-Fläche wird
+  eigens eingesetzt; ein offenes Menü wird als eigenes Bild an seiner Stelle eingefügt).
 - **Audio:** In der Sandbox gibt es keine Audio-Geräte. Bilder der BPM-Erkennung
   zeigen deshalb den manuellen Modus.
 - Die Statusleiste zeigt „Enttec: nicht gefunden", weil die Sandbox nur einen
