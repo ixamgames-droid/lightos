@@ -45,8 +45,8 @@ Der Dialog **Ausgabe konfigurieren** hat fünf Reiter: **Enttec Pro USB**, **Art
 - **Reiter Universen** (Schritt 5): alle Universen in einer Tabelle, mit einem Klick
   speichern und anwenden.
 
-Beide schreiben in dieselbe Datei `data/universes.json` im LightOS-Ordner, du kannst sie
-also mischen. Beim nächsten Start richtet LightOS die dort gespeicherten Ausgänge
+Beide schreiben in dieselbe Datei `universes.json` im LightOS-Datenordner
+(Windows `%APPDATA%\LightOS`, Linux `~/.local/share/LightOS`), du kannst sie also mischen. Beim nächsten Start richtet LightOS die dort gespeicherten Ausgänge
 automatisch wieder ein. **Schließen** beendet den Dialog; danach aktualisiert LightOS
 die Statusleiste.
 
@@ -137,7 +137,7 @@ Jede Zeile ist ein Universum: **#** (1–32), **Name** (frei wählbar) und:
    Art-Net `#` minus 1, sACN `#`.
 4. **+ Universe hinzufügen** — neue Zeile (höchstens 32). **Löschen** entfernt die
    markierten Zeilen aus der Tabelle; wirksam wird das erst mit **Speichern**.
-5. **Speichern** — schreibt `data/universes.json` und wendet die Konfiguration
+5. **Speichern** — schreibt `universes.json` (im LightOS-Datenordner) und wendet die Konfiguration
    **sofort** an, ohne Neustart. Zur Bestätigung zeigt LightOS den Pfad der Datei.
 
 Beim Speichern prüft LightOS die Tabelle und meldet sich, wenn

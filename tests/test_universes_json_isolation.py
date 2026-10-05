@@ -111,8 +111,10 @@ class UniversesJsonIsolationTest(unittest.TestCase):
         # sehen, ob `apply_output_config()` OHNE Pfadargument sie findet.
         from src.core.app_state import AppState
         quelle = __import__("inspect").getsource(AppState.apply_output_config)
-        self.assertIn("LIGHTOS_UNIVERSES_JSON", quelle,
-                      "die Leseseite kennt die Umlenkung nicht")
+        # XPLAT-44: beide Seiten loesen ueber ``paths.user_data_file`` auf,
+        # das die Umlenkung kennt.
+        self.assertIn('_user_data_file("universes.json")', quelle,
+                      "die Leseseite loest nicht ueber paths.user_data_file auf")
         self.assertNotIn('path: str = "data/universes.json"', quelle,
                          "der fest verdrahtete Default ist zurueck")
 

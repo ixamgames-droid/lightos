@@ -598,8 +598,10 @@ class MidiView(QWidget):
 
     def _save_mappings(self):
         # QA-50: Haken nur bei geprueftem Erfolg.
-        if self._mapper.save("data/midi_mappings.json"):
-            self._append_log("✓ Mappings gespeichert: data/midi_mappings.json")
+        from src.core.paths import user_data_file
+        pfad = user_data_file("midi_mappings.json")
+        if self._mapper.save(pfad):
+            self._append_log(f"✓ Mappings gespeichert: {pfad}")
         else:
             self._append_log("✗ Mappings NICHT gespeichert — s. Terminal-Ausgabe")
 
@@ -612,7 +614,8 @@ class MidiView(QWidget):
         Liste ueber die noch vollstaendige Datei. Aus einem Lesefehler wurde so
         ein Schreibverlust, ohne dass je ein Fehler zu sehen war.
         """
-        geladen = self._mapper.load("data/midi_mappings.json")
+        from src.core.paths import user_data_file
+        geladen = self._mapper.load(user_data_file("midi_mappings.json"))
         self._refresh_map_table()
         if geladen:
             self._append_log("✓ Mappings geladen")

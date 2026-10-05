@@ -361,7 +361,7 @@ docs/                     Anleitungen, Referenz, Design- und Audit-Dokumente
 tools/                    Show-Generatoren, Test-Gate, Doku- und Prüfwerkzeuge
 tests/                    Testsuite (headless)
 examples/                 Beispiel-Skripte (teils auf ein bestimmtes Rig zugeschnitten)
-data/, shows/             Laufzeitdaten (bis auf Controller-Bibliothek und einige Demo-Shows nicht im Repo)
+data/, shows/             Mitgeliefert: Controller-Bibliothek, Demo-Shows (Nutzerdaten liegen im App-Datenordner)
 ```
 
 ### Weiterführend

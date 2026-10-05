@@ -66,11 +66,10 @@ _PFAD_AUFRUFE = {
 }
 
 #: Bewusst CWD-relativ — ``(Datei relativ zu tools/, Aufruf)`` -> Grund.
-_AUSNAHMEN = {
-    ("anleitungsbilder/sandbox.py", "os.path.join('data', 'midi_mappings.json')"):
-        "spiegelt den Pfad, den die App selbst CWD-relativ benutzt "
-        "(src/ui/views/midi_view.py) — die Sandbox meldet, wo die App schreibt",
-}
+# XPLAT-44: die einzige Ausnahme (Sandbox spiegelte den CWD-relativen
+# ``data/midi_mappings.json`` der App) ist weg — die App benutzt den
+# App-Datenordner, die Sandbox fragt ``paths.user_data_file`` ab.
+_AUSNAHMEN: dict = {}
 
 
 def _ist_repo_relativ(wert):

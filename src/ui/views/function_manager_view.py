@@ -527,7 +527,8 @@ class FunctionManagerView(QWidget):
                 midi_out=MidiOutFeedback(message_type="cc" if is_cc else "note"),
             )
             mapper.add_mapping(mapping)
-            mapper.save("data/midi_mappings.json")
+            from src.core.paths import user_data_file
+            mapper.save(user_data_file("midi_mappings.json"))
             kind = "CC" if is_cc else "Note"
             QMessageBox.information(
                 self, "MIDI gelernt",

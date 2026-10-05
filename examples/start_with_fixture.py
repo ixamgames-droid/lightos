@@ -63,7 +63,8 @@ else:
 # Channel-Modifier laden (Curves pro DMX-Channel)
 try:
     from src.core.engine.channel_modifier import get_modifier_manager
-    get_modifier_manager().load("data/channel_modifiers.json")
+    from src.core.paths import user_data_file   # XPLAT-44: App-Datenordner
+    get_modifier_manager().load(user_data_file("channel_modifiers.json"))
     n = len(get_modifier_manager().all())
     if n:
         print(f"Channel-Modifier geladen: {n}")
@@ -115,8 +116,9 @@ try:
         # Mappings laden + global zuweisen
         if not hasattr(state, "midi_mapper"):
             state.midi_mapper = MidiMapper(state)
-        if os.path.exists("data/midi_mappings.json"):
-            state.midi_mapper.load("data/midi_mappings.json")
+        from src.core.paths import user_data_file
+        if os.path.exists(user_data_file("midi_mappings.json")):
+            state.midi_mapper.load(user_data_file("midi_mappings.json"))
             print(f"MIDI-Mappings geladen: {len(state.midi_mapper.get_mappings())} aktiv")
     else:
         print(f"APC mini nicht gefunden. Verfuegbar: {ports}")
