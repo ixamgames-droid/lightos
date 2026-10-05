@@ -89,6 +89,57 @@ def _has_own_color(attrs: dict[str, int], suffix: str = "") -> bool:
                          "color_a", "color_uv"))
 
 
+# VIZ-77: Gobo-Stil und Prisma-Facetten haengen NUR von der Kanalliste (Ranges
+# des Profils) und dem einen DMX-Wert ab — die Range-Suche lief aber bei jedem
+# Neubau ueber alle Kanaele und Ranges (gemessen ~25 % des Payload-Baus bei
+# Mega Arena). Gemerkt je Kanallisten-OBJEKT: ein Profil-Edit leert den
+# Kanal-Cache (``clear_channel_cache``) und liefert eine neue Liste, deren
+# Merkzettel leer beginnt. Die Liste selbst wird mitgehalten, damit ihre
+# ``id`` nicht an ein anderes Objekt weiterwandert.
+_KANAL_MEMO: dict[int, tuple] = {}
+_KANAL_MEMO_MAX = 512
+
+
+def _kanal_memo(channels) -> dict | None:
+    if not channels:
+        return None
+    e = _KANAL_MEMO.get(id(channels))
+    if e is not None and e[0] is channels:
+        return e[1]
+    if len(_KANAL_MEMO) >= _KANAL_MEMO_MAX:
+        _KANAL_MEMO.clear()
+    d: dict = {}
+    _KANAL_MEMO[id(channels)] = (channels, d)
+    return d
+
+
+def _gobo_style_gemerkt(attrs: dict, channels) -> str | None:
+    memo = _kanal_memo(channels)
+    if memo is None:
+        return _gobo_style(attrs, channels)
+    k = ("gobo", attrs.get("gobo_wheel"), attrs.get("gobo"))
+    try:
+        return memo[k]
+    except KeyError:
+        v = memo[k] = _gobo_style(attrs, channels)
+        return v
+    except TypeError:                      # unhashbarer Wert (Attrappe)
+        return _gobo_style(attrs, channels)
+
+
+def _prism_facets_gemerkt(attrs: dict, channels) -> int | None:
+    memo = _kanal_memo(channels)
+    if memo is None:
+        return _prism_facets(attrs, channels)
+    k = ("prism", attrs.get("prism"))
+    try:
+        return memo[k]
+    except KeyError:
+        v = memo[k] = _prism_facets(attrs, channels)
+        return v
+    except TypeError:
+        return _prism_facets(attrs, channels)
+
 
 def _gobo_style(attrs: dict, channels) -> str | None:
     """Muster-Stil des gerade gewaehlten Gobos ("" = offen/kein Muster).
@@ -269,14 +320,14 @@ def _build_fixture_payload(fixture, attrs: dict[str, int],
     # die Zuordnung Wert -> Range-Name -> Muster ist datengetrieben und lebt
     # schon in gobo_icons (dieselbe Quelle wie die 2D-Kacheln im Programmer).
     # Waere der Rohwert gewandert, muesste JS die Ranges des Profils kennen.
-    _gobo = _gobo_style(attrs, channels)
+    _gobo = _gobo_style_gemerkt(attrs, channels)
     if _gobo is not None:
         payload["gobo"] = _gobo
     # VIZ-PRISMA-3D: aus EINEM Strahl werden mehrere. Auch hier wandert die
     # fertige Facetten-ZAHL nach JS, nicht der Rohwert (Begruendung an
     # _prism_facets). Die Drehung dagegen ist ein reiner Winkel und geht roh
     # mit — dort gibt es keine Profil-Zuordnung aufzuloesen.
-    _prism = _prism_facets(attrs, channels)
+    _prism = _prism_facets_gemerkt(attrs, channels)
     if _prism is not None:
         payload["prism"] = _prism
         if "prism_rotation" in attrs:
@@ -339,6 +390,58 @@ def _build_fixture_payload(fixture, attrs: dict[str, int],
 _MULTIHEAD_BASES = ("color_r", "pan", "tilt")
 
 
+def _attr_layout(address: int, channels) -> tuple[tuple, int, int]:
+    """VIZ-77: welche Frame-Bytes ein Geraet liest — ``((attr_key, index), …)``
+    plus der Ausschnitt ``[lo, hi)``, den diese Indizes ueberspannen.
+
+    Dieselbe Vergabe wie ``VisualizerService._collect_attrs`` (Kopf 0 =
+    ``attr``, Kopf N = ``attr#N``; Kanaele ausserhalb 1..512 fallen weg) —
+    beide nutzen diese Funktion, damit sie nicht auseinanderlaufen."""
+    layout = []
+    seen: dict[str, int] = {}
+    for ch in channels:
+        dmx_addr = address + ch.channel_number - 1
+        if 1 <= dmx_addr <= 512:
+            a = ch.attribute
+            h = seen.get(a, 0)
+            seen[a] = h + 1
+            layout.append((a if h == 0 else f"{a}#{h}", dmx_addr - 1))
+    if not layout:
+        return (), 0, 0
+    idx = [i for _k, i in layout]
+    lo = min(idx)
+    hi = max(idx) + 1
+    return tuple((k, i - lo) for k, i in layout), lo, hi
+
+
+# VIZ-77: diese State-Events aendern nachweislich KEINE Eingabe des Payloads.
+# Der Programmer (und sein Verlauf) wirkt nur ueber den DMX-Frame, und genau
+# der steckt Byte fuer Byte im Cache-Schluessel. Ein Fader- oder XY-Pad-Zug
+# feuert ``programmer_changed`` bei jeder Bewegung — als Invalidierung haette
+# er den Cache genau dann leergefegt, wenn er am meisten bringt. JEDES andere
+# Event (auch ein kuenftiges, hier unbekanntes) leert den Cache: lieber einmal
+# zu viel bauen als ein Geraeteattribut verpassen.
+_PAYLOAD_NEUTRAL_EVENTS = frozenset({
+    "programmer_changed", "programmer_verlauf_changed", "hinweis",
+    "show_saved", "cue_recorded",
+})
+
+
+def _fixture_ident(fixture) -> tuple:
+    """VIZ-77: alle Geraete-Felder, die der Payload liest — direkt oder ueber
+    ``get_channels_for_patched`` (Profil/Modus/Kanalzahl/Spider) und
+    ``unapply_pan_tilt_orientation`` (invert/swap). Steht als Teil des
+    Cache-Schluessels da, damit eine Aenderung auch OHNE Event greift."""
+    g = getattr
+    return (g(fixture, "address", None), g(fixture, "universe", None),
+            bool(g(fixture, "invert_pan", False)),
+            bool(g(fixture, "invert_tilt", False)),
+            bool(g(fixture, "swap_pan_tilt", False)),
+            g(fixture, "fixture_profile_id", None), g(fixture, "mode_name", None),
+            g(fixture, "channel_count", None),
+            bool(g(fixture, "spider_dual_tilt", False)))
+
+
 def _multihead_count(attrs: dict[str, int]) -> int:
     mx = 0
     for key in attrs:
@@ -389,6 +492,21 @@ class VisualizerService:
         # Poll-Rueckfall nebeneinander laufen: die Antworten reisen ueber zwei
         # verschiedene IPC-Wege und koennen sich ueberholen.
         self._seq = 0
+        # VIZ-77 Payload-Cache je Geraet: {fid: (fixture, channels, ident,
+        # layout, ausschnitt_bytes, payload)}. Ein Treffer verlangt dasselbe
+        # Geraete-Objekt, dasselbe Kanal-Objekt (ein Profil-Edit leert den
+        # Kanal-Cache und liefert eine NEUE Liste), dieselben Geraete-Felder
+        # (``_fixture_ident``) und Byte-gleichen Ausschnitt des Display-Frames.
+        # Geleert wird er bei jedem nicht-neutralen State-Event
+        # (``_payload_rev``), spaetestens nach ``GATE_MAX_SKIPS`` Bauten und
+        # bei jedem Bau, den nur das Sicherheitsnetz der Frame-Sperre erzwingt.
+        self._payload_cache: dict[int, tuple] = {}
+        self._payload_rev = 0
+        # -1: der erste Bau gilt als voller Bau (Alter 0).
+        self._payload_cache_rev = -1
+        self._payload_cache_age = 0
+        # Zaehler fuer Tests/Messung: Treffer und Neubauten des letzten Baus.
+        self.payload_cache_stats = {"hits": 0, "builds": 0}
 
     # ── Timer-Lazy-Init (Qt-Objekt erst bei Bedarf, damit Tests ohne
     #    QApplication den Service instanzieren koennen) ─────────────────────
@@ -492,8 +610,6 @@ class VisualizerService:
         uebernommen: baut die rohen Attribut-Kanaele fuer EIN Fixture."""
         from src.core.app_state import get_channels_for_patched
 
-        attrs: dict[str, int] = {}
-        seen: dict[str, int] = {}
         universe = self._state.universes[fixture.universe]
         # WYSIWYG: den GESENDETEN Output speisen (POST Grand-Master/Blackout), damit
         # der 3D-Visualizer den echten Output zeigt — bei Blackout also dunkel.
@@ -504,18 +620,28 @@ class VisualizerService:
         if om is not None:
             frame = om.get_display_frame(fixture.universe)
         channels = get_channels_for_patched(fixture)
-        for ch in channels:
-            dmx_addr = fixture.address + ch.channel_number - 1
-            if 1 <= dmx_addr <= 512:
-                a = ch.attribute
-                h = seen.get(a, 0)
-                seen[a] = h + 1
-                key = a if h == 0 else f"{a}#{h}"
-                if frame is not None:
-                    attrs[key] = frame[dmx_addr - 1]
-                else:
-                    attrs[key] = universe.get_channel(dmx_addr)
-        return attrs
+        layout, lo, _hi = _attr_layout(fixture.address, channels)
+        if frame is not None:
+            return {k: frame[lo + i] for k, i in layout}
+        return {k: universe.get_channel(lo + i + 1) for k, i in layout}
+
+    def _frame_bytes(self, u) -> Optional[bytes]:
+        """VIZ-77: der Frame, aus dem ``_collect_attrs`` fuer Universum ``u``
+        liest — Display-Frame, sonst der Rohpuffer am Stueck. ``None``, wenn
+        das Universum keinen ganzen Puffer liefern kann (Test-Attrappen mit
+        nur ``get_channel``): dann baut der Snapshot ohne Cache wie bisher."""
+        om = getattr(self._state, "output_manager", None)
+        if om is not None:
+            frame = om.get_display_frame(u)
+            if frame is not None:
+                return frame
+        get_all = getattr(self._state.universes[u], "get_all", None)
+        if get_all is None:
+            return None
+        try:
+            return get_all()
+        except Exception:
+            return None
 
     def _build_snapshot(self) -> dict[int, dict[str, object]]:
         """Baut den Payload fuer JEDES aktuell platzierte, gepatchte Fixture.
@@ -532,19 +658,69 @@ class VisualizerService:
             from src.core.app_state import get_channels_for_patched
         except Exception:
             get_channels_for_patched = None
+        # VIZ-77: Cache verwerfen, wenn seit dem letzten Bau ein nicht-neutrales
+        # Event kam oder er GATE_MAX_SKIPS Bauten alt ist (Sicherheitsnetz fuer
+        # Aenderungen, die weder Event noch Schluessel sehen).
+        if (self._payload_cache_rev != self._payload_rev
+                or self._payload_cache_age >= self.GATE_MAX_SKIPS):
+            self._payload_cache = {}
+            self._payload_cache_rev = self._payload_rev
+            self._payload_cache_age = 0
+            # Der Gobo-/Prisma-Merkzettel faellt mit: auch er soll das
+            # Sicherheitsnetz nicht ueberdauern.
+            _KANAL_MEMO.clear()
+        else:
+            self._payload_cache_age += 1
+        cache = self._payload_cache
+        neu: dict[int, tuple] = {}
+        frames: dict = {}
+        hits = builds = 0
         for fixture in self._state.get_patched_fixtures():
-            if fixture.fid not in placed:
+            fid = fixture.fid
+            if fid not in placed:
                 continue
-            if fixture.universe not in universes:
+            u = fixture.universe
+            if u not in universes:
                 continue
-            attrs = self._collect_attrs(fixture)
             # Kanal-Objekte (gecached) mitgeben: nur so kennt die Payload-
             # Ableitung Farbrad-Slots und Shutter-Semantik (ChannelRange.kind).
             try:
                 channels = get_channels_for_patched(fixture)
             except Exception:
                 channels = None
-            snapshot[fixture.fid] = _build_fixture_payload(fixture, attrs, channels)
+            if u not in frames:
+                frames[u] = self._frame_bytes(u)
+            frame = frames[u]
+            builds += 1
+            if frame is None or channels is None:
+                # Ohne ganzen Frame bzw. Kanalliste kein Schluessel -> wie bisher.
+                attrs = self._collect_attrs(fixture)
+                snapshot[fid] = _build_fixture_payload(fixture, attrs, channels)
+                continue
+            ident = _fixture_ident(fixture)
+            alt = cache.get(fid)
+            if (alt is not None and alt[0] is fixture and alt[1] is channels
+                    and alt[2] == ident):
+                layout = alt[3]
+            else:
+                alt = None
+                layout = _attr_layout(fixture.address, channels)
+            rel, lo, hi = layout
+            # Ausschnitt EINMAL kopieren und Attribute aus genau dieser Kopie
+            # lesen: Schluessel und Payload stammen so sicher aus denselben Bytes.
+            aus = bytes(frame[lo:hi])
+            if alt is not None and alt[4] == aus:
+                payload = alt[5]
+                builds -= 1
+                hits += 1
+            else:
+                attrs = {k: aus[i] for k, i in rel}
+                payload = _build_fixture_payload(fixture, attrs, channels)
+            neu[fid] = (fixture, channels, ident, layout, aus, payload)
+            snapshot[fid] = payload
+        # Nur Geraete dieses Baus behalten: entfernte/unplatzierte fallen raus.
+        self._payload_cache = neu
+        self.payload_cache_stats = {"hits": hits, "builds": builds}
         return snapshot
 
     def _frame_signature(self) -> Optional[tuple]:
@@ -591,6 +767,12 @@ class VisualizerService:
                 and self._gate_skips < self.GATE_MAX_SKIPS):
             self._gate_skips += 1
             return
+        if sig is not None and sig == self._gate_sig and not needs_full:
+            # VIZ-77: dieser Bau kommt NUR vom Sicherheitsnetz der Sperre
+            # (GATE_MAX_SKIPS Ticks ohne Aenderung). Dann auch den Payload-
+            # Cache verwerfen — sonst wuerde er im Leerlauf erst nach
+            # GATE_MAX_SKIPS solcher Bauten (rund 30 s statt 1 s) geleert.
+            self._payload_cache_age = self.GATE_MAX_SKIPS
         self._gate_sig = sig
         self._gate_skips = 0
         snapshot = self._build_snapshot()
@@ -599,8 +781,11 @@ class VisualizerService:
 
         # Diff ggue. dem service-globalen Cache: nur GEAENDERTE Fixtures.
         changed: dict[int, dict[str, object]] = {}
+        last = self._last_payload
         for fid, payload in snapshot.items():
-            if self._last_payload.get(fid) != payload:
+            alt = last.get(fid)
+            # VIZ-77: ein Cache-Treffer liefert DASSELBE Objekt -> unveraendert.
+            if alt is not payload and alt != payload:
                 changed[fid] = payload
         # Fixtures, die aus dem Snapshot verschwunden sind (unpatched/entfernt),
         # werden hier bewusst NICHT nachgeschickt — das Aufraeumen laeuft ueber
@@ -649,6 +834,7 @@ class VisualizerService:
         if target is None:
             self._last_payload = {}
             self._gate_sig = None
+            self._payload_cache = {}
             for t in self._targets:
                 t.needs_full = True
         else:
@@ -704,6 +890,9 @@ class VisualizerService:
         # VIZ-70: jedes Event macht die Frame-Gate-Signatur ungueltig (siehe
         # ``_frame_signature``) — auch die, die hier sonst nichts ausloesen.
         self._state_rev += 1
+        if event not in _PAYLOAD_NEUTRAL_EVENTS:
+            # VIZ-77: Payload-Cache beim naechsten Bau verwerfen.
+            self._payload_rev += 1
         if event == "show_loaded":
             # VIZ-71 (S4): neue Show -> JEDES Ziel bekommt beim naechsten Tick
             # den vollen Bestand. Die fids der neuen Show koennen dieselben
@@ -738,6 +927,7 @@ class VisualizerService:
             self._timer.stop()
         self._targets.clear()
         self._last_payload = {}
+        self._payload_cache = {}
 
 
 # ── Singleton am AppState (Orchestrator-Entscheidung 5) ─────────────────────
