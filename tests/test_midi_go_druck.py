@@ -47,9 +47,12 @@ class _Ex:
             self.go += 1
         elif btn == 1:
             self.back += 1
+        elif btn == 2:
+            self._flash_active = True
 
     def release_btn(self, btn):
-        pass
+        if btn == 2:
+            self._flash_active = False
 
     def get_output(self):
         return {}
@@ -64,6 +67,20 @@ class _PE:
         return self.executors[slot - 1]
 
 
+class _FM:
+    def __init__(self):
+        self.log = []
+
+    def start(self, fid):
+        self.log.append(("start", fid))
+
+    def stop(self, fid):
+        self.log.append(("stop", fid))
+
+    def is_running(self, fid):
+        return False
+
+
 class _OM:
     grand_master = 1.0
 
@@ -75,6 +92,7 @@ class _State:
     def __init__(self):
         self.playback_engine = _PE()
         self.output_manager = _OM()
+        self.function_manager = _FM()
 
 
 @pytest.fixture
@@ -195,3 +213,39 @@ def test_legacy_flaches_mapping_wird_normalisiert():
                           "action": "executor_go", "param": "1",
                           "button_mode": "toggle"})
     assert m.button_mode == mm.BUTTON_PRESS
+
+
+# ── Zielwechsel weg von GO: "press" darf nicht haengen bleiben ──────────────
+
+def test_normalisierung_press_nur_fuer_go_back():
+    assert mm.normalize_button_mode(mm.ACTION_EXECUTOR_GO, "toggle") == mm.BUTTON_PRESS
+    assert mm.normalize_button_mode(mm.ACTION_EXECUTOR_FLASH, "press") == mm.BUTTON_FLASH
+    assert mm.normalize_button_mode(mm.ACTION_FUNCTION, "press") == mm.BUTTON_TOGGLE
+    # Bewusst gesetzte Modi anderer Ziele bleiben unangetastet.
+    assert mm.normalize_button_mode(mm.ACTION_FUNCTION, "flash") == mm.BUTTON_FLASH
+
+
+def test_go_auf_flash_umgestellt_loest_beim_loslassen(mapper):
+    """Neues Mapping (GO/press), Ziel danach auf Executor-Flash umgestellt."""
+    mp, state = mapper
+    m = mm.MidiMapping(msg_type="note_on", data1=60,
+                       action=mm.ACTION_EXECUTOR_GO, param="1")
+    m.action = mm.ACTION_EXECUTOR_FLASH
+    mp.add_mapping(m)
+    ex = state.playback_engine.get_executor(1)
+    mp._on_midi(MidiMessage("APC", 1, "note_on", 60, 127))
+    assert ex._flash_active is True
+    mp._on_midi(MidiMessage("APC", 1, "note_off", 60, 0))
+    assert ex._flash_active is False
+
+
+def test_go_auf_funktion_umgestellt_stoppt_wieder(mapper):
+    mp, state = mapper
+    m = mm.MidiMapping(msg_type="note_on", data1=61,
+                       action=mm.ACTION_EXECUTOR_GO, param="1")
+    m.action = mm.ACTION_FUNCTION
+    m.param = "5"
+    mp.add_mapping(m)
+    _druecken(mp, 61)
+    _druecken(mp, 61)
+    assert state.function_manager.log == [("start", 5), ("stop", 5)]

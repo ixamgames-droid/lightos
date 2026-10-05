@@ -55,9 +55,17 @@ def _clamp_7bit(value: int) -> int:
 
 
 def normalize_button_mode(action: str, mode: str) -> str:
-    """GO/BACK sind immer Druck-Aktionen; alle anderen Modi bleiben wie sie sind."""
+    """GO/BACK sind immer Druck-Aktionen; alle anderen Modi bleiben wie sie sind.
+
+    Umgekehrt ist ``press`` nur fuer GO/BACK gueltig: wird ein GO-Mapping auf
+    ein anderes Ziel umgestellt (Flash, Funktion ...), faellt der Modus auf die
+    Vorgabe des neuen Ziels zurueck — sonst wuerde ein Flash beim Loslassen nie
+    geloest und eine Funktion nie gestoppt.
+    """
     if action in _PRESS_ONLY_ACTIONS:
         return BUTTON_PRESS
+    if mode == BUTTON_PRESS:
+        return _infer_button_mode(action)
     return mode
 
 

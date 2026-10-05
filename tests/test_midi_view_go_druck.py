@@ -5,6 +5,8 @@ Modus-Spalte getipptes "toggle" wird fuer GO/BACK auf "press" normalisiert.
 """
 from PySide6.QtWidgets import QApplication
 
+import pytest
+
 import src.core.midi.midi_mapper as mm
 from src.ui.views import midi_view as midi_ui
 
@@ -108,3 +110,44 @@ def test_toggle_in_modus_spalte_wird_fuer_go_zu_druck(monkeypatch):
         assert mapper.liste[0].button_mode == mm.BUTTON_FLASH
     finally:
         view.close()
+
+
+@pytest.mark.parametrize("ziel,modus", [
+    ("executor_flash:1", mm.BUTTON_FLASH),
+    ("function:5", mm.BUTTON_TOGGLE),
+])
+def test_neues_mapping_zielwechsel_verlaesst_druck(monkeypatch, ziel, modus):
+    """"Neues Mapping" ist GO/press — ein anderes Ziel bekommt seinen Modus."""
+    view, mapper = _view(monkeypatch)
+    try:
+        view._add_mapping()
+        view._map_table.item(0, 1).setText(ziel)
+        assert mapper.liste[0].button_mode == modus
+        assert view._map_table.item(0, 5).text() == modus
+    finally:
+        view.close()
+
+
+@pytest.mark.parametrize("ziel,modus", [
+    (mm.ACTION_EXECUTOR_FLASH, mm.BUTTON_FLASH),
+    (mm.ACTION_EXECUTOR_GO, mm.BUTTON_PRESS),
+])
+def test_profil_editor_aktionswechsel_normalisiert_modus(monkeypatch, ziel, modus):
+    """Profil-Editor: GO-Zeile per Combo auf Flash umgestellt -> nicht mehr press."""
+    QApplication.instance() or QApplication([])
+    from src.core.input.profile import InputProfile
+    from src.ui.widgets import input_profile_editor as ipe
+
+    monkeypatch.setattr(ipe, "list_profiles", lambda: [])
+    monkeypatch.setattr(InputProfile, "save", lambda self: None)
+    ed = ipe.InputProfileEditor()
+    try:
+        start = mm.ACTION_EXECUTOR_GO if ziel != mm.ACTION_EXECUTOR_GO else mm.ACTION_EXECUTOR_FLASH
+        m = mm.MidiMapping(msg_type="note_on", data1=60, action=start, param="1")
+        ed._profile = InputProfile(name="t", mappings=[m])
+        ed._refresh_table()
+        cb = ed._table.cellWidget(0, 4)
+        cb.setCurrentIndex(cb.findData(ziel))
+        assert (m.action, m.button_mode) == (ziel, modus)
+    finally:
+        ed.close()
