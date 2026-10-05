@@ -57,6 +57,7 @@
 | VIZ-78 | A | perf/viz78-liveview-zeichnen | 2026-10-05T14:32Z | - |
 | BACKLOG-0510b | A | docs/entscheidungen-0510 | 2026-10-05T15:47Z | BACKLOG.md |
 | XPLAT-44 | A | fix/xplat44-datenort | 2026-10-05T16:00Z | - |
+| DOC-60 | A | docs/doc60-buehnenshow-effekte | 2026-10-05T16:18Z | - |
 
 ## Blocker & Fallen
 
@@ -165,7 +166,6 @@
 
 ## Verlauf
 
-- 2026-10-04T19:43Z A done VIZ-69
 - 2026-10-04T20:23Z A done FM-61
 - 2026-10-04T20:44Z A claim OUT-63
 - 2026-10-04T20:44Z A claim VIZ-71
@@ -195,3 +195,4 @@
 - 2026-10-05T16:00Z A done VIZ-77
 - 2026-10-05T16:00Z A uebernimmt XPLAT-44 von C (Claim verfallen)
 - 2026-10-05T16:00Z A claim XPLAT-44
+- 2026-10-05T16:18Z A claim DOC-60
