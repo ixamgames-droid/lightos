@@ -330,6 +330,37 @@ class StufenSzeneTest(unittest.TestCase):
         self.assertAlmostEqual(z["pr"], 1.0 * z["dyn"]["scale"], places=4)
         self.assertEqual(self._bridge_obj.__dict__.get("gemeldet", "low"), "low")
 
+    def test_2d_verschieben_meldet_kamerabewegung(self):
+        """Review-Befund: der 2D-Pan (Maus und Einfinger-Touch ueber
+        ``handlePointerMove``) schiebt ``orthoCam.position`` direkt und lief
+        an ``noteCameraMotion`` vorbei — die dynamische Aufloesung griff beim
+        Verschieben der Draufsicht nie. Getrieben ueber den echten Zeigerpfad."""
+        self._laden("low")
+        # Der Pan rechnet mit der Fenstergroesse; die nie gezeigte
+        # offscreen-Seite ist 0 breit und schwenkt deshalb gar nicht (A3D-41).
+        # Zeigen hilft nicht: danach verliert der Prozess fuer die folgenden
+        # Szenen-Tests seinen WebGL-Kontext. Also die Groesse vorgeben.
+        self._eval("Object.defineProperty(window, 'innerWidth', {value: 800, configurable: true});"
+                   " Object.defineProperty(window, 'innerHeight', {value: 600, configurable: true}); 1")
+        self._eval("window.__lightos.setViewMode('2D'); 1")
+        _pump(0.4)                     # Absenkung des Moduswechsels abklingen lassen
+        self.assertEqual(self._zustand()["dyn"]["scale"], 1)
+        raw = self._eval(
+            "(function(){ const L = window.__lightos; const P = L.__pointerState;"
+            " const vorher = L.view.activeCam.position.x;"
+            " P.dragMode = 'pan'; P.isLeftDragging = true;"
+            " P.lastMouseX = 100; P.lastMouseY = 100;"
+            " L.__handlePointerMove(130, 100);"
+            " const t = performance.now(); while (performance.now() - t < 12) {}"
+            " L.__handlePointerMove(160, 120);"
+            " P.isLeftDragging = false; P.dragMode = 'none';"
+            " return JSON.stringify({ dx: L.view.activeCam.position.x - vorher,"
+            "   dyn: L.dynamicResolutionInfo() }); })()")
+        r = json.loads(raw)
+        self.assertNotEqual(r["dx"], 0, "Testaufbau: die Kamera hat sich nicht bewegt")
+        self.assertLess(r["dyn"]["scale"], 1,
+                        "2D-Verschieben meldet keine Kamerabewegung")
+
     def test_hoch(self):
         self._laden("high")
         z = self._zustand()

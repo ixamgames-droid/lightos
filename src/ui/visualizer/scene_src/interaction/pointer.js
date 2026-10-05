@@ -4,6 +4,9 @@
 import * as THREE from '../three/three.js';
 import { renderer } from '../scene/renderer.js';
 import { rad2deg, deg2rad } from '../scene/renderer.js';
+// VIZ-71: der 2D-Pan schiebt orthoCam direkt (an updateCamera vorbei) und
+// meldet die Bewegung deshalb selbst — wie camera/cameras.js.
+import { noteCameraMotion } from '../scene/renderer.js';
 import { orthoCam, orthoState, updateCamera, viewportAspect } from '../camera/cameras.js';
 import { fixtures, stageObjects, settings, view } from '../state.js';
 import {
@@ -327,6 +330,9 @@ export function handlePointerMove(clientX, clientY, ctrlKey) {
       const wPerPxZ = (2 * orthoState.size) / window.innerHeight;
       orthoCam.position.x -= dx * wPerPxX;
       orthoCam.position.z -= dy * wPerPxZ;
+      // VIZ-71: ohne diese Meldung griff die dynamische Aufloesung beim
+      // Verschieben der Draufsicht nie (Maus und Einfinger-Touch).
+      noteCameraMotion();
     }
   } else if (dragMode === 'fixtureDrag') {
     // Fixture-Koerper ziehen = XZ-Verschieben am Boden (via Raycast -> schon
