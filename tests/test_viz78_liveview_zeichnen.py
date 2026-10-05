@@ -139,8 +139,8 @@ class KachelExaktTest(unittest.TestCase):
             p, kx, "e", LV._ellipse(0, 0, 21.6, 21.6),
             *self._nur_stift(LV._stift(QColor(80, 160, 255, 140), 2,
                                        Qt.PenStyle.DashLine)))
-        _male(fn, 1.0, (60.25, 60.5))
-        _male(fn, 1.0, (60.25, 60.5))
+        for _ in range(LV.KACHEL_AB):
+            _male(fn, 1.0, (60.25, 60.5))
         gebaut = LV._KACHEL_STATS["gebaut"]
         treffer = LV._KACHEL_STATS["treffer"]
         img = _male(fn, 1.0, (110.25, 97.5))       # gleicher Nachkomma-Anteil
@@ -199,6 +199,63 @@ class NichtKachelbarTest(unittest.TestCase):
             p.end()
 
 
+
+class KachelSchwelleTest(unittest.TestCase):
+    """Review VIZ-78 #2: Kachel erst beim dritten gleichen Schluessel."""
+
+    def setUp(self):
+        LV._kacheln_leeren()
+
+    @staticmethod
+    def _bild(farben):
+        """Ein Bild: jede Farbe zweimal (Paar), Fuellung + Glow-Verlauf."""
+        img = QImage(1100, 400, QImage.Format.Format_RGB32)
+        img.fill(0)
+        p = QPainter(img)
+        try:
+            p.setRenderHint(QPainter.RenderHint.Antialiasing)
+            for i, c in enumerate(farben):
+                for k in range(2):
+                    p.save()
+                    p.translate(40 + i * 60, 100 + k * 200)
+                    kx = LV._kachel_kontext(p)
+                    br, bk = LV._pinsel(c)
+                    LV._form(p, kx, "e", LV._ellipse(0, 0, 6, 6), brush=br,
+                             brush_key=bk)
+                    br, bk = LV._verlauf(0, 0, 18, (
+                        (0, c.lighter(160)), (0.7, c),
+                        (1, QColor(c.red(), c.green(), c.blue(), 0))))
+                    LV._form(p, kx, "e", LV._ellipse(0, 0, 18, 18), brush=br,
+                             brush_key=bk)
+                    p.restore()
+        finally:
+            p.end()
+
+    def test_paare_mit_wechselnder_farbe_bauen_keine_kachel(self):
+        rnd = random.Random(3)
+        gebaut = LV._KACHEL_STATS["gebaut"]
+        for _ in range(20):
+            self._bild([QColor(rnd.randrange(256), rnd.randrange(256),
+                               rnd.randrange(256), 200) for _ in range(16)])
+        self.assertEqual(LV._KACHEL_STATS["gebaut"], gebaut)
+        self.assertFalse(LV._KACHELN)
+
+    def test_dritte_gleiche_form_baut_vierte_trifft(self):
+        fn = lambda p, kx: LV._form(  # noqa: E731
+            p, kx, "e", LV._ellipse(0, 0, 9, 9), None,
+            LV._pinsel(QColor(10, 200, 90, 150))[0], None,
+            LV._pinsel(QColor(10, 200, 90, 150))[1])
+        gebaut = LV._KACHEL_STATS["gebaut"]
+        _male(fn, 1.0, (60, 60))
+        _male(fn, 1.0, (60, 60))
+        self.assertEqual(LV._KACHEL_STATS["gebaut"], gebaut)
+        _male(fn, 1.0, (60, 60))
+        self.assertEqual(LV._KACHEL_STATS["gebaut"], gebaut + 1)
+        treffer = LV._KACHEL_STATS["treffer"]
+        _male(fn, 1.0, (60, 60))
+        self.assertEqual(LV._KACHEL_STATS["treffer"], treffer + 1)
+
+
 _TYPEN = ("par", "moving_head", "pixel_head", "par_bar", "mover_bar", "matrix",
           "led_bar", "strobe", "dimmer", "spider", "scanner", "laser", "hazer",
           "other", "unbekannt")
@@ -238,13 +295,14 @@ class FixtureRendererPixelgleichTest(unittest.TestCase):
                         finally:
                             LV._kachel_kontext = orig
                         LV._kacheln_leeren()
-                        self._zeichne(ft, zoom, False, **dict(kw))
+                        for _ in range(LV.KACHEL_AB - 1):
+                            self._zeichne(ft, zoom, False, **dict(kw))
                         a = self._zeichne(ft, zoom, False, **dict(kw))
                         b = self._zeichne(ft, zoom, False, **dict(kw))
                         self.assertTrue(ref == a, "erste Kachel weicht ab")
                         self.assertTrue(ref == b, "Treffer weicht ab")
         LV._kacheln_leeren()
-        for _ in range(2):
+        for _ in range(LV.KACHEL_AB + 1):
             self._zeichne("par", 1.0, False, effects=["X"], anim_phase=0.1)
         self.assertGreater(LV._KACHEL_STATS["treffer"], 0)
         self.assertTrue(LV._KACHELN, "PAR mit Effekt muss Kacheln anlegen")

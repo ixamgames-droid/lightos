@@ -167,11 +167,15 @@ def _text_breite(pt: float, text: str) -> float:
 # Schluessels. Gedrehte/gescherte Painter, Deckkraft != 1, nicht ganzzahlige
 # Umlenkung (gebrochene Pixeldichte) -> direkt wie bisher.
 #
-# Eine Kachel entsteht erst, wenn derselbe Schluessel ZUM ZWEITEN Mal kommt —
-# Einzelstuecke (z. B. eine Farbe, die es nur einmal gibt) kosten so nichts
-# extra.
+# Eine Kachel entsteht erst, wenn derselbe Schluessel ZUM DRITTEN Mal kommt
+# (``KACHEL_AB``). Einzelstuecke und Paare kosten so nichts extra — z. B. ein
+# symmetrischer Chase, bei dem je zwei Geraete eine Farbe teilen, die sich
+# jedes Bild aendert: beim Bau schon beim zweiten Mal wurde dort jede Kachel
+# gebaut, einmal benutzt und nie wieder getroffen (gemessen: doppelt so teuer
+# wie direkt).
 _KACHELN: dict = {}
-_GESEHEN: set = set()
+_GESEHEN: dict = {}                   # Schluessel -> bisherige Vorkommen
+KACHEL_AB = 3
 GESEHEN_MAX = 20_000
 _KACHEL_PIXEL = [0]
 KACHEL_MAX_PIXEL = 4_000_000          # Summe aller Kacheln (~16 MB), dann leeren
@@ -262,12 +266,13 @@ def _form_durchgang(painter: QPainter, kx, art: str, geo: tuple, pen, brush,
     key = (art, geo, schluessel, m11, m22, tdx, tdy, bw, bh)
     img = _KACHELN.get(key)
     if img is None:
-        if key not in _GESEHEN:
-            # Erst beim zweiten Mal bauen; die Merkliste waechst mit jeder
+        n = _GESEHEN.get(key, 0) + 1
+        if n < KACHEL_AB:
+            # Erst beim dritten Mal bauen; die Merkliste waechst mit jeder
             # neuen Farbe (Chase) und wird deshalb eigenstaendig geleert.
-            if len(_GESEHEN) > GESEHEN_MAX:
+            if n == 1 and len(_GESEHEN) > GESEHEN_MAX:
                 _GESEHEN.clear()
-            _GESEHEN.add(key)
+            _GESEHEN[key] = n
             _KACHEL_STATS["direkt"] += 1
             _form_direkt(painter, art, geo, pen, brush)
             return
@@ -283,7 +288,7 @@ def _form_durchgang(painter: QPainter, kx, art: str, geo: tuple, pen, brush,
         finally:
             kp.end()
         _KACHELN[key] = img
-        _GESEHEN.discard(key)
+        _GESEHEN.pop(key, None)
         _KACHEL_PIXEL[0] += bw * bh
         _KACHEL_STATS["gebaut"] += 1
     else:
