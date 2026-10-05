@@ -54,7 +54,6 @@
 | DOC-56 | C | - | 2026-10-02T13:05Z | docs/anleitung_web_remote/ANLEITUNG.md |
 | FM-58 | A | feat/fm58-bibliothek-runde2 | 2026-10-02T18:20Z | fixtures/bibliothek |
 | SAMMEL-DOKU-C | A | sammel/doku-c | 2026-10-02T22:08Z | docs · BACKLOG.md |
-| VIZ-78 | A | perf/viz78-liveview-zeichnen | 2026-10-05T14:32Z | - |
 | XPLAT-44 | A | fix/xplat44-datenort | 2026-10-05T16:00Z | - |
 | DOC-60 | A | docs/doc60-buehnenshow-effekte | 2026-10-05T16:18Z | - |
 | VIZ-79 | A | fix/viz79-laserstrahlen-3d | 2026-10-05T16:59Z | - |
@@ -166,7 +165,6 @@
 
 ## Verlauf
 
-- 2026-10-04T20:44Z A claim VIZ-71
 - 2026-10-04T20:50Z A done DOC-57
 - 2026-10-04T21:06Z A claim DOC-59
 - 2026-10-04T21:18Z A done VIZ-67
@@ -196,3 +194,4 @@
 - 2026-10-05T16:18Z A claim DOC-60
 - 2026-10-05T16:59Z A claim VIZ-79
 - 2026-10-05T17:27Z A done BACKLOG-0510b
+- 2026-10-05T18:13Z A done VIZ-78
