@@ -80,3 +80,23 @@ def test_block_traegt_keine_helligkeit():
     assert p["intensity"] == 0
     assert set(p["laser"]) <= {"x", "y", "sx", "sy", "rot", "form", "dx", "dy",
                                "dz", "dr", "tempo"}
+
+
+def test_partylaser_motor_ist_keine_position():
+    """Review M2: PARTYLASER hat nur einen „Motor"-Kanal auf ``pan`` (kein
+    Tilt). Der Null-Frame darf den Faecher nicht ganz nach links schwenken."""
+    ch = _kanaele(fixture_db._party_laser_modes_data(), "7-Kanal")
+    null = _laser_payload(_fx(), {"macro": 0, "color_r": 0, "color_g": 0,
+                                  "color_b": 0, "shutter": 0, "pan": 0}, ch)
+    assert null.get("x", 0) != -1.0
+    assert "x" not in null and "dr" not in null
+    dreht = _laser_payload(_fx(), {"macro": 0, "color_r": 255, "color_g": 0,
+                                   "color_b": 0, "shutter": 0, "pan": 128}, ch)
+    assert "x" not in dreht
+    assert dreht["dr"] is True and abs(dreht["tempo"] - 128 / 255) < 0.01
+
+
+def test_echte_pan_tilt_achse_bleibt_position():
+    p = _laser_payload(_fx(), {"pan": 0, "tilt": 255}, [])
+    assert p["x"] == -1.0 and p["y"] == 1.0
+    assert "dr" not in p

@@ -299,8 +299,15 @@ def _laser_payload(fixture, attrs: dict, channels) -> dict | None:
         return None
     out: dict[str, object] = {}
     bewegt_selbst = False
+    # Pan/Tilt sind nur dann eine POSITION, wenn das Geraet eine echte Achse hat
+    # — beide Kanaele. Ein einzelner „pan" ist bei Party-Lasern ein Drehmotor
+    # (PARTYLASER: „Motor"); als Position gelesen schwenkte sein Null-Frame den
+    # Faecher ganz nach links (Review VIZ-79, M2).
+    echte_achse = "pan" in attrs and "tilt" in attrs
     for achse, quellen in (("x", ("laser_x", "pan")), ("y", ("laser_y", "tilt"))):
         for q in quellen:
+            if q in ("pan", "tilt") and not echte_achse:
+                continue
             r = _laser_statisch(attrs, channels, q)
             if r is None:
                 continue
@@ -331,6 +338,15 @@ def _laser_payload(fixture, attrs: dict, channels) -> dict | None:
     bank = int(attrs.get("laser_bank") or 0)
     muster = int(attrs.get("gobo_wheel") or 0) if "laser_bank" in attrs else 0
     out["form"] = (bank // 16 + muster) % _LASER_FORMEN
+    motor = None
+    if not echte_achse and "pan" in attrs and "laser_x" not in attrs:
+        # Drehmotor: 0 = steht, mehr = dreht schneller -> Rollen um die Strahlachse.
+        motor = max(0, min(255, int(attrs.get("pan") or 0))) / 255
+        if motor > 0:
+            out["dr"] = True
+            bewegt_selbst = True
+            if "speed" not in attrs:
+                out["tempo"] = round(motor, 4)
     if "speed" in attrs:
         tempo = max(0, min(255, int(attrs.get("speed") or 0))) / 255
         out["tempo"] = round(tempo, 4)

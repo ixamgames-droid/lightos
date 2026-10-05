@@ -137,6 +137,11 @@ export function resyncBeamVisibility(f) {
   if (f.parHeads) for (const ph of f.parHeads) set(ph.beam);
   if (f.moverHeads) for (const mh of f.moverHeads) set(mh.beam);
   if (f.bars) for (const bar of f.bars) { if (bar.beams) for (const bm of bar.beams) set(bm); }
+  // VIZ-79 (Review L2): ob ein bewegter Laser animiert wird, haengt an seiner
+  // Sichtbarkeit — die hat sich hier gerade geaendert (2D<->3D, Kegel aus/an,
+  // beamsOff). Sonst bliebe ein im 2D eingetroffener Bewegungs-Befehl nach dem
+  // Wechsel nach 3D stehen, bis das naechste DMX kommt.
+  noteLaserAnimation(f);
 }
 
 // ── Builders ─────────────────────────────────────────────────────────────────

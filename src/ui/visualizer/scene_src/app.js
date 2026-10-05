@@ -46,7 +46,7 @@ import { attachGizmoToSelection, axisParamUnderPointer } from './interaction/giz
 // A3D-41: Test-Seams fuer die NaN-Guards. Ueber echte Pointer-Events sind sie
 // nicht erreichbar — der Fehlerfall braucht ein Canvas MIT Pointer-Event und
 // OHNE Layout-Groesse, was sich in einem Test nicht per Maus herstellen laesst.
-import { setMouseFromCoords, intersectGround, mouse } from './interaction/picking.js';
+import { setMouseFromCoords, intersectGround, mouse, pickFixture } from './interaction/picking.js';
 import { fabDelete, fabRotate, fabPlace, wireTouchLateBindings } from './interaction/touch.js';
 
 import { getBridge, tryChannel, jsAddStageObject } from './bridge/bridge.js';
@@ -238,6 +238,8 @@ window.__lightos = {
   beamLengthScale,
   // VIZ-79: Laser-Zustand/Pose als Zahlen; optional zu einer festen Zeit t (s).
   laserInfo,
+  // VIZ-79 (Review H1): derselbe Fixture-Pick wie Klick/Hover/Zug.
+  __pickFixture: pickFixture,
   // VIZ-15 Boden-Pools: die Groessen-Rechnung ist rein (Abstand + Zoom-Winkel
   // rein, Skalierung raus), die Textur-Funktion belegt den Grauverlauf —
   // ein 'weiss mit fallendem Alpha' waere im Gruenkanal konstant und der

@@ -69,7 +69,8 @@ def _make_mock_bridge_class():
 
     @Slot(result=str)
     def pollControl(self):
-        return "{}"
+        # Review L1: der Test kann Poll-Zustaende (beamsOff) vorgeben.
+        return getattr(self, "_poll", "{}")
 
     attrs["requestFixtures"] = requestFixtures
     attrs["pollControl"] = pollControl
@@ -421,6 +422,116 @@ class Viz79LaserMusterSceneTest(Viz79LaserStrahlenSceneTest):
                 seq += 1
         self.assertEqual(vorher, self._eval(js),
                          "DMX-Updates haben Geometrien/Materialien neu angelegt")
+
+
+class Viz79ReviewSceneTest(Viz79LaserStrahlenSceneTest):
+    """Review VIZ-79: Picking (H1), Einpassen (M1), Animation (L1/L2)."""
+
+    test_laser_schiesst_lange_sichtbare_strahlen_ins_publikum = None
+    test_laser_hat_keinen_scheinwerferkegel = None
+    test_dunkel_heisst_unsichtbar = None
+    test_kegel_aus_schaltet_auch_laser_aus = None
+
+    def _info(self):
+        return json.loads(self._eval(
+            "JSON.stringify(window.__lightos.laserInfo(%d))" % _FID))
+
+    def _pick_boden(self, z):
+        """Derselbe Fixture-Pick wie Klick/Hover/Zug, auf einen Bodenpunkt
+        (0, 0, z) gezielt. Liefert die getroffene fid oder None."""
+        r = self._eval("""
+        (function(){
+          const L = window.__lightos;
+          const f = L.fixtures['%d'];
+          f.group.updateMatrixWorld(true);
+          L.view.activeCam.updateMatrixWorld();
+          const p = f.group.position.clone().set(0, 0, %r).project(L.view.activeCam);
+          // Bildschirmpunkt direkt als NDC in die geteilte Maus (offscreen hat
+          // das Canvas kein Layout fuer Client-Koordinaten).
+          L.__mouse.set(p.x, p.y);
+          const fid = L.__pickFixture();
+          return (fid === null || fid === undefined) ? 'null' : String(fid);
+        })()""" % (_FID, z))
+        return None if r == "null" else int(r)
+
+    def test_unsichtbare_strahlen_fangen_keinen_klick(self):
+        """H1: three r128 prueft `visible` beim Raycast nicht. Ein Klick 7 m
+        vor dem Laser auf den Boden darf ihn nicht auswaehlen."""
+        self._load_and_wait()
+        self._eval("window.__lightos.setViewMode('3D'); true")
+        self._bauen(_laser())
+        z = -4.6 + 7.0
+        for seq, (inten, form) in enumerate(
+                [(0, 0), (0, 3), (255, 0), (255, 3), (255, 2)], start=1):
+            self._apply([_gruen(intensity=inten, laser={"form": form})], seq)
+            self.assertIsNone(self._pick_boden(z),
+                              f"Bodenklick 7 m vor dem Laser waehlt ihn aus "
+                              f"(Intensitaet {inten}, Form {form})")
+        # Gegenprobe: das Gehaeuse selbst bleibt anklickbar.
+        r = self._eval("""
+        (function(){
+          const L = window.__lightos;
+          const f = L.fixtures['%d'];
+          f.group.updateMatrixWorld(true);
+          L.view.activeCam.updateMatrixWorld();
+          const p = f.group.position.clone().project(L.view.activeCam);
+          L.__mouse.set(p.x, p.y);
+          return String(L.__pickFixture());
+        })()""" % _FID)
+        self.assertEqual(r, str(_FID), "Gehaeuse nicht mehr anklickbar")
+
+    def test_einpassen_rahmt_das_geraet_nicht_die_strahlen(self):
+        """M1: „Auswahl einpassen" auf den Laser rahmt das 20-cm-Geraet."""
+        self._load_and_wait()
+        self._eval("window.__lightos.setViewMode('3D'); true")
+        self._bauen(_laser())
+        self._apply([_gruen()], 1)
+        self._eval("window.__lightos.view.selectedFids = [%d]; true" % _FID)
+        self._eval("window.__lightos.fitSelected(); true")
+        radius = float(self._eval("window.__lightos.view.radius"))
+        self.assertLess(radius, 6.0,
+                        f"Einpassen rahmt die Strahlen mit (Abstand {radius:.1f} m)")
+
+    def test_beamsoff_haelt_render_loop_nicht_wach(self):
+        """L1: ein ausgeblendeter (beamsOff) bewegter Laser haelt die Render-
+        Schleife nicht wach."""
+        self._load_and_wait()
+        self._bauen(_laser())
+        self._apply([_gruen(laser={"dx": True, "tempo": 0.2})], 1)
+        self.assertTrue(self._info()["animationAktiv"])
+        self._bridge_obj._poll = json.dumps({"beamsOff": [_FID]})
+        self._poll_until_true(
+            "!window.__lightos.laserInfo(%d).animationAktiv" % _FID)
+        # Auch ein neues DMX-Update weckt ihn nicht wieder.
+        self._apply([_gruen(laser={"dx": True, "tempo": 0.2})], 2)
+        self.assertFalse(self._info()["animationAktiv"])
+        # Wieder einblenden: er laeuft weiter.
+        self._bridge_obj._poll = json.dumps({"beamsOff": []})
+        self._poll_until_true(
+            "window.__lightos.laserInfo(%d).animationAktiv" % _FID)
+
+    def test_bewegung_ueberlebt_2d_3d_und_kegel_schalter(self):
+        """L2: kam der Bewegungs-Befehl, waehrend der Laser unsichtbar war
+        (2D bzw. Kegel aus), laeuft er nach dem Zurueckschalten — ohne neues DMX."""
+        self._load_and_wait()
+        self._bauen(_laser())
+        self._eval("window.__lightos.setViewMode('2D'); true")
+        self._apply([_gruen(laser={"dx": True, "tempo": 0.2})], 1)
+        self._eval("window.__lightos.setViewMode('3D'); true")
+        i = self._info()
+        self.assertTrue(i["bewegt"] and i["animationAktiv"],
+                        "nach 2D->3D steht der bewegte Laser still")
+        # Kegel aus, DMX, Kegel an (applySettings-Pfad wie das Settings-Panel).
+        self._eval("window.__lightos.settings.showCones = false;"
+                   " for (const k in window.__lightos.fixtures) {} true")
+        self._bridge_obj.settingsChanged.emit(json.dumps({"showCones": False}))
+        self._poll_until_true("window.__lightos.settings.showCones === false")
+        self._apply([_gruen(laser={"dx": True, "tempo": 0.2})], 2)
+        self._bridge_obj.settingsChanged.emit(json.dumps({"showCones": True}))
+        self._poll_until_true("window.__lightos.settings.showCones === true")
+        i = self._info()
+        self.assertTrue(i["bewegt"] and i["animationAktiv"],
+                        "nach Kegel aus/an steht der bewegte Laser still")
 
 
 if __name__ == "__main__":

@@ -20,7 +20,7 @@
 // und Sichtbarkeit — keine neuen Geometrien, keine neuen Materialien, keine
 // Vektor-Allokationen (Modul-Temporaere).
 import * as THREE from '../three/three.js';
-import { fixtures, settings, view } from '../state.js';
+import { fixtures, settings, view, beamsOff } from '../state.js';
 import { geteilteGeometrie } from '../scene/geteilte_geometrie.js';   // VIZ-66
 
 // 25 m reichen von einer Rueckwand-Traverse ueber Buehne und Publikum; 1,5 cm
@@ -68,6 +68,20 @@ function sheetGeo() {
   });
 }
 
+// Strahlen und Flaeche sind reines Licht, kein Koerper:
+//  * raycast = No-Op — three r128 prueft `visible` beim Raycast NICHT. Ohne das
+//    fing ein unsichtbarer (dunkler oder vom Muster abgeschalteter) 25-m-Strahl
+//    jeden Klick, Hover und Zug ab, der irgendwo vor dem Laser landete: ein
+//    Bodenklick waehlte den Laser aus, ein Zug verschob ihn (Review VIZ-79, H1).
+//    Dieselbe Regel wie bei der Lotlinie des Platzier-Geists (place_ghost.js).
+//  * excludeFromFit — „Auswahl einpassen" rahmt das Geraet, nicht 25 m Strahl
+//    (camera/presets.js, wie bei den Lichtkegeln).
+const _keinTreffer = () => {};
+function nurLicht(mesh) {
+  mesh.raycast = _keinTreffer;
+  mesh.userData.excludeFromFit = true;
+}
+
 // Rig an das Geraete-Modell haengen. `fensterZ` = Austrittsfenster (lokal).
 export function buildLaserRig(group, fensterZ) {
   const mat = new THREE.MeshBasicMaterial({
@@ -88,6 +102,7 @@ export function buildLaserRig(group, fensterZ) {
   for (let i = 0; i < LASER_MAX_BEAMS; i++) {
     const bm = new THREE.Mesh(beamGeo(), mat.clone());
     bm.userData.deckkraft = LASER_BEAM_OPACITY;
+    nurLicht(bm);
     pivot.add(bm);
     laserBeams.push(bm);
   }
@@ -96,6 +111,7 @@ export function buildLaserRig(group, fensterZ) {
   const sheet = new THREE.Mesh(sheetGeo(), sheetMat);
   sheet.userData.deckkraft = LASER_SHEET_OPACITY;
   sheet.userData.flaeche = true;
+  nurLicht(sheet);
   pivot.add(sheet);
   laserBeams.push(sheet);
   const rig = { pivot, beams: laserBeams.slice(0, LASER_MAX_BEAMS), sheet,
@@ -199,8 +215,12 @@ export function noteLaserAnimation(f) {
   else _bewegt.delete(f.fid);
 }
 
+// Pro-Geraet-Veto (beamsOff, VIZ-15) gilt auch hier: ein ausgeblendeter Laser
+// haelt den Render-Loop nicht wach und wird nicht weitergedreht.
 export function laserAnimationAktiv() {
-  return _bewegt.size > 0 && view.mode === '3D' && settings.showCones;
+  if (!(_bewegt.size > 0 && view.mode === '3D' && settings.showCones)) return false;
+  for (const fid of _bewegt) if (!beamsOff.has(fid)) return true;
+  return false;
 }
 
 export function tickLaserAnimation(t) {
@@ -209,6 +229,7 @@ export function tickLaserAnimation(t) {
   for (const fid of _bewegt) {
     const f = fixtures[fid];
     if (!f || !f.laserRig) { _bewegt.delete(fid); continue; }
+    if (beamsOff.has(fid)) continue;
     poseLaser(f.laserRig, zeit);
   }
 }
@@ -226,5 +247,6 @@ export function laserInfo(fid, t) {
     flaeche: !!rig.sheet.userData.aktiv,
     yaw: rig.pivot.rotation.y, pitch: rig.pivot.rotation.x, roll: rig.pivot.rotation.z,
     bewegt: _bewegt.has(Number(fid)),
+    animationAktiv: laserAnimationAktiv(),
   };
 }
