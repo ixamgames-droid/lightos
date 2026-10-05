@@ -55,7 +55,6 @@
 | FM-58 | A | feat/fm58-bibliothek-runde2 | 2026-10-02T18:20Z | fixtures/bibliothek |
 | SAMMEL-DOKU-C | A | sammel/doku-c | 2026-10-02T22:08Z | docs · BACKLOG.md |
 | DOC-60 | A | docs/doc60-buehnenshow-effekte | 2026-10-05T16:18Z | - |
-| VIZ-79 | A | fix/viz79-laserstrahlen-3d | 2026-10-05T16:59Z | - |
 | BACKLOG-KONSOLEN | A | docs/backlog-konsolen | 2026-10-05T18:14Z | BACKLOG.md |
 | VIZ-80 | A | fix/viz80-optik-gobo-3d | 2026-10-05T18:15Z | - |
 | MIDI-1 | A | fix/controller-p1 | 2026-10-05T18:52Z | - |
@@ -173,7 +172,6 @@
 
 ## Verlauf
 
-- 2026-10-05T00:16Z B done VIZ-68
 - 2026-10-05T00:43Z A done FM-63
 - 2026-10-05T01:18Z A done OUT-63
 - 2026-10-05T12:29Z A done DOC-59
@@ -203,3 +201,4 @@
 - 2026-10-05T18:52Z A claim OSC-05
 - 2026-10-05T19:34Z A claim LAS-23
 - 2026-10-05T19:34Z A claim LAS-24
+- 2026-10-05T19:34Z A done VIZ-79
