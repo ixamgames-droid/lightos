@@ -56,7 +56,6 @@
 | FM-58 | A | feat/fm58-bibliothek-runde2 | 2026-10-02T18:20Z | fixtures/bibliothek |
 | SAMMEL-DOKU-C | A | sammel/doku-c | 2026-10-02T22:08Z | docs · BACKLOG.md |
 | UI-74 | A | fix/ui74-profile-bearbeiten | 2026-10-04T17:07Z | src/ui/widgets/fixture_editor.py · src/ui/widgets/bibliothek_download_dialog.py · fixtures/bibliothek/eurolite |
-| VIZ-68 | B | feat/viz68-objekt-bibliothek | 2026-10-04T17:55Z | src/ui/visualizer/scene_src/stage/stage_objects.js · src/ui/visualizer/scene_src/stage/docking.js · src/ui/visualizer/scene_src/interaction/tools.js · src/ui/visualizer/visualizer_window.py · src/core/stage/stage_definition.py · src/core/stage/scene_graph.py · tests/test_viz68_objekt_bibliothek.py · BACKLOG.md |
 | FM-63 | A | feat/fm63-lightos-profile-vorrang | 2026-10-04T19:01Z | - |
 | OUT-63 | A | fix/out63-estop-maske-klebrig | 2026-10-04T20:44Z | - |
 | VIZ-71 | A | perf/viz71-lichtdaten-push | 2026-10-04T20:44Z | - |
@@ -170,7 +169,6 @@
 
 ## Verlauf
 
-- 2026-10-04T17:24Z B aktualisiert OUT-60-FOLGE: Dateien src/core/dmx/output_manager.py · src/core/dmx/serial_process.py · tests/test_out60_load_kein_null_frame.py · tests/test_out59_waisen_windows.py -> src/core/dmx/output_manager.py · src/core/dmx/serial_process.py
 - 2026-10-04T17:26Z C done UI-71
 - 2026-10-04T17:26Z A claim VIZ-67
 - 2026-10-04T17:33Z B claim OUT-61
@@ -200,3 +198,4 @@
 - 2026-10-04T23:30Z B done OUT-61
 - 2026-10-04T23:30Z B done OUT-61-folge
 - 2026-10-04T23:59Z A done BACKLOG-0410
+- 2026-10-05T00:16Z B done VIZ-68
