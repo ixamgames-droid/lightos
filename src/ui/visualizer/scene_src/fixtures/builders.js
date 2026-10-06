@@ -14,6 +14,7 @@ import { applyPrism, syncPrismToBeam } from './prism.js';   // VIZ-PRISMA-3D
 import { syncPoolSize } from './floor_pool.js';               // VIZ-15
 import { beamsOff } from '../state.js';                       // VIZ-15
 import { applyGobo } from './gobo_textures.js';   // VIZ-GOBO-3D
+import { buildLaserRig, applyLaser, noteLaserAnimation, LASER_BEAM_OPACITY } from './laser.js';   // VIZ-79
 import { stageObjects } from '../state.js';                   // VIZ-BEAM-OCCLUSION
 import { auftreffFlaeche } from './beam_stop.js';             // VIZ-BEAM-OCCLUSION
 
@@ -128,10 +129,19 @@ export function resyncBeamVisibility(f) {
   // stehen, waehrend der Hauptstrahl schon weg ist (genau die Klasse Stale, die
   // diese Funktion ueberhaupt erst noetig gemacht hat).
   syncPrismToBeam(f);
-  if (f.laserBeams) for (const bm of f.laserBeams) set(bm);
+  // VIZ-79: vom Muster nicht benutzte Laserstrahlen bleiben aus.
+  if (f.laserBeams) for (const bm of f.laserBeams) {
+    set(bm);
+    if (bm.userData.aktiv === false) bm.visible = false;
+  }
   if (f.parHeads) for (const ph of f.parHeads) set(ph.beam);
   if (f.moverHeads) for (const mh of f.moverHeads) set(mh.beam);
   if (f.bars) for (const bar of f.bars) { if (bar.beams) for (const bm of bar.beams) set(bm); }
+  // VIZ-79 (Review L2): ob ein bewegter Laser animiert wird, haengt an seiner
+  // Sichtbarkeit — die hat sich hier gerade geaendert (2D<->3D, Kegel aus/an,
+  // beamsOff). Sonst bliebe ein im 2D eingetroffener Bewegungs-Befehl nach dem
+  // Wechsel nach 3D stehen, bis das naechste DMX kommt.
+  noteLaserAnimation(f);
 }
 
 // ── Builders ─────────────────────────────────────────────────────────────────
@@ -788,7 +798,7 @@ export function buildLaser() {
     new THREE.BoxGeometry(0.12, 0.045, 0.008),
     new THREE.MeshStandardMaterial({ color: 0x101418, metalness: 0.3, roughness: 0.15 })
   );
-  windowPane.position.set(0, 0, -0.082);
+  windowPane.position.set(0, 0, 0.082);   // VIZ-79: Front zum Publikum (+Z)
   group.add(windowPane);
   // Haltebuegel (die Klasse haengt am Buegel oder steht auf ihm).
   [-0.115, 0.115].forEach(x => {
@@ -811,33 +821,18 @@ export function buildLaser() {
     new THREE.CircleGeometry(0.025, segs(10)),
     new THREE.MeshStandardMaterial({ color: 0x00ff00, emissive: 0x00ff00, emissiveIntensity: 1.0, roughness: 0.05, side: THREE.DoubleSide })
   );
-  lamp.position.set(0, 0, -0.088);
-  lamp.rotation.x = Math.PI / 2;
+  lamp.position.set(0, 0, 0.088);
+  // VIZ-79: CircleGeometry liegt in XY, ihre Normale ist schon +Z — die
+  // fruehere Drehung um X legte die Lampe flach, sie war von vorn nicht zu sehen.
   group.add(lamp);
-  // Fan of ~5 thin emissive beam lines radiating forward (downward in world-Y when hung)
-  const beamMat = new THREE.MeshBasicMaterial({
-    color: 0x00ff00,
-    transparent: true,
-    opacity: 0.6,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-  });
-  const FAN_ANGLES = [-0.35, -0.175, 0, 0.175, 0.35];  // radians spread in X
-  const laserBeams = [];
-  FAN_ANGLES.forEach((angle) => {
-    const beamLen = 1.8;
-    const geo = new THREE.CylinderGeometry(0.005, 0.005, beamLen, 4);
-    const beam = new THREE.Mesh(geo, beamMat.clone());
-    // Position: start just below emitter, fan out along Z (forward) with X spread
-    beam.position.set(Math.sin(angle) * beamLen * 0.5, 0, -0.1 - Math.cos(angle) * beamLen * 0.5);
-    beam.rotation.x = Math.PI / 2 - angle * 0.6;  // tilt so beam fans outward
-    beam.rotation.z = angle;
-    group.add(beam);
-    laserBeams.push(beam);
-  });
+  // VIZ-79: Strahlen-Rig (fixtures/laser.js) — bis zu acht duenne, additive
+  // 25-m-Strahlen plus eine Lichtflaeche, die ueber die Buehne ins Publikum
+  // (+Z) reichen. Bis VIZ-79 waren es fuenf 1,8-m-Stummel, die nach -Z in die
+  // Rueckwand zeigten. Muster, Groesse und Position setzt applyLaser aus DMX.
+  const { rig, laserBeams } = buildLaserRig(group, 0.088);
   // laserBeams zurueckgeben, damit updateFixture sie per DMX faerbt/dimmt
   // (vorher fix gruen 0x00ff00 / opacity 0.6, unabhaengig von Farbe/Intensitaet).
-  return { group, head: group, lamp, laserBeams };
+  return { group, head: group, lamp, laserBeams, laserRig: rig };
 }
 
 // ── Spider (Doppel-Bar Moving Head) ─────────────────────────────────────────
@@ -1478,7 +1473,9 @@ export function updatePixelHeadDmx(f, dmx) {
 // smoke/hazer bekommen BEWUSST keinen No-Op-Handler: ihr Indikator-Lamp
 // (f.lamp) und ihr Icon folgen im Monolith der DMX-Farbe — das bleibt so.
 export function updateGenericDmx(f, dmx) {
+  applyLaser(f, dmx);       // VIZ-79: vor der Farbe — legt fest, welche Strahlen aktiv sind
   applyGenericColor(f, dmx);
+  noteLaserAnimation(f);    // VIZ-79: nach der Farbe — erst dann steht „leuchtet" fest
   applyOptics(f, dmx);      // auch feste Scheinwerfer haben Zoom/Iris
   applyPrism(f, dmx);       // ... und manche ein Prisma
   applyGobo(f, dmx);        // ... und manche ein Gobo-Rad
@@ -1540,8 +1537,11 @@ function applyGenericColor(f, dmx) {
     for (const bm of f.laserBeams) {
       if (!bm.material) continue;
       bm.material.color = color;
-      bm.material.opacity = Math.max(0.0, intNorm * 0.6);
-      bm.visible = laserVis;
+      // VIZ-79: eigene Deckkraft (Strahl bzw. Flaeche), NICHT Beam Opacity.
+      const deck = (bm.userData.deckkraft !== undefined) ? bm.userData.deckkraft : LASER_BEAM_OPACITY;
+      bm.material.opacity = Math.max(0.0, intNorm * deck);
+      // Vom Muster nicht benutzte Strahlen bleiben aus (applyLaser).
+      bm.visible = laserVis && bm.userData.aktiv !== false;
     }
   }
   // Top-down icon color reflects active output color (only when bright)

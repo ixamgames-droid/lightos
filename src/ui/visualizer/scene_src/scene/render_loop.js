@@ -75,8 +75,10 @@ export function requestRender() { _dirty = true; }
 // geloescht. Registriert werden: der Selektions-Puls des Stage-Elements
 // (app.js) und das FPS-Overlay (camera/presets.js). Trace/Nachfahren braucht
 // KEINE Probe: die Bewegung rechnet Python und trifft als dmxBatch ein
-// (-> requestRender via Quelle 1); Laser-Faecher/Beams aendern sich ebenfalls
-// nur durch DMX-Updates, nicht zeitgesteuert.
+// (-> requestRender via Quelle 1). Ausnahme seit VIZ-79: ein Laser, dessen
+// Bewegung im Geraet selbst laeuft (dynamischer Kanalbereich, Auto-Programm),
+// dreht zeitgesteuert weiter — Probe laserAnimationAktiv (fixtures/laser.js),
+// nur solange so ein Laser sichtbar leuchtet.
 export function registerLiveAnimation(probeFn) { _liveAnimProbes.push(probeFn); }
 
 export function hasLiveAnimation() {

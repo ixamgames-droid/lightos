@@ -185,6 +185,33 @@ und schwenkst/zoomst mit zwei.
    - **Max. Strahllänge** — deckelt die sichtbare Länge der Kegel (0 = aus). Hilft bei
      waagerecht oder nach oben zeigenden Köpfen, deren Strahl nie auf den Boden trifft.
      Ändert nichts an der DMX-Ausgabe.
+   - **Laser** zeichnen keinen Kegel, sondern einen Fächer aus fünf dünnen Strahlen,
+     die 25 m weit nach vorn über die Bühne ins Publikum reichen. Sie folgen Farbe und
+     Helligkeit aus dem DMX, hängen aber bewusst **nicht** an Beam Opacity und Max.
+     Strahllänge — ein Laserstrahl fächert nicht auf und läuft bis zur Wand. Ist der
+     Laser-NOT-AUS gedrückt oder der Shutter zu, bleiben die Strahlen dunkel.
+   - **Laser-Kanäle im Bild:** X/Y-Bewegung (oder Pan/Tilt) schwenkt und neigt den
+     Fächer, X/Y-Zoom (oder Zoom) macht ihn breiter oder schmaler, die Muster-Rotation
+     dreht ihn um die Strahlachse. Musterbank bzw. Musterauswahl wählen **grob** eine
+     von vier Formen: Fächer, Einzelstrahl, Strahlenkranz oder Lichtfläche. Die echten
+     Muster des Geräts zeichnet die Ansicht nicht nach. Steht ein Kanal in einem
+     Bereich, in dem das Gerät selbst fährt (beim L2600 z. B. „Welle“ oder „Lauf“), oder
+     läuft im 6-Kanal-Modus das Programm mit Geschwindigkeit über 0, schwenkt der
+     Fächer langsam von selbst.
+   - **Optik, Gobo und Prisma** (Moving Heads und feste Scheinwerfer, sofern das
+     Profil die Kanäle hat): **Zoom** macht Kegel und Bodenfleck weiter oder enger
+     (0 = eng, 255 = weit), die **Iris** schließt ihn bis auf rund ein Drittel.
+     **Fokus** ist bei 128 scharf und wird zu beiden Enden weicher, **Frost** macht die
+     Kante weich und den Kegel etwas breiter. Das **Gobo** erscheint als Muster im
+     Bodenfleck (grob nachgezeichnet nach dem Namen des Gobo-Bereichs, „offen“ = voller
+     Fleck); die **Gobo-Rotation** dreht das Muster auf einen festen Winkel
+     (0–255 = eine Umdrehung). Ein **Prisma** teilt den Strahl in mehrere Kegel um den
+     Hauptstrahl (Facettenzahl aus dem Bereichsnamen, z. B. „6-fach Prisma“; ohne
+     Zahl drei); die **Prisma-Rotation** dreht den Fächer ebenfalls auf einen festen
+     Winkel. Ein Dauerdrehen, wie es echte Geräte im oberen Bereich dieser Kanäle
+     machen, zeigt die Ansicht nicht. Auf der Qualitätsstufe für schwache Grafik
+     zeichnet ein Prisma höchstens drei Strahlen. Geräte ohne diese Kanäle behalten
+     ihren festen Kegel.
    - **Lichtkegel**, **Bodenpunkte** und **Nebel/Haze** einzeln ein- und ausschalten.
      Einzelne Geräte nimmst du über das Rechtsklick-Menü der Fixture-Liste aus der
      Kegel-Anzeige.

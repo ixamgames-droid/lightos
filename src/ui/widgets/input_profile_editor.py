@@ -14,6 +14,7 @@ from src.core.midi.midi_mapper import (
     MidiMapping, ACTION_EXECUTOR_GO, ACTION_EXECUTOR_BACK, ACTION_EXECUTOR_FLASH,
     ACTION_EXECUTOR_FADER, ACTION_GRAND_MASTER, ACTION_PROGRAMMER_VAL,
     ACTION_PAGE_SELECT, ACTION_PAGE_NEXT, ACTION_PAGE_PREV, ACTION_NONE,
+    normalize_button_mode,
 )
 
 ACTIONS = [
@@ -172,12 +173,20 @@ class InputProfileEditor(QDialog):
                 idx = next((i for i, (l, v) in enumerate(ACTIONS) if v == m.action), 0)
                 cb.setCurrentIndex(idx)
                 cb.currentIndexChanged.connect(
-                    lambda _i, mm=m, c=cb: (setattr(mm, "action", c.currentData()), self._save_meta())
+                    lambda _i, mm=m, c=cb: self._set_action(mm, c.currentData())
                 )
                 self._table.setCellWidget(r, 4, cb)
                 self._table.setItem(r, 5, QTableWidgetItem(m.param))
                 self._table.setItem(r, 6, QTableWidgetItem(m.port_filter))
         self._table.blockSignals(False)
+
+    def _set_action(self, m, action):
+        """Aktion setzen und den Tastenmodus passend halten (MIDI-2): GO/BACK
+        sind immer ``press``, ein anderes Ziel faellt von ``press`` auf seine
+        Vorgabe zurueck (Flash loest beim Loslassen, Funktion stoppt wieder)."""
+        m.action = action
+        m.button_mode = normalize_button_mode(m.action, m.button_mode)
+        self._save_meta()
 
     def _on_item_edited(self, item):
         if not self._profile:

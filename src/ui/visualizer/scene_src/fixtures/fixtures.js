@@ -410,6 +410,12 @@ export function addFixture(data) {
     // Nebel/Hazer sind KEINE Licht-Fixtures -> kein Beam/SpotLight/Floor-Spot
     // (nur der emissive Indikator-Lamp aus dem build); vorher bekamen sie
     // faelschlich einen Lichtkegel + schattenwerfenden SpotLight.
+  } else if (rtype === 'laser') {
+    // VIZ-79: Laser strahlen ueber ihren eigenen Faecher (model.laserBeams aus
+    // buildLaser) — KEIN Lichtkegel, kein SpotLight, kein Bodenfleck. Bis VIZ-79
+    // bekam jeder Laser zusaetzlich den senkrecht nach unten zeigenden PAR-Kegel;
+    // der war das einzig Grosse, was man sah, und hing an Beam Opacity und
+    // Max. Strahllaenge — Laserstrahlen sah man dagegen praktisch nicht.
   } else {
     const headHost = model.head || model.group;
     const beamLength = rtype === 'led_bar' ? 6.0 : 8.0;
@@ -487,6 +493,7 @@ export function addFixture(data) {
     lens: model.lens || null,
     lamp: model.lamp || null,
     laserBeams: model.laserBeams || null,
+    laserRig: model.laserRig || null,   // VIZ-79: Strahlen-Rig (fixtures/laser.js)
     bars: model.bars || null,
     isSpider: !!model.isSpider,
     parHeads: model.parHeads || null,   // FM-3: PAR-Bar-Koepfe (je {lens, beam})
@@ -540,7 +547,7 @@ export function addFixture(data) {
   // Geraet dunkel bzw. in Mittelstellung, bis sich sein DMX wieder aenderte.
   const src = cachedDmx(fid) || data;
   updateFixture(fid, src.r ?? 0, src.g ?? 0, src.b ?? 0, src.intensity ?? 0,
-                src.pan ?? 128, src.tilt ?? 128, src.heads || null);
+                src.pan ?? 128, src.tilt ?? 128, src.heads || null, src);
 }
 
 export function removeFixture(fid) {
@@ -571,7 +578,39 @@ export function removeFixture(fid) {
   requestRender();  // 3c-2: Objekt aus der Szene entfernt
 }
 
-export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads) {
+// VIZ-80: Optik-, Gobo- und Prisma-Felder des Payloads, je mit dem Merker, den
+// ihr Handler am Fixture fuehrt (optics.js, gobo_textures.js, prism.js).
+//
+// Bis VIZ-80 kam KEINES dieser Felder im Betrieb an: `applyDmxEntry` und der
+// Cache-Neubau in `addFixture` reichen die Werte einzeln weiter, und
+// `updateFixture` baute den Handler-Kontext nur aus r/g/b/intensity/pan/tilt/
+// heads (+ seit VIZ-79 dem Laser-Block). Die Handler waren gebaut und getestet
+// — aber nur ueber Direktaufrufe, die genau diese Strecke ueberspringen.
+//
+// Fehlendes Feld: der Payload eines Geraets ist immer VOLLSTAENDIG (der Service
+// schickt je geaendertem Geraet den ganzen Eintrag, `_build_fixture_payload`),
+// und ein Feld fehlt darin nur, wenn das Profil den Kanal nicht hat. Innerhalb
+// eines Profils heisst "fehlt" also "unveraendert" — die Handler behalten ihren
+// `last*`-Stand. Hatte das Geraet den Kanal aber VORHER (Profilwechsel ohne
+// Neubau, oder Neubau aus einem Cache-Eintrag des alten Profils), bliebe ein
+// alter Zoom/Gobo/Prisma-Stand fuer immer stehen. Dafuer geht in genau diesem
+// Fall `null` an den Handler = "Kanal entfaellt, auf Grundstellung zurueck".
+const OPTIK_FELDER = [
+  ['zoom', 'lastZoom'], ['iris', 'lastIris'], ['focus', 'lastFocus'],
+  ['frost', 'lastFrost'], ['gobo', 'lastGobo'], ['gobo_rotation', 'lastGoboRot'],
+  ['prism', 'lastPrism'], ['prism_rotation', 'lastPrismRot'],
+];
+
+// Ein Payload-Eintrag aus `_build_fixture_payload` traegt immer Helligkeit und
+// Pan/Tilt; nur dann ist ein fehlendes Optik-Feld eine Aussage ueber das Profil.
+function istVollerEintrag(e) {
+  return e.intensity !== undefined && e.pan !== undefined && e.tilt !== undefined;
+}
+
+// `extra` (VIZ-79, optional): der ganze Payload-Eintrag. Daraus wandert nur,
+// was ein Handler ausdruecklich braucht — der Laser-Block (VIZ-79) und die
+// Optik-/Gobo-/Prisma-Felder (VIZ-80, s. OPTIK_FELDER).
+export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads, extra) {
   const f = fixtures[fid];
   if (!f) return;
   const color = new THREE.Color(r/255, g/255, b/255);
@@ -584,6 +623,18 @@ export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads) {
   // die Handler WEISEN sie den Materialien ZU (kein .copy()) — exakt die
   // Instanz-Sharing-Semantik des Monolithen.
   const dmx = { r, g, b, intensity, pan, tilt, heads, color, intNorm, skipBeam };
+  if (extra) {
+    if (extra.laser) dmx.laser = extra.laser;   // VIZ-79
+    // VIZ-80: ohne Allokation — nur Schluessel auf das ohnehin gebaute Objekt.
+    const voll = istVollerEintrag(extra);
+    for (let i = 0; i < OPTIK_FELDER.length; i++) {
+      const feld = OPTIK_FELDER[i][0];
+      const v = extra[feld];
+      if (v !== undefined) dmx[feld] = v;
+      else if (voll && f[OPTIK_FELDER[i][1]] !== undefined
+               && f[OPTIK_FELDER[i][1]] !== null) dmx[feld] = null;
+    }
+  }
 
   if (heads) f.lastHeads = heads;
 
