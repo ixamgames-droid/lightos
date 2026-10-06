@@ -434,6 +434,12 @@ def _build_fixture_payload(fixture, attrs: dict[str, int],
     _gobo = _gobo_style_gemerkt(attrs, channels)
     if _gobo is not None:
         payload["gobo"] = _gobo
+        # VIZ-80: Gobo-Drehung als WINKEL (roh, wie ``prism_rotation``) — nur
+        # zusammen mit einem Gobo-Rad, sonst gaebe es nichts zu drehen. JS
+        # (gobo_textures.js#applyGobo) dreht damit den Bodenfleck um seine
+        # Normale; eine fortlaufende Eigendrehung wird nicht erfunden.
+        if "gobo_rotation" in attrs:
+            payload["gobo_rotation"] = attrs["gobo_rotation"]
     # VIZ-PRISMA-3D: aus EINEM Strahl werden mehrere. Auch hier wandert die
     # fertige Facetten-ZAHL nach JS, nicht der Rohwert (Begruendung an
     # _prism_facets). Die Drehung dagegen ist ein reiner Winkel und geht roh

@@ -578,8 +578,38 @@ export function removeFixture(fid) {
   requestRender();  // 3c-2: Objekt aus der Szene entfernt
 }
 
+// VIZ-80: Optik-, Gobo- und Prisma-Felder des Payloads, je mit dem Merker, den
+// ihr Handler am Fixture fuehrt (optics.js, gobo_textures.js, prism.js).
+//
+// Bis VIZ-80 kam KEINES dieser Felder im Betrieb an: `applyDmxEntry` und der
+// Cache-Neubau in `addFixture` reichen die Werte einzeln weiter, und
+// `updateFixture` baute den Handler-Kontext nur aus r/g/b/intensity/pan/tilt/
+// heads (+ seit VIZ-79 dem Laser-Block). Die Handler waren gebaut und getestet
+// — aber nur ueber Direktaufrufe, die genau diese Strecke ueberspringen.
+//
+// Fehlendes Feld: der Payload eines Geraets ist immer VOLLSTAENDIG (der Service
+// schickt je geaendertem Geraet den ganzen Eintrag, `_build_fixture_payload`),
+// und ein Feld fehlt darin nur, wenn das Profil den Kanal nicht hat. Innerhalb
+// eines Profils heisst "fehlt" also "unveraendert" — die Handler behalten ihren
+// `last*`-Stand. Hatte das Geraet den Kanal aber VORHER (Profilwechsel ohne
+// Neubau, oder Neubau aus einem Cache-Eintrag des alten Profils), bliebe ein
+// alter Zoom/Gobo/Prisma-Stand fuer immer stehen. Dafuer geht in genau diesem
+// Fall `null` an den Handler = "Kanal entfaellt, auf Grundstellung zurueck".
+const OPTIK_FELDER = [
+  ['zoom', 'lastZoom'], ['iris', 'lastIris'], ['focus', 'lastFocus'],
+  ['frost', 'lastFrost'], ['gobo', 'lastGobo'], ['gobo_rotation', 'lastGoboRot'],
+  ['prism', 'lastPrism'], ['prism_rotation', 'lastPrismRot'],
+];
+
+// Ein Payload-Eintrag aus `_build_fixture_payload` traegt immer Helligkeit und
+// Pan/Tilt; nur dann ist ein fehlendes Optik-Feld eine Aussage ueber das Profil.
+function istVollerEintrag(e) {
+  return e.intensity !== undefined && e.pan !== undefined && e.tilt !== undefined;
+}
+
 // `extra` (VIZ-79, optional): der ganze Payload-Eintrag. Daraus wandert nur,
-// was ein Handler ausdruecklich braucht — derzeit der Laser-Block.
+// was ein Handler ausdruecklich braucht — der Laser-Block (VIZ-79) und die
+// Optik-/Gobo-/Prisma-Felder (VIZ-80, s. OPTIK_FELDER).
 export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads, extra) {
   const f = fixtures[fid];
   if (!f) return;
@@ -593,7 +623,18 @@ export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads, extra) 
   // die Handler WEISEN sie den Materialien ZU (kein .copy()) — exakt die
   // Instanz-Sharing-Semantik des Monolithen.
   const dmx = { r, g, b, intensity, pan, tilt, heads, color, intNorm, skipBeam };
-  if (extra && extra.laser) dmx.laser = extra.laser;   // VIZ-79
+  if (extra) {
+    if (extra.laser) dmx.laser = extra.laser;   // VIZ-79
+    // VIZ-80: ohne Allokation — nur Schluessel auf das ohnehin gebaute Objekt.
+    const voll = istVollerEintrag(extra);
+    for (let i = 0; i < OPTIK_FELDER.length; i++) {
+      const feld = OPTIK_FELDER[i][0];
+      const v = extra[feld];
+      if (v !== undefined) dmx[feld] = v;
+      else if (voll && f[OPTIK_FELDER[i][1]] !== undefined
+               && f[OPTIK_FELDER[i][1]] !== null) dmx[feld] = null;
+    }
+  }
 
   if (heads) f.lastHeads = heads;
 

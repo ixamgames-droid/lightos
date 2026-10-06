@@ -103,13 +103,41 @@ export function goboTexture(stil) {
   return tex;
 }
 
-/** Bodenfleck eines Fixtures an das aktuelle Gobo angleichen. */
+/** Bodenfleck eines Fixtures an das aktuelle Gobo angleichen.
+ *
+ *  `gobo`: Muster-Stil ("" = offen). `gobo_rotation` (VIZ-80): DMX 0..255 als
+ *  WINKEL des Musters, eine volle Umdrehung — wie `prism_rotation` in prism.js
+ *  eine Position, keine Geschwindigkeit (die eingebauten Profile haben fuer den
+ *  Kanal keine Ranges; ob ein Wert "Index" oder "Dreh-Tempo" heisst, sagt erst
+ *  ein Range-Name — eine fortlaufende Eigendrehung waere hier erfunden).
+ *  Gedreht wird die SCHEIBE um ihre eigene Normale, nicht die Textur: die
+ *  Textur ist je Stil fuer ALLE Geraete geteilt (CACHE oben), ein
+ *  `tex.rotation` drehte jedes Geraet mit demselben Gobo mit.
+ *
+ *  `null` (VIZ-80, s. fixtures.js#OPTIK_FELDER) = das Profil hat den Kanal
+ *  nicht (mehr): Muster bzw. Drehung zurueck auf Grundstellung.
+ */
 export function applyGobo(f, dmx) {
-  if (!f || !dmx || dmx.gobo === undefined) return;   // Geraet ohne Gobo-Rad
-  if (dmx.gobo === f.lastGobo) return;                // nichts geaendert
-  f.lastGobo = dmx.gobo;
+  if (!f || !dmx) return;
   const spot = f.floorSpot;
+  if (dmx.gobo_rotation !== undefined && dmx.gobo_rotation !== f.lastGoboRot) {
+    f.lastGoboRot = (dmx.gobo_rotation === null) ? undefined : dmx.gobo_rotation;
+    if (spot) {
+      const v = f.lastGoboRot;
+      spot.rotation.z = (typeof v === 'number' && isFinite(v))
+        ? (Math.max(0, Math.min(255, v)) / 255) * 2 * Math.PI : 0;
+    }
+  }
+  if (dmx.gobo === undefined) return;                 // Geraet ohne Gobo-Rad
+  if (dmx.gobo === f.lastGobo) return;                // nichts geaendert
+  f.lastGobo = (dmx.gobo === null) ? undefined : dmx.gobo;
   if (!spot || !spot.material) return;
-  spot.material.map = goboTexture(dmx.gobo);
-  spot.material.needsUpdate = true;                   // Material-Neubau noetig
+  const tex = goboTexture(f.lastGobo);
+  if (spot.material.map === tex) return;              // z. B. "" -> null bleibt null
+  // needsUpdate nur, wenn Textur KOMMT oder GEHT: das aendert das Shader-
+  // Programm (USE_MAP). Ein Wechsel zwischen zwei Mustern tauscht nur die
+  // Uniform — kein Neubau, kein Ruckler im Gobo-Chaser.
+  const programmWechsel = !spot.material.map !== !tex;
+  spot.material.map = tex;
+  if (programmWechsel) spot.material.needsUpdate = true;
 }

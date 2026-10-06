@@ -91,10 +91,13 @@ export function applyOptics(f, dmx) {
       && dmx.focus === undefined && dmx.frost === undefined) return;  // ohne Optik
   // Letzten Stand merken: der Service schickt DIFFERENTIELL, ein Batch ohne
   // zoom heisst "unveraendert" und darf den Kegel nicht zurueckspringen lassen.
-  if (dmx.zoom !== undefined) f.lastZoom = dmx.zoom;
-  if (dmx.iris !== undefined) f.lastIris = dmx.iris;
-  if (dmx.focus !== undefined) f.lastFocus = dmx.focus;
-  if (dmx.frost !== undefined) f.lastFrost = dmx.frost;
+  // VIZ-80: `null` heisst "das Profil hat den Kanal nicht (mehr)" (s.
+  // fixtures.js#OPTIK_FELDER) — Merker loeschen, damit die Rechnung unten auf
+  // die Grundstellung faellt statt auf dem alten Wert stehen zu bleiben.
+  if (dmx.zoom !== undefined) f.lastZoom = (dmx.zoom === null) ? undefined : dmx.zoom;
+  if (dmx.iris !== undefined) f.lastIris = (dmx.iris === null) ? undefined : dmx.iris;
+  if (dmx.focus !== undefined) f.lastFocus = (dmx.focus === null) ? undefined : dmx.focus;
+  if (dmx.frost !== undefined) f.lastFrost = (dmx.frost === null) ? undefined : dmx.frost;
   const weich = opticsSoftness(f.lastFocus, f.lastFrost);
   // Frost streut den Strahl real etwas auf; Fokus tut das NICHT — eine
   // unscharfe Kante ist keine breitere. Deshalb haengt die Aufweitung allein
@@ -120,7 +123,12 @@ export function applyOptics(f, dmx) {
     // jeder Scheinwerfer ohne Fokus/Frost eine erfundene Kantenschaerfe
     // (dieselbe Falle wie der erfundene 128er-Zoom-Default).
     if (f.lastFocus !== undefined || f.lastFrost !== undefined) {
+      // Gebaute Kantenschaerfe EINMAL merken — die Grundstellung, auf die ein
+      // entfallener Fokus/Frost-Kanal zurueckfuehrt (VIZ-80).
+      if (f.basePenumbra === undefined) f.basePenumbra = f.spot.penumbra;
       f.spot.penumbra = PENUMBRA_SCHARF + (PENUMBRA_WEICH - PENUMBRA_SCHARF) * weich;
+    } else if (f.basePenumbra !== undefined) {
+      f.spot.penumbra = f.basePenumbra;
     }
   }
   // VIZ-PRISMA-3D: die Prisma-Nebenstrahlen muessen diese Weite mitmachen.
