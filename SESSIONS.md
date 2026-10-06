@@ -55,7 +55,6 @@
 | FM-58 | A | feat/fm58-bibliothek-runde2 | 2026-10-02T18:20Z | fixtures/bibliothek |
 | SAMMEL-DOKU-C | A | sammel/doku-c | 2026-10-02T22:08Z | docs · BACKLOG.md |
 | DOC-60 | A | docs/doc60-buehnenshow-effekte | 2026-10-05T16:18Z | - |
-| OSC-05 | A | fix/controller-p1 | 2026-10-05T18:52Z | - |
 | LAS-23 | A | fix/las23-efx-achsen-gm | 2026-10-05T19:34Z | - |
 | LAS-24 | A | fix/las23-efx-achsen-gm | 2026-10-05T19:34Z | - |
 | QA-85 | A | fix/xplat44-test-windows | 2026-10-06T20:34Z | - |
@@ -166,7 +165,6 @@
 
 ## Verlauf
 
-- 2026-10-05T14:03Z A done VIZ-71
 - 2026-10-05T14:03Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-05T14:03Z A claim BACKLOG-0505
 - 2026-10-05T14:32Z A claim VIZ-78
@@ -196,3 +194,4 @@
 - 2026-10-06T21:02Z A done VIZ-80
 - 2026-10-06T21:31Z A done MIDI-1
 - 2026-10-06T21:32Z A done MIDI-2
+- 2026-10-06T21:32Z A done OSC-05
