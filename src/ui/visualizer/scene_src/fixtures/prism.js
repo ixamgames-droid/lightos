@@ -65,6 +65,12 @@ export function prismFacetCount(roh, lowSpec = isLowSpec) {
   return Math.min(n, lowSpec ? PRISMA_MAX_LOWSPEC : PRISMA_MAX);
 }
 
+// VIZ-80: abgeraeumt wird nur noch das EINHAENGEN, nicht der Bestand. Bis
+// VIZ-80 kamen die Prisma-Werte im Betrieb gar nicht an; seither schaltet ein
+// Prisma-Chaser (an/aus, 3er/6er im Wechsel) die Kegel mit DMX-Takt — ein
+// Neubau je Wechsel waere Allokation im 44-Hz-Pfad. Die Gelenke bleiben am
+// Fixture (`f.prismPool`) und werden beim naechsten Einschalten nur neu
+// ausgerichtet; ueberzaehlige werden unsichtbar geschaltet.
 function _raeumePrisma(f) {
   if (!f.prismGroup) return;
   // KEIN dispose: Geometrie und Material gehoeren dem Hauptstrahl (s. oben).
@@ -75,33 +81,55 @@ function _raeumePrisma(f) {
 }
 
 function _bauePrisma(f, n) {
-  _raeumePrisma(f);
   const beam = f.beam;
-  if (!beam || !beam.parent || n < 2) return;
-  const grp = new THREE.Group();
+  if (!beam || !beam.parent || n < 2) { _raeumePrisma(f); return; }
+  let pool = f.prismPool;
+  // Pool gehoert zu GENAU diesem Strahl (Neubau des Geraets -> neues f, also
+  // ohnehin neuer Pool; die Pruefung faengt nur einen getauschten Strahl ab).
+  if (!pool || pool.beam !== beam) {
+    pool = f.prismPool = { beam, grp: new THREE.Group(), gelenke: [], kegel: [] };
+  }
   const neigung = (f.baseSpotAngle || NEIGUNG_FALLBACK) * NEIGUNG_FAKTOR;
-  const kegel = [];
-  for (let i = 0; i < n - 1; i++) {
+  while (pool.gelenke.length < n - 1) {
     // Ein Drehgelenk je Nebenstrahl, Ursprung = Linse. 'YXZ' heisst: erst um
     // X neigen, dann um Y in den Kreis drehen — in dieser Reihenfolge bleibt
     // der Neigungswinkel fuer alle Strahlen gleich gross.
     const gelenk = new THREE.Group();
     gelenk.rotation.order = 'YXZ';
-    gelenk.rotation.set(neigung, (i * 2 * Math.PI) / (n - 1), 0);
     const m = new THREE.Mesh(beam.geometry, beam.material);
     m.position.copy(beam.position);
-    m.scale.copy(beam.scale);
-    m.visible = beam.visible;
     // Wie der Hauptstrahl aus der Fit-Bounding-Box heraushalten, sonst zoomt
     // "Auswahl einpassen" wegen der Faecher-Kegel viel zu weit raus.
     m.userData.excludeFromFit = true;
+    // Reine Deko, kein Koerper: three r128 prueft `visible` beim Raycast
+    // NICHT. Ohne No-Op fingen ueberzaehlige (unsichtbare) Pool-Kegel nach
+    // 6-fach -> 3-fach weiter Klicks ab und waehlten das Geraet statt Boden
+    // oder Buehnenobjekt (Review VIZ-80, L1; dieselbe Regel wie laser.js).
+    // Getroffen wird ueber Gehaeuse und Hauptstrahl.
+    m.raycast = () => {};
     gelenk.add(m);
-    grp.add(gelenk);
-    kegel.push(m);
+    pool.grp.add(gelenk);
+    pool.gelenke.push(gelenk);
+    pool.kegel.push(m);
   }
-  beam.parent.add(grp);
-  f.prismGroup = grp;
-  f.prismCones = kegel;
+  const aktiv = [];
+  for (let i = 0; i < pool.gelenke.length; i++) {
+    const an = i < n - 1;
+    pool.gelenke[i].visible = an;
+    if (!an) continue;
+    pool.gelenke[i].rotation.set(neigung, (i * 2 * Math.PI) / (n - 1), 0);
+    const m = pool.kegel[i];
+    m.position.copy(beam.position);
+    m.scale.copy(beam.scale);
+    m.visible = beam.visible;
+    aktiv.push(m);
+  }
+  if (pool.grp.parent !== beam.parent) {
+    if (pool.grp.parent) pool.grp.parent.remove(pool.grp);
+    beam.parent.add(pool.grp);
+  }
+  f.prismGroup = pool.grp;
+  f.prismCones = aktiv;
   f.prismFacetten = n;
 }
 
@@ -114,8 +142,11 @@ function _bauePrisma(f, n) {
 export function applyPrism(f, dmx) {
   if (!f || !dmx) return;
   if (dmx.prism === undefined && dmx.prism_rotation === undefined) return;
-  if (dmx.prism !== undefined) f.lastPrism = dmx.prism;
-  if (dmx.prism_rotation !== undefined) f.lastPrismRot = dmx.prism_rotation;
+  // VIZ-80: `null` = Profil ohne den Kanal (s. fixtures.js#OPTIK_FELDER).
+  if (dmx.prism !== undefined) f.lastPrism = (dmx.prism === null) ? undefined : dmx.prism;
+  if (dmx.prism_rotation !== undefined) {
+    f.lastPrismRot = (dmx.prism_rotation === null) ? undefined : dmx.prism_rotation;
+  }
 
   const n = prismFacetCount(f.lastPrism);
   if (n < 2) {
@@ -139,6 +170,10 @@ export function applyPrism(f, dmx) {
   for (const m of f.prismCones) {
     m.visible = beam.visible;
     m.scale.copy(beam.scale);
+    // VIZ-80: auch die Lage — setBeamLength (Auftreffpunkt) verschiebt den
+    // Hauptstrahl mit seiner Laenge; ohne Nachzug hingen die Nebenkegel bei
+    // geaenderter Laenge versetzt zur Linse.
+    m.position.copy(beam.position);
   }
 }
 
@@ -155,5 +190,6 @@ export function syncPrismToBeam(f) {
   for (const m of f.prismCones) {
     m.visible = f.beam.visible;
     m.scale.copy(f.beam.scale);
+    m.position.copy(f.beam.position);   // VIZ-80, s. applyPrism
   }
 }

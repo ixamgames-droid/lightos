@@ -828,7 +828,12 @@ class MainWindow(QMainWindow):
         self._slider_gm.setRange(0, 100)
         self._slider_gm.setValue(100)
         self._slider_gm.setFixedWidth(110)
-        self._slider_gm.setToolTip("Grand Master (0–100 %)")
+        self._slider_gm.setToolTip(
+            "Grand Master (0–100 %)\n"
+            "Laser ohne Dimmerkanal werden nicht stufenlos gedimmt, "
+            "sondern bei 0 % ausgeschaltet — nur, wenn das Geräteprofil "
+            "einen Aus-Wert kennt (Betriebsart „Laser aus“).\n"
+            "Sicher aus ist ein Laser nur mit dem Laser-NOT-AUS.")
         self._slider_gm.valueChanged.connect(self._on_grand_master_changed)
         gm_layout.addWidget(self._slider_gm)
         self._lbl_gm_val = QLabel("100%")

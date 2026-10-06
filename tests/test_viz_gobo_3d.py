@@ -87,6 +87,17 @@ class PayloadTest(unittest.TestCase):
         p = _build_fixture_payload(_Fx(), {"intensity": 255}, [_Ch("intensity")])
         self.assertNotIn("gobo", p)
 
+    def test_gobo_rotation_roh_und_nur_mit_rad(self):
+        """VIZ-80: die Drehung geht roh mit (Winkel), aber nur zusammen mit
+        einem Gobo-Rad — ohne Rad gibt es nichts zu drehen."""
+        p = _build_fixture_payload(
+            _Fx(), {"intensity": 255, "gobo_wheel": 35, "gobo_rotation": 77},
+            [_GOBO_CH, _Ch("gobo_rotation")])
+        self.assertEqual(p["gobo_rotation"], 77)
+        p = _build_fixture_payload(_Fx(), {"intensity": 255, "gobo_rotation": 77},
+                                   [_Ch("intensity"), _Ch("gobo_rotation")])
+        self.assertNotIn("gobo_rotation", p)
+
 
 class JsSeiteTest(unittest.TestCase):
     """Die JS-Seite zeichnet die Muster — hier gegen die Quelle geprueft, damit
