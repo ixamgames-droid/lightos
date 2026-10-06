@@ -579,6 +579,7 @@ class SqliteUebernahme(_TmpFall):
         self.assertEqual(dz._linux_gesperrte_dateien(p),
                          {(8, 2, 5678), (0xfd, 1, 42)})
 
+    @unittest.skipUnless(hasattr(os, "makedev"), "/proc/locks gibt es nur unter Linux (os.makedev fehlt unter Windows)")
     def test_lock_mit_gleichem_inode_auf_anderem_geraet_zaehlt_nicht(self):
         """B5: vorher zaehlte nur der Inode — ein Lock auf 08:02:5678 machte
         die Datei 08:03:5678 "in Benutzung"."""
@@ -586,6 +587,7 @@ class SqliteUebernahme(_TmpFall):
         self.assertFalse(dz._lock_trifft(os.makedev(8, 3), 5678, gesperrt))
         self.assertTrue(dz._lock_trifft(os.makedev(8, 2), 5678, gesperrt))
 
+    @unittest.skipUnless(hasattr(os, "makedev"), "/proc/locks gibt es nur unter Linux (os.makedev fehlt unter Windows)")
     def test_inode_rueckfall_nur_wenn_das_geraet_nicht_vorkommt(self):
         """btrfs/overlayfs: ``stat`` meldet ein anderes Geraet als
         /proc/locks — dann (und nur dann) entscheidet der Inode."""
