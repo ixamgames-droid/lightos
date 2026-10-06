@@ -32,6 +32,9 @@ Nach dem Start öffnet LightOS in der Sektion **Bühne**. Von oben nach unten:
    (Schritt 7) und die Ausgabe-Einstellungen.
 2. **Sektionsleiste** — die acht Arbeitsbereiche von LightOS, siehe Schritt 2.
 3. **GM** — der Grand Master. Er regelt die Gesamthelligkeit von 0 bis 100 %.
+   Laser ohne Dimmerkanal dimmt er nicht stufenlos, sondern schaltet sie bei 0 % aus —
+   aber nur, wenn das Geräteprofil einen Aus-Wert kennt. Sicher aus ist ein Laser
+   nur mit dem **Laser-NOT-AUS**.
 4. **TAP** — Tempo tippen. Laut Tooltip: einmal tippen setzt den Beat auf „jetzt",
    viermal im Takt setzt das Tempo.
 5. **STOP ALL** — hält alles an, was läuft: Cue-Listen auf allen Pages und alle

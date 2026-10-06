@@ -66,6 +66,22 @@ class EfxFixture:
     head: "int | None" = None
 
 
+def _target_to_dict(f: "EfxFixture") -> dict:
+    """Ein EFX-Ziel fuer die Show-Datei. Optionale Felder (``head``,
+    ``pan_attr``, ``tilt_attr``) stehen NUR drin, wenn sie vom Standard
+    abweichen — Alt-Shows bleiben so byte-gleich (Save->Load->Save-Fixpunkt)."""
+    d = {"fid": f.fid, "offset": f.start_offset}
+    if getattr(f, "head", None) is not None:
+        d["head"] = int(f.head)
+    pa = getattr(f, "pan_attr", "pan") or "pan"
+    ta = getattr(f, "tilt_attr", "tilt") or "tilt"
+    if pa != "pan":
+        d["pan_attr"] = str(pa)
+    if ta != "tilt":
+        d["tilt_attr"] = str(ta)
+    return d
+
+
 def _find_fixture(patch_cache, fid):
     for fx in patch_cache or ():
         if getattr(fx, "fid", None) == fid:
@@ -1135,12 +1151,11 @@ class EfxInstance(Function):
             # geschrieben. Damit bleibt der Dump einer Alt-Show byte-identisch
             # (Save->Load->Save-Fixpunkt, tests/test_show_roundtrip_fixpoint.py)
             # und Alt-Shows lesen den fehlenden Schluessel als „ganzes Geraet".
-            "fixtures": [
-                ({"fid": f.fid, "offset": f.start_offset}
-                 if getattr(f, "head", None) is None else
-                 {"fid": f.fid, "offset": f.start_offset, "head": int(f.head)})
-                for f in self.fixtures
-            ],
+            # LAS-23: ``pan_attr``/``tilt_attr`` ebenso NUR wenn vom Standard
+            # ("pan"/"tilt") abweichend — sonst verlor ein Laser-EFX
+            # (laser_x/laser_y) beim Speichern seine Achsen und schrieb nach dem
+            # Laden auf ``pan``/``tilt``, die der Laser nicht hat (stiller No-op).
+            "fixtures": [_target_to_dict(f) for f in self.fixtures],
             "width": self.width, "height": self.height,
             "x_offset": self.x_offset, "y_offset": self.y_offset,
             "rotation": self.rotation,
@@ -1186,7 +1201,16 @@ class EfxInstance(Function):
                     head = max(0, int(raw_head))
                 except (TypeError, ValueError):
                     head = None
-            return EfxFixture(fid=int(fid), start_offset=off, head=head)
+            # LAS-23: Achsen-Attribute (fehlen in Alt-Shows -> pan/tilt).
+            if isinstance(f, dict):
+                pa, ta = f.get("pan_attr"), f.get("tilt_attr")
+            else:
+                pa = getattr(f, "pan_attr", None)
+                ta = getattr(f, "tilt_attr", None)
+            pa = str(pa) if isinstance(pa, str) and pa.strip() else "pan"
+            ta = str(ta) if isinstance(ta, str) and ta.strip() else "tilt"
+            return EfxFixture(fid=int(fid), start_offset=off, head=head,
+                              pan_attr=pa, tilt_attr=ta)
 
         e.fixtures = [
             _mk_target(f)
