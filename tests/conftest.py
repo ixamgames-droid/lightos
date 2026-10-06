@@ -271,6 +271,13 @@ if not _TEST_XDG:                            # nichts geerbt -> selbst bauen
     os.makedirs(os.path.join(_TEST_XDG, "LightOS"), exist_ok=True)
     os.environ["XDG_DATA_HOME"] = _TEST_XDG
 
+# XPLAT-44: get_state() uebernimmt alte data/-Dateien (Programmordner + CWD) in
+# den App-Datenordner. In der Suite hiesse das: die ECHTE Show-DB aus dem
+# data/ des Checkouts wird gelesen und in den Test-Datenordner kopiert. Aus —
+# hart gesetzt, kein setdefault. Die Uebernahme-Tests nehmen den Schalter
+# selbst wieder heraus (test_xplat44_datenort._TmpFall).
+os.environ["LIGHTOS_NO_DATENUMZUG"] = "1"
+
 # QA-CRASHLOG-TESTS: crash.log aus der ECHTEN Absturz-Historie heraushalten.
 # Die APPDATA-Umlenkung darueber reicht dafuer NUR auf Windows — auf Linux/macOS
 # loest `app_data_dir()` ueber XDG bzw. ~/Library auf und ignoriert APPDATA, also

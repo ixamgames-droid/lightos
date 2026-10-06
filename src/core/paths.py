@@ -86,3 +86,61 @@ def sacn_cid_path() -> str:
     if override:
         return override
     return os.path.join(app_data_dir(), "sacn_cid")
+
+
+# ── XPLAT-44: Nutzerdaten, die frueher CWD-relativ unter ``data/`` lagen ──────
+#
+# Entscheidung des Projektinhabers (2026-10-05): ALLE Nutzerdaten liegen im
+# App-Datenordner. Vorher hingen diese fuenf Dateien am ARBEITSVERZEICHNIS
+# (``data/…`` relativ zum CWD) — wer LightOS nicht ueber ``start.sh`` /
+# ``start.bat`` / ``start.ps1`` startete (Verknuepfung ohne Arbeitsordner,
+# ``python <pfad>/main.py`` aus einem anderen Ordner, Paket), bekam ein zweites
+# ``data/`` neben dem Aufrufer, und Universen/MIDI/Gruppen wirkten "verschwunden".
+#
+# Das hier ist die EINE Liste dessen, was Nutzerdaten sind. Was NICHT darin
+# steht, bleibt mitgelieferte Repo-Ware und an seinem Ort:
+#   * ``data/controller_library/*.json`` (Vorlagen, repo-relativ ueber
+#     ``__file__`` aufgeloest, ``controller_library._BUILTIN_DIR``),
+#   * ``fixtures/`` (Fixture-Definitionen), ``shows/demo_*.lshow`` (Demos),
+#     ``assets/``.
+# ``src/core/datenumzug.py`` uebernimmt beim ersten Start genau diese Dateien
+# aus einem vorhandenen alten ``data/``.
+#: Dateiname -> Override-Umgebungsvariable (``None`` = keine).
+USER_DATA_FILES: dict[str, str | None] = {
+    "current_show.db": "LIGHTOS_SHOW_DB",
+    "universes.json": "LIGHTOS_UNIVERSES_JSON",
+    "midi_mappings.json": None,
+    "channel_groups.json": None,
+    "channel_modifiers.json": None,
+}
+
+
+def user_data_file(name: str) -> str:
+    """Pfad einer Nutzerdaten-Datei im App-Datenordner (XPLAT-44).
+
+    Eine gesetzte Override-Variable (``LIGHTOS_SHOW_DB``,
+    ``LIGHTOS_UNIVERSES_JSON``) hat Vorrang — dieselbe Bauart wie
+    ``crash_log_path()``; Tests und Werkzeuge lenken so auf Wegwerf-Pfade um.
+
+    Legt KEIN Verzeichnis an (wer schreibt, legt an: ``ensure_parent_dir``).
+    Unbekannte Namen sind ein Fehler: so kann keine neue Nutzerdatei an der
+    Liste (und damit an der Erststart-Uebernahme) vorbei entstehen.
+    """
+    if name not in USER_DATA_FILES:
+        raise ValueError(f"unbekannte Nutzerdaten-Datei: {name!r} "
+                         "(in paths.USER_DATA_FILES eintragen)")
+    var = USER_DATA_FILES[name]
+    if var:
+        override = os.environ.get(var)
+        if override:
+            return override
+    return os.path.join(app_data_dir(), name)
+
+
+def ensure_parent_dir(path: str) -> str:
+    """Legt den Elternordner von ``path`` an (falls es einen gibt) und gibt
+    ``path`` zurueck — fuer Schreibstellen: ``open(ensure_parent_dir(p), "w")``."""
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    return path
