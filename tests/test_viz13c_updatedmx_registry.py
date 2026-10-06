@@ -157,6 +157,17 @@ _HEADS_PIXEL_BAR = [
 _MULTI_HEADS = {29: _HEADS_PAR_BAR, 30: _HEADS_MOVER_BAR,
                 31: _HEADS_SPIDER, 33: _HEADS_PIXEL_BAR}
 
+# VIZ-80: Optik/Gobo/Prisma kommen seit VIZ-80 ueber den echten Weg in den
+# Handlern an. Bewusst NUR an zwei Geraeten — so zeigt der Golden-Diff, dass
+# sich ausschliesslich Geraete MIT diesen Feldern aendern (alle anderen
+# Eintraege bleiben byte-gleich): der Moving Head mit dem vollen Satz, der PAR
+# nur mit Zoom (feste Scheinwerfer gehen durch updateGenericDmx).
+_OPTIK = {
+    21: {"zoom": 40, "iris": 30, "focus": 60, "frost": 20, "gobo": "spiral",
+         "gobo_rotation": 64, "prism": 4, "prism_rotation": 100},
+    20: {"zoom": 200},
+}
+
 
 def _make_batch(intensity):
     batch = []
@@ -165,6 +176,7 @@ def _make_batch(intensity):
              "intensity": intensity, "pan": 200, "tilt": 64}
         if f["fid"] in _MULTI_HEADS:
             d["heads"] = _MULTI_HEADS[f["fid"]]
+        d.update(_OPTIK.get(f["fid"], {}))   # VIZ-80
         batch.append(d)
     return json.dumps(batch)
 
@@ -204,6 +216,19 @@ _DUMP_JS = """
             yokeRotY: f.yoke ? r4(f.yoke.rotation.y) : null,
             headRotX: f.head ? r4(f.head.rotation.x) : null,
             lastPanRad: (f._lastPanRad !== undefined) ? r4(f._lastPanRad) : null,
+            // VIZ-80: nur an Geraeten, die Optik/Gobo/Prisma-Felder bekommen —
+            // alle anderen Dumps behalten exakt ihre Schluessel.
+            ...((f.lastZoom !== undefined || f.lastGobo !== undefined
+                 || f.lastPrism !== undefined) ? { optik: {
+                beamX: f.beam ? r4(f.beam.scale.x) : null,
+                spotAngle: f.spot ? r4(f.spot.angle) : null,
+                penumbra: f.spot ? r4(f.spot.penumbra) : null,
+                gobo: !!(f.floorSpot && f.floorSpot.material.map),
+                goboRot: f.floorSpot ? r4(f.floorSpot.rotation.z) : null,
+                prismN: f.prismCones ? f.prismCones.length : 0,
+                prismRot: f.prismGroup ? r4(f.prismGroup.rotation.y) : null,
+                prismVis: f.prismCones ? f.prismCones.map(m => m.visible) : null,
+            } } : {}),
             icon: f.icon ? {
                 yaw: r4(f.icon.rotation.y),
                 bodyHex: hx(f.icon.userData.body.material.color),

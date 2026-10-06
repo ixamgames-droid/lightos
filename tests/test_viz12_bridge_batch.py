@@ -121,12 +121,13 @@ class JsBatchHandlerBraceBalanceTest(unittest.TestCase):
     def test_apply_dmx_calls_update_fixture_with_nullish_defaults(self):
         """Frueher byte-identisch ``d.pan||128`` — das machte aus Pan 0 (ganz
         links) die Mitte. VIZ-71: ``??`` (nur fehlende Werte bekommen den
-        Default), dieselben Felder wie bisher."""
+        Default), dieselben Felder wie bisher. VIZ-79: dazu der ganze Eintrag
+        als ``extra`` (daraus nimmt updateFixture den Laser-Block)."""
         with open(_DMX_APPLY_JS_PATH, encoding="utf-8") as f:
             apply_js = f.read()
         self.assertIn(
             "updateFixture(d.fid, d.r ?? 0, d.g ?? 0, d.b ?? 0, d.intensity ?? 0,\n"
-            "                d.pan ?? 128, d.tilt ?? 128, d.heads || null)",
+            "                d.pan ?? 128, d.tilt ?? 128, d.heads || null, d)",
             apply_js)
 
     def test_all_script_blocks_are_brace_and_paren_balanced(self):
