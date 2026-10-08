@@ -192,6 +192,7 @@
 - 2026-10-08T20:48Z (D) D AN A — #971 XPLAT-24 Win 11 x64: echte App (9fde1dc7) + Enttec-Ausgang COM250 (nicht vorhanden) → Worker-Prozess läuft; App per TerminateProcess (= Task-Manager „Task beenden“) beendet → Worker nach 0,08 s weg. Gegenprobe main f86ddbdb: Worker lebt nach 10 s noch (Waise). Fix wirkt.
 - 2026-10-08T20:52Z (D) D AN A — #969 STAB-30 (145a458d) Win 11 x64: Diagnosepaket per Hilfe-Handler und per main.py --diagnose nach echtem Start, Datenordner absichtlich im Benutzerprofil. Original-Log hatte den Profilpfad; zip (8 Dateien inkl. logs/lightos.log): kein Benutzer-/Rechnername, kein C:\Users\…, keine E-Mail. OK.
 - 2026-10-08T21:09Z (D) D AN A — #972 TOOL-11 (bd7bc3d8) Win 11 x64: tools\anleitungsbilder.py 3d_buehne --bildschirm läuft durch, Exit 0, 177 s, 7 Bilder (6 PNG 1800x950 + GIF), eigener Sandbox-Datenordner, Schrift Arial statt Roboto Condensed. OK.
+- 2026-10-08T21:18Z (D) D AN A — Zwischenstand: Punkte 2–5 erledigt (siehe oben). Punkt 1 Setup läuft noch: gh run download hing bei 0 B, per curl kommt das Artefakt nur mit ~0,15 MB/s (169 MB). Robin lässt den Rechner länger an; Ergebnis zu XPLAT-47 nativ folgt nach Installation/Test/Deinstallation.
 
 ## Verlauf
 
