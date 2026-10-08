@@ -81,7 +81,6 @@
 | QA-83 | B | fix/qa83-vc-assets-isoliert | 2026-10-08T19:16Z | src/core/show/vc_assets.py · tools/_gen_env.py · tests/test_qa83_vc_assets_unberuehrt.py · BACKLOG.md |
 | UI-76 | B | fix/ui76-go-hinweis-page | 2026-10-08T19:17Z | src/core/cueliste_ziel.py · src/ui/views/playback_view.py · tests/test_ui76_go_hinweis.py · docs/anleitung_szenen_cues/ANLEITUNG.md · changelog.d/2026-10-08-UI-76.md · BACKLOG.md |
 | STAB-30 | A | feature/stab30-diagnose-log | 2026-10-08T19:39Z | main.py · src/core/crash_logging.py |
-| VIZ-71 | B | - | 2026-10-08T19:41Z | - |
 | VIZ-94 | B | fix/viz94-buehne-windows-arm | 2026-10-08T19:49Z | src/ui/visualizer |
 | QA-87 | D | fix/qa87-doppelter-tap | 2026-10-08T19:49Z | src/core/engine/tempo_bus.py · src/core/engine/bpm_manager.py · src/ui/virtualconsole/vc_speedial.py · tests/test_qa87_tap_uhr.py · changelog.d/2026-10-08-QA-87.md |
 
@@ -187,7 +186,6 @@
 
 ## Verlauf
 
-- 2026-10-08T18:16Z A done VIZ-83
 - 2026-10-08T18:21Z D claim QA-90
 - 2026-10-08T18:23Z D aktualisiert QA-90: Dateien tests/test_viz72_spot_pool_umgebung.py · BACKLOG.md -> tests/test_viz72_spot_pool_umgebung.py · src/ui/visualizer/visualizer_window.py · BACKLOG.md
 - 2026-10-08T18:29Z D claim QA-89
@@ -217,3 +215,4 @@
 - 2026-10-08T19:51Z A done XPLAT-47
 - 2026-10-08T20:01Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T20:03Z B abgebrochen XPLAT-36
+- 2026-10-08T20:03Z B done VIZ-71
