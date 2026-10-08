@@ -65,6 +65,7 @@
 | QA-88 | D | fix/qa88-anleitungsbilder-windows | 2026-10-08T16:14Z | tools/anleitungsbilder.py · tools/anleitungsbilder/sandbox.py · tools/anleitungsbilder/runner.py · tests/test_qa88_anleitungsbilder_windows.py · docs/ANLEITUNGSBILDER.md |
 | DOC-62 | D | docs/doc62-installdoku-windows | 2026-10-08T16:16Z | INSTALL.md · CONTRIBUTING.md · install.py · tests/test_doc62_installdoku.py |
 | LAS-25 | A | fix/codex-p1-0810 | 2026-10-08T16:57Z | - |
+| TOOL-16 | A | fix/codex-p1-0810 | 2026-10-08T16:57Z | - |
 
 ## Blocker & Fallen
 
@@ -158,7 +159,6 @@
 
 ## Verlauf
 
-- 2026-10-06T21:32Z A done OSC-05
 - 2026-10-06T21:52Z A done LAS-23
 - 2026-10-06T21:52Z A done LAS-24
 - 2026-10-06T22:22Z A done QA-85
@@ -188,3 +188,4 @@
 - 2026-10-08T16:49Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T16:57Z A claim LAS-25
 - 2026-10-08T16:57Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-08T16:57Z A claim TOOL-16
