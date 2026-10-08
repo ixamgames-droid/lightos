@@ -68,10 +68,10 @@
 | UI-81 | A | fix/codex-p1-0810 | 2026-10-08T16:57Z | - |
 | BACKLOG-0810B | A | docs/backlog-web-codex | 2026-10-08T17:29Z | BACKLOG.md |
 | DEMO-07 | A | docs/demo07-showcase-shows | 2026-10-08T17:30Z | - |
+| VIZ-92 | A | fix/viz92-gobo-feinschliff | 2026-10-08T17:47Z | src/ui/visualizer |
 
 ## Blocker & Fallen
 
-- 2026-10-01T17:40Z (A) A AN B — PRIV-05 ist gemergt (#822). Ab jetzt liest session_claim.py die Namensliste auch aus <repo>\.git\klarnamen.txt — bitte dort dieselben Namen eintragen. Ausserdem gemergt: PROC-14 (#824, pr_bereit prueft den Claim des PR-Zweigs; release erst nach Merge). Offen bei A: XPLAT-40 (#825), PROC-16 (#827), danach PROC-17, PROC-09 (CHANGELOG-Fragmente), XPLAT-41, XPLAT-43. Regel ab heute fuer beide: kein Force-Push, auch nicht auf Feature-Zweige — Updates per Merge von origin/main in den Zweig.
 - 2026-10-01T17:51Z (B) B reserviert BPM-26, UI-68, UI-69 (Funde aus Robins Live-Funktionstest am Windows-PC): BPM-26 Kick + Offbeat-Hihat rastet auf 2/3 des Tempos ein (128 -> 85,3 bzw. 104,4 -> 69,6, Konfidenz 100 %), schon vor #826 da, offline reproduzierbar - B fixt jetzt. UI-68 Playback-Tab: GO auf Cueliste ohne Executor zeigt Aktive Cue, gibt aber kein Licht aus (Renderer rechnet nur Executor-Listen). UI-69 Beenden fragt bei aus Datei geladener Show nie nach Speichern (kein Dirty-Flag).
 - 2026-10-01T18:11Z (A) A UEBERGABE 01.10. abends (Limit erreicht, PC aus). Gemergt heute: #822 PRIV-05, #823 DOC-17, #824 PROC-14, #825 XPLAT-40. OFFEN: PR #827 PROC-16 (Gate gruen, CI lief), PR #828 PROC-09 changelog.d (Gate gruen, CI + ggf. main nachziehen). Lokal fertig, nicht gepusht: XPLAT-41 (wt-xplat41, Gate gruen, inkl. Ausnahme fuer den beobachtenden ARM-Job), PROC-17 (wt-proc17, auf PROC-16), XPLAT-43 summary.json (wt-xplat43). Danach geplant: PRIV-03 Klarname durchgehend auf Robin (Projektinhaber hat zugestimmt — B bitte vorher keine offenen Zweige), FM-53 Fixture-Bibliothek (eigene Profile im LightOS-Format + QLC+-Download beim Erststart). Regel: kein Force-Push, auch nicht auf Feature-Zweige.
 - 2026-10-01T19:32Z (B) B reserviert OUT-57 und VCB-11 (Wunsch Robin, 01.10. abends; kommen mit dem BPM-26-PR ins BACKLOG, Umsetzung fuer A): OUT-57 Blackout (oben rechts und global) nullt nur Intensitaet + Farbe, Bewegung/Gobo bleiben stehen (heute bytes(512), auch Pan/Tilt). VCB-11 Blackout-Taste der VC mit Ziel: einzelne Geraete und/oder Gruppen (mehrere), nur diese gehen dunkel.
@@ -160,8 +160,6 @@
 
 ## Verlauf
 
-- 2026-10-08T15:16Z A claim ENG-31
-- 2026-10-08T15:53Z A claim BACKLOG-D-BERICHT
 - 2026-10-08T15:53Z 3 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T15:54Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T15:54Z A claim VIZ-84
@@ -190,3 +188,5 @@
 - 2026-10-08T17:29Z A claim BACKLOG-0810B
 - 2026-10-08T17:29Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T17:30Z A claim DEMO-07
+- 2026-10-08T17:47Z A claim VIZ-92
+- 2026-10-08T17:47Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
