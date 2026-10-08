@@ -41,6 +41,12 @@
 //    Bildwiederholrate ist das nicht unterscheidbar, und der Fehler faellt zur
 //    sicheren Seite (volle Aufloesung). Wechselnde Last, bei der bis knapp
 //    die Haelfte der Frames verpasst wird, wird erkannt.
+//  * Echte Bildwiederholrate (VIZ-85, Testbericht D): Chromium tickt rAF auf
+//    einem 29,97-Hz-Fernseher teils mit 60 Hz. Abstaende von 16,7 und 33,4 ms
+//    gemischt sahen dann aus wie "jeder dritte Frame verpasst" (missed 0,33),
+//    obwohl der Bildschirm nur alle 33,4 ms ein Bild zeigt. Python reicht
+//    QScreen.refreshRate() als ?hz= herein (setDisplayHz); das Intervall ist
+//    mindestens DISPLAY_FLOOR x 1000/hz. Ohne Angabe gilt nur die Schaetzung.
 //  * Die Einstufung "langsam" verfaellt nach 30 s ohne Bestaetigung: die
 //    naechste Fahrt laeuft dann voll aufgeloest als Probe (abgesenkte Frames
 //    werden nicht gemessen, sonst kaeme Hoch aus "langsam" nie heraus).
@@ -68,6 +74,7 @@ export const PAIR_FACTOR = 1.25;       // Doppel-rAF-Paar ergibt hoechstens 1,25
 export const MEDIAN_FLOOR = 0.75;      // Intervall >= 0,75 x Median
 export const VSYNC_MIN_MS = 2.5;       // 400 Hz — kein Bildschirm ist schneller
 export const SLOW_EXPIRE_MS = 30000;   // "langsam" ohne Bestaetigung verfaellt
+export const DISPLAY_FLOOR = 0.97;     // VIZ-85: Untergrenze = 0,97 x Bildschirmintervall
 
 export function createDynamicResolution({
   now, setTimer, clearTimer, applyScale, requestRender, mode = 'slow',
@@ -86,6 +93,7 @@ export function createDynamicResolution({
   let _verpasst = 0;         // gedaempfter Anteil verpasster Frames
   let _langsam = false;      // Hysterese-Zustand fuer 'slow'
   let _bestaetigt = -Infinity;
+  let _displayMs = 0;        // VIZ-85: echtes Bildschirmintervall (0 = unbekannt)
 
   function langsam() {
     if (_langsam && now() - _bestaetigt > SLOW_EXPIRE_MS) {
@@ -125,12 +133,13 @@ export function createDynamicResolution({
       zus.push(summe);
       rest = 0;
     }
-    if (!zus.length) return Math.max(roh, VSYNC_MIN_MS);
+    if (!zus.length) return Math.max(roh, VSYNC_MIN_MS, _displayMs * DISPLAY_FLOOR);
     const sortiert = zus.slice().sort((a, b) => a - b);
     const idx = Math.min(sortiert.length - 1,
                          Math.floor(sortiert.length * VSYNC_PERCENTILE));
     const perz = sortiert[idx];
-    return Math.max(perz, median(zus) * MEDIAN_FLOOR, VSYNC_MIN_MS);
+    return Math.max(perz, median(zus) * MEDIAN_FLOOR, VSYNC_MIN_MS,
+                    _displayMs * DISPLAY_FLOOR);
   }
 
   function setzen(s) {
@@ -199,6 +208,11 @@ export function createDynamicResolution({
       else if (_verpasst < FAST_SHARE) _langsam = false;
       if (_langsam) _bestaetigt = now();
     },
+    // VIZ-85: echte Bildwiederholrate in Hz (QScreen.refreshRate); 0/ungueltig = unbekannt.
+    setDisplayHz(hz) {
+      const h = Number(hz);
+      _displayMs = (h >= 10 && h <= 500) ? 1000 / h : 0;
+    },
     setMode(m) {
       _mode = m;
       if (_mode === 'never' && _scale !== 1) { setzen(1); requestRender(); }
@@ -206,7 +220,8 @@ export function createDynamicResolution({
     scale() { return _scale; },
     info() {
       return { scale: _scale, mode: _mode, frameMs: _frameMs, vsyncMs: _vsyncMs,
-               missed: _verpasst, slow: langsam(), samples: _fenster.length };
+               missed: _verpasst, slow: langsam(), samples: _fenster.length,
+               displayMs: _displayMs };
     },
   };
 }

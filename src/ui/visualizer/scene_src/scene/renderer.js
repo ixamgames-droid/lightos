@@ -198,6 +198,8 @@ export const dynamicResolution = createDynamicResolution({
   requestRender,
   mode: tierSettings.dynamicResolution,
 });
+// VIZ-85: echte Bildwiederholrate aus Python (?hz=, QScreen.refreshRate).
+dynamicResolution.setDisplayHz(new URLSearchParams(window.location.search).get('hz'));
 export function applyPixelRatio() {
   const soll = basePixelRatio() * dynamicResolution.scale();
   // setPixelRatio legt den Canvas-Puffer neu an — nur beim WECHSEL.

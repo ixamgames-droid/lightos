@@ -296,6 +296,26 @@ def max_beam_range_pref() -> float:
     return float(min(val, MAX_BEAM_RANGE_MAX))
 
 
+def _bildschirm_hz(view) -> float:
+    """VIZ-85: Bildwiederholrate des Bildschirms, auf dem die Ansicht liegt
+    (sonst des Hauptbildschirms); 0.0, wenn unbekannt. Die dynamische
+    Aufloesung braucht sie, weil Chromium auf einem 29,97-Hz-Fernseher rAF
+    teils mit 60 Hz tickt — die Frame-Abstaende allein verraten den Takt nicht."""
+    try:
+        from PySide6.QtGui import QGuiApplication
+        scr = None
+        try:
+            scr = view.screen()
+        except Exception:
+            scr = None
+        if scr is None:
+            scr = QGuiApplication.primaryScreen()
+        hz = float(scr.refreshRate()) if scr is not None else 0.0
+    except Exception:
+        return 0.0
+    return hz if 10.0 <= hz <= 500.0 else 0.0
+
+
 def load_stage_html(view) -> None:
     """HTML mit Cache-Buster laden (v=Zeitstempel) — sowohl beim Erst-Load als
     auch beim Renderer-Neustart wiederverwendet, damit Three.js/Szene-JS nie
@@ -309,6 +329,9 @@ def load_stage_html(view) -> None:
         tier = quality_tier_pref()
         if tier != "auto":
             query += f"&gputier={tier}"
+        hz = _bildschirm_hz(view)
+        if hz:
+            query += f"&hz={hz:.2f}"      # VIZ-85: echte Bildwiederholrate
         url.setQuery(query)
         # A3D-23: die Stufe ist eine KONSTRUKTOR-Entscheidung des Renderers und
         # reist nur in dieser URL — sie laesst sich spaeter nicht nachpushen.

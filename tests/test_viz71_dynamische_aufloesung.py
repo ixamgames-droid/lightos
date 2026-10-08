@@ -64,6 +64,7 @@ for (const s of SCHRITTE) {
   else if (s[0] === 'warte') vor(s[1]);
   else if (s[0] === 'frame') d.noteFrameInterval(s[1]);
   else if (s[0] === 'modus') d.setMode(s[1]);
+  else if (s[0] === 'hz') d.setDisplayHz(s[1]);
   else if (s[0] === 'messen') aus.push({scale: d.scale(), renders, wechsel: log.slice()});
   else if (s[0] === 'info') aus.push(d.info());
 }
@@ -182,6 +183,37 @@ class DynamischeAufloesungTest(unittest.TestCase):
         self.assertFalse(info["slow"])
         self.assertLess(info["missed"], 0.1)
         self.assertEqual(m["scale"], 1, "GPU schafft jeden Vsync: nie absenken")
+
+    # VIZ-85 Nachmessung D (Windows, RX 580, 29,97-Hz-Fernseher): rAF tickt
+    # mit ~60 Hz, angezeigt wird mit 29,97 Hz — 16,7/16,7/33,4 gemischt sah wie
+    # "jeder dritte verpasst" aus (missed 0,32-0,36, slow=true, Skala 0,65).
+    @staticmethod
+    def _raf60_auf_30hz():
+        v60 = 1000 / 59.94
+        return [["frame", v60 if i % 3 else 2 * v60] for i in range(240)]
+
+    def test_hoch_2997hz_tv_mit_60hz_raf_bleibt_schnell(self):
+        schritte = [["hz", 29.97]] + self._raf60_auf_30hz()
+        info, m = _fahre(schritte + [["info"]] + _serie() + [["messen"]], modus="slow")
+        self.assertFalse(info["slow"], "Bildschirm zeigt nur 29,97 Hz: nichts verpasst")
+        self.assertGreater(info["vsyncMs"], 32.0)
+        self.assertEqual(m["scale"], 1)
+
+    def test_ohne_hz_bleibt_bisherige_schaetzung(self):
+        (info,) = _fahre(self._raf60_auf_30hz() + [["info"]], modus="slow")
+        self.assertTrue(info["slow"], "ohne echte Rate ist das Muster nicht unterscheidbar")
+        self.assertEqual(info["displayMs"], 0)
+
+    def test_ungueltige_hz_werden_ignoriert(self):
+        for hz in (0, None, "x", 5, 1000):
+            (info,) = _fahre([["hz", hz], ["info"]], modus="slow")
+            self.assertEqual(info["displayMs"], 0, hz)
+
+    def test_echte_langsamkeit_wird_mit_hz_weiter_erkannt(self):
+        v = 1000 / 60
+        schritte = [["hz", 60]] + [["frame", v if i % 3 else 3 * v] for i in range(240)]
+        (info,) = _fahre(schritte + [["info"]], modus="slow")
+        self.assertTrue(info["slow"])
 
     def test_hoch_doppel_raf_kurz_lang_reihenfolge_egal(self):
         v = 1000 / 29.97
