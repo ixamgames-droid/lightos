@@ -1778,6 +1778,10 @@ class AppState:
                             _union[_u] = _union.get(_u, frozenset()) | frozenset(_s)
                     self._push_laser_estop_mask(target_active=True, target_addrs=_union)
             with self._get_plan_lock():
+                # OUT-62 (Review): die zum Plan gehoerende Maske SOFORT merken —
+                # wirft unten etwas, bezoege sich der naechste Uebergang sonst
+                # auf die Maske des vorigen Plans.
+                self._blackout_keep_gesetzt = new_keep_mask
                 self._fix_index = fix_index
                 self._default_frame = new_default_frame
                 self._commit_spans = spans
@@ -1815,7 +1819,6 @@ class AppState:
             self.output_manager.set_blackout_keep_mask(new_keep_mask)
         except Exception as e:
             print(f"[AppState] set blackout mask error: {e}")
-        self._blackout_keep_gesetzt = new_keep_mask
         # OUT-61b: alle Laser-Adressen (unabhaengig vom NOT-AUS-Latch) — die
         # Lade-Sperre braucht sie, falls der Latch erst waehrend eines Loads
         # ausgeloest wird (dann ist der Plan schon leer).
