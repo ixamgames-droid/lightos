@@ -60,7 +60,6 @@
 | VIZ-86 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
 | VIZ-87 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
 | DOC-62 | D | docs/doc62-installdoku-windows | 2026-10-08T18:55Z | INSTALL.md · CONTRIBUTING.md · install.py · tests/test_doc62_installdoku.py |
-| LAS-25 | A | fix/codex-p1-0810 | 2026-10-08T16:57Z | - |
 | TOOL-16 | A | fix/codex-p1-0810 | 2026-10-08T16:57Z | - |
 | UI-81 | A | fix/codex-p1-0810 | 2026-10-08T16:57Z | - |
 | DEMO-07 | A | docs/demo07-showcase-shows | 2026-10-08T17:30Z | - |
@@ -186,7 +185,6 @@
 
 ## Verlauf
 
-- 2026-10-08T18:23Z D aktualisiert QA-90: Dateien tests/test_viz72_spot_pool_umgebung.py · BACKLOG.md -> tests/test_viz72_spot_pool_umgebung.py · src/ui/visualizer/visualizer_window.py · BACKLOG.md
 - 2026-10-08T18:29Z D claim QA-89
 - 2026-10-08T18:32Z B claim XPLAT-46
 - 2026-10-08T18:37Z A claim DOC-66
@@ -216,3 +214,4 @@
 - 2026-10-08T20:03Z B abgebrochen XPLAT-36
 - 2026-10-08T20:03Z B done VIZ-71
 - 2026-10-08T20:13Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-08T20:19Z A done LAS-25
