@@ -303,6 +303,8 @@ window.__lightos = {
              lichter, spots, schatten };
   },
   dynamicResolutionInfo: () => dynamicResolution.info(),
+  // Codex #966: neue Bildwiederholrate nach einem Bildschirmwechsel (Python).
+  setDisplayHz: (hz) => dynamicResolution.setDisplayHz(hz),
   __noteCameraMotion: noteCameraMotion,
   // A3D-41: Test-Seams fuer die NaN-Guards der Zeiger-Mathematik. `mouse` ist
   // absichtlich das GETEILTE Vector2 selbst (nicht eine Kopie) — der Test muss

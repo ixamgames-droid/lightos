@@ -316,6 +316,40 @@ def _bildschirm_hz(view) -> float:
     return hz if 10.0 <= hz <= 500.0 else 0.0
 
 
+def _hz_js(hz: float) -> str:
+    """JS-Schnipsel, das eine neue Bildwiederholrate an die laufende Seite
+    reicht (Codex #966: die URL-Angabe ``&hz=`` gilt nur beim Laden). Laeuft
+    die Szene noch nicht, wird der Wert fuer ``renderer.js`` geparkt."""
+    v = f"{float(hz):.2f}" if hz else "0"
+    return ("(function(h){var l=window.__lightos;"
+            "if(l&&typeof l.setDisplayHz==='function'){l.setDisplayHz(h);}"
+            "else{window.__lightosDisplayHz=h;}})(" + v + ");")
+
+
+def push_bildschirm_hz(view, screen=None) -> float:
+    """VIZ-85/Codex #966: nach einem Bildschirmwechsel die Hz des NEUEN
+    Bildschirms an die dynamische Aufloesung reichen. Das Popout wird erst
+    nach dem Laden per ``_place_on_free_screen()`` auf den Zweitschirm
+    geschoben — ohne diesen Nachschub bewertete die Seite einen 30-Hz-TV mit
+    der Hz des Hauptschirms. Rueckgabe: die gesendete Hz (0.0 = unbekannt,
+    dann wird die Angabe auf der Seite geloescht)."""
+    hz = 0.0
+    try:
+        if screen is not None:
+            hz = float(screen.refreshRate())
+            if not (10.0 <= hz <= 500.0):
+                hz = 0.0
+        else:
+            hz = _bildschirm_hz(view)
+    except Exception:
+        hz = 0.0
+    try:
+        view.page().runJavaScript(_hz_js(hz))
+    except Exception as e:
+        print(f"[Visualizer] push_bildschirm_hz error: {e}")
+    return hz
+
+
 def load_stage_html(view) -> None:
     """HTML mit Cache-Buster laden (v=Zeitstempel) — sowohl beim Erst-Load als
     auch beim Renderer-Neustart wiederverwendet, damit Three.js/Szene-JS nie
@@ -5708,6 +5742,10 @@ class VisualizerWindow(QMainWindow):
             self._bridge.push_pixel_ratio(ratio)
         except Exception as e:
             print(f"[Visualizer] screenChanged handling error: {e}")
+        # Codex #966: auch die Bildwiederholrate des neuen Bildschirms.
+        view = getattr(self, "_view", None)
+        if view is not None:
+            push_bildschirm_hz(view, screen)
 
     def hideEvent(self, event):
         # Nur versteckt (nicht geschlossen): Target auf inaktiv setzen -> spart
