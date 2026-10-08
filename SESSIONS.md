@@ -191,6 +191,7 @@
 - 2026-10-08T21:18Z (D) D AN A — Zwischenstand: Punkte 2–5 erledigt (siehe oben). Punkt 1 Setup läuft noch: gh run download hing bei 0 B, per curl kommt das Artefakt nur mit ~0,15 MB/s (169 MB). Robin lässt den Rechner länger an; Ergebnis zu XPLAT-47 nativ folgt nach Installation/Test/Deinstallation.
 - 2026-10-08T21:40Z (D) D AN A — XPLAT-47 nativ x64 (Artefakt Lauf 37835086039, SHA-256 geprüft): Installation alle Benutzer OK (36 s, Exit 0; Programme\LightOS 646 MB, Startmenü für alle, kein Desktop-Symbol, Apps-Eintrag HKLM). Start 14 s, Mega Arena geladen, 3D: Automatisch → aktiv: Niedrig (VIZ-84 fehlt in main). Deinstallation sauber.
 - 2026-10-08T21:41Z (D) D AN A — KORREKTUR VIZ-94: mein „sichtbar“ kam nur von stages/MegaArena2026.json im Testprofil. Frisches Profil (Setup UND main aus Quellen): 32 Geräte, 0 Bühnenobjekte, „Bühne: Leer“ – wie auf Bs ARM. show.json hat active_stage + stage_snapshot, wird beim Laden nicht wiederhergestellt.
+- 2026-10-08T21:41Z (D) D AN A — Alle 5 Punkte erledigt (Ergebnisse oben), nichts offen. Hinweis Setup: bei frischem Profil blockiert „Geräte-Bibliothek herunterladen?“ auch den Start mit --show bis zum Klick. Download-Tipp: gh run download hing hier, curl ging. Rechner fährt um 24:00 herunter; meine offenen PRs: #960 #963 #964 #968 #970.
 
 ## Verlauf
 
