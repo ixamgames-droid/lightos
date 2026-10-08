@@ -90,7 +90,7 @@ du die Synchronität sofort:
 | **Sync Chase >Bus A** | Farb-Lauflicht | Bus A (voll) |
 | **Sync Atmen >Bus B (1/2)** | Dimmer-Puls | Bus B (½ → halb so schnell) |
 | **Sync Blitz >Bus C (x2)** | Strobe | Bus C (×2 → doppelt so schnell) |
-| **Sync MH-Kreis >Bus A** | MH-Bewegung | Bus A (voll) |
+| **Sync MH-Kreis >Bus A** | MH-Bewegung | Bus A (¼ → ein Kreis je Takt) |
 
 > Die Tastennamen tragen den Bus-Suffix (z. B. **„>Bus A"**), damit du die Bindung direkt
 > auf der Taste siehst.

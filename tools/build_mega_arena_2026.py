@@ -24,9 +24,11 @@ VC-BAENKE (APC-Seiten):
     5 HARDSTYLE — BPM/Tap, Beat-Blink RRRW/RWRW, Speeds, Auto-Show, Media, Master
 
 Alle Effekte folgen dem Master-Bus "Global" (= globale Musik-BPM via Tap/Audio)
-mit eigenem tempo_multiplier (Speed-Dials 1/4..4x). Kategorien LAYERN (edit_slot
-statt globalem stop_all/exclusive). Safety: Mover-Shutter offen, Laser bleibt aus
-bis Arm/Muster, base_levels ohne implizite Grundhelligkeit.
+mit eigenem tempo_multiplier (Speed-Dials 1/4..4x; Bewegung MH 1/8..1/4, Spider
+1/16..1/8, ENG-31).
+Kategorien LAYERN (edit_slot statt globalem stop_all/exclusive). Safety: Mover-
+Shutter offen, Laser bleibt aus bis Arm/Muster, base_levels ohne implizite
+Grundhelligkeit.
 
 Aufruf:  venv/Scripts/python.exe tools/build_mega_arena_2026.py
          (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
@@ -88,6 +90,19 @@ OUT = os.environ.get("LIGHTOS_GEN_OUT") or os.path.join(_ROOT, "shows", "Mega_Ar
 STAGE_NAME = "MegaArena2026"
 MUSIC_DIR = os.environ.get("LIGHTOS_MEGA_MUSIC_DIR", r"C:/Users/X/Desktop/Musik/BP Party")
 BUS = "Global"            # Master: folgt der globalen Musik-BPM (Tap/Audio)
+SEED_BPM = 150.0          # Hardstyle-Grundtempo (s. FINALISIEREN)
+# ENG-31: Am Tempo-Bus ist bei tempo_multiplier 1 EIN BEAT EINE VOLLE FIGUR — bei
+# 150 BPM also 2,5 Kreise/Schwenks pro Sekunde, und die Geraete fahren das am Rig
+# wirklich so schnell (Zittern auf der Stelle). Bewegungen bleiben am Bus (takt-
+# synchron), aber mit kleinem Faktor — Regel aus der Praxis am Rig:
+#   * Moving Heads: Grundfaktor 1/4 (eine Figur je 4 Beats = 1 Takt);
+#   * Spider ("Wackellichter"): 1/4 bis 1/2 des MH-Faktors, also LANGSAMER als
+#     die Moving Heads — auch "Spider Wackeln";
+#   * Farbverlaeufe haben ihre eigenen Faktoren (Farb-Dials), unabhaengig davon.
+MH_MULT = 1.0 / 4.0
+SP_MULT = MH_MULT / 2.0                         # Spider: halbes MH-Tempo (1/8)
+MH_FACTORS = [1.0 / 8.0, 1.0 / 4.0]             # Dial-Stufen Moving Heads
+SP_FACTORS = [MH_MULT / 4.0, MH_MULT / 2.0]     # Dial-Stufen Spider: 1/16, 1/8
 PLAYLIST_MAX = 16
 
 
@@ -360,11 +375,13 @@ bind_tempo(gobo_wechsel, "gobo_mh")
 #  3) BEWEGUNG — MH-Formen + Publikums-Sweep + Spider-Tilt (kein Pan!)
 # ════════════════════════════════════════════════════════════════════════════
 def efx(name, algo, fids, group, phase_mode="sync", counter=False, size=140.0,
-        speed_hz=0.5, x=128.0, y=128.0, mult=1.0, rotation=0.0):
+        x=128.0, y=128.0, mult=MH_MULT, rotation=0.0):
     e = fm.new_efx(name)
     e.algorithm = algo
     e.fixtures = [EfxFixture(fid=f) for f in fids]
-    e.speed_hz, e.open_beam = speed_hz, True
+    # ENG-31: Free-Run (Bus noch ohne BPM) laeuft so schnell wie am Bus bei SEED_BPM —
+    # sonst waere der Effekt vor dem ersten Beat ein anderer als danach.
+    e.speed_hz, e.open_beam = round(SEED_BPM / 60.0 * mult, 4), True
     e.x_offset, e.y_offset = x, y
     e.width = e.height = size
     e.rotation = rotation
@@ -405,19 +422,22 @@ mh_wavy.set_custom_path(wavy_path); mh_wavy.open_beam = True
 mh_square = efx("MH Quadrat", EfxAlgorithm.SQUARE, all_mh, "mv_mh", phase_mode="sync", size=150)
 mh_heart = efx("MH Herz", EfxAlgorithm.CIRCLE, all_mh, "mv_mh", size=170)
 mh_heart.set_custom_path(heart_path); mh_heart.open_beam = True
-mh_random = efx("MH Random", EfxAlgorithm.RANDOM, all_mh, "mv_mh", size=160, speed_hz=0.7)
+# ENG-31: Random laeuft mit demselben Faktor wie die Formen (ein Wegpunkt je 4
+# Beats) — der Bewegungs-Dial setzt den Faktor absolut und zeigt ihn an; ein
+# abweichender Baufaktor waere nach dem ersten Druck ohnehin weg.
+mh_random = efx("MH Random", EfxAlgorithm.RANDOM, all_mh, "mv_mh", size=160)
 # Publikums-Sweep: breiter horizontaler Faecher NUR ueber die 4 Seiten-MH (ins Publikum)
 crowd_sweep = efx("Publikums-Sweep", EfxAlgorithm.LINE, mh_crowd, "mv_crowd",
-                  phase_mode="offset", size=230, speed_hz=0.4)
+                  phase_mode="offset", size=230)
 MH_SHAPES = [mh_circle, mh_eight, mh_wavy, mh_square, mh_heart, mh_random]
 
 # Spider (SPIDER14): NUR Tilt (kein Pan). LINE braucht rotation=90 (sonst statisch!).
-sp_scissor = efx("Spider Schere", EfxAlgorithm.LINE, spider_fids, "mv_sp",
-                 phase_mode="sync", size=210, speed_hz=0.6, rotation=90.0)
-sp_wave = efx("Spider Welle", EfxAlgorithm.CIRCLE, spider_fids, "mv_sp",
-              phase_mode="offset", size=180, speed_hz=0.5)
-sp_wiggle = efx("Spider Wackeln", EfxAlgorithm.LINE, spider_fids, "mv_sp",
-                phase_mode="sync", size=90, speed_hz=4.0, mult=2.0, rotation=90.0)
+sp_scissor = efx("Spider Schere", EfxAlgorithm.LINE, spider_fids, "mv_sp", mult=SP_MULT,
+                 phase_mode="sync", size=210, rotation=90.0)
+sp_wave = efx("Spider Welle", EfxAlgorithm.CIRCLE, spider_fids, "mv_sp", mult=SP_MULT,
+              phase_mode="offset", size=180)
+sp_wiggle = efx("Spider Wackeln", EfxAlgorithm.LINE, spider_fids, "mv_sp", mult=SP_MULT,
+                phase_mode="sync", size=90, rotation=90.0)
 
 
 def spider_pose(name, tl, tr):
@@ -438,6 +458,8 @@ def spider_pose(name, tl, tr):
 sp_out = spider_pose("Spider Aussen", 0, 255)
 sp_in = spider_pose("Spider Innen", 128, 128)
 SP_MOVES = [sp_scissor, sp_wave, sp_wiggle, crowd_sweep]
+# ENG-31: Der Spider-Dial setzt den Faktor ABSOLUT (1/16 oder 1/8) — alle Spider-
+# EFX laufen mit SP_MULT, "Spider Wackeln" eingeschlossen (nie schneller als die MH).
 SP_MULT_FX = [sp_scissor, sp_wave, sp_wiggle]
 
 
@@ -735,11 +757,14 @@ def flash_btn(fn, r, c, bank, accent, note=None, bg=None):
     _add(b, x, y, PAD, PAD, bank)
 
 
-def speed_dial(caption, x, y, bank, function_ids, ww=150, hh=146):
+def speed_dial(caption, x, y, bank, function_ids, ww=150, hh=146, factors=None, active=1.0):
     w = VCSpeedDial(caption)
     w.target_mode = SpeedTarget.TEMPO_BUS_MULT
     w.function_ids = [f.id for f in function_ids]
-    w.factor_buttons = [0.25, 0.5, 1.0, 2.0, 3.0, 4.0]
+    w.factor_buttons = list(factors or [0.25, 0.5, 1.0, 2.0, 3.0, 4.0])
+    # ENG-31: der Dial setzt tempo_multiplier ABSOLUT — seine Anzeige muss den
+    # Faktor zeigen, mit dem die Effekte gebaut wurden.
+    w._active_factor = w._mult = float(active)
     w.show_dial = False
     w.show_tap = False
     w.show_sync = False
@@ -878,8 +903,9 @@ for i, sc in enumerate((sp_out, sp_in)):
     fx_btn(sc, 4, 3 + i, B_MOVE, "#2a4a4a", "mv_sp", note=note_rc(4, 3 + i))
 label("Spider-Tilt (kein Pan!) + Posen", X0, pad_xy(3, 0)[1] - 16, 240, B_MOVE)
 xy_pad("MH Bereich (Box aufziehen)", CA, Y0, B_MOVE, all_mh, "area", efx_function_id=mh_circle.id)
-speed_dial("MH ×", CA, Y0 + 188, B_MOVE, MH_SHAPES + [crowd_sweep])
-speed_dial("Spider ×", CA + 162, Y0 + 188, B_MOVE, SP_MULT_FX)
+speed_dial("MH ×", CA, Y0 + 188, B_MOVE, MH_SHAPES + [crowd_sweep], factors=MH_FACTORS, active=MH_MULT)
+speed_dial("Spider ×", CA + 162, Y0 + 188, B_MOVE, SP_MULT_FX,
+           factors=SP_FACTORS, active=SP_MULT)
 label("BANK 3 BEWEGUNG — R0-1 MH-Formen · R2 Publikums-Sweep (Seiten) · R3-4 Spider-Tilt + Posen. "
       "Rechts: XY-Bereich + Speeds.", X0, Y0 + 6 * STEP, 440, B_MOVE)
 
@@ -947,7 +973,8 @@ label("AUTO-SHOW (Loop) · Licht An · Nebel", X0, pad_xy(3, 0)[1] - 16, 320, B_
 song_info(X0, pad_xy(4, 0)[1], B_HARD, ww=300, hh=64)
 # Speeds + Master-Dimmer
 speed_dial("Farbe ×", CA, Y0 + 190, B_HARD, par_color + led_color + spider_color)
-speed_dial("Bewegung ×", CA + 162, Y0 + 190, B_HARD, MH_SHAPES + SP_MULT_FX + [crowd_sweep])
+speed_dial("Bewegung ×", CA + 162, Y0 + 190, B_HARD, MH_SHAPES + [crowd_sweep],
+           factors=MH_FACTORS, active=MH_MULT)  # nur MH: Spider haben ihr halbes Tempo
 MFX = CB + 250
 master_fader("Spider", MFX, Y0, B_HARD, SliderMode.GROUP_DIMMER, group="Spider", midi_cc=52)
 master_fader("MH", MFX + 54, Y0, B_HARD, SliderMode.GROUP_DIMMER, group="Moving Heads", midi_cc=53)
@@ -1047,7 +1074,7 @@ state.show_name = "Mega Arena 2026"
 get_tempo_bus_manager().set_auto_sync(True)
 # Hardstyle-Grundtempo seeden (Global folgt zur Laufzeit der Musik-BPM/Tap).
 from src.core.engine.bpm_manager import get_bpm_manager as _gbm
-_gbm().request_bpm(150.0, "seed")
+_gbm().request_bpm(SEED_BPM, "seed")
 
 pe = state.playback_engine
 try:
