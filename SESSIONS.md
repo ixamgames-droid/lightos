@@ -67,6 +67,7 @@
 | TOOL-16 | A | fix/codex-p1-0810 | 2026-10-08T16:57Z | - |
 | UI-81 | A | fix/codex-p1-0810 | 2026-10-08T16:57Z | - |
 | BACKLOG-0810B | A | docs/backlog-web-codex | 2026-10-08T17:29Z | BACKLOG.md |
+| DEMO-07 | A | docs/demo07-showcase-shows | 2026-10-08T17:30Z | - |
 
 ## Blocker & Fallen
 
@@ -159,7 +160,6 @@
 
 ## Verlauf
 
-- 2026-10-08T15:16Z 6 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T15:16Z A claim ENG-31
 - 2026-10-08T15:53Z A claim BACKLOG-D-BERICHT
 - 2026-10-08T15:53Z 3 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
@@ -189,3 +189,4 @@
 - 2026-10-08T17:16Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T17:29Z A claim BACKLOG-0810B
 - 2026-10-08T17:29Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-08T17:30Z A claim DEMO-07
