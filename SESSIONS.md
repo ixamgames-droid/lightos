@@ -63,7 +63,7 @@
 | VIZ-86 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
 | VIZ-87 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
 | QA-86 | D | fix/qa86-szenen-stufe | 2026-10-08T15:59Z | tests/test_a3d41_mouse_nan_guard.py · tests/test_fm14b_pixel_ring_scene.py · tests/test_fm14_pixel_head_scene.py · tests/test_viz13c1_topdown_polish.py · tests/test_viz13c2_ondemand.py · tests/test_viz13c_updatedmx_registry.py · tests/test_viz14_arrange_scene.py · tests/test_viz14_deselect_scene.py · tests/test_viz14_drag_scene.py · tests/test_viz14_empty_state_scene.py · tests/test_viz14_labels_scene.py · tests/test_viz14_mode_frame_scene.py · tests/test_viz14_place_ghost_scene.py · tests/test_viz14_room_shell_scene.py · tests/test_viz14_selection_scene.py · tests/test_viz15_beam_falloff_scene.py · tests/test_viz15_beam_range_scene.py · tests/test_viz15_boden_pool_scene.py · tests/test_viz50a_panel_koerper_scene.py · tests/test_viz50b_weissband_scene.py · tests/test_viz52_tooltip_montage_drehung.py · tests/test_viz68_objekt_bibliothek.py · tests/test_viz71_apply_dmx_scene.py · tests/test_viz71_poll_robust.py · tests/test_viz79_laser_strahlen_scene.py · tests/test_viz80_optik_gobo_scene.py · tests/test_viz_beam_stop_scene.py · tests/test_viz_color_brightness.py · tests/test_viz_labels_js.py · tests/test_viz_optics_focus_frost_scene.py · tests/test_viz_scene_start_guard.py · tests/test_viz_shadow_dispose.py · tests/test_qa86_szenen_stufe_gesetzt.py |
-| QA-87 | D | fix/qa87-tap-uhr | 2026-10-08T16:05Z | src/core/engine/tap_uhr.py · src/core/engine/tempo_bus.py · src/core/engine/bpm_manager.py · src/ui/virtualconsole/vc_speedial.py · tests/test_vc_speed_node.py · tests/test_vc_tempo_widgets.py · tests/test_qa87_tap_uhr.py · changelog.d/2026-10-08-QA-87.md |
+| QA-87 | D | fix/qa87-tap-uhr | 2026-10-08T16:29Z | src/core/engine/tap_uhr.py · src/core/engine/tempo_bus.py · src/core/engine/bpm_manager.py · src/ui/virtualconsole/vc_speedial.py · tests/test_vc_speed_node.py · tests/test_vc_tempo_widgets.py · tests/test_qa87_tap_uhr.py · tests/test_tempo_bus.py · tests/test_tempo_grandmaster.py · tests/test_bpm_leader.py · changelog.d/2026-10-08-QA-87.md |
 | QA-88 | D | fix/qa88-anleitungsbilder-windows | 2026-10-08T16:14Z | tools/anleitungsbilder.py · tools/anleitungsbilder/sandbox.py · tools/anleitungsbilder/runner.py · tests/test_qa88_anleitungsbilder_windows.py · docs/ANLEITUNGSBILDER.md |
 | DOC-62 | D | docs/doc62-installdoku-windows | 2026-10-08T16:16Z | INSTALL.md · CONTRIBUTING.md · install.py · tests/test_doc62_installdoku.py |
 
@@ -160,7 +160,6 @@
 
 ## Verlauf
 
-- 2026-10-05T20:39Z A done BACKLOG-KONSOLEN
 - 2026-10-06T20:34Z A claim QA-85
 - 2026-10-06T20:34Z 3 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-06T21:02Z A done VIZ-80
@@ -190,3 +189,4 @@
 - 2026-10-08T16:14Z D claim QA-88
 - 2026-10-08T16:16Z D claim DOC-62
 - 2026-10-08T16:27Z 3 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-08T16:29Z D aktualisiert QA-87: Dateien src/core/engine/tap_uhr.py · src/core/engine/tempo_bus.py · src/core/engine/bpm_manager.py · src/ui/virtualconsole/vc_speedial.py · tests/test_vc_speed_node.py · tests/test_vc_tempo_widgets.py · tests/test_qa87_tap_uhr.py · changelog.d/2026-10-08-QA-87.md -> src/core/engine/tap_uhr.py · src/core/engine/tempo_bus.py · src/core/engine/bpm_manager.py · src/ui/virtualconsole/vc_speedial.py · tests/test_vc_speed_node.py · tests/test_vc_tempo_widgets.py · tests/test_qa87_tap_uhr.py · tests/test_tempo_bus.py · tests/test_tempo_grandmaster.py · tests/test_bpm_leader.py · changelog.d/2026-10-08-QA-87.md
