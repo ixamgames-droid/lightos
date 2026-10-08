@@ -265,6 +265,12 @@ class PatchedFixture(Base):
     # 0/90/180/270 im Uhrzeigersinn, danach optional waagerecht gespiegelt.
     element_rotation: Mapped[int] = mapped_column(Integer, default=0)
     element_flip: Mapped[bool] = mapped_column(Boolean, default=False)
+    # LAS-30: Laser-Achsen je Montage (haengend/stehend) — Gegenstueck zu
+    # invert_pan/invert_tilt/swap_pan_tilt fuer ``laser_x``/``laser_y``.
+    # Wirkt in derselben Ausgabestufe (``apply_pan_tilt_orientation``).
+    invert_laser_x: Mapped[bool] = mapped_column(Boolean, default=False)
+    invert_laser_y: Mapped[bool] = mapped_column(Boolean, default=False)
+    swap_laser_xy: Mapped[bool] = mapped_column(Boolean, default=False)
     # Moving-Head physische Pan/Tilt-Bereiche (Grad) + DMX-Nullpunkt (Mitte) —
     # fuer hardware-genaues Auto-Aim UND den 3D-Visualizer (gleiche Abbildung).
     # Default: typische Moving-Head-Werte 540/270, Mitte bei DMX 128.
@@ -407,6 +413,12 @@ def migrate_show_db(engine) -> None:
                 conn.execute(text(
                     "ALTER TABLE patched_fixtures ADD COLUMN element_flip "
                     "BOOLEAN DEFAULT 0"))
+            # LAS-30: Laser-Achsen-Orientierung (Default aus).
+            for _lcol in ("invert_laser_x", "invert_laser_y", "swap_laser_xy"):
+                if pcols and _lcol not in pcols:
+                    conn.execute(text(
+                        f"ALTER TABLE patched_fixtures ADD COLUMN {_lcol} "
+                        "BOOLEAN DEFAULT 0"))
     except Exception as e:
         print(f"[models] migrate_show_db error: {e}")
 

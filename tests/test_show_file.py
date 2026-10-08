@@ -32,6 +32,9 @@ class _FakePatchedFixture:
     # sonst faellt das Laden mit einem TypeError durch — genau so gefunden.
     element_rotation: int = 0
     element_flip: bool = False     # FM-13 (Default = zeilenweise, Bestand)
+    invert_laser_x: bool = False   # LAS-30
+    invert_laser_y: bool = False
+    swap_laser_xy: bool = False
     pan_range_deg: int = 540
     tilt_range_deg: int = 270
     pan_zero_dmx: int = 128
