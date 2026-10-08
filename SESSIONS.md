@@ -83,6 +83,7 @@
 | UI-76 | B | fix/ui76-go-hinweis-page | 2026-10-08T19:17Z | src/core/cueliste_ziel.py · src/ui/views/playback_view.py · tests/test_ui76_go_hinweis.py · docs/anleitung_szenen_cues/ANLEITUNG.md · changelog.d/2026-10-08-UI-76.md · BACKLOG.md |
 | STAB-30 | A | feature/stab30-diagnose-log | 2026-10-08T19:39Z | main.py · src/core/crash_logging.py |
 | VIZ-71 | B | - | 2026-10-08T19:41Z | - |
+| VIZ-94 | B | fix/viz94-buehne-windows-arm | 2026-10-08T19:42Z | - |
 
 ## Blocker & Fallen
 
@@ -183,7 +184,6 @@
 
 ## Verlauf
 
-- 2026-10-08T17:30Z A claim DEMO-07
 - 2026-10-08T17:47Z A claim VIZ-92
 - 2026-10-08T17:47Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T17:51Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
@@ -213,3 +213,4 @@
 - 2026-10-08T19:38Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T19:39Z A claim STAB-30
 - 2026-10-08T19:41Z B claim VIZ-71
+- 2026-10-08T19:42Z B claim VIZ-94
