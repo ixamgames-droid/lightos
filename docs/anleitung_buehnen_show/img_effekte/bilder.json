@@ -1,0 +1,490 @@
+{
+  "anleitung": "buehnen_effekte",
+  "werkzeug": "tools/anleitungsbilder.py",
+  "stand": "8148ec3f",
+  "schrift": "Noto Sans (statt Roboto Condensed)",
+  "qt": "6.11.1",
+  "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py buehnen_effekte'.",
+  "bilder": [
+    {
+      "datei": "01_matrix_gruppe.png",
+      "szene": "01_matrix_gruppe",
+      "titel": "Gruppe „PAR alle (links → rechts)“ wählen, Reiter Matrix, „+ Neu“",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "d18f3385beecf7c6c6dcf2955436dcdd"
+    },
+    {
+      "datei": "02_matrix_grundeinstellungen.png",
+      "szene": "02_matrix_grundeinstellungen",
+      "titel": "Matrix: Name, Algorithmus Chase, Stil Dimmer, Geschwindigkeit, Tempo-Bus",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "e17e6d4d2082303c968e48caceadf47a"
+    },
+    {
+      "datei": "03_matrix_bewegung.png",
+      "szene": "03_matrix_bewegung",
+      "titel": "Matrix: Bewegung Mitte→außen, Läufer-Breite, Start",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "cff365308560b2e1b462d98d8548d7e3"
+    },
+    {
+      "datei": "04_lauflicht_3d.gif",
+      "szene": "04_lauflicht_3d",
+      "titel": "GIF: Lauflicht Mitte → außen über 40 PARs (Farbe: Magenta)",
+      "groesse": [
+        640,
+        341
+      ],
+      "marken": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "md5": "2712efdd5dcc8b2dded5d7c3d7f2bc71",
+      "frames": 18,
+      "dauern_ms": [
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120
+      ]
+    },
+    {
+      "datei": "05_efx_neu.png",
+      "szene": "05_efx_neu",
+      "titel": "Gruppe „MH alle (links → rechts)“, Reiter EFX, „+ Neu“",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "beb4136ee0265b696197a49b19202c7a"
+    },
+    {
+      "datei": "06_efx_form.png",
+      "szene": "06_efx_form",
+      "titel": "EFX: Name, Algorithmus Line, Breite/Höhe/Zentrum",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "8673c4a52acd504230a76cbfb4030b1d"
+    },
+    {
+      "datei": "07_efx_tempo.png",
+      "szene": "07_efx_tempo",
+      "titel": "EFX: Geschwindigkeit, Tempo-Bus frei",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "6f917fefefc9ee99e9c4543174ddd43f"
+    },
+    {
+      "datei": "08_efx_verhaeltnis.png",
+      "szene": "08_efx_verhaeltnis",
+      "titel": "EFX: Verhältnis Fächer, Dimmer/Shutter mit öffnen, Speichern, Start",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "70604dc46f92ad162b9adeb1e94a82dc"
+    },
+    {
+      "datei": "09_welle_3d.gif",
+      "szene": "09_welle_3d",
+      "titel": "GIF: Pan-Welle über 20 Moving Heads (Farbe: MH Blau)",
+      "groesse": [
+        640,
+        341
+      ],
+      "marken": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "md5": "ed9149464005183f9ca3be3a2e00f4cb",
+      "frames": 15,
+      "dauern_ms": [
+        240,
+        240,
+        240,
+        240,
+        240,
+        240,
+        240,
+        240,
+        240,
+        240,
+        240,
+        240,
+        240,
+        240,
+        240
+      ]
+    },
+    {
+      "datei": "10_schwenker.png",
+      "szene": "10_schwenker",
+      "titel": "EFX: Fester Versatz pro Gerät 180° — Schwenker im Wechsel",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "895936b2d4084f39855cc2b1ad63a9c5"
+    },
+    {
+      "datei": "11_schwenker_3d.gif",
+      "szene": "11_schwenker_3d",
+      "titel": "GIF: Schwenker im Wechsel, Kamera fährt heran",
+      "groesse": [
+        640,
+        341
+      ],
+      "marken": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "md5": "12e9a9b80b216361e702f358fa256ba9",
+      "frames": 18,
+      "dauern_ms": [
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200
+      ]
+    },
+    {
+      "datei": "12_strobe.png",
+      "szene": "12_strobe",
+      "titel": "Matrix auf der Gruppe Strobes: Algorithmus Strobe, Stil Dimmer",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "12fe754530a46a9ed1df73a832b3f6c2"
+    },
+    {
+      "datei": "13_strobe_3d.gif",
+      "szene": "13_strobe_3d",
+      "titel": "GIF: Strobe auf der Mittel-Traverse",
+      "groesse": [
+        640,
+        341
+      ],
+      "marken": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "md5": "c16219757d3cb01ee80705768dc82984",
+      "frames": 16,
+      "dauern_ms": [
+        70,
+        70,
+        70,
+        70,
+        70,
+        70,
+        70,
+        70,
+        70,
+        70,
+        70,
+        70,
+        70,
+        70,
+        70,
+        70
+      ]
+    },
+    {
+      "datei": "14_laser_tab.png",
+      "szene": "14_laser_tab",
+      "titel": "Gruppe Laser, Reiter Laser, Regler X-Bewegung",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "3aea9e3762524eb6bb3219708a6b9317"
+    },
+    {
+      "datei": "15_laser_kanaele.png",
+      "szene": "15_laser_kanaele",
+      "titel": "Programmer → Szene: Kanäle auswählen",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "1a1efeefb993e65e697c843cd495a9da"
+    },
+    {
+      "datei": "16_laser_chaser.png",
+      "szene": "16_laser_chaser",
+      "titel": "Chaser „Mein Laser langsam“: Name, Run Order Loop, Tempo-Bus frei",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "f7b1501146ca85ec79a3441726ad28f1"
+    },
+    {
+      "datei": "17_laser_schritte.png",
+      "szene": "17_laser_schritte",
+      "titel": "Chaser: zwei Szenen übernommen, Fade In 4 s, Schließen",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "c3462ae90e8d402b181b63e796240543"
+    },
+    {
+      "datei": "18_laser_3d.gif",
+      "szene": "18_laser_3d",
+      "titel": "GIF: Laser an, Chaser „Mein Laser langsam“ schwenkt die Strahlen",
+      "groesse": [
+        600,
+        320
+      ],
+      "marken": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "md5": "535b10df7f5cb0fc4ded400afd7d1f5d",
+      "frames": 24,
+      "dauern_ms": [
+        350,
+        350,
+        350,
+        350,
+        350,
+        350,
+        350,
+        350,
+        350,
+        350,
+        350,
+        350,
+        350,
+        350,
+        350,
+        350,
+        350,
+        350,
+        350,
+        350,
+        350,
+        350,
+        350,
+        350
+      ]
+    },
+    {
+      "datei": "19_vc_button.png",
+      "szene": "19_vc_button",
+      "titel": "Button Einstellungen: Beschriftung, Funktion an/aus, Funktion, Slot",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "6712d342405632f690791f54f3e2e049"
+    },
+    {
+      "datei": "20_vc_seite.png",
+      "szene": "20_vc_seite",
+      "titel": "Eigene VC-Seite mit fünf Effekt-Knöpfen",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "73d3f027456500617081f850b88a71cd"
+    },
+    {
+      "datei": "21_3d_einstellungen.png",
+      "szene": "21_3d_einstellungen",
+      "titel": "3D-Visualizer, Reiter Einstellungen: Helligkeit, Beam Opacity, Nebel",
+      "groesse": [
+        1900,
+        1000
+      ],
+      "marken": [],
+      "md5": "85c3faa6701fe207ad6b0e9e40517d61"
+    },
+    {
+      "datei": "22_alles_3d.gif",
+      "szene": "22_alles_3d",
+      "titel": "GIF: alle selbst gebauten Effekte über die eigenen VC-Knöpfe, Kamera fährt aus dem Publikum heran",
+      "groesse": [
+        560,
+        298
+      ],
+      "marken": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "md5": "239ddd42dd45857b36b15bd49f80c55f",
+      "frames": 16,
+      "dauern_ms": [
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200
+      ]
+    }
+  ]
+}

@@ -16,7 +16,7 @@ if str(ROOT) not in sys.path:
 
 import pytest
 
-import src.core.engine.tempo_bus as tb
+from src.core.engine import tap_uhr
 from src.core.engine.tempo_bus import (
     TempoBus,
     TempoBusManager,
@@ -120,12 +120,13 @@ def test_tap_grandmaster_math(monkeypatch):
     times = [10.0, 10.5, 11.0, 11.5]
     state = {"i": 0}
 
-    def fake_monotonic():
+    def fake_jetzt():
         v = times[min(state["i"], len(times) - 1)]
         state["i"] += 1
         return v
 
-    monkeypatch.setattr(tb.time, "monotonic", fake_monotonic)
+    # QA-87: die Tap-Uhr ersetzen, nicht das prozessweite time.monotonic.
+    monkeypatch.setattr(tap_uhr, "jetzt", fake_jetzt)
     mgr = get_tempo_bus_manager()
     for _ in range(4):
         mgr.tap_grandmaster()                   # 0.5s Intervalle -> 120 BPM

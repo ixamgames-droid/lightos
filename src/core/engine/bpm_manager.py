@@ -17,6 +17,8 @@ import time
 import threading
 from typing import Callable
 
+from src.core.engine import tap_uhr
+
 
 BeatCallback = Callable[[int], None]   # callback(beat_index)
 
@@ -249,10 +251,14 @@ class BPMManager:
     def tap(self) -> float:
         """Tap-Tempo: BPM ueber die letzten 4 Taps. → MANUAL-Modus.
         Returns: aktuelle BPM (0 falls noch zu wenig Taps)."""
-        now = time.monotonic()
+        now = tap_uhr.jetzt()      # QA-87: nicht monotonic (Windows: 15,6-ms-Raster)
         with self._lock:
             if self._last_taps and (now - self._last_taps[-1] > self.TAP_WINDOW_SEC):
                 self._last_taps = []
+            if self._last_taps and now <= self._last_taps[-1]:
+                # QA-87: Tap ohne Zeitfortschritt verwerfen, BEVOR er in die
+                # Historie kommt (s. TempoBus.tap); Rueckgabe wie beim letzten Tap.
+                return 0.0 if len(self._last_taps) < 2 else self._bpm
             self._last_taps.append(now)
             if len(self._last_taps) > self.MAX_TAP_HISTORY + 1:
                 self._last_taps = self._last_taps[-(self.MAX_TAP_HISTORY + 1):]
@@ -260,10 +266,7 @@ class BPMManager:
                 return 0.0
             intervals = [self._last_taps[i + 1] - self._last_taps[i]
                          for i in range(len(self._last_taps) - 1)]
-            avg = sum(intervals) / len(intervals)
-            if avg <= 0:
-                return 0.0
-            bpm = 60.0 / avg
+            bpm = 60.0 / (sum(intervals) / len(intervals))
         self._set_manual(bpm, "tap")
         return self._bpm
 
