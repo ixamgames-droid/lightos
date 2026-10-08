@@ -81,6 +81,7 @@
 | OUT-64 | B | fix/out64-estop-ausgabeweg | 2026-10-08T19:11Z | src/core/dmx/output_manager.py · tests/test_out64_estop_ausgabeweg.py · changelog.d/2026-10-08-OUT-64.md · BACKLOG.md |
 | QA-83 | B | fix/qa83-vc-assets-isoliert | 2026-10-08T19:16Z | src/core/show/vc_assets.py · tools/_gen_env.py · tests/test_qa83_vc_assets_unberuehrt.py · BACKLOG.md |
 | UI-76 | B | fix/ui76-go-hinweis-page | 2026-10-08T19:17Z | src/core/cueliste_ziel.py · src/ui/views/playback_view.py · tests/test_ui76_go_hinweis.py · docs/anleitung_szenen_cues/ANLEITUNG.md · changelog.d/2026-10-08-UI-76.md · BACKLOG.md |
+| STAB-30 | A | feature/stab30-diagnose-log | 2026-10-08T19:39Z | main.py · src/core/crash_logging.py |
 
 ## Blocker & Fallen
 
@@ -180,7 +181,6 @@
 
 ## Verlauf
 
-- 2026-10-08T17:29Z A claim BACKLOG-0810B
 - 2026-10-08T17:29Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T17:30Z A claim DEMO-07
 - 2026-10-08T17:47Z A claim VIZ-92
@@ -210,3 +210,4 @@
 - 2026-10-08T19:17Z B claim UI-76
 - 2026-10-08T19:19Z D done QA-88
 - 2026-10-08T19:38Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-08T19:39Z A claim STAB-30
