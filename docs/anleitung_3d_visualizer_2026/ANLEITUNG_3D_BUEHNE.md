@@ -256,10 +256,15 @@ Bodenfleck und die leuchtende Linse. Die Umgebung (Bühne, Wände, Traversen,
 andere Geräte) **beleuchten** aber nur die hellsten Strahlen: auf **Hoch** die
 8 hellsten, auf **Niedrig** die 4, auf **Maximal** die 16 hellsten (Tabelle
 unten). Ein Rig mit höchstens so vielen Scheinwerfern sieht deshalb genau aus wie
-bisher. Bei mehr Geräten wandern die echten Lichter mit dem Geschehen: wird ein
-anderer Strahl deutlich heller (mindestens ein Viertel), übernimmt er das Licht
-des schwächsten — knapp hellere Strahlen lösen keinen Wechsel aus, damit das Licht
-bei einer Welle nicht flackert. Der Unterschied im Bild ist klein: an einer
+bisher. Bei mehr Geräten wandern die echten Lichter mit dem Geschehen, aber
+gebremst. Ein anderer Strahl übernimmt ein Licht erst, wenn er mindestens ein
+Viertel heller ist als der bisherige Halter **in dessen letztem Höhepunkt**. Ein
+leuchtendes Licht bleibt mindestens 0,4 s beim selben Gerät, und gewechselt wird
+höchstens fünfmal pro Sekunde. Bei einer schnellen Dimmer-Welle (bis etwa 2 s je
+Durchgang) bleiben die Lichter deshalb stehen. Bei langsameren Wellen und
+Lauflichtern ziehen sie mit. Geht ein Gerät schlagartig aus (Lauflicht, Blackout),
+ist sein Licht sofort frei. Sind viele Strahlen gleich hell, verteilen sich die
+Lichter über die Bühne. Der Unterschied im Bild ist klein: an einer
 80-Geräte-Bühne wichen rund 2 % der Bildpunkte merklich ab, vor allem die von
 vielen Scheinwerfern zugleich angestrahlte Bühnenfront und die Gehäuse.
 
