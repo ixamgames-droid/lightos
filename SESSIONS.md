@@ -59,7 +59,6 @@
 | VIZ-85 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
 | VIZ-86 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
 | VIZ-87 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
-| QA-87 | D | fix/qa87-tap-uhr | 2026-10-08T18:55Z | src/core/engine/tap_uhr.py · src/core/engine/tempo_bus.py · src/core/engine/bpm_manager.py · src/ui/virtualconsole/vc_speedial.py · tests/test_vc_speed_node.py · tests/test_vc_tempo_widgets.py · tests/test_qa87_tap_uhr.py · tests/test_tempo_bus.py · tests/test_tempo_grandmaster.py · tests/test_bpm_leader.py · changelog.d/2026-10-08-QA-87.md |
 | QA-88 | D | fix/qa88-anleitungsbilder-windows | 2026-10-08T18:55Z | tools/anleitungsbilder.py · tools/anleitungsbilder/sandbox.py · tools/anleitungsbilder/runner.py · tests/test_qa88_anleitungsbilder_windows.py · docs/ANLEITUNGSBILDER.md |
 | DOC-62 | D | docs/doc62-installdoku-windows | 2026-10-08T18:55Z | INSTALL.md · CONTRIBUTING.md · install.py · tests/test_doc62_installdoku.py |
 | LAS-25 | A | fix/codex-p1-0810 | 2026-10-08T16:57Z | - |
@@ -172,7 +171,6 @@
 
 ## Verlauf
 
-- 2026-10-08T16:49Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T16:57Z A claim LAS-25
 - 2026-10-08T16:57Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T16:57Z A claim TOOL-16
@@ -202,3 +200,4 @@
 - 2026-10-08T18:44Z A done BACKLOG-0810B
 - 2026-10-08T18:44Z D claim BPM-28
 - 2026-10-08T18:59Z B claim TOOL-11
+- 2026-10-08T19:03Z D done QA-87
