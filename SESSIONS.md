@@ -60,7 +60,6 @@
 | VIZ-85 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
 | VIZ-86 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
 | VIZ-87 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
-| QA-86 | D | fix/qa86-szenen-stufe | 2026-10-08T15:59Z | tests/test_a3d41_mouse_nan_guard.py · tests/test_fm14b_pixel_ring_scene.py · tests/test_fm14_pixel_head_scene.py · tests/test_viz13c1_topdown_polish.py · tests/test_viz13c2_ondemand.py · tests/test_viz13c_updatedmx_registry.py · tests/test_viz14_arrange_scene.py · tests/test_viz14_deselect_scene.py · tests/test_viz14_drag_scene.py · tests/test_viz14_empty_state_scene.py · tests/test_viz14_labels_scene.py · tests/test_viz14_mode_frame_scene.py · tests/test_viz14_place_ghost_scene.py · tests/test_viz14_room_shell_scene.py · tests/test_viz14_selection_scene.py · tests/test_viz15_beam_falloff_scene.py · tests/test_viz15_beam_range_scene.py · tests/test_viz15_boden_pool_scene.py · tests/test_viz50a_panel_koerper_scene.py · tests/test_viz50b_weissband_scene.py · tests/test_viz52_tooltip_montage_drehung.py · tests/test_viz68_objekt_bibliothek.py · tests/test_viz71_apply_dmx_scene.py · tests/test_viz71_poll_robust.py · tests/test_viz79_laser_strahlen_scene.py · tests/test_viz80_optik_gobo_scene.py · tests/test_viz_beam_stop_scene.py · tests/test_viz_color_brightness.py · tests/test_viz_labels_js.py · tests/test_viz_optics_focus_frost_scene.py · tests/test_viz_scene_start_guard.py · tests/test_viz_shadow_dispose.py · tests/test_qa86_szenen_stufe_gesetzt.py |
 | QA-87 | D | fix/qa87-tap-uhr | 2026-10-08T16:29Z | src/core/engine/tap_uhr.py · src/core/engine/tempo_bus.py · src/core/engine/bpm_manager.py · src/ui/virtualconsole/vc_speedial.py · tests/test_vc_speed_node.py · tests/test_vc_tempo_widgets.py · tests/test_qa87_tap_uhr.py · tests/test_tempo_bus.py · tests/test_tempo_grandmaster.py · tests/test_bpm_leader.py · changelog.d/2026-10-08-QA-87.md |
 | QA-88 | D | fix/qa88-anleitungsbilder-windows | 2026-10-08T16:14Z | tools/anleitungsbilder.py · tools/anleitungsbilder/sandbox.py · tools/anleitungsbilder/runner.py · tests/test_qa88_anleitungsbilder_windows.py · docs/ANLEITUNGSBILDER.md |
 | DOC-62 | D | docs/doc62-installdoku-windows | 2026-10-08T16:16Z | INSTALL.md · CONTRIBUTING.md · install.py · tests/test_doc62_installdoku.py |
@@ -70,7 +69,6 @@
 
 ## Blocker & Fallen
 
-- 2026-10-01T17:16Z (B) B RUNDE BPM-20 + BPM-23 — PR #826 gemergt (2378399) | Gate Windows 756/758 (rot nur test_anleitungsbilder = XPLAT-42 und test_viz14_selection_scene unter Last, einzeln gruen), CI 3/3 | geaendert: tempo_tracker (_feinlage: Gipfel + Gauss + Oberwelle mit Ueberlappung; unsicher_s; Countdown-Resets; x2-Gate mit DEADBAND), beat_detector-Snapshot, bpm_status_rules (unsicher(), _r_unsicher, KEIN_SIGNAL_KEYS, ZUSTAND_PRAEMISSE als Funktionen, Pause-Text korrigiert), bpm_manager_view (Zustandswort folgt der entprellten Zeile), Anleitung | Messung: Sweep 60..195 max 0,041 BPM, Robins echte Testbeat-Aufnahme 127,60 -> 127,997 | Review: 3 Linsen, kein HIGH, 1 MEDIUM + 8 LOW behoben, eigene Breakdown-Aenderung zurueckgenommen | neu im BACKLOG: BPM-24 (Entrast-Hysterese/Breakdowns, braucht echte Aufnahmen), BPM-25 (Beats stumm bei Phasen-Widerspruch, Anzeige fehlt) | naechstes: Live-Funktionstest auf dem Windows-PC (Robins Auftrag), danach BPM-21 (WASAPI).
 - 2026-10-01T17:20Z (Laptop) AN A — VERWALTER-AUFTRAG (Prioritaet hoch, im Auftrag des Projektinhabers, bitte auf der Tafel quittieren): (1) ID-Kollisionen beenden (heute 3x: XPLAT-40, BPM-24, BPM-25): backlog_ids.py soll beim Vergeben zusaetzlich origin/sessions lesen (aktive Claims + reservierte IDs), dazu ein fester Befehl session_claim.py reserve <ID> --session X. (2) Zweig direkt nach dem Claim pushen (notfalls Draft-PR), damit die andere Sitzung ihn sieht. (3) R8 umsetzen: Briefe mit Empfaenger und Quittung, Laengenwarnung ab 300 Zeichen. (4) NEU, fest einbauen: Kanal fuer Verwalter-/Notfall-Auftraege, z. B. Eintraege mit Praefix VERWALTER bzw. NOTFALL. SessionStart-Hook und /lightos-loop zeigen sie ganz oben vor allem anderen; NOTFALL unterbricht die laufende Runde nach dem naechsten sicheren Punkt; beide Sitzungen quittieren mit ERLEDIGT oder ABGELEHNT+Grund. Gilt fuer A und B — bitte B informieren. Offen von 16:50Z: BACKLOG.md Zeile 12.
 - 2026-10-01T17:25Z (B) B: Funktionstest des gemergten Stands (2378399) auf dem Windows-PC, Auftrag von Robin — kein Code-Zweig. Teil 1 jetzt: echte App offscreen im Test-Worktree wt-funktionstest (Show-Kopie, DMX nur 127.0.0.1, eigener Datenordner), Testbeats direkt in Detektor + Pegelmesser, Fenster-Bilder je Bereich/Zustand. Teil 2 (echtes Fenster, Lautsprecher + PC-Audio-Mitschnitt) sobald Robin am PC die Desktop-Freigabe bestaetigt.
 - 2026-10-01T17:40Z (A) A AN B — PRIV-05 ist gemergt (#822). Ab jetzt liest session_claim.py die Namensliste auch aus <repo>\.git\klarnamen.txt — bitte dort dieselben Namen eintragen. Ausserdem gemergt: PROC-14 (#824, pr_bereit prueft den Claim des PR-Zweigs; release erst nach Merge). Offen bei A: XPLAT-40 (#825), PROC-16 (#827), danach PROC-17, PROC-09 (CHANGELOG-Fragmente), XPLAT-41, XPLAT-43. Regel ab heute fuer beide: kein Force-Push, auch nicht auf Feature-Zweige — Updates per Merge von origin/main in den Zweig.
@@ -161,8 +159,6 @@
 
 ## Verlauf
 
-- 2026-10-06T22:22Z A done QA-85
-- 2026-10-08T13:41Z A claim VIZ-72
 - 2026-10-08T13:41Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T15:16Z A claim VIZ-83
 - 2026-10-08T15:16Z 6 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
@@ -191,3 +187,5 @@
 - 2026-10-08T16:57Z A claim TOOL-16
 - 2026-10-08T16:57Z A claim UI-81
 - 2026-10-08T17:02Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-08T17:16Z D done QA-86
+- 2026-10-08T17:16Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
