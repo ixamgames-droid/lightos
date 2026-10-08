@@ -76,6 +76,7 @@
 | XPLAT-46 | B | fix/xplat46-arm-x64-empfehlung | 2026-10-08T18:32Z | install.py · INSTALL.md · CONTRIBUTING.md · src/ui/main_window.py · src/utils/plattform_hinweis.py · tests/test_xplat46_arm_empfehlung.py · changelog.d/2026-10-08-XPLAT-46.md |
 | DOC-66 | A | docs/doc66-github-seite-audit | 2026-10-08T18:37Z | README.md · docs/ANLEITUNGEN.md |
 | XPLAT-24 | B | fix/xplat24-worker-job | 2026-10-08T18:41Z | src/core/dmx/serial_process.py · tests/test_xplat24_worker_job.py · changelog.d/2026-10-08-XPLAT-24.md · BACKLOG.md |
+| BPM-28 | D | fix/bpm28-beat-takt | 2026-10-08T18:44Z | src/core/engine/bpm_manager.py · tests/test_bpm28_beat_takt.py · BACKLOG.md · changelog.d/2026-10-08-BPM-28.md |
 
 ## Blocker & Fallen
 
@@ -170,7 +171,6 @@
 
 ## Verlauf
 
-- 2026-10-08T16:31Z A done BACKLOG-D-BERICHT
 - 2026-10-08T16:49Z A done ENG-31
 - 2026-10-08T16:49Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T16:57Z A claim LAS-25
@@ -200,3 +200,4 @@
 - 2026-10-08T18:41Z B claim XPLAT-24
 - 2026-10-08T18:41Z D aktualisiert QA-89: Dateien src/core/engine/cue_stack.py · tests/test_qa89_fade_uhr.py · tests/test_core_engine.py · BACKLOG.md · changelog.d/2026-10-08-QA-89.md -> src/core/engine/cue_stack.py · tests/test_qa89_fade_uhr.py · tests/test_cue_substack_and_attrdelay.py · BACKLOG.md · changelog.d/2026-10-08-QA-89.md
 - 2026-10-08T18:44Z A done BACKLOG-0810B
+- 2026-10-08T18:44Z D claim BPM-28
