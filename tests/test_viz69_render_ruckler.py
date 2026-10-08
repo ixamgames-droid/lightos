@@ -196,6 +196,12 @@ class Viz69RenderRucklerTest(unittest.TestCase):
               return JSON.stringify(out);
             })()"""))
 
+    def _pool_zustand(self):
+        """VIZ-72: die echten (gezeichneten) Lichter — [visible, castShadow, intensity]."""
+        return json.loads(self._eval(
+            "JSON.stringify(window.__lightos.spotPoolLights()"
+            ".map(l => [l.visible, l.castShadow, l.intensity]))"))
+
     def _tick(self):
         """Einen Frame deterministisch rendern, Neubau-Zaehler zurueckgeben."""
         return self._eval(
@@ -214,6 +220,9 @@ class Viz69RenderRucklerTest(unittest.TestCase):
         hell = self._spot_zustand()
         self.assertEqual(len(hell), len(_FIDS))
         self.assertTrue(all(v for v, _c, _i in hell), "heller Spot unsichtbar")
+        self._tick()
+        pool_hell = self._pool_zustand()
+        self.assertTrue(pool_hell, "keine Pool-Lichter (VIZ-72)")
 
         # Dimmer offen, Farbe schwarz (A3D-25/A3D-28) -> dunkel.
         self._emit_until_true(
@@ -228,6 +237,16 @@ class Viz69RenderRucklerTest(unittest.TestCase):
                          "Hell/Dunkel hat die Schatten-Zuteilung veraendert")
         self.assertTrue(all(i == 0 for _v, _c, i in dunkel),
                         "dunkel muss weiterhin 'kein Licht' heissen (intensity 0)")
+        # VIZ-72: gezeichnet werden nur noch die Pool-Lichter — fuer SIE gilt
+        # dieselbe Regel (die Geraete-Spots oben sind nur noch Parameter).
+        self._tick()
+        pool_dunkel = self._pool_zustand()
+        self.assertEqual([(v, c) for v, c, _i in pool_dunkel],
+                         [(v, c) for v, c, _i in pool_hell],
+                         "Hell/Dunkel hat Sichtbarkeit/Schatten der Pool-Lichter "
+                         "umgeschaltet (Programmschluessel, VIZ-69)")
+        self.assertTrue(all(i == 0 for _v, _c, i in pool_dunkel),
+                        "dunkles Pool-Licht muss intensity 0 haben")
 
         # Wieder hell -> Licht kommt zurueck, ohne Sichtbarkeitswechsel.
         self._emit_until_true(
