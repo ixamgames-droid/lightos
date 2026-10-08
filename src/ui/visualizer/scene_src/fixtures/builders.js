@@ -13,7 +13,9 @@ import { applyOptics } from './optics.js';   // VIZ-MH-OPTICS
 import { applyPrism, syncPrismToBeam } from './prism.js';   // VIZ-PRISMA-3D
 import { syncPoolSize } from './floor_pool.js';               // VIZ-15
 import { beamsOff } from '../state.js';                       // VIZ-15
-import { applyGobo, alignGoboFloor, GOBO_LICHT, GOBO_STRAHL, GOBO_FLECK } from './gobo_textures.js';   // VIZ-GOBO-3D, VIZ-83
+import { applyGobo, alignGoboFloor, goboWinkel, GOBO_LICHT, GOBO_STRAHL, GOBO_FLECK } from './gobo_textures.js';   // VIZ-GOBO-3D, VIZ-83
+import { glattKanal, glattZiel, glattWert } from './bewegung_glatt.js';   // VIZ-92
+import { requestRender } from '../scene/render_loop.js';                 // VIZ-92
 import { buildLaserRig, applyLaser, noteLaserAnimation, LASER_BEAM_OPACITY } from './laser.js';   // VIZ-79
 import { stageObjects } from '../state.js';                   // VIZ-BEAM-OCCLUSION
 import { auftreffFlaeche } from './beam_stop.js';             // VIZ-BEAM-OCCLUSION
@@ -1416,6 +1418,7 @@ export function updateMatrixPanelDmx(f, dmx) {
 // Reihenfolge-Vertrag: applyFloorAim liest die in applyPanTilt gesetzte
 // Kopf-Rotation (getWorldQuaternion) — PanTilt MUSS vor FloorAim laufen.
 export function updateMovingHeadDmx(f, dmx) {
+  _glattVorDmx(f);                   // VIZ-92: laufende Gobo-Drehung aufs Ziel
   // VIZ-83: Gobo VOR der Farbe — applyGenericColor liest `f.goboAktiv`
   // (SpotLight gedrosselt, Kegel/Fleck angehoben) im selben Frame.
   applyGobo(f, dmx);        // VIZ-GOBO-3D/VIZ-83: Muster in Kegel + Bodenfleck
@@ -1431,6 +1434,7 @@ export function updateMovingHeadDmx(f, dmx) {
   // Bodenauftreffpunkt schnell wandert. Kostet nichts ohne Prisma.
   syncPrismToBeam(f);
   syncIconPos(f);
+  _glattNachDmx(f, dmx);    // VIZ-92: ab hier bis zum Ziel glaetten
 }
 
 // ── FM-14: Pixel-Moving-Head — Kopf wie ein Moving Head, Segmente einzeln ───
@@ -1475,6 +1479,7 @@ export function updatePixelHeadDmx(f, dmx) {
 // smoke/hazer bekommen BEWUSST keinen No-Op-Handler: ihr Indikator-Lamp
 // (f.lamp) und ihr Icon folgen im Monolith der DMX-Farbe — das bleibt so.
 export function updateGenericDmx(f, dmx) {
+  _glattVorDmx(f);                   // VIZ-92 (Gobo-Drehung fester Geraete)
   applyLaser(f, dmx);       // VIZ-79: vor der Farbe — legt fest, welche Strahlen aktiv sind
   applyGobo(f, dmx);        // manche haben ein Gobo-Rad (VIZ-83: vor der Farbe)
   applyGenericColor(f, dmx);
@@ -1484,6 +1489,103 @@ export function updateGenericDmx(f, dmx) {
   applyFloorAim(f, dmx);
   syncPrismToBeam(f);       // nach applyFloorAim — s. updateMovingHeadDmx
   syncIconPos(f);
+  _glattNachDmx(f, dmx);
+}
+
+// ── VIZ-92: Pan/Tilt/Gobo-Drehung je Renderbild glaetten ────────────────────
+//
+// Der DMX-Pfad oben setzt weiter sofort das ZIEL (Zustand nach einem Update =
+// Zielzustand, wie bisher — Golden-/Szenen-Tests lesen ihn direkt). Kam die
+// Aenderung als Teil einer laufenden Bewegung (bewegung_glatt.js: kleiner
+// Schritt, kurz nach der vorigen), zeigt `tickBewegungGlaettung` vor jedem
+// Bild den Zwischenstand und richtet Kegel, Bodenfleck, Gobo-Muster,
+// Pool-Ziel und Prisma daran neu aus — derselbe applyFloorAim-Weg wie im
+// DMX-Update, also bleibt der Fleck unter dem Kopf, der zu SEHEN ist.
+// Helligkeit/Farbe laufen nie hier durch (Blackout bleibt sofort dunkel).
+//
+// Kosten (VIZ-69/71/72-Rahmen): ohne Bewegung nichts. Waehrend sich ein Kopf
+// bewegt, entsteht statt eines Bildes je DMX-Update eines je Glaettungsschritt
+// — gedeckelt auf GLATT_BILD_MS (60 Bilder/s, auch auf 120/144-Hz-Schirmen),
+// und KEINE Live-Probe: der Tick fordert sein Bild selbst an, nur wenn er
+// wirklich weitergerueckt ist. Auf der Stufe Niedrig ist die Glaettung aus
+// (schwache GPU, Push 15 Hz: dort bleibt es bei einem Bild je Update).
+const GLATT_BILD_MS = 1000 / 60 - 2;
+let _glattLetzterTick = -Infinity;
+const _glattAktiv = new Set();
+let _glattUhr = null;
+/** Test-Seam: eigene Uhr (ms); null = performance.now(). */
+export function setGlattUhr(fn) {
+  _glattUhr = (typeof fn === 'function') ? fn : null;
+  _glattLetzterTick = -Infinity;
+}
+function _glattJetzt() { return _glattUhr ? _glattUhr() : performance.now(); }
+
+function _glattVorDmx(f) {
+  const g = f._glatt;
+  if (!g) return;
+  // Laufende Gobo-Drehung erst aufs Ziel: applyGobo setzt den Winkel nur bei
+  // geaendertem Wert, der Rest des Updates (applyFloorAim) soll aber auf dem
+  // Zielzustand rechnen. Pan/Tilt setzt applyPanTilt ohnehin immer.
+  if (g.gobo.aktiv && f.beam && typeof g.gobo.nach === 'number') {
+    f.beam.rotation.y = g.gobo.nach;
+    if (f.floorSpot) f.floorSpot.rotation.z = g.gobo.nach;
+  }
+}
+
+function _glattNachDmx(f, dmx) {
+  f._skipBeam = !!(dmx && dmx.skipBeam);
+  if (isLowSpec) return;
+  const g = f._glatt || (f._glatt = {
+    pan: glattKanal(false), tilt: glattKanal(false), gobo: glattKanal(true),
+  });
+  const jetzt = _glattJetzt();
+  let laeuft = false;
+  if (schwenktKopf(f) && f.yoke && f.head) {
+    if (glattZiel(g.pan, f.yoke.rotation.y, jetzt)) laeuft = true;
+    if (glattZiel(g.tilt, f.head.rotation.x, jetzt)) laeuft = true;
+  }
+  if (f.beam && glattZiel(g.gobo, goboWinkel(f.lastGoboRot), jetzt)) laeuft = true;
+  if (laeuft) _glattAktiv.add(f);
+  // Das Update hat gerade den ZIELzustand gesetzt (auch ein reines Farb-
+  // Update setzt Pan/Tilt neu). Laeuft fuer das Geraet eine Glaettung, darf
+  // das naechste Bild nicht am Deckel scheitern — es zeigte sonst kurz das
+  // Ziel und sprang danach zurueck.
+  if (_glattAktiv.has(f)) _glattLetzterTick = -Infinity;
+}
+
+/** Laeuft gerade irgendwo eine Glaettung? (Test-/Diagnose-Seam.) */
+export function bewegungGlaettungAktiv() { return _glattAktiv.size > 0; }
+
+/** Vor jedem Bild (app.js#perFrameUpdate). Kostet nichts, solange sich kein
+ *  Kopf bewegt; sonst je bewegtem Geraet einen applyFloorAim-Durchlauf. */
+export function tickBewegungGlaettung() {
+  if (!_glattAktiv.size) return false;
+  const jetzt = _glattJetzt();
+  if (jetzt - _glattLetzterTick < GLATT_BILD_MS && jetzt >= _glattLetzterTick) return false;
+  _glattLetzterTick = jetzt;
+  for (const f of _glattAktiv) {
+    const g = f._glatt;
+    // Entferntes Geraet (removeFixture nimmt die Gruppe aus der Szene).
+    if (!g || !f.group || !f.group.parent) { _glattAktiv.delete(f); continue; }
+    if (schwenktKopf(f) && f.yoke && f.head) {
+      if (typeof g.pan.nach === 'number') f.yoke.rotation.y = glattWert(g.pan, jetzt);
+      if (typeof g.tilt.nach === 'number') f.head.rotation.x = glattWert(g.tilt, jetzt);
+      f._lastPanRad = f.yoke.rotation.y;
+      if (f.icon) f.icon.rotation.y = f.yoke.rotation.y + f.group.rotation.y;
+    }
+    if (f.beam && typeof g.gobo.nach === 'number') {
+      const w = glattWert(g.gobo, jetzt);
+      f.beam.rotation.y = w;
+      if (f.floorSpot) f.floorSpot.rotation.z = w;
+    }
+    applyFloorAim(f, { skipBeam: !!f._skipBeam });
+    syncPrismToBeam(f);
+    if (!(g.pan.aktiv || g.tilt.aktiv || g.gobo.aktiv)) _glattAktiv.delete(f);
+  }
+  // Bild anfordern — perFrame laeuft VOR dem Dirty-Gate (render_loop.js),
+  // dieses Bild zeigt den Zwischenstand also schon. Auch das letzte Stueck.
+  requestRender();
+  return true;
 }
 
 // ── updateDmx-Helfer (modul-privat) ─────────────────────────────────────────
