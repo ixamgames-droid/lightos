@@ -65,7 +65,6 @@
 | UI-81 | A | fix/codex-p1-0810 | 2026-10-08T16:57Z | - |
 | DEMO-07 | A | docs/demo07-showcase-shows | 2026-10-08T17:30Z | - |
 | VIZ-92 | A | fix/viz92-gobo-feinschliff | 2026-10-08T17:47Z | src/ui/visualizer |
-| XPLAT-47 | A | feature/xplat47-windows-setup | 2026-10-08T17:51Z | packaging/windows · .github/workflows |
 | FM-68 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:10Z | fixtures |
 | DOC-65 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:11Z | docs/anleitung_fixture_generator |
 | LAS-26 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:11Z | src/ui |
@@ -189,7 +188,6 @@
 
 ## Verlauf
 
-- 2026-10-08T18:11Z A claim DOC-65
 - 2026-10-08T18:11Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T18:11Z A claim LAS-26
 - 2026-10-08T18:16Z A done VIZ-83
@@ -219,3 +217,4 @@
 - 2026-10-08T19:49Z B aktualisiert VIZ-94: Branch fix/viz94-buehne-windows-arm -> fix/viz94-buehne-arm; Dateien - -> src/ui/visualizer
 - 2026-10-08T19:49Z B aktualisiert VIZ-94: Branch fix/viz94-buehne-arm -> fix/viz94-buehne-windows-arm
 - 2026-10-08T19:49Z D claim QA-87
+- 2026-10-08T19:51Z A done XPLAT-47
