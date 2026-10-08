@@ -93,6 +93,10 @@ MH_GOBO2 = 40
 LASER_OFFEN = 60
 LASER_ZU = 0
 LASER_FARBE = {"rot": 19, "gelb": 27, "gruen": 35, "cyan": 43, "blau": 51, "lila": 59}
+LASER_NOTAUS_ROT = "#b00000"
+# Fester Startwert der EFX-Zufallswege: jeder Bau ergibt dieselbe Datei (kein
+# EFX nutzt den Algorithmus Random, der Wert aendert also nichts am Licht).
+EFX_SEED = 2026
 
 
 def _kanaele(state, fid) -> dict:
@@ -123,6 +127,7 @@ def bauen(out: str, *, reset: bool = True) -> dict:
     from src.ui.virtualconsole.vc_slider import SliderMode
     from _shutter import shutter_offen
     from sqlalchemy import delete
+    from PySide6.QtGui import QColor
 
     b = ShowBuilder(reset=reset)
     st = b.state
@@ -172,10 +177,13 @@ def bauen(out: str, *, reset: bool = True) -> dict:
         pos[f] = (x, MITTE_Y - KLEMME, MITTE_Z + 0.5)
     for f, x in zip(laser_hinten, LASER_HINTEN_X):
         pos[f] = (x, HINTEN_Y - 0.3, HINTEN_TZ + 0.4)
-        rot[f] = (-80.0, 0.0, 0.0)             # nach vorn ueber das Publikum, leicht nach unten
+        # Laser strahlen entlang lokal +Z (Gehaeusefront, VIZ-79); x > 0 neigt
+        # nach unten. Leicht nach oben: auch mit der Y-Bewegung (±6°) bleibt
+        # jeder Strahl hoch ueber dem Publikum.
+        rot[f] = (-3.0, 0.0, 0.0)
     for f, x in zip(laser_kante, LASER_KANTE_X):
         pos[f] = (x, BUEHNE_H + 0.12, KANTE_Z - 0.4)
-        rot[f] = (-150.0, 0.0, 0.0)            # steil nach oben, leicht nach vorn
+        rot[f] = (-60.0, 0.0, 0.0)             # steil nach oben, leicht nach vorn
     pos[hazer[0]] = (-8.5, BUEHNE_H + 0.2, HINTEN_Z + 0.6)
     pos[hazer[1]] = (8.5, BUEHNE_H + 0.2, HINTEN_Z + 0.6)
     rot[hazer[0]] = rot[hazer[1]] = (0.0, 180.0, 0.0)
@@ -300,7 +308,8 @@ def bauen(out: str, *, reset: bool = True) -> dict:
         mh_breit.fn.set_value(f, k[f]["focus"], 128)
 
     def _mh_efx(name, algo, fids, **attrs):
-        return _frei(b.efx(name, algo, fixtures=[EfxFixture(fid=f) for f in fids], **attrs))
+        return _frei(b.efx(name, algo, fixtures=[EfxFixture(fid=f) for f in fids],
+                           random_seed=EFX_SEED, **attrs))
     # Pan- und Tilt-Welle: dieselbe Bewegung, ueber die Reihe (links -> rechts)
     # phasenversetzt verteilt (phase_mode „fan", spread 1 = eine ganze Periode
     # ueber die 20 Koepfe) — die Strahlen rollen wie eine Welle durch die Reihe.
@@ -323,7 +332,7 @@ def bauen(out: str, *, reset: bool = True) -> dict:
                             fixtures=([EfxFixture(fid=f, start_offset=0.0) for f in mh_a]
                                       + [EfxFixture(fid=f, start_offset=0.5) for f in mh_b]),
                             width=70.0, height=0.0, x_offset=128.0, y_offset=100.0,
-                            speed_hz=0.3, phase_mode="sync"))
+                            speed_hz=0.3, phase_mode="sync", random_seed=EFX_SEED))
     mh_strobe = _dim_matrix("MH Strobe", RgbAlgorithm.STROBE, mh_reihe, 10.0)
     mh_lauf = _dim_matrix("MH Lauflicht innen → außen", RgbAlgorithm.CHASE, mh_reihe,
                           5.0, movement="center_out", runner_width=2)
@@ -335,9 +344,8 @@ def bauen(out: str, *, reset: bool = True) -> dict:
             sc.fn.set_value(f, k[f]["color_wheel"], MH_RAD[farbe])
         mh_farbrad.fn.steps.append(ChaserStep(function_id=sc.id, fade_in=0.0,
                                               hold=2.0, fade_out=0.0))
-    mh_blau = b.scene("MH Blau")
-    for f in movers:
-        mh_blau.fn.set_value(f, k[f]["color_wheel"], MH_RAD["blau"])
+        if farbe == "blau":
+            mh_blau = sc            # Knopf „MH Blau" = Farbrad-Szene „MH Farbe blau"
     mh_weiss = b.scene("MH Weiß")
     for f in movers:
         mh_weiss.fn.set_value(f, k[f]["color_wheel"], MH_RAD["weiss"])
@@ -349,13 +357,18 @@ def bauen(out: str, *, reset: bool = True) -> dict:
         mh_gobo.fn.set_value(f, k[f]["prism_rotation"], 150)
 
     # ── 8) Laser ────────────────────────────────────────────────────────────
-    laser_an = b.scene("Laser an (grün)")
+    # „Laser an" schaltet nur ein (Betriebsart + Muster + Groesse), die Farbe
+    # kommt getrennt aus „Laser grün" bzw. dem Farbwechsel — wie Farbe und
+    # Dimmer bei den PARs.
+    laser_an = b.scene("Laser an")
     for f in laser:
         laser_an.fn.set_value(f, k[f]["shutter"], LASER_OFFEN)
         laser_an.fn.set_value(f, k[f]["laser_bank"], 40)
         laser_an.fn.set_value(f, k[f]["gobo_wheel"], 20)
-        laser_an.fn.set_value(f, k[f]["color_wheel"], LASER_FARBE["gruen"])
         laser_an.fn.set_value(f, k[f]["zoom"], 8)
+    laser_gruen = b.scene("Laser grün")
+    for f in laser:
+        laser_gruen.fn.set_value(f, k[f]["color_wheel"], LASER_FARBE["gruen"])
     # Langsame Laser-Bewegung: EFX ueber laser_x/laser_y (Positionsbereich
     # 0-127 des Profils; 128-255 waere „Bewegungs-Tempo" des Lasers).
     laser_langsam = _frei(b.efx("Laser langsam", EfxAlgorithm.EIGHT,
@@ -363,7 +376,8 @@ def bauen(out: str, *, reset: bool = True) -> dict:
                                                      tilt_attr="laser_y")
                                           for f in laser_reihe],
                                 width=100.0, height=70.0, x_offset=64.0, y_offset=64.0,
-                                speed_hz=0.08, phase_mode="fan", spread=0.5, bit16=False))
+                                speed_hz=0.08, phase_mode="fan", spread=0.5, bit16=False,
+                                random_seed=EFX_SEED))
     # Laser-Welle: waagerechter Schwenk, ueber die 10 Laser phasenversetzt.
     laser_welle = _frei(b.efx("Laser Welle", EfxAlgorithm.LINE,
                               fixtures=[EfxFixture(fid=f, pan_attr="laser_x",
@@ -371,11 +385,14 @@ def bauen(out: str, *, reset: bool = True) -> dict:
                                         for f in laser_reihe],
                               width=90.0, height=0.0, x_offset=64.0, y_offset=64.0,
                               speed_hz=0.12, phase_mode="fan", spread=1.0,
-                              bit16=False))
+                              bit16=False, random_seed=EFX_SEED))
+    # shutter_min/shutter_max sind Attribute der Matrix, keine params: offen =
+    # 60 („Manual Control"), nicht 255 — weiche Uebergaenge laufen sonst durch
+    # die Auto-/Sound-Bereiche 84-251.
     laser_lauf = _frei(b.matrix("Laser Lauf", RgbAlgorithm.CHASE, style=MatrixStyle.SHUTTER,
                                 fixtures=laser_reihe,
-                                params={"movement": "bounce", "runner_width": 2,
-                                        "shutter_min": LASER_ZU, "shutter_max": LASER_OFFEN}))
+                                params={"movement": "bounce", "runner_width": 2},
+                                shutter_min=LASER_ZU, shutter_max=LASER_OFFEN))
     laser_lauf.fn.matrix_speed = 5.0
     laser_farbe = b.chaser("Laser Farbwechsel")
     laser_farbe.fn.run_order = RunOrder.Loop
@@ -401,7 +418,8 @@ def bauen(out: str, *, reset: bool = True) -> dict:
         return Handle(c)
     # Kurze Show: Intro -> Aufbau -> Drop -> Breakdown -> Finale.
     look_intro = _look("Look Intro", [haze, par_blau, welle_lr, mh_an, mh_blau,
-                                      mh_schmal, tilt_welle, laser_an, laser_langsam])
+                                      mh_schmal, tilt_welle, laser_an, laser_gruen,
+                                      laser_langsam])
     look_aufbau = _look("Look Aufbau", [haze, par_farbwelle, welle_mitte, mh_an,
                                         mh_farbrad, mh_schmal, pan_welle, laser_an,
                                         laser_welle, laser_farbe])
@@ -410,7 +428,7 @@ def bauen(out: str, *, reset: bool = True) -> dict:
                                     laser_lauf, laser_farbe])
     look_break = _look("Look Breakdown", [haze, par_amber, welle_lr, mh_an, mh_blau, mh_gobo,
                                           mh_breit,
-                                          acht, laser_an, laser_langsam])
+                                          acht, laser_an, laser_gruen, laser_langsam])
     look_finale = _look("Look Finale", [haze, par_farbwechsel, par_strobe, mh_farbrad,
                                         mh_an, mh_schmal, kreis_welle, strobe_blitz,
                                         laser_an, laser_lauf, laser_farbe])
@@ -488,19 +506,26 @@ def bauen(out: str, *, reset: bool = True) -> dict:
     _knopf("MH Weiß", mh_weiss, 4, y, None, "mh_farbe")
     _knopf("Gobo + Prisma", mh_gobo, 5, y, "gobo_spin")
     y += DY
-    _titel("STROBE", y)
+    _titel("STROBE + NEBEL", y)
     _knopf("Strobes Blitz", strobe_blitz, 0, y, "strobe", "strobes")
     _knopf("Strobes Lauf", strobe_lauf, 1, y, "sparkle", "strobes")
     _knopf("MH Strobe", mh_strobe, 2, y, "strobe", "mh_dimmer")
     _knopf("MH Lauf innen → außen", mh_lauf, 3, y, None, "mh_dimmer")
+    _knopf("Haze an", haze, 4, y, "vu_meter")
     y += DY
-    _titel("LASER + NEBEL", y)
+    # Sieben Knoepfe wie die Reihe PAR FARBE — passt neben die Bibliothek.
+    _titel("LASER", y)
     _knopf("Laser an", laser_an, 0, y, "beam_sweep")
-    _knopf("Laser langsam", laser_langsam, 1, y, "pos_sweep", "laser_bewegung")
-    _knopf("Laser Welle", laser_welle, 2, y, None, "laser_bewegung")
-    _knopf("Laser Lauf", laser_lauf, 3, y, "color_chase")
-    _knopf("Laser Farbe", laser_farbe, 4, y, "spectrum")
-    _knopf("Haze an", haze, 5, y, "vu_meter")
+    _knopf("Laser grün", laser_gruen, 1, y, None, "laser_farbe")
+    _knopf("Laser Farbe", laser_farbe, 2, y, "spectrum", "laser_farbe")
+    _knopf("Laser langsam", laser_langsam, 3, y, "pos_sweep", "laser_bewegung")
+    _knopf("Laser Welle", laser_welle, 4, y, None, "laser_bewegung")
+    _knopf("Laser Lauf", laser_lauf, 5, y, "color_chase")
+    # Laser-NOT-AUS (rot): sofort alle Laser dunkel + entwaffnen; die Sperre
+    # loest erst ein bewusster Shutter-Wert im Programmer (Laser-Ansicht).
+    estop = b.button("Laser NOT-AUS", ButtonAction.LASER_ESTOP, bank=0)
+    estop.set_background_color(QColor(LASER_NOTAUS_ROT))
+    estop.setGeometry(X0 + 6 * DX, y, BW, BH)
     y += DY
     _titel("SHOW", y)
     _knopf("Intro", look_intro, 0, y, None, "show_look")
@@ -513,13 +538,13 @@ def bauen(out: str, *, reset: bool = True) -> dict:
     # Unten: Master-Regler links, Stop + Blackout rechts.
     for i, w in enumerate((
             b.slider("Grand Master", SliderMode.GRANDMASTER, bank=0, value=255),
-            b.slider("Tempo Welle", SliderMode.EFFECT_SPEED, function=welle_lr,
+            b.slider("Tempo Welle L→R", SliderMode.EFFECT_SPEED, function=welle_lr,
                      bank=0, value=128),
             b.slider("PAR", SliderMode.GROUP_DIMMER, bank=0, value=255,
                      programmer_group="PAR alle (links → rechts)"),
             b.slider("Moving Heads", SliderMode.GROUP_DIMMER, bank=0, value=255,
                      programmer_group="MH alle (links → rechts)"))):
-        w.setGeometry(20 + i * 100, y, 90, 160)
+        w.setGeometry(20 + i * 130, y, 120, 160)
     stop = b.button("Effekte stop", ButtonAction.STOP_ALL, bank=0)
     stop.setGeometry(X0 + 4 * DX, y + 50, BW, BH)
     blackout = b.button("BLACKOUT", ButtonAction.BLACKOUT, bank=0)
@@ -601,8 +626,12 @@ def bauen(out: str, *, reset: bool = True) -> dict:
     # „Aendert sich" vergleicht nur Anfang und Ende der Probe — ein Strobe
     # kann dabei genau im selben Zustand landen. Darum je Effekt zwei
     # Probenlaengen; eine davon muss eine Aenderung zeigen.
+    # Die Strobes haben einen eigenen Master-Dimmer: „Strobes Blitz" mit in die
+    # Probe, sonst meldet der Dimmer-Waechter sie faelschlich als dunkel. Beide
+    # GEMEINSAM gemessen (einzeln=False): ein Strobe darf im letzten Frame
+    # dunkel sein, „PAR an" bewegt nichts — einzeln bestuende keiner.
     build_and_verify(b, out, name=SHOW_NAME, universe=1, frames=200,
-                     render=[par_an])
+                     render=[par_an, strobe_blitz], einzeln=False)
     for fns, univ in (([lauf_aussen, lauf_innen, par_strobe, welle_lr, welle_mitte,
                         par_farbwechsel, par_farbwelle, strobe_blitz, strobe_lauf], 1),
                       ([mh_strobe, mh_lauf, mh_farbrad, pan_welle, tilt_welle,
@@ -612,7 +641,7 @@ def bauen(out: str, *, reset: bool = True) -> dict:
             if not any(b.verify_render([fn], universe=univ, frames=n)[1]
                        for n in (137, 150, 163, 171)):
                 raise SystemExit(f"Render-Smoke: '{fn.name}' aendert kein DMX ueber die Zeit")
-    for fns, univ in (([mh_an], 2), ([laser_an, haze], 3)):
+    for fns, univ in (([mh_an], 2), ([laser_an, laser_gruen, haze], 3)):
         lit, _bewegt, _ch = b.verify_render(fns, universe=univ, frames=20)
         if not lit:
             raise SystemExit(f"Render-Smoke: {fns[0].name} erzeugt kein DMX")
