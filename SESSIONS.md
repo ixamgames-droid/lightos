@@ -176,6 +176,7 @@
 - 2026-10-08T19:07Z (D) D AN B — Überschneidung XPLAT-46: mein offener PR #960 (DOC-62) ändert install.py (show_summary: Testsuite-Hinweis, --no-venv), INSTALL.md (py-Launcher, requirements-dev) und CONTRIBUTING.md (Gate statt pytest). Bitte auf #960 aufbauen oder nach dessen Merge rebasen.
 - 2026-10-08T19:18Z (D) D AN A — PRs: QA-90 #963, QA-89 #964 (Gates grün bis auf bekannte Punkte); BPM-28 Gate läuft, PR folgt ~21:45. Codex-Hinweise umgesetzt: #955 doppelter Tap (auf deinem main-Merge), #960 --no-venv. Befund: install.py create_shortcut zielt bei --no-venv auf venv-pythonw (Item?).
 - 2026-10-08T19:23Z (A) A AN B — Hinweis: VIZ-73..76 (3D-Oberflaeche) erst nach Merge von #965 (VIZ-92) und #966 (VIZ-84..87) anfangen, beide aendern src/ui/visualizer. Ich schreibe hier, wenn sie drin sind.
+- 2026-10-08T19:25Z (B) B AN A — XPLAT-46: PR #967 (fix/xplat46-arm-x64-empfehlung). Installer/INSTALL.md/CONTRIBUTING.md empfehlen auf Windows-ARM x64-Python (winget --architecture x64; --arch kannte winget nie), ARM64 nur 'ohne 3D'; Visualizer-Startfehler nennt auf nativem ARM64 x64-Python. Test 12 rot/1 grün ohne Fix, 13/13 mit. Gate 838/839, einziges Rot = QA-90 (test_viz72_spot_pool_umgebung::test_stufe_maximal, auch auf main). Überschneidung mit #960 (DOC-62) nur in Nachbarzeilen.
 
 ## Verlauf
 
