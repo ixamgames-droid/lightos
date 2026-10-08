@@ -226,7 +226,9 @@ class WeissbandSceneTest(unittest.TestCase):
 
     def _aufbauen(self):
         url = QUrl.fromLocalFile(_HTML_PATH)
-        url.setQuery(f"v={int(time.time() * 1000)}")
+        # QA-86: Stufe fest, sonst waehlt die GPU-Probe des Testrechners
+        # (Windows/ANGLE meldet 16 Textur-Einheiten -> 'low', Prisma gedeckelt).
+        url.setQuery(f"v={int(time.time() * 1000)}&gputier=high")
         self._view.load(url)
         ende = time.monotonic() + _LOAD_TIMEOUT_S
         while not self._geladen and time.monotonic() < ende:
