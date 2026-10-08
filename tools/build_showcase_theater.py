@@ -114,8 +114,8 @@ def bauen(out: str, *, reset: bool = True) -> dict:
         pos[f] = (x, GEGEN_Y - KLEMME, GEGEN_Z)
         rot[f] = (-30.0, 0.0, 0.0)                   # von hinten oben nach vorn
     for f, x in zip(horizont, HORIZONT_X):
-        pos[f] = (x, BUEHNE_H + 0.15, HINTEN_Z + 0.5)
-        rot[f] = (160.0, 0.0, 0.0)                   # nach oben an den Horizont
+        pos[f] = (x, BUEHNE_H + 0.15, HINTEN_Z + 0.6)
+        rot[f] = (172.0, 0.0, 0.0)                   # steil nach oben, leicht an den Horizont
     for f, x in zip(spots, SPOT_X):
         pos[f] = (x, FOH_Y - KLEMME, FOH_Z - 0.2)
 

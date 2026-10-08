@@ -1,7 +1,7 @@
 {
   "anleitung": "showcase",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "77df4d74",
+  "stand": "b3a8673f",
   "schrift": "Noto Sans (statt Roboto Condensed)",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py showcase'.",
@@ -155,7 +155,7 @@
         777
       ],
       "marken": [],
-      "md5": "98325010944ba22591e95765a72524b7"
+      "md5": "b99679d9fad509c0877bb859549e1945"
     },
     {
       "datei": "theater_05_ablauf.gif",
@@ -197,7 +197,7 @@
         [],
         []
       ],
-      "md5": "ed4f27dcb07568789d4062ee54ddc820",
+      "md5": "10ee12056a00c39ba81a2b2428601e10",
       "frames": 30,
       "dauern_ms": [
         500,
