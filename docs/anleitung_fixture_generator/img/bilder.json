@@ -1,0 +1,228 @@
+{
+  "anleitung": "fixture_generator",
+  "werkzeug": "tools/anleitungsbilder.py",
+  "stand": "eb47113e",
+  "schrift": "Noto Sans (statt Roboto Condensed)",
+  "qt": "6.11.1",
+  "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py fixture_generator'.",
+  "bilder": [
+    {
+      "datei": "01_patch_geraet_erstellen.png",
+      "szene": "01_patch_geraet_erstellen",
+      "titel": "Patchen: „Gerät erstellen…“ öffnet den Fixture Generator",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [
+        {
+          "nummer": 1,
+          "beschriftung": ""
+        }
+      ],
+      "md5": "76589a14718fa1e9d20cfdd0647eda41"
+    },
+    {
+      "datei": "02_generator_kopf.png",
+      "szene": "02_generator_kopf",
+      "titel": "Fixture Generator: Hersteller, Modell, Typ „laser“, Leistung",
+      "groesse": [
+        1200,
+        1320
+      ],
+      "marken": [
+        {
+          "nummer": 1,
+          "beschriftung": ""
+        },
+        {
+          "nummer": 2,
+          "beschriftung": ""
+        },
+        {
+          "nummer": 3,
+          "beschriftung": ""
+        },
+        {
+          "nummer": 4,
+          "beschriftung": ""
+        }
+      ],
+      "md5": "b59b84ae22911e2ef0fb5cc32f761985"
+    },
+    {
+      "datei": "03_generator_kanaele.png",
+      "szene": "03_generator_kanaele",
+      "titel": "Fixture Generator: Modus „9-Kanal“, neun Kanäle mit Attribut",
+      "groesse": [
+        1200,
+        1320
+      ],
+      "marken": [
+        {
+          "nummer": 1,
+          "beschriftung": ""
+        },
+        {
+          "nummer": 2,
+          "beschriftung": ""
+        },
+        {
+          "nummer": 3,
+          "beschriftung": ""
+        },
+        {
+          "nummer": 4,
+          "beschriftung": ""
+        }
+      ],
+      "md5": "0f83c6c5c54eeeb9b8205b4f6a6cd6ad"
+    },
+    {
+      "datei": "04_generator_bereiche.png",
+      "szene": "04_generator_bereiche",
+      "titel": "Fixture Generator: Bereiche der Betriebsart, „Laser aus“ = closed",
+      "groesse": [
+        1200,
+        1320
+      ],
+      "marken": [
+        {
+          "nummer": 1,
+          "beschriftung": ""
+        },
+        {
+          "nummer": 2,
+          "beschriftung": ""
+        },
+        {
+          "nummer": 3,
+          "beschriftung": ""
+        },
+        {
+          "nummer": 4,
+          "beschriftung": ""
+        }
+      ],
+      "md5": "879dfa173dbaffe353c1b0dde700a003"
+    },
+    {
+      "datei": "05_generator_pruefen.png",
+      "szene": "05_generator_pruefen",
+      "titel": "Fixture Generator: Prüfung mit Laser-Sicherheit, Live-Test, Speichern",
+      "groesse": [
+        1200,
+        1320
+      ],
+      "marken": [
+        {
+          "nummer": 1,
+          "beschriftung": ""
+        },
+        {
+          "nummer": 2,
+          "beschriftung": ""
+        },
+        {
+          "nummer": 3,
+          "beschriftung": ""
+        },
+        {
+          "nummer": 4,
+          "beschriftung": ""
+        }
+      ],
+      "md5": "e3e34631a5eb2445c34bd182c30b4051"
+    },
+    {
+      "datei": "06_patch_dialog.png",
+      "szene": "06_patch_dialog",
+      "titel": "Gerät hinzufügen: das neue Profil unter Laserworld",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "137c05c6d2627a9eb89833fdf57d7f46"
+    },
+    {
+      "datei": "07_programmer_laser.png",
+      "szene": "07_programmer_laser",
+      "titel": "Programmer, Reiter Laser: Betriebsart, NOT-AUS, Farbe, Bewegung",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [
+        {
+          "nummer": 1,
+          "beschriftung": ""
+        },
+        {
+          "nummer": 2,
+          "beschriftung": ""
+        },
+        {
+          "nummer": 3,
+          "beschriftung": ""
+        },
+        {
+          "nummer": 4,
+          "beschriftung": ""
+        }
+      ],
+      "md5": "0b7225e05c85295d472ccf17986a2ee4"
+    },
+    {
+      "datei": "08_laser_not_aus.png",
+      "szene": "08_laser_not_aus",
+      "titel": "Laser-NOT-AUS gedrückt: alle Laser dunkel, Anzeige rot",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [
+        {
+          "nummer": 1,
+          "beschriftung": ""
+        },
+        {
+          "nummer": 2,
+          "beschriftung": ""
+        }
+      ],
+      "md5": "fd40d9639da52e0af3a00e3bc627809a"
+    },
+    {
+      "datei": "09_programmer_efx.png",
+      "szene": "09_programmer_efx",
+      "titel": "Programmer, Reiter EFX: Kreis auf den Laser-Achsen X/Y",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [
+        {
+          "nummer": 1,
+          "beschriftung": ""
+        },
+        {
+          "nummer": 2,
+          "beschriftung": ""
+        }
+      ],
+      "md5": "0d6eefbd8016fa1fc3a4f3e343849089"
+    },
+    {
+      "datei": "10_3d_laser.png",
+      "szene": "10_3d_laser",
+      "titel": "3D-Visualizer: der Laser an der Traverse, Muster an",
+      "groesse": [
+        1113,
+        777
+      ],
+      "marken": [],
+      "md5": "81d48b2a370dc89a1309d17bd9878e4c"
+    }
+  ]
+}
