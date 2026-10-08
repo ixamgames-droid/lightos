@@ -38,8 +38,16 @@ fuehrt es per Emulation aus, und damit geht alles - auch der 3D-Visualizer.
 
 - `winget install Python.Python.3.12 --architecture x64`
 - oder von https://www.python.org/downloads/windows/ den "Windows installer (64-bit)"
-- danach `py -3.12-64 install.py` (`py -0p` zeigt alle installierten Pythons;
-  `-64` steht dort fuer x64, `-arm64` fuer natives ARM)
+- danach install.py mit genau diesem x64-Python starten:
+  `"%LOCALAPPDATA%\Programs\Python\Python312\python.exe" install.py --neu-venv`
+  (PowerShell: `& "$env:LOCALAPPDATA\Programs\Python\Python312\python.exe" install.py --neu-venv`).
+  `py -0p` zeigt alle installierten Pythons mit Pfad - das x64-Python ist der
+  Eintrag **ohne** `-arm64`. `py -3.12-64` ist nicht eindeutig: seit Python 3.11
+  heisst `-64` nur "nicht 32-bit" und kann auch das ARM64-Python treffen.
+- `--neu-venv` loescht ein vorhandenes `venv` und legt es mit dem laufenden
+  Python neu an. Ohne den Schalter bliebe ein frueher mit ARM64-Python gebautes
+  `venv` bestehen (und damit weiter kein 3D). Erkennt der Installer selbst, dass
+  das `venv` eine andere Architektur hat, fragt er nach.
 
 **Natives ARM64-Python geht auch, aber ohne 3D-Visualizer.** Die ARM64-Pakete
 von PySide6-Addons enthalten kein QtWebEngine (gemessen an 6.11, XPLAT-45);
@@ -258,7 +266,7 @@ ein Setup geraten.
 | Problem | Loesung |
 |---|---|
 | `ModuleNotFoundError: PySide6` | venv nicht aktiv - `venv\Scripts\activate` oder direkt `venv\Scripts\python main.py` |
-| Installer meldet "Natives ARM64-Python: ... OHNE 3D-Visualizer" | x64-Python installieren (`winget install Python.Python.3.12 --architecture x64`) und `py -3.12-64 install.py` ausfuehren |
+| Installer meldet "Natives ARM64-Python: ... OHNE 3D-Visualizer" | x64-Python installieren (`winget install Python.Python.3.12 --architecture x64`) und install.py damit mit `--neu-venv` erneut ausfuehren (siehe "Python auf Windows-ARM") |
 | `python-rtmidi` Build-Fehler auf ARM64 | x64-Python nehmen (siehe oben) oder MSVC Build Tools installieren; MIDI geht auch ohne (WinMM-Weg) |
 | "Visualizer nicht verfuegbar" | `PySide6` + `PySide6-Addons` erneut installieren (`python -m pip install --upgrade PySide6 PySide6-Addons`) |
 | "Visualizer nicht verfuegbar" auf Windows-ARM | Mit nativem ARM64-Python gibt es kein QtWebEngine - x64-Python installieren (siehe "Python auf Windows-ARM") |

@@ -17,6 +17,10 @@ import sysconfig
 
 #: Ein Befehl, den die Hinweise woertlich nennen (winget kennt ``--architecture``).
 X64_PYTHON_BEFEHL = "winget install Python.Python.3.12 --architecture x64"
+#: Eindeutiger Aufruf mit dem x64-Interpreter (Codex #967: "py -3.12-64"
+#: waehlt seit 3.11 auch ARM64) - ``--neu-venv`` baut das ARM64-venv neu.
+X64_INSTALLER_AUFRUF = (
+    r'"%LOCALAPPDATA%\Programs\Python\Python312\python.exe" install.py --neu-venv')
 
 
 def _normiere(arch: str) -> str:
@@ -72,9 +76,12 @@ def visualizer_startfehler_text(exc: BaseException | None = None, *,
             "3D-Visualizer.\n\n"
             "Abhilfe: x64-Python installieren (laeuft auf Windows-ARM per "
             "Emulation, mit allen Funktionen) und install.py damit erneut "
-            "ausfuehren:\n"
+            "ausfuehren - \"--neu-venv\" ersetzt das vorhandene ARM64-venv, "
+            "ohne das bliebe es bestehen:\n"
             f"    {X64_PYTHON_BEFEHL}\n"
-            "    py -3.12-64 install.py\n\n"
+            f"    {X64_INSTALLER_AUFRUF}\n"
+            "(\"py -0p\" zeigt alle Pythons mit Pfad; das x64-Python ist der "
+            "Eintrag OHNE \"-arm64\".)\n\n"
             "Pruefen: python tools/qt_module_befund.py"
         )
     return kopf + "Bitte prüfe, ob PySide6 + PySide6-Addons korrekt installiert sind."
