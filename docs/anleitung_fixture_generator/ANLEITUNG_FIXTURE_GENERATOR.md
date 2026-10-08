@@ -14,9 +14,12 @@ gäbe es ihn noch nicht. Für jedes andere Gerät gehst du genauso vor.
 > Interlock in Reichweite. Mehr dazu unten unter
 > [Abgleich mit dem echten Gerät](#8-abgleich-mit-dem-echten-gerät).
 
-Die Bilder entstehen mit `tools/anleitungsbilder.py fixture_generator` in einer
-Sandbox mit der Doku-Demo-Show; die 3D-Ansicht am echten Bildschirm
-(`--bildschirm`).
+Die Bilder stammen aus einem echten Durchlauf am Bildschirm: das Bild-Werkzeug
+(`tools/anleitungsbilder.py fixture_generator --bildschirm`) klickt und tippt
+in einer Sandbox mit der Doku-Demo-Show genau die Schritte dieser Anleitung —
+Generator öffnen, Felder, Kanäle und Bereiche eintippen, speichern, patchen,
+im Programmer bedienen. Das dabei gespeicherte Profil stimmt Feld für Feld mit
+dem Bibliotheksprofil überein.
 
 ---
 
@@ -107,8 +110,12 @@ Im Bereich **Patchen**, Reiter **Patch**, auf **Gerät erstellen…** klicken (1
 
 ![Fixture Generator: Kanäle](img/03_generator_kanaele.png)
 
-Der Modus heißt hier **9-Kanal**. Mit **+ Kanal** (4) legst du die Kanäle in
-der Reihenfolge des Handbuchs an (1) — Kanal 1 zuerst. Für jeden Kanal einen
+Ein neuer Generator startet mit einem Beispielmodus „Default“ (Dimmer, Rot,
+Grün, Blau). Ins Feld **Modus-Name** „9-Kanal“ tippen (der Reiter übernimmt den
+Namen mit Enter), mit **+ Kanal** (4) auf neun Kanäle aufstocken und die Zeilen
+in der Reihenfolge des Handbuchs überschreiben (1) — Kanal 1 zuerst. Name,
+Default und Highlight per Doppelklick in die Zelle, das Attribut im Auswahlfeld
+der Zeile (man kann es auch eintippen). Für jeden Kanal einen
 **Namen** und ein **Attribut** wählen. Das Attribut entscheidet, was LightOS
 mit dem Kanal macht:
 
@@ -170,7 +177,7 @@ startet der Laser mit seinem Default eingeschaltet, kommt ein Hinweis.
 
 Der **Live-Test** (3) schreibt Werte direkt an das echte Gerät — beim Laser
 nur unter den Sicherheitsregeln aus Abschnitt 8. **Speichern** (4) legt das
-Profil in deiner Bibliothek an.
+Profil in deiner Bibliothek an und bestätigt das mit einer kurzen Meldung.
 
 ## 7. Patchen und bedienen
 
@@ -178,9 +185,11 @@ Profil in deiner Bibliothek an.
 
 ![Gerät hinzufügen](img/06_patch_dialog.png)
 
-Im Patch-Dialog nach dem Hersteller suchen (1), das Gerät wählen (2), Modus
+Im Bereich **Patchen** auf **+ Gerät hinzufügen**, nach dem Hersteller
+suchen (1), das Gerät wählen (2) — „Herkunft: eigenes Profil“ —, Modus
 **9-Kanal** (3), Universum und **dieselbe Startadresse wie an den
-DIP-Schaltern** einstellen.
+DIP-Schaltern** eintippen (4; im Bild 120), **Hinzufügen**. Das Label ist der
+Kurzname; umbenennen kannst du es im Patch.
 
 ### Programmer, Reiter Laser
 

@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (
     QComboBox, QPushButton, QLabel, QTableWidget, QTableWidgetItem,
     QHeaderView, QAbstractItemView, QMessageBox, QInputDialog, QGroupBox,
     QDialogButtonBox, QTabWidget, QWidget, QCheckBox, QSlider,
-    QSplitter, QTextEdit, QFileDialog,
+    QSplitter, QTextEdit, QFileDialog, QGridLayout,
 )
 from PySide6.QtCore import Qt, QTimer
 
@@ -623,6 +623,9 @@ CHANNEL_COLS = ["#", "Name", "Attribut", "Default", "Highlight", "Invert", "Aufl
 SEGMENT_COL = 7
 RANGE_COLS = ["Von", "Bis", "Name", "Art"]
 
+#: FM-70: Mindesthoehe der Kanal-/Bereichstabelle (Kopfzeile + ~5 Zeilen).
+KANAL_TABELLE_MIN_H = 190
+
 
 class _RangeEditor(QWidget):
     """Bereichs-Tabelle eines Kanals + kompakte Schnellwahl-Vorschau."""
@@ -642,6 +645,7 @@ class _RangeEditor(QWidget):
             2, QHeaderView.ResizeMode.Stretch)
         self._tbl.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked |
                                   QAbstractItemView.EditTrigger.SelectedClicked)
+        self._tbl.setMinimumHeight(KANAL_TABELLE_MIN_H)
         lay.addWidget(self._tbl)
 
         row = QHBoxLayout()
@@ -844,6 +848,8 @@ class _ModeTab(QWidget):
         self._tbl.setSelectionBehavior(
             QAbstractItemView.SelectionBehavior.SelectRows)
         self._tbl.currentCellChanged.connect(self._on_row_changed)
+        # FM-70: mindestens fuenf Kanaele sichtbar.
+        self._tbl.setMinimumHeight(KANAL_TABELLE_MIN_H)
         ll.addWidget(self._tbl)
 
         row = QHBoxLayout()
@@ -1374,21 +1380,21 @@ class FixtureGeneratorDialog(QDialog):
     def _setup_ui(self):
         root = QVBoxLayout(self)
 
-        # Kopf
+        # Kopf — FM-70: zweispaltig. Einspaltig nahm der Kopf ein Drittel der
+        # Dialoghoehe; auf einem 1080er-Bildschirm (Dialog max. ~1000 px) blieb
+        # fuer die Kanaltabelle EINE Zeile.
         head = QGroupBox("Gerät")
-        form = QFormLayout(head)
+        grid = QGridLayout(head)
+        grid.setHorizontalSpacing(10)
+        grid.setVerticalSpacing(6)
         self._edit_mfr = QLineEdit(self._model.manufacturer)
-        form.addRow("Hersteller:", self._edit_mfr)
         self._edit_model = QLineEdit(self._model.model)
-        form.addRow("Modell:", self._edit_model)
         self._edit_short = QLineEdit(self._model.short_name)
         self._edit_short.setMaxLength(40)
-        form.addRow("Kurzname:", self._edit_short)
         self._cb_type = QComboBox()
         self._cb_type.addItems(FIXTURE_TYPES)
         self._cb_type.setCurrentText(self._model.fixture_type)
         self._cb_type.currentTextChanged.connect(lambda *_: self._revalidate())
-        form.addRow("Typ:", self._cb_type)
         # FM-12: 3D-Modell-Wahl mit Live-Vorschlag der Automatik.
         self._cb_vizmodel = QComboBox()
         for label, value in VIZ_MODEL_CHOICES:
@@ -1399,22 +1405,27 @@ class FixtureGeneratorDialog(QDialog):
             "aktuelle Vorschlag steht in Klammern.")
         idx = self._cb_vizmodel.findData(self._model.viz_model or "")
         self._cb_vizmodel.setCurrentIndex(idx if idx >= 0 else 0)
-        form.addRow("3D-Modell:", self._cb_vizmodel)
         self._spin_power = QSpinBox()
         self._spin_power.setRange(0, 5000)
         self._spin_power.setSuffix(" W")
         self._spin_power.setValue(self._model.power_w)
-        form.addRow("Leistung:", self._spin_power)
         self._edit_notes = QLineEdit(self._model.notes)
-        form.addRow("Notizen:", self._edit_notes)
-
-        import_row = QHBoxLayout()
         b_import = QPushButton("QLC+ (.qxf) importieren…")
         b_import.setToolTip("Vorhandene QLC+-Definition als Startpunkt laden.")
         b_import.clicked.connect(self._import_qxf)
-        import_row.addWidget(b_import)
-        import_row.addStretch(1)
-        form.addRow("", _wrap(import_row))
+        felder = [("Hersteller:", self._edit_mfr, "Modell:", self._edit_model),
+                  ("Kurzname:", self._edit_short, "Typ:", self._cb_type),
+                  ("3D-Modell:", self._cb_vizmodel, "Leistung:", self._spin_power)]
+        for r, (l1, w1, l2, w2) in enumerate(felder):
+            grid.addWidget(QLabel(l1), r, 0)
+            grid.addWidget(w1, r, 1)
+            grid.addWidget(QLabel(l2), r, 2)
+            grid.addWidget(w2, r, 3)
+        grid.addWidget(QLabel("Notizen:"), 3, 0)
+        grid.addWidget(self._edit_notes, 3, 1, 1, 2)
+        grid.addWidget(b_import, 3, 3)
+        grid.setColumnStretch(1, 1)
+        grid.setColumnStretch(3, 1)
         root.addWidget(head)
 
         # Modi
@@ -1437,15 +1448,16 @@ class FixtureGeneratorDialog(QDialog):
         mbl.addLayout(mrow)
         root.addWidget(modes_box, 1)
 
-        # Validierungs-Hinweise
+        # Validierungs-Hinweise und Live-Test NEBENEINANDER (FM-70: unter-
+        # einander kosteten sie ~250 px Hoehe, die der Kanaltabelle fehlten).
+        unten = QHBoxLayout()
         self._issues = QTextEdit()
         self._issues.setReadOnly(True)
-        self._issues.setMaximumHeight(96)
-        root.addWidget(self._issues)
-
-        # Live-Test
+        self._issues.setMaximumHeight(150)
+        unten.addWidget(self._issues, 1)
         self._live = _LiveTestPanel(self)
-        root.addWidget(self._live)
+        unten.addWidget(self._live, 1)
+        root.addLayout(unten)
 
         # Buttons
         btns = QHBoxLayout()
@@ -1522,11 +1534,24 @@ class FixtureGeneratorDialog(QDialog):
         while self._tabs.count():
             self._tabs.removeTab(0)
         for mode in self._model.modes:
-            tab = _ModeTab(mode)
-            self._tabs.addTab(tab, mode.name)
+            self._tab_dazu(_ModeTab(mode))
         if self._tabs.count() == 0:
             self._model.modes.append(GenMode("Default", [GenChannel("Dimmer", "intensity", 0, 255)]))
-            self._tabs.addTab(_ModeTab(self._model.modes[0]), "Default")
+            self._tab_dazu(_ModeTab(self._model.modes[0]))
+
+    def _tab_dazu(self, tab: "_ModeTab"):
+        """Modus-Reiter anlegen. DOC-65: das Feld „Modus-Name“ benennt auch den
+        Reiter um — vorher blieb dort „Default“ stehen, umbenennen ging nur
+        ueber „Modus umbenennen“."""
+        self._tabs.addTab(tab, tab.mode.name)
+        tab._edit_name.editingFinished.connect(
+            lambda t=tab: self._reiter_benennen(t))
+        return tab
+
+    def _reiter_benennen(self, tab: "_ModeTab"):
+        i = self._tabs.indexOf(tab)
+        if i >= 0:
+            self._tabs.setTabText(i, tab.mode.name)
 
     # ── Modus-Verwaltung ─────────────────────────────────────────────────
     def _add_mode(self):
@@ -1537,8 +1562,7 @@ class FixtureGeneratorDialog(QDialog):
             i += 1
         mode = GenMode(f"Modus {i}", [GenChannel("Kanal 1")])
         self._model.modes.append(mode)
-        tab = _ModeTab(mode)
-        self._tabs.addTab(tab, mode.name)
+        tab = self._tab_dazu(_ModeTab(mode))
         self._tabs.setCurrentWidget(tab)
         self._revalidate()
 

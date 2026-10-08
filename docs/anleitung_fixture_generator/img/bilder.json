@@ -1,7 +1,7 @@
 {
   "anleitung": "fixture_generator",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "eb47113e",
+  "stand": "8a2206ad",
   "schrift": "Noto Sans (statt Roboto Condensed)",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py fixture_generator'.",
@@ -20,63 +20,29 @@
           "beschriftung": ""
         }
       ],
-      "md5": "76589a14718fa1e9d20cfdd0647eda41"
+      "md5": "d30caa9ef7719431a8045737b30e6b62"
     },
     {
       "datei": "02_generator_kopf.png",
       "szene": "02_generator_kopf",
-      "titel": "Fixture Generator: Hersteller, Modell, Typ „laser“, Leistung",
+      "titel": "Fixture Generator: Hersteller, Modell, Typ „laser“, Leistung (eingetippt)",
       "groesse": [
         1200,
-        1320
+        1000
       ],
-      "marken": [
-        {
-          "nummer": 1,
-          "beschriftung": ""
-        },
-        {
-          "nummer": 2,
-          "beschriftung": ""
-        },
-        {
-          "nummer": 3,
-          "beschriftung": ""
-        },
-        {
-          "nummer": 4,
-          "beschriftung": ""
-        }
-      ],
-      "md5": "b59b84ae22911e2ef0fb5cc32f761985"
+      "marken": [],
+      "md5": "2e0dabf217a0a378719618cb790b402e"
     },
     {
       "datei": "03_generator_kanaele.png",
       "szene": "03_generator_kanaele",
-      "titel": "Fixture Generator: Modus „9-Kanal“, neun Kanäle mit Attribut",
+      "titel": "Fixture Generator: Modus „9-Kanal“, neun Kanäle mit Attribut (eingetippt)",
       "groesse": [
         1200,
-        1320
+        1000
       ],
-      "marken": [
-        {
-          "nummer": 1,
-          "beschriftung": ""
-        },
-        {
-          "nummer": 2,
-          "beschriftung": ""
-        },
-        {
-          "nummer": 3,
-          "beschriftung": ""
-        },
-        {
-          "nummer": 4,
-          "beschriftung": ""
-        }
-      ],
-      "md5": "0f83c6c5c54eeeb9b8205b4f6a6cd6ad"
+      "marken": [],
+      "md5": "5cc2f4c4b0340c0fa5ff6b52ea20b48f"
     },
     {
       "datei": "04_generator_bereiche.png",
@@ -84,27 +50,10 @@
       "titel": "Fixture Generator: Bereiche der Betriebsart, „Laser aus“ = closed",
       "groesse": [
         1200,
-        1320
+        1000
       ],
-      "marken": [
-        {
-          "nummer": 1,
-          "beschriftung": ""
-        },
-        {
-          "nummer": 2,
-          "beschriftung": ""
-        },
-        {
-          "nummer": 3,
-          "beschriftung": ""
-        },
-        {
-          "nummer": 4,
-          "beschriftung": ""
-        }
-      ],
-      "md5": "879dfa173dbaffe353c1b0dde700a003"
+      "marken": [],
+      "md5": "769e00ccf1f788a13cc960545effa3c5"
     },
     {
       "datei": "05_generator_pruefen.png",
@@ -112,38 +61,21 @@
       "titel": "Fixture Generator: Prüfung mit Laser-Sicherheit, Live-Test, Speichern",
       "groesse": [
         1200,
-        1320
+        1000
       ],
-      "marken": [
-        {
-          "nummer": 1,
-          "beschriftung": ""
-        },
-        {
-          "nummer": 2,
-          "beschriftung": ""
-        },
-        {
-          "nummer": 3,
-          "beschriftung": ""
-        },
-        {
-          "nummer": 4,
-          "beschriftung": ""
-        }
-      ],
-      "md5": "e3e34631a5eb2445c34bd182c30b4051"
+      "marken": [],
+      "md5": "7488bd1cb0fc3393d37481e2e375dd19"
     },
     {
       "datei": "06_patch_dialog.png",
       "szene": "06_patch_dialog",
-      "titel": "Gerät hinzufügen: das neue Profil unter Laserworld",
+      "titel": "Gerät hinzufügen: das neue Profil unter Laserworld, Adresse 120",
       "groesse": [
         1600,
         900
       ],
       "marken": [],
-      "md5": "137c05c6d2627a9eb89833fdf57d7f46"
+      "md5": "8cec0c228057982e6b93e9761ab31882"
     },
     {
       "datei": "07_programmer_laser.png",
@@ -171,7 +103,7 @@
           "beschriftung": ""
         }
       ],
-      "md5": "0b7225e05c85295d472ccf17986a2ee4"
+      "md5": "eb91af9d714fd26fb06946c1e06bcb77"
     },
     {
       "datei": "08_laser_not_aus.png",
@@ -191,7 +123,7 @@
           "beschriftung": ""
         }
       ],
-      "md5": "fd40d9639da52e0af3a00e3bc627809a"
+      "md5": "2780de4adec12132b20c3aca2a64dd9e"
     },
     {
       "datei": "09_programmer_efx.png",
@@ -211,7 +143,7 @@
           "beschriftung": ""
         }
       ],
-      "md5": "0d6eefbd8016fa1fc3a4f3e343849089"
+      "md5": "e71c5eda601eedc27543dc066cb1d082"
     },
     {
       "datei": "10_3d_laser.png",

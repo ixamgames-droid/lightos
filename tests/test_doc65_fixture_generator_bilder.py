@@ -2,7 +2,7 @@
 
 Haelt ohne GPU fest:
 
-* Szenen-Modul zielt auf die Anleitung; nur die 3D-Szene braucht die GPU,
+* Szenen-Modul zielt auf die Anleitung; alle Szenen laufen am echten Bildschirm,
 * Manifest, Bildordner und Bild-Links der Anleitung decken sich (plus das
   Typenschild-Foto, das kein Szenenbild ist),
 * das Typenschild-Foto ist verkleinert und ohne EXIF,
@@ -43,7 +43,9 @@ def _links() -> set[str]:
 def test_szenen_zielen_auf_die_anleitung():
     szenen, ziel = runner.lade_szenen("fixture_generator")
     assert ziel == "docs/anleitung_fixture_generator/img"
-    assert [s.name for s in szenen if s.braucht_gpu] == ["10_3d_laser"]
+    # Alle am echten Bildschirm: der Durchlauf ist zugleich der Eingabetest der
+    # Oberflaeche (QTest-Klicks/Tastatur in Generator, Patch-Dialog, Programmer).
+    assert szenen and all(s.braucht_gpu for s in szenen)
 
 
 def test_manifest_dateien_und_anleitung_decken_sich():
@@ -99,3 +101,18 @@ def test_dip_tabelle_in_der_anleitung():
 def test_im_index_eingetragen():
     with open(os.path.join(_REPO, "docs", "ANLEITUNGEN.md"), encoding="utf-8") as f:
         assert "anleitung_fixture_generator/ANLEITUNG_FIXTURE_GENERATOR.md" in f.read()
+
+
+def test_vergleich_findet_abweichungen_und_schweigt_bei_gleichheit():
+    from anleitungsbilder.szenen_fixture_generator import vergleich_daten
+    with open(_PROFIL, encoding="utf-8") as f:
+        bib = json.load(f)
+    assert vergleich_daten(json.loads(json.dumps(bib)), bib) == []
+    anders = json.loads(json.dumps(bib))
+    anders["modi"][0]["kanaele"][0]["default"] = 175
+    anders["modi"][0]["kanaele"][0]["bereiche"][0]["art"] = ""
+    anders["leistung_w"] = 15
+    z = vergleich_daten(anders, bib)
+    assert any(t.startswith("leistung_w") for t in z)
+    assert any(t.startswith("Kanal 1 default") for t in z)
+    assert any(t.startswith("Kanal 1 Bereiche") for t in z)
