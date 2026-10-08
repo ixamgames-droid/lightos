@@ -47,7 +47,11 @@ LASER_EXTRA_ATTRS = ("shutter", "gobo_wheel", "gobo_rotation", "zoom",
                      # Praktisch war der MASTER-DIMMER eines FB4 auf der
                      # Laser-Seite nicht bedienbar — ausgerechnet der Regler,
                      # den man zuerst sucht.
-                     "intensity", "color_r", "color_g", "color_b", "strobe")
+                     "intensity", "color_r", "color_g", "color_b", "strobe",
+                     # LAS-26: Mustergeschwindigkeit der Show-Laser
+                     # (EL-400RGB MK2, ZQ-B370: „Dynamic Pattern Speed“) — fiel
+                     # hier durch und war auf der Laser-Seite nicht bedienbar.
+                     "effect_speed")
 
 # LAS-11: Die Laser-Regler werden nach Bedeutung gruppiert statt als flache
 # Kanal-Liste gezeigt — die WICHTIGEN Achsen (Muster, Farbe, Geschwindigkeit)
@@ -62,7 +66,8 @@ _ROW_GROUPS: list[tuple[str, tuple[str, ...]]] = [
     ("Farbe", ("laser_color_change", "laser_color", "color_wheel",
                "color_r", "color_g", "color_b")),
     ("Bewegung & Geschwindigkeit",
-     ("speed", "laser_scan_rate", "gobo_rotation", "laser_x", "laser_y",
+     ("speed", "effect_speed", "laser_scan_rate", "gobo_rotation",
+      "laser_x", "laser_y",
       "zoom", "laser_zoom_x", "laser_zoom_y")),
     ("Zeichnen", ("laser_draw_mode", "laser_draw")),
 ]
