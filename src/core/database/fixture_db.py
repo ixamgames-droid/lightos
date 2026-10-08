@@ -3764,11 +3764,28 @@ def _code_stand() -> str:
     stehen ``_seed`` und alle ``_add_*``). Aendert sich eine Definition, aendert
     sich der Stand — dann (und nur dann) laeuft der Abgleich einmal."""
     import hashlib
+    datei = __file__ or ""
+    kandidaten = [datei[:-1]] if datei.endswith(".pyc") else []
+    kandidaten.append(datei)
+    for pfad in kandidaten:
+        try:
+            with open(pfad, "rb") as fh:
+                return hashlib.sha256(fh.read()).hexdigest()[:16]
+        except OSError:
+            continue
+    # XPLAT-47: im gefrorenen Windows-Build (PyInstaller) liegt kein Quelltext
+    # neben dem Modul — ``__file__`` zeigt ins Leere. Frueher hiess das Stand
+    # "" fuer immer: nach einem Update mit geaenderten Builtins lief der
+    # Abgleich nie wieder. Rueckfall: der Bytecode des Moduls ueber seinen
+    # Loader (aendert sich mit jeder Definitionsaenderung genauso).
     try:
-        with open(__file__, "rb") as fh:
-            return hashlib.sha256(fh.read()).hexdigest()[:16]
-    except OSError:
-        return ""
+        import marshal
+        code = __loader__.get_code(__name__)  # type: ignore[name-defined]
+        if code is not None:
+            return "c" + hashlib.sha256(marshal.dumps(code)).hexdigest()[:15]
+    except Exception:
+        pass
+    return ""
 
 
 def _stand_lesen(s) -> str:
