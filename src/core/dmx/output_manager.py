@@ -200,12 +200,22 @@ class OutputManager:
         self._laser_adressen: dict = {}
         self._laser_estop_aktiv = False
         # OUT-64: bei aktivem Latch die AUSGABEWEGE der gesperrten Universen
-        # ({weg: Adressen}); s. _estop_wege_nachfuehren.
-        self._laser_estop_wege: dict[tuple, frozenset] = {}
+        # ({weg: {adresse: aus_wert}}); s. _estop_wege_nachfuehren. Der Wert ist
+        # der bekannte Aus-Wert des Lasers (LAS-25), sonst 0.
+        self._laser_estop_wege: dict[tuple, dict] = {}
+        # OUT-65: bei aktivem Latch KLEBRIGE Laser-Aus-Werte je internem
+        # Universum ({universum: {adresse: aus_wert}}) — wie die Adressen
+        # (OUT-63): faellt ein Laser aus dem Patch, bleibt sein Aus-Wert stehen.
+        self._laser_estop_aus: dict[int, dict] = {}
+        # OUT-64 (Restluecke a): Wege eines Universums beim letzten
+        # ``remove_output`` — ueberbrueckt das Fenster zwischen ``remove_output``
+        # und dem folgenden ``add_*`` (apply_output_config, Dialog).
+        self._entfernte_wege: dict[int, list] = {}
         # Eigene kleine Sperre fuer das Fortschreiben der Wege (NOT-AUS aus
         # MIDI/OSC/Web-Thread vs. Umrouten im UI-Thread) — bewusst NICHT
         # _io_lock: den haelt _send_all waehrend der seriellen Writes.
-        self._estop_wege_lock = threading.Lock()
+        # Reentrant: set_gm_laser_aus_mask merkt unter ihr und fuehrt nach.
+        self._estop_wege_lock = threading.RLock()
         # slot → (level 0.0–1.0, target_fids | None). target_fids None = GLOBALER
         # Submaster (wirkt auf ALLE Fixtures, bisheriges Verhalten); ein
         # frozenset[int] beschraenkt den Submaster auf genau diese Fixture-fids
@@ -317,8 +327,38 @@ class OutputManager:
         Farbkanal. Bei Grand Master < ``GM_LASER_AUS_SCHWELLE`` setzt der
         Sende-Pfad diese Adressen NACH Channel-Modifier und GM-Skalierung auf
         ihren Aus-Wert (ein INVERSE-Modifier kann den Laser so nicht wieder
-        einschalten). Vom AppState aus dem Patch gepflegt."""
-        self._gm_laser_aus_mask = {u: dict(m) for u, m in (mask or {}).items()}
+        einschalten). Vom AppState aus dem Patch gepflegt.
+
+        OUT-65: bei aktivem NOT-AUS-Latch bleiben die bisherigen Aus-Werte in
+        ``_laser_estop_aus`` stehen (klebrig wie die Adressen, OUT-63)."""
+        neu = {u: dict(m) for u, m in (mask or {}).items()}
+        with self._wege_lock():
+            if getattr(self, "_laser_estop_aktiv", False):
+                self._aus_werte_merken(getattr(self, "_gm_laser_aus_mask", {}) or {})
+                self._aus_werte_merken(neu)
+            self._gm_laser_aus_mask = neu
+            self._estop_wege_nachfuehren()
+
+    def merke_laser_aus_werte(self, mask: dict[int, dict]):
+        """OUT-65: Aus-Werte NUR fuer den NOT-AUS vormerken (bei aktivem Latch),
+        ohne die GM-/Blackout-Maske anzufassen. Der Plan-Rebuild ruft das VOR
+        dem Push der neuen Laser-Adressen — sonst stuende eine neu adressierte
+        Laser-Adresse fuer ein paar Frames ohne Aus-Wert (= 0) in der Maske."""
+        with self._wege_lock():
+            if getattr(self, "_laser_estop_aktiv", False):
+                self._aus_werte_merken(mask or {})
+                self._estop_wege_nachfuehren()
+
+    def _aus_werte_merken(self, mask: dict):
+        """Unter ``_wege_lock``: Aus-Werte in die klebrige Maske uebernehmen
+        (neuer Wert gewinnt; nie entfernen). Eine Zuweisung = atomar."""
+        if not mask:
+            return
+        aus = {u: dict(m) for u, m in (getattr(self, "_laser_estop_aus", {}) or {}).items()}
+        for u, m in mask.items():
+            if m:
+                aus[u] = {**aus.get(u, {}), **m}
+        self._laser_estop_aus = aus
 
     def set_blackout_keep_mask(self, mask: dict[int, frozenset]):
         """OUT-57: Setzt je Universum die Adressen, die der Blackout STEHEN LAESST
@@ -337,9 +377,10 @@ class OutputManager:
         leere Maske heisst nicht „aus“: im Lade-Fenster ist der Plan leer, die
         Maske also leer, obwohl der Latch gerade ausgeloest wurde. ``None`` =
         wie bisher aus der Maske ableiten."""
-        self._laser_estop_mask = mask or {}
-        self._laser_estop_aktiv = bool(mask) if aktiv is None else bool(aktiv)
-        self._estop_wege_nachfuehren()
+        with self._wege_lock():
+            self._laser_estop_mask = mask or {}
+            self._laser_estop_aktiv = bool(mask) if aktiv is None else bool(aktiv)
+            self._estop_wege_nachfuehren()
 
     # ── OUT-64: NOT-AUS je Ausgabeweg ────────────────────────────────────────
     # Die NOT-AUS-Maske arbeitet in INTERNEN Universen. Der Laser haengt aber
@@ -366,6 +407,12 @@ class OutputManager:
             return ("netz", (ext if ext is not None else univ_num - 1) + 1)
         return ("netz", ext if ext is not None else univ_num)
 
+    def _wege_lock(self):
+        lock = getattr(self, "_estop_wege_lock", None)
+        if lock is None:          # Test-Manager per __new__ ohne __init__
+            lock = self._estop_wege_lock = threading.RLock()
+        return lock
+
     def _wege_von(self, univ_num: int) -> list:
         """Aktuelle Ausgabewege eines internen Universums.
 
@@ -386,31 +433,52 @@ class OutputManager:
 
     def _estop_wege_nachfuehren(self):
         """Bei aktivem Latch: die Wege der gesperrten Universen dazunehmen (nie
-        einengen); ohne Latch: leeren. Nach jeder Masken- und Routing-Aenderung."""
-        lock = getattr(self, "_estop_wege_lock", None)
-        if lock is None:          # Test-Manager per __new__ ohne __init__
-            lock = self._estop_wege_lock = threading.Lock()
-        with lock:
+        einengen); ohne Latch: leeren. Nach jeder Masken- und Routing-Aenderung.
+
+        Je Weg ``{adresse: aus_wert}``: der bekannte Aus-Wert des Lasers
+        (LAS-25 — 0 heisst bei vielen Lasern „Auto run“ = AN), sonst 0. Klebrig
+        wie die Adressen: ein einmal bekannter Aus-Wert wird nie durch 0
+        ersetzt, solange der Latch steht (OUT-65)."""
+        with self._wege_lock():
             if not getattr(self, "_laser_estop_aktiv", False):
                 self._laser_estop_wege = {}
+                self._laser_estop_aus = {}
                 return
-            wege = dict(getattr(self, "_laser_estop_wege", {}) or {})
+            # OUT-65: aktuelle und (im Lade-Fenster) Lade-Start-Aus-Werte
+            # mitnehmen — der Latch kann WAEHREND des Ladens fallen, dann ist
+            # die Live-Maske schon leer.
+            lade = getattr(self, "_lade", None)
+            if lade is not None and len(lade[1]) > 5:
+                self._aus_werte_merken(lade[1][5] or {})
+            self._aus_werte_merken(getattr(self, "_gm_laser_aus_mask", {}) or {})
+            aus_alle = getattr(self, "_laser_estop_aus", {}) or {}
+            wege = {w: dict(m) for w, m in
+                    (getattr(self, "_laser_estop_wege", {}) or {}).items()}
+            entfernt = getattr(self, "_entfernte_wege", None) or {}
             for u, addrs in dict(getattr(self, "_laser_estop_mask", {}) or {}).items():
                 if not addrs:
                     continue
-                for weg in self._wege_von(u):
-                    wege[weg] = frozenset(wege.get(weg, frozenset()) | frozenset(addrs))
+                aus_u = aus_alle.get(u, {})
+                for weg in self._wege_von(u) + list(entfernt.get(u, ())):
+                    werte = wege.setdefault(weg, {})
+                    for a in addrs:
+                        if a in aus_u:
+                            werte[a] = aus_u[a]
+                        elif a not in werte:
+                            werte[a] = 0
             self._laser_estop_wege = wege   # eine Zuweisung = atomar fuer _send_all
 
     @staticmethod
-    def _weg_nullen(data: bytes, addrs) -> bytes:
-        if not addrs:
+    def _weg_nullen(data: bytes, werte) -> bytes:
+        """OUT-64: die gesperrten Adressen eines Ausgabewegs auf ihren Aus-Wert
+        (``{adresse: aus_wert}``; ohne bekannten Aus-Wert steht dort 0)."""
+        if not werte:
             return data
         buf = bytearray(data)
         n = len(buf)
-        for addr in addrs:
+        for addr, wert in werte.items():
             if 1 <= addr <= n:
-                buf[addr - 1] = 0
+                buf[addr - 1] = wert
         return bytes(buf)
 
     def set_laser_adressen(self, mask: dict[int, frozenset]):
@@ -918,6 +986,7 @@ class OutputManager:
         self.close_enttec_on_port(port)
         self._swap_device(self._enttec_outputs, universe, _make_enttec_device(port))
         self._estop_wege_nachfuehren()       # OUT-64
+        self._entfernte_wege_vergessen(universe)
 
     def close_enttec_on_port(self, port: str):
         """Schliesst eine evtl. offene Enttec-Verbindung auf diesem COM-Port
@@ -953,6 +1022,7 @@ class OutputManager:
         self._swap_device(self._artnet_outputs, universe, ArtNetSender(target_ip))
         self._set_out_universe(universe, out_universe)
         self._estop_wege_nachfuehren()       # OUT-64
+        self._entfernte_wege_vergessen(universe)
 
     def add_sacn(self, universe: int, target_ip: str | None = None,
                  out_universe=None):
@@ -977,6 +1047,7 @@ class OutputManager:
         self._swap_device(self._sacn_outputs, universe, neu)
         self._set_out_universe(universe, out_universe)
         self._estop_wege_nachfuehren()       # OUT-64
+        self._entfernte_wege_vergessen(universe)
 
     #: NET-12: Registry-Name -> Registry-Attribut, fuer ``remove_output(ausser=…)``.
     _REGISTRY_NAMEN = ("enttec", "artnet", "sacn")
@@ -1020,6 +1091,17 @@ class OutputManager:
                       "sacn": self._sacn_outputs}
         if ausser is not None and ausser not in registries:
             raise ValueError(f"unbekannter Adaptertyp: {ausser!r}")
+        # OUT-64 (Restluecke a): die Wege VOR dem Entfernen merken. Faellt der
+        # NOT-AUS zwischen diesem Aufruf und dem folgenden ``add_*``, saehe
+        # ``_estop_wege_nachfuehren`` den alten Weg sonst nicht mehr — und ein
+        # anderes Universum duerfte ihn danach ungesperrt bekommen.
+        with self._wege_lock():
+            alt = self._wege_von(universe)
+            if alt:
+                ew = dict(getattr(self, "_entfernte_wege", None) or {})
+                ew[universe] = alt
+                self._entfernte_wege = ew
+            self._estop_wege_nachfuehren()
         victims = []
         with self._io_lock:
             for name, registry in registries.items():
@@ -1044,6 +1126,24 @@ class OutputManager:
                 dev.close()
             except Exception:
                 pass
+
+    def _entfernte_wege_vergessen(self, universe: int | None = None):
+        """OUT-64: gemerkte Wege aus ``remove_output`` verwerfen — fuer ein
+        Universum (nach seinem ``add_*``) oder alle (Ende von
+        ``apply_output_config``). Bei aktivem Latch sind sie dann schon in
+        ``_laser_estop_wege`` uebernommen."""
+        with self._wege_lock():
+            ew = getattr(self, "_entfernte_wege", None) or {}
+            if universe is None:
+                self._entfernte_wege = {}
+            elif universe in ew:
+                ew = dict(ew)
+                ew.pop(universe, None)
+                self._entfernte_wege = ew
+
+    def vergiss_entfernte_wege(self):
+        """OUT-64: oeffentlich fuer ``AppState.apply_output_config``."""
+        self._entfernte_wege_vergessen(None)
 
     def start(self):
         if self._running and self._thread and self._thread.is_alive():
@@ -1218,6 +1318,8 @@ class OutputManager:
         # Laser-Aus-Pass -> Betriebsart 0 statt Aus-Wert).
         blackout = bool(self._blackout)
         gm = self.grand_master
+        # OUT-65: klebrige NOT-AUS-Aus-Werte EINMAL je Frame lesen.
+        estop_aus = getattr(self, "_laser_estop_aus", None)
         for univ_num, universe in list(self.universes.items()):
             # Im Freeze den festgehaltenen Stand senden statt des (u. U. direkt
             # beschriebenen) Live-Universums. Ein Universum, das es beim
@@ -1330,10 +1432,14 @@ class OutputManager:
                 # B1 (Review LAS-25): Adressen mit bekanntem Aus-Wert bekommen
                 # DEN statt 0 — bei einem Laser mit 0 = „Auto run“ schaltete
                 # ein NOT-AUS mit 0 ihn sonst EIN. Alle anderen Adressen: 0.
+                # OUT-65: auch die klebrigen Aus-Werte seit dem Latch (Laser,
+                # der inzwischen aus dem Patch gefallen ist); live gewinnt.
+                kl = estop_aus.get(univ_num) if estop_aus else None
+                aus_e = {**kl, **aus} if (kl and aus) else (kl or aus)
                 buf = bytearray(data)
                 for addr in estop_mask:
                     if 1 <= addr <= 512:
-                        buf[addr - 1] = aus.get(addr, 0) if aus else 0
+                        buf[addr - 1] = aus_e.get(addr, 0) if aus_e else 0
                 data = bytes(buf)
             # ANZEIGE-Snapshot: exakt die Bytes, die gleich gesendet werden (POST
             # GM/Blackout/Channel-Modifier). GIL-atomare dict-Zuweisung mit
@@ -1350,7 +1456,10 @@ class OutputManager:
                 # sonst abwaertskompatibler Default (Art-Net num-1, sACN num).
                 ext = self._out_universe.get(univ_num)
                 # OUT-64: Laser-NOT-AUS je AUSGABEWEG — auch ein umgeroutetes
-                # Universum sendet auf dem Weg des Lasers dessen Adressen als 0.
+                # Universum sendet auf dem Weg des Lasers dessen Adressen mit
+                # ihrem Aus-Wert (LAS-25; unbekannt -> 0). Laeuft NACH allen
+                # Paessen oben, also auch nach dem NOT-AUS des Universums —
+                # darum MUSS hier derselbe Aus-Wert stehen, nie pauschal 0.
                 wege = getattr(self, "_laser_estop_wege", None)
                 # OUT-51: Die drei Sendeaufrufe fangen weiterhin ALLES — eine
                 # Exception darf den Output-Thread nie beenden, sonst steht die

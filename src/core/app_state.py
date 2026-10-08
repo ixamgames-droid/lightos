@@ -1775,8 +1775,23 @@ class AppState:
         # _estop_lock — sonst konnte ein fremder Thread (MIDI/OSC/Web) den Latch
         # zwischen Check und Tausch setzen und nur die ALTEN Adressen maskieren.
         # Lock-Reihenfolge: _estop_lock vor _plan_lock (kein Pfad nimmt sie umgekehrt).
+        # OUT-65: Aus-Werte des neuen Plans VOR den neuen Laser-Adressen
+        # vormerken (nur bei aktivem Latch wirksam) — sonst stuende eine neu
+        # adressierte Laser-Adresse bis zu set_gm_laser_aus_mask unten mit 0
+        # (= „Auto run“ bei vielen Lasern) in der NOT-AUS-Maske.
+        try:
+            new_laser_aus = self._build_gm_laser_aus_mask(fix_index)
+        except Exception as e:
+            print(f"[AppState] build gm laser mask error: {e}")
+            new_laser_aus = None
         with self._get_estop_lock():
             if getattr(self, "laser_estop_active", False):
+                merke = getattr(self.output_manager, "merke_laser_aus_werte", None)
+                if new_laser_aus and callable(merke):
+                    try:
+                        merke(new_laser_aus)
+                    except Exception as e:
+                        print(f"[AppState] merke laser aus error: {e}")
                 _old_le = getattr(self, "_laser_estop_addrs", {}) or {}
                 if _old_le != new_laser_estop_addrs:
                     _union = {}
@@ -1811,7 +1826,8 @@ class AppState:
         try:
             setze_aus = getattr(self.output_manager, "set_gm_laser_aus_mask", None)
             if setze_aus is not None:
-                setze_aus(self._build_gm_laser_aus_mask(fix_index))
+                setze_aus(new_laser_aus if new_laser_aus is not None
+                          else self._build_gm_laser_aus_mask(fix_index))
         except Exception as e:
             print(f"[AppState] set gm laser mask error: {e}")
         # OUT-57: Blackout-ERHALTEN-Maske — nur Position/Gobo/Prisma/Optik gepatchter
@@ -2163,6 +2179,14 @@ class AppState:
             except Exception as e:
                 print(f"[app_state] apply_output_config: Universe {num} "
                       f"({output}) fehlgeschlagen: {e}")
+        # OUT-64: die zwischen remove_output und add_* gemerkten Wege verwerfen
+        # (bei aktivem NOT-AUS sind sie bereits in dessen Wege-Liste).
+        vergiss = getattr(self.output_manager, "vergiss_entfernte_wege", None)
+        if callable(vergiss):
+            try:
+                vergiss()
+            except Exception as e:
+                print(f"[app_state] apply_output_config: Wege vergessen: {e}")
 
     def auto_patch_fixtures(self, undoable: bool = True):
         """Weist allen Fixtures aufeinander folgende Adressen zu (undobar)."""
