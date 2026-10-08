@@ -48,16 +48,18 @@ HELLIGKEIT = 10
 
 # Kameras wie camera/presets.js (theta/phi/radius/target); theta 0 = von vorn
 # (aus dem Publikum), phi = Winkel von oben, radius = Abstand in Metern.
-KAM_TOTALE = {"name": "Doku", "mode": "3D", "theta": 0.0, "phi": 1.32,
-              "radius": 32.0, "target": [0.0, 4.2, 0.0]}
-KAM_SCHRAEG = {"name": "Doku", "mode": "3D", "theta": 0.7, "phi": 1.2,
-               "radius": 32.0, "target": [0.0, 4.0, 0.0]}
-KAM_PUBLIKUM = {"name": "Doku", "mode": "3D", "theta": -0.25, "phi": 1.45,
-                "radius": 26.0, "target": [0.0, 5.0, 0.0]}
-KAM_WEIT = {"name": "Doku", "mode": "3D", "theta": 0.0, "phi": 1.42,
-            "radius": 54.0, "target": [0.0, 4.5, 1.0]}
-KAM_NAH = {"name": "Doku", "mode": "3D", "theta": 0.0, "phi": 1.47,
-           "radius": 22.0, "target": [0.0, 5.2, 0.0]}
+# Nah genug, dass die 20-m-Buehne gut die halbe Bildbreite fuellt, und eher
+# flach (phi nahe 90 Grad) — von oben wirkt die Buehne klein.
+KAM_TOTALE = {"name": "Doku", "mode": "3D", "theta": 0.0, "phi": 1.38,
+              "radius": 25.0, "target": [0.0, 4.6, 0.0]}
+KAM_SCHRAEG = {"name": "Doku", "mode": "3D", "theta": 0.55, "phi": 1.30,
+               "radius": 25.0, "target": [0.0, 4.4, 0.0]}
+KAM_PUBLIKUM = {"name": "Doku", "mode": "3D", "theta": -0.25, "phi": 1.47,
+                "radius": 21.0, "target": [0.0, 5.2, 0.0]}
+KAM_WEIT = {"name": "Doku", "mode": "3D", "theta": 0.0, "phi": 1.44,
+            "radius": 38.0, "target": [0.0, 4.8, 1.0]}
+KAM_NAH = {"name": "Doku", "mode": "3D", "theta": 0.0, "phi": 1.48,
+           "radius": 21.0, "target": [0.0, 5.2, 0.0]}
 
 
 # ── Show und Visualizer ─────────────────────────────────────────────────────
@@ -284,19 +286,109 @@ def flaeche(ui):
     return lbl
 
 
-def _vorbereitung(knoepfe, kam, vorlauf_s=2.0):
-    """``vorher``: Visualizer offen, alles aus, Knoepfe druecken, Vorlauf."""
+def _vorbereitung(knoepfe, kam, vorlauf_s=2.0, gm=1.0):
+    """``vorher``: Visualizer offen, alles aus, Knoepfe druecken, Vorlauf.
+    ``gm`` < 1 zieht den Grand Master zurueck (wie am Pult), damit der
+    Buehnenboden unter vollen PARs nicht weiss ausbrennt."""
     def vorher(ui):
         viz_auf(ui)
         alles_aus(ui)
         for k in knoepfe:
             druecken(ui, k)
+        ui.state.output_manager.set_grand_master(gm)
         sekunden(ui, vorlauf_s)
         kamera(ui, kam)
     return vorher
 
 
 def _aufraeumen(ui):
+    alles_aus(ui)
+
+
+# ── Laser-Beleg (offscreen) ─────────────────────────────────────────────────
+
+def _laser_kanal(ui, fid, attr):
+    from src.core.app_state import get_channels_for_patched
+    fx = next(f for f in ui.state.get_patched_fixtures() if f.fid == fid)
+    for c in sorted(get_channels_for_patched(fx), key=lambda c: c.channel_number):
+        if c.attribute == attr:
+            return int(fx.universe), int(fx.address) - 1 + int(c.channel_number) - 1
+    raise SzenenFehler(f"Gerät {fid} hat keinen Kanal {attr}")
+
+
+def _laser_dmx(ui, fids, attr):
+    werte = []
+    for f in fids:
+        u, i = _laser_kanal(ui, f, attr)
+        werte.append(int(ui.state.output_manager.get_display_frame(u)[i]))
+    return werte
+
+
+def beleg_laser(ui):
+    """Die Laser-Knöpfe der GELADENEN Show tun, was Übersicht und Anleitung
+    sagen (Display-Frame, d. h. was die Ausgabe senden würde):
+
+    * „Laser langsam"/„Laser Welle" bewegen ``laser_x`` (EFX auf den
+      Laser-Achsen, nach dem Laden — LAS-23),
+    * „Laser Lauf" schaltet nur zwischen 0 und 60 (Manual Control),
+    * Grand Master 0 schaltet die Laser ohne Dimmer aus (LAS-24),
+    * „Laser NOT-AUS" macht alle Laser-Kanäle dunkel.
+    """
+    laser = sorted(f.fid for f in ui.state.get_patched_fixtures()
+                   if (f.label or "").startswith("Laser"))
+    if len(laser) != 10:
+        raise SzenenFehler(f"{len(laser)} Laser statt 10")
+    for knopf in ("Laser langsam", "Laser Welle"):
+        alles_aus(ui)
+        for k in ("Laser an", "Laser grün", knopf):
+            druecken(ui, k)
+        verlauf = []
+        for _ in range(16):
+            ticks(ui, 22)
+            verlauf.append(_laser_dmx(ui, laser, "laser_x"))
+        erster = [v[0] for v in verlauf]
+        print(f"BELEG {knopf}: Laser 1 X-Bewegung alle 0,5 s: {erster}", flush=True)
+        for i in range(len(laser)):
+            spur = {v[i] for v in verlauf}
+            if max(spur) - min(spur) < 40:
+                raise SzenenFehler(f"{knopf}: Laser {i + 1} bewegt sich nicht ({sorted(spur)})")
+        if set(_laser_dmx(ui, laser, "shutter")) != {60}:
+            raise SzenenFehler(f"{knopf}: Laser nicht an")
+    alles_aus(ui)
+    druecken(ui, "Laser an")
+    druecken(ui, "Laser Lauf")
+    werte = set()
+    for _ in range(150):
+        ticks(ui, 1)
+        werte |= set(_laser_dmx(ui, laser, "shutter"))
+    print(f"BELEG Laser Lauf: Shutter-Werte {sorted(werte)}", flush=True)
+    if werte != {0, 60}:
+        raise SzenenFehler(f"Laser Lauf: Shutter {sorted(werte)} statt 0/60")
+    om = ui.state.output_manager
+    stufen = []
+    for gm in (0.5, 0.0):
+        om.set_grand_master(gm)
+        ticks(ui, 3)
+        stufen.append((gm, sorted(set(_laser_dmx(ui, laser, "shutter")))))
+    om.set_grand_master(1.0)
+    print(f"BELEG Grand Master -> Laser-Shutter: {stufen}", flush=True)
+    if stufen[-1][1] != [0]:
+        raise SzenenFehler("Grand Master 0 schaltet die Laser nicht aus")
+    druecken(ui, "Laser NOT-AUS")
+    ticks(ui, 5)
+    hoechst = max(max(_laser_dmx(ui, laser, a))
+                  for a in ("shutter", "laser_x", "color_wheel", "laser_bank"))
+    print(f"BELEG Laser NOT-AUS: höchster Laser-Wert {hoechst}", flush=True)
+    if hoechst != 0:
+        raise SzenenFehler("Laser NOT-AUS lässt Laser an")
+    # Sperre wieder lösen wie in der Laser-Ansicht (Shutter im Programmer),
+    # sonst bleiben die Laser in allen folgenden Bildern dunkel.
+    ui.state.set_laser_estop(False)
+    alles_aus(ui)
+    druecken(ui, "Laser an")
+    ticks(ui, 3)
+    if set(_laser_dmx(ui, laser, "shutter")) != {60}:
+        raise SzenenFehler("Laser nach Lösen des NOT-AUS nicht wieder an")
     alles_aus(ui)
 
 
@@ -318,7 +410,7 @@ _GIF_ZUSCHNITT = (230, 110, 1440, 767)
 
 
 def _fahrt_gif(name, titel, knoepfe, kam_von, kam_bis, *, n=18, schritt_s=0.2,
-               vorlauf_s=1.5, breite=720, weich=True):
+               vorlauf_s=1.5, breite=640, weich=True):
     """GIF mit Kamerafahrt: je Frame laeuft die Show ``schritt_s`` weiter und
     die Kamera rueckt ein Stueck von ``kam_von`` nach ``kam_bis``."""
     uhr = Uhr()
@@ -337,17 +429,21 @@ def _fahrt_gif(name, titel, knoepfe, kam_von, kam_bis, *, n=18, schritt_s=0.2,
                  titel=titel)
 
 
-_ORBIT_A = dict(KAM_TOTALE, theta=-0.65)
-_ORBIT_B = dict(KAM_TOTALE, theta=0.65)
+# Kurze Wege je GIF: wenige Bilder ueber eine weite Fahrt springen sichtbar.
+_ORBIT_A = dict(KAM_TOTALE, theta=-0.35, radius=27.0)
+_ORBIT_B = dict(KAM_TOTALE, theta=0.35, radius=27.0)
 
 SZENEN = [
+    # Der Laser-Beleg laeuft NACH dem Bild: der NOT-AUS hinterlaesst eine
+    # Meldung in der Statusleiste.
     Szene("01_vc_seite", sektion="Virtual Console", vorher=_vc_vorher,
-          nachher=_aufraeumen,
+          nachher=beleg_laser,
           titel="VC-Seite der Bühnen-Show: PAR-Dimmer/-Farbe, Moving Heads, "
                 "Strobe + Laser, Show-Looks, Grand Master"),
     Szene("02_aufbau", sektion="Bühne", braucht_gpu=True, groesse=_GROESSE,
           vorher=_vorbereitung(["PAR an", "Blau", "MH Licht an", "MH Weiß",
-                                "Position Bühne", "Beam schmal", "Haze an"], KAM_SCHRAEG),
+                                "Position Bühne", "Beam schmal", "Haze an"], KAM_SCHRAEG,
+                               gm=0.55),
           dialog=flaeche, nachher=_aufraeumen,
           titel="Aufbau: 20-m-Bühne, drei Traversen-Ebenen, PAR-Türme, LED-Wand"),
     Szene("03_intro", sektion="Bühne", braucht_gpu=True, groesse=_GROESSE,
@@ -355,21 +451,21 @@ SZENEN = [
           nachher=_aufraeumen,
           titel="Look Intro: blaue Dimmer-Welle, Tilt-Welle der Moving Heads, Laser"),
     Szene("04_drop", sektion="Bühne", braucht_gpu=True, groesse=_GROESSE,
-          vorher=_vorbereitung(["Drop"], KAM_PUBLIKUM, 2.3), dialog=flaeche,
+          vorher=_vorbereitung(["Drop"], KAM_PUBLIKUM, 2.3, gm=0.7), dialog=flaeche,
           nachher=_aufraeumen,
           titel="Look Drop: Lauflicht innen → außen, Schwenker A/B, Strobe-Lauf"),
     Szene("05_breakdown", sektion="Bühne", braucht_gpu=True, groesse=_GROESSE,
           vorher=_vorbereitung(["Breakdown"], KAM_SCHRAEG, 2.0), dialog=flaeche,
           nachher=_aufraeumen, titel="Look Breakdown: Amber-Welle, blaue Moving Heads mit Gobo + Prisma, Acht"),
     Szene("06_finale", sektion="Bühne", braucht_gpu=True, groesse=_GROESSE,
-          vorher=_vorbereitung(["Finale"], KAM_TOTALE, 2.33), dialog=flaeche,
+          vorher=_vorbereitung(["Finale"], KAM_TOTALE, 2.33, gm=0.5), dialog=flaeche,
           nachher=_aufraeumen, titel="Look Finale: Farbwechsel, Strobe, Kreis-Welle"),
     _fahrt_gif("07_wellen_orbit",
                "GIF: Dimmer-/Farbwelle über 40 PARs + Pan-Welle der Moving Heads, "
                "Kamera kreist langsam um die Bühne",
                ["Welle links → rechts", "Farbwelle", "MH Licht an", "Beam schmal",
                 "Farbrad", "Pan-Welle", "Haze an"], _ORBIT_A, _ORBIT_B,
-               n=20, schritt_s=0.2),
+               n=16, schritt_s=0.2, breite=600),
     _fahrt_gif("08_schwenker_dolly",
                "GIF: Schwenker A/B im Wechsel, Kamera fährt von weit hinten "
                "im Publikum nach vorn",
@@ -379,6 +475,6 @@ SZENEN = [
                "GIF: Lauflicht innen → außen, Strobes, Laser-Lauf — Schwenk",
                ["Lauflicht innen → außen", "Magenta", "Strobes Lauf", "Laser an",
                 "Laser Lauf", "Laser Farbe", "MH Licht an", "Tilt-Welle", "Farbrad"],
-               dict(KAM_PUBLIKUM, theta=-0.45), dict(KAM_PUBLIKUM, theta=0.25),
-               n=18, schritt_s=0.12),
+               dict(KAM_PUBLIKUM, theta=-0.3), dict(KAM_PUBLIKUM, theta=0.1),
+               n=14, schritt_s=0.12, breite=560),
 ]

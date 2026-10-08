@@ -632,6 +632,15 @@ def chaser_bauen(ui, *, bild_fn=None):
         ed._name_edit.setText(LASER)
         _combo_text(ed._combo_order, "Loop")
         _combo_daten(ed._tempo_bus_combo, FREI)
+        ui.pump(0.2)
+        if bild_fn is not None:
+            # Bild 16 zeigt NUR Schritte 1-3 (Name, Run Order, Tempo-Bus) —
+            # aufgenommen, bevor Schritte und Fade-Zeiten (Schritt 4) gesetzt sind.
+            dlg.resize(940, 830)
+            ui.pump(0.3)
+            ed._editor_scroll.verticalScrollBar().setValue(0)
+            ui.pump(0.2)
+            ergebnis["chaser_tempo"] = bild_fn(dlg, ed, "tempo")
         lst = ed._add_list
         for i in range(lst.count()):
             t = lst.item(i).text().split(": ", 1)[-1]
@@ -651,11 +660,6 @@ def chaser_bauen(ui, *, bild_fn=None):
                 hold.setValue(0.5)
         ui.pump(0.3)
         if bild_fn is not None:
-            dlg.resize(940, 830)
-            ui.pump(0.3)
-            ed._editor_scroll.verticalScrollBar().setValue(0)
-            ui.pump(0.2)
-            ergebnis["chaser_tempo"] = bild_fn(dlg, ed, "tempo")
             _oben(ui, ed._editor_scroll, ed._table, rand=50)
             ergebnis["chaser_schritte"] = bild_fn(dlg, ed, "schritte")
         knopf(dlg, "Schließen").click()
@@ -709,7 +713,7 @@ VC_KNOEPFE = [  # (Beschriftung, Funktion, Live-Edit-Slot)
     ("MH-Welle", WELLE, "MH"),
     ("Schwenker", SCHWENK, "MH"),
     ("Strobe", STROBE, "STR"),
-    ("Laser langsam", LASER, "LAS"),
+    ("Mein Laser", LASER, "LAS"),
 ]
 
 
@@ -729,12 +733,31 @@ def vc_bank2(ui):
     ui.pump(0.3)
 
 
-def vc_knopf_finden(ui, text):
+def vc_knoepfe_der_bank(ui):
+    """Alle Knöpfe der AKTUELLEN Bank — die Show selbst belegt Bank 1 mit
+    eigenen Knöpfen (darunter „Laser langsam"); eine Suche über alle Bänke
+    fand dort einen gleichnamigen Knopf, und der eigene wurde nie angelegt."""
     from src.ui.virtualconsole.vc_button import VCButton
-    for w in _vc(ui)._canvas.findChildren(VCButton):
+    canvas = _vc(ui)._canvas
+    return [w for w in canvas.findChildren(VCButton) if canvas.on_active_bank(w)]
+
+
+def vc_knopf_finden(ui, text):
+    for w in vc_knoepfe_der_bank(ui):
         if (w.caption or "") == text:
             return w
     return None
+
+
+def vc_bank_pruefen(ui):
+    """Auf der eigenen Bank liegen genau die fünf Knöpfe aus VC_KNOEPFE."""
+    canvas = _vc(ui)._canvas
+    namen = sorted((w.caption or "") for w in vc_knoepfe_der_bank(ui))
+    beleg(f"VC Bank {canvas.active_bank + 1}: {len(namen)} Knöpfe {namen}")
+    if canvas.active_bank != 1:
+        raise SzenenFehler(f"eigene Knöpfe nicht auf Bank 2 (Bank {canvas.active_bank + 1})")
+    if namen != sorted(t for t, _f, _s in VC_KNOEPFE):
+        raise SzenenFehler(f"Bank 2 hat {namen} statt der fünf eigenen Knöpfe")
 
 
 def vc_knopf_anlegen(ui, i, text, fn_name, slot, *, bild_fn=None):
@@ -778,6 +801,8 @@ def vc_alle_anlegen(ui, *, bis=None):
     for i, (text, fn_name, slot) in enumerate(VC_KNOEPFE[:bis]):
         if vc_knopf_finden(ui, text) is None:
             vc_knopf_anlegen(ui, i, text, fn_name, slot)
+    if bis is None:
+        vc_bank_pruefen(ui)
 
 
 def alle_effekte_bauen(ui):
@@ -826,10 +851,24 @@ def _druecken(w):
 
 # ── Bilder: Oberfläche ──────────────────────────────────────────────────────
 
+def _matrix_dirty_beleg(ui):
+    """Nebenbefund: zeigt der Editor bei einer unberuehrten Matrix
+    „ungespeicherte Änderungen“, steht hier, welche Felder abweichen."""
+    m = _mx(ui)
+    cur, saved = getattr(m, "_current", None), getattr(m, "_saved", None)
+    if cur is None or saved is None:
+        beleg("Matrix-Editor: keine Matrix geladen")
+        return
+    a, b = cur.to_dict(), saved.to_dict()
+    diff = {k: (b.get(k), a.get(k)) for k in set(a) | set(b) if a.get(k) != b.get(k)}
+    beleg(f"Matrix-Editor „{saved.name}“ nach Gruppenwahl: Abweichung gespeichert→Editor {diff}")
+
+
 def _b01(ui):
     start_vorher(ui)
     gruppe_waehlen(ui, G_PAR)
     reiter(ui, "Matrix")
+    _matrix_dirty_beleg(ui)
     return _bild(ui, [(gruppe_rechteck(ui, G_PAR), 1, "rechts"),
                       (tab_rechteck(ui, "Matrix"), 2, "oben"),
                       (_win_rect(ui, knopf(_mx(ui), "+ Neu")), 3, "rechts")])
@@ -1070,6 +1109,7 @@ def _v16(ui):
                     (_zeile_dlg(dlg, "Live-Edit-Slot:"), 4, "rechts")])
         _w, erg = vc_knopf_anlegen(ui, i, text, fn_name, slot, bild_fn=bild_fn)
         _VC_BILD.update(erg)
+    vc_bank_pruefen(ui)
 
 
 def _b16(ui):
@@ -1088,6 +1128,7 @@ def _b17(ui):
     _druecken(vc_knopf_finden(ui, "Schwenker"))
     bs.ticks(ui, 10)
     ui.pump(0.4)
+    vc_bank_pruefen(ui)
     kn = [vc_knopf_finden(ui, t) for t, _f, _s in VC_KNOEPFE]
     r = _win_rect(ui, kn[0])
     for w in kn[1:]:
@@ -1233,19 +1274,19 @@ def _alles_vorher(ui):
     for k in ("Haze an", "Farbwechsel", "MH Licht an", "Beam schmal", "Farbrad",
               "Laser an", "Laser Farbe"):
         bs.druecken(ui, k)
-    for t in ("Lauflicht", "Schwenker", "Laser langsam"):
+    for t in ("Lauflicht", "Schwenker", "Mein Laser"):
         _druecken(vc_knopf_finden(ui, t))
     bs.sekunden(ui, 1.5)
 
 
 def _alles_gif():
     uhr = bs.Uhr()
-    n, schritt_s = 20, 0.2
-    kam_a = {"name": "Doku", "mode": "3D", "theta": -0.35, "phi": 1.42, "radius": 46.0,
+    n, schritt_s = 16, 0.2
+    kam_a = {"name": "Doku", "mode": "3D", "theta": -0.3, "phi": 1.42, "radius": 36.0,
              "target": [0.0, 5.0, 1.0]}
     kam_b = {"name": "Doku", "mode": "3D", "theta": 0.3, "phi": 1.36, "radius": 28.0,
              "target": [0.0, 5.0, 0.0]}
-    wechsel = {7: ("Strobe",), 13: ("MH-Welle",)}
+    wechsel = {6: ("Strobe",), 12: ("MH-Welle",)}
 
     def frame_schritt(i):
         def schritt(ui):
@@ -1256,7 +1297,7 @@ def _alles_gif():
         return schritt
     return Szene("22_alles_3d", sektion="Programmer", vorher=_alles_vorher,
                  nachher=bs._aufraeumen, braucht_gpu=True, groesse=bs._GROESSE,
-                 gif_breite=640, gif_zuschnitt=bs._GIF_ZUSCHNITT, warte_s=0.3,
+                 gif_breite=560, gif_zuschnitt=bs._GIF_ZUSCHNITT, warte_s=0.3,
                  titel="GIF: alle selbst gebauten Effekte über die eigenen VC-Knöpfe, "
                        "Kamera fährt aus dem Publikum heran",
                  frames=[Frame(dauer_s=schritt_s, schritt=frame_schritt(i),
@@ -1307,7 +1348,7 @@ SZENEN = [
           titel="Chaser „Mein Laser langsam“: Name, Run Order Loop, Tempo-Bus frei"),
     Szene("17_laser_schritte", sektion="Programmer", dialog=_b14b, nachher=_n14,
           titel="Chaser: zwei Szenen übernommen, Fade In 4 s, Schließen"),
-    _gif("18_laser_3d", "GIF: Laser an, Chaser läuft (Bewegung im 3D nicht sichtbar)",
+    _gif("18_laser_3d", "GIF: Laser an, Chaser „Mein Laser langsam“ schwenkt die Strahlen",
          lambda ui: (laser_bauen(ui), _fm().start(funktion(LASER).id)),
          ["Laser an", "Laser Farbe", "Haze an"], KAM_LASER, dict(KAM_LASER, theta=0.3),
          n=14, schritt_s=0.25),

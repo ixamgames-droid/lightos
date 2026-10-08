@@ -1,7 +1,7 @@
 {
   "anleitung": "buehnen_show",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "a5443398",
+  "stand": "a772bd69",
   "schrift": "Noto Sans (statt Roboto Condensed)",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py buehnen_show'.",
@@ -15,7 +15,7 @@
         900
       ],
       "marken": [],
-      "md5": "ae3f2fabf46f4b38bfd29216abd9c89f"
+      "md5": "b7ae2270d894f725597f42f0c4468027"
     },
     {
       "datei": "02_aufbau.png",
@@ -26,7 +26,7 @@
         877
       ],
       "marken": [],
-      "md5": "7cee4f3caae332df64624bebc68efc03"
+      "md5": "c14acb7fed1affa7c972ccae85f8015f"
     },
     {
       "datei": "03_intro.png",
@@ -37,7 +37,7 @@
         877
       ],
       "marken": [],
-      "md5": "9c6273aa565a177a86a21c7ab914992f"
+      "md5": "3ceafd17d9d247d201d9c3c76e18cecc"
     },
     {
       "datei": "04_drop.png",
@@ -48,7 +48,7 @@
         877
       ],
       "marken": [],
-      "md5": "5c9f4bff901666088b6579978a38a1d6"
+      "md5": "491b15f32d162646c0e012339b7e96a4"
     },
     {
       "datei": "05_breakdown.png",
@@ -59,7 +59,7 @@
         877
       ],
       "marken": [],
-      "md5": "123492895d59a0b477f29cb2befb3600"
+      "md5": "494759596621011399f1fddd9c5f2d44"
     },
     {
       "datei": "06_finale.png",
@@ -70,15 +70,15 @@
         877
       ],
       "marken": [],
-      "md5": "c1ddf20814ed73cdbe7ce277095aaa98"
+      "md5": "f91e8d6527474db62b53f543c0007ac8"
     },
     {
       "datei": "07_wellen_orbit.gif",
       "szene": "07_wellen_orbit",
       "titel": "GIF: Dimmer-/Farbwelle über 40 PARs + Pan-Welle der Moving Heads, Kamera kreist langsam um die Bühne",
       "groesse": [
-        720,
-        384
+        600,
+        320
       ],
       "marken": [
         [],
@@ -96,19 +96,11 @@
         [],
         [],
         [],
-        [],
-        [],
-        [],
-        [],
         []
       ],
-      "md5": "f49e73500748054ea24359af14126794",
-      "frames": 20,
+      "md5": "aa611b67ed4afe733b661160f76506e2",
+      "frames": 16,
       "dauern_ms": [
-        200,
-        200,
-        200,
-        200,
         200,
         200,
         200,
@@ -132,8 +124,8 @@
       "szene": "08_schwenker_dolly",
       "titel": "GIF: Schwenker A/B im Wechsel, Kamera fährt von weit hinten im Publikum nach vorn",
       "groesse": [
-        720,
-        384
+        640,
+        341
       ],
       "marken": [
         [],
@@ -155,7 +147,7 @@
         [],
         []
       ],
-      "md5": "1d56e2832f78dd8cc075de9c6e1307d3",
+      "md5": "59c7e02c20b672c511bc3fb954bd59f1",
       "frames": 18,
       "dauern_ms": [
         200,
@@ -183,8 +175,8 @@
       "szene": "09_lauflicht_strobe",
       "titel": "GIF: Lauflicht innen → außen, Strobes, Laser-Lauf — Schwenk",
       "groesse": [
-        720,
-        384
+        560,
+        298
       ],
       "marken": [
         [],
@@ -200,19 +192,11 @@
         [],
         [],
         [],
-        [],
-        [],
-        [],
-        [],
         []
       ],
-      "md5": "5fc834710366482545d298a9e2871e7d",
-      "frames": 18,
+      "md5": "95fe511a20b7435fb5366027bae20dec",
+      "frames": 14,
       "dauern_ms": [
-        120,
-        120,
-        120,
-        120,
         120,
         120,
         120,

@@ -1,7 +1,7 @@
 {
   "anleitung": "buehnen_effekte",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "e6c2405b",
+  "stand": "a772bd69",
   "schrift": "Noto Sans (statt Roboto Condensed)",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py buehnen_effekte'.",
@@ -15,7 +15,7 @@
         900
       ],
       "marken": [],
-      "md5": "83d29614442fb996b364b273a15f2f09"
+      "md5": "d18f3385beecf7c6c6dcf2955436dcdd"
     },
     {
       "datei": "02_matrix_grundeinstellungen.png",
@@ -26,7 +26,7 @@
         900
       ],
       "marken": [],
-      "md5": "11c331d9be7c7d5d2a4cbe43bba660ff"
+      "md5": "e17e6d4d2082303c968e48caceadf47a"
     },
     {
       "datei": "03_matrix_bewegung.png",
@@ -37,7 +37,7 @@
         900
       ],
       "marken": [],
-      "md5": "70b88b3ad33b2a905b3d5c74a7368d58"
+      "md5": "cff365308560b2e1b462d98d8548d7e3"
     },
     {
       "datei": "04_lauflicht_3d.gif",
@@ -99,7 +99,7 @@
         900
       ],
       "marken": [],
-      "md5": "0c74fb3d9e907e357f219183791054f6"
+      "md5": "beb4136ee0265b696197a49b19202c7a"
     },
     {
       "datei": "06_efx_form.png",
@@ -110,7 +110,7 @@
         900
       ],
       "marken": [],
-      "md5": "6b2c53a0acc664c76438a2d468989f66"
+      "md5": "8673c4a52acd504230a76cbfb4030b1d"
     },
     {
       "datei": "07_efx_tempo.png",
@@ -121,7 +121,7 @@
         900
       ],
       "marken": [],
-      "md5": "bb8f96316a0e3d634cfd2b453c063695"
+      "md5": "6f917fefefc9ee99e9c4543174ddd43f"
     },
     {
       "datei": "08_efx_verhaeltnis.png",
@@ -132,7 +132,7 @@
         900
       ],
       "marken": [],
-      "md5": "6977513c96850737e49cb9dbe7c1fe99"
+      "md5": "70604dc46f92ad162b9adeb1e94a82dc"
     },
     {
       "datei": "09_welle_3d.gif",
@@ -159,7 +159,7 @@
         [],
         []
       ],
-      "md5": "c5b3931b6bfcf38eb05e408e29b526f8",
+      "md5": "ed9149464005183f9ca3be3a2e00f4cb",
       "frames": 15,
       "dauern_ms": [
         240,
@@ -188,7 +188,7 @@
         900
       ],
       "marken": [],
-      "md5": "d383572464c263524ddfdab96a8e4bdf"
+      "md5": "895936b2d4084f39855cc2b1ad63a9c5"
     },
     {
       "datei": "11_schwenker_3d.gif",
@@ -218,7 +218,7 @@
         [],
         []
       ],
-      "md5": "d59c4c5ece1a76306395b51a9b16d2bd",
+      "md5": "12e9a9b80b216361e702f358fa256ba9",
       "frames": 18,
       "dauern_ms": [
         200,
@@ -250,7 +250,7 @@
         900
       ],
       "marken": [],
-      "md5": "3bdc60b88891646610f505a539a73953"
+      "md5": "12fe754530a46a9ed1df73a832b3f6c2"
     },
     {
       "datei": "13_strobe_3d.gif",
@@ -308,7 +308,7 @@
         900
       ],
       "marken": [],
-      "md5": "3ea1715b93ad5f350954ffe826e0f01c"
+      "md5": "3aea9e3762524eb6bb3219708a6b9317"
     },
     {
       "datei": "15_laser_kanaele.png",
@@ -319,7 +319,7 @@
         900
       ],
       "marken": [],
-      "md5": "e0abd0e2572aa6f20cfa58359e49e6ed"
+      "md5": "1a1efeefb993e65e697c843cd495a9da"
     },
     {
       "datei": "16_laser_chaser.png",
@@ -330,7 +330,7 @@
         900
       ],
       "marken": [],
-      "md5": "6585ed65c5688f404b3a1a3a2e3468a7"
+      "md5": "f7b1501146ca85ec79a3441726ad28f1"
     },
     {
       "datei": "17_laser_schritte.png",
@@ -341,12 +341,12 @@
         900
       ],
       "marken": [],
-      "md5": "2f4acbc47fb37f58fd80223d191140e2"
+      "md5": "c3462ae90e8d402b181b63e796240543"
     },
     {
       "datei": "18_laser_3d.gif",
       "szene": "18_laser_3d",
-      "titel": "GIF: Laser an, Chaser läuft (Bewegung im 3D nicht sichtbar)",
+      "titel": "GIF: Laser an, Chaser „Mein Laser langsam“ schwenkt die Strahlen",
       "groesse": [
         640,
         341
@@ -367,7 +367,7 @@
         [],
         []
       ],
-      "md5": "28dacbef343c68c8d67904fa3d992e9a",
+      "md5": "250bed7c4a5a3fb48241b17dcd21f931",
       "frames": 14,
       "dauern_ms": [
         250,
@@ -395,7 +395,7 @@
         900
       ],
       "marken": [],
-      "md5": "c2329bb26fa99c56bd5392a4cf638813"
+      "md5": "6712d342405632f690791f54f3e2e049"
     },
     {
       "datei": "20_vc_seite.png",
@@ -406,7 +406,7 @@
         900
       ],
       "marken": [],
-      "md5": "86747f50051f8049dcd8e8db8df9ea9a"
+      "md5": "73d3f027456500617081f850b88a71cd"
     },
     {
       "datei": "21_3d_einstellungen.png",
@@ -417,15 +417,15 @@
         1000
       ],
       "marken": [],
-      "md5": "68f24be99870878ecd2c281a8b2710e6"
+      "md5": "85c3faa6701fe207ad6b0e9e40517d61"
     },
     {
       "datei": "22_alles_3d.gif",
       "szene": "22_alles_3d",
       "titel": "GIF: alle selbst gebauten Effekte über die eigenen VC-Knöpfe, Kamera fährt aus dem Publikum heran",
       "groesse": [
-        640,
-        341
+        560,
+        298
       ],
       "marken": [
         [],
@@ -443,19 +443,11 @@
         [],
         [],
         [],
-        [],
-        [],
-        [],
-        [],
         []
       ],
-      "md5": "33d0c33b0392708290332c05f6e89b65",
-      "frames": 20,
+      "md5": "ccd088b394077de1b030596ccc91aa09",
+      "frames": 16,
       "dauern_ms": [
-        200,
-        200,
-        200,
-        200,
         200,
         200,
         200,

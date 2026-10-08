@@ -190,8 +190,10 @@ hat das als **PAR Strobe**.
 ## 5. Langsame Laser-Bewegung (Szenen + Chaser mit Überblendung)
 
 Ein EFX lässt sich in der Oberfläche nur auf Pan/Tilt legen, nicht auf die X-/Y-Bewegung eines
-Lasers (Backlog LAS-22). Eine langsame Bewegung entsteht deshalb aus zwei Szenen, zwischen
-denen ein Chaser weich überblendet.
+Lasers (Backlog LAS-22). Die Show selbst hat solche Laser-EFX („Laser langsam", „Laser Welle"),
+weil der Generator sie direkt anlegt; die Show-Datei speichert die Laser-Achsen (LAS-23). Von
+Hand entsteht eine langsame Bewegung aus zwei Szenen, zwischen denen ein Chaser weich
+überblendet.
 
 ![Gruppe Laser, Reiter Laser, Regler X-Bewegung](img_effekte/14_laser_tab.png)
 
@@ -230,7 +232,7 @@ Im Reiter **Assistent** auf **+ Chaser**. Es öffnet sich **Bearbeiten: Neuer Ch
 
 Zum Starten den Chaser im Reiter **Assistent** in der Liste wählen und **Start** — oder einen
 Knopf dafür anlegen (Schritt 6). Die Laser müssen dazu an sein, in der Show über den Knopf
-**Laser an**.
+**Laser an**; die Farbe kommt getrennt davon aus **Laser grün** oder **Laser Farbe**.
 
 ![Laser an, Chaser läuft](img_effekte/18_laser_3d.gif)
 
@@ -238,15 +240,19 @@ Knopf dafür anlegen (Schritt 6). Die Laser müssen dazu an sein, in der Show ü
 92, 105, 118, 117, 104, 90, 77 … — der Wert gleitet in 4 Sekunden von links nach rechts und
 wieder zurück, bei allen zehn Lasern gleich.
 
-> **Grenze der 3D-Ansicht:** Der Visualizer zeichnet Laser als feste Kegel. Er zeigt An/Aus
-> und Farbe, aber keine X-/Y-Bewegung — im GIF steht der Laser still, obwohl der DMX-Wert
-> wandert (behoben mit VIZ-79). Am echten Gerät ist die Bewegung zu sehen.
+Der 3D-Visualizer zeichnet die Laser als dünne Strahlenfächer und schwenkt sie mit der
+X-/Y-Bewegung mit (VIZ-79). Er zeigt das Muster vereinfacht; das echte Gerät zeichnet seine
+eigenen Figuren.
+
+> **Sicherheit:** Der rote Knopf **Laser NOT-AUS** auf der Show-Seite schaltet alle Laser
+> sofort dunkel, auch während der Chaser läuft. Der **Grand Master** schaltet diese Laser erst
+> bei 0 % aus (sie haben keinen Dimmer), siehe [Große Bühnen-Show 2026](ANLEITUNG_BUEHNEN_SHOW.md#laser).
 
 ## 6. Effekte auf eigene Knöpfe legen (Virtual Console)
 
 In der Sektion **Virtual Console**:
 
-- Mit **▶** neben der Bank-Anzeige auf eine freie Bank wechseln (die Show belegt Bank 1).
+- Mit **▶** neben der Bank-Anzeige auf Bank 2 wechseln (die Show belegt Bank 1).
 - **Bearbeiten** einschalten (der Knopf heißt dann **Bearbeiten ✓**).
 - Rechtsklick auf eine freie Stelle → **Hinzufügen** → **Button**.
 - Doppelklick auf den neuen Knopf öffnet **Button Einstellungen**:
@@ -267,7 +273,10 @@ In der Sektion **Virtual Console**:
 | MH-Welle | Meine MH-Welle | MH |
 | Schwenker | Meine Schwenker | MH |
 | Strobe | Mein Strobe | STR |
-| Laser langsam | Mein Laser langsam | LAS |
+| Mein Laser | Mein Laser langsam | LAS |
+
+Die Beschriftung **Mein Laser** hält den Knopf vom gleichnamigen Show-Knopf **Laser langsam**
+auf Bank 1 getrennt.
 
 Knöpfe mit **demselben** Live-Edit-Slot lösen einander ab: **Schwenker** stoppt die
 **MH-Welle** und umgekehrt, weil zwei Bewegungen derselben Köpfe nicht gleichzeitig laufen
@@ -303,7 +312,9 @@ Visualizer.
 
 Für ruhige Bilder: Unter **Stufe** die Render-Qualität wählen. Auf **Hoch** wird die Auflösung
 während einer Kamerafahrt kurz gröber, wenn die Grafikkarte nicht nachkommt; **Maximal** bleibt
-immer scharf, braucht aber eine starke Grafikkarte.
+immer scharf, braucht aber eine starke Grafikkarte. Mit allen 80 Geräten und Effekten wird die
+3D-Ansicht auch auf **Hoch** zäh (gemessen etwa 9 Bilder pro Sekunde im großen Fenster); was
+dazu geplant ist, steht unter [Leistung](ANLEITUNG_BUEHNEN_SHOW.md#leistung-ehrlich).
 
 ## Wie die Bilder entstehen
 
