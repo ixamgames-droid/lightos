@@ -121,7 +121,11 @@ _KANAELE = [
     _Ch("gobo_wheel", [_Range(0, 9, "Offen / kein Gobo"),
                        _Range(10, 19, "Gobo 6 (Spirale)"),
                        _Range(20, 29, "Gobo 5 (Punkte)"),
-                       _Range(30, 39, "Gobo 3")]),
+                       _Range(30, 39, "Gobo 3"),
+                       _Range(40, 49, "Gobo 1 (Ring-Spalte)"),
+                       _Range(50, 59, "Gobo 2 (Ovale)"),
+                       _Range(60, 69, "Gobo 4 (Tetris)"),
+                       _Range(70, 79, "Gobo 7 (Zebra)")]),
     _Ch("gobo_rotation"),
     _Ch("prism", [_Range(0, 9, "Aus"), _Range(10, 255, "3 Facet Prism")]),
     _Ch("prism_rotation"),
@@ -367,6 +371,99 @@ class Viz83GoboStrahlSceneTest(unittest.TestCase):
         self.assertEqual(nachher["matVersion"], vorher["matVersion"],
                          "Gobo-Wechsel hat das Kegel-Material neu gebaut")
         self.assertTrue(nachher["mapOffen"])
+
+
+# B2: wo endet jeder helle Teilstrahl am Boden, und ist dort im Bodenmuster
+# Licht? Die Teilstrahlen werden in der UNTERSTEN Zeile der Kegel-Maske
+# gesucht (Canvas-Unterkante = Kegelbasis = Bodenende, s. fixtures.js#
+# beamFalloffTexture), ihr Endpunkt ueber die echte Welt-Matrix des Kegels
+# (Spitze -> Randpunkt, verlaengert bis auf die Hoehe der Bodenscheibe)
+# bestimmt und in der Bodenscheibe ueber deren Welt-Matrix und die
+# CircleGeometry-UVs (flipY: Canvas-Oberkante = v 1) nachgeschlagen.
+_TREFFER_JS = """
+(function(){
+  const T = window.THREE;
+  const f = window.__lightos.fixtures['%d'];
+  const beam = f.beam, disc = f.floorSpot;
+  beam.updateWorldMatrix(true, false);
+  disc.updateWorldMatrix(true, false);
+  const mc = beam.material.map.image;
+  const W = mc.width, H = mc.height;
+  const zeile = mc.getContext('2d').getImageData(0, H - 1, W, 1).data;
+  const an = x => zeile[(((x %% W) + W) %% W) * 4] > 127;
+  // Teilstrahlen = zusammenhaengende helle Laeufe (Naht bei u = 0/1 beachten).
+  let start = 0;
+  while (start < W && an(start)) start++;
+  const mitten = [];
+  for (let i = 0; i < W; i++) {
+    const x = start + i;
+    if (an(x) && !an(x - 1)) {
+      let e = x; while (an(e + 1) && e - x < W) e++;
+      mitten.push(((x + e) / 2 + 0.5) / W);
+    }
+  }
+  const p = beam.geometry.parameters, R = p.radius, h = p.height;
+  const A = beam.localToWorld(new T.Vector3(0, h / 2, 0));
+  const yB = new T.Vector3(); disc.getWorldPosition(yB);
+  const bc = disc.material.map ? disc.material.map.image : null;
+  const bd = bc ? bc.getContext('2d').getImageData(0, 0, bc.width, bc.height).data : null;
+  const Rd = disc.geometry.parameters.radius;
+  const out = [];
+  for (const u of mitten) {
+    const th = u * 2 * Math.PI;
+    const P = beam.localToWorld(new T.Vector3(R * Math.sin(th), -h / 2, R * Math.cos(th)));
+    const t = (yB.y - A.y) / (P.y - A.y);
+    const E = A.clone().add(P.clone().sub(A).multiplyScalar(t));
+    const l = disc.worldToLocal(E.clone());
+    const uu = (l.x / Rd + 1) / 2, vv = (l.y / Rd + 1) / 2;
+    let hell = -1;
+    if (bd) {
+      const px = Math.floor(uu * bc.width), py = Math.floor((1 - vv) * bc.height);
+      if (px >= 0 && py >= 0 && px < bc.width && py < bc.height)
+        hell = bd[(py * bc.width + px) * 4];
+    }
+    out.push({u: +u.toFixed(4), px: +uu.toFixed(3), py: +(1 - vv).toFixed(3), hell: hell});
+  }
+  return JSON.stringify(out);
+})()
+"""
+
+
+class Viz83StrahlTrifftMusterTest(Viz83GoboStrahlSceneTest):
+    """B2: jeder helle Teilstrahl endet am Boden auf einem hellen Motiv-Teil —
+    fuer mehrere Motive, Gobo-Drehungen und Kopfstellungen."""
+
+    def _treffer(self):
+        return json.loads(self._eval(_TREFFER_JS % _FID))
+
+    def test_jeder_teilstrahl_endet_auf_hellem_bodenmuster(self):
+        self._load_and_wait()
+        fehler = []
+        geprueft = 0
+        for rad, name in ((25, "Punkte"), (15, "Spirale"), (35, "Kreise"),
+                          (45, "Ring"), (55, "Ovale"), (65, "Tetris"), (75, "Zebra")):
+            for rot in (0, 37, 128, 201):
+                for pan, tilt in ((128, 128), (90, 128), (128, 150), (170, 110)):
+                    self._push(_payload(gobo_wheel=rad, gobo_rotation=rot,
+                                        pan=pan, tilt=tilt))
+                    tr = self._treffer()
+                    self.assertGreaterEqual(len(tr), 3, f"{name}: keine Teilstrahlen {tr}")
+                    for t in tr:
+                        geprueft += 1
+                        if t["hell"] <= 127:
+                            fehler.append((name, rot, pan, tilt, t))
+        self.assertGreater(geprueft, 500)
+        self.assertEqual(fehler[:6], [],
+                         f"{len(fehler)}/{geprueft} Teilstrahlen enden im Dunkeln")
+
+    # Die geerbten Tests laufen schon in der Basisklasse.
+    test_offen_bleibt_der_volle_kegel = None
+    test_gobo_ersetzt_den_vollen_kegel_durch_teilstrahlen = None
+    test_spirale_ist_eine_wendel = None
+    test_nummeriertes_gobo_ergibt_motiv = None
+    test_drehung_dreht_teilstrahlen_prisma_und_bodenmuster = None
+    test_dimmer_fade_kommt_bei_gobo_an = None
+    test_keine_neue_geometrie_und_kein_materialneubau_je_update = None
 
 
 if __name__ == "__main__":

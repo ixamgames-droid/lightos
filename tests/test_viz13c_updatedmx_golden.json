@@ -81,7 +81,7 @@
    "optik": {
     "beamX": 0.6339,
     "gobo": true,
-    "goboRot": 1.577,
+    "goboRot": 4.2524,
     "penumbra": 0.5915,
     "prismN": 3,
     "prismRot": 2.464,
@@ -791,7 +791,7 @@
    "optik": {
     "beamX": 0.6339,
     "gobo": true,
-    "goboRot": 1.577,
+    "goboRot": 4.2524,
     "penumbra": 0.5915,
     "prismN": 3,
     "prismRot": 2.464,

@@ -52,7 +52,107 @@ import * as THREE from '../three/three.js';
 const CACHE = new Map();
 const GROESSE = 128;
 
+// ── VIZ-83 B2: EINE Motiv-Beschreibung fuer Kegel UND Boden ────────────────
+//
+// Bis zum Review-Befund B2 gab es zwei getrennte Zeichnungen: die Bodenmotive
+// lagen bei 0,5–0,66 des Fleck-Radius, die Teilstrahlen trafen den Boden aber
+// am Kegelrand; der Winkel-Nullpunkt lag am Kegel auf +z, am Boden (nach der
+// -90°-Drehung der Scheibe) auf +x, und der Drehsinn war gespiegelt. Die
+// Teilstrahlen endeten neben dem Muster im Dunkeln.
+//
+// Jetzt beschreibt `MOTIVE` jedes Motiv EINMAL als Liste von Teilen
+// `{u, b}`: `u` = Lage auf dem Umfang (0..1, dieselbe Koordinate wie das u der
+// `ConeGeometry`, also Winkel theta = 2*pi*u mit x = sin, z = cos), `b` = Breite
+// des Teilstrahls als Anteil des Umfangs. Daraus entstehen
+//
+// * die Kegel-Maske: je Teil ein heller Streifen (die Spirale mit Drall —
+//   oben an der Linse um `drall` Umfang versetzt, am Boden genau bei `u`),
+// * das Bodenmotiv: je Teil ein helles Element bei `GOBO_RAND` (Anteil des
+//   Textur-Radius) unter dem Canvas-Winkel `a = pi/2 - 2*pi*u`. Mit dieser
+//   Wahl liegt Teil `u` nach der Scheiben-Drehung `rotation.z = w` in Welt-
+//   Richtung atan2(x, z) = 2*pi*u + w — genau dort, wo der um `w` gedrehte
+//   Kegel (`rotation.y = w`) seinen Teilstrahl hat: gleicher Nullpunkt
+//   (+z), gleicher Drehsinn.
+//
+// Dass der Kegelrand am Boden genau auf `GOBO_RAND` liegt, stellt
+// `alignGoboFloor` sicher (aus der echten Welt-Matrix des Kegels: Zoom,
+// Kegellaenge und Kopfstellung gehen damit von selbst ein).
+// Muster ohne Teilstrahl (innere Punkte, Zebra-Balken) zeichnet `innen`.
+export const GOBO_RAND = 0.62;
+// Das Bodenelement ist etwas breiter als sein Teilstrahl: der Strahl soll
+// sicher IM Element enden, nicht auf dessen Kante.
+const BODEN_UEBERMASS = 1.35;
+
+function _ring(n, b, form, versatz = 0) {
+  const out = [];
+  for (let i = 0; i < n; i++) out.push({ u: (i / n + versatz) % 1, b, form });
+  return out;
+}
+
+// Zebra: die Teilstrahlen sind die Stellen, an denen die Balken den Kegelrand
+// kreuzen — abgeleitet, nicht zusaetzlich erfunden.
+const ZEBRA_BALKEN = [-0.5, -0.25, 0, 0.25, 0.5];   // Mitte, Anteil von M (y nach unten)
+const ZEBRA_HALB = 0.075;
+function _zebraTeile() {
+  const out = [];
+  for (const y of ZEBRA_BALKEN) {
+    const s = y / GOBO_RAND;
+    if (Math.abs(s) >= 1) continue;
+    for (const a of [Math.asin(s), Math.PI - Math.asin(s)]) {
+      // Canvas-Winkel a -> u (Umkehrung von a = pi/2 - 2*pi*u)
+      const u = ((((Math.PI / 2 - a) / (2 * Math.PI)) % 1) + 1) % 1;
+      const halb = ZEBRA_HALB / (GOBO_RAND * Math.abs(Math.cos(a)));   // rad
+      out.push({ u, b: Math.min(0.05, (2 * halb / (2 * Math.PI)) / BODEN_UEBERMASS),
+                 form: '' });
+    }
+  }
+  return out;
+}
+
+const MOTIVE = {
+  'ring_slits': { teile: _ring(8, 0.04, 'bogen') },
+  'ovals': { teile: _ring(5, 0.045, 'oval') },
+  'circle_of_circles': { teile: _ring(7, 0.055, 'punkt') },
+  'tetris': {
+    teile: [[0.03, 0.05], [0.16, 0.03], [0.24, 0.06], [0.41, 0.035],
+            [0.55, 0.055], [0.65, 0.03], [0.78, 0.05], [0.90, 0.035]]
+      .map(([u, b]) => ({ u, b, form: 'block' })),
+    innen(g, M) {                               // ein T-Stein in der Mitte
+      const s = M * 0.16;
+      [[-1, -1], [0, -1], [1, -1], [0, 0]].forEach(([x, y]) =>
+        g.fillRect(M + (x - 0.5) * s, M + (y + 0.0) * s, s * 0.9, s * 0.9));
+    },
+  },
+  'dots': {
+    teile: _ring(14, 0.026, 'punkt'),
+    innen(g, M) {                               // innerer Ring ohne Teilstrahl
+      for (let i = 0; i < 7; i++) {
+        const a = (i / 7 + 1 / 14) * Math.PI * 2;
+        g.beginPath();
+        g.arc(M + Math.cos(a) * M * 0.3, M + Math.sin(a) * M * 0.3, M * 0.07, 0, Math.PI * 2);
+        g.fill();
+      }
+    },
+  },
+  // Drei Arme, die von der Mitte zum Rand laufen — jeder endet genau dort,
+  // wo die Wendel des Kegels am Boden ankommt.
+  'spiral': { teile: _ring(3, 0.025, 'arm', 0.5), drall: 0.5 },
+  'zebra': {
+    teile: _zebraTeile(),
+    innen(g, M) {
+      for (const y of ZEBRA_BALKEN) {
+        g.fillRect(M * 0.2, M + (y - ZEBRA_HALB) * M, M * 1.6, 2 * ZEBRA_HALB * M);
+      }
+    },
+  },
+};
+
+/** Canvas-Winkel (y nach unten) des Teils `u` im Bodenmotiv. */
+function bodenWinkel(u) { return Math.PI / 2 - 2 * Math.PI * u; }
+
 function zeichne(stil) {
+  const motiv = MOTIVE[stil];
+  if (!motiv) return null;    // "open"/"" oder unbekannt -> kein Muster, voller Fleck
   const c = document.createElement('canvas');
   c.width = c.height = GROESSE;
   const g = c.getContext('2d');
@@ -62,53 +162,41 @@ function zeichne(stil) {
   g.fillRect(0, 0, GROESSE, GROESSE);
   g.fillStyle = '#fff';
   g.strokeStyle = '#fff';
-  g.lineWidth = GROESSE * 0.06;
-
-  if (stil === 'ring_slits') {
-    for (let i = 0; i < 8; i++) {
-      const a0 = (i / 8) * Math.PI * 2, a1 = a0 + Math.PI / 10;
-      g.beginPath(); g.arc(M, M, M * 0.62, a0, a1); g.stroke();
-    }
-  } else if (stil === 'ovals') {
-    for (let i = 0; i < 5; i++) {
-      const a = (i / 5) * Math.PI * 2;
-      g.save(); g.translate(M + Math.cos(a) * M * 0.42, M + Math.sin(a) * M * 0.42);
-      g.rotate(a); g.beginPath(); g.ellipse(0, 0, M * 0.24, M * 0.12, 0, 0, Math.PI * 2);
+  g.lineCap = 'round';
+  const rr = M * GOBO_RAND;
+  for (const { u, b, form } of motiv.teile) {
+    const a = bodenWinkel(u);
+    const x = M + Math.cos(a) * rr, y = M + Math.sin(a) * rr;
+    // halbe Bogenlaenge des Teils am Rand, mit Uebermass
+    const hw = Math.PI * b * rr * BODEN_UEBERMASS;
+    if (form === 'punkt') {
+      g.beginPath(); g.arc(x, y, Math.max(hw, M * 0.05), 0, Math.PI * 2); g.fill();
+    } else if (form === 'bogen') {
+      const span = Math.PI * b * BODEN_UEBERMASS;
+      g.lineWidth = GROESSE * 0.06;
+      g.beginPath(); g.arc(M, M, rr, a - span, a + span); g.stroke();
+    } else if (form === 'oval') {
+      g.save(); g.translate(x, y); g.rotate(a);
+      g.beginPath(); g.ellipse(0, 0, M * 0.24, Math.max(hw, M * 0.1), 0, 0, Math.PI * 2);
       g.fill(); g.restore();
-    }
-  } else if (stil === 'circle_of_circles') {
-    for (let i = 0; i < 7; i++) {
-      const a = (i / 7) * Math.PI * 2;
+    } else if (form === 'block') {
+      const s = Math.max(2 * hw, M * 0.1);
+      g.save(); g.translate(x, y); g.rotate(a);
+      g.fillRect(-s / 2, -s / 2, s, s); g.restore();
+    } else if (form === 'arm') {
+      // Polarkurve von der Mitte (t = 0) zum Rand (t = 1); der Winkel holt
+      // eine Dreivierteldrehung auf und endet genau bei `a`.
+      g.lineWidth = Math.max(2 * hw, GROESSE * 0.04);
       g.beginPath();
-      g.arc(M + Math.cos(a) * M * 0.5, M + Math.sin(a) * M * 0.5, M * 0.14, 0, Math.PI * 2);
-      g.fill();
+      for (let t = 0; t <= 1.0001; t += 0.02) {
+        const w = a + (1 - t) * Math.PI * 1.5, r = rr * t;
+        const px = M + Math.cos(w) * r, py = M + Math.sin(w) * r;
+        if (t === 0) g.moveTo(px, py); else g.lineTo(px, py);
+      }
+      g.stroke();
     }
-  } else if (stil === 'tetris') {
-    const s = GROESSE / 8;
-    [[2,2],[3,2],[3,3],[4,3],[5,4],[5,5],[2,5],[4,1]].forEach(([x, y]) => {
-      g.fillRect(x * s, y * s, s * 0.9, s * 0.9);
-    });
-  } else if (stil === 'dots') {
-    for (let i = 0; i < 14; i++) {
-      const a = (i / 14) * Math.PI * 2, r = (i % 2 ? 0.32 : 0.62) * M;
-      g.beginPath(); g.arc(M + Math.cos(a) * r, M + Math.sin(a) * r, M * 0.07, 0, Math.PI * 2);
-      g.fill();
-    }
-  } else if (stil === 'spiral') {
-    g.beginPath();
-    for (let t = 0; t < Math.PI * 6; t += 0.08) {
-      const r = (t / (Math.PI * 6)) * M * 0.85;
-      const x = M + Math.cos(t) * r, y = M + Math.sin(t) * r;
-      if (t === 0) g.moveTo(x, y); else g.lineTo(x, y);
-    }
-    g.stroke();
-  } else if (stil === 'zebra') {
-    for (let i = 0; i < 5; i++) {
-      g.fillRect(GROESSE * 0.1, (0.12 + i * 0.18) * GROESSE, GROESSE * 0.8, GROESSE * 0.08);
-    }
-  } else {
-    return null;    // "open"/"" oder unbekannt -> kein Muster, voller Fleck
   }
+  if (motiv.innen) motiv.innen(g, M);
   // Weiche Kante: ein Gobo hat einen runden Rand, kein Quadrat.
   g.globalCompositeOperation = 'destination-in';
   g.beginPath(); g.arc(M, M, M * 0.96, 0, Math.PI * 2); g.fill();
@@ -116,28 +204,10 @@ function zeichne(stil) {
 }
 
 // ── VIZ-83: Teilstrahl-Masken fuer den Kegel ───────────────────────────────
-// Breite = Umfang (u), Hoehe = Laenge (v, Oberkante = Spitze = Linse, s.
-// fixtures.js#beamFalloffTexture). Nur die Spirale braucht die Hoehe.
+// Breite = Umfang (u), Hoehe = Laenge (v, Oberkante = Spitze = Linse,
+// Unterkante = Kegelbasis = Bodenende, s. fixtures.js#beamFalloffTexture).
 const STRAHL_B = 256, STRAHL_H = 64;
 const STRAHL_CACHE = new Map();
-
-// Je Motiv: Lage (0..1 ueber den Umfang) und Breite der Teilstrahlen. Die
-// Zahl folgt grob dem Motiv (14 Punkte -> 14 duenne Strahlen, 7 Kreise -> 7),
-// unregelmaessige Motive bekommen unregelmaessige Strahlen.
-function _gleichverteilt(n, breite) {
-  const out = [];
-  for (let i = 0; i < n; i++) out.push([i / n, breite]);
-  return out;
-}
-const STRAHLEN = {
-  ring_slits: _gleichverteilt(8, 0.035),
-  ovals: _gleichverteilt(5, 0.09),
-  circle_of_circles: _gleichverteilt(7, 0.06),
-  tetris: [[0.03, 0.06], [0.16, 0.03], [0.24, 0.08], [0.41, 0.04],
-           [0.55, 0.07], [0.63, 0.03], [0.78, 0.06], [0.90, 0.04]],
-  dots: _gleichverteilt(14, 0.022),
-  zebra: _gleichverteilt(10, 0.05),
-};
 
 function zeichneStrahl(stil) {
   const c = document.createElement('canvas');
@@ -148,30 +218,23 @@ function zeichneStrahl(stil) {
     g.fillRect(0, 0, STRAHL_B, STRAHL_H);
     return c;
   }
+  const motiv = MOTIVE[stil];
+  if (!motiv) return null;           // unbekannter Stil -> wie offen
   g.fillStyle = '#000';
   g.fillRect(0, 0, STRAHL_B, STRAHL_H);
   g.fillStyle = '#fff';
-  g.strokeStyle = '#fff';
-  if (stil === 'spiral') {
-    // Drei schraeg laufende Streifen: von der Linse zum Boden wandern sie um
-    // einen halben Umfang weiter -> eine Wendel um die Strahlachse.
-    g.lineWidth = STRAHL_B * 0.06;
-    for (let i = 0; i < 3; i++) {
-      for (const versatz of [-STRAHL_B, 0, STRAHL_B]) {   // Naht bei u=0/1
-        const x0 = (i / 3) * STRAHL_B + versatz;
-        g.beginPath(); g.moveTo(x0, 0); g.lineTo(x0 + STRAHL_B * 0.5, STRAHL_H);
-        g.stroke();
-      }
+  const drall = motiv.drall || 0;
+  for (const { u, b } of motiv.teile) {
+    // Viereck von der Linse (oben, um `drall` versetzt) zum Boden (unten,
+    // genau bei u). Ohne Drall ein gerader Streifen, mit Drall eine Wendel.
+    const w = Math.max(1, b * STRAHL_B) / 2;
+    const xu = u * STRAHL_B, xo = (u - drall) * STRAHL_B;
+    for (const versatz of [-STRAHL_B, 0, STRAHL_B]) {   // Naht bei u = 0/1
+      g.beginPath();
+      g.moveTo(xo - w + versatz, 0); g.lineTo(xo + w + versatz, 0);
+      g.lineTo(xu + w + versatz, STRAHL_H); g.lineTo(xu - w + versatz, STRAHL_H);
+      g.closePath(); g.fill();
     }
-    return c;
-  }
-  const liste = STRAHLEN[stil];
-  if (!liste) return null;           // unbekannter Stil -> wie offen
-  for (const [u, b] of liste) {
-    const w = Math.max(1, b * STRAHL_B), x = u * STRAHL_B - w / 2;
-    g.fillRect(x, 0, w, STRAHL_H);
-    if (x < 0) g.fillRect(x + STRAHL_B, 0, w, STRAHL_H);           // Naht
-    if (x + w > STRAHL_B) g.fillRect(x - STRAHL_B, 0, w, STRAHL_H);
   }
   return c;
 }
@@ -182,7 +245,7 @@ function zeichneStrahl(stil) {
  *  Shader neu. */
 export function beamGoboTexture(stil) {
   let key = String(stil || '');
-  if (key === 'open' || (key && !STRAHLEN[key] && key !== 'spiral')) key = '';
+  if (key === 'open' || (key && !MOTIVE[key])) key = '';
   if (STRAHL_CACHE.has(key)) return STRAHL_CACHE.get(key);
   let tex = null;
   try {
@@ -230,6 +293,91 @@ export function goboTexture(stil) {
   return tex;
 }
 
+// Wiederverwendete Rechenobjekte (44-Hz-Pfad, keine Allokation je Frame).
+const _A = new THREE.Vector3(), _P = new THREE.Vector3();
+const _EX = new THREE.Vector3(), _EY = new THREE.Vector3(), _C = new THREE.Vector3();
+const _EZ = new THREE.Vector3(0, 1, 0);
+const RAND_PROBEN = 16;
+
+/** Scheibe zurueck auf die normale TRS-Matrix (kein Gobo / kein Treffer). */
+function _scheibeFrei(disc) {
+  if (disc && disc.matrixAutoUpdate === false) disc.matrixAutoUpdate = true;
+}
+
+/** VIZ-83 B2: Bodenmuster auf die Teilstrahlen des Kegels ausrichten.
+ *
+ *  Rechnet aus der Welt-Matrix des Kegels, wo sein Basisrand auf der
+ *  getroffenen Flaeche (Hoehe `flaecheY`) ankommt: fuer `RAND_PROBEN` Stellen
+ *  `u` die Mantellinie Spitze -> Randpunkt (lokal x = R*sin, z = R*cos) bis auf
+ *  die Flaeche verlaengert. Senkrecht ist das ein Kreis, geneigt eine
+ *  gestreckte, verschobene Ellipse.
+ *
+ *  Die Scheibe bekommt dann die affine Abbildung, die den Motiv-Kreis bei
+ *  `GOBO_RAND` (Canvas-Winkel `pi/2 - 2*pi*u`, d. h. Scheiben-lokal
+ *  (sin 2*pi*u, -cos 2*pi*u) * GOBO_RAND * Radius) im Mittel der kleinsten
+ *  Quadrate auf diese Randpunkte legt — damit endet jeder Teilstrahl auf
+ *  seinem Bodenelement, auch bei Gobo-Drehung (der Kegel ist dann schon um
+ *  `rotation.y` gedreht) und bei schraeg stehendem Kopf. Eine TRS-Matrix
+ *  reicht dafuer nicht: die Streckrichtung (Neigung) und der Musterwinkel
+ *  (Gobo-Drehung) sind unabhaengig, die Abbildung braucht also eine Scherung.
+ *  Deshalb `matrixAutoUpdate = false`, solange ein Gobo projiziert wird.
+ *
+ *  Die TRS-Felder bleiben trotzdem sinnvoll belegt (Position = Auftreffpunkt
+ *  aus applyFloorAim, `rotation.z` = Gobo-Winkel plus Pan/Tilt-Abweichung von
+ *  Teil `u = 0`, auf ±pi gefaltet — ein senkrecht haengender Kopf behaelt also
+ *  genau den Gobo-Winkel). Rueckgabe: mittlerer Kegelrand-Abstand in Metern
+ *  (fuer syncPoolSize) oder `null`, wenn nichts auszurichten ist.
+ */
+export function alignGoboFloor(f, hitX, flaecheY, hitZ) {
+  const beam = f && f.beam, disc = f && f.floorSpot;
+  if (!disc) return null;
+  if (!f.goboAktiv || !beam || !beam.geometry || typeof hitX !== 'number') {
+    _scheibeFrei(disc);
+    return null;
+  }
+  const p = beam.geometry.parameters || {};
+  const R = p.radius, h = p.height;
+  const Rd = (disc.geometry && disc.geometry.parameters
+              && disc.geometry.parameters.radius) || 1;
+  if (!(R > 0) || !(h > 0)) { _scheibeFrei(disc); return null; }
+  beam.updateWorldMatrix(true, false);
+  beam.localToWorld(_A.set(0, h / 2, 0));        // Spitze (an der Linse)
+  const q = GOBO_RAND * Rd;
+  _C.set(0, 0, 0); _EX.set(0, 0, 0); _EY.set(0, 0, 0);
+  let psi0 = 0;
+  for (let i = 0; i < RAND_PROBEN; i++) {
+    const u = i / RAND_PROBEN, th = 2 * Math.PI * u;
+    beam.localToWorld(_P.set(R * Math.sin(th), -h / 2, R * Math.cos(th)));
+    const dy = _P.y - _A.y;
+    if (!(dy < -1e-6)) { _scheibeFrei(disc); return null; }   // zeigt nicht nach unten
+    const t = (flaecheY - _A.y) / dy;
+    if (!(t > 0) || !isFinite(t)) { _scheibeFrei(disc); return null; }
+    _P.sub(_A).multiplyScalar(t).add(_A);        // Endpunkt auf der Flaeche
+    if (i === 0) psi0 = Math.atan2(_P.x - hitX, _P.z - hitZ);
+    // Kleinste Quadrate fuer P = C + EX*lx + EY*ly mit (lx, ly) auf dem
+    // gleichmaessig abgetasteten Kreis: C = Mittel, EX/EY = 2/(N q^2) * Sum P*l.
+    const lx = Math.sin(th) * q, ly = -Math.cos(th) * q;
+    _C.add(_P);
+    _EX.addScaledVector(_P, lx);
+    _EY.addScaledVector(_P, ly);
+  }
+  _C.multiplyScalar(1 / RAND_PROBEN);
+  const k = 2 / (RAND_PROBEN * q * q);
+  _EX.multiplyScalar(k); _EY.multiplyScalar(k);
+  _EX.y = 0; _EY.y = 0;                            // flach auf der Flaeche
+  _C.y = flaecheY;
+  const basis = (typeof f.lastGoboRot === 'number' && isFinite(f.lastGoboRot))
+    ? (Math.max(0, Math.min(255, f.lastGoboRot)) / 255) * 2 * Math.PI : 0;
+  let d = (psi0 - basis) % (2 * Math.PI);
+  if (d > Math.PI) d -= 2 * Math.PI;
+  if (d <= -Math.PI) d += 2 * Math.PI;
+  disc.rotation.z = basis + d;
+  disc.matrixAutoUpdate = false;
+  disc.matrix.makeBasis(_EX, _EY, _EZ).setPosition(_C);
+  disc.matrixWorldNeedsUpdate = true;
+  return Math.sqrt((_EX.lengthSq() + _EY.lengthSq()) / 2) * q;
+}
+
 /** Bodenfleck eines Fixtures an das aktuelle Gobo angleichen.
  *
  *  `gobo`: Muster-Stil ("" = offen). `gobo_rotation` (VIZ-80): DMX 0..255 als
@@ -239,7 +387,9 @@ export function goboTexture(stil) {
  *  ein Range-Name — eine fortlaufende Eigendrehung waere hier erfunden).
  *  Gedreht wird die SCHEIBE um ihre eigene Normale, nicht die Textur: die
  *  Textur ist je Stil fuer ALLE Geraete geteilt (CACHE oben), ein
- *  `tex.rotation` drehte jedes Geraet mit demselben Gobo mit.
+ *  `tex.rotation` drehte jedes Geraet mit demselben Gobo mit. Den genauen
+ *  Sitz unter den Teilstrahlen (Pan/Tilt, Neigung, Kegelrand) setzt danach
+ *  `alignGoboFloor` aus applyFloorAim (VIZ-83 B2).
  *
  *  `null` (VIZ-80, s. fixtures.js#OPTIK_FELDER) = das Profil hat den Kanal
  *  nicht (mehr): Muster bzw. Drehung zurueck auf Grundstellung.

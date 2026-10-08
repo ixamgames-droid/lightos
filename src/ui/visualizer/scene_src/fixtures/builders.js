@@ -13,7 +13,7 @@ import { applyOptics } from './optics.js';   // VIZ-MH-OPTICS
 import { applyPrism, syncPrismToBeam } from './prism.js';   // VIZ-PRISMA-3D
 import { syncPoolSize } from './floor_pool.js';               // VIZ-15
 import { beamsOff } from '../state.js';                       // VIZ-15
-import { applyGobo, GOBO_LICHT, GOBO_STRAHL, GOBO_FLECK } from './gobo_textures.js';   // VIZ-GOBO-3D, VIZ-83
+import { applyGobo, alignGoboFloor, GOBO_LICHT, GOBO_STRAHL, GOBO_FLECK } from './gobo_textures.js';   // VIZ-GOBO-3D, VIZ-83
 import { buildLaserRig, applyLaser, noteLaserAnimation, LASER_BEAM_OPACITY } from './laser.js';   // VIZ-79
 import { stageObjects } from '../state.js';                   // VIZ-BEAM-OCCLUSION
 import { auftreffFlaeche } from './beam_stop.js';             // VIZ-BEAM-OCCLUSION
@@ -1657,6 +1657,7 @@ function applyFloorAim(f, dmx) {
   // waagerecht oder nach oben gerichteten Kopfes, der weder Boden noch Koerper
   // trifft und deshalb seine volle Grundlaenge behalten muss.
   let auftreffAbstand = Infinity;
+  let goboTreffer = null;       // VIZ-83 B2: Auftreffpunkt fuer das Gobo-Bodenmuster
   if (f.floorSpot && f.spotTarget) {
     const dir = new THREE.Vector3(0, -1, 0);
     // Floor-Spot folgt der Strahlrichtung fuer ALLE Beam-Fixtures: Moving Head
@@ -1695,6 +1696,7 @@ function applyFloorAim(f, dmx) {
         // aus, die in Wahrheit im Schatten des Podests liegt.
         f.floorSpot.position.set(hitX, flaeche.y + 0.01, hitZ);
         f.spotTarget.position.set(hitX, flaeche.y, hitZ);
+        goboTreffer = [hitX, flaeche.y + 0.01, hitZ];
         // VIZ-BEAM-OCCLUSION: den sichtbaren Kegel an der getroffenen FLAECHE
         // enden lassen. Er hatte eine feste Laenge und schoss deshalb hindurch
         // — Teil 1 stoppte ihn am Boden, Teil 2 zusaetzlich am ersten
@@ -1709,10 +1711,16 @@ function applyFloorAim(f, dmx) {
   // damit an drei Bedingungen; ein Geraet, das keine davon erfuellte, bekam nie
   // eine Laenge gesetzt.
   setBeamLength(f, auftreffAbstand);
+  // VIZ-83 B2: Bodenmuster unter die Teilstrahlen drehen und den Kegelrand am
+  // Boden messen — NACH setBeamLength, die Kegel-Laenge veraendert den Winkel
+  // der Mantellinien (nur scale.y waechst/schrumpft, der Radius bleibt).
+  const goboRand = goboTreffer
+    ? alignGoboFloor(f, goboTreffer[0], goboTreffer[1], goboTreffer[2])
+    : alignGoboFloor(f);          // kein Treffer: Scheibe zurueck auf TRS
   // VIZ-15: derselbe Abstand macht den Boden-Pool gross. Er hatte bisher einen
   // FESTEN Radius — ein Scheinwerfer 10 m ueber der Buehne warf denselben Fleck
   // wie einer 2 m darueber, und ein Zoom-Zug aenderte gar nichts.
-  syncPoolSize(f, auftreffAbstand);
+  syncPoolSize(f, auftreffAbstand, goboRand);
 }
 
 // Keep top-down icon position synced
