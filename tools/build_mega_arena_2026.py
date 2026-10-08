@@ -24,7 +24,8 @@ VC-BAENKE (APC-Seiten):
     5 HARDSTYLE — BPM/Tap, Beat-Blink RRRW/RWRW, Speeds, Auto-Show, Media, Master
 
 Alle Effekte folgen dem Master-Bus "Global" (= globale Musik-BPM via Tap/Audio)
-mit eigenem tempo_multiplier (Speed-Dials 1/4..4x; Bewegung 1/16..1/4, ENG-31).
+mit eigenem tempo_multiplier (Speed-Dials 1/4..4x; Bewegung MH 1/8..1/4, Spider
+1/16..1/8, ENG-31).
 Kategorien LAYERN (edit_slot statt globalem stop_all/exclusive). Safety: Mover-
 Shutter offen, Laser bleibt aus bis Arm/Muster, base_levels ohne implizite
 Grundhelligkeit.
@@ -91,13 +92,17 @@ MUSIC_DIR = os.environ.get("LIGHTOS_MEGA_MUSIC_DIR", r"C:/Users/X/Desktop/Musik/
 BUS = "Global"            # Master: folgt der globalen Musik-BPM (Tap/Audio)
 SEED_BPM = 150.0          # Hardstyle-Grundtempo (s. FINALISIEREN)
 # ENG-31: Am Tempo-Bus ist bei tempo_multiplier 1 EIN BEAT EINE VOLLE FIGUR — bei
-# 150 BPM also 2,5 Kreise/Schwenks pro Sekunde. Ein echter Moving Head schafft das
-# nicht und "zittert" links-rechts auf der Stelle. Bewegungen laufen deshalb ruhig:
-# eine Figur ueber 4 Takte (16 Beats) = 0,16 Hz bei 150 BPM.
-MOVE_MULT = 1.0 / 16.0
-MOVE_RANDOM_MULT = 1.0 / 8.0     # Random-Walk: ein Wegpunkt je 8 Beats
-WIGGLE_MULT = 1.0 / 4.0          # "Spider Wackeln": kleine Amplitude, bewusst flotter
-MOVE_FACTORS = [1.0 / 16.0, 1.0 / 8.0, 1.0 / 4.0]   # Speed-Dials der Bewegung
+# 150 BPM also 2,5 Kreise/Schwenks pro Sekunde, und die Geraete fahren das am Rig
+# wirklich so schnell (Zittern auf der Stelle). Bewegungen bleiben am Bus (takt-
+# synchron), aber mit kleinem Faktor — Regel aus der Praxis am Rig:
+#   * Moving Heads: Grundfaktor 1/4 (eine Figur je 4 Beats = 1 Takt);
+#   * Spider ("Wackellichter"): 1/4 bis 1/2 des MH-Faktors, also LANGSAMER als
+#     die Moving Heads — auch "Spider Wackeln";
+#   * Farbverlaeufe haben ihre eigenen Faktoren (Farb-Dials), unabhaengig davon.
+MH_MULT = 1.0 / 4.0
+SP_MULT = MH_MULT / 2.0                         # Spider: halbes MH-Tempo (1/8)
+MH_FACTORS = [1.0 / 8.0, 1.0 / 4.0]             # Dial-Stufen Moving Heads
+SP_FACTORS = [MH_MULT / 4.0, MH_MULT / 2.0]     # Dial-Stufen Spider: 1/16, 1/8
 PLAYLIST_MAX = 16
 
 
@@ -370,7 +375,7 @@ bind_tempo(gobo_wechsel, "gobo_mh")
 #  3) BEWEGUNG — MH-Formen + Publikums-Sweep + Spider-Tilt (kein Pan!)
 # ════════════════════════════════════════════════════════════════════════════
 def efx(name, algo, fids, group, phase_mode="sync", counter=False, size=140.0,
-        x=128.0, y=128.0, mult=MOVE_MULT, rotation=0.0):
+        x=128.0, y=128.0, mult=MH_MULT, rotation=0.0):
     e = fm.new_efx(name)
     e.algorithm = algo
     e.fixtures = [EfxFixture(fid=f) for f in fids]
@@ -417,20 +422,22 @@ mh_wavy.set_custom_path(wavy_path); mh_wavy.open_beam = True
 mh_square = efx("MH Quadrat", EfxAlgorithm.SQUARE, all_mh, "mv_mh", phase_mode="sync", size=150)
 mh_heart = efx("MH Herz", EfxAlgorithm.CIRCLE, all_mh, "mv_mh", size=170)
 mh_heart.set_custom_path(heart_path); mh_heart.open_beam = True
-mh_random = efx("MH Random", EfxAlgorithm.RANDOM, all_mh, "mv_mh", size=160,
-                mult=MOVE_RANDOM_MULT)
+# ENG-31: Random laeuft mit demselben Faktor wie die Formen (ein Wegpunkt je 4
+# Beats) — der Bewegungs-Dial setzt den Faktor absolut und zeigt ihn an; ein
+# abweichender Baufaktor waere nach dem ersten Druck ohnehin weg.
+mh_random = efx("MH Random", EfxAlgorithm.RANDOM, all_mh, "mv_mh", size=160)
 # Publikums-Sweep: breiter horizontaler Faecher NUR ueber die 4 Seiten-MH (ins Publikum)
 crowd_sweep = efx("Publikums-Sweep", EfxAlgorithm.LINE, mh_crowd, "mv_crowd",
                   phase_mode="offset", size=230)
 MH_SHAPES = [mh_circle, mh_eight, mh_wavy, mh_square, mh_heart, mh_random]
 
 # Spider (SPIDER14): NUR Tilt (kein Pan). LINE braucht rotation=90 (sonst statisch!).
-sp_scissor = efx("Spider Schere", EfxAlgorithm.LINE, spider_fids, "mv_sp",
+sp_scissor = efx("Spider Schere", EfxAlgorithm.LINE, spider_fids, "mv_sp", mult=SP_MULT,
                  phase_mode="sync", size=210, rotation=90.0)
-sp_wave = efx("Spider Welle", EfxAlgorithm.CIRCLE, spider_fids, "mv_sp",
+sp_wave = efx("Spider Welle", EfxAlgorithm.CIRCLE, spider_fids, "mv_sp", mult=SP_MULT,
               phase_mode="offset", size=180)
-sp_wiggle = efx("Spider Wackeln", EfxAlgorithm.LINE, spider_fids, "mv_sp",
-                phase_mode="sync", size=90, mult=WIGGLE_MULT, rotation=90.0)
+sp_wiggle = efx("Spider Wackeln", EfxAlgorithm.LINE, spider_fids, "mv_sp", mult=SP_MULT,
+                phase_mode="sync", size=90, rotation=90.0)
 
 
 def spider_pose(name, tl, tr):
@@ -451,9 +458,9 @@ def spider_pose(name, tl, tr):
 sp_out = spider_pose("Spider Aussen", 0, 255)
 sp_in = spider_pose("Spider Innen", 128, 128)
 SP_MOVES = [sp_scissor, sp_wave, sp_wiggle, crowd_sweep]
-# ENG-31: "Spider Wackeln" hat sein eigenes (flotteres) Tempo und haengt NICHT am
-# Bewegungs-Dial — der setzt den Multiplikator absolut und machte es sonst traege.
-SP_MULT_FX = [sp_scissor, sp_wave]
+# ENG-31: Der Spider-Dial setzt den Faktor ABSOLUT (1/16 oder 1/8) — alle Spider-
+# EFX laufen mit SP_MULT, "Spider Wackeln" eingeschlossen (nie schneller als die MH).
+SP_MULT_FX = [sp_scissor, sp_wave, sp_wiggle]
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -896,10 +903,9 @@ for i, sc in enumerate((sp_out, sp_in)):
     fx_btn(sc, 4, 3 + i, B_MOVE, "#2a4a4a", "mv_sp", note=note_rc(4, 3 + i))
 label("Spider-Tilt (kein Pan!) + Posen", X0, pad_xy(3, 0)[1] - 16, 240, B_MOVE)
 xy_pad("MH Bereich (Box aufziehen)", CA, Y0, B_MOVE, all_mh, "area", efx_function_id=mh_circle.id)
-speed_dial("MH ×", CA, Y0 + 188, B_MOVE, MH_SHAPES + [crowd_sweep],
-           factors=MOVE_FACTORS, active=MOVE_MULT)
+speed_dial("MH ×", CA, Y0 + 188, B_MOVE, MH_SHAPES + [crowd_sweep], factors=MH_FACTORS, active=MH_MULT)
 speed_dial("Spider ×", CA + 162, Y0 + 188, B_MOVE, SP_MULT_FX,
-           factors=MOVE_FACTORS, active=MOVE_MULT)
+           factors=SP_FACTORS, active=SP_MULT)
 label("BANK 3 BEWEGUNG — R0-1 MH-Formen · R2 Publikums-Sweep (Seiten) · R3-4 Spider-Tilt + Posen. "
       "Rechts: XY-Bereich + Speeds.", X0, Y0 + 6 * STEP, 440, B_MOVE)
 
@@ -967,8 +973,8 @@ label("AUTO-SHOW (Loop) · Licht An · Nebel", X0, pad_xy(3, 0)[1] - 16, 320, B_
 song_info(X0, pad_xy(4, 0)[1], B_HARD, ww=300, hh=64)
 # Speeds + Master-Dimmer
 speed_dial("Farbe ×", CA, Y0 + 190, B_HARD, par_color + led_color + spider_color)
-speed_dial("Bewegung ×", CA + 162, Y0 + 190, B_HARD, MH_SHAPES + SP_MULT_FX + [crowd_sweep],
-           factors=MOVE_FACTORS, active=MOVE_MULT)
+speed_dial("Bewegung ×", CA + 162, Y0 + 190, B_HARD, MH_SHAPES + [crowd_sweep],
+           factors=MH_FACTORS, active=MH_MULT)  # nur MH: Spider haben ihr halbes Tempo
 MFX = CB + 250
 master_fader("Spider", MFX, Y0, B_HARD, SliderMode.GROUP_DIMMER, group="Spider", midi_cc=52)
 master_fader("MH", MFX + 54, Y0, B_HARD, SliderMode.GROUP_DIMMER, group="Moving Heads", midi_cc=53)
