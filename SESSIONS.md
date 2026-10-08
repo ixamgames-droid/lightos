@@ -66,6 +66,7 @@
 | DOC-62 | D | docs/doc62-installdoku-windows | 2026-10-08T16:16Z | INSTALL.md · CONTRIBUTING.md · install.py · tests/test_doc62_installdoku.py |
 | LAS-25 | A | fix/codex-p1-0810 | 2026-10-08T16:57Z | - |
 | TOOL-16 | A | fix/codex-p1-0810 | 2026-10-08T16:57Z | - |
+| UI-81 | A | fix/codex-p1-0810 | 2026-10-08T16:57Z | - |
 
 ## Blocker & Fallen
 
@@ -159,7 +160,6 @@
 
 ## Verlauf
 
-- 2026-10-06T21:52Z A done LAS-23
 - 2026-10-06T21:52Z A done LAS-24
 - 2026-10-06T22:22Z A done QA-85
 - 2026-10-08T13:41Z A claim VIZ-72
@@ -189,3 +189,4 @@
 - 2026-10-08T16:57Z A claim LAS-25
 - 2026-10-08T16:57Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T16:57Z A claim TOOL-16
+- 2026-10-08T16:57Z A claim UI-81
