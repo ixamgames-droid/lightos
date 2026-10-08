@@ -61,7 +61,8 @@ from src.ui.virtualconsole.vc_color_list import VCColorList
 from src.ui.virtualconsole.vc_xypad import VCXYPad
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(_ROOT, "shows", "Event_Demo_2026.lshow")
+# ENG-31: LIGHTOS_GEN_OUT lenkt die Show um (Test baut sie in einem Wegwerf-Ordner).
+OUT = os.environ.get("LIGHTOS_GEN_OUT") or os.path.join(_ROOT, "shows", "Event_Demo_2026.lshow")
 MUSIC_DIR = r"C:/Users/X/Desktop/Musik/BP Party"
 
 BPM = 150.0
@@ -416,6 +417,11 @@ def efx(name, algo, fids, phase_mode="fan", spread=1.0, counter=False, mirror=Fa
         e.tempo_bus_id = bus
         e.tempo_multiplier = mult
         e.sync_group = "event"
+    else:
+        # ENG-31: ohne Bus ist Free-Run gemeint (speed_hz). Ein neuer EFX haengt aber
+        # per Default an "Global" mit Faktor 1 — sobald Musik/Tap eine BPM liefert,
+        # waere das ein Beat je Figur (2,5 Hz bei 150 BPM) und speed_hz ungelesen.
+        e.tempo_bus_id = ""
     return e
 
 
@@ -444,6 +450,7 @@ try:
     efx_mh_custom.set_custom_path(zig)
     efx_mh_custom.open_beam = True
     efx_mh_custom.width = efx_mh_custom.height = 170.0
+    efx_mh_custom.tempo_bus_id = ""      # ENG-31: Free-Run wie die anderen EFX (s. efx())
     EFX_MH.append(efx_mh_custom)
 except Exception as e:  # pragma: no cover
     print(f"[build] Custom-Path uebersprungen: {e}")
@@ -532,7 +539,13 @@ sync_chase = color_matrix("Sync Chase >Bus A", RgbAlgorithm.CHASE, [RGB(BLUE), R
                           speed=1.0, bus="A", mult=1.0, prio=2)
 sync_breathe = dimmer_matrix("Sync Atmen >Bus B (1/2)", RgbAlgorithm.BREATHE, speed=1.0, bus="B", mult=1.0, prio=3)
 sync_strobe = dimmer_matrix("Sync Blitz >Bus C (x2)", RgbAlgorithm.STROBE, speed=1.0, bus="C", mult=1.0, prio=4)
-sync_mh = efx("Sync MH-Kreis >Bus A", EfxAlgorithm.CIRCLE, mh_fids, phase_mode="fan", size=150, bus="A", mult=1.0)
+# ENG-31: Am Tempo-Bus ist bei tempo_multiplier 1 EIN BEAT EIN VOLLER KREIS — bei
+# 150 BPM 2,5 Kreise/s, der Moving Head zittert nur. Regel vom Rig: Moving Heads
+# mit Grundfaktor 1/4 (ein Kreis je Takt), weiter taktsynchron am Bus; speed_hz =
+# dasselbe Tempo fuer den Free-Run ohne Bus-BPM.
+SYNC_MOVE_MULT = 1.0 / 4.0
+sync_mh = efx("Sync MH-Kreis >Bus A", EfxAlgorithm.CIRCLE, mh_fids, phase_mode="fan", size=150,
+              speed_hz=round(BPM / 60.0 * SYNC_MOVE_MULT, 4), bus="A", mult=SYNC_MOVE_MULT)
 SYNC_FX = [sync_chase, sync_breathe, sync_strobe, sync_mh]
 
 

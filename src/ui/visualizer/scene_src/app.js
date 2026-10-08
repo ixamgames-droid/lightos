@@ -13,6 +13,9 @@ import { scene, renderer, gpuTier, dynamicResolution, basePixelRatio,
          noteCameraMotion } from './scene/renderer.js';
 import { applyBrightness } from './scene/lights.js';
 import { prepareShadowMap, requestShadowUpdate, shadowUpdateStats } from './scene/shadow_update.js';  // VIZ-69
+import { syncUmgebung, umgebungInfo } from './stage/umgebung_merge.js';  // VIZ-72
+import { syncSpotPool, noteShadowPass, spotPoolInfo, spotPoolLights, vergeben as spotPoolVergeben,
+         setSpotPoolUhr } from './scene/spot_pool.js';  // VIZ-72
 import { disposeObj } from './scene/grid_floor.js';
 import { view, fixtures, stageObjects, settings } from './state.js';
 
@@ -160,7 +163,12 @@ function renderFrame() {
   }
   _letzterRenderTick = _rafTick;
   _letzterRenderT = _t;
-  prepareShadowMap();
+  // VIZ-72: echte Lichter an die hellsten Strahlen — VOR der Schatten-Signatur,
+  // damit ein Besitzerwechsel (neue Lichtlage) die Shadow-Map erneuert.
+  syncSpotPool();
+  // VIZ-72: im Ansehen-Modus feste Umgebung je Material als ein Koerper.
+  syncUmgebung();
+  noteShadowPass(prepareShadowMap());
   scene.autoUpdate = false;
   try {
     renderer.render(scene, view.activeCam);
@@ -277,6 +285,19 @@ window.__lightos = {
   pixelRatio: () => renderer.getPixelRatio(),
   shadowMapType: () => renderer.shadowMap.type,
   shadowBudgetInfo,
+  // VIZ-72: Spot-Pool (echte Lichter) und Render-Kennzahlen des letzten Bildes.
+  spotPoolInfo, spotPoolLights, __spotPoolVergeben: spotPoolVergeben, __spotPoolUhr: setSpotPoolUhr, umgebungInfo,
+  renderInfo: () => {
+    let lichter = 0, spots = 0, schatten = 0;
+    scene.traverseVisible(o => {
+      if (!o.isLight) return;
+      lichter += 1;
+      if (o.isSpotLight) { spots += 1; if (o.castShadow) schatten += 1; }
+    });
+    return { calls: renderer.info.render.calls, dreiecke: renderer.info.render.triangles,
+             programme: renderer.info.programs ? renderer.info.programs.length : 0,
+             lichter, spots, schatten };
+  },
   dynamicResolutionInfo: () => dynamicResolution.info(),
   __noteCameraMotion: noteCameraMotion,
   // A3D-41: Test-Seams fuer die NaN-Guards der Zeiger-Mathematik. `mouse` ist
