@@ -217,7 +217,7 @@ class Viz83GoboStrahlSceneTest(unittest.TestCase):
 
     def _load_and_wait(self):
         url = QUrl.fromLocalFile(_HTML_PATH)
-        url.setQuery(f"v={int(time.time() * 1000)}")
+        url.setQuery(f"v={int(time.time() * 1000)}&gputier=high")
         self._view.load(url)
         deadline = time.monotonic() + _LOAD_TIMEOUT_S
         while not self._loaded_ok and time.monotonic() < deadline:
