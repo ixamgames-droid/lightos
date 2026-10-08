@@ -59,7 +59,6 @@
 | VIZ-85 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
 | VIZ-86 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
 | VIZ-87 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
-| QA-88 | D | fix/qa88-anleitungsbilder-windows | 2026-10-08T18:55Z | tools/anleitungsbilder.py · tools/anleitungsbilder/sandbox.py · tools/anleitungsbilder/runner.py · tests/test_qa88_anleitungsbilder_windows.py · docs/ANLEITUNGSBILDER.md |
 | DOC-62 | D | docs/doc62-installdoku-windows | 2026-10-08T18:55Z | INSTALL.md · CONTRIBUTING.md · install.py · tests/test_doc62_installdoku.py |
 | LAS-25 | A | fix/codex-p1-0810 | 2026-10-08T16:57Z | - |
 | TOOL-16 | A | fix/codex-p1-0810 | 2026-10-08T16:57Z | - |
@@ -179,7 +178,6 @@
 
 ## Verlauf
 
-- 2026-10-08T17:16Z D done QA-86
 - 2026-10-08T17:16Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T17:29Z A claim BACKLOG-0810B
 - 2026-10-08T17:29Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
@@ -209,3 +207,4 @@
 - 2026-10-08T19:11Z B claim OUT-64
 - 2026-10-08T19:16Z B claim QA-83
 - 2026-10-08T19:17Z B claim UI-76
+- 2026-10-08T19:19Z D done QA-88
