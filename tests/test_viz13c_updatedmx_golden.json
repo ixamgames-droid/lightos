@@ -762,12 +762,12 @@
    "bars": null,
    "beam": {
     "hex": 13132850,
-    "op": 0.6,
+    "op": 1,
     "vis": true
    },
    "floorSpot": {
     "hex": 13132850,
-    "op": 0.3882,
+    "op": 0.5824,
     "vis": true,
     "x": 4.7029,
     "z": -5.0567
@@ -805,7 +805,7 @@
    "parHeads": null,
    "spot": {
     "hex": 13132850,
-    "inten": 2.1176
+    "inten": 0.6353
    },
    "type": "moving_head",
    "yokeRotY": 2.6507

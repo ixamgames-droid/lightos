@@ -18,6 +18,34 @@
 //
 // Gecacht pro Stil: die Texturen sind zustandslos, ein Fixture-Wechsel kostet
 // damit nichts.
+//
+// ── VIZ-83: das Gobo FORMT den Strahl, statt nur Kreise dazuzulegen ─────────
+//
+// Bis VIZ-83 bekam nur der Bodenfleck das Muster. Der Kegel blieb VOLL, und der
+// SpotLight leuchtete am Boden weiter den ganzen runden Fleck aus — im Bild
+// stand also der normale Lichtkegel unveraendert da, und das Muster lag als
+// zusaetzliche Lichtkreise obendrauf. Ein echtes Gobo ist eine Blende: es
+// nimmt Licht WEG. Im Nebel zerfaellt der Strahl in Teilstrahlen
+// ("Beam-Breakup"), am Boden ist zwischen den Motiv-Teilen wirklich Dunkel.
+//
+// Drei Eingriffe, alle ohne neue Geometrie und ohne Shader-Neubau:
+//
+// 1. **Kegel-Maske** (`beamGoboTexture`): der Kegel traegt ab dem Bau eine
+//    `map`. "Offen" ist eine weisse Textur (Farbe * 1 = unveraendert), ein
+//    Gobo eine Streifen-Textur ueber die UMFANGS-Koordinate u der
+//    `ConeGeometry` — jeder helle Streifen ist ein Teilstrahl von der Linse
+//    bis zum Boden, schwarz ist bei additivem Material unsichtbar. Weil die
+//    `map` von Anfang an da ist, tauscht ein Gobo-Wechsel nur die Uniform
+//    (kein `needsUpdate`, kein neues Programm — VIZ-69-Regel).
+// 2. **Drehung** dreht den KEGEL um seine Achse (`beam.rotation.y`), nicht
+//    die Textur — dieselbe Ueberlegung wie bei der Bodenscheibe: die Textur
+//    ist je Stil fuer alle Geraete geteilt. Der Kegel ist rotationssymmetrisch,
+//    sichtbar dreht sich damit genau das Muster.
+// 3. **SpotLight gedrosselt** (`GOBO_LICHT`): r128 kennt kein `SpotLight.map`,
+//    der runde Lichtkreis laesst sich also nicht maskieren. Mit Gobo traegt
+//    deshalb der Bodenfleck (der das Muster hat) das Bild, und der SpotLight
+//    leuchtet nur noch als schwache Streuung mit. Nur `intensity` aendert
+//    sich, nie die Zahl der Lichter.
 
 import * as THREE from '../three/three.js';
 
@@ -87,6 +115,105 @@ function zeichne(stil) {
   return c;
 }
 
+// ── VIZ-83: Teilstrahl-Masken fuer den Kegel ───────────────────────────────
+// Breite = Umfang (u), Hoehe = Laenge (v, Oberkante = Spitze = Linse, s.
+// fixtures.js#beamFalloffTexture). Nur die Spirale braucht die Hoehe.
+const STRAHL_B = 256, STRAHL_H = 64;
+const STRAHL_CACHE = new Map();
+
+// Je Motiv: Lage (0..1 ueber den Umfang) und Breite der Teilstrahlen. Die
+// Zahl folgt grob dem Motiv (14 Punkte -> 14 duenne Strahlen, 7 Kreise -> 7),
+// unregelmaessige Motive bekommen unregelmaessige Strahlen.
+function _gleichverteilt(n, breite) {
+  const out = [];
+  for (let i = 0; i < n; i++) out.push([i / n, breite]);
+  return out;
+}
+const STRAHLEN = {
+  ring_slits: _gleichverteilt(8, 0.035),
+  ovals: _gleichverteilt(5, 0.09),
+  circle_of_circles: _gleichverteilt(7, 0.06),
+  tetris: [[0.03, 0.06], [0.16, 0.03], [0.24, 0.08], [0.41, 0.04],
+           [0.55, 0.07], [0.63, 0.03], [0.78, 0.06], [0.90, 0.04]],
+  dots: _gleichverteilt(14, 0.022),
+  zebra: _gleichverteilt(10, 0.05),
+};
+
+function zeichneStrahl(stil) {
+  const c = document.createElement('canvas');
+  c.width = STRAHL_B; c.height = STRAHL_H;
+  const g = c.getContext('2d');
+  if (!stil) {                       // offen: weiss = Kegel unveraendert
+    g.fillStyle = '#fff';
+    g.fillRect(0, 0, STRAHL_B, STRAHL_H);
+    return c;
+  }
+  g.fillStyle = '#000';
+  g.fillRect(0, 0, STRAHL_B, STRAHL_H);
+  g.fillStyle = '#fff';
+  g.strokeStyle = '#fff';
+  if (stil === 'spiral') {
+    // Drei schraeg laufende Streifen: von der Linse zum Boden wandern sie um
+    // einen halben Umfang weiter -> eine Wendel um die Strahlachse.
+    g.lineWidth = STRAHL_B * 0.06;
+    for (let i = 0; i < 3; i++) {
+      for (const versatz of [-STRAHL_B, 0, STRAHL_B]) {   // Naht bei u=0/1
+        const x0 = (i / 3) * STRAHL_B + versatz;
+        g.beginPath(); g.moveTo(x0, 0); g.lineTo(x0 + STRAHL_B * 0.5, STRAHL_H);
+        g.stroke();
+      }
+    }
+    return c;
+  }
+  const liste = STRAHLEN[stil];
+  if (!liste) return null;           // unbekannter Stil -> wie offen
+  for (const [u, b] of liste) {
+    const w = Math.max(1, b * STRAHL_B), x = u * STRAHL_B - w / 2;
+    g.fillRect(x, 0, w, STRAHL_H);
+    if (x < 0) g.fillRect(x + STRAHL_B, 0, w, STRAHL_H);           // Naht
+    if (x + w > STRAHL_B) g.fillRect(x - STRAHL_B, 0, w, STRAHL_H);
+  }
+  return c;
+}
+
+/** VIZ-83: Kegel-Maske fuer einen Stil. "" / "open" / unbekannt liefern die
+ *  WEISSE Textur (voller Kegel) — nie null, solange ein Canvas da ist: die
+ *  `map` bleibt damit dauerhaft am Material und ein Gobo-Wechsel baut keinen
+ *  Shader neu. */
+export function beamGoboTexture(stil) {
+  let key = String(stil || '');
+  if (key === 'open' || (key && !STRAHLEN[key] && key !== 'spiral')) key = '';
+  if (STRAHL_CACHE.has(key)) return STRAHL_CACHE.get(key);
+  let tex = null;
+  try {
+    const c = zeichneStrahl(key);
+    if (c) {
+      tex = new THREE.CanvasTexture(c);
+      tex.needsUpdate = true;
+    }
+  } catch (e) { tex = null; }
+  STRAHL_CACHE.set(key, tex);
+  return tex;
+}
+
+/** VIZ-83: frisch gebauten Kegel mit der offenen Maske ausstatten (einmal beim
+ *  Bau — danach wird nur noch die Textur getauscht). */
+export function applyBeamGoboBase(cone) {
+  if (!cone || !cone.material) return;
+  const tex = beamGoboTexture('');
+  if (!tex) return;
+  cone.material.map = tex;
+  cone.material.needsUpdate = true;
+}
+
+// VIZ-83: mit Gobo leuchtet der (unmaskierbare) SpotLight nur noch mit diesem
+// Anteil; Kegel und Bodenfleck werden etwas angehoben, weil die Blende den
+// groessten Teil ihrer Flaeche dunkel macht und die Teilstrahlen sonst neben
+// dem alten Vollkegel blass wirkten.
+export const GOBO_LICHT = 0.3;
+export const GOBO_STRAHL = 1.8;
+export const GOBO_FLECK = 1.5;
+
 /** THREE.CanvasTexture fuer einen Stil — oder null (= kein Muster). */
 export function goboTexture(stil) {
   const key = String(stil || '');
@@ -122,15 +249,25 @@ export function applyGobo(f, dmx) {
   const spot = f.floorSpot;
   if (dmx.gobo_rotation !== undefined && dmx.gobo_rotation !== f.lastGoboRot) {
     f.lastGoboRot = (dmx.gobo_rotation === null) ? undefined : dmx.gobo_rotation;
-    if (spot) {
-      const v = f.lastGoboRot;
-      spot.rotation.z = (typeof v === 'number' && isFinite(v))
-        ? (Math.max(0, Math.min(255, v)) / 255) * 2 * Math.PI : 0;
-    }
+    const v = f.lastGoboRot;
+    const winkel = (typeof v === 'number' && isFinite(v))
+      ? (Math.max(0, Math.min(255, v)) / 255) * 2 * Math.PI : 0;
+    if (spot) spot.rotation.z = winkel;
+    // VIZ-83: der Kegel dreht mit — seine Teilstrahlen sind dasselbe Muster.
+    // Prisma-Kegel ziehen in prism.js#syncPrismToBeam nach.
+    if (f.beam) f.beam.rotation.y = winkel;
   }
   if (dmx.gobo === undefined) return;                 // Geraet ohne Gobo-Rad
   if (dmx.gobo === f.lastGobo) return;                // nichts geaendert
   f.lastGobo = (dmx.gobo === null) ? undefined : dmx.gobo;
+  // VIZ-83: Kegel-Maske tauschen — nur die Uniform, die `map` ist seit dem Bau
+  // da (applyBeamGoboBase). Fehlt sie (kein Canvas), bleibt der Kegel voll.
+  const strahl = beamGoboTexture(f.lastGobo);
+  if (f.beam && f.beam.material && f.beam.material.map && strahl) {
+    f.beam.material.map = strahl;
+  }
+  // Ein echtes Muster blendet ab; "offen"/unbekannt laesst alles wie bisher.
+  f.goboAktiv = !!goboTexture(f.lastGobo);
   if (!spot || !spot.material) return;
   const tex = goboTexture(f.lastGobo);
   if (spot.material.map === tex) return;              // z. B. "" -> null bleibt null

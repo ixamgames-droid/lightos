@@ -13,7 +13,7 @@ import { applyOptics } from './optics.js';   // VIZ-MH-OPTICS
 import { applyPrism, syncPrismToBeam } from './prism.js';   // VIZ-PRISMA-3D
 import { syncPoolSize } from './floor_pool.js';               // VIZ-15
 import { beamsOff } from '../state.js';                       // VIZ-15
-import { applyGobo } from './gobo_textures.js';   // VIZ-GOBO-3D
+import { applyGobo, GOBO_LICHT, GOBO_STRAHL, GOBO_FLECK } from './gobo_textures.js';   // VIZ-GOBO-3D, VIZ-83
 import { buildLaserRig, applyLaser, noteLaserAnimation, LASER_BEAM_OPACITY } from './laser.js';   // VIZ-79
 import { stageObjects } from '../state.js';                   // VIZ-BEAM-OCCLUSION
 import { auftreffFlaeche } from './beam_stop.js';             // VIZ-BEAM-OCCLUSION
@@ -1416,10 +1416,12 @@ export function updateMatrixPanelDmx(f, dmx) {
 // Reihenfolge-Vertrag: applyFloorAim liest die in applyPanTilt gesetzte
 // Kopf-Rotation (getWorldQuaternion) — PanTilt MUSS vor FloorAim laufen.
 export function updateMovingHeadDmx(f, dmx) {
+  // VIZ-83: Gobo VOR der Farbe — applyGenericColor liest `f.goboAktiv`
+  // (SpotLight gedrosselt, Kegel/Fleck angehoben) im selben Frame.
+  applyGobo(f, dmx);        // VIZ-GOBO-3D/VIZ-83: Muster in Kegel + Bodenfleck
   applyGenericColor(f, dmx);
   applyOptics(f, dmx);      // VIZ-MH-OPTICS: Zoom/Iris auf Kegel + SpotLight
   applyPrism(f, dmx);       // VIZ-PRISMA-3D: aus einem Strahl werden mehrere
-  applyGobo(f, dmx);        // VIZ-GOBO-3D: Gobo-Muster in den Bodenfleck
   applyPanTilt(f, dmx);
   applyFloorAim(f, dmx);
   // GANZ zum Schluss: der Faecher kopiert Weite UND Laenge vom Hauptstrahl,
@@ -1474,11 +1476,11 @@ export function updatePixelHeadDmx(f, dmx) {
 // (f.lamp) und ihr Icon folgen im Monolith der DMX-Farbe — das bleibt so.
 export function updateGenericDmx(f, dmx) {
   applyLaser(f, dmx);       // VIZ-79: vor der Farbe — legt fest, welche Strahlen aktiv sind
+  applyGobo(f, dmx);        // manche haben ein Gobo-Rad (VIZ-83: vor der Farbe)
   applyGenericColor(f, dmx);
   noteLaserAnimation(f);    // VIZ-79: nach der Farbe — erst dann steht „leuchtet" fest
   applyOptics(f, dmx);      // auch feste Scheinwerfer haben Zoom/Iris
   applyPrism(f, dmx);       // ... und manche ein Prisma
-  applyGobo(f, dmx);        // ... und manche ein Gobo-Rad
   applyFloorAim(f, dmx);
   syncPrismToBeam(f);       // nach applyFloorAim — s. updateMovingHeadDmx
   syncIconPos(f);
@@ -1499,9 +1501,15 @@ function applyGenericColor(f, dmx) {
   // einen Shadow-Slot, obwohl es nichts emittiert. Genau der Kostenblock, den
   // das Dunkel-Culling einsparen soll.
   const lum = intNorm * Math.max(color.r, color.g, color.b);
+  // VIZ-83: ein Gobo ist eine Blende (gobo_textures.js, Modulkopf). Sichtbarkeit
+  // bleibt an `lum` — nur die Anteile verschieben sich, Farbe bleibt Farbe.
+  const gobo = !!f.goboAktiv;
   if (f.beam) {
     f.beam.material.color = color;
-    f.beam.material.opacity = Math.max(0.0, intNorm * settings.beamOpacity);
+    // Mit Gobo angehoben, aber nie ueber 1 (Deckkraft ist ein Anteil).
+    f.beam.material.opacity = gobo
+      ? Math.min(1.0, Math.max(0.0, intNorm * settings.beamOpacity * GOBO_STRAHL))
+      : Math.max(0.0, intNorm * settings.beamOpacity);
     f.beam.visible = beamsSichtbar(f, lum);
   }
   if (f.spot) {
@@ -1516,11 +1524,11 @@ function applyGenericColor(f, dmx) {
     // — ein konstanter Anteil statt sekundenlanger Ruckler.
     // A3D-25/A3D-28 gilt weiter: gemessen wird an der EFFEKTIVEN Leuchtdichte,
     // offener Dimmer + Farbe schwarz ist dunkel.
-    f.spot.intensity = lum > 0.01 ? intNorm * 3.0 : 0;
+    f.spot.intensity = lum > 0.01 ? intNorm * 3.0 * (gobo ? GOBO_LICHT : 1) : 0;
   }
   if (f.floorSpot) {
     f.floorSpot.material.color = color;
-    f.floorSpot.material.opacity = Math.max(0.0, intNorm * 0.55);
+    f.floorSpot.material.opacity = Math.max(0.0, intNorm * 0.55 * (gobo ? GOBO_FLECK : 1));
     f.floorSpot.visible = settings.showFloorSpots && lum > 0.01;
   }
   if (f.lens && f.lens.material) {

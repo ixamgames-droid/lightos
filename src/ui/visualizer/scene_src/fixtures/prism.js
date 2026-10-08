@@ -191,5 +191,8 @@ export function syncPrismToBeam(f) {
     m.visible = f.beam.visible;
     m.scale.copy(f.beam.scale);
     m.position.copy(f.beam.position);   // VIZ-80, s. applyPrism
+    // VIZ-83: Gobo-Drehung — jeder Nebenstrahl dreht sein (geteiltes)
+    // Teilstrahl-Muster um die eigene Achse mit.
+    m.rotation.y = f.beam.rotation.y;
   }
 }
