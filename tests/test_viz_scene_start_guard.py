@@ -305,7 +305,9 @@ class SceneErrorListenerTest(unittest.TestCase):
         lassen (vorher kam das Array als ``''`` an)."""
         from PySide6.QtCore import QUrl
         url = QUrl.fromLocalFile(_HTML_PATH)
-        url.setQuery(f"v={int(time.time() * 1000)}")
+        # QA-86: Stufe fest, sonst waehlt die GPU-Probe des Testrechners
+        # (Windows/ANGLE meldet 16 Textur-Einheiten -> 'low', Prisma gedeckelt).
+        url.setQuery(f"v={int(time.time() * 1000)}&gputier=high")
         self._view.load(url)
         ende = time.monotonic() + 40.0
         while not self._loaded and time.monotonic() < ende:
@@ -320,7 +322,9 @@ class SceneErrorListenerTest(unittest.TestCase):
     def test_listener_faengt_den_ersten_fehler_und_haelt_ihn_fest(self):
         from PySide6.QtCore import QUrl
         url = QUrl.fromLocalFile(_HTML_PATH)
-        url.setQuery(f"v={int(time.time() * 1000)}")
+        # QA-86: Stufe fest, sonst waehlt die GPU-Probe des Testrechners
+        # (Windows/ANGLE meldet 16 Textur-Einheiten -> 'low', Prisma gedeckelt).
+        url.setQuery(f"v={int(time.time() * 1000)}&gputier=high")
         self._view.load(url)
         ende = time.monotonic() + 40.0
         while not self._loaded and time.monotonic() < ende:

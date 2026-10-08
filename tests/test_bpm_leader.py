@@ -7,6 +7,7 @@ Modus-/Emitter-LOGIK, nicht das Beat-Timing).
 from __future__ import annotations
 import pytest
 
+from src.core.engine import tap_uhr
 from src.core.engine.bpm_manager import BPMManager, BpmMode
 from src.core.audio.beat_detector import BeatDetector
 
@@ -38,9 +39,10 @@ def test_request_bpm_keeps_auto(mgr):
 
 def test_tap_sets_manual(mgr):
     """Tap erzwingt MANUAL und blockt danach Auto-Quellen."""
-    # Zwei Taps mit fester Differenz -> deterministische BPM
-    import time
-    t0 = time.monotonic()
+    # Zwei Taps mit fester Differenz -> deterministische BPM.
+    # QA-87: der vorige Tap muss von DERSELBEN Uhr stammen wie tap() selbst —
+    # monotonic und perf_counter haben verschiedene Nullpunkte.
+    t0 = tap_uhr.jetzt()
     mgr._last_taps = [t0 - 0.5]      # 0.5 s Abstand -> 120 BPM
     bpm = mgr.tap()
     assert mgr.mode == BpmMode.MANUAL
