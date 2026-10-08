@@ -15,6 +15,7 @@
 | `_gen_env.py` | Spawn-sichere Bootstrap-Schicht fuer alle ``tools/build_*.py``-Generatoren (DEMO-02). |
 | `_profil.py` | TOOL-3: Geraeteprofil ueber Hersteller + Modell aufloesen — nie ueber eine rohe ID. |
 | `_run_showcase_app.py` | Wegwerf-Launcher fuer die Doku-Captures: startet LightOS UND laedt direkt die |
+| `_showcase.py` | DEMO-07: gemeinsame Bausteine der Showcase-Generatoren (``build_showcase_*.py``). |
 | `_showpath.py` | Show-Datei-Aufloesung fuer tools/-Skripte: shows/ mit Fallback shows/_archiv/. |
 | `_shutter.py` | ENG-28: Shutter in Generatoren nur mit Beleg oeffnen — nie mit dem Vorgabewert 255. |
 | `anleitungsbilder.py` | DOC-16: Anleitungsbilder reproduzierbar aus dem Code erzeugen. |
@@ -51,6 +52,8 @@
 | `build_neue_demo_show.py` | NEUE DEMO 2026 — Quadranten-Layout + echtes PLAYBACK, alles auf einer Show. |
 | `build_neuheiten_demo.py` | Vorfuehr-Show fuer die Neuerungen aus dem Lauf vom 19.-24.08.2026. |
 | `build_party_demo_show.py` | PARTY DEMO 2026 — BPM-getaktete Party-Show + Musik-Playlist. |
+| `build_showcase_club.py` | DEMO-07: Showcase „Club-Nacht" — Playback taktsynchron zum Tempo-Bus. |
+| `build_showcase_theater.py` | DEMO-07: Showcase „Theater/Event" — ruhige Cue-Liste mit Follow-Cues. |
 | `build_spot90_testshow.py` | Test-Show fuer ZWEI Varytec Hero Spot 90 (David, 26.08.2026). |
 | `build_test_show.py` | Erzeugt eine KOMPLETT vorprogrammierte Test-Show (.lshow) zum Anschauen aller |
 | `build_testshow_2026.py` | TESTSHOW 2026 — komplette musik-synchrone Show für Davids reales Rig. |

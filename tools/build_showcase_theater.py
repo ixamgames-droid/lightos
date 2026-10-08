@@ -73,7 +73,7 @@ PUNKTE = {
 }
 
 # ── Farben (R, G, B, W) ─────────────────────────────────────────────────────
-WARMWEISS = (255, 150, 60, 220)
+WARMWEISS = (255, 140, 50, 110)
 WARM = (255, 120, 30, 120)
 AMBER = (255, 110, 0, 0)
 BLAU = (0, 40, 255, 0)
@@ -155,7 +155,7 @@ def bauen(out: str, *, reset: bool = True) -> dict:
 
     def bild(fr, ge, ho, *spot_werte):
         werte = {}
-        werte.update(wash(front, *fr, zoom=120))
+        werte.update(wash(front, *fr, zoom=70))
         werte.update(wash(gegen, *ge))
         werte.update(wash(horizont, *ho))
         for s in spot_werte:
@@ -172,10 +172,10 @@ def bauen(out: str, *, reset: bool = True) -> dict:
         Cue(number=2, label="Saal dunkel", fade_in=4.0, follow=2.0, values=bild(
             (WARM, 0), (AMBER, 0), (BLAU, 15))),
         Cue(number=3, label="Begrüßung", fade_in=3.0, values=bild(
-            (WARMWEISS, 80), (AMBER, 40), (BLAU, 35),
+            (WARMWEISS, 65), (AMBER, 40), (BLAU, 35),
             spot(s1, 100, "Rednerpult", iris=60), spot(s2, 0, "Rednerpult"))),
         Cue(number=4, label="Rede-Spot", fade_in=2.5, values=bild(
-            (WARMWEISS, 30), (AMBER, 15), (BLAU, 10),
+            (WARMWEISS, 15), (AMBER, 15), (BLAU, 10),
             spot(s1, 100, "Rednerpult", iris=140, zoom=60),
             spot(s2, 100, "Rednerpult", iris=140, zoom=60))),
         # Szenenwechsel: Licht geht weg, die Spots fahren erst danach (im Dunkeln)
@@ -186,7 +186,8 @@ def bauen(out: str, *, reset: bool = True) -> dict:
             attr_delays={f: {"pan": 2.0, "tilt": 2.0} for f in spots}),
         Cue(number=6, label="Szene am Podest", fade_in=4.0, delay_in=0.5, values=bild(
             (WARM, 50), (AMBER, 60), (ABENDROT, 80),
-            spot(s1, 100, "Podest", iris=80, gobo=16), spot(s2, 85, "Podest", iris=80))),
+            spot(s1, 100, "Podest", iris=120, zoom=50, gobo=16),
+            spot(s2, 85, "Podest", iris=120, zoom=50))),
         Cue(number=7, label="Applaus", fade_in=1.5, values=bild(
             (WARMWEISS, 100), (AMBER, 80), (MAGENTA, 70),
             spot(s1, 100, "Bühnenmitte", zoom=140), spot(s2, 100, "Bühnenmitte", zoom=140))),
@@ -241,7 +242,7 @@ def bauen(out: str, *, reset: bool = True) -> dict:
         E("floor", 0.0, 0.01, 4.0, 24.0, 0.02, 22.0, "#17171b", "Saalboden"),
         E("platform", 0.0, BUEHNE_H / 2, BUEHNE_Z, BUEHNE_B, BUEHNE_H, BUEHNE_T, "#2b2420",
           "Bühne"),
-        E("wall", 0.0, 4.5, HINTEN_Z - 0.3, 14.0, 9.0, 0.3, "#c8ccd8", "Horizont"),
+        E("wall", 0.0, 4.5, HINTEN_Z - 0.3, 14.0, 9.0, 0.3, "#6e7280", "Horizont"),
         E("riser_stairs", PODEST[0], BUEHNE_H + PODEST_H / 2, PODEST[1], 3.0, PODEST_H, 2.8,
           "#332520", "Podest"),
         E("high_table", PULT[0], BUEHNE_H + 0.55, PULT[1], 0.7, 1.1, 0.6, "#5a4636",

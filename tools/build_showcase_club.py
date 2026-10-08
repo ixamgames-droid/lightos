@@ -13,7 +13,7 @@ RIG (35 Geraete, nur mitgelieferte Profile)::
     U1   4x Strobe    STR2        2-Kanal    @131..138  Traverse ueber der Tanzflaeche
     U2   8x Moving H. MH16        16-Kanal   @  1..128  hintere Traverse (Gobo, Prisma, Zoom)
     U2   4x Spider    SPIDER14    14-Kanal   @201..256  Traverse ueber der Tanzflaeche
-    U3   2x Laser     SH-LASER3W  25 Channel @  1..50   auf den Boxen links/rechts
+    U3   2x Laser     SH-LASER3W  25 Channel @  1..50   Enden der hinteren Traverse
     U3   1x Hazer     HZ1500PRO   2-Kanal    @101       hinten auf dem Podest
 
 PLAYBACK (Executor-Seite 1 „Club-Nacht")::
@@ -89,6 +89,7 @@ MH_X = [-5.25, -3.75, -2.25, -0.75, 0.75, 2.25, 3.75, 5.25]
 SPIDER_X = [-3.0, -1.0, 1.0, 3.0]
 STROBE_X = [-4.5, -2.0, 2.0, 4.5]
 BOX_X = 5.6
+LASER_X = 6.0
 
 # ── Farben und Rad-Werte (Profil-Bereiche) ──────────────────────────────────
 BLAU = (0, 40, 255, 0)
@@ -190,10 +191,11 @@ def bauen(out: str, *, reset: bool = True) -> dict:
         pos[f] = (x, FLOOR_Y - KLEMME, FLOOR_Z)
     for f, x in zip(strobes, STROBE_X):
         pos[f] = (x, FLOOR_Y - KLEMME, FLOOR_Z + 0.2)
-    # Laser auf den Boxen, leicht nach oben und nach innen (lokal +Z = Strahl).
+    # Laser an den Enden der hinteren Traverse, Strahl (lokal +Z) waagerecht
+    # nach vorn, leicht nach oben: hoch ueber der Tanzflaeche.
     for f, seite in zip(laser, (-1, 1)):
-        pos[f] = (seite * BOX_X, 2.62, KANTE_Z - 0.2)
-        rot[f] = (-8.0, -seite * 18.0, 0.0)
+        pos[f] = (seite * LASER_X, HINTEN_Y - 0.3, HINTEN_TZ + 0.4)
+        rot[f] = (-3.0, 0.0, 0.0)
     pos[hazer[0]] = (-4.2, PODEST_H + 0.2, HINTEN_Z + 0.6)
     rot[hazer[0]] = (0.0, 180.0, 0.0)
 
@@ -240,7 +242,7 @@ def bauen(out: str, *, reset: bool = True) -> dict:
     laser_welle = _am_bus(b.efx("Laser Welle", EfxAlgorithm.LINE,
                                 fixtures=[EfxFixture(fid=f, pan_attr="laser_x",
                                                      tilt_attr="laser_y") for f in laser],
-                                width=90.0, height=0.0, x_offset=64.0, y_offset=64.0,
+                                width=24.0, height=0.0, x_offset=64.0, y_offset=64.0,
                                 phase_mode="fan", spread=1.0, bit16=False,
                                 random_seed=EFX_SEED), LASER_MULT, "laser")
 
@@ -424,11 +426,11 @@ def bauen(out: str, *, reset: bool = True) -> dict:
         w.show_sync = False
         w.show_factors = True
         w.show_bpm = True
-        w.setGeometry(x, 20, 150, 160)
+        w.setGeometry(x, 20, 136, 160)
         return w
     _dial("MH ×", 962, mh_bewegungen, MH_FAKTOREN, MH_MULT)
-    _dial("Spider ×", 1120, sp_bewegungen, SP_FAKTOREN, SP_MULT)
-    _dial("Strobe ×", 1278, [strobe_lauf], STROBE_FAKTOREN, 1.0)
+    _dial("Spider ×", 1104, sp_bewegungen, SP_FAKTOREN, SP_MULT)
+    _dial("Strobe ×", 1246, [strobe_lauf], STROBE_FAKTOREN, 1.0)
 
     y = 290
     _titel("FLASH", y)
@@ -480,7 +482,6 @@ def bauen(out: str, *, reset: bool = True) -> dict:
         E("led_wall", 0.0, PODEST_H + 2.3, HINTEN_Z + 0.15, 8.0, 3.6, 0.2, "#0b0c26",
           "LED-Wand"),
         E("dj_booth", 0.0, PODEST_H + 0.6, PODEST_Z + 0.6, 2.4, 1.2, 1.0, "#1a1a25", "DJ-Pult"),
-        E("audience", 0.0, 0.05, TANZ_Z + 0.5, 9.0, 0.05, 5.0, "#101014", "Publikum"),
         E("bar_counter", 8.6, 0.55, 4.0, 5.0, 1.1, 0.8, "#3a2a20", "Bar", math.pi / 2),
         E("speaker", -BOX_X, 1.25, KANTE_Z - 0.2, 1.0, 2.5, 1.0, "#111111", "Box links"),
         E("speaker", BOX_X, 1.25, KANTE_Z - 0.2, 1.0, 2.5, 1.0, "#111111", "Box rechts"),
@@ -503,7 +504,7 @@ def bauen(out: str, *, reset: bool = True) -> dict:
     docks = {}
     for f in par_front + blinder:
         docks[f] = ids["Front-Traverse"]
-    for f in movers:
+    for f in movers + laser:
         docks[f] = ids["Hintere Traverse"]
     for f in spider + strobes:
         docks[f] = ids["Tanzflächen-Traverse"]

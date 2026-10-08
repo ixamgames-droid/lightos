@@ -1,0 +1,236 @@
+{
+  "anleitung": "showcase",
+  "werkzeug": "tools/anleitungsbilder.py",
+  "stand": "77df4d74",
+  "schrift": "Noto Sans (statt Roboto Condensed)",
+  "qt": "6.11.1",
+  "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py showcase'.",
+  "bilder": [
+    {
+      "datei": "club_01_vc.png",
+      "szene": "club_01_vc",
+      "titel": "Club-Nacht: VC mit Cue-Listen (GO/BACK), Playback-Fadern, Tempo, Speed-Dials und Flash-Tasten",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "b03e2cd25ec38a33da3d9d83700fe43f"
+    },
+    {
+      "datei": "club_02_playback.png",
+      "szene": "club_02_playback",
+      "titel": "Club-Nacht: Executor-Seite mit Ex 1 und Ex 2",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "e9975df19f8ba436acd40980542dc511"
+    },
+    {
+      "datei": "club_03_groove.png",
+      "szene": "club_03_groove",
+      "titel": "Cue 2 Groove: Gobos drehen, Acht der Moving Heads, Spider-Farben je Takt",
+      "groesse": [
+        1600,
+        777
+      ],
+      "marken": [],
+      "md5": "f431ba86ab486b465acdf978044f1a2d"
+    },
+    {
+      "datei": "club_04_drop.png",
+      "szene": "club_04_drop",
+      "titel": "Cue 4 Drop mit Drop-Puls auf Ex 2: rote Front im Takt, Laser, Strobe-Lauf",
+      "groesse": [
+        1600,
+        777
+      ],
+      "marken": [],
+      "md5": "07654c8d867cc772f2d3b8aa638013c7"
+    },
+    {
+      "datei": "club_05_playback.gif",
+      "szene": "club_05_playback",
+      "titel": "GIF: Cue-Liste Club-Nacht läuft — Intro, Groove, Build-up, Drop",
+      "groesse": [
+        560,
+        293
+      ],
+      "marken": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "md5": "74b8210b0eac92e3bf0c58ea71fec1b8",
+      "frames": 24,
+      "dauern_ms": [
+        400,
+        400,
+        400,
+        400,
+        400,
+        400,
+        400,
+        400,
+        400,
+        400,
+        400,
+        400,
+        400,
+        400,
+        400,
+        400,
+        400,
+        400,
+        400,
+        400,
+        400,
+        400,
+        400,
+        400
+      ]
+    },
+    {
+      "datei": "theater_01_vc.png",
+      "szene": "theater_01_vc",
+      "titel": "Theater/Event: Cue-Liste Abendablauf mit GO/BACK, Playback-Fader, Grand Master",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "7f81f1fb9a1db42b468d4f03e78aa4dd"
+    },
+    {
+      "datei": "theater_02_playback.png",
+      "szene": "theater_02_playback",
+      "titel": "Theater/Event: Cue-Liste mit Fade-, Delay- und Follow-Zeiten",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "bded439f1921f600b9982158502c6bf0"
+    },
+    {
+      "datei": "theater_03_rede.png",
+      "szene": "theater_03_rede",
+      "titel": "Cue 4 Rede-Spot: beide Spots auf dem Rednerpult, Saal zurückgenommen",
+      "groesse": [
+        1600,
+        777
+      ],
+      "marken": [],
+      "md5": "ee5f109ce0ce755d6df3036d0b08d9e3"
+    },
+    {
+      "datei": "theater_04_podest.png",
+      "szene": "theater_04_podest",
+      "titel": "Cue 6 Szene am Podest: Spots auf dem Podest, Horizont im Abendrot",
+      "groesse": [
+        1600,
+        777
+      ],
+      "marken": [],
+      "md5": "98325010944ba22591e95765a72524b7"
+    },
+    {
+      "datei": "theater_05_ablauf.gif",
+      "szene": "theater_05_ablauf",
+      "titel": "GIF: Rede-Spot, dann Szenenwechsel — die Spots fahren im Dunkeln aufs Podest, die Szene folgt von selbst",
+      "groesse": [
+        560,
+        302
+      ],
+      "marken": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "md5": "ed4f27dcb07568789d4062ee54ddc820",
+      "frames": 30,
+      "dauern_ms": [
+        500,
+        500,
+        500,
+        500,
+        500,
+        500,
+        500,
+        500,
+        500,
+        500,
+        500,
+        500,
+        500,
+        500,
+        500,
+        500,
+        500,
+        500,
+        500,
+        500,
+        500,
+        500,
+        500,
+        500,
+        500,
+        500,
+        500,
+        500,
+        500,
+        500
+      ]
+    }
+  ]
+}
