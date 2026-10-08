@@ -14,9 +14,13 @@ Gemessen, nicht vermutet:
   anlegt, und legte die Desktop-Verknuepfung ohne jeden Hinweis an.
 """
 import ast
+import importlib.util
 import os
 import re
+import sys
 import unittest
+from pathlib import Path
+from unittest import mock
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -64,6 +68,29 @@ class InstallDokuTest(unittest.TestCase):
                          "install.py nennt eine Startmenue-Verknuepfung, legt aber keine an")
         # Die Desktop-Verknuepfung entsteht ohne Rueckfrage — der Ausweg steht dabei.
         self.assertIn("--no-shortcut", doc)
+
+    def test_zusammenfassung_nennt_das_python_der_installation(self):
+        """Codex-Review zu DOC-62: mit ``--no-venv`` gibt es kein ``venv/``, die
+        Zusammenfassung nannte trotzdem dessen Python fuer Start und Testsuite."""
+        spec = importlib.util.spec_from_file_location(
+            "_install_doc62", os.path.join(REPO, "install.py"))
+        install = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(install)
+        kein_venv = os.path.join(REPO, "_kein_venv_doc62")
+        for use_venv in (True, False):
+            zeilen = []
+            with mock.patch.object(install, "VENV_DIR", Path(kein_venv)), \
+                    mock.patch.object(install, "info", zeilen.append), \
+                    mock.patch.object(install, "warn", zeilen.append):
+                install.show_summary(use_venv)
+                erwartet = install.venv_python() if use_venv else sys.executable
+            befehle = [z for z in zeilen if "main.py" in z or "requirements-dev.txt" in z]
+            with self.subTest(use_venv=use_venv):
+                self.assertEqual(len(befehle), 2, zeilen)
+                for z in befehle:
+                    self.assertIn(erwartet, z)
+                if not use_venv:
+                    self.assertEqual([z for z in zeilen if kein_venv in z], [])
 
 
 if __name__ == "__main__":

@@ -370,9 +370,12 @@ def write_manifest(created_dirs: list[str], shortcut: str | None):
     info(f"Manifest gespeichert: {MANIFEST_PATH}")
 
 
-def show_summary():
+def show_summary(use_venv: bool = True):
     py_arch = detect_arch()
     os_arch = detect_native_os_arch()
+    # Mit --no-venv gibt es kein venv/: die Befehle nennen dann das Python, in
+    # das installiert wurde (Codex-Review zu DOC-62).
+    py = venv_python() if use_venv else sys.executable
     info("=" * 60)
     info("Installation abgeschlossen!")
     info("=" * 60)
@@ -380,23 +383,18 @@ def show_summary():
     info(f"OS-Architektur:     {os_arch}")
     if os.name == "nt" and os_arch == "arm64" and py_arch != "arm64":
         warn("Python laeuft emuliert auf ARM64. Fuer native Performance ARM64-Python nutzen.")
-    info(f"venv:        {VENV_DIR}")
+    info(f"venv:        {VENV_DIR if use_venv else '- (--no-venv)'}")
     info(f"AppData:     {APPDATA_DIR}")
     info("")
     info("Starten mit:")
+    info(f"  {py} main.py")
     if os.name == "nt":
-        info(f"  {VENV_DIR / 'Scripts' / 'python.exe'} main.py")
         info("oder Desktop-Verknuepfung doppelklicken")
-    else:
-        info(f"  {VENV_DIR / 'bin' / 'python'} main.py")
     info("")
     info("Beispiel-Setups (vorkonfigurierte Patches/MIDI) siehe examples/")
     info("")
     info("Testsuite (nur fuer Entwicklung) braucht zusaetzlich:")
-    if os.name == "nt":
-        info(f"  {VENV_DIR / 'Scripts' / 'python.exe'} -m pip install -r requirements-dev.txt")
-    else:
-        info(f"  {VENV_DIR / 'bin' / 'python'} -m pip install -r requirements-dev.txt")
+    info(f"  {py} -m pip install -r requirements-dev.txt")
     info("")
     info("Deinstallieren mit:")
     info("  python uninstall.py")
@@ -436,7 +434,7 @@ def main():
         shortcut = create_shortcut()
 
     write_manifest(created, shortcut)
-    show_summary()
+    show_summary(use_venv)
 
 
 if __name__ == "__main__":
