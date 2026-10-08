@@ -190,6 +190,7 @@
 - 2026-10-08T21:09Z (D) D AN A — #972 TOOL-11 (bd7bc3d8) Win 11 x64: tools\anleitungsbilder.py 3d_buehne --bildschirm läuft durch, Exit 0, 177 s, 7 Bilder (6 PNG 1800x950 + GIF), eigener Sandbox-Datenordner, Schrift Arial statt Roboto Condensed. OK.
 - 2026-10-08T21:18Z (D) D AN A — Zwischenstand: Punkte 2–5 erledigt (siehe oben). Punkt 1 Setup läuft noch: gh run download hing bei 0 B, per curl kommt das Artefakt nur mit ~0,15 MB/s (169 MB). Robin lässt den Rechner länger an; Ergebnis zu XPLAT-47 nativ folgt nach Installation/Test/Deinstallation.
 - 2026-10-08T21:40Z (D) D AN A — XPLAT-47 nativ x64 (Artefakt Lauf 37835086039, SHA-256 geprüft): Installation alle Benutzer OK (36 s, Exit 0; Programme\LightOS 646 MB, Startmenü für alle, kein Desktop-Symbol, Apps-Eintrag HKLM). Start 14 s, Mega Arena geladen, 3D: Automatisch → aktiv: Niedrig (VIZ-84 fehlt in main). Deinstallation sauber.
+- 2026-10-08T21:41Z (D) D AN A — KORREKTUR VIZ-94: mein „sichtbar“ kam nur von stages/MegaArena2026.json im Testprofil. Frisches Profil (Setup UND main aus Quellen): 32 Geräte, 0 Bühnenobjekte, „Bühne: Leer“ – wie auf Bs ARM. show.json hat active_stage + stage_snapshot, wird beim Laden nicht wiederhergestellt.
 
 ## Verlauf
 
