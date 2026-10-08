@@ -56,7 +56,6 @@
 | SAMMEL-DOKU-C | A | sammel/doku-c | 2026-10-02T22:08Z | docs · BACKLOG.md |
 | DOC-60 | A | docs/doc60-buehnenshow-effekte | 2026-10-05T16:18Z | - |
 | VIZ-83 | A | fix/viz83-gobo-strahl | 2026-10-08T15:16Z | - |
-| ENG-31 | A | fix/eng31-mega-arena-tempo | 2026-10-08T15:16Z | - |
 | VIZ-84 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
 | VIZ-85 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
 | VIZ-86 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
@@ -68,7 +67,6 @@
 
 ## Blocker & Fallen
 
-- 2026-10-01T16:33Z (B) B reserviert BPM-24 (per backlog_ids.py, Tafel ohne BPM-24-Claim): Entrast-Hysterese robust gegen Konfidenzspitzen — sprachaehnliches Signal haelt den Lock 25 s (jede Schaetzung >= 0,15 nullt den Countdown), Beats laufen im alten Tempo weiter. Braucht echte Aufnahmen (MC-Sprache ueber Mikro, Musik mit Breakdown) zum Kalibrieren; kommt als Zeile mit dem BPM-20/23-PR ins BACKLOG.
 - 2026-10-01T16:50Z (Laptop) AN A (vom Verwalter-Laptop, im Auftrag des Projektinhabers): Aus dem Paket vom 01.10. ist noch offen: BACKLOG.md Zeile 12 nennt im FINALIZE-Punkt noch den alten lokalen Pfad des Windows-Rechners (C:/Users/<Klarname>/Downloads/...) - oeffentlich sichtbar. Bitte pseudonymisiert auf den neuen Ort umstellen (C:/Users/X/Projekte/lightos-main, Betreiber = Robin) und danach den ganzen Repo-Stand von main mit dem Klarnamen-Waechter (PRIV-05) gegenpruefen.
 - 2026-10-01T16:59Z (B) B reserviert BPM-25 (BPM-24 ist seit vorhin reserviert; backlog_ids sieht Tafel-Reservierungen nicht): Zustandswort zeigt EINGERASTET, waehrend der Phasen-Widerspruch (phase_ok=False, AGREE_N Widersprueche) die Beats stummschaltet — Fund der Review-Linse 3 zu PR #826, vorbestehend. Beide Zeilen kommen mit PR #826 ins BACKLOG.
 - 2026-10-01T17:16Z (B) B RUNDE BPM-20 + BPM-23 — PR #826 gemergt (2378399) | Gate Windows 756/758 (rot nur test_anleitungsbilder = XPLAT-42 und test_viz14_selection_scene unter Last, einzeln gruen), CI 3/3 | geaendert: tempo_tracker (_feinlage: Gipfel + Gauss + Oberwelle mit Ueberlappung; unsicher_s; Countdown-Resets; x2-Gate mit DEADBAND), beat_detector-Snapshot, bpm_status_rules (unsicher(), _r_unsicher, KEIN_SIGNAL_KEYS, ZUSTAND_PRAEMISSE als Funktionen, Pause-Text korrigiert), bpm_manager_view (Zustandswort folgt der entprellten Zeile), Anleitung | Messung: Sweep 60..195 max 0,041 BPM, Robins echte Testbeat-Aufnahme 127,60 -> 127,997 | Review: 3 Linsen, kein HIGH, 1 MEDIUM + 8 LOW behoben, eigene Breakdown-Aenderung zurueckgenommen | neu im BACKLOG: BPM-24 (Entrast-Hysterese/Breakdowns, braucht echte Aufnahmen), BPM-25 (Beats stumm bei Phasen-Widerspruch, Anzeige fehlt) | naechstes: Live-Funktionstest auf dem Windows-PC (Robins Auftrag), danach BPM-21 (WASAPI).
@@ -159,8 +157,6 @@
 
 ## Verlauf
 
-- 2026-10-06T20:34Z 3 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
-- 2026-10-06T21:02Z A done VIZ-80
 - 2026-10-06T21:31Z A done MIDI-1
 - 2026-10-06T21:32Z A done MIDI-2
 - 2026-10-06T21:32Z A done OSC-05
@@ -189,3 +185,5 @@
 - 2026-10-08T16:27Z 3 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T16:29Z D aktualisiert QA-87: Dateien src/core/engine/tap_uhr.py · src/core/engine/tempo_bus.py · src/core/engine/bpm_manager.py · src/ui/virtualconsole/vc_speedial.py · tests/test_vc_speed_node.py · tests/test_vc_tempo_widgets.py · tests/test_qa87_tap_uhr.py · changelog.d/2026-10-08-QA-87.md -> src/core/engine/tap_uhr.py · src/core/engine/tempo_bus.py · src/core/engine/bpm_manager.py · src/ui/virtualconsole/vc_speedial.py · tests/test_vc_speed_node.py · tests/test_vc_tempo_widgets.py · tests/test_qa87_tap_uhr.py · tests/test_tempo_bus.py · tests/test_tempo_grandmaster.py · tests/test_bpm_leader.py · changelog.d/2026-10-08-QA-87.md
 - 2026-10-08T16:31Z A done BACKLOG-D-BERICHT
+- 2026-10-08T16:49Z A done ENG-31
+- 2026-10-08T16:49Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
