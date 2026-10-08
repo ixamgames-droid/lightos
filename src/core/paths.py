@@ -144,3 +144,38 @@ def ensure_parent_dir(path: str) -> str:
     if parent:
         os.makedirs(parent, exist_ok=True)
     return path
+
+
+# ── XPLAT-47: mitgelieferte (schreibgeschuetzte) Programmdateien ─────────────
+#
+# Im Quellbetrieb liegen ``assets/``, ``fixtures/``, ``data/controller_library``
+# und die Visualizer-Dateien im Repo. Im gefrorenen Windows-Build (PyInstaller,
+# onedir, ``packaging/windows/``) liegen sie unter ``sys._MEIPASS`` (dem
+# ``_internal``-Ordner neben ``LightOS.exe``) — in derselben relativen Anordnung
+# wie im Repo. Der Installationsordner ist dort ``C:\Program Files\LightOS``
+# und damit SCHREIBGESCHUETZT: was hierueber aufgeloest wird, wird nur GELESEN.
+# Alles Schreibende gehoert in ``app_data_dir()``.
+
+
+def ist_gefroren() -> bool:
+    """True im gepackten Build (PyInstaller setzt ``sys.frozen``)."""
+    return bool(getattr(sys, "frozen", False))
+
+
+def programm_dir() -> str:
+    """Wurzel der mitgelieferten Programmdateien (nur lesen!).
+
+    * Quellbetrieb: das Repo (zwei Ebenen ueber ``src/core``).
+    * Gefroren: ``sys._MEIPASS`` (PyInstaller); fehlt das, der Ordner der exe.
+    """
+    if ist_gefroren():
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass:
+            return os.path.abspath(meipass)
+        return os.path.dirname(os.path.abspath(sys.executable))
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def programm_datei(*teile: str) -> str:
+    """Pfad einer mitgelieferten Datei/eines Ordners unter ``programm_dir()``."""
+    return os.path.join(programm_dir(), *teile)

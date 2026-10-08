@@ -18,7 +18,7 @@ Aufruf::
 
 Exit 0 = identisch (Abnahme bestanden), 1 = Abweichung, 2/3 = Lauf kaputt.
 
-★ VIER PINS, ohne die der Lauf entweder Davids Daten anfasst oder nichts misst
+★ FUENF PINS, ohne die der Lauf entweder echte Nutzerdaten anfasst oder nichts misst
 (Lehren aus ``reference_lightos_ui_automation``):
   1. ``XDG_DATA_HOME`` -> Wegwerf (Snaps, Buehnen, ``crash.log``).
   2. ``LIGHTOS_SHOW_DB`` -> Wegwerf. Der Default ist RELATIV zum Arbeits-
@@ -27,6 +27,10 @@ Exit 0 = identisch (Abnahme bestanden), 1 = Abweichung, 2/3 = Lauf kaputt.
      laedt die Show 0 Fixtures und der Test misst nichts.
   4. ``LIGHTOS_NO_OUTPUT_THREAD`` -> kein Sendethread. Auf ``/dev/ttyUSB0`` kann
      der HW-5-Langzeitlauf liegen; ein zweiter Oeffner wuerde ihn stoeren.
+  5. ``LIGHTOS_NO_DATENUMZUG`` -> keine Uebernahme alter ``data/``-Dateien
+     (TOOL-16). Sonst holt ``get_state()`` ein altes ``universes.json`` mit
+     Enttec-Eintrag in den Sandkasten und oeffnet den echten Port. Die
+     Ausgabe wird deshalb zusaetzlich NACH ``get_state()`` geprueft.
 
 ★ Und die Falle, die diesen Lauf zweimal „bestanden" melden liess, ohne etwas zu
 messen: die Show referenziert ihre Buehne nur per NAME (``stage_snapshot``), die
@@ -47,34 +51,114 @@ import tempfile
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO)
 
-_tmp = tempfile.mkdtemp(prefix="vizverify_")
-os.environ["XDG_DATA_HOME"] = os.path.join(_tmp, "xdg")
-os.environ["LIGHTOS_SHOW_DB"] = os.path.join(_tmp, "show.db")
-os.environ["LIGHTOS_FIXTURE_DB"] = os.path.expanduser(
-    "~/.local/share/LightOS/fixtures.db")
-os.environ["LIGHTOS_NO_OUTPUT_THREAD"] = "1"
-os.environ.setdefault("DISPLAY", ":0")
-os.environ.pop("QT_QPA_PLATFORM", None)          # echtes Fenster, nicht offscreen
+#: Teilstrings, die in der Ausgabe-Konfiguration ins echte Rig zeigen.
+_GEFAEHRLICH = ("255.255.255.255", "192.168.", "10.0.", "COM", "/dev/tty")
+#: Einzig erlaubte Netz-Ziele fuer Art-Net/sACN.
+_LOOPBACK = ("127.0.0.1", "localhost")
 
-_echte_stages = os.path.expanduser("~/.local/share/LightOS/stages")
-_sandkasten_stages = os.path.join(_tmp, "xdg", "LightOS", "stages")
-if os.path.isdir(_echte_stages):
-    os.makedirs(os.path.dirname(_sandkasten_stages), exist_ok=True)
-    shutil.copytree(_echte_stages, _sandkasten_stages)
 
-# DMX-Sicherheit UNMITTELBAR vor dem Start pruefen — ein pytest-Lauf schreibt
-# data/universes.json nachweislich zurueck (Lehre 2026-07-28).
-# XPLAT-44: gelesen wird die Datei, die die gestartete App WIRKLICH benutzt —
-# mit dem umgelenkten XDG_DATA_HOME oben also die der Wegwerf-Umgebung.
-from src.core.paths import user_data_file                          # noqa: E402
-_cfg_path = user_data_file("universes.json")
-_cfg = open(_cfg_path, encoding="utf-8").read() if os.path.exists(_cfg_path) else "[]"
-for _bad in ("255.255.255.255", "192.168.", "10.0.", "COM", "/dev/tty"):
-    if _bad in _cfg:
-        raise SystemExit(
-            f"ABBRUCH: {_cfg_path} enthaelt {_bad!r} — das wuerde ins "
-            f"echte Rig senden. Fuer diesen Lauf EIN Art-Net auf 127.0.0.1 "
-            f"eintragen.\n{_cfg}")
+#: Wegwerf-Ordner des laufenden Prozesses (von ``sandbox_einrichten``).
+_SANDBOX: str | None = None
+
+
+def sandbox_einrichten(tmp: str | None = None, *, fixture_db: str | None = None,
+                       stages_quelle: str | None = None) -> str:
+    """Pins 1-5 setzen (s. Modul-Doku) und die Buehnen in den Sandkasten
+    kopieren. Gibt den Wegwerf-Ordner zurueck."""
+    global _SANDBOX
+    tmp = tmp or tempfile.mkdtemp(prefix="vizverify_")
+    _SANDBOX = tmp
+    os.environ["XDG_DATA_HOME"] = os.path.join(tmp, "xdg")
+    os.environ["LIGHTOS_SHOW_DB"] = os.path.join(tmp, "show.db")
+    os.environ["LIGHTOS_FIXTURE_DB"] = fixture_db or os.path.expanduser(
+        "~/.local/share/LightOS/fixtures.db")
+    os.environ["LIGHTOS_NO_OUTPUT_THREAD"] = "1"
+    # TOOL-16: ohne diesen Pin uebernimmt get_state() ein altes
+    # data/universes.json (Arbeitsverzeichnis/Repo) in den Sandkasten und ruft
+    # danach apply_output_config() — mit einem Enttec-Eintrag oeffnete das den
+    # echten seriellen Port, NACHDEM die Pruefung unten die noch leere
+    # Sandkasten-Datei fuer sicher befunden hatte.
+    os.environ["LIGHTOS_NO_DATENUMZUG"] = "1"
+    echte_stages = stages_quelle or os.path.expanduser("~/.local/share/LightOS/stages")
+    sandkasten_stages = os.path.join(tmp, "xdg", "LightOS", "stages")
+    if os.path.isdir(echte_stages) and not os.path.exists(sandkasten_stages):
+        os.makedirs(os.path.dirname(sandkasten_stages), exist_ok=True)
+        shutil.copytree(echte_stages, sandkasten_stages)
+    return tmp
+
+
+def schutz_aktiv() -> bool:
+    """Stehen alle Schutzschalter auf DIESEM Sandkasten? (Pins 1, 2, 4, 5 —
+    die Fixture-Library darf echt sein, sie wird nur gelesen.)"""
+    if not _SANDBOX:
+        return False
+    env = os.environ
+    return (env.get("XDG_DATA_HOME") == os.path.join(_SANDBOX, "xdg")
+            and env.get("LIGHTOS_SHOW_DB") == os.path.join(_SANDBOX, "show.db")
+            and bool(env.get("LIGHTOS_NO_OUTPUT_THREAD"))
+            and bool(env.get("LIGHTOS_NO_DATENUMZUG")))
+
+
+def schutz_sicherstellen() -> None:
+    """B4 (Review TOOL-16): ``main()`` verlaesst sich nicht darauf, dass der
+    Aufrufer den Sandkasten eingerichtet hat — auch nicht nach ``import`` und
+    direktem ``main()``-Aufruf. Fehlen die Schutzschalter, richtet es ihn
+    selbst ein. Gibt es aber schon einen App-State, ist es dafuer zu spaet:
+    der hat Show-DB und Ausgabe bereits mit den falschen Pfaden geoeffnet ->
+    Abbruch."""
+    if not schutz_aktiv():
+        import src.core.app_state as app_state_mod
+        if getattr(app_state_mod, "_state", None) is not None:
+            raise SystemExit(
+                "ABBRUCH: Schutzschalter fehlen und der App-State existiert "
+                "schon — der Lauf saehe echte Daten/Ausgaenge. Werkzeug als "
+                "eigenen Prozess starten.")
+        sandbox_einrichten()
+    ausgabe_datei_pruefen()
+
+
+def ausgabe_datei_pruefen() -> None:
+    """DMX-Sicherheit: die Ausgabe-Konfiguration, die die App WIRKLICH benutzt
+    (XPLAT-44: mit umgelenktem XDG_DATA_HOME die der Wegwerf-Umgebung), darf
+    nicht ins echte Rig zeigen. Ein pytest-Lauf schreibt data/universes.json
+    nachweislich zurueck (Lehre 2026-07-28)."""
+    from src.core.paths import user_data_file
+    cfg_path = user_data_file("universes.json")
+    cfg = open(cfg_path, encoding="utf-8").read() if os.path.exists(cfg_path) else "[]"
+    for bad in _GEFAEHRLICH:
+        if bad in cfg:
+            raise SystemExit(
+                f"ABBRUCH: {cfg_path} enthaelt {bad!r} — das wuerde ins "
+                f"echte Rig senden. Fuer diesen Lauf EIN Art-Net auf 127.0.0.1 "
+                f"eintragen.\n{cfg}")
+
+
+def ausgabe_nach_state_pruefen(state) -> None:
+    """TOOL-16: NACH ``get_state()`` noch einmal pruefen — Datei UND die
+    tatsaechlich eingerichteten Adapter. Kein Enttec, Art-Net/sACN nur auf
+    Loopback; sonst alles schliessen und abbrechen."""
+    om = state.output_manager
+    fehler = []
+    if getattr(om, "_enttec_outputs", None):
+        fehler.append(f"Enttec auf Universum {sorted(om._enttec_outputs)}")
+    for name, ausgaenge in (("Art-Net", getattr(om, "_artnet_outputs", {}) or {}),
+                            ("sACN", getattr(om, "_sacn_outputs", {}) or {})):
+        for univ, dev in ausgaenge.items():
+            # Art-Net: ``target_ip``; sACN: ``_target_ip`` (None = Multicast
+            # ins ganze Netz -> ebenfalls verboten).
+            ziel = getattr(dev, "target_ip", None) or getattr(dev, "_target_ip", None)
+            if str(ziel or "") not in _LOOPBACK:
+                fehler.append(f"{name} Universum {univ} -> {ziel!r}")
+    if fehler:
+        for univ in list(getattr(om, "universes", {}) or {}):
+            try:
+                om.remove_output(univ)
+            except Exception:
+                pass
+        raise SystemExit("ABBRUCH nach get_state(): Ausgabe zeigt ins echte Rig — "
+                         + "; ".join(fehler))
+    ausgabe_datei_pruefen()
+
 
 from PySide6.QtCore import QTimer                                  # noqa: E402
 from PySide6.QtWidgets import QApplication                         # noqa: E402
@@ -107,8 +191,12 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Show nicht gefunden: {show}")
         return 2
 
+    # B4: Schutzschalter VOR jedem State/Fenster — auch ohne __main__-Block.
+    schutz_sicherstellen()
     app = QApplication.instance() or QApplication(sys.argv)
     from src.core.app_state import get_state
+    # TOOL-16: State ZUERST erzeugen und die Ausgabe danach erneut pruefen.
+    ausgabe_nach_state_pruefen(get_state())
     from src.core.show.show_file import load_show
     from src.ui.main_window import MainWindow
 
@@ -192,4 +280,8 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    sandbox_einrichten()
+    os.environ.setdefault("DISPLAY", ":0")
+    os.environ.pop("QT_QPA_PLATFORM", None)      # echtes Fenster, nicht offscreen
+    ausgabe_datei_pruefen()                     # UNMITTELBAR vor dem Start
     sys.exit(main())
