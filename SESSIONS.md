@@ -81,6 +81,7 @@
 | OUT-62 | B | fix/out62-blackout-maske-atomar | 2026-10-08T19:08Z | src/core/app_state.py · docs/components/engine/script.md · tests/test_out62_blackout_maske_atomar.py · changelog.d/2026-10-08-OUT-62.md · BACKLOG.md |
 | OUT-64 | B | fix/out64-estop-ausgabeweg | 2026-10-08T19:11Z | src/core/dmx/output_manager.py · tests/test_out64_estop_ausgabeweg.py · changelog.d/2026-10-08-OUT-64.md · BACKLOG.md |
 | QA-83 | B | fix/qa83-vc-assets-isoliert | 2026-10-08T19:16Z | src/core/show/vc_assets.py · tools/_gen_env.py · tests/test_qa83_vc_assets_unberuehrt.py · BACKLOG.md |
+| UI-76 | B | fix/ui76-go-hinweis-page | 2026-10-08T19:17Z | src/core/cueliste_ziel.py · src/ui/views/playback_view.py · tests/test_ui76_go_hinweis.py · docs/anleitung_szenen_cues/ANLEITUNG.md · changelog.d/2026-10-08-UI-76.md · BACKLOG.md |
 
 ## Blocker & Fallen
 
@@ -177,7 +178,6 @@
 
 ## Verlauf
 
-- 2026-10-08T17:02Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T17:16Z D done QA-86
 - 2026-10-08T17:16Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T17:29Z A claim BACKLOG-0810B
@@ -207,3 +207,4 @@
 - 2026-10-08T19:08Z B claim OUT-62
 - 2026-10-08T19:11Z B claim OUT-64
 - 2026-10-08T19:16Z B claim QA-83
+- 2026-10-08T19:17Z B claim UI-76
