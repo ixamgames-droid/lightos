@@ -83,7 +83,6 @@
 | STAB-30 | A | feature/stab30-diagnose-log | 2026-10-08T19:39Z | main.py · src/core/crash_logging.py |
 | VIZ-71 | B | - | 2026-10-08T19:41Z | - |
 | VIZ-94 | B | fix/viz94-buehne-windows-arm | 2026-10-08T19:49Z | src/ui/visualizer |
-| XPLAT-36 | B | fix/xplat36-viz13-aufteilen | 2026-10-08T19:43Z | tests/test_viz13_scene_modules_smoke.py · tests/test_viz13_scene_modules_smoke_b.py · tests/_viz13_szene_basis.py · BACKLOG.md |
 | QA-87 | D | fix/qa87-doppelter-tap | 2026-10-08T19:49Z | src/core/engine/tempo_bus.py · src/core/engine/bpm_manager.py · src/ui/virtualconsole/vc_speedial.py · tests/test_qa87_tap_uhr.py · changelog.d/2026-10-08-QA-87.md |
 
 ## Blocker & Fallen
@@ -188,7 +187,6 @@
 
 ## Verlauf
 
-- 2026-10-08T18:11Z A claim LAS-26
 - 2026-10-08T18:16Z A done VIZ-83
 - 2026-10-08T18:21Z D claim QA-90
 - 2026-10-08T18:23Z D aktualisiert QA-90: Dateien tests/test_viz72_spot_pool_umgebung.py · BACKLOG.md -> tests/test_viz72_spot_pool_umgebung.py · src/ui/visualizer/visualizer_window.py · BACKLOG.md
@@ -218,3 +216,4 @@
 - 2026-10-08T19:49Z D claim QA-87
 - 2026-10-08T19:51Z A done XPLAT-47
 - 2026-10-08T20:01Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-08T20:03Z B abgebrochen XPLAT-36
