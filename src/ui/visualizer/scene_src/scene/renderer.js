@@ -27,14 +27,14 @@ export const gpuProbeInfo = { tier: null, grund: '', chip: '', maxTex: null, ben
 
 // VIZ-84: Frame-Zeit-Rueckfall — ein paar bildschirmfuellende Draws mit einem
 // rechenlastigen Fragment-Shader auf dem Probe-Kontext, `readPixels` erzwingt
-// das Warten auf die GPU. Kostet auf einer diskreten Karte unter 1 ms, auf
+// das Warten auf die GPU (dessen Rueckweg-Kosten werden abgezogen). Kostet auf einer diskreten Karte unter 1 ms, auf
 // einem Software-Renderer deutlich mehr — deshalb bricht die Messung ab, sobald
 // das Urteil feststeht. Liefert die Dauer der Mess-Draws in ms oder null.
 function messeFuellrate(gl) {
   const vsQ = 'attribute vec2 p; void main() { gl_Position = vec4(p, 0.0, 1.0); }';
   const fsQ = 'precision mediump float; uniform float k;'
     + 'void main() { vec2 u = gl_FragCoord.xy * 0.013; float a = k;'
-    + ' for (int i = 0; i < 32; i++) { a = sin(a + u.x) * cos(a - u.y) + a * 0.5; }'
+    + ' for (int i = 0; i < 128; i++) { a = sin(a + u.x) * cos(a - u.y) + a * 0.5; }'
     + ' gl_FragColor = vec4(a, a * 0.5, 0.25, 1.0); }';
   let vs = null, fs = null, prog = null, buf = null;
   try {
@@ -62,14 +62,30 @@ function messeFuellrate(gl) {
     gl.uniform1f(kLoc, 0.1);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
-    const t0 = performance.now();
-    for (let i = 0; i < 6; i++) {
-      gl.uniform1f(kLoc, 0.2 + i * 0.1);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
-      gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
-      if (performance.now() - t0 > 4 * BENCH_HIGH_MS) break;   // Urteil steht
-    }
-    return performance.now() - t0;
+    // Befund nach Review: `readPixels` kostet je Draw einen vollen
+    // GPU-Rueckweg (auf echter integrierter Grafik ~2 ms), der mit der
+    // Fuellrate nichts zu tun hat. Deshalb zuerst dieselben Draws auf 1x1
+    // Pixel (nur Rueckweg + Draw-Overhead), dann bildschirmfuellend; je Lauf
+    // zaehlt das schnellste Einzelbild (Ausreisser/Scheduler raus), und das
+    // Ergebnis ist die reine Fuell-Zeit fuer 6 Draws.
+    const lauf = (w, h) => {
+      gl.viewport(0, 0, w, h);
+      let best = Infinity;
+      const t0 = performance.now();
+      for (let i = 0; i < 6; i++) {
+        const t = performance.now();
+        gl.uniform1f(kLoc, 0.2 + i * 0.1);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+        best = Math.min(best, performance.now() - t);
+        if (performance.now() - t0 > 4 * BENCH_HIGH_MS) break;   // Urteil steht
+      }
+      return best;
+    };
+    const rueckweg = lauf(1, 1);
+    const voll = lauf(512, 512);
+    if (!isFinite(rueckweg) || !isFinite(voll)) return null;
+    return Math.max(0, voll - rueckweg) * 6;
   } catch (e) {
     return null;
   } finally {

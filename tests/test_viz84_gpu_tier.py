@@ -136,6 +136,43 @@ class EntscheidungTest(unittest.TestCase):
             langsam = self._tier(chip, maxTex=32, ms=40)
             self.assertEqual(langsam["tier"], "low", chip)
 
+    def test_einstiegskarten_und_alte_apu_sind_niedrig(self):
+        # Review-Befund: GT 710/MX150/920MX und "AMD Radeon R7 Graphics"
+        # (Kaveri/Carrizo) fielen ueber "geforce" bzw. "radeon ... r[579]"
+        # auf Hoch; unter ANGLE waren sie vorher Niedrig.
+        for chip in (
+            "ANGLE (NVIDIA, NVIDIA GeForce GT 710 Direct3D11 vs_5_0 ps_5_0, D3D11)",
+            "ANGLE (NVIDIA, NVIDIA GeForce GT 1030 Direct3D11 vs_5_0 ps_5_0, D3D11)",
+            "ANGLE (NVIDIA, NVIDIA GeForce MX150 Direct3D11 vs_5_0 ps_5_0, D3D11)",
+            "ANGLE (NVIDIA, NVIDIA GeForce MX250 Direct3D11 vs_5_0 ps_5_0, D3D11)",
+            "ANGLE (NVIDIA, NVIDIA GeForce 920MX Direct3D11 vs_5_0 ps_5_0, D3D11)",
+            "ANGLE (AMD, AMD Radeon R7 Graphics Direct3D11 vs_5_0 ps_5_0, D3D11)",
+            "ANGLE (AMD, AMD Radeon(TM) R5 Graphics Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        ):
+            r = self._tier(chip, maxTex=32, ms=0.1)
+            self.assertEqual(r["tier"], "low", chip)
+            self.assertFalse(r["gemessen"], chip)
+        # Abgrenzung: echte Karten derselben Familien bleiben Hoch.
+        for chip in ("NVIDIA GeForce GTX 1050 Ti", "NVIDIA GeForce RTX 2060",
+                     "AMD Radeon R9 290", "AMD Radeon R7 260X"):
+            self.assertEqual(self._tier(chip, maxTex=16, ms=99)["tier"], "high", chip)
+
+    def test_warp_ist_software(self):
+        r = self._tier("ANGLE (Microsoft, Microsoft Direct3D WARP Direct3D11 "
+                       "vs_5_0 ps_5_0, D3D11)", maxTex=32, ms=0.1)
+        self.assertEqual(r["tier"], "low")
+        self.assertFalse(r["gemessen"])
+
+    def test_snapdragon_x_wird_gemessen(self):
+        chip = ("ANGLE (Qualcomm, Qualcomm(R) Adreno(TM) X1-85 GPU Direct3D11 "
+                "vs_5_0 ps_5_0, D3D11)")
+        r = self._tier(chip, maxTex=16, ms=1.0)
+        self.assertTrue(r["gemessen"])
+        self.assertEqual(r["tier"], "high")
+        # aeltere Adreno bleiben pauschal Niedrig
+        self.assertEqual(self._tier("ANGLE (Qualcomm, Adreno (TM) 690, OpenGL ES 3.2)",
+                                    ms=1.0)["tier"], "low")
+
     def test_ohne_messung_die_alte_texture_unit_regel(self):
         self.assertEqual(self._tier("", maxTex=16, ms=None)["tier"], "low")
         self.assertEqual(self._tier("", maxTex=32, ms=None)["tier"], "high")
@@ -288,6 +325,7 @@ class ProbeInDerSeiteTest(unittest.TestCase):
         ms = z["info"]["benchMs"]
         self.assertIsInstance(ms, (int, float), z)
         self.assertGreaterEqual(ms, 0)
+        print(f"[VIZ-84] echte Messung: benchMs={ms:.2f} grund={z['info']['grund']}")
 
 
 if __name__ == "__main__":

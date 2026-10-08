@@ -14,18 +14,23 @@
 // Rein (keine Imports): Node-Tests laden das Modul direkt.
 "use strict";
 
-// Frame-Zeit-Rueckfall: Gesamtdauer der Mess-Draws (renderer.js#messeFuellrate)
-// bis zu der eine GPU als 'high' gilt. Grob gewaehlt: diskrete Karten liegen
+// Frame-Zeit-Rueckfall: reine Fuell-Zeit von 6 Mess-Draws ohne den
+// readPixels-Rueckweg (renderer.js#messeFuellrate), bis zu der eine GPU als 'high' gilt. Grob gewaehlt: diskrete Karten liegen
 // weit darunter, Software-Renderer weit darueber; integrierte Grafik dazwischen
-// wird ohnehin meist schon am Namen erkannt.
+// wird ohnehin meist schon am Namen erkannt. Noch nicht an Windows-Werten
+// geeicht (RX 580 / Ryzen-Grafik / Iris Xe) — gpuProbeInfo().benchMs zeigt
+// den gemessenen Wert.
 export const BENCH_HIGH_MS = 6;
 
 // Reihenfolge zaehlt: Software zuerst (ein Software-Renderer kann einen
 // Kartennamen im String tragen), dann Mobil, dann APU-Grafik (traegt "Radeon",
 // ist aber integriert), dann diskret, dann Intel-Einstiegsgrafik.
 const REGELN = [
-  { re: /swiftshader|llvmpipe|softpipe|lavapipe|basic render/, tier: 'low',
+  { re: /swiftshader|llvmpipe|softpipe|lavapipe|basic render|\bwarp\b/, tier: 'low',
     grund: 'Software-Renderer' },
+  // Snapdragon X (Adreno X1-xx) ist etwa so stark wie eine Mittelklasse-Karte:
+  // nicht pauschal Niedrig, sondern messen.
+  { re: /adreno.*\bx1\b/, tier: null, grund: 'Snapdragon X' },
   { re: /adreno|mali|powervr|videocore|apple a\d/, tier: 'low',
     grund: 'Mobil-Grafik' },
   { re: /apple m\d/, tier: 'high', grund: 'Apple M' },
@@ -33,6 +38,12 @@ const REGELN = [
   // weder sicher schnell noch sicher langsam -> messen.
   { re: /vega \d+ graphics|radeon\(tm\) graphics|radeon graphics|radeon\(tm\) \d{3}m|radeon \d{3}m/,
     tier: null, grund: 'APU-Grafik' },
+  // Alte AMD-APU-Grafik (Kaveri/Carrizo: "AMD Radeon R5/R7 Graphics") und
+  // NVIDIA-Einstiegskarten (GT 710/730/1030, MX150/250, 920MX) waeren sonst
+  // ueber "radeon ... r[579]" bzw. "geforce" 'high'.
+  { re: /radeon(\(tm\))? r[2-7](\(tm\))? graphics/, tier: 'low', grund: 'alte AMD-APU' },
+  { re: /geforce(\(r\))? (gt \d{3,4}|mx\s?\d{3}|\d{3}mx)\b/, tier: 'low',
+    grund: 'NVIDIA-Einstieg' },
   { re: /geforce|\brtx\b|\bgtx\b|quadro|titan|tesla|firepro|\bradeon\b.*\b(rx|pro|r[579]|hd \d|vii)\b|\brx \d{3,4}|\barc\b/,
     tier: 'high', grund: 'diskrete GPU' },
   { re: /intel.*\b(u?hd)\b.*graphics/, tier: 'low', grund: 'Intel HD/UHD' },
