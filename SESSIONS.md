@@ -82,6 +82,7 @@
 | VIZ-94 | B | fix/viz94-buehne-windows-arm | 2026-10-08T19:49Z | src/ui/visualizer |
 | QA-87 | D | fix/qa87-doppelter-tap | 2026-10-08T20:36Z | src/core/engine/tempo_bus.py · src/core/engine/bpm_manager.py · src/ui/virtualconsole/vc_speedial.py · tests/test_qa87_tap_uhr.py · changelog.d/2026-10-08-QA-87.md |
 | VIZ-95 | A | feature/viz95-lasermuster-3d | 2026-10-08T20:47Z | src/ui/visualizer |
+| LAS-30 | A | feature/viz95-lasermuster-3d | 2026-10-08T20:52Z | src/core |
 
 ## Blocker & Fallen
 
@@ -192,7 +193,6 @@
 
 ## Verlauf
 
-- 2026-10-08T18:37Z A claim DOC-66
 - 2026-10-08T18:41Z B claim XPLAT-24
 - 2026-10-08T18:41Z D aktualisiert QA-89: Dateien src/core/engine/cue_stack.py · tests/test_qa89_fade_uhr.py · tests/test_core_engine.py · BACKLOG.md · changelog.d/2026-10-08-QA-89.md -> src/core/engine/cue_stack.py · tests/test_qa89_fade_uhr.py · tests/test_cue_substack_and_attrdelay.py · BACKLOG.md · changelog.d/2026-10-08-QA-89.md
 - 2026-10-08T18:44Z A done BACKLOG-0810B
@@ -222,3 +222,4 @@
 - 2026-10-08T20:19Z A done LAS-25
 - 2026-10-08T20:47Z A claim VIZ-95
 - 2026-10-08T20:50Z A done DOC-60
+- 2026-10-08T20:52Z A claim LAS-30
