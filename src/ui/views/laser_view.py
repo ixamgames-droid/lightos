@@ -84,6 +84,24 @@ def fixture_has_laser_capability(fx) -> bool:
     return is_laser_fixture(fx)
 
 
+def row_label(channel) -> str:
+    """LAS-26: Beschriftung einer Regler-Zeile = Kanalname aus dem Profil.
+
+    Vorher stand dort die allgemeine Attribut-Beschriftung — am Laser hiess
+    die Musterauswahl „Gobo-Rad“ und die Farbsegmente „Muster-Farbwechsel“.
+    Der Kanalname ist das, was im Handbuch steht. Ein Gruppen-Praefix
+    („A: Musterauswahl“ beim L2600) faellt weg: die Zeile gilt je nach
+    Mustergruppe fuer A, B oder beide. Ohne Namen bleibt die Attribut-
+    Beschriftung."""
+    import re
+    attr = getattr(channel, "attribute", "") or ""
+    name = (getattr(channel, "name", "") or "").strip()
+    name = re.sub(r"^[A-Z]\d?:\s*", "", name)
+    if not name or name == attr:
+        return attr_label(attr)
+    return name
+
+
 def _range_value(rng) -> int:
     """Anfahr-Wert für einen ChannelRange: Punktbereich → der Wert selbst,
     Band → Bandmitte (liegt sicher im Bereich, egal wie die Grenzen fallen)."""
@@ -110,9 +128,11 @@ class _ChannelRow(QWidget):
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(6)
 
-        lbl = QLabel(attr_label(self.attribute))
+        lbl = QLabel(row_label(channel))
         lbl.setMinimumWidth(130)
-        lbl.setToolTip(getattr(channel, "name", "") or "")
+        lbl.setMaximumWidth(230)
+        lbl.setWordWrap(True)
+        lbl.setToolTip(f"{attr_label(self.attribute)} ({self.attribute})")
         lay.addWidget(lbl)
 
         self._slider = QSlider(Qt.Orientation.Horizontal)
@@ -374,7 +394,6 @@ class LaserView(QWidget):
         pal_btns.addWidget(btn_save)
         pal_btns.addStretch(1)
         pv.addLayout(pal_btns)
-        root.addWidget(self._pal_box)
 
         # LAS-18b: Werksmuster-Picker für DMX-Muster-Laser (Klasse A) — vom
         # Nutzer gemerkte (Bank, Muster)-Slots als Kacheln, optional mit Foto
@@ -395,18 +414,30 @@ class LaserView(QWidget):
         pat_btns.addWidget(btn_pat_add)
         pat_btns.addStretch(1)
         pat_v.addLayout(pat_btns)
-        root.addWidget(self._pattern_box)
 
-        # Regler-Bereich (scrollbar).
+        # Regler-Bereich (scrollbar). LAS-26: die Regler (Muster, Farbe,
+        # Bewegung) stehen ZUERST, Muster-Paletten und Werksmuster darunter im
+        # selben Scrollbereich. Vorher lagen die beiden Boxen fest darueber —
+        # bei 900 px Fensterhoehe blieb fuer die Regler ein Streifen von gut
+        # einer Zeile, Farbe und Bewegung waren nur per Scrollen erreichbar.
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
+        inhalt = QWidget()
+        inhalt_lay = QVBoxLayout(inhalt)
+        inhalt_lay.setContentsMargins(0, 0, 0, 0)
+        inhalt_lay.setSpacing(6)
         self._rows_host = QWidget()
         self._rows_lay = QVBoxLayout(self._rows_host)
         self._rows_lay.setContentsMargins(0, 0, 0, 0)
         self._rows_lay.setSpacing(4)
         self._rows_lay.addStretch(1)
-        scroll.setWidget(self._rows_host)
+        inhalt_lay.addWidget(self._rows_host)
+        inhalt_lay.addWidget(self._pal_box)
+        inhalt_lay.addWidget(self._pattern_box)
+        inhalt_lay.addStretch(1)
+        scroll.setWidget(inhalt)
+        self._scroll = scroll
         root.addWidget(scroll, stretch=1)
 
     def _subscribe(self):

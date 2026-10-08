@@ -238,3 +238,31 @@ def test_generator_dialog_zeigt_die_bestaetigung():
     finally:
         dlg._live.shutdown()
         dlg.deleteLater()
+
+
+# ── 4: Regler vor Paletten, Beschriftung aus dem Profil ────────────────────
+
+def test_regler_stehen_vor_paletten_und_werksmustern(monkeypatch):
+    # Vorher lagen Muster-Paletten und Werksmuster FEST ueber dem Regler-
+    # Scrollbereich; bei 900 px Fensterhoehe blieb fuer die Regler gut eine
+    # Zeile. Jetzt: alles in einem Scrollbereich, Regler zuerst.
+    v, _st = _view(monkeypatch, [_FX(1, _el400())])
+    lay = v._scroll.widget().layout()
+    reihe = [lay.itemAt(i).widget() for i in range(lay.count())]
+    assert reihe.index(v._rows_host) < reihe.index(v._pal_box)
+    assert reihe.index(v._pal_box) < reihe.index(v._pattern_box)
+
+
+def test_zeilen_tragen_den_kanalnamen(monkeypatch):
+    from PySide6.QtWidgets import QLabel
+    v, _st = _view(monkeypatch, [_FX(1, _el400())])
+    texte = {r.findChildren(QLabel)[0].text() for r in v._rows.values()}
+    assert "Musterauswahl" in texte          # nicht „Gobo-Rad“
+    assert "Geschwindigkeit dynamische Muster" in texte
+
+
+def test_zeilen_beschriftung_ohne_gruppen_praefix_und_rueckfall():
+    from src.ui.views.laser_view import row_label
+    assert row_label(_Ch("gobo_wheel", 3, name="A: Musterauswahl")) == "Musterauswahl"
+    assert row_label(_Ch("laser_x", 4, name="laser_x")) == "X-Bewegung"
+    assert row_label(_Ch("laser_x", 4, name="")) == "X-Bewegung"
