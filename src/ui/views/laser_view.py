@@ -84,6 +84,11 @@ def fixture_has_laser_capability(fx) -> bool:
     return is_laser_fixture(fx)
 
 
+# LAS-26: Spaltenbreiten der Regler-Zeilen (Beschriftung, Bereichs-Auswahl).
+LABEL_BREITE = 170
+BEREICH_BREITE = 230
+
+
 def row_label(channel) -> str:
     """LAS-26: Beschriftung einer Regler-Zeile = Kanalname aus dem Profil.
 
@@ -129,8 +134,9 @@ class _ChannelRow(QWidget):
         lay.setSpacing(6)
 
         lbl = QLabel(row_label(channel))
-        lbl.setMinimumWidth(130)
-        lbl.setMaximumWidth(230)
+        # LAS-26: feste Spaltenbreiten — vorher sass jeder Regler je nach
+        # Namens- und Bereichslaenge woanders, die Zeilen fluchteten nicht.
+        lbl.setFixedWidth(LABEL_BREITE)
         lbl.setWordWrap(True)
         lbl.setToolTip(f"{attr_label(self.attribute)} ({self.attribute})")
         lay.addWidget(lbl)
@@ -145,7 +151,12 @@ class _ChannelRow(QWidget):
         lay.addWidget(self._spin)
 
         self._combo = QComboBox()
-        self._combo.setMinimumWidth(170)
+        self._combo.setFixedWidth(BEREICH_BREITE)
+        # Ohne Bereiche bleibt der Platz frei (Regler gleich lang wie die
+        # Nachbarzeilen).
+        pol = self._combo.sizePolicy()
+        pol.setRetainSizeWhenHidden(True)
+        self._combo.setSizePolicy(pol)
         self._combo.addItem("— Bereich wählen —", None)
         for r in self._ranges:
             lo = int(getattr(r, "range_from", 0) or 0)
@@ -811,7 +822,9 @@ class LaserView(QWidget):
         Selbst-Pin. Wir merken uns die Attribut-Namen PRO Gruppe (Titel als
         Schlüssel) und binden nur diesen String in die Closure; die Zeilen
         werden zur Laufzeit in ``self._rows`` nachgeschlagen."""
-        box = QGroupBox(title)
+        # LAS-26: „&“ im Titel ist fuer Qt ein Tastenkuerzel — „Bewegung &
+        # Geschwindigkeit“ stand als „Bewegung _Geschwindigkeit“ da.
+        box = QGroupBox(title.replace("&", "&&"))
         lay = QVBoxLayout(box)
         lay.setSpacing(3)
         lay.setContentsMargins(8, 4, 8, 6)

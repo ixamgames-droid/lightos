@@ -224,7 +224,8 @@ def test_rows_grouped_by_meaning(monkeypatch):
     nicht mehr eine flache Kanal-Liste."""
     _app()
     view, _state = _make_view(monkeypatch, [_FX(1, _l2600ish_channels())])
-    titles = [b.title() for b in _row_group_boxes(view)]
+    # LAS-26: „&“ ist im QGroupBox-Titel als „&&“ maskiert (kein Kuerzel).
+    titles = [b.title().replace("&&", "&") for b in _row_group_boxes(view)]
     # Muster (gobo_wheel, laser_bank) und Bewegung (laser_x) sind vorhanden;
     # Reihenfolge: Muster vor Bewegung.
     assert "Muster" in titles

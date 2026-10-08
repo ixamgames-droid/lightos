@@ -266,3 +266,30 @@ def test_zeilen_beschriftung_ohne_gruppen_praefix_und_rueckfall():
     assert row_label(_Ch("gobo_wheel", 3, name="A: Musterauswahl")) == "Musterauswahl"
     assert row_label(_Ch("laser_x", 4, name="laser_x")) == "X-Bewegung"
     assert row_label(_Ch("laser_x", 4, name="")) == "X-Bewegung"
+
+
+def test_gruppentitel_ohne_tastenkuerzel(monkeypatch):
+    # „Bewegung & Geschwindigkeit“ erschien als „Bewegung _Geschwindigkeit“:
+    # ein einzelnes „&“ macht Qt zum Tastenkuerzel.
+    import re
+    from PySide6.QtWidgets import QGroupBox
+    v, _st = _view(monkeypatch, [_FX(1, _el400())])
+    titel = [b.title() for b in v.findChildren(QGroupBox)]
+    assert "Bewegung && Geschwindigkeit" in titel
+    assert not [t for t in titel if re.search(r"(?<!&)&(?!&)", t)], titel
+
+
+def test_regler_zeilen_fluchten(monkeypatch):
+    # Beschriftung und Bereichs-Auswahl haben feste Breiten; eine Zeile ohne
+    # Bereiche haelt den Platz frei -> alle Schieberegler gleich lang.
+    from PySide6.QtWidgets import QComboBox, QLabel
+    v, _st = _view(monkeypatch, [_FX(1, _el400())])
+    v.resize(1200, 800)
+    v.show()
+    _app().processEvents()
+    breiten = {r._slider.width() for r in v._rows.values() if r.isVisible()}
+    v.hide()
+    assert len(breiten) == 1, breiten
+    for r in v._rows.values():
+        assert r.findChildren(QLabel)[0].minimumWidth() == r.findChildren(QLabel)[0].maximumWidth()
+        assert r.findChildren(QComboBox)[0].sizePolicy().retainSizeWhenHidden()
