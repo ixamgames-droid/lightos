@@ -28,7 +28,7 @@ Was „umkehren" heisst, haengt daran, wie das Profil die Achse beschreibt
     andere; am Geraet gemessen X 80 = rechts, X 200 = links). Umkehr = die
     Auslenkung bleibt, die Richtung wechselt: ein Wert im ersten Richtungs-
     bereich wird anteilig in den zweiten abgebildet und umgekehrt
-    (``80`` -> ``~199``). Der Mitte-Bereich bleibt unveraendert. ``255 - v``
+    (``80`` -> ``204``: 69/116 der Auslenkung -> 69/116 von 128-255). Der Mitte-Bereich bleibt unveraendert. ``255 - v``
     waere hier falsch: aus „Mitte" (5) wuerde 250 = fast ganz links.
 
 ``zwei_richtungen`` mit Mitte IN der Mitte
@@ -74,6 +74,31 @@ def _bereiche(channel) -> list[tuple[int, int, str]]:
     return out
 
 
+# Mitte-Konvention im KANALNAMEN, wenn das Profil keine Bereiche traegt
+# (Laserworld EL-400RGB MK2: „Position X (0-10 = Mitte)"). Erkannt werden
+# „0-10 = Mitte", „0–10 Mitte", „center 0-10", „Mitte: 0-10".
+_MITTE_NAME = (
+    re.compile(r"\b0\s*[-–]\s*(\d{1,3})\s*[:=]?\s*(?:mitte|center|centre|zentr)",
+               re.IGNORECASE),
+    re.compile(r"(?:mitte|center|centre|zentr\w*)\s*[:=]?\s*0\s*[-–]\s*(\d{1,3})\b",
+               re.IGNORECASE),
+)
+
+
+def _mitte_aus_name(channel) -> int | None:
+    """Obergrenze N des Mitte-Bereichs 0..N aus dem Kanalnamen, sonst None.
+    Daraus folgt die EL-400-Konvention: Mitte 0..N, Richtungen N+1..127 und
+    128..255."""
+    name = str(getattr(channel, "name", "") or "") if channel is not None else ""
+    for rx in _MITTE_NAME:
+        m = rx.search(name)
+        if m:
+            n = int(m.group(1))
+            if 0 <= n < 126:
+                return n
+    return None
+
+
 def achsen_plan(channel) -> tuple:
     """Wie die Achse dieses Kanals umgekehrt wird (siehe Modul-Doc).
 
@@ -82,6 +107,9 @@ def achsen_plan(channel) -> tuple:
     """
     rgs = _bereiche(channel)
     if not rgs:
+        n = _mitte_aus_name(channel)
+        if n is not None:
+            return ("zwei", (0, n), (n + 1, 127), (128, 255))
         return ("linear", 0, 255)
     lo_all, hi_all = rgs[0][0], max(r[1] for r in rgs)
     if len(rgs) == 1:
@@ -255,6 +283,7 @@ def profil_beschreibung(channels) -> str:
         return "Profil ohne laser_x/laser_y — die Optionen wirken hier nicht."
     arten = {achsen_plan(ch)[0] for ch in k.values()}
     if arten == {"linear"} and not any(_bereiche(ch) for ch in k.values()):
+        # (Mitte aus dem Kanalnamen erkannt -> Plan "zwei", nicht hier)
         return ("Profil beschreibt die Achsen nicht (keine Bereiche): Umkehr "
                 "linear (255 − Wert). Bitte am Gerät prüfen.")
     namen = {"linear": "linear (255 − Wert)",

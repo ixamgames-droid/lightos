@@ -303,3 +303,43 @@ def test_patch_dialog_nur_fuer_laser_und_uebernimmt_flags():
     assert (d.result_updates["invert_laser_x"], d.result_updates["invert_laser_y"],
             d.result_updates["swap_laser_xy"]) == (True, False, True)
     d.deleteLater()
+
+
+# EL-400-Bibliotheksprofil (FM-68): X/Y OHNE Bereiche, die Mitte steht nur im
+# Kanalnamen. Ohne Namens-Erkennung fiel das auf linear: Mitte 5 -> 250 = ganz
+# links.
+@pytest.mark.parametrize("name", ["Position X (0-10 = Mitte)",
+                                  "Position Y (0-10 = Mitte)",
+                                  "Position X (0–10 Mitte)",
+                                  "Pos X center 0-10"])
+def test_el400_mitte_aus_kanalnamen_ohne_bereiche(name):
+    ch = _ch("laser_x", 1)
+    ch.name = name
+    plan = achsen_plan(ch)
+    assert plan == ("zwei", (0, 10), (11, 127), (128, 255))
+    assert spiegel(5, plan) == 5
+    # Anteilig: 80 liegt bei 69/116 von 11-127 -> 69/116 von 128-255 = 204
+    # (eine feste Verschiebung um +117/+119 waere bei 127 -> 244/246 nicht am
+    # Bereichsende angekommen).
+    assert spiegel(80, plan) == 204
+    assert spiegel(200, plan) == 77
+    assert spiegel(204, plan) == 80
+
+
+def test_kanalname_ohne_mitte_bleibt_linear():
+    ch = _ch("laser_x", 1)
+    ch.name = "Position X"
+    assert achsen_plan(ch)[0] == "linear"
+
+
+def test_el400_name_ausgabe_bytes(monkeypatch):
+    chans = [_ch("shutter", 1), _ch("laser_x", 2), _ch("laser_y", 3)]
+    chans[1].name = "Position X (0-10 = Mitte)"
+    chans[2].name = "Position Y (0-10 = Mitte)"
+    monkeypatch.setattr(A, "get_channels_for_patched", lambda fx: chans)
+    out = apply_pan_tilt_orientation(
+        _Fx(invert_laser_x=True, invert_laser_y=True),
+        {"shutter": 0, "laser_x": 80, "laser_y": 5})
+    assert out["shutter"] == 0 and out["laser_y"] == 5
+    assert out["laser_x"] == 204
+    assert "Mitte bleibt" in profil_beschreibung(chans)
