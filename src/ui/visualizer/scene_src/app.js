@@ -8,7 +8,7 @@
 // blieb unveraendert - Buttons rufen weiterhin z.B. `setEditTool(...)` als
 // globale Funktion auf) und startet den Render-Loop + Bridge-Poll wie im
 // Original.
-import { scene, renderer, gpuTier, dynamicResolution, basePixelRatio,
+import { scene, renderer, gpuTier, gpuProbeInfo, dynamicResolution, basePixelRatio,
          PIXEL_RATIO_CAP, tierSettings, setDeviceRatio,
          noteCameraMotion } from './scene/renderer.js';
 import { applyBrightness } from './scene/lights.js';
@@ -280,6 +280,8 @@ window.__lightos = {
   // Low-Spec-Erkennung (2026-07-11): 'low' | 'high' — Test-/Debug-Hook,
   // Override per ?gputier=low|high in der Page-URL.
   gpuTier,
+  // VIZ-84: warum die Probe so entschied (Renderer-Name, Frame-Zeit, ...).
+  gpuProbeInfo: () => Object.assign({}, gpuProbeInfo),
   // VIZ-71: Qualitaetsstufe und Pixeldichte — Test-/Diagnose-Seams.
   tierSettings, pixelRatioCap: PIXEL_RATIO_CAP, basePixelRatio, setDeviceRatio,
   pixelRatio: () => renderer.getPixelRatio(),
