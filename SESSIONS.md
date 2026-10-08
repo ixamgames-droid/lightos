@@ -69,6 +69,7 @@
 | BACKLOG-0810B | A | docs/backlog-web-codex | 2026-10-08T17:29Z | BACKLOG.md |
 | DEMO-07 | A | docs/demo07-showcase-shows | 2026-10-08T17:30Z | - |
 | VIZ-92 | A | fix/viz92-gobo-feinschliff | 2026-10-08T17:47Z | src/ui/visualizer |
+| XPLAT-47 | A | feature/xplat47-windows-setup | 2026-10-08T17:51Z | packaging/windows · .github/workflows |
 
 ## Blocker & Fallen
 
@@ -160,7 +161,6 @@
 
 ## Verlauf
 
-- 2026-10-08T15:54Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T15:54Z A claim VIZ-84
 - 2026-10-08T15:54Z A claim VIZ-85
 - 2026-10-08T15:54Z A claim VIZ-86
@@ -190,3 +190,4 @@
 - 2026-10-08T17:47Z A claim VIZ-92
 - 2026-10-08T17:47Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T17:51Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-08T17:51Z A claim XPLAT-47
