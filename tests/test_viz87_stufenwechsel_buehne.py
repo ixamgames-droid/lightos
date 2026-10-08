@@ -53,7 +53,6 @@ _SIGNAL_SPECS = [
     ("allFixtures", (str,)), ("settingsChanged", (str,)),
     ("viewModeChanged", (str,)), ("editModeChanged", (str,)),
     ("stageLoaded", (str,)), ("pixelRatioSignal", (float,)),
-    ("addStageObjectData", (str,)),
 ]
 
 
@@ -66,11 +65,16 @@ def _mock_bridge_class():
 
     @Slot(result=str)
     def pollControl(self):
-        return "{}"
+        # Einmal-Events ueber den Pull-Kanal — wie in der App: Python->JS-
+        # Signale kommen nach dem Laden nicht zuverlaessig an (bridge.js).
+        if not self.events:
+            return "{}"
+        out, self.events = self.events, []
+        return json.dumps({"events": out})
 
     @Slot(str)
     def reportGpuTier(self, tier):
-        pass
+        self.verbunden = True
 
     @Slot(str)
     def stageListChanged(self, j):
@@ -120,6 +124,8 @@ class StufenwechselBuehneTest(unittest.TestCase):
         s.setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled, True)
         self._bridge_obj = _MockBridge()
         self._bridge_obj.echos = []
+        self._bridge_obj.events = []
+        self._bridge_obj.verbunden = False
         self._channel = QWebChannel(self._view)
         self._channel.registerObject("bridge", self._bridge_obj)
         self._view.page().setWebChannel(self._channel)
@@ -136,13 +142,14 @@ class StufenwechselBuehneTest(unittest.TestCase):
         ende = time.monotonic() + 10
         while time.monotonic() < ende and not self._eval("!!window.__lightosAppReady"):
             time.sleep(0.05)
-        # Bruecke verbunden? (Echos gehen ueber bridge.stageListChanged)
-        ende = time.monotonic() + 10
-        while time.monotonic() < ende and not self._eval(
-                "(function(){ try { return !!window.__lightos && "
-                "typeof window.qt !== 'undefined'; } catch (e) { return false; } })()"):
-            time.sleep(0.05)
-        _pump(1.0)
+        # Bruecke verbunden? (Echos gehen ueber bridge.stageListChanged.) Der
+        # Connect meldet als Erstes die Stufe (reportGpuTier).
+        ende = time.monotonic() + 15
+        while time.monotonic() < ende and not self._bridge_obj.verbunden:
+            _app.processEvents()
+            time.sleep(0.02)
+        self.assertTrue(self._bridge_obj.verbunden, "WebChannel nie verbunden")
+        _pump(0.3)
 
     def tearDown(self):
         destroy_webengine_view(self._view, _pump)
@@ -160,6 +167,9 @@ class StufenwechselBuehneTest(unittest.TestCase):
 
     def _laden(self, buehne):
         self._eval("window.__lightos.loadStageJson(%s); 1" % json.dumps(json.dumps(buehne)))
+
+    def _add_stage_data(self, d):
+        self._bridge_obj.events.append({"t": "addStageData", "j": json.dumps(d)})
 
     def _meshes(self):
         return json.loads(self._eval(
@@ -203,8 +213,8 @@ class StufenwechselBuehneTest(unittest.TestCase):
         """Verglichen wird mit dem Ist-Zustand, nicht mit dem letzten Load."""
         self._laden(_buehne(1))
         self._warte_echo(1)
-        self._bridge_obj.addStageObjectData.emit(json.dumps({
-            "id": "el03", "type": "wall", "position": {"x": 7.0, "y": 0.5, "z": 0.0}}))
+        self._add_stage_data({
+            "id": "el03", "type": "wall", "position": {"x": 7.0, "y": 0.5, "z": 0.0}})
         ende = time.monotonic() + 5
         while time.monotonic() < ende and abs(self._eval(
                 "window.__lightos.stageObjects['el03'].data.position.x") - 7.0) > 1e-6:
@@ -224,13 +234,14 @@ class StufenwechselBuehneTest(unittest.TestCase):
         for o in b["objects"]:                  # push_stage_definition/Reassert
             d = dict(o)
             d["reassert"] = True
-            self._bridge_obj.addStageObjectData.emit(json.dumps(d))
+            self._add_stage_data(d)
         _pump(1.0)
+        self.assertEqual(self._bridge_obj.events, [], "Poll hat die Events abgeholt")
         self.assertEqual(self._meshes(), vorher, "unveraenderte Elemente nicht neu bauen")
         # Groessenaenderung baut weiter neu (Gruppen-Typ: Truss).
         d = dict(b["objects"][1])
         d["size"] = {"x": 4.0, "y": 1.0, "z": 1.5}
-        self._bridge_obj.addStageObjectData.emit(json.dumps(d))
+        self._add_stage_data(d)
         ende = time.monotonic() + 5
         while time.monotonic() < ende and self._meshes()["el01"] == vorher["el01"]:
             time.sleep(0.05)
@@ -239,7 +250,7 @@ class StufenwechselBuehneTest(unittest.TestCase):
         # Farbaenderung kommt weiter an.
         d = dict(b["objects"][0])
         d["color"] = "#ff0000"
-        self._bridge_obj.addStageObjectData.emit(json.dumps(d))
+        self._add_stage_data(d)
         ende = time.monotonic() + 5
         while time.monotonic() < ende and self._eval(
                 "window.__lightos.stageObjects['el00'].data.color") != "#ff0000":
