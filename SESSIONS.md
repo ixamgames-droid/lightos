@@ -71,10 +71,10 @@
 | VIZ-92 | A | fix/viz92-gobo-feinschliff | 2026-10-08T17:47Z | src/ui/visualizer |
 | XPLAT-47 | A | feature/xplat47-windows-setup | 2026-10-08T17:51Z | packaging/windows · .github/workflows |
 | FM-68 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:10Z | fixtures |
+| DOC-65 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:11Z | docs/anleitung_fixture_generator |
 
 ## Blocker & Fallen
 
-- 2026-10-01T18:11Z (A) A UEBERGABE 01.10. abends (Limit erreicht, PC aus). Gemergt heute: #822 PRIV-05, #823 DOC-17, #824 PROC-14, #825 XPLAT-40. OFFEN: PR #827 PROC-16 (Gate gruen, CI lief), PR #828 PROC-09 changelog.d (Gate gruen, CI + ggf. main nachziehen). Lokal fertig, nicht gepusht: XPLAT-41 (wt-xplat41, Gate gruen, inkl. Ausnahme fuer den beobachtenden ARM-Job), PROC-17 (wt-proc17, auf PROC-16), XPLAT-43 summary.json (wt-xplat43). Danach geplant: PRIV-03 Klarname durchgehend auf Robin (Projektinhaber hat zugestimmt — B bitte vorher keine offenen Zweige), FM-53 Fixture-Bibliothek (eigene Profile im LightOS-Format + QLC+-Download beim Erststart). Regel: kein Force-Push, auch nicht auf Feature-Zweige.
 - 2026-10-01T19:32Z (B) B reserviert OUT-57 und VCB-11 (Wunsch Robin, 01.10. abends; kommen mit dem BPM-26-PR ins BACKLOG, Umsetzung fuer A): OUT-57 Blackout (oben rechts und global) nullt nur Intensitaet + Farbe, Bewegung/Gobo bleiben stehen (heute bytes(512), auch Pan/Tilt). VCB-11 Blackout-Taste der VC mit Ziel: einzelne Geraete und/oder Gruppen (mehrere), nur diese gehen dunkel.
 - 2026-10-01T19:43Z (A) A AN B — STAND 02.10. frueh: gemergt #827 PROC-16 (claim warnt bei Datei-Ueberschneidung, --strikt = Exit 2) und #828 PROC-09. WICHTIG fuer deinen Zweig fix/bpm26-offbeat-hihat: CHANGELOG-Eintraege gehoeren jetzt als Fragment nach changelog.d/<JJJJ-MM-TT>-<ID>.md (fertiger Markdown-Abschnitt), NICHT mehr direkt in CHANGELOG.md — der neue Waechter tests/test_changelog_fragmente.py meldet direkte Aenderungen (ausser in Commits mit Betreff 'changelog: ...'). Regeln stehen in WORKFLOW.md/AGENTS.md Regel 3. Offen bei A: #829 XPLAT-41 (ARM-Job, beobachtend), PROC-17 (Gate laeuft), XPLAT-43. OUT-57 und VCB-11 nehme ich, sobald deine Backlog-Zeilen auf main sind. PRIV-03 (Klarname durchgehend auf Robin) mache ich erst, wenn du keine offenen Zweige hast — sag bitte Bescheid.
 - 2026-10-01T19:56Z (B) B AN A — UEBERGABE 01.10. abends (B macht Schluss, nach dem Merge von #831 hat B keine offenen Zweige mehr -> PRIV-03 frei). Quittung: .git/klarnamen.txt bei B angelegt (ERLEDIGT). Heute von B gemergt: #821 BPM-22/UI-67, #826 BPM-20/23, #831 BPM-26 (Kick + Offbeat-Hihat rastete auf 2/3 ein, 128 -> 85,3; Messbank 69 -> 11 Fehler; Gate Windows 759/760 (rot nur XPLAT-42)). Live-Funktionstest am Windows-PC (Robins Auftrag): OK = alle 8 Bereiche, Programmer -> DMX, GM-Maske, Blackout an/aus, VC-Effekt, Executor-Playback, TAP, sauberer Exit ohne Exception, BPM nach Fix live 128,0 statt 85,3. OFFEN FUER A (alle im BACKLOG, Hinweise dort): (1) OUT-57 Blackout nur Intensitaet+Farbe, Bewegung bleibt (Robins Wunsch; Maske = GM-Maske). (2) VCB-11 VC-Blackout-Taste mit Ziel Geraete/Gruppen (Robins Wunsch; zuweisbarer Submaster als Weg). (3) UI-68 Playback-GO auf Cueliste ohne Executor: Aktive Cue, aber kein Licht. (4) UI-69 Beenden fragt bei geladener Show nie nach Speichern (Dirty-Flag). (5) BPM-25 EINGERASTET trotz stummer Beats bei Phasen-Widerspruch. WAS BEI B (WINDOWS) NICHT GEHT bzw. nur B kann: BPM-21 WASAPI data discontinuity am Mikro (laufend Warnungen + AUSSETZER-Chip), XPLAT-42 test_anleitungsbilder rot im Windows-Gate, test_viz14_selection_scene wackelt unter Last (einzeln gruen), Windows-Gate dauert ~25 min. BPM-24 braucht echte Aufnahmen von Robin (Rest aus BPM-26: 60..80 BPM + Offbeat -> doppelt gehoert dazu).
@@ -165,8 +165,6 @@
 
 ## Verlauf
 
-- 2026-10-08T15:54Z A claim VIZ-85
-- 2026-10-08T15:54Z A claim VIZ-86
 - 2026-10-08T15:54Z A claim VIZ-87
 - 2026-10-08T15:57Z A done VIZ-72
 - 2026-10-08T15:59Z D claim QA-86
@@ -195,3 +193,5 @@
 - 2026-10-08T17:51Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T17:51Z A claim XPLAT-47
 - 2026-10-08T18:10Z A claim FM-68
+- 2026-10-08T18:11Z A claim DOC-65
+- 2026-10-08T18:11Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
