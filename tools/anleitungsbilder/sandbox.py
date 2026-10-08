@@ -174,6 +174,17 @@ def einrichten(basis: str | None = None, *, bildschirm: bool = False) -> Sandbox
     os.environ["QT_QPA_PLATFORM"] = "xcb" if bildschirm else "offscreen"
     if bildschirm and os.path.exists(xauth):
         os.environ["XAUTHORITY"] = xauth
+    # QA-88: ``offscreen`` liest unter Windows NICHT die Systemschriften, sondern
+    # Qts eigene Schriftdatenbank — und die sucht unter <PySide6>/lib/fonts, wo
+    # seit Langem nichts mehr liegt ("Qt no longer ships fonts"). Gemessen
+    # 2026-10-08 (Windows 11): QFontInfo-Familie LEER, jedes Bild ohne Schrift.
+    # Linux hat fontconfig und braucht das nicht. Eine ausdrueckliche Vorgabe
+    # (QT_QPA_FONTDIR) gewinnt — sonst der Windows-Schriftordner.
+    if sys.platform == "win32" and not os.environ.get("QT_QPA_FONTDIR"):
+        windir = os.environ.get("WINDIR") or os.environ.get("SystemRoot") or r"C:\Windows"
+        schriften = os.path.join(windir, "Fonts")
+        if os.path.isdir(schriften):
+            os.environ["QT_QPA_FONTDIR"] = schriften
     os.environ["QT_ENABLE_HIGHDPI_SCALING"] = "0"
     os.environ["QT_SCALE_FACTOR"] = "1"
     os.environ.pop("QT_SCREEN_SCALE_FACTORS", None)

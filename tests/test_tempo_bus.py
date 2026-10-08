@@ -2,7 +2,8 @@
 
 Alles deterministisch: keine ``sleep``s, keine Abhaengigkeit vom BPM-Daemon-Thread.
 Die Beat-Position wird ausschliesslich ueber ``advance_frame`` getrieben; wo echte
-Zeit noetig waere (``tap()``), wird ``tempo_bus.time.monotonic`` gemonkeypatcht.
+Zeit noetig waere (``tap()``), wird die Tap-Uhr ``tap_uhr.jetzt`` gemonkeypatcht
+(QA-87; frueher das prozessweite ``time.monotonic``).
 
 Isolations-Vertrag (dieses Projekt hat eine Historie von Singleton-Leak-Flakies):
 Eine autouse-Fixture setzt VOR und NACH jedem Test den TempoBus-Singleton sowie den
@@ -22,7 +23,7 @@ if str(ROOT) not in sys.path:
 
 import pytest
 
-from src.core.engine import tempo_bus as tb
+from src.core.engine import tap_uhr
 from src.core.engine.tempo_bus import (
     TempoBus,
     TempoBusManager,
@@ -135,22 +136,21 @@ def test_bpm_zero_never_advances():
     assert bus.position() == pytest.approx(pos_before)
 
 
-# ── 5: tap() — kontrollierte monotonic-Sequenz -> ~120 BPM, source=="tap" ─────────
+# ── 5: tap() — kontrollierte Tap-Uhr-Sequenz -> ~120 BPM, source=="tap" ──────────
 
 class _FakeClock:
     """Gibt eine kontrollierte, aufsteigende Zeitsequenz zurueck.
 
-    Wichtig: ``tb.time`` / ``bm.time`` SIND das globale ``time``-Modul — ein Patch
-    von ``monotonic`` wirkt prozessweit (auch in Hintergrund-Threads wie MidiDispatch).
-    Darum darf der Fake NIE ``StopIteration`` werfen: nach Verbrauch der geplanten
-    Werte gibt er einfach den letzten Wert zurueck (Tap-Aufrufe im Test ziehen die
-    Werte der Reihe nach; fremde Threads sehen den letzten Stand)."""
+    Ersetzt wird seit QA-87 nur ``tap_uhr.jetzt`` — vorher war es ``time.monotonic``
+    im globalen ``time``-Modul, also prozessweit (auch in Hintergrund-Threads wie
+    MidiDispatch). Der Fake wirft trotzdem weiterhin NIE ``StopIteration``: nach
+    Verbrauch der geplanten Werte gibt er einfach den letzten Wert zurueck."""
 
     def __init__(self, values):
         self._values = list(values)
         self._i = 0
 
-    def monotonic(self):
+    def jetzt(self):
         if self._i < len(self._values):
             v = self._values[self._i]
             self._i += 1
@@ -164,7 +164,7 @@ def test_tap_converges_to_120_bpm(monkeypatch):
 
     # Fuenf Taps mit konstantem 0.5s-Abstand -> vier 0.5s-Intervalle -> 120 BPM.
     clock = _FakeClock([0.0, 0.5, 1.0, 1.5, 2.0])
-    monkeypatch.setattr(tb.time, "monotonic", clock.monotonic)
+    monkeypatch.setattr(tap_uhr, "jetzt", clock.jetzt)
 
     result = None
     for _ in range(5):
@@ -181,14 +181,13 @@ def test_tap_parity_with_bpm_manager(monkeypatch):
 
     mgr = get_tempo_bus_manager()
     bus = mgr.ensure_bus("A")
-    monkeypatch.setattr(tb.time, "monotonic", _FakeClock(seq).monotonic)
+    monkeypatch.setattr(tap_uhr, "jetzt", _FakeClock(seq).jetzt)
     bus_bpm = None
     for _ in range(5):
         bus_bpm = bus.tap()
 
     bpm_mgr = get_bpm_manager()
-    import src.core.engine.bpm_manager as bm
-    monkeypatch.setattr(bm.time, "monotonic", _FakeClock(seq).monotonic)
+    monkeypatch.setattr(tap_uhr, "jetzt", _FakeClock(seq).jetzt)
     glob_bpm = None
     for _ in range(5):
         glob_bpm = bpm_mgr.tap()
