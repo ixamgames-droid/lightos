@@ -6,11 +6,13 @@ unabhaengig vom globalen BPM-Leader.
 """
 import os
 import unittest
+from unittest import mock
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication
 
+from src.core.engine import tap_uhr
 from src.core.engine.tempo_bus import get_tempo_bus_manager, reset_tempo_bus_manager
 
 
@@ -33,11 +35,17 @@ class VcTempoButtonTest(unittest.TestCase):
         b = VCButton("Tap A")
         b.action = ButtonAction.TAP_BUS
         b.tempo_bus_id = "A"
-        b._trigger(True)        # 1. Tap -> nur Historie
-        b._trigger(True)        # 2. Tap -> BPM berechnet (geklemmt)
+        # QA-87: feste Tap-Zeiten. Vorher zwei Taps ohne Pause — unter Windows
+        # lagen sie (mit monotonic, 15,6-ms-Raster) im selben Tick: Abstand 0,
+        # BPM 0, Test rot.
+        uhr = {"t": 10.0}
+        with mock.patch.object(tap_uhr, "jetzt", lambda: uhr["t"]):
+            b._trigger(True)    # 1. Tap -> nur Historie
+            uhr["t"] = 10.5
+            b._trigger(True)    # 2. Tap -> 0,5 s Abstand -> 120 BPM
         bus = self.mgr.resolve("A")
         assert bus is not None
-        self.assertGreater(bus.bpm, 0.0)
+        self.assertAlmostEqual(bus.bpm, 120.0, places=6)
 
     def test_arm_bus_sets_armed(self):
         from src.ui.virtualconsole.vc_button import VCButton, ButtonAction

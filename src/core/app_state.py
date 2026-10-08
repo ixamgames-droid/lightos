@@ -1628,6 +1628,32 @@ class AppState:
         clear_channel_cache()
         self._rebuild_render_plan()
 
+    def profil_geaendert(self, profile_id=None) -> bool:
+        """UI-81: ein Fixture-Profil wurde in der Bibliothek geaendert (Editor/
+        Generator). Kanal-Cache verwerfen und — wenn gepatchte Geraete dieses
+        Profil nutzen — Patch-Cache, Universen und Render-Plan neu aufbauen und
+        ``patch_changed`` senden, damit DMX-Renderer, 2D/3D, Programmer und
+        gezielte Blackouts die neue Kanalbelegung sehen. Vorher lief nur
+        ``clear_channel_cache()``; der Render-Plan hielt die alten Kanaele bzw.
+        Defaults, bis jemand den Patch aenderte.
+
+        ``profile_id=None`` -> jedes gepatchte Geraet gilt als betroffen.
+        Rueckgabe: ob neu aufgebaut wurde."""
+        clear_channel_cache()
+        patch = list(getattr(self, "_patch_cache", None) or ())
+        betroffen = [fx for fx in patch
+                     if profile_id is None
+                     or getattr(fx, "fixture_profile_id", None) == profile_id]
+        if not betroffen:
+            return False
+        if getattr(self, "_show_engine", None):
+            self._reload_patch_cache()
+        else:
+            self._rebuild_universes()
+            self._rebuild_render_plan()
+        self._emit("patch_changed")
+        return True
+
     def _get_plan_lock(self):
         """STAB-15: Liefert das Render-Plan-Lock; legt es defensiv an, falls das
         Objekt ohne __init__ gebaut wurde (Test-Helfer via AppState.__new__ —
@@ -5239,6 +5265,18 @@ class AppState:
 # Ohne Cache macht get_channels_for_patched pro Fixture pro Frame (44 Hz) eine
 # neue DB-Session — viel zu teuer fuer den zentralen Per-Frame-Renderer.
 _channel_cache: dict = {}
+
+
+def profil_geaendert(profile_id=None) -> bool:
+    """UI-81: Einstieg fuer Profil-Editor und Generator nach dem Speichern.
+    Verwirft den Kanal-Cache und baut — falls es schon einen State gibt — Patch
+    und Render-Plan der betroffenen Geraete neu auf. Erzeugt KEINEN State (ein
+    frischer ``get_state()`` kennt das neue Profil ohnehin)."""
+    st = _state
+    if st is None:
+        clear_channel_cache()
+        return False
+    return st.profil_geaendert(profile_id)
 
 
 def clear_channel_cache():

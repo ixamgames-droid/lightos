@@ -29,6 +29,7 @@
 | `benchmark_universes.py` | T-8 / RM-Benchmark — Render-Performance fuer mehrere Universen. |
 | `bibliothek_profil.py` | FM-56: Werkzeug fuer die eigene Geraete-Bibliothek (LightOS-Profile). |
 | `build_apc_test_show.py` | KOMPLETTE Test-/Demo-Show fuer Davids reale Hardware: |
+| `build_buehnen_show_2026.py` | DOC-60: Grosse Buehnen-Show 2026 — Laser, Nebel, PARs, Moving Heads, Strobes. |
 | `build_demo_rgb_par.py` | Demo-Show "Demo RGB PAR" — 4x RGB-PAR mit einer 4-Cue-Cueliste. |
 | `build_demo_show_full.py` | DEMO SHOW FULL — komplette, nach ZWECK organisierte Show auf Davids realem Rig. |
 | `build_demo_zq_show.py` | Demo-/Bühnen-Show fuer Davids reale Hardware (DMO-01, Masterplan 2026-06-08): |

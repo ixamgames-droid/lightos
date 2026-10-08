@@ -81,6 +81,8 @@ err_*.txt
 dist/
 build/
 *.spec
+# XPLAT-47: die gepflegte Spec des Windows-Setups gehoert ins Repo.
+!packaging/windows/LightOS.spec
 
 # Vom Installer erstellt
 install_manifest.json
