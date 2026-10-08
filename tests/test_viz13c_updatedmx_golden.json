@@ -762,7 +762,7 @@
    "bars": null,
    "beam": {
     "hex": 13132850,
-    "op": 1,
+    "op": 0.7059,
     "vis": true
    },
    "floorSpot": {

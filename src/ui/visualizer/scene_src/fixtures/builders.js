@@ -1506,9 +1506,11 @@ function applyGenericColor(f, dmx) {
   const gobo = !!f.goboAktiv;
   if (f.beam) {
     f.beam.material.color = color;
-    // Mit Gobo angehoben, aber nie ueber 1 (Deckkraft ist ein Anteil).
+    // Mit Gobo angehoben, aber nie ueber 1 (Deckkraft ist ein Anteil). Die
+    // Kappung sitzt am FAKTOR, nicht am Produkt: sonst laege die Deckkraft
+    // schon ab ~65 % Dimmer auf 1 und ein Fade darueber kaeme nicht mehr an.
     f.beam.material.opacity = gobo
-      ? Math.min(1.0, Math.max(0.0, intNorm * settings.beamOpacity * GOBO_STRAHL))
+      ? Math.max(0.0, intNorm * Math.min(1.0, settings.beamOpacity * GOBO_STRAHL))
       : Math.max(0.0, intNorm * settings.beamOpacity);
     f.beam.visible = beamsSichtbar(f, lum);
   }

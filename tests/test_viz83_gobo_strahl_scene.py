@@ -342,6 +342,17 @@ class Viz83GoboStrahlSceneTest(unittest.TestCase):
         z = self._z()
         self.assertAlmostEqual(z["beamRot"], 0.0, places=6)
 
+    def test_dimmer_fade_kommt_bei_gobo_an(self):
+        """Die Gobo-Anhebung darf die Deckkraft nicht vor 100 % Dimmer kappen."""
+        self._load_and_wait()
+        werte = []
+        for dimmer in (179, 204, 230, 255):          # ~0,70 ... 1,0
+            self._push(_payload(gobo_wheel=25, intensity=dimmer))
+            werte.append(self._z()["beamOpacity"])
+        for a, b in zip(werte, werte[1:]):
+            self.assertGreater(b, a + 1e-3, f"Deckkraft steigt nicht mit dem Dimmer: {werte}")
+        self.assertLessEqual(werte[-1], 1.0 + 1e-9)
+
     def test_keine_neue_geometrie_und_kein_materialneubau_je_update(self):
         self._load_and_wait()
         self._push(_payload(gobo_wheel=0))
