@@ -2,7 +2,8 @@
 
 Deutsche Schritt-für-Schritt-Anleitungen mit Bildern, nach Themen sortiert. Wer neu ist,
 fängt bei **[Einstieg](#einstieg)** an und arbeitet die ersten vier Anleitungen der Reihe
-nach durch.
+nach durch. **Installiert** wird LightOS laut [INSTALL.md](../INSTALL.md) — auf Windows auch
+über das Setup `LightOS-Setup.exe` (Vorabversion, siehe [README](../README.md#installation-und-start)).
 
 **Zur Show jeder Anleitung** steht in der Zeile darunter, woher du sie bekommst:
 
@@ -27,13 +28,8 @@ der Sektionsleiste. Die Abläufe gelten weiter.
 | Anleitung | Worum geht's | Show |
 |---|---|---|
 | [Erste Schritte](anleitung_erste_schritte/ANLEITUNG.md) · [English](anleitung_erste_schritte/ANLEITUNG.en.md) | Hauptfenster und die acht Sektionen, neue Show anlegen, ein Gerät patchen, erster Wert im Programmer, speichern und öffnen. | Keine Show nötig |
-| [Ausgabe einrichten: ENTTEC, Art-Net, sACN](anleitung_ausgabe_einrichten/ANLEITUNG.md) | Dialog **Ausgabe → Konfigurieren...**: ENTTEC USB Pro, Art-Net, sACN, Universen verwalten, Kontrolle im Output- und DMX-Monitor, Warnungen verstehen. | Keine Show nötig |
-| [Programmer-Grundlagen](anleitung_programmer_grundlagen/ANLEITUNG.md) · [English](anleitung_programmer_grundlagen/ANLEITUNG.en.md) | Geräte und Gruppen wählen, Reiter Intensity/Color/Position/Paletten, Hervorheben/Abdunkeln, Farb-, Positions- und Fächer-Werkzeug, Löschen und Rückgängig. | Übungs-Rig aus Generic-Profilen, Tabelle zum Nachbauen in der Anleitung |
-| [Erste Schritte](anleitung_erste_schritte/ANLEITUNG.md) | Hauptfenster und die acht Sektionen, neue Show anlegen, ein Gerät patchen, erster Wert im Programmer, speichern und öffnen. | Keine Show nötig |
 | [Ausgabe einrichten: ENTTEC, Art-Net, sACN](anleitung_ausgabe_einrichten/ANLEITUNG.md) · [English](anleitung_ausgabe_einrichten/ANLEITUNG.en.md) | Dialog **Ausgabe → Konfigurieren...**: ENTTEC USB Pro, Art-Net, sACN, Universen verwalten, Kontrolle im Output- und DMX-Monitor, Warnungen verstehen. | Keine Show nötig |
-| [Programmer-Grundlagen](anleitung_programmer_grundlagen/ANLEITUNG.md) | Geräte und Gruppen wählen, Reiter Intensity/Color/Position/Paletten, Hervorheben/Abdunkeln, Farb-, Positions- und Fächer-Werkzeug, Löschen und Rückgängig. | Übungs-Rig aus Generic-Profilen, Tabelle zum Nachbauen in der Anleitung |
-| [Szenen, Snaps & Cue-Listen](anleitung_szenen_cues/ANLEITUNG.md) | Programmer-Stand als Snap, Snapshot oder Szene speichern und abrufen, Preset-Browser, Cue-Liste aufnehmen, auf einen Executor legen, mit GO abfahren und aus der Virtual Console auslösen. | Eigene Show mit Geräten und Gruppen; die Bilder zeigen das Übungs-Rig der Programmer-Grundlagen |
-| [Programmer-Grundlagen](anleitung_programmer_grundlagen/ANLEITUNG.md) | Geräte und Gruppen wählen, Reiter Intensity/Color/Position/Paletten, Hervorheben/Abdunkeln, Farb-, Positions- und Fächer-Werkzeug, Löschen und Rückgängig. | Übungs-Rig aus Generic-Profilen, Tabelle zum Nachbauen in der Anleitung |
+| [Programmer-Grundlagen](anleitung_programmer_grundlagen/ANLEITUNG.md) · [English](anleitung_programmer_grundlagen/ANLEITUNG.en.md) | Geräte und Gruppen wählen, Reiter Intensity/Color/Position/Paletten, Hervorheben/Abdunkeln, Farb-, Positions- und Fächer-Werkzeug, Löschen und Rückgängig. | Übungs-Rig aus Generic-Profilen, Tabelle zum Nachbauen in der Anleitung |
 | [Szenen, Snaps & Cue-Listen](anleitung_szenen_cues/ANLEITUNG.md) · [English](anleitung_szenen_cues/ANLEITUNG.en.md) | Programmer-Stand als Snap, Snapshot oder Szene speichern und abrufen, Preset-Browser, Cue-Liste aufnehmen, auf einen Executor legen, mit GO abfahren und aus der Virtual Console auslösen. | Eigene Show mit Geräten und Gruppen; die Bilder zeigen das Übungs-Rig der Programmer-Grundlagen |
 | [Komplettshow von Grund auf](anleitung_komplettshow_2026/ANLEITUNGEN.md) | Acht Kapitel von der neuen Show über Geräte, 3D-Positionen, Gruppen, Farbe, Matrix, Bewegung bis zur Virtual Console. | Die Anleitung baut die Show selbst auf; die fertige Show liegt nicht im Repo |
 | [Lichtshow-Tutorial: Matrix, Chase, Moving-Head-EFX, VC](tutorial_matrix/TUTORIAL_LICHTSHOW.md) | Ein kompletter Durchlauf mit vielen Bildern und GIFs. | Generator `build_tutorial_matrix_show.py` → `Tutorial_Matrix.lshow` |
@@ -131,6 +127,15 @@ frei kombinieren; das Tempo aller Ebenen hängt an Tempo-Buses (siehe
 | [APC mini + vier RGBW-Strahler](APC_SCHRITT_FUER_SCHRITT.md) | Schritt für Schritt mit der APC-Test-Show; dazu die [Seiten-Übersicht](APC_SEITEN_UEBERSICHT.md). | Generator `build_apc_test_show.py` → `APC_Test_Komplett.lshow` |
 | [Farb-/Effekt-VC-Show](FARB_FX_VC_SHOW.md) | Bedienung der Show, aus der „Effekte einfach aufbauen“ stammt. | Generator `build_farb_fx_vc_show.py` |
 | [Live-Edit-Show](LIVE_EDIT.md) | Vordefinierte Effekte live einmappen und bearbeiten. | Generator `build_live_edit_show.py` → `Live_Edit.lshow` |
+
+**Weitere Show-Beschreibungen** (Patch, Bänke und Bedienung einer Generator-Show; keine
+Schritt-für-Schritt-Anleitungen; auf ein kleines Rig aus RGBW-PARs, teils mit Moving Heads und
+APC mini, zugeschnitten):
+[APC-Test-Show — Handbuch](APC_TEST_SHOW.md) (`build_apc_test_show.py`) ·
+[Moving-Head-Demo](MOVING_HEAD_SHOW.md) (`build_movinghead_show.py`) ·
+[Musik-Show 2026 — Auto-Lichtshow zur Musik](MUSIK_SHOW_2026.md) (`build_musik_show_2026.py`) ·
+[Neue Demo 2026 — Quadranten + Playback](NEUE_DEMO.md) (`build_neue_demo_show.py`) ·
+[Komplett-Demo](KOMPLETT_DEMO.md) (`build_komplett_demo_show.py`).
 
 Direkt im Repo liegen außerdem einige kleine Demo-Shows in `shows/`: `Demo_Show_Full.lshow`,
 `Demo_ZQ_Buehne.lshow`, `APC_Demo_Show.lshow`, `demo_apc_mk2.lshow` und `demo_rgb_par.lshow`.
