@@ -53,6 +53,8 @@ _GOBO_CH = _Ch("gobo_wheel", [
     _Range(20, 29, "Gobo 2 (Ovale)"),
     _Range(30, 39, "Gobo 6 (Spirale)"),
     _Range(40, 49, "Gobo 9 (unbekanntes Muster)"),
+    _Range(50, 59, "Effektscheibe"),
+    _Range(60, 69, "Gobo 3"),
 ])
 
 
@@ -67,8 +69,31 @@ class StilErkennungTest(unittest.TestCase):
         Muster), ``None`` heisst „Geraet hat gar kein Rad"."""
         self.assertEqual(_gobo_style({"gobo_wheel": 5}, [_GOBO_CH]), "open")
 
-    def test_unbekannter_name_wird_nicht_geraten(self):
-        self.assertEqual(_gobo_style({"gobo_wheel": 45}, [_GOBO_CH]), "")
+    def test_name_ohne_motiv_und_ohne_nummer_wird_nicht_geraten(self):
+        self.assertEqual(_gobo_style({"gobo_wheel": 55}, [_GOBO_CH]), "")
+
+    def test_nummeriertes_gobo_bekommt_festes_motiv(self):
+        """VIZ-83 (aus VIZ-82): „Gobo 3" ohne Motiv-Wort (generischer Moving
+        Head) blieb im 3D ein voller Strahl. Jetzt: deterministisch ein Motiv
+        je Nummer, in der Reihenfolge von gobo_icons.STYLES."""
+        from src.ui.widgets.gobo_icons import STYLES
+        self.assertEqual(_gobo_style({"gobo_wheel": 65}, [_GOBO_CH]),
+                         STYLES[2])
+        self.assertEqual(STYLES[2], "circle_of_circles")
+        # Nummer ueber 7 laeuft im Kreis — nie "", nie ein Fehler.
+        self.assertEqual(_gobo_style({"gobo_wheel": 45}, [_GOBO_CH]),
+                         STYLES[(9 - 1) % len(STYLES)])
+
+    def test_generischer_moving_head_hat_sieben_verschiedene_motive(self):
+        from src.core.database.fixture_db import _GEN_MH_GOBO
+        ch = _Ch("gobo_wheel", [_Range(lo, hi, n) for lo, hi, n, _k in _GEN_MH_GOBO])
+        stile = [_gobo_style({"gobo_wheel": lo}, [ch])
+                 for lo, _hi, n, _k in _GEN_MH_GOBO if n.startswith("Gobo ")
+                 and n[5:].isdigit()]
+        self.assertEqual(len(stile), 7)
+        self.assertEqual(len(set(stile)), 7, stile)
+        self.assertNotIn("", stile)
+        self.assertEqual(_gobo_style({"gobo_wheel": 0}, [ch]), "open")
 
     def test_geraet_ohne_gobo_rad_liefert_none(self):
         self.assertIsNone(_gobo_style({"intensity": 255}, [_Ch("intensity")]))

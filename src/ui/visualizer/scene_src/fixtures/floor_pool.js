@@ -25,6 +25,7 @@
 //    damit als reine Multiplikation ab, ohne neue Geometrie und ohne
 //    zusaetzlichen Strahl.
 import * as THREE from '../three/three.js';
+import { GOBO_RAND } from './gobo_textures.js';   // VIZ-83 B2
 
 // Aus createFloorSpot: mit diesem Radius wird die Scheibe gebaut. Der Faktor
 // unten ist relativ dazu — steht die Zahl dort einmal anders, muss sie hier
@@ -95,10 +96,19 @@ export function applyPoolFalloff(disc) {
  *  schwankt minimal — ohne sie schriebe der 44-Hz-Pfad jeden Frame eine neue
  *  Skalierung (dieselbe Ueberlegung wie bei der Kegellaenge).
  */
-export function syncPoolSize(f, dist) {
+export function syncPoolSize(f, dist, goboRand) {
   const disc = f && f.floorSpot;
   if (!disc) return;
-  const k = floorPoolScale(dist, f.spot ? f.spot.angle : 0);
+  // VIZ-83 B2: mit Gobo bestimmt der KEGELRAND die Groesse — er muss im
+  // Motiv auf dessen Rand-Anteil liegen (gobo_textures.js#GOBO_RAND), damit
+  // jeder Teilstrahl auf seinem Bodenelement endet. `goboRand` ist der
+  // gemessene Randabstand in Metern (gobo_textures.js#alignGoboFloor). Die
+  // Scheibe zeichnet dann ihre eigene affine `matrix` (Neigung = Streckung);
+  // `scale` ist in dem Fall nur der Nennwert (mittlerer Radius).
+  const k = (typeof goboRand === 'number' && goboRand > 0 && isFinite(goboRand))
+    ? Math.max(POOL_MIN_RADIUS, Math.min(POOL_MAX_RADIUS, goboRand / GOBO_RAND))
+      / POOL_BASIS_RADIUS
+    : floorPoolScale(dist, f.spot ? f.spot.angle : 0);
   if (Math.abs((disc.scale.x || 1) - k) < 0.01) return;
   // Die Scheibe liegt flach (rotation.x = -PI/2), ihre lokale Z-Achse zeigt
   // also nach oben — skaliert wird in X und Y, nicht in X und Z.
