@@ -119,6 +119,8 @@ class DateiTest(unittest.TestCase):
         self.assertIn("laserworld.com", d["quelle"]["url"])
         # Was am Geraet noch offen ist, steht im Profil (nicht nur im Backlog).
         self.assertIn("abzugleichen", d["notizen"])
+        # DIP-Schalter: 10 OFF = DMX, 1-9 = Adresse (Handbuch 8.4).
+        self.assertIn("10 OFF = DMX", d["notizen"])
 
 
 class KanalbelegungTest(_Basis):
