@@ -9,7 +9,10 @@
 //
 // Bauen-Modi ('edit' / 'stage'), die 2D-Draufsicht und ein ausgewaehltes
 // Buehnenobjekt zeigen wieder die EINZELNEN Objekte — dort wird verschoben,
-// eingefaerbt, gepulst und halbtransparent gezeichnet.
+// eingefaerbt, gepulst und halbtransparent gezeichnet. Die Sammelkoerper
+// bleiben dabei (unsichtbar) bestehen: zurueck im Ansehen-Modus entscheidet
+// die Signatur, ob sie noch stimmen — ein blosser Moduswechsel baut nicht neu
+// (Review N2: vorher 24-51 ms Neubau bei 200 Objekten, je Wechsel).
 //
 // ★ Picking, Andocken und Strahl-Verdeckung bleiben unberuehrt: sie werfen
 // ihre Strahlen gegen `stageObjects[id].mesh`, nie gegen die Szene, und der
@@ -21,14 +24,16 @@
 // sich ueber ein gutes Dutzend Pfade (Bridge-Update, Stage-Reload, Docking,
 // Groesse, Farbe, Loeschen). Die Signatur liest genau das, was das Bild
 // bestimmt (Objekt, Weltmatrix, Geometrie, Material-Werte) — ein vergessener
-// Pfad kann so keinen veralteten Koerper stehen lassen.
+// Pfad kann so keinen veralteten Koerper stehen lassen. Wie dort als Zahlen in
+// einem wiederverwendeten Float64Array, ohne Strings (Review N1: der
+// String-Bau kostete bei 200 Objekten jedes Bild 0,7-0,9 ms, p90 3-4,6 ms GC).
 import * as THREE from '../three/three.js';
 import { stageObjects, view } from '../state.js';
 import { scene } from '../scene/renderer.js';
 
 let _koerper = [];         // zusammengefasste Meshes in der Szene
-let _versteckt = [];       // Original-Objekte (so.mesh), die dafuer unsichtbar sind
-let _sig = null;
+let _versteckt = [];       // Original-Objekte (so.mesh), die sie ersetzen
+let _aktiv = false;        // Sammelkoerper gerade sichtbar (Originale versteckt)
 let _neubauten = 0;
 
 /** Soll gerade zusammengefasst gezeichnet werden? */
@@ -62,26 +67,71 @@ function _sichtbarKette(o, wurzel) {
   return true;
 }
 
-function _signatur() {
-  const teile = [];
-  const ids = Object.keys(stageObjects).sort();
-  for (const id of ids) {
+// Signatur als Zahlenfolge (Muster shadow_update.js): _push vergleicht beim
+// Schreiben mit dem vorigen Bild, Groesse waechst bei Bedarf.
+let _sig = new Float64Array(4096);
+let _sigLaenge = -1;               // -1 = noch nie gemessen / verworfen
+let _schreib = 0;
+let _sigAnders = false;
+
+function _push(v) {
+  if (_schreib >= _sig.length) {
+    const neu = new Float64Array(_sig.length * 2);
+    neu.set(_sig);
+    _sig = neu;
+  }
+  if (!_sigAnders && (_schreib >= _sigLaenge || _sig[_schreib] !== v)) _sigAnders = true;
+  _sig[_schreib++] = v;
+}
+
+function _pushFarbe(c) {
+  if (c && c.isColor) { _push(c.r); _push(c.g); _push(c.b); } else { _push(-1); _push(-1); _push(-1); }
+}
+
+function _sigMesh(o) {
+  if (!o.isMesh) return;
+  const m = (o.material && !Array.isArray(o.material)) ? o.material : null;
+  _push(o.id);
+  _push(o.visible ? 1 : 0);
+  _push(o.geometry ? o.geometry.id : -1);
+  _push(m ? m.id : -1);
+  if (m) {
+    // Dieselben Werte wie _matSchluessel (Gruppierung beim Zusammenfassen).
+    _pushFarbe(m.color);
+    _pushFarbe(m.emissive);
+    _push(+m.emissiveIntensity || 0);
+    _push(+m.roughness || 0);
+    _push(+m.metalness || 0);
+    _push(+m.side || 0);
+    _push(m.transparent ? 1 : 0);
+    _push(+m.opacity || 0);
+    _push(m.depthWrite ? 1 : 0);
+    _push(m.vertexColors ? 1 : 0);
+    _push(m.flatShading ? 1 : 0);
+    _push(m.fog ? 1 : 0);
+    _push(m.wireframe ? 1 : 0);
+  }
+  _push(o.castShadow ? 1 : 0);
+  _push(o.receiveShadow ? 1 : 0);
+  const e = o.matrixWorld.elements;
+  for (let i = 0; i < 16; i++) _push(e[i]);
+}
+
+/** Signatur neu lesen; true, wenn sie sich seit dem letzten Mal geaendert hat. */
+function _signaturGeaendert() {
+  _schreib = 0;
+  _sigAnders = false;
+  for (const id in stageObjects) {
     const so = stageObjects[id];
     const w = so && so.mesh;
     if (!w) continue;
     w.updateMatrixWorld(true);
-    teile.push(id, w.id);
-    w.traverse(o => {
-      if (!o.isMesh) return;
-      teile.push(o.id, o.visible ? 1 : 0, o.geometry ? o.geometry.id : -1,
-                 o.material && !Array.isArray(o.material) ? o.material.id : -1,
-                 o.material && !Array.isArray(o.material) ? _matSchluessel(o.material) : '',
-                 o.castShadow ? 1 : 0, o.receiveShadow ? 1 : 0);
-      const e = o.matrixWorld.elements;
-      for (let i = 0; i < 16; i++) teile.push(e[i]);
-    });
+    _push(w.id);
+    w.traverse(_sigMesh);
   }
-  return teile.join('|');
+  if (_schreib !== _sigLaenge) _sigAnders = true;
+  _sigLaenge = _schreib;
+  return _sigAnders;
 }
 
 function _aufloesen() {
@@ -92,6 +142,20 @@ function _aufloesen() {
   _koerper = [];
   for (const w of _versteckt) w.visible = true;
   _versteckt = [];
+  _aktiv = false;
+}
+
+// Bauen/2D/Auswahl: Einzelobjekte zeigen, Sammelkoerper nur verbergen.
+function _verbergen() {
+  for (const k of _koerper) k.visible = false;
+  for (const w of _versteckt) w.visible = true;
+  _aktiv = false;
+}
+
+function _zeigen() {
+  for (const k of _koerper) k.visible = true;
+  for (const w of _versteckt) w.visible = false;
+  _aktiv = true;
 }
 
 const _n3 = new THREE.Matrix3();
@@ -178,6 +242,7 @@ function _zusammenfassen() {
     scene.add(k);
     _koerper.push(k);
   }
+  _aktiv = true;
   for (const w of _versteckt) w.visible = false;
   _neubauten += 1;
 }
@@ -185,28 +250,31 @@ function _zusammenfassen() {
 /** Vor JEDEM Bild (app.js#renderFrame). Liefert true, wenn sich etwas tat. */
 export function syncUmgebung() {
   if (!umgebungZusammenfassen()) {
-    if (_koerper.length || _versteckt.length) { _aufloesen(); _sig = null; return true; }
-    _sig = null;
+    if (_aktiv) { _verbergen(); return true; }
     return false;
   }
   // Die Originale sind waehrend des Zusammenfassens unsichtbar; fuer die
   // Signatur zaehlt ihre Sichtbarkeit deshalb kurz wie vorher.
-  for (const w of _versteckt) w.visible = true;
-  const sig = _signatur();
-  for (const w of _versteckt) w.visible = false;
-  if (sig === _sig) return false;
+  if (_aktiv) for (const w of _versteckt) w.visible = true;
+  const geaendert = _signaturGeaendert();
+  if (!geaendert) {
+    // Unveraendert: die vorhandenen Koerper (wieder) zeigen — nach einem
+    // Moduswechsel ohne Neubau.
+    const war = _aktiv;
+    _zeigen();
+    return !war;
+  }
   _aufloesen();
   _zusammenfassen();
-  _sig = sig;
   return true;
 }
 
 /** Test-/Diagnose-Seam. */
 export function umgebungInfo() {
   return {
-    aktiv: _koerper.length > 0,
+    aktiv: _aktiv && _koerper.length > 0,
     koerper: _koerper.length,
-    objekteZusammengefasst: _versteckt.length,
+    objekteZusammengefasst: _aktiv ? _versteckt.length : 0,
     objekteGesamt: Object.keys(stageObjects).length,
     neubauten: _neubauten,
   };

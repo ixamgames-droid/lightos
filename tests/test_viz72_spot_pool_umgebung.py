@@ -498,6 +498,44 @@ class Viz72SzeneTest(unittest.TestCase):
         self._tick()
         self.assertTrue(self._json("window.__lightos.umgebungInfo()")["aktiv"])
 
+    def test_moduswechsel_baut_nicht_neu(self):
+        """Review N2: Ansehen <-> Bauen ohne Aenderung behaelt die Koerper.
+        Eine Aenderung im Bauen-Modus baut beim Rueckweg genau einmal neu."""
+        self._buehne()
+        n = self._json("window.__lightos.umgebungInfo()")["neubauten"]
+        for _ in range(5):
+            self._eval("window.__lightos.setEditMode('edit'); 1")
+            self._tick()
+            self.assertFalse(self._json("window.__lightos.umgebungInfo()")["aktiv"])
+            self.assertTrue(all(self._sichtbar().values()))
+            self._eval("window.__lightos.setEditMode('view'); 1")
+            self._tick()
+            u = self._json("window.__lightos.umgebungInfo()")
+            self.assertTrue(u["aktiv"])
+            self.assertFalse(any(self._sichtbar().values()))
+        self.assertEqual(u["neubauten"], n, "Moduswechsel hat neu zusammengefasst")
+        # Aenderung im Bauen-Modus -> Rueckweg baut neu.
+        self._eval("window.__lightos.setEditMode('edit'); 1")
+        self._tick()
+        self._bridge_obj.removeStageObject.emit("t2")
+        self._poll_until_true("!window.__lightos.stageObjects['t2']")
+        self._eval("window.__lightos.setEditMode('view'); 1")
+        self._tick()
+        u = self._json("window.__lightos.umgebungInfo()")
+        self.assertEqual(u["neubauten"], n + 1)
+        self.assertEqual(u["objekteZusammengefasst"], 4)
+
+    def test_farbaenderung_im_ansehen_modus_baut_neu(self):
+        """Review N1: die Zahlen-Signatur sieht auch eine reine Farbaenderung."""
+        self._buehne()
+        n = self._json("window.__lightos.umgebungInfo()")["neubauten"]
+        self._eval("(function(){ window.__lightos.stageObjects['p1'].mesh.traverse(o => {"
+                   " if (o.isMesh) o.material.color.setRGB(0.9, 0.1, 0.1); }); return 1; })()")
+        self._tick()
+        self.assertEqual(self._json("window.__lightos.umgebungInfo()")["neubauten"], n + 1)
+        self._tick()
+        self.assertEqual(self._json("window.__lightos.umgebungInfo()")["neubauten"], n + 1)
+
     def test_aenderung_im_ansehen_modus_baut_neu(self):
         self._buehne()
         n = self._json("window.__lightos.umgebungInfo()")["neubauten"]
