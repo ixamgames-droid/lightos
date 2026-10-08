@@ -65,6 +65,7 @@ for (const s of SCHRITTE) {
   else if (s[0] === 'frame') d.noteFrameInterval(s[1]);
   else if (s[0] === 'modus') d.setMode(s[1]);
   else if (s[0] === 'messen') aus.push({scale: d.scale(), renders, wechsel: log.slice()});
+  else if (s[0] === 'info') aus.push(d.info());
 }
 console.log(JSON.stringify(aus));
 """
@@ -162,6 +163,68 @@ class DynamischeAufloesungTest(unittest.TestCase):
         (m,) = _fahre(langsam + [["warte", 31000]] + langsam + _serie() + [["messen"]],
                       modus="slow")
         self.assertLess(m["scale"], 1, "Probe bestaetigt langsam: wieder absenken")
+
+    # VIZ-85 (Testbericht Windows, 4K-Fernseher 29,97 Hz): das Minimum der
+    # rAF-Abstaende fiel durch gelegentliche Doppel-rAF auf 8-17 ms, normale
+    # 33-ms-Frames galten als verpasst, eine schnelle GPU wurde "langsam".
+    def test_hoch_2997hz_mit_doppel_raf_bleibt_schnell(self):
+        v = 1000 / 29.97
+        schritte = []
+        for i in range(200):
+            if i % 9 == 4:                    # ~11 %: rAF zweimal je Vsync
+                kurz = (8, 12.5, 17)[i % 3]
+                schritte += [["frame", kurz], ["frame", v - kurz]]
+            else:
+                schritte.append(["frame", v + (0.6 if i % 2 else -0.6)])
+        info, m = _fahre(schritte + [["info"]] + _serie() + [["messen"]], modus="slow")
+        self.assertAlmostEqual(info["vsyncMs"], v, delta=1.5,
+                               msg="Bildschirmintervall muss ~33,4 ms bleiben")
+        self.assertFalse(info["slow"])
+        self.assertLess(info["missed"], 0.1)
+        self.assertEqual(m["scale"], 1, "GPU schafft jeden Vsync: nie absenken")
+
+    def test_hoch_doppel_raf_kurz_lang_reihenfolge_egal(self):
+        v = 1000 / 29.97
+        schritte = []
+        for i in range(120):
+            if i % 8 == 3:
+                schritte += [["frame", v - 8], ["frame", 8]]   # erst lang, dann kurz
+            else:
+                schritte.append(["frame", v])
+        (info,) = _fahre(schritte + [["info"]], modus="slow")
+        self.assertFalse(info["slow"])
+        self.assertAlmostEqual(info["vsyncMs"], v, delta=1.5)
+
+    def test_hoch_jede_bildwiederholrate_mit_jitter_ist_schnell(self):
+        for hz in (30, 50, 60, 144):
+            v = 1000 / hz
+            schritte = []
+            for i in range(150):
+                ms = v * (1 + 0.08 * ((i * 7) % 5 - 2) / 2)   # +-8 % Jitter
+                if i % 13 == 6:
+                    schritte += [["frame", v * 0.3], ["frame", ms - v * 0.3]]
+                else:
+                    schritte.append(["frame", ms])
+            info, m = _fahre(schritte + [["info"]] + _serie() + [["messen"]], modus="slow")
+            self.assertFalse(info["slow"], f"{hz} Hz")
+            self.assertAlmostEqual(info["vsyncMs"], v, delta=v * 0.15, msg=f"{hz} Hz")
+            self.assertEqual(m["scale"], 1, f"{hz} Hz")
+
+    def test_hoch_144hz_wechselnde_last_wird_erkannt(self):
+        v = 1000 / 144
+        schritte = [["frame", v], ["frame", 2 * v], ["frame", v], ["frame", 2 * v],
+                    ["frame", v]] * 20
+        info, m = _fahre(schritte + [["info"]] + _serie() + [["messen"]], modus="slow")
+        self.assertAlmostEqual(info["vsyncMs"], v, delta=0.5)
+        self.assertTrue(info["slow"], "zwei von fuenf Frames verpasst")
+        self.assertLess(m["scale"], 1)
+
+    def test_hoch_monitorwechsel_60_auf_144hz(self):
+        schritte = [["frame", 16.7]] * 60 + [["frame", 1000 / 144]] * 80
+        info, m = _fahre(schritte + [["info"]] + _serie() + [["messen"]], modus="slow")
+        self.assertAlmostEqual(info["vsyncMs"], 1000 / 144, delta=0.7)
+        self.assertFalse(info["slow"])
+        self.assertEqual(m["scale"], 1)
 
     def test_maximal_senkt_nie_ab(self):
         (m,) = _fahre([["frame", 40]] * 10 + _serie(n=20) + [["messen"]], modus="never")
