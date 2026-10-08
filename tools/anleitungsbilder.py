@@ -202,10 +202,35 @@ def main(argv=None) -> int:
     return code
 
 
-if __name__ == "__main__":
-    rc = main()
+def _harter_ausstieg(rc: int) -> None:
+    """Prozess sofort beenden — ohne Qt-/Python-Abbau (QA-88).
+
+    ``os._exit`` ist unter Windows KEIN harter Ausstieg: die C-Laufzeit ruft
+    ``ExitProcess``, das alle anderen Threads abschiesst und DANACH die
+    DLL-Abbau-Routinen von Qt und Python laufen laesst. Gemessen 2026-10-08
+    (Windows 11, faulthandler): Kindprozesse von ``--alle``, deren Szene das
+    Tempo gesetzt hatte (BPM-Takt-Thread lief), starben IN ``os._exit`` mit
+    0xC0000005 — auch dann, wenn der Takt-Thread vorher gestoppt wurde; Szenen
+    ohne Tempo endeten sauber. Stderr dazu: "QThreadStorage: entry 0 destroyed
+    before end of thread". ``TerminateProcess`` beendet ohne DLL-Abbau und
+    behaelt den Exit-Code. Linux bleibt bei ``os._exit``.
+    """
     sys.stdout.flush()
     sys.stderr.flush()
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+            k32.GetCurrentProcess.restype = ctypes.c_void_p
+            k32.TerminateProcess.argtypes = [ctypes.c_void_p, ctypes.c_uint]
+            k32.TerminateProcess(k32.GetCurrentProcess(), rc & 0xFFFFFFFF)
+        except Exception:
+            pass                # Rueckfall unten
+    os._exit(rc)
+
+
+if __name__ == "__main__":
+    rc = main()
     # Harter Ausstieg: der Qt-Abbau eines vollen MainWindow ist fuer ein
     # Werkzeug ohne Nutzen und offscreen gelegentlich instabil.
-    os._exit(rc)
+    _harter_ausstieg(rc)

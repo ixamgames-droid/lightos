@@ -10,6 +10,7 @@ from PySide6.QtGui import QPainter, QColor, QFont, QPen, QConicalGradient
 import math
 from .vc_widget import VCWidget
 from .vc_style import paint_dial_knob   # VC3D-02: plastische Dreh-Knopf-Flaeche
+from src.core.engine import tap_uhr     # QA-87: Tap-Zeitquelle (nicht monotonic)
 
 
 class SpeedTarget(str):
@@ -347,7 +348,14 @@ class VCSpeedDial(VCWidget):
             except Exception:
                 pass
             return
-        now = time.monotonic()
+        now = tap_uhr.jetzt()
+        # QA-87: zwei Taps mit gleichem Zeitstempel (unter Windows mit
+        # monotonic() im selben 15,6-ms-Tick) teilten hier durch null. Ein Tap
+        # ohne Zeitfortschritt wird deshalb verworfen, BEVOR er in die Historie
+        # kommt — als 0-Intervall zoege er sonst den Mittelwert der folgenden
+        # Taps herunter. Gleiche Regel wie TempoBus.tap/BPMManager.tap.
+        if self._tap_times and now <= self._tap_times[-1]:
+            return
         self._tap_times.append(now)
         # Keep last 8 taps
         self._tap_times = self._tap_times[-8:]

@@ -74,7 +74,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Callable, Iterable
 
-from .paths import USER_DATA_FILES, app_data_dir
+from .paths import USER_DATA_FILES, app_data_dir, programm_dir
 
 MARKER_NAME = "datenumzug_xplat44.json"
 #: Sperrdatei im App-Ordner (zwischen Prozessen, s. ``_sperre``).
@@ -93,7 +93,10 @@ SICHERUNG = ".vor-xplat44"
 _SHOW_INHALT_TABELLEN = ("patched_fixtures", "fixture_groups",
                          "quarantined_fixtures")
 
-_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# XPLAT-47: im gefrorenen Build der Programmordner (sys._MEIPASS) — dort liegt
+# nur mitgelieferte Ware, kein altes ``data/`` mit Nutzerdateien; gelesen wird
+# ohnehin nur (kopiert in den App-Datenordner, nie zurueck).
+_REPO_ROOT = programm_dir()
 
 
 @dataclass
