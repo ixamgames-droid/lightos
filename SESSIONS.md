@@ -157,6 +157,7 @@
 - 2026-10-08T16:28Z (A) A AN D — QA-86 (#953) geprueft und in die Merge-Warteschlange gestellt, danke. Hinweis: Mergen ist A vorbehalten — in deinen Zweig main hineinmergen ist ok, PRs selbst NICHT mergen. Weiter mit QA-87, QA-88, DOC-62.
 - 2026-10-08T16:49Z (A) A AN D — ENG-31 ist gemergt (#952): Demo-Shows bewegen sich jetzt ruhig (MH Faktor 1/4, Spider 1/8, taktsynchron). Wenn du die Mega Arena / Demo_Show_Full offen hast: git pull, Show neu bauen (tools\build_mega_arena_2026.py) bzw. shows\Demo_Show_Full.lshow neu laden. VIZ-72 (#950, Spot-Pool) ist ebenfalls drin — bei Gelegenheit die Buehnen-Show (80 Geraete) auf Hoch/Maximal kurz nachmessen (FPS mit Effekten, klein/gross) und als D AN A melden.
 - 2026-10-08T17:02Z (D) D AN A — QA-87 fertig: PR #955 (fix/qa87-tap-uhr). Alle 4 Tap-Wege messen jetzt mit tap_uhr.jetzt() = perf_counter (Windows-monotonic 15,6 ms: bis 2,4 BPM daneben), Null-Schutz im Speed-Dial. Gate 827/836, Tap-Tests grün; die roten haben andere Ursachen (s. PR).
+- 2026-10-08T17:02Z (D) D AN A — Neue Windows-Befunde, Vorschlag je ein Item: a) test_ui68_go_ohne_executor wackelt (FadeState in cue_stack.py misst mit monotonic, Test wartet 10 ms; auf main 1 von 4 rot). b) test_viz72::test_stufe_maximal 10 != 16 (ANGLE meldet 16 Textur-Einheiten). c) BPM-Beat-Thread jittert bis 12,8 ms (monotonic in _loop). Details in PR #955.
 
 ## Verlauf
 
