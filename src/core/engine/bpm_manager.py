@@ -17,6 +17,8 @@ import time
 import threading
 from typing import Callable
 
+from src.core.engine import tap_uhr
+
 
 BeatCallback = Callable[[int], None]   # callback(beat_index)
 
@@ -264,7 +266,7 @@ class BPMManager:
     def tap(self) -> float:
         """Tap-Tempo: BPM ueber die letzten 4 Taps. → MANUAL-Modus.
         Returns: aktuelle BPM (0 falls noch zu wenig Taps)."""
-        now = time.monotonic()
+        now = tap_uhr.jetzt()      # QA-87: nicht monotonic (Windows: 15,6-ms-Raster)
         with self._lock:
             if self._last_taps and (now - self._last_taps[-1] > self.TAP_WINDOW_SEC):
                 self._last_taps = []

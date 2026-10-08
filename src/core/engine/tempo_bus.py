@@ -37,6 +37,7 @@ import threading
 import time
 from typing import Callable, Protocol, runtime_checkable
 
+from src.core.engine import tap_uhr
 from src.core.engine.bpm_manager import get_bpm_manager
 
 
@@ -211,7 +212,7 @@ class TempoBus:
         abgeleitete BPM zurück."""
         if self.role == "sub":
             return self.bpm
-        now = time.monotonic()
+        now = tap_uhr.jetzt()      # QA-87: nicht monotonic (Windows: 15,6-ms-Raster)
         if self.source == "bpm_global":
             # Leader-Lock respektieren (s. set_bpm): gesperrt -> kein Tap-Override.
             mgr = get_bpm_manager()
@@ -938,7 +939,7 @@ class TempoBusManager:
     def tap_grandmaster(self) -> float:
         """Tap-Tempo für den Grand-Master (gleiche Mathematik wie ``BPMManager.tap`` /
         ``TempoBus.tap``: Mittel der letzten 4 Intervalle). Liefert die neue BPM."""
-        now = time.monotonic()
+        now = tap_uhr.jetzt()      # QA-87: nicht monotonic (Windows: 15,6-ms-Raster)
         with self._lock:
             if self._gm_taps and (now - self._gm_taps[-1] > TempoBus.TAP_WINDOW_SEC):
                 self._gm_taps = []
