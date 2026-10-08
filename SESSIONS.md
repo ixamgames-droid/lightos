@@ -62,6 +62,7 @@
 | VIZ-84 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
 | VIZ-85 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
 | VIZ-86 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
+| VIZ-87 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
 
 ## Blocker & Fallen
 
@@ -159,7 +160,6 @@
 
 ## Verlauf
 
-- 2026-10-05T18:14Z A claim BACKLOG-KONSOLEN
 - 2026-10-05T18:15Z A claim VIZ-80
 - 2026-10-05T18:41Z A done XPLAT-44
 - 2026-10-05T18:52Z A claim MIDI-1
@@ -189,3 +189,4 @@
 - 2026-10-08T15:54Z A claim VIZ-84
 - 2026-10-08T15:54Z A claim VIZ-85
 - 2026-10-08T15:54Z A claim VIZ-86
+- 2026-10-08T15:54Z A claim VIZ-87
