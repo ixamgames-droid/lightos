@@ -199,6 +199,9 @@ class OutputManager:
         # OUT-61b: Laser-Adressen unabhaengig vom Latch + ausdruecklicher Latch.
         self._laser_adressen: dict = {}
         self._laser_estop_aktiv = False
+        # OUT-64: bei aktivem Latch die AUSGABEWEGE der gesperrten Universen
+        # ({weg: Adressen}); s. _estop_wege_nachfuehren.
+        self._laser_estop_wege: dict[tuple, frozenset] = {}
         # slot → (level 0.0–1.0, target_fids | None). target_fids None = GLOBALER
         # Submaster (wirkt auf ALLE Fixtures, bisheriges Verhalten); ein
         # frozenset[int] beschraenkt den Submaster auf genau diese Fixture-fids
@@ -332,6 +335,74 @@ class OutputManager:
         wie bisher aus der Maske ableiten."""
         self._laser_estop_mask = mask or {}
         self._laser_estop_aktiv = bool(mask) if aktiv is None else bool(aktiv)
+        self._estop_wege_nachfuehren()
+
+    # ── OUT-64: NOT-AUS je Ausgabeweg ────────────────────────────────────────
+    # Die NOT-AUS-Maske arbeitet in INTERNEN Universen. Der Laser haengt aber
+    # physisch an einem AUSGABEWEG (Enttec-Port, Art-Net-/sACN-Universum). Wird
+    # bei aktivem Latch umgeroutet — ein anderes internes Universum geht jetzt
+    # auf diesen Weg —, sendete es ungesperrt an den Laser (ein Rig-Modifier
+    # INVERSE macht aus 0 dann 255). Darum merkt sich der Manager zusaetzlich die
+    # Wege der gesperrten Universen und nullt die Laser-Adressen in JEDEM Frame,
+    # der ueber einen davon hinausgeht. Solange der Latch steht, wachsen die
+    # Wege nur (wie die klebrige Maske, OUT-63); das Loesen leert sie.
+
+    @staticmethod
+    def _weg_enttec(dev):
+        return ("enttec", getattr(dev, "port", None))
+
+    @staticmethod
+    def _weg_netz(protokoll: str, univ_num: int, ext):
+        """Art-Net ``n-1`` und sACN ``n`` sind fuer LightOS dasselbe Universum
+        (Default-Zuordnung in _send_all) — ein Knoten kann beide hoeren. Der
+        Schluessel ist deshalb das Netz-Universum, nicht Protokoll oder Ziel-IP
+        (Broadcast und Unicast erreichen denselben Knoten): lieber eine Adresse
+        zu viel gesperrt als ein Laser offen."""
+        if protokoll == "artnet":
+            return ("netz", (ext if ext is not None else univ_num - 1) + 1)
+        return ("netz", ext if ext is not None else univ_num)
+
+    def _wege_von(self, univ_num: int) -> list:
+        """Aktuelle Ausgabewege eines internen Universums (unter ``_io_lock``)."""
+        wege = []
+        lock = getattr(self, "_io_lock", None)
+        if lock is None:          # Test-Manager per __new__ ohne __init__
+            return wege
+        with lock:
+            ext = (getattr(self, "_out_universe", None) or {}).get(univ_num)
+            dev = (getattr(self, "_enttec_outputs", None) or {}).get(univ_num)
+            if dev is not None:
+                wege.append(self._weg_enttec(dev))
+            if (getattr(self, "_artnet_outputs", None) or {}).get(univ_num) is not None:
+                wege.append(self._weg_netz("artnet", univ_num, ext))
+            if (getattr(self, "_sacn_outputs", None) or {}).get(univ_num) is not None:
+                wege.append(self._weg_netz("sacn", univ_num, ext))
+        return wege
+
+    def _estop_wege_nachfuehren(self):
+        """Bei aktivem Latch: die Wege der gesperrten Universen dazunehmen (nie
+        einengen); ohne Latch: leeren. Nach jeder Masken- und Routing-Aenderung."""
+        if not getattr(self, "_laser_estop_aktiv", False):
+            self._laser_estop_wege = {}
+            return
+        wege = dict(getattr(self, "_laser_estop_wege", {}) or {})
+        for u, addrs in (getattr(self, "_laser_estop_mask", {}) or {}).items():
+            if not addrs:
+                continue
+            for weg in self._wege_von(u):
+                wege[weg] = frozenset(wege.get(weg, frozenset()) | frozenset(addrs))
+        self._laser_estop_wege = wege   # eine Zuweisung = atomar fuer _send_all
+
+    @staticmethod
+    def _weg_nullen(data: bytes, addrs) -> bytes:
+        if not addrs:
+            return data
+        buf = bytearray(data)
+        n = len(buf)
+        for addr in addrs:
+            if 1 <= addr <= n:
+                buf[addr - 1] = 0
+        return bytes(buf)
 
     def set_laser_adressen(self, mask: dict[int, frozenset]):
         """OUT-61b: ALLE Laser-Adressen des aktuellen Patches, unabhaengig vom
@@ -833,6 +904,7 @@ class OutputManager:
         # sein -> sonst "Access denied" beim erneuten Verbinden).
         self.close_enttec_on_port(port)
         self._swap_device(self._enttec_outputs, universe, _make_enttec_device(port))
+        self._estop_wege_nachfuehren()       # OUT-64
 
     def close_enttec_on_port(self, port: str):
         """Schliesst eine evtl. offene Enttec-Verbindung auf diesem COM-Port
@@ -867,6 +939,7 @@ class OutputManager:
                    out_universe=None):
         self._swap_device(self._artnet_outputs, universe, ArtNetSender(target_ip))
         self._set_out_universe(universe, out_universe)
+        self._estop_wege_nachfuehren()       # OUT-64
 
     def add_sacn(self, universe: int, target_ip: str | None = None,
                  out_universe=None):
@@ -890,6 +963,7 @@ class OutputManager:
             uebernimm(universe)
         self._swap_device(self._sacn_outputs, universe, neu)
         self._set_out_universe(universe, out_universe)
+        self._estop_wege_nachfuehren()       # OUT-64
 
     #: NET-12: Registry-Name -> Registry-Attribut, fuer ``remove_output(ausser=…)``.
     _REGISTRY_NAMEN = ("enttec", "artnet", "sacn")
@@ -1220,27 +1294,35 @@ class OutputManager:
                 # OUT-03: konfigurierte externe Universe-Nummer (falls gesetzt),
                 # sonst abwaertskompatibler Default (Art-Net num-1, sACN num).
                 ext = self._out_universe.get(univ_num)
+                # OUT-64: Laser-NOT-AUS je AUSGABEWEG — auch ein umgeroutetes
+                # Universum sendet auf dem Weg des Lasers dessen Adressen als 0.
+                wege = getattr(self, "_laser_estop_wege", None)
                 # OUT-51: Die drei Sendeaufrufe fangen weiterhin ALLES — eine
                 # Exception darf den Output-Thread nie beenden, sonst steht die
                 # ganze Ausgabe. Neu ist nur, dass der Fehler jetzt gezaehlt und
                 # bei anhaltendem Ausfall gemeldet wird, statt spurlos zu sein.
                 if enttec is not None:
                     try:
-                        enttec.send_dmx(data)
+                        enttec.send_dmx(self._weg_nullen(
+                            data, wege.get(self._weg_enttec(enttec)) if wege else None))
                     except Exception as exc:
                         self._buche_fehler("Enttec", univ_num, exc)
                     else:
                         self._buche_erfolg("Enttec", univ_num)
                 if artnet is not None:
                     try:
-                        artnet.send_dmx(ext if ext is not None else univ_num - 1, data)
+                        artnet.send_dmx(ext if ext is not None else univ_num - 1,
+                                        self._weg_nullen(data, wege.get(self._weg_netz(
+                                            "artnet", univ_num, ext)) if wege else None))
                     except Exception as exc:
                         self._buche_fehler("Art-Net", univ_num, exc)
                     else:
                         self._buche_erfolg("Art-Net", univ_num)
                 if sacn is not None:
                     try:
-                        sacn.send_dmx(ext if ext is not None else univ_num, data)
+                        sacn.send_dmx(ext if ext is not None else univ_num,
+                                      self._weg_nullen(data, wege.get(self._weg_netz(
+                                          "sacn", univ_num, ext)) if wege else None))
                     except Exception as exc:
                         self._buche_fehler("sACN", univ_num, exc)
                     else:
