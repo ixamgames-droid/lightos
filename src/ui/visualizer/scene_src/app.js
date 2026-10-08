@@ -14,7 +14,8 @@ import { scene, renderer, gpuTier, dynamicResolution, basePixelRatio,
 import { applyBrightness } from './scene/lights.js';
 import { prepareShadowMap, requestShadowUpdate, shadowUpdateStats } from './scene/shadow_update.js';  // VIZ-69
 import { syncUmgebung, umgebungInfo } from './stage/umgebung_merge.js';  // VIZ-72
-import { syncSpotPool, noteShadowPass, spotPoolInfo, spotPoolLights, vergeben as spotPoolVergeben } from './scene/spot_pool.js';  // VIZ-72
+import { syncSpotPool, noteShadowPass, spotPoolInfo, spotPoolLights, vergeben as spotPoolVergeben,
+         setSpotPoolUhr } from './scene/spot_pool.js';  // VIZ-72
 import { disposeObj } from './scene/grid_floor.js';
 import { view, fixtures, stageObjects, settings } from './state.js';
 
@@ -285,7 +286,7 @@ window.__lightos = {
   shadowMapType: () => renderer.shadowMap.type,
   shadowBudgetInfo,
   // VIZ-72: Spot-Pool (echte Lichter) und Render-Kennzahlen des letzten Bildes.
-  spotPoolInfo, spotPoolLights, __spotPoolVergeben: spotPoolVergeben, umgebungInfo,
+  spotPoolInfo, spotPoolLights, __spotPoolVergeben: spotPoolVergeben, __spotPoolUhr: setSpotPoolUhr, umgebungInfo,
   renderInfo: () => {
     let lichter = 0, spots = 0, schatten = 0;
     scene.traverseVisible(o => {
