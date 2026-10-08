@@ -83,7 +83,7 @@
 | UI-76 | B | fix/ui76-go-hinweis-page | 2026-10-08T19:17Z | src/core/cueliste_ziel.py · src/ui/views/playback_view.py · tests/test_ui76_go_hinweis.py · docs/anleitung_szenen_cues/ANLEITUNG.md · changelog.d/2026-10-08-UI-76.md · BACKLOG.md |
 | STAB-30 | A | feature/stab30-diagnose-log | 2026-10-08T19:39Z | main.py · src/core/crash_logging.py |
 | VIZ-71 | B | - | 2026-10-08T19:41Z | - |
-| VIZ-94 | B | fix/viz94-buehne-windows-arm | 2026-10-08T19:42Z | - |
+| VIZ-94 | B | fix/viz94-buehne-arm | 2026-10-08T19:49Z | src/ui/visualizer |
 | XPLAT-36 | B | fix/xplat36-viz13-aufteilen | 2026-10-08T19:43Z | tests/test_viz13_scene_modules_smoke.py · tests/test_viz13_scene_modules_smoke_b.py · tests/_viz13_szene_basis.py · BACKLOG.md |
 
 ## Blocker & Fallen
@@ -186,7 +186,6 @@
 
 ## Verlauf
 
-- 2026-10-08T17:51Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T17:51Z A claim XPLAT-47
 - 2026-10-08T18:10Z A claim FM-68
 - 2026-10-08T18:11Z A claim DOC-65
@@ -216,3 +215,4 @@
 - 2026-10-08T19:42Z B claim VIZ-94
 - 2026-10-08T19:43Z B claim XPLAT-36
 - 2026-10-08T19:43Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-08T19:49Z B aktualisiert VIZ-94: Branch fix/viz94-buehne-windows-arm -> fix/viz94-buehne-arm; Dateien - -> src/ui/visualizer
