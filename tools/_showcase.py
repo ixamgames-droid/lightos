@@ -20,6 +20,8 @@ Shows deshalb nur in einer Sandbox.
 """
 from __future__ import annotations
 
+import _gen_env  # noqa: F401  — Show-DB-Isolation, falls jemand nur dieses Modul importiert
+
 import json
 import math
 
