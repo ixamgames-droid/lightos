@@ -70,6 +70,7 @@ export const {
   LineLoop,
   LineSegments,
   MathUtils,
+  Matrix3,
   Matrix4,
   Mesh,
   MeshBasicMaterial,
