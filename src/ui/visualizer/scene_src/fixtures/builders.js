@@ -14,7 +14,7 @@ import { applyPrism, syncPrismToBeam } from './prism.js';   // VIZ-PRISMA-3D
 import { syncPoolSize } from './floor_pool.js';               // VIZ-15
 import { beamsOff } from '../state.js';                       // VIZ-15
 import { applyGobo, alignGoboFloor, goboWinkel, GOBO_LICHT, GOBO_STRAHL, GOBO_FLECK } from './gobo_textures.js';   // VIZ-GOBO-3D, VIZ-83
-import { glattKanal, glattZiel, glattWert } from './bewegung_glatt.js';   // VIZ-92
+import { glattKanal, glattZiel, glattWert, glattDeckel } from './bewegung_glatt.js';   // VIZ-92
 import { requestRender } from '../scene/render_loop.js';                 // VIZ-92
 import { buildLaserRig, applyLaser, noteLaserAnimation, LASER_BEAM_OPACITY } from './laser.js';   // VIZ-79
 import { stageObjects } from '../state.js';                   // VIZ-BEAM-OCCLUSION
@@ -1510,13 +1510,15 @@ export function updateGenericDmx(f, dmx) {
 // wirklich weitergerueckt ist. Auf der Stufe Niedrig ist die Glaettung aus
 // (schwache GPU, Push 15 Hz: dort bleibt es bei einem Bild je Update).
 const GLATT_BILD_MS = 1000 / 60 - 2;
-let _glattLetzterTick = -Infinity;
+// Codex #965: Deckel mit Ausnahme nur fuer frisch gezielte Geraete
+// (bewegung_glatt.js#glattDeckel).
+const _glattDeckel = glattDeckel(GLATT_BILD_MS);
 const _glattAktiv = new Set();
 let _glattUhr = null;
 /** Test-Seam: eigene Uhr (ms); null = performance.now(). */
 export function setGlattUhr(fn) {
   _glattUhr = (typeof fn === 'function') ? fn : null;
-  _glattLetzterTick = -Infinity;
+  _glattDeckel.zuruecksetzen();
 }
 function _glattJetzt() { return _glattUhr ? _glattUhr() : performance.now(); }
 
@@ -1550,7 +1552,7 @@ function _glattNachDmx(f, dmx) {
   // Update setzt Pan/Tilt neu). Laeuft fuer das Geraet eine Glaettung, darf
   // das naechste Bild nicht am Deckel scheitern — es zeigte sonst kurz das
   // Ziel und sprang danach zurueck.
-  if (_glattAktiv.has(f)) _glattLetzterTick = -Infinity;
+  if (_glattAktiv.has(f)) _glattDeckel.neuesZiel(f);
 }
 
 /** Laeuft gerade irgendwo eine Glaettung? (Test-/Diagnose-Seam.) */
@@ -1559,33 +1561,39 @@ export function bewegungGlaettungAktiv() { return _glattAktiv.size > 0; }
 /** Vor jedem Bild (app.js#perFrameUpdate). Kostet nichts, solange sich kein
  *  Kopf bewegt; sonst je bewegtem Geraet einen applyFloorAim-Durchlauf. */
 export function tickBewegungGlaettung() {
-  if (!_glattAktiv.size) return false;
+  if (!_glattAktiv.size) { _glattDeckel.vergessen(); return false; }
   const jetzt = _glattJetzt();
-  if (jetzt - _glattLetzterTick < GLATT_BILD_MS && jetzt >= _glattLetzterTick) return false;
-  _glattLetzterTick = jetzt;
-  for (const f of _glattAktiv) {
-    const g = f._glatt;
-    // Entferntes Geraet (removeFixture nimmt die Gruppe aus der Szene).
-    if (!g || !f.group || !f.group.parent) { _glattAktiv.delete(f); continue; }
-    if (schwenktKopf(f) && f.yoke && f.head) {
-      if (typeof g.pan.nach === 'number') f.yoke.rotation.y = glattWert(g.pan, jetzt);
-      if (typeof g.tilt.nach === 'number') f.head.rotation.x = glattWert(g.tilt, jetzt);
-      f._lastPanRad = f.yoke.rotation.y;
-      if (f.icon) f.icon.rotation.y = f.yoke.rotation.y + f.group.rotation.y;
-    }
-    if (f.beam && typeof g.gobo.nach === 'number') {
-      const w = glattWert(g.gobo, jetzt);
-      f.beam.rotation.y = w;
-      if (f.floorSpot) f.floorSpot.rotation.z = w;
-    }
-    applyFloorAim(f, { skipBeam: !!f._skipBeam });
-    syncPrismToBeam(f);
-    if (!(g.pan.aktiv || g.tilt.aktiv || g.gobo.aktiv)) _glattAktiv.delete(f);
+  const schritt = _glattDeckel.tick(jetzt);
+  if (!schritt) return false;
+  // Voller Schritt fuer alle — oder (Deckel haelt) nur die Geraete, deren
+  // Ziel ein Update gerade gesetzt hat, zurueck auf den Zwischenstand.
+  for (const f of (schritt.alle ? _glattAktiv : schritt.neu)) {
+    if (_glattAktiv.has(f)) _glattSchritt(f, jetzt);
   }
   // Bild anfordern — perFrame laeuft VOR dem Dirty-Gate (render_loop.js),
   // dieses Bild zeigt den Zwischenstand also schon. Auch das letzte Stueck.
   requestRender();
   return true;
+}
+
+function _glattSchritt(f, jetzt) {
+  const g = f._glatt;
+  // Entferntes Geraet (removeFixture nimmt die Gruppe aus der Szene).
+  if (!g || !f.group || !f.group.parent) { _glattAktiv.delete(f); return; }
+  if (schwenktKopf(f) && f.yoke && f.head) {
+    if (typeof g.pan.nach === 'number') f.yoke.rotation.y = glattWert(g.pan, jetzt);
+    if (typeof g.tilt.nach === 'number') f.head.rotation.x = glattWert(g.tilt, jetzt);
+    f._lastPanRad = f.yoke.rotation.y;
+    if (f.icon) f.icon.rotation.y = f.yoke.rotation.y + f.group.rotation.y;
+  }
+  if (f.beam && typeof g.gobo.nach === 'number') {
+    const w = glattWert(g.gobo, jetzt);
+    f.beam.rotation.y = w;
+    if (f.floorSpot) f.floorSpot.rotation.z = w;
+  }
+  applyFloorAim(f, { skipBeam: !!f._skipBeam });
+  syncPrismToBeam(f);
+  if (!(g.pan.aktiv || g.tilt.aktiv || g.gobo.aktiv)) _glattAktiv.delete(f);
 }
 
 // ── updateDmx-Helfer (modul-privat) ─────────────────────────────────────────

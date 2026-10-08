@@ -94,3 +94,36 @@ export function glattWert(k, jetzt) {
   if (p <= 0) return k.von;
   return k.von + k.delta * p;
 }
+
+// ── Bild-Deckel (Codex #965) ────────────────────────────────────────────────
+// Die Glaettung rechnet hoechstens alle `bildMs` einen Schritt fuer ALLE
+// bewegten Geraete. Ausnahme: ein Geraet, dessen Ziel ein DMX-Update gerade
+// neu gesetzt hat (der DMX-Pfad hat es aufs Ziel gestellt), muss im naechsten
+// Bild zurueck auf den Zwischenstand — sonst zeigte das Bild kurz das Ziel.
+// Diese Ausnahme gilt nur fuer DIESES Geraet und nur fuer das erste Bild; den
+// Takt der uebrigen setzt sie nicht zurueck. Frueher setzte jedes Update den
+// Deckel ganz zurueck: bei laufenden 44-Hz-Updates fiel er damit praktisch weg.
+//
+// tick(jetzt) -> {alle: true} (voller Schritt) | {alle: false, neu: [...]}
+// (nur frisch gezielte Geraete) | null (nichts zu tun).
+export function glattDeckel(bildMs) {
+  let letzter = -Infinity;
+  const neu = new Set();
+  return {
+    neuesZiel(x) { neu.add(x); },
+    zuruecksetzen() { letzter = -Infinity; neu.clear(); },
+    vergessen() { neu.clear(); },
+    tick(jetzt) {
+      // `jetzt < letzter`: Uhr sprang zurueck (Test-Uhr) -> nicht festhaengen.
+      if (!(jetzt - letzter < bildMs && jetzt >= letzter)) {
+        letzter = jetzt;
+        neu.clear();
+        return { alle: true };
+      }
+      if (!neu.size) return null;
+      const liste = [...neu];
+      neu.clear();
+      return { alle: false, neu: liste };
+    },
+  };
+}

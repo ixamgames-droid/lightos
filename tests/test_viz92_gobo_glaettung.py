@@ -145,5 +145,61 @@ class GlaettungTest(unittest.TestCase):
         self.assertEqual(r["werte"][-1], 0.1)
 
 
+
+# Codex #965: Bild-Deckel unter laufenden DMX-Updates. rAF im Takt `bild_ms`,
+# Updates (neues Ziel fuer Geraet 'a') im Takt `update_ms`, eine Sekunde lang.
+_DECKEL_TREIBER = """
+import { glattDeckel } from './glatt.mjs';
+const [bildMs, updateMs, dauer, deckelMs] = %s;
+const d = glattDeckel(deckelMs);
+let voll = 0, extra = 0, verpasst = 0;
+let naechstesUpdate = 0, offen = false;
+for (let t = 0; t < dauer; t += bildMs) {
+  while (naechstesUpdate <= t) { d.neuesZiel('a'); offen = true; naechstesUpdate += updateMs; }
+  const s = d.tick(t);
+  const traf = !!s && (s.alle || s.neu.includes('a'));
+  if (offen && !traf) verpasst += 1;
+  if (traf) offen = false;
+  if (s && s.alle) voll += 1; else if (s) extra += 1;
+}
+console.log(JSON.stringify({voll, extra, verpasst}));
+"""
+
+
+def _deckel(bild_ms, update_ms, dauer=1000.0, deckel_ms=1000 / 60 - 2):
+    with open(_MODUL, encoding="utf-8") as fh:
+        quelle = fh.read()
+    with tempfile.TemporaryDirectory() as verz:
+        with open(os.path.join(verz, "glatt.mjs"), "w", encoding="utf-8") as fh:
+            fh.write(quelle)
+        with open(os.path.join(verz, "treiber.mjs"), "w", encoding="utf-8") as fh:
+            fh.write(_DECKEL_TREIBER % json.dumps([bild_ms, update_ms, dauer, deckel_ms]))
+        out = subprocess.run(["node", os.path.join(verz, "treiber.mjs")],
+                             capture_output=True, text=True, timeout=30)
+    if out.returncode != 0:
+        raise AssertionError(out.stderr)
+    return json.loads(out.stdout)
+
+
+@unittest.skipUnless(_node_verfuegbar(), "node nicht installiert")
+class DeckelUnterLaufendenUpdatesTest(unittest.TestCase):
+    def test_44hz_updates_auf_240hz_schirm_halten_den_deckel(self):
+        r = _deckel(1000 / 240, 1000 / 44)
+        # Volle Glaett-Schritte (alle Geraete) hoechstens 60 je Sekunde —
+        # vorher setzte jedes Update den Deckel zurueck (~88 je Sekunde).
+        self.assertLessEqual(r["voll"], 61, r)
+        self.assertGreaterEqual(r["voll"], 50, r)
+
+    def test_erstes_bild_nach_jedem_update_zeigt_den_zwischenstand(self):
+        for bild_ms in (1000 / 240, 1000 / 144, 1000 / 60):
+            r = _deckel(bild_ms, 1000 / 44)
+            self.assertEqual(r["verpasst"], 0, (bild_ms, r))
+
+    def test_ohne_updates_nur_der_deckeltakt(self):
+        r = _deckel(1000 / 240, 10 ** 9)
+        self.assertLessEqual(r["voll"], 61, r)
+        self.assertLessEqual(r["extra"], 1, r)
+
+
 if __name__ == "__main__":
     unittest.main()
