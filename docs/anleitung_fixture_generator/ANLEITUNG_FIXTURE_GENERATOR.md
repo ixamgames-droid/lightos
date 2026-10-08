@@ -242,8 +242,8 @@ prüfen, was das Handbuch offenlässt. Beim EL-400RGB MK2 sind das:
 * Richtung von Scan- und Mustergeschwindigkeit (langsam → schnell oder
   umgekehrt),
 * ob Größe 0 klein oder groß ist,
-* die Farbstufen von Kanal 8 (die Open Fixture Library vermutet Weiß, Magenta,
-  Cyan, Gelb, Blau, Rot, Grün in Stufen — selbst als ungeprüft markiert),
+* die Farbstufen von Kanal 8 im Feinen (siehe die gemessenen Stützpunkte
+  unten),
 * was „Farbsegmente“ genau tut.
 
 **So testest du sicher** (zwei Personen, eine schaut nur auf den Strahl):
@@ -261,6 +261,22 @@ prüfen, was das Handbuch offenlässt. Beim EL-400RGB MK2 sind das:
    Geschwindigkeiten — jeweils langsam und notieren, was passiert.
 7. Was abweicht, im Profil korrigieren (Bereiche, Namen, Defaults) und neu
    speichern.
+
+### Was am echten Gerät schon bestätigt ist (08.10.2026)
+
+Am EL-400RGB MK2 (DIP-Schalter 1 AN, 2–9 AUS, 10 AUS = Adresse 1, über einen
+Enttec DMX USB Pro):
+
+* Betriebsart 175 („Statische Muster“), Musterauswahl 0, Größe 128 → ein Kreis.
+  Betriebsart 0 → aus.
+* **Blackout, Grand Master 0, Laser-NOT-AUS und gezielter Blackout** einer
+  VC-Taste schalten den Laser jeweils sofort dunkel; danach geht er wieder an.
+  LightOS schreibt dafür auf Kanal 1 den Aus-Wert 0.
+* **Farbe (Kanal 8)**, gemessene Stützpunkte: 0 = bunt/Farbwechsel, 20 = weiß,
+  40 = blau, 60 = weiß, 80 = hellblau (Cyan), 120 = grün, 160 = gelb,
+  200 = weiß, 240 = weiß. Rot und Magenta lagen zwischen diesen Punkten —
+  die Stufen sind schmaler und noch feiner abzugleichen. Bis dahin hat
+  Kanal 8 im Profil keine Bereiche; die Punkte stehen in den Profil-Notizen.
 
 Siehe auch: [Laser-Anleitung](../anleitung_laser/ANLEITUNG_LASER.md),
 [Geräte-Bibliothek & eigene Profile](../anleitung_geraete_bibliothek/ANLEITUNG.md).
