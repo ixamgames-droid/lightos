@@ -161,13 +161,28 @@ def _gobo_style(attrs: dict, channels) -> str | None:
     if kanal is None or wert is None:
         return None
     try:
-        from src.ui.widgets.gobo_icons import gobo_style_for
+        from src.ui.widgets.gobo_icons import (
+            STYLES, gobo_number_for, gobo_style_for)
     except Exception:
         return None
     for rg in (getattr(kanal, "ranges", None) or ()):
         try:
             if int(rg.range_from) <= int(wert) <= int(rg.range_to):
-                return gobo_style_for(getattr(rg, "name", "") or "")
+                name = getattr(rg, "name", "") or ""
+                stil = gobo_style_for(name)
+                if stil:
+                    return stil
+                # VIZ-83 (aus VIZ-82): "Gobo 3" ohne Motiv-Wort — etwa der
+                # generische Moving Head (fixture_db._GEN_MH_GOBO). Ohne Stil
+                # blieb der Strahl im 3D voll, obwohl ein Gobo im Strahl
+                # steckt. Deterministisch je Nummer ein Motiv (Reihenfolge der
+                # Doku-Referenz in gobo_icons.STYLES): dasselbe Gobo sieht
+                # immer gleich aus, verschiedene Nummern sehen verschieden
+                # aus. Die 2D-Kachel bleibt bewusst bei der Nummer.
+                nr = gobo_number_for(name)
+                if nr is not None and nr >= 1:
+                    return STYLES[(nr - 1) % len(STYLES)]
+                return ""
         except (TypeError, ValueError):
             continue
     return ""

@@ -13,7 +13,7 @@ import { applyOptics } from './optics.js';   // VIZ-MH-OPTICS
 import { applyPrism, syncPrismToBeam } from './prism.js';   // VIZ-PRISMA-3D
 import { syncPoolSize } from './floor_pool.js';               // VIZ-15
 import { beamsOff } from '../state.js';                       // VIZ-15
-import { applyGobo } from './gobo_textures.js';   // VIZ-GOBO-3D
+import { applyGobo, alignGoboFloor, GOBO_LICHT, GOBO_STRAHL, GOBO_FLECK } from './gobo_textures.js';   // VIZ-GOBO-3D, VIZ-83
 import { buildLaserRig, applyLaser, noteLaserAnimation, LASER_BEAM_OPACITY } from './laser.js';   // VIZ-79
 import { stageObjects } from '../state.js';                   // VIZ-BEAM-OCCLUSION
 import { auftreffFlaeche } from './beam_stop.js';             // VIZ-BEAM-OCCLUSION
@@ -1416,10 +1416,12 @@ export function updateMatrixPanelDmx(f, dmx) {
 // Reihenfolge-Vertrag: applyFloorAim liest die in applyPanTilt gesetzte
 // Kopf-Rotation (getWorldQuaternion) — PanTilt MUSS vor FloorAim laufen.
 export function updateMovingHeadDmx(f, dmx) {
+  // VIZ-83: Gobo VOR der Farbe — applyGenericColor liest `f.goboAktiv`
+  // (SpotLight gedrosselt, Kegel/Fleck angehoben) im selben Frame.
+  applyGobo(f, dmx);        // VIZ-GOBO-3D/VIZ-83: Muster in Kegel + Bodenfleck
   applyGenericColor(f, dmx);
   applyOptics(f, dmx);      // VIZ-MH-OPTICS: Zoom/Iris auf Kegel + SpotLight
   applyPrism(f, dmx);       // VIZ-PRISMA-3D: aus einem Strahl werden mehrere
-  applyGobo(f, dmx);        // VIZ-GOBO-3D: Gobo-Muster in den Bodenfleck
   applyPanTilt(f, dmx);
   applyFloorAim(f, dmx);
   // GANZ zum Schluss: der Faecher kopiert Weite UND Laenge vom Hauptstrahl,
@@ -1474,11 +1476,11 @@ export function updatePixelHeadDmx(f, dmx) {
 // (f.lamp) und ihr Icon folgen im Monolith der DMX-Farbe — das bleibt so.
 export function updateGenericDmx(f, dmx) {
   applyLaser(f, dmx);       // VIZ-79: vor der Farbe — legt fest, welche Strahlen aktiv sind
+  applyGobo(f, dmx);        // manche haben ein Gobo-Rad (VIZ-83: vor der Farbe)
   applyGenericColor(f, dmx);
   noteLaserAnimation(f);    // VIZ-79: nach der Farbe — erst dann steht „leuchtet" fest
   applyOptics(f, dmx);      // auch feste Scheinwerfer haben Zoom/Iris
   applyPrism(f, dmx);       // ... und manche ein Prisma
-  applyGobo(f, dmx);        // ... und manche ein Gobo-Rad
   applyFloorAim(f, dmx);
   syncPrismToBeam(f);       // nach applyFloorAim — s. updateMovingHeadDmx
   syncIconPos(f);
@@ -1499,9 +1501,17 @@ function applyGenericColor(f, dmx) {
   // einen Shadow-Slot, obwohl es nichts emittiert. Genau der Kostenblock, den
   // das Dunkel-Culling einsparen soll.
   const lum = intNorm * Math.max(color.r, color.g, color.b);
+  // VIZ-83: ein Gobo ist eine Blende (gobo_textures.js, Modulkopf). Sichtbarkeit
+  // bleibt an `lum` — nur die Anteile verschieben sich, Farbe bleibt Farbe.
+  const gobo = !!f.goboAktiv;
   if (f.beam) {
     f.beam.material.color = color;
-    f.beam.material.opacity = Math.max(0.0, intNorm * settings.beamOpacity);
+    // Mit Gobo angehoben, aber nie ueber 1 (Deckkraft ist ein Anteil). Die
+    // Kappung sitzt am FAKTOR, nicht am Produkt: sonst laege die Deckkraft
+    // schon ab ~65 % Dimmer auf 1 und ein Fade darueber kaeme nicht mehr an.
+    f.beam.material.opacity = gobo
+      ? Math.max(0.0, intNorm * Math.min(1.0, settings.beamOpacity * GOBO_STRAHL))
+      : Math.max(0.0, intNorm * settings.beamOpacity);
     f.beam.visible = beamsSichtbar(f, lum);
   }
   if (f.spot) {
@@ -1516,11 +1526,11 @@ function applyGenericColor(f, dmx) {
     // — ein konstanter Anteil statt sekundenlanger Ruckler.
     // A3D-25/A3D-28 gilt weiter: gemessen wird an der EFFEKTIVEN Leuchtdichte,
     // offener Dimmer + Farbe schwarz ist dunkel.
-    f.spot.intensity = lum > 0.01 ? intNorm * 3.0 : 0;
+    f.spot.intensity = lum > 0.01 ? intNorm * 3.0 * (gobo ? GOBO_LICHT : 1) : 0;
   }
   if (f.floorSpot) {
     f.floorSpot.material.color = color;
-    f.floorSpot.material.opacity = Math.max(0.0, intNorm * 0.55);
+    f.floorSpot.material.opacity = Math.max(0.0, intNorm * 0.55 * (gobo ? GOBO_FLECK : 1));
     f.floorSpot.visible = settings.showFloorSpots && lum > 0.01;
   }
   if (f.lens && f.lens.material) {
@@ -1647,6 +1657,7 @@ function applyFloorAim(f, dmx) {
   // waagerecht oder nach oben gerichteten Kopfes, der weder Boden noch Koerper
   // trifft und deshalb seine volle Grundlaenge behalten muss.
   let auftreffAbstand = Infinity;
+  let goboTreffer = null;       // VIZ-83 B2: Auftreffpunkt fuer das Gobo-Bodenmuster
   if (f.floorSpot && f.spotTarget) {
     const dir = new THREE.Vector3(0, -1, 0);
     // Floor-Spot folgt der Strahlrichtung fuer ALLE Beam-Fixtures: Moving Head
@@ -1685,6 +1696,7 @@ function applyFloorAim(f, dmx) {
         // aus, die in Wahrheit im Schatten des Podests liegt.
         f.floorSpot.position.set(hitX, flaeche.y + 0.01, hitZ);
         f.spotTarget.position.set(hitX, flaeche.y, hitZ);
+        goboTreffer = [hitX, flaeche.y + 0.01, hitZ];
         // VIZ-BEAM-OCCLUSION: den sichtbaren Kegel an der getroffenen FLAECHE
         // enden lassen. Er hatte eine feste Laenge und schoss deshalb hindurch
         // — Teil 1 stoppte ihn am Boden, Teil 2 zusaetzlich am ersten
@@ -1699,10 +1711,16 @@ function applyFloorAim(f, dmx) {
   // damit an drei Bedingungen; ein Geraet, das keine davon erfuellte, bekam nie
   // eine Laenge gesetzt.
   setBeamLength(f, auftreffAbstand);
+  // VIZ-83 B2: Bodenmuster unter die Teilstrahlen drehen und den Kegelrand am
+  // Boden messen — NACH setBeamLength, die Kegel-Laenge veraendert den Winkel
+  // der Mantellinien (nur scale.y waechst/schrumpft, der Radius bleibt).
+  const goboRand = goboTreffer
+    ? alignGoboFloor(f, goboTreffer[0], goboTreffer[1], goboTreffer[2])
+    : alignGoboFloor(f);          // kein Treffer: Scheibe zurueck auf TRS
   // VIZ-15: derselbe Abstand macht den Boden-Pool gross. Er hatte bisher einen
   // FESTEN Radius — ein Scheinwerfer 10 m ueber der Buehne warf denselben Fleck
   // wie einer 2 m darueber, und ein Zoom-Zug aenderte gar nichts.
-  syncPoolSize(f, auftreffAbstand);
+  syncPoolSize(f, auftreffAbstand, goboRand);
 }
 
 // Keep top-down icon position synced
