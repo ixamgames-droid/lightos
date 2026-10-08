@@ -75,6 +75,7 @@
 | QA-90 | D | fix/qa90-maximal-schatten | 2026-10-08T18:23Z | tests/test_viz72_spot_pool_umgebung.py · src/ui/visualizer/visualizer_window.py · BACKLOG.md |
 | QA-89 | D | fix/qa89-fade-uhr | 2026-10-08T18:29Z | src/core/engine/cue_stack.py · tests/test_qa89_fade_uhr.py · tests/test_core_engine.py · BACKLOG.md · changelog.d/2026-10-08-QA-89.md |
 | XPLAT-46 | B | fix/xplat46-arm-x64-empfehlung | 2026-10-08T18:32Z | install.py · INSTALL.md · CONTRIBUTING.md · src/ui/main_window.py · src/utils/plattform_hinweis.py · tests/test_xplat46_arm_empfehlung.py · changelog.d/2026-10-08-XPLAT-46.md |
+| DOC-66 | A | docs/doc66-github-seite-audit | 2026-10-08T18:37Z | README.md · docs/ANLEITUNGEN.md |
 
 ## Blocker & Fallen
 
@@ -169,7 +170,6 @@
 
 ## Verlauf
 
-- 2026-10-08T16:14Z D claim QA-88
 - 2026-10-08T16:16Z D claim DOC-62
 - 2026-10-08T16:27Z 3 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T16:29Z D aktualisiert QA-87: Dateien src/core/engine/tap_uhr.py · src/core/engine/tempo_bus.py · src/core/engine/bpm_manager.py · src/ui/virtualconsole/vc_speedial.py · tests/test_vc_speed_node.py · tests/test_vc_tempo_widgets.py · tests/test_qa87_tap_uhr.py · changelog.d/2026-10-08-QA-87.md -> src/core/engine/tap_uhr.py · src/core/engine/tempo_bus.py · src/core/engine/bpm_manager.py · src/ui/virtualconsole/vc_speedial.py · tests/test_vc_speed_node.py · tests/test_vc_tempo_widgets.py · tests/test_qa87_tap_uhr.py · tests/test_tempo_bus.py · tests/test_tempo_grandmaster.py · tests/test_bpm_leader.py · changelog.d/2026-10-08-QA-87.md
@@ -199,3 +199,4 @@
 - 2026-10-08T18:23Z D aktualisiert QA-90: Dateien tests/test_viz72_spot_pool_umgebung.py · BACKLOG.md -> tests/test_viz72_spot_pool_umgebung.py · src/ui/visualizer/visualizer_window.py · BACKLOG.md
 - 2026-10-08T18:29Z D claim QA-89
 - 2026-10-08T18:32Z B claim XPLAT-46
+- 2026-10-08T18:37Z A claim DOC-66
