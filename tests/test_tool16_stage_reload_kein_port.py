@@ -124,5 +124,77 @@ class NachStatePruefungTest(unittest.TestCase):
                 vsr.ausgabe_nach_state_pruefen(st)
 
 
+_KIND_MAIN = r'''
+import importlib.util, json, os, sys
+repo, tool, show, modus, ergebnis = sys.argv[1:6]
+sys.path.insert(0, repo)
+spec = importlib.util.spec_from_file_location("vsr", tool)
+vsr = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(vsr)          # nur Import — KEIN sandbox_einrichten()
+
+class _Halt(Exception):
+    pass
+
+class _QApp:
+    @staticmethod
+    def instance():
+        raise _Halt()
+
+vsr.QApplication = _QApp               # hinter dem Schutz anhalten, kein Fenster
+if modus == "state_schon_da":
+    import src.core.app_state as A
+    A._state = object()
+res = {"erreicht": False, "abbruch": ""}
+try:
+    vsr.main([show])
+except _Halt:
+    res["erreicht"] = True
+except SystemExit as e:
+    res["abbruch"] = str(e)
+res["xdg"] = os.environ.get("XDG_DATA_HOME", "")
+res["datenumzug_aus"] = os.environ.get("LIGHTOS_NO_DATENUMZUG", "")
+res["kein_thread"] = os.environ.get("LIGHTOS_NO_OUTPUT_THREAD", "")
+res["show_db"] = os.environ.get("LIGHTOS_SHOW_DB", "")
+with open(ergebnis, "w", encoding="utf-8") as fh:
+    json.dump(res, fh)
+os._exit(0)
+'''
+
+
+class MainOhneSandkastenTest(unittest.TestCase):
+    """B4 (Review): ``import`` + ``main()`` ohne ``__main__``-Block."""
+
+    def _lauf(self, modus):
+        with tempfile.TemporaryDirectory() as cwd:
+            show = os.path.join(cwd, "leer.lshow")
+            open(show, "w").close()
+            ergebnis = os.path.join(cwd, "ergebnis.json")
+            env = dict(os.environ)
+            for k in [k for k in env if k.startswith("LIGHTOS_")] + ["XDG_DATA_HOME"]:
+                env.pop(k, None)
+            env["QT_QPA_PLATFORM"] = "offscreen"
+            env["HOME"] = cwd
+            env["TMPDIR"] = cwd            # Wegwerf-Ordner mit aufraeumen
+            r = subprocess.run(
+                [sys.executable, "-c", _KIND_MAIN, REPO, TOOL, show, modus, ergebnis],
+                cwd=cwd, env=env, capture_output=True, text=True, timeout=120)
+            self.assertTrue(os.path.exists(ergebnis), r.stdout + r.stderr)
+            with open(ergebnis, encoding="utf-8") as fh:
+                return json.load(fh), cwd
+
+    def test_main_richtet_sandkasten_selbst_ein(self):
+        res, cwd = self._lauf("normal")
+        self.assertTrue(res["erreicht"], res)
+        self.assertTrue(res["datenumzug_aus"], res)
+        self.assertTrue(res["kein_thread"], res)
+        self.assertIn("vizverify_", res["xdg"])
+        self.assertIn("vizverify_", res["show_db"])
+
+    def test_main_bricht_ab_wenn_state_schon_existiert(self):
+        res, _ = self._lauf("state_schon_da")
+        self.assertFalse(res["erreicht"], res)
+        self.assertIn("ABBRUCH", res["abbruch"])
+
+
 if __name__ == "__main__":
     unittest.main()

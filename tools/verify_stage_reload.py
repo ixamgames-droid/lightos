@@ -57,11 +57,17 @@ _GEFAEHRLICH = ("255.255.255.255", "192.168.", "10.0.", "COM", "/dev/tty")
 _LOOPBACK = ("127.0.0.1", "localhost")
 
 
+#: Wegwerf-Ordner des laufenden Prozesses (von ``sandbox_einrichten``).
+_SANDBOX: str | None = None
+
+
 def sandbox_einrichten(tmp: str | None = None, *, fixture_db: str | None = None,
                        stages_quelle: str | None = None) -> str:
     """Pins 1-5 setzen (s. Modul-Doku) und die Buehnen in den Sandkasten
     kopieren. Gibt den Wegwerf-Ordner zurueck."""
+    global _SANDBOX
     tmp = tmp or tempfile.mkdtemp(prefix="vizverify_")
+    _SANDBOX = tmp
     os.environ["XDG_DATA_HOME"] = os.path.join(tmp, "xdg")
     os.environ["LIGHTOS_SHOW_DB"] = os.path.join(tmp, "show.db")
     os.environ["LIGHTOS_FIXTURE_DB"] = fixture_db or os.path.expanduser(
@@ -79,6 +85,36 @@ def sandbox_einrichten(tmp: str | None = None, *, fixture_db: str | None = None,
         os.makedirs(os.path.dirname(sandkasten_stages), exist_ok=True)
         shutil.copytree(echte_stages, sandkasten_stages)
     return tmp
+
+
+def schutz_aktiv() -> bool:
+    """Stehen alle Schutzschalter auf DIESEM Sandkasten? (Pins 1, 2, 4, 5 —
+    die Fixture-Library darf echt sein, sie wird nur gelesen.)"""
+    if not _SANDBOX:
+        return False
+    env = os.environ
+    return (env.get("XDG_DATA_HOME") == os.path.join(_SANDBOX, "xdg")
+            and env.get("LIGHTOS_SHOW_DB") == os.path.join(_SANDBOX, "show.db")
+            and bool(env.get("LIGHTOS_NO_OUTPUT_THREAD"))
+            and bool(env.get("LIGHTOS_NO_DATENUMZUG")))
+
+
+def schutz_sicherstellen() -> None:
+    """B4 (Review TOOL-16): ``main()`` verlaesst sich nicht darauf, dass der
+    Aufrufer den Sandkasten eingerichtet hat — auch nicht nach ``import`` und
+    direktem ``main()``-Aufruf. Fehlen die Schutzschalter, richtet es ihn
+    selbst ein. Gibt es aber schon einen App-State, ist es dafuer zu spaet:
+    der hat Show-DB und Ausgabe bereits mit den falschen Pfaden geoeffnet ->
+    Abbruch."""
+    if not schutz_aktiv():
+        import src.core.app_state as app_state_mod
+        if getattr(app_state_mod, "_state", None) is not None:
+            raise SystemExit(
+                "ABBRUCH: Schutzschalter fehlen und der App-State existiert "
+                "schon — der Lauf saehe echte Daten/Ausgaenge. Werkzeug als "
+                "eigenen Prozess starten.")
+        sandbox_einrichten()
+    ausgabe_datei_pruefen()
 
 
 def ausgabe_datei_pruefen() -> None:
@@ -155,6 +191,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Show nicht gefunden: {show}")
         return 2
 
+    # B4: Schutzschalter VOR jedem State/Fenster — auch ohne __main__-Block.
+    schutz_sicherstellen()
     app = QApplication.instance() or QApplication(sys.argv)
     from src.core.app_state import get_state
     # TOOL-16: State ZUERST erzeugen und die Ausgabe danach erneut pruefen.
