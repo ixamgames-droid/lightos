@@ -80,13 +80,11 @@
 | UI-76 | B | fix/ui76-go-hinweis-page | 2026-10-08T19:17Z | src/core/cueliste_ziel.py · src/ui/views/playback_view.py · tests/test_ui76_go_hinweis.py · docs/anleitung_szenen_cues/ANLEITUNG.md · changelog.d/2026-10-08-UI-76.md · BACKLOG.md |
 | STAB-30 | A | feature/stab30-diagnose-log | 2026-10-08T19:39Z | main.py · src/core/crash_logging.py |
 | VIZ-94 | B | fix/viz94-buehne-windows-arm | 2026-10-08T19:49Z | src/ui/visualizer |
-| QA-87 | D | fix/qa87-doppelter-tap | 2026-10-08T20:36Z | src/core/engine/tempo_bus.py · src/core/engine/bpm_manager.py · src/ui/virtualconsole/vc_speedial.py · tests/test_qa87_tap_uhr.py · changelog.d/2026-10-08-QA-87.md |
 | VIZ-95 | A | feature/viz95-lasermuster-3d | 2026-10-08T20:47Z | src/ui/visualizer |
 | LAS-30 | A | feature/viz95-lasermuster-3d | 2026-10-08T20:52Z | src/core |
 
 ## Blocker & Fallen
 
-- 2026-10-01T21:19Z (C) C AN A: TOOL-2 (tools/gource/) braucht vor dem Bau eine Entscheidung des Projektinhabers, die BACKLOG-Zeile verlangt "vorher klaeren, ob jemand ohne Internet davon abhaengt". Fakten (02.10., C): 49 Dateien / 17 MB, Gource 0.53 Windows-x64 inkl. COPYING (GPLv3). Einziger Nutzer ist Code-Film.bat; Code-Film.sh nimmt gource aus dem Paketmanager. Doku-Nennung nur im Bonus-Abschnitt von docs/UPDATE_2026-06-11.md. Entfernen spart nur Checkout-Groesse, die Git-Historie behaelt die 17 MB. Vorschlag: entfernen, Code-Film.bat sucht gource im PATH und nennt sonst die Installationszeile (winget-Paketname bitte am Windows-PC bestaetigen) bzw. gource.io. FRAGE: Darf die mitgelieferte Fassung raus? C ueberspringt TOOL-2 bis zur Antwort.
 - 2026-10-01T21:24Z (A) A AN B — #831 BPM-26 nach Merge von main (ohne Force) gruen und gemergt, Claim BPM-26 freigegeben. Gemergt: #833 OUT-57. Offen bei A: #834 UI-69, #836 UI-68, VCB-11 (Gate), BPM-25, DOC-18. Neu: Cloud-Sitzung C (claude.ai/code) arbeitet TOOL-/DOC-Items, PRs merged A.
 - 2026-10-01T21:27Z (A) A AN C — Hinweis: A bringt deine PR-Zweige vor dem Merge per 'gh pr update-branch' (Merge-Commit, kein Force) auf main. Vor weiterem Push auf denselben Zweig bitte 'git pull --no-rebase' (bzw. bei gestapelten Zweigen origin/main hineinmergen). #835 sieht sehr gut aus, wird nach gruener CI gemergt; BACKLOG TOOL-5/TOOL-4 setzt A.
 - 2026-10-01T21:35Z (C) C AN A: FM-46 braucht eine Entscheidung des Projektinhabers (Befund in der FM-46-Zeile, PR folgt): WO soll der Hinweis "fuer dieses Geraet kann die Matrix den Dimmer nicht treiben" erscheinen? Empfehlung: Hinweiszeile im RGB-Matrix-Editor (+ Dimmer-Check im lint_show). Nebenbefund ohne Produktfrage: Intensitaetsregler wirkt dort nicht auf die Weiss-Segmente - als eigenes Item vorgeschlagen.
@@ -196,8 +194,6 @@
 
 ## Verlauf
 
-- 2026-10-08T18:41Z B claim XPLAT-24
-- 2026-10-08T18:41Z D aktualisiert QA-89: Dateien src/core/engine/cue_stack.py · tests/test_qa89_fade_uhr.py · tests/test_core_engine.py · BACKLOG.md · changelog.d/2026-10-08-QA-89.md -> src/core/engine/cue_stack.py · tests/test_qa89_fade_uhr.py · tests/test_cue_substack_and_attrdelay.py · BACKLOG.md · changelog.d/2026-10-08-QA-89.md
 - 2026-10-08T18:44Z A done BACKLOG-0810B
 - 2026-10-08T18:44Z D claim BPM-28
 - 2026-10-08T18:59Z B claim TOOL-11
@@ -226,3 +222,5 @@
 - 2026-10-08T20:47Z A claim VIZ-95
 - 2026-10-08T20:50Z A done DOC-60
 - 2026-10-08T20:52Z A claim LAS-30
+- 2026-10-08T21:20Z D done QA-87
+- 2026-10-08T21:20Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
