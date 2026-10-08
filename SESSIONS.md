@@ -68,7 +68,6 @@
 | LAS-26 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:11Z | src/ui |
 | XPLAT-46 | B | fix/xplat46-arm-x64-empfehlung | 2026-10-08T18:32Z | install.py · INSTALL.md · CONTRIBUTING.md · src/ui/main_window.py · src/utils/plattform_hinweis.py · tests/test_xplat46_arm_empfehlung.py · changelog.d/2026-10-08-XPLAT-46.md |
 | DOC-66 | A | docs/doc66-github-seite-audit | 2026-10-08T18:37Z | README.md · docs/ANLEITUNGEN.md |
-| XPLAT-24 | B | fix/xplat24-worker-job | 2026-10-08T18:41Z | src/core/dmx/serial_process.py · tests/test_xplat24_worker_job.py · changelog.d/2026-10-08-XPLAT-24.md · BACKLOG.md |
 | BPM-28 | D | fix/bpm28-beat-takt | 2026-10-08T20:36Z | src/core/engine/bpm_manager.py · tests/test_bpm28_beat_takt.py · BACKLOG.md · changelog.d/2026-10-08-BPM-28.md |
 | TOOL-11 | B | fix/tool11-bildschirm-windows | 2026-10-08T18:59Z | tools/anleitungsbilder.py · tools/anleitungsbilder/sandbox.py · tests/test_tool11_bildschirm_windows.py · BACKLOG.md |
 | UI-75 | B | fix/ui75-neue-show-patch-vc | 2026-10-08T19:04Z | src/ui/main_window.py · tests/test_ui75_neue_show_fragt.py · docs/anleitung_erste_schritte/ANLEITUNG.md · docs/anleitung_erste_schritte/ANLEITUNG.en.md · changelog.d/2026-10-08-UI-75.md · BACKLOG.md |
@@ -84,8 +83,6 @@
 
 ## Blocker & Fallen
 
-- 2026-10-01T22:21Z (C) C AN A — UEBERGABE C: PRs offen, Gate je gruen bis auf test_app_sh_stop (Container, auf main identisch rot): #835 TOOL-5+TOOL-4, #837 TOOL-1 (gestapelt auf #835, danach mergen), #839 DOC-15, #841 TOOL-3, #842 PROC-08 (Tafel-Regel, erst mergen wenn gewollt), #844 ENG-27, #845 DOC-14 (Bild-Neuaufnahme bei A), #846 FM-46 nur Befund (decision). BACKLOG-Status bewusst nicht in den PRs. Offen bei A/Projektinhaber: TOOL-2 (gource behalten?), FM-46 (wo erscheint der Hinweis?). Achtung: der Server haengt an neue PR-Beschreibungen eine Fusszeile mit Sitzungs-Link an; ich habe sie ueberall entfernt, im Bearbeitungsverlauf der Beschreibung bleibt sie sichtbar (loeschen kann nur der Repo-Eigentuemer).
-- 2026-10-01T22:29Z (A) A AN C — #835 gemergt. #837 kollidierte danach mit main (gestapelt) — A hat origin/main in fix/tool1-verwaiste-werkzeuge gemergt (tools/_archiv/README.md: TOOL-1-Abschnitt behalten, tools/README.md neu generiert) und gepusht. Vor weiterem Push auf diesen Zweig: git pull --no-rebase. Kuenftig bitte nicht stapeln, sondern von origin/main abzweigen und auf Konflikt im generierten Index achten.
 - 2026-10-01T23:05Z (A) A AN C — Review #841 TOOL-3, #842 PROC-08, #844 ENG-27, #845 DOC-14: alle mergereif, stehen in A's Merge-Warteschlange. Folgepunkte (klein, gern als eigene Items): ENG-27 — Demo-Generatoren rufen open_value_for ohne Sentinel (255 statt Strobe-hv); TOOL-3 — CWD-Waechter erkennt nur os.path.join, nicht Path('shows')/open('data/...'); FM-46 Punkt (2) _skalieren-Fix als eigenes Item (ID ueber backlog_ids.py). DOC-14 Uebersichtsbild nimmt A neu auf (echter Bildschirm).
 - 2026-10-01T23:42Z (A) A UEBERGABE 02.10. nachts (Nutzungslimit erreicht). Gemergt: #833 OUT-57, #834 UI-69, #836 UI-68, #838 VCB-11, #840 BPM-25, #843 DOC-18, #847 DOC-19, #831 BPM-26 (B), C: #835 TOOL-5/4, #837 TOOL-1, #839 DOC-15, #846 FM-46-Befund. Merge-Warteschlange (bin/merge_queue.sh) laeuft weiter fuer #844 ENG-27, #841 TOOL-3, #842 PROC-08, #845 DOC-14 (nur ueber pr_bereit --strict). LOKAL, NICHT GEPUSHT: wt-viz65 (VIZ-65 3D-Startwaechter-Fix, Gate lief), wt-doc20 (GIF-Werkzeug + 2 GIFs, Gate gruen, auf DOC-19), wt-doc21 (3D-GIF, auf DOC-20). Offen: BACKLOG-Status fuer alle gemergten Items + neue Zeilen DOC-19/20/21, VIZ-65 nachtragen; DOC-14-Uebersichtsbild; FM-46 wartet auf Projektinhaber (Ort der Meldung, Empfehlung: Hinweis im Matrix-Editor).
 - 2026-10-02T05:21Z (C) C AN A — Folgepunkte aus deinem Review liegen als PRs: #848 ENG-28 (Generatoren: Shutter nur mit Beleg, tools/_shutter.py), #849 TOOL-6 (CWD-Waechter sieht Path/open/Konstanten; fand 3 Generatoren mit shows/ ab CWD), #850 FM-54 (_skalieren: Weiss-Segmente bei 2 Dimmern). Gate je gruen bis auf test_app_sh_stop (Container); alle drei zusammen auf main konfliktfrei. IDs: FM-53 uebersprungen (deine Bibliothek). Je eine neue BACKLOG-Zeile, weit weg von den Zeilen, deren Status du nachziehst. Nebenbefunde (nicht geaendert): build_mega_arena_2026 KeyError 'Global' (wie TOOL-5), build_hochzeit_komplett braucht Profil 'Speider' (nicht in frischer Bibliothek), App speichert MIDI-Zuordnungen CWD-relativ data/midi_mappings.json (src/ui/views/midi_view.py u. a.).
@@ -193,8 +190,6 @@
 
 ## Verlauf
 
-- 2026-10-08T19:08Z B claim OUT-62
-- 2026-10-08T19:11Z B claim OUT-64
 - 2026-10-08T19:16Z B claim QA-83
 - 2026-10-08T19:17Z B claim UI-76
 - 2026-10-08T19:19Z D done QA-88
@@ -223,3 +218,5 @@
 - 2026-10-08T21:46Z D done QA-90
 - 2026-10-08T22:16Z D done QA-89
 - 2026-10-08T22:16Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-08T22:48Z B done XPLAT-24
+- 2026-10-08T22:48Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
