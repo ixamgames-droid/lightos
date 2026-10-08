@@ -49,7 +49,7 @@ __all__ = ["ShowBuilder", "Handle", "BuildError", "RgbAlgorithm", "MatrixStyle",
 
 
 def build_and_verify(builder: ShowBuilder, out: str, *, render=None, name=None,
-                     universe: int = 1, frames: int = 44) -> str:
+                     universe: int = 1, frames: int = 44, einzeln: bool = True) -> str:
     """Speichert + validiert die Show (statisch + live) und macht optional einen
     Render-Smoke über ``render`` (Liste von Handles/IDs). Wirft bei Problemen.
 
@@ -74,11 +74,17 @@ def build_and_verify(builder: ShowBuilder, out: str, *, render=None, name=None,
     Probe je hochgezogen wurde. Ergebnis ist eine **Warnung**, kein Abbruch:
     ein Gerät darf bewusst dunkel bleiben, und ein harter Fehler würde
     Bestandsskripte brechen.
+
+    ``einzeln`` geht an :meth:`ShowBuilder.verify_render` (QA-51): ``False``
+    misst die genannten Funktionen GEMEINSAM — fuer ein stehendes Bild plus
+    einen Effekt, der allein im letzten Frame dunkel sein darf (Strobe), damit
+    der Dimmer-Waechter beide Geraetearten sieht.
     """
     builder.save(out, name=name)
     if render:
         lit, moved, _changed, probe = builder.verify_render(
-            render, universe=universe, return_snapshot=True, frames=frames)
+            render, universe=universe, return_snapshot=True, frames=frames,
+            einzeln=einzeln)
         if not (lit or moved):
             raise SystemExit(f"Render-Smoke fehlgeschlagen: {out} erzeugt kein DMX")
         from src.core.capability.dimmer_check import dunkle_geraete
