@@ -55,7 +55,6 @@
 | FM-58 | A | feat/fm58-bibliothek-runde2 | 2026-10-02T18:20Z | fixtures/bibliothek |
 | SAMMEL-DOKU-C | A | sammel/doku-c | 2026-10-02T22:08Z | docs · BACKLOG.md |
 | DOC-60 | A | docs/doc60-buehnenshow-effekte | 2026-10-05T16:18Z | - |
-| VIZ-72 | A | perf/viz72-grosse-rigs | 2026-10-08T13:41Z | - |
 | VIZ-83 | A | fix/viz83-gobo-strahl | 2026-10-08T15:16Z | - |
 | ENG-31 | A | fix/eng31-mega-arena-tempo | 2026-10-08T15:16Z | - |
 | BACKLOG-D-BERICHT | A | docs/backlog-d-bericht | 2026-10-08T15:53Z | BACKLOG.md |
@@ -160,7 +159,6 @@
 
 ## Verlauf
 
-- 2026-10-05T18:15Z A claim VIZ-80
 - 2026-10-05T18:41Z A done XPLAT-44
 - 2026-10-05T18:52Z A claim MIDI-1
 - 2026-10-05T18:52Z A claim MIDI-2
@@ -190,3 +188,4 @@
 - 2026-10-08T15:54Z A claim VIZ-85
 - 2026-10-08T15:54Z A claim VIZ-86
 - 2026-10-08T15:54Z A claim VIZ-87
+- 2026-10-08T15:57Z A done VIZ-72
