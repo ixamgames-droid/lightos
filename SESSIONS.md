@@ -64,10 +64,10 @@
 | QA-87 | D | fix/qa87-tap-uhr | 2026-10-08T16:29Z | src/core/engine/tap_uhr.py · src/core/engine/tempo_bus.py · src/core/engine/bpm_manager.py · src/ui/virtualconsole/vc_speedial.py · tests/test_vc_speed_node.py · tests/test_vc_tempo_widgets.py · tests/test_qa87_tap_uhr.py · tests/test_tempo_bus.py · tests/test_tempo_grandmaster.py · tests/test_bpm_leader.py · changelog.d/2026-10-08-QA-87.md |
 | QA-88 | D | fix/qa88-anleitungsbilder-windows | 2026-10-08T16:14Z | tools/anleitungsbilder.py · tools/anleitungsbilder/sandbox.py · tools/anleitungsbilder/runner.py · tests/test_qa88_anleitungsbilder_windows.py · docs/ANLEITUNGSBILDER.md |
 | DOC-62 | D | docs/doc62-installdoku-windows | 2026-10-08T16:16Z | INSTALL.md · CONTRIBUTING.md · install.py · tests/test_doc62_installdoku.py |
+| LAS-25 | A | fix/codex-p1-0810 | 2026-10-08T16:57Z | - |
 
 ## Blocker & Fallen
 
-- 2026-10-01T16:50Z (Laptop) AN A (vom Verwalter-Laptop, im Auftrag des Projektinhabers): Aus dem Paket vom 01.10. ist noch offen: BACKLOG.md Zeile 12 nennt im FINALIZE-Punkt noch den alten lokalen Pfad des Windows-Rechners (C:/Users/<Klarname>/Downloads/...) - oeffentlich sichtbar. Bitte pseudonymisiert auf den neuen Ort umstellen (C:/Users/X/Projekte/lightos-main, Betreiber = Robin) und danach den ganzen Repo-Stand von main mit dem Klarnamen-Waechter (PRIV-05) gegenpruefen.
 - 2026-10-01T16:59Z (B) B reserviert BPM-25 (BPM-24 ist seit vorhin reserviert; backlog_ids sieht Tafel-Reservierungen nicht): Zustandswort zeigt EINGERASTET, waehrend der Phasen-Widerspruch (phase_ok=False, AGREE_N Widersprueche) die Beats stummschaltet — Fund der Review-Linse 3 zu PR #826, vorbestehend. Beide Zeilen kommen mit PR #826 ins BACKLOG.
 - 2026-10-01T17:16Z (B) B RUNDE BPM-20 + BPM-23 — PR #826 gemergt (2378399) | Gate Windows 756/758 (rot nur test_anleitungsbilder = XPLAT-42 und test_viz14_selection_scene unter Last, einzeln gruen), CI 3/3 | geaendert: tempo_tracker (_feinlage: Gipfel + Gauss + Oberwelle mit Ueberlappung; unsicher_s; Countdown-Resets; x2-Gate mit DEADBAND), beat_detector-Snapshot, bpm_status_rules (unsicher(), _r_unsicher, KEIN_SIGNAL_KEYS, ZUSTAND_PRAEMISSE als Funktionen, Pause-Text korrigiert), bpm_manager_view (Zustandswort folgt der entprellten Zeile), Anleitung | Messung: Sweep 60..195 max 0,041 BPM, Robins echte Testbeat-Aufnahme 127,60 -> 127,997 | Review: 3 Linsen, kein HIGH, 1 MEDIUM + 8 LOW behoben, eigene Breakdown-Aenderung zurueckgenommen | neu im BACKLOG: BPM-24 (Entrast-Hysterese/Breakdowns, braucht echte Aufnahmen), BPM-25 (Beats stumm bei Phasen-Widerspruch, Anzeige fehlt) | naechstes: Live-Funktionstest auf dem Windows-PC (Robins Auftrag), danach BPM-21 (WASAPI).
 - 2026-10-01T17:20Z (Laptop) AN A — VERWALTER-AUFTRAG (Prioritaet hoch, im Auftrag des Projektinhabers, bitte auf der Tafel quittieren): (1) ID-Kollisionen beenden (heute 3x: XPLAT-40, BPM-24, BPM-25): backlog_ids.py soll beim Vergeben zusaetzlich origin/sessions lesen (aktive Claims + reservierte IDs), dazu ein fester Befehl session_claim.py reserve <ID> --session X. (2) Zweig direkt nach dem Claim pushen (notfalls Draft-PR), damit die andere Sitzung ihn sieht. (3) R8 umsetzen: Briefe mit Empfaenger und Quittung, Laengenwarnung ab 300 Zeichen. (4) NEU, fest einbauen: Kanal fuer Verwalter-/Notfall-Auftraege, z. B. Eintraege mit Praefix VERWALTER bzw. NOTFALL. SessionStart-Hook und /lightos-loop zeigen sie ganz oben vor allem anderen; NOTFALL unterbricht die laufende Runde nach dem naechsten sicheren Punkt; beide Sitzungen quittieren mit ERLEDIGT oder ABGELEHNT+Grund. Gilt fuer A und B — bitte B informieren. Offen von 16:50Z: BACKLOG.md Zeile 12.
@@ -158,8 +158,6 @@
 
 ## Verlauf
 
-- 2026-10-06T21:31Z A done MIDI-1
-- 2026-10-06T21:32Z A done MIDI-2
 - 2026-10-06T21:32Z A done OSC-05
 - 2026-10-06T21:52Z A done LAS-23
 - 2026-10-06T21:52Z A done LAS-24
@@ -188,3 +186,5 @@
 - 2026-10-08T16:31Z A done BACKLOG-D-BERICHT
 - 2026-10-08T16:49Z A done ENG-31
 - 2026-10-08T16:49Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-08T16:57Z A claim LAS-25
+- 2026-10-08T16:57Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
