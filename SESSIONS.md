@@ -55,7 +55,6 @@
 | FM-58 | A | feat/fm58-bibliothek-runde2 | 2026-10-02T18:20Z | fixtures/bibliothek |
 | SAMMEL-DOKU-C | A | sammel/doku-c | 2026-10-02T22:08Z | docs · BACKLOG.md |
 | DOC-60 | A | docs/doc60-buehnenshow-effekte | 2026-10-05T16:18Z | - |
-| VIZ-83 | A | fix/viz83-gobo-strahl | 2026-10-08T15:16Z | - |
 | VIZ-84 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
 | VIZ-85 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
 | VIZ-86 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
@@ -166,7 +165,6 @@
 
 ## Verlauf
 
-- 2026-10-08T15:57Z A done VIZ-72
 - 2026-10-08T15:59Z D claim QA-86
 - 2026-10-08T15:59Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T16:05Z D claim QA-87
@@ -196,3 +194,4 @@
 - 2026-10-08T18:11Z A claim DOC-65
 - 2026-10-08T18:11Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T18:11Z A claim LAS-26
+- 2026-10-08T18:16Z A done VIZ-83
