@@ -15,7 +15,7 @@ import { cachedSeq, noteShowGen, rememberDmx } from '../fixtures/dmx_cache.js';
 
 export function applyDmxEntry(d) {
   updateFixture(d.fid, d.r ?? 0, d.g ?? 0, d.b ?? 0, d.intensity ?? 0,
-                d.pan ?? 128, d.tilt ?? 128, d.heads || null);
+                d.pan ?? 128, d.tilt ?? 128, d.heads || null, d);
 }
 
 // arr: Payload-Liste; seq: Zahl (gilt fuer alle), Liste (je Eintrag) oder

@@ -2,7 +2,7 @@
 
 Problem (nur Windows):
     Importiert ein Generator ``app_state``/``output_manager`` und ist in der
-    Output-Konfiguration (``data/universes.json``) ein Enttec-Port eingetragen, dann
+    Output-Konfiguration (``universes.json``, App-Datenordner) ein Enttec-Port eingetragen, dann
     erzeugt ``get_state()`` ueber ``apply_output_config() -> add_enttec()`` einen
     :class:`~src.core.dmx.serial_process.EnttecProcessProxy`. Der startet einen
     Kindprozess mit ``multiprocessing`` im ``spawn``-Modus. ``spawn`` RE-IMPORTIERT
@@ -29,7 +29,7 @@ Fix (Single-Point, kein Guard in ~40 Dateien noetig):
       * ``LIGHTOS_NO_AUDIO_AUTOSTART=1`` -> kein WASAPI-Loopback-Capture im
         Build-Lauf (analog conftest; rein vorsorglich).
       * ``LIGHTOS_SHOW_DB=<tmp>/lightos_gen_<skript>_<pid>.db`` -> isolierte
-        Wegwerf-Show-DB statt der geteilten ``data/current_show.db``
+        Wegwerf-Show-DB statt der geteilten ``current_show.db`` (App-Datenordner)
         (STAB-CURSHOW (a): Generator-Laeufe duerfen Davids echten Show-Zustand
         nicht anfassen; Muster aus ``build_mega_arena_2026.py`` verallgemeinert).
 
@@ -60,7 +60,7 @@ os.environ.setdefault("LIGHTOS_NO_AUDIO_AUTOSTART", "1")
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 # STAB-CURSHOW (a): Generatoren/Tools duerfen nie auf der geteilten
-# data/current_show.db arbeiten — ShowBuilder(reset=True) macht dort reset_show()
+# Show-DB (App-Datenordner) arbeiten — ShowBuilder(reset=True) macht dort reset_show()
 # und patcht hinein, parallele Laeufe (oder eine offene App) desyncen die DB.
 # Isolierte Wegwerf-DB pro Lauf; Skript-Stem + PID, damit zwei gleichzeitig
 # laufende Generatoren sich keine Temp-DB teilen.

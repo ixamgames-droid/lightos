@@ -12,7 +12,7 @@ Aufruf:  venv/Scripts/python.exe tools/benchmark_universes.py [frames]   (Defaul
 Ergebnis: Tabelle auf stdout + geschrieben nach docs/PERFORMANCE.md.
 
 Hinweis: get_state() wendet beim ersten Aufruf die Output-Konfig aus
-data/universes.json an und oeffnet ggf. den dort konfigurierten Enttec-/sACN-Port.
+universes.json (App-Datenordner) an und oeffnet ggf. den dort konfigurierten Enttec-/sACN-Port.
 Fuer die Messung ist das irrelevant (Output-Thread aus, send_dmx() wird nie
 gerufen) — auf einer Maschine ohne den Port erscheint nur eine Warnzeile.
 """

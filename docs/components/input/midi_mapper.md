@@ -10,7 +10,7 @@ Feedback zurück (Outbound). App-weites **Singleton** über
 `get_midi_mapper(app_state)`, in der App gehalten als `app_state.midi_mapper`.
 
 Beim Erzeugen abonniert es den [midi_manager.md](midi_manager.md) und hakt sich
-in Zustandsquellen ein (Grand Master). Persistenz nach `data/midi_mappings.json`
+in Zustandsquellen ein (Grand Master). Persistenz nach `midi_mappings.json` im App-Datenordner
 (geladen in `AppState`).
 
 ## Unterstützte Nachrichten / Adressen

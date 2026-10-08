@@ -46,5 +46,6 @@ def find_show(name: str, *, hint: str = "") -> Path:
 
 
 def show_db_isolated() -> bool:
-    """True, wenn der Prozess NICHT auf der geteilten data/current_show.db arbeitet."""
+    """True, wenn der Prozess NICHT auf der geteilten Show-DB (App-Datenordner,
+    ``current_show.db``; vor XPLAT-44 ``data/current_show.db``) arbeitet."""
     return bool(os.environ.get("LIGHTOS_SHOW_DB"))

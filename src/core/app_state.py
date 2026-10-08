@@ -21,7 +21,9 @@ from .stage.scene_adapters import _DockView, _LiveViewDict, _SceneBackedDict, _V
 
 # Show-Datenbank. Per LIGHTOS_SHOW_DB umlenkbar — so können Tests (conftest setzt
 # eine Temp-DB) laufen, ohne die echte Show-DB der laufenden App anzufassen.
-SHOW_DB_PATH = os.environ.get("LIGHTOS_SHOW_DB", "data/current_show.db")
+# XPLAT-44: Standard ist der App-Datenordner, nicht mehr ``data/`` ab CWD.
+from .paths import user_data_file as _user_data_file  # noqa: E402
+SHOW_DB_PATH = _user_data_file("current_show.db")
 
 
 # STAB-CURSHOW: Bekannte Cloud-Sync-Ordner-Marker. Liegt die Show-DB in einem
@@ -586,9 +588,18 @@ class AppState:
         from .midi.midi_mapper import get_midi_mapper
         self.midi_mapper = get_midi_mapper(self)
         try:
-            self.midi_mapper and self.midi_mapper.load("data/midi_mappings.json")
+            self.midi_mapper and self.midi_mapper.load(
+                _user_data_file("midi_mappings.json"))
         except Exception as e:
             debug_swallow("app_state.midi_load", e)
+        # XPLAT-44 (Nebenbefund Review #863): die Kanal-Modifier wurden nur
+        # GESPEICHERT, beim Start aber nie geladen — nach einem Neustart waren
+        # sie weg. Fehlende Datei = keine Modifier (load() ist dann ein No-op).
+        try:
+            from .engine.channel_modifier import get_modifier_manager
+            get_modifier_manager().load(_user_data_file("channel_modifiers.json"))
+        except Exception as e:
+            debug_swallow("app_state.modifier_load", e)
         # Zentraler StateSync Event-Bus
         from .sync import get_sync
         self.sync = get_sync()
@@ -1770,6 +1781,13 @@ class AppState:
                 {u: frozenset(s) for u, s in gm_mask.items()})
         except Exception as e:
             print(f"[AppState] set gm mask error: {e}")
+        # LAS-24: Laser ohne Dimmer/Farbe — bei GM 0 Betriebsart auf „aus“.
+        try:
+            setze_aus = getattr(self.output_manager, "set_gm_laser_aus_mask", None)
+            if setze_aus is not None:
+                setze_aus(self._build_gm_laser_aus_mask(fix_index))
+        except Exception as e:
+            print(f"[AppState] set gm laser mask error: {e}")
         # OUT-57: Blackout-ERHALTEN-Maske — nur Position/Gobo/Prisma/Optik gepatchter
         # Lampen mit echtem Dimmer bleiben beim Blackout stehen, alles andere geht
         # auf 0 (auch ungepatchte Roh-Adressen im selben Universum).
@@ -2018,8 +2036,8 @@ class AppState:
         - sACN:   ``patch`` = Unicast-IP (leer = Multicast)
         Fehler pro Universe werden geloggt, brechen den Start aber nicht ab.
 
-        ``path=None`` nimmt ``LIGHTOS_UNIVERSES_JSON``, sonst
-        ``data/universes.json``. **Lese- und Schreibseite muessen dieselbe
+        ``path=None`` nimmt ``paths.user_data_file("universes.json")`` —
+        ``LIGHTOS_UNIVERSES_JSON``, sonst der App-Datenordner (XPLAT-44). **Lese- und Schreibseite muessen dieselbe
         Datei sehen** — der Dialog schreibt ueber ``output_config._UNIV_CONFIG_PATH``,
         und stuenden die beiden auseinander, richtete die App beim naechsten
         Start eine andere Konfiguration ein als die gerade gespeicherte.
@@ -2028,8 +2046,7 @@ class AppState:
         import json
         import os
         if path is None:
-            path = (os.environ.get("LIGHTOS_UNIVERSES_JSON")
-                    or os.path.join("data", "universes.json"))
+            path = _user_data_file("universes.json")
         if not os.path.exists(path):
             return
         try:
@@ -4695,6 +4712,122 @@ class AppState:
                 addrs.add(addr)
         return gm_mask
 
+    # LAS-24: Kanaele, ueber die ein Laser „aus“ geht — die Betriebsart
+    # (``shutter``: SH-LASER3W „Laser off“, L2600 „Aus“) bzw. ein
+    # Programmwahl-/Laser-Kanal (``macro``), sofern das Profil dort einen
+    # Aus-Bereich belegt.
+    _GM_LASER_AUS_ATTRS = ("shutter", "macro")
+    # Eindeutige Bereichsnamen: gelten an JEDEM shutter/macro-Kanal und auch
+    # bei Lasern MIT Dimmer (BlueStar: Dimmer nur fuer die LED, Laser per
+    # „Laser off“ am Programm-Kanal).
+    _GM_LASER_AUS_EINDEUTIG = ("laser off", "laser aus", "laser output off",
+                               "output off", "laser blackout", "laser black out",
+                               "blackout", "black out", "shut off")
+    # Bloßes „off/aus“ heisst an einem Macro-Kanal oft nur „kein Makro“
+    # (Galaxian 3D „Macros: Off“) — es zaehlt nur am ``shutter`` oder an einem
+    # Betriebsart-Kanal (Kanalname Mode/Modus/Betriebsart).
+    _GM_LASER_AUS_SCHLICHT = ("aus", "off")
+    _GM_LASER_BETRIEBSART_NAMEN = ("mode", "modus", "betriebsart")
+
+    @staticmethod
+    def _laser_wort_in(woerter, name: str) -> bool:
+        """Wort/Phrase als ganzes Wort irgendwo in ``name``."""
+        import re
+        return any(re.search(r"\b" + re.escape(w) + r"\b", name) for w in woerter)
+
+    @staticmethod
+    def _laser_name_beginnt(woerter, name: str) -> bool:
+        """Bereichsname BEGINNT mit dem Wort/der Phrase („Laser off (blackout)“,
+        „Blackout/Safe“) — „Decrease brightness up to blackout“ (DS-1000RGB,
+        Teil-Abdunklung) zaehlt nicht."""
+        import re
+        return any(re.match(r"\W*" + re.escape(w) + r"\b", name) for w in woerter)
+
+    @classmethod
+    def _laser_aus_wert(cls, ch, *, nur_eindeutig: bool = False) -> int | None:
+        """LAS-24: der „aus“-Wert EINES Kanals aus den Profil-Bereichen.
+
+        1. ein Bereich der Art ``closed`` -> dessen Untergrenze;
+        2. sonst ein Bereich, dessen Name mit einer eindeutigen Phrase BEGINNT
+           („laser off“, „blackout“, „output off“ …; ZQB370 „Laser Off“ ohne
+           Art) -> Untergrenze;
+        3. sonst ein Name, der mit bloßem „aus/off“ beginnt — nur am
+           ``shutter`` oder an einem Betriebsart-Kanal (Name
+           Mode/Modus/Betriebsart);
+        4. ohne jede Bereichsangabe: am ``shutter`` 0 (Laser-Konvention, wie der
+           NOT-AUS), am ``macro`` NICHTS (dort ist 0 oft ein Auto-Programm).
+
+        ``nur_eindeutig`` (Laser MIT Dimmer): NUR Schritt 2 — ein ``closed``
+        kann dort auch eine Teil-Abdunklung sein (DS-1000RGB „Safety zone
+        intensity“ 129-255), die Namen sind eindeutig.
+        """
+        attr = (getattr(ch, "attribute", "") or "").lower()
+        kanal = (getattr(ch, "name", "") or "").lower()
+        ranges = list(getattr(ch, "ranges", None) or ())
+        def _von(rg):
+            try:
+                return max(0, min(255, int(rg.range_from)))
+            except (TypeError, ValueError):
+                return None
+        for rg in ranges if not nur_eindeutig else ():
+            if (getattr(rg, "kind", "") or "").lower() == "closed":
+                v = _von(rg)
+                if v is not None:
+                    return v
+        stufen = [cls._GM_LASER_AUS_EINDEUTIG]
+        if not nur_eindeutig and (
+                attr == "shutter"
+                or cls._laser_wort_in(cls._GM_LASER_BETRIEBSART_NAMEN, kanal)):
+            stufen.append(cls._GM_LASER_AUS_SCHLICHT)
+        for woerter in stufen:
+            for rg in ranges:
+                name = (getattr(rg, "name", "") or "").lower()
+                if cls._laser_name_beginnt(woerter, name):
+                    v = _von(rg)
+                    if v is not None:
+                        return v
+        if not ranges and attr == "shutter" and not nur_eindeutig:
+            return 0
+        return None
+
+    def _build_gm_laser_aus_mask(self, fix_index) -> dict[int, dict[int, int]]:
+        """LAS-24: ``{universum: {adresse: aus_wert}}`` fuer DMX-Laser, die der
+        Grand Master ueber Dimmer/Farbe nicht (sicher) erreicht.
+
+        Ein Laser laesst sich ueber seine Betriebsart nicht stufenlos dimmen —
+        bei GM ~0 zieht der Sende-Pfad diese Adressen deshalb auf ihren
+        „aus“-Wert (``OutputManager.GM_LASER_AUS_SCHWELLE``), darueber bleiben
+        sie unveraendert. Laser OHNE Dimmer/Farbe: alle Regeln aus
+        :meth:`_laser_aus_wert`. Laser MIT Dimmer/Farbe: nur eindeutig
+        benannte Aus-Bereiche („Laser off“, „Blackout“ …) — der Dimmer gilt nicht immer fuer
+        den Laser (BlueStar: nur LED); bei GM ~0 ist ohnehin alles dunkel, ein
+        zusaetzlicher Aus-Wert schadet also nicht.
+        Kein belegbarer Aus-Kanal -> kein Eintrag (nicht raten)."""
+        out: dict[int, dict[int, int]] = {}
+        for _fid, (fx, chans) in fix_index.items():
+            if not fixture_uses_dmx(fx):
+                continue
+            is_laser = ((getattr(fx, "fixture_type", "") or "").lower() == "laser"
+                        or any((getattr(ch, "attribute", "") or "").startswith("laser_")
+                               for ch in chans))
+            if not is_laser:
+                continue
+            nur_eindeutig = bool(self._fixture_intensity_addrs(fx, chans))
+            for ch in chans:
+                attr = (getattr(ch, "attribute", "") or "").lower()
+                if attr not in self._GM_LASER_AUS_ATTRS:
+                    continue
+                wert = self._laser_aus_wert(ch, nur_eindeutig=nur_eindeutig)
+                if wert is None:
+                    continue
+                try:
+                    addr = int(fx.address) + int(ch.channel_number) - 1
+                except (TypeError, ValueError):
+                    continue
+                if 1 <= addr <= 512:
+                    out.setdefault(fx.universe, {})[addr] = wert
+        return out
+
     def _build_blackout_keep_mask(self, fix_index) -> dict[int, set]:
         """OUT-57: Blackout-ERHALTEN-Maske pro gepatchtem DMX-Universum — die
         Adressen, die der Blackout NICHT auf 0 zieht. Alles andere im Universum geht
@@ -7036,6 +7169,16 @@ _state: AppState | None = None
 def get_state() -> AppState:
     global _state
     if _state is None:
+        # XPLAT-44: die Uebernahme alter data/-Dateien MUSS vor dem ersten
+        # Oeffnen der Show-DB laufen — sonst legt open_show() im App-Ordner eine
+        # leere DB an, die den alten Stand verdraengt. Hier zentral, damit auch
+        # Werkzeuge/Beispiele (ohne main.py) zuerst uebernehmen; je Prozess nur
+        # einmal (main.py ruft es schon frueher, mit Dialog).
+        try:
+            from .datenumzug import einmal_je_prozess
+            einmal_je_prozess()
+        except Exception as e:
+            print(f"[datenumzug] uebersprungen: {e}")
         _state = AppState()
         _state.open_show()
         _state.apply_output_config()

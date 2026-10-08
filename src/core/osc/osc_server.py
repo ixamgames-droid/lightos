@@ -78,7 +78,48 @@ class OscServer:
         from src.core.app_state import get_state
         return get_state()
 
+    @staticmethod
+    def _is_pressed(args) -> bool:
+        """OSC-05: Taster-Wert auswerten — nur der DRUCK loest aus.
+
+        TouchOSC/Lemur-Taster senden 1.0 beim Druecken und 0.0 beim Loslassen;
+        ohne Auswertung loeste jeder Tastendruck zweimal aus. Ohne Argument
+        (reiner Trigger) wird wie bisher immer ausgeloest.
+
+        Skala aus dem Wert erkannt, Schwelle = halbe Skala:
+          0..1    -> >= 0.5   (TouchOSC/Lemur, auch int 0/1 und OSC-True/False)
+          0..100  -> >= 50    (Prozent, z. B. grandMA3)
+          > 100   -> gedrueckt (0..127 bzw. 0..255: alles ueber 100 liegt schon
+                                ueber der halben 0..127-Skala; ein Wert 101..127
+                                auf 0..255 ist nicht von 0..127 unterscheidbar)
+        Strings wie bei /blackout (``_as_on``).
+        """
+        if not args:
+            return True
+        raw = args[0]
+        if raw is None:
+            # OSC-Nil (",N") als "Bang" von manchen Sendern: wie ohne Argument.
+            return True
+        if isinstance(raw, str):
+            try:
+                raw = float(raw.strip())
+            except ValueError:
+                return OscServer._as_on(raw)
+        try:
+            v = float(raw)
+        except (TypeError, ValueError):
+            return bool(raw)
+        if v != v:   # NaN: kein gueltiger Druckwert
+            return False
+        if v <= 1.0:
+            return v >= 0.5
+        if v <= 100.0:
+            return v >= 50.0
+        return True
+
     def _handle_go(self, address, *args):
+        if not OscServer._is_pressed(args):
+            return   # OSC-05: Loslassen eines Tasters
         try:
             # A3D-40: einen Snapshot ziehen (kein Doppel-Fetch/Alias auf die Live-Liste,
             # die show_file beim Laden per cue_stacks.clear() in-place leert). Ohne das
@@ -95,6 +136,8 @@ class OscServer:
             pass
 
     def _handle_back(self, address, *args):
+        if not OscServer._is_pressed(args):
+            return   # OSC-05
         try:
             from src.core.cueliste_ziel import bediene_cueliste
             bediene_cueliste(self._get_state(), "back")   # UI-66, s. _handle_go
@@ -141,6 +184,8 @@ class OscServer:
             if slot < 0 or slot >= len(executors):
                 return
             ex = executors[slot]
+            if action in ("go", "back", "stop") and not OscServer._is_pressed(args):
+                return   # OSC-05: Loslassen eines Tasters; Fader unveraendert
             if action == "go":
                 ex.press_btn("go")
             elif action == "back":

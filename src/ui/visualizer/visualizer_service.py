@@ -247,6 +247,117 @@ def _prism_facets(attrs: dict, channels) -> int | None:
     return 0 if wert <= 0 else PRISM_FACETTEN_FALLBACK
 
 
+# ── VIZ-79: Laser-Block des Payloads ─────────────────────────────────────────
+# Der 3D-Viewer bildet einen Laser als Strahlen-Rig ab (scene_src/fixtures/
+# laser.js). Was die Profile an Laser-Kanaelen haben, wird HIER in wenige,
+# normierte Zahlen uebersetzt — JS kennt keine Ranges, und die Bedeutung eines
+# Werts haengt am Profil: beim L2600 ist laser_x 0-127 eine feste Position und
+# 128-255 eine Bewegung, die das Geraet selbst faehrt; beim FB4 ist der ganze
+# Bereich 0-255 Position (128 = Mitte).
+#
+# Regel: der ERSTE Range eines Kanals ist sein statischer Bereich (Position,
+# Groesse, Winkel), alles darueber ist Eigenbewegung des Geraets. Ein Kanal
+# ohne Ranges gilt ueber 0-255 als statisch. Farbe und Helligkeit kommen wie
+# bei jedem Geraet aus r/g/b/intensity — der Block traegt keine Helligkeit.
+_LASER_FORMEN = 4   # 0 Faecher · 1 Einzelstrahl · 2 Strahlenkranz · 3 Flaeche
+
+
+def _laser_statisch(attrs: dict, channels, attr: str):
+    """``(anteil 0..1, dynamisch)`` eines Laser-Kanals oder ``None``, wenn das
+    Geraet ihn nicht hat."""
+    from src.core.color_utils import _chan_by_attr
+    if attr not in attrs:
+        return None
+    v = max(0, min(255, int(attrs.get(attr) or 0)))
+    lo, hi = 0, 255
+    ch = _chan_by_attr(channels, attr)
+    rgs = []
+    for rg in (getattr(ch, "ranges", None) or ()) if ch is not None else ():
+        try:
+            rgs.append((int(rg.range_from), int(rg.range_to)))
+        except (TypeError, ValueError):
+            continue
+    if rgs:
+        lo, hi = min(rgs)
+    if v > hi:
+        return 0.5, True
+    return (v - lo) / max(1, hi - lo), False
+
+
+def _laser_payload(fixture, attrs: dict, channels) -> dict | None:
+    """Normierter Laser-Block fuer den 3D-Viewer — ``None`` fuer Nicht-Laser.
+
+    Ein Geraet zaehlt als Laser, wenn es als ``laser`` gepatcht ist oder
+    ``laser_*``-Kanaele hat. Position kommt aus ``laser_x``/``laser_y``, sonst
+    aus Pan/Tilt; Groesse aus ``laser_zoom_x``/``laser_zoom_y``, sonst ``zoom``;
+    der Winkel aus ``gobo_rotation``. Das Muster wird nur GROB abgebildet (vier
+    Formen aus Musterbank und Musterauswahl): die echten Muster sind
+    Vektorgrafiken im Geraet, die der Viewer nicht kennt."""
+    ist_laser = (getattr(fixture, "fixture_type", "") == "laser"
+                 or any(k.startswith("laser_") for k in attrs))
+    if not ist_laser:
+        return None
+    out: dict[str, object] = {}
+    bewegt_selbst = False
+    # Pan/Tilt sind nur dann eine POSITION, wenn das Geraet eine echte Achse hat
+    # — beide Kanaele. Ein einzelner „pan" ist bei Party-Lasern ein Drehmotor
+    # (PARTYLASER: „Motor"); als Position gelesen schwenkte sein Null-Frame den
+    # Faecher ganz nach links (Review VIZ-79, M2).
+    echte_achse = "pan" in attrs and "tilt" in attrs
+    for achse, quellen in (("x", ("laser_x", "pan")), ("y", ("laser_y", "tilt"))):
+        for q in quellen:
+            if q in ("pan", "tilt") and not echte_achse:
+                continue
+            r = _laser_statisch(attrs, channels, q)
+            if r is None:
+                continue
+            anteil, dyn = r
+            out[achse] = round(anteil * 2 - 1, 4)
+            if dyn:
+                out["d" + achse] = True
+                bewegt_selbst = True
+            break
+    for achse, quellen in (("sx", ("laser_zoom_x", "zoom")),
+                           ("sy", ("laser_zoom_y", "zoom"))):
+        for q in quellen:
+            r = _laser_statisch(attrs, channels, q)
+            if r is None:
+                continue
+            anteil, dyn = r
+            out[achse] = round(anteil, 4)
+            if dyn:
+                out["dz"] = True
+                bewegt_selbst = True
+            break
+    r = _laser_statisch(attrs, channels, "gobo_rotation")
+    if r is not None:
+        out["rot"] = round(r[0], 4)
+        if r[1]:
+            out["dr"] = True
+            bewegt_selbst = True
+    bank = int(attrs.get("laser_bank") or 0)
+    muster = int(attrs.get("gobo_wheel") or 0) if "laser_bank" in attrs else 0
+    out["form"] = (bank // 16 + muster) % _LASER_FORMEN
+    motor = None
+    if not echte_achse and "pan" in attrs and "laser_x" not in attrs:
+        # Drehmotor: 0 = steht, mehr = dreht schneller -> Rollen um die Strahlachse.
+        motor = max(0, min(255, int(attrs.get("pan") or 0))) / 255
+        if motor > 0:
+            out["dr"] = True
+            bewegt_selbst = True
+            if "speed" not in attrs:
+                out["tempo"] = round(motor, 4)
+    if "speed" in attrs:
+        tempo = max(0, min(255, int(attrs.get("speed") or 0))) / 255
+        out["tempo"] = round(tempo, 4)
+        # Kein Positionskanal (L2600 im 6-Kanal-Modus): das Geraet faehrt sein
+        # Programm selbst — mit Geschwindigkeit > 0 („0 = keine Bewegung“)
+        # schwenkt der Faecher langsam.
+        if not bewegt_selbst and "x" not in out and tempo > 0:
+            out["dx"] = True
+    return out
+
+
 def _mit_fein(pt: dict, achse: str, default: int = 128, sfx: str = ""):
     """Grobwert + ``<achse>_fine``/256 (VIZ-61); ohne oder mit 0 Fein der Grobwert.
     ``sfx`` = Kopf-Suffix (``"#1"`` …) fuer ``pan#1``/``pan_fine#1`` (VIZ-63)."""
@@ -323,10 +434,20 @@ def _build_fixture_payload(fixture, attrs: dict[str, int],
     _gobo = _gobo_style_gemerkt(attrs, channels)
     if _gobo is not None:
         payload["gobo"] = _gobo
+        # VIZ-80: Gobo-Drehung als WINKEL (roh, wie ``prism_rotation``) — nur
+        # zusammen mit einem Gobo-Rad, sonst gaebe es nichts zu drehen. JS
+        # (gobo_textures.js#applyGobo) dreht damit den Bodenfleck um seine
+        # Normale; eine fortlaufende Eigendrehung wird nicht erfunden.
+        if "gobo_rotation" in attrs:
+            payload["gobo_rotation"] = attrs["gobo_rotation"]
     # VIZ-PRISMA-3D: aus EINEM Strahl werden mehrere. Auch hier wandert die
     # fertige Facetten-ZAHL nach JS, nicht der Rohwert (Begruendung an
     # _prism_facets). Die Drehung dagegen ist ein reiner Winkel und geht roh
     # mit — dort gibt es keine Profil-Zuordnung aufzuloesen.
+    # VIZ-79: Laser-Block (Position, Groesse, Muster, Eigenbewegung).
+    _laser = _laser_payload(fixture, attrs, channels)
+    if _laser is not None:
+        payload["laser"] = _laser
     _prism = _prism_facets_gemerkt(attrs, channels)
     if _prism is not None:
         payload["prism"] = _prism

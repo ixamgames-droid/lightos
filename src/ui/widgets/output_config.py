@@ -11,11 +11,13 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QTimer
 import serial.tools.list_ports
 from src.core.app_state import get_state
+from src.core.paths import user_data_file
 from src.core.dmx.enttec_pro import EnttecPro, ENTTEC_VID, ENTTEC_PID
 
 # ⚠️ Umlenkbar — und das ist keine Test-Bequemlichkeit, sondern Datenschutz.
 #
-# Der Pfad ist RELATIV zum Arbeitsverzeichnis, und `_persist_output` schreibt
+# Der Pfad war bis XPLAT-44 RELATIV zum Arbeitsverzeichnis (heute: App-
+# Datenordner, `paths.user_data_file`), und `_persist_output` schreibt
 # ihn bei jedem „Übernehmen"/„Verbinden" neu. Wer die Suite im Repo-Ordner
 # fährt — also der Normalfall —, schrieb damit in **genau die Datei, ohne die
 # kein DMX rausgeht**: gemessen legte `tests/test_output_config_lifecycle.py`
@@ -29,8 +31,7 @@ from src.core.dmx.enttec_pro import EnttecPro, ENTTEC_VID, ENTTEC_PID
 # `LIGHTOS_FIXTURE_DB` / `LIGHTOS_CRASH_LOG` (s. `tests/conftest.py`): Default
 # unverändert, im Test ein Wegwerf-Pfad. Der Wächter dazu ist
 # `tests/test_universes_json_isolation.py`.
-_UNIV_CONFIG_PATH = os.environ.get(
-    "LIGHTOS_UNIVERSES_JSON") or os.path.join("data", "universes.json")
+_UNIV_CONFIG_PATH = user_data_file("universes.json")
 
 # A3D-33: gueltiger interner Universe-Bereich — identisch zu den 1..32-Spinboxen der
 # Tabs und der 32-Zeilen-Grenze in _univ_add. Die freie '#'-Spalte des Universe-Tables
