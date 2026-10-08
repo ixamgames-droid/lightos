@@ -72,7 +72,7 @@
 | FM-68 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:10Z | fixtures |
 | DOC-65 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:11Z | docs/anleitung_fixture_generator |
 | LAS-26 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:11Z | src/ui |
-| QA-90 | D | fix/qa90-maximal-schatten | 2026-10-08T18:21Z | tests/test_viz72_spot_pool_umgebung.py · BACKLOG.md |
+| QA-90 | D | fix/qa90-maximal-schatten | 2026-10-08T18:23Z | tests/test_viz72_spot_pool_umgebung.py · src/ui/visualizer/visualizer_window.py · BACKLOG.md |
 
 ## Blocker & Fallen
 
@@ -166,7 +166,6 @@
 
 ## Verlauf
 
-- 2026-10-08T15:59Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T16:05Z D claim QA-87
 - 2026-10-08T16:05Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T16:14Z D claim QA-88
@@ -196,3 +195,4 @@
 - 2026-10-08T18:11Z A claim LAS-26
 - 2026-10-08T18:16Z A done VIZ-83
 - 2026-10-08T18:21Z D claim QA-90
+- 2026-10-08T18:23Z D aktualisiert QA-90: Dateien tests/test_viz72_spot_pool_umgebung.py · BACKLOG.md -> tests/test_viz72_spot_pool_umgebung.py · src/ui/visualizer/visualizer_window.py · BACKLOG.md
