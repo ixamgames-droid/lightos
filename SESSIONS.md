@@ -72,7 +72,7 @@
 | XPLAT-46 | B | fix/xplat46-arm-x64-empfehlung | 2026-10-08T18:32Z | install.py · INSTALL.md · CONTRIBUTING.md · src/ui/main_window.py · src/utils/plattform_hinweis.py · tests/test_xplat46_arm_empfehlung.py · changelog.d/2026-10-08-XPLAT-46.md |
 | DOC-66 | A | docs/doc66-github-seite-audit | 2026-10-08T18:37Z | README.md · docs/ANLEITUNGEN.md |
 | XPLAT-24 | B | fix/xplat24-worker-job | 2026-10-08T18:41Z | src/core/dmx/serial_process.py · tests/test_xplat24_worker_job.py · changelog.d/2026-10-08-XPLAT-24.md · BACKLOG.md |
-| BPM-28 | D | fix/bpm28-beat-takt | 2026-10-08T18:44Z | src/core/engine/bpm_manager.py · tests/test_bpm28_beat_takt.py · BACKLOG.md · changelog.d/2026-10-08-BPM-28.md |
+| BPM-28 | D | fix/bpm28-beat-takt | 2026-10-08T20:36Z | src/core/engine/bpm_manager.py · tests/test_bpm28_beat_takt.py · BACKLOG.md · changelog.d/2026-10-08-BPM-28.md |
 | TOOL-11 | B | fix/tool11-bildschirm-windows | 2026-10-08T18:59Z | tools/anleitungsbilder.py · tools/anleitungsbilder/sandbox.py · tests/test_tool11_bildschirm_windows.py · BACKLOG.md |
 | UI-75 | B | fix/ui75-neue-show-patch-vc | 2026-10-08T19:04Z | src/ui/main_window.py · tests/test_ui75_neue_show_fragt.py · docs/anleitung_erste_schritte/ANLEITUNG.md · docs/anleitung_erste_schritte/ANLEITUNG.en.md · changelog.d/2026-10-08-UI-75.md · BACKLOG.md |
 | OUT-62 | B | fix/out62-blackout-maske-atomar | 2026-10-08T19:08Z | src/core/app_state.py · docs/components/engine/script.md · tests/test_out62_blackout_maske_atomar.py · changelog.d/2026-10-08-OUT-62.md · BACKLOG.md |
