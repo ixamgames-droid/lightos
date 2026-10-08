@@ -12,7 +12,8 @@ dann App starten → **Strg+O** → `shows/Farb_FX_VC_Show.lshow`. Bank wechseln
 Oben in jeder Bank: **MASTER BPM** + **Tap** + **Musik-BPM**. Das ist der eine Master-Takt.
 Jeder Effekt hängt daran und hat einen **eigenen Multiplikator** (Speed-Dial-Gitter
 `¼ ½ 1 2 3 4`). Ohne BPM laufen die Effekte in ihrem Eigentempo; sobald BPM da ist (Tap/Musik),
-rasten sie taktsynchron ein — jeder mit seinem Faktor (z. B. PAR-Farbe ×1, Spider ×2, MH ×½).
+rasten sie taktsynchron ein — jeder mit seinem Faktor (z. B. PAR-Farbe ×1). Bewegungen laufen
+bewusst langsam: Moving Heads ×¼ (eine Figur je Takt), Spider ×⅛ — nie schneller als die MH.
 
 ![Multiplikator-Dial „PAR ×“ mit Faktor-Gitter neben der Master-BPM und dem Musik-BPM-Knopf](anleitung_farb_fx_vc/img/02_speeddial_factorgrid.png)
 
@@ -74,7 +75,7 @@ schaltet das automatische „Farbe = sichtbar" ab.)*
 - **XY-Feld „MH Bereich (Box aufziehen)"**: Rechteck ziehen → **MH Kreis** fährt seine Figur nur in
   diesem Bereich (die anderen Formen bleiben unverändert).
 - **Spider** (Reihe 3–4): Ineinander · Auseinander · Wackeln · Außen · Innen · Zufall-3-Positionen.
-- Rechts: Multiplikator-Dials (MH / Spider).
+- Rechts: Multiplikator-Dials „MH ×" (⅛ ¼) und „Spider ×" (1/16 ⅛).
 
 ## Bank 4 — ÜBERSICHT / STROBE / MASTER
 - **Strobe** (Reihe 0, gehalten): Alle · nur PAR · nur MH · nur Spider.
@@ -83,7 +84,8 @@ schaltet das automatische „Farbe = sichtbar" ab.)*
   komplette Ausgabe an — alle Effekte und der Takt bleiben stehen, Blackout und Grand-Master wirken
   weiter; nochmal drücken taut auf).
 - **Übersicht**: Master-BPM + Multiplikator-Dials „Farbe ×" / „Bewegung ×" — dieselben Effekte wie
-  Bank 1–3, also **live synchron** (hier ändern = überall geändert).
+  Bank 1–3, also **live synchron** (hier ändern = überall geändert). „Bewegung ×" steuert nur die
+  Moving Heads; die Spider behalten ihr halbes Tempo (Dial „Spider ×" auf Bank 3).
 - **4 Master-Dimmer** ganz rechts (APC-Fader CC53–56): **Spider · MH · PAR · GRAND**.
 
 ## APC mini mk2
