@@ -334,6 +334,19 @@ class PackagingDateienTest(unittest.TestCase):
         self.assertIn("lightos.ico", s)
         self.assertIn("bundle_inhalt.HIDDEN_IMPORTS", s)
 
+    def test_paketierung_ist_in_git(self):
+        """``.gitignore`` schliesst ``*.spec`` aus (PyInstaller-Wegwerf-Specs) —
+        der erste CI-Lauf fand die Spec deshalb nicht. Die gepflegte Spec hat
+        eine Ausnahme und muss von Git erfasst werden."""
+        for rel in ("packaging/windows/LightOS.spec", "packaging/windows/LightOS.iss",
+                    "packaging/windows/bundle_inhalt.py"):
+            with self.subTest(rel=rel):
+                try:
+                    r = subprocess.run(["git", "check-ignore", "-q", rel], cwd=_REPO)
+                except OSError:
+                    self.skipTest("kein Git")
+                self.assertEqual(r.returncode, 1, f"{rel} wird von .gitignore verschluckt")
+
     def test_iss_eckpunkte(self):
         s = _lies("packaging", "windows", "LightOS.iss")
         for muss in ("DefaultDirName={autopf}\\LightOS",
