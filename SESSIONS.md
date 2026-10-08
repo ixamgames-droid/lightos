@@ -57,7 +57,6 @@
 | DOC-60 | A | docs/doc60-buehnenshow-effekte | 2026-10-05T16:18Z | - |
 | VIZ-83 | A | fix/viz83-gobo-strahl | 2026-10-08T15:16Z | - |
 | ENG-31 | A | fix/eng31-mega-arena-tempo | 2026-10-08T15:16Z | - |
-| BACKLOG-D-BERICHT | A | docs/backlog-d-bericht | 2026-10-08T15:53Z | BACKLOG.md |
 | VIZ-84 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
 | VIZ-85 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
 | VIZ-86 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
@@ -160,7 +159,6 @@
 
 ## Verlauf
 
-- 2026-10-06T20:34Z A claim QA-85
 - 2026-10-06T20:34Z 3 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-06T21:02Z A done VIZ-80
 - 2026-10-06T21:31Z A done MIDI-1
@@ -190,3 +188,4 @@
 - 2026-10-08T16:16Z D claim DOC-62
 - 2026-10-08T16:27Z 3 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T16:29Z D aktualisiert QA-87: Dateien src/core/engine/tap_uhr.py · src/core/engine/tempo_bus.py · src/core/engine/bpm_manager.py · src/ui/virtualconsole/vc_speedial.py · tests/test_vc_speed_node.py · tests/test_vc_tempo_widgets.py · tests/test_qa87_tap_uhr.py · changelog.d/2026-10-08-QA-87.md -> src/core/engine/tap_uhr.py · src/core/engine/tempo_bus.py · src/core/engine/bpm_manager.py · src/ui/virtualconsole/vc_speedial.py · tests/test_vc_speed_node.py · tests/test_vc_tempo_widgets.py · tests/test_qa87_tap_uhr.py · tests/test_tempo_bus.py · tests/test_tempo_grandmaster.py · tests/test_bpm_leader.py · changelog.d/2026-10-08-QA-87.md
+- 2026-10-08T16:31Z A done BACKLOG-D-BERICHT
