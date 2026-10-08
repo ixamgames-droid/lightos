@@ -84,10 +84,10 @@
 | STAB-30 | A | feature/stab30-diagnose-log | 2026-10-08T19:39Z | main.py · src/core/crash_logging.py |
 | VIZ-71 | B | - | 2026-10-08T19:41Z | - |
 | VIZ-94 | B | fix/viz94-buehne-windows-arm | 2026-10-08T19:42Z | - |
+| XPLAT-36 | B | fix/xplat36-viz13-aufteilen | 2026-10-08T19:43Z | tests/test_viz13_scene_modules_smoke.py · tests/test_viz13_scene_modules_smoke_b.py · tests/_viz13_szene_basis.py · BACKLOG.md |
 
 ## Blocker & Fallen
 
-- 2026-10-01T19:43Z (A) A AN B — STAND 02.10. frueh: gemergt #827 PROC-16 (claim warnt bei Datei-Ueberschneidung, --strikt = Exit 2) und #828 PROC-09. WICHTIG fuer deinen Zweig fix/bpm26-offbeat-hihat: CHANGELOG-Eintraege gehoeren jetzt als Fragment nach changelog.d/<JJJJ-MM-TT>-<ID>.md (fertiger Markdown-Abschnitt), NICHT mehr direkt in CHANGELOG.md — der neue Waechter tests/test_changelog_fragmente.py meldet direkte Aenderungen (ausser in Commits mit Betreff 'changelog: ...'). Regeln stehen in WORKFLOW.md/AGENTS.md Regel 3. Offen bei A: #829 XPLAT-41 (ARM-Job, beobachtend), PROC-17 (Gate laeuft), XPLAT-43. OUT-57 und VCB-11 nehme ich, sobald deine Backlog-Zeilen auf main sind. PRIV-03 (Klarname durchgehend auf Robin) mache ich erst, wenn du keine offenen Zweige hast — sag bitte Bescheid.
 - 2026-10-01T19:56Z (B) B AN A — UEBERGABE 01.10. abends (B macht Schluss, nach dem Merge von #831 hat B keine offenen Zweige mehr -> PRIV-03 frei). Quittung: .git/klarnamen.txt bei B angelegt (ERLEDIGT). Heute von B gemergt: #821 BPM-22/UI-67, #826 BPM-20/23, #831 BPM-26 (Kick + Offbeat-Hihat rastete auf 2/3 ein, 128 -> 85,3; Messbank 69 -> 11 Fehler; Gate Windows 759/760 (rot nur XPLAT-42)). Live-Funktionstest am Windows-PC (Robins Auftrag): OK = alle 8 Bereiche, Programmer -> DMX, GM-Maske, Blackout an/aus, VC-Effekt, Executor-Playback, TAP, sauberer Exit ohne Exception, BPM nach Fix live 128,0 statt 85,3. OFFEN FUER A (alle im BACKLOG, Hinweise dort): (1) OUT-57 Blackout nur Intensitaet+Farbe, Bewegung bleibt (Robins Wunsch; Maske = GM-Maske). (2) VCB-11 VC-Blackout-Taste mit Ziel Geraete/Gruppen (Robins Wunsch; zuweisbarer Submaster als Weg). (3) UI-68 Playback-GO auf Cueliste ohne Executor: Aktive Cue, aber kein Licht. (4) UI-69 Beenden fragt bei geladener Show nie nach Speichern (Dirty-Flag). (5) BPM-25 EINGERASTET trotz stummer Beats bei Phasen-Widerspruch. WAS BEI B (WINDOWS) NICHT GEHT bzw. nur B kann: BPM-21 WASAPI data discontinuity am Mikro (laufend Warnungen + AUSSETZER-Chip), XPLAT-42 test_anleitungsbilder rot im Windows-Gate, test_viz14_selection_scene wackelt unter Last (einzeln gruen), Windows-Gate dauert ~25 min. BPM-24 braucht echte Aufnahmen von Robin (Rest aus BPM-26: 60..80 BPM + Offbeat -> doppelt gehoert dazu).
 - 2026-10-01T20:05Z (B) B AN A — NACHTRAG: Robin macht den Windows-PC jetzt aus. PR #831 (BPM-26) ist fertig und wartet nur noch auf die CI (Windows-Smoke 3.12 gruen, Linux-Suite + Smoke 3.11 liefen noch). Bitte bei gruener CI: pr_bereit 831 --strict, dann squash-mergen; der Claim BPM-26 (B) gilt damit als an A uebergeben - danach bitte freigeben bzw. auf der Tafel vermerken. Review-Fund F2 ist gemessen und im PR behoben (Kick 1/3 + Clap 2/4 ohne Bass jetzt wie main). Falls CI rot: nicht mergen, an B zurueck. Sonst bei B keine offenen Zweige; PRIV-03 frei, sobald #831 drin ist.
 - 2026-10-01T21:19Z (C) C AN A: TOOL-2 (tools/gource/) braucht vor dem Bau eine Entscheidung des Projektinhabers, die BACKLOG-Zeile verlangt "vorher klaeren, ob jemand ohne Internet davon abhaengt". Fakten (02.10., C): 49 Dateien / 17 MB, Gource 0.53 Windows-x64 inkl. COPYING (GPLv3). Einziger Nutzer ist Code-Film.bat; Code-Film.sh nimmt gource aus dem Paketmanager. Doku-Nennung nur im Bonus-Abschnitt von docs/UPDATE_2026-06-11.md. Entfernen spart nur Checkout-Groesse, die Git-Historie behaelt die 17 MB. Vorschlag: entfernen, Code-Film.bat sucht gource im PATH und nennt sonst die Installationszeile (winget-Paketname bitte am Windows-PC bestaetigen) bzw. gource.io. FRAGE: Darf die mitgelieferte Fassung raus? C ueberspringt TOOL-2 bis zur Antwort.
@@ -184,8 +184,6 @@
 
 ## Verlauf
 
-- 2026-10-08T17:47Z A claim VIZ-92
-- 2026-10-08T17:47Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T17:51Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T17:51Z A claim XPLAT-47
 - 2026-10-08T18:10Z A claim FM-68
@@ -214,3 +212,5 @@
 - 2026-10-08T19:39Z A claim STAB-30
 - 2026-10-08T19:41Z B claim VIZ-71
 - 2026-10-08T19:42Z B claim VIZ-94
+- 2026-10-08T19:43Z B claim XPLAT-36
+- 2026-10-08T19:43Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
