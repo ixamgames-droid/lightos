@@ -72,6 +72,7 @@
 | XPLAT-47 | A | feature/xplat47-windows-setup | 2026-10-08T17:51Z | packaging/windows · .github/workflows |
 | FM-68 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:10Z | fixtures |
 | DOC-65 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:11Z | docs/anleitung_fixture_generator |
+| LAS-26 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:11Z | src/ui |
 
 ## Blocker & Fallen
 
@@ -165,7 +166,6 @@
 
 ## Verlauf
 
-- 2026-10-08T15:54Z A claim VIZ-87
 - 2026-10-08T15:57Z A done VIZ-72
 - 2026-10-08T15:59Z D claim QA-86
 - 2026-10-08T15:59Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
@@ -195,3 +195,4 @@
 - 2026-10-08T18:10Z A claim FM-68
 - 2026-10-08T18:11Z A claim DOC-65
 - 2026-10-08T18:11Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-08T18:11Z A claim LAS-26
