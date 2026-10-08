@@ -278,12 +278,19 @@ def bauen(out: str, *, reset: bool = True) -> dict:
         for ch in k[f]["intensity"]:
             blinder_an.fn.set_value(f, ch, 255)
 
-    laser_an = b.scene("Laser an")
-    for f in laser:
-        laser_an.fn.set_value(f, kanal(f, "shutter"), LASER_OFFEN)
-        laser_an.fn.set_value(f, kanal(f, "laser_bank"), 40)
-        laser_an.fn.set_value(f, kanal(f, "gobo_wheel"), 20)
-        laser_an.fn.set_value(f, kanal(f, "zoom"), 8)
+    def _laser_offen(name):
+        s = b.scene(name)
+        for f in laser:
+            s.fn.set_value(f, kanal(f, "shutter"), LASER_OFFEN)
+            s.fn.set_value(f, kanal(f, "laser_bank"), 40)
+            s.fn.set_value(f, kanal(f, "gobo_wheel"), 20)
+            s.fn.set_value(f, kanal(f, "zoom"), 8)
+        return s
+    laser_an = _laser_offen("Laser an")
+    # Eigene Szene fuer den FLASH-Knopf (Codex #962): Loslassen eines Flash
+    # stoppt seine Funktion unbedingt (vc_button.py) — teilte er sich die
+    # Szene mit dem Schalter „Laser an", ginge ein eingerasteter Laser aus.
+    laser_flash = _laser_offen("Laser Flash")
     laser_gruen = b.scene("Laser grün")
     for f in laser:
         laser_gruen.fn.set_value(f, kanal(f, "color_wheel"), LASER_FARBE["gruen"])
@@ -436,7 +443,7 @@ def bauen(out: str, *, reset: bool = True) -> dict:
     _titel("FLASH", y)
     _knopf("Strobe", strobe_blitz, 0, y, bg="strobe", flash=True)
     _knopf("Blinder", blinder_an, 1, y, bg="hot_white", flash=True)
-    _knopf("Laser", laser_an, 2, y, bg="beam_sweep", flash=True)
+    _knopf("Laser", laser_flash, 2, y, bg="beam_sweep", flash=True)
     blackout = b.button("BLACKOUT", ButtonAction.BLACKOUT, bank=0)
     blackout.setGeometry(X0 + 4 * DX, y, BW, BH)
     stop = b.button("Effekte stop", ButtonAction.STOP_ALL, bank=0)
@@ -520,7 +527,7 @@ def bauen(out: str, *, reset: bool = True) -> dict:
             if not any(b.verify_render([fn], universe=univ, frames=n)[1]
                        for n in (137, 150, 163, 171)):
                 raise SystemExit(f"Render-Smoke: '{fn.name}' aendert kein DMX ueber die Zeit")
-    for fns, univ in (([sp_an], 2), ([blinder_an], 1), ([laser_an, laser_gruen], 3)):
+    for fns, univ in (([sp_an], 2), ([blinder_an], 1), ([laser_an, laser_gruen], 3), ([laser_flash], 3)):
         if not b.verify_render(fns, universe=univ, frames=20)[0]:
             raise SystemExit(f"Render-Smoke: {fns[0].name} erzeugt kein DMX")
     return {"pars": pars, "par_front": par_front, "par_up": par_up, "blinder": blinder,

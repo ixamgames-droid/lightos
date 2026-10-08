@@ -64,6 +64,8 @@ laufen deshalb mit jeder Cue weiter.
 - **Speed-Dials:** „MH ×" (⅛ oder ¼), „Spider ×" (1/16 oder ⅛), „Strobe ×"
   (½, 1, 2).
 - **FLASH:** Strobe, Blinder, Laser — Licht nur, solange die Taste gedrückt ist.
+  Der FLASH-Laser hat eine eigene Szene („Laser Flash“): ist „Laser an“
+  eingerastet, bleibt der Laser nach dem Loslassen an.
 - **Moving Heads:** Kreis, Acht, Schwenk, Tilt-Welle und der
   **Bewegungs-Chaser**, der alle 16 Beats zur nächsten Figur wechselt. Die
   Tasten einer Reihe lösen sich gegenseitig ab.

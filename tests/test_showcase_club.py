@@ -168,6 +168,20 @@ class ShowcaseClubTest(unittest.TestCase):
         self.assertTrue({"Tap", "AudioBpm", "SyncBus", "Blackout", "LaserEstop"} <= aktionen,
                         aktionen)
 
+    def test_flash_teilt_keine_funktion_mit_einem_schalter(self):
+        """Codex #962: Loslassen eines FLASH stoppt seine Funktion unbedingt
+        (vc_button.py). Teilt er sie mit einem Schalter (FunctionToggle), geht
+        ein eingerasteter Look beim Loslassen aus — FLASH „Laser" vs. „Laser an"."""
+        self._bereit()
+        def ids(x):
+            return {i for i in [x.get("function_id"), *(x.get("function_ids") or [])]
+                    if i is not None}
+        knoepfe = [x for x in _widgets(self.show) if x["type"] == "VCButton"]
+        flash = set().union(*(ids(x) for x in knoepfe if x.get("action") == "FunctionFlash"))
+        schalter = set().union(*(ids(x) for x in knoepfe if x.get("action") == "FunctionToggle"))
+        self.assertTrue(flash and schalter)
+        self.assertEqual(flash & schalter, set())
+
     def _efx_am_bus(self):
         fns = [f for liste in self.show["functions"].values() for f in liste
                if f.get("type") == "EFX"]
