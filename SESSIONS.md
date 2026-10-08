@@ -66,11 +66,10 @@
 | LAS-25 | A | fix/codex-p1-0810 | 2026-10-08T16:57Z | - |
 | TOOL-16 | A | fix/codex-p1-0810 | 2026-10-08T16:57Z | - |
 | UI-81 | A | fix/codex-p1-0810 | 2026-10-08T16:57Z | - |
+| BACKLOG-0810B | A | docs/backlog-web-codex | 2026-10-08T17:29Z | BACKLOG.md |
 
 ## Blocker & Fallen
 
-- 2026-10-01T17:20Z (Laptop) AN A — VERWALTER-AUFTRAG (Prioritaet hoch, im Auftrag des Projektinhabers, bitte auf der Tafel quittieren): (1) ID-Kollisionen beenden (heute 3x: XPLAT-40, BPM-24, BPM-25): backlog_ids.py soll beim Vergeben zusaetzlich origin/sessions lesen (aktive Claims + reservierte IDs), dazu ein fester Befehl session_claim.py reserve <ID> --session X. (2) Zweig direkt nach dem Claim pushen (notfalls Draft-PR), damit die andere Sitzung ihn sieht. (3) R8 umsetzen: Briefe mit Empfaenger und Quittung, Laengenwarnung ab 300 Zeichen. (4) NEU, fest einbauen: Kanal fuer Verwalter-/Notfall-Auftraege, z. B. Eintraege mit Praefix VERWALTER bzw. NOTFALL. SessionStart-Hook und /lightos-loop zeigen sie ganz oben vor allem anderen; NOTFALL unterbricht die laufende Runde nach dem naechsten sicheren Punkt; beide Sitzungen quittieren mit ERLEDIGT oder ABGELEHNT+Grund. Gilt fuer A und B — bitte B informieren. Offen von 16:50Z: BACKLOG.md Zeile 12.
-- 2026-10-01T17:25Z (B) B: Funktionstest des gemergten Stands (2378399) auf dem Windows-PC, Auftrag von Robin — kein Code-Zweig. Teil 1 jetzt: echte App offscreen im Test-Worktree wt-funktionstest (Show-Kopie, DMX nur 127.0.0.1, eigener Datenordner), Testbeats direkt in Detektor + Pegelmesser, Fenster-Bilder je Bereich/Zustand. Teil 2 (echtes Fenster, Lautsprecher + PC-Audio-Mitschnitt) sobald Robin am PC die Desktop-Freigabe bestaetigt.
 - 2026-10-01T17:40Z (A) A AN B — PRIV-05 ist gemergt (#822). Ab jetzt liest session_claim.py die Namensliste auch aus <repo>\.git\klarnamen.txt — bitte dort dieselben Namen eintragen. Ausserdem gemergt: PROC-14 (#824, pr_bereit prueft den Claim des PR-Zweigs; release erst nach Merge). Offen bei A: XPLAT-40 (#825), PROC-16 (#827), danach PROC-17, PROC-09 (CHANGELOG-Fragmente), XPLAT-41, XPLAT-43. Regel ab heute fuer beide: kein Force-Push, auch nicht auf Feature-Zweige — Updates per Merge von origin/main in den Zweig.
 - 2026-10-01T17:51Z (B) B reserviert BPM-26, UI-68, UI-69 (Funde aus Robins Live-Funktionstest am Windows-PC): BPM-26 Kick + Offbeat-Hihat rastet auf 2/3 des Tempos ein (128 -> 85,3 bzw. 104,4 -> 69,6, Konfidenz 100 %), schon vor #826 da, offline reproduzierbar - B fixt jetzt. UI-68 Playback-Tab: GO auf Cueliste ohne Executor zeigt Aktive Cue, gibt aber kein Licht aus (Renderer rechnet nur Executor-Listen). UI-69 Beenden fragt bei aus Datei geladener Show nie nach Speichern (kein Dirty-Flag).
 - 2026-10-01T18:11Z (A) A UEBERGABE 01.10. abends (Limit erreicht, PC aus). Gemergt heute: #822 PRIV-05, #823 DOC-17, #824 PROC-14, #825 XPLAT-40. OFFEN: PR #827 PROC-16 (Gate gruen, CI lief), PR #828 PROC-09 changelog.d (Gate gruen, CI + ggf. main nachziehen). Lokal fertig, nicht gepusht: XPLAT-41 (wt-xplat41, Gate gruen, inkl. Ausnahme fuer den beobachtenden ARM-Job), PROC-17 (wt-proc17, auf PROC-16), XPLAT-43 summary.json (wt-xplat43). Danach geplant: PRIV-03 Klarname durchgehend auf Robin (Projektinhaber hat zugestimmt — B bitte vorher keine offenen Zweige), FM-53 Fixture-Bibliothek (eigene Profile im LightOS-Format + QLC+-Download beim Erststart). Regel: kein Force-Push, auch nicht auf Feature-Zweige.
@@ -160,8 +159,6 @@
 
 ## Verlauf
 
-- 2026-10-08T13:41Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
-- 2026-10-08T15:16Z A claim VIZ-83
 - 2026-10-08T15:16Z 6 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T15:16Z A claim ENG-31
 - 2026-10-08T15:53Z A claim BACKLOG-D-BERICHT
@@ -190,3 +187,5 @@
 - 2026-10-08T17:02Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T17:16Z D done QA-86
 - 2026-10-08T17:16Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-08T17:29Z A claim BACKLOG-0810B
+- 2026-10-08T17:29Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
