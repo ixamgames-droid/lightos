@@ -67,7 +67,7 @@
 | FM-68 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:10Z | fixtures |
 | DOC-65 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:11Z | docs/anleitung_fixture_generator |
 | LAS-26 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:11Z | src/ui |
-| QA-90 | D | fix/qa90-maximal-schatten | 2026-10-08T18:23Z | tests/test_viz72_spot_pool_umgebung.py · src/ui/visualizer/visualizer_window.py · BACKLOG.md |
+| QA-90 | D | fix/qa90-maximal-schatten | 2026-10-08T20:36Z | tests/test_viz72_spot_pool_umgebung.py · src/ui/visualizer/visualizer_window.py · BACKLOG.md |
 | QA-89 | D | fix/qa89-fade-uhr | 2026-10-08T18:41Z | src/core/engine/cue_stack.py · tests/test_qa89_fade_uhr.py · tests/test_cue_substack_and_attrdelay.py · BACKLOG.md · changelog.d/2026-10-08-QA-89.md |
 | XPLAT-46 | B | fix/xplat46-arm-x64-empfehlung | 2026-10-08T18:32Z | install.py · INSTALL.md · CONTRIBUTING.md · src/ui/main_window.py · src/utils/plattform_hinweis.py · tests/test_xplat46_arm_empfehlung.py · changelog.d/2026-10-08-XPLAT-46.md |
 | DOC-66 | A | docs/doc66-github-seite-audit | 2026-10-08T18:37Z | README.md · docs/ANLEITUNGEN.md |
