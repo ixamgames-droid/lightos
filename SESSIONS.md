@@ -65,7 +65,6 @@
 | LAS-25 | A | fix/codex-p1-0810 | 2026-10-08T16:57Z | - |
 | TOOL-16 | A | fix/codex-p1-0810 | 2026-10-08T16:57Z | - |
 | UI-81 | A | fix/codex-p1-0810 | 2026-10-08T16:57Z | - |
-| BACKLOG-0810B | A | docs/backlog-web-codex | 2026-10-08T17:29Z | BACKLOG.md |
 | DEMO-07 | A | docs/demo07-showcase-shows | 2026-10-08T17:30Z | - |
 | VIZ-92 | A | fix/viz92-gobo-feinschliff | 2026-10-08T17:47Z | src/ui/visualizer |
 | XPLAT-47 | A | feature/xplat47-windows-setup | 2026-10-08T17:51Z | packaging/windows · .github/workflows |
@@ -171,7 +170,6 @@
 
 ## Verlauf
 
-- 2026-10-08T16:29Z D aktualisiert QA-87: Dateien src/core/engine/tap_uhr.py · src/core/engine/tempo_bus.py · src/core/engine/bpm_manager.py · src/ui/virtualconsole/vc_speedial.py · tests/test_vc_speed_node.py · tests/test_vc_tempo_widgets.py · tests/test_qa87_tap_uhr.py · changelog.d/2026-10-08-QA-87.md -> src/core/engine/tap_uhr.py · src/core/engine/tempo_bus.py · src/core/engine/bpm_manager.py · src/ui/virtualconsole/vc_speedial.py · tests/test_vc_speed_node.py · tests/test_vc_tempo_widgets.py · tests/test_qa87_tap_uhr.py · tests/test_tempo_bus.py · tests/test_tempo_grandmaster.py · tests/test_bpm_leader.py · changelog.d/2026-10-08-QA-87.md
 - 2026-10-08T16:31Z A done BACKLOG-D-BERICHT
 - 2026-10-08T16:49Z A done ENG-31
 - 2026-10-08T16:49Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
@@ -201,3 +199,4 @@
 - 2026-10-08T18:37Z A claim DOC-66
 - 2026-10-08T18:41Z B claim XPLAT-24
 - 2026-10-08T18:41Z D aktualisiert QA-89: Dateien src/core/engine/cue_stack.py · tests/test_qa89_fade_uhr.py · tests/test_core_engine.py · BACKLOG.md · changelog.d/2026-10-08-QA-89.md -> src/core/engine/cue_stack.py · tests/test_qa89_fade_uhr.py · tests/test_cue_substack_and_attrdelay.py · BACKLOG.md · changelog.d/2026-10-08-QA-89.md
+- 2026-10-08T18:44Z A done BACKLOG-0810B
