@@ -5,6 +5,10 @@ Windows direkt unten, **[Linux weiter unten](#linux-x86_64)**.
 
 ## Schnellstart (Windows)
 
+> **Ohne Python:** es gibt auch ein fertiges Setup (`LightOS-Setup.exe`), siehe
+> [Windows-Setup](#windows-setup-lightos-setupexe--ohne-python). Der Weg hier unten
+> ist die Installation aus dem Quellcode.
+
 ```cmd
 python install.py
 ```
@@ -190,23 +194,54 @@ App-Datenordner  (Windows %APPDATA%/LightOS · Linux ~/.local/share/LightOS ·
 └── stages/                (3D-Buehnen)
 ```
 
-## Reale .exe statt Python? - Spaeter
+## Windows-Setup (LightOS-Setup.exe) — ohne Python
 
-Aktuell laeuft LightOS in Python (venv). Eine echte einklickbare .exe ginge per
-**PyInstaller** oder **Nuitka**:
+Seit XPLAT-47 gibt es ein echtes Windows-Setup: `LightOS-Setup.exe` installiert
+LightOS samt eigenem Python, Qt und QtWebEngine. Beim Nutzer braucht es **kein
+Python, kein venv und kein `install.py`**.
+
+**Woher:** Das Setup baut der GitHub-Workflow **„Windows-Setup“**
+(`.github/workflows/windows-setup.yml`) — von Hand gestartet (Actions → Windows-Setup →
+*Run workflow*) oder automatisch bei einem Versions-Tag `v*`. Das Ergebnis liegt als
+**Artefakt** `LightOS-Setup-<Version>` am Workflow-Lauf (zip mit der `LightOS-Setup.exe`,
+30 Tage aufbewahrt). Veröffentlicht als Release wird es (noch) nicht.
+
+**Was das Setup tut:**
+
+- installiert nach `C:\Program Files\LightOS` (für alle Benutzer; im Dialog lässt
+  sich „nur für mich“ wählen),
+- legt eine Startmenü-Verknüpfung an, auf Wunsch auch eine auf dem Desktop,
+- trägt einen Deinstaller ein (Einstellungen → Apps, oder Startmenü „LightOS
+  deinstallieren“),
+- legt die Lizenzen der Fremd-Komponenten bei (`THIRD_PARTY_NOTICES.md`, `licenses\`).
+
+**Deine Daten** (Shows, Show-DB, Geräte-Bibliothek, Snaps, Bühnen, Einstellungen)
+liegen wie bei der Python-Installation in `%APPDATA%\LightOS` — der Programmordner
+ist schreibgeschützt, LightOS schreibt dort nichts hin. Deinstallieren lässt die
+Daten deshalb stehen; ein späteres Setup findet sie wieder.
+
+**Windows auf ARM (Snapdragon):** Das Setup ist ein **x64-Paket**. Windows 11 auf ARM
+führt es in der x64-Emulation aus — **inklusive 3D-Visualizer** (QtWebEngine gibt es
+nur für x64, nicht in den nativen ARM64-Wheels, siehe XPLAT-45/46). Ein eigenes
+ARM64-Setup gibt es nicht.
+
+**Selbsttest ohne Fenster:** `"C:\Program Files\LightOS\LightOS.exe" --selbsttest bericht.txt`
+prüft, ob alle Module (inkl. QtWebEngine) und mitgelieferten Dateien da sind, schreibt
+den Bericht in die Datei und endet mit 0 (ok) bzw. 1. Funktioniert genauso im
+Quellbetrieb: `python main.py --selbsttest`.
+
+**Selbst bauen (Windows, x64-Python 3.12):**
 
 ```cmd
-python install.py --dev          # holt pyinstaller
-venv\Scripts\pyinstaller --windowed --icon assets/icons/lightos.ico --name LightOS main.py
+python -m pip install -r requirements.txt "pyinstaller>=6.10"
+python -m PyInstaller --noconfirm --clean packaging\windows\LightOS.spec
+"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=1.0.0 packaging\windows\LightOS.iss
 ```
 
-Resultat in `dist/LightOS/LightOS.exe` (~150 MB, alles included).
-
-**Achtung:** PyInstaller fuer ARM64 funktioniert ab Version 6.3, muss auf
-Snapdragon-Geraet selbst gebaut werden (Cross-Build moeglich aber bockig).
-
-Wenn du das vorbereitest sag Bescheid - dann mache ich ein dediziertes Build-Script
-(`build.py`) das auf beiden Architekturen sauber durchlaeuft.
+Ergebnis: `dist\LightOS\` (onedir-Build) und `dist\setup\LightOS-Setup.exe`. Was
+außer dem Code mitkommt, steht in `packaging/windows/bundle_inhalt.py` — nur
+Dateien, die Git kennt, damit keine privaten Laufzeitdaten aus `data/`/`shows/` in
+ein Setup geraten.
 
 ## Troubleshooting
 

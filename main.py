@@ -1,4 +1,14 @@
 """LightOS - Einstiegspunkt."""
+# XPLAT-47: freeze_support() ist die ALLERERSTE Anweisung. Der DMX-Worker
+# (src/core/dmx/serial_process.py) startet per ``mp.get_context("spawn")`` einen
+# Kindprozess. Im gepackten Windows-Build (PyInstaller) ist der Kindprozess
+# dieselbe LightOS.exe mit ``--multiprocessing-fork``; ohne diesen Aufruf liefe
+# darin die ganze App erneut an (Fenster, Sperre, rekursive Starts). Er muss
+# VOR jedem weiteren Import und vor der stdout-Umleitung stehen. Im
+# Quellbetrieb (nicht gefroren) tut er nichts.
+import multiprocessing
+multiprocessing.freeze_support()
+
 import sys
 import os
 import argparse
@@ -752,7 +762,16 @@ def main():
     parser.add_argument("--show", metavar="DATEI",
                         help="Diese .lshow beim Start oeffnen (statt der zuletzt "
                              "benutzten Show)")
+    parser.add_argument("--selbsttest", nargs="?", const="-", metavar="DATEI",
+                        help="Prueft Importe (inkl. QtWebEngine) und mitgelieferte "
+                             "Dateien ohne Fenster und beendet sich (0 = ok). "
+                             "Mit DATEI wird der Bericht dorthin geschrieben.")
     args = parser.parse_args()
+    if args.selbsttest:
+        # XPLAT-47: Rauchtest fuer den gepackten Build — VOR Einzelinstanz-
+        # Sperre, Crash-Logging und Datenuebernahme: keine Nebenwirkungen.
+        from src.core.selbsttest import main as _selbsttest
+        sys.exit(_selbsttest(None if args.selbsttest == "-" else args.selbsttest))
     # Fruehe, ehrliche Absage: ein Tippfehler im Pfad soll NICHT erst nach dem
     # kompletten Hochfahren als stiller Fehlschlag auffallen — dann steht die
     # alte Show da und man sucht den Fehler in der Show statt im Aufruf.
@@ -833,8 +852,8 @@ def main():
     # App-/Fenster-Icon (assets/icons/lightos.png, .ico fuer den Installer-Shortcut)
     try:
         from PySide6.QtGui import QIcon
-        _icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                  "assets", "icons", "lightos.png")
+        from src.core.paths import programm_datei   # XPLAT-47: auch gefroren
+        _icon_path = programm_datei("assets", "icons", "lightos.png")
         if os.path.exists(_icon_path):
             app.setWindowIcon(QIcon(_icon_path))
     except Exception as _e:
