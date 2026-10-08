@@ -48,6 +48,9 @@
 //    sich, nie die Zahl der Lichter.
 
 import * as THREE from '../three/three.js';
+// Zirkulaer mit floor_pool.js (das GOBO_RAND holt) — unbedenklich, beide
+// Konstanten werden nur in Funktionsruempfen gelesen, nie beim Modul-Laden.
+import { POOL_MAX_RADIUS } from './floor_pool.js';
 
 const CACHE = new Map();
 const GROESSE = 128;
@@ -298,6 +301,15 @@ const _A = new THREE.Vector3(), _P = new THREE.Vector3();
 const _EX = new THREE.Vector3(), _EY = new THREE.Vector3(), _C = new THREE.Vector3();
 const _EZ = new THREE.Vector3(0, 1, 0);
 const RAND_PROBEN = 16;
+// Codex-P2: Grenzen der affinen Bodenmatrix. Bei fast waagerechtem Kopf
+// treffen die Randstrahlen den Boden unter sehr flachem Winkel, weit weg —
+// die Kleinste-Quadrate-Ellipse wird dann riesig bzw. entartet. Reichweite wie
+// in builders.js#applyFloorAim (Bodentreffer nur bis 100 m), Halbachse wie der
+// normale Bodenfleck (floor_pool.js#POOL_MAX_RADIUS). Darueber hinaus faellt
+// die Scheibe auf den normalen TRS-Bodenfleck zurueck (geklemmte Groesse).
+const GOBO_MAX_WEITE = 100;
+// Kleinste/groesste Halbachse: darunter ist die Abbildung praktisch ein Strich.
+const GOBO_MIN_SEITENVERH = 1e-3;
 
 /** Scheibe zurueck auf die normale TRS-Matrix (kein Gobo / kein Treffer). */
 function _scheibeFrei(disc) {
@@ -352,7 +364,10 @@ export function alignGoboFloor(f, hitX, flaecheY, hitZ) {
     if (!(dy < -1e-6)) { _scheibeFrei(disc); return null; }   // zeigt nicht nach unten
     const t = (flaecheY - _A.y) / dy;
     if (!(t > 0) || !isFinite(t)) { _scheibeFrei(disc); return null; }
-    _P.sub(_A).multiplyScalar(t).add(_A);        // Endpunkt auf der Flaeche
+    _P.sub(_A).multiplyScalar(t);
+    // Zu flacher Randstrahl: trifft jenseits der Reichweite (Codex-P2).
+    if (!(_P.length() <= GOBO_MAX_WEITE)) { _scheibeFrei(disc); return null; }
+    _P.add(_A);                                  // Endpunkt auf der Flaeche
     if (i === 0) psi0 = Math.atan2(_P.x - hitX, _P.z - hitZ);
     // Kleinste Quadrate fuer P = C + EX*lx + EY*ly mit (lx, ly) auf dem
     // gleichmaessig abgetasteten Kreis: C = Mittel, EX/EY = 2/(N q^2) * Sum P*l.
@@ -366,6 +381,17 @@ export function alignGoboFloor(f, hitX, flaecheY, hitZ) {
   _EX.multiplyScalar(k); _EY.multiplyScalar(k);
   _EX.y = 0; _EY.y = 0;                            // flach auf der Flaeche
   _C.y = flaecheY;
+  // Codex-P2: Halbachsen der xz-Abbildung (Singulaerwerte der 2x2-Matrix
+  // [EX.x EY.x; EX.z EY.z]) pruefen — zu gross oder entartet -> TRS-Fleck.
+  const s1 = _EX.lengthSq() + _EY.lengthSq();
+  const det = _EX.x * _EY.z - _EY.x * _EX.z;
+  const smax = Math.sqrt(s1 / 2 + Math.sqrt(Math.max(0, s1 * s1 / 4 - det * det)));
+  if (!isFinite(smax) || !isFinite(det) || !isFinite(_C.x) || !isFinite(_C.z)
+      || smax * Rd > POOL_MAX_RADIUS
+      || Math.abs(det) < GOBO_MIN_SEITENVERH * smax * smax) {
+    _scheibeFrei(disc);
+    return null;
+  }
   const basis = (typeof f.lastGoboRot === 'number' && isFinite(f.lastGoboRot))
     ? (Math.max(0, Math.min(255, f.lastGoboRot)) / 255) * 2 * Math.PI : 0;
   let d = (psi0 - basis) % (2 * Math.PI);

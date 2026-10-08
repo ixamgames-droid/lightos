@@ -466,5 +466,63 @@ class Viz83StrahlTrifftMusterTest(Viz83GoboStrahlSceneTest):
     test_keine_neue_geometrie_und_kein_materialneubau_je_update = None
 
 
+# Codex-P2: fast waagerechter Kopf. Die Randstrahlen des Kegels treffen den
+# Boden dann unter sehr flachem Winkel, weit weg — die affine Bodenmatrix
+# (alignGoboFloor) darf nicht riesig oder entartet werden. Geprueft wird die
+# Welt-Matrix der Scheibe: endlich, groesste Halbachse (Singulaerwert der
+# xz-Abbildung mal Scheibenradius) hoechstens POOL_MAX_RADIUS.
+_SCHEIBE_JS = """
+(function(){
+  const f = window.__lightos.fixtures['%d'];
+  const disc = f.floorSpot;
+  disc.updateWorldMatrix(true, false);
+  const e = disc.matrixWorld.elements;
+  const Rd = disc.geometry.parameters.radius;
+  // Scheiben-lokal x/y -> Welt x/z (die Scheibe liegt flach).
+  const a = e[0], b = e[4], c = e[2], d = e[6];
+  const s1 = a*a + b*b + c*c + d*d, det = a*d - b*c;
+  const w = Math.sqrt(Math.max(0, s1*s1/4 - det*det));
+  const smax = Math.sqrt(Math.max(0, s1/2 + w));
+  return JSON.stringify({
+    endlich: e.every(x => Number.isFinite(x)),
+    halbachse: smax * Rd,
+    sichtbar: disc.visible,
+    affin: disc.matrixAutoUpdate === false,
+    goboAktiv: !!f.goboAktiv,
+  });
+})()
+"""
+
+
+class Viz83FlacherKopfTest(Viz83GoboStrahlSceneTest):
+    """Codex-P2: Kopf fast waagerecht + Gobo -> Bodenscheibe bleibt endlich
+    und begrenzt (kein NaN/Infinity, keine Riesenflaeche)."""
+
+    def _scheibe(self):
+        return json.loads(self._eval(_SCHEIBE_JS % _FID))
+
+    def test_flacher_kopf_gibt_begrenzte_bodenscheibe(self):
+        self._load_and_wait()
+        schlecht = []
+        for tilt in list(range(0, 64, 2)) + list(range(194, 256, 2)):
+            for rot in (0, 90):
+                self._push(_payload(gobo_wheel=25, gobo_rotation=rot,
+                                    pan=128, tilt=tilt))
+                z = self._scheibe()
+                self.assertTrue(z["goboAktiv"], z)
+                if not z["endlich"] or not (z["halbachse"] <= 12.0 + 1e-6):
+                    schlecht.append((tilt, rot, z))
+        self.assertEqual(schlecht[:4], [],
+                         f"{len(schlecht)} Stellungen mit entarteter Bodenscheibe")
+
+    test_offen_bleibt_der_volle_kegel = None
+    test_gobo_ersetzt_den_vollen_kegel_durch_teilstrahlen = None
+    test_spirale_ist_eine_wendel = None
+    test_nummeriertes_gobo_ergibt_motiv = None
+    test_drehung_dreht_teilstrahlen_prisma_und_bodenmuster = None
+    test_dimmer_fade_kommt_bei_gobo_an = None
+    test_keine_neue_geometrie_und_kein_materialneubau_je_update = None
+
+
 if __name__ == "__main__":
     unittest.main()
