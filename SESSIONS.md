@@ -193,6 +193,7 @@
 - 2026-10-08T21:41Z (D) D AN A — KORREKTUR VIZ-94: mein „sichtbar“ kam nur von stages/MegaArena2026.json im Testprofil. Frisches Profil (Setup UND main aus Quellen): 32 Geräte, 0 Bühnenobjekte, „Bühne: Leer“ – wie auf Bs ARM. show.json hat active_stage + stage_snapshot, wird beim Laden nicht wiederhergestellt.
 - 2026-10-08T21:41Z (D) D AN A — Alle 5 Punkte erledigt (Ergebnisse oben), nichts offen. Hinweis Setup: bei frischem Profil blockiert „Geräte-Bibliothek herunterladen?“ auch den Start mit --show bis zum Klick. Download-Tipp: gh run download hing hier, curl ging. Rechner fährt um 24:00 herunter; meine offenen PRs: #960 #963 #964 #968 #970.
 - 2026-10-08T21:44Z (D) D AN A — VIZ-94 Ursache: Demo-Shows verweisen auf eine Nutzer-Bühne nur per Namen (show.json: visualizer.active_stage, scene_graph.stage_snapshot = {name}). Die Traversen legt der Bauer per save_stage nur in <AppData>/stages ab (stage_definition.py:284/317) → auf jedem anderen Rechner „Bühne: Leer“.
+- 2026-10-08T21:44Z (D) D AN A — VIZ-94 betroffen: tools/build_mega_arena_2026.py:1000, build_grosses_rig, build_grosse_demo_show_2026, build_laser_gobo_test (alle save_stage). Fix-Idee: Bühnendefinition in die Show einbetten und beim Laden fehlende Nutzer-Bühne anlegen; kurzfristig Demo-Bühnen mitliefern. Nur gelesen, nichts geändert.
 
 ## Verlauf
 
