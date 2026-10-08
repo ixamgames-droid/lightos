@@ -1070,7 +1070,11 @@ class OutputManager:
         4. Laser-Aus-Werte (LAS-24/LAS-25) bei Blackout, GM < Schwelle oder
            fuer die Adressen eines Ziel-Blackouts — der Aus-Wert ist nicht
            immer 0, deshalb NACH den nullenden Paessen;
-        5. Laser-NOT-AUS (A3D-01) als allerletzte Ebene, gewinnt immer.
+        5. Laser-NOT-AUS (A3D-01) als allerletzte Ebene, gewinnt immer:
+           verriegelte Adressen auf ihren bekannten Aus-Wert, sonst 0.
+
+        Blackout und Grand Master werden EINMAL je Frame gelesen (B2), alle
+        Paesse sehen denselben Stand.
 
         Im Lade-Fenster (OUT-60/61) stammen alle Masken aus EINEM gelesenen
         ``_lade``-Tupel."""
@@ -1120,6 +1124,13 @@ class OutputManager:
             estop_start = None
             laser_start = None
             ziel = getattr(self, "_ziel_blackout_union", None)
+        # B2 (Review LAS-25): Blackout und Grand Master EINMAL je Frame lesen.
+        # Der UI-Thread darf beide jederzeit setzen; liest jeder Pass selbst,
+        # sehen Blackout-, GM-, Laser-Aus- und Ziel-Pass womoeglich
+        # verschiedene Staende (z. B. Blackout an im ersten, aus im
+        # Laser-Aus-Pass -> Betriebsart 0 statt Aus-Wert).
+        blackout = bool(self._blackout)
+        gm = self.grand_master
         for univ_num, universe in list(self.universes.items()):
             # Im Freeze den festgehaltenen Stand senden statt des (u. U. direkt
             # beschriebenen) Live-Universums. Ein Universum, das es beim
@@ -1139,7 +1150,7 @@ class OutputManager:
                 self._buche_fehler("Modifier", univ_num, exc)
             else:
                 self._buche_erfolg("Modifier", univ_num)
-            if self._blackout:
+            if blackout:
                 # OUT-57: Blackout nullt ALLES ausser der Erhalten-Maske (Pan/Tilt/
                 # Gobo/Prisma/Optik gepatchter Lampen mit echtem Dimmer) — sonst
                 # fuhren Moving Heads bei jedem Blackout in die Grundstellung und
@@ -1154,8 +1165,7 @@ class OutputManager:
                         if 1 <= addr <= len(data) and addr <= 512:
                             buf[addr - 1] = data[addr - 1]
                 data = bytes(buf)
-            elif self.grand_master < 0.999:
-                gm = self.grand_master
+            elif gm < 0.999:
                 mask = gm_masken.get(univ_num)
                 if mask is None:
                     # Ungepatchtes/rohes Universum: kein Adresswissen -> global
@@ -1176,7 +1186,7 @@ class OutputManager:
             # Erhalten-Maske 0; die Ziel-Masken enthalten nie Erhalten-Adressen.
             # getattr: Tests bauen den Manager teils per __new__ ohne __init__.
             ziel_mask = ziel.get(univ_num) if ziel else None
-            if ziel_mask and not self._blackout:
+            if ziel_mask and not blackout:
                 buf = bytearray(data)
                 n = len(buf)
                 for addr in ziel_mask:
@@ -1194,10 +1204,10 @@ class OutputManager:
             #     gerade genullt hat (also die Geraete dieses Ziels).
             # Laeuft NACH dem Channel-Modifier (ein INVERSE darf den Laser nicht
             # oeffnen); der NOT-AUS danach zwingt verriegelte Adressen trotzdem
-            # auf 0 — der gewinnt immer.
+            # auf Aus-Wert bzw. 0 — der gewinnt immer.
             aus = laser_aus_masken.get(univ_num)
             if aus:
-                if self._blackout or self.grand_master < self.GM_LASER_AUS_SCHWELLE:
+                if blackout or gm < self.GM_LASER_AUS_SCHWELLE:
                     ziel_aus = aus
                 elif ziel_mask:
                     ziel_aus = {a: w for a, w in aus.items() if a in ziel_mask}
@@ -1230,10 +1240,13 @@ class OutputManager:
                 if vorher:
                     estop_mask = set(vorher) | set(estop_mask or ())
             if estop_mask:
+                # B1 (Review LAS-25): Adressen mit bekanntem Aus-Wert bekommen
+                # DEN statt 0 — bei einem Laser mit 0 = „Auto run“ schaltete
+                # ein NOT-AUS mit 0 ihn sonst EIN. Alle anderen Adressen: 0.
                 buf = bytearray(data)
                 for addr in estop_mask:
                     if 1 <= addr <= 512:
-                        buf[addr - 1] = 0
+                        buf[addr - 1] = aus.get(addr, 0) if aus else 0
                 data = bytes(buf)
             # ANZEIGE-Snapshot: exakt die Bytes, die gleich gesendet werden (POST
             # GM/Blackout/Channel-Modifier). GIL-atomare dict-Zuweisung mit

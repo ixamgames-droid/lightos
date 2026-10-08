@@ -140,10 +140,30 @@ class BlackoutLaserAusTest(unittest.TestCase):
         self.assertEqual(d[19], 0)
 
     def test_estop_still_wins_over_off_value(self):
+        # B1 (Review): der NOT-AUS schreibt an Adressen mit bekanntem Aus-Wert
+        # DIESEN — 0 hiesse hier „Auto run“, der NOT-AUS schaltete den Laser an.
         self.om.set_blackout(True)
         self.om.set_laser_estop_mask({1: frozenset({10, 11, 12})})
         d = self._frame()
-        self.assertEqual((d[9], d[10], d[11]), (0, 0, 0))
+        self.assertEqual((d[9], d[10], d[11]), (_AUS, 0, 0))
+
+    def test_estop_without_blackout_uses_off_value(self):
+        self.om.grand_master = 1.0
+        self.om.set_laser_estop_mask({1: frozenset({10, 11, 12})})
+        d = self._frame()
+        self.assertEqual((d[9], d[10], d[11]), (_AUS, 0, 0))
+        self.assertEqual(d[19], 200)         # PAR unberuehrt
+
+    def test_estop_beats_inverse_modifier_with_off_value(self):
+        from src.core.engine.channel_modifier import (
+            ChannelModifier, CurveType, get_modifier_manager)
+        mgr = get_modifier_manager()
+        mgr.clear()
+        self.addCleanup(mgr.clear)
+        mgr.add(ChannelModifier(universe=1, address=11, curve=CurveType.INVERSE))
+        self.om.set_laser_estop_mask({1: frozenset({10, 11, 12})})
+        d = self._frame()
+        self.assertEqual((d[9], d[10]), (_AUS, 0))
 
     def test_load_window_blackout(self):
         self.om.set_blackout(True)
@@ -151,6 +171,63 @@ class BlackoutLaserAusTest(unittest.TestCase):
             self.om.set_gm_laser_aus_mask({})
             self.om._send_all()
             self.assertEqual(self.om._display_frame[1][9], _AUS)
+
+
+class _SeqOM(OutputManager):
+    """B2: ``_blackout``/``grand_master`` liefern bei JEDEM Lesen den naechsten
+    Wert einer Folge — ein UI-Thread, der mitten im Frame umschaltet."""
+    seq_bo = None
+    seq_gm = None
+
+    @property
+    def _blackout(self):
+        if self.seq_bo is not None:
+            return next(self.seq_bo)
+        return self.__dict__.get("_bo", False)
+
+    @_blackout.setter
+    def _blackout(self, v):
+        self.__dict__["_bo"] = v
+
+    @property
+    def grand_master(self):
+        if self.seq_gm is not None:
+            return next(self.seq_gm)
+        return self.__dict__.get("_gm", 1.0)
+
+    @grand_master.setter
+    def grand_master(self, v):
+        self.__dict__["_gm"] = v
+
+
+class EinmalLesenJeFrameTest(unittest.TestCase):
+    def setUp(self):
+        self.om = _SeqOM()
+        u = self.om.add_universe(1)
+        u.set_channel(10, _MANUAL)          # Laser-Betriebsart
+        u.set_channel(20, 200)              # PAR-Dimmer
+        self.om.set_gm_address_mask({1: frozenset({20})})
+        self.om.set_gm_laser_aus_mask({1: {10: _AUS}})
+
+    def _send(self):
+        self.om._send_all()
+        return self.om._display_frame[1]
+
+    def test_blackout_wechselt_mitten_im_frame(self):
+        import itertools
+        # Erstes Lesen „an“, jedes weitere „aus“.
+        self.om.seq_bo = itertools.chain([True], itertools.repeat(False))
+        d = self._send()
+        self.assertEqual(d[19], 0)          # Blackout-Pass lief
+        self.assertEqual(d[9], _AUS)        # Laser-Aus-Pass sah denselben Stand
+
+    def test_grand_master_wechselt_mitten_im_frame(self):
+        import itertools
+        # Erstes Lesen 0, jedes weitere 1.0.
+        self.om.seq_gm = itertools.chain([0.0], itertools.repeat(1.0))
+        d = self._send()
+        self.assertEqual(d[19], 0)          # PAR mit GM 0 skaliert
+        self.assertEqual(d[9], _AUS)
 
 
 if __name__ == "__main__":
