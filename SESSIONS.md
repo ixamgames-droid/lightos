@@ -82,6 +82,7 @@
 | STAB-30 | A | feature/stab30-diagnose-log | 2026-10-08T19:39Z | main.py · src/core/crash_logging.py |
 | VIZ-94 | B | fix/viz94-buehne-windows-arm | 2026-10-08T19:49Z | src/ui/visualizer |
 | QA-87 | D | fix/qa87-doppelter-tap | 2026-10-08T20:36Z | src/core/engine/tempo_bus.py · src/core/engine/bpm_manager.py · src/ui/virtualconsole/vc_speedial.py · tests/test_qa87_tap_uhr.py · changelog.d/2026-10-08-QA-87.md |
+| VIZ-95 | A | feature/viz95-lasermuster-3d | 2026-10-08T20:47Z | src/ui/visualizer |
 
 ## Blocker & Fallen
 
@@ -191,7 +192,6 @@
 
 ## Verlauf
 
-- 2026-10-08T18:29Z D claim QA-89
 - 2026-10-08T18:32Z B claim XPLAT-46
 - 2026-10-08T18:37Z A claim DOC-66
 - 2026-10-08T18:41Z B claim XPLAT-24
@@ -221,3 +221,4 @@
 - 2026-10-08T20:03Z B done VIZ-71
 - 2026-10-08T20:13Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T20:19Z A done LAS-25
+- 2026-10-08T20:47Z A claim VIZ-95
