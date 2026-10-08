@@ -66,7 +66,7 @@ import { placeGhostInfo, setPlaceableCount } from './interaction/place_ghost.js'
 import { dropAllowed, pendingDragFid } from './interaction/drag_drop.js';  // VIZ-14 Drag
 import { opticsSoftness, applyOptics } from './fixtures/optics.js';   // VIZ-MH-OPTICS
 import { prismFacetCount, applyPrism } from './fixtures/prism.js';    // VIZ-PRISMA-3D
-import { goboTexture } from './fixtures/gobo_textures.js';            // VIZ-80 (Test-Seam)
+import { goboTexture, beamGoboTexture } from './fixtures/gobo_textures.js';   // VIZ-80/VIZ-83 (Test-Seam)
 import { beamLengthScale } from './fixtures/builders.js';             // VIZ-15
 import { laserAnimationAktiv, tickLaserAnimation, laserInfo } from './fixtures/laser.js';   // VIZ-79
 import { floorPoolScale, poolFalloffTexture } from './fixtures/floor_pool.js';  // VIZ-15
@@ -246,6 +246,8 @@ window.__lightos = {
   // dass im Bodenfleck GENAU das Muster des Payloads liegt (Identitaet, kein
   // Pixelvergleich). Reine Leseoperation, legt hoechstens den Cache-Eintrag an.
   __goboTexture: goboTexture,
+  // VIZ-83: dasselbe fuer die Teilstrahl-Maske des Kegels ('' = offen/weiss).
+  __beamGoboTexture: beamGoboTexture,
   // VIZ-15: rein — drei Grenzen (Grundlaenge, Bodenauftreffpunkt, globale
   // Obergrenze) treffen aufeinander, und welche gewinnt IST die Aussage.
   beamLengthScale,
