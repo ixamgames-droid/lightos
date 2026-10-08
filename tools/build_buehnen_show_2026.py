@@ -28,6 +28,7 @@ Aufruf (Repo-Root)::
 
     ./venv/bin/python tools/build_buehnen_show_2026.py            # -> shows/Buehnen_Show_2026.lshow
     ./venv/bin/python tools/build_buehnen_show_2026.py --out PFAD.lshow
+    venv/Scripts/python tools/build_buehnen_show_2026.py       # Windows
 
 Eine vorhandene Datei wird NIE ueberschrieben (Abbruch mit Hinweis).
 Achtung: Der Generator speichert die Buehne „Bühnen-Show 2026" in den
