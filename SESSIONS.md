@@ -80,6 +80,7 @@
 | UI-75 | B | fix/ui75-neue-show-patch-vc | 2026-10-08T19:04Z | src/ui/main_window.py · tests/test_ui75_neue_show_fragt.py · docs/anleitung_erste_schritte/ANLEITUNG.md · docs/anleitung_erste_schritte/ANLEITUNG.en.md · changelog.d/2026-10-08-UI-75.md · BACKLOG.md |
 | OUT-62 | B | fix/out62-blackout-maske-atomar | 2026-10-08T19:08Z | src/core/app_state.py · docs/components/engine/script.md · tests/test_out62_blackout_maske_atomar.py · changelog.d/2026-10-08-OUT-62.md · BACKLOG.md |
 | OUT-64 | B | fix/out64-estop-ausgabeweg | 2026-10-08T19:11Z | src/core/dmx/output_manager.py · tests/test_out64_estop_ausgabeweg.py · changelog.d/2026-10-08-OUT-64.md · BACKLOG.md |
+| QA-83 | B | fix/qa83-vc-assets-isoliert | 2026-10-08T19:16Z | src/core/show/vc_assets.py · tools/_gen_env.py · tests/test_qa83_vc_assets_unberuehrt.py · BACKLOG.md |
 
 ## Blocker & Fallen
 
@@ -176,7 +177,6 @@
 
 ## Verlauf
 
-- 2026-10-08T16:57Z A claim UI-81
 - 2026-10-08T17:02Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T17:16Z D done QA-86
 - 2026-10-08T17:16Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
@@ -206,3 +206,4 @@
 - 2026-10-08T19:04Z B claim UI-75
 - 2026-10-08T19:08Z B claim OUT-62
 - 2026-10-08T19:11Z B claim OUT-64
+- 2026-10-08T19:16Z B claim QA-83
