@@ -85,6 +85,7 @@
 | VIZ-71 | B | - | 2026-10-08T19:41Z | - |
 | VIZ-94 | B | fix/viz94-buehne-windows-arm | 2026-10-08T19:49Z | src/ui/visualizer |
 | XPLAT-36 | B | fix/xplat36-viz13-aufteilen | 2026-10-08T19:43Z | tests/test_viz13_scene_modules_smoke.py · tests/test_viz13_scene_modules_smoke_b.py · tests/_viz13_szene_basis.py · BACKLOG.md |
+| QA-87 | D | fix/qa87-doppelter-tap | 2026-10-08T19:49Z | src/core/engine/tempo_bus.py · src/core/engine/bpm_manager.py · src/ui/virtualconsole/vc_speedial.py · tests/test_qa87_tap_uhr.py · changelog.d/2026-10-08-QA-87.md |
 
 ## Blocker & Fallen
 
@@ -186,7 +187,6 @@
 
 ## Verlauf
 
-- 2026-10-08T18:10Z A claim FM-68
 - 2026-10-08T18:11Z A claim DOC-65
 - 2026-10-08T18:11Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T18:11Z A claim LAS-26
@@ -216,3 +216,4 @@
 - 2026-10-08T19:43Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T19:49Z B aktualisiert VIZ-94: Branch fix/viz94-buehne-windows-arm -> fix/viz94-buehne-arm; Dateien - -> src/ui/visualizer
 - 2026-10-08T19:49Z B aktualisiert VIZ-94: Branch fix/viz94-buehne-arm -> fix/viz94-buehne-windows-arm
+- 2026-10-08T19:49Z D claim QA-87
