@@ -2622,8 +2622,8 @@ class MainWindow(QMainWindow):
         try:
             sb = self.statusBar()
             sb.showMessage(
-                "⏹  LASER NOT-AUS ausgelöst — Netzwerk-Ausgabe verriegelt "
-                "& unscharf", 6000)
+                "⏹  LASER NOT-AUS ausgelöst — alle Laser dunkel (DMX-Laser "
+                "verriegelt, Netzwerk-Ausgabe unscharf)", 6000)
             sb.setStyleSheet(
                 "QStatusBar{background:#b31414; color:#ffffff; font-weight:bold;}")
             QTimer.singleShot(6000, lambda: self._reset_statusbar_style())

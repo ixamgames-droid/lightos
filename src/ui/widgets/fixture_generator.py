@@ -317,6 +317,9 @@ def validate_model(model: GeneratorModel) -> list[tuple[str, str]]:
         # FM-46: Zuordnung Dimmer -> Weiss-Segment.
         issues.extend(_check_dimmer_segmente(mode, loc))
 
+        # LAS-26: Laser — gibt es einen Aus-Wert, und ist er der Grundwert?
+        issues.extend(_check_laser_aus(model, mode, loc))
+
     # Modus-Vergleich (gleiche Funktionen, andere Reihenfolge).
     issues.extend(_compare_modes(model.modes))
     return issues
@@ -410,6 +413,81 @@ def _check_dimmer_segmente(mode: GenMode, loc: str) -> list[tuple[str, str]]:
     for problem in zuordnung_probleme(mode.channels):
         out.append(("warn", f"{loc}: {problem}"))
     return out
+
+
+# ── LAS-26: Laser-Sicherheit ─────────────────────────────────────────────────
+#
+# Blackout, Grand Master 0, Ziel-Blackout und Laser-NOT-AUS schalten einen
+# DMX-Laser ueber seinen Aus-Wert dunkel (LAS-24/LAS-25): der Bereich der Art
+# ``closed`` (oder ein Bereich „Laser off/aus“) am Betriebsart-Kanal
+# (``shutter``/``macro``). Fehlt er, strahlt der Laser bei Grand Master 0
+# weiter — das sah man dem Profil beim Anlegen bisher nicht an. Dieselbe
+# Erkennung wie im Sende-Pfad (``AppState._laser_aus_wert``), keine zweite.
+
+_LASER_DIMMER = ("intensity", "dimmer", "master")
+
+
+def _ist_laser_modell(model: GeneratorModel, mode: GenMode) -> bool:
+    if (model.fixture_type or "").lower() == "laser":
+        return True
+    return any((c.attribute or "").startswith("laser_") for c in mode.channels)
+
+
+def laser_aus_kanal(model: GeneratorModel, mode: GenMode):
+    """``(kanalnummer, kanal, aus_wert)`` des Kanals, ueber den LightOS diesen
+    Laser dunkel schaltet — oder ``None`` (kein Laser / kein Aus-Wert)."""
+    if not _ist_laser_modell(model, mode):
+        return None
+    from src.core.app_state import AppState
+    for i, ch in enumerate(mode.channels, 1):
+        if (ch.attribute or "") not in AppState._GM_LASER_AUS_ATTRS:
+            continue
+        wert = AppState._laser_aus_wert(ch)
+        if wert is not None:
+            return i, ch, wert
+    return None
+
+
+def _check_laser_aus(model: GeneratorModel, mode: GenMode,
+                     loc: str) -> list[tuple[str, str]]:
+    if not _ist_laser_modell(model, mode):
+        return []
+    treffer = laser_aus_kanal(model, mode)
+    if treffer is None:
+        if any((c.attribute or "") in _LASER_DIMMER for c in mode.channels):
+            return []      # der Grand Master dimmt den Dimmer regulaer
+        return [("warn",
+                 f"{loc}: Laser ohne Aus-Wert — Grand Master 0 und gezielter "
+                 "Blackout schalten ihn nicht sicher dunkel. Den Bereich "
+                 "„Laser aus“ am Betriebsart-Kanal (Attribut 'shutter') mit "
+                 "der Art 'closed' anlegen.")]
+    nr, ch, wert = treffer
+    band = next((r for r in ch.ranges
+                 if int(r.range_from) <= wert <= int(r.range_to)), None)
+    lo = int(band.range_from) if band is not None else wert
+    hi = int(band.range_to) if band is not None else wert
+    if not lo <= int(ch.default_value) <= hi:
+        return [("warn",
+                 f"{loc}, Kanal {nr} ('{ch.name}'): Default "
+                 f"{ch.default_value} ist nicht „aus“ — nach dem Patchen "
+                 f"strahlt der Laser sofort. Default auf {wert} setzen.")]
+    return []
+
+
+def laser_sicherheit_text(model: GeneratorModel) -> str:
+    """Bestaetigung fuer die Hinweis-Box: ueber welchen Kanal und Wert LightOS
+    jeden Laser-Modus dunkel schaltet. Leer, wenn kein Modus ein Laser ist."""
+    teile = []
+    for mode in model.modes:
+        t = laser_aus_kanal(model, mode)
+        if t is not None:
+            nr, ch, wert = t
+            teile.append(f"Modus '{mode.name}': Kanal {nr} ('{ch.name}') = "
+                         f"{wert}")
+    if not teile:
+        return ""
+    return ("Laser-Sicherheit: Blackout, Grand Master 0, gezielter Blackout "
+            "und Laser-NOT-AUS schalten auf „aus“ — " + "; ".join(teile) + ".")
 
 
 def _compare_modes(modes: list[GenMode]) -> list[tuple[str, str]]:
@@ -1523,16 +1601,21 @@ class FixtureGeneratorDialog(QDialog):
         self._sync_all()
         self._update_viz_suggestion()
         issues = validate_model(self._model)
-        if not issues:
-            self._issues.setHtml(
-                "<span style='color:#3fb950;'>Keine Hinweise — Profil sieht "
-                "konsistent aus.</span>")
-            return
+        # LAS-26: bei Lasern sagen, worueber LightOS ihn dunkel schaltet.
+        try:
+            laser = laser_sicherheit_text(self._model)
+        except Exception:
+            laser = ""
         rows = []
+        if not issues:
+            rows.append("<span style='color:#3fb950;'>Keine Hinweise — Profil "
+                        "sieht konsistent aus.</span>")
         for sev, text in issues:
             color = "#f85149" if sev == "error" else "#d29922"
             tag = "FEHLER" if sev == "error" else "Hinweis"
             rows.append(f"<span style='color:{color};'>[{tag}]</span> {text}")
+        if laser:
+            rows.append(f"<span style='color:#3fb950;'>{laser}</span>")
         self._issues.setHtml("<br>".join(rows))
 
     # ── Import / Export ──────────────────────────────────────────────────

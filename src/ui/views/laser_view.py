@@ -310,6 +310,32 @@ class LaserView(QWidget):
         root.addWidget(self._safety_box)
         self._update_arm_button()
 
+        # LAS-26: NOT-AUS auch fuer DMX-Laser. Die Netzwerk-Box oben ist nur
+        # bei Ether-Dream/IDN-Lasern sichtbar — mit einem DMX-Laser in der
+        # Auswahl (EL-400RGB MK2, SH-LASER3W, L2600 …) gab es auf dieser Seite
+        # bisher KEINEN NOT-AUS und keine Anzeige, ob er greift. Derselbe Weg
+        # wie der Knopf der Netzwerk-Box (``_on_estop``): ``estop_all`` setzt
+        # den DMX-Latch (UXT-12) und verriegelt die Netzwerk-Ausgabe.
+        self._dmx_safety_box = QGroupBox("Laser-Sicherheit")
+        dsb = QHBoxLayout(self._dmx_safety_box)
+        self._btn_dmx_estop = QPushButton("⏹ LASER NOT-AUS")
+        self._btn_dmx_estop.setMinimumHeight(40)
+        self._btn_dmx_estop.setStyleSheet(
+            "QPushButton{background:#8b0000;color:#fff;font-weight:bold;"
+            "border:1px solid #b30000;border-radius:5px;padding:6px 14px;}"
+            "QPushButton:hover{background:#b30000;}")
+        self._btn_dmx_estop.setToolTip(
+            "Schaltet ALLE Laser sofort dunkel: DMX-Laser auf ihren Aus-Wert "
+            "(bis Betriebsart oder Muster neu gewählt wird), Netzwerk-Laser "
+            "werden unscharf.")
+        self._btn_dmx_estop.clicked.connect(weak_slot(self._on_estop))
+        dsb.addWidget(self._btn_dmx_estop)
+        self._lbl_dmx_estop = QLabel("")
+        self._lbl_dmx_estop.setWordWrap(True)
+        dsb.addWidget(self._lbl_dmx_estop, stretch=1)
+        self._dmx_safety_box.setVisible(False)
+        root.addWidget(self._dmx_safety_box)
+
         # Mustergruppe (Kopf 0/1) — nur sichtbar, wenn das Gerät doppelte
         # Laser-Attribute hat (z. B. L2600 34ch: Gruppe A + B).
         self._head_box = QGroupBox("Mustergruppe")
@@ -399,6 +425,9 @@ class LaserView(QWidget):
             # der Laser scharf ist (Täuschung in die gefährliche Richtung).
             sync.subscribe_widget(SyncEvent.LASER_ARMED_CHANGED, self,
                                   lambda *_: self._sync_arm_from_manager())
+            # LAS-26: NOT-AUS von einer VC-Taste -> Anzeige sofort mitziehen.
+            sync.subscribe_widget(SyncEvent.LASER_ESTOP, self,
+                                  lambda *_: self._update_dmx_estop_label())
         except Exception as e:
             print(f"[laser_view] sync subscribe error: {e}")
 
@@ -472,6 +501,10 @@ class LaserView(QWidget):
             if (_cap := laser_capability(f)) is not None
             and _cap.laser_class == LaserClass.NET_STREAM]
         self._safety_box.setVisible(bool(self._network_fids))
+        # LAS-26: DMX-Laser in der Auswahl -> eigener NOT-AUS + Zustand.
+        self._dmx_safety_box.setVisible(
+            len(self._fixtures) > len(self._network_fids))
+        self._update_dmx_estop_label()
         self._sync_arm_from_manager()   # VC-/MIDI-Änderungen widerspiegeln
         self._apply_figure_to_selection()
 
@@ -493,6 +526,27 @@ class LaserView(QWidget):
         except Exception as e:
             print(f"[laser_view] laser output unavailable: {e}")
             return None
+
+    def _update_dmx_estop_label(self):
+        """LAS-26: zeigt, ob der DMX-Laser-NOT-AUS gerade greift."""
+        try:
+            aktiv = bool(getattr(get_state(), "laser_estop_active", False))
+        except Exception:
+            aktiv = False
+        try:
+            if aktiv:
+                self._lbl_dmx_estop.setText(
+                    "NOT-AUS aktiv — alle DMX-Laser sind dunkel. Wieder an: "
+                    "Betriebsart oder Muster neu wählen.")
+                self._lbl_dmx_estop.setStyleSheet(
+                    "color:#ff7b72;font-weight:bold;")
+            else:
+                self._lbl_dmx_estop.setText(
+                    "Schaltet alle Laser sofort dunkel. Blackout und Grand "
+                    "Master 0 tun das auch — über den Aus-Wert der Betriebsart.")
+                self._lbl_dmx_estop.setStyleSheet("color:#8b949e;")
+        except RuntimeError:
+            pass
 
     def _update_arm_button(self):
         armed = self._btn_arm.isChecked()
@@ -544,6 +598,7 @@ class LaserView(QWidget):
         self._update_arm_button()
         if lo is not None:
             lo.clear_estop_all()
+        self._update_dmx_estop_label()
 
     def _on_figure_changed(self):
         # BEWUSST ohne Index-Parameter: verbunden ueber weak_slot, das die
@@ -779,7 +834,8 @@ class LaserView(QWidget):
             tile = PresetTile(
                 name, _range_value(r),
                 color=kind_colors.get(getattr(r, "kind", "") or ""),
-                tooltip=f"Shutter → {_range_value(r)}")
+                tooltip=f"{getattr(shutter, 'name', '') or 'Betriebsart'}"
+                        f" → {_range_value(r)}")
             tile.clicked.connect(weak_slot_fwd(self._on_mode_tile_clicked))
             self._mode_lay.addWidget(tile)
         self._mode_lay.addStretch(1)
@@ -925,6 +981,8 @@ class LaserView(QWidget):
                 continue
             for head in self._heads_for(f, attr):
                 state.set_programmer_value(fid, attr, int(value), head=head)
+        # Betriebsart/Muster loesen den DMX-NOT-AUS (A3D-02) — Anzeige folgen.
+        self._update_dmx_estop_label()
 
     def _load_values(self):
         if not self._fixtures:
