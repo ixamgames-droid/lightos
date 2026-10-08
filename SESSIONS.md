@@ -54,7 +54,6 @@
 | DOC-56 | C | - | 2026-10-02T13:05Z | docs/anleitung_web_remote/ANLEITUNG.md |
 | FM-58 | A | feat/fm58-bibliothek-runde2 | 2026-10-02T18:20Z | fixtures/bibliothek |
 | SAMMEL-DOKU-C | A | sammel/doku-c | 2026-10-02T22:08Z | docs · BACKLOG.md |
-| DOC-60 | A | docs/doc60-buehnenshow-effekte | 2026-10-05T16:18Z | - |
 | VIZ-84 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
 | VIZ-85 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
 | VIZ-86 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
@@ -193,7 +192,6 @@
 
 ## Verlauf
 
-- 2026-10-08T18:32Z B claim XPLAT-46
 - 2026-10-08T18:37Z A claim DOC-66
 - 2026-10-08T18:41Z B claim XPLAT-24
 - 2026-10-08T18:41Z D aktualisiert QA-89: Dateien src/core/engine/cue_stack.py · tests/test_qa89_fade_uhr.py · tests/test_core_engine.py · BACKLOG.md · changelog.d/2026-10-08-QA-89.md -> src/core/engine/cue_stack.py · tests/test_qa89_fade_uhr.py · tests/test_cue_substack_and_attrdelay.py · BACKLOG.md · changelog.d/2026-10-08-QA-89.md
@@ -223,3 +221,4 @@
 - 2026-10-08T20:13Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T20:19Z A done LAS-25
 - 2026-10-08T20:47Z A claim VIZ-95
+- 2026-10-08T20:50Z A done DOC-60
