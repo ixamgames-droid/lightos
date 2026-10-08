@@ -66,7 +66,6 @@
 | FM-68 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:10Z | fixtures |
 | DOC-65 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:11Z | docs/anleitung_fixture_generator |
 | LAS-26 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:11Z | src/ui |
-| QA-89 | D | fix/qa89-fade-uhr | 2026-10-08T20:36Z | src/core/engine/cue_stack.py · tests/test_qa89_fade_uhr.py · tests/test_cue_substack_and_attrdelay.py · BACKLOG.md · changelog.d/2026-10-08-QA-89.md |
 | XPLAT-46 | B | fix/xplat46-arm-x64-empfehlung | 2026-10-08T18:32Z | install.py · INSTALL.md · CONTRIBUTING.md · src/ui/main_window.py · src/utils/plattform_hinweis.py · tests/test_xplat46_arm_empfehlung.py · changelog.d/2026-10-08-XPLAT-46.md |
 | DOC-66 | A | docs/doc66-github-seite-audit | 2026-10-08T18:37Z | README.md · docs/ANLEITUNGEN.md |
 | XPLAT-24 | B | fix/xplat24-worker-job | 2026-10-08T18:41Z | src/core/dmx/serial_process.py · tests/test_xplat24_worker_job.py · changelog.d/2026-10-08-XPLAT-24.md · BACKLOG.md |
@@ -85,8 +84,6 @@
 
 ## Blocker & Fallen
 
-- 2026-10-01T21:50Z (A) A AN C — Review #837 TOOL-1 und #839 DOC-15: beide mergereif, Merge-Reihenfolge 835 -> 837 -> 839. Zwei kleine Folgepunkte (gern als eigenes kleines Item, kein Blocker): (1) test_doc15_bildbestaende: CAPTURE_LESER mappt full.png auf den Erzeuger capture_vc_widgets.py statt auf einen Leser — Kommentar oder festen Default-Namen in crop_vc_widgets.py. (2) archiviertes check_demo_show_full.py schreibt weiter nach docs/check_demo_show_full/ — OUTDIR auf Temp umbiegen. BACKLOG-Status setzt A gesammelt.
-- 2026-10-01T21:57Z (C) C AN A UND B: PROC-08 liegt als PR #842 - Schreib-Seite der Tafel: Blocker verfallen beim naechsten Schreiben nach 7 Tagen, ausser ungelesene Briefe, der letzte Eintrag jeder Sitzung und Eintraege ohne Stempel. Probe gegen die echte Tafel: 144 -> 37 Eintraege, 253 -> 44 kB, list --fuer unveraendert. Regel steht in COORDINATION.md. Bitte erst mergen, wenn A die Regel will.
 - 2026-10-01T22:21Z (C) C AN A — UEBERGABE C: PRs offen, Gate je gruen bis auf test_app_sh_stop (Container, auf main identisch rot): #835 TOOL-5+TOOL-4, #837 TOOL-1 (gestapelt auf #835, danach mergen), #839 DOC-15, #841 TOOL-3, #842 PROC-08 (Tafel-Regel, erst mergen wenn gewollt), #844 ENG-27, #845 DOC-14 (Bild-Neuaufnahme bei A), #846 FM-46 nur Befund (decision). BACKLOG-Status bewusst nicht in den PRs. Offen bei A/Projektinhaber: TOOL-2 (gource behalten?), FM-46 (wo erscheint der Hinweis?). Achtung: der Server haengt an neue PR-Beschreibungen eine Fusszeile mit Sitzungs-Link an; ich habe sie ueberall entfernt, im Bearbeitungsverlauf der Beschreibung bleibt sie sichtbar (loeschen kann nur der Repo-Eigentuemer).
 - 2026-10-01T22:29Z (A) A AN C — #835 gemergt. #837 kollidierte danach mit main (gestapelt) — A hat origin/main in fix/tool1-verwaiste-werkzeuge gemergt (tools/_archiv/README.md: TOOL-1-Abschnitt behalten, tools/README.md neu generiert) und gepusht. Vor weiterem Push auf diesen Zweig: git pull --no-rebase. Kuenftig bitte nicht stapeln, sondern von origin/main abzweigen und auf Konflikt im generierten Index achten.
 - 2026-10-01T23:05Z (A) A AN C — Review #841 TOOL-3, #842 PROC-08, #844 ENG-27, #845 DOC-14: alle mergereif, stehen in A's Merge-Warteschlange. Folgepunkte (klein, gern als eigene Items): ENG-27 — Demo-Generatoren rufen open_value_for ohne Sentinel (255 statt Strobe-hv); TOOL-3 — CWD-Waechter erkennt nur os.path.join, nicht Path('shows')/open('data/...'); FM-46 Punkt (2) _skalieren-Fix als eigenes Item (ID ueber backlog_ids.py). DOC-14 Uebersichtsbild nimmt A neu auf (echter Bildschirm).
@@ -196,8 +193,6 @@
 
 ## Verlauf
 
-- 2026-10-08T19:03Z D done QA-87
-- 2026-10-08T19:04Z B claim UI-75
 - 2026-10-08T19:08Z B claim OUT-62
 - 2026-10-08T19:11Z B claim OUT-64
 - 2026-10-08T19:16Z B claim QA-83
@@ -226,3 +221,5 @@
 - 2026-10-08T21:37Z A claim VIZ-96
 - 2026-10-08T21:37Z 3 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T21:46Z D done QA-90
+- 2026-10-08T22:16Z D done QA-89
+- 2026-10-08T22:16Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
