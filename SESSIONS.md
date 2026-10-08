@@ -57,6 +57,7 @@
 | DOC-60 | A | docs/doc60-buehnenshow-effekte | 2026-10-05T16:18Z | - |
 | VIZ-72 | A | perf/viz72-grosse-rigs | 2026-10-08T13:41Z | - |
 | VIZ-83 | A | fix/viz83-gobo-strahl | 2026-10-08T15:16Z | - |
+| ENG-31 | A | fix/eng31-mega-arena-tempo | 2026-10-08T15:16Z | - |
 
 ## Blocker & Fallen
 
@@ -157,7 +158,6 @@
 
 ## Verlauf
 
-- 2026-10-05T16:00Z A done VIZ-77
 - 2026-10-05T16:00Z A uebernimmt XPLAT-44 von C (Claim verfallen)
 - 2026-10-05T16:00Z A claim XPLAT-44
 - 2026-10-05T16:18Z A claim DOC-60
@@ -187,3 +187,4 @@
 - 2026-10-08T13:41Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T15:16Z A claim VIZ-83
 - 2026-10-08T15:16Z 6 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-08T15:16Z A claim ENG-31
