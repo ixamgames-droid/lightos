@@ -29,6 +29,8 @@ export function disposeObj(o) {
   // (waechst bis Context-Loss auf schwachen GPUs). Sicher hier: disposeObj laeuft
   // ausschliesslich ueber Fixture-/Stage-/Grid-Objekte, NIE ueber die persistenten
   // Szenen-Lichter (die werden nie getraversed/disposed).
+  // VIZ-72: der Geraete-Spot haengt nicht mehr an root (Parameter-Traeger, nie
+  // gerendert, also ohne Map); die Pool-Lichter gibt spot_pool.js selbst frei.
   if (o.isLight && o.shadow && typeof o.shadow.dispose === 'function') o.shadow.dispose();
 }
 

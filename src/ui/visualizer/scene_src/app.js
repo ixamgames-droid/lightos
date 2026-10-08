@@ -13,6 +13,9 @@ import { scene, renderer, gpuTier, dynamicResolution, basePixelRatio,
          noteCameraMotion } from './scene/renderer.js';
 import { applyBrightness } from './scene/lights.js';
 import { prepareShadowMap, requestShadowUpdate, shadowUpdateStats } from './scene/shadow_update.js';  // VIZ-69
+import { syncUmgebung, umgebungInfo } from './stage/umgebung_merge.js';  // VIZ-72
+import { syncSpotPool, noteShadowPass, spotPoolInfo, spotPoolLights, vergeben as spotPoolVergeben,
+         setSpotPoolUhr } from './scene/spot_pool.js';  // VIZ-72
 import { disposeObj } from './scene/grid_floor.js';
 import { view, fixtures, stageObjects, settings } from './state.js';
 
@@ -63,7 +66,7 @@ import { placeGhostInfo, setPlaceableCount } from './interaction/place_ghost.js'
 import { dropAllowed, pendingDragFid } from './interaction/drag_drop.js';  // VIZ-14 Drag
 import { opticsSoftness, applyOptics } from './fixtures/optics.js';   // VIZ-MH-OPTICS
 import { prismFacetCount, applyPrism } from './fixtures/prism.js';    // VIZ-PRISMA-3D
-import { goboTexture } from './fixtures/gobo_textures.js';            // VIZ-80 (Test-Seam)
+import { goboTexture, beamGoboTexture } from './fixtures/gobo_textures.js';   // VIZ-80/VIZ-83 (Test-Seam)
 import { beamLengthScale } from './fixtures/builders.js';             // VIZ-15
 import { laserAnimationAktiv, tickLaserAnimation, laserInfo } from './fixtures/laser.js';   // VIZ-79
 import { floorPoolScale, poolFalloffTexture } from './fixtures/floor_pool.js';  // VIZ-15
@@ -160,7 +163,12 @@ function renderFrame() {
   }
   _letzterRenderTick = _rafTick;
   _letzterRenderT = _t;
-  prepareShadowMap();
+  // VIZ-72: echte Lichter an die hellsten Strahlen — VOR der Schatten-Signatur,
+  // damit ein Besitzerwechsel (neue Lichtlage) die Shadow-Map erneuert.
+  syncSpotPool();
+  // VIZ-72: im Ansehen-Modus feste Umgebung je Material als ein Koerper.
+  syncUmgebung();
+  noteShadowPass(prepareShadowMap());
   scene.autoUpdate = false;
   try {
     renderer.render(scene, view.activeCam);
@@ -238,6 +246,8 @@ window.__lightos = {
   // dass im Bodenfleck GENAU das Muster des Payloads liegt (Identitaet, kein
   // Pixelvergleich). Reine Leseoperation, legt hoechstens den Cache-Eintrag an.
   __goboTexture: goboTexture,
+  // VIZ-83: dasselbe fuer die Teilstrahl-Maske des Kegels ('' = offen/weiss).
+  __beamGoboTexture: beamGoboTexture,
   // VIZ-15: rein — drei Grenzen (Grundlaenge, Bodenauftreffpunkt, globale
   // Obergrenze) treffen aufeinander, und welche gewinnt IST die Aussage.
   beamLengthScale,
@@ -277,6 +287,19 @@ window.__lightos = {
   pixelRatio: () => renderer.getPixelRatio(),
   shadowMapType: () => renderer.shadowMap.type,
   shadowBudgetInfo,
+  // VIZ-72: Spot-Pool (echte Lichter) und Render-Kennzahlen des letzten Bildes.
+  spotPoolInfo, spotPoolLights, __spotPoolVergeben: spotPoolVergeben, __spotPoolUhr: setSpotPoolUhr, umgebungInfo,
+  renderInfo: () => {
+    let lichter = 0, spots = 0, schatten = 0;
+    scene.traverseVisible(o => {
+      if (!o.isLight) return;
+      lichter += 1;
+      if (o.isSpotLight) { spots += 1; if (o.castShadow) schatten += 1; }
+    });
+    return { calls: renderer.info.render.calls, dreiecke: renderer.info.render.triangles,
+             programme: renderer.info.programs ? renderer.info.programs.length : 0,
+             lichter, spots, schatten };
+  },
   dynamicResolutionInfo: () => dynamicResolution.info(),
   __noteCameraMotion: noteCameraMotion,
   // A3D-41: Test-Seams fuer die NaN-Guards der Zeiger-Mathematik. `mouse` ist
