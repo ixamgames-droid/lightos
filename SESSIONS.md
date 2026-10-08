@@ -60,6 +60,7 @@
 | ENG-31 | A | fix/eng31-mega-arena-tempo | 2026-10-08T15:16Z | - |
 | BACKLOG-D-BERICHT | A | docs/backlog-d-bericht | 2026-10-08T15:53Z | BACKLOG.md |
 | VIZ-84 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
+| VIZ-85 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
 
 ## Blocker & Fallen
 
@@ -157,7 +158,6 @@
 
 ## Verlauf
 
-- 2026-10-05T17:27Z A done BACKLOG-0510b
 - 2026-10-05T18:13Z A done VIZ-78
 - 2026-10-05T18:14Z A claim BACKLOG-KONSOLEN
 - 2026-10-05T18:15Z A claim VIZ-80
@@ -187,3 +187,4 @@
 - 2026-10-08T15:53Z 3 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T15:54Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T15:54Z A claim VIZ-84
+- 2026-10-08T15:54Z A claim VIZ-85
