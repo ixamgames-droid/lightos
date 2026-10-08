@@ -46,6 +46,36 @@ PUSH_TIMEOUT_S = 0.5
 _TAKT_TOLERANZ_S = 0.008
 
 
+# VIZ-86: Zeitgeber mit Qt.PreciseTimer. Der Standard-QTimer ist ein
+# CoarseTimer — unter Windows rastet er auf das 15,6-ms-Systemraster ein, und
+# aus 33 ms werden 46,9 ms (gemessen: 21 statt 30 Pushes je Sekunde). Die
+# Funktor-Form von ``QTimer.singleShot`` legt in PySide6 keinen Typ fest, und
+# die Ueberladung mit ``timerType`` nimmt dort nur Slot-Namen, keine Funktion —
+# daher ein eigener Einmal-Zeitgeber. Die Timer leben bis zum Ausloesen in
+# einer Menge (sonst raeumte die GC sie vorher ab) und werden danach per
+# ``deleteLater`` freigegeben.
+_PRAEZISE_TIMER: set = set()
+
+
+def precise_single_shot(ms: int, fn: Callable[[], None]) -> None:
+    """Wie ``QTimer.singleShot(ms, fn)``, aber mit ``Qt.PreciseTimer``."""
+    from PySide6.QtCore import QTimer, Qt
+    t = QTimer()
+    t.setTimerType(Qt.TimerType.PreciseTimer)
+    t.setSingleShot(True)
+
+    def _los():
+        _PRAEZISE_TIMER.discard(t)
+        try:
+            t.deleteLater()
+        except RuntimeError:
+            pass
+        fn()
+    t.timeout.connect(_los)
+    _PRAEZISE_TIMER.add(t)
+    t.start(max(0, int(ms)))
+
+
 def push_script(entries, gen=None) -> str:
     """Skript fuer ``runJavaScript``. ``entries``: ``[(seq, payload), ...]``,
     ``gen``: Show-Generation der Werte (``None`` = ohne, Alt-Aufrufer).
@@ -204,10 +234,7 @@ class DmxPushChannel:
             if kanal is not None:
                 kanal._timer_armed = False
                 kanal._try_flush()
-        schedule = self._schedule
-        if schedule is None:
-            from PySide6.QtCore import QTimer
-            schedule = QTimer.singleShot
+        schedule = self._schedule or precise_single_shot   # VIZ-86
         schedule(max(1, int(warten_s * 1000)), _los)
 
     def _senden(self, jetzt: float) -> None:
@@ -265,10 +292,7 @@ class DmxPushChannel:
                 kanal._waechter(rest)
             else:
                 kanal._try_flush()
-        schedule = self._schedule
-        if schedule is None:
-            from PySide6.QtCore import QTimer
-            schedule = QTimer.singleShot
+        schedule = self._schedule or precise_single_shot   # VIZ-86
         schedule(int(warten_s * 1000) + 20, _pruefen)
 
     def _on_result(self, nr: int, r) -> None:

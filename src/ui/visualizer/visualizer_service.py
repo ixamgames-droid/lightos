@@ -655,8 +655,13 @@ class VisualizerService:
     def _ensure_timer(self):
         if self._timer_alive():
             return
-        from PySide6.QtCore import QTimer
+        from PySide6.QtCore import QTimer, Qt
         self._timer = QTimer()
+        # VIZ-86: PreciseTimer. Der Standard (CoarseTimer) rastet unter Windows
+        # auf das 15,6-ms-Systemraster ein: 66/33/22 ms wurden zu 12,6/21,2/
+        # 31,8 Pushes je Sekunde statt 15/30/44. Der Takt dieses Timers IST der
+        # Push-Takt der Qualitaetsstufe — er muss stimmen.
+        self._timer.setTimerType(Qt.TimerType.PreciseTimer)
         self._timer.timeout.connect(self._tick)
 
     def _ensure_subscribed(self):
