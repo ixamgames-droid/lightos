@@ -104,8 +104,9 @@ class TabelleTest(unittest.TestCase):
         self.assertNotIn("? 'max'", probe)
         # VIZ-84: die Entscheidung steht in gpu_tier.js — auch dort nie 'max'.
         self.assertIn("decideTier(", probe)
-        entscheidung = _js("scene", "gpu_tier.js")
-        self.assertNotIn("'max'", entscheidung)
+        code = "\n".join(z for z in _js("scene", "gpu_tier.js").splitlines()
+                         if not z.lstrip().startswith("//"))
+        self.assertNotIn("'max'", code)
 
 
 class AnleitungTest(unittest.TestCase):

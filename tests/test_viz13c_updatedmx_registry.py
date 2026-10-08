@@ -332,7 +332,10 @@ class UpdateDmxGoldenParityTest(unittest.TestCase):
     def _load_and_wait(self):
         self._loaded_ok.clear()
         url = QUrl.fromLocalFile(_HTML_PATH)
-        url.setQuery(f"v={int(time.time() * 1000)}")
+        # Golden ist mit Stufe 'high' eingefroren — fest vorgeben, sonst haengt
+        # das Ergebnis an der GPU des Testrechners (VIZ-84: Intel UHD und
+        # Software-Renderer gelten am Namen als 'low').
+        url.setQuery(f"v={int(time.time() * 1000)}&gputier=high")
         self._view.load(url)
         deadline = time.monotonic() + _LOAD_TIMEOUT_S
         while not self._loaded_ok and time.monotonic() < deadline:
