@@ -1,12 +1,13 @@
 r"""LightOS Installer.
 
-Installiert alle Abhaengigkeiten in einer virtuellen Umgebung und legt
-Start-Verknuepfungen sowie Default-Daten an.
+Installiert alle Abhaengigkeiten in einer virtuellen Umgebung und legt eine
+Desktop-Verknuepfung sowie Default-Daten an.
 
 Funktioniert auf Windows x64 UND ARM64.
 
 Usage:
     python install.py [--no-venv] [--no-shortcut] [--dev]
+    py -3.12 install.py ...      (Windows mit mehreren Pythons: Version waehlen)
 
 Was wird installiert/erstellt:
 - venv/                        (Python Virtual Environment, ~250 MB)
@@ -15,9 +16,14 @@ Was wird installiert/erstellt:
                                Windows %APPDATA%/LightOS, Linux ~/.local/share/LightOS,
                                macOS ~/Library/Application Support/LightOS — aufgeloest
                                von src/core/paths.app_data_dir() (XPLAT-04/-10)
-- Desktop\LightOS.lnk          (optional, --no-shortcut zum Ueberspringen)
-- Start-Menu\LightOS\LightOS.lnk (optional)
+- Desktop\LightOS.lnk          (nur Windows; Standard, OHNE Rueckfrage —
+                               --no-shortcut laesst sie weg)
 - install_manifest.json        (Liste aller installierten Dateien fuer uninstall.py)
+
+Eine Startmenue-Verknuepfung legt das Script NICHT an (DOC-62: hier stand bis
+2026-10-08 eine, die es nie gab). Die Test-Abhaengigkeiten (pytest & Co.,
+``requirements-dev.txt``) installiert es ebenfalls nicht — auch nicht mit
+``--dev`` (das holt nur pyinstaller); s. INSTALL.md „Entwickeln und Tests".
 """
 from __future__ import annotations
 import sys
@@ -335,6 +341,7 @@ def create_shortcut():
             check=True, capture_output=True
         )
         info(f"Verknuepfung erstellt: {shortcut_path}")
+        info("  (ohne Verknuepfung installieren: --no-shortcut)")
         return shortcut_path
     except Exception as e:
         warn(f"Verknuepfung fehlgeschlagen: {e}")
@@ -384,6 +391,12 @@ def show_summary():
         info(f"  {VENV_DIR / 'bin' / 'python'} main.py")
     info("")
     info("Beispiel-Setups (vorkonfigurierte Patches/MIDI) siehe examples/")
+    info("")
+    info("Testsuite (nur fuer Entwicklung) braucht zusaetzlich:")
+    if os.name == "nt":
+        info(f"  {VENV_DIR / 'Scripts' / 'python.exe'} -m pip install -r requirements-dev.txt")
+    else:
+        info(f"  {VENV_DIR / 'bin' / 'python'} -m pip install -r requirements-dev.txt")
     info("")
     info("Deinstallieren mit:")
     info("  python uninstall.py")
