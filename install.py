@@ -3,7 +3,9 @@ r"""LightOS Installer.
 Installiert alle Abhaengigkeiten in einer virtuellen Umgebung und legt
 Start-Verknuepfungen sowie Default-Daten an.
 
-Funktioniert auf Windows x64 UND ARM64.
+Funktioniert auf Windows x64 UND ARM64. Auf Windows-ARM ist x64-Python
+(per Emulation) der empfohlene Weg; natives ARM64-Python laeuft ohne
+3D-Visualizer (XPLAT-46).
 
 Usage:
     python install.py [--no-venv] [--no-shortcut] [--dev]
@@ -159,17 +161,31 @@ def detect_native_os_arch() -> str:
     )
 
 
+# XPLAT-46 (Entscheidung 05.10.2026): auf Windows-ARM ist x64-Python der
+# empfohlene Weg. Die nativen win_arm64-Wheels von PySide6-Addons haben kein
+# QtWebEngine (XPLAT-45) - mit ARM64-Python fehlt der 3D-Visualizer.
+X64_PYTHON_BEFEHL = "winget install Python.Python.3.12 --architecture x64"
+
+
 def check_arm_runtime():
-    """Hinweise, wenn auf ARM64 ein emuliertes Python genutzt wird."""
+    """Hinweise zur Python-Architektur auf Windows-ARM (XPLAT-46)."""
     py_arch = detect_arch()
     os_arch = detect_native_os_arch()
     info(f"Python-Architektur: {py_arch} | OS-Architektur: {os_arch}")
-    if os.name == "nt" and os_arch == "arm64" and py_arch != "arm64":
+    if os.name != "nt" or os_arch != "arm64":
+        return
+    if py_arch == "arm64":
         warn(
-            "Du bist auf Windows ARM64, aber Python laeuft nicht nativ als ARM64. "
-            "Bitte ARM64-Python installieren, sonst laufen DMX/MIDI/Qt ggf. nur per Emulation."
+            "Natives ARM64-Python: LightOS laeuft, aber OHNE 3D-Visualizer - "
+            "die ARM64-Pakete von PySide6-Addons enthalten kein QtWebEngine. "
+            "python-rtmidi baut hier nur mit MSVC Build Tools (MIDI geht sonst "
+            "ueber den eingebauten WinMM-Weg)."
         )
-        warn("Empfohlen: winget install Python.Python.3.14 --arch arm64")
+        warn(f"Empfohlen auf Windows-ARM: x64-Python ({X64_PYTHON_BEFEHL}), "
+             "dann: py -3.12-64 install.py")
+    else:
+        info("x64-Python unter Emulation auf Windows-ARM - empfohlener Weg, "
+             "der 3D-Visualizer ist verfuegbar.")
 
 
 def create_venv():
@@ -371,8 +387,9 @@ def show_summary():
     info("=" * 60)
     info(f"Python-Architektur: {py_arch}")
     info(f"OS-Architektur:     {os_arch}")
-    if os.name == "nt" and os_arch == "arm64" and py_arch != "arm64":
-        warn("Python laeuft emuliert auf ARM64. Fuer native Performance ARM64-Python nutzen.")
+    if os.name == "nt" and os_arch == "arm64" and py_arch == "arm64":
+        warn("Natives ARM64-Python: kein 3D-Visualizer. Mit x64-Python geht alles "
+             f"({X64_PYTHON_BEFEHL}).")
     info(f"venv:        {VENV_DIR}")
     info(f"AppData:     {APPDATA_DIR}")
     info("")

@@ -11,7 +11,7 @@ python install.py
 
 Das war's. Das Script:
 - Prueft Python-Version (>= 3.11)
-- Prueft Python-Architektur vs. OS-Architektur (ARM64-Emulation wird erkannt)
+- Prueft Python-Architektur vs. OS-Architektur (auf Windows-ARM: x64-Python empfohlen, siehe unten)
 - Erstellt `venv/`
 - Installiert Kern-Abhaengigkeiten + optionale Pakete separat
 - Legt App-Verzeichnisse an
@@ -24,18 +24,27 @@ Das war's. Das Script:
 |---|---|---|
 | **Windows** | 10/11 | 11 (ARM-Version) |
 | **Linux** | X11 (getestet: Mint 22.3) | nicht getestet |
-| **Python** | 3.11+ (3.12/3.13/3.14 OK) | 3.11+ ARM64-Build |
-| **VS Build Tools** | nicht noetig | optional (nur fuer `python-rtmidi`) |
+| **Python** | 3.11+ (3.12/3.13/3.14 OK) | 3.11+ **x64-Build** (laeuft per Emulation) |
+| **VS Build Tools** | nicht noetig | nicht noetig (nur bei nativem ARM64-Python fuer `python-rtmidi`) |
 
-### Python fuer ARM64 holen
-- Offizielle ARM64-Builds: https://www.python.org/downloads/windows/
-  Achten auf "**ARM64**" in den Dateinamen
-- Oder: `winget install Python.Python.3.14 --arch arm64`
+### Python auf Windows-ARM (Snapdragon): x64-Python nehmen
 
-### VS Build Tools fuer ARM64 (nur falls noetig)
-- Download: https://visualstudio.microsoft.com/visual-cpp-build-tools/
-- Bei Installation: "Desktop Development with C++" wählen
-- Wird gebraucht weil `python-rtmidi` keine fertigen ARM64-Wheels hat
+**Empfehlung: das normale x64-Python**, auch auf einem ARM-Geraet. Windows
+fuehrt es per Emulation aus, und damit geht alles - auch der 3D-Visualizer.
+
+- `winget install Python.Python.3.12 --architecture x64`
+- oder von https://www.python.org/downloads/windows/ den "Windows installer (64-bit)"
+- danach `py -3.12-64 install.py` (`py -0p` zeigt alle installierten Pythons;
+  `-64` steht dort fuer x64, `-arm64` fuer natives ARM)
+
+**Natives ARM64-Python geht auch, aber ohne 3D-Visualizer.** Die ARM64-Pakete
+von PySide6-Addons enthalten kein QtWebEngine (gemessen an 6.11, XPLAT-45);
+das Menue "3D-Visualizer" meldet dann "Visualizer nicht verfuegbar".
+`python-rtmidi` baut dort nur mit den MSVC Build Tools
+(https://visualstudio.microsoft.com/visual-cpp-build-tools/, "Desktop
+Development with C++") - ohne sie laeuft MIDI ueber den eingebauten WinMM-Weg.
+Welche Qt-Module ein Python mitbringt, zeigt `python tools/qt_module_befund.py`.
+Der Installer meldet beide Faelle.
 
 ## Installer-Optionen
 
@@ -58,12 +67,13 @@ python uninstall.py --keep-appdata  # Snapshots, Stages behalten
 
 ## ARM64-Kompatibilitaet (Snapdragon-Geraete)
 
-Kern-Abhaengigkeiten sind ARM64-kompatibel. Ein Paket bleibt optional:
+Gilt nur fuer **natives** ARM64-Python - mit dem empfohlenen x64-Python
+(siehe oben) gibt es diese Einschraenkungen nicht.
 
 | Paket | ARM64 Status |
 |---|---|
 | PySide6 | OK (ARM64-Wheel) |
-| PySide6-Addons | OK (ARM64-Wheel) |
+| PySide6-Addons | ARM64-Wheel **ohne QtWebEngine** - kein 3D-Visualizer |
 | numpy | OK (ARM64-Wheel) |
 | soundcard | OK (pure-Python) |
 | flask-socketio | OK (pure-Python) |
@@ -74,7 +84,7 @@ Kern-Abhaengigkeiten sind ARM64-kompatibel. Ein Paket bleibt optional:
 | mido | OK (pure-Python) |
 | **python-rtmidi** | optional, Build noetig (MSVC Build Tools) |
 
-Stand: 2026-05-25 (PyPI Latest Stable)
+Stand: 2026-05-25 (PyPI Latest Stable), QtWebEngine-Befund 2026-10 (XPLAT-45)
 
 ## Linux (x86_64)
 
@@ -213,9 +223,10 @@ Wenn du das vorbereitest sag Bescheid - dann mache ich ein dediziertes Build-Scr
 | Problem | Loesung |
 |---|---|
 | `ModuleNotFoundError: PySide6` | venv nicht aktiv - `venv\Scripts\activate` oder direkt `venv\Scripts\python main.py` |
-| Installer meldet "Python laeuft emuliert auf ARM64" | ARM64-Python installieren (`winget install Python.Python.3.14 --arch arm64`) und `install.py` erneut ausfuehren |
-| `python-rtmidi` Build-Fehler auf ARM64 | MSVC Build Tools installieren |
+| Installer meldet "Natives ARM64-Python: ... OHNE 3D-Visualizer" | x64-Python installieren (`winget install Python.Python.3.12 --architecture x64`) und `py -3.12-64 install.py` ausfuehren |
+| `python-rtmidi` Build-Fehler auf ARM64 | x64-Python nehmen (siehe oben) oder MSVC Build Tools installieren; MIDI geht auch ohne (WinMM-Weg) |
 | "Visualizer nicht verfuegbar" | `PySide6` + `PySide6-Addons` erneut installieren (`python -m pip install --upgrade PySide6 PySide6-Addons`) |
+| "Visualizer nicht verfuegbar" auf Windows-ARM | Mit nativem ARM64-Python gibt es kein QtWebEngine - x64-Python installieren (siehe "Python auf Windows-ARM") |
 | Enttec nicht erkannt | `pip install pyserial` neu, FTDI-Treiber pruefen |
 | APC mini mk2 in MIDI-View leer | Class-Compliant-Mode (Pad UL beim Anschluss halten), oder Akai APC Editor installieren |
 | `mido.backend` ist None | `pip install python-rtmidi` neu installieren |
