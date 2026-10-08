@@ -1034,7 +1034,9 @@ class VisualizerBridge(QObject):
         VisualizerBridge._poll_take_dmx(self, out)
         try:
             return json.dumps(out)
-        except Exception:
+        except Exception as e:
+            from src.core.diagnose_log import melde_still   # STAB-30
+            melde_still("viz.poll_json", e)
             return "{}"
 
     @Slot(result=str)
@@ -1875,6 +1877,9 @@ class VisualizerBridge(QObject):
         """JS meldet beim Channel-Connect die aktive Qualitätsstufe der Szene
         (Probe- oder Override-Ergebnis) — fürs Einstellungen-Tab-Label."""
         if tier:
+            # STAB-30: Qualitaetsstufe ins Sitzungs-Log/Diagnosepaket.
+            from src.core.diagnose_log import merke
+            merke("Visualizer GPU-Stufe", str(tier))
             self.pyGpuTierReported.emit(str(tier))
 
     @Slot()
@@ -3635,6 +3640,11 @@ class VisualizerWindow(QMainWindow):
 
     def _on_load_finished(self, ok: bool):
         if not ok:
+            # STAB-30: 3D-Seite nicht geladen (HTML/three.js fehlt, URL) — die
+            # Ansicht bleibt schwarz; bisher ohne jede Spur.
+            from src.core.diagnose_log import melde_still
+            melde_still("viz.laden", text="3D-Seite konnte nicht geladen werden "
+                                          "(loadFinished ok=False)")
             return
         guard = getattr(self, "_render_crash_guard", None)
         if guard is not None:

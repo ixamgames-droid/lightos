@@ -383,7 +383,10 @@ def _ziel_ist_leer(neu: str, sqlite: bool) -> bool:
         if not text.strip():
             return True
         return json.loads(text) in ([], {}, None)
-    except Exception:
+    except Exception as e:
+        # STAB-30: zaehlt dann als Konflikt — den Grund sichtbar machen.
+        from src.core.diagnose_log import melde_still
+        melde_still("datenumzug.ziel_pruefen", e, text=os.path.basename(neu))
         return False
 
 
@@ -462,7 +465,10 @@ def _marker_lesen(pfad: str) -> dict:
         with open(pfad, encoding="utf-8") as f:
             d = json.load(f)
         return d if isinstance(d, dict) else {}
-    except (OSError, ValueError):
+    except (OSError, ValueError) as e:
+        if os.path.exists(pfad):   # STAB-30: kaputte Marke, nicht "gibt's nicht"
+            from src.core.diagnose_log import melde_still
+            melde_still("datenumzug.marke", e)
         return {}
 
 
@@ -713,8 +719,12 @@ def alten_stand_uebernehmen(
                 try:
                     if not os.path.exists(orig):
                         os.replace(sich, orig)
-                except OSError:
-                    pass
+                except OSError as e:
+                    # STAB-30: sonst liegt der Stand still unter der Sicherung —
+                    # sieht aus wie Datenverlust.
+                    from src.core.diagnose_log import melde_still
+                    melde_still("datenumzug.rueckbau", e,
+                                text=f"Sicherung {sich!r} nicht zurueckgelegt")
             raise
         log(f"[datenumzug] {name}: alter Stand {alt!r} auf Wunsch uebernommen; "
             f"bisheriger Stand gesichert: {[s for _o, s in gesichert]!r}")

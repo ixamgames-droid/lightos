@@ -163,8 +163,11 @@ class ArtNetReceiver:
                         print(f"[ArtNet-In] cb error: {e}")
             except socket.timeout:
                 continue
-            except OSError:
+            except OSError as e:
                 # Socket closed during stop() ODER transienter Netzfehler.
+                if self._running:   # STAB-30: nur der unerwartete Abbruch
+                    from src.core.diagnose_log import melde_still
+                    melde_still("artnet.empfang", e, text="Empfang beendet")
                 self._running = False   # NET-06: Status ehrlich halten -> Auto-Restart
                 break
             except Exception as e:

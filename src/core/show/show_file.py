@@ -8,6 +8,7 @@ import tempfile
 
 from src.core.strict import strict_mode
 from src.core.stage.coords import normalize_rotation
+from src.core.diagnose_log import melde_still as _melde_still   # STAB-30
 
 SHOW_VERSION = "1.2"
 
@@ -1791,8 +1792,8 @@ def _load_show_impl(path: str | os.PathLike):
                 if vc_assets.is_asset_entry(_name):
                     try:
                         vc_assets.store_extracted(vc_assets.key_from_entry(_name), zf.read(_name))
-                    except Exception:
-                        pass
+                    except Exception as _e:
+                        _melde_still("show.vc_asset", _e, text=_name)   # STAB-30
         data = json.loads(raw)
     except Exception as e:
         return False, f"Öffnen fehlgeschlagen: {e}"
@@ -2207,14 +2208,16 @@ def _load_show_impl(path: str | os.PathLike):
         for fid_raw, p in (viz.get("positions", {}) or {}).items():
             try:
                 positions[int(fid_raw)] = (float(p[0]), float(p[1]), float(p[2]))
-            except Exception:
+            except Exception as _e:
+                _melde_still("show.viz_position", _e, text=f"Geraet {fid_raw}")
                 continue
         # Multi-Achsen-Ausrichtung (rx, ry, rz) in Grad. normalize_rotation laedt
         # auch Alt-Shows korrekt, die nur einen einzelnen Y-Float gespeichert haben.
         for fid_raw, val in (viz.get("rotations", {}) or {}).items():
             try:
                 rotations[int(fid_raw)] = normalize_rotation(val)
-            except Exception:
+            except Exception as _e:
+                _melde_still("show.viz_rotation", _e, text=f"Geraet {fid_raw}")
                 continue
         active_stage_name = str(viz.get("active_stage", "simple") or "simple")
         # Andock-Beziehungen {fid: stage_element_id}. Stale-Eintraege (Element der
@@ -2438,6 +2441,9 @@ def _load_show_impl(path: str | os.PathLike):
     # States; das Hauptfenster merkt nach dem Neuaufbau seiner Views erneut
     # (dessen VC-Layout kommt aus der Flaeche, nicht aus der Datei).
     merke_show_stand(state)
+    # STAB-30: Name + Geraeteanzahl ins Sitzungs-Log/Diagnosepaket.
+    from src.core.diagnose_log import melde_show_geladen
+    melde_show_geladen(state)
 
     # ★ QA-50: „geladen" nur sagen, wenn auch alles gelesen wurde. Sonst steht
     # die Zahl im Text — die Einzelheiten holt die UI ueber

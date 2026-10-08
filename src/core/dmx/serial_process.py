@@ -29,6 +29,9 @@ import multiprocessing as mp
 import os
 import time
 
+# STAB-30: gedrosselte Logzeile fuer bisher stille Fehler (nur stdlib, spawn-sicher).
+from src.core.diagnose_log import melde_still as _melde_still
+
 FRAME_INTERVAL = 1.0 / 44
 OPEN_RETRY_S = 1.0          # Worker-internes (Wieder-)Oeffnen des Ports, gedrosselt
 DMX_BYTES = 512
@@ -71,9 +74,12 @@ def _serial_worker_loop(dev_factory, buf, stop_flag, status,
                 try:
                     dev = dev_factory()
                     status.value = ST_OK
-                except Exception:
+                except Exception as e:
                     dev = None
                     status.value = ST_DISABLED
+                    # STAB-30: der GRUND (Zugriff verweigert, belegt, fehlt)
+                    # war bisher nirgends zu sehen — je Fehlerart einmal.
+                    _melde_still("dmx.enttec.oeffnen", e)
         if dev is not None:
             try:
                 with buf.get_lock():
@@ -83,9 +89,9 @@ def _serial_worker_loop(dev_factory, buf, stop_flag, status,
             try:
                 dev.send_dmx(bytes(local))
                 status.value = ST_DISABLED if dev.is_disabled() else ST_OK
-            except Exception:
+            except Exception as e:
                 # EnttecPro faengt Serial-Fehler selbst ab; hier nur ein Sicherheitsnetz.
-                pass
+                _melde_still("dmx.enttec.senden", e)   # STAB-30, gedrosselt
         sleep(max(0.0, frame_interval - (clock() - t0)))
     if dev is not None:
         try:
@@ -229,13 +235,18 @@ class EnttecProcessProxy:
             return
         p = self._proc
         if p is None or not p.is_alive():
+            # STAB-30: dass der Worker tot ist, war bisher unsichtbar.
+            _melde_still("dmx.enttec.worker",
+                         text=f"Sende-Prozess fuer {self.port} "
+                              f"nicht aktiv (Exitcode "
+                              f"{getattr(p, 'exitcode', None)}) — Neustart")
             self._maybe_respawn()
             return
         try:
             with self._buf.get_lock():
                 ctypes.memmove(self._buf.get_obj(), dmx_data, DMX_BYTES)
-        except Exception:
-            pass
+        except Exception as e:
+            _melde_still("dmx.enttec.puffer", e)   # STAB-30, gedrosselt
 
     def is_open(self) -> bool:
         """Worker-LEBENSZEICHEN: True, solange der Worker-Prozess laeuft. Das ist
