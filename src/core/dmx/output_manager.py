@@ -202,6 +202,10 @@ class OutputManager:
         # OUT-64: bei aktivem Latch die AUSGABEWEGE der gesperrten Universen
         # ({weg: Adressen}); s. _estop_wege_nachfuehren.
         self._laser_estop_wege: dict[tuple, frozenset] = {}
+        # Eigene kleine Sperre fuer das Fortschreiben der Wege (NOT-AUS aus
+        # MIDI/OSC/Web-Thread vs. Umrouten im UI-Thread) — bewusst NICHT
+        # _io_lock: den haelt _send_all waehrend der seriellen Writes.
+        self._estop_wege_lock = threading.Lock()
         # slot → (level 0.0–1.0, target_fids | None). target_fids None = GLOBALER
         # Submaster (wirkt auf ALLE Fixtures, bisheriges Verhalten); ein
         # frozenset[int] beschraenkt den Submaster auf genau diese Fixture-fids
@@ -363,35 +367,40 @@ class OutputManager:
         return ("netz", ext if ext is not None else univ_num)
 
     def _wege_von(self, univ_num: int) -> list:
-        """Aktuelle Ausgabewege eines internen Universums (unter ``_io_lock``)."""
+        """Aktuelle Ausgabewege eines internen Universums.
+
+        Bewusst OHNE ``_io_lock`` (Review zu OUT-64): den haelt ``_send_all``
+        waehrend der seriellen Writes (In-Proc-Enttec bis 0,5 s
+        ``write_timeout``) — ``set_laser_estop`` stuende sonst so lange.
+        Gelesen wird aus Dict-Kopien (wie ``ausgabe_status``)."""
         wege = []
-        lock = getattr(self, "_io_lock", None)
-        if lock is None:          # Test-Manager per __new__ ohne __init__
-            return wege
-        with lock:
-            ext = (getattr(self, "_out_universe", None) or {}).get(univ_num)
-            dev = (getattr(self, "_enttec_outputs", None) or {}).get(univ_num)
-            if dev is not None:
-                wege.append(self._weg_enttec(dev))
-            if (getattr(self, "_artnet_outputs", None) or {}).get(univ_num) is not None:
-                wege.append(self._weg_netz("artnet", univ_num, ext))
-            if (getattr(self, "_sacn_outputs", None) or {}).get(univ_num) is not None:
-                wege.append(self._weg_netz("sacn", univ_num, ext))
+        ext = dict(getattr(self, "_out_universe", None) or {}).get(univ_num)
+        dev = dict(getattr(self, "_enttec_outputs", None) or {}).get(univ_num)
+        if dev is not None:
+            wege.append(self._weg_enttec(dev))
+        if dict(getattr(self, "_artnet_outputs", None) or {}).get(univ_num) is not None:
+            wege.append(self._weg_netz("artnet", univ_num, ext))
+        if dict(getattr(self, "_sacn_outputs", None) or {}).get(univ_num) is not None:
+            wege.append(self._weg_netz("sacn", univ_num, ext))
         return wege
 
     def _estop_wege_nachfuehren(self):
         """Bei aktivem Latch: die Wege der gesperrten Universen dazunehmen (nie
         einengen); ohne Latch: leeren. Nach jeder Masken- und Routing-Aenderung."""
-        if not getattr(self, "_laser_estop_aktiv", False):
-            self._laser_estop_wege = {}
-            return
-        wege = dict(getattr(self, "_laser_estop_wege", {}) or {})
-        for u, addrs in (getattr(self, "_laser_estop_mask", {}) or {}).items():
-            if not addrs:
-                continue
-            for weg in self._wege_von(u):
-                wege[weg] = frozenset(wege.get(weg, frozenset()) | frozenset(addrs))
-        self._laser_estop_wege = wege   # eine Zuweisung = atomar fuer _send_all
+        lock = getattr(self, "_estop_wege_lock", None)
+        if lock is None:          # Test-Manager per __new__ ohne __init__
+            lock = self._estop_wege_lock = threading.Lock()
+        with lock:
+            if not getattr(self, "_laser_estop_aktiv", False):
+                self._laser_estop_wege = {}
+                return
+            wege = dict(getattr(self, "_laser_estop_wege", {}) or {})
+            for u, addrs in dict(getattr(self, "_laser_estop_mask", {}) or {}).items():
+                if not addrs:
+                    continue
+                for weg in self._wege_von(u):
+                    wege[weg] = frozenset(wege.get(weg, frozenset()) | frozenset(addrs))
+            self._laser_estop_wege = wege   # eine Zuweisung = atomar fuer _send_all
 
     @staticmethod
     def _weg_nullen(data: bytes, addrs) -> bytes:
@@ -902,6 +911,10 @@ class OutputManager:
         # Falls derselbe COM-Port bereits auf einem ANDEREN Universe offen ist,
         # zuerst thread-sicher schliessen (ein Port kann nur einmal geoeffnet
         # sein -> sonst "Access denied" beim erneuten Verbinden).
+        # OUT-64: VOR dem Schliessen nachfuehren — haengt der Laser an diesem
+        # Port (auch unter neuer COM-Nummer nach einem Reconnect), steht der
+        # Weg danach in der Liste, bevor ein anderes Universum ihn bekommt.
+        self._estop_wege_nachfuehren()
         self.close_enttec_on_port(port)
         self._swap_device(self._enttec_outputs, universe, _make_enttec_device(port))
         self._estop_wege_nachfuehren()       # OUT-64
