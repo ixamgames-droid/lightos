@@ -1613,11 +1613,12 @@ class FixtureGeneratorDialog(QDialog):
             return
         try:
             # FM-12: gecachte viz_model-Overrides/Channels des Profils verwerfen.
-            # UI-81: und gepatchte Geraete dieses Profils neu aufbauen.
-            from src.core.app_state import profil_geaendert
-            profil_geaendert(self.saved_id)
-        except Exception as e:
-            print(f"[UI-81] Profil-Aenderung nicht uebernommen: {e}")
+            # Kein profil_geaendert() wie im Editor (UI-81): der Generator legt
+            # immer ein NEUES Profil an, kein gepatchtes Geraet nutzt es schon.
+            from src.core.app_state import clear_channel_cache
+            clear_channel_cache()
+        except Exception:
+            pass
         try:
             from src.core.sync import get_sync, SyncEvent
             get_sync().emit(SyncEvent.REFRESH_ALL, None)
