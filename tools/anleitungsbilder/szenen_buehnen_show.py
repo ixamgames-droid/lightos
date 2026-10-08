@@ -41,9 +41,9 @@ _GROESSE = (1900, 1000)     # Visualizer-Fenster
 _HINWEIS_H = 40             # unten: Bedienhinweis der 3D-Ansicht, kommt nicht ins Bild
 _TAKT = 1.0 / 44.0          # ein DMX-Frame
 
-# Darstellung: Strahlen bewusst zurueckhaltend (Deckkraft 22 %), Nebel an,
+# Darstellung: Strahlen bewusst zurueckhaltend (Deckkraft 20 %), Nebel an,
 # Szene dunkel — die Buehne bleibt zwischen den Strahlen gut sichtbar.
-STRAHL_DECKKRAFT = 22
+STRAHL_DECKKRAFT = 20
 HELLIGKEIT = 10
 
 # Kameras wie camera/presets.js (theta/phi/radius/target); theta 0 = von vorn
@@ -410,7 +410,7 @@ _GIF_ZUSCHNITT = (230, 110, 1440, 767)
 
 
 def _fahrt_gif(name, titel, knoepfe, kam_von, kam_bis, *, n=18, schritt_s=0.2,
-               vorlauf_s=1.5, breite=640, weich=True):
+               vorlauf_s=1.5, breite=640, weich=True, gm=1.0):
     """GIF mit Kamerafahrt: je Frame laeuft die Show ``schritt_s`` weiter und
     die Kamera rueckt ein Stueck von ``kam_von`` nach ``kam_bis``."""
     uhr = Uhr()
@@ -421,7 +421,7 @@ def _fahrt_gif(name, titel, knoepfe, kam_von, kam_bis, *, n=18, schritt_s=0.2,
             kamera_sofort(ui, kamera_zwischen(kam_von, kam_bis, i / max(1, n - 1),
                                               weich=weich))
         return schritt
-    return Szene(name, sektion="Bühne", vorher=_vorbereitung(knoepfe, kam_von, vorlauf_s),
+    return Szene(name, sektion="Bühne", vorher=_vorbereitung(knoepfe, kam_von, vorlauf_s, gm),
                  nachher=_aufraeumen, braucht_gpu=True, groesse=_GROESSE,
                  gif_breite=breite, gif_zuschnitt=_GIF_ZUSCHNITT, warte_s=0.3,
                  frames=[Frame(dauer_s=schritt_s, schritt=frame_schritt(i),
@@ -455,7 +455,7 @@ SZENEN = [
           nachher=_aufraeumen,
           titel="Look Drop: Lauflicht innen → außen, Schwenker A/B, Strobe-Lauf"),
     Szene("05_breakdown", sektion="Bühne", braucht_gpu=True, groesse=_GROESSE,
-          vorher=_vorbereitung(["Breakdown"], KAM_SCHRAEG, 2.0), dialog=flaeche,
+          vorher=_vorbereitung(["Breakdown"], KAM_SCHRAEG, 2.0, gm=0.4), dialog=flaeche,
           nachher=_aufraeumen, titel="Look Breakdown: Amber-Welle, blaue Moving Heads mit Gobo + Prisma, Acht"),
     Szene("06_finale", sektion="Bühne", braucht_gpu=True, groesse=_GROESSE,
           vorher=_vorbereitung(["Finale"], KAM_TOTALE, 2.33, gm=0.5), dialog=flaeche,
@@ -477,4 +477,14 @@ SZENEN = [
                 "Laser Lauf", "Laser Farbe", "MH Licht an", "Tilt-Welle", "Farbrad"],
                dict(KAM_PUBLIKUM, theta=-0.3), dict(KAM_PUBLIKUM, theta=0.1),
                n=14, schritt_s=0.12, breite=560),
+    # Laser-Bewegung (VIZ-79) und Prisma (VIZ-80) zusammen: die Laser fahren
+    # ihre liegende Acht, die Moving Heads stehen mit Prisma auf der Buehne
+    # (drei Kegel je Kopf). Grand Master 60 %, sonst brennt der Boden aus.
+    _fahrt_gif("10_laser_prisma",
+               "GIF: „Laser langsam“ schwenkt die Strahlen, Moving Heads mit Prisma "
+               "(drei Kegel je Kopf) — Kamera fährt heran",
+               ["Laser an", "Laser grün", "Laser langsam", "MH Licht an", "MH Blau",
+                "Position Bühne", "Beam schmal", "Gobo + Prisma", "Haze an"],
+               dict(KAM_TOTALE, theta=-0.2, radius=30.0), dict(KAM_NAH, theta=0.15),
+               n=22, schritt_s=0.3, breite=600, gm=0.6),
 ]

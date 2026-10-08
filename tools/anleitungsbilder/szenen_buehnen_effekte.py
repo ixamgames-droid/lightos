@@ -1350,8 +1350,8 @@ SZENEN = [
           titel="Chaser: zwei Szenen übernommen, Fade In 4 s, Schließen"),
     _gif("18_laser_3d", "GIF: Laser an, Chaser „Mein Laser langsam“ schwenkt die Strahlen",
          lambda ui: (laser_bauen(ui), _fm().start(funktion(LASER).id)),
-         ["Laser an", "Laser Farbe", "Haze an"], KAM_LASER, dict(KAM_LASER, theta=0.3),
-         n=14, schritt_s=0.25),
+         ["Laser an", "Laser Farbe", "Haze an"], KAM_LASER,
+         dict(KAM_LASER, theta=0.25, radius=24.0), n=24, schritt_s=0.35, breite=600),
     # 6 VC
     Szene("19_vc_button", sektion="Virtual Console", vorher=_v16, dialog=_b16,
           titel="Button Einstellungen: Beschriftung, Funktion an/aus, Funktion, Slot"),

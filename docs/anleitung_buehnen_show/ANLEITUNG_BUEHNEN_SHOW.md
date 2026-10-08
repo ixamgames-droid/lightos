@@ -95,6 +95,13 @@ Kamerafahrten, während die Effekte laufen:
 
 ![Lauflicht, Strobe, Laser](img/09_lauflicht_strobe.gif)
 
+![Laser-Bewegung und Prisma](img/10_laser_prisma.gif)
+
+Im letzten GIF fahren die Laser „Laser langsam“, die Moving Heads stehen mit **Gobo + Prisma**
+auf der Bühne. Das Prisma zeigt der 3D-Visualizer als drei Kegel je Kopf (VIZ-80). Das Gobo
+bleibt dort ein voller Lichtfleck: Der generische Moving Head dieser Show nennt seine Gobos nur
+„Gobo 1“ … „Gobo 7“, und ohne Motiv im Namen zeichnet die Ansicht kein Muster (VIZ-82).
+
 Neu erzeugen (am Bildschirm, 3D braucht WebGL):
 
 ```bash
@@ -102,8 +109,8 @@ DISPLAY=:0 venv/bin/python tools/anleitungsbilder.py buehnen_show --bildschirm
 venv/bin/python tools/anleitungsbilder.py buehnen_show      # VC-Bild offscreen
 ```
 
-Darstellung im 3D-Visualizer: Strahl-Deckkraft 22 %, Nebel an, Szenen-Helligkeit 10. In den
-Standbildern Aufbau, Drop und Finale steht der Grand Master auf 50–70 %, damit der
+Darstellung im 3D-Visualizer: Strahl-Deckkraft 20 %, Nebel an, Szenen-Helligkeit 10. In den
+Standbildern Aufbau, Drop, Breakdown und Finale steht der Grand Master auf 40–70 %, damit der
 Bühnenboden nicht weiß ausbrennt.
 
 ## Leistung (ehrlich)

@@ -1,7 +1,7 @@
 {
   "anleitung": "buehnen_show",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "a772bd69",
+  "stand": "8148ec3f",
   "schrift": "Noto Sans (statt Roboto Condensed)",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py buehnen_show'.",
@@ -15,7 +15,7 @@
         900
       ],
       "marken": [],
-      "md5": "b7ae2270d894f725597f42f0c4468027"
+      "md5": "6cef087be3e4bae0be504b0e69007f49"
     },
     {
       "datei": "02_aufbau.png",
@@ -59,7 +59,7 @@
         877
       ],
       "marken": [],
-      "md5": "494759596621011399f1fddd9c5f2d44"
+      "md5": "b03af093ed20046ff0346a11bc25498d"
     },
     {
       "datei": "06_finale.png",
@@ -98,7 +98,7 @@
         [],
         []
       ],
-      "md5": "aa611b67ed4afe733b661160f76506e2",
+      "md5": "ea6cec6b1381d12c1448969387da1e7a",
       "frames": 16,
       "dauern_ms": [
         200,
@@ -147,7 +147,7 @@
         [],
         []
       ],
-      "md5": "59c7e02c20b672c511bc3fb954bd59f1",
+      "md5": "d3ff5ed3c6ec79e157bfc438683b3d91",
       "frames": 18,
       "dauern_ms": [
         200,
@@ -194,7 +194,7 @@
         [],
         []
       ],
-      "md5": "95fe511a20b7435fb5366027bae20dec",
+      "md5": "da3c24851fdf125bb4a75e1985949531",
       "frames": 14,
       "dauern_ms": [
         120,
@@ -211,6 +211,65 @@
         120,
         120,
         120
+      ]
+    },
+    {
+      "datei": "10_laser_prisma.gif",
+      "szene": "10_laser_prisma",
+      "titel": "GIF: „Laser langsam“ schwenkt die Strahlen, Moving Heads mit Prisma (drei Kegel je Kopf) — Kamera fährt heran",
+      "groesse": [
+        600,
+        320
+      ],
+      "marken": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "md5": "9eb5da15af0f7af838dbcc73e7dee948",
+      "frames": 22,
+      "dauern_ms": [
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300
       ]
     }
   ]
