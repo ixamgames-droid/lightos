@@ -18,7 +18,7 @@ Aufruf::
 
 Exit 0 = identisch (Abnahme bestanden), 1 = Abweichung, 2/3 = Lauf kaputt.
 
-★ FUENF PINS, ohne die der Lauf entweder Davids Daten anfasst oder nichts misst
+★ FUENF PINS, ohne die der Lauf entweder echte Nutzerdaten anfasst oder nichts misst
 (Lehren aus ``reference_lightos_ui_automation``):
   1. ``XDG_DATA_HOME`` -> Wegwerf (Snaps, Buehnen, ``crash.log``).
   2. ``LIGHTOS_SHOW_DB`` -> Wegwerf. Der Default ist RELATIV zum Arbeits-
