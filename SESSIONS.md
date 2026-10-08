@@ -81,7 +81,7 @@
 | UI-76 | B | fix/ui76-go-hinweis-page | 2026-10-08T19:17Z | src/core/cueliste_ziel.py · src/ui/views/playback_view.py · tests/test_ui76_go_hinweis.py · docs/anleitung_szenen_cues/ANLEITUNG.md · changelog.d/2026-10-08-UI-76.md · BACKLOG.md |
 | STAB-30 | A | feature/stab30-diagnose-log | 2026-10-08T19:39Z | main.py · src/core/crash_logging.py |
 | VIZ-94 | B | fix/viz94-buehne-windows-arm | 2026-10-08T19:49Z | src/ui/visualizer |
-| QA-87 | D | fix/qa87-doppelter-tap | 2026-10-08T19:49Z | src/core/engine/tempo_bus.py · src/core/engine/bpm_manager.py · src/ui/virtualconsole/vc_speedial.py · tests/test_qa87_tap_uhr.py · changelog.d/2026-10-08-QA-87.md |
+| QA-87 | D | fix/qa87-doppelter-tap | 2026-10-08T20:36Z | src/core/engine/tempo_bus.py · src/core/engine/bpm_manager.py · src/ui/virtualconsole/vc_speedial.py · tests/test_qa87_tap_uhr.py · changelog.d/2026-10-08-QA-87.md |
 
 ## Blocker & Fallen
 
