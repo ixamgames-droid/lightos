@@ -254,30 +254,47 @@ Rückgängig/Wiederholen (`Strg+Z`/`Strg+Y`) wirkt auch im Visualizer-Fenster.
 
 ## Was bei großen Rigs anders aussieht
 
-Ab dem **9. Gerät im Raum** wirft nicht mehr jeder Scheinwerfer einen eigenen
-Schlagschatten. Die Ansicht vergibt höchstens **8 Schlagschatten**, und zwar an
-die Geräte mit den niedrigsten Fixture-Nummern; alle übrigen leuchten normal
-weiter, werfen aber keinen Schatten auf Boden und Bühnenelemente. Wird ein Gerät
-entfernt, rückt das nächste nach.
+Ab dem **9. Gerät im Raum** (Stufe Hoch) beleuchten nicht mehr alle Scheinwerfer
+die Umgebung selbst.
 
-**Warum das so ist:** jeder Schlagschatten kostet die Grafikkarte nicht nur eine
-Textur, sondern auch Platz im Beleuchtungs-Programm. Ohne diese Grenze scheiterte
-auf Rechnern mit stärkerer Grafik ab 26 Schatten das Übersetzen dieses Programms —
-die Ansicht stürzte ohne Meldung ab, und kurz davor stand das Bild sekundenlang
-still. Zudem zeichnet jeder schattenwerfende Scheinwerfer die ganze Szene noch
-einmal aus seiner Sicht — mit 16 Schatten war das der größte Einzelposten pro
-Bild und ließ die Ansicht bei großen Rigs ruckeln. Acht Schatten reichen für den
-Raumeindruck. Die Obergrenze von 8 gilt überall gleich; nur auf sehr schwachen
-Grafikchips (weniger als 14 Textur-Einheiten) werfen noch weniger Geräte Schatten.
-Einzige Ausnahme nach oben ist die Qualitätsstufe **Maximal** (siehe unten): sie
-erlaubt bis zu 16 Schlagschatten und ist für starke Grafikkarten gedacht. Neu berechnet werden die Schatten nur, wenn sich etwas bewegt
-(Pan/Tilt, verschobene Geräte oder Bühnenteile) — Kamerafahrten und reine Farb- oder
-Dimmerwechsel kosten keinen Schattendurchlauf.
+**Echte Lichter:** Jeder Scheinwerfer zeigt immer seinen Lichtkegel, seinen
+Bodenfleck und die leuchtende Linse. Die Umgebung (Bühne, Wände, Traversen,
+andere Geräte) **beleuchten** aber nur die hellsten Strahlen: auf **Hoch** die
+8 hellsten, auf **Niedrig** die 4, auf **Maximal** die 16 hellsten (Tabelle
+unten). Ein Rig mit höchstens so vielen Scheinwerfern sieht deshalb genau aus wie
+bisher. Bei mehr Geräten wandern die echten Lichter mit dem Geschehen, aber
+gebremst. Ein anderer Strahl übernimmt ein Licht erst, wenn er mindestens ein
+Viertel heller ist als der bisherige Halter **in dessen letztem Höhepunkt**. Ein
+leuchtendes Licht bleibt mindestens 0,4 s beim selben Gerät, und gewechselt wird
+höchstens fünfmal pro Sekunde. Bei einer schnellen Dimmer-Welle (bis etwa 2 s je
+Durchgang) bleiben die Lichter deshalb stehen. Bei langsameren Wellen und
+Lauflichtern ziehen sie mit. Geht ein Gerät schlagartig aus (Lauflicht, Blackout),
+ist sein Licht sofort frei. Sind viele Strahlen gleich hell, verteilen sich die
+Lichter über die Bühne. Der Unterschied im Bild ist klein: an einer
+80-Geräte-Bühne wichen rund 2 % der Bildpunkte merklich ab, vor allem die von
+vielen Scheinwerfern zugleich angestrahlte Bühnenfront und die Gehäuse.
 
-**Wenn Schatten für eine bestimmte Stelle wichtig sind:** die Vergabe folgt der
-Fixture-Nummer. Ein Gerät, dessen Schatten man sehen will, sollte also eine
-niedrige Nummer haben — oder man nimmt für die Aufnahme die übrigen kurz aus dem
-Patch.
+**Warum das so ist:** jedes echte Licht rechnet die Grafikkarte für **jeden
+Bildpunkt jeder beleuchteten Fläche** einmal durch. Mit 68 Lichtern brauchte ein
+Bild der 80-Geräte-Bühne gemessen rund 55 ms (unter 20 Bilder pro Sekunde), mit 8
+echten Lichtern rund 20–25 ms.
+
+**Schlagschatten** werfen nur die echten Lichter: auf Hoch höchstens **8 Schlagschatten**,
+auf Niedrig 4, auf Maximal 16 — und zwar die der gerade hellsten Strahlen. Auf
+sehr schwachen Grafikchips (weniger als 14 Textur-Einheiten) werfen noch weniger
+Lichter Schatten. Jeder schattenwerfende Scheinwerfer zeichnet die ganze Szene
+noch einmal aus seiner Sicht, und jeder kostet Platz im Beleuchtungs-Programm —
+ohne Grenze scheiterte auf Rechnern mit stärkerer Grafik ab 26 Schatten das
+Übersetzen dieses Programms, die Ansicht stürzte ohne Meldung ab. Neu berechnet
+werden die Schatten nur, wenn sich etwas bewegt (Pan/Tilt, verschobene Geräte
+oder Bühnenteile, ein Licht wechselt zu einem anderen Strahl) — Kamerafahrten und
+reine Farb- oder Dimmerwechsel kosten keinen Schattendurchlauf.
+
+**Die Bühne als ein Körper:** im Modus **Ansehen** zeichnet die Ansicht alle
+Bühnenelemente mit gleichem Aussehen (zum Beispiel alle grauen Traversen) in
+einem Zug. Sichtbar ändert sich nichts. Sobald du auf **Bauen** wechselst, ein
+Element auswählst oder in die 2D-Draufsicht gehst, sind es wieder einzelne,
+bearbeitbare Elemente; Andocken und Anklicken funktionieren in beiden Modi gleich.
 
 Wie lange die Ansicht je Bild braucht, lässt sich messen:
 `./venv/bin/python tools/viz_render_benchmark.py 12 32 48` (echtes Fenster
@@ -290,11 +307,15 @@ Grafikkarte des Rechners. Sie wirkt auf das Vollfenster und die 3D-Ansicht in
 der Live View gleichermaßen; nach dem Umstellen lädt die Szene einmal neu.
 Neben der Auswahl steht, welche Stufe gerade **aktiv** ist.
 
-| Stufe | Lichtupdates | Bildschärfe (Pixeldichte) | Schlagschatten | Beim Drehen der Kamera |
-|---|---|---|---|---|
-| **Niedrig** | 15 pro Sekunde | höchstens 1,25-fach | 8, einfach | immer kurz gröber |
-| **Hoch** (Standard) | 30 pro Sekunde | höchstens 2-fach | 8, weich | gröber nur, wenn die Grafikkarte nicht nachkommt (sie verpasst regelmäßig Bilder gegenüber dem Bildschirmtakt) |
-| **Maximal** | 44 pro Sekunde | volle Bildschirmdichte | 16, weich | nie gröber |
+| Stufe | Lichtupdates | Bildschärfe (Pixeldichte) | Echte Lichter | Schlagschatten | Beim Drehen der Kamera |
+|---|---|---|---|---|---|
+| **Niedrig** | 15 pro Sekunde | höchstens 1,25-fach | 4 hellste | 4, einfach | immer kurz gröber |
+| **Hoch** (Standard) | 30 pro Sekunde | höchstens 2-fach | 8 hellste | 8, weich | gröber nur, wenn die Grafikkarte nicht nachkommt (sie verpasst regelmäßig Bilder gegenüber dem Bildschirmtakt) |
+| **Maximal** | 44 pro Sekunde | volle Bildschirmdichte | 16 hellste | 16, weich | nie gröber |
+
+**Echte Lichter** heißt: so viele Strahlen beleuchten höchstens gleichzeitig die
+Umgebung (siehe [Was bei großen Rigs anders aussieht](#was-bei-großen-rigs-anders-aussieht)).
+Kegel, Bodenflecken und Linsen zeigen alle Geräte auf jeder Stufe.
 
 - **Automatisch (empfohlen)** prüft beim Start die Grafikkarte und wählt
   **Niedrig** oder **Hoch**. **Maximal** wählt die Automatik nie — nur von Hand.

@@ -707,38 +707,45 @@ class SceneModulesSmokeTest(unittest.TestCase):
             timeout_s=10.0)
         self.assertTrue(built, "Nicht alle 30 Fixtures wurden gebaut")
 
+        # VIZ-72: Schatten werfen nur noch die Lichter des Spot-Pools; die
+        # Geraete-Spots sind Parameter-Traeger ausserhalb der Szene.
         count_js = """
             (function(){
                 const fx = window.__lightos.fixtures;
-                let spots = 0, shadows = 0;
+                let spots = 0, geraeteSchatten = 0;
                 for (const fid in fx) {
                     const s = fx[fid].spot;
-                    if (s) { spots += 1; if (s.castShadow) shadows += 1; }
+                    if (s) { spots += 1; if (s.castShadow) geraeteSchatten += 1; }
                 }
+                const p = window.__lightos.spotPoolInfo();
                 const gl = document.createElement('canvas').getContext('webgl');
                 const maxTex = gl ? gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS) : 16;
-                return JSON.stringify({spots: spots, shadows: shadows, maxTex: maxTex});
+                return JSON.stringify({spots: spots, geraeteSchatten: geraeteSchatten,
+                                       pool: p.groesse, dach: p.dach,
+                                       shadows: p.schatten, maxTex: maxTex});
             })()
         """
         c = json.loads(self._eval(count_js))
         budget = min(_shadow_hard_cap(), max(2, int(c["maxTex"]) - 6))
         self.assertEqual(c["spots"], n, "Jedes generische Fixture braucht seinen SpotLight")
+        self.assertEqual(c["geraeteSchatten"], 0, "Geraete-Spots werfen keine Schatten mehr")
+        self.assertEqual(c["pool"], min(n, c["dach"]))
         self.assertEqual(
-            c["shadows"], min(n, budget),
+            c["shadows"], min(c["pool"], budget),
             f"Shadow-Spots ({c['shadows']}) muessen exakt das Budget "
-            f"min({n}, {budget}) ausschoepfen — nicht mehr (Shader-Limit), "
+            f"min(Pool {c['pool']}, {budget}) ausschoepfen — nicht mehr (Shader-Limit), "
             f"nicht weniger (Optik ohne Not verschenkt)")
 
-        # Entfernen gibt Budget zurueck: nach dem Loeschen eines Fixtures
-        # bleibt die Verteilung exakt am (neuen) Limit.
+        # Entfernen: Pool und Schatten bleiben am (neuen) Limit.
         removed = self._emit_until_true(
             lambda: self._bridge_obj.fixtureRemoved.emit(800000),
             f"Object.keys(window.__lightos.fixtures).length === {n - 1}",
             timeout_s=5.0)
         self.assertTrue(removed, "fixtureRemoved erreichte den 3D-View nicht")
         c2 = json.loads(self._eval(count_js))
+        self.assertEqual(c2["pool"], min(n - 1, c2["dach"]))
         self.assertEqual(
-            c2["shadows"], min(n - 1, budget),
+            c2["shadows"], min(c2["pool"], budget),
             "Nach dem Entfernen wurde das Shadow-Budget nicht neu verteilt")
 
     def test_gpu_tier_low_reduces_geometry_and_culls_dark_spots(self):

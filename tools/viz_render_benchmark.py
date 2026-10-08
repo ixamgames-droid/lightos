@@ -526,12 +526,14 @@ def messen(stufen, runden=40, still=False, zerlegen=False, kumulativ=False,
 # sich die Einzelanteile ueberhaupt zur Gesamtlast addieren — tun sie es nicht,
 # ist die Last woanders (Geometrie, Uniform-Updates, Szenen-Traversierung).
 
+# VIZ-72: echte Lichter gibt es nur noch im Spot-Pool (scene/spot_pool.js);
+# die Geraete-Spots (`f.spot`) sind Parameter-Traeger ausserhalb der Szene.
+# Abgeschaltet und gezaehlt wird deshalb am Pool (`spotPoolLights()`).
 _SCHATTEN_AUS = """
 (function () {
   let n = 0;
-  for (const fid in window.__lightos.fixtures) {
-    const s = window.__lightos.fixtures[fid].spot;
-    if (s && s.castShadow) { s.castShadow = false; n += 1; }
+  for (const s of window.__lightos.spotPoolLights()) {
+    if (s.castShadow) { s.castShadow = false; n += 1; }
   }
   window.__lightos.requestRender();
   return n;
@@ -541,9 +543,8 @@ _SCHATTEN_AUS = """
 _SPOTS_AUS = """
 (function () {
   let n = 0;
-  for (const fid in window.__lightos.fixtures) {
-    const s = window.__lightos.fixtures[fid].spot;
-    if (s && s.visible) { s.visible = false; n += 1; }
+  for (const s of window.__lightos.spotPoolLights()) {
+    if (s.visible) { s.visible = false; n += 1; }
   }
   window.__lightos.requestRender();
   return n;
@@ -565,12 +566,10 @@ _ALLES_AN = """
 (function (budget) {
   const L = window.__lightos;
   let vergeben = 0;
-  for (const fid in L.fixtures) {
-    const s = L.fixtures[fid].spot;
-    if (!s) continue;
+  for (const s of L.spotPoolLights()) {
     s.visible = true;
-    s.castShadow = vergeben < budget;      // dieselbe fid-Reihenfolge wie
-    if (s.castShadow) vergeben += 1;       // syncSpotShadowBudget()
+    s.castShadow = vergeben < budget;      // dieselbe Reihenfolge wie
+    if (s.castShadow) vergeben += 1;       // spot_pool.js#resizeSpotPool
   }
   L.requestRender();
   return vergeben;
@@ -599,8 +598,10 @@ _ZAEHLEN = """
     const f = L.fixtures[fid];
     if (f.beam && f.beam.visible) kegel += 1;
     if (f.floorSpot && f.floorSpot.visible) boden += 1;
-    if (f.spot && f.spot.castShadow) schatten += 1;
-    if (f.spot && f.spot.visible) spots += 1;
+  }
+  for (const s of (L.spotPoolLights ? L.spotPoolLights() : [])) {
+    if (s.castShadow) schatten += 1;
+    if (s.visible) spots += 1;
   }
   return JSON.stringify({antwort: 1, geraete: Object.keys(L.fixtures).length,
                          kegel, boden, schatten, spots});

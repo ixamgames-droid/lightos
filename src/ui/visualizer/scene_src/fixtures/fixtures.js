@@ -24,6 +24,10 @@ import { requestRender } from '../scene/render_loop.js';
 import { makeFixtureLabel, disposeFixtureLabel } from './labels.js';  // VIZ-14
 import { updateEmptyState } from '../empty_state.js';
 import { cachedDmx } from './dmx_cache.js';   // VIZ-71
+// VIZ-72: echte Lichter nur noch aus dem Spot-Pool (scene/spot_pool.js).
+import { initSpotPool, resizeSpotPool } from '../scene/spot_pool.js';
+
+initSpotPool(fixtures);
 
 // fixtureMeshes: Raycast-Cache, kein geteilter Modul-State laut Design-
 // Dokument "Kern-Gotcha" (ehem. stage_scene.html:1026).
@@ -150,26 +154,25 @@ export function shadowBudgetInfo() {
   };
 }
 
-// Idempotent: verteilt das Budget deterministisch (fid-Reihenfolge) auf alle
-// vorhandenen Spots. three.js r128 erkennt den castShadow-Wechsel ueber die
-// lightsStateVersion selbst und kompiliert betroffene Programme neu.
-// ⚠️ VIZ-69: deshalb NUR beim Patchen (addFixture/removeFixture) rufen, nie pro
-// Frame oder pro DMX-Wert — die Zahl der Schatten-Spots gehoert zum
-// Programmschluessel, jede Umverteilung kostet eine Neukompilierung aller
-// Lit-Shader (Sekunden, nicht Millisekunden). Dunkle Spots behalten ihren
-// Schatten-Slot (dunkel = intensity 0, s. builders.js#applyGenericColor).
+// Idempotent. VIZ-72: Schatten werfen nur noch die Lichter des Spot-Pools
+// (scene/spot_pool.js) — die ersten min(Budget, Poolgroesse) davon. Der Pool
+// waechst mit der Zahl der Strahl-Geraete bis zum Dach der Stufe
+// (quality_tiers.js `realLights`); die Geraete-Spots selbst sind nur noch
+// Parameter-Traeger ausserhalb der Szene und werfen nie Schatten.
+// ⚠️ VIZ-69: NUR beim Patchen (addFixture/removeFixture) rufen, nie pro Frame
+// oder pro DMX-Wert — Lichter- und Schattenzahl gehoeren zum
+// Programmschluessel, jede Aenderung kostet eine Neukompilierung aller
+// Lit-Shader (Sekunden, nicht Millisekunden).
 export function syncSpotShadowBudget() {
   const budget = shadowSpotBudget();
-  let used = 0;
-  let changed = false;
+  let strahlen = 0;
   for (const fid in fixtures) {
     const spot = fixtures[fid] && fixtures[fid].spot;
     if (!spot) continue;
-    const want = used < budget;
-    if (want) used += 1;
-    if (spot.castShadow !== want) { spot.castShadow = want; changed = true; }
+    strahlen += 1;
+    spot.castShadow = false;
   }
-  if (changed) requestRender();
+  if (resizeSpotPool(strahlen, budget)) requestRender();
 }
 
 export function rebuildFixtureMeshList() {
@@ -428,8 +431,11 @@ export function addFixture(data) {
     headHost.add(beam);
 
     spot = new THREE.SpotLight(color, intensity * 3.0, 25, beamAngle * 1.2, 0.6, 1.0);
-    // castShadow vergibt syncSpotShadowBudget() nach der Registrierung —
-    // ein hartes `true` je Fixture sprengt auf 16-Unit-GPUs das Shader-Limit.
+    // VIZ-72: der Geraete-Spot ist nur noch PARAMETER-Traeger (Farbe,
+    // Intensitaet, Winkel, Halbschatten, Ziel) und haengt NICHT in der Szene.
+    // Echtes Licht geben die Lichter des Spot-Pools (scene/spot_pool.js), die
+    // vor jedem Bild an die hellsten Strahlen vergeben werden. Schatten werfen
+    // nur Pool-Lichter.
     spot.castShadow = false;
     // VIZ-69: der Spot bleibt IMMER sichtbar — dunkel heisst intensity 0
     // (Begruendung in builders.js#applyGenericColor: visible gehoert in r128
@@ -437,10 +443,9 @@ export function addFixture(data) {
     // Gleiches Mass wie dort schon beim Anlegen (A3D-25/A3D-28): Dimmer offen
     // + Farbe schwarz ist dunkel.
     if (intensity * Math.max(color.r, color.g, color.b) <= 0.01) spot.intensity = 0;
-    const shadowRes = isLowSpec ? 256 : 512;
-    spot.shadow.mapSize.width = shadowRes;
-    spot.shadow.mapSize.height = shadowRes;
-    root.add(spot);
+    // VIZ-72: bewusst KEIN root.add(spot) — s. o. Das Pool-Licht sitzt dort,
+    // wo dieser Spot frueher hing: spot.position (r128-Vorgabe 0,1,0) im
+    // Koordinatensystem von root.
 
     spotTarget = new THREE.Object3D();
     spotTarget.position.set(0, -root.position.y, 0);
