@@ -202,9 +202,15 @@ und schwenkst/zoomst mit zwei.
      Profil die Kanäle hat): **Zoom** macht Kegel und Bodenfleck weiter oder enger
      (0 = eng, 255 = weit), die **Iris** schließt ihn bis auf rund ein Drittel.
      **Fokus** ist bei 128 scharf und wird zu beiden Enden weicher, **Frost** macht die
-     Kante weich und den Kegel etwas breiter. Das **Gobo** erscheint als Muster im
-     Bodenfleck (grob nachgezeichnet nach dem Namen des Gobo-Bereichs, „offen“ = voller
-     Fleck); die **Gobo-Rotation** dreht das Muster auf einen festen Winkel
+     Kante weich und den Kegel etwas breiter. Ein **Gobo** formt den Strahl: statt des
+     vollen Kegels siehst du einzelne Teilstrahlen (bei der Spirale eine Wendel um die
+     Strahlachse), und im Bodenfleck erscheint das Muster mit dunklen Lücken
+     dazwischen. Der volle runde Lichtkreis am Boden tritt dabei stark zurück. Das
+     Motiv kommt aus dem Namen des Gobo-Bereichs (etwa „Spirale“, „Punkte“, „Ring“);
+     heißt ein Bereich nur „Gobo 3“, bekommt er ein festes Ersatzmotiv je Nummer, damit
+     verschiedene Gobos verschieden aussehen. Das Ersatzmotiv ist eine Annäherung,
+     nicht das echte Glas des Geräts. „Offen“ = voller Kegel wie ohne Gobo. Die
+     **Gobo-Rotation** dreht Teilstrahlen und Bodenmuster auf einen festen Winkel
      (0–255 = eine Umdrehung). Ein **Prisma** teilt den Strahl in mehrere Kegel um den
      Hauptstrahl (Facettenzahl aus dem Bereichsnamen, z. B. „6-fach Prisma“; ohne
      Zahl drei); die **Prisma-Rotation** dreht den Fächer ebenfalls auf einen festen

@@ -14,6 +14,7 @@ import { disposeObj } from '../scene/grid_floor.js';
 import { buildFixtureModel, updateFixtureDmx } from './registry.js';
 import { buildTopDownIcon } from './topdown_icons.js';
 import { applyPoolFalloff } from './floor_pool.js';   // VIZ-15
+import { applyBeamGoboBase } from './gobo_textures.js';   // VIZ-83
 import { fixtures, topDownIcons, settings, view } from '../state.js';
 import { deg2rad } from '../scene/renderer.js';
 // VIZ-13 3c-2: On-Demand-Rendering — jede DMX-/Bestands-Aenderung an
@@ -274,6 +275,9 @@ export function createBeamCone(color, intensity, angle, length) {
   });
   const cone = new THREE.Mesh(geo, mat);
   applyBeamFalloff(cone);          // VIZ-15: Laengs-Falloff (s. o.)
+  // VIZ-83: offene Gobo-Maske (weiss) ab dem Bau — ein Gobo tauscht spaeter
+  // nur die Textur, ohne Shader-Neubau (gobo_textures.js, Modulkopf).
+  applyBeamGoboBase(cone);
   cone.position.y = -length / 2;
   cone.visible = settings.showCones;
   // Aus Fit/Fit-Auswahl-Bounds ausschliessen: der Kegel ist bis zu 8 m lang und
