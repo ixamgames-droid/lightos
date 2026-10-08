@@ -121,6 +121,7 @@ console.warn('[viz] GPU-Tier: ' + gpuTier
   + ' (maxTextures=' + renderer.capabilities.maxTextures
   + ', pixelRatioCap=' + PIXEL_RATIO_CAP
   + ', schattenDach=' + tierSettings.shadowCap
+  + ', echteLichter=' + tierSettings.realLights
   + ', dynAufloesung=' + tierSettings.dynamicResolution
   + ', antialias=' + String(!isLowSpec) + ')');
 // Bundle ist three.js r128 (siehe three_local.js REVISION) - dort heisst die
