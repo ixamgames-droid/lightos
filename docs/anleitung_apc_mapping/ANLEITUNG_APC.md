@@ -93,19 +93,23 @@ Netzwerk (GMA-MSC, UDP-Port 6004).
 - **Device-ID** — die eigene MSC-Geräte-ID, wie sie am Pult als Ziel
   eingetragen ist. **127 = alle annehmen.** Ein Befehl an 127 (Broadcast)
   erreicht LightOS immer.
-- **GMA-MSC über Netzwerk** — nur für grandMA: Empfang per UDP. **IP** ist die
-  Netzwerkkarte, auf der gelauscht wird (z. B. die Art-Net-Karte, nicht
-  „0.0.0.0“), **Port** standardmäßig 6004. Mit **Übernehmen** wirksam; das Log
-  meldet, ob der Port belegt werden konnte.
+- **GMA-MSC über Netzwerk** — nur für grandMA: Empfang per UDP (Standard: aus).
+  **Schnittstelle** ist die Netzwerkkarte, auf der gelauscht wird — dieselbe
+  Liste wie bei Art-Net/sACN; für ein Pult im Netz dessen Karte wählen.
+  „nur dieser Rechner (127.0.0.1)“ erreicht kein Pult im Netz, „alle
+  Schnittstellen (0.0.0.0)“ nimmt Befehle aus jedem angeschlossenen Netz an
+  (Hinweis in der Ansicht). **Port** standardmäßig 6004. Mit **Übernehmen**
+  wirksam; das Log meldet, ob der Port belegt werden konnte.
 
-Die Einstellung gilt bis zum Neustart der App.
+Die Einstellungen werden mit **Übernehmen** gespeichert (gerätegebunden in den
+UI-Einstellungen, nicht in der Show) und beim nächsten Start wieder angewendet.
 
 **Was die Befehle tun:**
 
 | MSC-Befehl | Wirkung in LightOS |
 |---|---|
 | GO / TIMED_GO / RESUME | Cueliste → Executor (Nummer = Executor-Platz auf der aktuellen Seite, sonst Name des Executors oder der Cueliste; ohne Liste Executor 1). Mit Cue-Nummer (z. B. `1.5`) wird diese Cue angesprungen, ohne Nummer die nächste Cue. |
-| STOP / GO_OFF | Cueliste des Executors stoppen. |
+| STOP / GO_OFF | Cueliste des Executors stoppen; ohne Cueliste werden **alle** laufenden Cuelisten gestoppt (MSC-Spezifikation). |
 | SET | Regler *n* (ab 0) setzt den Fader von Executor *n+1* (Wert 0…16383). |
 | FIRE | Makro *n* startet die Funktion (Szene/Chaser) mit der ID *n*. |
 | ALL_OFF | Alle Cuelisten auf allen Seiten stoppen. |
