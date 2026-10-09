@@ -225,6 +225,11 @@ class TempoBus:
         with self._lock:
             if self._last_taps and (now - self._last_taps[-1] > self.TAP_WINDOW_SEC):
                 self._last_taps = []
+            if self._last_taps and now <= self._last_taps[-1]:
+                # QA-87: Tap ohne Zeitfortschritt verwerfen, BEVOR er in die
+                # Historie kommt — als 0-Intervall zoege er sonst den Mittelwert
+                # der folgenden Taps herunter (t, t, t+0,5 s -> 240 statt 120 BPM).
+                return self._bpm
             self._last_taps.append(now)
             if len(self._last_taps) > self.MAX_TAP_HISTORY + 1:
                 self._last_taps = self._last_taps[-(self.MAX_TAP_HISTORY + 1):]
@@ -233,10 +238,7 @@ class TempoBus:
                 return self._bpm
             intervals = [self._last_taps[i + 1] - self._last_taps[i]
                          for i in range(len(self._last_taps) - 1)]
-            avg = sum(intervals) / len(intervals)
-            if avg <= 0:
-                return self._bpm
-            bpm = 60.0 / avg
+            bpm = 60.0 / (sum(intervals) / len(intervals))
         self.set_bpm(bpm)
         return self._bpm
 
@@ -943,6 +945,8 @@ class TempoBusManager:
         with self._lock:
             if self._gm_taps and (now - self._gm_taps[-1] > TempoBus.TAP_WINDOW_SEC):
                 self._gm_taps = []
+            if self._gm_taps and now <= self._gm_taps[-1]:
+                return self._grandmaster_bpm    # QA-87: s. TempoBus.tap
             self._gm_taps.append(now)
             if len(self._gm_taps) > TempoBus.MAX_TAP_HISTORY + 1:
                 self._gm_taps = self._gm_taps[-(TempoBus.MAX_TAP_HISTORY + 1):]
@@ -950,10 +954,7 @@ class TempoBusManager:
                 return self._grandmaster_bpm
             intervals = [self._gm_taps[i + 1] - self._gm_taps[i]
                          for i in range(len(self._gm_taps) - 1)]
-            avg = sum(intervals) / len(intervals)
-            if avg <= 0:
-                return self._grandmaster_bpm
-            bpm = 60.0 / avg
+            bpm = 60.0 / (sum(intervals) / len(intervals))
         self.set_grandmaster_bpm(bpm)
         return self._grandmaster_bpm
 

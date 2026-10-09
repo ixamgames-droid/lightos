@@ -538,9 +538,8 @@ class MainWindow(QMainWindow):
     # ── Theme ─────────────────────────────────────────────────────────────────
 
     def _apply_theme(self):
-        theme_path = os.path.normpath(
-            os.path.join(os.path.dirname(__file__), "..", "..", "assets", "themes", "dark.qss")
-        )
+        from src.core.paths import programm_datei   # XPLAT-47: auch gefroren
+        theme_path = os.path.normpath(programm_datei("assets", "themes", "dark.qss"))
         qss = ""
         if os.path.exists(theme_path):
             with open(theme_path, "r", encoding="utf-8") as f:

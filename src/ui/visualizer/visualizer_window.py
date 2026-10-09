@@ -3437,12 +3437,13 @@ class VisualizerWindow(QMainWindow):
             "Automatisch: beim Start wird die Grafikkarte geprüft und die Stufe\n"
             "passend gewählt (schwache Chips wie im Surface → Niedrig).\n"
             "Manuell überschreiben, falls die Erkennung danebenliegt.\n\n"
-            "Niedrig = 15 Lichtupdates/s, Pixeldichte höchstens 1,25, 8 Schatten\n"
+            "Niedrig = 15 Lichtupdates/s, Pixeldichte höchstens 1,25, 4 Schatten\n"
             "(einfach), ohne Kantenglättung; beim Drehen der Kamera kurz gröber.\n"
             "Hoch = 30 Lichtupdates/s, Pixeldichte höchstens 2, 8 weiche Schatten;\n"
             "gröber beim Drehen nur, wenn die Grafikkarte nicht nachkommt.\n"
             "Maximal = 44 Lichtupdates/s (so schnell wie die DMX-Ausgabe), volle\n"
-            "Pixeldichte, 16 weiche Schatten, nie gröber — nur für starke GPUs.\n\n"
+            "Pixeldichte, bis zu 16 weiche Schatten (je nach Grafikkarte, unter\n"
+            "Windows meist 10), nie gröber — nur für starke GPUs.\n\n"
             "Gilt für dieses Gerät, nicht pro Show."
         )
         tier_pref = quality_tier_pref()

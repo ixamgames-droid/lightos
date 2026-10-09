@@ -23,13 +23,10 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass, field
-from src.core.paths import app_data_dir
+from src.core.paths import app_data_dir, programm_datei
 
-_BUILTIN_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
-        os.path.abspath(__file__))))),
-    "data", "controller_library",
-)
+# XPLAT-47: ueber ``programm_datei`` -> im gefrorenen Build unter sys._MEIPASS.
+_BUILTIN_DIR = programm_datei("data", "controller_library")
 _USER_DIR = os.path.join(app_data_dir(), "controller_library")
 
 SCHEMA_VERSION = 1
