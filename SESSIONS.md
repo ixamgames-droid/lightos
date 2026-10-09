@@ -72,7 +72,6 @@
 | UI-75 | B | fix/ui75-neue-show-patch-vc | 2026-10-08T19:04Z | src/ui/main_window.py · tests/test_ui75_neue_show_fragt.py · docs/anleitung_erste_schritte/ANLEITUNG.md · docs/anleitung_erste_schritte/ANLEITUNG.en.md · changelog.d/2026-10-08-UI-75.md · BACKLOG.md |
 | OUT-62 | B | fix/out62-blackout-maske-atomar | 2026-10-08T19:08Z | src/core/app_state.py · docs/components/engine/script.md · tests/test_out62_blackout_maske_atomar.py · changelog.d/2026-10-08-OUT-62.md · BACKLOG.md |
 | OUT-64 | B | fix/out64-estop-ausgabeweg | 2026-10-08T19:11Z | src/core/dmx/output_manager.py · tests/test_out64_estop_ausgabeweg.py · changelog.d/2026-10-08-OUT-64.md · BACKLOG.md |
-| QA-83 | B | fix/qa83-vc-assets-isoliert | 2026-10-08T19:16Z | src/core/show/vc_assets.py · tools/_gen_env.py · tests/test_qa83_vc_assets_unberuehrt.py · BACKLOG.md |
 | UI-76 | B | fix/ui76-go-hinweis-page | 2026-10-08T19:17Z | src/core/cueliste_ziel.py · src/ui/views/playback_view.py · tests/test_ui76_go_hinweis.py · docs/anleitung_szenen_cues/ANLEITUNG.md · changelog.d/2026-10-08-UI-76.md · BACKLOG.md |
 | STAB-30 | A | feature/stab30-diagnose-log | 2026-10-08T19:39Z | main.py · src/core/crash_logging.py |
 | VIZ-94 | B | fix/viz94-buehne-windows-arm | 2026-10-08T19:49Z | src/ui/visualizer |
@@ -174,7 +173,6 @@
 
 ## Verlauf
 
-- 2026-10-08T19:43Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T19:49Z B aktualisiert VIZ-94: Branch fix/viz94-buehne-windows-arm -> fix/viz94-buehne-arm; Dateien - -> src/ui/visualizer
 - 2026-10-08T19:49Z B aktualisiert VIZ-94: Branch fix/viz94-buehne-arm -> fix/viz94-buehne-windows-arm
 - 2026-10-08T19:49Z D claim QA-87
@@ -204,3 +202,4 @@
 - 2026-10-09T13:45Z A claim TOOL-25
 - 2026-10-09T13:45Z D claim VIZ-97
 - 2026-10-09T13:45Z D claim FM-72
+- 2026-10-09T14:10Z B done QA-83
