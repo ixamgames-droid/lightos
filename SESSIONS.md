@@ -71,7 +71,6 @@
 | BPM-28 | D | fix/bpm28-beat-takt | 2026-10-09T13:46Z | src/core/engine/bpm_manager.py · tests/test_bpm28_beat_takt.py · BACKLOG.md · changelog.d/2026-10-08-BPM-28.md |
 | OUT-64 | B | fix/out64-estop-ausgabeweg | 2026-10-08T19:11Z | src/core/dmx/output_manager.py · tests/test_out64_estop_ausgabeweg.py · changelog.d/2026-10-08-OUT-64.md · BACKLOG.md |
 | UI-76 | B | fix/ui76-go-hinweis-page | 2026-10-08T19:17Z | src/core/cueliste_ziel.py · src/ui/views/playback_view.py · tests/test_ui76_go_hinweis.py · docs/anleitung_szenen_cues/ANLEITUNG.md · changelog.d/2026-10-08-UI-76.md · BACKLOG.md |
-| STAB-30 | A | feature/stab30-diagnose-log | 2026-10-08T19:39Z | main.py · src/core/crash_logging.py |
 | VIZ-95 | A | feature/viz95-lasermuster-3d | 2026-10-08T20:47Z | src/ui/visualizer |
 | LAS-30 | A | feature/viz95-lasermuster-3d | 2026-10-08T20:52Z | src/core |
 | VIZ-96 | A | feature/viz96-gobo-projektion | 2026-10-08T21:37Z | src/ui/visualizer |
@@ -175,7 +174,6 @@
 
 ## Verlauf
 
-- 2026-10-08T20:47Z A claim VIZ-95
 - 2026-10-08T20:50Z A done DOC-60
 - 2026-10-08T20:52Z A claim LAS-30
 - 2026-10-08T21:20Z D done QA-87
@@ -205,3 +203,4 @@
 - 2026-10-09T14:47Z D aktualisiert XPLAT-48: Dateien - -> install.py · tests/test_xplat48_verknuepfung_no_venv.py · BACKLOG.md · changelog.d/2026-10-09-XPLAT-48.md
 - 2026-10-09T14:59Z B done OUT-62
 - 2026-10-09T15:25Z B done UI-75
+- 2026-10-09T15:55Z A done STAB-30
