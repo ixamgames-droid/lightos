@@ -228,6 +228,15 @@ venv/bin/python -c "import sys; sys.path.insert(0, 'tools'); from anleitungsbild
 - Pixelgleich sind die Bilder nur auf demselben Rechner mit denselben Schriften.
   Das Theme wünscht „Roboto Condensed"; fehlt sie, nimmt Qt einen Ersatz. Welcher es
   war, steht im Manifest unter `schrift`.
+- **Windows:** `offscreen` liest dort nicht die Systemschriften, sondern sucht im
+  PySide6-Ordner — und findet nichts. Ohne Hilfe hätten die Bilder gar keine Schrift
+  (die Ausgabe meldete eine leere Schrift statt „Roboto Condensed"). Die Sandbox
+  zeigt Qt deshalb unter Windows den Systemschriftordner (`QT_QPA_FONTDIR`, QA-88);
+  eine eigene Vorgabe in `QT_QPA_FONTDIR` gewinnt. Der Ersatz ist dort meist Arial.
+- **Ausstieg:** das Werkzeug beendet sich nach dem letzten Bild hart, ohne Qt-Abbau.
+  Unter Windows über `TerminateProcess` statt `os._exit` — `os._exit` lässt dort die
+  DLL-Abbau-Routinen laufen, und an denen starben Läufe mit gesetztem Tempo mit
+  0xC0000005 (QA-88).
 - Weicht ein neu gerendertes Bild nur unmerklich vom vorhandenen ab (weniger als
   0,05 % der Pixel, zum Beispiel eine leicht anders glimmende Lampe), bleibt die alte
   Datei liegen. So ändert ein Neu-Rendern nicht jedes Mal alle Bilder im Diff.
@@ -245,14 +254,16 @@ venv/bin/python -c "import sys; sys.path.insert(0, 'tools'); from anleitungsbild
 
 - **3D-Visualizer:** WebGL bekommt offscreen keinen Kontext, die Fläche bleibt schwarz.
   Szenen mit `braucht_gpu=True` werden deshalb übersprungen. Gebaut werden sie am
-  echten Bildschirm (X11) mit `--bildschirm`:
+  echten Bildschirm mit `--bildschirm` (Linux über X11, Windows direkt; auch mit `--alle`):
 
   ```bash
   DISPLAY=:0 venv/bin/python tools/anleitungsbilder.py vc_widgets --bildschirm
   ```
 
+  Unter Windows ohne `DISPLAY`: `venv\Scripts\python tools\anleitungsbilder.py 3d_buehne --bildschirm`.
+
   Die Sandbox bleibt dabei genauso aktiv. Das Werkzeug zeichnet dann statt `offscreen`
-  über `xcb`, das Fenster erscheint für die Dauer des Laufs auf dem Bildschirm (ohne
+  über `xcb` (Windows: `windows`), das Fenster erscheint für die Dauer des Laufs auf dem Bildschirm (ohne
   den Fokus zu nehmen) und es entstehen **nur** die Szenen mit `braucht_gpu` — alle
   anderen bleiben offscreen gebaut und unverändert. Das 3D-Fenster braucht beim Start
   rund 20 s, bis die Szene steht. Beispiel: `05_blackout_links_3d.gif` in

@@ -1720,6 +1720,8 @@ class FixtureGeneratorDialog(QDialog):
             return
         try:
             # FM-12: gecachte viz_model-Overrides/Channels des Profils verwerfen.
+            # Kein profil_geaendert() wie im Editor (UI-81): der Generator legt
+            # immer ein NEUES Profil an, kein gepatchtes Geraet nutzt es schon.
             from src.core.app_state import clear_channel_cache
             clear_channel_cache()
         except Exception:

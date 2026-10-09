@@ -74,7 +74,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Callable, Iterable
 
-from .paths import USER_DATA_FILES, app_data_dir
+from .paths import USER_DATA_FILES, app_data_dir, programm_dir
 
 MARKER_NAME = "datenumzug_xplat44.json"
 #: Sperrdatei im App-Ordner (zwischen Prozessen, s. ``_sperre``).
@@ -93,7 +93,10 @@ SICHERUNG = ".vor-xplat44"
 _SHOW_INHALT_TABELLEN = ("patched_fixtures", "fixture_groups",
                          "quarantined_fixtures")
 
-_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# XPLAT-47: im gefrorenen Build der Programmordner (sys._MEIPASS) — dort liegt
+# nur mitgelieferte Ware, kein altes ``data/`` mit Nutzerdateien; gelesen wird
+# ohnehin nur (kopiert in den App-Datenordner, nie zurueck).
+_REPO_ROOT = programm_dir()
 
 
 @dataclass
@@ -383,7 +386,10 @@ def _ziel_ist_leer(neu: str, sqlite: bool) -> bool:
         if not text.strip():
             return True
         return json.loads(text) in ([], {}, None)
-    except Exception:
+    except Exception as e:
+        # STAB-30: zaehlt dann als Konflikt — den Grund sichtbar machen.
+        from src.core.diagnose_log import melde_still
+        melde_still("datenumzug.ziel_pruefen", e, text=os.path.basename(neu))
         return False
 
 
@@ -462,7 +468,10 @@ def _marker_lesen(pfad: str) -> dict:
         with open(pfad, encoding="utf-8") as f:
             d = json.load(f)
         return d if isinstance(d, dict) else {}
-    except (OSError, ValueError):
+    except (OSError, ValueError) as e:
+        if os.path.exists(pfad):   # STAB-30: kaputte Marke, nicht "gibt's nicht"
+            from src.core.diagnose_log import melde_still
+            melde_still("datenumzug.marke", e)
         return {}
 
 
@@ -713,8 +722,12 @@ def alten_stand_uebernehmen(
                 try:
                     if not os.path.exists(orig):
                         os.replace(sich, orig)
-                except OSError:
-                    pass
+                except OSError as e:
+                    # STAB-30: sonst liegt der Stand still unter der Sicherung —
+                    # sieht aus wie Datenverlust.
+                    from src.core.diagnose_log import melde_still
+                    melde_still("datenumzug.rueckbau", e,
+                                text=f"Sicherung {sich!r} nicht zurueckgelegt")
             raise
         log(f"[datenumzug] {name}: alter Stand {alt!r} auf Wunsch uebernommen; "
             f"bisheriger Stand gesichert: {[s for _o, s in gesichert]!r}")

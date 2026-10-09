@@ -15,9 +15,12 @@ if str(ROOT) not in sys.path:
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from unittest import mock
+
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QPoint
 
+from src.core.engine import tap_uhr
 from src.core.engine.tempo_bus import get_tempo_bus_manager, reset_tempo_bus_manager
 from src.core.engine.bpm_manager import get_bpm_manager
 from src.ui.virtualconsole.vc_speedial import (
@@ -58,10 +61,17 @@ class SpeedNodeTest(unittest.TestCase):
         w.target_mode = SpeedTarget.SPEED_NODE
         w.role = "master"
         w.tempo_bus_id = "A"
-        w._tap()
-        w._tap()
+        # QA-87: feste Tap-Zeiten. Vorher zwei Taps ohne Pause — unter Windows
+        # lagen sie (mit monotonic, 15,6-ms-Raster) im selben Tick: Abstand 0,
+        # BPM 0, Test rot. Die Uhr bleibt pro Tap stehen, egal wie oft der
+        # Tap-Weg sie liest.
+        uhr = {"t": 10.0}
+        with mock.patch.object(tap_uhr, "jetzt", lambda: uhr["t"]):
+            w._tap()
+            uhr["t"] = 10.5
+            w._tap()
         bus = self.mgr.ensure_bus("A")
-        self.assertGreater(bus.bpm, 0.0)
+        self.assertAlmostEqual(bus.bpm, 120.0, places=6)
 
     # ── Sub ───────────────────────────────────────────────────────────────────
 

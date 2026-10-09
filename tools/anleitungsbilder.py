@@ -59,7 +59,8 @@ def _argumente(argv):
     ap.add_argument("--behalten", action="store_true",
                     help="Sandbox-Ordner nach dem Lauf nicht loeschen (Fehlersuche)")
     ap.add_argument("--bildschirm", action="store_true",
-                    help="auf dem echten X11-Bildschirm statt offscreen zeichnen; baut "
+                    help="auf dem echten Bildschirm (Linux X11, Windows) statt offscreen "
+                         "zeichnen; baut "
                          "NUR Szenen mit braucht_gpu (3D), alle anderen bleiben offscreen")
     return ap.parse_args(argv)
 
@@ -92,6 +93,10 @@ def _je_anleitung_ein_prozess(args, auftraege, nur) -> int:
             befehl += ["--ausgabe", ausgabe]
         if args.behalten:
             befehl.append("--behalten")
+        # TOOL-11 (3): ohne Weitergabe baute ``--alle --bildschirm`` jede
+        # Anleitung offscreen - die 3D-Szenen fielen still als „uebersprungen“ weg.
+        if args.bildschirm:
+            befehl.append("--bildschirm")
         if eigene:
             befehl += ["--nur", ",".join(eigene)]
         print(f"[anleitungsbilder] == {name} (eigener Prozess) ==", flush=True)
@@ -202,10 +207,35 @@ def main(argv=None) -> int:
     return code
 
 
-if __name__ == "__main__":
-    rc = main()
+def _harter_ausstieg(rc: int) -> None:
+    """Prozess sofort beenden — ohne Qt-/Python-Abbau (QA-88).
+
+    ``os._exit`` ist unter Windows KEIN harter Ausstieg: die C-Laufzeit ruft
+    ``ExitProcess``, das alle anderen Threads abschiesst und DANACH die
+    DLL-Abbau-Routinen von Qt und Python laufen laesst. Gemessen 2026-10-08
+    (Windows 11, faulthandler): Kindprozesse von ``--alle``, deren Szene das
+    Tempo gesetzt hatte (BPM-Takt-Thread lief), starben IN ``os._exit`` mit
+    0xC0000005 — auch dann, wenn der Takt-Thread vorher gestoppt wurde; Szenen
+    ohne Tempo endeten sauber. Stderr dazu: "QThreadStorage: entry 0 destroyed
+    before end of thread". ``TerminateProcess`` beendet ohne DLL-Abbau und
+    behaelt den Exit-Code. Linux bleibt bei ``os._exit``.
+    """
     sys.stdout.flush()
     sys.stderr.flush()
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+            k32.GetCurrentProcess.restype = ctypes.c_void_p
+            k32.TerminateProcess.argtypes = [ctypes.c_void_p, ctypes.c_uint]
+            k32.TerminateProcess(k32.GetCurrentProcess(), rc & 0xFFFFFFFF)
+        except Exception:
+            pass                # Rueckfall unten
+    os._exit(rc)
+
+
+if __name__ == "__main__":
+    rc = main()
     # Harter Ausstieg: der Qt-Abbau eines vollen MainWindow ist fuer ein
     # Werkzeug ohne Nutzen und offscreen gelegentlich instabil.
-    os._exit(rc)
+    _harter_ausstieg(rc)
