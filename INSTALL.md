@@ -288,6 +288,44 @@ außer dem Code mitkommt, steht in `packaging/windows/bundle_inhalt.py` — nur
 Dateien, die Git kennt, damit keine privaten Laufzeitdaten aus `data/`/`shows/` in
 ein Setup geraten.
 
+## Fehler melden / Diagnosepaket
+
+Wenn LightOS auf deinem Rechner etwas nicht tut (kein DMX, MIDI-Geraet stumm,
+3D-Ansicht schwarz, Absturz …), reicht **eine Datei**, damit wir aus der Ferne
+sehen, was im Hintergrund passiert ist:
+
+1. LightOS nach dem Problem **nicht neu installieren**, nur ggf. neu starten.
+2. **Hilfe → „Diagnosepaket speichern…“** — speichert `LightOS-Diagnose-<Datum>.zip`
+   (Vorschlag: Desktop).
+   Startet LightOS gar nicht mehr, geht es auch ohne Fenster:
+   - Windows (Installer): in der Eingabeaufforderung `LightOS.exe --diagnose` im
+     Installationsordner von LightOS aufrufen
+   - aus dem Quellordner: `python main.py --diagnose` (bzw. `venv\Scripts\python main.py --diagnose`)
+   - optional mit Ziel: `--diagnose D:\lightos-fehler.zip`
+3. Die zip-Datei per E-Mail/Messenger schicken, dazu ein Satz, was du gemacht hast
+   und was passiert ist (ungefaehre Uhrzeit hilft).
+
+**Im Paket:** die Sitzungs-Logs (aktuelle + vorige Sitzungen), `crash.log`,
+Systeminfo (LightOS-Version, Betriebssystem, Python/Qt, Bildschirme, GPU-Stufe,
+DMX-Ausgaenge, MIDI-Geraete), eine Liste der Einstellungen (nur Zahlen/Schalter —
+Texte, Pfade und Geheimnisse wie das Remote-Token nur als Platzhalter) und die
+Datei-Namen im Datenordner. **Nicht im Paket:** Show-Dateien, Datenbanken,
+Snaps, Buehnen. Dein Benutzername in Pfaden wird durch `~` bzw. `%USERNAME%`
+ersetzt.
+
+**Wo die Logs liegen** (falls du sie lieber selbst anhaengst):
+
+| System | Ordner |
+|---|---|
+| Windows (x64/ARM64) | `%APPDATA%\LightOS\logs\lightos.log` (+ `%APPDATA%\LightOS\crash.log`) |
+| Linux | `~/.local/share/LightOS/logs/lightos.log` (bzw. `$XDG_DATA_HOME/LightOS/…`) |
+| macOS | `~/Library/Application Support/LightOS/logs/lightos.log` |
+
+`lightos.log` ist die laufende bzw. letzte Sitzung, `lightos.log.1` die davor
+(bis `.5`); jede Datei ist auf 5 MB begrenzt. Jede Zeile traegt eine Uhrzeit,
+`!` markiert Fehlerausgaben, `[still:…]` Fehler, die LightOS frueher
+kommentarlos geschluckt hat, `[diagnose]` die erkannte Umgebung.
+
 ## Troubleshooting
 
 | Problem | Loesung |

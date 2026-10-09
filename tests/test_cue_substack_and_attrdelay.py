@@ -2,17 +2,16 @@
   F-6  — Pro-Attribut-Verzögerung (attr_delays) als verschobene Fade-Zeitachse.
   F-16 — Sequence-in-Sequence: eine Cue startet/mischt eine referenzierte Cueliste.
 
-FadeState ist wanduhr-basiert (time.monotonic); für deterministische Tests wird
+FadeState ist wanduhr-basiert (cue_stack.fade_uhr, QA-89); für deterministische Tests wird
 ``start_time`` zurückgesetzt, um eine bestimmte verstrichene Zeit zu simulieren.
 """
 import os
-import time
 import unittest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from src.core.engine.cue import Cue
-from src.core.engine.cue_stack import CueStack, FadeState
+from src.core.engine.cue_stack import CueStack, FadeState, fade_uhr
 
 
 # ── F-6: Pro-Attribut-Verzögerung ────────────────────────────────────────────
@@ -25,7 +24,7 @@ class AttrDelayTest(unittest.TestCase):
 
     def test_delayed_attr_starts_later(self):
         fs = self._fs({1: {"b": 1.0}})           # b startet 1 s später
-        fs.start_time = time.monotonic() - 0.5
+        fs.start_time = fade_uhr() - 0.5
         v = fs.current_values()
         self.assertAlmostEqual(v[1]["a"], 50, delta=3)   # a fadet normal
         self.assertEqual(v[1]["b"], 0)                   # b noch in Verzögerung
@@ -33,7 +32,7 @@ class AttrDelayTest(unittest.TestCase):
 
     def test_delayed_attr_then_runs(self):
         fs = self._fs({1: {"b": 1.0}})
-        fs.start_time = time.monotonic() - 1.5           # a fertig, b bei 0.5
+        fs.start_time = fade_uhr() - 1.5           # a fertig, b bei 0.5
         v = fs.current_values()
         self.assertEqual(v[1]["a"], 100)
         self.assertAlmostEqual(v[1]["b"], 50, delta=4)
@@ -41,7 +40,7 @@ class AttrDelayTest(unittest.TestCase):
 
     def test_done_only_when_last_attr_finishes(self):
         fs = self._fs({1: {"b": 1.0}})
-        fs.start_time = time.monotonic() - 2.1           # auch b fertig
+        fs.start_time = fade_uhr() - 2.1           # auch b fertig
         v = fs.current_values()
         self.assertEqual(v[1]["b"], 100)
         self.assertTrue(fs.done)
@@ -49,7 +48,7 @@ class AttrDelayTest(unittest.TestCase):
     def test_no_attr_delays_is_unchanged(self):
         # Regression: ohne attr_delays exakt der bisherige gemeinsame Fortschritt.
         fs = self._fs(None)
-        fs.start_time = time.monotonic() - 0.5
+        fs.start_time = fade_uhr() - 0.5
         v = fs.current_values()
         self.assertAlmostEqual(v[1]["a"], 50, delta=3)
         self.assertAlmostEqual(v[1]["b"], 50, delta=3)
@@ -229,7 +228,7 @@ class AttrDelayViaFadeToTest(unittest.TestCase):
                       fade_in=1.0, attr_delays={1: {"b": 1.0}}))
         s.go()
         self.assertIsNotNone(s._fade)
-        s._fade.start_time = time.monotonic() - 0.5     # 0.5 s in den 1-s-Fade
+        s._fade.start_time = fade_uhr() - 0.5     # 0.5 s in den 1-s-Fade
         vals = s._fade.current_values()
         self.assertAlmostEqual(vals[1]["a"], 50, delta=6)  # a fadet (scurve@0.5≈0.5)
         self.assertEqual(vals[1]["b"], 0)                  # b noch verzögert
@@ -258,7 +257,7 @@ class AttrDelayOutViaFadeToTest(unittest.TestCase):
     def test_back_uses_attr_delays_out(self):
         s = self._two_cue_stack(attr_delays_out={1: {"b": 1.0}})
         self.assertEqual(s._fade.attr_delays, {1: {"b": 1.0}})   # Out-Set, nicht In
-        s._fade.start_time = time.monotonic() - 0.5     # 0.5 s in den 1-s-Fade-Out
+        s._fade.start_time = fade_uhr() - 0.5     # 0.5 s in den 1-s-Fade-Out
         vals = s._fade.current_values()
         self.assertAlmostEqual(vals[1]["a"], 50, delta=4)  # a fadet 0->100 linear
         self.assertEqual(vals[1]["b"], 0)                  # b: Out-Delay 1 s -> hält
@@ -267,7 +266,7 @@ class AttrDelayOutViaFadeToTest(unittest.TestCase):
         # In-Seite gesetzt, Out-Seite leer: der BACK-Fade darf die In-Delays NICHT sehen.
         s = self._two_cue_stack(attr_delays={1: {"b": 5.0}})
         self.assertEqual(s._fade.attr_delays, {})       # leer = bisheriges Verhalten
-        s._fade.start_time = time.monotonic() - 0.5
+        s._fade.start_time = fade_uhr() - 0.5
         vals = s._fade.current_values()
         self.assertAlmostEqual(vals[1]["a"], 50, delta=4)
         self.assertAlmostEqual(vals[1]["b"], 50, delta=4)  # b NICHT verzögert
@@ -276,7 +275,7 @@ class AttrDelayOutViaFadeToTest(unittest.TestCase):
         # delay_out verzögert den ganzen BACK-Fade; delay_in (=0) darf nicht greifen.
         s = self._two_cue_stack(delay_in=0.0, delay_out=1.0)
         self.assertAlmostEqual(s._fade.delay, 1.0)      # delay_out als Basis
-        s._fade.start_time = time.monotonic() - 0.5     # noch in der delay_out-Phase
+        s._fade.start_time = fade_uhr() - 0.5     # noch in der delay_out-Phase
         vals = s._fade.current_values()
         self.assertEqual(vals[1]["a"], 0)               # from-Wert: Fade noch nicht los
         self.assertEqual(vals[1]["b"], 0)
@@ -290,7 +289,7 @@ class AttrDelayOutViaFadeToTest(unittest.TestCase):
                       attr_delays_out={1: {"b": 5.0}}))
         s.go()
         self.assertEqual(s._fade.attr_delays, {1: {"b": 1.0}})   # In-Set
-        s._fade.start_time = time.monotonic() - 0.5
+        s._fade.start_time = fade_uhr() - 0.5
         vals = s._fade.current_values()
         self.assertAlmostEqual(vals[1]["a"], 50, delta=4)
         self.assertEqual(vals[1]["b"], 0)
