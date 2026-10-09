@@ -16,7 +16,7 @@ nach durch. **Installiert** wird LightOS laut [INSTALL.md](../INSTALL.md) — au
   gelten trotzdem für jedes Rig; Namen von Tasten und Gruppen weichen dann ab.
 
 Die neuen Anleitungen (Erste Schritte, Ausgabe, Programmer-Grundlagen, Szenen & Cues,
-Geräte-Bibliothek, 3D-Bühne) zeigen
+Geräte-Bibliothek, 3D-Bühne, Große Bühnen-Show) zeigen
 die aktuelle Oberfläche; ihre Bilder entstehen aus dem Code ([so geht das](ANLEITUNGSBILDER.md)).
 Ältere Anleitungen zeigen teils eine frühere Oberfläche — etwa „Live View“ statt **Bühne** in
 der Sektionsleiste. Die Abläufe gelten weiter.
@@ -64,6 +64,7 @@ der Sektionsleiste. Die Abläufe gelten weiter.
 | [EFX — Moving-Head-Bewegung](anleitung_efx/ANLEITUNG_EFX.md) | Pan/Tilt-Bahnen (Kreis, Acht …), „Dimmer/Shutter mit öffnen“, Geräte-Verhältnis. | Beispiel-Show nicht im Repo |
 | [Matrix-Effekte](anleitung_matrix_effekte/ANLEITUNG_MATRIX_EFFEKTE.md) | Feuer, Regen, Radar, Spirale, Wisch und Welle. | Generator `build_event_demo_2026.py` |
 | [Abläufe & Mischen](anleitung_ablaeufe/ANLEITUNG_ABLAEUFE_MISCHEN.md) | Collections, Chaser, Cue-Listen und Live-Chase: Farbe × Bewegung × Strobo kombinieren. | Generator `build_event_demo_2026.py` |
+| [Große Bühnen-Show: Effekte selbst bauen](anleitung_buehnen_show/ANLEITUNG.md) | Lauflicht Mitte → außen und Welle (Matrix), Pan-Welle und Schwenker im Wechsel (EFX mit Versatz), Strobe, langsame Laser-Bewegung (Szenen + Chaser), eigene VC-Knöpfe, Nebel und Beam Opacity im 3D — Klick für Klick, jeder Effekt per DMX geprüft. | Generator `build_buehnen_show_2026.py` → `Buehnen_Show_2026.lshow` |
 | [Weiche Farbwechsel in der VC](anleitung_colorfade_vc/ANLEITUNG_COLORFADE_VC.md) | Eine RGB/RGBW-Matrix überblendet weich zwischen Farben, ohne den Tempo-Sync zu verlieren. | Beispiel-Show nicht im Repo |
 
 **So greifen die Ebenen ineinander:** Farbe (Farb-Matrix, Farbchase), Helligkeit
@@ -123,6 +124,7 @@ frei kombinieren; das Tempo aller Ebenen hängt an Tempo-Buses (siehe
 |---|---|---|
 | [Event-Demo 2026](ANLEITUNGEN_EVENT_DEMO.md) | Bank-Übersicht einer kompletten Show mit PARs, Moving Heads und Spidern; führt zu den Einzelanleitungen. | Generator `build_event_demo_2026.py` → `Event_Demo_2026.lshow` |
 | [Hochzeits-Show von Anfang bis Ende](anleitung_hochzeit_komplett/00_INDEX.md) | Zehnteiliger Durchlauf einer ruhigeren Show: Patch, Farben, Tempo-Controller, Live-Edit, Ablauf. | Generator `build_hochzeit_komplett.py` → `Hochzeit_Komplett_2026.lshow` |
+| [Große Bühnen-Show 2026](anleitung_buehnen_show/ANLEITUNG_BUEHNEN_SHOW.md) | 20-m-Bühne mit drei Traversen-Ebenen, 40 PARs, 20 Moving Heads, Strobes, 10 Lasern und Nebel; Wellen, Lauflichter, Show-Looks und Kamerafahrten im 3D. | Generator `build_buehnen_show_2026.py` → `Buehnen_Show_2026.lshow` |
 | [Feature-Showcase](FEATURE_SHOWCASE.md) | Eine Test-Show, die möglichst jede Funktion einmal zeigt. | Generator `build_feature_showcase.py` → `Feature_Showcase.lshow` |
 | [APC mini + vier RGBW-Strahler](APC_SCHRITT_FUER_SCHRITT.md) | Schritt für Schritt mit der APC-Test-Show; dazu die [Seiten-Übersicht](APC_SEITEN_UEBERSICHT.md). | Generator `build_apc_test_show.py` → `APC_Test_Komplett.lshow` |
 | [Farb-/Effekt-VC-Show](FARB_FX_VC_SHOW.md) | Bedienung der Show, aus der „Effekte einfach aufbauen“ stammt. | Generator `build_farb_fx_vc_show.py` |

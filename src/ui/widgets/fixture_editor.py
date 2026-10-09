@@ -1220,11 +1220,15 @@ class FixtureEditorDialog(QDialog):
         # (dort Zeile ~1264), und der Docstring von `clear_channel_cache`
         # behauptet ausdruecklich, Profil-Aenderungen aus „Generator/Editor"
         # reisten ueber denselben Weg — die Editor-Haelfte stimmte nicht.
+        #
+        # UI-81: Cache leeren allein reicht nicht — der Render-Plan haelt die
+        # Kanaele gepatchter Geraete fest. ``profil_geaendert`` baut Patch-Cache
+        # und Render-Plan neu auf und sendet ``patch_changed``.
         try:
-            from src.core.app_state import clear_channel_cache
-            clear_channel_cache()
-        except Exception:
-            pass
+            from src.core.app_state import profil_geaendert
+            profil_geaendert(getattr(self, "_saved_id", None))
+        except Exception as e:
+            print(f"[UI-81] Profil-Aenderung nicht uebernommen: {e}")
 
         QMessageBox.information(self, "Gespeichert",
                                 f"Fixture-Profil '{mfr_name} {name}' gespeichert.")
