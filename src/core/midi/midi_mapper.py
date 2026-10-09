@@ -379,6 +379,9 @@ class MidiMapper:
         # UI-Hook fuer Learn-Konflikt-Warnungen (Option B, rein additiv).
         self._conflict_callbacks: list[Callable[[dict], None]] = []
         self._toggle_states: dict[str, bool] = {}
+        # MIDI-4: _on_midi laeuft im MIDI-Empfangsthread, add/replace/remove
+        # und das Feedback-Polling in anderen Threads.
+        self._toggle_lock = threading.Lock()
         self._feedback_state_cache: dict[str, float] = {}
         self._feedback_output_cache: dict[str, int] = {}
         self._feedback_last_send_ts: dict[str, float] = {}
@@ -400,14 +403,16 @@ class MidiMapper:
         if not mapping.mapping_id:
             mapping.mapping_id = uuid4().hex
         if mapping.button_mode == BUTTON_TOGGLE:
-            self._toggle_states.setdefault(mapping.mapping_id, False)
+            with self._toggle_lock:
+                self._toggle_states.setdefault(mapping.mapping_id, False)
         self._mappings.append(mapping)
         self._emit_mapping_state(mapping, self._read_mapping_state(mapping))
 
     def remove_mapping(self, idx: int):
         if 0 <= idx < len(self._mappings):
             mapping = self._mappings.pop(idx)
-            self._toggle_states.pop(mapping.mapping_id, None)
+            with self._toggle_lock:
+                self._toggle_states.pop(mapping.mapping_id, None)
             self._feedback_state_cache.pop(mapping.mapping_id, None)
 
     def get_mappings(self) -> list[MidiMapping]:
@@ -415,11 +420,12 @@ class MidiMapper:
 
     def replace_mappings(self, mappings: list[MidiMapping]):
         self._mappings = list(mappings)
-        self._toggle_states = {}
+        with self._toggle_lock:
+            self._toggle_states = {
+                m.mapping_id: False for m in self._mappings
+                if m.button_mode == BUTTON_TOGGLE}
         self._feedback_state_cache = {}
         for mapping in self._mappings:
-            if mapping.button_mode == BUTTON_TOGGLE:
-                self._toggle_states[mapping.mapping_id] = False
             self._emit_mapping_state(mapping, self._read_mapping_state(mapping))
 
     # Learn mode ---------------------------------------------------------
@@ -526,10 +532,21 @@ class MidiMapper:
                 callback(msg)
             return
 
-        for mapping in self._mappings:
-            if not mapping.midi_in.matches(msg):
-                continue
-            self._handle_inbound_mapping(mapping, msg)
+        # MIDI-4: jede Zeile einzeln absichern — eine kaputte Zeile darf die
+        # anderen Zeilen derselben Note nicht abbrechen. Schnappschuss der
+        # Liste, weil die UI sie parallel ersetzen kann.
+        for mapping in list(self._mappings):
+            try:
+                if not mapping.midi_in.matches(msg):
+                    continue
+                self._handle_inbound_mapping(mapping, msg)
+            except Exception as e:
+                try:
+                    from src.core.diagnose_log import melde_still
+                    melde_still("midi.mapping", e,
+                                text=f"Mapping {mapping.name or mapping.action}")
+                except Exception:
+                    pass
 
     def _handle_inbound_mapping(self, mapping: MidiMapping, msg: MidiMessage):
         mode = _normalize_button_mode(
@@ -571,9 +588,9 @@ class MidiMapper:
         # Toggle mode
         if not is_pressed:
             return
-        cur = self._toggle_states.get(mapping.mapping_id, False)
-        new_state = not cur
-        self._toggle_states[mapping.mapping_id] = new_state
+        with self._toggle_lock:
+            new_state = not self._toggle_states.get(mapping.mapping_id, False)
+            self._toggle_states[mapping.mapping_id] = new_state
         self._execute_binary(mapping, new_state)
         self._emit_mapping_state(mapping, 1.0 if new_state else 0.0)
 
@@ -921,7 +938,9 @@ class MidiMapper:
             except Exception:
                 return 0.0
 
-        return 1.0 if self._toggle_states.get(mapping.mapping_id, False) else 0.0
+        with self._toggle_lock:
+            an = self._toggle_states.get(mapping.mapping_id, False)
+        return 1.0 if an else 0.0
 
     # Persistence --------------------------------------------------------
 
