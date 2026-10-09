@@ -58,7 +58,6 @@
 | VIZ-85 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
 | VIZ-86 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
 | VIZ-87 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
-| DOC-62 | D | docs/doc62-installdoku-windows | 2026-10-09T13:46Z | INSTALL.md · CONTRIBUTING.md · install.py · tests/test_doc62_installdoku.py |
 | TOOL-16 | A | fix/codex-p1-0810 | 2026-10-08T16:57Z | - |
 | UI-81 | A | fix/codex-p1-0810 | 2026-10-08T16:57Z | - |
 | DEMO-07 | A | docs/demo07-showcase-shows | 2026-10-08T17:30Z | - |
@@ -179,7 +178,6 @@
 
 ## Verlauf
 
-- 2026-10-08T21:46Z D done QA-90
 - 2026-10-08T22:16Z D done QA-89
 - 2026-10-08T22:16Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T22:48Z B done XPLAT-24
@@ -209,3 +207,4 @@
 - 2026-10-09T16:27Z A claim MIDI-16
 - 2026-10-09T16:27Z A claim MIDI-3
 - 2026-10-09T16:27Z A claim MIDI-4
+- 2026-10-09T16:47Z D done DOC-62
