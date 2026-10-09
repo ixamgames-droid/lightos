@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QComboBox, QListWidget, QListWidgetItem, QPlainTextEdit,
     QGroupBox, QFormLayout, QSplitter, QTableWidget,
     QTableWidgetItem, QHeaderView, QCheckBox, QAbstractItemView,
-    QInputDialog, QMessageBox, QSpinBox, QLineEdit
+    QInputDialog, QMessageBox, QSpinBox
 )
 from PySide6.QtCore import Qt, QTimer, Signal, QObject
 from PySide6.QtGui import QColor, QFont
@@ -670,11 +670,16 @@ class MidiView(QWidget):
         self._chk_msc_udp = QCheckBox("GMA-MSC über Netzwerk")
         self._chk_msc_udp.setChecked(st.udp_enabled)
         bl.addWidget(self._chk_msc_udp)
-        bl.addWidget(QLabel("IP:"))
-        self._edit_msc_host = QLineEdit(st.udp_host)
-        self._edit_msc_host.setToolTip("IP der Netzwerkschnittstelle, auf der "
-                                       "gelauscht wird (z. B. die Art-Net-Karte)")
-        bl.addWidget(self._edit_msc_host, stretch=1)
+        bl.addWidget(QLabel("Schnittstelle:"))
+        self._cmb_msc_host = QComboBox()
+        self._cmb_msc_host.setToolTip("Netzwerkschnittstelle, auf der gelauscht "
+                                      "wird (z. B. die Karte im Pult-Netz)")
+        self._fill_msc_ifaces(st.udp_host)
+        bl.addWidget(self._cmb_msc_host, stretch=1)
+        self._lbl_msc_hint = QLabel("")
+        self._lbl_msc_hint.setStyleSheet("color: #d0a040;")
+        self._cmb_msc_host.currentIndexChanged.connect(self._update_msc_hint)
+        self._update_msc_hint()
         bl.addWidget(QLabel("Port:"))
         self._spin_msc_port = QSpinBox()
         self._spin_msc_port.setRange(1, 65535)
@@ -683,7 +688,48 @@ class MidiView(QWidget):
         btn = QPushButton("Übernehmen")
         btn.clicked.connect(self._apply_msc)
         bl.addWidget(btn)
-        parent_layout.addWidget(box)
+        outer = QVBoxLayout()
+        outer.addWidget(box)
+        outer.addWidget(self._lbl_msc_hint)
+        parent_layout.addLayout(outer)
+
+    def _fill_msc_ifaces(self, current: str):
+        """Schnittstellenliste wie bei Art-Net/sACN (``list_output_interfaces``)
+        plus „nur dieser Rechner" und „alle (0.0.0.0)"."""
+        cmb = self._cmb_msc_host
+        cmb.clear()
+        cmb.addItem("nur dieser Rechner (127.0.0.1)", "127.0.0.1")
+        try:
+            from src.core.dmx.output_iface import list_output_interfaces
+            ifaces = list_output_interfaces()
+        except Exception:
+            ifaces = []
+        for e in ifaces:
+            ip = str(e.get("ip") or "")
+            if not ip or ip.startswith("127."):
+                continue
+            cmb.addItem(f"{e.get('name') or '?'} ({ip})", ip)
+        cmb.addItem("alle Schnittstellen (0.0.0.0)", "0.0.0.0")
+        cur = (current or "").strip() or "127.0.0.1"
+        i = cmb.findData(cur)
+        if i < 0:
+            # gespeicherte NIC gerade nicht vorhanden — trotzdem anzeigen
+            cmb.addItem(f"{cur} (nicht gefunden)", cur)
+            i = cmb.count() - 1
+        cmb.setCurrentIndex(i)
+
+    def _update_msc_hint(self, *_):
+        host = self._cmb_msc_host.currentData() or ""
+        if host == "0.0.0.0":
+            text = ("Hinweis: lauscht auf allen Schnittstellen — jedes Gerät in "
+                    "jedem angeschlossenen Netz kann Cues auslösen.")
+        elif host.startswith("127."):
+            text = ("Hinweis: 127.0.0.1 erreicht nur Programme auf diesem Rechner, "
+                    "kein Pult im Netz — für ein Pult dessen Netzwerkkarte wählen.")
+        else:
+            text = ""
+        self._lbl_msc_hint.setText(text)
+        self._lbl_msc_hint.setVisible(bool(text))
 
     def _apply_msc(self):
         from src.core.midi import msc as _msc
@@ -691,8 +737,10 @@ class MidiView(QWidget):
         st.enabled = self._chk_msc.isChecked()
         st.device_id = int(self._spin_msc_dev.value())
         st.udp_enabled = self._chk_msc_udp.isChecked()
-        st.udp_host = self._edit_msc_host.text().strip() or "127.0.0.1"
+        st.udp_host = str(self._cmb_msc_host.currentData() or "127.0.0.1")
         st.udp_port = int(self._spin_msc_port.value())
+        if not _msc.save_settings():
+            self._append_log("MSC: Einstellungen konnten nicht gespeichert werden")
         ok = False
         if self._mapper is not None:
             ok = self._mapper.apply_msc_udp()

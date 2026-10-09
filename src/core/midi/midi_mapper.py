@@ -574,6 +574,14 @@ class MidiMapper:
                     ex.press_btn("go")
                 return True
             if c in (_msc.STOP, _msc.GO_OFF):
+                if not (cmd.cue_list or "").strip():
+                    # MSC-Spezifikation: ohne Cue-Liste gilt der Befehl fuer
+                    # ALLE laufenden Listen (nicht nur Executor 1).
+                    pe = self._state.playback_engine
+                    if pe is None:
+                        return False
+                    pe.stop_all()
+                    return True
                 ex = self._msc_executor(cmd.cue_list)
                 if ex is None or ex.stack is None:
                     return False
@@ -1091,4 +1099,12 @@ def get_midi_mapper(app_state=None) -> MidiMapper | None:
     global _mapper_instance
     if _mapper_instance is None and app_state is not None:
         _mapper_instance = MidiMapper(app_state)
+        # MIDI-5/NET-14: gespeicherte MSC-Einstellungen beim Start anwenden.
+        try:
+            from . import msc as _msc
+            _msc.load_settings()
+            _mapper_instance.apply_msc_udp()
+        except Exception as e:
+            from src.core.diagnose_log import melde_still
+            melde_still("midi.msc", e, text="Start")
     return _mapper_instance

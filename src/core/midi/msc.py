@@ -75,6 +75,82 @@ def get_settings() -> MscSettings:
     return _settings
 
 
+# Ablage: ``ui_prefs.json`` im App-Datenordner, Sektion ``midi_msc`` —
+# geraetegebunden wie ``output_iface_ip`` (die NIC gehoert zum Rechner, nicht
+# zur Show). Pfad wird bei jedem Zugriff neu aufgeloest (Tests lenken
+# ``app_data_dir`` um).
+_PREFS_KEY = "midi_msc"
+
+
+def _prefs_path() -> str:
+    import os
+    from src.core import paths
+    return os.path.join(paths.app_data_dir(), "ui_prefs.json")
+
+
+def load_settings() -> MscSettings:
+    """Gespeicherte MSC-Einstellungen in ``_settings`` uebernehmen. Fehlende
+    oder ungueltige Werte behalten den bisherigen Stand — eine kaputte
+    Prefs-Datei kostet hoechstens die Einstellung."""
+    import json
+    try:
+        with open(_prefs_path(), encoding="utf-8") as f:
+            sek = (json.load(f) or {}).get(_PREFS_KEY)
+    except (OSError, ValueError, AttributeError):
+        return _settings
+    if not isinstance(sek, dict):
+        return _settings
+    if isinstance(sek.get("enabled"), bool):
+        _settings.enabled = sek["enabled"]
+    if isinstance(sek.get("udp_enabled"), bool):
+        _settings.udp_enabled = sek["udp_enabled"]
+    dev = sek.get("device_id")
+    if isinstance(dev, int) and not isinstance(dev, bool) and 0 <= dev <= 127:
+        _settings.device_id = dev
+    port = sek.get("udp_port")
+    if isinstance(port, int) and not isinstance(port, bool) and 1 <= port <= 65535:
+        _settings.udp_port = port
+    host = sek.get("udp_host")
+    if isinstance(host, str) and host.strip():
+        _settings.udp_host = host.strip()
+    return _settings
+
+
+def save_settings() -> bool:
+    """Aktuelle MSC-Einstellungen in ``ui_prefs.json`` schreiben (andere
+    Sektionen bleiben erhalten, Schreiben atomar). True = gespeichert."""
+    import json
+    import os
+    path = _prefs_path()
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            return False          # fremde/kaputte Datei nicht ueberschreiben
+    except FileNotFoundError:
+        data = {}
+    except (OSError, ValueError):
+        return False
+    data[_PREFS_KEY] = {
+        "enabled": bool(_settings.enabled),
+        "device_id": int(_settings.device_id),
+        "udp_enabled": bool(_settings.udp_enabled),
+        "udp_host": str(_settings.udp_host),
+        "udp_port": int(_settings.udp_port),
+    }
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        os.replace(tmp, path)
+    except OSError as e:
+        from src.core.diagnose_log import melde_still
+        melde_still("msc.prefs", e, text=path)
+        return False
+    return True
+
+
 def accepts_device(msg_device: int, own_device: int | None = None) -> bool:
     """Device-ID-Filter: eigene ID 0x7F nimmt alles, Ziel 0x7F (Broadcast)
     erreicht jeden."""

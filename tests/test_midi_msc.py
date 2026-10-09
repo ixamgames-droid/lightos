@@ -276,3 +276,56 @@ def test_abgeschnittene_sysex_wirft_nicht():
         assert _decode(raw, "Pult") is None
     paket = b"GMA\x00MSC\x00\x0e\x00\x00\x00" + bytes([0xF0, 0x7F, 1, 2, 1, 0xF7])
     assert msc.parse_gma_udp(paket) is None
+
+
+# ── Review-Nachbesserungen ───────────────────────────────────────────────────
+
+@pytest.mark.parametrize("cmd", [msc.STOP, msc.GO_OFF])
+def test_stop_ohne_liste_stoppt_alle_listen(cmd):
+    """MSC-Spezifikation: STOP/GO_OFF ohne Cue-Liste gilt fuer ALLE laufenden
+    Listen, nicht nur fuer Executor 1."""
+    m = _mapper()
+    pe = m._state.playback_engine
+    assert m.handle_msc(msc.parse_msc(_sx(1, cmd)))
+    assert all(ex.stack.log == ["stop"] for ex in pe.executors)
+
+
+def test_stop_mit_liste_stoppt_nur_diese(cmd=msc.STOP):
+    m = _mapper()
+    pe = m._state.playback_engine
+    assert m.handle_msc(msc.parse_msc(_sx(1, cmd, b"\x003")))
+    assert pe.executors[2].stack.log == ["stop"]
+    assert pe.executors[0].stack.log == []
+
+
+def test_einstellungen_dauerhaft(tmp_path, monkeypatch):
+    """MSC-Einstellungen landen in ui_prefs.json (Sektion ``midi_msc``),
+    fremde Sektionen bleiben erhalten, Laden stellt sie wieder her."""
+    import json
+    import src.core.paths as paths
+    monkeypatch.setattr(paths, "app_data_dir", lambda: str(tmp_path))
+    (tmp_path / "ui_prefs.json").write_text(json.dumps({"fremd": 1}))
+    st = msc.get_settings()
+    st.enabled, st.device_id = False, 9
+    st.udp_enabled, st.udp_host, st.udp_port = True, "0.0.0.0", 6005
+    assert msc.save_settings()
+    daten = json.loads((tmp_path / "ui_prefs.json").read_text())
+    assert daten["fremd"] == 1 and daten["midi_msc"]["device_id"] == 9
+    st.enabled, st.device_id = True, 127
+    st.udp_enabled, st.udp_host, st.udp_port = False, "127.0.0.1", 1
+    msc.load_settings()
+    assert (st.enabled, st.device_id, st.udp_enabled, st.udp_host,
+            st.udp_port) == (False, 9, True, "0.0.0.0", 6005)
+
+
+def test_einstellungen_kaputt_bleiben_default(tmp_path, monkeypatch):
+    import json
+    import src.core.paths as paths
+    monkeypatch.setattr(paths, "app_data_dir", lambda: str(tmp_path))
+    (tmp_path / "ui_prefs.json").write_text(json.dumps(
+        {"midi_msc": {"device_id": "x", "udp_port": 99999, "enabled": False}}))
+    st = msc.get_settings()
+    st.device_id, st.udp_port = 127, msc.GMA_PORT
+    msc.load_settings()
+    assert st.device_id == 127 and st.udp_port == msc.GMA_PORT
+    assert st.enabled is False
