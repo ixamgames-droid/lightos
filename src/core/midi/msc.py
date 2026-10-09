@@ -115,6 +115,10 @@ def parse_msc(raw, own_device: int | None = None) -> MscCommand | None:
         return None
     end = raw.index(0xF7) if 0xF7 in raw else len(raw)
     body = raw[:end]
+    if len(body) < 6:
+        # Abgeschnittene SysEx (F7 vor dem Befehlsbyte) — sonst IndexError im
+        # MIDI-Empfangsthread, der damit fuer alle Eingaenge stehen bliebe.
+        return None
     dev, fmt, cmd = body[2], body[4], body[5]
     data = body[6:]
     if not accepts_device(dev, own_device):
@@ -208,7 +212,12 @@ class GmaMscReceiver:
                 break
             if not _settings.enabled:
                 continue
-            cmd = parse_gma_udp(data)
+            try:
+                cmd = parse_gma_udp(data)
+            except Exception as e:      # kaputtes Paket darf den Thread nie beenden
+                from src.core.diagnose_log import melde_still
+                melde_still("msc.udp", e, text="Paket")
+                continue
             if cmd is None:
                 continue
             try:

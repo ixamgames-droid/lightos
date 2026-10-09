@@ -89,6 +89,7 @@ _MidiInProc = getattr(ctypes, "WINFUNCTYPE", ctypes.CFUNCTYPE)(
 _MMSYSERR_NOERROR  = 0
 _MIM_DATA          = 0x3C3    # Kurze MIDI-Message (Note/CC/...)
 _MIM_LONGDATA      = 0x3C4    # MIDI-5: SysEx-Puffer gefuellt (MSC)
+_MIM_LONGERROR     = 0x3C6    # unvollstaendige/ungueltige SysEx — Puffer kommt zurueck
 _SYSEX_BUFFERS     = 4
 _SYSEX_BUFSIZE     = 1024
 
@@ -167,13 +168,14 @@ class WinMMInput:
                 except Exception as e:
                     from src.core.diagnose_log import melde_still   # STAB-30
                     melde_still("midi.winmm", e, text=port_name)
-            elif msg_type == _MIM_LONGDATA:
+            elif msg_type in (_MIM_LONGDATA, _MIM_LONGERROR):
                 # MIDI-5: SysEx (MSC). Puffer auslesen und — ausser beim
                 # Schliessen (midiInReset gibt alle Puffer zurueck) — wieder
                 # einreihen.
                 try:
                     hdr = _MIDIHDR.from_address(param1)
-                    data = _longdata_bytes(hdr)
+                    data = (_longdata_bytes(hdr)
+                            if msg_type == _MIM_LONGDATA else [])
                     if data:
                         on_raw(data, port_name)
                     if not self._closing:

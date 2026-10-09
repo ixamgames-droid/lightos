@@ -264,3 +264,15 @@ def test_winmm_longdata_bytes():
     assert w._longdata_bytes(hdr) == list(raw)
     hdr.dwBytesRecorded = 0
     assert w._longdata_bytes(hdr) == []
+
+
+def test_abgeschnittene_sysex_wirft_nicht():
+    """Review-Fix: F7 vor dem Befehlsbyte warf IndexError — im MIDI-Empfangs-
+    thread (_rx_loop ruft _decode ohne try) haette das alle Eingaenge gestoppt."""
+    for raw in ([0xF0, 0x7F, 0x01, 0x02, 0x01, 0xF7],
+                [0xF0, 0x7F, 0x01, 0x02, 0xF7, 0x00],
+                [0xF0, 0x7F, 0x01, 0x02, 0x01]):
+        assert msc.parse_msc(raw) is None
+        assert _decode(raw, "Pult") is None
+    paket = b"GMA\x00MSC\x00\x0e\x00\x00\x00" + bytes([0xF0, 0x7F, 1, 2, 1, 0xF7])
+    assert msc.parse_gma_udp(paket) is None
