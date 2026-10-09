@@ -740,6 +740,9 @@ class MainWindow(QMainWindow):
         # Hilfe
         hm = mb.addMenu("&Hilfe")
         hm.addAction("Über LightOS").triggered.connect(self._about)
+        # STAB-30: ein Paket fuer die Fernhilfe (Logs + Systeminfo, keine Shows).
+        hm.addAction("Diagnosepaket speichern…").triggered.connect(
+            self._diagnosepaket_speichern)
 
     # ── UI aufbauen ───────────────────────────────────────────────────────────
 
@@ -2585,6 +2588,48 @@ class MainWindow(QMainWindow):
             "Enttec Pro USB &middot; Art-Net 4 &middot; MIDI<br><br>"
             "UI: QLC+ v5 Design System"
         )
+
+    def _diagnosepaket_speichern(self, ziel: str | None = None):
+        """STAB-30: Hilfe → „Diagnosepaket speichern…“. Erklaert vorher, was im
+        Paket steckt (und was NICHT), fragt nach dem Ziel und schreibt das zip.
+        ``ziel`` vorgegeben = ohne Dialoge (Tests). Gibt den Pfad oder None."""
+        from src.core import diagnose_log as dl
+        from PySide6.QtWidgets import QApplication, QFileDialog
+        headless = os.environ.get("QT_QPA_PLATFORM", "").startswith("offscreen")
+        if ziel is None:
+            antwort = QMessageBox.information(
+                self, "Diagnosepaket speichern",
+                "Das Diagnosepaket hilft bei der Fehlersuche aus der Ferne. "
+                "Es enthält:\n\n" + dl.PAKET_INHALT +
+                "\n\nDie Datei anschließend per E-Mail oder Messenger an die "
+                "LightOS-Hilfe schicken.",
+                QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Ok)
+            if antwort != QMessageBox.StandardButton.Ok:
+                return None
+            ziel, _ = QFileDialog.getSaveFileName(
+                self, "Diagnosepaket speichern", dl.standard_ziel(),
+                "Zip-Archiv (*.zip)")
+            if not ziel:
+                return None
+            if not ziel.lower().endswith(".zip"):
+                ziel += ".zip"
+        try:
+            dl.melde_laufzeit_umgebung()
+            pfad = dl.erstelle_diagnosepaket(
+                ziel, QApplication.applicationVersion() or "?")
+        except Exception as e:
+            print(f"[MainWindow] ERROR: Diagnosepaket nicht geschrieben: {e}")
+            if not headless:
+                QMessageBox.warning(self, "Diagnosepaket",
+                                    f"Das Diagnosepaket konnte nicht geschrieben "
+                                    f"werden:\n\n{e}")
+            return None
+        print(f"[MainWindow] Diagnosepaket geschrieben: {pfad}")
+        if not headless:
+            QMessageBox.information(self, "Diagnosepaket",
+                                    f"Gespeichert unter:\n\n{pfad}")
+        return pfad
 
     # ── State-Events ─────────────────────────────────────────────────────────
 
