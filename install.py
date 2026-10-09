@@ -190,6 +190,18 @@ def venv_pip() -> list[str]:
     return [venv_python(), "-m", "pip"]
 
 
+def verknuepfung_python(use_venv: bool = True, executable: str | None = None) -> str:
+    """XPLAT-48: das Python fuer die Desktop-Verknuepfung — ``pythonw.exe``
+    (startet ohne Konsolenfenster), sonst ``python.exe`` daneben.
+
+    Mit ``--no-venv`` gibt es kein ``venv/``: dann das Python, in das gerade
+    installiert wurde (``sys.executable``). Vorher zeigte die Verknuepfung
+    auch dann auf ``venv\\Scripts\\pythonw.exe`` — also ins Leere."""
+    python = venv_python() if use_venv else (executable or sys.executable)
+    pyw = os.path.join(os.path.dirname(python), "pythonw.exe")
+    return pyw if os.path.exists(pyw) else python
+
+
 def _load_requirements(req_path: Path) -> list[str]:
     lines: list[str] = []
     with open(req_path, "r", encoding="utf-8") as f:
@@ -289,7 +301,7 @@ def create_directories():
     return created
 
 
-def create_shortcut():
+def create_shortcut(use_venv: bool = True):
     """Erstellt eine Desktop-Verknuepfung (nur Windows)."""
     if os.name != "nt":
         return None
@@ -311,10 +323,7 @@ def create_shortcut():
 
     shortcut_path = os.path.join(desktop, "LightOS.lnk")
     # pythonw.exe -> startet OHNE Konsolenfenster; Fallback auf python.exe.
-    target = str(venv_python())
-    pyw = target.replace("python.exe", "pythonw.exe")
-    if os.path.exists(pyw):
-        target = pyw
+    target = verknuepfung_python(use_venv)
     arguments = f'"{ROOT / "main.py"}"'
     working_dir = str(ROOT)
 
@@ -420,7 +429,7 @@ def main():
 
     shortcut = None
     if not args.no_shortcut:
-        shortcut = create_shortcut()
+        shortcut = create_shortcut(use_venv)
 
     write_manifest(created, shortcut)
     show_summary()
