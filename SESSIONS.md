@@ -81,6 +81,7 @@
 | VIZ-96 | A | feature/viz96-gobo-projektion | 2026-10-08T21:37Z | src/ui/visualizer |
 | UI-84 | A | fix/ui84-efx-laden-geraeteliste | 2026-10-09T13:45Z | src/ui/views/efx_view.py |
 | VCB-41 | A | fix/vcb41-solo-zwilling | 2026-10-09T13:45Z | src/ui/virtualconsole |
+| TOOL-25 | A | fix/tool25-lint-snap-verweise | 2026-10-09T13:45Z | tools/lint_show.py |
 
 ## Blocker & Fallen
 
@@ -169,7 +170,6 @@
 
 ## Verlauf
 
-- 2026-10-08T19:41Z B claim VIZ-71
 - 2026-10-08T19:42Z B claim VIZ-94
 - 2026-10-08T19:43Z B claim XPLAT-36
 - 2026-10-08T19:43Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
@@ -199,3 +199,4 @@
 - 2026-10-09T13:45Z A claim UI-84
 - 2026-10-09T13:45Z 21 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-09T13:45Z A claim VCB-41
+- 2026-10-09T13:45Z A claim TOOL-25
