@@ -82,6 +82,21 @@ class PortnamenTests(unittest.TestCase):
         b2 = mm.MidiInBinding(device="X-Touch", channel=1, trigger_id=5)
         self.assertFalse(b2.matches(_msg(NEU)))
 
+    def test_teilstring_filter_mit_endziffer_bleibt(self):
+        # Getippter Filter mit Endziffer ist KEIN Windows-Index: er muss wie
+        # vor MIDI-3 als Teilstring auf den ALSA-Namen greifen.
+        self._mit([NEU])
+        for f in ("APC MINI MIDI 1", "MIDI 1"):
+            b = mm.MidiInBinding(device=f, channel=1, trigger_id=5)
+            self.assertTrue(b.matches(_msg(NEU)), f)
+        b2 = mm.MidiInBinding(device="X-Touch 2", channel=1, trigger_id=5)
+        self.assertFalse(b2.matches(_msg(NEU)))
+        # Windows-Index bleibt geraetegenau: "APC MINI 1" != "APC MINI 10".
+        self._mit(["APC MINI 0", "APC MINI 10"])
+        b3 = mm.MidiInBinding(device="APC MINI 1", channel=1, trigger_id=5)
+        self.assertTrue(b3.matches(_msg("APC MINI 0")))
+        self.assertFalse(b3.matches(_msg("APC MINI 10")))
+
     def test_learn_speichert_stabilen_namen(self):
         self._mit([ZWEI_A, ZWEI_B])
         b = mm.MidiInBinding.from_message(_msg(ZWEI_B))

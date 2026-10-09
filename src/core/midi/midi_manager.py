@@ -150,6 +150,11 @@ def geraet_passt(geraet: str, port_name: str, ports=None) -> bool:
         return False
     basis, n = ziel
     if port_basisname(port_name) != basis:
+        # Ein frei getippter Filter mit Endziffer ("APC MINI MIDI 1") sieht
+        # aus wie ein Windows-Index, ist aber ein Teilstring — gegen ein
+        # ANDERES Geraet (anderer Basisname) gilt der alte Teilstring-Abgleich.
+        if not _ORDINAL.match(geraet) and not _ALSA_SUFFIX.match(geraet):
+            return geraet in port_name
         return False
     return _ordinal(port_name, ports) == n
 
