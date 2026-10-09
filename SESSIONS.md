@@ -82,6 +82,7 @@
 | UI-84 | A | fix/ui84-efx-laden-geraeteliste | 2026-10-09T13:45Z | src/ui/views/efx_view.py |
 | VCB-41 | A | fix/vcb41-solo-zwilling | 2026-10-09T13:45Z | src/ui/virtualconsole |
 | TOOL-25 | A | fix/tool25-lint-snap-verweise | 2026-10-09T13:45Z | tools/lint_show.py |
+| VIZ-97 | D | fix/viz97-gobo-schluesselwoerter | 2026-10-09T13:45Z | src/ui/widgets/gobo_icons.py |
 
 ## Blocker & Fallen
 
@@ -170,7 +171,6 @@
 
 ## Verlauf
 
-- 2026-10-08T19:42Z B claim VIZ-94
 - 2026-10-08T19:43Z B claim XPLAT-36
 - 2026-10-08T19:43Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T19:49Z B aktualisiert VIZ-94: Branch fix/viz94-buehne-windows-arm -> fix/viz94-buehne-arm; Dateien - -> src/ui/visualizer
@@ -200,3 +200,4 @@
 - 2026-10-09T13:45Z 21 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-09T13:45Z A claim VCB-41
 - 2026-10-09T13:45Z A claim TOOL-25
+- 2026-10-09T13:45Z D claim VIZ-97
