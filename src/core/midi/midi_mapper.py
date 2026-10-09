@@ -497,6 +497,12 @@ class MidiMapper:
     # Inbound engine -----------------------------------------------------
 
     def _on_midi(self, msg: MidiMessage):
+        if msg.msg_type == "msc":
+            # MIDI-5/NET-14: MSC ist kein lernbares Mapping, sondern ein fester
+            # Befehlssatz (Cue-Liste -> Executor). Auch im Learn-Modus nicht
+            # verschlucken.
+            self.handle_msc(msg.msc)
+            return
         if self._learn_mode and self._learn_callback:
             if msg.msg_type in ("note_on", "note_off", "cc"):
                 callback = self._learn_callback
@@ -517,6 +523,87 @@ class MidiMapper:
             if not mapping.midi_in.matches(msg):
                 continue
             self._handle_inbound_mapping(mapping, msg)
+
+    # ── MIDI Show Control (MIDI-5 / NET-14) ──────────────────────────────────
+
+    def _msc_executor(self, cue_list: str):
+        """Cue-Liste -> Executor der aktuellen Page: Nummer = Slot, sonst
+        Name (Executor-Beschriftung oder Name der gebundenen Cueliste).
+        Leere Liste = Executor 1."""
+        pe = self._state.playback_engine
+        if pe is None:
+            return None
+        key = (cue_list or "").strip()
+        if not key:
+            key = "1"
+        try:
+            slot = int(float(key))
+        except ValueError:
+            slot = None
+        if slot is not None:
+            if slot < 1:
+                return None
+            try:
+                return pe.get_executor(slot)
+            except (IndexError, ValueError):
+                return None
+        name = key.casefold()
+        for ex in list(pe.executors):
+            stack_name = getattr(getattr(ex, "stack", None), "name", "") or ""
+            if (str(ex.label).casefold() == name
+                    or str(stack_name).casefold() == name):
+                return ex
+        return None
+
+    def handle_msc(self, cmd) -> bool:
+        """Fuehrt ein ``MscCommand`` aus. True, wenn etwas ausgeloest wurde."""
+        from . import msc as _msc
+        if cmd is None:
+            return False
+        try:
+            c = cmd.command
+            if c in (_msc.GO, _msc.TIMED_GO, _msc.RESUME, _msc.LOAD):
+                ex = self._msc_executor(cmd.cue_list)
+                if ex is None or ex.stack is None:
+                    return False
+                if c == _msc.LOAD:
+                    return False      # Vorladen kennt LightOS nicht
+                if cmd.cue:
+                    ex.stack.go_to(float(cmd.cue))
+                else:
+                    ex.press_btn("go")
+                return True
+            if c in (_msc.STOP, _msc.GO_OFF):
+                ex = self._msc_executor(cmd.cue_list)
+                if ex is None or ex.stack is None:
+                    return False
+                ex.press_btn("stop")
+                return True
+            if c == _msc.SET:
+                # Regler 0..n -> Executor-Fader 1..n+1, Wert 14 bit.
+                pe = self._state.playback_engine
+                if pe is None or cmd.control is None:
+                    return False
+                ex = pe.get_executor(int(cmd.control) + 1)
+                ex.fader_value = max(0.0, min(1.0, (cmd.value or 0) / 16383.0))
+                return True
+            if c == _msc.FIRE:
+                # Makro n -> Funktion (Szene/Chaser) mit ID n starten.
+                fm = getattr(self._state, "function_manager", None)
+                if fm is None or cmd.macro is None:
+                    return False
+                fm.start(int(cmd.macro))
+                return True
+            if c == _msc.ALL_OFF:
+                pe = self._state.playback_engine
+                if pe is None:
+                    return False
+                pe.stop_all()
+                return True
+        except Exception as e:
+            from src.core.diagnose_log import melde_still
+            melde_still("midi.msc", e, text=getattr(cmd, "name", ""))
+        return False
 
     def _handle_inbound_mapping(self, mapping: MidiMapping, msg: MidiMessage):
         mode = _normalize_button_mode(
@@ -965,12 +1052,36 @@ class MidiMapper:
             print(f"[midi_mapper] load error: {e}")
             return False
 
+    def apply_msc_udp(self) -> bool:
+        """NET-14: GMA-MSC-UDP-Empfaenger gemaess ``msc.get_settings()``
+        (neu) starten oder stoppen. True = laeuft danach."""
+        from . import msc as _msc
+        st = _msc.get_settings()
+        rx = getattr(self, "_msc_udp", None)
+        if rx is not None and (not st.udp_enabled or rx.host != st.udp_host
+                               or rx.port != int(st.udp_port)):
+            rx.stop()
+            rx = None
+            self._msc_udp = None
+        if not st.udp_enabled:
+            return False
+        if rx is None:
+            rx = _msc.GmaMscReceiver(self.handle_msc, st.udp_host, st.udp_port)
+            if not rx.start():
+                return False
+            self._msc_udp = rx
+        return True
+
     def close(self):
         self._feedback_running = False
         try:
             self._feedback_thread.join(timeout=0.5)
         except Exception:
             pass
+        rx = getattr(self, "_msc_udp", None)
+        if rx is not None:
+            rx.stop()
+            self._msc_udp = None
 
 
 _mapper_instance: MidiMapper | None = None

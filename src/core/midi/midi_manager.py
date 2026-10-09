@@ -64,6 +64,17 @@ def is_own_port(port_name: str) -> bool:
     return str(port_name or "").startswith(OWN_OUTPUT_CLIENT + ":")
 
 
+def _sysex_freigeben(midi_in) -> None:
+    """MIDI-5: RtMidi verwirft SysEx standardmaessig — fuer MSC freigeben.
+    Timing-Clock und Active Sensing bleiben gefiltert."""
+    setter = getattr(midi_in, "ignore_types", None)
+    if callable(setter):
+        try:
+            setter(sysex=False, timing=True, active_sense=True)
+        except Exception:
+            pass
+
+
 def _new_rtmidi_out():
     """Neuer RtMidi-Ausgang mit dem eigenen Clientnamen (s. ``OWN_OUTPUT_CLIENT``).
 
@@ -89,13 +100,35 @@ class MidiMessage:
     msg_type: str      # "note_on", "note_off", "cc", "pc", "pitchbend"
     data1: int         # Note / CC-Nummer / PC-Nummer
     data2: int         # Velocity / CC-Wert / 0
+    # MIDI-5: bei msg_type "msc" das zerlegte MscCommand (sonst None).
+    msc: object = None
+
+
+# MIDI-16: Mindestlaenge je Statustyp (Status + Datenbytes). Kuerzere
+# Nachrichten wurden frueher mit 0 aufgefuellt — [0xB0, 7] wurde zu CC7=0.
+_MIN_LEN = {0x80: 3, 0x90: 3, 0xB0: 3, 0xC0: 2, 0xE0: 3}
 
 
 def _decode(raw: list[int], port_name: str) -> MidiMessage | None:
     if not raw:
         return None
     status = raw[0]
+    if status == 0xF0:
+        # MIDI-5: SysEx — nur MIDI Show Control wird ausgewertet.
+        from . import msc as _msc
+        if not _msc.get_settings().enabled:
+            return None
+        cmd = _msc.parse_msc(raw)
+        if cmd is None:
+            return None
+        return MidiMessage(port_name, 0, "msc", cmd.command, 0, msc=cmd)
     msg_type_code = status & 0xF0
+    need = _MIN_LEN.get(msg_type_code)
+    if need is not None and len(raw) < need:
+        from src.core.diagnose_log import melde_still
+        melde_still("midi.kurz", text=f"{port_name}: Status 0x{status:02X} "
+                    f"mit {len(raw) - 1} statt {need - 1} Datenbytes verworfen")
+        return None
     channel = (status & 0x0F) + 1
     d1 = raw[1] if len(raw) > 1 else 0
     d2 = raw[2] if len(raw) > 2 else 0
@@ -311,6 +344,7 @@ class MidiManager:
                 return False
             idx = ports.index(port_name)
             m.open_port(idx)
+            _sysex_freigeben(m)
             m.set_callback(lambda msg, _: self._on_message(msg[0], port_name))
         except Exception as exc:
             # Port-spezifischer Fehler (z. B. belegt) — kein Backend-Breaker.
@@ -484,6 +518,7 @@ class MidiManager:
         try:
             m = rtmidi.MidiIn()
             m.open_virtual_port(name)
+            _sysex_freigeben(m)
             m.set_callback(lambda msg, _: self._on_message(msg[0], f"Virtual:{name}"))
             self._inputs[f"Virtual:{name}"] = m
             self._log(f"Virtueller MIDI-Eingang erstellt: {name}")

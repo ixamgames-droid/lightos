@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QComboBox, QListWidget, QListWidgetItem, QPlainTextEdit,
     QGroupBox, QFormLayout, QSplitter, QTableWidget,
     QTableWidgetItem, QHeaderView, QCheckBox, QAbstractItemView,
-    QInputDialog, QMessageBox
+    QInputDialog, QMessageBox, QSpinBox, QLineEdit
 )
 from PySide6.QtCore import Qt, QTimer, Signal, QObject
 from PySide6.QtGui import QColor, QFont
@@ -229,6 +229,12 @@ class MidiView(QWidget):
         except Exception as e:
             print(f"[MidiView] MTC box init error: {e}")
 
+        # ── MIDI Show Control (MIDI-5 / NET-14) ──────────────────────────────
+        try:
+            self._build_msc_box(layout)
+        except Exception as e:
+            print(f"[MidiView] MSC box init error: {e}")
+
         # Ports laden
         self._refresh_ports()
         self._refresh_map_table()
@@ -394,6 +400,12 @@ class MidiView(QWidget):
             "note_off": "NOTE-",
             "pc":       "PC   ",
         }
+        if msg.msg_type == "msc" and msg.msc is not None:
+            c = msg.msc
+            self._console.appendPlainText(
+                f"MSC   [{msg.port_name[:20]}] {c.name.upper()} "
+                f"Cue={c.cue or '-'} Liste={c.cue_list or '-'}")
+            return
         prefix = prefixes.get(msg.msg_type, msg.msg_type.upper()[:5])
         line = (f"{prefix} [{msg.port_name[:20]}] "
                 f"CH{msg.channel:2d} D1={msg.data1:3d} D2={msg.data2:3d}")
@@ -637,6 +649,59 @@ class MidiView(QWidget):
                 "wuerde die Datei damit ueberschreiben.")
 
     # ── MTC (MIDI Time Code) ─────────────────────────────────────────────────
+
+    def _build_msc_box(self, parent_layout):
+        """MIDI-5/NET-14: MSC-Empfang (an/aus, Device-ID) und GMA-MSC per UDP."""
+        from src.core.midi import msc as _msc
+        st = _msc.get_settings()
+        box = QGroupBox("MIDI Show Control (MSC)")
+        bl = QHBoxLayout(box)
+        self._chk_msc = QCheckBox("MSC an")
+        self._chk_msc.setChecked(st.enabled)
+        self._chk_msc.setToolTip("Cue-Befehle (GO/STOP/RESUME/SET/FIRE) von "
+                                 "grandMA, Hog, Eos, Titan per MIDI-SysEx annehmen")
+        bl.addWidget(self._chk_msc)
+        bl.addWidget(QLabel("Device-ID:"))
+        self._spin_msc_dev = QSpinBox()
+        self._spin_msc_dev.setRange(0, 127)
+        self._spin_msc_dev.setValue(st.device_id)
+        self._spin_msc_dev.setToolTip("Eigene MSC-Geräte-ID; 127 = alle annehmen")
+        bl.addWidget(self._spin_msc_dev)
+        self._chk_msc_udp = QCheckBox("GMA-MSC über Netzwerk")
+        self._chk_msc_udp.setChecked(st.udp_enabled)
+        bl.addWidget(self._chk_msc_udp)
+        bl.addWidget(QLabel("IP:"))
+        self._edit_msc_host = QLineEdit(st.udp_host)
+        self._edit_msc_host.setToolTip("IP der Netzwerkschnittstelle, auf der "
+                                       "gelauscht wird (z. B. die Art-Net-Karte)")
+        bl.addWidget(self._edit_msc_host, stretch=1)
+        bl.addWidget(QLabel("Port:"))
+        self._spin_msc_port = QSpinBox()
+        self._spin_msc_port.setRange(1, 65535)
+        self._spin_msc_port.setValue(int(st.udp_port) or _msc.GMA_PORT)
+        bl.addWidget(self._spin_msc_port)
+        btn = QPushButton("Übernehmen")
+        btn.clicked.connect(self._apply_msc)
+        bl.addWidget(btn)
+        parent_layout.addWidget(box)
+
+    def _apply_msc(self):
+        from src.core.midi import msc as _msc
+        st = _msc.get_settings()
+        st.enabled = self._chk_msc.isChecked()
+        st.device_id = int(self._spin_msc_dev.value())
+        st.udp_enabled = self._chk_msc_udp.isChecked()
+        st.udp_host = self._edit_msc_host.text().strip() or "127.0.0.1"
+        st.udp_port = int(self._spin_msc_port.value())
+        ok = False
+        if self._mapper is not None:
+            ok = self._mapper.apply_msc_udp()
+        if st.udp_enabled:
+            self._append_log(
+                f"GMA-MSC: lausche auf {st.udp_host}:{st.udp_port}" if ok
+                else f"GMA-MSC Fehler: {st.udp_host}:{st.udp_port} nicht belegbar")
+        else:
+            self._append_log("GMA-MSC: Netzwerkempfang aus")
 
     def _build_mtc_box(self, parent_layout):
         """Append a MTC Reader groupbox to parent_layout."""

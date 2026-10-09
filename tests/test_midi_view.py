@@ -144,3 +144,43 @@ def test_midi_view_survives_backend_scan_errors(monkeypatch):
         view.close()
         view.deleteLater()
         _app().processEvents()
+
+
+def test_midi_view_msc_einstellung_und_monitor(monkeypatch):
+    """MIDI-5/NET-14: MSC-Box setzt die Einstellung, ruft den Mapper und
+    zeigt MSC-Befehle im Monitor."""
+    from src.core.midi import msc
+    from src.core.midi.midi_manager import _decode
+    _app()
+    midi = _FakeMidi()
+    applied = []
+
+    class _MscMapper(_FakeMapper):
+        def apply_msc_udp(self):
+            applied.append(True)
+            return True
+
+    class _St:
+        midi_mapper = _MscMapper()
+
+    monkeypatch.setattr(midi_ui, "get_midi_manager", lambda: midi)
+    monkeypatch.setattr(midi_ui, "get_state", lambda: _St())
+    monkeypatch.setattr(midi_ui, "get_mtc_reader", lambda: _FakeMtcReader())
+    st = msc.get_settings()
+    alt = (st.enabled, st.device_id, st.udp_enabled, st.udp_host, st.udp_port)
+    view = midi_ui.MidiView()
+    try:
+        view._spin_msc_dev.setValue(5)
+        view._chk_msc_udp.setChecked(True)
+        view._edit_msc_host.setText("127.0.0.1")
+        view._apply_msc()
+        assert st.device_id == 5 and st.udp_enabled and applied
+        m = _decode([0xF0, 0x7F, 0x05, 0x02, 0x01, 0x01, ord("3"), 0xF7], "Pult")
+        midi.message_callbacks[0](m)
+        _app().processEvents()
+        assert "MSC" in view._console.toPlainText()
+    finally:
+        st.enabled, st.device_id, st.udp_enabled, st.udp_host, st.udp_port = alt
+        view.close()
+        view.deleteLater()
+        _app().processEvents()
