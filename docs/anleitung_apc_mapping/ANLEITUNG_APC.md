@@ -79,3 +79,51 @@ der Fader bewegt werden muss. In der VC-Toolbar als **„🎚 Pickup"** schaltba
 **Fader** → Rechtsklick → **🎹 MIDI Teach...** → Fader bewegen oder Element im Bild anklicken (bindet **CC**).
 Danach **APC LEDs** an für Rückmeldung. Bindungen werden mit der Show gespeichert. Ohne APC läuft alles
 per Touch/Tastatur weiter.
+
+## 7. MIDI Show Control (MSC) — Cues vom Lichtpult
+
+Große Pulte geben Cue-Befehle über **MIDI Show Control** an andere Software
+weiter: grandMA2/grandMA3, Hog 4, ETC Eos und Avolites Titan. LightOS nimmt
+diese Befehle an — per MIDI-Kabel (SysEx) oder bei grandMA zusätzlich per
+Netzwerk (GMA-MSC, UDP-Port 6004).
+
+**Einstellen** (MIDI-Ansicht, Kasten „MIDI Show Control (MSC)“):
+
+- **MSC an** — MSC-Befehle annehmen (Standard: an).
+- **Device-ID** — die eigene MSC-Geräte-ID, wie sie am Pult als Ziel
+  eingetragen ist. **127 = alle annehmen.** Ein Befehl an 127 (Broadcast)
+  erreicht LightOS immer.
+- **GMA-MSC über Netzwerk** — nur für grandMA: Empfang per UDP. **IP** ist die
+  Netzwerkkarte, auf der gelauscht wird (z. B. die Art-Net-Karte, nicht
+  „0.0.0.0“), **Port** standardmäßig 6004. Mit **Übernehmen** wirksam; das Log
+  meldet, ob der Port belegt werden konnte.
+
+Die Einstellung gilt bis zum Neustart der App.
+
+**Was die Befehle tun:**
+
+| MSC-Befehl | Wirkung in LightOS |
+|---|---|
+| GO / TIMED_GO / RESUME | Cueliste → Executor (Nummer = Executor-Platz auf der aktuellen Seite, sonst Name des Executors oder der Cueliste; ohne Liste Executor 1). Mit Cue-Nummer (z. B. `1.5`) wird diese Cue angesprungen, ohne Nummer die nächste Cue. |
+| STOP / GO_OFF | Cueliste des Executors stoppen. |
+| SET | Regler *n* (ab 0) setzt den Fader von Executor *n+1* (Wert 0…16383). |
+| FIRE | Makro *n* startet die Funktion (Szene/Chaser) mit der ID *n*. |
+| ALL_OFF | Alle Cuelisten auf allen Seiten stoppen. |
+
+LOAD, RESTORE und RESET werden erkannt, lösen aber nichts aus. Im MIDI-Monitor
+erscheinen empfangene Befehle als `MSC  GO Cue=… Liste=…`.
+
+**Am Pult:**
+
+- **grandMA2/3:** Setup → MIDI Show Control: *MSC Out* auf die MIDI-Schnittstelle
+  bzw. „Ethernet“ (dann die IP des LightOS-Rechners und Port 6004), *Exec* als
+  Cueliste, Device-ID passend zu LightOS, Command Format „All“ oder „General
+  Light“.
+- **Hog 4:** MIDI → Show Control: Ausgang aktivieren, Device-ID setzen.
+- **ETC Eos:** Setup → Show Control → MIDI Show Control: *MSC Transmit* an,
+  Device-ID setzen; Eos sendet Cueliste und Cuenummer.
+- **Avolites Titan:** Systemeinstellungen → MIDI → MSC senden; Cuelisten werden
+  über ihre Nummer übertragen.
+
+Unter Windows (WinMM) stellt LightOS dafür eigene SysEx-Puffer bereit; ohne sie
+hätte Windows jede MSC-Nachricht verworfen.
