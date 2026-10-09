@@ -74,7 +74,6 @@
 | OUT-64 | B | fix/out64-estop-ausgabeweg | 2026-10-08T19:11Z | src/core/dmx/output_manager.py · tests/test_out64_estop_ausgabeweg.py · changelog.d/2026-10-08-OUT-64.md · BACKLOG.md |
 | UI-76 | B | fix/ui76-go-hinweis-page | 2026-10-08T19:17Z | src/core/cueliste_ziel.py · src/ui/views/playback_view.py · tests/test_ui76_go_hinweis.py · docs/anleitung_szenen_cues/ANLEITUNG.md · changelog.d/2026-10-08-UI-76.md · BACKLOG.md |
 | STAB-30 | A | feature/stab30-diagnose-log | 2026-10-08T19:39Z | main.py · src/core/crash_logging.py |
-| VIZ-94 | B | fix/viz94-buehne-windows-arm | 2026-10-08T19:49Z | src/ui/visualizer |
 | VIZ-95 | A | feature/viz95-lasermuster-3d | 2026-10-08T20:47Z | src/ui/visualizer |
 | LAS-30 | A | feature/viz95-lasermuster-3d | 2026-10-08T20:52Z | src/core |
 | VIZ-96 | A | feature/viz96-gobo-projektion | 2026-10-08T21:37Z | src/ui/visualizer |
@@ -176,7 +175,6 @@
 
 ## Verlauf
 
-- 2026-10-08T20:01Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T20:03Z B abgebrochen XPLAT-36
 - 2026-10-08T20:03Z B done VIZ-71
 - 2026-10-08T20:13Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
@@ -206,3 +204,4 @@
 - 2026-10-09T14:28Z D aktualisiert VIZ-97: Dateien src/ui/widgets/gobo_icons.py -> src/ui/widgets/gobo_icons.py · tests/test_viz97_gobo_schluesselwoerter.py · BACKLOG.md · changelog.d/2026-10-09-VIZ-97.md
 - 2026-10-09T14:36Z D claim BPM-30
 - 2026-10-09T14:37Z D claim XPLAT-48
+- 2026-10-09T14:40Z B done VIZ-94
