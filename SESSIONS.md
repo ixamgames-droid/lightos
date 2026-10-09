@@ -81,7 +81,7 @@
 | UI-84 | A | fix/ui84-efx-laden-geraeteliste | 2026-10-09T13:45Z | src/ui/views/efx_view.py |
 | VCB-41 | A | fix/vcb41-solo-zwilling | 2026-10-09T13:45Z | src/ui/virtualconsole |
 | TOOL-25 | A | fix/tool25-lint-snap-verweise | 2026-10-09T13:45Z | tools/lint_show.py |
-| VIZ-97 | D | fix/viz97-gobo-schluesselwoerter | 2026-10-09T13:45Z | src/ui/widgets/gobo_icons.py |
+| VIZ-97 | D | fix/viz97-gobo-schluesselwoerter | 2026-10-09T14:28Z | src/ui/widgets/gobo_icons.py · tests/test_viz97_gobo_schluesselwoerter.py · BACKLOG.md · changelog.d/2026-10-09-VIZ-97.md |
 | FM-72 | D | fix/fm72-download-dialog-show | 2026-10-09T14:22Z | main.py · src/ui/main_window.py · tests/test_fm72_bibliothek_frage_mit_show.py · tests/test_fm53_bibliothek_download.py · docs/FIXTURE_SOURCES.md · docs/anleitung_geraete_bibliothek/ANLEITUNG.md · BACKLOG.md · changelog.d/2026-10-09-FM-72.md |
 
 ## Blocker & Fallen
@@ -173,7 +173,6 @@
 
 ## Verlauf
 
-- 2026-10-08T19:49Z B aktualisiert VIZ-94: Branch fix/viz94-buehne-arm -> fix/viz94-buehne-windows-arm
 - 2026-10-08T19:49Z D claim QA-87
 - 2026-10-08T19:51Z A done XPLAT-47
 - 2026-10-08T20:01Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
@@ -203,3 +202,4 @@
 - 2026-10-09T13:45Z D claim FM-72
 - 2026-10-09T14:10Z B done QA-83
 - 2026-10-09T14:22Z D aktualisiert FM-72: Dateien - -> main.py · src/ui/main_window.py · tests/test_fm72_bibliothek_frage_mit_show.py · tests/test_fm53_bibliothek_download.py · docs/FIXTURE_SOURCES.md · docs/anleitung_geraete_bibliothek/ANLEITUNG.md · BACKLOG.md · changelog.d/2026-10-09-FM-72.md
+- 2026-10-09T14:28Z D aktualisiert VIZ-97: Dateien src/ui/widgets/gobo_icons.py -> src/ui/widgets/gobo_icons.py · tests/test_viz97_gobo_schluesselwoerter.py · BACKLOG.md · changelog.d/2026-10-09-VIZ-97.md
