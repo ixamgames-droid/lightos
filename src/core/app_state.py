@@ -245,7 +245,9 @@ _BLACKOUT_ERHALTEN_ATTRS = frozenset({
     "gobo1", "gobo2",
     "prism", "prism_rot", "prism_rotation",
     "focus", "zoom", "iris", "frost",
-    "color_wheel", "colour_wheel",
+    # OUT-62: ``color`` ist das unterstuetzte Alt-Attribut des Farbrads
+    # (attr_groups, all_white) — ohne es fuhr das Rad beim Blackout auf 0.
+    "color_wheel", "colour_wheel", "color",
 })
 
 # A3D-02: Nur diese Laser-Attribute sind "output-/emissions-relevant" und heben den
@@ -1761,6 +1763,23 @@ class AppState:
         # unten (_old_le vs. frozenset-Werte) unangetastet bleibt.
         old_laser_addrs = {u: set(s) for u, s
                            in (getattr(self, "_laser_estop_addrs", {}) or {}).items()}
+        # OUT-62 (Codex #833): die Blackout-ERHALTEN-Maske gehoert zum Plan. Der
+        # Sende-Thread liest sie getrennt vom Render-Plan — zwischen Plan-Tausch
+        # und neuer Maske rendert der neue Plan z. B. einen Dimmer an einer
+        # Adresse, die die ALTE Maske als Pan fuehrt, und dessen Wert ginge bei
+        # aktivem Blackout hinaus. Darum VOR dem Tausch nur die Schnittmenge
+        # alt∩neu erhalten — Adressen, die in BEIDEN Patches Nicht-Licht sind —
+        # und NACH dem Tausch die neue Maske (unten). Ein Universum, das nur die
+        # alte Maske kennt, faellt im Uebergang weg (= komplett 0).
+        new_keep_mask = {u: frozenset(s) for u, s
+                         in self._build_blackout_keep_mask(fix_index).items()}
+        old_keep_mask = getattr(self, "_blackout_keep_gesetzt", None) or {}
+        try:
+            self.output_manager.set_blackout_keep_mask(
+                {u: old_keep_mask.get(u, frozenset()) & s
+                 for u, s in new_keep_mask.items()})
+        except Exception as e:
+            print(f"[AppState] set blackout mask (Uebergang) error: {e}")
         # CDX-12 (Plan-Rebuild): Ist der Laser-NOT-AUS AKTIV und aendern sich die
         # Laser-Adressen (Fixture umadressiert/entfernt/dazu), die Ebene-2-OM-Maske
         # ZUERST auf die VEREINIGUNG aus alten und neuen Adressen erweitern — BEVOR
@@ -1785,6 +1804,10 @@ class AppState:
                             _union[_u] = _union.get(_u, frozenset()) | frozenset(_s)
                     self._push_laser_estop_mask(target_active=True, target_addrs=_union)
             with self._get_plan_lock():
+                # OUT-62 (Review): die zum Plan gehoerende Maske SOFORT merken —
+                # wirft unten etwas, bezoege sich der naechste Uebergang sonst
+                # auf die Maske des vorigen Plans.
+                self._blackout_keep_gesetzt = new_keep_mask
                 self._fix_index = fix_index
                 self._default_frame = new_default_frame
                 self._commit_spans = spans
@@ -1817,9 +1840,9 @@ class AppState:
         # OUT-57: Blackout-ERHALTEN-Maske — nur Position/Gobo/Prisma/Optik gepatchter
         # Lampen mit echtem Dimmer bleiben beim Blackout stehen, alles andere geht
         # auf 0 (auch ungepatchte Roh-Adressen im selben Universum).
+        # OUT-62: nach dem Plan-Tausch die volle neue Maske (Uebergang s. oben).
         try:
-            self.output_manager.set_blackout_keep_mask(
-                {u: frozenset(s) for u, s in self._build_blackout_keep_mask(fix_index).items()})
+            self.output_manager.set_blackout_keep_mask(new_keep_mask)
         except Exception as e:
             print(f"[AppState] set blackout mask error: {e}")
         # OUT-61b: alle Laser-Adressen (unabhaengig vom NOT-AUS-Latch) — die

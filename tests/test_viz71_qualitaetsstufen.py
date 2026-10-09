@@ -102,7 +102,11 @@ class TabelleTest(unittest.TestCase):
         probe = quelle.split("function probeGpuTier()", 1)[1].split("\nexport const gpuTier", 1)[0]
         self.assertIn("forced === 'max'", probe, "max muss per ?gputier waehlbar sein")
         self.assertNotIn("? 'max'", probe)
-        self.assertRegex(probe, r"return \(maxTex <= 16 \|\| weakChip\) \? 'low' : 'high';")
+        # VIZ-84: die Entscheidung steht in gpu_tier.js — auch dort nie 'max'.
+        self.assertIn("decideTier(", probe)
+        code = "\n".join(z for z in _js("scene", "gpu_tier.js").splitlines()
+                         if not z.lstrip().startswith("//"))
+        self.assertNotIn("'max'", code)
 
 
 class AnleitungTest(unittest.TestCase):
