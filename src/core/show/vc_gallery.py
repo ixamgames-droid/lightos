@@ -6,16 +6,16 @@ bei Bedarf in den Asset-Cache (``vc_assets``), sodass sie wie eine user-Datei
 portabel in die ``.lshow`` eingebettet wird (Content-Hash-Key).
 
 Die Grafiken werden von ``tools/gen_vc_gallery.py`` erzeugt und mit-committed.
-Pfad ``__file__``-relativ (dev + Source-Install; ein frozen Build braeuchte einen
-Resource-Helper — bewusst nicht abgedeckt, es gibt keinen PyInstaller-Build)."""
+Pfad ueber ``paths.programm_datei`` (XPLAT-47): Repo im Quellbetrieb,
+``sys._MEIPASS`` im gefrorenen Windows-Build."""
 from __future__ import annotations
 import json
 import os
 
+from src.core.paths import programm_datei
 from . import vc_assets
 
-_GALLERY_DIR = os.path.normpath(os.path.join(
-    os.path.dirname(__file__), "..", "..", "..", "assets", "vc_gallery"))
+_GALLERY_DIR = os.path.normpath(programm_datei("assets", "vc_gallery"))
 
 
 def gallery_dir() -> str:
