@@ -55,7 +55,11 @@ def bind_to_output_iface(sock) -> bool:
     try:
         sock.bind((ip, 0))
         return True
-    except OSError:
+    except OSError as e:
+        # STAB-30: gewaehlte NIC weg (DHCP, Kabel) -> Art-Net/sACN gehen still
+        # ueber die Standardroute; das Rig bleibt dunkel, ohne jede Meldung.
+        from src.core.diagnose_log import melde_still
+        melde_still("dmx.netz.binden", e, text=f"Ausgangs-NIC {ip}")
         return False
 
 
@@ -69,7 +73,9 @@ def set_multicast_iface(sock) -> bool:
         sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF,
                         socket.inet_aton(ip))
         return True
-    except (OSError, AttributeError):
+    except (OSError, AttributeError) as e:
+        from src.core.diagnose_log import melde_still   # STAB-30
+        melde_still("dmx.netz.multicast", e, text=f"Ausgangs-NIC {ip}")
         return False
 
 
