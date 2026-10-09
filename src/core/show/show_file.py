@@ -1746,6 +1746,66 @@ def _resolve_stage_definition(stage_name: str):
         return None
 
 
+def _buehne_aus_szenengraph(stage_name: str, scene_graph_data):
+    """VIZ-94: die Buehnen-Elemente einer Show aus ihrem ``scene_graph``-Block.
+
+    Stage-Knoten sind alle Nicht-Fixture-Knoten MIT Geometrie (``size_m``);
+    Geister-Platzhalter (Dock auf eine unbekannte ID, s.
+    ``_prune_ghost_placeholder_nodes``) haben keine und bleiben draussen.
+    Abbildung wie ``SceneGraph.from_legacy``, nur umgekehrt (Y-Drehung in Grad
+    <-> ``StageElement.rotation`` in Radiant). None, wenn nichts da ist."""
+    import math
+    from src.core.stage.stage_definition import StageDefinition, StageElement
+    knoten = (scene_graph_data or {}).get("nodes") if isinstance(scene_graph_data, dict) else None
+    if isinstance(knoten, dict):
+        knoten = list(knoten.values())
+    elemente = []
+    for n in knoten or []:
+        if not isinstance(n, dict) or n.get("kind") in (None, "fixture"):
+            continue
+        size = n.get("size_m")
+        if not size or len(size) != 3:
+            continue
+        tr = n.get("transform") or {}
+        pos = tr.get("pos_m") or (0.0, 0.0, 0.0)
+        rot = tr.get("rot_deg") or (0.0, 0.0, 0.0)
+        try:
+            elemente.append(StageElement(
+                id=str(n.get("id") or ""), type=str(n["kind"]),
+                x=float(pos[0]), y=float(pos[1]), z=float(pos[2]),
+                w=float(size[0]), h=float(size[1]), d=float(size[2]),
+                rotation=math.radians(float(rot[1])),
+                color=n.get("color") or "#2a2a3a", name=n.get("name") or ""))
+        except Exception as e:
+            print(f"[show_file] Buehnen-Knoten {n.get('id')!r} uebersprungen: {e}")
+    return StageDefinition(name=stage_name, elements=elemente) if elemente else None
+
+
+def _buehne_aus_show_bereitstellen(stage_name: str, scene_graph_data) -> bool:
+    """VIZ-94: fehlt die Buehnen-Datei der Show im App-Ordner, aus dem
+    Szenengraph der Show anlegen.
+
+    Der Visualizer holt die Buehne NUR per Namen aus ``stages_dir()``
+    (``resolve_active_stage``). Die Datei entsteht auf dem Rechner, der die
+    Show gebaut hat (TOOL-13) — eine Show von dort zeigte hier alle Fixtures,
+    aber keine Traversen. Die ``.lshow`` traegt die Elemente vollstaendig im
+    ``scene_graph``. Eine vorhandene Datei gewinnt (Nutzer-Bearbeitung), fuer
+    Preset-Namen entsteht keine. True, wenn eine Datei angelegt wurde."""
+    try:
+        from src.core.stage.stage_definition import DEFAULT_PRESETS, load_stage, save_stage
+        if not stage_name or stage_name in DEFAULT_PRESETS:
+            return False
+        if load_stage(stage_name) is not None:
+            return False
+        stage = _buehne_aus_szenengraph(stage_name, scene_graph_data)
+        if stage is None:
+            return False
+        return save_stage(stage) is not None
+    except Exception as e:
+        print(f"[show_file] Buehne aus Show bereitstellen error: {e}")
+        return False
+
+
 def _resolve_stage_element_ids(stage_name: str) -> set[str] | None:
     """Element-IDs der aktiven Buehne (Preset-Key oder User-Stage), oder None
     wenn die Buehne nicht aufloesbar ist (dann keine Dock-Bereinigung)."""
@@ -2220,6 +2280,10 @@ def _load_show_impl(path: str | os.PathLike):
                 _melde_still("show.viz_rotation", _e, text=f"Geraet {fid_raw}")
                 continue
         active_stage_name = str(viz.get("active_stage", "simple") or "simple")
+        # VIZ-94: fehlt die Buehnen-Datei hier (Show von einem anderen Rechner),
+        # aus dem Szenengraph der Show anlegen — VOR der Dock-Pruefung unten,
+        # die die Element-IDs der Buehne braucht.
+        _buehne_aus_show_bereitstellen(active_stage_name, data.get("scene_graph"))
         # Andock-Beziehungen {fid: stage_element_id}. Stale-Eintraege (Element der
         # aktiven Buehne existiert nicht mehr) verwerfen, falls die Buehne aufloesbar.
         for fid_raw, sid in (viz.get("docks", {}) or {}).items():
