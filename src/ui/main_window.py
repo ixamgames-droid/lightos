@@ -2966,7 +2966,8 @@ class MainWindow(QMainWindow):
     def _has_unsaved_changes(self) -> bool:
         """Gibt es Arbeit, die beim Beenden/Wechseln verloren ginge?
 
-        * Nie gespeicherte Show: sobald es Inhalt gibt (Heuristik wie bisher).
+        * Nie gespeicherte Show: sobald es Show-Inhalt gibt (UI-75,
+          ``_neue_show_hat_inhalt``).
         * Aus Datei geladene/gespeicherte Show (UI-69): wenn sich der Inhalt
           seit dem letzten Laden/Speichern geaendert hat. Frueher stand hier
           fest ``False`` — Aenderungen landeten nur im Auto-Save, Beenden schloss
@@ -2980,12 +2981,7 @@ class MainWindow(QMainWindow):
                 return True
             # Nie gespeichert + es gibt Inhalt?
             if self._current_show_path is None:
-                has_content = (
-                    len(self._state.cue_stacks) > 0
-                    or len(self._state.function_manager.all()) > 0
-                    or bool(self._state.programmer)
-                )
-                return has_content
+                return self._neue_show_hat_inhalt()
             from src.core.show.show_file import show_hat_aenderungen
             views: dict = {}
             self._views_in_state(nur_vergleich=views)
@@ -2993,6 +2989,28 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"[main_window] unsaved check error: {e}")
             return False
+
+    def _neue_show_hat_inhalt(self) -> bool:
+        """UI-75: Hat eine nie gespeicherte Show Inhalt, der beim Beenden
+        verloren ginge?
+
+        Frueher zaehlten nur Cuelisten, Funktionen und Programmer-Werte: eine
+        Show mit nur Patch oder nur VC-Layout schloss ohne Rueckfrage, eine mit
+        nur Programmer-Werten fragte. Die Anleitung (Erste Schritte) verspricht
+        das Umgekehrte — es zaehlt Show-Inhalt (Patch, Gruppen, Cuelisten,
+        Funktionen, VC-Layout), nicht die Bedienung. Programmer-Werte sind
+        Bedienung, wie bei einer geladenen Show (``show_hat_aenderungen``)."""
+        st = self._state
+        if (st.get_patched_fixtures() or len(st.cue_stacks) > 0
+                or len(st.function_manager.all()) > 0):
+            return True
+        try:
+            if (self._vc_view.to_dict() or {}).get("widgets"):
+                return True
+        except Exception as e:
+            print(f"[main_window] vc content check error: {e}")
+        from src.core.show.show_file import _collect_fixture_groups
+        return bool(_collect_fixture_groups(st, []))
 
     def _rueckfrage_ungespeichert(self, titel: str, frage: str) -> bool:
         """UI-69: Speichern / Verwerfen / Abbrechen. True = weitermachen
