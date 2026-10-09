@@ -2459,8 +2459,17 @@ def load_show(path: str | os.PathLike):
     Danach rendert der naechste Frame die neue Show.
     """
     from src.core.app_state import get_state
-    sperre = getattr(getattr(get_state(), "output_manager", None), "lade_sperre", None)
-    if sperre is None:
-        return _load_show_impl(path)
-    with sperre():
-        return _load_show_impl(path)
+    state = get_state()
+    # UI-84: „Laden darf Funktionsdaten nie veraendern" — der Lade-Kontext
+    # umschliesst den GANZEN Ladevorgang inkl. Benachrichtigungsblock
+    # (patch_changed … refresh_all). Views, die der Programmer-Auswahl folgen,
+    # weisen waehrenddessen (und im Nachlauf der Ereignisschleife) nichts zu.
+    lade_kontext = getattr(state, "show_wird_geladen", None)
+    if lade_kontext is None:                      # Test-Attrappen ohne Kontext
+        lade_kontext = contextlib.nullcontext
+    sperre = getattr(getattr(state, "output_manager", None), "lade_sperre", None)
+    with lade_kontext():
+        if sperre is None:
+            return _load_show_impl(path)
+        with sperre():
+            return _load_show_impl(path)

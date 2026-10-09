@@ -54,6 +54,17 @@ def _nur_weiss_auswahl() -> bool:
         return False
 
 
+def _show_laedt() -> bool:
+    """UI-84: wird gerade eine Show geladen (``AppState.show_wird_geladen``)?
+    Dann folgt der Editor der Auswahl NICHT mit Zuweisung — das Laden setzt
+    die Auswahl nur als Nebenwirkung neu."""
+    try:
+        from src.core.app_state import get_state
+        return bool(get_state().laedt_show())
+    except Exception:
+        return False
+
+
 # Geraete-Verhaeltnis: (engine-key, deutsches Label) — Reihenfolge = Combo-Reihenfolge.
 PHASE_MODE_LABELS = [
     ("sync",   "Synchron (alle Köpfe gleich)"),
@@ -1606,7 +1617,8 @@ class EfxView(QWidget):
         # der Auto-Zuweisung mit ALLEN Movern gefuellt. Die gewollte Folge-
         # Zuweisung bei Auswahl-/Gruppenwechsel macht _sync_follow_selection
         # (dort ebenfalls nur bei sichtbarem Editor).
-        if self._follow and self._programm_waehlt == 0 and self._editor_sichtbar():
+        if (self._follow and self._programm_waehlt == 0
+                and self._editor_sichtbar() and not _show_laedt()):
             self._assign_from_selection()
         self._update_save_state()
 
@@ -1673,7 +1685,12 @@ class EfxView(QWidget):
             if self._current is None:
                 self._update_group_header()
                 return
-            self._assign_from_selection()
+            # UI-84: Waehrend eine Show geladen wird, setzt das Laden die
+            # Auswahl als Nebenwirkung neu (Live View bei patch_changed ->
+            # SELECTION_CHANGED). Das ist kein Benutzer-Auswahlwechsel: nur die
+            # Anzeige neu aufbauen, die geladene Geraeteliste nicht anfassen.
+            if not _show_laedt():
+                self._assign_from_selection()
             self._update_group_header()
         except RuntimeError:
             pass  # Widget beim Layout-Wechsel geloescht

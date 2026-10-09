@@ -133,6 +133,49 @@ class EfxLadenBehaeltGeraetelisteTest(unittest.TestCase):
         finally:
             win.close()
 
+    def test_laden_bei_offenem_efx_tab_im_programmer(self):
+        """UI-84 Review: Programmer offen, EFX-Tab aktiv (Folge-Editor
+        SICHTBAR). Beim Laden setzt die Live View ueber patch_changed die
+        Auswahl neu (SELECTION_CHANGED) — der Folge-Editor durfte das nicht als
+        Benutzer-Auswahlwechsel nehmen ('Kreis' [31, 32] -> [])."""
+        app = _app()
+        from src.ui import main_window as mw
+        pfad = self._baue_show()
+        vorher = self._efx_in_datei(pfad)
+        state = get_state()
+        win = mw.MainWindow()
+        win.show()
+        try:
+            state.set_selected_fids([31, 32, 33, 34, 40])
+            prog_idx = win._stack.indexOf(
+                win._programmer_view.parentWidget().parentWidget())
+            self.assertGreaterEqual(prog_idx, 0)
+            win._switch_section(prog_idx)
+            pv = win._programmer_view
+            pv._main_tabs.setCurrentIndex(pv._efx_tab_index)
+            for _ in range(3):
+                app.processEvents()
+            efx = pv._embedded_efx
+            self.assertTrue(efx.isVisible(), "EFX-Editor im Test nicht sichtbar")
+            warnungen = []
+            with mock.patch.object(mw.QMessageBox, "warning",
+                                   lambda *a, **k: warnungen.append(a[1:])):
+                win._open_show_path(pfad)
+            self.assertEqual([], warnungen, "Show nicht sauber geladen")
+            # Auch was direkt nach dem Laden in derselben Ereignisschleife
+            # auflaeuft (singleShot(0) & Co.), darf nichts zuweisen.
+            for _ in range(5):
+                app.processEvents()
+            fm = state.function_manager
+            nach = {f.name: _efx_fids(f) for f in fm.all()
+                    if f.name in ("Kreis", "Acht")}
+            self.assertEqual(vorher, nach,
+                             "Laden bei offenem EFX-Tab hat EFX veraendert")
+            self.assertTrue(win._do_save(pfad))
+            self.assertEqual(vorher, self._efx_in_datei(pfad))
+        finally:
+            win.close()
+
 
 
 class _Ch:
@@ -218,6 +261,94 @@ class SichtbarerFolgeEditorTest(unittest.TestCase):
         self.assertIs(neu[0], self.v._current)
         self.assertEqual([2, 3], _efx_fids(neu[0]))
         self.assertEqual([1, 2], _efx_fids(self.a))
+
+    def test_auswahlwechsel_beim_laden_weist_nicht_zu_danach_wieder(self):
+        """UI-84 Review: SELECTION_CHANGED waehrend des Lade-Kontexts (und im
+        Nachlauf derselben Ereignisschleife) laesst die EFX stehen; ein
+        echter Auswahlwechsel danach folgt bei sichtbarem Editor weiter."""
+        from src.core.sync import get_sync, SyncEvent
+        st = get_state()
+        self._sel = [3]
+        with st.show_wird_geladen():
+            self.assertTrue(st.laedt_show())
+            get_sync().emit(SyncEvent.SELECTION_CHANGED, None)
+            self.v._sync_follow_selection()
+        # Nachlauf: direkt nach dem Laden Aufgelaufenes zaehlt noch dazu.
+        self.assertTrue(st.laedt_show())
+        get_sync().emit(SyncEvent.SELECTION_CHANGED, None)
+        self.assertEqual([1, 2], _efx_fids(self.a))
+        for _ in range(3):
+            _app().processEvents()
+        self.assertFalse(st.laedt_show(), "Nachlauf endet nicht")
+        self.assertIs(self.a, self.v._current)
+        get_sync().emit(SyncEvent.SELECTION_CHANGED, None)   # Benutzer waehlt
+        self.assertEqual([3], _efx_fids(self.a))
+
+
+class LadeKontextTest(unittest.TestCase):
+    """AppState.show_wird_geladen / laedt_show (UI-84)."""
+
+    def test_verschachtelt_und_frist_ohne_ereignisschleife(self):
+        st = get_state()
+        self.assertFalse(st.laedt_show())
+        with st.show_wird_geladen():
+            with st.show_wird_geladen():
+                pass
+            self.assertTrue(st.laedt_show(), "inneres Ende beendet aeusseres")
+        self.assertTrue(st.laedt_show())
+        # Laeuft keine Ereignisschleife, endet der Nachlauf spaetestens per Frist.
+        st._show_lade_nachlauf_bis = 1e-9
+        self.assertFalse(st.laedt_show())
+
+    def test_load_show_setzt_kontext(self):
+        st = get_state()
+        gesehen = []
+        with mock.patch.object(SF, "_load_show_impl",
+                               lambda p: gesehen.append(st.laedt_show()) or (True, "")):
+            SF.load_show("egal.lshow")
+        self.assertEqual([True], gesehen)
+        for _ in range(3):
+            _app().processEvents()
+        self.assertFalse(st.laedt_show())
+
+
+class MatrixFolgeEditorLadenTest(unittest.TestCase):
+    """rgb_matrix_view._assign_from_selection schreibt das Grid live in die
+    gespeicherte Matrix — beim Laden darf das nicht passieren."""
+
+    def setUp(self):
+        _app()
+        from src.core.engine.function_manager import get_function_manager
+        from src.ui.views.rgb_matrix_view import RgbMatrixView
+        self._sel = []
+        st = get_state()
+        for name, wert in (("get_selected_group_id", lambda: None),
+                           ("get_selected_fids", lambda: list(self._sel))):
+            p = mock.patch.object(st, name, wert)
+            p.start()
+            self.addCleanup(p.stop)
+        self.fm = get_function_manager()
+        self.view = RgbMatrixView(follow_selection=True)
+        self.m = self.fm.new_rgb_matrix(name="UI84-Matrix")
+        self.addCleanup(lambda: self.fm.remove(self.m.id))
+        self.view.show()
+        self.m.cols, self.m.rows = 3, 1
+        self.m.fixture_grid = [10, 20, 30]
+        self.view._saved = self.m
+        self.view._current = self.m
+
+    def test_laden_laesst_grid_stehen_danach_folgt_es(self):
+        st = get_state()
+        self._sel = [7, 8]
+        with st.show_wird_geladen():
+            self.view._sync_follow_selection()
+        self.assertEqual([10, 20, 30], self.m.fixture_grid)
+        for _ in range(3):
+            _app().processEvents()
+        self.view._saved = self.m
+        self.view._current = self.m
+        self.view._sync_follow_selection()        # echter Auswahlwechsel
+        self.assertEqual([7, 8], self.m.fixture_grid)
 
 
 if __name__ == "__main__":
