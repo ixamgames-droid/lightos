@@ -68,7 +68,7 @@
 | LAS-26 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:11Z | src/ui |
 | XPLAT-46 | B | fix/xplat46-arm-x64-empfehlung | 2026-10-08T18:32Z | install.py · INSTALL.md · CONTRIBUTING.md · src/ui/main_window.py · src/utils/plattform_hinweis.py · tests/test_xplat46_arm_empfehlung.py · changelog.d/2026-10-08-XPLAT-46.md |
 | DOC-66 | A | docs/doc66-github-seite-audit | 2026-10-08T18:37Z | README.md · docs/ANLEITUNGEN.md |
-| BPM-28 | D | fix/bpm28-beat-takt | 2026-10-08T20:36Z | src/core/engine/bpm_manager.py · tests/test_bpm28_beat_takt.py · BACKLOG.md · changelog.d/2026-10-08-BPM-28.md |
+| BPM-28 | D | fix/bpm28-beat-takt | 2026-10-09T13:46Z | src/core/engine/bpm_manager.py · tests/test_bpm28_beat_takt.py · BACKLOG.md · changelog.d/2026-10-08-BPM-28.md |
 | UI-75 | B | fix/ui75-neue-show-patch-vc | 2026-10-08T19:04Z | src/ui/main_window.py · tests/test_ui75_neue_show_fragt.py · docs/anleitung_erste_schritte/ANLEITUNG.md · docs/anleitung_erste_schritte/ANLEITUNG.en.md · changelog.d/2026-10-08-UI-75.md · BACKLOG.md |
 | OUT-62 | B | fix/out62-blackout-maske-atomar | 2026-10-08T19:08Z | src/core/app_state.py · docs/components/engine/script.md · tests/test_out62_blackout_maske_atomar.py · changelog.d/2026-10-08-OUT-62.md · BACKLOG.md |
 | OUT-64 | B | fix/out64-estop-ausgabeweg | 2026-10-08T19:11Z | src/core/dmx/output_manager.py · tests/test_out64_estop_ausgabeweg.py · changelog.d/2026-10-08-OUT-64.md · BACKLOG.md |
