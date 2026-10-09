@@ -123,6 +123,34 @@ class TapUhrTest(unittest.TestCase):
             bus.tap()
             self.assertEqual(bus.tap(), vorher)
 
+    def test_verworfener_tap_bleibt_nicht_in_der_historie(self):
+        """Codex-Review #955: der doppelte Zeitstempel darf auch die FOLGENDEN Taps
+        nicht verfaelschen. Taps bei 10,0 / 10,0 / 10,5 / 10,5 / 11,0 s sind zwei
+        echte Abstaende von 0,5 s -> 120 BPM; mit dem Duplikat in der Historie
+        waren es 240 BPM (Mittel aus 0 / 0,5 / 0 / 0,5)."""
+        def tappen(tap):
+            ergebnis = None
+            for t in (10.0, 10.0, 10.5, 10.5, 11.0):
+                uhr.t = t
+                ergebnis = tap()
+            return ergebnis
+
+        uhr = _Uhr()
+        with mock.patch.object(tap_uhr, "jetzt", uhr):
+            bus = TempoBus("QA87")
+            self.assertAlmostEqual(tappen(bus.tap), 120.0, places=6)
+
+            mgr = _bpm_manager_ohne_timer()
+            self.assertAlmostEqual(tappen(mgr.tap), 120.0, places=6)
+
+            tbm = get_tempo_bus_manager()
+            self.assertAlmostEqual(tappen(tbm.tap_grandmaster), 120.0, places=6)
+
+            w = VCSpeedDial("Speed")
+            w.target_mode = SpeedTarget.FUNCTION
+            tappen(w._tap)
+            self.assertAlmostEqual(w.bpm, 120.0, places=6)
+
     # ── Mathematik an allen vier Stellen mit fester Uhr ──────────────────────
     def test_tap_mathematik_an_allen_vier_stellen(self):
         def tappen(tap, n=5):

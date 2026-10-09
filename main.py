@@ -27,6 +27,14 @@ from src.core.paths import app_data_dir as _app_data_dir
 # QA-CRASHLOG-TESTS: bewusst NICHT `_crash_log_path` benannt — so heisst
 # unten die Modul-Globale mit dem aufgeloesten Pfad.
 from src.core.paths import crash_log_path as _resolve_crash_log_path
+# STAB-30: Sitzungs-Log fuer Fernhilfe. stdout/stderr gehen ab hier ZUSAETZLICH
+# (Tee, mit Zeitstempel) in <App-Daten>/logs/lightos.log — zunaechst nur in einen
+# Puffer; die Datei oeffnet main() erst nach der Einzelinstanz-Sperre. Nur beim
+# echten Programmstart (nicht beim Import aus Tests) und nicht fuer --help/
+# --selbsttest/--diagnose. Ersetzt unter pythonw auch die fehlenden Streams.
+from src.core import diagnose_log as _dl
+if __name__ == "__main__" and _dl.soll_mitschreiben(sys.argv[1:]):
+    _dl.install_tee()
 
 APP_VERSION = "1.0.0"
 
@@ -766,12 +774,21 @@ def main():
                         help="Prueft Importe (inkl. QtWebEngine) und mitgelieferte "
                              "Dateien ohne Fenster und beendet sich (0 = ok). "
                              "Mit DATEI wird der Bericht dorthin geschrieben.")
+    parser.add_argument("--diagnose", nargs="?", const="", metavar="ZIEL.zip",
+                        help="Diagnosepaket (Logs, crash.log, Systeminfo, "
+                             "Einstellungen ohne private Inhalte) schreiben und "
+                             "beenden — ohne Fenster. Ohne ZIEL auf den Desktop.")
     args = parser.parse_args()
     if args.selbsttest:
         # XPLAT-47: Rauchtest fuer den gepackten Build — VOR Einzelinstanz-
         # Sperre, Crash-Logging und Datenuebernahme: keine Nebenwirkungen.
         from src.core.selbsttest import main as _selbsttest
         sys.exit(_selbsttest(None if args.selbsttest == "-" else args.selbsttest))
+    if args.diagnose is not None:
+        # STAB-30: wie --selbsttest VOR Sperre/Crash-Logging/Datenuebernahme —
+        # liest nur, startet nichts (auch neben einer laufenden Instanz nutzbar).
+        sys.exit(_dl.cli_diagnose(args.diagnose or None, APP_VERSION,
+                                  os.path.dirname(os.path.abspath(__file__))))
     # Fruehe, ehrliche Absage: ein Tippfehler im Pfad soll NICHT erst nach dem
     # kompletten Hochfahren als stiller Fehlschlag auffallen — dann steht die
     # alte Show da und man sucht den Fehler in der Show statt im Aufruf.
@@ -789,6 +806,12 @@ def main():
     if instance_lock is None:
         _report_already_running()
         return
+
+    # STAB-30: Sitzungs-Log oeffnen (rotiert die vorige Sitzung nach .1) und den
+    # Kopfblock schreiben — erst NACH der Sperre, sonst rotierte ein abgewiesener
+    # Zweitstart der laufenden Instanz das Log weg.
+    _dl.oeffne_sitzungslog(APP_VERSION, os.path.dirname(os.path.abspath(__file__)))
+    _dl.richte_python_logging_ein()
 
     _setup_crash_logging()
 
@@ -865,6 +888,14 @@ def main():
         window.showFullScreen()
     else:
         window.show()
+
+    # STAB-30: Bildschirme/DMX/MIDI/Show ins Sitzungs-Log nachtragen, sobald
+    # Ausgaenge und Hotplug-Scan einmal gelaufen sind.
+    try:
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(4000, _dl.melde_laufzeit_umgebung)
+    except Exception as _e:
+        print(f"[main] Diagnose-Nachtrag nicht geplant: {_e}")
 
     if args.show:
         _open_show_at_startup(window, args.show)

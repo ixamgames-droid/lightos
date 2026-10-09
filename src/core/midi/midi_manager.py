@@ -824,13 +824,20 @@ class MidiManager:
                 for cb in list(self._callbacks):
                     try:
                         cb(msg)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        # STAB-30: kaputte MIDI-Aktion sichtbar (je Art einmal).
+                        from src.core.diagnose_log import melde_still
+                        melde_still("midi.aktion", e, text=getattr(cb, "__qualname__", ""))
                 # Kein Per-Nachricht-Log hier: die MIDI-View zeigt eingehende Nachrichten
                 # thread-sicher und gedrosselt im Monitor an. Ein zusätzliches Log pro
                 # Event würde die Anzeige duplizieren und die Qt-Event-Loop fluten.
 
     def _log(self, text: str):
+        # STAB-30: Fehlermeldungen gingen NUR an die MIDI-Ansicht (Abonnent) —
+        # ohne geoeffnete Ansicht verschwanden sie. Gedrosselt ins Log.
+        if "fehler" in text.lower() or "error" in text.lower():
+            from src.core.diagnose_log import melde_still
+            melde_still("midi", text=text)
         for cb in list(self._log_callbacks):
             try:
                 cb(text)
