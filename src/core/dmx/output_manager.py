@@ -1061,6 +1061,23 @@ class OutputManager:
             time.sleep(sleep)
 
     def _send_all(self):
+        """Ein Ausgabe-Frame. Reihenfolge je Universum (verbindlich):
+
+        1. Channel-Modifier (INVERSE, Range-Lock, Kanaltausch);
+        2. globaler Blackout (alles ausser Erhalten-Maske auf 0) ODER
+           Grand Master (Intensitaets-/Farbadressen skalieren);
+        3. Ziel-Blackouts (VCB-11, Licht-Kanaele der Ziel-Geraete auf 0);
+        4. Laser-Aus-Werte (LAS-24/LAS-25) bei Blackout, GM < Schwelle oder
+           fuer die Adressen eines Ziel-Blackouts — der Aus-Wert ist nicht
+           immer 0, deshalb NACH den nullenden Paessen;
+        5. Laser-NOT-AUS (A3D-01) als allerletzte Ebene, gewinnt immer:
+           verriegelte Adressen auf ihren bekannten Aus-Wert, sonst 0.
+
+        Blackout und Grand Master werden EINMAL je Frame gelesen (B2), alle
+        Paesse sehen denselben Stand.
+
+        Im Lade-Fenster (OUT-60/61) stammen alle Masken aus EINEM gelesenen
+        ``_lade``-Tupel."""
         # Drive all registered tick callbacks first (function_manager, etc.).
         # Ueber eine Kopie iterieren: add_/remove_tick_callback laufen im UI-Thread
         # und koennen die Liste waehrenddessen mutieren (list changed size).
@@ -1107,6 +1124,13 @@ class OutputManager:
             estop_start = None
             laser_start = None
             ziel = getattr(self, "_ziel_blackout_union", None)
+        # B2 (Review LAS-25): Blackout und Grand Master EINMAL je Frame lesen.
+        # Der UI-Thread darf beide jederzeit setzen; liest jeder Pass selbst,
+        # sehen Blackout-, GM-, Laser-Aus- und Ziel-Pass womoeglich
+        # verschiedene Staende (z. B. Blackout an im ersten, aus im
+        # Laser-Aus-Pass -> Betriebsart 0 statt Aus-Wert).
+        blackout = bool(self._blackout)
+        gm = self.grand_master
         for univ_num, universe in list(self.universes.items()):
             # Im Freeze den festgehaltenen Stand senden statt des (u. U. direkt
             # beschriebenen) Live-Universums. Ein Universum, das es beim
@@ -1126,7 +1150,7 @@ class OutputManager:
                 self._buche_fehler("Modifier", univ_num, exc)
             else:
                 self._buche_erfolg("Modifier", univ_num)
-            if self._blackout:
+            if blackout:
                 # OUT-57: Blackout nullt ALLES ausser der Erhalten-Maske (Pan/Tilt/
                 # Gobo/Prisma/Optik gepatchter Lampen mit echtem Dimmer) — sonst
                 # fuhren Moving Heads bei jedem Blackout in die Grundstellung und
@@ -1141,8 +1165,7 @@ class OutputManager:
                         if 1 <= addr <= len(data) and addr <= 512:
                             buf[addr - 1] = data[addr - 1]
                 data = bytes(buf)
-            elif self.grand_master < 0.999:
-                gm = self.grand_master
+            elif gm < 0.999:
                 mask = gm_masken.get(univ_num)
                 if mask is None:
                     # Ungepatchtes/rohes Universum: kein Adresswissen -> global
@@ -1157,30 +1180,46 @@ class OutputManager:
                         if 1 <= addr <= 512:
                             buf[addr - 1] = min(255, int(buf[addr - 1] * gm + 0.5))
                     data = bytes(buf)
-                # LAS-24: Laser ohne Dimmer/Farbe kennt keine Zwischenstufe —
-                # bei GM ~0 Betriebsart/Shutter auf „aus“. Laeuft NACH dem
-                # Channel-Modifier (ein INVERSE darf den Laser nicht oeffnen).
-                aus = laser_aus_masken.get(univ_num)
-                if aus and gm < self.GM_LASER_AUS_SCHWELLE:
-                    buf = bytearray(data)
-                    n = len(buf)
-                    for addr, wert in aus.items():
-                        if 1 <= addr <= n:
-                            buf[addr - 1] = wert
-                    data = bytes(buf)
             # VCB-11: gezielte Blackouts (VC-Tasten mit Ziel) NACH dem Grand-Master
             # — nur die Licht-Kanaele ihrer Ziel-Geraete auf 0, der Rest laeuft
             # weiter. Beim globalen Blackout ist ohnehin alles ausser der
             # Erhalten-Maske 0; die Ziel-Masken enthalten nie Erhalten-Adressen.
             # getattr: Tests bauen den Manager teils per __new__ ohne __init__.
             ziel_mask = ziel.get(univ_num) if ziel else None
-            if ziel_mask and not self._blackout:
+            if ziel_mask and not blackout:
                 buf = bytearray(data)
                 n = len(buf)
                 for addr in ziel_mask:
                     if addr <= n:
                         buf[addr - 1] = 0
                 data = bytes(buf)
+            # LAS-24/LAS-25: Laser-Aus-Werte NACH Blackout und Ziel-Blackout,
+            # VOR dem NOT-AUS. Ein Laser ohne Dimmer/Farbe kennt keine
+            # Zwischenstufe — Betriebsart/Shutter muessen auf ihren „aus“-Wert,
+            # und der ist nicht immer 0 (``range_from`` eines „Laser off“-
+            # Bereichs). Bedeutet DMX 0 an diesem Kanal „an/Auto“, wuerde ein
+            # Blackout, der hier nur nullt, den Laser EINschalten. Deshalb:
+            #   * globaler Blackout oder GM < Schwelle -> alle Aus-Werte;
+            #   * Ziel-Blackout -> nur die Aus-Adressen, die der Ziel-Pass
+            #     gerade genullt hat (also die Geraete dieses Ziels).
+            # Laeuft NACH dem Channel-Modifier (ein INVERSE darf den Laser nicht
+            # oeffnen); der NOT-AUS danach zwingt verriegelte Adressen trotzdem
+            # auf Aus-Wert bzw. 0 — der gewinnt immer.
+            aus = laser_aus_masken.get(univ_num)
+            if aus:
+                if blackout or gm < self.GM_LASER_AUS_SCHWELLE:
+                    ziel_aus = aus
+                elif ziel_mask:
+                    ziel_aus = {a: w for a, w in aus.items() if a in ziel_mask}
+                else:
+                    ziel_aus = None
+                if ziel_aus:
+                    buf = bytearray(data)
+                    n = len(buf)
+                    for addr, wert in ziel_aus.items():
+                        if 1 <= addr <= n:
+                            buf[addr - 1] = wert
+                    data = bytes(buf)
             # A3D-01: Laser-NOT-AUS als ALLERLETZTE Ebene — nach Channel-Modifier,
             # Grand-Master UND Blackout die verriegelten Laser-Adressen hart auf 0
             # zwingen. Der Modifier-Pass oben laeuft VOR diesem Schritt und wuerde
@@ -1201,10 +1240,13 @@ class OutputManager:
                 if vorher:
                     estop_mask = set(vorher) | set(estop_mask or ())
             if estop_mask:
+                # B1 (Review LAS-25): Adressen mit bekanntem Aus-Wert bekommen
+                # DEN statt 0 — bei einem Laser mit 0 = „Auto run“ schaltete
+                # ein NOT-AUS mit 0 ihn sonst EIN. Alle anderen Adressen: 0.
                 buf = bytearray(data)
                 for addr in estop_mask:
                     if 1 <= addr <= 512:
-                        buf[addr - 1] = 0
+                        buf[addr - 1] = aus.get(addr, 0) if aus else 0
                 data = bytes(buf)
             # ANZEIGE-Snapshot: exakt die Bytes, die gleich gesendet werden (POST
             # GM/Blackout/Channel-Modifier). GIL-atomare dict-Zuweisung mit

@@ -42,8 +42,9 @@ FORMAT_VERSION = 1
 #: ``FixtureProfile.source`` der aus den Dateien eingespielten Profile.
 SOURCE_LIGHTOS = "lightos"
 
-_REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
-    os.path.abspath(__file__)))))
+# XPLAT-47: Programmordner statt ``__file__``-Kette (gefroren: sys._MEIPASS).
+from src.core.paths import programm_dir as _programm_dir
+_REPO = _programm_dir()
 #: Wurzel der mitgelieferten Bibliothek. ``LIGHTOS_BIBLIOTHEK_DIR`` (analog
 #: ``LIGHTOS_FIXTURE_DB``) lenkt sie um — fuer Tests, die einen Generator als
 #: eigenen Prozess gegen eine Bibliothek OHNE ein bestimmtes Geraet laufen

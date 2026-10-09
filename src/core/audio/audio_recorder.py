@@ -45,12 +45,17 @@ def _dbfs(lin: float) -> float:
 def _lightos_version() -> str | None:
     """APP_VERSION aus main.py (ohne main zu importieren) — None, wenn nicht ermittelbar."""
     try:
-        root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-        with open(os.path.join(root, "main.py"), encoding="utf-8") as f:
+        from src.core.paths import programm_datei
+        with open(programm_datei("main.py"), encoding="utf-8") as f:
             m = re.search(r'^APP_VERSION\s*=\s*["\']([^"\']+)["\']', f.read(), re.M)
         return m.group(1) if m else None
     except Exception:
-        return None
+        pass
+    # XPLAT-47: im gefrorenen Windows-Build gibt es main.py nicht als Datei —
+    # dort IST main das laufende ``__main__``-Modul.
+    import sys
+    ver = getattr(sys.modules.get("__main__"), "APP_VERSION", None)
+    return ver if isinstance(ver, str) else None
 
 
 def _log(msg: str) -> None:
