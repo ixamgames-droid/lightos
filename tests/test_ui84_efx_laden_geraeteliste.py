@@ -206,6 +206,19 @@ class SichtbarerFolgeEditorTest(unittest.TestCase):
         self.assertEqual([1], _efx_fids(self.b))
         self.assertEqual([1, 2], _efx_fids(self.a))
 
+    def test_neu_im_folgemodus_uebernimmt_auswahl(self):
+        """„+ Neu" im sichtbaren Folge-Editor: der frische Entwurf bekommt
+        weiter die aktuelle Auswahl (Benutzeraktion, kein Laden/Refresh)."""
+        self._sel = [2, 3]
+        vorher = {f.id for f in self.v._fm.all()}
+        self.v._add_efx()
+        neu = [f for f in self.v._fm.all() if f.id not in vorher]
+        self.addCleanup(lambda: [self.v._fm.remove(f.id) for f in neu])
+        self.assertEqual(1, len(neu))
+        self.assertIs(neu[0], self.v._current)
+        self.assertEqual([2, 3], _efx_fids(neu[0]))
+        self.assertEqual([1, 2], _efx_fids(self.a))
+
 
 if __name__ == "__main__":
     unittest.main()

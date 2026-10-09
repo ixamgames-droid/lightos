@@ -1492,8 +1492,14 @@ class EfxView(QWidget):
         # UI-04: Im Standalone-EFX-Tab bekommt eine frische Bewegung sofort
         # Geraete (aktuelle Auswahl, sonst alle gepatchten Movingheads) — sonst
         # laeuft ein spaeteres ▶ Start stumm (write() bricht bei leerer Liste ab).
-        # Im Follow-Modus uebernimmt _assign_from_selection (via _select_efx) die Zuweisung.
-        if not self._follow:
+        # Im Follow-Modus uebernimmt _assign_from_selection die Zuweisung. UI-84:
+        # ausdruecklich hier — die Zeilenwahl laeuft ueber _rebuild_from_state
+        # (programmatisch, also ohne Folge-Zuweisung in _select_efx), und ein
+        # zweites setCurrentRow auf dieselbe Zeile feuert kein Signal mehr.
+        if self._follow:
+            if self._current is efx and self._editor_sichtbar():
+                self._assign_from_selection()
+        else:
             self._auto_assign_if_empty(allow_all=True)
             # ENG-06: nach der Auto-Zuweisung den Spider-Modus aktualisieren. Bei der
             # vorigen _update_spider_mode-Auswertung war die Fixture-Liste noch leer
