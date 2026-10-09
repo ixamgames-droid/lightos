@@ -70,7 +70,6 @@
 | DOC-66 | A | docs/doc66-github-seite-audit | 2026-10-08T18:37Z | README.md · docs/ANLEITUNGEN.md |
 | BPM-28 | D | fix/bpm28-beat-takt | 2026-10-09T13:46Z | src/core/engine/bpm_manager.py · tests/test_bpm28_beat_takt.py · BACKLOG.md · changelog.d/2026-10-08-BPM-28.md |
 | UI-75 | B | fix/ui75-neue-show-patch-vc | 2026-10-08T19:04Z | src/ui/main_window.py · tests/test_ui75_neue_show_fragt.py · docs/anleitung_erste_schritte/ANLEITUNG.md · docs/anleitung_erste_schritte/ANLEITUNG.en.md · changelog.d/2026-10-08-UI-75.md · BACKLOG.md |
-| OUT-62 | B | fix/out62-blackout-maske-atomar | 2026-10-08T19:08Z | src/core/app_state.py · docs/components/engine/script.md · tests/test_out62_blackout_maske_atomar.py · changelog.d/2026-10-08-OUT-62.md · BACKLOG.md |
 | OUT-64 | B | fix/out64-estop-ausgabeweg | 2026-10-08T19:11Z | src/core/dmx/output_manager.py · tests/test_out64_estop_ausgabeweg.py · changelog.d/2026-10-08-OUT-64.md · BACKLOG.md |
 | UI-76 | B | fix/ui76-go-hinweis-page | 2026-10-08T19:17Z | src/core/cueliste_ziel.py · src/ui/views/playback_view.py · tests/test_ui76_go_hinweis.py · docs/anleitung_szenen_cues/ANLEITUNG.md · changelog.d/2026-10-08-UI-76.md · BACKLOG.md |
 | STAB-30 | A | feature/stab30-diagnose-log | 2026-10-08T19:39Z | main.py · src/core/crash_logging.py |
@@ -176,7 +175,6 @@
 
 ## Verlauf
 
-- 2026-10-08T20:13Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T20:19Z A done LAS-25
 - 2026-10-08T20:47Z A claim VIZ-95
 - 2026-10-08T20:50Z A done DOC-60
@@ -206,3 +204,4 @@
 - 2026-10-09T14:40Z B done VIZ-94
 - 2026-10-09T14:44Z D aktualisiert BPM-30: Dateien - -> src/core/app_state.py · src/core/engine/bpm_manager.py · tests/test_bpm30_beat_faden_ohne_appstate.py · BACKLOG.md · changelog.d/2026-10-09-BPM-30.md
 - 2026-10-09T14:47Z D aktualisiert XPLAT-48: Dateien - -> install.py · tests/test_xplat48_verknuepfung_no_venv.py · BACKLOG.md · changelog.d/2026-10-09-XPLAT-48.md
+- 2026-10-09T14:59Z B done OUT-62
