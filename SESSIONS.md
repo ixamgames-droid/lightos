@@ -84,6 +84,7 @@
 | NET-14 | A | feature/midi5-msc | 2026-10-09T16:27Z | src/core/midi |
 | MIDI-16 | A | feature/midi5-msc | 2026-10-09T16:27Z | src/core/midi |
 | MIDI-3 | A | fix/midi3-mapping-robust | 2026-10-09T16:27Z | src/core/midi/midi_mapper.py |
+| MIDI-4 | A | fix/midi3-mapping-robust | 2026-10-09T16:27Z | src/core/midi/midi_mapper.py |
 
 ## Blocker & Fallen
 
@@ -178,7 +179,6 @@
 
 ## Verlauf
 
-- 2026-10-08T21:37Z 3 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T21:46Z D done QA-90
 - 2026-10-08T22:16Z D done QA-89
 - 2026-10-08T22:16Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
@@ -208,3 +208,4 @@
 - 2026-10-09T16:27Z A claim NET-14
 - 2026-10-09T16:27Z A claim MIDI-16
 - 2026-10-09T16:27Z A claim MIDI-3
+- 2026-10-09T16:27Z A claim MIDI-4
