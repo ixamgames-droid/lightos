@@ -10,7 +10,8 @@ from dataclasses import dataclass, field
 from typing import Callable
 from uuid import uuid4
 
-from .midi_manager import MidiMessage, get_midi_manager
+from .midi_manager import (MidiMessage, geraet_passt, get_midi_manager,
+                           stabiler_portname)
 
 # Action types (legacy-compatible)
 ACTION_EXECUTOR_GO = "executor_go"
@@ -165,6 +166,16 @@ def _bindings_overlap(type_a, ch_a, d1_a, type_b, ch_b, d1_b) -> bool:
     return True
 
 
+def _offene_eingaenge() -> list[str]:
+    """Offene Eingaenge des Managers — fuer das Ordinal gleicher Geraete
+    (MIDI-3). Ohne Manager/Methode (Tests, Fakes) eine leere Liste."""
+    try:
+        fn = getattr(get_midi_manager(), "offene_eingaenge", None)
+        return list(fn()) if callable(fn) else []
+    except Exception:
+        return []
+
+
 @dataclass
 class MidiInBinding:
     """Incoming MIDI trigger definition."""
@@ -175,7 +186,9 @@ class MidiInBinding:
     message_type: str = "note"  # note or cc
 
     def matches(self, msg: MidiMessage) -> bool:
-        if self.device and self.device not in msg.port_name:
+        # MIDI-3: ueber den Geraetenamen, nicht ueber die ALSA-Nummer.
+        if self.device and not geraet_passt(self.device, msg.port_name,
+                                            _offene_eingaenge()):
             return False
         if self.channel != 0 and self.channel != msg.channel:
             return False
@@ -201,7 +214,7 @@ class MidiInBinding:
     @classmethod
     def from_message(cls, msg: MidiMessage) -> "MidiInBinding":
         return cls(
-            device=msg.port_name,
+            device=stabiler_portname(msg.port_name, _offene_eingaenge()),
             channel=msg.channel,
             trigger_id=msg.data1,
             message_type="cc" if msg.msg_type == "cc" else "note",
@@ -348,8 +361,8 @@ class MidiMapping:
         self.msg_type = "cc" if msg.msg_type == "cc" else "note_on"
         self.channel = int(msg.channel)
         self.data1 = int(msg.data1)
-        self.port_filter = msg.port_name
         self.midi_in = MidiInBinding.from_message(msg)
+        self.port_filter = self.midi_in.device
         if self.midi_out and self.midi_out.trigger_id < 0:
             self.midi_out.trigger_id = msg.data1
 
