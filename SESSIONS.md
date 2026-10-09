@@ -83,7 +83,7 @@
 | VIZ-97 | D | fix/viz97-gobo-schluesselwoerter | 2026-10-09T14:28Z | src/ui/widgets/gobo_icons.py · tests/test_viz97_gobo_schluesselwoerter.py · BACKLOG.md · changelog.d/2026-10-09-VIZ-97.md |
 | FM-72 | D | fix/fm72-download-dialog-show | 2026-10-09T14:22Z | main.py · src/ui/main_window.py · tests/test_fm72_bibliothek_frage_mit_show.py · tests/test_fm53_bibliothek_download.py · docs/FIXTURE_SOURCES.md · docs/anleitung_geraete_bibliothek/ANLEITUNG.md · BACKLOG.md · changelog.d/2026-10-09-FM-72.md |
 | BPM-30 | D | fix/bpm30-beat-thread-get-state | 2026-10-09T14:44Z | src/core/app_state.py · src/core/engine/bpm_manager.py · tests/test_bpm30_beat_faden_ohne_appstate.py · BACKLOG.md · changelog.d/2026-10-09-BPM-30.md |
-| XPLAT-48 | D | fix/xplat48-no-venv-verknuepfung | 2026-10-09T14:37Z | - |
+| XPLAT-48 | D | fix/xplat48-no-venv-verknuepfung | 2026-10-09T14:47Z | install.py · tests/test_xplat48_verknuepfung_no_venv.py · BACKLOG.md · changelog.d/2026-10-09-XPLAT-48.md |
 
 ## Blocker & Fallen
 
@@ -175,7 +175,6 @@
 
 ## Verlauf
 
-- 2026-10-08T20:03Z B done VIZ-71
 - 2026-10-08T20:13Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-08T20:19Z A done LAS-25
 - 2026-10-08T20:47Z A claim VIZ-95
@@ -205,3 +204,4 @@
 - 2026-10-09T14:37Z D claim XPLAT-48
 - 2026-10-09T14:40Z B done VIZ-94
 - 2026-10-09T14:44Z D aktualisiert BPM-30: Dateien - -> src/core/app_state.py · src/core/engine/bpm_manager.py · tests/test_bpm30_beat_faden_ohne_appstate.py · BACKLOG.md · changelog.d/2026-10-09-BPM-30.md
+- 2026-10-09T14:47Z D aktualisiert XPLAT-48: Dateien - -> install.py · tests/test_xplat48_verknuepfung_no_venv.py · BACKLOG.md · changelog.d/2026-10-09-XPLAT-48.md
