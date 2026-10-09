@@ -629,6 +629,11 @@ class EfxView(QWidget):
         self._loading = False
         # M0.1: im Programmer eingebettet folgt EFX automatisch der Auswahl
         self._follow = bool(follow_selection)
+        # UI-84: >0, solange das PROGRAMM die Listenzeile setzt (Laden, Refresh,
+        # Gruppenwechsel in _rebuild_from_state). Dann ist die Selektion keine
+        # Benutzeraktion -> _select_efx darf die Geraeteliste NICHT aus der
+        # Auswahl neu bilden (Laden/Refresh veraendert nie Funktionsdaten).
+        self._programm_waehlt = 0
         # E2: EFX editiert die Live-Instanz direkt (gewollt fuer Live-Programming),
         # informiert aber Bibliothek/andere EFX-Ansicht ueber Aenderungen —
         # entprellt, damit Spin-/Tipp-Folgen nicht je Tick FUNCTION_CHANGED feuern.
@@ -892,7 +897,12 @@ class EfxView(QWidget):
             # currentRowChanged -> _select_efx setzt _current auf die richtige
             # (gefilterte) Instanz, auch wenn der Index gleich bleibt.
             target = next((i for i, e in enumerate(vis) if e.id == prev_id), -1)
-            self._list.setCurrentRow(target if target >= 0 else 0)
+            # UI-84: programmatische Selektion — keine Folge-Zuweisung.
+            self._programm_waehlt += 1
+            try:
+                self._list.setCurrentRow(target if target >= 0 else 0)
+            finally:
+                self._programm_waehlt -= 1
             self._update_group_header()
             self._update_save_state()
         except RuntimeError:
@@ -1581,10 +1591,24 @@ class EfxView(QWidget):
         self._load_to_ui(self._current)
         if self._popout is not None:
             self._popout.bind(self._current)
-        # Im Follow-Modus uebernimmt die neu gewaehlte EFX sofort die Auswahl.
-        if self._follow:
+        # Im Follow-Modus uebernimmt die neu gewaehlte EFX sofort die Auswahl —
+        # UI-84: aber NUR, wenn der Benutzer die Zeile im sichtbaren Editor
+        # waehlt. Setzt das Programm die Zeile (Show laden, REFRESH_ALL,
+        # FUNCTION_CHANGED, Gruppenwechsel), bleibt die Geraeteliste der EFX
+        # unangetastet; sonst wurde beim Laden im Hauptfenster die erste EFX auf
+        # die gerade aktuelle (oft leere) Auswahl umgeschrieben und danach von
+        # der Auto-Zuweisung mit ALLEN Movern gefuellt. Die gewollte Folge-
+        # Zuweisung bei Auswahl-/Gruppenwechsel macht _sync_follow_selection
+        # (dort ebenfalls nur bei sichtbarem Editor).
+        if self._follow and self._programm_waehlt == 0 and self._editor_sichtbar():
             self._assign_from_selection()
         self._update_save_state()
+
+    def _editor_sichtbar(self) -> bool:
+        try:
+            return bool(self.isVisible())
+        except RuntimeError:
+            return False
 
     # ── Follow-Selection (M0.1, eingebettet im Programmer) ────────────────────
 
