@@ -12,7 +12,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| DOC-28 | C | - | 2026-10-02T10:36Z | docs/anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.en.md · docs/anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md · docs/ANLEITUNGEN.md · changelog.d/2026-10-02-DOC-28.md |
 | DOC-29 | C | - | 2026-10-02T10:51Z | docs/anleitung_patch_gruppen/ANLEITUNG_PATCH_GRUPPEN.md |
 | DOC-30 | C | - | 2026-10-02T10:52Z | docs/anleitung_programmer/ANLEITUNG_PROGRAMMER.md |
 | DOC-31 | C | - | 2026-10-02T10:53Z | docs/anleitung_zwei_universen/ANLEITUNG.md |
@@ -150,7 +149,6 @@
 
 ## Verlauf
 
-- 2026-10-09T13:45Z D claim FM-72
 - 2026-10-09T14:10Z B done QA-83
 - 2026-10-09T14:22Z D aktualisiert FM-72: Dateien - -> main.py · src/ui/main_window.py · tests/test_fm72_bibliothek_frage_mit_show.py · tests/test_fm53_bibliothek_download.py · docs/FIXTURE_SOURCES.md · docs/anleitung_geraete_bibliothek/ANLEITUNG.md · BACKLOG.md · changelog.d/2026-10-09-FM-72.md
 - 2026-10-09T14:28Z D aktualisiert VIZ-97: Dateien src/ui/widgets/gobo_icons.py -> src/ui/widgets/gobo_icons.py · tests/test_viz97_gobo_schluesselwoerter.py · BACKLOG.md · changelog.d/2026-10-09-VIZ-97.md
@@ -180,3 +178,4 @@
 - 2026-10-10T09:26Z C uebergeben DOC-26
 - 2026-10-10T09:26Z C uebergeben ENG-29
 - 2026-10-10T09:26Z C uebergeben DOC-27
+- 2026-10-10T09:26Z C uebergeben DOC-28
