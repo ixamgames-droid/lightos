@@ -47,7 +47,11 @@ LASER_EXTRA_ATTRS = ("shutter", "gobo_wheel", "gobo_rotation", "zoom",
                      # Praktisch war der MASTER-DIMMER eines FB4 auf der
                      # Laser-Seite nicht bedienbar — ausgerechnet der Regler,
                      # den man zuerst sucht.
-                     "intensity", "color_r", "color_g", "color_b", "strobe")
+                     "intensity", "color_r", "color_g", "color_b", "strobe",
+                     # LAS-26: Mustergeschwindigkeit der Show-Laser
+                     # (EL-400RGB MK2, ZQ-B370: „Dynamic Pattern Speed“) — fiel
+                     # hier durch und war auf der Laser-Seite nicht bedienbar.
+                     "effect_speed")
 
 # LAS-11: Die Laser-Regler werden nach Bedeutung gruppiert statt als flache
 # Kanal-Liste gezeigt — die WICHTIGEN Achsen (Muster, Farbe, Geschwindigkeit)
@@ -62,7 +66,8 @@ _ROW_GROUPS: list[tuple[str, tuple[str, ...]]] = [
     ("Farbe", ("laser_color_change", "laser_color", "color_wheel",
                "color_r", "color_g", "color_b")),
     ("Bewegung & Geschwindigkeit",
-     ("speed", "laser_scan_rate", "gobo_rotation", "laser_x", "laser_y",
+     ("speed", "effect_speed", "laser_scan_rate", "gobo_rotation",
+      "laser_x", "laser_y",
       "zoom", "laser_zoom_x", "laser_zoom_y")),
     ("Zeichnen", ("laser_draw_mode", "laser_draw")),
 ]
@@ -77,6 +82,29 @@ def fixture_has_laser_capability(fx) -> bool:
     kanonischen Klassifikator (:func:`capability.is_laser_fixture`); der Name
     bleibt für die Programmer-Tab-Sichtbarkeit (programmer_view) erhalten."""
     return is_laser_fixture(fx)
+
+
+# LAS-26: Spaltenbreiten der Regler-Zeilen (Beschriftung, Bereichs-Auswahl).
+LABEL_BREITE = 170
+BEREICH_BREITE = 230
+
+
+def row_label(channel) -> str:
+    """LAS-26: Beschriftung einer Regler-Zeile = Kanalname aus dem Profil.
+
+    Vorher stand dort die allgemeine Attribut-Beschriftung — am Laser hiess
+    die Musterauswahl „Gobo-Rad“ und die Farbsegmente „Muster-Farbwechsel“.
+    Der Kanalname ist das, was im Handbuch steht. Ein Gruppen-Praefix
+    („A: Musterauswahl“ beim L2600) faellt weg: die Zeile gilt je nach
+    Mustergruppe fuer A, B oder beide. Ohne Namen bleibt die Attribut-
+    Beschriftung."""
+    import re
+    attr = getattr(channel, "attribute", "") or ""
+    name = (getattr(channel, "name", "") or "").strip()
+    name = re.sub(r"^[A-Z]\d?:\s*", "", name)
+    if not name or name == attr:
+        return attr_label(attr)
+    return name
 
 
 def _range_value(rng) -> int:
@@ -105,9 +133,12 @@ class _ChannelRow(QWidget):
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(6)
 
-        lbl = QLabel(attr_label(self.attribute))
-        lbl.setMinimumWidth(130)
-        lbl.setToolTip(getattr(channel, "name", "") or "")
+        lbl = QLabel(row_label(channel))
+        # LAS-26: feste Spaltenbreiten — vorher sass jeder Regler je nach
+        # Namens- und Bereichslaenge woanders, die Zeilen fluchteten nicht.
+        lbl.setFixedWidth(LABEL_BREITE)
+        lbl.setWordWrap(True)
+        lbl.setToolTip(f"{attr_label(self.attribute)} ({self.attribute})")
         lay.addWidget(lbl)
 
         self._slider = QSlider(Qt.Orientation.Horizontal)
@@ -120,7 +151,12 @@ class _ChannelRow(QWidget):
         lay.addWidget(self._spin)
 
         self._combo = QComboBox()
-        self._combo.setMinimumWidth(170)
+        self._combo.setFixedWidth(BEREICH_BREITE)
+        # Ohne Bereiche bleibt der Platz frei (Regler gleich lang wie die
+        # Nachbarzeilen).
+        pol = self._combo.sizePolicy()
+        pol.setRetainSizeWhenHidden(True)
+        self._combo.setSizePolicy(pol)
         self._combo.addItem("— Bereich wählen —", None)
         for r in self._ranges:
             lo = int(getattr(r, "range_from", 0) or 0)
@@ -305,6 +341,32 @@ class LaserView(QWidget):
         root.addWidget(self._safety_box)
         self._update_arm_button()
 
+        # LAS-26: NOT-AUS auch fuer DMX-Laser. Die Netzwerk-Box oben ist nur
+        # bei Ether-Dream/IDN-Lasern sichtbar — mit einem DMX-Laser in der
+        # Auswahl (EL-400RGB MK2, SH-LASER3W, L2600 …) gab es auf dieser Seite
+        # bisher KEINEN NOT-AUS und keine Anzeige, ob er greift. Derselbe Weg
+        # wie der Knopf der Netzwerk-Box (``_on_estop``): ``estop_all`` setzt
+        # den DMX-Latch (UXT-12) und verriegelt die Netzwerk-Ausgabe.
+        self._dmx_safety_box = QGroupBox("Laser-Sicherheit")
+        dsb = QHBoxLayout(self._dmx_safety_box)
+        self._btn_dmx_estop = QPushButton("⏹ LASER NOT-AUS")
+        self._btn_dmx_estop.setMinimumHeight(40)
+        self._btn_dmx_estop.setStyleSheet(
+            "QPushButton{background:#8b0000;color:#fff;font-weight:bold;"
+            "border:1px solid #b30000;border-radius:5px;padding:6px 14px;}"
+            "QPushButton:hover{background:#b30000;}")
+        self._btn_dmx_estop.setToolTip(
+            "Schaltet ALLE Laser sofort dunkel: DMX-Laser auf ihren Aus-Wert "
+            "(bis Betriebsart oder Muster neu gewählt wird), Netzwerk-Laser "
+            "werden unscharf.")
+        self._btn_dmx_estop.clicked.connect(weak_slot(self._on_estop))
+        dsb.addWidget(self._btn_dmx_estop)
+        self._lbl_dmx_estop = QLabel("")
+        self._lbl_dmx_estop.setWordWrap(True)
+        dsb.addWidget(self._lbl_dmx_estop, stretch=1)
+        self._dmx_safety_box.setVisible(False)
+        root.addWidget(self._dmx_safety_box)
+
         # Mustergruppe (Kopf 0/1) — nur sichtbar, wenn das Gerät doppelte
         # Laser-Attribute hat (z. B. L2600 34ch: Gruppe A + B).
         self._head_box = QGroupBox("Mustergruppe")
@@ -343,7 +405,6 @@ class LaserView(QWidget):
         pal_btns.addWidget(btn_save)
         pal_btns.addStretch(1)
         pv.addLayout(pal_btns)
-        root.addWidget(self._pal_box)
 
         # LAS-18b: Werksmuster-Picker für DMX-Muster-Laser (Klasse A) — vom
         # Nutzer gemerkte (Bank, Muster)-Slots als Kacheln, optional mit Foto
@@ -364,18 +425,30 @@ class LaserView(QWidget):
         pat_btns.addWidget(btn_pat_add)
         pat_btns.addStretch(1)
         pat_v.addLayout(pat_btns)
-        root.addWidget(self._pattern_box)
 
-        # Regler-Bereich (scrollbar).
+        # Regler-Bereich (scrollbar). LAS-26: die Regler (Muster, Farbe,
+        # Bewegung) stehen ZUERST, Muster-Paletten und Werksmuster darunter im
+        # selben Scrollbereich. Vorher lagen die beiden Boxen fest darueber —
+        # bei 900 px Fensterhoehe blieb fuer die Regler ein Streifen von gut
+        # einer Zeile, Farbe und Bewegung waren nur per Scrollen erreichbar.
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
+        inhalt = QWidget()
+        inhalt_lay = QVBoxLayout(inhalt)
+        inhalt_lay.setContentsMargins(0, 0, 0, 0)
+        inhalt_lay.setSpacing(6)
         self._rows_host = QWidget()
         self._rows_lay = QVBoxLayout(self._rows_host)
         self._rows_lay.setContentsMargins(0, 0, 0, 0)
         self._rows_lay.setSpacing(4)
         self._rows_lay.addStretch(1)
-        scroll.setWidget(self._rows_host)
+        inhalt_lay.addWidget(self._rows_host)
+        inhalt_lay.addWidget(self._pal_box)
+        inhalt_lay.addWidget(self._pattern_box)
+        inhalt_lay.addStretch(1)
+        scroll.setWidget(inhalt)
+        self._scroll = scroll
         root.addWidget(scroll, stretch=1)
 
     def _subscribe(self):
@@ -394,6 +467,9 @@ class LaserView(QWidget):
             # der Laser scharf ist (Täuschung in die gefährliche Richtung).
             sync.subscribe_widget(SyncEvent.LASER_ARMED_CHANGED, self,
                                   lambda *_: self._sync_arm_from_manager())
+            # LAS-26: NOT-AUS von einer VC-Taste -> Anzeige sofort mitziehen.
+            sync.subscribe_widget(SyncEvent.LASER_ESTOP, self,
+                                  lambda *_: self._update_dmx_estop_label())
         except Exception as e:
             print(f"[laser_view] sync subscribe error: {e}")
 
@@ -467,6 +543,10 @@ class LaserView(QWidget):
             if (_cap := laser_capability(f)) is not None
             and _cap.laser_class == LaserClass.NET_STREAM]
         self._safety_box.setVisible(bool(self._network_fids))
+        # LAS-26: DMX-Laser in der Auswahl -> eigener NOT-AUS + Zustand.
+        self._dmx_safety_box.setVisible(
+            len(self._fixtures) > len(self._network_fids))
+        self._update_dmx_estop_label()
         self._sync_arm_from_manager()   # VC-/MIDI-Änderungen widerspiegeln
         self._apply_figure_to_selection()
 
@@ -488,6 +568,27 @@ class LaserView(QWidget):
         except Exception as e:
             print(f"[laser_view] laser output unavailable: {e}")
             return None
+
+    def _update_dmx_estop_label(self):
+        """LAS-26: zeigt, ob der DMX-Laser-NOT-AUS gerade greift."""
+        try:
+            aktiv = bool(getattr(get_state(), "laser_estop_active", False))
+        except Exception:
+            aktiv = False
+        try:
+            if aktiv:
+                self._lbl_dmx_estop.setText(
+                    "NOT-AUS aktiv — alle DMX-Laser sind dunkel. Wieder an: "
+                    "Betriebsart oder Muster neu wählen.")
+                self._lbl_dmx_estop.setStyleSheet(
+                    "color:#ff7b72;font-weight:bold;")
+            else:
+                self._lbl_dmx_estop.setText(
+                    "Schaltet alle Laser sofort dunkel. Blackout und Grand "
+                    "Master 0 tun das auch — über den Aus-Wert der Betriebsart.")
+                self._lbl_dmx_estop.setStyleSheet("color:#8b949e;")
+        except RuntimeError:
+            pass
 
     def _update_arm_button(self):
         armed = self._btn_arm.isChecked()
@@ -539,6 +640,7 @@ class LaserView(QWidget):
         self._update_arm_button()
         if lo is not None:
             lo.clear_estop_all()
+        self._update_dmx_estop_label()
 
     def _on_figure_changed(self):
         # BEWUSST ohne Index-Parameter: verbunden ueber weak_slot, das die
@@ -720,7 +822,9 @@ class LaserView(QWidget):
         Selbst-Pin. Wir merken uns die Attribut-Namen PRO Gruppe (Titel als
         Schlüssel) und binden nur diesen String in die Closure; die Zeilen
         werden zur Laufzeit in ``self._rows`` nachgeschlagen."""
-        box = QGroupBox(title)
+        # LAS-26: „&“ im Titel ist fuer Qt ein Tastenkuerzel — „Bewegung &
+        # Geschwindigkeit“ stand als „Bewegung _Geschwindigkeit“ da.
+        box = QGroupBox(title.replace("&", "&&"))
         lay = QVBoxLayout(box)
         lay.setSpacing(3)
         lay.setContentsMargins(8, 4, 8, 6)
@@ -774,7 +878,8 @@ class LaserView(QWidget):
             tile = PresetTile(
                 name, _range_value(r),
                 color=kind_colors.get(getattr(r, "kind", "") or ""),
-                tooltip=f"Shutter → {_range_value(r)}")
+                tooltip=f"{getattr(shutter, 'name', '') or 'Betriebsart'}"
+                        f" → {_range_value(r)}")
             tile.clicked.connect(weak_slot_fwd(self._on_mode_tile_clicked))
             self._mode_lay.addWidget(tile)
         self._mode_lay.addStretch(1)
@@ -920,6 +1025,8 @@ class LaserView(QWidget):
                 continue
             for head in self._heads_for(f, attr):
                 state.set_programmer_value(fid, attr, int(value), head=head)
+        # Betriebsart/Muster loesen den DMX-NOT-AUS (A3D-02) — Anzeige folgen.
+        self._update_dmx_estop_label()
 
     def _load_values(self):
         if not self._fixtures:

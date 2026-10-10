@@ -66,6 +66,7 @@ PFLICHT_RESSOURCEN: tuple[str, ...] = tuple("/".join(teile) for teile in (
     ("src", "ui", "visualizer", "three_local.js"),
     ("src", "ui", "visualizer", "scene_src", "app.js"),
     ("src", "web", "templates"),
+    ("src", "web", "static", "socket.io.min.js"),     # WEB-06: kein CDN
     ("assets", "icons", "lightos.png"),
     ("assets", "icons", "lightos.ico"),
     ("assets", "themes", "dark.qss"),

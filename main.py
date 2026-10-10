@@ -636,14 +636,19 @@ def _open_show_at_startup(window, pfad: str):
     QTimer.singleShot(0, lambda: window._open_show_path(pfad))
 
 
-def _bibliothek_beim_erststart(window) -> None:
+def _bibliothek_beim_erststart(window, mit_show: bool = False) -> None:
     """FM-53: beim ersten Start fragen, ob eine freie Geraete-Bibliothek geladen
     werden soll — nur solange die Bibliothek nichts ausser den eingebauten
     Profilen enthaelt und die Frage nie beantwortet wurde.
 
     Bewusst HIER und nicht im ``MainWindow``-Konstruktor: die Tests bauen das
     Fenster hundertfach, und ein modaler Dialog dort blockierte jeden davon.
-    Im Kiosk-Modus wird nicht gefragt."""
+    Im Kiosk-Modus wird nicht gefragt.
+
+    FM-72: Mit ``--show`` (Autostart, Vorfuehrung, Fernwartung) blockiert KEIN
+    modaler Dialog — die Show soll sofort bedienbar sein. Stattdessen ein Knopf
+    in der Statuszeile; die Frage gilt dann noch nicht als beantwortet und kommt
+    beim naechsten Start ohne ``--show`` wieder."""
     from PySide6.QtCore import QTimer
     try:
         from src.core.database import bibliothek_download as _bd
@@ -652,6 +657,9 @@ def _bibliothek_beim_erststart(window) -> None:
             return
     except Exception as e:
         print(f"[main] Bibliothek-Erststart uebersprungen: {e}")
+        return
+    if mit_show:
+        QTimer.singleShot(800, window._bibliothek_hinweis_zeigen)
         return
     QTimer.singleShot(800, lambda: window._open_bibliothek_download(erststart=True))
 
@@ -911,7 +919,7 @@ def main():
     if args.show:
         _open_show_at_startup(window, args.show)
     if not args.kiosk:
-        _bibliothek_beim_erststart(window)
+        _bibliothek_beim_erststart(window, mit_show=bool(args.show))
 
     _finalize_and_exit(app.exec())
 

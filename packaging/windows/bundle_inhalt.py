@@ -9,7 +9,7 @@ Anordnung: jede Datei landet im Bundle (``sys._MEIPASS``, der ``_internal``-
 Ordner neben ``LightOS.exe``) unter DEMSELBEN relativen Pfad wie im Repo. Darauf
 verlaesst sich ``src.core.paths.programm_datei`` — und die Stellen, die noch
 ``__file__``-relativ lesen (``visualizer_window.HTML_PATH``,
-``src/web/app.py`` templates): PyInstaller setzt ``__file__`` gefrorener Module
+``src/web/app.py`` templates + static): PyInstaller setzt ``__file__`` gefrorener Module
 auf ``<_MEIPASS>/<paket>/<modul>.py(c)``, ``dirname`` trifft also denselben Ordner.
 
 ★ Nur Dateien, die Git kennt (``git ls-files``): ``fixtures/`` und ``data/``
@@ -30,6 +30,7 @@ DATENORDNER: tuple[str, ...] = (
     "data/controller_library",     # Controller-Vorlagen (NICHT data/ insgesamt!)
     "src/ui/visualizer",           # stage_scene.html, three_local.js, scene_src/
     "src/web/templates",           # Web-Remote
+    "src/web/static",              # Web-Remote: socket.io.min.js lokal (WEB-06)
     "examples",                    # Beispielskripte (README verweist darauf)
     "licenses",                    # Lizenztexte der Fremd-Komponenten
 )
