@@ -20,7 +20,6 @@
 | VIZ-87 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
 | TOOL-16 | A | fix/codex-p1-0810 | 2026-10-08T16:57Z | - |
 | UI-81 | A | fix/codex-p1-0810 | 2026-10-08T16:57Z | - |
-| DEMO-07 | A | docs/demo07-showcase-shows | 2026-10-08T17:30Z | - |
 | FM-68 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:10Z | fixtures |
 | DOC-65 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:11Z | docs/anleitung_fixture_generator |
 | LAS-26 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:11Z | src/ui |
@@ -126,7 +125,6 @@
 
 ## Verlauf
 
-- 2026-10-10T09:27Z C uebergeben DOC-38
 - 2026-10-10T09:27Z C uebergeben DOC-39
 - 2026-10-10T09:27Z C uebergeben DOC-40
 - 2026-10-10T09:27Z C uebergeben DOC-41
@@ -156,3 +154,4 @@
 - 2026-10-10T09:29Z A claim DOC-69
 - 2026-10-10T09:29Z A claim STAB-32
 - 2026-10-10T09:29Z A claim OUT-67
+- 2026-10-10T09:39Z A done DEMO-07
