@@ -4992,14 +4992,33 @@ class AppState:
         Das ZIEL (nicht die aufgeloesten Adressen) wird gemerkt: Gruppen loesen
         sich bei jeder Gruppen- oder Patch-Aenderung neu auf
         (``_refresh_target_blackouts``), eine spaeter geaenderte Gruppe wirkt also
-        auch auf eine schon gedrueckte Taste."""
+        auch auf eine schon gedrueckte Taste.
+
+        VCB-36: ein Eintrag in ``groups`` ist ein Name (alte Layouts) ODER ein
+        ``(gid, name)``-Ref — der meint genau EINE Gruppe, auch wenn zwei gleich
+        heissen (``_group_positions`` loest einen Ref ueber die ID auf)."""
         spec = (tuple(int(f) for f in (fids or ()) if f is not None),
-                tuple(str(g) for g in (groups or ()) if g))
+                tuple(z for z in (self._blackout_gruppen_ziel(g)
+                                  for g in (groups or ())) if z is not None))
         specs = getattr(self, "_ziel_blackout_specs", None)
         if specs is None:
             specs = self._ziel_blackout_specs = {}
         specs[slot] = spec
         self._push_target_blackout(slot, spec)
+
+    @staticmethod
+    def _blackout_gruppen_ziel(g):
+        """VCB-36: ein Gruppen-Ziel in die Form bringen, die
+        ``group_cells_by_name`` versteht — ``(gid, name)`` oder Name; ``None``
+        fuer Leeres und Unlesbares (kein Ziel ist NICHT „alle Gruppen“)."""
+        if isinstance(g, (tuple, list)):
+            try:
+                return (int(g[0]), str(g[1] if len(g) > 1 else ""))
+            except (TypeError, ValueError, IndexError):
+                return None
+        if isinstance(g, int) and not isinstance(g, bool):
+            return (g, "")
+        return str(g) if g else None
 
     def clear_target_blackout(self, slot):
         """VCB-11: Gezielten Blackout eines Slots freigeben (no-op wenn keiner)."""

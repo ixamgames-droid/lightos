@@ -851,6 +851,11 @@ def _collect_fixture_groups(state, probleme: list | None = None) -> list:
             for nr, g in enumerate(zeilen, start=1):
                 try:
                     out.append({
+                        # VCB-36: die ID gehoert in die Datei. Ohne sie vergab
+                        # das Laden 1..n neu — wer eine Gruppe ueber ihre ID
+                        # meint (Blackout-Ziel einer VC-Taste), zeigte nach
+                        # Speichern/Laden auf eine andere oder keine.
+                        "id": int(g.id),
                         "name": g.name, "cols": int(g.cols), "rows": int(g.rows),
                         "positions_json": g.positions_json or "{}",
                         "folder": g.folder or "",
@@ -871,13 +876,48 @@ def _fixture_group_aus_daten(g):
     from src.core.database.models import FixtureGroup
     if not isinstance(g, dict):
         raise TypeError(f"Eintrag ist kein Objekt, sondern {type(g).__name__}")
-    return FixtureGroup(
+    fg = FixtureGroup(
         name=_als_text(g.get("name", "Gruppe"), "name", "Gruppe"),
         cols=_raster_mass(g, "cols"), rows=_raster_mass(g, "rows"),
         positions_json=_als_text(g.get("positions_json", "{}"),
                                  "positions_json", "{}") or "{}",
         folder=_als_text(g.get("folder", ""), "folder", ""),
     )
+    # VCB-36: gespeicherte ID uebernehmen. Fehlt sie (Alt-Show) oder ist sie
+    # unlesbar, bleibt sie offen — ``_restore_fixture_groups`` vergibt dann eine.
+    # Eine unlesbare ID kostet die Gruppe nicht (nur ihre Nummer).
+    gid = g.get("id")
+    if isinstance(gid, int) and not isinstance(gid, bool) and gid > 0:
+        fg.id = gid
+    return fg
+
+
+def _gruppen_ids_vergeben(gebaut: list) -> None:
+    """VCB-36: jeder Gruppe genau eine ID geben, bevor sie in die DB geht.
+
+    ALLE IDs werden hier vergeben, keine von der Datenbank. Mischte man
+    gespeicherte und automatisch vergebene, koennte eine automatische genau
+    die treffen, die ein spaeterer Eintrag mitbringt — die Transaktion
+    scheiterte, und ALLE Gruppen waeren weg (der Fall, den STAB-24 beendet
+    hat). Steht dieselbe ID zweimal in der Datei, behaelt sie der erste
+    Eintrag. Alt-Shows ohne IDs bekommen wie bisher 1..n in Datei-Reihenfolge."""
+    vergeben: set[int] = set()
+    for fg in gebaut:
+        if fg.id is None:
+            continue
+        if fg.id in vergeben:
+            _lenient(f"Fixture-Gruppe '{fg.name}': ID {fg.id} steht doppelt in "
+                     f"der Datei — neue ID vergeben", ValueError("doppelte ID"))
+            fg.id = None
+        else:
+            vergeben.add(fg.id)
+    frei = 1
+    for fg in gebaut:
+        if fg.id is None:
+            while frei in vergeben:
+                frei += 1
+            fg.id = frei
+            vergeben.add(frei)
 
 
 def _restore_fixture_groups(state, groups: list) -> None:
@@ -894,6 +934,7 @@ def _restore_fixture_groups(state, groups: list) -> None:
                            f"erwartet Liste"))
         groups = []
     gebaut = _je_eintrag(groups, _fixture_group_aus_daten, "Fixture-Gruppe", "name")
+    _gruppen_ids_vergeben(gebaut)
     try:
         from sqlalchemy import delete
         from src.core.database.models import FixtureGroup
