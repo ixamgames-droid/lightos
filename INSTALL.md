@@ -99,11 +99,56 @@ Gate meldet „0/… Segmente gruen" — dann die `pip install`-Zeile oben nachh
 
 ```cmd
 python uninstall.py              # Interaktiv (fragt pro Bereich)
-python uninstall.py --yes        # Alles sofort entfernen
+python uninstall.py --yes        # Installation ohne Rueckfrage entfernen - eigene Daten bleiben
 python uninstall.py --dry-run    # Nur anzeigen was entfernt wuerde
-python uninstall.py --keep-shows # Eigene .lshow Dateien behalten
-python uninstall.py --keep-appdata  # Snapshots, Stages behalten
+python uninstall.py --purge      # Zusaetzlich ALLE eigenen Daten loeschen (fragt nach)
 ```
+
+**Eigene Daten bleiben, solange `--purge` nicht dabei steht.** Im
+App-Datenordner (`%APPDATA%\LightOS`, unter Linux `~/.local/share/LightOS`)
+liegen eigene Shows (`shows/`), Show-DB, Universen, MIDI-Mappings, Gruppen,
+Modifier, Fixture-Bibliothek, Snaps, Buehnen, Profile, Auto-Save und Logs.
+
+Welche Option loescht was:
+
+| Option | venv, Verknuepfung, Manifest, `__pycache__` | Nutzerdateien in `data/` | `shows/` im Programmordner | App-Datenordner | eigene Shows im App-Datenordner |
+|---|---|---|---|---|---|
+| *(keine)* | je Rueckfrage | Rueckfrage | Rueckfrage (Vorgabe: Nein) | bleibt | bleiben |
+| `--yes` | ja | ja | bleibt | bleibt | bleiben |
+| `--purge` | je Rueckfrage | Rueckfrage | Rueckfrage (Vorgabe: Nein) | Sicherheitsfrage (Vorgabe: Nein) | wie App-Datenordner |
+| `--purge --yes` | ja | ja | bleibt | **ja, ohne Rueckfrage** | **ja** |
+| `--purge --keep-shows` | wie `--purge` | wie `--purge` | bleibt | wie `--purge`, ausser `shows/` | bleiben |
+| `--keep-shows` | unveraendert | unveraendert | bleibt | unveraendert | bleiben |
+| `--keep-appdata` | venv/`__pycache__` unveraendert; Manifest bleibt | unveraendert | unveraendert | bleibt, auch mit `--purge` | bleiben |
+| `--keep-venv` | venv und `__pycache__` bleiben | unveraendert | unveraendert | unveraendert | unveraendert |
+| `--dry-run` | nichts - listet nur auf | nichts | nichts | nichts | nichts |
+
+- `data/controller_library` (mitgelieferte Controller-Vorlagen) gehoert zum
+  Programm und bleibt immer stehen.
+- Eine Nutzerdatei in `data/` (z. B. `current_show.db`), von der es im
+  App-Datenordner noch keine Kopie gibt, bleibt ebenfalls immer stehen - das
+  ist der Fall, wenn LightOS seit dem Update auf den App-Datenordner nie
+  gestartet wurde. Sie ist dann der einzige Stand; der Lauf nennt sie.
+  Als Kopie zaehlt nur ein Stand mit Inhalt: eine im App-Datenordner frisch
+  und leer angelegte Datei (Show-DB ohne Patch, `[]`, `{}`) oder eine
+  unlesbare schuetzt den Stand in `data/` genauso. Dasselbe gilt, wenn im
+  App-Datenordner ein ANDERER Stand liegt, ueber den LightOS fuer diesen
+  Programmordner noch nie entschieden hat (etwa von einer zweiten
+  Installation): der naechste Start wuerde die Uebernahme anbieten.
+- Die Desktop-Verknuepfung `LightOS.lnk` wird nur entfernt, wenn das
+  Installations-Manifest sie nennt oder ihr Ziel in diesem Programmordner
+  liegt. Die Verknuepfung einer zweiten Installation bleibt - auch wenn das
+  Manifest den Pfad nennt, die Datei aber inzwischen nachweislich in einen
+  anderen Programmordner zeigt.
+- Gross-/Kleinschreibung spielt beim Schutz keine Rolle: ein von Hand angelegtes
+  `Shows` im App-Datenordner bleibt mit `--keep-shows` genauso stehen.
+- `--purge --keep-shows` laesst die Shows an ihrem Ort
+  (`<App-Datenordner>/shows`) liegen und loescht nur den Rest - es wird nichts
+  umkopiert.
+- `--dry-run` laesst sich mit jeder Option kombinieren und nennt genau die
+  Pfade, die der echte Lauf entfernen wuerde (`WUERDE LOESCHEN: ...`).
+- Im Programmordner liegende `shows/` loescht nur der interaktive Lauf nach
+  ausdruecklichem Ja.
 
 ## ARM64-Kompatibilitaet (Snapdragon-Geraete)
 
