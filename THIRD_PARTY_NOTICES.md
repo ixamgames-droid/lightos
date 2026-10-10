@@ -44,6 +44,21 @@ ins Repo kommen.
   - `assets/vendor/three.min.js`
   - `src/ui/visualizer/three_local.js`
 
+## Socket.IO-Client — Verbindung der Web-Remote (4.7.5)
+
+- **Herkunft:** socket.io-client (<https://github.com/socketio/socket.io>), Version 4.7.5,
+  Datei `dist/socket.io.min.js` aus dem npm-Paket
+  (<https://registry.npmjs.org/socket.io-client/-/socket.io-client-4.7.5.tgz>), unverändert.
+- **Urheber:** Copyright © 2014-2024 Guillermo Rauch.
+- **Lizenz:** MIT — [`licenses/MIT-socket.io.txt`](licenses/MIT-socket.io.txt).
+- **Dateien:**
+  - `src/web/static/socket.io.min.js`
+- **SHA-256:** `73eba16bc895fdfa454e27ecb80def31ede8d861f99e175ff93b110eabec044f`
+  (`tests/test_web06_socketio_lokal.py` prüft die Bytes).
+- **Warum im Repo:** Die Web-Remote läuft im lokalen Netz ohne Internet; die Seite lädt
+  deshalb nichts von fremden Servern (WEB-06). Version passend zum Server
+  (python-socketio 5.x / python-engineio 4.x, Socket.IO-Protokoll 5).
+
 ## Apache License 2.0 — für Geräteprofile auf QLC+-Basis
 
 - **Lizenztext:** [`licenses/Apache-2.0.txt`](licenses/Apache-2.0.txt).
