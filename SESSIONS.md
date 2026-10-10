@@ -12,7 +12,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| DOC-23 | C | - | 2026-10-02T10:20Z | docs/anleitung_erste_schritte/ANLEITUNG.en.md · docs/anleitung_erste_schritte/ANLEITUNG.md · docs/ANLEITUNGEN.md · changelog.d/2026-10-02-DOC-23.md |
 | DOC-24 | C | - | 2026-10-02T10:21Z | docs/anleitung_programmer_grundlagen/ANLEITUNG.en.md · docs/anleitung_programmer_grundlagen/ANLEITUNG.md · docs/ANLEITUNGEN.md · changelog.d/2026-10-02-DOC-24.md |
 | DOC-25 | C | - | 2026-10-02T10:23Z | docs/anleitung_szenen_cues/ANLEITUNG.en.md · docs/anleitung_szenen_cues/ANLEITUNG.md · docs/ANLEITUNGEN.md · changelog.d/2026-10-02-DOC-25.md |
 | DOC-26 | C | - | 2026-10-02T10:24Z | docs/anleitung_vc_widgets/*.en.md · docs/anleitung_vc_widgets/README.md · docs/ANLEITUNGEN.md · changelog.d/2026-10-02-DOC-26.md |
@@ -156,7 +155,6 @@
 
 ## Verlauf
 
-- 2026-10-08T23:12Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-09T13:45Z A claim UI-84
 - 2026-10-09T13:45Z 21 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-09T13:45Z A claim VCB-41
@@ -186,3 +184,4 @@
 - 2026-10-10T09:16Z A done VIZ-92
 - 2026-10-10T09:16Z 15 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-10T09:26Z C uebergeben DOC-14
+- 2026-10-10T09:26Z C uebergeben DOC-23
