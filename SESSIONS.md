@@ -59,6 +59,7 @@
 | TOOL-26 | B | feature/tool26-app-messwerkzeug | 2026-10-10T12:55Z | - |
 | VIZ-99 | B | fix/viz99-automatik-snapdragon | 2026-10-10T12:55Z | - |
 | XPLAT-51 | B | fix/xplat51-arm64-nicht-unterstuetzt | 2026-10-10T12:55Z | - |
+| XPLAT-52 | B | fix/xplat52-installer-venv-arch | 2026-10-10T12:55Z | - |
 
 ## Blocker & Fallen
 
@@ -161,7 +162,6 @@
 
 ## Verlauf
 
-- 2026-10-10T09:41Z D claim TOOL-24
 - 2026-10-10T09:41Z D claim FM-66
 - 2026-10-10T09:41Z D claim DOC-70
 - 2026-10-10T09:58Z D done BPM-28
@@ -191,3 +191,4 @@
 - 2026-10-10T12:55Z B claim TOOL-26
 - 2026-10-10T12:55Z B claim VIZ-99
 - 2026-10-10T12:55Z B claim XPLAT-51
+- 2026-10-10T12:55Z B claim XPLAT-52
