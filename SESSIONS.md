@@ -42,7 +42,6 @@
 | TOOL-24 | D | fix/tool24-proc18-lizenzhinweise-strukturiert | 2026-10-10T15:48Z | tests/test_proc18_fremd_lizenzhinweise.py |
 | FM-66 | D | fix/fm66-abgleich-modellname | 2026-10-10T15:48Z | src/core/database/bibliothek_format.py · tests/test_fm66_abgleich_modellname.py · docs/FIXTURE_LIBRARY.md |
 | DOC-70 | D | docs/doc70-netzwerk-windows | 2026-10-10T15:48Z | docs/anleitung_netzwerk_windows/ANLEITUNG.md · docs/ANLEITUNGEN.md · tests/test_doc70_netzwerk_windows.py |
-| VIZ-98 | D | fix/viz98-bodenfleck-ueber-horizont | 2026-10-10T15:48Z | src/ui/visualizer/scene_src/fixtures/builders.js · src/ui/visualizer/scene_src/bridge/bridge.js · tests/test_viz98_bodenfleck_ohne_treffer_scene.py · tests/test_viz_beam_laenge.py |
 | FM-73 | A | fix/fm73-sync-gleichnamige-modi | 2026-10-10T10:36Z | - |
 | PROC-19 | A | ci/proc19-doku-schnellweg | 2026-10-10T11:47Z | .github/workflows/ci.yml |
 | PROC-20 | A | feature/proc20-backlog-fragmente | 2026-10-10T11:47Z | tools · BACKLOG.md |
@@ -187,7 +186,6 @@
 
 ## Verlauf
 
-- 2026-10-10T13:55Z D done BPM-30
 - 2026-10-10T14:17Z B uebergeben XPLAT-51
 - 2026-10-10T14:17Z B uebergeben XPLAT-52
 - 2026-10-10T14:17Z A claim XPLAT-51
@@ -217,3 +215,4 @@
 - 2026-10-10T18:16Z D aktualisiert VCB-36: Branch - -> fix/vcb36-blackout-ziel-gruppen-id
 - 2026-10-10T18:17Z D aktualisiert UI-80: Branch - -> fix/ui80-matrix-entwurf-speed
 - 2026-10-10T18:24Z D aktualisiert UI-78: Branch - -> fix/ui78-efx-editor-texte
+- 2026-10-10T18:34Z D done VIZ-98
