@@ -63,6 +63,7 @@
 | UI-87 | D | fix/ui87-hilfe-oeffnen-windows | 2026-10-10T21:16Z | - |
 | QA-93 | D | fix/qa93-gate-ohne-echtes-fenster | 2026-10-10T21:16Z | - |
 | QA-94 | A | fix/cdx-1010-main | 2026-10-10T21:17Z | - |
+| QA-95 | A | fix/cdx-1010-main | 2026-10-10T21:17Z | - |
 
 ## Blocker & Fallen
 
@@ -199,7 +200,6 @@
 
 ## Verlauf
 
-- 2026-10-10T15:26Z D aktualisiert QA-91: Branch fix/qa91-subprocess-encoding -> fix/qa91-doc60-test-encoding
 - 2026-10-10T15:48Z B done XPLAT-46
 - 2026-10-10T16:51Z A done FM-68
 - 2026-10-10T17:17Z A done STAB-33
@@ -229,3 +229,4 @@
 - 2026-10-10T21:10Z B done VIZ-99
 - 2026-10-10T21:11Z D claim QA-93
 - 2026-10-10T21:17Z A claim QA-94
+- 2026-10-10T21:17Z A claim QA-95
