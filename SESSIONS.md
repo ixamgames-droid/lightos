@@ -55,7 +55,6 @@
 | VIZ-98 | D | fix/viz98-bodenfleck-ueber-horizont | 2026-10-10T11:42Z | src/ui/visualizer/scene_src/fixtures/builders.js · src/ui/visualizer/scene_src/bridge/bridge.js · tests/test_viz98_bodenfleck_ohne_treffer_scene.py · tests/test_viz_beam_laenge.py |
 | STAB-33 | A | fix/stab33-diagnose-windows | 2026-10-10T10:17Z | src/core/diagnose_log.py · main.py |
 | FM-73 | A | fix/fm73-sync-gleichnamige-modi | 2026-10-10T10:36Z | - |
-| ARM-PRUEFUNG-1010 | B | - | 2026-10-10T11:19Z | - |
 | PROC-19 | A | ci/proc19-doku-schnellweg | 2026-10-10T11:47Z | .github/workflows/ci.yml |
 | PROC-20 | A | feature/proc20-backlog-fragmente | 2026-10-10T11:47Z | tools · BACKLOG.md |
 
@@ -160,7 +159,6 @@
 
 ## Verlauf
 
-- 2026-10-10T09:29Z A claim OUT-67
 - 2026-10-10T09:39Z A done DEMO-07
 - 2026-10-10T09:41Z D claim TOOL-14
 - 2026-10-10T09:41Z D claim TOOL-21
@@ -190,3 +188,4 @@
 - 2026-10-10T11:47Z A claim PROC-20
 - 2026-10-10T12:06Z D done FM-72
 - 2026-10-10T12:25Z A done VCB-41
+- 2026-10-10T12:44Z B done ARM-PRUEFUNG-1010
