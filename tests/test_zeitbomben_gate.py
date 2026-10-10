@@ -219,7 +219,7 @@ class UhrVorspannTest(unittest.TestCase):
         """{Quelle: gesehenes Datum} aus einem echten Kindprozess."""
         env = zg.sprung_umgebung(tage, uhr=uhr)
         fertig = subprocess.run([sys.executable, "-c", self.ABFRAGE],
-                                cwd=REPO, env=env, text=True,
+                                cwd=REPO, env=env, text=True, encoding="utf-8", errors="replace",
                                 capture_output=True, timeout=120)
         self.assertEqual(fertig.returncode, 0, _kind_ausgabe(fertig))
         werte = [datetime.date.fromisoformat(w)
@@ -302,7 +302,7 @@ class UhrVorspannTest(unittest.TestCase):
             hier = _t.monotonic()
             fertig = subprocess.run(
                 [sys.executable, "-c", "import time;print(time.monotonic())"],
-                cwd=REPO, env=env, text=True, capture_output=True, timeout=120)
+                cwd=REPO, env=env, text=True, encoding="utf-8", errors="replace", capture_output=True, timeout=120)
             self.assertEqual(fertig.returncode, 0, _kind_ausgabe(fertig))
             dort = float(fertig.stdout.strip())
             self.assertLess(abs(dort - hier), 60,
@@ -450,7 +450,7 @@ class KanarieTest(unittest.TestCase):
              # gemeinsamen Vorfahren von Repo und Probe aus los - also
              # durch das halbe Home-Verzeichnis samt %TEMP%.
              "--rootdir", os.path.dirname(self.probe), self.probe],
-            cwd=REPO, env=env, text=True, capture_output=True, timeout=300)
+            cwd=REPO, env=env, text=True, encoding="utf-8", errors="replace", capture_output=True, timeout=300)
         self.assertEqual(fertig.returncode, 0,
                          "ohne Vorspann muss die Bombe gruen sein — sonst "
                          "misst der Test daneben" + chr(10)

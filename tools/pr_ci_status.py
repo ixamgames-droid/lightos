@@ -122,7 +122,7 @@ def hole_checks(pr: str, repo: str | None = None):
     befehl = ["gh", "pr", "view", str(pr), "--json", "statusCheckRollup"]
     if repo:
         befehl += ["--repo", repo]
-    erg = subprocess.run(befehl, capture_output=True, text=True, timeout=120)
+    erg = subprocess.run(befehl, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
     if erg.returncode != 0:
         raise RuntimeError(f"gh scheiterte: {erg.stderr.strip()[:400]}")
     return json.loads(erg.stdout).get("statusCheckRollup")

@@ -231,7 +231,7 @@ class BibliothekSchemaTest(unittest.TestCase):
         p = subprocess.Popen(
             [sys.executable, "-m", "pytest", "-q", _OPFER, "-p", "no:cacheprovider"],
             cwd=_REPO, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            text=True, env=env)
+            text=True, encoding="utf-8", errors="replace", env=env)
         self._letzte_pid = p.pid
         aus, _ = p.communicate(timeout=600)
         # Der Zaehlerstand ist hier eine SANITAETSPRUEFUNG, kein Beweis: er
@@ -287,7 +287,7 @@ class BibliothekSchemaTest(unittest.TestCase):
             env["LIGHTOS_FIXTURE_DB"] = vorgabe
         env["LIGHTOS_SHOW_DB"] = os.path.join(tmp, "show.db")   # QA-53
         fertig = subprocess.run([sys.executable, "-c", code], cwd=_REPO,
-                                capture_output=True, text=True, timeout=300,
+                                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300,
                                 env=env)
         self.assertEqual(0, fertig.returncode,
                          f"conftest liess sich nicht importieren:\n{fertig.stderr[-2000:]}")
@@ -756,7 +756,7 @@ class WaechterDeckungTest(unittest.TestCase):
             befehl += ["-p", plugin]
         befehl.append(opfer)
         fertig = subprocess.run(befehl, cwd=_REPO, capture_output=True,
-                                text=True, timeout=300, env=env)
+                                text=True, encoding="utf-8", errors="replace", timeout=300, env=env)
         return fertig.returncode, fertig.stdout + fertig.stderr
 
     # ── Der Abbruch muss AUSSEHEN wie ein Fehlschlag ────────────────────────

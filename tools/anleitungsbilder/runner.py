@@ -524,7 +524,7 @@ def fast_gleich(alt_pfad: str, neu: bytes, *, schwelle: int = 48,
 def git_stand() -> str:
     try:
         r = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=REPO,
-                           capture_output=True, text=True, timeout=10)
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10)
         return r.stdout.strip() or "?"
     except Exception:
         return "?"

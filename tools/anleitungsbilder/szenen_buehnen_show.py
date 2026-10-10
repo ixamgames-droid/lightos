@@ -88,7 +88,7 @@ def show_laden(ui):
     env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
     lauf = subprocess.run([sys.executable, os.path.join(tools, "build_buehnen_show_2026.py"),
                            "--out", pfad], env=env, cwd=os.getcwd(),
-                          capture_output=True, text=True, timeout=600)
+                          capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600)
     if lauf.returncode != 0 or not os.path.exists(pfad):
         raise SzenenFehler("Generator scheiterte: " + (lauf.stdout + lauf.stderr)[-600:])
     ok, meldung = load_show(pfad)

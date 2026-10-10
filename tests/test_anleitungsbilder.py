@@ -79,7 +79,7 @@ class MiniLaufTest(unittest.TestCase):
         cls.lauf = subprocess.run(
             [sys.executable, os.path.join(TOOLS, "anleitungsbilder.py"),
              "projektseite", "--nur", "02_patch", "--ausgabe", cls.ausgabe],
-            cwd=REPO, env=env, capture_output=True, text=True, timeout=180)
+            cwd=REPO, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=180)
         cls.nachher = _stand(cls.orte)
         cls.app_laeuft = sandbox.laufende_instanz()
 
@@ -171,7 +171,7 @@ class WindowsHomeTest(unittest.TestCase):
             "import shutil; os.chdir(%r); shutil.rmtree(b, ignore_errors=True)\n"
         ) % (TOOLS, REPO)
         r = subprocess.run([sys.executable, "-c", code], capture_output=True,
-                           text=True, timeout=60, cwd=REPO)
+                           text=True, encoding="utf-8", errors="replace", timeout=60, cwd=REPO)
         self.assertEqual(r.returncode, 0, r.stderr[-2000:])
         for k in ("USERPROFILE", "LOCALAPPDATA", "HOME"):
             self.assertIn(f"{k} True", r.stdout)
@@ -469,7 +469,7 @@ class AlleFrischTest(unittest.TestCase):
                 [sys.executable, os.path.join(TOOLS, "anleitungsbilder.py"),
                  "--alle", "--nur", "t8_hinterlassen,t8_frisch",
                  "--ausgabe", ausgabe],
-                cwd=REPO, env=env, capture_output=True, text=True, timeout=300)
+                cwd=REPO, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
             log = lauf.stdout[-4000:] + "\n--- stderr ---\n" + lauf.stderr[-3000:]
             self.assertNotIn("Zustand der vorigen Anleitung", lauf.stdout, log)
             self.assertEqual(lauf.returncode, 0, log)

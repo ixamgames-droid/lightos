@@ -173,6 +173,6 @@ def test_werkzeug_laeuft_durch_und_meldet_null_offen():
         pytest.skip("flacher Klon oder Audit-Datei fehlt — s. Kommentar oben")
     r = subprocess.run(
         [sys.executable, os.path.join(_REPO, "tools", "audit_bilder_stand.py"),
-         _AUDIT_DATEI], cwd=_REPO, capture_output=True, text=True)
+         _AUDIT_DATEI], cwd=_REPO, capture_output=True, text=True, encoding="utf-8", errors="replace")
     assert r.returncode == 0, r.stderr
     assert "OFFEN: 0" in r.stdout, r.stdout

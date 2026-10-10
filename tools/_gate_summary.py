@@ -78,7 +78,7 @@ def zaehle(results_tsv: str) -> dict[str, int]:
 def commit(repo: str) -> str | None:
     try:
         erg = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo,
-                             capture_output=True, text=True, timeout=10)
+                             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10)
     except (OSError, subprocess.SubprocessError):
         return None
     if erg.returncode != 0:

@@ -54,7 +54,7 @@ def _probe(plattform: str) -> str:
     env.pop("DISPLAY", None)
     env.pop("XAUTHORITY", None)
     r = subprocess.run([sys.executable, "-c", _SANDBOX_PROBE, TOOLS, plattform, REPO],
-                       capture_output=True, text=True, timeout=60, cwd=REPO, env=env)
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60, cwd=REPO, env=env)
     assert r.returncode == 0, r.stderr[-2000:]
     return r.stdout
 

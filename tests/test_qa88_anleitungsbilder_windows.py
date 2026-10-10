@@ -27,7 +27,7 @@ def _im_unterprozess(code: str) -> subprocess.CompletedProcess:
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     env.pop("QT_QPA_FONTDIR", None)          # die Sandbox soll selbst entscheiden
     return subprocess.run([sys.executable, "-c", textwrap.dedent(code)], cwd=REPO,
-                          env=env, capture_output=True, text=True, timeout=180)
+                          env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=180)
 
 
 class OffscreenSchriftTest(unittest.TestCase):

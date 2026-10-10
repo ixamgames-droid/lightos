@@ -47,7 +47,7 @@ def _sperrpfad_laut_skript() -> str:
     umgebung["LIGHTOS_VERIFY_NOLOCK"] = "1"     # nur fragen, nicht belegen
     umgebung.pop("LIGHTOS_LOCKFILE", None)
     r = subprocess.run(["bash", os.path.join(_REPO, "tools", "verify_loop.sh")],
-                       cwd=_REPO, env=umgebung, capture_output=True, text=True,
+                       cwd=_REPO, env=umgebung, capture_output=True, text=True, encoding="utf-8", errors="replace",
                        timeout=180)
     for zeile in r.stdout.splitlines():
         if zeile.startswith("[verify] Sperrdatei:"):

@@ -46,7 +46,7 @@ def _committete_shows() -> list[str]:
     benutzten Rechner die privaten Shows mit und wird zufaellig rot.
     """
     aus = subprocess.run(["git", "ls-files", "shows/"], cwd=_ROOT,
-                         capture_output=True, text=True, check=True).stdout
+                         capture_output=True, text=True, encoding="utf-8", errors="replace", check=True).stdout
     return [z for z in aus.splitlines() if z.endswith(".lshow")]
 
 

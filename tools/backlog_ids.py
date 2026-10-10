@@ -156,7 +156,7 @@ _ID_IM_TEXT = re.compile(r"\b[A-Z][A-Z0-9]*-\d+\b")
 # ── Alles ab hier redet mit git ──────────────────────────────────────────────
 
 def _git(*args: str) -> tuple[int, str]:
-    p = subprocess.run(("git",) + args, capture_output=True, text=True, encoding="utf-8")
+    p = subprocess.run(("git",) + args, capture_output=True, text=True, encoding="utf-8", errors="replace")
     return p.returncode, p.stdout
 
 
@@ -176,7 +176,7 @@ def offene_pr_zweige() -> tuple:
         ("gh", "pr", "list", "--state", "open", "--limit", str(_PR_LIMIT),
          "--json", "headRefName,isCrossRepository,number",
          "-q", ".[] | [.number, .headRefName, (.isCrossRepository|tostring)] | @tsv"),
-        capture_output=True, text=True, encoding="utf-8")
+        capture_output=True, text=True, encoding="utf-8", errors="replace")
     if p.returncode != 0:
         return [], f"`gh pr list` fehlgeschlagen: {p.stderr.strip()[:160]}"
     zeilen = [z.split("\t") for z in p.stdout.splitlines() if z.strip()]

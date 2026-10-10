@@ -365,7 +365,7 @@ class PufferHygieneTest(_WireTestBase):
             [sys.executable, "-c",
              "import tests.test_sacn_loopback as m;"
              "print(m._empfaenger_adresse(0))"],
-            cwd=wurzel, env=umgebung, capture_output=True, text=True, timeout=30)
+            cwd=wurzel, env=umgebung, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
         self.assertEqual(fremd.returncode, 0, fremd.stderr)
         eigen = _empfaenger_adresse(0)      # GLEICHER Index, anderer Prozess
         self.assertNotEqual(
