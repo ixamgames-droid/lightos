@@ -72,6 +72,7 @@ class Umgebung:
         self.eigene_show = _schreibe(self.app / "shows" / "meine.lshow")
         self.show_db = _schreibe(self.app / "current_show.db")
         _schreibe(self.app / "midi_mappings.json")
+        _schreibe(self.app / "universes.json")
         _schreibe(self.app / "fixtures.db")
         _schreibe(self.app / "snaps" / "s1.json")
         _schreibe(self.app / "stages" / "b1.json")
@@ -214,6 +215,72 @@ class TestRueckfragen:
         data = [f for f in fragen if f[0].startswith("data/")]
         assert len(data) == 1
         assert "controller_library" in data[0][0] and "bleib" in data[0][0]
+
+
+class TestSchreibweise:
+    """Windows/macOS: ``Shows`` und ``shows`` sind derselbe Ordner."""
+
+    def test_keep_shows_schuetzt_auch_gross_geschriebenes_shows(
+            self, umg, monkeypatch, capsys):
+        (umg.app / "shows").rename(umg.app / "Shows")
+        show = umg.app / "Shows" / "meine.lshow"
+        out, _ = _lauf(umg, monkeypatch, capsys, "--purge", "--yes",
+                       "--keep-shows", "--dry-run")
+        assert not [p for p in _angekuendigt(out) if p.name == "Shows"], out
+        _lauf(umg, monkeypatch, capsys, "--purge", "--yes", "--keep-shows")
+        assert _dateien(umg.app) == {str(show)}
+
+    def test_vorlagen_ordner_bleibt_auch_anders_geschrieben(
+            self, umg, monkeypatch, capsys):
+        (umg.repo / "data" / "controller_library").rename(
+            umg.repo / "data" / "Controller_Library")
+        _lauf(umg, monkeypatch, capsys, "--yes")
+        assert (umg.repo / "data" / "Controller_Library" / "apc_mini.json").exists()
+
+
+class TestNochNichtUebernommen:
+    """data/ ist nur dann "alter Stand", wenn der App-Ordner die Kopie schon hat.
+
+    Der Datenumzug XPLAT-44 kopiert erst beim ersten Start nach dem Update.
+    Lief LightOS seitdem nie, liegt die Show-DB NUR in data/.
+    """
+
+    def _ohne_kopie(self, umg):
+        umg.show_db.unlink()
+        _schreibe(umg.repo / "data" / "current_show.db-wal")
+        return (umg.repo / "data" / "current_show.db",
+                umg.repo / "data" / "current_show.db-wal")
+
+    def test_yes_laesst_die_einzige_show_db_stehen(self, umg, monkeypatch, capsys):
+        db, wal = self._ohne_kopie(umg)
+        out, fragen = _lauf(umg, monkeypatch, capsys, "--yes")
+        assert fragen == []
+        assert db.exists() and wal.exists(), "einziger Stand der Show-DB geloescht"
+        assert "current_show.db" in out and "BEHALTEN" in out
+        # was schon uebernommen ist, geht weiterhin weg
+        assert not (umg.repo / "data" / "universes.json").exists()
+        assert not (umg.repo / "data" / "_backup").exists()
+
+    def test_auch_interaktiv_und_mit_purge(self, umg, monkeypatch, capsys):
+        db, wal = self._ohne_kopie(umg)
+        _lauf(umg, monkeypatch, capsys, "--purge", antwort=True)
+        assert db.exists() and wal.exists()
+
+    def test_leere_kopie_zaehlt_nicht_als_uebernommen(self, umg, monkeypatch, capsys):
+        umg.show_db.write_bytes(b"")
+        _lauf(umg, monkeypatch, capsys, "--yes")
+        assert (umg.repo / "data" / "current_show.db").exists()
+
+    def test_trockenlauf_nennt_die_geschuetzte_datei_nicht(
+            self, umg, monkeypatch, capsys):
+        db, wal = self._ohne_kopie(umg)
+        out, _ = _lauf(umg, monkeypatch, capsys, "--yes", "--dry-run")
+        assert not {db, wal} & _angekuendigt(out)
+
+    def test_uebernommene_dateien_werden_wie_bisher_entfernt(
+            self, umg, monkeypatch, capsys):
+        _lauf(umg, monkeypatch, capsys, "--yes")
+        assert not (umg.repo / "data" / "current_show.db").exists()
 
 
 @pytest.mark.parametrize("schalter", KOMBINATIONEN, ids=lambda s: " ".join(s) or "-")

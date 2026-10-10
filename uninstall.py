@@ -7,7 +7,9 @@ Was wird entfernt:
 - venv/                  (Virtual Environment)
 - data/                  (nur Nutzerdateien aus der Zeit VOR dem Datenumzug
                           XPLAT-44; data/controller_library gehoert zum Programm
-                          und bleibt)
+                          und bleibt. Eine Nutzerdatei, die im App-Datenordner
+                          noch FEHLT - LightOS lief seit dem Update nie -, ist
+                          der einzige Stand und bleibt ebenfalls)
 - shows/                 (Shows im Programmordner - nur nach ausdruecklicher
                           Rueckfrage, mit --yes oder --keep-shows nie)
 - Desktop\LightOS.lnk
@@ -47,7 +49,7 @@ MANIFEST_PATH = ROOT / "install_manifest.json"
 # auf Linux ~/LightOS weg (vom alten Installer angelegt, meist leer) und LAESST die
 # echten Nutzerdaten in ~/.local/share/LightOS stehen.
 sys.path.insert(0, str(ROOT))
-from src.core.paths import app_data_dir            # noqa: E402
+from src.core.paths import app_data_dir, USER_DATA_FILES   # noqa: E402
 
 APPDATA_DIR = Path(app_data_dir())
 VENV_DIR = ROOT / "venv"
@@ -80,10 +82,50 @@ def appdata_frage(shows_bleiben: bool = False) -> str:
 
 
 def kinder_ausser(ordner: Path, behalten: tuple[str, ...]) -> list[Path]:
-    """Direkte Eintraege von ``ordner`` ohne die geschuetzten Namen."""
+    """Direkte Eintraege von ``ordner`` ohne die geschuetzten Namen.
+
+    Der Vergleich ignoriert Gross-/Kleinschreibung: unter Windows und macOS ist
+    ein von Hand angelegtes ``Shows`` derselbe Ordner wie ``shows`` - die App
+    speichert dorthin, ``iterdir()`` liefert aber die Schreibweise der Platte.
+    """
     if not ordner.is_dir():
         return []
-    return sorted(k for k in ordner.iterdir() if k.name not in behalten)
+    schutz = {b.casefold() for b in behalten}
+    return sorted(k for k in ordner.iterdir() if k.name.casefold() not in schutz)
+
+
+def nicht_uebernommen(data_dir: Path) -> tuple[str, ...]:
+    """Nutzerdateien in ``data/``, die im App-Datenordner (noch) fehlen.
+
+    Der Datenumzug XPLAT-44 kopiert erst beim ersten Start nach dem Update. Lief
+    LightOS seitdem nie, ist ``data/current_show.db`` kein "alter Datenstand",
+    sondern der einzige - der bleibt stehen, auch unter ``--yes``.
+    """
+    if not data_dir.is_dir():
+        return ()
+    fehlt = []
+    for name in USER_DATA_FILES:
+        ziel = APPDATA_DIR / name
+        try:
+            uebernommen = ziel.is_file() and ziel.stat().st_size > 0
+        except OSError:
+            uebernommen = False
+        if (data_dir / name).is_file() and not uebernommen:
+            fehlt.append(name)
+    return tuple(fehlt)
+
+
+def data_ziele(data_dir: Path) -> tuple[list[Path], tuple[str, ...]]:
+    """(zu loeschende Eintraege von ``data/``, geschuetzte Nutzerdateien)."""
+    einzig = nicht_uebernommen(data_dir)
+    praefixe = tuple(n.casefold() for n in einzig)
+    ziele = []
+    for kind in kinder_ausser(data_dir, DATA_BEHALTEN):
+        # samt SQLite-Begleitdateien (-wal/-shm/-journal) der Show-DB
+        if praefixe and kind.name.casefold().startswith(praefixe):
+            continue
+        ziele.append(kind)
+    return ziele, einzig
 
 
 def info(msg: str):
@@ -196,8 +238,13 @@ def main():
     data_dir = ROOT / "data"
     data_aufraeumen = args.yes or confirm(DATA_FRAGE)
     if data_aufraeumen:
-        for kind in kinder_ausser(data_dir, DATA_BEHALTEN):
+        ziele, einzig = data_ziele(data_dir)
+        for kind in ziele:
             targets.append(("data", kind))
+        if einzig:
+            warn(f"data/: {', '.join(einzig)} wird BEHALTEN - im App-Datenordner "
+                 "gibt es davon noch keine Kopie (LightOS lief seit dem Update "
+                 "nicht). Das ist der einzige Stand dieser Nutzerdaten.")
 
     # 3. shows/ im Programmordner - nie ohne ausdrueckliches Ja (XPLAT-49:
     #    --yes ist kein Ja zu eigenen Shows)

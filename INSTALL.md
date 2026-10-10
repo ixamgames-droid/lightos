@@ -125,6 +125,12 @@ Welche Option loescht was:
 
 - `data/controller_library` (mitgelieferte Controller-Vorlagen) gehoert zum
   Programm und bleibt immer stehen.
+- Eine Nutzerdatei in `data/` (z. B. `current_show.db`), von der es im
+  App-Datenordner noch keine Kopie gibt, bleibt ebenfalls immer stehen - das
+  ist der Fall, wenn LightOS seit dem Update auf den App-Datenordner nie
+  gestartet wurde. Sie ist dann der einzige Stand; der Lauf nennt sie.
+- Gross-/Kleinschreibung spielt beim Schutz keine Rolle: ein von Hand angelegtes
+  `Shows` im App-Datenordner bleibt mit `--keep-shows` genauso stehen.
 - `--purge --keep-shows` laesst die Shows an ihrem Ort
   (`<App-Datenordner>/shows`) liegen und loescht nur den Rest - es wird nichts
   umkopiert.
