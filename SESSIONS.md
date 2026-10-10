@@ -50,7 +50,7 @@
 | STAB-32 | A | feature/stab32-versionierte-sicherungen | 2026-10-10T09:29Z | - |
 | OUT-67 | A | feature/out67-ausgabe-ausfall-banner | 2026-10-10T09:29Z | - |
 | TOOL-14 | D | fix/tool14-gen-tools-index-argparse | 2026-10-10T11:10Z | tools/gen_tools_index.py · tests/test_tool14_gen_tools_index_cli.py |
-| TOOL-21 | D | - | 2026-10-10T09:41Z | - |
+| TOOL-21 | D | fix/tool21-gif-vergleich-rgb | 2026-10-10T11:13Z | tools/anleitungsbilder/runner.py · tests/test_tool21_bildvergleich_je_kanal.py |
 | TOOL-23 | D | - | 2026-10-10T09:41Z | - |
 | TOOL-24 | D | - | 2026-10-10T09:41Z | - |
 | FM-66 | D | - | 2026-10-10T09:41Z | - |
@@ -146,7 +146,6 @@
 
 ## Verlauf
 
-- 2026-10-10T09:28Z C uebergeben WEB-06
 - 2026-10-10T09:28Z C uebergeben DOC-54
 - 2026-10-10T09:28Z C uebergeben DOC-55
 - 2026-10-10T09:28Z C uebergeben DOC-56
@@ -176,3 +175,4 @@
 - 2026-10-10T10:47Z A aktualisiert LAS-30: Branch feature/viz95-lasermuster-3d -> feature/las30-laser-achsen; Dateien src/core -> src/core/laser
 - 2026-10-10T11:07Z D aktualisiert DOC-70: Dateien - -> docs/anleitung_netzwerk_windows/ANLEITUNG.md · docs/ANLEITUNGEN.md · tests/test_doc70_netzwerk_windows.py
 - 2026-10-10T11:10Z D aktualisiert TOOL-14: Branch - -> fix/tool14-gen-tools-index-argparse; Dateien - -> tools/gen_tools_index.py · tests/test_tool14_gen_tools_index_cli.py
+- 2026-10-10T11:13Z D aktualisiert TOOL-21: Branch - -> fix/tool21-gif-vergleich-rgb; Dateien - -> tools/anleitungsbilder/runner.py · tests/test_tool21_bildvergleich_je_kanal.py
