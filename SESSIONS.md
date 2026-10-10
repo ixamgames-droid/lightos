@@ -55,6 +55,7 @@
 | TOOL-23 | D | - | 2026-10-10T09:41Z | - |
 | TOOL-24 | D | - | 2026-10-10T09:41Z | - |
 | FM-66 | D | - | 2026-10-10T09:41Z | - |
+| DOC-70 | D | docs/doc70-netzwerk-windows | 2026-10-10T09:41Z | - |
 
 ## Blocker & Fallen
 
@@ -130,7 +131,6 @@
 
 ## Verlauf
 
-- 2026-10-10T09:27Z C uebergeben DOC-44
 - 2026-10-10T09:27Z C uebergeben DOC-45
 - 2026-10-10T09:27Z C uebergeben DOC-46
 - 2026-10-10T09:27Z C uebergeben DOC-47
@@ -160,3 +160,4 @@
 - 2026-10-10T09:41Z D claim TOOL-23
 - 2026-10-10T09:41Z D claim TOOL-24
 - 2026-10-10T09:41Z D claim FM-66
+- 2026-10-10T09:41Z D claim DOC-70
