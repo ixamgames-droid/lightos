@@ -751,10 +751,23 @@ class MainWindow(QMainWindow):
 
         # Hilfe
         hm = mb.addMenu("&Hilfe")
-        hm.addAction("Über LightOS").triggered.connect(self._about)
+        # UI-85: Doku, Tastenkuerzel und die Ordner direkt aus der App.
+        from src.ui import hilfe
+        hm.addAction("Erste Schritte").triggered.connect(
+            lambda _=False: hilfe.oeffne_doku(hilfe.ERSTE_SCHRITTE))
+        hm.addAction("Anleitungen öffnen").triggered.connect(
+            lambda _=False: hilfe.oeffne_doku(hilfe.ANLEITUNGEN))
+        hm.addAction("Tastenkürzel…").triggered.connect(self._tastenkuerzel_zeigen)
+        hm.addSeparator()
+        hm.addAction("Datenordner öffnen").triggered.connect(
+            lambda _=False: hilfe.oeffne_ordner(hilfe.datenordner()))
+        hm.addAction("Show-Ordner öffnen").triggered.connect(
+            lambda _=False: hilfe.oeffne_ordner(hilfe.show_ordner()))
         # STAB-30: ein Paket fuer die Fernhilfe (Logs + Systeminfo, keine Shows).
         hm.addAction("Diagnosepaket speichern…").triggered.connect(
-            self._diagnosepaket_speichern)
+            lambda _=False: self._diagnosepaket_speichern())
+        hm.addSeparator()
+        hm.addAction("Über LightOS").triggered.connect(self._about)
 
     # ── UI aufbauen ───────────────────────────────────────────────────────────
 
@@ -1038,6 +1051,17 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
 
+        # OUT-67: Ausfall-/Probenbanner. Sitzt im Wurzel-Layout UEBER der
+        # Sektionsleiste — die wird im Kiosk-Modus ausgeblendet (wie Menue und
+        # Statusleiste), das Banner bleibt. Gefuellt wird es aus dem
+        # bestehenden Hardware-Takt (`_update_ausgabe_label`).
+        from src.ui.ausgabe_banner import AusgabeBannerSteuerung
+        self._ausgabe_banner = AusgabeBannerSteuerung(
+            kiosk=self._kiosk_mode, parent=central)
+        if not self._kiosk_mode:
+            # Im Kiosk-Modus gibt es bewusst keinen Weg in die Einstellungen.
+            self._ausgabe_banner.bei_stoerung_klick = self._open_output_config
+        root.addWidget(self._ausgabe_banner.widget)
         root.addWidget(self._section_bar)
 
         # ── Stacked Widget ─────────────────────────────────────────────────────
@@ -1116,7 +1140,7 @@ class MainWindow(QMainWindow):
 
         # Keyboard-Shortcuts fuer Sektionswechsel (Strg+1..8, eine je Sektion)
         for i, btn in enumerate(self._section_btns):
-            act = QAction(f"Sektion {i+1}", self)
+            act = QAction(f"Sektion {i+1}: {btn._full_text}", self)
             act.setShortcut(f"Ctrl+{i+1}")
             act.triggered.connect(weak_slot(self._switch_section, i))
             self.addAction(act)
@@ -1402,6 +1426,12 @@ class MainWindow(QMainWindow):
             probleme = om.sende_probleme()
         except Exception:
             return
+        # OUT-67: dieselbe Auskunft, laut — oben im Fenster, auch im Kiosk-
+        # Modus (dort ist die Statusleiste ausgeblendet). Kein zweiter Timer,
+        # keine zweite Abfrage: das Banner bekommt die eben gelesenen Wege.
+        banner = getattr(self, "_ausgabe_banner", None)
+        if banner is not None:
+            banner.aktualisiere(om, wege)
         # OUT-56: gepatchte Universen ohne jeden Adapter. `sendet_wirklich` ist
         # dieselbe Frage, die der DMX-Monitor stellt (OUT-52) — eine zweite
         # Antwort darauf soll es nicht geben.
@@ -1922,11 +1952,13 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self._visualizer_window = None
             print(f"[MainWindow] Visualizer start error: {e}")
+            # XPLAT-46: auf nativem ARM64-Python fehlt QtWebEngine - dort
+            # nennt die Meldung x64-Python als Abhilfe statt "neu installieren".
+            from src.core.plattform_hinweis import visualizer_startfehler_text
             QMessageBox.warning(
                 self,
                 "Visualizer nicht verfügbar",
-                "Der 3D-Visualizer konnte nicht gestartet werden.\n\n"
-                "Bitte prüfe, ob PySide6 + PySide6-Addons korrekt installiert sind."
+                visualizer_startfehler_text(e),
             )
 
     def _close_visualizer(self):
@@ -2612,15 +2644,35 @@ class MainWindow(QMainWindow):
 
     # ── About ─────────────────────────────────────────────────────────────────
 
+    def _about_text(self) -> str:
+        """UI-85: echte Version, Build-Art, Datenordner und Doku-Link."""
+        from src.ui import hilfe
+        return hilfe.ueber_text()
+
     def _about(self):
-        QMessageBox.about(
-            self, "Über LightOS",
-            "<b>LightOS v1.0</b><br>"
-            "Professionelle DMX-Lichtsteuerung<br><br>"
-            "Windows x64 &amp; ARM64<br>"
-            "Enttec Pro USB &middot; Art-Net 4 &middot; MIDI<br><br>"
-            "UI: QLC+ v5 Design System"
-        )
+        QMessageBox.about(self, "Über LightOS", self._about_text())
+
+    def _tastenkuerzel_dialog(self):
+        """UI-85: Dialog mit allen Kuerzeln — gesammelt aus den vorhandenen
+        QAction/QShortcut-Objekten dieses Fensters und der uebrigen offenen
+        Fenster (z. B. 3D-Visualizer), nicht von Hand gepflegt."""
+        from PySide6.QtWidgets import QApplication
+        from src.ui import hilfe
+        wurzeln = [self] + [w for w in QApplication.topLevelWidgets()
+                            if w is not self and w.isVisible()
+                            and not isinstance(w, hilfe.TastenkuerzelDialog)]
+        # Kuerzel aus einer Ansicht tragen den Namen ihrer Sektion als Bereich.
+        bereiche = {self._stack.widget(i): f"Sektion {btn._full_text}"
+                    for i, btn in enumerate(self._section_btns)
+                    if self._stack.widget(i) is not None}
+        bereiche[self] = hilfe.ALLGEMEIN   # Fenstertitel waere der Show-Name
+        return hilfe.TastenkuerzelDialog(
+            hilfe.sammle_tastenkuerzel(wurzeln, bereiche), self)
+
+    def _tastenkuerzel_zeigen(self):
+        dlg = self._tastenkuerzel_dialog()
+        dlg.exec()
+        dlg.deleteLater()
 
     def _diagnosepaket_speichern(self, ziel: str | None = None):
         """STAB-30: Hilfe → „Diagnosepaket speichern…“. Erklaert vorher, was im
@@ -2893,8 +2945,8 @@ class MainWindow(QMainWindow):
         try:
             sb = self.statusBar()
             sb.showMessage(
-                "⏹  LASER NOT-AUS ausgelöst — Netzwerk-Ausgabe verriegelt "
-                "& unscharf", 6000)
+                "⏹  LASER NOT-AUS ausgelöst — alle Laser dunkel (DMX-Laser "
+                "verriegelt, Netzwerk-Ausgabe unscharf)", 6000)
             sb.setStyleSheet(
                 "QStatusBar{background:#b31414; color:#ffffff; font-weight:bold;}")
             QTimer.singleShot(6000, lambda: self._reset_statusbar_style())

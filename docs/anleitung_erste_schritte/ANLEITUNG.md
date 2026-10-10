@@ -29,7 +29,9 @@ Nach dem Start öffnet LightOS in der Sektion **Bühne**. Von oben nach unten:
 
 1. **Menüleiste** — `Datei`, `Bearbeiten`, `Ansicht`, `Show`, `Programmer`, `Datenbank`,
    `Ausgabe`, `Visualizer`, `Command`, `Hilfe`. Hier liegen Speichern und Öffnen
-   (Schritt 7) und die Ausgabe-Einstellungen.
+   (Schritt 7) und die Ausgabe-Einstellungen. Unter `Hilfe` findest du diese
+   Anleitung wieder, dazu **Tastenkürzel…** (alle Kürzel auf einen Blick) und
+   **Datenordner öffnen** / **Show-Ordner öffnen**.
 2. **Sektionsleiste** — die acht Arbeitsbereiche von LightOS, siehe Schritt 2.
 3. **GM** — der Grand Master. Er regelt die Gesamthelligkeit von 0 bis 100 %.
    Laser ohne Dimmerkanal dimmt er nicht stufenlos, sondern schaltet sie bei 0 % aus —

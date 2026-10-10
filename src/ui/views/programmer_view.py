@@ -1599,7 +1599,20 @@ class ProgrammerView(QWidget):
             if getattr(self, "_position_tab_index", -1) >= 0:
                 self._main_tabs.setTabVisible(self._position_tab_index, has_pos)
             if getattr(self, "_efx_tab_index", -1) >= 0:
-                self._main_tabs.setTabVisible(self._efx_tab_index, has_pos)
+                # LAS-22: auch fuer Laser, die ihr Bild ueber laser_x/laser_y
+                # bewegen — der EFX-Editor schreibt dann diese Achsen.
+                has_efx = has_pos
+                if not has_efx:
+                    try:
+                        from src.ui.views.efx_view import laser_achsen_attrs
+                        has_efx = any(
+                            laser_achsen_attrs(
+                                getattr(ch, "attribute", "")
+                                for ch in get_channels_for_patched(f))
+                            for f in selected)
+                    except Exception:
+                        has_efx = False
+                self._main_tabs.setTabVisible(self._efx_tab_index, has_efx)
             # LAS-02: Laser-Tab sichtbar, sobald EIN Laser-Geraet in der
             # Auswahl ist (gegen alle selektierten Geraete geprueft, wie beim
             # Mapping-Tab — nicht nur gegen das Template).
