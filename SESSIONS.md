@@ -61,6 +61,7 @@
 | XPLAT-51 | A | fix/xplat51-arm64-nicht-unterstuetzt | 2026-10-10T14:17Z | - |
 | XPLAT-52 | A | fix/xplat52-installer-venv-arch | 2026-10-10T14:17Z | - |
 | VIZ-100 | A | fix/viz100-haengend-andocken | 2026-10-10T14:38Z | src/ui/visualizer/scene_src/stage/docking.js |
+| VIZ-101 | A | fix/viz101-licht-durch-wand | 2026-10-10T14:38Z | - |
 
 ## Blocker & Fallen
 
@@ -173,7 +174,6 @@
 
 ## Verlauf
 
-- 2026-10-10T11:19Z D aktualisiert TOOL-23: Branch - -> fix/tool23-backlog-ids-tafel-fragmente; Dateien - -> tools/backlog_ids.py · tests/test_tool23_backlog_ids_tafel_fragmente.py · tests/test_backlog_ids.py
 - 2026-10-10T11:19Z B claim ARM-PRUEFUNG-1010
 - 2026-10-10T11:23Z D aktualisiert TOOL-24: Branch - -> fix/tool24-proc18-lizenzhinweise-strukturiert; Dateien - -> tests/test_proc18_fremd_lizenzhinweise.py
 - 2026-10-10T11:28Z D aktualisiert FM-66: Branch - -> fix/fm66-abgleich-modellname; Dateien - -> src/core/database/bibliothek_format.py · tests/test_fm66_abgleich_modellname.py · docs/FIXTURE_LIBRARY.md
@@ -203,3 +203,4 @@
 - 2026-10-10T14:25Z D done VIZ-97
 - 2026-10-10T14:34Z B uebergeben UI-86
 - 2026-10-10T14:38Z A claim VIZ-100
+- 2026-10-10T14:38Z A claim VIZ-101
