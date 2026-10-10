@@ -33,7 +33,7 @@
 | XPLAT-49 | A | fix/xplat49-uninstall-datenschutz | 2026-10-10T18:44Z | uninstall.py |
 | XPLAT-50 | A | fix/xplat49-uninstall-datenschutz | 2026-10-10T09:29Z | start.bat · start.ps1 |
 | FM-67 | A | fix/fm67-gleichnamige-modi | 2026-10-10T09:29Z | - |
-| DOC-69 | A | docs/doc69-doku-korrekturen | 2026-10-10T09:29Z | - |
+| DOC-69 | A | docs/doc69-doku-korrekturen | 2026-10-10T18:44Z | - |
 | STAB-32 | A | feature/stab32-versionierte-sicherungen | 2026-10-10T09:29Z | - |
 | OUT-67 | A | feature/out67-ausgabe-ausfall-banner | 2026-10-10T09:29Z | - |
 | TOOL-14 | D | fix/tool14-gen-tools-index-argparse | 2026-10-10T15:48Z | tools/gen_tools_index.py · tests/test_tool14_gen_tools_index_cli.py |
