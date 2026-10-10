@@ -411,27 +411,37 @@ def ist_uebernommen(name: str, quell_dir: str, ziel_dir: str | None = None) -> b
     Fuer Aufrufer, die den alten Stand loeschen wollen (``uninstall.py``) —
     dieselbe Leer-Pruefung wie die Uebernahme, im Zweifel ``False``:
 
-    * am Ziel liegt ein Nutzerstand -> ``True``;
-    * das Ziel fehlt oder ist frisch/leer (``[]``, ``{}``, leere Show-DB): die
-      Uebernahme stuende noch aus -> ``False``. Ausnahme: der Marker fuehrt
-      genau diese Datei dieses Quellordners als erledigt (uebernommen und
-      danach bewusst geleert oder zurueckgesetzt) -> ``True``;
+    * der Marker fuehrt genau diese Datei dieses Quellordners als erledigt
+      (kopiert, gleicher Stand oder ein SICHTBAR quittierter Konflikt) ->
+      ``True``, auch wenn das Ziel danach bewusst geleert wurde;
     * das Ziel ist unlesbar/kaputt -> ``False`` (der alte Stand koennte der
-      einzige brauchbare sein).
+      einzige brauchbare sein);
+    * am Ziel liegt derselbe Stand wie in der Quelle -> ``True``;
+    * am Ziel liegt ein ANDERER Nutzerstand, ueber den fuer diesen Quellordner
+      noch nie entschieden wurde (etwa der Stand einer zweiten Installation,
+      die den App-Datenordner schon gefuellt hat) -> ``False``: der naechste
+      Start wuerde das als Konflikt zeigen und die Uebernahme anbieten;
+    * das Ziel fehlt oder ist frisch/leer (``[]``, ``{}``, leere Show-DB): die
+      Uebernahme stuende noch aus -> ``False``.
 
     Liest nur; nimmt keine Sperre und legt nichts an.
     """
     ziel_dir = ziel_dir or app_data_dir()
-    zustand = _ziel_zustand(os.path.join(ziel_dir, name), _ist_sqlite(name))
-    if zustand == ZIEL_INHALT:
-        return True
+    sqlite = _ist_sqlite(name)
+    neu = os.path.join(ziel_dir, name)
+    zustand = _ziel_zustand(neu, sqlite)
     if zustand == ZIEL_UNKLAR:
         return False
     marker = _marker_lesen(os.path.join(ziel_dir, MARKER_NAME))
     s = _schluessel(quell_dir)
     if s in set(marker.get("quellen_erledigt") or []):
         return True
-    return name in (_teil_lesen(marker).get(s) or [])
+    if name in (_teil_lesen(marker).get(s) or []):
+        return True
+    if zustand != ZIEL_INHALT:
+        return False
+    return _gleicher_stand(os.path.join(quell_dir, name), neu,
+                           SQLITE_BEGLEITER if sqlite else ())
 
 
 def _db_ohne_show_inhalt(db: str) -> bool:

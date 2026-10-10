@@ -131,10 +131,15 @@ Welche Option loescht was:
   gestartet wurde. Sie ist dann der einzige Stand; der Lauf nennt sie.
   Als Kopie zaehlt nur ein Stand mit Inhalt: eine im App-Datenordner frisch
   und leer angelegte Datei (Show-DB ohne Patch, `[]`, `{}`) oder eine
-  unlesbare schuetzt den Stand in `data/` genauso.
+  unlesbare schuetzt den Stand in `data/` genauso. Dasselbe gilt, wenn im
+  App-Datenordner ein ANDERER Stand liegt, ueber den LightOS fuer diesen
+  Programmordner noch nie entschieden hat (etwa von einer zweiten
+  Installation): der naechste Start wuerde die Uebernahme anbieten.
 - Die Desktop-Verknuepfung `LightOS.lnk` wird nur entfernt, wenn das
   Installations-Manifest sie nennt oder ihr Ziel in diesem Programmordner
-  liegt. Die Verknuepfung einer zweiten Installation bleibt.
+  liegt. Die Verknuepfung einer zweiten Installation bleibt - auch wenn das
+  Manifest den Pfad nennt, die Datei aber inzwischen nachweislich in einen
+  anderen Programmordner zeigt.
 - Gross-/Kleinschreibung spielt beim Schutz keine Rolle: ein von Hand angelegtes
   `Shows` im App-Datenordner bleibt mit `--keep-shows` genauso stehen.
 - `--purge --keep-shows` laesst die Shows an ihrem Ort

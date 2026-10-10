@@ -110,7 +110,9 @@ def nicht_uebernommen(data_dir: Path) -> tuple[str, ...]:
     "Fehlt" heisst dasselbe wie beim Umzug selbst (``datenumzug.ist_uebernommen``):
     ein frisch angelegtes, inhaltlich leeres Ziel (``[]``, ``{}``, eine Show-DB
     ohne Patch) ist keine Kopie - es sei denn, der Umzugs-Marker fuehrt die
-    Datei als erledigt. Ein unlesbares Ziel zaehlt ebenfalls nicht als Kopie.
+    Datei als erledigt. Ein unlesbares Ziel zaehlt ebenfalls nicht als Kopie,
+    und auch nicht ein ANDERER Stand, ueber den der Umzug fuer diesen Ordner
+    nie entschieden hat (zweite Installation mit schon gefuelltem App-Ordner).
     """
     if not data_dir.is_dir():
         return ()
@@ -250,9 +252,21 @@ def eigene_verknuepfung(manifest_pfad: str | None, ziele=None) -> Path | None:
     Desktop zu nehmen, loeschte auf einem Rechner mit zwei Checkouts die
     Verknuepfung der ANDEREN Installation. ``ziele`` ist die Aufloesung
     (Vorgabe: ``verknuepfung_ziele``) - in Tests austauschbar.
+
+    Auch die im Manifest genannte bleibt, wenn sie NACHWEISLICH woandershin
+    zeigt: eine zweite Installation legt ihre ``LightOS.lnk`` an denselben
+    Platz und ueberschreibt die erste - das Manifest der ersten nennt den Pfad
+    dann weiter. Ist das Ziel nicht ermittelbar, gilt das Manifest.
     """
     if manifest_pfad:
-        return Path(manifest_pfad)
+        kandidat = Path(manifest_pfad)
+        if kandidat.exists() or kandidat.is_symlink():
+            gefunden = (ziele or verknuepfung_ziele)(kandidat)
+            if gefunden and not any(liegt_im_programmordner(z) for z in gefunden):
+                info(f"Verknuepfung wird BEHALTEN: {kandidat} zeigt inzwischen "
+                     f"auf eine andere Installation ({gefunden[0]})")
+                return None
+        return kandidat
     kandidat = standard_verknuepfung()
     if not (kandidat.exists() or kandidat.is_symlink()):
         return None
@@ -327,10 +341,11 @@ def main():
         for kind in ziele:
             targets.append(("data", kind))
         if einzig:
-            warn(f"data/: {', '.join(einzig)} wird BEHALTEN - im App-Datenordner "
-                 "gibt es davon noch keine Kopie mit Inhalt (LightOS hat den "
-                 "Stand seit dem Update nicht uebernommen). Das ist der einzige "
-                 "Stand dieser Nutzerdaten.")
+            warn(f"data/: {', '.join(einzig)} wird BEHALTEN - LightOS hat den "
+                 "Stand seit dem Update nicht in den App-Datenordner uebernommen "
+                 "(dort fehlt die Datei, ist leer oder traegt einen anderen "
+                 "Stand, ueber den noch nicht entschieden ist). Das kann der "
+                 "einzige Stand dieser Nutzerdaten sein.")
 
     # 3. shows/ im Programmordner - nie ohne ausdrueckliches Ja (XPLAT-49:
     #    --yes ist kein Ja zu eigenen Shows)

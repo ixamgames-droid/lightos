@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import itertools
 import json
+import shutil
 import sqlite3
 import sys
 from pathlib import Path
@@ -90,6 +91,10 @@ class Umgebung:
         self.show_db = _show_db(self.app / "current_show.db")
         _schreibe(self.app / "midi_mappings.json", '[{"cc": 1}]')
         _schreibe(self.app / "universes.json", '[{"id": 1}]')
+        # ... und zwar DIESELBEN wie data/: ein anderer Stand ohne Eintrag im
+        # Umzugs-Marker gaelte als noch nicht entschieden (s. TestAndererStand).
+        shutil.copyfile(self.show_db, self.repo / "data" / "current_show.db")
+        _schreibe(self.repo / "data" / "universes.json", '[{"id": 1}]')
         _schreibe(self.app / "fixtures.db")
         _schreibe(self.app / "snaps" / "s1.json")
         _schreibe(self.app / "stages" / "b1.json")
@@ -390,6 +395,73 @@ class TestLeeresZielIstKeineKopie:
         assert {p: Path(p).read_bytes() for p in _dateien(umg.app)} == vorher
 
 
+class TestAndererStand:
+    """Review: liegt im App-Ordner ein ANDERER Nutzerstand, ueber den der Umzug
+    fuer diesen Programmordner nie entschieden hat (zweite Installation, die
+    den App-Ordner schon gefuellt hat; LightOS lief hier seit dem Update nie),
+    dann ist ``data/`` der einzige Ort dieses Stands. Der naechste Start wuerde
+    den Konflikt zeigen und die Uebernahme anbieten - ``--yes`` darf dem nicht
+    zuvorkommen."""
+
+    def _anderer_stand(self, umg):
+        _show_db(umg.repo / "data" / "current_show.db", patch=3)
+        _schreibe(umg.repo / "data" / "universes.json", '[{"id": 2}]')
+
+    def test_anderer_stand_ohne_marker_bleibt(self, umg, monkeypatch, capsys):
+        self._anderer_stand(umg)
+        out, _ = _lauf(umg, monkeypatch, capsys, "--yes")
+        assert (umg.repo / "data" / "current_show.db").exists()
+        assert (umg.repo / "data" / "universes.json").exists()
+        assert "BEHALTEN" in out
+
+    def test_trockenlauf_nennt_ihn_nicht(self, umg, monkeypatch, capsys):
+        self._anderer_stand(umg)
+        out, _ = _lauf(umg, monkeypatch, capsys, "--yes", "--dry-run")
+        assert not {umg.repo / "data" / "current_show.db",
+                    umg.repo / "data" / "universes.json"} & _angekuendigt(out)
+
+    def test_quittierter_konflikt_gilt_als_entschieden(self, umg, monkeypatch, capsys):
+        from src.core import datenumzug
+        self._anderer_stand(umg)
+        quelle = datenumzug._schluessel(str(umg.repo / "data"))
+        _schreibe(umg.app / datenumzug.MARKER_NAME, json.dumps(
+            {"teil_erledigt": {quelle: ["universes.json"]}}))
+        _lauf(umg, monkeypatch, capsys, "--yes")
+        assert not (umg.repo / "data" / "universes.json").exists()
+        assert (umg.repo / "data" / "current_show.db").exists()
+
+    def test_erledigter_quellordner_gilt_als_entschieden(self, umg, monkeypatch, capsys):
+        from src.core import datenumzug
+        self._anderer_stand(umg)
+        quelle = datenumzug._schluessel(str(umg.repo / "data"))
+        _schreibe(umg.app / datenumzug.MARKER_NAME, json.dumps(
+            {"quellen_erledigt": [quelle]}))
+        _lauf(umg, monkeypatch, capsys, "--yes")
+        assert not (umg.repo / "data" / "current_show.db").exists()
+        assert not (umg.repo / "data" / "universes.json").exists()
+
+    def test_marker_eines_anderen_programmordners_entscheidet_nichts(
+            self, umg, monkeypatch, capsys):
+        from src.core import datenumzug
+        self._anderer_stand(umg)
+        _schreibe(umg.app / datenumzug.MARKER_NAME, json.dumps(
+            {"quellen_erledigt": [str(umg.tmp / "zweiter-checkout" / "data")]}))
+        _lauf(umg, monkeypatch, capsys, "--yes")
+        assert (umg.repo / "data" / "current_show.db").exists()
+
+    def test_urteil_deckt_sich_mit_dem_umzug(self, umg, monkeypatch, capsys):
+        """Was stehen bleibt, meldet der naechste Start als Konflikt."""
+        from src.core import datenumzug
+        monkeypatch.delenv(datenumzug.ENV_AUS, raising=False)
+        monkeypatch.delenv("LIGHTOS_UNIVERSES_JSON", raising=False)
+        self._anderer_stand(umg)
+        _lauf(umg, monkeypatch, capsys, "--yes")
+        erg = datenumzug.uebernehme_alte_daten(
+            ziel_dir=str(umg.app), quellen=[str(umg.repo / "data")],
+            dateien=["universes.json"], log=lambda _t: None)
+        assert [n for n, _ in erg.konflikte] == ["universes.json"], vars(erg)
+
+
 class TestFremdeVerknuepfung:
     """Befund vom Zweit-PC: ohne Manifest merkte ``--yes`` ``LightOS.lnk`` vom
     Desktop vor, egal wohin sie zeigt - bei zwei Checkouts die der ANDEREN
@@ -454,14 +526,33 @@ class TestFremdeVerknuepfung:
         _lauf(umg, monkeypatch, capsys, "--yes")
         assert lnk.exists()
 
-    def test_manifest_nennt_die_verknuepfung_dann_ohne_aufloesung(
+    def test_manifest_nennt_die_verknuepfung_ziel_nicht_ermittelbar(
             self, umg, monkeypatch, capsys):
-        def nie(_pfad):
-            raise AssertionError("mit Manifest wird nichts aufgeloest")
-
-        monkeypatch.setattr(umg.U, "verknuepfung_ziele", nie)
+        monkeypatch.setattr(umg.U, "verknuepfung_ziele", lambda _pfad: ())
         _lauf(umg, monkeypatch, capsys, "--yes")
         assert not umg.verknuepfung.exists()
+
+    def test_manifest_nennt_sie_und_sie_zeigt_in_den_eigenen_ordner(
+            self, umg, monkeypatch, capsys):
+        monkeypatch.setattr(umg.U, "verknuepfung_ziele",
+                            lambda _pfad: (str(umg.repo / "venv" / "pythonw.exe"),
+                                           str(umg.repo)))
+        _lauf(umg, monkeypatch, capsys, "--yes")
+        assert not umg.verknuepfung.exists()
+
+    def test_manifest_nennt_sie_aber_zweite_installation_hat_sie_ueberschrieben(
+            self, umg, monkeypatch, capsys):
+        """Zwei Installationen MIT Manifest teilen sich ``LightOS.lnk``: die
+        zweite ueberschreibt die Datei, das Manifest der ersten nennt sie weiter."""
+        anderes = umg.tmp / "zweiter-checkout"
+        monkeypatch.setattr(umg.U, "verknuepfung_ziele",
+                            lambda _pfad: (str(anderes / "venv" / "pythonw.exe"),
+                                           str(anderes)))
+        out, _ = _lauf(umg, monkeypatch, capsys, "--yes")
+        assert umg.verknuepfung.exists(), "Verknuepfung der anderen Installation geloescht"
+        assert "BEHALTEN" in out and "andere Installation" in out
+        out, _ = _lauf(umg, monkeypatch, capsys, "--yes", "--dry-run")
+        assert umg.verknuepfung not in _angekuendigt(out)
 
     def test_nein_zur_verknuepfung_laesst_sie_stehen(self, umg, monkeypatch, capsys):
         _lauf(umg, monkeypatch, capsys, "--keep-venv",
