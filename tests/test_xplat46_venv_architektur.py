@@ -103,6 +103,16 @@ class TestX64Auswahl:
         assert installer.x64_python_aus_liste(self.LISTE_NEU) == "C:\\Py\\Python312\\python.exe"
         assert installer.x64_python_aus_liste(self.LISTE_ALT) == "C:\\Py\\Python312\\python.exe"
 
+    def test_install_manager_tag_mit_klammern(self, installer):
+        # "py -0p" des Python-Install-Managers (ab 3.14), so am Windows-ARM-PC
+        # gemessen: der optionale Zusatz steht in eckigen Klammern.
+        liste = (" -V:3.14-arm64     C:\\Py\\pythoncore-3.14-arm64\\python.exe\n"
+                 " -V:3.14[-64] *   C:\\Py\\pythoncore-3.14-64\\python.exe\n")
+        assert (installer.x64_python_aus_liste(liste)
+                == "C:\\Py\\pythoncore-3.14-64\\python.exe")
+        nur_arm = " -V:3.14[-arm64] *   C:\\Py\\pythoncore-3.14-arm64\\python.exe\n"
+        assert installer.x64_python_aus_liste(nur_arm) is None
+
     def test_nur_arm64_und_32bit_ergibt_nichts(self, installer):
         liste = (" -V:3.12-arm64 *  C:\\Py\\Python312-arm64\\python.exe\n"
                  " -V:3.11-32       C:\\Py\\Python311-32\\python.exe\n")

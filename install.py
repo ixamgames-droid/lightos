@@ -187,12 +187,16 @@ def x64_python_aus_liste(ausgabe: str) -> str | None:
     """Pfad eines x64-Python aus der Ausgabe von ``py -0p`` (oder None).
 
     Der python.org-Installer registriert x64 als Tag "3.12", ARM64 als
-    "3.12-arm64" und 32-bit als "3.12-32" (aeltere Launcher: "3.12-64")."""
+    "3.12-arm64" und 32-bit als "3.12-32" (aeltere Launcher: "3.12-64").
+    Der Python-Install-Manager (Standard ab 3.14) schreibt den optionalen
+    Zusatz in eckigen Klammern: "3.14[-64]" - gemessen am Windows-ARM-PC,
+    ohne die Klammern zu entfernen fand die Suche dort kein x64-Python."""
     for zeile in (ausgabe or "").splitlines():
         m = _PY_LISTE_ZEILE.match(zeile)
         if not m:
             continue
         tag = m.group("tag").lower().split("/")[-1]
+        tag = tag.replace("[", "").replace("]", "")
         pfad = m.group("pfad").strip()
         if "arm64" in tag or "arm64" in pfad.lower() or tag.endswith("-32"):
             continue
