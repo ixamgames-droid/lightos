@@ -201,6 +201,7 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
     6. Programmer enthaelt nur fids von gepatchten Fixtures
     7. CueStack-Cues referenzieren nur gepatchte Fixtures
     8. Function-Manager Functions referenzieren nur gepatchte Fixtures
+    9. VC-Knoepfe verweisen nur auf vorhandene Bibliothek-Snaps (nur Meldung)
 
     Returns: Liste von Issues. Wenn fix=True werden auto-fixable Issues behoben.
     Validation darf NIE crashen - alle Fehler werden abgefangen.
@@ -565,5 +566,23 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
             'error', 'validate_and_repair',
             f"Unerwarteter Fehler: {e_outer}",
         ))
+
+    # 9. TOOL-25: VC-Knoepfe mit Verweis auf geloeschte Snaps ('warn') und
+    #    Knoepfe, deren Snaps sich auf demselben Kanal widersprechen ('info').
+    #    NUR melden — nie reparieren (welcher Snap gemeint war, weiss nur der
+    #    Nutzer). Eigener try: unabhaengig von DB/Patch oben.
+    try:
+        vc = getattr(state, "_vc_layout", None)
+        widgets = vc.get("widgets", []) if isinstance(vc, dict) else []
+        if widgets:
+            from src.core.capability.validate import (
+                INFO as _INFO, snap_verweis_befunde)
+            from src.core.engine.snap_library import get_snap_library
+            for b in snap_verweis_befunde(widgets, get_snap_library().to_dict()):
+                issues.append(ValidationIssue(
+                    'info' if b.severity == _INFO else 'warn',
+                    f"VC {b.where}", b.message))
+    except Exception as e:
+        issues.append(ValidationIssue('error', 'VC-Snap-Verweise', f"Fehler: {e}"))
 
     return issues
