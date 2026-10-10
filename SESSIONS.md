@@ -13,7 +13,6 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | FM-46c | A | feat/fm46-qxf-head | 2026-10-02T11:59Z | - |
-| DOC-51 | C | - | 2026-10-02T12:23Z | docs/anleitung_grosse_demo_2026/ANLEITUNG_GROSSE_DEMO_2026.md |
 | DOC-52 | C | - | 2026-10-02T12:24Z | docs/anleitung_komplettshow_2026 |
 | DOC-53 | C | - | 2026-10-02T12:26Z | docs/anleitung_hochzeit_komplett · tools/build_hochzeit_komplett.py · tests/test_doc53_hochzeit_linie.py · changelog.d/2026-10-02-DOC-53.md |
 | TOOL-10 | C | - | 2026-10-02T12:28Z | BACKLOG.md |
@@ -127,7 +126,6 @@
 
 ## Verlauf
 
-- 2026-10-10T09:26Z C uebergeben DOC-14
 - 2026-10-10T09:26Z C uebergeben DOC-23
 - 2026-10-10T09:26Z C uebergeben DOC-24
 - 2026-10-10T09:26Z C uebergeben DOC-25
@@ -157,3 +155,4 @@
 - 2026-10-10T09:27Z C uebergeben DOC-48
 - 2026-10-10T09:27Z C uebergeben DOC-49
 - 2026-10-10T09:28Z C uebergeben DOC-50
+- 2026-10-10T09:28Z C uebergeben DOC-51
