@@ -5,6 +5,7 @@ Backend-Priorität:
   2. WinMM via ctypes  (Windows ARM64 / kein Compiler nötig)
 """
 from __future__ import annotations
+import re
 import sys
 import threading
 import queue
@@ -73,6 +74,116 @@ def _sysex_freigeben(midi_in) -> None:
             setter(sysex=False, timing=True, active_sense=True)
         except Exception:
             pass
+
+
+# ── MIDI-3: Portnamen stabil ueber Neustecken ──────────────────────────────
+# ALSA haengt die Client:Port-Nummer an ("APC MINI:APC MINI MIDI 1 20:0"); sie
+# wechselt beim Neustecken. rtmidi auf Windows haengt einen Index an
+# ("APC MINI 1"). Fuer den Abgleich zaehlt der Geraetename; zwei gleiche
+# Geraete unterscheidet ein Ordinal (" #2"), vergeben in Steck-Reihenfolge.
+_ALSA_SUFFIX = re.compile(r"^(.*\S)\s+(\d+):(\d+)$")
+_WIN_INDEX = re.compile(r"^(.*\S)\s+(\d+)$")
+_ORDINAL = re.compile(r"^(.*\S)\s+#(\d+)$")
+
+
+def _zerlege(name: str) -> tuple[str, tuple[int, ...] | None]:
+    """(Basisname, Sortierschluessel aus der Nummer oder None)."""
+    name = str(name or "").strip()
+    m = _ALSA_SUFFIX.match(name)
+    if m:
+        return m.group(1), (int(m.group(2)), int(m.group(3)))
+    if ":" not in name:
+        m = _WIN_INDEX.match(name)
+        if m:
+            return m.group(1), (int(m.group(2)),)
+    return name, None
+
+
+def port_basisname(name: str) -> str:
+    """Portname ohne ALSA-Client:Port-Nummer bzw. Windows-Index."""
+    return _zerlege(name)[0]
+
+
+def _ordinal(port_name: str, ports) -> int:
+    basis = port_basisname(port_name)
+    gleich = {p for p in (ports or ()) if port_basisname(p) == basis}
+    gleich.add(port_name)
+    reihe = sorted(gleich, key=lambda p: (_zerlege(p)[1] or (), p))
+    return reihe.index(port_name) + 1
+
+
+def stabiler_portname(port_name: str, ports=None) -> str:
+    """Neustecken-fester Name: Basisname, ab dem zweiten gleichen Geraet mit
+    Ordinal (``"APC MINI:APC MINI MIDI 1 #2"``)."""
+    port_name = str(port_name or "").strip()
+    if not port_name:
+        return ""
+    n = _ordinal(port_name, ports)
+    basis = port_basisname(port_name)
+    return basis if n == 1 else f"{basis} #{n}"
+
+
+def _geraet_ziel(geraet: str, ports) -> tuple[str, int] | None:
+    """Fuer einen GERAETEGENAUEN Namen (mit Nummer oder Ordinal) das Paar
+    (Basisname, Ordinal); fuer einen freien Teilstring-Filter None."""
+    m = _ORDINAL.match(geraet)
+    if m:
+        return m.group(1), int(m.group(2))
+    basis, nummer = _zerlege(geraet)
+    if nummer is None:
+        return None
+    # Alt-Mapping mit Nummer, das Geraet steckt nicht mehr unter ihr: das
+    # erste gleichnamige Geraet nehmen.
+    return basis, 1
+
+
+def geraet_passt(geraet: str, port_name: str, ports=None) -> bool:
+    """Passt der gespeicherte Geraetename auf den Port einer Nachricht?
+
+    * leer: jedes Geraet
+    * exakt gleich: ja
+    * freier Teilstring (``"APC"``): wie bisher, zusaetzlich gegen den
+      Basisnamen
+    * geraetegenau (Nummer oder ``#n``): Basisname + Ordinal; eine alte Nummer,
+      die es noch gibt, bleibt exakt.
+    """
+    geraet = str(geraet or "").strip()
+    port_name = str(port_name or "")
+    if not geraet or geraet == port_name:
+        return True
+    ziel = _geraet_ziel(geraet, ports)
+    if ziel is None:
+        if geraet == port_basisname(port_name):
+            # Voller Geraetename ohne Ordinal = das erste dieser Geraete.
+            return _ordinal(port_name, ports) == 1
+        return geraet in port_name or geraet in port_basisname(port_name)
+    if ports and geraet in ports:
+        return False
+    basis, n = ziel
+    if port_basisname(port_name) != basis:
+        # Ein frei getippter Filter mit Endziffer ("APC MINI MIDI 1") sieht
+        # aus wie ein Windows-Index, ist aber ein Teilstring — gegen ein
+        # ANDERES Geraet (anderer Basisname) gilt der alte Teilstring-Abgleich.
+        if not _ORDINAL.match(geraet) and not _ALSA_SUFFIX.match(geraet):
+            return geraet in port_name
+        return False
+    return _ordinal(port_name, ports) == n
+
+
+def loese_portnamen_auf(geraet: str, ports) -> str | None:
+    """Gespeicherten (evtl. veralteten) Portnamen auf einen aktuell
+    vorhandenen Port abbilden; None, wenn keiner passt."""
+    geraet = str(geraet or "").strip()
+    ports = list(ports or ())
+    if geraet in ports:
+        return geraet
+    if (_geraet_ziel(geraet, ports) is None
+            and not any(port_basisname(p) == geraet for p in ports)):
+        return None
+    for p in ports:
+        if geraet_passt(geraet, p, ports):
+            return p
+    return None
 
 
 def _new_rtmidi_out():
@@ -701,13 +812,16 @@ class MidiManager:
         try:
             m = _new_rtmidi_out()
             ports = [m.get_port_name(i) for i in range(m.get_port_count())]
-            if port_name not in ports:
+            # MIDI-3: nach dem Neustecken traegt der Port eine neue
+            # ALSA-Nummer — ueber den Geraetenamen aufloesen.
+            echt = loese_portnamen_auf(port_name, ports)
+            if echt is None:
                 try:
                     m.delete()
                 except Exception:
                     pass
                 return None
-            m.open_port(ports.index(port_name))
+            m.open_port(ports.index(echt))
         except Exception as exc:
             self._log(f"MIDI Zweit-Ausgang nicht verfügbar ({port_name}): {exc}")
             return None
@@ -750,6 +864,14 @@ class MidiManager:
             return self._output_name
 
     # ── Callbacks ────────────────────────────────────────────────────────────
+
+    def offene_eingaenge(self) -> list[str]:
+        """Namen der offenen Eingaenge (MIDI-3: Ordinal gleicher Geraete)."""
+        return list(self._inputs.keys())
+
+    def stabiler_name(self, port_name: str) -> str:
+        """Neustecken-fester Name eines Eingangsports (MIDI-3)."""
+        return stabiler_portname(port_name, self.offene_eingaenge())
 
     def subscribe(self, cb: Callable[[MidiMessage], None]):
         self._callbacks.append(cb)

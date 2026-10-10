@@ -10,7 +10,8 @@ from dataclasses import dataclass, field
 from typing import Callable
 from uuid import uuid4
 
-from .midi_manager import MidiMessage, get_midi_manager
+from .midi_manager import (MidiMessage, geraet_passt, get_midi_manager,
+                           stabiler_portname)
 
 # Action types (legacy-compatible)
 ACTION_EXECUTOR_GO = "executor_go"
@@ -165,6 +166,16 @@ def _bindings_overlap(type_a, ch_a, d1_a, type_b, ch_b, d1_b) -> bool:
     return True
 
 
+def _offene_eingaenge() -> list[str]:
+    """Offene Eingaenge des Managers — fuer das Ordinal gleicher Geraete
+    (MIDI-3). Ohne Manager/Methode (Tests, Fakes) eine leere Liste."""
+    try:
+        fn = getattr(get_midi_manager(), "offene_eingaenge", None)
+        return list(fn()) if callable(fn) else []
+    except Exception:
+        return []
+
+
 @dataclass
 class MidiInBinding:
     """Incoming MIDI trigger definition."""
@@ -175,7 +186,9 @@ class MidiInBinding:
     message_type: str = "note"  # note or cc
 
     def matches(self, msg: MidiMessage) -> bool:
-        if self.device and self.device not in msg.port_name:
+        # MIDI-3: ueber den Geraetenamen, nicht ueber die ALSA-Nummer.
+        if self.device and not geraet_passt(self.device, msg.port_name,
+                                            _offene_eingaenge()):
             return False
         if self.channel != 0 and self.channel != msg.channel:
             return False
@@ -201,7 +214,7 @@ class MidiInBinding:
     @classmethod
     def from_message(cls, msg: MidiMessage) -> "MidiInBinding":
         return cls(
-            device=msg.port_name,
+            device=stabiler_portname(msg.port_name, _offene_eingaenge()),
             channel=msg.channel,
             trigger_id=msg.data1,
             message_type="cc" if msg.msg_type == "cc" else "note",
@@ -348,8 +361,8 @@ class MidiMapping:
         self.msg_type = "cc" if msg.msg_type == "cc" else "note_on"
         self.channel = int(msg.channel)
         self.data1 = int(msg.data1)
-        self.port_filter = msg.port_name
         self.midi_in = MidiInBinding.from_message(msg)
+        self.port_filter = self.midi_in.device
         if self.midi_out and self.midi_out.trigger_id < 0:
             self.midi_out.trigger_id = msg.data1
 
@@ -366,6 +379,9 @@ class MidiMapper:
         # UI-Hook fuer Learn-Konflikt-Warnungen (Option B, rein additiv).
         self._conflict_callbacks: list[Callable[[dict], None]] = []
         self._toggle_states: dict[str, bool] = {}
+        # MIDI-4: _on_midi laeuft im MIDI-Empfangsthread, add/replace/remove
+        # und das Feedback-Polling in anderen Threads.
+        self._toggle_lock = threading.Lock()
         self._feedback_state_cache: dict[str, float] = {}
         self._feedback_output_cache: dict[str, int] = {}
         self._feedback_last_send_ts: dict[str, float] = {}
@@ -387,14 +403,16 @@ class MidiMapper:
         if not mapping.mapping_id:
             mapping.mapping_id = uuid4().hex
         if mapping.button_mode == BUTTON_TOGGLE:
-            self._toggle_states.setdefault(mapping.mapping_id, False)
+            with self._toggle_lock:
+                self._toggle_states.setdefault(mapping.mapping_id, False)
         self._mappings.append(mapping)
         self._emit_mapping_state(mapping, self._read_mapping_state(mapping))
 
     def remove_mapping(self, idx: int):
         if 0 <= idx < len(self._mappings):
             mapping = self._mappings.pop(idx)
-            self._toggle_states.pop(mapping.mapping_id, None)
+            with self._toggle_lock:
+                self._toggle_states.pop(mapping.mapping_id, None)
             self._feedback_state_cache.pop(mapping.mapping_id, None)
 
     def get_mappings(self) -> list[MidiMapping]:
@@ -402,11 +420,12 @@ class MidiMapper:
 
     def replace_mappings(self, mappings: list[MidiMapping]):
         self._mappings = list(mappings)
-        self._toggle_states = {}
+        with self._toggle_lock:
+            self._toggle_states = {
+                m.mapping_id: False for m in self._mappings
+                if m.button_mode == BUTTON_TOGGLE}
         self._feedback_state_cache = {}
         for mapping in self._mappings:
-            if mapping.button_mode == BUTTON_TOGGLE:
-                self._toggle_states[mapping.mapping_id] = False
             self._emit_mapping_state(mapping, self._read_mapping_state(mapping))
 
     # Learn mode ---------------------------------------------------------
@@ -519,10 +538,21 @@ class MidiMapper:
                 callback(msg)
             return
 
-        for mapping in self._mappings:
-            if not mapping.midi_in.matches(msg):
-                continue
-            self._handle_inbound_mapping(mapping, msg)
+        # MIDI-4: jede Zeile einzeln absichern — eine kaputte Zeile darf die
+        # anderen Zeilen derselben Note nicht abbrechen. Schnappschuss der
+        # Liste, weil die UI sie parallel ersetzen kann.
+        for mapping in list(self._mappings):
+            try:
+                if not mapping.midi_in.matches(msg):
+                    continue
+                self._handle_inbound_mapping(mapping, msg)
+            except Exception as e:
+                try:
+                    from src.core.diagnose_log import melde_still
+                    melde_still("midi.mapping", e,
+                                text=f"Mapping {mapping.name or mapping.action}")
+                except Exception:
+                    pass
 
     # ── MIDI Show Control (MIDI-5 / NET-14) ──────────────────────────────────
 
@@ -653,9 +683,9 @@ class MidiMapper:
         # Toggle mode
         if not is_pressed:
             return
-        cur = self._toggle_states.get(mapping.mapping_id, False)
-        new_state = not cur
-        self._toggle_states[mapping.mapping_id] = new_state
+        with self._toggle_lock:
+            new_state = not self._toggle_states.get(mapping.mapping_id, False)
+            self._toggle_states[mapping.mapping_id] = new_state
         self._execute_binary(mapping, new_state)
         self._emit_mapping_state(mapping, 1.0 if new_state else 0.0)
 
@@ -1003,7 +1033,9 @@ class MidiMapper:
             except Exception:
                 return 0.0
 
-        return 1.0 if self._toggle_states.get(mapping.mapping_id, False) else 0.0
+        with self._toggle_lock:
+            an = self._toggle_states.get(mapping.mapping_id, False)
+        return 1.0 if an else 0.0
 
     # Persistence --------------------------------------------------------
 
