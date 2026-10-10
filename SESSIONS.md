@@ -55,7 +55,7 @@
 | PROC-19 | A | ci/proc19-doku-schnellweg | 2026-10-10T11:47Z | .github/workflows/ci.yml |
 | PROC-20 | A | feature/proc20-backlog-fragmente | 2026-10-10T11:47Z | tools · BACKLOG.md |
 | TOOL-26 | B | feature/tool26-app-messwerkzeug | 2026-10-10T13:25Z | tools/app_messung.py · tools/README.md · tests/test_tool26_app_messung.py · BACKLOG.md · changelog.d/2026-10-10-TOOL-26.md |
-| VIZ-99 | B | fix/viz99-automatik-snapdragon | 2026-10-10T13:27Z | src/ui/visualizer/scene_src/scene/gpu_tier.js · tests/test_viz84_gpu_tier.py · tests/test_viz99_automatik_snapdragon.py · src/ui/visualizer/visualizer_window.py · BACKLOG.md · changelog.d/2026-10-10-VIZ-99.md |
+| VIZ-99 | B | fix/viz99-automatik-snapdragon | 2026-10-10T14:09Z | src/ui/visualizer/scene_src/scene/gpu_tier.js · tests/test_viz84_gpu_tier.py · tests/test_viz99_automatik_snapdragon.py · src/ui/visualizer/visualizer_window.py · BACKLOG.md · changelog.d/2026-10-10-VIZ-99.md |
 | XPLAT-51 | B | fix/xplat51-arm64-nicht-unterstuetzt | 2026-10-10T12:55Z | - |
 | XPLAT-52 | B | fix/xplat52-installer-venv-arch | 2026-10-10T12:55Z | - |
 | UI-86 | B | fix/ui86-liveansicht-200-prozent | 2026-10-10T12:55Z | - |
