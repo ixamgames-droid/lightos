@@ -169,7 +169,7 @@ class EchteScheiben(unittest.TestCase):
                 [sys.executable, "-m", "pytest", "--collect-only", "-q",
                  "-p", zg.SCHEIBE_PLUGIN, "-p", "no:cacheprovider",
                  "--rootdir", self.ordner, pfad],
-                cwd=self.ordner, env=env, text=True, capture_output=True, timeout=120)
+                cwd=self.ordner, env=env, text=True, encoding="utf-8", errors="replace", capture_output=True, timeout=120)
             gesammelt += re.findall(r"test_fall\[(\w)\]", fertig.stdout)
         self.assertEqual(sorted(gesammelt), list("abcdefghijkl"),
                          "jeder Fall genau einmal ueber alle drei Kinder")
