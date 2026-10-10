@@ -119,6 +119,22 @@ def test_staffelung_mit_injizierter_uhr(daten):
     assert len(bleibt) == 30
 
 
+def test_auto_saves_verdraengen_keine_anlass_sicherung(daten):
+    """Review: der Stand vor einem Ueberschreiben/Verwerfen darf nicht nach
+    zehn Auto-Saves derselben Stunde verschwinden."""
+    start = JETZT.replace(minute=0, second=0)
+    vor_speichern = _lege_an("Abend", start, anlass=S.ANLASS_VOR_SPEICHERN)
+    vor_verwerfen = _lege_an("Abend", start + datetime.timedelta(seconds=30),
+                             anlass=S.ANLASS_VOR_VERWERFEN)
+    for i in range(1, 13):
+        _lege_an("Abend", start + datetime.timedelta(minutes=i))
+    S.raeume_auf(start + datetime.timedelta(minutes=13))
+    pfade = {e.pfad for e in S.liste_sicherungen("Abend")}
+    assert vor_speichern in pfade and vor_verwerfen in pfade
+    assert len([e for e in S.liste_sicherungen("Abend")
+                if e.anlass == S.ANLASS_AUTO]) == S.BEHALTE_LETZTE
+
+
 def test_staffelung_je_show_getrennt(daten):
     for i in range(15):
         _lege_an("A", JETZT - datetime.timedelta(seconds=i + 1))

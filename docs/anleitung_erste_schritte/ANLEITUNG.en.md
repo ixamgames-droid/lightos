@@ -238,7 +238,8 @@ file and the backup stay untouched; the old version is only kept once you store 
 *Speichern unter...*.
 
 Per show LightOS keeps the last 10 backups, plus one per hour of the last 24 hours and
-one per day of the last 14 days. If the folder grows beyond 500 MB, the oldest are
+one per day of the last 14 days — auto-saves and the backups taken before overwriting or
+discarding are counted separately, so auto-saves never push such a version out. If the folder grows beyond 500 MB, the oldest are
 deleted first.
 
 **Quitting with unsaved changes.** If you changed anything in the content of the show

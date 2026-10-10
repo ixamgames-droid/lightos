@@ -174,7 +174,18 @@ def zu_behalten(eintraege: list[Sicherung],
     * die ``BEHALTE_LETZTE`` neuesten,
     * je Stunde der letzten ``STUNDEN`` h die neueste,
     * je Kalendertag der letzten ``TAGE`` Tage die neueste.
+
+    Auto-Saves und Anlass-Sicherungen (vor dem Ueberschreiben / Verwerfen)
+    werden GETRENNT gestaffelt: sonst schoeben zehn Auto-Saves — bei 5 min
+    Intervall keine Stunde — genau den Stand hinaus, der vor einem
+    versehentlichen Ueberschreiben oder Verwerfen aufgehoben wurde.
     """
+    auto = [e for e in eintraege if e.anlass == ANLASS_AUTO]
+    anlass = [e for e in eintraege if e.anlass != ANLASS_AUTO]
+    return _staffel(auto, jetzt) | _staffel(anlass, jetzt)
+
+
+def _staffel(eintraege: list[Sicherung], jetzt: datetime.datetime) -> set[str]:
     sortiert = sorted(eintraege, key=lambda e: (e.zeit, e.pfad), reverse=True)
     behalten = {e.pfad for e in sortiert[:BEHALTE_LETZTE]}
     stunden: set = set()

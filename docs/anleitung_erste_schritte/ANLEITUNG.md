@@ -233,7 +233,9 @@ unverändert; behalten willst du die alte Version erst, wenn du sie mit *Speiche
 unter...* ablegst.
 
 Aufgehoben werden je Show die letzten 10 Sicherungen, dazu eine pro Stunde der letzten
-24 Stunden und eine pro Tag der letzten 14 Tage. Wird der Ordner größer als 500 MB,
+24 Stunden und eine pro Tag der letzten 14 Tage — Auto-Saves und die Sicherungen vor
+einem Überschreiben oder Verwerfen zählen dabei getrennt, damit Auto-Saves keinen solchen
+Stand verdrängen. Wird der Ordner größer als 500 MB,
 löscht LightOS die ältesten zuerst.
 
 **Beenden mit ungespeicherten Änderungen.** Hast du seit dem letzten Speichern oder
