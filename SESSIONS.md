@@ -60,6 +60,7 @@
 | DEMO-8 | A | feature/demo8-demoshows-im-setup | 2026-10-10T13:08Z | - |
 | XPLAT-51 | A | fix/xplat51-arm64-nicht-unterstuetzt | 2026-10-10T14:17Z | - |
 | XPLAT-52 | A | fix/xplat52-installer-venv-arch | 2026-10-10T14:17Z | - |
+| VIZ-100 | A | fix/viz100-haengend-andocken | 2026-10-10T14:38Z | src/ui/visualizer/scene_src/stage/docking.js |
 
 ## Blocker & Fallen
 
@@ -172,7 +173,6 @@
 
 ## Verlauf
 
-- 2026-10-10T11:15Z B done OUT-64
 - 2026-10-10T11:19Z D aktualisiert TOOL-23: Branch - -> fix/tool23-backlog-ids-tafel-fragmente; Dateien - -> tools/backlog_ids.py · tests/test_tool23_backlog_ids_tafel_fragmente.py · tests/test_backlog_ids.py
 - 2026-10-10T11:19Z B claim ARM-PRUEFUNG-1010
 - 2026-10-10T11:23Z D aktualisiert TOOL-24: Branch - -> fix/tool24-proc18-lizenzhinweise-strukturiert; Dateien - -> tests/test_proc18_fremd_lizenzhinweise.py
@@ -202,3 +202,4 @@
 - 2026-10-10T14:17Z A claim XPLAT-52
 - 2026-10-10T14:25Z D done VIZ-97
 - 2026-10-10T14:34Z B uebergeben UI-86
+- 2026-10-10T14:38Z A claim VIZ-100
