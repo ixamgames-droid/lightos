@@ -514,10 +514,18 @@ def create_user_profile(payload: dict, *, engine=None) -> int:
         )
         s.add(prof)
         s.flush()
+        # FM-73: keine zwei Modi gleichen Namens speichern — ein gepatchtes
+        # Geraet findet seinen Modus ueber Profil + Modusname. Der Generator
+        # meldet Doppelte schon im Dialog; hier steht der Riegel fuer JEDES
+        # Payload (auch von Hand gebaut): der zweite heisst „Name (2)“.
+        from .modus_wahl import eindeutiger_modusname
+        vergeben: set[str] = set()
         for m in payload.get("modes", []):
             channels = m.get("channels", [])
             mode = FixtureMode(
-                fixture_id=prof.id, name=(m.get("name") or "Modus").strip(),
+                fixture_id=prof.id,
+                name=eindeutiger_modusname(
+                    (m.get("name") or "Modus").strip(), vergeben),
                 channel_count=int(m.get("channel_count", len(channels))),
                 description="",
                 # FM-26: die physische Rasterform des Modus mitschreiben —

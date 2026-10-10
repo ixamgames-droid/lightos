@@ -5539,39 +5539,31 @@ def _resolve_mode(s, fixture):
     """Der ``FixtureMode`` eines gepatchten Geraets — mit der Fallback-Kette,
     die dieses Projekt ueberall meint, wenn es „der Modus des Geraets" sagt:
 
-      1. exakter Name, 2. irgendein Modus mit passender Kanalzahl,
+      1. exakter Name (bei gleichnamigen Modi der mit passender Kanalzahl,
+         FM-67), 2. irgendein Modus mit passender Kanalzahl,
       3. irgendein Modus des Profils, 4. ``None``.
 
     VIZ-50a: aus ``get_channels_for_patched`` herausgezogen, weil die Rasterform
     (``panel_grid_for``) DENSELBEN Modus meinen muss wie die Kanaele. Zweimal
     ausprogrammiert waeren es zwei Regeln, die auseinanderlaufen — und dann
     zeigte das 3D-Panel die Form des einen Modus mit den Pixeln des anderen."""
-    from sqlalchemy import select
-    from .database.models import FixtureMode
-    # ★ UI-74 (Review): Stufe 1 und 2 nehmen den ERSTEN Treffer (nach ID),
-    # nicht ``scalar_one_or_none``. Zwei Modi gleicher Kanalzahl sind normal,
-    # und ein doppelter Modusname liess sich im Editor speichern — beides warf
-    # ``MultipleResultsFound`` mitten im Renderpfad.
-    mode = s.execute(
-        select(FixtureMode)
-        .where(FixtureMode.fixture_id == fixture.fixture_profile_id)
-        .where(FixtureMode.name == fixture.mode_name)
-        .order_by(FixtureMode.id)
-    ).scalars().first()
-    if not mode:
-        mode = s.execute(
-            select(FixtureMode)
-            .where(FixtureMode.fixture_id == fixture.fixture_profile_id)
-            .where(FixtureMode.channel_count == fixture.channel_count)
-            .order_by(FixtureMode.id)
-        ).scalars().first()
-    if not mode:
-        mode = s.execute(
-            select(FixtureMode)
-            .where(FixtureMode.fixture_id == fixture.fixture_profile_id)
-            .order_by(FixtureMode.id)
-        ).scalars().first()
-    return mode
+    # ★ FM-73: die Regel selbst steht in ``database/modus_wahl.py`` — die
+    # Show-Pruefung (``sync.validate_and_repair``) und die Patch-Dialoge
+    # fragen dieselbe Funktion. Hier keine eigene Abfrage per Name oder
+    # Kanalzahl mehr: eine zweite Fassung lief schon einmal auseinander.
+    #
+    # Was die Regel festhaelt (und warum):
+    # * UI-74 (Review): immer der ERSTE Treffer nach ID, nie
+    #   ``scalar_one_or_none``. Zwei Modi gleicher Kanalzahl sind normal, und
+    #   ein doppelter Modusname liess sich speichern — beides warf
+    #   ``MultipleResultsFound`` mitten im Renderpfad.
+    # * FM-67: tragen zwei Modi denselben Namen, entscheidet die gespeicherte
+    #   Kanalzahl mit — sonst gewann stumm der aelteste, und ein Geraet im
+    #   6-Kanal-Modus fuhr die Kanaele des gleichnamigen 4-Kanal-Modus.
+    from .database import modus_wahl
+    return modus_wahl.modus_waehlen(
+        modus_wahl.modi_des_profils(s, fixture.fixture_profile_id),
+        fixture.mode_name, getattr(fixture, "channel_count", None))
 
 
 # VIZ-50a: Cache (felder, profile_id, mode_name, channel_count) -> (rows, cols).

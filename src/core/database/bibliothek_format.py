@@ -1186,7 +1186,9 @@ def qxf_zu_daten(pfad: str, original: str | None = None) -> dict:
     create_all_idempotent(eng)
     try:
         with Session(eng) as s:
-            if not import_qxf_file(pfad, s, {}):
+            # FM-73: Namen der Datei stehen lassen — doppelte Modusnamen
+            # macht `fuer_format_anpassen` eindeutig UND vermerkt es.
+            if not import_qxf_file(pfad, s, {}, modusnamen_eindeutig=False):
                 raise ProfilFehler([f"{pfad}: der QXF-Import hat kein Profil erzeugt "
                                     f"(Hersteller/Modell fehlt?)"])
             s.flush()
