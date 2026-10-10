@@ -5,7 +5,7 @@
 // leben bewusst beisammen; registry.js bleibt die deklarative Map.
 import * as THREE from '../three/three.js';
 import { geteilteGeometrie, platziere, verschmelzen } from '../scene/geteilte_geometrie.js';  // VIZ-66
-import { settings, view } from '../state.js';
+import { settings, view, fixtures } from '../state.js';
 import { tintTopDownIcon } from './topdown_icons.js';
 import { isLowSpec } from '../scene/renderer.js';
 import { placeElement, panelGrid, rotatePoint, ringSegmente, wabenPlatz } from './pixel_order.js';
@@ -23,6 +23,11 @@ import { auftreffFlaeche } from './beam_stop.js';             // VIZ-BEAM-OCCLUS
 // EIN gehaltener Raycaster statt einer Neuanlage pro Fixture und Frame —
 // derselbe Haushalt wie beim Andocken (stage/docking.js).
 const _strahl = new THREE.Raycaster();
+
+// VIZ-98: so weit (m) liegt das Pool-Ziel in Strahlrichtung, wenn der Strahl
+// nichts trifft. Gleich der Reichweite der Treffersuche (Boden < 100, Raycaster
+// far = 100) — dahinter gibt es in der Szene nichts zu beleuchten.
+const KEIN_TREFFER_FERN = 100;
 
 /**
  * Naechster Buehnenkoerper auf dem Strahl, oder `null`.
@@ -120,6 +125,40 @@ export function beamsSichtbar(f, hell) {
   if (!(settings.showCones && view.mode === '3D')) return false;
   if (!(hell > 0.01)) return false;
   return !beamsOff.has(Number(f && f.fid));
+}
+
+// VIZ-98: EINE Stelle beantwortet "darf dieser Bodenfleck leuchten?" — dieselbe
+// Bauart wie beamsSichtbar. Drei Stellen setzten `floorSpot.visible` (Farbe,
+// Settings, Aufbau), und keine fragte, ob der Strahl ueberhaupt etwas trifft:
+// zeigte ein Kopf ueber die Waagerechte, blieb der Fleck samt Gobo-Muster am
+// LETZTEN Auftreffpunkt liegen — der Strahl ging in die Luft, das Zebra lag am
+// Boden (Projektinhaber 10.10., Mega Arena, MH 1). `_keinAuftreffer` setzt
+// applyFloorAim; solange nie gezielt wurde, gilt "trifft" (bisheriges Verhalten).
+export function fleckSichtbar(f, hell) {
+  if (!settings.showFloorSpots) return false;
+  if (!(hell > 0.01)) return false;
+  return !(f && f._keinAuftreffer);
+}
+
+// EINE Stelle fuer die Regel "keine Zielrechnung": im 2D-Plan mit vielen
+// Geraeten wird der Auftreffpunkt nicht gerechnet (Kosten je Update). Stand
+// bisher nur in fixtures.js#updateFixture; VIZ-98 braucht dieselbe Regel beim
+// Moduswechsel (resyncFloorSpot), und zwei Kopien liefen auseinander.
+export function ohneZielrechnung() {
+  return view.mode === '2D' && Object.keys(fixtures).length > 50;
+}
+
+// VIZ-98 (Codex-Befund #999): Bodenfleck neu einordnen, wenn KEIN DMX-Update
+// ansteht — beim Wechsel 2D/3D. Ohne das klebte der Fleck am Stand des alten
+// Modus: zeigte der Kopf in 3D nach oben (Fleck aus) und wechselte man in den
+// 2D-Plan, blieb er bei stehendem Bild aus, obwohl dort niemand mehr rechnet,
+// ob der Strahl trifft. Zurueck in 3D rechnet applyFloorAim den Auftreffpunkt
+// aus der jetzigen Kopfstellung neu.
+export function resyncFloorSpot(f) {
+  // Nur Geraete, die applyFloorAim schon einmal eingeordnet hat — wessen
+  // Handler nie zielt, behaelt seinen Fleck unveraendert unter dem Geraet.
+  if (!f || !f.floorSpot || !f.spotTarget || f._keinAuftreffer === undefined) return;
+  applyFloorAim(f, { skipBeam: ohneZielrechnung() });
 }
 
 export function resyncBeamVisibility(f) {
@@ -1641,7 +1680,8 @@ function applyGenericColor(f, dmx) {
   if (f.floorSpot) {
     f.floorSpot.material.color = color;
     f.floorSpot.material.opacity = Math.max(0.0, intNorm * 0.55 * (gobo ? GOBO_FLECK : 1));
-    f.floorSpot.visible = settings.showFloorSpots && lum > 0.01;
+    f._fleckHell = lum;              // VIZ-98: applyFloorAim schaltet damit um
+    f.floorSpot.visible = fleckSichtbar(f, lum);
   }
   if (f.lens && f.lens.material) {
     f.lens.material.emissive = color;
@@ -1760,8 +1800,37 @@ function setBeamLength(f, dist) {
   beam.position.y = -(f.baseBeamLength * k) / 2;
 }
 
+// VIZ-98: kein Auftreffpunkt (Kopf waagerecht oder nach oben, nichts im Weg).
+// Das Pool-Ziel geht in Strahlrichtung in die Ferne — sonst beleuchtet das
+// echte Licht weiter die alte Stelle am Boden.
+function poolZielInDieFerne(f, origin, dir) {
+  f.spotTarget.position.set(origin.x + dir.x * KEIN_TREFFER_FERN,
+                            origin.y + dir.y * KEIN_TREFFER_FERN,
+                            origin.z + dir.z * KEIN_TREFFER_FERN);
+}
+
+// VIZ-98: ohne Treffer verschwindet der Fleck samt Gobo-Muster, statt am
+// letzten Auftreffpunkt liegen zu bleiben. applyFloorAim laeuft auch je Bild
+// aus der Glaettung (VIZ-92, _glattSchritt) — der Fleck geht also genau in dem
+// Bild aus, in dem der ANGEZEIGTE Kopf die Waagerechte ueberschreitet, und
+// kommt beim Zurueckschwenken am neuen Auftreffpunkt wieder. Geschaltet wird
+// nur beim Wechsel; die Helligkeit dazu hat applyGenericColor hinterlegt.
+function fleckFolgtTreffer(f, trifft) {
+  if (f._keinAuftreffer === !trifft) return;
+  f._keinAuftreffer = !trifft;
+  const hell = (typeof f._fleckHell === 'number')
+    ? f._fleckHell : f.floorSpot.material.opacity;
+  f.floorSpot.visible = fleckSichtbar(f, hell);
+}
+
 function applyFloorAim(f, dmx) {
-  if (dmx.skipBeam) return;
+  if (dmx.skipBeam) {
+    // VIZ-98 (Codex-Befund #999): ohne Zielrechnung weiss niemand, ob der
+    // Strahl trifft. Ein stehen gebliebenes "kein Auftreffpunkt" hielte den
+    // Fleck hier dauerhaft aus — dann zaehlt wie vor VIZ-98 nur die Helligkeit.
+    if (f.floorSpot) fleckFolgtTreffer(f, true);
+    return;
+  }
   // VIZ-15: "kein Auftreffpunkt bekannt". Bleibt der Wert stehen, entscheidet
   // allein die Grundlaenge bzw. die globale Obergrenze — genau der Fall eines
   // waagerecht oder nach oben gerichteten Kopfes, der weder Boden noch Koerper
@@ -1793,28 +1862,30 @@ function applyFloorAim(f, dmx) {
     // Fall, weil Scheinwerfer ueber Buehnenelementen stehen, nicht ueber
     // leerem Boden.
     const koerper = koerperTreffer(f, origin, dir);
-    if (Math.abs(dir.y) > 0.001) {
-      const tBoden = -origin.y / dir.y;
-      const flaeche = auftreffFlaeche(
-        (tBoden > 0 && tBoden < 100) ? tBoden : Infinity, koerper);
-      const t = flaeche.abstand;
-      if (isFinite(t)) {
-        const hitX = origin.x + dir.x * t;
-        const hitZ = origin.z + dir.z * t;
-        // Der Lichtfleck gehoert auf die getroffene FLAECHE — auf das Podest,
-        // nicht auf den Boden darunter. Sonst leuchtet die Ansicht eine Stelle
-        // aus, die in Wahrheit im Schatten des Podests liegt.
-        f.floorSpot.position.set(hitX, flaeche.y + 0.01, hitZ);
-        f.spotTarget.position.set(hitX, flaeche.y, hitZ);
-        goboTreffer = [hitX, flaeche.y + 0.01, hitZ];
-        // VIZ-BEAM-OCCLUSION: den sichtbaren Kegel an der getroffenen FLAECHE
-        // enden lassen. Er hatte eine feste Laenge und schoss deshalb hindurch
-        // — Teil 1 stoppte ihn am Boden, Teil 2 zusaetzlich am ersten
-        // Buehnenkoerper. `t` wird hier ohnehin gerechnet; die Kegel-Laenge
-        // daraus abzuleiten kostet nichts.
-        auftreffAbstand = t;
-      }
+    // VIZ-98: Boden nur nach unten; ein Koerper zaehlt in jeder Richtung.
+    const tBoden = dir.y < -0.001 ? -origin.y / dir.y : Infinity;
+    const flaeche = auftreffFlaeche(
+      (tBoden > 0 && tBoden < 100) ? tBoden : Infinity, koerper);
+    const t = flaeche.abstand;
+    if (isFinite(t)) {
+      const hitX = origin.x + dir.x * t;
+      const hitZ = origin.z + dir.z * t;
+      // Der Lichtfleck gehoert auf die getroffene FLAECHE — auf das Podest,
+      // nicht auf den Boden darunter. Sonst leuchtet die Ansicht eine Stelle
+      // aus, die in Wahrheit im Schatten des Podests liegt.
+      f.floorSpot.position.set(hitX, flaeche.y + 0.01, hitZ);
+      f.spotTarget.position.set(hitX, flaeche.y, hitZ);
+      goboTreffer = [hitX, flaeche.y + 0.01, hitZ];
+      // VIZ-BEAM-OCCLUSION: den sichtbaren Kegel an der getroffenen FLAECHE
+      // enden lassen. Er hatte eine feste Laenge und schoss deshalb hindurch
+      // — Teil 1 stoppte ihn am Boden, Teil 2 zusaetzlich am ersten
+      // Buehnenkoerper. `t` wird hier ohnehin gerechnet; die Kegel-Laenge
+      // daraus abzuleiten kostet nichts.
+      auftreffAbstand = t;
+    } else {
+      poolZielInDieFerne(f, origin, dir);
     }
+    fleckFolgtTreffer(f, isFinite(t));   // VIZ-98
   }
   // EINE Aufrufstelle fuer die Kegellaenge, und sie laeuft IMMER — auch ohne
   // Bodenfleck und ohne Auftreffpunkt. Vorher hing sie im innersten Zweig und

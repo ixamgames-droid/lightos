@@ -5,7 +5,7 @@ import { presetObjects, floorMesh } from '../scene/grid_floor.js';
 import { resizeOrtho, perspectiveCam, orthoCam } from '../camera/cameras.js';
 import { applyStageObject2DStyle, updateResizeHandles } from './stage_objects.js';
 import { requestRender } from '../scene/render_loop.js';  // VIZ-13 3c-2
-import { resyncBeamVisibility } from '../fixtures/builders.js';
+import { resyncBeamVisibility, resyncFloorSpot } from '../fixtures/builders.js';
 import { syncRoomShell } from '../scene/room_shell.js';
 
 // 3c-1: Gesten-Hint unten rechts pro Modus — vorher stand DAUERHAFT der
@@ -36,6 +36,9 @@ export function setViewMode(mode) {
     // bis das naechste DMX-Update der Fixture updateFixture() durchlaeuft. Deckt jetzt
     // auch PAR-Bar/Mover-Bar/Spider-Pro-Kopf-Kegel ab (vorher nur f.beam/f.laserBeams).
     resyncBeamVisibility(f);
+    // VIZ-98: dasselbe fuer den Bodenfleck — im 2D-Plan mit vielen Geraeten
+    // gibt es keine Zielrechnung, in 3D entscheidet der Auftreffpunkt.
+    resyncFloorSpot(f);
   }
   // Hide preset 3D scenery in 2D top-down to reduce clutter
   presetObjects.forEach(o => {
