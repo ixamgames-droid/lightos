@@ -32,7 +32,6 @@
 | MIDI-5 | A | feature/midi5-msc | 2026-10-09T16:27Z | src/core/midi |
 | NET-14 | A | feature/midi5-msc | 2026-10-09T16:27Z | src/core/midi |
 | MIDI-16 | A | feature/midi5-msc | 2026-10-09T16:27Z | src/core/midi |
-| MIDI-3 | A | fix/midi3-mapping-robust | 2026-10-09T16:27Z | src/core/midi/midi_mapper.py |
 | MIDI-4 | A | fix/midi3-mapping-robust | 2026-10-09T16:27Z | src/core/midi/midi_mapper.py |
 | XPLAT-49 | A | fix/xplat49-uninstall-datenschutz | 2026-10-10T09:29Z | uninstall.py |
 | XPLAT-50 | A | fix/xplat49-uninstall-datenschutz | 2026-10-10T09:29Z | start.bat · start.ps1 |
@@ -178,7 +177,6 @@
 
 ## Verlauf
 
-- 2026-10-10T11:28Z D aktualisiert FM-66: Branch - -> fix/fm66-abgleich-modellname; Dateien - -> src/core/database/bibliothek_format.py · tests/test_fm66_abgleich_modellname.py · docs/FIXTURE_LIBRARY.md
 - 2026-10-10T11:46Z A done BACKLOG-STATUS
 - 2026-10-10T11:47Z A claim PROC-19
 - 2026-10-10T11:47Z A claim PROC-20
@@ -208,3 +206,4 @@
 - 2026-10-10T14:38Z A claim VIZ-101
 - 2026-10-10T14:39Z A claim UI-86
 - 2026-10-10T14:39Z D claim QA-91
+- 2026-10-10T14:44Z A done MIDI-3
