@@ -53,7 +53,7 @@
 | TOOL-23 | D | fix/tool23-backlog-ids-tafel-fragmente | 2026-10-10T11:19Z | tools/backlog_ids.py · tests/test_tool23_backlog_ids_tafel_fragmente.py · tests/test_backlog_ids.py |
 | TOOL-24 | D | fix/tool24-proc18-lizenzhinweise-strukturiert | 2026-10-10T11:23Z | tests/test_proc18_fremd_lizenzhinweise.py |
 | FM-66 | D | fix/fm66-abgleich-modellname | 2026-10-10T11:28Z | src/core/database/bibliothek_format.py · tests/test_fm66_abgleich_modellname.py · docs/FIXTURE_LIBRARY.md |
-| DOC-70 | D | docs/doc70-netzwerk-windows | 2026-10-10T11:07Z | docs/anleitung_netzwerk_windows/ANLEITUNG.md · docs/ANLEITUNGEN.md · tests/test_doc70_netzwerk_windows.py |
+| DOC-70 | D | docs/doc70-netzwerk-windows | 2026-10-10T11:42Z | docs/anleitung_netzwerk_windows/ANLEITUNG.md · docs/ANLEITUNGEN.md · tests/test_doc70_netzwerk_windows.py |
 | VIZ-98 | D | fix/viz98-bodenfleck-ueber-horizont | 2026-10-10T11:42Z | src/ui/visualizer/scene_src/fixtures/builders.js · src/ui/visualizer/scene_src/bridge/bridge.js · tests/test_viz98_bodenfleck_ohne_treffer_scene.py · tests/test_viz_beam_laenge.py |
 | STAB-33 | A | fix/stab33-diagnose-windows | 2026-10-10T10:17Z | src/core/diagnose_log.py · main.py |
 | FM-73 | A | fix/fm73-sync-gleichnamige-modi | 2026-10-10T10:36Z | - |
