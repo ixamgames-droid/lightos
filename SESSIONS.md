@@ -29,7 +29,6 @@
 | VIZ-96 | A | feature/viz96-gobo-projektion | 2026-10-10T13:08Z | src/ui/visualizer |
 | UI-84 | A | fix/ui84-efx-laden-geraeteliste | 2026-10-09T13:45Z | src/ui/views/efx_view.py |
 | VIZ-97 | D | fix/viz97-gobo-schluesselwoerter | 2026-10-10T13:35Z | src/ui/widgets/gobo_icons.py · tests/test_viz97_gobo_schluesselwoerter.py · BACKLOG.md · changelog.d/2026-10-09-VIZ-97.md |
-| BPM-30 | D | fix/bpm30-beat-thread-get-state | 2026-10-10T13:35Z | src/core/app_state.py · src/core/engine/bpm_manager.py · tests/test_bpm30_beat_faden_ohne_appstate.py · BACKLOG.md · changelog.d/2026-10-09-BPM-30.md |
 | XPLAT-48 | D | fix/xplat48-no-venv-verknuepfung | 2026-10-10T13:35Z | install.py · tests/test_xplat48_verknuepfung_no_venv.py · BACKLOG.md · changelog.d/2026-10-09-XPLAT-48.md |
 | MIDI-5 | A | feature/midi5-msc | 2026-10-09T16:27Z | src/core/midi |
 | NET-14 | A | feature/midi5-msc | 2026-10-09T16:27Z | src/core/midi |
@@ -168,7 +167,6 @@
 
 ## Verlauf
 
-- 2026-10-10T10:46Z A claim BACKLOG-STATUS
 - 2026-10-10T10:47Z D aktualisiert VIZ-98: Dateien src/ui/visualizer/scene_src/fixtures/builders.js -> src/ui/visualizer/scene_src/fixtures/builders.js · src/ui/visualizer/scene_src/bridge/bridge.js · tests/test_viz98_bodenfleck_ohne_treffer_scene.py · tests/test_viz_beam_laenge.py
 - 2026-10-10T10:47Z A done CDX-0810
 - 2026-10-10T10:47Z A aktualisiert LAS-30: Branch feature/viz95-lasermuster-3d -> feature/las30-laser-achsen; Dateien src/core -> src/core/laser
@@ -198,3 +196,4 @@
 - 2026-10-10T13:08Z A claim DEMO-8
 - 2026-10-10T13:24Z B done UI-76
 - 2026-10-10T13:27Z B aktualisiert VIZ-99: Dateien - -> src/ui/visualizer/scene_src/scene/gpu_tier.js · tests/test_viz84_gpu_tier.py · tests/test_viz99_automatik_snapdragon.py · src/ui/visualizer/visualizer_window.py · BACKLOG.md · changelog.d/2026-10-10-VIZ-99.md
+- 2026-10-10T13:55Z D done BPM-30
