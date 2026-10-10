@@ -62,6 +62,7 @@
 | TOOL-19 | D | fix/tool19-werkzeuge-ohne-echten-ausgang | 2026-10-10T18:53Z | - |
 | QA-92 | D | fix/qa92-windows-rote-tests | 2026-10-10T19:32Z | - |
 | CDX-58 | A | fix/cdx-1010-main | 2026-10-10T19:30Z | - |
+| VIZ-102 | A | feature/viz102-gobo-hallenboden | 2026-10-10T19:43Z | - |
 
 ## Blocker & Fallen
 
@@ -191,7 +192,6 @@
 
 ## Verlauf
 
-- 2026-10-10T14:34Z B uebergeben UI-86
 - 2026-10-10T14:38Z A claim VIZ-100
 - 2026-10-10T14:38Z A claim VIZ-101
 - 2026-10-10T14:39Z A claim UI-86
@@ -221,3 +221,4 @@
 - 2026-10-10T19:30Z A aktualisiert UI-86: Branch perf/ui86-2d-ansicht-hidpi -> fix/ui86-2d-hidpi
 - 2026-10-10T19:30Z A claim CDX-58
 - 2026-10-10T19:31Z A aktualisiert UI-86: Branch fix/ui86-2d-hidpi -> perf/ui86-2d-ansicht-hidpi
+- 2026-10-10T19:43Z A claim VIZ-102
