@@ -238,9 +238,9 @@ function _goboProjizieren(i, p, f) {
   l.penumbra = GOBO_HALBSCHATTEN;
   setzeGoboLicht(i, 1, optik.skala * d[0], optik.skala * d[1], kachel);
   // VIZ-102: die Projektion laeuft ueber Kanten weiter (B3 schnitt sie an der
-  // Buehnenplatte ab); weit jenseits der Kegel-Reichweite faellt sie mit dem
-  // Abstandsquadrat (gobo_projektion.js#GOBO_FERN_AB).
-  setzeGoboFern(i, goboFern(l.position.distanceTo(p.ziel.position)));
+  // Buehnenplatte ab), endet aber mit der Reichweite des Kegels
+  // (builders.js#applyFloorAim -> f._goboFernQ / f._goboReich).
+  setzeGoboFern(i, goboFern(f._goboFernQ, f._goboReich));
   return true;
 }
 
@@ -261,7 +261,11 @@ function _neuesLicht() {
   // Dieselben Grundwerte wie das Geraete-Licht in fixtures.js#addFixture; alles,
   // was je Geraet anders ist, kopiert syncSpotPool() ohnehin hinein.
   const licht = new THREE.SpotLight(0xffffff, 0, 25, Math.PI / 10 * 1.2, 0.6, 1.0);
-  const res = isLowSpec ? 256 : 512;
+  // VIZ-102: mit Gobo-Projektion 1024 statt 512. Der Schatten einer
+  // Buehnenkante schneidet durch die Motiv-Teile; bei flachem Einfall zeigte
+  // die 512er-Map dort Treppen von mehreren Zentimetern (duenne, gezackte
+  // Splitter direkt hinter der Kante am Hallenboden).
+  const res = isLowSpec ? 256 : (goboProjektionAktiv() ? 1024 : 512);
   licht.shadow.mapSize.width = res;
   licht.shadow.mapSize.height = res;
   licht.castShadow = false;

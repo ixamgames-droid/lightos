@@ -71,26 +71,23 @@ export const GOBO_FLACH_HELL = 0.8;
 /** Buehnen-Elemente bis zu dieser mittleren Kantenlaenge (m) koennen fuer ein
  *  Gobo-Muster "schmal" sein (Traverse, Stuetze, kleines Podest). */
 export const GOBO_SCHMAL_MAX = 1.2;
-/** VIZ-102: ab diesem Vielfachen der Kegel-Reichweite (Licht -> Auftreffpunkt,
- *  entlang der Lichtachse) faellt die Projektion mit dem Quadrat des Abstands.
+/** VIZ-102: Reichweite der Projektion entlang der Lichtachse.
  *
- *  B3 schnitt die Projektion an der Buehnenkante ab, weil die Motiv-Teile
- *  dahinter "flach gestreckt" ueber den Hallenboden liefen. Die Streckung war
- *  echte Geometrie (Randstrahlen eines geneigten Kopfes treffen den 1 m
- *  tieferen Hallenboden unter 60-70 Grad zur Senkrechten, mehrere Meter weiter
- *  vorn) — falsch war die HELLIGKEIT dort: die Lichter fallen linear bis 25 m
- *  ab (decay 1), ein doppelt so weit entferntes Motiv-Teil war also fast so
- *  hell wie das Muster auf der Buehne statt ein Viertel so hell. Jetzt laeuft
- *  die Projektion ueber die Kante weiter (die Buehne wirft ihren Schatten),
- *  und jenseits von GOBO_FERN_AB x Reichweite gilt das Abstandsquadrat. Bis
- *  dahin bleibt alles wie bisher (Muster auf der getroffenen Flaeche, auch bei
- *  geneigtem Kopf: der ferne Rand liegt dort bei rund dem 1,5-Fachen). */
-export const GOBO_FERN_AB = 1.6;
-/** "Keine Abschwaechung" (kein Auftreffpunkt, Licht ohne Gobo). */
+ *  B3 schnitt die Projektion an der Buehnenkante ab. Jetzt laeuft sie ueber
+ *  Kanten weiter (die Buehne wirft ihren Schatten), gehoert aber zum KEGEL:
+ *
+ *   * `quadrat`: Achsabstand des fernen Kegelrands auf der getroffenen
+ *     Flaeche. Bis dahin volle Staerke (das Muster auf seiner Flaeche bleibt,
+ *     wie es war); was tiefer faellt (Hallenboden hinter der Kante), wird mit
+ *     dem Abstandsquadrat schwaecher — es ist dort nie heller als oben.
+ *   * `reich`: so weit reicht der sichtbare Kegel (mindestens `quadrat`).
+ *     Dahinter blendet die Projektion bis GOBO_AUSBLENDE x `reich` weich aus:
+ *     kein Muster ohne Strahl, auch wenn der Kegel an seiner Grundlaenge
+ *     endet.
+ */
+export const GOBO_AUSBLENDE = 1.15;
+/** "Keine Grenze" (kein Auftreffpunkt, Licht ohne Gobo). */
 export const GOBO_FERN_AUS = 1e6;
-/** Das Motiv reicht ueber den Kegelrand hinaus (Bodenelemente sitzen AUF dem
- *  Rand, gobo_textures.js): so weit, als Vielfaches des Rand-Radius. */
-export const GOBO_UEBERSTAND = 1.4;
 
 /** Ein Zeitschritt der Blende: `anteil` (0..1) laeuft linear auf `ziel`. */
 export function goboBlendeSchritt(anteil, ziel, dtMs, dauerMs = GOBO_BLENDE_MS) {
@@ -124,18 +121,21 @@ export function goboSchmal(groesse, durchmesser) {
   return k[1] < Math.min(GOBO_SCHMAL_MAX, durchmesser);
 }
 
-/** VIZ-102: Reichweiten-Uniform eines projizierenden Lichts aus dem Abstand
- *  Licht -> Auftreffpunkt (m). Unbrauchbar/kein Treffer: keine Abschwaechung. */
-export function goboFern(reichweite) {
-  if (!(reichweite > 0) || !isFinite(reichweite) || reichweite >= 90) return GOBO_FERN_AUS;
-  return reichweite * GOBO_FERN_AB;
+/** VIZ-102: Reichweiten-Paar [quadrat, reich] eines projizierenden Lichts.
+ *  Unbrauchbare Werte: keine Grenze. */
+export function goboFern(quadrat, reich) {
+  const ok = (v) => v > 0 && isFinite(v) && v < 90;
+  if (!ok(quadrat)) return [GOBO_FERN_AUS, GOBO_FERN_AUS];
+  return [quadrat, ok(reich) ? Math.max(quadrat, reich) : GOBO_FERN_AUS];
 }
 
 /** Faktor, den der Shader bei Achsabstand `w` anlegt (Test-Seam, dieselbe
  *  Rechnung wie GOBO_GLSL_MASKE). */
 export function goboFernFaktor(fern, w) {
-  const q = fern / Math.max(w, 0.0001);
-  return Math.min(1, q * q);
+  const q = fern[0] / Math.max(w, 0.0001);
+  const a = fern[1], b = fern[1] * GOBO_AUSBLENDE;
+  const t = Math.max(0, Math.min(1, (w - a) / (b - a)));
+  return Math.min(1, q * q) * (1 - t * t * (3 - 2 * t));
 }
 
 // ── VIZ-102: Kante der getroffenen Oberseite ────────────────────────────────
@@ -274,8 +274,9 @@ export const GOBO_GLSL_MASKE = [
   '\t\t\tfloat lightosGnr = floor( lightosGp.w + 0.5 );',
   '\t\t\tvec2 lightosGk = vec2( mod( lightosGnr, ' + GOBO_ATLAS_SPALTEN + '.0 ), floor( lightosGnr / ' + GOBO_ATLAS_SPALTEN + '.0 ) );',
   '\t\t\tfloat lightosGm = texture2D( lightosGoboMap, ( lightosGk + clamp( lightosGd, 0.002, 0.998 ) ) / vec2( ' + GOBO_ATLAS_SPALTEN + '.0, ' + GOBO_ATLAS_ZEILEN + '.0 ) ).r * lightosGin;',
-  '\t\t\tfloat lightosGf = lightosGoboFern[ i ] / max( vSpotShadowCoord[ i ].w, 0.0001 );',
-  '\t\t\tlightosGm *= min( 1.0, lightosGf * lightosGf );',
+  '\t\t\tfloat lightosGw = max( vSpotShadowCoord[ i ].w, 0.0001 );',
+  '\t\t\tfloat lightosGf = lightosGoboFern[ i ].x / lightosGw;',
+  '\t\t\tlightosGm *= min( 1.0, lightosGf * lightosGf ) * ( 1.0 - smoothstep( lightosGoboFern[ i ].y, lightosGoboFern[ i ].y * ' + GOBO_AUSBLENDE.toFixed(2) + ', lightosGw ) );',
   '\t\t\tdirectLight.color *= mix( 1.0, lightosGm, lightosGp.x );',
   '\t\t}',
 ].join('\n');
@@ -284,7 +285,7 @@ export const GOBO_GLSL_KOPF = [
   '#if defined( USE_SHADOWMAP ) && NUM_SPOT_LIGHT_SHADOWS > 0',
   'uniform sampler2D lightosGoboMap;',
   'uniform vec4 lightosGoboParam[ NUM_SPOT_LIGHT_SHADOWS ];',
-  'uniform float lightosGoboFern[ NUM_SPOT_LIGHT_SHADOWS ];',
+  'uniform vec2 lightosGoboFern[ NUM_SPOT_LIGHT_SHADOWS ];',
   '#endif',
   '',
 ].join('\n');
@@ -397,8 +398,8 @@ let _chunk = null;
 const _uniforms = {
   lightosGoboMap: { value: null },
   lightosGoboParam: { value: [] },
-  // VIZ-102: Reichweite je Schatten-Licht (goboFern); GOBO_FERN_AUS = keine
-  // Abschwaechung.
+  // VIZ-102: [quadrat, reich] je Schatten-Licht (goboFern), flach abgelegt
+  // (2 Zahlen je Licht); GOBO_FERN_AUS = keine Grenze.
   lightosGoboFern: { value: [] },
 };
 
@@ -435,7 +436,7 @@ export function installGoboProjektion(opt) {
   for (let i = 0; i < GOBO_MAX_LICHTER; i++) werte.push(new o.Vector4(0, 1, 0, 0));
   _uniforms.lightosGoboParam.value = werte;
   const fern = [];
-  for (let i = 0; i < GOBO_MAX_LICHTER; i++) fern.push(GOBO_FERN_AUS);
+  for (let i = 0; i < 2 * GOBO_MAX_LICHTER; i++) fern.push(GOBO_FERN_AUS);
   _uniforms.lightosGoboFern.value = fern;
   for (const klasse of o.materialKlassen) klasse.prototype.onBeforeCompile = lightosGoboHook;
   _aktiv = true;
@@ -464,14 +465,16 @@ export function setzeGoboLicht(i, an, cs, sn, kachel) {
 export function loescheGoboLicht(i) {
   const v = _uniforms.lightosGoboParam.value[i];
   if (v && v.x !== 0) v.set(0, 1, 0, 0);
-  setzeGoboFern(i, GOBO_FERN_AUS);
+  setzeGoboFern(i, null);
 }
 
-/** VIZ-102: Reichweite des Schatten-Lichts `i` (Ergebnis von goboFern). */
+/** VIZ-102: Reichweiten-Paar des Schatten-Lichts `i` (Ergebnis von goboFern);
+ *  null = keine Grenze. */
 export function setzeGoboFern(i, fern) {
   const a = _uniforms.lightosGoboFern.value;
-  if (!(i >= 0 && i < a.length)) return false;
-  a[i] = (fern > 0 && isFinite(fern)) ? fern : GOBO_FERN_AUS;
+  if (!(i >= 0 && 2 * i + 1 < a.length)) return false;
+  a[2 * i] = fern ? fern[0] : GOBO_FERN_AUS;
+  a[2 * i + 1] = fern ? fern[1] : GOBO_FERN_AUS;
   return true;
 }
 
@@ -485,6 +488,7 @@ export function goboProjektionInfo() {
     zeilen: GOBO_ATLAS_ZEILEN,
     index: Object.assign({}, _index),
     param: _uniforms.lightosGoboParam.value.map(v => [v.x, v.y, v.z, v.w]),
-    fern: _uniforms.lightosGoboFern.value.slice(),
+    fern: _uniforms.lightosGoboFern.value.filter((v, k) => k % 2 === 0)
+      .map((v, k) => [v, _uniforms.lightosGoboFern.value[2 * k + 1]]),
   };
 }

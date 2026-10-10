@@ -110,7 +110,23 @@ function _texturGuete(tex) {
 // `alignGoboFloor` sicher (aus der echten Welt-Matrix des Kegels: Zoom,
 // Kegellaenge und Kopfstellung gehen damit von selbst ein).
 // Muster ohne Teilstrahl (innere Punkte, Zebra-Balken) zeichnet `innen`.
-export const GOBO_RAND = 0.62;
+//
+// VIZ-102 (Nachbesserung): ein Gobo sitzt IM Strahl. Bis hierher lag der
+// Kegelrand bei 0,62 des Motivs und die Bodenelemente sassen AUF dem Rand —
+// ihre aeussere Haelfte (bis 0,84) lag ausserhalb des Kegels. In der Projektion
+// war das Licht ohne Strahl: bei 18 Grad Kegel reichte das Motiv bis 24 Grad,
+// die Teile landeten am Hallenboden Meter vor dem Kegelende. Jetzt ist
+// GOBO_RAND der Rand des Kegels UND des Motivs: die Elemente sitzen INNEN am
+// Rand (ihre Aussenkante beruehrt ihn — dort endet ihr Teilstrahl), und das
+// Bild endet am Rand mit weicher Kante (GOBO_WEICH innen, GOBO_SAUM aussen) —
+// wie das Abbild eines echten Gobos. Die Elemente sind im Verhaeltnis zum
+// Kegel so gross wie zuvor. Flaches Muster und Projektion zeichnen dieselben
+// Canvas-Motive, sie bleiben deckungsgleich.
+export const GOBO_RAND = 0.88;
+/** Weiche Bildkante (Anteil der Kachel): beginnt so weit innen vom Rand ... */
+export const GOBO_WEICH = 0.04;
+/** ... und ist so weit aussen ganz zu. */
+export const GOBO_SAUM = 0.04;
 // Das Bodenelement ist etwas breiter als sein Teilstrahl: der Strahl soll
 // sicher IM Element enden, nicht auf dessen Kante.
 const BODEN_UEBERMASS = 1.35;
@@ -129,7 +145,7 @@ const ZEBRA_HALB = 0.075;
 // wie die Blende — vorher liefen sie bis 0,8 des Scheibenradius und standen
 // als Streifen neben dem Fleck. Das Uebermass laesst jeden Teilstrahl sicher
 // IM Balken enden (wie BODEN_UEBERMASS fuer die anderen Motive).
-export const ZEBRA_RAND = GOBO_RAND * 1.15;
+export const ZEBRA_RAND = GOBO_RAND;   // VIZ-102: die Balken fuellen den Kegel bis zum Rand
 function _zebraTeile() {
   const out = [];
   for (const y of ZEBRA_BALKEN) {
@@ -180,7 +196,7 @@ const MOTIVE = {
       g.save();
       g.beginPath(); g.arc(M, M, M * ZEBRA_RAND, 0, Math.PI * 2); g.clip();
       for (const y of ZEBRA_BALKEN) {
-        g.fillRect(M * 0.2, M + (y - ZEBRA_HALB) * M, M * 1.6, 2 * ZEBRA_HALB * M);
+        g.fillRect(0, M + (y - ZEBRA_HALB) * M, 2 * M, 2 * ZEBRA_HALB * M);   // VIZ-102: bis zum Kegelrand
       }
       g.restore();
     },
@@ -210,15 +226,22 @@ function zeichne(stil) {
   const rr = M * GOBO_RAND;
   for (const { u, b, form } of motiv.teile) {
     const a = bodenWinkel(u);
-    const x = M + Math.cos(a) * rr, y = M + Math.sin(a) * rr;
     // halbe Bogenlaenge des Teils am Rand, mit Uebermass
     const hw = Math.PI * b * rr * BODEN_UEBERMASS;
+    // VIZ-102: jedes Element sitzt um seine halbe radiale Ausdehnung INNEN vom
+    // Kegelrand — seine Aussenkante liegt auf dem Rand, nichts ragt hinaus.
+    const innen = form === 'punkt' ? Math.max(hw, M * 0.05)
+      : form === 'oval' ? M * 0.24
+        : form === 'block' ? Math.max(2 * hw, M * 0.1) / 2 : 0;
+    // (0,75: die Aussenkante laeuft in die weiche Bildkante hinein.)
+    const re = rr - 0.75 * innen;
+    const x = M + Math.cos(a) * re, y = M + Math.sin(a) * re;
     if (form === 'punkt') {
       g.beginPath(); g.arc(x, y, Math.max(hw, M * 0.05), 0, Math.PI * 2); g.fill();
     } else if (form === 'bogen') {
       const span = Math.PI * b * BODEN_UEBERMASS;
       g.lineWidth = GROESSE * 0.06;
-      g.beginPath(); g.arc(M, M, rr, a - span, a + span); g.stroke();
+      g.beginPath(); g.arc(M, M, rr - GROESSE * 0.022, a - span, a + span); g.stroke();
     } else if (form === 'oval') {
       g.save(); g.translate(x, y); g.rotate(a);
       g.beginPath(); g.ellipse(0, 0, M * 0.24, Math.max(hw, M * 0.1), 0, 0, Math.PI * 2);
@@ -241,9 +264,15 @@ function zeichne(stil) {
     }
   }
   if (motiv.innen) motiv.innen(g, M);
-  // Weiche Kante: ein Gobo hat einen runden Rand, kein Quadrat.
+  // Runder Bildrand mit weicher Kante AM Kegelrand (VIZ-102): ausserhalb des
+  // Strahls liegt nichts mehr.
+  const kante = g.createRadialGradient(M, M, M * (GOBO_RAND - GOBO_WEICH),
+                                       M, M, M * (GOBO_RAND + GOBO_SAUM));
+  kante.addColorStop(0, 'rgba(255,255,255,1)');
+  kante.addColorStop(1, 'rgba(255,255,255,0)');
   g.globalCompositeOperation = 'destination-in';
-  g.beginPath(); g.arc(M, M, M * 0.96, 0, Math.PI * 2); g.fill();
+  g.fillStyle = kante;
+  g.fillRect(0, 0, GROESSE, GROESSE);
   return c;
 }
 
@@ -529,7 +558,7 @@ function _unterAus(f) {
  *  @param yUnten  Hoehe der Flaeche darunter
  *  @returns true, wenn die zweite Scheibe liegt
  */
-export function goboKanteAbgleichen(f, kante, unten, yUnten, hitX, hitZ) {
+export function goboKanteAbgleichen(f, kante, unten, yUnten, hitX, hitZ, anteil = 1) {
   const main = f && f.floorSpot;
   if (!main || !main.material) return false;
   const ebenen = main.material.clippingPlanes;
@@ -553,6 +582,11 @@ export function goboKanteAbgleichen(f, kante, unten, yUnten, hitX, hitZ) {
   const schatten = schattenRechteck(kante, _A.x, _A.y, _A.z, yUnten);
   if (schatten) _ebenenAufRechteck(disc.material.clippingPlanes, schatten, false);
   else _ebenenAufRechteck(disc.material.clippingPlanes, kante, false);
+  // Helligkeit unten: mit dem Ueberhang einblenden (so wie der Kegel waechst
+  // und die Projektion mit der Kegel-Reichweite ausblendet) und mit dem
+  // Abstandsquadrat schwaecher als auf der Oberseite — nie heller als oben.
+  const hoch = (_A.y - kante.y) / Math.max(1e-3, _A.y - yUnten);
+  f._goboUntenDeck = Math.max(0, Math.min(1, anteil)) * Math.max(0, Math.min(1, hoch * hoch));
   f._goboUnten = true;
   _unterAktiv.add(f);
   _unterAngleichen(f);
@@ -564,7 +598,7 @@ function _unterAngleichen(f) {
   if (!main || !disc || !main.parent) { _unterAktiv.delete(f); if (disc) disc.visible = false; return; }
   const a = main.material, b = disc.material;
   b.color = a.color;
-  b.opacity = a.opacity;
+  b.opacity = a.opacity * (typeof f._goboUntenDeck === 'number' ? f._goboUntenDeck : 1);
   if (b.map !== a.map && a.map) b.map = a.map;     // nur die Uniform (Gobo-Wechsel)
   disc.layers.mask = main.layers.mask;
   disc.visible = main.visible && !!a.map && !!f.goboAktiv;

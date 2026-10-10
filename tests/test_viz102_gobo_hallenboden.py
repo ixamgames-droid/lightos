@@ -4,10 +4,12 @@ Rueckmeldung des Projektinhabers nach der Live-Demo von VIZ-96:
 
 1. Die Projektion endete an der Buehnenkante (Grenzebene aus B3). Sie soll auf
    dem Hallenboden weiterlaufen. Die frueher gesehene "Streckung" dort war
-   echte Geometrie; falsch war die Helligkeit in der Ferne (linearer Abfall).
-   Jetzt: keine Grenze, dafuer Abstandsquadrat jenseits von ``GOBO_FERN_AB`` x
-   Kegel-Reichweite (``goboFern``/``goboFernFaktor``, dieselbe Rechnung wie im
-   Shader).
+   echte Geometrie des Motivs — das aber ueber den Kegel hinausreichte (Licht
+   ohne Strahl). Jetzt liegt das Motiv im Kegel, die Projektion laeuft ueber
+   die Kante weiter und gehoert zur Reichweite des Kegels: bis zum fernen
+   Kegelrand auf der getroffenen Flaeche volle Staerke, tiefer mit dem
+   Abstandsquadrat, jenseits der Kegel-Reichweite weich aus
+   (``goboFern``/``goboFernFaktor``, dieselbe Rechnung wie im Shader).
 2. Teile des flachen Musters hingen vor der Buehne in der Luft: die Scheibe
    ragte ueber die Kante der getroffenen Oberseite. Die Kante ist ein gedrehtes
    Rechteck (``kantenAbstand``); der Ueberhang (``goboUeberhang``) verlaengert
@@ -23,18 +25,25 @@ from test_viz96_gobo_projektion import _fahre, _node_verfuegbar
 
 _RUMPF = r"""
 // ── Reichweite ──
-aus.ab = G.GOBO_FERN_AB;
-aus.fern5 = G.goboFern(5);
-aus.fernKein = [G.goboFern(Infinity), G.goboFern(0), G.goboFern(NaN), G.goboFern(100)]
-  .map(v => v === G.GOBO_FERN_AUS);
-const F = G.goboFern(5);
-aus.faktor = [3, 5, 7.5, 8, 10, 16, 20].map(w => G.goboFernFaktor(F, w));
-aus.faktorAus = G.goboFernFaktor(G.GOBO_FERN_AUS, 80);
+aus.ausblende = G.GOBO_AUSBLENDE;
+const F = G.goboFern(6, 8);
+aus.fern = F;
+aus.fernKlein = G.goboFern(6, 4);          // Kegel kuerzer als das Muster auf seiner Flaeche
+aus.fernKein = [G.goboFern(Infinity, 8), G.goboFern(0, 8), G.goboFern(NaN, 8), G.goboFern(null, null)]
+  .map(v => v[0] === G.GOBO_FERN_AUS && v[1] === G.GOBO_FERN_AUS);
+aus.fernOhneReich = G.goboFern(6, null);
+aus.faktor = [3, 6, 7, 8, 8.6, 9.2, 12].map(w => G.goboFernFaktor(F, w));
+aus.faktorAus = G.goboFernFaktor(G.goboFern(null, null), 80);
+let fv = 2, mono = true;
+for (let w = 1; w < 12; w += 0.05) { const x = G.goboFernFaktor(F, w); if (x > fv + 1e-12) mono = false; fv = x; }
+aus.faktorMonoton = mono;
 // Shader: dieselbe Rechnung, auf die Maske, mit dem Achsabstand w.
 const fs = G.patchFragmentShader(THREE.ShaderLib.standard.fragmentShader,
                                  THREE.ShaderChunk.lights_fragment_begin);
-aus.glsl = fs.indexOf('float lightosGf = lightosGoboFern[ i ] / max( vSpotShadowCoord[ i ].w, 0.0001 );') >= 0
-  && fs.indexOf('lightosGm *= min( 1.0, lightosGf * lightosGf );') >= 0;
+aus.glsl = fs.indexOf('uniform vec2 lightosGoboFern[ NUM_SPOT_LIGHT_SHADOWS ];') >= 0
+  && fs.indexOf('float lightosGw = max( vSpotShadowCoord[ i ].w, 0.0001 );') >= 0
+  && fs.indexOf('float lightosGf = lightosGoboFern[ i ].x / lightosGw;') >= 0
+  && fs.indexOf('min( 1.0, lightosGf * lightosGf ) * ( 1.0 - smoothstep( lightosGoboFern[ i ].y, lightosGoboFern[ i ].y * 1.15, lightosGw ) )') >= 0;
 aus.keineEbene = fs.indexOf('lightosGoboEbene') < 0;
 // w der Schattenkoordinate IST der Abstand entlang der Lichtachse.
 const l = new THREE.SpotLight(0xffffff, 1, 25, 0.5, 0.05, 1);
@@ -94,7 +103,6 @@ for (const [ex, ez] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
 }
 aus.schattenNull = [G.schattenRechteck(K, 0, 1, 0, 0), G.schattenRechteck(K, 0, 0.5, 0, 0),
                     G.schattenRechteck(K, 0, 5, 0, 1), G.schattenRechteck(K, 0, 5, 0, 2)];
-aus.ueberstand = G.GOBO_UEBERSTAND;
 
 // ── Fussabdruck des geneigten Kegels ──
 const senk = G.strahlFussabdruck(0, -1, 0, 5, 0.4);
@@ -145,18 +153,22 @@ class Viz102LogikTest(unittest.TestCase):
         cls.r = _fahre(_RUMPF)
 
     # ── Punkt 1: Reichweite statt Grenze ─────────────────────────────────────
-    def test_bis_zur_reichweite_unveraendert_dahinter_abstandsquadrat(self):
+    def test_projektion_gehoert_zur_reichweite_des_kegels(self):
         r = self.r
-        self.assertGreaterEqual(r["ab"], 1.5, "Muster eines geneigten Kopfes bleibt unberuehrt")
-        self.assertLessEqual(r["ab"], 2.0)
-        self.assertAlmostEqual(r["fern5"], 5 * r["ab"], places=9)
+        self.assertEqual(r["fern"], [6, 8])
+        self.assertEqual(r["fernKlein"], [6, 6], "das Muster auf SEINER Flaeche bleibt immer ganz")
+        self.assertEqual(r["fernKein"], [True, True, True, True], "kein Auftreffpunkt: keine Grenze")
+        self.assertEqual(r["fernOhneReich"][0], 6)
         f = r["faktor"]
-        self.assertEqual(f[:4], [1, 1, 1, 1], "bis 1,6 x Reichweite (8 m) volle Staerke")
-        self.assertAlmostEqual(f[4], (8 / 10) ** 2, places=9)
-        self.assertAlmostEqual(f[5], (8 / 16) ** 2, places=9, msg="doppelt so weit: ein Viertel")
-        self.assertAlmostEqual(f[6], (8 / 20) ** 2, places=9)
+        self.assertEqual(f[:2], [1, 1], "bis zum fernen Kegelrand auf der Flaeche volle Staerke")
+        self.assertAlmostEqual(f[2], (6 / 7) ** 2, places=9, msg="tiefer: Abstandsquadrat")
+        self.assertAlmostEqual(f[3], (6 / 8) ** 2, places=9)
+        self.assertTrue(0 < f[4] < f[3], "jenseits der Kegel-Reichweite blendet es aus")
+        self.assertEqual(f[5], 0, "bei 1,15 x Reichweite ist nichts mehr da: kein Muster ohne Strahl")
+        self.assertEqual(f[6], 0)
+        self.assertTrue(r["faktorMonoton"], "nirgends heller als naeher am Licht")
         self.assertEqual(r["faktorAus"], 1)
-        self.assertEqual(r["fernKein"], [True, True, True, True], "kein Auftreffpunkt: aus")
+        self.assertAlmostEqual(r["ausblende"], 1.15, places=9)
 
     def test_shader_rechnet_dasselbe_und_kennt_keine_grenzebene_mehr(self):
         self.assertTrue(self.r["glsl"])
@@ -184,7 +196,6 @@ class Viz102LogikTest(unittest.TestCase):
         self.assertEqual(r["ueberKaputt"], [0, 0, 0])
         self.assertTrue(r["ueberMonoton"])
         self.assertLess(r["ueberSprung"], 0.02, "die Kegellaenge haengt daran — kein Sprung")
-        self.assertGreater(r["ueberstand"], 1.0)
 
     def test_fussabdruck_des_geneigten_kegels(self):
         r = self.r

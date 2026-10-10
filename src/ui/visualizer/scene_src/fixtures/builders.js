@@ -15,7 +15,7 @@ import { syncPoolSize } from './floor_pool.js';               // VIZ-15
 import { beamsOff } from '../state.js';                       // VIZ-15
 import { applyGobo, alignGoboFloor, goboKanteAbgleichen, goboWinkel, GOBO_LICHT, GOBO_STRAHL, GOBO_FLECK } from './gobo_textures.js';   // VIZ-GOBO-3D, VIZ-83
 import { glattKanal, glattZiel, glattWert, glattDeckel } from './bewegung_glatt.js';   // VIZ-92
-import { goboProjektionAktiv, goboFlachDeckkraft, goboSchmal, strahlFussabdruck, goboUeberhangGerichtet, kegelFernLaenge, GOBO_UEBERSTAND } from '../scene/gobo_projektion.js';      // VIZ-96
+import { goboProjektionAktiv, goboFlachDeckkraft, goboSchmal, strahlFussabdruck, goboUeberhangGerichtet, kegelFernLaenge } from '../scene/gobo_projektion.js';      // VIZ-96
 import { requestRender } from '../scene/render_loop.js';                 // VIZ-92
 import { buildLaserRig, applyLaser, noteLaserAnimation, LASER_BEAM_OPACITY } from './laser.js';   // VIZ-79
 import { stageObjects } from '../state.js';                   // VIZ-BEAM-OCCLUSION
@@ -2036,9 +2036,12 @@ function applyFloorAim(f, dmx) {
   const kante = (kt && kt.kante && goboTreffer && isFinite(auftreffAbstand)
                  && Math.abs(kt.abstand - auftreffAbstand) < 1e-6) ? kt.kante : null;
   let kegelAbstand = auftreffAbstand, ueber = 0, untenY = 0;
+  // Tangens des halben Kegelwinkels (der Kegel endet am Auftreffpunkt mit
+  // festem Radius). Das Gobo-Motiv liegt seit VIZ-102 ganz IM Kegel.
+  const bisTreffer = isFinite(auftreffAbstand)
+    ? Math.max(0.15, Math.min(f.baseBeamLength || auftreffAbstand, auftreffAbstand)) : 0;
+  const tanA = bisTreffer > 0 ? (_kegelDurchmesser(f) / 2) / bisTreffer : 0;
   if (kante && richtung) {
-    const bisTreffer = Math.max(0.15, Math.min(f.baseBeamLength || auftreffAbstand, auftreffAbstand));
-    const tanA = (_kegelDurchmesser(f) / 2) / bisTreffer * (f.goboAktiv ? GOBO_UEBERSTAND : 1);
     ueber = goboUeberhangGerichtet(
       kante, goboTreffer[0], goboTreffer[2],
       strahlFussabdruck(richtung.x, richtung.y, richtung.z, auftreffAbstand, tanA));
@@ -2053,6 +2056,16 @@ function applyFloorAim(f, dmx) {
   }
   setBeamLength(f, kegelAbstand);
   _kegelWeite(f, auftreffAbstand);
+  // VIZ-102: Reichweite der Projektion = Reichweite des Kegels
+  // (gobo_projektion.js#goboFern). `_goboFernQ`: ferner Kegelrand auf der
+  // getroffenen Flaeche; `_goboReich`: so weit reicht der sichtbare Kegel.
+  if (richtung && tanA > 0 && f.beam && f.baseBeamLength) {
+    f._goboFernQ = kegelFernLaenge(richtung.y, tanA, auftreffAbstand);
+    f._goboReich = Math.max(f._goboFernQ, f.baseBeamLength * f.beam.scale.y);
+  } else {
+    f._goboFernQ = null;
+    f._goboReich = null;
+  }
   // VIZ-83 B2: Bodenmuster unter die Teilstrahlen drehen und den Kegelrand am
   // Boden messen — NACH setBeamLength, die Kegel-Laenge veraendert den Winkel
   // der Mantellinien (nur scale.y waechst/schrumpft, der Radius bleibt).
@@ -2068,7 +2081,7 @@ function applyFloorAim(f, dmx) {
   // (gobo_textures.js#goboKanteAbgleichen). Nichts haengt mehr in der Luft.
   if (f.floorSpot) {
     goboKanteAbgleichen(f, kante, ueber > 0, untenY,
-                        goboTreffer ? goboTreffer[0] : 0, goboTreffer ? goboTreffer[2] : 0);
+                        goboTreffer ? goboTreffer[0] : 0, goboTreffer ? goboTreffer[2] : 0, ueber);
   }
 }
 

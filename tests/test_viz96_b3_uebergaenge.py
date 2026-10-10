@@ -73,12 +73,12 @@ aus.schmal = {
 const chunk = THREE.ShaderChunk.lights_fragment_begin;
 const fs = G.patchFragmentShader(THREE.ShaderLib.standard.fragmentShader, chunk);
 aus.sampler = (fs.match(/uniform\s+sampler2D\s+lightos\w+/g) || []).length;
-aus.feld = fs.indexOf('uniform float lightosGoboFern[ NUM_SPOT_LIGHT_SHADOWS ];') >= 0;
-const iEbene = fs.indexOf('lightosGoboFern[ i ] / max( vSpotShadowCoord[ i ].w');
+aus.feld = fs.indexOf('uniform vec2 lightosGoboFern[ NUM_SPOT_LIGHT_SHADOWS ];') >= 0;
+const iEbene = fs.indexOf('lightosGoboFern[ i ].x / lightosGw');
 const iMix = fs.indexOf('directLight.color *= mix( 1.0, lightosGm, lightosGp.x );');
 const iMaske = fs.indexOf('float lightosGm = texture2D( lightosGoboMap');
 aus.lage = iMaske >= 0 && iEbene > iMaske && iMix > iEbene;
-aus.einmal = fs.split('lightosGoboFern[ i ]').length - 1;
+aus.einmal = fs.split('lightosGoboFern[ i ]').length - 1;   // x einmal, y zweimal
 
 class Mat {}
 aus.installiert = G.installGoboProjektion({
@@ -90,16 +90,17 @@ const vorher = hook.toString();
 const sh = { fragmentShader: THREE.ShaderLib.standard.fragmentShader, uniforms: {} };
 hook.call(new Mat(), sh);
 aus.uniformDa = !!sh.uniforms.lightosGoboFern
-  && sh.uniforms.lightosGoboFern.value.length === G.GOBO_MAX_LICHTER;
-aus.grund = G.goboProjektionInfo().fern.every(v => v === G.GOBO_FERN_AUS);
+  && sh.uniforms.lightosGoboFern.value.length === 2 * G.GOBO_MAX_LICHTER;
+aus.grund = G.goboProjektionInfo().fern.every(v => v[0] === G.GOBO_FERN_AUS && v[1] === G.GOBO_FERN_AUS);
 const feld = sh.uniforms.lightosGoboFern.value;
 G.setzeGoboLicht(2, 1, 1, 0, 0);
-G.setzeGoboFern(2, 7.5);
+G.setzeGoboFern(2, [6, 7.5]);
 aus.gesetzt = G.goboProjektionInfo().fern[2];
 aus.gleichesFeld = sh.uniforms.lightosGoboFern.value === feld;
 G.loescheGoboLicht(2);
-aus.geloescht = G.goboProjektionInfo().fern[2] === G.GOBO_FERN_AUS;
-aus.ausserhalb = G.setzeGoboFern(99, 7.5);
+aus.geloescht = G.goboProjektionInfo().fern[2][0] === G.GOBO_FERN_AUS
+  && G.goboProjektionInfo().fern[2][1] === G.GOBO_FERN_AUS;
+aus.ausserhalb = G.setzeGoboFern(99, [6, 7.5]);
 aus.hookGleich = Mat.prototype.onBeforeCompile === hook && hook.toString() === vorher;
 """
 
@@ -175,14 +176,14 @@ class Viz96B3LogikTest(unittest.TestCase):
         self.assertEqual(r["sampler"], 1, "weiter genau EIN zusaetzlicher Sampler")
         self.assertTrue(r["feld"])
         self.assertTrue(r["lage"], "Reichweite wirkt auf die Maske, vor der Multiplikation aufs Licht")
-        self.assertEqual(r["einmal"], 1)
+        self.assertEqual(r["einmal"], 3)
 
     def test_reichweite_setzen_und_loeschen_aendert_nur_werte(self):
         r = self.r
         self.assertTrue(r["installiert"])
         self.assertTrue(r["uniformDa"])
         self.assertTrue(r["grund"], "Grundstellung = keine Abschwaechung")
-        self.assertEqual(r["gesetzt"], 7.5)
+        self.assertEqual(r["gesetzt"], [6, 7.5])
         self.assertTrue(r["gleichesFeld"])
         self.assertTrue(r["geloescht"], "loescheGoboLicht nimmt die Reichweite mit")
         self.assertFalse(r["ausserhalb"])

@@ -303,10 +303,12 @@ Darstellungen; Größe und Lage des Musters bleiben dabei gleich.
   bleibt der Schatten der Platte frei, und der Lichtkegel reicht bis zum Boden.
   Nichts schwebt in Höhe der Bühne in der Luft; das gilt auch für den flachen
   Fleck und auf der Stufe Niedrig.
-- **Flacher Einfall:** Ein schräg nach vorn gerichteter Kopf wirft die äußeren
-  Motiv-Teile unter flachem Winkel weit auf den Hallenboden. Dort sind sie
-  länger gezogen als auf der Bühne. Das ist die echte Geometrie des Strahls;
-  mit dem Abstand werden sie dunkler.
+- **Das Gobo-Bild liegt im Strahl:** Das Motiv füllt den Lichtkegel bis zu
+  seinem Rand und endet dort mit weicher Kante; außerhalb des Kegels (Zoom)
+  liegt kein Muster. Hinter einer Bühnenkante reicht die Projektion so weit wie
+  der Kegel und wird mit dem Abstand dunkler. Ein schräg nach vorn gerichteter
+  Kopf zieht die Teile am Hallenboden länger als auf der Bühne; das ist die
+  echte Geometrie des Strahls.
 - **Helligkeit:** Flacher Fleck und Projektion sind bei gleichem Dimmer etwa
   gleich hell. Die Projektion nimmt die Farbe der beleuchteten Fläche an, der
   flache Fleck bleibt etwas weißer.

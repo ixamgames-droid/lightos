@@ -60,12 +60,16 @@ _Z_JS = """
     deck: a.material.opacity, maske: a.layers.mask, sichtbar: a.visible,
     unter: b ? { sichtbar: b.visible, y: b.matrix.elements[13], ebenen: ebenen(b.material),
                  schnitt: b.material.clipIntersection, deck: b.material.opacity,
+                 anteil: (f._goboUntenDeck === undefined) ? null : f._goboUntenDeck,
                  maske: b.layers.mask, gleicheKarte: b.material.map === a.material.map,
                  gleicheFarbe: b.material.color.equals(a.material.color),
                  additiv: b.material.blending === T.AdditiveBlending,
                  fest: b.matrixAutoUpdate === false } : null,
     unterInSzene: unterInSzene,
     fern: (i >= 0 && g.fern) ? g.fern[i] : null,
+    fernQ: (f._goboFernQ === undefined) ? null : f._goboFernQ,
+    reich: (f._goboReich === undefined) ? null : f._goboReich,
+    rand: L.__goboRand ? L.__goboRand() : null,
     weite: l ? l.position.distanceTo(l.target.position) : null,
     hatEbene: 'ebene' in g,
     schatten: L.shadowUpdateStats().neubauten,
@@ -164,8 +168,10 @@ class Viz102KanteTest(_Viz102Basis):
         self.assertFalse(_ausgespart(u["ebenen"], 0, 0.01, schattenkante - 0.02))
         self.assertFalse(_ausgespart(u["ebenen"], 0, 0.01, -1.5))
         # Die zweite Scheibe folgt je Bild Deckkraft und Ebenen-Maske der ersten
-        # (auf Hoch projiziert das Geraet: beide ausgeblendet).
-        self.assertAlmostEqual(u["deck"], z["deck"], places=9)
+        # (auf Hoch projiziert das Geraet: beide ausgeblendet) — nie heller als
+        # oben: mit dem Ueberhang eingeblendet, mit dem Abstandsquadrat schwaecher.
+        self.assertTrue(0 < u["anteil"] <= ((ay - 1.0) / ay) ** 2 + 1e-9, u)
+        self.assertAlmostEqual(u["deck"], z["deck"] * u["anteil"], places=9)
         self.assertEqual(u["maske"], z["maske"])
         # 3) der Kegel reicht ueber die Platte hinaus Richtung Boden — und
         #    bleibt dabei gleich weit geoeffnet (laenger hiesse sonst spitzer:
@@ -180,7 +186,7 @@ class Viz102KanteTest(_Viz102Basis):
         self.assertGreaterEqual(z["version"], version)
         # Dimmer folgt.
         d = self._zeige(gobo_wheel=_RING, intensity=100)
-        self.assertAlmostEqual(d["unter"]["deck"], d["deck"], places=9)
+        self.assertAlmostEqual(d["unter"]["deck"], d["deck"] * d["unter"]["anteil"], places=9)
         # Gobo aus: zweite Scheibe weg, erste bleibt beschnitten.
         aus = self._zeige(gobo_wheel=0)
         self.assertFalse(aus["unter"]["sichtbar"])
@@ -231,18 +237,26 @@ class Viz102KanteTest(_Viz102Basis):
         for d, soll in ((innen - 0.05, True), (innen + 0.05, False)):
             self.assertEqual(_behalten(z["ebenen"], -d * s, 1.01, -d * c), soll, (d, z["ebenen"]))
 
-    def test_projektion_laeuft_weiter_nur_die_reichweite_bleibt(self):
+    def test_projektion_laeuft_weiter_bis_zur_reichweite_des_kegels(self):
         self._load_and_wait()
         self._platte(9.7)
         z = self._zeige(gobo_wheel=_RING)
         self.assertFalse(z["hatEbene"])
-        self.assertIsNotNone(z["weite"])
-        self.assertAlmostEqual(z["fern"], z["weite"] * 1.6, places=6,
-                               msg="Abfall erst jenseits 1,6 x Reichweite")
-        # Der Boden vor der Kante (rund 1,3 x) liegt darunter: volle Staerke.
-        self.assertGreater(z["fern"], (z["apex"][1] / (z["apex"][1] - 1.0)) * z["weite"])
+        q, reich = z["fern"]
+        # Senkrecht nach unten: ferner Kegelrand auf der Platte = Abstand zur Platte.
+        self.assertAlmostEqual(q, z["fernQ"], places=6)
+        self.assertAlmostEqual(q, z["weite"], delta=0.25)
+        # ... und die Projektion reicht so weit wie der (verlaengerte) Kegel.
+        self.assertAlmostEqual(reich, z["laenge"], delta=1e-6)
+        self.assertGreater(reich, q + 0.2, "Kegel ragt ueber die Kante: die Projektion geht mit")
+        # Mitten auf der Platte: Reichweite = Muster auf seiner Flaeche.
+        self._schiebe(0.0)
+        m = self._zeige(gobo_wheel=_RING)
+        self.assertAlmostEqual(m["fern"][1], m["fern"][0], delta=0.1)
+        self._schiebe(9.7)
         aus = self._zeige(gobo_wheel=0)
-        self.assertGreaterEqual(aus["fern"], 1e6)
+        self.assertGreaterEqual(aus["fern"][0], 1e6)
+        self.assertGreaterEqual(aus["fern"][1], 1e6)
 
     def test_entfernen_raeumt_die_zweite_scheibe_ab(self):
         self._load_and_wait()
@@ -257,6 +271,53 @@ class Viz102KanteTest(_Viz102Basis):
           window.__s102.traverse(o => { if (o.userData && o.userData.goboUnterScheibe) n += 1; });
           return n; })()""")
         self.assertEqual(n, 0)
+
+
+# Nachbesserung: das Gobo-Bild liegt IM Kegel. Je Stil der groesste Abstand
+# (Anteil der Kachel) eines sichtbaren Motiv-Pixels von der Mitte, dazu der
+# Oeffnungswinkel des projizierenden Lichts gegen den des sichtbaren Kegels.
+_IM_KEGEL_JS = """
+(function(){
+  const L = window.__lightos, f = L.fixtures['%d'], out = { stile: {} };
+  for (const stil of ['ring_slits', 'ovals', 'circle_of_circles', 'tetris', 'dots', 'spiral', 'zebra']) {
+    const c = L.__goboTexture(stil).image, g = c.getContext('2d');
+    const d = g.getImageData(0, 0, c.width, c.height).data, M = c.width / 2;
+    let rmax = 0, voll = 0;
+    for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) {
+      const a = d[(y * c.width + x) * 4 + 3], r = Math.hypot(x + 0.5 - M, y + 0.5 - M) / M;
+      if (a > 12 && d[(y * c.width + x) * 4] > 127 && r > rmax) rmax = r;
+      if (a > 242 && r > voll) voll = r;
+    }
+    out.stile[stil] = [rmax, voll];
+  }
+  const pool = L.spotPoolInfo(), i = pool.traeger.indexOf(%d);
+  const l = L.spotPoolLights()[i], p = f.beam.geometry.parameters;
+  const e = f.beam.matrixWorld.elements;
+  out.tanKegel = (p.radius * Math.hypot(e[0], e[1], e[2])) / (p.height * Math.hypot(e[4], e[5], e[6]));
+  out.tanLicht = Math.tan(l.angle);
+  out.karte = [l.shadow.mapSize.width, l.shadow.mapSize.height];
+  return JSON.stringify(out);
+})()
+"""
+
+
+class Viz102ImKegelTest(_Viz102Basis):
+    def test_motiv_liegt_im_kegel_mit_weicher_kante(self):
+        self._load_and_wait()
+        for zoom_attrs in ({}, {"pan": 110, "tilt": 150}):
+            self._zeige(gobo_wheel=_RING, **zoom_attrs)
+            z = self._json(_IM_KEGEL_JS % (_FID, _FID))
+            # Die Kachel reicht bis 1,0; der Kegelrand liegt bei 0,88. Das Licht
+            # oeffnet auf die ganze Kachel, das BILD endet am Kegelrand.
+            rand = z["tanKegel"] / z["tanLicht"]
+            self.assertAlmostEqual(rand, 0.88, delta=0.005)
+            for stil, (rmax, voll) in z["stile"].items():
+                # sichtbar hoechstens 5 % ueber den Kegelrand (weiche Kante) ...
+                self.assertLessEqual(rmax, rand * 1.05, f"{stil}: Licht ausserhalb des Kegels")
+                # ... voll deckend nur innerhalb, und das Motiv reicht bis an den Rand.
+                self.assertLessEqual(voll, rand, stil)
+                self.assertGreater(rmax, rand * 0.93, f"{stil}: Motiv fuellt den Kegel nicht")
+        self.assertEqual(z["karte"], [1024, 1024], "feinere Shadow-Map fuer die Kante im Motiv")
 
 
 class Viz102NiedrigTest(_Viz102Basis):
@@ -275,7 +336,8 @@ class Viz102NiedrigTest(_Viz102Basis):
         u = z["unter"]
         self.assertTrue(u and u["sichtbar"])
         self.assertEqual(u["maske"], 1)
-        self.assertAlmostEqual(u["deck"], (220 / 255) * 0.55 * 1.5, places=6)
+        self.assertAlmostEqual(u["deck"], (220 / 255) * 0.55 * 1.5 * u["anteil"], places=6)
+        self.assertTrue(0 < u["anteil"] < 1)
         self.assertAlmostEqual(u["y"], 0.01, places=6)
 
 
