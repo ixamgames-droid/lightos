@@ -116,8 +116,9 @@ Das **Open DMX USB** (günstigere Version) hat keine eigene Firmware — der PC 
 ### FTDI Treiber auf Windows ARM
 - FTDI bietet ARM64-kompatible VCP-Treiber an
 - Windows 11 ARM enthält FTDI-Treiber bereits inbox (seit Build 22H2+)
-- pyserial läuft nativ auf ARM64 (pure Python + Windows COMx)
-- Kein x64-Emulations-Overhead für den seriellen Port
+- pyserial ist reines Python und spricht den COM-Port über Windows an — das geht
+  mit dem auf Windows-ARM empfohlenen x64-Python (läuft per Emulation, siehe
+  [INSTALL.md](../INSTALL.md)) genauso wie mit nativem ARM64-Python
 
 ### Praxis-Hinweise
 - Auf Snapdragon-Geräten: USB-A via USB-C Adapter
