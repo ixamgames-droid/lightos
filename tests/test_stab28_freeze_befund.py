@@ -161,7 +161,7 @@ class HauptthreadStackTest(unittest.TestCase):
             "print(json.dumps([f[2] for f in erg['s']]))\n"
         )
         erg = subprocess.run([sys.executable, "-c", code],
-                             capture_output=True, text=True, timeout=120)
+                             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
         self.assertEqual(0, erg.returncode, erg.stderr[-800:])
         namen = json.loads(erg.stdout.strip().splitlines()[-1])
         for gesucht in ("ganz_innen", "eine_ebene_darueber", "<module>"):

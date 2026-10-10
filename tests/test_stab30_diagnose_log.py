@@ -36,7 +36,7 @@ def _env(tmp_path) -> dict:
 def _run(code: str, tmp_path, *args, timeout=120):
     return subprocess.run([sys.executable, "-c", textwrap.dedent(code), *args],
                           capture_output=True, text=True, timeout=timeout,
-                          cwd=_REPO, env=_env(tmp_path), encoding="utf-8")
+                          cwd=_REPO, env=_env(tmp_path), encoding="utf-8", errors="replace")
 
 
 # ── Tee ──────────────────────────────────────────────────────────────────────
@@ -259,7 +259,7 @@ def test_cli_diagnose_laeuft_ohne_fenster(tmp_path):
     env["QT_QPA_PLATFORM"] = "minimal-ungueltig"   # ein Fenster wuerde scheitern
     r = subprocess.run([sys.executable, "main.py", "--diagnose", str(ziel)],
                        capture_output=True, text=True, timeout=180, cwd=_REPO,
-                       env=env, encoding="utf-8")
+                       env=env, encoding="utf-8", errors="replace")
     assert r.returncode == 0, r.stderr
     assert ziel.is_file()
     with zipfile.ZipFile(ziel) as zf:
