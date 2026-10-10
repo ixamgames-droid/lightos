@@ -26,6 +26,7 @@ import { updateEmptyState } from '../empty_state.js';
 import { cachedDmx } from './dmx_cache.js';   // VIZ-71
 // VIZ-72: echte Lichter nur noch aus dem Spot-Pool (scene/spot_pool.js).
 import { initSpotPool, resizeSpotPool } from '../scene/spot_pool.js';
+import { goboProjektionInfo } from '../scene/gobo_projektion.js';   // VIZ-96
 
 initSpotPool(fixtures);
 
@@ -43,6 +44,14 @@ export const fixtureMeshes = []; // for raycasting
 // Daher: nur die ersten N Spots werfen Schatten, der Rest leuchtet ohne.
 // Reserve deckt Material-/Sonstige-Texturen (Boden-Canvas, Label-Sprites) ab.
 const SHADOW_TEXTURE_RESERVE = 6;
+// VIZ-96: die Gobo-Projektion belegt in jedem beleuchteten Material EINEN
+// weiteren Sampler (den Motiv-Atlas, scene/gobo_projektion.js) — er wird von
+// den Units abgezogen, bevor Shadow-Maps verteilt werden. Auf einer
+// 16-Unit-GPU bleiben auf der Stufe Maximal damit 9 statt 10 Schatten-Lichter;
+// Hoch (Dach 8) und Niedrig (keine Projektion) aendern sich nicht.
+function texturReserve() {
+  return SHADOW_TEXTURE_RESERVE + goboProjektionInfo().slots;
+}
 
 // ⚠️ VIZ-PERF (2026-08-03): Texture-Units sind NICHT die einzige Grenze.
 //
@@ -137,7 +146,7 @@ function shadowSpotBudget() {
       && renderer.capabilities.maxTextures) || 16;
     _shadowSpotBudget = Math.min(
       schattenDach(),   // SHADOW_SPOT_HARD_CAP je Stufe
-      Math.max(2, maxTex - SHADOW_TEXTURE_RESERVE));
+      Math.max(2, maxTex - texturReserve()));
   }
   return _shadowSpotBudget;
 }
@@ -148,7 +157,8 @@ export function shadowBudgetInfo() {
     && renderer.capabilities.maxTextures) || 16;
   return {
     maxTextures: maxTex,
-    reserve: SHADOW_TEXTURE_RESERVE,
+    reserve: texturReserve(),
+    goboSlots: goboProjektionInfo().slots,
     hardCap: schattenDach(),
     budget: shadowSpotBudget(),
   };

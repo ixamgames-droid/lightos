@@ -15,6 +15,7 @@ import { syncPoolSize } from './floor_pool.js';               // VIZ-15
 import { beamsOff } from '../state.js';                       // VIZ-15
 import { applyGobo, alignGoboFloor, goboWinkel, GOBO_LICHT, GOBO_STRAHL, GOBO_FLECK } from './gobo_textures.js';   // VIZ-GOBO-3D, VIZ-83
 import { glattKanal, glattZiel, glattWert, glattDeckel } from './bewegung_glatt.js';   // VIZ-92
+import { goboProjektionAktiv } from '../scene/gobo_projektion.js';      // VIZ-96
 import { requestRender } from '../scene/render_loop.js';                 // VIZ-92
 import { buildLaserRig, applyLaser, noteLaserAnimation, LASER_BEAM_OPACITY } from './laser.js';   // VIZ-79
 import { stageObjects } from '../state.js';                   // VIZ-BEAM-OCCLUSION
@@ -1636,7 +1637,12 @@ function applyGenericColor(f, dmx) {
     // — ein konstanter Anteil statt sekundenlanger Ruckler.
     // A3D-25/A3D-28 gilt weiter: gemessen wird an der EFFEKTIVEN Leuchtdichte,
     // offener Dimmer + Farbe schwarz ist dunkel.
-    f.spot.intensity = lum > 0.01 ? intNorm * 3.0 * (gobo ? GOBO_LICHT : 1) : 0;
+    // VIZ-96: mit Gobo-Projektion (Stufen Hoch/Maximal) behaelt das Geraet
+    // seine volle Lichtstaerke und bewirbt sich damit um ein Pool-Licht — das
+    // Pool-Licht traegt dann das Muster als Maske (scene/spot_pool.js). Ohne
+    // Projektion (Niedrig) bleibt es bei GOBO_LICHT = 0 wie seit VIZ-92.
+    const goboLicht = gobo ? (goboProjektionAktiv() ? 1 : GOBO_LICHT) : 1;
+    f.spot.intensity = lum > 0.01 ? intNorm * 3.0 * goboLicht : 0;
   }
   if (f.floorSpot) {
     f.floorSpot.material.color = color;
