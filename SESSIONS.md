@@ -48,6 +48,7 @@
 | FM-67 | A | fix/fm67-gleichnamige-modi | 2026-10-10T09:29Z | - |
 | WEB-06 | A | fix/web06-socketio-lokal | 2026-10-10T09:29Z | - |
 | UI-85 | A | feature/ui85-hilfe-menue | 2026-10-10T09:29Z | - |
+| DOC-69 | A | docs/doc69-doku-korrekturen | 2026-10-10T09:29Z | - |
 
 ## Blocker & Fallen
 
@@ -123,7 +124,6 @@
 
 ## Verlauf
 
-- 2026-10-10T09:27Z C uebergeben DOC-35
 - 2026-10-10T09:27Z C uebergeben DOC-36
 - 2026-10-10T09:27Z C uebergeben DOC-37
 - 2026-10-10T09:27Z C uebergeben DOC-38
@@ -153,3 +153,4 @@
 - 2026-10-10T09:29Z A claim FM-67
 - 2026-10-10T09:29Z A claim WEB-06
 - 2026-10-10T09:29Z A claim UI-85
+- 2026-10-10T09:29Z A claim DOC-69
