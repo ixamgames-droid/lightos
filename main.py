@@ -27,6 +27,14 @@ from src.core.paths import app_data_dir as _app_data_dir
 # QA-CRASHLOG-TESTS: bewusst NICHT `_crash_log_path` benannt — so heisst
 # unten die Modul-Globale mit dem aufgeloesten Pfad.
 from src.core.paths import crash_log_path as _resolve_crash_log_path
+# STAB-30: Sitzungs-Log fuer Fernhilfe. stdout/stderr gehen ab hier ZUSAETZLICH
+# (Tee, mit Zeitstempel) in <App-Daten>/logs/lightos.log — zunaechst nur in einen
+# Puffer; die Datei oeffnet main() erst nach der Einzelinstanz-Sperre. Nur beim
+# echten Programmstart (nicht beim Import aus Tests) und nicht fuer --help/
+# --selbsttest/--diagnose. Ersetzt unter pythonw auch die fehlenden Streams.
+from src.core import diagnose_log as _dl
+if __name__ == "__main__" and _dl.soll_mitschreiben(sys.argv[1:]):
+    _dl.install_tee()
 
 APP_VERSION = "1.0.0"
 
@@ -617,14 +625,19 @@ def _open_show_at_startup(window, pfad: str):
     QTimer.singleShot(0, lambda: window._open_show_path(pfad))
 
 
-def _bibliothek_beim_erststart(window) -> None:
+def _bibliothek_beim_erststart(window, mit_show: bool = False) -> None:
     """FM-53: beim ersten Start fragen, ob eine freie Geraete-Bibliothek geladen
     werden soll — nur solange die Bibliothek nichts ausser den eingebauten
     Profilen enthaelt und die Frage nie beantwortet wurde.
 
     Bewusst HIER und nicht im ``MainWindow``-Konstruktor: die Tests bauen das
     Fenster hundertfach, und ein modaler Dialog dort blockierte jeden davon.
-    Im Kiosk-Modus wird nicht gefragt."""
+    Im Kiosk-Modus wird nicht gefragt.
+
+    FM-72: Mit ``--show`` (Autostart, Vorfuehrung, Fernwartung) blockiert KEIN
+    modaler Dialog — die Show soll sofort bedienbar sein. Stattdessen ein Knopf
+    in der Statuszeile; die Frage gilt dann noch nicht als beantwortet und kommt
+    beim naechsten Start ohne ``--show`` wieder."""
     from PySide6.QtCore import QTimer
     try:
         from src.core.database import bibliothek_download as _bd
@@ -633,6 +646,9 @@ def _bibliothek_beim_erststart(window) -> None:
             return
     except Exception as e:
         print(f"[main] Bibliothek-Erststart uebersprungen: {e}")
+        return
+    if mit_show:
+        QTimer.singleShot(800, window._bibliothek_hinweis_zeigen)
         return
     QTimer.singleShot(800, lambda: window._open_bibliothek_download(erststart=True))
 
@@ -766,12 +782,21 @@ def main():
                         help="Prueft Importe (inkl. QtWebEngine) und mitgelieferte "
                              "Dateien ohne Fenster und beendet sich (0 = ok). "
                              "Mit DATEI wird der Bericht dorthin geschrieben.")
+    parser.add_argument("--diagnose", nargs="?", const="", metavar="ZIEL.zip",
+                        help="Diagnosepaket (Logs, crash.log, Systeminfo, "
+                             "Einstellungen ohne private Inhalte) schreiben und "
+                             "beenden — ohne Fenster. Ohne ZIEL auf den Desktop.")
     args = parser.parse_args()
     if args.selbsttest:
         # XPLAT-47: Rauchtest fuer den gepackten Build — VOR Einzelinstanz-
         # Sperre, Crash-Logging und Datenuebernahme: keine Nebenwirkungen.
         from src.core.selbsttest import main as _selbsttest
         sys.exit(_selbsttest(None if args.selbsttest == "-" else args.selbsttest))
+    if args.diagnose is not None:
+        # STAB-30: wie --selbsttest VOR Sperre/Crash-Logging/Datenuebernahme —
+        # liest nur, startet nichts (auch neben einer laufenden Instanz nutzbar).
+        sys.exit(_dl.cli_diagnose(args.diagnose or None, APP_VERSION,
+                                  os.path.dirname(os.path.abspath(__file__))))
     # Fruehe, ehrliche Absage: ein Tippfehler im Pfad soll NICHT erst nach dem
     # kompletten Hochfahren als stiller Fehlschlag auffallen — dann steht die
     # alte Show da und man sucht den Fehler in der Show statt im Aufruf.
@@ -789,6 +814,12 @@ def main():
     if instance_lock is None:
         _report_already_running()
         return
+
+    # STAB-30: Sitzungs-Log oeffnen (rotiert die vorige Sitzung nach .1) und den
+    # Kopfblock schreiben — erst NACH der Sperre, sonst rotierte ein abgewiesener
+    # Zweitstart der laufenden Instanz das Log weg.
+    _dl.oeffne_sitzungslog(APP_VERSION, os.path.dirname(os.path.abspath(__file__)))
+    _dl.richte_python_logging_ein()
 
     _setup_crash_logging()
 
@@ -866,10 +897,18 @@ def main():
     else:
         window.show()
 
+    # STAB-30: Bildschirme/DMX/MIDI/Show ins Sitzungs-Log nachtragen, sobald
+    # Ausgaenge und Hotplug-Scan einmal gelaufen sind.
+    try:
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(4000, _dl.melde_laufzeit_umgebung)
+    except Exception as _e:
+        print(f"[main] Diagnose-Nachtrag nicht geplant: {_e}")
+
     if args.show:
         _open_show_at_startup(window, args.show)
     if not args.kiosk:
-        _bibliothek_beim_erststart(window)
+        _bibliothek_beim_erststart(window, mit_show=bool(args.show))
 
     _finalize_and_exit(app.exec())
 

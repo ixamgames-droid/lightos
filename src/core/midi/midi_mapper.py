@@ -620,8 +620,10 @@ class MidiMapper:
                     fm.start(fid)
                 else:
                     fm.stop(fid)
-            except Exception:
-                pass
+            except Exception as e:
+                from src.core.diagnose_log import melde_still   # STAB-30
+                melde_still("midi.funktion", e,
+                            text=f"Mapping {mapping.target_id or mapping.param}")
             return
 
         if action == ACTION_EFFECT_ACTION:

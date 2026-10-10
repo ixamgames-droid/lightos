@@ -740,6 +740,9 @@ class MainWindow(QMainWindow):
         # Hilfe
         hm = mb.addMenu("&Hilfe")
         hm.addAction("Über LightOS").triggered.connect(self._about)
+        # STAB-30: ein Paket fuer die Fernhilfe (Logs + Systeminfo, keine Shows).
+        hm.addAction("Diagnosepaket speichern…").triggered.connect(
+            self._diagnosepaket_speichern)
 
     # ── UI aufbauen ───────────────────────────────────────────────────────────
 
@@ -2549,6 +2552,27 @@ class MainWindow(QMainWindow):
         from src.ui.widgets.bibliothek_download_dialog import BibliothekDownloadDialog
         BibliothekDownloadDialog(self, erststart=erststart).exec()
 
+    def _bibliothek_hinweis_zeigen(self):
+        """FM-72: die Erststart-Frage als Knopf in der Statuszeile statt als
+        modaler Dialog (Start mit ``--show``). Ein Klick oeffnet denselben
+        Dialog wie beim ersten Start; danach verschwindet der Knopf."""
+        if getattr(self, "_btn_bibliothek_hinweis", None) is not None:
+            return
+        btn = QPushButton("Geräte-Bibliothek laden…")
+        btn.setFlat(True)
+        btn.setToolTip("Eine freie Geräte-Bibliothek (QLC+ oder Open Fixture "
+                       "Library) herunterladen — dieselbe Frage wie beim ersten Start.")
+
+        def _klick():
+            self.statusBar().removeWidget(btn)
+            btn.deleteLater()
+            self._btn_bibliothek_hinweis = None
+            self._open_bibliothek_download(erststart=True)
+
+        btn.clicked.connect(_klick)
+        self.statusBar().addPermanentWidget(btn)
+        self._btn_bibliothek_hinweis = btn
+
     def _open_fixture_editor(self):
         try:
             from src.ui.widgets.fixture_editor import FixtureEditorDialog
@@ -2585,6 +2609,48 @@ class MainWindow(QMainWindow):
             "Enttec Pro USB &middot; Art-Net 4 &middot; MIDI<br><br>"
             "UI: QLC+ v5 Design System"
         )
+
+    def _diagnosepaket_speichern(self, ziel: str | None = None):
+        """STAB-30: Hilfe → „Diagnosepaket speichern…“. Erklaert vorher, was im
+        Paket steckt (und was NICHT), fragt nach dem Ziel und schreibt das zip.
+        ``ziel`` vorgegeben = ohne Dialoge (Tests). Gibt den Pfad oder None."""
+        from src.core import diagnose_log as dl
+        from PySide6.QtWidgets import QApplication, QFileDialog
+        headless = os.environ.get("QT_QPA_PLATFORM", "").startswith("offscreen")
+        if ziel is None:
+            antwort = QMessageBox.information(
+                self, "Diagnosepaket speichern",
+                "Das Diagnosepaket hilft bei der Fehlersuche aus der Ferne. "
+                "Es enthält:\n\n" + dl.PAKET_INHALT +
+                "\n\nDie Datei anschließend per E-Mail oder Messenger an die "
+                "LightOS-Hilfe schicken.",
+                QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Ok)
+            if antwort != QMessageBox.StandardButton.Ok:
+                return None
+            ziel, _ = QFileDialog.getSaveFileName(
+                self, "Diagnosepaket speichern", dl.standard_ziel(),
+                "Zip-Archiv (*.zip)")
+            if not ziel:
+                return None
+            if not ziel.lower().endswith(".zip"):
+                ziel += ".zip"
+        try:
+            dl.melde_laufzeit_umgebung()
+            pfad = dl.erstelle_diagnosepaket(
+                ziel, QApplication.applicationVersion() or "?")
+        except Exception as e:
+            print(f"[MainWindow] ERROR: Diagnosepaket nicht geschrieben: {e}")
+            if not headless:
+                QMessageBox.warning(self, "Diagnosepaket",
+                                    f"Das Diagnosepaket konnte nicht geschrieben "
+                                    f"werden:\n\n{e}")
+            return None
+        print(f"[MainWindow] Diagnosepaket geschrieben: {pfad}")
+        if not headless:
+            QMessageBox.information(self, "Diagnosepaket",
+                                    f"Gespeichert unter:\n\n{pfad}")
+        return pfad
 
     # ── State-Events ─────────────────────────────────────────────────────────
 
