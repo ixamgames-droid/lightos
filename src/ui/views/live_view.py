@@ -31,6 +31,7 @@ def _strobe_hz(ch, val: int) -> float:
 import math
 import os
 import time
+from collections import deque
 from src.core.paths import app_data_dir
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                 QPushButton, QSlider, QFrame, QSizePolicy,
@@ -39,7 +40,8 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                 QTabWidget, QInputDialog, QMessageBox,
                                 QTreeWidgetItem, QLineEdit,
                                 QButtonGroup, QStackedWidget)
-from PySide6.QtCore import Qt, QTimer, QPointF, QRectF, Signal, QByteArray, QMimeData
+from PySide6.QtCore import (Qt, QTimer, QPointF, QRect, QRectF, Signal, QByteArray,
+                            QMimeData)
 from PySide6.QtGui import (QPainter, QColor, QBrush, QPen, QFont, QPolygonF,
                             QLinearGradient, QRadialGradient, QMouseEvent,
                             QDrag, QFontMetricsF, QImage, QTransform,
@@ -1012,6 +1014,14 @@ class StageCanvas(QWidget):
         self._takte_ohne_paint: int = 0
         self._bg_pixmap = None
         self._bg_key: tuple | None = None
+        # UI-86: Ausschnitt (Widget-Koordinaten), den das Cache-Bild abdeckt.
+        self._bg_rect: QRect | None = None
+        # UI-86: gemessene Zeichenzeit -> Abstand der Takt-Bilder (siehe
+        # _bild_abstand_s). Die Uhr ist austauschbar, damit Tests ohne Warten
+        # und ohne echte Zeichenlast rechnen koennen.
+        self._uhr = time.perf_counter
+        self._zeichenzeiten: deque = deque(maxlen=self.ZEICHENZEIT_PROBEN)
+        self._naechstes_bild: float = 0.0
         # VIZ-78: Geraete-Steckbriefe (siehe _steckbrief).
         self._steckbriefe: dict = {}
         self._tick_fp: dict | None = None
@@ -1092,6 +1102,7 @@ class StageCanvas(QWidget):
             if on:
                 # Nach dem Wiedereinblenden sofort ein frisches Bild.
                 self._paint_sig = None
+                self._naechstes_bild = 0.0
                 if not self._update_timer.isActive():
                     self._update_timer.start(self.RENDER_INTERVAL_MS)
             else:
@@ -1167,9 +1178,56 @@ class StageCanvas(QWidget):
         self._paint_sig = None
         self._steckbriefe.clear()
 
+    # ── UI-86: Bildrate aus der gemessenen Zeichenzeit ───────────────────────
+    # Bei hoher Pixeldichte (200 % Skalierung) kostete ein Bild der 2D-Ansicht
+    # ~58 ms im UI-Thread; bei 10 Bildern/s blieb fuer Bedienung und 3D-Fenster
+    # kaum etwas uebrig. Der Takt zeichnet deshalb hoechstens so oft, dass die
+    # Zeichenzeit rund MAX_UI_ANTEIL des UI-Threads belegt. Die Regel haengt
+    # nur an der GEMESSENEN Zeit, nicht an Rechner oder Pixeldichte: wer
+    # schnell zeichnet (<= RENDER_INTERVAL_MS * MAX_UI_ANTEIL = 25 ms), behaelt
+    # die volle Rate. Bedienung (Auswahl, Ziehen, Zoom) ruft update() direkt
+    # und wird nie gebremst.
+    MAX_UI_ANTEIL = 0.25            # <= 0 schaltet die Regel ab
+    MAX_BILD_ABSTAND_S = 1.0        # nie seltener als ein Bild je Sekunde
+    ZEICHENZEIT_PROBEN = 5          # Median darueber: ein Ausreisser bremst nicht
+
+    def _zeichenzeit_s(self) -> float:
+        """Typische Dauer eines vollen Bildes (Median der letzten Proben)."""
+        proben = sorted(self._zeichenzeiten)
+        return proben[(len(proben) - 1) // 2] if proben else 0.0
+
+    def _bild_abstand_s(self) -> float:
+        """Mindestabstand zweier Takt-Bilder; 0 = volle Rate (jeder Takt)."""
+        if self.MAX_UI_ANTEIL <= 0:
+            return 0.0
+        abstand = self._zeichenzeit_s() / self.MAX_UI_ANTEIL
+        if abstand <= self.RENDER_INTERVAL_MS / 1000.0:
+            return 0.0
+        return min(abstand, self.MAX_BILD_ABSTAND_S)
+
+    def _bild_im_budget(self, jetzt: float) -> bool:
+        """Darf dieser Takt zeichnen? Halber Takt Toleranz, weil der Timer nur
+        im Raster von RENDER_INTERVAL_MS feuert; _bild_verbucht gleicht das
+        aus, sodass der MITTLERE Abstand stimmt."""
+        if self._bild_abstand_s() <= 0.0:
+            return True
+        return jetzt >= self._naechstes_bild - self.RENDER_INTERVAL_MS / 2000.0
+
+    def _bild_verbucht(self, jetzt: float) -> None:
+        abstand = self._bild_abstand_s()
+        if abstand <= 0.0:
+            self._naechstes_bild = 0.0
+            return
+        halb = self.RENDER_INTERVAL_MS / 2000.0
+        # Nach einer Pause kein Guthaben ansparen: ab jetzt zaehlen.
+        self._naechstes_bild = max(self._naechstes_bild, jetzt - halb) + abstand
+
     def _on_render_tick(self) -> None:
         if not self._darf_zeichnen():
             return
+        jetzt = self._uhr()
+        if not self._bild_im_budget(jetzt):
+            return      # Signatur bleibt stehen -> Aenderung kommt im naechsten
         sig = self._anzeige_signatur()
         self._takte_ohne_paint += 1
         if (not self._animiert and sig is not None and sig == self._paint_sig
@@ -1180,6 +1238,7 @@ class StageCanvas(QWidget):
         # VIZ-78: die Fingerabdruecke hat die Signatur eben schon gelesen —
         # das gleich folgende Bild nimmt sie, statt sie erneut abzufragen.
         self._tick_fp = ({fp[0]: fp for fp in sig[3]} if sig is not None else None)
+        self._bild_verbucht(jetzt)
         self.update()
 
     # ── VIZ-70: statischer Hintergrund als Pixmap ────────────────────────────
@@ -1238,34 +1297,79 @@ class StageCanvas(QWidget):
         painter.setFont(_schrift(8 * tscale))
         painter.drawText(aud_rect, Qt.AlignmentFlag.AlignCenter, "PUBLIKUM")
 
-    def _hintergrund_pixmap(self):
+    # UI-86: Passt die ganze Flaeche nicht unter BG_CACHE_MAX_PIXEL (bei 200 %
+    # Skalierung schon ab Zoom ~1,25), wird nur der sichtbare Ausschnitt
+    # gecacht — plus dieser Rand je Seite (Anteil der Ausschnittgroesse), damit
+    # nicht jeder Scroll-Schritt das Bild neu baut.
+    BG_CACHE_RAND = 0.25
+    # Ursprung des Ausschnitts auf dieses Raster legen: bei gebrochenem DPR
+    # (1,25/1,5/1,75) faellt er so auf ganze Geraetepixel.
+    _BG_RASTER = 4
+
+    def _hintergrund_pixmap(self, bedarf: QRect | None = None):
         """Gecachter Hintergrund in Geraetepixeln (oder ``None`` = direkt
-        zeichnen). Neu gebaut nur, wenn sich Welt, Raster, Zoom oder die
-        Pixeldichte des Bildschirms aendern."""
+        zeichnen); ``_bg_rect`` sagt, welchen Ausschnitt er abdeckt. Neu gebaut
+        nur, wenn sich Welt, Raster, Zoom oder die Pixeldichte des Bildschirms
+        aendern — oder der sichtbare Ausschnitt (samt ``bedarf``, dem gerade
+        neu zu zeichnenden Rechteck) das gecachte Stueck verlaesst."""
         try:
             dpr = float(self.devicePixelRatioF()) or 1.0
         except Exception:
             dpr = 1.0
         w, h = self.width(), self.height()
-        if w <= 0 or h <= 0 or w * h * dpr * dpr > self.BG_CACHE_MAX_PIXEL:
+        if w <= 0 or h <= 0:
             return None
+        grenze = self.BG_CACHE_MAX_PIXEL
         key = (self.world_w, self.world_h, self.zoom, self.grid_visible,
                self.grid_size, w, h, dpr)
-        if key == self._bg_key and self._bg_pixmap is not None:
+        voll = QRect(0, 0, w, h)
+        passt = lambda r: r.width() * r.height() * dpr * dpr <= grenze
+        if passt(voll):
+            ziel = noetig = voll
+        else:
+            try:
+                noetig = self.visibleRegion().boundingRect()
+            except RuntimeError:
+                return None
+            if bedarf is not None:
+                noetig = noetig.united(bedarf)
+            noetig = noetig.intersected(voll)
+            if noetig.isEmpty() or not passt(noetig):
+                return None
+            ziel = None
+        if (key == self._bg_key and self._bg_pixmap is not None
+                and self._bg_rect is not None
+                and self._bg_rect.contains(noetig)):
             return self._bg_pixmap
+        if ziel is None:
+            rx = int(noetig.width() * self.BG_CACHE_RAND)
+            ry = int(noetig.height() * self.BG_CACHE_RAND)
+            for kandidat in (noetig.adjusted(-rx, -ry, rx, ry), noetig):
+                kandidat = kandidat.intersected(voll)
+                q = self._BG_RASTER
+                x0, y0 = kandidat.x() // q * q, kandidat.y() // q * q
+                kandidat = QRect(x0, y0, kandidat.right() + 1 - x0,
+                                 kandidat.bottom() + 1 - y0)
+                if passt(kandidat):
+                    ziel = kandidat
+                    break
+            if ziel is None:
+                return None
         # Deckendes RGB32-Bild; die Beschriftungen kommen NICHT hinein (siehe
         # _zeichne_hintergrund).
         from PySide6.QtGui import QImage
         # Aufrunden: bei gebrochenem DPR (1,25/1,5/1,75) waere round() eine
         # Geraetepixel-Spalte zu schmal — wegen WA_OpaquePaintEvent bliebe dort
         # Altes bzw. Schwarz stehen.
-        pm = QImage(max(1, math.ceil(w * dpr)), max(1, math.ceil(h * dpr)),
+        pm = QImage(max(1, math.ceil(ziel.width() * dpr)),
+                    max(1, math.ceil(ziel.height() * dpr)),
                     QImage.Format.Format_RGB32)
         pm.setDevicePixelRatio(dpr)
         pm.fill(QColor("#0d1117"))
         p = QPainter(pm)
         try:
             p.setRenderHint(QPainter.RenderHint.Antialiasing)
+            p.translate(-ziel.x(), -ziel.y())
             p.scale(self.zoom, self.zoom)
             self._zeichne_hintergrund(p, 1.0 / self.zoom if self.zoom > 0 else 1.0,
                                       texte=False)
@@ -1273,6 +1377,7 @@ class StageCanvas(QWidget):
             p.end()
         self._bg_pixmap = pm
         self._bg_key = key
+        self._bg_rect = ziel
         return pm
 
     # ── Koordinaten-Umrechnung Canvas→Welt ───────────────────────────────────
@@ -1977,13 +2082,33 @@ class StageCanvas(QWidget):
 
     # ── Paint ─────────────────────────────────────────────────────────────────
 
+    def _ist_vollbild(self, event) -> bool:
+        """Zeichnet dieses Ereignis die ganze SICHTBARE Flaeche neu?"""
+        try:
+            sichtbar = self.visibleRegion().boundingRect()
+            return sichtbar.isEmpty() or event.rect().contains(sichtbar)
+        except Exception:
+            return True
+
     def paintEvent(self, event):
+        # UI-86: Zeichenzeit messen — nur volle Bilder, ein Teil-Repaint (z. B.
+        # unter der Minimap) ist billiger und wuerde die Rate schoenrechnen.
+        voll = self._ist_vollbild(event)
+        t0 = self._uhr()
+        try:
+            self._zeichne(event, voll)
+        finally:
+            if voll:
+                self._zeichenzeiten.append(max(0.0, self._uhr() - t0))
+
+    def _zeichne(self, event, _voll: bool = True) -> None:
         painter = QPainter(self)
         # VIZ-70: statischer Hintergrund aus dem Pixmap-Cache (1:1 in
         # Geraetepixeln, VOR Skalierung/Antialiasing) — sonst direkt wie bisher.
-        bg = self._hintergrund_pixmap()
+        # UI-86: bei grosser Flaeche deckt er nur den sichtbaren Ausschnitt ab.
+        bg = self._hintergrund_pixmap(event.rect())
         if bg is not None:
-            painter.drawImage(0, 0, bg)
+            painter.drawImage(self._bg_rect.topLeft(), bg)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.scale(self.zoom, self.zoom)
         # Bereichs-Beschriftungen bildschirm-konstant halten (Painter ist skaliert)
@@ -2006,11 +2131,8 @@ class StageCanvas(QWidget):
             _clip = QRectF(_er.x() / self.zoom - _rand, _er.y() / self.zoom - _rand,
                            _er.width() / self.zoom + 2 * _rand,
                            _er.height() / self.zoom + 2 * _rand)
-            _sichtbar = self.visibleRegion().boundingRect()
-            _voll = _sichtbar.isEmpty() or _er.contains(_sichtbar)
         except Exception:
             _clip = None
-            _voll = True
 
         # Fixtures
         try:
