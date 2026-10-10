@@ -111,6 +111,25 @@ def pruefe_ressourcen(wurzel: str | None = None,
     return fehler
 
 
+def pruefe_build_info(wurzel: str | None = None,
+                      gefroren: bool | None = None) -> list[str]:
+    """STAB-33: ein gepackter Build muss wissen, aus welchem Commit er stammt
+    (``build_info.json`` im Bundle) — sonst steht im Diagnosepaket wieder
+    ``Commit: unbekannt``. Im Quellbetrieb gibt es die Datei nicht (dort zaehlt
+    ``.git``), deshalb nur gefroren ein Fehler."""
+    gefroren = ist_gefroren() if gefroren is None else gefroren
+    if not gefroren:
+        return []
+    from src.core import diagnose_log
+    wurzel = wurzel or programm_dir()
+    if not os.path.isfile(os.path.join(wurzel, diagnose_log.BUILD_INFO_NAME)):
+        return [f"fehlt: {diagnose_log.BUILD_INFO_NAME} (vor dem Build "
+                "packaging/windows/build_info.py ausfuehren)"]
+    if not diagnose_log.build_commit(wurzel):
+        return [f"{diagnose_log.BUILD_INFO_NAME}: nicht lesbar oder ohne Commit"]
+    return []
+
+
 def pruefe_code_stand() -> list[str]:
     """Der Builtin-Fingerabdruck darf nicht leer sein (sonst laeuft der
     Abgleich nach einem Update nie wieder, s. ``fixture_db._code_stand``)."""
@@ -125,7 +144,13 @@ def bericht() -> tuple[int, list[str]]:
     zeilen = [f"LightOS-Selbsttest — gefroren={ist_gefroren()} "
               f"programm_dir={programm_dir()}",
               f"Python {sys.version.split()[0]} ({sys.platform})"]
-    fehler = pruefe_module() + pruefe_ressourcen() + pruefe_code_stand()
+    fehler = (pruefe_module() + pruefe_ressourcen() + pruefe_code_stand()
+              + pruefe_build_info())
+    try:
+        from src.core import diagnose_log
+        zeilen.append(f"Commit: {diagnose_log.commit_text() or 'unbekannt'}")
+    except Exception:
+        pass
     for name in OPTIONALE_MODULE:
         rest = pruefe_module((name,))
         zeilen.append(f"optional {name}: {'fehlt — ' + rest[0] if rest else 'ok'}")
