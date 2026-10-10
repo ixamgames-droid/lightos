@@ -202,6 +202,24 @@ class SammelnTest(_Tmp):
         self.assertEqual(self.backlog().replace(
             "teils — Teil 1 geliefert", "todo"), BACKLOG)
 
+    def test_freitext_zu_vorhandener_zeile_faellt_nicht_still_weg(self):
+        """Review-Fund: bei einer vorhandenen Zeile zaehlt nur der Status. Der
+        Freitext des Fragments verschwindet mit der Datei — das muss der Lauf
+        (auch --dry-run) sagen, sonst geht er unbemerkt verloren."""
+        self.frag("FM-2.md", "ID: FM-2\nStatus: teils\n\nGeliefert: Teil 1.\n")
+        for dry in (True, False):
+            aus: list[str] = []
+            self.assertEqual(bs.sammeln(self.repo, dry_run=dry, ausgabe=aus.append), 0)
+            hinweise = [z for z in aus if "Hinweis FM-2" in z]
+            self.assertEqual(len(hinweise), 1, aus)
+            self.assertIn("NICHT uebernommen", hinweise[0])
+        self.assertNotIn("Geliefert: Teil 1.", self.backlog())
+        # Ohne Freitext kein Hinweis.
+        self.frag("FM-2.md", "ID: FM-2\nStatus: todo\n")
+        aus = []
+        self.assertEqual(bs.sammeln(self.repo, ausgabe=aus.append), 0)
+        self.assertFalse([z for z in aus if "Hinweis" in z], aus)
+
     def test_review_wird_mit_pr_nummer_zu_done(self):
         self.frag("QA-7.md", "ID: QA-7\nStatus: review\n")
         self.assertEqual(bs.sammeln(self.repo, pr=993, heute="2026-10-10",
@@ -350,6 +368,20 @@ class PrAusHistorieTest(_GitRepo):
         self.commit("etwas anderes (#7)")
         self.frag("QA-7.md", "ID: QA-7\nStatus: review\n")
         self.assertEqual(bs.pr_aus_git(self.repo, "backlog.d/QA-7.md"), (None, None))
+
+
+    def test_nach_dem_merge_geaendertes_fragment_hat_keine_nummer(self):
+        """Review-Fund: das Fragment kam mit (#812) nach main und wurde danach
+        lokal geaendert (nicht committet). Die alte Nummer gilt fuer DIESEN
+        Inhalt nicht — sonst wuerde ein neuer 'review'-Stand als 'done (#812)'
+        eingetragen."""
+        self.frag("QA-7.md", "ID: QA-7\nStatus: todo\n")
+        self.commit("docs: Befund (QA-7) (#812)")
+        self.assertEqual(bs.pr_aus_git(self.repo, "backlog.d/QA-7.md")[0], 812)
+        self.frag("QA-7.md", "ID: QA-7\nStatus: review\n")
+        self.assertEqual(bs.pr_aus_git(self.repo, "backlog.d/QA-7.md"), (None, None))
+        self.assertEqual(bs.sammeln(self.repo, ausgabe=_still), 0)
+        self.assertEqual(self.reste(), ["QA-7.md"])
 
 
 class WaechterTest(_GitRepo):

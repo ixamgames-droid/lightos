@@ -52,7 +52,8 @@ Was der Sammel-Lauf tut
 * **ID steht noch nicht in BACKLOG.md** -> neue Tabellenzeile, mit so vielen
   Spalten wie die Tabelle an der Einfuegestelle hat.
 * **ID steht schon dort** -> NUR die Statusspalte wird ersetzt. Titel,
-  Prioritaet und Details der Zeile bleiben, wie sie sind.
+  Prioritaet und Details der Zeile bleiben, wie sie sind. Freitext im Fragment
+  wird dann NICHT uebernommen; der Lauf meldet das als Hinweis.
 * **``review``** wird zu ``done (<Datum>, [PR #N](…))``. Die Nummer kommt aus
   dem Betreff des letzten Commits, der das Fragment angefasst hat
   (Squash-Merge: ``… (#N)``), oder aus ``--pr N``. **Ohne Nummer bleibt das
@@ -373,6 +374,14 @@ def baue_backlog(text: str, frags: list[Fragment],
             neu = (zeilen[i][:m.start(3)] + f" {zelle} " + zeilen[i][m.end(3):])
             protokoll.append(f"Status {f.id}: {m.group(3).strip()[:60]} -> {zelle}"
                              if neu != zeilen[i] else f"unveraendert: {f.id}")
+            if f.details:
+                # Review-Fund: der Freitext faellt mit dem Fragment weg. Das
+                # ist gewollt (nur die Statusspalte), darf aber nicht still
+                # passieren — --dry-run zeigt es, bevor geloescht wird.
+                protokoll.append(
+                    f"Hinweis {f.id}: die Zeile gibt es schon — der Freitext des "
+                    "Fragments wird NICHT uebernommen (nur der Status; Kurzes "
+                    "gehoert in 'Status-Notiz')")
             zeilen[i] = neu
             fertig.append(f)
             continue

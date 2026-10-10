@@ -22,7 +22,9 @@ Was fehlt, woran man es merkt, wann es erledigt ist. Mehrere Zeilen werden
 beim Sammeln zu einer Tabellenzelle.
 ```
 
-Ein **vorhandenes** Item (nur der Status aendert sich):
+Ein **vorhandenes** Item (nur der Status aendert sich — Titel und Freitext
+eines solchen Fragments werden beim Sammeln **nicht** in die Zeile uebernommen,
+der Lauf meldet das als Hinweis; Kurzes gehoert in `Status-Notiz`):
 
 ```
 ID: FM-62
