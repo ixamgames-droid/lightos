@@ -60,6 +60,7 @@
 | QA-93 | D | fix/qa93-gate-ohne-echtes-fenster | 2026-10-10T22:54Z | - |
 | QA-94 | A | fix/cdx-1010-main | 2026-10-10T21:17Z | - |
 | QA-95 | A | fix/cdx-1010-main | 2026-10-10T21:17Z | - |
+| QA-91 | D | - | 2026-10-10T22:54Z | - |
 
 ## Blocker & Fallen
 
@@ -200,7 +201,6 @@
 
 ## Verlauf
 
-- 2026-10-10T18:00Z D claim VCB-36
 - 2026-10-10T18:00Z D claim UI-78
 - 2026-10-10T18:00Z D claim UI-80
 - 2026-10-10T18:00Z D claim TOOL-18
@@ -230,3 +230,4 @@
 - 2026-10-10T22:00Z D done TOOL-21
 - 2026-10-10T22:23Z A done LAS-31
 - 2026-10-10T22:49Z D done QA-91
+- 2026-10-10T22:54Z D claim QA-91
