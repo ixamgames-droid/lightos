@@ -27,7 +27,7 @@
 | OUT-64 | B | fix/out64-estop-ausgabeweg | 2026-10-08T19:11Z | src/core/dmx/output_manager.py · tests/test_out64_estop_ausgabeweg.py · changelog.d/2026-10-08-OUT-64.md · BACKLOG.md |
 | UI-76 | B | fix/ui76-go-hinweis-page | 2026-10-08T19:17Z | src/core/cueliste_ziel.py · src/ui/views/playback_view.py · tests/test_ui76_go_hinweis.py · docs/anleitung_szenen_cues/ANLEITUNG.md · changelog.d/2026-10-08-UI-76.md · BACKLOG.md |
 | VIZ-95 | A | feature/viz95-lasermuster-3d | 2026-10-08T20:47Z | src/ui/visualizer |
-| LAS-30 | A | feature/viz95-lasermuster-3d | 2026-10-08T20:52Z | src/core |
+| LAS-30 | A | feature/las30-laser-achsen | 2026-10-10T10:47Z | src/core/laser |
 | VIZ-96 | A | feature/viz96-gobo-projektion | 2026-10-08T21:37Z | src/ui/visualizer |
 | UI-84 | A | fix/ui84-efx-laden-geraeteliste | 2026-10-09T13:45Z | src/ui/views/efx_view.py |
 | VCB-41 | A | fix/vcb41-solo-zwilling | 2026-10-09T13:45Z | src/ui/virtualconsole |
@@ -143,7 +143,6 @@
 
 ## Verlauf
 
-- 2026-10-10T09:28Z C uebergeben DOC-53
 - 2026-10-10T09:28Z C uebergeben TOOL-10
 - 2026-10-10T09:28Z C uebergeben VCB-35
 - 2026-10-10T09:28Z C uebergeben WEB-06
@@ -173,3 +172,4 @@
 - 2026-10-10T10:46Z A claim BACKLOG-STATUS
 - 2026-10-10T10:47Z D aktualisiert VIZ-98: Dateien src/ui/visualizer/scene_src/fixtures/builders.js -> src/ui/visualizer/scene_src/fixtures/builders.js · src/ui/visualizer/scene_src/bridge/bridge.js · tests/test_viz98_bodenfleck_ohne_treffer_scene.py · tests/test_viz_beam_laenge.py
 - 2026-10-10T10:47Z A done CDX-0810
+- 2026-10-10T10:47Z A aktualisiert LAS-30: Branch feature/viz95-lasermuster-3d -> feature/las30-laser-achsen; Dateien src/core -> src/core/laser
