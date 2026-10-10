@@ -240,6 +240,15 @@ Universe 1 had its output removed while fixtures are patched on it:
 
 A click on the Enttec indicator opens the dialog from step 1 directly.
 
+**Banner at the top of the window.** If an output that has been set up fails (ENTTEC
+unplugged, network gone), a red bar `Ausgabe gestört: U<n> <Weg> — <Grund>` (output
+disturbed: universe, path, reason) also appears at the top of the main window — in kiosk
+mode too, where the status bar is hidden. It disappears by itself once the output has been
+sending again for a few seconds; a click opens the dialog from step 1 (not in kiosk mode).
+If **no** output is set up at all, a subtle `Probenmodus — es wird kein DMX gesendet`
+(rehearsal mode — no DMX is being sent) is shown there; a click hides this hint until the
+next program start.
+
 ## Network pitfall with Art-Net and sACN
 
 The computer must be **on the same network** as the node. If the node has `192.168.1.50`,
