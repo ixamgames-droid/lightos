@@ -538,7 +538,11 @@ class OhneRingeUnveraendertTest(_RigFall):
             "Gruppen-Rasterzelle": "2·K4",
             "Gruppen-Raster-Tooltip": "G2 · Kopf 4",
             "Matrix-Vorschau-Tooltip": "G2 · Kopf 4",
-            "EFX-Zielliste": "Fixture #2 · K4  offset=0.00",
+            # UI-84: „+ Neu" weist per Auto-Zuweisung zu (Zeile ohne
+            # offset). Das fruehere „  offset=0.00" kam nur zustande, weil der
+            # UNSICHTBARE Programmer-EFX-Editor die neue EFX beim Listen-Refresh
+            # aus der Auswahl befuellte — genau der behobene Fehler.
+            "EFX-Zielliste": "Fixture #2 · K4",
             "Fan-Werkzeug": "G2 · K4",
             "Command-Line-Statuszeile": "Selektiert: 1 (2·K4)",
             "Snap-Speichern-Dialog": "Rot (Kopf 4)  (1)",

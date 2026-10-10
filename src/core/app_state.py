@@ -332,6 +332,14 @@ class AppState:
         # add_fixture() nicht 1×/Fixture re-entrant patch_changed feuert; der
         # Aufrufer macht danach EINEN gebündelten Refresh.
         self._suppress_emits: bool = False
+        # UI-84: „Show wird geladen" (Zaehler, verschachtelbar). Waehrenddessen
+        # duerfen Views, die der Auswahl folgen (EFX-/Matrix-Folge-Editor im
+        # Programmer), keine Funktionsdaten aus der Auswahl ableiten — das
+        # Laden setzt die Auswahl als Nebenwirkung neu (Live View bei
+        # patch_changed), das ist kein Benutzer-Auswahlwechsel. Siehe
+        # show_wird_geladen() / laedt_show().
+        self._show_lade_tiefe: int = 0
+        self._show_lade_nachlauf_bis: float = 0.0
         # Gemeinsame Programmer-Geraeteauswahl (Reihenfolge = Auswahl-Reihenfolge).
         # Wird vom ProgrammerView gesetzt; alle Kategorien (RGB Matrix, Effekte,
         # Paletten …) lesen sie. Nicht persistiert. Siehe docs/PROGRAMMER_REBUILD.md
@@ -2006,6 +2014,61 @@ class AppState:
                     uni.set_channel(a, 0)
             # 2) dem Render-Thread vormerken (race-fest gegen Alt-Plan-Commit).
             pending[u] = set(pending.get(u, set())) | stale
+
+    # ── UI-84: Lade-Kontext ──────────────────────────────────────────────────
+
+    # Fallback-Frist fuer den Nachlauf, falls keine Ereignisschleife laeuft
+    # (der singleShot(0) unten feuert dann nie). In der App beendet der
+    # singleShot den Nachlauf im naechsten Durchlauf der Ereignisschleife.
+    _SHOW_LADE_NACHLAUF_S = 1.0
+
+    @contextlib.contextmanager
+    def show_wird_geladen(self):
+        """UI-84: Kontext um das Laden einer Show — „Laden darf Funktionsdaten
+        nie veraendern".
+
+        Beim Laden feuern patch_changed/refresh_all usw.; Views reagieren
+        darauf und setzen u. a. die Programmer-Auswahl neu (SELECTION_CHANGED).
+        Ein sichtbarer Folge-Editor (EFX/RGB-Matrix im Programmer) hielt das
+        fuer einen Auswahlwechsel und schrieb die Auswahl in die gerade
+        geladene Funktion. ``laedt_show()`` meldet waehrend dieses Kontexts —
+        und noch fuer Ereignisse, die das Laden in die Ereignisschleife gelegt
+        hat (Nachlauf bis zum naechsten Durchlauf) — True; die Folge-Editoren
+        bauen dann nur ihre Anzeige neu und weisen nichts zu."""
+        self._show_lade_tiefe += 1
+        try:
+            yield
+        finally:
+            self._show_lade_tiefe = max(0, self._show_lade_tiefe - 1)
+            if self._show_lade_tiefe == 0:
+                self._show_lade_nachlauf_starten()
+
+    def _show_lade_nachlauf_starten(self) -> None:
+        bis = time.monotonic() + self._SHOW_LADE_NACHLAUF_S
+        self._show_lade_nachlauf_bis = bis
+
+        def _ende(_bis=bis):
+            # Nur den EIGENEN Nachlauf beenden (ein spaeteres Laden hat ggf.
+            # schon einen neuen gestartet).
+            if self._show_lade_nachlauf_bis == _bis:
+                self._show_lade_nachlauf_bis = 0.0
+
+        try:
+            from PySide6.QtCore import QCoreApplication, QTimer
+            if (QCoreApplication.instance() is not None
+                    and threading.current_thread() is threading.main_thread()):
+                # Nach allem, was das Laden schon eingereiht hat (Qt arbeitet
+                # Null-Timer in Anlege-Reihenfolge ab).
+                QTimer.singleShot(0, _ende)
+        except Exception as e:
+            debug_swallow("app_state.show_lade_nachlauf", e)
+
+    def laedt_show(self) -> bool:
+        """UI-84: True, solange eine Show geladen wird (inkl. Nachlauf)."""
+        if self._show_lade_tiefe > 0:
+            return True
+        bis = self._show_lade_nachlauf_bis
+        return bool(bis) and time.monotonic() < bis
 
     @contextlib.contextmanager
     def deferred_unpatched_release(self):
