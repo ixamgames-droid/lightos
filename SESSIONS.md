@@ -63,6 +63,7 @@
 | QA-92 | D | fix/qa92-windows-rote-tests | 2026-10-10T19:32Z | - |
 | CDX-58 | A | fix/cdx-1010-main | 2026-10-10T19:30Z | - |
 | VIZ-102 | A | feature/viz102-gobo-hallenboden | 2026-10-10T19:43Z | - |
+| UI-87 | D | - | 2026-10-10T20:11Z | - |
 
 ## Blocker & Fallen
 
@@ -193,7 +194,6 @@
 
 ## Verlauf
 
-- 2026-10-10T14:38Z A claim VIZ-100
 - 2026-10-10T14:38Z A claim VIZ-101
 - 2026-10-10T14:39Z A claim UI-86
 - 2026-10-10T14:39Z D claim QA-91
@@ -223,3 +223,4 @@
 - 2026-10-10T19:30Z A claim CDX-58
 - 2026-10-10T19:31Z A aktualisiert UI-86: Branch fix/ui86-2d-hidpi -> perf/ui86-2d-ansicht-hidpi
 - 2026-10-10T19:43Z A claim VIZ-102
+- 2026-10-10T20:11Z D claim UI-87
