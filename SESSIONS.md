@@ -12,7 +12,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| DOC-34 | C | - | 2026-10-02T10:56Z | docs/anleitung_matrix_effekte/ANLEITUNG_MATRIX_EFFEKTE.md |
 | DOC-35 | C | - | 2026-10-02T10:57Z | docs/anleitung_efx/ANLEITUNG_EFX.md |
 | DOC-36 | C | - | 2026-10-02T10:58Z | docs/anleitung_moving_heads/ANLEITUNG_MOVING_HEADS.md |
 | DOC-37 | C | - | 2026-10-02T10:59Z | docs/anleitung_spider/ANLEITUNG_SPIDER.md · tools/build_event_demo_2026.py · tests/test_doc37_spider_wippe.py · changelog.d/2026-10-02-DOC-37.md |
@@ -144,7 +143,6 @@
 
 ## Verlauf
 
-- 2026-10-09T14:40Z B done VIZ-94
 - 2026-10-09T14:44Z D aktualisiert BPM-30: Dateien - -> src/core/app_state.py · src/core/engine/bpm_manager.py · tests/test_bpm30_beat_faden_ohne_appstate.py · BACKLOG.md · changelog.d/2026-10-09-BPM-30.md
 - 2026-10-09T14:47Z D aktualisiert XPLAT-48: Dateien - -> install.py · tests/test_xplat48_verknuepfung_no_venv.py · BACKLOG.md · changelog.d/2026-10-09-XPLAT-48.md
 - 2026-10-09T14:59Z B done OUT-62
@@ -174,3 +172,4 @@
 - 2026-10-10T09:26Z C uebergeben DOC-31
 - 2026-10-10T09:27Z C uebergeben DOC-32
 - 2026-10-10T09:27Z C uebergeben DOC-33
+- 2026-10-10T09:27Z C uebergeben DOC-34
