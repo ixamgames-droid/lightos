@@ -46,14 +46,42 @@
 //    deshalb der Bodenfleck (der das Muster hat) das Bild, und der SpotLight
 //    leuchtet nur noch als schwache Streuung mit. Nur `intensity` aendert
 //    sich, nie die Zahl der Lichter.
+//    VIZ-92: die "schwache Streuung" war am Boden weiter der volle runde
+//    Lichtkreis neben dem Muster — `GOBO_LICHT` ist jetzt 0.
 
 import * as THREE from '../three/three.js';
 // Zirkulaer mit floor_pool.js (das GOBO_RAND holt) — unbedenklich, beide
 // Konstanten werden nur in Funktionsruempfen gelesen, nie beim Modul-Laden.
-import { POOL_MAX_RADIUS } from './floor_pool.js';
+import { POOL_MAX_RADIUS, poolFalloffTexture } from './floor_pool.js';
+import { isLowSpec, renderer } from '../scene/renderer.js';   // VIZ-92
 
 const CACHE = new Map();
-const GROESSE = 128;
+// VIZ-92: 128 px waren fuer einen Bodenfleck von mehreren Metern zu grob —
+// das Zebra (Gobo 7) zeigte am Boden sichtbare Treppen und weiche Klumpen
+// statt gerader Balkenkanten. 512 (Zweierpotenz: three baut Mipmaps, das
+// Muster flimmert aus der Ferne nicht) bzw. 256 auf der Stufe Niedrig. Die
+// Texturen sind je Stil fuer ALLE Geraete geteilt (CACHE), der Speicher
+// waechst also mit der Zahl der Motive (7), nicht mit der Zahl der Geraete.
+export const GROESSE = isLowSpec ? 256 : 512;
+// VIZ-92: anisotrope Filterung — der Fleck liegt flach und wird fast immer
+// schraeg angesehen; ohne sie verschwimmen die Kanten quer zur Blickrichtung.
+// Niedrig bleibt bei 1 (Fuellrate).
+const ANISO_DACH = isLowSpec ? 1 : 8;
+function _anisotropie() {
+  try {
+    const n = renderer && renderer.capabilities
+      && renderer.capabilities.getMaxAnisotropy && renderer.capabilities.getMaxAnisotropy();
+    return Math.max(1, Math.min(ANISO_DACH, n || 1));
+  } catch (e) { return 1; }
+}
+/** Gemeinsame Einstellungen jeder Gobo-Textur (Mipmaps sind three-Vorgabe
+ *  fuer Zweierpotenzen: minFilter LinearMipmapLinear, generateMipmaps). */
+function _texturGuete(tex) {
+  tex.generateMipmaps = true;
+  tex.anisotropy = _anisotropie();
+  tex.needsUpdate = true;
+  return tex;
+}
 
 // ── VIZ-83 B2: EINE Motiv-Beschreibung fuer Kegel UND Boden ────────────────
 //
@@ -96,6 +124,11 @@ function _ring(n, b, form, versatz = 0) {
 // kreuzen — abgeleitet, nicht zusaetzlich erfunden.
 const ZEBRA_BALKEN = [-0.5, -0.25, 0, 0.25, 0.5];   // Mitte, Anteil von M (y nach unten)
 const ZEBRA_HALB = 0.075;
+// VIZ-92: die Balken enden knapp ausserhalb des Kegelrands (GOBO_RAND), rund
+// wie die Blende — vorher liefen sie bis 0,8 des Scheibenradius und standen
+// als Streifen neben dem Fleck. Das Uebermass laesst jeden Teilstrahl sicher
+// IM Balken enden (wie BODEN_UEBERMASS fuer die anderen Motive).
+export const ZEBRA_RAND = GOBO_RAND * 1.15;
 function _zebraTeile() {
   const out = [];
   for (const y of ZEBRA_BALKEN) {
@@ -143,9 +176,12 @@ const MOTIVE = {
   'zebra': {
     teile: _zebraTeile(),
     innen(g, M) {
+      g.save();
+      g.beginPath(); g.arc(M, M, M * ZEBRA_RAND, 0, Math.PI * 2); g.clip();
       for (const y of ZEBRA_BALKEN) {
         g.fillRect(M * 0.2, M + (y - ZEBRA_HALB) * M, M * 1.6, 2 * ZEBRA_HALB * M);
       }
+      g.restore();
     },
   },
 };
@@ -209,7 +245,9 @@ function zeichne(stil) {
 // ── VIZ-83: Teilstrahl-Masken fuer den Kegel ───────────────────────────────
 // Breite = Umfang (u), Hoehe = Laenge (v, Oberkante = Spitze = Linse,
 // Unterkante = Kegelbasis = Bodenende, s. fixtures.js#beamFalloffTexture).
-const STRAHL_B = 256, STRAHL_H = 64;
+// VIZ-92: Breite wie das Bodenmotiv (schmale Zebra-Teilstrahlen waren bei 256
+// nur wenige Texel breit und flimmerten beim Drehen).
+const STRAHL_B = GROESSE, STRAHL_H = 64;
 const STRAHL_CACHE = new Map();
 
 function zeichneStrahl(stil) {
@@ -253,10 +291,7 @@ export function beamGoboTexture(stil) {
   let tex = null;
   try {
     const c = zeichneStrahl(key);
-    if (c) {
-      tex = new THREE.CanvasTexture(c);
-      tex.needsUpdate = true;
-    }
+    if (c) tex = _texturGuete(new THREE.CanvasTexture(c));
   } catch (e) { tex = null; }
   STRAHL_CACHE.set(key, tex);
   return tex;
@@ -276,7 +311,13 @@ export function applyBeamGoboBase(cone) {
 // Anteil; Kegel und Bodenfleck werden etwas angehoben, weil die Blende den
 // groessten Teil ihrer Flaeche dunkel macht und die Teilstrahlen sonst neben
 // dem alten Vollkegel blass wirkten.
-export const GOBO_LICHT = 0.3;
+// VIZ-92: 0 statt 0,3. Auch 30 % zeichneten am Boden noch die VOLLE runde
+// Lichtflaeche des Strahlers neben das Muster (Gobo-Demo, Punkte/Tetris) —
+// r128 kann den SpotLight nicht maskieren, jeder Rest ist ein Kreis. Mit Gobo
+// traegt deshalb allein das Muster (Kegel-Teilstrahlen + Bodenmuster) das
+// Licht. Das Geraet gibt damit auch sein Pool-Licht ab (spot_pool.js zaehlt
+// Intensitaet 0 als dunkel) — ein anderer Strahl bekommt es.
+export const GOBO_LICHT = 0;
 export const GOBO_STRAHL = 1.8;
 export const GOBO_FLECK = 1.5;
 
@@ -287,10 +328,7 @@ export function goboTexture(stil) {
   let tex = null;
   try {
     const c = zeichne(key);
-    if (c) {
-      tex = new THREE.CanvasTexture(c);
-      tex.needsUpdate = true;
-    }
+    if (c) tex = _texturGuete(new THREE.CanvasTexture(c));
   } catch (e) { tex = null; }
   CACHE.set(key, tex);
   return tex;
@@ -420,14 +458,18 @@ export function alignGoboFloor(f, hitX, flaecheY, hitZ) {
  *  `null` (VIZ-80, s. fixtures.js#OPTIK_FELDER) = das Profil hat den Kanal
  *  nicht (mehr): Muster bzw. Drehung zurueck auf Grundstellung.
  */
+/** Gobo-Winkel (rad) aus dem DMX-Wert der Drehung; ohne Wert 0. */
+export function goboWinkel(v) {
+  return (typeof v === 'number' && isFinite(v))
+    ? (Math.max(0, Math.min(255, v)) / 255) * 2 * Math.PI : 0;
+}
+
 export function applyGobo(f, dmx) {
   if (!f || !dmx) return;
   const spot = f.floorSpot;
   if (dmx.gobo_rotation !== undefined && dmx.gobo_rotation !== f.lastGoboRot) {
     f.lastGoboRot = (dmx.gobo_rotation === null) ? undefined : dmx.gobo_rotation;
-    const v = f.lastGoboRot;
-    const winkel = (typeof v === 'number' && isFinite(v))
-      ? (Math.max(0, Math.min(255, v)) / 255) * 2 * Math.PI : 0;
+    const winkel = goboWinkel(f.lastGoboRot);
     if (spot) spot.rotation.z = winkel;
     // VIZ-83: der Kegel dreht mit — seine Teilstrahlen sind dasselbe Muster.
     // Prisma-Kegel ziehen in prism.js#syncPrismToBeam nach.
@@ -452,5 +494,13 @@ export function applyGobo(f, dmx) {
   // Uniform — kein Neubau, kein Ruckler im Gobo-Chaser.
   const programmWechsel = !spot.material.map !== !tex;
   spot.material.map = tex;
-  if (programmWechsel) spot.material.needsUpdate = true;
+  if (programmWechsel) {
+    // VIZ-92: mit Gobo KEIN weicher Pool-Rand (alphaMap). Der Verlauf dunkelte
+    // die Motiv-Teile am Kegelrand auf gut die Haelfte ab, waehrend der Kern
+    // voll leuchtete — die Blende hat selbst einen runden Rand (zeichne()).
+    // Getauscht nur hier, im selben Programmwechsel wie die map: kein
+    // zusaetzlicher Shader-Neubau.
+    spot.material.alphaMap = tex ? null : poolFalloffTexture();
+    spot.material.needsUpdate = true;
+  }
 }

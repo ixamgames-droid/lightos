@@ -245,7 +245,9 @@ _BLACKOUT_ERHALTEN_ATTRS = frozenset({
     "gobo1", "gobo2",
     "prism", "prism_rot", "prism_rotation",
     "focus", "zoom", "iris", "frost",
-    "color_wheel", "colour_wheel",
+    # OUT-62: ``color`` ist das unterstuetzte Alt-Attribut des Farbrads
+    # (attr_groups, all_white) — ohne es fuhr das Rad beim Blackout auf 0.
+    "color_wheel", "colour_wheel", "color",
 })
 
 # A3D-02: Nur diese Laser-Attribute sind "output-/emissions-relevant" und heben den
@@ -1761,6 +1763,23 @@ class AppState:
         # unten (_old_le vs. frozenset-Werte) unangetastet bleibt.
         old_laser_addrs = {u: set(s) for u, s
                            in (getattr(self, "_laser_estop_addrs", {}) or {}).items()}
+        # OUT-62 (Codex #833): die Blackout-ERHALTEN-Maske gehoert zum Plan. Der
+        # Sende-Thread liest sie getrennt vom Render-Plan — zwischen Plan-Tausch
+        # und neuer Maske rendert der neue Plan z. B. einen Dimmer an einer
+        # Adresse, die die ALTE Maske als Pan fuehrt, und dessen Wert ginge bei
+        # aktivem Blackout hinaus. Darum VOR dem Tausch nur die Schnittmenge
+        # alt∩neu erhalten — Adressen, die in BEIDEN Patches Nicht-Licht sind —
+        # und NACH dem Tausch die neue Maske (unten). Ein Universum, das nur die
+        # alte Maske kennt, faellt im Uebergang weg (= komplett 0).
+        new_keep_mask = {u: frozenset(s) for u, s
+                         in self._build_blackout_keep_mask(fix_index).items()}
+        old_keep_mask = getattr(self, "_blackout_keep_gesetzt", None) or {}
+        try:
+            self.output_manager.set_blackout_keep_mask(
+                {u: old_keep_mask.get(u, frozenset()) & s
+                 for u, s in new_keep_mask.items()})
+        except Exception as e:
+            print(f"[AppState] set blackout mask (Uebergang) error: {e}")
         # CDX-12 (Plan-Rebuild): Ist der Laser-NOT-AUS AKTIV und aendern sich die
         # Laser-Adressen (Fixture umadressiert/entfernt/dazu), die Ebene-2-OM-Maske
         # ZUERST auf die VEREINIGUNG aus alten und neuen Adressen erweitern — BEVOR
@@ -1775,8 +1794,23 @@ class AppState:
         # _estop_lock — sonst konnte ein fremder Thread (MIDI/OSC/Web) den Latch
         # zwischen Check und Tausch setzen und nur die ALTEN Adressen maskieren.
         # Lock-Reihenfolge: _estop_lock vor _plan_lock (kein Pfad nimmt sie umgekehrt).
+        # OUT-65: Aus-Werte des neuen Plans VOR den neuen Laser-Adressen
+        # vormerken (nur bei aktivem Latch wirksam) — sonst stuende eine neu
+        # adressierte Laser-Adresse bis zu set_gm_laser_aus_mask unten mit 0
+        # (= „Auto run“ bei vielen Lasern) in der NOT-AUS-Maske.
+        try:
+            new_laser_aus = self._build_gm_laser_aus_mask(fix_index)
+        except Exception as e:
+            print(f"[AppState] build gm laser mask error: {e}")
+            new_laser_aus = None
         with self._get_estop_lock():
             if getattr(self, "laser_estop_active", False):
+                merke = getattr(self.output_manager, "merke_laser_aus_werte", None)
+                if new_laser_aus and callable(merke):
+                    try:
+                        merke(new_laser_aus)
+                    except Exception as e:
+                        print(f"[AppState] merke laser aus error: {e}")
                 _old_le = getattr(self, "_laser_estop_addrs", {}) or {}
                 if _old_le != new_laser_estop_addrs:
                     _union = {}
@@ -1785,6 +1819,10 @@ class AppState:
                             _union[_u] = _union.get(_u, frozenset()) | frozenset(_s)
                     self._push_laser_estop_mask(target_active=True, target_addrs=_union)
             with self._get_plan_lock():
+                # OUT-62 (Review): die zum Plan gehoerende Maske SOFORT merken —
+                # wirft unten etwas, bezoege sich der naechste Uebergang sonst
+                # auf die Maske des vorigen Plans.
+                self._blackout_keep_gesetzt = new_keep_mask
                 self._fix_index = fix_index
                 self._default_frame = new_default_frame
                 self._commit_spans = spans
@@ -1811,15 +1849,16 @@ class AppState:
         try:
             setze_aus = getattr(self.output_manager, "set_gm_laser_aus_mask", None)
             if setze_aus is not None:
-                setze_aus(self._build_gm_laser_aus_mask(fix_index))
+                setze_aus(new_laser_aus if new_laser_aus is not None
+                          else self._build_gm_laser_aus_mask(fix_index))
         except Exception as e:
             print(f"[AppState] set gm laser mask error: {e}")
         # OUT-57: Blackout-ERHALTEN-Maske — nur Position/Gobo/Prisma/Optik gepatchter
         # Lampen mit echtem Dimmer bleiben beim Blackout stehen, alles andere geht
         # auf 0 (auch ungepatchte Roh-Adressen im selben Universum).
+        # OUT-62: nach dem Plan-Tausch die volle neue Maske (Uebergang s. oben).
         try:
-            self.output_manager.set_blackout_keep_mask(
-                {u: frozenset(s) for u, s in self._build_blackout_keep_mask(fix_index).items()})
+            self.output_manager.set_blackout_keep_mask(new_keep_mask)
         except Exception as e:
             print(f"[AppState] set blackout mask error: {e}")
         # OUT-61b: alle Laser-Adressen (unabhaengig vom NOT-AUS-Latch) — die
@@ -2163,6 +2202,14 @@ class AppState:
             except Exception as e:
                 print(f"[app_state] apply_output_config: Universe {num} "
                       f"({output}) fehlgeschlagen: {e}")
+        # OUT-64: die zwischen remove_output und add_* gemerkten Wege verwerfen
+        # (bei aktivem NOT-AUS sind sie bereits in dessen Wege-Liste).
+        vergiss = getattr(self.output_manager, "vergiss_entfernte_wege", None)
+        if callable(vergiss):
+            try:
+                vergiss()
+            except Exception as e:
+                print(f"[app_state] apply_output_config: Wege vergessen: {e}")
 
     def auto_patch_fixtures(self, undoable: bool = True):
         """Weist allen Fixtures aufeinander folgende Adressen zu (undobar)."""

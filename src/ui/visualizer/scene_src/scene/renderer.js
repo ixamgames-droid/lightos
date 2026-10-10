@@ -5,6 +5,7 @@ import { settings } from '../state.js';
 import { requestRender } from './render_loop.js';  // VIZ-13 3c-2
 import { tierProfile, pixelRatioCapFor } from './quality_tiers.js';         // VIZ-71
 import { createDynamicResolution } from './dynamic_resolution.js';          // VIZ-71
+import { decideTier, BENCH_HIGH_MS } from './gpu_tier.js';                                 // VIZ-84
 
 export const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x080808);
@@ -17,6 +18,85 @@ scene.fog = new THREE.FogExp2(0x080808, 0.025);
 // Override fuer Tests/Debug/Geraete-Praeferenz: ?gputier=low|high|max in der
 // Page-URL. VIZ-71: 'max' gibt es NUR ueber diesen Weg — die Probe waehlt nie
 // mehr als 'high'.
+// VIZ-84: die Entscheidung selbst steht rein in gpu_tier.js (Renderer-Name,
+// dann Frame-Zeit, dann Texture-Units). Test-Seams, nur ohne ?gputier
+// wirksam: `window.__lightosGpuRendererStub` (Renderer-Name) und
+// `window.__lightosGpuBenchStub` (Frame-Zeit in ms) — per DocumentCreation-
+// Skript vor dem Modul gesetzt.
+export const gpuProbeInfo = { tier: null, grund: '', chip: '', maxTex: null, benchMs: null };
+
+// VIZ-84: Frame-Zeit-Rueckfall — ein paar bildschirmfuellende Draws mit einem
+// rechenlastigen Fragment-Shader auf dem Probe-Kontext, `readPixels` erzwingt
+// das Warten auf die GPU (dessen Rueckweg-Kosten werden abgezogen). Kostet auf einer diskreten Karte unter 1 ms, auf
+// einem Software-Renderer deutlich mehr — deshalb bricht die Messung ab, sobald
+// das Urteil feststeht. Liefert die Dauer der Mess-Draws in ms oder null.
+function messeFuellrate(gl) {
+  const vsQ = 'attribute vec2 p; void main() { gl_Position = vec4(p, 0.0, 1.0); }';
+  const fsQ = 'precision mediump float; uniform float k;'
+    + 'void main() { vec2 u = gl_FragCoord.xy * 0.013; float a = k;'
+    + ' for (int i = 0; i < 128; i++) { a = sin(a + u.x) * cos(a - u.y) + a * 0.5; }'
+    + ' gl_FragColor = vec4(a, a * 0.5, 0.25, 1.0); }';
+  let vs = null, fs = null, prog = null, buf = null;
+  try {
+    gl.canvas.width = 512;
+    gl.canvas.height = 512;
+    gl.viewport(0, 0, 512, 512);
+    vs = gl.createShader(gl.VERTEX_SHADER);
+    gl.shaderSource(vs, vsQ); gl.compileShader(vs);
+    fs = gl.createShader(gl.FRAGMENT_SHADER);
+    gl.shaderSource(fs, fsQ); gl.compileShader(fs);
+    prog = gl.createProgram();
+    gl.attachShader(prog, vs); gl.attachShader(prog, fs);
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return null;
+    gl.useProgram(prog);
+    buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(prog, 'p');
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    const kLoc = gl.getUniformLocation(prog, 'k');
+    const px = new Uint8Array(4);
+    // Aufwaermen: Shader-Kompilierung/erste Belegung nicht mitmessen.
+    gl.uniform1f(kLoc, 0.1);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    // Befund nach Review: `readPixels` kostet je Draw einen vollen
+    // GPU-Rueckweg (auf echter integrierter Grafik ~2 ms), der mit der
+    // Fuellrate nichts zu tun hat. Deshalb zuerst dieselben Draws auf 1x1
+    // Pixel (nur Rueckweg + Draw-Overhead), dann bildschirmfuellend; je Lauf
+    // zaehlt das schnellste Einzelbild (Ausreisser/Scheduler raus), und das
+    // Ergebnis ist die reine Fuell-Zeit fuer 6 Draws.
+    const lauf = (w, h) => {
+      gl.viewport(0, 0, w, h);
+      let best = Infinity;
+      const t0 = performance.now();
+      for (let i = 0; i < 6; i++) {
+        const t = performance.now();
+        gl.uniform1f(kLoc, 0.2 + i * 0.1);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+        best = Math.min(best, performance.now() - t);
+        if (performance.now() - t0 > 4 * BENCH_HIGH_MS) break;   // Urteil steht
+      }
+      return best;
+    };
+    const rueckweg = lauf(1, 1);
+    const voll = lauf(512, 512);
+    if (!isFinite(rueckweg) || !isFinite(voll)) return null;
+    return Math.max(0, voll - rueckweg) * 6;
+  } catch (e) {
+    return null;
+  } finally {
+    try {
+      if (buf) gl.deleteBuffer(buf);
+      if (prog) gl.deleteProgram(prog);
+      if (vs) gl.deleteShader(vs);
+      if (fs) gl.deleteShader(fs);
+    } catch (e) { /* best effort */ }
+  }
+}
 function probeGpuTier() {
   // ⚠️ Der Probe-Kontext MUSS wieder freigegeben werden.
   //
@@ -37,18 +117,37 @@ function probeGpuTier() {
   let gl = null;
   try {
     const forced = new URLSearchParams(window.location.search).get('gputier');
-    if (forced === 'low' || forced === 'high' || forced === 'max') return forced;
+    if (forced === 'low' || forced === 'high' || forced === 'max') {
+      gpuProbeInfo.tier = forced;
+      gpuProbeInfo.grund = 'manuell (?gputier)';
+      return forced;
+    }
     const cv = document.createElement('canvas');
     gl = cv.getContext('webgl') || cv.getContext('experimental-webgl');
-    if (!gl) return 'low';
+    if (!gl) {
+      gpuProbeInfo.tier = 'low';
+      gpuProbeInfo.grund = 'kein WebGL-Kontext';
+      return 'low';
+    }
     const maxTex = gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS);
     let chip = '';
-    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-    if (dbg) chip = String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) || '');
-    // Mobile-/Emulations-Chips: fill-rate-limitiert, wenige Texture-Units.
-    const weakChip = /adreno|mali|powervr|videocore|swiftshader|basic render/i.test(chip);
-    return (maxTex <= 16 || weakChip) ? 'low' : 'high';
+    const stub = window.__lightosGpuRendererStub;
+    if (typeof stub === 'string') {
+      chip = stub;
+    } else {
+      const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+      if (dbg) chip = String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) || '');
+    }
+    const benchStub = window.__lightosGpuBenchStub;
+    const urteil = decideTier({
+      chip, maxTex,
+      messen: () => (typeof benchStub === 'number' ? benchStub : messeFuellrate(gl)),
+    });
+    Object.assign(gpuProbeInfo, urteil, { chip, maxTex });
+    return urteil.tier;
   } catch (e) {
+    gpuProbeInfo.tier = 'high';
+    gpuProbeInfo.grund = 'Probe-Fehler: ' + e;
     return 'high';
   } finally {
     // `finally`, nicht am Ende des try-Blocks: die Funktion hat vier
@@ -99,6 +198,13 @@ export const dynamicResolution = createDynamicResolution({
   requestRender,
   mode: tierSettings.dynamicResolution,
 });
+// VIZ-85: echte Bildwiederholrate aus Python (?hz=, QScreen.refreshRate).
+// Codex #966: Python reicht nach einem Bildschirmwechsel die neue Hz per
+// window.__lightos.setDisplayHz nach; kam sie vor dem Szenenstart, liegt sie
+// geparkt in window.__lightosDisplayHz und hat Vorrang vor der URL.
+dynamicResolution.setDisplayHz(window.__lightosDisplayHz != null
+  ? window.__lightosDisplayHz
+  : new URLSearchParams(window.location.search).get('hz'));
 export function applyPixelRatio() {
   const soll = basePixelRatio() * dynamicResolution.scale();
   // setPixelRatio legt den Canvas-Puffer neu an — nur beim WECHSEL.
@@ -118,7 +224,9 @@ renderer.shadowMap.type = tierSettings.softShadows ? THREE.PCFSoftShadowMap : TH
 // console.warn statt .log: Qt spiegelt nur Warning/Error-Konsolenzeilen ins
 // crash.log — so ist die Tier-Entscheidung auch nachtraeglich diagnostizierbar.
 console.warn('[viz] GPU-Tier: ' + gpuTier
-  + ' (maxTextures=' + renderer.capabilities.maxTextures
+  + ' (grund=' + gpuProbeInfo.grund
+  + ', renderer=' + gpuProbeInfo.chip
+  + ', maxTextures=' + renderer.capabilities.maxTextures
   + ', pixelRatioCap=' + PIXEL_RATIO_CAP
   + ', schattenDach=' + tierSettings.shadowCap
   + ', echteLichter=' + tierSettings.realLights

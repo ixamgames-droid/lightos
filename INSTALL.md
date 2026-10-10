@@ -13,14 +13,31 @@ Windows direkt unten, **[Linux weiter unten](#linux-x86_64)**.
 python install.py
 ```
 
+> **Mehrere Python-Versionen installiert?** `python` startet die Version, die im
+> PATH zuerst steht — nicht unbedingt die gewuenschte (gesehen: 3.12 installiert,
+> `python` war trotzdem 3.14). Der Python-Launcher `py` (kommt mit dem Installer
+> von python.org) waehlt die Version ausdruecklich. `py -0p` zeigt, was
+> installiert ist; dann zum Beispiel:
+>
+> ```cmd
+> py -3.12 install.py
+> ```
+>
+> Das `venv/` uebernimmt diese Version — danach immer `venv\Scripts\python …`
+> benutzen, nicht `python`.
+
 Das war's. Das Script:
 - Prueft Python-Version (>= 3.11)
 - Prueft Python-Architektur vs. OS-Architektur (ARM64-Emulation wird erkannt)
 - Erstellt `venv/`
 - Installiert Kern-Abhaengigkeiten + optionale Pakete separat
 - Legt App-Verzeichnisse an
-- Erstellt Desktop-Verknuepfung
+- Legt auf dem Desktop die Verknuepfung `LightOS.lnk` an — ohne Rueckfrage;
+  `--no-shortcut` laesst sie weg (eine Startmenue-Verknuepfung gibt es nicht)
 - Speichert Manifest fuer sauberes Deinstallieren
+
+Die Test-Abhaengigkeiten (pytest & Co.) installiert das Script **nicht** — wer
+die Testsuite fahren will, siehe [Entwickeln und Tests](#entwickeln-und-tests).
 
 ## Voraussetzungen
 
@@ -47,8 +64,36 @@ Das war's. Das Script:
 python install.py                # Standard (venv + shortcut)
 python install.py --no-venv      # In aktuelles Python installieren
 python install.py --no-shortcut  # Keine Desktop-Verknuepfung
-python install.py --dev          # Mit pyinstaller fuer Builds
+python install.py --dev          # Mit pyinstaller fuer Builds (KEINE Test-Pakete)
 ```
+
+Statt `python` geht ueberall auch `py -3.12` (bzw. die gewuenschte Version), s. o.
+
+## Entwickeln und Tests
+
+Fuer die App selbst reicht `install.py`. Die Testsuite braucht zusaetzlich
+pytest, pytest-timeout (Pflicht, `pytest.ini` setzt ein Zeitlimit je Test),
+hypothesis und Pillow — sie stehen bewusst **nicht** in `requirements.txt`:
+
+```cmd
+venv\Scripts\python -m pip install -r requirements-dev.txt
+```
+
+Danach das Test-Gate (ein Prozess je Testdatei, headless — kein Fenster):
+
+```powershell
+.\tools\verify_segmented.ps1              # Windows, alle Testdateien
+.\tools\verify_segmented.ps1 tests\test_x.py   # nur diese Datei
+```
+
+```bash
+./tools/verify_loop.sh                    # Linux
+```
+
+Fehlt pytest, endet jedes Segment sofort mit `No module named pytest`, und das
+Gate meldet „0/… Segmente gruen" — dann die `pip install`-Zeile oben nachholen.
+`pytest tests/` direkt aufzurufen ist kein Ersatz fuer das Gate (Begruendung in
+[AGENTS.md](AGENTS.md)).
 
 ## Deinstallation
 
@@ -243,11 +288,51 @@ außer dem Code mitkommt, steht in `packaging/windows/bundle_inhalt.py` — nur
 Dateien, die Git kennt, damit keine privaten Laufzeitdaten aus `data/`/`shows/` in
 ein Setup geraten.
 
+## Fehler melden / Diagnosepaket
+
+Wenn LightOS auf deinem Rechner etwas nicht tut (kein DMX, MIDI-Geraet stumm,
+3D-Ansicht schwarz, Absturz …), reicht **eine Datei**, damit wir aus der Ferne
+sehen, was im Hintergrund passiert ist:
+
+1. LightOS nach dem Problem **nicht neu installieren**, nur ggf. neu starten.
+2. **Hilfe → „Diagnosepaket speichern…“** — speichert `LightOS-Diagnose-<Datum>.zip`
+   (Vorschlag: Desktop).
+   Startet LightOS gar nicht mehr, geht es auch ohne Fenster:
+   - Windows (Installer): in der Eingabeaufforderung `LightOS.exe --diagnose` im
+     Installationsordner von LightOS aufrufen
+   - aus dem Quellordner: `python main.py --diagnose` (bzw. `venv\Scripts\python main.py --diagnose`)
+   - optional mit Ziel: `--diagnose D:\lightos-fehler.zip`
+3. Die zip-Datei per E-Mail/Messenger schicken, dazu ein Satz, was du gemacht hast
+   und was passiert ist (ungefaehre Uhrzeit hilft).
+
+**Im Paket:** die Sitzungs-Logs (aktuelle + vorige Sitzungen), `crash.log`,
+Systeminfo (LightOS-Version, Betriebssystem, Python/Qt, Bildschirme, GPU-Stufe,
+DMX-Ausgaenge, MIDI-Geraete), eine Liste der Einstellungen (nur Zahlen/Schalter —
+Texte, Pfade und Geheimnisse wie das Remote-Token nur als Platzhalter) und die
+Datei-Namen im Datenordner. **Nicht im Paket:** Show-Dateien, Datenbanken,
+Snaps, Buehnen. Dein Benutzername in Pfaden wird durch `~` bzw. `%USERNAME%`
+ersetzt.
+
+**Wo die Logs liegen** (falls du sie lieber selbst anhaengst):
+
+| System | Ordner |
+|---|---|
+| Windows (x64/ARM64) | `%APPDATA%\LightOS\logs\lightos.log` (+ `%APPDATA%\LightOS\crash.log`) |
+| Linux | `~/.local/share/LightOS/logs/lightos.log` (bzw. `$XDG_DATA_HOME/LightOS/…`) |
+| macOS | `~/Library/Application Support/LightOS/logs/lightos.log` |
+
+`lightos.log` ist die laufende bzw. letzte Sitzung, `lightos.log.1` die davor
+(bis `.5`); jede Datei ist auf 5 MB begrenzt. Jede Zeile traegt eine Uhrzeit,
+`!` markiert Fehlerausgaben, `[still:…]` Fehler, die LightOS frueher
+kommentarlos geschluckt hat, `[diagnose]` die erkannte Umgebung.
+
 ## Troubleshooting
 
 | Problem | Loesung |
 |---|---|
 | `ModuleNotFoundError: PySide6` | venv nicht aktiv - `venv\Scripts\activate` oder direkt `venv\Scripts\python main.py` |
+| `install.py` nimmt die falsche Python-Version | Mit dem Launcher waehlen: `py -0p` zeigt die installierten, `py -3.12 install.py` installiert mit 3.12 (s. Schnellstart) |
+| Test-Gate meldet „0/… Segmente gruen", im Segment-Log `No module named pytest` | Test-Abhaengigkeiten fehlen: `venv\Scripts\python -m pip install -r requirements-dev.txt` (s. [Entwickeln und Tests](#entwickeln-und-tests)) |
 | Installer meldet "Python laeuft emuliert auf ARM64" | ARM64-Python installieren (`winget install Python.Python.3.14 --arch arm64`) und `install.py` erneut ausfuehren |
 | `python-rtmidi` Build-Fehler auf ARM64 | MSVC Build Tools installieren |
 | "Visualizer nicht verfuegbar" | `PySide6` + `PySide6-Addons` erneut installieren (`python -m pip install --upgrade PySide6 PySide6-Addons`) |

@@ -472,7 +472,9 @@ class Verdrahtung(unittest.TestCase):
         self.assertIn("def _open_bibliothek_download(", mw)
         with open(os.path.join(repo, "main.py"), encoding="utf-8") as fh:
             m = fh.read()
-        self.assertIn("if not args.kiosk:\n        _bibliothek_beim_erststart(window)", m)
+        # FM-72: mit --show nur ein Hinweis in der Statuszeile statt Dialog.
+        self.assertIn("if not args.kiosk:\n        _bibliothek_beim_erststart("
+                      "window, mit_show=bool(args.show))", m)
 
 
 if __name__ == "__main__":

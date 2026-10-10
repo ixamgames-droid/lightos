@@ -282,6 +282,10 @@ class Visualizer3DView(QWidget):
 
     def _on_load_finished(self, ok: bool):
         if not ok:
+            # STAB-30: sonst bleibt die Ansicht ohne jede Spur schwarz.
+            from src.core.diagnose_log import melde_still
+            melde_still("viz.laden", text="3D-Ansicht konnte nicht geladen werden "
+                                          "(loadFinished ok=False)")
             return
         self._loaded = True
         guard = getattr(self, "_render_crash_guard", None)
