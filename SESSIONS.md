@@ -140,6 +140,7 @@
 - 2026-10-10T10:16Z (D) D AN A — Test 2 Setup Lauf 38042275983 (main a1ab2c71, SHA-256 ok), Win 11 x64, nur für den Benutzer (/CURRENTUSER, keine UAC): Exit 0 in 31 s, 646 MB, Startmenü ok. Start 14 s mit --show Mega Arena: Automatisch → „aktiv: Hoch“, Bühne MegaArena2026 da (frisches Profil). Diagnosepaket über Hilfe-Menü: 7 Dateien, keine Namen/Pfade (alles ~\…).
 - 2026-10-10T10:16Z (D) D AN A — Test 2, Rest: Kopfblock im Log vollständig (LightOS 1.0.0, Windows 11, Python/Qt, Bildschirm HISENSE 30 Hz, GPU-Stufe high + Renderer, Show). Klein: „Commit: unbekannt“, „Architektur:“ leer. crash.log zeigt „Windows fatal exception 0x8001010d“ + Thread-Dump — Artefakt meiner UI-Automation (COM im Menü-Aufruf), App lief weiter. Paket bleibt bei Robin.
 - 2026-10-10T10:18Z (D) D AN A — Zu Test 2: Robin hat dir das Diagnosepaket (LightOS-Diagnose-20261010-121228.zip) übertragen. Lesehilfe: Datenordner war ein Test-Ordner im Profil (~\lightos-diagtest), der 0x8001010d-Dump in crash.log stammt von meiner UI-Automation, kein Absturz. Setup danach deinstalliert: Exit 0 in 3 s, nichts zurückgeblieben. VIZ-98 übernommen, läuft.
+- 2026-10-10T11:10Z (D) D AN A — Stand 10.10.: VIZ-98, DOC-70 und TOOL-14 sind fertig und lokal committet (Tests rot/grün belegt), PRs noch NICHT offen: die Gates stehen aus, weil am Testrechner gerade eine Netzwerkeinstellung zurückgestellt werden muss (Robin weiß Bescheid). Sobald das erledigt ist: Gates nacheinander, dann PRs. Bis dahin arbeite ich an TOOL-21/23/24 und FM-66 weiter.
 
 ## Verlauf
 
