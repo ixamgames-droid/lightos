@@ -51,9 +51,16 @@ def _msg(port):
 class PortnamenTests(unittest.TestCase):
     def setUp(self):
         self._alt = mm.get_midi_manager
+        self._index = mgr._INDEX_BACKEND
 
     def tearDown(self):
         mm.get_midi_manager = self._alt
+        mgr._INDEX_BACKEND = self._index
+
+    def _rtmidi_windows(self):
+        """Einen Index haengt nur rtmidi unter Windows an (CDX-58) — die
+        Windows-Faelle schalten das Verhalten hier ausdruecklich ein."""
+        mgr._INDEX_BACKEND = True
 
     def _mit(self, eingaenge):
         fake = _FakeMidi(eingaenge)
@@ -61,6 +68,8 @@ class PortnamenTests(unittest.TestCase):
 
     def test_basisname_ohne_alsa_nummer(self):
         self.assertEqual(mgr.port_basisname(ALT), "APC MINI:APC MINI MIDI 1")
+        self.assertEqual(mgr.port_basisname("APC MINI 1"), "APC MINI 1")
+        self._rtmidi_windows()
         self.assertEqual(mgr.port_basisname("APC MINI 1"), "APC MINI")
         self.assertEqual(mgr.port_basisname("MIDIOUT2 (APC mini mk2)"),
                          "MIDIOUT2 (APC mini mk2)")
@@ -71,6 +80,7 @@ class PortnamenTests(unittest.TestCase):
         self.assertTrue(b.matches(_msg(NEU)))
 
     def test_windows_index_wechsel(self):
+        self._rtmidi_windows()
         self._mit(["APC MINI 2"])
         b = mm.MidiInBinding(device="APC MINI 1", channel=1, trigger_id=5)
         self.assertTrue(b.matches(_msg("APC MINI 2")))
@@ -92,6 +102,7 @@ class PortnamenTests(unittest.TestCase):
         b2 = mm.MidiInBinding(device="X-Touch 2", channel=1, trigger_id=5)
         self.assertFalse(b2.matches(_msg(NEU)))
         # Windows-Index bleibt geraetegenau: "APC MINI 1" != "APC MINI 10".
+        self._rtmidi_windows()
         self._mit(["APC MINI 0", "APC MINI 10"])
         b3 = mm.MidiInBinding(device="APC MINI 1", channel=1, trigger_id=5)
         self.assertTrue(b3.matches(_msg("APC MINI 0")))

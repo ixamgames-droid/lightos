@@ -73,6 +73,12 @@ def is_own_port(port_name: str) -> bool:
 _ALSA_SUFFIX = re.compile(r"^(.*\S)\s+(\d+):(\d+)$")
 _WIN_INDEX = re.compile(r"^(.*\S)\s+(\d+)$")
 _ORDINAL = re.compile(r"^(.*\S)\s+#(\d+)$")
+# CDX-58: einen Index haengt NUR rtmidi unter Windows an (RtMidi-WinMM,
+# "APC MINI 1"). Der ctypes-WinMM-Weg liefert den rohen Treibernamen, CoreMIDI
+# den Geraetenamen — dort gehoert eine Endzahl zum Modell ("Launchkey 61") und
+# darf nicht abgeschnitten werden, sonst teilen sich "… 49" und "… 61" einen
+# Basisnamen und die Bindung wandert auf das falsche Geraet.
+_INDEX_BACKEND = sys.platform == "win32" and RTMIDI_OK and not _USE_WINMM
 
 
 def _zerlege(name: str) -> tuple[str, tuple[int, ...] | None]:
@@ -81,7 +87,7 @@ def _zerlege(name: str) -> tuple[str, tuple[int, ...] | None]:
     m = _ALSA_SUFFIX.match(name)
     if m:
         return m.group(1), (int(m.group(2)), int(m.group(3)))
-    if ":" not in name:
+    if _INDEX_BACKEND and ":" not in name:
         m = _WIN_INDEX.match(name)
         if m:
             return m.group(1), (int(m.group(2)),)
@@ -89,7 +95,7 @@ def _zerlege(name: str) -> tuple[str, tuple[int, ...] | None]:
 
 
 def port_basisname(name: str) -> str:
-    """Portname ohne ALSA-Client:Port-Nummer bzw. Windows-Index."""
+    """Portname ohne ALSA-Client:Port-Nummer bzw. rtmidi-Windows-Index."""
     return _zerlege(name)[0]
 
 
@@ -112,21 +118,62 @@ def stabiler_portname(port_name: str, ports=None) -> str:
     return basis if n == 1 else f"{basis} #{n}"
 
 
-def _geraet_ziel(geraet: str, ports) -> tuple[str, int] | None:
+def _geraet_ziel(geraet: str, ports, geschwister=None) -> tuple[str, int] | None:
     """Fuer einen GERAETEGENAUEN Namen (mit Nummer oder Ordinal) das Paar
-    (Basisname, Ordinal); fuer einen freien Teilstring-Filter None."""
+    (Basisname, Ordinal); fuer einen freien Teilstring-Filter None.
+
+    ``geschwister``: alle gespeicherten Geraetenamen (z. B. die der uebrigen
+    Mappings). Damit verteilen sich mehrere verwaiste Alt-Nummern desselben
+    Modells auf mehrere gleiche Geraete, statt alle am ersten zu haengen.
+    """
     m = _ORDINAL.match(geraet)
     if m:
         return m.group(1), int(m.group(2))
     basis, nummer = _zerlege(geraet)
     if nummer is None:
         return None
-    # Alt-Mapping mit Nummer, das Geraet steckt nicht mehr unter ihr: das
-    # erste gleichnamige Geraet nehmen.
-    return basis, 1
+    # Alt-Mapping mit Nummer, das Geraet steckt nicht mehr unter ihr.
+    return basis, _ordinal_fuer_altnummer(geraet, basis, ports, geschwister)
 
 
-def geraet_passt(geraet: str, port_name: str, ports=None) -> bool:
+def _nummer_schluessel(name: str):
+    return (_zerlege(name)[1] or (), name)
+
+
+def _ordinal_fuer_altnummer(geraet: str, basis: str, ports, geschwister) -> int:
+    """Ordinal fuer eine verwaiste Alt-Nummer (CDX-58).
+
+    Zwei baugleiche Pulte, Mappings noch mit ALSA-Nummer (``… 20:0`` und
+    ``… 24:0``): nach dem Neustecken (``… 28:0``, ``… 32:0``) fielen beide auf
+    Ordinal 1 — alles hing am ersten Pult, das zweite loeste nichts aus.
+
+    Jetzt: die verwaisten Nummern in aufsteigender Reihenfolge auf die FREIEN
+    gleichnamigen Ports verteilen. Frei ist ein Port, den kein gespeicherter
+    Name noch exakt trifft (der gehoert seinem Mapping). Gibt es mehr
+    verwaiste Nummern als freie Ports — ein Pult, das ueber mehrere Sitzungen
+    verschiedene Nummern hatte —, teilen sich die uebrigen den letzten.
+    Ohne ``geschwister`` wie bisher: das erste gleichnamige Geraet.
+    """
+    ports = [p for p in (ports or ()) if port_basisname(p) == basis]
+    namen = {str(g or "").strip() for g in (geschwister or ())}
+    namen.add(geraet)
+    verwaist = sorted(
+        (g for g in namen
+         if g not in ports and not _ORDINAL.match(g)
+         and _zerlege(g)[1] is not None and _zerlege(g)[0] == basis),
+        key=_nummer_schluessel)
+    if not ports or geraet not in verwaist:
+        return 1
+    reihe = sorted(ports, key=_nummer_schluessel)
+    frei = [p for p in reihe if p not in namen]
+    if not frei:
+        return 1
+    ziel = frei[min(verwaist.index(geraet), len(frei) - 1)]
+    return reihe.index(ziel) + 1
+
+
+def geraet_passt(geraet: str, port_name: str, ports=None,
+                 geschwister=None) -> bool:
     """Passt der gespeicherte Geraetename auf den Port einer Nachricht?
 
     * leer: jedes Geraet
@@ -135,12 +182,15 @@ def geraet_passt(geraet: str, port_name: str, ports=None) -> bool:
       Basisnamen
     * geraetegenau (Nummer oder ``#n``): Basisname + Ordinal; eine alte Nummer,
       die es noch gibt, bleibt exakt.
+
+    ``geschwister`` (optional): alle gespeicherten Geraetenamen — siehe
+    ``_ordinal_fuer_altnummer``.
     """
     geraet = str(geraet or "").strip()
     port_name = str(port_name or "")
     if not geraet or geraet == port_name:
         return True
-    ziel = _geraet_ziel(geraet, ports)
+    ziel = _geraet_ziel(geraet, ports, geschwister)
     if ziel is None:
         if geraet == port_basisname(port_name):
             # Voller Geraetename ohne Ordinal = das erste dieser Geraete.

@@ -1757,21 +1757,15 @@ class MainWindow(QMainWindow):
     def _refresh_validation_banner(self):
         """Laeuft Validation (ohne Fix) und aktualisiert Banner-Text."""
         try:
-            from src.core.sync import validate_and_repair
-            issues = validate_and_repair(self._state, fix=False)
-            errors = [i for i in issues if i.severity == "error"]
-            warns = [i for i in issues if i.severity == "warn"]
-            count = len(errors) + len(warns)
-            if count == 0:
+            from src.core import sync
+            issues = sync.validate_and_repair(self._state, fix=False)
+            # CDX-58: auch ein reiner Hinweis ('info') zeigt das Banner.
+            banner = sync.banner_zusammenfassung(issues)
+            if banner is None:
                 self._lbl_validation.hide()
                 return
-            if errors:
-                color = "#ff4444"
-                icon = "!"
-            else:
-                color = "#ffaa00"
-                icon = "*"
-            self._lbl_validation.setText(f" {icon} {count} Issues ")
+            text, color = banner
+            self._lbl_validation.setText(text)
             self._lbl_validation.setStyleSheet(
                 f"background:{color}; color:#000; font-weight:bold;"
                 f" border-radius:3px; padding:2px 8px;"
@@ -2806,7 +2800,8 @@ class MainWindow(QMainWindow):
         """Wenn Show geladen wurde und Issues gefunden wurden, zeige Dialog."""
         try:
             issues = (data or {}).get("issues", []) if isinstance(data, dict) else []
-            # Nur Dialog wenn wirklich was zu berichten ist
+            # Nur Dialog wenn wirklich was zu berichten ist. Ein reiner Hinweis
+            # unterbricht das Laden nicht — er steht im Banner (CDX-58).
             relevant = [i for i in issues if getattr(i, "severity", "") in ('warn', 'error')
                         or getattr(i, "auto_fixed", False)]
             if relevant:
