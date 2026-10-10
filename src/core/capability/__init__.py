@@ -19,6 +19,7 @@ from .validate import (
     Finding,
     ERROR,
     WARNING,
+    INFO,
     ShowValidationError,
     validate_show_dict,
     validate_lshow,
