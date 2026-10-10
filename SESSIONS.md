@@ -13,7 +13,6 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | FM-46c | A | feat/fm46-qxf-head | 2026-10-02T11:59Z | - |
-| DOC-46 | C | - | 2026-10-02T12:01Z | docs/anleitung_vc_smartbuild/ANLEITUNG.md |
 | DOC-47 | C | - | 2026-10-02T12:04Z | docs/anleitung_gruppen_matrizen/ANLEITUNG_GRUPPEN_MATRIZEN.md |
 | DOC-48 | C | - | 2026-10-02T12:06Z | docs/anleitung_testshow_liveedit/ANLEITUNG_TESTSHOW_LIVEEDIT.md |
 | DOC-49 | C | - | 2026-10-02T12:07Z | docs/FARB_FX_VC_SHOW.md |
@@ -132,7 +131,6 @@
 
 ## Verlauf
 
-- 2026-10-09T16:47Z D done DOC-62
 - 2026-10-09T17:17Z A done VIZ-84
 - 2026-10-09T17:17Z 5 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-10T09:16Z A done VIZ-92
@@ -162,3 +160,4 @@
 - 2026-10-10T09:27Z C uebergeben DOC-43
 - 2026-10-10T09:27Z C uebergeben DOC-44
 - 2026-10-10T09:27Z C uebergeben DOC-45
+- 2026-10-10T09:27Z C uebergeben DOC-46
