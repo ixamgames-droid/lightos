@@ -53,7 +53,7 @@
 | XPLAT-52 | A | fix/xplat52-installer-venv-arch | 2026-10-10T14:17Z | - |
 | VIZ-100 | A | fix/viz100-haengend-andocken | 2026-10-10T19:30Z | src/ui/visualizer/scene_src/stage/docking.js |
 | VIZ-101 | A | fix/viz101-licht-durch-wand | 2026-10-10T14:38Z | - |
-| UI-86 | A | perf/ui86-2d-ansicht-hidpi | 2026-10-10T14:39Z | - |
+| UI-86 | A | fix/ui86-2d-hidpi | 2026-10-10T19:30Z | - |
 | QA-91 | D | fix/qa91-doc60-test-encoding | 2026-10-10T18:52Z | - |
 | VCB-36 | D | fix/vcb36-blackout-ziel-gruppen-id | 2026-10-10T18:53Z | - |
 | UI-78 | D | fix/ui78-efx-editor-texte | 2026-10-10T18:24Z | - |
@@ -189,7 +189,6 @@
 
 ## Verlauf
 
-- 2026-10-10T14:17Z A claim XPLAT-51
 - 2026-10-10T14:17Z A claim XPLAT-52
 - 2026-10-10T14:25Z D done VIZ-97
 - 2026-10-10T14:34Z B uebergeben UI-86
@@ -219,3 +218,4 @@
 - 2026-10-10T18:34Z D done VIZ-98
 - 2026-10-10T18:49Z D claim QA-92
 - 2026-10-10T19:27Z A done FM-67
+- 2026-10-10T19:30Z A aktualisiert UI-86: Branch perf/ui86-2d-ansicht-hidpi -> fix/ui86-2d-hidpi
