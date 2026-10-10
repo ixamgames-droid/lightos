@@ -177,6 +177,103 @@ class Viz98BodenfleckTest(_Basis):
         self.assertAlmostEqual(oben["ziel"][1], oben["fleck"][1] - 0.01, places=3)
 
 
+class Viz98OhneZielrechnungTest(_Basis):
+    """Codex-Befund zu #999: im 2D-Plan mit mehr als 50 Geraeten rechnet
+    ``applyFloorAim`` keinen Auftreffpunkt (``skipBeam``) und kehrte zurueck,
+    BEVOR der Merker „kein Auftreffpunkt" aktualisiert war. Zeigte der Kopf
+    zuletzt nach oben, blieb sein Fleck dort dauerhaft aus — der 2D-Plan lebt
+    aber gerade von den Flecken.
+
+    Jetzt: ohne Zielrechnung zaehlt wie vor VIZ-98 nur die Helligkeit, und ein
+    Wechsel 2D/3D ordnet den Fleck sofort neu ein (auch ohne DMX-Update)."""
+
+    # 1 Moving Head + 51 PARs = 52 Geraete -> im 2D-Plan gilt „ohne Zielrechnung".
+    GERAETE = [_geraet(tiltRange=270)] + [
+        _geraet(_FID + 1 + i, "par", x=-10 + (i % 17) * 1.2, z=-4 + (i // 17) * 2.0)
+        for i in range(51)]
+
+    def _lage(self):
+        return json.loads(self._eval(_LAGE_JS % _FID))
+
+    def _setze(self, **attrs):
+        self._push(_payload(**attrs))
+        self._bild()
+        return self._lage()
+
+    def _modus(self, modus):
+        self._bridge_obj.viewModeChanged.emit(modus)
+        _pump(0.4)
+        self.assertEqual(self._eval("window.__lightos.view.mode"), modus)
+
+    def _ohne_zielrechnung(self):
+        return self._eval("window.__lightos.view.mode === '2D' && "
+                          "Object.keys(window.__lightos.fixtures).length > 50")
+
+    def test_vorbedingung_52_geraete_und_die_regel_greift_nur_in_2d(self):
+        self._load_and_wait()
+        self.assertEqual(self._eval("Object.keys(window.__lightos.fixtures).length"), 52)
+        self.assertFalse(self._ohne_zielrechnung())
+        self._modus("2D")
+        self.assertTrue(self._ohne_zielrechnung())
+
+    def test_fleck_bleibt_im_2d_plan_nicht_dauerhaft_aus(self):
+        """Der Fall aus dem Befund: Kopf zeigt in 3D nach oben (Fleck aus),
+        dann 2D-Plan."""
+        self._load_and_wait()
+        self._setze(tilt=_UNTEN)
+        oben = self._setze(tilt=_OBEN)
+        self.assertFalse(oben["sichtbar"], oben)                # Vorbedingung: 3D, aus
+        self._modus("2D")
+        self.assertTrue(self._lage()["sichtbar"],
+                        "nach dem Wechsel in den 2D-Plan bleibt der Fleck aus, "
+                        "obwohl dort niemand rechnet, ob der Strahl trifft")
+        # ... und er bleibt an, auch wenn weitere Updates kommen (Kopf weiter oben).
+        for tilt in (_OBEN, _OBEN + 5, _OBEN):
+            z = self._setze(tilt=tilt)
+            self.assertTrue(z["sichtbar"], z)
+        # Helligkeit schaltet ihn weiterhin.
+        self.assertFalse(self._setze(tilt=_OBEN, intensity=0)["sichtbar"])
+        self.assertTrue(self._setze(tilt=_OBEN, intensity=255)["sichtbar"])
+
+    def test_update_im_2d_plan_setzt_einen_stehen_gebliebenen_merker_zurueck(self):
+        """Nur der DMX-Weg, ohne die Hilfe des Moduswechsels: der Merker steht
+        noch auf „kein Auftreffpunkt", das naechste Update im 2D-Plan muss ihn
+        loesen."""
+        self._load_and_wait()
+        self._setze(tilt=_UNTEN)
+        self._modus("2D")
+        self._eval("(function(){ const f = window.__lightos.fixtures['%d'];"
+                   " f._keinAuftreffer = true; f.floorSpot.visible = false; return 1; })()" % _FID)
+        self.assertFalse(self._lage()["sichtbar"])
+        self.assertTrue(self._setze(tilt=_OBEN)["sichtbar"],
+                        "applyFloorAim kehrt bei skipBeam zurueck, ohne den Merker zu loesen")
+
+    def test_zurueck_in_3d_entscheidet_wieder_der_auftreffpunkt(self):
+        self._load_and_wait()
+        self._setze(tilt=_UNTEN)
+        self._modus("2D")
+        oben = self._setze(tilt=_OBEN)
+        self.assertTrue(oben["sichtbar"], oben)                 # 2D: nur Helligkeit
+        self._modus("3D")
+        z = self._lage()
+        self.assertGreater(z["dirY"], 0.05, z)                  # Kopf zeigt nach oben
+        self.assertFalse(z["sichtbar"],
+                         f"zurueck in 3D liegt der Fleck noch am Boden: {z}")
+        unten = self._setze(tilt=_UNTEN)
+        self.assertTrue(unten["sichtbar"], unten)
+        self.assertAlmostEqual(unten["fleck"][1], 0.01, places=3)
+
+    def test_wenige_geraete_rechnen_auch_im_2d_plan(self):
+        """Die Ausnahme gilt erst ab 51 Geraeten — darunter rechnet auch der
+        2D-Plan den Auftreffpunkt, und der Fleck folgt ihm."""
+        self.GERAETE = [_geraet(tiltRange=270)]
+        self._load_and_wait()
+        self._modus("2D")
+        self.assertFalse(self._ohne_zielrechnung())
+        self.assertTrue(self._setze(tilt=_UNTEN)["sichtbar"])
+        self.assertFalse(self._setze(tilt=_OBEN)["sichtbar"])
+
+
 if __name__ == "__main__":
     import unittest
     unittest.main()

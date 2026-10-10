@@ -5,7 +5,7 @@
 // leben bewusst beisammen; registry.js bleibt die deklarative Map.
 import * as THREE from '../three/three.js';
 import { geteilteGeometrie, platziere, verschmelzen } from '../scene/geteilte_geometrie.js';  // VIZ-66
-import { settings, view } from '../state.js';
+import { settings, view, fixtures } from '../state.js';
 import { tintTopDownIcon } from './topdown_icons.js';
 import { isLowSpec } from '../scene/renderer.js';
 import { placeElement, panelGrid, rotatePoint, ringSegmente, wabenPlatz } from './pixel_order.js';
@@ -138,6 +138,27 @@ export function fleckSichtbar(f, hell) {
   if (!settings.showFloorSpots) return false;
   if (!(hell > 0.01)) return false;
   return !(f && f._keinAuftreffer);
+}
+
+// EINE Stelle fuer die Regel "keine Zielrechnung": im 2D-Plan mit vielen
+// Geraeten wird der Auftreffpunkt nicht gerechnet (Kosten je Update). Stand
+// bisher nur in fixtures.js#updateFixture; VIZ-98 braucht dieselbe Regel beim
+// Moduswechsel (resyncFloorSpot), und zwei Kopien liefen auseinander.
+export function ohneZielrechnung() {
+  return view.mode === '2D' && Object.keys(fixtures).length > 50;
+}
+
+// VIZ-98 (Codex-Befund #999): Bodenfleck neu einordnen, wenn KEIN DMX-Update
+// ansteht — beim Wechsel 2D/3D. Ohne das klebte der Fleck am Stand des alten
+// Modus: zeigte der Kopf in 3D nach oben (Fleck aus) und wechselte man in den
+// 2D-Plan, blieb er bei stehendem Bild aus, obwohl dort niemand mehr rechnet,
+// ob der Strahl trifft. Zurueck in 3D rechnet applyFloorAim den Auftreffpunkt
+// aus der jetzigen Kopfstellung neu.
+export function resyncFloorSpot(f) {
+  // Nur Geraete, die applyFloorAim schon einmal eingeordnet hat — wessen
+  // Handler nie zielt, behaelt seinen Fleck unveraendert unter dem Geraet.
+  if (!f || !f.floorSpot || !f.spotTarget || f._keinAuftreffer === undefined) return;
+  applyFloorAim(f, { skipBeam: ohneZielrechnung() });
 }
 
 export function resyncBeamVisibility(f) {
@@ -1803,7 +1824,13 @@ function fleckFolgtTreffer(f, trifft) {
 }
 
 function applyFloorAim(f, dmx) {
-  if (dmx.skipBeam) return;
+  if (dmx.skipBeam) {
+    // VIZ-98 (Codex-Befund #999): ohne Zielrechnung weiss niemand, ob der
+    // Strahl trifft. Ein stehen gebliebenes "kein Auftreffpunkt" hielte den
+    // Fleck hier dauerhaft aus — dann zaehlt wie vor VIZ-98 nur die Helligkeit.
+    if (f.floorSpot) fleckFolgtTreffer(f, true);
+    return;
+  }
   // VIZ-15: "kein Auftreffpunkt bekannt". Bleibt der Wert stehen, entscheidet
   // allein die Grundlaenge bzw. die globale Obergrenze — genau der Fall eines
   // waagerecht oder nach oben gerichteten Kopfes, der weder Boden noch Koerper
