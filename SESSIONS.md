@@ -60,6 +60,7 @@
 | VIZ-99 | B | fix/viz99-automatik-snapdragon | 2026-10-10T12:55Z | - |
 | XPLAT-51 | B | fix/xplat51-arm64-nicht-unterstuetzt | 2026-10-10T12:55Z | - |
 | XPLAT-52 | B | fix/xplat52-installer-venv-arch | 2026-10-10T12:55Z | - |
+| UI-86 | B | fix/ui86-liveansicht-200-prozent | 2026-10-10T12:55Z | - |
 
 ## Blocker & Fallen
 
@@ -162,7 +163,6 @@
 
 ## Verlauf
 
-- 2026-10-10T09:41Z D claim FM-66
 - 2026-10-10T09:41Z D claim DOC-70
 - 2026-10-10T09:58Z D done BPM-28
 - 2026-10-10T10:01Z D claim VIZ-98
@@ -192,3 +192,4 @@
 - 2026-10-10T12:55Z B claim VIZ-99
 - 2026-10-10T12:55Z B claim XPLAT-51
 - 2026-10-10T12:55Z B claim XPLAT-52
+- 2026-10-10T12:55Z B claim UI-86
