@@ -231,7 +231,10 @@ class EnttecPro:
         try:
             self._ser = serial.Serial(target, ENTTEC_BAUD, timeout=1,
                                       write_timeout=0.5)
-        except (serial.SerialException, OSError, ValueError):
+        except (serial.SerialException, OSError, ValueError) as e:
+            # STAB-30: der Grund des gescheiterten Wiederverbindens (gedrosselt).
+            from src.core.diagnose_log import melde_still
+            melde_still("dmx.enttec.reconnect", e, text=f"Port {target}")
             return
         self.port = target
         self._disabled = False
