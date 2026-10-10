@@ -60,7 +60,9 @@ frischen Stand von `main`):
 ./venv/bin/python tools/backlog_sammeln.py             # eintragen + Fragmente loeschen
 ```
 
-Danach mit dem Betreff `backlog: sammeln` committen. Ein neues Item bekommt
+Danach mit dem Betreff `backlog: sammeln` committen — als eigener Commit, der nur
+`BACKLOG.md` und die geloeschten Fragmente enthaelt (daran, nicht am Betreff,
+erkennt der Waechter den Sammel-Lauf). Ein neues Item bekommt
 eine Tabellenzeile, bei einem vorhandenen wird nur die Statusspalte ersetzt.
 Die PR-Nummer liest das Werkzeug aus dem Betreff des Merge-Commits (`… (#N)`);
 `--pr N` setzt sie von Hand. Ein `review`-Fragment ohne PR-Nummer bleibt

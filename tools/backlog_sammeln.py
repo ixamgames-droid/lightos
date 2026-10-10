@@ -75,8 +75,9 @@ Der Waechter WARNT nur
 ``--waechter`` (und ``tests/test_backlog_fragmente.py``) meldet, wenn der
 Zweig ``BACKLOG.md`` seit der Abzweigung von ``origin/main`` geaendert hat —
 mit Exit 0. Offene PRs alter Art, die ihre Zeile noch direkt eintragen,
-bleiben gueltig, und der Sammel-PR aendert die Datei absichtlich (Betreff
-``backlog: …`` bzw. eingesammelte Fragmente — dann schweigt der Waechter).
+bleiben gueltig, und der Sammel-PR aendert die Datei absichtlich. Der Waechter
+schweigt je Commit nur dort, wo ausschliesslich ``BACKLOG.md`` geaendert und
+Fragmente geloescht wurden — der Betreff allein nimmt nichts aus).
 Ohne ``origin/main`` (CI-Checkout) oder ausserhalb von Git: still.
 """
 from __future__ import annotations
@@ -444,6 +445,34 @@ def sammeln(repo: Path = REPO, *, pruefen: bool = False, dry_run: bool = False,
 
 # ---------------------------------------------------------------------- Waechter
 
+def _nur_sammler(namestatus: str) -> bool:
+    """Sieht diese ``--name-status``-Liste aus wie ein Sammel-Lauf?
+
+    Der Sammler aendert ``BACKLOG.md`` und loescht Fragmente — sonst nichts.
+    Genau das (und mindestens ein geloeschtes Fragment) muss dastehen."""
+    geloescht = 0
+    for zeile in namestatus.splitlines():
+        if not zeile.strip():
+            continue
+        art, _, pfad = zeile.partition("\t")
+        ordner, _, name = pfad.rpartition("/")
+        if art == "M" and pfad == BACKLOG:
+            continue
+        if art == "D" and ordner == FRAGMENT_ORDNER and FRAGMENT_NAME.match(name):
+            geloescht += 1
+            continue
+        return False
+    return geloescht > 0
+
+
+def _numstat(ausgabe: str) -> tuple[int, int]:
+    teile = ausgabe.split()
+    try:
+        return int(teile[0]), int(teile[1])
+    except (IndexError, ValueError):
+        return 0, 0
+
+
 def direkte_aenderung(repo: Path = REPO, basis: str = "origin/main") -> str:
     """Hinweistext, wenn der Zweig ``BACKLOG.md`` selbst geaendert hat — sonst ``""``.
 
@@ -451,8 +480,14 @@ def direkte_aenderung(repo: Path = REPO, basis: str = "origin/main") -> str:
     noch direkt eintragen, bleiben gueltig. Leer auch ohne ``origin/main``,
     ohne Merge-Basis oder ausserhalb von Git — so laeuft die CI. Gerechnet wird
     ueber die Merge-Basis, damit ein Zweig hinter ``main`` die dort inzwischen
-    gesammelten Zeilen nicht angelastet bekommt. Ein Sammel-Lauf (Fragmente der
-    Abzweigung sind weg) und ein Commit mit Betreff ``backlog: …`` schweigen."""
+    gesammelten Zeilen nicht angelastet bekommt.
+
+    ★ Ausgenommen ist JE COMMIT nur, was der Sammler macht (``_nur_sammler``:
+    ``BACKLOG.md`` geaendert, Fragmente geloescht, sonst nichts) — dasselbe
+    gilt fuer einen noch nicht committeten Lauf. Der Betreff zaehlt nicht:
+    frueher schaltete EIN Commit ``backlog: …`` (oder ein einziges geloeschtes
+    Fragment) den Hinweis fuer den ganzen Zweig ab, auch fuer Hand-Aenderungen
+    in anderen Commits. Gezaehlt werden nur die Zeilen der Hand-Aenderungen."""
     rc, _ = _git(repo, "rev-parse", "--verify", "-q", f"{basis}^{{commit}}")
     if rc != 0:
         return ""
@@ -463,16 +498,37 @@ def direkte_aenderung(repo: Path = REPO, basis: str = "origin/main") -> str:
     rc, diff = _git(repo, "diff", "--numstat", mb, "--", BACKLOG)
     if rc != 0 or not diff.strip():
         return ""
-    rc, betreffe = _git(repo, "log", "--format=%s", f"{mb}..HEAD", "--", BACKLOG)
-    if rc == 0 and any(b.strip().lower().startswith(MARKER)
-                       for b in betreffe.splitlines()):
-        return ""
-    rc, namen = _git(repo, "ls-tree", "-r", "--name-only", mb, "--",
-                     f"{FRAGMENT_ORDNER}/")
-    if rc == 0 and any(FRAGMENT_NAME.match(n.rsplit("/", 1)[-1])
-                       and not (repo / n).exists() for n in namen.split()):
-        return ""       # Sammel-Lauf
-    plus, minus = (diff.split() + ["?", "?"])[:2]
+    plus = minus = 0
+    sammler = hand = False
+    rc, commits = _git(repo, "log", "--no-merges", "--format=%H", f"{mb}..HEAD",
+                       "--", BACKLOG)
+    for sha in (commits.split() if rc == 0 else []):
+        rc, namen = _git(repo, "diff-tree", "--no-commit-id", "--name-status",
+                         "-r", "--no-renames", sha)
+        if rc == 0 and _nur_sammler(namen):
+            sammler = True
+            continue
+        hand = True
+        _, zahlen = _git(repo, "diff-tree", "--no-commit-id", "--numstat", "-r",
+                         sha, "--", BACKLOG)
+        p, m = _numstat(zahlen)
+        plus, minus = plus + p, minus + m
+    # Arbeitsbaum gegen HEAD: ein Sammel-Lauf vor dem Commit — oder Handarbeit.
+    rc, offen = _git(repo, "diff", "--numstat", "HEAD", "--", BACKLOG)
+    if rc == 0 and offen.strip():
+        rc, namen = _git(repo, "diff", "--name-status", "--no-renames", "HEAD")
+        if rc == 0 and _nur_sammler(namen):
+            sammler = True
+        else:
+            hand = True
+            p, m = _numstat(offen)
+            plus, minus = plus + p, minus + m
+    if not hand:
+        if sammler:
+            return ""
+        # Geaendert, aber keinem Commit zuzuordnen (z. B. in einem Merge von
+        # Hand aufgeloest): lieber melden als schweigen.
+        plus, minus = _numstat(diff)
     return (f"{BACKLOG} wurde auf diesem Zweig direkt geaendert (+{plus}/-{minus} "
             f"Zeilen). Das bleibt gueltig, kollidiert aber mit jedem anderen PR, der "
             f"dasselbe tut. Neuer Ablauf (PROC-20): je Item ein Fragment "

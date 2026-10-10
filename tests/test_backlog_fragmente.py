@@ -387,10 +387,12 @@ class PrAusHistorieTest(_GitRepo):
 class WaechterTest(_GitRepo):
     """Uebergang: BACKLOG.md direkt anzufassen wird gemeldet, nie rot."""
 
-    def _hand(self):
+    def _hand(self, alt: str = "| todo | **Offen**",
+              neu: str = "| review (Zweig `x`) | **Offen**"):
         p = self.repo / "BACKLOG.md"
-        p.write_text(p.read_text(encoding="utf-8").replace(
-            "| todo | **Offen**", "| review (Zweig `x`) | **Offen**"), encoding="utf-8")
+        text = p.read_text(encoding="utf-8")
+        self.assertIn(alt, text)
+        p.write_text(text.replace(alt, neu), encoding="utf-8")
 
     def test_ohne_origin_main_still(self):
         self._hand()
@@ -429,6 +431,58 @@ class WaechterTest(_GitRepo):
         self.assertEqual(bs.sammeln(self.repo, ausgabe=_still), 0)
         self.commit("backlog: sammeln")
         self.assertEqual(bs.direkte_aenderung(self.repo), "")
+
+    def test_betreff_backlog_allein_schaltet_den_hinweis_nicht_ab(self):
+        """Codex zu PROC-20: EIN Commit mit Betreff ``backlog: …`` schaltete
+        den Hinweis fuer den ganzen Zweig ab. Ausgenommen ist nur, was der
+        Sammler macht: BACKLOG.md aendern und Fragmente loeschen, sonst nichts."""
+        self.main_hier_festhalten()
+        self._hand()
+        self.commit("backlog: von Hand")
+        self.assertIn("BACKLOG.md", bs.direkte_aenderung(self.repo))
+
+    def test_sammel_commit_deckt_keine_hand_aenderung_im_selben_zweig(self):
+        self.frag("FM-2.md", "ID: FM-2\nStatus: done\n")
+        self.commit("feat: x (#3)")
+        self.main_hier_festhalten()
+        self.assertEqual(bs.sammeln(self.repo, ausgabe=_still), 0)
+        self.commit("backlog: sammeln")
+        self.assertEqual(bs.direkte_aenderung(self.repo), "")
+        self._hand("| **Alt** |", "| **Alt, umbenannt** |")
+        self.assertIn("BACKLOG.md", bs.direkte_aenderung(self.repo))   # uncommittet
+        self.commit("feat: mit Backlog")
+        hinweis = bs.direkte_aenderung(self.repo)
+        self.assertIn("BACKLOG.md", hinweis)
+        # gezaehlt wird nur die Hand-Aenderung (eine Zeile), nicht der Sammel-Lauf
+        self.assertIn("(+1/-1 Zeilen)", hinweis)
+
+    def test_sammel_lauf_uncommittet_und_ohne_marker_ist_keine_meldung(self):
+        self.frag("FM-2.md", "ID: FM-2\nStatus: done\n")
+        self.commit("feat: x (#3)")
+        self.main_hier_festhalten()
+        self.assertEqual(bs.sammeln(self.repo, ausgabe=_still), 0)
+        self.assertEqual(bs.direkte_aenderung(self.repo), "")
+        self.commit("chore: Backlog gesammelt")       # Betreff ist egal
+        self.assertEqual(bs.direkte_aenderung(self.repo), "")
+
+    def test_sammel_commit_mit_beifang_ist_kein_sammel_commit(self):
+        self.frag("FM-2.md", "ID: FM-2\nStatus: done\n")
+        self.commit("feat: x (#3)")
+        self.main_hier_festhalten()
+        self.assertEqual(bs.sammeln(self.repo, ausgabe=_still), 0)
+        (self.repo / "x.py").write_text("x = 1\n", encoding="utf-8")
+        self.commit("backlog: sammeln")
+        self.assertIn("BACKLOG.md", bs.direkte_aenderung(self.repo))
+
+    def test_geloeschtes_fragment_allein_deckt_keine_hand_aenderung(self):
+        self.frag("FM-2.md", "ID: FM-2\nStatus: done\n")
+        self.commit("feat: x (#3)")
+        self.main_hier_festhalten()
+        self._hand()
+        self.commit("feat: mit Backlog")
+        self.git("rm", "-q", "backlog.d/FM-2.md")
+        self.commit("chore: Fragment weg")
+        self.assertIn("BACKLOG.md", bs.direkte_aenderung(self.repo))
 
     def test_zweig_hinter_main_bekommt_main_nicht_angelastet(self):
         self.git("checkout", "-q", "-b", "feature")

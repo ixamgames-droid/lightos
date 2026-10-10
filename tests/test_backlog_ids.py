@@ -155,6 +155,30 @@ class KollisionenTest(unittest.TestCase):
         jz = {"origin/main": items_aus_backlog(tabelle("| FM-30 | P2 | todo | **A** | x |"))}
         self.assertEqual(kollisionen(jz, auf_main=set()), [])
 
+    def test_alt_pr_mit_zeile_und_fragment_pr_gleicher_titel_keine_kollision(self):
+        # Codex zu PROC-20: die Tabelle schreibt den Titel fett (**A**), das
+        # Fragment traegt ihn nackt. Dieselbe ID mit demselben Titel in einem
+        # Alt-PR (BACKLOG-Zeile) und einem Fragment-PR ist EIN Eintrag auf zwei
+        # Staenden — sonst endet --strict mit Exit 1 ohne echte Kollision.
+        import backlog_ids as B
+        frag = "ID: UI-99\nPrioritaet: P2\nStatus: review\nTitel: {}\n\nText.\n"
+        main_ = items_aus_backlog(tabelle("| UI-1 | P2 | done | **Alt** | x |"))
+        alt_pr = items_aus_backlog(tabelle(
+            "| UI-1 | P2 | done | **Alt** | x |",
+            "| UI-99 | P2 | review | **Neuer Knopf** | x |"))
+        for titel in ("Neuer Knopf", "**Neuer Knopf**"):
+            jz = {"origin/main": main_, "origin/alt": alt_pr,
+                  "origin/neu": B.mit_fragmenten(
+                      main_, {"backlog.d/UI-99.md": frag.format(titel)})}
+            self.assertEqual(kollisionen(jz, auf_main=set(main_)), [], titel)
+        # Gegenprobe: ein ANDERER Titel bleibt eine Kollision, und die Meldung
+        # zeigt die Titel so, wie sie im Zweig stehen.
+        jz["origin/neu"] = B.mit_fragmenten(
+            main_, {"backlog.d/UI-99.md": frag.format("Anderer Knopf")})
+        treffer = kollisionen(jz, auf_main=set(main_))
+        self.assertEqual([t[0] for t in treffer], ["UI-99"])
+        self.assertEqual(treffer[0][1]["origin/alt"], "**Neuer Knopf**")
+
 
 class FailClosedTest(unittest.TestCase):
     """★ CDX-57 (zweite Codex-Runde): eine Warnung allein genuegt nicht.

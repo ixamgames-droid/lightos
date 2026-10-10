@@ -92,6 +92,11 @@ def items_aus_backlog(text: str) -> dict:
     return gefunden
 
 
+def _titel_kern(titel: str) -> str:
+    """Titel ohne umschliessende ``**`` — Tabelle und Fragment gleich gelesen."""
+    return (titel or "").strip("* ").strip()
+
+
 def kollisionen(je_zweig: dict, auf_main: set) -> list:
     """``[(ID, {Zweig: Titel})]`` fuer jede NEUE ID mit verschiedenen Titeln.
 
@@ -114,7 +119,10 @@ def kollisionen(je_zweig: dict, auf_main: set) -> list:
                 titel_je_id[item_id][zweig] = titel
     treffer = []
     for item_id, nach_zweig in sorted(titel_je_id.items()):
-        if len(set(nach_zweig.values())) > 1:
+        # Verglichen wird ohne die Fettschrift der Tabelle: die BACKLOG-Zeile
+        # eines Alt-PR traegt ``**Titel**``, ein Fragment (PROC-20) den nackten
+        # Titel — derselbe Eintrag, keine Kollision.
+        if len({_titel_kern(t) for t in nach_zweig.values()}) > 1:
             treffer.append((item_id, nach_zweig))
     return treffer
 
@@ -178,7 +186,7 @@ def items_aus_fragmenten(fragmente: dict) -> dict:
         kopf = (text or "").replace("\r\n", "\n").split("\n\n", 1)[0]
         m_titel = _FRAGMENT_TITEL.search(kopf)
         if m_name and m_titel:
-            gefunden[m_name.group(1)] = m_titel.group(1).strip("* ").strip()
+            gefunden[m_name.group(1)] = _titel_kern(m_titel.group(1))
     return gefunden
 
 
