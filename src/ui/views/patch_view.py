@@ -252,7 +252,9 @@ class PatchFixtureEditDialog(QDialog):
                 _beschr = ""
             _tip = ("Je nach Montage (hängend/stehend) die Laser-Position "
                     "spiegeln oder X/Y tauschen — wirkt auf Programmer, Cues, "
-                    "EFX und 3D-Bild. Abschalt-/NOT-AUS-Werte bleiben unberührt.")
+                    "EFX und Netzwerk-Laser. Das 3D-Bild zeigt weiter die "
+                    "programmierte Richtung. Abschalt-/NOT-AUS-Werte bleiben "
+                    "unberührt.")
             for _c in (self._chk_inv_lx, self._chk_inv_ly, self._chk_swap_lxy):
                 _c.setToolTip(_tip)
             form.addRow("Laser-Ausrichtung:", self._chk_inv_lx)

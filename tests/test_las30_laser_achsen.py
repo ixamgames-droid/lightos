@@ -366,3 +366,21 @@ def test_patch_anleitung_erklaert_laser_ausrichtung():
     for wort in ("Mitte", "am Gerät prüfen", "NOT-AUS"):
         assert wort in abschnitt, wort
 
+
+
+def test_dialog_tooltip_widerspricht_der_anleitung_nicht():
+    """Review: der Tooltip der Haken sagte „wirkt auf … 3D-Bild", Anleitung und
+    Code (``unapply_pan_tilt_orientation`` im 3D-Payload) sagen das Gegenteil —
+    das 3D-Bild zeigt weiter die programmierte Richtung."""
+    from pathlib import Path
+    wurzel = Path(__file__).resolve().parent.parent
+    quelle = (wurzel / "src/ui/views/patch_view.py").read_text(encoding="utf-8")
+    block = quelle.split("# LAS-30: Laser-Ausrichtung", 1)[1].split(
+        "# Moving-Head-Ausrichtung", 1)[0]
+    tip = " ".join(block.split("_tip = (", 1)[1].split(")\n", 1)[0].split())
+    tip = tip.replace('" "', "")
+    assert "EFX und 3D-Bild" not in tip
+    assert "3D-Bild zeigt weiter die programmierte Richtung" in tip, tip
+    doku = (wurzel / "docs/anleitung_patch_gruppen/ANLEITUNG_PATCH_GRUPPEN.md"
+            ).read_text(encoding="utf-8")
+    assert "Das 3D-Bild zeigt den Laser weiter in der programmierten Richtung" in doku
