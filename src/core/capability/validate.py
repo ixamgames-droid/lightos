@@ -24,6 +24,9 @@ from .reflect import Capabilities, get_capabilities
 
 ERROR = "error"
 WARNING = "warning"
+# TOOL-25: reiner Hinweis — zaehlt weder als Fehler noch als Warnung (auch nicht
+# unter ``lint_show --strict``), steht aber in der Ausgabe.
+INFO = "info"
 
 
 @dataclass(frozen=True)
@@ -35,7 +38,7 @@ class Finding:
     swallow_site: str = ""   # echte file:line, die das sonst still schluckt
 
     def __str__(self) -> str:
-        tag = "ERROR" if self.severity == ERROR else "warn "
+        tag = {ERROR: "ERROR", INFO: "info "}.get(self.severity, "warn ")
         loc = f"   ({self.swallow_site})" if self.swallow_site else ""
         return f"{tag} [{self.code}] {self.where}: {self.message}{loc}"
 
@@ -213,6 +216,13 @@ def validate_show_dict(show: dict, caps: Capabilities | None = None) -> list[Fin
         if isinstance(w, dict):
             findings += _check_widget(
                 w, f"virtual_console.widgets[{j}]", caps, known_fids, fid_to_fn)
+
+    # TOOL-25: Snap-Verweise der Knoepfe gegen die Snap-Bibliothek der Show.
+    # Nur mit ``library``-Block: Alt-Shows ohne ihn erben beim Laden die
+    # globalen Snap-Dateien (show_file.py, migrate_from_disk) — welche das
+    # sind, weiss der Lint nicht, also kein Fehlalarm.
+    if "library" in show:
+        findings += snap_verweis_befunde(widgets, show.get("library"))
 
     return findings
 
@@ -425,6 +435,18 @@ def _check_widget(w: dict, where: str, caps: Capabilities,
                     WARNING, "VC-DANGLING", label,
                     f"{ref_key} {r} zeigt auf keine existierende Funktion",
                     "vc_widget.py (function_id-Bindung)"))
+    # TOOL-25: Mehrfach-Aktionen tragen je Eintrag eine eigene function_id
+    # (vc_button.py, _run_actions) — die blieben bisher ungeprueft.
+    acts = w.get("actions")
+    if isinstance(acts, list):
+        for n, entry in enumerate(acts):
+            r = entry.get("function_id") if isinstance(entry, dict) else None
+            if isinstance(r, int) and r > 0 and known_fids and r not in known_fids:
+                out.append(Finding(
+                    WARNING, "VC-DANGLING", label,
+                    f"actions[{n}].function_id {r} zeigt auf keine existierende "
+                    "Funktion",
+                    "vc_button.py (Mehrfach-Aktion)"))
 
     # Container-Kinder rekursiv prüfen (VCFrame/VCEffectEditor serialisieren ihre
     # Kinder unter "children" — vc_frame.py:271; nur diesen Key rekursieren, NICHT
@@ -436,6 +458,140 @@ def _check_widget(w: dict, where: str, caps: Capabilities,
             if isinstance(child, dict):
                 out += _check_widget(
                     child, f"{where}.children[{k}]", caps, known_fids, fid_to_fn)
+    return out
+
+
+# ── TOOL-25: Snap-Verweise der VC-Knoepfe ───────────────────────────────────────
+def _als_int(x):
+    if isinstance(x, bool):
+        return None
+    try:
+        return int(x)
+    except (TypeError, ValueError):
+        return None
+
+
+def _snap_tabelle(library) -> dict[int, dict]:
+    """``library``-Block (SnapLibrary.to_dict) -> {snap_id: snap_dict}."""
+    out: dict[int, dict] = {}
+    snaps = library.get("snaps") if isinstance(library, dict) else None
+    for sd in snaps or []:
+        if isinstance(sd, dict):
+            sid = _als_int(sd.get("id"))
+            if sid is not None:
+                out[sid] = sd
+    return out
+
+
+def _knopf_name(w: dict, ort: str) -> str:
+    """Lesbarer Ort: Widget-Typ, Beschriftung, Rahmen und Seite."""
+    name = f"{w.get('type')} '{w.get('caption', '')}'"
+    return f"{name} ({ort})" if ort else name
+
+
+def _snap_verweise(w: dict) -> list[tuple[str, int]]:
+    """(Feld, Snap-ID) aller Snaps, die dieses Widget beim Ausloesen liest.
+
+    VCButton liest ``snap_id``/``snap_ids`` nur in der Aktion ``LibrarySnap``
+    (``_snap_binding_for_action``); in jeder anderen Aktion sind sie inert.
+    Mehrfach-Aktionen lesen ``actions[n].snap_id`` bei ``type == library_snap``.
+    Andere Widget-Arten mit diesen Feldern werden ohne Aktions-Filter geprueft.
+    """
+    refs: list[tuple[str, int]] = []
+    liest_snaps = w.get("type") != "VCButton" or w.get("action") == "LibrarySnap"
+    if liest_snaps:
+        sid = _als_int(w.get("snap_id"))
+        if sid is not None:
+            refs.append(("snap_id", sid))
+        ids = w.get("snap_ids")
+        for x in ids if isinstance(ids, list) else []:
+            sid = _als_int(x)
+            if sid is not None and ("snap_id", sid) not in refs \
+                    and ("snap_ids", sid) not in refs:
+                refs.append(("snap_ids", sid))
+    acts = w.get("actions")
+    for n, entry in enumerate(acts if isinstance(acts, list) else []):
+        if isinstance(entry, dict) and entry.get("type") == "library_snap":
+            sid = _als_int(entry.get("snap_id"))
+            if sid is not None:
+                refs.append((f"actions[{n}].snap_id", sid))
+    return refs
+
+
+def _snap_konflikte(ids: list[int], tabelle: dict[int, dict]) -> list[str]:
+    """Je Paar (frueher, spaeter) die Kanaele, auf denen der spaetere Snap
+    einen ANDEREN Wert setzt — er ueberschreibt den frueheren (Reihenfolge
+    wie ``VCButton._all_snap_ids``: snap_id zuerst)."""
+    teile: list[str] = []
+    for a_i, a in enumerate(ids):
+        va = (tabelle.get(a) or {}).get("values") or {}
+        for b in ids[a_i + 1:]:
+            vb = (tabelle.get(b) or {}).get("values") or {}
+            kanaele = []
+            for fid, attrs_b in vb.items():
+                attrs_a = va.get(fid) if isinstance(va, dict) else None
+                if not isinstance(attrs_a, dict) or not isinstance(attrs_b, dict):
+                    continue
+                for attr, wert_b in attrs_b.items():
+                    if attr in attrs_a and attrs_a[attr] != wert_b:
+                        kanaele.append(
+                            f"Gerät {fid} {attr} {attrs_a[attr]}→{wert_b}")
+            if kanaele:
+                teile.append(f"Snap {b} überschreibt Snap {a} auf "
+                             + ", ".join(sorted(kanaele)))
+    return teile
+
+
+def snap_verweis_befunde(widgets, library) -> list[Finding]:
+    """Prueft die Snap-Verweise aller VC-Widgets (rekursiv in Rahmen) gegen
+    die Snap-Bibliothek (``library``-Block der Show bzw.
+    ``get_snap_library().to_dict()``).
+
+    * ``VC-SNAP-DANGLING`` (Warnung): Verweis auf einen Snap, den es nicht gibt.
+      ``VCButton._library_snaps`` ueberspringt ihn still — der Knopf tut nichts.
+    * ``VC-SNAP-KONFLIKT`` (Hinweis): mehrere Snaps eines Knopfs setzen auf
+      demselben Kanal verschiedene Werte. Kann gewollt sein, daher nur Hinweis.
+
+    Rein ueber Dicts, ohne Qt und ohne App-Zustand — damit nutzbar fuer den
+    Show-Lint und das „Issues"-Banner (``sync.validate_and_repair``).
+    """
+    tabelle = _snap_tabelle(library)
+    out: list[Finding] = []
+
+    def _gehe(liste, ort: str, rahmen: str):
+        for j, w in enumerate(liste if isinstance(liste, list) else []):
+            if not isinstance(w, dict):
+                continue
+            pfad = f"{ort}[{j}]"
+            seite = w.get("vc_page")
+            wo_teile = [t for t in (
+                f"in '{rahmen}'" if rahmen else "",
+                f"Seite {int(seite) + 1}" if _als_int(seite) is not None and rahmen else "",
+                pfad) if t]
+            name = _knopf_name(w, ", ".join(wo_teile))
+            refs = _snap_verweise(w)
+            for feld, sid in refs:
+                if sid not in tabelle:
+                    out.append(Finding(
+                        WARNING, "VC-SNAP-DANGLING", name,
+                        f"{feld} {sid} zeigt auf keinen Snap der Bibliothek "
+                        "(gelöscht?) — der Knopf schaltet ihn still nicht",
+                        "vc_button.py (_library_snaps überspringt fehlende IDs)"))
+            haupt = [sid for feld, sid in refs
+                     if feld in ("snap_id", "snap_ids") and sid in tabelle]
+            konflikte = _snap_konflikte(haupt, tabelle) if len(haupt) > 1 else []
+            if konflikte:
+                out.append(Finding(
+                    INFO, "VC-SNAP-KONFLIKT", name,
+                    "; ".join(konflikte)
+                    + " — der spätere Snap gewinnt (nur Hinweis)",
+                    "vc_button.py (_apply_library_snap, Reihenfolge)"))
+            kinder = w.get("children")
+            if isinstance(kinder, list):
+                _gehe(kinder, f"{pfad}.children",
+                      str(w.get("caption", "") or w.get("type", "")))
+
+    _gehe(widgets, "virtual_console.widgets", "")
     return out
 
 
