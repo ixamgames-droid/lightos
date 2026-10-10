@@ -1047,18 +1047,16 @@ _LIESMICH = ("LightOS-Diagnosepaket\n=====================\n\nEnthaelt:\n"
 #: Stand schreibt — auch First-Chance-Ausnahmen, die das Betriebssystem bzw. COM
 #: gleich danach selbst behandelt; die App laeuft weiter. Einen Filter kennt
 #: ``faulthandler.enable`` nicht (nur ``file``/``all_threads``), deshalb wird
-#: hier nur GEKENNZEICHNET. Bewusst eine kurze Liste bekannter COM/RPC-Hinweise:
-#: alles andere (access violation, 0xC0000005, stack overflow …) bleibt, wie es
-#: ist.
+#: hier nur GEKENNZEICHNET. Bewusst NUR Codes, die in einem echten Paket
+#: beobachtet UND als folgenlos belegt sind (die App lief nachweislich weiter).
+#: Ein Code, der bloss "nach COM aussieht", gehoert nicht hierher: stuende er
+#: als letzte Zeile vor einem echten Absturz, wuerde "kein Absturz" in die Irre
+#: fuehren. Alles andere (access violation, 0xC0000005, stack overflow, andere
+#: RPC-Codes …) bleibt, wie es ist, und zaehlt als "nicht als harmlos bekannt".
 HARMLOSE_WINDOWS_CODES: dict[str, str] = {
     "0x8001010d": "RPC_E_CANTCALLOUT_ININPUTSYNCCALL — COM-Aufruf waehrend einer "
                   "synchronen Eingabenachricht, typisch bei Bildschirmlesern/"
                   "UI-Automation",
-    "0x8001010e": "RPC_E_WRONG_THREAD — COM-Objekt aus einem anderen Thread "
-                  "angesprochen, COM lehnt den Aufruf ab",
-    "0x80010108": "RPC_E_DISCONNECTED — das COM-Gegenueber ist schon weg",
-    "0x800706ba": "RPC_S_SERVER_UNAVAILABLE — der angesprochene Dienst "
-                  "antwortet nicht",
 }
 _FATAL_ANFAENGE = ("Windows fatal exception:", "Fatal Python error:")
 

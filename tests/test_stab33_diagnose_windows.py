@@ -238,6 +238,10 @@ def test_gross_und_kleinschreibung_des_codes_egal():
     "Windows fatal exception: access violation",
     "Windows fatal exception: code 0xc0000005",
     "Windows fatal exception: code 0xc0000409",
+    # nie beobachtete COM/RPC-Codes werden NICHT auf Verdacht entwarnt
+    "Windows fatal exception: code 0x8001010e",
+    "Windows fatal exception: code 0x80010108",
+    "Windows fatal exception: code 0x800706ba",
     "Windows fatal exception: stack overflow",
     "Fatal Python error: Segmentation fault",
     "Fatal Python error: Aborted",
@@ -249,6 +253,12 @@ def test_echte_abstuerze_bleiben_unangetastet(zeile):
     assert harmlos == {}
     assert andere == 1
     assert "kein Absturz" not in text
+
+
+def test_harmlos_liste_enthaelt_nur_den_beobachteten_code():
+    """Die Entwarnung "kein Absturz" gilt nur fuer Codes, die in einem echten
+    Paket beobachtet und als folgenlos belegt sind — keine Liste auf Verdacht."""
+    assert set(d.HARMLOSE_WINDOWS_CODES) == {"0x8001010d"}
 
 
 def test_paket_kennzeichnet_crash_log_und_liesmich(tmp_path, monkeypatch):
