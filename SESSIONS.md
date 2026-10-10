@@ -61,6 +61,7 @@
 | UI-80 | D | fix/ui80-matrix-entwurf-speed | 2026-10-10T18:17Z | - |
 | TOOL-18 | D | fix/tool18-bilder-hinweis-gpu-szenen | 2026-10-10T18:10Z | - |
 | TOOL-19 | D | fix/tool19-werkzeuge-ohne-echten-ausgang | 2026-10-10T18:03Z | - |
+| QA-92 | D | fix/qa92-windows-rote-tests | 2026-10-10T18:49Z | - |
 
 ## Blocker & Fallen
 
@@ -186,7 +187,6 @@
 
 ## Verlauf
 
-- 2026-10-10T14:17Z B uebergeben XPLAT-51
 - 2026-10-10T14:17Z B uebergeben XPLAT-52
 - 2026-10-10T14:17Z A claim XPLAT-51
 - 2026-10-10T14:17Z A claim XPLAT-52
@@ -216,3 +216,4 @@
 - 2026-10-10T18:17Z D aktualisiert UI-80: Branch - -> fix/ui80-matrix-entwurf-speed
 - 2026-10-10T18:24Z D aktualisiert UI-78: Branch - -> fix/ui78-efx-editor-texte
 - 2026-10-10T18:34Z D done VIZ-98
+- 2026-10-10T18:49Z D claim QA-92
