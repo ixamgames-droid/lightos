@@ -145,12 +145,37 @@ def ids_aus_text(text: str) -> set:
     Changelog-Fragmente. Dort steht eine ID oft LANGE bevor ihre BACKLOG-Zeile
     landet (Sitzung C belegte am 02.10. DOC-23 … DOC-50 auf der Tafel; im
     BACKLOG stand keine davon, und das Werkzeug bot ``DOC-22`` an, obwohl A sie
-    schon gemergt hatte)."""
-    return {m.group(0) for m in _ID_IM_TEXT.finditer(text or "")
-            if zerlege(m.group(0))}
+    schon gemergt hatte).
+
+    TOOL-23: gelesen wird dieselbe Form, die :func:`zerlege` fuer die Tabelle
+    kennt — mehrteiliges Praefix (``PATCH-GRP-02``) und Buchstabe hinten
+    (``FM-46b``). Das alte Muster ``\\b[A-Z][A-Z0-9]*-\\d+\\b`` las an beidem
+    vorbei: ``FM-46b`` und ``UI-72_UI-73`` (Fragmentname mit zwei IDs) fand es
+    GAR NICHT, weil ``\\b`` zwischen Ziffer und Buchstabe bzw. Unterstrich nicht
+    greift, und aus ``PATCH-GRP-02`` wurde ``GRP-02``. Die Nummer zaehlte dann
+    in der falschen Gruppe oder ueberhaupt nicht.
+
+    ★ Im freien Text ist nicht zu entscheiden, ob ``NEU-FM-73`` ein Item der
+    Gruppe ``NEU-FM`` ist oder ``FM-73`` mit einem Wort davor. Deshalb zaehlt
+    JEDE Lesart: ``PATCH-GRP-02`` liefert ``PATCH-GRP-02`` und ``GRP-02``. Zu
+    viel Belegtes kostet eine uebersprungene Nummer, zu wenig eine Kollision.
+    """
+    gefunden = set()
+    for m in _ID_IM_TEXT.finditer(text or ""):
+        teile = m.group(0).split("-")
+        for i in range(len(teile) - 1):
+            lesart = "-".join(teile[i:])
+            if zerlege(lesart):
+                gefunden.add(lesart)
+    return gefunden
 
 
-_ID_IM_TEXT = re.compile(r"\b[A-Z][A-Z0-9]*-\d+\b")
+# Wie GETEILT, nur fuer Fundstellen mitten im Text: Grossbuchstaben-Praefix
+# (auch mehrteilig), Nummer, optionaler Kleinbuchstabe. Die Grenzen sind
+# Lookarounds statt ``\b``: ein Unterstrich (``UI-72_UI-73.md``) trennt zwei
+# IDs, und der Buchstabe hinten gehoert dazu.
+_ID_IM_TEXT = re.compile(
+    r"(?<![A-Za-z0-9])[A-Z][A-Z0-9]*(?:-[A-Z]+)*-\d+[a-z]*(?![A-Za-z0-9])")
 
 
 # ── Alles ab hier redet mit git ──────────────────────────────────────────────
@@ -202,18 +227,36 @@ def backlog_je_zweig(refs: list) -> dict:
     return je_zweig
 
 
-def weitere_belegte_ids(refs: list) -> set:
-    """IDs von der Belegungstafel (``origin/sessions:SESSIONS.md``, inkl.
-    Verlauf) und aus den Dateinamen unter ``changelog.d/`` jedes Refs."""
+TAFEL = "origin/sessions:SESSIONS.md"
+
+
+def weitere_belegte_ids(refs: list) -> tuple:
+    """``(IDs, Luecken)`` — IDs von der Belegungstafel (inkl. Verlauf) und aus
+    den Dateinamen unter ``changelog.d/`` jedes Refs.
+
+    TOOL-23: ein Lesefehler ist eine LUECKE und wird gemeldet. Bisher wurde er
+    still uebergangen: liess sich die Tafel nicht lesen (Zweig ``sessions``
+    nicht geholt), rechnete das Werkzeug ohne sie weiter und bot eine Nummer
+    an, die dort laengst belegt sein konnte — derselbe Schaden wie bei einem
+    unlesbaren Zweig (CDX-57), nur ohne jede Warnung.
+
+    Ein Ref OHNE ``changelog.d/`` ist keine Luecke: ``git ls-tree <ref> <pfad>``
+    liefert dann Exit 0 und nichts. Erst ein Fehler des Aufrufs zaehlt.
+    """
     ids: set = set()
-    rc, text = _git("show", "origin/sessions:SESSIONS.md")
+    luecken: list = []
+    rc, text = _git("show", TAFEL)
     if rc == 0:
         ids |= ids_aus_text(text)
+    else:
+        luecken.append(f"Belegungstafel `{TAFEL}` nicht lesbar")
     for ref in refs:
-        rc, out = _git("ls-tree", "--name-only", f"{ref}:changelog.d")
+        rc, out = _git("ls-tree", "--name-only", ref, "changelog.d/")
         if rc == 0:
             ids |= ids_aus_text(out)
-    return ids
+        else:
+            luecken.append(f"`changelog.d/` von {ref} nicht lesbar")
+    return ids, luecken
 
 
 def main(argv=None) -> int:
@@ -260,10 +303,6 @@ def main(argv=None) -> int:
         refs = ["origin/main"] + [f"origin/{b}" for b in zweige]
 
     je_zweig = backlog_je_zweig(refs)
-    # TOOL-9: Nummern, die nur auf der Tafel oder in einem Changelog-Fragment
-    # stehen, sind ebenfalls vergeben. Sie zaehlen NUR fuer die naechste freie
-    # Nummer, nicht fuer die Titel-Kollisionen (dort gibt es keinen Titel).
-    belegt = weitere_belegte_ids(refs)
     # ★ CDX-57: ein Ref, das nicht lesbar ist, wurde bisher still uebersprungen —
     # das Werkzeug behauptete dann Abdeckung, die es nicht hatte.
     fehlend = [r for r in refs if r not in je_zweig]
@@ -273,6 +312,15 @@ def main(argv=None) -> int:
     if not je_zweig:
         print("FEHLER: kein Ref mit BACKLOG.md gefunden — sind die Remote-Refs da?")
         return 2
+    # TOOL-9: Nummern, die nur auf der Tafel oder in einem Changelog-Fragment
+    # stehen, sind ebenfalls vergeben. Sie zaehlen NUR fuer die naechste freie
+    # Nummer, nicht fuer die Titel-Kollisionen (dort gibt es keinen Titel).
+    # Gefragt werden nur die lesbaren Refs — die anderen stehen schon oben als
+    # Luecke. TOOL-23: was sich HIER nicht lesen laesst, ist ebenfalls eine.
+    belegt, nicht_gelesen = weitere_belegte_ids(sorted(je_zweig))
+    for luecke in nicht_gelesen:
+        print(f"[ids] ⚠ {luecke}")
+        luecken.append(luecke)
 
     # ★ Die Abdeckung MUSS mit. Ohne sie sieht „keine Kollision" bei einem
     # einzigen gelesenen Zweig aus wie ein sauberer Bestand.

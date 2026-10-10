@@ -12,6 +12,7 @@ import { disposeObj } from '../scene/grid_floor.js';
 // Registry; die pro-Typ-Handler leben bei ihren Buildern (builders.js), wo
 // auch tintTopDownIcon konsumiert wird — nicht mehr hier.
 import { buildFixtureModel, updateFixtureDmx } from './registry.js';
+import { ohneZielrechnung } from './builders.js';   // VIZ-98
 import { buildTopDownIcon } from './topdown_icons.js';
 import { applyPoolFalloff } from './floor_pool.js';   // VIZ-15
 import { applyBeamGoboBase } from './gobo_textures.js';   // VIZ-83
@@ -624,7 +625,7 @@ export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads, extra) 
   if (!f) return;
   const color = new THREE.Color(r/255, g/255, b/255);
   const intNorm = intensity / 255;
-  const skipBeam = (view.mode === '2D' && Object.keys(fixtures).length > 50);
+  const skipBeam = ohneZielrechnung();
   // VIZ-13 3c Teil 2: gebuendelter DMX-Kontext fuer die updateDmx-Handler —
   // traegt den byte-identischen dmxBatch-Vertrag (r,g,b,intensity,pan,tilt,
   // heads) plus die abgeleiteten Werte, damit kein Handler sie neu rechnet.

@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (
     QComboBox, QPushButton, QLabel, QTableWidget, QTableWidgetItem,
     QHeaderView, QAbstractItemView, QMessageBox, QInputDialog, QGroupBox,
     QDialogButtonBox, QTabWidget, QWidget, QCheckBox, QSlider,
-    QSplitter, QTextEdit, QFileDialog,
+    QSplitter, QTextEdit, QFileDialog, QGridLayout,
 )
 from PySide6.QtCore import Qt, QTimer
 
@@ -317,6 +317,9 @@ def validate_model(model: GeneratorModel) -> list[tuple[str, str]]:
         # FM-46: Zuordnung Dimmer -> Weiss-Segment.
         issues.extend(_check_dimmer_segmente(mode, loc))
 
+        # LAS-26: Laser — gibt es einen Aus-Wert, und ist er der Grundwert?
+        issues.extend(_check_laser_aus(model, mode, loc))
+
     # Modus-Vergleich (gleiche Funktionen, andere Reihenfolge).
     issues.extend(_compare_modes(model.modes))
     return issues
@@ -410,6 +413,81 @@ def _check_dimmer_segmente(mode: GenMode, loc: str) -> list[tuple[str, str]]:
     for problem in zuordnung_probleme(mode.channels):
         out.append(("warn", f"{loc}: {problem}"))
     return out
+
+
+# ── LAS-26: Laser-Sicherheit ─────────────────────────────────────────────────
+#
+# Blackout, Grand Master 0, Ziel-Blackout und Laser-NOT-AUS schalten einen
+# DMX-Laser ueber seinen Aus-Wert dunkel (LAS-24/LAS-25): der Bereich der Art
+# ``closed`` (oder ein Bereich „Laser off/aus“) am Betriebsart-Kanal
+# (``shutter``/``macro``). Fehlt er, strahlt der Laser bei Grand Master 0
+# weiter — das sah man dem Profil beim Anlegen bisher nicht an. Dieselbe
+# Erkennung wie im Sende-Pfad (``AppState._laser_aus_wert``), keine zweite.
+
+_LASER_DIMMER = ("intensity", "dimmer", "master")
+
+
+def _ist_laser_modell(model: GeneratorModel, mode: GenMode) -> bool:
+    if (model.fixture_type or "").lower() == "laser":
+        return True
+    return any((c.attribute or "").startswith("laser_") for c in mode.channels)
+
+
+def laser_aus_kanal(model: GeneratorModel, mode: GenMode):
+    """``(kanalnummer, kanal, aus_wert)`` des Kanals, ueber den LightOS diesen
+    Laser dunkel schaltet — oder ``None`` (kein Laser / kein Aus-Wert)."""
+    if not _ist_laser_modell(model, mode):
+        return None
+    from src.core.app_state import AppState
+    for i, ch in enumerate(mode.channels, 1):
+        if (ch.attribute or "") not in AppState._GM_LASER_AUS_ATTRS:
+            continue
+        wert = AppState._laser_aus_wert(ch)
+        if wert is not None:
+            return i, ch, wert
+    return None
+
+
+def _check_laser_aus(model: GeneratorModel, mode: GenMode,
+                     loc: str) -> list[tuple[str, str]]:
+    if not _ist_laser_modell(model, mode):
+        return []
+    treffer = laser_aus_kanal(model, mode)
+    if treffer is None:
+        if any((c.attribute or "") in _LASER_DIMMER for c in mode.channels):
+            return []      # der Grand Master dimmt den Dimmer regulaer
+        return [("warn",
+                 f"{loc}: Laser ohne Aus-Wert — Grand Master 0 und gezielter "
+                 "Blackout schalten ihn nicht sicher dunkel. Den Bereich "
+                 "„Laser aus“ am Betriebsart-Kanal (Attribut 'shutter') mit "
+                 "der Art 'closed' anlegen.")]
+    nr, ch, wert = treffer
+    band = next((r for r in ch.ranges
+                 if int(r.range_from) <= wert <= int(r.range_to)), None)
+    lo = int(band.range_from) if band is not None else wert
+    hi = int(band.range_to) if band is not None else wert
+    if not lo <= int(ch.default_value) <= hi:
+        return [("warn",
+                 f"{loc}, Kanal {nr} ('{ch.name}'): Default "
+                 f"{ch.default_value} ist nicht „aus“ — nach dem Patchen "
+                 f"strahlt der Laser sofort. Default auf {wert} setzen.")]
+    return []
+
+
+def laser_sicherheit_text(model: GeneratorModel) -> str:
+    """Bestaetigung fuer die Hinweis-Box: ueber welchen Kanal und Wert LightOS
+    jeden Laser-Modus dunkel schaltet. Leer, wenn kein Modus ein Laser ist."""
+    teile = []
+    for mode in model.modes:
+        t = laser_aus_kanal(model, mode)
+        if t is not None:
+            nr, ch, wert = t
+            teile.append(f"Modus '{mode.name}': Kanal {nr} ('{ch.name}') = "
+                         f"{wert}")
+    if not teile:
+        return ""
+    return ("Laser-Sicherheit: Blackout, Grand Master 0, gezielter Blackout "
+            "und Laser-NOT-AUS schalten auf „aus“ — " + "; ".join(teile) + ".")
 
 
 def _compare_modes(modes: list[GenMode]) -> list[tuple[str, str]]:
@@ -545,6 +623,9 @@ CHANNEL_COLS = ["#", "Name", "Attribut", "Default", "Highlight", "Invert", "Aufl
 SEGMENT_COL = 7
 RANGE_COLS = ["Von", "Bis", "Name", "Art"]
 
+#: FM-70: Mindesthoehe der Kanal-/Bereichstabelle (Kopfzeile + ~5 Zeilen).
+KANAL_TABELLE_MIN_H = 190
+
 
 class _RangeEditor(QWidget):
     """Bereichs-Tabelle eines Kanals + kompakte Schnellwahl-Vorschau."""
@@ -564,6 +645,7 @@ class _RangeEditor(QWidget):
             2, QHeaderView.ResizeMode.Stretch)
         self._tbl.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked |
                                   QAbstractItemView.EditTrigger.SelectedClicked)
+        self._tbl.setMinimumHeight(KANAL_TABELLE_MIN_H)
         lay.addWidget(self._tbl)
 
         row = QHBoxLayout()
@@ -766,6 +848,8 @@ class _ModeTab(QWidget):
         self._tbl.setSelectionBehavior(
             QAbstractItemView.SelectionBehavior.SelectRows)
         self._tbl.currentCellChanged.connect(self._on_row_changed)
+        # FM-70: mindestens fuenf Kanaele sichtbar.
+        self._tbl.setMinimumHeight(KANAL_TABELLE_MIN_H)
         ll.addWidget(self._tbl)
 
         row = QHBoxLayout()
@@ -1296,21 +1380,21 @@ class FixtureGeneratorDialog(QDialog):
     def _setup_ui(self):
         root = QVBoxLayout(self)
 
-        # Kopf
+        # Kopf — FM-70: zweispaltig. Einspaltig nahm der Kopf ein Drittel der
+        # Dialoghoehe; auf einem 1080er-Bildschirm (Dialog max. ~1000 px) blieb
+        # fuer die Kanaltabelle EINE Zeile.
         head = QGroupBox("Gerät")
-        form = QFormLayout(head)
+        grid = QGridLayout(head)
+        grid.setHorizontalSpacing(10)
+        grid.setVerticalSpacing(6)
         self._edit_mfr = QLineEdit(self._model.manufacturer)
-        form.addRow("Hersteller:", self._edit_mfr)
         self._edit_model = QLineEdit(self._model.model)
-        form.addRow("Modell:", self._edit_model)
         self._edit_short = QLineEdit(self._model.short_name)
         self._edit_short.setMaxLength(40)
-        form.addRow("Kurzname:", self._edit_short)
         self._cb_type = QComboBox()
         self._cb_type.addItems(FIXTURE_TYPES)
         self._cb_type.setCurrentText(self._model.fixture_type)
         self._cb_type.currentTextChanged.connect(lambda *_: self._revalidate())
-        form.addRow("Typ:", self._cb_type)
         # FM-12: 3D-Modell-Wahl mit Live-Vorschlag der Automatik.
         self._cb_vizmodel = QComboBox()
         for label, value in VIZ_MODEL_CHOICES:
@@ -1321,22 +1405,27 @@ class FixtureGeneratorDialog(QDialog):
             "aktuelle Vorschlag steht in Klammern.")
         idx = self._cb_vizmodel.findData(self._model.viz_model or "")
         self._cb_vizmodel.setCurrentIndex(idx if idx >= 0 else 0)
-        form.addRow("3D-Modell:", self._cb_vizmodel)
         self._spin_power = QSpinBox()
         self._spin_power.setRange(0, 5000)
         self._spin_power.setSuffix(" W")
         self._spin_power.setValue(self._model.power_w)
-        form.addRow("Leistung:", self._spin_power)
         self._edit_notes = QLineEdit(self._model.notes)
-        form.addRow("Notizen:", self._edit_notes)
-
-        import_row = QHBoxLayout()
         b_import = QPushButton("QLC+ (.qxf) importieren…")
         b_import.setToolTip("Vorhandene QLC+-Definition als Startpunkt laden.")
         b_import.clicked.connect(self._import_qxf)
-        import_row.addWidget(b_import)
-        import_row.addStretch(1)
-        form.addRow("", _wrap(import_row))
+        felder = [("Hersteller:", self._edit_mfr, "Modell:", self._edit_model),
+                  ("Kurzname:", self._edit_short, "Typ:", self._cb_type),
+                  ("3D-Modell:", self._cb_vizmodel, "Leistung:", self._spin_power)]
+        for r, (l1, w1, l2, w2) in enumerate(felder):
+            grid.addWidget(QLabel(l1), r, 0)
+            grid.addWidget(w1, r, 1)
+            grid.addWidget(QLabel(l2), r, 2)
+            grid.addWidget(w2, r, 3)
+        grid.addWidget(QLabel("Notizen:"), 3, 0)
+        grid.addWidget(self._edit_notes, 3, 1, 1, 2)
+        grid.addWidget(b_import, 3, 3)
+        grid.setColumnStretch(1, 1)
+        grid.setColumnStretch(3, 1)
         root.addWidget(head)
 
         # Modi
@@ -1359,15 +1448,16 @@ class FixtureGeneratorDialog(QDialog):
         mbl.addLayout(mrow)
         root.addWidget(modes_box, 1)
 
-        # Validierungs-Hinweise
+        # Validierungs-Hinweise und Live-Test NEBENEINANDER (FM-70: unter-
+        # einander kosteten sie ~250 px Hoehe, die der Kanaltabelle fehlten).
+        unten = QHBoxLayout()
         self._issues = QTextEdit()
         self._issues.setReadOnly(True)
-        self._issues.setMaximumHeight(96)
-        root.addWidget(self._issues)
-
-        # Live-Test
+        self._issues.setMaximumHeight(150)
+        unten.addWidget(self._issues, 1)
         self._live = _LiveTestPanel(self)
-        root.addWidget(self._live)
+        unten.addWidget(self._live, 1)
+        root.addLayout(unten)
 
         # Buttons
         btns = QHBoxLayout()
@@ -1444,11 +1534,24 @@ class FixtureGeneratorDialog(QDialog):
         while self._tabs.count():
             self._tabs.removeTab(0)
         for mode in self._model.modes:
-            tab = _ModeTab(mode)
-            self._tabs.addTab(tab, mode.name)
+            self._tab_dazu(_ModeTab(mode))
         if self._tabs.count() == 0:
             self._model.modes.append(GenMode("Default", [GenChannel("Dimmer", "intensity", 0, 255)]))
-            self._tabs.addTab(_ModeTab(self._model.modes[0]), "Default")
+            self._tab_dazu(_ModeTab(self._model.modes[0]))
+
+    def _tab_dazu(self, tab: "_ModeTab"):
+        """Modus-Reiter anlegen. DOC-65: das Feld „Modus-Name“ benennt auch den
+        Reiter um — vorher blieb dort „Default“ stehen, umbenennen ging nur
+        ueber „Modus umbenennen“."""
+        self._tabs.addTab(tab, tab.mode.name)
+        tab._edit_name.editingFinished.connect(
+            lambda t=tab: self._reiter_benennen(t))
+        return tab
+
+    def _reiter_benennen(self, tab: "_ModeTab"):
+        i = self._tabs.indexOf(tab)
+        if i >= 0:
+            self._tabs.setTabText(i, tab.mode.name)
 
     # ── Modus-Verwaltung ─────────────────────────────────────────────────
     def _add_mode(self):
@@ -1459,8 +1562,7 @@ class FixtureGeneratorDialog(QDialog):
             i += 1
         mode = GenMode(f"Modus {i}", [GenChannel("Kanal 1")])
         self._model.modes.append(mode)
-        tab = _ModeTab(mode)
-        self._tabs.addTab(tab, mode.name)
+        tab = self._tab_dazu(_ModeTab(mode))
         self._tabs.setCurrentWidget(tab)
         self._revalidate()
 
@@ -1523,16 +1625,21 @@ class FixtureGeneratorDialog(QDialog):
         self._sync_all()
         self._update_viz_suggestion()
         issues = validate_model(self._model)
-        if not issues:
-            self._issues.setHtml(
-                "<span style='color:#3fb950;'>Keine Hinweise — Profil sieht "
-                "konsistent aus.</span>")
-            return
+        # LAS-26: bei Lasern sagen, worueber LightOS ihn dunkel schaltet.
+        try:
+            laser = laser_sicherheit_text(self._model)
+        except Exception:
+            laser = ""
         rows = []
+        if not issues:
+            rows.append("<span style='color:#3fb950;'>Keine Hinweise — Profil "
+                        "sieht konsistent aus.</span>")
         for sev, text in issues:
             color = "#f85149" if sev == "error" else "#d29922"
             tag = "FEHLER" if sev == "error" else "Hinweis"
             rows.append(f"<span style='color:{color};'>[{tag}]</span> {text}")
+        if laser:
+            rows.append(f"<span style='color:#3fb950;'>{laser}</span>")
         self._issues.setHtml("<br>".join(rows))
 
     # ── Import / Export ──────────────────────────────────────────────────
