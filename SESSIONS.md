@@ -56,6 +56,7 @@
 | FM-66 | D | - | 2026-10-10T09:41Z | - |
 | DOC-70 | D | docs/doc70-netzwerk-windows | 2026-10-10T09:41Z | - |
 | VIZ-98 | D | fix/viz98-bodenfleck-ueber-horizont | 2026-10-10T10:01Z | src/ui/visualizer/scene_src/fixtures/builders.js |
+| STAB-33 | A | fix/stab33-diagnose-windows | 2026-10-10T10:17Z | src/core/diagnose_log.py · main.py |
 
 ## Blocker & Fallen
 
@@ -139,7 +140,6 @@
 
 ## Verlauf
 
-- 2026-10-10T09:27Z C uebergeben DOC-47
 - 2026-10-10T09:27Z C uebergeben DOC-48
 - 2026-10-10T09:27Z C uebergeben DOC-49
 - 2026-10-10T09:28Z C uebergeben DOC-50
@@ -169,3 +169,4 @@
 - 2026-10-10T09:41Z D claim DOC-70
 - 2026-10-10T09:58Z D done BPM-28
 - 2026-10-10T10:01Z D claim VIZ-98
+- 2026-10-10T10:17Z A claim STAB-33
