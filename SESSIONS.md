@@ -12,7 +12,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| DOC-25 | C | - | 2026-10-02T10:23Z | docs/anleitung_szenen_cues/ANLEITUNG.en.md · docs/anleitung_szenen_cues/ANLEITUNG.md · docs/ANLEITUNGEN.md · changelog.d/2026-10-02-DOC-25.md |
 | DOC-26 | C | - | 2026-10-02T10:24Z | docs/anleitung_vc_widgets/*.en.md · docs/anleitung_vc_widgets/README.md · docs/ANLEITUNGEN.md · changelog.d/2026-10-02-DOC-26.md |
 | ENG-29 | C | - | 2026-10-02T10:33Z | BACKLOG.md · docs/befunde/eng29_drive_intensity.md |
 | DOC-27 | C | - | 2026-10-02T10:36Z | docs/anleitung_ausgabe_einrichten/ANLEITUNG.en.md · docs/anleitung_ausgabe_einrichten/ANLEITUNG.md · docs/ANLEITUNGEN.md · changelog.d/2026-10-02-DOC-27.md |
@@ -154,7 +153,6 @@
 
 ## Verlauf
 
-- 2026-10-09T13:45Z 21 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-09T13:45Z A claim VCB-41
 - 2026-10-09T13:45Z A claim TOOL-25
 - 2026-10-09T13:45Z D claim VIZ-97
@@ -184,3 +182,4 @@
 - 2026-10-10T09:26Z C uebergeben DOC-14
 - 2026-10-10T09:26Z C uebergeben DOC-23
 - 2026-10-10T09:26Z C uebergeben DOC-24
+- 2026-10-10T09:26Z C uebergeben DOC-25
