@@ -264,7 +264,7 @@ def _lade_tafel() -> dict:
 # ── Alles ab hier redet mit gh ───────────────────────────────────────────────
 
 def _gh(*args: str) -> str:
-    p = subprocess.run(("gh",) + args, capture_output=True, text=True, encoding="utf-8")
+    p = subprocess.run(("gh",) + args, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if p.returncode != 0:
         raise SystemExit(f"gh fehlgeschlagen: {' '.join(args)}\n{p.stderr.strip()}")
     return p.stdout.strip()

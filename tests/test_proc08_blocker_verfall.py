@@ -104,7 +104,7 @@ class VerfallsRegelTest(unittest.TestCase):
 
 
 def _git(*args, repo=None):
-    r = subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True)
+    r = subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True, encoding="utf-8", errors="replace")
     assert r.returncode == 0, f"git {' '.join(args)}: {r.stderr}"
     return r.stdout.strip()
 

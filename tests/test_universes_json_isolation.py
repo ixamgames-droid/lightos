@@ -75,7 +75,7 @@ class UniversesJsonIsolationTest(unittest.TestCase):
                   if os.path.exists(_ECHT) else None)
         subprocess.run(
             [sys.executable, "-m", "pytest", "-q", opfer],
-            cwd=_REPO, capture_output=True, text=True, timeout=600,
+            cwd=_REPO, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600,
             # Der Angriff: die Variable zeigt auf die ECHTE Datei.
             env=dict(os.environ, QT_QPA_PLATFORM="offscreen",
                      LIGHTOS_UNIVERSES_JSON=_ECHT))
@@ -136,7 +136,7 @@ class UniversesJsonIsolationTest(unittest.TestCase):
 
         r = subprocess.run(
             [sys.executable, "-m", "pytest", "-q", opfer],
-            cwd=_REPO, capture_output=True, text=True, timeout=600,
+            cwd=_REPO, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600,
             env=dict(os.environ, QT_QPA_PLATFORM="offscreen"))
 
         if not vorher_da:

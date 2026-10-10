@@ -157,7 +157,7 @@ class HeadlessGeneratorFullPatchTest(unittest.TestCase):
 
         proc = subprocess.run(
             [py, str(TOOLS / self.GENERATOR)],
-            cwd=str(ROOT), env=env, capture_output=True, text=True, timeout=300,
+            cwd=str(ROOT), env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300,
         )
         self.assertEqual(
             proc.returncode, 0,
@@ -182,7 +182,7 @@ class HeadlessGeneratorFullPatchTest(unittest.TestCase):
         )
         load_proc = subprocess.run(
             [py, "-c", loader], cwd=str(ROOT), env=env,
-            capture_output=True, text=True, timeout=300,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300,
         )
         self.assertEqual(
             load_proc.returncode, 0,

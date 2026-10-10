@@ -550,7 +550,7 @@ class HintergrundGebrochenerDprTest(unittest.TestCase):
                    QT_ENABLE_HIGHDPI_SCALING="1")
         env.pop("QT_SCREEN_SCALE_FACTORS", None)
         out = subprocess.run([sys.executable, "-c", _DPR_SKRIPT], cwd=repo, env=env,
-                             capture_output=True, text=True, timeout=120)
+                             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
         zeile = [z for z in out.stdout.splitlines() if z.startswith("ERGEBNIS")]
         self.assertTrue(zeile, out.stdout[-2000:] + out.stderr[-2000:])
         _, dpr, w, h, innen, schwarz = zeile[0].split()

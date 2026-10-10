@@ -170,7 +170,7 @@ class BeideVariablenTest(unittest.TestCase):
                 "print('APPDATA=' + conftest._TEST_APPDATA)\n"
                 "print('XDG=' + conftest._TEST_XDG)\n")
         fertig = subprocess.run([sys.executable, "-c", code], cwd=_REPO,
-                                capture_output=True, text=True, timeout=300,
+                                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300,
                                 env=env)
         self.assertEqual(
             0, fertig.returncode,
@@ -253,7 +253,7 @@ class AufraeumenTest(unittest.TestCase):
         fertig = subprocess.run(
             [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider",
              "-p", "qa73_melder", "tests/test_address_suggest.py"],
-            cwd=_REPO, capture_output=True, text=True, timeout=300, env=env)
+            cwd=_REPO, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300, env=env)
         self.assertEqual(0, fertig.returncode,
                          "das Kind-Segment lief nicht durch:\n"
                          f"{(fertig.stdout + fertig.stderr)[-2000:]}")

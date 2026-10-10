@@ -181,7 +181,7 @@ def test_generator_baut_in_sandbox_lint_sauber_und_laser_bewegen_nach_dem_laden(
     skript.write_text(_PROBE, encoding="utf-8")
     env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
     lauf = subprocess.run([sys.executable, "-I", str(skript), _REPO, basis], env=env,
-                          capture_output=True, text=True, timeout=900, cwd=basis)
+                          capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=900, cwd=basis)
     zeile = [z for z in lauf.stdout.splitlines() if z.startswith("ERGEBNIS ")]
     assert zeile, (lauf.stdout[-2000:], lauf.stderr[-2000:])
     erg = json.loads(zeile[-1][len("ERGEBNIS "):])

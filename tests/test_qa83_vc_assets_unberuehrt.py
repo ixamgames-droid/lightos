@@ -120,7 +120,7 @@ class GeneratorCacheTest(unittest.TestCase):
         env.pop("LIGHTOS_VC_ASSETS_DIR", None)
         r = subprocess.run(
             [sys.executable, "-c", _GENERATOR_PROBE, os.path.join(REPO, "tools"), REPO],
-            capture_output=True, text=True, timeout=60, cwd=REPO, env=env)
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60, cwd=REPO, env=env)
         self.assertEqual(0, r.returncode, r.stderr[-2000:])
         zeile = next(z for z in r.stdout.splitlines() if z.startswith("CACHE "))
         cache = _real(zeile[len("CACHE "):])
@@ -130,7 +130,7 @@ class GeneratorCacheTest(unittest.TestCase):
         eigen = os.path.join(echt, "eigener_cache")
         r = subprocess.run(
             [sys.executable, "-c", _GENERATOR_PROBE, os.path.join(REPO, "tools"), REPO],
-            capture_output=True, text=True, timeout=60, cwd=REPO,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60, cwd=REPO,
             env=dict(env, LIGHTOS_VC_ASSETS_DIR=eigen))
         self.assertEqual(0, r.returncode, r.stderr[-2000:])
         self.assertIn(f"CACHE {eigen}", r.stdout)

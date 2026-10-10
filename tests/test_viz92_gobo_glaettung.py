@@ -64,7 +64,7 @@ def _fahre(schritte, kreis=False):
         with open(os.path.join(verz, "treiber.mjs"), "w", encoding="utf-8") as fh:
             fh.write(_TREIBER % (json.dumps(schritte), "true" if kreis else "false"))
         out = subprocess.run(["node", os.path.join(verz, "treiber.mjs")],
-                             capture_output=True, text=True, timeout=30)
+                             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
     if out.returncode != 0:
         raise AssertionError(out.stderr)
     return json.loads(out.stdout)
@@ -175,7 +175,7 @@ def _deckel(bild_ms, update_ms, dauer=1000.0, deckel_ms=1000 / 60 - 2):
         with open(os.path.join(verz, "treiber.mjs"), "w", encoding="utf-8") as fh:
             fh.write(_DECKEL_TREIBER % json.dumps([bild_ms, update_ms, dauer, deckel_ms]))
         out = subprocess.run(["node", os.path.join(verz, "treiber.mjs")],
-                             capture_output=True, text=True, timeout=30)
+                             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
     if out.returncode != 0:
         raise AssertionError(out.stderr)
     return json.loads(out.stdout)

@@ -163,7 +163,7 @@ class GefrorenEndeZuEndeTest(unittest.TestCase):
         env.pop("LIGHTOS_BIBLIOTHEK_DIR", None)
         r = subprocess.run([sys.executable, "-c", _PROBE_GEFROREN, cls.bundle, _REPO],
                            cwd=cls._tmp.name, env=env, capture_output=True,
-                           text=True, timeout=120)
+                           text=True, encoding="utf-8", errors="replace", timeout=120)
         if r.returncode != 0:
             raise AssertionError(f"Probe gescheitert:\n{r.stdout}\n{r.stderr}")
         cls.erg = json.loads(r.stdout.strip().splitlines()[-1])
@@ -293,7 +293,7 @@ class SelbsttestTest(unittest.TestCase):
             env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
             r = subprocess.run([sys.executable, os.path.join(_REPO, "main.py"),
                                 "--selbsttest", bericht],
-                               cwd=d, env=env, capture_output=True, text=True,
+                               cwd=d, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace",
                                timeout=180)
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
             with open(bericht, encoding="utf-8") as f:

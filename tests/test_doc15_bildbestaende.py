@@ -50,7 +50,7 @@ CAPTURE_LESER = {
 
 def _verfolgt(pfad):
     aus = subprocess.run(["git", "ls-files", pfad], cwd=REPO,
-                         capture_output=True, text=True)
+                         capture_output=True, text=True, encoding="utf-8", errors="replace")
     if aus.returncode != 0:
         raise unittest.SkipTest("kein git-Arbeitsbaum")
     return [z for z in aus.stdout.splitlines() if z]

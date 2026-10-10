@@ -131,7 +131,7 @@ class ShowArgumentTest(unittest.TestCase):
         import sys
         aus = subprocess.run(
             [sys.executable, "main.py", "--help"],
-            capture_output=True, text=True, timeout=120,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120,
             cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         self.assertIn("--show", aus.stdout)
 
@@ -142,7 +142,7 @@ class ShowArgumentTest(unittest.TestCase):
         import sys
         aus = subprocess.run(
             [sys.executable, "main.py", "--show", "gibtesnicht.lshow"],
-            capture_output=True, text=True, timeout=120,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120,
             cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         self.assertNotEqual(aus.returncode, 0)
         self.assertIn("nicht gefunden", aus.stderr)

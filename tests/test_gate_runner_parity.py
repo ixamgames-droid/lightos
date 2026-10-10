@@ -67,7 +67,7 @@ def _git_index_mode(rel_path: str) -> str | None:
     """
     try:
         erg = subprocess.run(["git", "ls-files", "-s", "--", rel_path],
-                             cwd=_REPO_ROOT, capture_output=True, text=True,
+                             cwd=_REPO_ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace",
                              timeout=30)
     except (OSError, subprocess.SubprocessError):
         return None

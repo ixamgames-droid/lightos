@@ -82,7 +82,7 @@ def _entscheide(faelle):
         with open(os.path.join(verz, "treiber.mjs"), "w", encoding="utf-8") as fh:
             fh.write(_TREIBER % json.dumps(faelle))
         p = subprocess.run(["node", os.path.join(verz, "treiber.mjs")],
-                           capture_output=True, text=True, timeout=60)
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
         if p.returncode != 0:               # pragma: no cover
             raise AssertionError(p.stderr)
         return json.loads(p.stdout.strip())

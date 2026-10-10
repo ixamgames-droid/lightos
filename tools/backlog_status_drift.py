@@ -215,7 +215,7 @@ def spur_urteil(klasse: str, auf_main: bool) -> str | None:
 # ── Der Griff nach dem echten Repo (in der CI nicht verfuegbar) ──────────────
 
 def _git(*args: str) -> tuple[int, str]:
-    p = subprocess.run(("git",) + args, cwd=REPO, capture_output=True, text=True, encoding="utf-8")
+    p = subprocess.run(("git",) + args, cwd=REPO, capture_output=True, text=True, encoding="utf-8", errors="replace")
     return p.returncode, p.stdout
 
 
