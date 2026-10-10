@@ -587,6 +587,10 @@ class MainWindow(QMainWindow):
         fm.addMenu(self._recent_menu)
         self._rebuild_recent_menu()
 
+        # STAB-32: versionierte Sicherungen
+        a = fm.addAction("Ältere Version öffnen…")
+        a.triggered.connect(self._aeltere_version_oeffnen)
+
         # XML-Workspace Import
         fm.addSeparator()
         a = fm.addAction("XML-Workspace importieren...")
@@ -1954,10 +1958,15 @@ class MainWindow(QMainWindow):
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
             if reply != QMessageBox.StandardButton.Yes:
                 return
+            # STAB-32: ohne Speichern-Frage (headless) verwirft „Ja" auch
+            # ungespeicherte Aenderungen.
+            if self._has_unsaved_changes():
+                self._sicherung_vor_verwerfen()
         from src.core.show.show_file import reset_show
         reset_show()
         self._current_show_path = None
         self._aus_auto_save = False
+        self._sicherung_herkunft = None
         self.setWindowTitle("LightOS")
         self._sync_render_toggles()
         self._show_stand_merken()
@@ -1980,14 +1989,33 @@ class MainWindow(QMainWindow):
             if not self._rueckfrage_ungespeichert(
                     "Show öffnen", "Vor dem Öffnen der anderen Show speichern?"):
                 return
+        elif self._has_unsaved_changes():
+            self._sicherung_vor_verwerfen()      # STAB-32: headless ohne Frage
         self._open_show_path(path)
 
-    def _open_show_path(self, path: str, wiederherstellung: bool = False):
+    def _open_show_path(self, path: str, wiederherstellung: bool = False,
+                        sicherung=None):
         """Show laden. ``wiederherstellung``: ``path`` ist die Auto-Save-Datei
-        (Absturz-Wiederherstellung beim Start) — siehe unten."""
+        (Absturz-Wiederherstellung beim Start) — siehe unten. ``sicherung``
+        (STAB-32): ``path`` ist eine versionierte Sicherung und oeffnet sich
+        als NEUE ungespeicherte Show."""
         from src.core.show.show_file import load_show, letzte_ladeprobleme
         ok, msg = load_show(path)
-        if ok and wiederherstellung:
+        if ok and sicherung is not None:
+            # Wie die Absturz-Wiederherstellung: der Stand steht in keiner
+            # Show-Datei des Nutzers. Kein Pfad (Speichern = „Speichern
+            # unter" — weder das Original noch die Sicherung wird
+            # ueberschrieben), nicht in die Zuletzt-Liste, als ungespeichert
+            # markiert. Der Show-Name bleibt fuer weitere Sicherungen erhalten.
+            self._current_show_path = None
+            self._aus_auto_save = True
+            self._sicherung_herkunft = sicherung.show
+            self.setWindowTitle(
+                f"LightOS  -  {sicherung.show} (Sicherung vom {sicherung.zeit_text})")
+            self.statusBar().showMessage(
+                "Ältere Version geöffnet — zum Behalten speichern", 6000)
+            self._sync_render_toggles()
+        elif ok and wiederherstellung:
             # UI-69-Korrektur: der wiederhergestellte Stand steht NUR im
             # Auto-Save, in keiner Show-Datei des Nutzers. Galt er als „geoeffnet
             # aus auto_save.lshow", fragte Beenden nicht, und Strg+S schrieb in
@@ -1999,6 +2027,7 @@ class MainWindow(QMainWindow):
             # Eintrag der Zuletzt-Liste) koennte eine fremde Show ueberschreiben.
             self._current_show_path = None
             self._aus_auto_save = True
+            self._sicherung_herkunft = None
             self.setWindowTitle("LightOS  -  wiederhergestellt (nicht gespeichert)")
             self.statusBar().showMessage(
                 "Auto-Save wiederhergestellt — bitte speichern", 6000)
@@ -2006,6 +2035,7 @@ class MainWindow(QMainWindow):
         elif ok:
             self._current_show_path = path
             self._aus_auto_save = False
+            self._sicherung_herkunft = None
             self.setWindowTitle(f"LightOS  -  {msg}")
             self.statusBar().showMessage(msg, 4000)
             self._show_stand_merken(nachlaufend=True)   # UI-69: Laden ist keine Aenderung
@@ -2260,6 +2290,9 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 print(f"[main_window] collect_layout error: {e}")
                 verloren.append(f"Fensterlayout ({e})")
+            # STAB-32: den Stand, der gleich ueberschrieben wird, als Version
+            # aufheben (kehrt sofort zurueck, Fehler nur im Log).
+            self._sicherung_vor_ueberschreiben(path)
             save_show(path, layout=layout)
             # STAB-24 (c): was save_show selbst nicht einsammeln konnte (z. B. eine
             # unlesbare Fixture-Gruppe) gehoert in DIESELBE Lueckenliste.
@@ -2292,6 +2325,7 @@ class MainWindow(QMainWindow):
         # die fehlenden Teile kann ein erneutes Speichern nicht retten, eine
         # Speichern-Frage beim Beenden waere dafuer der falsche Hinweis.
         self._aus_auto_save = False
+        self._sicherung_herkunft = None
         try:
             from src.core.show.show_file import merke_show_stand
             merke_show_stand(self._state)
@@ -2930,6 +2964,77 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(f"Auto-Save: {path}", 2500)
         except Exception as e:
             print(f"[autosave] save error: {e}")
+            return
+        # STAB-32: denselben Stand zusaetzlich als Version aufheben. Die
+        # Auto-Save-Datei selbst bleibt der Absturz-Wiederherstellungsweg.
+        try:
+            from src.core.show import sicherungen
+            sicherungen.sichere_datei(path, self._sicherungs_name(),
+                                      sicherungen.ANLASS_AUTO)
+        except Exception as e:
+            print(f"[autosave] sicherung error: {e}")
+
+    # ── Versionierte Sicherungen (STAB-32) ───────────────────────────────────
+
+    def _sicherungs_name(self) -> str:
+        """Unter welchem Show-Namen die Sicherungen der offenen Show liegen."""
+        from src.core.show import sicherungen
+        if self._current_show_path:
+            return sicherungen.show_name_aus_pfad(self._current_show_path)
+        return getattr(self, "_sicherung_herkunft", None) or sicherungen.UNBENANNT
+
+    def _sicherung_vor_ueberschreiben(self, path: str):
+        """Vor einem manuellen Speichern ueber eine vorhandene Datei."""
+        try:
+            from src.core.show import sicherungen
+            if os.path.isfile(path):
+                sicherungen.sichere_datei(
+                    path, sicherungen.show_name_aus_pfad(path),
+                    sicherungen.ANLASS_VOR_SPEICHERN)
+        except Exception as e:
+            print(f"[main_window] sicherung vor speichern error: {e}")
+
+    def _sicherung_vor_verwerfen(self):
+        """Ungespeicherte Aenderungen werden gleich verworfen (Neue Show, Show
+        laden, Beenden): den Stand vorher als Version ablegen. Er steht in
+        keiner Datei, also wird er hier einmal geschrieben."""
+        try:
+            from src.core.show import sicherungen
+            from src.core.show.show_file import save_show
+            try:
+                self._views_in_state()          # VC-Layout usw. wie beim Speichern
+            except Exception as e:
+                print(f"[main_window] sicherung views error: {e}")
+            sicherungen.sichere_stand(save_show, self._sicherungs_name(),
+                                      sicherungen.ANLASS_VOR_VERWERFEN)
+        except Exception as e:
+            print(f"[main_window] sicherung vor verwerfen error: {e}")
+
+    def _aeltere_version_oeffnen(self):
+        """Datei → „Ältere Version öffnen…"."""
+        from PySide6.QtWidgets import QDialog
+        from src.ui.widgets.sicherungen_dialog import SicherungenDialog
+        dlg = SicherungenDialog(self._sicherungs_name(), self)
+        try:
+            if dlg.exec() != QDialog.DialogCode.Accepted:
+                return
+            wahl = dlg.auswahl()
+        finally:
+            dlg.deleteLater()
+        if wahl is not None:
+            self._oeffne_sicherung(wahl)
+
+    def _oeffne_sicherung(self, sicherung):
+        """Eine Sicherung als NEUE ungespeicherte Show oeffnen. Die offene Show
+        wird dabei ersetzt — ungespeicherte Aenderungen vorher anbieten."""
+        if self._has_unsaved_changes() and not _exit_prompt_suppressed():
+            if not self._rueckfrage_ungespeichert(
+                    "Ältere Version öffnen",
+                    "Vor dem Öffnen der älteren Version speichern?"):
+                return
+        elif self._has_unsaved_changes():
+            self._sicherung_vor_verwerfen()
+        self._open_show_path(sicherung.pfad, sicherung=sicherung)
 
     def _check_autosave_recovery(self):
         """Wenn auto_save existiert und neuer als andere Show ist - Recovery anbieten."""
@@ -3027,6 +3132,13 @@ class MainWindow(QMainWindow):
             get_visualizer_service(self._state).shutdown()
         except Exception as e:
             print(f"[MainWindow] visualizer service shutdown error: {e}")
+        # STAB-32: laufende Sicherungs-Kopien kurz zu Ende bringen (ein Rest
+        # wird sonst beim naechsten Aufraeumen fertiggestellt).
+        try:
+            from src.core.show import sicherungen
+            sicherungen.warte_bis_fertig(2.0)
+        except Exception:
+            pass
         super().closeEvent(event)
 
     def _has_unsaved_changes(self) -> bool:
@@ -3083,7 +3195,10 @@ class MainWindow(QMainWindow):
         (gespeichert oder bewusst verworfen), False = abbrechen — auch wenn
         das Speichern scheitert oder „Speichern unter" abgebrochen wird; sonst
         ginge die Arbeit genau in dem Fall verloren, vor dem gefragt wurde."""
-        if getattr(self, "_aus_auto_save", False):
+        if getattr(self, "_sicherung_herkunft", None):
+            text = ("Die Show wurde aus einer Sicherung geöffnet und noch "
+                    "nicht gespeichert.")
+        elif getattr(self, "_aus_auto_save", False):
             text = ("Die Show wurde aus dem Auto-Save wiederhergestellt und "
                     "noch nicht gespeichert.")
         elif self._current_show_path is None:
@@ -3102,6 +3217,8 @@ class MainWindow(QMainWindow):
             return False
         if reply == QMessageBox.StandardButton.Save:
             return bool(self._save_show())
+        # STAB-32: „Verwerfen" — den Stand vorher als Version aufheben.
+        self._sicherung_vor_verwerfen()
         return True
 
 

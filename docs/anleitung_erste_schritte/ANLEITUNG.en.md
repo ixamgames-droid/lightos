@@ -226,6 +226,21 @@ briefly in the status bar (`Gespeichert: …` = saved).
 newer than the show you saved last — for example after a crash — LightOS offers to
 restore it.
 
+**Older versions.** In addition, LightOS keeps several states of every show in the
+`sicherungen` (backups) folder inside the LightOS data folder: on every auto-save, before
+every save that overwrites an existing file, and before you discard unsaved changes (new
+show, opening another show, quitting). **Datei → Ältere Version öffnen…** (open older
+version) lists the backups of the current show with date, time, reason, size and the
+number of fixtures and functions; tick **Sicherungen aller Shows anzeigen** (show backups
+of all shows) to see the others as well. **Öffnen** (open) loads the selected version as
+a new, unsaved show — the window title then reads `Name (Sicherung vom …)`. Your show
+file and the backup stay untouched; the old version is only kept once you store it with
+*Speichern unter...*.
+
+Per show LightOS keeps the last 10 backups, plus one per hour of the last 24 hours and
+one per day of the last 14 days. If the folder grows beyond 500 MB, the oldest are
+deleted first.
+
 **Quitting with unsaved changes.** If you changed anything in the content of the show
 since the last save or open — patch, cue lists, functions, VC layout and so on — LightOS
 asks when you quit. In the picture a cue list was created:
