@@ -132,3 +132,8 @@ tools/data/
 
 # Temp-Seiten, die Szenen-Tests kurz in scene_src anlegen (nie einchecken)
 src/ui/visualizer/scene_src/**/_*_tmp.html
+
+# ── Build-Info (STAB-33) ────────────────────────────────────────────────────
+# Erzeugt packaging/windows/build_info.py vor dem PyInstaller-Lauf (Commit +
+# Datum fuers Bundle). Nie einchecken — der Stand waere sofort veraltet.
+/build_info.json
