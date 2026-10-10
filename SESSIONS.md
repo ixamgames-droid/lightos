@@ -34,7 +34,6 @@
 | XPLAT-49 | A | fix/xplat49-uninstall-datenschutz | 2026-10-10T09:29Z | uninstall.py |
 | XPLAT-50 | A | fix/xplat49-uninstall-datenschutz | 2026-10-10T09:29Z | start.bat · start.ps1 |
 | FM-67 | A | fix/fm67-gleichnamige-modi | 2026-10-10T09:29Z | - |
-| UI-85 | A | feature/ui85-hilfe-menue | 2026-10-10T09:29Z | - |
 | DOC-69 | A | docs/doc69-doku-korrekturen | 2026-10-10T09:29Z | - |
 | STAB-32 | A | feature/stab32-versionierte-sicherungen | 2026-10-10T09:29Z | - |
 | OUT-67 | A | feature/out67-ausgabe-ausfall-banner | 2026-10-10T09:29Z | - |
@@ -182,7 +181,6 @@
 
 ## Verlauf
 
-- 2026-10-10T12:55Z A done TOOL-25
 - 2026-10-10T12:55Z B claim TOOL-26
 - 2026-10-10T12:55Z B claim VIZ-99
 - 2026-10-10T12:55Z B claim XPLAT-51
@@ -212,3 +210,4 @@
 - 2026-10-10T15:48Z B done XPLAT-46
 - 2026-10-10T16:51Z A done FM-68
 - 2026-10-10T17:17Z A done STAB-33
+- 2026-10-10T17:40Z A done UI-85
