@@ -43,7 +43,7 @@
 | FM-66 | D | fix/fm66-abgleich-modellname | 2026-10-10T18:52Z | src/core/database/bibliothek_format.py · tests/test_fm66_abgleich_modellname.py · docs/FIXTURE_LIBRARY.md |
 | DOC-70 | D | docs/doc70-netzwerk-windows | 2026-10-10T18:52Z | docs/anleitung_netzwerk_windows/ANLEITUNG.md · docs/ANLEITUNGEN.md · tests/test_doc70_netzwerk_windows.py |
 | FM-73 | A | fix/fm73-sync-gleichnamige-modi | 2026-10-10T18:44Z | - |
-| PROC-19 | A | ci/proc19-doku-schnellweg | 2026-10-10T11:47Z | .github/workflows/ci.yml |
+| PROC-19 | A | ci/proc19-doku-schnellweg | 2026-10-10T18:57Z | .github/workflows/ci.yml |
 | PROC-20 | A | feature/proc20-backlog-fragmente | 2026-10-10T18:45Z | tools · BACKLOG.md |
 | TOOL-26 | B | feature/tool26-app-messwerkzeug | 2026-10-10T13:25Z | tools/app_messung.py · tools/README.md · tests/test_tool26_app_messung.py · BACKLOG.md · changelog.d/2026-10-10-TOOL-26.md |
 | VIZ-99 | B | fix/viz99-automatik-snapdragon | 2026-10-10T14:09Z | src/ui/visualizer/scene_src/scene/gpu_tier.js · tests/test_viz84_gpu_tier.py · tests/test_viz99_automatik_snapdragon.py · src/ui/visualizer/visualizer_window.py · BACKLOG.md · changelog.d/2026-10-10-VIZ-99.md |
