@@ -12,7 +12,7 @@ Doku-/Backlog-/Privatsphaere-Gates aus ``tools/doku_gates.txt``.
 Was als Doku zaehlt (alles andere ist ``voll``):
 
 * ``*.md`` direkt im Repo-Wurzelverzeichnis (README, BACKLOG*, WORKFLOW ...),
-* ``changelog.d/*.md``,
+* ``changelog.d/*.md`` und ``backlog.d/*.md`` (Fragmente, PROC-09/PROC-20),
 * unter ``docs/``: Markdown und Bilder (``.md .png .jpg .jpeg .gif .webp .svg``).
 
 Bewusst NICHT Doku: jede ``.md`` ausserhalb davon (``tools/README.md`` ist
@@ -61,6 +61,12 @@ GATES_DATEI = os.path.join(REPO, "tools", "doku_gates.txt")
 #: Was unter ``docs/`` als Doku gilt. Skripte und JSON bewusst nicht.
 DOCS_ENDUNGEN = frozenset({".md", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"})
 
+#: Fragment-Ordner: nur ``<ordner>/<datei>.md``, keine Unterordner. ``backlog.d``
+#: (PROC-20) steht hier, damit ein reiner Backlog-PR — ein neues Fragment oder
+#: der Sammel-PR, der Fragmente loescht und BACKLOG.md schreibt — den kurzen
+#: Weg nimmt. Seine Gates (``test_backlog_*``, ``test_doc_links``) laufen dort.
+FRAGMENT_ORDNER = frozenset({"changelog.d", "backlog.d"})
+
 
 def ist_doku(pfad: str) -> bool:
     """``True`` nur fuer einen sauberen, repo-relativen Doku-Pfad."""
@@ -74,7 +80,7 @@ def ist_doku(pfad: str) -> bool:
     endung = os.path.splitext(teile[-1])[1].lower()
     if len(teile) == 1:
         return endung == ".md"
-    if teile[0] == "changelog.d":
+    if teile[0] in FRAGMENT_ORDNER:
         return len(teile) == 2 and endung == ".md"
     if teile[0] == "docs":
         return endung in DOCS_ENDUNGEN

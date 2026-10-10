@@ -53,6 +53,8 @@ DOKU_PFADE = (
     "THIRD_PARTY_NOTICES.md",
     "changelog.d/2026-10-10-PROC-19.md",
     "changelog.d/README.md",
+    "backlog.d/PROC-20.md",          # PROC-20: Backlog-Fragmente
+    "backlog.d/README.md",
     "docs/ANLEITUNGEN.md",
     "docs/anleitung_efx/ANLEITUNG.md",
     "docs/anleitung_efx/ANLEITUNG.en.md",
@@ -88,6 +90,10 @@ VOLL_PFADE = (
     "examples/README.md",
     "packaging/windows/LIESMICH.md",
     "changelog.d/unterordner/x.md",
+    "backlog.d/unterordner/x.md",
+    "backlog.d/PROC-20.txt",
+    "backlog.dx/PROC-20.md",
+    "tools/backlog.d/PROC-20.md",
     # Unter docs/, aber keine Doku
     "docs/capability_manifest.json",
     "docs/anleitung_efx/img/bilder.json",
@@ -400,7 +406,7 @@ PFLICHT_GATES = (
 )
 
 _DOKU_NENNUNG = re.compile(
-    r"\.md\b|(^|[\"'/\\ ])docs(/|\\|$)|changelog\.d|BACKLOG")
+    r"\.md\b|(^|[\"'/\\ ])docs(/|\\|$)|changelog\.d|backlog\.d|BACKLOG")
 
 
 def nennt_doku(quelle: str) -> list[str]:
@@ -483,6 +489,7 @@ class GateListeTest(unittest.TestCase):
         self.assertTrue(nennt_doku('p = os.path.join(R, "docs", "a")'))
         self.assertTrue(nennt_doku('p = "BACKLOG.md"'))
         self.assertTrue(nennt_doku('p = R / "changelog.d"'))
+        self.assertTrue(nennt_doku('p = R / "backlog.d"'))
         self.assertFalse(nennt_doku('"""steht in docs/a.md"""\nx = "dock"'))
         self.assertFalse(nennt_doku('def f():\n    """siehe README.md"""\n    return 1'))
 

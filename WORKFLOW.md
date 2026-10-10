@@ -278,8 +278,8 @@ Namen — daran erkennt `tools/pr_bereit.py` die Checks) statt der vollen Suite 
 die Doku-/Backlog-/Privatsphaere-Gates. Das dauert Minuten statt einer halben
 Stunde und haelt die Merge-Warteschlange nicht auf.
 
-* **Was als Doku zaehlt:** `*.md` im Wurzelverzeichnis, `changelog.d/*.md`, und
-  unter `docs/` Markdown und Bilder. Alles andere ist „voll" — auch
+* **Was als Doku zaehlt:** `*.md` im Wurzelverzeichnis, `changelog.d/*.md`,
+  `backlog.d/*.md` (Backlog-Fragmente, PROC-20) und unter `docs/` Markdown und Bilder. Alles andere ist „voll" — auch
   `tools/README.md`, JSON und Skripte unter `docs/`, `tests/`, `tools/`, `.github/`.
   Eine einzige solche Datei im PR genuegt fuer die volle Suite.
 * **Wer entscheidet:** `tools/geaenderte_dateien_klasse.py` gibt `doku` oder `voll`
