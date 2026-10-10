@@ -13,7 +13,6 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | FM-46c | A | feat/fm46-qxf-head | 2026-10-02T11:59Z | - |
-| WEB-06 | C | - | 2026-10-02T12:53Z | BACKLOG.md |
 | DOC-54 | C | - | 2026-10-02T13:02Z | docs/anleitung_speed_bpm/ANLEITUNG_SPEED_BPM.md |
 | DOC-55 | C | - | 2026-10-02T13:04Z | docs/anleitung_einmessen/ANLEITUNG_EINMESSEN.md |
 | DOC-56 | C | - | 2026-10-02T13:05Z | docs/anleitung_web_remote/ANLEITUNG.md |
@@ -122,7 +121,6 @@
 
 ## Verlauf
 
-- 2026-10-10T09:26Z C uebergeben ENG-29
 - 2026-10-10T09:26Z C uebergeben DOC-27
 - 2026-10-10T09:26Z C uebergeben DOC-28
 - 2026-10-10T09:26Z C uebergeben DOC-29
@@ -152,3 +150,4 @@
 - 2026-10-10T09:28Z C uebergeben DOC-53
 - 2026-10-10T09:28Z C uebergeben TOOL-10
 - 2026-10-10T09:28Z C uebergeben VCB-35
+- 2026-10-10T09:28Z C uebergeben WEB-06
