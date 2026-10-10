@@ -23,6 +23,7 @@ FREMD_ORDNER = [
 #: Einzelne fremde Dateien ausserhalb dieser Ordner.
 FREMD_DATEIEN = [
     "src/ui/visualizer/three_local.js",
+    "src/web/static/socket.io.min.js",        # WEB-06
 ]
 
 

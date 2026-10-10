@@ -3,10 +3,12 @@ r"""LightOS Installer.
 Installiert alle Abhaengigkeiten in einer virtuellen Umgebung und legt eine
 Desktop-Verknuepfung sowie Default-Daten an.
 
-Funktioniert auf Windows x64 UND ARM64.
+Funktioniert auf Windows x64 UND ARM64. Auf Windows-ARM ist x64-Python
+(per Emulation) der empfohlene Weg; natives ARM64-Python laeuft ohne
+3D-Visualizer (XPLAT-46).
 
 Usage:
-    python install.py [--no-venv] [--no-shortcut] [--dev]
+    python install.py [--no-venv] [--no-shortcut] [--dev] [--neu-venv]
     py -3.12 install.py ...      (Windows mit mehreren Pythons: Version waehlen)
 
 Was wird installiert/erstellt:
@@ -165,23 +167,132 @@ def detect_native_os_arch() -> str:
     )
 
 
+# XPLAT-46 (Entscheidung 05.10.2026): auf Windows-ARM ist x64-Python der
+# empfohlene Weg. Die nativen win_arm64-Wheels von PySide6-Addons haben kein
+# QtWebEngine (XPLAT-45) - mit ARM64-Python fehlt der 3D-Visualizer.
+X64_PYTHON_BEFEHL = "winget install Python.Python.3.12 --architecture x64"
+# Codex #967: "py -3.12-64" heisst seit Python 3.11 nur "nicht 32-bit" und
+# waehlt bei parallel installiertem ARM64-Python nicht sicher x64. Eindeutig
+# ist der Pfad des x64-Interpreters (Standardort des python.org-/winget-
+# Installers; ARM64 liegt in "Python312-arm64").
+X64_PYTHON_STANDARDPFAD = r"%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
+
+# Zeilen aus "py -0p": " -V:3.12 *   C:\...\python.exe" (py >= 3.11) bzw.
+# " -3.12-64   C:\...\python.exe" (aelterer Launcher).
+_PY_LISTE_ZEILE = re.compile(r"^\s*-(?:V:)?(?P<tag>\S+?)\s+(?:\*\s+)?(?P<pfad>\S.*?\.exe)\s*$",
+                             re.IGNORECASE)
+
+
+def x64_python_aus_liste(ausgabe: str) -> str | None:
+    """Pfad eines x64-Python aus der Ausgabe von ``py -0p`` (oder None).
+
+    Der python.org-Installer registriert x64 als Tag "3.12", ARM64 als
+    "3.12-arm64" und 32-bit als "3.12-32" (aeltere Launcher: "3.12-64").
+    Der Python-Install-Manager (Standard ab 3.14) schreibt den optionalen
+    Zusatz in eckigen Klammern: "3.14[-64]" - gemessen am Windows-ARM-PC,
+    ohne die Klammern zu entfernen fand die Suche dort kein x64-Python."""
+    for zeile in (ausgabe or "").splitlines():
+        m = _PY_LISTE_ZEILE.match(zeile)
+        if not m:
+            continue
+        tag = m.group("tag").lower().split("/")[-1]
+        tag = tag.replace("[", "").replace("]", "")
+        pfad = m.group("pfad").strip()
+        if "arm64" in tag or "arm64" in pfad.lower() or tag.endswith("-32"):
+            continue
+        if re.fullmatch(r"3\.\d+(-64)?", tag):
+            return pfad
+    return None
+
+
+def finde_x64_python() -> str | None:
+    """Sucht per py-Launcher ein installiertes x64-Python (nur Windows)."""
+    if os.name != "nt":
+        return None
+    try:
+        r = subprocess.run(["py", "-0p"], capture_output=True, text=True, timeout=20)
+    except Exception:
+        return None
+    return x64_python_aus_liste((r.stdout or "") + "\n" + (r.stderr or ""))
+
+
+def x64_installer_aufruf(pfad: str | None = None) -> str:
+    """Eindeutiger Befehl, um install.py mit x64-Python neu zu starten; baut
+    ein vorhandenes (ARM64-)venv dabei neu (``--neu-venv``)."""
+    return f'"{pfad or X64_PYTHON_STANDARDPFAD}" install.py --neu-venv'
+
+
 def check_arm_runtime():
-    """Hinweise, wenn auf ARM64 ein emuliertes Python genutzt wird."""
+    """Hinweise zur Python-Architektur auf Windows-ARM (XPLAT-46)."""
     py_arch = detect_arch()
     os_arch = detect_native_os_arch()
     info(f"Python-Architektur: {py_arch} | OS-Architektur: {os_arch}")
-    if os.name == "nt" and os_arch == "arm64" and py_arch != "arm64":
-        warn(
-            "Du bist auf Windows ARM64, aber Python laeuft nicht nativ als ARM64. "
-            "Bitte ARM64-Python installieren, sonst laufen DMX/MIDI/Qt ggf. nur per Emulation."
-        )
-        warn("Empfohlen: winget install Python.Python.3.14 --arch arm64")
-
-
-def create_venv():
-    if VENV_DIR.exists():
-        info(f"venv existiert bereits: {VENV_DIR}")
+    if os.name != "nt" or os_arch != "arm64":
         return
+    if py_arch == "arm64":
+        warn(
+            "Natives ARM64-Python: LightOS laeuft, aber OHNE 3D-Visualizer - "
+            "die ARM64-Pakete von PySide6-Addons enthalten kein QtWebEngine. "
+            "python-rtmidi baut hier nur mit MSVC Build Tools (MIDI geht sonst "
+            "ueber den eingebauten WinMM-Weg)."
+        )
+        warn(f"Empfohlen auf Windows-ARM: x64-Python ({X64_PYTHON_BEFEHL}), "
+             f"dann: {x64_installer_aufruf(finde_x64_python())}")
+    else:
+        info("x64-Python unter Emulation auf Windows-ARM - empfohlener Weg, "
+             "der 3D-Visualizer ist verfuegbar.")
+
+
+def venv_arch() -> str:
+    """Architektur des Python im vorhandenen venv ('unknown', wenn es sich
+    nicht starten laesst)."""
+    py = venv_python()
+    if not Path(py).exists():
+        return "unknown"
+    try:
+        r = subprocess.run([py, "-c", "import sysconfig; print(sysconfig.get_platform())"],
+                           capture_output=True, text=True, timeout=60)
+    except Exception:
+        return "unknown"
+    plat = (r.stdout or "").strip().lower()
+    if r.returncode != 0 or not plat:
+        return "unknown"
+    if plat == "win32":
+        return "x86"
+    return normalize_arch(plat.split("-", 1)[1] if plat.startswith("win-") else plat)
+
+
+def _frage_ja(frage: str) -> bool:
+    """Ja/Nein-Rueckfrage; ohne Terminal (Skript, CI) immer Nein."""
+    try:
+        if not sys.stdin or not sys.stdin.isatty():
+            return False
+        return input(f"{frage} [j/N] ").strip().lower() in ("j", "ja", "y", "yes")
+    except (EOFError, OSError):
+        return False
+
+
+def create_venv(neu: bool = False):
+    """Legt das venv an. Ein vorhandenes bleibt — ausser ``neu`` (``--neu-venv``)
+    oder es wurde mit einer ANDEREN Architektur gebaut als das Python, das
+    gerade install.py ausfuehrt (Codex #967: wer auf Windows-ARM nach dem
+    Hinweis x64-Python installiert, behielt sonst sein ARM64-venv und damit
+    weiter keinen 3D-Visualizer); dann wird nachgefragt."""
+    if VENV_DIR.exists():
+        if not neu:
+            va, pa = venv_arch(), detect_arch()
+            if va != "unknown" and pa != "unknown" and va != pa:
+                warn(f"Das vorhandene venv wurde mit {va}-Python gebaut, "
+                     f"install.py laeuft mit {pa}-Python.")
+                neu = _frage_ja("venv mit diesem Python neu anlegen?")
+                if not neu:
+                    warn("venv bleibt unveraendert. Neu anlegen mit: "
+                         "python install.py --neu-venv (mit dem gewuenschten Python).")
+        if not neu:
+            info(f"venv existiert bereits: {VENV_DIR}")
+            return
+        info(f"Entferne altes venv: {VENV_DIR}")
+        shutil.rmtree(VENV_DIR)
     info(f"Erstelle venv in {VENV_DIR} ...")
     subprocess.run([sys.executable, "-m", "venv", str(VENV_DIR)], check=True)
 
@@ -381,8 +492,9 @@ def show_summary(use_venv: bool = True):
     info("=" * 60)
     info(f"Python-Architektur: {py_arch}")
     info(f"OS-Architektur:     {os_arch}")
-    if os.name == "nt" and os_arch == "arm64" and py_arch != "arm64":
-        warn("Python laeuft emuliert auf ARM64. Fuer native Performance ARM64-Python nutzen.")
+    if os.name == "nt" and os_arch == "arm64" and py_arch == "arm64":
+        warn("Natives ARM64-Python: kein 3D-Visualizer. Mit x64-Python geht alles "
+             f"({X64_PYTHON_BEFEHL}).")
     info(f"venv:        {VENV_DIR if use_venv else '- (--no-venv)'}")
     info(f"AppData:     {APPDATA_DIR}")
     info("")
@@ -408,6 +520,9 @@ def main():
                    help="Keine Desktop-Verknuepfung erstellen")
     p.add_argument("--dev", action="store_true",
                    help="Inklusive Dev-Dependencies (pyinstaller etc.)")
+    p.add_argument("--neu-venv", action="store_true",
+                   help="Vorhandenes venv loeschen und mit diesem Python neu anlegen "
+                        "(z. B. nach dem Wechsel auf x64-Python auf Windows-ARM)")
     args = p.parse_args()
 
     info(f"LightOS Installer - Arch: {detect_arch()}")
@@ -416,7 +531,7 @@ def main():
 
     use_venv = not args.no_venv
     if use_venv:
-        create_venv()
+        create_venv(neu=args.neu_venv)
     else:
         info("Skip venv (--no-venv)")
 
