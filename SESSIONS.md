@@ -61,7 +61,7 @@
 | VCB-36 | D | - | 2026-10-10T18:00Z | - |
 | UI-78 | D | - | 2026-10-10T18:00Z | - |
 | UI-80 | D | - | 2026-10-10T18:00Z | - |
-| TOOL-18 | D | - | 2026-10-10T18:00Z | - |
+| TOOL-18 | D | fix/tool18-bilder-hinweis-gpu-szenen | 2026-10-10T18:10Z | - |
 | TOOL-19 | D | fix/tool19-werkzeuge-ohne-echten-ausgang | 2026-10-10T18:03Z | - |
 
 ## Blocker & Fallen
@@ -187,7 +187,6 @@
 
 ## Verlauf
 
-- 2026-10-10T13:08Z A claim LAS-31
 - 2026-10-10T13:08Z A claim LAS-32
 - 2026-10-10T13:08Z A claim DEMO-8
 - 2026-10-10T13:24Z B done UI-76
@@ -217,3 +216,4 @@
 - 2026-10-10T18:00Z D claim TOOL-18
 - 2026-10-10T18:00Z D claim TOOL-19
 - 2026-10-10T18:03Z D aktualisiert TOOL-19: Branch - -> fix/tool19-werkzeuge-ohne-echten-ausgang
+- 2026-10-10T18:10Z D aktualisiert TOOL-18: Branch - -> fix/tool18-bilder-hinweis-gpu-szenen
