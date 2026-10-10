@@ -43,6 +43,9 @@ _HTML_PATH = os.path.join(_REPO, "src", "ui", "visualizer", "stage_scene.html")
 
 RX580_ANGLE = ("ANGLE (AMD, AMD Radeon RX 580 2048SP Direct3D11 vs_5_0 ps_5_0, "
                "D3D11-31.0.21921.1000)")
+# VIZ-99: der Renderer-Name, wie ihn der Windows-ARM-PC meldet (Snapdragon X Elite).
+X1_85_ANGLE = ("ANGLE (Qualcomm, Qualcomm(R) Adreno(TM) X1-85 GPU (0x36334330) "
+               "Direct3D11 vs_5_0 ps_5_0, D3D11)")
 
 
 @pytest.fixture(autouse=True)
@@ -163,15 +166,36 @@ class EntscheidungTest(unittest.TestCase):
         self.assertEqual(r["tier"], "low")
         self.assertFalse(r["gemessen"])
 
-    def test_snapdragon_x_wird_gemessen(self):
-        chip = ("ANGLE (Qualcomm, Qualcomm(R) Adreno(TM) X1-85 GPU Direct3D11 "
-                "vs_5_0 ps_5_0, D3D11)")
-        r = self._tier(chip, maxTex=16, ms=1.0)
-        self.assertTrue(r["gemessen"])
-        self.assertEqual(r["tier"], "high")
+    def test_adreno_x1_85_ist_hoch_ohne_messung(self):
+        """VIZ-99: am Windows-ARM-PC gemessen — die Start-Messung streute dort
+        von 6,6 bis 9,0 ms um die Grenze (6 ms), die Automatik waehlte Niedrig,
+        obwohl Hoch im Leerlauf 60 und unter Bewegung 51-57 fps haelt."""
+        for ms in (6.6, 7.2, 7.8, 9.0, 40.0):
+            r = self._tier(X1_85_ANGLE, maxTex=16, ms=ms)
+            self.assertEqual(r["tier"], "high", ms)
+            self.assertFalse(r["gemessen"], "X1-85 entscheidet der Name, nicht die Messung")
+            self.assertEqual(r["grund"], "Snapdragon X (Adreno X1-85)")
+        # ohne die Geraete-Kennung in Klammern, wie ihn aeltere Treiber melden
+        ohne_id = ("ANGLE (Qualcomm, Qualcomm(R) Adreno(TM) X1-85 GPU Direct3D11 "
+                   "vs_5_0 ps_5_0, D3D11)")
+        self.assertEqual(self._tier(ohne_id, ms=9.0)["tier"], "high")
+
+    def test_uebrige_adreno_x_reihe_wird_gemessen(self):
+        # X1-45 (Snapdragon X Plus mit 8 Kernen) und X2-… sind nicht gemessen:
+        # weder pauschal Niedrig noch pauschal Hoch.
+        for chip in ("ANGLE (Qualcomm, Qualcomm(R) Adreno(TM) X1-45 GPU Direct3D11 "
+                     "vs_5_0 ps_5_0, D3D11)",
+                     "ANGLE (Qualcomm, Qualcomm(R) Adreno(TM) X2-90 GPU Direct3D11 "
+                     "vs_5_0 ps_5_0, D3D11)"):
+            schnell = self._tier(chip, maxTex=16, ms=1.0)
+            self.assertTrue(schnell["gemessen"], chip)
+            self.assertEqual(schnell["tier"], "high", chip)
+            self.assertIn("Snapdragon X, Frame-Zeit", schnell["grund"])
+            self.assertEqual(self._tier(chip, maxTex=16, ms=9.0)["tier"], "low", chip)
         # aeltere Adreno bleiben pauschal Niedrig
-        self.assertEqual(self._tier("ANGLE (Qualcomm, Adreno (TM) 690, OpenGL ES 3.2)",
-                                    ms=1.0)["tier"], "low")
+        r = self._tier("ANGLE (Qualcomm, Adreno (TM) 690, OpenGL ES 3.2)", ms=1.0)
+        self.assertEqual(r["tier"], "low")
+        self.assertFalse(r["gemessen"])
 
     def test_ohne_messung_die_alte_texture_unit_regel(self):
         self.assertEqual(self._tier("", maxTex=16, ms=None)["tier"], "low")
@@ -305,6 +329,17 @@ class ProbeInDerSeiteTest(unittest.TestCase):
         z = self._laden(RX580_ANGLE, gputier="low")
         self.assertEqual(z["tier"], "low")
         self.assertEqual(z["info"]["grund"], "manuell (?gputier)")
+
+    def test_adreno_x1_85_wird_hoch_auch_bei_langsamer_startmessung(self):
+        """VIZ-99 in der echten Seite: mit der am Geraet gemessenen Start-Zeit
+        (9,0 ms, ueber der Grenze) waehlte die Automatik Niedrig."""
+        z = self._laden(X1_85_ANGLE, bench_ms=9.0)
+        if z["info"]["grund"] == "kein WebGL-Kontext":
+            self.skipTest("offscreen ohne WebGL")
+        self.assertEqual(z["tier"], "high", z)
+        self.assertEqual(z["info"]["grund"], "Snapdragon X (Adreno X1-85)")
+        self.assertIsNone(z["info"]["benchMs"], "per Name entschieden, nicht gemessen")
+        self.assertEqual(z["cap"], 2, "Hoch: Pixeldichte bis 2")
 
     def test_unbekannter_name_frame_zeit_rueckfall(self):
         z = self._laden("ANGLE (Unknown, Unknown Device, D3D11)", bench_ms=1.0)
