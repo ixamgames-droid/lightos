@@ -9,7 +9,7 @@ import { fixtures, settings, stageObjects, view } from '../state.js';
 import { addFixture, removeFixture } from '../fixtures/fixtures.js';
 import { applyDmx } from './dmx_apply.js';                                // VIZ-71
 import { forgetDmx, noteShowGen, pruneDmxCache } from '../fixtures/dmx_cache.js';      // VIZ-71
-import { resyncBeamVisibility } from '../fixtures/builders.js';
+import { resyncBeamVisibility, fleckSichtbar } from '../fixtures/builders.js';   // VIZ-98
 import { setBeamsOff } from '../state.js';   // VIZ-15
 import { setViewMode } from '../stage/view_mode.js';
 import { setEditMode, setBrightnessManual, resetBrightnessAuto, updateOutlines, jsApplyExternalSelection } from '../interaction/tools.js';
@@ -279,7 +279,9 @@ export function applySettings(s) {
     // nach showCones-Toggle sofort neu setzen — vorher blieben die PAR-Bar-/Mover-Bar-/
     // Spider-Pro-Kopf-Kegel bis zum naechsten DMX-Update der Fixture stale.
     resyncBeamVisibility(f);
-    if (f.floorSpot) f.floorSpot.visible = settings.showFloorSpots && f.floorSpot.material.opacity > 0.01;
+    // VIZ-98: ueber fleckSichtbar — ein Settings-Wechsel darf den Fleck eines
+    // Kopfes, dessen Strahl nichts trifft, nicht wieder einschalten.
+    if (f.floorSpot) f.floorSpot.visible = fleckSichtbar(f, f.floorSpot.material.opacity);
   }
   requestRender();  // 3c-2 Dirty-Quelle 6 (Settings: Fog/Beam-Sichtbarkeiten)
 }
