@@ -63,7 +63,7 @@ venv\Scripts\python tools\build_apc_test_show.py
 ```
 
 Der Generator ruft zuerst `reset_show()` (komplett leere Basis), patcht dann die
-4 PARs, baut alle Funktionen, die Bibliothek und die 5 VC‑Seiten und **verifiziert
+4 PARs, baut alle Funktionen, die Bibliothek und die 6 VC‑Seiten und **verifiziert
 am Ende durch erneutes Laden**. Du kannst dort Farben, Effekte und das Layout
 anpassen und neu bauen.
 

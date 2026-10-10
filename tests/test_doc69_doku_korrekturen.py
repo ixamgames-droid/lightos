@@ -79,6 +79,11 @@ class TestApcTestShow(unittest.TestCase):
         text = _lies(*self.DOC)
         self.assertNotIn("5 umschaltbare Seiten", text)
         self.assertIn("6 umschaltbare Seiten", text)
+        # Review: der Generator-Absatz nannte weiter "5 VC-Seiten" (mit
+        # geschuetztem Bindestrich) — jede Seitenzahl im Text muss 6 sein.
+        zahlen = re.findall(r"(\d+)\s+(?:umschaltbare\s+|VC[\u2011-])?Seiten\b", text)
+        self.assertTrue(zahlen)
+        self.assertEqual(set(zahlen), {"6"}, zahlen)
 
     def test_menuenamen_wie_im_programm(self):
         text = _lies(*self.DOC)
