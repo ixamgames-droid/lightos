@@ -87,6 +87,12 @@ Dieser Pfad führt der Reihe nach durch die wichtigsten Anleitungen. Die Bilder 
 
 Danach nach Thema weiter: **[alle Anleitungen](docs/ANLEITUNGEN.md)**.
 
+**Erst einmal nur ansehen?** Das Windows-Setup bringt fünf fertige Demo-Shows mit:
+**Datei → Demo-Show öffnen** (Club-Nacht, Theater/Event, Große Bühnen-Show, Mega Arena,
+Laser- und Gobo-Test). Die Demo öffnet sich als neue, ungespeicherte Show — **Speichern**
+legt deine eigene Kopie an. Aus dem Quellcode erzeugt sie einmalig
+`python packaging/demo_shows.py`.
+
 ---
 
 ## Installation und Start
@@ -400,6 +406,7 @@ baut `LightOS-Setup.exe` (PyInstaller + Inno Setup) samt Rauchtest der installie
 ```
 main.py, install.py       Start und Installer
 packaging/windows/        Windows-Setup (PyInstaller-Spec, Inno-Setup-Skript)
+packaging/demo_shows.py   baut die Demo-Shows für das Setup nach demo_shows/ (nicht eingecheckt)
 src/core/                 Engine, Datenmodell, Undo, Show-Datei, DMX, Audio/BPM, MIDI, OSC,
                           Laser, Bühne, Kommandozeile, Fixture-Datenbank, Capability-Prüfung
 src/ui/                   Hauptfenster, Views, Werkzeuge, Virtual Console, Visualizer (Three.js)

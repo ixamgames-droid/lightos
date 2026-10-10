@@ -17,6 +17,11 @@ gegen die auch ``packaging/windows/bundle_inhalt.py`` getestet wird
 (``tests/test_xplat47_windows_setup.py``): was hier steht, muss die Spec
 mitliefern.
 
+DEMO-8: die Demo-Shows (``demo_shows/``) werden beim Bauen erzeugt und sind
+nicht eingecheckt — sie stehen deshalb NICHT in ``PFLICHT_RESSOURCEN`` (der
+Quellbetrieb haette sonst immer einen Fehler). ``pruefe_demo_shows`` verlangt
+sie nur im gepackten Build; dort prueft es auch, dass jede Datei eine Show ist.
+
 Schreibt NICHTS ausser dem optionalen Bericht und legt keine Ordner an.
 """
 from __future__ import annotations
@@ -121,11 +126,34 @@ def pruefe_code_stand() -> list[str]:
         return [f"fixture_db: {type(e).__name__}: {e}"]
 
 
+def pruefe_demo_shows(wurzel: str | None = None,
+                      pflicht: bool | None = None) -> tuple[list[str], str]:
+    """DEMO-8: ``(fehler, berichtszeile)`` zum Demo-Ordner unter ``wurzel``.
+
+    ``pflicht`` (Standard: gepackter Build): fehlen die Demos, ist das ein
+    Fehler. Im Quellbetrieb ist ein fehlender Ordner nur ein Hinweis — eine
+    vorhandene, aber kaputte Demo faellt dagegen immer auf.
+    """
+    from src.core import demo_shows
+    if pflicht is None:
+        pflicht = ist_gefroren()
+    basis = os.path.join(wurzel or programm_dir(), demo_shows.ORDNER)
+    if not os.path.isfile(os.path.join(basis, demo_shows.INDEX)) and not pflicht:
+        return [], (f"{demo_shows.ORDNER}: nicht erzeugt "
+                    "(Quellbetrieb: python packaging/demo_shows.py)")
+    fehler = demo_shows.pruefe(basis)
+    anzahl = len(demo_shows.liste(basis))
+    return fehler, f"{demo_shows.ORDNER}: {anzahl} Demo-Show(s)"
+
+
 def bericht() -> tuple[int, list[str]]:
     zeilen = [f"LightOS-Selbsttest — gefroren={ist_gefroren()} "
               f"programm_dir={programm_dir()}",
               f"Python {sys.version.split()[0]} ({sys.platform})"]
     fehler = pruefe_module() + pruefe_ressourcen() + pruefe_code_stand()
+    demo_fehler, demo_zeile = pruefe_demo_shows()
+    fehler += demo_fehler
+    zeilen.append(demo_zeile)
     for name in OPTIONALE_MODULE:
         rest = pruefe_module((name,))
         zeilen.append(f"optional {name}: {'fehlt — ' + rest[0] if rest else 'ok'}")

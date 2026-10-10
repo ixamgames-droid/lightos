@@ -17,9 +17,16 @@ koennen auf einem Entwicklungsrechner private Laufzeitdaten enthalten
 (``data/*.db``, ``data/*.json`` sind gitignored). Ein lokaler Build darf die nie
 in ein Setup packen. Ohne Git (entpacktes Archiv) faellt der Sammler auf das
 Dateisystem zurueck und laesst dabei ``__pycache__`` und ``*.pyc`` weg.
+
+DEMO-8: die EINE Ausnahme sind die Demo-Shows. Sie werden beim Bauen erzeugt
+(``packaging/demo_shows.py`` -> ``demo_shows/``), sind bewusst nicht
+eingecheckt und kommen ueber ``erzeugte_dateien`` ins Bundle — und zwar nur,
+was ihr Verzeichnis ``demos.json`` nennt. Eine zufaellig in den Ordner gelegte
+Show reist so nicht mit.
 """
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 
@@ -42,6 +49,13 @@ EINZELDATEIEN: tuple[str, ...] = (
     # ueber ``__main__`` existiert, die Datei ist der Normalweg).
     "main.py",
 )
+
+#: DEMO-8: beim Bauen ERZEUGTE Ordner (nicht in Git) mit einem Verzeichnis
+#: ``demos.json``; mitgeliefert wird nur, was dort steht.
+ERZEUGTE_ORDNER: tuple[str, ...] = (
+    "demo_shows",                  # packaging/demo_shows.py
+)
+_ERZEUGT_INDEX = "demos.json"
 
 #: Dateiendungen, die nie ins Bundle gehoeren.
 _AUSLASSEN_ENDUNGEN = (".pyc", ".pyo")
@@ -81,10 +95,35 @@ def dateien(repo: str) -> list[str]:
     return sorted(set(aus))
 
 
+def erzeugte_dateien(repo: str) -> list[str]:
+    """DEMO-8: beim Bauen erzeugte Dateien (relativ, mit ``/``) — je Ordner
+    das Verzeichnis und die darin genannten ``.lshow``. Fehlt der Ordner (das
+    Bau-Skript lief nicht), ist die Liste leer: der Build bleibt moeglich, der
+    Selbsttest der gepackten exe meldet die fehlenden Demos."""
+    aus: list[str] = []
+    for rel in ERZEUGTE_ORDNER:
+        basis = os.path.join(repo, *rel.split("/"))
+        try:
+            with open(os.path.join(basis, _ERZEUGT_INDEX), encoding="utf-8") as f:
+                daten = json.load(f)
+        except (OSError, ValueError):
+            continue
+        eintraege = daten.get("demos") if isinstance(daten, dict) else None
+        namen = [str(e.get("datei") or "") for e in (eintraege or [])
+                 if isinstance(e, dict)]
+        gefunden = [n for n in namen
+                    if n.endswith(".lshow") and n == os.path.basename(n)
+                    and os.path.isfile(os.path.join(basis, n))]
+        if gefunden:
+            aus.extend(f"{rel}/{n}" for n in gefunden)
+            aus.append(f"{rel}/{_ERZEUGT_INDEX}")
+    return sorted(set(aus))
+
+
 def datas(repo: str) -> list[tuple[str, str]]:
     """``[(quelldatei_absolut, zielordner_im_bundle), …]`` fuer PyInstaller."""
     aus = []
-    for rel in dateien(repo):
+    for rel in dateien(repo) + erzeugte_dateien(repo):
         quelle = os.path.join(repo, *rel.split("/"))
         if not os.path.isfile(quelle):      # in Git, aber lokal geloescht
             continue

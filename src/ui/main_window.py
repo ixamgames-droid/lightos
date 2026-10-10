@@ -435,6 +435,9 @@ class MainWindow(QMainWindow):
         self._state.subscribe(self._on_state_event)
         self._visualizer_window = None
         self._current_show_path: str | None = None
+        # DEMO-8: Dateiname, den „Speichern unter" nach dem Oeffnen einer
+        # Demo-Show vorschlaegt (die Demo selbst hat keinen Pfad).
+        self._demo_dateiname: str | None = None
         self._kiosk_mode = kiosk
         self._touch_mode = touch
 
@@ -573,6 +576,14 @@ class MainWindow(QMainWindow):
         a = fm.addAction("Öffnen...")
         a.setShortcut(QKeySequence.StandardKey.Open)
         a.triggered.connect(self._open_show)
+
+        # DEMO-8: mitgelieferte Demo-Shows (Liste entsteht bei jedem Aufklappen
+        # neu — im Quellbetrieb koennen sie waehrend der Sitzung dazukommen).
+        self._demo_menu = QMenu("Demo-Show öffnen", self)
+        self._demo_menu.setToolTipsVisible(True)
+        self._demo_menu.aboutToShow.connect(self._rebuild_demo_menu)
+        fm.addMenu(self._demo_menu)
+        self._rebuild_demo_menu()
 
         a = fm.addAction("Speichern")
         a.setShortcut(QKeySequence.StandardKey.Save)
@@ -1959,6 +1970,7 @@ class MainWindow(QMainWindow):
         from src.core.show.show_file import reset_show
         reset_show()
         self._current_show_path = None
+        self._demo_dateiname = None
         self._aus_auto_save = False
         self.setWindowTitle("LightOS")
         self._sync_render_toggles()
@@ -1984,12 +1996,62 @@ class MainWindow(QMainWindow):
                 return
         self._open_show_path(path)
 
-    def _open_show_path(self, path: str, wiederherstellung: bool = False):
+    def _rebuild_demo_menu(self):
+        """DEMO-8: Untermenue Datei -> „Demo-Show öffnen" aus dem Demo-Ordner
+        bei den Programmdateien fuellen; ohne Demos ein ausgegrauter Hinweis."""
+        menu = getattr(self, "_demo_menu", None)
+        if menu is None:
+            return
+        from src.core import demo_shows
+        menu.clear()
+        try:
+            demos = demo_shows.liste()
+        except Exception as e:
+            print(f"[main_window] demo list error: {e}")
+            demos = []
+        if not demos:
+            leer = menu.addAction("(keine Demo-Shows vorhanden)")
+            leer.setEnabled(False)
+            leer.setToolTip(demo_shows.BAU_HINWEIS)
+            leer.setStatusTip(demo_shows.BAU_HINWEIS)
+            return
+        for demo in demos:
+            act = menu.addAction(demo.titel)
+            act.setToolTip(demo.beschreibung)
+            act.setStatusTip(demo.beschreibung)
+            act.triggered.connect(lambda _=False, d=demo: self._open_demo_show(d))
+
+    def _open_demo_show(self, demo):
+        """DEMO-8: Demo-Show als NEUE, ungespeicherte Show oeffnen. Das Original
+        liegt bei den Programmdateien (im Setup schreibgeschuetzt) und wird nur
+        gelesen."""
+        if self._has_unsaved_changes() and not _exit_prompt_suppressed():
+            if not self._rueckfrage_ungespeichert(
+                    "Demo-Show öffnen", "Vor dem Öffnen der Demo-Show speichern?"):
+                return
+        self._open_show_path(demo.pfad, demo=demo)
+
+    def _open_show_path(self, path: str, wiederherstellung: bool = False, demo=None):
         """Show laden. ``wiederherstellung``: ``path`` ist die Auto-Save-Datei
-        (Absturz-Wiederherstellung beim Start) — siehe unten."""
+        (Absturz-Wiederherstellung beim Start) — siehe unten. ``demo``
+        (DEMO-8): ``path`` ist eine mitgelieferte Demo-Show."""
         from src.core.show.show_file import load_show, letzte_ladeprobleme
         ok, msg = load_show(path)
-        if ok and wiederherstellung:
+        if ok:
+            self._demo_dateiname = None
+        if ok and demo is not None:
+            # DEMO-8: wie nach der Wiederherstellung — kein Pfad (Speichern =
+            # „Speichern unter" im Show-Ordner, nie zurueck in den
+            # Programmordner), nicht in die Zuletzt-Liste. Ohne Pfad gilt die
+            # Show ueber ``_neue_show_hat_inhalt`` als ungespeichert.
+            self._current_show_path = None
+            self._aus_auto_save = False
+            self._demo_dateiname = demo.dateiname
+            self.setWindowTitle(f"LightOS  -  {demo.titel} (Demo, nicht gespeichert)")
+            self.statusBar().showMessage(
+                "Demo-Show geöffnet — „Speichern“ legt deine eigene Kopie an", 6000)
+            self._sync_render_toggles()
+        elif ok and wiederherstellung:
             # UI-69-Korrektur: der wiederhergestellte Stand steht NUR im
             # Auto-Save, in keiner Show-Datei des Nutzers. Galt er als „geoeffnet
             # aus auto_save.lshow", fragte Beenden nicht, und Strg+S schrieb in
@@ -2143,14 +2205,19 @@ class MainWindow(QMainWindow):
         return self._do_save(self._current_show_path)
 
     def _save_show_as(self) -> bool:
+        start = self._default_show_dir()
+        if self._demo_dateiname and not self._current_show_path:
+            # DEMO-8: Namensvorschlag fuer die eigene Kopie einer Demo-Show.
+            start = os.path.join(start, self._demo_dateiname)
         path, _ = QFileDialog.getSaveFileName(
-            self, "Show speichern", self._default_show_dir(),
+            self, "Show speichern", start,
             "LightOS Show (*.lshow)"
         )
         if path:
             if not path.endswith(".lshow"):
                 path += ".lshow"
             self._current_show_path = path
+            self._demo_dateiname = None
             return self._do_save(path)
         return False
 

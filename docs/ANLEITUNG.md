@@ -277,6 +277,8 @@ Schritt für Schritt:
 
 - **Strg+S** speichert die Show; **Datei → Speichern unter…** als `.lshow`.
 - **Datei → Zuletzt verwendet** öffnet frühere Shows schnell.
+- **Datei → Demo-Show öffnen** lädt eine mitgelieferte Beispiel-Show als neue,
+  ungespeicherte Show (Speichern legt deine Kopie an).
 - **Datei → Show prüfen & reparieren…** (`Strg+Shift+R`) findet/behebt Probleme.
 
 ---

@@ -215,6 +215,10 @@ Everything goes through the **Datei** (File) menu:
    extension `.lshow` itself.
 4. **Zuletzt verwendet** (recently used) — the ten shows opened or saved last.
 
+Below **Öffnen...** there is also **Demo-Show öffnen** (open demo show): ready-made example
+shows that ship with the Windows setup (from source: `python packaging/demo_shows.py`). A
+demo opens as a new, unsaved show — **Speichern** asks for a name.
+
 The file dialogs start in the folder of the current show, otherwise in the `shows`
 folder inside the LightOS data folder (Linux: `~/.local/share/LightOS/shows`, Windows:
 `%APPDATA%\LightOS\shows`). After saving, the path is shown in the window title and

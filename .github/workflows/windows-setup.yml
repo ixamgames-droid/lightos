@@ -4,7 +4,8 @@ name: Windows-Setup
 # es als Workflow-Artefakt ab. Bewusst KEIN Release-Publish: ob und wann ein
 # Setup veroeffentlicht wird, entscheidet der Projektinhaber.
 #
-# Ablauf: Abhaengigkeiten -> PyInstaller (packaging/windows/LightOS.spec) ->
+# Ablauf: Abhaengigkeiten -> Demo-Shows erzeugen (DEMO-8,
+# packaging/demo_shows.py) -> PyInstaller (packaging/windows/LightOS.spec) ->
 # Rauchtest der gepackten exe (--selbsttest: Importe inkl. QtWebEngine und die
 # mitgelieferten Dateien, ohne Fenster) -> Inno Setup -> stilles Installieren
 # nach "Programme" -> Rauchtest der INSTALLIERTEN exe -> Deinstallieren ->
@@ -19,7 +20,8 @@ on:
     # (Pfadfilter gelten fuer Zweig-Pushes; Tag-Pushes laufen immer.)
     branches: ["**"]
     paths:
-      - "packaging/windows/**"
+      - "packaging/**"
+      - "src/core/demo_shows.py"
       - ".github/workflows/windows-setup.yml"
       - "src/core/selbsttest.py"
 
@@ -62,6 +64,17 @@ jobs:
           if ($env:GITHUB_REF_TYPE -eq "tag" -and $env:GITHUB_REF_NAME -ne "v$v") {
             Write-Host "::warning::Tag $env:GITHUB_REF_NAME passt nicht zu APP_VERSION $v"
           }
+
+      # DEMO-8: die Demo-Shows sind nicht eingecheckt, sie entstehen hier aus
+      # den Generatoren (Sandbox-Datenordner, Show-Lint --strict, unter einer
+      # Minute) und landen in demo_shows/ — bundle_inhalt.py nimmt sie mit, der
+      # Selbsttest der gepackten exe verlangt sie.
+      - name: Demo-Shows erzeugen
+        shell: pwsh
+        run: |
+          python packaging/demo_shows.py
+          if ($LASTEXITCODE -ne 0) { throw "Demo-Shows: Exit-Code $LASTEXITCODE" }
+          Get-ChildItem demo_shows | Format-Table Name, Length
 
       - name: PyInstaller-Build (onedir)
         shell: pwsh

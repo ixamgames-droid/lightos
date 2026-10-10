@@ -71,7 +71,7 @@ Visualizer als separates Fenster.
 
 | Menü | Einträge (Kurz) |
 |------|-----------------|
-| **Datei** | Neue Show · Öffnen · Speichern · Speichern unter · Zuletzt verwendet · XML-Workspace (.qxw) importieren · Show prüfen & reparieren · Beenden |
+| **Datei** | Neue Show · Öffnen · Demo-Show öffnen · Speichern · Speichern unter · Zuletzt verwendet · XML-Workspace (.qxw) importieren · Show prüfen & reparieren · Beenden |
 | **Bearbeiten** | Rückgängig · Wiederherstellen · Verlauf löschen (`core/undo.py`) |
 | **Ansicht** | Alle Views aktualisieren (F5) |
 | **Show** | Cue aufnehmen (R) · Nächste/Vorherige Page |
