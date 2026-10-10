@@ -60,6 +60,7 @@
 | QA-91 | D | fix/qa91-doc60-test-encoding | 2026-10-10T15:48Z | - |
 | VCB-36 | D | - | 2026-10-10T18:00Z | - |
 | UI-78 | D | - | 2026-10-10T18:00Z | - |
+| UI-80 | D | - | 2026-10-10T18:00Z | - |
 
 ## Blocker & Fallen
 
@@ -183,7 +184,6 @@
 
 ## Verlauf
 
-- 2026-10-10T12:55Z B claim XPLAT-51
 - 2026-10-10T12:55Z B claim XPLAT-52
 - 2026-10-10T12:55Z B claim UI-86
 - 2026-10-10T13:01Z B aktualisiert TOOL-26: Dateien - -> tools/app_messung.py · tools/README.md · tests/test_tool26_app_messung.py · BACKLOG.md · changelog.d/2026-10-10-TOOL-26.md
@@ -213,3 +213,4 @@
 - 2026-10-10T17:40Z A done UI-85
 - 2026-10-10T18:00Z D claim VCB-36
 - 2026-10-10T18:00Z D claim UI-78
+- 2026-10-10T18:00Z D claim UI-80
