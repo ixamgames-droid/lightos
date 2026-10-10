@@ -55,7 +55,6 @@
 | PROC-20 | A | feature/proc20-backlog-fragmente | 2026-10-10T11:47Z | tools · BACKLOG.md |
 | TOOL-26 | B | feature/tool26-app-messwerkzeug | 2026-10-10T13:25Z | tools/app_messung.py · tools/README.md · tests/test_tool26_app_messung.py · BACKLOG.md · changelog.d/2026-10-10-TOOL-26.md |
 | VIZ-99 | B | fix/viz99-automatik-snapdragon | 2026-10-10T14:09Z | src/ui/visualizer/scene_src/scene/gpu_tier.js · tests/test_viz84_gpu_tier.py · tests/test_viz99_automatik_snapdragon.py · src/ui/visualizer/visualizer_window.py · BACKLOG.md · changelog.d/2026-10-10-VIZ-99.md |
-| UI-86 | B | fix/ui86-liveansicht-200-prozent | 2026-10-10T12:55Z | - |
 | LAS-31 | A | feature/las31-notaus-kopfleiste | 2026-10-10T13:08Z | - |
 | LAS-32 | A | feature/las32-laser-sperrzonen | 2026-10-10T13:08Z | - |
 | DEMO-8 | A | feature/demo8-demoshows-im-setup | 2026-10-10T13:08Z | - |
@@ -173,7 +172,6 @@
 
 ## Verlauf
 
-- 2026-10-10T11:13Z D aktualisiert TOOL-21: Branch - -> fix/tool21-gif-vergleich-rgb; Dateien - -> tools/anleitungsbilder/runner.py · tests/test_tool21_bildvergleich_je_kanal.py
 - 2026-10-10T11:15Z B done OUT-64
 - 2026-10-10T11:19Z D aktualisiert TOOL-23: Branch - -> fix/tool23-backlog-ids-tafel-fragmente; Dateien - -> tools/backlog_ids.py · tests/test_tool23_backlog_ids_tafel_fragmente.py · tests/test_backlog_ids.py
 - 2026-10-10T11:19Z B claim ARM-PRUEFUNG-1010
@@ -203,3 +201,4 @@
 - 2026-10-10T14:17Z A claim XPLAT-51
 - 2026-10-10T14:17Z A claim XPLAT-52
 - 2026-10-10T14:25Z D done VIZ-97
+- 2026-10-10T14:34Z B uebergeben UI-86
