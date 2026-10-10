@@ -111,7 +111,9 @@ class QuelleTest(unittest.TestCase):
         Anwendung.
         """
         i = self.js.index("function applyFloorAim")
-        block = self.js[i:i + 3400]
+        # VIZ-98: die ganze Funktion statt eines festen Zeichenfensters — sie
+        # ist um den Fall „kein Auftreffpunkt" gewachsen, die Aussage bleibt.
+        block = self.js[i:self.js.index("\n}\n", i)]
         self.assertIn("auftreffAbstand = t", block,
                       "der Abstand muss aus dem schon gerechneten t kommen")
         self.assertIn("setBeamLength(f, auftreffAbstand)", block)

@@ -105,7 +105,7 @@ def _sonde(rumpf: str, zusatz_env: dict | None = None) -> _Lauf:
     t0 = time.perf_counter()
     try:
         p = subprocess.run([sys.executable, "-c", rumpf], cwd=_REPO,
-                           capture_output=True, text=True, timeout=_GRENZE_S,
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=_GRENZE_S,
                            env=umgebung)
     except subprocess.TimeoutExpired:
         return _Lauf(None, time.perf_counter() - t0, "")
