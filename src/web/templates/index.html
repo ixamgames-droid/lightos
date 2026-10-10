@@ -74,7 +74,8 @@
   </section>
 </main>
 
-<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<!-- WEB-06: lokal ausgeliefert (kein CDN) — die Seite muss ohne Internet laufen. -->
+<script src="{{ url_for('static', filename='socket.io.min.js') }}"></script>
 <script>
 const socket = io();
 let blackout = false;

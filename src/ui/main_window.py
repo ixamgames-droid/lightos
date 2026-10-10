@@ -1923,11 +1923,13 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self._visualizer_window = None
             print(f"[MainWindow] Visualizer start error: {e}")
+            # XPLAT-46: auf nativem ARM64-Python fehlt QtWebEngine - dort
+            # nennt die Meldung x64-Python als Abhilfe statt "neu installieren".
+            from src.core.plattform_hinweis import visualizer_startfehler_text
             QMessageBox.warning(
                 self,
                 "Visualizer nicht verfügbar",
-                "Der 3D-Visualizer konnte nicht gestartet werden.\n\n"
-                "Bitte prüfe, ob PySide6 + PySide6-Addons korrekt installiert sind."
+                visualizer_startfehler_text(e),
             )
 
     def _close_visualizer(self):
@@ -2565,6 +2567,27 @@ class MainWindow(QMainWindow):
         from src.ui.widgets.bibliothek_download_dialog import BibliothekDownloadDialog
         BibliothekDownloadDialog(self, erststart=erststart).exec()
 
+    def _bibliothek_hinweis_zeigen(self):
+        """FM-72: die Erststart-Frage als Knopf in der Statuszeile statt als
+        modaler Dialog (Start mit ``--show``). Ein Klick oeffnet denselben
+        Dialog wie beim ersten Start; danach verschwindet der Knopf."""
+        if getattr(self, "_btn_bibliothek_hinweis", None) is not None:
+            return
+        btn = QPushButton("Geräte-Bibliothek laden…")
+        btn.setFlat(True)
+        btn.setToolTip("Eine freie Geräte-Bibliothek (QLC+ oder Open Fixture "
+                       "Library) herunterladen — dieselbe Frage wie beim ersten Start.")
+
+        def _klick():
+            self.statusBar().removeWidget(btn)
+            btn.deleteLater()
+            self._btn_bibliothek_hinweis = None
+            self._open_bibliothek_download(erststart=True)
+
+        btn.clicked.connect(_klick)
+        self.statusBar().addPermanentWidget(btn)
+        self._btn_bibliothek_hinweis = btn
+
     def _open_fixture_editor(self):
         try:
             from src.ui.widgets.fixture_editor import FixtureEditorDialog
@@ -2699,8 +2722,8 @@ class MainWindow(QMainWindow):
         try:
             sb = self.statusBar()
             sb.showMessage(
-                "⏹  LASER NOT-AUS ausgelöst — Netzwerk-Ausgabe verriegelt "
-                "& unscharf", 6000)
+                "⏹  LASER NOT-AUS ausgelöst — alle Laser dunkel (DMX-Laser "
+                "verriegelt, Netzwerk-Ausgabe unscharf)", 6000)
             sb.setStyleSheet(
                 "QStatusBar{background:#b31414; color:#ffffff; font-weight:bold;}")
             QTimer.singleShot(6000, lambda: self._reset_statusbar_style())

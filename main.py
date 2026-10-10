@@ -145,6 +145,13 @@ def _setup_crash_logging():
         # den nativen Dump verschlucken. Darum bekommt der native Crash auch keinen
         # eigenen Zeitstempel; stattdessen verortet ihn die Vorige-Sitzung-Erkennung
         # beim naechsten Start ueber last_alive.txt.
+        # STAB-33: unter Windows schreibt faulthandler JEDE Ausnahme mit
+        # Fehlerbit als "Windows fatal exception: code 0x…" samt Stand aller
+        # Threads (all_threads=True ist der Standard) — auch First-Chance-
+        # Ausnahmen wie den COM-Hinweis 0x8001010d, nach denen die App
+        # weiterlaeuft. Einen Filter bietet faulthandler.enable nicht; das
+        # Diagnosepaket kennzeichnet die bekannten harmlosen Codes
+        # (diagnose_log.HARMLOSE_WINDOWS_CODES).
         faulthandler.enable(file=_crash_log_handle)
 
         # Hat eine VORHERIGE Sitzung NICHT sauber beendet? Per-PID-Flags, deren
@@ -455,6 +462,10 @@ def _install_qt_message_handler():
                     sys.stderr.write(message + "\n")
             except Exception:
                 pass
+            # STAB-33: die Zeile "[viz] GPU-Tier: … renderer=…" des Visualizers
+            # kommt hier als Qt-Meldung an -> Renderer-String fuer systeminfo.txt
+            # festhalten (wirft nie, fuer andere Meldungen ein Teilstring-Test).
+            _dl.merke_viz_gpu(message)
         qInstallMessageHandler(_handler)
     except Exception as e:
         print(f"[main] qt message handler setup error: {e}")
@@ -625,14 +636,19 @@ def _open_show_at_startup(window, pfad: str):
     QTimer.singleShot(0, lambda: window._open_show_path(pfad))
 
 
-def _bibliothek_beim_erststart(window) -> None:
+def _bibliothek_beim_erststart(window, mit_show: bool = False) -> None:
     """FM-53: beim ersten Start fragen, ob eine freie Geraete-Bibliothek geladen
     werden soll — nur solange die Bibliothek nichts ausser den eingebauten
     Profilen enthaelt und die Frage nie beantwortet wurde.
 
     Bewusst HIER und nicht im ``MainWindow``-Konstruktor: die Tests bauen das
     Fenster hundertfach, und ein modaler Dialog dort blockierte jeden davon.
-    Im Kiosk-Modus wird nicht gefragt."""
+    Im Kiosk-Modus wird nicht gefragt.
+
+    FM-72: Mit ``--show`` (Autostart, Vorfuehrung, Fernwartung) blockiert KEIN
+    modaler Dialog — die Show soll sofort bedienbar sein. Stattdessen ein Knopf
+    in der Statuszeile; die Frage gilt dann noch nicht als beantwortet und kommt
+    beim naechsten Start ohne ``--show`` wieder."""
     from PySide6.QtCore import QTimer
     try:
         from src.core.database import bibliothek_download as _bd
@@ -641,6 +657,9 @@ def _bibliothek_beim_erststart(window) -> None:
             return
     except Exception as e:
         print(f"[main] Bibliothek-Erststart uebersprungen: {e}")
+        return
+    if mit_show:
+        QTimer.singleShot(800, window._bibliothek_hinweis_zeigen)
         return
     QTimer.singleShot(800, lambda: window._open_bibliothek_download(erststart=True))
 
@@ -900,7 +919,7 @@ def main():
     if args.show:
         _open_show_at_startup(window, args.show)
     if not args.kiosk:
-        _bibliothek_beim_erststart(window)
+        _bibliothek_beim_erststart(window, mit_show=bool(args.show))
 
     _finalize_and_exit(app.exec())
 

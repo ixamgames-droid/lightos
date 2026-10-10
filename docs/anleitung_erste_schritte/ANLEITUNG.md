@@ -41,11 +41,16 @@ Nach dem Start öffnet LightOS in der Sektion **Bühne**. Von oben nach unten:
    viermal im Takt setzt das Tempo.
 5. **STOP ALL** — hält alles an, was läuft: Cue-Listen auf allen Pages und alle
    gestarteten Funktionen (Szenen, Chaser, Effekte).
-6. **BLACKOUT** — macht alles dunkel: alle Kanäle gehen auf 0, nur Moving Heads
+6. **BLACKOUT** — macht alles dunkel: alle Kanäle gehen auf 0 (Laser: Aus-Wert, s. u.), nur Moving Heads
    mit Dimmerkanal bleiben in ihrer Position (inkl. Gobo/Prisma/Zoom) stehen —
    sie fahren also nicht in die Grundstellung und beim Lösen wieder zurück.
-   Ungepatchte Kanäle, Geräte ohne Dimmer, Laser und Nebelmaschinen gehen
-   komplett aus. Der Knopf rastet ein; ein zweiter Klick hebt den Blackout wieder auf.
+   Ungepatchte Kanäle, Geräte ohne Dimmer und Nebelmaschinen gehen
+   komplett aus. **Laser** bekommen statt 0 den **Aus-Wert aus ihrem
+   Geräteprofil** (z. B. Betriebsart „Laser aus“) — der ist nicht immer 0,
+   denn bei manchen Lasern heißt DMX 0 „Auto“ und würde sie einschalten.
+   Kennt das Profil keinen Aus-Wert, strahlt ein Laser ohne Dimmer womöglich
+   weiter; sicher aus ist ein Laser nur mit dem **Laser-NOT-AUS**
+   (Details: [Laser-Anleitung](../anleitung_laser/ANLEITUNG_LASER.md#blackout-ziel-blackout-und-not-aus)). Der Knopf rastet ein; ein zweiter Klick hebt den Blackout wieder auf.
    Wie das im DMX-Monitor aussieht, zeigt
    [Ausgabe einrichten, Schritt 7](../anleitung_ausgabe_einrichten/ANLEITUNG.md#7-kontrolle-der-dmx-monitor).
    Nur einzelne Geräte oder Gruppen dunkel schaltet eine

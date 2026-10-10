@@ -40,7 +40,14 @@ class VCFrame(VCWidget):
             deactivate = getattr(c, "deactivate_for_solo", None)
             if callable(deactivate):
                 try:
-                    deactivate()
+                    # VCB-41: der Partner muss wissen, WER ausloest — steuert
+                    # der dieselbe Funktion, entscheidet allein er ueber sie.
+                    deactivate(activator=child)
+                except TypeError:
+                    try:
+                        deactivate()
+                    except Exception:
+                        pass
                 except Exception:
                     pass
 
