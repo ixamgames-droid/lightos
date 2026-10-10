@@ -173,7 +173,11 @@ New-NetFirewallRule @lightos -DisplayName 'LightOS Web-Remote (TCP 5000)'      -
 New-NetFirewallRule @lightos -DisplayName 'LightOS Art-Net-Eingang (UDP 6454)' -Protocol UDP -LocalPort 6454
 New-NetFirewallRule @lightos -DisplayName 'LightOS sACN-Eingang (UDP 5568)'    -Protocol UDP -LocalPort 5568
 New-NetFirewallRule @lightos -DisplayName 'LightOS MSC-Eingang (UDP 6004)'     -Protocol UDP -LocalPort 6004
+New-NetFirewallRule @lightos -DisplayName 'LightOS OS2L (TCP 1234)'            -Protocol TCP -LocalPort 1234
 ```
+
+Die letzte Zeile (OS2L) brauchst du nur, wenn die DJ-Software auf einem **anderen**
+Rechner läuft; auf demselben Rechner erreicht sie LightOS ohne Freigabe.
 
 - `Profile = 'Private'` — die Regeln gelten nur im Profil „Privat“. Im WLAN einer
   fremden Location bleibt der Rechner damit zu.
@@ -225,7 +229,7 @@ netsh advfirewall show currentprofile
 Eingabeaufforderung oder PowerShell:
 
 ```powershell
-netstat -ano | findstr ":5000 :6454 :5568 :6004"
+netstat -ano | findstr ":5000 :6454 :5568 :6004 :1234"
 ```
 
 Für jede eingeschaltete Funktion erscheint eine Zeile, die letzte Spalte ist die
@@ -273,16 +277,32 @@ zu ist.
 | Die Windows-Abfrage kam nie — oder sie wurde weggeklickt. | Es gibt eine Blockier-Regel für das Programm; sie geht jeder Freigabe vor. | Siehe unten. |
 | sACN kommt über WLAN nur ruckelnd oder gar nicht an. | Viele WLAN-Router bremsen oder filtern Multicast. | Kabel verwenden — oder am Sender **Unicast** auf die Adresse des Empfängers stellen. |
 
-**Blockier-Regeln finden** (als Administrator):
+**Blockier-Regeln finden.** Diese Abfrage liest nur. Sie zeigt je Regel die Kennung
+(`Name`), das Profil und das gesperrte Programm:
 
 ```powershell
-Get-NetFirewallRule -Direction Inbound -Action Block -Enabled True |
-    Where-Object DisplayName -match 'python|LightOS' |
-    Format-Table DisplayName, Profile
+Get-NetFirewallRule -Direction Inbound -Action Block -Enabled True | ForEach-Object {
+    [pscustomobject]@{ Name = $_.Name; Anzeige = $_.DisplayName; Profil = $_.Profile
+                       Programm = ($_ | Get-NetFirewallApplicationFilter).Program }
+} | Where-Object Programm -match 'python|LightOS' | Format-List
 ```
 
-Was hier steht, hält LightOS zu. Dieselbe Abfrage mit `| Remove-NetFirewallRule` statt
-`| Format-Table …` am Ende entfernt die gefundenen Regeln.
+Jeder Eintrag ist **eine** Regel. Gesucht ist nur die, bei der unter **Programm** genau
+die Datei steht, mit der du LightOS startest — `LightOS.exe` oder das `python.exe` bzw.
+`pythonw.exe` deiner Python-Installation — und deren **Profil** dein aktives ist
+(Schritt 2). Andere Python-Programme auf dem Rechner können eigene Blockier-Regeln
+haben; die bleiben, wie sie sind.
+
+**Genau diese eine Regel entfernen** (als Administrator). Die Kennung aus der Liste
+einsetzen; von Windows angelegte Regeln heißen etwa `TCP Query User{…}C:\…\python.exe`,
+und es gibt meist je eine für TCP und UDP:
+
+```powershell
+Remove-NetFirewallRule -Name '<Name aus der Liste>'
+```
+
+Danach die Funktion in LightOS neu einschalten und die Windows-Abfrage beantworten —
+oder die Port-Regeln aus Schritt 4 anlegen.
 
 ## 7. Wieder aufräumen
 

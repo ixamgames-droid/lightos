@@ -55,14 +55,20 @@ class Doc70NetzwerkWindowsTest(unittest.TestCase):
     # ── Ports gegen den Code ─────────────────────────────────────────────────
 
     def test_ports_der_firewall_regeln_stimmen_mit_dem_code(self):
+        from src.core.audio.os2l import OS2LServer
         from src.core.dmx import artnet_input, sacn_input
         from src.web import app as web_app
 
         web_port = inspect.signature(web_app.start_server).parameters["port"].default
+        os2l_port = inspect.signature(OS2LServer.__init__).parameters["port"].default
         soll = {
             web_port: "TCP",
             artnet_input.ARTNET_PORT: "UDP",
             sacn_input.SACN_PORT: "UDP",
+            # Codex-Befund zu #1002: die Tabelle verlangt die Freigabe, wenn die
+            # DJ-Software auf einem anderen Rechner laeuft — dann muss sie auch
+            # im Regel-Block stehen.
+            os2l_port: "TCP",
         }
         regeln = _regel_zeilen(self.text)
         for port, proto in soll.items():
@@ -162,6 +168,44 @@ class Doc70NetzwerkWindowsTest(unittest.TestCase):
         self.assertIn("Remove-NetFirewallRule -Group 'LightOS'", self.text)
         self.assertIn("Get-NetFirewallRule -Group 'LightOS'", self.text)
         self.assertIn("-WhatIf", self.text)
+
+    def test_jede_funktion_mit_freigabe_hat_eine_regel(self):
+        """Tabelle (Schritt 1) und Regel-Block (Schritt 4) duerfen nicht
+        auseinanderlaufen: jede Zeile, die „lauscht auf <Proto> <Port>" sagt
+        und eine Freigabe verlangt, hat eine Regel mit demselben Port."""
+        regeln = _regel_zeilen(self.text)
+        zeilen = [z for z in self.text.splitlines()
+                  if z.startswith("|") and "lauscht auf" in z]
+        self.assertGreaterEqual(len(zeilen), 5)
+        for z in zeilen:
+            spalten = [s.strip() for s in z.strip("|").split("|")]
+            m = re.search(r"lauscht auf (TCP|UDP) (\d+)", spalten[2])
+            self.assertTrue(m, z)
+            proto, port = m.group(1), int(m.group(2))
+            if spalten[3].startswith("nein"):
+                self.assertNotIn(port, regeln, f"Regel ohne Bedarf: {z}")
+            else:
+                with self.subTest(port=port):
+                    self.assertEqual(regeln.get(port), proto, z)
+
+    def test_blockier_regeln_werden_einzeln_und_gezielt_entfernt(self):
+        """Codex-Befund zu #1002: das fruehere Rezept haengte
+        ``| Remove-NetFirewallRule`` an eine Suche nach 'python|LightOS' im
+        Namen — das loeschte JEDE solche Blockier-Regel, auch die anderer
+        Python-Programme. Entfernt wird jetzt eine Regel ueber ihre Kennung."""
+        self.assertNotRegex(self.text, r"\|\s*Remove-NetFirewallRule")
+        self.assertIn("Remove-NetFirewallRule -Name '<Name aus der Liste>'", self.text)
+        # Die Liste davor zeigt Kennung UND Programm — sonst waere „die
+        # richtige Regel" nicht zu erkennen.
+        i = self.text.index("**Blockier-Regeln finden.**")
+        j = self.text.index("Remove-NetFirewallRule -Name")
+        liste = self.text[i:j]
+        self.assertIn("Get-NetFirewallApplicationFilter", liste)
+        self.assertIn("Name = $_.Name", liste)
+        # Sammel-Loeschen gibt es nur fuer die eigene Gruppe.
+        for zeile in self.text.splitlines():
+            if "Remove-NetFirewallRule" in zeile and "-Name" not in zeile:
+                self.assertIn("-Group 'LightOS'", zeile, zeile)
 
     # ── Pruefen heisst lesen ─────────────────────────────────────────────────
 
