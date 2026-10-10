@@ -80,7 +80,7 @@ Visualizer als separates Fenster.
 | **Ausgabe** | Konfigurieren · Channel-Modifier · Mock Mode · Web-Interface (:5000) · OSC (:7770) · OS2L (:1234) · Input-Profile |
 | **Visualizer** | 3D-Visualizer öffnen/schließen |
 | **Command** | Command-Line fokussieren (`:` / F12) |
-| **Hilfe** | Über LightOS |
+| **Hilfe** | Erste Schritte · Anleitungen öffnen · Tastenkürzel… (Liste aus den vorhandenen Aktionen, `ui/hilfe.py`) · Datenordner öffnen · Show-Ordner öffnen · Diagnosepaket speichern… · Über LightOS (Version, Build-Art, Datenordner, Doku-Link) |
 
 ---
 
