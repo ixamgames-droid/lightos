@@ -1,0 +1,51 @@
+{
+  "format_version": 1,
+  "hersteller": "Laserworld",
+  "hersteller_kurz": "LASERWORLD",
+  "modell": "EL-400RGB MK2",
+  "kurzname": "EL400RGBMK2",
+  "typ": "laser",
+  "leistung_w": 30,
+  "notizen": "Show-Laser Klasse 3B, RGB 320-400 mW, ein DMX-Modus mit 9 Kanaelen (beide Handbuch-Revisionen 2022 und 2024 zeigen nur diesen). Die Betriebsart (Kanal 1) ist zugleich der Aus-Schalter: 0-49 = Laser aus. Blackout, Grand Master 0, Ziel-Blackout und Laser-NOT-AUS schreiben dort 0 — der Laser ist dann dunkel. DIP-Schalter (Handbuch 8.2-8.4, Rueckseite, oben = ON): Schalter 10 = Betriebsart — 10 OFF = DMX-Betrieb (auch Slave), 10 ON = eigenstaendig; Schalter 1-9 = Startadresse binaer (1, 2, 4, 8, 16, 32, 64, 128, 256 — die eingeschalteten addieren). Laut Abbildungen: Auto-Modus = 1 + 10 ON, Musik-Modus = nur 10 ON, DMX-Adresse 1 = nur 1 ON. Alle Schalter aus ergaeben Adresse 0 — gibt es in DMX nicht. Am Geraet bestaetigt (Baujahr 2023): mit Schalter 10 ON laeuft der Laser ohne DMX selbststaendig Muster (Auto/Musik) und reagiert NICHT auf DMX; Schalter 1 ON, 2-9 OFF, 10 OFF = dunkel, wartet auf DMX, Startadresse 1. Kanal 3/4: 0-10 = Mittelstellung, 11-255 = Position; bewusst OHNE Wertebereiche angelegt, damit die 3D-Ansicht 11-255 als Position liest (sie haelt den ersten Bereich fuer den statischen) — die Mittelstellung steht im Kanalnamen. Am Geraet abzugleichen: Richtung von Position X/Y (links/rechts, oben/unten), Richtung von Scan- und Mustergeschwindigkeit (die Open Fixture Library vermutet schnell -> langsam), Groesse 0 = klein oder gross, die Farbstufen von Kanal 8 feiner (Handbuch nennt nur 0-255 Farbe) und was Farbsegmente (Kanal 9) genau tun. Kanal 8 Farbe am Geraet gemessen (08.10.2026, Stuetzpunkte, keine Bereichsgrenzen): 0-1 = bunt segmentiert mit Farbwechsel, 2-3 = weiss, 4-5 = magenta, 6 = weiss oder hellblau (unsicher), 8 = gelb, 10 = blau, 12 = rot, 20 = weiss, 30 = hellblau, 40 = blau, 60 = weiss, 80 = hellblau (cyan), 120 = gruen, 160 = gelb, 200 = weiss, 240 = weiss. Die Farbe wechselt also in sehr schmalen Stufen (etwa 2 DMX-Werte je Farbe) und wiederholt sich ueber den Bereich; alle Grundfarben liegen in 0-15 — genaue Stufengrenzen noch abzugleichen. Die Stuetzpunkte passen zur Stufenliste der Open Fixture Library (dort selbst als ungeprueft markiert). Am Geraet bestaetigt (08.10.2026, Adresse 1): Betriebsart 175 + Muster 0 + Groesse 128 = Kreis; Betriebsart 0 = aus; Blackout, Grand Master 0, Laser-NOT-AUS und gezielter Blackout schalten ueber den echten Sende-Pfad sofort dunkel (Aus-Maske Kanal 1 = 0), danach wieder an. Leistungsaufnahme: Typenschild 30 W, Handbuch-Datenblatt 15 W — das Typenschild gilt. Wellenlaengen: Typenschild 405-658 nm, Datenblatt 638/532/450 nm. Weitere Messung am Geraet (08.10.2026, Statisch-Modus Kanal 1 = 175, Farbe 120): Kanal 2 Muster — 0 Kreis, 32 vier kleine Kreise (eigene Farbe gelb), 64 Strich, 96 gepunkteter Kreis, 128 gepunktetes Dreieck, 160 Quadrat, 192 Stern, 240 pulsierender Kreis. Kanal 3 X: 0-10 Mitte, 80 = nach rechts, 200 = nach links (vom Betrachter aus). Kanal 4 Y: 80 = nach oben, 200 = nach unten. Kanal 7 Groesse UMGEKEHRT: 0 = sehr gross, 128 = mittel, 255 = sehr klein. Dynamisch (Kanal 1 = 225, Muster 0): Kreis waechst von klein nach gross; Kanal 6 = 30 fliessend, 220 in Stufen.",
+  "quelle": {
+    "titel": "Laserworld EL-400RGB MK2 Bedienungsanleitung (EN/DE/FR), Abschnitt 8.4 DMX-512 und technische Daten; Gegenprobe QLC+ Laserworld-EL-400RGB-MK2.qxf und Open Fixture Library laserworld/el-400rgb-mk2",
+    "version": "Ausgabe fuer Baujahre 2022-2024",
+    "datum": "2024-04-26",
+    "url": "https://www.laserworld.com/en/download-file-1780-EL_400RGB_MK2_web.html"
+  },
+  "herkunft": {"art": "hersteller-handbuch", "lizenz": "eigen"},
+  "autor": "LightOS",
+  "geprueft": {
+    "ok": true,
+    "wie": "Kanal fuer Kanal gegen zwei Revisionen des Herstellerhandbuchs (Maerz 2022 und April 2024, Abschnitt 8.4, englische und deutsche Tabelle) geprueft — alle neun Kanaele und die Bandgrenzen von Kanal 1 und 3/4 deckungsgleich; Kanalfolge zusaetzlich mit der QLC+-Datei und der Open-Fixture-Library-Datei abgeglichen (je 9 Kanaele, gleiche Reihenfolge, gleiche Betriebsart-Baender). Typenschild des Geraets (Baujahr 2023) liegt vor. Am Geraet (08.10.2026): Ein/Aus ueber die Betriebsart, Sicherheitskette (Blackout, Grand Master 0, NOT-AUS, gezielter Blackout) und Farb-Stuetzpunkte bestaetigt. Noch offen: Achsrichtungen, Geschwindigkeits-Richtung, Groessen-Richtung, feine Farbstufen (siehe notizen)."
+  },
+  "modi": [
+    {
+      "name": "9-Kanal",
+      "beschreibung": "Einziger DMX-Modus laut Handbuch: DIP-Schalter 10 OFF, Startadresse binaer ueber DIP 1-9 (Adresse 1 = nur Schalter 1 ON).",
+      "kanaele": [
+        {
+          "name": "Betriebsart",
+          "attribut": "shutter",
+          "default": 0,
+          "highlight": 175,
+          "bereiche": [
+            {"von": 0, "bis": 49, "name": "Laser aus", "art": "closed"},
+            {"von": 50, "bis": 99, "name": "Musik-Modus", "art": "sound"},
+            {"von": 100, "bis": 149, "name": "Auto-Modus", "art": ""},
+            {"von": 150, "bis": 199, "name": "Statische Muster (DMX)", "art": "open"},
+            {"von": 200, "bis": 255, "name": "Dynamische Muster (DMX)", "art": "open"}
+          ]
+        },
+        {"name": "Musterauswahl", "attribut": "gobo_wheel", "default": 0, "highlight": 0},
+        {"name": "Position X (0-10 = Mitte)", "attribut": "laser_x", "default": 0, "highlight": 0},
+        {"name": "Position Y (0-10 = Mitte)", "attribut": "laser_y", "default": 0, "highlight": 0},
+        {"name": "Scangeschwindigkeit", "attribut": "laser_scan_rate", "default": 0, "highlight": 0},
+        {"name": "Geschwindigkeit dynamische Muster", "attribut": "effect_speed", "default": 0, "highlight": 0},
+        {"name": "Zoom / Größe", "attribut": "zoom", "default": 128, "highlight": 128},
+        {"name": "Farbe", "attribut": "laser_color", "default": 0, "highlight": 0},
+        {"name": "Farbsegmente", "attribut": "laser_color_change", "default": 0, "highlight": 0}
+      ]
+    }
+  ]
+}
