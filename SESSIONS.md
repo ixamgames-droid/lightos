@@ -55,7 +55,7 @@
 | TOOL-24 | D | - | 2026-10-10T09:41Z | - |
 | FM-66 | D | - | 2026-10-10T09:41Z | - |
 | DOC-70 | D | docs/doc70-netzwerk-windows | 2026-10-10T09:41Z | - |
-| VIZ-98 | D | fix/viz98-bodenfleck-ueber-horizont | 2026-10-10T10:01Z | src/ui/visualizer/scene_src/fixtures/builders.js |
+| VIZ-98 | D | fix/viz98-bodenfleck-ueber-horizont | 2026-10-10T10:47Z | src/ui/visualizer/scene_src/fixtures/builders.js · src/ui/visualizer/scene_src/bridge/bridge.js · tests/test_viz98_bodenfleck_ohne_treffer_scene.py · tests/test_viz_beam_laenge.py |
 | STAB-33 | A | fix/stab33-diagnose-windows | 2026-10-10T10:17Z | src/core/diagnose_log.py · main.py |
 | FM-73 | A | fix/fm73-sync-gleichnamige-modi | 2026-10-10T10:36Z | - |
 | CDX-0810 | A | fix/cdx-0810-main | 2026-10-10T10:46Z | - |
@@ -144,7 +144,6 @@
 
 ## Verlauf
 
-- 2026-10-10T09:28Z C uebergeben DOC-51
 - 2026-10-10T09:28Z C uebergeben DOC-52
 - 2026-10-10T09:28Z C uebergeben DOC-53
 - 2026-10-10T09:28Z C uebergeben TOOL-10
@@ -174,3 +173,4 @@
 - 2026-10-10T10:36Z A claim FM-73
 - 2026-10-10T10:46Z A claim CDX-0810
 - 2026-10-10T10:46Z A claim BACKLOG-STATUS
+- 2026-10-10T10:47Z D aktualisiert VIZ-98: Dateien src/ui/visualizer/scene_src/fixtures/builders.js -> src/ui/visualizer/scene_src/fixtures/builders.js · src/ui/visualizer/scene_src/bridge/bridge.js · tests/test_viz98_bodenfleck_ohne_treffer_scene.py · tests/test_viz_beam_laenge.py
