@@ -23,7 +23,7 @@
 | FM-68 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:10Z | fixtures |
 | DOC-65 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:11Z | docs/anleitung_fixture_generator |
 | LAS-26 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:11Z | src/ui |
-| XPLAT-46 | B | fix/xplat46-arm-x64-empfehlung | 2026-10-08T18:32Z | install.py · INSTALL.md · CONTRIBUTING.md · src/ui/main_window.py · src/utils/plattform_hinweis.py · tests/test_xplat46_arm_empfehlung.py · changelog.d/2026-10-08-XPLAT-46.md |
+| XPLAT-46 | B | fix/xplat46-arm-x64-empfehlung | 2026-10-10T12:25Z | install.py · INSTALL.md · CONTRIBUTING.md · src/ui/main_window.py · src/utils/plattform_hinweis.py · tests/test_xplat46_arm_empfehlung.py · changelog.d/2026-10-08-XPLAT-46.md |
 | UI-76 | B | fix/ui76-go-hinweis-page | 2026-10-08T19:17Z | src/core/cueliste_ziel.py · src/ui/views/playback_view.py · tests/test_ui76_go_hinweis.py · docs/anleitung_szenen_cues/ANLEITUNG.md · changelog.d/2026-10-08-UI-76.md · BACKLOG.md |
 | VIZ-95 | A | feature/viz95-lasermuster-3d | 2026-10-08T20:47Z | src/ui/visualizer |
 | LAS-30 | A | feature/las30-laser-achsen | 2026-10-10T10:47Z | src/core/laser |
