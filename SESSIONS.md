@@ -13,7 +13,6 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | FM-46c | A | feat/fm46-qxf-head | 2026-10-02T11:59Z | - |
-| DOC-49 | C | - | 2026-10-02T12:07Z | docs/FARB_FX_VC_SHOW.md |
 | DOC-50 | C | - | 2026-10-02T12:09Z | docs/LIVE_EDIT_FENSTER.md |
 | DOC-51 | C | - | 2026-10-02T12:23Z | docs/anleitung_grosse_demo_2026/ANLEITUNG_GROSSE_DEMO_2026.md |
 | DOC-52 | C | - | 2026-10-02T12:24Z | docs/anleitung_komplettshow_2026 |
@@ -129,7 +128,6 @@
 
 ## Verlauf
 
-- 2026-10-10T09:16Z A done VIZ-92
 - 2026-10-10T09:16Z 15 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-10T09:26Z C uebergeben DOC-14
 - 2026-10-10T09:26Z C uebergeben DOC-23
@@ -159,3 +157,4 @@
 - 2026-10-10T09:27Z C uebergeben DOC-46
 - 2026-10-10T09:27Z C uebergeben DOC-47
 - 2026-10-10T09:27Z C uebergeben DOC-48
+- 2026-10-10T09:27Z C uebergeben DOC-49
