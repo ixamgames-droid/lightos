@@ -1910,11 +1910,13 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self._visualizer_window = None
             print(f"[MainWindow] Visualizer start error: {e}")
+            # XPLAT-46: auf nativem ARM64-Python fehlt QtWebEngine - dort
+            # nennt die Meldung x64-Python als Abhilfe statt "neu installieren".
+            from src.core.plattform_hinweis import visualizer_startfehler_text
             QMessageBox.warning(
                 self,
                 "Visualizer nicht verfügbar",
-                "Der 3D-Visualizer konnte nicht gestartet werden.\n\n"
-                "Bitte prüfe, ob PySide6 + PySide6-Addons korrekt installiert sind."
+                visualizer_startfehler_text(e),
             )
 
     def _close_visualizer(self):
