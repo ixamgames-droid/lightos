@@ -23,7 +23,6 @@
 | FM-68 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:10Z | fixtures |
 | DOC-65 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:11Z | docs/anleitung_fixture_generator |
 | LAS-26 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:11Z | src/ui |
-| XPLAT-46 | B | fix/xplat46-arm-x64-empfehlung | 2026-10-10T12:25Z | install.py · INSTALL.md · CONTRIBUTING.md · src/ui/main_window.py · src/utils/plattform_hinweis.py · tests/test_xplat46_arm_empfehlung.py · changelog.d/2026-10-08-XPLAT-46.md |
 | VIZ-95 | A | feature/viz95-lasermuster-3d | 2026-10-08T20:47Z | src/ui/visualizer |
 | LAS-30 | A | feature/las30-laser-achsen | 2026-10-10T10:47Z | src/core/laser |
 | VIZ-96 | A | feature/viz96-gobo-projektion | 2026-10-10T13:08Z | src/ui/visualizer |
@@ -183,7 +182,6 @@
 
 ## Verlauf
 
-- 2026-10-10T12:06Z D done FM-72
 - 2026-10-10T12:25Z A done VCB-41
 - 2026-10-10T12:44Z B done ARM-PRUEFUNG-1010
 - 2026-10-10T12:55Z A done TOOL-25
@@ -213,3 +211,4 @@
 - 2026-10-10T15:03Z D aktualisiert QA-91: Branch fix/qa91-doc60-test-encoding -> fix/qa91-subprocess-encoding
 - 2026-10-10T15:15Z A done WEB-06
 - 2026-10-10T15:26Z D aktualisiert QA-91: Branch fix/qa91-subprocess-encoding -> fix/qa91-doc60-test-encoding
+- 2026-10-10T15:48Z B done XPLAT-46
