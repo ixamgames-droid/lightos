@@ -35,7 +35,6 @@
 | DOC-69 | A | docs/doc69-doku-korrekturen | 2026-10-10T18:44Z | - |
 | STAB-32 | A | feature/stab32-versionierte-sicherungen | 2026-10-10T18:44Z | - |
 | OUT-67 | A | feature/out67-ausgabe-ausfall-banner | 2026-10-10T09:29Z | - |
-| TOOL-14 | D | fix/tool14-gen-tools-index-argparse | 2026-10-10T18:52Z | tools/gen_tools_index.py · tests/test_tool14_gen_tools_index_cli.py |
 | TOOL-21 | D | fix/tool21-gif-vergleich-rgb | 2026-10-10T18:52Z | tools/anleitungsbilder/runner.py · tests/test_tool21_bildvergleich_je_kanal.py |
 | TOOL-23 | D | fix/tool23-backlog-ids-tafel-fragmente | 2026-10-10T18:52Z | tools/backlog_ids.py · tests/test_tool23_backlog_ids_tafel_fragmente.py · tests/test_backlog_ids.py |
 | TOOL-24 | D | fix/tool24-proc18-lizenzhinweise-strukturiert | 2026-10-10T18:52Z | tests/test_proc18_fremd_lizenzhinweise.py |
@@ -195,7 +194,6 @@
 
 ## Verlauf
 
-- 2026-10-10T14:38Z A claim VIZ-101
 - 2026-10-10T14:39Z A claim UI-86
 - 2026-10-10T14:39Z D claim QA-91
 - 2026-10-10T14:44Z A done MIDI-3
@@ -225,3 +223,4 @@
 - 2026-10-10T19:31Z A aktualisiert UI-86: Branch fix/ui86-2d-hidpi -> perf/ui86-2d-ansicht-hidpi
 - 2026-10-10T19:43Z A claim VIZ-102
 - 2026-10-10T20:11Z D claim UI-87
+- 2026-10-10T20:14Z D done TOOL-14
