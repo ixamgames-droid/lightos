@@ -41,7 +41,6 @@
 | PROC-19 | A | ci/proc19-doku-schnellweg | 2026-10-10T18:57Z | .github/workflows/ci.yml |
 | PROC-20 | A | feature/proc20-backlog-fragmente | 2026-10-10T18:45Z | tools · BACKLOG.md |
 | TOOL-26 | B | feature/tool26-app-messwerkzeug | 2026-10-10T13:25Z | tools/app_messung.py · tools/README.md · tests/test_tool26_app_messung.py · BACKLOG.md · changelog.d/2026-10-10-TOOL-26.md |
-| LAS-31 | A | feature/las31-notaus-kopfleiste | 2026-10-10T13:08Z | - |
 | LAS-32 | A | feature/las32-laser-sperrzonen | 2026-10-10T13:08Z | - |
 | DEMO-8 | A | feature/demo8-demoshows-im-setup | 2026-10-10T13:08Z | - |
 | XPLAT-51 | A | fix/xplat51-arm64-nicht-unterstuetzt | 2026-10-10T14:17Z | - |
@@ -200,7 +199,6 @@
 
 ## Verlauf
 
-- 2026-10-10T17:17Z A done STAB-33
 - 2026-10-10T17:40Z A done UI-85
 - 2026-10-10T18:00Z D claim VCB-36
 - 2026-10-10T18:00Z D claim UI-78
@@ -230,3 +228,4 @@
 - 2026-10-10T21:17Z A claim QA-95
 - 2026-10-10T21:41Z D done DOC-70
 - 2026-10-10T22:00Z D done TOOL-21
+- 2026-10-10T22:23Z A done LAS-31
