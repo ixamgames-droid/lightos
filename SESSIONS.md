@@ -60,7 +60,7 @@
 | QA-92 | D | fix/qa92-windows-rote-tests | 2026-10-10T19:32Z | - |
 | CDX-58 | A | fix/cdx-1010-main | 2026-10-10T19:30Z | - |
 | VIZ-102 | A | feature/viz102-gobo-hallenboden | 2026-10-10T19:43Z | - |
-| UI-87 | D | fix/ui87-hilfe-oeffnen-windows | 2026-10-10T20:44Z | - |
+| UI-87 | D | fix/ui87-hilfe-oeffnen-windows | 2026-10-10T21:16Z | - |
 | QA-93 | D | fix/qa93-gate-ohne-echtes-fenster | 2026-10-10T21:11Z | - |
 
 ## Blocker & Fallen
