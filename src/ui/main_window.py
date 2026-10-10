@@ -2554,6 +2554,27 @@ class MainWindow(QMainWindow):
         from src.ui.widgets.bibliothek_download_dialog import BibliothekDownloadDialog
         BibliothekDownloadDialog(self, erststart=erststart).exec()
 
+    def _bibliothek_hinweis_zeigen(self):
+        """FM-72: die Erststart-Frage als Knopf in der Statuszeile statt als
+        modaler Dialog (Start mit ``--show``). Ein Klick oeffnet denselben
+        Dialog wie beim ersten Start; danach verschwindet der Knopf."""
+        if getattr(self, "_btn_bibliothek_hinweis", None) is not None:
+            return
+        btn = QPushButton("Geräte-Bibliothek laden…")
+        btn.setFlat(True)
+        btn.setToolTip("Eine freie Geräte-Bibliothek (QLC+ oder Open Fixture "
+                       "Library) herunterladen — dieselbe Frage wie beim ersten Start.")
+
+        def _klick():
+            self.statusBar().removeWidget(btn)
+            btn.deleteLater()
+            self._btn_bibliothek_hinweis = None
+            self._open_bibliothek_download(erststart=True)
+
+        btn.clicked.connect(_klick)
+        self.statusBar().addPermanentWidget(btn)
+        self._btn_bibliothek_hinweis = btn
+
     def _open_fixture_editor(self):
         try:
             from src.ui.widgets.fixture_editor import FixtureEditorDialog
