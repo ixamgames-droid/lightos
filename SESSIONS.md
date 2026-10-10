@@ -35,7 +35,7 @@
 | DOC-69 | A | docs/doc69-doku-korrekturen | 2026-10-10T18:44Z | - |
 | STAB-32 | A | feature/stab32-versionierte-sicherungen | 2026-10-10T18:44Z | - |
 | OUT-67 | A | feature/out67-ausgabe-ausfall-banner | 2026-10-10T09:29Z | - |
-| TOOL-24 | D | fix/tool24-proc18-lizenzhinweise-strukturiert | 2026-10-10T21:17Z | tests/test_proc18_fremd_lizenzhinweise.py |
+| TOOL-24 | D | fix/tool24-proc18-lizenzhinweise-strukturiert | 2026-10-10T22:54Z | tests/test_proc18_fremd_lizenzhinweise.py |
 | FM-66 | D | fix/fm66-abgleich-modellname | 2026-10-10T21:17Z | src/core/database/bibliothek_format.py · tests/test_fm66_abgleich_modellname.py · docs/FIXTURE_LIBRARY.md |
 | FM-73 | A | fix/fm73-sync-gleichnamige-modi | 2026-10-10T18:44Z | - |
 | PROC-19 | A | ci/proc19-doku-schnellweg | 2026-10-10T18:57Z | .github/workflows/ci.yml |
