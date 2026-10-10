@@ -58,6 +58,7 @@
 | STAB-33 | A | fix/stab33-diagnose-windows | 2026-10-10T10:17Z | src/core/diagnose_log.py · main.py |
 | FM-73 | A | fix/fm73-sync-gleichnamige-modi | 2026-10-10T10:36Z | - |
 | BACKLOG-STATUS | A | docs/backlog-status-1010 | 2026-10-10T10:46Z | BACKLOG.md |
+| ARM-PRUEFUNG-1010 | B | - | 2026-10-10T11:19Z | - |
 
 ## Blocker & Fallen
 
@@ -145,7 +146,6 @@
 
 ## Verlauf
 
-- 2026-10-10T09:28Z C uebergeben DOC-56
 - 2026-10-10T09:29Z A claim XPLAT-49
 - 2026-10-10T09:29Z A claim XPLAT-50
 - 2026-10-10T09:29Z A claim FM-67
@@ -175,3 +175,4 @@
 - 2026-10-10T11:13Z D aktualisiert TOOL-21: Branch - -> fix/tool21-gif-vergleich-rgb; Dateien - -> tools/anleitungsbilder/runner.py · tests/test_tool21_bildvergleich_je_kanal.py
 - 2026-10-10T11:15Z B done OUT-64
 - 2026-10-10T11:19Z D aktualisiert TOOL-23: Branch - -> fix/tool23-backlog-ids-tafel-fragmente; Dateien - -> tools/backlog_ids.py · tests/test_tool23_backlog_ids_tafel_fragmente.py · tests/test_backlog_ids.py
+- 2026-10-10T11:19Z B claim ARM-PRUEFUNG-1010
