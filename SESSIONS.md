@@ -58,7 +58,7 @@
 | UI-86 | A | perf/ui86-2d-ansicht-hidpi | 2026-10-10T14:39Z | - |
 | QA-91 | D | fix/qa91-doc60-test-encoding | 2026-10-10T15:48Z | - |
 | VCB-36 | D | fix/vcb36-blackout-ziel-gruppen-id | 2026-10-10T18:16Z | - |
-| UI-78 | D | - | 2026-10-10T18:00Z | - |
+| UI-78 | D | fix/ui78-efx-editor-texte | 2026-10-10T18:24Z | - |
 | UI-80 | D | fix/ui80-matrix-entwurf-speed | 2026-10-10T18:17Z | - |
 | TOOL-18 | D | fix/tool18-bilder-hinweis-gpu-szenen | 2026-10-10T18:10Z | - |
 | TOOL-19 | D | fix/tool19-werkzeuge-ohne-echten-ausgang | 2026-10-10T18:03Z | - |
@@ -187,7 +187,6 @@
 
 ## Verlauf
 
-- 2026-10-10T13:27Z B aktualisiert VIZ-99: Dateien - -> src/ui/visualizer/scene_src/scene/gpu_tier.js · tests/test_viz84_gpu_tier.py · tests/test_viz99_automatik_snapdragon.py · src/ui/visualizer/visualizer_window.py · BACKLOG.md · changelog.d/2026-10-10-VIZ-99.md
 - 2026-10-10T13:55Z D done BPM-30
 - 2026-10-10T14:17Z B uebergeben XPLAT-51
 - 2026-10-10T14:17Z B uebergeben XPLAT-52
@@ -217,3 +216,4 @@
 - 2026-10-10T18:11Z D done XPLAT-48
 - 2026-10-10T18:16Z D aktualisiert VCB-36: Branch - -> fix/vcb36-blackout-ziel-gruppen-id
 - 2026-10-10T18:17Z D aktualisiert UI-80: Branch - -> fix/ui80-matrix-entwurf-speed
+- 2026-10-10T18:24Z D aktualisiert UI-78: Branch - -> fix/ui78-efx-editor-texte
