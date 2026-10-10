@@ -57,7 +57,6 @@
 | VIZ-98 | D | fix/viz98-bodenfleck-ueber-horizont | 2026-10-10T11:42Z | src/ui/visualizer/scene_src/fixtures/builders.js · src/ui/visualizer/scene_src/bridge/bridge.js · tests/test_viz98_bodenfleck_ohne_treffer_scene.py · tests/test_viz_beam_laenge.py |
 | STAB-33 | A | fix/stab33-diagnose-windows | 2026-10-10T10:17Z | src/core/diagnose_log.py · main.py |
 | FM-73 | A | fix/fm73-sync-gleichnamige-modi | 2026-10-10T10:36Z | - |
-| BACKLOG-STATUS | A | docs/backlog-status-1010 | 2026-10-10T10:46Z | BACKLOG.md |
 | ARM-PRUEFUNG-1010 | B | - | 2026-10-10T11:19Z | - |
 
 ## Blocker & Fallen
@@ -152,7 +151,6 @@
 
 ## Verlauf
 
-- 2026-10-10T09:29Z A claim FM-67
 - 2026-10-10T09:29Z A claim WEB-06
 - 2026-10-10T09:29Z A claim UI-85
 - 2026-10-10T09:29Z A claim DOC-69
@@ -182,3 +180,4 @@
 - 2026-10-10T11:19Z B claim ARM-PRUEFUNG-1010
 - 2026-10-10T11:23Z D aktualisiert TOOL-24: Branch - -> fix/tool24-proc18-lizenzhinweise-strukturiert; Dateien - -> tests/test_proc18_fremd_lizenzhinweise.py
 - 2026-10-10T11:28Z D aktualisiert FM-66: Branch - -> fix/fm66-abgleich-modellname; Dateien - -> src/core/database/bibliothek_format.py · tests/test_fm66_abgleich_modellname.py · docs/FIXTURE_LIBRARY.md
+- 2026-10-10T11:46Z A done BACKLOG-STATUS
