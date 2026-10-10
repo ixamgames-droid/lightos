@@ -23,7 +23,7 @@ Daraus folgt die Grundregel, aus der alles andere abgeleitet ist:
 | Rolle | Wer | Zustaendig fuer |
 |---|---|---|
 | **Leitende Sitzung** (`A`) | die Sitzung, die diese Datei pflegt | **Arbeitsverteilung**, Second Brain, Prozess/Regeln, Konfliktentscheidung, Freigabe strittiger Merges |
-| **Mitarbeitende Sitzung** (`B`, `C`, …) | jede weitere | Zugeteilte Items abarbeiten **oder sich freie aus `BACKLOG.md` nehmen**, Befunde ins `BACKLOG.md`, Blocker in `SESSIONS.md` |
+| **Mitarbeitende Sitzung** (`B`, `C`, …) | jede weitere | Zugeteilte Items abarbeiten **oder sich freie aus `BACKLOG.md` nehmen**, Befunde als Fragment unter `backlog.d/` (PROC-20), Blocker in `SESSIONS.md` |
 
 **★ `A` teilt zu, `B` arbeitet ab (Ansage vom Betreiber, 2026-09-03).** Das ist
 die Grundform: `A` entscheidet, was als Naechstes drankommt und wer es macht,
@@ -108,15 +108,47 @@ Die Tafel liegt auf dem Branch **`sessions`**, nicht auf `main`:
 
 | Frage | Ort |
 |---|---|
-| *Was ist zu tun? Was wurde gefunden?* | `BACKLOG.md` (unveraendert die einzige Wahrheit) |
+| *Was ist zu tun? Was wurde gefunden?* | `BACKLOG.md` (unveraendert die einzige Wahrheit) — Neues und Statusaenderungen kommen als Fragment `backlog.d/<ID>.md` dorthin |
 | *Wer arbeitet gerade woran?* | `SESSIONS.md` auf Branch `sessions` |
 | *Worueber stolpert man gerade?* | Blocker-Abschnitt in `SESSIONS.md` |
 | *Was haben wir daraus gelernt?* | Second Brain — **nur `A` schreibt** |
 
-Der Backlog-Status (`todo` → `wip` → `done`) bleibt wie gehabt Teil des
-Arbeits-Commits. Er ist die **menschliche** Sicht; `SESSIONS.md` ist die
-**maschinelle** — bewusst getrennt, weil `BACKLOG.md` 1500 Zeilen hat und bei
-jedem Claim ein Konfliktkandidat waere.
+Der Backlog-Status bleibt Teil des Arbeits-Commits — seit 2026-10-10 (PROC-20)
+aber als **Fragment** `backlog.d/<ID>.md` statt als Aenderung an `BACKLOG.md`.
+Er ist die **menschliche** Sicht; `SESSIONS.md` ist die **maschinelle** —
+bewusst getrennt, weil `BACKLOG.md` 1500 Zeilen hat und bei jedem Claim ein
+Konfliktkandidat waere.
+
+### Backlog-Fragmente: so laeuft es fuer alle Sitzungen (PROC-20)
+
+1. **Im eigenen PR:** je Item eine Datei `backlog.d/<ID>.md`; `BACKLOG.md`
+   bleibt unberuehrt. Beispiel fuer ein neues Item, das der PR umsetzt:
+
+   ```
+   ID: UI-99
+   Prioritaet: P2
+   Status: review
+   Titel: Kurzer Titel des Items
+
+   Was fehlt, woran man es merkt, wann es erledigt ist.
+   ```
+
+   Fuer ein vorhandenes Item genuegen `ID:` und `Status:`. Ein Befund ohne
+   Umsetzung bekommt `Status: todo`. Alle Kopfzeilen:
+   [`backlog.d/README.md`](backlog.d/README.md).
+2. **Nach dem Merge:** nichts. Niemand setzt mehr von Hand `review` auf `done`.
+3. **Sammeln — nur `A`**, regelmaessig, als kleiner eigener PR auf frischem
+   `main`: `tools/backlog_sammeln.py --pruefen`, `--dry-run`, dann ohne
+   Schalter; Betreff `backlog: sammeln`. Aus `review` wird dabei
+   `done (<Datum>, PR #N)`. Bis dahin steht das Item nur im Fragment — das
+   Dashboard (liest nur `BACKLOG.md`) zeigt es erst nach dem Sammeln.
+4. **Arbeit an einem Item, dessen Fragment noch in `backlog.d/` liegt:** diese
+   Datei aendern, keine zweite anlegen. Sammelt `A` sie inzwischen ein, meldet
+   Git beim Aktualisieren des Zweigs „geaendert/geloescht" — die eigene Fassung
+   behalten; der naechste Sammel-Lauf ersetzt dann nur den Status der Zeile.
+5. **Uebergang:** offene PRs, die `BACKLOG.md` noch direkt aendern, bleiben
+   gueltig. `tests/test_backlog_fragmente.py` meldet es als Hinweis, kein Gate
+   wird davon rot.
 
 ### Blocker und Briefe an eine Sitzung (PROC-17)
 
@@ -267,8 +299,11 @@ ist ein Eingriff, den nur der Mensch entscheidet, nicht die Sitzung.
   Segments: `pgrep -fa "python main.py"`. Und `app.sh restart` waehrend die
   andere Sitzung am Rig misst, ist ein Eingriff in fremde Arbeit — erst in
   `SESSIONS.md` nachsehen.
-* **`BACKLOG.md` bearbeiten beide.** Aenderungen klein halten und zeitnah
-  mergen; ein tagealter Branch mit Backlog-Aenderungen konfliktet garantiert.
+* **`BACKLOG.md` fasst im normalen PR niemand mehr an** (PROC-20): Neues und
+  Statusaenderungen als Fragment `backlog.d/<ID>.md`, eingesammelt von `A`. Wer
+  die Datei doch direkt aendert (Uebergang, bewusste Korrektur), haelt die
+  Aenderung klein und mergt zeitnah — ein tagealter Branch mit
+  Backlog-Aenderungen konfliktet garantiert.
 
 ---
 

@@ -1,0 +1,8 @@
+ID: PROC-20
+Prioritaet: P2
+Status: review
+Titel: Backlog-Konflikte abschaffen: je Item ein Fragment unter backlog.d/ statt einer Zeile in BACKLOG.md
+
+**Herkunft:** Entscheidung Projektinhaber 10.10.2026. Jeder Feature-PR aenderte BACKLOG.md (neue Zeile bzw. Status `review (Zweig …)`). Folge: nach jedem Merge kollidierten die naechsten PRs in dieser Datei, und gemergte Items blieben auf `review` stehen, sodass das Dashboard sie nicht als erledigt zaehlte.
+**Geliefert:** nach dem Vorbild der CHANGELOG-Fragmente (PROC-09) legt ein PR je Item `backlog.d/<ID>.md` an (Kopfzeilen ID, Prioritaet, Status, Titel, Status-Notiz, Nach; Freitext = Details) und fasst BACKLOG.md nicht mehr an. `tools/backlog_sammeln.py` traegt die Fragmente ein (neue Zeile hinter der hoechsten Nummer der Gruppe bzw. Statusspalte ersetzen), macht aus `review` mit der PR-Nummer aus dem Merge-Betreff `done`, loescht die Fragmente und ist idempotent; `--pruefen`, `--dry-run`, `--pr N`, `--waechter`. `tools/backlog_ids.py` sieht die Fragmente aller offenen PR-Zweige fuer die naechste freie Nummer und die Kollisionspruefung; `tools/check_doc_links.py` prueft Links in Fragmenten ab dem Wurzelverzeichnis. Der Waechter fuer direkte BACKLOG-Aenderungen warnt nur, offene PRs alter Art bleiben gueltig. Ablauf in [backlog.d/README.md](backlog.d/README.md), AGENTS.md, WORKFLOW.md, COORDINATION.md und CONTRIBUTING.md; Tests in `tests/test_backlog_fragmente.py` und `tests/test_backlog_ids.py`.
+**Offen (bewusst):** das Dashboard ausserhalb des Repos liest weiter nur BACKLOG.md, der Stand dort ist also so frisch wie der letzte Sammel-Lauf.

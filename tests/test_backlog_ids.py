@@ -155,6 +155,30 @@ class KollisionenTest(unittest.TestCase):
         jz = {"origin/main": items_aus_backlog(tabelle("| FM-30 | P2 | todo | **A** | x |"))}
         self.assertEqual(kollisionen(jz, auf_main=set()), [])
 
+    def test_alt_pr_mit_zeile_und_fragment_pr_gleicher_titel_keine_kollision(self):
+        # Codex zu PROC-20: die Tabelle schreibt den Titel fett (**A**), das
+        # Fragment traegt ihn nackt. Dieselbe ID mit demselben Titel in einem
+        # Alt-PR (BACKLOG-Zeile) und einem Fragment-PR ist EIN Eintrag auf zwei
+        # Staenden — sonst endet --strict mit Exit 1 ohne echte Kollision.
+        import backlog_ids as B
+        frag = "ID: UI-99\nPrioritaet: P2\nStatus: review\nTitel: {}\n\nText.\n"
+        main_ = items_aus_backlog(tabelle("| UI-1 | P2 | done | **Alt** | x |"))
+        alt_pr = items_aus_backlog(tabelle(
+            "| UI-1 | P2 | done | **Alt** | x |",
+            "| UI-99 | P2 | review | **Neuer Knopf** | x |"))
+        for titel in ("Neuer Knopf", "**Neuer Knopf**"):
+            jz = {"origin/main": main_, "origin/alt": alt_pr,
+                  "origin/neu": B.mit_fragmenten(
+                      main_, {"backlog.d/UI-99.md": frag.format(titel)})}
+            self.assertEqual(kollisionen(jz, auf_main=set(main_)), [], titel)
+        # Gegenprobe: ein ANDERER Titel bleibt eine Kollision, und die Meldung
+        # zeigt die Titel so, wie sie im Zweig stehen.
+        jz["origin/neu"] = B.mit_fragmenten(
+            main_, {"backlog.d/UI-99.md": frag.format("Anderer Knopf")})
+        treffer = kollisionen(jz, auf_main=set(main_))
+        self.assertEqual([t[0] for t in treffer], ["UI-99"])
+        self.assertEqual(treffer[0][1]["origin/alt"], "**Neuer Knopf**")
+
 
 class FailClosedTest(unittest.TestCase):
     """★ CDX-57 (zweite Codex-Runde): eine Warnung allein genuegt nicht.
@@ -270,6 +294,131 @@ class TafelUndFragmenteTest(unittest.TestCase):
         finally:
             B._git, B.offene_pr_zweige = orig
         self.assertIn("DOC-44", buf.getvalue())
+
+
+class BacklogFragmenteTest(unittest.TestCase):
+    """PROC-20: ein Item, das nur als ``backlog.d/<ID>.md`` existiert, ist
+    vergeben — fuer die naechste freie Nummer UND fuer die Kollisionspruefung.
+    Seit kein PR mehr BACKLOG.md anfasst, stehen neue IDs NUR dort; ohne diese
+    Quelle boete das Werkzeug jede frisch vergebene Nummer noch einmal an."""
+
+    FRAG = "ID: FM-31\nPrioritaet: P2\nStatus: todo\nTitel: {}\n\nText.\n"
+
+    def test_fragment_liefert_id_und_titel(self):
+        import backlog_ids as B
+        self.assertEqual(
+            B.items_aus_fragmenten({"FM-31.md": self.FRAG.format("Return speichert"),
+                                    "README.md": "# Erklaerung FM-99\n"}),
+            {"FM-31": "Return speichert"})
+
+    def test_status_fragment_ohne_titel_traegt_keinen_titel_bei(self):
+        # Ein reines Status-Fragment gehoert zu einer vorhandenen Zeile; ein
+        # leerer Titel saehe sonst wie ein ABWEICHENDER Titel aus.
+        import backlog_ids as B
+        self.assertEqual(B.items_aus_fragmenten({"FM-29.md": "ID: FM-29\nStatus: done\n"}), {})
+
+    def test_die_backlog_zeile_gewinnt_gegen_das_fragment(self):
+        import backlog_ids as B
+        zeilen = items_aus_backlog(tabelle("| FM-31 | P2 | todo | **Aus der Tabelle** | x |"))
+        self.assertEqual(
+            B.mit_fragmenten(zeilen, {"FM-31.md": self.FRAG.format("Aus dem Fragment")}),
+            {"FM-31": "**Aus der Tabelle**"})
+
+    def test_fragment_hebt_die_naechste_freie(self):
+        import backlog_ids as B
+        main_ = items_aus_backlog(tabelle("| FM-30 | P2 | done | **A** | x |"))
+        jz = {"origin/main": main_,
+              "origin/a": B.mit_fragmenten(main_, {"FM-31.md": self.FRAG.format("Neu")})}
+        self.assertEqual(naechste_freie({"origin/main": main_}, "FM"), 31)
+        self.assertEqual(naechste_freie(jz, "FM"), 32)
+
+    def test_zwei_zweige_mit_demselben_neuen_fragment_kollidieren(self):
+        import backlog_ids as B
+        main_ = items_aus_backlog(tabelle("| FM-30 | P2 | done | **A** | x |"))
+        jz = {"origin/main": main_,
+              "origin/a": B.mit_fragmenten(main_, {"FM-31.md": self.FRAG.format("Return")}),
+              "origin/b": B.mit_fragmenten(main_, {"FM-31.md": self.FRAG.format("Regler")})}
+        self.assertEqual([t[0] for t in kollisionen(jz, auf_main=set(main_))], ["FM-31"])
+        # Positivkontrolle: derselbe Titel auf beiden Zweigen ist derselbe Eintrag.
+        jz["origin/b"] = jz["origin/a"]
+        self.assertEqual(kollisionen(jz, auf_main=set(main_)), [])
+
+    def test_fragment_gegen_tabellenzeile_eines_alten_pr_kollidiert(self):
+        # Uebergang: Zweig a traegt die ID noch direkt in BACKLOG.md ein,
+        # Zweig b legt fuer ein ANDERES Item dieselbe ID als Fragment an.
+        import backlog_ids as B
+        main_ = items_aus_backlog(tabelle("| FM-30 | P2 | done | **A** | x |"))
+        jz = {"origin/main": main_,
+              "origin/a": items_aus_backlog(tabelle("| FM-31 | P2 | todo | **Return** | x |")),
+              "origin/b": B.mit_fragmenten(main_, {"FM-31.md": self.FRAG.format("Regler")})}
+        self.assertEqual([t[0] for t in kollisionen(jz, auf_main=set(main_))], ["FM-31"])
+
+    def _main(self, fragmente: dict, argv):
+        """``main()`` mit zugehaltenem git; ``fragmente`` = {Ref: {Name: Text}}."""
+        import backlog_ids as B
+        orig = (B._git, B.offene_pr_zweige)
+        tabelle_main = tabelle("| DOC-21 | P3 | todo | **T** | d |")
+
+        def git(*args):
+            if args[:1] == ("show",) and args[1].endswith(":BACKLOG.md"):
+                return 0, tabelle_main
+            for ref, dateien in fragmente.items():
+                if args[:1] == ("ls-tree",) and args[-1] == f"{ref}:backlog.d":
+                    return 0, "".join(n + "\n" for n in dateien) + "README.md\n"
+                for name, text in dateien.items():
+                    if args == ("show", f"{ref}:backlog.d/{name}"):
+                        return 0, text
+            if args[:1] in (("show",), ("ls-tree",)):
+                return 1, ""
+            return 0, ""
+        B._git = git
+        B.offene_pr_zweige = lambda: (["a", "b"], None)
+        try:
+            import io
+            from contextlib import redirect_stdout
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                rc = B.main(list(argv) + ["--kein-fetch"])
+        finally:
+            B._git, B.offene_pr_zweige = orig
+        return rc, buf.getvalue()
+
+    _DOC22 = "ID: DOC-22\nPrioritaet: P3\nStatus: review\nTitel: {}\n"
+
+    def test_main_zaehlt_fragmente_fuer_die_naechste_freie(self):
+        """Ueber ``main()`` gemessen: die Auskunft selbst muss die Fragmente sehen."""
+        rc, aus = self._main({"origin/a": {"DOC-22.md": self._DOC22.format("Neu")}},
+                             ["--gruppe", "DOC"])
+        self.assertEqual(rc, 0, aus)
+        self.assertIn("DOC-23", aus)
+
+    def test_main_zaehlt_auch_ein_fragment_ohne_titel(self):
+        # Kein Titel = kein Beitrag zur Kollisionspruefung, aber die NUMMER
+        # ist vergeben (Dateiname genuegt).
+        rc, aus = self._main({"origin/a": {"DOC-30.md": "ID: DOC-30\nStatus: todo\n"}},
+                             ["--gruppe", "DOC"])
+        self.assertEqual(rc, 0, aus)
+        self.assertIn("DOC-31", aus)
+
+    def test_main_meldet_die_kollision_zweier_fragmente(self):
+        rc, aus = self._main({"origin/a": {"DOC-22.md": self._DOC22.format("Eins")},
+                              "origin/b": {"DOC-22.md": self._DOC22.format("Zwei")}},
+                             ["--strict"])
+        self.assertEqual(rc, 1, aus)
+        self.assertIn("DOC-22", aus)
+
+    def test_main_meldet_denselben_titel_nicht(self):
+        rc, aus = self._main({"origin/a": {"DOC-22.md": self._DOC22.format("Eins")},
+                              "origin/b": {"DOC-22.md": self._DOC22.format("Eins")}},
+                             ["--strict"])
+        self.assertEqual(rc, 0, aus)
+
+    def test_main_meldet_ein_fragment_das_auf_main_liegt_nicht(self):
+        # Nach dem Merge, vor dem Sammeln: die ID ist geerbt, keine Kollision.
+        rc, aus = self._main({"origin/main": {"DOC-22.md": self._DOC22.format("Eins")},
+                              "origin/b": {"DOC-22.md": self._DOC22.format("Eins, geschaerft")}},
+                             ["--strict"])
+        self.assertEqual(rc, 0, aus)
 
 
 if __name__ == "__main__":

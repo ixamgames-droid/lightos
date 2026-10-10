@@ -131,11 +131,35 @@ Code- und Git-Root.
   mit Fallback. Harte Regel: kein Linux-Fix darf Windows-ARM regredieren — und
   umgekehrt. `python-rtmidi` gibt es nur auf Linux/x64, auf ARM-Windows laeuft
   der WinMM-Pfad; MIDI-Aenderungen immer fuer BEIDE Zweige durchdenken.
+- **BACKLOG pflegen — als Fragment, nicht in `BACKLOG.md`** (seit 2026-10-10,
+  PROC-20). Ein PR legt je Item **eine Datei** `backlog.d/<ID>.md` an und fasst
+  `BACKLOG.md` nicht an — fuer ein neues Item genauso wie fuer eine
+  Statusaenderung:
+  ```
+  ID: UI-99
+  Prioritaet: P2
+  Status: review
+  Titel: Kurzer Titel des Items
+
+  Was fehlt, woran man es merkt, wann es erledigt ist.
+  ```
+  Fuer ein vorhandenes Item genuegen `ID:` und `Status:` (dazu optional
+  `Status-Notiz:`). Status im PR: `review`, wenn du das Item umsetzt; `todo`,
+  wenn du nur einen Befund ablegst (ausserdem `done`, `teils`, `blocked`).
+  Vorlage und alle Kopfzeilen: [`backlog.d/README.md`](backlog.d/README.md).
+  **Warum:** Jeder PR schrieb in dieselbe Datei — nach jedem Merge kollidierten
+  die naechsten PRs, und gemergte Items blieben auf `review` stehen.
+  **Eingesammelt** wird regelmaessig von der leitenden Sitzung in einem kleinen
+  eigenen PR: `./venv/bin/python tools/backlog_sammeln.py --pruefen`, dann
+  `--dry-run`, dann ohne Schalter; Commit-Betreff `backlog: sammeln`. Dabei wird
+  aus `review` von selbst `done (<Datum>, PR #N)`. **Uebergang:** ein offener PR,
+  der `BACKLOG.md` noch direkt aendert, bleibt gueltig —
+  `tests/test_backlog_fragmente.py` meldet das nur als Hinweis.
 - **Neues BACKLOG-Item? Nummer NICHT selbst raten:**
   `./venv/bin/python tools/backlog_ids.py --gruppe FM` (bzw. QA/VIZ/PROC/…).
-  Das Werkzeug rechnet ueber `main`, **alle offenen PR-Zweige, die Belegungstafel
-  und die Changelog-Fragmente** (TOOL-9) — dein eigenes
-  `BACKLOG.md` zeigt nur deinen Stand. Zweimal in vier Tagen haben parallel
+  Das Werkzeug rechnet ueber `main`, **alle offenen PR-Zweige, die Belegungstafel,
+  die Changelog-Fragmente** (TOOL-9) **und die Backlog-Fragmente** (PROC-20) —
+  dein eigenes `BACKLOG.md` zeigt nur deinen Stand. Zweimal in vier Tagen haben parallel
   arbeitende Sitzungen dieselbe Nummer vergeben (22.08. zweimal `FM-26`, 25.08.
   **dreimal** `FM-30`); `test_ids_are_unique` faengt das erst, wenn zwei davon
   gelandet sind, und dann kostet die Umbenennung einen Durchgang durch BACKLOG,
@@ -191,5 +215,6 @@ Store nachgezogen werden kann:
 - [ ] Test-Gate grün (`./tools/verify_loop.sh` bzw. `.\tools\verify_segmented.ps1`)
 - [ ] Test für neue/geänderte Logik vorhanden
 - [ ] CHANGELOG-Fragment `changelog.d/JJJJ-MM-TT-<ID>.md` angelegt (richtiger Abschnitt; `CHANGELOG.md` selbst unberührt)
+- [ ] BACKLOG-Fragment `backlog.d/<ID>.md` angelegt bzw. Status darin gesetzt (`BACKLOG.md` selbst unberührt)
 - [ ] Default-/Verhaltensänderung in `docs/` dokumentiert
 - [ ] „Memory-/Doku-Updates"-Block in der Zusammenfassung ausgegeben
