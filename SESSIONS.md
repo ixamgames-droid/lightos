@@ -20,7 +20,6 @@
 | VIZ-87 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
 | TOOL-16 | A | fix/codex-p1-0810 | 2026-10-08T16:57Z | - |
 | UI-81 | A | fix/codex-p1-0810 | 2026-10-08T16:57Z | - |
-| FM-68 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:10Z | fixtures |
 | DOC-65 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:11Z | docs/anleitung_fixture_generator |
 | LAS-26 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:11Z | src/ui |
 | VIZ-95 | A | feature/viz95-lasermuster-3d | 2026-10-08T20:47Z | src/ui/visualizer |
@@ -184,7 +183,6 @@
 
 ## Verlauf
 
-- 2026-10-10T12:25Z A done VCB-41
 - 2026-10-10T12:44Z B done ARM-PRUEFUNG-1010
 - 2026-10-10T12:55Z A done TOOL-25
 - 2026-10-10T12:55Z B claim TOOL-26
@@ -214,3 +212,4 @@
 - 2026-10-10T15:15Z A done WEB-06
 - 2026-10-10T15:26Z D aktualisiert QA-91: Branch fix/qa91-subprocess-encoding -> fix/qa91-doc60-test-encoding
 - 2026-10-10T15:48Z B done XPLAT-46
+- 2026-10-10T16:51Z A done FM-68
