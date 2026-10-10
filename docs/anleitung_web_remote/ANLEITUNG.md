@@ -5,10 +5,9 @@
 > zehn **Executor-Fader** (Ex 1–10) — alles über den Browser, ohne App-Installation.
 > Voraussetzung: Handy und PC hängen im **selben WLAN/LAN**.
 >
-> ⚠ **Derzeit braucht das Handy zusätzlich Internet:** Die Seite lädt ihre
-> Verbindungs-Bibliothek (socket.io) von `cdn.socket.io`. Ohne Internetzugang lädt
-> die Seite zwar, bleibt aber bei **„Verbinde...“** stehen, und keine Taste wirkt
-> (Befund WEB-06). Im reinen Technik-WLAN ohne Internet also vorher testen.
+> **Internet braucht das Handy nicht:** Die Seite kommt vollständig vom LightOS-PC,
+> auch ihre Verbindungs-Bibliothek (socket.io). Ein reines Technik-WLAN ohne
+> Internetzugang genügt (WEB-06).
 
 ---
 
