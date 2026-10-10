@@ -36,7 +36,6 @@
 | STAB-32 | A | feature/stab32-versionierte-sicherungen | 2026-10-10T18:44Z | - |
 | OUT-67 | A | feature/out67-ausgabe-ausfall-banner | 2026-10-10T09:29Z | - |
 | TOOL-21 | D | fix/tool21-gif-vergleich-rgb | 2026-10-10T18:52Z | tools/anleitungsbilder/runner.py · tests/test_tool21_bildvergleich_je_kanal.py |
-| TOOL-23 | D | fix/tool23-backlog-ids-tafel-fragmente | 2026-10-10T18:52Z | tools/backlog_ids.py · tests/test_tool23_backlog_ids_tafel_fragmente.py · tests/test_backlog_ids.py |
 | TOOL-24 | D | fix/tool24-proc18-lizenzhinweise-strukturiert | 2026-10-10T18:52Z | tests/test_proc18_fremd_lizenzhinweise.py |
 | FM-66 | D | fix/fm66-abgleich-modellname | 2026-10-10T18:52Z | src/core/database/bibliothek_format.py · tests/test_fm66_abgleich_modellname.py · docs/FIXTURE_LIBRARY.md |
 | DOC-70 | D | docs/doc70-netzwerk-windows | 2026-10-10T18:52Z | docs/anleitung_netzwerk_windows/ANLEITUNG.md · docs/ANLEITUNGEN.md · tests/test_doc70_netzwerk_windows.py |
@@ -195,7 +194,6 @@
 
 ## Verlauf
 
-- 2026-10-10T14:39Z A claim UI-86
 - 2026-10-10T14:39Z D claim QA-91
 - 2026-10-10T14:44Z A done MIDI-3
 - 2026-10-10T15:03Z D aktualisiert QA-91: Branch fix/qa91-doc60-test-encoding -> fix/qa91-subprocess-encoding
@@ -225,3 +223,4 @@
 - 2026-10-10T19:43Z A claim VIZ-102
 - 2026-10-10T20:11Z D claim UI-87
 - 2026-10-10T20:14Z D done TOOL-14
+- 2026-10-10T20:38Z D done TOOL-23
