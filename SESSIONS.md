@@ -28,7 +28,6 @@
 | LAS-30 | A | feature/las30-laser-achsen | 2026-10-10T10:47Z | src/core/laser |
 | VIZ-96 | A | feature/viz96-gobo-projektion | 2026-10-10T13:08Z | src/ui/visualizer |
 | UI-84 | A | fix/ui84-efx-laden-geraeteliste | 2026-10-09T13:45Z | src/ui/views/efx_view.py |
-| VIZ-97 | D | fix/viz97-gobo-schluesselwoerter | 2026-10-10T13:35Z | src/ui/widgets/gobo_icons.py · tests/test_viz97_gobo_schluesselwoerter.py · BACKLOG.md · changelog.d/2026-10-09-VIZ-97.md |
 | XPLAT-48 | D | fix/xplat48-no-venv-verknuepfung | 2026-10-10T13:35Z | install.py · tests/test_xplat48_verknuepfung_no_venv.py · BACKLOG.md · changelog.d/2026-10-09-XPLAT-48.md |
 | MIDI-5 | A | feature/midi5-msc | 2026-10-09T16:27Z | src/core/midi |
 | NET-14 | A | feature/midi5-msc | 2026-10-09T16:27Z | src/core/midi |
@@ -172,7 +171,6 @@
 
 ## Verlauf
 
-- 2026-10-10T11:10Z D aktualisiert TOOL-14: Branch - -> fix/tool14-gen-tools-index-argparse; Dateien - -> tools/gen_tools_index.py · tests/test_tool14_gen_tools_index_cli.py
 - 2026-10-10T11:13Z D aktualisiert TOOL-21: Branch - -> fix/tool21-gif-vergleich-rgb; Dateien - -> tools/anleitungsbilder/runner.py · tests/test_tool21_bildvergleich_je_kanal.py
 - 2026-10-10T11:15Z B done OUT-64
 - 2026-10-10T11:19Z D aktualisiert TOOL-23: Branch - -> fix/tool23-backlog-ids-tafel-fragmente; Dateien - -> tools/backlog_ids.py · tests/test_tool23_backlog_ids_tafel_fragmente.py · tests/test_backlog_ids.py
@@ -202,3 +200,4 @@
 - 2026-10-10T14:17Z B uebergeben XPLAT-52
 - 2026-10-10T14:17Z A claim XPLAT-51
 - 2026-10-10T14:17Z A claim XPLAT-52
+- 2026-10-10T14:25Z D done VIZ-97
