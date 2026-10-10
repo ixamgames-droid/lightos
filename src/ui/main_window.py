@@ -1039,6 +1039,17 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
 
+        # OUT-67: Ausfall-/Probenbanner. Sitzt im Wurzel-Layout UEBER der
+        # Sektionsleiste — die wird im Kiosk-Modus ausgeblendet (wie Menue und
+        # Statusleiste), das Banner bleibt. Gefuellt wird es aus dem
+        # bestehenden Hardware-Takt (`_update_ausgabe_label`).
+        from src.ui.ausgabe_banner import AusgabeBannerSteuerung
+        self._ausgabe_banner = AusgabeBannerSteuerung(
+            kiosk=self._kiosk_mode, parent=central)
+        if not self._kiosk_mode:
+            # Im Kiosk-Modus gibt es bewusst keinen Weg in die Einstellungen.
+            self._ausgabe_banner.bei_stoerung_klick = self._open_output_config
+        root.addWidget(self._ausgabe_banner.widget)
         root.addWidget(self._section_bar)
 
         # ── Stacked Widget ─────────────────────────────────────────────────────
@@ -1403,6 +1414,12 @@ class MainWindow(QMainWindow):
             probleme = om.sende_probleme()
         except Exception:
             return
+        # OUT-67: dieselbe Auskunft, laut — oben im Fenster, auch im Kiosk-
+        # Modus (dort ist die Statusleiste ausgeblendet). Kein zweiter Timer,
+        # keine zweite Abfrage: das Banner bekommt die eben gelesenen Wege.
+        banner = getattr(self, "_ausgabe_banner", None)
+        if banner is not None:
+            banner.aktualisiere(om, wege)
         # OUT-56: gepatchte Universen ohne jeden Adapter. `sendet_wirklich` ist
         # dieselbe Frage, die der DMX-Monitor stellt (OUT-52) — eine zweite
         # Antwort darauf soll es nicht geben.
