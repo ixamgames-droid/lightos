@@ -154,6 +154,32 @@ class BildrateTest(_Fall):
         self.assertEqual(c._bild_abstand_s(), 0.0,
                          "ein einzelnes langsames Bild darf die Rate nicht senken")
 
+    def test_erstes_langsames_bild_bremst_nicht(self):
+        """Das erste Bild nach dem Start ist oft das teuerste (Cache-Aufbau).
+        Als einzige Probe darf es den Takt nicht zurueckhalten."""
+        c = self._canvas()
+        uhr = _Uhr()
+        c._uhr = uhr
+        c._zeichenzeiten.clear()
+        kosten = [0.300, 0.003]
+        c._zeichne = lambda ev, voll=True: uhr.vor(kosten.pop(0))
+        c.paintEvent(QPaintEvent(c.rect()))
+        self.assertEqual(c._bild_abstand_s(), 0.0,
+                         "eine einzelne Probe ist noch keine Dauerlast")
+        self.assertTrue(c._bild_im_budget(uhr.t))
+        c.paintEvent(QPaintEvent(c.rect()))
+        self.assertEqual(c._bild_abstand_s(), 0.0)
+
+    def test_dauerlast_bremst_ab_der_dritten_probe(self):
+        c = self._canvas()
+        uhr = _Uhr()
+        c._uhr = uhr
+        c._zeichenzeiten.clear()
+        c._zeichne = lambda ev, voll=True: uhr.vor(0.058)
+        for _ in range(3):
+            c.paintEvent(QPaintEvent(c.rect()))
+        self.assertAlmostEqual(c._bild_abstand_s(), 0.058 / 0.25, places=6)
+
     def test_aenderung_nach_ruhe_kommt_im_naechsten_takt(self):
         """Die Bremse gilt fuer Dauerlast; eine einzelne Aenderung nach einer
         ruhigen Phase erscheint ohne Zusatzverzoegerung."""

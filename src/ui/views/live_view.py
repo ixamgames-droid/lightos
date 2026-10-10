@@ -1190,11 +1190,17 @@ class StageCanvas(QWidget):
     MAX_UI_ANTEIL = 0.25            # <= 0 schaltet die Regel ab
     MAX_BILD_ABSTAND_S = 1.0        # nie seltener als ein Bild je Sekunde
     ZEICHENZEIT_PROBEN = 5          # Median darueber: ein Ausreisser bremst nicht
+    # Erst ab so vielen Proben wird gebremst. Das allererste Bild ist oft das
+    # teuerste (Cache-Aufbau, Schriften); als einzige Probe waere es zugleich
+    # der Median und hielte den Takt bis zum naechsten Bild zurueck.
+    ZEICHENZEIT_MIN_PROBEN = 3
 
     def _zeichenzeit_s(self) -> float:
         """Typische Dauer eines vollen Bildes (Median der letzten Proben)."""
         proben = sorted(self._zeichenzeiten)
-        return proben[(len(proben) - 1) // 2] if proben else 0.0
+        if len(proben) < self.ZEICHENZEIT_MIN_PROBEN:
+            return 0.0
+        return proben[(len(proben) - 1) // 2]
 
     def _bild_abstand_s(self) -> float:
         """Mindestabstand zweier Takt-Bilder; 0 = volle Rate (jeder Takt)."""
