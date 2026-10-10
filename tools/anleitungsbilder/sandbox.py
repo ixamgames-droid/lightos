@@ -116,6 +116,21 @@ def echte_datenorte() -> list[str]:
     return aus
 
 
+def bildschirm_plattform(system: str | None = None) -> str:
+    """Qt-Plattform-Plugin fuer ``--bildschirm`` (TOOL-11).
+
+    Linux zeichnet ueber X11 (``xcb``, braucht ``DISPLAY``); Windows und macOS
+    haben ihren eigenen Bildschirm-Treiber und kennen weder ``xcb`` noch
+    ``DISPLAY`` - dort brach ``--bildschirm`` bisher sofort ab ("DISPLAY ist
+    leer"), obwohl ein Bildschirm da ist."""
+    system = sys.platform if system is None else system
+    if system == "win32":
+        return "windows"
+    if system == "darwin":
+        return "cocoa"
+    return "xcb"
+
+
 def einrichten(basis: str | None = None, *, bildschirm: bool = False) -> Sandbox:
     """Lenkt alle Datenpfade in ``basis`` (Default: frischer mkdtemp) um.
 
@@ -124,14 +139,16 @@ def einrichten(basis: str | None = None, *, bildschirm: bool = False) -> Sandbox
     ``LIGHTOS_SHOW_DB`` auf eine echte DB zeigt — darf hier NICHT gewinnen.
 
     ``bildschirm=True`` (DOC-21, ``--bildschirm``): statt ``offscreen`` auf dem
-    echten X11-Bildschirm (``xcb``) zeichnen — nur fuer 3D-Szenen, deren WebGL
-    offscreen schwarz bleibt. Alle Datenpfade bleiben genauso umgelenkt.
+    echten Bildschirm zeichnen (Linux ``xcb``, Windows ``windows``, TOOL-11) —
+    nur fuer 3D-Szenen, deren WebGL offscreen schwarz bleibt. Alle Datenpfade
+    bleiben genauso umgelenkt.
     """
     if any(m == "src" or m.startswith("src.") for m in sys.modules):
         raise RuntimeError(
             "Sandbox zu spaet: src ist schon importiert — die Pfade der Module "
             "sind damit bereits eingefroren.")
-    if bildschirm and not os.environ.get("DISPLAY"):
+    qpa = bildschirm_plattform() if bildschirm else "offscreen"
+    if qpa == "xcb" and not os.environ.get("DISPLAY"):
         raise SystemExit("[anleitungsbilder] --bildschirm braucht einen X11-Bildschirm "
                          "(DISPLAY ist leer).")
     # Die X-Anmeldung liegt sonst unter ~/.Xauthority — HOME wird gleich
@@ -171,8 +188,8 @@ def einrichten(basis: str | None = None, *, bildschirm: bool = False) -> Sandbox
     for k in _ENTFERNEN:
         os.environ.pop(k, None)
     # Qt: offscreen, feste Skalierung (dpr 1.0 -> 1600x900 bleibt 1600x900).
-    os.environ["QT_QPA_PLATFORM"] = "xcb" if bildschirm else "offscreen"
-    if bildschirm and os.path.exists(xauth):
+    os.environ["QT_QPA_PLATFORM"] = qpa
+    if qpa == "xcb" and os.path.exists(xauth):
         os.environ["XAUTHORITY"] = xauth
     # QA-88: ``offscreen`` liest unter Windows NICHT die Systemschriften, sondern
     # Qts eigene Schriftdatenbank — und die sucht unter <PySide6>/lib/fonts, wo

@@ -29,6 +29,9 @@ import multiprocessing as mp
 import os
 import time
 
+# STAB-30: gedrosselte Logzeile fuer bisher stille Fehler (nur stdlib, spawn-sicher).
+from src.core.diagnose_log import melde_still as _melde_still
+
 FRAME_INTERVAL = 1.0 / 44
 OPEN_RETRY_S = 1.0          # Worker-internes (Wieder-)Oeffnen des Ports, gedrosselt
 DMX_BYTES = 512
@@ -71,9 +74,12 @@ def _serial_worker_loop(dev_factory, buf, stop_flag, status,
                 try:
                     dev = dev_factory()
                     status.value = ST_OK
-                except Exception:
+                except Exception as e:
                     dev = None
                     status.value = ST_DISABLED
+                    # STAB-30: der GRUND (Zugriff verweigert, belegt, fehlt)
+                    # war bisher nirgends zu sehen — je Fehlerart einmal.
+                    _melde_still("dmx.enttec.oeffnen", e)
         if dev is not None:
             try:
                 with buf.get_lock():
@@ -83,9 +89,9 @@ def _serial_worker_loop(dev_factory, buf, stop_flag, status,
             try:
                 dev.send_dmx(bytes(local))
                 status.value = ST_DISABLED if dev.is_disabled() else ST_OK
-            except Exception:
+            except Exception as e:
                 # EnttecPro faengt Serial-Fehler selbst ab; hier nur ein Sicherheitsnetz.
-                pass
+                _melde_still("dmx.enttec.senden", e)   # STAB-30, gedrosselt
         sleep(max(0.0, frame_interval - (clock() - t0)))
     if dev is not None:
         try:
@@ -156,6 +162,106 @@ def _eltern_wache(ppid0: int):
     return _eltern_leben
 
 
+# ── XPLAT-24: Job-Objekt als zweite Wache (nur Windows) ─────────────────────
+# Die Handle-Wache (OUT-59) prueft nur ein Worker, der in seiner Schleife
+# ankommt. Zwei Faelle erreicht sie nie: ein Worker, der im Treiber haengt
+# (``send_dmx`` kehrt nicht zurueck - genau der Fall, fuer den die
+# Prozess-Isolation existiert), und ein Worker, dessen App stirbt, bevor er
+# das Handle oeffnen konnte (dann bleibt nur der unter Windows wirkungslose
+# PID-Vergleich). Beide blieben als Waise am COM-Port. Ein Job-Objekt mit
+# ``KILL_ON_JOB_CLOSE`` faengt beides: das einzige Handle haelt die App; stirbt
+# sie - auch hart per „Task beenden“ -, schliesst Windows es und beendet jeden
+# Prozess im Job. Der Worker erbt das Handle nicht (spawn startet ohne
+# Handle-Vererbung), haelt den Job also nicht selbst offen.
+_JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000
+_JOB_OBJECT_EXTENDED_LIMIT_INFORMATION = 9
+
+
+def _kernel32_job():
+    from ctypes import wintypes
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+
+    class _Basis(ctypes.Structure):
+        _fields_ = [("PerProcessUserTimeLimit", ctypes.c_int64),
+                    ("PerJobUserTimeLimit", ctypes.c_int64),
+                    ("LimitFlags", wintypes.DWORD),
+                    ("MinimumWorkingSetSize", ctypes.c_size_t),
+                    ("MaximumWorkingSetSize", ctypes.c_size_t),
+                    ("ActiveProcessLimit", wintypes.DWORD),
+                    ("Affinity", ctypes.c_size_t),
+                    ("PriorityClass", wintypes.DWORD),
+                    ("SchedulingClass", wintypes.DWORD)]
+
+    class _IoZaehler(ctypes.Structure):
+        _fields_ = [(n, ctypes.c_uint64) for n in (
+            "ReadOperationCount", "WriteOperationCount", "OtherOperationCount",
+            "ReadTransferCount", "WriteTransferCount", "OtherTransferCount")]
+
+    class _Erweitert(ctypes.Structure):
+        _fields_ = [("BasicLimitInformation", _Basis),
+                    ("IoInfo", _IoZaehler),
+                    ("ProcessMemoryLimit", ctypes.c_size_t),
+                    ("JobMemoryLimit", ctypes.c_size_t),
+                    ("PeakProcessMemoryUsed", ctypes.c_size_t),
+                    ("PeakJobMemoryUsed", ctypes.c_size_t)]
+
+    k32.CreateJobObjectW.argtypes = (ctypes.c_void_p, ctypes.c_wchar_p)
+    k32.CreateJobObjectW.restype = ctypes.c_void_p
+    k32.SetInformationJobObject.argtypes = (ctypes.c_void_p, ctypes.c_int,
+                                            ctypes.c_void_p, wintypes.DWORD)
+    k32.SetInformationJobObject.restype = wintypes.BOOL
+    k32.AssignProcessToJobObject.argtypes = (ctypes.c_void_p, ctypes.c_void_p)
+    k32.AssignProcessToJobObject.restype = wintypes.BOOL
+    k32.CloseHandle.argtypes = (ctypes.c_void_p,)
+    k32.CloseHandle.restype = wintypes.BOOL
+    return k32, _Erweitert
+
+
+def _kill_job_anlegen():
+    """Windows: Job-Handle mit ``KILL_ON_JOB_CLOSE``; sonst oder bei Fehler None.
+
+    Ein Fehler ist kein Grund, die Ausgabe abzuschalten - dann bleibt die
+    Handle-Wache allein, wie vor XPLAT-24."""
+    if os.name != "nt":
+        return None
+    try:
+        k32, _Erweitert = _kernel32_job()
+        job = k32.CreateJobObjectW(None, None)
+        if not job:
+            return None
+        info = _Erweitert()
+        info.BasicLimitInformation.LimitFlags = _JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        if not k32.SetInformationJobObject(job, _JOB_OBJECT_EXTENDED_LIMIT_INFORMATION,
+                                           ctypes.byref(info), ctypes.sizeof(info)):
+            k32.CloseHandle(job)
+            return None
+        return job
+    except Exception:
+        return None
+
+
+def _in_job(job, proc) -> bool:
+    """Haengt den gestarteten Worker in den Job. ``proc.sentinel`` ist unter
+    Windows das Prozess-Handle aus ``CreateProcess`` (Vollzugriff)."""
+    if not job:
+        return False
+    try:
+        k32, _ = _kernel32_job()
+        return bool(k32.AssignProcessToJobObject(job, int(proc.sentinel)))
+    except Exception:
+        return False
+
+
+def _job_schliessen(job) -> None:
+    if not job:
+        return
+    try:
+        k32, _ = _kernel32_job()
+        k32.CloseHandle(job)
+    except Exception:
+        pass
+
+
 class EnttecProcessProxy:
     """Schnittstellen-gleicher Ersatz fuer :class:`EnttecPro`, der die serielle
     Ausgabe in einen eigenen Prozess auslagert (Access-Violation-Isolation).
@@ -191,6 +297,8 @@ class EnttecProcessProxy:
         self._proc = None
         self._last_spawn = 0.0
         self._closed = False
+        # XPLAT-24: stirbt die App hart, beendet Windows jeden Worker im Job.
+        self._job = _kill_job_anlegen()
         self._spawn()
 
     def _default_process_factory(self):
@@ -206,6 +314,7 @@ class EnttecProcessProxy:
         self._status.value = ST_CONNECTING
         self._proc = self._process_factory()
         self._proc.start()
+        _in_job(self._job, self._proc)
         self._last_spawn = self._clock()
 
     def _maybe_respawn(self):
@@ -229,13 +338,18 @@ class EnttecProcessProxy:
             return
         p = self._proc
         if p is None or not p.is_alive():
+            # STAB-30: dass der Worker tot ist, war bisher unsichtbar.
+            _melde_still("dmx.enttec.worker",
+                         text=f"Sende-Prozess fuer {self.port} "
+                              f"nicht aktiv (Exitcode "
+                              f"{getattr(p, 'exitcode', None)}) — Neustart")
             self._maybe_respawn()
             return
         try:
             with self._buf.get_lock():
                 ctypes.memmove(self._buf.get_obj(), dmx_data, DMX_BYTES)
-        except Exception:
-            pass
+        except Exception as e:
+            _melde_still("dmx.enttec.puffer", e)   # STAB-30, gedrosselt
 
     def is_open(self) -> bool:
         """Worker-LEBENSZEICHEN: True, solange der Worker-Prozess laeuft. Das ist
@@ -285,6 +399,10 @@ class EnttecProcessProxy:
                 except Exception:
                     pass
         self._proc = None
+        # Zuletzt: ein Worker, den auch terminate() nicht erreicht hat, endet
+        # mit dem letzten Job-Handle.
+        job, self._job = self._job, None
+        _job_schliessen(job)
 
     def __enter__(self):
         return self

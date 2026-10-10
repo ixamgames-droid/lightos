@@ -8,13 +8,14 @@
 // blieb unveraendert - Buttons rufen weiterhin z.B. `setEditTool(...)` als
 // globale Funktion auf) und startet den Render-Loop + Bridge-Poll wie im
 // Original.
-import { scene, renderer, gpuTier, dynamicResolution, basePixelRatio,
+import { scene, renderer, gpuTier, gpuProbeInfo, dynamicResolution, basePixelRatio,
          PIXEL_RATIO_CAP, tierSettings, setDeviceRatio,
          noteCameraMotion } from './scene/renderer.js';
 import { applyBrightness } from './scene/lights.js';
 import { prepareShadowMap, requestShadowUpdate, shadowUpdateStats } from './scene/shadow_update.js';  // VIZ-69
 import { syncUmgebung, umgebungInfo } from './stage/umgebung_merge.js';  // VIZ-72
 import { syncSpotPool, noteShadowPass, spotPoolInfo, spotPoolLights, vergeben as spotPoolVergeben,
+  lichtUrsprung, SCHATTEN_NEAR,   // VIZ-92
          setSpotPoolUhr } from './scene/spot_pool.js';  // VIZ-72
 import { disposeObj } from './scene/grid_floor.js';
 import { view, fixtures, stageObjects, settings } from './state.js';
@@ -68,6 +69,7 @@ import { opticsSoftness, applyOptics } from './fixtures/optics.js';   // VIZ-MH-
 import { prismFacetCount, applyPrism } from './fixtures/prism.js';    // VIZ-PRISMA-3D
 import { goboTexture, beamGoboTexture } from './fixtures/gobo_textures.js';   // VIZ-80/VIZ-83 (Test-Seam)
 import { beamLengthScale } from './fixtures/builders.js';             // VIZ-15
+import { tickBewegungGlaettung, bewegungGlaettungAktiv, setGlattUhr } from './fixtures/builders.js';   // VIZ-92
 import { laserAnimationAktiv, tickLaserAnimation, laserInfo } from './fixtures/laser.js';   // VIZ-79
 import { floorPoolScale, poolFalloffTexture } from './fixtures/floor_pool.js';  // VIZ-15
 
@@ -126,6 +128,11 @@ function perFrameUpdate() {
   // VIZ-79: Laser mit Eigenbewegung (dynamische Kanalbereiche, Auto-Programm)
   // zeitgesteuert weiterdrehen — reine Transformation, keine neuen Objekte.
   tickLaserAnimation();
+  // VIZ-92: Pan/Tilt/Gobo-Drehung zwischen zwei DMX-Updates weiterziehen
+  // (Kegel, Bodenmuster und Pool-Ziel folgen dem angezeigten Kopf). Fordert
+  // sein Bild selbst an (requestRender), nur wenn es weitergerueckt ist —
+  // bewusst keine Live-Probe (die rendert jeden rAF-Tick).
+  tickBewegungGlaettung();
   fpsTick();
 }
 
@@ -246,6 +253,7 @@ window.__lightos = {
   // dass im Bodenfleck GENAU das Muster des Payloads liegt (Identitaet, kein
   // Pixelvergleich). Reine Leseoperation, legt hoechstens den Cache-Eintrag an.
   __goboTexture: goboTexture,
+  __glattUhr: setGlattUhr, bewegungGlaettungAktiv,   // VIZ-92 (Test-Seam)
   // VIZ-83: dasselbe fuer die Teilstrahl-Maske des Kegels ('' = offen/weiss).
   __beamGoboTexture: beamGoboTexture,
   // VIZ-15: rein — drei Grenzen (Grundlaenge, Bodenauftreffpunkt, globale
@@ -282,6 +290,8 @@ window.__lightos = {
   // Low-Spec-Erkennung (2026-07-11): 'low' | 'high' — Test-/Debug-Hook,
   // Override per ?gputier=low|high in der Page-URL.
   gpuTier,
+  // VIZ-84: warum die Probe so entschied (Renderer-Name, Frame-Zeit, ...).
+  gpuProbeInfo: () => Object.assign({}, gpuProbeInfo),
   // VIZ-71: Qualitaetsstufe und Pixeldichte — Test-/Diagnose-Seams.
   tierSettings, pixelRatioCap: PIXEL_RATIO_CAP, basePixelRatio, setDeviceRatio,
   pixelRatio: () => renderer.getPixelRatio(),
@@ -289,6 +299,7 @@ window.__lightos = {
   shadowBudgetInfo,
   // VIZ-72: Spot-Pool (echte Lichter) und Render-Kennzahlen des letzten Bildes.
   spotPoolInfo, spotPoolLights, __spotPoolVergeben: spotPoolVergeben, __spotPoolUhr: setSpotPoolUhr, umgebungInfo,
+  __lichtUrsprung: lichtUrsprung, SCHATTEN_NEAR,   // VIZ-92
   renderInfo: () => {
     let lichter = 0, spots = 0, schatten = 0;
     scene.traverseVisible(o => {
@@ -301,6 +312,8 @@ window.__lightos = {
              lichter, spots, schatten };
   },
   dynamicResolutionInfo: () => dynamicResolution.info(),
+  // Codex #966: neue Bildwiederholrate nach einem Bildschirmwechsel (Python).
+  setDisplayHz: (hz) => dynamicResolution.setDisplayHz(hz),
   __noteCameraMotion: noteCameraMotion,
   // A3D-41: Test-Seams fuer die NaN-Guards der Zeiger-Mathematik. `mouse` ist
   // absichtlich das GETEILTE Vector2 selbst (nicht eine Kopie) — der Test muss

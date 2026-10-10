@@ -59,7 +59,8 @@ def _argumente(argv):
     ap.add_argument("--behalten", action="store_true",
                     help="Sandbox-Ordner nach dem Lauf nicht loeschen (Fehlersuche)")
     ap.add_argument("--bildschirm", action="store_true",
-                    help="auf dem echten X11-Bildschirm statt offscreen zeichnen; baut "
+                    help="auf dem echten Bildschirm (Linux X11, Windows) statt offscreen "
+                         "zeichnen; baut "
                          "NUR Szenen mit braucht_gpu (3D), alle anderen bleiben offscreen")
     return ap.parse_args(argv)
 
@@ -92,6 +93,10 @@ def _je_anleitung_ein_prozess(args, auftraege, nur) -> int:
             befehl += ["--ausgabe", ausgabe]
         if args.behalten:
             befehl.append("--behalten")
+        # TOOL-11 (3): ohne Weitergabe baute ``--alle --bildschirm`` jede
+        # Anleitung offscreen - die 3D-Szenen fielen still als „uebersprungen“ weg.
+        if args.bildschirm:
+            befehl.append("--bildschirm")
         if eigene:
             befehl += ["--nur", ",".join(eigene)]
         print(f"[anleitungsbilder] == {name} (eigener Prozess) ==", flush=True)

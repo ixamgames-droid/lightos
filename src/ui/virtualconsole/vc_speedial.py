@@ -349,6 +349,13 @@ class VCSpeedDial(VCWidget):
                 pass
             return
         now = tap_uhr.jetzt()
+        # QA-87: zwei Taps mit gleichem Zeitstempel (unter Windows mit
+        # monotonic() im selben 15,6-ms-Tick) teilten hier durch null. Ein Tap
+        # ohne Zeitfortschritt wird deshalb verworfen, BEVOR er in die Historie
+        # kommt — als 0-Intervall zoege er sonst den Mittelwert der folgenden
+        # Taps herunter. Gleiche Regel wie TempoBus.tap/BPMManager.tap.
+        if self._tap_times and now <= self._tap_times[-1]:
+            return
         self._tap_times.append(now)
         # Keep last 8 taps
         self._tap_times = self._tap_times[-8:]
@@ -356,11 +363,7 @@ class VCSpeedDial(VCWidget):
             intervals = [self._tap_times[i+1] - self._tap_times[i]
                          for i in range(len(self._tap_times) - 1)]
             avg = sum(intervals) / len(intervals)
-            # QA-87: zwei Taps mit gleichem Zeitstempel (unter Windows mit
-            # monotonic() im selben 15,6-ms-Tick) teilten hier durch null.
-            # Gleiche Regel wie TempoBus.tap/BPMManager.tap: verwerfen.
-            if avg > 0:
-                self.bpm = 60.0 / avg
+            self.bpm = 60.0 / avg
 
     # ── Speed-Node (Master/Sub) ───────────────────────────────────────────────
 
