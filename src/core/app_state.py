@@ -7270,32 +7270,56 @@ def unapply_pan_tilt_orientation(fx, attrs: dict) -> dict:
 
 # Singleton
 _state: AppState | None = None
+# BPM-30: das Anlegen ist nicht atomar (Datenumzug, Show-DB, Ausgabe-Thread).
+# Zwei Faeden, die gleichzeitig zum ersten Mal get_state() riefen (gemessen:
+# zwei BPM-Beat-Faeden), bauten zwei AppStates. RLock, weil der Aufbau selbst
+# wieder get_state() erreichen kann.
+_state_lock = threading.RLock()
+
+
+def vorhandener_state() -> AppState | None:
+    """BPM-30: der App-Zustand, falls es ihn schon gibt — legt NIE einen an.
+
+    Fuer Hintergrund-Faeden (Beat-Takt & Co.): die duerfen den schweren Aufbau
+    (Datenumzug, Show-DB, Ausgabe-Thread) nicht selbst ausloesen. Er lief sonst
+    im Faden, und die Speicherbereinigung dort raeumte Qt-Objekte ab, waehrend
+    der Hauptthread Fenster abbaute -> Access Violation (Gate BPM-28,
+    test_bpm_view_state_table)."""
+    return _state
 
 
 def get_state() -> AppState:
     global _state
     if _state is None:
-        # XPLAT-44: die Uebernahme alter data/-Dateien MUSS vor dem ersten
-        # Oeffnen der Show-DB laufen — sonst legt open_show() im App-Ordner eine
-        # leere DB an, die den alten Stand verdraengt. Hier zentral, damit auch
-        # Werkzeuge/Beispiele (ohne main.py) zuerst uebernehmen; je Prozess nur
-        # einmal (main.py ruft es schon frueher, mit Dialog).
-        try:
-            from .datenumzug import einmal_je_prozess
-            einmal_je_prozess()
-        except Exception as e:
-            print(f"[datenumzug] uebersprungen: {e}")
-        _state = AppState()
-        _state.open_show()
-        _state.apply_output_config()
-        # Den 44-Hz-Output-Thread NICHT autostarten, wenn das ausdruecklich
-        # deaktiviert ist (Tests setzen LIGHTOS_NO_OUTPUT_THREAD): der Thread
-        # rendert in _render_frame und emittiert Sync-Events, die cross-thread in
-        # Qt marshallt werden. Das racete mit dem pytest-Teardown (processEvents/
-        # GC abgemeldeter Widgets) -> sporadische native Access Violation. Tests
-        # rendern synchron (tick()/_render_frame()); echte Hardware-Ausgabe wird
-        # dort ohnehin nicht geprueft.
-        if not os.environ.get("LIGHTOS_NO_OUTPUT_THREAD"):
-            _state.output_manager.start()
-        _state.start_playback()
+        with _state_lock:
+            if _state is None:
+                _state_anlegen()
     return _state
+
+
+def _state_anlegen() -> None:
+    """Baut den Singleton auf. Nur unter ``_state_lock`` aufrufen."""
+    global _state
+    # XPLAT-44: die Uebernahme alter data/-Dateien MUSS vor dem ersten
+    # Oeffnen der Show-DB laufen — sonst legt open_show() im App-Ordner eine
+    # leere DB an, die den alten Stand verdraengt. Hier zentral, damit auch
+    # Werkzeuge/Beispiele (ohne main.py) zuerst uebernehmen; je Prozess nur
+    # einmal (main.py ruft es schon frueher, mit Dialog).
+    try:
+        from .datenumzug import einmal_je_prozess
+        einmal_je_prozess()
+    except Exception as e:
+        print(f"[datenumzug] uebersprungen: {e}")
+    _state = AppState()
+    _state.open_show()
+    _state.apply_output_config()
+    # Den 44-Hz-Output-Thread NICHT autostarten, wenn das ausdruecklich
+    # deaktiviert ist (Tests setzen LIGHTOS_NO_OUTPUT_THREAD): der Thread
+    # rendert in _render_frame und emittiert Sync-Events, die cross-thread in
+    # Qt marshallt werden. Das racete mit dem pytest-Teardown (processEvents/
+    # GC abgemeldeter Widgets) -> sporadische native Access Violation. Tests
+    # rendern synchron (tick()/_render_frame()); echte Hardware-Ausgabe wird
+    # dort ohnehin nicht geprueft.
+    if not os.environ.get("LIGHTOS_NO_OUTPUT_THREAD"):
+        _state.output_manager.start()
+    _state.start_playback()
