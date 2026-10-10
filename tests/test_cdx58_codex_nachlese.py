@@ -375,7 +375,7 @@ class BacklogTest(unittest.TestCase):
         cls.rows = {r.id: r for r in bc.parse_rows(cls.zeilen)}
 
     def test_sichtpruefungen_sind_eigene_offene_zeilen(self):
-        for neu, alt in (("QA-92", "VIZ-83"), ("QA-93", "VIZ-92")):
+        for neu, alt in (("QA-94", "VIZ-83"), ("QA-95", "VIZ-92")):
             self.assertTrue(neu in self.rows, f"{neu} fehlt im Backlog")
             row = self.rows[neu]
             self.assertFalse(row.is_done, neu)
@@ -392,7 +392,7 @@ class BacklogTest(unittest.TestCase):
     def test_verdichten_laesst_die_pruefung_stehen(self):
         _rest, archiviert = self.bc.archive_split(self.zeilen)
         ids = {r.id for r in archiviert}
-        self.assertFalse({"QA-92", "QA-93"} & ids)
+        self.assertFalse({"QA-94", "QA-95"} & ids)
 
 
 if __name__ == "__main__":
