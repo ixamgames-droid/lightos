@@ -12,7 +12,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| DOC-43 | C | - | 2026-10-02T11:58Z | docs/anleitung_vc_workflow/ANLEITUNG_VC_WORKFLOW.md |
 | FM-46c | A | feat/fm46-qxf-head | 2026-10-02T11:59Z | - |
 | DOC-44 | C | - | 2026-10-02T12:00Z | docs/anleitung_vc/ANLEITUNG_VC.md |
 | DOC-45 | C | - | 2026-10-02T12:00Z | docs/anleitung_vc_elemente/ANLEITUNG_VC_ELEMENTE.md |
@@ -135,7 +134,6 @@
 
 ## Verlauf
 
-- 2026-10-09T16:27Z A claim MIDI-16
 - 2026-10-09T16:27Z A claim MIDI-3
 - 2026-10-09T16:27Z A claim MIDI-4
 - 2026-10-09T16:47Z D done DOC-62
@@ -165,3 +163,4 @@
 - 2026-10-10T09:27Z C uebergeben DOC-40
 - 2026-10-10T09:27Z C uebergeben DOC-41
 - 2026-10-10T09:27Z C uebergeben DOC-42
+- 2026-10-10T09:27Z C uebergeben DOC-43
