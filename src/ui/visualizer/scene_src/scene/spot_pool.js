@@ -76,6 +76,41 @@ const SCHLAGARTIG = 0.25;
 // Ohne Stufen-Angabe (alte Tabelle) — der Wert der Stufe Hoch.
 const POOL_STANDARD = 8;
 
+// ── VIZ-92: das Licht kommt aus der LINSE, nicht aus dem Gehaeuse ──────────
+// Bis VIZ-92 sass jedes Pool-Licht dort, wo frueher das Geraete-Licht hing:
+// `spot.position` (r128-Vorgabe 0, 1, 0) im Koordinatensystem der Gruppe —
+// also einen Meter UEBER dem Sockel, unabhaengig von Pan/Tilt. Der Strahl lief
+// damit erst durch Sockel, Buegel und Kopf des eigenen Geraets: unter der Linse
+// lag dessen Schatten (die "Fledermaus" aus Buegel und Kopf an der Rueckwand,
+// dunkle Flecken neben den Spidern in der Buehnen-Show).
+// Jetzt: Ursprung = Spitze des Kegels (dort sitzt die Linse bzw. der
+// Lichtaustritt, s. fixtures.js#createBeamCone), ein Stueck in
+// Strahlrichtung vorgeschoben; und die Schattenkamera beginnt erst nach
+// SCHATTEN_NEAR — das eigene Gehaeuse (Kopf-Trommel ~0,1 m, PAR-Dose ~0,15 m,
+// Sockel eines stehenden Kopfes ~0,35 m vor der Kopfmitte) landet nicht in der
+// eigenen Shadow-Map. Fremde Koerper weiter weg werfen weiter Schatten.
+export const LINSEN_VORSPRUNG = 0.02;
+export const SCHATTEN_NEAR = 0.5;
+const _apex = new THREE.Vector3(), _basis = new THREE.Vector3();
+
+/** Lichtursprung eines Geraets (Welt) nach `out`; ohne Kegel wie bisher. */
+export function lichtUrsprung(f, out) {
+  const beam = f && f.beam;
+  const p = beam && beam.geometry && beam.geometry.parameters;
+  if (p && p.height > 0) {
+    beam.updateWorldMatrix(true, false);
+    beam.localToWorld(_apex.set(0, p.height / 2, 0));
+    beam.localToWorld(_basis.set(0, -p.height / 2, 0));
+    _basis.sub(_apex);
+    const l = _basis.length();
+    out.copy(_apex);
+    if (l > 1e-9) out.addScaledVector(_basis, LINSEN_VORSPRUNG / l);
+    return out;
+  }
+  f.group.updateWorldMatrix(true, false);
+  return out.copy(f.spot.position).applyMatrix4(f.group.matrixWorld);
+}
+
 const _pool = [];          // [{ licht, ziel, fid }]
 let _fixtures = null;      // state.fixtures (per initSpotPool gesetzt, kein Import-Zyklus)
 let _vergaben = 0;         // Zaehler: wie oft wechselte ein Licht den Besitzer
@@ -97,6 +132,7 @@ function _neuesLicht() {
   licht.shadow.mapSize.width = res;
   licht.shadow.mapSize.height = res;
   licht.castShadow = false;
+  licht.shadow.camera.near = SCHATTEN_NEAR;   // VIZ-92: eigenes Gehaeuse ausblenden
   licht.userData.spotPool = true;
   const ziel = new THREE.Object3D();
   ziel.userData.spotPool = true;
@@ -364,14 +400,9 @@ export function syncSpotPool() {
     // seine Intensitaet ist 0 — auch in der 2D-Ansicht (Gruppe unsichtbar).
     const leuchtet = !!s && _hell.get(fid) > 0;
     if (s) {
-      // Das Geraete-Licht hing als Kind an der Geraete-Gruppe (root) und
-      // zielte auf f.spotTarget — genau diese Lage uebernimmt das Pool-Licht.
-      // ⚠️ NICHT der Ursprung von root: der SpotLight-Konstruktor von r128
-      // setzt `position = (0, 1, 0)` (Object3D.DefaultUp), das Licht sass also
-      // 1 m ueber dem Geraet in dessen Achsen. Gemessen: mit dem Ursprung wich
-      // das Bild eines 8-Geraete-Rigs in 2,1 % der Pixel ab, so 0 %.
-      f.group.updateWorldMatrix(true, false);
-      l.position.copy(s.position).applyMatrix4(f.group.matrixWorld);
+      // Ziel wie beim Geraete-Licht (f.spotTarget); der Ursprung sitzt seit
+      // VIZ-92 an der Linse (lichtUrsprung, s. o.) statt 1 m ueber dem Sockel.
+      lichtUrsprung(f, l.position);
       const t = s.target;
       if (t) {
         if (t.parent === scene || !t.parent) p.ziel.position.copy(t.position);

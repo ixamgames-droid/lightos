@@ -47,9 +47,9 @@ Jedes Bild führt zur passenden Schritt-für-Schritt-Anleitung.
       Tempo aus PC-Audio, Eingang, Lied-Analyse, OS2L oder TAP; Effekte laufen im Takt.
     </td>
     <td width="50%" valign="top">
-      <a href="docs/anleitung_3d_visualizer_2026/ANLEITUNG_3D_BUEHNE.md"><img src="docs/projektseite/img/07_buehne.png" alt="2D-Bühne mit PAR-Reihe und Movern"></a><br>
+      <a href="docs/anleitung_3d_visualizer_2026/ANLEITUNG_3D_BUEHNE.md"><img src="docs/anleitung_3d_visualizer_2026/img/01_uebersicht.png" alt="3D-Visualizer: Traversen-Bühne mit farbigen Lichtkegeln"></a><br>
       <b><a href="docs/anleitung_3d_visualizer_2026/ANLEITUNG_3D_BUEHNE.md">Bühne in 2D und 3D</a></b><br>
-      Rig von oben oder im 3D-Visualizer ansehen, Bühne bauen, Moving Heads einmessen.
+      Rig von oben oder im 3D-Visualizer ansehen, Bühne bauen, Moving Heads einmessen; drei Qualitätsstufen.
     </td>
   </tr>
   <tr>
@@ -91,10 +91,30 @@ Danach nach Thema weiter: **[alle Anleitungen](docs/ANLEITUNGEN.md)**.
 
 ## Installation und Start
 
-Voraussetzung: **Python 3.11 oder neuer**. Ausführlich, mit Optionen und Fehlerhilfe:
-**[INSTALL.md](INSTALL.md)**.
+Drei Wege — ausführlich, mit Optionen und Fehlerhilfe: **[INSTALL.md](INSTALL.md)**.
 
-**Windows 10/11** (x64 oder ARM64):
+### Windows 10/11: Setup ohne Python (Vorabversion)
+
+Es gibt ein Windows-Setup **`LightOS-Setup.exe`**, das LightOS samt eigenem Python, Qt und
+3D-Visualizer installiert — ohne Python, venv oder `install.py` beim Nutzer.
+
+- **Noch kein offizielles Release.** Das Setup baut der GitHub-Workflow
+  [„Windows-Setup“](.github/workflows/windows-setup.yml); es liegt als **Artefakt**
+  `LightOS-Setup-<Version>` (zip) an einem Workflow-Lauf unter
+  [Actions → Windows-Setup](https://github.com/ixamgames-droid/lightos/actions/workflows/windows-setup.yml)
+  und wird 30 Tage aufbewahrt. Zum Herunterladen braucht man ein GitHub-Konto.
+- **Unsigniert:** Windows SmartScreen warnt deshalb beim ersten Start („Der Computer wurde
+  durch Windows geschützt“). Weiter geht es über **Weitere Informationen → Trotzdem ausführen**.
+- Installiert nach `C:\Program Files\LightOS`, mit Startmenü-Eintrag und Deinstaller. Shows und
+  Einstellungen liegen in `%APPDATA%\LightOS` und bleiben beim Deinstallieren erhalten.
+- Das Setup ist ein **x64-Paket**; Windows 11 auf ARM (Snapdragon) führt es in der
+  x64-Emulation aus, inklusive 3D-Visualizer.
+
+Details: [INSTALL.md → Windows-Setup](INSTALL.md#windows-setup-lightos-setupexe--ohne-python).
+
+### Windows 10/11 aus dem Quellcode (x64 oder ARM64)
+
+Voraussetzung: **Python 3.11 oder neuer**.
 
 ```cmd
 git clone https://github.com/ixamgames-droid/lightos.git
@@ -104,9 +124,11 @@ venv\Scripts\python main.py
 ```
 
 `install.py` legt ein `venv/` an, installiert die Abhängigkeiten und eine Desktop-Verknüpfung.
-Auf ARM64-Geräten den ARM64-Installer von python.org nehmen.
+**Windows auf ARM:** Für den 3D-Visualizer ein **x64-Python** nehmen (läuft in der Emulation).
+Die nativen ARM64-Pakete von PySide6 enthalten kein QtWebEngine — mit ARM64-Python startet
+LightOS, aber ohne 3D-Ansicht.
 
-**Linux** (Debian/Ubuntu/Mint, X11):
+### Linux (Debian/Ubuntu/Mint, X11)
 
 ```bash
 sudo apt-get install -y python3 python3-venv python3-pip \
@@ -124,6 +146,17 @@ venv/bin/python main.py
 die BPM-Erkennung aus PC-Audio. Linux-Besonderheiten stehen in
 [INSTALL.md](INSTALL.md#linux-x86_64).
 
+### Systemanforderungen
+
+| | Anforderung |
+|---|---|
+| Betriebssystem | Linux x64 mit X11 (getestet: Mint 22.3) · Windows 10/11 x64 · Windows 11 auf ARM64 |
+| Python | 3.11 oder neuer (nur bei Installation aus dem Quellcode; das Setup bringt sein eigenes mit) |
+| 3D-Visualizer | QtWebEngine — unter Linux x64 und Windows x64 dabei, auf Windows-ARM nur mit x64-Python bzw. dem Setup; die Qualitätsstufe passt sich der Grafikkarte an |
+| DMX-Ausgabe (optional) | ENTTEC DMX USB Pro, oder Art-Net/sACN über das Netzwerk |
+| MIDI (optional) | z. B. Akai APC mini / mk2; unter Linux mit `python-rtmidi` |
+| macOS | nicht unterstützt |
+
 ---
 
 ## Funktionen im Detail
@@ -134,6 +167,9 @@ die BPM-Erkennung aus PC-Audio. Linux-Besonderheiten stehen in
 - Eingebaute Profile (Generic und handgepflegte Geräte) plus Import ganzer
   QLC+-Bibliotheken: Menü **Datenbank → Fixtures importieren (XML)...** liest einen Ordner mit
   `.qxf`-Dateien ein. Eigene Profile über **Datenbank → Neues Fixture-Profil...**.
+- **Fixture-Generator:** ein eigenes Geräteprofil grafisch anlegen (Modi, Kanäle, Wertebereiche,
+  Kopf-Form) — **Patchen → Patch → Gerät erstellen…**; LightOS-Profile lassen sich exportieren
+  und importieren ([Anleitung Geräte-Bibliothek](docs/anleitung_geraete_bibliothek/ANLEITUNG.md)).
 - Mitgelieferte Profile werden nach einem Update angeglichen; importierte Geräte bekommen die
   passenden Regler (Farbkanal statt „Dimmer“, Gobo-Rotation statt Geschwindigkeit).
 - Mehrkopf-Geräte (Moving-Bars, Spider, Hydrabeam) als echte Kopf-Ziele; Pan/Tilt invertieren
@@ -219,8 +255,14 @@ die BPM-Erkennung aus PC-Audio. Linux-Besonderheiten stehen in
 <summary><b>3D-Visualizer und Bühne</b></summary>
 
 - Three.js in QtWebEngine; 2D von oben und 3D, zwei Modi **Ansehen** und **Bauen**.
-- Gobos, Prisma, Zoom/Iris, Fokus/Frost im Lichtkegel; Kegel enden am Boden und an Podesten,
-  lassen sich in der Länge begrenzen oder je Gerät ausblenden.
+- Gobos, Prisma, Zoom/Iris, Fokus/Frost im Lichtkegel: ein **Gobo** formt den Strahl
+  (Motiv aus dem Namen des Gobo-Bereichs, sonst ein Ersatzmotiv je Nummer), ein **Prisma**
+  teilt ihn in mehrere Kegel; Gobo- und Prisma-Rotation drehen mit. Kegel enden am Boden und an
+  Podesten, lassen sich in der Länge begrenzen oder je Gerät ausblenden.
+- **Laser** zeichnen statt eines Kegels einen Fächer aus dünnen Strahlen, der X/Y bzw. Pan/Tilt
+  folgt; bei gedrücktem Laser-NOT-AUS oder geschlossenem Shutter bleiben sie dunkel.
+- **Qualitätsstufen Niedrig, Hoch und Maximal** (Reiter Einstellungen → Render-Qualität):
+  „Automatisch“ wählt beim Start Niedrig oder Hoch passend zur Grafikkarte, Maximal nur von Hand.
 - Geräte aus der Liste ins 3D ziehen, als Reihe, Raster oder Kreis anordnen; Bühnen-Presets,
   eigener Bühnenbau (Traversen, Podeste), optionale Raum-Hülle; Mover-Bars zeigen ihre Köpfe
   wie am echten Gerät. Auch große Rigs laufen.
@@ -251,7 +293,8 @@ die BPM-Erkennung aus PC-Audio. Linux-Besonderheiten stehen in
 <summary><b>Laser</b></summary>
 
 - DMX-Laser als eigene Geräteklasse: Muster, Gruppen, Werksmuster-Kacheln, Shutter sicher aus.
-- Laser-Reiter mit **Not-Aus**, Figuren zeichnen, Bild-Trace, Muster-Slots.
+- Laser-Reiter mit **Not-Aus**, Figuren zeichnen, Bild-Trace, Muster-Slots; dazu eine
+  VC-Taste **„Laser NOT-AUS“**, die alle Laser sofort dunkel schaltet und entwaffnet.
 - Punkt-Streaming über **Ether Dream** und **IDN** (bisher nur gegen Nachbildungen getestet).
 - [Anleitung: Laser bedienen](docs/anleitung_laser/ANLEITUNG_LASER.md)
 
@@ -284,7 +327,8 @@ Linux und Windows laufen aus demselben Quellcode; Plattform-Spezifisches liegt h
 |---|---|---|
 | Getestet auf | Mint 22.3, x64, X11 | Windows 10/11, x64 und ARM64 |
 | Python | 3.11+ | 3.11+ |
-| GitHub-CI | volle Testsuite, segmentiert (Python 3.12) | Smoke-Test aus fünf Dateien (Python 3.11 und 3.12) |
+| GitHub-CI | volle Testsuite, segmentiert (Python 3.12) | x64: Smoke-Test (Python 3.11 und 3.12); ARM64: volle Suite mit x64-Python, noch beobachtend |
+| Installation | aus dem Quellcode | Setup `LightOS-Setup.exe` (Vorabversion) oder aus dem Quellcode |
 | DMX am echten Rig | ENTTEC über `/dev/ttyUSB*` | ENTTEC über COM-Port |
 | MIDI | `python-rtmidi` / ALSA | WinMM |
 | Datenordner | `~/.local/share/LightOS` | `%APPDATA%\LightOS` |
@@ -312,7 +356,8 @@ sind eigene, im Code erzeugte Geometrie.
 | ENTTEC, Art-Net, sACN | im Betrieb, ENTTEC im Langzeittest geprüft |
 | Laser über DMX | im Einsatz |
 | Laser über Ether Dream / IDN | umgesetzt, aber nur gegen Nachbildungen getestet |
-| Windows | Alltagsrechner; in der CI nur ein Smoke-Test |
+| Windows | Alltagsrechner; in der CI Smoke-Test (x64) und volle Suite auf ARM64 (noch nicht blockierend) |
+| Windows-Setup | baut automatisch als Workflow-Artefakt, unsigniert; noch kein Release |
 | macOS | nicht unterstützt (Pfade vorbereitet, nie getestet) |
 
 Die meisten Beispiel-Shows der älteren Anleitungen liegen nicht im Repo; wo es einen Generator
@@ -346,12 +391,15 @@ aufgestautem nativem Qt-Zustand. Hintergrund und Parallelität: [WORKFLOW.md](WO
 ### CI
 
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml): Linux fährt die volle Suite
-segmentiert, Windows einen Smoke-Test aus fünf Dateien.
+segmentiert, Windows x64 einen Smoke-Test, Windows-ARM64 die volle Suite mit x64-Python
+(beobachtend). [`.github/workflows/windows-setup.yml`](.github/workflows/windows-setup.yml)
+baut `LightOS-Setup.exe` (PyInstaller + Inno Setup) samt Rauchtest der installierten exe.
 
 ### Projektstruktur
 
 ```
 main.py, install.py       Start und Installer
+packaging/windows/        Windows-Setup (PyInstaller-Spec, Inno-Setup-Skript)
 src/core/                 Engine, Datenmodell, Undo, Show-Datei, DMX, Audio/BPM, MIDI, OSC,
                           Laser, Bühne, Kommandozeile, Fixture-Datenbank, Capability-Prüfung
 src/ui/                   Hauptfenster, Views, Werkzeuge, Virtual Console, Visualizer (Three.js)
