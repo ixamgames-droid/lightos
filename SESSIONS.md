@@ -35,7 +35,6 @@
 | DOC-69 | A | docs/doc69-doku-korrekturen | 2026-10-10T18:44Z | - |
 | STAB-32 | A | feature/stab32-versionierte-sicherungen | 2026-10-10T18:44Z | - |
 | OUT-67 | A | feature/out67-ausgabe-ausfall-banner | 2026-10-10T09:29Z | - |
-| TOOL-21 | D | fix/tool21-gif-vergleich-rgb | 2026-10-10T21:17Z | tools/anleitungsbilder/runner.py · tests/test_tool21_bildvergleich_je_kanal.py |
 | TOOL-24 | D | fix/tool24-proc18-lizenzhinweise-strukturiert | 2026-10-10T21:17Z | tests/test_proc18_fremd_lizenzhinweise.py |
 | FM-66 | D | fix/fm66-abgleich-modellname | 2026-10-10T21:17Z | src/core/database/bibliothek_format.py · tests/test_fm66_abgleich_modellname.py · docs/FIXTURE_LIBRARY.md |
 | FM-73 | A | fix/fm73-sync-gleichnamige-modi | 2026-10-10T18:44Z | - |
@@ -201,7 +200,6 @@
 
 ## Verlauf
 
-- 2026-10-10T16:51Z A done FM-68
 - 2026-10-10T17:17Z A done STAB-33
 - 2026-10-10T17:40Z A done UI-85
 - 2026-10-10T18:00Z D claim VCB-36
@@ -231,3 +229,4 @@
 - 2026-10-10T21:17Z A claim QA-94
 - 2026-10-10T21:17Z A claim QA-95
 - 2026-10-10T21:41Z D done DOC-70
+- 2026-10-10T22:00Z D done TOOL-21
