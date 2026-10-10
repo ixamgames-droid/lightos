@@ -12,7 +12,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| DOC-32 | C | - | 2026-10-02T10:55Z | docs/anleitung_farbmatrix/ANLEITUNG_FARBMATRIX.md |
 | DOC-33 | C | - | 2026-10-02T10:56Z | docs/anleitung_dimmermatrix/ANLEITUNG_DIMMERMATRIX.md |
 | DOC-34 | C | - | 2026-10-02T10:56Z | docs/anleitung_matrix_effekte/ANLEITUNG_MATRIX_EFFEKTE.md |
 | DOC-35 | C | - | 2026-10-02T10:57Z | docs/anleitung_efx/ANLEITUNG_EFX.md |
@@ -146,7 +145,6 @@
 
 ## Verlauf
 
-- 2026-10-09T14:36Z D claim BPM-30
 - 2026-10-09T14:37Z D claim XPLAT-48
 - 2026-10-09T14:40Z B done VIZ-94
 - 2026-10-09T14:44Z D aktualisiert BPM-30: Dateien - -> src/core/app_state.py · src/core/engine/bpm_manager.py · tests/test_bpm30_beat_faden_ohne_appstate.py · BACKLOG.md · changelog.d/2026-10-09-BPM-30.md
@@ -176,3 +174,4 @@
 - 2026-10-10T09:26Z C uebergeben DOC-29
 - 2026-10-10T09:26Z C uebergeben DOC-30
 - 2026-10-10T09:26Z C uebergeben DOC-31
+- 2026-10-10T09:27Z C uebergeben DOC-32
