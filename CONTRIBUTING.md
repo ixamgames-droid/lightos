@@ -14,7 +14,7 @@ Danke für dein Interesse an LightOS! Diese Anleitung erklärt, wie du die Entwi
 | Git | 2.40 | https://git-scm.com |
 | Visual Studio Code oder PyCharm | aktuell | optional |
 
-**Windows ARM64:** Verwende das native ARM64-Python-Installer von python.org (nicht x64-Emulation).
+**Windows ARM64:** Verwende das **x64-Python** von python.org (laeuft per Emulation). Natives ARM64-Python geht nur ohne 3D-Visualizer, weil dessen PySide6-Addons kein QtWebEngine enthalten (XPLAT-45/46, Details in `INSTALL.md`).
 
 ### Repository klonen und Setup
 

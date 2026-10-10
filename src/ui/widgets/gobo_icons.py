@@ -31,10 +31,15 @@ STYLES = ("ring_slits", "ovals", "circle_of_circles", "tetris",
           "dots", "spiral", "zebra")
 
 # Schluesselwort → Stil (deutsch + englisch, bewusst eindeutig gehalten).
+# VIZ-97: der Conti Moving Head (fixture_db._CONTI_GOBO) hat dasselbe China-Rad
+# wie der ZQ02001 (gleiche DMX-Bereiche), nennt die Gobos aber anders:
+# "Tunnel" = ZQ "Gobo 2 (Ovale)", "3 Kreise" = ZQ "Gobo 3 (Kreis aus Kreisen)".
+# Ohne diese Woerter blieb der Strahl im 3D voll und die VC-Taste ohne Symbol —
+# auch fuer die "(Shake)"-Bereiche, die denselben Namen tragen.
 _KEYWORDS = [
     ("ring_slits",        ("ring", "spalte", "spalten", "slit")),
-    ("ovals",             ("oval",)),
-    ("circle_of_circles", ("kreis aus", "kreisen", "circle of")),
+    ("ovals",             ("oval", "tunnel")),
+    ("circle_of_circles", ("kreis aus", "kreisen", "kreise", "circle of")),
     ("tetris",            ("tetris",)),
     ("dots",              ("punkte", "dots")),
     ("spiral",            ("spirale", "spiral")),
