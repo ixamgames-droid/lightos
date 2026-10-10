@@ -26,7 +26,6 @@
 | LAS-30 | A | feature/las30-laser-achsen | 2026-10-10T10:47Z | src/core/laser |
 | VIZ-96 | A | feature/viz96-gobo-projektion | 2026-10-10T13:08Z | src/ui/visualizer |
 | UI-84 | A | fix/ui84-efx-laden-geraeteliste | 2026-10-09T13:45Z | src/ui/views/efx_view.py |
-| XPLAT-48 | D | fix/xplat48-no-venv-verknuepfung | 2026-10-10T15:48Z | install.py · tests/test_xplat48_verknuepfung_no_venv.py · BACKLOG.md · changelog.d/2026-10-09-XPLAT-48.md |
 | MIDI-5 | A | feature/midi5-msc | 2026-10-09T16:27Z | src/core/midi |
 | NET-14 | A | feature/midi5-msc | 2026-10-09T16:27Z | src/core/midi |
 | MIDI-16 | A | feature/midi5-msc | 2026-10-09T16:27Z | src/core/midi |
@@ -187,7 +186,6 @@
 
 ## Verlauf
 
-- 2026-10-10T13:08Z A claim LAS-32
 - 2026-10-10T13:08Z A claim DEMO-8
 - 2026-10-10T13:24Z B done UI-76
 - 2026-10-10T13:27Z B aktualisiert VIZ-99: Dateien - -> src/ui/visualizer/scene_src/scene/gpu_tier.js · tests/test_viz84_gpu_tier.py · tests/test_viz99_automatik_snapdragon.py · src/ui/visualizer/visualizer_window.py · BACKLOG.md · changelog.d/2026-10-10-VIZ-99.md
@@ -217,3 +215,4 @@
 - 2026-10-10T18:00Z D claim TOOL-19
 - 2026-10-10T18:03Z D aktualisiert TOOL-19: Branch - -> fix/tool19-werkzeuge-ohne-echten-ausgang
 - 2026-10-10T18:10Z D aktualisiert TOOL-18: Branch - -> fix/tool18-bilder-hinweis-gpu-szenen
+- 2026-10-10T18:11Z D done XPLAT-48
