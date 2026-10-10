@@ -1794,8 +1794,23 @@ class AppState:
         # _estop_lock — sonst konnte ein fremder Thread (MIDI/OSC/Web) den Latch
         # zwischen Check und Tausch setzen und nur die ALTEN Adressen maskieren.
         # Lock-Reihenfolge: _estop_lock vor _plan_lock (kein Pfad nimmt sie umgekehrt).
+        # OUT-65: Aus-Werte des neuen Plans VOR den neuen Laser-Adressen
+        # vormerken (nur bei aktivem Latch wirksam) — sonst stuende eine neu
+        # adressierte Laser-Adresse bis zu set_gm_laser_aus_mask unten mit 0
+        # (= „Auto run“ bei vielen Lasern) in der NOT-AUS-Maske.
+        try:
+            new_laser_aus = self._build_gm_laser_aus_mask(fix_index)
+        except Exception as e:
+            print(f"[AppState] build gm laser mask error: {e}")
+            new_laser_aus = None
         with self._get_estop_lock():
             if getattr(self, "laser_estop_active", False):
+                merke = getattr(self.output_manager, "merke_laser_aus_werte", None)
+                if new_laser_aus and callable(merke):
+                    try:
+                        merke(new_laser_aus)
+                    except Exception as e:
+                        print(f"[AppState] merke laser aus error: {e}")
                 _old_le = getattr(self, "_laser_estop_addrs", {}) or {}
                 if _old_le != new_laser_estop_addrs:
                     _union = {}
@@ -1834,7 +1849,8 @@ class AppState:
         try:
             setze_aus = getattr(self.output_manager, "set_gm_laser_aus_mask", None)
             if setze_aus is not None:
-                setze_aus(self._build_gm_laser_aus_mask(fix_index))
+                setze_aus(new_laser_aus if new_laser_aus is not None
+                          else self._build_gm_laser_aus_mask(fix_index))
         except Exception as e:
             print(f"[AppState] set gm laser mask error: {e}")
         # OUT-57: Blackout-ERHALTEN-Maske — nur Position/Gobo/Prisma/Optik gepatchter
@@ -2186,6 +2202,14 @@ class AppState:
             except Exception as e:
                 print(f"[app_state] apply_output_config: Universe {num} "
                       f"({output}) fehlgeschlagen: {e}")
+        # OUT-64: die zwischen remove_output und add_* gemerkten Wege verwerfen
+        # (bei aktivem NOT-AUS sind sie bereits in dessen Wege-Liste).
+        vergiss = getattr(self.output_manager, "vergiss_entfernte_wege", None)
+        if callable(vergiss):
+            try:
+                vergiss()
+            except Exception as e:
+                print(f"[app_state] apply_output_config: Wege vergessen: {e}")
 
     def auto_patch_fixtures(self, undoable: bool = True):
         """Weist allen Fixtures aufeinander folgende Adressen zu (undobar)."""
@@ -7225,32 +7249,56 @@ def unapply_pan_tilt_orientation(fx, attrs: dict) -> dict:
 
 # Singleton
 _state: AppState | None = None
+# BPM-30: das Anlegen ist nicht atomar (Datenumzug, Show-DB, Ausgabe-Thread).
+# Zwei Faeden, die gleichzeitig zum ersten Mal get_state() riefen (gemessen:
+# zwei BPM-Beat-Faeden), bauten zwei AppStates. RLock, weil der Aufbau selbst
+# wieder get_state() erreichen kann.
+_state_lock = threading.RLock()
+
+
+def vorhandener_state() -> AppState | None:
+    """BPM-30: der App-Zustand, falls es ihn schon gibt — legt NIE einen an.
+
+    Fuer Hintergrund-Faeden (Beat-Takt & Co.): die duerfen den schweren Aufbau
+    (Datenumzug, Show-DB, Ausgabe-Thread) nicht selbst ausloesen. Er lief sonst
+    im Faden, und die Speicherbereinigung dort raeumte Qt-Objekte ab, waehrend
+    der Hauptthread Fenster abbaute -> Access Violation (Gate BPM-28,
+    test_bpm_view_state_table)."""
+    return _state
 
 
 def get_state() -> AppState:
     global _state
     if _state is None:
-        # XPLAT-44: die Uebernahme alter data/-Dateien MUSS vor dem ersten
-        # Oeffnen der Show-DB laufen — sonst legt open_show() im App-Ordner eine
-        # leere DB an, die den alten Stand verdraengt. Hier zentral, damit auch
-        # Werkzeuge/Beispiele (ohne main.py) zuerst uebernehmen; je Prozess nur
-        # einmal (main.py ruft es schon frueher, mit Dialog).
-        try:
-            from .datenumzug import einmal_je_prozess
-            einmal_je_prozess()
-        except Exception as e:
-            print(f"[datenumzug] uebersprungen: {e}")
-        _state = AppState()
-        _state.open_show()
-        _state.apply_output_config()
-        # Den 44-Hz-Output-Thread NICHT autostarten, wenn das ausdruecklich
-        # deaktiviert ist (Tests setzen LIGHTOS_NO_OUTPUT_THREAD): der Thread
-        # rendert in _render_frame und emittiert Sync-Events, die cross-thread in
-        # Qt marshallt werden. Das racete mit dem pytest-Teardown (processEvents/
-        # GC abgemeldeter Widgets) -> sporadische native Access Violation. Tests
-        # rendern synchron (tick()/_render_frame()); echte Hardware-Ausgabe wird
-        # dort ohnehin nicht geprueft.
-        if not os.environ.get("LIGHTOS_NO_OUTPUT_THREAD"):
-            _state.output_manager.start()
-        _state.start_playback()
+        with _state_lock:
+            if _state is None:
+                _state_anlegen()
     return _state
+
+
+def _state_anlegen() -> None:
+    """Baut den Singleton auf. Nur unter ``_state_lock`` aufrufen."""
+    global _state
+    # XPLAT-44: die Uebernahme alter data/-Dateien MUSS vor dem ersten
+    # Oeffnen der Show-DB laufen — sonst legt open_show() im App-Ordner eine
+    # leere DB an, die den alten Stand verdraengt. Hier zentral, damit auch
+    # Werkzeuge/Beispiele (ohne main.py) zuerst uebernehmen; je Prozess nur
+    # einmal (main.py ruft es schon frueher, mit Dialog).
+    try:
+        from .datenumzug import einmal_je_prozess
+        einmal_je_prozess()
+    except Exception as e:
+        print(f"[datenumzug] uebersprungen: {e}")
+    _state = AppState()
+    _state.open_show()
+    _state.apply_output_config()
+    # Den 44-Hz-Output-Thread NICHT autostarten, wenn das ausdruecklich
+    # deaktiviert ist (Tests setzen LIGHTOS_NO_OUTPUT_THREAD): der Thread
+    # rendert in _render_frame und emittiert Sync-Events, die cross-thread in
+    # Qt marshallt werden. Das racete mit dem pytest-Teardown (processEvents/
+    # GC abgemeldeter Widgets) -> sporadische native Access Violation. Tests
+    # rendern synchron (tick()/_render_frame()); echte Hardware-Ausgabe wird
+    # dort ohnehin nicht geprueft.
+    if not os.environ.get("LIGHTOS_NO_OUTPUT_THREAD"):
+        _state.output_manager.start()
+    _state.start_playback()
