@@ -24,7 +24,6 @@
 | DOC-65 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:11Z | docs/anleitung_fixture_generator |
 | LAS-26 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:11Z | src/ui |
 | XPLAT-46 | B | fix/xplat46-arm-x64-empfehlung | 2026-10-08T18:32Z | install.py · INSTALL.md · CONTRIBUTING.md · src/ui/main_window.py · src/utils/plattform_hinweis.py · tests/test_xplat46_arm_empfehlung.py · changelog.d/2026-10-08-XPLAT-46.md |
-| OUT-64 | B | fix/out64-estop-ausgabeweg | 2026-10-08T19:11Z | src/core/dmx/output_manager.py · tests/test_out64_estop_ausgabeweg.py · changelog.d/2026-10-08-OUT-64.md · BACKLOG.md |
 | UI-76 | B | fix/ui76-go-hinweis-page | 2026-10-08T19:17Z | src/core/cueliste_ziel.py · src/ui/views/playback_view.py · tests/test_ui76_go_hinweis.py · docs/anleitung_szenen_cues/ANLEITUNG.md · changelog.d/2026-10-08-UI-76.md · BACKLOG.md |
 | VIZ-95 | A | feature/viz95-lasermuster-3d | 2026-10-08T20:47Z | src/ui/visualizer |
 | LAS-30 | A | feature/las30-laser-achsen | 2026-10-10T10:47Z | src/core/laser |
@@ -146,7 +145,6 @@
 
 ## Verlauf
 
-- 2026-10-10T09:28Z C uebergeben DOC-54
 - 2026-10-10T09:28Z C uebergeben DOC-55
 - 2026-10-10T09:28Z C uebergeben DOC-56
 - 2026-10-10T09:29Z A claim XPLAT-49
@@ -176,3 +174,4 @@
 - 2026-10-10T11:07Z D aktualisiert DOC-70: Dateien - -> docs/anleitung_netzwerk_windows/ANLEITUNG.md · docs/ANLEITUNGEN.md · tests/test_doc70_netzwerk_windows.py
 - 2026-10-10T11:10Z D aktualisiert TOOL-14: Branch - -> fix/tool14-gen-tools-index-argparse; Dateien - -> tools/gen_tools_index.py · tests/test_tool14_gen_tools_index_cli.py
 - 2026-10-10T11:13Z D aktualisiert TOOL-21: Branch - -> fix/tool21-gif-vergleich-rgb; Dateien - -> tools/anleitungsbilder/runner.py · tests/test_tool21_bildvergleich_je_kanal.py
+- 2026-10-10T11:15Z B done OUT-64
