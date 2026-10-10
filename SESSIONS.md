@@ -58,6 +58,7 @@
 | STAB-33 | A | fix/stab33-diagnose-windows | 2026-10-10T10:17Z | src/core/diagnose_log.py · main.py |
 | FM-73 | A | fix/fm73-sync-gleichnamige-modi | 2026-10-10T10:36Z | - |
 | ARM-PRUEFUNG-1010 | B | - | 2026-10-10T11:19Z | - |
+| PROC-19 | A | ci/proc19-doku-schnellweg | 2026-10-10T11:47Z | .github/workflows/ci.yml |
 
 ## Blocker & Fallen
 
@@ -151,7 +152,6 @@
 
 ## Verlauf
 
-- 2026-10-10T09:29Z A claim WEB-06
 - 2026-10-10T09:29Z A claim UI-85
 - 2026-10-10T09:29Z A claim DOC-69
 - 2026-10-10T09:29Z A claim STAB-32
@@ -181,3 +181,4 @@
 - 2026-10-10T11:23Z D aktualisiert TOOL-24: Branch - -> fix/tool24-proc18-lizenzhinweise-strukturiert; Dateien - -> tests/test_proc18_fremd_lizenzhinweise.py
 - 2026-10-10T11:28Z D aktualisiert FM-66: Branch - -> fix/fm66-abgleich-modellname; Dateien - -> src/core/database/bibliothek_format.py · tests/test_fm66_abgleich_modellname.py · docs/FIXTURE_LIBRARY.md
 - 2026-10-10T11:46Z A done BACKLOG-STATUS
+- 2026-10-10T11:47Z A claim PROC-19
