@@ -46,6 +46,7 @@
 | XPLAT-49 | A | fix/xplat49-uninstall-datenschutz | 2026-10-10T09:29Z | uninstall.py |
 | XPLAT-50 | A | fix/xplat49-uninstall-datenschutz | 2026-10-10T09:29Z | start.bat · start.ps1 |
 | FM-67 | A | fix/fm67-gleichnamige-modi | 2026-10-10T09:29Z | - |
+| WEB-06 | A | fix/web06-socketio-lokal | 2026-10-10T09:29Z | - |
 
 ## Blocker & Fallen
 
@@ -121,7 +122,6 @@
 
 ## Verlauf
 
-- 2026-10-10T09:27Z C uebergeben DOC-33
 - 2026-10-10T09:27Z C uebergeben DOC-34
 - 2026-10-10T09:27Z C uebergeben DOC-35
 - 2026-10-10T09:27Z C uebergeben DOC-36
@@ -151,3 +151,4 @@
 - 2026-10-10T09:29Z A claim XPLAT-49
 - 2026-10-10T09:29Z A claim XPLAT-50
 - 2026-10-10T09:29Z A claim FM-67
+- 2026-10-10T09:29Z A claim WEB-06
