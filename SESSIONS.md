@@ -50,6 +50,7 @@
 | DOC-69 | A | docs/doc69-doku-korrekturen | 2026-10-10T09:29Z | - |
 | STAB-32 | A | feature/stab32-versionierte-sicherungen | 2026-10-10T09:29Z | - |
 | OUT-67 | A | feature/out67-ausgabe-ausfall-banner | 2026-10-10T09:29Z | - |
+| TOOL-14 | D | - | 2026-10-10T09:41Z | - |
 
 ## Blocker & Fallen
 
@@ -125,7 +126,6 @@
 
 ## Verlauf
 
-- 2026-10-10T09:27Z C uebergeben DOC-39
 - 2026-10-10T09:27Z C uebergeben DOC-40
 - 2026-10-10T09:27Z C uebergeben DOC-41
 - 2026-10-10T09:27Z C uebergeben DOC-42
@@ -155,3 +155,4 @@
 - 2026-10-10T09:29Z A claim STAB-32
 - 2026-10-10T09:29Z A claim OUT-67
 - 2026-10-10T09:39Z A done DEMO-07
+- 2026-10-10T09:41Z D claim TOOL-14
