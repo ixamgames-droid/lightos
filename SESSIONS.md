@@ -63,6 +63,7 @@
 | UI-86 | B | fix/ui86-liveansicht-200-prozent | 2026-10-10T12:55Z | - |
 | LAS-31 | A | feature/las31-notaus-kopfleiste | 2026-10-10T13:08Z | - |
 | LAS-32 | A | feature/las32-laser-sperrzonen | 2026-10-10T13:08Z | - |
+| DEMO-8 | A | feature/demo8-demoshows-im-setup | 2026-10-10T13:08Z | - |
 
 ## Blocker & Fallen
 
@@ -166,7 +167,6 @@
 
 ## Verlauf
 
-- 2026-10-10T10:17Z A claim STAB-33
 - 2026-10-10T10:36Z A claim FM-73
 - 2026-10-10T10:46Z A claim CDX-0810
 - 2026-10-10T10:46Z A claim BACKLOG-STATUS
@@ -196,3 +196,4 @@
 - 2026-10-10T13:01Z B aktualisiert TOOL-26: Dateien - -> tools/app_messung.py · tools/README.md · tests/test_tool26_app_messung.py · BACKLOG.md · changelog.d/2026-10-10-TOOL-26.md
 - 2026-10-10T13:08Z A claim LAS-31
 - 2026-10-10T13:08Z A claim LAS-32
+- 2026-10-10T13:08Z A claim DEMO-8
