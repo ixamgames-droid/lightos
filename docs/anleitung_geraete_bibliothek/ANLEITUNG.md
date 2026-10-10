@@ -76,8 +76,10 @@ bestehende Shows nutzen ihn unverändert weiter.
 ## 2. Eine größere freie Bibliothek herunterladen
 
 Fehlt dein Gerät, kann LightOS eine freie Bibliothek aus dem Internet laden. Beim
-**ersten Start** fragt LightOS von sich aus. Später erreichst du den Download jederzeit
-über das Menü **Datenbank**:
+**ersten Start** fragt LightOS von sich aus. Startest du LightOS direkt mit einer Show
+(`--show`, etwa per Autostart), kommt statt der Frage unten in der Statuszeile der Knopf
+**Geräte-Bibliothek laden…** — die Show ist sofort bedienbar. Später erreichst du den
+Download jederzeit über das Menü **Datenbank**:
 
 ![Menü Datenbank](img/02_menue_datenbank.png)
 
