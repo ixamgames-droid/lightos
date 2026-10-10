@@ -192,11 +192,27 @@ def test_anonymisiere_windows_und_linux_pfade():
     assert t2 == "~/Library/LightOS kim mag Licht"
 
 
-def test_windows_arm_emulation_wird_benannt(monkeypatch):
+def test_windows_architektur_kommt_vom_system(monkeypatch):
+    """Am echten Windows: die Zeile ``Architektur:`` stammt aus
+    ``IsWow64Process2``, nicht aus dem Rueckfall ueber Umgebungsvariablen.
+
+    QA-92: der Test hiess ``test_windows_arm_emulation_wird_benannt`` und
+    erwartete das Wort „Maschine“ aus dem STAB-30-Text („… | Maschine …“).
+    STAB-33 hat den Text ersetzt („x64 nativ“, „x64-Prozess auf ARM64
+    (Emulation)“) — seitdem war er unter Windows auf JEDEM Rechner rot und fiel
+    nicht auf, weil er unter Linux uebersprungen wird. Die Texte selbst prueft
+    ``test_stab33_diagnose_windows.py`` mit vorgegebenen Werten; hier zaehlt,
+    dass der Systemaufruf auf diesem Rechner ein Ergebnis liefert."""
+    import re
     from src.core import diagnose_log as d
     if sys.platform != "win32":
         pytest.skip("IsWow64Process2 gibt es nur unter Windows")
-    assert "Maschine" in d._windows_architektur()
+    text = d._windows_architektur()
+    assert "Rueckfall" not in text, (
+        f"IsWow64Process2 lieferte nichts, die Zeile ist geraten: {text!r}")
+    assert "unbekannt" not in text, text
+    assert re.match(r"(32 Bit: )?(x64|x86|ARM64|ARM)( nativ$|-Prozess auf (x64|ARM64) \()",
+                    text), f"unerwartete Architektur-Zeile: {text!r}"
 
 
 def test_melde_still_drosselt_je_stelle(capsys):
