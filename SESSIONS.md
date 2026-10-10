@@ -43,7 +43,6 @@
 | PROC-19 | A | ci/proc19-doku-schnellweg | 2026-10-10T18:57Z | .github/workflows/ci.yml |
 | PROC-20 | A | feature/proc20-backlog-fragmente | 2026-10-10T18:45Z | tools · BACKLOG.md |
 | TOOL-26 | B | feature/tool26-app-messwerkzeug | 2026-10-10T13:25Z | tools/app_messung.py · tools/README.md · tests/test_tool26_app_messung.py · BACKLOG.md · changelog.d/2026-10-10-TOOL-26.md |
-| VIZ-99 | B | fix/viz99-automatik-snapdragon | 2026-10-10T14:09Z | src/ui/visualizer/scene_src/scene/gpu_tier.js · tests/test_viz84_gpu_tier.py · tests/test_viz99_automatik_snapdragon.py · src/ui/visualizer/visualizer_window.py · BACKLOG.md · changelog.d/2026-10-10-VIZ-99.md |
 | LAS-31 | A | feature/las31-notaus-kopfleiste | 2026-10-10T13:08Z | - |
 | LAS-32 | A | feature/las32-laser-sperrzonen | 2026-10-10T13:08Z | - |
 | DEMO-8 | A | feature/demo8-demoshows-im-setup | 2026-10-10T13:08Z | - |
@@ -197,7 +196,6 @@
 
 ## Verlauf
 
-- 2026-10-10T14:44Z A done MIDI-3
 - 2026-10-10T15:03Z D aktualisiert QA-91: Branch fix/qa91-doc60-test-encoding -> fix/qa91-subprocess-encoding
 - 2026-10-10T15:15Z A done WEB-06
 - 2026-10-10T15:26Z D aktualisiert QA-91: Branch fix/qa91-subprocess-encoding -> fix/qa91-doc60-test-encoding
@@ -227,3 +225,4 @@
 - 2026-10-10T20:14Z D done TOOL-14
 - 2026-10-10T20:38Z D done TOOL-23
 - 2026-10-10T20:44Z D aktualisiert UI-87: Branch - -> fix/ui87-hilfe-oeffnen-windows
+- 2026-10-10T21:10Z B done VIZ-99
