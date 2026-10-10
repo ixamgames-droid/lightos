@@ -84,6 +84,29 @@ def _temp_bibliothek(fall) -> tuple[object, int]:
         return motor, p.id
 
 
+def _profil(motor, name, modi) -> int:
+    """Ein weiteres Profil in der Temp-Bibliothek; ``modi`` in ID-Reihenfolge."""
+    with Session(motor) as s:
+        hersteller = s.execute(select(Manufacturer)).scalars().first()
+        p = FixtureProfile(manufacturer=hersteller, name=name,
+                           short_name=name.upper()[:8], fixture_type="par",
+                           source="user")
+        for modus, n in modi:
+            m = FixtureMode(fixture=p, name=modus, channel_count=n)
+            for i in range(1, n + 1):
+                m.channels.append(FixtureChannel(
+                    channel_number=i, name=f"{modus}/{n}-K{i}", attribute="intensity"))
+        s.add(p)
+        s.commit()
+        return p.id
+
+
+#: So sieht ein Profil NACH dem Import aus, dessen Datei zwei Modi „Standard“
+#: hatte: der zweite heisst „Standard (2)“. Davor ein fremder Modus mit
+#: derselben Kanalzahl — die Rueckfallstufe 2 naehme den.
+NACH_IMPORT = (("Anders", 6), ("Standard", 4), ("Standard (2)", 6))
+
+
 def _geraet(fid, pid, mode_name, channel_count, address, **mehr) -> PatchedFixture:
     werte = dict(fid=fid, label=f"G{fid}", fixture_profile_id=pid,
                  mode_name=mode_name, channel_count=channel_count,
@@ -178,6 +201,56 @@ class ShowOeffnenTest(unittest.TestCase):
         self.assertEqual(fehler, [])
         self.assertEqual(len(self.state.get_patched_fixtures()), 2)
 
+    # -- Codex-Befund (P1): umbenannter Zwilling „Name (2)“ --------------------
+
+    def _kanaele(self, pid, name, zahl):
+        with Session(self.motor) as s:
+            m = app_state._resolve_mode(s, SimpleNamespace(
+                fixture_profile_id=pid, mode_name=name, channel_count=zahl))
+            return m.name, m.channel_count, [c.name for c in m.channels]
+
+    def test_altshow_findet_den_umbenannten_zwilling(self):
+        """Die Altshow merkt sich („Standard“, 6). Nach dem Import heisst der
+        6-Kanal-Modus „Standard (2)“, und es gibt nur noch EINEN „Standard“
+        (4 Kanaele). Vor dem Fix gewann der — falsches Kanal-Mapping, und die
+        Show-Pruefung hielt den Modus fuer vorhanden."""
+        pid = _profil(self.motor, "Zwilling", NACH_IMPORT)
+        self.assertEqual(self._kanaele(pid, "Standard", 6),
+                         ("Standard (2)", 6,
+                          [f"Standard (2)/6-K{i}" for i in range(1, 7)]))
+        self._patchen(_geraet(5, pid, "Standard", 6, 1, fixture_type="par"))
+        issues = validate_and_repair(self.state, fix=True)
+        meine = self._fuer(issues, 5)
+        self.assertEqual([str(i) for i in meine if i.severity == "error"], [])
+        self.assertEqual(self._zeile(5)[:2], ("Standard (2)", 6),
+                         "die Show-Pruefung traegt den neuen Namen nicht ein")
+        self.assertTrue(any(i.auto_fixed and "'Standard (2)'" in i.message
+                            and "umbenannt" in i.message for i in meine),
+                        [str(i) for i in meine])
+        # im Speicher ebenso, und das naechste Oeffnen meldet nichts mehr
+        (f,) = [g for g in self.state.get_patched_fixtures() if g.fid == 5]
+        self.assertEqual((f.mode_name, f.channel_count), ("Standard (2)", 6))
+        nochmal = self._fuer(validate_and_repair(self.state, fix=True), 5)
+        self.assertEqual([str(i) for i in nochmal], [])
+        self.assertEqual(self._kanaele(pid, "Standard (2)", 6)[1], 6)
+
+    def test_ohne_reparatur_wird_der_zwilling_nur_gemeldet(self):
+        pid = _profil(self.motor, "Zwilling", NACH_IMPORT)
+        self._patchen(_geraet(6, pid, "Standard", 6, 1, fixture_type="par"))
+        meine = self._fuer(validate_and_repair(self.state, fix=False), 6)
+        self.assertEqual(self._zeile(6)[:2], ("Standard", 6))
+        self.assertTrue(any("'Standard (2)'" in i.message and not i.auto_fixed
+                            for i in meine), [str(i) for i in meine])
+
+    def test_passender_standard_bleibt_unberuehrt(self):
+        """Der Zwilling zaehlt nur, wenn der Namens-Treffer die falsche
+        Kanalzahl hat."""
+        pid = _profil(self.motor, "Zwilling", NACH_IMPORT)
+        self._patchen(_geraet(7, pid, "Standard", 4, 1, fixture_type="par"))
+        meine = self._fuer(validate_and_repair(self.state, fix=True), 7)
+        self.assertEqual([str(i) for i in meine], [])
+        self.assertEqual(self._zeile(7)[:2], ("Standard", 4))
+
     def test_sync_und_resolve_mode_meinen_denselben_modus(self):
         """Nach der Reparatur muss ``_resolve_mode`` genau den Modus liefern,
         den die Show-Pruefung eingetragen hat — sonst sind es zwei Regeln."""
@@ -222,6 +295,59 @@ class EineRegelTest(unittest.TestCase):
         self.assertEqual(self._wahl("weg", 8), ("B", 8))
         self.assertEqual(self._wahl("weg", 99), ("A", 4))
         self.assertIsNone(self._wahl("A", 4, modi=[]))
+
+    def test_alias_regel_fuer_den_umbenannten_zwilling(self):
+        """Hat der Namens-Treffer die falsche Kanalzahl, geht ein „Name (n)“
+        mit passender Kanalzahl vor — so heisst seit FM-73 der zweite von zwei
+        gleichnamigen Modi."""
+        def modi(*paare):
+            return [SimpleNamespace(id=i + 1, name=n, channel_count=c)
+                    for i, (n, c) in enumerate(paare)]
+
+        def beide(name, zahl, liste):
+            from src.core.database.modus_wahl import gleichnamiger_modus
+            m = gleichnamiger_modus(liste, name, zahl)
+            stufe1 = None if m is None else (m.name, m.channel_count)
+            self.assertEqual(stufe1, self._wahl(name, zahl, modi=liste),
+                             "Stufe 1 und die ganze Kette meinen denselben")
+            return stufe1
+
+        nach_import = modi(*NACH_IMPORT)
+        self.assertEqual(beide("Standard", 6, nach_import), ("Standard (2)", 6))
+        self.assertEqual(beide("Standard", 4, nach_import), ("Standard", 4))
+        # der exakte Name mit passender Kanalzahl schlaegt jeden Zwilling
+        self.assertEqual(beide("Standard", 6, modi(("Standard (2)", 6), ("Standard", 6))),
+                         ("Standard", 6))
+        # ein Zwilling mit falscher Kanalzahl hilft nicht: Name schlaegt Kanalzahl
+        self.assertEqual(beide("Standard", 6, modi(("Standard", 4), ("Standard (2)", 8))),
+                         ("Standard", 4))
+        self.assertEqual(beide("Standard", None, nach_import), ("Standard", 4))
+        # unter mehreren Zwillingen der mit der Kanalzahl
+        self.assertEqual(beide("Standard", 6, modi(
+            ("Standard", 4), ("Standard (2)", 5), ("Standard (3)", 6))),
+            ("Standard (3)", 6))
+        # auch ohne den Namens-Treffer selbst, und vor einem fremden Modus
+        self.assertEqual(beide("Standard", 6, modi(("Anders", 6), ("Standard (2)", 6))),
+                         ("Standard (2)", 6))
+        # nur das Suffix, das der Import vergibt
+        for kein_zwilling in ("Standard (1)", "Standard (x)", "Standard(2)",
+                              "Standard (2) Pro", "Standardmodus (2)", "Standard  (2)"):
+            with self.subTest(name=kein_zwilling):
+                self.assertEqual(
+                    self._wahl("Standard", 6, modi=modi(("Standard", 4), (kein_zwilling, 6))),
+                    ("Standard", 4))
+
+    def test_alias_regel_kennt_die_kuerzung_langer_namen(self):
+        from src.core.database.modus_wahl import (
+            MODUSNAME_MAX, eindeutiger_modusname, gleichnamiger_modus)
+        lang = "Sehr langer Modusname " * 4
+        lang = lang[:MODUSNAME_MAX]
+        vergeben = {lang}
+        zwilling = eindeutiger_modusname(lang, vergeben)
+        self.assertEqual(len(zwilling), MODUSNAME_MAX)
+        liste = [SimpleNamespace(id=1, name=lang, channel_count=4),
+                 SimpleNamespace(id=2, name=zwilling, channel_count=6)]
+        self.assertIs(gleichnamiger_modus(liste, lang, 6), liste[1])
 
     def test_reihenfolge_der_liste_ist_egal_es_zaehlt_die_id(self):
         """``fixture_db.get_modes`` sortiert nicht — die Regel muss es tun."""
@@ -370,6 +496,15 @@ class SpeichernTest(unittest.TestCase):
                 .order_by(FixtureMode.id)).all()
         self.assertEqual([tuple(m) for m in modi],
                          [("Standard", 1), ("Standard (2)", 2)])
+        # Codex-Befund (P1): eine Altshow, die den zweiten als („Standard“, 2)
+        # gespeichert hat, muss nach diesem Import wieder bei ihm ankommen.
+        with Session(motor) as s:
+            pid = s.execute(select(FixtureProfile.id)
+                            .where(FixtureProfile.name == "QXF-Zwilling")).scalar_one()
+            m = app_state._resolve_mode(s, SimpleNamespace(
+                fixture_profile_id=pid, mode_name="Standard", channel_count=2))
+            self.assertEqual((m.name, m.channel_count, len(m.channels)),
+                             ("Standard (2)", 2, 2))
 
 
 if __name__ == "__main__":

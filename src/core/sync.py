@@ -288,11 +288,17 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
                     modi = modi_je_profil[profile_id]
                     mode = modus_wahl.gleichnamiger_modus(
                         modi, mode_name, channel_count)
+                    # FM-73 (Review): der Treffer kann ein umbenannter
+                    # Zwilling sein („Standard (2)“ statt gespeichert
+                    # „Standard“, Alias-Regel in `modus_wahl`). Der Modus
+                    # ist da — aber der gespeicherte Name wird nachgezogen,
+                    # damit Show und Profil wieder dasselbe sagen.
+                    umbenannt = bool(mode) and mode.name != mode_name
 
-                    if not mode:
+                    if not mode or umbenannt:
                         # 2. Fallback: Mode mit passender Kanalanzahl, sonst
                         #    der erste des Profils (Stufen 2/3 der Regel).
-                        fallback = modus_wahl.modus_waehlen(
+                        fallback = mode if umbenannt else modus_wahl.modus_waehlen(
                             modi, mode_name, channel_count)
 
                         if fallback:
