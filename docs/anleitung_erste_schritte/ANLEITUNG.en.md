@@ -34,6 +34,9 @@ After starting, LightOS opens in the **Bühne** (stage) section. From top to bot
 1. **Menu bar** — `Datei` (File), `Bearbeiten` (Edit), `Ansicht` (View), `Show`,
    `Programmer`, `Datenbank` (Database), `Ausgabe` (Output), `Visualizer`, `Command`,
    `Hilfe` (Help). Saving and opening (step 7) and the output settings live here.
+   `Hilfe` brings you back to this guide and also offers **Tastenkürzel…** (all
+   keyboard shortcuts at a glance) and **Datenordner öffnen** / **Show-Ordner öffnen**
+   (open the data folder / the show folder).
 2. **Section bar** — the eight work areas of LightOS, see step 2.
 3. **GM** — the grand master. It controls the overall brightness from 0 to 100 %.
    Lasers without a dimmer channel are not dimmed gradually; they are switched off at 0 % —

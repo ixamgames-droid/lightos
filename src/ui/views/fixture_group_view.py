@@ -13,6 +13,7 @@ from PySide6.QtGui import (
     QPainter, QColor, QPen, QDrag, QFont, QBrush,
 )
 from src.core.app_state import get_state
+from src.ui.widgets.menue_knopf import MenueKnopf
 from src.core.database.models import FixtureGroup
 from src.core.group_cells import (base_fids_in_grid_order,
                                   referenzierte_fids_in_grid_order)
@@ -992,7 +993,11 @@ class FixtureGroupView(QWidget):
              "Nur aktiv, wenn das Gerät eigene Weiß-Kanäle hat (color_w) — die "
              "Zahl steht im Fixture-Profil, sie wird nicht geraten."),
         ):
-            _btn = QPushButton(_titel)
+            # STAB-33: MenueKnopf statt QPushButton.setMenu — der eingebaute
+            # Menue-Pfeil loeste unter Windows "QFont::setPointSize: Point
+            # size <= 0 (-1)" aus (s. widgets/menue_knopf.py); der Pfeil steht
+            # als "▾" schon im Text.
+            _btn = MenueKnopf(_titel)
             _btn.setToolTip(_hilfe)
             _menu = QMenu(_btn)
             # FM-40: die im Gerät hinterlegte Form steht OBEN — sie ist die
