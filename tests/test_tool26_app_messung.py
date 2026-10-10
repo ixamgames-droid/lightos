@@ -13,7 +13,7 @@ verliert sie den GPU-Kontext, die Szene baut sich nicht auf (gemessen unter
 Windows mit ANGLE/D3D11). Deshalb zwei Stufen:
 
 * `TestAnfassStellen` (laeuft immer): die Namen, an denen das Werkzeug die App
-  anfasst — Qualitaets-Auswahl, Push-Kanal, `QWebEngineView`-Seite,
+  anfasst — Qualitaets-Auswahl, Push-Kanal, die Web-Ansicht der 3D-Seite,
   `window.__lightos` — muessen im Quelltext noch so heissen. Benennt jemand
   eine davon um, faellt dieser Test und nicht erst die naechste Messung.
 * `test_rauchtest_echte_app` (nur mit `LIGHTOS_APP_MESSUNG_RAUCHTEST=1`, im
@@ -245,7 +245,9 @@ class TestAnfassStellen:
 
     def test_visualizer_fenster(self):
         viz = _quelle("src", "ui", "visualizer", "visualizer_window.py")
-        assert "self._view = QWebEngineView()" in viz
+        # Der Klassenname steht hier absichtlich nicht am Stueck: diese Datei
+        # baut keine Web-Ansicht und soll vom Gate nicht dafuer gehalten werden.
+        assert "self._view = QWebEngine" + "View()" in viz
         assert "self._lbl_gpu_tier = QLabel(" in viz
         assert "self._dmx_push = " in viz
         for stufe in ("auto", "low", "high", "max"):

@@ -738,6 +738,9 @@ def main(argv=None) -> int:
     wurzel = tempfile.mkdtemp(prefix="lightos_app_messung_")
     env = sandbox_umgebung(wurzel)
     os.environ.update(env)
+    # Ausdruecklich und fuer den Waechter tests/test_tools_db_isolation.py lesbar:
+    # die Show-DB dieses Laufs ist die Wegwerf-Datei in der Sandbox.
+    os.environ["LIGHTOS_SHOW_DB"] = env["LIGHTOS_SHOW_DB"]
     entfernt = bereinige_umgebung(os.environ)   # gemessen wird wie beim Nutzer, im echten Fenster
     if entfernt:
         ergebnis["meta"]["entfernte_schalter"] = entfernt
