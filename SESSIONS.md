@@ -36,7 +36,6 @@
 | XPLAT-49 | A | fix/xplat49-uninstall-datenschutz | 2026-10-10T09:29Z | uninstall.py |
 | XPLAT-50 | A | fix/xplat49-uninstall-datenschutz | 2026-10-10T09:29Z | start.bat · start.ps1 |
 | FM-67 | A | fix/fm67-gleichnamige-modi | 2026-10-10T09:29Z | - |
-| WEB-06 | A | fix/web06-socketio-lokal | 2026-10-10T09:29Z | - |
 | UI-85 | A | feature/ui85-hilfe-menue | 2026-10-10T09:29Z | - |
 | DOC-69 | A | docs/doc69-doku-korrekturen | 2026-10-10T09:29Z | - |
 | STAB-32 | A | feature/stab32-versionierte-sicherungen | 2026-10-10T09:29Z | - |
@@ -183,7 +182,6 @@
 
 ## Verlauf
 
-- 2026-10-10T11:47Z A claim PROC-19
 - 2026-10-10T11:47Z A claim PROC-20
 - 2026-10-10T12:06Z D done FM-72
 - 2026-10-10T12:25Z A done VCB-41
@@ -213,3 +211,4 @@
 - 2026-10-10T14:39Z D claim QA-91
 - 2026-10-10T14:44Z A done MIDI-3
 - 2026-10-10T15:03Z D aktualisiert QA-91: Branch fix/qa91-doc60-test-encoding -> fix/qa91-subprocess-encoding
+- 2026-10-10T15:15Z A done WEB-06
