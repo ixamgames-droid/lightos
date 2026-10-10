@@ -61,7 +61,7 @@
 | QA-92 | D | fix/qa92-windows-rote-tests | 2026-10-10T19:32Z | - |
 | CDX-58 | A | fix/cdx-1010-main | 2026-10-10T19:30Z | - |
 | VIZ-102 | A | feature/viz102-gobo-hallenboden | 2026-10-10T19:43Z | - |
-| UI-87 | D | - | 2026-10-10T20:11Z | - |
+| UI-87 | D | fix/ui87-hilfe-oeffnen-windows | 2026-10-10T20:44Z | - |
 
 ## Blocker & Fallen
 
@@ -194,7 +194,6 @@
 
 ## Verlauf
 
-- 2026-10-10T14:39Z D claim QA-91
 - 2026-10-10T14:44Z A done MIDI-3
 - 2026-10-10T15:03Z D aktualisiert QA-91: Branch fix/qa91-doc60-test-encoding -> fix/qa91-subprocess-encoding
 - 2026-10-10T15:15Z A done WEB-06
@@ -224,3 +223,4 @@
 - 2026-10-10T20:11Z D claim UI-87
 - 2026-10-10T20:14Z D done TOOL-14
 - 2026-10-10T20:38Z D done TOOL-23
+- 2026-10-10T20:44Z D aktualisiert UI-87: Branch - -> fix/ui87-hilfe-oeffnen-windows
