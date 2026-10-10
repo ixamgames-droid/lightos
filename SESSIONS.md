@@ -48,7 +48,7 @@
 | VIZ-100 | A | fix/viz100-haengend-andocken | 2026-10-10T19:30Z | src/ui/visualizer/scene_src/stage/docking.js |
 | VIZ-101 | A | fix/viz101-licht-durch-wand | 2026-10-10T14:38Z | - |
 | UI-86 | A | perf/ui86-2d-ansicht-hidpi | 2026-10-10T19:31Z | - |
-| VCB-36 | D | fix/vcb36-blackout-ziel-gruppen-id | 2026-10-10T21:16Z | - |
+| VCB-36 | D | fix/vcb36-blackout-ziel-gruppen-id | 2026-10-10T22:54Z | - |
 | UI-78 | D | fix/ui78-efx-editor-texte | 2026-10-10T21:16Z | - |
 | UI-80 | D | fix/ui80-matrix-entwurf-speed | 2026-10-10T21:16Z | - |
 | TOOL-18 | D | fix/tool18-bilder-hinweis-gpu-szenen | 2026-10-10T21:16Z | - |
