@@ -53,7 +53,7 @@
 | UI-86 | A | perf/ui86-2d-ansicht-hidpi | 2026-10-10T19:31Z | - |
 | QA-91 | D | fix/qa91-doc60-test-encoding | 2026-10-10T18:52Z | - |
 | VCB-36 | D | fix/vcb36-blackout-ziel-gruppen-id | 2026-10-10T21:16Z | - |
-| UI-78 | D | fix/ui78-efx-editor-texte | 2026-10-10T19:32Z | - |
+| UI-78 | D | fix/ui78-efx-editor-texte | 2026-10-10T21:16Z | - |
 | UI-80 | D | fix/ui80-matrix-entwurf-speed | 2026-10-10T18:53Z | - |
 | TOOL-18 | D | fix/tool18-bilder-hinweis-gpu-szenen | 2026-10-10T18:52Z | - |
 | TOOL-19 | D | fix/tool19-werkzeuge-ohne-echten-ausgang | 2026-10-10T18:53Z | - |
