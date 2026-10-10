@@ -12,7 +12,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| DOC-39 | C | - | 2026-10-02T11:09Z | docs/anleitung_3d_visualizer_2026/ANLEITUNG_3D_BUEHNE.md |
 | DOC-40 | C | - | 2026-10-02T11:11Z | docs/anleitung_farbchase/ANLEITUNG_FARBCHASE.md |
 | DOC-41 | C | - | 2026-10-02T11:11Z | docs/anleitung_colorfade_vc/ANLEITUNG_COLORFADE_VC.md |
 | DOC-42 | C | - | 2026-10-02T11:57Z | docs/anleitung_ablaeufe/ANLEITUNG_ABLAEUFE_MISCHEN.md · tools/build_event_demo_2026.py · tests/test_doc42_bank7_beschriftung.py · changelog.d/2026-10-02-DOC-42.md |
@@ -139,7 +138,6 @@
 
 ## Verlauf
 
-- 2026-10-09T15:55Z A done STAB-30
 - 2026-10-09T16:18Z A done DOC-66
 - 2026-10-09T16:27Z A claim MIDI-5
 - 2026-10-09T16:27Z A claim NET-14
@@ -169,3 +167,4 @@
 - 2026-10-10T09:27Z C uebergeben DOC-36
 - 2026-10-10T09:27Z C uebergeben DOC-37
 - 2026-10-10T09:27Z C uebergeben DOC-38
+- 2026-10-10T09:27Z C uebergeben DOC-39
