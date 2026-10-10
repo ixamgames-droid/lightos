@@ -212,8 +212,14 @@ passiert bei **GO** nichts, und der Hinweis sagt, was zu tun ist:
 
 Gibt es gar keinen freien Executor, steht dort „Kein freier Executor — Liste zuerst
 einem Executor zuweisen“. Der Hinweis verschwindet, sobald du eine andere Cueliste
-wählst oder die Page wechselst. Leertaste, Befehlszeile (`go`), Web-Remote und OSC legen
-keine Liste automatisch auf einen Executor.
+wählst, die Page wechselst oder einen Executor im Auswahlfeld von Hand belegst.
+Leertaste, Befehlszeile (`go`), Web-Remote und OSC legen keine Liste automatisch auf
+einen Executor.
+
+Liegt die Cueliste schon auf einem Executor einer **anderen Page**, legt **GO** sie nicht
+noch einmal an. Sie läuft dort, und der Hinweis sagt, wo, etwa „„Meine Show“ liegt auf
+Page 2, Ex 4“. Liegt sie auch auf einem Executor der aktuellen Page, gibt es keinen
+Hinweis.
 
 Am Executor: Der Fader regelt die Helligkeit der Cueliste. Die grüne Taste ist **GO**,
 **◀** geht zurück, **FL** blitzt die Cueliste, solange du drückst. **⚙** öffnet

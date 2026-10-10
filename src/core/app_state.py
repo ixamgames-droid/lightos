@@ -5539,7 +5539,8 @@ def _resolve_mode(s, fixture):
     """Der ``FixtureMode`` eines gepatchten Geraets — mit der Fallback-Kette,
     die dieses Projekt ueberall meint, wenn es „der Modus des Geraets" sagt:
 
-      1. exakter Name, 2. irgendein Modus mit passender Kanalzahl,
+      1. exakter Name (bei gleichnamigen Modi der mit passender Kanalzahl,
+         FM-67), 2. irgendein Modus mit passender Kanalzahl,
       3. irgendein Modus des Profils, 4. ``None``.
 
     VIZ-50a: aus ``get_channels_for_patched`` herausgezogen, weil die Rasterform
@@ -5552,12 +5553,19 @@ def _resolve_mode(s, fixture):
     # nicht ``scalar_one_or_none``. Zwei Modi gleicher Kanalzahl sind normal,
     # und ein doppelter Modusname liess sich im Editor speichern — beides warf
     # ``MultipleResultsFound`` mitten im Renderpfad.
-    mode = s.execute(
+    gleichnamig = s.execute(
         select(FixtureMode)
         .where(FixtureMode.fixture_id == fixture.fixture_profile_id)
         .where(FixtureMode.name == fixture.mode_name)
         .order_by(FixtureMode.id)
-    ).scalars().first()
+    ).scalars().all()
+    # ★ FM-67: tragen zwei Modi denselben Namen, entscheidet die gespeicherte
+    # Kanalzahl mit — sonst gewann stumm der aelteste, und ein Geraet im
+    # 6-Kanal-Modus fuhr die Kanaele des gleichnamigen 4-Kanal-Modus. Passt
+    # keiner, bleibt es beim ersten (nach ID), wie bisher.
+    mode = next((m for m in gleichnamig
+                 if m.channel_count == getattr(fixture, "channel_count", None)),
+                gleichnamig[0] if gleichnamig else None)
     if not mode:
         mode = s.execute(
             select(FixtureMode)
@@ -7249,32 +7257,56 @@ def unapply_pan_tilt_orientation(fx, attrs: dict) -> dict:
 
 # Singleton
 _state: AppState | None = None
+# BPM-30: das Anlegen ist nicht atomar (Datenumzug, Show-DB, Ausgabe-Thread).
+# Zwei Faeden, die gleichzeitig zum ersten Mal get_state() riefen (gemessen:
+# zwei BPM-Beat-Faeden), bauten zwei AppStates. RLock, weil der Aufbau selbst
+# wieder get_state() erreichen kann.
+_state_lock = threading.RLock()
+
+
+def vorhandener_state() -> AppState | None:
+    """BPM-30: der App-Zustand, falls es ihn schon gibt — legt NIE einen an.
+
+    Fuer Hintergrund-Faeden (Beat-Takt & Co.): die duerfen den schweren Aufbau
+    (Datenumzug, Show-DB, Ausgabe-Thread) nicht selbst ausloesen. Er lief sonst
+    im Faden, und die Speicherbereinigung dort raeumte Qt-Objekte ab, waehrend
+    der Hauptthread Fenster abbaute -> Access Violation (Gate BPM-28,
+    test_bpm_view_state_table)."""
+    return _state
 
 
 def get_state() -> AppState:
     global _state
     if _state is None:
-        # XPLAT-44: die Uebernahme alter data/-Dateien MUSS vor dem ersten
-        # Oeffnen der Show-DB laufen — sonst legt open_show() im App-Ordner eine
-        # leere DB an, die den alten Stand verdraengt. Hier zentral, damit auch
-        # Werkzeuge/Beispiele (ohne main.py) zuerst uebernehmen; je Prozess nur
-        # einmal (main.py ruft es schon frueher, mit Dialog).
-        try:
-            from .datenumzug import einmal_je_prozess
-            einmal_je_prozess()
-        except Exception as e:
-            print(f"[datenumzug] uebersprungen: {e}")
-        _state = AppState()
-        _state.open_show()
-        _state.apply_output_config()
-        # Den 44-Hz-Output-Thread NICHT autostarten, wenn das ausdruecklich
-        # deaktiviert ist (Tests setzen LIGHTOS_NO_OUTPUT_THREAD): der Thread
-        # rendert in _render_frame und emittiert Sync-Events, die cross-thread in
-        # Qt marshallt werden. Das racete mit dem pytest-Teardown (processEvents/
-        # GC abgemeldeter Widgets) -> sporadische native Access Violation. Tests
-        # rendern synchron (tick()/_render_frame()); echte Hardware-Ausgabe wird
-        # dort ohnehin nicht geprueft.
-        if not os.environ.get("LIGHTOS_NO_OUTPUT_THREAD"):
-            _state.output_manager.start()
-        _state.start_playback()
+        with _state_lock:
+            if _state is None:
+                _state_anlegen()
     return _state
+
+
+def _state_anlegen() -> None:
+    """Baut den Singleton auf. Nur unter ``_state_lock`` aufrufen."""
+    global _state
+    # XPLAT-44: die Uebernahme alter data/-Dateien MUSS vor dem ersten
+    # Oeffnen der Show-DB laufen — sonst legt open_show() im App-Ordner eine
+    # leere DB an, die den alten Stand verdraengt. Hier zentral, damit auch
+    # Werkzeuge/Beispiele (ohne main.py) zuerst uebernehmen; je Prozess nur
+    # einmal (main.py ruft es schon frueher, mit Dialog).
+    try:
+        from .datenumzug import einmal_je_prozess
+        einmal_je_prozess()
+    except Exception as e:
+        print(f"[datenumzug] uebersprungen: {e}")
+    _state = AppState()
+    _state.open_show()
+    _state.apply_output_config()
+    # Den 44-Hz-Output-Thread NICHT autostarten, wenn das ausdruecklich
+    # deaktiviert ist (Tests setzen LIGHTOS_NO_OUTPUT_THREAD): der Thread
+    # rendert in _render_frame und emittiert Sync-Events, die cross-thread in
+    # Qt marshallt werden. Das racete mit dem pytest-Teardown (processEvents/
+    # GC abgemeldeter Widgets) -> sporadische native Access Violation. Tests
+    # rendern synchron (tick()/_render_frame()); echte Hardware-Ausgabe wird
+    # dort ohnehin nicht geprueft.
+    if not os.environ.get("LIGHTOS_NO_OUTPUT_THREAD"):
+        _state.output_manager.start()
+    _state.start_playback()
