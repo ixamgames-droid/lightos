@@ -12,7 +12,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| DOC-41 | C | - | 2026-10-02T11:11Z | docs/anleitung_colorfade_vc/ANLEITUNG_COLORFADE_VC.md |
 | DOC-42 | C | - | 2026-10-02T11:57Z | docs/anleitung_ablaeufe/ANLEITUNG_ABLAEUFE_MISCHEN.md · tools/build_event_demo_2026.py · tests/test_doc42_bank7_beschriftung.py · changelog.d/2026-10-02-DOC-42.md |
 | DOC-43 | C | - | 2026-10-02T11:58Z | docs/anleitung_vc_workflow/ANLEITUNG_VC_WORKFLOW.md |
 | FM-46c | A | feat/fm46-qxf-head | 2026-10-02T11:59Z | - |
@@ -137,7 +136,6 @@
 
 ## Verlauf
 
-- 2026-10-09T16:27Z A claim MIDI-5
 - 2026-10-09T16:27Z A claim NET-14
 - 2026-10-09T16:27Z A claim MIDI-16
 - 2026-10-09T16:27Z A claim MIDI-3
@@ -167,3 +165,4 @@
 - 2026-10-10T09:27Z C uebergeben DOC-38
 - 2026-10-10T09:27Z C uebergeben DOC-39
 - 2026-10-10T09:27Z C uebergeben DOC-40
+- 2026-10-10T09:27Z C uebergeben DOC-41
