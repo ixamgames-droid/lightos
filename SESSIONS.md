@@ -50,7 +50,7 @@
 | OUT-67 | A | feature/out67-ausgabe-ausfall-banner | 2026-10-10T09:29Z | - |
 | TOOL-14 | D | fix/tool14-gen-tools-index-argparse | 2026-10-10T11:10Z | tools/gen_tools_index.py · tests/test_tool14_gen_tools_index_cli.py |
 | TOOL-21 | D | fix/tool21-gif-vergleich-rgb | 2026-10-10T11:13Z | tools/anleitungsbilder/runner.py · tests/test_tool21_bildvergleich_je_kanal.py |
-| TOOL-23 | D | - | 2026-10-10T09:41Z | - |
+| TOOL-23 | D | fix/tool23-backlog-ids-tafel-fragmente | 2026-10-10T11:19Z | tools/backlog_ids.py · tests/test_tool23_backlog_ids_tafel_fragmente.py · tests/test_backlog_ids.py |
 | TOOL-24 | D | - | 2026-10-10T09:41Z | - |
 | FM-66 | D | - | 2026-10-10T09:41Z | - |
 | DOC-70 | D | docs/doc70-netzwerk-windows | 2026-10-10T11:07Z | docs/anleitung_netzwerk_windows/ANLEITUNG.md · docs/ANLEITUNGEN.md · tests/test_doc70_netzwerk_windows.py |
@@ -145,7 +145,6 @@
 
 ## Verlauf
 
-- 2026-10-10T09:28Z C uebergeben DOC-55
 - 2026-10-10T09:28Z C uebergeben DOC-56
 - 2026-10-10T09:29Z A claim XPLAT-49
 - 2026-10-10T09:29Z A claim XPLAT-50
@@ -175,3 +174,4 @@
 - 2026-10-10T11:10Z D aktualisiert TOOL-14: Branch - -> fix/tool14-gen-tools-index-argparse; Dateien - -> tools/gen_tools_index.py · tests/test_tool14_gen_tools_index_cli.py
 - 2026-10-10T11:13Z D aktualisiert TOOL-21: Branch - -> fix/tool21-gif-vergleich-rgb; Dateien - -> tools/anleitungsbilder/runner.py · tests/test_tool21_bildvergleich_je_kanal.py
 - 2026-10-10T11:15Z B done OUT-64
+- 2026-10-10T11:19Z D aktualisiert TOOL-23: Branch - -> fix/tool23-backlog-ids-tafel-fragmente; Dateien - -> tools/backlog_ids.py · tests/test_tool23_backlog_ids_tafel_fragmente.py · tests/test_backlog_ids.py
