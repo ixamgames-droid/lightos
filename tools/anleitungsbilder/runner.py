@@ -454,11 +454,29 @@ def gif_frames(quelle):
                 for f in ImageSequence.Iterator(im)]
 
 
+def abweichende_pixel(a, b, schwelle: int) -> int:
+    """Zahl der Pixel, die in MINDESTENS EINEM Farbkanal um mehr als
+    ``schwelle`` (0…255) abweichen. ``a`` und ``b``: RGB-Bilder gleicher Groesse.
+
+    TOOL-21: bis hierhin wurde die Differenz erst in Graustufen gewandelt
+    (``convert("L")`` = 0,299 R + 0,587 G + 0,114 B) und DANN gegen die Schwelle
+    gehalten. Damit zaehlte eine Aenderung je nach Kanal verschieden: Blau kam
+    selbst beim vollen Sprung 0 -> 255 nur auf 29 und blieb unter der Schwelle
+    48, Rot bis 162 und Gruen bis 82 ebenso. Ein Bild, in dem ein Feld von
+    Schwarz auf Blau wechselt, galt als „unveraendert" und wurde nicht neu
+    geschrieben. Jetzt zaehlt der groesste der drei Kanalabstaende — so, wie
+    es der Docstring von :func:`fast_gleich` („je Kanal") schon beschrieb.
+    """
+    from PIL import ImageChops
+    rot, gruen, blau = ImageChops.difference(a, b).split()
+    groesste = ImageChops.lighter(ImageChops.lighter(rot, gruen), blau)
+    return groesste.point(lambda v: 255 if v > schwelle else 0).histogram()[255]
+
+
 def gif_fast_gleich(alt_pfad: str, neu: bytes, *, schwelle: int = 48,
                     anteil: float = 0.0005) -> bool:
     """Wie :func:`fast_gleich`, fuer GIFs: gleiche Frame-Zahl, gleiche Dauern
     und jeder Frame unter der Schwelle."""
-    from PIL import ImageChops
     if not os.path.exists(alt_pfad):
         return False
     try:
@@ -471,9 +489,7 @@ def gif_fast_gleich(alt_pfad: str, neu: bytes, *, schwelle: int = 48,
     for (fa, da), (fb, db) in zip(a, b):
         if da != db or fa.size != fb.size:
             return False
-        diff = ImageChops.difference(fa, fb).convert("L").point(
-            lambda v: 255 if v > schwelle else 0)
-        if diff.histogram()[255] >= anteil * fa.size[0] * fa.size[1]:
+        if abweichende_pixel(fa, fb, schwelle) >= anteil * fa.size[0] * fa.size[1]:
             return False
     return True
 
@@ -506,7 +522,7 @@ def fast_gleich(alt_pfad: str, neu: bytes, *, schwelle: int = 48,
     alte Datei liegen, solange weniger als ``anteil`` der Pixel um mehr als
     ``schwelle`` (je Kanal, 0…255) abweichen.
     """
-    from PIL import Image, ImageChops
+    from PIL import Image
     if not os.path.exists(alt_pfad):
         return False
     try:
@@ -516,9 +532,7 @@ def fast_gleich(alt_pfad: str, neu: bytes, *, schwelle: int = 48,
         return False
     if a.size != b.size:
         return False
-    diff = ImageChops.difference(a, b).convert("L").point(
-        lambda v: 255 if v > schwelle else 0)
-    return diff.histogram()[255] < anteil * a.size[0] * a.size[1]
+    return abweichende_pixel(a, b, schwelle) < anteil * a.size[0] * a.size[1]
 
 
 def git_stand() -> str:
