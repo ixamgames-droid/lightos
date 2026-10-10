@@ -32,6 +32,14 @@ Fix (Single-Point, kein Guard in ~40 Dateien noetig):
         Wegwerf-Show-DB statt der geteilten ``current_show.db`` (App-Datenordner)
         (STAB-CURSHOW (a): Generator-Laeufe duerfen Davids echten Show-Zustand
         nicht anfassen; Muster aus ``build_mega_arena_2026.py`` verallgemeinert).
+      * ``LIGHTOS_UNIVERSES_JSON=<tmp>/lightos_gen_<skript>_<pid>_universes.json``
+        -> eine Ausgabe-Konfiguration, die es nicht gibt (TOOL-19). ``get_state()``
+        ruft ``apply_output_config()`` IMMER auf, und das richtete bisher ein, was
+        in der ECHTEN ``universes.json`` steht: bei einem Enttec-Eintrag oeffnete
+        ein Generator-Lauf den echten seriellen Port, bei Art-Net/sACN die
+        Sende-Sockets. ``LIGHTOS_NO_OUTPUT_THREAD`` verhindert nur den Sende-Thread,
+        nicht das Oeffnen. Die Datei wird nie angelegt — fehlt sie, richtet
+        ``apply_output_config()`` nichts ein.
 
     ``setdefault`` respektiert eine bereits gesetzte Umgebung (z. B. wenn jemand den
     Generator bewusst mit echtem Output-Prozess oder gegen eine echte DB laufen
@@ -77,4 +85,15 @@ os.environ.setdefault(
 os.environ.setdefault(
     "LIGHTOS_VC_ASSETS_DIR",
     os.path.join(tempfile.gettempdir(), f"lightos_gen_{_stem}_{os.getpid()}_vc_assets"),
+)
+# TOOL-19: kein Generator oeffnet einen echten DMX-Ausgang. ``get_state()``
+# wendet die Ausgabe-Konfiguration an, sobald es sie findet — also zeigt die
+# Variable auf eine Datei, die es nicht gibt (sie wird auch nie angelegt).
+# ``setdefault`` wie bei den Schaltern oben: ein schon gesetzter Wert ist eine
+# bewusste Umlenkung (Testlauf, Bild-Sandbox, ``verify_stage_reload``) und
+# gewinnt. Die Startskripte setzen die Variable nicht.
+os.environ.setdefault(
+    "LIGHTOS_UNIVERSES_JSON",
+    os.path.join(tempfile.gettempdir(),
+                 f"lightos_gen_{_stem}_{os.getpid()}_universes.json"),
 )
