@@ -55,6 +55,7 @@
 | TOOL-24 | D | - | 2026-10-10T09:41Z | - |
 | FM-66 | D | - | 2026-10-10T09:41Z | - |
 | DOC-70 | D | docs/doc70-netzwerk-windows | 2026-10-10T09:41Z | - |
+| VIZ-98 | D | fix/viz98-bodenfleck-ueber-horizont | 2026-10-10T10:01Z | src/ui/visualizer/scene_src/fixtures/builders.js |
 
 ## Blocker & Fallen
 
@@ -135,7 +136,6 @@
 
 ## Verlauf
 
-- 2026-10-10T09:27Z C uebergeben DOC-46
 - 2026-10-10T09:27Z C uebergeben DOC-47
 - 2026-10-10T09:27Z C uebergeben DOC-48
 - 2026-10-10T09:27Z C uebergeben DOC-49
@@ -165,3 +165,4 @@
 - 2026-10-10T09:41Z D claim FM-66
 - 2026-10-10T09:41Z D claim DOC-70
 - 2026-10-10T09:58Z D done BPM-28
+- 2026-10-10T10:01Z D claim VIZ-98
