@@ -42,6 +42,14 @@ EINZELDATEIEN: tuple[str, ...] = (
     "main.py",
 )
 
+#: Dateien, die erst der Build erzeugt (nicht in Git) — sie kommen mit, wenn es
+#: sie gibt. STAB-33: ``build_info.json`` (Commit/Datum des Builds), geschrieben
+#: von ``packaging/windows/build_info.py`` vor dem PyInstaller-Lauf. Bewusst
+#: NICHT in ``dateien()``: jene Liste bleibt "nur, was Git kennt".
+GENERIERTE_DATEIEN: tuple[str, ...] = (
+    "build_info.json",
+)
+
 #: Dateiendungen, die nie ins Bundle gehoeren.
 _AUSLASSEN_ENDUNGEN = (".pyc", ".pyo")
 
@@ -89,6 +97,10 @@ def datas(repo: str) -> list[tuple[str, str]]:
             continue
         ziel = os.path.dirname(rel) or "."
         aus.append((quelle, ziel))
+    for rel in GENERIERTE_DATEIEN:
+        quelle = os.path.join(repo, *rel.split("/"))
+        if os.path.isfile(quelle):
+            aus.append((quelle, os.path.dirname(rel) or "."))
     return aus
 
 

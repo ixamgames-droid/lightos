@@ -11,7 +11,8 @@ EINE Datei schicken koennen, aus der hervorgeht, was im Hintergrund passiert ist
   landen die ``print("[modul] …")``-Zeilen, Python-``logging``, die Qt-Meldungen
   (der Qt-Handler in ``main.py`` schreibt nach ``stderr``) und die JS-Konsole
   des Visualizers (wird dort per ``print`` weitergereicht) in derselben Datei.
-* **Kopfblock** je Sitzung: Version/Commit, gefroren ja/nein, Betriebssystem samt
+* **Kopfblock** je Sitzung: Version/Commit (im Setup-Build aus der eingebetteten
+  ``build_info.json``, sonst aus ``.git``), gefroren ja/nein, Betriebssystem samt
   Architektur (Windows-ARM-Emulation erkennbar), Python, PySide6/Qt, Datenordner
   (Benutzerpfad anonymisiert). Was erst spaeter bekannt ist (Bildschirme, GPU-
   Stufe, DMX-Ausgaenge, MIDI, Show), meldet :func:`merke` als ``[diagnose]``-Zeile
@@ -21,7 +22,9 @@ EINE Datei schicken koennen, aus der hervorgeht, was im Hintergrund passiert ist
   ``_STILL_MAX_JE_TAG`` verschiedene).
 * :func:`erstelle_diagnosepaket` — zip mit Logs, ``crash.log``, Systeminfo und
   einer Einstellungsliste OHNE private Inhalte (keine Show-Dateien, keine
-  Datenbanken, Benutzerpfade anonymisiert).
+  Datenbanken, Benutzerpfade anonymisiert). In ``crash.log`` werden bekannte
+  harmlose Windows-Meldungen (COM-Hinweise, STAB-33) als "kein Absturz"
+  gekennzeichnet — echte Abstuerze bleiben unveraendert.
 
 Grundregel wie bei ``crash_logging``: **Logging darf den Start nie verhindern und
 nie blockieren.** Jeder Schreibfehler wird geschluckt; ist die Datei nicht
@@ -492,6 +495,52 @@ def laufzeit_infos() -> dict[str, str]:
         return dict(_laufzeit)
 
 
+def gpu_aus_viz_meldung(meldung) -> dict | None:
+    """Zerlegt die Zeile ``[viz] GPU-Tier: high (grund=…, renderer=…,
+    maxTextures=…, …)``, die der Visualizer per ``console.warn`` schreibt und
+    die als Qt-Meldung ankommt. ``None``, wenn es nicht diese Zeile ist.
+
+    Der Renderer-String enthaelt selbst Kommas und Klammern ("ANGLE (AMD,
+    Radeon … Direct3D11 …, D3D11)") — er reicht deshalb bis zum festen
+    Nachbarfeld ``, maxTextures=``."""
+    try:
+        if not meldung or "GPU-Tier:" not in meldung:
+            return None
+        import re
+        m = re.search(r"\[viz\] GPU-Tier:\s*(\S+)\s*\((.*)\)\s*$", meldung.strip())
+        if not m:
+            return None
+        stufe, innen = m.group(1), m.group(2)
+        r = re.search(r"renderer=(.*?)(?:, maxTextures=|$)", innen)
+        if not r:
+            return None
+        g = re.search(r"grund=(.*?)(?:, renderer=|$)", innen)
+        rest = innen[r.end(1):].lstrip(", ")
+        return {"stufe": stufe, "renderer": r.group(1).strip(),
+                "grund": g.group(1).strip() if g else "", "details": rest}
+    except Exception:
+        return None
+
+
+def merke_viz_gpu(meldung) -> bool:
+    """Aufruf aus dem Qt-Meldungs-Handler (``main.py``): ist ``meldung`` die
+    GPU-Tier-Zeile des Visualizers, den Renderer-String fuer ``systeminfo.txt``
+    festhalten. True = erkannt. Billig fuer alle anderen Meldungen, wirft nie."""
+    try:
+        info = gpu_aus_viz_meldung(meldung)
+        if not info:
+            return False
+        merke("Visualizer GPU-Renderer", info["renderer"])
+        einzel = ", ".join(t for t in (
+            f"Stufe {info['stufe']}",
+            f"Grund: {info['grund']}" if info["grund"] else "",
+            info["details"]) if t)
+        merke("Visualizer GPU-Details", einzel, loggen=False)
+        return True
+    except Exception:
+        return False
+
+
 # ── Systeminfo ───────────────────────────────────────────────────────────────
 def _standard_programm_dir() -> str:
     if getattr(sys, "frozen", False):
@@ -542,28 +591,154 @@ def git_commit(programm_dir: str | None = None) -> str:
         return ""
 
 
+BUILD_INFO_NAME = "build_info.json"
+
+
+def build_info(programm_dir: str | None = None) -> dict:
+    """Inhalt der beim Bauen eingebetteten ``build_info.json`` (Commit, Zweig,
+    Datum — geschrieben von ``packaging/windows/build_info.py``). Leer, wenn es
+    sie nicht gibt oder sie nicht lesbar ist."""
+    try:
+        wurzel = programm_dir or _standard_programm_dir()
+        with open(os.path.join(wurzel, BUILD_INFO_NAME), encoding="utf-8") as f:
+            daten = json.load(f)
+        return daten if isinstance(daten, dict) else {}
+    except Exception:
+        return {}
+
+
+def build_commit(programm_dir: str | None = None) -> str:
+    """``<Commit, 12 Stellen> (<Zweig>, gebaut <Datum>)`` aus der eingebetteten
+    Build-Info. Leer, wenn unbekannt."""
+    info = build_info(programm_dir)
+    commit = str(info.get("commit") or "").strip()
+    if not commit:
+        return ""
+    zusatz = [str(info[k]) for k in ("ref",) if info.get(k)]
+    if info.get("datum"):
+        zusatz.append(f"gebaut {info['datum']}")
+    return commit[:12] + (f" ({', '.join(zusatz)})" if zusatz else "")
+
+
+def commit_text(programm_dir: str | None = None) -> str:
+    """Commit fuer Kopfblock/Systeminfo. Gefroren (Setup-Build) gibt es kein
+    ``.git`` — dort zaehlt die eingebettete Build-Info. Im Quellbetrieb zaehlt
+    ``.git``; eine liegen gebliebene ``build_info.json`` eines lokalen Builds
+    waere dort veraltet und kommt nur zum Zug, wenn ``.git`` nichts hergibt."""
+    if getattr(sys, "frozen", False):
+        # erst der uebergebene Ordner, dann das Bundle selbst (_MEIPASS)
+        return (build_commit(programm_dir)
+                or (build_commit(None) if programm_dir else "")
+                or git_commit(programm_dir))
+    return git_commit(programm_dir) or build_commit(programm_dir)
+
+
+#: IMAGE_FILE_MACHINE_* -> Kurzname.
+_MASCHINEN = {0xAA64: "ARM64", 0x8664: "x64", 0x014C: "x86", 0x01C4: "ARM"}
+_MASCHINEN_NAMEN = {"AMD64": "x64", "X86_64": "x64", "X64": "x64", "EM64T": "x64",
+                    "ARM64": "ARM64", "AARCH64": "ARM64",
+                    "X86": "x86", "I386": "x86", "I686": "x86", "ARM": "ARM"}
+
+
+def _maschine_kurz(name) -> str:
+    return _MASCHINEN_NAMEN.get(str(name or "").strip().upper(), "")
+
+
+def windows_architektur(wow_maschine: int | None, native_maschine: int | None,
+                        *, machine: str = "", env=None, bits: int = 64) -> str:
+    """Text der Zeile ``Architektur:`` — reine Funktion, alle Werte kommen herein
+    (damit unter Linux testbar).
+
+    ``wow_maschine``/``native_maschine`` sind die beiden Ausgaben von
+    ``IsWow64Process2`` (``IMAGE_FILE_MACHINE_*``) oder ``None``, wenn der Aufruf
+    nicht ging. Achtung: fuer einen Prozess, der NICHT unter WOW64 laeuft, ist
+    ``wow_maschine`` 0 — das gilt auch fuer ein x64-Python auf einem ARM64-Geraet
+    (x64-Emulation ist kein WOW64). Die Prozess-Architektur kommt deshalb aus
+    ``machine`` (``platform.machine()``) bzw. ``PROCESSOR_ARCHITECTURE``.
+
+    Rueckfall ohne Systemaufruf: ``PROCESSOR_ARCHITEW6432`` nennt bei einem
+    32-Bit-Prozess die echte Maschine; ein emuliertes x64-Python auf ARM64
+    verraet nur ``PROCESSOR_IDENTIFIER`` ("ARMv8 …"). Nie leer."""
+    env = env if env is not None else {}
+    rueckfall = not native_maschine
+    prozess = ""
+    if wow_maschine:
+        prozess = _MASCHINEN.get(wow_maschine, "")
+    prozess = (prozess or _maschine_kurz(machine)
+               or _maschine_kurz(env.get("PROCESSOR_ARCHITECTURE")))
+    if not prozess and bits == 32:
+        prozess = "x86"
+    if native_maschine:
+        nativ = _MASCHINEN.get(native_maschine, hex(native_maschine))
+    else:
+        nativ = _maschine_kurz(env.get("PROCESSOR_ARCHITEW6432"))
+        if not nativ and "ARM" in env.get("PROCESSOR_IDENTIFIER", "").upper():
+            nativ = "ARM64"
+        if not nativ:
+            nativ = _maschine_kurz(env.get("PROCESSOR_ARCHITECTURE")) or prozess
+    if not prozess and not nativ:
+        text = f"unbekannt ({bits} Bit)"
+    elif not prozess:
+        text = f"Prozess unbekannt ({bits} Bit) auf {nativ}"
+    elif prozess == nativ:
+        text = f"{prozess} nativ"
+    elif nativ == "ARM64":
+        text = f"{prozess}-Prozess auf ARM64 (Emulation)"
+    elif prozess == "x86" and nativ == "x64":
+        text = "x86-Prozess auf x64 (WOW64)"
+    else:
+        text = f"{prozess}-Prozess auf {nativ}"
+    if bits == 32 or prozess in ("x86", "ARM"):
+        text = f"32 Bit: {text}"
+    if rueckfall:
+        text += " [Rueckfall: aus Umgebungsvariablen, IsWow64Process2 ohne Ergebnis]"
+    return text
+
+
+def _iswow64process2() -> tuple[int, int] | None:
+    """``(Prozess-Maschine, native Maschine)`` aus ``IsWow64Process2`` oder
+    ``None`` (kein Windows, Windows < 10 1511, Aufruf gescheitert).
+
+    STAB-33: ``argtypes``/``restype`` sind Pflicht. Ohne sie gibt
+    ``GetCurrentProcess()`` das Pseudo-Handle (-1) als 32-Bit-``int`` zurueck und
+    ctypes reicht es so weiter — auf x64 ein ungueltiges Handle, der Aufruf
+    scheitert und die Zeile blieb leer."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+        k32 = ctypes.WinDLL("kernel32", use_last_error=True)  # type: ignore[attr-defined]
+        k32.GetCurrentProcess.restype = wintypes.HANDLE
+        k32.GetCurrentProcess.argtypes = []
+        k32.IsWow64Process2.restype = wintypes.BOOL
+        k32.IsWow64Process2.argtypes = [wintypes.HANDLE,
+                                        ctypes.POINTER(wintypes.USHORT),
+                                        ctypes.POINTER(wintypes.USHORT)]
+        proc = wintypes.USHORT(0)
+        nativ = wintypes.USHORT(0)
+        if not k32.IsWow64Process2(k32.GetCurrentProcess(), ctypes.byref(proc),
+                                   ctypes.byref(nativ)):
+            return None
+        return int(proc.value), int(nativ.value)
+    except Exception:
+        return None
+
+
 def _windows_architektur() -> str:
     """Prozess- und Maschinen-Architektur unter Windows. Ein x64-Python auf einem
     ARM64-Geraet meldet ueber ``platform.machine()`` "AMD64" (emuliert) — erst
     ``IsWow64Process2`` verraet die echte Maschine."""
+    bits = struct.calcsize("P") * 8
     try:
-        import ctypes
-        k32 = ctypes.windll.kernel32            # type: ignore[attr-defined]
-        proc = ctypes.c_ushort(0)
-        nativ = ctypes.c_ushort(0)
-        if not k32.IsWow64Process2(k32.GetCurrentProcess(), ctypes.byref(proc),
-                                   ctypes.byref(nativ)):
-            return ""
-        namen = {0xAA64: "ARM64", 0x8664: "x64", 0x014C: "x86", 0x01C4: "ARM"}
-        maschine = namen.get(nativ.value, hex(nativ.value))
-        prozess = platform.machine() or "?"
-        emuliert = (maschine == "ARM64" and prozess.upper() not in ("ARM64", "AARCH64"))
-        if emuliert:
-            return f"Maschine {maschine}, Prozess {prozess} — EMULIERT (x64/x86 auf ARM64)"
-        return f"Maschine {maschine}, Prozess {prozess} (nativ)"
+        machine = platform.machine()
     except Exception:
-        ident = os.environ.get("PROCESSOR_IDENTIFIER", "")
-        return f"PROCESSOR_IDENTIFIER={ident}" if ident else ""
+        machine = ""
+    try:
+        paar = _iswow64process2()
+    except Exception:
+        paar = None
+    wow, nativ = paar if paar else (None, None)
+    return windows_architektur(wow, nativ, machine=machine, env=os.environ,
+                               bits=bits)
 
 
 def basis_infos(app_version: str = "?", programm_dir: str | None = None
@@ -579,7 +754,7 @@ def basis_infos(app_version: str = "?", programm_dir: str | None = None
         zeilen.append((name, anonymisiere(str(wert))))
 
     feld("LightOS", lambda: app_version)
-    feld("Commit", lambda: git_commit(programm_dir) or "unbekannt")
+    feld("Commit", lambda: commit_text(programm_dir) or "unbekannt")
     feld("Gefroren (Installer-Build)",
          lambda: "ja" if getattr(sys, "frozen", False) else "nein (Quellbetrieb)")
     feld("Betriebssystem", lambda: platform.platform())
@@ -865,6 +1040,83 @@ _LIESMICH = ("LightOS-Diagnosepaket\n=====================\n\nEnthaelt:\n"
              "systeminfo.txt, einstellungen.txt, datenordner.txt\n")
 
 
+#: ``Windows fatal exception: code 0x…`` — Codes, die KEIN Absturz sind.
+#:
+#: ``faulthandler`` haengt unter Windows einen Vectored Exception Handler ein, der
+#: jede Ausnahme mit gesetztem Fehlerbit (0x8…/0xC…) als "fatal" samt Thread-
+#: Stand schreibt — auch First-Chance-Ausnahmen, die das Betriebssystem bzw. COM
+#: gleich danach selbst behandelt; die App laeuft weiter. Einen Filter kennt
+#: ``faulthandler.enable`` nicht (nur ``file``/``all_threads``), deshalb wird
+#: hier nur GEKENNZEICHNET. Bewusst eine kurze Liste bekannter COM/RPC-Hinweise:
+#: alles andere (access violation, 0xC0000005, stack overflow …) bleibt, wie es
+#: ist.
+HARMLOSE_WINDOWS_CODES: dict[str, str] = {
+    "0x8001010d": "RPC_E_CANTCALLOUT_ININPUTSYNCCALL — COM-Aufruf waehrend einer "
+                  "synchronen Eingabenachricht, typisch bei Bildschirmlesern/"
+                  "UI-Automation",
+    "0x8001010e": "RPC_E_WRONG_THREAD — COM-Objekt aus einem anderen Thread "
+                  "angesprochen, COM lehnt den Aufruf ab",
+    "0x80010108": "RPC_E_DISCONNECTED — das COM-Gegenueber ist schon weg",
+    "0x800706ba": "RPC_S_SERVER_UNAVAILABLE — der angesprochene Dienst "
+                  "antwortet nicht",
+}
+_FATAL_ANFAENGE = ("Windows fatal exception:", "Fatal Python error:")
+
+
+def kennzeichne_harmlose_ausnahmen(text: str) -> tuple[str, dict[str, int], int]:
+    """Setzt hinter jede ``Windows fatal exception: code <bekannt harmlos>``-
+    Zeile eine Zeile ``^ kein Absturz: COM-Hinweis <code> …``. Das Original
+    bleibt vollstaendig stehen (auch der Thread-Stand).
+
+    Rueckgabe: ``(Text, {code: Anzahl}, andere)`` — ``andere`` zaehlt die
+    uebrigen "fatal"-Zeilen (echte Abstuerze), die NICHT angefasst werden."""
+    harmlos: dict[str, int] = {}
+    andere = 0
+    if not text or "fatal" not in text.lower():
+        return text, harmlos, andere
+    import re
+    muster = re.compile(r"^Windows fatal exception: code (0x[0-9a-fA-F]+)\s*$")
+    raus = []
+    for zeile in text.splitlines(keepends=True):
+        raus.append(zeile)
+        nackt = zeile.rstrip("\r\n")
+        if not nackt.startswith(_FATAL_ANFAENGE):
+            continue
+        m = muster.match(nackt)
+        code = m.group(1).lower() if m else ""
+        if code in HARMLOSE_WINDOWS_CODES:
+            harmlos[code] = harmlos.get(code, 0) + 1
+            ende = zeile[len(nackt):] or "\n"
+            raus.append(f"    ^ kein Absturz: COM-Hinweis {code} "
+                        f"({HARMLOSE_WINDOWS_CODES[code]}). LightOS lief weiter; "
+                        "der folgende Thread-Stand ist nur eine Momentaufnahme."
+                        + ende)
+        else:
+            andere += 1
+    return "".join(raus), harmlos, andere
+
+
+def _liesmich_absturzhinweise(befunde: list[tuple[str, dict[str, int], int]]) -> str:
+    """Abschnitt fuer LIESMICH.txt — nur, wenn ein harmloser Code vorkam."""
+    if not any(h for _n, h, _a in befunde):
+        return ""
+    zeilen = ["", "Hinweise zum Absturzprotokoll", "-----------------------------"]
+    for name, harmlos, andere in befunde:
+        for code, n in sorted(harmlos.items()):
+            zeilen.append(
+                f"{name}: {n}× 'Windows fatal exception: code {code}' = "
+                f"kein Absturz: COM-Hinweis {code} "
+                f"({HARMLOSE_WINDOWS_CODES[code].split(' — ')[0]}). Windows "
+                "meldet das intern, LightOS lief weiter. Die Stellen sind in "
+                "der Datei mit '^ kein Absturz' gekennzeichnet.")
+        if harmlos and andere:
+            zeilen.append(
+                f"{name}: {andere} weitere 'fatal'-Eintraege sind NICHT als "
+                "harmlos bekannt und unveraendert — das koennen echte "
+                "Abstuerze sein.")
+    return "\n".join(zeilen) + "\n"
+
+
 def standard_ziel() -> str:
     """Desktop (falls vorhanden), sonst Home — dort findet ein Tester die Datei."""
     home = os.path.expanduser("~")
@@ -926,11 +1178,20 @@ def erstelle_diagnosepaket(ziel: str | None = None, app_version: str = "?",
     except Exception:
         pass
     eintraege: list[tuple[str, str]] = [("LIESMICH.txt", _LIESMICH)]
+    befunde: list[tuple[str, dict[str, int], int]] = []
     for pfad, name in _logdateien():
         if pfad.lower().endswith(_VERBOTENE_ENDUNGEN):
             continue
         try:
-            eintraege.append((name, anonymisiere(_lies_text(pfad))))
+            text = anonymisiere(_lies_text(pfad))
+            if name.startswith("crash/"):
+                # STAB-33: COM-Hinweise sehen in crash.log wie Abstuerze aus.
+                try:
+                    text, harmlos, andere = kennzeichne_harmlose_ausnahmen(text)
+                    befunde.append((name, harmlos, andere))
+                except Exception:
+                    pass
+            eintraege.append((name, text))
         except Exception as e:
             eintraege.append((name + ".fehler.txt",
                               f"nicht lesbar: {type(e).__name__}: {e}\n"))
@@ -941,6 +1202,10 @@ def erstelle_diagnosepaket(ziel: str | None = None, app_version: str = "?",
             eintraege.append((name, anonymisiere(fn())))
         except Exception as e:
             eintraege.append((name, f"nicht erstellbar: {type(e).__name__}: {e}\n"))
+    try:
+        eintraege[0] = ("LIESMICH.txt", _LIESMICH + _liesmich_absturzhinweise(befunde))
+    except Exception:
+        pass
     tmp = ziel + ".tmp"
     with zipfile.ZipFile(tmp, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         for name, text in eintraege:

@@ -145,6 +145,13 @@ def _setup_crash_logging():
         # den nativen Dump verschlucken. Darum bekommt der native Crash auch keinen
         # eigenen Zeitstempel; stattdessen verortet ihn die Vorige-Sitzung-Erkennung
         # beim naechsten Start ueber last_alive.txt.
+        # STAB-33: unter Windows schreibt faulthandler JEDE Ausnahme mit
+        # Fehlerbit als "Windows fatal exception: code 0x…" samt Stand aller
+        # Threads (all_threads=True ist der Standard) — auch First-Chance-
+        # Ausnahmen wie den COM-Hinweis 0x8001010d, nach denen die App
+        # weiterlaeuft. Einen Filter bietet faulthandler.enable nicht; das
+        # Diagnosepaket kennzeichnet die bekannten harmlosen Codes
+        # (diagnose_log.HARMLOSE_WINDOWS_CODES).
         faulthandler.enable(file=_crash_log_handle)
 
         # Hat eine VORHERIGE Sitzung NICHT sauber beendet? Per-PID-Flags, deren
@@ -455,6 +462,10 @@ def _install_qt_message_handler():
                     sys.stderr.write(message + "\n")
             except Exception:
                 pass
+            # STAB-33: die Zeile "[viz] GPU-Tier: … renderer=…" des Visualizers
+            # kommt hier als Qt-Meldung an -> Renderer-String fuer systeminfo.txt
+            # festhalten (wirft nie, fuer andere Meldungen ein Teilstring-Test).
+            _dl.merke_viz_gpu(message)
         qInstallMessageHandler(_handler)
     except Exception as e:
         print(f"[main] qt message handler setup error: {e}")
