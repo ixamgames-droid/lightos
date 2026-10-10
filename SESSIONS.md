@@ -32,7 +32,6 @@
 | MIDI-4 | A | fix/midi3-mapping-robust | 2026-10-09T16:27Z | src/core/midi/midi_mapper.py |
 | XPLAT-49 | A | fix/xplat49-uninstall-datenschutz | 2026-10-10T18:44Z | uninstall.py |
 | XPLAT-50 | A | fix/xplat49-uninstall-datenschutz | 2026-10-10T09:29Z | start.bat · start.ps1 |
-| FM-67 | A | fix/fm67-gleichnamige-modi | 2026-10-10T09:29Z | - |
 | DOC-69 | A | docs/doc69-doku-korrekturen | 2026-10-10T18:44Z | - |
 | STAB-32 | A | feature/stab32-versionierte-sicherungen | 2026-10-10T18:44Z | - |
 | OUT-67 | A | feature/out67-ausgabe-ausfall-banner | 2026-10-10T09:29Z | - |
@@ -190,7 +189,6 @@
 
 ## Verlauf
 
-- 2026-10-10T14:17Z B uebergeben XPLAT-52
 - 2026-10-10T14:17Z A claim XPLAT-51
 - 2026-10-10T14:17Z A claim XPLAT-52
 - 2026-10-10T14:25Z D done VIZ-97
@@ -220,3 +218,4 @@
 - 2026-10-10T18:24Z D aktualisiert UI-78: Branch - -> fix/ui78-efx-editor-texte
 - 2026-10-10T18:34Z D done VIZ-98
 - 2026-10-10T18:49Z D claim QA-92
+- 2026-10-10T19:27Z A done FM-67
