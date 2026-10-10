@@ -246,14 +246,24 @@ class AusModusEineStufeTest(unittest.TestCase):
     der Fall entsteht also schon beim bequemsten Aufruf.
 
     Bewusst als Subprozess statt als Quelltext-Scan: die Frage ist, was das
-    Werkzeug TUT, wenn man es so aufruft. Der Abbruch liegt vor dem Aufbau der
-    Szene, der Test kostet deshalb keinen Renderlauf.
+    Werkzeug TUT, wenn man es so aufruft.
+
+    ★ QA-93: JEDER Aufruf hier laeuft mit ``--plan``. Das Werkzeug loescht
+    ``QT_QPA_PLATFORM`` und misst in einem ECHTEN 1600x900-Fenster (so soll es
+    sein — offscreen misst die CPU). Der eine gueltige Aufruf dieser Klasse
+    (``32 --runden 32 --aus kegel``) startete deshalb bei jedem Gate eine
+    Messung: rund zehn Sekunden ein bildschirmfuellendes Fenster „python“ vor
+    dem, der am Rechner arbeitet (am Windows-Testrechner mitgeschrieben). Mit
+    ``--plan`` endet das Werkzeug nach dem Lesen seiner Zeile — die Abbrueche
+    liegen davor und bleiben, was sie waren.
     """
 
     def _lauf(self, *argv):
         umgebung = dict(os.environ, QT_QPA_PLATFORM="offscreen")
-        return subprocess.run([sys.executable, _WERKZEUG, *argv],
+        # ``--plan`` VORN: hinten waere es bei ``32 --runden`` der Wert der Option.
+        return subprocess.run([sys.executable, _WERKZEUG, "--plan", *argv],
                               cwd=_REPO, capture_output=True, text=True,
+                              encoding="utf-8", errors="replace",
                               env=umgebung, timeout=180)
 
     def test_mehrere_stufen_mit_aus_werden_abgelehnt(self):
@@ -285,6 +295,23 @@ class AusModusEineStufeTest(unittest.TestCase):
             "EINE Fixture-Zahl", r.stderr + r.stdout,
             "der Optionswert wurde wertbasiert gefiltert und hat die Stufe "
             "mitgenommen — der Lauf fiel auf den Default-Dreisatz zurueck")
+        # QA-93: statt „irgendetwas ist gelaufen“ steht jetzt da, WAS gelesen wurde.
+        self.assertEqual(r.returncode, 0, r.stderr[-800:])
+        plan = json.loads(r.stdout)
+        self.assertEqual((plan["stufen"], plan["runden"], plan["aus"]),
+                         ([32], 32, "kegel"))
+
+    def test_optionswert_ohne_aus_misst_genau_die_eine_stufe(self):
+        """Derselbe Fall OHNE ``--aus`` — dort gab es keinen Abbruch, der den
+        Rueckfall auf den Default-Dreisatz angezeigt haette."""
+        r = self._lauf("32", "--runden", "32")
+        self.assertEqual(r.returncode, 0, r.stderr[-800:])
+        plan = json.loads(r.stdout)
+        self.assertEqual((plan["stufen"], plan["runden"]), ([32], 32))
+        r = self._lauf("--aufwaermen", "12", "12")
+        plan = json.loads(r.stdout)
+        self.assertEqual((plan["stufen"], plan["aufwaermen"]), ([12], 12))
+        self.assertEqual(json.loads(self._lauf().stdout)["stufen"], [12, 32, 48])
 
     def test_option_ohne_wert_bricht_ab(self):
         """Ein fehlender Wert darf nicht als 'Default' durchgehen."""
