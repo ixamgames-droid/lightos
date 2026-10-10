@@ -37,7 +37,7 @@
 | OUT-67 | A | feature/out67-ausgabe-ausfall-banner | 2026-10-10T09:29Z | - |
 | TOOL-21 | D | fix/tool21-gif-vergleich-rgb | 2026-10-10T21:17Z | tools/anleitungsbilder/runner.py · tests/test_tool21_bildvergleich_je_kanal.py |
 | TOOL-24 | D | fix/tool24-proc18-lizenzhinweise-strukturiert | 2026-10-10T21:17Z | tests/test_proc18_fremd_lizenzhinweise.py |
-| FM-66 | D | fix/fm66-abgleich-modellname | 2026-10-10T18:52Z | src/core/database/bibliothek_format.py · tests/test_fm66_abgleich_modellname.py · docs/FIXTURE_LIBRARY.md |
+| FM-66 | D | fix/fm66-abgleich-modellname | 2026-10-10T21:17Z | src/core/database/bibliothek_format.py · tests/test_fm66_abgleich_modellname.py · docs/FIXTURE_LIBRARY.md |
 | DOC-70 | D | docs/doc70-netzwerk-windows | 2026-10-10T21:17Z | docs/anleitung_netzwerk_windows/ANLEITUNG.md · docs/ANLEITUNGEN.md · tests/test_doc70_netzwerk_windows.py |
 | FM-73 | A | fix/fm73-sync-gleichnamige-modi | 2026-10-10T18:44Z | - |
 | PROC-19 | A | ci/proc19-doku-schnellweg | 2026-10-10T18:57Z | .github/workflows/ci.yml |
