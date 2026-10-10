@@ -233,3 +233,66 @@ def test_midi_view_msc_schnittstellenwahl(monkeypatch, tmp_path):
         view.close()
         view.deleteLater()
         _app().processEvents()
+
+
+def test_midi_view_msc_set_belegung_und_udp_monitor(monkeypatch, tmp_path):
+    """Codex-Review #990: SET-Belegung/Formate waehlbar und gespeichert;
+    per UDP empfangene MSC-Befehle erscheinen im Monitor (Quelle MSC/UDP)."""
+    import json
+    from src.core.midi import msc
+    import src.core.paths as paths
+    _app()
+    monkeypatch.setattr(paths, "app_data_dir", lambda: str(tmp_path))
+
+    class _MscMapper(_FakeMapper):
+        def __init__(self):
+            super().__init__()
+            self.msc_cbs = []
+
+        def apply_msc_udp(self):
+            return False
+
+        def subscribe_msc(self, cb):
+            self.msc_cbs.append(cb)
+
+        def unsubscribe_msc(self, cb):
+            self.msc_cbs.remove(cb)
+
+    mapper = _MscMapper()
+
+    class _St:
+        midi_mapper = mapper
+
+    monkeypatch.setattr(midi_ui, "get_midi_manager", lambda: _FakeMidi())
+    monkeypatch.setattr(midi_ui, "get_state", lambda: _St())
+    monkeypatch.setattr(midi_ui, "get_mtc_reader", lambda: _FakeMtcReader())
+    st = msc.get_settings()
+    alt = dict(vars(st))
+    view = midi_ui.MidiView()
+    try:
+        cmb = view._cmb_msc_set
+        assert cmb.currentData() == msc.SET_GRANDMA          # Vorgabe
+        assert not view._chk_msc_allfmt.isChecked()          # Filter an
+        assert len(mapper.msc_cbs) == 1
+        # UDP-Befehl -> Monitor
+        cmd = msc.parse_msc([0xF0, 0x7F, 0x7F, 0x02, 0x01, msc.SET,
+                             2, 1, 0, 0x32, 0xF7])
+        mapper.msc_cbs[0](MidiMessage("MSC/UDP", 0, "msc", cmd.command, 0, msc=cmd))
+        _app().processEvents()
+        text = view._console.toPlainText()
+        assert "MSC/UDP" in text and "Executor=3 Seite=1" in text and "50.0%" in text
+        # Einstellung umstellen und speichern
+        cmb.setCurrentIndex(cmb.findData(msc.SET_STANDARD))
+        view._chk_msc_allfmt.setChecked(True)
+        view._apply_msc()
+        assert st.set_layout == msc.SET_STANDARD and st.all_formats is True
+        sek = json.loads((tmp_path / "ui_prefs.json").read_text())["midi_msc"]
+        assert sek["set_layout"] == "standard" and sek["all_formats"] is True
+        view.close()
+        assert mapper.msc_cbs == []
+    finally:
+        vars(st).clear()
+        vars(st).update(alt)
+        view.close()
+        view.deleteLater()
+        _app().processEvents()

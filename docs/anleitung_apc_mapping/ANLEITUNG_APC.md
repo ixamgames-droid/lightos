@@ -100,6 +100,27 @@ Netzwerk (GMA-MSC, UDP-Port 6004).
   Schnittstellen (0.0.0.0)“ nimmt Befehle aus jedem angeschlossenen Netz an
   (Hinweis in der Ansicht). **Port** standardmäßig 6004. Mit **Übernehmen**
   wirksam; das Log meldet, ob der Port belegt werden konnte.
+- **SET-Belegung** — wie der Befehl SET (Fader setzen) gelesen wird; die Pulte
+  belegen die vier Datenbytes unterschiedlich:
+  - **grandMA (Executor, Seite)** — Standard. Byte 1 = Executor (ab 0),
+    Byte 2 = Seite (ab 1), danach der Wert als Feinanteil und Prozent
+    (0…100). „Executor 3, Seite 1, 50 %“ kommt als `02 01 00 32` und setzt
+    den Fader von Executor 3 auf der **Executor-Seite 1** von LightOS — egal,
+    welche Seite gerade angezeigt wird.
+  - **Standard (14-Bit-Regler)** — die Lesart der MSC-Spezifikation:
+    Reglernummer *n* (ab 0, zwei Bytes) setzt Executor *n+1* der **aktuellen**
+    Seite, Wert 0…16383.
+
+  grandMA ist die Vorgabe, weil es das einzige Pult mit eigenem Netzwerkweg ist
+  und ein grandMA-SET in der Standard-Lesart praktisch nie wirkt (die Seite im
+  zweiten Byte ergäbe Regler 128 und höher). Gibt es den angesprochenen
+  Executor oder die Seite nicht, steht das einmal je Ziel im Diagnose-Log
+  (`[still:midi.msc.set] …`) — mit dem Hinweis, die Belegung umzustellen.
+- **alle Formate annehmen** — Standard: aus. MSC-Befehle tragen ein
+  „Command Format“ (Gewerk). LightOS nimmt nur Licht (`01`–`0F`) und „alle“
+  (`7F`) an; ein GO für Ton, Maschinerie oder Video löst so keine Licht-Cue
+  aus, auch wenn die Device-ID auf 127 steht. Nur einschalten, wenn das Pult
+  ein anderes Format sendet und sich nicht umstellen lässt.
 
 Die Einstellungen werden mit **Übernehmen** gespeichert (gerätegebunden in den
 UI-Einstellungen, nicht in der Show) und beim nächsten Start wieder angewendet.
@@ -110,19 +131,25 @@ UI-Einstellungen, nicht in der Show) und beim nächsten Start wieder angewendet.
 |---|---|
 | GO / TIMED_GO / RESUME | Cueliste → Executor (Nummer = Executor-Platz auf der aktuellen Seite, sonst Name des Executors oder der Cueliste; ohne Liste Executor 1). Mit Cue-Nummer (z. B. `1.5`) wird diese Cue angesprungen, ohne Nummer die nächste Cue. |
 | STOP / GO_OFF | Cueliste des Executors stoppen; ohne Cueliste werden **alle** laufenden Cuelisten gestoppt (MSC-Spezifikation). |
-| SET | Regler *n* (ab 0) setzt den Fader von Executor *n+1* (Wert 0…16383). |
+| SET | Setzt einen Executor-Fader — je nach **SET-Belegung**: grandMA = Executor und Seite aus dem Befehl, Wert in Prozent; Standard = Regler *n* (ab 0) → Executor *n+1* der aktuellen Seite, Wert 0…16383. |
 | FIRE | Makro *n* startet die Funktion (Szene/Chaser) mit der ID *n*. |
 | ALL_OFF | Alle Cuelisten auf allen Seiten stoppen. |
 
 LOAD, RESTORE und RESET werden erkannt, lösen aber nichts aus. Im MIDI-Monitor
-erscheinen empfangene Befehle als `MSC  GO Cue=… Liste=…`.
+erscheinen empfangene Befehle als `MSC  [Quelle] GO Cue=… Liste=…` bzw.
+`MSC  [Quelle] SET Executor=… Seite=… Wert=…`. Die Quelle ist der MIDI-Eingang
+oder **`MSC/UDP`** für Befehle aus dem Netzwerk — auch die erscheinen dort.
+Befehle mit fremder Device-ID oder fremdem Format werden verworfen und nicht
+angezeigt.
 
 **Am Pult:**
 
 - **grandMA2/3:** Setup → MIDI Show Control: *MSC Out* auf die MIDI-Schnittstelle
   bzw. „Ethernet“ (dann die IP des LightOS-Rechners und Port 6004), *Exec* als
   Cueliste, Device-ID passend zu LightOS, Command Format „All“ oder „General
-  Light“.
+  Light“ (andere Formate verwirft LightOS, siehe „alle Formate annehmen“).
+  SET-Belegung in LightOS auf „grandMA (Executor, Seite)“ lassen.
+- **Andere Pulte mit SET:** SET-Belegung „Standard (14-Bit-Regler)“.
 - **Hog 4:** MIDI → Show Control: Ausgang aktivieren, Device-ID setzen.
 - **ETC Eos:** Setup → Show Control → MIDI Show Control: *MSC Transmit* an,
   Device-ID setzen; Eos sendet Cueliste und Cuenummer.

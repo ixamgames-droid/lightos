@@ -36,6 +36,20 @@ _CUE_COMMANDS = (GO, STOP, RESUME, LOAD, GO_OFF)
 
 ALL_DEVICES = 0x7F
 
+# Command-Format (Byte 4): 0x01..0x0F = Licht (General Lighting, Moving
+# Lights, Colour Changers, Strobes, Lasers, Chasers), 0x10.. = Ton,
+# 0x20.. = Maschinerie, 0x30.. = Video, ... ; 0x7F = alle Gewerke.
+ALL_FORMATS = 0x7F
+_LIGHTING_FORMATS = range(0x01, 0x10)
+
+# SET-Belegung: wie die vier Datenbytes von SET gelesen werden.
+#   "standard": MSC 1.0 — <Regler LSB MSB> <Wert LSB MSB>, je 14 bit.
+#   "grandma":  grandMA — <Executor ab 0> <Seite ab 1> <fein 0..127>
+#               <grob 0..100 Prozent>.
+SET_STANDARD = "standard"
+SET_GRANDMA = "grandma"
+SET_LAYOUTS = (SET_GRANDMA, SET_STANDARD)
+
 GMA_PORT = 6004
 
 
@@ -47,8 +61,11 @@ class MscCommand:
     cue: str = ""          # ASCII-Cuenummer, z. B. "1.5" ("" = aktuelle/naechste)
     cue_list: str = ""     # "" = Standardliste
     cue_path: str = ""
-    control: int | None = None   # SET: Regler-Nummer (14 bit)
-    value: int | None = None     # SET: Wert (14 bit, 0..16383)
+    control: int | None = None   # SET: Regler-Nummer (14 bit, Lesart "standard")
+    value: int | None = None     # SET: Wert (14 bit, 0..16383, Lesart "standard")
+    # SET: die vier Rohbytes — die Lesart (standard/grandMA) waehlt erst der
+    # Mapper nach ``MscSettings.set_layout``.
+    set_data: tuple = field(default_factory=tuple)
     macro: int | None = None     # FIRE: Makronummer (0..127)
     time: tuple = field(default_factory=tuple)  # TIMED_GO: (h, m, s, frames, sub)
 
@@ -66,6 +83,13 @@ class MscSettings:
     udp_enabled: bool = False
     udp_host: str = "127.0.0.1"
     udp_port: int = GMA_PORT
+    # SET-Belegung. Vorgabe grandMA: es ist das einzige Pult mit eigenem
+    # Netzwerkweg (NET-14), und mit der Standard-Lesart wirkt ein grandMA-SET
+    # praktisch nie (Seite 1 im zweiten Byte ergibt Regler >= 128).
+    set_layout: str = SET_GRANDMA
+    # False = nur Licht-Formate (0x01..0x0F) und 0x7F annehmen; ein GO fuer
+    # Ton oder Maschinerie loest dann keine Licht-Cue aus.
+    all_formats: bool = False
 
 
 _settings = MscSettings()
@@ -113,6 +137,10 @@ def load_settings() -> MscSettings:
     host = sek.get("udp_host")
     if isinstance(host, str) and host.strip():
         _settings.udp_host = host.strip()
+    if sek.get("set_layout") in SET_LAYOUTS:
+        _settings.set_layout = sek["set_layout"]
+    if isinstance(sek.get("all_formats"), bool):
+        _settings.all_formats = sek["all_formats"]
     return _settings
 
 
@@ -137,6 +165,9 @@ def save_settings() -> bool:
         "udp_enabled": bool(_settings.udp_enabled),
         "udp_host": str(_settings.udp_host),
         "udp_port": int(_settings.udp_port),
+        "set_layout": (_settings.set_layout
+                       if _settings.set_layout in SET_LAYOUTS else SET_GRANDMA),
+        "all_formats": bool(_settings.all_formats),
     }
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -156,6 +187,24 @@ def accepts_device(msg_device: int, own_device: int | None = None) -> bool:
     erreicht jeden."""
     own = _settings.device_id if own_device is None else own_device
     return own == ALL_DEVICES or msg_device == ALL_DEVICES or msg_device == own
+
+
+def accepts_format(fmt: int, all_formats: bool | None = None) -> bool:
+    """Command-Format-Filter: nur Licht (0x01..0x0F) und 0x7F (alle Gewerke).
+    Sonst wuerde — gerade mit Device-ID 0x7F — ein GO fuer Ton, Maschinerie
+    oder Pyro eine Licht-Cue ausloesen. ``all_formats`` schaltet den Filter ab."""
+    alle = _settings.all_formats if all_formats is None else all_formats
+    return bool(alle) or fmt == ALL_FORMATS or fmt in _LIGHTING_FORMATS
+
+
+def set_grandma(set_data) -> tuple[int, int, float] | None:
+    """grandMA-Lesart von SET: ``(executor ab 1, seite ab 1, wert 0..1)``.
+    Wert = grob (0..100 Prozent) + fein/128."""
+    if len(set_data) < 4:
+        return None
+    ex, seite, fein, grob = (int(b) & 0x7F for b in set_data[:4])
+    wert = max(0.0, min(1.0, (grob + fein / 128.0) / 100.0))
+    return ex + 1, seite, wert
 
 
 def _ascii(chunk) -> str:
@@ -182,7 +231,8 @@ def is_msc(raw) -> bool:
 
 
 def parse_msc(raw, own_device: int | None = None) -> MscCommand | None:
-    """Zerlegt eine MSC-SysEx. None bei Nicht-MSC, Fremd-Device oder Muell."""
+    """Zerlegt eine MSC-SysEx. None bei Nicht-MSC, Fremd-Device, fremdem
+    Gewerk (Command-Format) oder Muell."""
     try:
         raw = [int(b) & 0xFF for b in raw]
     except (TypeError, ValueError):
@@ -199,6 +249,8 @@ def parse_msc(raw, own_device: int | None = None) -> MscCommand | None:
     data = body[6:]
     if not accepts_device(dev, own_device):
         return None
+    if not accepts_format(fmt):
+        return None
     out = MscCommand(device_id=dev, command_format=fmt, command=cmd)
     if cmd in _CUE_COMMANDS:
         out.cue, out.cue_list, out.cue_path = _split_cue_fields(data)
@@ -212,6 +264,7 @@ def parse_msc(raw, own_device: int | None = None) -> MscCommand | None:
             return None
         out.control = data[0] | (data[1] << 7)
         out.value = data[2] | (data[3] << 7)
+        out.set_data = tuple(data[:4])
     elif cmd == FIRE:
         if len(data) < 1:
             return None

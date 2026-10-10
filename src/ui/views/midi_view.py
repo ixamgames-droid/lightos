@@ -66,6 +66,11 @@ class MidiView(QWidget):
         self._setup_ui()
         self._midi.subscribe_log(self._log_callback)
         self._midi.subscribe(self._midi_callback)
+        # NET-14: per UDP empfangene MSC-Befehle kommen nicht ueber den
+        # MIDI-Manager — beim Mapper mithoeren, sonst fehlen sie im Monitor.
+        sub = getattr(self._mapper, "subscribe_msc", None)
+        if callable(sub):
+            sub(self._midi_callback)
 
         # Auto-Refresh Ports alle 2 Sek - erkennt USB-Hotplug
         from PySide6.QtCore import QTimer
@@ -80,6 +85,9 @@ class MidiView(QWidget):
             timer.stop()
         try:
             self._midi.unsubscribe(self._midi_callback)
+            unsub = getattr(self._mapper, "unsubscribe_msc", None)
+            if callable(unsub):
+                unsub(self._midi_callback)
             self._midi.unsubscribe_log(self._log_callback)
         except Exception:
             pass
@@ -401,15 +409,30 @@ class MidiView(QWidget):
             "pc":       "PC   ",
         }
         if msg.msg_type == "msc" and msg.msc is not None:
-            c = msg.msc
-            self._console.appendPlainText(
-                f"MSC   [{msg.port_name[:20]}] {c.name.upper()} "
-                f"Cue={c.cue or '-'} Liste={c.cue_list or '-'}")
+            self._console.appendPlainText(self._msc_zeile(msg))
             return
         prefix = prefixes.get(msg.msg_type, msg.msg_type.upper()[:5])
         line = (f"{prefix} [{msg.port_name[:20]}] "
                 f"CH{msg.channel:2d} D1={msg.data1:3d} D2={msg.data2:3d}")
         self._console.appendPlainText(line)
+
+    @staticmethod
+    def _msc_zeile(msg: MidiMessage) -> str:
+        """Monitorzeile fuer einen MSC-Befehl; Quelle = Portname bzw.
+        ``MSC/UDP`` fuer den Netzwerkweg."""
+        from src.core.midi import msc as _msc
+        c = msg.msc
+        kopf = f"MSC   [{msg.port_name[:20]}] {c.name.upper()} "
+        if c.command == _msc.SET:
+            if _msc.get_settings().set_layout == _msc.SET_GRANDMA:
+                gma = _msc.set_grandma(getattr(c, "set_data", ()) or ())
+                if gma is not None:
+                    return (kopf + f"Executor={gma[0]} Seite={gma[1]} "
+                                   f"Wert={gma[2] * 100:.1f}%")
+            return kopf + f"Regler={c.control} Wert={c.value}"
+        if c.command == _msc.FIRE:
+            return kopf + f"Makro={c.macro}"
+        return kopf + f"Cue={c.cue or '-'} Liste={c.cue_list or '-'}"
 
     def _set_monitor_active(self, active: bool):
         self._monitor_active = bool(active)
@@ -655,7 +678,9 @@ class MidiView(QWidget):
         from src.core.midi import msc as _msc
         st = _msc.get_settings()
         box = QGroupBox("MIDI Show Control (MSC)")
-        bl = QHBoxLayout(box)
+        box_l = QVBoxLayout(box)
+        bl = QHBoxLayout()
+        box_l.addLayout(bl)
         self._chk_msc = QCheckBox("MSC an")
         self._chk_msc.setChecked(st.enabled)
         self._chk_msc.setToolTip("Cue-Befehle (GO/STOP/RESUME/SET/FIRE) von "
@@ -685,9 +710,34 @@ class MidiView(QWidget):
         self._spin_msc_port.setRange(1, 65535)
         self._spin_msc_port.setValue(int(st.udp_port) or _msc.GMA_PORT)
         bl.addWidget(self._spin_msc_port)
+        # Zweite Zeile: SET-Belegung und Gewerke-Filter.
+        bl2 = QHBoxLayout()
+        box_l.addLayout(bl2)
+        bl2.addWidget(QLabel("SET-Belegung:"))
+        self._cmb_msc_set = QComboBox()
+        self._cmb_msc_set.addItem("grandMA (Executor, Seite)", _msc.SET_GRANDMA)
+        self._cmb_msc_set.addItem("Standard (14-Bit-Regler)", _msc.SET_STANDARD)
+        self._cmb_msc_set.setToolTip(
+            "Wie der MSC-Befehl SET gelesen wird.\n"
+            "grandMA: Byte 1 = Executor (ab 0), Byte 2 = Seite (ab 1), "
+            "Wert in Prozent — setzt den Fader auf der genannten "
+            "Executor-Seite.\n"
+            "Standard: 14-Bit-Reglernummer n setzt Executor n+1 der "
+            "aktuellen Seite, Wert 0…16383.")
+        self._cmb_msc_set.setCurrentIndex(
+            max(0, self._cmb_msc_set.findData(st.set_layout)))
+        bl2.addWidget(self._cmb_msc_set)
+        self._chk_msc_allfmt = QCheckBox("alle Formate annehmen")
+        self._chk_msc_allfmt.setChecked(bool(st.all_formats))
+        self._chk_msc_allfmt.setToolTip(
+            "Aus (Standard): nur Befehle für Licht (Command-Format 01–0F) "
+            "und „alle“ (7F). An: auch Befehle für Ton, Maschinerie, Video "
+            "usw. lösen Cues aus.")
+        bl2.addWidget(self._chk_msc_allfmt)
+        bl2.addStretch(1)
         btn = QPushButton("Übernehmen")
         btn.clicked.connect(self._apply_msc)
-        bl.addWidget(btn)
+        bl2.addWidget(btn)
         outer = QVBoxLayout()
         outer.addWidget(box)
         outer.addWidget(self._lbl_msc_hint)
@@ -739,6 +789,8 @@ class MidiView(QWidget):
         st.udp_enabled = self._chk_msc_udp.isChecked()
         st.udp_host = str(self._cmb_msc_host.currentData() or "127.0.0.1")
         st.udp_port = int(self._spin_msc_port.value())
+        st.set_layout = str(self._cmb_msc_set.currentData() or _msc.SET_GRANDMA)
+        st.all_formats = self._chk_msc_allfmt.isChecked()
         if not _msc.save_settings():
             self._append_log("MSC: Einstellungen konnten nicht gespeichert werden")
         ok = False

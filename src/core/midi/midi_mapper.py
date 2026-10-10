@@ -40,6 +40,8 @@ def _parse_effect_param(param: str) -> tuple[str, int | None]:
 BUTTON_TOGGLE = "toggle"
 BUTTON_FLASH = "flash"
 BUTTON_CONTINUOUS = "continuous"
+# Portname, unter dem per UDP empfangene MSC-Befehle im Monitor erscheinen.
+MSC_UDP_PORT_NAME = "MSC/UDP"
 # MIDI-2: reine Druck-Aktion. Jeder Druck loest genau einmal aus, Loslassen tut
 # nichts. Fuer GO/BACK der einzige zulaessige Modus — frueher war ``toggle`` die
 # Vorgabe, und jeder ZWEITE GO-Druck schaltete den Toggle aus und loeste BACK
@@ -585,6 +587,88 @@ class MidiMapper:
                 return ex
         return None
 
+    def _msc_set(self, cmd) -> bool:
+        """SET -> Executor-Fader. Die Lesart der Datenbytes bestimmt
+        ``MscSettings.set_layout``:
+
+        - ``grandma``: Byte 0 = Executor (ab 0), Byte 1 = Seite (ab 1) ->
+          Executor-Seite von LightOS; Wert = grob (Prozent) + fein/128.
+        - ``standard``: 14-bit-Regler n -> Executor n+1 der aktuellen Seite,
+          Wert 14 bit.
+
+        Einen Executor, den es nicht gibt, nicht still schlucken: gedrosselte
+        Meldung (je Ziel einmal), sonst sucht man am Pult ohne Anhaltspunkt."""
+        from . import msc as _msc
+        from src.core.diagnose_log import melde_still
+        pe = self._state.playback_engine
+        if pe is None or cmd.control is None:
+            return False
+        seiten = getattr(pe, "pages", None)
+        if _msc.get_settings().set_layout == _msc.SET_GRANDMA:
+            gma = _msc.set_grandma(getattr(cmd, "set_data", ()) or ())
+            if gma is None:
+                return False
+            slot, seite, wert = gma
+            n_seiten = len(seiten) if seiten is not None else 1
+            if not 1 <= seite <= n_seiten:
+                melde_still("midi.msc.set", text=(
+                    f"SET (grandMA): Seite {seite} gibt es nicht "
+                    f"(1..{n_seiten}) — Executor {slot} nicht gesetzt. Sendet "
+                    "das Pult 14-Bit-Regler, die SET-Belegung auf "
+                    "'Standard' stellen."))
+                return False
+            n_slots = len(seiten[seite - 1]) if seiten is not None else len(pe.executors)
+            if not 1 <= slot <= n_slots:
+                melde_still("midi.msc.set", text=(
+                    f"SET (grandMA): Executor {slot} auf Seite {seite} gibt es "
+                    f"nicht (1..{n_slots})"))
+                return False
+            ex = (seiten[seite - 1][slot - 1] if seiten is not None
+                  else pe.get_executor(slot))
+        else:
+            slot = int(cmd.control) + 1
+            n_slots = len(pe.executors)
+            if not 1 <= slot <= n_slots:
+                melde_still("midi.msc.set", text=(
+                    f"SET (Standard): Regler {int(cmd.control)} -> Executor "
+                    f"{slot} gibt es nicht (1..{n_slots}). Sendet eine grandMA, "
+                    "die SET-Belegung auf 'grandMA (Executor, Seite)' stellen."))
+                return False
+            ex = pe.get_executor(slot)
+            wert = max(0.0, min(1.0, (cmd.value or 0) / 16383.0))
+        ex.fader_value = wert
+        return True
+
+    def subscribe_msc(self, callback) -> None:
+        """Beobachter fuer MSC-Befehle, die NICHT ueber einen MIDI-Eingang
+        kommen (GMA-MSC per UDP) — sonst fehlen sie im MIDI-Monitor. Der
+        Callback bekommt eine ``MidiMessage`` (Port ``MSC/UDP``) und laeuft im
+        Empfangsthread."""
+        if not hasattr(self, "_msc_listeners"):
+            self._msc_listeners = []
+        if callback not in self._msc_listeners:
+            self._msc_listeners.append(callback)
+
+    def unsubscribe_msc(self, callback) -> None:
+        try:
+            getattr(self, "_msc_listeners", []).remove(callback)
+        except ValueError:
+            pass
+
+    def _on_msc_udp(self, cmd) -> bool:
+        """NET-14: per UDP empfangenen Befehl ausfuehren UND den Beobachtern
+        (MIDI-Monitor) zeigen."""
+        ok = self.handle_msc(cmd)
+        if cmd is not None:
+            msg = MidiMessage(MSC_UDP_PORT_NAME, 0, "msc", cmd.command, 0, msc=cmd)
+            for cb in list(getattr(self, "_msc_listeners", ())):
+                try:
+                    cb(msg)
+                except Exception as e:
+                    from src.core.diagnose_log import melde_still
+                    melde_still("midi.msc", e, text="Monitor")
+        return ok
+
     def handle_msc(self, cmd) -> bool:
         """Fuehrt ein ``MscCommand`` aus. True, wenn etwas ausgeloest wurde."""
         from . import msc as _msc
@@ -618,13 +702,7 @@ class MidiMapper:
                 ex.press_btn("stop")
                 return True
             if c == _msc.SET:
-                # Regler 0..n -> Executor-Fader 1..n+1, Wert 14 bit.
-                pe = self._state.playback_engine
-                if pe is None or cmd.control is None:
-                    return False
-                ex = pe.get_executor(int(cmd.control) + 1)
-                ex.fader_value = max(0.0, min(1.0, (cmd.value or 0) / 16383.0))
-                return True
+                return self._msc_set(cmd)
             if c == _msc.FIRE:
                 # Makro n -> Funktion (Szene/Chaser) mit ID n starten.
                 fm = getattr(self._state, "function_manager", None)
@@ -1106,7 +1184,7 @@ class MidiMapper:
         if not st.udp_enabled:
             return False
         if rx is None:
-            rx = _msc.GmaMscReceiver(self.handle_msc, st.udp_host, st.udp_port)
+            rx = _msc.GmaMscReceiver(self._on_msc_udp, st.udp_host, st.udp_port)
             if not rx.start():
                 return False
             self._msc_udp = rx

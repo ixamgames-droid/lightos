@@ -19,9 +19,10 @@ def _sx(dev, cmd, data=b"", fmt=0x01):
 @pytest.fixture(autouse=True)
 def _settings_reset():
     st = msc.get_settings()
-    alt = (st.enabled, st.device_id, st.udp_enabled, st.udp_host, st.udp_port)
+    alt = dict(vars(st))
     yield
-    st.enabled, st.device_id, st.udp_enabled, st.udp_host, st.udp_port = alt
+    vars(st).clear()
+    vars(st).update(alt)
 
 
 # ── Parser ───────────────────────────────────────────────────────────────────
@@ -118,13 +119,21 @@ class _Stack:
 
 
 class _PE:
+    """Wie die echte PlaybackEngine: mehrere Seiten, ``executors`` = aktuelle."""
+
     def __init__(self):
-        self.executors = [Executor(i + 1) for i in range(10)]
+        self.pages = [[Executor(i + 1) for i in range(10)] for _ in range(3)]
+        self.current_page = 0
         for i, ex in enumerate(self.executors):
             ex.stack = _Stack(f"Liste {i + 1}")
 
-    def get_executor(self, slot):
-        return self.executors[slot - 1]
+    @property
+    def executors(self):
+        return self.pages[self.current_page]
+
+    def get_executor(self, slot, page=None):
+        p = self.current_page if page is None else page
+        return self.pages[p][slot - 1]
 
     def stop_all(self):
         for ex in self.executors:
@@ -170,6 +179,7 @@ def test_mapper_stop_set_fire_alloff():
     pe = m._state.playback_engine
     assert m.handle_msc(msc.parse_msc(_sx(1, msc.STOP, b"\x002")))
     assert pe.executors[1].stack.log == ["stop"]
+    msc.get_settings().set_layout = msc.SET_STANDARD
     assert m.handle_msc(msc.parse_msc(_sx(1, msc.SET, bytes([0, 0, 0, 0x40]))))
     assert pe.executors[0].fader_value == pytest.approx(8192 / 16383)
     assert m.handle_msc(msc.parse_msc(_sx(1, msc.FIRE, bytes([7]))))
@@ -329,3 +339,155 @@ def test_einstellungen_kaputt_bleiben_default(tmp_path, monkeypatch):
     msc.load_settings()
     assert st.device_id == 127 and st.udp_port == msc.GMA_PORT
     assert st.enabled is False
+
+
+# ── Codex-Review #990: SET-Belegung, Command-Format, UDP im Monitor ──────────
+
+@pytest.fixture
+def meldungen(monkeypatch):
+    """Faengt ``melde_still`` ab (die echte Funktion entdoppelt prozessweit)."""
+    import src.core.diagnose_log as dl
+    got = []
+    monkeypatch.setattr(dl, "melde_still",
+                        lambda tag, exc=None, text="": got.append((tag, text)))
+    return got
+
+
+def test_set_vorgabe_ist_grandma_und_rohbytes_bleiben():
+    assert msc.MscSettings().set_layout == msc.SET_GRANDMA
+    s = msc.parse_msc(_sx(0x01, msc.SET, bytes([2, 1, 0, 0x64])))
+    assert s.set_data == (2, 1, 0, 0x64)
+    assert msc.set_grandma(s.set_data) == (3, 1, 1.0)
+
+
+def test_set_grandma_executor_und_seite(meldungen):
+    """grandMA sendet 'Executor 3 / Seite 1' als 02 01 — das ist NICHT
+    Regler 130, sondern Executor 3 auf Executor-Seite 1."""
+    m = _mapper()
+    pe = m._state.playback_engine
+    pe.current_page = 2                     # Seite kommt aus dem Befehl
+    assert msc.get_settings().set_layout == msc.SET_GRANDMA
+    assert m.handle_msc(msc.parse_msc(_sx(1, msc.SET, bytes([2, 1, 0, 0x32]))))
+    assert pe.pages[0][2].fader_value == pytest.approx(0.5)
+    assert m.handle_msc(msc.parse_msc(_sx(1, msc.SET, bytes([0, 2, 64, 24]))))
+    assert pe.pages[1][0].fader_value == pytest.approx(0.245)
+    assert m.handle_msc(msc.parse_msc(_sx(1, msc.SET, bytes([9, 3, 0, 0x64]))))
+    assert pe.pages[2][9].fader_value == pytest.approx(1.0)
+    assert pe.pages[2][2].fader_value == pytest.approx(1.0)   # unberuehrt
+    assert meldungen == []
+
+
+@pytest.mark.parametrize("daten, wort", [
+    (bytes([10, 1, 0, 0x64]), "Executor 11"),   # Platz gibt es nicht
+    (bytes([0, 0, 0, 0x64]), "Seite 0"),        # Seiten zaehlen ab 1
+    (bytes([0, 4, 0, 0x64]), "Seite 4"),        # nur 3 Seiten
+])
+def test_set_grandma_ungueltig_wird_gemeldet(meldungen, daten, wort):
+    m = _mapper()
+    pe = m._state.playback_engine
+    vorher = [[ex.fader_value for ex in seite] for seite in pe.pages]
+    assert not m.handle_msc(msc.parse_msc(_sx(1, msc.SET, daten)))
+    assert [[ex.fader_value for ex in seite] for seite in pe.pages] == vorher
+    assert len(meldungen) == 1 and meldungen[0][0] == "midi.msc.set"
+    assert wort in meldungen[0][1]
+
+
+def test_set_standard_14bit_und_ungueltig_gemeldet(meldungen):
+    m = _mapper()
+    pe = m._state.playback_engine
+    pe.current_page = 1
+    msc.get_settings().set_layout = msc.SET_STANDARD
+    assert m.handle_msc(msc.parse_msc(_sx(1, msc.SET, bytes([3, 0, 0x7F, 0x7F]))))
+    assert pe.pages[1][3].fader_value == pytest.approx(1.0)
+    assert meldungen == []
+    # grandMA-Bytes in der Standard-Lesart: Regler 130 -> gemeldet statt still
+    assert not m.handle_msc(msc.parse_msc(_sx(1, msc.SET, bytes([2, 1, 0, 0x64]))))
+    assert len(meldungen) == 1 and "Regler 130" in meldungen[0][1]
+
+
+@pytest.mark.parametrize("fmt, ok", [
+    (0x01, True), (0x02, True), (0x0F, True), (0x7F, True),
+    (0x00, False), (0x10, False), (0x20, False), (0x30, False), (0x60, False),
+])
+def test_command_format_nur_licht(fmt, ok):
+    """Mit Device-ID 0x7F darf ein GO fuer Ton/Maschinerie keine Licht-Cue
+    ausloesen."""
+    assert msc.get_settings().device_id == msc.ALL_DEVICES
+    c = msc.parse_msc(_sx(0x7F, msc.GO, b"1", fmt=fmt))
+    assert (c is not None) is ok
+    assert (_decode(_sx(0x7F, msc.GO, b"1", fmt=fmt), "Pult") is not None) is ok
+
+
+def test_command_format_alle_annehmen_und_udp():
+    assert msc.MscSettings().all_formats is False
+    assert msc.parse_gma_udp(_gma(_sx(0x7F, msc.GO, b"1", fmt=0x10))) is None
+    msc.get_settings().all_formats = True
+    assert msc.parse_msc(_sx(0x7F, msc.GO, b"1", fmt=0x10)) is not None
+    assert msc.parse_gma_udp(_gma(_sx(0x7F, msc.GO, b"1", fmt=0x10))) is not None
+
+
+def test_ton_go_loest_keine_cue_aus():
+    m = _mapper()
+    m._learn_mode, m._learn_callback, m._mappings = False, None, []
+    msg = _decode(_sx(0x7F, msc.GO, b"1", fmt=0x10), "Pult")
+    if msg is not None:
+        m._on_midi(msg)
+    assert m._state.playback_engine.executors[0].stack.log == []
+
+
+def test_set_belegung_und_formate_dauerhaft(tmp_path, monkeypatch):
+    import json
+    import src.core.paths as paths
+    monkeypatch.setattr(paths, "app_data_dir", lambda: str(tmp_path))
+    st = msc.get_settings()
+    st.set_layout, st.all_formats = msc.SET_STANDARD, True
+    assert msc.save_settings()
+    sek = json.loads((tmp_path / "ui_prefs.json").read_text())["midi_msc"]
+    assert sek["set_layout"] == "standard" and sek["all_formats"] is True
+    st.set_layout, st.all_formats = msc.SET_GRANDMA, False
+    msc.load_settings()
+    assert (st.set_layout, st.all_formats) == (msc.SET_STANDARD, True)
+    # kaputte Werte aendern nichts
+    (tmp_path / "ui_prefs.json").write_text(json.dumps(
+        {"midi_msc": {"set_layout": "quatsch", "all_formats": "ja"}}))
+    msc.load_settings()
+    assert (st.set_layout, st.all_formats) == (msc.SET_STANDARD, True)
+
+
+def test_udp_befehl_erreicht_monitor_beobachter():
+    """Per UDP empfangene Befehle muessen im MIDI-Monitor sichtbar sein
+    (Quelle 'MSC/UDP') — sie laufen nicht ueber den MIDI-Manager."""
+    m = _mapper()
+    gesehen = []
+    m.subscribe_msc(gesehen.append)
+    st = msc.get_settings()
+    st.udp_enabled, st.udp_host, st.udp_port = True, "127.0.0.1", 0
+    try:
+        assert m.apply_msc_udp()
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.sendto(_gma(_sx(1, msc.GO, b"\x002")), ("127.0.0.1", m._msc_udp.port))
+        s.close()
+        t0 = time.monotonic()
+        while not gesehen and time.monotonic() - t0 < 2.0:
+            time.sleep(0.02)
+    finally:
+        m._msc_udp.stop()
+    assert len(gesehen) == 1
+    assert gesehen[0].port_name == "MSC/UDP" and gesehen[0].msg_type == "msc"
+    assert gesehen[0].msc.cue_list == "2"
+    assert m._state.playback_engine.executors[1].stack.log == ["go"]   # genau einmal
+    m.unsubscribe_msc(gesehen.append)
+    m._on_msc_udp(msc.parse_msc(_sx(1, msc.GO, b"\x003")))
+    assert len(gesehen) == 1
+
+
+def test_udp_monitor_fehler_stoppt_befehl_nicht(meldungen):
+    m = _mapper()
+
+    def kaputt(_msg):
+        raise RuntimeError("Monitor weg")
+
+    m.subscribe_msc(kaputt)
+    assert m._on_msc_udp(msc.parse_msc(_sx(1, msc.GO, b"\x002")))
+    assert m._state.playback_engine.executors[1].stack.log == ["go"]
+    assert meldungen and meldungen[0][0] == "midi.msc"
