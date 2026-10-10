@@ -480,11 +480,17 @@ class BPMManager:
             pass
         # Plus: Beat-synchrone Cuelisten taktgenau weiterschalten (on_beat zaehlt
         # selbst die beats_per_cue und triggert nur die aktive, beat_sync-Liste).
+        # BPM-30: nur einen SCHON VORHANDENEN App-Zustand nehmen. get_state()
+        # legte ihn sonst hier im Beat-Faden an (Datenumzug, Show-DB,
+        # Ausgabe-Thread) — gemessen: Access Violation im Faden 'BPM-Beat'. Ohne
+        # Zustand gibt es auch keine Cuelisten, die mitzaehlen muessten.
         try:
-            from src.core.app_state import get_state
-            for stack in list(getattr(get_state(), "cue_stacks", []) or []):
-                if getattr(stack, "beat_sync", False):
-                    stack.on_beat()
+            from src.core.app_state import vorhandener_state
+            st = vorhandener_state()
+            if st is not None:
+                for stack in list(getattr(st, "cue_stacks", []) or []):
+                    if getattr(stack, "beat_sync", False):
+                        stack.on_beat()
         except Exception:
             pass
 
