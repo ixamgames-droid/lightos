@@ -61,6 +61,7 @@
 | LAS-32 | A | feature/las32-laser-sperrzonen | 2026-10-10T13:08Z | - |
 | DEMO-8 | A | feature/demo8-demoshows-im-setup | 2026-10-10T13:08Z | - |
 | XPLAT-51 | A | fix/xplat51-arm64-nicht-unterstuetzt | 2026-10-10T14:17Z | - |
+| XPLAT-52 | A | fix/xplat52-installer-venv-arch | 2026-10-10T14:17Z | - |
 
 ## Blocker & Fallen
 
@@ -171,7 +172,6 @@
 
 ## Verlauf
 
-- 2026-10-10T11:07Z D aktualisiert DOC-70: Dateien - -> docs/anleitung_netzwerk_windows/ANLEITUNG.md · docs/ANLEITUNGEN.md · tests/test_doc70_netzwerk_windows.py
 - 2026-10-10T11:10Z D aktualisiert TOOL-14: Branch - -> fix/tool14-gen-tools-index-argparse; Dateien - -> tools/gen_tools_index.py · tests/test_tool14_gen_tools_index_cli.py
 - 2026-10-10T11:13Z D aktualisiert TOOL-21: Branch - -> fix/tool21-gif-vergleich-rgb; Dateien - -> tools/anleitungsbilder/runner.py · tests/test_tool21_bildvergleich_je_kanal.py
 - 2026-10-10T11:15Z B done OUT-64
@@ -201,3 +201,4 @@
 - 2026-10-10T14:17Z B uebergeben XPLAT-51
 - 2026-10-10T14:17Z B uebergeben XPLAT-52
 - 2026-10-10T14:17Z A claim XPLAT-51
+- 2026-10-10T14:17Z A claim XPLAT-52
