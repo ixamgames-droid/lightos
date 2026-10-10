@@ -3,22 +3,34 @@ r"""LightOS Uninstaller.
 Entfernt was install.py angelegt hat. Liest install_manifest.json wenn vorhanden,
 sonst Fallback auf bekannte Pfade.
 
-Was wird entfernt (optional pro Bereich abfragbar):
+Was wird entfernt:
 - venv/                  (Virtual Environment)
-- data/                  (nur noch der Datenstand von VOR dem Datenumzug XPLAT-44
-                          und mitgelieferte Controller-Vorlagen)
-- shows/                 (eigene Shows - per Default ERHALTEN, --shows zum Loeschen)
-- App-Datenordner        (%APPDATA%/LightOS bzw. ~/.local/share/LightOS: ALLE
-                          Nutzerdaten - Show-DB, Universen, MIDI-Mappings, Gruppen,
-                          Modifier, Snapshots, Stages, Profile, Auto-Save)
+- data/                  (nur Nutzerdateien aus der Zeit VOR dem Datenumzug
+                          XPLAT-44; data/controller_library gehoert zum Programm
+                          und bleibt)
+- shows/                 (Shows im Programmordner - nur nach ausdruecklicher
+                          Rueckfrage, mit --yes oder --keep-shows nie)
 - Desktop\LightOS.lnk
 - install_manifest.json
+- __pycache__ unter src/
+
+Was NUR mit --purge entfernt wird (XPLAT-49):
+- App-Datenordner        (%APPDATA%/LightOS bzw. ~/.local/share/LightOS: eigene
+                          Shows, Show-DB, Universen, MIDI-Mappings, Gruppen,
+                          Modifier, Fixture-Bibliothek, Snaps, Buehnen, Profile,
+                          Auto-Save, Logs)
 
 Usage:
     python uninstall.py                  (interaktiv - fragt jeden Bereich)
-    python uninstall.py --yes            (alles ohne Rueckfrage entfernen)
-    python uninstall.py --keep-shows     (Shows behalten)
-    python uninstall.py --keep-appdata   (AppData behalten)
+    python uninstall.py --yes            (Installation ohne Rueckfrage entfernen;
+                                          App-Datenordner und Shows bleiben)
+    python uninstall.py --purge          (zusaetzlich den App-Datenordner, nach
+                                          Sicherheitsfrage)
+    python uninstall.py --purge --yes    (dasselbe ohne Sicherheitsfrage)
+    python uninstall.py --keep-shows     (Shows behalten - im Programmordner UND,
+                                          bei --purge, im App-Datenordner)
+    python uninstall.py --keep-appdata   (App-Datenordner behalten, auch bei --purge)
+    python uninstall.py --keep-venv      (venv/ behalten)
     python uninstall.py --dry-run        (nur anzeigen was geloescht wuerde)
 """
 from __future__ import annotations
@@ -43,15 +55,35 @@ VENV_DIR = ROOT / "venv"
 # XPLAT-44: die Nutzerdaten (Show-DB, Universen, MIDI, Gruppen, Modifier) liegen
 # im App-Datenordner, nicht mehr in data/. Die Fragen muessen das sagen — sonst
 # loescht, wer den App-Ordner fuer "nur Snapshots" haelt, ungewarnt die Show.
-DATA_FRAGE = ("data/ loeschen? (nur der alte Datenstand von VOR dem Update und "
-              "mitgelieferte Controller-Vorlagen - die aktuellen Nutzerdaten "
-              "liegen im App-Datenordner)")
+# XPLAT-49: data/controller_library ist versioniert (Programm, keine Nutzerdaten).
+DATA_BEHALTEN = ("controller_library",)
+DATA_FRAGE = ("data/ aufraeumen? (nur der alte Datenstand von VOR dem Update - "
+              "die aktuellen Nutzerdaten liegen im App-Datenordner; die "
+              "mitgelieferten Vorlagen in data/controller_library bleiben)")
+
+# XPLAT-49: eigene Shows liegen standardmaessig in <App-Datenordner>/shows.
+APPDATA_SHOWS = "shows"
+APPDATA_INHALT = ("eigene Shows, Show-DB, Universen, MIDI-Mappings, Gruppen, "
+                  "Modifier, Fixture-Bibliothek, Snaps, Buehnen, Profile, "
+                  "Auto-Save, Logs")
 
 
-def appdata_frage() -> str:
-    return (f"{APPDATA_DIR}/ loeschen? (ALLE Nutzerdaten: Show-DB, Universen, "
-            "MIDI-Mappings, Gruppen, Modifier, Snapshots, Stages, Profile, "
-            "Auto-Save!)")
+def appdata_frage(shows_bleiben: bool = False) -> str:
+    if shows_bleiben:
+        return (f"{APPDATA_DIR}/ WIRKLICH loeschen? (ALLE Nutzerdaten: Show-DB, "
+                "Universen, MIDI-Mappings, Gruppen, Modifier, Fixture-Bibliothek, "
+                "Snaps, Buehnen, Profile, Auto-Save, Logs - nur eigene Shows in "
+                f"{APPDATA_DIR / APPDATA_SHOWS} bleiben!)")
+    return (f"{APPDATA_DIR}/ WIRKLICH loeschen? (ALLE Nutzerdaten: eigene Shows, "
+            "Show-DB, Universen, MIDI-Mappings, Gruppen, Modifier, "
+            "Fixture-Bibliothek, Snaps, Buehnen, Profile, Auto-Save, Logs!)")
+
+
+def kinder_ausser(ordner: Path, behalten: tuple[str, ...]) -> list[Path]:
+    """Direkte Eintraege von ``ordner`` ohne die geschuetzten Namen."""
+    if not ordner.is_dir():
+        return []
+    return sorted(k for k in ordner.iterdir() if k.name not in behalten)
 
 
 def info(msg: str):
@@ -122,11 +154,17 @@ def remove_shortcut(shortcut_path: str | None, dry_run: bool):
 def main():
     p = argparse.ArgumentParser(description="LightOS Uninstaller")
     p.add_argument("--yes", action="store_true",
-                   help="Keine Rueckfragen - alles entfernen (ausser explizit ausgeschlossen)")
+                   help="Keine Rueckfragen - Installation entfernen. Der "
+                        "App-Datenordner und shows/ bleiben (dafuer: --purge)")
+    p.add_argument("--purge", action="store_true",
+                   help="AUCH den App-Datenordner loeschen (eigene Shows, Show-DB, "
+                        "MIDI-Mappings, Bibliothek, Snaps, Buehnen, Logs). Fragt "
+                        "nach, ausser zusammen mit --yes")
     p.add_argument("--keep-shows", action="store_true",
-                   help="shows/ behalten")
+                   help="Shows behalten: shows/ im Programmordner und, bei --purge, "
+                        "shows/ im App-Datenordner")
     p.add_argument("--keep-appdata", action="store_true",
-                   help="%%APPDATA%%/LightOS/ behalten")
+                   help="App-Datenordner behalten (gewinnt gegen --purge)")
     p.add_argument("--keep-venv", action="store_true",
                    help="venv/ behalten")
     p.add_argument("--dry-run", action="store_true",
@@ -154,23 +192,48 @@ def main():
         if args.yes or confirm(f"venv loeschen? ({VENV_DIR})"):
             targets.append(("venv", VENV_DIR))
 
-    # 2. data/
-    if args.yes or confirm(DATA_FRAGE):
-        targets.append(("data", ROOT / "data"))
+    # 2. data/ - nur Nutzerdateien, data/controller_library gehoert zum Programm
+    data_dir = ROOT / "data"
+    data_aufraeumen = args.yes or confirm(DATA_FRAGE)
+    if data_aufraeumen:
+        for kind in kinder_ausser(data_dir, DATA_BEHALTEN):
+            targets.append(("data", kind))
 
-    # 3. shows/
-    if not args.keep_shows:
-        if confirm("shows/ loeschen? (deine eigenen .lshow Dateien!)", default=False):
-            targets.append(("shows", ROOT / "shows"))
-        else:
-            info("shows/ wird BEHALTEN")
-    else:
+    # 3. shows/ im Programmordner - nie ohne ausdrueckliches Ja (XPLAT-49:
+    #    --yes ist kein Ja zu eigenen Shows)
+    if args.keep_shows:
         info("shows/ wird BEHALTEN (--keep-shows)")
+    elif args.yes:
+        info("shows/ wird BEHALTEN (--yes loescht keine eigenen Shows)")
+    elif confirm("shows/ loeschen? (deine eigenen .lshow Dateien im "
+                 "Programmordner!)", default=False):
+        targets.append(("shows", ROOT / "shows"))
+    else:
+        info("shows/ wird BEHALTEN")
 
-    # 4. AppData
-    if not args.keep_appdata:
-        if args.yes or confirm(appdata_frage(), default=False):
-            targets.append(("appdata", APPDATA_DIR))
+    # 4. App-Datenordner - nur mit --purge (XPLAT-49)
+    if args.keep_appdata:
+        info(f"App-Datenordner wird BEHALTEN (--keep-appdata): {APPDATA_DIR}")
+    elif not args.purge:
+        info(f"App-Datenordner wird BEHALTEN: {APPDATA_DIR}")
+        info(f"  Dort liegt: {APPDATA_INHALT}.")
+        info("  Loeschen nur ausdruecklich mit --purge.")
+    else:
+        warn(f"--purge: der App-Datenordner {APPDATA_DIR} soll geloescht werden.")
+        warn(f"  Dort liegt: {APPDATA_INHALT}.")
+        if args.keep_shows:
+            info(f"  --keep-shows: eigene Shows bleiben in "
+                 f"{APPDATA_DIR / APPDATA_SHOWS}")
+        if args.yes or confirm(appdata_frage(args.keep_shows), default=False):
+            if args.keep_shows:
+                # Aussparen statt vorher wegsichern: eine Kopie kann scheitern
+                # oder unvollstaendig sein, ein nicht angefasster Ordner nicht.
+                for kind in kinder_ausser(APPDATA_DIR, (APPDATA_SHOWS,)):
+                    targets.append(("appdata", kind))
+            else:
+                targets.append(("appdata", APPDATA_DIR))
+        else:
+            info("App-Datenordner wird BEHALTEN")
 
     # 5. Shortcut
     shortcut = manifest.get("shortcut")
@@ -204,13 +267,17 @@ def main():
         remove_shortcut(shortcut, args.dry_run)
 
     # Manifest selbst
-    if not args.dry_run and not args.keep_appdata:
+    if not args.keep_appdata:
         if MANIFEST_PATH.exists():
-            try:
-                MANIFEST_PATH.unlink()
-                info(f"Manifest entfernt: {MANIFEST_PATH}")
-            except Exception:
-                pass
+            remove_path(MANIFEST_PATH, args.dry_run)
+
+    # data/ selbst nur, wenn nichts mehr drin ist (ohne Vorlagen-Ordner)
+    if data_aufraeumen and data_dir.is_dir() and not args.dry_run:
+        try:
+            if not any(data_dir.iterdir()):
+                data_dir.rmdir()
+        except OSError:
+            pass
 
     info("")
     info("Fertig.")
