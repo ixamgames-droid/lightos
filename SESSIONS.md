@@ -61,6 +61,7 @@
 | TOOL-18 | D | fix/tool18-bilder-hinweis-gpu-szenen | 2026-10-10T18:52Z | - |
 | TOOL-19 | D | fix/tool19-werkzeuge-ohne-echten-ausgang | 2026-10-10T18:53Z | - |
 | QA-92 | D | fix/qa92-windows-rote-tests | 2026-10-10T18:49Z | - |
+| CDX-58 | A | fix/cdx-1010-main | 2026-10-10T19:30Z | - |
 
 ## Blocker & Fallen
 
@@ -189,7 +190,6 @@
 
 ## Verlauf
 
-- 2026-10-10T14:17Z A claim XPLAT-52
 - 2026-10-10T14:25Z D done VIZ-97
 - 2026-10-10T14:34Z B uebergeben UI-86
 - 2026-10-10T14:38Z A claim VIZ-100
@@ -219,3 +219,4 @@
 - 2026-10-10T18:49Z D claim QA-92
 - 2026-10-10T19:27Z A done FM-67
 - 2026-10-10T19:30Z A aktualisiert UI-86: Branch perf/ui86-2d-ansicht-hidpi -> fix/ui86-2d-hidpi
+- 2026-10-10T19:30Z A claim CDX-58
