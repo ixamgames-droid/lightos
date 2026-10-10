@@ -56,7 +56,7 @@
 | UI-78 | D | fix/ui78-efx-editor-texte | 2026-10-10T21:16Z | - |
 | UI-80 | D | fix/ui80-matrix-entwurf-speed | 2026-10-10T21:16Z | - |
 | TOOL-18 | D | fix/tool18-bilder-hinweis-gpu-szenen | 2026-10-10T21:16Z | - |
-| TOOL-19 | D | fix/tool19-werkzeuge-ohne-echten-ausgang | 2026-10-10T18:53Z | - |
+| TOOL-19 | D | fix/tool19-werkzeuge-ohne-echten-ausgang | 2026-10-10T21:16Z | - |
 | QA-92 | D | fix/qa92-windows-rote-tests | 2026-10-10T21:16Z | - |
 | CDX-58 | A | fix/cdx-1010-main | 2026-10-10T19:30Z | - |
 | VIZ-102 | A | feature/viz102-gobo-hallenboden | 2026-10-10T19:43Z | - |
