@@ -24,7 +24,6 @@
 | DOC-65 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:11Z | docs/anleitung_fixture_generator |
 | LAS-26 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:11Z | src/ui |
 | XPLAT-46 | B | fix/xplat46-arm-x64-empfehlung | 2026-10-10T12:25Z | install.py · INSTALL.md · CONTRIBUTING.md · src/ui/main_window.py · src/utils/plattform_hinweis.py · tests/test_xplat46_arm_empfehlung.py · changelog.d/2026-10-08-XPLAT-46.md |
-| UI-76 | B | fix/ui76-go-hinweis-page | 2026-10-08T19:17Z | src/core/cueliste_ziel.py · src/ui/views/playback_view.py · tests/test_ui76_go_hinweis.py · docs/anleitung_szenen_cues/ANLEITUNG.md · changelog.d/2026-10-08-UI-76.md · BACKLOG.md |
 | VIZ-95 | A | feature/viz95-lasermuster-3d | 2026-10-08T20:47Z | src/ui/visualizer |
 | LAS-30 | A | feature/las30-laser-achsen | 2026-10-10T10:47Z | src/core/laser |
 | VIZ-96 | A | feature/viz96-gobo-projektion | 2026-10-10T13:08Z | src/ui/visualizer |
@@ -168,7 +167,6 @@
 
 ## Verlauf
 
-- 2026-10-10T10:36Z A claim FM-73
 - 2026-10-10T10:46Z A claim CDX-0810
 - 2026-10-10T10:46Z A claim BACKLOG-STATUS
 - 2026-10-10T10:47Z D aktualisiert VIZ-98: Dateien src/ui/visualizer/scene_src/fixtures/builders.js -> src/ui/visualizer/scene_src/fixtures/builders.js · src/ui/visualizer/scene_src/bridge/bridge.js · tests/test_viz98_bodenfleck_ohne_treffer_scene.py · tests/test_viz_beam_laenge.py
@@ -198,3 +196,4 @@
 - 2026-10-10T13:08Z A claim LAS-31
 - 2026-10-10T13:08Z A claim LAS-32
 - 2026-10-10T13:08Z A claim DEMO-8
+- 2026-10-10T13:24Z B done UI-76
