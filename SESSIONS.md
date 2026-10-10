@@ -57,6 +57,7 @@
 | PROC-19 | A | ci/proc19-doku-schnellweg | 2026-10-10T11:47Z | .github/workflows/ci.yml |
 | PROC-20 | A | feature/proc20-backlog-fragmente | 2026-10-10T11:47Z | tools · BACKLOG.md |
 | TOOL-26 | B | feature/tool26-app-messwerkzeug | 2026-10-10T12:55Z | - |
+| VIZ-99 | B | fix/viz99-automatik-snapdragon | 2026-10-10T12:55Z | - |
 
 ## Blocker & Fallen
 
@@ -159,7 +160,6 @@
 
 ## Verlauf
 
-- 2026-10-10T09:41Z D claim TOOL-21
 - 2026-10-10T09:41Z D claim TOOL-23
 - 2026-10-10T09:41Z D claim TOOL-24
 - 2026-10-10T09:41Z D claim FM-66
@@ -189,3 +189,4 @@
 - 2026-10-10T12:44Z B done ARM-PRUEFUNG-1010
 - 2026-10-10T12:55Z A done TOOL-25
 - 2026-10-10T12:55Z B claim TOOL-26
+- 2026-10-10T12:55Z B claim VIZ-99
