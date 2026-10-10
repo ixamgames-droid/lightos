@@ -1,0 +1,69 @@
+# PROC-19 — die Gates des CI-Schnellwegs fuer reine Doku-/Backlog-PRs.
+#
+# Aendert ein PR ausschliesslich Doku (tools/geaenderte_dateien_klasse.py sagt
+# "doku"), faehrt die CI statt der vollen Suite nur die Testdateien, die hier
+# stehen. Lokal: ./tools/verify_loop.sh --doku
+#
+# Format: je Zeile ein Muster (fnmatch, Gross-/Kleinschreibung zaehlt) auf den
+# DATEINAMEN unter tests/. "#" leitet einen Kommentar ein.
+# Eine Zeile mit "!" davor nimmt eine Testdatei BEWUSST aus — mit Grund.
+#
+# Der Waechter tests/test_proc19_doku_schnellweg.py verlangt: jede Testdatei,
+# die in ihrem Code (nicht nur im Docstring) eine Doku-Datei nennt, steht hier
+# — als Gate oder als Ausnahme. Wer einen neuen Test schreibt, der eine
+# Anleitung, den Backlog oder ein Changelog-Fragment liest, traegt ihn als Gate
+# ein; sonst wuerde ein Doku-PR ihn auf dem kurzen Weg nie fahren und erst der
+# Push nach main (immer volle Suite) wuerde rot.
+
+# ── Doku: Links, Bilder, Anleitungen ────────────────────────────────────────
+test_doc_*.py                      # doc_links, doc_images, doc_removed_ui
+test_doc[0-9]*.py                  # test_doc13_..., test_doc62_installdoku ...
+test_audit_bilder_stand.py
+test_audit_coverage_docs_exist.py
+test_anleitungsbilder.py           # u. a. jedes GIF unter docs/ <= 2 MB
+test_las24_gm_laser_aus.py         # Wortlaut in anleitung_erste_schritte
+test_las25_doku_aus_werte.py
+test_fm52_programmer_verlauf.py    # Wortlaut in anleitung_programmer_grundlagen
+test_ui64_programmer_playback.py
+test_viz69_render_ruckler.py       # Wortlaut in ANLEITUNG_3D_BUEHNE.md
+test_viz71_qualitaetsstufen.py
+test_xplat44_datenort.py           # Datenort-Angaben in docs/*.md
+test_ui_verification_checklist.py
+test_open_points_source.py
+
+# ── Backlog und Changelog ───────────────────────────────────────────────────
+test_backlog_*.py
+test_changelog_fragmente.py
+test_qa55_doku_und_backlog_gates.py
+test_qa64_status_drift.py
+
+# ── Privatsphaere, Lizenz, Repo-Hygiene (laufen ueber ALLE Dateien) ─────────
+test_keine_privaten_dateien.py
+test_keine_konfliktmarker.py
+test_tool2_keine_binaerdateien.py
+test_proc18_fremd_lizenzhinweise.py
+test_fm56_bibliothek_waechter.py   # THIRD_PARTY_NOTICES.md
+test_xplat47_windows_setup.py      # THIRD_PARTY_NOTICES.md im Setup-Bundle
+
+# ── Prozess-Doku (WORKFLOW.md, COORDINATION.md, AGENTS.md) ──────────────────
+test_cdx50_doku_nennt_die_echte_sperre.py
+test_proc08_blocker_verfall.py
+test_proc10_ci_status.py
+test_proc13_messfehler_dokumentiert.py
+test_proc19_*.py                   # Klassifizierer + ci.yml-Struktur des Schnellwegs
+
+# ── Werkzeug-Index (liest die Wurzel-README) ────────────────────────────────
+test_tools_index.py
+test_tool1_verwaiste_werkzeuge.py
+
+# ── Bewusst ausgenommen ─────────────────────────────────────────────────────
+!test_capability_manifest.py       # docs/capability_manifest.json ist keine Doku -> volle Suite
+!test_fm53_bibliothek_download.py  # "README.md" nur als Eintrag eines Test-Archivs
+!test_fm56_review.py               # tools/README.md ist keine Doku -> volle Suite
+!test_session_claim.py             # "docs/y.md" nur als Beispielwert fuer --files
+!test_tool11_bildschirm_windows.py # docs/.../img nur als Beispielpfade
+!test_tool3_generator_annahmen.py  # "docs" nur in erzeugtem Beispielcode
+!test_tool5_demo_global_bus.py     # prueft ein Werkzeug, liest keine Doku
+!test_undo_coverage.py             # nennt docs/UNDO_COVERAGE.md nur in Meldungen
+!test_vc_widgets_showcase_layout.py # liest nur docs/.../geometry.json (keine Doku -> volle Suite)
+!test_xplat20_werkzeuge_utf8.py    # eigene Wegwerf-Dateien im Temp-Ordner

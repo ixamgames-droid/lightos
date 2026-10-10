@@ -71,6 +71,7 @@
 | `crop_vc_widgets.py` | Cropper fuer die VC-Widget-Doku: schneidet aus EINEM Vollbild-Screenshot |
 | `fixture_herkunft.py` | QA-72 — was weiss die Bibliothek ueber die HERKUNFT ihrer Profile? |
 | `gallery_server.py` | DOC-11 Galerie-Render-Server (Dev-/Doku-Werkzeug). |
+| `geaenderte_dateien_klasse.py` | PROC-19 — aendert ein Zweig NUR Doku-/Verwaltungsdateien? Gibt ``doku`` oder ``voll`` aus. |
 | `gen_capabilities.py` | Erzeugt den Agenten-Vertrag aus dem Code: docs/CAPABILITIES.md + |
 | `gen_tools_index.py` | Generiert tools/README.md — Index aller Werkzeuge mit Zweck-Zeile. |
 | `gen_vc_gallery.py` | Erzeugt die eingebaute VC-Button-Grafik-Galerie (Bilder + animierte GIFs mit |
