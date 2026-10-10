@@ -54,6 +54,11 @@ Nach dem Start öffnet LightOS in der Sektion **Bühne**. Von oben nach unten:
    Nur einzelne Geräte oder Gruppen dunkel schaltet eine
    [Blackout-Taste mit Ziel](../anleitung_vc_widgets/01_button.md#blackout-mit-ziel-vcb-11)
    in der Virtual Console.
+   Direkt darüber, in der rechten Ecke der Menüleiste, sitzt der Knopf **LASER NOT-AUS**
+   (auch im Kiosk-Modus oben rechts; Tastenkürzel `Strg+Umschalt+L`): ein Klick schaltet
+   alle Laser sofort dunkel, ohne Rückfrage, und der Knopf blinkt dann als
+   **LASER NOT-AUS AKTIV**. Gelöst wird er nur bewusst — noch einmal klicken und die
+   Rückfrage bestätigen.
 7. **Befehlszeile** — für Tastatur-Befehle wie `1 thru 5 @ 80`. Beispiele stehen als
    Platzhaltertext im Feld.
 8. **Statusleiste** — links der Zustand des ENTTEC-Adapters (`Enttec: nicht gefunden`,
