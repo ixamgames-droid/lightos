@@ -54,6 +54,40 @@ def _nur_weiss_auswahl() -> bool:
         return False
 
 
+# LAS-22: DMX-Laser bewegen ihr Bild ueber ``laser_x``/``laser_y`` statt ueber
+# Pan/Tilt. Die Engine kann das seit LAS-23 (``EfxFixture.pan_attr``/
+# ``tilt_attr``), der Editor bot es nicht an. Laser zaehlen hier NUR, wenn sie
+# ausgewaehlt sind — nie im Rueckfall „alle Mover“ (``app_state.mover_fids``,
+# auch der VC-Pfad): ein per Taste gestarteter Kreis-EFX darf keinen Laser
+# mitschwenken, den niemand gewaehlt hat.
+LASER_ACHSEN = ("laser_x", "laser_y")
+
+
+def laser_achsen_attrs(attrs) -> tuple[str, str] | None:
+    """``(pan_attr, tilt_attr)`` fuer ein Geraet mit diesen Kanal-Attributen,
+    wenn es ein Laser-Bild ueber X/Y bewegt — sonst ``None``. Ein Geraet mit
+    echtem Pan UND Tilt bleibt ein Mover (Pan/Tilt hat Vorrang)."""
+    basis = {(a or "").partition("#")[0] for a in attrs}
+    if "pan" in basis and "tilt" in basis:
+        return None
+    if basis & set(LASER_ACHSEN):
+        return LASER_ACHSEN
+    return None
+
+
+def _laser_achsen_fuer_fid(fid) -> tuple[str, str] | None:
+    try:
+        from src.core.app_state import get_state, get_channels_for_patched
+        fx = next((f for f in get_state().get_patched_fixtures()
+                   if int(f.fid) == int(fid)), None)
+        if fx is None:
+            return None
+        return laser_achsen_attrs(
+            getattr(ch, "attribute", "") for ch in get_channels_for_patched(fx))
+    except Exception:
+        return None
+
+
 # Geraete-Verhaeltnis: (engine-key, deutsches Label) — Reihenfolge = Combo-Reihenfolge.
 PHASE_MODE_LABELS = [
     ("sync",   "Synchron (alle Köpfe gleich)"),
@@ -706,11 +740,15 @@ class EfxView(QWidget):
                     hs = heads_for(fid)
                 except Exception:
                     hs = None
+            # LAS-22: Laser bewegen laser_x/laser_y statt pan/tilt.
+            achsen = _laser_achsen_fuer_fid(fid)
+            extra = ({"pan_attr": achsen[0], "tilt_attr": achsen[1]}
+                     if achsen else {})
             if hs:
                 for h in sorted(hs):
-                    out.append(EfxFixture(fid=int(fid), head=int(h)))
+                    out.append(EfxFixture(fid=int(fid), head=int(h), **extra))
             else:
-                out.append(EfxFixture(fid=int(fid)))
+                out.append(EfxFixture(fid=int(fid), **extra))
         return out
 
     @staticmethod
@@ -1668,6 +1706,7 @@ class EfxView(QWidget):
             patched = {f.fid: f for f in state.get_patched_fixtures()}
             movers = []
             spiders = 0
+            laser = 0
             for fid in fids:
                 fx = patched.get(fid)
                 if fx is None:
@@ -1681,6 +1720,10 @@ class EfxView(QWidget):
                 elif is_dual_tilt_fixture(fx):
                     movers.append(fid)
                     spiders += 1
+                elif laser_achsen_attrs(attrs):
+                    # LAS-22: Laser-Bild ueber laser_x/laser_y.
+                    movers.append(fid)
+                    laser += 1
             self._current.fixtures = self._targets_for(movers)
             self._fx_list.clear()
             _kopf = _head_beschriftung()
@@ -1690,6 +1733,9 @@ class EfxView(QWidget):
                 title = "Geräte: keine beweglichen Geräte in der Auswahl"
             elif spiders == len(movers):
                 title = f"Geräte: {len(movers)} Spider (folgen der Auswahl)"
+            elif laser == len(movers):
+                title = (f"Geräte: {len(movers)} Laser — bewegt X/Y "
+                         "(folgen der Auswahl)")
             else:
                 title = f"Geräte: {len(movers)} Gerät(e) (folgen der Auswahl)"
             self._fx_box.setTitle(title)
@@ -2184,7 +2230,13 @@ class EfxView(QWidget):
             sel = [int(f) for f in get_state().get_selected_fids()]
         except Exception:
             sel = []
-        return self._patched_movers(sel) if sel else []
+        if not sel:
+            return []
+        # LAS-22: ausgewaehlte Laser mit X/Y-Kanaelen zaehlen mit (Reihenfolge
+        # der Auswahl bleibt) — nur hier, nicht im Rueckfall „alle Mover“.
+        movers = set(self._patched_movers(sel))
+        return [f for f in sel
+                if f in movers or _laser_achsen_fuer_fid(f) is not None]
 
     def _auto_assign_if_empty(self, allow_all: bool = True) -> int:
         """Weist der aktiven EFX bewegliche Geraete zu, falls ihre Liste leer ist:

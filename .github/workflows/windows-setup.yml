@@ -63,6 +63,14 @@ jobs:
             Write-Host "::warning::Tag $env:GITHUB_REF_NAME passt nicht zu APP_VERSION $v"
           }
 
+      # STAB-33: Commit + Datum ins Bundle (build_info.json). Im gepackten Build
+      # gibt es kein .git — ohne diese Datei meldet das Diagnosepaket
+      # "Commit: unbekannt". Liest GITHUB_SHA/GITHUB_REF_NAME/GITHUB_RUN_ID;
+      # der --selbsttest unten schlaegt fehl, wenn sie im Bundle fehlt.
+      - name: Build-Info schreiben (Commit ins Bundle)
+        shell: pwsh
+        run: python packaging/windows/build_info.py
+
       - name: PyInstaller-Build (onedir)
         shell: pwsh
         run: python -m PyInstaller --noconfirm --clean packaging/windows/LightOS.spec
