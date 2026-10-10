@@ -59,6 +59,7 @@
 | UI-86 | A | perf/ui86-2d-ansicht-hidpi | 2026-10-10T14:39Z | - |
 | QA-91 | D | fix/qa91-doc60-test-encoding | 2026-10-10T15:48Z | - |
 | VCB-36 | D | - | 2026-10-10T18:00Z | - |
+| UI-78 | D | - | 2026-10-10T18:00Z | - |
 
 ## Blocker & Fallen
 
@@ -182,7 +183,6 @@
 
 ## Verlauf
 
-- 2026-10-10T12:55Z B claim VIZ-99
 - 2026-10-10T12:55Z B claim XPLAT-51
 - 2026-10-10T12:55Z B claim XPLAT-52
 - 2026-10-10T12:55Z B claim UI-86
@@ -212,3 +212,4 @@
 - 2026-10-10T17:17Z A done STAB-33
 - 2026-10-10T17:40Z A done UI-85
 - 2026-10-10T18:00Z D claim VCB-36
+- 2026-10-10T18:00Z D claim UI-78
