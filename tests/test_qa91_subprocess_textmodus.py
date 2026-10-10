@@ -37,8 +37,19 @@ FUNKTIONEN = {"run", "check_output", "check_call", "call", "Popen",
               "getoutput", "getstatusoutput"}
 
 
+#: Fehlerbehandlungen, die nie werfen UND nichts verschweigen: das fremde Byte
+#: bleibt als Ersatzzeichen bzw. ``\xNN`` sichtbar. (``ignore`` wirft auch
+#: nicht, laesst das Zeichen aber spurlos verschwinden.)
+ERLAUBTE_ERRORS = {"replace", "backslashreplace"}
+
+
 def _wahr(node: ast.AST | None) -> bool:
     return isinstance(node, ast.Constant) and node.value is True
+
+
+def _ist_utf8(node: ast.AST) -> bool:
+    return (isinstance(node, ast.Constant) and isinstance(node.value, str)
+            and node.value.lower().replace("-", "").replace("_", "") == "utf8")
 
 
 def subprocess_aufrufe(baum: ast.AST):
@@ -76,18 +87,30 @@ def _baum(quelle: str) -> ast.AST:
 
 def textmodus_ohne_kodierung(quelle: str) -> list[tuple[int, str]]:
     """``[(Zeile, Grund)]`` fuer jeden ``subprocess``-Aufruf, der im Textmodus
-    liest oder schreibt, ohne Kodierung UND Fehlerbehandlung festzulegen."""
+    liest oder schreibt, ohne Kodierung UND Fehlerbehandlung festzulegen.
+
+    Geprueft werden die WERTE, nicht nur die Schluesselwoerter (Codex-Review
+    #1013): ``encoding=None, errors=None`` oder ``encoding="cp1252",
+    errors="strict"`` tragen beide Woerter und dekodieren trotzdem mit der
+    Locale bzw. werfen. Ein Wert, der erst zur Laufzeit feststeht (Variable),
+    ist ebenfalls ein Befund — der Waechter kann ihn nicht beurteilen."""
     befunde = []
     for node in subprocess_aufrufe(_baum(quelle)):
         kw = {k.arg: k.value for k in node.keywords if k.arg}
         textmodus = (_wahr(kw.get("text")) or _wahr(kw.get("universal_newlines"))
-                     or "encoding" in kw)
+                     or "encoding" in kw or "errors" in kw)
         if not textmodus:
             continue
         if "encoding" not in kw:
             befunde.append((node.lineno, "Textmodus ohne encoding"))
+        elif not _ist_utf8(kw["encoding"]):
+            befunde.append((node.lineno, "encoding ist nicht utf-8"))
         elif "errors" not in kw:
             befunde.append((node.lineno, "encoding ohne errors"))
+        else:
+            e = kw["errors"]
+            if not (isinstance(e, ast.Constant) and e.value in ERLAUBTE_ERRORS):
+                befunde.append((node.lineno, "errors ist nicht replace"))
     return befunde
 
 
@@ -137,6 +160,22 @@ class MusterTest(unittest.TestCase):
             'run(c, text=True)': "Textmodus ohne encoding",
             'subprocess.run(c, text=True, encoding="utf-8")': "encoding ohne errors",
             'subprocess.run(c, encoding="utf-8")': "encoding ohne errors",
+            # Beide Woerter da, aber mit Werten, die nichts sichern (Codex #1013).
+            'subprocess.run(c, text=True, encoding=None, errors=None)':
+                "encoding ist nicht utf-8",
+            'subprocess.run(c, text=True, encoding="cp1252", errors="strict")':
+                "encoding ist nicht utf-8",
+            'subprocess.run(c, text=True, encoding=kodierung, errors="replace")':
+                "encoding ist nicht utf-8",
+            'subprocess.run(c, text=True, encoding="utf-8", errors="strict")':
+                "errors ist nicht replace",
+            'subprocess.run(c, text=True, encoding="utf-8", errors=None)':
+                "errors ist nicht replace",
+            'subprocess.run(c, text=True, encoding="utf-8", errors="ignore")':
+                "errors ist nicht replace",
+            'subprocess.run(c, text=True, encoding="utf-8", errors=fehler)':
+                "errors ist nicht replace",
+            'subprocess.run(c, errors="replace")': "Textmodus ohne encoding",
         }
         kopf = "import subprocess\nfrom subprocess import run\n"
         for quelle, grund in faelle.items():
@@ -148,6 +187,8 @@ class MusterTest(unittest.TestCase):
                 'subprocess.run(c, text=False)',
                 'subprocess.run(c, text=True, encoding="utf-8", errors="replace")',
                 'subprocess.Popen(c, encoding="utf-8", errors="replace")',
+                'subprocess.run(c, text=True, encoding="UTF-8", errors="replace")',
+                'subprocess.run(c, text=True, encoding="utf8", errors="backslashreplace")',
                 'etwas.run(c, text=True)',                                      # kein subprocess
                 'mock.call(pfad, "w", encoding="utf-8")',
         ):
