@@ -43,6 +43,93 @@ export const GOBO_MAX_LICHTWINKEL = 1.35;
  *  die Motiv-Teile am Rand ab (VIZ-92). */
 export const GOBO_HALBSCHATTEN = 0.05;
 
+// ── VIZ-96 B3: Uebergaenge und Angleichung ──────────────────────────────────
+/** Dauer EINER Blende (ms): Projektion aus- bzw. einblenden. Wechselt ein
+ *  Pool-Licht den Besitzer, laufen zwei nacheinander (alter Halter aus, neuer
+ *  ein) — ein Licht kann nur ein Motiv tragen. */
+export const GOBO_BLENDE_MS = 180;
+/** Laengster Zeitschritt einer Blende (ms). Bilder entstehen nur auf
+ *  Anforderung; nach einer Pause darf der erste Schritt die Blende nicht
+ *  ueberspringen. Und beim Umzug eines Lichts entstehen die Shadow-Maps neu —
+ *  das Bild dauert dann laenger (am Bildschirm gemessen: ein Schritt trug ein
+ *  Drittel des ganzen Wechsels). Mit 50 ms traegt kein Bild mehr als gut ein
+ *  Viertel; bei niedriger Bildrate dauert die Blende dafuer etwas laenger. */
+export const GOBO_BLENDE_SCHRITT_MAX_MS = 50;
+/** Ein Geraet, das gerade projiziert, zaehlt bei der Pool-Vergabe um diesen
+ *  Faktor heller (zusaetzlich zur Pool-Hysterese): ein Wechsel kostet hier
+ *  eine sichtbare Blende, er soll nicht an einer knappen Helligkeits-Differenz
+ *  haengen. */
+export const GOBO_HALTE_BONUS = 1.2;
+/** Helligkeit des flachen Rueckfall-Musters, solange die Projektion aktiv ist
+ *  (Stufen Hoch/Maximal). Die Projektion ist echtes Licht (Flaechenfarbe x
+ *  Licht), das flache Muster eine additive Scheibe — am Bildschirm gemessen
+ *  war die Scheibe bei gleichem Dimmer deutlich heller (Sichtpruefung B2).
+ *  Angeglichen wird die SCHEIBE: die Projektion teilt sich die Lichtstaerke mit
+ *  allen offenen Strahlen (VIZ-91-Abstimmung), ein Faktor dort haette Gobo-
+ *  Strahlen gegen offene verschoben; und dunkler brennt nichts aus. */
+export const GOBO_FLACH_HELL = 0.8;
+/** Buehnen-Elemente bis zu dieser mittleren Kantenlaenge (m) koennen fuer ein
+ *  Gobo-Muster "schmal" sein (Traverse, Stuetze, kleines Podest). */
+export const GOBO_SCHMAL_MAX = 1.2;
+/** So weit (m) unter der Flaeche, auf der der Kegel endet, endet auch die
+ *  Projektion. Die Luft faengt den Versatz der Schattenmatrix waehrend einer
+ *  Kopfbewegung ab (sie ist hoechstens ein Bild alt). */
+export const GOBO_GRENZE_LUFT = 0.25;
+
+/** Ein Zeitschritt der Blende: `anteil` (0..1) laeuft linear auf `ziel`. */
+export function goboBlendeSchritt(anteil, ziel, dtMs, dauerMs = GOBO_BLENDE_MS) {
+  const a = (typeof anteil === 'number' && isFinite(anteil)) ? Math.max(0, Math.min(1, anteil)) : 0;
+  const z = ziel > 0.5 ? 1 : 0;
+  if (!(dauerMs > 0)) return z;
+  const dt = Math.max(0, Math.min(GOBO_BLENDE_SCHRITT_MAX_MS, dtMs || 0));
+  const schritt = dt / dauerMs;
+  if (z > a) return Math.min(1, a + schritt);
+  return z < a ? Math.max(0, a - schritt) : a;
+}
+
+/** Deckkraft der flachen Scheibe: `basis` (aus Dimmer), angeglichen an die
+ *  Projektion und mit dem Anteil des flachen Musters (1 = nur flach). Anteil 0
+ *  laesst die Deckkraft stehen — die Scheibe ist dann ueber ihre Ebenen-Maske
+ *  ausgeblendet, und "Deckkraft > 0" bleibt das Mass fuer "leuchtet". */
+export function goboFlachDeckkraft(basis, anteil) {
+  const a = (typeof anteil === 'number' && isFinite(anteil)) ? Math.max(0, Math.min(1, anteil)) : 1;
+  return basis * GOBO_FLACH_HELL * (a > 0 ? a : 1);
+}
+
+/** Ist ein Buehnen-Element fuer ein Muster mit `durchmesser` (m, Kegelrand)
+ *  zu schmal, um es zu tragen? Massgeblich ist die MITTLERE Kantenlaenge:
+ *  Traverse 2,4 x 0,3 x 0,3 -> 0,3 (schmal), Wand 10 x 6 x 0,2 -> 6,
+ *  Buehnenplatte 8 x 1 x 5 -> 5 (beide Ziel). */
+export function goboSchmal(groesse, durchmesser) {
+  if (!groesse || !(durchmesser > 0)) return false;
+  const k = [Math.abs(groesse.x), Math.abs(groesse.y), Math.abs(groesse.z)];
+  if (!k.every(v => typeof v === 'number' && isFinite(v))) return false;
+  k.sort((a, b) => a - b);
+  return k[1] < Math.min(GOBO_SCHMAL_MAX, durchmesser);
+}
+
+/** Grenzebene der Projektion in den Koordinaten des Schattenlichts.
+ *
+ *  Welt-Ebene y >= `y` - GOBO_GRENZE_LUFT, als Zeilenvektor n = (0, 1, 0, -y').
+ *  Der Shader kennt nur `vSpotShadowCoord = M * welt`; n * welt ist dort
+ *  (n * M^-1) * vSpotShadowCoord — exakt, ohne perspektivische Division.
+ *
+ *  @param minv  Elemente der INVERSEN Schattenmatrix (spaltenweise, wie three)
+ *  @returns [a, b, c, d], auf den groessten Betrag normiert
+ */
+export function goboEbene(minv, y) {
+  const g = y - GOBO_GRENZE_LUFT;
+  const out = [0, 0, 0, 0];
+  let m = 0;
+  for (let j = 0; j < 4; j++) {
+    out[j] = minv[j * 4 + 1] - g * minv[j * 4 + 3];
+    m = Math.max(m, Math.abs(out[j]));
+  }
+  if (!(m > 0) || !isFinite(m)) return [0, 0, 0, 1];
+  for (let j = 0; j < 4; j++) out[j] /= m;
+  return out;
+}
+
 // ── Shader-Patch ────────────────────────────────────────────────────────────
 // Anker: die Schatten-Zeile des SPOT-Blocks in `lights_fragment_begin` (r128).
 // Sie steht innerhalb von
@@ -67,6 +154,7 @@ export const GOBO_GLSL_MASKE = [
   '\t\t\tfloat lightosGnr = floor( lightosGp.w + 0.5 );',
   '\t\t\tvec2 lightosGk = vec2( mod( lightosGnr, ' + GOBO_ATLAS_SPALTEN + '.0 ), floor( lightosGnr / ' + GOBO_ATLAS_SPALTEN + '.0 ) );',
   '\t\t\tfloat lightosGm = texture2D( lightosGoboMap, ( lightosGk + clamp( lightosGd, 0.002, 0.998 ) ) / vec2( ' + GOBO_ATLAS_SPALTEN + '.0, ' + GOBO_ATLAS_ZEILEN + '.0 ) ).r * lightosGin;',
+  '\t\t\tlightosGm *= step( 0.0, dot( lightosGoboEbene[ i ], vSpotShadowCoord[ i ] ) );',
   '\t\t\tdirectLight.color *= mix( 1.0, lightosGm, lightosGp.x );',
   '\t\t}',
 ].join('\n');
@@ -75,6 +163,7 @@ export const GOBO_GLSL_KOPF = [
   '#if defined( USE_SHADOWMAP ) && NUM_SPOT_LIGHT_SHADOWS > 0',
   'uniform sampler2D lightosGoboMap;',
   'uniform vec4 lightosGoboParam[ NUM_SPOT_LIGHT_SHADOWS ];',
+  'uniform vec4 lightosGoboEbene[ NUM_SPOT_LIGHT_SHADOWS ];',
   '#endif',
   '',
 ].join('\n');
@@ -187,6 +276,9 @@ let _chunk = null;
 const _uniforms = {
   lightosGoboMap: { value: null },
   lightosGoboParam: { value: [] },
+  // B3: Grenzebene je Schatten-Licht; (0, 0, 0, 1) = keine Grenze (w > 0 vor
+  // dem Licht).
+  lightosGoboEbene: { value: [] },
 };
 
 // EINE Funktion fuer alle Materialien: three nimmt `onBeforeCompile.toString()`
@@ -197,6 +289,7 @@ function lightosGoboHook(shader) {
   shader.fragmentShader = fs;
   shader.uniforms.lightosGoboMap = _uniforms.lightosGoboMap;
   shader.uniforms.lightosGoboParam = _uniforms.lightosGoboParam;
+  shader.uniforms.lightosGoboEbene = _uniforms.lightosGoboEbene;
   _gepatcht += 1;
 }
 
@@ -220,6 +313,9 @@ export function installGoboProjektion(opt) {
   const werte = [];
   for (let i = 0; i < GOBO_MAX_LICHTER; i++) werte.push(new o.Vector4(0, 1, 0, 0));
   _uniforms.lightosGoboParam.value = werte;
+  const ebenen = [];
+  for (let i = 0; i < GOBO_MAX_LICHTER; i++) ebenen.push(new o.Vector4(0, 0, 0, 1));
+  _uniforms.lightosGoboEbene.value = ebenen;
   for (const klasse of o.materialKlassen) klasse.prototype.onBeforeCompile = lightosGoboHook;
   _aktiv = true;
   return true;
@@ -247,6 +343,17 @@ export function setzeGoboLicht(i, an, cs, sn, kachel) {
 export function loescheGoboLicht(i) {
   const v = _uniforms.lightosGoboParam.value[i];
   if (v && v.x !== 0) v.set(0, 1, 0, 0);
+  setzeGoboEbene(i, null);
+}
+
+/** B3: Grenzebene des Schatten-Lichts `i` (Ergebnis von goboEbene); null =
+ *  keine Grenze. */
+export function setzeGoboEbene(i, e) {
+  const v = _uniforms.lightosGoboEbene.value[i];
+  if (!v) return false;
+  if (e) v.set(e[0], e[1], e[2], e[3]);
+  else if (v.w !== 1 || v.x !== 0 || v.y !== 0 || v.z !== 0) v.set(0, 0, 0, 1);
+  return true;
 }
 
 /** Test-/Diagnose-Seam. */
@@ -259,5 +366,6 @@ export function goboProjektionInfo() {
     zeilen: GOBO_ATLAS_ZEILEN,
     index: Object.assign({}, _index),
     param: _uniforms.lightosGoboParam.value.map(v => [v.x, v.y, v.z, v.w]),
+    ebene: _uniforms.lightosGoboEbene.value.map(v => [v.x, v.y, v.z, v.w]),
   };
 }
