@@ -45,7 +45,7 @@
 | STAB-32 | A | feature/stab32-versionierte-sicherungen | 2026-10-10T09:29Z | - |
 | OUT-67 | A | feature/out67-ausgabe-ausfall-banner | 2026-10-10T09:29Z | - |
 | TOOL-14 | D | fix/tool14-gen-tools-index-argparse | 2026-10-10T13:36Z | tools/gen_tools_index.py · tests/test_tool14_gen_tools_index_cli.py |
-| TOOL-21 | D | fix/tool21-gif-vergleich-rgb | 2026-10-10T11:42Z | tools/anleitungsbilder/runner.py · tests/test_tool21_bildvergleich_je_kanal.py |
+| TOOL-21 | D | fix/tool21-gif-vergleich-rgb | 2026-10-10T13:36Z | tools/anleitungsbilder/runner.py · tests/test_tool21_bildvergleich_je_kanal.py |
 | TOOL-23 | D | fix/tool23-backlog-ids-tafel-fragmente | 2026-10-10T11:42Z | tools/backlog_ids.py · tests/test_tool23_backlog_ids_tafel_fragmente.py · tests/test_backlog_ids.py |
 | TOOL-24 | D | fix/tool24-proc18-lizenzhinweise-strukturiert | 2026-10-10T11:42Z | tests/test_proc18_fremd_lizenzhinweise.py |
 | FM-66 | D | fix/fm66-abgleich-modellname | 2026-10-10T11:42Z | src/core/database/bibliothek_format.py · tests/test_fm66_abgleich_modellname.py · docs/FIXTURE_LIBRARY.md |
