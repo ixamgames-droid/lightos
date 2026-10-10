@@ -11,6 +11,27 @@ from ..debug_log import debug_swallow
 TICK = 0.02  # 50 Hz Fade-Update
 
 
+def fade_uhr() -> float:
+    """Zeitquelle des Fade-Fortschritts (QA-89) — hochaufloesend auf allen Plattformen.
+
+    ``time.monotonic()`` ist unter Windows ``GetTickCount64()`` mit 15,625 ms
+    Aufloesung: ein Fade rueckte nur in diesen Schritten vor, und der 44-Hz-
+    Ausgang (22,7 ms) sah abwechselnd einen und zwei Schritte — ein ungleich-
+    maessiger Verlauf. Eine Cue mit Fade 0 (intern 1 ms) blieb nach GO bis zum
+    naechsten Tick dunkel; ``test_ui68_go_ohne_executor`` wartete 10 ms und
+    wackelte deshalb unter Windows (vorher 8 von 10 Laeufen rot, 2026-10-08).
+    ``time.perf_counter()`` ist dort QueryPerformanceCounter (100 ns), unter
+    Linux dieselbe Uhr wie ``monotonic``.
+
+    ⚠️ Nur fuer ``FadeState`` selbst: ``start_time`` und der Fortschritt muessen
+    von DERSELBEN Uhr kommen (``perf_counter`` und ``monotonic`` haben
+    verschiedene Nullpunkte). Von aussen kommen nur Dauern hinein
+    (``shift_clock``), und die sind uhrunabhaengig. Tests ersetzen diese
+    Funktion gezielt, statt ``time.monotonic`` prozessweit zu verbiegen.
+    """
+    return time.perf_counter()
+
+
 class FadeState:
     """Laufender Fade zwischen zwei Cue-Zuständen."""
 
@@ -25,7 +46,7 @@ class FadeState:
         # F-6: optionale Pro-Attribut-Verzögerung {fid: {attr: extra_delay_s}};
         # leer = ein gemeinsamer Fortschritt für die ganze Cue (bisheriges Verhalten).
         self.attr_delays = attr_delays or {}
-        self.start_time = time.monotonic()
+        self.start_time = fade_uhr()      # QA-89: nicht monotonic (Windows-Raster)
         self.done = False
         # Manueller Crossfade: wenn aktiv, treibt manual_pos (0..1) den Uebergang
         # statt der verstrichenen Zeit (Fader scrubbt von Hand).
@@ -36,7 +57,7 @@ class FadeState:
         """Roher Fortschritt 0..1 (oder -1 = noch in der Delay-Phase)."""
         if self.manual:
             return max(0.0, min(1.0, self.manual_pos))
-        elapsed = time.monotonic() - self.start_time - self.delay
+        elapsed = fade_uhr() - self.start_time - self.delay
         if elapsed < 0:
             return -1.0
         return min(1.0, elapsed / self.duration)
@@ -91,7 +112,7 @@ class FadeState:
         """F-6: Blend mit eigener, um ``attr_delays`` verschobener Zeitachse je
         Attribut. ``done`` erst, wenn auch das am längsten verzögerte Attribut fertig
         ist. Attribute ohne Eintrag verhalten sich exakt wie im Normalpfad."""
-        base = time.monotonic() - self.start_time - self.delay
+        base = fade_uhr() - self.start_time - self.delay
         max_extra = 0.0
         result: dict[int, dict[str, int]] = {}
         all_fids = set(self.from_vals) | set(self.to_vals)
@@ -352,7 +373,8 @@ class CueStack:
     def shift_clock(self, seconds: float) -> None:
         """Laufenden Cue-Fade um ``seconds`` weiterschieben (Freeze-Auftauen).
 
-        ``FadeState`` misst seinen Fortschritt gegen ``time.monotonic()``; ohne
+        ``FadeState`` misst seinen Fortschritt gegen ``fade_uhr()`` (QA-89;
+        ``seconds`` ist eine Dauer und damit uhrunabhaengig); ohne
         das Verschieben waere ein 3-Sekunden-Fade nach einem 10-Sekunden-Freeze
         beim Auftauen sofort fertig, statt dort weiterzumachen, wo er stand.
         Ein von Hand gescrubbter Fade (``manual``) haengt an der Faderposition,

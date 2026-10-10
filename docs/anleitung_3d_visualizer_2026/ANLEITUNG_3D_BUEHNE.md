@@ -170,7 +170,7 @@ und schwenkst/zoomst mit zwei.
 ![Reiter Einstellungen: Render-Qualität, Szenen-Helligkeit und Strahl-Optionen](img/05_einstellungen.png)
 
 1. **Render-Qualität — Stufe:** „Automatisch (empfohlen)" prüft beim Start die
-   Grafikkarte und wählt passend; „Hoch (Desktop-GPU)", „Niedrig (schwache/mobile
+   Grafikkarte (Name, sonst eine kurze Start-Messung) und wählt passend; „Hoch (Desktop-GPU)", „Niedrig (schwache/mobile
    GPU)" bzw. „Maximal (starke Desktop-GPU)" überschreiben das — Details und Tabelle in
    [Qualitätsstufe](#qualitätsstufe-tab-einstellungen--render-qualität). Niedrig rechnet ohne Kantenglättung, mit weniger Auflösung,
    Schatten und Kegeldetail — flüssiger auf schwachen Chips. Die Wahl gilt für diesen
@@ -319,6 +319,18 @@ Kegel, Bodenflecken und Linsen zeigen alle Geräte auf jeder Stufe.
 
 - **Automatisch (empfohlen)** prüft beim Start die Grafikkarte und wählt
   **Niedrig** oder **Hoch**. **Maximal** wählt die Automatik nie — nur von Hand.
+  Entschieden wird zuerst am **Namen der Grafikkarte**, den der Browser meldet:
+  eine eigene Grafikkarte (GeForce, Radeon RX, Arc, Apple M …) ergibt **Hoch**,
+  Software-Darstellung, Handy-Grafik, Intel HD/UHD und Einstiegskarten ergeben
+  **Niedrig**. Sagt der Name nichts Eindeutiges (z. B. Grafik im Prozessor,
+  Snapdragon X oder ein verborgener Name), misst die Ansicht beim Start kurz,
+  wie schnell die Grafik zeichnet (**Start-Messung**), und stuft danach ein.
+  Erst wenn auch das nicht geht, zählt die alte Faustregel (Anzahl der
+  Textur-Einheiten). Passt die Wahl nicht, die Stufe von Hand einstellen.
+- **Bildschirmtakt:** ob die Grafikkarte „nicht nachkommt“, misst die Ansicht
+  gegen die Bildwiederholrate des Bildschirms, auf dem das Fenster gerade
+  liegt. Wird das 3D-Fenster auf einen anderen Bildschirm geschoben (etwa einen
+  Fernseher mit 30 Hz), übernimmt es dessen Takt sofort.
 - **Lichtupdates** heißt: so oft pro Sekunde kommen Farbe, Dimmer und Pan/Tilt
   in der 3D-Ansicht an. 44 entspricht der DMX-Ausgabe selbst; schneller gibt es
   nichts Neues. Ein Blackout ist auch auf Niedrig sofort dunkel — es kommen nur

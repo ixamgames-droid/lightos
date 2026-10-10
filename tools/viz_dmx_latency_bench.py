@@ -69,7 +69,7 @@ def _pumpen(app, sekunden: float) -> None:
 
 def spike(repo: str, dauer: float) -> None:
     app = _qt(repo)
-    from PySide6.QtCore import QTimer
+    from PySide6.QtCore import QTimer, Qt
     from src.ui.visualizer.visualizer_view import Visualizer3DView
     v = Visualizer3DView()
     v.resize(800, 600)
@@ -95,6 +95,7 @@ def spike(repo: str, dauer: float) -> None:
             lambda r, n=n: zurueck.__setitem__(n, (time.perf_counter(), r)))
 
     takt = QTimer()
+    takt.setTimerType(Qt.TimerType.PreciseTimer)   # VIZ-86: Windows-Raster
     takt.timeout.connect(feuern)
     takt.start(33)
     _pumpen(app, dauer)
@@ -114,7 +115,7 @@ def messen(repo: str, show: str, dauer: float) -> None:
     kopie = os.path.join(tmp, os.path.basename(show))
     shutil.copy(os.path.abspath(show), kopie)
     app = _qt(repo)
-    from PySide6.QtCore import QTimer
+    from PySide6.QtCore import QTimer, Qt
     from src.core.app_state import get_state, get_channels_for_patched
     from src.core.show.show_file import load_show
     from src.core.stage.stage_definition import resolve_active_stage
@@ -233,6 +234,7 @@ def messen(repo: str, show: str, dauer: float) -> None:
         k0 = schritt["n"]
         tick_ms.clear()
         w = QTimer()
+        w.setTimerType(Qt.TimerType.PreciseTimer)      # VIZ-86: Windows-Raster
         if szene != "leerlauf":
             w.timeout.connect(lambda: schreiben(szene))
             w.start(23)                  # ~44 Hz wie der DMX-Ausgang
