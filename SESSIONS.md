@@ -56,7 +56,6 @@
 | PROC-20 | A | feature/proc20-backlog-fragmente | 2026-10-10T11:47Z | tools · BACKLOG.md |
 | TOOL-26 | B | feature/tool26-app-messwerkzeug | 2026-10-10T13:25Z | tools/app_messung.py · tools/README.md · tests/test_tool26_app_messung.py · BACKLOG.md · changelog.d/2026-10-10-TOOL-26.md |
 | VIZ-99 | B | fix/viz99-automatik-snapdragon | 2026-10-10T14:09Z | src/ui/visualizer/scene_src/scene/gpu_tier.js · tests/test_viz84_gpu_tier.py · tests/test_viz99_automatik_snapdragon.py · src/ui/visualizer/visualizer_window.py · BACKLOG.md · changelog.d/2026-10-10-VIZ-99.md |
-| XPLAT-52 | B | fix/xplat52-installer-venv-arch | 2026-10-10T12:55Z | - |
 | UI-86 | B | fix/ui86-liveansicht-200-prozent | 2026-10-10T12:55Z | - |
 | LAS-31 | A | feature/las31-notaus-kopfleiste | 2026-10-10T13:08Z | - |
 | LAS-32 | A | feature/las32-laser-sperrzonen | 2026-10-10T13:08Z | - |
@@ -171,7 +170,6 @@
 
 ## Verlauf
 
-- 2026-10-10T10:47Z A done CDX-0810
 - 2026-10-10T10:47Z A aktualisiert LAS-30: Branch feature/viz95-lasermuster-3d -> feature/las30-laser-achsen; Dateien src/core -> src/core/laser
 - 2026-10-10T11:07Z D aktualisiert DOC-70: Dateien - -> docs/anleitung_netzwerk_windows/ANLEITUNG.md · docs/ANLEITUNGEN.md · tests/test_doc70_netzwerk_windows.py
 - 2026-10-10T11:10Z D aktualisiert TOOL-14: Branch - -> fix/tool14-gen-tools-index-argparse; Dateien - -> tools/gen_tools_index.py · tests/test_tool14_gen_tools_index_cli.py
@@ -201,3 +199,4 @@
 - 2026-10-10T13:27Z B aktualisiert VIZ-99: Dateien - -> src/ui/visualizer/scene_src/scene/gpu_tier.js · tests/test_viz84_gpu_tier.py · tests/test_viz99_automatik_snapdragon.py · src/ui/visualizer/visualizer_window.py · BACKLOG.md · changelog.d/2026-10-10-VIZ-99.md
 - 2026-10-10T13:55Z D done BPM-30
 - 2026-10-10T14:17Z B uebergeben XPLAT-51
+- 2026-10-10T14:17Z B uebergeben XPLAT-52
