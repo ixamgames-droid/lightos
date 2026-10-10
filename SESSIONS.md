@@ -54,7 +54,7 @@
 | TOOL-23 | D | - | 2026-10-10T09:41Z | - |
 | TOOL-24 | D | - | 2026-10-10T09:41Z | - |
 | FM-66 | D | - | 2026-10-10T09:41Z | - |
-| DOC-70 | D | docs/doc70-netzwerk-windows | 2026-10-10T09:41Z | - |
+| DOC-70 | D | docs/doc70-netzwerk-windows | 2026-10-10T11:07Z | docs/anleitung_netzwerk_windows/ANLEITUNG.md · docs/ANLEITUNGEN.md · tests/test_doc70_netzwerk_windows.py |
 | VIZ-98 | D | fix/viz98-bodenfleck-ueber-horizont | 2026-10-10T10:47Z | src/ui/visualizer/scene_src/fixtures/builders.js · src/ui/visualizer/scene_src/bridge/bridge.js · tests/test_viz98_bodenfleck_ohne_treffer_scene.py · tests/test_viz_beam_laenge.py |
 | STAB-33 | A | fix/stab33-diagnose-windows | 2026-10-10T10:17Z | src/core/diagnose_log.py · main.py |
 | FM-73 | A | fix/fm73-sync-gleichnamige-modi | 2026-10-10T10:36Z | - |
@@ -143,7 +143,6 @@
 
 ## Verlauf
 
-- 2026-10-10T09:28Z C uebergeben TOOL-10
 - 2026-10-10T09:28Z C uebergeben VCB-35
 - 2026-10-10T09:28Z C uebergeben WEB-06
 - 2026-10-10T09:28Z C uebergeben DOC-54
@@ -173,3 +172,4 @@
 - 2026-10-10T10:47Z D aktualisiert VIZ-98: Dateien src/ui/visualizer/scene_src/fixtures/builders.js -> src/ui/visualizer/scene_src/fixtures/builders.js · src/ui/visualizer/scene_src/bridge/bridge.js · tests/test_viz98_bodenfleck_ohne_treffer_scene.py · tests/test_viz_beam_laenge.py
 - 2026-10-10T10:47Z A done CDX-0810
 - 2026-10-10T10:47Z A aktualisiert LAS-30: Branch feature/viz95-lasermuster-3d -> feature/las30-laser-achsen; Dateien src/core -> src/core/laser
+- 2026-10-10T11:07Z D aktualisiert DOC-70: Dateien - -> docs/anleitung_netzwerk_windows/ANLEITUNG.md · docs/ANLEITUNGEN.md · tests/test_doc70_netzwerk_windows.py
