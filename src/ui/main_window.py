@@ -2,6 +2,7 @@
 from __future__ import annotations
 import os
 import json
+import time
 from src.core.paths import app_data_dir
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QLabel,
@@ -10,7 +11,9 @@ from PySide6.QtWidgets import (
     QMenu, QSlider, QInputDialog,
 )
 from PySide6.QtCore import Qt, QSize, QTimer, Signal
-from PySide6.QtGui import QAction, QKeySequence, QIcon, QPixmap, QColor, QPainter
+from PySide6.QtGui import (
+    QAction, QKeySequence, QIcon, QPixmap, QColor, QPainter, QShortcut,
+)
 from src.core.app_state import get_state
 from src.core.dmx.enttec_pro import find_enttec_port
 from src.ui.views.patch_view import PatchView
@@ -415,6 +418,10 @@ class MainWindow(QMainWindow):
     # UI-58: Blackout kann aus Fremd-Threads kommen (Web, OSC, MIDI) — wie beim
     # Grand-Master nur emittieren, der Slot laeuft im UI-Thread.
     _blackout_changed_sig = Signal(bool)
+    # LAS-31: der Laser-NOT-AUS wird auch aus Fremd-Threads ausgeloest (MIDI,
+    # OSC, Web) — der Abonnent emittiert nur, Statuszeile und Kopfleisten-
+    # Knopf werden im UI-Thread nachgefuehrt.
+    _laser_estop_sig = Signal()
     # Marshallt beliebige State-Event-Zustellungen aus Worker-Threads (MIDI/OSC/
     # Web/Audio) in den UI-Thread. AutoConnection => Cross-Thread-Emits werden
     # gequeued, Emits aus dem UI-Thread laufen direkt.
@@ -432,6 +439,7 @@ class MainWindow(QMainWindow):
         # unten emittiert nur noch, der Slot laeuft garantiert im UI-Thread.
         self._gm_changed_sig.connect(self._sync_header_gm)
         self._blackout_changed_sig.connect(self._sync_blackout_button)
+        self._laser_estop_sig.connect(self._on_laser_estop_ui)
         self._state.subscribe(self._on_state_event)
         self._visualizer_window = None
         self._current_show_path: str | None = None
@@ -460,6 +468,9 @@ class MainWindow(QMainWindow):
         # Fenster GC-unsichtbar fest (Fallenklasse STAB-09/10).
         self._hw_timer.timeout.connect(self._check_hardware)
         self._hw_timer.start()
+
+        # LAS-31: fester Laser-NOT-AUS oben rechts (im Kiosk eigener Streifen).
+        self._build_laser_notaus()
 
         # Kiosk-Modus: Menubar + Statusbar ausblenden, direkt zur Virtual Console
         if kiosk:
@@ -496,7 +507,8 @@ class MainWindow(QMainWindow):
             sync.subscribe(SyncEvent.REFRESH_ALL, lambda *_: self._refresh_foreign_badges())
             # UXT-09: Laser-NOT-AUS unmissverständlich bestätigen (egal woher
             # ausgelöst) — prominenter, nicht-blockierender Statuszeilen-Alarm.
-            sync.subscribe(SyncEvent.LASER_ESTOP, self._on_laser_estop)
+            # LAS-31: ueber ein Signal, weil MIDI/OSC aus ihrem Thread ausloesen.
+            sync.subscribe(SyncEvent.LASER_ESTOP, self._laser_estop_melden)
         except Exception as e:
             print(f"[main_window] sync subscribe error: {e}")
 
@@ -743,10 +755,23 @@ class MainWindow(QMainWindow):
 
         # Hilfe
         hm = mb.addMenu("&Hilfe")
-        hm.addAction("Über LightOS").triggered.connect(self._about)
+        # UI-85: Doku, Tastenkuerzel und die Ordner direkt aus der App.
+        from src.ui import hilfe
+        hm.addAction("Erste Schritte").triggered.connect(
+            lambda _=False: hilfe.oeffne_doku(hilfe.ERSTE_SCHRITTE))
+        hm.addAction("Anleitungen öffnen").triggered.connect(
+            lambda _=False: hilfe.oeffne_doku(hilfe.ANLEITUNGEN))
+        hm.addAction("Tastenkürzel…").triggered.connect(self._tastenkuerzel_zeigen)
+        hm.addSeparator()
+        hm.addAction("Datenordner öffnen").triggered.connect(
+            lambda _=False: hilfe.oeffne_ordner(hilfe.datenordner()))
+        hm.addAction("Show-Ordner öffnen").triggered.connect(
+            lambda _=False: hilfe.oeffne_ordner(hilfe.show_ordner()))
         # STAB-30: ein Paket fuer die Fernhilfe (Logs + Systeminfo, keine Shows).
         hm.addAction("Diagnosepaket speichern…").triggered.connect(
-            self._diagnosepaket_speichern)
+            lambda _=False: self._diagnosepaket_speichern())
+        hm.addSeparator()
+        hm.addAction("Über LightOS").triggered.connect(self._about)
 
     # ── UI aufbauen ───────────────────────────────────────────────────────────
 
@@ -1030,6 +1055,17 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
 
+        # OUT-67: Ausfall-/Probenbanner. Sitzt im Wurzel-Layout UEBER der
+        # Sektionsleiste — die wird im Kiosk-Modus ausgeblendet (wie Menue und
+        # Statusleiste), das Banner bleibt. Gefuellt wird es aus dem
+        # bestehenden Hardware-Takt (`_update_ausgabe_label`).
+        from src.ui.ausgabe_banner import AusgabeBannerSteuerung
+        self._ausgabe_banner = AusgabeBannerSteuerung(
+            kiosk=self._kiosk_mode, parent=central)
+        if not self._kiosk_mode:
+            # Im Kiosk-Modus gibt es bewusst keinen Weg in die Einstellungen.
+            self._ausgabe_banner.bei_stoerung_klick = self._open_output_config
+        root.addWidget(self._ausgabe_banner.widget)
         root.addWidget(self._section_bar)
 
         # ── Stacked Widget ─────────────────────────────────────────────────────
@@ -1108,7 +1144,7 @@ class MainWindow(QMainWindow):
 
         # Keyboard-Shortcuts fuer Sektionswechsel (Strg+1..8, eine je Sektion)
         for i, btn in enumerate(self._section_btns):
-            act = QAction(f"Sektion {i+1}", self)
+            act = QAction(f"Sektion {i+1}: {btn._full_text}", self)
             act.setShortcut(f"Ctrl+{i+1}")
             act.triggered.connect(weak_slot(self._switch_section, i))
             self.addAction(act)
@@ -1394,6 +1430,12 @@ class MainWindow(QMainWindow):
             probleme = om.sende_probleme()
         except Exception:
             return
+        # OUT-67: dieselbe Auskunft, laut — oben im Fenster, auch im Kiosk-
+        # Modus (dort ist die Statusleiste ausgeblendet). Kein zweiter Timer,
+        # keine zweite Abfrage: das Banner bekommt die eben gelesenen Wege.
+        banner = getattr(self, "_ausgabe_banner", None)
+        if banner is not None:
+            banner.aktualisiere(om, wege)
         # OUT-56: gepatchte Universen ohne jeden Adapter. `sendet_wirklich` ist
         # dieselbe Frage, die der DMX-Monitor stellt (OUT-52) — eine zweite
         # Antwort darauf soll es nicht geben.
@@ -1914,11 +1956,13 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self._visualizer_window = None
             print(f"[MainWindow] Visualizer start error: {e}")
+            # XPLAT-46: auf nativem ARM64-Python fehlt QtWebEngine - dort
+            # nennt die Meldung x64-Python als Abhilfe statt "neu installieren".
+            from src.core.plattform_hinweis import visualizer_startfehler_text
             QMessageBox.warning(
                 self,
                 "Visualizer nicht verfügbar",
-                "Der 3D-Visualizer konnte nicht gestartet werden.\n\n"
-                "Bitte prüfe, ob PySide6 + PySide6-Addons korrekt installiert sind."
+                visualizer_startfehler_text(e),
             )
 
     def _close_visualizer(self):
@@ -2634,15 +2678,35 @@ class MainWindow(QMainWindow):
 
     # ── About ─────────────────────────────────────────────────────────────────
 
+    def _about_text(self) -> str:
+        """UI-85: echte Version, Build-Art, Datenordner und Doku-Link."""
+        from src.ui import hilfe
+        return hilfe.ueber_text()
+
     def _about(self):
-        QMessageBox.about(
-            self, "Über LightOS",
-            "<b>LightOS v1.0</b><br>"
-            "Professionelle DMX-Lichtsteuerung<br><br>"
-            "Windows x64 &amp; ARM64<br>"
-            "Enttec Pro USB &middot; Art-Net 4 &middot; MIDI<br><br>"
-            "UI: QLC+ v5 Design System"
-        )
+        QMessageBox.about(self, "Über LightOS", self._about_text())
+
+    def _tastenkuerzel_dialog(self):
+        """UI-85: Dialog mit allen Kuerzeln — gesammelt aus den vorhandenen
+        QAction/QShortcut-Objekten dieses Fensters und der uebrigen offenen
+        Fenster (z. B. 3D-Visualizer), nicht von Hand gepflegt."""
+        from PySide6.QtWidgets import QApplication
+        from src.ui import hilfe
+        wurzeln = [self] + [w for w in QApplication.topLevelWidgets()
+                            if w is not self and w.isVisible()
+                            and not isinstance(w, hilfe.TastenkuerzelDialog)]
+        # Kuerzel aus einer Ansicht tragen den Namen ihrer Sektion als Bereich.
+        bereiche = {self._stack.widget(i): f"Sektion {btn._full_text}"
+                    for i, btn in enumerate(self._section_btns)
+                    if self._stack.widget(i) is not None}
+        bereiche[self] = hilfe.ALLGEMEIN   # Fenstertitel waere der Show-Name
+        return hilfe.TastenkuerzelDialog(
+            hilfe.sammle_tastenkuerzel(wurzeln, bereiche), self)
+
+    def _tastenkuerzel_zeigen(self):
+        dlg = self._tastenkuerzel_dialog()
+        dlg.exec()
+        dlg.deleteLater()
 
     def _diagnosepaket_speichern(self, ziel: str | None = None):
         """STAB-30: Hilfe → „Diagnosepaket speichern…“. Erklaert vorher, was im
@@ -2713,6 +2777,200 @@ class MainWindow(QMainWindow):
 
     # ── ISO-01/02: aktive Fremdwerte anzeigen + zentral leeren ─────────────────
 
+    # ── LAS-31: fester Laser-NOT-AUS in der Kopfleiste ─────────────────────────
+
+    _NOTAUS_KUERZEL = "Ctrl+Shift+L"
+    _NOTAUS_TEXT = "LASER NOT-AUS"
+    _NOTAUS_TEXT_AKTIV = "LASER NOT-AUS AKTIV"
+    _NOTAUS_STIL_BEREIT = (
+        "QPushButton{background:#5a0f0f; color:#ffffff; font-weight:bold;"
+        " font-size:11px; padding:2px 8px; border:2px solid #ff3030;"
+        " border-radius:3px;}"
+        "QPushButton:hover{background:#8a1515;}"
+        "QPushButton:pressed{background:#ff0000;}")
+    _NOTAUS_STIL_AKTIV = (
+        "QPushButton{background:#ff0000; color:#ffffff; font-weight:bold;"
+        " font-size:11px; padding:2px 8px; border:2px solid #ffffff;"
+        " border-radius:3px;}",
+        "QPushButton{background:#ffffff; color:#cc0000; font-weight:bold;"
+        " font-size:11px; padding:2px 8px; border:2px solid #ff0000;"
+        " border-radius:3px;}")
+    # Nach dem Ausloesen wird ein weiterer Klick so lange nicht als Wunsch zum
+    # Loesen gewertet — ein Doppelklick im Schreck oeffnet keine Rueckfrage.
+    _NOTAUS_SPERRE_S = 1.0
+
+    def _build_laser_notaus(self):
+        """Knopf oben rechts, Takt fuer Anzeige/Blinken, Tastenkuerzel.
+
+        Platz: die rechte Ecke der Menueleiste, direkt ueber BLACKOUT. In der
+        Sektionsleiste selbst ist kein Platz — sie ist bei 1440 px exakt voll
+        (UI-25: Sektions-Tabs zeigen dort gerade noch den vollen Titel), ein
+        weiterer Knopf kuerzte die Navigation. Im Kiosk-Modus sind Menue- und
+        Sektionsleiste ausgeblendet; dort bekommt der Knopf einen eigenen
+        schmalen Streifen ueber dem Inhalt.
+
+        Der Knopf fuehrt KEINEN eigenen Zustand: aktiv ist, was
+        ``AppState.laser_estop_active`` sagt. Er ist bewusst nie ausgegraut —
+        auch ein nicht als Laser erkanntes Geraet muss abschaltbar bleiben."""
+        btn = QPushButton(self._NOTAUS_TEXT)
+        btn.setObjectName("laserNotausBtn")
+        btn.setMinimumHeight(38 if getattr(self, "_touch_mode", False) else 22)
+        btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)   # nie per Leertaste/Enter
+        btn.setAutoRepeat(False)
+        # Breite fest auf den laengeren Aktiv-Text: die Menueleiste ordnet ihre
+        # Ecke bei einem Textwechsel nicht neu an („…NOT-AUS AK“ abgeschnitten),
+        # und der Knopf springt beim Ausloesen nicht.
+        btn.setStyleSheet(self._NOTAUS_STIL_AKTIV[0])
+        btn.setText(self._NOTAUS_TEXT_AKTIV)
+        btn.ensurePolished()
+        btn.setMinimumWidth(btn.sizeHint().width() + 6)
+        btn.setText(self._NOTAUS_TEXT)
+        btn.clicked.connect(self._on_notaus_clicked)
+        self._btn_laser_notaus = btn
+        self._notaus_sperre_bis = 0.0
+        self._notaus_blink = 0
+        self._notaus_tip = None
+        if getattr(self, "_kiosk_mode", False):
+            self._notaus_in_kioskleiste()
+        else:
+            # In einem Rahmen: die Menueleiste teilt der Ecke die Breite nach
+            # sizeHint() zu — der des Knopfs folgt dem (kuerzeren) Ruhetext, der
+            # des Rahmen-Layouts beachtet die Mindestbreite.
+            ecke = QWidget(self.menuBar())
+            ecke.setObjectName("notausEcke")
+            self._notaus_ecke = ecke        # Referenz halten (sonst raeumt PySide ab)
+            lay = QHBoxLayout(ecke)
+            lay.setContentsMargins(0, 0, 0, 0)
+            lay.addWidget(btn)
+            self.menuBar().setCornerWidget(ecke, Qt.Corner.TopRightCorner)
+            ecke.show()
+
+        sc = QShortcut(QKeySequence(self._NOTAUS_KUERZEL), self)
+        sc.setContext(Qt.ShortcutContext.ApplicationShortcut)
+        sc.setAutoRepeat(False)
+        sc.activated.connect(self._laser_notaus_ausloesen)
+        self._sc_laser_notaus = sc
+
+        # Der Latch kann sich ohne Ereignis aendern (ein Muster-Abruf im
+        # Programmer loest ihn) — darum im Takt nachlesen; derselbe Takt blinkt.
+        self._notaus_timer = QTimer(self)
+        self._notaus_timer.setInterval(450)
+        self._notaus_timer.timeout.connect(self._notaus_tick)
+        self._notaus_timer.start()
+        self._sync_notaus_button()
+
+    def _notaus_in_kioskleiste(self):
+        """Kiosk: eigener schmaler Streifen ueber dem Inhalt, Knopf rechts
+        (die Sektionsleiste mit BLACKOUT ist dort ausgeblendet)."""
+        btn = getattr(self, "_btn_laser_notaus", None)
+        if btn is None:
+            return
+        try:
+            leiste = QWidget()
+            leiste.setObjectName("notausLeiste")
+            lay = QHBoxLayout(leiste)
+            lay.setContentsMargins(4, 2, 4, 2)
+            lay.addStretch(1)
+            lay.addWidget(btn)
+            root = self.centralWidget().layout()
+            root.insertWidget(max(0, root.indexOf(self._section_bar)), leiste)
+            self._notaus_leiste = leiste
+        except Exception as e:
+            print(f"[main_window] NOT-AUS-Leiste (Kiosk) fehlgeschlagen: {e}")
+
+    def _laser_notaus_ausloesen(self):
+        """Ausloesen — ein Schritt, keine Rueckfrage (Klick und Tastenkuerzel)."""
+        try:
+            self._state.laser_notaus_ausloesen()
+        except Exception as e:
+            print(f"[main_window] Laser-NOT-AUS Fehler: {e}")
+            try:
+                self._state.set_laser_estop(True)
+            except Exception as e2:
+                print(f"[main_window] Laser-NOT-AUS: Latch nicht gesetzt: {e2}")
+        self._sync_notaus_button()
+
+    def _on_notaus_clicked(self):
+        """Jeder Klick schaltet ZUERST ab — auch bei stehendem Latch (ein
+        Netzwerk-Laser kann inzwischen wieder scharf sein). Stand der Latch
+        schon vor dem Klick, folgt danach die Rueckfrage zum Loesen."""
+        war_aktiv = bool(getattr(self._state, "laser_estop_active", False))
+        self._laser_notaus_ausloesen()
+        jetzt = time.monotonic()
+        if not war_aktiv:
+            self._notaus_sperre_bis = jetzt + self._NOTAUS_SPERRE_S
+            return
+        if jetzt < self._notaus_sperre_bis:
+            return
+        antwort = QMessageBox.warning(
+            self, "Laser-NOT-AUS lösen?",
+            "Der Laser-NOT-AUS ist aktiv.\n\n"
+            "Nach dem Lösen geben DMX-Laser sofort wieder aus, was Programmer, "
+            "Szenen und Effekte gerade vorgeben. Netzwerk-Laser bleiben "
+            "unscharf.\n\n"
+            "Nur lösen, wenn der Strahlbereich frei ist. Jetzt lösen?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel)
+        if antwort != QMessageBox.StandardButton.Yes:
+            self._sync_notaus_button()
+            return
+        try:
+            self._state.laser_notaus_loesen()
+        except Exception as e:
+            print(f"[main_window] Laser-NOT-AUS lösen Fehler: {e}")
+        self._sync_notaus_button()
+        try:
+            if not getattr(self._state, "laser_estop_active", False):
+                self.statusBar().showMessage("Laser-NOT-AUS gelöst", 5000)
+        except Exception:
+            pass
+
+    def _notaus_tick(self):
+        self._notaus_blink ^= 1
+        self._sync_notaus_button()
+
+    def _sync_notaus_button(self):
+        """Anzeige aus der einen Quelle der Wahrheit ableiten."""
+        btn = getattr(self, "_btn_laser_notaus", None)
+        if btn is None:
+            return
+        try:
+            aktiv = bool(getattr(self._state, "laser_estop_active", False))
+            try:
+                n = int(self._state.laser_anzahl())
+            except Exception:
+                n = 0
+            if aktiv:
+                text = self._NOTAUS_TEXT_AKTIV
+                stil = self._NOTAUS_STIL_AKTIV[self._notaus_blink & 1]
+                tip = ("LASER NOT-AUS AKTIV — Laser sind dunkel verriegelt.\n"
+                       "Lösen: klicken und die Rückfrage bestätigen.\n")
+            else:
+                text = self._NOTAUS_TEXT
+                stil = self._NOTAUS_STIL_BEREIT
+                tip = ("Laser-NOT-AUS: alle Laser sofort dunkel — ein Klick, "
+                       "keine Rückfrage (Strg+Umschalt+L).\n")
+            tip += f"Erkannte Laser: {n}"
+            if not aktiv:
+                tip += " — der Knopf wirkt auch, wenn keiner erkannt ist."
+            if btn.text() != text:
+                btn.setText(text)
+            if btn.styleSheet() != stil:
+                btn.setStyleSheet(stil)
+            if tip != self._notaus_tip:
+                self._notaus_tip = tip
+                btn.setToolTip(tip)
+        except RuntimeError:
+            pass        # Fenster schon abgebaut
+
+    def _laser_estop_melden(self, *_):
+        """SyncEvent-Abonnent: laeuft im ausloesenden Thread, fasst nichts an."""
+        self._laser_estop_sig.emit()
+
+    def _on_laser_estop_ui(self):
+        self._on_laser_estop()
+        self._sync_notaus_button()
+
     def _on_laser_estop(self, *_):
         """UXT-09: unmissverständliche, nicht-blockierende NOT-AUS-Bestätigung.
         Bewusst KEIN modaler Dialog (den müsste man im Ernstfall erst wegklicken)
@@ -2721,8 +2979,8 @@ class MainWindow(QMainWindow):
         try:
             sb = self.statusBar()
             sb.showMessage(
-                "⏹  LASER NOT-AUS ausgelöst — Netzwerk-Ausgabe verriegelt "
-                "& unscharf", 6000)
+                "⏹  LASER NOT-AUS ausgelöst — alle Laser dunkel (DMX-Laser "
+                "verriegelt, Netzwerk-Ausgabe unscharf)", 6000)
             sb.setStyleSheet(
                 "QStatusBar{background:#b31414; color:#ffffff; font-weight:bold;}")
             QTimer.singleShot(6000, lambda: self._reset_statusbar_style())

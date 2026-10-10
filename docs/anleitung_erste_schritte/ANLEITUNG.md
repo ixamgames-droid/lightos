@@ -29,7 +29,9 @@ Nach dem Start öffnet LightOS in der Sektion **Bühne**. Von oben nach unten:
 
 1. **Menüleiste** — `Datei`, `Bearbeiten`, `Ansicht`, `Show`, `Programmer`, `Datenbank`,
    `Ausgabe`, `Visualizer`, `Command`, `Hilfe`. Hier liegen Speichern und Öffnen
-   (Schritt 7) und die Ausgabe-Einstellungen.
+   (Schritt 7) und die Ausgabe-Einstellungen. Unter `Hilfe` findest du diese
+   Anleitung wieder, dazu **Tastenkürzel…** (alle Kürzel auf einen Blick) und
+   **Datenordner öffnen** / **Show-Ordner öffnen**.
 2. **Sektionsleiste** — die acht Arbeitsbereiche von LightOS, siehe Schritt 2.
 3. **GM** — der Grand Master. Er regelt die Gesamthelligkeit von 0 bis 100 %.
    Laser ohne Dimmerkanal dimmt er nicht stufenlos, sondern schaltet sie bei 0 % aus —
@@ -54,6 +56,11 @@ Nach dem Start öffnet LightOS in der Sektion **Bühne**. Von oben nach unten:
    Nur einzelne Geräte oder Gruppen dunkel schaltet eine
    [Blackout-Taste mit Ziel](../anleitung_vc_widgets/01_button.md#blackout-mit-ziel-vcb-11)
    in der Virtual Console.
+   Direkt darüber, in der rechten Ecke der Menüleiste, sitzt der Knopf **LASER NOT-AUS**
+   (auch im Kiosk-Modus oben rechts; Tastenkürzel `Strg+Umschalt+L`): ein Klick schaltet
+   alle Laser sofort dunkel, ohne Rückfrage, und der Knopf blinkt dann als
+   **LASER NOT-AUS AKTIV**. Gelöst wird er nur bewusst — noch einmal klicken und die
+   Rückfrage bestätigen.
 7. **Befehlszeile** — für Tastatur-Befehle wie `1 thru 5 @ 80`. Beispiele stehen als
    Platzhaltertext im Feld.
 8. **Statusleiste** — links der Zustand des ENTTEC-Adapters (`Enttec: nicht gefunden`,

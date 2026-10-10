@@ -25,7 +25,7 @@ import session_claim as sc      # noqa: E402
 
 def _git(*args, repo=None, eingabe=None):
     r = subprocess.run(["git", *args], cwd=repo, input=eingabe,
-                       capture_output=True, text=True)
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
     assert r.returncode == 0, f"git {' '.join(args)}: {r.stderr}"
     return r.stdout.strip()
 
@@ -487,7 +487,7 @@ class KlarnamenUndSchraegstrichTest(unittest.TestCase):
         ort = sc._git_klarnamen_datei()
         self.assertTrue(ort and ort.endswith("klarnamen.txt"), ort)
         common = subprocess.run(["git", "rev-parse", "--git-common-dir"],
-                                capture_output=True, text=True,
+                                capture_output=True, text=True, encoding="utf-8", errors="replace",
                                 cwd=os.path.dirname(os.path.abspath(__file__))).stdout.strip()
         self.assertEqual(os.path.basename(os.path.dirname(ort)), os.path.basename(common))
 
