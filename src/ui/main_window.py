@@ -3013,28 +3013,44 @@ class MainWindow(QMainWindow):
     def _aeltere_version_oeffnen(self):
         """Datei → „Ältere Version öffnen…"."""
         from PySide6.QtWidgets import QDialog
+        from src.core.show import sicherungen
         from src.ui.widgets.sicherungen_dialog import SicherungenDialog
-        dlg = SicherungenDialog(self._sicherungs_name(), self)
-        try:
-            if dlg.exec() != QDialog.DialogCode.Accepted:
-                return
-            wahl = dlg.auswahl()
-        finally:
-            dlg.deleteLater()
-        if wahl is not None:
-            self._oeffne_sicherung(wahl)
+        # Von der Liste bis zum fertigen Laden wird keine Sicherung geloescht:
+        # ein Auto-Save bei offenem Dialog oder die Sicherung, die das
+        # Verwerfen der offenen Show gleich anlegt, schoebe sonst genau die
+        # gewaehlte aeltere Version aus der Staffelung.
+        with sicherungen.aufraeumen_angehalten():
+            dlg = SicherungenDialog(self._sicherungs_name(), self)
+            try:
+                if dlg.exec() != QDialog.DialogCode.Accepted:
+                    return
+                wahl = dlg.auswahl()
+            finally:
+                dlg.deleteLater()
+            if wahl is not None:
+                self._oeffne_sicherung(wahl)
 
     def _oeffne_sicherung(self, sicherung):
         """Eine Sicherung als NEUE ungespeicherte Show oeffnen. Die offene Show
         wird dabei ersetzt — ungespeicherte Aenderungen vorher anbieten."""
-        if self._has_unsaved_changes() and not _exit_prompt_suppressed():
-            if not self._rueckfrage_ungespeichert(
-                    "Ältere Version öffnen",
-                    "Vor dem Öffnen der älteren Version speichern?"):
-                return
-        elif self._has_unsaved_changes():
-            self._sicherung_vor_verwerfen()
-        self._open_show_path(sicherung.pfad, sicherung=sicherung)
+        from src.core.show import sicherungen
+        # Erst pruefen, dann fragen: ist die Datei schon weg, wird die offene
+        # Show gar nicht erst zum Verwerfen angeboten.
+        if not os.path.isfile(sicherung.pfad):
+            QMessageBox.warning(
+                self, "Ältere Version öffnen",
+                "Diese Sicherung gibt es nicht mehr — sie wurde inzwischen "
+                "aufgeräumt. Die offene Show bleibt unverändert.")
+            return
+        with sicherungen.aufraeumen_angehalten():
+            if self._has_unsaved_changes() and not _exit_prompt_suppressed():
+                if not self._rueckfrage_ungespeichert(
+                        "Ältere Version öffnen",
+                        "Vor dem Öffnen der älteren Version speichern?"):
+                    return
+            elif self._has_unsaved_changes():
+                self._sicherung_vor_verwerfen()
+            self._open_show_path(sicherung.pfad, sicherung=sicherung)
 
     def _check_autosave_recovery(self):
         """Wenn auto_save existiert und neuer als andere Show ist - Recovery anbieten."""

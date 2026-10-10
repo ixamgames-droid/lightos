@@ -18,6 +18,7 @@ import datetime
 import hashlib
 import json
 import os
+import shutil
 import tempfile
 import unittest
 import uuid
@@ -208,6 +209,113 @@ def test_sicherung_haelt_den_stand_vor_dem_ersetzen(daten, tmp_path, monkeypatch
     assert os.stat(ziel).st_nlink == 1
     (e,) = S.liste_sicherungen("Meine Show")
     assert (e.zeit, e.anlass, e.groesse) == (JETZT, S.ANLASS_VOR_SPEICHERN, 11)
+
+
+def test_link_ist_die_sicherung_die_quelle_wird_nie_gelesen(daten, tmp_path, monkeypatch):
+    """Review-Punkt Windows: las der Hintergrund-Thread den Hardlink, hielt er
+    einen Zugriff auf DIESELBE Datei wie die Show offen — ``os.replace`` der
+    Show scheitert dann unter Windows. Der Link selbst ist die Sicherung; es
+    wird weder kopiert noch geoeffnet."""
+    def _nie(*a, **k):
+        raise AssertionError("die Quelle/der Link darf nicht gelesen werden")
+    monkeypatch.setattr(S.shutil, "copyfile", _nie)
+    quelle = tmp_path / "Meine Show.lshow"
+    quelle.write_bytes(b"ALTER STAND")
+    ziel = S.sichere_datei(str(quelle), "Meine Show", S.ANLASS_VOR_SPEICHERN, JETZT)
+    # sofort da — nicht erst, wenn ein Hintergrund-Auftrag durch ist
+    assert ziel and os.path.isfile(ziel)
+    assert os.path.samefile(ziel, quelle)
+    neu = tmp_path / "neu.tmp"
+    neu.write_bytes(b"NEUER STAND")
+    os.replace(neu, quelle)                 # darf sofort folgen
+    with open(ziel, "rb") as f:
+        assert f.read() == b"ALTER STAND"
+    assert os.stat(ziel).st_nlink == 1
+    assert S.warte_bis_fertig()
+    assert os.listdir(daten / "sicherungen") == [os.path.basename(ziel)]
+
+
+def test_kopie_ohne_hardlink_wird_bei_gesperrter_quelle_wiederholt(
+        daten, tmp_path, monkeypatch):
+    def _kein_link(*a, **k):
+        raise OSError("Dateisystem kann keine Hardlinks")
+    monkeypatch.setattr(S.os, "link", _kein_link)
+    monkeypatch.setattr(S, "KOPIER_PAUSE_S", 0.0)
+    echt, versuche = shutil.copyfile, []
+
+    def _gesperrt(q, z, *a, **k):
+        versuche.append(q)
+        if len(versuche) < 3:
+            raise PermissionError(13, "wird von einem anderen Prozess verwendet")
+        return echt(q, z, *a, **k)
+    monkeypatch.setattr(S.shutil, "copyfile", _gesperrt)
+    quelle = tmp_path / "Meine Show.lshow"
+    quelle.write_bytes(b"ALTER STAND")
+    ziel = S.sichere_datei(str(quelle), "Meine Show", S.ANLASS_AUTO, JETZT)
+    assert len(versuche) == 3
+    with open(ziel, "rb") as f:
+        assert f.read() == b"ALTER STAND"
+    assert S.warte_bis_fertig()
+    assert os.listdir(daten / "sicherungen") == [os.path.basename(ziel)]
+
+    # dauerhaft gesperrt: kein Wurf, kein Rest, nur ein Logeintrag
+    versuche.clear()
+    monkeypatch.setattr(S.shutil, "copyfile",
+                        lambda *a, **k: (_ for _ in ()).throw(PermissionError(13, "zu")))
+    assert S.sichere_datei(str(quelle), "Meine Show", S.ANLASS_AUTO,
+                           JETZT + datetime.timedelta(minutes=1)) is None
+    assert os.listdir(daten / "sicherungen") == [os.path.basename(ziel)]
+
+
+def _zwoelf_alte(show="Alt"):
+    """Zwoelf Anlass-Sicherungen, alle aelter als die Tages-Staffel: die
+    Staffelung behaelt nur die zehn neuesten."""
+    basis = JETZT - datetime.timedelta(days=60)
+    return [_lege_an(show, basis - datetime.timedelta(days=i),
+                     anlass=S.ANLASS_VOR_SPEICHERN) for i in range(12)]
+
+
+def test_angehaltenes_aufraeumen_loescht_nichts_und_wird_nachgeholt(daten):
+    pfade = _zwoelf_alte()
+    assert not S.aufraeumen_ist_angehalten()
+    with S.aufraeumen_angehalten():
+        with S.aufraeumen_angehalten():                 # schachtelbar
+            assert S.raeume_auf(JETZT) == []
+        assert S.aufraeumen_ist_angehalten()
+        assert S.raeume_auf(JETZT, max_bytes=1) == []   # auch die Groessengrenze
+        assert S.warte_bis_fertig()
+        assert all(os.path.isfile(p) for p in pfade)
+    assert not S.aufraeumen_ist_angehalten()
+    assert S.warte_bis_fertig()                         # nachgeholt
+    assert [os.path.isfile(p) for p in pfade] == [True] * 10 + [False] * 2
+
+
+def test_schon_laufender_durchgang_loescht_nach_dem_anhalten_nichts_mehr(
+        daten, monkeypatch):
+    """Die Pause greift am Loeschen selbst — ein Durchgang, der seine Liste
+    schon berechnet hat, verliert das Rennen gegen ``aufraeumen_angehalten``."""
+    pfade = _zwoelf_alte()
+    echt = S.zu_behalten
+    mitten_drin = []
+
+    def _haelt_an(eintraege, jetzt):
+        behalten = echt(eintraege, jetzt)
+        halter = S.aufraeumen_angehalten()
+        halter.__enter__()                  # Dialog geht JETZT auf
+        mitten_drin.append(halter)
+        return behalten
+    monkeypatch.setattr(S, "zu_behalten", _haelt_an)
+    assert S.raeume_auf(JETZT) == []
+    assert all(os.path.isfile(p) for p in pfade)
+    monkeypatch.setattr(S, "zu_behalten", echt)
+    mitten_drin[0].__exit__(None, None, None)
+    assert S.warte_bis_fertig()
+    assert sum(os.path.isfile(p) for p in pfade) == 10
+
+
+def test_ohne_pause_bleibt_das_aufraeumen_wie_es_war(daten):
+    pfade = _zwoelf_alte()
+    assert sorted(S.raeume_auf(JETZT)) == sorted(pfade[10:])
 
 
 def test_gleiche_sekunde_ueberschreibt_nichts(daten, tmp_path):
@@ -549,6 +657,135 @@ class HauptfensterSicherungenTest(unittest.TestCase):
         self.assertFalse(self.win._has_unsaved_changes())
         self.assertEqual(original, _hash(self.pfad))
         self.assertEqual(sicherung, _hash(e.pfad))
+
+    # -- Gewaehlte Version gegen das Aufraeumen geschuetzt ----------------------
+
+    def _zehn_alte_versionen(self):
+        """Zehn Anlass-Sicherungen von „Sommerfest" (je 1 Cueliste), alle
+        aelter als die Tages-Staffel: die AELTESTE ist die zehnte — die
+        naechste neue Anlass-Sicherung schiebt genau sie hinaus."""
+        basis = datetime.datetime.now() - datetime.timedelta(days=40)
+        for i in range(10):
+            ziel = S.neuer_pfad("Sommerfest", S.ANLASS_VOR_SPEICHERN,
+                                basis - datetime.timedelta(days=i))
+            shutil.copyfile(self.pfad, ziel)
+        alle = S.liste_sicherungen("Sommerfest")
+        self.assertEqual(10, len(alle))
+        self.assertEqual([], S.raeume_auf(), "Vorbedingung: noch alle in der Staffel")
+        return alle[-1]
+
+    def _oeffne_nach_dem_hintergrund(self, aktion):
+        """``aktion`` ausfuehren; das Laden wartet vorher, bis der
+        Hintergrund-Thread durch ist — so trifft das Rennen sicher ein."""
+        echt = self.win._open_show_path
+        beim_laden = []
+
+        def _spaet(path, *a, **k):
+            S.warte_bis_fertig()
+            beim_laden.append(os.path.isfile(path))
+            return echt(path, *a, **k)
+        with mock.patch.object(self.win, "_open_show_path", _spaet):
+            aktion()
+        self.app.processEvents()
+        return beim_laden
+
+    def test_verwerfen_loescht_die_gewaehlte_version_nicht(self):
+        """Codex-Befund (P1): „Verwerfen" legt eine neue Sicherung an; deren
+        Aufraeumen loeschte die gewaehlte (zehnte) Version, bevor sie geladen
+        war."""
+        for name, unterdrueckt, antwort in (
+                ("Verwerfen", False, QMessageBox.StandardButton.Discard),
+                ("ohne Rueckfrage", True, None)):
+            with self.subTest(name):
+                self.setUp()
+                wahl = self._zehn_alte_versionen()
+                self._aendern()
+                with mock.patch.object(self.mw, "_exit_prompt_suppressed",
+                                       lambda: unterdrueckt), \
+                     mock.patch.object(self.mw.QMessageBox, "question",
+                                       lambda *a, **k: antwort):
+                    beim_laden = self._oeffne_nach_dem_hintergrund(
+                        lambda: self.win._oeffne_sicherung(wahl))
+                self.assertEqual([True], beim_laden,
+                                 "gewaehlte Sicherung vor dem Laden geloescht")
+                self.assertEqual(["Erster Stand"],
+                                 [s.name for s in self.state.cue_stacks],
+                                 "die gewaehlte aeltere Version ist geladen")
+                self.assertIn("Sicherung vom", self.win.windowTitle())
+                # der verworfene Stand liegt als neueste Version da
+                neueste = self._sicherungen()[0]
+                self.assertEqual(S.ANLASS_VOR_VERWERFEN, neueste.anlass)
+                self.assertEqual(["Erster Stand", "Zweiter Stand"],
+                                 self._cuelisten(neueste.pfad))
+                self.assertFalse(S.aufraeumen_ist_angehalten())
+
+    def test_speichern_vor_dem_oeffnen_loescht_die_gewaehlte_version_nicht(self):
+        wahl = self._zehn_alte_versionen()
+        self._aendern()
+        with mock.patch.object(self.mw, "_exit_prompt_suppressed", lambda: False), \
+             mock.patch.object(self.mw.QMessageBox, "question",
+                               lambda *a, **k: QMessageBox.StandardButton.Save):
+            beim_laden = self._oeffne_nach_dem_hintergrund(
+                lambda: self.win._oeffne_sicherung(wahl))
+        self.assertEqual([True], beim_laden)
+        self.assertEqual(["Erster Stand"], [s.name for s in self.state.cue_stacks])
+        self.assertEqual(["Erster Stand", "Zweiter Stand"], self._cuelisten(self.pfad))
+
+    def test_auto_save_bei_offenem_dialog_loescht_keine_gelistete_version(self):
+        from src.ui.widgets import sicherungen_dialog as D
+        wahl = self._zehn_alte_versionen()
+        auto = os.path.join(self.ordner, "auto_save.lshow")
+        gesehen = []
+
+        def _dialog_laeuft(dlg):
+            # waehrend der Dialog offen ist: eine neue Anlass-Sicherung + Aufraeumen
+            S.sichere_datei(self.pfad, "Sommerfest", S.ANLASS_VOR_SPEICHERN)
+            self.win._autosave_dirty = True
+            with mock.patch.object(self.win, "_autosave_path", lambda: auto):
+                self.win._do_autosave()
+            S.warte_bis_fertig()
+            gesehen.append(S.aufraeumen_ist_angehalten())
+            dlg.waehle(len(dlg.eintraege()) - 1)
+            self.assertEqual(wahl.pfad, dlg.auswahl().pfad)
+            return D.QDialog.DialogCode.Accepted
+        with mock.patch.object(D.SicherungenDialog, "exec", _dialog_laeuft):
+            beim_laden = self._oeffne_nach_dem_hintergrund(
+                self.win._aeltere_version_oeffnen)
+        self.assertEqual([True], gesehen)
+        self.assertEqual([True], beim_laden)
+        self.assertIn("Sicherung vom", self.win.windowTitle())
+        self.assertFalse(S.aufraeumen_ist_angehalten())
+        S.warte_bis_fertig()
+        self.assertFalse(os.path.isfile(wahl.pfad),
+                         "nach dem Laden wird das Aufraeumen nachgeholt")
+
+    def test_fehlende_sicherung_laesst_die_offene_show_unveraendert(self):
+        """Ist die gewaehlte Datei doch weg (von Hand geloescht), wird die
+        offene Show weder zum Verwerfen angeboten noch geleert."""
+        self._drei_versionen()
+        wahl = S.liste_sicherungen("Sommerfest")[0]
+        os.remove(wahl.pfad)
+        self._aendern()
+        vorher = self._sicherungen()
+        fragen, warnungen = [], []
+        with mock.patch.object(self.mw, "_exit_prompt_suppressed", lambda: False), \
+             mock.patch.object(self.mw.QMessageBox, "question",
+                               lambda *a, **k: fragen.append(a) or
+                               QMessageBox.StandardButton.Discard), \
+             mock.patch.object(self.mw.QMessageBox, "warning",
+                               lambda *a, **k: warnungen.append(a[2])):
+            self.win._oeffne_sicherung(wahl)
+            self.assertEqual([], fragen, "nichts zu verwerfen anbieten")
+            self.assertEqual(1, len(warnungen))
+            self.assertIn("gibt es nicht mehr", warnungen[0])
+            # … und selbst der Ladeversuch auf die fehlende Datei leert nichts
+            self.win._open_show_path(wahl.pfad, sicherung=wahl)
+            self.assertEqual(2, len(warnungen))
+        self.assertEqual(["Erster Stand", "Zweiter Stand"],
+                         [s.name for s in self.state.cue_stacks])
+        self.assertEqual(self.pfad, self.win._current_show_path)
+        self.assertTrue(self.win._has_unsaved_changes())
+        self.assertEqual(vorher, self._sicherungen(), "keine Sicherung angelegt")
 
     def test_menuepunkt_oeffnet_die_auswahl(self):
         from src.ui.widgets import sicherungen_dialog as D

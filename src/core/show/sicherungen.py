@@ -18,14 +18,25 @@ Der Absturz-Wiederherstellungsweg (``auto_save.lshow``, STAB-01/05) bleibt
 unberuehrt: dieser Ordner ist ein ZUSAETZLICHES Archiv.
 
 **Nie blockierend, nie werfend.** Eine vorhandene Datei wird im Aufrufer nur
-per Hardlink „eingefroren" (ein Verzeichniseintrag, keine Datenkopie): das
+per Hardlink gesichert (ein Verzeichniseintrag, keine Datenkopie): das
 anschliessende Speichern ersetzt die Show per ``os.replace`` durch eine neue
-Datei, der Link behaelt den alten Inhalt. Das eigentliche Kopieren in eine
-unabhaengige Datei (tmp + ``os.replace``) und das Aufraeumen laufen in einem
-Hintergrund-Thread. Kann das Dateisystem keine Hardlinks (FAT, anderes
-Laufwerk), wird einmal direkt kopiert — das Speichern selbst schreibt dieselbe
-Groessenordnung. Jeder Fehler landet nur im Log
+Datei, der Link behaelt den alten Inhalt und ist ab dann die einzige Datei
+dieses Standes. Der Link IST die Sicherung — er wird nie gelesen oder kopiert:
+ein offener Lese-Zugriff auf den Link sperrte unter Windows genau das
+``os.replace``, mit dem das Speichern die Show ersetzt (beide Namen sind
+dieselbe Datei). Bis die Quelle ersetzt ist, teilen sich Quelle und Sicherung
+die Daten; LightOS schreibt Shows nie an Ort und Stelle, nur ueber
+tmp + ``os.replace``. Kann das Dateisystem keine Hardlinks (FAT, anderes
+Laufwerk), wird einmal direkt kopiert, bevor der Aufrufer weiterschreibt — das
+Speichern selbst schreibt dieselbe Groessenordnung. Das Aufraeumen laeuft in
+einem Hintergrund-Thread. Jeder Fehler landet nur im Log
 (``diagnose_log.melde_still``); eine Sicherung darf das Speichern nie stoppen.
+
+**Aufraeumen anhaltbar.** Solange eine Sicherung ausgewaehlt und geoeffnet
+wird (:func:`aufraeumen_angehalten`), loescht :func:`raeume_auf` nichts: sonst
+koennte die Sicherung, die das Verwerfen der offenen Show eben anlegt, genau
+die gewaehlte aeltere Version aus der Staffelung schieben, bevor sie geladen
+ist.
 
 Importiert weder Qt noch ``app_state`` — nur Dateien.
 """
@@ -38,14 +49,16 @@ import queue
 import re
 import shutil
 import threading
+import time
 import zipfile
+from contextlib import contextmanager
 from dataclasses import dataclass
 
 from src.core.paths import app_data_dir
 
 ORDNER = "sicherungen"
 ENDUNG = ".lshow"
-_STUFE = ".stufe"          # eingefrorener Hardlink, wartet auf die Kopie
+_STUFE = ".stufe"          # Rest einer frueheren Fassung (Link vor der Kopie)
 _TMP = ".tmp"
 UNBENANNT = "Unbenannt"
 
@@ -206,23 +219,74 @@ def _staffel(eintraege: list[Sicherung], jetzt: datetime.datetime) -> set[str]:
 
 
 def _entferne(pfad: str) -> bool:
+    """Eine alte Sicherung loeschen — nicht, solange das Aufraeumen angehalten
+    ist. Pruefung und Loeschen unter EINER Sperre: wer
+    :func:`aufraeumen_angehalten` betreten hat, verliert danach keine Datei
+    mehr, auch nicht an einen schon laufenden Durchgang."""
+    global _nachholen
+    with _halt_lock:
+        if _halt:
+            _nachholen = True
+            return False
+        try:
+            os.remove(pfad)
+            return True
+        except FileNotFoundError:
+            return True
+        except OSError as e:
+            _melde(e, "alte Sicherung nicht loeschbar")
+            return False
+
+
+_halt_lock = threading.Lock()
+_halt = 0                  # offene ``aufraeumen_angehalten``-Bloecke
+_nachholen = False         # ein Aufraeumen fiel in die Pause
+
+
+def aufraeumen_ist_angehalten() -> bool:
+    with _halt_lock:
+        return _halt > 0
+
+
+@contextmanager
+def aufraeumen_angehalten():
+    """Solange der Block laeuft, loescht :func:`raeume_auf` KEINE Sicherung.
+
+    Fuer „Ältere Version öffnen": zwischen Auswahl und Laden entstehen neue
+    Sicherungen (Verwerfen/Speichern der offenen Show, Auto-Save), deren
+    Aufraeumen sonst die gewaehlte Version loeschen koennte. Neue Sicherungen
+    werden weiter geschrieben. Ein in die Pause gefallenes Aufraeumen wird
+    danach im Hintergrund nachgeholt. Schachtelbar, aus jedem Thread."""
+    global _halt, _nachholen
+    with _halt_lock:
+        _halt += 1
     try:
-        os.remove(pfad)
-        return True
-    except FileNotFoundError:
-        return True
-    except OSError as e:
-        _melde(e, "alte Sicherung nicht loeschbar")
-        return False
+        yield
+    finally:
+        with _halt_lock:
+            _halt -= 1
+            holen = _halt == 0 and _nachholen
+            if holen:
+                _nachholen = False
+        if holen:
+            _im_hintergrund(raeume_auf)
 
 
 def raeume_auf(jetzt: datetime.datetime | None = None,
                ordner: str | None = None,
                max_bytes: int | None = None) -> list[str]:
     """Staffelung je Show anwenden, dann die Groessengrenze (aelteste zuerst
-    weg, ueber alle Shows). Liefert die geloeschten Pfade. Wirft nie."""
+    weg, ueber alle Shows). Liefert die geloeschten Pfade. Wirft nie.
+
+    Loescht nichts, solange :func:`aufraeumen_angehalten` offen ist (wird
+    danach nachgeholt)."""
+    global _nachholen
     geloescht: list[str] = []
     try:
+        with _halt_lock:
+            if _halt:
+                _nachholen = True
+                return geloescht
         ordner = ordner or sicherungs_dir()
         jetzt = jetzt or datetime.datetime.now()
         grenze = MAX_GESAMT_BYTES if max_bytes is None else max_bytes
@@ -255,8 +319,9 @@ def raeume_auf(jetzt: datetime.datetime | None = None,
 
 def _reste_fertigstellen(ordner: str) -> None:
     """Uebrig gebliebene Stufen-/Temp-Dateien einer beendeten Sitzung: ein
-    eingefrorener Link hat gueltigen Inhalt und wird zur Sicherung; eine halbe
-    Temp-Kopie wird verworfen. Nur Dateien, an denen gerade niemand arbeitet."""
+    eingefrorener Link (``.stufe``, fruehere Fassung dieses Moduls) hat
+    gueltigen Inhalt und wird zur Sicherung; eine halbe Temp-Kopie wird
+    verworfen. Nur Dateien, an denen gerade niemand arbeitet."""
     try:
         namen = os.listdir(ordner)
     except OSError:
@@ -337,6 +402,25 @@ def _kopiere_atomar(quelle: str, ziel: str) -> None:
         raise
 
 
+#: Kopier-Versuche, wenn die Quelle kurz gesperrt ist (Windows: Virenscanner,
+#: Suchindex, Cloud-Sync halten frisch geschriebene Dateien fuer Augenblicke).
+KOPIER_VERSUCHE = 4
+KOPIER_PAUSE_S = 0.05
+
+
+def _kopiere_mit_wiederholung(quelle: str, ziel: str) -> None:
+    """``_kopiere_atomar``, bei ``PermissionError`` (gesperrte Datei) nach kurzer
+    Pause erneut. Andere Fehler (Platte voll, Quelle weg) sofort weiter."""
+    for versuch in range(1, KOPIER_VERSUCHE + 1):
+        try:
+            _kopiere_atomar(quelle, ziel)
+            return
+        except PermissionError:
+            if versuch == KOPIER_VERSUCHE:
+                raise
+            time.sleep(KOPIER_PAUSE_S * versuch)
+
+
 def neuer_pfad(show: str, anlass: str,
                jetzt: datetime.datetime | None = None,
                ordner: str | None = None) -> str:
@@ -361,7 +445,8 @@ def sichere_datei(quelle: str, show: str, anlass: str,
     """Den JETZIGEN Inhalt von ``quelle`` als neue Sicherung ablegen.
 
     Kehrt sofort zurueck (siehe Modul-Docstring); der Aufrufer darf ``quelle``
-    danach per ``os.replace`` ersetzen. Liefert den Zielpfad oder ``None``
+    danach per ``os.replace`` ersetzen — auch unter Windows sofort: an der
+    Quelle bleibt kein Zugriff offen. Liefert den Zielpfad oder ``None``
     (keine Quelle / Fehler — nur geloggt)."""
     try:
         quelle = os.fspath(quelle)
@@ -369,33 +454,25 @@ def sichere_datei(quelle: str, show: str, anlass: str,
             return None
         jetzt = jetzt or datetime.datetime.now()
         ziel = neuer_pfad(show, anlass, jetzt)
-        stufe = ziel + _STUFE
-        with _aktiv_lock:
-            _aktiv.add(ziel)
         try:
-            os.link(quelle, stufe)
+            # Der Link ist die Sicherung (s. Modul-Docstring) — kein Lesen.
+            try:
+                os.link(quelle, ziel)
+            except FileExistsError:
+                # derselbe Name im selben Augenblick vergeben -> naechster
+                ziel = neuer_pfad(show, anlass, jetzt)
+                os.link(quelle, ziel)
         except (OSError, NotImplementedError, AttributeError):
-            # Kein Hardlink moeglich -> einmal direkt kopieren.
+            # Kein Hardlink moeglich -> einmal direkt kopieren. Die Kopie ist
+            # fertig und geschlossen, bevor der Aufrufer die Quelle ersetzt.
+            with _aktiv_lock:
+                _aktiv.add(ziel)
             try:
-                _kopiere_atomar(quelle, ziel)
+                _kopiere_mit_wiederholung(quelle, ziel)
             finally:
                 with _aktiv_lock:
                     _aktiv.discard(ziel)
-            _im_hintergrund(lambda: raeume_auf(jetzt))
-            return ziel
-
-        def _fertig():
-            try:
-                _kopiere_atomar(stufe, ziel)
-                os.remove(stufe)
-            except Exception as e:
-                _melde(e, "Sicherung nicht kopierbar")
-            finally:
-                with _aktiv_lock:
-                    _aktiv.discard(ziel)
-            raeume_auf(jetzt)
-
-        _im_hintergrund(_fertig)
+        _im_hintergrund(lambda: raeume_auf(jetzt))
         return ziel
     except Exception as e:
         _melde(e, "Sicherung nicht anlegbar")
