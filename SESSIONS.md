@@ -12,7 +12,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| DOC-27 | C | - | 2026-10-02T10:36Z | docs/anleitung_ausgabe_einrichten/ANLEITUNG.en.md · docs/anleitung_ausgabe_einrichten/ANLEITUNG.md · docs/ANLEITUNGEN.md · changelog.d/2026-10-02-DOC-27.md |
 | DOC-28 | C | - | 2026-10-02T10:36Z | docs/anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.en.md · docs/anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md · docs/ANLEITUNGEN.md · changelog.d/2026-10-02-DOC-28.md |
 | DOC-29 | C | - | 2026-10-02T10:51Z | docs/anleitung_patch_gruppen/ANLEITUNG_PATCH_GRUPPEN.md |
 | DOC-30 | C | - | 2026-10-02T10:52Z | docs/anleitung_programmer/ANLEITUNG_PROGRAMMER.md |
@@ -151,7 +150,6 @@
 
 ## Verlauf
 
-- 2026-10-09T13:45Z D claim VIZ-97
 - 2026-10-09T13:45Z D claim FM-72
 - 2026-10-09T14:10Z B done QA-83
 - 2026-10-09T14:22Z D aktualisiert FM-72: Dateien - -> main.py · src/ui/main_window.py · tests/test_fm72_bibliothek_frage_mit_show.py · tests/test_fm53_bibliothek_download.py · docs/FIXTURE_SOURCES.md · docs/anleitung_geraete_bibliothek/ANLEITUNG.md · BACKLOG.md · changelog.d/2026-10-09-FM-72.md
@@ -181,3 +179,4 @@
 - 2026-10-10T09:26Z C uebergeben DOC-25
 - 2026-10-10T09:26Z C uebergeben DOC-26
 - 2026-10-10T09:26Z C uebergeben ENG-29
+- 2026-10-10T09:26Z C uebergeben DOC-27
