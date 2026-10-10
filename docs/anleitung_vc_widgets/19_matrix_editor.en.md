@@ -95,7 +95,7 @@ Depending on style and algorithm, it shows either fixed color buttons **C1/C2/C3
 | **Aus Auswahl** | Builds the grid from the fixtures selected on the left in the programmer – for a real group as a 2D grid including gaps, otherwise as 1 × N. |
 | **Auto-Zuweisung aus Patch** | Fills the current grid with fixtures from the active selection/group (fallback: the whole patch). |
 
-> In **follow mode** (programmer tab „Matrix") these buttons are hidden; the group is then called „Geräte (folgen der Programmer-Auswahl)" (fixtures (follow the programmer selection)) and takes over the selected group automatically.
+> In **follow mode** (programmer tab „Matrix") these buttons are hidden; the group is then called „Geräte (folgen der Programmer-Auswahl)" (fixtures (follow the programmer selection)) and takes over the selected group automatically whenever you change the selection. While loading a show the matrix does not follow the selection — the stored grid stays exactly as saved in the file.
 
 ## Algorithms
 

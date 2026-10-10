@@ -353,3 +353,22 @@ class MatrixFolgeEditorLadenTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ── Doku: „folgt der Auswahl“ nennt die Ausnahme beim Laden ──────────────────
+
+@_pytest_xplat15.mark.parametrize("pfad", [
+    "docs/anleitung_komplettshow_2026/05_matrix_dimmer/ANLEITUNG.md",
+    "docs/anleitung_vc_widgets/19_matrix_editor.md",
+    "docs/anleitung_vc_widgets/19_matrix_editor.en.md",
+    "docs/anleitung_efx/ANLEITUNG_EFX.md",
+])
+def test_doku_folgt_der_auswahl_nennt_laden(pfad):
+    """Wer „folgt der Auswahl“ verspricht, sagt auch: nicht beim Laden."""
+    from pathlib import Path
+    text = (Path(__file__).resolve().parent.parent / pfad).read_text(
+        encoding="utf-8")
+    zeilen = [z for z in text.split("\n")
+              if "Laden einer Show" in z or "loading a show" in z]
+    assert zeilen, pfad
+    assert any(("Auswahl" in z or "selection" in z) for z in zeilen), pfad
