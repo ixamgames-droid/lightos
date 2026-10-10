@@ -55,7 +55,7 @@
 | FM-73 | A | fix/fm73-sync-gleichnamige-modi | 2026-10-10T10:36Z | - |
 | PROC-19 | A | ci/proc19-doku-schnellweg | 2026-10-10T11:47Z | .github/workflows/ci.yml |
 | PROC-20 | A | feature/proc20-backlog-fragmente | 2026-10-10T11:47Z | tools · BACKLOG.md |
-| TOOL-26 | B | feature/tool26-app-messwerkzeug | 2026-10-10T13:01Z | tools/app_messung.py · tools/README.md · tests/test_tool26_app_messung.py · BACKLOG.md · changelog.d/2026-10-10-TOOL-26.md |
+| TOOL-26 | B | feature/tool26-app-messwerkzeug | 2026-10-10T13:25Z | tools/app_messung.py · tools/README.md · tests/test_tool26_app_messung.py · BACKLOG.md · changelog.d/2026-10-10-TOOL-26.md |
 | VIZ-99 | B | fix/viz99-automatik-snapdragon | 2026-10-10T12:55Z | - |
 | XPLAT-51 | B | fix/xplat51-arm64-nicht-unterstuetzt | 2026-10-10T12:55Z | - |
 | XPLAT-52 | B | fix/xplat52-installer-venv-arch | 2026-10-10T12:55Z | - |
