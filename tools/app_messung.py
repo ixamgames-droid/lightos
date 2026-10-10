@@ -35,6 +35,8 @@ Blackout im 3D sichtbar?".
                 fuenfmal Blackout bis das 3D dunkel ist.
 * ``gobo``      Moving Heads mit Gobo: Rotation + Schwenk; je Bild der
                 ANGEZEIGTE Winkel -> Anteil der Bilder ohne Bewegung.
+                Gemessen wird an einem Geraet MIT Kanal ``gobo_rotation``;
+                hat die Show keines, steht dort "nicht messbar" statt 100 %.
 
 ``dimmer`` und ``gobo`` laufen je einmal mit sichtbarem und mit minimiertem
 Hauptfenster (``--hauptfenster``): die 2D-Ansicht im Hauptfenster teilt sich den
@@ -49,6 +51,8 @@ UI-Thread mit dem 3D.
   Offscreen-Modus gibt es bewusst nicht. Die volle App verliert dort den
   GPU-Kontext ("Context lost during MakeCurrent", gemessen unter Windows mit
   ANGLE/D3D11), die Szene baut sich dann nicht auf.
+* Die Sandbox wird am Ende geloescht (auch beim Zeitlimit und bei fruehem
+  Abbruch). ``--sandbox-behalten`` laesst sie fuer die Fehlersuche stehen.
 * Beendet wird ueber das Schliessen des Hauptfensters (der Weg des Nutzers).
   Ein harter Ausstieg bei offenem Fenster endete mit PySide6 6.12 in einer
   Access Violation.
@@ -56,6 +60,7 @@ UI-Thread mit dem 3D.
 from __future__ import annotations
 
 import argparse
+import atexit
 import json
 import math
 import os
@@ -80,6 +85,7 @@ MESSUNGEN = ("buehne", "leerlauf", "dimmer", "gobo")
 FENSTER = ("sichtbar", "minimiert")
 EXIT_REGEL = 2          # Sandbox- oder Ausgabe-Regel verletzt
 EXIT_FEHLER = 1
+SANDBOX_PRAEFIX = "lightos_app_messung_"
 
 
 class Regelverstoss(RuntimeError):
@@ -214,6 +220,88 @@ def bewegung_statistik(winkel_rad) -> dict:
     }
 
 
+GOBO_OHNE_ROTATION = "kein Moving Head mit Kanal gobo_rotation"
+
+
+def gobo_geraet(fid, fixture_type: str, kanaele) -> dict | None:
+    """Eintrag fuer die Gobo-Messung oder None.
+
+    Aufgenommen wird jeder Moving Head mit Gobo-Rad (mindestens zwei Bereiche):
+    Gobo-Bild und Schwenk lassen sich an ihm pruefen. ``rotation`` sagt, ob er
+    einen Kanal ``gobo_rotation`` hat — NUR dann dreht sich im 3D etwas, und nur
+    an so einem Geraet darf das Gleichmass der Drehung gemessen werden. Ohne den
+    Kanal steht der Winkel still; ``stand_anteil`` 1.0 waere dann kein Befund
+    ueber die Anzeige, sondern ueber das Profil."""
+    kanaele = list(kanaele or [])
+    attrs = [getattr(c, "attribute", "") for c in kanaele]
+    if "gobo_wheel" not in attrs or fixture_type != "moving_head":
+        return None
+    bereiche = sorted(getattr(kanaele[attrs.index("gobo_wheel")], "ranges", []) or [],
+                      key=lambda r: r.range_from)
+    if len(bereiche) < 2:
+        return None
+    b = bereiche[min(3, len(bereiche) - 1)]
+    return {"fid": fid, "wert": (b.range_from + b.range_to) // 2,
+            "rotation": "gobo_rotation" in attrs}
+
+
+def gobo_auswertung(winkel_rad, gobo_geraete) -> dict:
+    """Gleichmass der Gobo-Drehung — oder ausdruecklich 'nicht messbar', wenn
+    kein Geraet der Show einen Rotationskanal hat (statt eines falschen
+    ``stand_anteil`` 1.0)."""
+    drehbar = sum(1 for g in gobo_geraete if g.get("rotation"))
+    if not drehbar:
+        return {"nicht_messbar": GOBO_OHNE_ROTATION}
+    erg = bewegung_statistik(winkel_rad)
+    erg["geraete_mit_rotation"] = drehbar
+    return erg
+
+
+def gobo_messgeraet(gobo_geraete, ersatz):
+    """FID, an der gemessen wird: der erste Moving Head MIT Rotationskanal,
+    sonst der erste mit Gobo (Schwenk), sonst ``ersatz``."""
+    for g in gobo_geraete:
+        if g.get("rotation"):
+            return g["fid"]
+    return gobo_geraete[0]["fid"] if gobo_geraete else ersatz
+
+
+def raeume_sandbox(wurzel: str) -> bool:
+    """Den Wegwerf-Ordner dieses Laufs loeschen. True = er ist weg.
+
+    Geloescht wird nur ein Ordner, den dieses Werkzeug selbst angelegt hat
+    (Namensanfang ``SANDBOX_PRAEFIX``). Steht der Prozess noch darin, wechselt
+    er vorher hinaus — unter Windows liesse sich der Ordner sonst nicht
+    entfernen. Wirft nie: ein Rest (z. B. eine noch offene Datei) bleibt
+    liegen und wird vom Aufrufer gemeldet."""
+    try:
+        wurzel = os.path.abspath(wurzel)
+        if not os.path.basename(wurzel).startswith(SANDBOX_PRAEFIX):
+            return False
+        if not os.path.isdir(wurzel):
+            return True
+        if liegt_in(os.getcwd(), wurzel) or os.path.abspath(os.getcwd()) == wurzel:
+            os.chdir(os.path.dirname(wurzel))
+        shutil.rmtree(wurzel, ignore_errors=True)
+        return not os.path.exists(wurzel)
+    except Exception:                                # noqa: BLE001
+        return False
+
+
+def harter_ausstieg(code: int, aufraeumen) -> None:
+    """``os._exit`` ueberspringt atexit — deshalb vorher selbst aufraeumen."""
+    try:
+        aufraeumen()
+    except Exception:                                # noqa: BLE001
+        pass
+    for strom in (sys.stdout, sys.stderr):
+        try:
+            strom.flush()
+        except Exception:                            # noqa: BLE001
+            pass
+    os._exit(code)
+
+
 def stromquelle() -> str:
     """'Netz', 'Akku' oder 'unbekannt' — nur lesend, ohne Zusatzpakete."""
     try:
@@ -300,6 +388,9 @@ def baue_parser() -> argparse.ArgumentParser:
                    help="Checkout, dessen App gemessen wird (Vorgabe: dieser)")
     p.add_argument("--zeitlimit", type=float, default=900.0, metavar="S",
                    help="Harter Abbruch nach so vielen Sekunden (Vorgabe 900)")
+    p.add_argument("--sandbox-behalten", action="store_true",
+                   help="Den Wegwerf-Ordner am Ende NICHT loeschen (Fehlersuche: crash.log, "
+                        "Show-DB); sein Pfad wird ausgegeben")
     return p
 
 
@@ -455,18 +546,19 @@ class Messung:
             if "shutter" in attrs and offen >= 0:
                 d["shutter"] = offen
             self.voll[f.fid] = d
-            if "gobo_wheel" in attrs and getattr(f, "fixture_type", "") == "moving_head":
-                bereiche = sorted(getattr(kanaele[attrs.index("gobo_wheel")], "ranges", []) or [],
-                                  key=lambda r: r.range_from)
-                if len(bereiche) >= 2:
-                    b = bereiche[min(3, len(bereiche) - 1)]
-                    self.gobo.append({"fid": f.fid, "wert": (b.range_from + b.range_to) // 2})
+            g = gobo_geraet(f.fid, getattr(f, "fixture_type", ""), kanaele)
+            if g is not None:
+                self.gobo.append(g)
+        mit_rotation = sum(1 for g in self.gobo if g["rotation"])
         self.erg["show"] = {"geraete": len(geraete), "dimmbar": len(self.dimkanal),
                             "gobo_moving_heads": len(self.gobo),
+                            "gobo_mit_rotation": mit_rotation,
+                            "gobo_ohne_rotation": len(self.gobo) - mit_rotation,
                             "attribute": sorted(alle_attribute),
                             "titel": self.mw.windowTitle()}
         self.melde(f"Show geladen: {len(geraete)} Geraete, {len(self.dimkanal)} dimmbar, "
-                   f"{len(self.gobo)} Gobo-Moving-Heads")
+                   f"{len(self.gobo)} Gobo-Moving-Heads "
+                   f"({mit_rotation} mit Rotationskanal)")
 
         t0 = time.perf_counter()
         self.mw._open_visualizer()                   # derselbe Weg wie der Menuepunkt
@@ -503,7 +595,8 @@ class Messung:
                 elif self.modus == "gobo":
                     for g in self.gobo:
                         d = st.programmer.setdefault(g["fid"], {})
-                        d["gobo_rotation"] = int((t * 42.5) % 256)                  # 6 s je Umlauf
+                        if g["rotation"]:
+                            d["gobo_rotation"] = int((t * 42.5) % 256)              # 6 s je Umlauf
                         d["pan"] = int(128 + 40 * math.sin(2 * math.pi * t / 5.0))   # 5 s je Schwenk
         self.treiber = QTimer()
         self.treiber.setTimerType(Qt.TimerType.PreciseTimer)
@@ -597,7 +690,7 @@ class Messung:
         self.melde(f"\n=== Stufe {stufe}: {viz._lbl_gpu_tier.text()}"
                    f" | Probe: {(e['info'] or {}).get('probe')}")
         was = self.args.messungen
-        fid0 = self.gobo[0]["fid"] if self.gobo else self.fids[0]
+        fid0 = gobo_messgeraet(self.gobo, self.fids[0])
 
         if "buehne" in was and erste:
             buehne = {}
@@ -642,7 +735,9 @@ class Messung:
             with self.st._prog_lock:
                 for g in self.gobo:
                     d = dict(self.voll[g["fid"]])
-                    d.update({"pan": 128, "tilt": 128, "gobo_wheel": 0, "gobo_rotation": 0})
+                    d.update({"pan": 128, "tilt": 128, "gobo_wheel": 0})
+                    if g["rotation"]:
+                        d["gobo_rotation"] = 0
                     self.st.programmer[g["fid"]] = d
             self.pump(1.5)
             e["licht_offen"] = self.jsj(_JS_LICHT % fids)
@@ -658,13 +753,14 @@ class Messung:
                 self.pump(1.5)
                 m = self.abschnitt(fid0)
                 self.modus = None
-                m["gobo"] = bewegung_statistik(m.pop("_g"))
+                m["gobo"] = gobo_auswertung(m.pop("_g"), self.gobo)
                 m["pan"] = bewegung_statistik(m.pop("_p"))
                 m.update({"messung": "gobo", "hauptfenster": lage})
                 e["messungen"].append(m)
                 self.melde(f"   Gobo + Schwenk, Hauptfenster {lage}: {m['bild'].get('fps')} fps, "
                            f"Push {m['push_hz']}/s, Bilder ohne Gobo-Bewegung "
-                           f"{m['gobo'].get('stand_anteil')}")
+                           + str(m["gobo"].get("stand_anteil",
+                                               "nicht messbar — " + GOBO_OHNE_ROTATION)))
             self.fenster_lage("sichtbar")
             self.programmer_leeren()
 
@@ -735,7 +831,32 @@ def main(argv=None) -> int:
         melde("WARNUNG: Der Rechner laeuft auf AKKU — Bildraten und Zeiten sind dann nicht "
               "mit Netz-Messungen vergleichbar.")
 
-    wurzel = tempfile.mkdtemp(prefix="lightos_app_messung_")
+    wurzel = tempfile.mkdtemp(prefix=SANDBOX_PRAEFIX)
+    start_ordner = os.getcwd()
+    erledigt = []
+
+    def aufraeumen() -> None:
+        """Sandbox loeschen — genau einmal, auf JEDEM Weg aus dem Werkzeug."""
+        if erledigt:
+            return
+        erledigt.append(True)
+        if args.sandbox_behalten:
+            melde(f"Sandbox bleibt liegen: {wurzel}")
+            return
+        if not raeume_sandbox(wurzel):
+            melde(f"Hinweis: Sandbox liess sich nicht vollstaendig loeschen: {wurzel}")
+        elif os.path.isdir(start_ordner):
+            try:
+                os.chdir(start_ordner)
+            except OSError:
+                pass
+
+    # Der gewoehnliche Weg endet in main._finalize_and_exit(): das fuehrt die
+    # atexit-Hooks selbst aus und geht dann mit os._exit. Zuerst angemeldet =
+    # zuletzt ausgefuehrt, also NACH den Hooks der App (Clean-Marker), die noch
+    # in die Sandbox schreiben. Fruehe Ausstiege und der Zeitlimit-Waechter
+    # rufen aufraeumen() ausdruecklich.
+    atexit.register(aufraeumen)
     env = sandbox_umgebung(wurzel)
     os.environ.update(env)
     # Ausdruecklich und fuer den Waechter tests/test_tools_db_isolation.py lesbar:
@@ -770,6 +891,7 @@ def main(argv=None) -> int:
              "LIGHTOS_CRASH_LOG", "LIGHTOS_SACN_CID")})
     except Regelverstoss as e:
         melde(f"ABBRUCH: {e}")
+        aufraeumen()
         return EXIT_REGEL
 
     try:
@@ -787,6 +909,7 @@ def main(argv=None) -> int:
             _baue_mega_arena(repo, show, env, melde)
     except Exception as e:                           # noqa: BLE001
         melde(f"FEHLER: {e}")
+        aufraeumen()
         return EXIT_FEHLER
     os.chdir(wurzel)
 
@@ -794,7 +917,7 @@ def main(argv=None) -> int:
         time.sleep(args.zeitlimit)
         ergebnis["fehler"] = f"Zeitlimit {args.zeitlimit:.0f} s erreicht"
         abschluss(EXIT_FEHLER)
-        os._exit(EXIT_FEHLER)
+        harter_ausstieg(EXIT_FEHLER, aufraeumen)
     threading.Thread(target=waechter, daemon=True).start()
 
     from PySide6.QtWidgets import QApplication

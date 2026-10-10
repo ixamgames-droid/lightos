@@ -125,6 +125,194 @@ class TestSandbox:
         assert not draussen.exists(), "ausserhalb der Sandbox wurde etwas angelegt"
 
 
+# ── Sandbox wird wieder geloescht (Codex-Review #1005) ───────────────────────
+
+class _Kanal:
+    def __init__(self, attribute, bereiche=0):
+        self.attribute = attribute
+        self.ranges = [type("B", (), {"range_from": i * 10, "range_to": i * 10 + 9})()
+                       for i in range(bereiche)]
+
+
+class TestSandboxAufraeumen:
+    def test_raeume_sandbox_loescht_auch_wenn_der_prozess_darin_steht(
+            self, am, tmp_path, umgebung_wie_vorher):
+        wurzel = tmp_path / (am.SANDBOX_PRAEFIX + "abc")
+        (wurzel / "appdata" / "LightOS").mkdir(parents=True)
+        (wurzel / "appdata" / "LightOS" / "show.db").write_text("x")
+        os.chdir(wurzel / "appdata")
+        assert am.raeume_sandbox(str(wurzel)) is True
+        assert not wurzel.exists()
+        assert am.raeume_sandbox(str(wurzel)) is True          # zweimal schadet nicht
+
+    def test_fremde_ordner_werden_nie_geloescht(self, am, tmp_path):
+        fremd = tmp_path / "echte_daten"
+        fremd.mkdir()
+        (fremd / "fixtures.db").write_text("wichtig")
+        assert am.raeume_sandbox(str(fremd)) is False
+        assert (fremd / "fixtures.db").read_text() == "wichtig"
+
+    def test_harter_ausstieg_raeumt_vor_os_exit_auf(self, am, monkeypatch):
+        """os._exit ueberspringt atexit — der Zeitlimit-Waechter muss selbst
+        aufraeumen."""
+        ablauf = []
+        monkeypatch.setattr(am.os, "_exit", lambda code: ablauf.append(("exit", code)))
+        am.harter_ausstieg(am.EXIT_FEHLER, lambda: ablauf.append("aufraeumen"))
+        assert ablauf == ["aufraeumen", ("exit", am.EXIT_FEHLER)]
+
+        def kaputt():
+            raise OSError("Ordner gesperrt")
+        ablauf.clear()
+        am.harter_ausstieg(3, kaputt)
+        assert ablauf == [("exit", 3)]                          # Ausstieg trotzdem
+        quelle = _quelle("tools", "app_messung.py")
+        assert "harter_ausstieg(EXIT_FEHLER, aufraeumen)" in quelle
+        assert quelle.count("os._exit(") == 1, "os._exit nur noch in harter_ausstieg"
+
+    def _wurzeln(self, am, monkeypatch, tmp_path):
+        angelegt = []
+        echt = am.tempfile.mkdtemp
+
+        def mkdtemp(prefix=""):
+            pfad = echt(prefix=prefix, dir=str(tmp_path))
+            angelegt.append(pfad)
+            return pfad
+        monkeypatch.setattr(am.tempfile, "mkdtemp", mkdtemp)
+        return angelegt
+
+    def test_fruehe_ausstiege_hinterlassen_keine_sandbox(
+            self, am, tmp_path, monkeypatch, capsys, umgebung_wie_vorher):
+        angelegt = self._wurzeln(am, monkeypatch, tmp_path)
+        # 1) Regelverstoss (Datenordner ausserhalb)
+        echt = am.sandbox_umgebung
+        draussen = tmp_path / "echte_daten"
+
+        def kaputt(wurzel):
+            env = echt(wurzel)
+            env["APPDATA"] = env["XDG_DATA_HOME"] = env["HOME"] = str(draussen)
+            return env
+        monkeypatch.setattr(am, "sandbox_umgebung", kaputt)
+        assert am.main(["--stufen", "low", "--messungen", "leerlauf"]) == am.EXIT_REGEL
+        # 2) Show laesst sich nicht bauen
+        monkeypatch.setattr(am, "sandbox_umgebung", echt)
+
+        def baut_nicht(*_a, **_k):
+            raise RuntimeError("Mega Arena liess sich nicht bauen")
+        monkeypatch.setattr(am, "_baue_mega_arena", baut_nicht)
+        assert am.main(["--stufen", "low", "--messungen", "leerlauf"]) == am.EXIT_FEHLER
+        assert len(angelegt) == 2
+        for pfad in angelegt:
+            assert os.path.basename(pfad).startswith(am.SANDBOX_PRAEFIX)
+            assert not os.path.exists(pfad), f"Sandbox blieb liegen: {pfad}"
+        assert "Sandbox bleibt liegen" not in capsys.readouterr().out
+
+    def test_sandbox_behalten_auf_wunsch(
+            self, am, tmp_path, monkeypatch, capsys, umgebung_wie_vorher):
+        angelegt = self._wurzeln(am, monkeypatch, tmp_path)
+
+        def baut_nicht(*_a, **_k):
+            raise RuntimeError("kaputt")
+        monkeypatch.setattr(am, "_baue_mega_arena", baut_nicht)
+        assert am.main(["--stufen", "low", "--sandbox-behalten"]) == am.EXIT_FEHLER
+        assert os.path.isdir(angelegt[0])
+        assert f"Sandbox bleibt liegen: {angelegt[0]}" in capsys.readouterr().out
+
+    def test_gewoehnlicher_weg_laeuft_ueber_atexit(self, am):
+        """Der normale Lauf endet in main._finalize_and_exit(): das fuehrt die
+        atexit-Hooks selbst aus, BEVOR es mit os._exit geht. Darauf stuetzt
+        sich das Aufraeumen — faellt das weg, bleibt die Sandbox liegen."""
+        main_py = _quelle("main.py")
+        ende = main_py[main_py.index("def _finalize_and_exit("):]
+        ende = ende[:ende.index("\ndef ", 1)]
+        assert ende.index("atexit._run_exitfuncs()") < ende.index("os._exit(")
+        assert "atexit.register(aufraeumen)" in _quelle("tools", "app_messung.py")
+
+    def test_atexit_raeumt_im_echten_prozess_auf(self, am, tmp_path):
+        """Ende wie in main._finalize_and_exit (Hooks ausfuehren, os._exit) in
+        einem eigenen Prozess: danach ist der Ordner weg."""
+        skript = tmp_path / "lauf.py"
+        skript.write_text(
+            "import atexit, importlib.util, os, sys\n"
+            "spec = importlib.util.spec_from_file_location('am', sys.argv[1])\n"
+            "am = importlib.util.module_from_spec(spec); spec.loader.exec_module(am)\n"
+            "am.tempfile.tempdir = sys.argv[2]\n"
+            "am._baue_mega_arena = lambda repo, ziel, env, melde: open(ziel, 'w').close()\n"
+            "class Stopp(Exception): pass\n"
+            "def kein_thread(*a, **k): raise Stopp()\n"
+            "am.threading.Thread = kein_thread\n"
+            "try:\n"
+            "    am.main(['--stufen', 'low', '--messungen', 'leerlauf'])\n"
+            "except Stopp:\n"
+            "    pass\n"
+            "print('CWD', os.getcwd(), flush=True)\n"
+            "atexit._run_exitfuncs()\n"
+            "sys.stdout.flush()\n"
+            "os._exit(0)\n", encoding="utf-8")
+        basis = tmp_path / "tmp"
+        basis.mkdir()
+        env = {k: v for k, v in os.environ.items() if not k.startswith("LIGHTOS_")}
+        r = subprocess.run([sys.executable, str(skript), WERKZEUG, str(basis)],
+                           cwd=str(tmp_path), env=env, capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=120)
+        assert r.returncode == 0, r.stdout + r.stderr
+        # der Lauf stand wirklich IN der Sandbox, als die Hooks liefen
+        cwd = [z for z in r.stdout.splitlines() if z.startswith("CWD ")][0][4:]
+        assert os.path.basename(cwd).startswith(am.SANDBOX_PRAEFIX), r.stdout
+        assert os.listdir(basis) == [], f"Sandbox blieb liegen: {os.listdir(basis)}"
+
+
+# ── Gobo: nur Geraete mit Rotationskanal messen (Codex-Review #1005) ─────────
+
+class TestGoboRotation:
+    def test_ohne_rotationskanal_wird_getrennt_ausgewiesen(self, am):
+        mit = am.gobo_geraet(1, "moving_head", [_Kanal("pan"), _Kanal("gobo_wheel", 6),
+                                                _Kanal("gobo_rotation")])
+        ohne = am.gobo_geraet(2, "moving_head", [_Kanal("pan"), _Kanal("gobo_wheel", 6)])
+        assert mit == {"fid": 1, "wert": 34, "rotation": True}
+        assert ohne == {"fid": 2, "wert": 34, "rotation": False}
+
+    def test_kein_gobo_geraet(self, am):
+        assert am.gobo_geraet(3, "par", [_Kanal("gobo_wheel", 6)]) is None
+        assert am.gobo_geraet(4, "moving_head", [_Kanal("pan")]) is None
+        assert am.gobo_geraet(5, "moving_head", [_Kanal("gobo_wheel", 1)]) is None
+        assert am.gobo_geraet(6, "moving_head", None) is None
+
+    def test_gemessen_wird_am_geraet_mit_rotation(self, am):
+        ohne = {"fid": 2, "wert": 34, "rotation": False}
+        mit = {"fid": 7, "wert": 34, "rotation": True}
+        assert am.gobo_messgeraet([ohne, mit], 99) == 7
+        assert am.gobo_messgeraet([ohne], 99) == 2          # Schwenk bleibt messbar
+        assert am.gobo_messgeraet([], 99) == 99
+
+    def test_stehender_winkel_ohne_rotationskanal_ist_kein_messwert(self, am):
+        """Der Fehler: ein Moving Head ohne gobo_rotation steht im 3D still —
+        der Bericht meldete dafuer 'stand_anteil 1.0' (= Anzeige ruckelt)."""
+        steht = [0.0] * 200
+        ohne = [{"fid": 2, "wert": 34, "rotation": False}]
+        erg = am.gobo_auswertung(steht, ohne)
+        assert "stand_anteil" not in erg
+        assert erg == {"nicht_messbar": am.GOBO_OHNE_ROTATION}
+        # MIT Rotationskanal ist derselbe stehende Winkel ein echter Befund
+        mit = ohne + [{"fid": 7, "wert": 34, "rotation": True}]
+        erg = am.gobo_auswertung(steht, mit)
+        assert erg["stand_anteil"] == 1.0 and erg["geraete_mit_rotation"] == 1
+        dreht = [math.radians(i * 1.0) for i in range(200)]
+        assert am.gobo_auswertung(dreht, mit)["stand_anteil"] == 0.0
+
+    def test_tabelle_zeigt_strich_statt_100_prozent(self, am):
+        erg = {"stufen": {"low": {"anzeige": "Niedrig", "soll_push": 15, "messungen": [
+            {"messung": "gobo", "hauptfenster": "sichtbar", "push_hz": 15.0,
+             "bild": {"fps": 60.0, "bilder_ueber_50ms": 0},
+             "gobo": am.gobo_auswertung([0.0] * 50, [{"fid": 2, "rotation": False}])}]}}}
+        assert "| Niedrig | gobo | sichtbar | 60,0 | 0 | 15,0 (15) | - | - |" in am.tabelle(erg)
+
+    def test_messung_benutzt_die_helfer(self):
+        quelle = _quelle("tools", "app_messung.py")
+        assert "gobo_geraet(f.fid" in quelle
+        assert "fid0 = gobo_messgeraet(self.gobo, self.fids[0])" in quelle
+        assert 'm["gobo"] = gobo_auswertung(m.pop("_g"), self.gobo)' in quelle
+
+
 # ── kein DMX nach aussen ─────────────────────────────────────────────────────
 
 class TestKeineAusgabe:
