@@ -45,6 +45,7 @@
 | MIDI-4 | A | fix/midi3-mapping-robust | 2026-10-09T16:27Z | src/core/midi/midi_mapper.py |
 | XPLAT-49 | A | fix/xplat49-uninstall-datenschutz | 2026-10-10T09:29Z | uninstall.py |
 | XPLAT-50 | A | fix/xplat49-uninstall-datenschutz | 2026-10-10T09:29Z | start.bat · start.ps1 |
+| FM-67 | A | fix/fm67-gleichnamige-modi | 2026-10-10T09:29Z | - |
 
 ## Blocker & Fallen
 
@@ -120,7 +121,6 @@
 
 ## Verlauf
 
-- 2026-10-10T09:27Z C uebergeben DOC-32
 - 2026-10-10T09:27Z C uebergeben DOC-33
 - 2026-10-10T09:27Z C uebergeben DOC-34
 - 2026-10-10T09:27Z C uebergeben DOC-35
@@ -150,3 +150,4 @@
 - 2026-10-10T09:28Z C uebergeben DOC-56
 - 2026-10-10T09:29Z A claim XPLAT-49
 - 2026-10-10T09:29Z A claim XPLAT-50
+- 2026-10-10T09:29Z A claim FM-67
