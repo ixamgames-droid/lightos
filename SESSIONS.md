@@ -51,7 +51,7 @@
 | TOOL-14 | D | fix/tool14-gen-tools-index-argparse | 2026-10-10T11:10Z | tools/gen_tools_index.py · tests/test_tool14_gen_tools_index_cli.py |
 | TOOL-21 | D | fix/tool21-gif-vergleich-rgb | 2026-10-10T11:13Z | tools/anleitungsbilder/runner.py · tests/test_tool21_bildvergleich_je_kanal.py |
 | TOOL-23 | D | fix/tool23-backlog-ids-tafel-fragmente | 2026-10-10T11:19Z | tools/backlog_ids.py · tests/test_tool23_backlog_ids_tafel_fragmente.py · tests/test_backlog_ids.py |
-| TOOL-24 | D | - | 2026-10-10T09:41Z | - |
+| TOOL-24 | D | fix/tool24-proc18-lizenzhinweise-strukturiert | 2026-10-10T11:23Z | tests/test_proc18_fremd_lizenzhinweise.py |
 | FM-66 | D | - | 2026-10-10T09:41Z | - |
 | DOC-70 | D | docs/doc70-netzwerk-windows | 2026-10-10T11:07Z | docs/anleitung_netzwerk_windows/ANLEITUNG.md · docs/ANLEITUNGEN.md · tests/test_doc70_netzwerk_windows.py |
 | VIZ-98 | D | fix/viz98-bodenfleck-ueber-horizont | 2026-10-10T10:47Z | src/ui/visualizer/scene_src/fixtures/builders.js · src/ui/visualizer/scene_src/bridge/bridge.js · tests/test_viz98_bodenfleck_ohne_treffer_scene.py · tests/test_viz_beam_laenge.py |
@@ -146,7 +146,6 @@
 
 ## Verlauf
 
-- 2026-10-10T09:29Z A claim XPLAT-49
 - 2026-10-10T09:29Z A claim XPLAT-50
 - 2026-10-10T09:29Z A claim FM-67
 - 2026-10-10T09:29Z A claim WEB-06
@@ -176,3 +175,4 @@
 - 2026-10-10T11:15Z B done OUT-64
 - 2026-10-10T11:19Z D aktualisiert TOOL-23: Branch - -> fix/tool23-backlog-ids-tafel-fragmente; Dateien - -> tools/backlog_ids.py · tests/test_tool23_backlog_ids_tafel_fragmente.py · tests/test_backlog_ids.py
 - 2026-10-10T11:19Z B claim ARM-PRUEFUNG-1010
+- 2026-10-10T11:23Z D aktualisiert TOOL-24: Branch - -> fix/tool24-proc18-lizenzhinweise-strukturiert; Dateien - -> tests/test_proc18_fremd_lizenzhinweise.py
