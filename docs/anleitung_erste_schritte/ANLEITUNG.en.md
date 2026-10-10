@@ -53,6 +53,11 @@ After starting, LightOS opens in the **Bühne** (stage) section. From top to bot
    To black out only some fixtures or groups, use a
    [blackout button with a target](../anleitung_vc_widgets/01_button.md#blackout-mit-ziel-vcb-11)
    in the Virtual Console.
+   Right above it, in the right corner of the menu bar, sits the **LASER NOT-AUS** button
+   (laser emergency stop; also top right in kiosk mode; shortcut `Ctrl+Shift+L`): one click
+   makes all lasers dark at once, without a confirmation, and the button then flashes as
+   **LASER NOT-AUS AKTIV**. It is released only deliberately — click it again and confirm
+   the prompt.
 7. **Command line** — for keyboard commands such as `1 thru 5 @ 80`. Examples are shown as
    placeholder text in the field.
 8. **Status bar** — on the left the state of the ENTTEC adapter
