@@ -60,7 +60,7 @@
 | VIZ-100 | A | fix/viz100-haengend-andocken | 2026-10-10T14:38Z | src/ui/visualizer/scene_src/stage/docking.js |
 | VIZ-101 | A | fix/viz101-licht-durch-wand | 2026-10-10T14:38Z | - |
 | UI-86 | A | perf/ui86-2d-ansicht-hidpi | 2026-10-10T14:39Z | - |
-| QA-91 | D | fix/qa91-doc60-test-encoding | 2026-10-10T15:26Z | - |
+| QA-91 | D | fix/qa91-doc60-test-encoding | 2026-10-10T15:48Z | - |
 
 ## Blocker & Fallen
 
