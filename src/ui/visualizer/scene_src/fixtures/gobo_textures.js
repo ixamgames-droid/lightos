@@ -54,6 +54,7 @@ import * as THREE from '../three/three.js';
 // Konstanten werden nur in Funktionsruempfen gelesen, nie beim Modul-Laden.
 import { POOL_MAX_RADIUS, poolFalloffTexture } from './floor_pool.js';
 import { isLowSpec, renderer } from '../scene/renderer.js';   // VIZ-92
+import { schattenRechteck } from '../scene/gobo_projektion.js';   // VIZ-102
 
 const CACHE = new Map();
 // VIZ-92: 128 px waren fuer einen Bodenfleck von mehreren Metern zu grob —
@@ -382,8 +383,10 @@ function _scheibeFrei(disc) {
  *  genau den Gobo-Winkel). Rueckgabe: mittlerer Kegelrand-Abstand in Metern
  *  (fuer syncPoolSize) oder `null`, wenn nichts auszurichten ist.
  */
-export function alignGoboFloor(f, hitX, flaecheY, hitZ) {
-  const beam = f && f.beam, disc = f && f.floorSpot;
+export function alignGoboFloor(f, hitX, flaecheY, hitZ, zielScheibe = null) {
+  // VIZ-102: `zielScheibe` = die zweite Scheibe auf der Flaeche unter einer
+  // Kante (goboKanteAbgleichen) — dieselbe Rechnung fuer eine andere Hoehe.
+  const beam = f && f.beam, disc = zielScheibe || (f && f.floorSpot);
   if (!disc) return null;
   if (!f.goboAktiv || !beam || !beam.geometry || typeof hitX !== 'number') {
     _scheibeFrei(disc);
@@ -439,11 +442,149 @@ export function alignGoboFloor(f, hitX, flaecheY, hitZ) {
   let d = (psi0 - basis) % (2 * Math.PI);
   if (d > Math.PI) d -= 2 * Math.PI;
   if (d <= -Math.PI) d += 2 * Math.PI;
-  disc.rotation.z = basis + d;
+  if (!zielScheibe) disc.rotation.z = basis + d;
   disc.matrixAutoUpdate = false;
   disc.matrix.makeBasis(_EX, _EY, _EZ).setPosition(_C);
   disc.matrixWorldNeedsUpdate = true;
   return Math.sqrt((_EX.lengthSq() + _EY.lengthSq()) / 2) * q;
+}
+
+// ── VIZ-102: nichts schwebt ueber einer Kante ───────────────────────────────
+//
+// Die flache Scheibe liegt in der EBENE der getroffenen Oberseite (Podest,
+// Buehnenplatte). Trifft der Strahl nahe der Kante, ragte sie darueber hinaus
+// und hing in der Luft — bei Motiven mit vielen Einzelteilen (Tetris) standen
+// Vierecke frei vor der Buehne. Jetzt:
+//
+//   * die Scheibe wird an den Kanten der Oberseite beschnitten (vier
+//     Clipping-Ebenen am Material — sie sind ab dem Bau da und stehen sonst
+//     weit draussen, die Zahl der Ebenen und damit das Programm aendert sich
+//     nie: VIZ-69);
+//   * mit Gobo liegt der Rest als ZWEITE Scheibe auf der Flaeche darunter
+//     (Hallenboden), aus derselben Kegel-Rechnung (alignGoboFloor) — und der
+//     Schatten der Oberseite ist dort ausgespart (clipIntersection ueber das
+//     vom Licht aus gestreckte Rechteck). Die zweite Scheibe entsteht erst,
+//     wenn sie gebraucht wird; ihr Material ist fuer alle Geraete gleich
+//     gebaut (ein Programm).
+//
+// Gilt auf allen Stufen — es ist das Rueckfall-Muster der Geraete ohne
+// projizierendes Licht und auf Niedrig das einzige.
+export const KANTE_ANZAHL = 4;
+const KANTE_FREI = 1e6;
+const _unterAktiv = new Set();     // Geraete, deren zweite Scheibe gerade liegt
+
+/** Vier Clipping-Ebenen in Grundstellung (schneiden nichts). */
+export function neueKantenEbenen() {
+  const out = [];
+  for (let i = 0; i < KANTE_ANZAHL; i++) out.push(new THREE.Plane(new THREE.Vector3(0, 1, 0), KANTE_FREI));
+  return out;
+}
+
+function _ebenenFrei(ebenen) {
+  if (!ebenen) return;
+  for (const e of ebenen) { e.normal.set(0, 1, 0); e.constant = KANTE_FREI; }
+}
+
+// Ebenen auf die vier Seiten des Rechtecks; `innen` = Normalen zeigen nach
+// innen (behalten wird das Innere), sonst nach aussen.
+function _ebenenAufRechteck(ebenen, r, innen) {
+  const v = innen ? -1 : 1;
+  const mx = r.cx * r.c - r.cz * r.s;      // Mitte in lokalen Achsen
+  const mz = r.cx * r.s + r.cz * r.c;
+  ebenen[0].normal.set(v * r.c, 0, -v * r.s);   ebenen[0].constant = -v * (mx + r.hx);
+  ebenen[1].normal.set(-v * r.c, 0, v * r.s);   ebenen[1].constant = v * (mx - r.hx);
+  ebenen[2].normal.set(v * r.s, 0, v * r.c);    ebenen[2].constant = -v * (mz + r.hz);
+  ebenen[3].normal.set(-v * r.s, 0, -v * r.c);  ebenen[3].constant = v * (mz - r.hz);
+}
+
+function _unterScheibe(f) {
+  if (f.floorSpot2) return f.floorSpot2;
+  const main = f.floorSpot;
+  const mat = new THREE.MeshBasicMaterial({
+    color: main.material.color, transparent: true, opacity: main.material.opacity,
+    side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending,
+    map: main.material.map || null,
+    clippingPlanes: neueKantenEbenen(), clipIntersection: true,
+  });
+  const disc = new THREE.Mesh(main.geometry, mat);
+  disc.matrixAutoUpdate = false;
+  disc.visible = false;
+  disc.userData.goboUnterScheibe = true;
+  if (main.parent) main.parent.add(disc);
+  f.floorSpot2 = disc;
+  return disc;
+}
+
+function _unterAus(f) {
+  if (f.floorSpot2) f.floorSpot2.visible = false;
+  f._goboUnten = false;
+  _unterAktiv.delete(f);
+}
+
+/** Scheibe(n) eines Geraets an der Kante der getroffenen Oberseite ausrichten.
+ *
+ *  @param kante   Oberseite (gobo_projektion.js: {cx, cz, hx, hz, c, s, y})
+ *                 oder null = keine Kante (Boden, Wand, kein Treffer)
+ *  @param unten   true = das Muster ragt ueber die Kante (Rest nach unten)
+ *  @param yUnten  Hoehe der Flaeche darunter
+ *  @returns true, wenn die zweite Scheibe liegt
+ */
+export function goboKanteAbgleichen(f, kante, unten, yUnten, hitX, hitZ) {
+  const main = f && f.floorSpot;
+  if (!main || !main.material) return false;
+  const ebenen = main.material.clippingPlanes;
+  if (!kante || !ebenen || ebenen.length !== KANTE_ANZAHL) {
+    _ebenenFrei(ebenen);
+    _unterAus(f);
+    return false;
+  }
+  _ebenenAufRechteck(ebenen, kante, true);
+  // Zweite Scheibe nur mit Gobo (affine Kegel-Rechnung) — der weiche Fleck
+  // eines offenen Strahls wird nur beschnitten.
+  if (!unten || !f.goboAktiv || main.matrixAutoUpdate !== false || !f.beam
+      || !(typeof yUnten === 'number') || !(yUnten < kante.y)) {
+    _unterAus(f);
+    return false;
+  }
+  const disc = _unterScheibe(f);
+  if (alignGoboFloor(f, hitX, yUnten + 0.01, hitZ, disc) === null) { _unterAus(f); return false; }
+  const p = f.beam.geometry.parameters;
+  f.beam.localToWorld(_A.set(0, p.height / 2, 0));
+  const schatten = schattenRechteck(kante, _A.x, _A.y, _A.z, yUnten);
+  if (schatten) _ebenenAufRechteck(disc.material.clippingPlanes, schatten, false);
+  else _ebenenAufRechteck(disc.material.clippingPlanes, kante, false);
+  f._goboUnten = true;
+  _unterAktiv.add(f);
+  _unterAngleichen(f);
+  return true;
+}
+
+function _unterAngleichen(f) {
+  const main = f.floorSpot, disc = f.floorSpot2;
+  if (!main || !disc || !main.parent) { _unterAktiv.delete(f); if (disc) disc.visible = false; return; }
+  const a = main.material, b = disc.material;
+  b.color = a.color;
+  b.opacity = a.opacity;
+  if (b.map !== a.map && a.map) b.map = a.map;     // nur die Uniform (Gobo-Wechsel)
+  disc.layers.mask = main.layers.mask;
+  disc.visible = main.visible && !!a.map && !!f.goboAktiv;
+}
+
+/** Vor jedem Bild (scene/spot_pool.js#syncSpotPool): die zweiten Scheiben
+ *  folgen Farbe, Deckkraft, Ebenen-Maske und Sichtbarkeit der ersten. */
+export function syncGoboUnterScheiben() {
+  if (!_unterAktiv.size) return;
+  for (const f of _unterAktiv) _unterAngleichen(f);
+}
+
+/** Geraet entfernt (fixtures.js#removeFixture). */
+export function entferneGoboUnterScheibe(f) {
+  _unterAktiv.delete(f);
+  const disc = f && f.floorSpot2;
+  if (!disc) return;
+  if (disc.parent) disc.parent.remove(disc);
+  if (disc.material) disc.material.dispose();   // Geometrie gehoert der ersten Scheibe
+  f.floorSpot2 = null;
 }
 
 /** Bodenfleck eines Fixtures an das aktuelle Gobo angleichen.

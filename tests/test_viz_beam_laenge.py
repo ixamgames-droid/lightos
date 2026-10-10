@@ -116,7 +116,10 @@ class QuelleTest(unittest.TestCase):
         block = self.js[i:self.js.index("\n}\n", i)]
         self.assertIn("auftreffAbstand = t", block,
                       "der Abstand muss aus dem schon gerechneten t kommen")
-        self.assertIn("setBeamLength(f, auftreffAbstand)", block)
+        # VIZ-102: die Laenge geht vom Auftreffabstand aus und waechst nur,
+        # wenn ein Gobo-Fleck ueber die Kante der getroffenen Oberseite ragt.
+        self.assertIn("let kegelAbstand = auftreffAbstand", block)
+        self.assertIn("setBeamLength(f, kegelAbstand)", block)
         self.assertEqual(block.count("setBeamLength(f,"), 1,
                          "genau EINE Anwendung — zwei waeren zwei Wahrheiten")
         self.assertEqual(block.count("koerperTreffer(f,"), 1,

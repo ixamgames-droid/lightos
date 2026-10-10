@@ -219,6 +219,8 @@ export function noteCameraMotion() { dynamicResolution.noteCameraMotion(); }
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(basePixelRatio());
 renderer.shadowMap.enabled = true;
+// VIZ-102: Clipping-Ebenen je Material (nur die Bodenflecken tragen welche).
+renderer.localClippingEnabled = true;
 // PCFSoft sampelt deutlich mehr Shadow-Taps pro Pixel als plain PCF.
 renderer.shadowMap.type = tierSettings.softShadows ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
 // console.warn statt .log: Qt spiegelt nur Warning/Error-Konsolenzeilen ins

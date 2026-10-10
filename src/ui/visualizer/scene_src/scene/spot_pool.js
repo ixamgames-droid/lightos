@@ -67,11 +67,11 @@ import { requestShadowUpdate } from './shadow_update.js';
 import { requestRender } from './render_loop.js';
 // VIZ-96: Gobo-Projektion — reine Rechnung/Shader-Patch in gobo_projektion.js,
 // Motive und Kegelrand aus gobo_textures.js.
-import { goboTexture, GOBO_STILE, GOBO_RAND, GROESSE as GOBO_KACHEL_PX } from '../fixtures/gobo_textures.js';
+import { goboTexture, GOBO_STILE, GOBO_RAND, GROESSE as GOBO_KACHEL_PX, syncGoboUnterScheiben } from '../fixtures/gobo_textures.js';
 import {
   installGoboProjektion, baueGoboAtlas, goboProjektionAktiv, goboKachel, goboLichtWinkel,
   goboDrehung, setzeGoboLicht, loescheGoboLicht, GOBO_HALBSCHATTEN, GOBO_MAX_LICHTER,
-  goboBlendeSchritt, goboFlachDeckkraft, goboEbene, setzeGoboEbene, GOBO_HALTE_BONUS,
+  goboBlendeSchritt, goboFlachDeckkraft, goboFern, setzeGoboFern, GOBO_HALTE_BONUS,
   GOBO_BLENDE_MS,
 } from './gobo_projektion.js';
 
@@ -101,6 +101,12 @@ const POOL_STANDARD = 8;
 export const LINSEN_VORSPRUNG = 0.02;
 export const SCHATTEN_NEAR = 0.5;
 const _apex = new THREE.Vector3(), _basis = new THREE.Vector3();
+const _ursprung = new THREE.Vector3();
+// VIZ-102: Rechenrauschen der Kegel-Matrix (Gobo-Drehung) — darunter gilt die
+// Lage bzw. der Winkel eines Pool-Lichts als unveraendert (1 Mikrometer bzw.
+// 1e-6 rad; eine echte Kopfbewegung liegt um Groessenordnungen darueber).
+const LAGE_RUHE2 = 1e-12;
+const WINKEL_RUHE = 1e-6;
 
 /** Lichtursprung eines Geraets (Welt) nach `out`; ohne Kegel wie bisher. */
 export function lichtUrsprung(f, out) {
@@ -195,28 +201,6 @@ function _projektionAbgleichen() {
   _projNeu.clear();
 }
 
-// B3: Inverse der Schattenmatrix, wie three sie fuer dieses Licht baut
-// (SpotLightShadow.updateMatrices: Oeffnung 2 x angle x focus, Lage des
-// Lichts, lookAt aufs Ziel). Selbst gerechnet statt `shadow.matrix` gelesen:
-// die entsteht erst im Schattendurchlauf NACH syncSpotPool und waere hier
-// ein Bild alt (beim Besitzerwechsel die des Vorgaengers).
-const _sKam = new THREE.PerspectiveCamera(50, 1, 0.5, 500);
-const _sM = new THREE.Matrix4();
-function _schattenMatrixInvers(l, ziel) {
-  const sc = l.shadow.camera;
-  _sKam.fov = THREE.MathUtils.RAD2DEG * 2 * l.angle * (l.shadow.focus || 1);
-  _sKam.aspect = l.shadow.mapSize.width / l.shadow.mapSize.height;
-  _sKam.near = sc.near;
-  _sKam.far = l.distance || sc.far;
-  _sKam.updateProjectionMatrix();
-  _sKam.position.copy(l.position);
-  _sKam.lookAt(ziel.position);
-  _sKam.updateMatrixWorld();
-  _sM.set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1)
-    .multiply(_sKam.projectionMatrix).multiply(_sKam.matrixWorldInverse);
-  return _sM.invert();
-}
-
 // Pool-Licht `i` (Slot p) projiziert das Gobo von Geraet f. Liefert false,
 // wenn es nicht geht (Licht ohne Schatten, kein Motiv, kein Kegel).
 // Der Musterwinkel kommt aus der Welt-Matrix des Kegels — sie traegt die
@@ -247,16 +231,16 @@ function _goboProjizieren(i, p, f) {
     (e[0] * b[4] + e[1] * b[5] + e[2] * b[6]) / lx,
     (e[8] * b[0] + e[9] * b[1] + e[10] * b[2]) / lz,
     (e[8] * b[4] + e[9] * b[5] + e[10] * b[6]) / lz);
-  l.angle = optik.winkel;
+  // VIZ-102: der Winkel kommt aus den Spaltenlaengen der gedrehten Kegel-
+  // Matrix — gleiche Ruhe-Regel wie beim Ursprung (s. LAGE_RUHE2).
+  if (!(Math.abs(optik.winkel - p.goboWinkel) < WINKEL_RUHE)) p.goboWinkel = optik.winkel;
+  l.angle = p.goboWinkel;
   l.penumbra = GOBO_HALBSCHATTEN;
   setzeGoboLicht(i, 1, optik.skala * d[0], optik.skala * d[1], kachel);
-  // B3: die Projektion endet an der Flaeche, auf der der Kegel endet
-  // (builders.js#applyFloorAim: Oberseite von Podest/Buehnenplatte).
-  if (typeof f._goboGrenzY === 'number' && isFinite(f._goboGrenzY)) {
-    setzeGoboEbene(i, goboEbene(_schattenMatrixInvers(l, p.ziel).elements, f._goboGrenzY));
-  } else {
-    setzeGoboEbene(i, null);
-  }
+  // VIZ-102: die Projektion laeuft ueber Kanten weiter (B3 schnitt sie an der
+  // Buehnenplatte ab); weit jenseits der Kegel-Reichweite faellt sie mit dem
+  // Abstandsquadrat (gobo_projektion.js#GOBO_FERN_AB).
+  setzeGoboFern(i, goboFern(l.position.distanceTo(p.ziel.position)));
   return true;
 }
 
@@ -290,7 +274,7 @@ function _neuesLicht() {
   scene.add(licht);
   // `traeger`: das Geraet, dessen Werte das Licht gerade zeigt. Gleich `fid`,
   // ausser waehrend ein verdraengter Gobo-Halter noch ausblendet (VIZ-96 B3).
-  return { licht, ziel, fid: null, traeger: null, veraltet: false };
+  return { licht, ziel, fid: null, traeger: null, veraltet: false, goboWinkel: NaN };
 }
 
 /**
@@ -494,6 +478,10 @@ function _lage(fid) {
 
 /** Vor JEDEM Bild (app.js#renderFrame) — vor prepareShadowMap. */
 export function syncSpotPool() {
+  // VIZ-102: der Teil eines flachen Musters, der ueber eine Kante ragt, liegt
+  // als zweite Scheibe auf der Flaeche darunter — sie folgt hier je Bild
+  // Farbe, Deckkraft und Sichtbarkeit der ersten (auch auf Stufe Niedrig).
+  syncGoboUnterScheiben();
   if (!_pool.length || !_fixtures) {
     if (_projiziert.size) _projektionAbgleichen();   // VIZ-96: Bodenmuster zurueck
     _blenden = 0;
@@ -602,7 +590,14 @@ export function syncSpotPool() {
     if (s) {
       // Ziel wie beim Geraete-Licht (f.spotTarget); der Ursprung sitzt seit
       // VIZ-92 an der Linse (lichtUrsprung, s. o.) statt 1 m ueber dem Sockel.
-      lichtUrsprung(f, l.position);
+      // VIZ-102: nur uebernehmen, wenn sich die Lage wirklich aendert. Der
+      // Ursprung kommt aus der Welt-Matrix des KEGELS, und der dreht sich mit
+      // dem Gobo um die eigene Achse: rechnerisch bleibt die Spitze stehen,
+      // in den letzten Stellen wackelt sie aber — die Schatten-Signatur
+      // (shadow_update.js) sah darin eine Bewegung und zeichnete bei reiner
+      // Gobo-Drehung in JEDEM Bild alle Shadow-Maps neu (gemessen 23/s).
+      lichtUrsprung(f, _ursprung);
+      if (_ursprung.distanceToSquared(l.position) > LAGE_RUHE2) l.position.copy(_ursprung);
       const t = s.target;
       if (t) {
         if (t.parent === scene || !t.parent) p.ziel.position.copy(t.position);
@@ -651,7 +646,7 @@ export function syncSpotPool() {
     }
   }
   if (verdraengt) _letzterWechsel = jetzt;
-  if (gobo) _projektionAbgleichen();
+  if (gobo) { _projektionAbgleichen(); syncGoboUnterScheiben(); }
   // B3: eine laufende Blende braucht das naechste Bild (Bilder entstehen nur
   // auf Anforderung) — genau so lange, wie sie laeuft.
   _blenden = blendet;

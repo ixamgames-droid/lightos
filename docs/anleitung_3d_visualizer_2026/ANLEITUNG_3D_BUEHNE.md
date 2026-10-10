@@ -287,6 +287,33 @@ Licht ihr Gobo in den Raum (Muster auf Hindernissen, Schatten dahinter). Alle
 echtes Licht zu einem anderen Strahl, wechselt das Gerät zwischen beiden
 Darstellungen; Größe und Lage des Musters bleiben dabei gleich.
 
+#### Gobo-Projektion im Einzelnen
+
+- **Wechsel ohne Sprung:** Wandert ein echtes Licht zu einem helleren Gerät,
+  blendet das alte Gerät in knapp 0,2 Sekunden auf sein flaches Muster über;
+  danach blendet das neue Gerät seine Projektion ein. Ein Gerät, das gerade
+  projiziert, behält sein Licht etwas länger, damit der Wechsel nicht an einem
+  knappen Helligkeitsunterschied hängt. Ein Blackout ist sofort dunkel.
+- **Traverse, Stütze, kleines Podest im Strahl:** Trifft die Strahlmitte ein
+  Element, das schmaler ist als das Muster, laufen Muster und Kegel bis zur
+  Fläche dahinter. Die Projektion legt ihr Motiv zusätzlich auf das Element,
+  dahinter bleibt sein Schatten.
+- **Bühnenkante:** Ragt ein Muster über die Kante einer Bühnenplatte oder eines
+  Podests, liegt der Teil dahinter auf dem Boden darunter. Direkt vor der Kante
+  bleibt der Schatten der Platte frei, und der Lichtkegel reicht bis zum Boden.
+  Nichts schwebt in Höhe der Bühne in der Luft; das gilt auch für den flachen
+  Fleck und auf der Stufe Niedrig.
+- **Flacher Einfall:** Ein schräg nach vorn gerichteter Kopf wirft die äußeren
+  Motiv-Teile unter flachem Winkel weit auf den Hallenboden. Dort sind sie
+  länger gezogen als auf der Bühne. Das ist die echte Geometrie des Strahls;
+  mit dem Abstand werden sie dunkler.
+- **Helligkeit:** Flacher Fleck und Projektion sind bei gleichem Dimmer etwa
+  gleich hell. Die Projektion nimmt die Farbe der beleuchteten Fläche an, der
+  flache Fleck bleibt etwas weißer.
+- **Bildrate:** Eine Gobo-Projektion kostet so viel wie ein offener Strahl mit
+  echtem Licht. Gobo-Wechsel und Gobo-Drehung lösen keine Neuberechnung der
+  Schatten aus; eine Kopfbewegung schon.
+
 **Warum das so ist:** jedes echte Licht rechnet die Grafikkarte für **jeden
 Bildpunkt jeder beleuchteten Fläche** einmal durch. Mit 68 Lichtern brauchte ein
 Bild der 80-Geräte-Bühne gemessen rund 55 ms (unter 20 Bilder pro Sekunde), mit 8
