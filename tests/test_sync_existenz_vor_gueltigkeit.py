@@ -19,6 +19,11 @@ das Geraet galt als nicht vorhanden. Die Folge war kein Hinweis, sondern ein
 doppelte `(fixture_id, name)`-Modus-Paare** (gemessen mit
 `SELECT fixture_id, name, COUNT(*) ... HAVING COUNT(*)>1`), und
 `scalar_one_or_none()` wirft darauf `MultipleResultsFound`.
+
+Nachtrag FM-73: die Modus-Suche selbst wirft darauf nicht mehr (gemeinsame
+Regel in `src/core/database/modus_wahl.py`, Verhaltenstest in
+`tests/test_fm73_sync_gleichnamige_modi.py`). Die Stellung des `add` bleibt
+richtig — jede andere Pruefung kann weiter scheitern.
 """
 from __future__ import annotations
 
@@ -73,7 +78,11 @@ class ExistenzVorGueltigkeitTest(unittest.TestCase):
         kann, entscheidet ein Konfigurationsfehler ueber das LOESCHEN von
         Nutzerwerten — und das ist die falsche Fehlrichtung."""
         add = self.rumpf.index("valid_fids.add(fid)")
-        werfend = self.rumpf.index("scalar_one_or_none()")
+        # FM-73: die Modus-Suche wirft bei doppelten Modusnamen nicht mehr
+        # (gemeinsame Regel in ``modus_wahl``). Sie bleibt trotzdem die erste
+        # Pruefung, die scheitern KANN (Bibliothek nicht lesbar) — also die
+        # Marke, vor der der ``add`` stehen muss.
+        werfend = self.rumpf.index("modus_wahl.modi_des_profils(")
         self.assertLess(
             add, werfend,
             "valid_fids.add(fid) steht hinter einer werfenden Pruefung — "

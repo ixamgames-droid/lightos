@@ -166,9 +166,16 @@ class PatchFixtureEditDialog(QDialog):
 
         self._combo_mode = QComboBox()
         current_mode_idx = -1
+        # FM-73: der Modus des Geraets nach der gemeinsamen Regel, aber NUR
+        # Stufe 1 (Name; bei gleichnamigen die Kanalzahl) — vorher gewann
+        # unter gleichnamigen Modi der letzte Eintrag. Fehlt der Name, bleibt
+        # es wie bisher beim ersten Eintrag der Liste.
+        from src.core.database.modus_wahl import gleichnamiger_modus
+        aktuell = gleichnamiger_modus(self._modes, self._fixture.mode_name,
+                                      self._fixture.channel_count)
         for i, m in enumerate(self._modes):
             self._combo_mode.addItem(f"{m.name} ({m.channel_count}ch)", (m.name, m.channel_count))
-            if m.name == self._fixture.mode_name:
+            if m is aktuell:
                 current_mode_idx = i
         if current_mode_idx >= 0:
             self._combo_mode.setCurrentIndex(current_mode_idx)
