@@ -27,7 +27,7 @@
 | UI-76 | B | fix/ui76-go-hinweis-page | 2026-10-08T19:17Z | src/core/cueliste_ziel.py · src/ui/views/playback_view.py · tests/test_ui76_go_hinweis.py · docs/anleitung_szenen_cues/ANLEITUNG.md · changelog.d/2026-10-08-UI-76.md · BACKLOG.md |
 | VIZ-95 | A | feature/viz95-lasermuster-3d | 2026-10-08T20:47Z | src/ui/visualizer |
 | LAS-30 | A | feature/las30-laser-achsen | 2026-10-10T10:47Z | src/core/laser |
-| VIZ-96 | A | feature/viz96-gobo-projektion | 2026-10-08T21:37Z | src/ui/visualizer |
+| VIZ-96 | A | feature/viz96-gobo-projektion | 2026-10-10T13:08Z | src/ui/visualizer |
 | UI-84 | A | fix/ui84-efx-laden-geraeteliste | 2026-10-09T13:45Z | src/ui/views/efx_view.py |
 | VIZ-97 | D | fix/viz97-gobo-schluesselwoerter | 2026-10-10T11:42Z | src/ui/widgets/gobo_icons.py · tests/test_viz97_gobo_schluesselwoerter.py · BACKLOG.md · changelog.d/2026-10-09-VIZ-97.md |
 | BPM-30 | D | fix/bpm30-beat-thread-get-state | 2026-10-10T11:42Z | src/core/app_state.py · src/core/engine/bpm_manager.py · tests/test_bpm30_beat_faden_ohne_appstate.py · BACKLOG.md · changelog.d/2026-10-09-BPM-30.md |
