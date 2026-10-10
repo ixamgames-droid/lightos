@@ -183,7 +183,7 @@ def show_laden(ui, welche: str):
         env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
         lauf = subprocess.run([sys.executable, os.path.join(tools, GENERATOR[welche]),
                                "--out", pfad], env=env, cwd=os.getcwd(),
-                              capture_output=True, text=True, timeout=900)
+                              capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=900)
         if lauf.returncode != 0 or not os.path.exists(pfad):
             raise SzenenFehler("Generator scheiterte: " + (lauf.stdout + lauf.stderr)[-600:])
     sim_einbauen()
