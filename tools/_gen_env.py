@@ -92,8 +92,29 @@ os.environ.setdefault(
 # ``setdefault`` wie bei den Schaltern oben: ein schon gesetzter Wert ist eine
 # bewusste Umlenkung (Testlauf, Bild-Sandbox, ``verify_stage_reload``) und
 # gewinnt. Die Startskripte setzen die Variable nicht.
+_UNIVERSES_VOR_DER_UMLENKUNG = os.environ.get("LIGHTOS_UNIVERSES_JSON") or None
 os.environ.setdefault(
     "LIGHTOS_UNIVERSES_JSON",
     os.path.join(tempfile.gettempdir(),
                  f"lightos_gen_{_stem}_{os.getpid()}_universes.json"),
 )
+
+
+def echte_universes_json() -> str:
+    """Pfad der Ausgabe-Konfiguration, die OHNE die Umlenkung oben gelten wuerde
+    — nur zum LESEN.
+
+    Die Umlenkung trifft jeden Leser von ``user_data_file("universes.json")``,
+    auch den, der gar keinen Ausgang oeffnen, sondern nur nachsehen will:
+    ``build_spot90_testshow.py`` waehlt aus der echten Konfiguration das
+    Universum mit Ausgang und prueft seinen Patch am Ende dagegen. Mit der
+    Umlenkung fiel es still auf Universum 1 zurueck, und die Schlusspruefung
+    las dieselbe fehlende Datei — am Rig mit dem Ausgang auf Universum 3 waere
+    eine Test-Show entstanden, die nichts sendet (Codex-Review #1017).
+
+    Hatte der Aufrufer die Variable selbst gesetzt (Testlauf, Sandbox), ist
+    SEIN Wert die gemeinte Konfiguration."""
+    if _UNIVERSES_VOR_DER_UMLENKUNG:
+        return _UNIVERSES_VOR_DER_UMLENKUNG
+    from src.core.paths import app_data_dir
+    return os.path.join(app_data_dir(), "universes.json")

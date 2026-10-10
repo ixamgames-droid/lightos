@@ -51,23 +51,47 @@ for name in ("add_enttec", "add_artnet", "add_sacn"):
 from src.core.app_state import get_state
 st = get_state()
 pfad = os.environ.get("LIGHTOS_UNIVERSES_JSON", "")
+ge = sys.modules.get("_gen_env")
+echte = ge.echte_universes_json() if hasattr(ge, "echte_universes_json") else ""
+mit_ausgang = None
+if echte and os.path.isfile(echte):
+    with open(echte, encoding="utf-8") as fh:
+        mit_ausgang = [u["num"] for u in json.load(fh) if u.get("output")]
 print("ERGEBNIS " + json.dumps({
     "aufrufe": aufrufe,
     "universes_json": pfad,
     "datei_existiert": bool(pfad) and os.path.exists(pfad),
     "ausgaenge": len(st.output_manager.ausgabe_status()),
     "kein_sende_thread": bool(os.environ.get("LIGHTOS_NO_OUTPUT_THREAD")),
+    "echte_universes_json": echte,
+    "echte_mit_ausgang": mit_ausgang,
+    "extra": globals().get("EXTRA"),
 }))
 '''
 
+#: Vorspann: die Funktion, mit der ``build_spot90_testshow.py`` sein Universum
+#: waehlt, aus dem Skript herausgeloest und aufgerufen. Das ganze Skript laeuft
+#: hier nicht — es schreibt eine Show ins Repo.
+_SPOT90 = r'''
+import _gen_env
+import ast as _ast
+with open(os.path.join(sys.argv[1], "tools", "build_spot90_testshow.py"), encoding="utf-8") as _f:
+    _baum = _ast.parse(_f.read())
+_fn = [n for n in _baum.body
+       if isinstance(n, _ast.FunctionDef) and n.name == "_universum_mit_ausgang"]
+_ns = {"_gen_env": _gen_env}
+exec(compile(_ast.Module(body=_fn, type_ignores=[]), "build_spot90_testshow", "exec"), _ns)
+EXTRA = {"universum": _ns["_universum_mit_ausgang"]()}
+'''
 
-def _lauf(vorspann: str, extra_env: dict | None = None) -> dict:
+
+def _lauf(vorspann: str, extra_env: dict | None = None, konfig: list | None = None) -> dict:
     """Kindprozess mit eigenem Datenordner samt „echter" ``universes.json``."""
     with tempfile.TemporaryDirectory(prefix="lightos_tool19_") as tmp:
         daten = os.path.join(tmp, "LightOS")
         os.makedirs(daten)
         with open(os.path.join(daten, "universes.json"), "w", encoding="utf-8") as f:
-            json.dump(ECHTE_KONFIG, f)
+            json.dump(ECHTE_KONFIG if konfig is None else konfig, f)
         skript = os.path.join(tmp, "kind.py")
         with open(skript, "w", encoding="utf-8") as f:
             f.write(_KIND.replace("VORSPANN", vorspann))
@@ -130,6 +154,78 @@ class GeneratorOeffnetKeinenAusgangTest(unittest.TestCase):
             erg = _lauf("import _gen_env  # noqa: F401", {"LIGHTOS_UNIVERSES_JSON": eigen})
             self.assertEqual(os.path.normcase(erg["universes_json"]), os.path.normcase(eigen))
             self.assertEqual([a[:2] for a in erg["aufrufe"]], [["add_artnet", 1]])
+
+
+class EchteKonfigurationBleibtLesbarTest(unittest.TestCase):
+    """Codex-Review #1017: die Umlenkung darf dem Werkzeug, das die echte
+    Konfiguration nur LESEN will, nicht den Blick darauf nehmen."""
+
+    #: Der Ausgang haengt NICHT auf Universum 1 — sonst waere die richtige
+    #: Antwort dieselbe wie der stille Rueckfall.
+    RIG = [
+        {"num": 1, "name": "leer", "output": "", "patch": ""},
+        {"num": 3, "name": "Rig", "output": "Enttec", "patch": "COM_TOOL19"},
+    ]
+
+    def test_gen_env_nennt_die_echte_datei_und_richtet_trotzdem_nichts_ein(self):
+        erg = _lauf("import _gen_env  # noqa: F401")
+        self.assertEqual(os.path.basename(erg["echte_universes_json"]), "universes.json")
+        self.assertEqual(os.path.basename(os.path.dirname(erg["echte_universes_json"])),
+                         "LightOS")
+        self.assertEqual(erg["echte_mit_ausgang"], [1, 2, 3],
+                         "die echte Konfiguration ist ueber _gen_env nicht lesbar")
+        self.assertNotEqual(os.path.normcase(erg["echte_universes_json"]),
+                            os.path.normcase(erg["universes_json"]))
+        self.assertEqual(erg["aufrufe"], [], "Lesen darf keinen Ausgang einrichten")
+
+    def test_eine_bewusste_umlenkung_ist_die_gemeinte_konfiguration(self):
+        with tempfile.TemporaryDirectory(prefix="lightos_tool19_pin_") as d:
+            eigen = os.path.join(d, "eigene.json")
+            with open(eigen, "w", encoding="utf-8") as f:
+                json.dump([{"num": 7, "output": "ArtNet", "patch": "127.0.0.1"}], f)
+            erg = _lauf("import _gen_env  # noqa: F401", {"LIGHTOS_UNIVERSES_JSON": eigen})
+            self.assertEqual(os.path.normcase(erg["echte_universes_json"]),
+                             os.path.normcase(eigen))
+            self.assertEqual(erg["echte_mit_ausgang"], [7])
+
+    def test_spot90_waehlt_das_universum_mit_ausgang(self):
+        """Am Rig mit dem Ausgang auf Universum 3 fiel der Generator mit der
+        Umlenkung still auf Universum 1 zurueck — die Test-Show haette am
+        Geraet nichts gesendet."""
+        erg = _lauf(_SPOT90, konfig=self.RIG)
+        self.assertEqual(erg["extra"], {"universum": 3}, erg)
+        self.assertEqual(erg["aufrufe"], [],
+                         "der Generator hat beim Nachsehen einen Ausgang eingerichtet")
+
+    def test_kein_generator_liest_die_umgelenkte_datei_als_echte(self):
+        """Wer ``_gen_env``/``_builder`` laedt, bekommt ueber
+        ``user_data_file("universes.json")`` die Wegwerfdatei. Ein Werkzeug, das
+        die Konfiguration des Rechners meint, muss ``echte_universes_json()``
+        nehmen."""
+        falsch = []
+        for pfad in sorted(TOOLS.rglob("*.py")):
+            teile = pfad.relative_to(TOOLS).parts
+            if "__pycache__" in teile or teile[0] == "_archiv":
+                continue
+            try:
+                baum = ast.parse(pfad.read_text(encoding="utf-8", errors="replace"))
+            except SyntaxError:
+                continue
+            if not JedesWerkzeugIstGeschuetztTest._importe(baum) & {"_gen_env", "_builder"}:
+                continue
+            for node in ast.walk(baum):
+                if not (isinstance(node, ast.Call) and node.args):
+                    continue
+                f = node.func
+                name = f.id if isinstance(f, ast.Name) else getattr(f, "attr", "")
+                arg = node.args[0]
+                if name == "user_data_file" and isinstance(arg, ast.Constant) \
+                        and arg.value == "universes.json":
+                    falsch.append(f"{pfad.relative_to(REPO).as_posix()}:{node.lineno}")
+        self.assertEqual(falsch, [])
+        spot = (TOOLS / "build_spot90_testshow.py").read_text(encoding="utf-8")
+        self.assertEqual(spot.count("_gen_env.echte_universes_json()"), 2,
+                         "Auswahl UND Schlusspruefung lesen die echte Konfiguration")
 
 
 class JedesWerkzeugIstGeschuetztTest(unittest.TestCase):
