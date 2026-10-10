@@ -16,6 +16,8 @@ Stand: 2026-06-21. Verifiziert gegen die laufende App und den Quellcode
 
 **Öffnen:** Sektionsleiste → **BPM** (oder **Strg+8**) → Unter-Tab **Generator**.
 
+![Unter-Tab Generator vor der ersten Analyse: oben der Kasten „Quelle, Genre & Engine" mit Datei wählen…, Genre, Engine, Fenster, Schritt, Takt und den Knöpfen Analysieren und Ordner analysieren…; darunter der Kasten „BPM-Verlauf & Beatgrid" mit leerem Plot, den Beatgrid-Knöpfen, ▶ Vorhören, „Im Player laden & als BPM-Quelle nutzen" und „Als .json exportieren"](../anleitung_bpm_manager/img/generator.png)
+
 ---
 
 ## In 6 Schritten zum fertigen Beatgrid
@@ -101,8 +103,7 @@ BPM-Wert. (Details: [BPM-Manager-Anleitung, Abschnitt „Taktgenau"](../anleitun
 > Mithören und OS2L ab. **Manuell** und **🔒 Tempo einfrieren** haben weiterhin Vorrang: dann
 > bleibt das Tempo stehen, bis du in **Erkennung** auf **Auto** gehst bzw. das Einfrieren löst.
 > Und die Quelle muss wirklich auf **Lied-Analyse (Player)** stehen: bei **Aus** oder
-> **OS2L** führt das Lied **nicht** (seit BPM-17 — vorher tat es das, obwohl die Anzeige
-> etwas anderes sagte). Zusätzlich braucht es im Musik-Tab den Haken **BPM koppeln**.
+> **OS2L** führt das Lied **nicht**. Zusätzlich braucht es im Musik-Tab den Haken **BPM koppeln**.
 
 Mit **„Als .json exportieren"** sicherst du die komplette Analyse (BPM-Kurve, Beatgrid,
 Struktur) als Datei.

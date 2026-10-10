@@ -11,8 +11,10 @@ Usage:
 
 Was wird installiert/erstellt:
 - venv/                        (Python Virtual Environment, ~250 MB)
-- data/                        (lokale Show-DB, MIDI-Mappings, Modifier)
-- App-Datenordner              (Recent-Files, Stages, Input-Profile, Snapshots, Auto-Save)
+- data/                        (nur mitgelieferte Vorlagen, z. B. controller_library/)
+- App-Datenordner              (ALLE Nutzerdaten seit XPLAT-44: Shows, Show-DB,
+                               universes.json, MIDI-Mappings, Modifier, Recent-Files,
+                               Stages, Input-Profile, Snapshots, Auto-Save)
                                Windows %APPDATA%/LightOS, Linux ~/.local/share/LightOS,
                                macOS ~/Library/Application Support/LightOS — aufgeloest
                                von src/core/paths.app_data_dir() (XPLAT-04/-10)

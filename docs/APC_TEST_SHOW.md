@@ -5,12 +5,13 @@ Diese Anleitung gehört zur Show **`shows/APC_Test_Komplett.lshow`** und ist auf
 
 - **4× Generic „Stage Light ZQ01424"** im **8‑Kanal‑RGBW‑Mode**
   (Universe 1, Adressen **1 / 9 / 17 / 25**)
-- **Akai APC mini** (Original) als Hardware‑Controller der Virtual Console
+- **Akai APC mini mk2** als Hardware‑Controller der Virtual Console
+  (ein Original‑APC‑mini geht auch — Umstellung in Abschnitt 4)
 
 Ziel der Show: **jeden Programmier‑Stil einmal anfassbar machen** und zeigen, wie
 man sie **mischt** — Farben, Dimmer‑Effekte, RGB‑Matrix, fertige Looks, manuelles
 RGBW‑Mischen per Fader und die fixture‑eigenen Auto‑Programme. Aufgeteilt auf
-**5 umschaltbare Seiten**.
+**6 umschaltbare Seiten**.
 
 > Tiefer einsteigen?
 > Oberfläche → [ANLEITUNG.md](ANLEITUNG.md) · Effekte/Speed → [EFFEKTE.md](EFFEKTE.md) ·
@@ -49,10 +50,10 @@ dann passt die Show 1:1.
 ## 2. Show laden & (neu) erzeugen
 
 ### Laden
-1. **Playback → Show Manager** (oder Menü „Show öffnen") → `APC_Test_Komplett.lshow`.
+1. **Playback → Show Manager** (oder Menü **Datei → Öffnen...**) → `APC_Test_Komplett.lshow`.
 2. **E/A → MIDI**: APC mini als Eingang aktiv (Backend WinMM).
 3. **Virtual Console**: oben **„APC LEDs"** einschalten → die Pads leuchten.
-4. **Ausgabe → Konfiguration**: dein DMX‑Interface (Enttec/Art‑Net/sACN) auf Universe 1.
+4. **Ausgabe → Konfigurieren...**: dein DMX‑Interface (Enttec/Art‑Net/sACN) auf Universe 1.
 
 ### Neu erzeugen (Generator)
 Die Show wird vollständig aus einem Skript gebaut — reproduzierbar und in sich sauber:

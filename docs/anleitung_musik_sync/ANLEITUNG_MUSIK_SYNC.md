@@ -58,15 +58,19 @@ passiert automatisch:
 
 ## 4. Tempo / BPM folgt der Musik
 
-- In der **BPM**-Sektion (Strg+8) unter **Einstellungen** bei **BPM-Quelle** „Live-Audio" und als **Audio-Eingang**
-  **PC-Audio (Player/Spotify)** wählen — dann erkennt LightOS das Tempo aus der laufenden Musik (den Modus setzt LightOS dabei automatisch auf AUTO)
-  (im **Monitor** oben springt die große **BPM-Zahl** mit, z. B. ~150 BPM bei Hardstyle).
-- Am **taktgenausten** läuft es über **OS2L (VirtualDJ)**: als Quelle **OS2L (VirtualDJ)** wählen
+- In der **BPM**-Sektion (Strg+8), Unter-Tab **Erkennung**, oben rechts in der Liste **Quelle**
+  einen **PC-Audio**-Eintrag wählen (z. B. „PC-Audio (Systemstandard)") — dann erkennt LightOS das
+  Tempo aus der laufenden Musik. Die große **BPM-Zahl** springt mit (z. B. ~150 BPM bei Hardstyle),
+  das Zustandswort daneben zeigt **EINGERASTET**, sobald das Tempo steht.
+- Am **taktgenausten** läuft es über **OS2L**: als Quelle **OS2L (DJ-Software)** wählen
   (das startet den Server auf Port 1234 gleich mit — der Menüpunkt *Ausgabe → OS2L-Server (Port 1234)*
   tut genau dasselbe und stellt die Quelle ebenfalls um) und in VirtualDJ den OS2L-Versand aktivieren —
   dann liefert der DJ-Player den exakten Takt statt der Audio-Schätzung.
-- Alternativ **MANUAL** mit **Tap-Tempo** (TAP), den **Nudge-Tasten** (±1/±5/±10) oder dem
-  **BPM-Fader** in der VC.
+- Alternativ von Hand: **TAP** im Takt tippen (ab dem 4. Tipp schaltet LightOS auf **Manuell**),
+  mit **Nudge** (−5/−1/+1/+5, im Bereich **Erweitert**) nachziehen oder den **BPM-Fader** in der VC
+  benutzen. Zurück zur Erkennung: **Auto** klicken.
+- Alle Bedienelemente der BPM-Sektion erklärt die
+  [BPM-Manager-Anleitung](../anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md).
 - Alle **Beat-Effekte** (Farb-Chase, Dimmer …) folgen taktgenau. Über einen **Tempo-Bus** laufen
   gekoppelte Effekte relativ zueinander (z. B. der **Dimmer doppelt so schnell** wie der Farb-Chase,
   phasen-gekoppelt) — siehe Anleitung *Virtuelle Konsole* (Dimmer 2×).
@@ -83,6 +87,6 @@ So steuerst du Wiedergabe und Tempo komplett aus der VC (und per APC mini, s. *A
 
 **Kurz:** Playlist laden → globalen Schalter „Lichtshow automatisch zur Musik starten" setzen
 (und/oder pro Lied über „Auto-Show für Lied…" Funktionen zuweisen) → **Play** startet Musik **und**
-Show automatisch → BPM-Sektion auf **BPM-Quelle „Live-Audio" / Audio-Eingang PC-Audio (Player/Spotify)** (oder **OS2L (VirtualDJ)** für
+Show automatisch → BPM-Sektion: **Quelle** auf einen **PC-Audio**-Eintrag (oder **OS2L (DJ-Software)** für
 exakten Takt) → die Effekte folgen taktgenau der Musik. Bedienung über die (show-spezifischen)
 VC-Bänke *Strobe/Musik* + *Tempo/BPM* (optional APC mini).

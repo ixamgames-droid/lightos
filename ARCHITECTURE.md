@@ -1,7 +1,8 @@
 # LightOS — Technische Architektur
 
-> **Stand: 2026-06-10** — komplett gegen den Code verifiziert (Komplett-Scan,
-> Testsuite: 517 passed + 358 subtests). Diese Datei ist die **kanonische
+> **Stand: 2026-06-10** — damals komplett gegen den Code verifiziert
+> (Komplett-Scan). Seither punktuell nachgezogen, nicht neu durchgesehen: im
+> Zweifel gilt der Code. Diese Datei ist die **kanonische
 > Architektur-Übersicht**. Vertiefungen:
 > [docs/OUTPUT_MERGE_CONTRACT.md](docs/OUTPUT_MERGE_CONTRACT.md) (verbindlicher
 > Render-Vertrag), [docs/EFFEKTE.md](docs/EFFEKTE.md),
@@ -14,8 +15,8 @@
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │                        UI-Layer (PySide6)                        │
-│ MainWindow (8 Sektionen): Bühne · Patchen · Programmer ·        │
-│ Virtual Console · Simple Desk · Playback · Eingabe/Ausgabe       │
+│ MainWindow (Sektionen): Bühne · Patchen · Programmer ·          │
+│ Virtual Console · Simple Desk · Playback · Eingabe/Ausgabe · BPM │
 └──────────────┬───────────────────────────────▲───────────────────┘
                │ Setter (set_programmer_value, │ Events
                │ start/stop Funktionen, …)     │ (subscribe/_emit,
@@ -246,7 +247,8 @@ Start einmalig per Kopie (Details: `docs/CONFIG_REFERENCE.md`).
 
 ## Tests & Werkzeuge
 
-- `tests/` — 517 Tests (+358 Subtests), pytest; wichtige Regressionen:
+- `tests/` — pytest, mehrere hundert Testdateien (eine je Thema; die Zahl
+  waechst laufend und steht deshalb nicht hier); wichtige Regressionen:
   `test_render_frame.py`, `test_function_layer_order.py`,
   `test_programmer_priority.py`, `test_dimmer_master.py`,
   `test_iso_simple_desk.py`, `test_output_manager.py`.

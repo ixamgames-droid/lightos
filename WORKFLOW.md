@@ -86,9 +86,21 @@ GitHub keine CI.
 
 ## Tests vor jedem Commit
 
-- `python main.py` muss starten ohne Crash
-- Geaenderte Module einmal importieren
-- Bei UI-Aenderungen: betroffene View instanziieren
+Ein Befehl, ueberall derselbe (auch in `CONTRIBUTING.md` und `INSTALL.md`):
+die betroffenen Testdateien ueber das Test-Gate laufen lassen — ein Prozess je
+Testdatei, headless.
+
+```
+./tools/verify_loop.sh tests/test_x.py          # Linux
+.\tools\verify_segmented.ps1 tests\test_x.py    # Windows
+```
+
+- Vor dem Merge laeuft dasselbe Gate OHNE Dateiangabe (volle Suite), s. naechster
+  Abschnitt.
+- Kein Sammellauf ueber den ganzen Testordner in EINEM pytest-Prozess — der stirbt
+  an angesammeltem nativem Qt-Zustand (Begruendung in `AGENTS.md`).
+- Bei UI-Aenderungen zusaetzlich: die App einmal starten und die betroffene
+  Ansicht oeffnen.
 
 ## Test-Gate (Loop-Modus)
 
