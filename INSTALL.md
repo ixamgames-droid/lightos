@@ -129,6 +129,12 @@ Welche Option loescht was:
   App-Datenordner noch keine Kopie gibt, bleibt ebenfalls immer stehen - das
   ist der Fall, wenn LightOS seit dem Update auf den App-Datenordner nie
   gestartet wurde. Sie ist dann der einzige Stand; der Lauf nennt sie.
+  Als Kopie zaehlt nur ein Stand mit Inhalt: eine im App-Datenordner frisch
+  und leer angelegte Datei (Show-DB ohne Patch, `[]`, `{}`) oder eine
+  unlesbare schuetzt den Stand in `data/` genauso.
+- Die Desktop-Verknuepfung `LightOS.lnk` wird nur entfernt, wenn das
+  Installations-Manifest sie nennt oder ihr Ziel in diesem Programmordner
+  liegt. Die Verknuepfung einer zweiten Installation bleibt.
 - Gross-/Kleinschreibung spielt beim Schutz keine Rolle: ein von Hand angelegtes
   `Shows` im App-Datenordner bleibt mit `--keep-shows` genauso stehen.
 - `--purge --keep-shows` laesst die Shows an ihrem Ort

@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import itertools
 import json
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -40,6 +41,21 @@ KOMBINATIONEN = [
 def _schreibe(pfad: Path, text: str = "x") -> Path:
     pfad.parent.mkdir(parents=True, exist_ok=True)
     pfad.write_text(text, encoding="utf-8")
+    return pfad
+
+
+def _show_db(pfad: Path, patch: int = 1) -> Path:
+    """Eine Show-DB wie von der App angelegt; ``patch`` = Zahl der Geraete."""
+    pfad.parent.mkdir(parents=True, exist_ok=True)
+    if pfad.exists():
+        pfad.unlink()
+    con = sqlite3.connect(pfad)
+    con.execute("create table patched_fixtures (id integer primary key, name text)")
+    con.execute("create table fixture_groups (id integer primary key, name text)")
+    con.executemany("insert into patched_fixtures (name) values (?)",
+                    [(f"Geraet {i}",) for i in range(patch)])
+    con.commit()
+    con.close()
     return pfad
 
 
@@ -70,9 +86,10 @@ class Umgebung:
         _schreibe(self.repo / "install_manifest.json", json.dumps(
             {"version": "t", "arch": "x64", "shortcut": str(self.verknuepfung)}))
         self.eigene_show = _schreibe(self.app / "shows" / "meine.lshow")
-        self.show_db = _schreibe(self.app / "current_show.db")
-        _schreibe(self.app / "midi_mappings.json")
-        _schreibe(self.app / "universes.json")
+        # Der App-Ordner traegt ECHTE Staende: nur die zaehlen als uebernommen.
+        self.show_db = _show_db(self.app / "current_show.db")
+        _schreibe(self.app / "midi_mappings.json", '[{"cc": 1}]')
+        _schreibe(self.app / "universes.json", '[{"id": 1}]')
         _schreibe(self.app / "fixtures.db")
         _schreibe(self.app / "snaps" / "s1.json")
         _schreibe(self.app / "stages" / "b1.json")
@@ -281,6 +298,175 @@ class TestNochNichtUebernommen:
             self, umg, monkeypatch, capsys):
         _lauf(umg, monkeypatch, capsys, "--yes")
         assert not (umg.repo / "data" / "current_show.db").exists()
+
+
+class TestLeeresZielIstKeineKopie:
+    """Codex-Befund (P1): ein frisch angelegtes, inhaltlich leeres Ziel ist
+    groesser als 0 Byte, aber kein Nutzerstand - der Umzug (``datenumzug``)
+    wuerde es noch ersetzen. Der Uninstaller muss genauso urteilen, sonst
+    loescht ``--yes`` den einzigen echten Stand in ``data/``."""
+
+    @pytest.mark.parametrize("leer", ["[]", "{}", "null", " \n", "[]\n"])
+    def test_leeres_json_im_app_ordner_schuetzt_den_alten_stand(
+            self, umg, monkeypatch, capsys, leer):
+        (umg.app / "universes.json").write_text(leer, encoding="utf-8")
+        out, _ = _lauf(umg, monkeypatch, capsys, "--yes")
+        assert (umg.repo / "data" / "universes.json").exists()
+        assert "universes.json" in out and "BEHALTEN" in out
+
+    def test_frisch_angelegte_leere_show_db_schuetzt_den_alten_stand(
+            self, umg, monkeypatch, capsys):
+        _show_db(umg.show_db, patch=0)
+        assert umg.show_db.stat().st_size > 0
+        wal = _schreibe(umg.repo / "data" / "current_show.db-wal")
+        out, _ = _lauf(umg, monkeypatch, capsys, "--yes")
+        assert (umg.repo / "data" / "current_show.db").exists()
+        assert wal.exists()
+        assert "current_show.db" in out and "BEHALTEN" in out
+
+    def test_trockenlauf_nennt_den_geschuetzten_stand_nicht(
+            self, umg, monkeypatch, capsys):
+        (umg.app / "universes.json").write_text("[]", encoding="utf-8")
+        out, _ = _lauf(umg, monkeypatch, capsys, "--yes", "--dry-run")
+        assert umg.repo / "data" / "universes.json" not in _angekuendigt(out)
+
+    def test_unlesbares_ziel_ist_keine_kopie(self, umg, monkeypatch, capsys):
+        umg.show_db.write_bytes(b"kein sqlite")
+        (umg.app / "universes.json").write_text("{kaputt", encoding="utf-8")
+        _lauf(umg, monkeypatch, capsys, "--yes")
+        assert (umg.repo / "data" / "current_show.db").exists()
+        assert (umg.repo / "data" / "universes.json").exists()
+
+    def test_urteil_deckt_sich_mit_dem_umzug(self, umg, monkeypatch, capsys):
+        """Was der Uninstaller stehen laesst, uebernimmt der naechste Start."""
+        from src.core import datenumzug
+        monkeypatch.delenv(datenumzug.ENV_AUS, raising=False)
+        monkeypatch.delenv("LIGHTOS_UNIVERSES_JSON", raising=False)
+        (umg.app / "universes.json").write_text("[]", encoding="utf-8")
+        _schreibe(umg.repo / "data" / "universes.json", '[{"id": 7}]')
+        _lauf(umg, monkeypatch, capsys, "--yes")
+        erg = datenumzug.uebernehme_alte_daten(
+            ziel_dir=str(umg.app), quellen=[str(umg.repo / "data")],
+            dateien=["universes.json"], log=lambda _t: None)
+        assert [n for n, _ in erg.kopiert] == ["universes.json"], vars(erg)
+        assert json.loads((umg.app / "universes.json").read_text("utf-8")) == [{"id": 7}]
+
+    def _marker(self, umg, **felder):
+        from src.core import datenumzug
+        _schreibe(umg.app / datenumzug.MARKER_NAME, json.dumps(felder))
+        return datenumzug._schluessel(str(umg.repo / "data"))
+
+    def test_marker_erledigt_bewusst_geleertes_ziel_gilt_als_uebernommen(
+            self, umg, monkeypatch, capsys):
+        from src.core import datenumzug
+        quelle = datenumzug._schluessel(str(umg.repo / "data"))
+        self._marker(umg, quellen_erledigt=[quelle], kopiert=["universes.json"])
+        (umg.app / "universes.json").write_text("[]", encoding="utf-8")
+        _lauf(umg, monkeypatch, capsys, "--yes")
+        assert not (umg.repo / "data" / "universes.json").exists()
+
+    def test_marker_teil_erledigt_gilt_je_datei(self, umg, monkeypatch, capsys):
+        from src.core import datenumzug
+        quelle = datenumzug._schluessel(str(umg.repo / "data"))
+        self._marker(umg, teil_erledigt={quelle: ["universes.json"]})
+        (umg.app / "universes.json").unlink()
+        _show_db(umg.show_db, patch=0)
+        _lauf(umg, monkeypatch, capsys, "--yes")
+        assert not (umg.repo / "data" / "universes.json").exists()
+        assert (umg.repo / "data" / "current_show.db").exists()
+
+    def test_marker_eines_anderen_quellordners_zaehlt_nicht(
+            self, umg, monkeypatch, capsys):
+        self._marker(umg, quellen_erledigt=[str(umg.tmp / "woanders" / "data")],
+                     kopiert=["universes.json"])
+        (umg.app / "universes.json").write_text("[]", encoding="utf-8")
+        _lauf(umg, monkeypatch, capsys, "--yes")
+        assert (umg.repo / "data" / "universes.json").exists()
+
+    def test_pruefung_veraendert_den_app_ordner_nicht(self, umg, monkeypatch, capsys):
+        _show_db(umg.show_db, patch=0)
+        vorher = {p: Path(p).read_bytes() for p in _dateien(umg.app)}
+        _lauf(umg, monkeypatch, capsys, "--yes")
+        assert {p: Path(p).read_bytes() for p in _dateien(umg.app)} == vorher
+
+
+class TestFremdeVerknuepfung:
+    """Befund vom Zweit-PC: ohne Manifest merkte ``--yes`` ``LightOS.lnk`` vom
+    Desktop vor, egal wohin sie zeigt - bei zwei Checkouts die der ANDEREN
+    Installation. Geloescht wird nur, was das Manifest nennt oder was in den
+    eigenen Programmordner zeigt. Die Aufloesung des Ziels ist austauschbar."""
+
+    def _ohne_manifest(self, umg, monkeypatch, ziele):
+        (umg.repo / "install_manifest.json").unlink()
+        lnk = _schreibe(umg.tmp / "heim" / "Desktop" / "LightOS.lnk")
+        gefragt: list[Path] = []
+
+        def aufloesen(pfad):
+            gefragt.append(Path(pfad))
+            return ziele
+
+        monkeypatch.setattr(umg.U, "verknuepfung_ziele", aufloesen)
+        return lnk, gefragt
+
+    def test_verknuepfung_einer_anderen_installation_bleibt(
+            self, umg, monkeypatch, capsys):
+        anderes = umg.tmp / "zweiter-checkout"
+        lnk, gefragt = self._ohne_manifest(umg, monkeypatch, (
+            str(anderes / "venv" / "Scripts" / "pythonw.exe"), str(anderes)))
+        out, _ = _lauf(umg, monkeypatch, capsys, "--yes")
+        assert gefragt == [lnk]
+        assert lnk.exists(), "Verknuepfung der anderen Installation geloescht"
+        assert "BEHALTEN" in out and "andere Installation" in out
+
+    def test_auch_der_trockenlauf_nennt_sie_nicht(self, umg, monkeypatch, capsys):
+        lnk, _ = self._ohne_manifest(umg, monkeypatch, (str(umg.tmp / "zweiter"),))
+        out, _ = _lauf(umg, monkeypatch, capsys, "--yes", "--dry-run")
+        assert lnk not in _angekuendigt(out)
+
+    def test_eigene_verknuepfung_ohne_manifest_wird_entfernt(
+            self, umg, monkeypatch, capsys):
+        lnk, _ = self._ohne_manifest(umg, monkeypatch, (
+            str(umg.repo / "venv" / "Scripts" / "pythonw.exe"), str(umg.repo)))
+        _lauf(umg, monkeypatch, capsys, "--yes")
+        assert not lnk.exists()
+
+    def test_nachbarordner_mit_gleichem_anfang_ist_nicht_der_eigene(
+            self, umg, monkeypatch, capsys):
+        nachbar = umg.repo.parent / (umg.repo.name + "-alt")
+        lnk, _ = self._ohne_manifest(umg, monkeypatch, (str(nachbar / "venv"),))
+        _lauf(umg, monkeypatch, capsys, "--yes")
+        assert lnk.exists()
+
+    def test_nicht_aufloesbares_ziel_bleibt(self, umg, monkeypatch, capsys):
+        lnk, _ = self._ohne_manifest(umg, monkeypatch, ())
+        out, _ = _lauf(umg, monkeypatch, capsys, "--yes")
+        assert lnk.exists()
+        assert "BEHALTEN" in out
+
+    def test_ohne_pywin32_und_ausserhalb_von_windows_wird_nichts_geraten(
+            self, umg, monkeypatch, capsys):
+        """Die echte Aufloesung liefert hier nichts - also bleibt die Datei."""
+        (umg.repo / "install_manifest.json").unlink()
+        lnk = _schreibe(umg.tmp / "heim" / "Desktop" / "LightOS.lnk")
+        if sys.platform == "win32":
+            pytest.skip("unter Windows loest PowerShell die Test-Datei nicht auf")
+        assert umg.U.verknuepfung_ziele(lnk) == ()
+        _lauf(umg, monkeypatch, capsys, "--yes")
+        assert lnk.exists()
+
+    def test_manifest_nennt_die_verknuepfung_dann_ohne_aufloesung(
+            self, umg, monkeypatch, capsys):
+        def nie(_pfad):
+            raise AssertionError("mit Manifest wird nichts aufgeloest")
+
+        monkeypatch.setattr(umg.U, "verknuepfung_ziele", nie)
+        _lauf(umg, monkeypatch, capsys, "--yes")
+        assert not umg.verknuepfung.exists()
+
+    def test_nein_zur_verknuepfung_laesst_sie_stehen(self, umg, monkeypatch, capsys):
+        _lauf(umg, monkeypatch, capsys, "--keep-venv",
+              antwort=lambda frage: "Verknuepfung" not in frage)
+        assert umg.verknuepfung.exists()
 
 
 @pytest.mark.parametrize("schalter", KOMBINATIONEN, ids=lambda s: " ".join(s) or "-")

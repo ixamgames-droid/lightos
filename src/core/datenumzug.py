@@ -362,13 +362,17 @@ def _kopiere_ohne_ueberschreiben(paare: list[tuple[str, str]]) -> None:
                     pass
 
 
-def _ziel_ist_leer(neu: str, sqlite: bool) -> bool:
-    """True, wenn am Ziel KEIN Nutzerstand liegt: fehlende Hauptdatei (nur
-    verwaiste Nebendateien), eine Show-DB ohne Patch/Gruppen/Quarantaene oder
-    ein JSON ``[]``/``{}``/``null``/leer. Im Zweifel (unlesbar, kaputt) False —
-    dann bleibt es beim Konflikt, ersetzt wird nichts."""
+#: Ergebnisse von ``_ziel_zustand``.
+ZIEL_FEHLT, ZIEL_LEER, ZIEL_INHALT, ZIEL_UNKLAR = "fehlt", "leer", "inhalt", "unklar"
+
+
+def _ziel_zustand(neu: str, sqlite: bool) -> str:
+    """Was am Ziel liegt: ``ZIEL_FEHLT`` (keine Hauptdatei), ``ZIEL_LEER`` (eine
+    Show-DB ohne Patch/Gruppen/Quarantaene oder ein JSON ``[]``/``{}``/``null``/
+    leer), ``ZIEL_INHALT`` (ein Nutzerstand) oder ``ZIEL_UNKLAR`` (unlesbar,
+    kaputt). Liest nur — die Show-DB ueber eine Kopie."""
     if not os.path.exists(neu):
-        return True
+        return ZIEL_FEHLT
     try:
         if sqlite:
             # Auf einer KOPIE pruefen: so faellt keine Recovery/Checkpoint am
@@ -380,17 +384,54 @@ def _ziel_ist_leer(neu: str, sqlite: bool) -> bool:
                 for b in SQLITE_BEGLEITER:
                     if os.path.isfile(neu + b):
                         shutil.copy2(neu + b, kopie + b)
-                return _db_ohne_show_inhalt(kopie)
+                return ZIEL_LEER if _db_ohne_show_inhalt(kopie) else ZIEL_INHALT
         with open(neu, encoding="utf-8") as f:
             text = f.read()
         if not text.strip():
-            return True
-        return json.loads(text) in ([], {}, None)
+            return ZIEL_LEER
+        return ZIEL_LEER if json.loads(text) in ([], {}, None) else ZIEL_INHALT
     except Exception as e:
-        # STAB-30: zaehlt dann als Konflikt — den Grund sichtbar machen.
+        # STAB-30: den Grund sichtbar machen.
         from src.core.diagnose_log import melde_still
         melde_still("datenumzug.ziel_pruefen", e, text=os.path.basename(neu))
+        return ZIEL_UNKLAR
+
+
+def _ziel_ist_leer(neu: str, sqlite: bool) -> bool:
+    """True, wenn am Ziel KEIN Nutzerstand liegt: fehlende Hauptdatei (nur
+    verwaiste Nebendateien), eine Show-DB ohne Patch/Gruppen/Quarantaene oder
+    ein JSON ``[]``/``{}``/``null``/leer. Im Zweifel (unlesbar, kaputt) False —
+    dann bleibt es beim Konflikt, ersetzt wird nichts."""
+    return _ziel_zustand(neu, sqlite) in (ZIEL_FEHLT, ZIEL_LEER)
+
+
+def ist_uebernommen(name: str, quell_dir: str, ziel_dir: str | None = None) -> bool:
+    """Darf ``quell_dir/name`` als ALTER Datenstand gelten (XPLAT-49)?
+
+    Fuer Aufrufer, die den alten Stand loeschen wollen (``uninstall.py``) —
+    dieselbe Leer-Pruefung wie die Uebernahme, im Zweifel ``False``:
+
+    * am Ziel liegt ein Nutzerstand -> ``True``;
+    * das Ziel fehlt oder ist frisch/leer (``[]``, ``{}``, leere Show-DB): die
+      Uebernahme stuende noch aus -> ``False``. Ausnahme: der Marker fuehrt
+      genau diese Datei dieses Quellordners als erledigt (uebernommen und
+      danach bewusst geleert oder zurueckgesetzt) -> ``True``;
+    * das Ziel ist unlesbar/kaputt -> ``False`` (der alte Stand koennte der
+      einzige brauchbare sein).
+
+    Liest nur; nimmt keine Sperre und legt nichts an.
+    """
+    ziel_dir = ziel_dir or app_data_dir()
+    zustand = _ziel_zustand(os.path.join(ziel_dir, name), _ist_sqlite(name))
+    if zustand == ZIEL_INHALT:
+        return True
+    if zustand == ZIEL_UNKLAR:
         return False
+    marker = _marker_lesen(os.path.join(ziel_dir, MARKER_NAME))
+    s = _schluessel(quell_dir)
+    if s in set(marker.get("quellen_erledigt") or []):
+        return True
+    return name in (_teil_lesen(marker).get(s) or [])
 
 
 def _db_ohne_show_inhalt(db: str) -> bool:

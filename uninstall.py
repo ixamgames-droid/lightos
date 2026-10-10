@@ -8,11 +8,14 @@ Was wird entfernt:
 - data/                  (nur Nutzerdateien aus der Zeit VOR dem Datenumzug
                           XPLAT-44; data/controller_library gehoert zum Programm
                           und bleibt. Eine Nutzerdatei, die im App-Datenordner
-                          noch FEHLT - LightOS lief seit dem Update nie -, ist
-                          der einzige Stand und bleibt ebenfalls)
+                          noch FEHLT oder dort nur frisch und leer angelegt ist
+                          - LightOS hat sie seit dem Update nie uebernommen -,
+                          ist der einzige Stand und bleibt ebenfalls)
 - shows/                 (Shows im Programmordner - nur nach ausdruecklicher
                           Rueckfrage, mit --yes oder --keep-shows nie)
-- Desktop\LightOS.lnk
+- Desktop\LightOS.lnk    (nur die EIGENE: im Manifest genannt oder mit Ziel
+                          in diesem Programmordner - die Verknuepfung einer
+                          zweiten Installation bleibt)
 - install_manifest.json
 - __pycache__ unter src/
 
@@ -41,6 +44,7 @@ import sys
 import json
 import shutil
 import argparse
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).parent.resolve()
@@ -50,6 +54,8 @@ MANIFEST_PATH = ROOT / "install_manifest.json"
 # echten Nutzerdaten in ~/.local/share/LightOS stehen.
 sys.path.insert(0, str(ROOT))
 from src.core.paths import app_data_dir, USER_DATA_FILES   # noqa: E402
+# Nur Standardbibliothek + paths: laeuft auch mit dem System-Python ohne venv.
+from src.core.datenumzug import ist_uebernommen   # noqa: E402
 
 APPDATA_DIR = Path(app_data_dir())
 VENV_DIR = ROOT / "venv"
@@ -100,17 +106,24 @@ def nicht_uebernommen(data_dir: Path) -> tuple[str, ...]:
     Der Datenumzug XPLAT-44 kopiert erst beim ersten Start nach dem Update. Lief
     LightOS seitdem nie, ist ``data/current_show.db`` kein "alter Datenstand",
     sondern der einzige - der bleibt stehen, auch unter ``--yes``.
+
+    "Fehlt" heisst dasselbe wie beim Umzug selbst (``datenumzug.ist_uebernommen``):
+    ein frisch angelegtes, inhaltlich leeres Ziel (``[]``, ``{}``, eine Show-DB
+    ohne Patch) ist keine Kopie - es sei denn, der Umzugs-Marker fuehrt die
+    Datei als erledigt. Ein unlesbares Ziel zaehlt ebenfalls nicht als Kopie.
     """
     if not data_dir.is_dir():
         return ()
     fehlt = []
     for name in USER_DATA_FILES:
-        ziel = APPDATA_DIR / name
+        if not (data_dir / name).is_file():
+            continue
         try:
-            uebernommen = ziel.is_file() and ziel.stat().st_size > 0
-        except OSError:
+            uebernommen = ist_uebernommen(name, str(data_dir), str(APPDATA_DIR))
+        except Exception as e:      # im Zweifel bleibt der alte Stand stehen
+            warn(f"{name}: Stand im App-Datenordner nicht pruefbar ({e})")
             uebernommen = False
-        if (data_dir / name).is_file() and not uebernommen:
+        if not uebernommen:
             fehlt.append(name)
     return tuple(fehlt)
 
@@ -175,22 +188,94 @@ def remove_path(path: Path, dry_run: bool):
         warn(f"Konnte nicht entfernen ({path}): {e}")
 
 
-def remove_shortcut(shortcut_path: str | None, dry_run: bool):
-    if not shortcut_path:
-        # Versuch auf bekanntem Pfad
-        try:
-            import winreg
-            with winreg.OpenKey(
-                winreg.HKEY_CURRENT_USER,
-                r"Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders"
-            ) as k:
-                desktop = winreg.QueryValueEx(k, "Desktop")[0]
-                desktop = os.path.expandvars(desktop)
-        except Exception:
-            desktop = str(Path.home() / "Desktop")
-        shortcut_path = os.path.join(desktop, "LightOS.lnk")
-    p = Path(shortcut_path)
-    remove_path(p, dry_run)
+def standard_verknuepfung() -> Path:
+    """``LightOS.lnk`` auf dem Desktop - der Ort, an den install.py sie legt."""
+    try:
+        import winreg
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders"
+        ) as k:
+            desktop = winreg.QueryValueEx(k, "Desktop")[0]
+            desktop = os.path.expandvars(desktop)
+    except Exception:
+        desktop = str(Path.home() / "Desktop")
+    return Path(desktop) / "LightOS.lnk"
+
+
+def verknuepfung_ziele(pfad: Path) -> tuple[str, ...]:
+    """Ziel und Arbeitsordner einer ``.lnk`` - leer, wenn nicht ermittelbar.
+
+    Ueber PowerShell/WScript.Shell wie install.py beim Anlegen (kein
+    zusaetzliches Paket). Ausserhalb von Windows gibt es nichts aufzuloesen.
+    """
+    if os.name != "nt":
+        return ()
+    ps = ("$s=(New-Object -ComObject WScript.Shell).CreateShortcut($env:LIGHTOS_LNK);"
+          "[Console]::OutputEncoding=[Text.Encoding]::UTF8;"
+          "$s.TargetPath;$s.WorkingDirectory")
+    try:
+        aus = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", ps],
+            check=True, capture_output=True, timeout=30,
+            env={**os.environ, "LIGHTOS_LNK": str(pfad)},
+        ).stdout.decode("utf-8", errors="replace")
+    except Exception as e:
+        warn(f"Ziel der Verknuepfung nicht lesbar ({pfad}): {e}")
+        return ()
+    return tuple(z.strip() for z in aus.splitlines() if z.strip())
+
+
+def _schluessel(pfad) -> str:
+    try:
+        p = os.path.realpath(str(pfad))
+    except (OSError, ValueError):
+        p = os.path.abspath(str(pfad))
+    return os.path.normcase(p)
+
+
+def liegt_im_programmordner(pfad: str) -> bool:
+    try:
+        wurzel, p = _schluessel(ROOT), _schluessel(pfad)
+        return os.path.commonpath([wurzel, p]) == wurzel
+    except ValueError:              # anderes Laufwerk
+        return False
+
+
+def eigene_verknuepfung(manifest_pfad: str | None, ziele=None) -> Path | None:
+    """Die Verknuepfung DIESER Installation - oder ``None``.
+
+    Eigen ist sie, wenn das Manifest sie nennt oder ihr Ziel bzw. Arbeitsordner
+    im eigenen Programmordner liegt. Ohne Manifest einfach ``LightOS.lnk`` vom
+    Desktop zu nehmen, loeschte auf einem Rechner mit zwei Checkouts die
+    Verknuepfung der ANDEREN Installation. ``ziele`` ist die Aufloesung
+    (Vorgabe: ``verknuepfung_ziele``) - in Tests austauschbar.
+    """
+    if manifest_pfad:
+        return Path(manifest_pfad)
+    kandidat = standard_verknuepfung()
+    if not (kandidat.exists() or kandidat.is_symlink()):
+        return None
+    gefunden = (ziele or verknuepfung_ziele)(kandidat)
+    if any(liegt_im_programmordner(z) for z in gefunden):
+        return kandidat
+    if gefunden:
+        info(f"Verknuepfung wird BEHALTEN: {kandidat} zeigt auf eine andere "
+             f"Installation ({gefunden[0]})")
+    else:
+        info(f"Verknuepfung wird BEHALTEN: {kandidat} - ohne Manifest ist nicht "
+             "feststellbar, ob sie zu dieser Installation gehoert")
+    return None
+
+
+def remove_shortcut(shortcut: Path | None, dry_run: bool):
+    """Entfernt die von ``eigene_verknuepfung`` bestaetigte Verknuepfung.
+
+    ``None`` heisst: keine eigene gefunden - dann wird NICHTS angefasst (frueher
+    fiel das auf ``LightOS.lnk`` vom Desktop zurueck, egal wem sie gehoerte).
+    """
+    if shortcut is not None:
+        remove_path(Path(shortcut), dry_run)
 
 
 def main():
@@ -243,8 +328,9 @@ def main():
             targets.append(("data", kind))
         if einzig:
             warn(f"data/: {', '.join(einzig)} wird BEHALTEN - im App-Datenordner "
-                 "gibt es davon noch keine Kopie (LightOS lief seit dem Update "
-                 "nicht). Das ist der einzige Stand dieser Nutzerdaten.")
+                 "gibt es davon noch keine Kopie mit Inhalt (LightOS hat den "
+                 "Stand seit dem Update nicht uebernommen). Das ist der einzige "
+                 "Stand dieser Nutzerdaten.")
 
     # 3. shows/ im Programmordner - nie ohne ausdrueckliches Ja (XPLAT-49:
     #    --yes ist kein Ja zu eigenen Shows)
@@ -282,13 +368,12 @@ def main():
         else:
             info("App-Datenordner wird BEHALTEN")
 
-    # 5. Shortcut
-    shortcut = manifest.get("shortcut")
+    # 5. Shortcut - nur die eigene (Manifest oder Ziel im Programmordner)
+    shortcut = None
     if args.yes or confirm("Desktop-Verknuepfung loeschen?"):
-        info(f"Suche Verknuepfung: {shortcut or '(default)'}")
-        # Wird unten gesondert behandelt
+        # jetzt aufloesen: das Ziel liegt in venv/, das gleich geloescht wird
+        shortcut = eigene_verknuepfung(manifest.get("shortcut"))
     else:
-        shortcut = None
         info("Verknuepfung wird BEHALTEN")
 
     # 6. Pycache cleanup (immer wenn nicht --keep-venv)
@@ -310,8 +395,7 @@ def main():
             remove_path(p, args.dry_run)
 
     # Shortcut
-    if shortcut is not None or (args.yes and not args.keep_appdata):
-        remove_shortcut(shortcut, args.dry_run)
+    remove_shortcut(shortcut, args.dry_run)
 
     # Manifest selbst
     if not args.keep_appdata:
