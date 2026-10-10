@@ -12,6 +12,7 @@
 # Aufruf (aus dem Repo-Root):
 #   ./tools/verify_loop.sh                  # compileall + VOLLE Suite
 #   ./tools/verify_loop.sh tests/test_x.py  # compileall + nur diese Tests
+#   ./tools/verify_loop.sh --doku           # compileall + nur die Doku-Gates (PROC-19)
 #
 # Exit 0 = gruen, sonst rot.
 set -u
@@ -28,6 +29,25 @@ if [ -z "$PY" ]; then
 fi
 
 export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-offscreen}"
+
+# ── PROC-19: --doku ──────────────────────────────────────────────────────────
+# Der kurze Weg fuer reine Doku-/Backlog-Aenderungen: statt der vollen Suite nur
+# die Gates aus tools/doku_gates.txt. Die CI nimmt ihn, wenn
+# tools/geaenderte_dateien_klasse.py fuer den PR "doku" sagt.
+#
+# Der Schalter wird hier ABGERAEUMT (shift), bevor `_verify_lock "$@"` laeuft:
+# ohne Argumente nimmt der Lauf die Voll-Suiten-Sperre, und das ist gewollt. Er
+# faehrt den Segment-Runner, und der leert `.pytest_segments` — neben einem
+# laufenden vollen Gate im selben Arbeitsbaum waere das genau QA-53.
+DOKU=0
+if [ "${1:-}" = "--doku" ]; then
+    DOKU=1
+    shift
+    if [ "$#" -gt 0 ]; then
+        echo "[verify] FEHLER: --doku nimmt keine weiteren Argumente (die Liste steht in tools/doku_gates.txt)"
+        exit 2
+    fi
+fi
 
 # PROC-02c: dieselbe WebEngine-Absicherung, die auch der Segment-Runner benutzt.
 # Ueber den Repo-Root, nicht ueber $(dirname "$0"): oben wurde bereits dorthin
@@ -163,7 +183,33 @@ if [ -n "${LIGHTOS_VERIFY_DRYRUN:-}" ]; then
     exit 0
 fi
 
-if [ "$#" -gt 0 ]; then
+if [ "$DOKU" = "1" ]; then
+    # PROC-19: die Doku-Gates, segmentiert wie die volle Suite — einige bauen
+    # echte Views bzw. die 3D-Szene, und der Segment-Runner bringt die
+    # WebEngine-Sperre dafuer schon mit.
+    SEG="$(dirname "$0")/verify_segmented.sh"
+    mapfile -t GATES < <("$PY" tools/geaenderte_dateien_klasse.py --gates)
+    if [ "${#GATES[@]}" -eq 0 ] || [ ! -x "$SEG" ]; then
+        echo "[verify] FEHLER: keine Doku-Gates gefunden (tools/doku_gates.txt) oder $SEG fehlt"
+        exit 2
+    fi
+    # Lokal ehrlich bleiben: --doku ist nur dann das ganze Gate, wenn der Zweig
+    # wirklich nur Doku aendert. In der CI hat das der Schritt davor entschieden
+    # (und origin/main ist dort gar nicht geholt).
+    if [ -z "${GITHUB_ACTIONS:-}" ]; then
+        _klasse="$("$PY" tools/geaenderte_dateien_klasse.py 2>/dev/null)"
+        if [ "$_klasse" != "doku" ]; then
+            echo "[verify] ⚠ Dieser Zweig aendert gegen origin/main NICHT nur Doku — --doku ersetzt hier das volle Gate nicht."
+        fi
+    fi
+    echo "[verify] 2/2 Doku-Gates segmentiert (${#GATES[@]} Dateien, ${LIGHTOS_VERIFY_JOBS:-3} parallel) ..."
+    if ! "$SEG" -j "${LIGHTOS_VERIFY_JOBS:-3}" "${GATES[@]}"; then
+        echo "[verify] DOKU-GATES ROT"
+        exit 1
+    fi
+    echo "[verify] GRUEN - Doku-Gates bestanden (NICHT die volle Suite)."
+    exit 0
+elif [ "$#" -gt 0 ]; then
     # Gezielte Dateien: direkt, in EINEM Prozess. Hier gibt es keinen ueber
     # Dateigrenzen akkumulierenden Zustand zu vermeiden, und der Weg ist schnell.
     #

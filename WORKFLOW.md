@@ -271,6 +271,38 @@ Das verbindliche Test-Gate des Loop-Modus laeuft ueber `tools/verify_loop.ps1`:
 
 Details zur Sperre: `SecondBrain/reference_pytest_lock.md`.
 
+### CI-Schnellweg fuer reine Doku-/Backlog-PRs (PROC-19)
+
+Aendert ein PR **ausschliesslich** Doku, faehrt die CI in denselben Jobs (gleiche
+Namen — daran erkennt `tools/pr_bereit.py` die Checks) statt der vollen Suite nur
+die Doku-/Backlog-/Privatsphaere-Gates. Das dauert Minuten statt einer halben
+Stunde und haelt die Merge-Warteschlange nicht auf.
+
+* **Was als Doku zaehlt:** `*.md` im Wurzelverzeichnis, `changelog.d/*.md`, und
+  unter `docs/` Markdown und Bilder. Alles andere ist „voll" — auch
+  `tools/README.md`, JSON und Skripte unter `docs/`, `tests/`, `tools/`, `.github/`.
+  Eine einzige solche Datei im PR genuegt fuer die volle Suite.
+* **Wer entscheidet:** `tools/geaenderte_dateien_klasse.py` gibt `doku` oder `voll`
+  aus. Gerechnet wird gegen den Merge-Base mit `main`, nicht gegen den letzten
+  Commit. Im Zweifel `voll` (unbekannte Datei, Git-Fehler, keine Aenderung).
+* **Push nach `main` faehrt immer die volle Suite.** Der Schnellweg gilt nur im
+  Pull-Request.
+* **Welche Gates laufen:** die Liste steht in `tools/doku_gates.txt`. Ein neuer
+  Test, der eine Anleitung, den Backlog oder ein Changelog-Fragment liest, wird
+  dort eingetragen — `tests/test_proc19_doku_schnellweg.py` meldet ihn sonst.
+* **Windows-Legs:** im Doku-Fall laufen dort keine Tests; die Jobs enden gruen
+  mit dem Schritt „Doku-PR: Kurzweg". Die Gates faehrt die Linux-Leg.
+
+Lokal:
+
+```
+./venv/bin/python tools/geaenderte_dateien_klasse.py   # doku oder voll (gegen origin/main)
+./tools/verify_loop.sh --doku                          # Syntax-Check + nur die Doku-Gates
+```
+
+`verify_loop.sh --doku` ersetzt das volle Gate nur, wenn der Zweig wirklich nur
+Doku aendert; sonst sagt der Lauf das in einer Warnzeile.
+
 ### Kein Flake, ein Messfehler: das Gate misst den Baum, den es bekommt (PROC-13)
 
 Ein roter Gate-Lauf ist nicht automatisch ein roter Code. Zwei Messfehler haben

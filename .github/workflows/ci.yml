@@ -29,12 +29,26 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # PROC-19: der Test-Merge UND seine beiden Eltern — sonst laesst sich
+          # nicht sagen, was der PR gegenueber main aendert.
+          fetch-depth: 2
 
       - name: Python 3.12 einrichten
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
+
+      # PROC-19: aendert der PR NUR Doku? Dann unten der kurze Weg. Der Schritt
+      # laeuft nur im Pull-Request — bei einem Push bleibt die Ausgabe leer, und
+      # leer heisst volle Suite.
+      - name: Aenderungsklasse bestimmen (PROC-19)
+        id: klasse
+        if: github.event_name == 'pull_request'
+        env:
+          PR_KOPF_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python tools/geaenderte_dateien_klasse.py --ci
 
       # Systempakete wie in INSTALL.md. build-essential + libasound2-dev sind fuer
       # python-rtmidi Pflicht (C-Extension) — ohne die gibt es auf Linux GAR KEIN
@@ -85,6 +99,7 @@ jobs:
       # greift hier also nicht. Darum die Flags als Job-Env, inklusive der
       # Linux-Sandbox-Flags, die main.py sonst beisteuert.
       - name: Volle Suite (segmentiert)
+        if: steps.klasse.outputs.klasse != 'doku'
         env:
           QTWEBENGINE_CHROMIUM_FLAGS: >-
             --no-sandbox --disable-gpu-sandbox --disable-dev-shm-usage
@@ -121,6 +136,25 @@ jobs:
           xvfb-run -a --server-args="-screen 0 1280x1024x24" \
             env LIGHTOS_VERIFY_JOBS=3 ./tools/verify_loop.sh
 
+      # PROC-19: der kurze Weg fuer reine Doku-/Backlog-PRs. Statt der vollen
+      # Suite nur die Gates aus tools/doku_gates.txt — segmentiert, mit
+      # derselben Umgebung wie oben (ein paar davon bauen echte Views bzw. die
+      # 3D-Szene). tests/test_proc19_doku_schnellweg.py haelt fest, dass die
+      # Umgebung beider Schritte gleich bleibt.
+      - name: "Doku-PR: nur Doku-Gates (PROC-19)"
+        if: steps.klasse.outputs.klasse == 'doku'
+        env:
+          QTWEBENGINE_CHROMIUM_FLAGS: >-
+            --no-sandbox --disable-gpu-sandbox --disable-dev-shm-usage
+            --disable-gpu --enable-unsafe-swiftshader
+            --use-gl=angle --use-angle=swiftshader --in-process-gpu
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          GALLIUM_DRIVER: llvmpipe
+          LIGHTOS_HARDEN_EXIT_ALL: "1"
+        run: |
+          xvfb-run -a --server-args="-screen 0 1280x1024x24" \
+            env LIGHTOS_VERIFY_JOBS=3 ./tools/verify_loop.sh --doku
+
       - name: Segment-Logs bei Fehlschlag hochladen
         if: failure()
         uses: actions/upload-artifact@v4
@@ -153,6 +187,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # PROC-19: der Test-Merge UND seine beiden Eltern — sonst laesst sich
+          # nicht sagen, was der PR gegenueber main aendert.
+          fetch-depth: 2
 
       - name: Python ${{ matrix.python-version }} einrichten
         uses: actions/setup-python@v5
@@ -160,10 +198,28 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
 
+      # PROC-19: aendert der PR NUR Doku? Dann unten der kurze Weg. Der Schritt
+      # laeuft nur im Pull-Request — bei einem Push bleibt die Ausgabe leer, und
+      # leer heisst volle Suite.
+      - name: Aenderungsklasse bestimmen (PROC-19)
+        id: klasse
+        if: github.event_name == 'pull_request'
+        env:
+          PR_KOPF_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python tools/geaenderte_dateien_klasse.py --ci
+
+      # PROC-19: die Doku-Gates faehrt die Linux-Leg; hier gibt es fuer einen
+      # reinen Doku-PR nichts zu pruefen. Der Job endet gruen unter demselben
+      # Namen, damit tools/pr_bereit.py seine Checks unveraendert findet.
+      - name: "Doku-PR: Kurzweg, keine Tests (PROC-19)"
+        if: steps.klasse.outputs.klasse == 'doku'
+        run: echo "Reiner Doku-PR - die Doku-Gates faehrt die Linux-Leg."
+
       # Kern-Pakete + PySide6 (offscreen) fuer den headless View-Smoke (QA-11):
       # test_views.py baut echte Qt-Views (VC/SimpleDesk/EFX/Matrix), damit eine
       # kaputte committete View auch auf GitHub auffaellt (nicht nur lokal).
       - name: Kern-Abhaengigkeiten installieren
+        if: steps.klasse.outputs.klasse != 'doku'
         run: |
           python -m pip install --upgrade pip
           # pytest-timeout: ohne das Plugin sind die timeout-Keys aus pytest.ini
@@ -201,6 +257,7 @@ jobs:
       # Kernpakete (kein rtmidi/soundcard/Flask). Die volle Datei faehrt das
       # lokale Windows-Gate. tests/test_ci_windows_legs.py haelt die Liste fest.
       - name: Unit-Tests ausfuehren
+        if: steps.klasse.outputs.klasse != 'doku'
         env:
           QT_QPA_PLATFORM: offscreen
           LIGHTOS_HARDEN_EXIT_ALL: "1"
@@ -242,6 +299,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # PROC-19: der Test-Merge UND seine beiden Eltern — sonst laesst sich
+          # nicht sagen, was der PR gegenueber main aendert.
+          fetch-depth: 2
 
       # XPLAT-45: ZUERST das native ARM64-Python, nur fuer den Befund. Die
       # zweite setup-python-Stufe unten legt danach x64 vorne in den PATH.
@@ -252,7 +313,22 @@ jobs:
           python-version: "3.14"
           architecture: arm64
 
+      # PROC-19: aendert der PR NUR Doku? Dann unten der kurze Weg. Der Schritt
+      # laeuft nur im Pull-Request — bei einem Push bleibt die Ausgabe leer, und
+      # leer heisst volle Suite.
+      - name: Aenderungsklasse bestimmen (PROC-19)
+        id: klasse
+        if: github.event_name == 'pull_request'
+        env:
+          PR_KOPF_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python tools/geaenderte_dateien_klasse.py --ci
+
+      - name: "Doku-PR: Kurzweg, keine Tests (PROC-19)"
+        if: steps.klasse.outputs.klasse == 'doku'
+        run: echo "Reiner Doku-PR - die Doku-Gates faehrt die Linux-Leg."
+
       - name: Natives ARM64 — Qt-Module der Wheels (Befund, darf scheitern)
+        if: steps.klasse.outputs.klasse != 'doku'
         shell: pwsh
         continue-on-error: true
         run: |
@@ -266,6 +342,7 @@ jobs:
       # 3.14 gibt es fuer win32-x64 und win32-arm64 im Manifest von
       # actions/python-versions; x64 laeuft auf windows-11-arm per Emulation.
       - name: Python 3.14 (x64 unter Emulation, wie am Rig) einrichten
+        if: steps.klasse.outputs.klasse != 'doku'
         uses: actions/setup-python@v5
         with:
           python-version: "3.14"
@@ -273,6 +350,7 @@ jobs:
           cache: pip
 
       - name: venv + Abhaengigkeiten (ohne native Optionale)
+        if: steps.klasse.outputs.klasse != 'doku'
         shell: pwsh
         run: |
           # Ohne das bricht pwsh bei einem fehlgeschlagenen pip NICHT ab, und
@@ -288,6 +366,7 @@ jobs:
           venv\Scripts\python.exe -m pip install -r requirements-dev.txt
 
       - name: python-rtmidi + winrt (darf scheitern)
+        if: steps.klasse.outputs.klasse != 'doku'
         shell: pwsh
         continue-on-error: true
         run: |
@@ -298,6 +377,7 @@ jobs:
           venv\Scripts\python.exe -c "import rtmidi; print('python-rtmidi OK', rtmidi.__file__)"
 
       - name: Qt-Module des Suite-venv (QtWebEngine erwartet)
+        if: steps.klasse.outputs.klasse != 'doku'
         shell: pwsh
         continue-on-error: true
         run: |
@@ -309,6 +389,7 @@ jobs:
       # keine Failures. QT_QPA_PLATFORM=offscreen setzt das Skript selbst.
       # -j 4: der Parameter heisst -Jobs (Alias -j), windows-11-arm hat 4 Kerne.
       - name: Volle Suite (segmentiert)
+        if: steps.klasse.outputs.klasse != 'doku'
         shell: pwsh
         env:
           LIGHTOS_HARDEN_EXIT_ALL: "1"
