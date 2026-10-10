@@ -63,6 +63,7 @@
 | VIZ-100 | A | fix/viz100-haengend-andocken | 2026-10-10T14:38Z | src/ui/visualizer/scene_src/stage/docking.js |
 | VIZ-101 | A | fix/viz101-licht-durch-wand | 2026-10-10T14:38Z | - |
 | UI-86 | A | perf/ui86-2d-ansicht-hidpi | 2026-10-10T14:39Z | - |
+| QA-91 | D | fix/qa91-doc60-test-encoding | 2026-10-10T14:39Z | - |
 
 ## Blocker & Fallen
 
@@ -175,7 +176,6 @@
 
 ## Verlauf
 
-- 2026-10-10T11:23Z D aktualisiert TOOL-24: Branch - -> fix/tool24-proc18-lizenzhinweise-strukturiert; Dateien - -> tests/test_proc18_fremd_lizenzhinweise.py
 - 2026-10-10T11:28Z D aktualisiert FM-66: Branch - -> fix/fm66-abgleich-modellname; Dateien - -> src/core/database/bibliothek_format.py · tests/test_fm66_abgleich_modellname.py · docs/FIXTURE_LIBRARY.md
 - 2026-10-10T11:46Z A done BACKLOG-STATUS
 - 2026-10-10T11:47Z A claim PROC-19
@@ -205,3 +205,4 @@
 - 2026-10-10T14:38Z A claim VIZ-100
 - 2026-10-10T14:38Z A claim VIZ-101
 - 2026-10-10T14:39Z A claim UI-86
+- 2026-10-10T14:39Z D claim QA-91
