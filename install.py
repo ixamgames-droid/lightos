@@ -1,12 +1,13 @@
 r"""LightOS Installer.
 
-Installiert alle Abhaengigkeiten in einer virtuellen Umgebung und legt
-Start-Verknuepfungen sowie Default-Daten an.
+Installiert alle Abhaengigkeiten in einer virtuellen Umgebung und legt eine
+Desktop-Verknuepfung sowie Default-Daten an.
 
 Funktioniert auf Windows x64 UND ARM64.
 
 Usage:
     python install.py [--no-venv] [--no-shortcut] [--dev]
+    py -3.12 install.py ...      (Windows mit mehreren Pythons: Version waehlen)
 
 Was wird installiert/erstellt:
 - venv/                        (Python Virtual Environment, ~250 MB)
@@ -15,9 +16,14 @@ Was wird installiert/erstellt:
                                Windows %APPDATA%/LightOS, Linux ~/.local/share/LightOS,
                                macOS ~/Library/Application Support/LightOS — aufgeloest
                                von src/core/paths.app_data_dir() (XPLAT-04/-10)
-- Desktop\LightOS.lnk          (optional, --no-shortcut zum Ueberspringen)
-- Start-Menu\LightOS\LightOS.lnk (optional)
+- Desktop\LightOS.lnk          (nur Windows; Standard, OHNE Rueckfrage —
+                               --no-shortcut laesst sie weg)
 - install_manifest.json        (Liste aller installierten Dateien fuer uninstall.py)
+
+Eine Startmenue-Verknuepfung legt das Script NICHT an (DOC-62: hier stand bis
+2026-10-08 eine, die es nie gab). Die Test-Abhaengigkeiten (pytest & Co.,
+``requirements-dev.txt``) installiert es ebenfalls nicht — auch nicht mit
+``--dev`` (das holt nur pyinstaller); s. INSTALL.md „Entwickeln und Tests".
 """
 from __future__ import annotations
 import sys
@@ -344,6 +350,7 @@ def create_shortcut(use_venv: bool = True):
             check=True, capture_output=True
         )
         info(f"Verknuepfung erstellt: {shortcut_path}")
+        info("  (ohne Verknuepfung installieren: --no-shortcut)")
         return shortcut_path
     except Exception as e:
         warn(f"Verknuepfung fehlgeschlagen: {e}")
@@ -372,9 +379,12 @@ def write_manifest(created_dirs: list[str], shortcut: str | None):
     info(f"Manifest gespeichert: {MANIFEST_PATH}")
 
 
-def show_summary():
+def show_summary(use_venv: bool = True):
     py_arch = detect_arch()
     os_arch = detect_native_os_arch()
+    # Mit --no-venv gibt es kein venv/: die Befehle nennen dann das Python, in
+    # das installiert wurde (Codex-Review zu DOC-62).
+    py = venv_python() if use_venv else sys.executable
     info("=" * 60)
     info("Installation abgeschlossen!")
     info("=" * 60)
@@ -382,17 +392,18 @@ def show_summary():
     info(f"OS-Architektur:     {os_arch}")
     if os.name == "nt" and os_arch == "arm64" and py_arch != "arm64":
         warn("Python laeuft emuliert auf ARM64. Fuer native Performance ARM64-Python nutzen.")
-    info(f"venv:        {VENV_DIR}")
+    info(f"venv:        {VENV_DIR if use_venv else '- (--no-venv)'}")
     info(f"AppData:     {APPDATA_DIR}")
     info("")
     info("Starten mit:")
+    info(f"  {py} main.py")
     if os.name == "nt":
-        info(f"  {VENV_DIR / 'Scripts' / 'python.exe'} main.py")
         info("oder Desktop-Verknuepfung doppelklicken")
-    else:
-        info(f"  {VENV_DIR / 'bin' / 'python'} main.py")
     info("")
     info("Beispiel-Setups (vorkonfigurierte Patches/MIDI) siehe examples/")
+    info("")
+    info("Testsuite (nur fuer Entwicklung) braucht zusaetzlich:")
+    info(f"  {py} -m pip install -r requirements-dev.txt")
     info("")
     info("Deinstallieren mit:")
     info("  python uninstall.py")
@@ -432,7 +443,7 @@ def main():
         shortcut = create_shortcut(use_venv)
 
     write_manifest(created, shortcut)
-    show_summary()
+    show_summary(use_venv)
 
 
 if __name__ == "__main__":

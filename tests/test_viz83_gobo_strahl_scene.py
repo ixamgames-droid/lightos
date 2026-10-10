@@ -294,9 +294,9 @@ class Viz83GoboStrahlSceneTest(unittest.TestCase):
         self.assertGreaterEqual(z["strahlen"], 10, f"zu wenige Teilstrahlen: {z}")
         self.assertTrue(z["beamSichtbar"])
         self.assertTrue(z["fleckMuster"], "Bodenfleck ohne Muster")
-        # Der unmaskierbare SpotLight leuchtet den runden Fleck nicht mehr voll.
-        self.assertLess(z["spot"], offen["spot"] * 0.5)
-        self.assertGreater(z["spot"], 0.0)
+        # Der unmaskierbare SpotLight leuchtet den runden Fleck nicht mehr
+        # (VIZ-92: gar nicht mehr — auch 30 % zeichneten den vollen Kreis).
+        self.assertEqual(z["spot"], 0.0)
         # Zurueck auf offen: alles wie vorher.
         self._push(_payload(gobo_wheel=0))
         zurueck = self._z()

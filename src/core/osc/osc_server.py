@@ -3,6 +3,9 @@ from __future__ import annotations
 import threading
 from typing import Callable
 
+# STAB-30: gedrosselte Logzeile statt stiller OSC-Fehler.
+from src.core.diagnose_log import melde_still as _melde_still
+
 try:
     from pythonosc import dispatcher as osc_dispatcher
     from pythonosc import osc_server as _osc_server
@@ -132,8 +135,8 @@ class OscServer:
             # ausdruecklich Executor N.
             from src.core.cueliste_ziel import bediene_cueliste
             bediene_cueliste(self._get_state(), "go")
-        except Exception:
-            pass
+        except Exception as _e:
+            _melde_still("osc", _e, text=str(address))   # STAB-30
 
     def _handle_back(self, address, *args):
         if not OscServer._is_pressed(args):
@@ -141,15 +144,15 @@ class OscServer:
         try:
             from src.core.cueliste_ziel import bediene_cueliste
             bediene_cueliste(self._get_state(), "back")   # UI-66, s. _handle_go
-        except Exception:
-            pass
+        except Exception as _e:
+            _melde_still("osc", _e, text=str(address))   # STAB-30
 
     def _handle_blackout(self, address, *args):
         try:
             val = self._as_on(args[0]) if args else False
             self._get_state().output_manager.set_blackout(val)
-        except Exception:
-            pass
+        except Exception as _e:
+            _melde_still("osc", _e, text=str(address))   # STAB-30
 
     @staticmethod
     def _as_on(raw) -> bool:
@@ -167,8 +170,8 @@ class OscServer:
     def _handle_clear(self, address, *args):
         try:
             self._get_state().clear_programmer()
-        except Exception:
-            pass
+        except Exception as _e:
+            _melde_still("osc", _e, text=str(address))   # STAB-30
 
     def _handle_exec(self, address: str, *args):
         # /lightos/exec/{n}/go or /lightos/exec/{n}/fader
@@ -194,8 +197,8 @@ class OscServer:
                 ex.press_btn("stop")
             elif action == "fader" and args:
                 ex.fader_value = max(0.0, min(1.0, float(args[0])))
-        except Exception:
-            pass
+        except Exception as _e:
+            _melde_still("osc", _e, text=str(address))   # STAB-30
 
     def _handle_channel(self, address: str, *args):
         # /lightos/ch/{universe}/{channel}  value
@@ -211,8 +214,8 @@ class OscServer:
             # Universe (sonst ueberschriebe der 44-Hz-Renderer gepatchte Kanaele
             # jeden Frame). Range-Guards liegen in set_input_channel.
             state.set_input_channel(universe, channel, value, source="osc")
-        except Exception:
-            pass
+        except Exception as _e:
+            _melde_still("osc", _e, text=str(address))   # STAB-30
 
 
 class OscSender:
@@ -234,8 +237,8 @@ class OscSender:
             return
         try:
             self._client.send_message(address, list(args) if len(args) != 1 else args[0])
-        except Exception:
-            pass
+        except Exception as _e:
+            _melde_still("osc", _e, text=str(address))   # STAB-30
 
 
 _server: OscServer | None = None
