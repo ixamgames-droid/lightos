@@ -12,7 +12,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| DOC-33 | C | - | 2026-10-02T10:56Z | docs/anleitung_dimmermatrix/ANLEITUNG_DIMMERMATRIX.md |
 | DOC-34 | C | - | 2026-10-02T10:56Z | docs/anleitung_matrix_effekte/ANLEITUNG_MATRIX_EFFEKTE.md |
 | DOC-35 | C | - | 2026-10-02T10:57Z | docs/anleitung_efx/ANLEITUNG_EFX.md |
 | DOC-36 | C | - | 2026-10-02T10:58Z | docs/anleitung_moving_heads/ANLEITUNG_MOVING_HEADS.md |
@@ -145,7 +144,6 @@
 
 ## Verlauf
 
-- 2026-10-09T14:37Z D claim XPLAT-48
 - 2026-10-09T14:40Z B done VIZ-94
 - 2026-10-09T14:44Z D aktualisiert BPM-30: Dateien - -> src/core/app_state.py · src/core/engine/bpm_manager.py · tests/test_bpm30_beat_faden_ohne_appstate.py · BACKLOG.md · changelog.d/2026-10-09-BPM-30.md
 - 2026-10-09T14:47Z D aktualisiert XPLAT-48: Dateien - -> install.py · tests/test_xplat48_verknuepfung_no_venv.py · BACKLOG.md · changelog.d/2026-10-09-XPLAT-48.md
@@ -175,3 +173,4 @@
 - 2026-10-10T09:26Z C uebergeben DOC-30
 - 2026-10-10T09:26Z C uebergeben DOC-31
 - 2026-10-10T09:27Z C uebergeben DOC-32
+- 2026-10-10T09:27Z C uebergeben DOC-33
