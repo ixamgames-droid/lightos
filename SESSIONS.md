@@ -29,7 +29,6 @@
 | LAS-30 | A | feature/las30-laser-achsen | 2026-10-10T10:47Z | src/core/laser |
 | VIZ-96 | A | feature/viz96-gobo-projektion | 2026-10-08T21:37Z | src/ui/visualizer |
 | UI-84 | A | fix/ui84-efx-laden-geraeteliste | 2026-10-09T13:45Z | src/ui/views/efx_view.py |
-| VCB-41 | A | fix/vcb41-solo-zwilling | 2026-10-09T13:45Z | src/ui/virtualconsole |
 | TOOL-25 | A | fix/tool25-lint-snap-verweise | 2026-10-09T13:45Z | tools/lint_show.py |
 | VIZ-97 | D | fix/viz97-gobo-schluesselwoerter | 2026-10-10T11:42Z | src/ui/widgets/gobo_icons.py · tests/test_viz97_gobo_schluesselwoerter.py · BACKLOG.md · changelog.d/2026-10-09-VIZ-97.md |
 | BPM-30 | D | fix/bpm30-beat-thread-get-state | 2026-10-10T11:42Z | src/core/app_state.py · src/core/engine/bpm_manager.py · tests/test_bpm30_beat_faden_ohne_appstate.py · BACKLOG.md · changelog.d/2026-10-09-BPM-30.md |
@@ -155,7 +154,6 @@
 
 ## Verlauf
 
-- 2026-10-10T09:29Z A claim STAB-32
 - 2026-10-10T09:29Z A claim OUT-67
 - 2026-10-10T09:39Z A done DEMO-07
 - 2026-10-10T09:41Z D claim TOOL-14
@@ -185,3 +183,4 @@
 - 2026-10-10T11:47Z A claim PROC-19
 - 2026-10-10T11:47Z A claim PROC-20
 - 2026-10-10T12:06Z D done FM-72
+- 2026-10-10T12:25Z A done VCB-41
