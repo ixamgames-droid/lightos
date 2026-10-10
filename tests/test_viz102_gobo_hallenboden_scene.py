@@ -57,6 +57,11 @@ _Z_JS = """
     laenge: f.baseBeamLength * f.beam.scale.y, grund: f.baseBeamLength,
     durchmesser: 2 * p.radius * f.beam.scale.x, apex: [apex.x, apex.y, apex.z],
     fleckY: a.position.y, ebenen: ebenen(a.material), version: a.material.version,
+    kegelEbenen: ebenen(f.beam.material), kegelSchnitt: !!f.beam.material.clipIntersection,
+    kegelVersion: f.beam.material.version, kegelDa: !!f._kegelSchnitt,
+    kegelDeck: f.beam.material.opacity, kegelBasis: (f._kegelDeck === undefined) ? null : f._kegelDeck,
+    kegelWeit: f._kegelWeit || 1,
+    nah: L.spotPoolLights().length ? L.spotPoolLights()[0].shadow.camera.near : null,
     deck: a.material.opacity, maske: a.layers.mask, sichtbar: a.visible,
     unter: b ? { sichtbar: b.visible, y: b.matrix.elements[13], ebenen: ebenen(b.material),
                  schnitt: b.material.clipIntersection, deck: b.material.opacity,
@@ -180,7 +185,23 @@ class Viz102KanteTest(_Viz102Basis):
         self.assertAlmostEqual(z["durchmesser"] / z["laenge"],
                                offen["durchmesser"] / offen["laenge"], delta=0.004)
         self.assertGreater(z["durchmesser"], offen["durchmesser"] * 1.03)
-        self.assertLessEqual(z["laenge"], min(z["grund"], ay) + 0.08)
+        self.assertLessEqual(z["laenge"], min(2 * z["grund"], ay) + 0.08)
+        # 3b) ... und scheint dabei nicht durch die Platte: im Schattenraum
+        #     unter der Oberseite wird er nicht gezeichnet (fuenf Ebenen ab dem
+        #     Bau, clipIntersection), an der Kante vorbei schon.
+        ax, az = z["apex"][0], z["apex"][2]
+
+        def im_schatten(x, zz, t):
+            return _ausgespart(z["kegelEbenen"], ax + (x - ax) * t, ay + (1.0 - ay) * t,
+                               az + (zz - az) * t)
+        self.assertTrue(z["kegelSchnitt"] and z["kegelDa"])
+        self.assertEqual(len(z["kegelEbenen"]), 5)
+        self.assertEqual(len(offen["kegelEbenen"]), 5)
+        self.assertFalse(offen["kegelDa"], "offener Strahl endet an der Platte: nichts zu schneiden")
+        self.assertTrue(im_schatten(0.0, 0.2, 1.1), "Kegel scheint durch die Platte")
+        self.assertFalse(im_schatten(0.0, -0.4, 1.1), "Teil an der Kante vorbei muss sichtbar bleiben")
+        self.assertFalse(im_schatten(0.0, 0.2, 0.9), "ueber der Platte unberuehrt")
+        self.assertEqual(z["kegelVersion"], offen["kegelVersion"], "kein Materialneubau am Kegel")
         # 4) nur Werte: kein needsUpdate am Material der ersten Scheibe durch die Kante.
         self.assertEqual(self._zeige(gobo_wheel=_RING, gobo_rotation=40)["version"], z["version"])
         self.assertGreaterEqual(z["version"], version)
@@ -197,6 +218,8 @@ class Viz102KanteTest(_Viz102Basis):
         self.assertAlmostEqual(frei["durchmesser"], offen["durchmesser"], delta=1e-6,
                                msg="ohne Kante wieder die Weite aus Zoom/Iris allein")
         self.assertAlmostEqual(frei["fleckY"], 0.01, places=6)
+        self.assertFalse(frei["kegelDa"])
+        self.assertFalse(_ausgespart(frei["kegelEbenen"], 0, 0.5, 0.2))
         self.assertTrue(_behalten(frei["ebenen"], 0, 0.01, -5))
         self.assertFalse(frei["unter"]["sichtbar"])
 
@@ -215,7 +238,7 @@ class Viz102KanteTest(_Viz102Basis):
         self.assertAlmostEqual(laengen[0], z["apex"][1] - 1.0, delta=0.08, msg="ganz auf der Platte")
         self.assertTrue(all(b >= a - 1e-9 for a, b in zip(laengen, laengen[1:])), reihe)
         # Nach der Kante (Strahlmitte trifft den Boden) dieselbe Laenge wie kurz davor.
-        ziel = min(z["grund"], z["apex"][1])
+        ziel = min(2 * z["grund"], z["apex"][1])
         self.assertAlmostEqual(laengen[-1], ziel, delta=0.08)
         self.assertAlmostEqual(reihe[-1][2], 0.01, places=6)
         self.assertLess(max(b - a for a, b in zip(laengen, laengen[1:])), 0.35,
@@ -318,6 +341,32 @@ class Viz102ImKegelTest(_Viz102Basis):
                 self.assertLessEqual(voll, rand, stil)
                 self.assertGreater(rmax, rand * 0.93, f"{stil}: Motiv fuellt den Kegel nicht")
         self.assertEqual(z["karte"], [1024, 1024], "feinere Shadow-Map fuer die Kante im Motiv")
+
+    def test_geneigter_gobo_kegel_reicht_bis_zum_fernen_rand(self):
+        self._load_and_wait()
+        self._uhr(0)                 # stehende Uhr: keine laufende Glaettung beim Messen
+        self._zeige(gobo_wheel=0, pan=128, tilt=160)
+        offen = self._zeige(gobo_wheel=0, pan=128, tilt=160)
+        z = self._zeige(gobo_wheel=_RING, pan=128, tilt=160)
+        # Gleicher Oeffnungswinkel wie der offene Kegel (der am Auftreffpunkt
+        # der Achse endet) ...
+        self.assertAlmostEqual(offen["durchmesser"] / offen["laenge"],
+                               z["durchmesser"] / z["laenge"], delta=0.004)
+        # ... aber mit Gobo bis zum fernen Rand des Musters (hoechstens
+        # 1,6-mal so lang), und die Projektion reicht genau so weit wie der Kegel.
+        self.assertGreater(z["laenge"], offen["laenge"] * 1.05)
+        self.assertLessEqual(z["laenge"], offen["laenge"] * 1.6 + 0.08)
+        self.assertAlmostEqual(z["reich"], z["laenge"], delta=1e-6)
+        self.assertAlmostEqual(z["fern"][1], z["laenge"], delta=1e-6)
+        # Der laengere Kegel zeichnet schwaecher (1 / weit^2, nie unter 0,3) —
+        # am Auftreffpunkt bleibt er so hell wie der Kegel, der dort endet.
+        w = z["kegelWeit"]
+        self.assertGreater(w, 1.05)
+        self.assertAlmostEqual(z["kegelDeck"], z["kegelBasis"] * max(0.3, 1 / (w * w)), places=9)
+        self.assertAlmostEqual(offen["kegelDeck"], offen["kegelBasis"], places=9)
+        self.assertAlmostEqual(offen["kegelWeit"], 1.0, places=9)
+        # Shader und Pool muessen dieselbe Near-Ebene meinen (weicher Schattenrand).
+        self.assertAlmostEqual(z["nah"], 0.5, places=9)
 
 
 class Viz102NiedrigTest(_Viz102Basis):

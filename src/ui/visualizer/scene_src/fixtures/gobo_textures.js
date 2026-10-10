@@ -54,7 +54,7 @@ import * as THREE from '../three/three.js';
 // Konstanten werden nur in Funktionsruempfen gelesen, nie beim Modul-Laden.
 import { POOL_MAX_RADIUS, poolFalloffTexture } from './floor_pool.js';
 import { isLowSpec, renderer } from '../scene/renderer.js';   // VIZ-92
-import { schattenRechteck } from '../scene/gobo_projektion.js';   // VIZ-102
+import { schattenRechteck, schattenPyramide } from '../scene/gobo_projektion.js';   // VIZ-102
 
 const CACHE = new Map();
 // VIZ-92: 128 px waren fuer einen Bodenfleck von mehreren Metern zu grob —
@@ -507,6 +507,44 @@ export function neueKantenEbenen() {
   const out = [];
   for (let i = 0; i < KANTE_ANZAHL; i++) out.push(new THREE.Plane(new THREE.Vector3(0, 1, 0), KANTE_FREI));
   return out;
+}
+
+// ── VIZ-102: der Kegel scheint nicht durch die Buehne ───────────────────────
+// Ein ueber die Kante verlaengerter Kegel laeuft geometrisch durch die Platte
+// und kam unter bzw. vor ihr wieder zum Vorschein. Sein Material traegt fuenf
+// Clipping-Ebenen (clipIntersection, ab dem Bau — kein Programmwechsel): im
+// Schattenraum unter der getroffenen Oberseite wird er nicht gezeichnet.
+export const KEGEL_EBENEN = 5;
+
+/** Fuenf Ebenen in Grundstellung (schneiden nichts: ueberall positiv). */
+export function neueKegelEbenen() {
+  const out = [];
+  for (let i = 0; i < KEGEL_EBENEN; i++) out.push(new THREE.Plane(new THREE.Vector3(0, 1, 0), KANTE_FREI));
+  return out;
+}
+
+/** Kegel eines Geraets am Schattenraum der getroffenen Oberseite beschneiden;
+ *  kante = null: nichts beschneiden. Liefert true, wenn beschnitten wird. */
+export function kegelSchnittAbgleichen(f, kante) {
+  const beam = f && f.beam;
+  const ebenen = beam && beam.material && beam.material.clippingPlanes;
+  if (!ebenen || ebenen.length !== KEGEL_EBENEN) return false;
+  let pyramide = null;
+  if (kante && beam.geometry && beam.geometry.parameters) {
+    beam.updateWorldMatrix(true, false);
+    beam.localToWorld(_A.set(0, beam.geometry.parameters.height / 2, 0));
+    pyramide = schattenPyramide(kante, _A.x, _A.y, _A.z);
+  }
+  if (!pyramide) {
+    if (f._kegelSchnitt) { _ebenenFrei(ebenen); f._kegelSchnitt = false; }
+    return false;
+  }
+  for (let i = 0; i < KEGEL_EBENEN; i++) {
+    ebenen[i].normal.set(pyramide[i][0], pyramide[i][1], pyramide[i][2]);
+    ebenen[i].constant = pyramide[i][3];
+  }
+  f._kegelSchnitt = true;
+  return true;
 }
 
 function _ebenenFrei(ebenen) {

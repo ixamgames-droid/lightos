@@ -236,6 +236,40 @@ export function kegelFernLaenge(dy, tanA, untenAbstand) {
   return Math.max(untenAbstand, H / Math.cos(Math.min(th + a, FLACH_DACH)) * Math.cos(a));
 }
 
+/** VIZ-102: Schattenraum UNTER einer Oberseite, vom Lichtpunkt aus — die
+ *  Pyramide durch die vier Kanten, unterhalb der Oberseite. Der Lichtkegel
+ *  wird darin nicht gezeichnet: was auf der Oberseite auftrifft, endet dort;
+ *  nur was an der Kante vorbeigeht, laeuft weiter.
+ *
+ *  @returns fuenf Ebenen [nx, ny, nz, d] — ein Punkt liegt im Schattenraum,
+ *           wenn n * p + d fuer ALLE fuenf negativ ist (clipIntersection);
+ *           null, wenn das Licht nicht ueber der Oberseite steht.
+ */
+export function schattenPyramide(kante, ax, ay, az) {
+  if (!kante || !(ay - kante.y > 1e-3)) return null;
+  const ecke = (ex, ez) => {
+    const lx = ex * kante.hx, lz = ez * kante.hz;
+    return [kante.cx + lx * kante.c + lz * kante.s, kante.y, kante.cz - lx * kante.s + lz * kante.c];
+  };
+  const e = [ecke(1, 1), ecke(1, -1), ecke(-1, -1), ecke(-1, 1)];
+  const out = [];
+  for (let k = 0; k < 4; k++) {
+    const p = e[k], q = e[(k + 1) % 4];
+    const ux = p[0] - ax, uy = p[1] - ay, uz = p[2] - az;
+    const vx = q[0] - ax, vy = q[1] - ay, vz = q[2] - az;
+    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const l = Math.hypot(nx, ny, nz);
+    if (!(l > 1e-9)) return null;
+    nx /= l; ny /= l; nz /= l;
+    let d = -(nx * ax + ny * ay + nz * az);
+    // Innen (Mitte der Oberseite) negativ.
+    if (nx * kante.cx + ny * kante.y + nz * kante.cz + d > 0) { nx = -nx; ny = -ny; nz = -nz; d = -d; }
+    out.push([nx, ny, nz, d]);
+  }
+  out.push([0, 1, 0, -kante.y]);      // unterhalb der Oberseite negativ
+  return out;
+}
+
 /** Schatten der Oberseite auf der Ebene `yUnten`, vom Lichtpunkt (ax, ay, az)
  *  aus: wieder ein Rechteck gleicher Drehung (zentrische Streckung um den
  *  Lichtfusspunkt). null, wenn das Licht nicht ueber der Oberseite steht. */
@@ -264,6 +298,60 @@ export const GOBO_ANKER =
 // aus (/\[\s*i\s*\]/ -> `[ 0 ]`, `[ 1 ]`, ...). Ein nacktes `i` bliebe stehen.
 // `w` wird nach unten begrenzt: hinter dem Licht waere die Division sonst
 // 0/0 -> NaN, und NaN * 0 (Licht dort ohnehin aus) bliebe NaN.
+// ── VIZ-102: weicher Schattenrand im Gobo-Bild ──────────────────────────────
+// Der Schatten einer Kante (Buehnenplatte, Wuerfel) schneidet hart durch die
+// Motiv-Teile; was die Schattengrenze nur knapp ueberragt, blieb als duenner
+// Keil oder Splitter stehen. Fuer projizierende Lichter liest die Maske die
+// Shadow-Map deshalb an acht Stellen im Umkreis (zwei Ringe) und laesst das
+// Bild dort weich auslaufen, wo ein Teil der Umgebung im Schatten liegt:
+// schmale Reste verschwinden, die Grenze bekommt einen Halbschatten.
+// Als verdeckt zaehlt eine Stelle nur, wenn der Schattenwerfer DEUTLICH
+// naeher am Licht liegt (GOBO_SAUM_TIEFE) — so wirft eine schraeg getroffene
+// Flaeche keinen Scheinschatten auf sich selbst (die Tiefe aendert sich dort
+// ueber den Umkreis um Zentimeter), ein Hindernis mit Abstand aber schon.
+/** Radien der beiden Ringe in Texeln der Shadow-Map. */
+export const GOBO_SAUM_RINGE = [3, 7];
+/** Mindestabstand (m) Schattenwerfer -> Flaeche fuer den weichen Rand. */
+export const GOBO_SAUM_TIEFE = 0.3;
+/** Near-Ebene der Schattenkamera der Pool-Lichter (spot_pool.js#SCHATTEN_NEAR;
+ *  ein Szenen-Test haelt beide gleich). Damit wird GOBO_SAUM_TIEFE in
+ *  Tiefenpuffer-Einheiten umgerechnet: dz = 0,5 * near * dm / w^2 (far >> near). */
+export const GOBO_SCHATTEN_NAH = 0.5;
+/** Anteil unverdeckter Stellen, ab dem das Bild beginnt bzw. voll steht. */
+export const GOBO_SAUM_STUFE = [0.3, 0.9];
+
+function _saumGlsl() {
+  const [r1, r2] = GOBO_SAUM_RINGE;
+  const d = (r2 * Math.SQRT1_2).toFixed(3);
+  const versatz = [
+    [r1.toFixed(1), '0.0'], ['-' + r1.toFixed(1), '0.0'], ['0.0', r1.toFixed(1)], ['0.0', '-' + r1.toFixed(1)],
+    [d, d], ['-' + d, d], [d, '-' + d], ['-' + d, '-' + d],
+  ];
+  const k = (0.5 * GOBO_SCHATTEN_NAH * GOBO_SAUM_TIEFE).toFixed(4);
+  const zeilen = [
+    '\t\t\tif ( receiveShadow && lightosGp.x > 0.0 && lightosGm > 0.0 ) {',
+    '\t\t\t\tvec3 lightosGc = vSpotShadowCoord[ i ].xyz / lightosGw;',
+    '\t\t\t\tfloat lightosGz = lightosGc.z + spotLightShadow.shadowBias - ' + k + ' / ( lightosGw * lightosGw );',
+    '\t\t\t\tvec2 lightosGt = 1.0 / spotLightShadow.shadowMapSize;',
+    '\t\t\t\tfloat lightosGs = 0.0;',
+  ];
+  for (const [x, y] of versatz) {
+    zeilen.push('\t\t\t\tlightosGs += texture2DCompare( spotShadowMap[ i ], lightosGc.xy + vec2( '
+                + x + ', ' + y + ' ) * lightosGt, lightosGz );');
+  }
+  zeilen.push('\t\t\t\tlightosGm *= smoothstep( ' + GOBO_SAUM_STUFE[0].toFixed(2) + ', '
+              + GOBO_SAUM_STUFE[1].toFixed(2) + ', lightosGs * 0.125 );');
+  zeilen.push('\t\t\t}');
+  return zeilen;
+}
+
+/** Dieselbe Rechnung wie im Shader (Test-Seam): `frei` = Zahl der acht
+ *  Stellen, die NICHT verdeckt sind. */
+export function goboSaumFaktor(frei) {
+  const t = Math.max(0, Math.min(1, (frei / 8 - GOBO_SAUM_STUFE[0]) / (GOBO_SAUM_STUFE[1] - GOBO_SAUM_STUFE[0])));
+  return t * t * (3 - 2 * t);
+}
+
 export const GOBO_GLSL_MASKE = [
   '',
   '\t\t{',
@@ -277,9 +365,10 @@ export const GOBO_GLSL_MASKE = [
   '\t\t\tfloat lightosGw = max( vSpotShadowCoord[ i ].w, 0.0001 );',
   '\t\t\tfloat lightosGf = lightosGoboFern[ i ].x / lightosGw;',
   '\t\t\tlightosGm *= min( 1.0, lightosGf * lightosGf ) * ( 1.0 - smoothstep( lightosGoboFern[ i ].y, lightosGoboFern[ i ].y * ' + GOBO_AUSBLENDE.toFixed(2) + ', lightosGw ) );',
+].concat(_saumGlsl(), [
   '\t\t\tdirectLight.color *= mix( 1.0, lightosGm, lightosGp.x );',
   '\t\t}',
-].join('\n');
+]).join('\n');
 
 export const GOBO_GLSL_KOPF = [
   '#if defined( USE_SHADOWMAP ) && NUM_SPOT_LIGHT_SHADOWS > 0',

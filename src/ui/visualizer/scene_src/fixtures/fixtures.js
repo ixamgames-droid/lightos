@@ -15,7 +15,7 @@ import { buildFixtureModel, updateFixtureDmx } from './registry.js';
 import { ohneZielrechnung } from './builders.js';   // VIZ-98
 import { buildTopDownIcon } from './topdown_icons.js';
 import { applyPoolFalloff } from './floor_pool.js';   // VIZ-15
-import { applyBeamGoboBase, neueKantenEbenen, entferneGoboUnterScheibe } from './gobo_textures.js';   // VIZ-83, VIZ-102
+import { applyBeamGoboBase, neueKantenEbenen, neueKegelEbenen, entferneGoboUnterScheibe } from './gobo_textures.js';   // VIZ-83, VIZ-102
 import { fixtures, topDownIcons, settings, view } from '../state.js';
 import { deg2rad } from '../scene/renderer.js';
 // VIZ-13 3c-2: On-Demand-Rendering — jede DMX-/Bestands-Aenderung an
@@ -283,6 +283,10 @@ export function createBeamCone(color, intensity, angle, length) {
     side: THREE.DoubleSide,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
+    // VIZ-102: fuenf Clipping-Ebenen ab dem Bau (Grundstellung: schneiden
+    // nichts) — der Kegel wird im Schattenraum unter einer getroffenen
+    // Oberseite nicht gezeichnet (gobo_textures.js#kegelSchnittAbgleichen).
+    clippingPlanes: neueKegelEbenen(), clipIntersection: true,
   });
   const cone = new THREE.Mesh(geo, mat);
   applyBeamFalloff(cone);          // VIZ-15: Laengs-Falloff (s. o.)

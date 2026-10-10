@@ -143,6 +143,39 @@ aus.fernGeneigt = Lf;
 // muss die Hoehe der unteren Flaeche sein (7,2 m Achse -> H = 7,2 cos th).
 aus.fernHoehe = [Lf / Math.cos(aW) * Math.cos(th + aW), 7.2 * Math.cos(th)];
 aus.fernFlach = G.kegelFernLaenge(-Math.cos(1.5), 0.4, 6);
+
+// ── Schattenraum unter der Oberseite (Kegel scheint nicht durch) ──
+const KP = { cx: 0, cz: 0, hx: 5.5, hz: 3.5, c: 1, s: 0, y: 1 };
+const AP = [-1.5, 5.3, -2.5];
+const PY = G.schattenPyramide(KP, AP[0], AP[1], AP[2]);
+const innen = (p) => PY.every(e => e[0] * p[0] + e[1] * p[1] + e[2] * p[2] + e[3] < 0);
+// Strahl vom Licht durch einen Punkt der Oberseitenebene, verlaengert unter sie.
+const unter = (x, z, t) => [AP[0] + (x - AP[0]) * t, AP[1] + (1 - AP[1]) * t, AP[2] + (z - AP[2]) * t];
+aus.pyramide = {
+  n: PY.length,
+  durchPlatte: [innen(unter(0, 0, 1.1)), innen(unter(5, 3, 1.2)), innen(unter(-5.4, -3.4, 1.05))],
+  anKanteVorbei: [innen(unter(0, 3.6, 1.2)), innen(unter(5.6, 0, 1.2)), innen(unter(0, 6, 1.24))],
+  ueberPlatte: [innen([0, 1.2, 0]), innen([0, 3, 0]), innen(unter(0, 0, 0.9))],
+  vorDerWand: innen([0, 0.5, 3.6]),          // direkt vor der Vorderwand, im Schatten der Platte
+  weitVorn: innen([0, 0.5, 5.5]),            // hinter der Schattengrenze: Licht
+};
+// gedreht: gleiche Aussage in gedrehten Achsen.
+const KR = { cx: 0, cz: 0, hx: 5.5, hz: 3.5, c: Math.cos(0.5), s: Math.sin(0.5), y: 1 };
+const PR = G.schattenPyramide(KR, 0, 5, 0);
+aus.pyramideGedreht = PR.every(e => e[1] * 0.5 + e[3] < 0);     // Punkt (0, 0.5, 0) unter der Mitte
+aus.pyramideNull = [G.schattenPyramide(KP, 0, 1, 0), G.schattenPyramide(KP, 0, 0.2, 0), G.schattenPyramide(null, 0, 5, 0)];
+
+// ── weicher Schattenrand ──
+aus.saum = [0, 2, 3, 4, 6, 7, 8].map(n => G.goboSaumFaktor(n));
+aus.saumGlsl = {
+  stellen: fs.split('texture2DCompare( spotShadowMap[ i ], lightosGc.xy + vec2(').length - 1,
+  nurGobo: fs.indexOf('if ( receiveShadow && lightosGp.x > 0.0 && lightosGm > 0.0 ) {') >= 0,
+  tiefe: fs.indexOf('float lightosGz = lightosGc.z + spotLightShadow.shadowBias - 0.0750 / ( lightosGw * lightosGw );') >= 0,
+  stufe: fs.indexOf('lightosGm *= smoothstep( 0.30, 0.90, lightosGs * 0.125 );') >= 0,
+  vorLicht: fs.indexOf('lightosGs * 0.125') < fs.indexOf('directLight.color *= mix( 1.0, lightosGm, lightosGp.x );'),
+  sampler: (fs.match(/uniform\s+sampler2D\s+lightos\w+/g) || []).length,
+};
+aus.saumKonst = [G.GOBO_SAUM_RINGE, G.GOBO_SAUM_TIEFE, G.GOBO_SCHATTEN_NAH];
 """
 
 
@@ -228,6 +261,35 @@ class Viz102LogikTest(unittest.TestCase):
         self.assertAlmostEqual(r["fernHoehe"][0], r["fernHoehe"][1], places=9)
         self.assertTrue(math.isfinite(r["fernFlach"]))
         self.assertEqual(r["fernFlach"], 6, "zu flach: Achslaenge")
+
+    def test_kegel_wird_im_schattenraum_der_oberseite_nicht_gezeichnet(self):
+        p = self.r["pyramide"]
+        self.assertEqual(p["n"], 5)
+        self.assertEqual(p["durchPlatte"], [True, True, True],
+                         "Strahlen DURCH die Platte enden an der Oberseite")
+        self.assertEqual(p["anKanteVorbei"], [False, False, False],
+                         "was an der Kante vorbeigeht, laeuft weiter")
+        self.assertEqual(p["ueberPlatte"], [False, False, False], "ueber der Platte unberuehrt")
+        self.assertTrue(p["vorDerWand"])
+        self.assertFalse(p["weitVorn"])
+        self.assertTrue(self.r["pyramideGedreht"])
+        self.assertEqual(self.r["pyramideNull"], [None, None, None])
+
+    def test_weicher_schattenrand_laesst_schmale_reste_auslaufen(self):
+        r = self.r
+        f = r["saum"]
+        self.assertEqual(f[0], 0)
+        self.assertEqual(f[1], 0, "ein Viertel frei (duenner Keil): ganz weg")
+        self.assertTrue(0 < f[2] < f[3] < f[4] < 1, f)
+        self.assertGreater(f[5], 0.9)
+        self.assertEqual(f[6], 1, "frei von Schatten: unveraendert")
+        g = r["saumGlsl"]
+        self.assertEqual(g["stellen"], 8)
+        self.assertTrue(g["nurGobo"], "nur projizierende Lichter zahlen die acht Abfragen")
+        self.assertTrue(g["tiefe"], "0,5 x near x 0,3 m: schraege Flaechen beschatten sich nicht selbst")
+        self.assertTrue(g["stufe"] and g["vorLicht"])
+        self.assertEqual(g["sampler"], 1, "kein weiterer Sampler (die Shadow-Map ist schon da)")
+        self.assertEqual(r["saumKonst"], [[3, 7], 0.3, 0.5])
 
     def test_schatten_der_oberseite_ist_das_gestreckte_rechteck(self):
         r = self.r

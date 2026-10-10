@@ -119,7 +119,7 @@ class QuelleTest(unittest.TestCase):
         # VIZ-102: die Laenge geht vom Auftreffabstand aus und waechst nur,
         # wenn ein Gobo-Fleck ueber die Kante der getroffenen Oberseite ragt.
         self.assertIn("let kegelAbstand = auftreffAbstand", block)
-        self.assertIn("setBeamLength(f, kegelAbstand)", block)
+        self.assertIn("setBeamLength(f, kegelAbstand, ueberBasis)", block)
         self.assertEqual(block.count("setBeamLength(f,"), 1,
                          "genau EINE Anwendung — zwei waeren zwei Wahrheiten")
         self.assertEqual(block.count("koerperTreffer(f,"), 1,

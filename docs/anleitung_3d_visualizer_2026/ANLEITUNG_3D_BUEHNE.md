@@ -301,6 +301,9 @@ Darstellungen; Größe und Lage des Musters bleiben dabei gleich.
 - **Bühnenkante:** Ragt ein Muster über die Kante einer Bühnenplatte oder eines
   Podests, liegt der Teil dahinter auf dem Boden darunter. Direkt vor der Kante
   bleibt der Schatten der Platte frei, und der Lichtkegel reicht bis zum Boden.
+  Der Kegel selbst endet auf der Platte, wo er auftrifft; nur der Teil, der an
+  der Kante vorbeigeht, läuft weiter. An der Schattengrenze läuft das Muster
+  weich aus.
   Nichts schwebt in Höhe der Bühne in der Luft; das gilt auch für den flachen
   Fleck und auf der Stufe Niedrig.
 - **Das Gobo-Bild liegt im Strahl:** Das Motiv füllt den Lichtkegel bis zu
