@@ -274,6 +274,51 @@ class ShowOeffnenTest(unittest.TestCase):
                     self.assertEqual((name, zahl), (n, c))
 
 
+class ProfilNeuzuordnungTest(unittest.TestCase):
+    """Review: zeigt die Profil-ID der Show ins Leere (anderer Rechner, neu
+    aufgebaute Bibliothek), sucht ``show_file._resolve_fixture_profile_id`` das
+    Profil ueber den Namen — und prueft dabei, ob es den Modus der Show hat.
+    Diese Pruefung kannte den umbenannten Zwilling nicht."""
+
+    def setUp(self):
+        self.motor, self.pid = _temp_bibliothek(self)
+        from src.core.show import show_file
+        self.show_file = show_file
+        self._vorher = list(show_file._ladeprobleme)
+        show_file._ladeprobleme.clear()
+        self.addCleanup(self._zurueck)
+
+    def _zurueck(self):
+        self.show_file._ladeprobleme[:] = self._vorher
+
+    def _aufloesen(self, name, zahl):
+        return self.show_file._resolve_fixture_profile_id(
+            999_999, "Testwerk", "Zwilling", mode_name=name, channel_count=zahl)
+
+    def test_zwilling_gilt_als_modus_der_show(self):
+        pid = _profil(self.motor, "Zwilling", NACH_IMPORT)
+        self.assertEqual(self._aufloesen("Standard", 6), pid)
+        self.assertEqual([p for p in self.show_file._ladeprobleme if "NICHT" in p], [])
+
+    def test_profil_mit_zwilling_geht_vor_fremdem_modus_gleicher_kanalzahl(self):
+        fremd = _profil(self.motor, "Zwilling", (("Sechs", 6),))
+        pid = _profil(self.motor, "Zwilling", NACH_IMPORT)
+        self.assertLess(fremd, pid)
+        self.assertEqual(self._aufloesen("Standard", 6), pid)
+
+    def test_wirklich_fehlender_modus_wird_weiter_gemeldet(self):
+        _profil(self.motor, "Zwilling", NACH_IMPORT)
+        self._aufloesen("Standard", 9)
+        self.assertTrue(any("NICHT" in p for p in self.show_file._ladeprobleme),
+                        self.show_file._ladeprobleme)
+
+    def test_ohne_kanalzahl_gibt_es_keinen_zwillings_treffer(self):
+        _profil(self.motor, "Zwilling", (("Standard (2)", 6),))
+        self._aufloesen("Standard", 0)
+        self.assertTrue(any("NICHT" in p for p in self.show_file._ladeprobleme),
+                        self.show_file._ladeprobleme)
+
+
 class EineRegelTest(unittest.TestCase):
     """Die Regel steht an EINER Stelle, und alle fragen sie."""
 

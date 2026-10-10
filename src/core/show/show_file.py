@@ -493,8 +493,17 @@ def _resolve_fixture_profile_id(profile_id: int, manufacturer_name: str,
                     modi.setdefault(int(fid_), []).append((mname, int(mcount or 0)))
 
                 def _exakt(t) -> bool:
-                    return any(n == mode_name and (not channel_count or c == channel_count)
-                               for n, c in modi.get(int(t[0]), []))
+                    paare = modi.get(int(t[0]), [])
+                    if any(n == mode_name and (not channel_count or c == channel_count)
+                           for n, c in paare):
+                        return True
+                    # FM-73: der Import hat den zweiten gleichnamigen Modus in
+                    # „Name (n)“ umbenannt — fuer die Show ist das derselbe
+                    # Modus (Alias-Regel in ``modus_wahl``), kein fehlender.
+                    from src.core.database.modus_wahl import ist_zwilling
+                    return bool(channel_count) and any(
+                        c == channel_count and ist_zwilling(n, mode_name)
+                        for n, c in paare)
 
                 def _kanalzahl(t) -> bool:
                     return bool(channel_count) and any(
