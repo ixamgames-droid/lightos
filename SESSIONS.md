@@ -32,7 +32,6 @@
 | VCB-41 | A | fix/vcb41-solo-zwilling | 2026-10-09T13:45Z | src/ui/virtualconsole |
 | TOOL-25 | A | fix/tool25-lint-snap-verweise | 2026-10-09T13:45Z | tools/lint_show.py |
 | VIZ-97 | D | fix/viz97-gobo-schluesselwoerter | 2026-10-10T11:42Z | src/ui/widgets/gobo_icons.py · tests/test_viz97_gobo_schluesselwoerter.py · BACKLOG.md · changelog.d/2026-10-09-VIZ-97.md |
-| FM-72 | D | fix/fm72-download-dialog-show | 2026-10-10T11:42Z | main.py · src/ui/main_window.py · tests/test_fm72_bibliothek_frage_mit_show.py · tests/test_fm53_bibliothek_download.py · docs/FIXTURE_SOURCES.md · docs/anleitung_geraete_bibliothek/ANLEITUNG.md · BACKLOG.md · changelog.d/2026-10-09-FM-72.md |
 | BPM-30 | D | fix/bpm30-beat-thread-get-state | 2026-10-10T11:42Z | src/core/app_state.py · src/core/engine/bpm_manager.py · tests/test_bpm30_beat_faden_ohne_appstate.py · BACKLOG.md · changelog.d/2026-10-09-BPM-30.md |
 | XPLAT-48 | D | fix/xplat48-no-venv-verknuepfung | 2026-10-10T11:42Z | install.py · tests/test_xplat48_verknuepfung_no_venv.py · BACKLOG.md · changelog.d/2026-10-09-XPLAT-48.md |
 | MIDI-5 | A | feature/midi5-msc | 2026-10-09T16:27Z | src/core/midi |
@@ -154,7 +153,6 @@
 
 ## Verlauf
 
-- 2026-10-10T09:29Z A claim DOC-69
 - 2026-10-10T09:29Z A claim STAB-32
 - 2026-10-10T09:29Z A claim OUT-67
 - 2026-10-10T09:39Z A done DEMO-07
@@ -184,3 +182,4 @@
 - 2026-10-10T11:46Z A done BACKLOG-STATUS
 - 2026-10-10T11:47Z A claim PROC-19
 - 2026-10-10T11:47Z A claim PROC-20
+- 2026-10-10T12:06Z D done FM-72
