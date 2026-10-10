@@ -12,7 +12,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| DOC-37 | C | - | 2026-10-02T10:59Z | docs/anleitung_spider/ANLEITUNG_SPIDER.md · tools/build_event_demo_2026.py · tests/test_doc37_spider_wippe.py · changelog.d/2026-10-02-DOC-37.md |
 | DOC-38 | C | - | 2026-10-02T11:07Z | docs/anleitung_3d_geraete_ohne_rgb/ANLEITUNG_3D_GERAETE_OHNE_RGB.md |
 | DOC-39 | C | - | 2026-10-02T11:09Z | docs/anleitung_3d_visualizer_2026/ANLEITUNG_3D_BUEHNE.md |
 | DOC-40 | C | - | 2026-10-02T11:11Z | docs/anleitung_farbchase/ANLEITUNG_FARBCHASE.md |
@@ -141,7 +140,6 @@
 
 ## Verlauf
 
-- 2026-10-09T14:59Z B done OUT-62
 - 2026-10-09T15:25Z B done UI-75
 - 2026-10-09T15:55Z A done STAB-30
 - 2026-10-09T16:18Z A done DOC-66
@@ -171,3 +169,4 @@
 - 2026-10-10T09:27Z C uebergeben DOC-34
 - 2026-10-10T09:27Z C uebergeben DOC-35
 - 2026-10-10T09:27Z C uebergeben DOC-36
+- 2026-10-10T09:27Z C uebergeben DOC-37
