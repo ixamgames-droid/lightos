@@ -5515,7 +5515,8 @@ def _resolve_mode(s, fixture):
     """Der ``FixtureMode`` eines gepatchten Geraets — mit der Fallback-Kette,
     die dieses Projekt ueberall meint, wenn es „der Modus des Geraets" sagt:
 
-      1. exakter Name, 2. irgendein Modus mit passender Kanalzahl,
+      1. exakter Name (bei gleichnamigen Modi der mit passender Kanalzahl,
+         FM-67), 2. irgendein Modus mit passender Kanalzahl,
       3. irgendein Modus des Profils, 4. ``None``.
 
     VIZ-50a: aus ``get_channels_for_patched`` herausgezogen, weil die Rasterform
@@ -5528,12 +5529,19 @@ def _resolve_mode(s, fixture):
     # nicht ``scalar_one_or_none``. Zwei Modi gleicher Kanalzahl sind normal,
     # und ein doppelter Modusname liess sich im Editor speichern — beides warf
     # ``MultipleResultsFound`` mitten im Renderpfad.
-    mode = s.execute(
+    gleichnamig = s.execute(
         select(FixtureMode)
         .where(FixtureMode.fixture_id == fixture.fixture_profile_id)
         .where(FixtureMode.name == fixture.mode_name)
         .order_by(FixtureMode.id)
-    ).scalars().first()
+    ).scalars().all()
+    # ★ FM-67: tragen zwei Modi denselben Namen, entscheidet die gespeicherte
+    # Kanalzahl mit — sonst gewann stumm der aelteste, und ein Geraet im
+    # 6-Kanal-Modus fuhr die Kanaele des gleichnamigen 4-Kanal-Modus. Passt
+    # keiner, bleibt es beim ersten (nach ID), wie bisher.
+    mode = next((m for m in gleichnamig
+                 if m.channel_count == getattr(fixture, "channel_count", None)),
+                gleichnamig[0] if gleichnamig else None)
     if not mode:
         mode = s.execute(
             select(FixtureMode)

@@ -464,7 +464,9 @@ class DoppelteModiTest(_TempDB, unittest.TestCase):
                           "user", modi=(("A", 4), ("A", 6)))
             s.commit()
             f = SimpleNamespace(fixture_profile_id=pid, mode_name="A", channel_count=6)
-            self.assertEqual(app_state._resolve_mode(s, f).channel_count, 4)
+            # FM-67: bei gleichnamigen Modi entscheidet die Kanalzahl mit
+            # (vorher gewann der aeltere 4-Kanal-Modus).
+            self.assertEqual(app_state._resolve_mode(s, f).channel_count, 6)
 
 
 class NichtAsciiHerstellerTest(_TempDB, unittest.TestCase):
