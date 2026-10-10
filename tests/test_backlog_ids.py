@@ -183,14 +183,21 @@ class FailClosedTest(unittest.TestCase):
     def _main_mit(self, zweige, warnung, refs_lesbar=True):
         import backlog_ids as bi
         orig_pr, orig_je = bi.offene_pr_zweige, bi.backlog_je_zweig
+        orig_weitere = bi.weitere_belegte_ids
         bi.offene_pr_zweige = lambda: (zweige, warnung)
         bi.backlog_je_zweig = lambda refs: (
             {r: bi.items_aus_backlog(self._BACKLOG) for r in refs}
             if refs_lesbar else {"origin/main": bi.items_aus_backlog(self._BACKLOG)})
+        # TOOL-23: auch dieser Griff nach git ist zu. Seit eine unlesbare Tafel
+        # eine Luecke ist, liefe die Positivkontrolle in der CI (kein
+        # `origin/sessions`) sonst in genau die Luecke, die sie ausschliesst.
+        # Die Lesefehler selbst misst test_tool23_backlog_ids_tafel_fragmente.py.
+        bi.weitere_belegte_ids = lambda refs: (set(), [])
         try:
             return bi.main(["--gruppe", "FM", "--kein-fetch"])
         finally:
             bi.offene_pr_zweige, bi.backlog_je_zweig = orig_pr, orig_je
+            bi.weitere_belegte_ids = orig_weitere
 
     def test_ein_unlesbarer_ref_verhindert_die_auskunft(self):
         self.assertEqual(
