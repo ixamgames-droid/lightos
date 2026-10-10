@@ -173,7 +173,12 @@ def create_app(port: int = 5000) -> tuple:
         raise RuntimeError("Flask / flask-socketio not installed")
 
     template_dir = os.path.join(os.path.dirname(__file__), "templates")
-    _flask_app = Flask(__name__, template_folder=template_dir)
+    # WEB-06: der Socket.IO-Client liegt lokal unter static/ — nichts aus dem
+    # Internet. Ordner ausdruecklich setzen (wie templates), damit die Aufloesung
+    # im gefrorenen Build nicht an Flasks root_path-Erkennung haengt.
+    static_dir = os.path.join(os.path.dirname(__file__), "static")
+    _flask_app = Flask(__name__, template_folder=template_dir,
+                       static_folder=static_dir, static_url_path="/static")
     # SECRET_KEY: aus ENV lesen, sonst zufaellig generieren (nie hardcoden!)
     import secrets
     _flask_app.config["SECRET_KEY"] = os.environ.get("LIGHTOS_FLASK_SECRET") or secrets.token_hex(32)
