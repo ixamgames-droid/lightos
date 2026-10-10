@@ -258,7 +258,10 @@ Python, kein venv und kein `install.py`**.
 - legt eine Startmenü-Verknüpfung an, auf Wunsch auch eine auf dem Desktop,
 - trägt einen Deinstaller ein (Einstellungen → Apps, oder Startmenü „LightOS
   deinstallieren“),
-- legt die Lizenzen der Fremd-Komponenten bei (`THIRD_PARTY_NOTICES.md`, `licenses\`).
+- legt die Lizenzen der Fremd-Komponenten bei (`THIRD_PARTY_NOTICES.md`, `licenses\`),
+- bringt fünf **Demo-Shows** mit: **Datei → Demo-Show öffnen**. Eine Demo öffnet sich als
+  neue, ungespeicherte Show; **Speichern** fragt nach einem Namen und legt deine Kopie in
+  `%APPDATA%\LightOS\shows` an. Das Original im Programmordner bleibt unverändert.
 
 **Deine Daten** (Shows, Show-DB, Geräte-Bibliothek, Snaps, Bühnen, Einstellungen)
 liegen wie bei der Python-Installation in `%APPDATA%\LightOS` — der Programmordner
@@ -279,6 +282,7 @@ Quellbetrieb: `python main.py --selbsttest`.
 
 ```cmd
 python -m pip install -r requirements.txt "pyinstaller>=6.10"
+python packaging\demo_shows.py
 python -m PyInstaller --noconfirm --clean packaging\windows\LightOS.spec
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=1.0.0 packaging\windows\LightOS.iss
 ```
@@ -286,7 +290,11 @@ python -m PyInstaller --noconfirm --clean packaging\windows\LightOS.spec
 Ergebnis: `dist\LightOS\` (onedir-Build) und `dist\setup\LightOS-Setup.exe`. Was
 außer dem Code mitkommt, steht in `packaging/windows/bundle_inhalt.py` — nur
 Dateien, die Git kennt, damit keine privaten Laufzeitdaten aus `data/`/`shows/` in
-ein Setup geraten.
+ein Setup geraten. Einzige Ausnahme sind die Demo-Shows: `packaging/demo_shows.py`
+erzeugt sie aus den Generatoren nach `demo_shows/` (eigener Wegwerf-Datenordner, Show-Lint,
+unter einer Minute); ohne diesen Schritt meldet der Selbsttest der gepackten exe sie als
+fehlend. Im Quellbetrieb reicht derselbe Aufruf (`python packaging/demo_shows.py`), danach
+steht **Datei → Demo-Show öffnen** auch dort bereit.
 
 ## Fehler melden / Diagnosepaket
 

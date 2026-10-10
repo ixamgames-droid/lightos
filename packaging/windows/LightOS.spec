@@ -2,6 +2,7 @@
 # XPLAT-47: PyInstaller-Spec fuer den Windows-Build von LightOS.
 #
 # Bauen (auf Windows, im Repo-Root, mit installierten requirements.txt):
+#     python packaging/demo_shows.py        (DEMO-8: Demo-Shows -> demo_shows/)
 #     python -m PyInstaller --noconfirm --clean packaging/windows/LightOS.spec
 # Ergebnis: dist/LightOS/LightOS.exe (+ _internal/). Danach baut
 # packaging/windows/LightOS.iss daraus das Setup (LightOS-Setup.exe).
@@ -11,7 +12,8 @@
 # Dateien; onefile entpackte bei JEDEM Start ~300 MB in einen Temp-Ordner.
 #
 # Was ausser Python-Code mitkommt, steht in bundle_inhalt.py (dort auch, warum
-# nur Git-bekannte Dateien gepackt werden).
+# nur Git-bekannte Dateien gepackt werden — und die eine Ausnahme: die beim
+# Bauen erzeugten Demo-Shows, DEMO-8).
 import os
 import sys
 
@@ -27,6 +29,11 @@ hiddenimports = list(bundle_inhalt.HIDDEN_IMPORTS)
 # schuetzt vor einem fehlenden Modul, das erst beim Klick auf einen Menuepunkt
 # auffiele.
 hiddenimports += collect_submodules("src")
+
+if not bundle_inhalt.erzeugte_dateien(REPO):
+    print("WARNUNG (DEMO-8): keine Demo-Shows in demo_shows/ — vorher "
+          "'python packaging/demo_shows.py' ausfuehren. Der Selbsttest der "
+          "gepackten exe meldet das als Fehler.")
 
 a = Analysis(  # noqa: F821
     [os.path.join(REPO, "main.py")],

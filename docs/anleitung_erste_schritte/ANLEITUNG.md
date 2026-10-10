@@ -210,6 +210,10 @@ Alles läuft über das Menü **Datei**:
    LightOS selbst.
 4. **Zuletzt verwendet** — die zehn zuletzt geöffneten oder gespeicherten Shows.
 
+Unter **Öffnen...** steht außerdem **Demo-Show öffnen**: fertige Beispiel-Shows, die das
+Windows-Setup mitbringt (aus dem Quellcode: `python packaging/demo_shows.py`). Eine Demo
+öffnet sich als neue, ungespeicherte Show — **Speichern** fragt nach einem Namen.
+
 Die Datei-Dialoge starten im Ordner der aktuellen Show, sonst im Ordner `shows` im
 LightOS-Datenordner (Linux: `~/.local/share/LightOS/shows`, Windows:
 `%APPDATA%\LightOS\shows`). Nach dem Speichern steht der Pfad im Fenstertitel und kurz

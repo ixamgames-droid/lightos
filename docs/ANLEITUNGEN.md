@@ -11,6 +11,11 @@ nach durch. **Installiert** wird LightOS laut [INSTALL.md](../INSTALL.md) — au
   **Datei → Öffnen...**:
   `venv/bin/python tools/<generator>.py` (Linux) bzw.
   `venv\Scripts\python tools\<generator>.py` (Windows).
+- **Demo-Show** — die Show ist im Windows-Setup dabei: **Datei → Demo-Show öffnen**. Das gilt
+  für `Showcase_Club_Nacht`, `Showcase_Theater_Event`, `Buehnen_Show_2026`, `Mega_Arena_2026`
+  und den Laser- und Gobo-Test. Sie öffnet sich als neue, ungespeicherte Show; **Speichern**
+  legt deine eigene Kopie an. Aus dem Quellcode baut `python packaging/demo_shows.py` alle
+  fünf auf einmal; der einzelne Generator geht weiterhin.
 - **Keine Show nötig** — die Anleitung beginnt mit einer leeren oder deiner eigenen Show.
 - **Beispiel-Show nicht im Repo** — die Bilder stammen aus einer privaten Show. Die Schritte
   gelten trotzdem für jedes Rig; Namen von Tasten und Gruppen weichen dann ab.
@@ -108,7 +113,7 @@ frei kombinieren; das Tempo aller Ebenen hängt an Tempo-Buses (siehe
 | [Moving Heads einmessen](anleitung_einmessen/ANLEITUNG_EINMESSEN.md) | Zielen im 3D-Visualizer an den echten Aufbau angleichen; ab vier Punkten rechnet LightOS die echte Position. | Keine Show nötig |
 | [Woher der 3D-Visualizer seine Farbe nimmt](anleitung_3d_geraete_ohne_rgb/ANLEITUNG_3D_GERAETE_OHNE_RGB.md) | Geräte ohne RGB — Blinder, Farbrad-Mover, Dimmer-PAR: welche Farbe und Helligkeit der Visualizer ableitet. | Generator `build_farbprobe_3d.py` → `Farbprobe_3D.lshow` |
 | [Laser bedienen](anleitung_laser/ANLEITUNG_LASER.md) | Muster wählen und speichern, Werksmuster-Kacheln, VC-Knopf und Tempo-Fader; Netzwerk-Laser mit Zeichen-Studio und Sicherheit. | Keine Show nötig |
-| [Test-Show „Laser Gobo Test 2026“](ANLEITUNG_LASER_GOBO_TEST_2026.md) | Laser, Gobo-Moving-Heads, PARs und Nebel an einem Rig prüfen. | Generator `build_laser_gobo_test.py` |
+| [Test-Show „Laser Gobo Test 2026“](ANLEITUNG_LASER_GOBO_TEST_2026.md) | Laser, Gobo-Moving-Heads, PARs und Nebel an einem Rig prüfen. | Demo-Show „Laser- und Gobo-Test“ · Generator `build_laser_gobo_test.py` |
 
 ## Ausgabe
 
@@ -124,9 +129,9 @@ frei kombinieren; das Tempo aller Ebenen hängt an Tempo-Buses (siehe
 |---|---|---|
 | [Event-Demo 2026](ANLEITUNGEN_EVENT_DEMO.md) | Bank-Übersicht einer kompletten Show mit PARs, Moving Heads und Spidern; führt zu den Einzelanleitungen. | Generator `build_event_demo_2026.py` → `Event_Demo_2026.lshow` |
 | [Hochzeits-Show von Anfang bis Ende](anleitung_hochzeit_komplett/00_INDEX.md) | Zehnteiliger Durchlauf einer ruhigeren Show: Patch, Farben, Tempo-Controller, Live-Edit, Ablauf. | Generator `build_hochzeit_komplett.py` → `Hochzeit_Komplett_2026.lshow` |
-| [Große Bühnen-Show 2026](anleitung_buehnen_show/ANLEITUNG_BUEHNEN_SHOW.md) | 20-m-Bühne mit drei Traversen-Ebenen, 40 PARs, 20 Moving Heads, Strobes, 10 Lasern und Nebel; Wellen, Lauflichter, Show-Looks und Kamerafahrten im 3D. | Generator `build_buehnen_show_2026.py` → `Buehnen_Show_2026.lshow` |
-| [Showcase „Club-Nacht“](showcase/club_nacht.md) | Mittelgroßer Club: eine Nacht auf der Cue-Liste, Bewegungen und Chaser im Takt (Tap oder Musik-BPM), FLASH-Tasten und Laser-NOT-AUS. | Generator `build_showcase_club.py` → `Showcase_Club_Nacht.lshow` |
-| [Showcase „Theater/Event“](showcase/theater_event.md) | Kleiner Saal: ruhige Cue-Liste mit weichen Fades, Wartezeiten und Follow-Cues, Spots auf festen Positionen. | Generator `build_showcase_theater.py` → `Showcase_Theater_Event.lshow` |
+| [Große Bühnen-Show 2026](anleitung_buehnen_show/ANLEITUNG_BUEHNEN_SHOW.md) | 20-m-Bühne mit drei Traversen-Ebenen, 40 PARs, 20 Moving Heads, Strobes, 10 Lasern und Nebel; Wellen, Lauflichter, Show-Looks und Kamerafahrten im 3D. | Demo-Show „Große Bühnen-Show“ · Generator `build_buehnen_show_2026.py` → `Buehnen_Show_2026.lshow` |
+| [Showcase „Club-Nacht“](showcase/club_nacht.md) | Mittelgroßer Club: eine Nacht auf der Cue-Liste, Bewegungen und Chaser im Takt (Tap oder Musik-BPM), FLASH-Tasten und Laser-NOT-AUS. | Demo-Show „Showcase: Club-Nacht“ · Generator `build_showcase_club.py` → `Showcase_Club_Nacht.lshow` |
+| [Showcase „Theater/Event“](showcase/theater_event.md) | Kleiner Saal: ruhige Cue-Liste mit weichen Fades, Wartezeiten und Follow-Cues, Spots auf festen Positionen. | Demo-Show „Showcase: Theater / Event“ · Generator `build_showcase_theater.py` → `Showcase_Theater_Event.lshow` |
 | [Feature-Showcase](FEATURE_SHOWCASE.md) | Eine Test-Show, die möglichst jede Funktion einmal zeigt. | Generator `build_feature_showcase.py` → `Feature_Showcase.lshow` |
 | [APC mini + vier RGBW-Strahler](APC_SCHRITT_FUER_SCHRITT.md) | Schritt für Schritt mit der APC-Test-Show; dazu die [Seiten-Übersicht](APC_SEITEN_UEBERSICHT.md). | Generator `build_apc_test_show.py` → `APC_Test_Komplett.lshow` |
 | [Farb-/Effekt-VC-Show](FARB_FX_VC_SHOW.md) | Bedienung der Show, aus der „Effekte einfach aufbauen“ stammt. | Generator `build_farb_fx_vc_show.py` |
