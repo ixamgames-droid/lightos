@@ -58,7 +58,7 @@
 | QA-91 | D | fix/qa91-doc60-test-encoding | 2026-10-10T18:52Z | - |
 | VCB-36 | D | fix/vcb36-blackout-ziel-gruppen-id | 2026-10-10T18:16Z | - |
 | UI-78 | D | fix/ui78-efx-editor-texte | 2026-10-10T18:24Z | - |
-| UI-80 | D | fix/ui80-matrix-entwurf-speed | 2026-10-10T18:17Z | - |
+| UI-80 | D | fix/ui80-matrix-entwurf-speed | 2026-10-10T18:53Z | - |
 | TOOL-18 | D | fix/tool18-bilder-hinweis-gpu-szenen | 2026-10-10T18:52Z | - |
 | TOOL-19 | D | fix/tool19-werkzeuge-ohne-echten-ausgang | 2026-10-10T18:53Z | - |
 | QA-92 | D | fix/qa92-windows-rote-tests | 2026-10-10T18:49Z | - |
