@@ -966,20 +966,36 @@ def _abgleichen(s, daten: dict) -> str:
     from sqlalchemy.orm import selectinload
     from .models import (ABLOESBARE_QUELLEN, FixtureChannel, FixtureMode, FixtureProfile,
                          Manufacturer)
+    from .fixture_db import ist_bearbeitet, profil_schluessel
     name_h, modell = daten["hersteller"].strip(), daten["modell"].strip()
+    # UI-74: Hersteller ohne Gross/klein — wie `_hersteller`. Sonst fand eine
+    # korrigierte Schreibweise das schon eingespielte Profil nicht wieder und
+    # legte es ein zweites Mal an.
+    hersteller_ids = [m.id for m in hersteller_ohne_gross_klein(s, name_h)]
+    # ★ FM-66: dasselbe gilt fuer das MODELL. Der Abgleich verglich es roh
+    # (`FixtureProfile.name == modell`): „PAR 7“ in der Datei fand ein „Par 7“
+    # in der DB nicht — die Datei legte ein zweites Profil an, statt das
+    # vorhandene zu pflegen, und ein gleichnamiges eigenes Profil oder Builtin
+    # verdeckte sie nicht mehr (zwei Eintraege fuer ein Geraet, FM-43).
+    # Verglichen wird ueber `fixture_db.profil_schluessel` — dieselbe
+    # Gleichheit wie beim Abloesen (FM-63) und im Dubletten-Riegel des Editors:
+    # Gross/klein und Leerzeichen zaehlen nicht, Satzzeichen SCHON („PAR-56“
+    # und „PAR 56“ sind zwei Geraete). In Python statt in SQL, weil SQLite nur
+    # ASCII faltet (s. `hersteller_ohne_gross_klein`). Erst die Namen, dann nur
+    # die Treffer mit Modi/Kanaelen laden — ein Hersteller aus einem
+    # QLC+-Import hat schnell mehrere hundert Profile.
+    ziel = profil_schluessel("", modell)[1]
+    treffer_ids = [pid for pid, pname in s.execute(
+        select(FixtureProfile.id, FixtureProfile.name)
+        .where(FixtureProfile.manufacturer_id.in_(hersteller_ids)))
+        if profil_schluessel("", pname)[1] == ziel] if hersteller_ids else []
     vorhanden = s.execute(
         select(FixtureProfile)
-        .join(Manufacturer, FixtureProfile.manufacturer_id == Manufacturer.id)
         .options(selectinload(FixtureProfile.modes)
                  .selectinload(FixtureMode.channels)
                  .selectinload(FixtureChannel.ranges))
-        # UI-74: Hersteller ohne Gross/klein — wie `_hersteller`. Sonst fand
-        # eine korrigierte Schreibweise das schon eingespielte Profil nicht
-        # wieder und legte es ein zweites Mal an.
-        .where(Manufacturer.id.in_(
-                   [m.id for m in hersteller_ohne_gross_klein(s, name_h)]),
-               FixtureProfile.name == modell)
-        .order_by(FixtureProfile.id)).scalars().all()
+        .where(FixtureProfile.id.in_(treffer_ids))
+        .order_by(FixtureProfile.id)).scalars().all() if treffer_ids else []
     if any(p.source not in (SOURCE_LIGHTOS, *ABLOESBARE_QUELLEN) for p in vorhanden):
         return "verdeckt"
     eigene = [p for p in vorhanden if p.source == SOURCE_LIGHTOS]
@@ -989,12 +1005,14 @@ def _abgleichen(s, daten: dict) -> str:
         # daneben waere also ein dauerhaftes Doppel. Steht das LightOS-Profil
         # schon in der DB (Import erst danach bearbeitet), wird es weiter
         # gepflegt statt still zu veralten.
-        from .fixture_db import ist_bearbeitet
         if any(ist_bearbeitet(p.herkunft) for p in vorhanden):
             return "verdeckt"
         _anlegen(s, daten, SOURCE_LIGHTOS)
         return "neu"
-    prof = eigene[0]
+    # FM-66: die exakte Schreibweise gewinnt, sonst der aelteste Eintrag (wie
+    # beim Hersteller). `_kopf_setzen` uebernimmt danach die Schreibweise der
+    # Datei; die Profil-ID bleibt.
+    prof = next((p for p in eigene if p.name == modell), eigene[0])
     # UI-74: stand das Profil unter einer anderen Schreibweise des Herstellers
     # (alter Datenfehler), zieht es zum richtigen Hersteller um.
     hersteller = _hersteller(s, daten)
@@ -1039,12 +1057,15 @@ def einspielen(s, verzeichnis: str | None = None,
     EINER Datei — werden gemeldet und uebersprungen, nie halb eingespielt; die
     uebrigen Dateien laufen weiter. Liefert, ob die DB geaendert wurde."""
     from sqlalchemy import select
+    from .fixture_db import profil_schluessel
     from .models import FixtureProfile, Manufacturer
     wurzel = verzeichnis or BIBLIOTHEK_DIR
     stempel = stempel or {}
     bericht: dict = {"neu": [], "aktualisiert": [], "verdeckt": [], "fehler": [],
                      "stempel": {}}
-    da = {(m.casefold(), n.casefold()) for m, n in s.execute(
+    # FM-66: dieselbe Gleichheit wie `_abgleichen` — sonst hielte die
+    # Stempel-Abkuerzung ein Profil fuer fehlend, das der Abgleich findet.
+    da = {profil_schluessel(m, n) for m, n in s.execute(
         select(Manufacturer.name, FixtureProfile.name)
         .join(FixtureProfile, FixtureProfile.manufacturer_id == Manufacturer.id)
         .where(FixtureProfile.source == SOURCE_LIGHTOS))}
@@ -1061,7 +1082,7 @@ def einspielen(s, verzeichnis: str | None = None,
             else:
                 daten = lade_datei(pfad)
             name_h, modell = daten["hersteller"].strip(), daten["modell"].strip()
-            schluessel = (name_h.casefold(), modell.casefold())
+            schluessel = profil_schluessel(name_h, modell)
             if schluessel in gesehen:
                 bericht["fehler"].append(f"{pfad}: {name_h} / {modell} doppelt in der "
                                          f"Bibliothek (schon in {gesehen[schluessel]})")

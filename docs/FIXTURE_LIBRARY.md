@@ -252,7 +252,10 @@ beschrieben; Prüfung und Einspielen stehen in `src/core/database/bibliothek_for
   LightOS-Profil an, der Fixture-Browser den Import unter „Ältere QLC+-Importe“. Ein im
   Fixture-Editor geändert gespeicherter Import (Bearbeitet-Marke in `herkunft`) zählt wie
   ein eigenes Profil und wird nie abgelöst. `user`- und `qlcplus`-Profile werden nie
-  angefasst.
+  angefasst. „Gleicher Hersteller + Modell“ heißt dabei überall dasselbe
+  (`fixture_db.profil_schluessel`): Groß-/Kleinschreibung und Leerzeichen zählen nicht,
+  Satzzeichen schon — `PAR 7` findet ein vorhandenes `Par 7` wieder (FM-66), `PAR-56` und
+  `PAR 56` bleiben zwei Geräte.
 - **Die Herkunft geht nie verloren.** Beim Einspielen und beim Import einer Datei
   steht die vollständige Herkunft (quelle, herkunft, geprueft, autor) auch in der DB
   (`FixtureProfile.herkunft`, JSON). Der Export — Werkzeug wie Editor — liest sie von
