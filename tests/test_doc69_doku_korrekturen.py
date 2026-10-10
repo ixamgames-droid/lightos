@@ -134,6 +134,32 @@ class TestContributing(unittest.TestCase):
         self.assertNotIn("pytest + ruff", self.text)
         self.assertNotIn("ruff", _lies(".github", "workflows", "ci.yml"))
 
+    def test_commit_sprache_einheitlich_mit_workflow(self):
+        """CONTRIBUTING und WORKFLOW nennen dieselbe Commit-Form und Sprache."""
+        workflow = _lies("WORKFLOW.md")
+        m = re.search(r"### Commit-Messages\n(.*?)\n### ", workflow, re.S)
+        self.assertIsNotNone(m)
+        abschnitt = m.group(1)
+        self.assertNotIn("Englisch oder Deutsch", abschnitt)
+        self.assertNotIn("Add 2D top-down live view", abschnitt)
+        for text in (self.text, abschnitt):
+            self.assertIn("<typ>(<bereich>):", text)
+            self.assertIn("Beschreibung auf Deutsch", text)
+
+    def test_ci_windows_ehrlich(self):
+        """Blockierend ist unter Windows nur der Smoke-Test; die volle
+        Windows-ARM-Suite laeuft beobachtend (continue-on-error)."""
+        flach = _flach(self.text)
+        self.assertNotIn("Test-Gate auf Linux und Windows", flach)
+        self.assertIn("Smoke-Test", flach)
+        self.assertIn("beobachtend", flach)
+        ci = _lies(".github", "workflows", "ci.yml")
+        arm = ci.split("\n  windows-arm:\n", 1)[1]
+        kopf = arm.split("    steps:", 1)[0]
+        self.assertIn("continue-on-error: true", kopf,
+                      "Windows-ARM blockiert jetzt -> CONTRIBUTING anpassen")
+        self.assertIn("Windows-Smoke", ci)
+
 
 class TestGateAngaben(unittest.TestCase):
     def test_requirements_dev_nennt_kein_sammel_pytest(self):

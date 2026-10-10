@@ -50,11 +50,14 @@ fix/midi-apc-detection     Bugfix
 
 ### Commit-Messages
 
-- Imperativ, Englisch oder Deutsch (konsistent pro Commit)
+- Format der ersten Zeile: `<typ>(<bereich>): <kurze Beschreibung> (<BACKLOG-ID>)` —
+  Typ als englisches Kürzel (`feat`, `fix`, `docs`, `test`, `refactor`, `chore`),
+  Beschreibung auf Deutsch. Tabelle und Einzelheiten:
+  [CONTRIBUTING.md](CONTRIBUTING.md#commits).
 - Kurz: 1 Zeile + optional Body
-- Format:
+- Beispiel:
   ```
-  Add 2D top-down live view
+  feat(live): 2D-Draufsicht als Live View
 
   Neue Section als erste Anlaufstelle beim App-Start.
   Zeigt gepatchte Fixtures mit Live-DMX-Farben.

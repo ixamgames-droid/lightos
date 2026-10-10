@@ -102,9 +102,11 @@ ruff check src/ tests/
 
 ### Commits
 
-Format: `<typ>(<bereich>): <kurze Beschreibung> (<BACKLOG-ID>)` — auf Deutsch,
-der Bereich ist das Subsystem (`vc`, `dmx`, `engine`, `docs`, `backlog` …), die
-ID die Zeile aus `BACKLOG.md`, soweit es eine gibt.
+Format: `<typ>(<bereich>): <kurze Beschreibung> (<BACKLOG-ID>)`. Der Typ ist
+eines der englischen Kürzel aus der Tabelle, die Beschreibung auf Deutsch (so
+sieht die ganze Historie aus — `git log --oneline`). Der Bereich ist das
+Subsystem (`vc`, `dmx`, `engine`, `docs`, `backlog` …), die ID die Zeile aus
+`BACKLOG.md`, soweit es eine gibt.
 
 | Typ | Wann |
 |-----|------|
@@ -159,7 +161,11 @@ src/
 2. Feature-Branch anlegen: `git checkout -b feature/mein-feature main`
 3. Änderungen committen (Tests nicht vergessen!)
 4. PR gegen `main` öffnen — Template ausfüllen
-5. CI muss grün sein (Test-Gate auf Linux und Windows; einen Linter fährt die CI nicht)
+5. CI muss grün sein. Blockierend sind die volle Test-Suite unter Linux und ein
+   Smoke-Test unter Windows (eine Handvoll Kern-Testdateien, Python 3.11 und 3.12).
+   Die volle Suite unter Windows-ARM läuft nur beobachtend mit: Ein Fehlschlag dort
+   hält den PR nicht auf, das Log sollte man sich trotzdem ansehen. Einen Linter
+   fährt die CI nicht.
 
 **Vor dem PR:** das Test-Gate (`.\tools\verify_segmented.ps1` bzw. `./tools/verify_loop.sh`) lokal ausführen.
 
