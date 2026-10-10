@@ -132,8 +132,9 @@ class WinMMInput:
                 b2 = (param1 >> 16) & 0xFF
                 try:
                     on_raw([b0, b1, b2], port_name)
-                except Exception:
-                    pass
+                except Exception as e:
+                    from src.core.diagnose_log import melde_still   # STAB-30
+                    melde_still("midi.winmm", e, text=port_name)
 
         self._cb = _MidiInProc(_cb)
 

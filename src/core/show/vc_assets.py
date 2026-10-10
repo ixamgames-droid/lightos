@@ -41,6 +41,13 @@ def cache_dir() -> str:
     if _override_dir:
         os.makedirs(_override_dir, exist_ok=True)
         return _override_dir
+    # QA-83: wie LIGHTOS_SHOW_DB — Generatoren (tools/_gen_env.py) lenken den
+    # Cache in einen Wegwerf-Ordner, statt Galerie-Bilder in den echten
+    # Datenordner zu legen.
+    eigen = os.environ.get("LIGHTOS_VC_ASSETS_DIR")
+    if eigen:
+        os.makedirs(eigen, exist_ok=True)
+        return eigen
     d = os.path.join(app_data_dir(), "vc_assets")
     os.makedirs(d, exist_ok=True)
     return d
