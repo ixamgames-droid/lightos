@@ -71,12 +71,11 @@ meldet „0/… Segmente grün" — dann `requirements-dev.txt` nachinstallieren
 
 ### Teststruktur
 
-```
-tests/
-├── test_core_engine.py     # DMX-Merge, Cue, CueStack, UndoStack (93 Tests)
-├── test_show_file.py       # Show-Datei laden/speichern
-└── test_views.py           # UI-Smoke-Tests (erfordern Qt)
-```
+`tests/` ist flach: mehrere hundert Dateien `test_<thema>.py`, je Datei ein
+Thema (oft mit der Backlog-ID im Namen, z. B. `test_doc62_installdoku.py`).
+Gemeinsame Isolation (Wegwerf-Datenordner, keine echte Show-DB, kein echtes
+Ausgabegerät) liefert `tests/conftest.py`. Ein neuer Test gehört in eine eigene
+Datei oder in die Datei des Themas — nicht in eine Sammeldatei.
 
 ---
 
@@ -103,7 +102,11 @@ ruff check src/ tests/
 
 ### Commits
 
-Format: `<typ>: <kurze Beschreibung>` (Englisch oder Deutsch)
+Format: `<typ>(<bereich>): <kurze Beschreibung> (<BACKLOG-ID>)`. Der Typ ist
+eines der englischen Kürzel aus der Tabelle, die Beschreibung auf Deutsch (so
+sieht die ganze Historie aus — `git log --oneline`). Der Bereich ist das
+Subsystem (`vc`, `dmx`, `engine`, `docs`, `backlog` …), die ID die Zeile aus
+`BACKLOG.md`, soweit es eine gibt.
 
 | Typ | Wann |
 |-----|------|
@@ -114,22 +117,22 @@ Format: `<typ>: <kurze Beschreibung>` (Englisch oder Deutsch)
 | `docs` | Dokumentation |
 | `chore` | Build, Dependencies, CI |
 
-Beispiel: `feat: add MIDI learn to VC fader`
+Beispiel: `fix(dmx): Laser-NOT-AUS gilt je Ausgabeweg, auch nach Routing-Umstellung (OUT-64)`
 
 ---
 
 ## Branch-Strategie
 
 ```
-main          ← stabil, CI muss grün sein
-dev           ← Integration-Branch, PRs gehen hierher
-feature/xyz   ← Feature-Branches, von dev abzweigen
-fix/xyz       ← Bugfix-Branches
+main          ← stabil, CI muss grün sein; einziger dauerhafter Zweig
+feature/xyz   ← Feature-Branches, von main abzweigen
+fix/xyz       ← Bugfix-Branches, von main abzweigen
+docs/xyz      ← reine Doku-Änderungen
 ```
 
-- PRs immer gegen `dev`, nicht `main`
-- Squash-Merge bevorzugt (saubere History)
-- Mindestens 1 Review vor Merge in `dev`
+- PRs gehen direkt gegen `main` — einen Integrations-Zweig gibt es nicht
+- Squash-Merge (ein Commit je PR, saubere History)
+- Kein Force-Push auf einen bereits gepushten Zweig — Korrekturen als neue Commits
 
 ---
 
@@ -155,12 +158,16 @@ src/
 ## Pull Request einreichen
 
 1. Fork erstellen (GitHub-Button „Fork")
-2. Feature-Branch anlegen: `git checkout -b feature/mein-feature dev`
+2. Feature-Branch anlegen: `git checkout -b feature/mein-feature main`
 3. Änderungen committen (Tests nicht vergessen!)
-4. PR gegen `dev` öffnen — Template ausfüllen
-5. CI muss grün sein (pytest + ruff)
+4. PR gegen `main` öffnen — Template ausfüllen
+5. CI muss grün sein. Blockierend sind die volle Test-Suite unter Linux und ein
+   Smoke-Test unter Windows (eine Handvoll Kern-Testdateien, Python 3.11 und 3.12).
+   Die volle Suite unter Windows-ARM läuft nur beobachtend mit: Ein Fehlschlag dort
+   hält den PR nicht auf, das Log sollte man sich trotzdem ansehen. Einen Linter
+   fährt die CI nicht.
 
-**Vor dem PR:** das Test-Gate (`.\tools\verify_segmented.ps1` bzw. `./tools/verify_loop.sh`) und `ruff check src/` lokal ausführen.
+**Vor dem PR:** das Test-Gate (`.\tools\verify_segmented.ps1` bzw. `./tools/verify_loop.sh`) lokal ausführen.
 
 ---
 

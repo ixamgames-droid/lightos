@@ -58,8 +58,10 @@ ist „Enttec und Art-Net gleichzeitig".
 
 ## 3. Prüfen, dass beide laufen
 
-- **Statusleiste unten links** zeigt den Enttec-Zustand: **`Enttec: COM3 OK`** (grün) = Adapter
-  verbunden. Art-Net braucht keinen Verbindungsstatus (verbindungsloses UDP) — es sendet,
+- **Statusleiste unten links** zeigt den Enttec-Zustand: **`Enttec: COM3 aktiv (1)`** (grün) = Adapter
+  verbunden und sendet (in Klammern die Zahl der Universen auf diesem Adapter). Orange
+  „`… verbindet …`" = der Port wird gerade geöffnet; rot „`… sendet NICHT`" = eingerichtet,
+  aber es geht kein DMX raus (USB-Kabel/Port prüfen). Art-Net braucht keinen Verbindungsstatus (verbindungsloses UDP) — es sendet,
   sobald der Output-Typ auf ArtNet steht.
 - **Test:** Sektion **Programmer** → beide Geräte auswählen (`Alle`) → im Tab **Intensity** den
   **Master Dimmer** hochziehen und im Tab **Color** eine Farbe wählen. Jetzt leuchten
@@ -83,6 +85,6 @@ Art-Net ist Netzwerk-Ausgabe. Dein PC (bzw. der USB-Netzwerk-Adapter, an dem der
 - **Ausgabe-Typ ist pro Universum** — Enttec, Art-Net und sACN beliebig mischen.
 - **Gerät → Universum → Backend:** erst patchen (Universe), dann das Universum auf das
   richtige Interface stellen.
-- **Enttec:** COM-Port aus dem Enttec-Tab; Status „`… OK`" in der Statusleiste = verbunden.
+- **Enttec:** COM-Port aus dem Enttec-Tab; Status „`… aktiv (…)`" (grün) in der Statusleiste = verbunden.
 - **Art-Net:** Node-IP oder Broadcast, und der PC muss **im selben Subnetz** liegen (sonst
   stumm trotz „konfiguriert").

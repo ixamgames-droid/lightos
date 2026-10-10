@@ -34,10 +34,24 @@ assignees: ''
 | Feld | Wert |
 |------|------|
 | LightOS Version | z.B. 1.0.0 |
+| Setup oder Quellcode? | `LightOS-Setup.exe` (Windows-Setup) oder Quellcode (`git clone` + `install.py`) |
 | Betriebssystem | z.B. Linux Mint 22.3 (X11) oder Windows 11 ARM64 |
-| Python-Version | z.B. 3.12.3 |
+| Python-Version | z.B. 3.12.3 (nur bei Quellcode — das Setup bringt sein eigenes mit) |
 | Hardware | z.B. Surface Pro X (Snapdragon 8cx) oder PC x86_64 |
 | Angeschlossene Geräte | z.B. Enttec Pro auf `/dev/ttyUSB0` bzw. COM4, APC Mini |
+
+---
+
+## Diagnosepaket
+
+<!-- Am schnellsten hilft EINE Datei: in LightOS Hilfe → „Diagnosepaket speichern…" -->
+<!-- wählen und die erzeugte zip-Datei hier anhängen. Der Dialog zeigt vorher, was -->
+<!-- hineinkommt (Logs, Absturzprotokoll, Systeminfo, Einstellungen) und was nicht -->
+<!-- (Show-Dateien, Datenbanken). Ein Issue ist öffentlich: bei Bedenken kurz in -->
+<!-- das zip hineinsehen, bevor du es anhängst. -->
+<!-- Startet LightOS gar nicht mehr: stattdessen den Log-Ausschnitt unten einfügen. -->
+
+- [ ] Diagnosepaket angehängt
 
 ---
 

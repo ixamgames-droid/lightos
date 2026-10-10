@@ -208,13 +208,12 @@ Siehe [DMX_PROTOCOL.md](DMX_PROTOCOL.md) und [ARTNET.md](ARTNET.md).
 ### Ausgabe-Geräte
 | Gerät | Protokoll | Interface |
 |-------|-----------|-----------|
-| Enttec Open DMX USB | DMX512 (Serial) | USB |
 | Enttec Pro USB | DMX512 (Serial + Firmware) | USB |
 | Art-Net Node (beliebig) | Art-Net 4 | Ethernet/WLAN |
 | sACN / E1.31 | sACN | Ethernet (Output + Input) |
 
 ### Ausgabe-Einstellungen
-- Refresh-Rate: 44 Hz (Standard), konfigurierbar 1–44 Hz
+- Refresh-Rate: 44 Hz (fest)
 - Universum-Mapping: Welches Universe → welches Gerät
 - Prioritäten: Welcher Output hat Vorrang bei Konflikt
 
@@ -233,8 +232,8 @@ Siehe [DMX_PROTOCOL.md](DMX_PROTOCOL.md) und [ARTNET.md](ARTNET.md).
 - Gerätename / Label
 
 ### App-Einstellungen
-- Sprache (DE/EN)
-- Theme (Dark / Light / Custom)
+- Sprache: Deutsch (die Oberfläche ist nicht umschaltbar; einige Anleitungen gibt es zusätzlich auf Englisch)
+- Theme: dunkel (fest)
 - Standard-Fade-Zeit
 - Output-Konfiguration
 - MIDI-Einstellungen

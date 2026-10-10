@@ -144,12 +144,9 @@ Alternativ pro Universe direkt eine Verbindung aufbauen:
 > auf `1`, Art-Net-Tab auf `2`). So überschreibt die Art-Net-Zuweisung nicht die
 > Enttec-Zuweisung — jede Zeile in `universes.json` bleibt für sich erhalten.
 
-Beide Wege schreiben in dieselbe `universes.json`; du kannst sie mischen — aber
-**Achtung:** die Tabelle im Tab **Universen** wird nur beim Öffnen des Dialogs (und nach
-Art-Net-**Übernehmen**) geladen. Nach **Verbinden** im Enttec-Tab bzw. **Übernehmen** im
-sACN-Tab den Dialog erst schließen und neu öffnen, bevor du im Tab **Universen** auf
-**Speichern** klickst — sonst schreibt die beim Öffnen geladene Tabelle den alten Stand
-zurück, und die gerade eingerichtete Verbindung ist wieder weg.
+Beide Wege schreiben in dieselbe `universes.json`; du kannst sie mischen. Die Tabelle
+im Tab **Universen** zeigt nach **Verbinden** (Enttec) bzw. **Übernehmen** (Art-Net, sACN)
+sofort den neuen Stand — du musst den Dialog dafür nicht schließen und neu öffnen.
 
 > Netzwerk-/Protokoll-Details zu Art-Net (Port 6454, PortAddress, Broadcast):
 > [ARTNET.md](../ARTNET.md). Grundlagen DMX/Universe/Adressraum:
