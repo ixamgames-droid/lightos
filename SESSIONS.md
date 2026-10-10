@@ -13,7 +13,6 @@
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
 | FM-46c | A | feat/fm46-qxf-head | 2026-10-02T11:59Z | - |
-| DOC-56 | C | - | 2026-10-02T13:05Z | docs/anleitung_web_remote/ANLEITUNG.md |
 | FM-58 | A | feat/fm58-bibliothek-runde2 | 2026-10-02T18:20Z | fixtures/bibliothek |
 | SAMMEL-DOKU-C | A | sammel/doku-c | 2026-10-02T22:08Z | docs · BACKLOG.md |
 | VIZ-85 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
@@ -119,7 +118,6 @@
 
 ## Verlauf
 
-- 2026-10-10T09:26Z C uebergeben DOC-29
 - 2026-10-10T09:26Z C uebergeben DOC-30
 - 2026-10-10T09:26Z C uebergeben DOC-31
 - 2026-10-10T09:27Z C uebergeben DOC-32
@@ -149,3 +147,4 @@
 - 2026-10-10T09:28Z C uebergeben WEB-06
 - 2026-10-10T09:28Z C uebergeben DOC-54
 - 2026-10-10T09:28Z C uebergeben DOC-55
+- 2026-10-10T09:28Z C uebergeben DOC-56
