@@ -211,7 +211,14 @@ und schwenkst/zoomst mit zwei.
      verschiedene Gobos verschieden aussehen. Das Ersatzmotiv ist eine Annäherung,
      nicht das echte Glas des Geräts. „Offen“ = voller Kegel wie ohne Gobo. Die
      **Gobo-Rotation** dreht Teilstrahlen und Bodenmuster auf einen festen Winkel
-     (0–255 = eine Umdrehung). Ein **Prisma** teilt den Strahl in mehrere Kegel um den
+     (0–255 = eine Umdrehung). Auf den Stufen **Hoch** und **Maximal** wirft ein
+     Gerät, das gerade eines der echten Lichter hält, sein Gobo wirklich in den
+     Raum: Das Muster liegt auf allem, was der Strahl trifft (Boden, Podest,
+     Traverse, andere Geräte), und hinter einem Hindernis bleibt der Schatten
+     dunkel. Gobo-Geräte ohne echtes Licht und alle Geräte auf **Niedrig** zeigen
+     das Muster als flachen Fleck auf der Fläche, die die Strahlmitte trifft (siehe
+     [Was bei großen Rigs anders aussieht](#was-bei-großen-rigs-anders-aussieht)).
+     Ein **Prisma** teilt den Strahl in mehrere Kegel um den
      Hauptstrahl (Facettenzahl aus dem Bereichsnamen, z. B. „6-fach Prisma“; ohne
      Zahl drei); die **Prisma-Rotation** dreht den Fächer ebenfalls auf einen festen
      Winkel. Ein Dauerdrehen, wie es echte Geräte im oberen Bereich dieser Kanäle
@@ -274,6 +281,12 @@ Lichter über die Bühne. Der Unterschied im Bild ist klein: an einer
 80-Geräte-Bühne wichen rund 2 % der Bildpunkte merklich ab, vor allem die von
 vielen Scheinwerfern zugleich angestrahlte Bühnenfront und die Gehäuse.
 
+**Gobo-Muster:** Auf **Hoch** und **Maximal** projizieren die Geräte mit echtem
+Licht ihr Gobo in den Raum (Muster auf Hindernissen, Schatten dahinter). Alle
+übrigen Gobo-Geräte zeigen das Muster als flachen Fleck am Boden. Wechselt ein
+echtes Licht zu einem anderen Strahl, wechselt das Gerät zwischen beiden
+Darstellungen; Größe und Lage des Musters bleiben dabei gleich.
+
 **Warum das so ist:** jedes echte Licht rechnet die Grafikkarte für **jeden
 Bildpunkt jeder beleuchteten Fläche** einmal durch. Mit 68 Lichtern brauchte ein
 Bild der 80-Geräte-Bühne gemessen rund 55 ms (unter 20 Bilder pro Sekunde), mit 8
@@ -307,11 +320,11 @@ Grafikkarte des Rechners. Sie wirkt auf das Vollfenster und die 3D-Ansicht in
 der Live View gleichermaßen; nach dem Umstellen lädt die Szene einmal neu.
 Neben der Auswahl steht, welche Stufe gerade **aktiv** ist.
 
-| Stufe | Lichtupdates | Bildschärfe (Pixeldichte) | Echte Lichter | Schlagschatten | Beim Drehen der Kamera |
-|---|---|---|---|---|---|
-| **Niedrig** | 15 pro Sekunde | höchstens 1,25-fach | 4 hellste | 4, einfach | immer kurz gröber |
-| **Hoch** (Standard) | 30 pro Sekunde | höchstens 2-fach | 8 hellste | 8, weich | gröber nur, wenn die Grafikkarte nicht nachkommt (sie verpasst regelmäßig Bilder gegenüber dem Bildschirmtakt) |
-| **Maximal** | 44 pro Sekunde | volle Bildschirmdichte | 16 hellste | 16, weich | nie gröber |
+| Stufe | Lichtupdates | Bildschärfe (Pixeldichte) | Echte Lichter | Schlagschatten | Gobo-Muster | Beim Drehen der Kamera |
+|---|---|---|---|---|---|---|
+| **Niedrig** | 15 pro Sekunde | höchstens 1,25-fach | 4 hellste | 4, einfach | flacher Fleck | immer kurz gröber |
+| **Hoch** (Standard) | 30 pro Sekunde | höchstens 2-fach | 8 hellste | 8, weich | projiziert (echte Lichter) | gröber nur, wenn die Grafikkarte nicht nachkommt (sie verpasst regelmäßig Bilder gegenüber dem Bildschirmtakt) |
+| **Maximal** | 44 pro Sekunde | volle Bildschirmdichte | 16 hellste | 16, weich | projiziert (echte Lichter) | nie gröber |
 
 **Echte Lichter** heißt: so viele Strahlen beleuchten höchstens gleichzeitig die
 Umgebung (siehe [Was bei großen Rigs anders aussieht](#was-bei-großen-rigs-anders-aussieht)).

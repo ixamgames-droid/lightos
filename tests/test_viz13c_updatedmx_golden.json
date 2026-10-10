@@ -805,7 +805,7 @@
    "parHeads": null,
    "spot": {
     "hex": 13132850,
-    "inten": 0
+    "inten": 2.1176
    },
    "type": "moving_head",
    "yokeRotY": 2.6507

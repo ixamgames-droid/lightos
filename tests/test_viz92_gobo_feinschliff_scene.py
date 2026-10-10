@@ -4,8 +4,9 @@ Befunde (Projektinhaber 08.10., Gobo-Live-Demo, Stufe Hoch, generischer MH16)
 und was hier ueber die ECHTE Seite (Produktiv-Push) gemessen wird:
 
 1. Neben dem Gobo-Muster lag am Boden noch die volle runde Lichtflaeche des
-   Strahlers (SpotLight mit 30 %). -> Mit Gobo leuchtet der SpotLight nicht
-   mehr (auch das Pool-Licht nicht), das Bodenmuster traegt keinen
+   Strahlers (SpotLight mit 30 %). -> Mit Gobo leuchtet kein unmaskiertes
+   Licht mehr (seit VIZ-96 traegt das Pool-Licht auf Hoch/Maximal das Gobo als
+   Maske, auf Niedrig bleibt es dunkel), das Bodenmuster traegt keinen
    Pool-Verlauf, und kein heller Motiv-Pixel liegt weit ausserhalb des
    Kegelrands (Zebra-Balken liefen bis 0,94 des Scheibenradius).
 2. Zebra kantig/pixelig: 128-px-Textur auf mehreren Metern Bodenfleck. ->
@@ -289,6 +290,9 @@ _LICHT_JS = """
     alphaMap: fm.alphaMap === null ? 'null'
       : (fm.alphaMap === L.poolFalloffTexture() ? 'falloff' : 'andere'),
     muster: !!fm.map,
+    // VIZ-96: traegt das Pool-Licht das Gobo als Maske (Projektion)?
+    projektion: L.goboProjektionInfo().aktiv,
+    maske: (i >= 0 && L.goboProjektionInfo().param[i]) ? L.goboProjektionInfo().param[i][0] : 0,
   });
 })()
 """
@@ -412,10 +416,13 @@ class Viz92MusterTest(_Basis):
             self._push(_payload(gobo_wheel=rad))
             self._bild()
             z = self._json(_LICHT_JS % (_FID, _FID))
-            # Der SpotLight kann nicht maskiert werden — jeder Rest waere am
-            # Boden der volle runde Fleck neben dem Muster.
-            self.assertEqual(z["spot"], 0.0, f"Gobo {rad}: SpotLight leuchtet {z}")
-            self.assertIn(z["pool"], (0.0, None), f"Gobo {rad}: Pool-Licht leuchtet {z}")
+            # Ein UNMASKIERTES Licht waere am Boden der volle runde Fleck neben
+            # dem Muster. Seit VIZ-96 (Stufe Hoch) darf das Pool-Licht leuchten,
+            # aber nur mit dem Gobo als Maske (scene/gobo_projektion.js); ohne
+            # Projektion (Stufe Niedrig, test_viz96_*) bleibt es dunkel.
+            self.assertTrue(z["projektion"], "Stufe Hoch projiziert")
+            self.assertGreater(z["pool"], 0.0, f"Gobo {rad}: {z}")
+            self.assertEqual(z["maske"], 1, f"Gobo {rad}: Pool-Licht leuchtet unmaskiert {z}")
             self.assertTrue(z["muster"])
             # Kein Pool-Verlauf ueber dem Muster: die Teile am Kegelrand waeren
             # sonst halb so hell wie der Kern.

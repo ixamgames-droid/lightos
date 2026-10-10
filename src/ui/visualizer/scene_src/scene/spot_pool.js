@@ -65,6 +65,13 @@ import * as THREE from '../three/three.js';
 import { scene, isLowSpec, tierSettings } from './renderer.js';
 import { requestShadowUpdate } from './shadow_update.js';
 import { requestRender } from './render_loop.js';
+// VIZ-96: Gobo-Projektion — reine Rechnung/Shader-Patch in gobo_projektion.js,
+// Motive und Kegelrand aus gobo_textures.js.
+import { goboTexture, GOBO_STILE, GOBO_RAND, GROESSE as GOBO_KACHEL_PX } from '../fixtures/gobo_textures.js';
+import {
+  installGoboProjektion, baueGoboAtlas, goboProjektionAktiv, goboKachel, goboLichtWinkel,
+  goboDrehung, setzeGoboLicht, loescheGoboLicht, GOBO_HALBSCHATTEN, GOBO_MAX_LICHTER,
+} from './gobo_projektion.js';
 
 export const HYSTERESE = 1.25;
 export const MIN_HALT_MS = 400;
@@ -109,6 +116,104 @@ export function lichtUrsprung(f, out) {
   }
   f.group.updateWorldMatrix(true, false);
   return out.copy(f.spot.position).applyMatrix4(f.group.matrixWorld);
+}
+
+// ── VIZ-96: Gobo-Projektion an den Pool gekoppelt ──────────────────────────
+// Ein Geraet, das gerade ein Pool-Licht MIT Schatten haelt und ein Gobo zeigt,
+// projiziert echt: das Pool-Licht traegt das Motiv als Maske (Muster auf
+// Hindernissen, Schatten dahinter), und die flache Bodenmuster-Scheibe des
+// Geraets wird ausgeblendet. Alle anderen Gobo-Geraete behalten das
+// Bodenmuster wie seit VIZ-83/VIZ-92.
+//
+// Installiert wird EINMAL beim Laden dieses Moduls, vor dem ersten Bild, und
+// nur wenn die Stufe es will (quality_tiers.js `goboProjektion`: Niedrig aus).
+// Scheitert etwas (kein Canvas, anderer three-Stand), bleibt alles beim
+// Bodenmuster — goboProjektionAktiv() ist dann false.
+function _starteGoboProjektion() {
+  if (!(tierSettings && tierSettings.goboProjektion)) return false;
+  try {
+    const atlas = baueGoboAtlas(
+      GOBO_STILE,
+      (stil) => { const t = goboTexture(stil); return t ? t.image : null; },
+      (b, h) => { const c = document.createElement('canvas'); c.width = b; c.height = h; return c; },
+      GOBO_KACHEL_PX);
+    if (!atlas) return false;
+    // Ohne Mipmaps: projektive Koordinaten springen an Koerperkanten, die
+    // kleinste Mip-Stufe zoege dort graue Saeume (und mischte Nachbar-Kacheln).
+    const tex = new THREE.CanvasTexture(atlas.canvas);
+    tex.generateMipmaps = false;
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    tex.needsUpdate = true;
+    return installGoboProjektion({
+      materialKlassen: [THREE.MeshStandardMaterial],
+      lichtChunk: THREE.ShaderChunk.lights_fragment_begin,
+      Vector4: THREE.Vector4,
+      atlas: tex,
+      index: atlas.index,
+    });
+  } catch (e) {
+    return false;
+  }
+}
+_starteGoboProjektion();
+
+const _projiziert = new Set();   // Geraete, deren Pool-Licht gerade das Gobo traegt
+const _projNeu = new Set();
+const _blick = new THREE.Matrix4();
+const _hoch = new THREE.Vector3(0, 1, 0);
+
+function _bodenmuster(f, zeigen) {
+  f.goboProjiziert = !zeigen;
+  // Ueber die Ebenen-Maske, nicht ueber `visible`/Deckkraft: die schreibt
+  // builders.js#applyGenericColor bei jedem DMX-Update neu.
+  if (f.floorSpot) {
+    if (zeigen) f.floorSpot.layers.enable(0); else f.floorSpot.layers.disable(0);
+  }
+}
+
+function _projektionAbgleichen() {
+  for (const f of _projiziert) if (!_projNeu.has(f)) _bodenmuster(f, true);
+  for (const f of _projNeu) if (!_projiziert.has(f)) _bodenmuster(f, false);
+  _projiziert.clear();
+  for (const f of _projNeu) _projiziert.add(f);
+  _projNeu.clear();
+}
+
+// Pool-Licht `i` (Slot p) projiziert das Gobo von Geraet f. Liefert false,
+// wenn es nicht geht (Licht ohne Schatten, kein Motiv, kein Kegel).
+// Der Musterwinkel kommt aus der Welt-Matrix des Kegels — sie traegt die
+// ANGEZEIGTE Kopfstellung und Gobo-Drehung (VIZ-92: geglaettet je Bild).
+function _goboProjizieren(i, p, f) {
+  const l = p.licht;
+  if (i >= GOBO_MAX_LICHTER || !l.castShadow) return false;
+  const kachel = goboKachel(f.lastGobo);
+  const beam = f.beam;
+  const gp = beam && beam.geometry && beam.geometry.parameters;
+  if (kachel < 0 || !gp || !(gp.radius > 0) || !(gp.height > 0)) return false;
+  const e = beam.matrixWorld.elements;     // von lichtUrsprung() gerade aktualisiert
+  const lx = Math.hypot(e[0], e[1], e[2]);
+  const ly = Math.hypot(e[4], e[5], e[6]);
+  const lz = Math.hypot(e[8], e[9], e[10]);
+  if (!(lx > 1e-9) || !(ly > 1e-9) || !(lz > 1e-9)) return false;
+  // Rand des SICHTBAREN Kegels (Zoom/Iris in x/z, Kegellaenge in y) — derselbe
+  // Rand, auf den alignGoboFloor das Bodenmuster legt: beim Wechsel zwischen
+  // Scheibe und Projektion springt die Groesse des Musters nicht.
+  const optik = goboLichtWinkel((gp.radius * lx) / (gp.height * ly), GOBO_RAND);
+  if (!optik) return false;
+  // Achsen der Schattenkamera, wie three sie baut (SpotLightShadow:
+  // Position des Lichts, lookAt aufs Ziel, Welt-Up).
+  _blick.lookAt(l.position, p.ziel.position, _hoch);
+  const b = _blick.elements;               // Spalte 0 = rechts, Spalte 1 = hoch
+  const d = goboDrehung(
+    (e[0] * b[0] + e[1] * b[1] + e[2] * b[2]) / lx,
+    (e[0] * b[4] + e[1] * b[5] + e[2] * b[6]) / lx,
+    (e[8] * b[0] + e[9] * b[1] + e[10] * b[2]) / lz,
+    (e[8] * b[4] + e[9] * b[5] + e[10] * b[6]) / lz);
+  l.angle = optik.winkel;
+  l.penumbra = GOBO_HALBSCHATTEN;
+  setzeGoboLicht(i, 1, optik.skala * d[0], optik.skala * d[1], kachel);
+  return true;
 }
 
 const _pool = [];          // [{ licht, ziel, fid }]
@@ -335,7 +440,11 @@ function _lage(fid) {
 
 /** Vor JEDEM Bild (app.js#renderFrame) — vor prepareShadowMap. */
 export function syncSpotPool() {
-  if (!_pool.length || !_fixtures) return;
+  if (!_pool.length || !_fixtures) {
+    if (_projiziert.size) _projektionAbgleichen();   // VIZ-96: Bodenmuster zurueck
+    return;
+  }
+  const gobo = goboProjektionAktiv();
   _hell.clear();
   for (const fid in _fixtures) {
     const f = _fixtures[fid];
@@ -417,6 +526,16 @@ export function syncSpotPool() {
     } else {
       l.intensity = 0;
     }
+    // VIZ-96: Gobo-Halter. Mit Schatten-Licht traegt das Licht das Muster als
+    // Maske; ohne (Licht jenseits des Schatten-Budgets) laesst es sich nicht
+    // maskieren — dann bleibt es dunkel wie seit VIZ-92 (sonst laege wieder der
+    // volle runde Lichtkreis neben dem Bodenmuster).
+    let projiziert = false;
+    if (gobo && s && f.goboAktiv) {
+      if (leuchtet && _goboProjizieren(i, p, f)) { projiziert = true; _projNeu.add(f); }
+      else l.intensity = 0;
+    }
+    if (gobo && !projiziert) loescheGoboLicht(i);
     // Dunkles Pool-Licht: seine Shadow-Map nicht neu zeichnen (es traegt nichts
     // bei). Lief waehrenddessen ein Schattendurchlauf, ist seine Map veraltet
     // (noteShadowPass) — dann wird sie beim Wiederaufleuchten erneuert.
@@ -428,6 +547,7 @@ export function syncSpotPool() {
     }
   }
   if (verdraengt) _letzterWechsel = jetzt;
+  if (gobo) _projektionAbgleichen();
 }
 
 /** Nach prepareShadowMap: `neu` = in diesem Bild entstehen die Shadow-Maps neu.
@@ -457,6 +577,9 @@ export function spotPoolInfo() {
     minHaltMs: MIN_HALT_MS,
     wechselAbstandMs: WECHSEL_ABSTAND_MS,
     ausstehend: _info.ausstehend,
+    // VIZ-96: fids, deren Pool-Licht gerade das Gobo projiziert.
+    goboProjiziert: _pool.filter(p => p.fid !== null && _fixtures && _fixtures[p.fid]
+      && _projiziert.has(_fixtures[p.fid])).map(p => p.fid),
   };
 }
 

@@ -186,6 +186,10 @@ const MOTIVE = {
   },
 };
 
+/** VIZ-96: alle Motive in fester Reihenfolge (= Kachel-Nummern des Atlas in
+ *  scene/gobo_projektion.js). */
+export const GOBO_STILE = Object.freeze(Object.keys(MOTIVE));
+
 /** Canvas-Winkel (y nach unten) des Teils `u` im Bodenmotiv. */
 function bodenWinkel(u) { return Math.PI / 2 - 2 * Math.PI * u; }
 
