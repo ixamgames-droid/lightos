@@ -15,6 +15,7 @@
 | `_gen_env.py` | Spawn-sichere Bootstrap-Schicht fuer alle ``tools/build_*.py``-Generatoren (DEMO-02). |
 | `_profil.py` | TOOL-3: Geraeteprofil ueber Hersteller + Modell aufloesen — nie ueber eine rohe ID. |
 | `_run_showcase_app.py` | Wegwerf-Launcher fuer die Doku-Captures: startet LightOS UND laedt direkt die |
+| `_showcase.py` | DEMO-07: gemeinsame Bausteine der Showcase-Generatoren (``build_showcase_*.py``). |
 | `_showpath.py` | Show-Datei-Aufloesung fuer tools/-Skripte: shows/ mit Fallback shows/_archiv/. |
 | `_shutter.py` | ENG-28: Shutter in Generatoren nur mit Beleg oeffnen — nie mit dem Vorgabewert 255. |
 | `anleitungsbilder.py` | DOC-16: Anleitungsbilder reproduzierbar aus dem Code erzeugen. |
@@ -28,6 +29,7 @@
 | `benchmark_universes.py` | T-8 / RM-Benchmark — Render-Performance fuer mehrere Universen. |
 | `bibliothek_profil.py` | FM-56: Werkzeug fuer die eigene Geraete-Bibliothek (LightOS-Profile). |
 | `build_apc_test_show.py` | KOMPLETTE Test-/Demo-Show fuer Davids reale Hardware: |
+| `build_buehnen_show_2026.py` | DOC-60: Grosse Buehnen-Show 2026 — Laser, Nebel, PARs, Moving Heads, Strobes. |
 | `build_demo_rgb_par.py` | Demo-Show "Demo RGB PAR" — 4x RGB-PAR mit einer 4-Cue-Cueliste. |
 | `build_demo_show_full.py` | DEMO SHOW FULL — komplette, nach ZWECK organisierte Show auf Davids realem Rig. |
 | `build_demo_zq_show.py` | Demo-/Bühnen-Show fuer Davids reale Hardware (DMO-01, Masterplan 2026-06-08): |
@@ -51,6 +53,8 @@
 | `build_neue_demo_show.py` | NEUE DEMO 2026 — Quadranten-Layout + echtes PLAYBACK, alles auf einer Show. |
 | `build_neuheiten_demo.py` | Vorfuehr-Show fuer die Neuerungen aus dem Lauf vom 19.-24.08.2026. |
 | `build_party_demo_show.py` | PARTY DEMO 2026 — BPM-getaktete Party-Show + Musik-Playlist. |
+| `build_showcase_club.py` | DEMO-07: Showcase „Club-Nacht" — Playback taktsynchron zum Tempo-Bus. |
+| `build_showcase_theater.py` | DEMO-07: Showcase „Theater/Event" — ruhige Cue-Liste mit Follow-Cues. |
 | `build_spot90_testshow.py` | Test-Show fuer ZWEI Varytec Hero Spot 90 (David, 26.08.2026). |
 | `build_test_show.py` | Erzeugt eine KOMPLETT vorprogrammierte Test-Show (.lshow) zum Anschauen aller |
 | `build_testshow_2026.py` | TESTSHOW 2026 — komplette musik-synchrone Show für Davids reales Rig. |

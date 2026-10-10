@@ -253,7 +253,17 @@ class Viz72SzeneTest(unittest.TestCase):
     def test_stufe_maximal(self):
         self._rig(n=20, tier="max")
         self.assertEqual(self._pool()["groesse"], 16)
-        self.assertEqual(self._pool()["schatten"], 16)
+        # QA-90: Maximal hebt das Schatten-DACH auf 16 — wie viele Schatten es
+        # dann wirklich sind, deckelt zusaetzlich die Textur-Reserve der GPU
+        # (fixtures.js#shadowSpotBudget, gewollt seit VIZ-71). Unter Windows
+        # meldet ANGLE/D3D11 immer 16 Textur-Einheiten -> 16 - 6 = 10 Schatten;
+        # eine Linux-Desktop-GPU (32 Einheiten) kommt auf die vollen 16. Fest
+        # 16 zu erwarten machte den Test unter Windows rot (10 != 16).
+        info = self._json("window.__lightos.shadowBudgetInfo()")
+        self.assertEqual(info["hardCap"], 16, "Maximal hebt das Dach nicht auf 16")
+        erwartet = min(16, max(2, info["maxTextures"] - info["reserve"]))
+        self.assertEqual(info["budget"], erwartet, info)
+        self.assertEqual(self._pool()["schatten"], erwartet, info)
 
     # ── (2) Vergabe an die hellsten, mit Hysterese ───────────────────────────
     def test_pool_vergibt_an_die_hellsten(self):
@@ -264,12 +274,12 @@ class Viz72SzeneTest(unittest.TestCase):
         self.assertEqual(sorted(self._pool()["halter"]), list(_FIDS[4:]))
         self.assertEqual(self._pool()["leuchtend"], 8)
 
-        # Pool-Licht steht dort, wo das Geraete-Licht frueher hing:
-        # spot.position (r128-Vorgabe 0,1,0) im Koordinatensystem der Gruppe.
+        # Pool-Licht sitzt an der Linse des Geraets (VIZ-92: vorher 1 m ueber
+        # dem Sockel, das eigene Gehaeuse warf Schatten), Ziel wie f.spot.
         lage = self._json("""(function(){ const L = window.__lightos;
             const l = L.spotPoolLights()[0]; const fid = L.spotPoolInfo().halter[0];
-            const f = L.fixtures[fid]; f.group.updateMatrixWorld(true);
-            const v = f.spot.position.clone().applyMatrix4(f.group.matrixWorld);
+            const f = L.fixtures[fid];
+            const v = L.__lichtUrsprung(f, new window.THREE.Vector3());
             return [l.position.distanceTo(v), l.target.position.distanceTo(f.spot.target.position),
                     Math.abs(l.intensity - f.spot.intensity)]; })()""")
         self.assertLess(max(lage), 1e-6, lage)

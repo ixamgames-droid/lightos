@@ -1,0 +1,276 @@
+{
+  "anleitung": "buehnen_show",
+  "werkzeug": "tools/anleitungsbilder.py",
+  "stand": "8148ec3f",
+  "schrift": "Noto Sans (statt Roboto Condensed)",
+  "qt": "6.11.1",
+  "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py buehnen_show'.",
+  "bilder": [
+    {
+      "datei": "01_vc_seite.png",
+      "szene": "01_vc_seite",
+      "titel": "VC-Seite der Bühnen-Show: PAR-Dimmer/-Farbe, Moving Heads, Strobe + Laser, Show-Looks, Grand Master",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "6cef087be3e4bae0be504b0e69007f49"
+    },
+    {
+      "datei": "02_aufbau.png",
+      "szene": "02_aufbau",
+      "titel": "Aufbau: 20-m-Bühne, drei Traversen-Ebenen, PAR-Türme, LED-Wand",
+      "groesse": [
+        1900,
+        877
+      ],
+      "marken": [],
+      "md5": "c14acb7fed1affa7c972ccae85f8015f"
+    },
+    {
+      "datei": "03_intro.png",
+      "szene": "03_intro",
+      "titel": "Look Intro: blaue Dimmer-Welle, Tilt-Welle der Moving Heads, Laser",
+      "groesse": [
+        1900,
+        877
+      ],
+      "marken": [],
+      "md5": "3ceafd17d9d247d201d9c3c76e18cecc"
+    },
+    {
+      "datei": "04_drop.png",
+      "szene": "04_drop",
+      "titel": "Look Drop: Lauflicht innen → außen, Schwenker A/B, Strobe-Lauf",
+      "groesse": [
+        1900,
+        877
+      ],
+      "marken": [],
+      "md5": "491b15f32d162646c0e012339b7e96a4"
+    },
+    {
+      "datei": "05_breakdown.png",
+      "szene": "05_breakdown",
+      "titel": "Look Breakdown: Amber-Welle, blaue Moving Heads mit Gobo + Prisma, Acht",
+      "groesse": [
+        1900,
+        877
+      ],
+      "marken": [],
+      "md5": "b03af093ed20046ff0346a11bc25498d"
+    },
+    {
+      "datei": "06_finale.png",
+      "szene": "06_finale",
+      "titel": "Look Finale: Farbwechsel, Strobe, Kreis-Welle",
+      "groesse": [
+        1900,
+        877
+      ],
+      "marken": [],
+      "md5": "f91e8d6527474db62b53f543c0007ac8"
+    },
+    {
+      "datei": "07_wellen_orbit.gif",
+      "szene": "07_wellen_orbit",
+      "titel": "GIF: Dimmer-/Farbwelle über 40 PARs + Pan-Welle der Moving Heads, Kamera kreist langsam um die Bühne",
+      "groesse": [
+        600,
+        320
+      ],
+      "marken": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "md5": "ea6cec6b1381d12c1448969387da1e7a",
+      "frames": 16,
+      "dauern_ms": [
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200
+      ]
+    },
+    {
+      "datei": "08_schwenker_dolly.gif",
+      "szene": "08_schwenker_dolly",
+      "titel": "GIF: Schwenker A/B im Wechsel, Kamera fährt von weit hinten im Publikum nach vorn",
+      "groesse": [
+        640,
+        341
+      ],
+      "marken": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "md5": "d3ff5ed3c6ec79e157bfc438683b3d91",
+      "frames": 18,
+      "dauern_ms": [
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200,
+        200
+      ]
+    },
+    {
+      "datei": "09_lauflicht_strobe.gif",
+      "szene": "09_lauflicht_strobe",
+      "titel": "GIF: Lauflicht innen → außen, Strobes, Laser-Lauf — Schwenk",
+      "groesse": [
+        560,
+        298
+      ],
+      "marken": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "md5": "da3c24851fdf125bb4a75e1985949531",
+      "frames": 14,
+      "dauern_ms": [
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120,
+        120
+      ]
+    },
+    {
+      "datei": "10_laser_prisma.gif",
+      "szene": "10_laser_prisma",
+      "titel": "GIF: „Laser langsam“ schwenkt die Strahlen, Moving Heads mit Prisma (drei Kegel je Kopf) — Kamera fährt heran",
+      "groesse": [
+        600,
+        320
+      ],
+      "marken": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "md5": "9eb5da15af0f7af838dbcc73e7dee948",
+      "frames": 22,
+      "dauern_ms": [
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300,
+        300
+      ]
+    }
+  ]
+}
