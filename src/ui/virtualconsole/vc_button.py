@@ -796,13 +796,19 @@ class VCButton(VCWidget):
         self.update()
         return True
 
-    def deactivate_for_solo(self):
+    def deactivate_for_solo(self, activator=None):
         """Schaltet diesen Button fuer einen Solo-Frame gezielt aus.
 
         ``_pressed`` beschreibt nur den physischen Tastendruck. Toggle-Buttons
         bleiben dagegen ueber den laufenden Effekt bzw. ``_snap_active`` aktiv.
         Ein blosses ``_trigger(False)`` kann diese Zustaende nicht beenden, weil
         FUNCTION_TOGGLE und Library-Snap-Toggle nur auf den Druck reagieren.
+
+        VCB-41: Funktionen, die der ausloesende Knopf (``activator``) SELBST
+        steuert, bleiben unangetastet — sonst stoppte der Zwilling sie, und der
+        gedrueckte Toggle saehe „steht" und startete sie sofort neu (Ausschalten
+        unmoeglich). Ueber diese Funktionen entscheidet allein der Ausloeser,
+        Ein/Aus verhaelt sich wie bei einem einzelnen Knopf.
         """
         was_pressed = self._pressed
         self._pressed = False
@@ -812,7 +818,15 @@ class VCButton(VCWidget):
             try:
                 from src.core.app_state import get_state
                 fm = get_state().function_manager
+                geschuetzt = set()
+                if (activator is not None and activator is not self
+                        and getattr(activator, "action", None) in (
+                            ButtonAction.FUNCTION_TOGGLE,
+                            ButtonAction.FUNCTION_FLASH)):
+                    geschuetzt = set(activator._all_function_ids())
                 for fid in self._all_function_ids():
+                    if fid in geschuetzt:
+                        continue
                     if fm.is_running(fid):
                         # Solo bedeutet wirklich nur ein aktiver Button. Ein
                         # Fade-Out duerfte den alten Effekt sonst parallel zum
