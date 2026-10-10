@@ -36,13 +36,43 @@ Hilfen:
 - **Gerät erstellen…** baut ein eigenes Profil (Kanäle/Attribute), falls dein Gerät nicht in der
   Datenbank ist.
 - **Löschen** entfernt die markierten Zeilen (mit Rückfrage). Doppelklick auf eine Zeile öffnet
-  *Gerät bearbeiten* (Label, Modus, Universe, DMX-Adresse, bei Movern auch Pan/Tilt invertieren/tauschen).
+  *Gerät bearbeiten* (Label, Modus, Universe, DMX-Adresse, bei Movern auch Pan/Tilt invertieren/tauschen,
+  bei Lasern die Laser-Ausrichtung — siehe unten).
 - Die Leiste **„Belegte DMX-Kanäle — Universe:"** unten (mit der Universe-Auswahl direkt daneben)
   zeigt pro Universe als farbige Blöcke, welche Kanäle belegt sind. **Adresskonflikte** erkennst du
   direkt in der **Tabelle**: betroffene Zeilen werden rot eingefärbt und die FID mit **⚠** markiert.
   Oben rechts erscheint dann der Knopf **„⚠ N Adresskonflikt(e) — auflösen…"**: ein Klick öffnet
   *Adresskonflikte auflösen*, dort legst du die betroffenen Geräte mit **Auf Vorschlag
   verschieben** bzw. **Alle verschieben** auf freie Adressen.
+
+### Laser-Ausrichtung (hängend/stehend)
+
+Ein Laser, der **hängend** statt stehend montiert ist (oder um 90° gedreht), fährt dieselbe
+Programmierung spiegelverkehrt. Statt jede Szene umzubauen, stellst du das einmal je Gerät ein:
+Doppelklick auf die Laser-Zeile → *Gerät bearbeiten* → Zeile **Laser-Ausrichtung:** (erscheint
+nur bei Lasern):
+
+- **X-Achse umkehren** — links/rechts spiegeln.
+- **Y-Achse umkehren** — oben/unten spiegeln.
+- **X/Y tauschen** — für einen um 90° gedreht montierten Laser.
+
+Die Haken wirken auf Programmer, Cues, EFX und Netzwerk-Laser; sie stehen in der Show-Datei.
+Das 3D-Bild zeigt den Laser weiter in der programmierten Richtung. Abschalt-Werte (Shutter),
+**NOT-AUS** und Blackout sind nicht betroffen.
+
+**Was „umkehren" bedeutet, hängt vom Profil ab** — die Zeile unter den Haken sagt, welcher
+Fall gilt:
+
+- Hat die Achse einen **Mitte-Bereich** und zwei Richtungen (z. B. 0–10 Mitte, 11–127 eine
+  Richtung, 128–255 die andere), bleibt die Mitte, wo sie ist; nur die Richtung wechselt bei
+  gleicher Auslenkung. Es wird also **nicht** einfach `255 − Wert` gerechnet.
+- Hat der Kanal einen festen Positionsbereich und darüber eine Eigenbewegung, wird nur der
+  Positionsbereich gespiegelt.
+- Beschreibt das Profil die Achse nicht, rechnet LightOS linear (`255 − Wert`).
+
+Nach dem Umstellen **am Gerät prüfen**: Laser mit kleiner Leistung auf eine sichere Fläche
+richten, eine Position links und eine rechts (bzw. oben/unten) anfahren und ansehen, ob die
+Richtung stimmt — vor allem bei „linear", denn dort kennt LightOS die Achse nicht.
 
 ## 2. Fixture-Gruppen anlegen
 

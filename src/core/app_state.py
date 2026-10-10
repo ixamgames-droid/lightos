@@ -1463,6 +1463,8 @@ class AppState:
             # Whitelist, Normalisierung, Undo-Schnappschuss, Wiederherstellung.
             # Diesmal von Anfang an, statt sie beim naechsten Vorfall zu finden.
             "element_rotation", "element_flip",
+            # LAS-30
+            "invert_laser_x", "invert_laser_y", "swap_laser_xy",
             "pan_range_deg", "tilt_range_deg", "pan_zero_dmx", "tilt_zero_dmx",
             "aim_offset_pan", "aim_offset_tilt",
             "protocol", "net_host",
@@ -1474,6 +1476,9 @@ class AppState:
                 values["element_rotation"])
         if "element_flip" in values:
             values["element_flip"] = bool(values["element_flip"])
+        for _lk in ("invert_laser_x", "invert_laser_y", "swap_laser_xy"):
+            if _lk in values:
+                values[_lk] = bool(values[_lk])
         if "pixel_order" in values:
             # Garbage aus Skript-/Remote-Pfaden klemmen — kanonische Quelle ist
             # das Leaf-Modul core.pixel_order, dieselbe wie die Show-Persistenz.
@@ -1560,6 +1565,9 @@ class AppState:
             "pixel_order": getattr(f, "pixel_order", "rowwise") or "rowwise",
             "element_rotation": int(getattr(f, "element_rotation", 0) or 0),
             "element_flip": bool(getattr(f, "element_flip", False)),
+            "invert_laser_x": bool(getattr(f, "invert_laser_x", False)),
+            "invert_laser_y": bool(getattr(f, "invert_laser_y", False)),
+            "swap_laser_xy": bool(getattr(f, "swap_laser_xy", False)),
             "pan_range_deg": getattr(f, "pan_range_deg", 540),
             "tilt_range_deg": getattr(f, "tilt_range_deg", 270),
             "pan_zero_dmx": getattr(f, "pan_zero_dmx", 128),
@@ -1594,6 +1602,9 @@ class AppState:
             pixel_order=d.get("pixel_order", "rowwise") or "rowwise",
             element_rotation=int(d.get("element_rotation", 0) or 0),
             element_flip=bool(d.get("element_flip", False)),
+            invert_laser_x=bool(d.get("invert_laser_x", False)),
+            invert_laser_y=bool(d.get("invert_laser_y", False)),
+            swap_laser_xy=bool(d.get("swap_laser_xy", False)),
             pan_range_deg=d.get("pan_range_deg", 540),
             tilt_range_deg=d.get("tilt_range_deg", 270),
             pan_zero_dmx=d.get("pan_zero_dmx", 128),
@@ -7115,7 +7126,13 @@ def apply_pan_tilt_orientation(fx, attrs: dict) -> dict:
     Pfad). Andernfalls ein NEUES dict (Programmer-/Funktions-State bleibt roh).
     Reihenfolge: erst Swap (Achsen tauschen inkl. Fine), dann Invert je Kanal.
     Fine-Kanaele werden als 16-bit-Paar korrekt mit-invertiert.
+
+    LAS-30: dieselbe Stufe kehrt auch die Laser-Achsen ``laser_x``/``laser_y``
+    um (``invert_laser_x``/``invert_laser_y``/``swap_laser_xy``) — mit der
+    Achsen-Konvention des Profils, siehe ``src.core.laser.achsen``.
     """
+    from src.core.laser.achsen import apply_laser_orientation
+    attrs = apply_laser_orientation(fx, attrs)
     inv_pan = bool(getattr(fx, "invert_pan", False))
     inv_tilt = bool(getattr(fx, "invert_tilt", False))
     swap = bool(getattr(fx, "swap_pan_tilt", False))
@@ -7186,7 +7203,11 @@ def unapply_pan_tilt_orientation(fx, attrs: dict) -> dict:
     hier also erst Invert, dann Swap. Beides sind Involutionen, aber ihre
     Komposition ist es NICHT: bei gleichzeitig gesetztem Swap und Invert liefert
     zweimaliges Anwenden der Vorwaertsfunktion ein falsches Ergebnis.
+
+    LAS-30: nimmt auch die Laser-Achsen-Umkehr/-Tausch zurueck.
     """
+    from src.core.laser.achsen import unapply_laser_orientation
+    attrs = unapply_laser_orientation(fx, attrs)
     inv_pan = bool(getattr(fx, "invert_pan", False))
     inv_tilt = bool(getattr(fx, "invert_tilt", False))
     swap = bool(getattr(fx, "swap_pan_tilt", False))
