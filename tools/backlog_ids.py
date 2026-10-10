@@ -21,6 +21,9 @@ Code-Kommentare. Dieses Werkzeug fragt vorher.
 Zwei Fragen
 -----------
 1. **Welche ID ist frei?** Ueber alle Zweige gerechnet, nicht nur den eigenen.
+   Gezaehlt wird jede ID aus ``BACKLOG.md``, aus den Backlog-Fragmenten
+   ``backlog.d/<ID>.md`` (PROC-20 — dort stehen neue Items bis zum
+   Sammel-Lauf), von der Belegungstafel und aus ``changelog.d/``.
 2. **Gibt es schon eine Kollision?** Dieselbe ID auf zwei Zweigen mit
    VERSCHIEDENEM Titel. Gleicher Titel ist keine Kollision, sondern derselbe
    Eintrag auf zwei Staenden — der haeufige Normalfall.
@@ -153,6 +156,40 @@ def ids_aus_text(text: str) -> set:
 _ID_IM_TEXT = re.compile(r"\b[A-Z][A-Z0-9]*-\d+\b")
 
 
+# PROC-20: backlog.d/<ID>.md — Kopfzeilen `Name: Wert` bis zur ersten Leerzeile.
+_FRAGMENT_NAME = re.compile(r"^([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+[a-z]?)\.md$")
+_FRAGMENT_TITEL = re.compile(r"^Titel:[ \t]*(.+?)[ \t]*$", re.M)
+
+
+def items_aus_fragmenten(fragmente: dict) -> dict:
+    """``{ID: Titel}`` aus ``{Dateiname: Text}`` der Backlog-Fragmente (PROC-20).
+
+    Seit kein PR mehr ``BACKLOG.md`` anfasst, steht ein NEUES Item bis zum
+    Sammel-Lauf nur als ``backlog.d/<ID>.md`` im Baum. Die ID kommt aus dem
+    Dateinamen (``README.md`` faellt damit heraus), der Titel aus der Kopfzeile.
+
+    ★ Ein Fragment OHNE Titel ist eine reine Statusmeldung zu einer vorhandenen
+    Zeile und traegt hier nichts bei: ein leerer Titel saehe in
+    ``kollisionen`` wie ein abweichender aus. Seine Nummer zaehlt trotzdem —
+    ueber die Dateinamen in ``weitere_belegte_ids``."""
+    gefunden = {}
+    for name, text in fragmente.items():
+        m_name = _FRAGMENT_NAME.match(name.rsplit("/", 1)[-1])
+        kopf = (text or "").replace("\r\n", "\n").split("\n\n", 1)[0]
+        m_titel = _FRAGMENT_TITEL.search(kopf)
+        if m_name and m_titel:
+            gefunden[m_name.group(1)] = m_titel.group(1).strip("* ").strip()
+    return gefunden
+
+
+def mit_fragmenten(items: dict, fragmente: dict) -> dict:
+    """Die Items eines Zweigs samt seiner Fragmente — die BACKLOG-Zeile gewinnt.
+
+    Steht die ID schon in der Tabelle, ist das Fragment eine Statusmeldung zu
+    DIESER Zeile; ihr (aelterer, ausfuehrlicherer) Titel bleibt der Massstab."""
+    return {**items_aus_fragmenten(fragmente), **items}
+
+
 # ── Alles ab hier redet mit git ──────────────────────────────────────────────
 
 def _git(*args: str) -> tuple[int, str]:
@@ -202,17 +239,39 @@ def backlog_je_zweig(refs: list) -> dict:
     return je_zweig
 
 
+def fragmente_je_zweig(refs: list) -> dict:
+    """``{Ref: {Dateiname: Text}}`` der Backlog-Fragmente (PROC-20).
+
+    Ein Ref ohne ``backlog.d/`` liefert ein leeres Verzeichnis — das ist der
+    Normalfall (aeltere Zweige) und keine Luecke in der Abdeckung."""
+    je_zweig = {}
+    for ref in refs:
+        rc, out = _git("ls-tree", "--name-only", f"{ref}:backlog.d")
+        dateien = {}
+        for name in (out.split("\n") if rc == 0 else []):
+            name = name.strip()
+            if not _FRAGMENT_NAME.match(name):
+                continue
+            rc2, text = _git("show", f"{ref}:backlog.d/{name}")
+            if rc2 == 0:
+                dateien[name] = text
+        je_zweig[ref] = dateien
+    return je_zweig
+
+
 def weitere_belegte_ids(refs: list) -> set:
     """IDs von der Belegungstafel (``origin/sessions:SESSIONS.md``, inkl.
-    Verlauf) und aus den Dateinamen unter ``changelog.d/`` jedes Refs."""
+    Verlauf) und aus den Dateinamen unter ``changelog.d/`` und ``backlog.d/``
+    jedes Refs."""
     ids: set = set()
     rc, text = _git("show", "origin/sessions:SESSIONS.md")
     if rc == 0:
         ids |= ids_aus_text(text)
     for ref in refs:
-        rc, out = _git("ls-tree", "--name-only", f"{ref}:changelog.d")
-        if rc == 0:
-            ids |= ids_aus_text(out)
+        for ordner in ("changelog.d", "backlog.d"):
+            rc, out = _git("ls-tree", "--name-only", f"{ref}:{ordner}")
+            if rc == 0:
+                ids |= ids_aus_text(out)
     return ids
 
 
@@ -277,6 +336,15 @@ def main(argv=None) -> int:
     # ★ Die Abdeckung MUSS mit. Ohne sie sieht „keine Kollision" bei einem
     # einzigen gelesenen Zweig aus wie ein sauberer Bestand.
     print(f"[ids] geprueft: {', '.join(sorted(je_zweig))}")
+
+    # PROC-20: neue Items stehen bis zum Sammel-Lauf nur als backlog.d/<ID>.md
+    # im Baum — fuer Kollision UND naechste freie Nummer zaehlen sie wie Zeilen.
+    fragmente = fragmente_je_zweig(sorted(je_zweig))
+    je_zweig = {ref: mit_fragmenten(items, fragmente.get(ref, {}))
+                for ref, items in je_zweig.items()}
+    n_frag = sum(len(f) for f in fragmente.values())
+    if n_frag:
+        print(f"[ids] dazu {n_frag} Backlog-Fragment(e) aus backlog.d/ dieser Refs.")
 
     auf_main = set(je_zweig.get("origin/main", {}))
     treffer = kollisionen(je_zweig, auf_main)

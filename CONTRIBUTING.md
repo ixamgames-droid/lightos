@@ -160,6 +160,28 @@ src/
 4. PR gegen `dev` öffnen — Template ausfüllen
 5. CI muss grün sein (pytest + ruff)
 
+**Backlog und Changelog als Fragment:** Ein PR ändert weder `BACKLOG.md` noch
+`CHANGELOG.md` direkt — beide Dateien würden sonst mit jedem parallelen PR
+kollidieren. Stattdessen je eine eigene Datei:
+
+- `changelog.d/JJJJ-MM-TT-<ID>.md` — der fertige Changelog-Abschnitt
+  (Vorlage: [`changelog.d/README.md`](changelog.d/README.md)).
+- `backlog.d/<ID>.md` — das Backlog-Item bzw. sein neuer Status
+  (Vorlage: [`backlog.d/README.md`](backlog.d/README.md)), zum Beispiel:
+
+  ```
+  ID: UI-99
+  Prioritaet: P2
+  Status: review
+  Titel: Kurzer Titel des Items
+
+  Was fehlt, woran man es merkt, wann es erledigt ist.
+  ```
+
+Eingetragen werden die Fragmente später gesammelt mit
+`tools/changelog_sammeln.py` bzw. `tools/backlog_sammeln.py`; aus `review` wird
+dabei `done` mit der PR-Nummer.
+
 **Vor dem PR:** das Test-Gate (`.\tools\verify_segmented.ps1` bzw. `./tools/verify_loop.sh`) und `ruff check src/` lokal ausführen.
 
 ---

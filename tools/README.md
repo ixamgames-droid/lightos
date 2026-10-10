@@ -25,6 +25,7 @@
 | `audit_tooltip_coverage.py` | QA-13 Tooltip-/Label-Coverage-Audit fuer interaktive Steuerelemente. |
 | `backlog_compact.py` | Backlog-Verdichter + Queue-View fuer BACKLOG.md (Loop-Werkzeug). |
 | `backlog_ids.py` | Naechste freie Backlog-ID — ueber ALLE Zweige, nicht nur den eigenen. |
+| `backlog_sammeln.py` | BACKLOG-Fragmente sammeln — und direkte BACKLOG-Aenderungen melden (PROC-20). |
 | `backlog_status_drift.py` | QA-64 — misst, ob der Status im BACKLOG.md noch zum CODE auf `main` passt. |
 | `benchmark_universes.py` | T-8 / RM-Benchmark — Render-Performance fuer mehrere Universen. |
 | `bibliothek_profil.py` | FM-56: Werkzeug fuer die eigene Geraete-Bibliothek (LightOS-Profile). |

@@ -84,6 +84,43 @@ GitHub keine CI.
   neuen leeren `## [Unreleased]`-Kopf setzen): erzeugt Zeilen ohne Fragment,
   daher Commit-Betreff `changelog: release x.y.z` — sonst meldet der Waechter.
 
+### BACKLOG-Fragmente (PROC-20)
+
+Ein PR schreibt seine Backlog-Zeile bzw. seinen Status **nicht** in
+`BACKLOG.md`, sondern legt je Item eine Datei `backlog.d/<ID>.md` an (Vorlage
+und alle Kopfzeilen in [`backlog.d/README.md`](backlog.d/README.md)). Grund:
+bisher aenderte jeder Feature-PR dieselbe Datei — nach jedem Merge kollidierten
+die naechsten PRs, und gemergte Items blieben auf `review` stehen.
+
+Beispiel `backlog.d/UI-99.md` (neues Item, das dieser PR auch umsetzt):
+
+```
+ID: UI-99
+Prioritaet: P2
+Status: review
+Titel: Kurzer Titel des Items
+
+Was fehlt, woran man es merkt, wann es erledigt ist.
+```
+
+- **Statusaenderung an einem vorhandenen Item:** nur `ID:` und `Status:`
+  (`todo`, `review`, `done`, `teils`, `blocked`), optional `Status-Notiz:`.
+- **ID holen:** `./venv/bin/python tools/backlog_ids.py --gruppe <GRUPPE>` —
+  sieht auch die Fragmente der offenen PR-Zweige.
+- **Sammeln** regelmaessig durch die leitende Sitzung, als kleiner eigener PR
+  auf frischem `main`: `./venv/bin/python tools/backlog_sammeln.py --pruefen`,
+  dann `--dry-run`, dann ohne Schalter; Commit-Betreff `backlog: sammeln`. Neue
+  Items bekommen eine Zeile hinter der hoechsten Nummer ihrer Gruppe, bei
+  vorhandenen wird nur die Statusspalte ersetzt, `review` wird zu
+  `done (<Datum>, PR #N)` (Nummer aus dem Merge-Betreff oder `--pr N`). Ein
+  `review`-Fragment ohne PR-Nummer bleibt liegen; ein zweiter Lauf aendert
+  nichts.
+- **Das Dashboard** liest weiter nur `BACKLOG.md` — sein Stand ist so frisch
+  wie der letzte Sammel-Lauf.
+- **Uebergang:** offene PRs, die `BACKLOG.md` noch direkt aendern, bleiben
+  gueltig. `tests/test_backlog_fragmente.py` (bzw.
+  `tools/backlog_sammeln.py --waechter`) meldet das als Hinweis, nie als Fehler.
+
 ## Tests vor jedem Commit
 
 - `python main.py` muss starten ohne Crash
@@ -390,6 +427,7 @@ zusaetzlichen Funden.
 - Bei neuen Dependencies: `requirements.txt` aktualisieren
 - Bei Architektur-Aenderungen: `README.md` oder `INSTALL.md` synchron halten
 - Nutzer-sichtbare Aenderung: CHANGELOG-Fragment unter `changelog.d/` (nicht `CHANGELOG.md` direkt)
+- Neues Item oder neuer Status: BACKLOG-Fragment unter `backlog.d/` (nicht `BACKLOG.md` direkt)
 
 ## Plattform-Kompatibilitaet
 
