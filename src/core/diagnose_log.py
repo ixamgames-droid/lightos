@@ -856,7 +856,7 @@ PAKET_INHALT = (
     "• eine Liste der Einstellungen (Zahlen und Schalter; Texte, Pfade und "
     "Geheimnisse nur als Platzhalter)\n"
     "• die Datei-NAMEN im Datenordner\n\n"
-    "NICHT enthalten: Show-Dateien, Datenbanken, Snaps, Buehnen. Dein "
+    "NICHT enthalten: Show-Dateien, Sicherungen, Datenbanken, Snaps, Buehnen. Dein "
     "Benutzername in Pfaden wird durch ~ bzw. %USERNAME% ersetzt.")
 
 _LIESMICH = ("LightOS-Diagnosepaket\n=====================\n\nEnthaelt:\n"
