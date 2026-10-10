@@ -31,6 +31,10 @@ Exit 0 = identisch (Abnahme bestanden), 1 = Abweichung, 2/3 = Lauf kaputt.
      (TOOL-16). Sonst holt ``get_state()`` ein altes ``universes.json`` mit
      Enttec-Eintrag in den Sandkasten und oeffnet den echten Port. Die
      Ausgabe wird deshalb zusaetzlich NACH ``get_state()`` geprueft.
+     Dazu ``LIGHTOS_UNIVERSES_JSON`` HART auf eine Datei im Sandkasten (Codex
+     #959): ein beim Bediener gesetzter Wert zeigte sonst auf die echte
+     Konfiguration, und Enttec-Ziele ausserhalb der Liste ``_GEFAEHRLICH``
+     (``/dev/serial/by-id/...``, kleines ``com3``) kaemen durch die Vorpruefung.
 
 ★ Und die Falle, die diesen Lauf zweimal „bestanden" melden liess, ohne etwas zu
 messen: die Show referenziert ihre Buehne nur per NAME (``stage_snapshot``), die
@@ -79,6 +83,9 @@ def sandbox_einrichten(tmp: str | None = None, *, fixture_db: str | None = None,
     # echten seriellen Port, NACHDEM die Pruefung unten die noch leere
     # Sandkasten-Datei fuer sicher befunden hatte.
     os.environ["LIGHTOS_NO_DATENUMZUG"] = "1"
+    # Codex #959: hart setzen (nicht setdefault) — ein vom Bediener gesetzter
+    # Wert zeigte auf die echte Ausgabe-Konfiguration.
+    os.environ["LIGHTOS_UNIVERSES_JSON"] = os.path.join(tmp, "universes.json")
     echte_stages = stages_quelle or os.path.expanduser("~/.local/share/LightOS/stages")
     sandkasten_stages = os.path.join(tmp, "xdg", "LightOS", "stages")
     if os.path.isdir(echte_stages) and not os.path.exists(sandkasten_stages):
@@ -95,6 +102,7 @@ def schutz_aktiv() -> bool:
     env = os.environ
     return (env.get("XDG_DATA_HOME") == os.path.join(_SANDBOX, "xdg")
             and env.get("LIGHTOS_SHOW_DB") == os.path.join(_SANDBOX, "show.db")
+            and env.get("LIGHTOS_UNIVERSES_JSON") == os.path.join(_SANDBOX, "universes.json")
             and bool(env.get("LIGHTOS_NO_OUTPUT_THREAD"))
             and bool(env.get("LIGHTOS_NO_DATENUMZUG")))
 

@@ -172,6 +172,25 @@ Hat dein Laser eine Netzwerk-Ausgabe (Ether Dream / IDN), erscheint zusätzlich:
   Sky, Wookie): solche Laser **strahlen bei Grand Master 0 % weiter**.
   Verlässlich aus ist ein Laser nur mit dem **NOT-AUS**.
 
+### Blackout, Ziel-Blackout und NOT-AUS
+
+Dieselben **Aus-Werte aus dem Geräteprofil** wie beim Grand Master gelten auch
+hier — ein Laser bekommt also nicht einfach überall 0:
+
+- **BLACKOUT** (global): alle Laser bekommen ihre Aus-Werte (z. B. Betriebsart
+  „Laser aus“, Shutter zu). Der Aus-Wert ist **nicht immer 0** — bei manchen
+  Lasern bedeutet DMX 0 an der Betriebsart „Auto“; eine reine Null würde
+  sie einschalten.
+- **Blackout-Taste mit Ziel:** nur die Laser im Ziel bekommen ihre Aus-Werte,
+  alle anderen laufen weiter.
+- **Laser-NOT-AUS:** schreibt an jede Laser-Adresse mit bekanntem Aus-Wert
+  diesen Wert, an alle übrigen Laser-Adressen 0 — und gewinnt immer (auch
+  gegen Kanal-Modifier, Grand Master und Blackout).
+- Kennt das Profil **keinen** Aus-Wert (siehe oben), gibt es nichts zu
+  schreiben: Blackout und Ziel-Blackout setzen dann die Lichtkanäle auf 0,
+  ein Laser ohne Dimmer kann trotzdem weiterstrahlen. Im DMX-Monitor sieht man
+  bei Lasern deshalb nach einem Blackout nicht unbedingt überall 0.
+
 ### Laser-EFX (Bewegung)
 
 - Ein EFX bewegt bei Lasern die Achsen **„X-Bewegung“/„Y-Bewegung“**

@@ -89,6 +89,64 @@ class StageReloadKeinPortTest(unittest.TestCase):
         self.assertEqual(res["abbruch"], "", res)
 
 
+class GesetzteUniversesVariableTest(unittest.TestCase):
+    """Codex #959: ``LIGHTOS_UNIVERSES_JSON`` des Bedieners zeigt auf die echte
+    Konfiguration. Ein Enttec-Ziel, das ``_GEFAEHRLICH`` nicht kennt
+    (``/dev/serial/by-id/...``), kam durch die Vorpruefung, und
+    ``apply_output_config()`` oeffnete den Port. Der Sandkasten setzt die
+    Variable jetzt hart auf eine eigene Datei."""
+
+    def test_echte_konfiguration_per_variable_oeffnet_keinen_port(self):
+        with tempfile.TemporaryDirectory() as cwd:
+            echt = os.path.join(cwd, "echte_universes.json")
+            with open(echt, "w", encoding="utf-8") as fh:
+                json.dump([{"num": 1, "output": "Enttec",
+                            "patch": "/dev/serial/by-id/usb-FTDI_Test-if00-port0"}], fh)
+            sandbox = os.path.join(cwd, "sandbox")
+            os.makedirs(sandbox)
+            ergebnis = os.path.join(cwd, "ergebnis.json")
+            env = dict(os.environ)
+            for k in [k for k in env if k.startswith("LIGHTOS_")] + ["XDG_DATA_HOME"]:
+                env.pop(k, None)
+            env["LIGHTOS_UNIVERSES_JSON"] = echt
+            env["QT_QPA_PLATFORM"] = "offscreen"
+            env["HOME"] = cwd              # nie das echte Konto beruehren
+            r = subprocess.run(
+                [sys.executable, "-c", _KIND, REPO, TOOL, sandbox, ergebnis],
+                cwd=cwd, env=env, capture_output=True, text=True, timeout=120)
+            self.assertTrue(os.path.exists(ergebnis), r.stdout + r.stderr)
+            with open(ergebnis, encoding="utf-8") as fh:
+                res = json.load(fh)
+        self.assertEqual(res["geoeffnet"], [], res)
+        self.assertEqual(res["abbruch"], "", res)
+
+    def test_schutz_verlangt_die_umgelenkte_datei(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("vsr_pin", TOOL)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        alt = {k: os.environ.get(k) for k in (
+            "XDG_DATA_HOME", "LIGHTOS_SHOW_DB", "LIGHTOS_FIXTURE_DB",
+            "LIGHTOS_NO_OUTPUT_THREAD", "LIGHTOS_NO_DATENUMZUG", "LIGHTOS_UNIVERSES_JSON")}
+
+        def _zurueck():
+            for k, v in alt.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+        self.addCleanup(_zurueck)
+        with tempfile.TemporaryDirectory() as tmp:
+            os.environ["LIGHTOS_UNIVERSES_JSON"] = os.path.join(tmp, "anderswo.json")
+            mod.sandbox_einrichten(tmp, fixture_db=os.path.join(tmp, "fx.db"),
+                                   stages_quelle=os.path.join(tmp, "keine"))
+            self.assertEqual(os.environ["LIGHTOS_UNIVERSES_JSON"],
+                             os.path.join(tmp, "universes.json"))
+            self.assertTrue(mod.schutz_aktiv())
+            os.environ["LIGHTOS_UNIVERSES_JSON"] = os.path.join(tmp, "anderswo.json")
+            self.assertFalse(mod.schutz_aktiv())
+
+
 class NachStatePruefungTest(unittest.TestCase):
     """Die zweite Pruefung erkennt einen trotzdem eingerichteten Adapter."""
 

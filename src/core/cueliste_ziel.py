@@ -82,13 +82,23 @@ def _pages(state) -> list:
         return []
 
 
-def executor_von(state, stack):
+def executor_von(state, stack, bevorzugt_page=None):
     """UI-73: ``(page_index, slot)`` des ersten Executors, auf dem ``stack``
-    liegt — oder None. Page-Index 0-basiert wie ``PlaybackEngine.pages``."""
+    liegt — oder None. Page-Index 0-basiert wie ``PlaybackEngine.pages``.
+
+    UI-76: ``bevorzugt_page`` (meist die aktuelle Page) wird ZUERST
+    durchsucht. Dieselbe Liste darf auf mehreren Pages liegen; ohne Vorrang
+    meldete GO „liegt auf Page 1“, obwohl sie auch in der sichtbaren Leiste
+    lag."""
     if stack is None:
         return None
     try:
-        for pi, page in enumerate(_pages(state)):
+        pages = list(_pages(state))
+        if bevorzugt_page is not None and 0 <= bevorzugt_page < len(pages):
+            for ex in pages[bevorzugt_page]:
+                if getattr(ex, "stack", None) is stack:
+                    return bevorzugt_page, getattr(ex, "slot", None)
+        for pi, page in enumerate(pages):
             for ex in page:
                 if getattr(ex, "stack", None) is stack:
                     return pi, getattr(ex, "slot", None)

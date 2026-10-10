@@ -38,6 +38,12 @@ Profilen enthält (den eingebauten und denen der LightOS-Bibliothek unter
 `fixtures/bibliothek/`, FM-60). Ohne Zustimmung wird **nichts** heruntergeladen. Später geht
 es jederzeit über **Datenbank → Geräte-Bibliothek herunterladen...**
 
+Startet LightOS direkt mit einer Show (`--show`, etwa per Autostart), blockiert
+kein Dialog den Start: Statt der Frage steht unten in der Statuszeile der Knopf
+**Geräte-Bibliothek laden…**. Die Frage gilt erst mit einer Antwort als erledigt
+und kommt beim nächsten Start ohne `--show` wieder. Im Kiosk-Modus wird nicht
+gefragt (FM-72).
+
 - **Quellen:** QLC+-Fixtures einer festen Version (Apache-2.0, GitHub-Archiv)
   oder die Open Fixture Library als QLC+-Export (MIT). Lizenz, Link und
   ungefähre Größe (QLC+ ca. 12,7 MB, OFL ca. 2,7 MB) stehen im Dialog, **bevor**
