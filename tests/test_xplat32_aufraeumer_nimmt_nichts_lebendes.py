@@ -92,7 +92,7 @@ def _nachbar_raeumt_auf(weg: str, beleg: str) -> list:
     for _anlauf in range(_ANLAEUFE):
         fertig = subprocess.run([sys.executable, "-c", quelle],
                                 env=_fremde_umgebung(), cwd=_REPO,
-                                capture_output=True, text=True, timeout=300)
+                                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
         if fertig.returncode != 0:
             raise AssertionError("der Nachbarprozess ist gescheitert: "
                                  f"{fertig.stderr[-2000:]}")

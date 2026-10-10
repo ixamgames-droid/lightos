@@ -119,7 +119,7 @@ class DEMO06GenEnvModuleImport(unittest.TestCase):
         repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         r = subprocess.run(
             [sys.executable, "-c", "import tools; import _gen_env; print('GEN_OK')"],
-            cwd=repo, capture_output=True, text=True, timeout=60)
+            cwd=repo, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
         self.assertIn("GEN_OK", r.stdout,
                       "tools/__init__ muss tools/ auf sys.path legen, damit der "
                       "Modul-Import-Pfad _gen_env aufloest (DEMO-06). "
