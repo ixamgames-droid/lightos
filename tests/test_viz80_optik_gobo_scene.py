@@ -196,8 +196,10 @@ class Viz80OptikGoboPrismaSceneTest(unittest.TestCase):
     # ── Helfer ───────────────────────────────────────────────────────────────
     def _load_and_wait(self):
         url = QUrl.fromLocalFile(_HTML_PATH)
-        # QA-86: Stufe fest, sonst waehlt die GPU-Probe des Testrechners
-        # (Windows/ANGLE meldet 16 Textur-Einheiten -> 'low', Prisma gedeckelt).
+        # gputier=high ist Pflicht (wie test_viz_prisma_3d_scene): ohne Query
+        # entscheidet die GPU-Probe nach dem Testrechner. Seit VIZ-84 gilt ein
+        # Software-Renderer (offscreen: SwiftShader/llvmpipe) am Namen als
+        # 'low', und 'low' deckelt das Prisma auf 2 Nebenstrahlen statt 5.
         url.setQuery(f"v={int(time.time() * 1000)}&gputier=high")
         self._view.load(url)
         deadline = time.monotonic() + _LOAD_TIMEOUT_S
