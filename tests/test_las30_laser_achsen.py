@@ -343,3 +343,26 @@ def test_el400_name_ausgabe_bytes(monkeypatch):
     assert out["shutter"] == 0 and out["laser_y"] == 5
     assert out["laser_x"] == 204
     assert "Mitte bleibt" in profil_beschreibung(chans)
+
+
+# ── Doku-Pflicht: die Haken stehen in der Patch-Anleitung ────────────────────
+
+def test_patch_anleitung_erklaert_laser_ausrichtung():
+    """Jeder Haken des Dialogs steht woertlich in der Patch-Anleitung."""
+    import re
+    from pathlib import Path
+    wurzel = Path(__file__).resolve().parent.parent
+    quelle = (wurzel / "src/ui/views/patch_view.py").read_text(encoding="utf-8")
+    block = quelle.split("# LAS-30: Laser-Ausrichtung", 1)[1].split(
+        "# Moving-Head-Ausrichtung", 1)[0]
+    haken = re.findall(r'QCheckBox\("([^"]+)"\)', block)
+    assert len(haken) == 3, haken
+    doku = (wurzel / "docs/anleitung_patch_gruppen/ANLEITUNG_PATCH_GRUPPEN.md"
+            ).read_text(encoding="utf-8")
+    for text in haken + ["Laser-Ausrichtung:", "Gerät bearbeiten"]:
+        assert text in doku, text
+    abschnitt = doku.split("Laser-Ausrichtung (hängend/stehend)", 1)[1].split(
+        "\n## ", 1)[0]
+    for wort in ("Mitte", "am Gerät prüfen", "NOT-AUS"):
+        assert wort in abschnitt, wort
+
