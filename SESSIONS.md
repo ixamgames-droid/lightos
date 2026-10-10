@@ -12,7 +12,6 @@
 
 | Item | Sitzung | Branch | seit (UTC) | Dateien |
 |---|---|---|---|---|
-| DOC-38 | C | - | 2026-10-02T11:07Z | docs/anleitung_3d_geraete_ohne_rgb/ANLEITUNG_3D_GERAETE_OHNE_RGB.md |
 | DOC-39 | C | - | 2026-10-02T11:09Z | docs/anleitung_3d_visualizer_2026/ANLEITUNG_3D_BUEHNE.md |
 | DOC-40 | C | - | 2026-10-02T11:11Z | docs/anleitung_farbchase/ANLEITUNG_FARBCHASE.md |
 | DOC-41 | C | - | 2026-10-02T11:11Z | docs/anleitung_colorfade_vc/ANLEITUNG_COLORFADE_VC.md |
@@ -140,7 +139,6 @@
 
 ## Verlauf
 
-- 2026-10-09T15:25Z B done UI-75
 - 2026-10-09T15:55Z A done STAB-30
 - 2026-10-09T16:18Z A done DOC-66
 - 2026-10-09T16:27Z A claim MIDI-5
@@ -170,3 +168,4 @@
 - 2026-10-10T09:27Z C uebergeben DOC-35
 - 2026-10-10T09:27Z C uebergeben DOC-36
 - 2026-10-10T09:27Z C uebergeben DOC-37
+- 2026-10-10T09:27Z C uebergeben DOC-38
