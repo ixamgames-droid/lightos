@@ -401,7 +401,15 @@ export function updateStageObjectProps(id, props) {
   const data = so.data;
 
   // Size: replace geometry (Mesh) or rebuild scale (Group with loaded model / truss)
-  if (props.size) {
+  // VIZ-87: nur bei echter Aenderung. Jedes Laden schickt jedes Element noch
+  // zweimal als addStageData hinterher (push_stage_definition + Reassert nach
+  // 1,2 s) — bei unveraenderter Groesse baute das bisher jede Truss, LED-Wand
+  // und Treppe neu, also die halbe Buehne dreimal je Stufenwechsel.
+  const groesseNeu = props.size && (
+    (props.size.x != null && Math.abs(props.size.x - data.size.x) > 1e-9)
+    || (props.size.y != null && Math.abs(props.size.y - data.size.y) > 1e-9)
+    || (props.size.z != null && Math.abs(props.size.z - data.size.z) > 1e-9));
+  if (groesseNeu) {
     const sz = props.size;
     if (sz.x != null) data.size.x = sz.x;
     if (sz.y != null) data.size.y = sz.y;
@@ -449,7 +457,8 @@ export function updateStageObjectProps(id, props) {
   }
 
   // Color: update material (works on Mesh or recursively on Group)
-  if (props.color) {
+  // VIZ-87: gleiche Farbe = nichts zu tun (s. Groesse).
+  if (props.color && String(props.color).toLowerCase() !== String(data.color || '').toLowerCase()) {
     data.color = props.color;
     const col = new THREE.Color(props.color);
     if (so.mesh.isMesh && so.mesh.material) {
@@ -846,6 +855,35 @@ export function isUserRemoved(id) {
 // destruktiver Loesch-Abgleich uebersprungen werden kann.
 let _currentStageReloadToken = null;
 
+// VIZ-87: steht genau diese Buehne schon in der Szene? Verglichen wird mit
+// dem, was die Objekte JETZT tragen (`so.data`, gleiches Format wie
+// StageElement.to_js_dict) — nicht mit dem letzten Load: Aenderungen seither
+// (Ziehen im 3D, Python-Inkremente) zaehlen als Unterschied.
+function _gleich(a, b) {
+  if (typeof a === 'number' || typeof b === 'number') {
+    return Math.abs(Number(a) - Number(b)) < 1e-6;
+  }
+  return (a == null ? '' : String(a)) === (b == null ? '' : String(b));
+}
+function stageStimmtUeberein(objekte) {
+  if (!Array.isArray(objekte)) return false;
+  for (const o of objekte) {
+    const so = o && o.id && stageObjects[o.id];
+    if (!so) return false;
+    const d = so.data;
+    const p = o.position || {}, z = o.size || {};
+    if (d.type !== o.type) return false;
+    if (!_gleich(d.position.x, p.x) || !_gleich(d.position.y, p.y)
+        || !_gleich(d.position.z, p.z)) return false;
+    if (!_gleich(d.size.x, z.x) || !_gleich(d.size.y, z.y)
+        || !_gleich(d.size.z, z.z)) return false;
+    if (!_gleich(d.rotation || 0, o.rotation || 0)) return false;
+    if (!_gleich(String(d.color || '').toLowerCase(), String(o.color || '').toLowerCase())) return false;
+    if (!_gleich(d.name || '', o.name || '')) return false;
+  }
+  return true;
+}
+
 export function loadStageJson(json) {
   const incoming = typeof json === 'string' ? JSON.parse(json) : json;
   const incomingToken = incoming && incoming._reloadToken;
@@ -865,6 +903,27 @@ export function loadStageJson(json) {
   if (typeof incomingToken === 'number'
       && incomingToken === _currentStageReloadToken
       && isAlreadyComplete) {
+    return;
+  }
+  // VIZ-87: NEUER Token, aber dieselbe Buehne, die schon steht. Das ist der
+  // Normalfall nach jedem Seiten-Neuladen (Qualitaetsstufe, "Szene neu
+  // laden"): die frische Seite baut die Buehne sofort aus dem Poll-Zustand,
+  // und 400 ms nach loadFinished schickt Python dieselbe Buehne mit neuem
+  // Token noch einmal. Bisher hiess das: alles abreissen und neu bauen — bei
+  // grossen Buehnen unter Windows (ANGLE) Sekunden, und das Pending-Gate in
+  // Python lief derweil in seinen 6-s-Rueckfall ("pending stage snapshot
+  // blieb aus"). Jetzt: Token uebernehmen, Auswahl wie bei einem Load
+  // zuruecksetzen und das finale Echo schicken — ohne Neubau.
+  if (typeof incomingToken === 'number' && isAlreadyComplete
+      && !(Array.isArray(incoming.fixtures) && incoming.fixtures.length)
+      && stageStimmtUeberein(incoming.objects)) {
+    _currentStageReloadToken = incomingToken;
+    _userRemovedIds.clear();
+    view.selectedStageId = null;
+    clearResizeHandles();
+    try { updateOutlinesRef.get()(); } catch (e) { /* Auswahl-UI best effort */ }
+    notifyStageListChanged();
+    requestRender();
     return;
   }
   _isLoadingStage = true;

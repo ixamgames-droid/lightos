@@ -23,6 +23,21 @@ from src.core.engine import tap_uhr
 BeatCallback = Callable[[int], None]   # callback(beat_index)
 
 
+def takt_uhr() -> float:
+    """Zeitquelle des Beat-Timers ``_loop`` (BPM-28) — hochaufloesend auf allen
+    Plattformen.
+
+    ``time.monotonic()`` ist unter Windows ``GetTickCount64()`` mit 15,625 ms
+    Aufloesung: der Timer bemerkte einen faelligen Beat erst beim naechsten
+    Uhr-Schritt, jeder Beat kam 0–15,6 ms zu spaet (gemessen 2026-10-08,
+    Windows 11, 120 BPM: Abstaende bis 12,8 ms neben dem Soll).
+    ``time.perf_counter()`` ist dort QueryPerformanceCounter (100 ns), unter
+    Linux dieselbe Uhr wie ``monotonic``. Die Zeit bleibt im Timer — die
+    Beat-Callbacks bekommen nur den Index, keinen Zeitstempel.
+    """
+    return time.perf_counter()
+
+
 from enum import Enum
 
 
@@ -609,13 +624,13 @@ class BPMManager:
 
     def _loop(self):
         me = threading.current_thread()
-        next_tick = time.monotonic()
+        next_tick = takt_uhr()      # BPM-28: nicht monotonic (Windows-Raster)
         sub = 0   # Sub-Tick-Zaehler innerhalb eines Beats (fuer subdivision)
         # `self._timer is me` stellt sicher, dass ein evtl. verdraengter (alter)
         # Timer-Thread keinen Beat mehr feuert — nur der aktuell registrierte.
         while (self._running and self._timer is me and self._bpm > 0
                and not self._external_is_emitter()):
-            now = time.monotonic()
+            now = takt_uhr()
             subdiv = max(1, self._subdivision)
             interval = 60.0 / max(self._bpm, 1.0) / subdiv
             if now >= next_tick:
@@ -634,7 +649,7 @@ class BPMManager:
                 if now - next_tick > interval:
                     next_tick = now + interval
                     sub = 0
-            sleep = max(0.001, next_tick - time.monotonic())
+            sleep = max(0.001, next_tick - takt_uhr())
             time.sleep(min(0.05, sleep))
 
 
