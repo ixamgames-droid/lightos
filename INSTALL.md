@@ -297,6 +297,7 @@ Quellbetrieb: `python main.py --selbsttest`.
 
 ```cmd
 python -m pip install -r requirements.txt "pyinstaller>=6.10"
+python packaging\windows\build_info.py
 python -m PyInstaller --noconfirm --clean packaging\windows\LightOS.spec
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=1.0.0 packaging\windows\LightOS.iss
 ```
@@ -304,7 +305,10 @@ python -m PyInstaller --noconfirm --clean packaging\windows\LightOS.spec
 Ergebnis: `dist\LightOS\` (onedir-Build) und `dist\setup\LightOS-Setup.exe`. Was
 außer dem Code mitkommt, steht in `packaging/windows/bundle_inhalt.py` — nur
 Dateien, die Git kennt, damit keine privaten Laufzeitdaten aus `data/`/`shows/` in
-ein Setup geraten.
+ein Setup geraten. `build_info.py` schreibt vorher `build_info.json` (Commit und
+Datum des Builds) — sie kommt ins Bundle, damit ein Diagnosepaket aus dem Setup
+den Stand nennt, aus dem es gebaut ist; fehlt sie, schlägt `--selbsttest` der
+gepackten exe fehl.
 
 ## Fehler melden / Diagnosepaket
 
@@ -330,6 +334,13 @@ Texte, Pfade und Geheimnisse wie das Remote-Token nur als Platzhalter) und die
 Datei-Namen im Datenordner. **Nicht im Paket:** Show-Dateien, Datenbanken,
 Snaps, Buehnen. Dein Benutzername in Pfaden wird durch `~` bzw. `%USERNAME%`
 ersetzt.
+
+**`Windows fatal exception: code 0x8001010d` in `crash.log` ist kein Absturz.**
+Windows meldet damit intern einen abgelehnten COM-Aufruf (typisch, wenn ein
+Bildschirmleser oder ein Automatisierungs-Werkzeug mitliest); LightOS laeuft
+weiter. Das Paket kennzeichnet solche bekannten Codes in der Kopie von
+`crash.log` und in `LIESMICH.txt` mit „kein Absturz: COM-Hinweis …“. Alle
+anderen „fatal“-Eintraege bleiben unveraendert.
 
 **Wo die Logs liegen** (falls du sie lieber selbst anhaengst):
 
