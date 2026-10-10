@@ -17,9 +17,10 @@ in ``main_window.py`` stehen (dort waechst sonst alles zusammen):
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass
 
-from PySide6.QtCore import Qt, QUrl
+from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtGui import QAction, QDesktopServices, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView, QDialog, QDialogButtonBox, QHeaderView, QLabel, QLineEdit,
@@ -37,21 +38,87 @@ DOKU_URL = GITHUB_DOCS + ANLEITUNGEN
 
 # ── Doku ─────────────────────────────────────────────────────────────────────
 
+def _windows_zuordnung(endung: str) -> bool | None:
+    """Fragt Windows, ob fuer ``endung`` (``".md"``) ein Programm zugeordnet ist.
+
+    ``AssocQueryStringW`` mit ``ASSOCF_INIT_IGNOREUNKNOWN``: ohne dieses Flag
+    antwortet Windows fuer JEDE Endung mit „OpenWith.exe“ — dem Dialog „App
+    auswaehlen“. ``None``, wenn die Frage selbst nicht ging."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+        frage = ctypes.windll.shlwapi.AssocQueryStringW
+        frage.argtypes = [wintypes.DWORD, wintypes.DWORD, wintypes.LPCWSTR,
+                          wintypes.LPCWSTR, wintypes.LPWSTR,
+                          ctypes.POINTER(wintypes.DWORD)]
+        frage.restype = ctypes.c_long                       # HRESULT
+        # Programmdatei (2) — und, weil eine Zuordnung zu einer Store-App keine
+        # EXE nennen muss, ersatzweise der Anzeigename der App (4).
+        for was in (2, 4):
+            puffer = ctypes.create_unicode_buffer(1024)
+            laenge = wintypes.DWORD(1024)
+            if frage(0x400, was, endung, None, puffer, ctypes.byref(laenge)) == 0 \
+                    and puffer.value.strip():
+                return True
+        return False
+    except Exception:
+        return None
+
+
+def hat_zugeordnetes_programm(pfad: str, frage=None) -> bool:
+    """Oeffnet das Betriebssystem ``pfad`` mit einem Programm — oder mit dem
+    Dialog „Wie soll diese Datei geoeffnet werden?“ (UI-87).
+
+    Nur unter Windows eine echte Frage; ueberall sonst und im Zweifel ``True``
+    (dann bleibt es beim bisherigen Verhalten). ``frage`` ist austauschbar,
+    damit der Fall auf jedem Betriebssystem pruefbar ist."""
+    if frage is None:
+        if sys.platform != "win32":
+            return True
+        frage = _windows_zuordnung
+    endung = os.path.splitext(pfad)[1]
+    if not endung:
+        return True
+    return frage(endung) is not False
+
+
 def doku_ziel(rel: str) -> QUrl:
-    """Ziel fuer eine Doku-Datei (``rel`` relativ zu ``docs/``, mit ``/``)."""
+    """Ziel fuer eine Doku-Datei (``rel`` relativ zu ``docs/``, mit ``/``).
+
+    UI-87: die lokale Datei nur, wenn das Betriebssystem sie auch oeffnen kann.
+    Ein frisches Windows hat fuer ``.md`` kein Programm — „Erste Schritte“
+    zeigte dort im Quellbetrieb den Dialog „Oeffnen mit“ statt der Anleitung
+    (und ``openUrl`` meldete Erfolg). Dann der Link auf die Projektseite."""
     lokal = os.path.join(programm_dir(), "docs", *rel.split("/"))
-    if os.path.isfile(lokal):
+    if os.path.isfile(lokal) and hat_zugeordnetes_programm(lokal):
         return QUrl.fromLocalFile(lokal)
     return QUrl(GITHUB_DOCS + rel)
 
 
-def oeffne(url: QUrl) -> bool:
-    """Reicht ``url`` an das Betriebssystem (Browser, Dateimanager, Editor)."""
+def _jetzt_oeffnen(url: QUrl) -> None:
     try:
-        return bool(QDesktopServices.openUrl(url))
+        if not QDesktopServices.openUrl(url):
+            print(f"[hilfe] liess sich nicht oeffnen: {url.toString()}")
     except Exception as e:
         print(f"[hilfe] openUrl fehlgeschlagen ({url.toString()}): {e}")
-        return False
+
+
+def oeffne(url: QUrl) -> bool:
+    """Reicht ``url`` an das Betriebssystem (Browser, Dateimanager, Editor) —
+    nicht sofort, sondern ueber die Ereignisschleife. ``True`` = angenommen.
+
+    UI-87: ein Menue-Eintrag kann auch ueber die Bedienhilfen ausgeloest werden
+    (UI-Automation „Invoke“ — so arbeiten Screenreader und Sprachsteuerung).
+    Der Aufruf laeuft dann in einem eingabe-synchronen Fensteraufruf, und aus
+    dem laesst Windows nichts nach aussen starten: am Testrechner oeffnete
+    „Datenordner öffnen“ so KEINEN Explorer, im ``crash.log`` stand
+    ``0x8001010d``. Ein Zeitgeber mit 0 ms laesst den Aufruf erst zurueckkehren.
+    """
+    try:
+        QTimer.singleShot(0, lambda: _jetzt_oeffnen(url))
+    except Exception:
+        _jetzt_oeffnen(url)             # keine Ereignisschleife: wie bisher sofort
+    return True
 
 
 def oeffne_doku(rel: str) -> bool:

@@ -69,10 +69,17 @@ class HilfeMenueTest(unittest.TestCase):
         p1 = mock.patch.object(self.hilfe, "app_data_dir", return_value=self.daten)
         p2 = mock.patch.object(self.hilfe.QDesktopServices, "openUrl",
                                return_value=True)
+        # UI-87: ob das Betriebssystem fuer ``.md`` ein Programm kennt, haengt
+        # vom Rechner ab (ein frisches Windows: nein) — hier gilt „ja“, die
+        # Faelle ohne Zuordnung prueft test_ui87_hilfe_oeffnen.py.
+        p3 = mock.patch.object(self.hilfe, "hat_zugeordnetes_programm",
+                               return_value=True)
         p1.start()
         self.open_url = p2.start()
+        p3.start()
         self.addCleanup(p1.stop)
         self.addCleanup(p2.stop)
+        self.addCleanup(p3.stop)
 
     # ── Helfer ───────────────────────────────────────────────────────────────
 
@@ -92,6 +99,8 @@ class HilfeMenueTest(unittest.TestCase):
                   f"{[a.text() for a in self._hilfe_menue().actions()]}")
 
     def _geoeffnet(self) -> QUrl:
+        # UI-87: geoeffnet wird ueber die Ereignisschleife, nicht im Klick selbst.
+        QApplication.processEvents()
         self.assertEqual(self.open_url.call_count, 1, "openUrl genau einmal")
         return self.open_url.call_args[0][0]
 
@@ -133,6 +142,7 @@ class HilfeMenueTest(unittest.TestCase):
         with mock.patch.object(self.hilfe, "programm_dir", return_value=leer):
             self._aktion("Anleitungen öffnen").trigger()
             self._aktion("Erste Schritte").trigger()
+        QApplication.processEvents()          # UI-87: oeffnen ueber die Ereignisschleife
         urls = [c[0][0].toString() for c in self.open_url.call_args_list]
         basis = "https://github.com/ixamgames-droid/lightos/blob/main/docs/"
         self.assertEqual(urls, [
