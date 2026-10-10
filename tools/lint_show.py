@@ -7,6 +7,8 @@ Bauteil-Sätze von LightOS — macht halluzinierte Widgets/Algos/Params/Styles l
     (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 
 Exit-Code 1, sobald ein ERROR-Finding existiert (mit --strict auch bei Warnungen).
+Hinweise (``info``, z. B. widerspruechliche Snaps an einem Knopf) werden nur
+ausgegeben und zaehlen auch unter --strict nicht.
 """
 from __future__ import annotations
 
@@ -26,7 +28,7 @@ except Exception:
     _app = None
 
 from src.core.capability.validate import (  # noqa: E402
-    ERROR, WARNING, validate_lshow, format_findings)
+    ERROR, INFO, WARNING, validate_lshow, format_findings)
 from src.core.capability.dimmer_check import befunde_lshow  # noqa: E402
 
 
@@ -64,11 +66,13 @@ def main(argv: list[str]) -> int:
         findings = list(findings) + befunde_lshow(path)
         errs = [f for f in findings if f.severity == ERROR]
         warns = [f for f in findings if f.severity == WARNING]
+        infos = [f for f in findings if f.severity == INFO]
         total_err += len(errs)
         total_warn += len(warns)
         mark = "[FAIL]" if errs else ("[warn]" if warns else "[ ok ]")
         print(f"\n{mark} {os.path.basename(path)} -- "
-              f"{len(errs)} Fehler, {len(warns)} Warnungen")
+              f"{len(errs)} Fehler, {len(warns)} Warnungen"
+              + (f", {len(infos)} Hinweise" if infos else ""))
         if findings:
             print(format_findings(findings))
 

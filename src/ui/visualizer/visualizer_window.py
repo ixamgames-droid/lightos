@@ -3497,7 +3497,7 @@ class VisualizerWindow(QMainWindow):
         self._combo_quality.addItem("Maximal (starke Desktop-GPU)", "max")
         self._combo_quality.setToolTip(
             "Automatisch: beim Start wird die Grafikkarte geprüft und die Stufe\n"
-            "passend gewählt (schwache Chips wie im Surface → Niedrig).\n"
+            "passend gewählt (schwache Chips wie Intel-HD/UHD-Grafik → Niedrig).\n"
             "Manuell überschreiben, falls die Erkennung danebenliegt.\n\n"
             "Niedrig = 15 Lichtupdates/s, Pixeldichte höchstens 1,25, 4 Schatten\n"
             "(einfach), ohne Kantenglättung; beim Drehen der Kamera kurz gröber.\n"

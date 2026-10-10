@@ -285,6 +285,9 @@ class PlaybackView(QWidget):
         self._executors_widgets: list[ExecutorWidget] = []
         for i in range(1, 11):
             ex_widget = ExecutorWidget(i, self._state)
+            # UI-76: eine Hand-Zuweisung macht den Bindungs-Hinweis von GO
+            # hinfaellig („liegt jetzt auf Ex N“ stimmte danach nicht mehr).
+            ex_widget.belegung_geaendert.connect(self._belegung_von_hand)
             exec_scroll.addWidget(ex_widget)
             self._executors_widgets.append(ex_widget)
         exec_widget = QWidget()
@@ -449,9 +452,11 @@ class PlaybackView(QWidget):
         if liegt_auf_executor(self._state, stack):
             # UI-73: liegt sie auf einer ANDEREN Page, laeuft sie dort — die
             # Executor-Leiste dieser Page bleibt leer. Sagen, wo.
-            ort = executor_von(self._state, stack)
             aktuell = getattr(getattr(self._state, "playback_engine", None),
                               "current_page", None)
+            # UI-76: liegt sie AUCH auf der aktuellen Page, gibt es nichts zu
+            # melden — die aktuelle Page zuerst pruefen.
+            ort = executor_von(self._state, stack, bevorzugt_page=aktuell)
             if ort is not None and ort[0] != aktuell:
                 self._zeige_hinweis(
                     f"„{listen_name(stack)}“ liegt auf Page {ort[0] + 1}, Ex {ort[1]}",
@@ -480,6 +485,10 @@ class PlaybackView(QWidget):
         self._zeige_hinweis(f"„{listen_name(stack)}“ liegt jetzt auf Ex {slot}",
                             status=True)
         return True
+
+    def _belegung_von_hand(self):
+        """UI-76: Executor-Belegung im Auswahlfeld geaendert -> Hinweis weg."""
+        self._zeige_hinweis("")
 
     def _zeige_hinweis(self, text: str, status: bool = False):
         """UI-68: Hinweis in der Playback-Ansicht und (status=True) zusaetzlich
@@ -688,6 +697,9 @@ class PlaybackView(QWidget):
 class ExecutorWidget(QWidget):
     """Ein Executor-Slot: Fader + Label + 3 Buttons."""
 
+    #: UI-76: der Bediener hat die Cueliste im Auswahlfeld geaendert.
+    belegung_geaendert = Signal()
+
     def __init__(self, slot: int, state: AppState, parent=None):
         super().__init__(parent)
         self._slot = slot
@@ -819,6 +831,7 @@ class ExecutorWidget(QWidget):
             return
         ex.stack = self._combo.currentData()
         self._lbl.setText(self._display_name(ex))
+        self.belegung_geaendert.emit()
 
     def refresh_from_state(self):
         """Combo/Fader/Label aus dem Executor der aktuellen Page neu aufbauen

@@ -321,9 +321,10 @@ Kegel, Bodenflecken und Linsen zeigen alle Geräte auf jeder Stufe.
   **Niedrig** oder **Hoch**. **Maximal** wählt die Automatik nie — nur von Hand.
   Entschieden wird zuerst am **Namen der Grafikkarte**, den der Browser meldet:
   eine eigene Grafikkarte (GeForce, Radeon RX, Arc, Apple M …) ergibt **Hoch**,
+  ebenso die Grafik des Snapdragon X Elite (Adreno X1-85, am Gerät gemessen);
   Software-Darstellung, Handy-Grafik, Intel HD/UHD und Einstiegskarten ergeben
   **Niedrig**. Sagt der Name nichts Eindeutiges (z. B. Grafik im Prozessor,
-  Snapdragon X oder ein verborgener Name), misst die Ansicht beim Start kurz,
+  andere Snapdragon-X-Chips oder ein verborgener Name), misst die Ansicht beim Start kurz,
   wie schnell die Grafik zeichnet (**Start-Messung**), und stuft danach ein.
   Erst wenn auch das nicht geht, zählt die alte Faustregel (Anzahl der
   Textur-Einheiten). Passt die Wahl nicht, die Stufe von Hand einstellen.
