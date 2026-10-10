@@ -70,3 +70,11 @@ os.environ.setdefault(
     "LIGHTOS_SHOW_DB",
     os.path.join(tempfile.gettempdir(), f"lightos_gen_{_stem}_{os.getpid()}.db"),
 )
+# QA-83: dasselbe fuer den VC-Asset-Cache. ``import_to_cache`` (Galerie-Bilder,
+# z. B. build_mega_arena_2026.py) und das Selbstpruef-Laden der fertigen Show
+# legten die Bilder sonst in den ECHTEN Datenordner. Die Show bettet sie beim
+# Speichern ohnehin ein; die App entpackt sie beim Laden in ihren Cache.
+os.environ.setdefault(
+    "LIGHTOS_VC_ASSETS_DIR",
+    os.path.join(tempfile.gettempdir(), f"lightos_gen_{_stem}_{os.getpid()}_vc_assets"),
+)

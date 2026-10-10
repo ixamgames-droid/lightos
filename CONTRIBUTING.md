@@ -35,28 +35,39 @@ pip install -r requirements.txt
 python main.py
 ```
 
-### Optionale Dev-Tools
+### Test- und Dev-Abhängigkeiten
 
 ```powershell
-pip install pytest pytest-qt black ruff mypy
+venv\Scripts\python -m pip install -r requirements-dev.txt   # pytest, pytest-timeout, hypothesis, Pillow
+pip install black ruff mypy                                  # optional: Formatter/Linter/Typen
 ```
+
+`pytest-timeout` ist Pflicht, nicht Kür: `pytest.ini` setzt ein Zeitlimit je Test,
+damit ein hängender Test gemeldet wird, statt den ganzen Lauf zu blockieren.
 
 ---
 
 ## Tests ausführen
 
+Die Suite läuft **segmentiert** — ein pytest-Prozess je Testdatei — und **nicht**
+als ein einziges `pytest tests/`: ein Sammelprozess stirbt reproduzierbar an
+angesammeltem nativem Qt-Zustand (Begründung in `AGENTS.md`, Details in
+`WORKFLOW.md`).
+
 ```powershell
-# Alle Tests
-pytest tests/ -v
-
-# Nur Core-Engine
-pytest tests/test_core_engine.py -v
-
-# Mit Coverage
-pytest tests/ --cov=src --cov-report=term-missing
+.\tools\verify_segmented.ps1                              # Windows: alle Testdateien
+.\tools\verify_segmented.ps1 tests\test_core_engine.py    # nur diese Datei
 ```
 
-**Wichtig:** Tests laufen ohne laufende Qt-Anwendung. UI-Tests benötigen `pytest-qt` und ein Display.
+```bash
+./tools/verify_loop.sh                                    # Linux: alle Testdateien
+./tools/verify_loop.sh tests/test_core_engine.py          # nur diese Datei
+```
+
+**Headless:** die Runner setzen `QT_QPA_PLATFORM=offscreen` selbst — es öffnet sich
+kein Fenster, ein Display ist nicht nötig, `pytest-qt` wird nicht gebraucht.
+Fehlt pytest, endet jedes Segment sofort mit `No module named pytest` und das Gate
+meldet „0/… Segmente grün" — dann `requirements-dev.txt` nachinstallieren (s. o.).
 
 ### Teststruktur
 
@@ -149,7 +160,7 @@ src/
 4. PR gegen `dev` öffnen — Template ausfüllen
 5. CI muss grün sein (pytest + ruff)
 
-**Vor dem PR:** `pytest tests/ -v` und `ruff check src/` lokal ausführen.
+**Vor dem PR:** das Test-Gate (`.\tools\verify_segmented.ps1` bzw. `./tools/verify_loop.sh`) und `ruff check src/` lokal ausführen.
 
 ---
 

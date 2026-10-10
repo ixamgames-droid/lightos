@@ -740,6 +740,9 @@ class MainWindow(QMainWindow):
         # Hilfe
         hm = mb.addMenu("&Hilfe")
         hm.addAction("Über LightOS").triggered.connect(self._about)
+        # STAB-30: ein Paket fuer die Fernhilfe (Logs + Systeminfo, keine Shows).
+        hm.addAction("Diagnosepaket speichern…").triggered.connect(
+            self._diagnosepaket_speichern)
 
     # ── UI aufbauen ───────────────────────────────────────────────────────────
 
@@ -2588,6 +2591,48 @@ class MainWindow(QMainWindow):
             "UI: QLC+ v5 Design System"
         )
 
+    def _diagnosepaket_speichern(self, ziel: str | None = None):
+        """STAB-30: Hilfe → „Diagnosepaket speichern…“. Erklaert vorher, was im
+        Paket steckt (und was NICHT), fragt nach dem Ziel und schreibt das zip.
+        ``ziel`` vorgegeben = ohne Dialoge (Tests). Gibt den Pfad oder None."""
+        from src.core import diagnose_log as dl
+        from PySide6.QtWidgets import QApplication, QFileDialog
+        headless = os.environ.get("QT_QPA_PLATFORM", "").startswith("offscreen")
+        if ziel is None:
+            antwort = QMessageBox.information(
+                self, "Diagnosepaket speichern",
+                "Das Diagnosepaket hilft bei der Fehlersuche aus der Ferne. "
+                "Es enthält:\n\n" + dl.PAKET_INHALT +
+                "\n\nDie Datei anschließend per E-Mail oder Messenger an die "
+                "LightOS-Hilfe schicken.",
+                QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Ok)
+            if antwort != QMessageBox.StandardButton.Ok:
+                return None
+            ziel, _ = QFileDialog.getSaveFileName(
+                self, "Diagnosepaket speichern", dl.standard_ziel(),
+                "Zip-Archiv (*.zip)")
+            if not ziel:
+                return None
+            if not ziel.lower().endswith(".zip"):
+                ziel += ".zip"
+        try:
+            dl.melde_laufzeit_umgebung()
+            pfad = dl.erstelle_diagnosepaket(
+                ziel, QApplication.applicationVersion() or "?")
+        except Exception as e:
+            print(f"[MainWindow] ERROR: Diagnosepaket nicht geschrieben: {e}")
+            if not headless:
+                QMessageBox.warning(self, "Diagnosepaket",
+                                    f"Das Diagnosepaket konnte nicht geschrieben "
+                                    f"werden:\n\n{e}")
+            return None
+        print(f"[MainWindow] Diagnosepaket geschrieben: {pfad}")
+        if not headless:
+            QMessageBox.information(self, "Diagnosepaket",
+                                    f"Gespeichert unter:\n\n{pfad}")
+        return pfad
+
     # ── State-Events ─────────────────────────────────────────────────────────
 
     def _run_in_ui(self, fn):
@@ -2968,7 +3013,8 @@ class MainWindow(QMainWindow):
     def _has_unsaved_changes(self) -> bool:
         """Gibt es Arbeit, die beim Beenden/Wechseln verloren ginge?
 
-        * Nie gespeicherte Show: sobald es Inhalt gibt (Heuristik wie bisher).
+        * Nie gespeicherte Show: sobald es Show-Inhalt gibt (UI-75,
+          ``_neue_show_hat_inhalt``).
         * Aus Datei geladene/gespeicherte Show (UI-69): wenn sich der Inhalt
           seit dem letzten Laden/Speichern geaendert hat. Frueher stand hier
           fest ``False`` — Aenderungen landeten nur im Auto-Save, Beenden schloss
@@ -2982,12 +3028,7 @@ class MainWindow(QMainWindow):
                 return True
             # Nie gespeichert + es gibt Inhalt?
             if self._current_show_path is None:
-                has_content = (
-                    len(self._state.cue_stacks) > 0
-                    or len(self._state.function_manager.all()) > 0
-                    or bool(self._state.programmer)
-                )
-                return has_content
+                return self._neue_show_hat_inhalt()
             from src.core.show.show_file import show_hat_aenderungen
             views: dict = {}
             self._views_in_state(nur_vergleich=views)
@@ -2995,6 +3036,28 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"[main_window] unsaved check error: {e}")
             return False
+
+    def _neue_show_hat_inhalt(self) -> bool:
+        """UI-75: Hat eine nie gespeicherte Show Inhalt, der beim Beenden
+        verloren ginge?
+
+        Frueher zaehlten nur Cuelisten, Funktionen und Programmer-Werte: eine
+        Show mit nur Patch oder nur VC-Layout schloss ohne Rueckfrage, eine mit
+        nur Programmer-Werten fragte. Die Anleitung (Erste Schritte) verspricht
+        das Umgekehrte — es zaehlt Show-Inhalt (Patch, Gruppen, Cuelisten,
+        Funktionen, VC-Layout), nicht die Bedienung. Programmer-Werte sind
+        Bedienung, wie bei einer geladenen Show (``show_hat_aenderungen``)."""
+        st = self._state
+        if (st.get_patched_fixtures() or len(st.cue_stacks) > 0
+                or len(st.function_manager.all()) > 0):
+            return True
+        try:
+            if (self._vc_view.to_dict() or {}).get("widgets"):
+                return True
+        except Exception as e:
+            print(f"[main_window] vc content check error: {e}")
+        from src.core.show.show_file import _collect_fixture_groups
+        return bool(_collect_fixture_groups(st, []))
 
     def _rueckfrage_ungespeichert(self, titel: str, frage: str) -> bool:
         """UI-69: Speichern / Verwerfen / Abbrechen. True = weitermachen
