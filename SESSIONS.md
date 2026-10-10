@@ -62,7 +62,7 @@
 | UI-78 | D | - | 2026-10-10T18:00Z | - |
 | UI-80 | D | - | 2026-10-10T18:00Z | - |
 | TOOL-18 | D | - | 2026-10-10T18:00Z | - |
-| TOOL-19 | D | - | 2026-10-10T18:00Z | - |
+| TOOL-19 | D | fix/tool19-werkzeuge-ohne-echten-ausgang | 2026-10-10T18:03Z | - |
 
 ## Blocker & Fallen
 
@@ -187,7 +187,6 @@
 
 ## Verlauf
 
-- 2026-10-10T13:01Z B aktualisiert TOOL-26: Dateien - -> tools/app_messung.py · tools/README.md · tests/test_tool26_app_messung.py · BACKLOG.md · changelog.d/2026-10-10-TOOL-26.md
 - 2026-10-10T13:08Z A claim LAS-31
 - 2026-10-10T13:08Z A claim LAS-32
 - 2026-10-10T13:08Z A claim DEMO-8
@@ -217,3 +216,4 @@
 - 2026-10-10T18:00Z D claim UI-80
 - 2026-10-10T18:00Z D claim TOOL-18
 - 2026-10-10T18:00Z D claim TOOL-19
+- 2026-10-10T18:03Z D aktualisiert TOOL-19: Branch - -> fix/tool19-werkzeuge-ohne-echten-ausgang
