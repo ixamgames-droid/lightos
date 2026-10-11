@@ -52,6 +52,10 @@ class PortnamenTests(unittest.TestCase):
     def setUp(self):
         self._alt = mm.get_midi_manager
         self._index = mgr._INDEX_BACKEND
+        # Ausgangslage fest: unter Windows mit rtmidi ist der Schalter schon beim
+        # Import an — die Faelle unten schalten ihn ausdruecklich ein, wo sie ihn
+        # brauchen (Befund vom Windows-Testrechner, CDX-58).
+        mgr._INDEX_BACKEND = False
 
     def tearDown(self):
         mm.get_midi_manager = self._alt
