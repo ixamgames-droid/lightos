@@ -2,7 +2,7 @@
 from __future__ import annotations
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QScrollArea, QPushButton,
-    QLabel, QSizePolicy, QSplitter,
+    QLabel, QSizePolicy, QSplitter, QMessageBox,
 )
 from PySide6.QtCore import Qt, QPoint, QSize, QTimer
 
@@ -364,6 +364,25 @@ class VirtualConsoleView(QWidget):
         btn_clear.setVisible(False)
         tb_layout.addWidget(btn_clear)
 
+        # WEB-09: vorlaeufiger Einstieg in die Handy-Konsole, bis die
+        # Seitenleiste des Editors (WEB-10) das Anordnen von Hand erlaubt.
+        self._btn_handy_fuellen = QPushButton("📱 Handy füllen")
+        self._btn_handy_fuellen.setFixedHeight(26)
+        self._btn_handy_fuellen.setToolTip(
+            "Handy-Konsole automatisch füllen: legt alle fernbedienbaren Elemente "
+            "(Tasten, Fader, Cuelisten) auf die Handy-Seiten.\n"
+            "Nur was dort liegt, lässt sich vom Handy aus bedienen "
+            "(Ausgabe → Web-Remote: Verbindung & Token → „Handy-Konsole“).")
+        self._btn_handy_fuellen.setStyleSheet("""
+            QPushButton { background:#21262d; color:#7ee787; border:1px solid #30363d;
+                          border-radius:3px; font-size:10px; padding:0 8px; }
+            QPushButton:hover { background:#30363d; }
+        """)
+        self._btn_handy_fuellen.clicked.connect(self._handy_konsole_fuellen)
+        self._btn_handy_fuellen.setProperty("edit_only", True)
+        self._btn_handy_fuellen.setVisible(False)
+        tb_layout.addWidget(self._btn_handy_fuellen)
+
         btn_save = QPushButton("Canvas exportieren…")
         btn_save.setFixedHeight(26)
         btn_save.setToolTip("Nur dieses VC-Layout als separate JSON-Datei exportieren "
@@ -452,6 +471,21 @@ class VirtualConsoleView(QWidget):
         self._canvas.widget_selected.connect(self._on_canvas_widget_selected)
         self._on_bank_changed(self._canvas.active_bank)
         self._main_scroll.setWidget(self._canvas)
+        # WEB-08: die Konsole fuer die Fernausloesung anmelden. Die Bruecke
+        # haengt als Kind am Canvas (stirbt mit ihm) und reicht Aufrufe des
+        # Web-Threads in den UI-Thread. Ob sie etwas ausfuehren darf,
+        # entscheidet die Einstellung in ``src.web.vc_remote`` — Standard AUS.
+        self._fernbedienung = None
+        try:
+            from src.ui.virtualconsole.vc_fernbedienung import VCFernbedienung
+            from src.web import vc_remote
+            self._fernbedienung = VCFernbedienung(self._canvas)
+            # Kein ``destroyed``-Lambda zum Abmelden (STAB-09: so eine Connection
+            # pinnt ihre Fangvariablen GC-unsichtbar). Eine Bruecke, deren
+            # Konsole abgebaut ist, antwortet von selbst mit „keine Konsole".
+            vc_remote.registriere(self._fernbedienung)
+        except Exception as e:
+            print(f"[virtual_console_view] ERROR: Fernbedienung nicht angemeldet: {e}")
         splitter.addWidget(self._main_scroll)
 
         # Inspector-Panel (Eigenschaften des gewaehlten Widgets, nur im Edit-Modus).
@@ -850,6 +884,39 @@ class VirtualConsoleView(QWidget):
     def _clear_all(self):
         if self._edit_mode:
             self._canvas._clear()
+
+    def _handy_konsole_fuellen(self):
+        """WEB-09: „Handy-Konsole automatisch füllen" — ersetzt die bisherigen
+        Handy-Seiten (nach Rueckfrage, wenn es schon welche gibt). Ein
+        Rueckgaengig-Schritt der Konsole."""
+        if not self._canvas_alive():
+            return
+        try:
+            vorhanden = bool(self._canvas.handy_seiten()["seiten"])
+            if vorhanden and QMessageBox.question(
+                    self, "Handy-Konsole automatisch füllen",
+                    "Die bisherigen Handy-Seiten werden durch eine neue, "
+                    "automatische Anordnung ersetzt.\n\nFortfahren? "
+                    "(Rückgängig mit Strg+Z)",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
+                return
+            anzahl, seiten = self._canvas.handy_konsole_automatisch_fuellen()
+        except Exception as e:
+            print(f"[virtual_console_view] ERROR: Handy-Konsole füllen: {e}")
+            QMessageBox.warning(self, "Handy-Konsole", str(e))
+            return
+        if anzahl == 0:
+            QMessageBox.information(
+                self, "Handy-Konsole",
+                "Keine fernbedienbaren Elemente gefunden.\n"
+                "Fernbedienbar sind Tasten, Fader und Cuelisten.")
+            return
+        QMessageBox.information(
+            self, "Handy-Konsole",
+            f"{anzahl} Element(e) auf {seiten} Handy-Seite(n) gelegt.\n\n"
+            "Einschalten: Ausgabe → Web-Remote: Verbindung & Token → "
+            "„Handy-Konsole“. Dort steht auch der Link fürs Handy.")
 
     def _save(self):
         self._canvas._save()

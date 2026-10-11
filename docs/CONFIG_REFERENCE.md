@@ -128,6 +128,7 @@ löscht, erscheint dem Netz als ein anderes Gerät.
 |---|---|---|---|
 | `app_data_dir()/sacn_cid` | sACN-CID (E1.31 Component Identifier) als UUID-Text — dieselbe für **alle** sACN-Universen dieser Installation. | `src/core/dmx/sacn_source.py` (lazy beim ersten `SACNSender`) | Empfänger, die Quellen über die CID verfolgen, sehen eine neue, unbekannte Konsole; die alte bleibt als Karteileiche in ihren Listen. |
 | `ui_prefs.json` → `remote.token` | Web-Remote-Auth-Token. | `src/web/remote_settings.py:106` | Gekoppelte Handys/Browser müssen den Link neu scannen. |
+| `ui_prefs.json` → `remote.vc_remote_enabled` | Schalter „Handy-Konsole“ im Web-Remote-Dialog (WEB-09). Standard `false`. | `src/web/remote_settings.py` (`set_vc_remote_enabled`) | Die Handy-Konsole ist wieder aus; die Handy-Seiten selbst liegen in der Show und bleiben erhalten. |
 
 ---
 

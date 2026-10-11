@@ -1281,7 +1281,15 @@ def _vc_ohne_live_werte(knoten):
     if isinstance(knoten, list):
         return [_vc_ohne_live_werte(k) for k in knoten]
     if isinstance(knoten, dict):
-        felder = _LIVE_FELDER_VC.get(knoten.get("type"), ())
+        typ = knoten.get("type")
+        felder = _LIVE_FELDER_VC.get(typ, ())
+        # WEB-08: die Kennung eines VC-Widgets ist keine Aenderung am Inhalt.
+        # Eine Show von vor WEB-08 bekommt beim Laden Kennungen — zaehlten sie
+        # mit, gaelte jede alte Show sofort als "ungespeichert geaendert".
+        # Nur am Widget selbst (Typ "VC…"): ein gleichnamiges Feld tiefer in
+        # den Widget-Daten ist Inhalt.
+        if isinstance(typ, str) and typ.startswith("VC"):
+            felder = tuple(felder) + ("id",)
         return {k: _vc_ohne_live_werte(v) for k, v in knoten.items() if k not in felder}
     return knoten
 

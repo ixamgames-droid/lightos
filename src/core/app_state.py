@@ -269,6 +269,32 @@ _BLACKOUT_ERHALTEN_ATTRS = frozenset({
 # tests/test_laser_dmx_estop.py::test_intensity_on_laser_keeps_latch.
 _LASER_REARM_ATTRS = frozenset({"shutter", "laser_bank", "gobo_wheel", "macro"})
 
+# WEB-08: Der Laser-NOT-AUS ist aus der Ferne nur AUSLOESBAR, nie aufhebbar.
+# ``set_programmer_value`` loest den Latch, sobald jemand bewusst einen
+# ausgaberelevanten Laser-Wert setzt (s. o.). Am Pult ist das gewollt. Kommt der
+# Wert aber ueber die Fernausloesung (ein VC-Fader auf ``shutter``, eine
+# Snap-/Snapshot-Taste mit Laser-Werten), haette das Handy den NOT-AUS geloest,
+# ohne dass jemand den Raum sieht. Innerhalb von ``laser_notaus_nicht_loesbar()``
+# wird der Wert deshalb geschrieben, der Latch aber bleibt stehen. Je Thread
+# gezaehlt: ein gleichzeitiger Griff am Pult (anderer Thread) ist nicht betroffen.
+_notaus_sperre = threading.local()
+
+
+@contextlib.contextmanager
+def laser_notaus_nicht_loesbar():
+    """Kontext: in diesem Thread loest ``set_programmer_value`` den
+    Laser-NOT-AUS nicht. Verschachtelbar."""
+    _notaus_sperre.tiefe = getattr(_notaus_sperre, "tiefe", 0) + 1
+    try:
+        yield
+    finally:
+        _notaus_sperre.tiefe = max(0, getattr(_notaus_sperre, "tiefe", 1) - 1)
+
+
+def laser_notaus_loesen_gesperrt() -> bool:
+    """True, solange dieser Thread in ``laser_notaus_nicht_loesbar()`` steht."""
+    return getattr(_notaus_sperre, "tiefe", 0) > 0
+
 # LAS-04: Netzwerk-Protokolle ohne DMX-Adressraum (PatchedFixture.protocol).
 LASER_NETWORK_PROTOCOLS = ("etherdream", "idn")
 
@@ -2682,6 +2708,7 @@ class AppState:
         # "attr#N" (Kopf>0) direkt als attribute durch -> vor dem Whitelist-Check das
         # "#N"-Suffix abspalten, sonst entriegelt ein Kopf>0-Gate den Not-Aus nicht.
         if (getattr(self, "laser_estop_active", False)
+                and not laser_notaus_loesen_gesperrt()      # WEB-08: nie aus der Ferne
                 and str(attribute).split("#", 1)[0] in _LASER_REARM_ATTRS
                 and int(fid) in getattr(self, "_laser_fids", frozenset())):
             # A3D-01: Flag-Wechsel und Mask-Push atomar koppeln (siehe _get_estop_lock).
