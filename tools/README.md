@@ -21,6 +21,7 @@
 | `anleitungsbilder.py` | DOC-16: Anleitungsbilder reproduzierbar aus dem Code erzeugen. |
 | `app.ps1` | LightOS App-Treiber — App starten/stoppen/warten/screenshotten aus EINEM Skript. |
 | `app.sh` | tools/app.sh — Linux-Pendant zu tools/app.ps1 (App-Steuerung fuer UI-Verifikation). |
+| `app_messung.py` | TOOL-26: Die ECHTE App in einer Sandbox messen — 3D-fps, Push-Takt, Blackout, Buehnen-Elemente. |
 | `audit_bilder_stand.py` | Welche Punkte eines Bilder-Audits sind noch offen? |
 | `audit_tooltip_coverage.py` | QA-13 Tooltip-/Label-Coverage-Audit fuer interaktive Steuerelemente. |
 | `backlog_compact.py` | Backlog-Verdichter + Queue-View fuer BACKLOG.md (Loop-Werkzeug). |
@@ -71,6 +72,7 @@
 | `crop_vc_widgets.py` | Cropper fuer die VC-Widget-Doku: schneidet aus EINEM Vollbild-Screenshot |
 | `fixture_herkunft.py` | QA-72 — was weiss die Bibliothek ueber die HERKUNFT ihrer Profile? |
 | `gallery_server.py` | DOC-11 Galerie-Render-Server (Dev-/Doku-Werkzeug). |
+| `geaenderte_dateien_klasse.py` | PROC-19 — aendert ein Zweig NUR Doku-/Verwaltungsdateien? Gibt ``doku`` oder ``voll`` aus. |
 | `gen_capabilities.py` | Erzeugt den Agenten-Vertrag aus dem Code: docs/CAPABILITIES.md + |
 | `gen_tools_index.py` | Generiert tools/README.md — Index aller Werkzeuge mit Zweck-Zeile. |
 | `gen_vc_gallery.py` | Erzeugt die eingebaute VC-Button-Grafik-Galerie (Bilder + animierte GIFs mit |
