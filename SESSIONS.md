@@ -67,6 +67,7 @@
 | MIDI-10 | D | - | 2026-10-11T13:58Z | - |
 | MIDI-15 | D | - | 2026-10-11T13:58Z | - |
 | ENG-30 | D | - | 2026-10-11T13:58Z | - |
+| XPLAT-36 | D | - | 2026-10-11T13:58Z | - |
 
 ## Blocker & Fallen
 
@@ -215,7 +216,6 @@
 
 ## Verlauf
 
-- 2026-10-10T22:49Z D done QA-91
 - 2026-10-10T22:54Z D claim QA-91
 - 2026-10-10T22:54Z D claim DOC-70
 - 2026-10-10T22:54Z D claim TOOL-21
@@ -245,3 +245,4 @@
 - 2026-10-11T13:58Z D claim MIDI-10
 - 2026-10-11T13:58Z D claim MIDI-15
 - 2026-10-11T13:58Z D claim ENG-30
+- 2026-10-11T13:58Z D claim XPLAT-36
