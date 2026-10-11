@@ -28,7 +28,6 @@
 | NET-14 | A | feature/midi5-msc | 2026-10-09T16:27Z | src/core/midi |
 | MIDI-16 | A | feature/midi5-msc | 2026-10-09T16:27Z | src/core/midi |
 | MIDI-4 | A | fix/midi3-mapping-robust | 2026-10-09T16:27Z | src/core/midi/midi_mapper.py |
-| XPLAT-49 | A | fix/xplat49-uninstall-datenschutz | 2026-10-10T18:44Z | uninstall.py |
 | XPLAT-50 | A | fix/xplat49-uninstall-datenschutz | 2026-10-10T09:29Z | start.bat · start.ps1 |
 | STAB-32 | A | feature/stab32-versionierte-sicherungen | 2026-10-10T18:44Z | - |
 | OUT-67 | A | feature/out67-ausgabe-ausfall-banner | 2026-10-10T09:29Z | - |
@@ -213,7 +212,6 @@
 
 ## Verlauf
 
-- 2026-10-10T21:17Z A claim QA-95
 - 2026-10-10T21:41Z D done DOC-70
 - 2026-10-10T22:00Z D done TOOL-21
 - 2026-10-10T22:23Z A done LAS-31
@@ -243,3 +241,4 @@
 - 2026-10-11T13:25Z A done FM-73
 - 2026-10-11T13:51Z A aktualisiert LAS-33: Branch - -> feature/las33-laser-profilangaben-generator
 - 2026-10-11T13:51Z A aktualisiert LAS-34: Branch - -> feature/las34-laser-tab
+- 2026-10-11T13:57Z A done XPLAT-49
