@@ -69,7 +69,7 @@ console.log(JSON.stringify(ergebnis));
         with open(os.path.join(verz, "treiber.mjs"), "w", encoding="utf-8") as fh:
             fh.write(treiber.replace("AUFRUFE", json.dumps(aufrufe)))
         p = subprocess.run(["node", os.path.join(verz, "treiber.mjs")],
-                           capture_output=True, text=True, timeout=60)
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
         if p.returncode != 0:               # pragma: no cover
             raise AssertionError(p.stderr)
         return json.loads(p.stdout.strip())

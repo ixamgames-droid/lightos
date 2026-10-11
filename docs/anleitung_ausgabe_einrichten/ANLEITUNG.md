@@ -223,6 +223,14 @@ der Ausgang genommen, während dort Geräte gepatcht sind:
 
 Ein Klick auf die Enttec-Anzeige öffnet direkt den Dialog aus Schritt 1.
 
+**Banner oben im Fenster.** Fällt ein eingerichteter Ausgang aus (ENTTEC abgezogen,
+Netzwerk weg), erscheint zusätzlich oben im Hauptfenster ein roter Balken
+`Ausgabe gestört: U<n> <Weg> — <Grund>` — auch im Kiosk-Modus, in dem die Statusleiste
+ausgeblendet ist. Er verschwindet von selbst, sobald der Ausgang einige Sekunden wieder
+sendet; ein Klick öffnet den Dialog aus Schritt 1 (nicht im Kiosk-Modus). Ist **gar kein**
+Ausgang eingerichtet, steht dort dezent `Probenmodus — es wird kein DMX gesendet`; ein
+Klick blendet diesen Hinweis bis zum nächsten Programmstart aus.
+
 ## Netzwerk-Falle bei Art-Net und sACN
 
 Der Rechner muss **im selben Netz** wie der Node liegen. Hat der Node `192.168.1.50`,
