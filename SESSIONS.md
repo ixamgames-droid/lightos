@@ -44,7 +44,7 @@
 | TOOL-18 | D | fix/tool18-bilder-hinweis-gpu-szenen | 2026-10-10T22:54Z | - |
 | TOOL-19 | D | fix/tool19-werkzeuge-ohne-echten-ausgang | 2026-10-10T22:54Z | - |
 | CDX-58 | A | fix/cdx-1010-main | 2026-10-10T19:30Z | - |
-| VIZ-102 | A | feature/viz102-gobo-hallenboden | 2026-10-10T19:43Z | - |
+| VIZ-102 | A | feature/viz102-gobo-hallenboden | 2026-10-11T16:09Z | - |
 | UI-87 | D | fix/ui87-hilfe-oeffnen-windows | 2026-10-10T22:54Z | - |
 | QA-93 | D | fix/qa93-gate-ohne-echtes-fenster | 2026-10-10T22:54Z | - |
 | QA-94 | A | fix/cdx-1010-main | 2026-10-10T21:17Z | - |
