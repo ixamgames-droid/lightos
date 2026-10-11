@@ -923,8 +923,11 @@ class AppState:
 
     # FM-38: Felder EINER Fixture-Gruppe, die ein Undo feldweise zurueckholt —
     # EINE Liste fuer Schnappschuss UND Wiederherstellung (zwei driften).
-    # Die id gehoert bewusst NICHT dazu: keine Bindung haengt an ihr (VC/Matrix/
-    # EFX binden ueber den NAMEN, die .lshow speichert sie gar nicht).
+    # Die id gehoert NICHT in diese Liste (sie ist kein Feld, das man einer neuen
+    # Zeile einfach mitgibt — die Nummer kann inzwischen belegt sein). Seit
+    # VCB-36 haengt aber eine Bindung an ihr (Blackout-Ziel einer VC-Taste):
+    # der Schnappschuss merkt sie unter ``id`` und das Undo gibt sie zurueck,
+    # wenn sie frei ist (``_restore_fixture_with_groups``).
     _GROUP_SNAP_FIELDS = ("name", "cols", "rows", "positions_json", "folder")
 
     @staticmethod
@@ -954,7 +957,9 @@ class AppState:
 
     @classmethod
     def _group_to_dict(cls, g) -> dict:
-        return {k: getattr(g, k) for k in cls._GROUP_SNAP_FIELDS}
+        d = {k: getattr(g, k) for k in cls._GROUP_SNAP_FIELDS}
+        d["id"] = getattr(g, "id", None)        # VCB-36, s. _GROUP_SNAP_FIELDS
+        return d
 
     @staticmethod
     def _zellen_umschreiben(positions_json: str, alt_fid: int, neu_fid: int) -> str:
@@ -998,6 +1003,7 @@ class AppState:
         gescheitert: list[str] = []
         with self._session() as s:
             eingefuegt: list = []
+            alte_ids: dict = {}
             for gd in gruppen:
                 try:
                     with s.begin_nested():
@@ -1007,6 +1013,7 @@ class AppState:
                         g_neu = _FG(**felder)
                         s.add(g_neu)
                     eingefuegt.append(g_neu)
+                    alte_ids[g_neu] = gd.get("id")
                 except Exception as e:
                     gescheitert.append(f"{gd.get('name', '?')} ({e})")
             if eingefuegt:
@@ -1024,6 +1031,22 @@ class AppState:
                                 s.delete(g)
                 except Exception as e:
                     gescheitert.append(f"Werks-Gruppe nicht entfernt ({e})")
+                # VCB-36: die alte ID zurueckgeben — eine VC-Taste meint ihr
+                # Blackout-Ziel ueber sie und schaltete nach Ctrl+Z sonst nichts
+                # mehr. ERST JETZT: die Werks-Gruppe von add_fixture sass oft
+                # genau auf dieser Nummer. Ist sie anderweitig belegt, behaelt
+                # die Gruppe ihre neue (lieber kein Ziel als ein fremdes).
+                for g_neu in eingefuegt:
+                    alt_id = alte_ids.get(g_neu)
+                    try:
+                        with s.begin_nested():
+                            s.flush()
+                            if (isinstance(alt_id, int) and alt_id != g_neu.id
+                                    and s.get(_FG, alt_id) is None):
+                                g_neu.id = alt_id
+                                s.flush()
+                    except Exception as e:
+                        debug_swallow("app_state._restore_fixture_with_groups.id", e)
             try:
                 s.commit()
             except Exception as e:
@@ -5140,14 +5163,33 @@ class AppState:
         Das ZIEL (nicht die aufgeloesten Adressen) wird gemerkt: Gruppen loesen
         sich bei jeder Gruppen- oder Patch-Aenderung neu auf
         (``_refresh_target_blackouts``), eine spaeter geaenderte Gruppe wirkt also
-        auch auf eine schon gedrueckte Taste."""
+        auch auf eine schon gedrueckte Taste.
+
+        VCB-36: ein Eintrag in ``groups`` ist ein Name (alte Layouts) ODER ein
+        ``(gid, name)``-Ref — der meint genau EINE Gruppe, auch wenn zwei gleich
+        heissen (``_group_positions`` loest einen Ref ueber die ID auf)."""
         spec = (tuple(int(f) for f in (fids or ()) if f is not None),
-                tuple(str(g) for g in (groups or ()) if g))
+                tuple(z for z in (self._blackout_gruppen_ziel(g)
+                                  for g in (groups or ())) if z is not None))
         specs = getattr(self, "_ziel_blackout_specs", None)
         if specs is None:
             specs = self._ziel_blackout_specs = {}
         specs[slot] = spec
         self._push_target_blackout(slot, spec)
+
+    @staticmethod
+    def _blackout_gruppen_ziel(g):
+        """VCB-36: ein Gruppen-Ziel in die Form bringen, die
+        ``group_cells_by_name`` versteht — ``(gid, name)`` oder Name; ``None``
+        fuer Leeres und Unlesbares (kein Ziel ist NICHT „alle Gruppen“)."""
+        if isinstance(g, (tuple, list)):
+            try:
+                return (int(g[0]), str(g[1] if len(g) > 1 else ""))
+            except (TypeError, ValueError, IndexError):
+                return None
+        if isinstance(g, int) and not isinstance(g, bool):
+            return (g, "")
+        return str(g) if g else None
 
     def clear_target_blackout(self, slot):
         """VCB-11: Gezielten Blackout eines Slots freigeben (no-op wenn keiner)."""

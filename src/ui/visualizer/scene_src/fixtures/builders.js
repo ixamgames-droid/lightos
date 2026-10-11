@@ -15,6 +15,7 @@ import { syncPoolSize } from './floor_pool.js';               // VIZ-15
 import { beamsOff } from '../state.js';                       // VIZ-15
 import { applyGobo, alignGoboFloor, goboWinkel, GOBO_LICHT, GOBO_STRAHL, GOBO_FLECK } from './gobo_textures.js';   // VIZ-GOBO-3D, VIZ-83
 import { glattKanal, glattZiel, glattWert, glattDeckel } from './bewegung_glatt.js';   // VIZ-92
+import { goboProjektionAktiv, goboFlachDeckkraft, goboSchmal } from '../scene/gobo_projektion.js';      // VIZ-96
 import { requestRender } from '../scene/render_loop.js';                 // VIZ-92
 import { buildLaserRig, applyLaser, noteLaserAnimation, LASER_BEAM_OPACITY } from './laser.js';   // VIZ-79
 import { stageObjects } from '../state.js';                   // VIZ-BEAM-OCCLUSION
@@ -63,17 +64,57 @@ function koerperTreffer(f, origin, dir) {
     f._koerperSchluessel = 0;
     return null;
   }
+  // VIZ-96 B3: mit Gobo zaehlen schmale Koerper nicht als Auftreffflaeche
+  // (s. _goboSchmalMass) — das Mass gehoert in den Schluessel, damit Gobo
+  // an/aus und Zoom das Ergebnis erneuern.
+  const schmal = _goboSchmalMass(f);
   const schluessel = origin.x + origin.y * 2 + origin.z * 3
-    + dir.x * 5 + dir.y * 7 + dir.z * 11 + signatur * 19 + anzahl * 23;
+    + dir.x * 5 + dir.y * 7 + dir.z * 11 + signatur * 19 + anzahl * 23 + schmal * 29;
   if (f._koerperSchluessel === schluessel) return f._koerperTreffer;
 
-  const treffer = _koerperTrefferRechnen(origin, dir);
+  const treffer = _koerperTrefferRechnen(origin, dir, schmal);
   f._koerperSchluessel = schluessel;
   f._koerperTreffer = treffer;
   return treffer;
 }
 
-function _koerperTrefferRechnen(origin, dir) {
+// VIZ-96 B3: Durchmesser (m) des Gobo-Musters am Kegelende, 0 = kein Gobo
+// bzw. keine Projektion (Stufe Niedrig: Treffersuche wie bisher).
+//
+// Die Treffersuche verfolgt nur den ZENTRALSTRAHL. Traf er eine Traverse,
+// legte sie die ganze flache Musterscheibe (mehrere Meter) auf deren
+// 0,3 m breite Oberseite — das Muster schwebte in der Luft — und liess den
+// Kegel dort enden, obwohl fast das ganze Licht an der Traverse vorbeigeht.
+// Mit Gobo rechnet die Suche deshalb durch Koerper hindurch, die schmaler
+// sind als das Muster (gobo_projektion.js#goboSchmal), bis zur Flaeche
+// dahinter: Boden, Buehnenplatte oder Wand. Das gilt fuer JEDES Gobo-Geraet,
+// ob es gerade projiziert oder das flache Muster zeigt — Kegel und Muster
+// springen damit nicht, wenn das Pool-Licht wechselt. Die Projektion selbst
+// legt ihr Motiv weiter auf die Traverse und den Schatten dahinter.
+function _goboSchmalMass(f) {
+  if (!f.goboAktiv || !goboProjektionAktiv()) return 0;
+  const beam = f.beam;
+  const p = beam && beam.geometry && beam.geometry.parameters;
+  if (!p || !(p.radius > 0)) return 0;
+  const d = 2 * p.radius * (beam.scale.x || 1);
+  return (d > 0 && isFinite(d)) ? d : 0;
+}
+
+const _normale = new THREE.Vector3();
+
+// Masse des Buehnenobjekts, zu dem ein getroffenes Mesh gehoert (oder null).
+function _koerperGroesse(obj) {
+  for (let o = obj; o; o = o.parent) {
+    const id = o.userData && o.userData.stageId;
+    if (id && stageObjects[id]) {
+      const d = stageObjects[id].data;
+      return (d && d.size) || null;
+    }
+  }
+  return null;
+}
+
+function _koerperTrefferRechnen(origin, dir, schmal = 0) {
   const meshes = [];
   for (const id in stageObjects) {
     const m = stageObjects[id] && stageObjects[id].mesh;
@@ -92,8 +133,19 @@ function _koerperTrefferRechnen(origin, dir) {
   _strahl.near = 0.05;                       // nicht das eigene Gehaeuse treffen
   _strahl.far = 100;
   const hits = _strahl.intersectObjects(meshes, true);
-  if (!hits.length) return null;
-  return { abstand: hits[0].distance, y: hits[0].point.y };
+  for (const h of hits) {
+    if (schmal > 0 && goboSchmal(_koerperGroesse(h.object), schmal)) continue;
+    // `oben`: der Strahl trifft eine Oberseite (Podest, Buehnenplatte) — nur
+    // dann ist die Trefferhoehe eine Flaeche, an der die Projektion enden
+    // kann (applyFloorAim -> f._goboGrenzY).
+    let oben = false;
+    if (h.face && h.object) {
+      _normale.copy(h.face.normal).transformDirection(h.object.matrixWorld);
+      oben = _normale.y > 0.7;
+    }
+    return { abstand: h.distance, y: h.point.y, oben };
+  }
+  return null;
 }
 
 // LowRes-Anschluss (VIZ-15/VIZ-LOWSPEC): Auf Low-Tier-GPUs halbieren die
@@ -1675,7 +1727,12 @@ function applyGenericColor(f, dmx) {
     // — ein konstanter Anteil statt sekundenlanger Ruckler.
     // A3D-25/A3D-28 gilt weiter: gemessen wird an der EFFEKTIVEN Leuchtdichte,
     // offener Dimmer + Farbe schwarz ist dunkel.
-    f.spot.intensity = lum > 0.01 ? intNorm * 3.0 * (gobo ? GOBO_LICHT : 1) : 0;
+    // VIZ-96: mit Gobo-Projektion (Stufen Hoch/Maximal) behaelt das Geraet
+    // seine volle Lichtstaerke und bewirbt sich damit um ein Pool-Licht — das
+    // Pool-Licht traegt dann das Muster als Maske (scene/spot_pool.js). Ohne
+    // Projektion (Niedrig) bleibt es bei GOBO_LICHT = 0 wie seit VIZ-92.
+    const goboLicht = gobo ? (goboProjektionAktiv() ? 1 : GOBO_LICHT) : 1;
+    f.spot.intensity = lum > 0.01 ? intNorm * 3.0 * goboLicht : 0;
   }
   if (f.floorSpot) {
     f.floorSpot.material.color = color;
@@ -1706,6 +1763,16 @@ function applyGenericColor(f, dmx) {
   }
   // Top-down icon color reflects active output color (only when bright)
   tintTopDownIcon(f.icon, color, intNorm);
+  // VIZ-96 B3: flaches Rueckfall-Muster an die Projektion angleichen
+  // (Helligkeit) und waehrend einer Blende anteilig zeigen. Die Deckkraft
+  // oben bleibt die Basis; den Anteil fuehrt scene/spot_pool.js je Bild nach.
+  // Ohne Projektion (Stufe Niedrig) bleibt alles wie vor VIZ-96.
+  if (f.floorSpot && gobo && goboProjektionAktiv()) {
+    f._fleckBasis = f.floorSpot.material.opacity;
+    f.floorSpot.material.opacity = goboFlachDeckkraft(f._fleckBasis, f._goboFlach);
+  } else if (f._fleckBasis !== undefined) {
+    f._fleckBasis = undefined;
+  }
 }
 
 // EINE Stelle beantwortet „richtet dieses Modell seinen KOPF ueber Pan/Tilt
@@ -1902,6 +1969,14 @@ function applyFloorAim(f, dmx) {
   // FESTEN Radius — ein Scheinwerfer 10 m ueber der Buehne warf denselben Fleck
   // wie einer 2 m darueber, und ein Zoom-Zug aenderte gar nichts.
   syncPoolSize(f, auftreffAbstand, goboRand);
+  // VIZ-96 B3: endet der Kegel auf der Oberseite eines Koerpers (Podest,
+  // Buehnenplatte), endet dort auch die Projektion — sonst liefen die
+  // Motiv-Teile jenseits der Kante weit gestreckt ueber den Hallenboden,
+  // waehrend der Kegel auf der Buehne aufhoert. Boden- und Wandtreffer: keine
+  // Grenze. Gelesen von scene/spot_pool.js#_goboProjizieren.
+  const kt = f._koerperTreffer;
+  f._goboGrenzY = (kt && kt.oben && isFinite(auftreffAbstand)
+                   && Math.abs(kt.abstand - auftreffAbstand) < 1e-6) ? kt.y : null;
 }
 
 // Keep top-down icon position synced
