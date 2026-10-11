@@ -41,7 +41,7 @@
 | PROC-19 | A | ci/proc19-doku-schnellweg | 2026-10-10T18:57Z | .github/workflows/ci.yml |
 | PROC-20 | A | feature/proc20-backlog-fragmente | 2026-10-10T18:45Z | tools · BACKLOG.md |
 | TOOL-26 | B | feature/tool26-app-messwerkzeug | 2026-10-10T13:25Z | tools/app_messung.py · tools/README.md · tests/test_tool26_app_messung.py · BACKLOG.md · changelog.d/2026-10-10-TOOL-26.md |
-| LAS-32 | A | feature/las32-laser-sperrzonen | 2026-10-10T13:08Z | - |
+| LAS-32 | A | feature/las32-s1-sperrzonen-anzeige | 2026-10-11T09:40Z | - |
 | DEMO-8 | A | feature/demo8-demoshows-im-setup | 2026-10-10T13:08Z | - |
 | XPLAT-51 | A | fix/xplat51-arm64-nicht-unterstuetzt | 2026-10-10T14:17Z | - |
 | XPLAT-52 | A | fix/xplat52-installer-venv-arch | 2026-10-10T14:17Z | - |
@@ -205,7 +205,6 @@
 
 ## Verlauf
 
-- 2026-10-10T18:00Z D claim TOOL-19
 - 2026-10-10T18:03Z D aktualisiert TOOL-19: Branch - -> fix/tool19-werkzeuge-ohne-echten-ausgang
 - 2026-10-10T18:10Z D aktualisiert TOOL-18: Branch - -> fix/tool18-bilder-hinweis-gpu-szenen
 - 2026-10-10T18:11Z D done XPLAT-48
@@ -235,3 +234,4 @@
 - 2026-10-10T22:54Z D claim DOC-70
 - 2026-10-10T22:54Z D claim TOOL-21
 - 2026-10-11T09:40Z A claim WEB-08
+- 2026-10-11T09:40Z A aktualisiert LAS-32: Branch feature/las32-laser-sperrzonen -> feature/las32-s1-sperrzonen-anzeige
