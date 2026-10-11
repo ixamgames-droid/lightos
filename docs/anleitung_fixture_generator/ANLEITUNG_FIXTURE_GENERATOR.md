@@ -93,6 +93,15 @@ Im Bereich **Patchen**, Reiter **Patch**, auf **Gerät erstellen…** klicken (1
 
 ![Patchen: Gerät erstellen](img/01_patch_geraet_erstellen.png)
 
+> **Nicht verwechseln:** Der Generator liegt **nur** hier, unter **Patchen →
+> Patch → Gerät erstellen…**. Das Menü **Datenbank → Neues Fixture-Profil…**
+> (und **Fixture-Profil bearbeiten…**) öffnet den einfacheren **Fixture
+> Editor** — Kanalliste ohne Bereiche, Prüfung und Live-Test.
+>
+> Der Dialog öffnet so groß, wie sein Inhalt es braucht, höchstens so groß wie
+> der Bildschirm. Auf einem kleinen Bildschirm (z. B. 1366 × 768) erscheint
+> rechts ein Rollbalken; **Speichern** und **Abbrechen** bleiben immer sichtbar.
+
 ## 3. Kopf: Hersteller, Modell, Typ
 
 ![Fixture Generator: Kopf](img/02_generator_kopf.png)
