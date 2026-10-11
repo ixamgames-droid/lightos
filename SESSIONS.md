@@ -42,7 +42,6 @@
 | WEB-08 | A | feature/web08-widget-kennung-fernausloesung | 2026-10-11T09:40Z | - |
 | VCB-42 | D | fix/vcb42-blackout-ziel-gruppe-wiedererkennen | 2026-10-11T12:13Z | src/core/app_state.py · src/core/show/show_file.py · src/ui/virtualconsole/vc_button.py · src/ui/virtualconsole/target_list_editor.py · tests/test_vcb42_blackout_ziel_wiedererkennen.py |
 | WEB-09 | A | feature/web09-handy-seite-rueckmeldung | 2026-10-11T12:08Z | - |
-| VIZ-103 | D | fix/viz103-haengend-an-unterkante | 2026-10-11T12:57Z | src/ui/visualizer/scene_src/fixtures/mount_pose.js · tests/test_viz103_haengend_unterkante_scene.py |
 | UI-88 | D | perf/ui88-2d-bild-schneller | 2026-10-11T14:27Z | src/ui/views/live_view.py · tests/test_ui88_2d_bild_schneller.py |
 | UI-89 | A | fix/ui89-programmer-reiter-nur-passende | 2026-10-11T12:14Z | - |
 | LAS-33 | A | feature/las33-laser-profilangaben-generator | 2026-10-11T13:51Z | - |
@@ -222,7 +221,6 @@
 
 ## Verlauf
 
-- 2026-10-11T17:49Z D done TOOL-24
 - 2026-10-11T17:49Z 7 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-11T18:08Z A done MIDI-5
 - 2026-10-11T18:08Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
@@ -252,3 +250,4 @@
 - 2026-10-11T20:58Z D aktualisiert OUT-71: Branch - -> fix/out71-schlussbild-beim-beenden
 - 2026-10-11T21:02Z A done UI-86
 - 2026-10-11T21:35Z D done VCB-36
+- 2026-10-11T21:55Z D done VIZ-103
