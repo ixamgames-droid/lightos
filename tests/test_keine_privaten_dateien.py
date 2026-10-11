@@ -33,7 +33,7 @@ _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 def _getrackte_dateien() -> list[str]:
     """Alle von git verwalteten Pfade — also alles, was oeffentlich ist."""
     r = subprocess.run(["git", "ls-files", "-z"], cwd=_REPO,
-                       capture_output=True, text=True)
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
     if r.returncode != 0:
         return []
     return [p for p in r.stdout.split("\0") if p]

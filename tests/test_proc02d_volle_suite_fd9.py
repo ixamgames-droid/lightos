@@ -193,7 +193,7 @@ class _WegwerfRepo:
             umgebung["LIGHTOS_VERIFY_SINGLE"] = "1"
         return subprocess.run(
             ["bash", str(self.pfad / "tools" / "verify_loop.sh")],
-            cwd=str(self.pfad), env=umgebung, capture_output=True, text=True,
+            cwd=str(self.pfad), env=umgebung, capture_output=True, text=True, encoding="utf-8", errors="replace",
             timeout=timeout, start_new_session=True)
 
     def _umgebung(self, single=False) -> dict:
@@ -215,7 +215,7 @@ class _WegwerfRepo:
         return subprocess.Popen(
             ["bash", str(self.pfad / "tools" / "verify_loop.sh")],
             cwd=str(self.pfad), env=self._umgebung(single),
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
             start_new_session=True)
 
     @staticmethod
@@ -495,7 +495,7 @@ class GezielterLaufNimmtDieSperreGarNichtTest(unittest.TestCase):
             ["bash", str(self.repo.pfad / "tools" / "verify_loop.sh"),
              "tests/test_enkel.py"],
             cwd=str(self.repo.pfad), env=umgebung, capture_output=True,
-            text=True, timeout=300, start_new_session=True)
+            text=True, encoding="utf-8", errors="replace", timeout=300, start_new_session=True)
         self.assertEqual(0, erg.returncode, erg.stdout[-3000:])
         self.assertFalse(
             self.repo.sperre.exists(),
