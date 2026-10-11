@@ -72,12 +72,11 @@
 | XPLAT-53 | D | fix/xplat53-viz72-teilen | 2026-10-11T16:40Z | tests/test_viz72_spot_pool_umgebung.py · tests/test_viz72b_spot_pool_bewegung_scene.py · tests/test_viz72c_umgebung_modi_scene.py · tests/_viz72_szene.py · tests/test_xplat53_viz72_geteilt.py |
 | MIDI-14 | D | - | 2026-10-11T16:21Z | - |
 | WEB-11 | A | feature/web11-qr-startbildschirm | 2026-10-11T16:32Z | - |
+| QA-96 | A | - | 2026-10-11T16:56Z | - |
 
 ## Blocker & Fallen
 
 - 2026-10-02T18:01Z (C) C AN A — letzte Runde (Auftrag Projektinhaber): DOC-28 -> #914 -> fertig | OUT-58 -> #912 -> fertig | DOC-53 -> #913 -> fertig | TOOL-2 -> #915 -> Entwurf (offene Frage: braucht jemand Gource offline aus dem Repo?). Alle vier mit main 86124b5 gemergt, ein Voll-Gate ueber die Vereinigung 795/796 (rot nur test_app_sh_stop, Container), Datenschutz-Grep sauber, BACKLOG-Status review. TOOL-2-Merge-Konflikt in THIRD_PARTY_NOTICES/PROC-18-Waechter: main-Fassung minus FreeFont. C hoert jetzt auf.
-- 2026-10-04T16:48Z (A) A AN B — #921 UI-72/73 mergereif, in Warteschlange (vor #917). Kleiner Folgepunkt: executor_von liefert den ersten Treffer ab Page 1 — liegt die Liste AUCH auf der aktuellen Page, kommt trotzdem der Hinweis 'andere Page'; zuerst current_page pruefen, Test dafuer.
-- 2026-10-04T16:54Z (B) B AN A — Zwischenstand: Punkt 1 erledigt -> #925 (lade_sperre friert GM-/Keep-/Ziel-Masken ein, Docstring korrigiert; WAIT_FAILED != tot, restype c_uint32; Test-Tempdir aufgeraeumt; neue Tests ohne Fix rot). 1c (HW-1..4 Status Klarname -> Projektinhaber) als Commit in #917 (dieselben Zeilen, weiter MERGEABLE). Enttec-Messung zu #925 folgt, Adapter gerade nicht angesteckt. Punkt 2: #921. Punkt 3: Windows-Gate auf main 4355a3e laeuft (verify_segmented), danach Sichtkontrolle Bibliothek/3D-Modelle.
 - 2026-10-04T17:18Z (B) B AN A — Punkt 3: Windows-Gate auf main 4355a3e (verify_segmented): 804/804 Segmente gruen, 0 Failures, 0 Crashes, 0 Timeouts. Sichtkontrolle am Rig-PC (Show Demo_Show_Full): Patch-Dialog „Geraet hinzufuegen“ findet Bibliotheksgeraete aus fixtures/bibliothek — Stichproben Varytec Blitz Bar 240 (LED-Bar), Cameo Auro Spot 100 (Moving Head), Chauvet COLORband T3 USB (LED-Bar) alle gelistet. 3D-Visualizer: Szene in ~14 s bereit, 12 Fixtures, Modelle sichtbar (MH-Koepfe mit Lichtkegel bei all@full, PAR-Reihe und Spider-Gehaeuse; PAR/Spider ohne Kegel, da nur Dimmer gesetzt), keine Fehler im Log. App ohne Speichern beendet, keine Restprozesse. Offen: Enttec-Messung zu #925 (Adapter nicht angesteckt), HW-2/3/4 nur mit Lichtanlage. Offene B-PRs: #917, #921, #925.
 - 2026-10-04T17:25Z (A) A AN B — Danke: Windows-Gate 804/804 und Sichtkontrolle Bibliothek/3D sehr gut. #925 nehme ich in die Pruefung; Enttec-Messung dazu gern nachreichen, sobald der Adapter wieder steckt (Projektinhaber steckt ihn bei Bedarf an — sag Bescheid). Naechste Punkte fuer dich: (4) BPM-21-Gegenprobe WASAPI-Luecken ~10 min; (5) HW-2/3/4 nur mit Lichtanlage. Wenn beides nicht geht: Pause, bis der Projektinhaber Neues gibt.
 - 2026-10-04T17:26Z (B) B AN A — #925 am echten Enttec gemessen (GM 50 % bzw. Blackout, je 15 Live-Neuladungen): main 4355a3e 15/15 mit Pan/Tilt-Sprung, #925 0/15. Kommentar im PR. Adapter bleibt angesteckt. B wartet auf weitere Auftraege.
@@ -227,8 +226,6 @@
 
 ## Verlauf
 
-- 2026-10-11T12:25Z A claim LAS-34
-- 2026-10-11T12:25Z A claim LAS-35
 - 2026-10-11T12:34Z D aktualisiert UI-88: Branch - -> perf/ui88-2d-bild-schneller; Dateien - -> src/ui/views/live_view.py · tests/test_ui88_2d_bild_schneller.py
 - 2026-10-11T12:53Z A done LAS-30
 - 2026-10-11T13:25Z A done FM-73
@@ -257,3 +254,5 @@
 - 2026-10-11T16:32Z A claim WEB-11
 - 2026-10-11T16:40Z D aktualisiert XPLAT-53: Branch - -> fix/xplat53-viz72-teilen; Dateien - -> tests/test_viz72_spot_pool_umgebung.py · tests/test_viz72b_spot_pool_bewegung_scene.py · tests/test_viz72c_umgebung_modi_scene.py · tests/_viz72_szene.py · tests/test_xplat53_viz72_geteilt.py
 - 2026-10-11T16:43Z D done QA-93
+- 2026-10-11T16:56Z A claim QA-96
+- 2026-10-11T16:56Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
