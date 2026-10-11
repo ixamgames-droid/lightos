@@ -67,7 +67,7 @@
 | XPLAT-36 | D | fix/xplat36-einzellauf-zeitlimit | 2026-10-11T16:30Z | tools/verify_segmented.ps1 · tools/verify_segmented.sh · tests/test_xplat36_einzellauf_zeitlimit.py |
 | OUT-68 | A | feature/out68-udmx-adapter | 2026-10-11T14:02Z | - |
 | OUT-69 | A | - | 2026-10-11T14:04Z | - |
-| WEB-10 | A | feature/web10-handy-seitenleiste | 2026-10-11T15:10Z | - |
+| WEB-10 | A | feature/web10-handy-seitenleiste | 2026-10-11T16:32Z | - |
 | OUT-70 | A | feature/out70-interface-erkennung-assistent | 2026-10-11T15:44Z | - |
 | UI-90 | D | - | 2026-10-11T16:21Z | - |
 | XPLAT-53 | D | - | 2026-10-11T16:21Z | - |
