@@ -698,6 +698,17 @@ class SeitenTest(_MitAnsicht):
         self.assertEqual([s["name"] for s in self.canvas.handy_seiten()["seiten"]],
                          ["C", "A", "B"])
 
+    def test_ordnen_ohne_seiten_ist_kein_fehler(self):
+        # Review WEB-10: eine leere Reihenfolge bei null Seiten ist formal
+        # gueltig — die gezeigte Seite 0 steht aber nicht darin (ValueError).
+        self.assertEqual(self.canvas.handy_seiten(), hs.leer())
+        vorher = self._schritte()
+        self.assertFalse(self.canvas.handy_seiten_ordnen([]))
+        self.assertFalse(self.leiste.seiten_ordnen([]))
+        self.assertFalse(self.canvas.handy_seite_verschieben(0, 0))
+        self.assertEqual(self._schritte(), vorher)
+        self.assertEqual(self.canvas.handy_seite_nr(), 0)
+
     def test_reiter_waehlt_die_seite_fuer_das_ablegen(self):
         a, b = self._taste(text="A"), self._taste(x=140, text="B")
         self.leiste.seite_hinzufuegen()

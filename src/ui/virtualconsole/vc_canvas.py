@@ -2383,8 +2383,8 @@ class VCCanvas(QWidget):
         ueber mehrere Plaetze gezogen wurde."""
         from src.core import handy_seiten as _hs
         neu = _hs.seiten_ordnen(self.handy_seiten(), reihenfolge)
-        if neu is None:
-            return False
+        if neu is None or not neu["seiten"]:
+            return False                # ohne Seiten gibt es nichts zu ordnen
         # Die gezeigte Seite wandert mit ihrem Inhalt. VOR dem Uebernehmen
         # gesetzt: die Seitenleiste liest sie beim Neuaufbau.
         vorher = self._handy_seite_nr
