@@ -34,7 +34,6 @@
 | OUT-67 | A | feature/out67-ausgabe-ausfall-banner | 2026-10-10T09:29Z | - |
 | TOOL-24 | D | fix/tool24-proc18-lizenzhinweise-strukturiert | 2026-10-10T22:54Z | tests/test_proc18_fremd_lizenzhinweise.py |
 | FM-66 | D | fix/fm66-abgleich-modellname | 2026-10-10T22:54Z | src/core/database/bibliothek_format.py · tests/test_fm66_abgleich_modellname.py · docs/FIXTURE_LIBRARY.md |
-| FM-73 | A | fix/fm73-sync-gleichnamige-modi | 2026-10-10T18:44Z | - |
 | PROC-19 | A | ci/proc19-doku-schnellweg | 2026-10-10T18:57Z | .github/workflows/ci.yml |
 | PROC-20 | A | feature/proc20-backlog-fragmente | 2026-10-10T18:45Z | tools · BACKLOG.md |
 | TOOL-26 | B | feature/tool26-app-messwerkzeug | 2026-10-10T13:25Z | tools/app_messung.py · tools/README.md · tests/test_tool26_app_messung.py · BACKLOG.md · changelog.d/2026-10-10-TOOL-26.md |
@@ -213,7 +212,6 @@
 
 ## Verlauf
 
-- 2026-10-10T21:10Z B done VIZ-99
 - 2026-10-10T21:11Z D claim QA-93
 - 2026-10-10T21:17Z A claim QA-94
 - 2026-10-10T21:17Z A claim QA-95
@@ -243,3 +241,4 @@
 - 2026-10-11T12:25Z A claim LAS-35
 - 2026-10-11T12:34Z D aktualisiert UI-88: Branch - -> perf/ui88-2d-bild-schneller; Dateien - -> src/ui/views/live_view.py · tests/test_ui88_2d_bild_schneller.py
 - 2026-10-11T12:53Z A done LAS-30
+- 2026-10-11T13:25Z A done FM-73
