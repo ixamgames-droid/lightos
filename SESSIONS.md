@@ -51,7 +51,6 @@
 | UI-80 | D | fix/ui80-matrix-entwurf-speed | 2026-10-10T22:54Z | - |
 | TOOL-18 | D | fix/tool18-bilder-hinweis-gpu-szenen | 2026-10-10T22:54Z | - |
 | TOOL-19 | D | fix/tool19-werkzeuge-ohne-echten-ausgang | 2026-10-10T22:54Z | - |
-| QA-92 | D | fix/qa92-windows-rote-tests | 2026-10-10T22:54Z | - |
 | CDX-58 | A | fix/cdx-1010-main | 2026-10-10T19:30Z | - |
 | VIZ-102 | A | feature/viz102-gobo-hallenboden | 2026-10-10T19:43Z | - |
 | UI-87 | D | fix/ui87-hilfe-oeffnen-windows | 2026-10-10T22:54Z | - |
@@ -207,7 +206,6 @@
 
 ## Verlauf
 
-- 2026-10-10T18:24Z D aktualisiert UI-78: Branch - -> fix/ui78-efx-editor-texte
 - 2026-10-10T18:34Z D done VIZ-98
 - 2026-10-10T18:49Z D claim QA-92
 - 2026-10-10T19:27Z A done FM-67
@@ -237,3 +235,4 @@
 - 2026-10-11T10:34Z D aktualisiert VCB-42: Branch - -> fix/vcb42-blackout-ziel-gruppe-wiedererkennen; Dateien - -> src/core/app_state.py · src/core/show/show_file.py · src/ui/virtualconsole/vc_button.py · src/ui/virtualconsole/target_list_editor.py · tests/test_vcb42_blackout_ziel_wiedererkennen.py
 - 2026-10-11T10:38Z A done DEMO-8
 - 2026-10-11T10:58Z A claim WEB-09
+- 2026-10-11T11:29Z D done QA-92
