@@ -381,9 +381,17 @@ class VCButton(VCWidget):
         # VCB-36: Gruppen ueber ihre ID (``blackout_group_ids``) — zwei Gruppen
         # duerfen gleich heissen. ``blackout_groups`` haelt nur noch NAMEN aus
         # alten Layouts, die sich keiner Gruppe eindeutig zuordnen liessen.
+        # VCB-42: je Gruppen-ID der Steckbrief ``{"uid", "name", "folder"}`` der
+        # Gruppe, die GEMEINT ist. Die Nummer allein sagt das nicht (sie wird
+        # nach dem Loeschen neu vergeben und gilt nur in einer Show). Eine ID
+        # ohne Eintrag stammt aus einem Layout von vor VCB-42; ``name`` None
+        # heisst: die Gruppe gab es schon beim Uebernehmen nicht.
         self.blackout_fids: list[int] = []
         self.blackout_group_ids: list[int] = []
+        self.blackout_group_refs: dict[int, dict] = {}
         self.blackout_groups: list[str] = []
+        self._bo_verloren_cache = None
+        self._bo_tip_gesetzt = False
         # Slot des gezielten Blackouts raeumen, wenn die Taste geloescht wird.
         self.destroyed.connect(lambda *_, s=id(self): _clear_target_blackout_slot(s))
         # Tempo-Sync Phase 5: Ziel-Bus fuer TAP_BUS/SYNC_BUS/ARM_BUS ("" = aktiver/Default-Bus).
@@ -992,29 +1000,196 @@ class VCButton(VCWidget):
                     or self.blackout_groups)
 
     def _blackout_gruppen_ziele(self) -> list:
-        """VCB-36: Gruppen-Ziele fuer ``set_target_blackout`` — je ID ein
-        ``(gid, "")``-Ref (meint genau diese Gruppe), dahinter die Alt-Namen."""
-        return [(int(g), "") for g in self.blackout_group_ids] + list(self.blackout_groups)
+        """VCB-36: Gruppen-Ziele fuer ``set_target_blackout`` — je ID ein Ref
+        (meint genau diese Gruppe), dahinter die Alt-Namen.
 
-    def _blackout_gruppen_fuer_alte_versionen(self) -> list[str]:
+        VCB-42: der Ref traegt den Steckbrief ``(gid, name, ordner, kennung)``;
+        der State prueft ihn bei jedem Aufloesen."""
+        return self._blackout_pruefen()[0]
+
+    # ── VCB-42: Gruppen-Ziele wiedererkennen ─────────────────────────────────
+
+    @staticmethod
+    def _gruppen_steckbriefe() -> dict | None:
+        """``{id: (Name, Ordner, Kennung)}`` aller Gruppen; ``None`` = Show-DB
+        nicht lesbar (dann wird nichts gefolgert und nichts vergessen)."""
+        try:
+            from src.core.app_state import get_state
+            return get_state().gruppen_steckbriefe()
+        except Exception:
+            return None
+
+    @staticmethod
+    def _steckbrief(ref) -> tuple | None:
+        """Eintrag aus ``blackout_group_refs`` -> ``(Name, Ordner, Kennung)``."""
+        if not isinstance(ref, dict):
+            return None
+        return (ref.get("name"), ref.get("folder") or "", ref.get("uid") or "")
+
+    def blackout_gruppen_waehlen(self, ids):
+        """Gruppen als Ziel waehlen, wie es der Dialog tut: je ID wird der
+        Steckbrief der Gruppe gemerkt, die JETZT diese Nummer traegt."""
+        jetzt = self._gruppen_steckbriefe()
+        alt = self.blackout_group_refs
+        self.blackout_group_ids, self.blackout_group_refs = [], {}
+        for g in (ids or []):
+            try:
+                gid = int(g)
+            except (TypeError, ValueError):
+                continue
+            if gid in self.blackout_group_ids:
+                continue
+            self.blackout_group_ids.append(gid)
+            if jetzt is None:
+                if gid in alt:              # DB nicht lesbar: nichts vergessen
+                    self.blackout_group_refs[gid] = dict(alt[gid])
+            elif gid in jetzt:
+                name, ordner, uid = jetzt[gid]
+                self.blackout_group_refs[gid] = {"uid": uid, "name": name, "folder": ordner}
+        self._blackout_anzeige_veraltet()
+
+    def _blackout_ziele_nachziehen(self) -> dict | None:
+        """Die Steckbriefe auf den Stand der Show bringen und die Steckbriefe
+        aller Gruppen liefern (``None`` = Show-DB nicht lesbar, nichts geaendert).
+
+        * Ziel gilt (``group_ref.ziel_gilt``) -> Name/Ordner/Kennung der Gruppe
+          uebernehmen. So folgt der Steckbrief dem Umbenennen, und ein Ziel, das
+          nur noch ueber den Namen passte, bekommt die neue Kennung.
+        * Nur die Nummer bekannt (Layout von vor VCB-42) -> die Gruppe, die sie
+          jetzt traegt, ist gemeint; traegt sie keine, wird das gemerkt — eine
+          SPAETER angelegte Gruppe mit dieser Nummer erbt das Ziel nicht.
+        * Ziel verloren -> Steckbrief bleibt, wie er ist."""
+        from src.core.group_ref import ziel_gilt
+        if not self.blackout_group_ids:
+            self.blackout_group_refs = {}
+            return {}
+        jetzt = self._gruppen_steckbriefe()
+        if jetzt is None:
+            return None
+        refs: dict[int, dict] = {}
+        for gid in self.blackout_group_ids:
+            ref = self.blackout_group_refs.get(gid)
+            aktuell = jetzt.get(gid)
+            if aktuell is not None and ziel_gilt(self._steckbrief(ref), aktuell):
+                refs[gid] = {"uid": aktuell[2], "name": aktuell[0], "folder": aktuell[1]}
+            elif ref is None:
+                refs[gid] = {"uid": "", "name": None, "folder": ""}
+            else:
+                refs[gid] = dict(ref)
+        self.blackout_group_refs = refs
+        return jetzt
+
+    def _blackout_ziel_text(self, gid) -> str:
+        """Ein Gruppen-Ziel fuer Meldungen — mit dem Namen, den es HATTE."""
+        ref = self.blackout_group_refs.get(gid) or {}
+        name, ordner = ref.get("name") or "", ref.get("folder") or ""
+        if not name:
+            return f"Gruppe #{gid}"
+        return f"„{name}“ ({ordner})" if ordner else f"„{name}“"
+
+    def _blackout_pruefen(self) -> tuple[list, list[int]]:
+        """``(Gruppen-Ziele fuer set_target_blackout, IDs der verlorenen Ziele)``
+        — mit EINER Abfrage der Show-DB (laeuft bei jedem Tastendruck)."""
+        from src.core.group_ref import ziel_gilt
+        jetzt = self._blackout_ziele_nachziehen()
+        ziele: list = []
+        verloren: list[int] = []
+        for gid in self.blackout_group_ids:
+            ref = self.blackout_group_refs.get(gid)
+            if ref is None:
+                # Show-DB nicht lesbar und kein Steckbrief: nur die Nummer.
+                ziele.append((int(gid), ""))
+                continue
+            ziele.append((int(gid), ref.get("name"), ref.get("folder") or "",
+                          ref.get("uid") or ""))
+            if jetzt is not None and not ziel_gilt(self._steckbrief(ref), jetzt.get(gid)):
+                verloren.append(gid)
+        return ziele + list(self.blackout_groups), verloren
+
+    def _blackout_ziele_verloren(self) -> list[str]:
+        """VCB-42: die Gruppen-Ziele dieser Blackout-Taste, die es nicht mehr
+        gibt (geloescht, oder die Nummer gehoert jetzt einer anderen Gruppe) —
+        als Text mit ihrem frueheren Namen. Leer = alles da. Ohne lesbare
+        Show-DB defensiv leer (kein Fehlalarm)."""
+        if self.action != ButtonAction.BLACKOUT or not self.blackout_group_ids:
+            return []
+        return [self._blackout_ziel_text(g) for g in self._blackout_pruefen()[1]]
+
+    def _blackout_anzeige_veraltet(self):
+        """Die gemerkte Antwort fuer die Warn-Anzeige verwerfen."""
+        self._bo_verloren_cache = None
+
+    def _blackout_verloren_anzeige(self) -> list[str]:
+        """``_blackout_ziele_verloren`` fuer ``paintEvent``: hoechstens einmal je
+        Sekunde gegen die Show-DB geprueft (gezeichnet wird viel oefter)."""
+        if self.action != ButtonAction.BLACKOUT or not self.blackout_group_ids:
+            return []
+        import time
+        jetzt = time.monotonic()
+        c = self._bo_verloren_cache
+        if c is None or jetzt - c[0] > 1.0:
+            c = self._bo_verloren_cache = (jetzt, self._blackout_ziele_verloren())
+        return c[1]
+
+    def _blackout_editor_fuellen(self, editor):
+        """Den Ziel-Editor des Dialogs mit dem Ziel dieser Taste fuellen.
+        Verlorene Gruppen-Ziele stehen als eigene Zeile da (``gx:``), mit ihrem
+        frueheren Namen — nicht als die Gruppe, die die Nummer jetzt traegt."""
+        from .target_list_editor import blackout_ziel_schluessel
+        verloren = self._blackout_pruefen()[1]
+        editor.set_verlorene({
+            g: ((self.blackout_group_refs.get(g) or {}).get("name") or "",
+                (self.blackout_group_refs.get(g) or {}).get("folder") or "")
+            for g in verloren})
+        editor.set_targets(blackout_ziel_schluessel(
+            self.blackout_fids, self.blackout_groups, self.blackout_group_ids,
+            verloren=verloren))
+
+    def _blackout_ziel_aus_editor(self, editor):
+        """Das Ziel aus dem Dialog uebernehmen (OK). Gewaehlte Gruppen bekommen
+        ihren Steckbrief neu; ein verlorenes Ziel, dessen Zeile stehen geblieben
+        ist, bleibt verloren — die Taste wird dadurch weder an eine fremde
+        Gruppe gebunden noch zum globalen Blackout."""
+        alt = self.blackout_group_refs
+        self.blackout_fids = editor.fids()
+        self.blackout_groups = editor.groups()
+        self.blackout_gruppen_waehlen(editor.group_ids())
+        for gid in editor.verlorene_ids():
+            if gid not in self.blackout_group_ids:
+                self.blackout_group_ids.append(gid)
+                self.blackout_group_refs[gid] = dict(
+                    alt.get(gid) or {"uid": "", "name": None, "folder": ""})
+
+    def _blackout_gruppen_fuer_alte_versionen(self, jetzt=None) -> list[str]:
         """VCB-36: Inhalt des Feldes ``blackout_groups`` in der Datei — die
         Alt-Namen UND die Namen der ID-Ziele. Eine aeltere Programmversion kennt
         nur dieses Feld; bliebe es leer, waere die Taste dort ein GLOBALER
-        Blackout statt eines gezielten."""
+        Blackout statt eines gezielten.
+
+        ``jetzt``: die Steckbriefe aller Gruppen, wenn der Aufrufer sie schon
+        hat (``_blackout_ziele_nachziehen``) — spart die zweite Abfrage."""
         namen = list(self.blackout_groups)
         if self.blackout_group_ids:
-            try:
-                from .target_list_editor import _blackout_gruppen
-                je_id = {gid: name for gid, name, _ordner in _blackout_gruppen()}
-            except Exception:
-                je_id = {}
+            from src.core.group_ref import ziel_gilt
+            if jetzt is None:
+                jetzt = self._gruppen_steckbriefe()
             for gid in self.blackout_group_ids:
-                # Geloeschte oder namenlose Gruppe (oder Show-DB nicht lesbar):
-                # ein Platzhalter, den keine Gruppe traegt. Die aeltere Version
-                # findet dazu nichts und schaltet nichts — liesse man den
-                # Eintrag weg, bliebe das Feld leer und die Taste waere dort
-                # doch der GLOBALE Blackout.
-                name = je_id.get(gid) or _BLACKOUT_ZIEL_PLATZHALTER.format(gid=gid)
+                ref = self.blackout_group_refs.get(gid)
+                if jetzt is None:
+                    # Show-DB nicht lesbar: der Name, den die Taste sich gemerkt hat.
+                    name = (ref or {}).get("name") or ""
+                elif gid in jetzt and ziel_gilt(self._steckbrief(ref), jetzt[gid]):
+                    name = jetzt[gid][0]
+                else:
+                    # VCB-42: verlorenes Ziel. NICHT der Name der Gruppe, die die
+                    # Nummer jetzt traegt — eine aeltere Version schaltete sie.
+                    name = ""
+                # Geloeschte, verlorene oder namenlose Gruppe: ein Platzhalter,
+                # den keine Gruppe traegt. Die aeltere Version findet dazu
+                # nichts und schaltet nichts — liesse man den Eintrag weg,
+                # bliebe das Feld leer und die Taste waere dort doch der
+                # GLOBALE Blackout.
+                name = name or _BLACKOUT_ZIEL_PLATZHALTER.format(gid=gid)
                 if name not in namen:
                     namen.append(name)
         return namen
@@ -1315,8 +1490,15 @@ class VCButton(VCWidget):
             if self.has_blackout_target():
                 # VCB-11: nur die Ziel-Geraete dunkel, der Rest laeuft weiter.
                 if press:
-                    state.set_target_blackout(id(self), self.blackout_fids,
-                                              self._blackout_gruppen_ziele())
+                    ziele, verloren = self._blackout_pruefen()
+                    state.set_target_blackout(id(self), self.blackout_fids, ziele)
+                    self._blackout_anzeige_veraltet()
+                    if verloren:
+                        # VCB-42: nicht still ins Leere schalten.
+                        self._show_status(
+                            "Blackout-Ziel verloren: "
+                            + ", ".join(self._blackout_ziel_text(g) for g in verloren)
+                            + " — die Taste schaltet dafür nichts. Ziel neu wählen.")
                 else:
                     state.clear_target_blackout(id(self))
             else:
@@ -1954,7 +2136,14 @@ class VCButton(VCWidget):
         # Tote Bindung: zeigt der Button auf eine nicht (mehr) existierende
         # Funktions-ID, einen roten gestrichelten Rahmen + ⚠ zeichnen, damit der
         # Klick nicht still ins Leere geht (statt frustfreiem "passiert nichts").
-        if self._binding_unresolved():
+        tot = self._binding_unresolved()
+        # VCB-42: derselbe Marker fuer ein verlorenes Blackout-Ziel — die Taste
+        # schaltet dann (fuer diese Gruppe) nichts.
+        bo_verloren = [] if tot else self._blackout_verloren_anzeige()
+        if not bo_verloren and self._bo_tip_gesetzt:
+            self._bo_tip_gesetzt = False
+            self.setToolTip("")
+        if tot or bo_verloren:
             pen = QPen(QColor("#ff5555"), 2)
             pen.setStyle(Qt.PenStyle.DashLine)
             p.setPen(pen)
@@ -1965,8 +2154,15 @@ class VCButton(VCWidget):
             p.setFont(QFont("Segoe UI", 9, QFont.Weight.Bold))
             p.drawText(self.rect().adjusted(0, 2, -4, 0),
                        Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight, "⚠")
-            self.setToolTip(f"Funktion #{self.function_id} nicht gefunden — "
-                            f"tote Bindung. Funktion neu zuweisen.")
+            if tot:
+                self.setToolTip(f"Funktion #{self.function_id} nicht gefunden — "
+                                f"tote Bindung. Funktion neu zuweisen.")
+            else:
+                self._bo_tip_gesetzt = True
+                self.setToolTip(
+                    "Blackout-Ziel verloren: " + ", ".join(bo_verloren)
+                    + " — gelöscht oder aus einer anderen Show. Die Taste schaltet "
+                      "dafür nichts (kein globaler Blackout). Ziel im Dialog neu wählen.")
 
         # BTN-01: Multi-Action-Indikator oben links (Anzahl Zusatz-Aktionen)
         if self.actions:
@@ -1987,7 +2183,7 @@ class VCButton(VCWidget):
         (Inspector); ``live=False`` = erst beim OK (modaler Dialog)."""
         from PySide6.QtWidgets import QPushButton, QColorDialog
         from .target_list_editor import (TargetListEditor, SnapListEditor,
-                                         BlackoutTargetEditor, blackout_ziel_schluessel)
+                                         BlackoutTargetEditor)
 
         cap = QLineEdit(self.caption)
 
@@ -2097,9 +2293,7 @@ class VCButton(VCWidget):
 
         # VCB-11: Ziel der Blackout-Taste — Geraete und/oder Gruppen; leer = global.
         blackout_editor = BlackoutTargetEditor(title="Blackout-Ziel")
-        blackout_editor.set_targets(
-            blackout_ziel_schluessel(self.blackout_fids, self.blackout_groups,
-                                     self.blackout_group_ids))
+        self._blackout_editor_fuellen(blackout_editor)
         blackout_editor.setToolTip(
             "Leer = globaler Blackout. Mit Ziel schaltet die Taste NUR diese Geräte/"
             "Gruppen dunkel (Dimmer/Farbe auf 0, Pan/Tilt/Gobo bleiben); der Rest "
@@ -2264,12 +2458,11 @@ class VCButton(VCWidget):
             # freigegeben (Ziel/Aktion koennten sich gerade geaendert haben).
             self._release_target_blackout()
             if self.action == BO:
-                self.blackout_fids = blackout_editor.fids()
-                self.blackout_group_ids = blackout_editor.group_ids()
-                self.blackout_groups = blackout_editor.groups()
+                self._blackout_ziel_aus_editor(blackout_editor)
             else:
                 self.blackout_fids, self.blackout_groups = [], []
-                self.blackout_group_ids = []
+                self.blackout_group_ids, self.blackout_group_refs = [], {}
+            self._blackout_anzeige_veraltet()
             self.edit_slot = edit_slot_edit.text().strip()
             self.tempo_bus_id = bus_combo.currentData() or ""
             self.midi_type = midi_type_combo.currentText()
@@ -2573,7 +2766,8 @@ class VCButton(VCWidget):
         d["laser_palette"] = self.laser_palette
         # VCB-11: Ziel der Blackout-Taste (leer = global).
         d["blackout_fids"] = list(self.blackout_fids)
-        d["blackout_groups"] = self._blackout_gruppen_fuer_alte_versionen()
+        jetzt = self._blackout_ziele_nachziehen()   # VCB-42: Umbenanntes mitnehmen
+        d["blackout_groups"] = self._blackout_gruppen_fuer_alte_versionen(jetzt)
         if self.blackout_group_ids:
             # VCB-36: die IDs sind massgeblich. ``blackout_groups`` traegt dann
             # auch die Namen der ID-Ziele (fuer aeltere Programmversionen) — die
@@ -2581,6 +2775,18 @@ class VCButton(VCWidget):
             # bleibt das Layout Zeichen fuer Zeichen wie bisher.
             d["blackout_group_ids"] = list(self.blackout_group_ids)
             d["blackout_groups_nur_name"] = list(self.blackout_groups)
+            # VCB-42: je ID der Steckbrief der gemeinten Gruppe. Die Nummer
+            # allein traegt nicht in eine andere Show (VC-Layout laden) und
+            # nicht ueber Loeschen + Neuanlegen. Auch ein VERLORENES Ziel bleibt
+            # mit seinem Steckbrief stehen: zurueck in der eigenen Show wirkt
+            # die Taste wieder.
+            refs = [{"id": gid,
+                     "uid": self.blackout_group_refs[gid].get("uid") or "",
+                     "name": self.blackout_group_refs[gid].get("name"),
+                     "folder": self.blackout_group_refs[gid].get("folder") or ""}
+                    for gid in self.blackout_group_ids if gid in self.blackout_group_refs]
+            if refs:
+                d["blackout_group_refs"] = refs
         d["tempo_bus_id"] = self.tempo_bus_id
         d["edit_slot"] = self.edit_slot
         d["actions"] = [dict(a) for a in self.actions]
@@ -2675,6 +2881,28 @@ class VCButton(VCWidget):
                                 if isinstance(g, str) and g.strip()]
         if _bgi_roh and not (_bgi or self.blackout_groups or self.blackout_fids):
             self.blackout_groups = [_BLACKOUT_ZIEL_UNLESBAR]
+        # VCB-42: Steckbrief je ID. Ein unlesbarer Eintrag kostet nur sich
+        # selbst — die ID gilt dann wie in einem Layout von vor VCB-42 (ueber
+        # die Nummer) und bekommt gleich unten ihren Steckbrief.
+        from src.core.group_ref import uid_lesbar
+        _refs: dict[int, dict] = {}
+        _refs_roh = d.get("blackout_group_refs", None)
+        for r in (_refs_roh if isinstance(_refs_roh, (list, tuple)) else []):
+            if not isinstance(r, dict) or "name" not in r:
+                continue
+            gid, name, ordner = r.get("id"), r.get("name"), r.get("folder")
+            if (not isinstance(gid, int) or isinstance(gid, bool)
+                    or gid not in _bgi or gid in _refs
+                    or not (name is None or isinstance(name, str))):
+                continue
+            _refs[gid] = {"uid": uid_lesbar(r.get("uid")), "name": name,
+                          "folder": ordner if isinstance(ordner, str) else ""}
+        self.blackout_group_refs = _refs
+        # Die Gruppen der Show stehen beim Laden schon (erst die Show, dann das
+        # VC-Layout): IDs ohne Steckbrief jetzt festlegen, nicht erst beim
+        # ersten Druck — bis dahin koennte die Nummer neu vergeben sein.
+        self._blackout_ziele_nachziehen()
+        self._blackout_anzeige_veraltet()
         # Show neu geladen: ein noch gehaltener Teil-Blackout gehoert zur alten Show.
         self._release_target_blackout()
         self.tempo_bus_id = d.get("tempo_bus_id", "") or ""

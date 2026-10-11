@@ -856,6 +856,10 @@ def _collect_fixture_groups(state, probleme: list | None = None) -> list:
                         # meint (Blackout-Ziel einer VC-Taste), zeigte nach
                         # Speichern/Laden auf eine andere oder keine.
                         "id": int(g.id),
+                        # VCB-42: die Kennung auch. Die ID sagt nur „welche
+                        # Nummer“, die Kennung „welche Gruppe“ — ohne sie waere
+                        # nach dem Laden jede Gruppe fuer eine Taste eine neue.
+                        "uid": g.uid or "",
                         "name": g.name, "cols": int(g.cols), "rows": int(g.rows),
                         "positions_json": g.positions_json or "{}",
                         "folder": g.folder or "",
@@ -899,6 +903,11 @@ def _fixture_group_aus_daten(g):
     if (isinstance(gid, int) and not isinstance(gid, bool)
             and 0 < gid <= _GRUPPEN_ID_MAX):
         fg.id = gid
+    # VCB-42: gespeicherte Kennung uebernehmen. Fehlt sie (Alt-Show) oder ist
+    # sie unlesbar, bleibt sie offen — ``_gruppen_ids_vergeben`` gibt dann eine
+    # neue. Auch hier kostet ein kaputter Wert nur sich selbst, nicht die Gruppe.
+    from ..group_ref import uid_lesbar
+    fg.uid = uid_lesbar(g.get("uid")) or None
     return fg
 
 
@@ -910,7 +919,21 @@ def _gruppen_ids_vergeben(gebaut: list) -> None:
     die treffen, die ein spaeterer Eintrag mitbringt — die Transaktion
     scheiterte, und ALLE Gruppen waeren weg (der Fall, den STAB-24 beendet
     hat). Steht dieselbe ID zweimal in der Datei, behaelt sie der erste
-    Eintrag. Alt-Shows ohne IDs bekommen wie bisher 1..n in Datei-Reihenfolge."""
+    Eintrag. Alt-Shows ohne IDs bekommen wie bisher 1..n in Datei-Reihenfolge.
+
+    VCB-42: dasselbe fuer die Kennung — jede Gruppe genau eine, keine doppelt
+    (der erste Eintrag behaelt sie). Zwei Gruppen mit derselben Kennung waeren
+    fuer eine Taste „dieselbe“."""
+    from ..group_ref import neue_uid
+    kennungen: set[str] = set()
+    for fg in gebaut:
+        if not fg.uid or fg.uid in kennungen:
+            if fg.uid:
+                _lenient(f"Fixture-Gruppe '{fg.name}': Kennung steht doppelt in "
+                         f"der Datei — neue Kennung vergeben",
+                         ValueError("doppelte Kennung"))
+            fg.uid = neue_uid()
+        kennungen.add(fg.uid)
     vergeben: set[int] = set()
     for fg in gebaut:
         if fg.id is None:
