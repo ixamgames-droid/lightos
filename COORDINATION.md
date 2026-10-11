@@ -93,6 +93,14 @@ Claims nur an (Exit 1 erst mit `--strict`), Entwuerfe zaehlen nie als
 „Claim fehlt". Ein alter PR von vor der Regel laesst sich bewusst durchwinken:
 `pr_bereit.py <PR> --ohne-claim "Begruendung"`.
 
+**Reine Doku-/Backlog-PRs sind schnell gruen (PROC-19):** aendert ein PR nur
+`*.md` im Wurzelverzeichnis, `changelog.d/` oder Markdown/Bilder unter `docs/`,
+faehrt die CI statt der vollen Suite nur die Gates aus `tools/doku_gates.txt`.
+Die Checks heissen wie immer, `pr_bereit.py` braucht keine Sonderbehandlung.
+Wer Status-Pflege und Code trennt, haelt die Warteschlange kurz: ein einziger
+Code-, Test- oder Werkzeug-Pfad im PR bedeutet volle Suite. Details:
+`WORKFLOW.md`, Abschnitt „CI-Schnellweg".
+
 ### Warum ein eigener Branch `sessions`
 
 Die Tafel liegt auf dem Branch **`sessions`**, nicht auf `main`:
