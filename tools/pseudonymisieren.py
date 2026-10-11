@@ -56,7 +56,7 @@ def _repo() -> str:
 
 def _dateien(repo: str) -> list[str]:
     r = subprocess.run(["git", "ls-files", "-z"], cwd=repo,
-                       capture_output=True, text=True, encoding="utf-8")
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
     if r.returncode != 0:
         return []
     return [p for p in r.stdout.split("\0")

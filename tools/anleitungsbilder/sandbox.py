@@ -315,7 +315,7 @@ def laufende_instanz() -> bool:
     import subprocess
     try:
         r = subprocess.run(["pgrep", "-af", "main.py"], capture_output=True,
-                           text=True, timeout=5)
+                           text=True, encoding="utf-8", errors="replace", timeout=5)
     except Exception:
         return False
     muster = re.compile(r"python[\w.]*\s+(?:\S*/)?main\.py\b")

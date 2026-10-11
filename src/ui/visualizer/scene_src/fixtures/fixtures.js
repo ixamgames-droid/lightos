@@ -12,6 +12,7 @@ import { disposeObj } from '../scene/grid_floor.js';
 // Registry; die pro-Typ-Handler leben bei ihren Buildern (builders.js), wo
 // auch tintTopDownIcon konsumiert wird — nicht mehr hier.
 import { buildFixtureModel, updateFixtureDmx } from './registry.js';
+import { ohneZielrechnung } from './builders.js';   // VIZ-98
 import { buildTopDownIcon } from './topdown_icons.js';
 import { applyPoolFalloff } from './floor_pool.js';   // VIZ-15
 import { applyBeamGoboBase } from './gobo_textures.js';   // VIZ-83
@@ -24,6 +25,7 @@ import { requestRender } from '../scene/render_loop.js';
 import { makeFixtureLabel, disposeFixtureLabel } from './labels.js';  // VIZ-14
 import { updateEmptyState } from '../empty_state.js';
 import { cachedDmx } from './dmx_cache.js';   // VIZ-71
+import { syncMountPose } from './mount_pose.js';   // VIZ-100
 // VIZ-72: echte Lichter nur noch aus dem Spot-Pool (scene/spot_pool.js).
 import { initSpotPool, resizeSpotPool } from '../scene/spot_pool.js';
 
@@ -554,6 +556,10 @@ export function addFixture(data) {
   // VIZ-71 (N1/N2): mit dem zuletzt angekommenen DMX-Stand bauen, nicht mit
   // den festen Nullen aus der Geraeteliste — sonst blieb ein neu gebautes
   // Geraet dunkel bzw. in Mittelstellung, bis sich sein DMX wieder aenderte.
+  // VIZ-100: haengende Haltung VOR dem ersten Zielen — Kegel und Bodenfleck
+  // gehen vom Kopf aus. Steht die Buehne noch nicht (Geraete vor der Buehne
+  // geladen), zieht app.js#perFrameUpdate die Haltung im naechsten Bild nach.
+  syncMountPose(fixtures[fid]);
   const src = cachedDmx(fid) || data;
   updateFixture(fid, src.r ?? 0, src.g ?? 0, src.b ?? 0, src.intensity ?? 0,
                 src.pan ?? 128, src.tilt ?? 128, src.heads || null, src);
@@ -624,7 +630,7 @@ export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads, extra) 
   if (!f) return;
   const color = new THREE.Color(r/255, g/255, b/255);
   const intNorm = intensity / 255;
-  const skipBeam = (view.mode === '2D' && Object.keys(fixtures).length > 50);
+  const skipBeam = ohneZielrechnung();
   // VIZ-13 3c Teil 2: gebuendelter DMX-Kontext fuer die updateDmx-Handler —
   // traegt den byte-identischen dmxBatch-Vertrag (r,g,b,intensity,pan,tilt,
   // heads) plus die abgeleiteten Werte, damit kein Handler sie neu rechnet.
