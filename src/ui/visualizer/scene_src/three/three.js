@@ -86,6 +86,7 @@ export const {
   Raycaster,
   RingGeometry,
   Scene,
+  ShaderMaterial,
   Sphere,
   SpotLight,
   Sprite,

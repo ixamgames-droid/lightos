@@ -310,5 +310,155 @@ class SperrzonenSceneTest(unittest.TestCase):
         self.assertEqual(fremd, 0)
 
 
+    # ── Darstellungs-Stile des Feldes (alt / a / b / c) ──────────────────────
+    def _stil_info(self):
+        return json.loads(self._eval(
+            "JSON.stringify(window.__lightosSperrzonen.stilInfo())"))
+
+    def _anzeige_objekte(self):
+        return self._eval(
+            "(function(){let n=0; window.__lightos.fixtures[%d].group.parent.traverse("
+            "o=>{ if(o.userData&&o.userData.sperrzonenAnzeige) n++; }); return n;})()" % _FID)
+
+    def test_stile_zeichnen_und_der_schalter_wirkt(self):
+        pos, rot = (0.0, 5.6, 2.5), (0.0, 0.0, 0.0)
+        feld = LaserFeld(links=20, rechts=20, oben=20, unten=20, zuschlag=5)
+        publikum = Sperrzone(id="p", name="Publikum", x=0.0, y=0.0, z=8.5,
+                             breite=11.0, hoehe=2.0, tiefe=8.0)
+        technik = Sperrzone(id="t", name="Technik", x=8.6, y=0.0, z=0.5,
+                            breite=2.4, hoehe=2.5, tiefe=4.0)
+        zonen = (publikum, technik)
+        namen = {z.id: z.name for z in zonen}
+
+        def setze(p, r):
+            self._poll(fixtures=json.dumps([_laser(p, r)]),
+                       sperrzonen=_daten(zonen=zonen, feld=feld))
+            sp = S.feld_spitze(p, r)
+            achse = S.geraete_achsen(r)[0]
+            # Lage UND Richtung muessen angekommen sein: die Ecke links-oben
+            # liegt, auf die Achse projiziert, genau eine Feldlaenge voraus.
+            self._poll_until_true(
+                "(function(){const f=window.__lightosSperrzonen.info().felder[0];"
+                " if(!f||!f.sichtbar) return false; const s=%s, a=%s, e=f.weltEcken[0];"
+                " const d=Math.abs(f.x-s[0])+Math.abs(f.y-s[1])+Math.abs(f.z-s[2]);"
+                " const v=(e[0]-s[0])*a[0]+(e[1]-s[1])*a[1]+(e[2]-s[2])*a[2];"
+                " return d<1e-4 && Math.abs(v-f.ecken[0][2])<1e-3;})()"
+                % (json.dumps(list(sp)), json.dumps(list(achse))))
+
+        self._load_and_wait()
+        setze(pos, rot)
+        soll = S.pruefe_laser(_FID, "Laser", pos, rot, feld, zonen)
+        self.assertEqual(soll.zonen, ["Publikum"])
+
+        # Standard ist die bisherige Pyramide; der Schalter haengt (auch) an
+        # window.__lightos, ohne dass app.js davon weiss.
+        self.assertEqual(self._eval("window.__lightos.sperrzonenStil()"), "alt")
+        self.assertEqual(self._eval("window.__lightosSperrzonen.stile"),
+                         ["alt", "a", "b", "c"])
+        vorher = self._stil_info()
+        self.assertEqual(vorher["fehler"], "")
+        self.assertTrue(vorher["felder"][0]["altSichtbar"])
+        self.assertFalse(vorher["felder"][0]["extra"])
+        self.assertFalse(vorher["lasersicht"]["sichtbar"])
+        objekte_alt = self._anzeige_objekte()
+        ecken_alt = self._info()["felder"][0]["weltEcken"]
+
+        for stil in ("a", "b", "c"):
+            with self.subTest(stil=stil):
+                self.assertEqual(
+                    self._eval("window.__lightos.sperrzonenStil(%r)" % stil), stil)
+                self._eval("window.__lightos.__renderTick && window.__lightos.__renderTick()")
+                i = self._stil_info()
+                self.assertEqual(i["stil"], stil)
+                self.assertEqual(i["fehler"], "", "Stil wirft beim Zeichnen")
+                f = i["felder"][0]
+                self.assertFalse(f["altSichtbar"], "alte Pyramide noch im Bild")
+                self.assertTrue(f["extra"])
+                # jedes neue Objekt ist als reine Anzeige gekennzeichnet
+                self.assertEqual(f["ohneKennung"], 0)
+                self.assertEqual([namen[z] for z in f["erreicht"]], soll.zonen)
+                self.assertGreater(self._anzeige_objekte(), objekte_alt)
+                z = {e["id"]: e for e in i["zonen"]}
+                if stil == "a":
+                    self.assertEqual(f["teile"]["ansatz"], 1.5)
+                    self.assertGreater(f["teile"]["fuss"], 0)      # Boden
+                    self.assertGreater(f["teile"]["schnitt"], 0)   # Publikum
+                    self.assertEqual(z["p"]["zustand"], "")
+                    self.assertFalse(i["lasersicht"]["sichtbar"])
+                else:
+                    self.assertGreater(f["teile"]["ansatz"], 1.5)
+                    self.assertLess(f["teile"]["ansatz"], 5.0)
+                    self.assertEqual(z["p"]["zustand"], "erreicht")
+                    self.assertEqual(z["p"]["laser"], [_FID])
+                    self.assertTrue(z["p"]["rand"])
+                    self.assertIn("Laser %d erreicht diese Zone" % _FID, z["p"]["zusatz"])
+                    self.assertGreater(z["p"]["deckkraft"], 0.3)
+                    self.assertEqual(z["t"]["zustand"], "frei")
+                    self.assertFalse(z["t"]["rand"])
+                    self.assertLess(z["t"]["deckkraft"], 0.2)
+                    self.assertTrue(z["t"]["schildSichtbar"])
+                if stil == "b":
+                    # die beiden unteren Feldkanten enden auf der Zone
+                    self.assertEqual(f["teile"]["kanten"], 2)
+                    self.assertGreater(f["teile"]["umriss"], 0)
+                    self.assertFalse(i["lasersicht"]["sichtbar"])
+                if stil == "c":
+                    ls = i["lasersicht"]
+                    self.assertTrue(ls["sichtbar"])
+                    self.assertFalse(ls["faengtEingabe"])
+                    self.assertGreater(ls["breite"], 100)
+                    self.assertEqual(ls["titel"], "Sicht von Laser %d" % _FID)
+                    self.assertEqual(ls["zonen"], ["Publikum", "Technik"])
+                    self.assertEqual(ls["erreicht"], ["Publikum"])
+                    # ein-/ausblendbar
+                    self.assertFalse(self._eval("window.__lightosSperrzonen.lasersicht(false)"))
+                    self.assertFalse(self._stil_info()["lasersicht"]["sichtbar"])
+                    self.assertTrue(self._eval("window.__lightosSperrzonen.lasersicht(true)"))
+                    self.assertTrue(self._stil_info()["lasersicht"]["sichtbar"])
+                # Zonen bleiben, was sie sind: an ihrer Stelle, ohne Eingabe zu fangen
+                info = self._info()
+                self.assertEqual([e["raycastTreffer"] for e in info["zonen"]], [0, 0])
+                self.assertEqual(info["felder"][0]["weltEcken"], ecken_alt)
+                # am Geraet haengt weiterhin nichts
+                self.assertEqual(self._eval(
+                    "(function(){let n=0; window.__lightos.fixtures[%d].group.traverse("
+                    "o=>{ if(o.userData&&o.userData.sperrzonenAnzeige) n++; }); return n;})()"
+                    % _FID), 0)
+
+        # Das Bild folgt derselben Vorschrift wie die Rechnung in Python —
+        # in jedem Stil, fuer getroffene wie freie Lagen.
+        lagen = [((0.0, 5.6, 2.5), (-30.0, 0.0, 0.0)), ((0.0, 5.6, 2.5), (30.0, 0.0, 0.0)),
+                 ((0.0, 5.6, 2.5), (10.0, 75.0, 0.0)), ((0.0, 5.6, 2.5), (0.0, 180.0, 0.0)),
+                 ((3.0, 4.0, -6.0), (0.0, 0.0, 0.0)), ((8.6, 1.0, 0.5), (-80.0, 0.0, 0.0)),
+                 ((0.0, 5.6, 2.5), (0.0, -55.0, 25.0)),
+                 # nach unten geneigt, vom Boden aus: nur der OBERE Rand reicht hin
+                 ((0.0, 0.2, -10.0), (22.0, 0.0, 0.0))]
+        self.assertEqual(S.pruefe_laser(_FID, "Laser", lagen[-1][0], lagen[-1][1],
+                                        feld, zonen).zonen, ["Publikum"])
+        gesehen = set()
+        for stil in ("c", "a", "alt", "b"):
+            self._eval("window.__lightos.sperrzonenStil(%r)" % stil)
+            for p, r in lagen:
+                setze(p, r)
+                erwartet = S.pruefe_laser(_FID, "Laser", p, r, feld, zonen).zonen
+                i = self._stil_info()
+                self.assertEqual(i["fehler"], "")
+                self.assertEqual(sorted(namen[z] for z in i["felder"][0]["erreicht"]),
+                                 sorted(erwartet), f"Stil {stil}, Lage {p} {r}")
+                gesehen.add(tuple(sorted(erwartet)))
+        self.assertIn((), gesehen)                      # auch eine freie Lage war dabei
+        self.assertGreater(len(gesehen), 2)
+
+        # Unbekannter Stil aendert nichts; zurueck auf 'alt' raeumt restlos auf.
+        self.assertEqual(self._eval("window.__lightos.sperrzonenStil('gibtsnicht')"), "b")
+        setze(pos, rot)
+        self.assertEqual(self._eval("window.__lightos.sperrzonenStil('alt')"), "alt")
+        nachher = self._stil_info()
+        self.assertEqual(nachher["zonen"], vorher["zonen"])
+        self.assertEqual(nachher["felder"], vorher["felder"])
+        self.assertFalse(nachher["lasersicht"]["sichtbar"])
+        self.assertEqual(self._anzeige_objekte(), objekte_alt)
+
+
 if __name__ == "__main__":
     unittest.main()
