@@ -64,7 +64,7 @@
 | LAS-35 | A | - | 2026-10-11T12:25Z | - |
 | MIDI-10 | D | feature/midi10-pitchbend-fader | 2026-10-11T14:47Z | src/core/midi/midi_manager.py · src/core/midi/midi_mapper.py · src/ui/virtualconsole/vc_widget.py · src/ui/virtualconsole/vc_slider.py · src/ui/views/midi_view.py · src/ui/widgets/midi_teach_dialog.py · src/ui/widgets/input_profile_editor.py · tests/test_midi10_pitchbend_fader.py · docs/anleitung_vc_widgets/02_fader.md · docs/anleitung_vc_widgets/02_fader.en.md |
 | MIDI-15 | D | - | 2026-10-11T13:58Z | - |
-| ENG-30 | D | perf/eng30-engine-zeit-je-frame | 2026-10-11T14:52Z | - |
+| ENG-30 | D | perf/eng30-engine-zeit-je-frame | 2026-10-11T15:41Z | src/core/app_state.py · src/core/engine/function_manager.py · src/core/engine/patch_index.py · src/core/engine/scene.py · src/core/engine/efx.py · src/core/engine/rgb_matrix.py · src/core/engine/mapped_channel.py · tools/engine_frame_zeit.py · tools/benchmark_universes.py · docs/ENGINE_FRAME_ZEIT.md · docs/PERFORMANCE.md · tests/test_eng30_frame_zeit.py |
 | XPLAT-36 | D | - | 2026-10-11T13:58Z | - |
 | OUT-68 | A | feature/out68-udmx-adapter | 2026-10-11T14:02Z | - |
 | OUT-69 | A | - | 2026-10-11T14:04Z | - |
@@ -221,7 +221,6 @@
 
 ## Verlauf
 
-- 2026-10-11T10:38Z A done DEMO-8
 - 2026-10-11T10:58Z A claim WEB-09
 - 2026-10-11T11:29Z D done QA-92
 - 2026-10-11T11:49Z A done DOC-69
@@ -251,3 +250,4 @@
 - 2026-10-11T14:58Z B done TOOL-26
 - 2026-10-11T15:10Z A claim WEB-10
 - 2026-10-11T15:31Z A done PROC-19
+- 2026-10-11T15:41Z D aktualisiert ENG-30: Dateien - -> src/core/app_state.py · src/core/engine/function_manager.py · src/core/engine/patch_index.py · src/core/engine/scene.py · src/core/engine/efx.py · src/core/engine/rgb_matrix.py · src/core/engine/mapped_channel.py · tools/engine_frame_zeit.py · tools/benchmark_universes.py · docs/ENGINE_FRAME_ZEIT.md · docs/PERFORMANCE.md · tests/test_eng30_frame_zeit.py
