@@ -22,6 +22,7 @@ test_ui85_hilfe_menue.py           # Hilfe-Menue oeffnet docs/ANLEITUNGEN.md + E
 test_web06_socketio_lokal.py       # liest THIRD_PARTY_NOTICES.md (Lizenzhinweis Socket.IO)
 test_xplat46_*.py                  # ARM-Empfehlung/venv-Architektur: lesen INSTALL.md
 test_las30_laser_achsen.py         # Patch-Anleitung nennt die Achsen-Haken
+test_las32_*.py                    # Laser-Anleitung, Abschnitt Sperrzonen
 test_tool14_gen_tools_index_cli.py # tools/README.md
 test_tool23_backlog_ids_tafel_fragmente.py  # BACKLOG / Tafel
 test_ui84_efx_laden_geraeteliste.py # Anleitung Matrix/EFX beim Laden
