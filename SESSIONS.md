@@ -70,7 +70,7 @@
 | WEB-10 | A | feature/web10-handy-seitenleiste | 2026-10-11T16:32Z | - |
 | OUT-70 | A | feature/out70-interface-erkennung-assistent | 2026-10-11T15:44Z | - |
 | UI-90 | D | - | 2026-10-11T16:21Z | - |
-| XPLAT-53 | D | - | 2026-10-11T16:21Z | - |
+| XPLAT-53 | D | fix/xplat53-viz72-teilen | 2026-10-11T16:40Z | tests/test_viz72_spot_pool_umgebung.py · tests/test_viz72b_spot_pool_bewegung_scene.py · tests/test_viz72c_umgebung_modi_scene.py · tests/_viz72_szene.py · tests/test_xplat53_viz72_geteilt.py |
 | MIDI-14 | D | - | 2026-10-11T16:21Z | - |
 | WEB-11 | A | feature/web11-qr-startbildschirm | 2026-10-11T16:32Z | - |
 
@@ -228,7 +228,6 @@
 
 ## Verlauf
 
-- 2026-10-11T12:20Z A done UI-84
 - 2026-10-11T12:24Z A claim LAS-33
 - 2026-10-11T12:25Z A claim LAS-34
 - 2026-10-11T12:25Z A claim LAS-35
@@ -258,3 +257,4 @@
 - 2026-10-11T16:21Z D claim MIDI-14
 - 2026-10-11T16:30Z D aktualisiert XPLAT-36: Branch - -> fix/xplat36-einzellauf-zeitlimit; Dateien - -> tools/verify_segmented.ps1 · tools/verify_segmented.sh · tests/test_xplat36_einzellauf_zeitlimit.py
 - 2026-10-11T16:32Z A claim WEB-11
+- 2026-10-11T16:40Z D aktualisiert XPLAT-53: Branch - -> fix/xplat53-viz72-teilen; Dateien - -> tests/test_viz72_spot_pool_umgebung.py · tests/test_viz72b_spot_pool_bewegung_scene.py · tests/test_viz72c_umgebung_modi_scene.py · tests/_viz72_szene.py · tests/test_xplat53_viz72_geteilt.py
