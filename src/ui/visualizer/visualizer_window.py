@@ -946,6 +946,37 @@ class VisualizerBridge(QObject):
             fids = []
         self._poll_set("beamsOff", fids)
 
+    def _sync_sperrzonen(self) -> None:
+        """LAS-32 (S1): Sperrzonen + Laser-Felder an die Szene reichen — reine
+        Anzeige. Ein JSON-Text mit sortierten Schluesseln, damit derselbe
+        Bestand denselben Text ergibt (der Poll schickt nur Geaendertes)."""
+        # Alles im try: eine reine Anzeige darf den Aufrufer (_on_state raeumt
+        # danach geloeschte Geraete aus der Szene) nie abbrechen.
+        try:
+            from src.core.laser.sperrzonen import szenen_daten
+            from src.core.laser import sperrzonen_merker
+            daten = szenen_daten(self._state)
+            # Fenster „Sicht des Lasers": gemerkte Vorliebe dieses Rechners.
+            daten["lasersicht"] = sperrzonen_merker.lasersicht_zeigen()
+            text = json.dumps(daten, sort_keys=True)
+            VisualizerBridge._poll_set(self, "sperrzonen", text)
+        except Exception as e:                           # noqa: BLE001
+            print(f"[Visualizer] Sperrzonen-Abgleich: {e}")
+
+    @Slot(bool)
+    @_bridge_slot_guard
+    def sperrzonenLasersicht(self, an: bool):
+        """LAS-32: das Fenster „Sicht des Lasers" wurde IM 3D ein- oder
+        ausgeblendet (Kreuz am Fenster bzw. Knopf unten links). Nur merken und
+        weitersagen — reine Anzeige, an der Ausgabe aendert sich nichts."""
+        from src.core.laser import sperrzonen_merker
+        sperrzonen_merker.merke_lasersicht(bool(an))
+        VisualizerBridge._sync_sperrzonen(self)
+        try:
+            self._state._emit("sperrzonen_anzeige_changed", bool(an))
+        except Exception as e:                           # noqa: BLE001
+            print(f"[Visualizer] Sperrzonen-Anzeige: {e}")
+
     def _sync_placeable(self) -> None:
         """Zahl offener Platzierungen in den Poll stellen (idempotent)."""
         try:
@@ -1146,6 +1177,7 @@ class VisualizerBridge(QObject):
         if not self._subscribed:
             self._state.subscribe(self._on_state)
             self._subscribed = True
+            VisualizerBridge._sync_sperrzonen(self)   # LAS-32: Stand beim Oeffnen
 
     def dispose(self):
         """Melde den State-Subscriber wieder ab (idempotent). Vom Owner beim
@@ -2410,6 +2442,11 @@ class VisualizerBridge(QObject):
         ]
 
     def _on_state(self, event: str, data):
+        # LAS-32 (S1): Zonen/Felder gehoeren zur Show und haengen am Patch
+        # (welche Geraete Laser sind) -> bei allen dreien neu in den Poll.
+        if event in ("sperrzonen_changed", "sperrzonen_anzeige_changed",
+                     "show_loaded", "patch_changed"):
+            VisualizerBridge._sync_sperrzonen(self)
         if event == "show_loaded":
             # Review VIZ-71: zuerst die Show-Generation, damit schon der erste
             # Batch der neuen Show sie traegt.
@@ -2773,6 +2810,15 @@ class VisualizerWindow(QMainWindow):
         act_clear_fx.setToolTip("Alle platzierten Fixtures aus der Szene entfernen")
         act_clear_fx.triggered.connect(self._clear_positions)
         tb.addAction(act_clear_fx)
+
+        # LAS-32 (S1): Sperrzonen anlegen/bearbeiten und Laser-Felder eintragen.
+        act_sperrzonen = QAction("Sperrzonen…", self)
+        act_sperrzonen.setToolTip(
+            "Sperrzonen (rote Quader) und das Maximalfeld je Laser eintragen.\n"
+            "Nur Anzeige — schaltet den Laser NICHT ab.")
+        act_sperrzonen.triggered.connect(self._on_sperrzonen_dialog)
+        tb.addAction(act_sperrzonen)
+        self._act_sperrzonen = act_sperrzonen
 
         tb.addSeparator()
 
@@ -5647,7 +5693,38 @@ class VisualizerWindow(QMainWindow):
         except Exception as e:
             print(f"[Visualizer] _on_brightness_from_js error: {e}")
 
+    def _on_sperrzonen_dialog(self):
+        """LAS-32 (S1): den Sperrzonen-Dialog zeigen (nicht modal — das 3D
+        dahinter zeichnet jede Aenderung sofort)."""
+        from src.ui.visualizer.sperrzonen_ui import SperrzonenDialog
+        dlg = getattr(self, "_sperrzonen_dlg", None)
+        if dlg is None:
+            dlg = SperrzonenDialog(self._state, self)
+            self._sperrzonen_dlg = dlg
+        else:
+            dlg.neu_laden()
+        dlg.show()
+        dlg.raise_()
+        dlg.activateWindow()
+
     def _on_state(self, event: str, _data):
+        if event == "sperrzonen_anzeige_changed":
+            # LAS-32: Fenster „Sicht des Lasers" im 3D geschlossen/geoeffnet ->
+            # der Haken im Sperrzonen-Dialog zieht nach.
+            dlg = getattr(self, "_sperrzonen_dlg", None)
+            if dlg is not None:
+                try:
+                    dlg.lasersicht_nachziehen()
+                except Exception as e:                   # noqa: BLE001
+                    print(f"[Visualizer] Sperrzonen-Dialog: {e}")
+        if event in ("patch_changed", "show_loaded"):
+            # LAS-32: ein offener Sperrzonen-Dialog zeigt sonst die alte Show.
+            dlg = getattr(self, "_sperrzonen_dlg", None)
+            if dlg is not None and dlg.isVisible():
+                try:
+                    dlg.neu_laden()
+                except Exception as e:                   # noqa: BLE001
+                    print(f"[Visualizer] Sperrzonen-Dialog: {e}")
         if event == "patch_changed":
             self._refresh_patch_list()
         elif event == "show_loaded":

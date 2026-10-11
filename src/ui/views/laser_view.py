@@ -367,6 +367,16 @@ class LaserView(QWidget):
         self._dmx_safety_box.setVisible(False)
         root.addWidget(self._dmx_safety_box)
 
+        # LAS-32 (S1): Sperrzonen-Meldung je Laser — nur Anzeige, schaltet
+        # nichts ab (eigenes Widget, unsichtbar ohne DMX-Laser).
+        try:
+            from src.ui.visualizer.sperrzonen_ui import SperrzonenHinweis
+            self._sperrzonen_hinweis = SperrzonenHinweis(get_state(), self)
+            root.addWidget(self._sperrzonen_hinweis)
+        except Exception as e:                           # noqa: BLE001
+            self._sperrzonen_hinweis = None
+            print(f"[laser_view] Sperrzonen-Hinweis: {e}")
+
         # Mustergruppe (Kopf 0/1) — nur sichtbar, wenn das Gerät doppelte
         # Laser-Attribute hat (z. B. L2600 34ch: Gruppe A + B).
         self._head_box = QGroupBox("Mustergruppe")
