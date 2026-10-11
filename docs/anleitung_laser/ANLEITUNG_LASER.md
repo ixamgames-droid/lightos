@@ -251,9 +251,12 @@ worauf es ankommt:
 - **Rote Schraffur:** der Teil einer Sperrzone, den das Feld erreicht. Das
   Schild über der Zone bekommt eine zweite Zeile *„⚠ Laser 1 erreicht diese
   Zone“* (bei mehreren: *„Laser 1, 3 erreichen diese Zone“*). Zonen, die kein
-  Laser erreicht, sind etwas blasser.
+  Laser erreicht, sind etwas blasser — aber nur, solange **alle** Laser
+  prüfbar sind. Fehlen einem Laser Randwinkel oder der Platz im 3D, bleibt
+  jede Zone kräftig: für ihn weiß LightOS es nicht.
 - **Kein Treffer:** die vier Feldkanten laufen ein Stück ausblendend weiter,
-  und am Ansatz steht *„Laser 1: erreicht keine Zone“*.
+  und am Ansatz steht *„Laser 1: erreicht keine Zone — nur Anzeige“*. Das
+  ist **keine Freigabe** (siehe Grenzen oben).
 - **Fenster „Sicht des Lasers“** unten links: das Bild aus dem Austrittsfenster
   heraus. Das Feld ist ein gelbes Rechteck (durchgezogen = mit Zuschlag,
   gestrichelt = deine Randwinkel, an den Seiten die Gradzahlen), die Zonen

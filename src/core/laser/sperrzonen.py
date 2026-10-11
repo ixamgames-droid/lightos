@@ -684,16 +684,24 @@ FELD_ANZEIGE_LAENGE_M = 25.0
 
 def szenen_daten(state) -> dict:
     """Was der 3D-Visualizer zeichnet: alle Zonen und je DMX-Laser mit
-    vollstaendigen Randwinkeln das Feld. Reine Anzeige-Daten."""
+    vollstaendigen Randwinkeln das Feld. Reine Anzeige-Daten.
+
+    ``ungeprueft`` = Zahl der DMX-Laser OHNE vollstaendige Randwinkel. Solange
+    es einen gibt, zeichnet das 3D keine Zone als „von keinem Laser erreicht"
+    (blasser) — fuer den nicht pruefbaren Laser weiss das niemand."""
     daten = getattr(state, "sperrzonen", None) or SperrzonenDaten()
     if daten.fremd is not None:
-        return {"zonen": [], "felder": [], "laenge": FELD_ANZEIGE_LAENGE_M}
+        return {"zonen": [], "felder": [], "laenge": FELD_ANZEIGE_LAENGE_M,
+                "ungeprueft": 0}
     felder = []
+    ungeprueft = 0
     for fid, _name, kennung in dmx_laser_geraete(state):
         feld = daten.feld(fid, kennung)
         if feld.vollstaendig:
             eintrag = feld.to_dict()
             eintrag["fid"] = fid
             felder.append(eintrag)
+        else:
+            ungeprueft += 1
     return {"zonen": [z.to_dict() for z in daten.zonen], "felder": felder,
-            "laenge": FELD_ANZEIGE_LAENGE_M}
+            "laenge": FELD_ANZEIGE_LAENGE_M, "ungeprueft": ungeprueft}

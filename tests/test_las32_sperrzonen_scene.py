@@ -491,12 +491,34 @@ class SperrzonenSceneTest(unittest.TestCase):
         self.assertEqual(i["felder"][0]["erreicht"], [])
         self.assertEqual(t["schnitt"], 0)
         self.assertGreater(t["weiter"], t["ansatz"])
-        self.assertEqual(t["hinweis"], "Laser %d: erreicht keine Zone" % _FID)
+        # Der Hinweis im Bild traegt „nur Anzeige" bei sich — er steht auch
+        # dann da, wenn das Fenster (mit seinem „Nur Anzeige") ausgeblendet ist.
+        self.assertEqual(t["hinweis"],
+                         "Laser %d: erreicht keine Zone — nur Anzeige" % _FID)
         self.assertEqual(i["felder"][0]["ohneKennung"], 0)
         self.assertEqual([e["zustand"] for e in i["zonen"]], ["frei", "frei"])
         self.assertEqual([e["zusatz"] for e in i["zonen"]], ["", ""])
         self.assertTrue(i["lasersicht"]["sichtbar"])
         self.assertEqual(i["lasersicht"]["erreicht"], [])
+        blass = i["zonen"][0]["deckkraft"]
+        # Gibt es daneben einen NICHT pruefbaren Laser (Randwinkel fehlen), ist
+        # „kein Treffer" keine Aussage ueber die Zone: sie bleibt kraeftig.
+        self._poll(fixtures=json.dumps([laser(_FID, pos, frei)]),
+                   sperrzonen=daten(ungeprueft=1))
+        self._poll_until_true(
+            "window.__lightosSperrzonen.darstellung().zonen[0].zustand===''")
+        i = self._darstellung()
+        self.assertEqual([e["zustand"] for e in i["zonen"]], ["", ""])
+        self.assertGreater(i["zonen"][0]["deckkraft"], blass)
+        self.assertEqual(i["felder"][0]["erreicht"], [])
+        # Ebenso, wenn ein Laser zwar Randwinkel hat, aber im 3D nicht steht.
+        self._poll(fixtures=json.dumps([laser(_FID, pos, frei)]),
+                   sperrzonen=daten(felder=(_FID, fid2)))
+        self._poll_until_true(
+            "window.__lightosSperrzonen.info().felder.length===2")
+        i = self._darstellung()
+        self.assertEqual([e["zustand"] for e in i["zonen"]], ["", ""])
+        self.assertGreater(i["zonen"][0]["deckkraft"], blass)
 
         # (5) Zwei Laser: der zweite haengt seitlich und trifft „Technik".
         pos2, rot2 = (8.6, 5.0, 8.0), (0.0, 180.0, 0.0)
@@ -540,8 +562,16 @@ class SperrzonenSceneTest(unittest.TestCase):
                  ((3.0, 4.0, -6.0), (0.0, 0.0, 0.0)), ((8.6, 1.0, 0.5), (-80.0, 0.0, 0.0)),
                  ((0.0, 5.6, 2.5), (0.0, -55.0, 25.0)),
                  # nach unten geneigt, vom Boden aus: nur der OBERE Rand reicht hin
-                 ((0.0, 0.2, -10.0), (22.0, 0.0, 0.0))]
-        self.assertEqual(S.pruefe_laser(_FID, "Laser", lagen[-1][0], lagen[-1][1],
+                 ((0.0, 0.2, -10.0), (22.0, 0.0, 0.0)),
+                 # Geraet IN „Technik", Austrittsfenster schaut gerade heraus
+                 # und strahlt von ihr weg: trotzdem erreicht
+                 ((8.6, 1.0, 2.55), (0.0, 0.0, 0.0))]
+        im_geraet = lagen[-1]
+        self.assertIn("Technik", S.pruefe_laser(_FID, "Laser", im_geraet[0], im_geraet[1],
+                                                feld, zonen).zonen)
+        self.assertFalse(S.kann_erreichen(S.feld_spitze(*im_geraet), im_geraet[1],
+                                          feld, technik))
+        self.assertEqual(S.pruefe_laser(_FID, "Laser", lagen[-2][0], lagen[-2][1],
                                         feld, zonen).zonen, ["Publikum"])
         gesehen = set()
         for p, r in lagen:
@@ -567,6 +597,53 @@ class SperrzonenSceneTest(unittest.TestCase):
         self.assertIn((), gesehen)                      # auch eine freie Lage war dabei
         self.assertGreater(len(gesehen), 2)
 
+        # (6b) Ungleiche Randwinkel: das Bild rechnet mit DENSELBEN vier Seiten
+        # wie Python. In jeder dieser Lagen entscheidet genau die Seite — mit
+        # vertauschtem links/rechts bzw. oben/unten kaeme das Gegenteil heraus.
+        schief = [(LaserFeld(links=40, rechts=2, oben=5, unten=5, zuschlag=2), "lr"),
+                  (LaserFeld(links=2, rechts=40, oben=5, unten=5, zuschlag=2), "lr"),
+                  (LaserFeld(links=5, rechts=5, oben=2, unten=40, zuschlag=2), "ou"),
+                  (LaserFeld(links=5, rechts=5, oben=40, unten=2, zuschlag=2), "ou")]
+        # je Seitenpaar zwei Lagen: die Zone liegt einmal auf der einen, einmal
+        # auf der anderen Seite des Feldes
+        orte = {"lr": [((-9.0, 1.0, 2.0), (0.0, 0.0, 0.0)),
+                       ((-9.0, 1.0, 15.0), (0.0, 180.0, 0.0))],
+                "ou": [((0.0, 5.6, -4.0), (0.0, 0.0, 0.0)),
+                       ((0.0, -3.0, -4.0), (0.0, 0.0, 0.0))]}
+        ergebnisse = set()
+        for fl, paar, p, r in [(fl, paar, p, r) for fl, paar in schief
+                               for p, r in orte[paar]]:
+            if paar == "lr":
+                gespiegelt = LaserFeld(links=fl.rechts, rechts=fl.links, oben=fl.oben,
+                                       unten=fl.unten, zuschlag=2)
+            else:
+                gespiegelt = LaserFeld(links=fl.links, rechts=fl.rechts, oben=fl.unten,
+                                       unten=fl.oben, zuschlag=2)
+            erwartet = S.pruefe_laser(_FID, "Laser", p, r, fl, zonen).zonen
+            self.assertNotEqual(
+                sorted(erwartet),
+                sorted(S.pruefe_laser(_FID, "Laser", p, r, gespiegelt, zonen).zonen),
+                "Lage taugt nicht: die Seite entscheidet hier nichts")
+            e = fl.to_dict()
+            e["fid"] = _FID
+            text = json.dumps({"zonen": [z.to_dict() for z in zonen], "felder": [e],
+                               "laenge": S.FELD_ANZEIGE_LAENGE_M}, sort_keys=True)
+            self._poll(fixtures=json.dumps([laser(_FID, p, r)]), sperrzonen=text)
+            angekommen(_FID, p, r)
+            # warten, bis genau DIESES Feld angekommen ist (alle vier Ecken)
+            self._poll_until_true(
+                "JSON.stringify(window.__lightosSperrzonen.info().felder[0].ecken)"
+                "===JSON.stringify(window.__lightosSperrzonen.feldEcken(%s, %r))"
+                % (json.dumps(e), S.FELD_ANZEIGE_LAENGE_M))
+            i = self._darstellung()
+            self.assertEqual(i["fehler"], "")
+            self.assertEqual(sorted(namen[z] for z in i["felder"][0]["erreicht"]),
+                             sorted(erwartet), f"Feld {e} Lage {p} {r}")
+            self.assertEqual(i["felder"][0]["teile"]["schnitt"] > 0, bool(erwartet))
+            ergebnisse.add((paar, p, tuple(sorted(erwartet))))
+        # jede der vier Lagen kam mit Treffer UND ohne vor
+        self.assertEqual(len(ergebnisse), 8)
+
         # (7) Alles weg: Szene und Fenster raeumen restlos auf.
         self._poll(fixtures=json.dumps([laser(_FID, pos, rot)]),
                    sperrzonen=daten(felder=(), zonen_=()))
@@ -577,6 +654,23 @@ class SperrzonenSceneTest(unittest.TestCase):
             "(function(){let n=0; window.__lightos.fixtures[%d].group.parent.traverse("
             "o=>{ if(o.userData&&o.userData.sperrzonenAnzeige) n++; }); return n;})()" % _FID), 0)
         self.assertFalse(self._darstellung()["lasersicht"]["sichtbar"])
+
+        # (8) Ohne Laser-Feld kostet der Abgleich im Poll nichts: er fasst
+        # weder Buehnenkoerper noch Auswahl an — auch nicht mit Zonen allein.
+        zaehlen = ("(function(){const so=window.__lightos.stageObjects; window.__lasN=0;"
+                   " so.__las32probe={}; Object.defineProperty(so.__las32probe,'mesh',"
+                   "{get(){ window.__lasN++; return null; }});"
+                   " let r; try{ r=window.__lightosSperrzonen.abgleich(); }"
+                   " finally{ delete so.__las32probe; } return [r, window.__lasN];})()")
+        self.assertEqual(self._eval(zaehlen), [False, 0])
+        self._poll(fixtures=json.dumps([laser(_FID, pos, rot)]),
+                   sperrzonen=daten(felder=()))
+        self._poll_until_true("window.__lightosSperrzonen.info().zonen.length===2")
+        self.assertEqual(self._eval(zaehlen), [False, 0])
+        # Gegenprobe: mit Feld schaut er hin.
+        self._poll(fixtures=json.dumps([laser(_FID, pos, rot)]), sperrzonen=daten())
+        angekommen(_FID, pos, rot)
+        self.assertGreater(self._eval(zaehlen)[1], 0)
 
 
 if __name__ == "__main__":

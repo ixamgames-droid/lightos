@@ -44,12 +44,12 @@ export const ZONEN_FARBE = 0xff2020;
 export const ZONEN_DECKKRAFT = 0.22;
 export const FELD_FARBE = 0xffb000;
 export const FELD_LAENGE_STANDARD = 25.0;   // wie LASER_BEAM_LENGTH (laser.js)
-const WINKEL_GESAMT_MAX = 89.0;
 
 const _noop = () => {};
 const _zonen = {};      // id -> { gruppe, daten, zustand, laser }
 const _felder = {};     // fid -> { gruppe, daten, ecken, lage, extra, erreicht, teile }
 let _laenge = FELD_LAENGE_STANDARD;
+let _ungeprueft = 0;    // DMX-Laser OHNE vollstaendige Randwinkel (aus Python)
 const _spitze = new THREE.Vector3();
 
 function zahl(v, def) {
@@ -206,12 +206,8 @@ function baueZone(d) {
 // bleiben als Pruefgroesse: an ihnen bindet der Szenen-Test die Lage des
 // Feldes an feld_ebenen() in Python.
 export function feldEcken(d, laenge) {
-  const z = Math.max(2, zahl(d.zuschlag, 5));
-  const tan = w => Math.tan(Math.min(WINKEL_GESAMT_MAX, zahl(w, 0) + z) * Math.PI / 180);
-  const L = laenge;
-  const xl = L * tan(d.links), xr = -L * tan(d.rechts);
-  const yo = L * tan(d.oben), yu = -L * tan(d.unten);
-  return [[xl, yo, L], [xr, yo, L], [xr, yu, L], [xl, yu, L]];
+  // Dieselben Tangens-Werte und Kanten, mit denen unten gezeichnet wird.
+  return G.kantenRichtungen(G.tanWerte(d)).map(r => [r[0] * laenge, r[1] * laenge, laenge]);
 }
 
 /** Anker eines Feldes: eine leere Gruppe, die die Lage des Austrittsfensters
@@ -236,6 +232,7 @@ export function setSperrzonen(json) {
   for (const id in _zonen) { entsorge(_zonen[id].gruppe); delete _zonen[id]; }
   for (const fid in _felder) { entsorge(_felder[fid].gruppe); delete _felder[fid]; }
   _laenge = Math.max(1, zahl(d.laenge, FELD_LAENGE_STANDARD));
+  _ungeprueft = Math.max(0, zahl(d.ungeprueft, 0));
   // Fenster „Sicht des Lasers": der gemerkte Zustand kommt aus Python.
   if (typeof d.lasersicht === 'boolean') _lasersichtAn = d.lasersicht;
   for (const z of (d.zonen || [])) {
@@ -260,6 +257,9 @@ export function setSperrzonen(json) {
  *  laeuft bei jedem Poll — so folgt das Feld einem verschobenen, gedrehten
  *  oder neu gebauten Geraet, ohne dass der Geraetebau davon wissen muss. */
 export function sperrzonenAbgleich() {
+  // Ohne Laser-Feld haengt nichts an Geraeten, Buehne oder Auswahl: der Poll
+  // kostet dann nichts (auch nicht mit Zonen allein).
+  if (!Object.keys(_felder).length) return false;
   let geaendert = lagenAbgleich();
   // Fussabdruck und die Sicht des Lasers haengen auch an den Buehnenkoerpern
   // — verschobene Plattform, neues Bild.
@@ -330,10 +330,13 @@ function auswahlFolgen() {
 //   SCHRAFFUR    der Teil einer Sperrzone, den das Feld erreicht, kraeftig rot
 //                schraffiert. Ihr Schild sitzt UEBER der Zone, neben der
 //                Schraffur, und traegt „⚠ Laser N erreicht diese Zone".
-//                Nicht erreichte Zonen sind etwas blasser.
+//                Nicht erreichte Zonen sind etwas blasser — aber nur, wenn
+//                ALLE DMX-Laser pruefbar sind: fehlen einem die Randwinkel
+//                oder der Platz im 3D, weiss niemand, ob er die Zone
+//                erreicht, und sie bleibt kraeftig.
 //   OHNE TREFFER die Feldkanten laufen ein Stueck ausblendend weiter (wohin
 //                zeigt das Feld?), am Ansatz steht „Laser N: erreicht keine
-//                Zone".
+//                Zone — nur Anzeige".
 //   FENSTER      „Sicht des Lasers" (sperrzonen_lasersicht.js): Bild-im-Bild
 //                aus dem Austrittsfenster, ein-/ausblendbar.
 //
@@ -450,7 +453,7 @@ function umriss(polygon) {
   return polygon.map((p, i) => [p, polygon[(i + 1) % polygon.length]]);
 }
 
-/** Kleines, sachliches Schild am Feld-Ansatz („… erreicht keine Zone"). */
+/** Kleines, sachliches Schild am Feld-Ansatz („… erreicht keine Zone — nur Anzeige"). */
 function hinweisSchild(text) {
   const c = document.createElement('canvas');
   c.height = 64;
@@ -697,12 +700,14 @@ function baueSchnitt(k, z) {
 }
 
 /** Zustand einer Zone ins Bild setzen: Schild (mit Treffer-Zeile), Blaesse.
- *  `aktiv` = es steht ueberhaupt ein pruefbares Feld in der Szene. */
-function zonenZustand(z, laser, aktiv, mitte) {
+ *  `aktiv` = es steht ueberhaupt ein pruefbares Feld in der Szene;
+ *  `unsicher` = mindestens ein Laser ist NICHT pruefbar — dann heisst „kein
+ *  Treffer" nicht „frei" (wie in Python: nie „erreicht keine Zone" raten). */
+function zonenZustand(z, laser, aktiv, mitte, unsicher) {
   const u = z.gruppe.userData;
   const par = u.koerper.geometry.parameters;
   z.laser = laser.slice();
-  z.zustand = !aktiv ? '' : (laser.length ? 'erreicht' : 'frei');
+  z.zustand = !aktiv ? '' : (laser.length ? 'erreicht' : (unsicher ? '' : 'frei'));
   const blass = z.zustand === 'frei';
   u.koerper.material.opacity = blass ? ZONE_BLASS_DECKKRAFT : ZONEN_DECKKRAFT;
   u.kanten.material.opacity = blass ? 0.5 : 0.9;
@@ -790,7 +795,7 @@ function aufbau() {
     }
     let hinweis = '';
     if (frei && Object.keys(_zonen).length) {
-      hinweis = 'Laser ' + Number(fid) + ': erreicht keine Zone';
+      hinweis = 'Laser ' + Number(fid) + ': erreicht keine Zone — nur Anzeige';
       const h = hinweisSchild(hinweis);
       // ueber der Oberkante des Ansatzes, damit es ihn nicht verdeckt
       h.position.set(0, k.t.o * ANSATZ_LAENGE + 0.25, ANSATZ_LAENGE);
@@ -802,10 +807,13 @@ function aufbau() {
     e.extra = extra;
   }
   const fids = Object.keys(kontexte).map(Number).sort((a, b) => a - b);
+  // Nicht pruefbar: Laser ohne Randwinkel (zaehlt Python) oder mit Feld, aber
+  // ohne Platz im 3D (Feld unsichtbar).
+  const unsicher = _ungeprueft > 0 || fids.length < Object.keys(_felder).length;
   for (const id in _zonen) {
     const m = mitten[id];
     zonenZustand(_zonen[id], (jeZone[id] || []).sort((a, b) => a - b), fids.length > 0,
-                 (m && m.n) ? m.summe.map(v => v / m.n) : null);
+                 (m && m.n) ? m.summe.map(v => v / m.n) : null, unsicher);
   }
   // Fenster „Sicht des Lasers": nur mit pruefbarem Laser UND Zone.
   const moeglich = fids.length > 0 && Object.keys(_zonen).length > 0;

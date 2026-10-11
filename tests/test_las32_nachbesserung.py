@@ -99,6 +99,12 @@ class BindungTest(unittest.TestCase):
         self.assertNotIn("erreicht keine Zone", text)
         self.assertIn("Randwinkel fehlen — nicht prüfbar", text)
         self.assertEqual(S.szenen_daten(st)["felder"], [])      # kein Feld im 3D
+        # … und das 3D erfaehrt, dass ein Laser nicht pruefbar ist: es zeichnet
+        # dann keine Zone als „von keinem Laser erreicht" (blasser).
+        self.assertEqual(S.szenen_daten(st)["ungeprueft"], 1)
+        st.sperrzonen.setze_feld(2, _feld(geraet=S.geraete_kennung(st._patch[0])))
+        self.assertEqual(S.szenen_daten(st)["ungeprueft"], 0)
+        self.assertEqual(len(S.szenen_daten(st)["felder"]), 1)
 
     def test_bindung_ueberlebt_speichern_und_laden(self):
         daten = SperrzonenDaten()
