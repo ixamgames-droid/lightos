@@ -35,7 +35,6 @@
 | VIZ-101 | A | fix/viz101-licht-durch-wand | 2026-10-10T14:38Z | - |
 | UI-86 | A | perf/ui86-2d-ansicht-hidpi | 2026-10-10T19:31Z | - |
 | VCB-36 | D | fix/vcb36-blackout-ziel-gruppen-id | 2026-10-10T22:54Z | - |
-| UI-78 | D | fix/ui78-efx-editor-texte | 2026-10-10T22:54Z | - |
 | TOOL-18 | D | fix/tool18-bilder-hinweis-gpu-szenen | 2026-10-10T22:54Z | - |
 | CDX-58 | A | fix/cdx-1010-main | 2026-10-10T19:30Z | - |
 | VIZ-102 | A | feature/viz102-gobo-hallenboden | 2026-10-11T16:09Z | - |
@@ -219,7 +218,6 @@
 
 ## Verlauf
 
-- 2026-10-11T15:41Z D aktualisiert ENG-30: Dateien - -> src/core/app_state.py · src/core/engine/function_manager.py · src/core/engine/patch_index.py · src/core/engine/scene.py · src/core/engine/efx.py · src/core/engine/rgb_matrix.py · src/core/engine/mapped_channel.py · tools/engine_frame_zeit.py · tools/benchmark_universes.py · docs/ENGINE_FRAME_ZEIT.md · docs/PERFORMANCE.md · tests/test_eng30_frame_zeit.py
 - 2026-10-11T15:44Z A claim OUT-70
 - 2026-10-11T16:05Z A done VIZ-96
 - 2026-10-11T16:21Z D claim UI-90
@@ -249,3 +247,4 @@
 - 2026-10-11T19:24Z D claim VCB-43
 - 2026-10-11T19:24Z D claim OUT-71
 - 2026-10-11T19:35Z D done UI-80
+- 2026-10-11T19:55Z D done UI-78
