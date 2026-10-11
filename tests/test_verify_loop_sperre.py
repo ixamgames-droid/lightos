@@ -129,7 +129,7 @@ class VolleSuiteSerialisiertTest(unittest.TestCase):
         haengenbleibt — das ist im Warte-Test der erwuenschte Ausgang.
         """
         p = subprocess.Popen([_RUNNER], cwd=_REPO, stdout=subprocess.PIPE,
-                             stderr=subprocess.STDOUT, text=True,
+                             stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
                              start_new_session=True, env=self.env)
         try:
             ausgabe, _ = p.communicate(timeout=timeout)
@@ -184,7 +184,7 @@ class VolleSuiteSerialisiertTest(unittest.TestCase):
                    if k != "LIGHTOS_VERIFY_DRYRUN"}
             r = subprocess.run(
                 [_RUNNER, "tests/test_keine_privaten_dateien.py"],
-                cwd=_REPO, capture_output=True, text=True, timeout=180,
+                cwd=_REPO, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=180,
                 env=env)
             self.assertNotIn("warte", r.stdout.lower())
             self.assertEqual(r.returncode, 0, r.stdout[-2000:])
@@ -222,7 +222,7 @@ class KeineZweiteSuiteAusEinemTestTest(unittest.TestCase):
                "LIGHTOS_VERIFY_DRYRUN": "1",
                "LIGHTOS_SHOW_DB": os.path.join(self._dir, "kind.db")}
         r = subprocess.run([_RUNNER], cwd=_REPO, capture_output=True,
-                           text=True, timeout=180, env=env)
+                           text=True, encoding="utf-8", errors="replace", timeout=180, env=env)
 
         self.assertEqual(0, r.returncode, r.stdout[-2000:])
         self.assertNotIn("segmentiert", r.stdout,
@@ -255,7 +255,7 @@ class KeineZweiteSuiteAusEinemTestTest(unittest.TestCase):
         subprocess.run(
             [sys.executable, "-m", "pytest", "tests/test_app_data_dir.py",
              "-k", "diesen_namen_gibt_es_nicht", "-q", "-p", "no:cacheprovider"],
-            cwd=_REPO, capture_output=True, text=True, timeout=180, env=env)
+            cwd=_REPO, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=180, env=env)
 
         self.assertTrue(os.path.exists(db),
                         "Der Kindprozess hat die Show-DB des Elternprozesses "
@@ -305,7 +305,7 @@ class SperreGiltUeberWorktreeGrenzenTest(unittest.TestCase):
         # gemeldet, weil Bestimmung und Belegung getrennt sind.
         umgebung["LIGHTOS_VERIFY_NOLOCK"] = "1"
         r = subprocess.run(["bash", os.path.join(wurzel, "tools", "verify_loop.sh")],
-                           cwd=wurzel, env=umgebung, capture_output=True, text=True,
+                           cwd=wurzel, env=umgebung, capture_output=True, text=True, encoding="utf-8", errors="replace",
                            timeout=180)
         for zeile in r.stdout.splitlines():
             if zeile.startswith("[verify] Sperrdatei:"):
@@ -325,7 +325,7 @@ class SperreGiltUeberWorktreeGrenzenTest(unittest.TestCase):
                     zweig = "proc02b-probe-" + os.path.basename(ziel)
                     r = subprocess.run(
                         ["git", "worktree", "add", "--detach", ziel, "HEAD"],
-                        cwd=_REPO, capture_output=True, text=True, timeout=120)
+                        cwd=_REPO, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
                     if r.returncode != 0:
                         self.skipTest(f"worktree add ging nicht: {r.stderr[:200]}")
                     angelegt.append(ziel)
@@ -372,7 +372,7 @@ class SperreGiltUeberWorktreeGrenzenTest(unittest.TestCase):
                 umgebung["LIGHTOS_LOCKFILE"] = os.path.join(tmp, name + ".lock")
                 r = subprocess.run(
                     ["bash", os.path.join(_REPO, "tools", "verify_loop.sh")],
-                    cwd=_REPO, env=umgebung, capture_output=True, text=True,
+                    cwd=_REPO, env=umgebung, capture_output=True, text=True, encoding="utf-8", errors="replace",
                     timeout=120)
                 pfade.append(next(z.split(":", 1)[1].strip()
                                   for z in r.stdout.splitlines()

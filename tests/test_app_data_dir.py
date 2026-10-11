@@ -117,7 +117,7 @@ _APPDATA_SELFRESOLVE = re.compile(r"""environ(?:\.get\(|\[)\s*["']APPDATA["']"""
 
 def _tracked_python_files():
     out = subprocess.run(["git", "ls-files", "*.py"], cwd=_REPO_ROOT,
-                         capture_output=True, text=True, check=True).stdout
+                         capture_output=True, text=True, encoding="utf-8", errors="replace", check=True).stdout
     for rel in out.splitlines():
         rel = rel.strip()
         if not rel or rel.startswith(_SKIP_PREFIXES):

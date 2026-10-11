@@ -110,7 +110,7 @@ def _run_pytest_in(ordner, dateiname, env, extra_args=()):
     return subprocess.run(
         [sys.executable, "-m", "pytest", dateiname, "-q",
          "-p", "no:cacheprovider", "-p", "conftest", *extra_args],
-        cwd=str(ordner), env=env, capture_output=True, text=True, timeout=300)
+        cwd=str(ordner), env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
 
 
 @pytest.mark.parametrize("env_extra, label", [

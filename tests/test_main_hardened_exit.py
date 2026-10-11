@@ -17,7 +17,7 @@ def test_finalize_and_exit_runs_atexit_hooks(tmp_path):
     result = subprocess.run(
         [sys.executable, "-c", code],
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         timeout=15,
         env=None,
     )
