@@ -22,6 +22,7 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 from .function import Function, FunctionType
+from .patch_index import PatchListe
 
 if TYPE_CHECKING:
     from src.core.dmx.universe import Universe
@@ -115,6 +116,8 @@ def hsv_to_rgb(h: float, s: float, v: float) -> Color:
 
 
 def _find_fixture(patch_cache, fid):
+    if type(patch_cache) is PatchListe:         # ENG-30: nachschlagen
+        return patch_cache.finde(fid)
     for fx in patch_cache or ():
         if getattr(fx, "fid", None) == fid:
             return fx

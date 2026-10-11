@@ -443,6 +443,9 @@ class AppState:
         # Vorberechneter Render-Plan (bei Patch-Aenderung erneuert) fuer den
         # zentralen Per-Frame-Renderer _render_frame().
         self._fix_index: dict[int, tuple] = {}          # fid -> (fixture, channels)
+        # ENG-30: fid -> (Eintrag aus _fix_index, Adresse, Universum,
+        #                 Intensitaets-, Dimmer-, Farb-Adressen) — s. _adress_listen.
+        self._adress_plan: dict[int, tuple] = {}
         # VCB-11: slot -> (fids, gruppen) der gedrueckten Blackout-Tasten mit Ziel.
         self._ziel_blackout_specs: dict = {}
         self._default_frame: dict[int, bytes] = {}      # univ -> 512B Default-Frame
@@ -1770,6 +1773,20 @@ class AppState:
         # getauschte Kombination (neuer fix_index + alte spans/defaults) sieht.
         new_default_frame = {u: bytes(b) for u, b in defaults.items()}
         new_patched_set = {u: frozenset(s) for u, s in addrs.items()}
+        # ENG-30: die Adresslisten, die _render_frame je Geraet braucht, EINMAL
+        # hier ableiten statt in jedem Frame (bei 80 Geraeten rund 5700
+        # Attributzugriffe auf Datenbank-Objekte je Frame, die Haelfte der
+        # Grundlast). Ein Geraet, bei dem das Ableiten wirft, bleibt ohne
+        # Eintrag — der Frame rechnet es dann wie bisher selbst (und meldet
+        # den Fehler dort, wo er bisher auch auffiel).
+        adress_plan: dict[int, tuple] = {}
+        for _fid, _eintrag in fix_index.items():
+            try:
+                _fx = _eintrag[0]
+                adress_plan[_fid] = (_eintrag, _fx.address, _fx.universe,
+                                     *self._adress_listen(_fx, _eintrag[1]))
+            except Exception:
+                continue
         new_laser_estop_addrs = {u: frozenset(s) for u, s in laser_addrs.items()}
         new_laser_fids = frozenset(laser_fids)
         # A3D-18: Snapshot der bisher gepatchten Adressen VOR dem Tausch — Adressen,
@@ -1843,6 +1860,7 @@ class AppState:
                 # auf die Maske des vorigen Plans.
                 self._blackout_keep_gesetzt = new_keep_mask
                 self._fix_index = fix_index
+                self._adress_plan = adress_plan
                 self._default_frame = new_default_frame
                 self._commit_spans = spans
                 self._patched_set = new_patched_set
@@ -4091,6 +4109,8 @@ class AppState:
         # getauschte Feld-Kombination in diesen Frame einschleusen.
         with self._get_plan_lock():
             fix_index = self._fix_index
+            # ENG-30: defensiv wie _laser_estop_addrs (Test-Stubs ohne das Feld).
+            adress_plan = getattr(self, "_adress_plan", None) or {}
             default_frame = self._default_frame
             commit_spans = self._commit_spans
             patched_set = self._patched_set
@@ -4159,26 +4179,26 @@ class AppState:
         effect_present: dict[int, bool] = {}
         for fidi, entry in fix_index.items():
             fx, chans = entry
-            addrs = self._fixture_intensity_addrs(fx, chans)
+            fx_univ = fx.universe
+            # ENG-30: Listen aus dem Plan — aber nur, wenn der Eintrag noch
+            # GENAU zu diesem Geraet passt: derselbe (Geraet, Kanaele)-Eintrag
+            # und unveraenderte Adresse/Universum. Sonst (von Hand gesetzter
+            # _fix_index, Adresse am Objekt geaendert) wie bisher ableiten.
+            # Die Listen sind geteilt und werden NUR gelesen.
+            plan = adress_plan.get(fidi)
+            if (plan is not None and plan[0] is entry
+                    and plan[1] == fx.address and plan[2] == fx_univ):
+                addrs, dims, cols = plan[3], plan[4], plan[5]
+            else:
+                addrs, dims, cols = self._adress_listen(fx, chans)
             inten_addrs[fidi] = addrs
-            dims: list[int] = []
-            cols: list[int] = []
-            for ch in chans:
-                a_l = (getattr(ch, "attribute", "") or "").lower()
-                ad = fx.address + ch.channel_number - 1
-                if not (1 <= ad <= 512):
-                    continue
-                if a_l in _DIM_INTENSITY_ATTRS:
-                    dims.append(ad)
-                elif a_l in _DIM_COLOR_ATTRS:
-                    cols.append(ad)
             dim_addrs[fidi] = dims
             color_addrs[fidi] = cols
-            su = scratch.get(fx.universe)
+            su = scratch.get(fx_univ)
             if su is None:
                 effect_present[fidi] = False
                 continue
-            base = default_frame.get(fx.universe)
+            base = default_frame.get(fx_univ)
             present = False
             for a in addrs:
                 dv = base[a - 1] if (base and a - 1 < len(base)) else 0
@@ -4807,6 +4827,31 @@ class AppState:
                 # dienen; subtraktives CMY NICHT (Skalieren Richtung 0 hellt auf).
                 color.append(addr)
         return inten if inten else color
+
+    def _adress_listen(self, fx, chans) -> tuple[list[int], list[int], list[int]]:
+        """ENG-30: die drei Adresslisten, die ``_render_frame`` je Geraet braucht.
+
+        ``(intensitaet, dimmer, farbe)``: die Adressen, die der Dimmer-Master
+        skaliert (``_fixture_intensity_addrs``), NUR die echten Dimmer-/
+        Intensitaets-Kanaele und NUR die Farb-Kanaele (hier MIT CMY — die
+        implizite Grundhelligkeit 4a² fragt „ist eine Farbe aktiv", nicht
+        „darf ich skalieren").
+
+        Reine Ableitung aus Geraet und Kanaelen. ``_rebuild_render_plan`` legt
+        das Ergebnis in den Plan; EINE Stelle fuer Plan und Frame."""
+        addrs = self._fixture_intensity_addrs(fx, chans)
+        dims: list[int] = []
+        cols: list[int] = []
+        for ch in chans:
+            a_l = (getattr(ch, "attribute", "") or "").lower()
+            ad = fx.address + ch.channel_number - 1
+            if not (1 <= ad <= 512):
+                continue
+            if a_l in _DIM_INTENSITY_ATTRS:
+                dims.append(ad)
+            elif a_l in _DIM_COLOR_ATTRS:
+                cols.append(ad)
+        return addrs, dims, cols
 
     def _fixture_head_intensity_addr_map(self, fx, chans) -> dict:
         """FM-HEADLAYOUT A4: ``{head: [addr]}`` — welche Adressen ein KOPF-genauer

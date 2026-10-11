@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 
 from .function import Function, FunctionType
 from .function import gibt_ueber_dmx_aus as _gibt_ueber_dmx_aus
+from .patch_index import PatchListe
 
 if TYPE_CHECKING:
     from src.core.dmx.universe import Universe
@@ -83,6 +84,8 @@ def _target_to_dict(f: "EfxFixture") -> dict:
 
 
 def _find_fixture(patch_cache, fid):
+    if type(patch_cache) is PatchListe:         # ENG-30: nachschlagen
+        return patch_cache.finde(fid)
     for fx in patch_cache or ():
         if getattr(fx, "fid", None) == fid:
             return fx

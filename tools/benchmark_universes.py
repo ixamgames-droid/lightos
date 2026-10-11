@@ -198,11 +198,17 @@ alle aktiv. {frames} gemessene Frames je Konfiguration (nach 10 Warmup-Frames),
   `FunctionManager.new_rgb_matrix` / `new_efx` + `start(id)`.
 - Nur die Render-Pipeline wird vermessen; das Senden (Enttec/sACN/Art-Net) ist
   bewusst deaktiviert und nicht Teil der Zahlen.
-- Werte sind stark maschinen-, last- und thermik-abhängig (auf diesem ARM64-Gerät
-  schwankten die Absolutzeiten zwischen Läufen um ~2×, v.a. bei 16/32 Universen unter
-  Dauerlast). Aussagekräftig ist primär der **Trend**: super-lineares Wachstum mit der
-  Universen-Zahl, und ab 16–32 Universen liegt die Render-Zeit über dem 44-Hz-Budget
-  (≈ 22,7 ms). Für stabile Absolutzahlen auf einer idle Maschine mehrfach laufen lassen.
+- Werte sind stark maschinen-, last- und thermik-abhängig; zwischen zwei Läufen
+  können die Absolutzeiten um den Faktor 2 auseinanderliegen. Aussagekräftig ist der
+  **Trend** über die Universen-Zahl. Für stabile Absolutzahlen auf einer unbelasteten
+  Maschine mehrfach laufen lassen und den kleinsten Wert nehmen.
+- **Verlauf:** Bis ENG-30 (Oktober 2026) wuchs die Zeit super-linear — jede Matrix-Zelle
+  und jeder EFX-Kopf suchte sein Gerät per Durchlauf durch die ganze Patch-Liste, und
+  der Renderer leitete je Frame für jedes Gerät die Dimmer-/Farbadressen neu ab. Auf
+  einem Rechner gemessen (Windows 11 / x64, p50): 8 / 16 / 32 Universen vorher
+  5,6 / 14,1 / 39,9 ms, danach 3,1 / 6,0 / 12,0 ms — 32 Universen liegen damit unter
+  dem 44-Hz-Budget. Verteilung je Funktionsart an einer echten Show:
+  [ENGINE_FRAME_ZEIT.md](ENGINE_FRAME_ZEIT.md).
 - Bei Vergleichen dieselbe Konfiguration (PARs/Universum, Frames) verwenden; neu
   erzeugen nach Engine-Änderungen, die den Render-Pfad betreffen.
 """

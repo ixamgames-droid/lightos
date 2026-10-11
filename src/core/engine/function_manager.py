@@ -3,6 +3,7 @@ from __future__ import annotations
 import threading
 from typing import TYPE_CHECKING
 from .function import Function, FunctionType, _alloc_id, bump_next_id
+from .patch_index import PatchListe
 from .scene import Scene
 from .chaser import Chaser
 from .collection import Collection
@@ -40,6 +41,8 @@ class FunctionManager:
         # An die Identitaet des patch_cache gebunden (Re-Patch => Neuaufbau).
         self._dim_map_cache: dict[int, frozenset[int]] | None = None
         self._dim_map_key: int = -1
+        # ENG-30: die Patch-Liste mit fid-Tabelle, die ``write`` bekommt.
+        self._patch_liste: PatchListe | None = None
 
     # ── CRUD ──────────────────────────────────────────────────────────────────
 
@@ -425,6 +428,17 @@ class FunctionManager:
         self._dim_map_key = key
         return result
 
+    def _patch_mit_tabelle(self, patch_cache):
+        """ENG-30: ``patch_cache`` als :class:`PatchListe` — neu gebaut nur,
+        wenn sich die Liste geaendert hat (andere Liste oder andere Geraete).
+        Alles, was keine gewoehnliche Liste ist, geht unveraendert durch."""
+        if type(patch_cache) is not list:
+            return patch_cache
+        liste = getattr(self, "_patch_liste", None)
+        if liste is None or not liste.passt_zu(patch_cache):
+            liste = self._patch_liste = PatchListe(patch_cache)
+        return liste
+
     def tick(self, universes: dict[int, "Universe"],
              patch_cache: list["PatchedFixture"],
              dt: float):
@@ -437,6 +451,9 @@ class FunctionManager:
         from src.core.dmx.universe import Universe
         dim_map = None  # lazy — nur bei Bedarf aufbauen
         finished = set()
+        # ENG-30: Funktionen bekommen die Liste mit fid-Tabelle. ``patch_cache``
+        # selbst bleibt fuer _dim_addr_map (an dessen Identitaet gebunden).
+        patch_fn = self._patch_mit_tabelle(patch_cache)
         # LTP-Reihenfolge: in Start-Reihenfolge ticken — die zuletzt gestartete
         # Funktion schreibt zuletzt und gewinnt damit bei Kanal-Ueberschneidung
         # (z. B. zwei Effekte auf denselben Dimmer-/Farbkanal). Frueher wurde
@@ -476,7 +493,7 @@ class FunctionManager:
                 except AttributeError:
                     env = 1.0
                 if inten >= 0.999 and env >= 0.999:
-                    f.write(universes, patch_cache, dt, self._functions)
+                    f.write(universes, patch_fn, dt, self._functions)
                 else:
                     if dim_map is None:
                         dim_map = self._dim_addr_map(patch_cache)
@@ -494,7 +511,7 @@ class FunctionManager:
                         pu.set_range(1, su.get_all())   # Seed — NICHT geloggt
                         pu.begin_write_log()            # ab hier nur Funktions-Writes
                         priv[u] = pu
-                    f.write(priv, patch_cache, dt, self._functions)
+                    f.write(priv, patch_fn, dt, self._functions)
                     for u, pu in priv.items():
                         shared = universes.get(u)
                         if shared is None:
