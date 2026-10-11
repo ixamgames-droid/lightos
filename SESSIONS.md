@@ -63,7 +63,7 @@
 | UI-88 | D | perf/ui88-2d-bild-schneller | 2026-10-11T13:29Z | src/ui/views/live_view.py · tests/test_ui88_2d_bild_schneller.py |
 | UI-89 | A | fix/ui89-programmer-reiter-nur-passende | 2026-10-11T12:14Z | - |
 | LAS-33 | A | feature/las33-laser-profilangaben-generator | 2026-10-11T13:51Z | - |
-| LAS-34 | A | - | 2026-10-11T12:25Z | - |
+| LAS-34 | A | feature/las34-laser-tab | 2026-10-11T13:51Z | - |
 | LAS-35 | A | - | 2026-10-11T12:25Z | - |
 
 ## Blocker & Fallen
@@ -213,7 +213,6 @@
 
 ## Verlauf
 
-- 2026-10-10T21:17Z A claim QA-94
 - 2026-10-10T21:17Z A claim QA-95
 - 2026-10-10T21:41Z D done DOC-70
 - 2026-10-10T22:00Z D done TOOL-21
@@ -243,3 +242,4 @@
 - 2026-10-11T12:53Z A done LAS-30
 - 2026-10-11T13:25Z A done FM-73
 - 2026-10-11T13:51Z A aktualisiert LAS-33: Branch - -> feature/las33-laser-profilangaben-generator
+- 2026-10-11T13:51Z A aktualisiert LAS-34: Branch - -> feature/las34-laser-tab
