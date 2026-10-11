@@ -196,8 +196,9 @@ plattformneutral (keine `sys.platform`-Verzweigung im Kern) — es fehlen auf Li
 nur ein paar **Systempakete** und eine **Audio-Monitor-Quelle**, sonst schlaegt
 `pip install` fehl oder einzelne Funktionen bleiben still.
 
-> Was Windows (noch) voraus hat: die GitHub-CI faehrt bisher nur `windows-latest`,
-> und das ARM64-Geraet ist das schaerfere Pruefgeraet fuer Qt-Teardown-Races.
+> Die GitHub-CI faehrt die Suite auf Linux (`ubuntu-latest`) und Windows
+> (`windows-latest`, dazu `windows-11-arm`). Was Windows (noch) voraus hat:
+> das ARM64-Geraet ist das schaerfere Pruefgeraet fuer Qt-Teardown-Races.
 > Umgekehrt ist auf Linux `python-rtmidi` echt installiert — dort laeuft also ein
 > **anderer MIDI-Codepfad** als der WinMM-Fallback auf ARM-Windows.
 
@@ -284,13 +285,14 @@ LightOS selbst installiert keine Treiber. Falls Hardware nicht erkannt wird:
 LightOS/
 ├── venv/                  (Virtual Environment, ~250 MB)
 ├── data/controller_library/ (mitgelieferte Controller-Vorlagen)
-├── shows/                 (deine .lshow Dateien)
+├── shows/                 (mitgelieferte Demo-Shows)
 ├── fixtures/custom/       (eigene Fixture-Profile)
 ├── install_manifest.json
 └── src/, assets/, docs/   (Source, mitgeliefert)
 
 App-Datenordner  (Windows %APPDATA%/LightOS · Linux ~/.local/share/LightOS ·
                   macOS ~/Library/Application Support/LightOS)
+├── shows/                 (deine .lshow Dateien — Standardordner von Oeffnen/Speichern)
 ├── current_show.db        (Show-DB)
 ├── universes.json         (Ausgabe-Konfiguration)
 ├── midi_mappings.json     (globale MIDI-Zuordnungen)
@@ -321,7 +323,10 @@ Python, kein venv und kein `install.py`**.
 - legt eine Startmenü-Verknüpfung an, auf Wunsch auch eine auf dem Desktop,
 - trägt einen Deinstaller ein (Einstellungen → Apps, oder Startmenü „LightOS
   deinstallieren“),
-- legt die Lizenzen der Fremd-Komponenten bei (`THIRD_PARTY_NOTICES.md`, `licenses\`).
+- legt die Lizenzen der Fremd-Komponenten bei (`THIRD_PARTY_NOTICES.md`, `licenses\`),
+- bringt fünf **Demo-Shows** mit: **Datei → Demo-Show öffnen**. Eine Demo öffnet sich als
+  neue, ungespeicherte Show; **Speichern** fragt nach einem Namen und legt deine Kopie in
+  `%APPDATA%\LightOS\shows` an. Das Original im Programmordner bleibt unverändert.
 
 **Deine Daten** (Shows, Show-DB, Geräte-Bibliothek, Snaps, Bühnen, Einstellungen)
 liegen wie bei der Python-Installation in `%APPDATA%\LightOS` — der Programmordner
@@ -342,6 +347,7 @@ Quellbetrieb: `python main.py --selbsttest`.
 
 ```cmd
 python -m pip install -r requirements.txt "pyinstaller>=6.10"
+python packaging\demo_shows.py
 python packaging\windows\build_info.py
 python -m PyInstaller --noconfirm --clean packaging\windows\LightOS.spec
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=1.0.0 packaging\windows\LightOS.iss
@@ -350,10 +356,43 @@ python -m PyInstaller --noconfirm --clean packaging\windows\LightOS.spec
 Ergebnis: `dist\LightOS\` (onedir-Build) und `dist\setup\LightOS-Setup.exe`. Was
 außer dem Code mitkommt, steht in `packaging/windows/bundle_inhalt.py` — nur
 Dateien, die Git kennt, damit keine privaten Laufzeitdaten aus `data/`/`shows/` in
-ein Setup geraten. `build_info.py` schreibt vorher `build_info.json` (Commit und
+ein Setup geraten. Einzige Ausnahme sind die Demo-Shows: `packaging/demo_shows.py`
+erzeugt sie aus den Generatoren nach `demo_shows/` (eigener Wegwerf-Datenordner, Show-Lint,
+unter einer Minute); ohne diesen Schritt meldet der Selbsttest der gepackten exe sie als
+fehlend. Im Quellbetrieb reicht derselbe Aufruf (`python packaging/demo_shows.py`), danach
+steht **Datei → Demo-Show öffnen** auch dort bereit. `build_info.py` schreibt außerdem vorher `build_info.json` (Commit und
 Datum des Builds) — sie kommt ins Bundle, damit ein Diagnosepaket aus dem Setup
 den Stand nennt, aus dem es gebaut ist; fehlt sie, schlägt `--selbsttest` der
 gepackten exe fehl.
+
+## LightOS aktualisieren
+
+Deine Daten (Shows, Show-DB, Geraete-Bibliothek, Einstellungen) liegen im
+**App-Datenordner** (s. [Verzeichnisstruktur](#verzeichnisstruktur-nach-install))
+und nicht im Programmordner — ein Update fasst sie nicht an. Vor einem groesseren
+Sprung schadet eine Kopie dieses Ordners trotzdem nicht.
+
+**Aus dem Quellcode (git):** LightOS beenden, dann im Programmordner
+
+```bash
+git pull
+python install.py
+```
+
+`install.py` darf beliebig oft laufen: es zieht geaenderte Abhaengigkeiten aus
+`requirements.txt` in das vorhandene `venv/` nach und laesst alles andere stehen
+(Windows mit mehreren Pythons: `py -3.12 install.py`, Linux: `python3 install.py`).
+Danach wie gewohnt starten. Wer die Tests faehrt, holt anschliessend
+`requirements-dev.txt` nach (s. [Entwickeln und Tests](#entwickeln-und-tests)).
+
+**Mit dem Windows-Setup:** LightOS beenden und das neue `LightOS-Setup.exe`
+einfach **drueber installieren** — vorher deinstallieren ist nicht noetig. Das
+Setup ersetzt nur den Programmordner; der App-Datenordner `%APPDATA%\LightOS`
+bleibt, wie er ist.
+
+**Nach dem Update:** Zeigt eine Anleitung einen Schalter, den du im Programm
+nicht findest, laeuft meist noch die alte Instanz — LightOS ganz beenden und neu
+starten.
 
 ## Fehler melden / Diagnosepaket
 
