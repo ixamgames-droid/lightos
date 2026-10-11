@@ -277,7 +277,43 @@ Schritt für Schritt:
 
 - **Strg+S** speichert die Show; **Datei → Speichern unter…** als `.lshow`.
 - **Datei → Zuletzt verwendet** öffnet frühere Shows schnell.
+- **Datei → Demo-Show öffnen** lädt eine mitgelieferte Beispiel-Show als neue,
+  ungespeicherte Show (Speichern legt deine Kopie an).
 - **Datei → Show prüfen & reparieren…** (`Strg+Shift+R`) findet/behebt Probleme.
+
+### Das „Issues"-Banner und die Meldungen zu Knöpfen
+
+Findet LightOS beim Laden oder nach einer Patch-Änderung etwas, erscheint oben in der
+Leiste ein farbiges Feld; ein Klick darauf öffnet die Liste.
+
+| Feld | Bedeutung |
+| --- | --- |
+| rot „! N Issues" | mindestens ein Fehler |
+| gelb „* N Issues" | nur Warnungen |
+| blau „i N Hinweis(e)" | nur Hinweise — nichts ist kaputt, aber einen Blick wert |
+
+Zwei Meldungen betreffen Knöpfe der Virtuellen Konsole mit der Aktion
+„Bibliothek-Snap". LightOS meldet sie nur und ändert nichts — welcher Snap gemeint
+war, weißt nur du:
+
+- **Warnung „… zeigt auf keinen Snap der Bibliothek (gelöscht?)":** Der Knopf verweist
+  auf einen Snap, den es nicht mehr gibt, und schaltet ihn deshalb still nicht.
+  Abhilfe: Knopf-Einstellungen öffnen und einen vorhandenen Snap wählen oder den
+  Verweis entfernen.
+- **Hinweis „Snap B überschreibt Snap A auf …":** Ein Knopf schaltet mehrere Snaps, die
+  auf demselben Kanal desselben Geräts verschiedene Werte setzen; der spätere gewinnt.
+  Das kann gewollt sein. Ein Hinweis allein öffnet beim Laden keinen Dialog, er steht
+  nur im blauen Feld.
+
+Dieselbe Prüfung gibt es für eine Show-Datei ohne die App:
+`python tools/lint_show.py <show.lshow>` (mit `--strict` gilt jede Warnung als Fehler,
+Hinweise nicht). Die Codes dort:
+
+| Code | Schwere | Bedeutung |
+| --- | --- | --- |
+| `VC-SNAP-DANGLING` | Warnung | `snap_id`, `snap_ids` oder `actions[n].snap_id` zeigt auf einen Snap, der in der Bibliothek der Show fehlt. Nur bei Shows mit eigenem Bibliotheks-Block. |
+| `VC-SNAP-KONFLIKT` | Hinweis | Snaps eines Knopfs widersprechen sich auf demselben Kanal. |
+| `VC-DANGLING` | Warnung | `function_id`/`function_ids` oder `actions[n].function_id` zeigt auf eine Funktion, die es nicht gibt — auch dann, wenn die Show gar keine Funktion mehr enthält. Bei Mehrfach-Aktionen zählt das Feld nur für die Typen „Funktion" und „Effekt-Aktion"; an anderen Typen ist ein Restwert wirkungslos und wird nicht gemeldet. |
 
 ---
 

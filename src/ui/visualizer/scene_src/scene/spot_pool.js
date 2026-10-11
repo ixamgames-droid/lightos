@@ -65,6 +65,15 @@ import * as THREE from '../three/three.js';
 import { scene, isLowSpec, tierSettings } from './renderer.js';
 import { requestShadowUpdate } from './shadow_update.js';
 import { requestRender } from './render_loop.js';
+// VIZ-96: Gobo-Projektion — reine Rechnung/Shader-Patch in gobo_projektion.js,
+// Motive und Kegelrand aus gobo_textures.js.
+import { goboTexture, GOBO_STILE, GOBO_RAND, GROESSE as GOBO_KACHEL_PX } from '../fixtures/gobo_textures.js';
+import {
+  installGoboProjektion, baueGoboAtlas, goboProjektionAktiv, goboKachel, goboLichtWinkel,
+  goboDrehung, setzeGoboLicht, loescheGoboLicht, GOBO_HALBSCHATTEN, GOBO_MAX_LICHTER,
+  goboBlendeSchritt, goboFlachDeckkraft, goboEbene, setzeGoboEbene, GOBO_HALTE_BONUS,
+  GOBO_BLENDE_MS,
+} from './gobo_projektion.js';
 
 export const HYSTERESE = 1.25;
 export const MIN_HALT_MS = 400;
@@ -111,6 +120,146 @@ export function lichtUrsprung(f, out) {
   return out.copy(f.spot.position).applyMatrix4(f.group.matrixWorld);
 }
 
+// ── VIZ-96: Gobo-Projektion an den Pool gekoppelt ──────────────────────────
+// Ein Geraet, das gerade ein Pool-Licht MIT Schatten haelt und ein Gobo zeigt,
+// projiziert echt: das Pool-Licht traegt das Motiv als Maske (Muster auf
+// Hindernissen, Schatten dahinter), und die flache Bodenmuster-Scheibe des
+// Geraets wird ausgeblendet. Alle anderen Gobo-Geraete behalten das
+// Bodenmuster wie seit VIZ-83/VIZ-92.
+//
+// Installiert wird EINMAL beim Laden dieses Moduls, vor dem ersten Bild, und
+// nur wenn die Stufe es will (quality_tiers.js `goboProjektion`: Niedrig aus).
+// Scheitert etwas (kein Canvas, anderer three-Stand), bleibt alles beim
+// Bodenmuster — goboProjektionAktiv() ist dann false.
+function _starteGoboProjektion() {
+  if (!(tierSettings && tierSettings.goboProjektion)) return false;
+  try {
+    const atlas = baueGoboAtlas(
+      GOBO_STILE,
+      (stil) => { const t = goboTexture(stil); return t ? t.image : null; },
+      (b, h) => { const c = document.createElement('canvas'); c.width = b; c.height = h; return c; },
+      GOBO_KACHEL_PX);
+    if (!atlas) return false;
+    // Ohne Mipmaps: projektive Koordinaten springen an Koerperkanten, die
+    // kleinste Mip-Stufe zoege dort graue Saeume (und mischte Nachbar-Kacheln).
+    const tex = new THREE.CanvasTexture(atlas.canvas);
+    tex.generateMipmaps = false;
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    tex.needsUpdate = true;
+    return installGoboProjektion({
+      materialKlassen: [THREE.MeshStandardMaterial],
+      lichtChunk: THREE.ShaderChunk.lights_fragment_begin,
+      Vector4: THREE.Vector4,
+      atlas: tex,
+      index: atlas.index,
+    });
+  } catch (e) {
+    return false;
+  }
+}
+_starteGoboProjektion();
+
+const _projiziert = new Set();   // Geraete, deren Pool-Licht gerade das Gobo traegt
+const _projNeu = new Set();
+const _blick = new THREE.Matrix4();
+const _hoch = new THREE.Vector3(0, 1, 0);
+
+// B3: `flach` = Anteil des flachen Bodenmusters (1 = nur flach, 0 = nur
+// Projektion). Dazwischen laeuft eine Blende: das Pool-Licht leuchtet mit
+// (1 - flach), die Scheibe mit `flach` — nur Uniform-Werte (Lichtstaerke,
+// Deckkraft), keine Neukompilierung.
+function _bodenmuster(f, flach) {
+  if (f._goboFlach === flach) return;
+  f._goboFlach = flach;
+  f.goboProjiziert = flach < 1;
+  const disc = f.floorSpot;
+  if (!disc) return;
+  // Ganz aus ueber die Ebenen-Maske, nicht ueber `visible`: das schreibt
+  // builders.js#applyGenericColor bei jedem DMX-Update neu. Die Deckkraft
+  // setzt applyGenericColor aus derselben Rechnung (goboFlachDeckkraft) —
+  // hier wird sie zwischen zwei DMX-Updates nachgefuehrt.
+  if (flach > 0) disc.layers.enable(0); else disc.layers.disable(0);
+  if (typeof f._fleckBasis === 'number' && disc.material) {
+    disc.material.opacity = goboFlachDeckkraft(f._fleckBasis, flach);
+  }
+}
+
+function _projektionAbgleichen() {
+  for (const f of _projiziert) {
+    if (!_projNeu.has(f)) { f._goboAnteil = 0; _bodenmuster(f, 1); }
+  }
+  for (const f of _projNeu) _bodenmuster(f, 1 - f._goboAnteil);
+  _projiziert.clear();
+  for (const f of _projNeu) _projiziert.add(f);
+  _projNeu.clear();
+}
+
+// B3: Inverse der Schattenmatrix, wie three sie fuer dieses Licht baut
+// (SpotLightShadow.updateMatrices: Oeffnung 2 x angle x focus, Lage des
+// Lichts, lookAt aufs Ziel). Selbst gerechnet statt `shadow.matrix` gelesen:
+// die entsteht erst im Schattendurchlauf NACH syncSpotPool und waere hier
+// ein Bild alt (beim Besitzerwechsel die des Vorgaengers).
+const _sKam = new THREE.PerspectiveCamera(50, 1, 0.5, 500);
+const _sM = new THREE.Matrix4();
+function _schattenMatrixInvers(l, ziel) {
+  const sc = l.shadow.camera;
+  _sKam.fov = THREE.MathUtils.RAD2DEG * 2 * l.angle * (l.shadow.focus || 1);
+  _sKam.aspect = l.shadow.mapSize.width / l.shadow.mapSize.height;
+  _sKam.near = sc.near;
+  _sKam.far = l.distance || sc.far;
+  _sKam.updateProjectionMatrix();
+  _sKam.position.copy(l.position);
+  _sKam.lookAt(ziel.position);
+  _sKam.updateMatrixWorld();
+  _sM.set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1)
+    .multiply(_sKam.projectionMatrix).multiply(_sKam.matrixWorldInverse);
+  return _sM.invert();
+}
+
+// Pool-Licht `i` (Slot p) projiziert das Gobo von Geraet f. Liefert false,
+// wenn es nicht geht (Licht ohne Schatten, kein Motiv, kein Kegel).
+// Der Musterwinkel kommt aus der Welt-Matrix des Kegels — sie traegt die
+// ANGEZEIGTE Kopfstellung und Gobo-Drehung (VIZ-92: geglaettet je Bild).
+function _goboProjizieren(i, p, f) {
+  const l = p.licht;
+  if (i >= GOBO_MAX_LICHTER || !l.castShadow) return false;
+  const kachel = goboKachel(f.lastGobo);
+  const beam = f.beam;
+  const gp = beam && beam.geometry && beam.geometry.parameters;
+  if (kachel < 0 || !gp || !(gp.radius > 0) || !(gp.height > 0)) return false;
+  const e = beam.matrixWorld.elements;     // von lichtUrsprung() gerade aktualisiert
+  const lx = Math.hypot(e[0], e[1], e[2]);
+  const ly = Math.hypot(e[4], e[5], e[6]);
+  const lz = Math.hypot(e[8], e[9], e[10]);
+  if (!(lx > 1e-9) || !(ly > 1e-9) || !(lz > 1e-9)) return false;
+  // Rand des SICHTBAREN Kegels (Zoom/Iris in x/z, Kegellaenge in y) — derselbe
+  // Rand, auf den alignGoboFloor das Bodenmuster legt: beim Wechsel zwischen
+  // Scheibe und Projektion springt die Groesse des Musters nicht.
+  const optik = goboLichtWinkel((gp.radius * lx) / (gp.height * ly), GOBO_RAND);
+  if (!optik) return false;
+  // Achsen der Schattenkamera, wie three sie baut (SpotLightShadow:
+  // Position des Lichts, lookAt aufs Ziel, Welt-Up).
+  _blick.lookAt(l.position, p.ziel.position, _hoch);
+  const b = _blick.elements;               // Spalte 0 = rechts, Spalte 1 = hoch
+  const d = goboDrehung(
+    (e[0] * b[0] + e[1] * b[1] + e[2] * b[2]) / lx,
+    (e[0] * b[4] + e[1] * b[5] + e[2] * b[6]) / lx,
+    (e[8] * b[0] + e[9] * b[1] + e[10] * b[2]) / lz,
+    (e[8] * b[4] + e[9] * b[5] + e[10] * b[6]) / lz);
+  l.angle = optik.winkel;
+  l.penumbra = GOBO_HALBSCHATTEN;
+  setzeGoboLicht(i, 1, optik.skala * d[0], optik.skala * d[1], kachel);
+  // B3: die Projektion endet an der Flaeche, auf der der Kegel endet
+  // (builders.js#applyFloorAim: Oberseite von Podest/Buehnenplatte).
+  if (typeof f._goboGrenzY === 'number' && isFinite(f._goboGrenzY)) {
+    setzeGoboEbene(i, goboEbene(_schattenMatrixInvers(l, p.ziel).elements, f._goboGrenzY));
+  } else {
+    setzeGoboEbene(i, null);
+  }
+  return true;
+}
+
 const _pool = [];          // [{ licht, ziel, fid }]
 let _fixtures = null;      // state.fixtures (per initSpotPool gesetzt, kein Import-Zyklus)
 let _vergaben = 0;         // Zaehler: wie oft wechselte ein Licht den Besitzer
@@ -139,7 +288,9 @@ function _neuesLicht() {
   scene.add(ziel);
   licht.target = ziel;
   scene.add(licht);
-  return { licht, ziel, fid: null, veraltet: false };
+  // `traeger`: das Geraet, dessen Werte das Licht gerade zeigt. Gleich `fid`,
+  // ausser waehrend ein verdraengter Gobo-Halter noch ausblendet (VIZ-96 B3).
+  return { licht, ziel, fid: null, traeger: null, veraltet: false };
 }
 
 /**
@@ -231,6 +382,9 @@ function _waehle(k, neu, hell, lage) {
  *   wechselErlaubt  false = in diesem Bild nicht verdraengen (Abstand der
  *              Wechsel-Bilder); freie Slots fuellen sich trotzdem.
  *   lage       fid -> {x,y,z}: gleich helle Kandidaten raeumlich verteilen.
+ *   halteBonus Map fid -> Faktor (> 1): so viel zaeher haelt DIESER Halter
+ *              sein Licht (VIZ-96 B3: ein projizierendes Gobo-Geraet). Wirkt
+ *              nur gegen Verdraengung, nie fuer einen Herausforderer.
  *   info       Objekt; bekommt `ausstehend` = true, wenn ein Wechsel nur
  *              aufgeschoben ist (Haltezeit, Wechselabstand, abklingende
  *              Spitze) — der Aufrufer fordert dann spaeter ein Bild an.
@@ -243,6 +397,8 @@ export function vergeben(halter, hell, hysterese = HYSTERESE, opt = null) {
   const minHalt = (typeof o.minHalt === 'number') ? o.minHalt : MIN_HALT_MS;
   const wechselErlaubt = o.wechselErlaubt !== false;
   const lage = o.lage || null;
+  const bonus = o.halteBonus || null;
+  const zaeh = (fid) => (bonus && fid !== null && bonus.get(fid)) || 1;
   if (o.info) o.info.ausstehend = false;
   const staerke = (fid) => {
     const h = hell.get(fid) || 0;
@@ -279,7 +435,7 @@ export function vergeben(halter, hell, hysterese = HYSTERESE, opt = null) {
   while (k < _kand.length) {
     let schwach = -1, schwachS = 0, gesperrt = false;
     for (let i = 0; i < neu.length; i++) {
-      const si = staerke(neu[i]);
+      const si = staerke(neu[i]) * zaeh(neu[i]);
       if (si > 0 && seit && seit[i] != null && jetzt - seit[i] < minHalt) {
         gesperrt = true;
         continue;
@@ -293,7 +449,7 @@ export function vergeben(halter, hell, hysterese = HYSTERESE, opt = null) {
       // schluege — Haltezeit oder abklingende Spitze geben ihm den Platz bald.
       if (o.info && (gesperrt || spitze)) {
         for (let i = 0; i < neu.length; i++) {
-          if (herausforderer > (hell.get(neu[i]) || 0) * hysterese) { o.info.ausstehend = true; break; }
+          if (herausforderer > (hell.get(neu[i]) || 0) * zaeh(neu[i]) * hysterese) { o.info.ausstehend = true; break; }
         }
       }
       break;   // _kand ist absteigend sortiert — kein Weiterer schafft es
@@ -314,6 +470,9 @@ const _dunkelSeit = new Map();   // fid -> seit wann ganz dunkel (ms)
 const _vorher = new Map();       // fid -> Helligkeit im Bild davor
 let _letzterWechsel = -Infinity; // Zeit des letzten Bildes mit Verdraengung
 const _info = { ausstehend: false };
+const _bonus = new Map();        // VIZ-96 B3: fid -> Haltebonus (projizierende Gobo-Geraete)
+let _blenden = 0;                // ... wie viele Blenden liefen im letzten Bild
+const BLENDE_START_MS = 16;      // erster Schritt einer Blende (ein Bild bei 60 Hz)
 let _uhr = null;                  // Test-Seam: simulierte Zeit statt performance.now()
 
 /** Test-Seam: eigene Uhr (ms) fuer syncSpotPool; null = performance.now(). */
@@ -335,11 +494,21 @@ function _lage(fid) {
 
 /** Vor JEDEM Bild (app.js#renderFrame) — vor prepareShadowMap. */
 export function syncSpotPool() {
-  if (!_pool.length || !_fixtures) return;
+  if (!_pool.length || !_fixtures) {
+    if (_projiziert.size) _projektionAbgleichen();   // VIZ-96: Bodenmuster zurueck
+    _blenden = 0;
+    return;
+  }
+  const gobo = goboProjektionAktiv();
   _hell.clear();
   for (const fid in _fixtures) {
     const f = _fixtures[fid];
-    if (f && f.spot) _hell.set(Number(fid), strahlHelligkeit(f));
+    if (!f || !f.spot) continue;
+    const h = strahlHelligkeit(f);
+    _hell.set(Number(fid), h);
+    // B3: zeigte das Geraet im Bild davor schon ein Gobo (dann lag sein
+    // flaches Muster am Boden, falls es nicht projizierte)?
+    if (gobo) { f._goboLitVor = !!f._goboLit; f._goboLit = h > 0 && !!f.goboAktiv; }
   }
   // Spitzenwerte nachfuehren: steigen sofort, klingen mit der Zeit ab.
   // Schlagartig aus (Lauflicht, Blackout) -> sofort 0; allmaehlich auf 0
@@ -373,8 +542,17 @@ export function syncSpotPool() {
   const alt = _pool.map(p => p.fid);
   while (_seit.length < _pool.length) _seit.push(null);
   _seit.length = _pool.length;
+  // B3: wer gerade projiziert, haelt sein Licht zaeher (ein Wechsel kostet
+  // dort eine sichtbare Blende).
+  _bonus.clear();
+  if (gobo) {
+    for (const p of _pool) {
+      const ft = (p.fid !== null) ? _fixtures[p.fid] : null;
+      if (ft && p.traeger === p.fid && _projiziert.has(ft)) _bonus.set(p.fid, GOBO_HALTE_BONUS);
+    }
+  }
   const neu = vergeben(alt, _hell, HYSTERESE, {
-    spitze: _spitze, seit: _seit, jetzt, lage: _lage, info: _info,
+    spitze: _spitze, seit: _seit, jetzt, lage: _lage, info: _info, halteBonus: _bonus,
     wechselErlaubt: jetzt - _letzterWechsel >= WECHSEL_ABSTAND_MS,
   });
   // Aufgeschobener Wechsel: spaeter noch ein Bild anfordern, auch wenn sonst
@@ -384,6 +562,7 @@ export function syncSpotPool() {
     _warteTimer = setTimeout(() => { _warteTimer = 0; requestRender(); }, WARTE_MS);
   }
   let verdraengt = false;
+  let blendet = 0;
   for (let i = 0; i < _pool.length; i++) {
     const p = _pool[i];
     const fid = neu[i];
@@ -394,11 +573,32 @@ export function syncSpotPool() {
       _seit[i] = jetzt;
     }
     const l = p.licht;
-    const f = (fid !== null) ? _fixtures[fid] : null;
+    // VIZ-96 B3: Blende beim Besitzerwechsel. Projiziert der bisherige Traeger
+    // noch sichtbar sein Gobo, behaelt er das LICHT, bis seine Projektion
+    // ausgeblendet ist (sein flaches Muster blendet dabei ein); erst dann
+    // zieht das Licht zum neuen Halter um und blendet dort ein. Die VERGABE
+    // (`p.fid`, Haltezeiten, Wechselabstand) ist davon unberuehrt. Sofort
+    // umgezogen wird, wenn der alte Traeger dunkel ist (Blackout, Lauflicht),
+    // kein Gobo mehr zeigt oder selbst einen anderen Slot bekommen hat.
+    let uebernahme = false;
+    if (p.traeger !== fid) {
+      const alt_ = (p.traeger !== null) ? _fixtures[p.traeger] : null;
+      let haelt = false;
+      if (gobo && alt_ && alt_.spot && alt_.goboAktiv && _projiziert.has(alt_)
+          && alt_._goboAnteil > 0 && _hell.get(p.traeger) > 0 && neu.indexOf(p.traeger) < 0) {
+        // Erster Schritt klein: nach einer Bildpause ist `dt` beliebig gross.
+        alt_._goboAnteil = goboBlendeSchritt(alt_._goboAnteil, 0,
+                                             alt_._goboAnteil >= 1 ? Math.min(dt, BLENDE_START_MS) : dt);
+        haelt = alt_._goboAnteil > 0;
+      }
+      if (!haelt) { p.traeger = fid; uebernahme = true; }
+    }
+    const tfid = p.traeger;
+    const f = (tfid !== null) ? _fixtures[tfid] : null;
     const s = f && f.spot;
     // Ein dunkler Halter (Schritt 1 in vergeben) behaelt Lage und Winkel, nur
     // seine Intensitaet ist 0 — auch in der 2D-Ansicht (Gruppe unsichtbar).
-    const leuchtet = !!s && _hell.get(fid) > 0;
+    const leuchtet = !!s && _hell.get(tfid) > 0;
     if (s) {
       // Ziel wie beim Geraete-Licht (f.spotTarget); der Ursprung sitzt seit
       // VIZ-92 an der Linse (lichtUrsprung, s. o.) statt 1 m ueber dem Sockel.
@@ -417,6 +617,29 @@ export function syncSpotPool() {
     } else {
       l.intensity = 0;
     }
+    // VIZ-96: Gobo-Halter. Mit Schatten-Licht traegt das Licht das Muster als
+    // Maske; ohne (Licht jenseits des Schatten-Budgets) laesst es sich nicht
+    // maskieren — dann bleibt es dunkel wie seit VIZ-92 (sonst laege wieder der
+    // volle runde Lichtkreis neben dem Bodenmuster).
+    let projiziert = false;
+    if (gobo && s && f.goboAktiv) {
+      if (leuchtet && _goboProjizieren(i, p, f)) {
+        projiziert = true;
+        _projNeu.add(f);
+        // B3: Anteil der Projektion (0..1). Ausblenden rechnet der Zweig oben;
+        // einblenden nur, wo vorher das flache Muster zu sehen war — ein
+        // Geraet, das gerade erst aufleuchtet oder sein Gobo einschwenkt,
+        // projiziert sofort (kein kuenstliches Nachziehen).
+        let a;
+        if (tfid !== fid) a = f._goboAnteil;
+        else if (_projiziert.has(f)) a = goboBlendeSchritt(f._goboAnteil, 1, dt);
+        else if (uebernahme && f._goboLitVor) a = goboBlendeSchritt(0, 1, BLENDE_START_MS);
+        else a = 1;
+        f._goboAnteil = a;
+        if (a < 1) { l.intensity *= a; blendet += 1; }
+      } else l.intensity = 0;
+    }
+    if (gobo && !projiziert) loescheGoboLicht(i);
     // Dunkles Pool-Licht: seine Shadow-Map nicht neu zeichnen (es traegt nichts
     // bei). Lief waehrenddessen ein Schattendurchlauf, ist seine Map veraltet
     // (noteShadowPass) — dann wird sie beim Wiederaufleuchten erneuert.
@@ -428,6 +651,11 @@ export function syncSpotPool() {
     }
   }
   if (verdraengt) _letzterWechsel = jetzt;
+  if (gobo) _projektionAbgleichen();
+  // B3: eine laufende Blende braucht das naechste Bild (Bilder entstehen nur
+  // auf Anforderung) — genau so lange, wie sie laeuft.
+  _blenden = blendet;
+  if (blendet) requestRender();
 }
 
 /** Nach prepareShadowMap: `neu` = in diesem Bild entstehen die Shadow-Maps neu.
@@ -457,6 +685,18 @@ export function spotPoolInfo() {
     minHaltMs: MIN_HALT_MS,
     wechselAbstandMs: WECHSEL_ABSTAND_MS,
     ausstehend: _info.ausstehend,
+    // VIZ-96: fids, deren Pool-Licht gerade das Gobo projiziert (B3: der
+    // TRAEGER des Lichts — waehrend einer Blende noch der alte Halter).
+    goboProjiziert: _pool.filter(p => p.traeger !== null && _fixtures && _fixtures[p.traeger]
+      && _projiziert.has(_fixtures[p.traeger])).map(p => p.traeger),
+    traeger: _pool.map(p => p.traeger),
+    goboAnteil: _pool.map(p => {
+      const f = (p.traeger !== null && _fixtures) ? _fixtures[p.traeger] : null;
+      return (f && _projiziert.has(f)) ? f._goboAnteil : 0;
+    }),
+    goboBlenden: _blenden,
+    goboBlendeMs: GOBO_BLENDE_MS,
+    goboHalteBonus: GOBO_HALTE_BONUS,
   };
 }
 
