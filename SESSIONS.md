@@ -23,7 +23,6 @@
 | DOC-65 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:11Z | docs/anleitung_fixture_generator |
 | LAS-26 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:11Z | src/ui |
 | VIZ-95 | A | feature/viz95-lasermuster-3d | 2026-10-08T20:47Z | src/ui/visualizer |
-| VIZ-96 | A | feature/viz96-gobo-projektion | 2026-10-11T09:58Z | src/ui/visualizer |
 | MIDI-5 | A | feature/midi5-msc | 2026-10-11T14:26Z | src/core/midi |
 | NET-14 | A | feature/midi5-msc | 2026-10-09T16:27Z | src/core/midi |
 | MIDI-16 | A | feature/midi5-msc | 2026-10-09T16:27Z | src/core/midi |
@@ -223,7 +222,6 @@
 
 ## Verlauf
 
-- 2026-10-11T11:29Z D done QA-92
 - 2026-10-11T11:49Z A done DOC-69
 - 2026-10-11T12:09Z D claim VIZ-103
 - 2026-10-11T12:09Z D claim UI-88
@@ -253,3 +251,4 @@
 - 2026-10-11T15:31Z A done PROC-19
 - 2026-10-11T15:41Z D aktualisiert ENG-30: Dateien - -> src/core/app_state.py · src/core/engine/function_manager.py · src/core/engine/patch_index.py · src/core/engine/scene.py · src/core/engine/efx.py · src/core/engine/rgb_matrix.py · src/core/engine/mapped_channel.py · tools/engine_frame_zeit.py · tools/benchmark_universes.py · docs/ENGINE_FRAME_ZEIT.md · docs/PERFORMANCE.md · tests/test_eng30_frame_zeit.py
 - 2026-10-11T15:44Z A claim OUT-70
+- 2026-10-11T16:05Z A done VIZ-96
