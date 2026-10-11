@@ -116,11 +116,56 @@ Gate meldet „0/… Segmente gruen" — dann die `pip install`-Zeile oben nachh
 
 ```cmd
 python uninstall.py              # Interaktiv (fragt pro Bereich)
-python uninstall.py --yes        # Alles sofort entfernen
+python uninstall.py --yes        # Installation ohne Rueckfrage entfernen - eigene Daten bleiben
 python uninstall.py --dry-run    # Nur anzeigen was entfernt wuerde
-python uninstall.py --keep-shows # Eigene .lshow Dateien behalten
-python uninstall.py --keep-appdata  # Snapshots, Stages behalten
+python uninstall.py --purge      # Zusaetzlich ALLE eigenen Daten loeschen (fragt nach)
 ```
+
+**Eigene Daten bleiben, solange `--purge` nicht dabei steht.** Im
+App-Datenordner (`%APPDATA%\LightOS`, unter Linux `~/.local/share/LightOS`)
+liegen eigene Shows (`shows/`), Show-DB, Universen, MIDI-Mappings, Gruppen,
+Modifier, Fixture-Bibliothek, Snaps, Buehnen, Profile, Auto-Save und Logs.
+
+Welche Option loescht was:
+
+| Option | venv, Verknuepfung, Manifest, `__pycache__` | Nutzerdateien in `data/` | `shows/` im Programmordner | App-Datenordner | eigene Shows im App-Datenordner |
+|---|---|---|---|---|---|
+| *(keine)* | je Rueckfrage | Rueckfrage | Rueckfrage (Vorgabe: Nein) | bleibt | bleiben |
+| `--yes` | ja | ja | bleibt | bleibt | bleiben |
+| `--purge` | je Rueckfrage | Rueckfrage | Rueckfrage (Vorgabe: Nein) | Sicherheitsfrage (Vorgabe: Nein) | wie App-Datenordner |
+| `--purge --yes` | ja | ja | bleibt | **ja, ohne Rueckfrage** | **ja** |
+| `--purge --keep-shows` | wie `--purge` | wie `--purge` | bleibt | wie `--purge`, ausser `shows/` | bleiben |
+| `--keep-shows` | unveraendert | unveraendert | bleibt | unveraendert | bleiben |
+| `--keep-appdata` | venv/`__pycache__` unveraendert; Manifest bleibt | unveraendert | unveraendert | bleibt, auch mit `--purge` | bleiben |
+| `--keep-venv` | venv und `__pycache__` bleiben | unveraendert | unveraendert | unveraendert | unveraendert |
+| `--dry-run` | nichts - listet nur auf | nichts | nichts | nichts | nichts |
+
+- `data/controller_library` (mitgelieferte Controller-Vorlagen) gehoert zum
+  Programm und bleibt immer stehen.
+- Eine Nutzerdatei in `data/` (z. B. `current_show.db`), von der es im
+  App-Datenordner noch keine Kopie gibt, bleibt ebenfalls immer stehen - das
+  ist der Fall, wenn LightOS seit dem Update auf den App-Datenordner nie
+  gestartet wurde. Sie ist dann der einzige Stand; der Lauf nennt sie.
+  Als Kopie zaehlt nur ein Stand mit Inhalt: eine im App-Datenordner frisch
+  und leer angelegte Datei (Show-DB ohne Patch, `[]`, `{}`) oder eine
+  unlesbare schuetzt den Stand in `data/` genauso. Dasselbe gilt, wenn im
+  App-Datenordner ein ANDERER Stand liegt, ueber den LightOS fuer diesen
+  Programmordner noch nie entschieden hat (etwa von einer zweiten
+  Installation): der naechste Start wuerde die Uebernahme anbieten.
+- Die Desktop-Verknuepfung `LightOS.lnk` wird nur entfernt, wenn das
+  Installations-Manifest sie nennt oder ihr Ziel in diesem Programmordner
+  liegt. Die Verknuepfung einer zweiten Installation bleibt - auch wenn das
+  Manifest den Pfad nennt, die Datei aber inzwischen nachweislich in einen
+  anderen Programmordner zeigt.
+- Gross-/Kleinschreibung spielt beim Schutz keine Rolle: ein von Hand angelegtes
+  `Shows` im App-Datenordner bleibt mit `--keep-shows` genauso stehen.
+- `--purge --keep-shows` laesst die Shows an ihrem Ort
+  (`<App-Datenordner>/shows`) liegen und loescht nur den Rest - es wird nichts
+  umkopiert.
+- `--dry-run` laesst sich mit jeder Option kombinieren und nennt genau die
+  Pfade, die der echte Lauf entfernen wuerde (`WUERDE LOESCHEN: ...`).
+- Im Programmordner liegende `shows/` loescht nur der interaktive Lauf nach
+  ausdruecklichem Ja.
 
 ## ARM64-Kompatibilitaet (Snapdragon-Geraete)
 
@@ -151,8 +196,9 @@ plattformneutral (keine `sys.platform`-Verzweigung im Kern) — es fehlen auf Li
 nur ein paar **Systempakete** und eine **Audio-Monitor-Quelle**, sonst schlaegt
 `pip install` fehl oder einzelne Funktionen bleiben still.
 
-> Was Windows (noch) voraus hat: die GitHub-CI faehrt bisher nur `windows-latest`,
-> und das ARM64-Geraet ist das schaerfere Pruefgeraet fuer Qt-Teardown-Races.
+> Die GitHub-CI faehrt die Suite auf Linux (`ubuntu-latest`) und Windows
+> (`windows-latest`, dazu `windows-11-arm`). Was Windows (noch) voraus hat:
+> das ARM64-Geraet ist das schaerfere Pruefgeraet fuer Qt-Teardown-Races.
 > Umgekehrt ist auf Linux `python-rtmidi` echt installiert — dort laeuft also ein
 > **anderer MIDI-Codepfad** als der WinMM-Fallback auf ARM-Windows.
 
@@ -239,13 +285,14 @@ LightOS selbst installiert keine Treiber. Falls Hardware nicht erkannt wird:
 LightOS/
 ├── venv/                  (Virtual Environment, ~250 MB)
 ├── data/controller_library/ (mitgelieferte Controller-Vorlagen)
-├── shows/                 (deine .lshow Dateien)
+├── shows/                 (mitgelieferte Demo-Shows)
 ├── fixtures/custom/       (eigene Fixture-Profile)
 ├── install_manifest.json
 └── src/, assets/, docs/   (Source, mitgeliefert)
 
 App-Datenordner  (Windows %APPDATA%/LightOS · Linux ~/.local/share/LightOS ·
                   macOS ~/Library/Application Support/LightOS)
+├── shows/                 (deine .lshow Dateien — Standardordner von Oeffnen/Speichern)
 ├── current_show.db        (Show-DB)
 ├── universes.json         (Ausgabe-Konfiguration)
 ├── midi_mappings.json     (globale MIDI-Zuordnungen)
@@ -317,6 +364,35 @@ steht **Datei → Demo-Show öffnen** auch dort bereit. `build_info.py` schreibt
 Datum des Builds) — sie kommt ins Bundle, damit ein Diagnosepaket aus dem Setup
 den Stand nennt, aus dem es gebaut ist; fehlt sie, schlägt `--selbsttest` der
 gepackten exe fehl.
+
+## LightOS aktualisieren
+
+Deine Daten (Shows, Show-DB, Geraete-Bibliothek, Einstellungen) liegen im
+**App-Datenordner** (s. [Verzeichnisstruktur](#verzeichnisstruktur-nach-install))
+und nicht im Programmordner — ein Update fasst sie nicht an. Vor einem groesseren
+Sprung schadet eine Kopie dieses Ordners trotzdem nicht.
+
+**Aus dem Quellcode (git):** LightOS beenden, dann im Programmordner
+
+```bash
+git pull
+python install.py
+```
+
+`install.py` darf beliebig oft laufen: es zieht geaenderte Abhaengigkeiten aus
+`requirements.txt` in das vorhandene `venv/` nach und laesst alles andere stehen
+(Windows mit mehreren Pythons: `py -3.12 install.py`, Linux: `python3 install.py`).
+Danach wie gewohnt starten. Wer die Tests faehrt, holt anschliessend
+`requirements-dev.txt` nach (s. [Entwickeln und Tests](#entwickeln-und-tests)).
+
+**Mit dem Windows-Setup:** LightOS beenden und das neue `LightOS-Setup.exe`
+einfach **drueber installieren** — vorher deinstallieren ist nicht noetig. Das
+Setup ersetzt nur den Programmordner; der App-Datenordner `%APPDATA%\LightOS`
+bleibt, wie er ist.
+
+**Nach dem Update:** Zeigt eine Anleitung einen Schalter, den du im Programm
+nicht findest, laeuft meist noch die alte Instanz — LightOS ganz beenden und neu
+starten.
 
 ## Fehler melden / Diagnosepaket
 

@@ -2746,7 +2746,8 @@ class MainWindow(QMainWindow):
         Paket steckt (und was NICHT), fragt nach dem Ziel und schreibt das zip.
         ``ziel`` vorgegeben = ohne Dialoge (Tests). Gibt den Pfad oder None."""
         from src.core import diagnose_log as dl
-        from PySide6.QtWidgets import QApplication, QFileDialog
+        from src.ui import hilfe
+        from PySide6.QtWidgets import QFileDialog
         headless = os.environ.get("QT_QPA_PLATFORM", "").startswith("offscreen")
         if ziel is None:
             antwort = QMessageBox.information(
@@ -2768,8 +2769,9 @@ class MainWindow(QMainWindow):
                 ziel += ".zip"
         try:
             dl.melde_laufzeit_umgebung()
-            pfad = dl.erstelle_diagnosepaket(
-                ziel, QApplication.applicationVersion() or "?")
+            # QA-92: dieselbe Quelle wie „Über LightOS“ — nicht die Qt-Version der
+            # Anwendung, die unter Windows ungesetzt die der EXE ist.
+            pfad = dl.erstelle_diagnosepaket(ziel, hilfe.app_version())
         except Exception as e:
             print(f"[MainWindow] ERROR: Diagnosepaket nicht geschrieben: {e}")
             if not headless:
