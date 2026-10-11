@@ -1,7 +1,7 @@
 """VCWidget — Basisklasse aller Virtual-Console-Widgets."""
 from __future__ import annotations
-from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout, QMenu, QSizePolicy
-from PySide6.QtCore import Qt, QPoint, QRect, Signal, QTimer
+from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout, QMenu, QSizePolicy, QWidget
+from PySide6.QtCore import Qt, QPoint, QRect, Signal, QTimer, QEvent
 from PySide6.QtGui import QPainter, QColor, QPen, QCursor, QAction
 import re
 import uuid
@@ -66,6 +66,57 @@ def midi_binding_matches(msg, midi_type: str, midi_ch: int, midi_data1: int) -> 
     return midi_data1 == msg.data1
 
 
+class HandyAbzeichen(QWidget):
+    """WEB-10: kleines Abzeichen „liegt auf der Handy-Konsole" in der rechten
+    oberen Ecke eines VC-Widgets (nur im Bearbeiten-Modus).
+
+    Ein eigenes Kind-Widget statt Malen im ``paintEvent``: die Unterklassen
+    uebermalen die Flaeche der Basisklasse vollstaendig. Fuer die Maus ist es
+    durchlaessig — Auswaehlen, Ziehen und die Groessen-Griffe des Widgets
+    bleiben, wie sie sind. Gezeichnet (kein Emoji): unabhaengig davon, ob der
+    Rechner eine Emoji-Schrift hat.
+    """
+
+    GROESSE = 18
+    RAND = 3
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setObjectName("handy_abzeichen")
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.setFixedSize(self.GROESSE, self.GROESSE)
+        parent.installEventFilter(self)
+        self._setze_lage()
+
+    def _setze_lage(self):
+        p = self.parentWidget()
+        if p is not None:
+            self.move(max(0, p.width() - self.GROESSE - self.RAND), self.RAND)
+            self.raise_()
+
+    def eventFilter(self, obj, event):
+        if event.type() in (QEvent.Type.Resize, QEvent.Type.ChildAdded,
+                            QEvent.Type.Show):
+            self._setze_lage()
+        return False
+
+    def paintEvent(self, _event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        g = self.GROESSE
+        p.setPen(QPen(QColor("#0d1117"), 1))
+        p.setBrush(QColor("#2ea043"))
+        p.drawEllipse(1, 1, g - 2, g - 2)
+        # Handy: hochkantes Rechteck mit Punkt unten
+        p.setPen(QPen(QColor("#ffffff"), 1.4))
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawRoundedRect(6, 3, g - 12, g - 6, 1.5, 1.5)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QColor("#ffffff"))
+        p.drawRect(8, g - 6, g - 16, 1)
+        p.end()
+
+
 class VCWidget(QFrame):
     """Basisklasse — abstrakt, nicht direkt instanziieren."""
 
@@ -119,6 +170,8 @@ class VCWidget(QFrame):
         self._orig_rect = QRect()
         self._dwell_timer = None         # Single-Shot: enthuellt nach Verweilen die Griffe
         self._pre_edit_snapshot = None   # Canvas-Stand vor Move/Resize (fuer Undo)
+        self._handy_abzeichen = None     # WEB-10: Abzeichen „liegt auf der Handy-Konsole"
+        self._ueber_handy = False        # WEB-10: wird gerade in die Seitenleiste gezogen
         self._bg_color = QColor("#2a2a2a")
         self._fg_color = QColor("#ffffff")
         self.setFrameShape(QFrame.Shape.Box)
@@ -223,6 +276,21 @@ class VCWidget(QFrame):
             # Echte Bewegung -> es ist ein Verschieben, also kein „Verweilen"-Reveal.
             if abs(delta.x()) > self._DWELL_MOVE_TOL or abs(delta.y()) > self._DWELL_MOVE_TOL:
                 self._cancel_dwell()
+                # WEB-10: ueber dem Raster der Handy-Seitenleiste? Dann zeigt die
+                # Leiste die Zielzelle und das Widget bleibt an seinem Platz —
+                # es wird verknuepft, nicht verschoben.
+                _canvas = self._find_canvas()
+                ueber = False
+                if _canvas is not None and hasattr(_canvas, "handy_zieh_bewegt"):
+                    ueber = _canvas.handy_zieh_bewegt(
+                        self, event.globalPosition().toPoint())
+                self._ueber_handy = ueber
+                if ueber:
+                    if self.geometry() != self._orig_rect:
+                        self.setGeometry(self._orig_rect)
+                        self.moved.emit(self._orig_rect.x(), self._orig_rect.y())
+                    event.accept()
+                    return
             nx = max(0, self._orig_rect.x() + delta.x())
             ny = max(0, self._orig_rect.y() + delta.y())
             if self._snap_grid > 0:
@@ -248,6 +316,17 @@ class VCWidget(QFrame):
         self._resizing = False
         self._resize_zone = None
         self._cancel_dwell()
+        # WEB-10: ueber der Handy-Seitenleiste losgelassen -> Verknuepfung
+        # ablegen. Das Widget steht wieder an seinem Platz, also folgt unten
+        # weder ein Verschiebe-Schritt noch ein Umhaengen in einen Kasten; der
+        # eine Rueckgaengig-Schritt ist der der Handy-Seiten.
+        if was_dragging and self._edit_mode and self._ueber_handy:
+            if self.geometry() != self._orig_rect:
+                self.setGeometry(self._orig_rect)
+            _canvas = self._find_canvas()
+            if _canvas is not None and hasattr(_canvas, "handy_zieh_losgelassen"):
+                _canvas.handy_zieh_losgelassen(self, event.globalPosition().toPoint())
+        self._ueber_handy = False
         geom_changed = self.geometry() != self._orig_rect
         # Verschieben/Groesse ist ein Undo-Punkt — aber nur bei wirklicher
         # Geometrie-Aenderung (reiner Auswahl-Klick erzeugt keinen).
@@ -412,6 +491,11 @@ class VCWidget(QFrame):
         super().leaveEvent(event)
 
     def _show_context_menu(self, global_pos: QPoint):
+        self._baue_kontextmenue().exec(global_pos)
+
+    def _baue_kontextmenue(self) -> QMenu:
+        """Das Rechtsklick-Menue (Bearbeiten-Modus) — gebaut, nicht gezeigt:
+        so laesst es sich ohne offenes Menue pruefen."""
         menu = QMenu(self)
         menu.addAction("Einstellungen...").triggered.connect(self._edit_properties)
         # Grafische Widget-Galerie: nur wenn fuer den aktuellen Aspekt mehrere
@@ -458,11 +542,73 @@ class VCWidget(QFrame):
             a.setCheckable(True)
             a.setChecked(self.bank == i)
             a.triggered.connect(lambda checked=False, b=i: self._set_bank(b))
+        self._handy_menuepunkt(menu, _canvas)
         menu.addAction("Löschen").triggered.connect(self.delete_requested.emit)
         menu.addAction("Vordergrund-Farbe").triggered.connect(self._pick_fg)
         menu.addAction("Hintergrund-Farbe").triggered.connect(self._pick_bg)
         self._extend_context_menu(menu)   # Unterklassen-Hook (VC-IMG: Button-Bild)
-        menu.exec(global_pos)
+        return menu
+
+    # ── WEB-10: Handy-Konsole ────────────────────────────────────────────────
+
+    def _handy_menuepunkt(self, menu, canvas) -> None:
+        """„Auf Handy-Konsole legen" — ausgegraut mit Grund, wenn das Widget
+        nicht fernbedienbar ist oder auf der gezeigten Seite schon liegt."""
+        if canvas is None or not hasattr(canvas, "handy_ablegen"):
+            return
+        menu.addSeparator()
+        akt = menu.addAction("📱 Auf Handy-Konsole legen")
+        akt.setObjectName("handy_ablegen")
+        try:
+            ok, grund = canvas.handy_ablegbar(self)
+            if ok:
+                from src.core import handy_seiten as _hs
+                abschnitt = canvas.handy_seiten()
+                nr = canvas.handy_seite_nr()
+                if abschnitt["seiten"] and _hs.eintrag(abschnitt, nr, self.widget_id):
+                    ok = False
+                    grund = (f"Liegt schon auf „{abschnitt['seiten'][nr]['name']}“. "
+                             f"Für eine weitere Seite diese zuerst in der "
+                             f"Seitenleiste wählen.")
+        except Exception as e:
+            ok, grund = False, str(e)
+        if ok:
+            akt.setToolTip("Legt eine Verknüpfung auf die Handy-Seite, die die "
+                           "Seitenleiste zeigt: gleiche Funktion, gleicher Zustand.")
+            akt.triggered.connect(self._auf_handy_konsole_legen)
+        else:
+            akt.setEnabled(False)
+            akt.setText("📱 Auf Handy-Konsole legen — nicht möglich")
+            akt.setToolTip(grund)
+            akt.setStatusTip(grund)
+            hinweis = menu.addAction("      " + grund)
+            hinweis.setObjectName("handy_ablegen_grund")
+            hinweis.setEnabled(False)
+        menu.setToolTipsVisible(True)
+        menu.addSeparator()
+
+    def _auf_handy_konsole_legen(self):
+        canvas = self._find_canvas()
+        if canvas is None or not hasattr(canvas, "handy_ablegen"):
+            return
+        ok, text = canvas.handy_ablegen(self)
+        if not ok:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.information(self, "Handy-Konsole", text)
+
+    def setze_handy_abzeichen(self, an: bool) -> None:
+        """Abzeichen „liegt auf der Handy-Konsole" zeigen oder entfernen."""
+        if an:
+            if self._handy_abzeichen is None:
+                self._handy_abzeichen = HandyAbzeichen(self)
+            self._handy_abzeichen.show()
+            self._handy_abzeichen.raise_()
+        elif self._handy_abzeichen is not None:
+            self._handy_abzeichen.hide()
+
+    def hat_handy_abzeichen(self) -> bool:
+        a = self._handy_abzeichen
+        return a is not None and not a.isHidden()
 
     def _extend_context_menu(self, menu):
         """Hook für Unterklassen, um dem Rechtsklick-Menü eigene Aktionen

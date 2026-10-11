@@ -281,6 +281,112 @@ def eintrag_entfernen(abschnitt, seite: int, kennung: str) -> dict | None:
     return neu
 
 
+def seite_verschieben(abschnitt, von: int, nach: int) -> dict | None:
+    """Reihenfolge der Seiten aendern: Seite ``von`` steht danach an Stelle
+    ``nach``. Namen und Inhalt wandern mit."""
+    neu = _kopie(abschnitt)
+    n = len(neu["seiten"])
+    if not (isinstance(von, int) and isinstance(nach, int)
+            and 0 <= von < n and 0 <= nach < n):
+        return None
+    neu["seiten"].insert(nach, neu["seiten"].pop(von))
+    return neu
+
+
+def seiten_ordnen(abschnitt, reihenfolge) -> dict | None:
+    """Seiten in neuer Reihenfolge: ``reihenfolge[i]`` ist die bisherige Nummer
+    der Seite, die danach an Stelle i steht. None, wenn die Liste nicht jede
+    Seite genau einmal nennt."""
+    neu = _kopie(abschnitt)
+    n = len(neu["seiten"])
+    folge = list(reihenfolge) if isinstance(reihenfolge, (list, tuple)) else None
+    if folge is None or any(isinstance(v, bool) or not isinstance(v, int) for v in folge) \
+            or sorted(folge) != list(range(n)):
+        return None
+    neu["seiten"] = [neu["seiten"][i] for i in folge]
+    return neu
+
+
+def seiten_mit(abschnitt, kennung) -> list:
+    """Nummern der Seiten, auf denen ``kennung`` liegt."""
+    a = normalisiere(abschnitt)
+    return [nr for nr, seite in enumerate(a["seiten"])
+            if any(e["widget"] == kennung for e in seite["eintraege"])]
+
+
+def eintrag(abschnitt, seite: int, kennung) -> dict | None:
+    """Der Eintrag von ``kennung`` auf der Seite (Kopie) oder None."""
+    a = normalisiere(abschnitt)
+    if not (isinstance(seite, int) and 0 <= seite < len(a["seiten"])):
+        return None
+    for e in a["seiten"][seite]["eintraege"]:
+        if e["widget"] == kennung:
+            return dict(e)
+    return None
+
+
+def freie_zellen(abschnitt, seite: int) -> int:
+    a = normalisiere(abschnitt)
+    if not (isinstance(seite, int) and 0 <= seite < len(a["seiten"])):
+        return 0
+    belegt = sum(e["breite"] * e["hoehe"] for e in a["seiten"][seite]["eintraege"])
+    return SPALTEN * ZEILEN - belegt
+
+
+# ── Groessen je Art (WEB-10) ─────────────────────────────────────────────────
+#
+# Was die Handy-Ansicht (``konsole.html``) sinnvoll darstellen kann:
+#   Taste     1 x 1 … 4 x 2
+#   Fader     senkrecht 1 x 2 … 1 x 5  ODER  waagerecht 2 x 1 … 4 x 1
+#             (die Ansicht legt einen Fader quer, sobald er breiter als hoch ist)
+#   Cueliste  4 x 2 … 4 x 4 (immer volle Breite: Anzeige + GO/BACK/STOP)
+
+def groesse_begrenzen(typ, breite, hoehe) -> tuple:
+    """Die naechste erlaubte Groesse (Breite, Hoehe) fuer ein Element der Art
+    ``typ`` ('taste' | 'fader' | 'cueliste')."""
+    b = _ganzzahl(breite, 1)
+    h = _ganzzahl(hoehe, 1)
+    if typ == "fader":
+        if b >= 2 and h <= 1:                       # quer
+            return (max(2, min(SPALTEN, b)), 1)
+        return (1, max(2, min(5, h)))               # senkrecht
+    if typ == "cueliste":
+        return (SPALTEN, max(2, min(4, h)))
+    return (max(1, min(SPALTEN, b)), max(1, min(2, h)))
+
+
+def groesse_erlaubt(typ, breite, hoehe) -> bool:
+    return (breite, hoehe) == groesse_begrenzen(typ, breite, hoehe)
+
+
+def naechster_platz(abschnitt, kennung, breite: int, hoehe: int,
+                    ab_seite: int = 0):
+    """Wohin ein neues Element kommt: der erste freie Platz der Seite
+    ``ab_seite``, sonst der einer folgenden Seite, sonst eine neue Seite.
+
+    Rueckgabe ``(abschnitt, seite, spalte, zeile)`` — der Abschnitt ist um
+    eine Seite gewachsen, wenn eine neue noetig war — oder None, wenn nirgends
+    Platz ist und es schon :data:`MAX_SEITEN` Seiten gibt. Seiten, auf denen
+    das Element schon liegt, werden uebersprungen (je Seite hoechstens einmal).
+    """
+    a = normalisiere(abschnitt)
+    start = max(0, _ganzzahl(ab_seite, 0) or 0)
+    for nr in range(start, len(a["seiten"])):
+        if any(e["widget"] == kennung for e in a["seiten"][nr]["eintraege"]):
+            continue
+        stelle = freie_stelle(a, nr, breite, hoehe)
+        if stelle is not None:
+            return (a, nr, stelle[0], stelle[1])
+    gewachsen = seite_hinzufuegen(a)
+    if gewachsen is None:
+        return None
+    nr = len(gewachsen["seiten"]) - 1
+    stelle = freie_stelle(gewachsen, nr, breite, hoehe)
+    if stelle is None:
+        return None
+    return (gewachsen, nr, stelle[0], stelle[1])
+
+
 # ── Automatisch fuellen ──────────────────────────────────────────────────────
 
 def standard_groesse(auskunft: dict) -> tuple:

@@ -181,20 +181,16 @@ programmiert.
 
 ### Einrichten
 
-1. **Elemente auswählen:** In der virtuellen Konsole **„Bearbeiten"** einschalten
-   und in der Werkzeugleiste **„📱 Handy füllen"** drücken („Handy-Konsole
-   automatisch füllen"). LightOS legt alle fernbedienbaren Elemente auf die
-   **Handy-Seiten** — ein Raster aus 4 Spalten × 10 Zeilen je Seite:
-   Cuelisten oben (4 × 3 Felder), darunter die Tasten (1 Feld; lange
-   Beschriftungen und Not-Tasten 2 Felder breit), dann die Fader senkrecht
-   nebeneinander (1 × 3 Felder) und eine Blackout-Taste über die volle Breite
-   ganz unten. Was nicht auf eine Seite passt, kommt auf die nächste.
-   Rückgängig mit **Strg+Z**. Ein zweiter Druck ersetzt die Seiten nach einer
-   Rückfrage. Von Hand anordnen (ziehen, Größe ändern, einzelne Elemente
-   weglassen) kommt mit der Seitenleiste des Editors (WEB-10).
-2. **Einschalten:** **Ausgabe → „Web-Remote: Verbindung & Token…"** → Haken bei
-   **„Handy-Konsole"** setzen. Standard ist **aus**. Darunter erscheint der
-   Link fürs Handy: `http://<PC-IP>:5000/konsole?k=<token>`.
+1. **Handy-Konsole bauen:** In der virtuellen Konsole die Seitenleiste
+   **„📱 Handy-Konsole"** einblenden (Knopf in der Werkzeugleiste),
+   **„Bearbeiten"** einschalten und die Elemente hineinlegen — Schritt für
+   Schritt im Abschnitt [Handy-Konsole bauen](#handy-konsole-bauen-web-10)
+   weiter unten. Am schnellsten geht der Anfang mit **„Automatisch füllen"**.
+2. **Einschalten:** in der Seitenleiste oben den Schalter **„Handy-Konsole:
+   aus/an"** umlegen — oder **Ausgabe → „Web-Remote: Verbindung & Token…"** →
+   Haken bei **„Handy-Konsole"**. Beides ist dieselbe Einstellung; Standard ist
+   **aus**. Den Link fürs Handy (`http://<PC-IP>:5000/konsole?k=<token>`) zeigt
+   der Dialog, den **„Verbinden…"** in der Seitenleiste öffnet.
 3. **Am Handy öffnen** und als Lesezeichen bzw. auf den Startbildschirm legen.
    Die feste Seite zeigt oben rechts zusätzlich **„Handy-Konsole ▸"**, solange
    die Konsole eingeschaltet ist.
@@ -204,6 +200,69 @@ gehen auch bei **„Canvas exportieren…/importieren…"** mit. Eine Show von f
 lädt unverändert — sie hat einfach noch keine Handy-Seiten. Löschst du ein
 Element in der Konsole, verschwindet seine Verknüpfung; machst du das Löschen
 rückgängig, ist auch die Verknüpfung wieder da.
+
+### Handy-Konsole bauen (WEB-10)
+
+Die Seitenleiste **„📱 Handy-Konsole"** zeigt das Handy im Hochformat als
+**Raster aus 4 Spalten × 10 Zeilen** — so, wie es am Handy aussieht —, darunter
+fest **Master** und **BLACKOUT** (die liegen am Handy immer unten und lassen
+sich nicht belegen). Was du hier ablegst, sind **Verknüpfungen**: das Element
+in der großen Konsole bleibt, wo es ist, und behält seine Funktion.
+
+1. **Leiste einblenden:** In der Werkzeugleiste der virtuellen Konsole auf
+   **„📱 Handy-Konsole"** drücken. Die Leiste erscheint rechts neben der
+   Konsole. Ohne „Bearbeiten" ist sie eine **Vorschau**; zum Bauen
+   **„Bearbeiten"** einschalten.
+2. **Element ablegen** — zwei Wege:
+   - **Ziehen:** das Element in der Konsole anfassen und in die Leiste ziehen.
+     Die Zielzelle wird **grün** umrandet (frei) oder **rot** (belegt bzw.
+     nicht möglich). Loslassen legt die Verknüpfung ab; das Element selbst
+     springt an seinen Platz zurück.
+   - **Rechtsklick → „📱 Auf Handy-Konsole legen":** legt es auf den nächsten
+     freien Platz der Seite, die die Leiste gerade zeigt. Ist die Seite voll,
+     kommt es auf die nächste, notfalls auf eine neue.
+
+   Aufs Handy können **Tasten, Fader und Cuelisten**. Bei allem anderen
+   (XY-Pad, Drehregler, Anzeigen, Kästen …) und bei **Laser-Muster-Tasten** ist
+   der Menüpunkt **ausgegraut** und der Grund steht darunter.
+3. **Anordnen:** eine Kachel im Raster anfassen und **verschieben**. Auf ein
+   belegtes Feld lässt sie sich nicht legen.
+4. **Größe ändern:** die Kachel am **Griff unten rechts** ziehen (er erscheint,
+   sobald die Kachel angeklickt ist).
+
+   | Art | kleinste … größte Größe (Spalten × Zeilen) |
+   |---|---|
+   | Taste | 1 × 1 … 4 × 2 |
+   | Fader senkrecht | 1 × 2 … 1 × 5 |
+   | Fader waagerecht | 2 × 1 … 4 × 1 (in **einer** Zeile nach rechts ziehen) |
+   | Cueliste | 4 × 2 … 4 × 4 (immer volle Breite) |
+5. **Herunternehmen:** Kachel anklicken und **Entf** drücken, oder Rechtsklick
+   → **„Von der Handy-Konsole nehmen"**. Das löscht nur die Verknüpfung, nie das
+   Element in der Konsole.
+6. **Seiten:** über dem Raster stehen die Reiter. **„+"** legt eine Seite an
+   (höchstens 12), **„−"** löscht die gezeigte Seite (Rückfrage, wenn etwas
+   darauf liegt). **Doppelklick** auf einen Reiter benennt um, **Ziehen**
+   ändert die Reihenfolge. Ein Element darf auf **mehreren Seiten** liegen
+   (zum Beispiel der Master-Fader), je Seite aber nur einmal — dafür die
+   Seite zuerst über ihren Reiter wählen.
+7. **„Automatisch füllen"** legt alle fernbedienbaren Elemente auf einmal ab:
+   Cuelisten oben (4 × 3 Felder), darunter die Tasten (1 Feld; lange
+   Beschriftungen und Not-Tasten 2 Felder breit), dann die Fader senkrecht
+   nebeneinander (1 × 3 Felder) und eine Blackout-Taste über die volle Breite
+   ganz unten; was nicht passt, kommt auf die nächste Seite. Gibt es schon
+   Seiten, werden sie nach einer Rückfrage **ersetzt**. **„Alles leeren"**
+   entfernt alle Handy-Seiten (ebenfalls mit Rückfrage).
+8. **Verbinden:** oben in der Leiste steht der Schalter **„Handy-Konsole:
+   aus/an"**, darunter der Zustand (**aus** · **an · 0 Handys verbunden** ·
+   **an · 2 Handys verbunden**). **„Verbinden…"** öffnet den Dialog mit Link
+   und Schlüssel. Der Schalter geht auch ohne „Bearbeiten" — die Handy-Konsole
+   lässt sich so jederzeit mit einem Griff ausschalten.
+
+Jeder Schritt ist **ein** Rückgängig-Schritt (**Strg+Z**, wiederholen mit
+**Strg+Y**). Ein **verbundenes Handy** zeigt jede Änderung sofort, ohne
+Nachladen. Elemente, die auf einer Handy-Seite liegen, tragen im
+Bearbeiten-Modus in der großen Konsole ein kleines **grünes Handy-Abzeichen**
+oben rechts.
 
 ### Bedienen
 
@@ -254,6 +313,6 @@ Socket-Verbindung.
 2. PC-LAN-IP per `ipconfig` holen → am Handy `http://<PC-IP>:5000/?k=<token>` öffnen (Token/Direkt-Link aus dem Verbindungs-Dialog, gleiches WLAN).
 3. **GO/BACK/STOP** = Cueliste · **Blackout** = alles dunkel (Toggle) · **Fader Ex 1–10** = Executor-Pegel.
 4. **Token-geschützt** (`?k=…`, ohne → 403) + CORS-Allowlist; Token ist ein **geteiltes** Setup-Geheimnis → nur im vertrauenswürdigen Netz nutzen, danach ausschalten.
-5. **Handy-Konsole** (eigene Tasten/Fader/Cuelisten): VC → Bearbeiten → **„📱 Handy füllen"**, dann im Verbindungs-Dialog **„Handy-Konsole"** anhaken → am Handy `http://<PC-IP>:5000/konsole?k=<token>`.
+5. **Handy-Konsole** (eigene Tasten/Fader/Cuelisten): VC → **„📱 Handy-Konsole"** → Bearbeiten → Elemente hineinziehen oder **„Automatisch füllen"**, Schalter **„Handy-Konsole: an"** → am Handy `http://<PC-IP>:5000/konsole?k=<token>` (Link unter **„Verbinden…"**).
 
 Zurück zur Übersicht: [../ANLEITUNGEN.md](../ANLEITUNGEN.md)

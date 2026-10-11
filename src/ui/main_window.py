@@ -2570,8 +2570,8 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(dlg, "Handy-Konsole", str(e))
             _refresh_labels()
             self.statusBar().showMessage(
-                "Handy-Konsole eingeschaltet — Elemente über „Handy füllen“ in der "
-                "virtuellen Konsole auswählen." if remote_settings.is_vc_remote_enabled()
+                "Handy-Konsole eingeschaltet — Elemente in der virtuellen Konsole über "
+                "die Seitenleiste „📱 Handy-Konsole“ auswählen." if remote_settings.is_vc_remote_enabled()
                 else "Handy-Konsole ausgeschaltet.", 5000)
 
         def _lan_toggled(checked: bool):

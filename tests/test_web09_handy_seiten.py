@@ -458,53 +458,56 @@ class UndoTest(_MitKonsole):
 
 
 class KnopfTest(unittest.TestCase):
-    """Der vorlaeufige Einstieg in der Werkzeugleiste der virtuellen Konsole."""
+    """„Automatisch füllen". Seit WEB-10 steht der Knopf in der Seitenleiste
+    „Handy-Konsole" (der vorlaeufige Knopf in der Werkzeugleiste ist entfallen);
+    mehr dazu in ``tests/test_web10_handy_seitenleiste.py``."""
 
     def setUp(self):
         from src.ui.views.virtual_console_view import VirtualConsoleView
         self.view = VirtualConsoleView()
+        self.view._btn_edit.setChecked(True)
+        self.knopf = self.view._handy_leiste._btn_fuellen
 
     def tearDown(self):
         self.view.close()
         self.view.deleteLater()
 
     def test_knopf_fuellt_und_fragt_vor_dem_ersetzen(self):
-        from src.ui.views import virtual_console_view as modul
+        from src.ui.virtualconsole import vc_handy_leiste as modul
         canvas = self.view._canvas
-        knopf = self.view._btn_handy_fuellen
-        self.assertIn("Handy", knopf.text())
-        self.assertIn("Handy-Konsole automatisch füllen", knopf.toolTip())
-        self.assertTrue(knopf.property("edit_only"))
+        knopf = self.knopf
+        self.assertEqual(knopf.text(), "Automatisch füllen")
+        self.assertIn("automatisch auf die Handy-Seiten", knopf.toolTip())
 
         t = canvas._add_widget("VCButton", QPoint(10, 10))
-        with mock.patch.object(modul.QMessageBox, "information") as info, \
-                mock.patch.object(modul.QMessageBox, "question") as frage:
+        with mock.patch.object(modul.QMessageBox, "question") as frage:
             knopf.click()
             frage.assert_not_called()          # noch nichts da, nichts zu ersetzen
-            self.assertEqual(info.call_count, 1)
         self.assertEqual(hs.freigegebene_kennungen(canvas.handy_seiten()), {t.widget_id})
 
         # Jetzt gibt es Seiten: von Hand umgestellt, dann „Nein" — bleibt.
         umgestellt = hs.eintrag_setzen(canvas.handy_seiten(), 0, t.widget_id, 3, 7)
         canvas.setze_handy_seiten(umgestellt)
-        with mock.patch.object(modul.QMessageBox, "information"), \
-                mock.patch.object(modul.QMessageBox, "question",
-                                  return_value=modul.QMessageBox.StandardButton.No):
+        with mock.patch.object(modul.QMessageBox, "question",
+                               return_value=modul.QMessageBox.StandardButton.No):
             knopf.click()
         self.assertEqual(canvas.handy_seiten(), umgestellt)
-        with mock.patch.object(modul.QMessageBox, "information"), \
-                mock.patch.object(modul.QMessageBox, "question",
-                                  return_value=modul.QMessageBox.StandardButton.Yes):
+        with mock.patch.object(modul.QMessageBox, "question",
+                               return_value=modul.QMessageBox.StandardButton.Yes):
             knopf.click()
         self.assertNotEqual(canvas.handy_seiten(), umgestellt)
 
     def test_ohne_fernbedienbares_gibt_es_einen_hinweis_statt_leerer_seiten(self):
-        from src.ui.views import virtual_console_view as modul
+        from src.ui.virtualconsole import vc_handy_leiste as modul
         self.view._canvas._add_widget("VCLabel", QPoint(10, 10))
         with mock.patch.object(modul.QMessageBox, "information") as info:
-            self.view._btn_handy_fuellen.click()
+            self.knopf.click()
         self.assertIn("Keine fernbedienbaren", info.call_args[0][2])
         self.assertEqual(self.view._canvas.handy_seiten(), hs.leer())
+
+    def test_nur_im_bearbeiten_modus(self):
+        self.view._btn_edit.setChecked(False)
+        self.assertFalse(self.knopf.isEnabled())
 
 
 if __name__ == "__main__":

@@ -105,6 +105,8 @@ class VCCanvas(QWidget):
     bank_changed = Signal(int)          # aktive Bank (0-basiert) gewechselt
     widget_selected = Signal(object)    # VC-Widget gewaehlt (None = Auswahl aufgehoben) -> Inspector-Panel
     handy_seiten_changed = Signal()     # WEB-09: Handy-Seiten geaendert (Editor/Seitenleiste)
+    handy_seite_gewaehlt = Signal(int)  # WEB-10: in der Seitenleiste gezeigte Handy-Seite
+    handy_abgelegt = Signal(str)        # WEB-10: Widget (Kennung) auf eine Handy-Seite gelegt
     # Intern: MIDI aus dem Dispatch-Thread thread-sicher in den UI-Thread holen
     _midi_received = Signal(object)
     # Intern: Page/Bank-Wechsel der Engine (kann aus MIDI-Thread kommen)
@@ -123,6 +125,13 @@ class VCCanvas(QWidget):
         # WEB-09: Handy-Seiten (Verknuepfungen auf Widgets), s. src/core/handy_seiten.py.
         # Teil des VC-Layouts — to_dict/from_dict und damit Show, Export und Undo.
         self._handy_seiten: dict = {"version": 1, "seiten": []}
+        # WEB-10: die Seite, die die Seitenleiste gerade zeigt — dorthin legt
+        # „Auf Handy-Konsole legen". Reiner Anzeigezustand, nicht in der Show.
+        self._handy_seite_nr = 0
+        # WEB-10: die Seitenleiste als Ablageziel beim Ziehen eines Widgets
+        # (schwach gehalten; s. ``handy_ablageziel_setzen``).
+        self._handy_ablageziel = None
+        self.handy_seiten_changed.connect(self._handy_abzeichen_aktualisieren)
         self._UNDO_MAX = 50
         # Basis-Arbeitsflaeche. Die tatsaechliche Mindestgroesse waechst mit dem
         # Inhalt mit (siehe _update_content_extent) — sonst haette die
@@ -610,6 +619,7 @@ class VCCanvas(QWidget):
             child.set_edit_mode(enabled)
         if not enabled:
             self._on_widget_selected(None)   # Inspector leeren, wenn Edit-Modus aus
+        self._handy_abzeichen_aktualisieren()   # WEB-10: Abzeichen nur beim Bearbeiten
         self.update()
 
     def _on_widget_selected(self, w):
@@ -1563,6 +1573,9 @@ class VCCanvas(QWidget):
             self._restoring = _prev
         if _ok:
             self.push_undo_snapshot(_pre_snapshot)   # _restoring wieder aus -> wirkt; nur bei Erfolg
+            # WEB-10: die Kennung ist mitgewandert — Abzeichen und Seitenleiste
+            # zeigen jetzt das neue Widget (das evtl. nicht mehr fernbedienbar ist).
+            self.handy_seiten_changed.emit()
         return new
 
     def build_from_smart_results(self, results, pos=None, origin=None, box=False) -> list:
@@ -1954,10 +1967,21 @@ class VCCanvas(QWidget):
     def _remove_widget(self, widget: VCWidget):
         if not self._restoring:
             self._push_undo()      # Widget geloescht -> per Strg+Z wiederherstellbar
+        # WEB-10: mit dem Widget (und bei einem Kasten: seinem Inhalt) fallen
+        # seine Verknuepfungen weg — Seitenleiste und Abzeichen erfahren es.
+        try:
+            _handy_vorher = self.handy_seiten()
+        except Exception:
+            _handy_vorher = None
         widget.hide()
         widget.setParent(None)
         widget.deleteLater()
         self._update_content_extent()
+        try:
+            if _handy_vorher is not None and self.handy_seiten() != _handy_vorher:
+                self.handy_seiten_changed.emit()
+        except Exception as e:
+            print(f"[VCCanvas] ERROR: Handy-Seiten nach Loeschen: {e}")
 
     def _clear(self):
         for child in self.findChildren(VCWidget,
@@ -2138,6 +2162,313 @@ class VCCanvas(QWidget):
         neu = _hs.automatisch_fuellen(auskuenfte)
         self.setze_handy_seiten(neu)
         return _hs.anzahl_eintraege(neu), len(neu["seiten"])
+
+    # ── WEB-10: Handy-Konsole von Hand bauen (Seitenleiste des Editors) ──────
+    #
+    # Jede Aenderung laeuft ueber ``setze_handy_seiten`` und ist damit EIN
+    # Rueckgaengig-Schritt. Die Regeln (was aufs Handy darf, wie gross, wo Platz
+    # ist) stehen hier und nicht in der Seitenleiste: was diese Methoden nicht
+    # ablegen, liegt auf keiner Seite und ist am Handy nicht erreichbar.
+
+    #: Bezeichnungen fuer die Begruendung „nicht fernbedienbar".
+    _HANDY_TYPNAMEN = {
+        "VCXYPad": "XY-Pad", "VCLabel": "Beschriftung", "VCSpeedDial": "Tempo-Rad",
+        "VCFrame": "Kasten", "VCColor": "Farbwähler", "VCEncoder": "Drehregler",
+        "VCColorList": "Chase-Liste", "VCSongInfo": "Musik-Anzeige",
+        "VCBpmDisplay": "BPM-Anzeige", "VCBusSelector": "Tempo-Bus-Wahl",
+        "VCTempoBusController": "Tempo-Controller", "VCEffectColors": "Effekt-Farben",
+        "VCStepper": "Schrittschalter", "VCEffectEditor": "Effekt-Editor",
+        "VCEffectDisplay": "Effekt-Anzeige", "VCMultiLiveEditor": "Live-Editor",
+    }
+
+    def handy_auskunft(self, widget) -> dict | None:
+        """Fernbedien-Auskunft eines Widgets (``vc_fernbedienung.beschreibe``)
+        oder None — wirft nicht."""
+        if widget is None:
+            return None
+        try:
+            from .vc_fernbedienung import beschreibe
+            return beschreibe(widget)
+        except Exception as e:
+            print(f"[VCCanvas] ERROR: Auskunft {type(widget).__name__}: {e}")
+            return None
+
+    def handy_ablegbar(self, widget) -> tuple[bool, str]:
+        """Darf dieses Widget auf eine Handy-Seite? (ja/nein, Begruendung).
+
+        Genau das, was die Fernausloesung bedienen kann (WEB-08): Taste, Fader,
+        Cueliste — ohne Laser-Muster. Kein eigener Massstab: ein Widget, das
+        ``beschreibe`` nicht kennt, zeigte das Handy ohnehin nur als leeres Feld.
+        """
+        if widget is None:
+            return False, "Das Element gibt es nicht mehr."
+        if self.handy_auskunft(widget) is not None:
+            return True, ""
+        name = type(widget).__name__
+        if name == "VCButton":
+            return False, "Laser-Muster sind nicht fernbedienbar (nur am Pult)."
+        typ = self._HANDY_TYPNAMEN.get(name, name.replace("VC", ""))
+        return False, (f"{typ} ist nicht fernbedienbar — aufs Handy können "
+                       f"Tasten, Fader und Cuelisten.")
+
+    def handy_kennungen(self) -> set:
+        """Kennungen der Widgets, die auf irgendeiner Handy-Seite liegen."""
+        from src.core import handy_seiten as _hs
+        return _hs.freigegebene_kennungen(self.handy_seiten())
+
+    def handy_seite_nr(self) -> int:
+        """Die in der Seitenleiste gezeigte Handy-Seite (0, wenn es keine gibt)."""
+        n = len(self.handy_seiten()["seiten"])
+        return max(0, min(n - 1, int(self._handy_seite_nr))) if n else 0
+
+    def setze_handy_seite_nr(self, nr) -> None:
+        try:
+            nr = int(nr)
+        except (TypeError, ValueError):
+            return
+        n = len(self.handy_seiten()["seiten"])
+        nr = max(0, min(n - 1, nr)) if n else 0
+        if nr != self._handy_seite_nr:
+            self._handy_seite_nr = nr
+            self.handy_seite_gewaehlt.emit(nr)
+
+    def handy_zielfeld(self, widget, seite: int, spalte: int, zeile: int,
+                       abschnitt=None):
+        """Wohin ein Ablegen bei Zelle (spalte, zeile) fuehrte:
+        ``(spalte, zeile, breite, hoehe, passt)`` — oder None, wenn das Widget
+        nicht ablegbar ist. Liegt es schon auf der Seite, behaelt es seine
+        Groesse (es wird verschoben); sonst gilt die Standardgroesse seiner Art.
+        Ein Feld, das ueber den Rand ragte, wird hereingeschoben."""
+        from src.core import handy_seiten as _hs
+        auskunft = self.handy_auskunft(widget)
+        if auskunft is None:
+            return None
+        if abschnitt is None:
+            abschnitt = self.handy_seiten()
+        vorhanden = _hs.eintrag(abschnitt, seite, widget.widget_id)
+        if vorhanden is not None:
+            breite, hoehe = vorhanden["breite"], vorhanden["hoehe"]
+        else:
+            breite, hoehe = _hs.standard_groesse(auskunft)
+        try:
+            spalte = max(0, min(_hs.SPALTEN - breite, int(spalte)))
+            zeile = max(0, min(_hs.ZEILEN - hoehe, int(zeile)))
+        except (TypeError, ValueError):
+            return None
+        ok = _hs.passt(abschnitt, seite, spalte, zeile, breite, hoehe,
+                       ausser=widget.widget_id)
+        return (spalte, zeile, breite, hoehe, ok)
+
+    def handy_ablegen(self, widget, seite=None, spalte=None, zeile=None) -> tuple[bool, str]:
+        """Legt ein Widget als Verknuepfung auf die Handy-Konsole.
+
+        Ohne Zelle (Rechtsklick „Auf Handy-Konsole legen"): der naechste freie
+        Platz der gezeigten Seite, sonst der einer folgenden, sonst eine neue
+        Seite. Mit Zelle (Ziehen in die Seitenleiste): genau dorthin — liegt das
+        Widget schon auf der Seite, wird es verschoben.
+
+        Ein Widget liegt je Seite hoechstens EINMAL (auf mehreren Seiten darf
+        es liegen): die Kennung ist auf einer Seite der Name des Eintrags, und
+        das Dateiformat aus WEB-09 verwirft ein zweites Vorkommen beim Laden.
+
+        Rueckgabe (ok, Text) — der Text ist die Begruendung bzw. der Ort.
+        """
+        from src.core import handy_seiten as _hs
+        ok, grund = self.handy_ablegbar(widget)
+        if not ok:
+            return False, grund
+        kennung = widget.widget_id
+        abschnitt = self.handy_seiten()
+        if spalte is None or zeile is None:
+            start = self.handy_seite_nr() if seite is None else int(seite)
+            if abschnitt["seiten"] and _hs.eintrag(abschnitt, start, kennung) is not None:
+                return False, (f"Liegt schon auf „{abschnitt['seiten'][start]['name']}“ "
+                               f"— für eine weitere Seite diese zuerst in der "
+                               f"Seitenleiste wählen.")
+            breite, hoehe = _hs.standard_groesse(self.handy_auskunft(widget))
+            platz = _hs.naechster_platz(abschnitt, kennung, breite, hoehe, start)
+            if platz is None:
+                return False, (f"Kein Platz mehr: alle Seiten sind voll und mehr als "
+                               f"{_hs.MAX_SEITEN} Seiten gibt es nicht.")
+            abschnitt, nr, spalte, zeile = platz
+        else:
+            if not abschnitt["seiten"]:
+                abschnitt = _hs.seite_hinzufuegen(abschnitt)   # die erste Seite
+                nr = 0
+            else:
+                nr = self.handy_seite_nr() if seite is None else int(seite)
+            ziel = self.handy_zielfeld(widget, nr, spalte, zeile, abschnitt)
+            if ziel is None:
+                return False, "Dort ist kein Platz."
+            spalte, zeile, breite, hoehe, _passt = ziel
+        neu = _hs.eintrag_setzen(abschnitt, nr, kennung, spalte, zeile, breite, hoehe)
+        if neu is None:
+            return False, "Dort ist kein Platz — das Feld ist belegt."
+        if not self.setze_handy_seiten(neu):
+            return False, "Liegt dort schon."
+        self.setze_handy_seite_nr(nr)
+        self.handy_abgelegt.emit(kennung)
+        return True, neu["seiten"][nr]["name"]
+
+    def handy_eintrag_aendern(self, seite: int, kennung: str, spalte: int, zeile: int,
+                              breite=None, hoehe=None) -> bool:
+        """Verknuepfung im Raster verschieben und/oder ihre Groesse aendern.
+        Die Groesse wird auf das begrenzt, was die Handy-Ansicht fuer diese Art
+        darstellen kann (``handy_seiten.groesse_begrenzen``). False, wenn der
+        Platz belegt ist, ausserhalb liegt oder sich nichts aendert."""
+        from src.core import handy_seiten as _hs
+        abschnitt = self.handy_seiten()
+        alt = _hs.eintrag(abschnitt, seite, kennung)
+        if alt is None:
+            return False
+        breite = alt["breite"] if breite is None else breite
+        hoehe = alt["hoehe"] if hoehe is None else hoehe
+        if (breite, hoehe) != (alt["breite"], alt["hoehe"]):
+            auskunft = self.handy_auskunft(self.widget_mit_kennung(kennung))
+            if auskunft is None:
+                return False            # nicht (mehr) fernbedienbar: nur verschieben
+            breite, hoehe = _hs.groesse_begrenzen(auskunft["typ"], breite, hoehe)
+        neu = _hs.eintrag_setzen(abschnitt, seite, kennung, spalte, zeile, breite, hoehe)
+        return neu is not None and self.setze_handy_seiten(neu)
+
+    def handy_eintrag_entfernen(self, seite: int, kennung: str) -> bool:
+        """Verknuepfung von der Seite nehmen. Das Original bleibt, wo es ist."""
+        from src.core import handy_seiten as _hs
+        neu = _hs.eintrag_entfernen(self.handy_seiten(), seite, kennung)
+        return neu is not None and self.setze_handy_seiten(neu)
+
+    def handy_seite_hinzufuegen(self, name=None) -> int | None:
+        """Neue leere Seite am Ende; gibt ihre Nummer zurueck (None bei 12)."""
+        from src.core import handy_seiten as _hs
+        neu = _hs.seite_hinzufuegen(self.handy_seiten(), name)
+        if neu is None or not self.setze_handy_seiten(neu):
+            return None
+        nr = len(neu["seiten"]) - 1
+        self.setze_handy_seite_nr(nr)
+        return nr
+
+    def handy_seite_umbenennen(self, seite: int, name) -> bool:
+        from src.core import handy_seiten as _hs
+        neu = _hs.seite_umbenennen(self.handy_seiten(), seite, name)
+        return neu is not None and self.setze_handy_seiten(neu)
+
+    def handy_seite_loeschen(self, seite: int) -> bool:
+        from src.core import handy_seiten as _hs
+        neu = _hs.seite_entfernen(self.handy_seiten(), seite)
+        if neu is None:
+            return False
+        # Die gezeigte Seite bleibt dieselbe, wenn eine davor verschwindet.
+        # VOR dem Uebernehmen gesetzt: die Seitenleiste liest sie beim Neuaufbau.
+        gezeigt = self.handy_seite_nr()
+        if seite < gezeigt:
+            gezeigt -= 1
+        self._handy_seite_nr = max(0, min(len(neu["seiten"]) - 1, gezeigt))
+        self.setze_handy_seiten(neu)
+        self.handy_seite_gewaehlt.emit(self._handy_seite_nr)
+        return True
+
+    def handy_seite_verschieben(self, von: int, nach: int) -> bool:
+        """Seite ``von`` an Stelle ``nach`` setzen (Inhalt und Name wandern mit)."""
+        n = len(self.handy_seiten()["seiten"])
+        if not (isinstance(von, int) and isinstance(nach, int)
+                and 0 <= von < n and 0 <= nach < n):
+            return False
+        folge = list(range(n))
+        folge.insert(nach, folge.pop(von))
+        return self.handy_seiten_ordnen(folge)
+
+    def handy_seiten_ordnen(self, reihenfolge) -> bool:
+        """Seiten in neuer Reihenfolge (``reihenfolge[i]`` = bisherige Nummer
+        der Seite an Stelle i) — ein Rueckgaengig-Schritt, auch wenn eine Seite
+        ueber mehrere Plaetze gezogen wurde."""
+        from src.core import handy_seiten as _hs
+        neu = _hs.seiten_ordnen(self.handy_seiten(), reihenfolge)
+        if neu is None:
+            return False
+        # Die gezeigte Seite wandert mit ihrem Inhalt. VOR dem Uebernehmen
+        # gesetzt: die Seitenleiste liest sie beim Neuaufbau.
+        vorher = self._handy_seite_nr
+        self._handy_seite_nr = list(reihenfolge).index(self.handy_seite_nr())
+        if not self.setze_handy_seiten(neu):
+            self._handy_seite_nr = vorher
+            return False
+        self.handy_seite_gewaehlt.emit(self._handy_seite_nr)
+        return True
+
+    def handy_alles_leeren(self) -> bool:
+        """Alle Handy-Seiten entfernen (ein Rueckgaengig-Schritt)."""
+        from src.core import handy_seiten as _hs
+        if _hs.ist_leer(self.handy_seiten()):
+            return False
+        self._handy_seite_nr = 0
+        self.setze_handy_seiten(_hs.leer())
+        self.handy_seite_gewaehlt.emit(0)
+        return True
+
+    def _handy_abzeichen_aktualisieren(self) -> None:
+        """Im Bearbeiten-Modus tragen Widgets, die auf einer Handy-Seite
+        liegen, ein kleines Abzeichen. Im Betrieb keines."""
+        try:
+            kennungen = self.handy_kennungen() if self._edit_mode else set()
+            for w in self.alle_widgets():
+                w.setze_handy_abzeichen(getattr(w, "widget_id", None) in kennungen)
+        except Exception as e:
+            print(f"[VCCanvas] ERROR: Handy-Abzeichen: {e}")
+
+    # Ziehen eines Widgets in die Seitenleiste. Ein VC-Widget wird im
+    # Bearbeiten-Modus mit der Maus VERSCHOBEN (kein Qt-Drag); liegt der Zeiger
+    # dabei ueber dem Raster der Seitenleiste, bleibt das Widget an seinem Platz
+    # und die Seitenleiste zeigt die Zielzelle. Beim Loslassen dort entsteht
+    # die Verknuepfung — das Original wird nicht bewegt.
+
+    def handy_ablageziel_setzen(self, ziel) -> None:
+        """Die Seitenleiste meldet sich als Ablageziel an (None = ab). Sie muss
+        ``zieh_vorschau(widget, global_pos) -> bool``, ``zieh_ablegen(widget,
+        global_pos) -> bool`` und ``zieh_ende()`` haben."""
+        import weakref
+        self._handy_ablageziel = weakref.ref(ziel) if ziel is not None else None
+
+    def _handy_ziel(self):
+        ref = self._handy_ablageziel
+        ziel = ref() if ref is not None else None
+        if ziel is None:
+            return None
+        try:
+            import shiboken6
+            if not shiboken6.isValid(ziel):
+                return None
+        except Exception:
+            pass
+        return ziel
+
+    def handy_zieh_bewegt(self, widget, global_pos) -> bool:
+        """Waehrend ein Widget gezogen wird. True = der Zeiger ist ueber dem
+        Raster der Seitenleiste (das Widget soll dann nicht mitwandern)."""
+        ziel = self._handy_ziel()
+        if ziel is None or not self._edit_mode:
+            return False
+        try:
+            return bool(ziel.zieh_vorschau(widget, global_pos))
+        except Exception as e:
+            print(f"[VCCanvas] ERROR: Handy-Ablage (Vorschau): {e}")
+            return False
+
+    def handy_zieh_losgelassen(self, widget, global_pos) -> bool:
+        """Beim Loslassen. True = ueber der Seitenleiste losgelassen (ob die
+        Ablage dort gelang oder nicht — das Widget wird nicht verschoben)."""
+        ziel = self._handy_ziel()
+        if ziel is None or not self._edit_mode:
+            return False
+        try:
+            return bool(ziel.zieh_ablegen(widget, global_pos))
+        except Exception as e:
+            print(f"[VCCanvas] ERROR: Handy-Ablage: {e}")
+            return False
+        finally:
+            try:
+                ziel.zieh_ende()
+            except Exception:
+                pass
 
     def uebersprungene_widgets(self) -> list[str]:
         """QA-50: VC-Widgets, die beim letzten Laden nicht gebaut werden konnten.

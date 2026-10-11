@@ -364,25 +364,6 @@ class VirtualConsoleView(QWidget):
         btn_clear.setVisible(False)
         tb_layout.addWidget(btn_clear)
 
-        # WEB-09: vorlaeufiger Einstieg in die Handy-Konsole, bis die
-        # Seitenleiste des Editors (WEB-10) das Anordnen von Hand erlaubt.
-        self._btn_handy_fuellen = QPushButton("📱 Handy füllen")
-        self._btn_handy_fuellen.setFixedHeight(26)
-        self._btn_handy_fuellen.setToolTip(
-            "Handy-Konsole automatisch füllen: legt alle fernbedienbaren Elemente "
-            "(Tasten, Fader, Cuelisten) auf die Handy-Seiten.\n"
-            "Nur was dort liegt, lässt sich vom Handy aus bedienen "
-            "(Ausgabe → Web-Remote: Verbindung & Token → „Handy-Konsole“).")
-        self._btn_handy_fuellen.setStyleSheet("""
-            QPushButton { background:#21262d; color:#7ee787; border:1px solid #30363d;
-                          border-radius:3px; font-size:10px; padding:0 8px; }
-            QPushButton:hover { background:#30363d; }
-        """)
-        self._btn_handy_fuellen.clicked.connect(self._handy_konsole_fuellen)
-        self._btn_handy_fuellen.setProperty("edit_only", True)
-        self._btn_handy_fuellen.setVisible(False)
-        tb_layout.addWidget(self._btn_handy_fuellen)
-
         btn_save = QPushButton("Canvas exportieren…")
         btn_save.setFixedHeight(26)
         btn_save.setToolTip("Nur dieses VC-Layout als separate JSON-Datei exportieren "
@@ -436,6 +417,29 @@ class VirtualConsoleView(QWidget):
         self._btn_inspector.toggled.connect(self._toggle_inspector)
         tb_layout.addWidget(self._btn_inspector)
 
+        # WEB-10: Seitenleiste „Handy-Konsole" ein-/ausblenden. Immer sichtbar:
+        # im Betrieb ist die Leiste eine Vorschau (und der Schalter „an/aus"
+        # bleibt ein Griff), gebaut wird im Bearbeiten-Modus. Ersetzt den
+        # vorlaeufigen Knopf „Handy füllen" aus WEB-09 — „Automatisch füllen"
+        # steht jetzt in der Leiste.
+        self._btn_handy = QPushButton("📱 Handy-Konsole")
+        self._btn_handy.setObjectName("vc_handy_konsole")
+        self._btn_handy.setCheckable(True)
+        self._btn_handy.setChecked(False)
+        self._btn_handy.setFixedHeight(26)
+        self._btn_handy.setToolTip(
+            "Seitenleiste „Handy-Konsole“: hier baust du, was am Handy zu sehen "
+            "ist.\nElemente im Bearbeiten-Modus hineinziehen oder per Rechtsklick "
+            "→ „Auf Handy-Konsole legen“.")
+        self._btn_handy.setStyleSheet("""
+            QPushButton { background:#21262d; color:#7ee787; border:1px solid #30363d;
+                          border-radius:3px; font-size:10px; padding:0 8px; }
+            QPushButton:checked { background:#12351d; color:#7ee787; border-color:#2ea043; }
+            QPushButton:hover { background:#30363d; }
+        """)
+        self._btn_handy.toggled.connect(self._toggle_handy_leiste)
+        tb_layout.addWidget(self._btn_handy)
+
         layout.addWidget(toolbar)
         self._toolbar_widget = toolbar
 
@@ -488,6 +492,17 @@ class VirtualConsoleView(QWidget):
             print(f"[virtual_console_view] ERROR: Fernbedienung nicht angemeldet: {e}")
         splitter.addWidget(self._main_scroll)
 
+        # WEB-10: Seitenleiste „Handy-Konsole" — direkt neben der Konsole, damit
+        # der Weg beim Hineinziehen kurz ist.
+        from src.ui.virtualconsole.vc_handy_leiste import HandyKonsolenLeiste
+        self._handy_leiste = HandyKonsolenLeiste(self._canvas)
+        self._handy_leiste.setVisible(False)
+        self._handy_leiste.verbinden_angefragt.connect(self._handy_verbinden)
+        # Rechtsklick „Auf Handy-Konsole legen" bei ausgeblendeter Leiste: sie
+        # erscheint, damit man sieht, wo das Element gelandet ist.
+        self._canvas.handy_abgelegt.connect(self._handy_abgelegt)
+        splitter.addWidget(self._handy_leiste)
+
         # Inspector-Panel (Eigenschaften des gewaehlten Widgets, nur im Edit-Modus).
         self._inspector = VCInspectorPanel()
         self._inspector.setStyleSheet(
@@ -505,9 +520,11 @@ class VirtualConsoleView(QWidget):
 
         # Größenverhältnis: Canvas viel breiter als Inspector/Sidebar
         splitter.setStretchFactor(0, 4)
-        splitter.setStretchFactor(1, 0)
-        splitter.setStretchFactor(2, 1)
-        splitter.setCollapsible(1, True)
+        splitter.setStretchFactor(1, 0)     # Handy-Konsole: feste Breite
+        splitter.setStretchFactor(2, 0)
+        splitter.setStretchFactor(3, 1)
+        splitter.setCollapsible(1, False)
+        splitter.setCollapsible(2, True)
         self._splitter = splitter
 
         # Stretch=1: der Canvas-/Sidebar-Splitter bekommt den gesamten
@@ -691,6 +708,9 @@ class VirtualConsoleView(QWidget):
             else:
                 self._inspector.clear()
                 self._inspector.setVisible(False)
+        # WEB-10: die Handy-Seitenleiste ist nur im Bearbeiten-Modus bedienbar.
+        if getattr(self, "_handy_leiste", None) is not None:
+            self._handy_leiste.set_edit_mode(enabled)
 
     def _toggle_snap(self, checked: bool):
         self._canvas.set_snap_to_grid(checked)
@@ -885,38 +905,35 @@ class VirtualConsoleView(QWidget):
         if self._edit_mode:
             self._canvas._clear()
 
-    def _handy_konsole_fuellen(self):
-        """WEB-09: „Handy-Konsole automatisch füllen" — ersetzt die bisherigen
-        Handy-Seiten (nach Rueckfrage, wenn es schon welche gibt). Ein
-        Rueckgaengig-Schritt der Konsole."""
-        if not self._canvas_alive():
-            return
-        try:
-            vorhanden = bool(self._canvas.handy_seiten()["seiten"])
-            if vorhanden and QMessageBox.question(
-                    self, "Handy-Konsole automatisch füllen",
-                    "Die bisherigen Handy-Seiten werden durch eine neue, "
-                    "automatische Anordnung ersetzt.\n\nFortfahren? "
-                    "(Rückgängig mit Strg+Z)",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                    QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
-                return
-            anzahl, seiten = self._canvas.handy_konsole_automatisch_fuellen()
-        except Exception as e:
-            print(f"[virtual_console_view] ERROR: Handy-Konsole füllen: {e}")
-            QMessageBox.warning(self, "Handy-Konsole", str(e))
-            return
-        if anzahl == 0:
+    # ── WEB-10: Handy-Konsole ────────────────────────────────────────────────
+
+    def _toggle_handy_leiste(self, checked: bool):
+        self._btn_handy.setText("📱 Handy-Konsole ✓" if checked else "📱 Handy-Konsole")
+        self._handy_leiste.setVisible(bool(checked))
+        if checked:
+            self._handy_leiste.set_edit_mode(self._edit_mode)
+
+    def _handy_abgelegt(self, _kennung: str):
+        if not self._btn_handy.isChecked():
+            self._btn_handy.setChecked(True)
+
+    def _handy_verbinden(self):
+        """„Verbinden…" in der Seitenleiste: der bestehende Dialog „Web-Remote:
+        Verbindung & Token" mit Link und Schluessel."""
+        fenster = self.window()
+        oeffnen = getattr(fenster, "_open_web_remote_dialog", None)
+        if callable(oeffnen):
+            try:
+                oeffnen()
+            except Exception as e:
+                print(f"[virtual_console_view] ERROR: Web-Remote-Dialog: {e}")
+                QMessageBox.warning(self, "Handy-Konsole", str(e))
+        else:
             QMessageBox.information(
                 self, "Handy-Konsole",
-                "Keine fernbedienbaren Elemente gefunden.\n"
-                "Fernbedienbar sind Tasten, Fader und Cuelisten.")
-            return
-        QMessageBox.information(
-            self, "Handy-Konsole",
-            f"{anzahl} Element(e) auf {seiten} Handy-Seite(n) gelegt.\n\n"
-            "Einschalten: Ausgabe → Web-Remote: Verbindung & Token → "
-            "„Handy-Konsole“. Dort steht auch der Link fürs Handy.")
+                "Link und Schlüssel fürs Handy stehen unter\n"
+                "Ausgabe → „Web-Remote: Verbindung & Token…“.")
+        self._handy_leiste._verbindung_zeigen()
 
     def _save(self):
         self._canvas._save()
