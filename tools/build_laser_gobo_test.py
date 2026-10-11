@@ -13,9 +13,11 @@ Effekte: Farbe (PAR Rainbow/Chase, MH Farbrad), Bewegung (MH Kreis), GOBO
 Frame (kein globales stop_all), Master/Speed-Slider, Tempo-SpeedDial. Trassen-Rig
 mit 2D+3D-Positionen. Danach LIVE per Computer-Use durch alle UI-Bereiche prüfen.
 
-Erzeugt shows/Laser Gobo Test 2026.lshow (git-ignoriert).
+Erzeugt shows/Laser Gobo Test 2026.lshow (git-ignoriert); ``--out PFAD.lshow``
+lenkt die Datei um (DEMO-8: ``packaging/demo_shows.py`` baut sie fuer das Setup).
 """
 import _gen_env  # noqa: F401  (MUSS erster Import sein — spawn-sichere Env-Switches)
+import argparse
 import os
 import json
 import math
@@ -35,7 +37,11 @@ OUT = os.path.join(_ROOT, "shows", "Laser Gobo Test 2026.lshow")
 STAGE_NAME = "LaserGoboTest2026"
 
 
-def main():
+def main(argv=None):
+    ap = argparse.ArgumentParser(description="Laser- und Gobo-Testshow bauen.")
+    ap.add_argument("--out", default=OUT,
+                    help="Ziel-.lshow (Standard: shows/Laser Gobo Test 2026.lshow)")
+    out = os.path.abspath(ap.parse_args(argv).out)
     b = ShowBuilder(reset=True)
 
     # ---- 1) PATCH: 18 Fixtures über 2 Universen ----
@@ -209,8 +215,8 @@ def main():
         pos[fid] = (x, 0.4, 3.5)
 
     # ---- 7) SPEICHERN + VALIDIEREN ----
-    build_and_verify(b, OUT, name="Laser Gobo Test 2026")
-    print(f"[ok] geschrieben: {OUT}")
+    build_and_verify(b, out, name="Laser Gobo Test 2026")
+    print(f"[ok] geschrieben: {out}")
     print(f"[ok] Stage '{STAGE_NAME}' -> %APPDATA%/LightOS/stages/{STAGE_NAME}.json")
 
 

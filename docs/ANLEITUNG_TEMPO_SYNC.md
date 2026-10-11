@@ -17,12 +17,12 @@ Tempo in LightOS hat **drei Ebenen** — von global nach fein:
 |---|---|---|
 | **1. Globale BPM** | *Eine* Geschwindigkeit für die ganze Show (aus Musik, Tap oder manuell). | BPM-Tab (**Strg+8**) |
 | **2. Tempo-Bus** | Eine benannte „Uhr". Jeder Effekt hängt an **genau einem** Bus. Der Standard-Bus heißt **„Global"** und folgt der globalen BPM. | BPM-Tab / VC |
-| **3. Pro Effekt** | **Multiplikator** (×½, ×2 …) + **Phase** — wie schnell und wie versetzt *dieser* Effekt relativ zu seinem Bus läuft. | Effekt-Einstellungen / Speed-Dial |
+| **3. Pro Effekt** | **Tempo ×** (Faktor: 0,5 = halb, 2 = doppelt …) + **Tempo-Versatz** — wie schnell und wie versetzt *dieser* Effekt relativ zu seinem Bus läuft. | Effekt-Einstellungen / Speed-Dial |
 
 Und quer darüber liegt die **Synchronisierung**: sie sorgt dafür, dass Effekte ihren
 Zyklus **gemeinsam auf der Eins** beginnen — nicht „gleich schnell", sondern **im gleichen Takt**.
 
-> 🔑 **Merksatz:** *Geschwindigkeit* (Multiplikator) und *Takt-Start* (Sync) sind zwei
+> 🔑 **Merksatz:** *Geschwindigkeit* (Tempo ×) und *Takt-Start* (Sync) sind zwei
 > verschiedene Dinge. Du willst meistens **unterschiedliche Geschwindigkeit + gemeinsamen Start**.
 
 ---
@@ -66,29 +66,29 @@ Master anlegen, Rolle/Folgt/Faktor) oder live per **Speed-Dial** in der Virtuell
 
 ---
 
-## 3. Einen Effekt ans Tempo hängen (Multiplikator + Phase)
+## 3. Einen Effekt ans Tempo hängen (Tempo × + Tempo-Versatz)
 
 **Jeder** zeitbasierte Effekt (RGB-Matrix, EFX-Bewegung, Chaser, Sequence) trägt drei
 Tempo-Einstellungen:
 
 - **Tempo-Bus** — an welcher Uhr der Effekt hängt (`Global`, ein Master/Sub, oder *kein* Bus = **Free-Run**).
-- **Multiplikator** — wie schnell relativ zum Bus: **¼ · ½ · 1× · 2× · 4×** (bis ×16 fein einstellbar).
-- **Phase** — Versatz in Beats (0…1), um den Effekt gegen andere zu „verschieben".
+- **Tempo ×** — der Faktor (Multiplikator), wie schnell relativ zum Bus: **0,25 · 0,5 · 1 · 2 · 4** (bis 16 fein einstellbar).
+- **Tempo-Versatz** — Versatz (Phase) in Beats (0…1), um den Effekt gegen andere zu „verschieben".
 
 Du setzt das an drei Stellen:
 1. **Direkt im Effekt-Editor** (RGB-Matrix, EFX, Chaser, Sequence): **Tempo-Bus /
-   Multiplikator / Phase** und die Checkbox **„Taktgleich starten"**. Neue Effekte stehen
-   standardmäßig auf **Global · 1× · Phase 0 · Taktgleich an** — sie starten also direkt
+   Tempo × / Tempo-Versatz** und die Checkbox **„Taktgleich starten"**. Neue Effekte stehen
+   standardmäßig auf **Global · Tempo × 1 · Tempo-Versatz 0 · Taktgleich an** — sie starten also direkt
    im gemeinsamen Raster. Nur für einen bewusst frei laufenden Effekt den Haken weg
    (oder **Tempo-Bus = Frei**).
 2. **Tempo-Controller-Widget** in der VC — der bequeme Weg: **ein Bus + Quelle
    (Sound/Tap/Fix) + Faktor + gekoppelte Effekte** in einem Panel. Effekt einfach
    drauf­ziehen. → **[Tempo-Controller-Anleitung](anleitung_tempo_controller/ANLEITUNG_TEMPO_CONTROLLER.md)**.
 3. **Live aus der VC** über einen **Speed-Dial** mit Ziel **„Effekt ×½/×2 (Multiplier)"** —
-   das „Multiplikator-Fenster", mit dem du den Faktor eines Effekts (oder mehrerer,
+   das Fenster für den Faktor, mit dem du den Faktor eines Effekts (oder mehrerer,
    per Komma-Liste) im Betrieb auf **Half/Double** ziehst.
 
-> ⚠️ **Falle:** Der **Multiplikator wirkt nur, wenn der Effekt an einem Bus hängt.** Bei
+> ⚠️ **Falle:** **Tempo × wirkt nur, wenn der Effekt an einem Bus hängt.** Bei
 > Free-Run (`Tempo-Bus = kein/leer`) wird er ignoriert — dann zählt die effekteigene
 > „Speed". Wenn dein ×½ „nichts tut", hängt der Effekt vermutlich nicht am Bus.
 
@@ -154,16 +154,16 @@ Genau dein Fall — Farbe wechselt rot/blau/rot/blau, Dimmer geht an/aus **halb 
 und beides startet im selben Takt, sodass z. B. nur **rot/aus/rot/aus** übrig bleibt.
 
 1. **Globale BPM** setzen (Strg+8) — Quelle Live-Audio oder Tap, bis die Zahl stimmt.
-2. **Farb-Effekt** (RGB-Matrix/Chase) auf **Tempo-Bus = „Global"**, **Multiplikator = 1×**.
+2. **Farb-Effekt** (RGB-Matrix/Chase) auf **Tempo-Bus = „Global"**, **Tempo × = 1**.
 3. **Dimmer-Effekt** (Dimmer-Matrix/Chase) ebenfalls auf **Tempo-Bus = „Global"**,
-   aber **Multiplikator = ½**.
+   aber **Tempo × = 0,5**.
 4. **BPM-Tab → ☑ Auto-Sync** **einschalten** (vor dem Starten).
 5. Beide Effekte starten. Dank Auto-Sync beginnen sie ihren Zyklus gemeinsam auf der Eins —
    die Farbe macht zwei Wechsel, während der Dimmer einen Zyklus macht → **rot/aus/rot/aus**.
 6. Verrutscht? Einmal **[ Jetzt synchronisieren ]** drücken — alles springt wieder zusammen.
 
-> Variante: Dimmer **×2** (doppelt so schnell) für „blinkt zweimal pro Farbe". Über die
-> **Phase** (0…1 Beat) kannst du den Dimmer zusätzlich gegen die Farbe versetzen.
+> Variante: Dimmer **Tempo × = 2** (doppelt so schnell) für „blinkt zweimal pro Farbe". Über den
+> **Tempo-Versatz** (0…1 Beat) kannst du den Dimmer zusätzlich gegen die Farbe versetzen.
 
 Eine ausführlich bebilderte Variante steht in
 **[Dimmer-Matrix & relative Geschwindigkeit](anleitung_dimmermatrix/ANLEITUNG_DIMMERMATRIX.md)**.
@@ -172,11 +172,10 @@ Eine ausführlich bebilderte Variante steht in
 
 ## 6. Live-Tipps
 
-- **Freeze** (VC-Aktion „Freeze (alles anhalten)", Standard-Taste **F3**): hält seit
-  BUG-FBW (2026-08-02) **alles** an — der Renderer rechnet nicht mehr und die Ausgabe
-  hält ihren Stand. Der Tempo-Bus friert dabei mit, das frühere Verhalten ist also
-  enthalten: friert alle Buses
-  + globalen Leader auf 0 ein — bus-gekoppelte Effekte **halten** die Pose. Toggle.
+- **Freeze** (VC-Aktion „Freeze (alles anhalten)", Standard-Taste **F3**): hält
+  **alles** an — der Renderer rechnet nicht mehr und die Ausgabe hält ihren Stand.
+  Die Tempo-Buses frieren dabei mit ein, bus-gekoppelte Effekte **halten** also ihre
+  Pose. Nochmal drücken löst den Freeze wieder (Toggle).
 - **Tap** mitklatschen, wenn die Audio-Erkennung mal danebenliegt; danach ggf. **🔒 Lock**.
 - **APC mini / MIDI**: Tap, Sync, Auto-Sync, Freeze und Speed-Dials lassen sich auf Pads/Fader
   legen → **[APC mappen](anleitung_apc_mapping/ANLEITUNG_APC.md)**.
