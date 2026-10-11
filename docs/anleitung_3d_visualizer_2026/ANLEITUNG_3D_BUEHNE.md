@@ -129,10 +129,19 @@ Gespeichert wird mit der Bühne ([Teil F](#teil-f--speichern)) — Typ, Lage, Gr
    ein (sie hängen darunter) bzw. stehen oben auf Plattform, Boden, Lautsprecher,
    Publikumsfläche oder DJ-Booth — und wandern mit, wenn du das Element verschiebst.
    Aus, platzierst du frei auf fester Höhe. Die Statuszeile meldet den Zustand.
+   **Moving Heads hängen kopfüber:** Ist ein Moving Head an eine horizontale Traverse
+   angedockt, sitzt sein Sockel oben an der Unterkante der Traverse, Bügel und Kopf
+   hängen frei darunter — der Strahl beginnt unter der Traverse, nicht in ihr. Pan und
+   Tilt zeigen dabei in dieselbe Richtung wie vorher. Lösen (frei ziehen bei „Andocken
+   aus", oder die Traverse löschen) stellt das Gerät wieder auf den Sockel. An Stützen
+   und bei PARs, Leisten und anderen Geräten ohne Bügel ändert sich nichts.
 4. **Position & Ausrichtung** — die Felder des gewählten Geräts:
    - **Unten an die Traverse:** `Y` = Unterkante der Traverse minus 0,25 m. Im Bild hängt
      Spot 1 an der Back-Traverse (`Y=6`, 0,3 m hoch): `Y=5.6`, `Z=-2.5`, `X` entlang
-     der Traverse verteilen. Genau diese Höhe setzt auch das Andocken.
+     der Traverse verteilen. Genau diese Höhe setzt auch das Andocken. Die Höhe allein
+     macht ein Gerät aber nicht „hängend": nur ein **angedockter** Moving Head wird
+     kopfüber gezeichnet. Wer `Y` von Hand einträgt, dockt danach einmal an (Andocken
+     an, Gerät kurz auf die Traverse ziehen).
    - **Oben auf die Traverse:** `Y` knapp über die Traverse (z. B. `Y=6.5`).
    - **Seitlich:** an eine Stütze setzen (deren `X`/`Z`, mittlere `Y`) und mit **Drehen
      (Hochachse Y)** zur Seite ausrichten.
