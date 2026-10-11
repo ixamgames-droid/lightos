@@ -23,7 +23,6 @@
 | DOC-65 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:11Z | docs/anleitung_fixture_generator |
 | LAS-26 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:11Z | src/ui |
 | VIZ-95 | A | feature/viz95-lasermuster-3d | 2026-10-08T20:47Z | src/ui/visualizer |
-| LAS-30 | A | feature/las30-laser-achsen | 2026-10-10T18:44Z | src/core/laser |
 | VIZ-96 | A | feature/viz96-gobo-projektion | 2026-10-11T09:58Z | src/ui/visualizer |
 | MIDI-5 | A | feature/midi5-msc | 2026-10-10T18:44Z | src/core/midi |
 | NET-14 | A | feature/midi5-msc | 2026-10-09T16:27Z | src/core/midi |
@@ -213,7 +212,6 @@
 
 ## Verlauf
 
-- 2026-10-10T20:44Z D aktualisiert UI-87: Branch - -> fix/ui87-hilfe-oeffnen-windows
 - 2026-10-10T21:10Z B done VIZ-99
 - 2026-10-10T21:11Z D claim QA-93
 - 2026-10-10T21:17Z A claim QA-94
@@ -243,3 +241,4 @@
 - 2026-10-11T12:25Z A claim LAS-34
 - 2026-10-11T12:25Z A claim LAS-35
 - 2026-10-11T12:34Z D aktualisiert UI-88: Branch - -> perf/ui88-2d-bild-schneller; Dateien - -> src/ui/views/live_view.py · tests/test_ui88_2d_bild_schneller.py
+- 2026-10-11T12:53Z A done LAS-30
