@@ -72,6 +72,7 @@
 | UI-90 | D | - | 2026-10-11T16:21Z | - |
 | XPLAT-53 | D | - | 2026-10-11T16:21Z | - |
 | MIDI-14 | D | - | 2026-10-11T16:21Z | - |
+| WEB-11 | A | feature/web11-qr-startbildschirm | 2026-10-11T16:32Z | - |
 
 ## Blocker & Fallen
 
@@ -227,7 +228,6 @@
 
 ## Verlauf
 
-- 2026-10-11T12:14Z A claim UI-89
 - 2026-10-11T12:20Z A done UI-84
 - 2026-10-11T12:24Z A claim LAS-33
 - 2026-10-11T12:25Z A claim LAS-34
@@ -257,3 +257,4 @@
 - 2026-10-11T16:21Z D claim XPLAT-53
 - 2026-10-11T16:21Z D claim MIDI-14
 - 2026-10-11T16:30Z D aktualisiert XPLAT-36: Branch - -> fix/xplat36-einzellauf-zeitlimit; Dateien - -> tools/verify_segmented.ps1 · tools/verify_segmented.sh · tests/test_xplat36_einzellauf_zeitlimit.py
+- 2026-10-11T16:32Z A claim WEB-11
