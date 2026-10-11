@@ -150,6 +150,27 @@ def test_geteilte_kennung_ohne_passenden_namen_bleibt_unbekannt():
 
 # ── Befunde ──────────────────────────────────────────────────────────────────
 
+@pytest.mark.parametrize("produkt", [
+    "Cruzer Express", "PCI Express Card Reader", "ExpressCard", "USB3.0 express"])
+def test_namens_zeile_trifft_nicht_mitten_im_wort(produkt):
+    """Review: „xpress“ steckt in jedem „Express“ — ein USB-Stick darf weder
+    als Chauvet-Interface in der Liste stehen noch den Einsteck-Hinweis
+    ausloesen."""
+    assert ifc.ordne_ein(0x0781, 0x5567, "SanDisk", produkt) is None
+    stick = _roh(0x0781, 0x5567, produkt, "SanDisk", ort="1-6")
+    assert ifc.erkenne(quellen=([stick], []), **_frei()) == []
+
+
+def test_namens_zeile_trifft_weiter_am_wortanfang():
+    for hersteller, produkt, teil in (
+            ("Chauvet", "Xpress 512", "Chauvet"),
+            ("", "Chauvet-Xpress Plus", "Chauvet"),
+            ("ADJ", "myDMX 3.0", "myDMX"),
+            ("Nicolaudie", "SIUDI-8A", "Nicolaudie")):
+        e = ifc.ordne_ein(0x1234, 0x5678, hersteller, produkt)
+        assert e is not None and teil in e.name, (hersteller, produkt)
+
+
 def test_befund_ft232_typ_unklar_laesst_sich_trotzdem_einrichten():
     b = ifc.bewerte(FT232, **_frei())
     assert b.code == ifc.B_TYP_UNKLAR and b.ampel == ifc.AMPEL_GELB

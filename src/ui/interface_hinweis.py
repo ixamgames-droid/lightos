@@ -26,8 +26,15 @@ ABFRAGE_MS = 5000
 PREF = "interface_hinweis"
 
 
+def _niemand(_port) -> list:
+    return []
+
+
 def _standard_suche():
-    return interfaces.erkenne(schnell=True)
+    # Der Hinweis braucht nur „was steckt?“ — nicht „wer haelt den Port?“.
+    # Diese Frage durchsucht unter Linux ganz ``/proc`` und fiele sonst alle
+    # 5 s fuer jeden seriellen Adapter an (auch den eigenen, laufenden).
+    return interfaces.erkenne(schnell=True, belegt=_niemand)
 
 
 class InterfaceHinweis:

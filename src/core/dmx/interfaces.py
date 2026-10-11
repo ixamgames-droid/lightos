@@ -27,6 +27,7 @@ Kein Qt, kein ``app_state`` — reine Daten und Rechnung.
 from __future__ import annotations
 
 import os
+import re
 import sys
 from dataclasses import dataclass, field, replace
 
@@ -354,14 +355,24 @@ def _passt_text(merkmale: tuple[str, ...], text: str) -> bool:
     return any(m in t for m in merkmale)
 
 
+def _passt_wort(merkmale: tuple[str, ...], text: str) -> bool:
+    """Wie :func:`_passt_text`, aber das Merkmal muss an einem WORTANFANG
+    stehen. Fuer Zeilen ohne Kennung: dort entscheidet allein der Text, und
+    „xpress“ steckt sonst in jedem „Express“ (USB-Stick „Cruzer Express“ wuerde
+    als Chauvet-Interface gemeldet)."""
+    t = (text or "").lower()
+    return any(re.search(r"(?<![a-z0-9])" + re.escape(m), t) for m in merkmale)
+
+
 def _merkmal_passt(e: Eintrag, hersteller: str, produkt: str) -> bool:
     """Bei reinen Namens-Zeilen genuegt EIN Feld, sonst muessen alle
     angegebenen Felder passen (geteilte Kennung: Hersteller UND Produkt)."""
+    passt = _passt_wort if e.vid is None else _passt_text
     treffer = []
     if e.hersteller:
-        treffer.append(_passt_text(e.hersteller, hersteller))
+        treffer.append(passt(e.hersteller, hersteller))
     if e.produkt:
-        treffer.append(_passt_text(e.produkt, produkt))
+        treffer.append(passt(e.produkt, produkt))
     if e.vid is None:
         return any(treffer)
     return all(treffer)

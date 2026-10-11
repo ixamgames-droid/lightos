@@ -443,3 +443,20 @@ def test_einsteck_abfrage_sucht_im_hilfsthread_und_nie_bei_kein_usb(app,
         assert ih.ABFRAGE_MS >= 3000
     finally:
         leiste.deleteLater()
+
+
+def test_einsteck_abfrage_fragt_nie_wer_den_port_haelt(monkeypatch):
+    """Review: die Abfrage alle 5 s darf nicht jedes Mal ganz ``/proc``
+    durchsuchen (``port_belegt_von``) — sie braucht nur „was steckt?“."""
+    ft = _roh(0x0403, 0x6001, "FT232R USB UART", "FTDI", "/dev/ttyUSB0",
+              ort="1-2")
+    gefragt = []
+    monkeypatch.delenv("LIGHTOS_KEIN_USB", raising=False)
+    monkeypatch.setattr(ifc, "_system", lambda: "linux")
+    monkeypatch.setattr(ifc, "lies_sysfs", lambda *a, **k: [ft])
+    monkeypatch.setattr(ifc, "lies_seriell", lambda *a, **k: [])
+    monkeypatch.setattr(ifc, "_zugriff", lambda p: True)
+    monkeypatch.setattr(ifc, "_belegt", lambda p: gefragt.append(p) or [])
+    befunde = ih._standard_suche()
+    assert [b.geraet.port for b in befunde] == ["/dev/ttyUSB0"]
+    assert gefragt == []
