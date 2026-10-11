@@ -209,6 +209,17 @@ class SperrzonenSceneTest(unittest.TestCase):
                 self.assertAlmostEqual(a, b, places=4)
         # Eine Zone faengt keine Eingabe: ein Strahl mitten hindurch trifft nichts.
         self.assertEqual(z["raycastTreffer"], 0)
+        # Namensschild: traegt den Namen, ist so breit wie sein Text und haelt
+        # in der Totale einen festen Anteil der Bildhoehe (sonst unlesbar).
+        self.assertEqual(z["schild"]["text"], "Publikum")
+        self.assertGreater(z["schild"]["seitenverhaeltnis"], 2.0)
+        self.assertAlmostEqual(z["schild"]["breite"] / z["schild"]["hoehe"],
+                               z["schild"]["seitenverhaeltnis"], places=4)
+        hoehen = self._eval("[0, 5, 30, 60].map(window.__lightosSperrzonen.schildHoehe)")
+        self.assertEqual(hoehen[0], 0.45)
+        self.assertEqual(hoehen[1], 0.45)            # aus der Naehe nie kleiner
+        self.assertAlmostEqual(hoehen[2], 0.036 * 30, places=6)
+        self.assertAlmostEqual(hoehen[3], 0.036 * 60, places=6)
 
         # (3) Feld: sitzt am Geraet, und seine vier Kanten liegen GENAU auf den
         # Ebenen, mit denen Python „kann erreichen?" rechnet.

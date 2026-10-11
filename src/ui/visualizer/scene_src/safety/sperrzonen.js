@@ -72,24 +72,70 @@ function entsorge(gruppe) {
   });
 }
 
+// Namensschild einer Zone. Es soll in JEDER Ansicht lesbar sein — in der
+// Totale, von der Seite und im 2D-Plan. Ein Schild fester Groesse in Metern
+// ist aus 25 m Abstand ein paar Pixel hoch. Darum haelt es einen festen Anteil
+// der Bildhoehe (SCHILD_ANTEIL) und wird nur aus der Naehe nicht kleiner als
+// SCHILD_MIN_M. Gesetzt wird das unmittelbar vor dem Zeichnen (onBeforeRender)
+// aus der Kamera, mit der gerade gezeichnet wird.
+export const SCHILD_ANTEIL = 0.036;
+export const SCHILD_MIN_M = 0.45;
+
+/** Hoehe des Schilds in Metern fuer eine Bildhoehe von `weltHoehe` Metern
+ *  (in der Entfernung des Schilds). */
+export function schildHoehe(weltHoehe) {
+  const h = SCHILD_ANTEIL * zahl(weltHoehe, 0);
+  return Math.max(SCHILD_MIN_M, h);
+}
+
+const _kamPos = new THREE.Vector3();
+const _schildPos = new THREE.Vector3();
+
+function schildAnpassen(_renderer, _scene, camera) {
+  let weltHoehe = 0;
+  if (camera.isOrthographicCamera) {
+    weltHoehe = (camera.top - camera.bottom) / (camera.zoom || 1);
+  } else if (camera.isPerspectiveCamera) {
+    camera.getWorldPosition(_kamPos);
+    this.getWorldPosition(_schildPos);
+    weltHoehe = 2 * _kamPos.distanceTo(_schildPos) * Math.tan(camera.fov * Math.PI / 360);
+  }
+  const h = schildHoehe(weltHoehe);
+  const b = h * this.userData.seitenverhaeltnis;
+  if (Math.abs(this.scale.y - h) > 1e-4) {
+    this.scale.set(b, h, 1);
+    this.updateMatrixWorld(true);     // gilt noch fuer DIESES Bild
+  }
+}
+
 function schild(text) {
+  const beschriftung = String(text).slice(0, 24);
   const c = document.createElement('canvas');
-  c.width = 512; c.height = 96;
-  const g = c.getContext('2d');
-  g.fillStyle = 'rgba(60,0,0,0.78)';
+  c.height = 96;
+  let g = c.getContext('2d');
+  g.font = 'bold 52px sans-serif';
+  // So breit wie der Text: ein kurzer Name gibt ein kurzes Schild.
+  c.width = Math.max(160, Math.min(1024, Math.ceil(g.measureText(beschriftung).width) + 56));
+  g = c.getContext('2d');
+  g.fillStyle = 'rgba(70,0,0,0.92)';
   g.fillRect(0, 0, c.width, c.height);
-  g.strokeStyle = '#ff4040';
-  g.lineWidth = 4;
-  g.strokeRect(2, 2, c.width - 4, c.height - 4);
-  g.fillStyle = '#ffd0d0';
-  g.font = 'bold 40px sans-serif';
+  g.strokeStyle = '#ff5050';
+  g.lineWidth = 5;
+  g.strokeRect(2.5, 2.5, c.width - 5, c.height - 5);
+  g.fillStyle = '#ffffff';
+  g.font = 'bold 52px sans-serif';
   g.textAlign = 'center';
   g.textBaseline = 'middle';
-  g.fillText(String(text).slice(0, 24), c.width / 2, c.height / 2, c.width - 24);
+  g.fillText(beschriftung, c.width / 2, c.height / 2 + 2, c.width - 24);
   const mat = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c),
-                                         transparent: true, depthTest: false });
+                                         transparent: true, depthTest: false,
+                                         depthWrite: false, fog: false });
   const s = new THREE.Sprite(mat);
-  s.scale.set(2.4, 0.45, 1);
+  s.userData.seitenverhaeltnis = c.width / c.height;
+  s.userData.text = beschriftung;
+  s.scale.set(SCHILD_MIN_M * c.width / c.height, SCHILD_MIN_M, 1);
+  s.renderOrder = 20;                 // ueber Zonen und Feld
+  s.onBeforeRender = schildAnpassen;
   nurAnzeige(s);
   return s;
 }
@@ -117,6 +163,7 @@ function baueZone(d) {
   gruppe.add(koerper, kanten, s);
   nurAnzeige(gruppe);
   gruppe.userData.koerper = koerper;
+  gruppe.userData.schild = s;
   scene.add(gruppe);
   return gruppe;
 }
@@ -259,6 +306,9 @@ export function sperrzonenInfo() {
       transparent: !!k.material.transparent,
       inSzene: g.parent === scene, sichtbar: g.visible,
       raycastTreffer: treffer,
+      schild: { text: g.userData.schild.userData.text,
+                breite: g.userData.schild.scale.x, hoehe: g.userData.schild.scale.y,
+                seitenverhaeltnis: g.userData.schild.userData.seitenverhaeltnis },
     });
   }
   const felder = [];
@@ -282,4 +332,5 @@ export function sperrzonenInfo() {
 // Zugang fuer Tests und Diagnose, ohne app.js anzufassen.
 window.__lightosSperrzonen = {
   setzen: setSperrzonen, abgleich: sperrzonenAbgleich, info: sperrzonenInfo, feldEcken,
+  schildHoehe,
 };

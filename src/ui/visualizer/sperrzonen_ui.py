@@ -214,7 +214,7 @@ class SperrzonenDialog(QDialog):
         self._laedt = False
         self.setWindowTitle("Sperrzonen (Vorschau) — nur Anzeige")
         self.setModal(False)
-        self.resize(760, 640)
+        self.resize(780, 780)
         root = QVBoxLayout(self)
 
         grenzen = QLabel(f"<b>{html.escape(S.HINWEIS_NUR_ANZEIGE)}</b><br>"
@@ -260,7 +260,7 @@ class SperrzonenDialog(QDialog):
         self._dreh.valueChanged.connect(self._zone_geaendert)
         form.addRow("Drehung um die Hochachse", self._dreh)
         zl.addWidget(self._form_host, stretch=2)
-        root.addWidget(zbox, stretch=2)
+        root.addWidget(zbox, stretch=3)
 
         # ── Laser-Felder ──────────────────────────────────────────────────
         lbox = QGroupBox("Maximalfeld je Laser — Randwinkel von der Geräteachse")
