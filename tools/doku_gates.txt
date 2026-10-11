@@ -17,6 +17,7 @@
 
 # ── Doku: Links, Bilder, Anleitungen ────────────────────────────────────────
 test_doc_*.py                      # doc_links, doc_images, doc_removed_ui
+test_viz96_gobo_projektion.py      # 3D-Anleitung nennt die Gobo-Projektion
 test_doc[0-9]*.py                  # test_doc13_..., test_doc62_installdoku ...
 test_ui85_hilfe_menue.py           # Hilfe-Menue oeffnet docs/ANLEITUNGEN.md + Erste Schritte (Pfade muessen existieren)
 test_cdx58_codex_nachlese.py       # liest docs/ (Solo-Ausnahme, Lint-Meldungen)
