@@ -10,7 +10,10 @@ from PySide6.QtWidgets import (
     QHeaderView, QAbstractItemView, QMessageBox, QInputDialog, QGroupBox,
     QDialogButtonBox, QTabWidget, QWidget,
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSize
+from src.ui.widgets.dialog_groesse import (InhaltsRollbereich,
+                                           beim_ersten_zeigen_anpassen,
+                                           mindestzeilen_setzen)
 from PySide6.QtGui import QBrush, QColor
 from sqlalchemy.orm import Session
 from sqlalchemy import select, delete
@@ -256,7 +259,9 @@ class _ModeTab(QWidget):
             1, QHeaderView.ResizeMode.Stretch)
         self._tbl.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked |
                                   QAbstractItemView.EditTrigger.SelectedClicked)
-        layout.addWidget(self._tbl)
+        # FM-74: mindestens fuenf Kanaele sichtbar (vorher 40 px Tabelle).
+        mindestzeilen_setzen(self._tbl)
+        layout.addWidget(self._tbl, 1)
 
         btn_row = QHBoxLayout()
         btn_add = QPushButton("+ Channel")
@@ -536,7 +541,9 @@ class FixtureEditorDialog(QDialog):
                  nur_ansehen: bool = False, als_kopie: bool = False):
         super().__init__(parent)
         self.setWindowTitle("Fixture Editor")
-        self.setMinimumSize(720, 560)
+        # FM-74: kleines Mindestmass — der Inhalt liegt in einem Rollbereich,
+        # die Startgroesse setzt `showEvent` aus dem Bedarf des Inhalts.
+        self.setMinimumSize(560, 400)
         self._fixture_id = fixture_id   # None = neu, sonst bearbeiten
         # UI-74: mitgelieferte Profile (builtin/lightos) werden NICHT an Ort
         # und Stelle bearbeitet — die naechste Bibliotheks-Aktualisierung
@@ -611,7 +618,13 @@ class FixtureEditorDialog(QDialog):
             self._tabs.widget(i).nur_ansehen()
 
     def _setup_ui(self):
-        root = QVBoxLayout(self)
+        # FM-74: Kopf und Modi liegen in einem Rollbereich (`root` = Layout
+        # des Inhalts); Import/Export und Speichern bleiben darunter stehen.
+        aussen = QVBoxLayout(self)
+        inhalt = QWidget()
+        root = QVBoxLayout(inhalt)
+        root.setContentsMargins(0, 0, 0, 0)
+        aussen.addWidget(InhaltsRollbereich(inhalt), 1)
 
         # Header form
         form = QFormLayout()
@@ -676,7 +689,7 @@ class FixtureEditorDialog(QDialog):
         lightos_row.addWidget(btn_lightos_import)
         lightos_row.addWidget(btn_lightos_export)
         lightos_row.addStretch(1)
-        root.addLayout(lightos_row)
+        aussen.addLayout(lightos_row)
 
         # Save/Cancel
         btn_box = QDialogButtonBox(
@@ -684,7 +697,14 @@ class FixtureEditorDialog(QDialog):
         btn_box.accepted.connect(self._save)
         btn_box.rejected.connect(self.reject)
         self._btn_save = btn_box.button(QDialogButtonBox.StandardButton.Save)
-        root.addWidget(btn_box)
+        aussen.addWidget(btn_box)
+
+    def showEvent(self, e):
+        # FM-74: Startgroesse aus dem Bedarf des Inhalts, begrenzt auf den
+        # Bildschirm — erst hier, weil erst jetzt das Profil geladen ist.
+        beim_ersten_zeigen_anpassen(self, wunsch=QSize(760, 0),
+                                    zugabe=QSize(0, 90))
+        super().showEvent(e)
 
     # ── FM-30: `Return` speichert nicht mehr das ganze Profil ────────────
     #

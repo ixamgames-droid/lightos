@@ -29,7 +29,9 @@ from PySide6.QtWidgets import (
     QDialogButtonBox, QTabWidget, QWidget, QCheckBox, QSlider,
     QSplitter, QTextEdit, QFileDialog, QGridLayout,
 )
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QSize, QTimer
+from src.ui.widgets.dialog_groesse import (InhaltsRollbereich,
+                                           beim_ersten_zeigen_anpassen)
 
 # Wiederverwendung der bereits gepflegten Listen aus dem einfachen Editor.
 from src.ui.widgets.fixture_editor import FIXTURE_TYPES, CHANNEL_ATTRS
@@ -1370,7 +1372,12 @@ class FixtureGeneratorDialog(QDialog):
     def __init__(self, parent=None, model: GeneratorModel | None = None):
         super().__init__(parent)
         self.setWindowTitle("Fixture Generator")
-        self.setMinimumSize(900, 680)
+        # FM-74: KEIN grosses Mindestmass mehr. `setMinimumSize(900, 680)`
+        # ersetzte den Mindestbedarf des Layouts (~1100 x 970) — der Dialog
+        # durfte kleiner sein als sein Inhalt und schob dann Tabellenkopf,
+        # Knoepfe und Felder uebereinander. Der Inhalt liegt jetzt in einem
+        # Rollbereich; die Startgroesse setzt `showEvent`.
+        self.setMinimumSize(640, 420)
         self.saved_id: int | None = None
         self._model = model or _default_model()
         self._setup_ui()
@@ -1391,7 +1398,13 @@ class FixtureGeneratorDialog(QDialog):
 
     # ── UI-Aufbau ────────────────────────────────────────────────────────
     def _setup_ui(self):
-        root = QVBoxLayout(self)
+        # FM-74: alles ausser der Knopfzeile liegt in einem Rollbereich —
+        # `root` ist das Layout des Inhalts, `aussen` das des Dialogs.
+        aussen = QVBoxLayout(self)
+        inhalt = QWidget()
+        root = QVBoxLayout(inhalt)
+        root.setContentsMargins(0, 0, 0, 0)
+        aussen.addWidget(InhaltsRollbereich(inhalt), 1)
 
         # Kopf — FM-70: zweispaltig. Einspaltig nahm der Kopf ein Drittel der
         # Dialoghoehe; auf einem 1080er-Bildschirm (Dialog max. ~1000 px) blieb
@@ -1484,7 +1497,16 @@ class FixtureGeneratorDialog(QDialog):
         self._btn_box.accepted.connect(self._save)
         self._btn_box.rejected.connect(self.reject)
         btns.addWidget(self._btn_box)
-        root.addLayout(btns)
+        # FM-74: ausserhalb des Rollbereichs — Speichern bleibt erreichbar.
+        aussen.addLayout(btns)
+
+    def showEvent(self, e):
+        # FM-74: Startgroesse aus dem Bedarf des Inhalts, begrenzt auf den
+        # Bildschirm. Erst hier, weil erst jetzt Modi und Typ (Laser-Seiten)
+        # stehen; VOR `super()`, damit Qt mit der endgueltigen Groesse einmittet.
+        beim_ersten_zeigen_anpassen(self, wunsch=QSize(1200, 0),
+                                    zugabe=QSize(0, 120))
+        super().showEvent(e)
 
     # ── FM-30: `Return` speichert nicht mehr das ganze Profil ────────────
     #
