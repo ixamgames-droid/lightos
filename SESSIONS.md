@@ -64,6 +64,7 @@
 | WEB-09 | A | feature/web09-handy-seite-rueckmeldung | 2026-10-11T12:08Z | - |
 | VIZ-103 | D | fix/viz103-haengend-an-unterkante | 2026-10-11T12:14Z | src/ui/visualizer/scene_src/fixtures/mount_pose.js · tests/test_viz103_haengend_unterkante_scene.py |
 | UI-88 | D | - | 2026-10-11T12:09Z | - |
+| UI-89 | A | fix/ui89-programmer-reiter-nur-passende | 2026-10-11T12:14Z | - |
 
 ## Blocker & Fallen
 
@@ -210,7 +211,6 @@
 
 ## Verlauf
 
-- 2026-10-10T19:30Z A claim CDX-58
 - 2026-10-10T19:31Z A aktualisiert UI-86: Branch fix/ui86-2d-hidpi -> perf/ui86-2d-ansicht-hidpi
 - 2026-10-10T19:43Z A claim VIZ-102
 - 2026-10-10T20:11Z D claim UI-87
@@ -240,3 +240,4 @@
 - 2026-10-11T12:09Z D claim VIZ-103
 - 2026-10-11T12:09Z D claim UI-88
 - 2026-10-11T12:14Z D aktualisiert VIZ-103: Branch - -> fix/viz103-haengend-an-unterkante; Dateien - -> src/ui/visualizer/scene_src/fixtures/mount_pose.js · tests/test_viz103_haengend_unterkante_scene.py
+- 2026-10-11T12:14Z A claim UI-89
