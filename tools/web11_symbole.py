@@ -6,6 +6,7 @@ fremden Bilder. Vollflaechiger Hintergrund in der Farbe des Pult-Designs: iOS
 und Android schneiden die Ecken selbst zu.
 
     QT_QPA_PLATFORM=offscreen ./venv/bin/python tools/web11_symbole.py
+      (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 
 Die Dateien sind eingecheckt; das Skript braucht man nur, wenn sich das Motiv
 aendern soll.
