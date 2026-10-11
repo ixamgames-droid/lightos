@@ -27,6 +27,7 @@ test_las30_laser_achsen.py         # Patch-Anleitung nennt die Achsen-Haken
 test_tool14_gen_tools_index_cli.py # tools/README.md
 test_tool23_backlog_ids_tafel_fragmente.py  # BACKLOG / Tafel
 test_ui84_efx_laden_geraeteliste.py # Anleitung Matrix/EFX beim Laden
+test_ui91_efx_reiter_geraeteliste.py # Anleitungen nennen „Auswahl übernehmen“ (EFX/Matrix)
 test_xplat49_uninstall_datenschutz.py # INSTALL.md
 test_xplat50_startskripte_arm.py   # INSTALL.md / Startskripte
 test_audit_bilder_stand.py

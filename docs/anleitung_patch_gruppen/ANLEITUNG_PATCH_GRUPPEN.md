@@ -2,7 +2,7 @@
 
 > **Patchen** = jedes Gerät auf seine **DMX-Adresse** legen (damit LightOS weiß, welche Kanäle
 > welches Gerät steuern). **Gruppen** fassen Geräte zusammen und legen über ein **Raster** ihre
-> Reihenfolge fest — die Basis für Matrix-/EFX-Effekte (die folgen der Gruppen-Auswahl).
+> Reihenfolge fest — die Basis für Matrix-/EFX-Effekte (neue Effekte nehmen die Gruppen-Auswahl).
 
 ---
 
@@ -114,7 +114,7 @@ Die Gruppen dieser Show:
 
 ## 3. Warum das Raster wichtig ist
 
-Matrix- und EFX-Effekte **folgen der Gruppen-Auswahl**, und das **Raster bestimmt die
+Neue Matrix- und EFX-Effekte **nehmen die Gruppen-Auswahl**, und das **Raster bestimmt die
 Reihenfolge/Position**: Ein Chase läuft genau in der Raster-Reihenfolge über die Geräte, eine
 2D-Matrix nutzt Spalten×Zeilen als Fläche. Deshalb lohnt es sich, die Gruppen sauber anzulegen
 (z. B. PAR-Reihe als 8×1, alle Mover als 4×1).

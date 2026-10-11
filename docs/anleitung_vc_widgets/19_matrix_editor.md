@@ -18,7 +18,7 @@ Der Editor ist die Werkbank, an der du diese Looks baust und bearbeitest.
 
 ## Wo man ihn findet
 
-- **Im Programmer:** Reiter **„Matrix"**. Dort folgt die Matrix automatisch deiner Geräte-Auswahl (siehe unten „Folge-Modus"), du programmierst also direkt an den gerade gewählten Geräten.
+- **Im Programmer:** Reiter **„Matrix"**. Dort nimmt eine neue Matrix automatisch deine Geräte-Auswahl (siehe unten „Folge-Modus"), du programmierst also direkt an den gerade gewählten Geräten.
 - **Als eigener Sub-Tab / Manager:** dieselbe Oberfläche, aber mit manueller Geräte-Zuweisung (Knöpfe „Aus Auswahl" und „Auto-Zuweisung aus Patch").
 - **Als großes Fenster:** Knopf **„⤢ Großes Fenster"** oben rechts koppelt den kompletten Editor in ein frei vergrößerbares, scrollbares Fenster aus (gut bei vielen Einstellwerten). Erneut tippen oder Fenster schließen dockt ihn wieder an.
 
@@ -93,7 +93,7 @@ Zeigt – abhängig von Style und Algorithmus – entweder feste Farbknöpfe **C
 | **Aus Auswahl** | Bildet das Grid aus den links im Programmer gewählten Geräten – bei einer echten Gruppe als 2D-Raster inkl. Lücken, sonst als 1 × N. |
 | **Auto-Zuweisung aus Patch** | Füllt das aktuelle Raster mit Geräten der aktiven Auswahl/Gruppe (Fallback: ganzer Patch). |
 
-> Im **Folge-Modus** (Programmer-Reiter „Matrix") sind diese Knöpfe ausgeblendet; die Gruppe heißt dann „Geräte (folgen der Programmer-Auswahl)" und übernimmt die gewählte Gruppe automatisch, sobald du die Auswahl wechselst. Beim Laden einer Show folgt die Matrix der Auswahl nicht — das gespeicherte Raster bleibt, wie es in der Datei steht.
+> Im **Folge-Modus** (Programmer-Reiter „Matrix") heißt die Gruppe „Geräte"; statt der beiden Knöpfe gibt es dort **Auswahl übernehmen** (dieselbe Wirkung wie „Aus Auswahl"). Der Auswahl folgt von selbst nur eine mit **+ Neu** frisch angelegte Matrix — bis du sie speicherst, eine andere Matrix anklickst oder den Reiter verlässt. Eine gespeicherte Matrix behält ihr Raster, auch wenn du den Reiter öffnest oder die Auswahl wechselst; weicht die Auswahl ab, steht in der Statuszeile „… gespeichert – weicht von der Auswahl ab", und **Auswahl übernehmen** setzt das Raster neu. Beim Laden einer Show folgt die Matrix der Auswahl nicht — das gespeicherte Raster bleibt, wie es in der Datei steht.
 
 ## Algorithmen
 

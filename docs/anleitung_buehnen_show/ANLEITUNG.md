@@ -102,8 +102,8 @@ Helligkeitsbänder; der Dimmer der 40 PARs ist dann spiegelgleich zur Mitte abge
 1. Links unter **Gruppen** auf **MH alle (links → rechts) (20)** klicken.
 2. Der Programmer springt in den Reiter **Matrix**. Selbst auf den Reiter **EFX** wechseln.
    Er erscheint nur, wenn die Auswahl Geräte mit Pan und Tilt enthält.
-3. **+ Neu** legt einen neuen EFX an. Er gehört sofort zu den 20 gewählten Köpfen (der
-   Editor folgt der Programmer-Auswahl).
+3. **+ Neu** legt einen neuen EFX an. Er gehört sofort zu den 20 gewählten Köpfen (ein
+   neuer EFX nimmt die Programmer-Auswahl).
 
 ![Name, Algorithmus Line, Breite, Höhe, Zentrum](img_effekte/06_efx_form.png)
 
@@ -135,10 +135,10 @@ Helligkeitsbänder; der Dimmer der 40 PARs ist dann spiegelgleich zur Mitte abge
 Sekunde später ist er weitergewandert (145, 136, 127 …). Tilt steht bei allen auf 96, der
 Dimmer auf 255.
 
-> **Achtung, der angezeigte EFX folgt der Auswahl.** Wer bei offenem Reiter **EFX** auf
-> **Keine** klickt oder eine andere Gruppe wählt, bindet den gerade angezeigten EFX an die neue
-> Auswahl — auch einen schon gespeicherten. Vor dem Wechsel der Auswahl erst auf einen anderen
-> Reiter gehen (zum Beispiel **Intensity**). Siehe Backlog UI-79.
+> **Gespeichert bleibt gespeichert.** Nur der neue EFX folgt der Auswahl, und nur bis zum
+> **💾 Speichern**. Danach ändern weder **Keine** noch eine andere Gruppe noch das Öffnen des
+> Reiters seine Geräte. Soll ein gespeicherter EFX andere Geräte bekommen: ihn anklicken, die
+> Geräte wählen und in der Geräte-Box **Auswahl übernehmen** drücken.
 
 ## 3. Schwenker, die sich abwechseln (EFX, 180° Versatz)
 

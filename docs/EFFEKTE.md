@@ -57,7 +57,8 @@ Hz = Umläufe/Sekunde (höher = schneller); x = Faktor auf Schrittzeiten
 ## 2. EFX – Bewegungseffekte für Moving Heads (Programmer → Tab EFX)
 
 Geometrische **Pan/Tilt-Figuren**. Links Liste, Mitte Editor, rechts Live-
-Vorschau der Bahn. Der EFX **folgt der Programmer-Auswahl** — erst die Gruppe
+Vorschau der Bahn. Ein **neuer EFX nimmt die Programmer-Auswahl** (ein
+gespeicherter nur über **Auswahl übernehmen**) — erst die Gruppe
 (z. B. Moving Heads) wählen, dann den EFX.
 
 ![EFX-Editor (Algorithmus Circle, Pan/Tilt-Hub)](anleitung_efx/img/01_efx_editor.png)
@@ -87,8 +88,9 @@ Ausführlich (inkl. `open_beam`): [EFX-Anleitung](anleitung_efx/ANLEITUNG_EFX.md
 ## 3. RGB Matrix – Pixel-Effekte auf einem LED-Raster (Programmer → Tab Matrix)
 
 Spielt animierte Muster auf einem Raster aus Fixtures ab. Links Liste, Mitte
-Editor, rechts Live-Vorschau des Pixelbilds. Das Raster **folgt der
-Programmer-Auswahl** — erst die Gruppe wählen, dann die Matrix.
+Editor, rechts Live-Vorschau des Pixelbilds. Eine **neue Matrix nimmt das
+Raster der Programmer-Auswahl** (eine gespeicherte nur über **Auswahl
+übernehmen**) — erst die Gruppe wählen, dann **+ Neu**.
 
 ![Farb-Matrix im Editor (Style RGB, Chase)](anleitung_farbmatrix/img/01_matrix_rgb.png)
 

@@ -33,11 +33,11 @@ Du bist nach dem Gruppen-Klick bereits im Tab **Matrix**. Wähle eine Matrix (od
 - **Algorithmus: Chase**
 - **Stil: RGB** (bei Spider/RGBW-PAR auch RGBW)
 
-Die eingebettete Matrix **folgt automatisch der Programmer-Auswahl** (Überschrift „Geräte
-(folgen der Programmer-Auswahl)") und setzt **Spalten** und **Reihen** aus der Gruppen-Definition
-selbst — du siehst z. B. „**1×10 = 10 Fixtures, 0 Lücken (Gruppe »Farb-Matrix«)**". Ein manuelles Setzen
-von **Spalten/Reihen** ist daher meist unnötig und wird beim nächsten Auswahl-Sync ohnehin wieder
-überschrieben.
+Die neue Matrix **nimmt automatisch die Programmer-Auswahl** und setzt **Spalten** und
+**Reihen** aus der Gruppen-Definition selbst — du siehst z. B. „**1×10 = 10 Fixtures, 0 Lücken
+(Gruppe »Farb-Matrix«)**". Ein manuelles Setzen von **Spalten/Reihen** ist daher meist unnötig. Eine
+gespeicherte Matrix behält ihr Raster; an eine andere Gruppe bindest du sie mit **Auswahl
+übernehmen**.
 
 > **Bleibt es dunkel?** Eine **neu angelegte** Matrix setzt nur die **Farbe**, nicht den
 > Dimmer. Geräte, deren Dimmer auf 0 steht, bleiben dann schwarz. Abhilfe: im Menü

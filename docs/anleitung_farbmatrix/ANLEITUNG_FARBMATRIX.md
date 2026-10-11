@@ -26,10 +26,12 @@ dann Programmer → Tab **Matrix** → **+ Neu** → in **Grundeinstellungen**:
   **gespeicherte** Fassung — ungespeicherte Änderungen (Hinweis „● ungespeicherte Änderungen")
   wirken nicht auf den laufenden Effekt.
 
-**Spalten/Zeilen** stellst du nicht von Hand ein: das **Raster folgt der Programmer-Auswahl** —
-bei einer Gruppe deren Raster (auch 2D), bei loser Auswahl eine Zeile mit allen Geräten. Die
+**Spalten/Zeilen** stellst du nicht von Hand ein: die **neue Matrix nimmt das Raster der
+Programmer-Auswahl** — bei einer Gruppe deren Raster (auch 2D), bei loser Auswahl eine Zeile mit
+allen Geräten. Die
 neue Matrix gehört zu der Gruppe, die beim **+ Neu** aktiv war, und erscheint nur unter ihr in der
-Liste. Steht „0 Fixtures", die Gruppe in der Gruppen-Liste **neu anklicken**.
+Liste. Steht „0 Fixtures", die Gruppe in der Gruppen-Liste **neu anklicken** und **Auswahl übernehmen**
+drücken.
 
 ![Farb-Matrix im Editor (Stil RGB, Chase)](img/01_matrix_rgb.png)
 
