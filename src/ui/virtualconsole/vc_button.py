@@ -1176,16 +1176,31 @@ class VCButton(VCWidget):
 
     def _run_extra_actions(self):
         from PySide6.QtCore import QTimer
+        # WEB-08: kam der Druck aus der Ferne, gilt „Laser-NOT-AUS nicht
+        # aufhebbar" auch fuer die VERZOEGERTEN Zusatzaktionen — sie laufen
+        # spaeter aus dem Timer, ausserhalb des Kontexts der Fernausloesung.
+        from src.core.app_state import laser_notaus_loesen_gesperrt
+        aus_der_ferne = laser_notaus_loesen_gesperrt()
         for entry in list(self.actions):
             try:
                 delay = float(entry.get("delay", 0) or 0)
             except (TypeError, ValueError):
                 delay = 0.0
             if delay > 0:
-                QTimer.singleShot(int(delay * 1000),
-                                  lambda e=entry: self._execute_extra(e))
+                if aus_der_ferne:
+                    QTimer.singleShot(int(delay * 1000),
+                                      lambda e=entry: self._execute_extra_fern(e))
+                else:
+                    QTimer.singleShot(int(delay * 1000),
+                                      lambda e=entry: self._execute_extra(e))
             else:
                 self._execute_extra(entry)
+
+    def _execute_extra_fern(self, entry: dict):
+        """WEB-08: verzoegerte Zusatzaktion eines Drucks aus der Ferne."""
+        from src.core.app_state import laser_notaus_nicht_loesbar
+        with laser_notaus_nicht_loesbar():
+            self._execute_extra(entry)
 
     def _execute_extra(self, entry: dict):
         """Fuehrt eine einzelne Zusatz-Aktion diskret aus (kein Press/Release-State).

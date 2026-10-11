@@ -752,3 +752,146 @@ class RegistrierungTest(_Basis):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ── Laser-NOT-AUS: aus der Ferne nur ausloesbar, nie aufhebbar ───────────────
+#
+# Am Pult loest ein bewusst gesetzter Laser-Wert (Shutter, Musterbank, Gobo,
+# Macro) den NOT-AUS wieder (``AppState.set_programmer_value``). Ein Fader oder
+# eine Snap-Taste mit solchen Werten taete das auch vom Handy aus — die feste
+# Web-Remote-Seite kann das nicht (sie schreibt in die Eingangs-Schicht, die
+# Aus-Maske bleibt). Die Fernausloesung darf hier nicht mehr koennen.
+
+class NotAusKernTest(unittest.TestCase):
+    """Die Sperre selbst, am echten Latch (Aufbau wie test_laser_dmx_estop)."""
+
+    def setUp(self):
+        import importlib.util
+        import src.core.app_state as A
+        pfad = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            "test_laser_dmx_estop.py")
+        spec = importlib.util.spec_from_file_location("_las_estop_helfer", pfad)
+        self.helfer = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.helfer)
+        self.A = A
+        self._orig = A.get_channels_for_patched
+        A.get_channels_for_patched = lambda fx: self.helfer._CHANNELS[fx.fid]
+        self.st = self.helfer._make_state()
+
+    def tearDown(self):
+        self.A.get_channels_for_patched = self._orig
+
+    def test_im_fern_kontext_bleibt_der_not_aus_stehen(self):
+        self.st.set_laser_estop(True)
+        with self.A.laser_notaus_nicht_loesbar():
+            for attr in ("shutter", "laser_bank", "gobo_wheel", "gobo_wheel#1"):
+                self.st.set_programmer_value(7, attr, 200)
+                self.assertTrue(self.st.laser_estop_active, attr)
+        # der Wert ist geschrieben, die Ausgabe bleibt trotzdem dunkel
+        self.assertEqual(self.st.programmer[7]["shutter"], 200)
+        self.st._render_frame(0.02)
+        for adresse in (10, 11, 12, 13):
+            self.assertEqual(self.st.universes[1].get_channel(adresse), 0)
+
+    def test_gegenprobe_am_pult_loest_der_wert_weiterhin(self):
+        self.st.set_laser_estop(True)
+        with self.A.laser_notaus_nicht_loesbar():
+            pass                            # Kontext verlassen -> Sperre weg
+        self.assertFalse(self.A.laser_notaus_loesen_gesperrt())
+        self.st.set_programmer_value(7, "shutter", 200)
+        self.assertFalse(self.st.laser_estop_active)
+
+    def test_sperre_gilt_nur_im_eigenen_thread_und_verschachtelt(self):
+        gesehen = []
+        with self.A.laser_notaus_nicht_loesbar():
+            with self.A.laser_notaus_nicht_loesbar():
+                pass
+            self.assertTrue(self.A.laser_notaus_loesen_gesperrt())
+            t = threading.Thread(
+                target=lambda: gesehen.append(self.A.laser_notaus_loesen_gesperrt()))
+            t.start()
+            t.join(5)
+        self.assertEqual(gesehen, [False])
+        self.assertFalse(self.A.laser_notaus_loesen_gesperrt())
+
+    def test_sperre_faellt_auch_nach_einer_ausnahme(self):
+        with self.assertRaises(ValueError):
+            with self.A.laser_notaus_nicht_loesbar():
+                raise ValueError("x")
+        self.assertFalse(self.A.laser_notaus_loesen_gesperrt())
+
+
+class NotAusFernTest(_Basis):
+    """Die Fernausloesung setzt die Sperre — der Klick am Pult nicht."""
+
+    def setUp(self):
+        super().setUp()
+        import types
+        from src.core.app_state import laser_notaus_loesen_gesperrt
+        self.gesehen = []
+        self._alt = {}
+        for name in ("set_programmer_value", "get_patched_fixtures"):
+            self._alt[name] = self.state.__dict__.get(name, None)
+        self.state.get_patched_fixtures = lambda: [types.SimpleNamespace(fid=7)]
+        self.state.set_programmer_value = (
+            lambda *a, **k: self.gesehen.append(laser_notaus_loesen_gesperrt()))
+
+    def tearDown(self):
+        for name, alt in self._alt.items():
+            if alt is None:
+                self.state.__dict__.pop(name, None)
+            else:
+                setattr(self.state, name, alt)
+        super().tearDown()
+
+    def _shutter_fader(self, x):
+        w = self.canvas._add_widget("VCSlider", QPoint(x, 10))
+        w.mode = SliderMode.PROGRAMMER
+        w.programmer_attr = "shutter"
+        w.programmer_scope = "all"
+        return w
+
+    def test_fader_aus_der_ferne_schreibt_unter_der_sperre(self):
+        fern = self._shutter_fader(10)
+        self.gesehen.clear()
+        r = self.fern.aktion(fern.widget_id, "setzen", 200)
+        self.assertTrue(r["ok"], r)
+        self.assertTrue(self.gesehen, "der Fader hat nichts geschrieben")
+        self.assertTrue(all(self.gesehen), self.gesehen)
+
+    def test_gegenprobe_der_griff_am_pult_ist_nicht_gesperrt(self):
+        griff = self._shutter_fader(10)
+        self.gesehen.clear()
+        griff.value = 200
+        self.assertTrue(self.gesehen, "der Fader hat nichts geschrieben")
+        self.assertFalse(any(self.gesehen), self.gesehen)
+
+    def _taste_mit_spaeter_zusatzaktion(self, x):
+        from src.core.app_state import laser_notaus_loesen_gesperrt
+        w = self._taste(ButtonAction.CLEAR, x=x)
+        w.actions = [{"type": "clear", "delay": 0.02}]
+        spaet = []
+        w._execute_extra = lambda e: spaet.append(laser_notaus_loesen_gesperrt())
+        return w, spaet
+
+    def _warte(self, liste):
+        from PySide6.QtTest import QTest
+        for _ in range(100):
+            if liste:
+                return
+            QTest.qWait(10)
+
+    def test_verzoegerte_zusatzaktion_aus_der_ferne_bleibt_gesperrt(self):
+        w, spaet = self._taste_mit_spaeter_zusatzaktion(10)
+        r = self.fern.aktion(w.widget_id, "umschalten")
+        self.assertTrue(r["ok"], r)
+        self.assertEqual(spaet, [], "die Zusatzaktion sollte verzoegert laufen")
+        self._warte(spaet)
+        self.assertEqual(spaet, [True])
+
+    def test_gegenprobe_verzoegerte_zusatzaktion_am_pult(self):
+        w, spaet = self._taste_mit_spaeter_zusatzaktion(10)
+        w._taste(True)
+        w._taste(False)
+        self._warte(spaet)
+        self.assertEqual(spaet, [False])

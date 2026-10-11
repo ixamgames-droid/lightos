@@ -28,6 +28,13 @@ Tastatur: beide betreffen nur Maus und Finger am Pult.
   nichts, was die feste Web-Remote-Seite nicht schon konnte.
 * *Laser NOT-AUS* ist ausloesbar. Die Taste kennt nur diese eine Richtung
   (dunkel + unscharf); aufheben kann sie nichts.
+  Aufheben kann die Fernausloesung ihn auch auf Umwegen nicht: am Pult loest
+  ein bewusst gesetzter Laser-Wert (Shutter, Musterbank, Gobo, Macro) den
+  NOT-AUS wieder — ein Fader oder eine Snap-Taste mit solchen Werten taete das
+  sonst auch vom Handy aus. Jede Aktion laeuft deshalb in
+  ``app_state.laser_notaus_nicht_loesbar()``: der Wert wird geschrieben, der
+  NOT-AUS bleibt stehen, bis ihn jemand am Pult loest. Das gilt auch fuer
+  verzoegerte Zusatzaktionen einer Taste.
 * *Laser scharf/unscharf*: aus der Ferne nur UNSCHARF. Scharf geschaltet wird
   am Pult — dort steht jemand, der den Raum sieht. Das Web-Remote konnte den
   Laser bisher nicht scharf schalten, und dabei bleibt es.
@@ -208,19 +215,23 @@ def ausfuehren(widget, aktion, wert=None) -> dict:
     if not isinstance(aktion, str) or aktion not in erlaubt:
         return _nein(AKTION_UNBEKANNT)
     try:
-        if art == "taste":
-            ergebnis = _taste_ausfuehren(widget, aktion)
-        elif art == "fader":
-            v = _fader_wert(wert)
-            if v is None:
-                return _nein(WERT_UNGUELTIG)
-            widget.value = v                # derselbe Setter wie Maus, Rad, MIDI
-            ergebnis = {"ok": True}
-        else:
-            # dieselben Slots, an denen die drei Knoepfe der Cueliste haengen
-            {"go": widget._do_go, "back": widget._do_back,
-             "stop": widget._do_stop}[aktion]()
-            ergebnis = {"ok": True}
+        # Der Laser-NOT-AUS ist aus der Ferne nicht aufhebbar (s. Modulkopf):
+        # alles, was die Aktion in den Programmer schreibt, laesst den Latch stehen.
+        from src.core.app_state import laser_notaus_nicht_loesbar
+        with laser_notaus_nicht_loesbar():
+            if art == "taste":
+                ergebnis = _taste_ausfuehren(widget, aktion)
+            elif art == "fader":
+                v = _fader_wert(wert)
+                if v is None:
+                    return _nein(WERT_UNGUELTIG)
+                widget.value = v            # derselbe Setter wie Maus, Rad, MIDI
+                ergebnis = {"ok": True}
+            else:
+                # dieselben Slots, an denen die drei Knoepfe der Cueliste haengen
+                {"go": widget._do_go, "back": widget._do_back,
+                 "stop": widget._do_stop}[aktion]()
+                ergebnis = {"ok": True}
         if ergebnis.get("ok"):
             ergebnis["widget"] = beschreibe(widget)
         return ergebnis
