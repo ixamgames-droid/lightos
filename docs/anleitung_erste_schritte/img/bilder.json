@@ -1,7 +1,7 @@
 {
   "anleitung": "erste_schritte",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "3403c9c7",
+  "stand": "e3d80129",
   "schrift": "Noto Sans (statt Roboto Condensed)",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py erste_schritte'.",
@@ -37,7 +37,7 @@
         900
       ],
       "marken": [],
-      "md5": "ab519bd69bf193585868b93a2543a798"
+      "md5": "2785f6b463b6283ec81b5102cbcdf83a"
     },
     {
       "datei": "04_rueckfrage.png",
@@ -114,7 +114,7 @@
         900
       ],
       "marken": [],
-      "md5": "3b72b1c75985d613bf8b0bcd27011d42"
+      "md5": "7a674f299296796139cc267832595e3f"
     },
     {
       "datei": "11_beenden.png",

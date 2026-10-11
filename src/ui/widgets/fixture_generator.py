@@ -272,6 +272,7 @@ def validate_model(model: GeneratorModel) -> list[tuple[str, str]]:
 
     Geprueft wird:
     - leere Modi / fehlende Kanaele,
+    - doppelte Modusnamen (FM-73),
     - Bereiche ausserhalb 0–255 und range_from > range_to,
     - ueberlappende Bereiche innerhalb eines Kanals,
     - Luecken zwischen Bereichen (nur wenn ueberhaupt Bereiche existieren),
@@ -287,6 +288,18 @@ def validate_model(model: GeneratorModel) -> list[tuple[str, str]]:
     if not model.modes:
         issues.append(("error", "Kein Modus angelegt."))
         return issues
+
+    # FM-73: zwei Modi gleichen Namens sind nicht aufloesbar — ein gepatchtes
+    # Geraet findet seinen Modus ueber Profil + Modusname. Gespeichert wuerde
+    # der zweite als „Name (2)“ (`fixture_db.create_user_profile`); besser,
+    # der Nutzer vergibt selbst einen sprechenden Namen.
+    from src.core.database.modus_wahl import doppelte_modusnamen
+    doppelt = doppelte_modusnamen((m.name or "Modus").strip() for m in model.modes)
+    if doppelt:
+        issues.append(("error",
+                       "Modusnamen müssen eindeutig sein — doppelt: "
+                       + ", ".join(f"„{n}“" for n in doppelt)
+                       + ". Beim Speichern bekäme der zweite den Zusatz „(2)“."))
 
     for mode in model.modes:
         loc = f"Modus '{mode.name}'"
