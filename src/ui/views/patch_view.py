@@ -92,6 +92,10 @@ def _copy_fixture(src: PatchedFixture, fid: int, universe: int,
         pixel_order=getattr(src, "pixel_order", "rowwise") or "rowwise",
         element_rotation=int(getattr(src, "element_rotation", 0) or 0),
         element_flip=bool(getattr(src, "element_flip", False)),
+        # LAS-30: Laser-Montage gehoert wie invert_pan zum Geraetetyp/Aufbau.
+        invert_laser_x=bool(getattr(src, "invert_laser_x", False)),
+        invert_laser_y=bool(getattr(src, "invert_laser_y", False)),
+        swap_laser_xy=bool(getattr(src, "swap_laser_xy", False)),
         pan_range_deg=src.pan_range_deg,
         tilt_range_deg=src.tilt_range_deg,
         pan_zero_dmx=src.pan_zero_dmx,
@@ -166,9 +170,16 @@ class PatchFixtureEditDialog(QDialog):
 
         self._combo_mode = QComboBox()
         current_mode_idx = -1
+        # FM-73: der Modus des Geraets nach der gemeinsamen Regel, aber NUR
+        # Stufe 1 (Name; bei gleichnamigen die Kanalzahl) — vorher gewann
+        # unter gleichnamigen Modi der letzte Eintrag. Fehlt der Name, bleibt
+        # es wie bisher beim ersten Eintrag der Liste.
+        from src.core.database.modus_wahl import gleichnamiger_modus
+        aktuell = gleichnamiger_modus(self._modes, self._fixture.mode_name,
+                                      self._fixture.channel_count)
         for i, m in enumerate(self._modes):
             self._combo_mode.addItem(f"{m.name} ({m.channel_count}ch)", (m.name, m.channel_count))
-            if m.name == self._fixture.mode_name:
+            if m is aktuell:
                 current_mode_idx = i
         if current_mode_idx >= 0:
             self._combo_mode.setCurrentIndex(current_mode_idx)
@@ -226,6 +237,40 @@ class PatchFixtureEditDialog(QDialog):
 
         self._lbl_channels = QLabel("")
         form.addRow("Kanäle:", self._lbl_channels)
+
+        # LAS-30: Laser-Ausrichtung je Montage (haengend/stehend) — nur Laser.
+        self._chk_inv_lx = self._chk_inv_ly = self._chk_swap_lxy = None
+        self._lbl_laser_achsen = None
+        if (self._fixture.fixture_type or "").lower() == "laser":
+            from src.core.laser.achsen import profil_beschreibung
+            self._chk_inv_lx = QCheckBox("X-Achse umkehren")
+            self._chk_inv_lx.setChecked(
+                bool(getattr(self._fixture, "invert_laser_x", False)))
+            self._chk_inv_ly = QCheckBox("Y-Achse umkehren")
+            self._chk_inv_ly.setChecked(
+                bool(getattr(self._fixture, "invert_laser_y", False)))
+            self._chk_swap_lxy = QCheckBox("X/Y tauschen")
+            self._chk_swap_lxy.setChecked(
+                bool(getattr(self._fixture, "swap_laser_xy", False)))
+            try:
+                _beschr = profil_beschreibung(
+                    get_channels_for_patched(self._fixture))
+            except Exception:
+                _beschr = ""
+            _tip = ("Je nach Montage (hängend/stehend) die Laser-Position "
+                    "spiegeln oder X/Y tauschen — wirkt auf Programmer, Cues, "
+                    "EFX und Netzwerk-Laser. Das 3D-Bild zeigt weiter die "
+                    "programmierte Richtung. Abschalt-/NOT-AUS-Werte bleiben "
+                    "unberührt.")
+            for _c in (self._chk_inv_lx, self._chk_inv_ly, self._chk_swap_lxy):
+                _c.setToolTip(_tip)
+            form.addRow("Laser-Ausrichtung:", self._chk_inv_lx)
+            form.addRow("", self._chk_inv_ly)
+            form.addRow("", self._chk_swap_lxy)
+            if _beschr:
+                self._lbl_laser_achsen = QLabel(_beschr)
+                self._lbl_laser_achsen.setWordWrap(True)
+                form.addRow("", self._lbl_laser_achsen)
 
         # Moving-Head-Ausrichtung (M3.4): Pan/Tilt invertieren/tauschen.
         self._chk_inv_pan = self._chk_inv_tilt = self._chk_swap = None
@@ -598,6 +643,12 @@ class PatchFixtureEditDialog(QDialog):
                 self._combo_protocol.currentData() or "dmx")
             self.result_updates["net_host"] = (
                 self._edit_net_host.text() or "").strip()
+        if self._chk_inv_lx is not None:
+            self.result_updates.update({
+                "invert_laser_x": self._chk_inv_lx.isChecked(),
+                "invert_laser_y": self._chk_inv_ly.isChecked(),
+                "swap_laser_xy": self._chk_swap_lxy.isChecked(),
+            })
         if self._chk_inv_pan is not None:
             self.result_updates.update({
                 "invert_pan": self._chk_inv_pan.isChecked(),

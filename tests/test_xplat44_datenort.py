@@ -1003,14 +1003,16 @@ class Deinstallation(unittest.TestCase):
                 mock.patch.object(U, "remove_path"), \
                 mock.patch.object(U, "remove_shortcut"), \
                 mock.patch.object(sys, "argv",
-                                  ["uninstall.py", "--dry-run", "--keep-venv"]):
+                                  ["uninstall.py", "--dry-run", "--keep-venv",
+                                   "--purge"]):
+            # XPLAT-49: nach dem App-Ordner wird nur noch mit --purge gefragt.
             U.main()
         data = [f for f in fragen if f[0].startswith("data/")]
         app = [f for f in fragen if f[0].startswith(str(U.APPDATA_DIR))]
         self.assertEqual(len(data), 1, fragen)
         self.assertEqual(len(app), 1, fragen)
         self.assertNotIn("Show-DB", data[0][0])
-        for wort in ("Show-DB", "Universen", "MIDI"):
+        for wort in ("eigene Shows", "Show-DB", "Universen", "MIDI"):
             self.assertIn(wort, app[0][0])
         self.assertFalse(app[0][1], "App-Ordner darf nicht per Enter weg sein")
 

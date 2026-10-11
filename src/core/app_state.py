@@ -358,6 +358,14 @@ class AppState:
         # add_fixture() nicht 1×/Fixture re-entrant patch_changed feuert; der
         # Aufrufer macht danach EINEN gebündelten Refresh.
         self._suppress_emits: bool = False
+        # UI-84: „Show wird geladen" (Zaehler, verschachtelbar). Waehrenddessen
+        # duerfen Views, die der Auswahl folgen (EFX-/Matrix-Folge-Editor im
+        # Programmer), keine Funktionsdaten aus der Auswahl ableiten — das
+        # Laden setzt die Auswahl als Nebenwirkung neu (Live View bei
+        # patch_changed), das ist kein Benutzer-Auswahlwechsel. Siehe
+        # show_wird_geladen() / laedt_show().
+        self._show_lade_tiefe: int = 0
+        self._show_lade_nachlauf_bis: float = 0.0
         # Gemeinsame Programmer-Geraeteauswahl (Reihenfolge = Auswahl-Reihenfolge).
         # Wird vom ProgrammerView gesetzt; alle Kategorien (RGB Matrix, Effekte,
         # Paletten …) lesen sie. Nicht persistiert. Siehe docs/PROGRAMMER_REBUILD.md
@@ -1489,6 +1497,8 @@ class AppState:
             # Whitelist, Normalisierung, Undo-Schnappschuss, Wiederherstellung.
             # Diesmal von Anfang an, statt sie beim naechsten Vorfall zu finden.
             "element_rotation", "element_flip",
+            # LAS-30
+            "invert_laser_x", "invert_laser_y", "swap_laser_xy",
             "pan_range_deg", "tilt_range_deg", "pan_zero_dmx", "tilt_zero_dmx",
             "aim_offset_pan", "aim_offset_tilt",
             "protocol", "net_host",
@@ -1500,6 +1510,9 @@ class AppState:
                 values["element_rotation"])
         if "element_flip" in values:
             values["element_flip"] = bool(values["element_flip"])
+        for _lk in ("invert_laser_x", "invert_laser_y", "swap_laser_xy"):
+            if _lk in values:
+                values[_lk] = bool(values[_lk])
         if "pixel_order" in values:
             # Garbage aus Skript-/Remote-Pfaden klemmen — kanonische Quelle ist
             # das Leaf-Modul core.pixel_order, dieselbe wie die Show-Persistenz.
@@ -1586,6 +1599,9 @@ class AppState:
             "pixel_order": getattr(f, "pixel_order", "rowwise") or "rowwise",
             "element_rotation": int(getattr(f, "element_rotation", 0) or 0),
             "element_flip": bool(getattr(f, "element_flip", False)),
+            "invert_laser_x": bool(getattr(f, "invert_laser_x", False)),
+            "invert_laser_y": bool(getattr(f, "invert_laser_y", False)),
+            "swap_laser_xy": bool(getattr(f, "swap_laser_xy", False)),
             "pan_range_deg": getattr(f, "pan_range_deg", 540),
             "tilt_range_deg": getattr(f, "tilt_range_deg", 270),
             "pan_zero_dmx": getattr(f, "pan_zero_dmx", 128),
@@ -1620,6 +1636,9 @@ class AppState:
             pixel_order=d.get("pixel_order", "rowwise") or "rowwise",
             element_rotation=int(d.get("element_rotation", 0) or 0),
             element_flip=bool(d.get("element_flip", False)),
+            invert_laser_x=bool(d.get("invert_laser_x", False)),
+            invert_laser_y=bool(d.get("invert_laser_y", False)),
+            swap_laser_xy=bool(d.get("swap_laser_xy", False)),
             pan_range_deg=d.get("pan_range_deg", 540),
             tilt_range_deg=d.get("tilt_range_deg", 270),
             pan_zero_dmx=d.get("pan_zero_dmx", 128),
@@ -2032,6 +2051,61 @@ class AppState:
                     uni.set_channel(a, 0)
             # 2) dem Render-Thread vormerken (race-fest gegen Alt-Plan-Commit).
             pending[u] = set(pending.get(u, set())) | stale
+
+    # ── UI-84: Lade-Kontext ──────────────────────────────────────────────────
+
+    # Fallback-Frist fuer den Nachlauf, falls keine Ereignisschleife laeuft
+    # (der singleShot(0) unten feuert dann nie). In der App beendet der
+    # singleShot den Nachlauf im naechsten Durchlauf der Ereignisschleife.
+    _SHOW_LADE_NACHLAUF_S = 1.0
+
+    @contextlib.contextmanager
+    def show_wird_geladen(self):
+        """UI-84: Kontext um das Laden einer Show — „Laden darf Funktionsdaten
+        nie veraendern".
+
+        Beim Laden feuern patch_changed/refresh_all usw.; Views reagieren
+        darauf und setzen u. a. die Programmer-Auswahl neu (SELECTION_CHANGED).
+        Ein sichtbarer Folge-Editor (EFX/RGB-Matrix im Programmer) hielt das
+        fuer einen Auswahlwechsel und schrieb die Auswahl in die gerade
+        geladene Funktion. ``laedt_show()`` meldet waehrend dieses Kontexts —
+        und noch fuer Ereignisse, die das Laden in die Ereignisschleife gelegt
+        hat (Nachlauf bis zum naechsten Durchlauf) — True; die Folge-Editoren
+        bauen dann nur ihre Anzeige neu und weisen nichts zu."""
+        self._show_lade_tiefe += 1
+        try:
+            yield
+        finally:
+            self._show_lade_tiefe = max(0, self._show_lade_tiefe - 1)
+            if self._show_lade_tiefe == 0:
+                self._show_lade_nachlauf_starten()
+
+    def _show_lade_nachlauf_starten(self) -> None:
+        bis = time.monotonic() + self._SHOW_LADE_NACHLAUF_S
+        self._show_lade_nachlauf_bis = bis
+
+        def _ende(_bis=bis):
+            # Nur den EIGENEN Nachlauf beenden (ein spaeteres Laden hat ggf.
+            # schon einen neuen gestartet).
+            if self._show_lade_nachlauf_bis == _bis:
+                self._show_lade_nachlauf_bis = 0.0
+
+        try:
+            from PySide6.QtCore import QCoreApplication, QTimer
+            if (QCoreApplication.instance() is not None
+                    and threading.current_thread() is threading.main_thread()):
+                # Nach allem, was das Laden schon eingereiht hat (Qt arbeitet
+                # Null-Timer in Anlege-Reihenfolge ab).
+                QTimer.singleShot(0, _ende)
+        except Exception as e:
+            debug_swallow("app_state.show_lade_nachlauf", e)
+
+    def laedt_show(self) -> bool:
+        """UI-84: True, solange eine Show geladen wird (inkl. Nachlauf)."""
+        if self._show_lade_tiefe > 0:
+            return True
+        bis = self._show_lade_nachlauf_bis
+        return bool(bis) and time.monotonic() < bis
 
     @contextlib.contextmanager
     def deferred_unpatched_release(self):
@@ -5621,39 +5695,23 @@ def _resolve_mode(s, fixture):
     (``panel_grid_for``) DENSELBEN Modus meinen muss wie die Kanaele. Zweimal
     ausprogrammiert waeren es zwei Regeln, die auseinanderlaufen — und dann
     zeigte das 3D-Panel die Form des einen Modus mit den Pixeln des anderen."""
-    from sqlalchemy import select
-    from .database.models import FixtureMode
-    # ★ UI-74 (Review): Stufe 1 und 2 nehmen den ERSTEN Treffer (nach ID),
-    # nicht ``scalar_one_or_none``. Zwei Modi gleicher Kanalzahl sind normal,
-    # und ein doppelter Modusname liess sich im Editor speichern — beides warf
-    # ``MultipleResultsFound`` mitten im Renderpfad.
-    gleichnamig = s.execute(
-        select(FixtureMode)
-        .where(FixtureMode.fixture_id == fixture.fixture_profile_id)
-        .where(FixtureMode.name == fixture.mode_name)
-        .order_by(FixtureMode.id)
-    ).scalars().all()
-    # ★ FM-67: tragen zwei Modi denselben Namen, entscheidet die gespeicherte
-    # Kanalzahl mit — sonst gewann stumm der aelteste, und ein Geraet im
-    # 6-Kanal-Modus fuhr die Kanaele des gleichnamigen 4-Kanal-Modus. Passt
-    # keiner, bleibt es beim ersten (nach ID), wie bisher.
-    mode = next((m for m in gleichnamig
-                 if m.channel_count == getattr(fixture, "channel_count", None)),
-                gleichnamig[0] if gleichnamig else None)
-    if not mode:
-        mode = s.execute(
-            select(FixtureMode)
-            .where(FixtureMode.fixture_id == fixture.fixture_profile_id)
-            .where(FixtureMode.channel_count == fixture.channel_count)
-            .order_by(FixtureMode.id)
-        ).scalars().first()
-    if not mode:
-        mode = s.execute(
-            select(FixtureMode)
-            .where(FixtureMode.fixture_id == fixture.fixture_profile_id)
-            .order_by(FixtureMode.id)
-        ).scalars().first()
-    return mode
+    # ★ FM-73: die Regel selbst steht in ``database/modus_wahl.py`` — die
+    # Show-Pruefung (``sync.validate_and_repair``) und die Patch-Dialoge
+    # fragen dieselbe Funktion. Hier keine eigene Abfrage per Name oder
+    # Kanalzahl mehr: eine zweite Fassung lief schon einmal auseinander.
+    #
+    # Was die Regel festhaelt (und warum):
+    # * UI-74 (Review): immer der ERSTE Treffer nach ID, nie
+    #   ``scalar_one_or_none``. Zwei Modi gleicher Kanalzahl sind normal, und
+    #   ein doppelter Modusname liess sich speichern — beides warf
+    #   ``MultipleResultsFound`` mitten im Renderpfad.
+    # * FM-67: tragen zwei Modi denselben Namen, entscheidet die gespeicherte
+    #   Kanalzahl mit — sonst gewann stumm der aelteste, und ein Geraet im
+    #   6-Kanal-Modus fuhr die Kanaele des gleichnamigen 4-Kanal-Modus.
+    from .database import modus_wahl
+    return modus_wahl.modus_waehlen(
+        modus_wahl.modi_des_profils(s, fixture.fixture_profile_id),
+        fixture.mode_name, getattr(fixture, "channel_count", None))
 
 
 # VIZ-50a: Cache (felder, profile_id, mode_name, channel_count) -> (rows, cols).
@@ -7197,7 +7255,13 @@ def apply_pan_tilt_orientation(fx, attrs: dict) -> dict:
     Pfad). Andernfalls ein NEUES dict (Programmer-/Funktions-State bleibt roh).
     Reihenfolge: erst Swap (Achsen tauschen inkl. Fine), dann Invert je Kanal.
     Fine-Kanaele werden als 16-bit-Paar korrekt mit-invertiert.
+
+    LAS-30: dieselbe Stufe kehrt auch die Laser-Achsen ``laser_x``/``laser_y``
+    um (``invert_laser_x``/``invert_laser_y``/``swap_laser_xy``) — mit der
+    Achsen-Konvention des Profils, siehe ``src.core.laser.achsen``.
     """
+    from src.core.laser.achsen import apply_laser_orientation
+    attrs = apply_laser_orientation(fx, attrs)
     inv_pan = bool(getattr(fx, "invert_pan", False))
     inv_tilt = bool(getattr(fx, "invert_tilt", False))
     swap = bool(getattr(fx, "swap_pan_tilt", False))
@@ -7268,7 +7332,11 @@ def unapply_pan_tilt_orientation(fx, attrs: dict) -> dict:
     hier also erst Invert, dann Swap. Beides sind Involutionen, aber ihre
     Komposition ist es NICHT: bei gleichzeitig gesetztem Swap und Invert liefert
     zweimaliges Anwenden der Vorwaertsfunktion ein falsches Ergebnis.
+
+    LAS-30: nimmt auch die Laser-Achsen-Umkehr/-Tausch zurueck.
     """
+    from src.core.laser.achsen import unapply_laser_orientation
+    attrs = unapply_laser_orientation(fx, attrs)
     inv_pan = bool(getattr(fx, "invert_pan", False))
     inv_tilt = bool(getattr(fx, "invert_tilt", False))
     swap = bool(getattr(fx, "swap_pan_tilt", False))
