@@ -70,6 +70,7 @@
 | MIDI-14 | D | - | 2026-10-11T16:21Z | - |
 | WEB-11 | A | feature/web11-qr-startbildschirm | 2026-10-11T16:32Z | - |
 | QA-96 | A | - | 2026-10-11T16:56Z | - |
+| XPLAT-54 | D | fix/xplat54-backlog-fragmente-test-windows | 2026-10-11T18:31Z | tests/test_backlog_fragmente.py |
 
 ## Blocker & Fallen
 
@@ -218,7 +219,6 @@
 
 ## Verlauf
 
-- 2026-10-11T13:58Z D claim MIDI-10
 - 2026-10-11T13:58Z D claim MIDI-15
 - 2026-10-11T13:58Z D claim ENG-30
 - 2026-10-11T13:58Z D claim XPLAT-36
@@ -248,3 +248,4 @@
 - 2026-10-11T18:08Z A done MIDI-5
 - 2026-10-11T18:08Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-11T18:11Z A aktualisiert LAS-35: Branch - -> feature/las35-zonen-planer
+- 2026-10-11T18:31Z D claim XPLAT-54
