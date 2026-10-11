@@ -24,7 +24,7 @@
 | LAS-26 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:11Z | src/ui |
 | VIZ-95 | A | feature/viz95-lasermuster-3d | 2026-10-08T20:47Z | src/ui/visualizer |
 | VIZ-96 | A | feature/viz96-gobo-projektion | 2026-10-11T09:58Z | src/ui/visualizer |
-| MIDI-5 | A | feature/midi5-msc | 2026-10-10T18:44Z | src/core/midi |
+| MIDI-5 | A | feature/midi5-msc | 2026-10-11T14:26Z | src/core/midi |
 | NET-14 | A | feature/midi5-msc | 2026-10-09T16:27Z | src/core/midi |
 | MIDI-16 | A | feature/midi5-msc | 2026-10-09T16:27Z | src/core/midi |
 | MIDI-4 | A | fix/midi3-mapping-robust | 2026-10-09T16:27Z | src/core/midi/midi_mapper.py |
