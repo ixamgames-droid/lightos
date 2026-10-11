@@ -187,7 +187,9 @@ def form_polylinien(muster) -> list[Linie]:
     eine eigene Form ohne Punkte ergibt eine leere Liste (nichts zu zeichnen),
     nie einen Fehler."""
     form = _feld(muster, "form", "")
-    if form not in FORMEN:
+    # Auch eine Form, die gar kein Text ist (Liste, Objekt aus einem von Hand
+    # gebauten Eintrag), ist nur „unbekannt“ — kein Fehler.
+    if not isinstance(form, str) or form not in FORMEN:
         return []
     linien = _grundform(form, anzahl_fuer(form, _feld(muster, "anzahl")),
                         _feld(muster, "linien", ()))

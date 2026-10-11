@@ -454,8 +454,8 @@ def bereichs_hinweise(eintraege, was: str = "Bereiche") -> list[str]:
     for e in eintraege or ():
         try:
             von, bis = int(e["von"]), int(e["bis"])
-        except (KeyError, TypeError, ValueError):
-            continue
+        except (KeyError, TypeError, ValueError, OverflowError):
+            continue                # OverflowError: int(inf)
         name = str(e.get("name") or e.get("art") or f"{von}–{bis}")
         if von > bis:
             out.append(f"{was}: „{name}“ ist verdreht (von {von} > bis {bis}).")

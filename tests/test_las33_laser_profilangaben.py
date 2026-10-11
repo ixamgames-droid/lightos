@@ -545,6 +545,22 @@ def test_eigene_form_und_muster_objekt():
     assert m[3].als_dict() == PA.bereinige(MUSTER)["muster"][3]
 
 
+def test_unsinnige_eintraege_werfen_nicht():
+    """Review: die Zeichen- und die Hinweis-Funktion bekommen im Generator
+    auch ROHE Eintraege (vor dem Bereinigen). Eine Form, die kein Text ist,
+    und ein Bereich mit ``inf`` sind dort „unbekannt“ — kein Absturz."""
+    for form in (["kreis"], {"form": "kreis"}, 7, None, float("inf")):
+        assert MF.form_polylinien({"form": form}) == []
+    kaputt = [{"von": float("inf"), "bis": 3, "name": "a"},
+              {"von": float("nan"), "bis": 3, "name": "b"},
+              {"von": [], "bis": {}, "name": "c"}, "kein Objekt", None,
+              {"von": 0, "bis": 255, "name": "ganz"}]
+    assert PA.bereichs_hinweise(kaputt, "Muster") == []
+    assert PA.laser_profilangaben([{"name": "k", "attribut": "raw", "laser": {
+        "version": 1, "muster": [{"von": 0, "bis": 1, "name": "x",
+                                  "form": ["kreis"]}]}}]) is None
+
+
 # ── EL-400RGB MK2: nur Belegtes ──────────────────────────────────────────────
 
 def _el400_kanaele():
