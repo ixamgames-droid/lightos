@@ -37,8 +37,10 @@ RIG = [  # fid, Kurzname, Modus, Kanaele, Typ
     (PAR, "PARD", "4-Kanal Dimmer+RGB", 4, "par"),
     (MH, "MH16", "16-Kanal", 16, "moving_head"),
     (BALKEN, "ZQ06121", "154-Kanal 48 Zonen RGB + 8x Weiss", 154, "matrix"),
-    # Laser MIT Dimmer und RGBW (dazu Muster/Rotation/Makros) = Kombi-Geraet.
-    (KOMBI, "Boom Box Fx2", "19-channel", 19, "laser"),
+    # Laser MIT Dimmer, RGB und Strobe (dazu Cue-Auswahl ueber gobo_wheel,
+    # Rotation, Makro) = Kombi-Geraet. Eingebautes Profil — ein Geraet aus der
+    # nachgeladenen Bibliothek kennt eine frische Installation nicht (QA-61).
+    (KOMBI, "PANGFB4", "39-Kanal", 39, "laser"),
     (NEBEL, "EURON10", "2-Kanal (Nebel + Lüfter)", 2, "hazer"),
 ]
 
