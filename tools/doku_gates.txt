@@ -30,6 +30,7 @@ test_xplat50_startskripte_arm.py   # INSTALL.md / Startskripte
 test_audit_bilder_stand.py
 test_audit_coverage_docs_exist.py
 test_anleitungsbilder.py           # u. a. jedes GIF unter docs/ <= 2 MB
+test_tool18_bilder_hinweis_gpu.py  # Bild-Werkzeug: Fehlstand unter docs/<anleitung>/img (Zielpfad im Wegwerf-Ordner)
 test_las24_gm_laser_aus.py         # Wortlaut in anleitung_erste_schritte
 test_las25_doku_aus_werte.py
 test_fm52_programmer_verlauf.py    # Wortlaut in anleitung_programmer_grundlagen
