@@ -36,7 +36,7 @@
 | PROC-19 | A | ci/proc19-doku-schnellweg | 2026-10-10T18:57Z | .github/workflows/ci.yml |
 | PROC-20 | A | feature/proc20-backlog-fragmente | 2026-10-10T18:45Z | tools · BACKLOG.md |
 | TOOL-26 | B | feature/tool26-app-messwerkzeug | 2026-10-10T13:25Z | tools/app_messung.py · tools/README.md · tests/test_tool26_app_messung.py · BACKLOG.md · changelog.d/2026-10-10-TOOL-26.md |
-| LAS-32 | A | feature/las32-s1-sperrzonen-anzeige | 2026-10-11T09:40Z | - |
+| LAS-32 | A | feature/las32-s1-sperrzonen-anzeige | 2026-10-11T14:32Z | - |
 | XPLAT-51 | A | fix/xplat51-arm64-nicht-unterstuetzt | 2026-10-10T14:17Z | - |
 | XPLAT-52 | A | fix/xplat52-installer-venv-arch | 2026-10-10T14:17Z | - |
 | VIZ-101 | A | fix/viz101-licht-durch-wand | 2026-10-10T14:38Z | - |
