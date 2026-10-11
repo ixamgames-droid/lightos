@@ -215,14 +215,24 @@ class SperrzonenSceneTest(unittest.TestCase):
         f = info["felder"][0]
         self.assertEqual(f["fid"], _FID)
         self.assertTrue(f["inSzene"] and f["sichtbar"])
-        for ist, erwartet in zip((f["x"], f["y"], f["z"]), _POS):
+        # Spitze = Austrittsfenster des Modells, NICHT der Geraete-Ursprung —
+        # dieselbe Stelle, ab der Python rechnet (feld_spitze).
+        spitze = S.feld_spitze(_POS, _ROT)
+        for ist, erwartet in zip((f["x"], f["y"], f["z"]), spitze):
+            self.assertAlmostEqual(ist, erwartet, places=5)
+        self.assertGreater(sum((spitze[i] - _POS[i]) ** 2 for i in range(3)) ** 0.5, 0.05)
+        fenster = self._eval(
+            "(function(){const f=window.__lightos.fixtures[%d];"
+            " const v=new THREE.Vector3(); f.group.updateMatrixWorld(true);"
+            " f.laserRig.pivot.getWorldPosition(v); return [v.x,v.y,v.z];})()" % _FID)
+        for ist, erwartet in zip(fenster, spitze):
             self.assertAlmostEqual(ist, erwartet, places=5)
         ebenen = S.feld_ebenen(_ROT, _FELD)      # [hinten, rechts, links, oben, unten]
         vorn, rechts, oben = S.geraete_achsen(_ROT)
         # Ecken-Reihenfolge der Seite: links-oben, rechts-oben, rechts-unten, links-unten
         auf_ebenen = [(2, 3), (1, 3), (1, 4), (2, 4)]
         for ecke, (e1, e2) in zip(f["weltEcken"], auf_ebenen):
-            d = [ecke[i] - _POS[i] for i in range(3)]
+            d = [ecke[i] - spitze[i] for i in range(3)]
             laenge = sum(v * v for v in d) ** 0.5
             self.assertGreater(laenge, S.FELD_ANZEIGE_LAENGE_M - 1e-6)
             for e in (e1, e2):
@@ -233,7 +243,7 @@ class SperrzonenSceneTest(unittest.TestCase):
             self.assertAlmostEqual(sum(vorn[i] * d[i] for i in range(3)),
                                    S.FELD_ANZEIGE_LAENGE_M, places=3)
         # Seitenprobe: die Ecke „rechts-oben" liegt wirklich rechts und oben.
-        d = [f["weltEcken"][1][i] - _POS[i] for i in range(3)]
+        d = [f["weltEcken"][1][i] - spitze[i] for i in range(3)]
         self.assertGreater(sum(rechts[i] * d[i] for i in range(3)), 0)
         self.assertGreater(sum(oben[i] * d[i] for i in range(3)), 0)
 
@@ -241,12 +251,14 @@ class SperrzonenSceneTest(unittest.TestCase):
         # Feld folgt beim naechsten Poll, ohne dass sich die Zonendaten aendern.
         neu_pos, neu_rot = (-4.0, 3.0, 2.0), (0.0, -90.0, 0.0)
         self._poll(fixtures=json.dumps([_laser(neu_pos, neu_rot)]), sperrzonen=_daten())
+        neu_spitze = S.feld_spitze(neu_pos, neu_rot)
         self._poll_until_true(
-            "Math.abs(window.__lightosSperrzonen.info().felder[0].x - (-4.0)) < 1e-6")
+            "Math.abs(window.__lightosSperrzonen.info().felder[0].x - (%r)) < 1e-5"
+            % neu_spitze[0])
         f = self._info()["felder"][0]
         ebenen = S.feld_ebenen(neu_rot, _FELD)
         for ecke, (e1, e2) in zip(f["weltEcken"], auf_ebenen):
-            d = [ecke[i] - neu_pos[i] for i in range(3)]
+            d = [ecke[i] - neu_spitze[i] for i in range(3)]
             laenge = sum(v * v for v in d) ** 0.5
             for e in (e1, e2):
                 self.assertAlmostEqual(

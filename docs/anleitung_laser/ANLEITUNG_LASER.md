@@ -236,7 +236,29 @@ verschieden sein (z. B. hinter einer Blende). Steht ein Wert auf
 *„nicht angegeben“*, ist der Laser **nicht prüfbar**. Dazu der **Zuschlag**
 rundum: Vorgabe 5°, mindestens 2°. Im 3D erscheint das Feld (mit Zuschlag) als
 dünne gelbe Pyramide am Gerät — gezeichnet bis 25 m, gerechnet ohne
-Längengrenze.
+Längengrenze. Ihre Spitze sitzt im **Austrittsfenster** des Lasers (im Modell
+knapp 9 cm vor der Gerätemitte), nicht in der Gerätemitte.
+
+**Schnellweg „Winkel aus Profil / Datenblatt“** (Knopf unter der Tabelle, gilt
+für die gewählte Zeile): Nennt das Geräteprofil einen Abstrahlwinkel, trägt
+LightOS ihn ein. Sonst fragt es nach dem **Gesamtwinkel waagerecht/senkrecht**
+aus dem Datenblatt und verteilt ihn je zur Hälfte auf links/rechts bzw.
+oben/unten. Das ist ein Datenblatt-Wert, keine Messung — die Ränder am Gerät
+nachprüfen. Für den Laserworld EL-400RGB MK2 ist im Profil kein Winkel
+hinterlegt, weil die ausgewerteten Handbuch-Abschnitte keinen nennen.
+
+**Pyramide und grüne Strahlen liegen nicht auf einer Achse.** Die gelbe
+Pyramide folgt der Geräteachse — von ihr aus trägst du die Randwinkel ein, mit
+ihr wird gerechnet. Die grünen Strahlen im 3D sind ein Schema und fest um
+rund 3,4° nach unten geneigt, damit sie im Bild über die Köpfe laufen. Der
+Unterschied ist kleiner als der Zuschlag von 5°; bei kleinerem Zuschlag und
+kleinem Randwinkel „unten“ können die Strahlen im Bild knapp außerhalb der
+Pyramide liegen. Maßgeblich ist die Pyramide.
+
+**Randwinkel gehören zum Gerät.** Löschst du einen Laser, gehen seine
+Randwinkel mit (Rückgängig holt beides zurück). Sitzt später ein anderes
+Lasermodell auf derselben Gerätenummer, gilt es als *nicht prüfbar*, bis du
+seine eigenen Winkel einträgst.
 
 **Meldung je Laser** — im Laser-Tab und im Sperrzonen-Fenster, gelb
 überschrieben mit *„Nur Anzeige — schaltet den Laser NICHT ab (am Gerät noch
@@ -249,6 +271,13 @@ nicht abgenommen)“*:
 | *Randwinkel fehlen — nicht prüfbar* | Für diesen Laser sind nicht alle vier Randwinkel eingetragen. |
 | *im 3D nicht platziert — nicht prüfbar* | Der Laser hat im 3D keinen Platz. |
 | *Laser gepatcht, keine Sperrzonen angelegt* | In dieser Show gibt es keine Zone. |
+
+**Hauptfenster:** Hast du auf diesem Rechner schon einmal eine Zone angelegt
+oder eine Show mit Zonen geladen, steht oben rechts neben dem Laser-NOT-AUS
+klein und gelb *„Laser gepatcht — keine Sperrzonen angelegt“*, solange ein
+DMX-Laser gepatcht ist und die Show keine Zone hat. Wer nie mit Sperrzonen
+gearbeitet hat oder keinen Laser patcht, sieht die Zeile nicht. Lädst du nach
+einer Show mit Zonen eine ohne, meldet die Statuszeile das einmal.
 
 **Speichern:** Zonen und Randwinkel gehören zur **Show**. Eine Show ohne Zonen
 sieht aus wie bisher. Öffnest und speicherst du die Show mit einem **älteren

@@ -2874,6 +2874,7 @@ class MainWindow(QMainWindow):
             self._notaus_ecke = ecke        # Referenz halten (sonst raeumt PySide ab)
             lay = QHBoxLayout(ecke)
             lay.setContentsMargins(0, 0, 0, 0)
+            self._sperrzonen_kopfzeile_bauen(lay)     # LAS-32, links vom Knopf
             lay.addWidget(btn)
             self.menuBar().setCornerWidget(ecke, Qt.Corner.TopRightCorner)
             ecke.show()
@@ -2891,6 +2892,7 @@ class MainWindow(QMainWindow):
         self._notaus_timer.timeout.connect(self._notaus_tick)
         self._notaus_timer.start()
         self._sync_notaus_button()
+        self._sync_sperrzonen_kopfzeile()
 
     def _notaus_in_kioskleiste(self):
         """Kiosk: eigener schmaler Streifen ueber dem Inhalt, Knopf rechts
@@ -2904,6 +2906,7 @@ class MainWindow(QMainWindow):
             lay = QHBoxLayout(leiste)
             lay.setContentsMargins(4, 2, 4, 2)
             lay.addStretch(1)
+            self._sperrzonen_kopfzeile_bauen(lay)     # LAS-32, auch im Kiosk
             lay.addWidget(btn)
             root = self.centralWidget().layout()
             root.insertWidget(max(0, root.indexOf(self._section_bar)), leiste)
@@ -2961,6 +2964,68 @@ class MainWindow(QMainWindow):
     def _notaus_tick(self):
         self._notaus_blink ^= 1
         self._sync_notaus_button()
+        self._sync_sperrzonen_kopfzeile()
+
+    # ── LAS-32: gelbe Zeile „Laser gepatcht — keine Sperrzonen angelegt" ──────
+
+    def _sperrzonen_kopfzeile_bauen(self, layout) -> None:
+        """Kleine gelbe Zeile links neben dem Laser-NOT-AUS (nicht modal, kein
+        Knopf). Reine Anzeige: sie liest nur ``state.sperrzonen`` und den Patch.
+        Ein Fehler hier darf den NOT-AUS-Knopf daneben nie mitreissen."""
+        self._sperrzonen_kopfzeile = None
+        try:
+            from src.ui.visualizer.sperrzonen_ui import SperrzonenKopfzeile
+            zeile = SperrzonenKopfzeile(lambda: self._state, layout.parentWidget())
+            layout.addWidget(zeile)
+            self._sperrzonen_kopfzeile = zeile
+        except Exception as e:
+            print(f"[main_window] Sperrzonen-Kopfzeile: {e}")
+
+    def _sync_sperrzonen_kopfzeile(self) -> None:
+        zeile = getattr(self, "_sperrzonen_kopfzeile", None)
+        if zeile is None:
+            return
+        try:
+            vorher = zeile.isHidden()
+            zeile.aktualisieren()
+            if vorher != zeile.isHidden():
+                # Die Menueleiste teilt ihrer Ecke die Breite nur beim Setzen zu.
+                ecke = getattr(self, "_notaus_ecke", None)
+                if ecke is not None:
+                    ecke.adjustSize()
+                    self.menuBar().setCornerWidget(ecke, Qt.Corner.TopRightCorner)
+                    ecke.show()
+        except RuntimeError:
+            pass        # Fenster schon abgebaut
+        except Exception as e:
+            print(f"[main_window] Sperrzonen-Kopfzeile: {e}")
+
+    def _sperrzonen_wechsel_melden(self) -> None:
+        """Von einer Show MIT Sperrzonen auf eine OHNE gewechselt, Laser
+        gepatcht: einmal melden (Statuszeile, gelb, nicht modal). Das Flag
+        setzt der Lader; es wird hier verbraucht."""
+        try:
+            if not getattr(self._state, "sperrzonen_wechsel_hinweis", False):
+                return
+            self._state.sperrzonen_wechsel_hinweis = False
+            from src.core.laser.sperrzonen import MELDUNG_SHOW_OHNE_ZONEN
+            sb = self.statusBar()
+            sb.showMessage(MELDUNG_SHOW_OHNE_ZONEN, 15000)
+            sb.setStyleSheet(
+                "QStatusBar{background:#5a4a00; color:#ffcc00; font-weight:bold;}")
+            QTimer.singleShot(15000, self._sperrzonen_meldung_ende)
+        except Exception as e:
+            print(f"[main_window] Sperrzonen-Wechselmeldung: {e}")
+
+    def _sperrzonen_meldung_ende(self) -> None:
+        """Gelb wieder wegnehmen — aber nur, wenn inzwischen keine ANDERE
+        Meldung steht (der rote NOT-AUS-Alarm raeumt seine Farbe selbst ab und
+        darf von hier nicht verkuerzt werden)."""
+        try:
+            if not self.statusBar().currentMessage():
+                self._reset_statusbar_style()
+        except Exception:
+            pass
 
     def _sync_notaus_button(self):
         """Anzeige aus der einen Quelle der Wahrheit ableiten."""
@@ -3104,6 +3169,9 @@ class MainWindow(QMainWindow):
                 ValidationDialog(issues, self).exec()
         except Exception as e:
             print(f"[main_window] show_loaded handler error: {e}")
+        # LAS-32: Kopfzeile sofort nachziehen + einmalige Wechselmeldung.
+        self._sync_sperrzonen_kopfzeile()
+        self._sperrzonen_wechsel_melden()
         # T1.6 Layout aus Show anwenden
         try:
             layout = getattr(self._state, "_last_loaded_layout", None)

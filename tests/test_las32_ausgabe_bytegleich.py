@@ -171,12 +171,34 @@ class AusgabeBytegleichTest(unittest.TestCase):
         for datei in sorted((wurzel / "dmx").glob("*.py")):
             text = datei.read_text(encoding="utf-8").lower()
             self.assertNotIn("sperrzon", text, datei.name)
-        # app_state haelt den Bestand nur vor (ein Attribut) — Render-Pfad und
-        # Masken greifen nicht darauf zu.
+        # app_state haelt den Bestand vor (ein Attribut) und nimmt beim
+        # Loeschen/Zurueckholen eines Geraets dessen Randwinkel mit — sonst
+        # nichts. Render-Pfad, Plan und Masken greifen nicht darauf zu: das
+        # Wort darf nur in diesen Funktionen vorkommen.
+        import ast
         quelle = (wurzel / "app_state.py").read_text(encoding="utf-8")
-        zeilen = [z for z in quelle.splitlines() if "sperrzon" in z.lower()
-                  and not z.strip().startswith("#")]
-        self.assertEqual(len(zeilen), 2, zeilen)
+        erlaubt = {"__init__", "add_fixture", "remove_fixture",
+                   "_sperrzonen_feld_nehmen", "_sperrzonen_feld_zurueck"}
+        zeilen = quelle.splitlines()
+        gefunden = set()
+        for knoten in ast.walk(ast.parse(quelle)):
+            if not isinstance(knoten, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            # nur die Zeilen der Funktion selbst, nicht die ihrer inneren defs
+            innere = [k for k in ast.walk(knoten)
+                      if isinstance(k, ast.FunctionDef) and k is not knoten]
+            for nr in range(knoten.lineno, knoten.end_lineno + 1):
+                if any(k.lineno <= nr <= k.end_lineno for k in innere):
+                    continue
+                z = zeilen[nr - 1]
+                if "sperrzon" in z.lower() and not z.strip().startswith("#"):
+                    gefunden.add(knoten.name)
+        self.assertTrue(gefunden)
+        self.assertEqual(gefunden - erlaubt - {"_undo", "_redo"}, set(), gefunden)
+        for name in ("_render_frame", "_rebuild_render_plan",
+                     "_build_gm_laser_aus_mask", "set_laser_estop"):
+            self.assertIn(f"def {name}(", quelle, name)   # die Probe meint echte Namen
+            self.assertNotIn(name, gefunden)
 
 
 if __name__ == "__main__":

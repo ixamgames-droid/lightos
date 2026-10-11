@@ -24,7 +24,8 @@ Das Maximalfeld sind vier Randwinkel, gemessen von der Geraeteachse:
 **links/rechts/oben/unten aus Sicht des Geraets in Strahlrichtung**. Sie
 duerfen verschieden sein (per Blende begrenztes Feld). Rundum kommt der
 Sicherheitszuschlag dazu. Das ergibt eine nach vorn offene Pyramide mit der
-Spitze am Geraet. Gerechnet wird mit Ebenen (Richtungen), nicht mit Winkeln in
+Spitze im **Austrittsfenster** (:func:`feld_spitze` — dort, wo das 3D-Modell
+das Fenster hat, nicht im Geraete-Mittelpunkt). Gerechnet wird mit Ebenen (Richtungen), nicht mit Winkeln in
 einer Bildebene — grosse Winkel verzerren so nicht.
 
 Eine Zone ist ein Quader (um die Hochachse drehbar) mit festem Rand. Der Teil
@@ -59,6 +60,27 @@ ZONEN_RAND_M = 0.10
 ZONE_MIN_M = 0.05
 
 RAENDER = ("links", "rechts", "oben", "unten")
+
+#: Lage des Austrittsfensters vor dem Geraete-Ursprung, entlang der
+#: Strahlachse (Meter). Dieselbe Zahl, mit der das 3D-Modell sein Strahlen-Rig
+#: aufhaengt (``fixtures/builders.js``: ``buildLaserRig(group, 0.088)``) — per
+#: Test aneinander gebunden. Dort sitzt die Spitze der Feld-Pyramide.
+AUSTRITT_VORN_M = 0.088
+
+#: Das 3D zeichnet die Strahlen eines Lasers als SCHEMA: fest um diesen Winkel
+#: nach unten geneigt (``fixtures/laser.js``: ``LASER_PITCH = 0.06`` rad), damit
+#: sie im Bild ueber die Koepfe laufen. Die Feld-Pyramide folgt dagegen der
+#: Geraeteachse, von der aus die Randwinkel gemessen werden — sie ist das, womit
+#: gerechnet wird. Der Unterschied ist kleiner als der Standard-Zuschlag
+#: (:data:`ZUSCHLAG_STANDARD`); bei kleinerem Zuschlag und kleinem Randwinkel
+#: „unten" kann das Strahlen-Schema im Bild knapp ausserhalb der Pyramide
+#: liegen. Massgeblich ist die Pyramide.
+STRAHLBILD_NEIGUNG_GRAD = math.degrees(0.06)
+
+#: Kopfleiste des Hauptfensters (G10).
+KOPFLEISTE_KEINE_ZONEN = "Laser gepatcht — keine Sperrzonen angelegt"
+MELDUNG_SHOW_OHNE_ZONEN = ("Die vorige Show hatte Sperrzonen, diese hat keine "
+                           "— Laser gepatcht, keine Sperrzonen angelegt")
 
 HINWEIS_NUR_ANZEIGE = ("Nur Anzeige — schaltet den Laser NICHT ab "
                        "(am Gerät noch nicht abgenommen)")
@@ -138,17 +160,30 @@ class Sperrzone:
 @dataclass
 class LaserFeld:
     """Maximalfeld eines Lasers: vier Randwinkel in Grad (``None`` = nicht
-    angegeben) und der Sicherheitszuschlag."""
+    angegeben) und der Sicherheitszuschlag.
+
+    ``geraet`` bindet das Feld an das Geraet, fuer das es eingetragen wurde
+    (:func:`geraete_kennung`: Hersteller, Modell, Modus). Die Geraete-Nummer
+    allein reicht nicht: sie wird nach dem Loeschen neu vergeben, und ein
+    anderer Laser auf derselben Nummer darf die Winkel nicht erben. Leer =
+    ungebunden (Show aus einem Stand vor dieser Bindung)."""
     links: float | None = None
     rechts: float | None = None
     oben: float | None = None
     unten: float | None = None
     zuschlag: float = ZUSCHLAG_STANDARD
+    geraet: str = ""
 
     def __post_init__(self):
         for r in RAENDER:
             setattr(self, r, _winkel_oder_none(getattr(self, r)))
         self.zuschlag = zuschlag_begrenzen(self.zuschlag)
+        self.geraet = str(self.geraet or "")
+
+    def passt_zu(self, kennung) -> bool:
+        """Gilt dieses Feld fuer das Geraet mit ``kennung``? Ungebunden (eine
+        Seite leer/unbekannt) passt immer."""
+        return not self.geraet or not kennung or self.geraet == str(kennung)
 
     @property
     def vollstaendig(self) -> bool:
@@ -162,6 +197,8 @@ class LaserFeld:
     def to_dict(self) -> dict:
         d = {r: getattr(self, r) for r in RAENDER}
         d["zuschlag"] = float(self.zuschlag)
+        if self.geraet:
+            d["geraet"] = self.geraet
         return d
 
     @classmethod
@@ -170,7 +207,27 @@ class LaserFeld:
             raise ValueError("Laser-Feld ist kein Objekt")
         return cls(links=d.get("links"), rechts=d.get("rechts"),
                    oben=d.get("oben"), unten=d.get("unten"),
-                   zuschlag=d.get("zuschlag", ZUSCHLAG_STANDARD))
+                   zuschlag=d.get("zuschlag", ZUSCHLAG_STANDARD),
+                   geraet=d.get("geraet") if isinstance(d.get("geraet"), str) else "")
+
+
+def geraete_kennung(fx) -> str:
+    """Woran ein Laser-Feld sein Geraet wiedererkennt: Hersteller, Modell und
+    Modus (klein geschrieben). Bewusst NICHT die Profil-Nummer der Datenbank —
+    die ist je Rechner verschieden, die Show reist. Leer, wenn das Geraet
+    nichts davon traegt (dann wird nicht gebunden)."""
+    teile = [str(getattr(fx, n, "") or "").strip().lower()
+             for n in ("manufacturer_name", "fixture_name", "mode_name")]
+    return "|".join(teile) if any(teile[:2]) else ""
+
+
+def feld_aus_gesamtwinkel(waagerecht, senkrecht) -> LaserFeld | None:
+    """Datenblatt-Schnellweg: der VOLLE Abstrahlwinkel je Achse, je zur
+    Haelfte auf die beiden Raender verteilt. Unbrauchbare Angabe -> ``None``."""
+    h, v = _winkel_voll(waagerecht), _winkel_voll(senkrecht)
+    if h is None or v is None:
+        return None
+    return LaserFeld(links=h / 2, rechts=h / 2, oben=v / 2, unten=v / 2)
 
 
 def feld_aus_profil(profil) -> LaserFeld | None:
@@ -198,12 +255,28 @@ def feld_aus_profil(profil) -> LaserFeld | None:
             return feld
     aw = _lies("laser_abstrahlwinkel")
     if isinstance(aw, (list, tuple)) and len(aw) == 2:
-        h, v = _winkel_voll(aw[0]), _winkel_voll(aw[1])
-    else:
-        h = v = _winkel_voll(aw)
-    if h is None or v is None:
+        return feld_aus_gesamtwinkel(aw[0], aw[1])
+    return feld_aus_gesamtwinkel(aw, aw)
+
+
+def winkel_aus_bibliothek(hersteller, modell, verzeichnis=None) -> LaserFeld | None:
+    """Das Feld, das die mitgelieferte Geraete-Bibliothek fuer dieses Modell
+    belegt — oder ``None``. Gelesen wird die Profil-Datei selbst (Kopffelder
+    ``laser_randwinkel`` / ``laser_abstrahlwinkel``); ein Profil traegt den
+    Winkel nur, wenn er im Handbuch/Datenblatt steht. Jeder Fehler -> ``None``
+    (dann fragt die Oberflaeche nach dem Datenblatt-Wert, statt zu raten)."""
+    try:
+        import os
+        from src.core.database import bibliothek_format as B
+        if not str(hersteller or "").strip() or not str(modell or "").strip():
+            return None
+        pfad = os.path.join(verzeichnis or B.BIBLIOTHEK_DIR,
+                            B.dateiname(str(hersteller), str(modell)))
+        if not os.path.isfile(pfad):
+            return None
+        return feld_aus_profil(B.lade_datei(pfad))
+    except Exception:                                    # noqa: BLE001
         return None
-    return LaserFeld(links=h / 2, rechts=h / 2, oben=v / 2, unten=v / 2)
 
 
 def _winkel_voll(wert):
@@ -232,9 +305,22 @@ class SperrzonenDaten:
         return (not self.zonen and self.fremd is None
                 and all(f.leer for f in self.laser_felder.values()))
 
-    def feld(self, fid: int) -> LaserFeld:
-        """Das Feld eines Lasers (ohne Eintrag: nichts angegeben)."""
-        return self.laser_felder.get(int(fid)) or LaserFeld()
+    def feld(self, fid: int, kennung=None) -> LaserFeld:
+        """Das Feld eines Lasers (ohne Eintrag: nichts angegeben).
+
+        Mit ``kennung`` (:func:`geraete_kennung` des Geraets, das JETZT auf
+        dieser Nummer sitzt): ein Feld, das fuer ein ANDERES Geraet eingetragen
+        wurde, gilt als nicht angegeben — „nicht pruefbar", nie ein geerbtes
+        „erreicht keine Zone"."""
+        feld = self.laser_felder.get(int(fid))
+        if feld is None or not feld.passt_zu(kennung):
+            return LaserFeld()
+        return feld
+
+    def nimm_feld(self, fid: int):
+        """Feld eines Lasers herausnehmen (Geraet geloescht). Rueckgabe: das
+        Feld oder ``None`` — der Aufrufer hebt es fuer das Rueckgaengig auf."""
+        return self.laser_felder.pop(int(fid), None)
 
     def setze_feld(self, fid: int, feld: LaserFeld) -> None:
         if feld.leer:
@@ -414,9 +500,17 @@ def _schneide(polygon, spitze, n):
     return aus
 
 
+def feld_spitze(pos, rot_deg):
+    """Spitze der Feld-Pyramide: das Austrittsfenster, :data:`AUSTRITT_VORN_M`
+    vor dem Geraete-Ursprung ``pos`` entlang der Strahlachse."""
+    vorn, _rechts, _oben = geraete_achsen(rot_deg)
+    return tuple(float(pos[i]) + AUSTRITT_VORN_M * vorn[i] for i in range(3))
+
+
 def kann_erreichen(pos, rot_deg, feld: LaserFeld, zone: Sperrzone,
                    rand: float = ZONEN_RAND_M) -> bool:
-    """Kann ein Laser an ``pos`` mit Montage-Drehung ``rot_deg`` und dem
+    """Kann ein Laser, dessen AUSTRITTSFENSTER an ``pos`` sitzt
+    (:func:`feld_spitze`), mit Montage-Drehung ``rot_deg`` und dem
     Maximalfeld ``feld`` (plus Zuschlag) die Zone erreichen?
 
     Die Reichweite ist unbegrenzt gerechnet (ein Laserstrahl endet nicht nach
@@ -483,8 +577,11 @@ def pruefe_laser(fid: int, name: str, pos, rot_deg, feld: LaserFeld,
                            grund="im 3D nicht platziert — nicht prüfbar")
     erreicht = []
     try:
+        spitze = feld_spitze(pos, rot_deg)
         for zone in zonen:
-            if kann_erreichen(pos, rot_deg, feld, zone):
+            # Sitzt das GERAET in der Zone, gilt sie als erreicht — auch wenn
+            # das Fenster gerade noch herausschaut.
+            if punkt_in_zone(pos, zone) or kann_erreichen(spitze, rot_deg, feld, zone):
                 erreicht.append(zone.name)
     except Exception:                                    # noqa: BLE001
         return LaserBefund(fid, name, STATUS_NICHT_PRUEFBAR,
@@ -495,16 +592,37 @@ def pruefe_laser(fid: int, name: str, pos, rot_deg, feld: LaserFeld,
 
 
 def pruefe_alle(laser, positionen, rotationen, daten: SperrzonenDaten) -> list:
-    """Befunde fuer alle Laser. ``laser`` = Folge von ``(fid, name)``."""
+    """Befunde fuer alle Laser. ``laser`` = Folge von ``(fid, name)`` oder
+    ``(fid, name, kennung)`` (:func:`dmx_laser_geraete`)."""
     befunde = []
     positionen = positionen or {}
     rotationen = rotationen or {}
-    for fid, name in laser:
-        fid = int(fid)
+    for eintrag in laser:
+        fid, name = int(eintrag[0]), eintrag[1]
+        kennung = eintrag[2] if len(eintrag) > 2 else None
         befunde.append(pruefe_laser(fid, name, positionen.get(fid),
-                                    rotationen.get(fid), daten.feld(fid),
+                                    rotationen.get(fid), daten.feld(fid, kennung),
                                     daten.zonen))
     return befunde
+
+
+def kopfleisten_hinweis(anzahl_laser: int, daten: SperrzonenDaten,
+                        benutzt: bool) -> str:
+    """Die gelbe Zeile in der Kopfleiste des Hauptfensters — oder leer.
+
+    Sie steht nur da, wenn (a) ein DMX-Laser gepatcht ist, (b) die Show keine
+    Zone hat und (c) auf diesem Rechner schon einmal mit Sperrzonen gearbeitet
+    wurde (``benutzt``). Wer keinen Laser hat oder die Funktion nie angefasst
+    hat, sieht nichts: die Sperrzonen sind eine reine Anzeige, ihr Fehlen
+    nimmt niemandem etwas weg, der nie welche hatte — eine Dauerwarnung dort
+    stumpft nur ab. Wer sie benutzt, verlaesst sich auf das Bild; fuer den ist
+    eine Show ohne Zonen (z. B. eine aeltere, mitten am Abend geladen) genau
+    der Zustand, der nicht still bleiben darf."""
+    if anzahl_laser <= 0 or not benutzt:
+        return ""
+    if daten is None or daten.fremd is not None or daten.zonen:
+        return ""
+    return KOPFLEISTE_KEINE_ZONEN
 
 
 def kopfzeile(anzahl_laser: int, daten: SperrzonenDaten) -> str:
@@ -521,7 +639,12 @@ def kopfzeile(anzahl_laser: int, daten: SperrzonenDaten) -> str:
 
 
 def dmx_laser(state) -> list:
-    """``[(fid, name), ...]`` der gepatchten DMX-Laser.
+    """``[(fid, name), ...]`` der gepatchten DMX-Laser."""
+    return [(fid, name) for fid, name, _k in dmx_laser_geraete(state)]
+
+
+def dmx_laser_geraete(state) -> list:
+    """``[(fid, name, kennung), ...]`` der gepatchten DMX-Laser.
 
     Netzwerk-Laser (Ether Dream/IDN) senden ihren eigenen Punktstrom und sind
     nicht Teil dieser Anzeige.
@@ -536,7 +659,7 @@ def dmx_laser(state) -> list:
         if cap is None or cap.laser_class == LaserClass.NET_STREAM:
             continue
         name = (getattr(fx, "label", "") or getattr(fx, "fixture_name", "") or "")
-        laser.append((int(fx.fid), str(name)))
+        laser.append((int(fx.fid), str(name), geraete_kennung(fx)))
     return laser
 
 
@@ -544,7 +667,7 @@ def state_befunde(state) -> tuple[str, list]:
     """``(kopfzeile, befunde)`` fuer den aktuellen Stand der Show (nur
     DMX-Laser, s. :func:`dmx_laser`)."""
     daten = getattr(state, "sperrzonen", None) or SperrzonenDaten()
-    laser = dmx_laser(state)
+    laser = dmx_laser_geraete(state)
     kopf = kopfzeile(len(laser), daten)
     if daten.fremd is not None or not daten.zonen:
         return kopf, []
@@ -565,8 +688,8 @@ def szenen_daten(state) -> dict:
     if daten.fremd is not None:
         return {"zonen": [], "felder": [], "laenge": FELD_ANZEIGE_LAENGE_M}
     felder = []
-    for fid, _name in dmx_laser(state):
-        feld = daten.feld(fid)
+    for fid, _name, kennung in dmx_laser_geraete(state):
+        feld = daten.feld(fid, kennung)
         if feld.vollstaendig:
             eintrag = feld.to_dict()
             eintrag["fid"] = fid

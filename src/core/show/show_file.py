@@ -1938,6 +1938,12 @@ def _load_show_impl(path: str | os.PathLike):
     # sonst nullt der Zwischenschritt mit dem leeren Patch alle alten Adressen im
     # Live-Universe und der Output-Thread sendet den Blackout-Puls, bis der neue
     # Patch gerendert ist.
+    # LAS-32 (G10): hatte die Show, die gleich ersetzt wird, Sperrzonen?
+    try:
+        _sz_hatte_zonen = bool(getattr(getattr(state, "sperrzonen", None), "zonen", None))
+    except Exception:
+        _sz_hatte_zonen = False
+    state.sperrzonen_wechsel_hinweis = False
     with _deferred_addr_release(state):
         _prev_suppress = getattr(state, "_suppress_emits", False)
         state._suppress_emits = True
@@ -2516,6 +2522,22 @@ def _load_show_impl(path: str | os.PathLike):
     except Exception as e:
         _lenient("music_autoshow load error", e)
         state.music_autoshow = {"enabled": False, "function_ids": [], "bank": 0, "slots": {}}
+
+    # LAS-32 (G10): von einer Show MIT Sperrzonen auf eine OHNE gewechselt,
+    # waehrend DMX-Laser gepatcht sind -> das Hauptfenster meldet es einmal
+    # (es liest und loescht dieses Flag im show_loaded-Handler). Eine Show mit
+    # Zonen merkt ausserdem, dass die Funktion auf diesem Rechner benutzt wird.
+    try:
+        from src.core.laser import sperrzonen as _sz
+        from src.core.laser.sperrzonen_merker import merke_benutzt as _sz_merke
+        _sz_daten = state.sperrzonen
+        if _sz_daten.zonen:
+            _sz_merke()
+        state.sperrzonen_wechsel_hinweis = bool(
+            _sz_hatte_zonen and not _sz_daten.zonen and _sz_daten.fremd is None
+            and _sz.dmx_laser(state))
+    except Exception as e:
+        _lenient("sperrzonen wechsel-hinweis error", e)
 
     # Notify listeners after full replacement
     try:

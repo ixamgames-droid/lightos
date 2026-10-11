@@ -19,6 +19,16 @@
 //   3. Das Feld haengt NICHT am Geraete-Objekt, sondern steht daneben in der
 //      Szene und uebernimmt dessen Lage (sperrzonenAbgleich). So aendert sich
 //      am Geraet nichts (Auswahl-Rahmen, Aufraeumen, Picking).
+//
+// Spitze der Pyramide = AUSTRITTSFENSTER des Modells (dort haengt das
+// Strahlen-Rig, f.laserRig.pivot), nicht der Geraete-Ursprung — dieselbe Stelle
+// wie feld_spitze() in Python.
+//
+// Achse: die Pyramide folgt der GERAETEACHSE (von ihr aus werden die Randwinkel
+// gemessen). Das Strahlen-Schema des Lasers (laser.js) ist dagegen fest um
+// LASER_PITCH (~3,4 Grad) nach unten geneigt, damit die Strahlen im Bild ueber
+// die Koepfe laufen. Beide Bilder liegen also bewusst nicht auf einer Achse;
+// gerechnet wird mit der Pyramide (Python: STRAHLBILD_NEIGUNG_GRAD).
 import * as THREE from '../three/three.js';
 import { scene, deg2rad } from '../scene/renderer.js';
 import { fixtures } from '../state.js';
@@ -35,6 +45,7 @@ const _noop = () => {};
 const _zonen = {};      // id -> { gruppe, daten }
 const _felder = {};     // fid -> { gruppe, daten, ecken, lage }
 let _laenge = FELD_LAENGE_STANDARD;
+const _spitze = new THREE.Vector3();
 
 function zahl(v, def) {
   const n = Number(v);
@@ -193,7 +204,14 @@ export function sperrzonenAbgleich() {
       if (e.gruppe.visible) { e.gruppe.visible = false; e.lage = ''; geaendert = true; }
       continue;
     }
-    const p = g.position, q = g.quaternion;
+    const q = g.quaternion;
+    // Austrittsfenster: Lage des Strahlen-Rigs im Geraet (lokal), in die Welt
+    // gedreht. Modell ohne Rig -> Geraete-Ursprung.
+    const rig = f.laserRig && f.laserRig.pivot;
+    _spitze.set(0, 0, 0);
+    if (rig) _spitze.copy(rig.position).multiply(g.scale).applyQuaternion(q);
+    _spitze.add(g.position);
+    const p = _spitze;
     const lage = [p.x, p.y, p.z, q.x, q.y, q.z, q.w].map(v => v.toFixed(5)).join('|');
     if (lage !== e.lage || !e.gruppe.visible) {
       e.gruppe.position.copy(p);
