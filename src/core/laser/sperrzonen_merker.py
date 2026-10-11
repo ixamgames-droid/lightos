@@ -8,6 +8,11 @@ angefasst hat, bekommt keine Dauerwarnung.
 
 Gesetzt wird es, wenn eine Zone angelegt oder eine Show mit Zonen geladen
 wird. Es gehoert zum Rechner, nicht zur Show, und wird nie zurueckgenommen.
+
+Daneben, in derselben Datei: ob das Fenster „Sicht des Lasers" im 3D gezeigt
+wird (Schluessel ``sperrzonen_lasersicht``, Vorgabe an) — eine reine
+Anzeige-Vorliebe des Rechners.
+
 Nichts hier fasst die DMX-Ausgabe an.
 """
 from __future__ import annotations
@@ -75,8 +80,51 @@ def merke_benutzt(pfad: str | None = None) -> None:
         print(f"[sperrzonen] Merker nicht gespeichert: {e}")
 
 
+# ── Fenster „Sicht des Lasers" im 3D ────────────────────────────────────────
+_SCHLUESSEL_LASERSICHT = "sperrzonen_lasersicht"
+_lasersicht = None      # None = noch nicht nachgesehen
+
+
+def lasersicht_zeigen(pfad: str | None = None) -> bool:
+    """Soll das 3D das Fenster „Sicht des Lasers" zeigen? Vorgabe: ja. Ohne
+    ``pfad`` wird die Datei je Sitzung nur einmal gelesen."""
+    global _lasersicht
+    if pfad is not None:
+        daten = _lies(pfad)
+        return bool(daten.get(_SCHLUESSEL_LASERSICHT, True)) if daten else True
+    if _lasersicht is None:
+        daten = _lies(_pfad())
+        _lasersicht = bool(daten.get(_SCHLUESSEL_LASERSICHT, True)) if daten else True
+    return _lasersicht
+
+
+def merke_lasersicht(an: bool, pfad: str | None = None) -> None:
+    """Gilt sofort fuer diese Sitzung, auch wenn das Schreiben scheitert."""
+    global _lasersicht
+    an = bool(an)
+    eigener_pfad = pfad is not None
+    if not eigener_pfad:
+        if _lasersicht is an:
+            return
+        _lasersicht = an
+    pfad = pfad or _pfad()
+    try:
+        daten = _lies(pfad)
+        if daten is None or bool(daten.get(_SCHLUESSEL_LASERSICHT, True)) is an:
+            return
+        daten[_SCHLUESSEL_LASERSICHT] = an
+        os.makedirs(os.path.dirname(pfad), exist_ok=True)
+        tmp = f"{pfad}.{os.getpid()}.tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(daten, f, indent=2, ensure_ascii=False)
+        os.replace(tmp, pfad)
+    except Exception as e:                               # noqa: BLE001
+        print(f"[sperrzonen] Merker nicht gespeichert: {e}")
+
+
 def _vergiss_sitzung() -> None:
     """Nur fuer Tests."""
-    global _sitzung, _gelesen
+    global _sitzung, _gelesen, _lasersicht
     _sitzung = False
     _gelesen = None
+    _lasersicht = None

@@ -105,25 +105,6 @@ export function punktImQuader(p, hb, hh, ht) {
   return Math.abs(p[0]) <= hb && Math.abs(p[1]) <= hh && Math.abs(p[2]) <= ht;
 }
 
-/** Strahl (Ursprung o, Richtung d) gegen Quader um den Ursprung: Abstand bis
- *  zum Eintritt, `Infinity` = verfehlt. Startet der Strahl im Quader: 0. */
-export function strahlQuader(o, d, hb, hh, ht) {
-  const h = [hb, hh, ht];
-  let t0 = 0, t1 = Infinity;
-  for (let a = 0; a < 3; a++) {
-    if (Math.abs(d[a]) < 1e-12) {
-      if (Math.abs(o[a]) > h[a]) return Infinity;
-      continue;
-    }
-    let u = (-h[a] - o[a]) / d[a], v = (h[a] - o[a]) / d[a];
-    if (u > v) { const w = u; u = v; v = w; }
-    if (u > t0) t0 = u;
-    if (v < t1) t1 = v;
-    if (t0 > t1) return Infinity;
-  }
-  return t0;
-}
-
 /** Die vier Kanten-Richtungen der Pyramide (nicht normiert, z = 1):
  *  links-oben, rechts-oben, rechts-unten, links-unten. */
 export function kantenRichtungen(t) {

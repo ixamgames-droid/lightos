@@ -676,8 +676,9 @@ def state_befunde(state) -> tuple[str, list]:
     return kopf, befunde
 
 
-#: Laenge der im 3D gezeichneten Feld-Pyramide (Meter). Nur Darstellung — die
-#: Rechnung oben kennt keine Reichweiten-Grenze.
+#: Laenge, bis zu der das 3D das Feld hoechstens darstellt (Meter); der
+#: Fussabdruck am Boden endet meist frueher und blendet aus. Nur Darstellung —
+#: die Rechnung oben kennt keine Reichweiten-Grenze.
 FELD_ANZEIGE_LAENGE_M = 25.0
 
 

@@ -11,7 +11,7 @@ import { applyDmx } from './dmx_apply.js';                                // VIZ
 import { forgetDmx, noteShowGen, pruneDmxCache } from '../fixtures/dmx_cache.js';      // VIZ-71
 import { resyncBeamVisibility, fleckSichtbar } from '../fixtures/builders.js';   // VIZ-98
 import { setBeamsOff } from '../state.js';   // VIZ-15
-import { setSperrzonen, sperrzonenAbgleich } from '../safety/sperrzonen.js';   // LAS-32 (nur Anzeige)
+import { setSperrzonen, sperrzonenAbgleich, setLasersichtMelder } from '../safety/sperrzonen.js';   // LAS-32 (nur Anzeige)
 import { setViewMode } from '../stage/view_mode.js';
 import { setEditMode, setBrightnessManual, resetBrightnessAuto, updateOutlines, jsApplyExternalSelection } from '../interaction/tools.js';
 import { setFpsVisible } from '../camera/presets.js';
@@ -308,6 +308,12 @@ export function removeFixturesNotIn(fids) {
 // Qt WebChannel
 // ============================================================================
 export let bridge = null;
+
+// LAS-32: Fenster „Sicht des Lasers" im 3D ein-/ausgeblendet -> Python merkt
+// es sich (ui_prefs). Ohne Bruecke/Slot bleibt es bei dieser Sitzung.
+setLasersichtMelder(an => {
+  if (bridge && bridge.sperrzonenLasersicht) bridge.sperrzonenLasersicht(!!an);
+});
 
 export function tryChannel() {
   if (typeof QWebChannel !== 'undefined' && typeof qt !== 'undefined') {

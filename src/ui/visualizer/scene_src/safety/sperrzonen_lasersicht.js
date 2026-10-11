@@ -1,9 +1,12 @@
-// LAS-32 (Slice S1), Stil „c": SICHT DES LASERS als kleines Fenster im 3D.
+// LAS-32 (Slice S1): SICHT DES LASERS als kleines Fenster im 3D.
 //
 // Ein Bild-im-Bild aus dem Austrittsfenster heraus: das Maximalfeld als
 // Rechteck, die Sperrzonen als dunkle Flecken darin — so, wie man eine Blende
-// einstellen wuerde. NUR ANZEIGE: das Fenster faengt keine Eingabe
-// (pointer-events: none) und schaltet nichts.
+// einstellen wuerde. NUR ANZEIGE: das Bild selbst faengt keine Eingabe
+// (pointer-events: none) und schaltet nichts am Laser. Bedienbar sind allein
+// die kleinen Knoepfe in der Kopfzeile (Laser waehlen, Fenster schliessen)
+// und — bei geschlossenem Fenster — der Knopf „Sicht des Lasers", der es
+// wieder oeffnet.
 //
 // Gezeichnet wird mit 2D-Canvas, nicht mit einer zweiten 3D-Kamera: die
 // Bildebene ist die Tangens-Ebene des Lasers (u = rechts, v = oben), in der
@@ -11,12 +14,47 @@
 // Laser-Koordinaten an (sperrzonen.js), hier wird nur projiziert.
 import { schneide, blick } from './sperrzonen_geo.js';
 
-const BREITE = 420, HOEHE = 356;
-const RAND = 10, KOPF = 26, FUSS = 22;
+const BREITE = 420, HOEHE = 362;
+const RAND = 10, KOPF = 32, FUSS = 22;
 const NAH = 0.05;
+/** Bis zu so vielen Lasern je ein Umschalter, darueber „‹ ›". */
+const SCHALTER_MAX = 3;
 
-let _kasten = null, _leinwand = null, _muster = null, _dpr = 1;
+let _kasten = null, _leinwand = null, _leiste = null, _zeiger = null;
+let _muster = null, _dpr = 1;
 let _letzte = null;
+let _leisteSig = '';
+let _bedienung = { an: null, waehle: null };
+
+/** Rueckrufe der Knoepfe: { an(bool), waehle(fid) } — gesetzt von sperrzonen.js. */
+export function lasersichtBedienung(b) {
+  _bedienung = Object.assign({ an: null, waehle: null }, b || {});
+}
+
+/** Ein Knopf, dessen Klick NICHT in die 3D-Szene durchfaellt. */
+function knopf(text, titel, aktiv, klick) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.textContent = text;
+  b.title = titel;
+  b.style.cssText = [
+    'pointer-events:auto', 'cursor:pointer', 'font:bold 11px sans-serif',
+    'height:24px', 'min-width:26px', 'padding:0 8px', 'margin:0', 'border-radius:4px',
+    'border:1px solid rgba(255,176,0,0.65)',
+    'background:' + (aktiv ? '#ffb000' : 'rgba(34,38,48,0.96)'),
+    'color:' + (aktiv ? '#1a1400' : '#ffcf70'),
+  ].join(';');
+  for (const ev of ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'touchstart',
+                    'touchend', 'dblclick', 'wheel', 'contextmenu']) {
+    b.addEventListener(ev, e => e.stopPropagation());
+  }
+  b.addEventListener('click', e => {
+    e.stopPropagation();
+    e.preventDefault();
+    try { klick(); } catch (err) { console.log('sperrzonen: Lasersicht-Knopf', err); }
+  });
+  return b;
+}
 
 function anlegen() {
   if (_kasten) return;
@@ -35,7 +73,60 @@ function anlegen() {
   _leinwand.style.cssText = `display:block;width:${BREITE}px;height:${HOEHE}px`;
   _dpr = dpr;
   _kasten.appendChild(_leinwand);
+  _leiste = document.createElement('div');
+  _leiste.style.cssText = 'position:absolute;top:4px;right:6px;display:flex;gap:4px;'
+                          + 'align-items:center;pointer-events:none';
+  _kasten.appendChild(_leiste);
   document.body.appendChild(_kasten);
+}
+
+function zeigerAnlegen() {
+  if (_zeiger) return;
+  _zeiger = knopf('Sicht des Lasers ▸', 'Fenster „Sicht des Lasers" einblenden', false,
+                  () => { if (_bedienung.an) _bedienung.an(true); });
+  _zeiger.id = 'sperrzonen-lasersicht-auf';
+  _zeiger.style.position = 'absolute';
+  _zeiger.style.left = '12px';
+  _zeiger.style.bottom = '40px';
+  _zeiger.style.zIndex = '6';
+  _zeiger.style.height = '26px';
+  _zeiger.style.display = 'none';
+  _zeiger.style.boxShadow = '0 2px 10px rgba(0,0,0,0.5)';
+  document.body.appendChild(_zeiger);
+}
+
+/** Kopfzeile: Umschalter je Laser (nur bei mehreren) und das Schliessen-Kreuz. */
+function leisteFuellen(d) {
+  const laser = d.laser || [d.fid];
+  const sig = laser.join(',') + '|' + d.fid;
+  if (sig === _leisteSig) return;
+  _leisteSig = sig;
+  while (_leiste.firstChild) _leiste.removeChild(_leiste.firstChild);
+  const waehle = fid => () => { if (_bedienung.waehle) _bedienung.waehle(fid); };
+  if (laser.length > 1 && laser.length <= SCHALTER_MAX) {
+    for (const fid of laser) {
+      const b = knopf('Laser ' + fid, 'Sicht von Laser ' + fid, fid === d.fid, waehle(fid));
+      b.dataset.fid = String(fid);
+      _leiste.appendChild(b);
+    }
+  } else if (laser.length > SCHALTER_MAX) {
+    const i = Math.max(0, laser.indexOf(d.fid)), n = laser.length;
+    const vor = knopf('‹', 'voriger Laser', false, waehle(laser[(i + n - 1) % n]));
+    vor.dataset.fid = String(laser[(i + n - 1) % n]);
+    const nach = knopf('›', 'nächster Laser', false, waehle(laser[(i + 1) % n]));
+    nach.dataset.fid = String(laser[(i + 1) % n]);
+    const wo = document.createElement('span');
+    wo.textContent = (i + 1) + '/' + n;
+    wo.style.cssText = 'font:11px sans-serif;color:#ffcf70;padding:0 2px';
+    _leiste.appendChild(vor);
+    _leiste.appendChild(wo);
+    _leiste.appendChild(nach);
+  }
+  const zu = knopf('✕', 'Fenster ausblenden (wieder einblenden: Knopf „Sicht des Lasers" '
+                        + 'unten links oder im Sperrzonen-Fenster)', false,
+                   () => { if (_bedienung.an) _bedienung.an(false); });
+  zu.id = 'sperrzonen-lasersicht-zu';
+  _leiste.appendChild(zu);
 }
 
 function schraffur(g) {
@@ -59,20 +150,27 @@ function vorn(polygon) {
 }
 
 /**
- * @param {?object} d  null = ausblenden. Sonst
- *   { titel, tan:{l,r,o,u}, tanOhne:{l,r,o,u}, winkel:{links,rechts,oben,unten,zuschlag},
+ * @param {?object} d  null = Fenster ausblenden. Sonst
+ *   { fid, laser:[fid…], titel, tan:{l,r,o,u}, tanOhne:{l,r,o,u},
+ *     winkel:{links,rechts,oben,unten,zuschlag},
  *     zonen:[{name, erreicht, flaechen:[polygon]}], linien:[[a,b]], koerper:[[a,b]] }
  *   — alle Punkte in Laser-Koordinaten.
+ * @param {boolean} moeglich  es gibt etwas zu zeigen (pruefbarer Laser UND
+ *   Zone): bei ausgeblendetem Fenster steht dann der Knopf zum Einblenden da.
  */
-export function zeichneLasersicht(d) {
-  _letzte = d ? { sichtbar: true, titel: d.titel, zonen: d.zonen.map(z => z.name),
+export function zeichneLasersicht(d, moeglich) {
+  _letzte = d ? { sichtbar: true, titel: d.titel, fid: d.fid, laser: (d.laser || []).slice(),
+                  zonen: d.zonen.map(z => z.name),
                   erreicht: d.zonen.filter(z => z.erreicht).map(z => z.name) }
               : { sichtbar: false };
+  if (!d && moeglich) zeigerAnlegen();
+  if (_zeiger) _zeiger.style.display = (!d && moeglich) ? 'block' : 'none';
   if (!d) {
     if (_kasten) _kasten.style.display = 'none';
     return;
   }
   anlegen();
+  leisteFuellen(d);
   _kasten.style.display = 'block';
   const g = _leinwand.getContext('2d');
   const dpr = _dpr;
@@ -100,15 +198,6 @@ export function zeichneLasersicht(d) {
   g.fillStyle = '#ffb000';
   g.fillText(d.titel, RAND, KOPF / 2 + 1);
   const erreicht = d.zonen.filter(z => z.erreicht).map(z => z.name);
-  g.textAlign = 'right';
-  g.font = '12px sans-serif';
-  if (erreicht.length) {
-    g.fillStyle = '#ff6060';
-    g.fillText('im Feld: ' + erreicht.join(', '), BREITE - RAND, KOPF / 2 + 1, BREITE - 150);
-  } else {
-    g.fillStyle = '#9fb0a0';
-    g.fillText('keine Zone im Feld', BREITE - RAND, KOPF / 2 + 1);
-  }
 
   g.save();
   g.beginPath();
@@ -220,6 +309,18 @@ export function zeichneLasersicht(d) {
     g.fillStyle = '#ffffff';
     g.fillText(s.name, x, y + 1);
   }
+  // Befund oben links im Bild (die Kopfzeile gehoert den Knoepfen).
+  {
+    const text = erreicht.length ? '⚠ im Feld: ' + erreicht.join(', ') : 'keine Zone im Feld';
+    g.font = 'bold 12px sans-serif';
+    g.textAlign = 'left';
+    g.textBaseline = 'middle';
+    const b = Math.min(pw - 8, g.measureText(text).width + 14);
+    g.fillStyle = erreicht.length ? 'rgba(110,0,0,0.92)' : 'rgba(20,24,30,0.88)';
+    g.fillRect(px + 4, py + 4, b, 20);
+    g.fillStyle = erreicht.length ? '#ffd0d0' : '#b9c4cf';
+    g.fillText(text, px + 11, py + 15, b - 12);
+  }
   g.restore();
   g.strokeStyle = 'rgba(255,255,255,0.18)';
   g.lineWidth = 1;
@@ -244,5 +345,9 @@ export function lasersichtInfo() {
     sichtbar,
     faengtEingabe: !!(_kasten && _kasten.style.pointerEvents !== 'none'),
     breite: _leinwand ? _leinwand.width : 0,
+    knopfAuf: !!(_zeiger && _zeiger.style.display !== 'none'),
+    schalter: (sichtbar && _leiste)
+      ? Array.from(_leiste.querySelectorAll('button[data-fid]')).map(b => Number(b.dataset.fid))
+      : [],
   });
 }

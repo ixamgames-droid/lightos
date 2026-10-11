@@ -15,6 +15,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtWidgets import QApplication
 
 from src.core.laser import sperrzonen as S
+from src.core.laser import sperrzonen_merker as M
 from src.core.laser.sperrzonen import LaserFeld, Sperrzone, SperrzonenDaten
 from src.ui.visualizer import sperrzonen_ui as UI
 
@@ -246,6 +247,74 @@ class BridgeTest(unittest.TestCase):
         self.assertEqual(d["felder"], [{"fid": 2, "links": 1.0, "rechts": 2.0,
                                         "oben": 3.0, "unten": 4.0, "zuschlag": 5.0}])
         self.assertGreater(b._poll_rev["sperrzonen"], rev)
+
+    def test_fenster_sicht_des_lasers_wird_gemerkt_und_weitergesagt(self):
+        """Standard: an. Das Kreuz am Fenster im 3D (Slot) und der Haken im
+        Dialog merken sich die Wahl; der Poll traegt sie in die Szene."""
+        M._vergiss_sitzung()
+        self.addCleanup(M._vergiss_sitzung)
+        self.addCleanup(M.merke_lasersicht, True)
+        st = _State()
+        VB, b = self._bridge(st)
+        VB._sync_sperrzonen(b)
+        self.assertIs(json.loads(b._poll_state["sperrzonen"])["lasersicht"], True)
+        rev = b._poll_rev["sperrzonen"]
+        # Kreuz im 3D
+        VB.sperrzonenLasersicht(b, False)
+        self.assertFalse(M.lasersicht_zeigen())
+        self.assertIs(json.loads(b._poll_state["sperrzonen"])["lasersicht"], False)
+        self.assertGreater(b._poll_rev["sperrzonen"], rev)
+        self.assertIn("sperrzonen_anzeige_changed", st.ereignisse)
+        # … ueberlebt den Neustart (neue Sitzung liest die Datei)
+        M._vergiss_sitzung()
+        self.assertFalse(M.lasersicht_zeigen())
+        # Haken im Dialog: steht passend, schaltet zurueck, meldet es
+        dlg = UI.SperrzonenDialog(st)
+        try:
+            chk = dlg._chk_lasersicht
+            self.assertFalse(chk.isChecked())
+            st.ereignisse.clear()
+            chk.setChecked(True)
+            self.assertTrue(M.lasersicht_zeigen())
+            self.assertEqual(st.ereignisse, ["sperrzonen_anzeige_changed"])
+            VB._on_state(b, "sperrzonen_anzeige_changed", True)
+            self.assertIs(json.loads(b._poll_state["sperrzonen"])["lasersicht"], True)
+            # im 3D geschlossen, waehrend der Dialog offen ist: Haken zieht nach,
+            # ohne selbst wieder zu melden
+            M.merke_lasersicht(False)
+            st.ereignisse.clear()
+            dlg.lasersicht_nachziehen()
+            self.assertFalse(chk.isChecked())
+            self.assertEqual(st.ereignisse, [])
+        finally:
+            dlg.close()
+            dlg.deleteLater()
+            _app.processEvents()
+        # Die Vorliebe gehoert zum Rechner: an Bestand und Show aendert sie nichts.
+        self.assertEqual(st.sperrzonen.to_dict(), SperrzonenDaten().to_dict())
+
+    def test_merker_lasersicht_laesst_fremde_abschnitte_stehen(self):
+        import shutil
+        import tempfile
+        tmp = tempfile.mkdtemp(prefix="las32s_")
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        pfad = os.path.join(tmp, "ui_prefs.json")
+        self.assertTrue(M.lasersicht_zeigen(pfad))               # Datei fehlt: Vorgabe an
+        with open(pfad, "w", encoding="utf-8") as f:
+            json.dump({"bpm_settings": {"x": 1}, "sperrzonen_benutzt": True}, f)
+        self.assertTrue(M.lasersicht_zeigen(pfad))
+        M.merke_lasersicht(False, pfad)
+        self.assertFalse(M.lasersicht_zeigen(pfad))
+        with open(pfad, encoding="utf-8") as f:
+            daten = json.load(f)
+        self.assertEqual(daten["bpm_settings"], {"x": 1})
+        self.assertIs(daten["sperrzonen_benutzt"], True)
+        with open(pfad, "w", encoding="utf-8") as f:
+            f.write("{halb")
+        M.merke_lasersicht(True, pfad)                           # unlesbar: nicht anfassen
+        with open(pfad, encoding="utf-8") as f:
+            self.assertEqual(f.read(), "{halb")
+        self.assertTrue(M.lasersicht_zeigen(pfad))
 
     def test_bridge_reagiert_auf_aenderung_show_und_patch(self):
         st = _State()

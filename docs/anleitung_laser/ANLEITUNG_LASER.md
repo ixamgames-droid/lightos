@@ -234,10 +234,43 @@ aus Sicht des Geräts in Strahlrichtung**. Eintragen, was der Laser bei größte
 Muster und voller Auslenkung höchstens erreicht; die vier Werte dürfen
 verschieden sein (z. B. hinter einer Blende). Steht ein Wert auf
 *„nicht angegeben“*, ist der Laser **nicht prüfbar**. Dazu der **Zuschlag**
-rundum: Vorgabe 5°, mindestens 2°. Im 3D erscheint das Feld (mit Zuschlag) als
-dünne gelbe Pyramide am Gerät — gezeichnet bis 25 m, gerechnet ohne
-Längengrenze. Ihre Spitze sitzt im **Austrittsfenster** des Lasers (im Modell
-knapp 9 cm vor der Gerätemitte), nicht in der Gerätemitte.
+rundum: Vorgabe 5°, mindestens 2°. Gerechnet wird mit dem Feld samt Zuschlag
+— einer nach vorn offenen Pyramide ohne Längengrenze, deren Spitze im
+**Austrittsfenster** des Lasers sitzt (im Modell knapp 9 cm vor der
+Gerätemitte), nicht in der Gerätemitte.
+
+**Was das 3D davon zeigt** — keine Pyramide quer durchs Bild, sondern das,
+worauf es ankommt:
+
+- **Ansatz am Gerät:** ein kurzes gelbes Stück (1,5 m) zeigt Öffnung und
+  Richtung des Feldes.
+- **Fußabdruck:** ein gelber Umriss mit zarter Füllung dort, wo das Feld auf
+  den Boden oder eine Plattform fällt. Er reicht 12 m weit (hängt der Laser so
+  hoch, dass das Feld erst dahinter aufsetzt, noch 5 m ab dort) und blendet zum
+  Ende hin aus — das Feld hört dort nicht auf, nur das Bild.
+- **Rote Schraffur:** der Teil einer Sperrzone, den das Feld erreicht. Das
+  Schild über der Zone bekommt eine zweite Zeile *„⚠ Laser 1 erreicht diese
+  Zone“* (bei mehreren: *„Laser 1, 3 erreichen diese Zone“*). Zonen, die kein
+  Laser erreicht, sind etwas blasser.
+- **Kein Treffer:** die vier Feldkanten laufen ein Stück ausblendend weiter,
+  und am Ansatz steht *„Laser 1: erreicht keine Zone“*.
+- **Fenster „Sicht des Lasers“** unten links: das Bild aus dem Austrittsfenster
+  heraus. Das Feld ist ein gelbes Rechteck (durchgezogen = mit Zuschlag,
+  gestrichelt = deine Randwinkel, an den Seiten die Gradzahlen), die Zonen
+  liegen als rote Flächen darin, der Teil im Feld schraffiert — so, wie du eine
+  Blende einstellen würdest. Oben links steht, welche Zonen im Feld liegen.
+  Bei mehreren Lasern wählst du im Fenster (*„Laser 1 | Laser 2“*); es folgt
+  auch dem Laser, den du im 3D anklickst. Das **✕** blendet das Fenster aus,
+  der Knopf **„Sicht des Lasers ▸“** an derselben Stelle oder der Haken
+  **„Sicht des Lasers zeigen“** im Sperrzonen-Fenster holt es zurück; LightOS
+  merkt sich die Wahl. Das Fenster erscheint nur, wenn es mindestens einen
+  Laser mit Randwinkeln und mindestens eine Zone gibt.
+
+Der Fußabdruck ist eine Orientierungshilfe mit Lücken: er fällt nur auf den
+Boden und auf **quaderförmige** Bühnenteile (nicht auf Traversen, runde oder
+schräge Körper) und kennt **keine Verdeckung** — auch was im Schatten einer
+Plattform läge, wird umrandet. Ob ein Laser eine Zone erreicht, hängt davon
+nicht ab; das sagen Schraffur, Schild und die Meldung.
 
 **Schnellweg „Winkel aus Profil / Datenblatt“** (Knopf unter der Tabelle, gilt
 für die gewählte Zeile): Nennt das Geräteprofil einen Abstrahlwinkel, trägt
@@ -247,13 +280,13 @@ oben/unten. Das ist ein Datenblatt-Wert, keine Messung — die Ränder am Gerät
 nachprüfen. Für den Laserworld EL-400RGB MK2 ist im Profil kein Winkel
 hinterlegt, weil die ausgewerteten Handbuch-Abschnitte keinen nennen.
 
-**Pyramide und grüne Strahlen liegen nicht auf einer Achse.** Die gelbe
-Pyramide folgt der Geräteachse — von ihr aus trägst du die Randwinkel ein, mit
-ihr wird gerechnet. Die grünen Strahlen im 3D sind ein Schema und fest um
+**Feld und grüne Strahlen liegen nicht auf einer Achse.** Das gelbe Feld
+(Ansatz, Fußabdruck) folgt der Geräteachse — von ihr aus trägst du die
+Randwinkel ein, mit ihm wird gerechnet. Die grünen Strahlen im 3D sind ein Schema und fest um
 rund 3,4° nach unten geneigt, damit sie im Bild über die Köpfe laufen. Der
 Unterschied ist kleiner als der Zuschlag von 5°; bei kleinerem Zuschlag und
-kleinem Randwinkel „unten“ können die Strahlen im Bild knapp außerhalb der
-Pyramide liegen. Maßgeblich ist die Pyramide.
+kleinem Randwinkel „unten“ können die Strahlen im Bild knapp außerhalb des
+Feldes liegen. Maßgeblich ist das gelbe Feld.
 
 **Randwinkel gehören zum Gerät.** Löschst du einen Laser, gehen seine
 Randwinkel mit (Rückgängig holt beides zurück). Sitzt später ein anderes

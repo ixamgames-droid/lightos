@@ -19,7 +19,7 @@ import html
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
-    QAbstractItemView, QDialog, QDialogButtonBox, QFormLayout, QFrame,
+    QAbstractItemView, QCheckBox, QDialog, QDialogButtonBox, QFormLayout, QFrame,
     QGroupBox, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListWidget,
     QListWidgetItem, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout,
     QWidget,
@@ -308,6 +308,18 @@ class SperrzonenDialog(QDialog):
         ll.addLayout(schnell)
         root.addWidget(lbox, stretch=2)
 
+        # ── Darstellung im 3D ─────────────────────────────────────────────
+        self._chk_lasersicht = QCheckBox("Sicht des Lasers zeigen (kleines Fenster im 3D)")
+        self._chk_lasersicht.setObjectName("sperrzonenLasersicht")
+        self._chk_lasersicht.setToolTip(
+            "Blendet im 3D unten links ein Bild aus Sicht des Lasers ein: das "
+            "Feld als Rechteck, die Sperrzonen darin. Erscheint nur, wenn es "
+            "einen Laser mit Randwinkeln und mindestens eine Zone gibt. "
+            "Nur Anzeige.")
+        self._chk_lasersicht.setChecked(M.lasersicht_zeigen())
+        self._chk_lasersicht.toggled.connect(self._lasersicht_geschaltet)
+        root.addWidget(self._chk_lasersicht)
+
         self._hinweis = SperrzonenHinweis(state, self)
         root.addWidget(self._hinweis)
 
@@ -321,8 +333,25 @@ class SperrzonenDialog(QDialog):
     def _daten(self):
         return self._state.sperrzonen
 
+    def _lasersicht_geschaltet(self, an: bool) -> None:
+        """Haken „Sicht des Lasers zeigen": merken, das 3D zieht nach."""
+        M.merke_lasersicht(bool(an))
+        try:
+            self._state._emit("sperrzonen_anzeige_changed", bool(an))
+        except Exception as e:                           # noqa: BLE001
+            print(f"[sperrzonen] emit error: {e}")
+
+    def lasersicht_nachziehen(self) -> None:
+        """Das Fenster wurde im 3D selbst geschlossen/geoeffnet."""
+        an = M.lasersicht_zeigen()
+        if self._chk_lasersicht.isChecked() != an:
+            self._chk_lasersicht.blockSignals(True)
+            self._chk_lasersicht.setChecked(an)
+            self._chk_lasersicht.blockSignals(False)
+
     def neu_laden(self) -> None:
         """Dialog aus dem State fuellen (z. B. nach dem Laden einer Show)."""
+        self.lasersicht_nachziehen()
         self._laedt = True
         try:
             fremd = self._daten().fremd is not None
