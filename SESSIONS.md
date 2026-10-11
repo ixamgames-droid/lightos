@@ -62,7 +62,7 @@
 | VCB-42 | D | fix/vcb42-blackout-ziel-gruppe-wiedererkennen | 2026-10-11T12:13Z | src/core/app_state.py · src/core/show/show_file.py · src/ui/virtualconsole/vc_button.py · src/ui/virtualconsole/target_list_editor.py · tests/test_vcb42_blackout_ziel_wiedererkennen.py |
 | WEB-09 | A | feature/web09-handy-seite-rueckmeldung | 2026-10-11T12:08Z | - |
 | VIZ-103 | D | fix/viz103-haengend-an-unterkante | 2026-10-11T12:14Z | src/ui/visualizer/scene_src/fixtures/mount_pose.js · tests/test_viz103_haengend_unterkante_scene.py |
-| UI-88 | D | - | 2026-10-11T12:09Z | - |
+| UI-88 | D | perf/ui88-2d-bild-schneller | 2026-10-11T12:34Z | src/ui/views/live_view.py · tests/test_ui88_2d_bild_schneller.py |
 | UI-89 | A | fix/ui89-programmer-reiter-nur-passende | 2026-10-11T12:14Z | - |
 | LAS-33 | A | - | 2026-10-11T12:24Z | - |
 | LAS-34 | A | - | 2026-10-11T12:25Z | - |
@@ -213,7 +213,6 @@
 
 ## Verlauf
 
-- 2026-10-10T20:38Z D done TOOL-23
 - 2026-10-10T20:44Z D aktualisiert UI-87: Branch - -> fix/ui87-hilfe-oeffnen-windows
 - 2026-10-10T21:10Z B done VIZ-99
 - 2026-10-10T21:11Z D claim QA-93
@@ -243,3 +242,4 @@
 - 2026-10-11T12:24Z A claim LAS-33
 - 2026-10-11T12:25Z A claim LAS-34
 - 2026-10-11T12:25Z A claim LAS-35
+- 2026-10-11T12:34Z D aktualisiert UI-88: Branch - -> perf/ui88-2d-bild-schneller; Dateien - -> src/ui/views/live_view.py · tests/test_ui88_2d_bild_schneller.py
