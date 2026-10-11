@@ -393,7 +393,7 @@ def lauf(dateien, tage: int, shim: str = SHIM, zeitlimit: int = 480,
             env[SCHEIBE_VAR] = "%d/%d" % scheibe
             env["PYTHONPATH"] = os.pathsep.join([SCHEIBE_ORDNER, env["PYTHONPATH"]])
         befehl = _befehl_fuer(dateien, tage, scheibe)
-        fertig = subprocess.run(befehl, cwd=REPO, env=env, text=True, encoding="utf-8",
+        fertig = subprocess.run(befehl, cwd=REPO, env=env, text=True, encoding="utf-8", errors="replace",
                                 capture_output=True, timeout=zeitlimit)
     ausgabe = (fertig.stdout or "") + (fertig.stderr or "")
     wirksam = (not tage) or (MARKE_OK in ausgabe)
