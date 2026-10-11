@@ -160,7 +160,7 @@ class StartAusFremdemOrdner(unittest.TestCase):
             for var in ("LIGHTOS_SHOW_DB", "LIGHTOS_UNIVERSES_JSON"):
                 env.pop(var, None)
             r = subprocess.run([sys.executable, "-c", _PROBE, _REPO], cwd=fremd,
-                               env=env, capture_output=True, text=True, timeout=180)
+                               env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=180)
             self.assertEqual(r.returncode, 0, r.stderr[-2000:])
             erg = json.loads(r.stdout.strip().splitlines()[-1])
             app = os.path.join(xdg, "LightOS")
@@ -219,7 +219,7 @@ class GetStateZuerst(unittest.TestCase):
 
     def _probe(self, env, *extra):
         r = subprocess.run([sys.executable, "-c", _PROBE_STATE, _REPO, *extra],
-                           cwd=self.cwd, env=env, capture_output=True, text=True,
+                           cwd=self.cwd, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace",
                            timeout=180)
         self.assertEqual(r.returncode, 0, r.stderr[-2000:])
 
@@ -913,7 +913,7 @@ print(json.dumps({"kopiert": [n for n, _ in erg.kopiert],
         env.pop(dz.ENV_AUS, None)
         prozesse = [subprocess.Popen(
             [sys.executable, skript, self.ziel, self.alt, rolle, sync, _REPO],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace", env=env,
             cwd=self.basis) for rolle in ("A", "B")]
         aus = []
         for p in prozesse:
