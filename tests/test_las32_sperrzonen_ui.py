@@ -1,6 +1,10 @@
-"""LAS-32 (S1): Bedienung (Dialog) und Meldung je Laser.
+"""LAS-32 (S1): Bedienung und Meldung je Laser.
 
-Der Dialog legt Zonen an, verschiebt, vergroessert, benennt und loescht sie und
+Seit LAS-35 ist die Bedienung der Planer (``sperrzonen_planer.py``); die
+Zahlenfelder des frueheren Dialogs leben dort als Massleiste und in den
+Laser-Karten weiter — diese Tests pruefen sie dort.
+
+Der Planer legt Zonen an, verschiebt, vergroessert, benennt und loescht sie und
 nimmt je Laser die vier Randwinkel + Zuschlag auf. Die Meldung sagt je Laser
 „kann Zone X erreichen" / „erreicht keine Zone" / „Randwinkel fehlen — nicht
 prüfbar" und ist gelb beschriftet, dass nichts abgeschaltet wird.
@@ -17,6 +21,7 @@ from PySide6.QtWidgets import QApplication
 from src.core.laser import sperrzonen as S
 from src.core.laser import sperrzonen_merker as M
 from src.core.laser.sperrzonen import LaserFeld, Sperrzone, SperrzonenDaten
+from src.ui.visualizer import sperrzonen_planer as P
 from src.ui.visualizer import sperrzonen_ui as UI
 
 _app = QApplication.instance() or QApplication([])
@@ -107,16 +112,18 @@ class HinweisTest(unittest.TestCase):
         self.assertIn("&lt;b&gt;Bar&lt;/b&gt;", UI.hinweis_html(st))
 
     def test_kein_text_der_oberflaeche_verspricht_schutz(self):
-        quelle = pathlib.Path(UI.__file__).read_text(encoding="utf-8")
-        for wort in ("geschützt", "abgesichert", "überwacht", "Schutzzone"):
-            self.assertNotIn(wort, quelle, wort)
+        import src.ui.visualizer.einmess_assistent as A
+        for modul in (UI, P, A):
+            quelle = pathlib.Path(modul.__file__).read_text(encoding="utf-8")
+            for wort in ("geschützt", "abgesichert", "überwacht", "Schutzzone"):
+                self.assertNotIn(wort, quelle, f"{modul.__name__}: {wort}")
         self.assertIn("Kein Laserschutz", UI.GRENZEN_TEXT)
 
 
 class DialogTest(unittest.TestCase):
     def setUp(self):
         self.st = _State()
-        self.dlg = UI.SperrzonenDialog(self.st)
+        self.dlg = P.SperrzonenPlaner(self.st)
 
     def tearDown(self):
         self.dlg.close()
@@ -126,9 +133,9 @@ class DialogTest(unittest.TestCase):
     def test_grenzen_stehen_oben_im_dialog(self):
         from PySide6.QtWidgets import QLabel
         lab = self.dlg.findChild(QLabel, "sperrzonenGrenzen")
-        self.assertIn("NICHT ab", lab.text())
+        self.assertIn("schaltet den Laser nicht ab", lab.text())
         self.assertIn("Laserschutzbeauftragten", lab.text())
-        self.assertIn("nur Anzeige", self.dlg.windowTitle())
+        self.assertEqual(self.dlg.windowTitle(), "Sperrzonen planen")
 
     def test_anlegen_benennen_verschieben_groesse_loeschen(self):
         self.assertEqual(self.st.sperrzonen.zonen, [])
@@ -136,7 +143,7 @@ class DialogTest(unittest.TestCase):
         self.dlg._btn_neu.click()
         self.assertEqual(len(self.st.sperrzonen.zonen), 1)
         zone = self.st.sperrzonen.zonen[0]
-        self.assertEqual(zone.name, "Publikum")
+        self.assertEqual(zone.name, "Zone")
         self.assertIn("sperrzonen_changed", self.st.ereignisse)
         self.assertTrue(self.dlg._form_host.isEnabled())
 
@@ -159,11 +166,11 @@ class DialogTest(unittest.TestCase):
         self.assertGreaterEqual(self.st.ereignisse.count("sperrzonen_changed"), 8)
 
         self.dlg._btn_neu.click()
-        self.assertEqual([z.name for z in self.st.sperrzonen.zonen], ["Bar", "Publikum"])
+        self.assertEqual([z.name for z in self.st.sperrzonen.zonen], ["Bar", "Zone"])
         self.assertEqual(self.dlg._liste.currentRow(), 1)
         self.dlg._liste.setCurrentRow(0)
         self.dlg._btn_loeschen.click()
-        self.assertEqual([z.name for z in self.st.sperrzonen.zonen], ["Publikum"])
+        self.assertEqual([z.name for z in self.st.sperrzonen.zonen], ["Zone"])
         self.dlg._btn_loeschen.click()
         self.assertEqual(self.st.sperrzonen.zonen, [])
         self.assertFalse(self.dlg._form_host.isEnabled())
@@ -174,7 +181,7 @@ class DialogTest(unittest.TestCase):
         self.assertGreaterEqual(self.st.sperrzonen.zonen[0].breite, S.ZONE_MIN_M)
 
     def test_randwinkel_starten_als_nicht_angegeben(self):
-        self.assertEqual(self.dlg._tabelle.rowCount(), 1)       # nur der Laser
+        self.assertEqual(list(self.dlg._laser_karten), [2])     # nur der Laser
         spins = self.dlg._feld_spins[2]
         for rand in S.RAENDER:
             self.assertEqual(spins[rand].text(), "nicht angegeben")
@@ -269,7 +276,7 @@ class BridgeTest(unittest.TestCase):
         M._vergiss_sitzung()
         self.assertFalse(M.lasersicht_zeigen())
         # Haken im Dialog: steht passend, schaltet zurueck, meldet es
-        dlg = UI.SperrzonenDialog(st)
+        dlg = P.SperrzonenPlaner(st)
         try:
             chk = dlg._chk_lasersicht
             self.assertFalse(chk.isChecked())
@@ -373,7 +380,7 @@ class EinbauTest(unittest.TestCase):
         try:
             VW.VisualizerWindow._on_sperrzonen_dialog(win)
             dlg = win._sperrzonen_dlg
-            self.assertIsInstance(dlg, UI.SperrzonenDialog)
+            self.assertIsInstance(dlg, P.SperrzonenPlaner)
             self.assertFalse(dlg.isModal())
             st.sperrzonen.zonen.append(_zone_vorn())
             VW.VisualizerWindow._on_sperrzonen_dialog(win)      # zweiter Aufruf: neu geladen

@@ -2811,10 +2811,12 @@ class VisualizerWindow(QMainWindow):
         act_clear_fx.triggered.connect(self._clear_positions)
         tb.addAction(act_clear_fx)
 
-        # LAS-32 (S1): Sperrzonen anlegen/bearbeiten und Laser-Felder eintragen.
+        # LAS-32/LAS-35: Sperrzonen planen (ziehen, Vorlagen), Laser-Felder
+        # eintragen oder einmessen.
         act_sperrzonen = QAction("Sperrzonen…", self)
         act_sperrzonen.setToolTip(
-            "Sperrzonen (rote Quader) und das Maximalfeld je Laser eintragen.\n"
+            "Sperrzonen planen: Zonen ziehen, Laser-Felder eintragen oder "
+            "einmessen.\n"
             "Nur Anzeige — schaltet den Laser NICHT ab.")
         act_sperrzonen.triggered.connect(self._on_sperrzonen_dialog)
         tb.addAction(act_sperrzonen)
@@ -5694,37 +5696,31 @@ class VisualizerWindow(QMainWindow):
             print(f"[Visualizer] _on_brightness_from_js error: {e}")
 
     def _on_sperrzonen_dialog(self):
-        """LAS-32 (S1): den Sperrzonen-Dialog zeigen (nicht modal — das 3D
-        dahinter zeichnet jede Aenderung sofort)."""
-        from src.ui.visualizer.sperrzonen_ui import SperrzonenDialog
-        dlg = getattr(self, "_sperrzonen_dlg", None)
-        if dlg is None:
-            dlg = SperrzonenDialog(self._state, self)
-            self._sperrzonen_dlg = dlg
-        else:
-            dlg.neu_laden()
-        dlg.show()
-        dlg.raise_()
-        dlg.activateWindow()
+        """LAS-35: den Sperrzonen-Planer zeigen (nicht modal — das 3D dahinter
+        zeichnet jede Aenderung sofort). Er hat den frueheren Zahlenfeld-Dialog
+        (LAS-32) abgeloest."""
+        from src.ui.visualizer.sperrzonen_planer import planer_oeffnen
+        self._sperrzonen_dlg = planer_oeffnen(self._state, self)
 
     def _on_state(self, event: str, _data):
         if event == "sperrzonen_anzeige_changed":
             # LAS-32: Fenster „Sicht des Lasers" im 3D geschlossen/geoeffnet ->
-            # der Haken im Sperrzonen-Dialog zieht nach.
+            # der Haken im Sperrzonen-Planer zieht nach.
             dlg = getattr(self, "_sperrzonen_dlg", None)
             if dlg is not None:
                 try:
                     dlg.lasersicht_nachziehen()
                 except Exception as e:                   # noqa: BLE001
-                    print(f"[Visualizer] Sperrzonen-Dialog: {e}")
+                    print(f"[Visualizer] Sperrzonen-Planer: {e}")
         if event in ("patch_changed", "show_loaded"):
-            # LAS-32: ein offener Sperrzonen-Dialog zeigt sonst die alte Show.
+            # Ein offener Planer zeigt sonst die alte Show; ein laufendes
+            # Einmessen endet dabei (Laser aus).
             dlg = getattr(self, "_sperrzonen_dlg", None)
-            if dlg is not None and dlg.isVisible():
+            if dlg is not None:
                 try:
-                    dlg.neu_laden()
+                    dlg.patch_oder_show_geaendert()
                 except Exception as e:                   # noqa: BLE001
-                    print(f"[Visualizer] Sperrzonen-Dialog: {e}")
+                    print(f"[Visualizer] Sperrzonen-Planer: {e}")
         if event == "patch_changed":
             self._refresh_patch_list()
         elif event == "show_loaded":
