@@ -233,20 +233,33 @@ def lese_schnittstellen() -> list:
     return raus
 
 
+def lage_ohne_netz() -> Lage | None:
+    """Die Lagen, die schon ohne Blick auf die Netzwerkkarten feststehen
+    (Server aus, nur dieser PC, Handy-Konsole aus) — sonst ``None``. Die
+    Oberflaeche fragt das zuerst: die Karten und die Standard-Route liest sie
+    nur, wenn es ueberhaupt einen Code geben kann (das Lesen kostet im
+    Oberflaechen-Takt Millisekunden, ohne Netz auch eine Namensaufloesung)."""
+    from src.web import app as web_app
+    from src.web import remote_settings
+    if not web_app.is_running():
+        return Lage(SERVER_AUS)
+    if str(web_app.bind_host() or "").startswith("127."):
+        return Lage(NUR_LOKAL)
+    if not remote_settings.is_vc_remote_enabled():
+        return Lage(KONSOLE_AUS)
+    return None
+
+
 def lage_jetzt(schnittstellen=None, bevorzugt=None) -> Lage:
     """``lage`` mit den echten Werten des laufenden Programms. Die Liste der
     Karten und die Adresse der Standard-Route kann der Aufrufer hereinreichen
     (die Oberflaeche fragt sie nicht bei jedem Takt neu ab)."""
     from src.web import app as web_app
     from src.web import remote_settings
-    laeuft = bool(web_app.is_running())
-    if not laeuft:
-        return Lage(SERVER_AUS)
+    vorab = lage_ohne_netz()
+    if vorab is not None:
+        return vorab
     bind_host = web_app.bind_host()
-    if bind_host.startswith("127."):
-        return Lage(NUR_LOKAL)
-    if not remote_settings.is_vc_remote_enabled():
-        return Lage(KONSOLE_AUS)
     if schnittstellen is None:
         schnittstellen = lese_schnittstellen()
     if bevorzugt is None:

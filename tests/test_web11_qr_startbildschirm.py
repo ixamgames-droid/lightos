@@ -970,6 +970,32 @@ class FeldTest(_MitNetz):
         self.assertIn("Web-Interface", schritt.text())
         self.kein_schluessel_sichtbar()
 
+    def test_netzwerkkarten_werden_nur_gelesen_wenn_es_einen_code_geben_kann(self):
+        # Review: die Seitenleiste fragt im Halbsekundentakt. Steht die Lage
+        # ohne Netz fest (Konsole aus, Server aus, nur dieser PC), darf das
+        # Feld weder die Karten noch die Standard-Route abfragen — das kostet
+        # im Oberflaechen-Takt Zeit, ohne Netz auch eine Namensaufloesung.
+        gelesen = []
+        with mock.patch.object(hv, "lese_schnittstellen",
+                               lambda: gelesen.append("karten") or list(self.karten)), \
+                mock.patch.object(hv, "standard_adresse",
+                                  lambda: gelesen.append("route") or ""):
+            feld = self._feld()
+            feld.aktualisiere(sofort=True)                  # Konsole aus
+            self.assertEqual(feld.lage().zustand, hv.KONSOLE_AUS)
+            remote_settings.set_vc_remote_enabled(True)
+            self.bind = "127.0.0.1"                         # nur dieser PC
+            feld.aktualisiere(sofort=True)
+            self.assertEqual(feld.lage().zustand, hv.NUR_LOKAL)
+            self.laeuft = False                             # Web-Interface aus
+            feld.aktualisiere(sofort=True)
+            self.assertEqual(feld.lage().zustand, hv.SERVER_AUS)
+            self.assertEqual(gelesen, [], "Netz gelesen, obwohl es keinen Code geben kann")
+            self.laeuft, self.bind = True, "0.0.0.0"
+            feld.aktualisiere(sofort=True)
+            self.assertTrue(feld.hat_code())
+            self.assertEqual(sorted(set(gelesen)), ["karten", "route"])
+
     def test_nur_an_diesem_pc_gebunden_zeigt_den_schritt(self):
         remote_settings.set_vc_remote_enabled(True)
         self.bind = "127.0.0.1"

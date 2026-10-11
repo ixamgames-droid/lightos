@@ -207,6 +207,12 @@ class HandyQrFeld(QWidget):
     def _lage_lesen(self) -> hv.Lage:
         if self._quelle is not None:
             return self._quelle()
+        # Steht die Lage ohne Netz fest (Server aus, nur dieser PC, Konsole
+        # aus), werden die Netzwerkkarten gar nicht erst gelesen — die
+        # Seitenleiste fragt im Halbsekundentakt, auch wenn alles aus ist.
+        vorab = hv.lage_ohne_netz()
+        if vorab is not None:
+            return vorab
         jetzt = time.monotonic()
         zeit, karten, bevorzugt = self._netz
         if not zeit or jetzt - zeit >= _NETZ_ALLE:
