@@ -72,7 +72,7 @@ def _fahre(rumpf: str):
         with open(os.path.join(verz, "treiber.mjs"), "w", encoding="utf-8") as fh:
             fh.write(_KOPF % json.dumps(_THREE) + rumpf + _FUSS)
         out = subprocess.run(["node", os.path.join(verz, "treiber.mjs")],
-                             capture_output=True, text=True, timeout=60)
+                             capture_output=True, text=True, encoding=\"utf-8\", errors=\"replace\", timeout=60)
     if out.returncode != 0:
         raise AssertionError(out.stderr)
     return json.loads(out.stdout)
