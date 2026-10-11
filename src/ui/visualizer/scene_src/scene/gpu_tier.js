@@ -28,9 +28,24 @@ export const BENCH_HIGH_MS = 6;
 const REGELN = [
   { re: /swiftshader|llvmpipe|softpipe|lavapipe|basic render|\bwarp\b/, tier: 'low',
     grund: 'Software-Renderer' },
-  // Snapdragon X (Adreno X1-xx) ist etwa so stark wie eine Mittelklasse-Karte:
-  // nicht pauschal Niedrig, sondern messen.
-  { re: /adreno.*\bx1\b/, tier: null, grund: 'Snapdragon X' },
+  // VIZ-99: Adreno X1-85 (Snapdragon X Elite und X Plus mit 10 Kernen) ist am
+  // Geraet gemessen und traegt Hoch — deshalb per Name, nicht per Messung.
+  // Windows-ARM-PC (X1E-80-100, die schwaechste X1-85-Ausfuehrung), Netzbetrieb,
+  // Mega Arena mit 32 Geraeten, 200-%-Bildschirm, Stufe Hoch: Leerlauf 60 fps,
+  // unter Bewegung 51-57 fps bei minimiertem Hauptfenster (Niedrig: 59-60).
+  // Mit sichtbarem Hauptfenster 35-47 fps (Niedrig: 37-60) — dort bremst die
+  // 2D-Ansicht den gemeinsamen UI-Thread, nicht die Grafik.
+  // Warum nicht messen: die Start-Messung lieferte auf DIESEM Chip bei sechs
+  // Starts 6,6 / 7,2 / 7,2 / 7,8 / 7,8 / 9,0 ms — sie streut um ein Drittel
+  // und liegt knapp ueber BENCH_HIGH_MS. Jede Grenze in dieser Gegend
+  // liesse die Stufe von Start zu Start kippen; mit 6 ms war es immer Niedrig
+  // (Pixeldichte 1,25 auf einem 200-%-Bildschirm, keine Kantenglaettung, keine
+  // geglaettete Bewegung).
+  { re: /adreno.*\bx1-85\b/, tier: 'high', grund: 'Snapdragon X (Adreno X1-85)' },
+  // Die uebrige Adreno-X-Reihe (X1-45 im Snapdragon X Plus mit 8 Kernen, etwa
+  // halb so schnell; X2-…) ist nicht gemessen: nicht pauschal Niedrig, sondern
+  // die Frame-Zeit entscheiden lassen.
+  { re: /adreno.*\bx\d\b/, tier: null, grund: 'Snapdragon X' },
   { re: /adreno|mali|powervr|videocore|apple a\d/, tier: 'low',
     grund: 'Mobil-Grafik' },
   { re: /apple m\d/, tier: 'high', grund: 'Apple M' },

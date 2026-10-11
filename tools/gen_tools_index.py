@@ -9,10 +9,15 @@ lassen:
     venv/Scripts/python.exe tools/gen_tools_index.py
     (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 
+Nur nachsehen, ob der Index noch stimmt (schreibt nichts, Exit 1 = veraltet):
+
+    venv/Scripts/python.exe tools/gen_tools_index.py --pruefen
+
 Reines Stdlib-Werkzeug, keine src-Imports.
 """
 from __future__ import annotations
 
+import argparse
 import ast
 import os
 import re
@@ -102,8 +107,47 @@ def build_readme() -> str:
     return "\n".join(lines)
 
 
-def main() -> int:
+def _parser() -> argparse.ArgumentParser:
+    ap = argparse.ArgumentParser(
+        prog="gen_tools_index.py",
+        description="Schreibt tools/README.md neu: Index aller Werkzeuge in "
+                    "tools/ mit Zweck-Zeile, dazu die Kurzliste fuer "
+                    "tools/_archiv/.")
+    ap.add_argument(
+        "--pruefen", action="store_true",
+        help="nichts schreiben; Exit 1, wenn tools/README.md fehlt oder nicht "
+             "dem entspricht, was der Generator jetzt schreiben wuerde")
+    return ap
+
+
+def _vorhandene_readme() -> str | None:
+    """Inhalt der README, ``None`` wenn sie fehlt.
+
+    Gelesen wird mit vereinheitlichten Zeilenenden: Git checkt die Datei unter
+    Windows je nach ``core.autocrlf`` mit CRLF aus — das ist keine Abweichung.
+    """
+    try:
+        with open(README, "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        return None
+
+
+def main(argv: list[str] | None = None) -> int:
+    # TOOL-14: bis hierhin las main() die Kommandozeile gar nicht — JEDER
+    # Aufruf schrieb die README neu, auch ``--help`` und ein Tippfehler in
+    # einer Option. argparse beendet beides, bevor etwas geschrieben ist.
+    args = _parser().parse_args(argv)
     content = build_readme()
+    if args.pruefen:
+        vorhanden = _vorhandene_readme()
+        if vorhanden == content:
+            print(f"aktuell: {README}")
+            return 0
+        grund = "fehlt" if vorhanden is None else "ist veraltet"
+        print(f"{README} {grund} -> tools/gen_tools_index.py ohne --pruefen "
+              f"laufen lassen", file=sys.stderr)
+        return 1
     with open(README, "w", encoding="utf-8", newline="\n") as f:
         f.write(content)
     print(f"geschrieben: {README} ({content.count(chr(10))} Zeilen)")

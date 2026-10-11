@@ -34,6 +34,9 @@ After starting, LightOS opens in the **Bühne** (stage) section. From top to bot
 1. **Menu bar** — `Datei` (File), `Bearbeiten` (Edit), `Ansicht` (View), `Show`,
    `Programmer`, `Datenbank` (Database), `Ausgabe` (Output), `Visualizer`, `Command`,
    `Hilfe` (Help). Saving and opening (step 7) and the output settings live here.
+   `Hilfe` brings you back to this guide and also offers **Tastenkürzel…** (all
+   keyboard shortcuts at a glance) and **Datenordner öffnen** / **Show-Ordner öffnen**
+   (open the data folder / the show folder).
 2. **Section bar** — the eight work areas of LightOS, see step 2.
 3. **GM** — the grand master. It controls the overall brightness from 0 to 100 %.
    Lasers without a dimmer channel are not dimmed gradually; they are switched off at 0 % —
@@ -53,6 +56,11 @@ After starting, LightOS opens in the **Bühne** (stage) section. From top to bot
    To black out only some fixtures or groups, use a
    [blackout button with a target](../anleitung_vc_widgets/01_button.md#blackout-mit-ziel-vcb-11)
    in the Virtual Console.
+   Right above it, in the right corner of the menu bar, sits the **LASER NOT-AUS** button
+   (laser emergency stop; also top right in kiosk mode; shortcut `Ctrl+Shift+L`): one click
+   makes all lasers dark at once, without a confirmation, and the button then flashes as
+   **LASER NOT-AUS AKTIV**. It is released only deliberately — click it again and confirm
+   the prompt.
 7. **Command line** — for keyboard commands such as `1 thru 5 @ 80`. Examples are shown as
    placeholder text in the field.
 8. **Status bar** — on the left the state of the ENTTEC adapter
