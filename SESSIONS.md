@@ -64,7 +64,7 @@
 | MIDI-10 | D | feature/midi10-pitchbend-fader | 2026-10-11T14:47Z | src/core/midi/midi_manager.py · src/core/midi/midi_mapper.py · src/ui/virtualconsole/vc_widget.py · src/ui/virtualconsole/vc_slider.py · src/ui/views/midi_view.py · src/ui/widgets/midi_teach_dialog.py · src/ui/widgets/input_profile_editor.py · tests/test_midi10_pitchbend_fader.py · docs/anleitung_vc_widgets/02_fader.md · docs/anleitung_vc_widgets/02_fader.en.md |
 | MIDI-15 | D | - | 2026-10-11T13:58Z | - |
 | ENG-30 | D | perf/eng30-engine-zeit-je-frame | 2026-10-11T15:41Z | src/core/app_state.py · src/core/engine/function_manager.py · src/core/engine/patch_index.py · src/core/engine/scene.py · src/core/engine/efx.py · src/core/engine/rgb_matrix.py · src/core/engine/mapped_channel.py · tools/engine_frame_zeit.py · tools/benchmark_universes.py · docs/ENGINE_FRAME_ZEIT.md · docs/PERFORMANCE.md · tests/test_eng30_frame_zeit.py |
-| XPLAT-36 | D | - | 2026-10-11T13:58Z | - |
+| XPLAT-36 | D | fix/xplat36-einzellauf-zeitlimit | 2026-10-11T16:30Z | tools/verify_segmented.ps1 · tools/verify_segmented.sh · tests/test_xplat36_einzellauf_zeitlimit.py |
 | OUT-68 | A | feature/out68-udmx-adapter | 2026-10-11T14:02Z | - |
 | OUT-69 | A | - | 2026-10-11T14:04Z | - |
 | WEB-10 | A | feature/web10-handy-seitenleiste | 2026-10-11T15:10Z | - |
@@ -227,7 +227,6 @@
 
 ## Verlauf
 
-- 2026-10-11T12:14Z D aktualisiert VIZ-103: Branch - -> fix/viz103-haengend-an-unterkante; Dateien - -> src/ui/visualizer/scene_src/fixtures/mount_pose.js · tests/test_viz103_haengend_unterkante_scene.py
 - 2026-10-11T12:14Z A claim UI-89
 - 2026-10-11T12:20Z A done UI-84
 - 2026-10-11T12:24Z A claim LAS-33
@@ -257,3 +256,4 @@
 - 2026-10-11T16:21Z D claim UI-90
 - 2026-10-11T16:21Z D claim XPLAT-53
 - 2026-10-11T16:21Z D claim MIDI-14
+- 2026-10-11T16:30Z D aktualisiert XPLAT-36: Branch - -> fix/xplat36-einzellauf-zeitlimit; Dateien - -> tools/verify_segmented.ps1 · tools/verify_segmented.sh · tests/test_xplat36_einzellauf_zeitlimit.py
