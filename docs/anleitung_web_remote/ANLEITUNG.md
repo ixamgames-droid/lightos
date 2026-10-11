@@ -5,6 +5,9 @@
 > zehn **Executor-Fader** (Ex 1–10) — alles über den Browser, ohne App-Installation.
 > Voraussetzung: Handy und PC hängen im **selben WLAN/LAN**.
 >
+> Wer **eigene** Tasten, Fader und Cuelisten aus der virtuellen Konsole aufs Handy
+> legen will, nimmt die **Handy-Konsole** — siehe [Abschnitt 5](#5-handy-konsole--eigene-tasten-fader-und-cuelisten-aufs-handy-web-09).
+>
 > **Internet braucht das Handy nicht:** Die Seite kommt vollständig vom LightOS-PC,
 > auch ihre Verbindungs-Bibliothek (socket.io). Ein reines Technik-WLAN ohne
 > Internetzugang genügt (WEB-06).
@@ -167,11 +170,90 @@ Seit 2026-07 ist das Web-Remote **per Default abgesichert** (Design-Entscheidung
 
 ---
 
+## 5. Handy-Konsole — eigene Tasten, Fader und Cuelisten aufs Handy (WEB-09)
+
+Die feste Seite aus Abschnitt 3 kennt nur GO, Blackout und die Executor-Fader.
+Die **Handy-Konsole** zeigt stattdessen **deine** Elemente aus der virtuellen
+Konsole: Tasten, Fader und Cuelisten als **Verknüpfungen**. Das Handy drückt
+dabei das Original — gleiche Funktion, gleicher Zustand, auch wenn das Element
+auf einer anderen Bank oder in einem Kasten liegt. Nichts wird doppelt
+programmiert.
+
+### Einrichten
+
+1. **Elemente auswählen:** In der virtuellen Konsole **„Bearbeiten"** einschalten
+   und in der Werkzeugleiste **„📱 Handy füllen"** drücken („Handy-Konsole
+   automatisch füllen"). LightOS legt alle fernbedienbaren Elemente auf die
+   **Handy-Seiten** — ein Raster aus 4 Spalten × 10 Zeilen je Seite:
+   Cuelisten oben (4 × 3 Felder), darunter die Tasten (1 Feld; lange
+   Beschriftungen und Not-Tasten 2 Felder breit), dann die Fader senkrecht
+   nebeneinander (1 × 3 Felder) und eine Blackout-Taste über die volle Breite
+   ganz unten. Was nicht auf eine Seite passt, kommt auf die nächste.
+   Rückgängig mit **Strg+Z**. Ein zweiter Druck ersetzt die Seiten nach einer
+   Rückfrage. Von Hand anordnen (ziehen, Größe ändern, einzelne Elemente
+   weglassen) kommt mit der Seitenleiste des Editors (WEB-10).
+2. **Einschalten:** **Ausgabe → „Web-Remote: Verbindung & Token…"** → Haken bei
+   **„Handy-Konsole"** setzen. Standard ist **aus**. Darunter erscheint der
+   Link fürs Handy: `http://<PC-IP>:5000/konsole?k=<token>`.
+3. **Am Handy öffnen** und als Lesezeichen bzw. auf den Startbildschirm legen.
+   Die feste Seite zeigt oben rechts zusätzlich **„Handy-Konsole ▸"**, solange
+   die Konsole eingeschaltet ist.
+
+Die Handy-Seiten gehören zur Show: sie werden mit der Show gespeichert und
+gehen auch bei **„Canvas exportieren…/importieren…"** mit. Eine Show von früher
+lädt unverändert — sie hat einfach noch keine Handy-Seiten. Löschst du ein
+Element in der Konsole, verschwindet seine Verknüpfung; machst du das Löschen
+rückgängig, ist auch die Verknüpfung wieder da.
+
+### Bedienen
+
+| Element | Am Handy |
+|---|---|
+| **Taste** | Antippen löst aus. Der Zustand kommt vom Pult zurück: läuft die Funktion, leuchtet die Taste in ihrer Farbe aus der Konsole. Tasten mit dem Zusatz **„halten"** (Flash, „nur gehalten", Blackout, Alles Weiß) wirken, solange der Finger darauf liegt. |
+| **Fader** | Senkrecht, mit Prozentanzeige. Gezogen wird **relativ**: ein versehentliches Antippen verstellt nichts. Bewegt jemand den Fader am Pult, wandert er am Handy mit. |
+| **Cueliste** | Laufende Cue, die nächste Cue und **GO / BACK / STOP** — für genau diese Cueliste (nicht die „GO-Zielliste" der festen Seite). |
+| **Master + BLACKOUT** (unten, immer da) | Grand Master als Fader; **BLACKOUT** schaltet um (antippen = dunkel, noch einmal = hell) und leuchtet rot, solange das Pult dunkel ist. |
+| **Seiten** | Reiter oben, oder auf freier Fläche seitlich wischen. |
+
+Oben rechts steht die Verbindung: **verbunden** (grün) oder **getrennt** (rot).
+Solange das Handy getrennt ist, ist die Bedienung **gesperrt** — nichts wird
+„blind" gedrückt und später nachgeholt. Sobald die Verbindung wieder steht,
+gleicht das Handy den ganzen Zustand neu ab.
+
+### Was dabei zur Sicherheit gilt
+
+- **Nur was auf einer Handy-Seite liegt**, ist vom Handy aus zu sehen und zu
+  bedienen. Alles andere beantwortet der Server mit **403** — auch wenn jemand
+  die Kennung eines Elements kennt.
+- **Gehaltene Tasten werden losgelassen**, wenn die Verbindung abreißt (WLAN
+  weg, Seite geschlossen, Akku leer), wenn du die Handy-Konsole ausschaltest,
+  den Schlüssel neu erzeugst oder das Web-Interface stoppst. Eine Flash-Taste
+  bleibt so nicht hängen.
+- Es gilt **derselbe Schlüssel** wie für die feste Seite. Er wird beim Verbinden
+  geprüft und bei jeder einzelnen Bedienung noch einmal; nach „Token neu
+  erzeugen" kann auch ein noch verbundenes Handy nichts mehr auslösen.
+- **Laser:** Scharf geschaltet wird ein Laser nur am Pult — vom Handy aus geht
+  nur „unscharf". Laser-Muster lassen sich nicht aufs Handy legen. Den
+  **Laser-NOT-AUS** kann das Handy auslösen, aber nie aufheben, auch nicht über
+  einen Fader oder eine Farb-Taste, die Laser-Werte setzt.
+- Die Seite kommt vollständig vom LightOS-PC und braucht **kein Internet**.
+
+Technik in Kürze: Seite `GET /konsole`, Stand `GET /api/vc/konsole`, Bedienung
+über die Socket-Verbindung (`vc_hallo`, `vc_aktion`, `vc_pult`; Rückmeldung
+`vc_konsole`, `vc_zustand`, höchstens zehnmal je Sekunde) — die Adressen
+`POST /api/vc/widget/<Kennung>/aktion` und `POST /api/vc/pult` gibt es
+zusätzlich. Wer über diese HTTP-Adressen eine Halte-Taste drückt, muss sie
+selbst wieder loslassen; das automatische Loslassen hängt an der
+Socket-Verbindung.
+
+---
+
 ## Kurz-Referenz
 
 1. **Ausgabe → „Web-Interface (Port 5000)"** anhaken → Server läuft auf `0.0.0.0:5000`.
 2. PC-LAN-IP per `ipconfig` holen → am Handy `http://<PC-IP>:5000/?k=<token>` öffnen (Token/Direkt-Link aus dem Verbindungs-Dialog, gleiches WLAN).
 3. **GO/BACK/STOP** = Cueliste · **Blackout** = alles dunkel (Toggle) · **Fader Ex 1–10** = Executor-Pegel.
 4. **Token-geschützt** (`?k=…`, ohne → 403) + CORS-Allowlist; Token ist ein **geteiltes** Setup-Geheimnis → nur im vertrauenswürdigen Netz nutzen, danach ausschalten.
+5. **Handy-Konsole** (eigene Tasten/Fader/Cuelisten): VC → Bearbeiten → **„📱 Handy füllen"**, dann im Verbindungs-Dialog **„Handy-Konsole"** anhaken → am Handy `http://<PC-IP>:5000/konsole?k=<token>`.
 
 Zurück zur Übersicht: [../ANLEITUNGEN.md](../ANLEITUNGEN.md)
