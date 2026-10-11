@@ -46,7 +46,6 @@
 | CDX-58 | A | fix/cdx-1010-main | 2026-10-10T19:30Z | - |
 | VIZ-102 | A | feature/viz102-gobo-hallenboden | 2026-10-11T16:09Z | - |
 | UI-87 | D | fix/ui87-hilfe-oeffnen-windows | 2026-10-10T22:54Z | - |
-| QA-93 | D | fix/qa93-gate-ohne-echtes-fenster | 2026-10-10T22:54Z | - |
 | QA-94 | A | fix/cdx-1010-main | 2026-10-10T21:17Z | - |
 | QA-95 | A | fix/cdx-1010-main | 2026-10-10T21:17Z | - |
 | QA-91 | D | - | 2026-10-10T22:54Z | - |
@@ -228,7 +227,6 @@
 
 ## Verlauf
 
-- 2026-10-11T12:24Z A claim LAS-33
 - 2026-10-11T12:25Z A claim LAS-34
 - 2026-10-11T12:25Z A claim LAS-35
 - 2026-10-11T12:34Z D aktualisiert UI-88: Branch - -> perf/ui88-2d-bild-schneller; Dateien - -> src/ui/views/live_view.py · tests/test_ui88_2d_bild_schneller.py
@@ -258,3 +256,4 @@
 - 2026-10-11T16:30Z D aktualisiert XPLAT-36: Branch - -> fix/xplat36-einzellauf-zeitlimit; Dateien - -> tools/verify_segmented.ps1 · tools/verify_segmented.sh · tests/test_xplat36_einzellauf_zeitlimit.py
 - 2026-10-11T16:32Z A claim WEB-11
 - 2026-10-11T16:40Z D aktualisiert XPLAT-53: Branch - -> fix/xplat53-viz72-teilen; Dateien - -> tests/test_viz72_spot_pool_umgebung.py · tests/test_viz72b_spot_pool_bewegung_scene.py · tests/test_viz72c_umgebung_modi_scene.py · tests/_viz72_szene.py · tests/test_xplat53_viz72_geteilt.py
+- 2026-10-11T16:43Z D done QA-93
