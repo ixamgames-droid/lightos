@@ -62,7 +62,7 @@
 | VIZ-103 | D | fix/viz103-haengend-an-unterkante | 2026-10-11T12:57Z | src/ui/visualizer/scene_src/fixtures/mount_pose.js · tests/test_viz103_haengend_unterkante_scene.py |
 | UI-88 | D | perf/ui88-2d-bild-schneller | 2026-10-11T13:29Z | src/ui/views/live_view.py · tests/test_ui88_2d_bild_schneller.py |
 | UI-89 | A | fix/ui89-programmer-reiter-nur-passende | 2026-10-11T12:14Z | - |
-| LAS-33 | A | - | 2026-10-11T12:24Z | - |
+| LAS-33 | A | feature/las33-laser-profilangaben-generator | 2026-10-11T13:51Z | - |
 | LAS-34 | A | - | 2026-10-11T12:25Z | - |
 | LAS-35 | A | - | 2026-10-11T12:25Z | - |
 
@@ -213,7 +213,6 @@
 
 ## Verlauf
 
-- 2026-10-10T21:11Z D claim QA-93
 - 2026-10-10T21:17Z A claim QA-94
 - 2026-10-10T21:17Z A claim QA-95
 - 2026-10-10T21:41Z D done DOC-70
@@ -243,3 +242,4 @@
 - 2026-10-11T12:34Z D aktualisiert UI-88: Branch - -> perf/ui88-2d-bild-schneller; Dateien - -> src/ui/views/live_view.py · tests/test_ui88_2d_bild_schneller.py
 - 2026-10-11T12:53Z A done LAS-30
 - 2026-10-11T13:25Z A done FM-73
+- 2026-10-11T13:51Z A aktualisiert LAS-33: Branch - -> feature/las33-laser-profilangaben-generator
