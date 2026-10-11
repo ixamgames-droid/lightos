@@ -460,7 +460,12 @@ def _build_fixture_payload(fixture, attrs: dict[str, int],
     # _prism_facets). Die Drehung dagegen ist ein reiner Winkel und geht roh
     # mit — dort gibt es keine Profil-Zuordnung aufzuloesen.
     # VIZ-79: Laser-Block (Position, Groesse, Muster, Eigenbewegung).
-    _laser = _laser_payload(fixture, attrs, channels)
+    # LAS-30: ``attrs`` ist der DRAHT-Wert und traegt die Laser-Achsen-Umkehr
+    # des Geraets (invert_laser_x/y, swap_laser_xy). Wie bei Pan/Tilt (VIZ-55)
+    # hier zuruecknehmen, sonst zeigt das Bild den Laser gespiegelt.
+    from src.core.laser.achsen import unapply_laser_orientation
+    _laser = _laser_payload(
+        fixture, unapply_laser_orientation(fixture, attrs, channels), channels)
     if _laser is not None:
         payload["laser"] = _laser
     _prism = _prism_facets_gemerkt(attrs, channels)

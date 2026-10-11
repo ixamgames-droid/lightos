@@ -50,11 +50,14 @@ fix/midi-apc-detection     Bugfix
 
 ### Commit-Messages
 
-- Imperativ, Englisch oder Deutsch (konsistent pro Commit)
+- Format der ersten Zeile: `<typ>(<bereich>): <kurze Beschreibung> (<BACKLOG-ID>)` —
+  Typ als englisches Kürzel (`feat`, `fix`, `docs`, `test`, `refactor`, `chore`),
+  Beschreibung auf Deutsch. Tabelle und Einzelheiten:
+  [CONTRIBUTING.md](CONTRIBUTING.md#commits).
 - Kurz: 1 Zeile + optional Body
-- Format:
+- Beispiel:
   ```
-  Add 2D top-down live view
+  feat(live): 2D-Draufsicht als Live View
 
   Neue Section als erste Anlaufstelle beim App-Start.
   Zeigt gepatchte Fixtures mit Live-DMX-Farben.
@@ -86,9 +89,21 @@ GitHub keine CI.
 
 ## Tests vor jedem Commit
 
-- `python main.py` muss starten ohne Crash
-- Geaenderte Module einmal importieren
-- Bei UI-Aenderungen: betroffene View instanziieren
+Ein Befehl, ueberall derselbe (auch in `CONTRIBUTING.md` und `INSTALL.md`):
+die betroffenen Testdateien ueber das Test-Gate laufen lassen — ein Prozess je
+Testdatei, headless.
+
+```
+./tools/verify_loop.sh tests/test_x.py          # Linux
+.\tools\verify_segmented.ps1 tests\test_x.py    # Windows
+```
+
+- Vor dem Merge laeuft dasselbe Gate OHNE Dateiangabe (volle Suite), s. naechster
+  Abschnitt.
+- Kein Sammellauf ueber den ganzen Testordner in EINEM pytest-Prozess — der stirbt
+  an angesammeltem nativem Qt-Zustand (Begruendung in `AGENTS.md`).
+- Bei UI-Aenderungen zusaetzlich: die App einmal starten und die betroffene
+  Ansicht oeffnen.
 
 ## Test-Gate (Loop-Modus)
 
@@ -270,6 +285,38 @@ Das verbindliche Test-Gate des Loop-Modus laeuft ueber `tools/verify_loop.ps1`:
   > „keine `FAILED`-Zeile" ein echter Fehlschlag stecken.
 
 Details zur Sperre: `SecondBrain/reference_pytest_lock.md`.
+
+### CI-Schnellweg fuer reine Doku-/Backlog-PRs (PROC-19)
+
+Aendert ein PR **ausschliesslich** Doku, faehrt die CI in denselben Jobs (gleiche
+Namen — daran erkennt `tools/pr_bereit.py` die Checks) statt der vollen Suite nur
+die Doku-/Backlog-/Privatsphaere-Gates. Das dauert Minuten statt einer halben
+Stunde und haelt die Merge-Warteschlange nicht auf.
+
+* **Was als Doku zaehlt:** `*.md` im Wurzelverzeichnis, `changelog.d/*.md`,
+  `backlog.d/*.md` (Backlog-Fragmente, PROC-20) und unter `docs/` Markdown und Bilder. Alles andere ist „voll" — auch
+  `tools/README.md`, JSON und Skripte unter `docs/`, `tests/`, `tools/`, `.github/`.
+  Eine einzige solche Datei im PR genuegt fuer die volle Suite.
+* **Wer entscheidet:** `tools/geaenderte_dateien_klasse.py` gibt `doku` oder `voll`
+  aus. Gerechnet wird gegen den Merge-Base mit `main`, nicht gegen den letzten
+  Commit. Im Zweifel `voll` (unbekannte Datei, Git-Fehler, keine Aenderung).
+* **Push nach `main` faehrt immer die volle Suite.** Der Schnellweg gilt nur im
+  Pull-Request.
+* **Welche Gates laufen:** die Liste steht in `tools/doku_gates.txt`. Ein neuer
+  Test, der eine Anleitung, den Backlog oder ein Changelog-Fragment liest, wird
+  dort eingetragen — `tests/test_proc19_doku_schnellweg.py` meldet ihn sonst.
+* **Windows-Legs:** im Doku-Fall laufen dort keine Tests; die Jobs enden gruen
+  mit dem Schritt „Doku-PR: Kurzweg". Die Gates faehrt die Linux-Leg.
+
+Lokal:
+
+```
+./venv/bin/python tools/geaenderte_dateien_klasse.py   # doku oder voll (gegen origin/main)
+./tools/verify_loop.sh --doku                          # Syntax-Check + nur die Doku-Gates
+```
+
+`verify_loop.sh --doku` ersetzt das volle Gate nur, wenn der Zweig wirklich nur
+Doku aendert; sonst sagt der Lauf das in einer Warnzeile.
 
 ### Kein Flake, ein Messfehler: das Gate misst den Baum, den es bekommt (PROC-13)
 

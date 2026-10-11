@@ -148,18 +148,26 @@ def oeffne_ordner(pfad: str) -> bool:
 # ── Ueber LightOS ────────────────────────────────────────────────────────────
 
 def app_version() -> str:
-    """Die echte Version (``APP_VERSION`` aus ``main.py``)."""
+    """Die echte Version (``APP_VERSION`` aus ``main.py``).
+
+    QA-92: ``QApplication.applicationVersion()`` ist NUR noch Rueckfall. Solange
+    dort niemand eine Version gesetzt hat, liefert Qt unter Windows die
+    Dateiversion der laufenden EXE — im Quellbetrieb die von ``python.exe``
+    („3.12.10150.1013“). Leer wie unter Linux ist der Wert dort nie; als erste
+    Quelle gefragt, stand deshalb ueberall, wo nicht ``main.py`` selbst die
+    QApplication baut (Tests, Werkzeuge), die Python-Version als LightOS-Version
+    im Dialog und im Diagnosepaket."""
     try:
-        from PySide6.QtWidgets import QApplication
-        v = QApplication.applicationVersion()
+        # liest main.py bzw. im Build das laufende ``__main__`` (XPLAT-47)
+        from src.core.audio.audio_recorder import _lightos_version
+        v = _lightos_version()
         if v:
             return v
     except Exception:
         pass
     try:
-        # liest main.py bzw. im Build das laufende ``__main__`` (XPLAT-47)
-        from src.core.audio.audio_recorder import _lightos_version
-        return _lightos_version() or "?"
+        from PySide6.QtWidgets import QApplication
+        return QApplication.applicationVersion() or "?"
     except Exception:
         return "?"
 
