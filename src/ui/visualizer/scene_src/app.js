@@ -70,6 +70,8 @@ import { prismFacetCount, applyPrism } from './fixtures/prism.js';    // VIZ-PRI
 import { goboTexture, beamGoboTexture } from './fixtures/gobo_textures.js';   // VIZ-80/VIZ-83 (Test-Seam)
 import { goboProjektionInfo } from './scene/gobo_projektion.js';   // VIZ-96 (Test-Seam)
 import { beamLengthScale } from './fixtures/builders.js';             // VIZ-15
+import { resyncFloorSpot } from './fixtures/builders.js';             // VIZ-100
+import { syncMountPoses } from './fixtures/mount_pose.js';            // VIZ-100
 import { tickBewegungGlaettung, bewegungGlaettungAktiv, setGlattUhr } from './fixtures/builders.js';   // VIZ-92
 import { laserAnimationAktiv, tickLaserAnimation, laserInfo } from './fixtures/laser.js';   // VIZ-79
 import { floorPoolScale, poolFalloffTexture } from './fixtures/floor_pool.js';  // VIZ-15
@@ -134,6 +136,11 @@ function perFrameUpdate() {
   // sein Bild selbst an (requestRender), nur wenn es weitergerueckt ist —
   // bewusst keine Live-Probe (die rendert jeden rAF-Tick).
   tickBewegungGlaettung();
+  // VIZ-100: haengende Haltung an die Andock-Bindung angleichen. EINE Stelle
+  // fuer alle Wege, auf denen sich `f.dockedTo` oder das Buehnen-Element
+  // aendert (Ziehen, Undo/Redo, Element entfernt, Buehne geladen) — im
+  // Ruhezustand ein Vergleich je Geraet, sonst nichts.
+  if (syncMountPoses(resyncFloorSpot)) requestRender();
   fpsTick();
 }
 

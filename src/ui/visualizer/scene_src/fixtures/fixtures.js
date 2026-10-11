@@ -25,6 +25,7 @@ import { requestRender } from '../scene/render_loop.js';
 import { makeFixtureLabel, disposeFixtureLabel } from './labels.js';  // VIZ-14
 import { updateEmptyState } from '../empty_state.js';
 import { cachedDmx } from './dmx_cache.js';   // VIZ-71
+import { syncMountPose } from './mount_pose.js';   // VIZ-100
 // VIZ-72: echte Lichter nur noch aus dem Spot-Pool (scene/spot_pool.js).
 import { initSpotPool, resizeSpotPool } from '../scene/spot_pool.js';
 import { goboProjektionInfo } from '../scene/gobo_projektion.js';   // VIZ-96
@@ -573,6 +574,10 @@ export function addFixture(data) {
   // VIZ-71 (N1/N2): mit dem zuletzt angekommenen DMX-Stand bauen, nicht mit
   // den festen Nullen aus der Geraeteliste — sonst blieb ein neu gebautes
   // Geraet dunkel bzw. in Mittelstellung, bis sich sein DMX wieder aenderte.
+  // VIZ-100: haengende Haltung VOR dem ersten Zielen — Kegel und Bodenfleck
+  // gehen vom Kopf aus. Steht die Buehne noch nicht (Geraete vor der Buehne
+  // geladen), zieht app.js#perFrameUpdate die Haltung im naechsten Bild nach.
+  syncMountPose(fixtures[fid]);
   const src = cachedDmx(fid) || data;
   updateFixture(fid, src.r ?? 0, src.g ?? 0, src.b ?? 0, src.intensity ?? 0,
                 src.pan ?? 128, src.tilt ?? 128, src.heads || null, src);
