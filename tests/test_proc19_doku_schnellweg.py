@@ -203,7 +203,7 @@ class GitVergleichTest(unittest.TestCase):
     def git(self, *args):
         env = dict(os.environ, **_GIT_ENV)
         return subprocess.run(["git", "-C", self.repo, *args], check=True,
-                              capture_output=True, text=True, env=env).stdout.strip()
+                              capture_output=True, text=True, encoding="utf-8", errors="replace", env=env).stdout.strip()
 
     def schreibe(self, pfad, text):
         voll = os.path.join(self.repo, *pfad.split("/"))
@@ -361,7 +361,7 @@ class AufrufTest(unittest.TestCase):
             e.pop(k, None)
         e.update(env)
         return subprocess.run([sys.executable, SKRIPT, *args], capture_output=True,
-                              text=True, encoding="utf-8", env=e, cwd=REPO, timeout=50)
+                              text=True, encoding="utf-8", errors="replace", env=e, cwd=REPO, timeout=50)
 
     def test_ci_push_schreibt_voll_in_github_output(self):
         with tempfile.TemporaryDirectory() as d:
@@ -690,7 +690,7 @@ class LokalerSchalterTest(unittest.TestCase):
     def test_doku_mit_weiteren_argumenten_ist_ein_fehler(self):
         r = subprocess.run(
             ["bash", os.path.join(REPO, "tools", "verify_loop.sh"), "--doku", "tests/x.py"],
-            capture_output=True, text=True, cwd=REPO, timeout=50,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=REPO, timeout=50,
             env=dict(os.environ, LIGHTOS_VERIFY_DRYRUN="1", LIGHTOS_VERIFY_NOLOCK="1"))
         self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
         self.assertIn("--doku", r.stdout)

@@ -103,7 +103,7 @@ def klasse(pfade) -> str:
 def _git(repo: str, *args: str) -> str:
     return subprocess.run(
         ["git", "-C", repo, *args], check=True, capture_output=True,
-        text=True, encoding="utf-8").stdout
+        text=True, encoding="utf-8", errors="replace").stdout
 
 
 def geaenderte_dateien(basis: str, repo: str = REPO) -> list[str] | None:
