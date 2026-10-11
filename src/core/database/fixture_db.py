@@ -478,6 +478,15 @@ def segment_wert(v) -> int | None:
     return n if n >= 0 else None
 
 
+def _laser_text(laser) -> str:
+    """LAS-33: ``laser``-Objekt eines Payload-Kanals als DB-Text (``""`` =
+    keine Angaben). Aufbau: ``src/core/laser/profilangaben.py``."""
+    if not laser:
+        return ""
+    from src.core.laser.profilangaben import als_text
+    return als_text(laser)
+
+
 def create_user_profile(payload: dict, *, engine=None) -> int:
     """Speichert ein vom Fixture-Generator erzeugtes Payload als neues
     FixtureProfile (source="user") in der DB und gibt die neue Profil-ID zurueck.
@@ -549,6 +558,10 @@ def create_user_profile(payload: dict, *, engine=None) -> int:
                     # Fehlt der Schluessel (aeltere Payloads, Handbau), ist
                     # das „keine Zuordnung" — dasselbe wie NULL.
                     segment=segment_wert(ch.get("segment")),
+                    # LAS-33: Laser-Angaben (Muster, Farben, Richtung,
+                    # Betriebsart) als JSON-Text; fehlt der Schluessel oder
+                    # ist er ungueltig, bleibt das Feld leer = keine Angaben.
+                    laser_angaben=_laser_text(ch.get("laser")),
                 )
                 s.add(fc)
                 s.flush()
