@@ -700,6 +700,61 @@ class SocketTest(_WebBasis):
         sc.disconnect()
         self.assertTrue(flash._pressed)                  # nicht vom Handy gehalten
 
+    def test_loslassen_das_nicht_ankommt_wird_nachgeholt(self):
+        """Antwortet die Oberflaeche beim Loslassen nicht rechtzeitig, darf die
+        Taste nicht haengen bleiben: sie gilt danach nicht mehr als gehalten,
+        ein Verbindungsabbruch liesse sie also auch nicht mehr los."""
+        a = self._efx("WEB09 Socket Halt3")
+        flash = self._taste(ButtonAction.FUNCTION_FLASH, fid=a.id)
+        self._auf_seite(flash)
+        self._anmelden()
+        sc = self._socket()
+        sc.emit("vc_aktion", {"id": flash.widget_id, "aktion": "druecken"}, callback=True)
+        self.assertTrue(flash._pressed)
+        with mock.patch.object(self.fern, "aktion",
+                               return_value={"ok": False, "fehler": "zeitueberschreitung"}):
+            r = sc.emit("vc_aktion", {"id": flash.widget_id, "aktion": "loslassen"},
+                        callback=True)
+        self.assertEqual(r["fehler"], "zeitueberschreitung")
+        self.assertFalse(flash._pressed)
+        self.assertFalse(self.fm.is_running(a.id))
+        self.assertEqual(vc_remote.gehaltene(), set())
+
+    def test_gehalten_und_von_der_seite_genommen_wird_losgelassen(self):
+        a = self._efx("WEB09 Socket Halt4")
+        flash = self._taste(ButtonAction.FUNCTION_FLASH, fid=a.id)
+        self._auf_seite(flash)
+        self._anmelden()
+        sc = self._socket()
+        sc.emit("vc_aktion", {"id": flash.widget_id, "aktion": "druecken"}, callback=True)
+        self.canvas.setze_handy_seiten(hs.leer())
+        r = sc.emit("vc_aktion", {"id": flash.widget_id, "aktion": "loslassen"},
+                    callback=True)
+        self.assertEqual(r["fehler"], "nicht_freigegeben")
+        self.assertFalse(flash._pressed)
+
+    def test_loslassen_ohne_eigenen_druck_holt_nichts_nach(self):
+        """Der Nachhol-Weg prueft keine Freigabe — er darf deshalb nur greifen,
+        wenn DIESES Handy die Taste hielt. Eine am Pult gehaltene Taste
+        ausserhalb der Seiten bleibt gedrueckt."""
+        draussen = self._taste(ButtonAction.FUNCTION_FLASH)
+        draussen.fern_taste(True)
+        self._anmelden()
+        sc = self._socket()
+        r = sc.emit("vc_aktion", {"id": draussen.widget_id, "aktion": "loslassen"},
+                    callback=True)
+        self.assertEqual(r["fehler"], "nicht_freigegeben")
+        self.assertTrue(draussen._pressed)
+
+    def test_kennung_die_kein_text_ist_wird_abgelehnt(self):
+        self._anmelden()
+        sc = self._socket()
+        for kennung in ([1], {"a": 1}, 5, None):
+            for aktion in ("setzen", "druecken", "loslassen", ["go"]):
+                r = sc.emit("vc_aktion", {"id": kennung, "aktion": aktion, "wert": 1,
+                                          "n": 1}, callback=True)
+                self.assertEqual(r, {"ok": False, "fehler": "anfrage_ungueltig"})
+
     def test_abgelehnter_druck_gilt_nicht_als_gehalten(self):
         draussen = self._taste(ButtonAction.FUNCTION_FLASH)
         self._anmelden()

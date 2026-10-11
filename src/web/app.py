@@ -620,14 +620,25 @@ def _register_socketio(sio):
         if not isinstance(data, dict):
             return {"ok": False, "fehler": "anfrage_ungueltig"}
         kennung, aktion = data.get("id"), data.get("aktion")
+        # Nur Text kommt weiter: eine Liste oder ein Objekt als Kennung taugte
+        # nicht einmal als Schluessel der Folgenummern (TypeError im Handler).
+        if not isinstance(kennung, str) or not isinstance(aktion, str):
+            return {"ok": False, "fehler": "anfrage_ungueltig"}
         if aktion == "setzen" and _veraltet(request.sid, kennung, data.get("n")):
             return {"ok": True, "veraltet": True}
         antwort = vc_remote.widget_aktion(kennung, aktion, data.get("wert"))
-        if isinstance(kennung, str):
-            if aktion == "druecken" and antwort.get("ok"):
-                vc_remote.gehalten_merken(request.sid, kennung, True)
-            elif aktion == "loslassen":
-                vc_remote.gehalten_merken(request.sid, kennung, False)
+        if aktion == "druecken" and antwort.get("ok"):
+            vc_remote.gehalten_merken(request.sid, kennung, True)
+        elif aktion == "loslassen":
+            hielt = kennung in vc_remote.gehaltene(request.sid)
+            vc_remote.gehalten_merken(request.sid, kennung, False)
+            if hielt and not antwort.get("ok"):
+                # Das Loslassen kam nicht an (Oberflaeche antwortete nicht
+                # rechtzeitig, Widget inzwischen von der Seite genommen) — die
+                # Taste gilt hier aber nicht mehr als gehalten, ein spaeterer
+                # Verbindungsabbruch liesse sie also auch nicht mehr los.
+                # Deshalb jetzt ueber den Weg, der nicht verfaellt.
+                vc_remote.loslassen([kennung])
         return antwort
 
     @sio.on("vc_pult")

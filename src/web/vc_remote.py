@@ -247,6 +247,13 @@ def alle_loslassen() -> None:
     _loslassen(kennungen)
 
 
+def loslassen(kennungen) -> None:
+    """Tasten loslassen, die ein Handy gehalten hat — ohne auf die Oberflaeche
+    zu warten und ohne zu verfallen. Fuer ein Loslassen, das ueber den normalen
+    Weg nicht ankam. Der Aufrufer stellt sicher, dass das Handy sie hielt."""
+    _loslassen(set(kennungen or ()))
+
+
 def _loslassen(kennungen) -> None:
     if not kennungen:
         return
