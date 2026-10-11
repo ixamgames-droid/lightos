@@ -38,7 +38,6 @@
 | TOOL-18 | D | fix/tool18-bilder-hinweis-gpu-szenen | 2026-10-10T22:54Z | - |
 | VIZ-102 | A | feature/viz102-gobo-hallenboden | 2026-10-11T16:09Z | - |
 | UI-87 | D | fix/ui87-hilfe-oeffnen-windows | 2026-10-10T22:54Z | - |
-| QA-94 | A | fix/cdx-1010-main | 2026-10-10T21:17Z | - |
 | QA-95 | A | fix/cdx-1010-main | 2026-10-10T21:17Z | - |
 | QA-91 | D | - | 2026-10-10T22:54Z | - |
 | DOC-70 | D | - | 2026-10-10T22:54Z | - |
@@ -219,7 +218,6 @@
 
 ## Verlauf
 
-- 2026-10-11T16:21Z D claim UI-90
 - 2026-10-11T16:21Z D claim XPLAT-53
 - 2026-10-11T16:21Z D claim MIDI-14
 - 2026-10-11T16:30Z D aktualisiert XPLAT-36: Branch - -> fix/xplat36-einzellauf-zeitlimit; Dateien - -> tools/verify_segmented.ps1 · tools/verify_segmented.sh · tests/test_xplat36_einzellauf_zeitlimit.py
@@ -249,3 +247,4 @@
 - 2026-10-11T19:55Z D done UI-78
 - 2026-10-11T20:18Z A claim WEB-13
 - 2026-10-11T20:28Z A done CDX-58
+- 2026-10-11T20:28Z A done QA-94
