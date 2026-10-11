@@ -698,6 +698,15 @@ class SeitenTest(_MitAnsicht):
         self.assertEqual([s["name"] for s in self.canvas.handy_seiten()["seiten"]],
                          ["C", "A", "B"])
 
+    def test_rollpfeile_der_reiter_haben_einen_tooltip(self):
+        # Gate test_tooltip_coverage: textlose Knoepfe brauchen einen Tooltip.
+        from PySide6.QtWidgets import QToolButton
+        pfeile = self.leiste._reiter.findChildren(QToolButton)
+        self.assertEqual(len(pfeile), 2)
+        texte = {p.toolTip() for p in pfeile}
+        self.assertEqual(len(texte), 2)
+        self.assertTrue(all("rollen" in t for t in texte), texte)
+
     def test_ordnen_ohne_seiten_ist_kein_fehler(self):
         # Review WEB-10: eine leere Reihenfolge bei null Seiten ist formal
         # gueltig — die gezeigte Seite 0 steht aber nicht darin (ValueError).

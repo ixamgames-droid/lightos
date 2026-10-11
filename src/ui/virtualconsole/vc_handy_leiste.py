@@ -22,7 +22,7 @@ from PySide6.QtCore import QPoint, QPointF, QRect, QRectF, QSize, Qt, QTimer, Si
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QLinearGradient, QPainter, QPen
 from PySide6.QtWidgets import (QHBoxLayout, QInputDialog, QLabel, QMenu, QMessageBox,
                                QPushButton, QScrollArea, QSizePolicy, QTabBar,
-                               QVBoxLayout, QWidget)
+                               QToolButton, QVBoxLayout, QWidget)
 
 from src.core import handy_seiten as hs
 
@@ -758,6 +758,13 @@ class HandyKonsolenLeiste(QWidget):
         """)
         self._reiter.setToolTip("Seiten der Handy-Konsole.\nIm Bearbeiten-Modus: "
                                 "Doppelklick benennt um, Ziehen ändert die Reihenfolge.")
+        # Die Rollpfeile des Reiterbalkens (erscheinen bei vielen Seiten) haben
+        # keinen Text — ohne Tooltip waeren sie stumme Knoepfe.
+        for pfeil in self._reiter.findChildren(QToolButton):
+            links = "Left" in pfeil.objectName()
+            pfeil.setToolTip("Reiter der Handy-Seiten nach links rollen" if links
+                             else "Reiter der Handy-Seiten nach rechts rollen")
+            pfeil.setAccessibleName("Seiten zurück" if links else "Seiten weiter")
         self._reiter.currentChanged.connect(self._reiter_gewaehlt)
         self._reiter.tabBarDoubleClicked.connect(self._reiter_doppelklick)
         self._reiter.reihenfolge_geaendert.connect(self.seiten_ordnen)
