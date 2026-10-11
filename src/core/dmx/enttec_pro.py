@@ -257,6 +257,25 @@ class EnttecPro:
     def is_open(self) -> bool:
         return self._ser.is_open
 
+    def ausschreiben(self, frist_s: float = 0.3) -> bool:
+        """OUT-71: warten, bis der Ausgabepuffer des Treibers leer ist — das
+        zuletzt geschriebene Bild also wirklich auf der Leitung war. Noetig vor
+        ``close()``, das den Puffer verwirft. Hoechstens ``frist_s``; liefert,
+        ob der Puffer leer wurde. Bewusst NICHT ``Serial.flush()``: das wartet
+        unter Windows ohne Grenze, wenn das Geraet nichts mehr abnimmt."""
+        if self._disabled or not self._ser.is_open:
+            return False
+        ende = time.monotonic() + max(0.0, float(frist_s))
+        while True:
+            try:
+                if int(self._ser.out_waiting) <= 0:
+                    return True
+            except Exception:
+                return False        # Port weg / Treiber kennt die Abfrage nicht
+            if time.monotonic() >= ende:
+                return False
+            time.sleep(0.005)
+
     def close(self):
         """Schliesst den Port. Vorher den Output-Puffer abbrechen/leeren — sonst kann
         CloseHandle() unter Windows mit einem noch ausstehenden WriteFile kollidieren

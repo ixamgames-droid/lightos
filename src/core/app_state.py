@@ -2209,7 +2209,10 @@ class AppState:
         try:
             for eintrag in self.output_manager.ausgabe_status():
                 if eintrag["universum"] not in konfiguriert:
-                    self.output_manager.remove_output(eintrag["universum"])
+                    # OUT-71: dieses Universum gibt es nicht mehr — sein Adapter
+                    # soll dunkel enden, nicht das letzte Bild halten.
+                    self.output_manager.remove_output(eintrag["universum"],
+                                                      schlussbild=True)
         except Exception as e:
             print(f"[app_state] apply_output_config: raeumen fehlgeschlagen: {e}")
 
@@ -2238,7 +2241,13 @@ class AppState:
                 # existiert — sonst sendet nach einem Typ-Wechsel der alte Adapter
                 # weiter mit (Doppel-Output) bzw. ein "Disabled"-Universe gibt weiter
                 # Licht aus.
-                self.output_manager.remove_output(num)
+                # OUT-71: nur wenn KEIN Nachfolger kommt („Disabled“), endet der
+                # alte Adapter mit einem dunklen Bild — sonst blitzte bei jedem
+                # „Uebernehmen“ die Buehne dunkel.
+                if output == "Disabled":
+                    self.output_manager.remove_output(num, schlussbild=True)
+                else:
+                    self.output_manager.remove_output(num)
                 if output == "Enttec" and patch:
                     # HW-5b: den Port BEGUTACHTEN, bevor wir ihn oeffnen. Ein Name
                     # von einer anderen Plattform ("COM_FAKE" aus der Windows-Zeit

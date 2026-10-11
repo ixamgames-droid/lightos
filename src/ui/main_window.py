@@ -3453,7 +3453,10 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"[MainWindow] audio capture shutdown error: {e}")
 
-        self._state.output_manager.stop()
+        # OUT-71: vor dem Schliessen EIN sicheres Schlussbild (alles dunkel,
+        # Laser auf ihre Aus-Werte) — Adapter mit eigenem Prozessor halten
+        # sonst das letzte Bild, ein laufender Laser bliebe an.
+        self._state.output_manager.stop(schlussbild=True)
         # LAS-05: Laser-Streaming-Thread mit herunterfahren (Netzwerk-Laser).
         try:
             self._state.stop_laser_output()

@@ -87,7 +87,9 @@ def test_worker_loop_sends_latest_buffer_and_sets_status():
                         frame_interval=0.0,
                         sleep=lambda _t: stop.__setattr__("value", 1),
                         clock=lambda: 0.0)
-    assert dev.sent == [pattern], "Worker sendet das aktuelle 512-Byte-Frame"
+    # OUT-71: beim geordneten Stopp geht das zuletzt veroeffentlichte Bild noch
+    # einmal hinaus (Schlussbild) — einmal im Lauf, einmal beim Stopp.
+    assert dev.sent == [pattern, pattern], "Worker sendet das aktuelle 512-Byte-Frame"
     assert status.value == ST_OK
 
 

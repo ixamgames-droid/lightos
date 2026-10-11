@@ -231,6 +231,31 @@ sendet; ein Klick öffnet den Dialog aus Schritt 1 (nicht im Kiosk-Modus). Ist *
 Ausgang eingerichtet, steht dort dezent `Probenmodus — es wird kein DMX gesendet`; ein
 Klick blendet diesen Hinweis bis zum nächsten Programmstart aus.
 
+## 9. Was beim Beenden und beim Entfernen einer Ausgabe hinausgeht
+
+Viele Adapter halten das zuletzt empfangene Bild, auch wenn kein Programm mehr
+sendet – ein ENTTEC DMX USB Pro ebenso wie die meisten Art-Net- und sACN-Nodes.
+Damit nach dem Schließen von LightOS nichts weiterleuchtet, sendet LightOS
+vorher **ein letztes Bild**:
+
+- **Beim Beenden:** jede Ausgabe bekommt ein Bild wie bei einem Blackout – alle
+  Lichtkanäle auf 0, Laser auf ihre **Aus-Werte** (nicht einfach 0, siehe
+  Laser-Anleitung). Pan/Tilt, Gobo und Optik von Moving Heads mit Dimmer bleiben
+  stehen; die Köpfe fahren also nicht in die Grundstellung.
+- **Beim Entfernen einer Ausgabe** (Universum gelöscht, Ausgabe auf „Disabled“
+  gestellt, Art-Net oder sACN abgewählt): dasselbe Bild an genau diese Ausgabe.
+- **Nicht beim „Übernehmen“** einer Einstellung: dort folgt sofort die neue
+  Ausgabe, ein dunkles Bild wäre ein Blitzer auf der Bühne.
+
+Reagiert ein Adapter nicht (abgezogen, Treiber hängt), wartet LightOS höchstens
+rund eine Sekunde und beendet sich dann trotzdem. Dieser eine Adapter bekommt
+dann kein letztes Bild – alle anderen schon.
+
+> **Wichtig:** Das letzte Bild ersetzt keinen Hauptschalter. Stürzt der Rechner
+> ab oder fällt der Strom aus, sendet niemand mehr etwas, und ein Adapter hält,
+> was er zuletzt bekam. Laser gehören deshalb an einen eigenen, erreichbaren
+> Schalter am Gerät.
+
 ## Netzwerk-Falle bei Art-Net und sACN
 
 Der Rechner muss **im selben Netz** wie der Node liegen. Hat der Node `192.168.1.50`,

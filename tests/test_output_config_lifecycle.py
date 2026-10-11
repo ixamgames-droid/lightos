@@ -77,7 +77,7 @@ class _FakeOutputManager:
         self.last_out_universe = out_universe
         self._sacn_outputs[int(universe)] = object()
 
-    def remove_output(self, universe, ausser=None):
+    def remove_output(self, universe, ausser=None, schlussbild=False):
         # NET-12: der echte Manager kennt `ausser` (welcher Adaptertyp
         # STEHEN bleibt). Ohne den Parameter wirft das Double einen
         # TypeError, den `_apply_sacn` in seinem try schluckt — dann

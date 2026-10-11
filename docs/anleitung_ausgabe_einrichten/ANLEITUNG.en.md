@@ -249,6 +249,31 @@ If **no** output is set up at all, a subtle `Probenmodus — es wird kein DMX ge
 (rehearsal mode — no DMX is being sent) is shown there; a click hides this hint until the
 next program start.
 
+## 9. What goes out when you quit or remove an output
+
+Many adapters hold the last frame they received even when no program is sending
+any more – an ENTTEC DMX USB Pro as well as most Art-Net and sACN nodes. So that
+nothing keeps shining after LightOS is closed, LightOS sends **one last frame**
+first:
+
+- **On quit:** every output gets a frame like a blackout – all light channels to
+  0, lasers to their **off values** (not simply 0, see the laser guide).
+  Pan/tilt, gobo and optics of moving heads with a dimmer stay where they are, so
+  the heads do not travel to their home position.
+- **When an output is removed** (universe deleted, output set to „Disabled“,
+  Art-Net or sACN unticked): the same frame to exactly that output.
+- **Not on „Übernehmen“** (apply): the new output follows immediately there, and a
+  dark frame would be a flash on stage.
+
+If an adapter does not respond (unplugged, driver hanging), LightOS waits about
+one second at most and then quits anyway. That one adapter gets no last frame –
+all others do.
+
+> **Important:** the last frame is no substitute for a main switch. If the
+> computer crashes or the power fails, nobody sends anything any more, and an
+> adapter holds whatever it received last. Lasers therefore belong on their own
+> reachable switch at the device.
+
 ## Network pitfall with Art-Net and sACN
 
 The computer must be **on the same network** as the node. If the node has `192.168.1.50`,

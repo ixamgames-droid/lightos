@@ -63,8 +63,10 @@ def _serial_worker_loop(dev_factory, buf, stop_flag, status,
     dev = None
     last_open_try = float("-inf")
     local = bytearray(DMX_BYTES)
+    eltern_weg = False
     while not stop_flag.value:
         if parent_alive is not None and not parent_alive():
+            eltern_weg = True
             break
         t0 = clock()
         if dev is None:
@@ -93,6 +95,24 @@ def _serial_worker_loop(dev_factory, buf, stop_flag, status,
                 # EnttecPro faengt Serial-Fehler selbst ab; hier nur ein Sicherheitsnetz.
                 _melde_still("dmx.enttec.senden", e)   # STAB-30, gedrosselt
         sleep(max(0.0, frame_interval - (clock() - t0)))
+    if dev is not None and not eltern_weg:
+        # OUT-71: geordneter Stopp. Das zuletzt veroeffentlichte Bild (beim
+        # Beenden das Schlussbild) kann NACH dem letzten Senden gekommen sein —
+        # noch einmal senden und ausschreiben lassen, bevor close() den Puffer
+        # verwirft. Der Elternprozess wartet darauf hoechstens 1 s (close()).
+        # Ist der Elternprozess weg (OUT-53), wird nur noch geschlossen.
+        try:
+            try:
+                with buf.get_lock():
+                    local[:] = bytes(buf.get_obj())
+            except AttributeError:
+                local[:] = bytes(buf[:])
+            dev.send_dmx(bytes(local))
+            ausschreiben = getattr(dev, "ausschreiben", None)
+            if callable(ausschreiben):
+                ausschreiben(0.3)
+        except Exception as e:
+            _melde_still("dmx.enttec.schlussbild", e)
     if dev is not None:
         try:
             dev.close()

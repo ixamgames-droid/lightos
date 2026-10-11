@@ -171,6 +171,13 @@ class OutputManager:
     #: „aus“ (Betriebsart auf den Aus-Wert). Darueber sind sie unveraendert an —
     #: eine Betriebsart laesst sich nicht stufenlos skalieren.
     GM_LASER_AUS_SCHWELLE = 0.01
+    #: OUT-71: so lange darf das Schlussbild beim Beenden brauchen (Senden und
+    #: Ausschreiben ALLER Ausgaenge). Danach geht das Beenden ohne es weiter —
+    #: ein abgezogener oder haengender Adapter haelt das Programm nicht fest.
+    SCHLUSSBILD_FRIST_S = 1.0
+    #: OUT-71: so lange wird je seriellem Ausgang gewartet, bis das Schlussbild
+    #: wirklich auf der Leitung ist (518 Bytes bei 57600 Baud sind rund 90 ms).
+    SCHLUSSBILD_AUSSCHREIBEN_S = 0.3
 
     def __init__(self):
         self.universes: dict[int, Universe] = {}
@@ -1052,7 +1059,8 @@ class OutputManager:
     #: NET-12: Registry-Name -> Registry-Attribut, fuer ``remove_output(ausser=…)``.
     _REGISTRY_NAMEN = ("enttec", "artnet", "sacn")
 
-    def remove_output(self, universe: int, ausser: str | None = None):
+    def remove_output(self, universe: int, ausser: str | None = None,
+                      schlussbild: bool = False):
         """OUT-05: entfernt ALLE Ausgabe-Adapter (Enttec/ArtNet/sACN) fuer ein
         Universe thread-sicher und schliesst sie. Noetig fuer Output-Typ-Wechsel und
         "Disabled": frueher schrieben add_enttec/add_artnet/add_sacn nur in ihre
@@ -1085,6 +1093,13 @@ class OutputManager:
         ``add_sacn`` tauscht ihn ueber ``_swap_device`` MIT Uebergabe aus. Der
         Grund fuer den Aufruf (MU-01: bei einem Typ-Wechsel muessen die FREMDEN
         Adapter weg, sonst Doppel-Output) bleibt dabei vollstaendig erhalten.
+
+        ``schlussbild`` (OUT-71): der Ausgang geht WIRKLICH (Universum
+        geloescht, auf „Disabled“ gestellt, Art-Net/sACN abgewaehlt) — die
+        entfernten Adapter bekommen vorher EIN Blackout-Bild, sonst hielte
+        ein Adapter mit eigenem Prozessor das letzte Bild. NICHT setzen, wenn
+        gleich ein Nachfolger fuer dasselbe Universum kommt: das Bild waere
+        bei jedem „Uebernehmen“ ein Dunkel-Blitzer auf der Buehne.
         """
         registries = {"enttec": self._enttec_outputs,
                       "artnet": self._artnet_outputs,
@@ -1103,13 +1118,16 @@ class OutputManager:
                 self._entfernte_wege = ew
             self._estop_wege_nachfuehren()
         victims = []
+        # OUT-71: die externe Universe-Nummer VOR dem Entfernen lesen (unten
+        # wird sie geloescht) — das Schlussbild geht an dieselbe Nummer.
+        ext = self._out_universe.get(universe)
         with self._io_lock:
             for name, registry in registries.items():
                 if name == ausser:
                     continue
                 dev = registry.pop(universe, None)
                 if dev is not None:
-                    victims.append(dev)
+                    victims.append((name, dev))
             # OUT-03: eine evtl. konfigurierte externe Universe-Nummer mit
             # entfernen, damit ein spaeter neu angelegter Adapter nicht die alte
             # Nummer erbt.
@@ -1121,11 +1139,40 @@ class OutputManager:
             if ausser is None:
                 self._out_universe.pop(universe, None)
             self._vergiss_fehler(universe)
-        for dev in victims:
+        if schlussbild and victims:
+            self._schlussbild_an(universe, ext, victims)
+        for _name, dev in victims:
             try:
                 dev.close()
             except Exception:
                 pass
+
+    def _schlussbild_an(self, universe: int, ext, victims) -> None:
+        """OUT-71: den schon aus der Registry genommenen Adaptern EINES
+        Universums ein Blackout-Bild senden. Sie gehoeren jetzt nur noch dem
+        Aufrufer (der Ausgabe-Thread sieht sie nicht mehr; das Herausnehmen
+        lief unter ``_io_lock``, ein laufendes Senden war also fertig).
+        Begrenzt durch den Schreib-Timeout des Geraets und
+        ``SCHLUSSBILD_AUSSCHREIBEN_S``."""
+        bilder: dict = {}
+        try:
+            self._send_all(schlussbild=True, _nur_rechnen=bilder)
+        except Exception as exc:
+            print(f"[OutputManager] Schlussbild U{universe}: {exc}")
+        data = bilder.get(universe)
+        if data is None:
+            data = bytes(512)       # Universum schon weg: dunkel ist dunkel
+        for name, dev in victims:
+            try:
+                if name == "enttec":
+                    dev.send_dmx(data)
+                    self._ausschreiben(dev)
+                elif name == "artnet":
+                    dev.send_dmx(ext if ext is not None else universe - 1, data)
+                else:
+                    dev.send_dmx(ext if ext is not None else universe, data)
+            except Exception as exc:
+                print(f"[OutputManager] Schlussbild U{universe} ({name}): {exc}")
 
     def _entfernte_wege_vergessen(self, universe: int | None = None):
         """OUT-64: gemerkte Wege aus ``remove_output`` verwerfen — fuer ein
@@ -1171,7 +1218,16 @@ class OutputManager:
         self._thread = threading.Thread(target=self._loop, daemon=True, name="DMX-Output")
         self._thread.start()
 
-    def stop(self):
+    def stop(self, schlussbild: bool = False):
+        """Ausgabe anhalten und alle Ausgaenge schliessen.
+
+        ``schlussbild`` (OUT-71, vom Hauptfenster beim Beenden): vor dem
+        Schliessen geht je Ausgang EIN Bild hinaus, gerechnet wie ein Blackout im
+        laufenden Betrieb — alles ausser der Erhalten-Maske auf 0, Laser auf ihre
+        Aus-Werte, NOT-AUS obenauf. Adapter mit eigenem Prozessor (Enttec Pro,
+        uDMX) und viele Art-Net-/sACN-Nodes halten sonst das letzte Bild: ein
+        Laser, der beim Beenden lief, bliebe an. Mit Zeitlimit
+        (``SCHLUSSBILD_FRIST_S``)."""
         self._running = False
         t = self._thread
         if t is not None:
@@ -1180,38 +1236,7 @@ class OutputManager:
             # (0.5 s); die 2 s sind reichlich Reserve.
             t.join(timeout=self._stop_join_s)
             if t.is_alive():
-                # Thread haengt weiterhin (blockierender Treiber / totes Geraet).
-                # Geraete dann BEWUSST NICHT schliessen: ein CloseHandle() neben
-                # einem noch laufenden WriteFile loest unter Windows eine Access
-                # Violation aus (crash.log 21.+22.06.). Der Prozess endet ohnehin
-                # gleich -> das OS gibt den Port frei. Lieber "lecken" als crashen.
-                import sys
-                print("[OutputManager] DMX-Output-Thread reagiert nicht — direkte "
-                      "Geraete bleiben offen (Schutz vor Access Violation beim "
-                      "Beenden); prozessisolierte Serial-Worker werden beendet.",
-                      file=sys.stderr)
-                # STAB-09: Ein EnttecProcessProxy darf hier trotzdem geschlossen
-                # werden. Sein send_dmx() blockiert nie im Treiber, sondern
-                # schreibt nur in Shared Memory. Ohne diesen expliziten Close
-                # ueberlebt der per ``spawn`` gestartete Worker den anschliessenden
-                # os._exit()-Pfad als Waise und haelt den USB-Port weiter offen.
-                #
-                # Bewusst OHNE _io_lock: genau dieser kann vom haengenden Thread
-                # gehalten werden. Snapshot/Identity-Pop sind unter dem GIL
-                # konsistent; ein bereits gelesener Proxy ignoriert nach close()
-                # weitere send_dmx()-Aufrufe. Direkte Serial-/Socket-Geraete
-                # bleiben fuer den bisherigen Windows-AV-Schutz unangetastet.
-                isolated = []
-                for universe, dev in list(self._enttec_outputs.items()):
-                    if getattr(dev, "process_isolated", False):
-                        if self._enttec_outputs.get(universe) is dev:
-                            self._enttec_outputs.pop(universe, None)
-                            isolated.append(dev)
-                for dev in isolated:
-                    try:
-                        dev.close()
-                    except Exception:
-                        pass
+                self._haengend_abbauen(schlussbild)
                 # STAB-04: Referenz auf den noch lebenden Thread BEHALTEN (nicht
                 # auf None setzen). Sonst startet ein folgender start() einen
                 # zweiten DMX-Thread daneben, der gleichzeitig seriell schreibt
@@ -1220,6 +1245,15 @@ class OutputManager:
                 # erneut, sobald sein write() zurueckkommt.
                 return
         self._thread = None
+        if schlussbild:
+            haenger = self._sende_schlussbild()
+            if haenger is not None:
+                # Das Schlussbild selbst haengt in einem Schreiben: wie ein
+                # haengender Ausgabe-Thread behandeln (direkte Geraete NICHT
+                # schliessen) und als Zombie merken.
+                self._thread = haenger
+                self._haengend_abbauen(schlussbild)
+                return
         # Thread ist sicher beendet -> kein gleichzeitiges write() mehr moeglich.
         with self._io_lock:
             for registry in (self._enttec_outputs, self._artnet_outputs, self._sacn_outputs):
@@ -1234,6 +1268,116 @@ class OutputManager:
             # die es nicht mehr gibt.
             self._sende_fehler.clear()
 
+    def _hat_ausgaenge(self) -> bool:
+        return bool(self._enttec_outputs or self._artnet_outputs or self._sacn_outputs)
+
+    def _sende_schlussbild(self):
+        """OUT-71: EIN Blackout-Bild an alle Ausgaenge, dann die seriellen
+        ausschreiben lassen. Laeuft in einem Hilfs-Thread mit Zeitlimit; liefert
+        ``None``, wenn er fertig wurde, sonst den noch laufenden Thread (ein
+        Ausgang haengt im Schreiben).
+
+        Nur aufrufen, wenn der Ausgabe-Thread sicher beendet ist."""
+        if not self._hat_ausgaenge():
+            return None
+
+        def lauf():
+            try:
+                self._send_all(schlussbild=True)
+            except Exception as exc:
+                print(f"[OutputManager] Schlussbild: {exc}")
+            # Bei seriellen Ausgaengen steht das Bild jetzt erst im Puffer des
+            # Treibers — und close() verwirft den Puffer (Schutz vor einer
+            # Zugriffsverletzung). Also warten, bis es auf der Leitung ist.
+            for dev in list(self._enttec_outputs.values()):
+                self._ausschreiben(dev)
+
+        th = threading.Thread(target=lauf, name="DMX-Schlussbild", daemon=True)
+        th.start()
+        th.join(timeout=self.SCHLUSSBILD_FRIST_S)
+        if th.is_alive():
+            import sys
+            print("[OutputManager] Schlussbild beim Beenden nicht fertig geworden "
+                  f"(>{self.SCHLUSSBILD_FRIST_S:.1f} s) — ein Ausgang reagiert nicht.",
+                  file=sys.stderr)
+            return th
+        return None
+
+    def _ausschreiben(self, dev) -> None:
+        """OUT-71: einen seriellen Ausgang sein letztes Bild fertig senden
+        lassen (Geraete ohne diese Faehigkeit: nichts zu tun)."""
+        fn = getattr(dev, "ausschreiben", None)
+        if callable(fn):
+            try:
+                fn(self.SCHLUSSBILD_AUSSCHREIBEN_S)
+            except Exception:
+                pass
+
+    def _haengend_abbauen(self, schlussbild: bool = False):
+        """Ein Thread haengt weiterhin in einem Schreiben (blockierender Treiber
+        / totes Geraet). Direkte Geraete dann BEWUSST NICHT schliessen: ein
+        CloseHandle() neben einem noch laufenden WriteFile loest unter Windows
+        eine Access Violation aus (crash.log 21.+22.06.). Der Prozess endet
+        ohnehin gleich -> das OS gibt den Port frei. Lieber "lecken" als crashen."""
+        import sys
+        print("[OutputManager] DMX-Output-Thread reagiert nicht — direkte "
+              "Geraete bleiben offen (Schutz vor Access Violation beim "
+              "Beenden); prozessisolierte Serial-Worker werden beendet.",
+              file=sys.stderr)
+        # STAB-09: Ein EnttecProcessProxy darf hier trotzdem geschlossen
+        # werden. Sein send_dmx() blockiert nie im Treiber, sondern
+        # schreibt nur in Shared Memory. Ohne diesen expliziten Close
+        # ueberlebt der per ``spawn`` gestartete Worker den anschliessenden
+        # os._exit()-Pfad als Waise und haelt den USB-Port weiter offen.
+        #
+        # Bewusst OHNE _io_lock: genau dieser kann vom haengenden Thread
+        # gehalten werden. Snapshot/Identity-Pop sind unter dem GIL
+        # konsistent; ein bereits gelesener Proxy ignoriert nach close()
+        # weitere send_dmx()-Aufrufe. Direkte Serial-/Socket-Geraete
+        # bleiben fuer den bisherigen Windows-AV-Schutz unangetastet.
+        bilder: dict = {}
+        if schlussbild:
+            # OUT-71: auch hier soll der Prozess-Ausgang dunkel enden. Das Bild
+            # nur AUSRECHNEN (kein Geraet, kein Lock) — sein Worker sendet das
+            # zuletzt veroeffentlichte Bild beim Stoppen noch einmal.
+            try:
+                self._send_all(schlussbild=True, _nur_rechnen=bilder)
+            except Exception as exc:
+                print(f"[OutputManager] Schlussbild (Prozess-Ausgaenge): {exc}")
+        if bilder:
+            # OUT-71: Art-Net/sACN senden per UDP und blockieren nicht — auch sie
+            # bekommen ihr Schlussbild, obwohl ein anderer Ausgang haengt. Nur
+            # senden, NICHT schliessen (der haengende Thread haelt evtl. den Lock).
+            for registry, artnet in ((self._artnet_outputs, True),
+                                     (self._sacn_outputs, False)):
+                for universe, dev in list(registry.items()):
+                    data = bilder.get(universe)
+                    if data is None:
+                        continue
+                    ext = self._out_universe.get(universe)
+                    if ext is None:
+                        ext = universe - 1 if artnet else universe
+                    try:
+                        dev.send_dmx(ext, data)
+                    except Exception:
+                        pass
+        isolated = []
+        for universe, dev in list(self._enttec_outputs.items()):
+            if getattr(dev, "process_isolated", False):
+                if self._enttec_outputs.get(universe) is dev:
+                    self._enttec_outputs.pop(universe, None)
+                    isolated.append((universe, dev))
+        for universe, dev in isolated:
+            if universe in bilder:
+                try:
+                    dev.send_dmx(bilder[universe])
+                except Exception:
+                    pass
+            try:
+                dev.close()
+            except Exception:
+                pass
+
     def _loop(self):
         while self._running:
             t0 = time.perf_counter()
@@ -1247,7 +1391,7 @@ class OutputManager:
             sleep = max(0.0, FRAME_INTERVAL - elapsed)
             time.sleep(sleep)
 
-    def _send_all(self):
+    def _send_all(self, schlussbild: bool = False, _nur_rechnen: dict | None = None):
         """Ein Ausgabe-Frame. Reihenfolge je Universum (verbindlich):
 
         1. Channel-Modifier (INVERSE, Range-Lock, Kanaltausch);
@@ -1316,7 +1460,9 @@ class OutputManager:
         # sehen Blackout-, GM-, Laser-Aus- und Ziel-Pass womoeglich
         # verschiedene Staende (z. B. Blackout an im ersten, aus im
         # Laser-Aus-Pass -> Betriebsart 0 statt Aus-Wert).
-        blackout = bool(self._blackout)
+        # OUT-71: das Schlussbild beim Beenden ist ein Blackout-Bild — dieselbe
+        # Rechnung, ohne den Schalter anzufassen.
+        blackout = bool(self._blackout) or schlussbild
         gm = self.grand_master
         # OUT-65: klebrige NOT-AUS-Aus-Werte EINMAL je Frame lesen.
         estop_aus = getattr(self, "_laser_estop_aus", None)
@@ -1445,6 +1591,11 @@ class OutputManager:
             # GM/Blackout/Channel-Modifier). GIL-atomare dict-Zuweisung mit
             # immutable ``bytes`` — keine Sperre noetig, Anzeige-Leser sehen immer
             # einen vollstaendigen Frame. NUR fuer die Anzeige, nie zurueckgeschrieben.
+            if _nur_rechnen is not None:
+                # OUT-71: nur das Bild ausrechnen, nichts senden und die Anzeige
+                # nicht anfassen (fuer einen einzelnen Ausgang, der gleich geht).
+                _nur_rechnen[univ_num] = data
+                continue
             self._display_frame[univ_num] = data
             # Geraete-Zugriff unter Lock: verhindert, dass der UI-Thread ein
             # Geraet schliesst/austauscht, waehrend wir hier senden (Deadlock).
