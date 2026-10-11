@@ -5893,5 +5893,13 @@ class VisualizerWindow(QMainWindow):
         if not self._confirm_close_with_unsaved_stage():
             event.ignore()
             return
+        # LAS-35: das Fenster wird nur versteckt — der Sperrzonen-Planer
+        # erfaehrt davon nichts. Ein laufendes Einmessen endet hier (Laser aus).
+        dlg = getattr(self, "_sperrzonen_dlg", None)
+        if dlg is not None:
+            try:
+                dlg.einmessen_abbrechen()
+            except Exception as e:                       # noqa: BLE001
+                print(f"[Visualizer] ERROR: Einmessen nicht beendet: {e}")
         event.ignore()
         self.hide()

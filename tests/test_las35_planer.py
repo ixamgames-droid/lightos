@@ -788,6 +788,62 @@ class LaserKartenTest(_PlanerFall):
             self.assertEqual(self.st.programmer, {(2, "shutter"): 0}, ende)
             self.assertNotIn(2, self.st.sperrzonen.laser_felder)
 
+    def _einschalten_ueber_den_assistenten(self):
+        self._mit_attrappen()
+        self.st.programmer.clear()
+        self.dlg.show()
+        self.dlg.einmessen_starten(2)
+        ass = self.dlg._assistent
+        ass._btn_weiter.click()
+        ass.chk_bestaetigt.setChecked(True)
+        ass.btn_zeigen.click()
+        self.assertEqual(self.st.programmer, {(2, "shutter"): 124})
+
+    def test_esc_und_verstecken_schalten_aus(self):
+        """Esc ruft bei einem QDialog ``reject()`` — das versteckt das Fenster
+        OHNE ``closeEvent``. Auch dieser Weg ist ein Abbruch: Laser aus."""
+        from PySide6.QtTest import QTest
+        for ende in ("esc", "reject", "hide"):
+            self._einschalten_ueber_den_assistenten()
+            if ende == "esc":
+                QTest.keyClick(self.dlg, Qt.Key.Key_Escape)
+            elif ende == "reject":
+                self.dlg.reject()
+            else:
+                self.dlg.hide()
+            _app.processEvents()
+            self.assertFalse(self.dlg.isVisible(), ende)
+            self.assertEqual(self.st.programmer, {(2, "shutter"): 0}, ende)
+            self.assertIsNone(self.dlg._assistent, ende)
+            self.assertNotIn(2, self.st.sperrzonen.laser_felder)
+
+    def test_3d_fenster_schliessen_schaltet_aus(self):
+        """Das 3D-Fenster wird beim Schliessen nur versteckt; der Planer
+        bekommt davon kein Ereignis. Ein laufendes Einmessen endet trotzdem."""
+        import src.ui.visualizer.visualizer_window as VW
+
+        class _Fenster(VW.VisualizerWindow):
+            def __init__(self, state, dlg):
+                VW.QMainWindow.__init__(self)
+                self._state = state
+                self._sperrzonen_dlg = dlg
+
+            def _confirm_close_with_unsaved_stage(self):
+                return True
+
+            def hideEvent(self, ev):
+                VW.QMainWindow.hideEvent(self, ev)
+
+        self._einschalten_ueber_den_assistenten()
+        win = _Fenster(self.st, self.dlg)
+        self.addCleanup(win.deleteLater)
+        win.show()
+        _app.processEvents()
+        win.close()
+        _app.processEvents()
+        self.assertEqual(self.st.programmer, {(2, "shutter"): 0})
+        self.assertIsNone(self.dlg._assistent)
+
 
 # ── Einstieg und alte Funktionen ────────────────────────────────────────────
 

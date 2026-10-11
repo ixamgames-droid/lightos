@@ -585,16 +585,15 @@ class EinmessAssistent(QWidget):
     def stopp(self) -> None:
         """STOPP: Betriebsart auf „Aus" — egal, wer eingeschaltet hat."""
         if self.schalter.eingeschaltet:
-            self.schalter.beenden()
-            ok = True
+            ok = self.schalter.beenden() is not False
         else:
             ok = self.schalter.stopp()
         self.chk_bestaetigt.setChecked(False)
         self._zeigen_auffrischen()
         self._lbl_zustand.setText(
             "STOPP: Betriebsart steht auf „Aus“." if ok else
-            f'<b style="color:{UI.GELB}">Dieses Gerät hat keinen Betriebsart-Kanal — '
-            "LASER NOT-AUS oben rechts benutzen.</b>")
+            f'<b style="color:{UI.GELB}">LightOS konnte die Betriebsart nicht auf '
+            "„Aus“ setzen — LASER NOT-AUS oben rechts benutzen.</b>")
         if self.schritt() == 3:
             self._zeige_schritt(3)
 

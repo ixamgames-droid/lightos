@@ -387,6 +387,24 @@ class AssistentTest(unittest.TestCase):
         self.assertFalse(self.ass.schalter.eingeschaltet)
         self.assertEqual(self.ergebnis, [], "STOPP beendet den Assistenten nicht")
 
+    def test_stopp_behauptet_kein_aus_wenn_das_schreiben_scheitert(self):
+        """Scheitert der Schreibzugriff, darf der Dialog nicht „steht auf Aus"
+        melden — er verweist auf den LASER NOT-AUS."""
+        self._bis_schritt(1)
+        self.ass.chk_bestaetigt.setChecked(True)
+        self.ass.btn_zeigen.click()
+        self.assertTrue(self.ass.schalter.eingeschaltet)
+
+        def _kaputt(*_a, **_k):
+            raise RuntimeError("Ausgabe weg")
+
+        self.st.set_programmer_value = _kaputt
+        self.ass._btn_stopp.click()
+        text = self.ass._lbl_zustand.text()
+        self.assertNotIn("steht auf", text)
+        self.assertIn("LASER NOT-AUS", text)
+        self.assertIs(_schalter(self.st).beenden(), True, "nichts eingeschaltet: nichts zu tun")
+
     def test_abbruch_schaltet_in_jedem_schritt_aus(self):
         for schritt in (1, 2, 3):
             st = _State()

@@ -1582,10 +1582,24 @@ class SperrzonenPlaner(QDialog):
         self._gewaehlt = None
         self.neu_laden()
 
+    def einmessen_abbrechen(self) -> None:
+        """Ein laufendes Einmessen beenden: Laser aus (falls der Assistent ihn
+        eingeschaltet hat), nichts eintragen. Ohne Assistent passiert nichts."""
+        if self._assistent is not None:
+            self._assistent_schliessen(abbrechen=True)
+
     def closeEvent(self, ev):  # noqa: N802 (Qt-API)
         # Schliessen mitten im Einmessen = Abbruch = Laser aus.
         self._assistent_schliessen(abbrechen=True)
         super().closeEvent(ev)
+
+    def hideEvent(self, ev):  # noqa: N802 (Qt-API)
+        # Esc ruft ``reject()`` und versteckt den Dialog OHNE ``closeEvent``;
+        # auch das ist ein Abbruch. Nur das Minimieren durch den Fenster-
+        # Manager (spontan) laesst das Einmessen stehen.
+        if not ev.spontaneous():
+            self.einmessen_abbrechen()
+        super().hideEvent(ev)
 
 
 _offen = None        # der eine offene Planer (je Programm)

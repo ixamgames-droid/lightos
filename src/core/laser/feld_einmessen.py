@@ -336,11 +336,13 @@ class FeldSchalter:
             return False
         return True
 
-    def beenden(self) -> None:
-        """Ende oder Abbruch: aus, falls der Assistent eingeschaltet hat."""
+    def beenden(self) -> bool:
+        """Ende oder Abbruch: aus, falls der Assistent eingeschaltet hat.
+        ``False`` = das Ausschalten ist fehlgeschlagen (der Aufrufer darf dann
+        nicht „steht auf Aus" behaupten)."""
         if not self.eingeschaltet:
-            return
-        self.stopp()
+            return True
+        ok = self.stopp()
         self.eingeschaltet = False
         for attribut, alt in self._vorher.items():
             if attribut == BETRIEBSART_ATTRIBUT:
@@ -354,3 +356,4 @@ class FeldSchalter:
                 print(f"[feld_einmessen] ERROR: Wert {attribut} nicht "
                       f"zurückgenommen: {e}")
         self._vorher = {}
+        return ok
