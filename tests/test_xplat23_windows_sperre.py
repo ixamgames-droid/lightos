@@ -92,7 +92,7 @@ class SperrPfadTest(unittest.TestCase):
 
         common = subprocess.run(
             ["git", "-C", str(REPO), "rev-parse", "--git-common-dir"],
-            capture_output=True, text=True, timeout=30)
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
         if common.returncode != 0 or not common.stdout.strip():
             self.skipTest("kein Git-Checkout — der gemeinsame Git-Ordner ist "
                           "nicht bestimmbar")

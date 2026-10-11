@@ -114,7 +114,7 @@ class BildschirmwechselTest(unittest.TestCase):
             pfad = os.path.join(verz, "t.js")
             with open(pfad, "w", encoding="utf-8") as f:
                 f.write(treiber)
-            p = subprocess.run(["node", pfad], capture_output=True, text=True, timeout=30)
+            p = subprocess.run(["node", pfad], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
         self.assertEqual(p.returncode, 0, p.stderr)
         self.assertEqual(p.stdout.strip(), "[29.97,29.97]")
 

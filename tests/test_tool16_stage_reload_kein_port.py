@@ -81,7 +81,7 @@ class StageReloadKeinPortTest(unittest.TestCase):
             env["HOME"] = cwd              # nie das echte Konto beruehren
             r = subprocess.run(
                 [sys.executable, "-c", _KIND, REPO, TOOL, sandbox, ergebnis],
-                cwd=cwd, env=env, capture_output=True, text=True, timeout=120)
+                cwd=cwd, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
             self.assertTrue(os.path.exists(ergebnis), r.stdout + r.stderr)
             with open(ergebnis, encoding="utf-8") as fh:
                 res = json.load(fh)
@@ -113,7 +113,7 @@ class GesetzteUniversesVariableTest(unittest.TestCase):
             env["HOME"] = cwd              # nie das echte Konto beruehren
             r = subprocess.run(
                 [sys.executable, "-c", _KIND, REPO, TOOL, sandbox, ergebnis],
-                cwd=cwd, env=env, capture_output=True, text=True, timeout=120)
+                cwd=cwd, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
             self.assertTrue(os.path.exists(ergebnis), r.stdout + r.stderr)
             with open(ergebnis, encoding="utf-8") as fh:
                 res = json.load(fh)
@@ -235,7 +235,7 @@ class MainOhneSandkastenTest(unittest.TestCase):
             env["TMPDIR"] = cwd            # Wegwerf-Ordner mit aufraeumen
             r = subprocess.run(
                 [sys.executable, "-c", _KIND_MAIN, REPO, TOOL, show, modus, ergebnis],
-                cwd=cwd, env=env, capture_output=True, text=True, timeout=120)
+                cwd=cwd, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
             self.assertTrue(os.path.exists(ergebnis), r.stdout + r.stderr)
             with open(ergebnis, encoding="utf-8") as fh:
                 return json.load(fh), cwd
