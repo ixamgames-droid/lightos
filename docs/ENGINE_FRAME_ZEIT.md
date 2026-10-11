@@ -26,6 +26,7 @@ LightOS rechnet 44-mal je Sekunde einen DMX-Frame: Funktionen rendern, Programme
 Die unteren fünf Zeilen sind keine sinnvollen Bühnenzustände, sondern Belastungsproben je Funktionsart. „Alle 5 Looks zugleich" lag vorher **über** dem Budget (der Thread hätte nur noch 26 statt 44 Frames je Sekunde geschafft), jetzt darunter.
 
 Die **Ausgabe ist unverändert**: über 300 Frames in allen elf Fällen Byte für Byte dieselben Werte wie vorher (`--abdruck 300`), ebenso am gekürzten Rig.
+Derselbe Vergleich läuft als Test mit: `tests/test_eng30_frame_zeit.py` rendert die Bühnen-Show einmal mit und einmal ohne die beiden Abkürzungen (`--ohne-schnellwege` schaltet sie ab) und verlangt dieselbe Ausgabe – am vollen und am gekürzten Rig. Mit `--ohne-schnellwege` ohne `--abdruck` zeigt das Werkzeug außerdem die Zeit des alten Wegs, ohne dass ein zweiter Checkout nötig ist.
 
 ## Verteilung je Funktionsart
 

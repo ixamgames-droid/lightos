@@ -17,6 +17,11 @@ Nuetzliche Schalter:
     --schlank 16,32      dieselbe Show auf 16 Moving Heads + 32 PAR gekuerzt
     --abdruck 300        Ausgabe von 300 Frames je Fall hashen — zwei Staende
                          mit gleichem Abdruck geben Byte fuer Byte dasselbe aus
+    --ohne-schnellwege   die beiden Abkuerzungen aus ENG-30 abschalten (Tabelle
+                         fid -> Geraet, Adresslisten im Render-Plan): derselbe
+                         Stand rechnet dann auf dem alten Weg. Mit --abdruck
+                         der Beweis, dass beide Wege dasselbe ausgeben; ohne
+                         --abdruck die Zeit "vorher" ohne zweiten Checkout
     --profil "Look Drop" cProfile dieses Falls (die 40 teuersten Funktionen)
     --basis ORDNER       Sandbox/Show dort ablegen und wiederverwenden
 
@@ -46,6 +51,8 @@ def _argumente(argv=None):
                     help="Rig kuerzen: so viele Moving Heads und PAR behalten")
     ap.add_argument("--abdruck", type=int, default=0, metavar="N",
                     help="statt zu messen: N Frames je Fall hashen")
+    ap.add_argument("--ohne-schnellwege", action="store_true",
+                    help="Tabelle fid->Geraet und Adress-Plan abschalten (alter Weg)")
     ap.add_argument("--profil", default="", metavar="FALL", help="cProfile dieses Falls")
     ap.add_argument("--basis", default="", help="Ordner fuer Sandbox und Show (Standard: temporaer)")
     return ap.parse_args(argv)
@@ -94,6 +101,46 @@ def _rig_kuerzen(st, schlank: str):
             behalten[art] -= 1
             continue
         st.remove_fixture(f.fid, undoable=False)
+
+
+def _schnellwege_abschalten(st):
+    """Beide Abkuerzungen aus ENG-30 aus: Funktionen bekommen die gewoehnliche
+    Patch-Liste (Suche per Durchlauf), und der Render-Plan bleibt leer (der
+    Frame leitet die Adresslisten je Geraet selbst ab)."""
+    from src.core.engine.function_manager import FunctionManager
+
+    FunctionManager._patch_mit_tabelle = lambda selbst, patch_cache: patch_cache
+    klasse = type(st)
+    echt_plan = klasse._rebuild_render_plan
+
+    def plan_ohne_listen(selbst):
+        echt_plan(selbst)
+        selbst._adress_plan = {}
+    klasse._rebuild_render_plan = plan_ohne_listen
+    st._adress_plan = {}
+
+
+def _zaehler_einbauen(st) -> dict:
+    """Mitzaehlen, welcher Weg laeuft: Nachschlagen in der Tabelle und
+    Ableitungen der Adresslisten im Frame. Nur fuer --abdruck (die Huellen
+    kosten Zeit und haben in einer Messung nichts verloren)."""
+    from src.core.engine import patch_index
+
+    z = {"tabelle": 0, "ableitungen": 0}
+    echt_finde = patch_index.PatchListe.finde
+
+    def finde(selbst, fid):
+        z["tabelle"] += 1
+        return echt_finde(selbst, fid)
+    patch_index.PatchListe.finde = finde
+    klasse = type(st)
+    echt_listen = klasse._adress_listen
+
+    def listen(selbst, fx, chans):
+        z["ableitungen"] += 1
+        return echt_listen(selbst, fx, chans)
+    klasse._adress_listen = listen
+    return z
 
 
 class Messung:
@@ -218,8 +265,11 @@ def main(argv=None) -> int:
     basis = os.path.abspath(arg.basis) if arg.basis else tempfile.mkdtemp(prefix="lightos_eng30_")
     os.makedirs(basis, exist_ok=True)
     _app, st, fm = _show_laden(basis)
+    if arg.ohne_schnellwege:
+        _schnellwege_abschalten(st)
     if arg.schlank:
         _rig_kuerzen(st, arg.schlank)
+    zaehler = _zaehler_einbauen(st) if arg.abdruck else None
     m = Messung(st, fm, arg.bilder, arg.runden)
     nur = [n.strip() for n in arg.nur.split(",") if n.strip()]
     faelle = {n: ids for n, ids in m.faelle.items()
@@ -234,13 +284,18 @@ def main(argv=None) -> int:
 
     if arg.abdruck:
         print(f"\nAbdruck der Ausgabe ueber {arg.abdruck} Frames je Fall:")
+        zaehler["tabelle"] = zaehler["ableitungen"] = 0
         for name, ids in faelle.items():
             kennung, belegt = m.abdruck(ids, arg.abdruck)
             print(f"  {name:30s} {kennung}   Werte ungleich 0: {belegt}")
+        print(f"Schnellwege {'aus' if arg.ohne_schnellwege else 'an'}: "
+              f"Tabelle {zaehler['tabelle']}-mal befragt, "
+              f"Adresslisten {zaehler['ableitungen']}-mal im Frame abgeleitet")
         fm.stop_all()
         return 0
 
-    print(f"\nZeit je Frame in ms (kleinster Mittelwert aus {arg.runden} x {arg.bilder} Frames)\n")
+    print(f"\nZeit je Frame in ms (kleinster Mittelwert aus {arg.runden} x {arg.bilder} Frames)"
+          + (" — OHNE Schnellwege (alter Weg)" if arg.ohne_schnellwege else "") + "\n")
     print("| Fall | Mittel | Median | p95 |")
     print("|---|---|---|---|")
     for name, ids in faelle.items():

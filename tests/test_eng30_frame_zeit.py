@@ -16,13 +16,22 @@ Abgesichert ist hier vor allem, dass sich am ERGEBNIS nichts ändert: dieselbe
 Antwort wie die Suche (auch bei doppelter fid), dieselbe Ausgabe mit und ohne
 Plan, und der alte Weg überall dort, wo Tabelle oder Plan nicht passen.
 Zeiten prüft der Test nicht (der Rechner ist nie leer) — er zählt Zugriffe.
+
+Der große Vergleich steht am Ende: die ganze Bühnen-Show (80 Geräte, alle
+Looks, alle Funktionsarten) einmal mit und einmal ohne die Abkürzungen
+gerendert — Byte für Byte dieselbe Ausgabe.
 """
 from __future__ import annotations
 
 import os
+import re
+import subprocess
+import sys
 import threading
 import types
 import unittest
+
+import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -524,6 +533,80 @@ class RenderPlanTest(unittest.TestCase):
         self.assertEqual(mit, ohne)
         self.assertTrue(any(any(b) for b in mit), "Probe schreibt gar nichts")
         self.assertGreater(len(set(mit)), 3, "Probe unterscheidet die Schritte nicht")
+
+
+# ── Die ganze Bühnen-Show: beide Wege, dieselbe Ausgabe ───────────────────
+
+_REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_WERKZEUG = os.path.join(_REPO, "tools", "engine_frame_zeit.py")
+_FRAMES = 60
+
+
+def _abdruck(basis, *schalter):
+    """``tools/engine_frame_zeit.py --abdruck`` als eigener Prozess (die
+    Sandbox muss stehen, BEVOR ein src-Modul geladen ist). Liefert
+    ``({fall: (kennung, belegt)}, (tabelle, ableitungen), ausgabe)``."""
+    lauf = subprocess.run(
+        [sys.executable, _WERKZEUG, "--abdruck", str(_FRAMES), "--basis", str(basis), *schalter],
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+        timeout=600, env=dict(os.environ, QT_QPA_PLATFORM="offscreen", PYTHONIOENCODING="utf-8"))
+    aus = lauf.stdout + lauf.stderr
+    assert lauf.returncode == 0, aus[-3000:]
+    faelle = {m.group(1).strip(): (m.group(2), int(m.group(3))) for m in re.finditer(
+        r"^  (.+?)\s+([0-9a-f]{16})\s+Werte ungleich 0: (\d+)$", lauf.stdout, re.M)}
+    z = re.search(r"Tabelle (\d+)-mal befragt, Adresslisten (\d+)-mal im Frame abgeleitet",
+                  lauf.stdout)
+    assert z, aus[-3000:]
+    return faelle, (int(z.group(1)), int(z.group(2))), lauf.stdout
+
+
+@pytest.fixture(scope="module")
+def show_ordner(tmp_path_factory):
+    """EIN Ordner fuer beide Vergleiche: die Show wird nur einmal gebaut."""
+    return tmp_path_factory.mktemp("eng30_show")
+
+
+@pytest.mark.timeout(900)
+def test_buehnen_show_gibt_mit_und_ohne_schnellwege_dasselbe_aus(show_ordner):
+    """★ Der Vergleich, auf den es ankommt (Wunsch aus dem Review, A).
+
+    Dieselbe Show, derselbe Stand, dieselben Frames — einmal mit Tabelle und
+    Adress-Plan, einmal auf dem alten Weg (Suche per Durchlauf, Ableitung je
+    Frame). Elf Fälle: nichts läuft, die fünf Looks, alle Funktionen je Art.
+    Gehasht werden alle Universen über jeden Frame.
+
+    Dass der zweite Lauf WIRKLICH den alten Weg nimmt, steht nicht nur im
+    Schalter: das Werkzeug zählt mit, wie oft die Tabelle befragt und wie oft
+    im Frame abgeleitet wurde."""
+    mit, (tab_mit, abl_mit), aus_mit = _abdruck(show_ordner)
+    ohne, (tab_ohne, abl_ohne), aus_ohne = _abdruck(show_ordner, "--ohne-schnellwege")
+
+    # Die Probe ist nicht leer und unterscheidet die Fälle.
+    assert len(mit) == 11, aus_mit
+    assert all(belegt > 0 for _k, belegt in mit.values()), mit
+    assert len({k for k, _b in mit.values()}) == 11, "Fälle geben dasselbe aus — Probe taugt nicht"
+
+    # Beide Läufe sind die, die sie sein sollen.
+    assert "Schnellwege an" in aus_mit and "Schnellwege aus" in aus_ohne
+    assert tab_mit > 1000 and abl_mit == 0, (tab_mit, abl_mit)
+    assert tab_ohne == 0 and abl_ohne > 1000, (tab_ohne, abl_ohne)
+
+    assert mit == ohne
+
+
+@pytest.mark.timeout(900)
+def test_gekuerztes_rig_gibt_mit_und_ohne_schnellwege_dasselbe_aus(show_ordner):
+    """Dasselbe, nachdem 32 der 80 Geräte aus dem Patch genommen sind: der
+    Plan wird dabei neu gebaut, und Szenen fragen nach Geräten, die es nicht
+    mehr gibt (der teuerste Fall der alten Suche)."""
+    mit, (tab_mit, abl_mit), aus_mit = _abdruck(show_ordner, "--schlank", "16,32")
+    ohne, (tab_ohne, abl_ohne), _aus = _abdruck(show_ordner, "--schlank", "16,32",
+                                               "--ohne-schnellwege")
+    assert "Rig: 48 Geraete" in aus_mit, aus_mit[:400]
+    assert len(mit) == 11
+    assert tab_mit > 1000 and abl_mit == 0, (tab_mit, abl_mit)
+    assert tab_ohne == 0 and abl_ohne > 1000, (tab_ohne, abl_ohne)
+    assert mit == ohne
 
 
 if __name__ == "__main__":
