@@ -28,6 +28,8 @@ INLINE_CODE = re.compile(r"`[^`\n]*`")
 # gegateten BACKLOG.md dorthin — ohne Eintrag hier waeren genau die Verweise
 # ungeprueft, die das Gate schuetzen soll (Review-Fund 2026-07-28).
 FRAGMENT_ORDNER = "changelog.d"   # PROC-09
+# PROC-20: Backlog-Fragmente landen genauso woertlich in BACKLOG.md.
+FRAGMENT_ORDNER_ALLE = (FRAGMENT_ORDNER, "backlog.d")
 TOP_LEVEL = ("README.md", "BACKLOG.md", "BACKLOG_ARCHIVE.md", "ROADMAP.md",
              "CHANGELOG.md")
 
@@ -51,11 +53,12 @@ def _iter_md_files():
     # PROC-09: CHANGELOG-Fragmente. Sie landen spaeter woertlich in
     # CHANGELOG.md — ein toter Link soll schon im PR auffallen, nicht erst
     # nach dem Sammel-Lauf auf main.
-    frag = os.path.join(REPO, FRAGMENT_ORDNER)
-    if os.path.isdir(frag):
-        for fn in sorted(os.listdir(frag)):
-            if fn.lower().endswith(".md"):
-                yield os.path.join(frag, fn)
+    for name in FRAGMENT_ORDNER_ALLE:
+        frag = os.path.join(REPO, name)
+        if os.path.isdir(frag):
+            for fn in sorted(os.listdir(frag)):
+                if fn.lower().endswith(".md"):
+                    yield os.path.join(frag, fn)
 
 
 def _basis_ordner(md: str) -> str:
@@ -65,9 +68,10 @@ def _basis_ordner(md: str) -> str:
     von ``CHANGELOG.md`` im Repo-Wurzelverzeichnis; seine Links muessen also
     von DORT aus stimmen (``docs/x.md``, nicht ``../docs/x.md``). Nach dem
     eigenen Ordner geprueft waere jeder korrekte Fragment-Link tot — und jeder
-    „reparierte" nach dem Sammeln."""
+    „reparierte" nach dem Sammeln. PROC-20: dasselbe gilt fuer
+    ``backlog.d/<ID>.md`` und ``BACKLOG.md``."""
     ordner = os.path.dirname(md)
-    if (os.path.basename(ordner) == FRAGMENT_ORDNER
+    if (os.path.basename(ordner) in FRAGMENT_ORDNER_ALLE
             and os.path.dirname(ordner) == REPO
             and os.path.basename(md) != "README.md"):
         return REPO
