@@ -36,7 +36,6 @@
 | UI-86 | A | perf/ui86-2d-ansicht-hidpi | 2026-10-10T19:31Z | - |
 | VCB-36 | D | fix/vcb36-blackout-ziel-gruppen-id | 2026-10-10T22:54Z | - |
 | TOOL-18 | D | fix/tool18-bilder-hinweis-gpu-szenen | 2026-10-10T22:54Z | - |
-| CDX-58 | A | fix/cdx-1010-main | 2026-10-10T19:30Z | - |
 | VIZ-102 | A | feature/viz102-gobo-hallenboden | 2026-10-11T16:09Z | - |
 | UI-87 | D | fix/ui87-hilfe-oeffnen-windows | 2026-10-10T22:54Z | - |
 | QA-94 | A | fix/cdx-1010-main | 2026-10-10T21:17Z | - |
@@ -220,7 +219,6 @@
 
 ## Verlauf
 
-- 2026-10-11T16:05Z A done VIZ-96
 - 2026-10-11T16:21Z D claim UI-90
 - 2026-10-11T16:21Z D claim XPLAT-53
 - 2026-10-11T16:21Z D claim MIDI-14
@@ -250,3 +248,4 @@
 - 2026-10-11T19:35Z D done UI-80
 - 2026-10-11T19:55Z D done UI-78
 - 2026-10-11T20:18Z A claim WEB-13
+- 2026-10-11T20:28Z A done CDX-58
