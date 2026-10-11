@@ -65,6 +65,7 @@
 | UI-88 | D | - | 2026-10-11T12:09Z | - |
 | UI-89 | A | fix/ui89-programmer-reiter-nur-passende | 2026-10-11T12:14Z | - |
 | LAS-33 | A | - | 2026-10-11T12:24Z | - |
+| LAS-34 | A | - | 2026-10-11T12:25Z | - |
 
 ## Blocker & Fallen
 
@@ -211,7 +212,6 @@
 
 ## Verlauf
 
-- 2026-10-10T20:11Z D claim UI-87
 - 2026-10-10T20:14Z D done TOOL-14
 - 2026-10-10T20:38Z D done TOOL-23
 - 2026-10-10T20:44Z D aktualisiert UI-87: Branch - -> fix/ui87-hilfe-oeffnen-windows
@@ -241,3 +241,4 @@
 - 2026-10-11T12:14Z A claim UI-89
 - 2026-10-11T12:20Z A done UI-84
 - 2026-10-11T12:24Z A claim LAS-33
+- 2026-10-11T12:25Z A claim LAS-34
