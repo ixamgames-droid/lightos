@@ -63,9 +63,17 @@ def _show_laden(basis: str):
     sys.path.insert(0, REPO)
     sys.path.insert(0, os.path.join(REPO, "tools"))
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    # Die Show-DB dieses Laufs liegt im Wegwerf-Ordner — hier ausdruecklich,
+    # nicht nur ueber die Sandbox: griffe die einmal nicht (Import scheitert,
+    # Schalter umbenannt), liefe das Werkzeug sonst auf der echten
+    # current_show.db (STAB-CURSHOW; tests/test_tools_db_isolation.py).
+    os.environ["LIGHTOS_SHOW_DB"] = os.path.join(basis, "show.db")
     from anleitungsbilder import sandbox
 
     sandbox.einrichten(basis)
+    show_db = os.path.realpath(os.environ.get("LIGHTOS_SHOW_DB", ""))
+    if not show_db.startswith(os.path.realpath(basis)):
+        raise SystemExit(f"Show-DB liegt ausserhalb der Sandbox: {show_db}")
     show = os.path.join(basis, "buehnen_show.lshow")
     if not os.path.exists(show):
         bau = subprocess.run(
