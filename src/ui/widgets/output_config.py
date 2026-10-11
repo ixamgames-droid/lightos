@@ -105,6 +105,22 @@ def _udmx_suchen() -> dict:
             "code": udmx.G_OK, "text": ""}
 
 
+def _port_kennzeichnung(p) -> str:
+    """OUT-70: Zusatz in der Portliste — „[Enttec DMX USB Pro]“ nur, wenn sich
+    das Geraet so ausweist; sonst „[FTDI-Adapter, Typ unklar]“."""
+    try:
+        from src.core.dmx.interfaces import ordne_ein, FAMILIEN
+        e = ordne_ein(p.vid, p.pid, str(getattr(p, "manufacturer", "") or ""),
+                      str(getattr(p, "product", "") or ""))
+        if e is None:
+            return ""
+        if FAMILIEN[e.familie].typ_unklar:
+            return "  [FTDI-Adapter, Typ unklar]"
+        return f"  [{e.name}]"
+    except Exception:                                    # noqa: BLE001
+        return ""
+
+
 def _list_ifaces() -> list:
     """NET-04: NICs fuer die Auswahl — Fehler kosten hoechstens die Liste."""
     try:
@@ -510,6 +526,19 @@ class OutputConfigDialog(QDialog):
     def _setup_ui(self):
         layout = QVBoxLayout(self)
         tabs = QTabWidget()
+        self._tabs = tabs
+
+        # ── OUT-70: Assistent ────────────────────────────────────────────────
+        kopf = QHBoxLayout()
+        hinweis = QLabel("Neues Interface? Der Assistent zeigt, was "
+                         "angeschlossen ist und was es braucht.")
+        hinweis.setWordWrap(True)
+        kopf.addWidget(hinweis, 1)
+        self._btn_assistent = QPushButton("Interface einrichten…")
+        self._btn_assistent.setAutoDefault(False)
+        self._btn_assistent.clicked.connect(self._assistent_oeffnen)
+        kopf.addWidget(self._btn_assistent)
+        layout.addLayout(kopf)
 
         # ── Enttec Tab ────────────────────────────────────────────────────────
         enttec_tab = QWidget()
@@ -679,6 +708,7 @@ class OutputConfigDialog(QDialog):
         af.addRow("Status:", self._lbl_artnet_status)
 
         tabs.addTab(artnet_tab, "Art-Net")
+        self._artnet_tab_index = tabs.indexOf(artnet_tab)
 
         # ── sACN Tab ──────────────────────────────────────────────────────────
         sacn_tab = QWidget()
@@ -953,7 +983,9 @@ class OutputConfigDialog(QDialog):
             if p.description:
                 label += f"  —  {p.description}"
             if p.vid == ENTTEC_VID and p.pid == ENTTEC_PID:
-                label += "  [Enttec Pro]"
+                # OUT-70: 0403:6001 ist der FTDI-Chip, kein Beweis fuer einen
+                # Enttec Pro — nur sagen, was sich ablesen laesst.
+                label += _port_kennzeichnung(p)
             self._combo_port.addItem(label, p.device)
         self._enttec_port_waehlen(aktuell)
         if self._combo_port.count() == 0:
@@ -1087,6 +1119,37 @@ class OutputConfigDialog(QDialog):
             # Statusfeld). Dann bleibt die ehrliche Teilaussage stehen.
             self._lbl_enttec_status.setText(
                 f"Eingerichtet: {port} → Universe {univ} (gespeichert)")
+
+    # ── OUT-70: Assistent „Interface einrichten…“ ────────────────────────────
+
+    def _assistent_oeffnen(self):
+        """Den Assistenten zeigen. Er richtet ueber :meth:`_assistent_einrichten`
+        ein — also ueber dieselben Wege wie die Reiter, nicht ueber einen
+        zweiten. Danach ggf. in den Art-Net-Reiter wechseln."""
+        from src.ui.widgets.interface_assistent import InterfaceAssistent
+        dlg = InterfaceAssistent(self, state=get_state(),
+                                 einrichten=self._assistent_einrichten)
+        dlg.exec()
+        if dlg.artnet_gewuenscht:
+            self._tabs.setCurrentIndex(self._artnet_tab_index)
+        return dlg
+
+    def _assistent_einrichten(self, art: str, ziel: str, universum: int) -> str:
+        """Eine vom Assistenten gewaehlte Ausgabe anlegen — exakt der Weg des
+        jeweiligen Reiters (Auswahl setzen, „Verbinden“). Liefert den Satz aus
+        dem Status-Label des Reiters."""
+        if art == "Enttec":
+            self._refresh_ports(bevorzugt=ziel)
+            self._spin_enttec_univ.setValue(int(universum))
+            self._connect_enttec()
+            return self._lbl_enttec_status.text()
+        if art == "uDMX":
+            self._udmx_gesucht = True       # Reiter soll die Wahl nicht ersetzen
+            self._udmx_adapter_waehlen(ziel, "vom Assistenten gewählt")
+            self._spin_udmx_univ.setValue(int(universum))
+            self._connect_udmx()
+            return self._lbl_udmx_status.text()
+        return f"Die Ausgabe-Art „{art}“ lässt sich hier nicht einrichten."
 
     # ── OUT-68: uDMX-Adapter ─────────────────────────────────────────────────
 

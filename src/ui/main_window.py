@@ -15,7 +15,7 @@ from PySide6.QtGui import (
     QAction, QKeySequence, QIcon, QPixmap, QColor, QPainter, QShortcut,
 )
 from src.core.app_state import get_state
-from src.core.dmx.enttec_pro import find_enttec_port
+from src.core.dmx.enttec_pro import find_enttec_port, port_art
 from src.ui.views.patch_view import PatchView
 from src.ui.views.programmer_view import ProgrammerView
 from src.ui.views.playback_view import PlaybackView
@@ -472,6 +472,18 @@ class MainWindow(QMainWindow):
         self._hw_timer.timeout.connect(self._check_hardware)
         self._hw_timer.start()
 
+        # OUT-70: Hinweis in der Statusleiste, wenn im Betrieb ein bekanntes
+        # DMX-Interface eingesteckt wird. Sucht in einem Hilfs-Thread, rein
+        # lesend, hoechstens alle 5 s; abschaltbar im Menue „Ausgabe“.
+        from src.ui.interface_hinweis import InterfaceHinweis, ABFRAGE_MS
+        self._interface_hinweis = InterfaceHinweis(
+            self.statusBar(), self._interface_hinweis_klick,
+            aktiv=self._interface_hinweis_an)
+        self._interface_timer = QTimer(self)
+        self._interface_timer.setInterval(ABFRAGE_MS)
+        self._interface_timer.timeout.connect(self._interface_hinweis.takt)
+        self._interface_timer.start()
+
         # LAS-31: fester Laser-NOT-AUS oben rechts (im Kiosk eigener Streifen).
         self._build_laser_notaus()
 
@@ -721,6 +733,17 @@ class MainWindow(QMainWindow):
         om = mb.addMenu("&Ausgabe")
         om.addAction("Konfigurieren...").triggered.connect(self._open_output_config)
         om.addAction("Channel-Modifier...").triggered.connect(self._open_channel_modifiers)
+        om.addAction("Interface einrichten…").triggered.connect(
+            self._interface_hinweis_klick)
+        self._act_interface_hinweis = om.addAction(
+            "Hinweis bei neuem DMX-Interface")
+        self._act_interface_hinweis.setCheckable(True)
+        self._act_interface_hinweis.setChecked(self._interface_hinweis_an())
+        self._act_interface_hinweis.setToolTip(
+            "Meldet in der Statusleiste, wenn ein bekanntes DMX-Interface "
+            "eingesteckt wird. Eingerichtet wird nichts von selbst.")
+        self._act_interface_hinweis.triggered.connect(
+            self._interface_hinweis_schalten)
         om.addSeparator()
         self._act_mock = om.addAction("Mock Mode AN/AUS")
         self._act_mock.setCheckable(True)
@@ -1368,11 +1391,21 @@ class MainWindow(QMainWindow):
                 self._lbl_enttec.setToolTip("")
         elif (port := self._enttec_port_gesucht()):
             # Adapter steckt, aber kein Universe ist ihm zugewiesen.
-            self._lbl_enttec.setText(f"Enttec: {port} erkannt, kein Universe")
+            # OUT-70: 0403:6001 ist der FTDI-Chip — nur „Enttec“ sagen, wenn
+            # sich das Geraet so ausweist (oder die Art unbekannt bleibt).
+            if getattr(self, "_portsuche_art", "") == "unklar":
+                self._lbl_enttec.setText(
+                    f"FTDI-Adapter {port} erkannt (Typ unklar), kein Universe")
+                self._lbl_enttec.setToolTip(
+                    "Ein FTDI-Adapter ist da, aber kein Universe gibt darüber "
+                    "aus. Enttec Pro oder Open DMX? Menü Ausgabe → "
+                    "„Interface einrichten…“ zeigt, was zu tun ist.")
+            else:
+                self._lbl_enttec.setText(f"Enttec: {port} erkannt, kein Universe")
+                self._lbl_enttec.setToolTip(
+                    "Der Adapter ist da, aber kein Universe gibt darueber aus. "
+                    "Im Universe-Manager einem Universe den Ausgang 'Enttec' geben.")
             self._lbl_enttec.setStyleSheet("color: #ffb454;")
-            self._lbl_enttec.setToolTip(
-                "Der Adapter ist da, aber kein Universe gibt darueber aus. "
-                "Im Universe-Manager einem Universe den Ausgang 'Enttec' geben.")
         else:
             self._lbl_enttec.setText("Enttec: nicht gefunden")
             self._lbl_enttec.setStyleSheet("color: #ff4444;")
@@ -1400,6 +1433,12 @@ class MainWindow(QMainWindow):
             return self._portsuche_wert
         self._portsuche_zeit = jetzt
         self._portsuche_wert = find_enttec_port()
+        # OUT-70: gleich mitmerken, ob sich der Fund als Pro ausweist.
+        try:
+            self._portsuche_art = (port_art(self._portsuche_wert)
+                                   if self._portsuche_wert else "")
+        except Exception:
+            self._portsuche_art = ""
         return self._portsuche_wert
 
     def _universen_mit_geraeten(self) -> list[int]:
@@ -1978,11 +2017,43 @@ class MainWindow(QMainWindow):
 
     # ── Output-Konfiguration ──────────────────────────────────────────────────
 
-    def _open_output_config(self):
+    def _open_output_config(self, assistent: bool = False):
         from src.ui.widgets.output_config import OutputConfigDialog
         dlg = OutputConfigDialog(self)
+        if assistent is True:
+            # OUT-70: gleich den Assistenten zeigen — erst wenn der Dialog
+            # steht (Timer haengt am Dialog und stirbt mit ihm).
+            t = QTimer(dlg)
+            t.setSingleShot(True)
+            t.timeout.connect(dlg._assistent_oeffnen)
+            t.start(0)
         dlg.exec()
         self._check_hardware()
+
+    # ── OUT-70: Hinweis „neues DMX-Interface“ ────────────────────────────────
+
+    def _interface_hinweis_an(self) -> bool:
+        try:
+            from src.ui.views.programmer_view import _load_prefs
+            from src.ui.interface_hinweis import PREF
+            return bool(_load_prefs().get(PREF, True))
+        except Exception:
+            return True
+
+    def _interface_hinweis_schalten(self, an: bool):
+        try:
+            from src.ui.views.programmer_view import _save_prefs
+            from src.ui.interface_hinweis import PREF
+            _save_prefs({PREF: bool(an)})
+        except Exception as e:
+            print(f"[main_window] interface_hinweis prefs error: {e}")
+        if not an:
+            hinweis = getattr(self, "_interface_hinweis", None)
+            if hinweis is not None:
+                hinweis.schliesse()
+
+    def _interface_hinweis_klick(self, *_):
+        self._open_output_config(assistent=True)
 
     def _open_channel_modifiers(self):
         try:
