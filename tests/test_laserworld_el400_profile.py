@@ -231,12 +231,14 @@ class SicherheitTest(_Basis):
         self.om._send_all()
         self._ist_aus(self._kanal1())
 
-    def test_not_aus_loest_nur_ueber_betriebsart_oder_muster(self):
-        # A3D-02: Position/Farbe/Zoom duerfen den NOT-AUS nicht loesen; die
-        # Betriebsart (shutter) und die Musterauswahl (gobo_wheel) schon.
-        from src.core.app_state import _LASER_REARM_ATTRS
-        rearm = {c.attribute for c in self.chans} & _LASER_REARM_ATTRS
-        self.assertEqual(rearm, {"shutter", "gobo_wheel"})
+    def test_not_aus_loest_ueber_kein_attribut(self):
+        # LAS-36 (frueher A3D-02 „…nur ueber Betriebsart oder Muster“): die Liste
+        # der loesenden Attribute gibt es nicht mehr — kein Kanal dieses Profils
+        # hebt den NOT-AUS auf, geloest wird nur mit Rueckfrage. Das Verhalten
+        # selbst prueft tests/test_las36_notaus_nur_mit_rueckfrage.py.
+        import src.core.app_state as app_state
+        self.assertFalse(hasattr(app_state, "_LASER_REARM_ATTRS"))
+        self.assertIn("shutter", {c.attribute for c in self.chans})
 
 
 class LaserSeiteTest(_Basis):

@@ -356,9 +356,9 @@ class LaserView(QWidget):
             "border:1px solid #b30000;border-radius:5px;padding:6px 14px;}"
             "QPushButton:hover{background:#b30000;}")
         self._btn_dmx_estop.setToolTip(
-            "Schaltet ALLE Laser sofort dunkel: DMX-Laser auf ihren Aus-Wert "
-            "(bis Betriebsart oder Muster neu gewählt wird), Netzwerk-Laser "
-            "werden unscharf.")
+            "Schaltet ALLE Laser sofort dunkel: DMX-Laser auf ihren Aus-Wert, "
+            "Netzwerk-Laser werden unscharf. Dieser Knopf löst nur aus — "
+            "gelöst wird der NOT-AUS mit dem Knopf oben rechts (Rückfrage).")
         self._btn_dmx_estop.clicked.connect(weak_slot(self._on_estop))
         dsb.addWidget(self._btn_dmx_estop)
         self._lbl_dmx_estop = QLabel("")
@@ -467,7 +467,8 @@ class LaserView(QWidget):
             # der Laser scharf ist (Täuschung in die gefährliche Richtung).
             sync.subscribe_widget(SyncEvent.LASER_ARMED_CHANGED, self,
                                   lambda *_: self._sync_arm_from_manager())
-            # LAS-26: NOT-AUS von einer VC-Taste -> Anzeige sofort mitziehen.
+            # LAS-26: NOT-AUS von einer VC-Taste -> Anzeige sofort mitziehen;
+            # LAS-36: dasselbe Ereignis kommt beim Loesen oben rechts.
             sync.subscribe_widget(SyncEvent.LASER_ESTOP, self,
                                   lambda *_: self._update_dmx_estop_label())
         except Exception as e:
@@ -578,8 +579,8 @@ class LaserView(QWidget):
         try:
             if aktiv:
                 self._lbl_dmx_estop.setText(
-                    "NOT-AUS aktiv — alle DMX-Laser sind dunkel. Wieder an: "
-                    "Betriebsart oder Muster neu wählen.")
+                    "NOT-AUS aktiv — Werte werden gemerkt, der Laser bleibt "
+                    "dunkel. Lösen: Knopf oben rechts.")
                 self._lbl_dmx_estop.setStyleSheet(
                     "color:#ff7b72;font-weight:bold;")
             else:
@@ -1025,7 +1026,8 @@ class LaserView(QWidget):
                 continue
             for head in self._heads_for(f, attr):
                 state.set_programmer_value(fid, attr, int(value), head=head)
-        # Betriebsart/Muster loesen den DMX-NOT-AUS (A3D-02) — Anzeige folgen.
+        # LAS-36: ein Wert loest den NOT-AUS nicht mehr; die Anzeige sagt weiter,
+        # warum der Laser dunkel bleibt.
         self._update_dmx_estop_label()
 
     def _load_values(self):

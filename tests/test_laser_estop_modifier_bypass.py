@@ -176,9 +176,14 @@ class LaserEstopMaskPushTest(unittest.TestCase):
         self.st.set_laser_estop(True)
         self.assertEqual(self.om._laser_estop_mask, {1: frozenset({10, 11, 12, 13})})
 
-    def test_laser_value_clears_mask(self):
+    def test_laser_value_keeps_mask(self):
+        # LAS-36 (frueher „…clears_mask“): ein Laser-Wert laesst Latch UND
+        # Ausgabe-Maske stehen; geleert wird sie erst beim bewussten Loesen.
         self.st.set_laser_estop(True)
-        self.st.set_programmer_value(7, "laser_bank", 42)   # bewusst "wieder an"
+        self.st.set_programmer_value(7, "laser_bank", 42)
+        self.assertTrue(self.st.laser_estop_active)
+        self.assertEqual(self.om._laser_estop_mask, {1: frozenset({10, 11, 12, 13})})
+        self.st.laser_notaus_loesen()
         self.assertFalse(self.st.laser_estop_active)
         self.assertEqual(self.om._laser_estop_mask, {})
 

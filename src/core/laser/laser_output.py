@@ -208,8 +208,8 @@ class LaserOutputManager:
         self._estopped = True
         # UXT-12: auch DMX-Muster-Laser (L2600 & Co.) hart dunkel schalten — der
         # folgende Netzwerk-Estop erreicht sie nicht. Latch im State setzen; der
-        # Renderer zwingt deren Kanäle dann auf 0, bis bewusst ein neuer Laser-
-        # Wert gesetzt wird.
+        # Renderer zwingt deren Kanäle dann auf die Aus-Werte, bis der NOT-AUS
+        # mit Rückfrage gelöst wird (LAS-36: ein Laser-Wert löst ihn nicht mehr).
         #
         # CDX-25: Der Latch steht BEWUSST VOR der Netzwerk-I/O-Schleife. `conn.estop()`
         # ist ein TCP-/UDP-Roundtrip mit `timeout=0.5` je Verbindung (etherdream.py:146,

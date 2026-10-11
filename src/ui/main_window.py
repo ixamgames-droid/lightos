@@ -2915,8 +2915,8 @@ class MainWindow(QMainWindow):
         sc.activated.connect(self._laser_notaus_ausloesen)
         self._sc_laser_notaus = sc
 
-        # Der Latch kann sich ohne Ereignis aendern (ein Muster-Abruf im
-        # Programmer loest ihn) — darum im Takt nachlesen; derselbe Takt blinkt.
+        # Der Zustand wird im Takt nachgelesen (der Knopf fuehrt keinen eigenen);
+        # derselbe Takt blinkt.
         self._notaus_timer = QTimer(self)
         self._notaus_timer.setInterval(450)
         self._notaus_timer.timeout.connect(self._notaus_tick)
@@ -2966,28 +2966,16 @@ class MainWindow(QMainWindow):
             return
         if jetzt < self._notaus_sperre_bis:
             return
-        antwort = QMessageBox.warning(
-            self, "Laser-NOT-AUS lösen?",
-            "Der Laser-NOT-AUS ist aktiv.\n\n"
-            "Nach dem Lösen geben DMX-Laser sofort wieder aus, was Programmer, "
-            "Szenen und Effekte gerade vorgeben. Netzwerk-Laser bleiben "
-            "unscharf.\n\n"
-            "Nur lösen, wenn der Strahlbereich frei ist. Jetzt lösen?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
-            QMessageBox.StandardButton.Cancel)
-        if antwort != QMessageBox.StandardButton.Yes:
-            self._sync_notaus_button()
-            return
-        try:
-            self._state.laser_notaus_loesen()
-        except Exception as e:
-            print(f"[main_window] Laser-NOT-AUS lösen Fehler: {e}")
+        # LAS-36: der EINE Loese-Weg — Rueckfrage und Loesen liegen gemeinsam in
+        # src/ui/laser_notaus.py (ein spaeterer zweiter Knopf nimmt dieselbe).
+        from src.ui.laser_notaus import loesen_mit_rueckfrage
+        geloest = loesen_mit_rueckfrage(self, self._state)
         self._sync_notaus_button()
-        try:
-            if not getattr(self._state, "laser_estop_active", False):
+        if geloest:
+            try:
                 self.statusBar().showMessage("Laser-NOT-AUS gelöst", 5000)
-        except Exception:
-            pass
+            except Exception:
+                pass
 
     def _notaus_tick(self):
         self._notaus_blink ^= 1
@@ -3007,8 +2995,10 @@ class MainWindow(QMainWindow):
             if aktiv:
                 text = self._NOTAUS_TEXT_AKTIV
                 stil = self._NOTAUS_STIL_AKTIV[self._notaus_blink & 1]
-                tip = ("LASER NOT-AUS AKTIV — Laser sind dunkel verriegelt.\n"
-                       "Lösen: klicken und die Rückfrage bestätigen.\n")
+                tip = ("LASER NOT-AUS AKTIV — Werte werden gemerkt, der Laser "
+                       "bleibt dunkel.\n"
+                       "Lösen geht nur hier: klicken und die Rückfrage "
+                       "bestätigen.\n")
             else:
                 text = self._NOTAUS_TEXT
                 stil = self._NOTAUS_STIL_BEREIT
@@ -3032,7 +3022,10 @@ class MainWindow(QMainWindow):
         self._laser_estop_sig.emit()
 
     def _on_laser_estop_ui(self):
-        self._on_laser_estop()
+        # LAS-36: das Ereignis kommt auch beim Loesen — der rote Alarm
+        # „ausgelöst“ gehoert nur zum stehenden Latch.
+        if getattr(self._state, "laser_estop_active", False):
+            self._on_laser_estop()
         self._sync_notaus_button()
 
     def _on_laser_estop(self, *_):

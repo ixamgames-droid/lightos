@@ -648,12 +648,15 @@ def _vorher_not_aus(ui):
 
 
 def _nachher_not_aus(ui):
-    # Wieder an: Betriebsart neu waehlen (Klick auf die Kachel).
-    from PySide6.QtWidgets import QApplication
+    # LAS-36: ein Klick auf eine Betriebsart loest den NOT-AUS nicht mehr. Die
+    # Szene loest ihn wie die Rueckfrage oben rechts (ohne den Dialog zu oeffnen)
+    # und waehlt danach die Betriebsart fuer die Folgebilder.
     _laser_an(ui, None)
+    if not getattr(ui.state, "laser_estop_active", False):
+        raise SzenenFehler("Klick auf „Statische Muster“ löste den NOT-AUS (LAS-36)")
+    ui.state.laser_notaus_loesen()
     if getattr(ui.state, "laser_estop_active", False):
-        raise SzenenFehler("Klick auf „Statische Muster“ löste den NOT-AUS nicht")
-    _ = QApplication
+        raise SzenenFehler("NOT-AUS ließ sich nicht lösen")
     # Der rote Statuszeilen-Alarm stuende sonst noch 6 s in den Folgebildern.
     ui.win.statusBar().clearMessage()
     ui.win._reset_statusbar_style()

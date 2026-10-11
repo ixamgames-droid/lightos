@@ -381,9 +381,9 @@ def beleg_laser(ui):
     print(f"BELEG Laser NOT-AUS: höchster Laser-Wert {hoechst}", flush=True)
     if hoechst != 0:
         raise SzenenFehler("Laser NOT-AUS lässt Laser an")
-    # Sperre wieder lösen wie in der Laser-Ansicht (Shutter im Programmer),
+    # Sperre wieder lösen wie die Rückfrage oben rechts (LAS-36; ohne Dialog),
     # sonst bleiben die Laser in allen folgenden Bildern dunkel.
-    ui.state.set_laser_estop(False)
+    ui.state.laser_notaus_loesen()
     alles_aus(ui)
     druecken(ui, "Laser an")
     ticks(ui, 3)
