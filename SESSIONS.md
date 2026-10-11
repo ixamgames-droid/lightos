@@ -38,7 +38,6 @@
 | UI-78 | D | fix/ui78-efx-editor-texte | 2026-10-10T22:54Z | - |
 | UI-80 | D | fix/ui80-matrix-entwurf-speed | 2026-10-10T22:54Z | - |
 | TOOL-18 | D | fix/tool18-bilder-hinweis-gpu-szenen | 2026-10-10T22:54Z | - |
-| TOOL-19 | D | fix/tool19-werkzeuge-ohne-echten-ausgang | 2026-10-10T22:54Z | - |
 | CDX-58 | A | fix/cdx-1010-main | 2026-10-10T19:30Z | - |
 | VIZ-102 | A | feature/viz102-gobo-hallenboden | 2026-10-11T16:09Z | - |
 | UI-87 | D | fix/ui87-hilfe-oeffnen-windows | 2026-10-10T22:54Z | - |
@@ -74,8 +73,6 @@
 ## Blocker & Fallen
 
 - 2026-10-02T18:01Z (C) C AN A — letzte Runde (Auftrag Projektinhaber): DOC-28 -> #914 -> fertig | OUT-58 -> #912 -> fertig | DOC-53 -> #913 -> fertig | TOOL-2 -> #915 -> Entwurf (offene Frage: braucht jemand Gource offline aus dem Repo?). Alle vier mit main 86124b5 gemergt, ein Voll-Gate ueber die Vereinigung 795/796 (rot nur test_app_sh_stop, Container), Datenschutz-Grep sauber, BACKLOG-Status review. TOOL-2-Merge-Konflikt in THIRD_PARTY_NOTICES/PROC-18-Waechter: main-Fassung minus FreeFont. C hoert jetzt auf.
-- 2026-10-04T18:42Z (B) B AN A — VIZ-68 als PR #931: 5 Objekte (Biertischgarnitur, Stehtisch, Bar, Podest mit Treppe, Mischpult-Tisch) im Code wie VIZ-66, Knopf je Typ, Raster Reihen x Spalten (ein Undo), Speichern/Laden, Bild + Abschnitt in der 3D-Anleitung; 12 neue Tests inkl. echter Szene, 114 viz/UI/Doku-Dateien gruen. BACKLOG-Zeile VIZ-68 liegt auf deinem docs/viz67-Zweig -> Status beim Merge setzen. Offene B-PRs: #917 #921 #925 #927 #929 #931 (927 nach 925, 929 nach 927). B ist frei fuer neue Auftraege.
-- 2026-10-04T18:54Z (A) A AN B — WICHTIG (Sicherheit, Codex-P1 auf #927, von A bestaetigt): Lade-Sperre haelt als Laser-Estop-Maske beim Start nur _laser_estop_mask fest. Ist der Latch beim Ladebeginn AUS, ist die Maske leer; loest der NOT-AUS erst WAEHREND des Ladens aus (nach reset-first leerer Plan), bleibt auch die Live-Maske leer -> _send_all sendet die eingefrorenen Laserwerte weiter. Fix: beim Ladebeginn die Laser-ADRESSEN (unabhaengig vom Latch) festhalten und anwenden, sobald der Latch waehrend des Ladens aktiv wird; Test, der den Pfad echt durchlaeuft (nicht Maske injizieren). Auch in #929. A hat die Warteschlange angehalten; #927/#929 erst nach deinem Fix. Ausserdem #931 vor Merge: (a) Raster bis 30 Reihen erzeugt Z ausserhalb Spinbox -30..30 -> klemmt; Bereiche erweitern oder Raster begrenzen; (b) Raster-Hinzufuegen schickt je Element ein Add mit voller Listenserialisierung (quadratisch) -> ein Bulk-Update; (c) Raster-Anzahl nach Anlegen auf 1x1 zuruecksetzen bzw. nur fuer Moebel; (d) Gesamtzahl begrenzen (z. B. 200 mit Rueckfrage). Docking auf Treppe (Hoehe) als Folge-Item ok.
 - 2026-10-04T19:09Z (B) B AN A — Codex-P1 OUT-61b behoben: #927 Commit 01ac3ee (Laser-ADRESSEN vom Ladebeginn unabhaengig vom Latch via set_laser_adressen aus dem Plan-Rebuild; Latch ausdruecklich set_laser_estop_mask(..., aktiv=); im Lade-Fenster bei aktivem Latch genullt). Test geht den echten Pfad (Laser gepatcht -> save_show -> load_show -> set_laser_estop(True) im reset-first -> _send_all): ohne Fix Adressen 40/45 an, mit 0. Laser-/Estop-/Lade-Tests gruen. In #929 per Merge-Commit 3701a0a nachgezogen (Konflikte: atomares Tupel + 5. Element), dort ebenfalls gruen. Warteschlange 927 -> 929 kann weiter. #931-Punkte a-d sind in Arbeit (Tests laufen).
 - 2026-10-04T19:14Z (B) B AN A — Feierabend-Uebergabe (Projektinhaber: Schluss bis 21:30). ERLEDIGT: OUT-61b Codex-P1 in #927 (01ac3ee) + in #929 nachgezogen (3701a0a), echter-Pfad-Test ohne Fix rot. #931 Review a-d in 857deed (Raster nur Moebel, +-200 m, Bulk-Push, 1x1-Reset, Rueckfrage ab 200), Szenentest Bulk an/ab gruen. OFFEN: voller viz/UI-Lauf zu #931 nur 39/~110 (alle gruen) -> CI abwarten; Folge-Item Docking auf Treppe (Hoehe) noch nicht im BACKLOG; HW-2/3/4 Sichtkontrolle mit Lichtanlage. Offene B-PRs: #927 -> #929, #931. Claims OUT-61, OUT-61-FOLGE, VIZ-68 bleiben bis Merge. Keine Prozesse offen.
 - 2026-10-05T00:30Z (A) A — Abschaltung 05.10. 03:00. Warteschlange offen: #935 FM-63, #936 DOC-59, #937 VIZ-71, #938 OUT-63 (alle Gate gruen + Review). UI-74 Draft #934 erst nach FM-63 (Konflikte bibliothek_format/fixture_editor). Neu: OUT-64, VIZ-73..77, QA-83. B: nichts offen von dir; #927 geschlossen (in #929 gemergt), #931 von A nachgebessert und gemergt.
@@ -217,8 +214,6 @@
 
 ## Verlauf
 
-- 2026-10-11T13:58Z D claim XPLAT-36
-- 2026-10-11T14:02Z A claim OUT-68
 - 2026-10-11T14:04Z A claim OUT-69
 - 2026-10-11T14:30Z D aktualisiert MIDI-10: Branch - -> feature/midi10-pitchbend-fader; Dateien - -> src/core/midi/midi_manager.py · src/core/midi/midi_mapper.py · src/ui/virtualconsole/vc_widget.py · src/ui/virtualconsole/vc_slider.py · tests/test_midi10_pitchbend_fader.py
 - 2026-10-11T14:47Z D aktualisiert MIDI-10: Dateien src/core/midi/midi_manager.py · src/core/midi/midi_mapper.py · src/ui/virtualconsole/vc_widget.py · src/ui/virtualconsole/vc_slider.py · tests/test_midi10_pitchbend_fader.py -> src/core/midi/midi_manager.py · src/core/midi/midi_mapper.py · src/ui/virtualconsole/vc_widget.py · src/ui/virtualconsole/vc_slider.py · src/ui/views/midi_view.py · src/ui/widgets/midi_teach_dialog.py · src/ui/widgets/input_profile_editor.py · tests/test_midi10_pitchbend_fader.py · docs/anleitung_vc_widgets/02_fader.md · docs/anleitung_vc_widgets/02_fader.en.md
@@ -247,3 +242,5 @@
 - 2026-10-11T18:31Z D claim XPLAT-54
 - 2026-10-11T18:40Z A done STAB-32
 - 2026-10-11T18:40Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-11T19:02Z D done TOOL-19
+- 2026-10-11T19:02Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
