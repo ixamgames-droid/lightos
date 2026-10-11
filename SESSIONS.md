@@ -64,7 +64,7 @@
 | LAS-33 | A | feature/las33-laser-profilangaben-generator | 2026-10-11T13:51Z | - |
 | LAS-34 | A | feature/las34-laser-tab | 2026-10-11T13:51Z | - |
 | LAS-35 | A | - | 2026-10-11T12:25Z | - |
-| MIDI-10 | D | feature/midi10-pitchbend-fader | 2026-10-11T14:30Z | src/core/midi/midi_manager.py · src/core/midi/midi_mapper.py · src/ui/virtualconsole/vc_widget.py · src/ui/virtualconsole/vc_slider.py · tests/test_midi10_pitchbend_fader.py |
+| MIDI-10 | D | feature/midi10-pitchbend-fader | 2026-10-11T14:47Z | src/core/midi/midi_manager.py · src/core/midi/midi_mapper.py · src/ui/virtualconsole/vc_widget.py · src/ui/virtualconsole/vc_slider.py · src/ui/views/midi_view.py · src/ui/widgets/midi_teach_dialog.py · src/ui/widgets/input_profile_editor.py · tests/test_midi10_pitchbend_fader.py · docs/anleitung_vc_widgets/02_fader.md · docs/anleitung_vc_widgets/02_fader.en.md |
 | MIDI-15 | D | - | 2026-10-11T13:58Z | - |
 | ENG-30 | D | - | 2026-10-11T13:58Z | - |
 | XPLAT-36 | D | - | 2026-10-11T13:58Z | - |
@@ -220,7 +220,6 @@
 
 ## Verlauf
 
-- 2026-10-11T09:40Z A claim WEB-08
 - 2026-10-11T09:40Z A aktualisiert LAS-32: Branch feature/las32-laser-sperrzonen -> feature/las32-s1-sperrzonen-anzeige
 - 2026-10-11T10:20Z A done VIZ-100
 - 2026-10-11T10:24Z D claim VCB-42
@@ -250,3 +249,4 @@
 - 2026-10-11T14:02Z A claim OUT-68
 - 2026-10-11T14:04Z A claim OUT-69
 - 2026-10-11T14:30Z D aktualisiert MIDI-10: Branch - -> feature/midi10-pitchbend-fader; Dateien - -> src/core/midi/midi_manager.py · src/core/midi/midi_mapper.py · src/ui/virtualconsole/vc_widget.py · src/ui/virtualconsole/vc_slider.py · tests/test_midi10_pitchbend_fader.py
+- 2026-10-11T14:47Z D aktualisiert MIDI-10: Dateien src/core/midi/midi_manager.py · src/core/midi/midi_mapper.py · src/ui/virtualconsole/vc_widget.py · src/ui/virtualconsole/vc_slider.py · tests/test_midi10_pitchbend_fader.py -> src/core/midi/midi_manager.py · src/core/midi/midi_mapper.py · src/ui/virtualconsole/vc_widget.py · src/ui/virtualconsole/vc_slider.py · src/ui/views/midi_view.py · src/ui/widgets/midi_teach_dialog.py · src/ui/widgets/input_profile_editor.py · tests/test_midi10_pitchbend_fader.py · docs/anleitung_vc_widgets/02_fader.md · docs/anleitung_vc_widgets/02_fader.en.md
