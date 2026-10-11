@@ -41,6 +41,7 @@ der Sektionsleiste. Die Abläufe gelten weiter.
 | [Patchen & Gruppen](anleitung_patch_gruppen/ANLEITUNG_PATCH_GRUPPEN.md) | Geräte auf DMX-Adressen legen, Fixture-Gruppen und ihr Raster anlegen. | Beispiel-Show nicht im Repo |
 | [Gruppen und Matrizen anlegen](anleitung_gruppen_matrizen/ANLEITUNG_GRUPPEN_MATRIZEN.md) | Mehrkopf-Geräte und Panels: Kopf-Gruppe beim Patchen, Köpfe als Raster oder Block, zu einer Zelle zusammenfassen, Matrizen zusammenlegen. | Keine Show nötig |
 | [Geräte-Bibliothek & eigene Profile](anleitung_geraete_bibliothek/ANLEITUNG.md) | Mitgelieferte Profile und LightOS-Bibliothek (Herkunft, „geprüft“), Gerät aus der Bibliothek patchen, freie Bibliothek herunterladen, eigenes Profil im Fixture-Editor, LightOS-Profil exportieren/importieren, Zuordnung Dimmer → Weiß-Segment, die neuen 3D-Modelle. | Keine Show nötig |
+| [Eigenes Gerät mit dem Fixture Generator anlegen](anleitung_fixture_generator/ANLEITUNG_FIXTURE_GENERATOR.md) | Am Beispiel des Show-Lasers Laserworld EL-400RGB MK2: Angaben von Typenschild und Handbuch-DMX-Tabelle, DIP-Schalter, Generator (Kopf, Kanäle, Attribute, Bereiche), Laser-Sicherheit über den Aus-Wert, Prüfen/Speichern, patchen, Reiter Laser, Laser-NOT-AUS, EFX auf den Laser-Achsen, 3D, sicherer Abgleich am echten Gerät. | Keine Show nötig |
 | [Programmer: jedes Gerät richtig bedienen](anleitung_geraete_bedienen/ANLEITUNG_GERAETE_BEDIENEN.md) | Was der Programmer je Gerät zeigt: Shutter-/Strobe-Knöpfe, Programm-Kacheln, zweite gleiche Kanäle, Mehrkopf-Umschalter, Nebel und Laser. | Keine Show nötig |
 | [Moving Heads steuern](anleitung_moving_heads/ANLEITUNG_MOVING_HEADS.md) | Farbrad, Gobo, Bewegung und gezieltes Pan/Tilt über die Virtual Console. | Generator `build_event_demo_2026.py` → `Event_Demo_2026.lshow` |
 | [Spider steuern](anleitung_spider/ANLEITUNG_SPIDER.md) | Farb-Themes je Bar und Tilt-Bewegung (Schere, Wippe). | Generator `build_event_demo_2026.py` |
@@ -117,6 +118,7 @@ frei kombinieren; das Tempo aller Ebenen hängt an Tempo-Buses (siehe
 | [Ausgabe einrichten: ENTTEC, Art-Net, sACN](anleitung_ausgabe_einrichten/ANLEITUNG.md) | Siehe [Einstieg](#einstieg) — der aktuelle Weg mit Bildern. | Keine Show nötig |
 | [Zwei Universen über zwei Adapter](anleitung_zwei_universen/ANLEITUNG.md) | Universe 1 über ENTTEC USB Pro, Universe 2 über Art-Net, patchen und im Output-Monitor prüfen. | Keine Show nötig |
 | [ENTTEC und Art-Net gleichzeitig](anleitung_enttec_artnet/ANLEITUNG_ENTTEC_ARTNET.md) | Jedes Universum mit eigenem Ausgabe-Backend; ENTTEC, Art-Net und sACN frei mischen. | Keine Show nötig |
+| [Netzwerk vorbereiten (Windows)](anleitung_netzwerk_windows/ANLEITUNG.md) | Welche Funktion welchen Port braucht (Art-Net 6454, sACN 5568, Web-Remote 5000, MSC 6004), Netzwerkprofil, feste Adresse im Lichtnetz, Firewall-Freigaben anlegen und entfernen, typische Fehlerbilder. | Keine Show nötig |
 
 ## Shows & Beispiele
 

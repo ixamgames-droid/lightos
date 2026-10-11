@@ -38,7 +38,7 @@ _AUSNAHMEN = {"tests/test_keine_konfliktmarker.py"}
 
 def _versionierte_textdateien():
     aus = subprocess.run(["git", "ls-files"], cwd=REPO, capture_output=True,
-                         text=True, check=True).stdout.splitlines()
+                         text=True, encoding="utf-8", errors="replace", check=True).stdout.splitlines()
     for rel in aus:
         if rel in _AUSNAHMEN:
             continue

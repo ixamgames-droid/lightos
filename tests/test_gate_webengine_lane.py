@@ -93,7 +93,7 @@ class WebEngineSpurTest(unittest.TestCase):
             erg = subprocess.run(
                 ["bash", str(RUNNER), "-j", "3", *dateien],
                 cwd=str(REPO), env=umgebung, capture_output=True,
-                text=True, timeout=180)
+                text=True, encoding="utf-8", errors="replace", timeout=180)
             self.assertEqual(erg.returncode, 0,
                              f"Runner rot:\n{erg.stdout}\n{erg.stderr}")
 
@@ -139,7 +139,7 @@ class WebEngineSpurTest(unittest.TestCase):
             erg = subprocess.run(
                 ["bash", str(RUNNER), "-j", "3", *dateien],
                 cwd=str(REPO), env=umgebung, capture_output=True,
-                text=True, timeout=180)
+                text=True, encoding="utf-8", errors="replace", timeout=180)
             self.assertEqual(erg.returncode, 0,
                              f"Runner rot:\n{erg.stdout}\n{erg.stderr}")
 
@@ -190,7 +190,7 @@ class Xplat17SignaturTest(unittest.TestCase):
         return subprocess.run(
             ["bash", str(RUNNER), "-j", "2", *dateien],
             cwd=str(REPO), env=umgebung, capture_output=True,
-            text=True, timeout=180)
+            text=True, encoding="utf-8", errors="replace", timeout=180)
 
     @unittest.skipUnless(_RUNNER_LAEUFT, _RUNNER_GRUND)
     def test_kontextverlust_wird_benannt_bleibt_aber_rot(self):

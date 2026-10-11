@@ -207,14 +207,21 @@ class FailClosedTest(unittest.TestCase):
     def _main_mit(self, zweige, warnung, refs_lesbar=True):
         import backlog_ids as bi
         orig_pr, orig_je = bi.offene_pr_zweige, bi.backlog_je_zweig
+        orig_weitere = bi.weitere_belegte_ids
         bi.offene_pr_zweige = lambda: (zweige, warnung)
         bi.backlog_je_zweig = lambda refs: (
             {r: bi.items_aus_backlog(self._BACKLOG) for r in refs}
             if refs_lesbar else {"origin/main": bi.items_aus_backlog(self._BACKLOG)})
+        # TOOL-23: auch dieser Griff nach git ist zu. Seit eine unlesbare Tafel
+        # eine Luecke ist, liefe die Positivkontrolle in der CI (kein
+        # `origin/sessions`) sonst in genau die Luecke, die sie ausschliesst.
+        # Die Lesefehler selbst misst test_tool23_backlog_ids_tafel_fragmente.py.
+        bi.weitere_belegte_ids = lambda refs: (set(), [])
         try:
             return bi.main(["--gruppe", "FM", "--kein-fetch"])
         finally:
             bi.offene_pr_zweige, bi.backlog_je_zweig = orig_pr, orig_je
+            bi.weitere_belegte_ids = orig_weitere
 
     def test_ein_unlesbarer_ref_verhindert_die_auskunft(self):
         self.assertEqual(
@@ -362,13 +369,17 @@ class BacklogFragmenteTest(unittest.TestCase):
         def git(*args):
             if args[:1] == ("show",) and args[1].endswith(":BACKLOG.md"):
                 return 0, tabelle_main
+            if args[:1] == ("show",) and "SESSIONS.md" in args[1]:
+                return 0, ""
             for ref, dateien in fragmente.items():
-                if args[:1] == ("ls-tree",) and args[-1] == f"{ref}:backlog.d":
-                    return 0, "".join(n + "\n" for n in dateien) + "README.md\n"
+                if args[:1] == ("ls-tree",) and args[-2:] == (ref, "backlog.d/"):
+                    return 0, "".join(f"backlog.d/{n}\n" for n in dateien) + "backlog.d/README.md\n"
                 for name, text in dateien.items():
                     if args == ("show", f"{ref}:backlog.d/{name}"):
                         return 0, text
-            if args[:1] in (("show",), ("ls-tree",)):
+            if args[:1] == ("ls-tree",):
+                return 0, ""          # Ordner fehlt: Exit 0 und nichts (TOOL-23)
+            if args[:1] == ("show",):
                 return 1, ""
             return 0, ""
         B._git = git
