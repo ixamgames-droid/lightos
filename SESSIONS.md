@@ -71,6 +71,7 @@
 | XPLAT-54 | D | fix/xplat54-backlog-fragmente-test-windows | 2026-10-11T18:31Z | tests/test_backlog_fragmente.py |
 | WEB-12 | A | fix/web12-handy-rechte-laser | 2026-10-11T19:15Z | - |
 | LAS-36 | A | fix/las36-notaus-loesen-lasererkennung | 2026-10-11T19:15Z | - |
+| LAS-37 | D | - | 2026-10-11T19:24Z | - |
 
 ## Blocker & Fallen
 
@@ -215,7 +216,6 @@
 
 ## Verlauf
 
-- 2026-10-11T14:52Z D aktualisiert ENG-30: Branch - -> perf/eng30-engine-zeit-je-frame
 - 2026-10-11T14:58Z B done TOOL-26
 - 2026-10-11T15:10Z A claim WEB-10
 - 2026-10-11T15:31Z A done PROC-19
@@ -245,3 +245,4 @@
 - 2026-10-11T19:15Z A claim WEB-12
 - 2026-10-11T19:15Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-11T19:15Z A claim LAS-36
+- 2026-10-11T19:24Z D claim LAS-37
