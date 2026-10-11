@@ -42,7 +42,6 @@
 | PROC-20 | A | feature/proc20-backlog-fragmente | 2026-10-10T18:45Z | tools · BACKLOG.md |
 | TOOL-26 | B | feature/tool26-app-messwerkzeug | 2026-10-10T13:25Z | tools/app_messung.py · tools/README.md · tests/test_tool26_app_messung.py · BACKLOG.md · changelog.d/2026-10-10-TOOL-26.md |
 | LAS-32 | A | feature/las32-s1-sperrzonen-anzeige | 2026-10-11T09:40Z | - |
-| DEMO-8 | A | feature/demo8-demoshows-im-setup | 2026-10-10T13:08Z | - |
 | XPLAT-51 | A | fix/xplat51-arm64-nicht-unterstuetzt | 2026-10-10T14:17Z | - |
 | XPLAT-52 | A | fix/xplat52-installer-venv-arch | 2026-10-10T14:17Z | - |
 | VIZ-101 | A | fix/viz101-licht-durch-wand | 2026-10-10T14:38Z | - |
@@ -206,7 +205,6 @@
 
 ## Verlauf
 
-- 2026-10-10T18:16Z D aktualisiert VCB-36: Branch - -> fix/vcb36-blackout-ziel-gruppen-id
 - 2026-10-10T18:17Z D aktualisiert UI-80: Branch - -> fix/ui80-matrix-entwurf-speed
 - 2026-10-10T18:24Z D aktualisiert UI-78: Branch - -> fix/ui78-efx-editor-texte
 - 2026-10-10T18:34Z D done VIZ-98
@@ -236,3 +234,4 @@
 - 2026-10-11T10:20Z A done VIZ-100
 - 2026-10-11T10:24Z D claim VCB-42
 - 2026-10-11T10:34Z D aktualisiert VCB-42: Branch - -> fix/vcb42-blackout-ziel-gruppe-wiedererkennen; Dateien - -> src/core/app_state.py · src/core/show/show_file.py · src/ui/virtualconsole/vc_button.py · src/ui/virtualconsole/target_list_editor.py · tests/test_vcb42_blackout_ziel_wiedererkennen.py
+- 2026-10-11T10:38Z A done DEMO-8
