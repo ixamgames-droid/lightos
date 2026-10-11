@@ -80,9 +80,9 @@ class Doc70NetzwerkWindowsTest(unittest.TestCase):
     def test_msc_port_stimmt_sobald_es_das_modul_gibt(self):
         regeln = _regel_zeilen(self.text)
         if os.path.exists(MSC_MODUL):
-            spec = importlib.util.spec_from_file_location("_doc70_msc", MSC_MODUL)
-            msc = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(msc)
+            # Regulaer importieren: per ``spec_from_file_location`` ohne Eintrag
+            # in ``sys.modules`` scheitern die Dataclasses des Moduls.
+            from src.core.midi import msc
             self.assertEqual(regeln.get(msc.GMA_PORT), "UDP", regeln)
         else:
             # Der Schalter fehlt in dieser Version — die Anleitung muss das sagen.

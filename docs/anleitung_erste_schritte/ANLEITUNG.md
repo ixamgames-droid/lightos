@@ -217,6 +217,10 @@ Alles läuft über das Menü **Datei**:
    LightOS selbst.
 4. **Zuletzt verwendet** — die zehn zuletzt geöffneten oder gespeicherten Shows.
 
+Unter **Öffnen...** steht außerdem **Demo-Show öffnen**: fertige Beispiel-Shows, die das
+Windows-Setup mitbringt (aus dem Quellcode: `python packaging/demo_shows.py`). Eine Demo
+öffnet sich als neue, ungespeicherte Show — **Speichern** fragt nach einem Namen.
+
 Die Datei-Dialoge starten im Ordner der aktuellen Show, sonst im Ordner `shows` im
 LightOS-Datenordner (Linux: `~/.local/share/LightOS/shows`, Windows:
 `%APPDATA%\LightOS\shows`). Nach dem Speichern steht der Pfad im Fenstertitel und kurz
@@ -227,6 +231,23 @@ im LightOS-Datenordner. Das Intervall stellst du unter **Datei → Auto-Save-Int
 ein (1–60 Minuten). Ist beim nächsten Start diese Sicherung neuer als deine zuletzt
 gespeicherte Show — etwa nach einem Absturz —, bietet LightOS an, sie
 wiederherzustellen.
+
+**Ältere Versionen.** Zusätzlich hebt LightOS mehrere Stände jeder Show im Ordner
+`sicherungen` im LightOS-Datenordner auf: bei jedem Auto-Save, vor jedem Speichern, das
+eine vorhandene Datei überschreibt, und bevor du ungespeicherte Änderungen verwirfst
+(Neue Show, andere Show öffnen, Beenden). Über **Datei → Ältere Version öffnen…** siehst
+du die Sicherungen der aktuellen Show mit Datum, Uhrzeit, Anlass, Größe und Geräte- und
+Funktionszahl; mit dem Haken **Sicherungen aller Shows anzeigen** auch die der anderen.
+**Öffnen** lädt die gewählte Version als neue, ungespeicherte Show — im Fenstertitel
+steht dann `Name (Sicherung vom …)`. Deine Show-Datei und die Sicherung bleiben dabei
+unverändert; behalten willst du die alte Version erst, wenn du sie mit *Speichern
+unter...* ablegst.
+
+Aufgehoben werden je Show die letzten 10 Sicherungen, dazu eine pro Stunde der letzten
+24 Stunden und eine pro Tag der letzten 14 Tage — Auto-Saves und die Sicherungen vor
+einem Überschreiben oder Verwerfen zählen dabei getrennt, damit Auto-Saves keinen solchen
+Stand verdrängen. Wird der Ordner größer als 500 MB,
+löscht LightOS die ältesten zuerst.
 
 **Beenden mit ungespeicherten Änderungen.** Hast du seit dem letzten Speichern oder
 Öffnen etwas am Inhalt der Show geändert — Patch, Cuelisten, Funktionen, VC-Layout

@@ -675,9 +675,16 @@ def segmente_aus_mode(mode_el, nummern: list[int], channels) -> dict[int, int]:
 
 
 def import_qxf_file(path: str, session: Session,
-                    mfr_cache: dict[str, Manufacturer]) -> bool:
+                    mfr_cache: dict[str, Manufacturer], *,
+                    modusnamen_eindeutig: bool = True) -> bool:
     """Importiert eine einzelne .qxf-Datei. Gibt True bei Erfolg (neu angelegt)
-    zurück, False bei Parse-Fehler oder Duplikat."""
+    zurück, False bei Parse-Fehler oder Duplikat.
+
+    FM-73: zwei Modi gleichen Namens in der Datei werden beim Import eindeutig
+    gemacht („Name (2)“). ``modusnamen_eindeutig=False`` laesst die Namen der
+    Datei stehen — fuer den Umbau ins Bibliotheksformat
+    (``bibliothek_format.qxf_zu_daten``), der denselben Schritt selbst macht
+    und ihn in ``herkunft.geaendert`` vermerkt."""
     try:
         tree = ET.parse(path)
         root = tree.getroot()
@@ -786,6 +793,8 @@ def import_qxf_file(path: str, session: Session,
             for i, (ch_name, ch_el) in enumerate(all_ch, 1):
                 _make_channel(mode_obj, i, ch_name, ch_el)
     else:
+        from .modus_wahl import eindeutiger_modusname
+        modusnamen: set[str] = set()
         for mode_el in modes:
             ch_refs = _findall(mode_el, "Channel")
             # FM-23: die eigene Angabe des Modus schlaegt die fixture-weite.
@@ -795,7 +804,13 @@ def import_qxf_file(path: str, session: Session,
                 mode_grid = fallback_grid
             mode_obj = FixtureMode(
                 fixture=fixture,
-                name=mode_el.get("Name", "Standard"),
+                # FM-73: echte QLC+-Dateien haben vereinzelt zwei Modi
+                # gleichen Namens; der zweite wird „Name (2)“. Die
+                # Kanalnummerierung unten nimmt weiter den Namen der Datei.
+                name=(eindeutiger_modusname(
+                          mode_el.get("Name", "Standard"), modusnamen)
+                      if modusnamen_eindeutig
+                      else mode_el.get("Name", "Standard")),
                 channel_count=len(ch_refs),
                 grid_rows=mode_grid[0], grid_cols=mode_grid[1],
             )

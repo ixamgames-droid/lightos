@@ -1,6 +1,10 @@
 # LightOS — Roadmap
 
-> Stand: 2026-07-30 · Priorisierung: Kurzfristig (< 3 Monate) → Mittelfristig (3–9 Monate) → Langfristig (> 9 Monate)
+> **Historischer Stand (2026-07-30) — wird nicht mehr gepflegt.** Einzelne Punkte
+> unten sind inzwischen umgesetzt oder verworfen. Was wirklich offen ist und in
+> welcher Reihenfolge es drankommt, steht in [BACKLOG.md](BACKLOG.md).
+>
+> Priorisierung: Kurzfristig (< 3 Monate) → Mittelfristig (3–9 Monate) → Langfristig (> 9 Monate)
 
 ---
 
