@@ -609,7 +609,7 @@ class PaketierungTest(unittest.TestCase):
         self.assertIn("/demo_shows/", _lies(".gitignore").splitlines())
         try:
             aus = subprocess.run(["git", "ls-files", "--", "demo_shows"], cwd=_REPO,
-                                 capture_output=True, check=True, text=True)
+                                 capture_output=True, check=True, text=True, encoding="utf-8", errors="replace")
         except (OSError, subprocess.CalledProcessError):
             self.skipTest("kein Git")
         self.assertEqual(aus.stdout.strip(), "")
