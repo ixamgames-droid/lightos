@@ -44,7 +44,6 @@
 | WEB-09 | A | feature/web09-handy-seite-rueckmeldung | 2026-10-11T12:08Z | - |
 | UI-88 | D | perf/ui88-2d-bild-schneller | 2026-10-11T14:27Z | src/ui/views/live_view.py · tests/test_ui88_2d_bild_schneller.py |
 | UI-89 | A | fix/ui89-programmer-reiter-nur-passende | 2026-10-11T12:14Z | - |
-| LAS-33 | A | feature/las33-laser-profilangaben-generator | 2026-10-11T13:51Z | - |
 | LAS-34 | A | feature/las34-laser-tab | 2026-10-11T13:51Z | - |
 | LAS-35 | A | feature/las35-zonen-planer | 2026-10-11T18:11Z | - |
 | MIDI-10 | D | feature/midi10-pitchbend-fader | 2026-10-11T14:47Z | src/core/midi/midi_manager.py · src/core/midi/midi_mapper.py · src/ui/virtualconsole/vc_widget.py · src/ui/virtualconsole/vc_slider.py · src/ui/views/midi_view.py · src/ui/widgets/midi_teach_dialog.py · src/ui/widgets/input_profile_editor.py · tests/test_midi10_pitchbend_fader.py · docs/anleitung_vc_widgets/02_fader.md · docs/anleitung_vc_widgets/02_fader.en.md |
@@ -221,7 +220,6 @@
 
 ## Verlauf
 
-- 2026-10-11T17:49Z 7 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-11T18:08Z A done MIDI-5
 - 2026-10-11T18:08Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-11T18:11Z A aktualisiert LAS-35: Branch - -> feature/las35-zonen-planer
@@ -251,3 +249,4 @@
 - 2026-10-11T21:02Z A done UI-86
 - 2026-10-11T21:35Z D done VCB-36
 - 2026-10-11T21:55Z D done VIZ-103
+- 2026-10-11T22:18Z A done LAS-33
