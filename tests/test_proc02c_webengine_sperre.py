@@ -169,7 +169,7 @@ class SperreUeberLaeufeHinwegTest(unittest.TestCase):
         return subprocess.Popen(["bash", str(SEG_RUNNER), "-j", "3", *dateien],
                                 cwd=str(REPO), env=env,
                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                text=True)
+                                text=True, encoding="utf-8", errors="replace")
 
     def test_zwei_gleichzeitige_laeufe_ueberlappen_nie_im_webengine_segment(self):
         a = self._dateien("weba", MARKER)
@@ -288,7 +288,7 @@ class SperreUeberLaeufeHinwegTest(unittest.TestCase):
                             SEG_WEBENGINE="1")
             erg = subprocess.run(["bash", str(SEG_RUNNER), "-j", "3", *dateien],
                                  cwd=str(REPO), env=env, capture_output=True,
-                                 text=True, timeout=300)
+                                 text=True, encoding="utf-8", errors="replace", timeout=300)
         finally:
             _halter_abraeumen(halter)
         self.assertEqual(0, erg.returncode, erg.stdout)
@@ -341,7 +341,7 @@ class GezielterLaufNimmtDieSperreTest(unittest.TestCase):
                         LIGHTOS_SEG_OUT=str(self._tmp / "out"),
                         LIGHTOS_SHOW_DB=str(self._tmp / "kind.db"), **extra)
         return subprocess.run([str(LOOP_RUNNER), str(p)], cwd=str(REPO), env=env,
-                              capture_output=True, text=True, timeout=timeout)
+                              capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout)
 
     def test_webengine_einzellauf_wartet_auf_die_sperre(self):
         halter = self._halter(6)
@@ -415,7 +415,7 @@ class GezielterLaufNimmtDieSperreTest(unittest.TestCase):
                         LIGHTOS_SEG_OUT=str(self._tmp / "out"),
                         LIGHTOS_SHOW_DB=str(self._tmp / "kind.db"), **extra)
         return subprocess.run([str(LOOP_RUNNER), *argumente], cwd=str(REPO),
-                              env=env, capture_output=True, text=True,
+                              env=env, capture_output=True, text=True, encoding="utf-8", errors="replace",
                               timeout=timeout)
 
     def test_ein_verzeichnis_als_argument_nimmt_die_sperre_auch(self):
@@ -497,7 +497,7 @@ class GezielterLaufNimmtDieSperreTest(unittest.TestCase):
                     erg = subprocess.run(
                         ["bash", str(SEG_RUNNER), "-j", jobs, str(verz)],
                         cwd=str(REPO), env=env, capture_output=True,
-                        text=True, timeout=300)
+                        text=True, encoding="utf-8", errors="replace", timeout=300)
                 finally:
                     _halter_abraeumen(halter)
                 self.assertEqual(0, erg.returncode, erg.stdout)
@@ -517,7 +517,7 @@ class GezielterLaufNimmtDieSperreTest(unittest.TestCase):
         """
         skript = f'. "{HELFER}"; webengine_argumente "$@" && echo JA || echo NEIN'
         erg = subprocess.run(["bash", "-c", skript, "_", *argumente],
-                             cwd=str(cwd), capture_output=True, text=True,
+                             cwd=str(cwd), capture_output=True, text=True, encoding="utf-8", errors="replace",
                              timeout=60)
         return erg.stdout.strip()
 
@@ -594,7 +594,7 @@ def test_spur():
                         LIGHTOS_WEBENGINE_LOCKFILE=str(self.sperre))
         erg = subprocess.run(["bash", str(SEG_RUNNER), "-j", "2", str(p)],
                              cwd=str(REPO), env=env, capture_output=True,
-                             text=True, timeout=300)
+                             text=True, encoding="utf-8", errors="replace", timeout=300)
         enkel = int(pidfile.read_text(encoding="utf-8")) if pidfile.exists() else 0
         try:
             self.assertEqual(0, erg.returncode, erg.stdout)
@@ -651,7 +651,7 @@ def test_spur():
                         LIGHTOS_WEBENGINE_KIND_DECKEL="0.5")
         erg = subprocess.run(["bash", str(SEG_RUNNER), "-j", "2", str(p)],
                              cwd=str(REPO), env=env, capture_output=True,
-                             text=True, timeout=300)
+                             text=True, encoding="utf-8", errors="replace", timeout=300)
         fake_pid = int(pidfile.read_text(encoding="utf-8")) if pidfile.exists() else 0
         try:
             self.assertEqual(0, erg.returncode, erg.stdout)
@@ -683,7 +683,7 @@ def test_spur():
                         LIGHTOS_WEBENGINE_KIND_DECKEL="0.5")
         erg = subprocess.run(["bash", str(SEG_RUNNER), "-j", "2", str(p)],
                              cwd=str(REPO), env=env, capture_output=True,
-                             text=True, timeout=300)
+                             text=True, encoding="utf-8", errors="replace", timeout=300)
         self.assertEqual(0, erg.returncode, erg.stdout)
         self.assertNotIn("EIGENE Chromium-Kinder", erg.stdout, erg.stdout)
 
@@ -712,7 +712,7 @@ def test_spur():
                        LIGHTOS_WEBENGINE_SPERRE_WARTE="5")
             erg = subprocess.run(["bash", str(SEG_RUNNER), "-j", "2", str(p)],
                                  cwd=str(REPO), env=env, capture_output=True,
-                                 text=True, timeout=120)
+                                 text=True, encoding="utf-8", errors="replace", timeout=120)
         finally:
             _halter_abraeumen(halter)
         self.assertEqual(0, erg.returncode, erg.stdout)
@@ -760,7 +760,7 @@ class GezielterLaufGibtDieSperreEbensoFreiTest(unittest.TestCase):
         # derselben Gruppe steckt — eine Lastfalle, und ausgerechnet in diesem
         # Item die falsche Antwort.
         return subprocess.run([str(LOOP_RUNNER), str(datei)], cwd=str(REPO),
-                              env=env, capture_output=True, text=True,
+                              env=env, capture_output=True, text=True, encoding="utf-8", errors="replace",
                               timeout=timeout, start_new_session=True)
 
     def test_ein_ueberlebender_enkel_haelt_die_sperre_des_einzellaufs_nicht_fest(self):
@@ -882,7 +882,7 @@ def test_spur():
             proc = subprocess.Popen(
                 [str(LOOP_RUNNER), str(p), "-s"], cwd=str(REPO), env=env,
                 stdin=neben, stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT, text=True)
+                stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
             os.close(neben)
             neben = None
             aus = proc.communicate(timeout=200)[0]
@@ -947,7 +947,7 @@ class SperreGiltUeberWorktreeGrenzenTest(unittest.TestCase):
 
     def _git(self, *args):
         erg = subprocess.run(["git", *args], cwd=str(self.basis),
-                             capture_output=True, text=True, timeout=120)
+                             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
         if erg.returncode != 0:
             self.skipTest(f"git {args[0]} ging nicht: {erg.stderr[:200]}")
         return erg
@@ -975,7 +975,7 @@ class SperreGiltUeberWorktreeGrenzenTest(unittest.TestCase):
         env.update(extra)
         r = subprocess.run(["bash", str(wurzel / "tools" / "verify_loop.sh")],
                            cwd=str(wurzel), env=env, capture_output=True,
-                           text=True, timeout=300)
+                           text=True, encoding="utf-8", errors="replace", timeout=300)
         for zeile in r.stdout.splitlines():
             if zeile.startswith("[verify] WebEngine-Sperrdatei:"):
                 return zeile.split(":", 1)[1].strip()
@@ -990,7 +990,7 @@ class SperreGiltUeberWorktreeGrenzenTest(unittest.TestCase):
         env.update(extra)
         return subprocess.run([str(wurzel / "tools" / "verify_loop.sh"), str(datei)],
                               cwd=str(wurzel), env=env, capture_output=True,
-                              text=True, timeout=300)
+                              text=True, encoding="utf-8", errors="replace", timeout=300)
 
     def test_verschachtelter_und_geschwister_worktree_teilen_die_sperre(self):
         # Die beiden Lagen aus PROC-02b: einmal Geschwister von `repo/`, einmal
@@ -1073,7 +1073,7 @@ class WartenAufEigeneKinderTest(unittest.TestCase):
                   f'webengine_warte_auf_kinder {pgid}; echo "rc=$?"')
         t0 = time.monotonic()
         erg = subprocess.run(["bash", "-c", skript], cwd=str(REPO),
-                             capture_output=True, text=True, timeout=60)
+                             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
         return erg.stdout.strip(), time.monotonic() - t0
 
     def test_eigene_kinder_halten_das_warten_auf_fremde_nicht(self):
