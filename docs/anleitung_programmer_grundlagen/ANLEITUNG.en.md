@@ -159,17 +159,22 @@ The tab bar only shows what fits the selection. Without a selection it shows
 
 | Tab | When visible | Contents |
 |---|---|---|
-| **Intensity** | always | dimmer, shutter/strobe |
+| **Intensity** | selection has a dimmer, shutter/strobe or colour | dimmer, shutter/strobe |
 | **Color** | selection has colour channels | quick select, colour faders |
 | **Position** | selection has pan/tilt | see step 5 |
-| **Gobo** | selection has a gobo wheel | gobo tiles, rotation |
+| **Gobo** | selection has a gobo wheel (a laser's pattern selection does not count) | gobo tiles, rotation |
 | **Weitere** | selection has further channels | optics (zoom, focus, prism, iris), effects, programmes, everything else |
 | **Mapping** | selection has pan/tilt | map one position onto other channels |
 | **Assistent** | always | effect assistant, **+ Szene** (scene), **+ Chaser**, **Programmer → Szene**, list of all functions with **Start**/**Stop** |
-| **EFX** | selection has pan/tilt | movement effects |
-| **Matrix** | always | colour and dimmer matrices of the selection ([Matrix-Effekte](../anleitung_matrix_effekte/ANLEITUNG_MATRIX_EFFEKTE.md), German) |
+| **EFX** | selection has pan/tilt or a laser with X/Y movement | movement effects |
+| **Matrix** | selection has a dimmer or colour | colour and dimmer matrices of the selection ([Matrix-Effekte](../anleitung_matrix_effekte/ANLEITUNG_MATRIX_EFFEKTE.md), German) |
 | **Laser** | selection contains a laser | see [Laser bedienen](../anleitung_laser/ANLEITUNG_LASER.md) (German) |
 | **Paletten** | always | stored colours, positions … to recall |
+
+A pure laser (no dimmer, no colour mixing) therefore only shows **Assistent**, **EFX**,
+**Laser** and **Paletten** — everything it can do lives in the **Laser** tab. A laser that
+brings a dimmer or RGB also gets **Intensity**, **Color** and **Matrix**. The open tab stays
+open when the selection changes, as long as it still exists.
 
 ![Palettes tab with a recorded colour](img/06_paletten.png)
 

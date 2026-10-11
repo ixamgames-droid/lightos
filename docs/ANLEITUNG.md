@@ -132,7 +132,8 @@ Was im Programmer „an" ist, ist die Quelle für Szenen/Snapshots.
 ### 4.2 Attribute einstellen
 Rechts erscheinen Tabs je nach Gerätetyp:
 **Intensity · Color · Position · Gobo · Weitere** (Gobo nur bei Gobo-Geräten)
-sowie **Assistent · EFX · Matrix · Paletten**. Pro Kanal ein Fader
+sowie **Assistent · EFX · Matrix · Paletten** — jeweils nur die, die zur Auswahl
+passen (ein reiner Laser zeigt z. B. nur Assistent, EFX, Laser, Paletten). Pro Kanal ein Fader
 (0–255 / 0–100 %); `↺` setzt einen Kanal auf den Standardwert.
 - **Intensity-Tab:** Dimmer + **Strobe** (Status-Kacheln „Auf" / „Zu" sowie
   „Strobe langsam" / „Strobe mittel" / „Strobe schnell", dazu der Slider

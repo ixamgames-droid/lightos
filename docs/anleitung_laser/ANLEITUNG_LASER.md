@@ -43,7 +43,8 @@ einfache Bedienung.)
 
 Wechsle in den **Programmer** und **wähle den Laser** in der Geräteliste. Es
 erscheint der Tab **„Laser"**. Er ist nach Bedeutung gegliedert statt roher
-DMX-Kanäle:
+DMX-Kanäle. Ist nur ein reiner Laser gewählt, zeigt die Reiterleiste daneben
+nur noch **Assistent**, **EFX** und **Paletten**:
 
 - **Betriebsart** (Kacheln)
 - **Mustergruppe** und **Muster** (Bank + Musterauswahl)
