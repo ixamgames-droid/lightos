@@ -799,7 +799,7 @@ def _meta(repo: str) -> dict:
             "interpreter": sysconfig.get_platform()}
     try:
         r = subprocess.run(["git", "-C", repo, "rev-parse", "--short", "HEAD"],
-                           capture_output=True, text=True, timeout=20)
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=20)
         meta["commit"] = r.stdout.strip() or "?"
     except Exception:                                # noqa: BLE001
         meta["commit"] = "?"
