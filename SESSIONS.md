@@ -70,6 +70,7 @@
 | QA-96 | A | - | 2026-10-11T16:56Z | - |
 | XPLAT-54 | D | fix/xplat54-backlog-fragmente-test-windows | 2026-10-11T18:31Z | tests/test_backlog_fragmente.py |
 | WEB-12 | A | fix/web12-handy-rechte-laser | 2026-10-11T19:15Z | - |
+| LAS-36 | A | fix/las36-notaus-loesen-lasererkennung | 2026-10-11T19:15Z | - |
 
 ## Blocker & Fallen
 
@@ -214,7 +215,6 @@
 
 ## Verlauf
 
-- 2026-10-11T14:47Z D aktualisiert MIDI-10: Dateien src/core/midi/midi_manager.py · src/core/midi/midi_mapper.py · src/ui/virtualconsole/vc_widget.py · src/ui/virtualconsole/vc_slider.py · tests/test_midi10_pitchbend_fader.py -> src/core/midi/midi_manager.py · src/core/midi/midi_mapper.py · src/ui/virtualconsole/vc_widget.py · src/ui/virtualconsole/vc_slider.py · src/ui/views/midi_view.py · src/ui/widgets/midi_teach_dialog.py · src/ui/widgets/input_profile_editor.py · tests/test_midi10_pitchbend_fader.py · docs/anleitung_vc_widgets/02_fader.md · docs/anleitung_vc_widgets/02_fader.en.md
 - 2026-10-11T14:52Z D aktualisiert ENG-30: Branch - -> perf/eng30-engine-zeit-je-frame
 - 2026-10-11T14:58Z B done TOOL-26
 - 2026-10-11T15:10Z A claim WEB-10
@@ -244,3 +244,4 @@
 - 2026-10-11T19:02Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-11T19:15Z A claim WEB-12
 - 2026-10-11T19:15Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-11T19:15Z A claim LAS-36
