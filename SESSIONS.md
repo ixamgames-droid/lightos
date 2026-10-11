@@ -68,7 +68,7 @@
 | LAS-36 | A | fix/las36-notaus-loesen-lasererkennung | 2026-10-11T19:15Z | - |
 | LAS-37 | D | fix/las37-eine-laser-erkennung | 2026-10-11T20:38Z | - |
 | VCB-43 | D | fix/vcb43-halte-blackout-fremder-blackout | 2026-10-11T20:50Z | - |
-| OUT-71 | D | - | 2026-10-11T19:24Z | - |
+| OUT-71 | D | fix/out71-schlussbild-beim-beenden | 2026-10-11T20:58Z | - |
 | WEB-13 | A | - | 2026-10-11T20:18Z | - |
 | STAB-34 | D | fix/stab34-speichern-frage-nach-show-laden | 2026-10-11T20:28Z | src/core/capability/reflect.py · src/core/capability/manifest.py · src/core/show/showbuilder/builder.py · src/ui/main_window.py · tests/test_stab34_speichern_frage_nach_show_laden.py |
 | UI-91 | A | fix/ui91-efx-reiter-geraeteliste | 2026-10-11T20:42Z | - |
@@ -221,7 +221,6 @@
 
 ## Verlauf
 
-- 2026-10-11T16:56Z A claim QA-96
 - 2026-10-11T16:56Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-11T17:16Z A done PROC-20
 - 2026-10-11T17:49Z D done TOOL-24
@@ -251,3 +250,4 @@
 - 2026-10-11T20:42Z A claim UI-91
 - 2026-10-11T20:43Z A claim FM-74
 - 2026-10-11T20:50Z D aktualisiert VCB-43: Branch - -> fix/vcb43-halte-blackout-fremder-blackout
+- 2026-10-11T20:58Z D aktualisiert OUT-71: Branch - -> fix/out71-schlussbild-beim-beenden
