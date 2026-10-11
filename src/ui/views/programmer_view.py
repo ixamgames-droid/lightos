@@ -359,6 +359,9 @@ class ProgrammerView(QWidget):
             self._body.deleteLater()
         # Zonen-spezifische Referenzen invalidieren (werden ggf. neu erzeugt).
         self._tile_preview = None
+        # LAS-34: Lampen-Vorschau für reine Laser von selbst zugeklappt?
+        self._vorschau_auto_zu = False
+        self._vorschau_vorher = False
         self._effects_list = None
         self._body = QWidget()
         self._root.addWidget(self._body, stretch=1)
@@ -908,6 +911,11 @@ class ProgrammerView(QWidget):
         self._refresh_effects_list()
 
     def _on_bottom_collapsed(self, collapsed: bool):
+        # LAS-34: Solange die Vorschau für einen reinen Laser von selbst zu
+        # ist, gilt ein Klick nur für jetzt — gemerkt wird der Zustand der
+        # anderen Geräte.
+        if getattr(self, "_vorschau_auto_zu", False):
+            return
         _save_prefs({"programmer_bottom_collapsed": bool(collapsed)})
 
     def _push_selection_to_preview(self):
@@ -1482,6 +1490,7 @@ class ProgrammerView(QWidget):
                 # gar nicht mehr gewaehlt ist — und der Laser-Reiter blieb offen.
                 self._update_fixture_combo([])
                 self._tabs_grundzustand()
+                self._vorschau_fuer_laser(False)
                 self._lbl_selection.setText(_EMPTY_SELECTION_MSG)
                 self._color_preview.set_fixtures([])
                 self._template_channels = []
@@ -1574,12 +1583,48 @@ class ProgrammerView(QWidget):
 
             # UI-89: EINE Stelle entscheidet ueber die Reiterleiste und setzt
             # sie in einem Zug (nur Aenderungen, offener Reiter bleibt).
+            nur_laser = all(self._ist_laser(f) for f in selected)
             self._reiter_anwenden(
                 self._reiter_sichtbarkeit(selected, normal,
                                           weiss_block is not None),
-                laser_zuerst=all(self._ist_laser(f) for f in selected))
+                laser_zuerst=nur_laser)
+            self._vorschau_fuer_laser(nur_laser and self._reiner_laser(selected))
         except RuntimeError:
             pass  # Widgets beim Layout-Wechsel zwischenzeitlich geloescht
+
+    def _reiner_laser(self, selected) -> bool:
+        """LAS-34: Laser OHNE Dimmer/Farbmischung — für sie zeigen Farbstreifen
+        und Lampen-Vorschau nichts (ein schwarzes Feld mit dem Wort „Laser“)."""
+        try:
+            from src.ui.views.laser_view import LASER_KOMBI_ATTRS
+            for f in selected:
+                for ch in get_channels_for_patched(f):
+                    if (getattr(ch, "attribute", "") or "") in LASER_KOMBI_ATTRS:
+                        return False
+            return bool(selected)
+        except Exception:
+            return False
+
+    def _vorschau_fuer_laser(self, reiner_laser: bool):
+        """LAS-34: Beim reinen Laser klappt die Lampen-Vorschau zu und der
+        Farbstreifen verschwindet — der Laser-Reiter braucht die Höhe, und
+        beide zeigen dort nichts. Der GEMERKTE Zustand (für alle anderen
+        Geräte) bleibt unberührt: sobald etwas anderes gewählt ist, steht die
+        Vorschau wieder so da wie vorher."""
+        try:
+            self._color_preview.setVisible(not reiner_laser)
+            tp = getattr(self, "_tile_preview", None)
+            if tp is None:
+                return
+            if reiner_laser and not self._vorschau_auto_zu:
+                self._vorschau_vorher = tp.is_collapsed()
+                self._vorschau_auto_zu = True
+                tp.set_collapsed(True)          # ohne Signal: nichts gemerkt
+            elif not reiner_laser and self._vorschau_auto_zu:
+                self._vorschau_auto_zu = False
+                tp.set_collapsed(self._vorschau_vorher)
+        except RuntimeError:
+            pass
 
     @staticmethod
     def _ist_laser(fx) -> bool:

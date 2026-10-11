@@ -46,6 +46,40 @@ erscheint der Tab **„Laser"**. Er ist nach Bedeutung gegliedert statt roher
 DMX-Kanäle. Ist nur ein reiner Laser gewählt, zeigt die Reiterleiste daneben
 nur noch **Assistent**, **EFX** und **Paletten**:
 
+Ganz oben steht die **Sicherheitsleiste** — eine Zeile: links der Zustand
+(**Laser AN** / **Laser AUS** laut Betriebsart, bzw. **NOT-AUS aktiv**), Modell
+und Anzahl der gewählten Laser, rechts der Knopf **LASER NOT-AUS**.
+
+Was darunter steht, hängt vom Geräteprofil ab.
+
+**Profil mit Laser-Angaben** (Musterliste, Farbtabelle, Richtungen — z. B.
+Laserworld EL-400RGB MK2; anlegen im Fixture Generator):
+
+- **Betriebsart** als Umschalter: **Aus · Musik · Auto · Statische Muster ·
+  Dynamische Muster**. Unter jedem Namen steht, ob LightOS steuert oder das
+  Gerät selbst läuft. In **Musik** und **Auto** sind Muster, Lage und Farbe
+  ausgegraut — sie wirken dort nicht.
+- **Vorschau & Position:** das gewählte Muster in der gewählten Farbe, Größe
+  und Lage. **Ziehen** verschiebt das Muster; der gestrichelte Rand ist die
+  größte Auslenkung. Darunter steht die Lage („X 28 % rechts", „Y 34 % oben"),
+  **Mitte** stellt zurück.
+- **Muster:** eine Kachel je Muster des Profils, mit Schemabild und Name
+  (Schemazeichnung, kein Foto; ein bewegtes Muster trägt **≈**). **alle 0–255**
+  klappt den Regler auf — für Werte, zu denen das Profil keinen Eintrag hat.
+- **Farbe:** ein Feld je Farbe der Farbtabelle, ebenfalls mit **alle 0–255**.
+  Farbe ändert die Helligkeit nicht.
+- **Regler** laufen richtig herum und nennen ihre Enden (**Größe** klein → groß,
+  auch wenn der DMX-Kanal umgekehrt zählt); daneben steht der gesendete
+  DMX-Wert. **Mustertempo** wirkt nur bei dynamischen Mustern. Nennt das Profil
+  für einen Regler keine Richtung, läuft er von 0 bis 255 und sagt das dazu.
+- **Gemerkte Muster:** siehe Abschnitt 5.
+
+Sind mehrere Laser gewählt, wirkt jede Bedienung auf alle; die Vorschau zeigt
+den ersten. Macht ein Profil zu einem Teil keine Angaben — oder unterscheiden
+sich die gewählten Laser darin —, steht dort die bisherige Bedienung.
+
+**Profil ohne Laser-Angaben** (bisherige Bedienung):
+
 - **Betriebsart** (Kacheln)
 - **Mustergruppe** und **Muster** (Bank + Musterauswahl)
 - **Farbe**, **Bewegung & Geschwindigkeit**, **Zeichnen**
@@ -55,6 +89,10 @@ Neben jedem Regler steht der **Klartext des Wertebereichs** — z. B. zeigt das
 Muster-Farbfeld bei Wert 40 automatisch „40–47 Blau", die Musterbank
 „0–223 Animations-Bänke 1–14". So musst du keine DMX-Tabelle neben der Konsole
 liegen haben.
+
+Ist nur ein reiner Laser gewählt (ohne Dimmer und Farbmischung), klappt die
+**Lampen-Vorschau** unter den Reitern von selbst zu. Für alle anderen Geräte
+bleibt sie, wie du sie eingestellt hast.
 
 ---
 
@@ -87,6 +125,10 @@ Damit du ein schönes Muster später mit **einem Klick** wiederbekommst:
 - **„💾 Muster speichern…"** (Box **„Muster-Paletten"**) legt die aktuellen
   Laser-Werte der Auswahl als **benanntes Muster** ab. Es erscheint als Kachel
   in „Muster-Paletten" und lässt sich per Klick wieder auf den Laser anwenden.
+- Bei einem Profil mit Laser-Angaben heißt dasselbe **„Gemerkte Muster"**:
+  **+ merken…** speichert, die kleinen Knöpfe daneben rufen ab (weitere unter
+  **▾**). Es sind dieselben Laser-Paletten der Show — umbenennen und löschen
+  im Reiter **Paletten**.
 
 ### 5b. Werksmuster-Bibliothek mit eigenen Fotos (nur DMX-Muster-Laser)
 

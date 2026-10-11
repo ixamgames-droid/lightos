@@ -12,25 +12,41 @@ Sektionen:
 - **Muster-Paletten**: benannte Presets der Laser-Werte (``PaletteType.LASER``),
   gespeichert über die bestehende Palette-Engine (verwalten im Paletten-Tab).
 
+LAS-34: liefert das Geräteprofil Laser-Angaben (``laser_profilangaben``:
+Betriebsart, Musterliste, Farbtabelle, Richtungen), stehen statt der Regler
+BAUSTEINE da — Sicherheitsleiste, Betriebsart-Umschalter, Vorschau & Position,
+Muster-Galerie, Farbfelder, Regler mit sprechenden Enden, gemerkte Muster.
+Jeder Baustein fällt EINZELN auf die bisherige Bedienung (Kacheln, Regler)
+zurück, wenn das Profil dafür nichts sagt oder die gewählten Laser sich darin
+unterscheiden. Kein Kanal geht dabei verloren (``bedienbare_attribute``).
+
 Werte fließen ausschließlich über ``set_programmer_value(fid, attr, head=)`` —
 kein eigener Render-Pfad. Laser-Safety: diese View schreibt nur auf explizite
 Nutzeraktion; es gibt keinen Auto-Start.
 """
 from __future__ import annotations
 
+import importlib
+from dataclasses import dataclass
+
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QSlider,
     QSpinBox, QComboBox, QPushButton, QRadioButton, QButtonGroup,
-    QScrollArea, QGroupBox, QInputDialog, QFrame,
+    QScrollArea, QGroupBox, QInputDialog, QFrame, QMenu, QToolButton,
 )
-from PySide6.QtCore import Qt, QRect
+from PySide6.QtCore import Qt, QRect, QTimer
 from PySide6.QtGui import QColor, QFont, QPainter, QPen, QPixmap
 
 from src.core.app_state import get_state, get_channels_for_patched
 from src.core.attr_groups import attr_label
 from src.core.laser.capability import (laser_capability, LaserClass,
                                        is_laser_fixture)
+from src.core.laser.profilangaben import FARBEN, laser_profilangaben
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
+from src.ui.widgets.laser_tab_bausteine import (
+    TOUCH, BetriebsartUmschalter, FarbFelder, LageAnzeige, LageFeld,
+    MusterGalerie, SprechRegler, farbe_als_qt, lage_text, nebentext,
+    ueberschrift)
 
 # Nicht-``laser_*``-Attribute, die auf einem Laser-Fixture zur Laser-Steuerung
 # gehören (Musterauswahl = gobo_wheel, Rotation = gobo_rotation usw.).
@@ -146,10 +162,130 @@ def _sorted_ranges(ch) -> list:
                   key=lambda r: int(getattr(r, "range_from", 0) or 0))
 
 
-class _ChannelRow(QWidget):
-    """Eine Regler-Zeile: Label + Slider + Spin + Range-Auswahl (ComboBox)."""
+# ── LAS-34: Bausteine aus den Profilangaben ─────────────────────────────────
 
-    def __init__(self, channel, on_change, parent=None):
+#: Regler der rechten Spalte: Attribut -> (Titel, Zusatz, Zusatz OHNE
+#: Richtungsangabe, eigene Worte fuer die Enden). Sie stehen dort nur, wenn das
+#: Profil ueberhaupt Laser-Angaben macht; mit ``Richtung`` laufen sie richtig
+#: herum und tragen sprechende Enden, ohne sind es gewoehnliche Regler 0..255
+#: — und es steht dabei, dass das Profil die Richtung nicht nennt.
+OHNE_RICHTUNG = "Richtung nicht im Profil"
+SPRECH_REGLER: tuple[tuple[str, str, str, str, dict | None], ...] = (
+    ("zoom", "Größe", "", OHNE_RICHTUNG, None),
+    # Das Zeichentempo ist die Scangeschwindigkeit: langsam heisst hier „ruhig“.
+    ("laser_scan_rate", "Zeichentempo", "", OHNE_RICHTUNG,
+     {"langsam": "ruhig"}),
+    ("effect_speed", "Mustertempo", "nur bei dynamischen Mustern",
+     "nur bei dynamischen Mustern", None),
+    ("laser_color_change", "Farbsegmente", "", "Profil ohne Stufen", None),
+)
+
+#: Modul der Sperrzonen-Anzeige (LAS-32). Auf einem Stand ohne diese Funktion
+#: gibt es das Modul nicht — dann bleibt das Abzeichen der Sicherheitsleiste
+#: weg. Bewusst KEIN Import am Dateianfang.
+SPERRZONEN_MODUL = "src.core.laser.sperrzonen"
+NUR_ANZEIGE = "Nur Anzeige · schaltet nicht ab"
+
+
+def sperrzonen_hinweis(state, fids) -> tuple[str, str] | None:
+    """Schnittstelle zur Sperrzonen-Anzeige: ``(Kurztext, Einzelheiten)`` fuer
+    die gewaehlten Laser — oder ``None``, wenn es nichts zu sagen gibt oder
+    die Funktion auf diesem Stand fehlt.
+
+    Der Text ist ein HINWEIS. Die Sperrzonen sind eine reine Anzeige; sie
+    schalten keinen Laser ab und ersetzen keinen Laserschutz."""
+    try:
+        modul = importlib.import_module(SPERRZONEN_MODUL)
+        kopf, befunde = modul.state_befunde(state)
+    except Exception:
+        return None
+    try:
+        frei = getattr(modul, "STATUS_FREI", "frei")
+        fids = {int(f) for f in fids}
+        eigene = [b for b in befunde if int(getattr(b, "fid", -1)) in fids
+                  and getattr(b, "status", frei) != frei]
+        if eigene:
+            wort = "Hinweis" if len(eigene) == 1 else "Hinweise"
+            return (f"⚠ Sperrzonen: {len(eigene)} {wort}",
+                    "\n".join(str(getattr(b, "text", "")) for b in eigene))
+        if kopf and not befunde:
+            return str(kopf), str(kopf)
+    except Exception as e:
+        print(f"[laser_view] Sperrzonen-Hinweis: {e}")
+    return None
+
+
+@dataclass
+class _Plan:
+    """Welche Bausteine die Auswahl bekommt (``None``/leer = Rueckfall auf die
+    bisherige Bedienung dieses Teils)."""
+    betriebsart: object = None      # KanalAngaben mit .betriebsart
+    muster: object = None           # KanalAngaben mit .muster
+    farben: object = None           # KanalAngaben mit .farben
+    lage: tuple | None = None       # (Richtung laser_x, Richtung laser_y)
+    regler: tuple = ()              # ((Attribut, Richtung | None), …)
+
+    @property
+    def neu(self) -> bool:
+        return bool(self.betriebsart or self.muster or self.farben
+                    or self.lage or self.regler)
+
+    def abgedeckt(self) -> set[str]:
+        """Attribute, die ein Baustein bedient (statt einer Regler-Zeile)."""
+        out = {a for a, _r in self.regler}
+        for k in (self.betriebsart, self.muster, self.farben):
+            if k is not None:
+                out.add(k.attribut)
+        if self.lage is not None:
+            out |= {"laser_x", "laser_y"}
+        return out
+
+    def kennung(self) -> str:
+        return repr((self.betriebsart, self.muster, self.farben, self.lage,
+                     self.regler))
+
+
+_MODELL_NAMEN: dict[int, str] = {}
+
+
+def _modell_name(fx) -> str:
+    """Modellname eines gepatchten Lasers (aus dem Profil; je Profil einmal
+    nachgeschlagen)."""
+    pid = getattr(fx, "fixture_profile_id", None)
+    if pid is None:
+        return str(getattr(fx, "fixture_name", None)
+                   or getattr(fx, "name", None) or "")
+    if pid not in _MODELL_NAMEN:
+        name = ""
+        try:
+            from sqlalchemy.orm import Session
+            from src.core.database.fixture_db import engine
+            from src.core.database.models import FixtureProfile
+            with Session(engine()) as s:
+                prof = s.get(FixtureProfile, int(pid))
+                name = str(getattr(prof, "name", "") or "")
+        except Exception as e:
+            print(f"[laser_view] Modellname nicht lesbar: {e}")
+        _MODELL_NAMEN[pid] = name
+    return _MODELL_NAMEN[pid]
+
+
+def farb_name(farbe) -> str:
+    """Anzeigename einer Farbe der Farbtabelle („gruen“ -> „Grün“)."""
+    name = (getattr(farbe, "name", "") or "").strip()
+    bekannt = FARBEN.get(name.casefold())
+    if bekannt is not None:
+        return bekannt[0]
+    return name[:1].upper() + name[1:]
+
+
+class _ChannelRow(QWidget):
+    """Eine Regler-Zeile: Label + Slider + Spin + Range-Auswahl (ComboBox).
+
+    ``kompakt`` (LAS-34): nur Schieber und Zahlenfeld — die Zeile hinter
+    „alle 0–255“ unter der Muster-Galerie bzw. den Farbfeldern."""
+
+    def __init__(self, channel, on_change, parent=None, kompakt: bool = False):
         super().__init__(parent)
         self.attribute = channel.attribute
         self._on_change = on_change
@@ -191,6 +327,11 @@ class _ChannelRow(QWidget):
             self._combo.addItem(f"{lo}-{hi}  {name}", _range_value(r))
         self._combo.setVisible(bool(self._ranges))
         lay.addWidget(self._combo)
+        if kompakt:
+            lbl.setVisible(False)
+            pol.setRetainSizeWhenHidden(False)
+            self._combo.setSizePolicy(pol)
+            self._combo.setVisible(False)
 
         self._slider.valueChanged.connect(self._slider_changed)
         self._spin.valueChanged.connect(self._spin_changed)
@@ -306,6 +447,10 @@ class LaserView(QWidget):
         self._collapsible_groups: dict[str, list[str]] = {}
         self._template_sig: tuple = ()
         self._head_mode: str = "A"          # "A" | "B" | "AB"
+        # LAS-34: aktive Bausteine und ihre Regler.
+        self._plan = _Plan()
+        self._sprech: dict[str, SprechRegler] = {}
+        self._kanal_je_attr: dict[str, object] = {}
 
         self._build_ui()
         self._subscribe()
@@ -314,7 +459,7 @@ class LaserView(QWidget):
     # ------------------------------------------------------------------ UI --
     def _build_ui(self):
         root = QVBoxLayout(self)
-        root.setContentsMargins(8, 8, 8, 8)
+        root.setContentsMargins(8, 8, 8, 6)
         root.setSpacing(8)
 
         self._info = QLabel("Kein Laser in der Auswahl.")
@@ -367,29 +512,55 @@ class LaserView(QWidget):
         root.addWidget(self._safety_box)
         self._update_arm_button()
 
-        # LAS-26: NOT-AUS auch fuer DMX-Laser. Die Netzwerk-Box oben ist nur
-        # bei Ether-Dream/IDN-Lasern sichtbar — mit einem DMX-Laser in der
-        # Auswahl (EL-400RGB MK2, SH-LASER3W, L2600 …) gab es auf dieser Seite
-        # bisher KEINEN NOT-AUS und keine Anzeige, ob er greift. Derselbe Weg
-        # wie der Knopf der Netzwerk-Box (``_on_estop``): ``estop_all`` setzt
-        # den DMX-Latch (UXT-12) und verriegelt die Netzwerk-Ausgabe.
-        self._dmx_safety_box = QGroupBox("Laser-Sicherheit")
+        # LAS-34: Sicherheitsleiste — EINE Zeile statt der beiden Kaesten
+        # „Laser-Sicherheit“ und „Sperrzonen“. Links der Zustand (Laser AN/AUS
+        # laut Betriebsart bzw. NOT-AUS aktiv, Modell, Anzahl), rechts das
+        # Sperrzonen-Abzeichen (nur wo es die Funktion gibt) und der NOT-AUS.
+        # Der Knopf geht denselben Weg wie bisher (``_on_estop``): ``estop_all``
+        # setzt den DMX-Latch (UXT-12) und verriegelt die Netzwerk-Ausgabe.
+        # Die Namen ``_dmx_safety_box``/``_btn_dmx_estop``/``_lbl_dmx_estop``
+        # bleiben (LAS-26) — sichtbar ist die Leiste, sobald ein DMX-Laser in
+        # der Auswahl ist.
+        self._dmx_safety_box = QFrame()
+        self._dmx_safety_box.setObjectName("laserSicherheitsleiste")
+        self._dmx_safety_box.setStyleSheet(
+            "#laserSicherheitsleiste{background:#1c1c1c;border:1px solid "
+            "#3a3a3a;border-radius:4px;}")
+        self._dmx_safety_box.setFixedHeight(44)
         dsb = QHBoxLayout(self._dmx_safety_box)
-        self._btn_dmx_estop = QPushButton("⏹ LASER NOT-AUS")
-        self._btn_dmx_estop.setMinimumHeight(40)
+        dsb.setContentsMargins(12, 0, 4, 0)
+        dsb.setSpacing(8)
+        self._zustand_punkt = QLabel()
+        self._zustand_punkt.setFixedSize(10, 10)
+        dsb.addWidget(self._zustand_punkt)
+        self._lbl_dmx_estop = QLabel("")
+        dsb.addWidget(self._lbl_dmx_estop)
+        self._lbl_modell = QLabel("")
+        self._lbl_modell.setStyleSheet("color:#8b949e;background:transparent;")
+        dsb.addWidget(self._lbl_modell)
+        dsb.addStretch(1)
+        self._sperrzonen_abzeichen = QLabel("")
+        self._sperrzonen_abzeichen.setTextFormat(Qt.TextFormat.RichText)
+        self._sperrzonen_abzeichen.setFixedHeight(TOUCH)
+        self._sperrzonen_abzeichen.setStyleSheet(
+            "QLabel{background:#2e2600;border:1px solid #f0c000;color:#f0c000;"
+            "border-radius:18px;padding:0 11px;font-size:12px;}")
+        self._sperrzonen_abzeichen.setVisible(False)
+        dsb.addWidget(self._sperrzonen_abzeichen)
+        self._btn_dmx_estop = QPushButton("■ LASER NOT-AUS")
+        self._btn_dmx_estop.setFixedHeight(TOUCH)
+        self._btn_dmx_estop.setMinimumWidth(138)
         self._btn_dmx_estop.setStyleSheet(
             "QPushButton{background:#8b0000;color:#fff;font-weight:bold;"
-            "border:1px solid #b30000;border-radius:5px;padding:6px 14px;}"
+            "border:1px solid #d02020;border-radius:3px;padding:0 12px;}"
             "QPushButton:hover{background:#b30000;}")
         self._btn_dmx_estop.setToolTip(
             "Schaltet ALLE Laser sofort dunkel: DMX-Laser auf ihren Aus-Wert "
             "(bis Betriebsart oder Muster neu gewählt wird), Netzwerk-Laser "
-            "werden unscharf.")
+            "werden unscharf. Blackout und Grand Master 0 schalten ebenfalls "
+            "über den Aus-Wert der Betriebsart dunkel.")
         self._btn_dmx_estop.clicked.connect(weak_slot(self._on_estop))
         dsb.addWidget(self._btn_dmx_estop)
-        self._lbl_dmx_estop = QLabel("")
-        self._lbl_dmx_estop.setWordWrap(True)
-        dsb.addWidget(self._lbl_dmx_estop, stretch=1)
         self._dmx_safety_box.setVisible(False)
         root.addWidget(self._dmx_safety_box)
 
@@ -408,16 +579,43 @@ class LaserView(QWidget):
         hb.addStretch(1)
         root.addWidget(self._head_box)
 
+        # LAS-34: Betriebsart als Umschalter (Segmente aus den Profilangaben).
+        # Daneben der Hinweis, wenn das Gerät selbst läuft (Musik/Auto).
+        self._seg_box = QWidget()
+        sgl = QVBoxLayout(self._seg_box)
+        sgl.setContentsMargins(0, 0, 0, 0)
+        sgl.setSpacing(4)
+        seg_kopf = QHBoxLayout()
+        seg_kopf.addWidget(ueberschrift("Betriebsart"))
+        self._lbl_gesperrt = QLabel(
+            "Gerät läuft selbst — Muster, Lage und Farbe wirken in dieser "
+            "Betriebsart nicht.")
+        self._lbl_gesperrt.setStyleSheet(
+            "color:#f0c000;font-size:11px;background:transparent;")
+        self._lbl_gesperrt.setVisible(False)
+        seg_kopf.addStretch(1)
+        seg_kopf.addWidget(self._lbl_gesperrt)
+        sgl.addLayout(seg_kopf)
+        self._umschalter = BetriebsartUmschalter(self._betriebsart_gewaehlt)
+        sgl.addWidget(self._umschalter)
+        self._seg_box.setVisible(False)
+        root.addWidget(self._seg_box)
+
         # Betriebsart-Schnellwahl (Shutter-Ranges als Kacheln: Aus/Auto/Sound/
-        # Muster-an). Bewusst „Betriebsart", damit „Muster" eindeutig die
-        # Musterauswahl meint (nicht den Shutter-Modus).
+        # Muster-an) — die bisherige Bedienung, wenn das Profil keine
+        # Betriebsart-Angaben macht. Bewusst „Betriebsart", damit „Muster"
+        # eindeutig die Musterauswahl meint (nicht den Shutter-Modus).
         self._mode_box = QGroupBox("Betriebsart")
         self._mode_lay = QHBoxLayout(self._mode_box)
         self._mode_lay.setSpacing(6)
         root.addWidget(self._mode_box)
 
+        # LAS-34: die drei Spalten der Bausteine.
+        self._bausteine = self._baue_bausteine()
+
         # Muster-Paletten (PaletteType.LASER) — Anlegen hier, Verwalten im
-        # Paletten-Tab.
+        # Paletten-Tab. Mit Bausteinen stehen sie als „Gemerkte Muster“ in der
+        # mittleren Spalte (dieselbe Ablage); dieser Kasten ist der Rückfall.
         self._pal_box = QGroupBox("Muster-Paletten")
         pv = QVBoxLayout(self._pal_box)
         self._pal_grid = QGridLayout()
@@ -452,11 +650,11 @@ class LaserView(QWidget):
         pat_btns.addStretch(1)
         pat_v.addLayout(pat_btns)
 
-        # Regler-Bereich (scrollbar). LAS-26: die Regler (Muster, Farbe,
-        # Bewegung) stehen ZUERST, Muster-Paletten und Werksmuster darunter im
-        # selben Scrollbereich. Vorher lagen die beiden Boxen fest darueber —
-        # bei 900 px Fensterhoehe blieb fuer die Regler ein Streifen von gut
-        # einer Zeile, Farbe und Bewegung waren nur per Scrollen erreichbar.
+        # Scrollbereich: Bausteine, darunter die Regler (alles, was kein
+        # Baustein bedient), Muster-Paletten und Werksmuster. LAS-26: die
+        # Regler stehen VOR den Paletten. LAS-34: mit Bausteinen passt der
+        # Inhalt ohne Rollen; der Scrollbereich fängt nur auf, was ein Profil
+        # darüber hinaus mitbringt.
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
@@ -464,6 +662,7 @@ class LaserView(QWidget):
         inhalt_lay = QVBoxLayout(inhalt)
         inhalt_lay.setContentsMargins(0, 0, 0, 0)
         inhalt_lay.setSpacing(6)
+        inhalt_lay.addWidget(self._bausteine)
         self._rows_host = QWidget()
         self._rows_lay = QVBoxLayout(self._rows_host)
         self._rows_lay.setContentsMargins(0, 0, 0, 0)
@@ -476,6 +675,144 @@ class LaserView(QWidget):
         scroll.setWidget(inhalt)
         self._scroll = scroll
         root.addWidget(scroll, stretch=1)
+
+    def _baue_bausteine(self) -> QWidget:
+        """LAS-34: Vorschau & Position | Muster + gemerkte Muster | Farbe +
+        Regler. Jede Spalte bzw. jeder Teil ist einzeln ausblendbar."""
+        host = QWidget()
+        lay = QHBoxLayout(host)
+        lay.setContentsMargins(0, 2, 0, 0)
+        lay.setSpacing(15)
+
+        # ── Spalte 1: Vorschau & Position ────────────────────────────────
+        self._lage_box = QWidget()
+        l1 = QVBoxLayout(self._lage_box)
+        l1.setContentsMargins(0, 0, 0, 0)
+        l1.setSpacing(5)
+        kopf = QHBoxLayout()
+        kopf.addWidget(ueberschrift("Vorschau & Position"))
+        kopf.addStretch(1)
+        self._lbl_lage_hinweis = nebentext("ziehen zum Verschieben")
+        kopf.addWidget(self._lbl_lage_hinweis)
+        l1.addLayout(kopf)
+        self._lage_feld = LageFeld(self._lage_gezogen)
+        l1.addWidget(self._lage_feld)
+        fuss = QHBoxLayout()
+        fuss.setContentsMargins(0, 0, 16, 0)
+        fuss.setSpacing(6)
+        self._lage_x = LageAnzeige("X")
+        self._lage_y = LageAnzeige("Y")
+        fuss.addWidget(self._lage_x, stretch=1)
+        fuss.addWidget(self._lage_y, stretch=1)
+        self._btn_mitte = QPushButton("Mitte")
+        self._btn_mitte.setFixedSize(60, TOUCH)
+        self._btn_mitte.setToolTip("Lage zurück in die Mitte.")
+        self._btn_mitte.clicked.connect(weak_slot(self._lage_mitte))
+        fuss.addWidget(self._btn_mitte)
+        l1.addLayout(fuss)
+        l1.addStretch(1)
+        self._lage_box.setFixedWidth(LageFeld.SEITE + 16)
+        lay.addWidget(self._lage_box)
+
+        # ── Spalte 2: Muster-Galerie + gemerkte Muster ───────────────────
+        self._spalte_muster = QWidget()
+        l2 = QVBoxLayout(self._spalte_muster)
+        l2.setContentsMargins(0, 0, 0, 0)
+        l2.setSpacing(5)
+        self._muster_box = QWidget()
+        mb = QVBoxLayout(self._muster_box)
+        mb.setContentsMargins(0, 0, 0, 0)
+        mb.setSpacing(5)
+        kopf = QHBoxLayout()
+        kopf.addWidget(ueberschrift("Muster"))
+        kopf.addStretch(1)
+        self._lbl_muster_zahl = nebentext("")
+        kopf.addWidget(self._lbl_muster_zahl)
+        self._btn_muster_alle = self._alle_knopf(self._muster_alle_umschalten)
+        kopf.addWidget(self._btn_muster_alle)
+        mb.addLayout(kopf)
+        self._galerie = MusterGalerie(self._muster_gewaehlt)
+        mb.addWidget(self._galerie)
+        self._muster_alle_host = QWidget()
+        mah = QVBoxLayout(self._muster_alle_host)
+        mah.setContentsMargins(0, 0, 0, 0)
+        self._muster_alle_host.setVisible(False)
+        mb.addWidget(self._muster_alle_host)
+        l2.addWidget(self._muster_box)
+
+        self._gemerkt_box = QWidget()
+        gb = QVBoxLayout(self._gemerkt_box)
+        gb.setContentsMargins(0, 6, 0, 0)
+        gb.setSpacing(5)
+        gb.addWidget(ueberschrift("Gemerkte Muster"))
+        self._gemerkt_lay = QHBoxLayout()
+        self._gemerkt_lay.setSpacing(4)
+        gb.addLayout(self._gemerkt_lay)
+        l2.addWidget(self._gemerkt_box)
+        self._lbl_schema = nebentext(
+            "Musterbilder sind Schemazeichnungen aus dem Geräteprofil — am "
+            "Gerät kann es anders aussehen.")
+        self._lbl_schema.setWordWrap(True)
+        l2.addWidget(self._lbl_schema)
+        l2.addStretch(1)
+        self._spalte_muster.setFixedWidth(296)
+        lay.addWidget(self._spalte_muster)
+
+        # ── Spalte 3: Farbe + Regler ─────────────────────────────────────
+        self._spalte_farbe = QWidget()
+        l3 = QVBoxLayout(self._spalte_farbe)
+        l3.setContentsMargins(0, 0, 0, 0)
+        l3.setSpacing(3)
+        self._farbe_box = QWidget()
+        fb = QVBoxLayout(self._farbe_box)
+        fb.setContentsMargins(0, 0, 0, 0)
+        fb.setSpacing(4)
+        kopf = QHBoxLayout()
+        kopf.addWidget(ueberschrift("Farbe"))
+        kopf.addStretch(1)
+        self._lbl_farbe = QLabel("")
+        self._lbl_farbe.setTextFormat(Qt.TextFormat.RichText)
+        self._lbl_farbe.setStyleSheet("font-size:11px;background:transparent;")
+        kopf.addWidget(self._lbl_farbe)
+        self._btn_farbe_alle = self._alle_knopf(self._farbe_alle_umschalten)
+        kopf.addWidget(self._btn_farbe_alle)
+        fb.addLayout(kopf)
+        self._farbfelder = FarbFelder(self._farbe_gewaehlt)
+        fb.addWidget(self._farbfelder)
+        self._farbe_alle_host = QWidget()
+        fah = QVBoxLayout(self._farbe_alle_host)
+        fah.setContentsMargins(0, 0, 0, 0)
+        self._farbe_alle_host.setVisible(False)
+        fb.addWidget(self._farbe_alle_host)
+        # Farbe und Helligkeit bleiben getrennt — das steht dabei.
+        fb.addWidget(nebentext("Farbe ändert die Helligkeit nicht."))
+        l3.addWidget(self._farbe_box)
+        self._regler_box = QWidget()
+        self._regler_lay = QVBoxLayout(self._regler_box)
+        self._regler_lay.setContentsMargins(0, 0, 0, 0)
+        self._regler_lay.setSpacing(4)
+        l3.addWidget(self._regler_box)
+        l3.addStretch(1)
+        self._spalte_farbe.setFixedWidth(308)
+        lay.addWidget(self._spalte_farbe)
+        lay.addStretch(1)
+        host.setVisible(False)
+        return host
+
+    def _alle_knopf(self, slot) -> QToolButton:
+        """„alle 0–255“: klappt den bisherigen Regler auf — für Werte, zu
+        denen das Profil keinen Eintrag hat."""
+        btn = QToolButton()
+        btn.setText("alle 0–255 ▸")
+        btn.setCheckable(True)
+        btn.setAutoRaise(True)
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn.setStyleSheet("QToolButton{color:#6ab0ff;font-size:11px;border:0;"
+                          "background:transparent;padding:0 0 0 4px;}")
+        btn.setToolTip("Den Regler 0–255 aufklappen — für Werte, zu denen "
+                       "das Profil keinen Eintrag hat.")
+        btn.toggled.connect(weak_slot_fwd(slot))
+        return btn
 
     def _subscribe(self):
         try:
@@ -496,8 +833,38 @@ class LaserView(QWidget):
             # LAS-26: NOT-AUS von einer VC-Taste -> Anzeige sofort mitziehen.
             sync.subscribe_widget(SyncEvent.LASER_ESTOP, self,
                                   lambda *_: self._update_dmx_estop_label())
+            # LAS-34: Die Bausteine zeigen einen ZUSTAND (Laser AN/AUS,
+            # gewähltes Muster, Lage). Ändert ihn jemand anderes (Clear,
+            # Palette, VC, Befehlszeile), ziehen sie nach — gebündelt, damit
+            # ein Zug im Feld (zwei Werte) nur einmal nachlädt.
+            # Der Zustand „Laser AN/AUS“ folgt auch der laufenden Ausgabe
+            # (Szene, Blackout) — nur solange der Reiter zu sehen ist.
+            self._zustand_takt = QTimer(self)
+            self._zustand_takt.setInterval(500)
+            self._zustand_takt.timeout.connect(self._update_dmx_estop_label)
+            self._werte_takt = QTimer(self)
+            self._werte_takt.setSingleShot(True)
+            self._werte_takt.setInterval(30)
+            self._werte_takt.timeout.connect(self._werte_nachziehen)
+            sync.subscribe_widget(SyncEvent.PROGRAMMER_CHANGED, self,
+                                  lambda *_: self._werte_takt.start())
         except Exception as e:
             print(f"[laser_view] sync subscribe error: {e}")
+
+    def _werte_nachziehen(self):
+        try:
+            if not self.isVisible():
+                return
+            # Wer gerade eine Zahl eintippt, wird nicht überschrieben.
+            from PySide6.QtWidgets import QApplication
+            fokus = QApplication.focusWidget()
+            if (fokus is not None and self.isAncestorOf(fokus)
+                    and fokus.inherits("QLineEdit")):
+                self._bausteine_laden()
+            else:
+                self._load_values()
+        except RuntimeError:
+            pass
 
     def _on_show_loaded(self):
         # Safety: eine neu geladene Show startet UNSCHARF und ohne aktive
@@ -531,6 +898,15 @@ class LaserView(QWidget):
         super().showEvent(event)
         if getattr(self, "_stale", True):
             self.refresh_from_selection()
+        takt = getattr(self, "_zustand_takt", None)
+        if takt is not None:
+            takt.start()
+
+    def hideEvent(self, event):  # noqa: N802 (Qt-API)
+        super().hideEvent(event)
+        takt = getattr(self, "_zustand_takt", None)
+        if takt is not None:
+            takt.stop()
 
     def refresh_from_selection(self):
         """Auswahl einlesen, Template bilden, Regler/Kacheln (neu) aufbauen."""
@@ -569,20 +945,28 @@ class LaserView(QWidget):
             if (_cap := laser_capability(f)) is not None
             and _cap.laser_class == LaserClass.NET_STREAM]
         self._safety_box.setVisible(bool(self._network_fids))
-        # LAS-26: DMX-Laser in der Auswahl -> eigener NOT-AUS + Zustand.
-        self._dmx_safety_box.setVisible(
-            len(self._fixtures) > len(self._network_fids))
-        self._update_dmx_estop_label()
+        # LAS-26: DMX-Laser in der Auswahl -> eigener NOT-AUS + Zustand
+        # (LAS-34: als Sicherheitsleiste; sie trägt dann auch Modell/Anzahl).
+        hat_dmx = len(self._fixtures) > len(self._network_fids)
+        self._dmx_safety_box.setVisible(hat_dmx)
+        self._info.setVisible(not hat_dmx)
         self._sync_arm_from_manager()   # VC-/MIDI-Änderungen widerspiegeln
         self._apply_figure_to_selection()
 
         template = self._template_channels()
-        sig = tuple((ch.attribute, int(getattr(ch, "channel_number", 0) or 0))
-                    for ch in template)
+        self._kanal_je_attr = {getattr(ch, "attribute", ""): ch
+                               for ch in template}
+        plan = self._plan_bilden(template)
+        sig = (tuple((ch.attribute, int(getattr(ch, "channel_number", 0) or 0))
+                     for ch in template), plan.kennung())
         if sig != self._template_sig:
             self._template_sig = sig
+            self._plan = plan
             self._rebuild_rows(template)
+            self._bausteine_aufbauen(template)
             self._rebuild_mode_tiles(template)
+        self._sperrzonen_aktualisieren()
+        self._update_dmx_estop_label()
         self._load_values()
         self._rebuild_palettes()
         self._rebuild_patterns(template)
@@ -596,23 +980,77 @@ class LaserView(QWidget):
             return None
 
     def _update_dmx_estop_label(self):
-        """LAS-26: zeigt, ob der DMX-Laser-NOT-AUS gerade greift."""
+        """Zustand in der Sicherheitsleiste: NOT-AUS aktiv (LAS-26) bzw.
+        Laser AN/AUS laut Betriebsart, dazu Modell und Anzahl (LAS-34)."""
         try:
             aktiv = bool(getattr(get_state(), "laser_estop_active", False))
         except Exception:
             aktiv = False
         try:
+            n = len(self._fixtures)
+            zahl = f"{n} Laser"
             if aktiv:
-                self._lbl_dmx_estop.setText(
-                    "NOT-AUS aktiv — alle DMX-Laser sind dunkel. Wieder an: "
-                    "Betriebsart oder Muster neu wählen.")
-                self._lbl_dmx_estop.setStyleSheet(
-                    "color:#ff7b72;font-weight:bold;")
+                text, farbe, punkt = "NOT-AUS aktiv", "#ff7b72", "#ff4040"
+                neben = ("· alle DMX-Laser sind dunkel · wieder an: "
+                         "Betriebsart oder Muster neu wählen")
             else:
-                self._lbl_dmx_estop.setText(
-                    "Schaltet alle Laser sofort dunkel. Blackout und Grand "
-                    "Master 0 tun das auch — über den Aus-Wert der Betriebsart.")
-                self._lbl_dmx_estop.setStyleSheet("color:#8b949e;")
+                an = [self._laser_an(f) for f in self._fixtures]
+                n_an = sum(1 for a in an if a)
+                if not an or any(a is None for a in an):
+                    text, farbe, punkt = "Laser", "#ffffff", "#555555"
+                elif n_an == 0:
+                    text, farbe, punkt = "Laser AUS", "#c8c8c8", "#555555"
+                elif n_an == n:
+                    text, farbe, punkt = "Laser AN", "#ffffff", "#30ff50"
+                else:
+                    text, farbe, punkt = (f"Laser AN ({n_an} von {n})",
+                                          "#ffffff", "#30ff50")
+                neben = "· " + " · ".join(
+                    t for t in (self._modell_text(), zahl) if t)
+            self._lbl_dmx_estop.setText(text)
+            self._lbl_dmx_estop.setStyleSheet(
+                f"color:{farbe};font-weight:bold;background:transparent;")
+            self._lbl_dmx_estop.setToolTip(
+                "Laut Betriebsart — im Programmer oder in der laufenden "
+                "Ausgabe. Blackout, Grand Master 0 und NOT-AUS schalten den "
+                "Laser über den Aus-Wert der Betriebsart dunkel.")
+            self._zustand_punkt.setStyleSheet(
+                f"background:{punkt};border-radius:5px;")
+            self._lbl_modell.setText(neben)
+        except RuntimeError:
+            pass
+
+    def _modell_text(self) -> str:
+        """Modellname(n) der gewählten Laser für die Sicherheitsleiste."""
+        namen: list[str] = []
+        for f in self._fixtures:
+            name = _modell_name(f)
+            if name and name not in namen:
+                namen.append(name)
+        if len(namen) > 2:
+            return "verschiedene Modelle"
+        return ", ".join(namen)
+
+    def _sperrzonen_aktualisieren(self):
+        """Abzeichen der Sicherheitsleiste — nur, wo es die Sperrzonen-
+        Anzeige gibt und sie zu den gewählten Lasern etwas sagt."""
+        try:
+            hinweis = sperrzonen_hinweis(
+                get_state(), [getattr(f, "fid", -1) for f in self._fixtures]
+            ) if self._fixtures else None
+        except Exception:
+            hinweis = None
+        try:
+            if hinweis is None:
+                self._sperrzonen_abzeichen.setVisible(False)
+                return
+            kurz, lang = hinweis
+            self._sperrzonen_abzeichen.setText(
+                f"<b>{kurz}</b> &nbsp;<span style='color:#d8b84a'>"
+                f"{NUR_ANZEIGE}</span>")
+            self._sperrzonen_abzeichen.setToolTip(
+                f"{lang}\n\n{NUR_ANZEIGE}. Kein Laserschutz.")
+            self._sperrzonen_abzeichen.setVisible(True)
         except RuntimeError:
             pass
 
@@ -810,6 +1248,378 @@ class LaserView(QWidget):
                 best = max(best, max(counts.values()))
         return best
 
+    # ── LAS-34: Bausteine ─────────────────────────────────────────────────
+    def _plan_bilden(self, template: list) -> _Plan:
+        """Welche Bausteine die Auswahl bekommt. Ein Baustein entsteht nur,
+        wenn ALLE gewählten Laser dieselbe Angabe dazu machen — sonst bleibt
+        dieser Teil bei der bisherigen Bedienung."""
+        plan = _Plan()
+        if not self._fixtures:
+            return plan
+        by_attr = {getattr(ch, "attribute", ""): ch for ch in template}
+        je = []
+        for f in self._fixtures:
+            try:
+                je.append(laser_profilangaben(
+                    list(get_channels_for_patched(f) or ())))
+            except Exception as e:
+                print(f"[laser_view] Profilangaben nicht lesbar: {e}")
+                je.append(None)
+        if not any(a is not None for a in je):
+            return plan
+
+        def gemeinsam(holen):
+            """``(einig, wert)`` über alle gewählten Laser."""
+            werte = []
+            for a in je:
+                try:
+                    werte.append(holen(a) if a is not None else None)
+                except Exception:
+                    werte.append(None)
+            return all(w == werte[0] for w in werte[1:]), werte[0]
+
+        def kanal(name: str, feld: str):
+            einig, teil = gemeinsam(
+                lambda a: (lambda k: None if k is None
+                           else (k.attribut, getattr(k, feld)))(getattr(a, name)))
+            if not einig or teil is None or teil[0] not in by_attr:
+                return None
+            return getattr(je[0], name)
+
+        ba = kanal("betriebsart_kanal", "betriebsart")
+        if ba is not None:
+            # Jeder Wertebereich des Kanals muss ein Segment haben — sonst
+            # wäre eine Betriebsart des Geräts nicht mehr wählbar.
+            bereiche = _sorted_ranges(by_attr[ba.attribut])
+            if all(ba.betriebsart_fuer(_range_value(r)) is not None
+                   for r in bereiche):
+                plan.betriebsart = ba
+        plan.muster = kanal("muster_kanal", "muster")
+        plan.farben = kanal("farb_kanal", "farben")
+        if "laser_x" in by_attr and "laser_y" in by_attr:
+            ex, rx = gemeinsam(lambda a: a.richtung("laser_x"))
+            ey, ry = gemeinsam(lambda a: a.richtung("laser_y"))
+            if ex and ey and rx is not None and ry is not None:
+                plan.lage = (rx, ry)
+        belegt = plan.abgedeckt()
+        regler = []
+        for attr, *_ in SPRECH_REGLER:
+            if attr not in by_attr or attr in belegt:
+                continue
+            einig, richtung = gemeinsam(lambda a, attr=attr: a.richtung(attr))
+            # Ohne Richtung nur, wenn die Zeile nichts verlöre: ein Kanal mit
+            # benannten Wertebereichen behält seine Zeile samt Auswahlliste.
+            if einig and (richtung is not None
+                          or not _sorted_ranges(by_attr[attr])):
+                regler.append((attr, richtung))
+        if plan.neu or any(r is not None for _a, r in regler):
+            plan.regler = tuple(regler)
+        return plan
+
+    def _bausteine_aufbauen(self, template: list):
+        """Die Bausteine zum aktuellen Plan füllen bzw. ausblenden."""
+        plan = self._plan
+        by_attr = self._kanal_je_attr
+
+        self._seg_box.setVisible(plan.betriebsart is not None)
+        self._umschalter.set_eintraege(
+            plan.betriebsart.betriebsart if plan.betriebsart else ())
+
+        self._lage_box.setVisible(plan.lage is not None)
+
+        self._muster_box.setVisible(plan.muster is not None)
+        self._galerie.set_muster(plan.muster.muster if plan.muster else ())
+        self._lbl_schema.setVisible(plan.muster is not None)
+        if plan.muster is not None:
+            self._lbl_muster_zahl.setText(
+                f"{len(plan.muster.muster)} aus Profil ·")
+        self._alle_zeile(self._muster_alle_host, self._btn_muster_alle,
+                         by_attr.get(plan.muster.attribut)
+                         if plan.muster else None)
+
+        self._farbe_box.setVisible(plan.farben is not None)
+        self._farbfelder.set_farben(plan.farben.farben if plan.farben else ())
+        self._alle_zeile(self._farbe_alle_host, self._btn_farbe_alle,
+                         by_attr.get(plan.farben.attribut)
+                         if plan.farben else None)
+
+        while self._regler_lay.count():
+            w = self._regler_lay.takeAt(0).widget()
+            if w is not None:
+                w.setParent(None)
+                w.deleteLater()
+        self._sprech = {}
+        texte = {a: (t, z, o, w) for a, t, z, o, w in SPRECH_REGLER}
+        for attr, richtung in plan.regler:
+            titel, zusatz, ohne, worte = texte[attr]
+            if richtung is None:
+                zusatz = ohne
+            regler = SprechRegler(attr, titel, richtung, self._regler_bewegt,
+                                  zusatz=f"· {zusatz}" if zusatz else "",
+                                  worte=worte)
+            ch = by_attr.get(attr)
+            regler.setToolTip(
+                f"{row_label(ch) if ch is not None else titel} ({attr})"
+                + ("" if richtung is not None else
+                   "\nDas Profil nennt keine Richtung: der Regler läuft wie "
+                   "der DMX-Wert, 0 bis 255."))
+            self._sprech[attr] = regler
+            self._regler_lay.addWidget(regler)
+        self._regler_box.setVisible(bool(self._sprech))
+
+        self._gemerkt_box.setVisible(plan.neu)
+        self._spalte_muster.setVisible(plan.muster is not None or plan.neu)
+        self._spalte_farbe.setVisible(plan.farben is not None
+                                      or bool(self._sprech))
+        self._bausteine.setVisible(plan.neu)
+
+    def _alle_zeile(self, host: QWidget, knopf: QToolButton, channel):
+        """Die Zeile hinter „alle 0–255“ (neu) aufbauen: der bisherige Regler
+        des Kanals, zugeklappt."""
+        lay = host.layout()
+        while lay.count():
+            w = lay.takeAt(0).widget()
+            if w is not None:
+                w.setParent(None)
+                w.deleteLater()
+        knopf.blockSignals(True)
+        knopf.setChecked(False)
+        knopf.setText("alle 0–255 ▸")
+        knopf.blockSignals(False)
+        host.setVisible(False)
+        if channel is None:
+            return
+        row = _ChannelRow(channel, self._write_value, kompakt=True)
+        self._rows[channel.attribute] = row
+        lay.addWidget(row)
+
+    def _muster_alle_umschalten(self, an: bool):
+        self._btn_muster_alle.setText("alle 0–255 ▾" if an else "alle 0–255 ▸")
+        self._muster_alle_host.setVisible(bool(an))
+        # Die Werksmuster (eigene Slots mit Foto) gehören zum Regler.
+        self._rebuild_patterns()
+
+    def _farbe_alle_umschalten(self, an: bool):
+        self._btn_farbe_alle.setText("alle 0–255 ▾" if an else "alle 0–255 ▸")
+        self._farbe_alle_host.setVisible(bool(an))
+
+    def _wert(self, attr: str, fixture=None) -> int:
+        """Aktueller Wert eines Attributs: Programmer des ersten (bzw. des
+        genannten) Lasers, kopfgerecht; ohne Programmer-Wert der Grundwert des
+        Kanals — das, was das Gerät dann bekommt."""
+        fx = fixture if fixture is not None else (
+            self._fixtures[0] if self._fixtures else None)
+        val = None
+        if fx is not None:
+            state = get_state()
+            fid = getattr(fx, "fid", None)
+            read_head = 1 if self._head_mode == "B" else 0
+            try:
+                val = state.get_programmer_value(fid, attr, head=read_head)
+            except TypeError:
+                val = state.get_programmer_value(fid, attr)
+            except Exception:
+                val = None
+        if val is None:
+            ch = self._kanal_je_attr.get(attr)
+            val = getattr(ch, "default_value", 0) if ch is not None else 0
+        try:
+            return max(0, min(255, int(val or 0)))
+        except (TypeError, ValueError):
+            return 0
+
+    def _an_bei(self, wert: int) -> bool | None:
+        """Ist der Laser bei diesem Betriebsart-Wert an? ``None`` = das Profil
+        sagt es nicht (kein Betriebsart-Kanal mit Bereichen)."""
+        ba = self._plan.betriebsart
+        if ba is not None:
+            b = ba.betriebsart_fuer(wert)
+            return None if b is None else b.art != "aus"
+        ch = self._kanal_je_attr.get("shutter")
+        for r in (_sorted_ranges(ch) if ch is not None else ()):
+            lo = int(getattr(r, "range_from", 0) or 0)
+            hi = int(getattr(r, "range_to", lo) or lo)
+            if lo <= wert <= hi:
+                return (getattr(r, "kind", "") or "") != "closed"
+        return None
+
+    def _ausgabe_wert(self, fixture, attr: str) -> int | None:
+        """Was die Ausgabe für diesen Kanal zuletzt gerechnet hat (nach
+        Blackout, Grand Master, laufenden Szenen) — ``None`` = unbekannt.
+        Nur gelesen."""
+        try:
+            om = getattr(get_state(), "output_manager", None)
+            if om is None:
+                return None
+            frame = om.get_display_frame(int(fixture.universe))
+            if frame is None:
+                return None
+            for ch in get_channels_for_patched(fixture):
+                if (getattr(ch, "attribute", "") or "") == attr:
+                    return int(frame[int(fixture.address) - 1
+                                     + int(ch.channel_number) - 1])
+        except Exception:
+            pass
+        return None
+
+    def _laser_an(self, fixture) -> bool | None:
+        """Ist dieser Laser an? Massgeblich ist die Betriebsart — im
+        Programmer ODER in der laufenden Ausgabe (eine Szene kann den Laser
+        einschalten, ohne dass der Programmer davon weiss). Im Zweifel „an“:
+        die Anzeige darf nie dunkel melden, was leuchtet."""
+        ba = self._plan.betriebsart
+        attr = ba.attribut if ba is not None else "shutter"
+        an = self._an_bei(self._wert(attr, fixture))
+        if an is None:
+            return None
+        ausgabe = self._ausgabe_wert(fixture, attr)
+        return bool(an or (ausgabe is not None and self._an_bei(ausgabe)))
+
+    def _bausteine_laden(self):
+        """Die Bausteine auf die aktuellen Werte stellen (ohne zu schreiben)."""
+        plan = self._plan
+        try:
+            self._update_dmx_estop_label()
+            if not plan.neu or not self._fixtures:
+                return
+            aktiv = None
+            if plan.betriebsart is not None:
+                aktiv = plan.betriebsart.betriebsart_fuer(
+                    self._wert(plan.betriebsart.attribut))
+                self._umschalter.set_aktiv(aktiv)
+            # Musik/Auto: das Gerät läuft selbst — Muster, Lage und Farbe
+            # wirken nicht. („Aus“ sperrt nicht: dort stellt man vor.)
+            gesperrt = (aktiv is not None and not aktiv.steuert
+                        and aktiv.art != "aus")
+            self._lbl_gesperrt.setVisible(gesperrt)
+
+            farbe = None
+            bild_farbe = None
+            if plan.farben is not None:
+                v = self._wert(plan.farben.attribut)
+                farbe = plan.farben.farbe_fuer(v)
+                self._farbfelder.set_gewaehlt(farbe)
+                name = farb_name(farbe) if farbe is not None else "kein Eintrag"
+                self._lbl_farbe.setText(
+                    f'<span style="color:#fff">{name}</span> '
+                    f'<span style="color:#8b949e">· DMX {v}</span>')
+                # Ohne Eintrag ist die Farbe unbekannt: neutral zeichnen.
+                bild_farbe = (farbe_als_qt(farbe) if farbe is not None
+                              else QColor("#b8b8b8"))
+                self._row_zeigen(plan.farben.attribut, v)
+            muster = None
+            if plan.muster is not None:
+                v = self._wert(plan.muster.attribut)
+                muster = plan.muster.muster_fuer(v)
+                self._galerie.set_gewaehlt(muster)
+                self._galerie.set_farbe(bild_farbe)
+                self._row_zeigen(plan.muster.attribut, v)
+            for attr, regler in self._sprech.items():
+                regler.set_dmx(self._wert(attr))
+            tempo = self._sprech.get("effect_speed")
+            if tempo is not None:
+                tempo.set_aktiv(aktiv is None or aktiv.art == "dynamisch")
+            if plan.lage is not None:
+                rx, ry = plan.lage
+                ax = rx.dmx_zu_regler(self._wert("laser_x"))
+                ay = ry.dmx_zu_regler(self._wert("laser_y"))
+                self._lage_feld.set_bild(muster, bild_farbe, self._groesse())
+                self._lage_feld.set_lage(ax, ay)
+                self._lage_x.set_text(lage_text(ax, *self._enden(
+                    rx, ("links", "rechts"))))
+                self._lage_y.set_text(lage_text(ay, *self._enden(
+                    ry, ("unten", "oben"))))
+                n = len(self._fixtures)
+                self._lbl_lage_hinweis.setText(
+                    "ziehen zum Verschieben" if n == 1
+                    else f"zeigt den ersten von {n} Lasern")
+            for w in (self._lage_feld, self._btn_mitte, self._galerie,
+                      self._muster_alle_host, self._farbfelder,
+                      self._farbe_alle_host):
+                w.setEnabled(not gesperrt)
+        except RuntimeError:
+            pass
+
+    def _row_zeigen(self, attr: str, value: int):
+        row = self._rows.get(attr)
+        if row is not None:
+            row.set_value(value)
+
+    @staticmethod
+    def _enden(richtung, ersatz: tuple[str, str]) -> tuple[str, str]:
+        from src.core.laser.profilangaben import ENDEN
+        a, b = richtung.enden
+        if a and b:
+            return ENDEN.get(a, a), ENDEN.get(b, b)
+        return ersatz
+
+    def _groesse(self) -> float | None:
+        """Bildgröße 0.0 (klein) .. 1.0 (groß) für die Vorschau."""
+        if "zoom" not in self._kanal_je_attr:
+            return None
+        v = self._wert("zoom")
+        regler = self._sprech.get("zoom")
+        if regler is not None and regler.richtung is not None:
+            return regler.richtung.dmx_zu_regler(v)
+        return v / 255.0
+
+    def _betriebsart_gewaehlt(self, eintrag):
+        """Segment gewählt: die Bereichsmitte schreiben — derselbe Wert wie
+        die bisherige Kachel dieses Bereichs."""
+        ba = self._plan.betriebsart
+        if ba is not None:
+            self._write_value(ba.attribut, int(eintrag.mitte))
+
+    def _muster_gewaehlt(self, muster):
+        if self._plan.muster is not None:
+            self._write_value(self._plan.muster.attribut, int(muster.mitte))
+
+    def _farbe_gewaehlt(self, farbe):
+        if self._plan.farben is not None:
+            self._write_value(self._plan.farben.attribut, int(farbe.mitte))
+
+    def _regler_bewegt(self, attr: str, dmx: int):
+        self._write_value(attr, int(dmx))
+
+    def _lage_gezogen(self, ax: float, ay: float):
+        """Ziehen im Feld: Reglerstellung je Achse (0 = links/unten, 1 =
+        rechts/oben) über die ``Richtung`` des Profils in DMX — umgekehrte
+        Kanäle und der Mittelbereich sind dort berücksichtigt. Geschrieben
+        wird der MODELL-Wert; hängt der Laser kopfüber (LAS-30:
+        ``invert_laser_x`` …), dreht die Ausgabestufe ihn wie bei jedem
+        anderen Schreiber."""
+        if self._plan.lage is None:
+            return
+        rx, ry = self._plan.lage
+        self._write_value("laser_x", rx.regler_zu_dmx(ax))
+        self._write_value("laser_y", ry.regler_zu_dmx(ay))
+
+    def _lage_mitte(self):
+        if self._plan.lage is None:
+            return
+        for attr, r in zip(("laser_x", "laser_y"), self._plan.lage):
+            mitte = r.mitte_dmx
+            self._write_value(
+                attr, mitte if mitte is not None else r.regler_zu_dmx(0.5))
+
+    def bedienbare_attribute(self) -> set[str]:
+        """Alle Attribute, die dieser Reiter gerade bedient: Regler-Zeilen,
+        Bausteine und die Betriebsart-Kacheln. Für die Zusage „kein Kanal
+        geht verloren“ (UI-89, LAS-34)."""
+        out = set(self._rows) | set(self._sprech)
+        plan = self._plan
+        if plan.betriebsart is not None and not self._seg_box.isHidden():
+            out.add(plan.betriebsart.attribut)
+        if plan.muster is not None and not self._muster_box.isHidden():
+            out.add(plan.muster.attribut)
+        if plan.farben is not None and not self._farbe_box.isHidden():
+            out.add(plan.farben.attribut)
+        if plan.lage is not None and not self._lage_box.isHidden():
+            out |= {"laser_x", "laser_y"}
+        if not self._mode_box.isHidden():
+            out.add("shutter")
+        return out
+
     # ------------------------------------------------------------- Aufbau --
     def _rebuild_rows(self, template: list):
         while self._rows_lay.count() > 1:
@@ -819,6 +1629,10 @@ class LaserView(QWidget):
                 w.deleteLater()
         self._rows = {}
         self._collapsible_groups = {}
+        # LAS-34: was ein Baustein bedient, bekommt hier keine Zeile.
+        ohne = self._plan.abgedeckt()
+        template = [ch for ch in template
+                    if getattr(ch, "attribute", "") not in ohne]
         by_attr = {getattr(ch, "attribute", ""): ch for ch in template}
 
         # Kern-Achsen als benannte Gruppen (Muster / Farbe / Bewegung … /
@@ -841,6 +1655,7 @@ class LaserView(QWidget):
         if rest:
             box = self._make_row_group(_ADVANCED_GROUP, rest, collapsed=True)
             self._rows_lay.insertWidget(self._rows_lay.count() - 1, box)
+        self._rows_host.setVisible(bool(self._rows))
 
     def _make_row_group(self, title: str, channels: list,
                         collapsed: bool) -> QGroupBox:
@@ -894,6 +1709,10 @@ class LaserView(QWidget):
         shutter = next((ch for ch in template if ch.attribute == "shutter"),
                        None)
         ranges = _sorted_ranges(shutter) if shutter is not None else []
+        # LAS-34: bedient der Umschalter die Betriebsart, entfallen die Kacheln.
+        ba = self._plan.betriebsart
+        if ba is not None and ba.attribut == "shutter":
+            ranges = []
         self._mode_box.setVisible(bool(ranges))
         if not ranges:
             return
@@ -935,7 +1754,61 @@ class LaserView(QWidget):
                                       "anwenden")
             tile.clicked.connect(weak_slot(self._apply_palette, p))
             self._pal_grid.addWidget(tile, i // 4, i % 4)
-        self._pal_box.setVisible(True)
+        # LAS-34: mit Bausteinen stehen dieselben Paletten als „Gemerkte
+        # Muster“ in der mittleren Spalte — der Kasten ist der Rückfall.
+        self._pal_box.setVisible(not self._plan.neu)
+        self._gemerkte_aufbauen(palettes)
+
+    #: So viele gemerkte Muster stehen als Knopf da; weitere im Menü „▾“.
+    GEMERKT_SICHTBAR = 2
+
+    def _gemerkte_aufbauen(self, palettes: list):
+        """„Gemerkte Muster“: kleine Knöpfe für die Laser-Paletten der Show
+        (``PaletteType.LASER`` — dieselbe Ablage wie der Paletten-Reiter,
+        keine zweite) und „+ merken…“."""
+        lay = self._gemerkt_lay
+        while lay.count():
+            w = lay.takeAt(0).widget()
+            if w is not None:
+                w.setParent(None)
+                w.deleteLater()
+        self._gemerkt_knoepfe = []
+        for p in palettes[:self.GEMERKT_SICHTBAR]:
+            btn = QPushButton(self._gemerkt_text(p, 11))
+            btn.setFixedHeight(TOUCH)
+            btn.setToolTip(f"„{p.name}“ auf die gewählten Laser anwenden "
+                           "(umbenennen und löschen im Reiter Paletten).")
+            btn.clicked.connect(weak_slot(self._apply_palette, p))
+            self._gemerkt_knoepfe.append(btn)
+            lay.addWidget(btn, stretch=1)
+        rest = palettes[self.GEMERKT_SICHTBAR:]
+        if rest:
+            mehr = QToolButton()
+            mehr.setText(f"+{len(rest)} ▾")
+            mehr.setFixedHeight(TOUCH)
+            mehr.setToolTip("Weitere gemerkte Muster")
+            mehr.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+            menu = QMenu(mehr)
+            for p in rest:
+                menu.addAction(p.name).triggered.connect(
+                    weak_slot(self._apply_palette, p))
+            mehr.setMenu(menu)
+            lay.addWidget(mehr)
+        merken = QPushButton("+ merken…")
+        merken.setFixedHeight(TOUCH)
+        merken.setToolTip(
+            "Muster, Farbe, Größe und Lage der gewählten Laser unter einem "
+            "Namen merken (als Laser-Palette der Show).")
+        merken.clicked.connect(weak_slot(self._save_palette))
+        self._btn_merken = merken
+        lay.addWidget(merken)
+        if not palettes:
+            lay.addStretch(1)
+
+    @staticmethod
+    def _gemerkt_text(palette, laenge: int) -> str:
+        name = str(getattr(palette, "name", "") or "")
+        return name if len(name) <= laenge else name[:laenge - 1] + "…"
 
     # ── Werksmuster-Picker (LAS-18b) ──────────────────────────────────────
     def _pattern_picker_applicable(self, template=None) -> bool:
@@ -963,6 +1836,11 @@ class LaserView(QWidget):
             if w is not None:
                 w.deleteLater()
         applicable = self._pattern_picker_applicable(template)
+        # LAS-34: steht die Muster-Galerie des Profils da, gehören die selbst
+        # gemerkten Werksmuster zum Regler hinter „alle 0–255“.
+        if (applicable and self._plan.muster is not None
+                and not self._btn_muster_alle.isChecked()):
+            applicable = False
         self._pattern_box.setVisible(applicable)
         if not applicable:
             return
@@ -1056,8 +1934,9 @@ class LaserView(QWidget):
                 continue
             for head in self._heads_for(f, attr):
                 state.set_programmer_value(fid, attr, int(value), head=head)
-        # Betriebsart/Muster loesen den DMX-NOT-AUS (A3D-02) — Anzeige folgen.
-        self._update_dmx_estop_label()
+        # Betriebsart/Muster loesen den DMX-NOT-AUS (A3D-02) — Anzeige folgen
+        # (LAS-34: samt Bausteinen: Zustand, Vorschau, Sperre in Musik/Auto).
+        self._bausteine_laden()
 
     def _load_values(self):
         if not self._fixtures:
@@ -1074,6 +1953,7 @@ class LaserView(QWidget):
             except Exception:
                 val = None
             row.set_value(int(val) if val is not None else 0)
+        self._bausteine_laden()
 
     def _on_head_mode_toggled(self, key: str, on: bool):
         """Bound-Slot statt Lambda (STAB-10): nur der AKTIV werdende
