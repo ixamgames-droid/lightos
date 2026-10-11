@@ -32,7 +32,6 @@
 | OUT-67 | A | feature/out67-ausgabe-ausfall-banner | 2026-10-10T09:29Z | - |
 | TOOL-24 | D | fix/tool24-proc18-lizenzhinweise-strukturiert | 2026-10-10T22:54Z | tests/test_proc18_fremd_lizenzhinweise.py |
 | FM-66 | D | fix/fm66-abgleich-modellname | 2026-10-10T22:54Z | src/core/database/bibliothek_format.py · tests/test_fm66_abgleich_modellname.py · docs/FIXTURE_LIBRARY.md |
-| PROC-20 | A | feature/proc20-backlog-fragmente | 2026-10-10T18:45Z | tools · BACKLOG.md |
 | LAS-32 | A | feature/las32-s1-sperrzonen-anzeige | 2026-10-11T14:32Z | - |
 | XPLAT-51 | A | fix/xplat51-arm64-nicht-unterstuetzt | 2026-10-10T14:17Z | - |
 | XPLAT-52 | A | fix/xplat52-installer-venv-arch | 2026-10-10T14:17Z | - |
@@ -227,7 +226,6 @@
 
 ## Verlauf
 
-- 2026-10-11T12:34Z D aktualisiert UI-88: Branch - -> perf/ui88-2d-bild-schneller; Dateien - -> src/ui/views/live_view.py · tests/test_ui88_2d_bild_schneller.py
 - 2026-10-11T12:53Z A done LAS-30
 - 2026-10-11T13:25Z A done FM-73
 - 2026-10-11T13:51Z A aktualisiert LAS-33: Branch - -> feature/las33-laser-profilangaben-generator
@@ -257,3 +255,4 @@
 - 2026-10-11T16:43Z D done QA-93
 - 2026-10-11T16:56Z A claim QA-96
 - 2026-10-11T16:56Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-11T17:16Z A done PROC-20
