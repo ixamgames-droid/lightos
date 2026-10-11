@@ -69,6 +69,7 @@
 | ENG-30 | D | - | 2026-10-11T13:58Z | - |
 | XPLAT-36 | D | - | 2026-10-11T13:58Z | - |
 | OUT-68 | A | feature/out68-udmx-adapter | 2026-10-11T14:02Z | - |
+| OUT-69 | A | - | 2026-10-11T14:04Z | - |
 
 ## Blocker & Fallen
 
@@ -218,7 +219,6 @@
 
 ## Verlauf
 
-- 2026-10-10T22:54Z D claim DOC-70
 - 2026-10-10T22:54Z D claim TOOL-21
 - 2026-10-11T09:40Z A claim WEB-08
 - 2026-10-11T09:40Z A aktualisiert LAS-32: Branch feature/las32-laser-sperrzonen -> feature/las32-s1-sperrzonen-anzeige
@@ -248,3 +248,4 @@
 - 2026-10-11T13:58Z D claim ENG-30
 - 2026-10-11T13:58Z D claim XPLAT-36
 - 2026-10-11T14:02Z A claim OUT-68
+- 2026-10-11T14:04Z A claim OUT-69
