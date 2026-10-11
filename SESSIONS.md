@@ -73,6 +73,7 @@
 | LAS-36 | A | fix/las36-notaus-loesen-lasererkennung | 2026-10-11T19:15Z | - |
 | LAS-37 | D | - | 2026-10-11T19:24Z | - |
 | VCB-43 | D | - | 2026-10-11T19:24Z | - |
+| OUT-71 | D | - | 2026-10-11T19:24Z | - |
 
 ## Blocker & Fallen
 
@@ -217,7 +218,6 @@
 
 ## Verlauf
 
-- 2026-10-11T15:10Z A claim WEB-10
 - 2026-10-11T15:31Z A done PROC-19
 - 2026-10-11T15:41Z D aktualisiert ENG-30: Dateien - -> src/core/app_state.py · src/core/engine/function_manager.py · src/core/engine/patch_index.py · src/core/engine/scene.py · src/core/engine/efx.py · src/core/engine/rgb_matrix.py · src/core/engine/mapped_channel.py · tools/engine_frame_zeit.py · tools/benchmark_universes.py · docs/ENGINE_FRAME_ZEIT.md · docs/PERFORMANCE.md · tests/test_eng30_frame_zeit.py
 - 2026-10-11T15:44Z A claim OUT-70
@@ -247,3 +247,4 @@
 - 2026-10-11T19:15Z A claim LAS-36
 - 2026-10-11T19:24Z D claim LAS-37
 - 2026-10-11T19:24Z D claim VCB-43
+- 2026-10-11T19:24Z D claim OUT-71
