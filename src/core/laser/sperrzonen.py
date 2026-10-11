@@ -345,7 +345,10 @@ def feld_ebenen(rot_deg, feld: LaserFeld):
         return tuple(vz * achse[i] - t * vorn[i] for i in range(3))
 
     return [
-        tuple(-v for v in vorn),            # nichts hinter dem Geraet
+        # Nichts hinter dem Geraet. Folgt rechnerisch schon aus den beiden
+        # Seitenebenen (ihre Summe ergibt genau diese Bedingung); ausdruecklich,
+        # damit es nicht an der Winkelsumme haengt.
+        tuple(-v for v in vorn),
         _ebene(rechts, 1.0, feld.rechts),
         _ebene(rechts, -1.0, feld.links),
         _ebene(oben, 1.0, feld.oben),
