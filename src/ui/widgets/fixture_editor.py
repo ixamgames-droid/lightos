@@ -1038,8 +1038,8 @@ class FixtureEditorDialog(QDialog):
 
         # UI-74 (Review): zwei Modi gleichen Namens sind nicht aufloesbar —
         # gepatchte Geraete finden ihren Modus ueber Profil + Modusname.
-        namen = [m[0] for m in modes_data]
-        doppelt = sorted({n for n in namen if namen.count(n) > 1})
+        from src.core.database.modus_wahl import doppelte_modusnamen
+        doppelt = doppelte_modusnamen(m[0] for m in modes_data)
         if doppelt:
             QMessageBox.warning(
                 self, "Speichern",
