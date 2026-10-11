@@ -306,6 +306,10 @@ Basics of DMX and universes: [DMX_PROTOCOL.md](../DMX_PROTOCOL.md) (German).
 
 ## Further reading
 
+- [Supported DMX interfaces](INTERFACES.md) (German) — compatibility list, driver links
+  and "Ethernet→DMX with a LAN cable straight to the PC" step by step. The button
+  **Interface einrichten…** above the tabs opens an assistant that shows which DMX
+  interfaces are connected and what each one needs. LightOS never installs drivers.
 - [Zwei Universen über zwei Adapter](../anleitung_zwei_universen/ANLEITUNG.md) (German)
   — ENTTEC on Universe 1 and Art-Net on Universe 2 step by step, with the rules for
   duplicate targets.

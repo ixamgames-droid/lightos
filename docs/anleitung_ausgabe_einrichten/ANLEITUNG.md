@@ -48,6 +48,13 @@ Der Dialog **Ausgabe konfigurieren** hat sechs Reiter: **Enttec Pro USB**, **uDM
 - **Reiter Universen** (Schritt 5): alle Universen in einer Tabelle, mit einem Klick
   speichern und anwenden.
 
+Über den Reitern steht der Knopf **Interface einrichten…**. Er öffnet einen
+Assistenten, der zeigt, welche DMX-Interfaces am Rechner hängen, was jedes braucht
+(Zugriffsrecht, Treiber) und wie es sich einrichten lässt — samt einem Testsignal und
+einer Seite für Netzwerk-Adapter. Was LightOS kennt, steht in
+[Unterstützte DMX-Interfaces](INTERFACES.md). Die Bilder dieser Anleitung zeigen den
+Dialog noch ohne diesen Knopf.
+
 Beide schreiben in dieselbe Datei `universes.json` im LightOS-Datenordner
 (Windows `%APPDATA%\LightOS`, Linux `~/.local/share/LightOS`), du kannst sie also mischen. Beim nächsten Start richtet LightOS die dort gespeicherten Ausgänge
 automatisch wieder ein. **Schließen** beendet den Dialog; danach aktualisiert LightOS
@@ -287,6 +294,8 @@ DMX und Universen: [DMX_PROTOCOL.md](../DMX_PROTOCOL.md).
 
 ## Weiterlesen
 
+- [Unterstützte DMX-Interfaces](INTERFACES.md) — Kompatibilitätsliste, Treiber-Links und
+  „Ethernet→DMX per LAN-Kabel direkt am PC“ Schritt für Schritt.
 - [Zwei Universen über zwei Adapter](../anleitung_zwei_universen/ANLEITUNG.md) — ENTTEC
   auf Universe 1 und Art-Net auf Universe 2 Schritt für Schritt, mit den Regeln für
   doppelte Ziele.

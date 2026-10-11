@@ -879,6 +879,29 @@ def udmx_infos(immer: bool = True) -> list[str]:
         return [f"? ({type(e).__name__}: {e})"]
 
 
+def interface_infos() -> list[str]:
+    """OUT-70: angeschlossene DMX-Interfaces (Kennung, Befund, Port).
+
+    Rein lesend (``interfaces.erkenne``); Seriennummern nur maskiert. Nennt
+    auch Geraete, die LightOS nicht unterstuetzt — gerade die erklaeren, warum
+    „nichts gefunden“ wird."""
+    try:
+        from src.core.dmx import interfaces
+        if os.environ.get("LIGHTOS_KEIN_USB"):
+            abgeschaltet = ["Erkennung abgeschaltet (LIGHTOS_KEIN_USB)"]
+        else:
+            abgeschaltet = None
+        mod = sys.modules.get("src.core.app_state")
+        state = getattr(mod, "_state", None) if mod else None
+        om = getattr(state, "output_manager", None)
+        ziele = interfaces.eingerichtete_ziele(om) if om is not None else {}
+        zeilen = interfaces.diagnose_zeilen(
+            interfaces.erkenne(eingerichtet=ziele))
+        return zeilen or abgeschaltet or ["keine erkannt"]
+    except Exception as e:
+        return [f"? ({type(e).__name__}: {e})"]
+
+
 def show_info() -> str:
     """Geladene Show (Name, Geraeteanzahl) — leer ohne App-Zustand."""
     try:
@@ -948,7 +971,9 @@ def systeminfo_text(app_version: str = "?", programm_dir: str | None = None) -> 
     zeilen += [f"{k}: {v}" for k, v in basis_infos(app_version, programm_dir)]
     for titel, werte in (("Bildschirme", bildschirm_infos()),
                          ("DMX-Ausgaenge", dmx_infos()),
-                         ("uDMX (USB)", udmx_infos()), ("MIDI", midi_infos())):
+                         ("uDMX (USB)", udmx_infos()),
+                         ("DMX-Interfaces", interface_infos()),
+                         ("MIDI", midi_infos())):
         if werte:
             zeilen += ["", f"{titel}:"] + [f"  {anonymisiere(w)}" for w in werte]
     if show_info():

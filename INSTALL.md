@@ -264,6 +264,11 @@ oben der verlaessliche.
 
 LightOS selbst installiert keine Treiber. Falls Hardware nicht erkannt wird:
 
+Welche Interfaces LightOS kennt und welchen Treiber jedes braucht, steht in
+[Unterstützte DMX-Interfaces](docs/anleitung_ausgabe_einrichten/INTERFACES.md). Der
+Assistent **Ausgabe → Interface einrichten…** zeigt dasselbe für die Geräte, die gerade
+angeschlossen sind.
+
 ### Enttec DMX USB Pro
 - Treiber kommt mit Windows (FTDI). Sollte automatisch funktionieren.
 - Falls nicht: https://ftdichip.com/drivers/vcp-drivers/ (Windows VCP Driver)
