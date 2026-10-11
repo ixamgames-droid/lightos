@@ -71,6 +71,7 @@
 | OUT-70 | A | feature/out70-interface-erkennung-assistent | 2026-10-11T15:44Z | - |
 | UI-90 | D | - | 2026-10-11T16:21Z | - |
 | XPLAT-53 | D | - | 2026-10-11T16:21Z | - |
+| MIDI-14 | D | - | 2026-10-11T16:21Z | - |
 
 ## Blocker & Fallen
 
@@ -225,7 +226,6 @@
 
 ## Verlauf
 
-- 2026-10-11T12:09Z D claim UI-88
 - 2026-10-11T12:14Z D aktualisiert VIZ-103: Branch - -> fix/viz103-haengend-an-unterkante; Dateien - -> src/ui/visualizer/scene_src/fixtures/mount_pose.js · tests/test_viz103_haengend_unterkante_scene.py
 - 2026-10-11T12:14Z A claim UI-89
 - 2026-10-11T12:20Z A done UI-84
@@ -255,3 +255,4 @@
 - 2026-10-11T16:05Z A done VIZ-96
 - 2026-10-11T16:21Z D claim UI-90
 - 2026-10-11T16:21Z D claim XPLAT-53
+- 2026-10-11T16:21Z D claim MIDI-14
