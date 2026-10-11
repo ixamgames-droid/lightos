@@ -88,7 +88,7 @@ Der Dialog blendet je nach gewählter **Aktion** nur die passenden Felder ein. B
 | Effekte stoppen (Tempo bleibt) | Stoppt alle laufenden Effekt-Funktionen; Tempo/BPM bleiben unverändert (Pause/Effekt-Stop) |
 | Blackout | Schaltet Blackout an, solange gedrückt (Moment-Override) — alles auf 0, nur Position/Gobo/Optik von Moving Heads mit Dimmer bleiben stehen; Laser/Nebel ganz aus. Mit **Blackout-Ziel** nur die gewählten Geräte/Gruppen (s. u.) |
 | Laser scharf/unscharf | Schaltet den Netzwerk-Laser-Ausgang scharf/unscharf (unscharf = Ausgabe geblankt) — LAS-10 |
-| Laser NOT-AUS | Laser-Not-Aus: sofort dunkel + entwaffnen |
+| Laser NOT-AUS | Laser-Not-Aus: sofort dunkel + entwaffnen. Die Taste löst nur aus — gelöst wird mit dem Knopf **LASER NOT-AUS** oben rechts im Hauptfenster (Rückfrage) |
 | Laser-Muster abrufen | Ruft ein gespeichertes Laser-Muster (Muster-Palette) ab — LAS-18 |
 | Alles Weiß (gehalten) | Blitzt die gebundene (hochpriore) Weiß-Szene, solange gedrückt; beim Loslassen zurück |
 | Freeze (BPM einfrieren) | Friert das Tempo ein — alle Buses + globaler Leader auf 0 (Toggle); bus-gekoppelte Effekte halten ihre Position |

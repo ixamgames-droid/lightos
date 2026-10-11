@@ -90,7 +90,7 @@ Depending on the selected **Aktion**, the dialog only shows the fields that appl
 | Effekte stoppen (Tempo bleibt) (stop effects (tempo stays)) | Stops all running effect functions; tempo/BPM stay unchanged (pause/effect stop) |
 | Blackout | Switches blackout on while pressed (momentary override) — everything to 0, only position/gobo/optics of moving heads with a dimmer stay where they are; lasers/fog completely off. With **Blackout-Ziel** (blackout target), only the selected fixtures/groups (see below) |
 | Laser scharf/unscharf (laser armed/disarmed) | Arms/disarms the network laser output (disarmed = output blanked) — LAS-10 |
-| Laser NOT-AUS (laser EMERGENCY STOP) | Laser emergency stop: dark immediately + disarm |
+| Laser NOT-AUS (laser EMERGENCY STOP) | Laser emergency stop: dark immediately + disarm. The button only triggers — release it with the **LASER NOT-AUS** button at the top right of the main window (confirmation prompt) |
 | Laser-Muster abrufen | Recalls a saved laser pattern (pattern palette) — LAS-18 |
 | Alles Weiß (gehalten) (all white (held)) | Flashes the bound (high-priority) white scene while pressed; back on release |
 | Freeze (BPM einfrieren) (freeze (freeze BPM)) | Freezes the tempo — all buses + the global leader to 0 (toggle); bus-coupled effects hold their position |

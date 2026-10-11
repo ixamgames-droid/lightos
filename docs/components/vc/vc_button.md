@@ -48,7 +48,7 @@ Die Aktion wird im Button-Editor über deutsche Labels
 | `TAP_BUS` / `SYNC_BUS` / `ARM_BUS` | Tempo-Bus tap/sync/arm | Wirkt auf benannten Bus `tempo_bus_id` | `tempo_bus_id` |
 | `MEDIA_PLAY_PAUSE` / `MEDIA_NEXT` / `MEDIA_PREV` | Musik-Player | `media_player.toggle/next/prev()` | — |
 | `LASER_ARM` | Laser scharf/unscharf | `LaserOutputManager.set_armed(...)` (Safety-Toggle) | — |
-| `LASER_ESTOP` | Laser NOT-AUS | `estop_all()` + entwaffnen | — |
+| `LASER_ESTOP` | Laser NOT-AUS | `estop_all()` + entwaffnen; löst nur aus — gelöst wird am Knopf oben rechts im Hauptfenster mit Rückfrage (LAS-36) | — |
 | `LASER_PATTERN` | Laser-Muster abrufen | Wendet `PaletteType.LASER`-Palette auf ihre Fixtures an | `laser_palette` |
 
 ### Start-Modifikatoren (nur `FUNCTION_TOGGLE`/`FLASH`)

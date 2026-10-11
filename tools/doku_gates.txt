@@ -34,6 +34,7 @@ test_audit_coverage_docs_exist.py
 test_anleitungsbilder.py           # u. a. jedes GIF unter docs/ <= 2 MB
 test_las24_gm_laser_aus.py         # Wortlaut in anleitung_erste_schritte
 test_las25_doku_aus_werte.py
+test_las36_doku_notaus_loesen.py   # Wortlaut NOT-AUS loesen: Erste Schritte, Laser, Buehnen-Show, Geraete-Generator
 test_fm52_programmer_verlauf.py    # Wortlaut in anleitung_programmer_grundlagen
 test_ui64_programmer_playback.py
 test_viz69_render_ruckler.py       # Wortlaut in ANLEITUNG_3D_BUEHNE.md

@@ -186,6 +186,12 @@ hier — ein Laser bekommt also nicht einfach überall 0:
 - **Laser-NOT-AUS:** schreibt an jede Laser-Adresse mit bekanntem Aus-Wert
   diesen Wert, an alle übrigen Laser-Adressen 0 — und gewinnt immer (auch
   gegen Kanal-Modifier, Grand Master und Blackout).
+- **NOT-AUS lösen:** nur mit dem Knopf **LASER NOT-AUS** oben rechts im
+  Hauptfenster — klicken und die Rückfrage bestätigen. Der Knopf im Laser-Tab
+  und die VC-Taste „Laser NOT-AUS“ lösen nur aus. Solange der NOT-AUS aktiv
+  ist, werden Werte gemerkt, der Laser bleibt dunkel: Betriebsart, Muster,
+  Regler, Snaps und MIDI lösen ihn nicht. Nach dem Lösen gibt der Laser sofort
+  wieder aus, was eingestellt ist.
 - Kennt das Profil **keinen** Aus-Wert (siehe oben), gibt es nichts zu
   schreiben: Blackout und Ziel-Blackout setzen dann die Lichtkanäle auf 0,
   ein Laser ohne Dimmer kann trotzdem weiterstrahlen. Im DMX-Monitor sieht man

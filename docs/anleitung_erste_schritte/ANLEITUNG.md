@@ -60,7 +60,10 @@ Nach dem Start öffnet LightOS in der Sektion **Bühne**. Von oben nach unten:
    (auch im Kiosk-Modus oben rechts; Tastenkürzel `Strg+Umschalt+L`): ein Klick schaltet
    alle Laser sofort dunkel, ohne Rückfrage, und der Knopf blinkt dann als
    **LASER NOT-AUS AKTIV**. Gelöst wird er nur bewusst — noch einmal klicken und die
-   Rückfrage bestätigen.
+   Rückfrage bestätigen. Nichts anderes löst ihn: kein Regler, keine Taste der Virtual
+   Console, kein MIDI-Controller, kein Tastenkürzel. Solange er aktiv ist, werden
+   Laser-Werte gemerkt, der Laser bleibt dunkel; nach dem Lösen gibt er sofort wieder
+   aus, was eingestellt ist.
 7. **Befehlszeile** — für Tastatur-Befehle wie `1 thru 5 @ 80`. Beispiele stehen als
    Platzhaltertext im Feld.
 8. **Statusleiste** — links der Zustand des ENTTEC-Adapters (`Enttec: nicht gefunden`,
