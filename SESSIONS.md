@@ -35,7 +35,6 @@
 | FM-66 | D | fix/fm66-abgleich-modellname | 2026-10-10T22:54Z | src/core/database/bibliothek_format.py · tests/test_fm66_abgleich_modellname.py · docs/FIXTURE_LIBRARY.md |
 | PROC-19 | A | ci/proc19-doku-schnellweg | 2026-10-10T18:57Z | .github/workflows/ci.yml |
 | PROC-20 | A | feature/proc20-backlog-fragmente | 2026-10-10T18:45Z | tools · BACKLOG.md |
-| TOOL-26 | B | feature/tool26-app-messwerkzeug | 2026-10-10T13:25Z | tools/app_messung.py · tools/README.md · tests/test_tool26_app_messung.py · BACKLOG.md · changelog.d/2026-10-10-TOOL-26.md |
 | LAS-32 | A | feature/las32-s1-sperrzonen-anzeige | 2026-10-11T14:32Z | - |
 | XPLAT-51 | A | fix/xplat51-arm64-nicht-unterstuetzt | 2026-10-10T14:17Z | - |
 | XPLAT-52 | A | fix/xplat52-installer-venv-arch | 2026-10-10T14:17Z | - |
@@ -220,7 +219,6 @@
 
 ## Verlauf
 
-- 2026-10-11T10:20Z A done VIZ-100
 - 2026-10-11T10:24Z D claim VCB-42
 - 2026-10-11T10:34Z D aktualisiert VCB-42: Branch - -> fix/vcb42-blackout-ziel-gruppe-wiedererkennen; Dateien - -> src/core/app_state.py · src/core/show/show_file.py · src/ui/virtualconsole/vc_button.py · src/ui/virtualconsole/target_list_editor.py · tests/test_vcb42_blackout_ziel_wiedererkennen.py
 - 2026-10-11T10:38Z A done DEMO-8
@@ -250,3 +248,4 @@
 - 2026-10-11T14:30Z D aktualisiert MIDI-10: Branch - -> feature/midi10-pitchbend-fader; Dateien - -> src/core/midi/midi_manager.py · src/core/midi/midi_mapper.py · src/ui/virtualconsole/vc_widget.py · src/ui/virtualconsole/vc_slider.py · tests/test_midi10_pitchbend_fader.py
 - 2026-10-11T14:47Z D aktualisiert MIDI-10: Dateien src/core/midi/midi_manager.py · src/core/midi/midi_mapper.py · src/ui/virtualconsole/vc_widget.py · src/ui/virtualconsole/vc_slider.py · tests/test_midi10_pitchbend_fader.py -> src/core/midi/midi_manager.py · src/core/midi/midi_mapper.py · src/ui/virtualconsole/vc_widget.py · src/ui/virtualconsole/vc_slider.py · src/ui/views/midi_view.py · src/ui/widgets/midi_teach_dialog.py · src/ui/widgets/input_profile_editor.py · tests/test_midi10_pitchbend_fader.py · docs/anleitung_vc_widgets/02_fader.md · docs/anleitung_vc_widgets/02_fader.en.md
 - 2026-10-11T14:52Z D aktualisiert ENG-30: Branch - -> perf/eng30-engine-zeit-je-frame
+- 2026-10-11T14:58Z B done TOOL-26
