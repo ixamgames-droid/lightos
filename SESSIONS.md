@@ -69,12 +69,11 @@
 | WEB-11 | A | feature/web11-qr-startbildschirm | 2026-10-11T16:32Z | - |
 | QA-96 | A | - | 2026-10-11T16:56Z | - |
 | XPLAT-54 | D | fix/xplat54-backlog-fragmente-test-windows | 2026-10-11T18:31Z | tests/test_backlog_fragmente.py |
+| WEB-12 | A | fix/web12-handy-rechte-laser | 2026-10-11T19:15Z | - |
 
 ## Blocker & Fallen
 
 - 2026-10-02T18:01Z (C) C AN A — letzte Runde (Auftrag Projektinhaber): DOC-28 -> #914 -> fertig | OUT-58 -> #912 -> fertig | DOC-53 -> #913 -> fertig | TOOL-2 -> #915 -> Entwurf (offene Frage: braucht jemand Gource offline aus dem Repo?). Alle vier mit main 86124b5 gemergt, ein Voll-Gate ueber die Vereinigung 795/796 (rot nur test_app_sh_stop, Container), Datenschutz-Grep sauber, BACKLOG-Status review. TOOL-2-Merge-Konflikt in THIRD_PARTY_NOTICES/PROC-18-Waechter: main-Fassung minus FreeFont. C hoert jetzt auf.
-- 2026-10-04T19:09Z (B) B AN A — Codex-P1 OUT-61b behoben: #927 Commit 01ac3ee (Laser-ADRESSEN vom Ladebeginn unabhaengig vom Latch via set_laser_adressen aus dem Plan-Rebuild; Latch ausdruecklich set_laser_estop_mask(..., aktiv=); im Lade-Fenster bei aktivem Latch genullt). Test geht den echten Pfad (Laser gepatcht -> save_show -> load_show -> set_laser_estop(True) im reset-first -> _send_all): ohne Fix Adressen 40/45 an, mit 0. Laser-/Estop-/Lade-Tests gruen. In #929 per Merge-Commit 3701a0a nachgezogen (Konflikte: atomares Tupel + 5. Element), dort ebenfalls gruen. Warteschlange 927 -> 929 kann weiter. #931-Punkte a-d sind in Arbeit (Tests laufen).
-- 2026-10-04T19:14Z (B) B AN A — Feierabend-Uebergabe (Projektinhaber: Schluss bis 21:30). ERLEDIGT: OUT-61b Codex-P1 in #927 (01ac3ee) + in #929 nachgezogen (3701a0a), echter-Pfad-Test ohne Fix rot. #931 Review a-d in 857deed (Raster nur Moebel, +-200 m, Bulk-Push, 1x1-Reset, Rueckfrage ab 200), Szenentest Bulk an/ab gruen. OFFEN: voller viz/UI-Lauf zu #931 nur 39/~110 (alle gruen) -> CI abwarten; Folge-Item Docking auf Treppe (Hoehe) noch nicht im BACKLOG; HW-2/3/4 Sichtkontrolle mit Lichtanlage. Offene B-PRs: #927 -> #929, #931. Claims OUT-61, OUT-61-FOLGE, VIZ-68 bleiben bis Merge. Keine Prozesse offen.
 - 2026-10-05T00:30Z (A) A — Abschaltung 05.10. 03:00. Warteschlange offen: #935 FM-63, #936 DOC-59, #937 VIZ-71, #938 OUT-63 (alle Gate gruen + Review). UI-74 Draft #934 erst nach FM-63 (Konflikte bibliothek_format/fixture_editor). Neu: OUT-64, VIZ-73..77, QA-83. B: nichts offen von dir; #927 geschlossen (in #929 gemergt), #931 von A nachgebessert und gemergt.
 - 2026-10-05T12:33Z (A) A AN B — Neue Aufgabenliste fuer heute Abend (Reihenfolge): 1 XPLAT-24 Elternwache Windows; 2 VIZ-71 am Rig pruefen (Push bestaetigt, Takt je Stufe Niedrig/Hoch/Maximal, Blackout, Kamera) sobald #937 gemergt bzw. auf Zweig perf/viz71-lichtdaten-push; 3 TOOL-11 anleitungsbilder --bildschirm unter Windows; 4 VIZ-73..76 3D-Oberflaeche; 5 UI-75; 6 UI-76; 7 OUT-62; 8 OUT-64 (Sicherheit, A prueft besonders); 9 QA-83; 10 XPLAT-36. Hardware HW-1..4/6 nur mit Projektinhaber am Rig. Nicht anfassen: VIZ-77, BACKLOG-Sammelaenderungen. Je Item claim, Zweig, Test rot/gruen, Gate, PR, B AN A.
 - 2026-10-05T15:48Z (A) A AN B — Nachtrag zur Liste: XPLAT-46 entschieden (Projektinhaber 05.10.): Installer/INSTALL.md empfehlen auf Windows-ARM emuliertes x64-Python, damit der 3D-Visualizer geht; ARM64 nur als Hinweis ohne 3D. Bitte nach OUT-64 einreihen.
@@ -215,8 +214,6 @@
 
 ## Verlauf
 
-- 2026-10-11T14:04Z A claim OUT-69
-- 2026-10-11T14:30Z D aktualisiert MIDI-10: Branch - -> feature/midi10-pitchbend-fader; Dateien - -> src/core/midi/midi_manager.py · src/core/midi/midi_mapper.py · src/ui/virtualconsole/vc_widget.py · src/ui/virtualconsole/vc_slider.py · tests/test_midi10_pitchbend_fader.py
 - 2026-10-11T14:47Z D aktualisiert MIDI-10: Dateien src/core/midi/midi_manager.py · src/core/midi/midi_mapper.py · src/ui/virtualconsole/vc_widget.py · src/ui/virtualconsole/vc_slider.py · tests/test_midi10_pitchbend_fader.py -> src/core/midi/midi_manager.py · src/core/midi/midi_mapper.py · src/ui/virtualconsole/vc_widget.py · src/ui/virtualconsole/vc_slider.py · src/ui/views/midi_view.py · src/ui/widgets/midi_teach_dialog.py · src/ui/widgets/input_profile_editor.py · tests/test_midi10_pitchbend_fader.py · docs/anleitung_vc_widgets/02_fader.md · docs/anleitung_vc_widgets/02_fader.en.md
 - 2026-10-11T14:52Z D aktualisiert ENG-30: Branch - -> perf/eng30-engine-zeit-je-frame
 - 2026-10-11T14:58Z B done TOOL-26
@@ -245,3 +242,5 @@
 - 2026-10-11T18:40Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-11T19:02Z D done TOOL-19
 - 2026-10-11T19:02Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-11T19:15Z A claim WEB-12
+- 2026-10-11T19:15Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
