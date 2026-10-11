@@ -103,7 +103,7 @@ class DieFlaggeWirktBeiPytestTest(unittest.TestCase):
         fertig = subprocess.run(
             [sys.executable, "-m", "pytest", "-p", "no:cacheprovider"] + extra
             + [self.pfad],
-            cwd=zg.REPO, text=True, capture_output=True, timeout=300)
+            cwd=zg.REPO, text=True, encoding="utf-8", errors="replace", capture_output=True, timeout=300)
         for zeile in (fertig.stdout or "").splitlines():
             if zeile.startswith("rootdir:"):
                 return zeile.split(":", 1)[1].strip()
