@@ -45,7 +45,6 @@
 | DEMO-8 | A | feature/demo8-demoshows-im-setup | 2026-10-10T13:08Z | - |
 | XPLAT-51 | A | fix/xplat51-arm64-nicht-unterstuetzt | 2026-10-10T14:17Z | - |
 | XPLAT-52 | A | fix/xplat52-installer-venv-arch | 2026-10-10T14:17Z | - |
-| VIZ-100 | A | fix/viz100-haengend-andocken | 2026-10-10T19:30Z | src/ui/visualizer/scene_src/stage/docking.js |
 | VIZ-101 | A | fix/viz101-licht-durch-wand | 2026-10-10T14:38Z | - |
 | UI-86 | A | perf/ui86-2d-ansicht-hidpi | 2026-10-10T19:31Z | - |
 | VCB-36 | D | fix/vcb36-blackout-ziel-gruppen-id | 2026-10-10T22:54Z | - |
@@ -205,7 +204,6 @@
 
 ## Verlauf
 
-- 2026-10-10T18:03Z D aktualisiert TOOL-19: Branch - -> fix/tool19-werkzeuge-ohne-echten-ausgang
 - 2026-10-10T18:10Z D aktualisiert TOOL-18: Branch - -> fix/tool18-bilder-hinweis-gpu-szenen
 - 2026-10-10T18:11Z D done XPLAT-48
 - 2026-10-10T18:16Z D aktualisiert VCB-36: Branch - -> fix/vcb36-blackout-ziel-gruppen-id
@@ -235,3 +233,4 @@
 - 2026-10-10T22:54Z D claim TOOL-21
 - 2026-10-11T09:40Z A claim WEB-08
 - 2026-10-11T09:40Z A aktualisiert LAS-32: Branch feature/las32-laser-sperrzonen -> feature/las32-s1-sperrzonen-anzeige
+- 2026-10-11T10:20Z A done VIZ-100
