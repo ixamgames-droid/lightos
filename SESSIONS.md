@@ -65,6 +65,7 @@
 | LAS-34 | A | feature/las34-laser-tab | 2026-10-11T13:51Z | - |
 | LAS-35 | A | - | 2026-10-11T12:25Z | - |
 | MIDI-10 | D | - | 2026-10-11T13:58Z | - |
+| MIDI-15 | D | - | 2026-10-11T13:58Z | - |
 
 ## Blocker & Fallen
 
@@ -213,7 +214,6 @@
 
 ## Verlauf
 
-- 2026-10-10T22:00Z D done TOOL-21
 - 2026-10-10T22:23Z A done LAS-31
 - 2026-10-10T22:49Z D done QA-91
 - 2026-10-10T22:54Z D claim QA-91
@@ -243,3 +243,4 @@
 - 2026-10-11T13:51Z A aktualisiert LAS-34: Branch - -> feature/las34-laser-tab
 - 2026-10-11T13:57Z A done XPLAT-49
 - 2026-10-11T13:58Z D claim MIDI-10
+- 2026-10-11T13:58Z D claim MIDI-15
