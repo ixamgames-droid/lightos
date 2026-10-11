@@ -2443,6 +2443,53 @@ class AppState:
                 self.laser_estop_active = False
                 self._push_laser_estop_mask(target_active=False)
 
+    def laser_notaus_ausloesen(self):
+        """LAS-31: Laser-NOT-AUS ausloesen — EIN Weg fuer Kopfleiste und
+        Tastenkuerzel, derselbe Ablauf wie die VC-Taste (LAS-10) und die
+        Laser-Seite: verriegeln -> unscharf -> Geraete-Verriegelung loesen.
+
+        ``estop_all`` setzt den DMX-Latch (``set_laser_estop(True)``) und meldet
+        ``SyncEvent.LASER_ESTOP``; ``armed=False`` haelt Netzwerk-Laser danach
+        dunkel. Scheitert der Netzwerk-Teil, wird der DMX-Latch trotzdem
+        gesetzt und gemeldet — ein NOT-AUS darf nicht an einem Folgefehler
+        haengen bleiben. Idempotent: bei stehendem Latch schaltet ein weiterer
+        Aufruf erneut ab (z. B. einen wieder scharf geschalteten Laser)."""
+        try:
+            lo = self.ensure_laser_output()
+            lo.estop_all()
+            lo.set_armed(False)
+            lo.clear_estop_all()
+        except Exception as e:
+            print(f"[AppState] Laser-NOT-AUS: Netzwerk-Teil fehlgeschlagen: {e}")
+            # Latch notfalls direkt (estop_all setzt ihn als Erstes — steht er
+            # schon, ist das ein No-Op) und die Anzeige trotzdem benachrichtigen.
+            self.set_laser_estop(True)
+            try:
+                from .sync import get_sync, SyncEvent
+                get_sync().emit(SyncEvent.LASER_ESTOP, None)
+            except Exception:
+                pass
+
+    def laser_notaus_loesen(self):
+        """LAS-31: den Laser-NOT-AUS bewusst loesen (die Oberflaeche fragt vorher
+        nach). Loest NUR den DMX-Latch samt Ausgabe-Maske; Netzwerk-Laser bleiben
+        unscharf — Scharfschalten ist ein eigener Schritt."""
+        self.set_laser_estop(False)
+
+    def laser_anzahl(self) -> int:
+        """LAS-31: Zahl der als Laser erkannten gepatchten Geraete — DMX-Laser
+        aus dem Render-Plan plus Netzwerk-Laser (Ether Dream/IDN). Nur fuer die
+        Anzeige; der NOT-AUS haengt nicht davon ab."""
+        fids = set(getattr(self, "_laser_fids", frozenset()) or ())
+        try:
+            from .laser.laser_output import _STREAM_PROTOCOLS
+            for f in list(getattr(self, "_patch_cache", None) or ()):
+                if (getattr(f, "protocol", "") or "").lower() in _STREAM_PROTOCOLS:
+                    fids.add(getattr(f, "fid", None))
+        except Exception:
+            pass
+        return len(fids)
+
     def _channels_for_fid(self, fid: int):
         """Kanalliste des gepatchten Fixtures — oder ``None``, wenn es (noch)
         nicht im Patch steht. Nur fuer die Kopf-Aufloesung (FM-17)."""

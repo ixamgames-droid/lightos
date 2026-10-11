@@ -8,11 +8,14 @@ import { fixtures, stageObjects, view } from '../state.js';
 import { applyStageEmissive } from '../interaction/tools.js';
 import { _stageIdFromObject } from '../interaction/picking.js';
 import { requestRender } from '../scene/render_loop.js';  // VIZ-13 3c-2
+import { DOCK_HANG_OFFSET } from '../fixtures/mount_pose.js';   // VIZ-100
 
 export const DOCK_HANG_TYPES = { truss_h: 1, truss_v: 1 };
 export const DOCK_TOP_TYPES  = { platform: 1, floor: 1, dj_booth: 1, speaker: 1, audience: 1,
                                   bar_counter: 1, riser_stairs: 1 };   // VIZ-68
-export const DOCK_HANG_OFFSET = 0.25;
+// VIZ-100: der Versatz steht in fixtures/mount_pose.js — dort rueckt die
+// haengende Haltung das Modell um genau diesen Betrag an die Traverse heran.
+export { DOCK_HANG_OFFSET };
 export const DOCK_TOP_OFFSET  = 0.30;
 const _dockRay = new THREE.Raycaster();
 let _dockHighlightId = null;
