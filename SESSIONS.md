@@ -32,7 +32,6 @@
 | MIDI-4 | A | fix/midi3-mapping-robust | 2026-10-09T16:27Z | src/core/midi/midi_mapper.py |
 | XPLAT-49 | A | fix/xplat49-uninstall-datenschutz | 2026-10-10T18:44Z | uninstall.py |
 | XPLAT-50 | A | fix/xplat49-uninstall-datenschutz | 2026-10-10T09:29Z | start.bat · start.ps1 |
-| DOC-69 | A | docs/doc69-doku-korrekturen | 2026-10-10T18:44Z | - |
 | STAB-32 | A | feature/stab32-versionierte-sicherungen | 2026-10-10T18:44Z | - |
 | OUT-67 | A | feature/out67-ausgabe-ausfall-banner | 2026-10-10T09:29Z | - |
 | TOOL-24 | D | fix/tool24-proc18-lizenzhinweise-strukturiert | 2026-10-10T22:54Z | tests/test_proc18_fremd_lizenzhinweise.py |
@@ -207,7 +206,6 @@
 
 ## Verlauf
 
-- 2026-10-10T18:34Z D done VIZ-98
 - 2026-10-10T18:49Z D claim QA-92
 - 2026-10-10T19:27Z A done FM-67
 - 2026-10-10T19:30Z A aktualisiert UI-86: Branch perf/ui86-2d-ansicht-hidpi -> fix/ui86-2d-hidpi
@@ -237,3 +235,4 @@
 - 2026-10-11T10:38Z A done DEMO-8
 - 2026-10-11T10:58Z A claim WEB-09
 - 2026-10-11T11:29Z D done QA-92
+- 2026-10-11T11:49Z A done DOC-69
