@@ -420,7 +420,7 @@ class WaechterTest(_GitRepo):
         p = subprocess.run(
             (sys.executable, str(REPO / "tools" / "backlog_sammeln.py"),
              "--waechter", "--repo", str(self.repo)),
-            capture_output=True, text=True, encoding="utf-8")
+            capture_output=True, text=True, encoding="utf-8", errors="replace")
         self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
         self.assertIn("HINWEIS", p.stdout)
 
