@@ -188,6 +188,78 @@ def test_einziger_adapter_an_anderer_buchse_wird_wiedererkannt():
     assert udmx.waehle(udmx.liste_geraete(fake.usb(g)), "2008:1066@1-2")._dev is g
 
 
+def test_streng_nimmt_nie_den_einzigen_vorhandenen_als_ersatz():
+    """Review OUT-68: bei mehreren uDMX-Ausgaengen kann „der einzige
+    vorhandene" der Adapter eines ANDEREN Universums sein."""
+    g = fake.Geraet(ports=(4,))
+    geraete = udmx.liste_geraete(fake.usb(g))
+    assert udmx.waehle(geraete, "2008:1066@1-4", streng=True)._dev is g
+    with pytest.raises(udmx.UdmxFehler) as e:
+        udmx.waehle(geraete, "2008:1066@1-2", streng=True)
+    assert e.value.code == udmx.G_NICHT_DA and "Anschluss" in str(e.value)
+    for offen in ("2008:1066", ""):
+        with pytest.raises(udmx.UdmxFehler) as e:
+            udmx.waehle(geraete, offen, streng=True)
+        assert e.value.code == udmx.G_MEHRDEUTIG
+    # Die Seriennummer ist exakt — sie gilt auch streng, an jeder Buchse.
+    s = fake.anyma(serie="A1", ports=(7,))
+    assert udmx.waehle(udmx.liste_geraete(fake.usb(s)), "16c0:05dc#A1",
+                       streng=True)._dev is s
+
+
+def test_abgezogener_adapter_greift_nicht_den_des_anderen_universums():
+    """Zwei gleiche Adapter ohne Seriennummer, zwei Universen. Wird der zweite
+    abgezogen, darf sein Sender nicht auf den ersten ausweichen."""
+    uhr = Uhr()
+    a, b = fake.Geraet(ports=(2,)), fake.Geraet(ports=(3,), adresse=6)
+    usb = fake.usb(a, b)
+    eins = udmx.Udmx("2008:1066@1-2", usb=usb, clock=uhr, streng=lambda: True)
+    zwei = udmx.Udmx("2008:1066@1-3", usb=usb, clock=uhr, streng=lambda: True)
+    eins.send_dmx(bytes([1]) * 512)
+    zwei.send_dmx(bytes([2]) * 512)
+    b.verhalten = lambda _d: (_ for _ in ()).throw(fake.abgezogen())
+    usb[0].geraete = [a]
+    for _ in range(4):
+        zwei.send_dmx(bytes([2]) * 512)
+        eins.send_dmx(bytes([1]) * 512)
+        uhr.t += udmx.Udmx.RECONNECT_EVERY_S + 0.1
+    assert zwei.is_disabled() and zwei.grund == udmx.G_NICHT_DA
+    assert {t[4][0] for t in a.transfers} == {1}
+    # Zurueck an seine Buchse: er sendet wieder — auf SEINEN Adapter.
+    neu = fake.Geraet(ports=(3,), adresse=9)
+    usb[0].geraete = [a, neu]
+    zwei.send_dmx(bytes([2]) * 512)
+    assert not zwei.is_disabled() and neu.transfers[-1][4][0] == 2
+
+
+def test_ersatzweise_gehaltener_adapter_wird_losgelassen_sobald_streng_gilt():
+    """Ein Ausgang allein darf seinen umgesteckten Adapter nehmen. Kommt ein
+    zweiter uDMX-Ausgang dazu, gilt das nicht mehr — auch nicht fuer den schon
+    gehaltenen Adapter (er kann der des neuen Ausgangs sein)."""
+    streng = [False]
+    g = fake.Geraet(ports=(4,))
+    dev = udmx.Udmx("2008:1066@1-2", usb=fake.usb(g), streng=lambda: streng[0])
+    dev.send_dmx(BILD)
+    assert len(g.transfers) == 1 and not dev.is_disabled()
+    streng[0] = True
+    dev.send_dmx(BILD)
+    assert len(g.transfers) == 1 and dev.is_disabled()
+    assert dev.grund == udmx.G_NICHT_DA
+    # Ein exakt passender Adapter bleibt dagegen, wenn „streng" spaeter kommt.
+    g2 = fake.Geraet(ports=(2,))
+    dev2 = udmx.Udmx("2008:1066@1-2", usb=fake.usb(g2), streng=lambda: streng[0])
+    dev2.send_dmx(BILD)
+    assert len(g2.transfers) == 1 and not dev2.is_disabled()
+    # … und ein Schluessel ohne Anschluss/Seriennummer wird „mehrdeutig".
+    streng[0] = False
+    g3 = fake.Geraet()
+    dev3 = udmx.Udmx("", usb=fake.usb(g3), streng=lambda: streng[0])
+    dev3.send_dmx(BILD)
+    streng[0] = True
+    dev3.send_dmx(BILD)
+    assert len(g3.transfers) == 1 and dev3.grund == udmx.G_MEHRDEUTIG
+
+
 def test_seriennummer_passt_nur_auf_genau_diesen_adapter():
     a, b = fake.anyma(serie="A1"), fake.anyma(serie="B2", ports=(3,))
     geraete = udmx.liste_geraete(fake.usb(a, b))

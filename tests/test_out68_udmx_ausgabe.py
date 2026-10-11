@@ -172,6 +172,10 @@ def test_prozess_sender_startet_den_udmx_worker_und_meldet_den_grund(monkeypatch
         echt = proxy._default_process_factory()
         assert echt._target is udmx_process._udmx_worker_main
         assert echt._args[0] == "2008:1066@1-2" and echt._args[4] is proxy._grund
+        # Review OUT-68: auch „streng" reist als Shared-Wert in den Prozess.
+        assert echt._args[6] is proxy._streng and not proxy.ist_streng()
+        proxy.setze_streng(True)
+        assert proxy._streng.value == 1 and proxy.ist_streng()
         assert om_mod.geraet_zustand(proxy) == om_mod.ZUSTAND_VERBINDET
 
         proxy.send_dmx(bytes([9]) * 512)                  # nur Shared Memory
@@ -333,7 +337,7 @@ def test_fehler_im_udmx_sender_beendet_den_frame_nicht():
 def test_typwechsel_und_stop_schliessen_den_adapter(monkeypatch):
     gebaut = []
 
-    def fabrik(schluessel):
+    def fabrik(schluessel, streng=False):
         gebaut.append(Empfaenger(schluessel))
         return gebaut[-1]
     monkeypatch.setattr(om_mod, "_make_udmx_device", fabrik)
@@ -351,6 +355,73 @@ def test_typwechsel_und_stop_schliessen_den_adapter(monkeypatch):
     om.stop()
     assert gebaut[2].zu == 1 and om._udmx_outputs == {}
     assert "udmx" in om._REGISTRY_NAMEN
+
+
+def test_mehrere_udmx_ausgaenge_schalten_alle_sender_auf_streng(monkeypatch):
+    """Review OUT-68: bei mehr als einem uDMX-Ausgang darf kein Sender „den
+    einzigen vorhandenen Adapter" nehmen — das waere der eines anderen
+    Universums, sobald der eigene abgezogen ist."""
+    class Sender(Empfaenger):
+        def __init__(self, port, streng=False):
+            super().__init__(port)
+            self.streng_start = self.streng = streng
+
+        def setze_streng(self, an):
+            self.streng = an
+
+    monkeypatch.setattr(om_mod, "_make_udmx_device", Sender)
+    om = om_mod.OutputManager()
+    om.add_udmx(1, "2008:1066@1-2")
+    eins = om._udmx_outputs[1]
+    assert eins.streng_start is False and eins.streng is False
+    om.add_udmx(2, "2008:1066@1-3")
+    zwei = om._udmx_outputs[2]
+    # Der zweite startet SCHON streng (kein Fenster), der erste wird es.
+    assert zwei.streng_start is True and zwei.streng is True
+    assert eins.streng is True
+    # Denselben Ausgang neu einrichten aendert daran nichts.
+    om.add_udmx(2, "2008:1066@1-3")
+    assert om._udmx_outputs[2].streng_start is True and eins.streng is True
+    # Bleibt nur einer uebrig, darf er wieder an einer anderen Buchse haengen.
+    om.remove_output(2)
+    assert eins.streng is False
+    om.add_udmx(2, "2008:1066@1-3")
+    assert eins.streng is True
+    om.close_udmx_on_device("2008:1066@1-3")
+    assert eins.streng is False
+    om.stop()
+
+
+def test_zwei_sender_ein_adapter_abgezogen_der_andere_bekommt_kein_fremdes_bild(
+        monkeypatch):
+    """Dasselbe ueber die echten Sende-Threads: Universum 2 verliert seinen
+    Adapter — an dem von Universum 1 kommt nie ein Bild von Universum 2 an."""
+    monkeypatch.setattr(udmx.Udmx, "RECONNECT_EVERY_S", 0.01)
+    a, b = fake.Geraet(ports=(2,)), fake.Geraet(ports=(3,), adresse=6)
+    usb = fake.usb(a, b)
+    monkeypatch.setattr(
+        om_mod, "_make_udmx_device",
+        lambda schluessel, streng=False: udmx_process.UdmxThreadProxy(
+            schluessel, frame_interval=0.002, _usb=usb, streng=streng))
+    om = om_mod.OutputManager()
+    try:
+        om.add_udmx(1, "2008:1066@1-2")
+        om.add_udmx(2, "2008:1066@1-3")
+        eins, zwei = om._udmx_outputs[1], om._udmx_outputs[2]
+        eins.send_dmx(bytes([1]) * 512)
+        zwei.send_dmx(bytes([2]) * 512)
+        assert _warte(lambda: b.transfers and b.transfers[-1][4][0] == 2)
+        b.verhalten = lambda _d: (_ for _ in ()).throw(fake.abgezogen())
+        usb[0].geraete = [a]
+        assert _warte(zwei.is_disabled)
+        vorher = usb[0].suchen
+        assert _warte(lambda: usb[0].suchen >= vorher + 5)   # sucht weiter
+        assert zwei.is_disabled() and zwei.grund() == udmx.G_NICHT_DA
+        assert "Anschluss" in zwei.grund_text() or "nicht gefunden" in zwei.grund_text()
+        assert {t[4][0] for t in a.transfers} <= {0, 1}
+        assert eins.is_connected()
+    finally:
+        om.stop()
 
 
 def test_manager_ohne_init_kommt_ohne_udmx_tabelle_aus():
@@ -541,6 +612,9 @@ def test_gespeicherter_adapter_fehlt_in_der_liste_bleibt_sichtbar(dialog):
 
 def test_verbinden_richtet_ein_speichert_und_nennt_den_grund(dialog, konfig, monkeypatch):
     class Geraet(Empfaenger):
+        def __init__(self, port="2008:1066", streng=False):
+            super().__init__(port)
+
         def is_connected(self):
             return False
 

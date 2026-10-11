@@ -430,7 +430,7 @@ def schluessel_lesen(text) -> tuple[int | None, int | None, str, str]:
     return vid, pid, serie.strip(), ort.strip()
 
 
-def waehle(geraete, schluessel) -> UdmxGeraet:
+def waehle(geraete, schluessel, streng: bool = False) -> UdmxGeraet:
     """Den zum Schluessel passenden Adapter — oder :class:`UdmxFehler`.
 
     ★ Nie raten (Lehre aus OUT-66, wo ein Wiederverbinden per Kennung den
@@ -441,6 +441,12 @@ def waehle(geraete, schluessel) -> UdmxGeraet:
       gibt es GENAU EINEN Adapter dieser Kennung, ist es derselbe an anderer
       Buchse. Bei mehreren: keiner.
     * Nur Kennung / gar nichts -> genau einer, sonst „mehrdeutig".
+
+    ``streng`` (mehr als EIN uDMX-Ausgang eingerichtet): nur noch der exakte
+    Treffer zaehlt — Seriennummer oder genau dieser Anschluss. Der Ersatz „der
+    einzige vorhandene" faellt weg, denn der einzige vorhandene Adapter kann
+    der eines ANDEREN Universums sein (dessen eigener ist nur gerade abgezogen):
+    zwei Universen sendeten dann abwechselnd auf denselben Ausgang.
     """
     vid, pid, serie, ort = schluessel_lesen(schluessel)
     passend = [g for g in geraete
@@ -459,6 +465,18 @@ def waehle(geraete, schluessel) -> UdmxGeraet:
         for g in nutzbar:
             if g.ort == ort:
                 return g
+    if streng:
+        if ort:
+            raise UdmxFehler(
+                G_NICHT_DA,
+                f"uDMX-Adapter ({schluessel}) steckt nicht an seinem Anschluss. "
+                f"Bei mehreren uDMX-Ausgängen zählt nur der gewählte Anschluss "
+                f"— zurückstecken oder in den Ausgabe-Einstellungen neu auswählen.")
+        raise UdmxFehler(
+            G_MEHRDEUTIG,
+            "Mehrere uDMX-Ausgänge eingerichtet, aber für diesen ist kein "
+            "bestimmter Adapter gewählt — bitte in den Ausgabe-Einstellungen "
+            "einen auswählen.")
     if len(nutzbar) == 1:
         return nutzbar[0]
     if ort:
@@ -487,10 +505,15 @@ class Udmx:
     RECONNECT_EVERY_S = 2.0
 
     def __init__(self, schluessel: str = "", usb=None, melde_grund=None,
-                 clock=time.monotonic):
+                 clock=time.monotonic, streng=None):
         self.port = str(schluessel or "").strip()
         self._usb = usb
         self._melde_grund = melde_grund
+        #: Aufrufbar -> ``True``, solange mehr als ein uDMX-Ausgang
+        #: eingerichtet ist (s. :func:`waehle`). ``None`` = nie.
+        self._streng = streng
+        #: Der gehaltene Adapter wurde unter ``streng`` gewaehlt bzw. bestaetigt.
+        self._exakt = False
         self._clock = clock
         self._fail_count = 0
         self._disabled = False
@@ -518,9 +541,33 @@ class Udmx:
             self._usb = _usb_laden()
         return self._usb
 
+    def _ist_streng(self) -> bool:
+        if self._streng is None:
+            return False
+        try:
+            return bool(self._streng())
+        except Exception:                                # noqa: BLE001
+            return True          # im Zweifel die sichere Seite: nicht raten
+
     def _suchen(self):
-        g = waehle(liste_geraete(self._bibliothek()), self.port)
-        self.geraet, self._dev = g, g._dev
+        streng = self._ist_streng()
+        g = waehle(liste_geraete(self._bibliothek()), self.port, streng=streng)
+        self.geraet, self._dev, self._exakt = g, g._dev, streng
+
+    def _noch_der_richtige(self) -> bool:
+        """Ist inzwischen ein weiterer uDMX-Ausgang dazugekommen, darf ein
+        ersatzweise gewaehlter Adapter („der einzige vorhandene") nicht
+        gehalten werden — er kann jetzt dem anderen Ausgang gehoeren."""
+        if self._exakt or not self._ist_streng():
+            return True
+        try:
+            waehle([self.geraet] if self.geraet is not None else [],
+                   self.port, streng=True)
+        except UdmxFehler as e:
+            self._disable(e.code)
+            return False
+        self._exakt = True
+        return True
 
     def _setze_grund(self, code: int):
         if code == self.grund:
@@ -585,6 +632,8 @@ class Udmx:
                 return
         dev = self._dev
         if dev is None:
+            return
+        if not self._noch_der_richtige():
             return
         try:
             n = dev.ctrl_transfer(REQUEST_TYPE_OUT, REQUEST_KANALBEREICH,

@@ -48,6 +48,15 @@ sonst `vid:pid@anschluss` (z. B. `2008:1066@1-2`), sonst `vid:pid`. `waehle()` r
 mit Seriennummer nur genau dieser Adapter; mit Anschluss dieser Anschluss, ersatzweise
 der **einzige** Adapter dieser Kennung; ohne beides genau einer, sonst „mehrdeutig".
 
+Sind **mehrere** uDMX-Ausgänge eingerichtet, gilt `streng`: nur noch der exakte Treffer
+(Seriennummer oder genau dieser Anschluss). Der Ersatz „der einzige vorhandene" entfällt
+dann, weil das der Adapter eines anderen Universums sein kann, dessen eigener gerade
+abgezogen ist – zwei Universen sendeten sonst abwechselnd auf denselben Ausgang. Ein
+Schlüssel ohne Seriennummer und Anschluss sendet in diesem Fall gar nicht („mehrere
+Adapter – bitte einen auswählen"). Der OutputManager führt das nach
+(`_udmx_streng_nachfuehren` → `setze_streng` der Sender), auch für einen bereits
+ersatzweise gehaltenen Adapter.
+
 ## Konfiguration / Schalter
 
 | Schalter | Wirkung |

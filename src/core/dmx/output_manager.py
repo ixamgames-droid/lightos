@@ -44,7 +44,7 @@ def _make_enttec_device(port: str):
         return EnttecPro(port)
 
 
-def _make_udmx_device(schluessel: str):
+def _make_udmx_device(schluessel: str, streng: bool = False):
     """OUT-68: erzeugt das uDMX-Ausgabegeraet — nie eines, das den
     Ausgabe-Thread blockieren kann.
 
@@ -52,17 +52,20 @@ def _make_udmx_device(schluessel: str):
     STAB-08). Mit ``LIGHTOS_SERIAL_INPROC=1`` oder wenn sich kein Prozess
     starten laesst, sendet ein eigener THREAD — auch dann legt ``send_dmx`` nur
     das neueste Bild ab. pyusb wird erst im Sender geladen; fehlt es, bleibt
-    der Adapter „tot" mit erklaerendem Grund, die App laeuft weiter."""
+    der Adapter „tot" mit erklaerendem Grund, die App laeuft weiter.
+
+    ``streng``: es gibt schon einen anderen uDMX-Ausgang — der Sender nimmt
+    dann von Anfang an nur genau seinen Adapter (``udmx.waehle``)."""
     from .udmx_process import UdmxProcessProxy, UdmxThreadProxy
     if os.environ.get("LIGHTOS_SERIAL_INPROC"):
-        return UdmxThreadProxy(schluessel)
+        return UdmxThreadProxy(schluessel, streng=streng)
     try:
-        return UdmxProcessProxy(schluessel)
+        return UdmxProcessProxy(schluessel, streng=streng)
     except Exception as e:
         import sys
         print(f"[OutputManager] uDMX-Prozess-Isolation nicht verfuegbar ({e}) "
               f"-> Sende-Thread.", file=sys.stderr)
-        return UdmxThreadProxy(schluessel)
+        return UdmxThreadProxy(schluessel, streng=streng)
 
 
 # ── OUT-51: Sendefehler zaehlen statt schlucken ──────────────────────────────
@@ -1072,10 +1075,31 @@ class OutputManager:
         schluessel = str(schluessel or "").strip()
         self._estop_wege_nachfuehren()       # OUT-64, vor dem Schliessen
         self.close_udmx_on_device(schluessel)
-        self._swap_device(self._udmx_tabelle(), universe,
-                          _make_udmx_device(schluessel))
+        reg = self._udmx_tabelle()
+        # Gibt es schon einen ANDEREN uDMX-Ausgang, startet der neue Sender
+        # gleich streng — sonst griffe er, wenn sein Adapter gerade fehlt, den
+        # des anderen Universums (und hielte ihn).
+        streng = any(u != universe for u in list(reg))
+        self._swap_device(reg, universe,
+                          _make_udmx_device(schluessel, streng=streng))
+        self._udmx_streng_nachfuehren()
         self._estop_wege_nachfuehren()
         self._entfernte_wege_vergessen(universe)
+
+    def _udmx_streng_nachfuehren(self):
+        """Sagt jedem uDMX-Sender, ob er der einzige ist. Bei mehreren darf
+        keiner „den einzigen vorhandenen Adapter" nehmen: das waere, sobald ein
+        Adapter abgezogen ist, der eines anderen Universums — zwei Universen
+        sendeten abwechselnd auf denselben Ausgang."""
+        geraete = list(self._udmx_tabelle().values())
+        streng = len(geraete) > 1
+        for dev in geraete:
+            f = getattr(dev, "setze_streng", None)
+            if callable(f):
+                try:
+                    f(streng)
+                except Exception:
+                    pass
 
     def close_udmx_on_device(self, schluessel: str):
         """Schliesst einen evtl. offenen uDMX-Adapter mit diesem Schluessel
@@ -1092,6 +1116,8 @@ class OutputManager:
                 dev.close()
             except Exception:
                 pass
+        if victims:
+            self._udmx_streng_nachfuehren()
 
     def _set_out_universe(self, universe: int, out_universe):
         """OUT-03: merkt/loescht die konfigurierte externe Universe-Nummer fuer
@@ -1217,6 +1243,7 @@ class OutputManager:
                 dev.close()
             except Exception:
                 pass
+        self._udmx_streng_nachfuehren()
 
     def _entfernte_wege_vergessen(self, universe: int | None = None):
         """OUT-64: gemerkte Wege aus ``remove_output`` verwerfen — fuer ein

@@ -35,15 +35,21 @@ from src.core.dmx import udmx as _udmx
 LOG_NAME = "dmx.udmx"
 
 
-def _fabrik(schluessel, grund, usb=None):
+def _fabrik(schluessel, grund, usb=None, streng=None):
     """``dev_factory`` fuer die Sende-Schleife: oeffnet den Adapter und haelt
-    den Grund eines Fehlschlags im (Shared-)Wert ``grund`` fest."""
+    den Grund eines Fehlschlags im (Shared-)Wert ``grund`` fest.
+
+    ``streng`` ist ein (Shared-)Wert, den der OutputManager setzt, sobald mehr
+    als ein uDMX-Ausgang eingerichtet ist — s. ``udmx.waehle``."""
     def melde(code):
         grund.value = int(code)
 
+    ist_streng = None if streng is None else (lambda: bool(streng.value))
+
     def oeffnen():
         try:
-            dev = _udmx.Udmx(schluessel, usb=usb, melde_grund=melde)
+            dev = _udmx.Udmx(schluessel, usb=usb, melde_grund=melde,
+                             streng=ist_streng)
         except _udmx.UdmxFehler as e:
             grund.value = e.code
             raise
@@ -53,10 +59,11 @@ def _fabrik(schluessel, grund, usb=None):
 
 
 def _udmx_worker_main(schluessel, buf, stop_flag, status, grund,
-                      frame_interval=FRAME_INTERVAL):
+                      frame_interval=FRAME_INTERVAL, streng=None):
     """Kindprozess-Einstieg (Top-Level -> picklebar fuer ``spawn``)."""
     ppid0 = os.getppid()
-    _serial_worker_loop(_fabrik(schluessel, grund), buf, stop_flag, status,
+    _serial_worker_loop(_fabrik(schluessel, grund, streng=streng), buf,
+                        stop_flag, status,
                         frame_interval, parent_alive=_eltern_wache(ppid0),
                         log_name=LOG_NAME)
 
@@ -80,15 +87,25 @@ class _GrundAuskunft:
         """Halber Satz fuer Banner/Statusleiste."""
         return _udmx.grund_kurz(self.grund())
 
+    def setze_streng(self, an: bool):
+        """Vom OutputManager: mehr als ein uDMX-Ausgang eingerichtet -> der
+        Sender nimmt nur noch genau seinen Adapter (``udmx.waehle``)."""
+        self._streng.value = 1 if an else 0
+
+    def ist_streng(self) -> bool:
+        return bool(self._streng.value)
+
 
 class UdmxProcessProxy(_GrundAuskunft, EnttecProcessProxy):
     """uDMX-Adapter in einem eigenen Prozess (s. Modul-Doku)."""
     _LOG_NAME = LOG_NAME
 
     def __init__(self, schluessel: str, frame_interval: float = FRAME_INTERVAL,
-                 _process_factory=None, _clock=time.monotonic):
+                 _process_factory=None, _clock=time.monotonic,
+                 streng: bool = False):
         # VOR super().__init__: das startet den Prozess bereits.
         self._grund = mp.get_context("spawn").Value("b", _udmx.G_OK)
+        self._streng = mp.get_context("spawn").Value("b", 1 if streng else 0)
         super().__init__(str(schluessel or "").strip(), frame_interval,
                          _process_factory=_process_factory, _clock=_clock)
 
@@ -96,7 +113,7 @@ class UdmxProcessProxy(_GrundAuskunft, EnttecProcessProxy):
         return self._ctx.Process(
             target=_udmx_worker_main,
             args=(self.port, self._buf, self._stop, self._status, self._grund,
-                  self._frame_interval),
+                  self._frame_interval, self._streng),
             name="UdmxUsb",
             daemon=True,
         )
@@ -125,14 +142,16 @@ class UdmxThreadProxy(_GrundAuskunft):
     process_isolated = False
 
     def __init__(self, schluessel: str, frame_interval: float = FRAME_INTERVAL,
-                 _dev_factory=None, _usb=None):
+                 _dev_factory=None, _usb=None, streng: bool = False):
         self.port = str(schluessel or "").strip()
         self._buf = _Bild()
         self._stop = _Wert(0)
         self._status = _Wert(ST_CONNECTING)
         self._grund = _Wert(_udmx.G_OK)
+        self._streng = _Wert(1 if streng else 0)
         self._closed = False
-        fabrik = _dev_factory or _fabrik(self.port, self._grund, usb=_usb)
+        fabrik = _dev_factory or _fabrik(self.port, self._grund, usb=_usb,
+                                         streng=self._streng)
         self._thread = threading.Thread(
             target=_serial_worker_loop,
             args=(fabrik, self._buf, self._stop, self._status, frame_interval),
