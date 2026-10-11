@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="LightOS">
+<meta name="format-detection" content="telephone=no">
+<title>LightOS Handy-Konsole</title>
+<!-- WEB-09: Handy-Konsole. Alles lokal: keine Schriften, Bilder oder Skripte
+     von ausserhalb, die Seite muss am Veranstaltungsort ohne Internet laufen. -->
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#0d1117;overflow:hidden;overscroll-behavior:none}
+body{position:fixed;top:0;right:0;bottom:0;left:0;color:#e6edf3;
+  font-family:-apple-system,'Segoe UI',Roboto,'DejaVu Sans',Arial,sans-serif;font-size:14px;line-height:1.2;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:none}
+#app{position:absolute;top:0;right:0;bottom:0;left:0;display:flex;flex-direction:column;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+
+/* Kopf */
+#kopf{flex:0 0 44px;background:#161b22;border-bottom:1px solid #30363d;display:flex;align-items:center;padding:0 12px;gap:10px}
+#kopf .logo{color:#58a6ff;font-weight:700;font-size:16px}
+#kopf .titel{flex:1;min-width:0;color:#c3ccd5;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#kopf a{color:#8b949e;font-size:12px;text-decoration:none;padding:10px 4px}
+#verb{font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;white-space:nowrap;color:#f85149}
+#verb:before{content:'';width:9px;height:9px;border-radius:50%;background:#f85149}
+#verb.an{color:#3fb950}
+#verb.an:before{background:#3fb950;box-shadow:0 0 6px #3fb950}
+
+/* Seiten-Reiter */
+#reiter{flex:0 0 auto;display:none;background:#12161c;border-bottom:1px solid #30363d;overflow:hidden}
+#reiter.mehrere{display:flex}
+#reiter button{flex:1;min-width:0;height:40px;background:none;border:none;color:#8b949e;font:inherit;font-size:13px;font-weight:700;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 6px;border-bottom:3px solid transparent}
+#reiter button.an{color:#58a6ff;border-bottom-color:#58a6ff}
+
+/* Raster */
+#buehne{flex:1;min-height:0;position:relative}
+.seite{position:absolute;top:0;right:0;bottom:0;left:0;display:none;gap:7px;padding:9px;
+  grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(10,minmax(0,1fr))}
+.seite.an{display:grid}
+.zelle{min-width:0;min-height:0;position:relative;border-radius:10px;touch-action:none}
+.leer{border:1px dashed #262c35;background:rgba(22,27,34,.35)}
+
+/* Taste */
+.taste{background:linear-gradient(#2b323c,#1f252d);border:1px solid #3a424d;border-bottom:4px solid #12161b;color:#e6edf3;
+  font-weight:700;font-size:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+  overflow:hidden;padding:2px 4px}
+.taste .streifen{width:24px;height:6px;border-radius:3px;margin-bottom:5px;background:var(--farbe,#58a6ff);box-shadow:0 0 0 1px rgba(0,0,0,.5)}
+.taste .name{max-width:100%;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word}
+.taste small{font-size:10px;font-weight:400;color:#9aa4af;margin-top:2px}
+.taste .punkt{position:absolute;top:6px;right:6px;width:8px;height:8px;border-radius:50%;background:#3d444d}
+.taste.aktiv{background:var(--farbe,#1f6feb);border-color:var(--rand,#79b8ff);border-bottom-color:rgba(0,0,0,.55);
+  color:var(--text,#fff);box-shadow:0 0 14px var(--schein,rgba(88,166,255,.55))}
+.taste.aktiv .streifen{background:var(--text,#fff);opacity:.85}
+.taste.aktiv small{color:var(--text,#fff);opacity:.8}
+.taste.aktiv .punkt{background:#fff;box-shadow:0 0 6px #fff}
+.taste.finger{transform:translateY(2px);border-bottom-width:2px;filter:brightness(1.25)}
+.taste.blackout{background:#050607;border:2px solid #da3633;border-bottom:4px solid #6b1917;color:#ff5b55;font-size:18px;letter-spacing:1.5px}
+.taste.blackout .streifen{display:none}
+.taste.blackout.aktiv{background:#da3633;color:#fff;box-shadow:0 0 16px rgba(218,54,51,.7)}
+.taste.notaus{background:linear-gradient(#b3312e,#8e2421);border-color:#f0625d;border-bottom-color:#4f1210;color:#fff}
+.taste.notaus .streifen{display:none}
+
+/* Fader */
+.fader{background:#11161c;border:1px solid #30363d;display:flex;flex-direction:column;align-items:center;padding:6px 0 5px;overflow:hidden}
+.fader .wert{font-size:13px;font-weight:700;color:#58a6ff;flex:0 0 auto}
+.fader .bahn{flex:1;min-height:0;width:14px;border-radius:7px;background:#05070a;border:1px solid #2a3038;margin:14px 0 14px;position:relative}
+.fader .fuell{position:absolute;left:0;right:0;bottom:0;border-radius:6px;background:linear-gradient(#58a6ff,#1f6feb)}
+.fader .griff{position:absolute;left:-18px;width:48px;height:24px;margin-bottom:-12px;border-radius:5px;
+  background:linear-gradient(#e6edf3,#9aa4af);border:1px solid #fff;box-shadow:0 3px 6px rgba(0,0,0,.7)}
+.fader .griff:after{content:'';position:absolute;left:6px;right:6px;top:10px;height:2px;background:#30363d}
+.fader .name{font-size:11px;font-weight:700;color:#c3ccd5;max-width:100%;padding:0 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 0 auto}
+.fader.finger{border-color:#58a6ff}
+.fader.gm{border-color:#d29922;background:#1a160b}
+.fader.gm .wert,.fader.gm .name{color:#f2cc60}
+.fader.gm .fuell{background:linear-gradient(#f2cc60,#d29922)}
+/* Fader, der quer liegt (breiter als hoch): Bahn waagerecht */
+.fader.quer{flex-direction:row;padding:0 10px;gap:10px}
+.fader.quer .bahn{height:14px;width:auto;flex:1;margin:0 14px}
+.fader.quer .fuell{top:0;bottom:0;right:auto}
+.fader.quer .griff{left:auto;top:-18px;width:24px;height:48px;margin:0 0 0 -12px}
+.fader.quer .griff:after{left:10px;right:auto;top:6px;bottom:6px;width:2px;height:auto}
+.fader.quer .wert{width:44px;text-align:right}
+
+/* Cueliste */
+.cueliste{background:#111820;border:1px solid #2b5d9e;display:flex;flex-direction:column;padding:6px;gap:6px;overflow:hidden}
+.cueliste .anzeige{flex:1 1 0;min-height:0;padding:0 6px;display:flex;flex-direction:column;justify-content:center;overflow:hidden}
+.cueliste .z1{display:flex;justify-content:space-between;gap:8px;font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+.cueliste .z1 span:first-child{overflow:hidden;text-overflow:ellipsis}
+.cueliste .jetzt{font-size:18px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.cueliste .jetzt em{font-style:normal;color:#58a6ff;margin-right:7px}
+.cueliste .danach{font-size:12px;color:#9aa4af;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.cueliste .balken{height:3px;border-radius:2px;background:#21262d;margin-top:5px;overflow:hidden}
+.cueliste .balken i{display:block;height:100%;width:0;background:#58a6ff}
+.cueliste .knoepfe{flex:1.25 1 0;min-height:44px;display:flex;gap:7px}
+.cueliste.flach .anzeige .danach,.cueliste.flach .balken{display:none}
+.kn{flex:1;min-width:0;border-radius:10px;border:1px solid #3a424d;border-bottom:4px solid #12161b;background:linear-gradient(#2b323c,#1f252d);
+  color:#e6edf3;font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;touch-action:none}
+.kn.go{flex:2;background:linear-gradient(#2f81f7,#1a5fd0);border-color:#79b8ff;border-bottom-color:#0f3a82;color:#fff;font-size:24px}
+.kn.stop{background:linear-gradient(#b3312e,#8e2421);border-color:#f0625d;border-bottom-color:#4f1210;color:#fff}
+.kn.finger{transform:translateY(2px);border-bottom-width:2px;filter:brightness(1.25)}
+
+/* Feste Leiste unten: Grand Master + Blackout */
+#leiste{flex:0 0 auto;background:#161b22;border-top:1px solid #30363d;padding:8px 9px 9px;display:flex;gap:8px;height:74px}
+#gm{flex:1.6;min-width:0;border-radius:10px;touch-action:none}
+#bo{flex:1;min-width:0;border-radius:10px;background:#050607;border:2px solid #da3633;border-bottom:4px solid #6b1917;color:#ff5b55;
+  font:inherit;font-weight:700;font-size:16px;letter-spacing:1.2px;touch-action:none}
+#bo.aktiv{background:#da3633;color:#fff;box-shadow:0 0 16px rgba(218,54,51,.7)}
+#bo.finger{filter:brightness(1.3)}
+
+/* Hinweise / Sperre */
+#hinweis{position:absolute;top:0;right:0;bottom:0;left:0;display:none;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:28px;gap:10px;color:#c3ccd5;font-size:15px;line-height:1.45}
+#hinweis.an{display:flex}
+#hinweis b{font-size:19px;color:#e6edf3}
+#hinweis small{font-size:13px;color:#8b949e}
+#sperre{position:absolute;top:44px;right:0;bottom:0;left:0;display:none;align-items:center;justify-content:center;
+  background:rgba(7,9,13,.72);z-index:20;touch-action:none}
+#sperre.an{display:flex}
+#sperre div{background:#161b22;border:1px solid #da3633;border-radius:12px;padding:16px 22px;text-align:center;font-weight:700;color:#ff7b72;
+  box-shadow:0 10px 30px rgba(0,0,0,.7)}
+#sperre small{display:block;font-weight:400;color:#9aa4af;margin-top:5px;font-size:12px}
+#meldung{position:absolute;left:50%;bottom:92px;transform:translateX(-50%);background:#3b1717;border:1px solid #7d2a27;color:#ffb3ad;
+  border-radius:16px;padding:7px 14px;font-size:13px;font-weight:700;opacity:0;transition:opacity .2s;pointer-events:none;z-index:30;white-space:nowrap}
+#meldung.an{opacity:1}
+
+@media (max-height:560px){ #kopf{flex-basis:34px}#sperre{top:34px}#reiter button{height:32px}#leiste{height:60px;padding:5px 9px 6px}
+  .seite{gap:5px;padding:6px}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="kopf">
+    <span class="logo">LightOS</span>
+    <span class="titel" id="titel">Handy-Konsole</span>
+    <a href="/" id="zurueck">‹ Remote</a>
+    <span id="verb">getrennt</span>
+  </div>
+  <div id="reiter"></div>
+  <div id="buehne">
+    <div id="hinweis" class="an"><b>Verbinde …</b></div>
+  </div>
+  <div id="leiste">
+    <div id="gm" class="zelle fader gm quer"><span class="name">Master</span><div class="bahn"><i class="fuell"></i><b class="griff"></b></div><span class="wert">–</span></div>
+    <button id="bo" type="button">BLACKOUT</button>
+  </div>
+  <div id="sperre"><div>Getrennt<small>Bedienung gesperrt – verbinde neu …</small></div></div>
+  <div id="meldung"></div>
+</div>
+
+<script src="{{ url_for('static', filename='socket.io.min.js') }}"></script>
+<script>
+(function () {
+'use strict';
+
+var FEHLERTEXT = {
+  nur_am_pult: 'Nur am Pult möglich',
+  nicht_freigegeben: 'Nicht für das Handy freigegeben',
+  abgeschaltet: 'Handy-Konsole ist ausgeschaltet',
+  unbekannte_kennung: 'Element gibt es nicht mehr',
+  typ_nicht_erlaubt: 'Element ist nicht fernbedienbar',
+  keine_konsole: 'Keine Konsole in LightOS geöffnet',
+  zeitueberschreitung: 'LightOS antwortet nicht',
+  kein_zugang: 'Kein Zugang – Link mit Schlüssel neu öffnen'
+};
+
+var $ = function (id) { return document.getElementById(id); };
+var buehne = $('buehne'), reiter = $('reiter'), hinweis = $('hinweis');
+
+var stand = null;          // letzter vollständiger Stand vom Pult
+var rev = 0;               // Nummer der letzten verarbeiteten Meldung
+var hoechsteRev = 0;       // höchste Nummer, die seit dem Verbinden ankam
+var verbunden = false;
+var keinZugang = false;    // Schlüssel fehlt oder gilt nicht mehr
+var seiteNr = 0;
+var ansichten = {};        // Kennung -> Liste von {el, setze(w)}
+var inHand = {};           // Kennung -> Zeitpunkt der letzten eigenen Bewegung
+var gmInHand = 0;
+var aktiveFinger = [];     // Abbruch-Funktionen laufender Berührungen
+var zaehler = 0;
+
+/* ── Verbindung ─────────────────────────────────────────────────────── */
+
+var socket = (typeof io === 'function') ? io({reconnectionDelay: 500, reconnectionDelayMax: 2000}) : null;
+
+function setzeVerbunden(an) {
+  verbunden = an;
+  $('verb').className = an ? 'an' : '';
+  $('verb').textContent = an ? 'verbunden' : (keinZugang ? 'kein Zugang' : 'getrennt');
+  // Ohne Zugang erklärt der Hinweis die Lage – die Sperre läge nur darüber.
+  $('sperre').className = (an || keinZugang) ? '' : 'an';
+  if (!an) {
+    // Alles loslassen, was gerade berührt wird: die Anzeige soll nicht
+    // „gedrückt" stehen bleiben. Das Pult lässt gehaltene Tasten selbst los.
+    aktiveFinger.slice().forEach(function (abbruch) { abbruch(); });
+    aktiveFinger = [];
+  }
+}
+
+function melde(text) {
+  var m = $('meldung');
+  m.textContent = text;
+  m.className = 'an';
+  clearTimeout(melde.t);
+  melde.t = setTimeout(function () { m.className = ''; }, 1800);
+}
+
+function zeigeHinweis(titel, text) {
+  hinweis.innerHTML = '';
+  var b = document.createElement('b'); b.textContent = titel; hinweis.appendChild(b);
+  if (text) { var s = document.createElement('small'); s.textContent = text; hinweis.appendChild(s); }
+  hinweis.className = 'an';
+}
+
+function sende(ereignis, daten, beiAntwort) {
+  if (!socket || !verbunden) { return false; }
+  socket.emit(ereignis, daten, function (antwort) {
+    if (antwort && antwort.ok === false) {
+      melde(FEHLERTEXT[antwort.fehler] || 'Nicht ausgeführt');
+    }
+    if (beiAntwort) { beiAntwort(antwort); }
+  });
+  return true;
+}
+
+function aktion(kennung, name, wert) {
+  var daten = {id: kennung, aktion: name};
+  if (wert !== undefined) { daten.wert = wert; daten.n = ++zaehler; }
+  return sende('vc_aktion', daten, function (antwort) {
+    // Die Antwort trägt den neuen Zustand – nicht erst auf die Meldung warten.
+    if (antwort && antwort.ok && antwort.widget && name !== 'setzen') {
+      uebernehmeWidget(antwort.widget);
+    }
+  });
+}
+
+if (socket) {
+  socket.on('connect', function () {
+    hoechsteRev = 0;
+    keinZugang = false;
+    setzeVerbunden(true);
+    socket.emit('vc_hallo', {});       // vollständiger Abgleich nach jedem Verbinden
+  });
+  socket.on('disconnect', function () { setzeVerbunden(false); });
+  socket.on('connect_error', function () {
+    setzeVerbunden(false);
+    if (Date.now() - zuletztGeprueft > 3000) { ladeStand(true); }   // Schlüssel noch gültig?
+  });
+  socket.on('vc_konsole', function (k) {
+    uebernehmeAlles(k);
+    // Kam eine neuere Meldung schon VOR diesem Abgleich an, ist er überholt.
+    if (k && k.aktiv && hoechsteRev > (k.rev || 0)) { socket.emit('vc_hallo', {}); }
+  });
+  socket.on('vc_zustand', function (d) {
+    if (!d) { return; }
+    var n = d.rev || 0;
+    if (n > hoechsteRev) { hoechsteRev = n; }
+    if (!stand || n <= rev) { return; }           // schon im Abgleich enthalten
+    if (n > rev + 1) { socket.emit('vc_hallo', {}); return; }   // Lücke: neu abgleichen
+    rev = n;
+    if (d.widgets) { Object.keys(d.widgets).forEach(function (k) { uebernehmeWidget(d.widgets[k]); }); }
+    if (d.gm !== undefined) { stand.gm = d.gm; zeigeGm(); }
+    if (d.blackout !== undefined) { stand.blackout = d.blackout; zeigeBlackout(); }
+  });
+} else {
+  zeigeHinweis('Seite unvollständig geladen', 'Bitte neu laden.');
+}
+
+// Stand über HTTP holen: beim ersten Aufbau steht die Seite so, bevor der
+// Socket verbunden ist – und ein fehlender oder entwerteter Schlüssel fällt
+// auf (der Socket meldet dann nur „keine Verbindung", nicht warum).
+var zuletztGeprueft = 0;
+function ladeStand(nurPruefen) {
+  zuletztGeprueft = Date.now();
+  fetch('/api/vc/konsole', {credentials: 'same-origin', cache: 'no-store'}).then(function (r) {
+  if (r.status === 403) {
+    keinZugang = true;
+    stand = null;
+    var alte = buehne.querySelectorAll('.seite');
+    for (var i = 0; i < alte.length; i++) { buehne.removeChild(alte[i]); }
+    reiter.className = '';
+    $('leiste').style.display = 'none';
+    setzeVerbunden(false);
+    zeigeHinweis('Kein Zugang', 'Den Link mit Schlüssel aus LightOS öffnen: Ausgabe → Web-Remote: Verbindung & Token.');
+    return null;
+  }
+  return r.json();
+  }).then(function (k) { if (k && !stand && !nurPruefen) { uebernehmeAlles(k); } }).catch(function () {});
+}
+ladeStand(false);
+
+/* ── Farben ─────────────────────────────────────────────────────────── */
+
+function farbe(hex) {
+  var m = /^#([0-9a-f]{6})$/i.exec(hex || '');
+  if (!m) { return null; }
+  var n = parseInt(m[1], 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+  // Sehr dunkle Widget-Farben aufhellen: am Handy muss „an" leuchten.
+  var hell = Math.max(r, g, b);
+  if (hell < 180) {
+    var f = hell < 8 ? 0 : 180 / hell;
+    if (f === 0) { r = 88; g = 166; b = 255; } else { r = Math.round(r * f); g = Math.round(g * f); b = Math.round(b * f); }
+  }
+  var lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return {
+    voll: 'rgb(' + r + ',' + g + ',' + b + ')',
+    rand: 'rgb(' + Math.min(255, r + 70) + ',' + Math.min(255, g + 70) + ',' + Math.min(255, b + 70) + ')',
+    schein: 'rgba(' + r + ',' + g + ',' + b + ',.6)',
+    text: lum > 0.6 ? '#10141a' : '#ffffff'
+  };
+}
+
+/* ── Berührung ──────────────────────────────────────────────────────── */
+
+// Eine Berührung auf einem Element verfolgen. ``unten`` darf false liefern
+// (nichts tun). Jede begonnene Berührung endet garantiert mit ``oben`` —
+// auch bei Abbruch durch das System oder Verbindungsverlust.
+function finger(el, unten, zieh, oben) {
+  el.addEventListener('pointerdown', function (ev) {
+    ev.preventDefault();
+    if (!verbunden || el._finger !== undefined) { return; }
+    if (unten(ev) === false) { return; }
+    el._finger = ev.pointerId;
+    try { el.setPointerCapture(ev.pointerId); } catch (e) {}
+    el.classList.add('finger');
+    if (navigator.vibrate) { try { navigator.vibrate(8); } catch (e) {} }
+    var fertig = false;
+    function ende(evt) {
+      if (evt && evt.pointerId !== undefined && evt.pointerId !== el._finger) { return; }
+      if (fertig) { return; }
+      fertig = true;
+      el._finger = undefined;
+      el.classList.remove('finger');
+      el.removeEventListener('pointermove', bewegt);
+      el.removeEventListener('pointerup', ende);
+      el.removeEventListener('pointercancel', ende);
+      el.removeEventListener('lostpointercapture', ende);
+      var i = aktiveFinger.indexOf(ende);
+      if (i >= 0) { aktiveFinger.splice(i, 1); }
+      if (oben) { oben(evt); }
+    }
+    function bewegt(evt) {
+      if (evt.pointerId !== el._finger) { return; }
+      evt.preventDefault();
+      if (zieh) { zieh(evt); }
+    }
+    el.addEventListener('pointermove', bewegt);
+    el.addEventListener('pointerup', ende);
+    el.addEventListener('pointercancel', ende);
+    el.addEventListener('lostpointercapture', ende);
+    aktiveFinger.push(ende);
+  });
+}
+
+/* ── Elemente ───────────────────────────────────────────────────────── */
+
+function baueTaste(w, el) {
+  el.className += ' taste';
+  if (w.funktion === 'Blackout') { el.className += ' blackout'; }
+  if (w.funktion === 'LaserEstop') { el.className += ' notaus'; }
+  var streifen = document.createElement('i'); streifen.className = 'streifen';
+  var name = document.createElement('span'); name.className = 'name';
+  var klein = document.createElement('small');
+  var punkt = document.createElement('i'); punkt.className = 'punkt';
+  el.appendChild(streifen); el.appendChild(name); el.appendChild(klein); el.appendChild(punkt);
+  var aktuell = w;
+  finger(el, function () {
+    if (aktuell.bedienung === 'halten') { return aktion(aktuell.id, 'druecken'); }
+    return aktion(aktuell.id, 'umschalten');
+  }, null, function () {
+    if (aktuell.bedienung === 'halten') {
+      // Kein ``sende`` mit Sperre: ein Loslassen soll immer hinaus, solange
+      // der Socket steht. Reißt er ab, lässt das Pult selbst los.
+      if (socket) { socket.emit('vc_aktion', {id: aktuell.id, aktion: 'loslassen'}); }
+    }
+  });
+  return function (neu) {
+    aktuell = neu;
+    name.textContent = neu.beschriftung || '';
+    klein.textContent = neu.bedienung === 'halten' ? 'halten' : '';
+    var f = farbe(neu.farbe);
+    if (f && neu.funktion !== 'Blackout' && neu.funktion !== 'LaserEstop') {
+      el.style.setProperty('--farbe', f.voll);
+      el.style.setProperty('--rand', f.rand);
+      el.style.setProperty('--schein', f.schein);
+      el.style.setProperty('--text', f.text);
+    }
+    el.classList.toggle('aktiv', !!neu.aktiv);
+  };
+}
+
+// Fader-Bedienung für ein Element mit .bahn/.fuell/.griff/.wert.
+// Relativ zum Aufsetzpunkt: ein Antippen verstellt nichts, erst das Ziehen.
+function faderBedienung(el, lies, schreibe) {
+  var bahn = el.querySelector('.bahn'), fuell = el.querySelector('.fuell'),
+      griff = el.querySelector('.griff'), wertEl = el.querySelector('.wert');
+  var start = null, letzter = 0, offen = null, zuletztGesendet = -1;
+  function quer() { return el.classList.contains('quer'); }
+  function zeige(v) {
+    var p = Math.max(0, Math.min(100, v / 255 * 100));
+    if (quer()) {
+      fuell.style.width = p + '%'; fuell.style.height = '';
+      griff.style.left = p + '%'; griff.style.bottom = '';
+    } else {
+      fuell.style.height = p + '%'; fuell.style.width = '';
+      griff.style.bottom = p + '%'; griff.style.left = '';
+    }
+    wertEl.textContent = Math.round(p) + '%';
+  }
+  function schicke(v, sofort) {
+    if (v === zuletztGesendet) { return; }
+    var jetzt = Date.now();
+    if (!sofort && jetzt - letzter < 33) {       // höchstens ~30 Werte je Sekunde
+      offen = v;
+      return;
+    }
+    letzter = jetzt; offen = null; zuletztGesendet = v;
+    schreibe(v);
+  }
+  finger(el, function (ev) {
+    var r = bahn.getBoundingClientRect();
+    start = {x: ev.clientX, y: ev.clientY, wert: lies(), weg: Math.max(40, quer() ? el.getBoundingClientRect().width : r.height)};
+    zuletztGesendet = -1;
+  }, function (ev) {
+    var d = quer() ? (ev.clientX - start.x) : (start.y - ev.clientY);
+    var v = Math.max(0, Math.min(255, Math.round(start.wert + d / start.weg * 255)));
+    zeige(v);
+    el._wert = v;
+    schicke(v, false);
+  }, function () {
+    if (offen !== null) { schicke(offen, true); }
+    start = null;
+  });
+  return zeige;
+}
+
+function baueFader(w, el) {
+  el.className += ' fader';
+  if (w.modus && /grand/i.test(w.modus)) { el.className += ' gm'; }
+  el.innerHTML = '<span class="wert"></span><div class="bahn"><i class="fuell"></i><b class="griff"></b></div><span class="name"></span>';
+  var aktuell = w;
+  var zeige = faderBedienung(el, function () { return el._wert !== undefined ? el._wert : aktuell.wert; },
+    function (v) { inHand[aktuell.id] = Date.now(); aktion(aktuell.id, 'setzen', v); });
+  return function (neu) {
+    aktuell = neu;
+    el.querySelector('.name').textContent = neu.beschriftung || '';
+    // Während der Finger zieht (und kurz danach) gewinnt die eigene Hand –
+    // die Rückmeldung des eigenen Werts ließe den Griff sonst zurückspringen.
+    if (el._finger !== undefined || Date.now() - (inHand[neu.id] || 0) < 400) { return; }
+    el._wert = neu.wert;
+    zeige(neu.wert);
+  };
+}
+
+function knopf(text, klasse, tun) {
+  var b = document.createElement('div');
+  b.className = 'kn ' + klasse;
+  b.textContent = text;
+  finger(b, tun, null, null);
+  return b;
+}
+
+function baueCueliste(w, el, hoehe) {
+  el.className += ' cueliste' + (hoehe < 3 ? ' flach' : '');
+  var anzeige = document.createElement('div'); anzeige.className = 'anzeige';
+  anzeige.innerHTML = '<div class="z1"><span></span><span></span></div><div class="jetzt"></div><div class="danach"></div><div class="balken"><i></i></div>';
+  var knoepfe = document.createElement('div'); knoepfe.className = 'knoepfe';
+  var aktuell = w;
+  knoepfe.appendChild(knopf('GO', 'go', function () { return aktion(aktuell.id, 'go'); }));
+  knoepfe.appendChild(knopf('BACK', 'back', function () { return aktion(aktuell.id, 'back'); }));
+  knoepfe.appendChild(knopf('STOP', 'stop', function () { return aktion(aktuell.id, 'stop'); }));
+  if (hoehe >= 2) { el.appendChild(anzeige); }
+  el.appendChild(knoepfe);
+  function nr(n) { return (Math.round(n * 100) / 100).toString().replace('.', ','); }
+  return function (neu) {
+    aktuell = neu;
+    var z = anzeige.querySelectorAll('.z1 span');
+    var laeuft = neu.cue_index >= 0;
+    z[0].textContent = (neu.liste || neu.beschriftung || 'Cueliste') + (neu.liste ? (laeuft ? ' · läuft' : ' · bereit') : ' · keine Liste');
+    z[1].textContent = neu.anzahl ? (Math.max(0, neu.cue_index + 1) + ' / ' + neu.anzahl) : '';
+    var jetzt = anzeige.querySelector('.jetzt');
+    jetzt.innerHTML = '';
+    if (neu.cue) {
+      var em = document.createElement('em'); em.textContent = nr(neu.cue.nummer); jetzt.appendChild(em);
+      jetzt.appendChild(document.createTextNode(neu.cue.name || 'Cue'));
+    } else {
+      jetzt.appendChild(document.createTextNode(neu.liste ? '—' : ''));
+    }
+    anzeige.querySelector('.danach').textContent = neu.naechste ? ('danach: ' + nr(neu.naechste.nummer) + ' · ' + (neu.naechste.name || 'Cue')) : (neu.liste ? 'danach: –' : '');
+    anzeige.querySelector('.balken i').style.width = neu.anzahl ? (Math.max(0, neu.cue_index + 1) / neu.anzahl * 100) + '%' : '0';
+  };
+}
+
+/* ── Aufbau ─────────────────────────────────────────────────────────── */
+
+function uebernehmeWidget(w) {
+  if (!w || !stand) { return; }
+  stand.widgets[w.id] = w;
+  (ansichten[w.id] || []).forEach(function (a) { a(w); });
+}
+
+function zeigeGm() { if (stand && $('gm')._finger === undefined && Date.now() - gmInHand > 400) { $('gm')._wert = stand.gm; gmZeige(stand.gm); } }
+function zeigeBlackout() { $('bo').classList.toggle('aktiv', !!(stand && stand.blackout)); }
+
+function zeigeSeite(nr) {
+  var seiten = buehne.querySelectorAll('.seite');
+  if (!seiten.length) { return; }
+  seiteNr = Math.max(0, Math.min(seiten.length - 1, nr));
+  for (var i = 0; i < seiten.length; i++) { seiten[i].classList.toggle('an', i === seiteNr); }
+  var knoepfe = reiter.querySelectorAll('button');
+  for (var j = 0; j < knoepfe.length; j++) { knoepfe[j].classList.toggle('an', j === seiteNr); }
+  $('titel').textContent = (stand.seiten[seiteNr] && stand.seiten[seiteNr].name) || 'Handy-Konsole';
+  try { sessionStorage.setItem('lightos_seite', String(seiteNr)); } catch (e) {}
+}
+
+function uebernehmeAlles(k) {
+  if (!k) { return; }
+  stand = {seiten: k.seiten || [], widgets: k.widgets || {}, gm: k.gm, blackout: k.blackout, aktiv: !!k.aktiv};
+  rev = k.rev || 0;
+  ansichten = {};
+  aktiveFinger.slice().forEach(function (abbruch) { abbruch(); });
+  aktiveFinger = [];
+  var alte = buehne.querySelectorAll('.seite');
+  for (var i = 0; i < alte.length; i++) { buehne.removeChild(alte[i]); }
+  reiter.innerHTML = '';
+  $('leiste').style.display = stand.aktiv ? '' : 'none';
+  if (!stand.aktiv) {
+    reiter.className = '';
+    $('titel').textContent = 'Handy-Konsole';
+    zeigeHinweis('Handy-Konsole ist ausgeschaltet', 'In LightOS einschalten: Ausgabe → Web-Remote: Verbindung & Token → „Handy-Konsole“.');
+    return;
+  }
+  zeigeGm(); zeigeBlackout();
+  if (!stand.seiten.length) {
+    reiter.className = '';
+    $('titel').textContent = 'Handy-Konsole';
+    zeigeHinweis('Noch keine Handy-Seite', 'In LightOS: Virtuelle Konsole → Bearbeiten → „Handy füllen“.');
+    return;
+  }
+  hinweis.className = '';
+  stand.seiten.forEach(function (seite, nr) {
+    var s = document.createElement('div');
+    s.className = 'seite';
+    var spalten = seite.spalten || 4, zeilen = seite.zeilen || 10;
+    s.style.gridTemplateColumns = 'repeat(' + spalten + ',minmax(0,1fr))';
+    s.style.gridTemplateRows = 'repeat(' + zeilen + ',minmax(0,1fr))';
+    (seite.eintraege || []).forEach(function (e) {
+      var el = document.createElement('div');
+      el.className = 'zelle';
+      el.style.gridColumn = (e.spalte + 1) + ' / span ' + e.breite;
+      el.style.gridRow = (e.zeile + 1) + ' / span ' + e.hoehe;
+      var w = stand.widgets[e.widget];
+      if (!w) { el.className += ' leer'; s.appendChild(el); return; }   // verwaist: leeres Feld
+      var setze;
+      if (w.typ === 'fader') {
+        if (e.breite > e.hoehe) { el.className += ' quer'; }
+        setze = baueFader(w, el);
+      } else if (w.typ === 'cueliste') {
+        setze = baueCueliste(w, el, e.hoehe);
+      } else {
+        setze = baueTaste(w, el);
+      }
+      setze(w);
+      (ansichten[w.id] = ansichten[w.id] || []).push(setze);
+      s.appendChild(el);
+    });
+    buehne.appendChild(s);
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = seite.name || ('Seite ' + (nr + 1));
+    b.addEventListener('pointerdown', function (ev) { ev.preventDefault(); zeigeSeite(nr); });
+    reiter.appendChild(b);
+  });
+  reiter.className = stand.seiten.length > 1 ? 'mehrere' : '';
+  var gemerkt = seiteNr;
+  try { var g = parseInt(sessionStorage.getItem('lightos_seite'), 10); if (!isNaN(g)) { gemerkt = g; } } catch (e) {}
+  zeigeSeite(gemerkt);
+}
+
+/* ── Feste Leiste ───────────────────────────────────────────────────── */
+
+var gmZeige = faderBedienung($('gm'), function () { return $('gm')._wert !== undefined ? $('gm')._wert : (stand ? stand.gm : 255); },
+  function (v) { gmInHand = Date.now(); if (stand) { stand.gm = v; } sende('vc_pult', {gm: v, n: ++zaehler}); });
+
+finger($('bo'), function () {
+  if (!stand) { return false; }
+  var an = !stand.blackout;
+  return sende('vc_pult', {blackout: an}, function (antwort) {
+    if (antwort && antwort.ok) { stand.blackout = antwort.blackout; zeigeBlackout(); }
+  });
+}, null, null);
+
+/* ── Wischen zwischen Seiten (nur auf freier Fläche) ────────────────── */
+
+(function () {
+  var s = null;
+  buehne.addEventListener('pointerdown', function (ev) {
+    var z = ev.target;
+    // Nur wo kein Bedienelement liegt: ein Wisch über eine Taste löst sie aus,
+    // nicht den Seitenwechsel.
+    if (z !== buehne && !z.classList.contains('seite') && !z.classList.contains('leer')) { s = null; return; }
+    s = {x: ev.clientX, y: ev.clientY, id: ev.pointerId};
+  });
+  buehne.addEventListener('pointerup', function (ev) {
+    if (!s || s.id !== ev.pointerId) { return; }
+    var dx = ev.clientX - s.x, dy = ev.clientY - s.y;
+    s = null;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > 1.5 * Math.abs(dy)) { zeigeSeite(seiteNr + (dx < 0 ? 1 : -1)); }
+  });
+})();
+
+/* ── Kein Zoom, kein Scrollen, kein Kontextmenü ─────────────────────── */
+
+['gesturestart', 'gesturechange', 'gestureend', 'contextmenu', 'dblclick', 'selectstart'].forEach(function (n) {
+  document.addEventListener(n, function (ev) { ev.preventDefault(); }, {passive: false});
+});
+document.addEventListener('touchmove', function (ev) { ev.preventDefault(); }, {passive: false});
+
+// Für Tests und Fehlersuche (kein Teil der Bedienung).
+window.lightosKonsole = {stand: function () { return stand; }, verbunden: function () { return verbunden; }};
+})();
+</script>
+</body>
+</html>

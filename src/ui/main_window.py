@@ -2473,6 +2473,20 @@ class MainWindow(QMainWindow):
         cb_lan = QCheckBox("LAN-/Handy-Remote (aus = nur dieser PC)")
         lay.addWidget(cb_lan)
 
+        # WEB-09: die Handy-Konsole. Standard AUS; eingeschaltet bedient das
+        # Handy nur, was auf einer Handy-Seite der virtuellen Konsole liegt.
+        cb_konsole = QCheckBox("Handy-Konsole (bedient nur Elemente der Handy-Seiten)")
+        cb_konsole.setObjectName("web_remote_handy_konsole")
+        cb_konsole.setToolTip(
+            "Aus: das Handy hat nur die feste Fernbedienung (GO, Blackout, "
+            "Executor-Fader).\nEin: zusätzlich die Handy-Konsole mit den Elementen, "
+            "die in der virtuellen Konsole auf einer Handy-Seite liegen.")
+        lay.addWidget(cb_konsole)
+        edit_konsole = QLineEdit()
+        edit_konsole.setReadOnly(True)
+        edit_konsole.setObjectName("web_remote_konsole_link")
+        lay.addWidget(edit_konsole)
+
         lbl_hint = QLabel()
         lbl_hint.setWordWrap(True)
         lbl_hint.setStyleSheet("color: #999;")
@@ -2490,6 +2504,16 @@ class MainWindow(QMainWindow):
             cb_lan.blockSignals(True)
             cb_lan.setChecked(bool(lan_on))
             cb_lan.blockSignals(False)
+            try:
+                konsole_an = remote_settings.is_vc_remote_enabled()
+            except Exception:
+                konsole_an = False
+            cb_konsole.blockSignals(True)
+            cb_konsole.setChecked(bool(konsole_an))
+            cb_konsole.blockSignals(False)
+            edit_konsole.setVisible(bool(konsole_an))
+            edit_konsole.setText(f"{url}/konsole?k={token}" if token
+                                 else f"{url}/konsole")
             lbl_hint.setText(
                 "Erreichbar für Geräte im selben (W)LAN — Zugriff nur mit Token."
                 if lan_on else
@@ -2534,6 +2558,22 @@ class MainWindow(QMainWindow):
                 if refreshed else
                 "Neues Token gespeichert (wirkt beim nächsten Einschalten).", 5000)
 
+        def _konsole_toggled(checked: bool):
+            # Wirkt sofort am laufenden Server: die Schnittstelle liest die
+            # Einstellung bei jedem Aufruf. Beim Ausschalten werden gehaltene
+            # Tasten losgelassen und verbundene Handys gesperrt.
+            try:
+                remote_settings.set_vc_remote_enabled(bool(checked))
+                from src.web import vc_remote
+                vc_remote.einstellung_geaendert()
+            except Exception as e:
+                QMessageBox.warning(dlg, "Handy-Konsole", str(e))
+            _refresh_labels()
+            self.statusBar().showMessage(
+                "Handy-Konsole eingeschaltet — Elemente über „Handy füllen“ in der "
+                "virtuellen Konsole auswählen." if remote_settings.is_vc_remote_enabled()
+                else "Handy-Konsole ausgeschaltet.", 5000)
+
         def _lan_toggled(checked: bool):
             remote_settings.set_lan_remote_enabled(bool(checked))
             # NET-09-Falle: die Bind-Adresse wird NUR in start_server gelesen. Ein
@@ -2565,6 +2605,7 @@ class MainWindow(QMainWindow):
         btn_copy.clicked.connect(_copy)
         btn_regen.clicked.connect(_regen)
         cb_lan.toggled.connect(_lan_toggled)
+        cb_konsole.toggled.connect(_konsole_toggled)
         _refresh_labels()
         dlg.exec()
 

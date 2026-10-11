@@ -40,13 +40,30 @@ Tastatur: beide betreffen nur Maus und Finger am Pult.
   Laser bisher nicht scharf schalten, und dabei bleibt es.
 * *Laser-Muster abrufen* ist nicht fernbedienbar: auf DMX-Lasern wirkt ein
   Muster ohne Scharfschaltung direkt auf die Ausgabe.
+
+**WEB-09: Handy-Seiten, Freigabe und Rueckmeldung**
+
+* Die Web-Schnittstelle ruft alles mit ``nur_handy_seiten=True``: geliefert und
+  bedient wird dann nur, was auf einer Handy-Seite der Konsole liegt
+  (``VCCanvas.handy_seiten()``). Geprueft wird im UI-Thread, im selben Auftrag
+  wie die Aktion — zwischen Pruefung und Ausfuehrung kann sich nichts aendern.
+* :meth:`VCFernbedienung.konsole` liefert die Seiten samt Zustand der darauf
+  liegenden Widgets, dazu Grand Master und Blackout.
+* Ein Takt im UI-Thread (:attr:`VCFernbedienung.TAKT_MS`) vergleicht diesen
+  Stand mit dem zuletzt gemeldeten und gibt nur die AENDERUNG an
+  ``src.web.vc_remote`` weiter — solange ein Handy zuschaut. Abgefragt statt
+  verdrahtet: so ist jede Quelle einer Aenderung erfasst (Maus, MIDI, eine
+  Funktion, die von selbst endet, eine Cue, die weiterlaeuft), ohne an jeder
+  einzeln einen Haken zu pflegen.
+* :meth:`VCFernbedienung.loslassen` laesst gehaltene Tasten los, OHNE auf den
+  UI-Thread zu warten — der Weg fuer „Verbindung zum Handy abgerissen".
 """
 from __future__ import annotations
 
 import math
 import threading
 
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, QTimer, Signal
 
 from .vc_widget import kennung_gueltig
 
@@ -57,6 +74,7 @@ AKTION_UNBEKANNT = "aktion_unbekannt"
 WERT_UNGUELTIG = "wert_ungueltig"
 NUR_AM_PULT = "nur_am_pult"
 KEINE_KONSOLE = "keine_konsole"
+NICHT_FREIGEGEBEN = "nicht_freigegeben"     # WEB-09: liegt auf keiner Handy-Seite
 ZEITUEBERSCHREITUNG = "zeitueberschreitung"
 FEHLER = "fehler"
 
@@ -267,6 +285,9 @@ class VCFernbedienung(QObject):
     """
 
     ZEITLIMIT_S = 2.0
+    #: WEB-09: Abstand der Rueckmeldung ans Handy. 100 ms = hoechstens zehn
+    #: Meldungen je Sekunde, egal wie schnell sich am Pult etwas aendert.
+    TAKT_MS = 100
     _auftrag_sig = Signal(object)
 
     def __init__(self, canvas):
@@ -274,6 +295,15 @@ class VCFernbedienung(QObject):
         self._canvas = canvas
         self._ui_thread = threading.get_ident()
         self._auftrag_sig.connect(self._bearbeite)   # fremder Thread -> eingereiht
+        # WEB-09: Rueckmeldung. ``_gemeldet`` ist der Stand, den die Handys
+        # kennen; ``_rev`` zaehlt die Meldungen (das Handy erkennt daran eine
+        # Luecke und gleicht neu ab).
+        self._gemeldet: dict | None = None
+        self._rev = 0
+        self._takt_timer = QTimer(self)
+        self._takt_timer.setInterval(self.TAKT_MS)
+        self._takt_timer.timeout.connect(self._takt)
+        self._takt_timer.start()
 
     # ── Konsole ──────────────────────────────────────────────────────────────
 
@@ -331,15 +361,20 @@ class VCFernbedienung(QObject):
 
     # ── Oeffentlich (aus jedem Thread) ───────────────────────────────────────
 
-    def widgets(self) -> list[dict]:
+    def widgets(self, nur_handy_seiten: bool = False) -> list[dict]:
         """Alle fernbedienbaren Widgets mit Zustand. Leer, wenn es keine
-        Konsole (mehr) gibt oder die Oberflaeche nicht antwortet."""
+        Konsole (mehr) gibt oder die Oberflaeche nicht antwortet.
+        WEB-09: mit ``nur_handy_seiten`` nur die, die auf einer Handy-Seite
+        liegen — so ruft es die Web-Schnittstelle."""
         def _liste():
             c = self.canvas()
             if c is None:
                 return []
+            frei = self._freigegeben(c) if nur_handy_seiten else None
             out = []
             for w in c.alle_widgets():
+                if frei is not None and getattr(w, "widget_id", None) not in frei:
+                    continue
                 try:
                     e = beschreibe(w)
                 except Exception as err:
@@ -355,9 +390,11 @@ class VCFernbedienung(QObject):
             print(f"[vc_fernbedienung] ERROR: {e}")
             return []
 
-    def aktion(self, kennung, aktion, wert=None) -> dict:
+    def aktion(self, kennung, aktion, wert=None, nur_handy_seiten: bool = False) -> dict:
         """Aktion auf dem Widget mit ``kennung``. Liefert immer ein Dict mit
-        ``ok``; bei Ablehnung steht der Grund in ``fehler``."""
+        ``ok``; bei Ablehnung steht der Grund in ``fehler``.
+        WEB-09: mit ``nur_handy_seiten`` wird ein Widget, das auf keiner
+        Handy-Seite liegt, abgelehnt (``nicht_freigegeben``)."""
         def _tun():
             c = self.canvas()
             if c is None:
@@ -367,9 +404,207 @@ class VCFernbedienung(QObject):
             w = c.widget_mit_kennung(kennung)
             if w is None:
                 return _nein(UNBEKANNTE_KENNUNG)
+            if nur_handy_seiten and kennung not in self._freigegeben(c):
+                return _nein(NICHT_FREIGEGEBEN)
             return ausfuehren(w, aktion, wert)
         try:
             return self._im_ui_thread(_tun, _nein)
         except Exception as e:
             print(f"[vc_fernbedienung] ERROR: {e}")
             return _nein(FEHLER)
+
+    # ── WEB-09: Handy-Seiten ─────────────────────────────────────────────────
+
+    @staticmethod
+    def _freigegeben(canvas) -> set:
+        """Kennungen der Widgets auf den Handy-Seiten. Im Zweifel leer: was
+        nicht nachweislich freigegeben ist, ist es nicht."""
+        try:
+            from src.core import handy_seiten as _hs
+            return _hs.freigegebene_kennungen(canvas.handy_seiten())
+        except Exception as e:
+            print(f"[vc_fernbedienung] ERROR: Handy-Seiten: {e}")
+            return set()
+
+    def _konsole_jetzt(self) -> dict | None:
+        """Seiten + Zustand der darauf liegenden Widgets + Grand Master +
+        Blackout. Im UI-Thread aufrufen. None ohne Konsole."""
+        c = self.canvas()
+        if c is None:
+            return None
+        try:
+            abschnitt = c.handy_seiten()
+        except Exception as e:
+            print(f"[vc_fernbedienung] ERROR: Handy-Seiten: {e}")
+            abschnitt = {"version": 1, "seiten": []}
+        # Einmal je Aufruf nachschlagen statt je Eintrag die ganze Konsole
+        # abzusuchen — der Takt laeuft zehnmal je Sekunde.
+        nach_kennung = {getattr(w, "widget_id", None): w for w in c.alle_widgets()}
+        widgets: dict = {}
+        seiten = []
+        for seite in abschnitt.get("seiten", []):
+            eintraege = []
+            for e in seite.get("eintraege", []):
+                kennung = e["widget"]
+                if kennung not in widgets:
+                    w = nach_kennung.get(kennung)
+                    try:
+                        auskunft = beschreibe(w) if w is not None else None
+                    except Exception as err:
+                        print(f"[vc_fernbedienung] ERROR: Auskunft "
+                              f"{type(w).__name__}: {err}")
+                        auskunft = None
+                    # None = verwaist oder nicht (mehr) fernbedienbar. Die
+                    # Zelle bleibt in der Seite stehen und wird am Handy leer
+                    # gezeigt — die uebrige Anordnung verrutscht nicht.
+                    widgets[kennung] = auskunft
+                eintraege.append(dict(e))
+            seiten.append({"name": seite.get("name", ""),
+                           "spalten": seite.get("spalten"),
+                           "zeilen": seite.get("zeilen"),
+                           "eintraege": eintraege})
+        return {"seiten": seiten,
+                "widgets": {k: v for k, v in widgets.items() if v is not None},
+                **self._pult_jetzt()}
+
+    @staticmethod
+    def _pult_jetzt() -> dict:
+        """Grand Master (0..255) und Blackout — was am Handy fest unten steht."""
+        try:
+            from src.core.app_state import get_state
+            om = get_state().output_manager
+            return {"gm": max(0, min(255, int(round(float(om.grand_master) * 255)))),
+                    "blackout": bool(om.blackout)}
+        except Exception as e:
+            print(f"[vc_fernbedienung] ERROR: Pult-Zustand: {e}")
+            return {"gm": 255, "blackout": False}
+
+    def konsole(self) -> dict | None:
+        """Vollstaendiger Stand der Handy-Konsole (aus jedem Thread) — fuer den
+        ersten Aufruf und den Abgleich nach einer Wiederverbindung. ``rev`` ist
+        die Nummer der letzten Meldung, die in diesem Stand schon enthalten
+        ist. None, wenn es keine Konsole gibt oder sie nicht antwortet."""
+        def _stand():
+            k = self._konsole_jetzt()
+            if k is None:
+                return {"_keine": True}
+            k["rev"] = self._rev
+            if self._gemeldet is None:
+                # Der erste Zuschauer: sein Abgleich IST der gemeldete Stand.
+                # Was sich bis zum naechsten Takt aendert, wird so gemeldet
+                # statt stillschweigend zur neuen Vergleichsbasis.
+                self._gemeldet = k
+            return k
+        try:
+            k = self._im_ui_thread(_stand, lambda _code: None)
+        except Exception as e:
+            print(f"[vc_fernbedienung] ERROR: {e}")
+            return None
+        if not isinstance(k, dict) or k.get("_keine"):
+            return None
+        return k
+
+    def pult(self, gm=None, blackout=None) -> dict:
+        """WEB-09: Grand Master (0..255) und/oder Blackout setzen — dieselben
+        Aufrufe wie der GM-Fader und der Blackout-Schalter am Pult."""
+        def _tun():
+            from src.core.app_state import get_state
+            om = get_state().output_manager
+            if gm is not None:
+                v = _fader_wert(gm)
+                if v is None:
+                    return _nein(WERT_UNGUELTIG)
+                om.set_grand_master(v / 255.0)
+            if blackout is not None:
+                if not isinstance(blackout, bool):
+                    return _nein(WERT_UNGUELTIG)
+                om.set_blackout(blackout)
+            return {"ok": True, **self._pult_jetzt()}
+        try:
+            return self._im_ui_thread(_tun, _nein)
+        except Exception as e:
+            print(f"[vc_fernbedienung] ERROR: {e}")
+            return _nein(FEHLER)
+
+    def loslassen(self, kennungen) -> None:
+        """Laesst die genannten Tasten los — fuer „Verbindung abgerissen".
+
+        Wartet NICHT auf den UI-Thread und verwirft nichts: der Auftrag bleibt
+        eingereiht, bis die Oberflaeche ihn abarbeitet. (``aktion`` gibt nach
+        :attr:`ZEITLIMIT_S` auf — richtig fuer einen Druck, falsch fuer ein
+        Loslassen: eine Flash-Taste bliebe sonst haengen, gerade wenn die
+        Oberflaeche beschaeftigt ist.) Ohne Freigabe-Pruefung: loslassen darf
+        man immer, auch wenn das Widget inzwischen von der Seite genommen wurde.
+        """
+        ziel = [k for k in (kennungen or []) if kennung_gueltig(k)]
+        if not ziel:
+            return
+
+        def _tun():
+            c = self.canvas()
+            if c is None:
+                return True
+            for k in ziel:
+                w = c.widget_mit_kennung(k)
+                if w is None or _art(w) != "taste":
+                    continue
+                try:
+                    from src.core.app_state import laser_notaus_nicht_loesbar
+                    with laser_notaus_nicht_loesbar():
+                        w.fern_taste(False)
+                except Exception as e:
+                    print(f"[vc_fernbedienung] ERROR: Loslassen: {e}")
+            return True
+
+        if threading.get_ident() == self._ui_thread:
+            _tun()
+            return
+        try:
+            self._auftrag_sig.emit(_Auftrag(_tun))
+        except RuntimeError:                # Bruecke/Konsole schon geloescht
+            pass
+
+    # ── WEB-09: Rueckmeldung ans Handy ───────────────────────────────────────
+
+    def _takt(self):
+        """Stand mit dem zuletzt gemeldeten vergleichen, Aenderung melden.
+        Laeuft im UI-Thread. Tut nichts, solange kein Handy zuschaut."""
+        try:
+            from src.web import vc_remote
+            if vc_remote.bruecke() is not self or vc_remote.zuschauer() <= 0:
+                self._gemeldet = None       # naechster Zuschauer: frischer Vergleich
+                return
+            jetzt = self._konsole_jetzt()
+            if jetzt is None:
+                return
+            alt = self._gemeldet
+            if (alt is None or jetzt["seiten"] != alt["seiten"]
+                    or set(jetzt["widgets"]) != set(alt["widgets"])):
+                # Die Seiten selbst haben sich geaendert (Editor, Rueckgaengig,
+                # Show geladen) — oder es gibt noch keine Vergleichsbasis: alles neu.
+                self._rev += 1
+                self._gemeldet = jetzt
+                vc_remote.melde("vc_konsole", {"aktiv": True, **jetzt,
+                                               "rev": self._rev})
+                return
+            delta: dict = {}
+            geaendert = {k: v for k, v in jetzt["widgets"].items()
+                         if v != alt["widgets"].get(k)}
+            if geaendert:
+                delta["widgets"] = geaendert
+            for feld in ("gm", "blackout"):
+                if jetzt[feld] != alt[feld]:
+                    delta[feld] = jetzt[feld]
+            if not delta:
+                return
+            self._rev += 1
+            self._gemeldet = jetzt
+            delta["rev"] = self._rev
+            vc_remote.melde("vc_zustand", delta)
+            self._takt_fehler = None
+        except Exception as e:
+            # Derselbe Fehler kaeme sonst zehnmal je Sekunde ins Protokoll.
+            text = f"{type(e).__name__}: {e}"
+            if text != getattr(self, "_takt_fehler", None):
+                self._takt_fehler = text
+                print(f"[vc_fernbedienung] ERROR: Rueckmeldung: {text}")

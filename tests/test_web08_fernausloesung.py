@@ -612,6 +612,12 @@ class WebSchnittstelleTest(_Basis):
     def _anmelden(self):
         self.assertEqual(self.client.get("/?k=geheim123").status_code, 200)
 
+    def _auf_handy_seite(self):
+        """WEB-09: die Schnittstelle bedient nur, was auf einer Handy-Seite
+        liegt. Diese Tests pruefen die Fernausloesung selbst — also alles
+        Fernbedienbare freigeben (die Freigabe prueft test_web09_…)."""
+        self.canvas.handy_konsole_automatisch_fuellen()
+
     def _aktion(self, kennung, **daten):
         return self.client.post(f"/api/vc/widget/{kennung}/aktion", json=daten)
 
@@ -648,6 +654,7 @@ class WebSchnittstelleTest(_Basis):
         a = self._efx("WEB08 WebAn")
         taste = self._taste(fid=a.id, beschriftung="Strobe")
         self.canvas._add_widget("VCLabel", QPoint(300, 10))
+        self._auf_handy_seite()
         self._anmelden()
 
         r = self.client.get("/api/vc/widgets")
@@ -668,6 +675,7 @@ class WebSchnittstelleTest(_Basis):
         remote_settings.set_vc_remote_enabled(True)
         fader = self.canvas._add_widget("VCSlider", QPoint(10, 10))
         fader.mode = SliderMode.LEVEL
+        self._auf_handy_seite()
         self._anmelden()
         with mock.patch.object(type(fader), "_apply"):
             r = self._aktion(fader.widget_id, aktion="setzen", wert=200)
@@ -682,6 +690,7 @@ class WebSchnittstelleTest(_Basis):
         remote_settings.set_vc_remote_enabled(True)
         taste = self._taste()
         label = self.canvas._add_widget("VCLabel", QPoint(300, 10))
+        self._auf_handy_seite()
         self._anmelden()
         self.assertEqual(self._aktion("wgibtesnicht", aktion="umschalten").status_code, 404)
         self.assertEqual(self._aktion(label.widget_id, aktion="umschalten").status_code, 403)

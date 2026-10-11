@@ -292,7 +292,11 @@ def _register_auth(app):
         try:
             path = request.path or "/"
             # Allowlist: Startseite (macht den Handshake) + statische Assets.
-            if path == "/" or path.startswith("/static/"):
+            # WEB-09: die Seite der Handy-Konsole macht denselben Handshake —
+            # so taugt ihr Link mit Schluessel als Lesezeichen auf dem
+            # Startbildschirm. Ausgeliefert wird dort nur die leere Huelle;
+            # jeder Inhalt kommt ueber /api/ bzw. den Socket, also hinter dem Gate.
+            if path in ("/", "/konsole") or path.startswith("/static/"):
                 return None
             if session.get("authed") is True:
                 # Security-Review: die Session muss zur AKTUELLEN Auth-Epoche passen
@@ -307,8 +311,7 @@ def _register_auth(app):
 
 def _register_routes(app):
 
-    @app.route("/")
-    def index():
+    def _handshake():
         # NET-01: Token-Handshake. ``?k=<token>`` per constant-time-Vergleich gegen
         # das persistierte Token; bei Treffer die Session als authed markieren.
         try:
@@ -326,7 +329,31 @@ def _register_routes(app):
                     session["epoch"] = remote_settings.get_auth_epoch()
         except Exception as e:
             print(f"[web] handshake error: {e}")
-        return render_template("index.html")
+
+    def _konsole_an() -> bool:
+        try:
+            from src.web import vc_remote
+            return bool(vc_remote.ist_aktiv())
+        except Exception:
+            return False
+
+    @app.route("/")
+    def index():
+        _handshake()
+        # WEB-09: die feste Seite verlinkt auf die Handy-Konsole, wenn sie
+        # eingeschaltet ist.
+        return render_template("index.html", konsole_an=_konsole_an())
+
+    @app.route("/konsole")
+    def konsole_seite():
+        # WEB-09: die Handy-Konsole. Die Seite selbst traegt keine Daten der
+        # Show — Seiten und Zustand holt sie ueber /api/vc/konsole und den Socket.
+        _handshake()
+        antwort = app.make_response(render_template("konsole.html"))
+        # Nie aus dem Zwischenspeicher: nach einem Update soll das Handy nicht
+        # mit einer alten Seite gegen eine neue Schnittstelle sprechen.
+        antwort.headers["Cache-Control"] = "no-store"
+        return antwort
 
     @app.route("/api/status")
     def status():
@@ -445,6 +472,25 @@ def _register_routes(app):
                                               data.get("wert"))
         return jsonify(antwort), vc_remote.status_fuer(antwort)
 
+    # ── WEB-09: Handy-Konsole ─────────────────────────────────────────────────
+    # Seiten + Zustand in einem Abruf (erster Aufbau der Seite, Rueckfall ohne
+    # Socket) und Grand Master/Blackout der festen Leiste.
+
+    @app.route("/api/vc/konsole")
+    def api_vc_konsole():
+        from src.web import vc_remote
+        return jsonify(vc_remote.konsole())
+
+    @app.route("/api/vc/pult", methods=["POST"])
+    def api_vc_pult():
+        from src.web import vc_remote
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            antwort = {"ok": False, "fehler": "anfrage_ungueltig"}
+        else:
+            antwort = vc_remote.pult(gm=data.get("gm"), blackout=data.get("blackout"))
+        return jsonify(antwort), vc_remote.status_fuer(antwort)
+
 
 def _register_socketio(sio):
 
@@ -500,6 +546,108 @@ def _register_socketio(sio):
         data = data or {}                     # WEB-03: leerer Emit -> kein AttributeError
         enabled = bool(data.get("enabled", False))
         _get_state().output_manager.set_blackout(enabled)
+
+    # ── WEB-09: Handy-Konsole ueber den Socket ────────────────────────────────
+    #
+    # Rueckmeldung Pult -> Handy: die Bruecke der Konsole gibt Aenderungen an
+    # ``vc_remote.melde`` ab; von hier gehen sie an den Raum der Zuschauer.
+    # Aktionen Handy -> Pult: dieselbe Pruefkette wie ueber HTTP
+    # (``vc_remote.widget_aktion``), nur ohne den Aufbau einer Anfrage je
+    # Fader-Schritt.
+    #
+    # ⚠️ Der Schluessel wird beim Verbinden geprueft (``on_connect``) — eine
+    # offene Verbindung laeuft danach aber nicht mehr durch das HTTP-Gate. Jedes
+    # Ereignis der Handy-Konsole prueft deshalb selbst noch einmal Anmeldung UND
+    # Epoche und trennt die Verbindung, wenn sie nicht (mehr) gilt.
+    from flask_socketio import join_room, disconnect
+    from src.web import vc_remote
+
+    RAUM = "vc_konsole"
+    # Je Verbindung und Widget die Nummer des letzten Fader-Werts. Socket.IO
+    # arbeitet die Ereignisse einer Verbindung in eigenen Threads ab: ohne die
+    # Nummer koennte ein aelterer Wert den neueren ueberholen und der Fader am
+    # Ende auf einem Zwischenstand stehen.
+    folge: dict = {}
+    folge_lock = threading.Lock()
+
+    def _senden(ereignis, daten):
+        sio.emit(ereignis, daten, to=RAUM)
+
+    vc_remote.setze_sender(_senden)
+
+    def _berechtigt() -> bool:
+        try:
+            from src.web import remote_settings
+            if (session.get("authed") is True
+                    and session.get("epoch") == remote_settings.get_auth_epoch()):
+                return True
+        except Exception as e:
+            print(f"[web] socket gate error: {e}")
+        try:
+            disconnect()
+        except Exception:
+            pass
+        return False
+
+    def _veraltet(sid, schluessel, nummer) -> bool:
+        """True, wenn zu ``schluessel`` schon ein Wert mit hoeherer Nummer kam."""
+        if isinstance(nummer, bool) or not isinstance(nummer, (int, float)):
+            return False                    # ohne Nummer: immer ausfuehren
+        with folge_lock:
+            je_sid = folge.setdefault(sid, {})
+            if nummer <= je_sid.get(schluessel, float("-inf")):
+                return True
+            je_sid[schluessel] = nummer
+            return False
+
+    @sio.on("vc_hallo")
+    def on_vc_hallo(data=None):
+        """Das Handy zeigt die Konsole an: als Zuschauer fuehren und den ganzen
+        Stand schicken. Kommt nach JEDEM Verbinden — das ist der vollstaendige
+        Abgleich nach einer Wiederverbindung."""
+        if not _berechtigt():
+            return {"ok": False, "fehler": "kein_zugang"}
+        join_room(RAUM)
+        vc_remote.zuschauer_dazu(request.sid)   # VOR dem Abgleich, s. Bruecke
+        stand = vc_remote.konsole()
+        emit("vc_konsole", stand)
+        return {"ok": True}
+
+    @sio.on("vc_aktion")
+    def on_vc_aktion(data=None):
+        if not _berechtigt():
+            return {"ok": False, "fehler": "kein_zugang"}
+        if not isinstance(data, dict):
+            return {"ok": False, "fehler": "anfrage_ungueltig"}
+        kennung, aktion = data.get("id"), data.get("aktion")
+        if aktion == "setzen" and _veraltet(request.sid, kennung, data.get("n")):
+            return {"ok": True, "veraltet": True}
+        antwort = vc_remote.widget_aktion(kennung, aktion, data.get("wert"))
+        if isinstance(kennung, str):
+            if aktion == "druecken" and antwort.get("ok"):
+                vc_remote.gehalten_merken(request.sid, kennung, True)
+            elif aktion == "loslassen":
+                vc_remote.gehalten_merken(request.sid, kennung, False)
+        return antwort
+
+    @sio.on("vc_pult")
+    def on_vc_pult(data=None):
+        if not _berechtigt():
+            return {"ok": False, "fehler": "kein_zugang"}
+        if not isinstance(data, dict):
+            return {"ok": False, "fehler": "anfrage_ungueltig"}
+        if "gm" in data and _veraltet(request.sid, "#gm", data.get("n")):
+            return {"ok": True, "veraltet": True}
+        return vc_remote.pult(gm=data.get("gm"), blackout=data.get("blackout"))
+
+    @sio.on("disconnect")
+    def on_disconnect(*_args):
+        # Verbindung weg — egal warum (WLAN, Seite geschlossen, Schluessel
+        # gewechselt, Server aus): gehaltene Tasten loslassen.
+        sid = request.sid
+        with folge_lock:
+            folge.pop(sid, None)
+        vc_remote.zuschauer_weg(sid)
 
 
 def _halter_hinweis(port: int) -> str:
@@ -635,6 +783,15 @@ def stop_server():
     t, _thread = _thread, None
     if t is not None and t.is_alive():
         t.join(timeout=3.0)
+    # WEB-09: was jetzt noch als gehalten gefuehrt wird, loslassen, und die
+    # Rueckmeldung abmelden — die Bruecke der Konsole soll nicht in einen
+    # abgebauten Server senden.
+    try:
+        from src.web import vc_remote
+        vc_remote.alle_loslassen()
+        vc_remote.setze_sender(None)
+    except Exception as e:
+        print(f"[web] vc_remote shutdown error: {e}")
     # CDX-24: Globals mit abraeumen — sonst meldet `refresh_running_token()` auch
     # nach dem Ausschalten noch Erfolg (`_flask_app` blieb gesetzt), und der Dialog
     # behauptet „Neues Token aktiv" fuer einen Server, der gar nicht laeuft.
