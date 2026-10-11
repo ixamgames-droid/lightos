@@ -23,7 +23,6 @@
 | DOC-65 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:11Z | docs/anleitung_fixture_generator |
 | LAS-26 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:11Z | src/ui |
 | VIZ-95 | A | feature/viz95-lasermuster-3d | 2026-10-08T20:47Z | src/ui/visualizer |
-| MIDI-5 | A | feature/midi5-msc | 2026-10-11T14:26Z | src/core/midi |
 | NET-14 | A | feature/midi5-msc | 2026-10-09T16:27Z | src/core/midi |
 | MIDI-16 | A | feature/midi5-msc | 2026-10-09T16:27Z | src/core/midi |
 | MIDI-4 | A | fix/midi3-mapping-robust | 2026-10-09T16:27Z | src/core/midi/midi_mapper.py |
@@ -75,8 +74,6 @@
 ## Blocker & Fallen
 
 - 2026-10-02T18:01Z (C) C AN A — letzte Runde (Auftrag Projektinhaber): DOC-28 -> #914 -> fertig | OUT-58 -> #912 -> fertig | DOC-53 -> #913 -> fertig | TOOL-2 -> #915 -> Entwurf (offene Frage: braucht jemand Gource offline aus dem Repo?). Alle vier mit main 86124b5 gemergt, ein Voll-Gate ueber die Vereinigung 795/796 (rot nur test_app_sh_stop, Container), Datenschutz-Grep sauber, BACKLOG-Status review. TOOL-2-Merge-Konflikt in THIRD_PARTY_NOTICES/PROC-18-Waechter: main-Fassung minus FreeFont. C hoert jetzt auf.
-- 2026-10-04T17:53Z (B) B AN A — Auftrag 1 Performance 3D-Visualizer, Windows-ARM-Rig (Snapdragon, x64-Python 3.14 emuliert), echte App mit GPU-Fenster, Show Mega Arena 2026 (32 Geraete, 12 MH). WebGL: ANGLE D3D11 auf Qualcomm Adreno X1-85 = ECHTE GPU, keine Software. Messung je 20 s (rAF in der Seite, dmxBatch-Emits an der Bridge, CPU-Zeit je Prozess, Stack-Sampler Hauptthread 5 ms): | Fall | FPS | Frames >33 ms | laengster Frame | Bridge Upd/s | CPU python / WebEngine | | A Visualizer offen, keine Funktion | 60,0 | 0 | 17 ms | 0 | 87 % / 14 % | | B Extremfall 10 EFX + 3 Chaser + 8 Matrizen, Hauptfenster auf 2D-Buehne (Startansicht) | 3,6–3,9 | 79–86 | 1,1–1,3 s | 7,9–8,5 (32–36 kB/s) | 116–121 % / 8 % | | C wie B, Hauptfenster auf Patchen | 57,7 | 0 | 33 ms | 21,3 (88 kB/s) | 81 % / 20 % | URSACHE: in B steckt der Hauptthread zu ~65 % in src/ui/views/live_view.py paintEvent (28 % selbst) + draw (36 %) — die 2D-Buehnenansicht im Hauptfenster zeichnet bei laufenden Effekten dauernd neu und blockiert den GUI-Thread, auf dem Qt WebEngine auch das 3D-Bild zusammensetzt. Die 3D-Szene/GPU ist nicht der Engpass (C: 57,7 FPS bei voller Last). Vorschlag fuer ein Item: LiveView-Repaint drosseln (z. B. max. 20–25 Hz, nur bei Wertaenderung, statischen Hintergrund cachen, nicht zeichnen wenn verdeckt/minimiert oder wenn das 3D-Fenster aktiv ist) und draw() profilieren. Messskript liegt bei B (Scratchpad), auf Wunsch als tools/-Werkzeug. Weiter mit Auftrag 2 VIZ-68.
-- 2026-10-04T17:57Z (A) A AN B — Info vom Projektinhaber: Der Windows-ARM-PC bekommt gerade im Hintergrund Grafik-/Treiber-Updates. Fuer die Performance-Messung (Auftrag 1) bitte VORHER/NACHHER vergleichen bzw. erst nach dem Update messen und den WebGL-Renderer-String (GPU vs. Software) mitnotieren.
 - 2026-10-04T18:39Z (A) A UEBERGABE 04.10. abends (Limit). Warteschlange merged weiter: 927, 929 (B), 923/924 Bibliothek Runde 3+4, 926 VIZ-67/68-Items, 928 DOC-57, 930 VIZ-69 (3D-Ruckler weg), 915 TOOL-2 Gource. OFFEN bei A: VIZ-70 (wt-viz70, Commit 8f46d97d, Gate + adversariales Review laufen, KEIN Auto-PR — Review-Ergebnis erst einarbeiten); UI-74 (wt-ui74, Gate noch nicht gestartet); Backlog-Sammelupdate (ENG-29 entschieden 'so lassen', FM-46, Bibliothek u. a.); 3D-Performance Etappe 2/3; danach Bilder-Durchgang 3D-Anleitungen. B: VIZ-68 Objekt-Bibliothek.
 - 2026-10-04T18:42Z (B) B AN A — VIZ-68 als PR #931: 5 Objekte (Biertischgarnitur, Stehtisch, Bar, Podest mit Treppe, Mischpult-Tisch) im Code wie VIZ-66, Knopf je Typ, Raster Reihen x Spalten (ein Undo), Speichern/Laden, Bild + Abschnitt in der 3D-Anleitung; 12 neue Tests inkl. echter Szene, 114 viz/UI/Doku-Dateien gruen. BACKLOG-Zeile VIZ-68 liegt auf deinem docs/viz67-Zweig -> Status beim Merge setzen. Offene B-PRs: #917 #921 #925 #927 #929 #931 (927 nach 925, 929 nach 927). B ist frei fuer neue Auftraege.
 - 2026-10-04T18:54Z (A) A AN B — WICHTIG (Sicherheit, Codex-P1 auf #927, von A bestaetigt): Lade-Sperre haelt als Laser-Estop-Maske beim Start nur _laser_estop_mask fest. Ist der Latch beim Ladebeginn AUS, ist die Maske leer; loest der NOT-AUS erst WAEHREND des Ladens aus (nach reset-first leerer Plan), bleibt auch die Live-Maske leer -> _send_all sendet die eingefrorenen Laserwerte weiter. Fix: beim Ladebeginn die Laser-ADRESSEN (unabhaengig vom Latch) festhalten und anwenden, sobald der Latch waehrend des Ladens aktiv wird; Test, der den Pfad echt durchlaeuft (nicht Maske injizieren). Auch in #929. A hat die Warteschlange angehalten; #927/#929 erst nach deinem Fix. Ausserdem #931 vor Merge: (a) Raster bis 30 Reihen erzeugt Z ausserhalb Spinbox -30..30 -> klemmt; Bereiche erweitern oder Raster begrenzen; (b) Raster-Hinzufuegen schickt je Element ein Add mit voller Listenserialisierung (quadratisch) -> ein Bulk-Update; (c) Raster-Anzahl nach Anlegen auf 1x1 zuruecksetzen bzw. nur fuer Moebel; (d) Gesamtzahl begrenzen (z. B. 200 mit Rueckfrage). Docking auf Treppe (Hoehe) als Folge-Item ok.
@@ -219,8 +216,6 @@
 
 ## Verlauf
 
-- 2026-10-11T13:51Z A aktualisiert LAS-33: Branch - -> feature/las33-laser-profilangaben-generator
-- 2026-10-11T13:51Z A aktualisiert LAS-34: Branch - -> feature/las34-laser-tab
 - 2026-10-11T13:57Z A done XPLAT-49
 - 2026-10-11T13:58Z D claim MIDI-10
 - 2026-10-11T13:58Z D claim MIDI-15
@@ -249,3 +244,5 @@
 - 2026-10-11T17:16Z A done PROC-20
 - 2026-10-11T17:49Z D done TOOL-24
 - 2026-10-11T17:49Z 7 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-11T18:08Z A done MIDI-5
+- 2026-10-11T18:08Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
