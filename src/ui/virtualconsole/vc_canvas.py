@@ -104,6 +104,7 @@ class VCCanvas(QWidget):
     snap_assign_done = Signal()         # Bibliothek-Snap-Assign abgeschlossen
     bank_changed = Signal(int)          # aktive Bank (0-basiert) gewechselt
     widget_selected = Signal(object)    # VC-Widget gewaehlt (None = Auswahl aufgehoben) -> Inspector-Panel
+    handy_seiten_changed = Signal()     # WEB-09: Handy-Seiten geaendert (Editor/Seitenleiste)
     # Intern: MIDI aus dem Dispatch-Thread thread-sicher in den UI-Thread holen
     _midi_received = Signal(object)
     # Intern: Page/Bank-Wechsel der Engine (kann aus MIDI-Thread kommen)
@@ -119,6 +120,9 @@ class VCCanvas(QWidget):
         self._redo_stack: list[dict] = []
         self._restoring = False
         self._laedt_layout = False     # WEB-08: from_dict laeuft (Kennungen am Ende pruefen)
+        # WEB-09: Handy-Seiten (Verknuepfungen auf Widgets), s. src/core/handy_seiten.py.
+        # Teil des VC-Layouts — to_dict/from_dict und damit Show, Export und Undo.
+        self._handy_seiten: dict = {"version": 1, "seiten": []}
         self._UNDO_MAX = 50
         # Basis-Arbeitsflaeche. Die tatsaechliche Mindestgroesse waechst mit dem
         # Inhalt mit (siehe _update_content_extent) — sonst haette die
@@ -2089,6 +2093,52 @@ class VCCanvas(QWidget):
                   f"(doppelt oder ungueltig)")
         return len(doppelt)
 
+    # ── WEB-09: Handy-Seiten ─────────────────────────────────────────────────
+
+    def _alle_kennungen(self) -> set:
+        return {getattr(w, "widget_id", None) for w in self.alle_widgets()}
+
+    def handy_seiten(self) -> dict:
+        """Die Handy-Seiten als eigener (kopierter) Abschnitt — bereinigt um
+        Verknuepfungen, deren Widget inzwischen geloescht wurde. Der gespeicherte
+        Stand bleibt dabei unberuehrt: ein Rueckgaengig des Loeschens bringt
+        Widget UND Verknuepfung zurueck (der Undo-Schnappschuss entsteht vor dem
+        Loeschen)."""
+        from src.core import handy_seiten as _hs
+        return _hs.normalisiere(self._handy_seiten, self._alle_kennungen())
+
+    def setze_handy_seiten(self, abschnitt, undo: bool = True) -> bool:
+        """Neue Handy-Seiten uebernehmen (ein Rueckgaengig-Schritt). Gibt True
+        zurueck, wenn sich etwas geaendert hat."""
+        from src.core import handy_seiten as _hs
+        neu = _hs.normalisiere(abschnitt, self._alle_kennungen())
+        if neu == self.handy_seiten():
+            return False
+        if undo:
+            self._push_undo()
+        self._handy_seiten = neu
+        self.handy_seiten_changed.emit()
+        return True
+
+    def handy_konsole_automatisch_fuellen(self) -> tuple[int, int]:
+        """WEB-09: alle fernbedienbaren Widgets auf die Handy-Seiten ordnen
+        (ersetzt die bisherigen Seiten; ein Rueckgaengig-Schritt). Rueckgabe:
+        (Zahl der Verknuepfungen, Zahl der Seiten)."""
+        from src.core import handy_seiten as _hs
+        from .vc_fernbedienung import beschreibe
+        auskuenfte = []
+        for w in self.alle_widgets():
+            try:
+                a = beschreibe(w)
+            except Exception as e:
+                print(f"[VCCanvas] ERROR: Auskunft {type(w).__name__}: {e}")
+                a = None
+            if a is not None:
+                auskuenfte.append(a)
+        neu = _hs.automatisch_fuellen(auskuenfte)
+        self.setze_handy_seiten(neu)
+        return _hs.anzahl_eintraege(neu), len(neu["seiten"])
+
     def uebersprungene_widgets(self) -> list[str]:
         """QA-50: VC-Widgets, die beim letzten Laden nicht gebaut werden konnten.
 
@@ -2106,7 +2156,14 @@ class VCCanvas(QWidget):
         for child in self.findChildren(VCWidget,
                                        options=Qt.FindChildOption.FindDirectChildrenOnly):
             widgets.append(child.to_dict())
-        return {"widgets": widgets}
+        d = {"widgets": widgets}
+        # WEB-09: Handy-Seiten nur schreiben, wenn es welche gibt — eine Show
+        # ohne Handy-Konsole sieht in der Datei aus wie vorher.
+        seiten = self.handy_seiten()
+        if seiten["seiten"]:
+            from src.core import handy_seiten as _hs
+            d[_hs.SCHLUESSEL] = seiten
+        return d
 
     def from_dict(self, d: dict):
         if not self._restoring:
@@ -2138,6 +2195,18 @@ class VCCanvas(QWidget):
         # WEB-08: eine von Hand zusammenkopierte Layout-Datei kann dieselbe
         # Kennung zweimal tragen — einmal pruefen, wenn alles steht.
         self._kennungen_reparieren()
+        # WEB-09: Handy-Seiten uebernehmen — NACH den Kennungen, damit eine
+        # Verknuepfung auf das Widget zeigt, das die Kennung behalten hat.
+        # Fehlt der Abschnitt (Show/Layout von frueher), gibt es keine Seiten;
+        # Verknuepfungen auf nicht (mehr) vorhandene Widgets fallen weg.
+        try:
+            from src.core import handy_seiten as _hs
+            self._handy_seiten = _hs.normalisiere(
+                d.get(_hs.SCHLUESSEL), self._alle_kennungen())
+        except Exception as e:
+            print(f"[VCCanvas] ERROR: Handy-Seiten nicht lesbar: {e}")
+            self._handy_seiten = {"version": 1, "seiten": []}
+        self.handy_seiten_changed.emit()
         # Aktive Bank an die (ggf. aus der Show geladene) Engine-Page angleichen
         # und Sichtbarkeit setzen.
         if getattr(self, "_pe", None) is not None:
