@@ -63,6 +63,7 @@
 | QA-91 | D | - | 2026-10-10T22:54Z | - |
 | DOC-70 | D | - | 2026-10-10T22:54Z | - |
 | TOOL-21 | D | - | 2026-10-10T22:54Z | - |
+| WEB-08 | A | feature/web08-widget-kennung-fernausloesung | 2026-10-11T09:40Z | - |
 
 ## Blocker & Fallen
 
@@ -204,7 +205,6 @@
 
 ## Verlauf
 
-- 2026-10-10T18:00Z D claim TOOL-18
 - 2026-10-10T18:00Z D claim TOOL-19
 - 2026-10-10T18:03Z D aktualisiert TOOL-19: Branch - -> fix/tool19-werkzeuge-ohne-echten-ausgang
 - 2026-10-10T18:10Z D aktualisiert TOOL-18: Branch - -> fix/tool18-bilder-hinweis-gpu-szenen
@@ -234,3 +234,4 @@
 - 2026-10-10T22:54Z D claim QA-91
 - 2026-10-10T22:54Z D claim DOC-70
 - 2026-10-10T22:54Z D claim TOOL-21
+- 2026-10-11T09:40Z A claim WEB-08
