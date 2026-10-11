@@ -33,7 +33,6 @@
 | XPLAT-51 | A | fix/xplat51-arm64-nicht-unterstuetzt | 2026-10-10T14:17Z | - |
 | XPLAT-52 | A | fix/xplat52-installer-venv-arch | 2026-10-10T14:17Z | - |
 | VIZ-101 | A | fix/viz101-licht-durch-wand | 2026-10-10T14:38Z | - |
-| VCB-36 | D | fix/vcb36-blackout-ziel-gruppen-id | 2026-10-10T22:54Z | - |
 | TOOL-18 | D | fix/tool18-bilder-hinweis-gpu-szenen | 2026-10-10T22:54Z | - |
 | VIZ-102 | A | feature/viz102-gobo-hallenboden | 2026-10-11T16:09Z | - |
 | UI-87 | D | fix/ui87-hilfe-oeffnen-windows | 2026-10-10T22:54Z | - |
@@ -222,7 +221,6 @@
 
 ## Verlauf
 
-- 2026-10-11T17:16Z A done PROC-20
 - 2026-10-11T17:49Z D done TOOL-24
 - 2026-10-11T17:49Z 7 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-11T18:08Z A done MIDI-5
@@ -252,3 +250,4 @@
 - 2026-10-11T20:50Z D aktualisiert VCB-43: Branch - -> fix/vcb43-halte-blackout-fremder-blackout
 - 2026-10-11T20:58Z D aktualisiert OUT-71: Branch - -> fix/out71-schlussbild-beim-beenden
 - 2026-10-11T21:02Z A done UI-86
+- 2026-10-11T21:35Z D done VCB-36
