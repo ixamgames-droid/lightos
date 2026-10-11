@@ -103,13 +103,22 @@ class FollowNoBackgroundClobberTest(unittest.TestCase):
         self.v._sync_follow_selection()
         self.assertEqual([f.fid for f in self.efx.fixtures], [1, 2])
 
-    def test_visible_editor_still_follows_selection(self):
-        # Sichtbar/aktiv: Follow funktioniert weiterhin wie vorgesehen.
+    def test_visible_editor_keeps_saved_efx_until_taken(self):
+        # UI-91: Auch SICHTBAR folgt ein gespeicherter EFX der Auswahl nicht
+        # mehr von selbst (frueher: ja — Reiter oeffnen genuegte fuer eine
+        # stille Aenderung). Erst „Auswahl übernehmen" bindet ihn um.
         self.v.show()
         self.assertTrue(self.v.isVisible())
+        zeile = next(i for i, e in enumerate(self.v._visible_instances())
+                     if e.id == self.efx.id)
+        self.v._list.setCurrentRow(zeile)
+        self.assertIs(self.efx, self.v._current)
         self._sel = [1]
         self.v._sync_follow_selection()
-        self.assertEqual([f.fid for f in self.v._current.fixtures], [1])
+        self.assertEqual([f.fid for f in self.efx.fixtures], [1, 2])
+        self.assertTrue(self.v._btn_fx_take.isEnabled())
+        self.v._btn_fx_take.click()
+        self.assertEqual([f.fid for f in self.efx.fixtures], [1])
 
 
 if __name__ == "__main__":

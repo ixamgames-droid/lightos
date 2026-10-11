@@ -346,6 +346,11 @@ class RgbMatrixView(QWidget):
         # Einbettungs-Modus: die Matrix folgt automatisch der Programmer-Auswahl,
         # statt dass man hier separat Geräte zuweist (siehe R3-Fix).
         self._follow_selection = follow_selection
+        # UI-91: id der Matrix, die in DIESEM Editor frisch mit „+ Neu" angelegt
+        # wurde und deshalb der Programmer-Auswahl folgt — bis sie gespeichert,
+        # eine andere Zeile gewaehlt oder der Reiter verlassen wird. Jede andere
+        # Matrix aendert ihr Raster nur ueber „Auswahl übernehmen".
+        self._folgt_id: int | None = None
         self._setup_ui()
         self._connect_sync()
         self._rebuild_from_state()
@@ -692,6 +697,7 @@ class RgbMatrixView(QWidget):
             if not vis:
                 self._saved = None
                 self._current = None
+                self._folgt_id = None
                 self._sync_preview(None)
                 self._update_group_header()
                 return
@@ -706,18 +712,22 @@ class RgbMatrixView(QWidget):
         # zweite Instanz (Sub-Tab vs. Programmer) nicht divergiert.
         super().showEvent(event)
         self._rebuild_from_state()
-        # Folgemodus: das Grid sofort aus der aktiven Auswahl/Gruppe ableiten,
-        # sobald die Matrix-Ansicht sichtbar wird. Ohne das zeigt der erste
-        # Wechsel auf den Matrix-Tab die 8x4-Standardmatrix, weil
-        # set_selected_fids() bei unveraenderter Auswahl kein SELECTION_CHANGED
-        # feuert (und set_selected_group_id() nie eines feuert) — das Grid wurde
-        # dann nie aus der gewaehlten Gruppe uebernommen. _assign_from_selection
-        # liest die selected_group_id direkt, also greift es beim ersten Mal.
+        # Folgemodus: die Liste sofort auf die aktive Gruppe filtern, sobald die
+        # Matrix-Ansicht sichtbar wird (set_selected_group_id() feuert kein
+        # Event). UI-91: Sichtbarwerden schreibt KEIN Raster mehr — frueher
+        # uebernahm die vorgewaehlte Matrix hier die Auswahl, Reiter oeffnen
+        # genuegte fuer eine stille Aenderung der Show.
         if self._follow_selection:
             try:
                 self._sync_follow_selection()
             except RuntimeError:
                 pass
+
+    def hideEvent(self, event):
+        # UI-91: Wer den Reiter verlaesst, hat die frisch angelegte Matrix
+        # fertig gebunden — beim Wiederkommen folgt sie nicht mehr von selbst.
+        super().hideEvent(event)
+        self._folgt_id = None
 
     def _setup_ui(self):
         layout = QHBoxLayout(self)
@@ -1265,7 +1275,10 @@ class RgbMatrixView(QWidget):
                 break
         # Folgemodus: die neue Matrix sofort mit dem Gruppen-Grid versorgen, damit
         # nie die leere 8x4-Standardmatrix als „Phantom" sichtbar bleibt.
+        # UI-91: ausdruecklich hier (Neuanlage) — und nur DIESE Matrix folgt
+        # danach der Auswahl (_folgt_auswahl).
         if self._follow_selection and self._current is not None:
+            self._folgt_id = m.id
             self._assign_from_selection()
 
     def _delete(self):
@@ -1285,10 +1298,14 @@ class RgbMatrixView(QWidget):
             self._sync_preview(None)
             return
         self._saved = vis[row]
+        # UI-91: eine andere Zeile beendet das Folgen der frisch angelegten Matrix.
+        if self._saved.id != self._folgt_id:
+            self._folgt_id = None
         self._make_draft()
         self._sync_preview(self._current)
         self._load_ui(self._current)
         self._update_dirty()
+        self._grid_abweichung_anzeigen()
 
     def _on_style_change(self, text: str):
         """Style-Combo hat sich geaendert: Sichtbarkeit anpassen, style-abhaengige
@@ -1871,6 +1888,8 @@ class RgbMatrixView(QWidget):
             if gname:
                 self._saved.source_group = gname
                 self._current.source_group = gname  # Draft synchron (kein dirty)
+        # UI-91: gespeichert = fest gebunden, folgt der Auswahl nicht mehr.
+        self._folgt_id = None
         self._update_dirty()
         self._notify_change()
 
@@ -1899,17 +1918,27 @@ class RgbMatrixView(QWidget):
         self._btn_reset.setEnabled(dirty)
 
     def _enable_follow_selection(self):
-        """Einbettungs-Modus: Matrix folgt automatisch der Programmer-Auswahl.
-        Manuelle Geräte-Zuweisung wird ausgeblendet."""
-        self._btn_from_sel.setVisible(False)
+        """Einbettungs-Modus im Programmer: die Liste ist auf die aktive Gruppe
+        gefiltert. Der Auswahl FOLGT nur eine hier frisch angelegte Matrix
+        (UI-91, _folgt_auswahl); jede andere bekommt die Auswahl ueber den Knopf
+        „Auswahl übernehmen"."""
+        # UI-91: der Knopf bleibt sichtbar — er ist die ausdrueckliche Handlung.
+        self._btn_from_sel.setText("Auswahl übernehmen")
+        self._btn_from_sel.setToolTip(
+            "Setzt das Raster dieser Matrix auf die links im Programmer gewählte "
+            "Gruppe bzw. Auswahl. Eine gespeicherte Matrix ändert ihr Raster nur "
+            "über diesen Knopf.")
+        self._btn_from_sel.setVisible(True)
         self._btn_auto_assign.setVisible(False)
-        # FM-22: „Raster aus Gerät" setzt das Grid VON HAND — im Folgemodus wuerde
-        # der naechste SELECTION_CHANGED es sofort wieder ueberschreiben. Ein Knopf,
-        # dessen Wirkung Sekunden spaeter verschwindet, ist schlimmer als keiner.
+        # FM-22: „Raster aus Gerät" setzt das Grid VON HAND — an einer frisch
+        # angelegten, folgenden Matrix wuerde der naechste SELECTION_CHANGED es
+        # sofort wieder ueberschreiben. Ein Knopf, dessen Wirkung Sekunden
+        # spaeter verschwindet, ist schlimmer als keiner.
         # Der Muster-Assistent liest das Grid nur und bleibt deshalb sichtbar.
         self._btn_panel_grid.setVisible(False)
-        self._grid_box.setTitle("Geräte (folgen der Programmer-Auswahl)")
-        self._grid_label.setText("Folgt automatisch der links gewählten Gruppe.")
+        self._grid_box.setTitle("Geräte")
+        self._grid_label.setText("Mit „+ Neu“ entsteht eine Matrix für die "
+                                 "links gewählte Gruppe.")
         # KEIN Auto-Anlegen mehr: frueher wurde hier eine 8x4-Standardmatrix erzeugt.
         # Solange noch keine Gruppe/Geraete gewaehlt waren (oder die Grid-Uebernahme
         # nicht griff), blieb diese leere Standardmatrix als „Phantom" sichtbar.
@@ -1930,13 +1959,10 @@ class RgbMatrixView(QWidget):
         self._sync_follow_selection()
 
     def _sync_follow_selection(self):
-        """Folgt der Programmer-Auswahl: Liste auf die aktive Gruppe filtern und das
-        Grid der ausgewaehlten Matrix aus der Gruppe uebernehmen.
-
-        Wichtig: Es wird NICHT mehr blind irgendeine Matrix auf die neue Gruppe
-        umgeschrieben. Die Liste zeigt nur Matrizen der aktiven Gruppe (+ ungebundene);
-        die ausgewaehlte gehoert also immer zur aktuellen Gruppe (oder ist ungebunden),
-        sodass die Grid-Uebernahme korrekt ist."""
+        """Auswahl-/Gruppenwechsel im Programmer: Liste auf die aktive Gruppe
+        filtern. Nur eine hier frisch angelegte Matrix bekommt dabei das Raster
+        der Auswahl (UI-91, _folgt_auswahl); an jeder anderen wird nur angezeigt,
+        ob ihr Raster von der Auswahl abweicht."""
         # WURZEL-FIX (2026-06-24): Follow-Grid-Uebernahme NUR, waehrend diese
         # eingebettete Matrix-Editor-Seite wirklich sichtbar/aktiv ist. Sonst wuerde
         # eine Auswahländerung in einem ANDEREN Tab (z. B. Virtual Console) das
@@ -1962,18 +1988,65 @@ class RgbMatrixView(QWidget):
             # gespeicherte Matrix (_current UND _saved). Waehrend eine Show
             # geladen wird, ist ein SELECTION_CHANGED/GROUP_CHANGED nur
             # Nebenwirkung des Ladens -> nur Anzeige neu, Grid unangetastet.
-            if not _show_laedt():
+            if self._folgt_auswahl() and not _show_laedt():
                 self._assign_from_selection()
+            else:
+                self._grid_abweichung_anzeigen()
             self._update_group_header()
         except RuntimeError:
             pass  # Widget beim Layout-Wechsel gelöscht
 
-    def _assign_from_selection(self):
-        """Bildet das Grid aus dem Programmer: Gruppen-Pfad (echtes 2D-Grid inkl.
-        Luecken) oder Fallback 1×N bei loser Einzel-/Mehrfachauswahl."""
-        if self._current is None:
-            self._grid_label.setText("Erst eine Matrix anlegen/auswählen.")
+    def _folgt_auswahl(self) -> bool:
+        """UI-91: Folgt die angezeigte Matrix der Programmer-Auswahl? Nur die in
+        diesem Editor frisch angelegte (``_folgt_id``). Eine gespeicherte Matrix
+        aendert ihr Raster nie von selbst — nicht beim Oeffnen des Reiters, nicht
+        bei einer vorgewaehlten Zeile und nicht beim Auswahlwechsel."""
+        return bool(self._follow_selection and self._saved is not None
+                    and self._folgt_id is not None
+                    and self._saved.id == self._folgt_id)
+
+    @staticmethod
+    def _raster_schluessel(cols, rows, fixture_grid, head_grid, weiss_grid):
+        """Vergleichsform eines Rasters; eine Achse nur aus None gilt als leer."""
+        def _achse(werte):
+            werte = list(werte or [])
+            return werte if any(w is not None for w in werte) else []
+        return (int(cols), int(rows), list(fixture_grid or []),
+                _achse(head_grid), _achse(weiss_grid))
+
+    def _grid_abweichung_anzeigen(self):
+        """UI-91: Raster-Zeile einer NICHT folgenden Matrix im Programmer — nennt
+        das gespeicherte Raster und ob die Auswahl davon abweicht. Schreibt
+        nichts in die Matrix."""
+        if not self._follow_selection or self._folgt_auswahl():
             return
+        m = self._saved
+        if m is None:
+            return
+        try:
+            n = sum(1 for f in m.fixture_grid if f is not None)
+            text = f"{m.rows}×{m.cols} = {n} Fixtures gespeichert"
+            raster, _t = self._auswahl_raster()
+            if raster is not None and (
+                    self._raster_schluessel(**raster) != self._raster_schluessel(
+                        m.cols, m.rows, m.fixture_grid,
+                        getattr(m, "head_grid", []),
+                        getattr(m, "weiss_grid", []))):
+                text += " – weicht von der Auswahl ab"
+            self._grid_label.setText(text)
+        except RuntimeError:
+            pass  # Widget beim Layout-Wechsel gelöscht
+        except Exception as e:
+            print(f"[rgb_matrix_view] ERROR: Raster-Vergleich: {e}")
+
+    def _auswahl_raster(self):
+        """Raster, das die Programmer-Auswahl ergaebe — nur lesend.
+
+        Liefert ``(raster, text)``: ``raster`` ist ein dict mit ``cols``,
+        ``rows``, ``fixture_grid``, ``head_grid``, ``weiss_grid`` — oder None,
+        wenn es nichts zu uebernehmen gibt (``text`` sagt dann warum).
+        Gruppen-Pfad: echtes 2D-Grid inkl. Luecken; sonst 1×N aus der losen
+        Einzel-/Mehrfachauswahl."""
         from src.core.app_state import get_state
         state = get_state()
 
@@ -2004,22 +2077,6 @@ class RgbMatrixView(QWidget):
                         # so sieht jeder Konsument ohne Achsenkenntnis nichts
                         # statt etwas Falsches (s. `weiss_grid_from_positions`).
                         weiss_grid = weiss_grid_from_positions(positions, g.cols, g.rows)
-                        # Grid-Zuweisung ist live: sofort in beide Instanzen (kein dirty).
-                        self._current.cols = g.cols
-                        self._current.rows = g.rows
-                        self._current.fixture_grid = grid
-                        self._current.head_grid = head_grid
-                        self._current.weiss_grid = weiss_grid
-                        if self._saved is not None:
-                            self._saved.cols = g.cols
-                            self._saved.rows = g.rows
-                            self._saved.fixture_grid = list(grid)
-                            self._saved.head_grid = list(head_grid)
-                            self._saved.weiss_grid = list(weiss_grid)
-                        for spin, val in ((self._cols_spin, g.cols), (self._rows_spin, g.rows)):
-                            spin.blockSignals(True)
-                            spin.setValue(val)
-                            spin.blockSignals(False)
                         n = sum(1 for f in grid if f is not None)
                         n_weiss = sum(1 for w in weiss_grid if w is not None)
                         # FM-41: Weiss-Zellen sind in `grid` Luecken — sie hier
@@ -2027,36 +2084,27 @@ class RgbMatrixView(QWidget):
                         # irrefuehrend („da fehlt was", obwohl da etwas steht).
                         luecken = len(grid) - n - n_weiss
                         _weiss_text = f", {n_weiss} Weiß-Segmente" if n_weiss else ""
-                        self._grid_label.setText(
-                            f"{g.rows}×{g.cols} = {n} Fixtures{_weiss_text}, "
-                            f"{luecken} Lücken (Gruppe »{g.name}«)"
-                        )
-                        self._sync_preview(self._current)
-                        self._update_dirty()
-                        return
+                        return (dict(cols=g.cols, rows=g.rows, fixture_grid=grid,
+                                     head_grid=head_grid, weiss_grid=weiss_grid),
+                                f"{g.rows}×{g.cols} = {n} Fixtures{_weiss_text}, "
+                                f"{luecken} Lücken (Gruppe »{g.name}«)")
                 except Exception as e:
-                    self._grid_label.setText(f"Gruppen-Grid Fehler: {e}")
+                    print(f"[rgb_matrix_view] ERROR: Gruppen-Grid: {e}")
                     # weiter zum Fallback
 
         # 2) Fallback: lose Auswahl -> 1×N (bisheriges Verhalten)
         try:
             fids = [int(f) for f in state.get_selected_fids()]
         except Exception as e:
-            self._grid_label.setText(f"Fehler: {e}")
-            return
+            return None, f"Fehler: {e}"
         if not fids:
             # FM-51: reine Weiss-Auswahl ist nicht „nichts gewaehlt" — die lose
             # Auswahl kennt keine Weiss-Achse, dafuer gibt es das Gruppen-Raster.
-            self._grid_label.setText(
+            return None, (
                 "Keine Geräte im Programmer ausgewählt." if state.auswahl_ist_leer()
                 else "Nur Weiß-Segmente gewählt – für die Matrix eine Gruppe "
                      "mit Weiß-Raster verwenden.")
-            return
-        # Grid-Zuweisung ist live: sofort in beide Instanzen (kein dirty).
-        self._current.cols = len(fids)
-        self._current.rows = 1
-        self._current.fixture_grid = list(fids)
-        self._current.head_grid = []          # FM-16: lose Auswahl = ganze Fixtures
+        # FM-16: lose Auswahl = ganze Fixtures (head_grid leer).
         # ★★ FM-41 (nachgemessen 05.09.): weiss_grid MUSS hier mit zurueck.
         # Sonst fuhr die Matrix weiter die Weiss-Segmente eines Geraets, das in
         # `fixture_grid` gar nicht mehr vorkommt — gemessen blieb CH154 eines
@@ -2064,22 +2112,28 @@ class RgbMatrixView(QWidget):
         # Laden. Genau die Richtung, die der `to_dict`-Docstring ausschliessen
         # will: eine verlorene Weiss-Angabe darf zu „leuchtet nicht"
         # degradieren, nie zu ungewolltem Licht.
-        self._current.weiss_grid = []
-        if self._saved is not None:
-            self._saved.cols = len(fids)
-            self._saved.rows = 1
-            self._saved.fixture_grid = list(fids)
-            self._saved.head_grid = []
-            self._saved.weiss_grid = []
-        for spin, val in ((self._cols_spin, len(fids)), (self._rows_spin, 1)):
-            spin.blockSignals(True)
-            spin.setValue(val)
-            spin.blockSignals(False)
-        self._grid_label.setText(
-            f"1×{len(fids)} = {len(fids)} Fixtures (aus Auswahl)"
-        )
-        self._sync_preview(self._current)
-        self._update_dirty()
+        return (dict(cols=len(fids), rows=1, fixture_grid=list(fids),
+                     head_grid=[], weiss_grid=[]),
+                f"1×{len(fids)} = {len(fids)} Fixtures (aus Auswahl)")
+
+    def _assign_from_selection(self):
+        """Bildet das Grid aus dem Programmer: Gruppen-Pfad (echtes 2D-Grid inkl.
+        Luecken) oder Fallback 1×N bei loser Einzel-/Mehrfachauswahl.
+
+        UI-91: SCHREIBT in die gespeicherte Matrix (Grid-Zuweisung ist live:
+        sofort in beide Instanzen, kein dirty). Aufrufer sind nur ausdrueckliche
+        Handlungen (Knopf, „+ Neu") und die frisch angelegte Matrix, solange sie
+        der Auswahl folgt — nie eine blosse Anzeige."""
+        if self._current is None:
+            self._grid_label.setText("Erst eine Matrix anlegen/auswählen.")
+            return
+        raster, text = self._auswahl_raster()
+        if raster is None:
+            self._grid_label.setText(text)
+            return
+        self._apply_panel_grid(raster["cols"], raster["rows"],
+                               raster["fixture_grid"], raster["head_grid"], text,
+                               weiss_grid=raster["weiss_grid"])
 
     def _auto_assign(self):
         # Auto-Zuweisung: bevorzugt die aktive Auswahl/Gruppe, damit die Matrix nur

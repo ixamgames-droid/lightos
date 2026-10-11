@@ -94,14 +94,21 @@ class FollowNoBackgroundClobberTest(unittest.TestCase):
         self.assertEqual(self.m.fixture_grid, [10, 20, 30],
                          "Hintergrund-Auswahl darf das gespielte Grid nicht clobbern")
 
-    def test_visible_editor_still_follows_selection(self):
-        # Sichtbar/aktiv: Follow funktioniert weiterhin wie vorgesehen.
+    def test_visible_editor_keeps_saved_grid_until_taken(self):
+        # UI-91: Auch SICHTBAR folgt eine vorhandene Matrix der Auswahl nicht
+        # mehr von selbst; erst „Auswahl übernehmen" setzt das Raster neu.
         self.view.show()
         self.assertTrue(self.view.isVisible())
+        zeile = next(i for i, e in enumerate(self.view._visible_instances())
+                     if e.id == self.m.id)
+        self.view._list.setCurrentRow(zeile)
+        self.assertIs(self.m, self.view._saved)
         self._sel = [7, 8]
         self.view._sync_follow_selection()
-        self.assertEqual(self.m.fixture_grid, [7, 8],
-                         "Sichtbarer Follow-Editor folgt der Auswahl weiterhin")
+        self.assertEqual(self.m.fixture_grid, [10, 20, 30],
+                         "Sichtbarer Editor darf das gespeicherte Raster nicht umschreiben")
+        self.view._btn_from_sel.click()
+        self.assertEqual(self.m.fixture_grid, [7, 8])
         self.view.deleteLater()
 
 

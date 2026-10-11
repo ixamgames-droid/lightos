@@ -393,7 +393,9 @@ def _matrix_vorher(ui):
     if idx < 0:
         raise SzenenFehler("Matrix nicht in der Liste des Matrix-Editors")
     view._list.setCurrentRow(idx)
-    view._sync_follow_selection()
+    # UI-91: eine vorhandene Matrix folgt der Auswahl nicht von selbst — das
+    # Gruppen-Raster ausdruecklich uebernehmen (Knopf „Auswahl übernehmen").
+    view._assign_from_selection()
     ui.pump(0.4)
 
 

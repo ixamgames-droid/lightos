@@ -198,8 +198,9 @@ class _Fx:
 
 class SichtbarerFolgeEditorTest(unittest.TestCase):
     """Auch bei SICHTBAREM eingebettetem Editor: Refresh/Laden (programmatische
-    Zeilenwahl) laesst die Geraeteliste stehen; ein echter Klick auf eine andere
-    EFX uebernimmt weiterhin die Auswahl (gewollter Folgemodus)."""
+    Zeilenwahl) laesst die Geraeteliste stehen. Seit UI-91 gilt das fuer JEDE
+    Anzeige eines gespeicherten EFX — auch Klick und Auswahlwechsel; umgebunden
+    wird nur ueber „Auswahl übernehmen" (Tests dazu: test_ui91_…)."""
 
     def setUp(self):
         _app()
@@ -242,10 +243,15 @@ class SichtbarerFolgeEditorTest(unittest.TestCase):
         self.assertEqual([1, 2], _efx_fids(self.a))
         self.assertEqual([3], _efx_fids(self.b))
 
-    def test_klick_auf_andere_efx_folgt_weiter_der_auswahl(self):
+    def test_klick_auf_andere_efx_bindet_nicht_um(self):
+        """UI-91: einen gespeicherten EFX anzuklicken ist keine Zuweisung
+        (frueher uebernahm er dabei die Auswahl)."""
         self._sel = [1]
         self.v._list.setCurrentRow(self._zeile(self.b))   # Benutzerklick
         self.assertIs(self.b, self.v._current)
+        self.assertEqual([3], _efx_fids(self.b))
+        self.assertEqual([1, 2], _efx_fids(self.a))
+        self.v._btn_fx_take.click()                       # ausdruecklich
         self.assertEqual([1], _efx_fids(self.b))
         self.assertEqual([1, 2], _efx_fids(self.a))
 
@@ -262,10 +268,11 @@ class SichtbarerFolgeEditorTest(unittest.TestCase):
         self.assertEqual([2, 3], _efx_fids(neu[0]))
         self.assertEqual([1, 2], _efx_fids(self.a))
 
-    def test_auswahlwechsel_beim_laden_weist_nicht_zu_danach_wieder(self):
+    def test_auswahlwechsel_beim_laden_weist_nicht_zu_danach_nur_der_entwurf(self):
         """UI-84 Review: SELECTION_CHANGED waehrend des Lade-Kontexts (und im
-        Nachlauf derselben Ereignisschleife) laesst die EFX stehen; ein
-        echter Auswahlwechsel danach folgt bei sichtbarem Editor weiter."""
+        Nachlauf derselben Ereignisschleife) laesst die EFX stehen. UI-91: ein
+        echter Auswahlwechsel danach laesst einen gespeicherten EFX ebenfalls
+        stehen — nur der eigene Entwurf folgt."""
         from src.core.sync import get_sync, SyncEvent
         st = get_state()
         self._sel = [3]
@@ -282,7 +289,24 @@ class SichtbarerFolgeEditorTest(unittest.TestCase):
         self.assertFalse(st.laedt_show(), "Nachlauf endet nicht")
         self.assertIs(self.a, self.v._current)
         get_sync().emit(SyncEvent.SELECTION_CHANGED, None)   # Benutzer waehlt
-        self.assertEqual([3], _efx_fids(self.a))
+        self.assertEqual([1, 2], _efx_fids(self.a))
+        vorher = {f.id for f in self.v._fm.all()}
+        self.v._add_efx()                                    # Entwurf
+        neu = [f for f in self.v._fm.all() if f.id not in vorher]
+        self.addCleanup(lambda: [self.v._fm.remove(f.id) for f in neu])
+        self.assertEqual([3], _efx_fids(neu[0]))
+        # Auch der Entwurf folgt waehrend des Ladens nicht ...
+        self._sel = [1]
+        with st.show_wird_geladen():
+            get_sync().emit(SyncEvent.SELECTION_CHANGED, None)
+        self.assertEqual([3], _efx_fids(neu[0]))
+        for _ in range(3):
+            _app().processEvents()
+        self.assertFalse(st.laedt_show())
+        # ... danach wieder.
+        get_sync().emit(SyncEvent.SELECTION_CHANGED, None)
+        self.assertEqual([1], _efx_fids(neu[0]))
+        self.assertEqual([1, 2], _efx_fids(self.a))
 
 
 class LadeKontextTest(unittest.TestCase):
@@ -337,7 +361,7 @@ class MatrixFolgeEditorLadenTest(unittest.TestCase):
         self.view._saved = self.m
         self.view._current = self.m
 
-    def test_laden_laesst_grid_stehen_danach_folgt_es(self):
+    def test_laden_laesst_grid_stehen_danach_folgt_nur_die_neue(self):
         st = get_state()
         self._sel = [7, 8]
         with st.show_wird_geladen():
@@ -348,7 +372,24 @@ class MatrixFolgeEditorLadenTest(unittest.TestCase):
         self.view._saved = self.m
         self.view._current = self.m
         self.view._sync_follow_selection()        # echter Auswahlwechsel
-        self.assertEqual([7, 8], self.m.fixture_grid)
+        # UI-91: eine vorhandene Matrix folgt auch danach nicht von selbst.
+        self.assertEqual([10, 20, 30], self.m.fixture_grid)
+        # Die frisch angelegte folgt — ausser waehrend des Ladens.
+        vorher = {f.id for f in self.fm.all()}
+        self.view._add()
+        neu = [f for f in self.fm.all() if f.id not in vorher]
+        self.addCleanup(lambda: [self.fm.remove(f.id) for f in neu])
+        self.assertEqual([7, 8], neu[0].fixture_grid)
+        self._sel = [9]
+        with st.show_wird_geladen():
+            self.view._sync_follow_selection()
+        self.assertEqual([7, 8], neu[0].fixture_grid)
+        for _ in range(3):
+            _app().processEvents()
+        self.assertFalse(st.laedt_show())
+        self.view._sync_follow_selection()
+        self.assertEqual([9], neu[0].fixture_grid)
+        self.assertEqual([10, 20, 30], self.m.fixture_grid)
 
 
 if __name__ == "__main__":
