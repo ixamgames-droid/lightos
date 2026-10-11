@@ -46,12 +46,12 @@ Kommunikation über USB mit proprietärem Message-Format (nicht direkt DMX):
 
 | Label | Beschreibung |
 |-------|-------------|
-| 0x03 | DMX Output senden (Send DMX Packet) |
-| 0x06 | Programmierbarkeit ändern |
-| 0x0A | Seriellen Baud-Rate Parameter setzen |
-| 0x0D | Get Widget Parameters |
+| 0x03 | Get Widget Parameters (Geräte-Einstellungen abfragen) |
+| 0x04 | Set Widget Parameters |
+| 0x06 | DMX Output senden (Send DMX Packet) — das einzige Label, das LightOS sendet |
+| 0x0A | Seriennummer abfragen |
 
-### DMX Senden (Label 0x03)
+### DMX Senden (Label 0x06)
 ```python
 # Paket-Aufbau für Enttec Pro
 START_OF_MSG = 0x7E
@@ -107,7 +107,7 @@ class EnttecPro:
 
 Das **Open DMX USB** (günstigere Version) hat keine eigene Firmware — der PC generiert das DMX-Timing selbst. Auf Windows ist das wegen des nicht-deterministischen Schedulings fehleranfällig.
 
-**Empfehlung:** Enttec Pro verwenden. Open DMX wird als optionale Fallback-Implementierung unterstützt.
+**LightOS unterstützt Open DMX USB (und baugleiche Billig-Adapter ohne eigene Firmware) nicht** — es gibt nur den Treiber für das **Enttec DMX USB Pro** (`src/core/dmx/enttec_pro.py`). Wer ein USB-Interface kauft: ein **Pro** (oder ein dazu kompatibles Gerät) nehmen, oder über **Art-Net/sACN** ausgeben.
 
 ---
 
@@ -165,6 +165,8 @@ Enttec Pro unterstützt **1 Universe pro Gerät**. Für mehrere Universen:
 |--------|-------------|
 | Mehrere Enttec Pros | Ein Gerät pro Universe |
 | Art-Net Node | Netzwerkbasiert, viele Universen |
-| Enttec Pro Mk2 | Dual-Universe Version |
+| sACN (E1.31) | Netzwerkbasiert, viele Universen |
 
-LightOS unterstützt alle drei Optionen gleichzeitig.
+LightOS unterstützt alle drei Optionen gleichzeitig (Ausgabe-Typ je Universe). Den **zweiten
+Ausgang eines Enttec Pro Mk2** steuert LightOS nicht an — es spricht nur das Protokoll
+des Pro (ein Universe je Gerät).

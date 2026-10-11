@@ -80,9 +80,13 @@ class ChannelRangeLockDialog(QDialog):
 
     def _load(self):
         modes = fdb.get_modes(self._fixture.fixture_profile_id)
-        mode = next((m for m in modes if m.name == self._fixture.mode_name), None)
-        if mode is None and modes:
-            mode = modes[0]
+        # FM-73: derselbe Modus, den auch Renderpfad und Show-Pruefung meinen
+        # (`modus_wahl`) — vorher zeigte der Dialog bei gleichnamigen Modi die
+        # Kanaele des aeltesten, und bei fehlendem Namen die des ersten statt
+        # des Modus mit passender Kanalzahl.
+        from src.core.database.modus_wahl import modus_waehlen
+        mode = modus_waehlen(modes, self._fixture.mode_name,
+                             self._fixture.channel_count)
         if mode is None:
             return
 

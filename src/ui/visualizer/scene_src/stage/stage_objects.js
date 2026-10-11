@@ -644,6 +644,8 @@ export function removeStageObject(id) {
   for (const fid in fixtures) {
     const f = fixtures[fid];
     if (f && f.dockedTo === id) {
+      // VIZ-100: beim Neuladen der Buehne die Bindung merken — s. loadStageJson.
+      if (_isLoadingStage && _ladeDocks) _ladeDocks[fid] = id;
       f.dockedTo = null;
       const bridge = bridgeRef.get();
       if (bridge && bridge.fixtureDockChanged) {
@@ -821,6 +823,13 @@ export function getStageJson() {
 // einzelnen create/remove-Operationen NICHT jeweils zurück an Python
 // melden – das löst sonst N×Tree-Rebuilds aus.
 let _isLoadingStage = false;
+// VIZ-100: Andock-Bindungen, die das Wegraeumen der alten Buehne in
+// loadStageJson geloest hat (fid -> Element-ID). Python ignoriert genau diese
+// Undock-Meldungen (Reload-Churn-Guard in fixtureDockChanged) und behaelt die
+// Bindung; JS verlor sie bisher bis zum naechsten Neuaufbau der Geraeteliste —
+// angedockte Geraete zogen nach einem Buehnen-Reload nicht mehr mit, und die
+// haengende Haltung fiele zurueck auf "stehend".
+let _ladeDocks = null;
 
 // Tombstones expliziter Löschungen seit dem letzten Bulk-Load: der
 // Repair-Loop (loadStageJson-finally) darf ein gerade erst gelöschtes
@@ -933,6 +942,7 @@ export function loadStageJson(json) {
     // Ein frischer autoritativer Load ueberschreibt alte Loesch-Tombstones:
     // was Python jetzt pusht, gilt.
     _userRemovedIds.clear();
+    _ladeDocks = {};
     clearStageObjects();
     view.selectedStageId = null;
     clearResizeHandles();
@@ -950,6 +960,12 @@ export function loadStageJson(json) {
         }
       });
     }
+    // VIZ-100: Bindungen an Elemente, die es nach dem Laden wieder gibt,
+    // bleiben (gleiche ID = gleiches Element; Python hat sie nie geloest).
+    for (const fid in _ladeDocks) {
+      const f = fixtures[fid];
+      if (f && !f.dockedTo && stageObjects[_ladeDocks[fid]]) f.dockedTo = _ladeDocks[fid];
+    }
     if (data.fixtures && Array.isArray(data.fixtures)) {
       data.fixtures.forEach(fp => {
         const f = fixtures[fp.fid];
@@ -966,6 +982,7 @@ export function loadStageJson(json) {
     console.log('loadStageJson error:', e);
   } finally {
     _isLoadingStage = false;
+    _ladeDocks = null;
     // EINE einzige finale Sync ans Python schicken (statt N×)
     notifyStageListChanged();
     // QtWebEngine kann direkt nach einem großen QWebChannel-Callback einen

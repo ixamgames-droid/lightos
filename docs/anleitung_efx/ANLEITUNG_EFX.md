@@ -13,7 +13,9 @@ Programmer → links unter **Gruppen** die Gruppe wählen (z. B. **Moving Heads 
 Mover**). Der Gruppen-Klick springt in den Reiter **Matrix** — wechsle danach selbst in den Reiter
 **EFX** (er erscheint nur, wenn die Auswahl Geräte mit Pan/Tilt enthält) und drücke **+ Neu**. Der
 eingebettete EFX **folgt der Programmer-Auswahl LIVE**: der gerade angezeigte EFX bindet sich
-sofort an genau die ausgewählten Geräte.
+sofort an genau die ausgewählten Geräte. Das gilt, wenn du den EFX im sichtbaren Editor anklickst
+oder dort die Auswahl wechselst — beim Laden einer Show folgt kein EFX der Auswahl, die
+gespeicherten Geräte bleiben, wie sie in der Datei stehen.
 
 **Wichtig — Speichern:** Ein neuer EFX ist zunächst ein **Entwurf** (in der Liste mit **●**
 markiert). Erst **💾 Speichern** macht ihn dauerhaft und bindet ihn an die aktive Gruppe. Einen
