@@ -721,17 +721,26 @@ class HandyKonsolenLeiste(QWidget):
         self._btn_verbinden.setObjectName("handy_verbinden")
         self._btn_verbinden.setFixedHeight(TREFFER)
         self._btn_verbinden.setToolTip(
-            "Öffnet „Web-Remote: Verbindung & Token“ mit dem Link und dem "
+            "Öffnet „Web-Remote: Verbindung & Token“ mit QR-Code, Link und "
             "Schlüssel fürs Handy.")
         self._btn_verbinden.setStyleSheet(_KNOPF_CSS)
         self._btn_verbinden.clicked.connect(self.verbinden_angefragt.emit)
         zeile.addWidget(self._btn_verbinden)
         lay.addLayout(zeile)
-        # Platz fuer den QR-Code des Handy-Links (eigener Folgebaustein): er
-        # kommt in diesen Behaelter, zwischen Schalter und Zustand.
+        # WEB-11: der QR-Code des Handy-Links, zwischen Schalter und Zustand.
+        # Sichtbar nur, wenn das Web-Interface laeuft UND die Handy-Konsole an
+        # ist; sonst bleibt der Behaelter weg (die Zustandszeile erklaert die
+        # Lage) oder zeigt den noetigen Schritt. Klick auf den Code vergroessert.
         self._qr_platz = QWidget()
         self._qr_platz.setObjectName("handy_qr_platz")
         self._qr_platz.setVisible(False)
+        qr_lay = QVBoxLayout(self._qr_platz)
+        qr_lay.setContentsMargins(0, 0, 0, 0)
+        from src.ui.widgets.handy_qr import HandyQrFeld
+        self._qr = HandyQrFeld(klein=True, parent=self._qr_platz)
+        self._qr.vergroessern.connect(self.qr_vergroessern)
+        qr_lay.addWidget(self._qr)
+        self._qr_gross = None
         lay.addWidget(self._qr_platz)
         self._lbl_zustand = QLabel("aus")
         self._lbl_zustand.setObjectName("handy_zustand")
@@ -1029,6 +1038,28 @@ class HandyKonsolenLeiste(QWidget):
         if an:
             farbe = "#7ee787" if (laeuft and anzahl) else ("#d29922" if not laeuft else "#c3ccd5")
         self._lbl_zustand.setStyleSheet(f"color:{farbe}; font-size:10px;")
+        self._qr_zeigen()
+
+    def _qr_zeigen(self) -> None:
+        """WEB-11: QR-Code nachziehen (Schalter, Server, erneuerter Schluessel,
+        andere Netzwerkkarte) — im Takt der Leiste, ohne eigene Verdrahtung."""
+        try:
+            self._qr.aktualisiere()
+            self._qr_platz.setVisible(self._qr.hat_inhalt())
+        except Exception as e:
+            print(f"[vc_handy_leiste] ERROR: QR-Code: {type(e).__name__}")
+            self._qr_platz.setVisible(False)
+
+    def qr_vergroessern(self):
+        """Klick auf den kleinen Code: derselbe Code gross in einem eigenen
+        Fenster (zum Scannen aus der Entfernung). Gibt das Fenster zurueck."""
+        from src.ui.widgets.handy_qr import HandyQrDialog
+        if self._qr_gross is None:
+            self._qr_gross = HandyQrDialog(self.window())
+        self._qr_gross.feld.aktualisiere(sofort=True)
+        self._qr_gross.show()
+        self._qr_gross.raise_()
+        return self._qr_gross
 
     def _schalter_umgelegt(self, an: bool) -> None:
         # Wirkt sofort am laufenden Server (er liest die Einstellung bei jedem

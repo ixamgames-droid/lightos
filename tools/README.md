@@ -100,6 +100,7 @@
 | `verify_stage_reload.py` | VIZ-STAGE-RELOAD-PACING — ueberlebt das volle Rig einen Renderer-Neustart? |
 | `viz_dmx_latency_bench.py` | VIZ-71 — wie schnell und wie schlank kommen die Lichtdaten im 3D-Viewer an? |
 | `viz_render_benchmark.py` | Render-Kosten der 3D-Szene messen — die Zahl, die bis 2026-08-03 fehlte. |
+| `web11_symbole.py` | WEB-11: Symbole der Handy-Konsole fuer den Startbildschirm zeichnen. |
 | `zeitbomben_gate.py` | Waechter gegen Zeitbomben — Tests, die von selbst rot werden (QA-63). |
 
 ## _archiv/ — ausgemustert

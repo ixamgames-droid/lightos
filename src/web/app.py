@@ -16,6 +16,11 @@ _socketio: Any = None
 _thread: threading.Thread | None = None
 _server: Any = None   # NET-09: Werkzeug-Server-Handle fuer thread-safen shutdown()
 _running = False
+# WEB-11: woran der laufende Server gebunden ist. Der QR-Code der Handy-Konsole
+# darf nur erscheinen, wenn das Handy ihn auch erreicht — „nur dieser PC"
+# (127.0.0.1) heisst: kein Code, sondern der noetige Schritt.
+_bind_host = ""
+_port = 5000
 
 
 def _get_state():
@@ -105,7 +110,8 @@ def remote_url(port: int = 5000) -> str:
     return f"http://{get_lan_ip()}:{port}"
 
 
-def cors_allowlist(port: int = 5000, lan_ip: str | None = None) -> list[str]:
+def cors_allowlist(port: int = 5000, lan_ip: str | None = None,
+                   weitere=()) -> list[str]:
     """NET-03: konkrete CORS-Origin-Allowlist statt ``"*"``.
 
     Frueher stand ``cors_allowed_origins="*"`` — JEDE Website im Browser des
@@ -118,7 +124,84 @@ def cors_allowlist(port: int = 5000, lan_ip: str | None = None) -> list[str]:
     origins = [f"http://127.0.0.1:{port}", f"http://localhost:{port}"]
     if ip and ip not in ("127.0.0.1", "localhost"):
         origins.insert(0, f"http://{ip}:{port}")
+    # WEB-11: ``weitere`` = die uebrigen eigenen Adressen dieses Rechners. Mit
+    # mehreren Netzwerkkarten (WLAN + Kabel) ist die Adresse der Standard-Route
+    # nicht unbedingt die, unter der das Handy den PC sieht; waehlt der Nutzer
+    # im QR-Dialog die andere Karte, kaeme die Seite von einem Ursprung, den
+    # die Liste nicht kennt — der Socket wuerde abgewiesen. Es bleiben eigene
+    # Adressen dieses Rechners, also weiterhin kein fremder Ursprung.
+    for andere in weitere or ():
+        eintrag = f"http://{andere}:{port}"
+        if andere and eintrag not in origins:
+            origins.append(eintrag)
     return origins
+
+
+def _eigene_adressen() -> list[str]:
+    """WEB-11: alle brauchbaren IPv4-Adressen der aktiven Netzwerkkarten (nur
+    gelesen). Nie eine Ausnahme — im Zweifel leer, dann gilt die bisherige
+    Liste aus ``get_lan_ip``."""
+    try:
+        from src.web import handy_verbindung
+        return [a.ip for a in handy_verbindung.brauchbare_adressen(
+            handy_verbindung.lese_schnittstellen())]
+    except Exception as e:
+        print(f"[web] own addresses error: {type(e).__name__}")
+        return []
+
+
+def bind_host() -> str:
+    """WEB-11: die Adresse, an die der LAUFENDE Server gebunden ist
+    (``0.0.0.0`` = alle Karten, ``127.0.0.1`` = nur dieser PC); leer, wenn er
+    nicht laeuft."""
+    return _bind_host if _running else ""
+
+
+def server_port() -> int:
+    """WEB-11: der Port des laufenden Servers (sonst der Standard 5000)."""
+    return int(_port or 5000)
+
+
+def erlaubte_hosts() -> set[str] | None:
+    """WEB-11: die Adressen, von denen der laufende Server eine Seite samt
+    Socket annimmt (aus der Origin-Liste). ``None``, wenn kein Server laeuft
+    oder die Liste nicht lesbar ist — dann wird nichts ausgesiebt."""
+    app = _flask_app
+    if app is None:
+        return None
+    try:
+        from urllib.parse import urlsplit
+        return {urlsplit(o).hostname or "" for o in
+                app.config.get("CORS_ALLOWED_ORIGINS") or []}
+    except Exception:
+        return None
+
+
+# WEB-11: Web-App-Manifest der Handy-Konsole. Farben wie die Seite selbst
+# (Hintergrund des Pult-Designs). Bewusst OHNE Service Worker / Offline-Cache:
+# der braeuchte HTTPS, das es im Heimnetz ohne Zertifikat nicht gibt — und die
+# Seite ist ohne laufende Verbindung zum Pult ohnehin nutzlos.
+KONSOLE_MANIFEST = {
+    "name": "LightOS Handy-Konsole",
+    "short_name": "LightOS",
+    "description": "Fernbedienung für das LightOS-Lichtpult im eigenen Netz.",
+    "lang": "de",
+    "id": "/konsole",
+    "start_url": "/konsole",
+    "scope": "/",
+    "display": "standalone",
+    "orientation": "portrait",
+    "background_color": "#0d1117",
+    "theme_color": "#0d1117",
+    "icons": [
+        {"src": "/static/icons/konsole-192.png", "sizes": "192x192",
+         "type": "image/png", "purpose": "any"},
+        {"src": "/static/icons/konsole-512.png", "sizes": "512x512",
+         "type": "image/png", "purpose": "any"},
+        {"src": "/static/icons/konsole-maskable-512.png", "sizes": "512x512",
+         "type": "image/png", "purpose": "maskable"},
+    ],
+}
 
 
 def _num(data, key, default, cast):
@@ -196,7 +279,7 @@ def create_app(port: int = 5000) -> tuple:
         _flask_app.config["LIGHTOS_REMOTE_TOKEN"] = ""
     # NET-03: konkrete Origin-Allowlist statt "*" (Drive-by-CSRF/-WebSocket). Die
     # Liste auch in der App-Config ablegen, damit UI/Tests sie einsehen koennen.
-    origins = cors_allowlist(port)
+    origins = cors_allowlist(port, weitere=_eigene_adressen())
     _flask_app.config["CORS_ALLOWED_ORIGINS"] = origins
     _socketio = SocketIO(_flask_app, cors_allowed_origins=origins, async_mode="threading")
 
@@ -296,7 +379,11 @@ def _register_auth(app):
             # so taugt ihr Link mit Schluessel als Lesezeichen auf dem
             # Startbildschirm. Ausgeliefert wird dort nur die leere Huelle;
             # jeder Inhalt kommt ueber /api/ bzw. den Socket, also hinter dem Gate.
-            if path in ("/", "/konsole") or path.startswith("/static/"):
+            # WEB-11: das Manifest fuer „Zum Startbildschirm" liegt ebenfalls
+            # davor — der Browser holt es ohne Sitzung, und es enthaelt nichts
+            # Geheimes (kein Schluessel, keine Daten der Show).
+            if path in ("/", "/konsole", "/konsole/manifest.webmanifest") \
+                    or path.startswith("/static/"):
                 return None
             if session.get("authed") is True:
                 # Security-Review: die Session muss zur AKTUELLEN Auth-Epoche passen
@@ -353,6 +440,20 @@ def _register_routes(app):
         # Nie aus dem Zwischenspeicher: nach einem Update soll das Handy nicht
         # mit einer alten Seite gegen eine neue Schnittstelle sprechen.
         antwort.headers["Cache-Control"] = "no-store"
+        return antwort
+
+    @app.route("/konsole/manifest.webmanifest")
+    def konsole_manifest():
+        # WEB-11: Web-App-Manifest fuer „Zum Startbildschirm hinzufuegen".
+        # ★ ``start_url`` traegt KEINEN Schluessel: das Manifest ist ohne
+        # Anmeldung abrufbar. Die Seite kommt vom Startbildschirm ueber ihre
+        # bestehende Sitzung bzw. den im Handy gemerkten Schluessel wieder
+        # hinein (s. konsole.html).
+        import json as _json
+        antwort = app.response_class(
+            _json.dumps(KONSOLE_MANIFEST, ensure_ascii=False, indent=1),
+            mimetype="application/manifest+json")
+        antwort.headers["Cache-Control"] = "no-cache"
         return antwort
 
     @app.route("/api/status")
@@ -675,7 +776,7 @@ def _halter_hinweis(port: int) -> str:
 
 def start_server(port: int = 5000):
     """Start the web server in a background thread."""
-    global _thread, _running, _server
+    global _thread, _running, _server, _bind_host, _port
     if _running:
         return
     if not HAS_FLASK:
@@ -754,6 +855,7 @@ def start_server(port: int = 5000):
     finally:
         BaseWSGIServer.allow_reuse_address = _reuse_alt
     _running = True
+    _bind_host, _port = host, int(port)
     _thread = threading.Thread(
         target=_server.serve_forever,
         daemon=True,
@@ -768,8 +870,9 @@ def stop_server():
     # thread-safe und unterbricht ``serve_forever()``; ``server_close()`` gibt den
     # Listen-Socket frei -> :5000 ist SOFORT beim Toggle 'aus' frei (frueher blieb
     # er bis App-Ende offen). Idempotent + fehlertolerant.
-    global _running, _server, _thread, _flask_app, _socketio
+    global _running, _server, _thread, _flask_app, _socketio, _bind_host, _port
     _running = False
+    _bind_host, _port = "", 5000
     # CDX-24 (Safety): BESTEHENDE Verbindungen ZUERST kappen — `server_close()`
     # gibt nur den LISTEN-Socket frei. Werkzeugs `ThreadedWSGIServer` laeuft mit
     # `daemon_threads = True`, deshalb sammelt `ThreadingMixIn` seine Handler-

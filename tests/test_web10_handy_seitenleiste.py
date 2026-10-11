@@ -912,11 +912,15 @@ class VerbindungTest(_MitAnsicht):
             self.leiste._btn_verbinden.click()
         self.assertIn("Web-Remote: Verbindung & Token", info.call_args[0][2])
 
-    def test_platz_fuer_den_qr_code_ist_reserviert_aber_leer(self):
+    def test_platz_fuer_den_qr_code_bleibt_ohne_laufenden_server_weg(self):
+        # WEB-11 hat den Behaelter gefuellt (tests/test_web11_qr_startbildschirm.py);
+        # ohne laufendes Web-Interface bleibt er unsichtbar.
         platz = self.leiste.findChild(QWidget, "handy_qr_platz")
         self.assertIsNotNone(platz)
         self.assertFalse(platz.isVisible())
-        self.assertEqual(platz.findChildren(QWidget), [])
+        remote_settings.set_vc_remote_enabled(True)
+        self.leiste._takt_schlag()
+        self.assertFalse(platz.isVisible())
 
     def test_aenderung_erscheint_sofort_am_verbundenen_handy(self):
         fern = self.view._fernbedienung

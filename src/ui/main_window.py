@@ -2453,6 +2453,11 @@ class MainWindow(QMainWindow):
         dlg = QDialog(self)          # Parent = Lebensdauer an das Fenster koppeln
         dlg.setWindowTitle("Web-Remote: Verbindung & Token")
         lay = QVBoxLayout(dlg)
+        # WEB-11: der Dialog folgt seinem Inhalt — der QR-Code erscheint und
+        # verschwindet mit den Schaltern; ohne das staucht Qt die Zeilen
+        # darunter in den Code hinein, statt das Fenster zu vergroessern.
+        from PySide6.QtWidgets import QLayout
+        lay.setSizeConstraint(QLayout.SizeConstraint.SetFixedSize)
 
         lbl_url = QLabel()
         lbl_url.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
@@ -2465,7 +2470,13 @@ class MainWindow(QMainWindow):
 
         row = QHBoxLayout()
         btn_copy = QPushButton("Link kopieren")
-        btn_regen = QPushButton("Token neu erzeugen")
+        # WEB-11: „Schlüssel" ist das Wort der Handy-Konsole, „Token" das der
+        # Anleitung zur festen Fernbedienung — der Knopf nennt beide.
+        btn_regen = QPushButton("Schlüssel erneuern (neues Token)")
+        btn_regen.setObjectName("web_remote_schluessel_erneuern")
+        btn_regen.setToolTip(
+            "Erzeugt einen neuen Schlüssel. Alle bisherigen Links und QR-Codes "
+            "werden sofort ungültig, verbundene Geräte getrennt.")
         row.addWidget(btn_copy)
         row.addWidget(btn_regen)
         lay.addLayout(row)
@@ -2486,6 +2497,14 @@ class MainWindow(QMainWindow):
         edit_konsole.setReadOnly(True)
         edit_konsole.setObjectName("web_remote_konsole_link")
         lay.addWidget(edit_konsole)
+
+        # WEB-11: QR-Code zum Verbinden. Zeigt den Code nur, wenn das
+        # Web-Interface laeuft, im LAN erreichbar ist UND die Handy-Konsole an
+        # ist — sonst den noetigen Schritt. Der Link im Code ist derselbe wie
+        # im Feld darueber (mit der gewaehlten Netzwerkkarte).
+        from src.ui.widgets.handy_qr import HandyQrFeld
+        qr_feld = HandyQrFeld(klein=False, parent=dlg)
+        lay.addWidget(qr_feld)
 
         lbl_hint = QLabel()
         lbl_hint.setWordWrap(True)
@@ -2514,6 +2533,11 @@ class MainWindow(QMainWindow):
             edit_konsole.setVisible(bool(konsole_an))
             edit_konsole.setText(f"{url}/konsole?k={token}" if token
                                  else f"{url}/konsole")
+            # WEB-11: Code und Feld zeigen dieselbe Adresse — bei mehreren
+            # Netzwerkkarten die im QR-Feld gewaehlte.
+            qr_feld.aktualisiere(sofort=True)
+            if qr_feld.url():
+                edit_konsole.setText(qr_feld.url())
             lbl_hint.setText(
                 "Erreichbar für Geräte im selben (W)LAN — Zugriff nur mit Token."
                 if lan_on else
@@ -2532,9 +2556,9 @@ class MainWindow(QMainWindow):
             # Default bewusst „Nein": ein Enter/Leertaste im Showbetrieb wuerde
             # sonst alle Geraete rauswerfen.
             if QMessageBox.question(
-                    dlg, "Token neu erzeugen",
-                    "Ein neues Token macht ALLE bisherigen Links und angemeldeten "
-                    "Geräte sofort ungültig.\n\nFortfahren?",
+                    dlg, "Schlüssel erneuern",
+                    "Ein neuer Schlüssel (Token) macht ALLE bisherigen Links, "
+                    "QR-Codes und angemeldeten Geräte sofort ungültig.\n\nFortfahren?",
                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                     QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
                 return
@@ -2544,7 +2568,7 @@ class MainWindow(QMainWindow):
                 # alten Links weiter gelten (save_settings schluckt Schreibfehler).
                 remote_settings.regenerate_token()
             except Exception as e:
-                QMessageBox.warning(dlg, "Token neu erzeugen", str(e))
+                QMessageBox.warning(dlg, "Schlüssel erneuern", str(e))
                 _refresh_labels()
                 return
             # Ohne das hier laeuft die Rotation ins Leere: der Gate liest das Token
@@ -2602,6 +2626,12 @@ class MainWindow(QMainWindow):
                     QMessageBox.warning(dlg, "Web-Interface Fehler", str(e))
             _refresh_labels()
 
+        def _qr_geaendert():
+            # andere Netzwerkkarte gewaehlt / Schluessel von anderswo erneuert
+            if qr_feld.url():
+                edit_konsole.setText(qr_feld.url())
+
+        qr_feld.geaendert.connect(_qr_geaendert)
         btn_copy.clicked.connect(_copy)
         btn_regen.clicked.connect(_regen)
         cb_lan.toggled.connect(_lan_toggled)

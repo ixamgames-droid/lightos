@@ -865,7 +865,9 @@ class SeiteTest(_WebBasis):
         self.assertIn("/static/socket.io.min.js", quellen)
         for q in quellen:
             self.assertTrue(q.startswith("/") and not q.startswith("//"), q)
-        self.assertNotRegex(html, r"(?i)@import|url\s*\(|<link\b|<img\b|<iframe\b")
+        # WEB-11: <link> gibt es jetzt (Manifest, Symbole) — die Schleife oben
+        # prueft, dass auch ihre Ziele vom eigenen Server kommen.
+        self.assertNotRegex(html, r"(?i)@import|url\s*\(|<img\b|<iframe\b")
         self.assertEqual(self.client.get("/static/socket.io.min.js").status_code, 200)
 
     def test_vorlage_selbst_ist_frei_von_externen_adressen(self):

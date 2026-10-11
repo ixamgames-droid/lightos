@@ -53,6 +53,10 @@ DEFAULTS: dict = {
     # -> ein 'Token neu erzeugen' wirft bestehende Sessions SOFORT raus (Security-
     # Review). Im Cookie steht nur die Zahl, nichts Token-Ableitbares.
     "auth_epoch": 0,
+    # WEB-11: die zuletzt fuer den QR-Code der Handy-Konsole gewaehlte eigene
+    # Netzwerkadresse (bei mehreren Netzwerkkarten). Nur ein Merker: gibt es
+    # die Adresse nicht mehr, wird sie nicht benutzt.
+    "handy_ip": "",
 }
 
 
@@ -243,3 +247,13 @@ def is_vc_remote_enabled() -> bool:
 
 def set_vc_remote_enabled(enabled: bool) -> None:
     save_settings({"vc_remote_enabled": bool(enabled)})
+
+
+def get_handy_ip() -> str:
+    """WEB-11: die zuletzt fuer den Handy-Link gewaehlte eigene Adresse."""
+    wert = load_settings().get("handy_ip", "")
+    return wert if isinstance(wert, str) else ""
+
+
+def set_handy_ip(ip: str) -> None:
+    save_settings({"handy_ip": str(ip or "")})

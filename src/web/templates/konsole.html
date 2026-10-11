@@ -10,6 +10,12 @@
 <meta name="apple-mobile-web-app-title" content="LightOS">
 <meta name="format-detection" content="telephone=no">
 <title>LightOS Handy-Konsole</title>
+<!-- WEB-11: „Zum Startbildschirm hinzufügen". Das Manifest trägt keinen
+     Schlüssel; Symbole liegen lokal. Bewusst KEIN Service Worker: der bräuchte
+     HTTPS, und ohne Verbindung zum Pult hat die Seite nichts zu zeigen. -->
+<link rel="manifest" href="{{ url_for('konsole_manifest') }}">
+<link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='icons/apple-touch-icon-180.png') }}">
+<link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/konsole-192.png') }}">
 <!-- WEB-09: Handy-Konsole. Alles lokal: keine Schriften, Bilder oder Skripte
      von ausserhalb, die Seite muss am Veranstaltungsort ohne Internet laufen. -->
 <style>
@@ -119,17 +125,34 @@ body{position:fixed;top:0;right:0;bottom:0;left:0;color:#e6edf3;
 #hinweis.an{display:flex}
 #hinweis b{font-size:19px;color:#e6edf3}
 #hinweis small{font-size:13px;color:#8b949e}
-#sperre{position:absolute;top:44px;right:0;bottom:0;left:0;display:none;align-items:center;justify-content:center;
+#sperre{position:absolute;top:calc(44px + env(safe-area-inset-top, 0px));right:0;bottom:0;left:0;display:none;align-items:center;justify-content:center;
   background:rgba(7,9,13,.72);z-index:20;touch-action:none}
 #sperre.an{display:flex}
 #sperre div{background:#161b22;border:1px solid #da3633;border-radius:12px;padding:16px 22px;text-align:center;font-weight:700;color:#ff7b72;
   box-shadow:0 10px 30px rgba(0,0,0,.7)}
 #sperre small{display:block;font-weight:400;color:#9aa4af;margin-top:5px;font-size:12px}
-#meldung{position:absolute;left:50%;bottom:92px;transform:translateX(-50%);background:#3b1717;border:1px solid #7d2a27;color:#ffb3ad;
+#meldung{position:absolute;left:50%;bottom:calc(92px + env(safe-area-inset-bottom, 0px));transform:translateX(-50%);background:#3b1717;border:1px solid #7d2a27;color:#ffb3ad;
   border-radius:16px;padding:7px 14px;font-size:13px;font-weight:700;opacity:0;transition:opacity .2s;pointer-events:none;z-index:30;white-space:nowrap}
 #meldung.an{opacity:1}
 
-@media (max-height:560px){ #kopf{flex-basis:34px}#sperre{top:34px}#reiter button{height:32px}#leiste{height:60px;padding:5px 9px 6px}
+/* WEB-11: Schlüssel eintippen, wenn die Seite ohne gültige Anmeldung startet */
+#hinweis form{display:flex;gap:8px;margin-top:6px;width:100%;max-width:300px}
+#hinweis input{flex:1;min-width:0;height:44px;border-radius:10px;border:1px solid #3a424d;background:#0d1117;color:#e6edf3;
+  font:inherit;font-size:16px;padding:0 12px;-webkit-user-select:text;user-select:text;touch-action:manipulation}
+#hinweis input:focus{outline:none;border-color:#58a6ff}
+#hinweis form button{height:44px;border-radius:10px;border:1px solid #79b8ff;background:#1f6feb;color:#fff;font:inherit;font-weight:700;
+  padding:0 14px;touch-action:manipulation}
+
+/* WEB-11: Tipp „Zum Startbildschirm hinzufügen" — dezent, wegklickbar */
+#tipp{flex:0 0 auto;display:none;align-items:center;gap:10px;background:#12161c;border-top:1px solid #30363d;color:#9aa4af;
+  font-size:12px;line-height:1.35;padding:7px 6px 7px 12px}
+#tipp.an{display:flex}
+#tipp .text{flex:1;min-width:0}
+#tipp b{color:#c3ccd5}
+#tipp button{flex:0 0 auto;width:40px;height:40px;background:none;border:none;color:#8b949e;font:inherit;font-size:20px;
+  touch-action:manipulation}
+
+@media (max-height:560px){ #kopf{flex-basis:34px}#sperre{top:calc(34px + env(safe-area-inset-top, 0px))}#tipp{display:none !important}#reiter button{height:32px}#leiste{height:60px;padding:5px 9px 6px}
   .seite{gap:5px;padding:6px}}
 </style>
 </head>
@@ -144,6 +167,10 @@ body{position:fixed;top:0;right:0;bottom:0;left:0;color:#e6edf3;
   <div id="reiter"></div>
   <div id="buehne">
     <div id="hinweis" class="an"><b>Verbinde …</b></div>
+  </div>
+  <div id="tipp" role="note">
+    <span class="text" id="tipp_text"></span>
+    <button type="button" id="tipp_zu" aria-label="Tipp schließen">×</button>
   </div>
   <div id="leiste">
     <div id="gm" class="zelle fader gm quer"><span class="name">Master</span><div class="bahn"><i class="fuell"></i><b class="griff"></b></div><span class="wert">–</span></div>
@@ -217,6 +244,90 @@ function zeigeHinweis(titel, text) {
   hinweis.className = 'an';
 }
 
+/* ── WEB-11: Anmeldung merken, Start vom Startbildschirm ────────────────
+   Das Symbol auf dem Startbildschirm öffnet /konsole OHNE Schlüssel (er steht
+   nicht im Manifest). Hinein kommt die Seite dann so:
+   1. über die Sitzung des Browsers (Cookie) – solange LightOS nicht neu
+      gestartet und der Schlüssel nicht erneuert wurde;
+   2. sonst über den Schlüssel, den sich dieses Handy beim letzten gültigen
+      Aufruf gemerkt hat (localStorage, nur auf diesem Gerät, nur für diese
+      Adresse) – die Seite ruft sich damit EINMAL selbst neu auf (auch wenn
+      LightOS neu gestartet wurde, während sie offen war: dann gilt der
+      Schlüssel noch, nur die Sitzung nicht mehr);
+   3. sonst: Hinweis „neu verbinden" mit Feld zum Eintippen des Schlüssels
+      (in einer Startbildschirm-App gibt es keine Kamera zum Scannen).
+   Ein am Pult erneuerter Schlüssel macht den gemerkten wertlos; er wird dann
+   verworfen. */
+
+var MERK_K = 'lightos_konsole_k', MERK_TIPP = 'lightos_konsole_tipp', MERK_VERSUCH = 'lightos_konsole_versuch';
+function merkLies(name) { try { return window.localStorage.getItem(name) || ''; } catch (e) { return ''; } }
+function merkSetze(name, wert) {
+  try { if (wert) { window.localStorage.setItem(name, wert); } else { window.localStorage.removeItem(name); } } catch (e) { /* privates Fenster */ }
+}
+var urlK = '';
+try { urlK = new URLSearchParams(window.location.search).get('k') || ''; } catch (e) { urlK = ''; }
+
+function oeffneMit(schluessel) {
+  window.location.replace('/konsole?k=' + encodeURIComponent(schluessel));
+}
+
+// Je Schlüssel genau EIN Selbstaufruf – gemerkt für diesen Tab, damit aus
+// einem ungültigen Schlüssel keine Endlosschleife wird.
+function schonVersucht(schluessel) {
+  try { return window.sessionStorage.getItem(MERK_VERSUCH) === schluessel; } catch (e) { return true; }
+}
+function merkeVersuch(schluessel) {
+  try {
+    if (schluessel) { window.sessionStorage.setItem(MERK_VERSUCH, schluessel); }
+    else { window.sessionStorage.removeItem(MERK_VERSUCH); }
+    return true;
+  } catch (e) { return false; }
+}
+
+function zeigeZugang() {
+  var gemerkt = merkLies(MERK_K);
+  var kandidat = gemerkt || urlK;
+  if (kandidat && !schonVersucht(kandidat) && merkeVersuch(kandidat)) { oeffneMit(kandidat); return; }
+  var hatte = !!(urlK || gemerkt);
+  if (gemerkt) { merkSetze(MERK_K, ''); }            // er gilt nicht mehr
+  zeigeHinweis(hatte ? 'Neu verbinden' : 'Kein Zugang',
+    (hatte ? 'Der Schlüssel gilt nicht mehr – er wurde am Pult erneuert. ' : '') +
+    'Den QR-Code in LightOS scannen (Ausgabe → Web-Remote: Verbindung & Token) oder den Schlüssel hier eintippen.');
+  var f = document.createElement('form'), feld = document.createElement('input'), knopf = document.createElement('button');
+  feld.id = 'schluessel'; feld.type = 'text'; feld.placeholder = 'Schlüssel';
+  feld.setAttribute('autocomplete', 'off'); feld.setAttribute('autocapitalize', 'off');
+  feld.setAttribute('autocorrect', 'off'); feld.setAttribute('spellcheck', 'false');
+  feld.setAttribute('aria-label', 'Schlüssel');
+  knopf.type = 'submit'; knopf.textContent = 'Verbinden';
+  f.appendChild(feld); f.appendChild(knopf);
+  f.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var wert = feld.value.replace(/\s+/g, '');
+    if (wert) { oeffneMit(wert); }
+  });
+  hinweis.appendChild(f);
+}
+
+function zeigeTipp() {
+  var tipp = $('tipp');
+  var alsApp = false;
+  try {
+    alsApp = window.navigator.standalone === true ||
+      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+  } catch (e) { alsApp = false; }
+  if (alsApp || merkLies(MERK_TIPP)) { return; }
+  var ua = window.navigator.userAgent || '';
+  var ios = '<b>iPhone:</b> Teilen → „Zum Home-Bildschirm“';
+  var android = '<b>Android:</b> Menü ⋮ → „App installieren“ oder „Zum Startbildschirm hinzufügen“';
+  var geste = /iPhone|iPad|iPod/.test(ua) ? ios : (/Android/.test(ua) ? android : ios + ' · ' + android);
+  $('tipp_text').innerHTML = 'Tipp: wie eine App starten – ' + geste + '.';
+  tipp.className = 'an';
+}
+$('tipp_zu').addEventListener('click', function () {
+  $('tipp').className = '';
+  merkSetze(MERK_TIPP, '1');
+});
+
 function sende(ereignis, daten, beiAntwort) {
   if (!socket || !verbunden) { return false; }
   socket.emit(ereignis, daten, function (antwort) {
@@ -246,7 +357,10 @@ if (socket) {
     setzeVerbunden(true);
     socket.emit('vc_hallo', {});       // vollständiger Abgleich nach jedem Verbinden
   });
-  socket.on('disconnect', function () { setzeVerbunden(false); });
+  socket.on('disconnect', function (grund) {
+    setzeVerbunden(false);
+    if (grund === 'io server disconnect') { nachTrennung(600); }
+  });
   socket.on('connect_error', function () {
     setzeVerbunden(false);
     if (Date.now() - zuletztGeprueft > 3000) { ladeStand(true); }   // Schlüssel noch gültig?
@@ -286,11 +400,31 @@ function ladeStand(nurPruefen) {
     reiter.className = '';
     $('leiste').style.display = 'none';
     setzeVerbunden(false);
-    zeigeHinweis('Kein Zugang', 'Den Link mit Schlüssel aus LightOS öffnen: Ausgabe → Web-Remote: Verbindung & Token.');
+    $('tipp').className = '';
+    zeigeZugang();
     return null;
   }
+  // Angemeldet: den Schlüssel aus der Adresse merken (nur einen, der gilt),
+  // damit der Start vom Startbildschirm ohne ?k= wieder hineinfindet.
+  if (r.ok && urlK) { merkSetze(MERK_K, urlK); }
+  if (r.ok) { merkeVersuch(''); }
+  if (r.ok && !nurPruefen) { zeigeTipp(); }
+  // Vom Pult getrennt, der Zugang gilt aber noch (z. B. Web-Interface neu
+  // gestartet): von selbst wieder verbinden.
+  if (r.ok && nurPruefen && nichtVonSelbst()) { socket.connect(); }
   return r.json();
-  }).then(function (k) { if (k && !stand && !nurPruefen) { uebernehmeAlles(k); } }).catch(function () {});
+  }).then(function (k) { if (k && !stand && !nurPruefen) { uebernehmeAlles(k); } }).catch(function () {
+    // Pult nicht erreichbar: später noch einmal nachsehen.
+    if (nurPruefen && nichtVonSelbst()) { nachTrennung(3000); }
+  });
+}
+// Trennt das PULT die Verbindung (Schlüssel erneuert, Web-Interface aus oder
+// neu gestartet), versucht der Socket es NICHT von selbst wieder. Dann prüft
+// die Seite ihren Zugang: gilt er nicht mehr, kommt „Neu verbinden".
+function nichtVonSelbst() { return !!socket && !socket.connected && socket.active === false; }
+function nachTrennung(ms) {
+  clearTimeout(nachTrennung.t);
+  nachTrennung.t = setTimeout(function () { ladeStand(true); }, ms);
 }
 ladeStand(false);
 
@@ -617,7 +751,11 @@ finger($('bo'), function () {
 /* ── Kein Zoom, kein Scrollen, kein Kontextmenü ─────────────────────── */
 
 ['gesturestart', 'gesturechange', 'gestureend', 'contextmenu', 'dblclick', 'selectstart'].forEach(function (n) {
-  document.addEventListener(n, function (ev) { ev.preventDefault(); }, {passive: false});
+  document.addEventListener(n, function (ev) {
+    // Das Feld für den Schlüssel bleibt ein gewöhnliches Eingabefeld.
+    if (ev.target && ev.target.tagName === 'INPUT') { return; }
+    ev.preventDefault();
+  }, {passive: false});
 });
 document.addEventListener('touchmove', function (ev) { ev.preventDefault(); }, {passive: false});
 
