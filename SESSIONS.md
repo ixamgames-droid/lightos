@@ -63,6 +63,7 @@
 | DOC-70 | D | - | 2026-10-10T22:54Z | - |
 | TOOL-21 | D | - | 2026-10-10T22:54Z | - |
 | WEB-08 | A | feature/web08-widget-kennung-fernausloesung | 2026-10-11T09:40Z | - |
+| VCB-42 | D | - | 2026-10-11T10:24Z | - |
 
 ## Blocker & Fallen
 
@@ -204,7 +205,6 @@
 
 ## Verlauf
 
-- 2026-10-10T18:10Z D aktualisiert TOOL-18: Branch - -> fix/tool18-bilder-hinweis-gpu-szenen
 - 2026-10-10T18:11Z D done XPLAT-48
 - 2026-10-10T18:16Z D aktualisiert VCB-36: Branch - -> fix/vcb36-blackout-ziel-gruppen-id
 - 2026-10-10T18:17Z D aktualisiert UI-80: Branch - -> fix/ui80-matrix-entwurf-speed
@@ -234,3 +234,4 @@
 - 2026-10-11T09:40Z A claim WEB-08
 - 2026-10-11T09:40Z A aktualisiert LAS-32: Branch feature/las32-laser-sperrzonen -> feature/las32-s1-sperrzonen-anzeige
 - 2026-10-11T10:20Z A done VIZ-100
+- 2026-10-11T10:24Z D claim VCB-42
