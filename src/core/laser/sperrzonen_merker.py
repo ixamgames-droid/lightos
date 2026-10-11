@@ -17,6 +17,7 @@ import os
 
 _SCHLUESSEL = "sperrzonen_benutzt"
 _sitzung = False        # gilt fuer diese Sitzung, auch wenn das Schreiben scheitert
+_gelesen = None         # was die Datei beim ersten Nachsehen sagte (None = noch nicht)
 
 
 def _pfad() -> str:
@@ -38,10 +39,20 @@ def _lies(pfad: str):
 
 
 def war_benutzt(pfad: str | None = None) -> bool:
+    """Ohne ``pfad`` wird die Datei je Sitzung nur EINMAL gelesen: das
+    Hauptfenster fragt im Takt seines NOT-AUS-Knopfs (gut zweimal je Sekunde),
+    und ein Dateizugriff im UI-Thread gehoert dort nicht hin. Wahr werden kann
+    die Antwort danach nur noch ueber :func:`merke_benutzt`."""
+    global _gelesen
     if _sitzung:
         return True
-    daten = _lies(pfad or _pfad())
-    return bool(daten and daten.get(_SCHLUESSEL))
+    if pfad is not None:
+        daten = _lies(pfad)
+        return bool(daten and daten.get(_SCHLUESSEL))
+    if _gelesen is None:
+        daten = _lies(_pfad())
+        _gelesen = bool(daten and daten.get(_SCHLUESSEL))
+    return _gelesen
 
 
 def merke_benutzt(pfad: str | None = None) -> None:
@@ -66,5 +77,6 @@ def merke_benutzt(pfad: str | None = None) -> None:
 
 def _vergiss_sitzung() -> None:
     """Nur fuer Tests."""
-    global _sitzung
+    global _sitzung, _gelesen
     _sitzung = False
+    _gelesen = None

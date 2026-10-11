@@ -3010,20 +3010,31 @@ class MainWindow(QMainWindow):
             self._state.sperrzonen_wechsel_hinweis = False
             from src.core.laser.sperrzonen import MELDUNG_SHOW_OHNE_ZONEN
             sb = self.statusBar()
+            if not getattr(self, "_sperrzonen_meldung_verdrahtet", False):
+                sb.messageChanged.connect(self._sperrzonen_meldung_gewechselt)
+                self._sperrzonen_meldung_verdrahtet = True
             sb.showMessage(MELDUNG_SHOW_OHNE_ZONEN, 15000)
             sb.setStyleSheet(
                 "QStatusBar{background:#5a4a00; color:#ffcc00; font-weight:bold;}")
-            QTimer.singleShot(15000, self._sperrzonen_meldung_ende)
+            self._sperrzonen_meldung_gelb = True
         except Exception as e:
             print(f"[main_window] Sperrzonen-Wechselmeldung: {e}")
 
-    def _sperrzonen_meldung_ende(self) -> None:
-        """Gelb wieder wegnehmen — aber nur, wenn inzwischen keine ANDERE
-        Meldung steht (der rote NOT-AUS-Alarm raeumt seine Farbe selbst ab und
-        darf von hier nicht verkuerzt werden)."""
+    def _sperrzonen_meldung_gewechselt(self, text) -> None:
+        """Das Gelb gehoert zu genau dieser einen Meldung: sobald sie ablaeuft
+        oder eine ANDERE Meldung sie ersetzt, geht die Farbe weg. Ein fester
+        Zeitgeber reichte nicht — stand nach 15 s gerade eine andere Meldung
+        da, blieb die Statuszeile dauerhaft gelb, und jede spaetere Meldung sah
+        wie eine Warnung aus. Der rote NOT-AUS-Alarm setzt seine Farbe NACH
+        seiner Meldung und wird davon nicht beruehrt."""
         try:
-            if not self.statusBar().currentMessage():
-                self._reset_statusbar_style()
+            if not getattr(self, "_sperrzonen_meldung_gelb", False):
+                return
+            from src.core.laser.sperrzonen import MELDUNG_SHOW_OHNE_ZONEN
+            if text == MELDUNG_SHOW_OHNE_ZONEN:
+                return
+            self._sperrzonen_meldung_gelb = False
+            self._reset_statusbar_style()
         except Exception:
             pass
 

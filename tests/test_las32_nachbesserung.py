@@ -251,6 +251,29 @@ class KopfzeileWidgetTest(unittest.TestCase):
         self.assertTrue(self._zeile(_State(_Fx(5, "par")), True).isHidden())
         self.assertTrue(self._zeile(_State(), False).isHidden())
 
+    def test_takt_kostet_ohne_gebrauch_weder_patch_noch_platte(self):
+        """Die Zeile wird im Takt des NOT-AUS-Knopfs gefragt (gut zweimal je
+        Sekunde, UI-Thread): wer die Funktion nie benutzt hat, loest dabei
+        keinen Gang durch den Patch aus, und die Einstellungsdatei wird je
+        Sitzung nur einmal gelesen."""
+        st = _State()
+        st.get_patched_fixtures = mock.Mock(side_effect=AssertionError("Patch gelesen"))
+        M._vergiss_sitzung()
+        self.addCleanup(M._vergiss_sitzung)
+        with mock.patch.object(M, "_pfad", return_value="/gibt/es/nicht.json"), \
+                mock.patch.object(M, "_lies", return_value={}) as lies:
+            z = UI.SperrzonenKopfzeile(lambda: st)
+            self.addCleanup(z.deleteLater)
+            for _ in range(5):
+                z.aktualisieren()
+            self.assertTrue(z.isHidden())
+            self.assertEqual(lies.call_count, 1)
+            # ... und der Merker wirkt trotzdem sofort
+            M._sitzung = True
+            st.get_patched_fixtures = lambda: [_Fx(2)]
+            z.aktualisieren()
+            self.assertFalse(z.isHidden())
+
     def test_neue_zone_im_dialog_setzt_den_merker(self):
         st = _State()
         with mock.patch.object(M, "merke_benutzt") as merke:
@@ -267,6 +290,52 @@ class KopfzeileWidgetTest(unittest.TestCase):
                          "Kopfleiste UND Kiosk-Streifen")
         self.assertIn("self._sync_sperrzonen_kopfzeile()", quelle)
         self.assertIn("self._sperrzonen_wechsel_melden()", quelle)
+
+
+class WechselMeldungFarbeTest(unittest.TestCase):
+    """Das Gelb der einmaligen Meldung gehoert zu genau dieser Meldung: ersetzt
+    eine andere sie oder laeuft sie ab, ist die Statuszeile wieder normal."""
+
+    def setUp(self):
+        import types
+        from PySide6.QtWidgets import QStatusBar
+        from src.ui.main_window import MainWindow
+        sb = QStatusBar()
+        self.addCleanup(sb.deleteLater)
+
+        class _Fenster:
+            _state = types.SimpleNamespace(sperrzonen_wechsel_hinweis=True)
+            statusBar = staticmethod(lambda: sb)
+            _reset_statusbar_style = MainWindow._reset_statusbar_style
+            _sperrzonen_wechsel_melden = MainWindow._sperrzonen_wechsel_melden
+            _sperrzonen_meldung_gewechselt = MainWindow._sperrzonen_meldung_gewechselt
+
+        self.sb, self.fenster = sb, _Fenster()
+
+    def test_meldung_ist_gelb_und_wird_einmal_gezeigt(self):
+        self.fenster._sperrzonen_wechsel_melden()
+        self.assertEqual(self.sb.currentMessage(), S.MELDUNG_SHOW_OHNE_ZONEN)
+        self.assertIn("#ffcc00", self.sb.styleSheet())
+        self.assertFalse(self.fenster._state.sperrzonen_wechsel_hinweis)
+
+    def test_andere_meldung_nimmt_das_gelb_weg(self):
+        self.fenster._sperrzonen_wechsel_melden()
+        self.sb.showMessage("Show gespeichert", 5000)
+        self.assertEqual(self.sb.styleSheet(), "")
+
+    def test_abgelaufene_meldung_nimmt_das_gelb_weg(self):
+        self.fenster._sperrzonen_wechsel_melden()
+        self.sb.clearMessage()
+        self.assertEqual(self.sb.styleSheet(), "")
+
+    def test_spaetere_farbe_einer_anderen_meldung_bleibt(self):
+        """Der NOT-AUS-Alarm zeigt erst seine Meldung und faerbt dann rot —
+        dieses Rot darf hier nicht wieder weggenommen werden."""
+        self.fenster._sperrzonen_wechsel_melden()
+        self.sb.showMessage("LASER NOT-AUS", 6000)
+        self.sb.setStyleSheet("QStatusBar{background:#b31414;}")
+        self.sb.showMessage("noch eine Meldung", 1000)
+        self.assertIn("#b31414", self.sb.styleSheet())
 
 
 class WechselMeldungTest(unittest.TestCase):

@@ -141,8 +141,13 @@ class SperrzonenKopfzeile(QLabel):
             daten = getattr(state, "sperrzonen", None)
             if daten is None:
                 return ""
-            return S.kopfleisten_hinweis(len(S.dmx_laser(state)), daten,
-                                         M.war_benutzt())
+            # Billig zuerst — das laeuft im Takt des NOT-AUS-Knopfs: wer die
+            # Funktion nie benutzt hat oder Zonen hat, kostet keinen Gang
+            # durch den Patch.
+            benutzt = M.war_benutzt()
+            if not S.kopfleisten_hinweis(1, daten, benutzt):
+                return ""
+            return S.kopfleisten_hinweis(len(S.dmx_laser(state)), daten, benutzt)
         except Exception:                                # noqa: BLE001
             return ""       # eine Anzeige darf das Hauptfenster nie stoeren
 
