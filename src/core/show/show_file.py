@@ -869,6 +869,12 @@ def _collect_fixture_groups(state, probleme: list | None = None) -> list:
     return out
 
 
+# VCB-36: groesste Gruppen-ID, die aus einer Datei uebernommen wird — SQLites
+# Grenze fuer eine Ganzzahl. Genau die: jede ID, die die Datenbank halten (und
+# damit speichern) kann, bleibt lesbar; alles darueber kann sie nicht einfuegen.
+_GRUPPEN_ID_MAX = 2**63 - 1
+
+
 def _fixture_group_aus_daten(g):
     """EINEN Gruppen-Eintrag der .lshow uebersetzen; wirft bei unlesbarem
     Eintrag (der Aufrufer ueberspringt und meldet genau diesen, STAB-24).
@@ -886,8 +892,12 @@ def _fixture_group_aus_daten(g):
     # VCB-36: gespeicherte ID uebernehmen. Fehlt sie (Alt-Show) oder ist sie
     # unlesbar, bleibt sie offen — ``_restore_fixture_groups`` vergibt dann eine.
     # Eine unlesbare ID kostet die Gruppe nicht (nur ihre Nummer).
+    # Auch eine zu GROSSE Zahl gilt als unlesbar: an einer ID jenseits von
+    # SQLites 64 Bit scheitert das Einfuegen (OverflowError) — und mit ihm die
+    # ganze Transaktion, also ALLE Gruppen (STAB-24).
     gid = g.get("id")
-    if isinstance(gid, int) and not isinstance(gid, bool) and gid > 0:
+    if (isinstance(gid, int) and not isinstance(gid, bool)
+            and 0 < gid <= _GRUPPEN_ID_MAX):
         fg.id = gid
     return fg
 

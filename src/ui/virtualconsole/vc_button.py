@@ -307,6 +307,13 @@ EFFECT_ACTION_LABELS: list[tuple[str, str]] = [
 ]
 
 
+# VCB-36: Namen, die KEINE Gruppe traegt — sie halten eine Blackout-Taste ein
+# Ziel-Blackout, wenn ihr eigentliches Ziel nicht (mehr) benennbar ist. Ein
+# Name ohne Gruppe schaltet nichts; ein leeres Ziel waere der globale Blackout.
+_BLACKOUT_ZIEL_PLATZHALTER = "(Gruppe #{gid} — gelöscht oder ohne Namen)"
+_BLACKOUT_ZIEL_UNLESBAR = "(unlesbares Blackout-Ziel)"
+
+
 def _clear_target_blackout_slot(slot) -> None:
     """VCB-11: gibt den gezielten Blackout einer (geloeschten/umgestellten) Taste
     frei — sonst bliebe ihr Teil-Blackout als Geist haengen."""
@@ -1002,8 +1009,13 @@ class VCButton(VCWidget):
             except Exception:
                 je_id = {}
             for gid in self.blackout_group_ids:
-                name = je_id.get(gid)
-                if name and name not in namen:
+                # Geloeschte oder namenlose Gruppe (oder Show-DB nicht lesbar):
+                # ein Platzhalter, den keine Gruppe traegt. Die aeltere Version
+                # findet dazu nichts und schaltet nichts — liesse man den
+                # Eintrag weg, bliebe das Feld leer und die Taste waere dort
+                # doch der GLOBALE Blackout.
+                name = je_id.get(gid) or _BLACKOUT_ZIEL_PLATZHALTER.format(gid=gid)
+                if name not in namen:
                     namen.append(name)
         return namen
 
@@ -2653,10 +2665,16 @@ class VCButton(VCWidget):
         # Mit IDs im Layout stehen die echten Alt-Namen in
         # ``blackout_groups_nur_name`` (``blackout_groups`` wiederholt dann die
         # Namen der ID-Ziele); ein altes Layout kennt nur ``blackout_groups``.
-        _bg_roh = d.get("blackout_groups_nur_name" if "blackout_group_ids" in d
-                        else "blackout_groups", None)
+        # Hat KEINE ID das Lesen ueberlebt (alle unlesbar, etwa als Text
+        # gespeichert), gelten die Namen aus ``blackout_groups`` — dort stehen
+        # auch die der ID-Ziele. Ein Ziel-Blackout darf durch kaputte Eintraege
+        # ungenauer werden (Name statt ID) oder ins Leere gehen, aber NIE zum
+        # globalen werden.
+        _bg_roh = d.get("blackout_groups_nur_name" if _bgi else "blackout_groups", None)
         self.blackout_groups = [g for g in (_bg_roh if isinstance(_bg_roh, (list, tuple)) else [])
                                 if isinstance(g, str) and g.strip()]
+        if _bgi_roh and not (_bgi or self.blackout_groups or self.blackout_fids):
+            self.blackout_groups = [_BLACKOUT_ZIEL_UNLESBAR]
         # Show neu geladen: ein noch gehaltener Teil-Blackout gehoert zur alten Show.
         self._release_target_blackout()
         self.tempo_bus_id = d.get("tempo_bus_id", "") or ""
