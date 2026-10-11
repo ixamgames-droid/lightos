@@ -63,6 +63,7 @@
 | TOOL-21 | D | - | 2026-10-10T22:54Z | - |
 | WEB-08 | A | feature/web08-widget-kennung-fernausloesung | 2026-10-11T09:40Z | - |
 | VCB-42 | D | fix/vcb42-blackout-ziel-gruppe-wiedererkennen | 2026-10-11T10:34Z | src/core/app_state.py · src/core/show/show_file.py · src/ui/virtualconsole/vc_button.py · src/ui/virtualconsole/target_list_editor.py · tests/test_vcb42_blackout_ziel_wiedererkennen.py |
+| WEB-09 | A | feature/web09-handy-seite-rueckmeldung | 2026-10-11T10:58Z | - |
 
 ## Blocker & Fallen
 
@@ -205,7 +206,6 @@
 
 ## Verlauf
 
-- 2026-10-10T18:17Z D aktualisiert UI-80: Branch - -> fix/ui80-matrix-entwurf-speed
 - 2026-10-10T18:24Z D aktualisiert UI-78: Branch - -> fix/ui78-efx-editor-texte
 - 2026-10-10T18:34Z D done VIZ-98
 - 2026-10-10T18:49Z D claim QA-92
@@ -235,3 +235,4 @@
 - 2026-10-11T10:24Z D claim VCB-42
 - 2026-10-11T10:34Z D aktualisiert VCB-42: Branch - -> fix/vcb42-blackout-ziel-gruppe-wiedererkennen; Dateien - -> src/core/app_state.py · src/core/show/show_file.py · src/ui/virtualconsole/vc_button.py · src/ui/virtualconsole/target_list_editor.py · tests/test_vcb42_blackout_ziel_wiedererkennen.py
 - 2026-10-11T10:38Z A done DEMO-8
+- 2026-10-11T10:58Z A claim WEB-09
