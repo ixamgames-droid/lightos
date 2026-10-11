@@ -50,11 +50,14 @@ fix/midi-apc-detection     Bugfix
 
 ### Commit-Messages
 
-- Imperativ, Englisch oder Deutsch (konsistent pro Commit)
+- Format der ersten Zeile: `<typ>(<bereich>): <kurze Beschreibung> (<BACKLOG-ID>)` —
+  Typ als englisches Kürzel (`feat`, `fix`, `docs`, `test`, `refactor`, `chore`),
+  Beschreibung auf Deutsch. Tabelle und Einzelheiten:
+  [CONTRIBUTING.md](CONTRIBUTING.md#commits).
 - Kurz: 1 Zeile + optional Body
-- Format:
+- Beispiel:
   ```
-  Add 2D top-down live view
+  feat(live): 2D-Draufsicht als Live View
 
   Neue Section als erste Anlaufstelle beim App-Start.
   Zeigt gepatchte Fixtures mit Live-DMX-Farben.
@@ -84,11 +87,60 @@ GitHub keine CI.
   neuen leeren `## [Unreleased]`-Kopf setzen): erzeugt Zeilen ohne Fragment,
   daher Commit-Betreff `changelog: release x.y.z` — sonst meldet der Waechter.
 
+### BACKLOG-Fragmente (PROC-20)
+
+Ein PR schreibt seine Backlog-Zeile bzw. seinen Status **nicht** in
+`BACKLOG.md`, sondern legt je Item eine Datei `backlog.d/<ID>.md` an (Vorlage
+und alle Kopfzeilen in [`backlog.d/README.md`](backlog.d/README.md)). Grund:
+bisher aenderte jeder Feature-PR dieselbe Datei — nach jedem Merge kollidierten
+die naechsten PRs, und gemergte Items blieben auf `review` stehen.
+
+Beispiel `backlog.d/UI-99.md` (neues Item, das dieser PR auch umsetzt):
+
+```
+ID: UI-99
+Prioritaet: P2
+Status: review
+Titel: Kurzer Titel des Items
+
+Was fehlt, woran man es merkt, wann es erledigt ist.
+```
+
+- **Statusaenderung an einem vorhandenen Item:** nur `ID:` und `Status:`
+  (`todo`, `review`, `done`, `teils`, `blocked`), optional `Status-Notiz:`.
+- **ID holen:** `./venv/bin/python tools/backlog_ids.py --gruppe <GRUPPE>` —
+  sieht auch die Fragmente der offenen PR-Zweige.
+- **Sammeln** regelmaessig durch die leitende Sitzung, als kleiner eigener PR
+  auf frischem `main`: `./venv/bin/python tools/backlog_sammeln.py --pruefen`,
+  dann `--dry-run`, dann ohne Schalter; Commit-Betreff `backlog: sammeln`. Neue
+  Items bekommen eine Zeile hinter der hoechsten Nummer ihrer Gruppe, bei
+  vorhandenen wird nur die Statusspalte ersetzt, `review` wird zu
+  `done (<Datum>, PR #N)` (Nummer aus dem Merge-Betreff oder `--pr N`). Ein
+  `review`-Fragment ohne PR-Nummer bleibt liegen; ein zweiter Lauf aendert
+  nichts.
+- **Das Dashboard** liest weiter nur `BACKLOG.md` — sein Stand ist so frisch
+  wie der letzte Sammel-Lauf.
+- **Uebergang:** offene PRs, die `BACKLOG.md` noch direkt aendern, bleiben
+  gueltig. `tests/test_backlog_fragmente.py` (bzw.
+  `tools/backlog_sammeln.py --waechter`) meldet das als Hinweis, nie als Fehler.
+
 ## Tests vor jedem Commit
 
-- `python main.py` muss starten ohne Crash
-- Geaenderte Module einmal importieren
-- Bei UI-Aenderungen: betroffene View instanziieren
+Ein Befehl, ueberall derselbe (auch in `CONTRIBUTING.md` und `INSTALL.md`):
+die betroffenen Testdateien ueber das Test-Gate laufen lassen — ein Prozess je
+Testdatei, headless.
+
+```
+./tools/verify_loop.sh tests/test_x.py          # Linux
+.\tools\verify_segmented.ps1 tests\test_x.py    # Windows
+```
+
+- Vor dem Merge laeuft dasselbe Gate OHNE Dateiangabe (volle Suite), s. naechster
+  Abschnitt.
+- Kein Sammellauf ueber den ganzen Testordner in EINEM pytest-Prozess — der stirbt
+  an angesammeltem nativem Qt-Zustand (Begruendung in `AGENTS.md`).
+- Bei UI-Aenderungen zusaetzlich: die App einmal starten und die betroffene
+  Ansicht oeffnen.
 
 ## Test-Gate (Loop-Modus)
 
@@ -271,6 +323,38 @@ Das verbindliche Test-Gate des Loop-Modus laeuft ueber `tools/verify_loop.ps1`:
 
 Details zur Sperre: `SecondBrain/reference_pytest_lock.md`.
 
+### CI-Schnellweg fuer reine Doku-/Backlog-PRs (PROC-19)
+
+Aendert ein PR **ausschliesslich** Doku, faehrt die CI in denselben Jobs (gleiche
+Namen — daran erkennt `tools/pr_bereit.py` die Checks) statt der vollen Suite nur
+die Doku-/Backlog-/Privatsphaere-Gates. Das dauert Minuten statt einer halben
+Stunde und haelt die Merge-Warteschlange nicht auf.
+
+* **Was als Doku zaehlt:** `*.md` im Wurzelverzeichnis, `changelog.d/*.md`,
+  `backlog.d/*.md` (Backlog-Fragmente, PROC-20) und unter `docs/` Markdown und Bilder. Alles andere ist „voll" — auch
+  `tools/README.md`, JSON und Skripte unter `docs/`, `tests/`, `tools/`, `.github/`.
+  Eine einzige solche Datei im PR genuegt fuer die volle Suite.
+* **Wer entscheidet:** `tools/geaenderte_dateien_klasse.py` gibt `doku` oder `voll`
+  aus. Gerechnet wird gegen den Merge-Base mit `main`, nicht gegen den letzten
+  Commit. Im Zweifel `voll` (unbekannte Datei, Git-Fehler, keine Aenderung).
+* **Push nach `main` faehrt immer die volle Suite.** Der Schnellweg gilt nur im
+  Pull-Request.
+* **Welche Gates laufen:** die Liste steht in `tools/doku_gates.txt`. Ein neuer
+  Test, der eine Anleitung, den Backlog oder ein Changelog-Fragment liest, wird
+  dort eingetragen — `tests/test_proc19_doku_schnellweg.py` meldet ihn sonst.
+* **Windows-Legs:** im Doku-Fall laufen dort keine Tests; die Jobs enden gruen
+  mit dem Schritt „Doku-PR: Kurzweg". Die Gates faehrt die Linux-Leg.
+
+Lokal:
+
+```
+./venv/bin/python tools/geaenderte_dateien_klasse.py   # doku oder voll (gegen origin/main)
+./tools/verify_loop.sh --doku                          # Syntax-Check + nur die Doku-Gates
+```
+
+`verify_loop.sh --doku` ersetzt das volle Gate nur, wenn der Zweig wirklich nur
+Doku aendert; sonst sagt der Lauf das in einer Warnzeile.
+
 ### Kein Flake, ein Messfehler: das Gate misst den Baum, den es bekommt (PROC-13)
 
 Ein roter Gate-Lauf ist nicht automatisch ein roter Code. Zwei Messfehler haben
@@ -390,6 +474,7 @@ zusaetzlichen Funden.
 - Bei neuen Dependencies: `requirements.txt` aktualisieren
 - Bei Architektur-Aenderungen: `README.md` oder `INSTALL.md` synchron halten
 - Nutzer-sichtbare Aenderung: CHANGELOG-Fragment unter `changelog.d/` (nicht `CHANGELOG.md` direkt)
+- Neues Item oder neuer Status: BACKLOG-Fragment unter `backlog.d/` (nicht `BACKLOG.md` direkt)
 
 ## Plattform-Kompatibilitaet
 

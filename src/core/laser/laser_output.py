@@ -50,6 +50,18 @@ def _prog_value(state, fid: int, attr: str, default: int) -> int:
         return default
 
 
+def _laser_xy(state, fx, fid: int) -> tuple[float, float]:
+    """Position -1..1 aus ``laser_x``/``laser_y`` — mit der Achsen-Umkehr des
+    Geraets (LAS-30). Netzwerk-Laser haben keine Kanal-Bereiche: lineare
+    Achse, 128 = Mitte."""
+    from src.core.laser.achsen import apply_laser_orientation
+    xy = apply_laser_orientation(fx, {
+        "laser_x": _prog_value(state, fid, "laser_x", 128),
+        "laser_y": _prog_value(state, fid, "laser_y", 128)}, channels=())
+    return ((xy.get("laser_x", 128) - 128) / 127.0,
+            (xy.get("laser_y", 128) - 128) / 127.0)
+
+
 def build_test_frame(state, fx, limits: LaserLimits, fps: int) -> LaserFrame:
     """Kreis-Testmuster aus den Programmer-Werten des Netzwerk-Lasers.
 
@@ -62,8 +74,7 @@ def build_test_frame(state, fx, limits: LaserLimits, fps: int) -> LaserFrame:
     # Shutter-Gate: unter 128 bleibt der Frame komplett dunkel — deckt den
     # Laser-Safety-Default (Shutter 0 beim Patchen) ab.
     lit = _prog_value(state, fid, "shutter", 0) >= 128
-    cx = (_prog_value(state, fid, "laser_x", 128) - 128) / 127.0
-    cy = (_prog_value(state, fid, "laser_y", 128) - 128) / 127.0
+    cx, cy = _laser_xy(state, fx, fid)
     radius = _prog_value(state, fid, "zoom", 128) / 255.0
     r = _prog_value(state, fid, "color_r", 255) / 255.0
     g = _prog_value(state, fid, "color_g", 255) / 255.0
@@ -298,8 +309,7 @@ class LaserOutputManager:
         pps = min(20000, int(self.limits.max_pps))
         n = max(int(self.limits.min_points),
                 min(int(self.limits.max_points), pps // max(1, self.TARGET_FPS)))
-        ox = (_prog_value(self._state, fid, "laser_x", 128) - 128) / 127.0
-        oy = (_prog_value(self._state, fid, "laser_y", 128) - 128) / 127.0
+        ox, oy = _laser_xy(self._state, fx, fid)
         # LAS-VIEW (2026-08-05): Default 128 wie beim Testmuster (Zeile ~67).
         # Vorher stand hier 255 — ohne gesetzten Programmer-Wert war eine
         # gezeichnete Figur damit DOPPELT so gross wie das Testmuster desselben
