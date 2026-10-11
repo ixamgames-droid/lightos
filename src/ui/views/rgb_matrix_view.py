@@ -30,6 +30,17 @@ _PROMOTED_PARAM_KEYS = frozenset({"color_cycle", "dimmer_cycle",
                                   "color_order", "color_interval"})
 
 
+def _show_laedt() -> bool:
+    """UI-84: wird gerade eine Show geladen (``AppState.show_wird_geladen``)?
+    Dann folgt der Editor der Auswahl NICHT mit Zuweisung — das Laden setzt
+    die Auswahl nur als Nebenwirkung neu."""
+    try:
+        from src.core.app_state import get_state
+        return bool(get_state().laedt_show())
+    except Exception:
+        return False
+
+
 def _viz_modell(fixture) -> str:
     """Render-Modell eines gepatchten Geraets — lokal importiert wie alle
     app_state-Zugriffe dieser Datei (Zyklus Views <-> app_state)."""
@@ -1926,7 +1937,12 @@ class RgbMatrixView(QWidget):
             if self._saved is None:
                 self._update_group_header()
                 return
-            self._assign_from_selection()
+            # UI-84: _assign_from_selection schreibt das Grid LIVE in die
+            # gespeicherte Matrix (_current UND _saved). Waehrend eine Show
+            # geladen wird, ist ein SELECTION_CHANGED/GROUP_CHANGED nur
+            # Nebenwirkung des Ladens -> nur Anzeige neu, Grid unangetastet.
+            if not _show_laedt():
+                self._assign_from_selection()
             self._update_group_header()
         except RuntimeError:
             pass  # Widget beim Layout-Wechsel gelöscht
