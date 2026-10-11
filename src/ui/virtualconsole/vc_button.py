@@ -1604,6 +1604,47 @@ class VCButton(VCWidget):
         elif self.action == ButtonAction.TOGGLE and press:
             ex.press_btn("go")
 
+    # ── Druck / Loslassen ─────────────────────────────────────────────────────
+
+    def _taste(self, press: bool):
+        """Der Weg eines Mausklicks im Bedien-Modus: Zustand setzen, ausloesen,
+        neu zeichnen. WEB-08: als eigene Methode, damit die Fernausloesung
+        (``vc_fernbedienung``) nachweislich DENSELBEN Weg nimmt und nicht eine
+        vierte Abschrift davon pflegt."""
+        self._pressed = bool(press)
+        self._trigger(bool(press))
+        self.update()
+
+    def fern_taste(self, press: bool) -> bool:
+        """WEB-08: Druck/Loslassen aus der Ferne. Wie die Maus, mit einer
+        Abweichung: ein wiederholter Druck auf eine schon gedrueckte Taste (und
+        ein Loslassen ohne Druck) tut nichts. Ein doppelt angekommener Befehl
+        schaltete ein Toggle sonst sofort wieder aus. Kein Long-Press — der
+        oeffnet einen Editor am Pult. Rueckgabe: True, wenn ausgeloest wurde."""
+        press = bool(press)
+        if press == bool(self._pressed):
+            return False
+        self._taste(press)
+        return True
+
+    def leuchtet(self) -> bool:
+        """WEB-08: „ist diese Taste gerade an?" — dieselbe Summe, aus der
+        ``paintEvent`` sein ``lit`` bildet (gedrueckt, Snap-Toggle an, Musik-BPM
+        an, Funktion laeuft, Aktionszustand). Fuer die Rueckmeldung ans Handy,
+        ohne zu zeichnen."""
+        if self._pressed:
+            return True
+        if self.action == ButtonAction.LIBRARY_SNAP and self._snap_active:
+            return True
+        if self.action == ButtonAction.AUDIO_BPM:
+            try:
+                from src.core.engine.bpm_manager import get_bpm_manager
+                if get_bpm_manager().audio_active:
+                    return True
+            except Exception:
+                pass
+        return bool(self._function_running() or self._aktionszustand())
+
     # ── Mouse ─────────────────────────────────────────────────────────────────
 
     def mousePressEvent(self, event):
@@ -1614,9 +1655,7 @@ class VCButton(VCWidget):
             event.accept()
             return
         if event.button() == Qt.MouseButton.LeftButton:
-            self._pressed = True
-            self._trigger(True)
-            self.update()
+            self._taste(True)
             self._maybe_arm_long_press()
         event.accept()
 
@@ -1626,9 +1665,7 @@ class VCButton(VCWidget):
             return
         self._lp_timer.stop()           # kurzer Tap -> Long-Press abbrechen
         if event.button() == Qt.MouseButton.LeftButton and self._pressed:
-            self._pressed = False
-            self._trigger(False)
-            self.update()
+            self._taste(False)
         event.accept()
 
     # ── Live-Mini-Editor (Welle 4, O): Long-Press im Live-Modus ───────────────

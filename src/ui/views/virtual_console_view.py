@@ -452,6 +452,21 @@ class VirtualConsoleView(QWidget):
         self._canvas.widget_selected.connect(self._on_canvas_widget_selected)
         self._on_bank_changed(self._canvas.active_bank)
         self._main_scroll.setWidget(self._canvas)
+        # WEB-08: die Konsole fuer die Fernausloesung anmelden. Die Bruecke
+        # haengt als Kind am Canvas (stirbt mit ihm) und reicht Aufrufe des
+        # Web-Threads in den UI-Thread. Ob sie etwas ausfuehren darf,
+        # entscheidet die Einstellung in ``src.web.vc_remote`` — Standard AUS.
+        self._fernbedienung = None
+        try:
+            from src.ui.virtualconsole.vc_fernbedienung import VCFernbedienung
+            from src.web import vc_remote
+            self._fernbedienung = VCFernbedienung(self._canvas)
+            # Kein ``destroyed``-Lambda zum Abmelden (STAB-09: so eine Connection
+            # pinnt ihre Fangvariablen GC-unsichtbar). Eine Bruecke, deren
+            # Konsole abgebaut ist, antwortet von selbst mit „keine Konsole".
+            vc_remote.registriere(self._fernbedienung)
+        except Exception as e:
+            print(f"[virtual_console_view] ERROR: Fernbedienung nicht angemeldet: {e}")
         splitter.addWidget(self._main_scroll)
 
         # Inspector-Panel (Eigenschaften des gewaehlten Widgets, nur im Edit-Modus).

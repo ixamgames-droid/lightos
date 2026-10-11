@@ -118,6 +118,7 @@ class VCCanvas(QWidget):
         self._undo_stack: list[dict] = []
         self._redo_stack: list[dict] = []
         self._restoring = False
+        self._laedt_layout = False     # WEB-08: from_dict laeuft (Kennungen am Ende pruefen)
         self._UNDO_MAX = 50
         # Basis-Arbeitsflaeche. Die tatsaechliche Mindestgroesse waechst mit dem
         # Inhalt mit (siehe _update_content_extent) — sonst haette die
@@ -1522,8 +1523,11 @@ class VCCanvas(QWidget):
             aspect = self._widget_aspect(widget)
         pos = widget.pos()
         carry = {}
+        # WEB-08: ``widget_id`` wandert mit — gemeint ist dasselbe Bedienelement
+        # an derselben Stelle, eine Verknuepfung der Handy-Konsole soll halten.
         for attr in ("function_id", "function_ids", "param_keys_per_id",
-                     "param_key", "efx_function_id", "caption", "bank"):
+                     "param_key", "efx_function_id", "caption", "bank",
+                     "widget_id"):
             if hasattr(widget, attr):
                 carry[attr] = getattr(widget, attr)
         # VCB-30: Vorher-Stand erst SICHERN, aber den Undo-Schritt erst NACH
@@ -1736,6 +1740,11 @@ class VCCanvas(QWidget):
         w.set_snap_grid(self.GRID if self._snap_to_grid else 0)
         if d:
             w.apply_dict(d)
+            # WEB-08: ein aus einem Dict gebautes Widget kann eine Kennung
+            # mitbringen, die es auf der Flaeche schon gibt (Kopie, Einfuegen).
+            # Beim Laden einer ganzen Konsole prueft ``from_dict`` einmal am Ende.
+            if not self._laedt_layout:
+                self._kennungen_reparieren()
         else:
             snapped = QPoint(
                 round(pos.x() / self.GRID) * self.GRID,
@@ -2030,6 +2039,56 @@ class VCCanvas(QWidget):
         if (self.minimumWidth(), self.minimumHeight()) != (right, bottom):
             self.setMinimumSize(QSize(right, bottom))
 
+    # ── WEB-08: Kennungen ────────────────────────────────────────────────────
+
+    def alle_widgets(self) -> list:
+        """Alle VC-Widgets der Konsole, auch die in Kaesten und auf anderen
+        Baenken — in Anlage-Reihenfolge (ein Kasten vor seinem Inhalt)."""
+        try:
+            return list(self.findChildren(VCWidget))
+        except RuntimeError:
+            return []
+
+    def widget_mit_kennung(self, kennung):
+        """Das Widget zu einer Kennung oder None. Unabhaengig von Bank, Seite
+        und Sichtbarkeit — eine Verknuepfung meint das Widget, nicht den Ort."""
+        if not isinstance(kennung, str) or not kennung:
+            return None
+        for w in self.alle_widgets():
+            if getattr(w, "widget_id", None) == kennung:
+                return w
+        return None
+
+    def _kennungen_reparieren(self) -> int:
+        """Stellt sicher, dass jede Kennung auf der Flaeche genau EINMAL
+        vorkommt. Gibt die Zahl der neu vergebenen Kennungen zurueck.
+
+        Das ERSTE Vorkommen behaelt die Kennung: ein eingefuegtes oder
+        kopiertes Widget haengt hinter den vorhandenen, also bekommt die Kopie
+        die neue und das Original behaelt seine — und beim Laden einer Datei
+        mit Dubletten bleibt die Zuordnung so, wie sie beim naechsten Laden
+        wieder waere.
+        """
+        from .vc_widget import kennung_gueltig, neue_kennung
+        gesehen: set[str] = set()
+        doppelt = []
+        for w in self.alle_widgets():
+            k = getattr(w, "widget_id", None)
+            if not kennung_gueltig(k) or k in gesehen:
+                doppelt.append(w)
+            else:
+                gesehen.add(k)
+        for w in doppelt:
+            k = neue_kennung()
+            while k in gesehen:
+                k = neue_kennung()
+            w.widget_id = k
+            gesehen.add(k)
+        if doppelt:
+            print(f"[VCCanvas] info: {len(doppelt)} VC-Kennung(en) neu vergeben "
+                  f"(doppelt oder ungueltig)")
+        return len(doppelt)
+
     def uebersprungene_widgets(self) -> list[str]:
         """QA-50: VC-Widgets, die beim letzten Laden nicht gebaut werden konnten.
 
@@ -2062,16 +2121,23 @@ class VCCanvas(QWidget):
         # nicht lautlos sein. Gesammelt wird hier, gewarnt wird beim Speichern —
         # dort entsteht der Verlust, und dort ist die Warnung noch nutzbar.
         self._uebersprungen: list[str] = []
-        for wd in d.get("widgets", []):
-            wtype = wd.get("type", "")
-            # Pro-Widget abgesichert: ein einzelnes defektes Widget (unbekannter Typ,
-            # unbekannte Aktion/Feld aus einer anderen Version) darf NICHT das Laden der
-            # restlichen VC abbrechen (sonst verschwindet fast die ganze Konsole).
-            try:
-                self._add_widget(wtype, QPoint(wd.get("x", 0), wd.get("y", 0)), wd)
-            except Exception as e:
-                print(f"[VCCanvas] Widget '{wtype}' uebersprungen: {e}")
-                self._uebersprungen.append(f"{wtype or '(ohne Typ)'}: {e}")
+        self._laedt_layout = True
+        try:
+            for wd in d.get("widgets", []):
+                wtype = wd.get("type", "")
+                # Pro-Widget abgesichert: ein einzelnes defektes Widget (unbekannter Typ,
+                # unbekannte Aktion/Feld aus einer anderen Version) darf NICHT das Laden der
+                # restlichen VC abbrechen (sonst verschwindet fast die ganze Konsole).
+                try:
+                    self._add_widget(wtype, QPoint(wd.get("x", 0), wd.get("y", 0)), wd)
+                except Exception as e:
+                    print(f"[VCCanvas] Widget '{wtype}' uebersprungen: {e}")
+                    self._uebersprungen.append(f"{wtype or '(ohne Typ)'}: {e}")
+        finally:
+            self._laedt_layout = False
+        # WEB-08: eine von Hand zusammenkopierte Layout-Datei kann dieselbe
+        # Kennung zweimal tragen — einmal pruefen, wenn alles steht.
+        self._kennungen_reparieren()
         # Aktive Bank an die (ggf. aus der Show geladene) Engine-Page angleichen
         # und Sichtbarkeit setzen.
         if getattr(self, "_pe", None) is not None:

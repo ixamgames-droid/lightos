@@ -3,6 +3,51 @@ from __future__ import annotations
 from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout, QMenu, QSizePolicy
 from PySide6.QtCore import Qt, QPoint, QRect, Signal, QTimer
 from PySide6.QtGui import QPainter, QColor, QPen, QCursor, QAction
+import re
+import uuid
+
+# ── WEB-08: feste Kennung je VC-Widget ───────────────────────────────────────
+#
+# Typ, Lage und Beschriftung sagen nicht, WELCHES Widget gemeint ist: zwei
+# gleiche Tasten sind danach nicht zu unterscheiden, und nach dem Umsortieren
+# zeigt jede Position auf etwas anderes. Die Handy-Konsole legt Widgets aber als
+# Verknuepfung ab — sie braucht etwas, das Verschieben, Bankwechsel und
+# Speichern/Laden ueberlebt.
+#
+# Die Kennung steht im Widget-Dict unter ``id``. Sie beginnt mit einem
+# Buchstaben: ``patch_dedup._als_ints`` liest reine Ziffern-Strings im VC-Layout
+# als Zahlen ("kommt diese Geraete-ID in der Konsole vor?") — eine Kennung aus
+# lauter Ziffern zaehlte dort als Geraete-ID.
+KENNUNG_FELD = "id"
+_KENNUNG_MUSTER = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{3,63}$")
+
+
+def neue_kennung() -> str:
+    """Frische Kennung: ``w`` + 11 Hex-Zeichen (44 Bit Zufall)."""
+    return "w" + uuid.uuid4().hex[:11]
+
+
+def kennung_gueltig(kennung) -> bool:
+    """Nur Buchstabe + [A-Za-z0-9_-], 4–64 Zeichen. Die Kennung wandert in
+    URLs und Dateien; alles andere wird beim Laden durch eine neue ersetzt."""
+    return isinstance(kennung, str) and bool(_KENNUNG_MUSTER.match(kennung))
+
+
+def ohne_kennung(d):
+    """Kopie eines Widget-Dicts ohne Kennungen (auch die der Kinder eines
+    Kastens) — die Vorlage fuer eine KOPIE. Das Original-Dict bleibt unberuehrt.
+
+    Ein zweites Widget ist ein zweites Ziel; truege es die Kennung der Vorlage,
+    zeigte eine Verknuepfung auf zwei Widgets zugleich. ``VCCanvas`` repariert
+    das zwar beim Einfuegen, aber wer kopiert, soll es gar nicht erst erzeugen.
+    """
+    if not isinstance(d, dict):
+        return d
+    out = {k: v for k, v in d.items() if k != KENNUNG_FELD}
+    kinder = out.get("children")
+    if isinstance(kinder, list):
+        out["children"] = [ohne_kennung(k) for k in kinder]
+    return out
 
 
 def midi_binding_matches(msg, midi_type: str, midi_ch: int, midi_data1: int) -> bool:
@@ -56,6 +101,9 @@ class VCWidget(QFrame):
     def __init__(self, caption: str = "", parent=None):
         super().__init__(parent)
         self.caption = caption
+        # WEB-08: feste Kennung, s. Modulkopf. Jedes neue Objekt bekommt eine
+        # frische; ``apply_dict`` uebernimmt die gespeicherte.
+        self.widget_id: str = neue_kennung()
         # Bank/Page-Zugehoerigkeit: -1 = auf allen Banks sichtbar (Default,
         # rueckwaertskompatibel), 0..9 = nur auf dieser Bank (= Executor-Page).
         self.bank = -1
@@ -706,6 +754,7 @@ class VCWidget(QFrame):
         g = self.geometry()
         return {
             "type": self.__class__.__name__,
+            KENNUNG_FELD: self.widget_id,
             "caption": self.caption,
             "bank": self.bank,
             "x": g.x(), "y": g.y(),
@@ -715,6 +764,12 @@ class VCWidget(QFrame):
         }
 
     def apply_dict(self, d: dict):
+        # WEB-08: gespeicherte Kennung uebernehmen. Fehlt sie (Show von vor
+        # WEB-08) oder ist sie unbrauchbar, bleibt die frische aus ``__init__`` —
+        # sie steht ab dem naechsten Speichern in der Datei.
+        _kennung = d.get(KENNUNG_FELD)
+        if kennung_gueltig(_kennung):
+            self.widget_id = _kennung
         self.caption = d.get("caption", self.caption)
         try:
             self.bank = int(d.get("bank", -1))
