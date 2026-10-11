@@ -183,6 +183,7 @@ _ZUSTAND_JS = """
     fleckRot: f.floorSpot ? f.floorSpot.rotation.z : null,
     fleckMuster: !!(f.floorSpot && f.floorSpot.material.map),
     spot: f.spot.intensity,
+    projektion: L.goboProjektionInfo().aktiv,   // VIZ-96
     beamOpacity: f.beam.material.opacity,
     beamSichtbar: f.beam.visible,
     matVersion: f.beam.material.version,
@@ -294,9 +295,13 @@ class Viz83GoboStrahlSceneTest(unittest.TestCase):
         self.assertGreaterEqual(z["strahlen"], 10, f"zu wenige Teilstrahlen: {z}")
         self.assertTrue(z["beamSichtbar"])
         self.assertTrue(z["fleckMuster"], "Bodenfleck ohne Muster")
-        # Der unmaskierbare SpotLight leuchtet den runden Fleck nicht mehr
-        # (VIZ-92: gar nicht mehr — auch 30 % zeichneten den vollen Kreis).
-        self.assertEqual(z["spot"], 0.0)
+        # Der runde Fleck des SpotLights darf nicht neben dem Muster liegen
+        # (VIZ-92). Seit VIZ-96 behaelt das Geraet auf der Stufe Hoch seine
+        # Lichtstaerke und bewirbt sich damit um ein Pool-Licht — das traegt das
+        # Gobo dann als Maske und leuchtet nie unmaskiert
+        # (test_viz96_gobo_projektion_scene.py). Ohne Projektion (Niedrig): 0.
+        self.assertTrue(z["projektion"], "Stufe Hoch projiziert das Gobo")
+        self.assertAlmostEqual(z["spot"], 3.0, places=6)
         # Zurueck auf offen: alles wie vorher.
         self._push(_payload(gobo_wheel=0))
         zurueck = self._z()
