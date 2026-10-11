@@ -25,7 +25,6 @@
 | VIZ-95 | A | feature/viz95-lasermuster-3d | 2026-10-08T20:47Z | src/ui/visualizer |
 | LAS-30 | A | feature/las30-laser-achsen | 2026-10-10T18:44Z | src/core/laser |
 | VIZ-96 | A | feature/viz96-gobo-projektion | 2026-10-11T09:58Z | src/ui/visualizer |
-| UI-84 | A | fix/ui84-efx-laden-geraeteliste | 2026-10-10T18:44Z | src/ui/views/efx_view.py |
 | MIDI-5 | A | feature/midi5-msc | 2026-10-10T18:44Z | src/core/midi |
 | NET-14 | A | feature/midi5-msc | 2026-10-09T16:27Z | src/core/midi |
 | MIDI-16 | A | feature/midi5-msc | 2026-10-09T16:27Z | src/core/midi |
@@ -211,7 +210,6 @@
 
 ## Verlauf
 
-- 2026-10-10T19:31Z A aktualisiert UI-86: Branch fix/ui86-2d-hidpi -> perf/ui86-2d-ansicht-hidpi
 - 2026-10-10T19:43Z A claim VIZ-102
 - 2026-10-10T20:11Z D claim UI-87
 - 2026-10-10T20:14Z D done TOOL-14
@@ -241,3 +239,4 @@
 - 2026-10-11T12:09Z D claim UI-88
 - 2026-10-11T12:14Z D aktualisiert VIZ-103: Branch - -> fix/viz103-haengend-an-unterkante; Dateien - -> src/ui/visualizer/scene_src/fixtures/mount_pose.js · tests/test_viz103_haengend_unterkante_scene.py
 - 2026-10-11T12:14Z A claim UI-89
+- 2026-10-11T12:20Z A done UI-84
