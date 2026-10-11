@@ -90,7 +90,7 @@ class ZaehlerWarntWennErgebnisseFehlenTest(unittest.TestCase):
             return subprocess.run(
                 ["bash", str(RUNNER), "-j", "1", *dateien],
                 cwd=str(REPO), env=umgebung, capture_output=True,
-                text=True, timeout=300)
+                text=True, encoding="utf-8", errors="replace", timeout=300)
 
     def test_fehlende_zeilen_werden_gemeldet(self):
         erg = self._lauf(raeumen=True)
