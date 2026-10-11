@@ -1073,6 +1073,13 @@ def _show_daten(state, probleme: list) -> dict:
         "music_autoshow": getattr(state, "music_autoshow", None)
         or {"enabled": False, "function_ids": [], "bank": 0},
     }
+    # LAS-32 (S1): Sperrzonen als EIGENER Abschnitt mit eigener Versionsnummer
+    # — bewusst kein Knoten im Szenengraph (ein aelterer Programmstand macht aus
+    # einer unbekannten Knotenart ein Geraet). Nur geschrieben, wenn es etwas
+    # gibt: eine Show ohne Zonen bleibt Byte fuer Byte wie bisher.
+    sperrzonen = getattr(state, "sperrzonen", None)
+    if sperrzonen is not None and not sperrzonen.ist_leer():
+        show["sperrzonen"] = sperrzonen.to_dict()
     if scene_graph_data is not None:
         show["scene_graph"] = scene_graph_data
     return show
@@ -1640,6 +1647,13 @@ def _reset_state(state, *, emit_events: bool = True, blackout_output: bool = Tru
     except Exception as e:
         print(f"[show_file] reset laser patterns error: {e}")
 
+    # LAS-32: Sperrzonen und Laser-Felder leeren.
+    try:
+        from src.core.laser.sperrzonen import SperrzonenDaten
+        state.sperrzonen = SperrzonenDaten()
+    except Exception as e:
+        print(f"[show_file] reset sperrzonen error: {e}")
+
     pe = getattr(state, "playback_engine", None)
     if pe is not None:
         try:
@@ -2092,6 +2106,19 @@ def _load_show_impl(path: str | os.PathLike):
             PatternSlot.from_dict, "Laser-Muster", "name", "label")
     except Exception as e:
         _lenient("load laser patterns error", e)
+
+    # LAS-32 (S1): Sperrzonen (eigener Abschnitt). Alt-Show ohne Abschnitt ->
+    # leerer Bestand; die Anzeige meldet dann „keine Sperrzonen", nie einen
+    # Zustand, der nach Schutz aussieht.
+    try:
+        from src.core.laser.sperrzonen import SperrzonenDaten, daten_aus_abschnitt
+        state.sperrzonen, _sz_probleme = daten_aus_abschnitt(data.get("sperrzonen"))
+        for _p in _sz_probleme:
+            print(f"[show_file] {_p}")
+            _ladeprobleme.append(_p)
+    except Exception as e:
+        state.sperrzonen = SperrzonenDaten()
+        _lenient("load sperrzonen error", e)
 
     try:
         from src.core.engine.efx_path import get_efx_path_library

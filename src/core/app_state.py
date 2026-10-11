@@ -567,6 +567,10 @@ class AppState:
         # LAS-18b: gemerkte WERKSMUSTER-Slots für DMX-Muster-Laser (Bank/Wert
         # + optionales Nutzer-Foto) — Kachel-Picker der Laser-Steuerseite.
         self.laser_patterns: list = []
+        # LAS-32 (S1): Sperrzonen + Maximalfeld je Laser — NUR ANZEIGE. Die
+        # Ausgabe (OutputManager/Render-Pfad) liest dieses Feld nicht.
+        from src.core.laser.sperrzonen import SperrzonenDaten
+        self.sperrzonen = SperrzonenDaten()
         self.playback_engine = None  # wird in start_playback() gesetzt
         # Musik-Playlist (In-App-Player): Liste von {path,title,genre,bpm}.
         # SSOT für die .lshow; der MediaPlayer (core/audio/media_player.py) wird

@@ -198,6 +198,63 @@ hier — ein Laser bekommt also nicht einfach überall 0:
   mitgespeichert; der Show-Check (`tools/lint_show.py`) warnt, wenn ein EFX auf
   ein Gerät zeigt, das keine der beiden Achsen hat.
 
+## 9. Sperrzonen (Vorschau)
+
+> **Grenzen — zuerst lesen.**
+> - **Nur Anzeige.** Die Sperrzonen schalten den Laser **nicht** ab und ändern
+>   nichts an dem, was LightOS sendet. Am Gerät ist die Funktion noch nicht
+>   abgenommen.
+> - **Kein Ersatz** für Blende/Abschattung am Gerät, für Abstände und
+>   Mindesthöhen und für den Laserschutzbeauftragten samt
+>   Gefährdungsbeurteilung.
+> - Die Rechnung kennt **nur, was im 3D eingetragen ist**. Hängt der Laser real
+>   anders, ist er anders gekippt oder sind die Randwinkel falsch, stimmt die
+>   Meldung nicht.
+> - **Spiegelungen** (Spiegelkugel, Glas, Chrom, nasse Flächen) und
+>   **Abschattungen** (Wand, Traverse) werden nicht gerechnet.
+> - Geräte, die LightOS **nicht als Laser kennt** (falsches Profil, rohe
+>   Kanäle, zweiter Laser auf derselben Adresse), und **Netzwerk-Laser**
+>   (Ether Dream/IDN) tauchen in der Meldung nicht auf.
+
+Wozu es trotzdem gut ist: Schon beim Aufbau siehst du, **welcher Laser
+überhaupt in welchen Bereich strahlen könnte** — und kannst ihn so hängen und
+per Blende begrenzen, dass sein Feld den Publikumsbereich gar nicht erreicht.
+
+**Zonen anlegen** — im 3D-Fenster, Werkzeugleiste **„Sperrzonen…“**:
+
+1. **„Neue Zone“** legt einen Quader an (im 3D rot und durchscheinend, mit
+   Namensschild).
+2. Rechts **Name**, **Mitte X/Z**, **Unterkante**, **Breite/Höhe/Tiefe** und
+   **Drehung** eintragen. Das 3D zeigt jede Änderung sofort.
+3. **„Löschen“** entfernt die gewählte Zone.
+
+**Maximalfeld je Laser** — im selben Fenster, Tabelle darunter: vier
+**Randwinkel** in Grad, gemessen von der Geräteachse, **links/rechts/oben/unten
+aus Sicht des Geräts in Strahlrichtung**. Eintragen, was der Laser bei größtem
+Muster und voller Auslenkung höchstens erreicht; die vier Werte dürfen
+verschieden sein (z. B. hinter einer Blende). Steht ein Wert auf
+*„nicht angegeben“*, ist der Laser **nicht prüfbar**. Dazu der **Zuschlag**
+rundum: Vorgabe 5°, mindestens 2°. Im 3D erscheint das Feld (mit Zuschlag) als
+dünne gelbe Pyramide am Gerät — gezeichnet bis 25 m, gerechnet ohne
+Längengrenze.
+
+**Meldung je Laser** — im Laser-Tab und im Sperrzonen-Fenster, gelb
+überschrieben mit *„Nur Anzeige — schaltet den Laser NICHT ab (am Gerät noch
+nicht abgenommen)“*:
+
+| Meldung | Bedeutung |
+|---|---|
+| *kann Zone „Publikum“ erreichen* | Das eingetragene Feld (plus Zuschlag) berührt die Zone. Der Teil einer Zone **hinter** dem Gerät zählt nicht. |
+| *erreicht keine Zone* | Nach den eingetragenen Werten berührt das Feld keine Zone. **Keine Freigabe** — siehe Grenzen. |
+| *Randwinkel fehlen — nicht prüfbar* | Für diesen Laser sind nicht alle vier Randwinkel eingetragen. |
+| *im 3D nicht platziert — nicht prüfbar* | Der Laser hat im 3D keinen Platz. |
+| *Laser gepatcht, keine Sperrzonen angelegt* | In dieser Show gibt es keine Zone. |
+
+**Speichern:** Zonen und Randwinkel gehören zur **Show**. Eine Show ohne Zonen
+sieht aus wie bisher. Öffnest und speicherst du die Show mit einem **älteren
+LightOS**, gehen die Zonen verloren — danach meldet LightOS wieder *„keine
+Sperrzonen angelegt“*.
+
 ---
 
 ### Siehe auch
