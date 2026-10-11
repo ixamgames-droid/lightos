@@ -26,6 +26,7 @@ Nutzeraktion; es gibt keinen Auto-Start.
 """
 from __future__ import annotations
 
+import html
 import importlib
 from dataclasses import dataclass
 
@@ -1046,7 +1047,8 @@ class LaserView(QWidget):
                 return
             kurz, lang = hinweis
             self._sperrzonen_abzeichen.setText(
-                f"<b>{kurz}</b> &nbsp;<span style='color:#d8b84a'>"
+                f"<b>{html.escape(str(kurz))}</b> &nbsp;"
+                "<span style='color:#d8b84a'>"
                 f"{NUR_ANZEIGE}</span>")
             self._sperrzonen_abzeichen.setToolTip(
                 f"{lang}\n\n{NUR_ANZEIGE}. Kein Laserschutz.")
@@ -1499,7 +1501,10 @@ class LaserView(QWidget):
                 v = self._wert(plan.farben.attribut)
                 farbe = plan.farben.farbe_fuer(v)
                 self._farbfelder.set_gewaehlt(farbe)
-                name = farb_name(farbe) if farbe is not None else "kein Eintrag"
+                # Der Name kommt aus dem Geräteprofil (auch aus einer
+                # geladenen Datei) und steht in einem Rich-Text-Feld.
+                name = html.escape(farb_name(farbe)) if farbe is not None \
+                    else "kein Eintrag"
                 self._lbl_farbe.setText(
                     f'<span style="color:#fff">{name}</span> '
                     f'<span style="color:#8b949e">· DMX {v}</span>')

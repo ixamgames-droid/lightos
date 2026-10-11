@@ -519,6 +519,20 @@ def test_farbe_aendert_die_helligkeit_nicht(monkeypatch):
     assert {attr for _fid, attr, _v in st.geschrieben} == {"laser_color"}
 
 
+def test_farbname_aus_dem_profil_wird_nicht_als_html_gelesen(monkeypatch):
+    """Der Farbname stammt aus dem Geraeteprofil (auch aus einer geladenen
+    Datei) und steht in einem Rich-Text-Feld: Spitzklammern bleiben Text."""
+    chans = _el400()
+    farb = next(c for c in chans if c.attribute == "laser_color")
+    farb.laser["farben"][7]["name"] = "<img src=x>gruen"
+    v, st = _view(monkeypatch, [_FX(1, chans)])
+    assert v._plan.farben is not None
+    next(f for f in v._farbfelder.felder if f.farbe.von == 120).click()
+    assert st.programmer[1]["laser_color"] == 120
+    assert "<img" not in v._lbl_farbe.text()
+    assert "&lt;img src=x&gt;gruen" in v._lbl_farbe.text()
+
+
 def test_farbe_alle_0_255(monkeypatch):
     v, st = _view(monkeypatch, [_FX(1, _el400())])
     v._btn_farbe_alle.click()
@@ -1019,6 +1033,11 @@ def test_eingeklappte_vorschau_bleibt_eingeklappt(echt):
         assert tp.is_collapsed()
         waehle(1)
         assert tp.is_collapsed()
+        # Beim Laser von Hand aufgeklappt: gilt nur jetzt — gemerkt bleibt
+        # „zu“, und beim naechsten Geraet steht sie wieder so da.
+        tp.toggle_collapsed()
+        assert not tp.is_collapsed()
+        assert pvm._load_prefs()["programmer_bottom_collapsed"] is True
         waehle(2)
         assert tp.is_collapsed()                    # nicht „versehentlich auf“
         assert pvm._load_prefs()["programmer_bottom_collapsed"] is True
