@@ -70,7 +70,7 @@ def _umgebung(out: Path) -> dict:
 def _git_head() -> str | None:
     try:
         erg = subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(REPO),
-                             capture_output=True, text=True, timeout=10)
+                             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10)
     except (OSError, subprocess.SubprocessError):
         return None
     if erg.returncode != 0:
@@ -90,7 +90,7 @@ class LinuxRunnerSchreibtSummaryTest(unittest.TestCase):
         out = tmp / "out"
         erg = subprocess.run(["bash", str(SH), "-j", "2", *dateien],
                              cwd=str(REPO), env=_umgebung(out),
-                             capture_output=True, text=True, timeout=180)
+                             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=180)
         return erg, out
 
     def test_felder_und_zaehlung(self):

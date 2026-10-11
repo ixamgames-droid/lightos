@@ -253,7 +253,7 @@ class AusModusEineStufeTest(unittest.TestCase):
     def _lauf(self, *argv):
         umgebung = dict(os.environ, QT_QPA_PLATFORM="offscreen")
         return subprocess.run([sys.executable, _WERKZEUG, *argv],
-                              cwd=_REPO, capture_output=True, text=True,
+                              cwd=_REPO, capture_output=True, text=True, encoding="utf-8", errors="replace",
                               env=umgebung, timeout=180)
 
     def test_mehrere_stufen_mit_aus_werden_abgelehnt(self):

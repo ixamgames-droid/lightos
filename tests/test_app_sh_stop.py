@@ -109,7 +109,7 @@ class AppShStopTest(unittest.TestCase):
         (self.repo / "main.py").write_text("\n".join(quelle), encoding="utf-8")
         e = subprocess.run(
             ["bash", "-c", "venv/bin/python main.py >/dev/null 2>&1 & echo $!"],
-            cwd=self.repo, capture_output=True, text=True, timeout=30)
+            cwd=self.repo, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
         pid = int(e.stdout.strip())
         self.gestartet.append(pid)
         for _ in range(100):         # warten, bis der Prozess wirklich steht
@@ -123,7 +123,7 @@ class AppShStopTest(unittest.TestCase):
         umg = dict(os.environ, XDG_RUNTIME_DIR=str(self.pidfile.parent))
         return subprocess.run(
             ["bash", str(self.repo / "tools" / "app.sh"), "stop"],
-            capture_output=True, text=True, env=umg, timeout=90)
+            capture_output=True, text=True, encoding="utf-8", errors="replace", env=umg, timeout=90)
 
     # ── Die Tests ────────────────────────────────────────────────────────────
 
@@ -148,7 +148,7 @@ class AppShStopTest(unittest.TestCase):
         """
         app = self._fake_app()
         e_k = subprocess.run(['bash', '-c', 'sleep 300 >/dev/null 2>&1 & echo $!'],
-                             capture_output=True, text=True, timeout=30)
+                             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
         koeder = int(e_k.stdout.strip())
         self.gestartet.append(koeder)
         self.pidfile.write_text(str(koeder), encoding='utf-8')
@@ -169,7 +169,7 @@ class AppShStopTest(unittest.TestCase):
         app = self._fake_app(mit_kind=True)
         time.sleep(0.5)
         kinder = subprocess.run(["pgrep", "-P", str(app)],
-                                capture_output=True, text=True)
+                                capture_output=True, text=True, encoding="utf-8", errors="replace")
         kind_pids = [int(z) for z in kinder.stdout.split() if z.strip()]
         self.assertTrue(kind_pids, "Attrappe hat kein Kind erzeugt")
 
