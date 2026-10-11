@@ -141,13 +141,14 @@ Seit 2026-07 ist das Web-Remote **per Default abgesichert** (Design-Entscheidung
   **403**; auch SocketIO lehnt unauthentisierte Verbindungen ab. Nach dem Handshake merkt ein
   `HttpOnly`/`SameSite=Strict`-Cookie die Anmeldung. Token und Direkt-Link zeigt der Dialog
   **„Ausgabe → Web-Remote: Verbindung & Token…"** (er öffnet sich auch beim Einschalten);
-  dort macht **„Token neu erzeugen"** alle bisherigen Links und angemeldeten Geräte sofort
-  ungültig — auch am **laufenden** Server, ohne Neustart. Schon verbundene Geräte werden dabei
+  dort macht **„Schlüssel erneuern (neues Token)"** alle bisherigen Links, QR-Codes und
+  angemeldeten Geräte sofort ungültig — auch am **laufenden** Server, ohne Neustart. Schon verbundene Geräte werden dabei
   aktiv getrennt (ein offener WebSocket läuft nicht mehr durch das HTTP-Gate und könnte sonst
   weitersteuern), und ein Wiederverbinden mit der alten Anmeldung wird abgewiesen.
 - **CORS-Allowlist (NET-03).** Statt `cors_allowed_origins="*"` erlaubt der SocketIO-Endpunkt
-  nur noch die bekannten Origins (`http://<lan-ip>:5000`, `127.0.0.1`, `localhost`) — eine
-  fremde Webseite im selben Netz kann sich nicht mehr einfach drauf verbinden.
+  nur noch die bekannten Origins (die eigenen Adressen des PCs als `http://<lan-ip>:5000`,
+  dazu `127.0.0.1` und `localhost`) — eine fremde Webseite im selben Netz kann sich nicht
+  mehr einfach drauf verbinden. Die Liste entsteht beim Einschalten des Web-Interface.
 - **LAN-Bind steuerbar.** Die Checkbox **„LAN-/Handy-Remote"** im selben Dialog (Default AN,
   sicher weil Token davor) bindet `0.0.0.0` (das Handy erreicht es); AUS bindet `127.0.0.1`
   (nur der PC selbst). Die Bind-Adresse wird beim Serverstart gesetzt — läuft das
@@ -157,13 +158,14 @@ Seit 2026-07 ist das Web-Remote **per Default abgesichert** (Design-Entscheidung
 **Trotzdem Rest-Risiko im Blick behalten:**
 
 - Das Token ist ein **geteiltes** Setup-Geheimnis (keine Einzel-Benutzer/PIN). Wer den
-  Direkt-Link kennt, kann steuern → Link/Token nicht im Publikum herumzeigen; bei Verdacht
-  **„Token neu erzeugen"**.
+  Direkt-Link oder den QR-Code kennt, kann steuern → Link, Token und QR-Code nicht im
+  Publikum herumzeigen; bei Verdacht **„Schlüssel erneuern (neues Token)"**.
 - Weiterhin sinnvoll: ein **vertrauenswürdiges** Netz (eigenes Technik-WLAN), das Interface
   nach Gebrauch ausschalten, und Port 5000 **nicht** ins Internet weiterleiten.
 
-> **Offene Follow-ups:** QR-Bild des Direkt-Links, OSC-Source-Allowlist und Token-Rotation pro
-> Start sind bewusst noch offen (siehe Design-Doc). Der OSC-Eingang ist separat nur über den
+> **Offene Follow-ups:** OSC-Source-Allowlist und Token-Rotation pro Start sind bewusst
+> noch offen (siehe Design-Doc); den QR-Code gibt es für die Handy-Konsole
+> ([Abschnitt 6](#6-handy-verbinden--qr-code-und-startbildschirm-web-11)). Der OSC-Eingang ist separat nur über den
 > Loopback-/„OSC über Netzwerk"-Schalter (Default AUS) abgesichert. Für diesen Schalter gibt
 > es derzeit keine Oberfläche; er steht als `osc_network_enabled` in `ui_prefs.json` im
 > App-Datenordner (Befund WEB-06).
@@ -191,7 +193,9 @@ programmiert.
    Haken bei **„Handy-Konsole"**. Beides ist dieselbe Einstellung; Standard ist
    **aus**. Den Link fürs Handy (`http://<PC-IP>:5000/konsole?k=<token>`) zeigt
    der Dialog, den **„Verbinden…"** in der Seitenleiste öffnet.
-3. **Am Handy öffnen** und als Lesezeichen bzw. auf den Startbildschirm legen.
+3. **Am Handy öffnen:** den **QR-Code** scannen (er steht in der Seitenleiste
+   und im Dialog) und die Seite auf den Startbildschirm legen — siehe
+   [Abschnitt 6 „Handy verbinden"](#6-handy-verbinden--qr-code-und-startbildschirm-web-11).
    Die feste Seite zeigt oben rechts zusätzlich **„Handy-Konsole ▸"**, solange
    die Konsole eingeschaltet ist.
 
@@ -254,8 +258,9 @@ in der großen Konsole bleibt, wo es ist, und behält seine Funktion.
    entfernt alle Handy-Seiten (ebenfalls mit Rückfrage).
 8. **Verbinden:** oben in der Leiste steht der Schalter **„Handy-Konsole:
    aus/an"**, darunter der Zustand (**aus** · **an · 0 Handys verbunden** ·
-   **an · 2 Handys verbunden**). **„Verbinden…"** öffnet den Dialog mit Link
-   und Schlüssel. Der Schalter geht auch ohne „Bearbeiten" — die Handy-Konsole
+   **an · 2 Handys verbunden**) und — sobald das Web-Interface läuft und die
+   Handy-Konsole an ist — der **QR-Code** fürs Handy (Klick vergrößert ihn).
+   **„Verbinden…"** öffnet den Dialog mit QR-Code, Link und Schlüssel. Der Schalter geht auch ohne „Bearbeiten" — die Handy-Konsole
    lässt sich so jederzeit mit einem Griff ausschalten.
 
 Jeder Schritt ist **ein** Rückgängig-Schritt (**Strg+Z**, wiederholen mit
@@ -289,8 +294,8 @@ gleicht das Handy den ganzen Zustand neu ab.
   den Schlüssel neu erzeugst oder das Web-Interface stoppst. Eine Flash-Taste
   bleibt so nicht hängen.
 - Es gilt **derselbe Schlüssel** wie für die feste Seite. Er wird beim Verbinden
-  geprüft und bei jeder einzelnen Bedienung noch einmal; nach „Token neu
-  erzeugen" kann auch ein noch verbundenes Handy nichts mehr auslösen.
+  geprüft und bei jeder einzelnen Bedienung noch einmal; nach „Schlüssel
+  erneuern" kann auch ein noch verbundenes Handy nichts mehr auslösen.
 - **Laser:** Scharf geschaltet wird ein Laser nur am Pult — vom Handy aus geht
   nur „unscharf". Laser-Muster lassen sich nicht aufs Handy legen. Den
   **Laser-NOT-AUS** kann das Handy auslösen, aber nie aufheben, auch nicht über
@@ -307,12 +312,117 @@ Socket-Verbindung.
 
 ---
 
+## 6. Handy verbinden — QR-Code und Startbildschirm (WEB-11)
+
+### QR-Code scannen
+
+1. **Web-Interface einschalten** (Ausgabe → „Web-Interface (Port 5000)") und die
+   **Handy-Konsole** einschalten (Schalter in der Seitenleiste oder Haken im
+   Dialog). Der QR-Code erscheint **nur, wenn beides an ist**.
+2. Den Code findest du an zwei Stellen:
+   - in der Seitenleiste **„📱 Handy-Konsole"** der virtuellen Konsole, klein
+     unter dem Schalter — **ein Klick darauf vergrößert ihn** in einem eigenen
+     Fenster;
+   - im Dialog **Ausgabe → „Web-Remote: Verbindung & Token…"** (den öffnet auch
+     **„Verbinden…"** in der Seitenleiste), groß, unter dem Link.
+3. Am Handy die **Kamera** auf den Code halten und den angezeigten Link
+   antippen. Das Handy muss im **selben WLAN** sein wie der PC. Die Seite
+   öffnet sich und ist sofort angemeldet.
+
+Im Code steht derselbe Link wie im Feld darüber:
+`http://<PC-IP>:5000/konsole?k=<Schlüssel>`. Der Code wird auf dem PC erzeugt —
+ohne Internet und ohne zusätzliches Programm.
+
+> **Nur im eigenen WLAN zeigen — wer den Code scannt, kann die Handy-Konsole
+> bedienen.** Den Code nicht auf eine Leinwand, in einen Stream oder in ein
+> Foto geraten lassen. Ist das doch passiert: im Dialog **„Schlüssel erneuern
+> (neues Token)"** drücken. Alle alten Codes und Links gelten dann sofort nicht
+> mehr, verbundene Handys werden getrennt, und der angezeigte Code wechselt auf
+> den neuen Schlüssel.
+
+**Mehrere Netzwerkkarten** (zum Beispiel WLAN und Kabel, oder eine virtuelle
+Karte): unter dem Code erscheint die Auswahl **„Netzwerkkarte"** mit Name und
+Adresse. Wähle die Karte, die im selben Netz hängt wie das Handy — meist das
+WLAN. LightOS merkt sich die Wahl. Angeboten werden nur Adressen, die der PC
+gerade wirklich hat.
+
+**Statt des Codes steht ein Hinweis?** Dann fehlt genau der genannte Schritt:
+
+| Hinweis | Was zu tun ist |
+|---|---|
+| „Das Web-Interface läuft nicht." | **Ausgabe → Web-Interface (Port 5000)** anhaken. |
+| „… nur auf diesem PC erreichbar." | Im Dialog **„LAN-/Handy-Remote"** anhaken — sonst kommt kein anderes Gerät an die Seite. |
+| „Die Handy-Konsole ist ausgeschaltet." | Schalter **„Handy-Konsole"** einschalten. |
+| „Keine Netzwerkverbindung gefunden." | Den PC mit dem WLAN (oder per Kabel mit dem Router) verbinden. |
+| „Das Netzwerk hat sich geändert …" | Der PC hat seine Adresse erst bekommen, als das Web-Interface schon lief. **Web-Interface einmal aus- und wieder einschalten.** |
+
+### Auf den Startbildschirm legen
+
+Danach startet die Handy-Konsole mit einem Fingertipp, im Vollbild und ohne
+Adresszeile — wie eine App.
+
+- **iPhone / iPad (Safari):** **Teilen** (das Quadrat mit dem Pfeil nach oben)
+  → **„Zum Home-Bildschirm"** → **„Hinzufügen"**.
+- **Android (Chrome):** **Menü ⋮** → **„App installieren"** bzw. **„Zum
+  Startbildschirm hinzufügen"**.
+
+Beim ersten Besuch zeigt die Seite dazu unten einen kleinen Tipp; mit **×**
+verschwindet er dauerhaft.
+
+Was du dabei wissen solltest:
+
+- **Die Seite braucht die laufende Verbindung zum Pult.** Sie ist keine
+  eigenständige App und funktioniert nicht „offline": ohne laufendes LightOS
+  und ohne das gemeinsame WLAN zeigt sie „getrennt". (Ein Offline-Speicher im
+  Handy würde eine verschlüsselte Verbindung mit Zertifikat voraussetzen, die
+  es im Heimnetz nicht gibt — und ohne Pult gäbe es ohnehin nichts zu bedienen.)
+- **Der Schlüssel steht nicht im Symbol.** Das Handy merkt sich die Anmeldung
+  und den zuletzt gültigen Schlüssel selbst (nur auf diesem Gerät). Deshalb
+  kommst du vom Startbildschirm aus wieder hinein, auch nach einem Neustart von
+  LightOS.
+- **Nach „Schlüssel erneuern"** zeigt die Seite **„Neu verbinden"**. Dann den
+  neuen QR-Code scannen — oder, wenn die Seite als Symbol vom Startbildschirm
+  läuft, den Schlüssel in das Feld auf der Seite **eintippen** (er steht im
+  Dialog hinter „Token:") und **„Verbinden"** drücken.
+- **iPhone:** Je nach iOS-Version führt das Symbol auf dem Home-Bildschirm
+  seinen eigenen Speicher, getrennt von Safari. Zeigt der erste Start vom
+  Home-Bildschirm „Kein Zugang", den Schlüssel dort einmal eintippen — danach
+  merkt ihn sich auch das Symbol.
+- **Die Adresse des PCs muss gleich bleiben.** Das Symbol zeigt auf die
+  Adresse, unter der du es angelegt hast. Vergibt der Router dem PC eine neue,
+  läuft das Symbol ins Leere: neu scannen und das Symbol neu anlegen — oder dem
+  PC eine feste Adresse geben
+  ([Netzwerk vorbereiten, Schritt 3](../anleitung_netzwerk_windows/ANLEITUNG.md)).
+
+### „Seite nicht erreichbar" — was tun?
+
+Der Reihe nach prüfen:
+
+1. **Gleiches WLAN?** Handy und PC müssen im selben Netz sein. Ein
+   **Gast-WLAN** trennt die Geräte oft voneinander; mobile Daten am Handy
+   führen gar nicht ins Heimnetz.
+2. **Richtige Netzwerkkarte gewählt?** Hat der PC mehrere, unter dem QR-Code
+   die Karte wählen, die im WLAN des Handys hängt, und neu scannen. Eine
+   Adresse, die mit `172.` beginnt oder zu einer virtuellen Karte gehört
+   (Docker, VPN, WSL), ist fast nie die richtige.
+3. **Firewall:** Unter Windows muss **TCP-Port 5000** für eingehende
+   Verbindungen freigegeben sein. Die Abfrage beim ersten Einschalten mit
+   **„Zugriff erlauben"** (privates Netz) bestätigen; wie du die Freigabe
+   nachträglich anlegst und prüfst, steht in
+   [Netzwerk vorbereiten (Windows)](../anleitung_netzwerk_windows/ANLEITUNG.md).
+4. **Läuft das Web-Interface, und ist „LAN-/Handy-Remote" an?** Zeigt LightOS
+   statt des Codes einen Hinweis, zuerst den erledigen (Tabelle oben).
+5. **Die Seite lädt, zeigt aber „Kein Zugang" oder „Neu verbinden":** Der
+   Schlüssel passt nicht (mehr) — den aktuellen QR-Code scannen.
+
+---
+
 ## Kurz-Referenz
 
 1. **Ausgabe → „Web-Interface (Port 5000)"** anhaken → Server läuft auf `0.0.0.0:5000`.
 2. PC-LAN-IP per `ipconfig` holen → am Handy `http://<PC-IP>:5000/?k=<token>` öffnen (Token/Direkt-Link aus dem Verbindungs-Dialog, gleiches WLAN).
 3. **GO/BACK/STOP** = Cueliste · **Blackout** = alles dunkel (Toggle) · **Fader Ex 1–10** = Executor-Pegel.
 4. **Token-geschützt** (`?k=…`, ohne → 403) + CORS-Allowlist; Token ist ein **geteiltes** Setup-Geheimnis → nur im vertrauenswürdigen Netz nutzen, danach ausschalten.
-5. **Handy-Konsole** (eigene Tasten/Fader/Cuelisten): VC → **„📱 Handy-Konsole"** → Bearbeiten → Elemente hineinziehen oder **„Automatisch füllen"**, Schalter **„Handy-Konsole: an"** → am Handy `http://<PC-IP>:5000/konsole?k=<token>` (Link unter **„Verbinden…"**).
+5. **Handy-Konsole** (eigene Tasten/Fader/Cuelisten): VC → **„📱 Handy-Konsole"** → Bearbeiten → Elemente hineinziehen oder **„Automatisch füllen"**, Schalter **„Handy-Konsole: an"** → am Handy den **QR-Code** scannen (Seitenleiste oder **„Verbinden…"**; Link: `http://<PC-IP>:5000/konsole?k=<token>`) → **„Zum Startbildschirm hinzufügen"**.
 
 Zurück zur Übersicht: [../ANLEITUNGEN.md](../ANLEITUNGEN.md)
