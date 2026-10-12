@@ -541,6 +541,77 @@ def laser_sicherheit_text(model: GeneratorModel) -> str:
             "und Laser-NOT-AUS schalten auf „aus“ — " + "; ".join(teile) + ".")
 
 
+# ── FM-75: Live-Test mit einem Laser ─────────────────────────────────────────
+#
+# Der Live-Test schreibt beim Start sofort die Default-Werte ALLER Kanaele an
+# das echte Geraet und danach jede Fader-Bewegung — am Renderer, an Blackout
+# und Grand Master vorbei. Bei einem Laser hiess das: ein Klick auf „Test
+# starten“, und er strahlt, ohne Rueckfrage. Der Laser-NOT-AUS wirkt nur auf
+# GEPATCHTE Laser; ein Profil, das hier erst entsteht, ist meist nicht gepatcht.
+
+def live_test_aus_werte(model: GeneratorModel, mode: GenMode | None) -> dict[int, int]:
+    """Kanal-Offset (0-basiert) -> Wert, mit dem der Test einen Laser dunkel
+    schaltet. Leer, wenn der Modus kein Laser ist oder keinen Aus-Wert kennt.
+    Dieselbe Erkennung wie Pruefung und Sende-Pfad (``laser_aus_kanal``)."""
+    treffer = laser_aus_kanal(model, mode) if mode is not None else None
+    if treffer is None:
+        return {}
+    nr, _ch, wert = treffer
+    return {nr - 1: int(wert)}
+
+
+def _default_ist_aus(ch: GenChannel, wert: int) -> bool:
+    band = next((r for r in ch.ranges
+                 if int(r.range_from) <= wert <= int(r.range_to)), None)
+    lo = int(band.range_from) if band is not None else wert
+    hi = int(band.range_to) if band is not None else wert
+    return lo <= int(ch.default_value) <= hi
+
+
+def live_test_laser_hinweis(model: GeneratorModel, mode: GenMode | None,
+                            universe: int, adresse: int) -> str:
+    """Text der Rueckfrage vor einem Live-Test mit einem Laser — leer, wenn
+    der Modus kein Laser ist (dann startet der Test wie bisher ohne Frage)."""
+    if mode is None or not mode.channels or not _ist_laser_modell(model, mode):
+        return ""
+    n = len(mode.channels)
+    bis = min(512, int(adresse) + n - 1)
+    wo = (f"Adresse {adresse}" if bis == adresse
+          else f"Adresse {adresse}–{bis}")
+    teile = [
+        f"Dieses Profil ist ein Laser. Der Live-Test sendet sofort echte "
+        f"DMX-Werte an Universe {universe}, {wo}: zuerst die Default-Werte "
+        f"der {n} Kanäle, danach jede Fader-Bewegung."]
+    treffer = laser_aus_kanal(model, mode)
+    if treffer is None:
+        teile.append(
+            "⚠ Für diesen Modus ist kein Aus-Wert hinterlegt. Ob der Laser mit "
+            "den Default-Werten strahlt, kann LightOS nicht sagen — rechne "
+            "damit. „Blackout“ im Test setzt alle Kanäle auf 0; auch das kann "
+            "bei einem Laser „an“ heißen.")
+    else:
+        nr, ch, wert = treffer
+        if _default_ist_aus(ch, wert):
+            teile.append(
+                f"Mit den Default-Werten bleibt er aus (Kanal {nr} "
+                f"„{ch.name}“ = {int(ch.default_value)}). Er strahlt, sobald "
+                f"du diesen Fader aus dem Aus-Bereich bewegst.")
+        else:
+            teile.append(
+                f"⚠ Mit den Default-Werten strahlt er SOFORT: Kanal {nr} "
+                f"„{ch.name}“ startet auf {int(ch.default_value)}, „aus“ "
+                f"wäre {wert}.")
+        teile.append(
+            f"„Blackout“ im Test stellt Kanal {nr} auf {wert} (aus) und alle "
+            f"anderen Kanäle auf 0.")
+    teile.append(
+        "Vorher prüfen: Niemand steht im Strahlbereich, der Laser ist sicher "
+        "ausgerichtet, und Schlüsselschalter oder Not-Aus am Gerät sind "
+        "erreichbar. Löst jemand den Laser-NOT-AUS von LightOS aus, beendet "
+        "das auch diesen Test.")
+    return "\n\n".join(teile)
+
+
 def _compare_modes(modes: list[GenMode]) -> list[tuple[str, str]]:
     out: list[tuple[str, str]] = []
     for i in range(len(modes)):
@@ -607,22 +678,45 @@ class LiveTester:
                 self._saved[addr] = 0
         self._u.set_channel(addr, _clamp(value))
 
-    def blackout(self):
+    def blackout(self, aus_werte: dict | None = None):
         """Setzt alle bisher angefassten Kanaele auf 0 (Test-Blackout), ohne den
-        gemerkten Restore-Stand zu verwerfen."""
+        gemerkten Restore-Stand zu verwerfen.
+
+        ``aus_werte`` (FM-75): Kanal-Offset -> Wert fuer Kanaele, an denen 0
+        NICHT „aus“ heisst — die Betriebsart eines Lasers (0 = „Auto run“ bei
+        manchen Geraeten). Auch hier nur, was der Test schon angefasst hat."""
         if self._u is None:
             return
+        sonder = {self._base + int(off): _clamp(wert)
+                  for off, wert in (aus_werte or {}).items()}
         for addr in list(self._saved.keys()):
             try:
-                self._u.set_channel(addr, 0)
+                self._u.set_channel(addr, sonder.get(addr, 0))
             except Exception:
                 pass
 
-    def restore(self):
+    def halten(self):
+        """FM-75: den Test beenden, OHNE die Vorwerte zurueckzuschreiben — was
+        zuletzt gesetzt wurde (der Blackout mit Aus-Werten), bleibt stehen.
+        Fuer den Laser-NOT-AUS: die Vorwerte waren meist 0, und 0 kann einen
+        Laser einschalten. Idempotent."""
+        self._saved.clear()
+        self._active = False
+
+    def restore(self, aus_werte: dict | None = None):
         """Stellt alle waehrend des Tests gesetzten Kanaele auf ihren Vorwert
-        zurueck und beendet den Test (idempotent)."""
+        zurueck und beendet den Test (idempotent).
+
+        ``aus_werte`` (FM-75, Kanal-Offset -> Wert): war der Vorwert eines
+        solchen Kanals 0, bleibt stattdessen der Aus-Wert stehen. 0 heisst an
+        der Betriebsart mancher Laser „Auto run“ — „Test stoppen“ schaltete
+        den Laser sonst EIN. Ein Vorwert ungleich 0 (laufende Show) gewinnt."""
+        sonder = {self._base + int(off): _clamp(wert)
+                  for off, wert in (aus_werte or {}).items()}
         if self._u is not None:
             for addr, val in self._saved.items():
+                if not val and sonder.get(addr):
+                    val = sonder[addr]
                 try:
                     self._u.set_channel(addr, val)
                 except Exception:
@@ -1279,15 +1373,41 @@ def _center(widget: QWidget) -> QWidget:
     return w
 
 
+def _laser_test_fragen(parent, text: str) -> bool:
+    """FM-75: die Rueckfrage selbst. Knoepfe mit festen Namen statt Ja/Nein
+    (deren Beschriftung haengt an der Qt-Uebersetzung); Vorgabe und Escape
+    sind „Abbrechen“ — ein versehentliches Enter startet nichts."""
+    box = QMessageBox(parent)
+    box.setIcon(QMessageBox.Icon.Warning)
+    box.setWindowTitle("Live-Test mit einem Laser starten?")
+    box.setText(text)
+    start = box.addButton("Test starten", QMessageBox.ButtonRole.AcceptRole)
+    abbrechen = box.addButton("Abbrechen", QMessageBox.ButtonRole.RejectRole)
+    box.setDefaultButton(abbrechen)
+    box.setEscapeButton(abbrechen)
+    box.exec()
+    return box.clickedButton() is start
+
+
 class _LiveTestPanel(QGroupBox):
     """Echter Live-Test: Universe + Startadresse + ein Fader pro Kanal, der
     direkt ins Universe schreibt. 'Wackeln' rampt einen Kanal hin/her.
     Sauberes Restore beim Schliessen."""
 
+    #: FM-75: so oft wird waehrend eines Laser-Tests nach dem NOT-AUS gesehen.
+    NOTAUS_PRUEFEN_MS = 150
+
     def __init__(self, dialog: "FixtureGeneratorDialog", parent=None):
         super().__init__("Live-Test (echte DMX-Ausgabe)", parent)
         self._dialog = dialog
         self._tester: LiveTester | None = None
+        # FM-75: Aus-Werte des laufenden Tests (Kanal-Offset -> Wert) und die
+        # Wache, die einen Laser-Test beim Laser-NOT-AUS beendet. Ein Timer im
+        # UI-Thread statt eines Abonnements: der NOT-AUS kommt auch aus dem
+        # MIDI-/OSC-Thread, und der Test endet so in jedem Fall hier.
+        self._aus_werte: dict[int, int] = {}
+        self._notaus_timer = QTimer(self)
+        self._notaus_timer.timeout.connect(self._notaus_pruefen)
         self._faders: list[QSlider] = []
         self._wiggle_timer = QTimer(self)
         self._wiggle_timer.timeout.connect(self._wiggle_tick)
@@ -1345,11 +1465,55 @@ class _LiveTestPanel(QGroupBox):
         else:
             self._stop()
 
+    def _modell(self) -> GeneratorModel:
+        """Das Modell des Dialogs mit dem Stand der Kopf-Felder (Typ!)."""
+        try:
+            self._dialog._sync_all()
+        except Exception:
+            pass
+        return self._dialog._model
+
+    def _notaus_aktiv(self) -> bool:
+        try:
+            return bool(getattr(self._dialog.get_state(), "laser_estop_active", False))
+        except Exception:
+            return False
+
+    def _laser_test_erlaubt(self, mode: GenMode) -> str:
+        """FM-75: vor einem Live-Test mit einem Laser fragen — und bei
+        stehendem Laser-NOT-AUS gar nicht erst anfangen. Leer = starten,
+        sonst der Satz fuer die Infozeile."""
+        model = self._modell()
+        hinweis = live_test_laser_hinweis(model, mode, self._spin_univ.value(),
+                                          self._spin_addr.value())
+        if not hinweis:
+            return ""
+        if self._notaus_aktiv():
+            QMessageBox.warning(
+                self, "Live-Test",
+                "Der Laser-NOT-AUS ist aktiv. Solange er steht, startet "
+                "LightOS keinen Live-Test mit einem Laser.\n\n"
+                "Erst den NOT-AUS im Hauptfenster lösen — wenn der "
+                "Strahlbereich frei ist.")
+            return "Nicht gestartet — der Laser-NOT-AUS ist aktiv."
+        if not _laser_test_fragen(self, hinweis):
+            return "Nicht gestartet — es wurde nichts gesendet."
+        return ""
+
     def _start(self):
         mode = self.current_mode()
         if not mode or not mode.channels:
-            self._info.setText("Kein Modus/Kanäle zum Testen.")
+            # Erst den Knopf loesen, dann der Text: das Loesen laeuft ueber
+            # `_stop`, und das schriebe sonst „Test gestoppt“ darueber.
             self._btn_start.setChecked(False)
+            self._info.setText("Kein Modus/Kanäle zum Testen.")
+            return
+        # FM-75: VOR dem ersten gesendeten Wert (und bevor die Ausgabe
+        # gestartet oder ein Universum angelegt wird).
+        absage = self._laser_test_erlaubt(mode)
+        if absage:
+            self._btn_start.setChecked(False)
+            self._info.setText(absage)
             return
         try:
             state = self._dialog.get_state()
@@ -1368,6 +1532,9 @@ class _LiveTestPanel(QGroupBox):
             return
 
         self._tester = LiveTester(universe, self._spin_addr.value())
+        self._aus_werte = live_test_aus_werte(self._modell(), mode)
+        if _ist_laser_modell(self._modell(), mode):
+            self._notaus_timer.start(self.NOTAUS_PRUEFEN_MS)
         self._build_faders(mode)
         self._spin_univ.setEnabled(False)
         self._spin_addr.setEnabled(False)
@@ -1376,25 +1543,51 @@ class _LiveTestPanel(QGroupBox):
             f"AKTIV — Universe {univ_num}, Adresse {self._spin_addr.value()}. "
             f"Fader schreiben direkt aufs Gerät.")
 
+    def _notaus_pruefen(self):
+        """FM-75: der Laser-NOT-AUS beendet einen laufenden Laser-Test — der
+        Test schreibt am Renderer vorbei, und ein nicht gepatchtes Geraet
+        steht in keiner NOT-AUS-Maske. Der Laser geht auf seinen Aus-Wert und
+        BLEIBT dort (kein Zurueckschreiben der Vorwerte: die waren meist 0)."""
+        if self._tester is None:
+            self._notaus_timer.stop()
+            return
+        if not self._notaus_aktiv():
+            return
+        tester, self._tester = self._tester, None
+        tester.blackout(self._aus_werte)
+        tester.halten()
+        self._stop()
+        self._info.setText(
+            "Laser-NOT-AUS — Test beendet, Laser auf „aus“ gestellt.")
+
     def _stop(self):
+        self._notaus_timer.stop()
         self._btn_wiggle.setChecked(False)
         self._wiggle_timer.stop()
+        bleibt = ""
         if self._tester is not None:
-            self._tester.restore()
+            self._tester.restore(self._aus_werte)
             self._tester = None
+            if any(self._aus_werte.values()):
+                off, wert = next((o, w) for o, w in self._aus_werte.items() if w)
+                bleibt = (f" Kanal {off + 1} steht auf {wert} (Laser aus), "
+                          f"falls dort vorher 0 stand.")
+        self._aus_werte = {}
         self._clear_faders()
         self._spin_univ.setEnabled(True)
         self._spin_addr.setEnabled(True)
         self._btn_start.setChecked(False)
         self._btn_start.setText("Test starten")
-        self._info.setText("Test gestoppt — Kanäle zurückgesetzt.")
+        self._info.setText("Test gestoppt — Kanäle zurückgesetzt." + bleibt)
 
     def _on_blackout(self):
         if self._tester is not None:
-            self._tester.blackout()
-            for f in self._faders:
+            # FM-75: bei einem Laser ist 0 nicht immer „aus“ — die Betriebsart
+            # geht auf ihren Aus-Wert, und der Fader zeigt ihn.
+            self._tester.blackout(self._aus_werte)
+            for i, f in enumerate(self._faders):
                 f.blockSignals(True)
-                f.setValue(0)
+                f.setValue(self._aus_werte.get(i, 0))
                 f.blockSignals(False)
 
     def _build_faders(self, mode: GenMode):
@@ -1461,9 +1654,10 @@ class _LiveTestPanel(QGroupBox):
 
     def shutdown(self):
         """Sauberes Restore/Blackout — vom Dialog bei close/reject aufgerufen."""
+        self._notaus_timer.stop()
         self._wiggle_timer.stop()
         if self._tester is not None:
-            self._tester.restore()
+            self._tester.restore(self._aus_werte)
             self._tester = None
 
 

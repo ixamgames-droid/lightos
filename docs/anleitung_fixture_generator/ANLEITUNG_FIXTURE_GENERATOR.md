@@ -292,6 +292,22 @@ Der **Live-Test** (3) schreibt Werte direkt an das echte Gerät — beim Laser
 nur unter den Sicherheitsregeln aus Abschnitt 9. **Speichern** (4) legt das
 Profil in deiner Bibliothek an und bestätigt das mit einer kurzen Meldung.
 
+**Live-Test mit einem Laser.** **Test starten** sendet sofort die Default-Werte
+aller Kanäle. Bei einem Laser-Profil fragt LightOS deshalb vorher nach
+(**Live-Test mit einem Laser starten?**) und sagt dabei, an welche Adressen
+gesendet wird und ob der Laser mit den Default-Werten **sofort strahlt**. Mit
+**Abbrechen** – das ist die Vorgabe – wird nichts gesendet.
+
+- **Blackout** im Test stellt den Laser auf seinen **Aus-Wert**, nicht einfach
+  auf 0 (bei manchen Lasern heißt 0 „Auto run“). Dasselbe gilt für **Test
+  stoppen** und für das Schließen des Fensters, wenn auf der Adresse vorher 0
+  stand – der Kanal bleibt dann auf dem Aus-Wert stehen.
+- Der **Laser-NOT-AUS** beendet einen laufenden Laser-Test und lässt den Laser
+  auf „aus“. Solange der NOT-AUS aktiv ist, startet kein Live-Test mit einem
+  Laser.
+- Kennt das Profil noch **keinen Aus-Wert**, sagt die Rückfrage das: LightOS
+  weiß dann nicht, ob der Laser mit den gesendeten Werten strahlt.
+
 ## 8. Patchen und bedienen
 
 ### Patchen
