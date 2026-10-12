@@ -213,6 +213,7 @@ def test_umgebung_holt_ansichten_ab_und_schont_uebersprungene_konsole(show):
             nur_vergleich["virtual_console"] = {"widgets": [
                 {"type": "VCButton", "caption": "BO", "blackout_fids": [1]}]}
             nur_vergleich["snapshots"] = []
+            nur_vergleich["channel_groups"] = [{"name": "Saal"}]
 
         def _sicherungs_name(self):
             return "Abend"
@@ -233,6 +234,8 @@ def test_umgebung_holt_ansichten_ab_und_schont_uebersprungene_konsole(show):
     u = D.Umgebung(_Fenster(vc), show.state)
     u.abholen()
     assert not u.konsole_gesperrt
+    assert show.state._channel_groups_data == [{"name": "Saal"}], \
+        "die Sicherung vor dem Klonen enthält auch die Kanal-Gruppen"
     plan = K.plane(show.state, [1], [2], K.Optionen(wie=K.HINZUFUEGEN),
                    snap_library=show.snaps, palette_manager=show.paletten)
     K.anwenden_mit_rueckweg(show.state, plan, davor=u.abholen, danach=u.nachziehen)

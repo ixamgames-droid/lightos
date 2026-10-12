@@ -221,10 +221,25 @@ class Plan:
         return out
 
     def anwenden(self, state) -> int:
-        """Schreibt den Plan. Liefert die Zahl der geänderten Stellen."""
+        """Schreibt den Plan. Liefert die Zahl der geänderten Stellen.
+
+        Scheitert ein Schritt, werden die schon geschriebenen wieder
+        zurückgenommen und der Fehler geht weiter — eine halb geklonte Show
+        bleibt nicht stehen."""
+        schritte = self._alle_schritte()
         with _plan_sperre(state):
-            for s in self._alle_schritte():
-                s.anwenden()
+            try:
+                for s in schritte:
+                    s.anwenden()
+            except Exception:
+                for s in reversed(schritte):
+                    try:
+                        s.zuruecknehmen()
+                    except Exception:      # noqa: BLE001 — Rest trotzdem zurück
+                        pass
+                self._angewendet = False
+                self._melden(state)
+                raise
         self._angewendet = True
         self._melden(state)
         return self.aenderungen
@@ -708,7 +723,8 @@ def _matrix_einfuegen(stand: dict, q: int, z: int, gleich: bool,
     """``(neuer Stand, info)``. ``info``: ``neu`` (Zellen), ``schon``,
     ``koepfe_zusammen``, ``weiss_weg``, ``gewachsen``."""
     info = {"neu": 0, "schon": False, "koepfe_zusammen": False,
-            "weiss_weg": 0, "gewachsen": False, "quelle": False}
+            "weiss_weg": 0, "gewachsen": False, "quelle": False,
+            "ans_ende_statt_neben": False}
     fg, hg, wg = stand["fixture_grid"], stand["head_grid"], stand["weiss_grid"]
     i_f = [i for i, f in enumerate(fg) if f == q]
     i_w = [i for i, w in enumerate(wg) if w and w[0] == q]
@@ -766,6 +782,9 @@ def _matrix_einfuegen(stand: dict, q: int, z: int, gleich: bool,
             stelle += 1
             wachsen()
     else:
+        # Ein mehrzeiliges Matrix-Raster rückt nicht auf: das Ziel kommt ans
+        # Ende, und die Vorschau sagt das.
+        info["ans_ende_statt_neben"] = position == POS_NEBEN
         belegt = [i for i, f in enumerate(fg) if f is not None]
         belegt += [i for i, w in enumerate(wg) if w]
         stelle = (max(belegt) + 1) if belegt else 0
@@ -1162,7 +1181,10 @@ def _plane_effekte(plan, state, q, z, opt, _snaps, _pal) -> None:
                 _weg(plan, BEREICH_EFFEKTE, objekt, q, z,
                      f"Weiß-Segment-Zellen — {GRUND_SPAETER}")
                 continue
-            text = (f"im Raster {_wo(opt.position)}"
+            wo = ("ans Ende (neben die Quelle geht nur in einer einzelnen "
+                  "Zeile oder Spalte)"
+                  if info["ans_ende_statt_neben"] else _wo(opt.position))
+            text = (f"im Raster {wo}"
                     + (f" ({info['neu']} Zellen)" if info["neu"] > 1 else "")
                     + (f", Raster wächst auf {_n['cols']}×{_n['rows']}"
                        if info["gewachsen"] else ""))

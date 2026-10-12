@@ -425,6 +425,35 @@ def test_matrix_zweidimensional_luecke_fuellen_sonst_neue_zeile(show):
     plan.zuruecknehmen(show.state)
     assert (m.cols, m.rows, m.fixture_grid) == (2, 2, [1, 2, 3, None])
 
+    # „neben die Quelle" gibt es im mehrzeiligen Raster nicht — das Ziel kommt
+    # ans Ende, und die Vorschau behauptet nichts anderes.
+    plan = show.plane([1], [8], bereiche=[K.BEREICH_EFFEKTE], position=K.POS_NEBEN)
+    assert "ans Ende" in plan.eintraege[0].text
+    assert "im Raster neben die Quelle" not in plan.eintraege[0].text
+    plan.anwenden(show.state)
+    assert m.fixture_grid == [1, 2, 3, 8]
+
+
+def test_fehler_mitten_im_anwenden_laesst_nichts_halb_geklont(show):
+    show.patch(1, RGB)
+    show.patch(2, RGB)
+    snap = show.snaps.add_snap("Rot", "", {1: {"color_r": 255}})
+    gid = show.gruppe("Front", {"0,0": 1})
+    show.state.base_levels = {1: {"intensity": 255}}
+    plan = show.plane([1], [2])
+    schritte = plan._alle_schritte()
+    assert len(schritte) == 3
+
+    def kaputt():
+        raise RuntimeError("Platte voll")
+
+    schritte[-1].anwenden = kaputt
+    with pytest.raises(RuntimeError):
+        plan.anwenden(show.state)
+    assert snap.values == {1: {"color_r": 255}}
+    assert show.gruppe_lesen(gid)[2] == {"0,0": 1}
+    assert show.state.base_levels == {1: {"intensity": 255}}
+
 
 def test_matrix_kopfzellen(show):
     show.patch(1, RGB)

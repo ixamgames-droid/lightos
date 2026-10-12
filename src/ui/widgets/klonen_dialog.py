@@ -68,6 +68,10 @@ class Umgebung:
             return
         if isinstance(ansichten.get("snapshots"), list):
             self.state._snapshots_data = ansichten["snapshots"]
+        # Kanal-Gruppen werden nicht geklont, gehören aber in die Sicherung
+        # „vor dem Klonen" — sonst fehlten dort ungespeicherte Änderungen.
+        if isinstance(ansichten.get("channel_groups"), list):
+            self.state._channel_groups_data = ansichten["channel_groups"]
         vc = getattr(self.fenster, "_vc_view", None)
         try:
             uebersprungen = getattr(vc, "uebersprungene_widgets", lambda: [])()

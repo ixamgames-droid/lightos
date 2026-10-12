@@ -114,7 +114,9 @@ passend ausrechnen. Sie gehen auch zwischen verschiedenen Typen:
   Gruppe rücken die Geräte dahinter um einen Platz; in einem mehrzeiligen Raster geht
   „neben die Quelle" nur, wenn die Zelle rechts frei ist — sonst kommt das Ziel ans Ende
   und die Vorschau sagt es. Die automatische Köpfe-Gruppe der Quelle bleibt unberührt.
-- **Matrix-Raster:** ebenso; eine einzeilige Matrix wird um eine Zelle länger.
+- **Matrix-Raster:** eine einzeilige Matrix (oder eine einzelne Spalte) wird um eine
+  Zelle länger, bei „neben die Quelle" rücken die Geräte dahinter auf. In einer
+  mehrzeiligen Matrix kommt das Ziel immer ans Ende — die Vorschau sagt es.
 - **Bewegungs-Effekte:** das Ziel reiht sich in den Fächer ein und übernimmt den
   Versatz der Quelle; der Fächer verteilt sich neu (die Vorschau nennt „4 → 5 Ziele").
   Hat das Ziel kein Pan/Tilt, fällt es weg.
