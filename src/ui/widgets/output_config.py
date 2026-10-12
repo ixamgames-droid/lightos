@@ -1349,7 +1349,9 @@ class OutputConfigDialog(QDialog):
             # (nicht den aktuellen Spin-Wert — der koennte inzwischen auf ein fremdes
             # Universum zeigen und dessen Adapter faelschlich killen).
             if self._artnet_active_univ is not None:
-                state.output_manager.remove_output(self._artnet_active_univ)
+                # OUT-71: abgewaehlt = der Ausgang geht wirklich -> dunkel enden.
+                state.output_manager.remove_output(self._artnet_active_univ,
+                                                   schlussbild=True)
                 self._artnet_active_univ = None
             self._lbl_artnet_status.setText("Inaktiv")
             return
@@ -1563,7 +1565,9 @@ class OutputConfigDialog(QDialog):
             # MU-02 (+Review): das beim Apply belegte Universum raeumen, nicht den
             # aktuellen Spin-Wert (koennte auf ein fremdes Universum zeigen).
             if self._sacn_active_univ is not None:
-                state.output_manager.remove_output(self._sacn_active_univ)
+                # OUT-71: abgewaehlt = der Ausgang geht wirklich -> dunkel enden.
+                state.output_manager.remove_output(self._sacn_active_univ,
+                                                   schlussbild=True)
                 self._sacn_active_univ = None
             self._lbl_sacn_status.setText("Inaktiv")
             return
