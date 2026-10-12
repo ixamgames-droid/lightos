@@ -65,6 +65,17 @@ def is_own_port(port_name: str) -> bool:
     return str(port_name or "").startswith(OWN_OUTPUT_CLIENT + ":")
 
 
+def _sysex_freigeben(midi_in) -> None:
+    """MIDI-5: RtMidi verwirft SysEx standardmaessig — fuer MSC freigeben.
+    Timing-Clock und Active Sensing bleiben gefiltert."""
+    setter = getattr(midi_in, "ignore_types", None)
+    if callable(setter):
+        try:
+            setter(sysex=False, timing=True, active_sense=True)
+        except Exception:
+            pass
+
+
 # ── MIDI-3: Portnamen stabil ueber Neustecken ──────────────────────────────
 # ALSA haengt die Client:Port-Nummer an ("APC MINI:APC MINI MIDI 1 20:0"); sie
 # wechselt beim Neustecken. rtmidi auf Windows haengt einen Index an
@@ -73,6 +84,12 @@ def is_own_port(port_name: str) -> bool:
 _ALSA_SUFFIX = re.compile(r"^(.*\S)\s+(\d+):(\d+)$")
 _WIN_INDEX = re.compile(r"^(.*\S)\s+(\d+)$")
 _ORDINAL = re.compile(r"^(.*\S)\s+#(\d+)$")
+# CDX-58: einen Index haengt NUR rtmidi unter Windows an (RtMidi-WinMM,
+# "APC MINI 1"). Der ctypes-WinMM-Weg liefert den rohen Treibernamen, CoreMIDI
+# den Geraetenamen — dort gehoert eine Endzahl zum Modell ("Launchkey 61") und
+# darf nicht abgeschnitten werden, sonst teilen sich "… 49" und "… 61" einen
+# Basisnamen und die Bindung wandert auf das falsche Geraet.
+_INDEX_BACKEND = sys.platform == "win32" and RTMIDI_OK and not _USE_WINMM
 
 
 def _zerlege(name: str) -> tuple[str, tuple[int, ...] | None]:
@@ -81,7 +98,7 @@ def _zerlege(name: str) -> tuple[str, tuple[int, ...] | None]:
     m = _ALSA_SUFFIX.match(name)
     if m:
         return m.group(1), (int(m.group(2)), int(m.group(3)))
-    if ":" not in name:
+    if _INDEX_BACKEND and ":" not in name:
         m = _WIN_INDEX.match(name)
         if m:
             return m.group(1), (int(m.group(2)),)
@@ -89,7 +106,7 @@ def _zerlege(name: str) -> tuple[str, tuple[int, ...] | None]:
 
 
 def port_basisname(name: str) -> str:
-    """Portname ohne ALSA-Client:Port-Nummer bzw. Windows-Index."""
+    """Portname ohne ALSA-Client:Port-Nummer bzw. rtmidi-Windows-Index."""
     return _zerlege(name)[0]
 
 
@@ -112,21 +129,62 @@ def stabiler_portname(port_name: str, ports=None) -> str:
     return basis if n == 1 else f"{basis} #{n}"
 
 
-def _geraet_ziel(geraet: str, ports) -> tuple[str, int] | None:
+def _geraet_ziel(geraet: str, ports, geschwister=None) -> tuple[str, int] | None:
     """Fuer einen GERAETEGENAUEN Namen (mit Nummer oder Ordinal) das Paar
-    (Basisname, Ordinal); fuer einen freien Teilstring-Filter None."""
+    (Basisname, Ordinal); fuer einen freien Teilstring-Filter None.
+
+    ``geschwister``: alle gespeicherten Geraetenamen (z. B. die der uebrigen
+    Mappings). Damit verteilen sich mehrere verwaiste Alt-Nummern desselben
+    Modells auf mehrere gleiche Geraete, statt alle am ersten zu haengen.
+    """
     m = _ORDINAL.match(geraet)
     if m:
         return m.group(1), int(m.group(2))
     basis, nummer = _zerlege(geraet)
     if nummer is None:
         return None
-    # Alt-Mapping mit Nummer, das Geraet steckt nicht mehr unter ihr: das
-    # erste gleichnamige Geraet nehmen.
-    return basis, 1
+    # Alt-Mapping mit Nummer, das Geraet steckt nicht mehr unter ihr.
+    return basis, _ordinal_fuer_altnummer(geraet, basis, ports, geschwister)
 
 
-def geraet_passt(geraet: str, port_name: str, ports=None) -> bool:
+def _nummer_schluessel(name: str):
+    return (_zerlege(name)[1] or (), name)
+
+
+def _ordinal_fuer_altnummer(geraet: str, basis: str, ports, geschwister) -> int:
+    """Ordinal fuer eine verwaiste Alt-Nummer (CDX-58).
+
+    Zwei baugleiche Pulte, Mappings noch mit ALSA-Nummer (``… 20:0`` und
+    ``… 24:0``): nach dem Neustecken (``… 28:0``, ``… 32:0``) fielen beide auf
+    Ordinal 1 — alles hing am ersten Pult, das zweite loeste nichts aus.
+
+    Jetzt: die verwaisten Nummern in aufsteigender Reihenfolge auf die FREIEN
+    gleichnamigen Ports verteilen. Frei ist ein Port, den kein gespeicherter
+    Name noch exakt trifft (der gehoert seinem Mapping). Gibt es mehr
+    verwaiste Nummern als freie Ports — ein Pult, das ueber mehrere Sitzungen
+    verschiedene Nummern hatte —, teilen sich die uebrigen den letzten.
+    Ohne ``geschwister`` wie bisher: das erste gleichnamige Geraet.
+    """
+    ports = [p for p in (ports or ()) if port_basisname(p) == basis]
+    namen = {str(g or "").strip() for g in (geschwister or ())}
+    namen.add(geraet)
+    verwaist = sorted(
+        (g for g in namen
+         if g not in ports and not _ORDINAL.match(g)
+         and _zerlege(g)[1] is not None and _zerlege(g)[0] == basis),
+        key=_nummer_schluessel)
+    if not ports or geraet not in verwaist:
+        return 1
+    reihe = sorted(ports, key=_nummer_schluessel)
+    frei = [p for p in reihe if p not in namen]
+    if not frei:
+        return 1
+    ziel = frei[min(verwaist.index(geraet), len(frei) - 1)]
+    return reihe.index(ziel) + 1
+
+
+def geraet_passt(geraet: str, port_name: str, ports=None,
+                 geschwister=None) -> bool:
     """Passt der gespeicherte Geraetename auf den Port einer Nachricht?
 
     * leer: jedes Geraet
@@ -135,12 +193,15 @@ def geraet_passt(geraet: str, port_name: str, ports=None) -> bool:
       Basisnamen
     * geraetegenau (Nummer oder ``#n``): Basisname + Ordinal; eine alte Nummer,
       die es noch gibt, bleibt exakt.
+
+    ``geschwister`` (optional): alle gespeicherten Geraetenamen — siehe
+    ``_ordinal_fuer_altnummer``.
     """
     geraet = str(geraet or "").strip()
     port_name = str(port_name or "")
     if not geraet or geraet == port_name:
         return True
-    ziel = _geraet_ziel(geraet, ports)
+    ziel = _geraet_ziel(geraet, ports, geschwister)
     if ziel is None:
         if geraet == port_basisname(port_name):
             # Voller Geraetename ohne Ordinal = das erste dieser Geraete.
@@ -200,13 +261,35 @@ class MidiMessage:
     msg_type: str      # "note_on", "note_off", "cc", "pc", "pitchbend"
     data1: int         # Note / CC-Nummer / PC-Nummer
     data2: int         # Velocity / CC-Wert / 0
+    # MIDI-5: bei msg_type "msc" das zerlegte MscCommand (sonst None).
+    msc: object = None
+
+
+# MIDI-16: Mindestlaenge je Statustyp (Status + Datenbytes). Kuerzere
+# Nachrichten wurden frueher mit 0 aufgefuellt — [0xB0, 7] wurde zu CC7=0.
+_MIN_LEN = {0x80: 3, 0x90: 3, 0xB0: 3, 0xC0: 2, 0xE0: 3}
 
 
 def _decode(raw: list[int], port_name: str) -> MidiMessage | None:
     if not raw:
         return None
     status = raw[0]
+    if status == 0xF0:
+        # MIDI-5: SysEx — nur MIDI Show Control wird ausgewertet.
+        from . import msc as _msc
+        if not _msc.get_settings().enabled:
+            return None
+        cmd = _msc.parse_msc(raw)
+        if cmd is None:
+            return None
+        return MidiMessage(port_name, 0, "msc", cmd.command, 0, msc=cmd)
     msg_type_code = status & 0xF0
+    need = _MIN_LEN.get(msg_type_code)
+    if need is not None and len(raw) < need:
+        from src.core.diagnose_log import melde_still
+        melde_still("midi.kurz", text=f"{port_name}: Status 0x{status:02X} "
+                    f"mit {len(raw) - 1} statt {need - 1} Datenbytes verworfen")
+        return None
     channel = (status & 0x0F) + 1
     d1 = raw[1] if len(raw) > 1 else 0
     d2 = raw[2] if len(raw) > 2 else 0
@@ -422,6 +505,7 @@ class MidiManager:
                 return False
             idx = ports.index(port_name)
             m.open_port(idx)
+            _sysex_freigeben(m)
             m.set_callback(lambda msg, _: self._on_message(msg[0], port_name))
         except Exception as exc:
             # Port-spezifischer Fehler (z. B. belegt) — kein Backend-Breaker.
@@ -595,6 +679,7 @@ class MidiManager:
         try:
             m = rtmidi.MidiIn()
             m.open_virtual_port(name)
+            _sysex_freigeben(m)
             m.set_callback(lambda msg, _: self._on_message(msg[0], f"Virtual:{name}"))
             self._inputs[f"Virtual:{name}"] = m
             self._log(f"Virtueller MIDI-Eingang erstellt: {name}")

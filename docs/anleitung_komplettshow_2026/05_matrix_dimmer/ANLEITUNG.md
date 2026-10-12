@@ -42,6 +42,6 @@ In dieser Anleitung lernst du, wie du in der Show `shows/Komplettshow_2026.lshow
 
 ## Tipps und Fallen
 
-- **Fixture-Bindung – richtige Gruppe wählen:** Eine Matrix **folgt der Programmer-Auswahl** und übernimmt die aktuell gewählte Gruppe als ihre Geräte. Lass beim Bauen also die richtige Gruppe (hier "PAR") ausgewählt. Das gespeicherte Geräte-Raster bleibt erhalten und wird auch beim Auslösen über die Virtuelle Konsole genutzt.
+- **Fixture-Bindung – richtige Gruppe wählen:** Im Programmer-Reiter **Matrix** **folgt die Matrix der Programmer-Auswahl**: Wechselst du dort die Auswahl oder Gruppe, übernimmt die angezeigte Matrix sie als ihre Geräte. Lass beim Bauen also die richtige Gruppe (hier "PAR") ausgewählt. Das gilt nur für deine eigenen Auswahlwechsel — beim Laden einer Show folgt die Matrix der Auswahl nicht, das gespeicherte Geräte-Raster kommt unverändert aus der Datei. Es wird auch beim Auslösen über die Virtuelle Konsole genutzt.
 - **Farbe als eigene Ebene:** Setze Farbe über eine eigene RGB-Matrix statt live im Programmer — so bleibt sie Teil der Show und lässt den Dimmer-Effekt unberührt.
 - **Style "Dimmer" – früherer Absturz-Bug:** Beim Umstellen auf Style `Dimmer` gab es einen Absturz wegen eines fehlenden UI-Labels. Dieser Fehler wurde behoben.

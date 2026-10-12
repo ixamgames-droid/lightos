@@ -274,6 +274,9 @@ def _fixture_to_dict(pf) -> dict:
             "pixel_order": _to_pixel_order(pf.get("pixel_order", "rowwise")),
             "element_rotation": _to_rotation(pf.get("element_rotation", 0)),
             "element_flip": bool(pf.get("element_flip", False)),
+            "invert_laser_x": bool(pf.get("invert_laser_x", False)),
+            "invert_laser_y": bool(pf.get("invert_laser_y", False)),
+            "swap_laser_xy": bool(pf.get("swap_laser_xy", False)),
             "pan_range_deg": _to_int(pf.get("pan_range_deg", 540), 540),
             "tilt_range_deg": _to_int(pf.get("tilt_range_deg", 270), 270),
             "pan_zero_dmx": _to_int(pf.get("pan_zero_dmx", 128), 128),
@@ -310,6 +313,9 @@ def _fixture_to_dict(pf) -> dict:
         "pixel_order": _to_pixel_order(getattr(pf, "pixel_order", "rowwise")),
         "element_rotation": _to_rotation(getattr(pf, "element_rotation", 0)),
         "element_flip": bool(getattr(pf, "element_flip", False)),
+        "invert_laser_x": bool(getattr(pf, "invert_laser_x", False)),
+        "invert_laser_y": bool(getattr(pf, "invert_laser_y", False)),
+        "swap_laser_xy": bool(getattr(pf, "swap_laser_xy", False)),
         "pan_range_deg": _to_int(getattr(pf, "pan_range_deg", 540), 540),
         "tilt_range_deg": _to_int(getattr(pf, "tilt_range_deg", 270), 270),
         "pan_zero_dmx": _to_int(getattr(pf, "pan_zero_dmx", 128), 128),
@@ -362,6 +368,9 @@ def _patched_fixture_from_data(d: dict, fallback_fid: int):
         pixel_order=_to_pixel_order(d.get("pixel_order", "rowwise")),
         element_rotation=_to_rotation(d.get("element_rotation", 0)),
         element_flip=bool(d.get("element_flip", False)),
+        invert_laser_x=bool(d.get("invert_laser_x", False)),
+        invert_laser_y=bool(d.get("invert_laser_y", False)),
+        swap_laser_xy=bool(d.get("swap_laser_xy", False)),
         pan_range_deg=_to_int(d.get("pan_range_deg", 540), 540),
         tilt_range_deg=_to_int(d.get("tilt_range_deg", 270), 270),
         pan_zero_dmx=_to_int(d.get("pan_zero_dmx", 128), 128),
@@ -493,8 +502,17 @@ def _resolve_fixture_profile_id(profile_id: int, manufacturer_name: str,
                     modi.setdefault(int(fid_), []).append((mname, int(mcount or 0)))
 
                 def _exakt(t) -> bool:
-                    return any(n == mode_name and (not channel_count or c == channel_count)
-                               for n, c in modi.get(int(t[0]), []))
+                    paare = modi.get(int(t[0]), [])
+                    if any(n == mode_name and (not channel_count or c == channel_count)
+                           for n, c in paare):
+                        return True
+                    # FM-73: der Import hat den zweiten gleichnamigen Modus in
+                    # „Name (n)“ umbenannt — fuer die Show ist das derselbe
+                    # Modus (Alias-Regel in ``modus_wahl``), kein fehlender.
+                    from src.core.database.modus_wahl import ist_zwilling
+                    return bool(channel_count) and any(
+                        c == channel_count and ist_zwilling(n, mode_name)
+                        for n, c in paare)
 
                 def _kanalzahl(t) -> bool:
                     return bool(channel_count) and any(
@@ -2603,8 +2621,17 @@ def load_show(path: str | os.PathLike):
     Danach rendert der naechste Frame die neue Show.
     """
     from src.core.app_state import get_state
-    sperre = getattr(getattr(get_state(), "output_manager", None), "lade_sperre", None)
-    if sperre is None:
-        return _load_show_impl(path)
-    with sperre():
-        return _load_show_impl(path)
+    state = get_state()
+    # UI-84: „Laden darf Funktionsdaten nie veraendern" — der Lade-Kontext
+    # umschliesst den GANZEN Ladevorgang inkl. Benachrichtigungsblock
+    # (patch_changed … refresh_all). Views, die der Programmer-Auswahl folgen,
+    # weisen waehrenddessen (und im Nachlauf der Ereignisschleife) nichts zu.
+    lade_kontext = getattr(state, "show_wird_geladen", None)
+    if lade_kontext is None:                      # Test-Attrappen ohne Kontext
+        lade_kontext = contextlib.nullcontext
+    sperre = getattr(getattr(state, "output_manager", None), "lade_sperre", None)
+    with lade_kontext():
+        if sperre is None:
+            return _load_show_impl(path)
+        with sperre():
+            return _load_show_impl(path)

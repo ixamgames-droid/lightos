@@ -93,7 +93,7 @@ Zeigt – abhängig von Style und Algorithmus – entweder feste Farbknöpfe **C
 | **Aus Auswahl** | Bildet das Grid aus den links im Programmer gewählten Geräten – bei einer echten Gruppe als 2D-Raster inkl. Lücken, sonst als 1 × N. |
 | **Auto-Zuweisung aus Patch** | Füllt das aktuelle Raster mit Geräten der aktiven Auswahl/Gruppe (Fallback: ganzer Patch). |
 
-> Im **Folge-Modus** (Programmer-Reiter „Matrix") sind diese Knöpfe ausgeblendet; die Gruppe heißt dann „Geräte (folgen der Programmer-Auswahl)" und übernimmt die gewählte Gruppe automatisch.
+> Im **Folge-Modus** (Programmer-Reiter „Matrix") sind diese Knöpfe ausgeblendet; die Gruppe heißt dann „Geräte (folgen der Programmer-Auswahl)" und übernimmt die gewählte Gruppe automatisch, sobald du die Auswahl wechselst. Beim Laden einer Show folgt die Matrix der Auswahl nicht — das gespeicherte Raster bleibt, wie es in der Datei steht.
 
 ## Algorithmen
 

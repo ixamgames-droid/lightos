@@ -157,7 +157,7 @@ _HERKUNFT_FELDER = {"art", "lizenz", "urheber", "original", "geaendert"}
 _GEPRUEFT_FELDER = {"ok", "wie"}
 _MODUS_FELDER = {"name", "beschreibung", "raster", "weiss", "kanaele"}
 _KANAL_FELDER = {"name", "attribut", "default", "highlight", "invert",
-                 "aufloesung", "segment", "bereiche"}
+                 "aufloesung", "segment", "bereiche", "laser"}
 _BEREICH_FELDER = {"von", "bis", "name", "art"}
 _FORM_FELDER = {"rows", "cols"}
 
@@ -359,6 +359,10 @@ def pruefe(daten, datei: str = "") -> list[str]:
                 elif s >= n_weiss:
                     out.append(f"{wk}.segment: Weiss-Segment {s} gibt es nicht "
                                f"({n_weiss} color_w-Kanaele, 0-basiert)")
+            if "laser" in c:
+                # LAS-33: Muster, Farben, Richtung, Betriebsart (optional).
+                from src.core.laser import profilangaben as PA
+                out += PA.pruefe(c["laser"], f"{wk}.laser")
             bereiche = c.get("bereiche", [])
             if not isinstance(bereiche, list):
                 out.append(f"{wk}.bereiche: Liste erwartet")
@@ -448,6 +452,7 @@ def pruefe_bibliothek(verzeichnis: str | None = None, *,
 # ── DB -> Daten (Export) ─────────────────────────────────────────────────────
 
 def _modus_zu_daten(m) -> dict:
+    from src.core.laser import profilangaben as PA
     d: dict = {"name": m.name}
     if m.description:
         d["beschreibung"] = m.description
@@ -474,6 +479,10 @@ def _modus_zu_daten(m) -> dict:
                  "art": r.kind or ""}
                 for r in sorted(c.ranges, key=lambda r: (r.range_from, r.range_to,
                                                          r.name, r.kind or ""))]
+        # LAS-33: die Laser-Angaben gehen beim Export mit.
+        laser = PA.aus_text(c.laser_angaben)
+        if laser:
+            k["laser"] = laser
         kanaele.append(k)
     d["kanaele"] = kanaele
     return d
@@ -622,6 +631,7 @@ def daten_aus_feldern(*, hersteller: str, modell: str, kurzname: str, typ: str,
     mit Kanaelen wie in ``_ModeTab.channels`` (``attribute``/``default``/
     ``highlight``/``invert``/``resolution``/``segment``/``ranges``)."""
     from src.core.dimmer_segmente import ist_dimmer
+    from src.core.laser import profilangaben as PA
     from .fixture_db import segment_wert
     md = []
     for name, kanaele, beschreibung, raster, weiss in modi:
@@ -653,6 +663,11 @@ def daten_aus_feldern(*, hersteller: str, modell: str, kurzname: str, typ: str,
                                  for r in sorted(rs, key=lambda r: (
                                      int(r.get("range_from", 0)),
                                      int(r.get("range_to", 255))))]
+            # LAS-33: Laser-Angaben des Kanals (der Editor zeigt sie nicht,
+            # traegt sie aber mit).
+            laser = PA.bereinige(c.get("laser"))
+            if laser:
+                k["laser"] = laser
             ks.append(k)
         m["kanaele"] = ks
         md.append(m)
@@ -805,7 +820,9 @@ def _modes_data(daten: dict) -> list:
 
 def _modi_anlegen(s, prof, daten: dict) -> None:
     """Modi ueber ``_add_modes`` anlegen und danach die Felder nachtragen, die
-    die Builtin-Tupel nicht kennen (Beschreibung, Invert, Aufloesung, Segment)."""
+    die Builtin-Tupel nicht kennen (Beschreibung, Invert, Aufloesung, Segment,
+    Laser-Angaben)."""
+    from src.core.laser import profilangaben as PA
     from .fixture_db import _add_modes
     vorher = set(id(m) for m in prof.modes)
     _add_modes(s, prof, _modes_data(daten))
@@ -818,6 +835,8 @@ def _modi_anlegen(s, prof, daten: dict) -> None:
             ch.invert = bool(cd.get("invert", False))
             ch.resolution = cd.get("aufloesung", "8bit")
             ch.segment = cd.get("segment")
+            # LAS-33: Laser-Angaben (leer = keine).
+            ch.laser_angaben = PA.als_text(cd.get("laser"))
 
 
 def _provenance(daten: dict) -> str:
@@ -928,7 +947,7 @@ def _vergleichsform(prof) -> tuple:
                    m.white_rows or 0, m.white_cols or 0, m.channel_count,
                    tuple((c.channel_number, c.name, c.attribute, c.default_value,
                           c.highlight_value, bool(c.invert), c.resolution or "8bit",
-                          c.segment,
+                          c.segment, c.laser_angaben or "",
                           tuple(sorted((r.range_from, r.range_to, r.name, r.kind or "")
                                        for r in c.ranges)))
                          for c in sorted(m.channels, key=lambda c: c.channel_number)))
@@ -1186,7 +1205,9 @@ def qxf_zu_daten(pfad: str, original: str | None = None) -> dict:
     create_all_idempotent(eng)
     try:
         with Session(eng) as s:
-            if not import_qxf_file(pfad, s, {}):
+            # FM-73: Namen der Datei stehen lassen — doppelte Modusnamen
+            # macht `fuer_format_anpassen` eindeutig UND vermerkt es.
+            if not import_qxf_file(pfad, s, {}, modusnamen_eindeutig=False):
                 raise ProfilFehler([f"{pfad}: der QXF-Import hat kein Profil erzeugt "
                                     f"(Hersteller/Modell fehlt?)"])
             s.flush()
