@@ -69,6 +69,7 @@ export const {
   LineBasicMaterial,
   LineLoop,
   LineSegments,
+  LinearFilter,
   MathUtils,
   Matrix3,
   Matrix4,
@@ -86,6 +87,7 @@ export const {
   Raycaster,
   RingGeometry,
   Scene,
+  ShaderChunk,
   ShaderMaterial,
   Sphere,
   SpotLight,
@@ -94,6 +96,7 @@ export const {
   TorusGeometry,
   Vector2,
   Vector3,
+  Vector4,
   WebGLRenderer,
   sRGBEncoding,
 } = window.THREE;
