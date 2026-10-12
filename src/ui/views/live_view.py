@@ -40,7 +40,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                 QTabWidget, QInputDialog, QMessageBox,
                                 QTreeWidgetItem, QLineEdit,
                                 QButtonGroup, QStackedWidget)
-from PySide6.QtCore import (Qt, QTimer, QPointF, QRect, QRectF, Signal, QByteArray,
+from PySide6.QtCore import (Qt, QTimer, QPoint, QPointF, QRect, QRectF, Signal, QByteArray,
                             QMimeData)
 from PySide6.QtGui import (QPainter, QColor, QBrush, QPen, QFont, QPolygonF,
                             QLinearGradient, QRadialGradient, QMouseEvent,
@@ -173,6 +173,11 @@ def _text_breite(pt: float, text: str) -> float:
 # die nicht 8 Bit je Kanal vormultipliziert speichern (10-Bit-X11, RGBA64,
 # ARGB32 ohne Vormultiplikation, RGB16 — dort rundet das Aufblenden anders),
 # -> direkt wie bisher. Bitgleich ist der Cache also nur auf 8-Bit-Zielen.
+#
+# UI-88: bei Pixeldichte != 1 zeichnet die Flaeche deshalb nicht mehr direkt
+# aufs Fenster, sondern in ein Zwischenbild in Geraetepixeln
+# (``StageCanvas._zwischenbild``) — dort gibt es keine Umlenkung, und der
+# Cache gilt wie bei Pixeldichte 1.
 #
 # Eine Kachel entsteht erst, wenn derselbe Schluessel ZUM DRITTEN Mal kommt
 # (``KACHEL_AB``). Einzelstuecke und Paare kosten so nichts extra — z. B. ein
@@ -413,6 +418,21 @@ _P_888_15 = _stift(QColor("#888"), 1.5)
 _P_444_1 = _stift(QColor("#444"), 1)
 _B_FX = _pinsel(QColor(60, 130, 255, 200))
 
+# UI-88: was ``draw`` je Geraet und Bild neu gebaut hat, einmal vormerken. Die
+# Flag-Kombinationen sind in PySide6 Python-Enums — jedes ``|`` ist dort ein
+# Python-Aufruf (gemessen: rund 290 je Bild bei 80 Geraeten); die Farben
+# wurden je Aufruf aus ihrem Text gelesen.
+_AL_LABEL = (Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop
+             | Qt.TextFlag.TextDontClip)
+_AL_PROZENT = (Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignBottom
+               | Qt.TextFlag.TextDontClip)
+_AL_MITTE = Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextDontClip
+_C_LABEL = QColor("#bbb")
+_C_GOLD = QColor("#FFD700")
+_C_GRAU = QColor("#aaa")
+_C_FX_TEXT = QColor(210, 230, 255)
+_C_DUNKEL = QColor(18, 18, 22)
+
 
 class FixtureRenderer:
     """Zeichnet ein Fixture je nach Typ unterscheidbar."""
@@ -426,7 +446,7 @@ class FixtureRenderer:
              zoom: float = 1.0, pan_range_deg: float = 540.0,
              tilt_range_deg: float = 270.0, pan_zero_dmx: float = 128.0,
              tilt_zero_dmx: float = 128.0, lod: int = 0,
-             ring_segments: int = 0):
+             ring_segments: int = 0, einrasten=None):
         # ring_segments (VIZ-53): Zahl der Ring-Segmente eines 'pixel_head'.
         # Sie ist eine Eigenschaft des GEPATCHTEN Geraets und kommt deshalb vom
         # Canvas mit (`app_state.pixel_ring_segments`) — dieselbe Zahl, die auch
@@ -438,7 +458,26 @@ class FixtureRenderer:
         effects = effects or []
         painter.save()
         painter.translate(x, y)
-        _kx = _kachel_kontext(painter)      # VIZ-78
+        if einrasten is not None:
+            # UI-88: ``einrasten`` = die Zeichen-Hinweise des Painters, der ins
+            # Zwischenbild der Flaeche zeichnet (Geraetepixel, keine Umlenkung —
+            # Welt- und Geraetematrix sind dort dieselbe, nur Skalierung und
+            # Verschiebung). Das Symbol rastet auf GANZE Geraetepixel ein: bei
+            # 250 % und Zoom 2,24 hatte sonst jedes Geraet einen anderen
+            # Nachkomma-Anteil; gleiche Formen (Gehaeuse, Pulsring) bekamen je
+            # Geraet eine eigene Kachel und trafen nie. Symbol samt Beschriftung
+            # verschieben sich dabei um hoechstens einen halben Geraetepixel
+            # (0,2 logische Pixel bei 250 %).
+            # Der Kachel-Kontext steht damit fest und wird nicht bei Qt erfragt
+            # (``_kachel_kontext`` kostete je Geraet sechs Rueckfragen).
+            _wt = painter.worldTransform()
+            _m11, _m22 = _wt.m11(), _wt.m22()
+            _dx, _dy = float(round(_wt.dx())), float(round(_wt.dy()))
+            _wt = QTransform(_m11, 0.0, 0.0, _m22, _dx, _dy)
+            painter.setWorldTransform(_wt)
+            _kx = (_m11, _m22, _dx, _dy, 0.0, 0.0, _wt, einrasten)
+        else:
+            _kx = _kachel_kontext(painter)      # VIZ-78
         # Texte in konstanter Bildschirmgroesse: der Painter ist global mit dem
         # Zoom skaliert, also Punktgroessen/Badge-Geometrie mit 1/Zoom
         # gegenrechnen, damit Labels bei kleinem Zoom lesbar bleiben und bei
@@ -447,7 +486,7 @@ class FixtureRenderer:
 
         # Blinkt die Fixture gerade im "Aus"-Phase → Licht ausschalten
         if blink_off:
-            color = QColor(18, 18, 22)
+            color = _C_DUNKEL
             intensity = 0
 
         # 2D-Helligkeit an die Intensitaet koppeln (wie 3D): bei niedriger
@@ -455,11 +494,10 @@ class FixtureRenderer:
         # voll gesaettigt zu zeichnen — ein auf 0% geparktes Geraet sieht dann
         # auch im 2D dunkel aus (3D faerbt das Icon bei ~0% nach 0x3a3a4a).
         _inorm = max(0.0, min(1.0, intensity / 255.0))
-        _off = QColor(0x3a, 0x3a, 0x4a)
         color = QColor(
-            int(_off.red()   + (color.red()   - _off.red())   * _inorm),
-            int(_off.green() + (color.green() - _off.green()) * _inorm),
-            int(_off.blue()  + (color.blue()  - _off.blue())  * _inorm),
+            int(0x3a + (color.red()   - 0x3a) * _inorm),
+            int(0x3a + (color.green() - 0x3a) * _inorm),
+            int(0x4a + (color.blue()  - 0x4a) * _inorm),
         )
 
         # Effekt-Ring (pulsierend, blau) — hinter Selection-Ring
@@ -792,30 +830,24 @@ class FixtureRenderer:
         # LOD 0 = "PREFIX Name", LOD 1 = nur Kurz-Label (spart Breite bei Dichte),
         # LOD 2 = kein Label (Selektion/Hover bekommt vom Canvas immer LOD 0).
         if lod <= 1:
-            painter.setPen(QColor("#bbb"))
+            painter.setPen(_C_LABEL)
             painter.setFont(_schrift(8 * tscale))
             text_rect = label_rect(size, tscale)
             if lod == 0:
                 _txt = (f"{label_prefix} {label}" if label else label_prefix)
             else:
                 _txt = (label if label else label_prefix)
-            painter.drawText(text_rect,
-                             Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop
-                             | Qt.TextFlag.TextDontClip,
-                             _txt)
+            painter.drawText(text_rect, _AL_LABEL, _txt)
 
         # Intensity-Wert oben — nur bei voller Detailstufe (sonst Text-Salat)
         _pct_w = 0.0
         if intensity > 0 and lod == 0:
-            painter.setPen(QColor("#FFD700") if intensity > 200 else QColor("#aaa"))
+            painter.setPen(_C_GOLD if intensity > 200 else _C_GRAU)
             painter.setFont(_schrift(7 * tscale))
             inten_pct = int(intensity / 255 * 100)
             _pct_txt = f"{inten_pct}%"
             _pct_w = _text_breite(7 * tscale, _pct_txt)
-            painter.drawText(oben_rect(size, tscale),
-                            Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignBottom
-                            | Qt.TextFlag.TextDontClip,
-                            _pct_txt)
+            painter.drawText(oben_rect(size, tscale), _AL_PROZENT, _pct_txt)
 
         # FX-Badge oben rechts (Geometrie + Schrift bildschirm-konstant) — nur LOD 0
         if effects and lod == 0:
@@ -823,10 +855,9 @@ class FixtureRenderer:
             _form(painter, _kx, "rr", (badge_rect.x(), badge_rect.y(), badge_rect.width(),
                                   badge_rect.height(), 3 * tscale, 3 * tscale),
                   brush=_B_FX[0], brush_key=_B_FX[1])
-            painter.setPen(QColor(210, 230, 255))
+            painter.setPen(_C_FX_TEXT)
             painter.setFont(_schrift(6 * tscale, True))
-            painter.drawText(badge_rect,
-                             Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextDontClip,
+            painter.drawText(badge_rect, _AL_MITTE,
                              f"FX{len(effects)}" if len(effects) > 1 else "FX")
 
         painter.restore()
@@ -1016,6 +1047,8 @@ class StageCanvas(QWidget):
         self._bg_key: tuple | None = None
         # UI-86: Ausschnitt (Widget-Koordinaten), den das Cache-Bild abdeckt.
         self._bg_rect: QRect | None = None
+        # UI-88: Zwischenbild in Geraetepixeln (siehe _zwischenbild).
+        self._zb: QImage | None = None
         # UI-86: gemessene Zeichenzeit -> Abstand der Takt-Bilder (siehe
         # _bild_abstand_s). Die Uhr ist austauschbar, damit Tests ohne Warten
         # und ohne echte Zeichenlast rechnen koennen.
@@ -1025,7 +1058,12 @@ class StageCanvas(QWidget):
         # VIZ-78: Geraete-Steckbriefe (siehe _steckbrief).
         self._steckbriefe: dict = {}
         self._tick_fp: dict | None = None
+        # Nullpunkt der Steckbrief-Uhr; ``_sb_uhr`` = Sekunden seither (je Bild
+        # einmal gesetzt), ``_sb_rest`` = wie viele das laufende Bild noch
+        # auffrischen darf (UI-88).
         self._steckbrief_zeit: float = time.monotonic()
+        self._sb_uhr: float = 0.0
+        self._sb_rest: int = 1 << 30
 
         # Live-Update: der Takt fragt erst, ob sich ueberhaupt etwas zeigt
         # (siehe _on_render_tick), statt blind update() zu rufen.
@@ -1958,6 +1996,15 @@ class StageCanvas(QWidget):
     # spaetestens STECKBRIEF_MAX_ALTER_S verwerfen ihn (Profil-Bearbeitung
     # ohne Fingerabdruck-Aenderung).
     STECKBRIEF_MAX_ALTER_S = 1.0
+    # UI-88: nach dem Hoechstalter wird NICHT mehr alles auf einmal verworfen.
+    # Das kostete einmal je Sekunde ein Bild, das alle Steckbriefe neu baute —
+    # bei 80 Geraeten doppelt so lang wie die anderen (gemessen: p90 195 ms bei
+    # einem Median von 96 ms; in der App der Ausreisser im Ereignis-Verzug).
+    # Jetzt hat jeder Steckbrief sein eigenes Alter, und ein Bild frischt
+    # hoechstens den STECKBRIEF_BILDER-ten Teil auf: dieselbe Arbeit, verteilt
+    # auf so viele Bilder. Eine Profil-Aenderung ohne Patch-Ereignis ist damit
+    # nach Hoechstalter + STECKBRIEF_BILDER Bildern ueberall angekommen.
+    STECKBRIEF_BILDER = 8
 
     def _steckbriefe_verwerfen(self) -> None:
         self._steckbriefe.clear()
@@ -1968,8 +2015,12 @@ class StageCanvas(QWidget):
             fp = self._patch_fingerabdruck(fixture)
         sb = self._steckbriefe.get(fixture.fid)
         if sb is not None and sb["fp"] == fp:
-            return sb
-        sb = {"fp": fp, "uni": fixture.universe, "label": f"{fixture.fid}",
+            if (self._sb_uhr - sb["t"] <= self.STECKBRIEF_MAX_ALTER_S
+                    or self._sb_rest <= 0):
+                return sb
+            self._sb_rest -= 1          # zu alt: auffrischen, solange das Bild noch darf
+        sb = {"fp": fp, "t": self._sb_uhr, "uni": fixture.universe,
+              "label": f"{fixture.fid}",
               "farbe": [], "kanaele": [], "pt": [], "strobe": [], "ok": True}
         try:
             channels = get_channels_for_patched(fixture)
@@ -2107,16 +2158,115 @@ class StageCanvas(QWidget):
             if voll:
                 self._zeichenzeiten.append(max(0.0, self._uhr() - t0))
 
+    # ── UI-88: Zwischenbild in Geraetepixeln ─────────────────────────────────
+    # Der Kachel-Cache (VIZ-78) gilt nur, wenn der Painter ohne skalierte
+    # Umlenkung in ein 8-Bit-Ziel zeichnet — also bei Pixeldichte 1. Auf einem
+    # Bildschirm mit 125–300 % fiel er komplett aus: jede Ellipse wurde je Bild
+    # neu gerastert (gemessen bei 250 %, 80 Geraete: 278 Ellipsen, 40 von 83 ms).
+    # Bei Pixeldichte != 1 zeichnet die Flaeche deshalb zuerst in ein eigenes
+    # Bild in GERAETEPIXELN (Pixeldichte als gewoehnliche Skalierung der
+    # Weltmatrix, keine Umlenkung) und legt es danach 1:1 auf das Fenster. Im
+    # Zwischenbild gelten genau die Bedingungen von Pixeldichte 1 — der Cache
+    # greift wieder, bitgleich zum direkten Zeichnen in dieses Bild.
+    #
+    # Obergrenze wie beim Hintergrund-Cache: passt der neu zu zeichnende
+    # Bereich nicht darunter, wird direkt gezeichnet wie bisher.
+    ZWISCHENBILD_MAX_PIXEL = 9_000_000      # <= 0 schaltet das Zwischenbild ab
+
+    def _zwischenbild(self, rect: QRect):
+        """``(Bild, x0, y0, dpr)`` fuer den Bereich ``rect`` (Widget-Koordinaten)
+        oder ``None`` = direkt zeichnen (Pixeldichte 1, Bereich leer/zu gross).
+        ``x0, y0`` = linke obere Ecke des Bilds in Geraetepixeln der Flaeche."""
+        if self.ZWISCHENBILD_MAX_PIXEL <= 0:
+            return None
+        try:
+            dpr = float(self.devicePixelRatioF()) or 1.0
+        except Exception:
+            return None
+        if dpr == 1.0:
+            return None
+        x0, y0 = math.floor(rect.x() * dpr), math.floor(rect.y() * dpr)
+        w = math.ceil((rect.x() + rect.width()) * dpr) - x0
+        h = math.ceil((rect.y() + rect.height()) * dpr) - y0
+        if w <= 0 or h <= 0 or w * h > self.ZWISCHENBILD_MAX_PIXEL:
+            return None
+        img = self._zb
+        if img is None or img.width() != w or img.height() != h:
+            neu = QImage(w, h, QImage.Format.Format_RGB32)
+            if neu.isNull():
+                return None
+            # Das groesste Bild bleibt (volles Bild je Takt); ein kleineres
+            # (Teil-Repaint unter der Minimap) ist ein Wegwerf-Bild.
+            if img is None or w * h >= img.width() * img.height():
+                self._zb = neu
+            img = neu
+        return img, x0, y0, dpr
+
     def _zeichne(self, event, _voll: bool = True) -> None:
-        painter = QPainter(self)
+        zb = self._zwischenbild(event.rect())
+        if zb is None:
+            painter = QPainter(self)
+            try:
+                self._zeichne_inhalt(painter, event, _voll, False)
+            finally:
+                painter.end()
+            return
+        img, x0, y0, dpr = zb
+        painter = QPainter(img)
+        try:
+            painter.translate(-x0, -y0)
+            painter.scale(dpr, dpr)
+            self._zeichne_inhalt(painter, event, _voll, True)
+        finally:
+            painter.end()
+        ziel = QPainter(self)
+        try:
+            # 1:1 in Geraetepixeln: das Bild traegt dafuer kurz die Pixeldichte
+            # des Fensters (wie der Hintergrund-Cache).
+            img.setDevicePixelRatio(dpr)
+            ziel.drawImage(QPointF(x0 / dpr, y0 / dpr), img)
+        finally:
+            ziel.end()
+            img.setDevicePixelRatio(1.0)
+
+    def _hintergrund_1zu1(self, painter: QPainter, bg: QImage) -> bool:
+        """UI-88: den Hintergrund-Cache als reine Kopie ins Zwischenbild legen.
+
+        Mit Pixeldichte am Bild und Skalierung am Painter nimmt Qt den Weg fuer
+        skalierte Bilder (je Pixel abgetastet) — obwohl 1:1 herauskommt. Hier
+        liegen beide in Geraetepixeln; ohne Matrix ist es ein Kopieren. Liefert
+        ``False``, wenn die Lage kein ganzer Geraetepixel ist (dann zeichnet
+        der Aufrufer wie bisher)."""
+        wt = painter.worldTransform()
+        dpr = bg.devicePixelRatio()
+        x = self._bg_rect.x() * dpr + wt.dx()
+        y = self._bg_rect.y() * dpr + wt.dy()
+        if abs(x - round(x)) > 1e-6 or abs(y - round(y)) > 1e-6:
+            return False
+        bg.setDevicePixelRatio(1.0)
+        try:
+            painter.setWorldTransform(_IDENTITAET)
+            painter.drawImage(QPoint(round(x), round(y)), bg)
+        finally:
+            painter.setWorldTransform(wt)
+            bg.setDevicePixelRatio(dpr)
+        return True
+
+    def _zeichne_inhalt(self, painter: QPainter, event, _voll: bool,
+                        einrasten: bool) -> None:
+        """Zeichnet den Inhalt mit ``painter`` — direkt auf die Flaeche oder
+        ins Zwischenbild (``einrasten``: Symbole auf ganze Geraetepixel)."""
         # VIZ-70: statischer Hintergrund aus dem Pixmap-Cache (1:1 in
         # Geraetepixeln, VOR Skalierung/Antialiasing) — sonst direkt wie bisher.
         # UI-86: bei grosser Flaeche deckt er nur den sichtbaren Ausschnitt ab.
         bg = self._hintergrund_pixmap(event.rect())
-        if bg is not None:
+        if bg is not None and not (einrasten and self._hintergrund_1zu1(painter, bg)):
             painter.drawImage(self._bg_rect.topLeft(), bg)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.scale(self.zoom, self.zoom)
+        # UI-88: im Zwischenbild bekommt ``draw`` die Zeichen-Hinweise mit
+        # (einmal je Bild gelesen) und rastet die Symbole ein.
+        _einr = painter.renderHints() if einrasten else None
         # Bereichs-Beschriftungen bildschirm-konstant halten (Painter ist skaliert)
         tscale = 1.0 / self.zoom if self.zoom > 0 else 1.0
         if bg is None:
@@ -2158,10 +2308,10 @@ class StageCanvas(QWidget):
 
         lese = self._wert_leser()
         fp_map, self._tick_fp = self._tick_fp, None
-        jetzt_t = time.monotonic()
-        if jetzt_t - self._steckbrief_zeit > self.STECKBRIEF_MAX_ALTER_S:
-            self._steckbriefe.clear()
-            self._steckbrief_zeit = jetzt_t
+        # UI-88: Steckbriefe altern einzeln; dieses Bild frischt hoechstens
+        # einen Teil auf (siehe STECKBRIEF_BILDER).
+        self._sb_uhr = time.monotonic() - self._steckbrief_zeit
+        self._sb_rest = max(1, -(-len(fixtures) // max(1, self.STECKBRIEF_BILDER)))
         for fixture in fixtures:
             if fixture.fid not in self._positions:
                 continue
@@ -2213,7 +2363,7 @@ class StageCanvas(QWidget):
                 zoom=self.zoom,
                 pan_range_deg=_pr, tilt_range_deg=_tr,
                 pan_zero_dmx=_pz, tilt_zero_dmx=_tz,
-                lod=_lod, ring_segments=_ring,
+                lod=_lod, ring_segments=_ring, einrasten=_einr,
             )
             # Info-Box für genau ein selektiertes Fixture vorbereiten
             if fixture.fid in self._selected_fids and len(self._selected_fids) == 1:
@@ -2241,8 +2391,6 @@ class StageCanvas(QWidget):
             band_pen = QPen(QColor(120, 180, 255), 1, Qt.PenStyle.DashLine)
             painter.setPen(band_pen)
             painter.drawRect(self._band_rect)
-
-        painter.end()
 
     # ── Maus-Events ───────────────────────────────────────────────────────────
 
