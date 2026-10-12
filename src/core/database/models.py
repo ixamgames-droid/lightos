@@ -189,6 +189,20 @@ class FixtureChannel(Base):
     # (``migrate_fixtures_db``) fuer jeden Kanal „keine Zuordnung" traegt.
     segment: Mapped[int | None] = mapped_column(Integer, nullable=True,
                                                 default=None)
+    # LAS-33: Laser-Angaben dieses Kanals als JSON-Text — Musterliste,
+    # Farbtabelle, Richtung (umgekehrt / sprechende Enden / Mittelbereich) und
+    # Bedeutung der Betriebsart-Bereiche. Aufbau, Pruefung und die Lese-Schicht
+    # stehen in ``src/core/laser/profilangaben.py``; das JSON traegt seine
+    # eigene ``version``. Leer/NULL = keine Angaben, und das ist der Normalfall
+    # (jedes Nicht-Laser-Profil, jedes Alt-Profil).
+    #
+    # ★ Warum EIN Textfeld am Kanal und keine eigenen Tabellen: die Angaben
+    #   werden nie abgefragt, nur als Ganzes gelesen und geschrieben — und sie
+    #   muessen jeden Weg mitgehen, der einen Kanal kopiert (Bibliotheksdatei,
+    #   Export/Import, Editor, Generator). Ein Feld am Kanal reist dort mit;
+    #   drei Tabellen muesste jeder dieser Wege einzeln kennen.
+    laser_angaben: Mapped[str | None] = mapped_column(Text, nullable=True,
+                                                      default="")
 
     mode: Mapped[FixtureMode] = relationship(back_populates="channels")
     ranges: Mapped[list[ChannelRange]] = relationship(
@@ -265,6 +279,12 @@ class PatchedFixture(Base):
     # 0/90/180/270 im Uhrzeigersinn, danach optional waagerecht gespiegelt.
     element_rotation: Mapped[int] = mapped_column(Integer, default=0)
     element_flip: Mapped[bool] = mapped_column(Boolean, default=False)
+    # LAS-30: Laser-Achsen je Montage (haengend/stehend) — Gegenstueck zu
+    # invert_pan/invert_tilt/swap_pan_tilt fuer ``laser_x``/``laser_y``.
+    # Wirkt in derselben Ausgabestufe (``apply_pan_tilt_orientation``).
+    invert_laser_x: Mapped[bool] = mapped_column(Boolean, default=False)
+    invert_laser_y: Mapped[bool] = mapped_column(Boolean, default=False)
+    swap_laser_xy: Mapped[bool] = mapped_column(Boolean, default=False)
     # Moving-Head physische Pan/Tilt-Bereiche (Grad) + DMX-Nullpunkt (Mitte) —
     # fuer hardware-genaues Auto-Aim UND den 3D-Visualizer (gleiche Abbildung).
     # Default: typische Moving-Head-Werte 540/270, Mitte bei DMX 128.
@@ -407,6 +427,12 @@ def migrate_show_db(engine) -> None:
                 conn.execute(text(
                     "ALTER TABLE patched_fixtures ADD COLUMN element_flip "
                     "BOOLEAN DEFAULT 0"))
+            # LAS-30: Laser-Achsen-Orientierung (Default aus).
+            for _lcol in ("invert_laser_x", "invert_laser_y", "swap_laser_xy"):
+                if pcols and _lcol not in pcols:
+                    conn.execute(text(
+                        f"ALTER TABLE patched_fixtures ADD COLUMN {_lcol} "
+                        "BOOLEAN DEFAULT 0"))
     except Exception as e:
         print(f"[models] migrate_show_db error: {e}")
 
@@ -457,6 +483,11 @@ def migrate_fixtures_db(engine) -> None:
             ccols = {row[1] for row in conn.execute(text("PRAGMA table_info(channels)"))}
             if ccols and "segment" not in ccols:
                 conn.execute(text("ALTER TABLE channels ADD COLUMN segment INTEGER"))
+            # LAS-33: Laser-Angaben je Kanal (JSON-Text). Dieselbe Falle wie
+            # oben — ohne die Spalte waere jede bestehende fixtures.db unladbar.
+            if ccols and "laser_angaben" not in ccols:
+                conn.execute(text(
+                    "ALTER TABLE channels ADD COLUMN laser_angaben TEXT DEFAULT ''"))
     except Exception as e:
         print(f"[models] migrate_fixtures_db error: {e}")
 

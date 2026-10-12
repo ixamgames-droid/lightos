@@ -1,7 +1,8 @@
 # LightOS - Test-/Entwicklungs-Abhaengigkeiten (NICHT zur Laufzeit noetig)
 # Installieren: ./venv/Scripts/python.exe -m pip install -r requirements-dev.txt
 #
-# Das Test-Gate (tools/verify_loop.ps1 bzw. python -m pytest tests/) braucht
+# Das Test-Gate (Windows tools/verify_segmented.ps1, Linux tools/verify_loop.sh —
+# ein Prozess je Testdatei, kein Sammellauf ueber den ganzen Ordner) braucht
 # zusaetzlich pytest-timeout, damit ein haengender Test gekillt + gemeldet wird
 # statt den ganzen Lauf zu blockieren (siehe pytest.ini).
 

@@ -68,7 +68,10 @@ import { dropAllowed, pendingDragFid } from './interaction/drag_drop.js';  // VI
 import { opticsSoftness, applyOptics } from './fixtures/optics.js';   // VIZ-MH-OPTICS
 import { prismFacetCount, applyPrism } from './fixtures/prism.js';    // VIZ-PRISMA-3D
 import { goboTexture, beamGoboTexture } from './fixtures/gobo_textures.js';   // VIZ-80/VIZ-83 (Test-Seam)
+import { goboProjektionInfo } from './scene/gobo_projektion.js';   // VIZ-96 (Test-Seam)
 import { beamLengthScale } from './fixtures/builders.js';             // VIZ-15
+import { resyncFloorSpot } from './fixtures/builders.js';             // VIZ-100
+import { syncMountPoses } from './fixtures/mount_pose.js';            // VIZ-100
 import { tickBewegungGlaettung, bewegungGlaettungAktiv, setGlattUhr } from './fixtures/builders.js';   // VIZ-92
 import { laserAnimationAktiv, tickLaserAnimation, laserInfo } from './fixtures/laser.js';   // VIZ-79
 import { floorPoolScale, poolFalloffTexture } from './fixtures/floor_pool.js';  // VIZ-15
@@ -133,6 +136,11 @@ function perFrameUpdate() {
   // sein Bild selbst an (requestRender), nur wenn es weitergerueckt ist —
   // bewusst keine Live-Probe (die rendert jeden rAF-Tick).
   tickBewegungGlaettung();
+  // VIZ-100: haengende Haltung an die Andock-Bindung angleichen. EINE Stelle
+  // fuer alle Wege, auf denen sich `f.dockedTo` oder das Buehnen-Element
+  // aendert (Ziehen, Undo/Redo, Element entfernt, Buehne geladen) — im
+  // Ruhezustand ein Vergleich je Geraet, sonst nichts.
+  if (syncMountPoses(resyncFloorSpot)) requestRender();
   fpsTick();
 }
 
@@ -209,6 +217,15 @@ window.fabPlace = fabPlace;
 // Qt WebChannel starten (ehem. stage_scene.html:3513 `setTimeout(tryChannel, 200)`)
 // ============================================================================
 setTimeout(tryChannel, 200);
+
+// VIZ-96 (Test-Seam): GL-Typkonstante eines aktiven Uniforms -> Name.
+function typName(gl, typ) {
+  for (const k of ['SAMPLER_2D', 'SAMPLER_CUBE', 'SAMPLER_3D', 'SAMPLER_2D_SHADOW',
+                   'SAMPLER_2D_ARRAY', 'SAMPLER_2D_ARRAY_SHADOW', 'SAMPLER_CUBE_SHADOW']) {
+    if (gl[k] !== undefined && gl[k] === typ) return k;
+  }
+  return '';
+}
 
 // ============================================================================
 // Expose for debug (ehem. stage_scene.html:3555-3559 `window.__lightos`)
@@ -300,6 +317,23 @@ window.__lightos = {
   // VIZ-72: Spot-Pool (echte Lichter) und Render-Kennzahlen des letzten Bildes.
   spotPoolInfo, spotPoolLights, __spotPoolVergeben: spotPoolVergeben, __spotPoolUhr: setSpotPoolUhr, umgebungInfo,
   __lichtUrsprung: lichtUrsprung, SCHATTEN_NEAR,   // VIZ-92
+  // VIZ-96: Zustand der Gobo-Projektion (Uniform-Werte je Schatten-Licht).
+  goboProjektionInfo,
+  // VIZ-96: uebersetzter Fragment-Quelltext und belegte Sampler je Programm —
+  // nur mit lebendem GL-Kontext (sonst leere Liste). Reine Leseoperation.
+  __programmInfo: () => {
+    const gl = renderer.getContext();
+    if (!gl || gl.isContextLost()) return [];
+    return (renderer.info.programs || []).map(p => {
+      let sampler = 0;
+      const n = gl.getProgramParameter(p.program, gl.ACTIVE_UNIFORMS) || 0;
+      for (let i = 0; i < n; i++) {
+        const u = gl.getActiveUniform(p.program, i);
+        if (u && /^sampler/i.test(typName(gl, u.type))) sampler += u.size;
+      }
+      return { name: p.name, sampler, quelle: gl.getShaderSource(p.fragmentShader) || '' };
+    });
+  },
   renderInfo: () => {
     let lichter = 0, spots = 0, schatten = 0;
     scene.traverseVisible(o => {

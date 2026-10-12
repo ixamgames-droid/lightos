@@ -478,6 +478,15 @@ def segment_wert(v) -> int | None:
     return n if n >= 0 else None
 
 
+def _laser_text(laser) -> str:
+    """LAS-33: ``laser``-Objekt eines Payload-Kanals als DB-Text (``""`` =
+    keine Angaben). Aufbau: ``src/core/laser/profilangaben.py``."""
+    if not laser:
+        return ""
+    from src.core.laser.profilangaben import als_text
+    return als_text(laser)
+
+
 def create_user_profile(payload: dict, *, engine=None) -> int:
     """Speichert ein vom Fixture-Generator erzeugtes Payload als neues
     FixtureProfile (source="user") in der DB und gibt die neue Profil-ID zurueck.
@@ -514,10 +523,18 @@ def create_user_profile(payload: dict, *, engine=None) -> int:
         )
         s.add(prof)
         s.flush()
+        # FM-73: keine zwei Modi gleichen Namens speichern — ein gepatchtes
+        # Geraet findet seinen Modus ueber Profil + Modusname. Der Generator
+        # meldet Doppelte schon im Dialog; hier steht der Riegel fuer JEDES
+        # Payload (auch von Hand gebaut): der zweite heisst „Name (2)“.
+        from .modus_wahl import eindeutiger_modusname
+        vergeben: set[str] = set()
         for m in payload.get("modes", []):
             channels = m.get("channels", [])
             mode = FixtureMode(
-                fixture_id=prof.id, name=(m.get("name") or "Modus").strip(),
+                fixture_id=prof.id,
+                name=eindeutiger_modusname(
+                    (m.get("name") or "Modus").strip(), vergeben),
                 channel_count=int(m.get("channel_count", len(channels))),
                 description="",
                 # FM-26: die physische Rasterform des Modus mitschreiben —
@@ -549,6 +566,10 @@ def create_user_profile(payload: dict, *, engine=None) -> int:
                     # Fehlt der Schluessel (aeltere Payloads, Handbau), ist
                     # das „keine Zuordnung" — dasselbe wie NULL.
                     segment=segment_wert(ch.get("segment")),
+                    # LAS-33: Laser-Angaben (Muster, Farben, Richtung,
+                    # Betriebsart) als JSON-Text; fehlt der Schluessel oder
+                    # ist er ungueltig, bleibt das Feld leer = keine Angaben.
+                    laser_angaben=_laser_text(ch.get("laser")),
                 )
                 s.add(fc)
                 s.flush()

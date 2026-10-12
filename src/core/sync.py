@@ -189,6 +189,34 @@ class ValidationIssue:
         return self.__str__()
 
 
+BANNER_FEHLER = "#ff4444"
+BANNER_WARNUNG = "#ffaa00"
+BANNER_HINWEIS = "#58a6ff"
+
+
+def banner_zusammenfassung(issues) -> tuple[str, str] | None:
+    """Text und Farbe des „Issues"-Banners; ``None`` = nichts zu melden.
+
+    Fehler und Warnungen wie bisher („N Issues", rot bzw. gelb). CDX-58: gibt
+    es NUR Hinweise (Schwere ``info``, z. B. „Snaps widersprechen sich"),
+    erscheint das Banner trotzdem — ruhiger gefaerbt und als „Hinweis"
+    benannt. Vorher blieb so ein Befund unsichtbar, bis jemand von sich aus
+    „Show pruefen & reparieren" oeffnete.
+    """
+    issues = list(issues or ())
+    fehler = sum(1 for i in issues if getattr(i, "severity", "") == "error")
+    warnungen = sum(1 for i in issues if getattr(i, "severity", "") == "warn")
+    if fehler or warnungen:
+        zeichen, farbe = ("!", BANNER_FEHLER) if fehler else ("*", BANNER_WARNUNG)
+        return f" {zeichen} {fehler + warnungen} Issues ", farbe
+    hinweise = sum(1 for i in issues if getattr(i, "severity", "") == "info"
+                   and not getattr(i, "auto_fixed", False))
+    if hinweise:
+        wort = "Hinweis" if hinweise == 1 else "Hinweise"
+        return f" i {hinweise} {wort} ", BANNER_HINWEIS
+    return None
+
+
 def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
     """Pruefe und repariere den App-State.
 
@@ -209,10 +237,11 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
 
     try:
-        from sqlalchemy import select, update
+        from sqlalchemy import update
         from sqlalchemy.orm import Session
+        from src.core.database import modus_wahl
         from src.core.database.fixture_db import engine as fdb_engine
-        from src.core.database.models import FixtureMode, FixtureProfile, PatchedFixture
+        from src.core.database.models import FixtureProfile, PatchedFixture
 
         # Hole alle PatchedFixtures
         try:
@@ -222,6 +251,9 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
             return issues
 
         valid_fids: set[int] = set()
+        # FM-73: die Modi je Profil nur einmal lesen (32 gleiche Geraete =
+        # eine Abfrage statt 32).
+        modi_je_profil: dict = {}
 
         with Session(fdb_engine()) as s_fix:
             for f in patched:
@@ -248,11 +280,11 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
                     # sondern ein LOESCHEN seiner Programmer-, Cue- und
                     # Szenenwerte, bei JEDEM `open_show`.
                     #
-                    # ⚠️ Der Ausloeser liegt real vor: in der Bibliothek des
+                    # ⚠️ Der Ausloeser lag real vor: in der Bibliothek des
                     # Betreibers stehen 2 doppelte `(fixture_id, name)`-
-                    # Modus-Paare, und `scalar_one_or_none()` unten wirft
-                    # darauf `MultipleResultsFound`. Ein Geraet auf so einem
-                    # Profil verlor seine Werte still.
+                    # Modus-Paare, und die Modus-Suche unten warf darauf
+                    # `MultipleResultsFound` (behoben mit FM-73). Ein Geraet
+                    # auf so einem Profil verlor seine Werte still.
                     #
                     # Deshalb steht der `add` jetzt HIER: das Geraet steht im
                     # Patch, damit sind seine Werte nicht verwaist — ob seine
@@ -268,29 +300,34 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
                     address = getattr(f, "address", 0)
 
                     # 1. Mode existiert?
-                    mode = None
-                    if profile_id is not None:
-                        mode = s_fix.execute(
-                            select(FixtureMode)
-                            .where(FixtureMode.fixture_id == profile_id)
-                            .where(FixtureMode.name == mode_name)
-                        ).scalar_one_or_none()
+                    #
+                    # ★ FM-73: dieselbe Aufloesung wie ueberall sonst
+                    # (`modus_wahl`, auch `app_state._resolve_mode`). Vorher
+                    # standen hier eigene Abfragen per Name bzw. Kanalzahl,
+                    # die bei mehreren Treffern eine Ausnahme warfen: bei
+                    # gleichnamigen Modi (die liegen in echten Bibliotheken
+                    # vor) und bei zwei Modi gleicher Kanalzahl (voellig
+                    # normal). Die Folge war bei JEDEM Oeffnen eine
+                    # Fehlerzeile, keine Reparatur, und die Pruefungen 2b-4
+                    # fielen fuer das Geraet aus.
+                    if profile_id not in modi_je_profil:
+                        modi_je_profil[profile_id] = modus_wahl.modi_des_profils(
+                            s_fix, profile_id)
+                    modi = modi_je_profil[profile_id]
+                    mode = modus_wahl.gleichnamiger_modus(
+                        modi, mode_name, channel_count)
+                    # FM-73 (Review): der Treffer kann ein umbenannter
+                    # Zwilling sein („Standard (2)“ statt gespeichert
+                    # „Standard“, Alias-Regel in `modus_wahl`). Der Modus
+                    # ist da — aber der gespeicherte Name wird nachgezogen,
+                    # damit Show und Profil wieder dasselbe sagen.
+                    umbenannt = bool(mode) and mode.name != mode_name
 
-                    if not mode:
-                        # 2. Fallback: Mode mit passender Kanalanzahl
-                        fallback = None
-                        if profile_id is not None:
-                            fallback = s_fix.execute(
-                                select(FixtureMode)
-                                .where(FixtureMode.fixture_id == profile_id)
-                                .where(FixtureMode.channel_count == channel_count)
-                            ).scalar_one_or_none()
-
-                            if not fallback:
-                                fallback = s_fix.execute(
-                                    select(FixtureMode)
-                                    .where(FixtureMode.fixture_id == profile_id)
-                                ).scalars().first()
+                    if not mode or umbenannt:
+                        # 2. Fallback: Mode mit passender Kanalanzahl, sonst
+                        #    der erste des Profils (Stufen 2/3 der Regel).
+                        fallback = mode if umbenannt else modus_wahl.modus_waehlen(
+                            modi, mode_name, channel_count)
 
                         if fallback:
                             if fix:

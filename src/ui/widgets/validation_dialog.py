@@ -28,10 +28,15 @@ class ValidationDialog(QDialog):
             errors = [i for i in issues if getattr(i, "severity", "") == 'error']
             warns = [i for i in issues if getattr(i, "severity", "") == 'warn']
             fixed = [i for i in issues if getattr(i, "auto_fixed", False)]
+            # CDX-58: Hinweise (Schwere 'info', nicht behoben) mitzaehlen —
+            # sonst stuende ueber einer Liste mit einem Eintrag „0 · 0 · 0".
+            hints = [i for i in issues if getattr(i, "severity", "") == 'info'
+                     and not getattr(i, "auto_fixed", False)]
 
             summary = QLabel(
                 f"<b>{len(errors)} Fehler</b> &middot; "
                 f"<b>{len(warns)} Warnungen</b> &middot; "
+                f"<b>{len(hints)} Hinweise</b> &middot; "
                 f"<b>{len(fixed)} automatisch behoben</b>"
             )
             summary.setStyleSheet("padding: 6px; font-size: 13px;")

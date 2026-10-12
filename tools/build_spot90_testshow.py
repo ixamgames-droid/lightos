@@ -23,7 +23,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import _gen_env  # noqa: F401  # DEMO-02: spawn-sichere Env-Schalter VOR app_state
+import _gen_env  # DEMO-02: spawn-sichere Env-Schalter VOR app_state
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication
@@ -127,8 +127,10 @@ fm = get_function_manager()
 # Universum, das in der universes.json (App-Datenordner) wirklich einen Ausgang hat.
 def _universum_mit_ausgang(vorgabe: int = 1) -> int:
     import json as _j
-    from src.core.paths import user_data_file   # XPLAT-44: App-Datenordner
-    pfad = user_data_file("universes.json")
+    # TOOL-19: NICHT ``user_data_file("universes.json")`` — das ist seit der
+    # Umlenkung in ``_gen_env`` eine Datei, die es nicht gibt (damit
+    # ``get_state()`` keinen Ausgang oeffnet). Hier wird die ECHTE gelesen.
+    pfad = _gen_env.echte_universes_json()
     try:
         with open(pfad, encoding="utf-8") as fh:
             mit = [int(u["num"]) for u in (_j.load(fh) or []) if u.get("output")]
@@ -401,8 +403,7 @@ print(f"  VC-Positionen: {len(plaetze)} verschiedene, "
 # Universum ohne Ausgang sieht in der App voellig normal aus — nur am Rig
 # passiert nichts.
 import json as _json
-from src.core.paths import user_data_file   # noqa: E402  (XPLAT-44)
-_konf = user_data_file("universes.json")
+_konf = _gen_env.echte_universes_json()     # die echte, s. _universum_mit_ausgang
 _ausgaenge = []
 try:
     with open(_konf, encoding="utf-8") as fh:
