@@ -52,7 +52,7 @@
 | WEB-10 | A | feature/web10-handy-seitenleiste | 2026-10-11T16:32Z | - |
 | OUT-70 | A | feature/out70-interface-erkennung-assistent | 2026-10-11T15:44Z | - |
 | UI-90 | D | - | 2026-10-11T16:21Z | - |
-| MIDI-14 | D | - | 2026-10-11T16:21Z | - |
+| MIDI-14 | D | feature/midi14-motorfader-rueckmeldung | 2026-10-12T18:32Z | src/core/midi/midi_mapper.py · src/core/midi/midi_manager.py · tests/test_midi14_motorfader_rueckmeldung.py |
 | WEB-11 | A | feature/web11-qr-startbildschirm | 2026-10-11T16:32Z | - |
 | QA-96 | A | - | 2026-10-11T16:56Z | - |
 | WEB-12 | A | fix/web12-handy-rechte-laser | 2026-10-11T19:15Z | - |
@@ -260,7 +260,6 @@
 
 ## Verlauf
 
-- 2026-10-12T15:08Z D claim OUT-75
 - 2026-10-12T15:08Z A claim VIZ-104
 - 2026-10-12T15:15Z D done STAB-34
 - 2026-10-12T15:26Z B claim VIZ-105
@@ -290,3 +289,4 @@
 - 2026-10-12T18:15Z A claim VCB-45
 - 2026-10-12T18:15Z A claim VCB-46
 - 2026-10-12T18:23Z D done MIDI-10
+- 2026-10-12T18:32Z D aktualisiert MIDI-14: Branch - -> feature/midi14-motorfader-rueckmeldung; Dateien - -> src/core/midi/midi_mapper.py · src/core/midi/midi_manager.py · tests/test_midi14_motorfader_rueckmeldung.py
