@@ -68,7 +68,7 @@
 | STAB-34 | D | fix/stab34-speichern-frage-nach-show-laden | 2026-10-11T20:28Z | src/core/capability/reflect.py · src/core/capability/manifest.py · src/core/show/showbuilder/builder.py · src/ui/main_window.py · tests/test_stab34_speichern_frage_nach_show_laden.py |
 | UI-91 | A | fix/ui91-efx-reiter-geraeteliste | 2026-10-11T20:42Z | - |
 | FM-74 | A | fix/fm74-generator-editor-startgroesse | 2026-10-11T20:43Z | - |
-| OUT-72 | D | - | 2026-10-12T13:39Z | - |
+| OUT-72 | D | fix/out72-schlussbild-typwechsel-laser-nachlauf | 2026-10-12T14:44Z | src/core/dmx/output_manager.py · src/core/app_state.py · src/ui/widgets/output_config.py |
 | OUT-73 | D | fix/out73-enttec-reiter-toter-anschluss | 2026-10-12T13:51Z | src/ui/widgets/output_config.py |
 | OUT-74 | D | fix/out74-adapter-umzug-alte-zeile | 2026-10-12T14:06Z | src/ui/widgets/output_config.py · src/core/app_state.py |
 | LAS-38 | D | fix/las38-laser-erkennung-alle-modi | 2026-10-12T14:24Z | src/core/laser/erkennung.py · src/core/app_state.py |
@@ -229,7 +229,6 @@
 
 ## Verlauf
 
-- 2026-10-11T19:24Z D claim VCB-43
 - 2026-10-11T19:24Z D claim OUT-71
 - 2026-10-11T19:35Z D done UI-80
 - 2026-10-11T19:55Z D done UI-78
@@ -259,3 +258,4 @@
 - 2026-10-12T14:09Z D done XPLAT-54
 - 2026-10-12T14:24Z D aktualisiert LAS-38: Branch - -> fix/las38-laser-erkennung-alle-modi; Dateien - -> src/core/laser/erkennung.py · src/core/app_state.py
 - 2026-10-12T14:26Z A claim WEB-14
+- 2026-10-12T14:44Z D aktualisiert OUT-72: Branch - -> fix/out72-schlussbild-typwechsel-laser-nachlauf; Dateien - -> src/core/dmx/output_manager.py · src/core/app_state.py · src/ui/widgets/output_config.py
