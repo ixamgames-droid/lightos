@@ -20,6 +20,9 @@ from sqlalchemy import select, delete
 from src.core.database.fixture_db import (als_bearbeitet_markieren, engine,
                                           segment_wert)
 from src.core.database.models import ABLOESBARE_QUELLEN
+# LAS-33: Laser-Angaben eines Kanals reisen durch den Editor mit.
+from src.core.laser.profilangaben import (als_text as laser_als_text,
+                                           aus_text as laser_aus_text)
 from src.core.database.models import (
     Manufacturer, FixtureProfile, FixtureMode, FixtureChannel, ChannelRange,
     GEO_MAX,
@@ -962,6 +965,11 @@ class FixtureEditorDialog(QDialog):
                     # loescht und baut die Modi neu — was hier nicht
                     # mitgelesen wird, ist nach dem naechsten Speichern weg.
                     "segment": c.segment,
+                    # LAS-33: Laser-Angaben (Muster/Farben/Richtung). Der
+                    # Editor zeigt sie nicht — aber aus demselben Grund wie
+                    # beim Segment muessen sie hier mitgelesen werden, sonst
+                    # loescht das naechste Speichern sie.
+                    "laser": laser_aus_text(c.laser_angaben),
                     "ranges": [{
                         "range_from": r.range_from, "range_to": r.range_to,
                         "name": r.name, "kind": r.kind,
@@ -1207,6 +1215,8 @@ class FixtureEditorDialog(QDialog):
                         # FM-46: nur an Dimmern gespeichert (s. Spalte).
                         segment=(segment_wert(ch.get("segment"))
                                  if ist_dimmer(ch.get("attribute")) else None),
+                        # LAS-33: unveraendert zurueckschreiben.
+                        laser_angaben=laser_als_text(ch.get("laser")),
                     )
                     s.add(fc)
                     for r in ch.get("ranges", []) or []:

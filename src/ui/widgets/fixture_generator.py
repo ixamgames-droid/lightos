@@ -50,6 +50,9 @@ from src.core.dimmer_segmente import (HINWEIS_TEXT, SegmentZiele,
                                       vorschlag_dimmer_segmente,
                                       zuordnung_fehlt, zuordnung_probleme)
 from src.core.database.fixture_db import segment_wert
+# LAS-33: Laser-Angaben (Muster, Farben, Richtungen) — reine Daten und Pruefung.
+from src.core.laser.profilangaben import (bereichs_hinweise,
+                                          bereinige as laser_bereinige)
 from src.ui.widgets.fixture_editor import (KEIN_SEGMENT,
                                            frage_vorschlag_ueberschreiben,
                                            leerzelle_hintergrund,
@@ -117,6 +120,10 @@ class GenChannel:
     # ``None`` = keine Zuordnung). Gespeichert als ``FixtureChannel.segment``;
     # an Nicht-Dimmern verwirft ``build_profile_payload`` den Wert.
     segment: int | None = None
+    # LAS-33: Laser-Angaben dieses Kanals — Musterliste, Farbtabelle, Richtung,
+    # Betriebsart (Aufbau: ``src/core/laser/profilangaben.py``). Leer = keine.
+    # Die Laser-Seiten des Dialogs schreiben direkt hinein.
+    laser: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -191,6 +198,8 @@ def build_profile_payload(model: GeneratorModel) -> dict:
                 # fuer Dimmer-Attribute in `channels_for_axis`).
                 "segment": (segment_wert(ch.segment)
                             if ist_dimmer(ch.attribute) else None),
+                # LAS-33: nur was gueltig ist (mit Version), sonst ``None``.
+                "laser": laser_bereinige(ch.laser),
                 "ranges": [
                     {"range_from": _clamp(r.range_from),
                      "range_to": _clamp(r.range_to),
@@ -334,6 +343,9 @@ def validate_model(model: GeneratorModel) -> list[tuple[str, str]]:
 
         # LAS-26: Laser — gibt es einen Aus-Wert, und ist er der Grundwert?
         issues.extend(_check_laser_aus(model, mode, loc))
+
+        # LAS-33: Musterliste/Farbtabelle — Ueberlappungen und Luecken.
+        issues.extend(_check_laser_angaben(mode, loc))
 
     # Modus-Vergleich (gleiche Funktionen, andere Reihenfolge).
     issues.extend(_compare_modes(model.modes))
@@ -487,6 +499,32 @@ def _check_laser_aus(model: GeneratorModel, mode: GenMode,
                  f"{ch.default_value} ist nicht „aus“ — nach dem Patchen "
                  f"strahlt der Laser sofort. Default auf {wert} setzen.")]
     return []
+
+
+def _check_laser_angaben(mode: GenMode, loc: str) -> list[tuple[str, str]]:
+    """LAS-33: Hinweise zu den Laser-Angaben eines Modus — ueberlappende oder
+    lueckenhafte Bereiche in Musterliste, Farbtabelle und Betriebsart, und
+    Eintraege, die unvollstaendig sind und deshalb nicht gespeichert wuerden.
+    Nie eine Sperre: ein Laser mit erst acht gemessenen Mustern HAT Luecken."""
+    out: list[tuple[str, str]] = []
+    for i, ch in enumerate(mode.channels, 1):
+        laser = ch.laser if isinstance(ch.laser, dict) else {}
+        sauber = laser_bereinige(laser) or {}
+        for feld, was in (("muster", "Muster"), ("farben", "Farben"),
+                          ("betriebsart", "Betriebsart")):
+            roh = laser.get(feld) or []
+            if not roh:
+                continue
+            chloc = f"{loc}, Kanal {i} ('{ch.name}')"
+            fehlen = len(roh) - len(sauber.get(feld, ()))
+            if fehlen:
+                out.append(("warn",
+                            f"{chloc}: {fehlen} Eintrag/Einträge in „{was}“ "
+                            f"unvollständig (Name, Bereich oder Form fehlt) — "
+                            f"sie werden nicht gespeichert."))
+            for text in bereichs_hinweise(roh, was):
+                out.append(("warn", f"{chloc}: {text}"))
+    return out
 
 
 def laser_sicherheit_text(model: GeneratorModel) -> str:
@@ -898,7 +936,33 @@ class _ModeTab(QWidget):
         self._range_editor = _RangeEditor()
         split.addWidget(self._range_editor)
         split.setSizes([420, 320])
-        lay.addWidget(split, 1)
+
+        # ── LAS-33: Laser-Seiten ─────────────────────────────────────────────
+        #
+        # Die Kanaltabelle bleibt die erste Seite; daneben drei Seiten fuer die
+        # Laser-Angaben (Muster, Farben, Richtungen). Bei einem Nicht-Laser
+        # sind sie samt Reiterleiste ausgeblendet — der Dialog sieht dann aus
+        # wie vorher und verliert keine Zeile Hoehe (FM-70).
+        from src.ui.widgets.laser_profil_seiten import (FarbSeite, MusterSeite,
+                                                        RichtungSeite)
+        self._seiten = QTabWidget()
+        self._seiten.setDocumentMode(True)
+        self._seiten.addTab(split, "Kanäle && Bereiche")
+        self.laser_muster = MusterSeite(mode, self._laser_geaendert)
+        self.laser_farben = FarbSeite(mode, self._laser_geaendert)
+        self.laser_richtung = RichtungSeite(mode, self._laser_geaendert)
+        self._laser_seiten = (self.laser_muster, self.laser_farben,
+                              self.laser_richtung)
+        for seite, titel in zip(self._laser_seiten,
+                                ("Laser: Muster", "Laser: Farben",
+                                 "Laser: Richtungen")):
+            self._seiten.addTab(seite, titel)
+        self._seiten.currentChanged.connect(self._seite_gewechselt)
+        lay.addWidget(self._seiten, 1)
+        #: Rueckruf des Dialogs nach einer Aenderung auf einer Laser-Seite.
+        self.laser_geaendert = None
+        self._typ_laser = False
+        self.set_typ_laser(False)
 
         self._refresh()
 
@@ -926,6 +990,45 @@ class _ModeTab(QWidget):
 
     def _on_name_changed(self):
         self.mode.name = self._edit_name.text().strip() or "Modus"
+
+    # ── LAS-33: Laser-Seiten ─────────────────────────────────────────────
+    def ist_laser(self) -> bool:
+        """Zeigt dieser Modus die Laser-Seiten? Ja, wenn der Geraetetyp
+        „laser“ ist oder ein Kanal ein Laser-Attribut traegt."""
+        return self._typ_laser or any(
+            (c.attribute or "").startswith("laser_") for c in self.mode.channels)
+
+    def set_typ_laser(self, typ_laser: bool) -> None:
+        """Vom Dialog gesetzt, wenn sich der Geraetetyp aendert."""
+        self._typ_laser = bool(typ_laser)
+        self._laser_sichtbarkeit()
+
+    def _laser_sichtbarkeit(self) -> None:
+        laser = self.ist_laser()
+        for i in range(1, self._seiten.count()):
+            self._seiten.setTabVisible(i, laser)
+        self._seiten.tabBar().setVisible(laser)
+        if not laser and self._seiten.currentIndex() != 0:
+            self._seiten.setCurrentIndex(0)
+
+    def laser_seiten_sichtbar(self) -> bool:
+        return self._seiten.isTabVisible(1)
+
+    def zeige_seite(self, index: int) -> None:
+        """0 = Kanaele, 1 = Muster, 2 = Farben, 3 = Richtungen."""
+        self._seiten.setCurrentIndex(index)
+
+    def _seite_gewechselt(self, index: int) -> None:
+        # Kanalnamen/-reihenfolge koennen sich auf der ersten Seite geaendert
+        # haben — die Laser-Seite beim Betreten neu aus dem Modus aufbauen.
+        self.sync_from_widgets()
+        seite = self._seiten.widget(index)
+        if seite in self._laser_seiten:
+            seite.aktualisieren()
+
+    def _laser_geaendert(self) -> None:
+        if self.laser_geaendert is not None:
+            self.laser_geaendert()
 
     def _add(self):
         self.sync_from_widgets()
@@ -1010,6 +1113,8 @@ class _ModeTab(QWidget):
             self._ziele.nachziehen(self.mode.channels)
             self._sync_fine_combo()
             self._refresh_segment_cells()
+            # LAS-33: ein Laser-Attribut blendet die Laser-Seiten ein.
+            self._laser_sichtbarkeit()
 
     # ── FM-46: Spalte „Weiß-Segment“ ─────────────────────────────────────
     # Dieselbe Spalte wie im einfachen Editor (Begruendung dort, an
@@ -1447,9 +1552,20 @@ class FixtureGeneratorDialog(QDialog):
             grid.addWidget(w1, r, 1)
             grid.addWidget(QLabel(l2), r, 2)
             grid.addWidget(w2, r, 3)
+        # LAS-33: ein LightOS-Profil (aus dem Fixture-Editor exportiert oder
+        # aus der Bibliothek) als Vorlage laden — samt Laser-Angaben.
+        b_profil = QPushButton("LightOS-Profil (.json) laden…")
+        b_profil.setToolTip(
+            "Ein LightOS-Profil als Startpunkt laden — z. B. um einem Laser "
+            "Muster, Farben und Richtungen nachzutragen. Gespeichert wird ein "
+            "neues eigenes Profil.")
+        b_profil.clicked.connect(self._import_profil)
+        laden = QHBoxLayout()
+        laden.addWidget(b_profil)
+        laden.addWidget(b_import)
         grid.addWidget(QLabel("Notizen:"), 3, 0)
-        grid.addWidget(self._edit_notes, 3, 1, 1, 2)
-        grid.addWidget(b_import, 3, 3)
+        grid.addWidget(self._edit_notes, 3, 1)
+        grid.addLayout(laden, 3, 2, 1, 2)
         grid.setColumnStretch(1, 1)
         grid.setColumnStretch(3, 1)
         root.addWidget(head)
@@ -1581,6 +1697,9 @@ class FixtureGeneratorDialog(QDialog):
         self._tabs.addTab(tab, tab.mode.name)
         tab._edit_name.editingFinished.connect(
             lambda t=tab: self._reiter_benennen(t))
+        # LAS-33: Laser-Seiten — sichtbar je nach Typ, Aenderungen pruefen.
+        tab.set_typ_laser(self._cb_type.currentText() == "laser")
+        tab.laser_geaendert = self._laser_hinweise
         return tab
 
     def _reiter_benennen(self, tab: "_ModeTab"):
@@ -1656,9 +1775,22 @@ class FixtureGeneratorDialog(QDialog):
         label = VIZ_MODEL_LABELS.get(sug, sug)
         self._cb_vizmodel.setItemText(0, f"Automatisch (Vorschlag: {label})")
 
+    def _laser_hinweise(self):
+        """LAS-33: nach einer Aenderung auf einer Laser-Seite nur die
+        Hinweisliste neu rechnen (kein Zuruecklesen der Tabellen noetig — die
+        Seiten schreiben direkt ins Modell)."""
+        self._zeige_hinweise()
+
     def _revalidate(self):
         self._sync_all()
         self._update_viz_suggestion()
+        # LAS-33: Typ „laser“ blendet die Laser-Seiten der Modi ein.
+        for i in range(self._tabs.count()):
+            self._tabs.widget(i).set_typ_laser(
+                self._model.fixture_type == "laser")
+        self._zeige_hinweise()
+
+    def _zeige_hinweise(self):
         issues = validate_model(self._model)
         # LAS-26: bei Lasern sagen, worueber LightOS ihn dunkel schaltet.
         try:
@@ -1688,11 +1820,33 @@ class FixtureGeneratorDialog(QDialog):
         except Exception as e:
             QMessageBox.warning(self, "Import", f"Import fehlgeschlagen:\n{e}")
             return
+        self.set_model(model)
+
+    def _import_profil(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "LightOS-Profil (.json) wählen", "", "LightOS-Profil (*.json)")
+        if not path:
+            return
+        try:
+            from src.core.database import bibliothek_format as BF
+            model = model_from_daten(BF.lade_datei(path))
+        except Exception as e:
+            QMessageBox.warning(self, "Laden", f"Laden fehlgeschlagen:\n{e}")
+            return
+        self.set_model(model)
+
+    def set_model(self, model: GeneratorModel) -> None:
+        """Ein anderes Modell in den Dialog laden (Import, Vorlage)."""
         self._model = model
         self._edit_mfr.setText(model.manufacturer)
         self._edit_model.setText(model.model)
         self._edit_short.setText(model.short_name)
+        # Der Typ-Wechsel loest sonst `_revalidate` aus, BEVOR Leistung,
+        # 3D-Modell und Notizen gesetzt sind — `_sync_all` laese dann die
+        # alten Feldinhalte ins neue Modell zurueck.
+        self._cb_type.blockSignals(True)
         self._cb_type.setCurrentText(model.fixture_type)
+        self._cb_type.blockSignals(False)
         vidx = self._cb_vizmodel.findData(model.viz_model or "")
         self._cb_vizmodel.setCurrentIndex(vidx if vidx >= 0 else 0)
         self._spin_power.setValue(model.power_w)
@@ -1798,6 +1952,61 @@ def _default_model() -> GeneratorModel:
             GenChannel("Grün", "color_g", 0, 255),
             GenChannel("Blau", "color_b", 0, 255),
         ])])
+
+
+def model_from_daten(daten: dict) -> GeneratorModel:
+    """LAS-33: ein LightOS-Profil (Aufbau der Bibliotheksdatei,
+    ``fixtures/bibliothek/SCHEMA.md``) als :class:`GeneratorModel` — der Weg,
+    ein vorhandenes Profil im Generator WIEDER ZU OEFFNEN, samt Laser-Angaben.
+
+    Gespeichert wird danach wie immer ein NEUES eigenes Profil; die Herkunft
+    der Vorlage (``quelle``/``herkunft``) reist nicht mit."""
+    import copy
+    modes: list[GenMode] = []
+    for m in daten.get("modi", ()):
+        chans = []
+        for c in m.get("kanaele", ()):
+            chans.append(GenChannel(
+                name=str(c.get("name", "Kanal")),
+                attribute=str(c.get("attribut", "raw") or "raw"),
+                default_value=_clamp(c.get("default", 0)),
+                highlight_value=_clamp(c.get("highlight", 255)),
+                invert=bool(c.get("invert", False)),
+                resolution="16bit" if c.get("aufloesung") == "16bit" else "8bit",
+                ranges=[GenRange(_clamp(b.get("von", 0)), _clamp(b.get("bis", 255)),
+                                 str(b.get("name", "")), str(b.get("art", "") or ""))
+                        for b in c.get("bereiche", ())],
+                segment=segment_wert(c.get("segment")),
+                laser=copy.deepcopy(laser_bereinige(c.get("laser")) or {})))
+        raster, weiss = m.get("raster") or {}, m.get("weiss") or {}
+        modes.append(GenMode(
+            str(m.get("name", "Modus")), chans,
+            grid_rows=_clamp_geo(raster.get("rows", 0)),
+            grid_cols=_clamp_geo(raster.get("cols", 0)),
+            white_rows=_clamp_geo(weiss.get("rows", 0)),
+            white_cols=_clamp_geo(weiss.get("cols", 0))))
+    return GeneratorModel(
+        manufacturer=str(daten.get("hersteller", "Generic")),
+        short_mfr=str(daten.get("hersteller_kurz", "")),
+        model=str(daten.get("modell", PLATZHALTER_MODELL)),
+        short_name=str(daten.get("kurzname", "")),
+        fixture_type=str(daten.get("typ", "other")),
+        power_w=int(daten.get("leistung_w", 0) or 0),
+        notes=str(daten.get("notizen", "")),
+        viz_model=str(daten.get("viz_model", "")),
+        modes=modes)
+
+
+def model_from_profile(profil_id: int, *, engine=None) -> GeneratorModel:
+    """LAS-33: ein Profil aus der Fixture-DB als :class:`GeneratorModel`
+    (siehe :func:`model_from_daten`)."""
+    from src.core.database import bibliothek_format as BF
+    # Die Herkunft wird hier nicht gebraucht — feste Angaben, damit der Export
+    # auch fuer Profile gelingt, deren Herkunft sich nicht belegen laesst.
+    return model_from_daten(BF.exportiere(
+        profil_id, engine=engine, quelle={"titel": "Vorlage"},
+        herkunft={"art": "lightos", "lizenz": "eigen"},
+        geprueft={"ok": False, "wie": "Vorlage"}, autor="Vorlage"))
 
 
 def model_from_qxf(path: str) -> GeneratorModel:
