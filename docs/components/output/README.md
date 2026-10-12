@@ -20,6 +20,7 @@ AppState-Eingangsschicht zurück in Universen.
 | [`universe`](universe.md) | Thread-sicherer 512-Kanal-DMX-Puffer + Schreib-Protokoll. |
 | [`enttec_pro`](enttec_pro.md) | Enttec DMX USB Pro über pyserial (Fehler-Watchdog / Reconnect, OUT-02). |
 | [`serial_process`](serial_process.md) | Prozess-isolierte serielle Ausgabe (Access-Violation-Isolation, STAB-08). |
+| [`udmx`](udmx.md) | uDMX-Adapter über rohes USB (pyusb optional), mit entkoppeltem Sender `udmx_process` (OUT-68). |
 | [`artnet`](artnet.md) | Art-Net-4-UDP-Sender. |
 | [`sacn`](sacn.md) | sACN-/E1.31-Sender (UDP Multicast/Unicast, Stream-Termination OUT-06). |
 

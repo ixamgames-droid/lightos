@@ -27,7 +27,7 @@ There is **no** special double-click function during operation – a double-clic
 Small status markers in the element:
 
 - **Yellow `⇅` or `▯` at the top left** – `⇅` = the fader is inverted, `▯` = a partial range (min/max) is set. The percentage at the top already reflects this.
-- **Cyan dot at the top right** – a MIDI CC binding is active.
+- **Cyan dot at the top right** – a MIDI binding (CC or pitch bend) is active.
 - **Yellow dashed line + `⊘▲`/`⊘▼` (soft takeover)** – only when „Pickup" is active and the fader, after a bank/page change, is waiting for the physical fader to pass through (see [MIDI & keyboard](#midi--keyboard)). The dashed line marks the target (VC) value, the second yellow line the current physical fader position, the arrow the direction in which you have to move the physical fader.
 
 If „Touch-Lock" is active for the VC, the fader ignores mouse/touch (display only); MIDI/APC keeps controlling it (see [README.en.md](README.en.md)).
@@ -60,8 +60,9 @@ A double-click (in edit mode) opens the „Fader Einstellungen" (fader settings)
 | **DMX-Kanal (Level-Modus)** (DMX channel (level mode)) | Only mode *DMX-Kanal (Level)*: target channel in the universe. | Integer |
 | **Playback Executor-Slot** | Only mode *Playback (Executor)*: the executor slot index (0-based) whose fader this control drives. A separate field – „nicht gesetzt" (not set) = no slot (the fader then has no effect). | Integer ≥ 0 or „nicht gesetzt" |
 | **Slot/Funktions-ID (Playback/Effekt)** (slot/function ID (playback/effect)) | Only visible in the **effect modes** (under „Erweitert" (advanced)): effect function ID(s). Several IDs separated by commas = group. Empty = active effect. The „Steuert" list overrides this field. Does **not** set the playback slot – the separate field *Playback Executor-Slot* is for that; in playback mode this field is not shown at all. | Integer(s), comma-separated |
-| **CC-Nummer (-1=keine)** (CC number (-1=none)) | MIDI controller number for the CC binding. | -1 (none) to 127 |
-| **MIDI-Kanal (0=alle)** (MIDI channel (0=all)) | MIDI channel of the binding. | 0 (all) to 16 |
+| **Art** (kind) | Kind of MIDI binding: **CC** (fader with a controller number, e.g. APC mini) or **Pitchbend (Motorfader, 14 Bit)** for Mackie Control and X-Touch desks. Pitch bend has no number – the fader is its MIDI channel. | CC / Pitchbend |
+| **CC-Nummer (-1=keine)** (CC number (-1=none)) | MIDI controller number for the CC binding. Locked when the kind is *Pitchbend*. | -1 (none) to 127 |
+| **MIDI-Kanal (0=alle)** (MIDI channel (0=all)) | MIDI channel of the binding. For *Pitchbend* pick the fader's channel (fader 1 = channel 1 …); with „Alle“ (all) every fader of the desk moves this control. | 0 (all) to 16 |
 
 ### The modes in plain words
 
@@ -120,10 +121,11 @@ The actual live effect runs through the shared seam `src/core/engine/effect_live
 
 ## MIDI & keyboard
 
-The fader supports **MIDI teach** (CC only, no note); there is **no key assignment** (a fader needs a continuous value, not a key press).
+The fader supports **MIDI teach** for **CC** and **pitch bend** (no note); there is **no key assignment** (a fader needs a continuous value, not a key press).
 
 - **Assign:** in the dialog, enter the **CC-Nummer** (0–127) and optionally the **MIDI-Kanal** (0 = all) – or learn the next incoming CC via right-click „MIDI Teach…". Active binding = cyan dot at the top right.
 - **Effect:** incoming CC values (0–127) are mapped absolutely to 0–255 (0–100 %). Only the number bound as CC on the matching channel counts.
+- **Motor faders (Mackie Control, X-Touch):** these desks send their faders as **pitch bend**, not CC – one MIDI channel per fader, the value with 14 bits (16,384 steps instead of 128). Assign: right-click „MIDI Teach…“ and move the fader on the desk (the note its touch sensor sends when you grab it is skipped), or set **Art = Pitchbend** and the channel in the dialog. The control then reaches all 256 steps; with CC it is only every second one. **The desk does not move its faders by itself yet** – feedback to the motors is a separate open item (MIDI-14). Until then „Pickup“ helps against jumps.
 - **Soft takeover / „Pickup":** a global VC switch for non-motorized controllers (e.g. APC mini). After a bank/page change, the physical fader is usually somewhere other than the VC value. With pickup active, the fader only takes over once the physical fader **passes through** the current VC value **once** – so there is no jump. Until then the element shows the yellow pickup hint (target line + ghost position + `⊘▲`/`⊘▼` direction arrow) and ignores MIDI.
 
 ## Tips & pitfalls

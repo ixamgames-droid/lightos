@@ -152,14 +152,17 @@ def _recovery_prompt_suppressed() -> bool:
 
     Zwei Netze (analog ``LIGHTOS_NO_OUTPUT_THREAD``):
     - ``LIGHTOS_NO_RECOVERY_PROMPT`` — tests/conftest.py setzt es explizit;
-    - ``QT_QPA_PLATFORM`` beginnt mit ``offscreen`` — faengt Tools/Skripte
-      ohne conftest ab (deckt auch Varianten wie ``offscreen:...``).
+    - Qt laeuft ohne Bildschirm (``qt_plattform.ohne_bildschirm``) — faengt
+      Tools/Skripte ohne conftest ab.
 
     In der echten App ist beides nie aktiv -> Live-Recovery unveraendert.
+    STAB-34: gefragt wird die Plattform, die Qt WIRKLICH benutzt — nicht die
+    Umgebungsvariable (siehe ``_exit_prompt_suppressed``).
     """
     if os.environ.get("LIGHTOS_NO_RECOVERY_PROMPT"):
         return True
-    return os.environ.get("QT_QPA_PLATFORM", "").startswith("offscreen")
+    from src.core.qt_plattform import ohne_bildschirm
+    return ohne_bildschirm()
 
 
 def _exit_prompt_suppressed() -> bool:
@@ -171,8 +174,15 @@ def _exit_prompt_suppressed() -> bool:
     setzt, will NICHT, dass beim Beenden ungespeicherte Arbeit kommentarlos
     verworfen wird. Hier zaehlt deshalb allein die headless-Plattform, auf der
     ein modaler Dialog schlicht niemanden erreicht.
+
+    STAB-34: „headless“ heisst die Plattform, auf der Qt WIRKLICH laeuft
+    (``qt_plattform.ohne_bildschirm``) — nicht die Umgebungsvariable
+    ``QT_QPA_PLATFORM``. Die las Qt nur beim Start; ein spaeter nachgeladenes
+    Modul hatte sie in der sichtbaren App auf „offscreen“ gestellt, und ab dem
+    ersten Laden einer Show wurde hier nie mehr gefragt.
     """
-    return os.environ.get("QT_QPA_PLATFORM", "").startswith("offscreen")
+    from src.core.qt_plattform import ohne_bildschirm
+    return ohne_bildschirm()
 
 
 def _colored_icon(color: str, size: int = 16) -> QIcon:
@@ -1664,8 +1674,11 @@ class MainWindow(QMainWindow):
             pass
 
     def _toggle_blackout(self, checked: bool):
-        self._state.output_manager.set_blackout(checked)
-        self._sync_blackout_button(checked)
+        om = self._state.output_manager
+        om.set_blackout(checked)
+        # VCB-43: anzeigen, ob es wirklich dunkel IST — haelt eine VC-Taste den
+        # Blackout, macht „aus“ hier nicht hell, und der Knopf bleibt an.
+        self._sync_blackout_button(bool(om.blackout))
 
     def _sync_blackout_button(self, an: bool):
         """UI-58: der Knopf zeigt den ECHTEN Blackout-Zustand, auch wenn ihn ein
@@ -2777,7 +2790,10 @@ class MainWindow(QMainWindow):
         from src.core import diagnose_log as dl
         from src.ui import hilfe
         from PySide6.QtWidgets import QFileDialog
-        headless = os.environ.get("QT_QPA_PLATFORM", "").startswith("offscreen")
+        # STAB-34: die echte Plattform, nicht die Variable — sonst blieb in der
+        # sichtbaren App nach dem Laden einer Show „Gespeichert unter …“ aus.
+        from src.core.qt_plattform import ohne_bildschirm
+        headless = ohne_bildschirm()
         if ziel is None:
             antwort = QMessageBox.information(
                 self, "Diagnosepaket speichern",
@@ -3015,8 +3031,11 @@ class MainWindow(QMainWindow):
                 tip = ("Laser-NOT-AUS: alle Laser sofort dunkel — ein Klick, "
                        "keine Rückfrage (Strg+Umschalt+L).\n")
             tip += f"Erkannte Laser: {n}"
-            if not aktiv:
-                tip += " — der Knopf wirkt auch, wenn keiner erkannt ist."
+            if n == 0:
+                # LAS-37: ehrlich bleiben — ohne erkannten Laser ist die
+                # NOT-AUS-Maske leer, ueber DMX geht dann nichts dunkel.
+                tip += (" — über DMX schaltet der Knopf dann nichts dunkel: er "
+                        "deckt nur Geräte, die LightOS als Laser erkennt.")
             if btn.text() != text:
                 btn.setText(text)
             if btn.styleSheet() != stil:
