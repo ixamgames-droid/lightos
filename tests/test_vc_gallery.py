@@ -105,7 +105,7 @@ class TestLintBgImage(unittest.TestCase):
         try:
             b = VCButton("X")
             b.bg_image = bg_image
-            findings = _check_widget(b.to_dict(), "test", get_capabilities(), set())
+            findings = _check_widget(b.to_dict(), "test", get_capabilities(), None)
             return [f.code for f in findings]
         finally:
             vc_assets.set_cache_dir_for_test(None)

@@ -11,7 +11,7 @@ from typing import Callable
 from uuid import uuid4
 
 from .midi_manager import (MidiMessage, geraet_passt, get_midi_manager,
-                           stabiler_portname)
+                           stabiler_portname, fader_wert)
 
 # Action types (legacy-compatible)
 ACTION_EXECUTOR_GO = "executor_go"
@@ -40,6 +40,8 @@ def _parse_effect_param(param: str) -> tuple[str, int | None]:
 BUTTON_TOGGLE = "toggle"
 BUTTON_FLASH = "flash"
 BUTTON_CONTINUOUS = "continuous"
+# Portname, unter dem per UDP empfangene MSC-Befehle im Monitor erscheinen.
+MSC_UDP_PORT_NAME = "MSC/UDP"
 # MIDI-2: reine Druck-Aktion. Jeder Druck loest genau einmal aus, Loslassen tut
 # nichts. Fuer GO/BACK der einzige zulaessige Modus — frueher war ``toggle`` die
 # Vorgabe, und jeder ZWEITE GO-Druck schaltete den Toggle aus und loeste BACK
@@ -103,7 +105,18 @@ def _action_from_target(target: str) -> tuple[str, str]:
 
 
 def _msg_type_from_binding(binding_type: str) -> str:
+    if binding_type == "pitchbend":             # MIDI-10
+        return "pitchbend"
     return "cc" if binding_type == "cc" else "note_on"
+
+
+def _binding_type_from_msg_type(msg_type: str) -> str:
+    """Flaches Feld ``msg_type`` (note_on/cc/pitchbend) -> Typ der Bindung.
+    EINE Stelle statt dreier ``"cc" if … else "note"``, die Pitchbend zu einer
+    Note gemacht haetten (MIDI-10)."""
+    if msg_type == "pitchbend":
+        return "pitchbend"
+    return "cc" if msg_type == "cc" else "note"
 
 
 # --- Konflikt-Erkennung beim MIDI-Learn (STAB-12, Option B) -----------------
@@ -143,8 +156,12 @@ def _iter_vc_bindings() -> list[tuple]:
 
 
 def _binding_family(msg_type: str) -> str:
-    """note_on/note_off/note -> 'note', cc -> 'cc' (Match-Familie)."""
-    return "cc" if str(msg_type) == "cc" else "note"
+    """note_on/note_off/note -> 'note', cc -> 'cc', pitchbend -> 'pitchbend'
+    (Match-Familie)."""
+    t = str(msg_type)
+    if t == "pitchbend":
+        return "pitchbend"
+    return "cc" if t == "cc" else "note"
 
 
 def _bindings_overlap(type_a, ch_a, d1_a, type_b, ch_b, d1_b) -> bool:
@@ -152,14 +169,19 @@ def _bindings_overlap(type_a, ch_a, d1_a, type_b, ch_b, d1_b) -> bool:
 
     Gleiche data1, gleiche Familie (note vs cc), ueberlappender Kanal
     (0 = alle Kanaele). Deckt sich mit MidiInBinding.matches /
-    midi_binding_matches (note_on bindet auch note_off)."""
-    try:
-        if int(d1_a) != int(d1_b):
+    midi_binding_matches (note_on bindet auch note_off).
+
+    MIDI-10: ein Pitchbend-Fader ist sein Kanal — ``data1`` gehoert dort zum
+    Wert und zaehlt nicht."""
+    fam_a, fam_b = _binding_family(type_a), _binding_family(type_b)
+    if fam_a != fam_b:
+        return False
+    if fam_a != "pitchbend":
+        try:
+            if int(d1_a) != int(d1_b):
+                return False
+        except (TypeError, ValueError):
             return False
-    except (TypeError, ValueError):
-        return False
-    if _binding_family(type_a) != _binding_family(type_b):
-        return False
     ca, cb = int(ch_a or 0), int(ch_b or 0)
     if ca != 0 and cb != 0 and ca != cb:
         return False
@@ -183,15 +205,21 @@ class MidiInBinding:
     device: str = ""
     channel: int = 1
     trigger_id: int = 0
-    message_type: str = "note"  # note or cc
+    message_type: str = "note"  # note, cc oder pitchbend (MIDI-10)
 
-    def matches(self, msg: MidiMessage) -> bool:
+    def matches(self, msg: MidiMessage, geschwister=None) -> bool:
         # MIDI-3: ueber den Geraetenamen, nicht ueber die ALSA-Nummer.
+        # ``geschwister`` = Geraetenamen aller Mappings (CDX-58: zwei
+        # baugleiche Pulte mit Alt-Nummern bleiben getrennt).
         if self.device and not geraet_passt(self.device, msg.port_name,
-                                            _offene_eingaenge()):
+                                            _offene_eingaenge(), geschwister):
             return False
         if self.channel != 0 and self.channel != msg.channel:
             return False
+        if self.message_type == "pitchbend":
+            # MIDI-10: je Fader ein Kanal; ``data1`` sind die unteren 7 Bit des
+            # Werts und aendern sich mit jeder Bewegung.
+            return msg.msg_type == "pitchbend"
         if self.trigger_id != msg.data1:
             return False
         if self.message_type == "cc":
@@ -213,11 +241,13 @@ class MidiInBinding:
 
     @classmethod
     def from_message(cls, msg: MidiMessage) -> "MidiInBinding":
+        pitchbend = msg.msg_type == "pitchbend"
         return cls(
             device=stabiler_portname(msg.port_name, _offene_eingaenge()),
             channel=msg.channel,
-            trigger_id=msg.data1,
-            message_type="cc" if msg.msg_type == "cc" else "note",
+            # MIDI-10: bei Pitchbend ist data1 Teil des Werts, nicht der Kennung.
+            trigger_id=0 if pitchbend else msg.data1,
+            message_type=_binding_type_from_msg_type(msg.msg_type),
         )
 
     def to_dict(self) -> dict:
@@ -310,7 +340,7 @@ class MidiMapping:
         self.button_mode = _normalize_button_mode(self.action, self.button_mode)
 
         # Legacy -> structured sync (kept for editor compatibility).
-        legacy_binding_type = "cc" if self.msg_type == "cc" else "note"
+        legacy_binding_type = _binding_type_from_msg_type(self.msg_type)
         self.midi_in = MidiInBinding(
             device=self.port_filter,
             channel=int(self.channel),
@@ -318,7 +348,10 @@ class MidiMapping:
             message_type=legacy_binding_type,
         )
 
-        if self.midi_out and self.midi_out.trigger_id < 0:
+        # MIDI-10: ein Pitchbend-Fader hat keine Nummer. ``data1`` (0) als
+        # Rueckmelde-Note zu nehmen, schaltete am Mackie-Pult die LED von Note 0.
+        if (self.midi_out and self.midi_out.trigger_id < 0
+                and self.msg_type != "pitchbend"):
             self.midi_out.trigger_id = int(self.data1)
 
     @classmethod
@@ -358,17 +391,25 @@ class MidiMapping:
         }
 
     def set_from_learn_message(self, msg: MidiMessage):
-        self.msg_type = "cc" if msg.msg_type == "cc" else "note_on"
+        self.msg_type = _msg_type_from_binding(
+            _binding_type_from_msg_type(msg.msg_type))
         self.channel = int(msg.channel)
-        self.data1 = int(msg.data1)
+        # MIDI-10: Pitchbend hat keine Nummer (data1 = untere Bits des Werts).
+        self.data1 = 0 if msg.msg_type == "pitchbend" else int(msg.data1)
         self.midi_in = MidiInBinding.from_message(msg)
         self.port_filter = self.midi_in.device
-        if self.midi_out and self.midi_out.trigger_id < 0:
-            self.midi_out.trigger_id = msg.data1
+        if (self.midi_out and self.midi_out.trigger_id < 0
+                and self.msg_type != "pitchbend"):
+            self.midi_out.trigger_id = self.data1
 
 
 class MidiMapper:
     """Bidirectional MIDI mapping engine (inbound + outbound feedback)."""
+
+    # MIDI-10 (Lernen): als Klassen-Vorgabe, damit auch ein ohne __init__
+    # gebautes Objekt (Tests) sie hat. Siehe start_learn.
+    _learn_pitchbend = False
+    _learn_note: MidiMessage | None = None
 
     def __init__(self, app_state):
         self._state = app_state
@@ -430,14 +471,43 @@ class MidiMapper:
 
     # Learn mode ---------------------------------------------------------
 
-    def start_learn(self, callback):
-        """Wait for the next note/cc message and return it to callback(msg)."""
+    def start_learn(self, callback, *, pitchbend: bool = False):
+        """Wait for the next note/cc message and return it to callback(msg).
+
+        MIDI-10: mit ``pitchbend=True`` lernt der Aufrufer auch Pitchbend-Fader
+        (Mackie Control, X-Touch). Deren Beruehrungssensor schickt VOR der
+        ersten Bewegung eine Note; damit nicht die statt des Faders gelernt
+        wird, zaehlt eine Note dann erst beim Loslassen — kommt vorher ein
+        Pitchbend, gewinnt der Fader. Ohne den Schalter bleibt alles wie
+        bisher: Pitchbend wird uebergangen, die erste Note zaehlt sofort
+        (so wollen es die Aufrufer, die nur Tasten binden)."""
+        self._learn_note = None
+        self._learn_pitchbend = bool(pitchbend)
         self._learn_mode = True
         self._learn_callback = callback
 
     def stop_learn(self):
         self._learn_mode = False
         self._learn_callback = None
+        self._learn_note = None
+
+    def _lern_auswahl(self, msg: MidiMessage):
+        """Die Nachricht, die das Lernen beendet — oder ``None`` (weiter warten)."""
+        art = msg.msg_type
+        if not self._learn_pitchbend:
+            return msg if art in ("note_on", "note_off", "cc") else None
+        if art in ("pitchbend", "cc"):
+            return msg
+        if art not in ("note_on", "note_off"):
+            return None
+        wartend = self._learn_note
+        if art == "note_on" and msg.data2 > 0:
+            if wartend is not None:
+                return wartend          # zweite Taste, oder Geraet ohne Note-Off
+            self._learn_note = msg      # Taste oder Beruehrung? Abwarten.
+            return None
+        # Loslassen: die gehaltene Note gilt; ohne gehaltene wie bisher.
+        return wartend if wartend is not None else msg
 
     # Learn-Konflikt-Warnung (STAB-12, Option B) -------------------------
 
@@ -516,28 +586,39 @@ class MidiMapper:
     # Inbound engine -----------------------------------------------------
 
     def _on_midi(self, msg: MidiMessage):
+        if msg.msg_type == "msc":
+            # MIDI-5/NET-14: MSC ist kein lernbares Mapping, sondern ein fester
+            # Befehlssatz (Cue-Liste -> Executor). Auch im Learn-Modus nicht
+            # verschlucken.
+            self.handle_msc(msg.msc)
+            return
         if self._learn_mode and self._learn_callback:
-            if msg.msg_type in ("note_on", "note_off", "cc"):
+            gelernt = self._lern_auswahl(msg)
+            if gelernt is not None:
                 callback = self._learn_callback
                 self._learn_mode = False
                 self._learn_callback = None
+                self._learn_note = None
                 # Konflikt-Check VOR dem Anwenden der Bindung: so zaehlt die
                 # gerade gelernte Zeile sich nicht selbst mit (Option B).
                 try:
                     self.check_and_warn_conflicts(
-                        msg.msg_type, msg.channel, msg.data1,
+                        gelernt.msg_type, gelernt.channel, gelernt.data1,
                         learned_label="Mapper-Learn")
                 except Exception:
                     pass
-                callback(msg)
+                callback(gelernt)
             return
 
         # MIDI-4: jede Zeile einzeln absichern — eine kaputte Zeile darf die
         # anderen Zeilen derselben Note nicht abbrechen. Schnappschuss der
         # Liste, weil die UI sie parallel ersetzen kann.
-        for mapping in list(self._mappings):
+        mappings = list(self._mappings)
+        geraete = {m.midi_in.device for m in mappings
+                   if getattr(m.midi_in, "device", "")}
+        for mapping in mappings:
             try:
-                if not mapping.midi_in.matches(msg):
+                if not mapping.midi_in.matches(msg, geraete):
                     continue
                 self._handle_inbound_mapping(mapping, msg)
             except Exception as e:
@@ -548,24 +629,193 @@ class MidiMapper:
                 except Exception:
                     pass
 
+    # ── MIDI Show Control (MIDI-5 / NET-14) ──────────────────────────────────
+
+    def _msc_executor(self, cue_list: str):
+        """Cue-Liste -> Executor der aktuellen Page: Nummer = Slot, sonst
+        Name (Executor-Beschriftung oder Name der gebundenen Cueliste).
+        Leere Liste = Executor 1."""
+        pe = self._state.playback_engine
+        if pe is None:
+            return None
+        key = (cue_list or "").strip()
+        if not key:
+            key = "1"
+        try:
+            slot = int(float(key))
+        except ValueError:
+            slot = None
+        if slot is not None:
+            if slot < 1:
+                return None
+            try:
+                return pe.get_executor(slot)
+            except (IndexError, ValueError):
+                return None
+        name = key.casefold()
+        for ex in list(pe.executors):
+            stack_name = getattr(getattr(ex, "stack", None), "name", "") or ""
+            if (str(ex.label).casefold() == name
+                    or str(stack_name).casefold() == name):
+                return ex
+        return None
+
+    def _msc_set(self, cmd) -> bool:
+        """SET -> Executor-Fader. Die Lesart der Datenbytes bestimmt
+        ``MscSettings.set_layout``:
+
+        - ``grandma``: Byte 0 = Executor (ab 0), Byte 1 = Seite (ab 1) ->
+          Executor-Seite von LightOS; Wert = grob (Prozent) + fein/128.
+        - ``standard``: 14-bit-Regler n -> Executor n+1 der aktuellen Seite,
+          Wert 14 bit.
+
+        Einen Executor, den es nicht gibt, nicht still schlucken: gedrosselte
+        Meldung (je Ziel einmal), sonst sucht man am Pult ohne Anhaltspunkt."""
+        from . import msc as _msc
+        from src.core.diagnose_log import melde_still
+        pe = self._state.playback_engine
+        if pe is None or cmd.control is None:
+            return False
+        seiten = getattr(pe, "pages", None)
+        if _msc.get_settings().set_layout == _msc.SET_GRANDMA:
+            gma = _msc.set_grandma(getattr(cmd, "set_data", ()) or ())
+            if gma is None:
+                return False
+            slot, seite, wert = gma
+            n_seiten = len(seiten) if seiten is not None else 1
+            if not 1 <= seite <= n_seiten:
+                melde_still("midi.msc.set", text=(
+                    f"SET (grandMA): Seite {seite} gibt es nicht "
+                    f"(1..{n_seiten}) — Executor {slot} nicht gesetzt. Sendet "
+                    "das Pult 14-Bit-Regler, die SET-Belegung auf "
+                    "'Standard' stellen."))
+                return False
+            n_slots = len(seiten[seite - 1]) if seiten is not None else len(pe.executors)
+            if not 1 <= slot <= n_slots:
+                melde_still("midi.msc.set", text=(
+                    f"SET (grandMA): Executor {slot} auf Seite {seite} gibt es "
+                    f"nicht (1..{n_slots})"))
+                return False
+            ex = (seiten[seite - 1][slot - 1] if seiten is not None
+                  else pe.get_executor(slot))
+        else:
+            slot = int(cmd.control) + 1
+            n_slots = len(pe.executors)
+            if not 1 <= slot <= n_slots:
+                melde_still("midi.msc.set", text=(
+                    f"SET (Standard): Regler {int(cmd.control)} -> Executor "
+                    f"{slot} gibt es nicht (1..{n_slots}). Sendet eine grandMA, "
+                    "die SET-Belegung auf 'grandMA (Executor, Seite)' stellen."))
+                return False
+            ex = pe.get_executor(slot)
+            wert = max(0.0, min(1.0, (cmd.value or 0) / 16383.0))
+        ex.fader_value = wert
+        return True
+
+    def subscribe_msc(self, callback) -> None:
+        """Beobachter fuer MSC-Befehle, die NICHT ueber einen MIDI-Eingang
+        kommen (GMA-MSC per UDP) — sonst fehlen sie im MIDI-Monitor. Der
+        Callback bekommt eine ``MidiMessage`` (Port ``MSC/UDP``) und laeuft im
+        Empfangsthread."""
+        if not hasattr(self, "_msc_listeners"):
+            self._msc_listeners = []
+        if callback not in self._msc_listeners:
+            self._msc_listeners.append(callback)
+
+    def unsubscribe_msc(self, callback) -> None:
+        try:
+            getattr(self, "_msc_listeners", []).remove(callback)
+        except ValueError:
+            pass
+
+    def _on_msc_udp(self, cmd) -> bool:
+        """NET-14: per UDP empfangenen Befehl ausfuehren UND den Beobachtern
+        (MIDI-Monitor) zeigen."""
+        ok = self.handle_msc(cmd)
+        if cmd is not None:
+            msg = MidiMessage(MSC_UDP_PORT_NAME, 0, "msc", cmd.command, 0, msc=cmd)
+            for cb in list(getattr(self, "_msc_listeners", ())):
+                try:
+                    cb(msg)
+                except Exception as e:
+                    from src.core.diagnose_log import melde_still
+                    melde_still("midi.msc", e, text="Monitor")
+        return ok
+
+    def handle_msc(self, cmd) -> bool:
+        """Fuehrt ein ``MscCommand`` aus. True, wenn etwas ausgeloest wurde."""
+        from . import msc as _msc
+        if cmd is None:
+            return False
+        try:
+            c = cmd.command
+            if c in (_msc.GO, _msc.TIMED_GO, _msc.RESUME, _msc.LOAD):
+                ex = self._msc_executor(cmd.cue_list)
+                if ex is None or ex.stack is None:
+                    return False
+                if c == _msc.LOAD:
+                    return False      # Vorladen kennt LightOS nicht
+                if cmd.cue:
+                    ex.stack.go_to(float(cmd.cue))
+                else:
+                    ex.press_btn("go")
+                return True
+            if c in (_msc.STOP, _msc.GO_OFF):
+                if not (cmd.cue_list or "").strip():
+                    # MSC-Spezifikation: ohne Cue-Liste gilt der Befehl fuer
+                    # ALLE laufenden Listen (nicht nur Executor 1).
+                    pe = self._state.playback_engine
+                    if pe is None:
+                        return False
+                    pe.stop_all()
+                    return True
+                ex = self._msc_executor(cmd.cue_list)
+                if ex is None or ex.stack is None:
+                    return False
+                ex.press_btn("stop")
+                return True
+            if c == _msc.SET:
+                return self._msc_set(cmd)
+            if c == _msc.FIRE:
+                # Makro n -> Funktion (Szene/Chaser) mit ID n starten.
+                fm = getattr(self._state, "function_manager", None)
+                if fm is None or cmd.macro is None:
+                    return False
+                fm.start(int(cmd.macro))
+                return True
+            if c == _msc.ALL_OFF:
+                pe = self._state.playback_engine
+                if pe is None:
+                    return False
+                pe.stop_all()
+                return True
+        except Exception as e:
+            from src.core.diagnose_log import melde_still
+            melde_still("midi.msc", e, text=getattr(cmd, "name", ""))
+        return False
+
     def _handle_inbound_mapping(self, mapping: MidiMapping, msg: MidiMessage):
         mode = _normalize_button_mode(
             mapping.action,
             (mapping.button_mode or _infer_button_mode(mapping.action)).lower())
         if mode == BUTTON_CONTINUOUS:
-            value = msg.data2 / 127.0
+            value = fader_wert(msg)         # MIDI-10: Pitchbend mit 14 Bit
             self._execute_continuous(mapping, value)
             self._emit_mapping_state(mapping, value)
             return
 
+        # Ein Fader (CC oder Pitchbend) an einer Tasten-Aktion: obere Haelfte
+        # = gedrueckt. data2 ist bei Pitchbend das obere Byte, die Schwelle 64
+        # liegt also auch dort in der Mitte.
+        als_fader = msg.msg_type in ("cc", "pitchbend")
         is_pressed = (
             (msg.msg_type == "note_on" and msg.data2 > 0)
-            or (msg.msg_type == "cc" and msg.data2 >= 64)
+            or (als_fader and msg.data2 >= 64)
         )
         is_released = (
             msg.msg_type == "note_off"
             or (msg.msg_type == "note_on" and msg.data2 == 0)
-            or (msg.msg_type == "cc" and msg.data2 < 64)
+            or (als_fader and msg.data2 < 64)
         )
 
         if mode == BUTTON_PRESS:
@@ -807,6 +1057,10 @@ class MidiMapper:
             if mapping.midi_out is None:
                 continue
             fb = mapping.midi_out
+            if mapping.msg_type == "pitchbend" and fb.trigger_id < 0:
+                # MIDI-10: keine Rueckmeldung ohne ausdruecklich gesetztes Ziel
+                # — der Rueckfall auf ``data1`` waere hier Note/CC 0.
+                continue
             ch = int(fb.channel or mapping.channel or 1)
             trigger = int(fb.trigger_id if fb.trigger_id >= 0 else mapping.data1)
             msg_type = fb.message_type or "note"
@@ -997,12 +1251,36 @@ class MidiMapper:
             print(f"[midi_mapper] load error: {e}")
             return False
 
+    def apply_msc_udp(self) -> bool:
+        """NET-14: GMA-MSC-UDP-Empfaenger gemaess ``msc.get_settings()``
+        (neu) starten oder stoppen. True = laeuft danach."""
+        from . import msc as _msc
+        st = _msc.get_settings()
+        rx = getattr(self, "_msc_udp", None)
+        if rx is not None and (not st.udp_enabled or rx.host != st.udp_host
+                               or rx.port != int(st.udp_port)):
+            rx.stop()
+            rx = None
+            self._msc_udp = None
+        if not st.udp_enabled:
+            return False
+        if rx is None:
+            rx = _msc.GmaMscReceiver(self._on_msc_udp, st.udp_host, st.udp_port)
+            if not rx.start():
+                return False
+            self._msc_udp = rx
+        return True
+
     def close(self):
         self._feedback_running = False
         try:
             self._feedback_thread.join(timeout=0.5)
         except Exception:
             pass
+        rx = getattr(self, "_msc_udp", None)
+        if rx is not None:
+            rx.stop()
+            self._msc_udp = None
 
 
 _mapper_instance: MidiMapper | None = None
@@ -1012,4 +1290,12 @@ def get_midi_mapper(app_state=None) -> MidiMapper | None:
     global _mapper_instance
     if _mapper_instance is None and app_state is not None:
         _mapper_instance = MidiMapper(app_state)
+        # MIDI-5/NET-14: gespeicherte MSC-Einstellungen beim Start anwenden.
+        try:
+            from . import msc as _msc
+            _msc.load_settings()
+            _mapper_instance.apply_msc_udp()
+        except Exception as e:
+            from src.core.diagnose_log import melde_still
+            melde_still("midi.msc", e, text="Start")
     return _mapper_instance

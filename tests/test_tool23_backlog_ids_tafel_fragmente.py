@@ -175,9 +175,11 @@ class LesefehlerTest(unittest.TestCase):
         self.assertEqual(code, 0)
         for args in gefragt:
             self.assertEqual(args[:2], ("ls-tree", "--name-only"))
-            self.assertEqual(args[3], "changelog.d/", args)
+            # PROC-20: neben ``changelog.d/`` wird auch ``backlog.d/`` gefragt.
+            self.assertIn(args[3], ("changelog.d/", "backlog.d/"), args)
             self.assertNotIn(":", args[2], "Ref und Pfad muessen getrennt sein")
-        self.assertEqual(sorted(a[2] for a in gefragt), ["origin/alt", "origin/main"])
+        self.assertEqual(sorted({a[2] for a in gefragt}), ["origin/alt", "origin/main"])
+        self.assertEqual({a[3] for a in gefragt}, {"changelog.d/", "backlog.d/"})
 
     def test_weitere_belegte_ids_liefert_ids_und_luecken(self):
         orig = B._git

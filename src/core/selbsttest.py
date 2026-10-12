@@ -59,6 +59,7 @@ PFLICHT_MODULE: tuple[str, ...] = (
 OPTIONALE_MODULE: tuple[str, ...] = (
     "rtmidi",
     "soundcard",
+    "usb.core",      # OUT-68: pyusb, nur fuer uDMX-Adapter (rohes USB)
 )
 
 #: Mitgelieferte Dateien/Ordner relativ zu ``programm_dir()``. Ordner muessen
@@ -182,6 +183,12 @@ def bericht() -> tuple[int, list[str]]:
     for name in OPTIONALE_MODULE:
         rest = pruefe_module((name,))
         zeilen.append(f"optional {name}: {'fehlt — ' + rest[0] if rest else 'ok'}")
+    try:
+        # OUT-68: pyusb allein genuegt nicht — darunter braucht es libusb.
+        from src.core.dmx.udmx import bibliothek_status
+        zeilen.append(f"optional uDMX: {bibliothek_status()['text']}")
+    except Exception as e:
+        zeilen.append(f"optional uDMX: ? ({type(e).__name__}: {e})")
     try:
         from PySide6 import __version__ as pyside_version
         zeilen.append(f"PySide6 {pyside_version}")

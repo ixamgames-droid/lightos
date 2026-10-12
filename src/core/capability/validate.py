@@ -212,10 +212,15 @@ def validate_show_dict(show: dict, caps: Capabilities | None = None) -> list[Fin
     # ── Virtuelle Konsole ───────────────────────────────────────────────────────
     vc = show.get("virtual_console") or {}
     widgets = vc.get("widgets", []) if isinstance(vc, dict) else []
+    # CDX-58: ein LEERER Katalog ist ein bekannter Katalog — jeder Verweis
+    # haengt dann (letzte Funktion geloescht). Nur wenn der ``functions``-Block
+    # ganz fehlt (Teil-Dict), ist unbekannt, welche Funktionen es gibt.
+    katalog = known_fids if isinstance(
+        show.get("functions"), (dict, list)) else None
     for j, w in enumerate(widgets):
         if isinstance(w, dict):
             findings += _check_widget(
-                w, f"virtual_console.widgets[{j}]", caps, known_fids, fid_to_fn)
+                w, f"virtual_console.widgets[{j}]", caps, katalog, fid_to_fn)
 
     # TOOL-25: Snap-Verweise der Knoepfe gegen die Snap-Bibliothek der Show.
     # Nur mit ``library``-Block: Alt-Shows ohne ihn erben beim Laden die
@@ -333,9 +338,17 @@ _WIDGET_ENUM_FIELDS = {
 }
 
 
+# Mehrfach-Aktionen, die ``actions[n].function_id`` auswerten
+# (``VCButton._execute_extra``).
+_AKTIONEN_MIT_FUNKTION = ("function", "effect_action")
+
+
 def _check_widget(w: dict, where: str, caps: Capabilities,
-                  known_fids: set[int],
+                  known_fids: set[int] | None,
                   fid_to_fn: dict[int, dict] | None = None) -> list[Finding]:
+    """``known_fids``: IDs aller Funktionen der Show. ``None`` = Katalog
+    unbekannt (keine Verweis-Pruefung); eine LEERE Menge = es gibt keine
+    Funktion, jeder Verweis haengt (CDX-58)."""
     fid_to_fn = fid_to_fn or {}
     out: list[Finding] = []
     wtype = w.get("type")
@@ -430,18 +443,25 @@ def _check_widget(w: dict, where: str, caps: Capabilities,
         ref = w.get(ref_key)
         refs = ref if isinstance(ref, list) else ([ref] if ref is not None else [])
         for r in refs:
-            if isinstance(r, int) and r > 0 and known_fids and r not in known_fids:
+            if (isinstance(r, int) and r > 0 and known_fids is not None
+                    and r not in known_fids):
                 out.append(Finding(
                     WARNING, "VC-DANGLING", label,
                     f"{ref_key} {r} zeigt auf keine existierende Funktion",
                     "vc_widget.py (function_id-Bindung)"))
     # TOOL-25: Mehrfach-Aktionen tragen je Eintrag eine eigene function_id
     # (vc_button.py, _run_actions) — die blieben bisher ungeprueft.
+    # CDX-58: nur die Aktionstypen, die das Feld LESEN (_execute_extra) — ein
+    # uebrig gebliebener Wert an ``library_snap``/``snapshot``/… ist inert.
     acts = w.get("actions")
     if isinstance(acts, list):
         for n, entry in enumerate(acts):
-            r = entry.get("function_id") if isinstance(entry, dict) else None
-            if isinstance(r, int) and r > 0 and known_fids and r not in known_fids:
+            if not isinstance(entry, dict) \
+                    or entry.get("type") not in _AKTIONEN_MIT_FUNKTION:
+                continue
+            r = entry.get("function_id")
+            if (isinstance(r, int) and r > 0 and known_fids is not None
+                    and r not in known_fids):
                 out.append(Finding(
                     WARNING, "VC-DANGLING", label,
                     f"actions[{n}].function_id {r} zeigt auf keine existierende "

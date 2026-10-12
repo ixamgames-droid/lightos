@@ -74,7 +74,10 @@ class _MIDIOUTCAPSW(ctypes.Structure):
 
 # Callback-Typ (WINFUNCTYPE = stdcall; CFUNCTYPE = cdecl)
 # void CALLBACK MidiInProc(HMIDIIN, UINT, DWORD_PTR, DWORD_PTR, DWORD_PTR)
-_MidiInProc = ctypes.WINFUNCTYPE(
+# getattr: ausserhalb von Windows gibt es kein WINFUNCTYPE — so bleibt das
+# Modul importierbar (Tests der SysEx-Pufferlogik, MIDI-5); WINMM_OK ist dort
+# ohnehin False.
+_MidiInProc = getattr(ctypes, "WINFUNCTYPE", ctypes.CFUNCTYPE)(
     None,
     ctypes.c_void_p,    # HMIDIIN
     ctypes.c_uint,      # wMsg
@@ -85,6 +88,33 @@ _MidiInProc = ctypes.WINFUNCTYPE(
 
 _MMSYSERR_NOERROR  = 0
 _MIM_DATA          = 0x3C3    # Kurze MIDI-Message (Note/CC/...)
+_MIM_LONGDATA      = 0x3C4    # MIDI-5: SysEx-Puffer gefuellt (MSC)
+_MIM_LONGERROR     = 0x3C6    # unvollstaendige/ungueltige SysEx — Puffer kommt zurueck
+_SYSEX_BUFFERS     = 4
+_SYSEX_BUFSIZE     = 1024
+
+
+class _MIDIHDR(ctypes.Structure):
+    _fields_ = [
+        ("lpData",          ctypes.c_void_p),
+        ("dwBufferLength",  ctypes.c_uint32),
+        ("dwBytesRecorded", ctypes.c_uint32),
+        ("dwUser",          ctypes.c_size_t),
+        ("dwFlags",         ctypes.c_uint32),
+        ("lpNext",          ctypes.c_void_p),
+        ("reserved",        ctypes.c_size_t),
+        ("dwOffset",        ctypes.c_uint32),
+        ("dwReserved",      ctypes.c_size_t * 8),
+    ]
+
+
+def _longdata_bytes(hdr: "_MIDIHDR") -> list[int]:
+    """MIDI-5: aufgezeichnete Bytes eines SysEx-Puffers (MIM_LONGDATA)."""
+    n = int(hdr.dwBytesRecorded)
+    if n <= 0 or not hdr.lpData:
+        return []
+    n = min(n, int(hdr.dwBufferLength))
+    return list(ctypes.string_at(hdr.lpData, n))
 _CALLBACK_FUNCTION = 0x00030000
 
 
@@ -123,6 +153,9 @@ class WinMMInput:
                  on_raw: "Callable[[list[int], str], None]"):
         self._name = port_name
         self._handle = ctypes.c_void_p(0)
+        self._closing = False
+        self._sysex_bufs: list = []
+        self._sysex_hdrs: list = []
 
         # Callback muss als ctypes-Objekt gehalten werden (verhindert GC)
         def _cb(h, msg_type, instance, param1, param2):
@@ -135,6 +168,22 @@ class WinMMInput:
                 except Exception as e:
                     from src.core.diagnose_log import melde_still   # STAB-30
                     melde_still("midi.winmm", e, text=port_name)
+            elif msg_type in (_MIM_LONGDATA, _MIM_LONGERROR):
+                # MIDI-5: SysEx (MSC). Puffer auslesen und — ausser beim
+                # Schliessen (midiInReset gibt alle Puffer zurueck) — wieder
+                # einreihen.
+                try:
+                    hdr = _MIDIHDR.from_address(param1)
+                    data = (_longdata_bytes(hdr)
+                            if msg_type == _MIM_LONGDATA else [])
+                    if data:
+                        on_raw(data, port_name)
+                    if not self._closing:
+                        _lib.midiInAddBuffer(self._handle, ctypes.byref(hdr),
+                                             ctypes.sizeof(_MIDIHDR))
+                except Exception as e:
+                    from src.core.diagnose_log import melde_still
+                    melde_still("midi.winmm", e, text=f"{port_name} SysEx")
 
         self._cb = _MidiInProc(_cb)
 
@@ -147,12 +196,37 @@ class WinMMInput:
         )
         if rc != _MMSYSERR_NOERROR:
             raise RuntimeError(f"midiInOpen Fehlercode {rc} fuer '{port_name}'")
+        self._add_sysex_buffers()
         _lib.midiInStart(self._handle)
+
+    def _add_sysex_buffers(self):
+        """MIDI-5: ohne bereitgestellte Puffer verwirft WinMM jede SysEx."""
+        for _ in range(_SYSEX_BUFFERS):
+            try:
+                buf = ctypes.create_string_buffer(_SYSEX_BUFSIZE)
+                hdr = _MIDIHDR()
+                hdr.lpData = ctypes.cast(buf, ctypes.c_void_p)
+                hdr.dwBufferLength = _SYSEX_BUFSIZE
+                size = ctypes.sizeof(_MIDIHDR)
+                if _lib.midiInPrepareHeader(self._handle, ctypes.byref(hdr),
+                                            size) != _MMSYSERR_NOERROR:
+                    break
+                _lib.midiInAddBuffer(self._handle, ctypes.byref(hdr), size)
+                self._sysex_bufs.append(buf)
+                self._sysex_hdrs.append(hdr)
+            except Exception:
+                break
 
     def close_port(self):
         """Selbe Schnittstelle wie rtmidi.MidiIn.close_port()."""
+        self._closing = True
         try:
             _lib.midiInReset(self._handle)
+            for hdr in self._sysex_hdrs:
+                _lib.midiInUnprepareHeader(self._handle, ctypes.byref(hdr),
+                                           ctypes.sizeof(_MIDIHDR))
+            self._sysex_hdrs.clear()
+            self._sysex_bufs.clear()
             _lib.midiInClose(self._handle)
         except Exception:
             pass

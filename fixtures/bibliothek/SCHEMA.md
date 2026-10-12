@@ -90,6 +90,7 @@ Unbekannte Felder sind ein Fehler (Tippfehler fallen so auf).
 | `aufloesung` | nein | `"8bit"` (Default) oder `"16bit"` |
 | `segment` | nein | nur an Dimmer-Kanälen (`intensity`/`dimmer`/`master`): welches eigene Weiß-Segment dieser Dimmer dimmt, **0-basiert** = Index unter den `color_w`-Kanälen des Modus (FM-46). Nur setzen, wenn das Handbuch es sagt |
 | `bereiche` | nein | Wertebereiche, siehe unten |
+| `laser` | nein | Laser-Angaben dieses Kanals (LAS-33): Musterliste, Farbtabelle, Richtung, Betriebsart — siehe „Laser-Angaben“ unten |
 
 ### Bereich (`bereiche[]`)
 
@@ -100,6 +101,59 @@ Unbekannte Felder sind ein Fehler (Tippfehler fallen so auf).
 | `art` | nein | Art des Bereichs, siehe Liste. Fehlt sie, wird sie aus dem Namen abgeleitet (wie bei den eingebauten Profilen); besser ausdrücklich angeben |
 
 Erst Bereiche mit `art` erzeugen in der Bedienung Farb-/Gobo-/Strobe-/Offen-Kacheln.
+
+### Laser-Angaben (`kanaele[].laser`, LAS-33)
+
+Optional, für Laser: was die DMX-Werte eines Kanals **bedeuten**. Daraus baut
+die Laser-Bedienung Musterbilder, Farbfelder und Regler, die richtig herum
+laufen. Fehlt das Feld, ist der Kanal ein Regler wie bisher — jedes Profil
+ohne `laser` bleibt gültig. Im Fixture Generator gibt es dafür die Seiten
+„Laser: Muster / Farben / Richtungen“
+([Anleitung](../../docs/anleitung_fixture_generator/ANLEITUNG_FIXTURE_GENERATOR.md#6-laser-muster-farben-richtungen)).
+
+**Nur Belegtes eintragen** (Handbuch oder am Gerät gemessen) — ein Wert ohne
+Eintrag bleibt in der Bedienung ein Regler. Überlappungen und Lücken sind
+erlaubt (der Generator weist darauf hin); ein einzeln gemessener Wert bekommt
+`von` = `bis`.
+
+| Feld | Pflicht | Inhalt |
+|---|---|---|
+| `version` | ja | `1` — Version der Laser-Angaben (unabhängig von `format_version`). Eine höhere Zahl liest diese Fassung nicht (Rückfall auf Regler) |
+| `muster` | nein | Musterliste: `[{"von", "bis", "name", "form", "anzahl"?, "stil"?, "bewegt"?, "linien"?}]` |
+| `farben` | nein | Farbtabelle: `[{"von", "bis", "name", "farbe"}]` — `farbe` = `"#rrggbb"` oder `"mehrfarbig"` |
+| `richtung` | nein | `{"umgekehrt"?, "ende_niedrig"?, "ende_hoch"?, "mitte"?: {"von", "bis"}}` |
+| `betriebsart` | nein | `[{"von", "bis", "art", "steuert"}]` — `art`: `aus` · `musik` · `auto` · `statisch` · `dynamisch`; `steuert`: wirken Muster/Lage aus LightOS in diesem Bereich? |
+
+Mindestens eines der vier Felder muss da sein.
+
+**Muster.** `form` aus dem Baukasten: `kreis` · `linie_waagerecht` ·
+`linie_senkrecht` · `dreieck` · `quadrat` · `stern` · `punkte_kreis` ·
+`punkte_linie` · `welle` · `kreuz` · `spirale` · `mehrere_kreise` — oder
+`eigene` mit `linien`: `[{"punkte": [[x, y], …], "geschlossen"?: true}]` in
+normierten Koordinaten (x von -1 links bis 1 rechts, y von -1 unten bis 1
+oben; höchstens 32 Linienzüge mit je 256 Punkten). `anzahl` (1..64) zählt je
+nach Form Zacken (`stern`, Standard 5), Punkte (`punkte_kreis` 8,
+`punkte_linie` 5), Wellen (`welle` 2), Windungen (`spirale` 3), Kreise
+(`mehrere_kreise` 4) oder Linien (`linie_*` 1). `stil`: `linie` (Standard) ·
+`gepunktet` · `gefuellt`. `bewegt`: `true` für pulsierende/animierte Muster.
+
+**Richtung.** `ende_niedrig`/`ende_hoch` sagen, was ein niedriger bzw. hoher
+DMX-Wert bewirkt: `klein`/`gross`, `langsam`/`schnell`, `links`/`rechts`,
+`unten`/`oben` (immer als Paar). Steht das Paar andersherum (niedrig = `gross`),
+läuft der Kanal umgekehrt; `umgekehrt` darf dem nicht widersprechen. `mitte`
+ist ein Wertebereich, der die Mittelstellung bedeutet (z. B. 0–10). Das ist
+eine Angabe für die **Bedienung** — am DMX-Signal ändert sie nichts (anders
+als `invert`).
+
+```json
+{"name": "Zoom / Größe", "attribut": "zoom", "default": 128, "highlight": 128,
+ "laser": {"version": 1,
+           "richtung": {"umgekehrt": true, "ende_niedrig": "gross", "ende_hoch": "klein"}}}
+```
+
+Vollständiges Beispiel: `laserworld/el-400rgb-mk2.json`. Code:
+`src/core/laser/profilangaben.py` (Prüfung und Lese-Schicht
+`laser_profilangaben`), `src/core/laser/musterformen.py` (Form → Linien).
 
 ## Listen
 

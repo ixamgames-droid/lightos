@@ -9,6 +9,8 @@ war damit eine Behauptung. Deshalb liegt es im Repo und nicht im Scratchpad.
     ./venv/bin/python tools/viz_render_benchmark.py 8 24 64
     ./venv/bin/python tools/viz_render_benchmark.py --json     # nur die Zahlen
     ./venv/bin/python tools/viz_render_benchmark.py 32 --zerlegen   # Anteile trennen
+    ./venv/bin/python tools/viz_render_benchmark.py 32 --runden 200 --plan
+                                    # nur zeigen, was gemessen WUERDE (kein Fenster)
 
     # Fuer belastbare Anteile (s. "Die Rampe" weiter unten):
     ./venv/bin/python tools/viz_render_benchmark.py 32 \
@@ -779,6 +781,19 @@ def main():
             f"gehoert in einen eigenen Prozess — sonst traegt der abgeschaltete "
             f"Zustand in die naechste Stufe hinueber. Beispiel: "
             f"tools/viz_render_benchmark.py 32 --aus {aus}")
+    if "--plan" in sys.argv:
+        # QA-93: nur zeigen, was gemessen WUERDE — ohne Fenster, ohne Messung.
+        # Dafuer gibt es zwei Gruende. (1) Wer eine lange Messreihe startet,
+        # kann vorher nachsehen, wie das Werkzeug seine Zeile gelesen hat.
+        # (2) Der Test der Zeilen-Auswertung braucht keine Messung: bis hierher
+        # startete er eine — mit dem echten 1600x900-Fenster dieses Werkzeugs,
+        # rund zehn Sekunden lang, bei JEDEM Gate auf dem Bildschirm dessen,
+        # der am Rechner arbeitet.
+        print(json.dumps({"stufen": sorted(stufen), "runden": runden,
+                          "aufwaermen": aufwaermen, "aus": aus,
+                          "zerlegen": zerlegen, "kumulativ": kumulativ,
+                          "rohdaten": rohdaten}))
+        return 0
     ergebnis = messen(sorted(stufen), runden=runden, still=still,
                       zerlegen=zerlegen, kumulativ=kumulativ, aus=aus,
                       rohdaten=rohdaten, aufwaermen=aufwaermen)

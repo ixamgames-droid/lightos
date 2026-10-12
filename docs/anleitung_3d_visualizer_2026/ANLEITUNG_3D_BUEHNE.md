@@ -135,6 +135,11 @@ Gespeichert wird mit der Bühne ([Teil F](#teil-f--speichern)) — Typ, Lage, Gr
    Tilt zeigen dabei in dieselbe Richtung wie vorher. Lösen (frei ziehen bei „Andocken
    aus", oder die Traverse löschen) stellt das Gerät wieder auf den Sockel. An Stützen
    und bei PARs, Leisten und anderen Geräten ohne Bügel ändert sich nichts.
+   Der Sockel sitzt auch dann an der Unterkante, wenn die Höhe des Geräts nicht genau
+   vom Andocken stammt (von Hand eingetragen, aus einer älteren Show, Traverse
+   nachträglich dicker oder höher gemacht): bis 0,5 m unter der Unterkante rückt das
+   Bild an die Kante, die gespeicherte Höhe bleibt, wie sie ist. Liegt das Gerät weiter
+   weg, wird es bei seiner gespeicherten Position gezeichnet.
 4. **Position & Ausrichtung** — die Felder des gewählten Geräts:
    - **Unten an die Traverse:** `Y` = Unterkante der Traverse minus 0,25 m. Im Bild hängt
      Spot 1 an der Back-Traverse (`Y=6`, 0,3 m hoch): `Y=5.6`, `Z=-2.5`, `X` entlang

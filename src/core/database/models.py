@@ -189,6 +189,20 @@ class FixtureChannel(Base):
     # (``migrate_fixtures_db``) fuer jeden Kanal „keine Zuordnung" traegt.
     segment: Mapped[int | None] = mapped_column(Integer, nullable=True,
                                                 default=None)
+    # LAS-33: Laser-Angaben dieses Kanals als JSON-Text — Musterliste,
+    # Farbtabelle, Richtung (umgekehrt / sprechende Enden / Mittelbereich) und
+    # Bedeutung der Betriebsart-Bereiche. Aufbau, Pruefung und die Lese-Schicht
+    # stehen in ``src/core/laser/profilangaben.py``; das JSON traegt seine
+    # eigene ``version``. Leer/NULL = keine Angaben, und das ist der Normalfall
+    # (jedes Nicht-Laser-Profil, jedes Alt-Profil).
+    #
+    # ★ Warum EIN Textfeld am Kanal und keine eigenen Tabellen: die Angaben
+    #   werden nie abgefragt, nur als Ganzes gelesen und geschrieben — und sie
+    #   muessen jeden Weg mitgehen, der einen Kanal kopiert (Bibliotheksdatei,
+    #   Export/Import, Editor, Generator). Ein Feld am Kanal reist dort mit;
+    #   drei Tabellen muesste jeder dieser Wege einzeln kennen.
+    laser_angaben: Mapped[str | None] = mapped_column(Text, nullable=True,
+                                                      default="")
 
     mode: Mapped[FixtureMode] = relationship(back_populates="channels")
     ranges: Mapped[list[ChannelRange]] = relationship(
@@ -469,6 +483,11 @@ def migrate_fixtures_db(engine) -> None:
             ccols = {row[1] for row in conn.execute(text("PRAGMA table_info(channels)"))}
             if ccols and "segment" not in ccols:
                 conn.execute(text("ALTER TABLE channels ADD COLUMN segment INTEGER"))
+            # LAS-33: Laser-Angaben je Kanal (JSON-Text). Dieselbe Falle wie
+            # oben — ohne die Spalte waere jede bestehende fixtures.db unladbar.
+            if ccols and "laser_angaben" not in ccols:
+                conn.execute(text(
+                    "ALTER TABLE channels ADD COLUMN laser_angaben TEXT DEFAULT ''"))
     except Exception as e:
         print(f"[models] migrate_fixtures_db error: {e}")
 
