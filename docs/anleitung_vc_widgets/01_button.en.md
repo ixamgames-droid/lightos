@@ -138,7 +138,7 @@ With the action **Blackout**, the dialog shows the **Blackout-Ziel** list. If it
 
 1. **Aktion:** set it to **Blackout**. Only then does the **Blackout-Ziel** list appear.
 2. The **Blackout-Ziel** list — here with the group „PAR links“ and the single fixture „Wash 1“ (followed by the fixture number `[#9]`). Use **×** to take an entry out again.
-3. **+ Gerät/Gruppe hinzufügen** appends a line; the selection box first lists all groups („Gruppe: …“ (group: …)), then all patched fixtures („Gerät: …“ (fixture: …)). You can mix groups and individual fixtures.
+3. **+ Gerät/Gruppe hinzufügen** appends a line; the selection box first lists all groups („Gruppe: …“ (group: …)), then all patched fixtures („Gerät: …“ (fixture: …)). You can mix groups and individual fixtures. If a group lies in a folder, the folder follows in brackets („Gruppe: PARs  (Front)“) — that keeps two groups with the same name apart.
 4. **OK** applies the setting.
 
 Two buttons side by side — one with a target, one without:
@@ -175,7 +175,8 @@ The same sequence in the 3D visualizer, looking at the stage from the front — 
 - **Several buttons** stack: if you release one, the fixtures of the others stay dark.
 - **Releasing, deleting the button, switching banks, loading a show** release the partial blackout — nothing gets stuck. If only the main view changes or the window is minimized while a MIDI pad is held, it stays dark (as with the global blackout).
 - The DMX monitor and the visualizer show the partial blackout just like the global one. Regardless of this, the laser NOT-AUS (emergency stop) remains the last layer.
-- The target is saved in the show (`blackout_fids`, `blackout_groups`); older layouts without these fields load as a global blackout.
+- A group is remembered by its **number**, not by its name: renaming it does not change the target, and two groups with the same name (for example „PARs“ in the folders „Front“ and „Back“) are two different targets. If the group is deleted, the list shows „Gruppe #… (nicht gefunden)“ — the button then blacks out nothing; it does not turn into the global blackout.
+- The target is saved in the show (`blackout_fids`, `blackout_group_ids`); older layouts without these fields load as a global blackout. Layouts from earlier versions carried group **names** (`blackout_groups`) and keep working unchanged. When the settings are opened, such a name becomes the number if exactly one group has that name; if several do, the entry is marked „mehrdeutig — bitte neu wählen“.
 
 ## Binding to an effect
 

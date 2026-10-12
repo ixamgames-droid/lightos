@@ -307,6 +307,13 @@ EFFECT_ACTION_LABELS: list[tuple[str, str]] = [
 ]
 
 
+# VCB-36: Namen, die KEINE Gruppe traegt — sie halten eine Blackout-Taste ein
+# Ziel-Blackout, wenn ihr eigentliches Ziel nicht (mehr) benennbar ist. Ein
+# Name ohne Gruppe schaltet nichts; ein leeres Ziel waere der globale Blackout.
+_BLACKOUT_ZIEL_PLATZHALTER = "(Gruppe #{gid} — gelöscht oder ohne Namen)"
+_BLACKOUT_ZIEL_UNLESBAR = "(unlesbares Blackout-Ziel)"
+
+
 def _clear_target_blackout_slot(slot) -> None:
     """VCB-11: gibt den gezielten Blackout einer (geloeschten/umgestellten) Taste
     frei — sonst bliebe ihr Teil-Blackout als Geist haengen. VCB-43: ebenso
@@ -386,9 +393,13 @@ class VCButton(VCWidget):
         # LAS-18: Name des Laser-Musters (PaletteType.LASER) fuer LASER_PATTERN.
         self.laser_palette: str = ""
         # VCB-11: Ziel einer BLACKOUT-Taste — einzelne Geraete (fids) und/oder
-        # Fixture-Gruppen (Namen, zur Laufzeit aufgeloest). Beides leer = globaler
+        # Fixture-Gruppen (zur Laufzeit aufgeloest). Alles leer = globaler
         # Blackout wie bisher (alte Layouts ohne die Felder laden genau so).
+        # VCB-36: Gruppen ueber ihre ID (``blackout_group_ids``) — zwei Gruppen
+        # duerfen gleich heissen. ``blackout_groups`` haelt nur noch NAMEN aus
+        # alten Layouts, die sich keiner Gruppe eindeutig zuordnen liessen.
         self.blackout_fids: list[int] = []
+        self.blackout_group_ids: list[int] = []
         self.blackout_groups: list[str] = []
         # Slot des gezielten Blackouts raeumen, wenn die Taste geloescht wird.
         self.destroyed.connect(lambda *_, s=id(self): _clear_target_blackout_slot(s))
@@ -994,7 +1005,36 @@ class VCButton(VCWidget):
 
     def has_blackout_target(self) -> bool:
         """VCB-11: Hat diese (BLACKOUT-)Taste ein Ziel? Nein = globaler Blackout."""
-        return bool(self.blackout_fids or self.blackout_groups)
+        return bool(self.blackout_fids or self.blackout_group_ids
+                    or self.blackout_groups)
+
+    def _blackout_gruppen_ziele(self) -> list:
+        """VCB-36: Gruppen-Ziele fuer ``set_target_blackout`` — je ID ein
+        ``(gid, "")``-Ref (meint genau diese Gruppe), dahinter die Alt-Namen."""
+        return [(int(g), "") for g in self.blackout_group_ids] + list(self.blackout_groups)
+
+    def _blackout_gruppen_fuer_alte_versionen(self) -> list[str]:
+        """VCB-36: Inhalt des Feldes ``blackout_groups`` in der Datei — die
+        Alt-Namen UND die Namen der ID-Ziele. Eine aeltere Programmversion kennt
+        nur dieses Feld; bliebe es leer, waere die Taste dort ein GLOBALER
+        Blackout statt eines gezielten."""
+        namen = list(self.blackout_groups)
+        if self.blackout_group_ids:
+            try:
+                from .target_list_editor import _blackout_gruppen
+                je_id = {gid: name for gid, name, _ordner in _blackout_gruppen()}
+            except Exception:
+                je_id = {}
+            for gid in self.blackout_group_ids:
+                # Geloeschte oder namenlose Gruppe (oder Show-DB nicht lesbar):
+                # ein Platzhalter, den keine Gruppe traegt. Die aeltere Version
+                # findet dazu nichts und schaltet nichts — liesse man den
+                # Eintrag weg, bliebe das Feld leer und die Taste waere dort
+                # doch der GLOBALE Blackout.
+                name = je_id.get(gid) or _BLACKOUT_ZIEL_PLATZHALTER.format(gid=gid)
+                if name not in namen:
+                    namen.append(name)
+        return namen
 
     def _release_target_blackout(self):
         """VCB-11: eigenen gezielten Blackout freigeben (no-op wenn keiner)."""
@@ -1293,7 +1333,7 @@ class VCButton(VCWidget):
                 # VCB-11: nur die Ziel-Geraete dunkel, der Rest laeuft weiter.
                 if press:
                     state.set_target_blackout(id(self), self.blackout_fids,
-                                              self.blackout_groups)
+                                              self._blackout_gruppen_ziele())
                 else:
                     state.clear_target_blackout(id(self))
             else:
@@ -2078,7 +2118,8 @@ class VCButton(VCWidget):
         # VCB-11: Ziel der Blackout-Taste — Geraete und/oder Gruppen; leer = global.
         blackout_editor = BlackoutTargetEditor(title="Blackout-Ziel")
         blackout_editor.set_targets(
-            blackout_ziel_schluessel(self.blackout_fids, self.blackout_groups))
+            blackout_ziel_schluessel(self.blackout_fids, self.blackout_groups,
+                                     self.blackout_group_ids))
         blackout_editor.setToolTip(
             "Leer = globaler Blackout. Mit Ziel schaltet die Taste NUR diese Geräte/"
             "Gruppen dunkel (Dimmer/Farbe auf 0, Pan/Tilt/Gobo bleiben); der Rest "
@@ -2244,9 +2285,11 @@ class VCButton(VCWidget):
             self._release_target_blackout()
             if self.action == BO:
                 self.blackout_fids = blackout_editor.fids()
+                self.blackout_group_ids = blackout_editor.group_ids()
                 self.blackout_groups = blackout_editor.groups()
             else:
                 self.blackout_fids, self.blackout_groups = [], []
+                self.blackout_group_ids = []
             self.edit_slot = edit_slot_edit.text().strip()
             self.tempo_bus_id = bus_combo.currentData() or ""
             self.midi_type = midi_type_combo.currentText()
@@ -2550,7 +2593,14 @@ class VCButton(VCWidget):
         d["laser_palette"] = self.laser_palette
         # VCB-11: Ziel der Blackout-Taste (leer = global).
         d["blackout_fids"] = list(self.blackout_fids)
-        d["blackout_groups"] = list(self.blackout_groups)
+        d["blackout_groups"] = self._blackout_gruppen_fuer_alte_versionen()
+        if self.blackout_group_ids:
+            # VCB-36: die IDs sind massgeblich. ``blackout_groups`` traegt dann
+            # auch die Namen der ID-Ziele (fuer aeltere Programmversionen) — die
+            # echten Alt-Namen stehen deshalb getrennt daneben. Ohne ID-Ziel
+            # bleibt das Layout Zeichen fuer Zeichen wie bisher.
+            d["blackout_group_ids"] = list(self.blackout_group_ids)
+            d["blackout_groups_nur_name"] = list(self.blackout_groups)
         d["tempo_bus_id"] = self.tempo_bus_id
         d["edit_slot"] = self.edit_slot
         d["actions"] = [dict(a) for a in self.actions]
@@ -2624,9 +2674,27 @@ class VCButton(VCWidget):
             if iv not in _bf:
                 _bf.append(iv)
         self.blackout_fids = _bf
-        _bg_roh = d.get("blackout_groups", None)
+        # VCB-36: Gruppen-IDs. Nur echte positive Ganzzahlen — ein unlesbarer
+        # Eintrag kostet sich selbst, nicht die Taste.
+        _bgi = []
+        _bgi_roh = d.get("blackout_group_ids", None)
+        for i in (_bgi_roh if isinstance(_bgi_roh, (list, tuple)) else []):
+            if isinstance(i, int) and not isinstance(i, bool) and i > 0 and i not in _bgi:
+                _bgi.append(i)
+        self.blackout_group_ids = _bgi
+        # Mit IDs im Layout stehen die echten Alt-Namen in
+        # ``blackout_groups_nur_name`` (``blackout_groups`` wiederholt dann die
+        # Namen der ID-Ziele); ein altes Layout kennt nur ``blackout_groups``.
+        # Hat KEINE ID das Lesen ueberlebt (alle unlesbar, etwa als Text
+        # gespeichert), gelten die Namen aus ``blackout_groups`` — dort stehen
+        # auch die der ID-Ziele. Ein Ziel-Blackout darf durch kaputte Eintraege
+        # ungenauer werden (Name statt ID) oder ins Leere gehen, aber NIE zum
+        # globalen werden.
+        _bg_roh = d.get("blackout_groups_nur_name" if _bgi else "blackout_groups", None)
         self.blackout_groups = [g for g in (_bg_roh if isinstance(_bg_roh, (list, tuple)) else [])
                                 if isinstance(g, str) and g.strip()]
+        if _bgi_roh and not (_bgi or self.blackout_groups or self.blackout_fids):
+            self.blackout_groups = [_BLACKOUT_ZIEL_UNLESBAR]
         # Show neu geladen: ein noch gehaltener Teil-Blackout gehoert zur alten Show.
         self._release_target_blackout()
         self.tempo_bus_id = d.get("tempo_bus_id", "") or ""

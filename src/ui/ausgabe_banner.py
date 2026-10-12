@@ -70,6 +70,8 @@ def _grund(w) -> str:
         return problem
     if w.get("weg") == "Enttec":
         return "Adapter nicht verbunden (USB-Kabel/Port prüfen)"
+    if w.get("weg") == "uDMX":                       # OUT-68
+        return "Adapter nicht verbunden (USB-Kabel prüfen)"
     return "es wird nichts gesendet"
 
 
