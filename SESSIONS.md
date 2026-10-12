@@ -74,6 +74,7 @@
 | LAS-38 | D | fix/las38-laser-erkennung-alle-modi | 2026-10-12T14:24Z | src/core/laser/erkennung.py · src/core/app_state.py |
 | STAB-35 | A | - | 2026-10-12T13:40Z | - |
 | STAB-36 | A | - | 2026-10-12T13:40Z | - |
+| WEB-14 | A | - | 2026-10-12T14:26Z | - |
 
 ## Blocker & Fallen
 
@@ -227,7 +228,6 @@
 
 ## Verlauf
 
-- 2026-10-11T19:24Z D claim LAS-37
 - 2026-10-11T19:24Z D claim VCB-43
 - 2026-10-11T19:24Z D claim OUT-71
 - 2026-10-11T19:35Z D done UI-80
@@ -257,3 +257,4 @@
 - 2026-10-12T14:06Z D aktualisiert OUT-74: Branch - -> fix/out74-adapter-umzug-alte-zeile; Dateien - -> src/ui/widgets/output_config.py · src/core/app_state.py
 - 2026-10-12T14:09Z D done XPLAT-54
 - 2026-10-12T14:24Z D aktualisiert LAS-38: Branch - -> fix/las38-laser-erkennung-alle-modi; Dateien - -> src/core/laser/erkennung.py · src/core/app_state.py
+- 2026-10-12T14:26Z A claim WEB-14
