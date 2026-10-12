@@ -286,6 +286,9 @@ die BPM-Erkennung aus PC-Audio. Linux-Besonderheiten stehen in
   ein anderes Programm den Port belegt.
 - **Art-Net 4** und **sACN/E1.31** (Ausgang und Eingang, Merge HTP/LTP), Netzwerkkarte wählbar,
   Art-Net-Startuniversum einstellbar; bis zu **32 Universen**, mehrere Adapter gleichzeitig.
+- Betrieb neben einem externen Lichtpult — DMX senden, DMX einmischen oder per MIDI Show
+  Control Cues auslösen lassen:
+  [Externe Pulte über Netzwerk und MIDI](docs/anleitung_externe_pulte/ANLEITUNG_EXTERNE_PULTE.md).
 - Die Statusleiste meldet ein Universum ohne Ausgang; der DMX-Monitor zeigt, ob das Bild
   wirklich rausgeht.
 - **MIDI** mit Profil-Editor (APC mini und APC mini mk2 dabei), LED-Feedback, mehrere Ausgänge

@@ -124,6 +124,7 @@ frei kombinieren; das Tempo aller Ebenen hängt an Tempo-Buses (siehe
 | [Zwei Universen über zwei Adapter](anleitung_zwei_universen/ANLEITUNG.md) | Universe 1 über ENTTEC USB Pro, Universe 2 über Art-Net, patchen und im Output-Monitor prüfen. | Keine Show nötig |
 | [ENTTEC und Art-Net gleichzeitig](anleitung_enttec_artnet/ANLEITUNG_ENTTEC_ARTNET.md) | Jedes Universum mit eigenem Ausgabe-Backend; ENTTEC, Art-Net und sACN frei mischen. | Keine Show nötig |
 | [Netzwerk vorbereiten (Windows)](anleitung_netzwerk_windows/ANLEITUNG.md) | Welche Funktion welchen Port braucht (Art-Net 6454, sACN 5568, Web-Remote 5000, MSC 6004), Netzwerkprofil, feste Adresse im Lichtnetz, Firewall-Freigaben anlegen und entfernen, typische Fehlerbilder. | Keine Show nötig |
+| [Externe Pulte über Netzwerk und MIDI](anleitung_externe_pulte/ANLEITUNG_EXTERNE_PULTE.md) | LightOS neben einem externen Lichtpult: DMX per Art-Net/sACN an das Pult senden, DMX vom Pult empfangen und einmischen (HTP/LTP), Cues per MIDI Show Control auslösen lassen; was nicht geht, Netzwerk und Ports (6454, 5568, 6004), Sicherheit, Fehlersuche, Stand der Erprobung. | Keine Show nötig |
 
 ## Shows & Beispiele
 
