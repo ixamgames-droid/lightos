@@ -170,7 +170,11 @@ Läufer auf Lampe 4 und 8 — Lampe 3 und 7 sind dann wieder exakt bei den 40 % 
   LightOS darüber und werden nicht verrechnet.
 - **Addieren ohne Effekt darunter** arbeitet auf 0 und sieht aus wie ein normaler Dimmer-Effekt.
   Ihm gehört dann der Dimmer der Lampe; ein Programmer- oder Snap-Dimmer zählt währenddessen
-  nicht — genau wie bei jedem anderen Dimmer-Effekt.
+  nicht — genau wie bei jedem anderen Dimmer-Effekt. Das gilt auch, wenn darunter **nur ein
+  Farb-Effekt** läuft und die Lampen bisher über die automatische Grundhelligkeit geleuchtet
+  haben: Mit dem Start des Addieren-Modify gehen alle Lampen, die im Lauflicht gerade nicht dran
+  sind, **aus** (die Farbe bleibt stehen, der Dimmer steht auf 0). Wer das nicht will, lässt
+  darunter einen Dimmer-Effekt laufen, z. B. einen festen Pegel.
 - **Abziehen und Abdunkeln ohne Effekt darunter** tun nichts. Sie greifen nur dort, wo ein Effekt
   den Dimmer gerade treibt; Grundwerte, Snaps und Programmer-Helligkeit werden nie abgedunkelt.
 - Steht **Dimmer-Bereich Min** im Modify-Effekt über 0, bekommt **jede** Lampe diesen Grundbetrag
