@@ -81,6 +81,7 @@ PFLICHT_RESSOURCEN: tuple[str, ...] = tuple("/".join(teile) for teile in (
     ("fixtures", "bibliothek"),
     ("licenses",),
     ("THIRD_PARTY_NOTICES.md",),
+    ("LICENSE",),                                     # LIZ-1: Lizenztext
 ))
 
 

@@ -351,8 +351,17 @@ der 3D-Visualizer startet mit `--no-sandbox` (abschaltbar über
 
 ## Status und Grenzen
 
-LightOS ist ein privates Projekt in aktiver Entwicklung — ohne Garantie, ohne Lizenz, ohne Support.
-Mitgelieferte fremde Komponenten (three.js, Geräteprofile auf QLC+-Basis) stehen unter ihren eigenen
+### Lizenz und Urheber
+
+**Copyright (c) 2026 [ixamgames-droid](https://github.com/ixamgames-droid/lightos) — alle Rechte
+vorbehalten.** Der Quelltext ist öffentlich, damit man ihn **ansehen** kann. Benutzen, Verändern
+und Weitergeben sind nur mit schriftlicher Erlaubnis des Urhebers gestattet — der volle Text steht
+in [LICENSE](LICENSE). Einen **Testzugang** (persönliche, befristete Lizenzdatei) gibt es auf
+Anfrage über GitHub; ohne gültige Lizenzdatei startet das Programm nicht. Wie das geht und wohin
+die Datei gehört: [docs/LIZENZ_UND_TESTZUGANG.md](docs/LIZENZ_UND_TESTZUGANG.md).
+
+LightOS ist ein privates Projekt in aktiver Entwicklung und in der Testphase — ohne Garantie und
+ohne Support. Mitgelieferte fremde Komponenten (three.js, Geräteprofile auf QLC+-Basis) stehen unter ihren eigenen
 Lizenzen — siehe [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Die 3D-Modelle im Visualizer
 sind eigene, im Code erzeugte Geometrie.
 
