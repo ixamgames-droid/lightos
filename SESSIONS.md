@@ -83,6 +83,7 @@
 | STAB-38 | A | fix/stab38-absturz-matrix-pingpong | 2026-10-12T17:33Z | src/ui/views/rgb_matrix_view.py |
 | FM-75 | D | fix/fm75-live-test-laser-rueckfrage | 2026-10-12T17:35Z | src/ui/widgets/fixture_generator.py · tests/test_fm75_live_test_laser_rueckfrage.py · docs/anleitung_fixture_generator |
 | PROC-21 | D | fix/test-verschmutzung-allwhite-las32 | 2026-10-12T17:48Z | tests/conftest.py · tests/test_allwhite_covers_all.py · tests/test_out61_estop_lade_fenster.py · tests/test_proc21_test_verschmutzung.py |
+| OUT-77 | D | fix/out77-diagnose-udmx-seriennummer | 2026-10-12T18:00Z | src/core/diagnose_log.py · tests/test_out77_diagnose_seriennummer.py |
 
 ## Blocker & Fallen
 
@@ -249,7 +250,6 @@
 
 ## Verlauf
 
-- 2026-10-12T13:40Z A claim STAB-36
 - 2026-10-12T13:51Z D aktualisiert OUT-73: Branch - -> fix/out73-enttec-reiter-toter-anschluss; Dateien - -> src/ui/widgets/output_config.py
 - 2026-10-12T14:06Z D aktualisiert OUT-74: Branch - -> fix/out74-adapter-umzug-alte-zeile; Dateien - -> src/ui/widgets/output_config.py · src/core/app_state.py
 - 2026-10-12T14:09Z D done XPLAT-54
@@ -279,3 +279,4 @@
 - 2026-10-12T17:35Z D claim FM-75
 - 2026-10-12T17:48Z D claim PROC-21
 - 2026-10-12T17:50Z D done XPLAT-53
+- 2026-10-12T18:00Z D claim OUT-77
