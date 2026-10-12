@@ -62,7 +62,6 @@
 | UI-91 | A | fix/ui91-efx-reiter-geraeteliste | 2026-10-12T16:01Z | - |
 | FM-74 | A | fix/fm74-generator-editor-startgroesse | 2026-10-12T16:22Z | - |
 | OUT-72 | D | fix/out72-schlussbild-typwechsel-laser-nachlauf | 2026-10-12T14:44Z | src/core/dmx/output_manager.py · src/core/app_state.py · src/ui/widgets/output_config.py |
-| OUT-73 | D | fix/out73-enttec-reiter-toter-anschluss | 2026-10-12T13:51Z | src/ui/widgets/output_config.py |
 | OUT-74 | D | fix/out74-adapter-umzug-alte-zeile | 2026-10-12T14:06Z | src/ui/widgets/output_config.py · src/core/app_state.py |
 | LAS-38 | D | fix/las38-laser-erkennung-alle-modi | 2026-10-12T14:24Z | src/core/laser/erkennung.py · src/core/app_state.py |
 | STAB-35 | A | fix/stab36-absturz-auswahlwechsel | 2026-10-12T15:43Z | - |
@@ -261,7 +260,6 @@
 
 ## Verlauf
 
-- 2026-10-12T15:26Z B claim VIZ-105
 - 2026-10-12T15:26Z B claim VIZ-106
 - 2026-10-12T15:27Z D claim VCB-44
 - 2026-10-12T15:41Z D claim UI-92
@@ -291,3 +289,4 @@
 - 2026-10-12T18:32Z D aktualisiert MIDI-14: Branch - -> feature/midi14-motorfader-rueckmeldung; Dateien - -> src/core/midi/midi_mapper.py · src/core/midi/midi_manager.py · tests/test_midi14_motorfader_rueckmeldung.py
 - 2026-10-12T18:42Z D aktualisiert MIDI-15: Branch - -> feature/midi15-touch-sperre; Dateien - -> src/core/midi/midi_mapper.py · src/ui/views/midi_view.py · tests/test_midi15_touch_sperre.py
 - 2026-10-12T18:42Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-12T18:42Z D done OUT-73
