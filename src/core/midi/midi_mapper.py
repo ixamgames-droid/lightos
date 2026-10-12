@@ -49,6 +49,20 @@ MOTOR_SCHRITT = 0.002
 #: Stellung — dort wird nichts aus einem geratenen Zustand nachgefuehrt.
 _MOTOR_LESBAR = (ACTION_EXECUTOR_FADER, ACTION_GRAND_MASTER)
 
+# ── MIDI-15: Beruehrungs-Note ────────────────────────────────────────────────
+#: Mackie Control: der Beruehrungssensor von Fader n (Pitchbend auf Kanal n,
+#: 1..9, 9 = Master) meldet sich als Note 104..112 auf MIDI-Kanal 1 —
+#: Anschlag > 0 = beruehrt, 0 (oder Note-Off) = losgelassen.
+TOUCH_KANAL = 1
+TOUCH_NOTE_FADER_1 = 104
+
+
+def mackie_touch_note(fader_kanal: int) -> int | None:
+    """Die Beruehrungs-Note zum Pitchbend-Kanal eines Mackie-Faders, oder
+    ``None`` ausserhalb von 1..9 (dort kennt das Protokoll keine)."""
+    k = int(fader_kanal)
+    return TOUCH_NOTE_FADER_1 + k - 1 if 1 <= k <= 9 else None
+
 
 def _parse_effect_param(param: str) -> tuple[str, int | None]:
     """'<key>[@<fid>]' -> (key, fid|None)."""
@@ -290,6 +304,9 @@ class MidiOutFeedback:
     state_on: int = 127
     brightness: int | None = None
     aux_channel: int | None = None
+    #: MIDI-15 (nur Motorfader): Note des Beruehrungssensors auf
+    #: ``TOUCH_KANAL``; ``None`` = der Fader hat keinen / wird nicht ausgewertet.
+    touch_note: int | None = None
 
     @classmethod
     def from_dict(cls, data: dict | None) -> "MidiOutFeedback | None":
@@ -297,6 +314,7 @@ class MidiOutFeedback:
             return None
         brightness = data.get("brightness")
         aux_channel = data.get("aux_channel")
+        touch_note = data.get("touch_note")
         return cls(
             device=str(data.get("device", "")),
             channel=int(data.get("channel", 1)),
@@ -306,10 +324,11 @@ class MidiOutFeedback:
             state_on=_clamp_7bit(int(data.get("state_on", 127))),
             brightness=None if brightness is None else _clamp_7bit(int(brightness)),
             aux_channel=None if aux_channel is None else int(aux_channel),
+            touch_note=None if touch_note is None else _clamp_7bit(int(touch_note)),
         )
 
     def to_dict(self) -> dict:
-        return {
+        daten = {
             "device": self.device,
             "channel": int(self.channel),
             "trigger_id": int(self.trigger_id),
@@ -319,6 +338,11 @@ class MidiOutFeedback:
             "brightness": self.brightness,
             "aux_channel": self.aux_channel,
         }
+        # MIDI-15: nur schreiben, wenn gesetzt — gespeicherte Rueckmeldungen
+        # ohne Beruehrungs-Note bleiben Zeichen fuer Zeichen gleich.
+        if self.touch_note is not None:
+            daten["touch_note"] = int(self.touch_note)
+        return daten
 
 
 def ist_motorfader(mapping) -> bool:
@@ -330,12 +354,15 @@ def ist_motorfader(mapping) -> bool:
             and getattr(mapping, "msg_type", "") == "pitchbend")
 
 
-def motor_rueckmeldung(mapping, geraet: str = "") -> "MidiOutFeedback":
+def motor_rueckmeldung(mapping, geraet: str = "", touch: bool = True) -> "MidiOutFeedback":
     """MIDI-14: die Rueckmeldung, die den Motorfader dieses Mappings nachfuehrt
     — derselbe Kanal wie der Fader; ``geraet`` = Ausgang des Pults (leer = der
-    gemeinsame Ausgang)."""
-    return MidiOutFeedback(device=str(geraet or ""), channel=int(mapping.channel),
-                           trigger_id=-1, message_type=FEEDBACK_MOTOR)
+    gemeinsame Ausgang). MIDI-15: mit ``touch`` wird die Beruehrungs-Note nach
+    Mackie-Belegung eingetragen (Kanal 1..9)."""
+    return MidiOutFeedback(
+        device=str(geraet or ""), channel=int(mapping.channel), trigger_id=-1,
+        message_type=FEEDBACK_MOTOR,
+        touch_note=mackie_touch_note(mapping.channel) if touch else None)
 
 
 @dataclass
@@ -473,6 +500,10 @@ class MidiMapper:
         self._motor_send_ts: dict[str, float] = {}
         self._motor_wert: dict[str, int] = {}
         self._motor_offen: dict[str, tuple[MidiMapping, float]] = {}
+        # MIDI-15: mapping_id der Motorfader, die gerade beruehrt werden, und
+        # die Stellung (0..1), die jeder Fader zuletzt selbst gemeldet hat.
+        self._motor_beruehrt: set[str] = set()
+        self._motor_hand_wert: dict[str, float] = {}
         self._feedback_queue: queue.Queue[tuple[MidiMapping, float]] = queue.Queue(maxsize=2048)
         self._feedback_running = True
         self._last_state_poll_ts = 0.0
@@ -641,6 +672,7 @@ class MidiMapper:
             # verschlucken.
             self.handle_msc(msg.msc)
             return
+        self._motor_beruehrung(msg)         # MIDI-15, auch waehrend des Lernens
         if self._learn_mode and self._learn_callback:
             gelernt = self._lern_auswahl(msg)
             if gelernt is not None:
@@ -1168,11 +1200,57 @@ class MidiMapper:
             return False
         jetzt = self._uhr()
         with self._motor_lock:
+            if mapping.mapping_id in self._motor_beruehrt:
+                # MIDI-15: der Sensor sagt, die Hand liegt auf dem Fader — was
+                # jetzt kommt, ist nie der Bericht einer Motorfahrt.
+                self._motor_hand_ts[mapping.mapping_id] = jetzt
+                self._motor_hand_wert[mapping.mapping_id] = fader_wert(msg)
+                return False
             gesendet = self._motor_send_ts.get(mapping.mapping_id)
             if gesendet is not None and (jetzt - gesendet) < MOTOR_ECHO_FENSTER_S:
                 return True
             self._motor_hand_ts[mapping.mapping_id] = jetzt
+            self._motor_hand_wert[mapping.mapping_id] = fader_wert(msg)
         return False
+
+    def _motor_beruehrung(self, msg: MidiMessage) -> None:
+        """MIDI-15: Beruehrungs-Note eines Motorfaders auswerten.
+
+        Beruehrt: nichts geht mehr an seinen Motor (``_motor_melden`` merkt
+        den Auftrag nur). Losgelassen: die Stellung wird sofort nachgetragen —
+        ohne die Wartezeit aus MIDI-14, denn der Sensor weiss es genau.
+        Die Note laeuft danach ganz normal weiter durch die Mappings."""
+        if msg.msg_type not in ("note_on", "note_off") or msg.channel != TOUCH_KANAL:
+            return
+        beruehrt = msg.msg_type == "note_on" and msg.data2 > 0
+        mappings = list(self._mappings)
+        geraete = {m.midi_in.device for m in mappings
+                   if getattr(m.midi_in, "device", "")}
+        for mapping in mappings:
+            if not ist_motorfader(mapping) or mapping.midi_out.touch_note != msg.data1:
+                continue
+            geraet = mapping.midi_in.device
+            if geraet and not geraet_passt(geraet, msg.port_name,
+                                           _offene_eingaenge(), geraete):
+                continue                    # dieselbe Note von einem anderen Pult
+            mid = mapping.mapping_id
+            with self._motor_lock:
+                if beruehrt:
+                    self._motor_beruehrt.add(mid)
+                    continue
+                war = mid in self._motor_beruehrt
+                self._motor_beruehrt.discard(mid)
+                if war:
+                    # sofort nachtragen: die Hand ist weg, keine Wartezeit
+                    self._motor_hand_ts.pop(mid, None)
+                    self._motor_wert.pop(mid, None)     # auch wenn der Wert gleich ist
+                    if mapping.action in _MOTOR_LESBAR:
+                        # der Wert zaehlt nicht: gesendet wird der echte Stand
+                        self._motor_offen.setdefault(mid, (mapping, 0.0))
+                    elif mid in self._motor_hand_wert:
+                        # Ziel ohne lesbaren Stand: nur, was der Fader selbst
+                        # gemeldet hat — nie eine geratene Stellung
+                        self._motor_offen[mid] = (mapping, self._motor_hand_wert[mid])
 
     def _motor_stellung(self, mapping: MidiMapping, vorgabe: float) -> float:
         """Wohin der Fader gehoert (0..1). Bei einem lesbaren Ziel der echte
@@ -1195,7 +1273,8 @@ class MidiMapper:
         mid = mapping.mapping_id
         with self._motor_lock:
             hand = self._motor_hand_ts.get(mid)
-            if hand is not None and (jetzt - hand) < MOTOR_HAND_RUHE_S:
+            if (mid in self._motor_beruehrt             # MIDI-15
+                    or (hand is not None and (jetzt - hand) < MOTOR_HAND_RUHE_S)):
                 self._motor_offen[mid] = (mapping, float(value))
                 return False
             self._motor_offen.pop(mid, None)
@@ -1210,6 +1289,8 @@ class MidiMapper:
         faellig = []
         with self._motor_lock:
             for mid, (mapping, value) in list(self._motor_offen.items()):
+                if mid in self._motor_beruehrt:         # MIDI-15: erst loslassen
+                    continue
                 hand = self._motor_hand_ts.get(mid)
                 if hand is None or (jetzt - hand) >= MOTOR_HAND_RUHE_S:
                     faellig.append((mapping, value))
@@ -1253,6 +1334,12 @@ class MidiMapper:
                     tabelle.clear()
                 else:
                     tabelle.pop(mapping_id, None)
+            if mapping_id is None:
+                self._motor_beruehrt.clear()
+                self._motor_hand_wert.clear()
+            else:
+                self._motor_beruehrt.discard(mapping_id)
+                self._motor_hand_wert.pop(mapping_id, None)
 
     @staticmethod
     def _sende(midi, geraet: str, msg_type: str, ch: int, trigger: int,

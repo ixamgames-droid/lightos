@@ -74,9 +74,20 @@ Schleife sendet die Stellung mit 14 Bit auf dem Kanal des Faders zurück
   zurückgerechnet durch `continuous_min/max`) – nur bei Executor-Fader und Grand Master
   (`_MOTOR_LESBAR`). Andere stufenlose Ziele bekommen nur ihre eigene Stellung zurück.
 
-Schwelle `MOTOR_SCHRITT` = 0,2 % (statt 1 % der LED-Rückmeldung). Grenze: bewegt die
-Software den Wert laufend (Überblendung), gewinnt bis MIDI-15 (Berührungs-Note) der Motor.
-VC-Fader haben keinen MIDI-Rückweg und werden nicht nachgeführt.
+Schwelle `MOTOR_SCHRITT` = 0,2 % (statt 1 % der LED-Rückmeldung). VC-Fader haben keinen
+MIDI-Rückweg und werden nicht nachgeführt.
+
+**Touch-Sperre (MIDI-15):** `MidiOutFeedback.touch_note` nennt die Note des
+Berührungssensors (Mackie: Fader 1..9 = Note 104..112 auf Kanal 1,
+`mackie_touch_note`; `motor_rueckmeldung` trägt sie ein, gespeichert wird das Feld nur,
+wenn es gesetzt ist). `_motor_beruehrung` wertet sie vor allem anderen aus – auch während
+des Lernens –, die Note läuft danach normal weiter durch die Mappings. Berührt: nichts
+geht an den Motor, und was vom Fader kommt, ist nie ein Echo (so kommt die Hand auch durch
+eine laufende Überblendung). Losgelassen: die Stellung wird sofort nachgetragen, ohne die
+Wartezeit – bei Zielen ohne lesbaren Stand nur, was der Fader selbst gemeldet hat. Ohne
+`touch_note` (Kanal 10..16, anderes Pult) gelten allein die Regeln aus MIDI-14; dort
+gewinnt bei einer laufenden Fahrt der Motor. Kommt das Loslassen nie an (Kabel gezogen),
+steht der Fader still, bis er wieder berührt und losgelassen wird.
 
 ## Gekoppelte VC-/Engine-Teile
 

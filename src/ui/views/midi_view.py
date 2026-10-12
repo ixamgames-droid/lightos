@@ -624,6 +624,19 @@ class MidiView(QWidget):
         self._prompt_feedback_values(mappings[row])
         self._refresh_map_table()
 
+    @staticmethod
+    def _touch_satz(mapping: MidiMapping) -> str:
+        """MIDI-15: welche Note LightOS als Beruehrungssensor dieses Faders
+        liest — oder dass es fuer diesen Kanal keine gibt."""
+        from src.core.midi.midi_mapper import TOUCH_KANAL, mackie_touch_note
+        note = mackie_touch_note(mapping.channel)
+        if note is None:
+            return ("\n\nFür Kanal %d kennt die Mackie-Belegung keinen "
+                    "Berührungssensor; hier gilt nur die Bewegung."
+                    % mapping.channel)
+        return ("\n\nBerührungssensor nach Mackie-Belegung: Note %d auf "
+                "Kanal %d." % (note, TOUCH_KANAL))
+
     def _motor_rueckmeldung_fragen(self, mapping: MidiMapping):
         """MIDI-14: das Nachfuehren des Motorfaders ein- oder ausschalten.
         Ein Pitchbend-Fader hat keine LED mit Velocity — seine „Rueckmeldung“
@@ -649,8 +662,9 @@ class MidiView(QWidget):
             f"zurück (Ausgang: {geraet or 'gemeinsamer Ausgang'}): der Fader "
             f"fährt mit, wenn sich der Wert anderswo ändert — am Bildschirm, "
             f"durch einen Seitenwechsel oder von einem zweiten Pult.\n\n"
-            f"Solange du den Fader bewegst, sendet LightOS nichts an seinen "
-            f"Motor.",
+            f"Solange du den Fader bewegst oder berührst, sendet LightOS "
+            f"nichts an seinen Motor."
+            + MidiView._touch_satz(mapping),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.Yes)
         if antwort == QMessageBox.StandardButton.Yes:
