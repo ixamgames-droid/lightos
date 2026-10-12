@@ -320,9 +320,162 @@ class AusgabeEntfernenTest(unittest.TestCase):
         with open(os.path.join(_REPO, "src", "ui", "widgets", "output_config.py"),
                   encoding="utf-8") as f:
             dialog = f.read()
-        # Abwaehlen von Art-Net und sACN: ja. Die drei Ersetzen-Wege: nein.
+        # Abwaehlen von Art-Net und sACN: ja. Die vier Ersetzen-Wege (Enttec,
+        # uDMX, Art-Net, sACN): nein.
         self.assertEqual(dialog.count("schlussbild=True)"), 2)
-        self.assertEqual(dialog.count("remove_output("), 5)
+        self.assertEqual(dialog.count("remove_output("), 6)
+
+
+class _Udmx(_Ausgang):
+    """Attrappe eines uDMX-Senders (OUT-68): ``send_dmx`` legt das Bild nur ab,
+    ein ``ausschreiben`` gibt es nicht — der Sender schickt beim Schliessen das
+    zuletzt abgelegte Bild selbst noch einmal (s. ``WorkerTest``)."""
+    ausschreiben = None
+
+    def __init__(self, name="udmx"):
+        super().__init__(name=name)
+
+
+class UdmxTest(unittest.TestCase):
+    """OUT-68 kam nach OUT-71 auf main: uDMX-Adapter haben einen eigenen
+    Prozessor und halten das letzte Bild genau wie ein Enttec Pro."""
+
+    def test_beenden_nur_mit_udmx_sendet_das_schlussbild(self):
+        om = _manager()
+        u = _Udmx()
+        om._udmx_outputs[1] = u
+        om.stop(schlussbild=True)
+        self.assertEqual(u.bilder, [bytes(512)])
+        self.assertEqual([was for _n, was in u.protokoll], ["senden", "schliessen"])
+
+    def test_beenden_udmx_neben_den_anderen_wegen(self):
+        om = _manager()
+        om.set_gm_laser_aus_mask({1: {10: 50}})
+        a, u, artnet = _Ausgang(), _Udmx(), _Netz()
+        om._enttec_outputs[1] = a
+        om._udmx_outputs[1] = u
+        om._artnet_outputs[1] = artnet
+        om.stop(schlussbild=True)
+        self.assertEqual(u.bilder, a.bilder)
+        self.assertEqual(u.bilder[0][9], 50)                    # Laser auf Aus-Wert
+        self.assertTrue(u.zu and a.zu and artnet.zu)
+
+    def test_entfernter_udmx_ausgang_bekommt_vorher_ein_dunkles_bild(self):
+        om = _manager()
+        om.set_gm_laser_aus_mask({1: {10: 50}})
+        u = _Udmx()
+        om._udmx_outputs[1] = u
+        om.remove_output(1, schlussbild=True)
+        self.assertEqual(len(u.bilder), 1)
+        self.assertEqual(u.bilder[0][9], 50)
+        self.assertEqual(sum(u.bilder[0]), 50)
+        self.assertEqual([was for _n, was in u.protokoll], ["senden", "schliessen"])
+        self.assertNotIn(1, om._udmx_outputs)
+
+    def test_entfernen_ohne_auftrag_laesst_udmx_nicht_dunkel_blitzen(self):
+        om = _manager()
+        u = _Udmx()
+        om._udmx_outputs[1] = u
+        om.remove_output(1)
+        self.assertEqual(u.bilder, [])
+        self.assertTrue(u.zu)
+
+    def test_haengender_adapter_laesst_udmx_trotzdem_dunkel_enden(self):
+        """Beide uDMX-Bauarten legen in ``send_dmx`` nur ein Bild ab — sie
+        duerfen neben einem haengenden Adapter beendet werden (wie auf main)
+        und bekommen vorher ihr Schlussbild."""
+        sperre = threading.Event()
+        self.addCleanup(sperre.set)
+        om = _manager()
+        om.add_universe(2)
+        om.universes[2].set_channel(5, 255)
+        om.set_gm_laser_aus_mask({2: {5: 40}})
+        om.SCHLUSSBILD_FRIST_S = 0.4
+        om._enttec_outputs[1] = _Haenger(sperre)
+        u = _Udmx()
+        om._udmx_outputs[2] = u
+        om.stop(schlussbild=True)
+        self.assertTrue(u.zu)
+        self.assertTrue(u.bilder, "der uDMX-Ausgang bekam kein Schlussbild")
+        self.assertEqual(u.bilder[-1][4], 40)
+        self.assertEqual(sum(u.bilder[-1]), 40)
+        self.assertNotIn(2, om._udmx_outputs)
+
+    def test_haengender_ausgabe_thread_ohne_schlussbild_beendet_udmx_wie_bisher(self):
+        """Der Weg von main (OUT-68) bleibt: ohne Schlussbild nur schliessen."""
+        om = _manager()
+        u = _Udmx()
+        om._udmx_outputs[1] = u
+        om._haengend_abbauen(False)
+        self.assertEqual(u.bilder, [])
+        self.assertTrue(u.zu)
+
+
+class NotAusJeWegTest(unittest.TestCase):
+    """OUT-64 gilt auch fuer ein Schlussbild, das an ``_send_all`` vorbei an EIN
+    Geraet geht: alle uDMX-Ausgaenge teilen sich einen Ausgabeweg — ein zweites
+    Universum darf dort die verriegelte Laser-Adresse auch mit seinem letzten
+    Bild nicht mit einem eigenen Wert beschreiben."""
+
+    def _aufbau(self):
+        om = _manager({1: 0})
+        om.add_universe(2)
+        om.universes[2].set_channel(5, 200)
+        om.set_blackout_keep_mask({2: frozenset({5})})          # bliebe beim Blackout stehen
+        om.set_gm_laser_aus_mask({1: {5: 40}})                  # Laser auf Universum 1
+        return om
+
+    def test_bild_beim_entfernen_traegt_den_aus_wert_des_lasers(self):
+        om = self._aufbau()
+        laser, anderer = _Udmx("laser"), _Udmx("anderer")
+        om._udmx_outputs[1] = laser
+        om._udmx_outputs[2] = anderer
+        om.set_laser_estop_mask({1: frozenset({5})}, aktiv=True)
+        om.remove_output(2, schlussbild=True)
+        self.assertEqual(anderer.bilder[0][4], 40)
+
+    def test_ohne_not_aus_bleibt_die_erhalten_maske(self):
+        om = self._aufbau()
+        om._udmx_outputs[1] = _Udmx("laser")
+        anderer = _Udmx("anderer")
+        om._udmx_outputs[2] = anderer
+        om.remove_output(2, schlussbild=True)
+        self.assertEqual(anderer.bilder[0][4], 200)
+
+    def test_netz_weg_beim_entfernen(self):
+        om = self._aufbau()
+        laser, anderer = _Netz(), _Netz()
+        om._sacn_outputs[1] = laser                              # sACN 1
+        om._artnet_outputs[2] = anderer
+        om._out_universe[2] = 0                                  # Art-Net 0 = dasselbe Netz-Universum
+        om.set_laser_estop_mask({1: frozenset({5})}, aktiv=True)
+        om.remove_output(2, schlussbild=True)
+        self.assertEqual(anderer.bilder[0][1][4], 40)
+
+    def test_haengender_adapter_netz_und_udmx_mit_gesperrtem_weg(self):
+        # Der Haenger sitzt auf dem ERSTEN Universum: das gemeinsame Senden
+        # kommt an den Universen dahinter gar nicht mehr vorbei.
+        sperre = threading.Event()
+        self.addCleanup(sperre.set)
+        om = _manager({1: 0})
+        om.add_universe(2)
+        om.add_universe(3)
+        om.universes[3].set_channel(5, 200)
+        om.set_blackout_keep_mask({3: frozenset({5})})
+        om.set_gm_laser_aus_mask({2: {5: 40}})                  # Laser auf Universum 2
+        om.SCHLUSSBILD_FRIST_S = 0.4
+        om._enttec_outputs[1] = _Haenger(sperre)
+        laser, anderer, netz = _Udmx("laser"), _Udmx("anderer"), _Netz()
+        om._udmx_outputs[2] = laser
+        om._udmx_outputs[3] = anderer
+        om._sacn_outputs[3] = netz
+        om._artnet_outputs[2] = _Netz()                          # Art-Net 1 = sACN 2
+        om._out_universe[3] = 2                                  # sACN 2: derselbe Netz-Weg
+        om.set_laser_estop_mask({2: frozenset({5})}, aktiv=True)
+        om.stop(schlussbild=True)
+        self.assertEqual(laser.bilder[-1][4], 40)
+        self.assertEqual(anderer.bilder[-1][4], 40)
+        self.assertEqual(netz.bilder[-1][1][4], 40)
 
 
 class WorkerTest(unittest.TestCase):

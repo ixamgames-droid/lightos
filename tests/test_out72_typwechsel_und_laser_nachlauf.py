@@ -60,6 +60,19 @@ class _Enttec:
         self.zu = True
 
 
+class _Udmx(_Enttec):
+    """uDMX-Sender (OUT-68): ``port`` ist der Adapter-Schluessel; ein
+    ``ausschreiben`` hat er nicht."""
+    ausschreiben = None
+
+    def __init__(self, schluessel="", streng=False):
+        super().__init__(schluessel)
+        self.streng = streng
+
+    def setze_streng(self, an):
+        self.streng = bool(an)
+
+
 class _ArtNet:
     def __init__(self, target_ip="255.255.255.255"):
         self.target_ip = target_ip
@@ -94,7 +107,8 @@ class _MitAttrappen(unittest.TestCase):
 
     def setUp(self):
         self.gebaut: list = []
-        orig = (om_mod.ArtNetSender, om_mod.SACNSender, om_mod._make_enttec_device)
+        orig = (om_mod.ArtNetSender, om_mod.SACNSender, om_mod._make_enttec_device,
+                om_mod._make_udmx_device)
 
         def merke(klasse):
             def bauen(*a, **k):
@@ -106,15 +120,20 @@ class _MitAttrappen(unittest.TestCase):
         om_mod.ArtNetSender = merke(_ArtNet)
         om_mod.SACNSender = merke(_SACN)
         om_mod._make_enttec_device = merke(_Enttec)
+        om_mod._make_udmx_device = merke(_Udmx)
 
         def zurueck():
-            om_mod.ArtNetSender, om_mod.SACNSender, om_mod._make_enttec_device = orig
+            (om_mod.ArtNetSender, om_mod.SACNSender, om_mod._make_enttec_device,
+             om_mod._make_udmx_device) = orig
         self.addCleanup(zurueck)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # A) Typ- und Zielwechsel: wer wirklich geht, endet dunkel
 # ══════════════════════════════════════════════════════════════════════════════
+
+UDMX, UDMX2 = "16c0:05dc@1-4", "16c0:05dc@1-5"
+
 
 class NachfolgerAngesagtTest(_MitAttrappen):
 
@@ -247,6 +266,53 @@ class NachfolgerAngesagtTest(_MitAttrappen):
         with self.assertRaises(ValueError):
             _manager().nachfolger_ansagen(1, "dmx512")
 
+    # ── uDMX (OUT-68) ────────────────────────────────────────────────────────
+
+    def test_typwechsel_enttec_auf_udmx_der_enttec_endet_dunkel(self):
+        om = _manager()
+        alt = _Enttec("COM3")
+        om._enttec_outputs[1] = alt
+        om.nachfolger_ansagen(1, "udmx", UDMX)
+        om.remove_output(1)
+        self.assertEqual(alt.bilder, [DUNKEL])
+
+    def test_typwechsel_udmx_auf_artnet_der_udmx_endet_dunkel(self):
+        om = _manager()
+        om.set_gm_laser_aus_mask({1: {10: 50}})
+        alt = _Udmx(UDMX)
+        om._udmx_outputs[1] = alt
+        om.nachfolger_ansagen(1, "artnet", "2.0.0.1")
+        om.remove_output(1)
+        self.assertEqual(len(alt.bilder), 1, "sonst haelt der uDMX-Adapter sein letztes Bild")
+        self.assertEqual(alt.bilder[0][9], 50)
+        self.assertEqual(sum(alt.bilder[0]), 50)
+        self.assertTrue(alt.zu)
+
+    def test_derselbe_udmx_kommt_wieder_kein_dunkel_blitzer(self):
+        om = _manager()
+        alt = _Udmx(UDMX)
+        om._udmx_outputs[1] = alt
+        om.nachfolger_ansagen(1, "udmx", UDMX)
+        om.remove_output(1)
+        self.assertEqual(alt.bilder, [])
+        self.assertTrue(alt.zu)
+
+    def test_anderer_udmx_adapter_der_alte_endet_dunkel(self):
+        om = _manager()
+        alt = _Udmx(UDMX)
+        om._udmx_outputs[1] = alt
+        om.nachfolger_ansagen(1, "udmx", UDMX2)
+        om.remove_output(1)
+        self.assertEqual(alt.bilder, [DUNKEL])
+
+    def test_ein_enttec_mit_demselben_text_ist_kein_udmx(self):
+        om = _manager()
+        alt = _Enttec(UDMX)
+        om._enttec_outputs[1] = alt
+        om.nachfolger_ansagen(1, "udmx", UDMX)
+        om.remove_output(1)
+        self.assertEqual(alt.bilder, [DUNKEL])
+
     def test_die_engine_wird_dabei_nicht_getickt(self):
         om = _manager()
         ticks = []
@@ -313,6 +379,31 @@ class TauschDirektTest(_MitAttrappen):
         om.add_enttec(1, "COM3")
         self.assertEqual(alt.bilder, [])
         self.assertTrue(alt.zu, "der Anschluss wird fuer das neue Universum neu geoeffnet")
+
+    def test_udmx_anderer_adapter_auf_demselben_universum(self):
+        om = _manager()
+        om.add_udmx(1, UDMX)
+        alt = self.gebaut[-1]
+        om.add_udmx(1, UDMX2)
+        self.assertEqual(alt.bilder, [DUNKEL])
+        self.assertTrue(alt.zu)
+        self.assertEqual(om._udmx_outputs[1].port, UDMX2)
+
+    def test_udmx_unveraendert_kein_bild(self):
+        om = _manager()
+        om.add_udmx(1, UDMX)
+        alt = self.gebaut[-1]
+        om.add_udmx(1, UDMX)
+        self.assertEqual(alt.bilder, [])
+        self.assertTrue(alt.zu)
+
+    def test_udmx_zieht_auf_ein_anderes_universum_kein_bild(self):
+        om = _manager()
+        om.add_udmx(2, UDMX)
+        alt = self.gebaut[-1]
+        om.add_udmx(1, UDMX)
+        self.assertEqual(alt.bilder, [])
+        self.assertNotIn(2, om._udmx_outputs)
 
 
 #: E1.31: Options-Byte (Bit 6 = Stream_Terminated), Universum, DMX-Daten.
@@ -441,6 +532,34 @@ class KonfigurationAnwendenTest(_MitAttrappen):
         self.assertEqual(alt.bilder, [DUNKEL])
         self.assertNotIn(1, self.om._enttec_outputs)
 
+    def test_typwechsel_enttec_auf_udmx_in_der_tabelle(self):
+        self._anwenden([{"num": 1, "output": "Enttec", "patch": "COM3"}])
+        enttec = self.om._enttec_outputs[1]
+        self._anwenden([{"num": 1, "output": "uDMX", "patch": UDMX}])
+        self.assertEqual(enttec.bilder, [DUNKEL])
+        self.assertEqual(self.om._udmx_outputs[1].port, UDMX)
+
+    def test_typwechsel_udmx_auf_sacn_in_der_tabelle(self):
+        self._anwenden([{"num": 1, "output": "uDMX", "patch": UDMX}])
+        udmx = self.om._udmx_outputs[1]
+        self._anwenden([{"num": 1, "output": "sACN", "patch": ""}])
+        self.assertEqual(udmx.bilder, [DUNKEL])
+        self.assertTrue(udmx.zu)
+
+    def test_udmx_unveraendert_uebernehmen_blitzt_nicht(self):
+        zeilen = [{"num": 1, "output": "uDMX", "patch": UDMX}]
+        self._anwenden(zeilen)
+        erster = self.om._udmx_outputs[1]
+        self._anwenden(zeilen)
+        self._anwenden(zeilen)
+        self.assertEqual(erster.bilder, [])
+
+    def test_anderer_udmx_adapter_in_der_tabelle(self):
+        self._anwenden([{"num": 1, "output": "uDMX", "patch": UDMX}])
+        alt = self.om._udmx_outputs[1]
+        self._anwenden([{"num": 1, "output": "uDMX", "patch": UDMX2}])
+        self.assertEqual(alt.bilder, [DUNKEL])
+
     def test_disabled_bleibt_wie_seit_out71(self):
         self._anwenden([{"num": 1, "output": "ArtNet", "patch": "2.0.0.1"}])
         alt = self.om._artnet_outputs[1]
@@ -464,13 +583,14 @@ class KonfigurationAnwendenTest(_MitAttrappen):
 
 
 class DialogSagtAnTest(unittest.TestCase):
-    """Die drei „Verbinden“/„Uebernehmen“ der Einzel-Reiter sagen ihren
+    """Die vier „Verbinden“/„Uebernehmen“ der Einzel-Reiter sagen ihren
     Nachfolger an, BEVOR sie entfernen."""
 
     def test_reihenfolge_im_quelltext(self):
         import inspect
         from src.ui.widgets import output_config as oc
         for methode, name in ((oc.OutputConfigDialog._connect_enttec, "enttec"),
+                              (oc.OutputConfigDialog._connect_udmx, "udmx"),
                               (oc.OutputConfigDialog._apply_artnet, "artnet"),
                               (oc.OutputConfigDialog._apply_sacn, "sacn")):
             quelle = inspect.getsource(methode)
