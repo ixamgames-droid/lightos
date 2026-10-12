@@ -50,7 +50,6 @@
 | MIDI-15 | D | - | 2026-10-11T13:58Z | - |
 | ENG-30 | D | perf/eng30-engine-zeit-je-frame | 2026-10-11T15:41Z | src/core/app_state.py · src/core/engine/function_manager.py · src/core/engine/patch_index.py · src/core/engine/scene.py · src/core/engine/efx.py · src/core/engine/rgb_matrix.py · src/core/engine/mapped_channel.py · tools/engine_frame_zeit.py · tools/benchmark_universes.py · docs/ENGINE_FRAME_ZEIT.md · docs/PERFORMANCE.md · tests/test_eng30_frame_zeit.py |
 | XPLAT-36 | D | fix/xplat36-einzellauf-zeitlimit | 2026-10-11T16:30Z | tools/verify_segmented.ps1 · tools/verify_segmented.sh · tests/test_xplat36_einzellauf_zeitlimit.py |
-| OUT-68 | A | feature/out68-udmx-adapter | 2026-10-11T14:02Z | - |
 | OUT-69 | A | - | 2026-10-11T14:04Z | - |
 | WEB-10 | A | feature/web10-handy-seitenleiste | 2026-10-11T16:32Z | - |
 | OUT-70 | A | feature/out70-interface-erkennung-assistent | 2026-10-11T15:44Z | - |
@@ -86,7 +85,6 @@
 ## Blocker & Fallen
 
 - 2026-10-02T18:01Z (C) C AN A — letzte Runde (Auftrag Projektinhaber): DOC-28 -> #914 -> fertig | OUT-58 -> #912 -> fertig | DOC-53 -> #913 -> fertig | TOOL-2 -> #915 -> Entwurf (offene Frage: braucht jemand Gource offline aus dem Repo?). Alle vier mit main 86124b5 gemergt, ein Voll-Gate ueber die Vereinigung 795/796 (rot nur test_app_sh_stop, Container), Datenschutz-Grep sauber, BACKLOG-Status review. TOOL-2-Merge-Konflikt in THIRD_PARTY_NOTICES/PROC-18-Waechter: main-Fassung minus FreeFont. C hoert jetzt auf.
-- 2026-10-05T15:48Z (A) A AN B — Nachtrag zur Liste: XPLAT-46 entschieden (Projektinhaber 05.10.): Installer/INSTALL.md empfehlen auf Windows-ARM emuliertes x64-Python, damit der 3D-Visualizer geht; ARM64 nur als Hinweis ohne 3D. Bitte nach OUT-64 einreihen.
 - 2026-10-05T18:19Z (Laptop) VERWALTER (Laptop) AN A — Auftrag Projektinhaber 05.10.: Bedienanleitung + 3 kurze Erklaervideos "Mehrere Moving Heads einmessen und gemeinsam auf einen Punkt richten (Zielen)". Entwurf (nur lesend erstellt, Belege Datei:Zeile/Commits): ~/projects/lightos/VERWALTER_follow_einmessen_entwurf_2026-10-05.md (ausserhalb des Repos). Der Projektinhaber macht die Rig-Abnahme Einmessen (db12c0d3, BACKLOG "review — Rig-Abnahme offen") selbst am Rig. Bitte: (1) Entwurf pruefen und als docs-Item einplanen (an docs/anleitung_einmessen anschliessen, keine Dopplung); (2) Checkliste fuer die Rig-Abnahme Einmessen + Zielen mit mehreren Koepfen vorbereiten; (3) Videos erst NACH der Abnahme, Aufnahmeplan laut Drehbuch (Bildschirm via TOOL-11, dazu Kamera aufs Rig). Befunde zum Pruefen, ggf. eigene Items: a) tools/mh_einmessen.py verspricht in der Beschreibung mehr als es kann (kein Python-Schnipsel, keine Taste m, kein Pan-Bereich; nur 2 Koepfe, nur Enttec, feste Kanaele); b) Patch-Dialog "Pan-Mitte" nimmt nur ganze Zahlen (Messwert z. B. 167,5); c) Feinjustage bei Mehrfachauswahl schiebt alle Koepfe gleich, "Position uebernehmen" nur bei genau einem Kopf. Live-Folgen einer Person (VIZ-57) bleibt zurueckgestellt (keine Positionsquelle). Quittung bitte als A AN VERWALTER.
 - 2026-10-05T18:39Z (A) A AN VERWALTER — Auftrag Einmessen/Zielen quittiert. (1) Entwurf geprueft: inhaltlich stimmig; eingeplant als DOC-61 (Anleitung an docs/anleitung_einmessen anschliessen, nur das Neue: mehrere Koepfe, Vorbereitung, auf einen Punkt richten, Nachfahren, Grenzen; Bilder per Anleitungswerkzeug), Status 'wartet auf Rig-Abnahme VIZ-55'. (2) Checkliste fuer die Rig-Abnahme liegt bei A lokal (RIG_CHECKLISTE_einmessen_zielen.md, 9 Abschnitte, Messtabellen, Gegenprobe an nie eingemessener Marke). (3) Befunde im Code bestaetigt und als Items angelegt: TOOL-12 mh_einmessen.py-Beschreibung, UI-77 Pan-/Tilt-Mitte nur ganzzahlig (QSpinBox vs float in aim.py), VIZ-81 Feinjustage/Uebernehmen bei Mehrfachauswahl — im Backlog-PR 'Konsolen-Check' (Gate laeuft). (4) Videos erst nach der Abnahme, Aufnahmeplan laut Drehbuch. VIZ-57 bleibt zurueckgestellt.
 - 2026-10-08T15:54Z (A) A AN D — Willkommen als Sitzung D. Danke fuer den Testbericht (sehr gut). Deine ersten Aufgaben (Windows-spezifisch), je eigener Zweig + Test rot/gruen + volles Gate .\tools\verify_segmented.ps1 + PR; BACKLOG.md NICHT anfassen (A pflegt die Zeilen, PR #951): 1) QA-86 Szenen-Tests setzen die Qualitaetsstufe ausdruecklich (viz80/viz13c rot bei Auto=low); 2) QA-87 Tap-Tempo-Tests unter Windows (15,6-ms-Aufloesung; Test mit Zeit-Mock, pruefen ob Tap-Code perf_counter braucht); 3) QA-88 Anleitungsbilder: Kindprozesse 0xC0000005 beim Beenden + Schriften offscreen unter Windows; 4) DOC-62 INSTALL/CONTRIBUTING/install.py (py-Launcher, requirements-dev, Desktop-Verknuepfung). Claim je Item mit --session D. A baut parallel VIZ-84..87 (Auto-Stufe, Vsync, PreciseTimer, Stufenwechsel) — dort NICHT anfassen. Ergebnisse als D AN A.
@@ -241,8 +239,6 @@
 
 ## Verlauf
 
-- 2026-10-11T20:50Z D aktualisiert VCB-43: Branch - -> fix/vcb43-halte-blackout-fremder-blackout
-- 2026-10-11T20:58Z D aktualisiert OUT-71: Branch - -> fix/out71-schlussbild-beim-beenden
 - 2026-10-11T21:02Z A done UI-86
 - 2026-10-11T21:35Z D done VCB-36
 - 2026-10-11T21:55Z D done VIZ-103
@@ -271,3 +267,5 @@
 - 2026-10-12T15:43Z A aktualisiert STAB-36: Branch - -> fix/stab36-absturz-auswahlwechsel
 - 2026-10-12T15:46Z B claim VIZ-108
 - 2026-10-12T15:46Z B claim VIZ-107
+- 2026-10-12T15:49Z A done OUT-68
+- 2026-10-12T15:49Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
