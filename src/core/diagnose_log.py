@@ -114,12 +114,37 @@ def _seriennummern_kuerzen(text: str) -> str:
                   lambda m: m.group(1) + kuerze_seriennummer(m.group(2)), text)
 
 
+def _lizenz_inhalt_entfernen(text: str) -> str:
+    """OUT-77 (zweite Sicherung zu LIZ-1): nichts durchlassen, was wie der
+    Inhalt einer Lizenzdatei aussieht.
+
+    Lizenzdateien kommen nie ins Paket, und ins Log schreibt LightOS nur eine
+    gekuerzte Kennung. Sollte der Inhalt einer solchen Datei trotzdem einmal in
+    einer Fehlermeldung oder einem Log landen, bleibt er hier haengen:
+
+    * ein JSON-Objekt, das ein Feld ``signatur`` enthaelt, wird als Ganzes
+      ersetzt (mit ihm der Name des Lizenznehmers und die Kennung);
+    * ein einzelnes Signaturfeld — ``"signatur": "…"`` oder ``signatur=…`` mit
+      einem langen Base64-Wert — verliert seinen Wert.
+
+    Nur lange Base64-Werte zaehlen (ab 43 Zeichen = 32 Bytes): das Wort
+    „Signatur“ kommt in Logs auch sonst vor (Absturz-Signatur ``Typ@datei``).
+    """
+    import re
+    wert = r"[A-Za-z0-9+/_-]{43,}={0,2}"
+    text = re.sub(r'(?is)\{[^{}]*"signatur"\s*:\s*"' + wert + r'"[^{}]*\}',
+                  "{Lizenzdatei: Inhalt entfernt}", text)
+    return re.sub(r'(?i)("?signatur"?\s*[:=]\s*"?)' + wert,
+                  lambda m: m.group(1) + "(entfernt)", text)
+
+
 def anonymisiere(text: str, home: str | None = None,
                  user: str | None = None) -> str:
     """Ersetzt den Home-Pfad durch ``~`` und den Benutzernamen als Pfadteil durch
     ``%USERNAME%`` — in beiden Schreibweisen der Trenner, unter Windows ohne
     Ruecksicht auf Gross-/Kleinschreibung. Kuerzt ausserdem die Seriennummern
-    von USB-Adaptern (OUT-77)."""
+    von USB-Adaptern und entfernt, was wie der Inhalt einer Lizenzdatei
+    aussieht (OUT-77)."""
     if not text:
         return text
     try:
@@ -140,6 +165,10 @@ def anonymisiere(text: str, home: str | None = None,
         pass
     try:
         text = _seriennummern_kuerzen(text)
+    except Exception:
+        pass
+    try:
+        text = _lizenz_inhalt_entfernen(text)
     except Exception:
         pass
     return text

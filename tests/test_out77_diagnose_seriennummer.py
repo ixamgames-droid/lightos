@@ -104,6 +104,58 @@ def test_das_paket_sagt_dass_gekuerzt_wird():
     assert "Seriennummern von USB-Adaptern werden gekuerzt" in diagnose_log.PAKET_INHALT
 
 
+# ── zweite Sicherung zu LIZ-1: Inhalt einer Lizenzdatei ──────────────────────
+#
+# Alle Werte hier sind ERFUNDEN (ein Muster aus Buchstaben, kein Schluessel,
+# keine echte Lizenz, kein echter Name). In Tests steht nie eine echte Datei.
+
+_ERFUNDENE_SIGNATUR = "QUJD" * 21 + "QUI="            # 88 Zeichen Base64-Form
+_ERFUNDENE_LIZENZ = ('{"format": 1, "kennung": "AAAA2222BBBB", "name": "Erika Beispiel", '
+                     '"gueltig_bis": null, "ausgestellt_am": "2026-01-01", "hinweis": "", '
+                     f'"signatur": "{_ERFUNDENE_SIGNATUR}"' + "}")
+
+
+def test_ganze_lizenzdatei_in_einer_fehlermeldung_verschwindet():
+    text = anonymisiere(f"[lizenz] unlesbar: {_ERFUNDENE_LIZENZ} — bitte neu waehlen")
+    assert _ERFUNDENE_SIGNATUR not in text
+    assert "Erika Beispiel" not in text, "mit der Signatur geht auch der Name"
+    assert "AAAA2222BBBB" not in text
+    assert text == "[lizenz] unlesbar: {Lizenzdatei: Inhalt entfernt} — bitte neu waehlen"
+
+
+def test_mehrzeilige_lizenzdatei_verschwindet():
+    mehrzeilig = _ERFUNDENE_LIZENZ.replace(", ", ",\n  ")
+    text = anonymisiere("Inhalt:\n" + mehrzeilig + "\nEnde")
+    assert _ERFUNDENE_SIGNATUR not in text and "Erika Beispiel" not in text
+    assert text == "Inhalt:\n{Lizenzdatei: Inhalt entfernt}\nEnde"
+
+
+@pytest.mark.parametrize("zeile", [
+    f'"signatur": "{_ERFUNDENE_SIGNATUR}"',
+    f"signatur={_ERFUNDENE_SIGNATUR}",
+    f"Signatur: {_ERFUNDENE_SIGNATUR}",
+])
+def test_einzelnes_signaturfeld_verliert_seinen_wert(zeile):
+    text = anonymisiere(f"vorher {zeile} nachher")
+    assert _ERFUNDENE_SIGNATUR not in text
+    assert "(entfernt)" in text and text.startswith("vorher ") and text.endswith(" nachher")
+
+
+def test_das_wort_signatur_allein_bleibt():
+    """„Signatur“ steht in Logs auch sonst — die Absturz-Signatur ``Typ@datei``,
+    die Signatur-Migration der Geraeteprofile. Nur lange Base64-Werte zaehlen."""
+    for text in ("Signatur: ZeroDivisionError@app_state.py:1234",
+                 "Signatur-Migration: 3 Profile umbenannt",
+                 'signatur = "kurz"',
+                 "Lizenz: gueltig (unbefristet, Kennung AAAA…)"):
+        assert anonymisiere(text) == text, text
+
+
+def test_entfernen_ist_wiederholbar():
+    einmal = anonymisiere(f"x {_ERFUNDENE_LIZENZ} y signatur={_ERFUNDENE_SIGNATUR}")
+    assert anonymisiere(einmal) == einmal
+
+
 # ── im Paket ─────────────────────────────────────────────────────────────────
 
 @pytest.fixture
