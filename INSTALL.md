@@ -264,9 +264,61 @@ oben der verlaessliche.
 
 LightOS selbst installiert keine Treiber. Falls Hardware nicht erkannt wird:
 
+Welche Interfaces LightOS kennt und welchen Treiber jedes braucht, steht in
+[Unterstützte DMX-Interfaces](docs/anleitung_ausgabe_einrichten/INTERFACES.md). Der
+Assistent **Ausgabe → Interface einrichten…** zeigt dasselbe für die Geräte, die gerade
+angeschlossen sind.
+
 ### Enttec DMX USB Pro
 - Treiber kommt mit Windows (FTDI). Sollte automatisch funktionieren.
 - Falls nicht: https://ftdichip.com/drivers/vcp-drivers/ (Windows VCP Driver)
+
+### uDMX-Adapter (USB)
+
+Gemeint sind Adapter ohne COM-Port, die direkt ueber USB angesprochen werden: der
+*Anyma uDMX* samt Nachbauten (USB-Kennung `16c0:05dc`) und der *CYL-6602 „USB-DMX512“*
+(meldet sich als „Sun-light USBDMX512“, Kennung `2008:1066`). In LightOS ist das die
+Ausgabe-Art **uDMX (USB)**. Drei Dinge sind einmalig noetig; LightOS richtet keines
+davon selbst ein (kein sudo, keine Treiber-Installation):
+
+**1. Das Zusatzpaket `pyusb`** (optional — ohne es fehlt nur diese Ausgabe-Art):
+
+```bash
+# Linux
+./venv/bin/python -m pip install pyusb
+sudo apt-get install libusb-1.0-0        # meist schon vorhanden
+```
+
+```powershell
+# Windows: libusb-package bringt die libusb-DLL mit
+venv\Scripts\python -m pip install pyusb libusb-package
+```
+
+Ob beides gefunden wird, zeigt der Selbsttest (Zeile `optional uDMX: …`) und das
+Diagnosepaket (Abschnitt „uDMX (USB)“).
+
+**2. Linux: Zugriffsrecht per udev-Regel.** Ohne sie darf nur root den Adapter
+ansprechen; LightOS meldet dann „Kein Zugriffsrecht“. Die Regeldatei liegt im Repo:
+
+```bash
+sudo cp packaging/linux/60-lightos-udmx.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules && sudo udevadm trigger
+sudo usermod -aG plugdev "$USER"         # danach ab- und wieder anmelden
+```
+
+Danach den Adapter einmal neu einstecken. Die Regel gibt die beiden Kennungen fuer die
+Gruppe `plugdev` und das gerade angemeldete Konto frei — die geteilte Kennung
+`16c0:05dc` nur zusammen mit dem Produktnamen „uDMX“.
+
+**3. Windows: WinUSB-Treiber zuweisen.** Windows hat fuer diese Adapter keinen eigenen
+Treiber. Dem Geraet muss einmalig der generische WinUSB-Treiber zugewiesen werden, zum
+Beispiel mit dem Programm Zadig (https://zadig.akeo.ie, Adminrechte noetig): Adapter
+einstecken, in Zadig das Geraet waehlen, als Treiber „WinUSB“ einstellen, installieren.
+**Noch nicht am Geraet erprobt** — weder unter Windows x64 noch auf Windows-ARM. Wenn
+es nicht gelingt: einen Art-Net-Node verwenden.
+
+**Stand der Pruefung:** am Geraet CYL-6602 getestet: Kommunikation ja; Ausgang mit
+angeschlossenem Geraet noch nicht bestaetigt; OUT2 ungeprueft.
 
 ### Akai APC mini mk2
 - Standard-Class-Compliant (kein Extra-Treiber noetig in den meisten Faellen)
@@ -451,6 +503,7 @@ kommentarlos geschluckt hat, `[diagnose]` die erkannte Umgebung.
 | "Visualizer nicht verfuegbar" | `PySide6` + `PySide6-Addons` erneut installieren (`python -m pip install --upgrade PySide6 PySide6-Addons`) |
 | "Visualizer nicht verfuegbar" auf Windows-ARM | Mit nativem ARM64-Python gibt es kein QtWebEngine - x64-Python installieren (siehe "Python auf Windows-ARM") |
 | Enttec nicht erkannt | `pip install pyserial` neu, FTDI-Treiber pruefen |
+| uDMX-Adapter „Kein Zugriffsrecht“ / „pyusb fehlt“ / „laesst sich nicht oeffnen“ | siehe [uDMX-Adapter (USB)](#udmx-adapter-usb): udev-Regel (Linux), `pip install pyusb`, WinUSB-Treiber (Windows) |
 | APC mini mk2 in MIDI-View leer | Class-Compliant-Mode (Pad UL beim Anschluss halten), oder Akai APC Editor installieren |
 | `mido.backend` ist None | `pip install python-rtmidi` neu installieren |
 | **Linux:** `pip install` bricht bei `python-rtmidi` ab | `sudo apt-get install build-essential libasound2-dev`, dann erneut installieren |

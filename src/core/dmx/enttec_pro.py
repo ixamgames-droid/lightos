@@ -12,12 +12,60 @@ END_OF_MSG = 0xE7
 LABEL_DMX_OUTPUT = 6
 
 
-def find_enttec_port() -> str | None:
-    """Sucht automatisch nach einem Enttec Pro anhand VID/PID."""
+def pro_kandidaten() -> list[tuple[str, bool]]:
+    """Serielle Ports, die ein Pro-kompatibles Interface sein KOENNEN:
+    ``[(port, eindeutig)]``, eindeutige zuerst.
+
+    OUT-70: ``0403:6001`` ist die Kennung des FTDI-Chips, nicht die eines
+    Enttec Pro — dieselbe tragen „Open DMX“-Kabel, der Eurolite Pro Mk2 und
+    beliebige FT232-Adapter. ``eindeutig`` ist nur, wer sich mit seinem
+    Produkttext als Pro-Format-Geraet ausweist („DMX USB PRO“, „ULTRADMX“,
+    „DMXIS“). Geraete, die sich als etwas ANDERES ausweisen, fehlen ganz.
+    Gelesen wird nur die Portliste; kein Port wird geoeffnet.
+    """
+    from src.core.dmx.interfaces import ist_pro_kandidat
+    sicher, unklar = [], []
     for port in serial.tools.list_ports.comports():
-        if port.vid == ENTTEC_VID and port.pid == ENTTEC_PID:
-            return port.device
-    return None
+        if port.vid != ENTTEC_VID or port.pid != ENTTEC_PID:
+            continue
+        try:
+            art = ist_pro_kandidat(port.vid, port.pid,
+                                   str(getattr(port, "manufacturer", "") or ""),
+                                   str(getattr(port, "product", "") or ""))
+        except Exception:                                # noqa: BLE001
+            art = 1
+        if art == 2:
+            sicher.append((port.device, True))
+        elif art == 1:
+            unklar.append((port.device, False))
+    return sicher + unklar
+
+
+def find_enttec_port() -> str | None:
+    """Sucht den Port eines Pro-kompatiblen Interfaces.
+
+    OUT-70: haelt nicht mehr jedes ``0403:6001`` fuer einen Enttec Pro. Ein
+    Geraet, das sich als Pro ausweist, gewinnt vor einem FTDI-Adapter mit
+    unklarem Typ; ein Geraet, das sich als etwas anderes ausweist, wird nie
+    genommen. **Steckt nur ein FTDI-Adapter mit unklarem Typ, wird er wie
+    bisher geliefert** — viele Pro-kompatible Adapter melden sich schlicht als
+    „FT232R USB UART“, und eine eingerichtete Ausgabe darf nach einem Update
+    nicht ausfallen. Ob der Fund sicher ist, sagt :func:`pro_kandidaten`.
+    """
+    kandidaten = pro_kandidaten()
+    return kandidaten[0][0] if kandidaten else None
+
+
+def port_art(port: str) -> str:
+    """Was ist an ``port`` angeschlossen? ``"pro"`` (weist sich als Pro aus),
+    ``"unklar"`` (FTDI, Typ nicht ablesbar) oder ``""`` (keine Auskunft)."""
+    try:
+        for p, eindeutig in pro_kandidaten():
+            if p == port:
+                return "pro" if eindeutig else "unklar"
+    except Exception:                                    # noqa: BLE001
+        pass
+    return ""
 
 
 def list_serial_ports() -> list[str]:
