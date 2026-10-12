@@ -53,7 +53,6 @@
 | QA-96 | A | - | 2026-10-11T16:56Z | - |
 | WEB-12 | A | fix/web12-handy-rechte-laser | 2026-10-11T19:15Z | - |
 | LAS-36 | A | fix/las36-notaus-loesen-lasererkennung | 2026-10-12T18:55Z | - |
-| OUT-71 | D | fix/out71-schlussbild-beim-beenden | 2026-10-11T20:58Z | - |
 | WEB-13 | A | - | 2026-10-11T20:18Z | - |
 | UI-91 | A | fix/ui91-efx-reiter-geraeteliste | 2026-10-12T16:01Z | - |
 | FM-74 | A | fix/fm74-generator-editor-startgroesse | 2026-10-12T16:22Z | - |
@@ -290,7 +289,6 @@
 
 ## Verlauf
 
-- 2026-10-12T16:20Z B claim STAB-37
 - 2026-10-12T16:22Z D done LAS-37
 - 2026-10-12T16:44Z D done VCB-43
 - 2026-10-12T17:08Z D done XPLAT-36
@@ -320,3 +318,4 @@
 - 2026-10-12T20:02Z D done FM-66
 - 2026-10-12T21:01Z A done LIZ-1
 - 2026-10-12T21:34Z D done TOOL-18
+- 2026-10-12T22:00Z D done OUT-71
