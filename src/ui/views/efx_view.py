@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
                                 QComboBox, QLabel, QCheckBox, QLineEdit,
                                 QSizePolicy, QScrollArea, QDialog, QMessageBox)
 from PySide6.QtCore import Qt, QTimer, QRect, QPoint
-from PySide6.QtGui import QPainter, QColor, QPen, QFont, QFontMetrics
+from PySide6.QtGui import QPainter, QColor, QPen, QFont
 from src.core.engine.efx import EfxInstance, EfxAlgorithm, EfxFixture, advance_phase
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
 from src.ui.widgets.flow_layout import FlowLayout
@@ -21,6 +21,59 @@ DIRECTION_LABELS = {
     "backward": "Rückwärts",
     "bounce":   "Pendel",
 }
+
+
+def _formular(parent=None) -> QFormLayout:
+    """Formular der Editor-Spalte: zu breite Felder rutschen UNTER ihre
+    Beschriftung, statt abgeschnitten zu werden (UI-78).
+
+    Eingebettet im Programmer teilt sich die Spalte die Breite mit der
+    Vorschau. Neben den Beschriftungen blieben dann z. B. 177 px fuer ein
+    Auswahlfeld, das 189 px braucht — „Gleichmäßig verteilt (Fächer“. Mit
+    ``WrapLongRows`` braucht das Formular nur noch die Breite seines breitesten
+    FELDES; wie viel Platz die Schrift verlangt, entscheidet damit nicht mehr
+    ueber die Lesbarkeit, sondern nur noch ueber die Zahl der Umbrueche."""
+    f = QFormLayout(parent)
+    f.setVerticalSpacing(4)
+    f.setHorizontalSpacing(0)       # der Abstand steckt in der Beschriftung, s. u.
+    f.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
+    return f
+
+
+class _MitwachsendeAuswahl(QComboBox):
+    """Auswahlfeld, das nie schmaler ist als sein laengster Eintrag — auch fuer
+    Eintraege, die erst NACH dem ersten Anzeigen dazukommen (UI-78).
+
+    Die Qt-Vorgabe misst nur beim ersten Anzeigen. ``AdjustToContents`` allein
+    genuegt nicht: Qt verwirft beim Einfuegen den Groessenhinweis, den
+    gemerkten MINDEST-Hinweis aber nicht — und nur der haelt das Layout davon
+    ab, das Feld zusammenzuschieben."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+
+    def minimumSizeHint(self):
+        return self.sizeHint()
+
+
+_FELD_ABSTAND = 4       # px zwischen Beschriftung und Feld
+
+
+def _abstand_in_die_beschriftungen(spalte: QWidget) -> None:
+    """Legt den Abstand Beschriftung → Feld in die Beschriftung selbst.
+
+    Qt entscheidet den Umbruch mit ``Breite < Beschriftung + Feld`` — OHNE den
+    waagrechten Abstand des Formulars. Lag die Breite genau in dieser Luecke,
+    blieb das Feld neben der Beschriftung und wurde um den Abstand schmaler als
+    sein Text (nachgemessen: Auswahlfeld 166 statt 169 px). Als rechter Rand der
+    Beschriftung rechnet der Abstand in der Umbruch-Entscheidung mit."""
+    for f in spalte.findChildren(QFormLayout):
+        for zeile in range(f.rowCount()):
+            item = f.itemAt(zeile, QFormLayout.ItemRole.LabelRole)
+            beschriftung = item.widget() if item is not None else None
+            if beschriftung is not None:
+                beschriftung.setContentsMargins(0, 0, _FELD_ABSTAND, 0)
 
 
 def _head_beschriftung():
@@ -1082,8 +1135,7 @@ class EfxView(QWidget):
         self._name_edit = QLineEdit()
         self._name_edit.setPlaceholderText("Name des Effekts")
         self._name_edit.textChanged.connect(self._on_name_change)
-        name_row = QFormLayout()
-        name_row.setSpacing(4)
+        name_row = _formular()
         name_row.addRow("Name:", self._name_edit)
         ec.addLayout(name_row)
 
@@ -1098,8 +1150,7 @@ class EfxView(QWidget):
         # ── Gruppe 1: Form & Geometrie ──────────────────────────────────
         form_box = QGroupBox("Form && Geometrie")
         form_box.setStyleSheet(_box_style)
-        form = QFormLayout(form_box)
-        form.setSpacing(4)
+        form = _formular(form_box)
 
         self._algo_combo = QComboBox()
         for a in EfxAlgorithm:
@@ -1112,7 +1163,10 @@ class EfxView(QWidget):
         path_row = QHBoxLayout(path_row_w)
         path_row.setContentsMargins(0, 0, 0, 0)
         path_row.setSpacing(4)
-        self._path_combo = QComboBox()
+        # UI-78: Pfadnamen vergibt der Benutzer, und sie kommen NACH dem ersten
+        # Anzeigen dazu. Mit der Qt-Vorgabe blieb das Feld bei der Breite des
+        # Platzhalters „—“ — neben den beiden Knoepfen rund 80 px fuer den Namen.
+        self._path_combo = _MitwachsendeAuswahl()
         self._path_combo.currentTextChanged.connect(self._on_path_selected)
         path_row.addWidget(self._path_combo, stretch=1)
         self._btn_path_new  = QPushButton("+ Aufzeichnen…")
@@ -1127,16 +1181,15 @@ class EfxView(QWidget):
                 QPushButton:hover { background:#30363d; }
             """)
             path_row.addWidget(b)
-        # EFX-PATH-BTN-LABEL: Die Text-Buttons duerfen nicht mehr vom stretchenden
-        # Combo zusammengequetscht werden ("eich"/"beit"). Mindestbreite = echte
-        # Label-Breite (10px-Font aus dem StyleSheet) + Rand fuer Padding/Border,
-        # damit die Beschriftung immer vollstaendig passt.
-        _btn_font = QFont(self._btn_path_new.font())
-        _btn_font.setPixelSize(10)
-        _fm = QFontMetrics(_btn_font)
+        # EFX-PATH-BTN-LABEL: Die Text-Buttons duerfen nicht vom stretchenden
+        # Combo zusammengequetscht werden ("eich"/"beit"). Ihre Untergrenze ist
+        # der eigene Groessenhinweis (Text + Innenabstand + Rand des Themes).
+        # UI-78: KEINE selbst gerechnete Mindestbreite mehr — „Textbreite + 20“
+        # lag mit dem Theme (10 px Innenabstand je Seite + Rand) 4–6 px UNTER dem
+        # Hinweis, und eine gesetzte Mindestbreite ERSETZT ihn: sie erlaubte dem
+        # Layout genau das Quetschen, das sie verhindern sollte.
         for b in (self._btn_path_new, self._btn_path_edit):
-            b.setMinimumWidth(_fm.horizontalAdvance(b.text()) + 20)
-            b.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+            b.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
         self._btn_path_new.clicked.connect(self._record_new_path)
         self._btn_path_edit.clicked.connect(self._edit_current_path)
         self._btn_path_del.clicked.connect(self._delete_current_path)
@@ -1193,8 +1246,7 @@ class EfxView(QWidget):
             pat_grid.addWidget(b, i // 3, i % 3)
         spv.addLayout(pat_grid)
 
-        sp_form = QFormLayout()
-        sp_form.setSpacing(4)
+        sp_form = _formular()
         self._spider_amp_spin = QSpinBox()
         self._spider_amp_spin.setRange(0, 255)
         self._spider_amp_spin.setSingleStep(5)
@@ -1226,8 +1278,7 @@ class EfxView(QWidget):
         # ── Gruppe 2: Tempo & Richtung ──────────────────────────────────
         tempo_box = QGroupBox("Tempo && Richtung")
         tempo_box.setStyleSheet(_box_style)
-        tform = QFormLayout(tempo_box)
-        tform.setSpacing(4)
+        tform = _formular(tempo_box)
         self._speed_spin = dspin(0.01, 10, 0.1, 0.5)
         tform.addRow("Geschwindigkeit (Hz):", self._speed_spin)
         self._tempo_bus_combo = QComboBox()
@@ -1319,8 +1370,7 @@ class EfxView(QWidget):
         # daneben, weil es ebenfalls das Zusammenspiel der Köpfe formt.
         rel_box = QGroupBox("Verhältnis der Geräte zueinander")
         rel_box.setStyleSheet(_box_style)
-        relf = QFormLayout(rel_box)
-        relf.setSpacing(4)
+        relf = _formular(rel_box)
         self._phase_mode_combo = QComboBox()
         for key, label in PHASE_MODE_LABELS:
             self._phase_mode_combo.addItem(label, key)
@@ -1379,8 +1429,7 @@ class EfxView(QWidget):
         # ── Gruppe 4: Sichtbarkeit & Sonstiges ──────────────────────────
         vis_box = QGroupBox("Sichtbarkeit && Sonstiges")
         vis_box.setStyleSheet(_box_style)
-        vform = QFormLayout(vis_box)
-        vform.setSpacing(4)
+        vform = _formular(vis_box)
         self._open_beam_chk = QCheckBox("Dimmer/Shutter mit öffnen")
         self._open_beam_chk.toggled.connect(self._on_param_change)
         vform.addRow("Sichtbarkeit:", self._open_beam_chk)
@@ -1420,7 +1469,14 @@ class EfxView(QWidget):
         # Kein eigener Scroll mehr um die Formspalte (das erzeugte sonst eine
         # zweite, horizontale Not-Scrollleiste). Die GANZE rechte Seite liegt
         # jetzt in EINEM aeusseren Scrollbereich (siehe unten).
-        editor_col.setMinimumWidth(280)
+        # UI-78: KEIN ``setMinimumWidth(280)`` mehr. Eine gesetzte Mindestbreite
+        # ERSETZT die aus dem Inhalt berechnete — 280 lag darunter, und das
+        # Layout durfte die Spalte schmaler machen, als ihre Texte sind
+        # („jedes 2. Gerät entgegengesetz“). Jetzt gilt die Breite des
+        # breitesten Feldes (siehe ``_formular``); reicht der Platz dafuer
+        # nicht, schiebt der aeussere Scrollbereich, statt abzuschneiden.
+        self._editor_col = editor_col
+        _abstand_in_die_beschriftungen(editor_col)
         top_row.addWidget(editor_col, stretch=2)
 
         # Vorschau (Pfad + animierte Fixture-Punkte) — interaktiv: Zentrum/Figur

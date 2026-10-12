@@ -2351,6 +2351,19 @@ class RgbMatrixInstance(Function):
             self.phase_offset = 0.0
         self.sync_group = str(d.get(
             "sync_group", getattr(self, "sync_group", "")) or "")
+        # UI-80: „Beim Start am Takt ausrichten" hat im Matrix-Editor einen
+        # Haken, wurde hier aber nicht uebernommen — der Entwurf fiel auf den
+        # Vorgabewert zurueck (Aenderungs-Hinweis ohne Aenderung), und ein im
+        # Editor umgestellter Haken kam beim Speichern nie in der Matrix an.
+        self.align_on_start = bool(d.get(
+            "align_on_start", getattr(self, "align_on_start", True)))
+        # ★ BEWUSST NICHT hier: ``speed``, ``intensity`` und ``folder`` der
+        # Function-Basis. Tempo- und Helligkeits-Master setzen VC-Regler am
+        # LAUFENDEN Effekt, den Ordner die Bibliothek — der Editor bearbeitet
+        # keins davon. Uebernaehme apply_dict sie, schriebe „Speichern" im Editor
+        # den Stand von beim Oeffnen zurueck und setzte ein inzwischen bewegtes
+        # Regler-Tempo zurueck. Beim Laden einer Show stellt sie der
+        # FunctionManager her (eine Stelle fuer alle Funktionstypen).
         # drive_intensity: R1-Default True fuer Alt-Shows (ohne Key) bleibt hell.
         self.drive_intensity = bool(d.get("drive_intensity", True))
         # Phase-3-Style-Felder (Default RGB damit Alt-Shows unveraendert bleiben).
