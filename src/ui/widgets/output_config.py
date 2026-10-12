@@ -461,6 +461,19 @@ def _persist_output(num: int, output: str, patch: str, out_universe=_UNSET) -> b
     return _save_universe_config(rows)
 
 
+def _nachfolger_ansagen(om, universe: int, name: str, ziel: str = "",
+                        out_universe=None) -> None:
+    """OUT-72: dem Ausgabe-Manager sagen, welcher Adapter GLEICH nach dem
+    folgenden ``remove_output`` fuer dieses Universum kommt. Jeder entfernte
+    Adapter, der nicht genau dieser ist (anderer Typ, Anschluss, Adresse),
+    bekommt dann sein Schlussbild — ein Enttec, der auf Art-Net umgestellt
+    wird, hielte sonst sein letztes Bild. Attrappen ohne die Methode bleiben
+    beim bisherigen Verhalten."""
+    ansagen = getattr(om, "nachfolger_ansagen", None)
+    if callable(ansagen):
+        ansagen(universe, name, ziel, out_universe)
+
+
 class OutputConfigDialog(QDialog):
     # OUT-51: So oft wird nach „Verbinden" hoechstens nachgefragt, ob der Port
     # wirklich offen ist (je ~0,9 s). Der Serial-Worker wird als eigener Prozess
@@ -930,6 +943,7 @@ class OutputConfigDialog(QDialog):
             # MU-01: erst ALLE Alt-Adapter dieses Universums entfernen/schliessen
             # (auch ArtNet/sACN), sonst bleibt bei einem Cross-Typ-Wechsel der alte
             # Adapter aktiv -> Doppel-Output/Leak. Analog apply_output_config (OUT-05).
+            _nachfolger_ansagen(om, univ, "enttec", port)      # OUT-72
             om.remove_output(univ)
             om.add_enttec(univ, port)
             # QA-50: „(gespeichert)" nur sagen, wenn es auch gespeichert ist.
@@ -1063,13 +1077,14 @@ class OutputConfigDialog(QDialog):
         # MU-01: erst ALLE Alt-Adapter dieses Universums entfernen/schliessen, sonst
         # bleibt bei einem Cross-Typ-Wechsel (z. B. Enttec->ArtNet) der alte Adapter
         # aktiv -> Doppel-Output/Leak. Analog apply_output_config (OUT-05).
-        state.output_manager.remove_output(univ)
         # A3D-15: externe Art-Net-Universe aus der (bisher toten) Startuniversum-
         # Spinbox durchreichen. Weicht sie NICHT vom Default (univ-1) ab -> None,
         # damit der Send-Pfad den abwaertskompatiblen Default (univ_num-1) nutzt und
         # universes.json sauber bleibt (Konvention "leer = Default", wie die Tabelle).
         start = self._spin_artnet_start_univ.value()
         out_u = start if start != univ - 1 else None
+        _nachfolger_ansagen(state.output_manager, univ, "artnet", ip, out_u)  # OUT-72
+        state.output_manager.remove_output(univ)
         state.output_manager.add_artnet(univ, ip, out_universe=out_u)
         self._artnet_active_univ = univ   # MU-02: fuer korrektes Abwaehlen merken
         gespeichert = _persist_output(univ, "ArtNet", ip, out_universe=out_u)
@@ -1288,6 +1303,8 @@ class OutputConfigDialog(QDialog):
             # Gemessen: 5 von 5 Uebernahmen mit unveraenderter Konfiguration.
             # Der MU-01-Grund fuer diesen Aufruf bleibt erhalten — die FREMDEN
             # Adaptertypen werden weiterhin entfernt.
+            # OUT-72: die FREMDEN Adapter gehen wirklich -> Schlussbild.
+            _nachfolger_ansagen(state.output_manager, univ, "sacn", target_ip or "")
             state.output_manager.remove_output(univ, ausser="sacn")
             state.output_manager.add_sacn(univ, target_ip)
             self._sacn_active_univ = univ   # MU-02: fuer korrektes Abwaehlen merken

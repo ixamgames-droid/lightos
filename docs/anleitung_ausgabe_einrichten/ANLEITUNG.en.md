@@ -262,12 +262,30 @@ first:
   the heads do not travel to their home position.
 - **When an output is removed** (universe deleted, output set to „Disabled“,
   Art-Net or sACN unticked): the same frame to exactly that output.
-- **Not on „Übernehmen“** (apply): the new output follows immediately there, and a
-  dark frame would be a flash on stage.
+- **When you switch to a different adapter:** if you move a universe from ENTTEC
+  to Art-Net, to another port, another target IP or another universe number on
+  the network, the **previous** adapter or node gets the same last frame –
+  otherwise it would hold whatever it received last.
+- **Not on „Übernehmen“** (apply) **without a change:** the same output follows
+  immediately there, and a dark frame would be a flash on stage.
 
 If an adapter does not respond (unplugged, driver hanging), LightOS waits about
 one second at most and then quits anyway. That one adapter gets no last frame –
 all others do.
+
+**Lasers that are taken out of the patch.** If you remove a laser from the
+patch, give it another address or load a show without it, the device still
+listens on its previous address. If that address dropped to 0, some lasers would
+switch **on** (for many, DMX 0 means "auto run") – and LightOS could no longer
+control them. So the laser's **off value** stays on its previous address, also
+during a blackout and in the last frame on quit, until
+
+- the address is patched again (then the new fixture decides), or
+- LightOS is closed.
+
+This applies only to addresses whose off value is not 0. While such a value is
+held, nothing else goes out on that address – not even a value from a script or
+from the Simple Desk. The DMX Monitor shows the held value.
 
 > **Important:** the last frame is no substitute for a main switch. If the
 > computer crashes or the power fails, nobody sends anything any more, and an

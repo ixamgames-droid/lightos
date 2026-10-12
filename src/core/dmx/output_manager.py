@@ -250,6 +250,14 @@ class OutputManager:
         # wird jede Adresse auf ihren „aus“-Wert (Betriebsart „Laser off“)
         # gezogen. Vom AppState aus dem Patch gepflegt.
         self._gm_laser_aus_mask: dict[int, dict] = {}
+        # OUT-72: Aus-Werte von Lasern, die NICHT MEHR gepatcht sind (entfernt,
+        # umadressiert, andere Show). {universe -> {addr: aus_wert}} — steht
+        # bei jedem Frame auf der Leitung, bis die Adresse wieder gepatcht ist
+        # oder die Ausgabe endet. Vom AppState gepflegt (set_laser_aus_verwaist).
+        self._laser_aus_verwaist: dict[int, dict] = {}
+        # OUT-72: fuer das naechste remove_output(universe) angesagter
+        # Nachfolger {universe -> (typ, ziel, externes Universum)}.
+        self._nachfolger: dict[int, tuple] = {}
         # OUT-57: Adressen je Universum, die der BLACKOUT STEHEN LAESST (Erhalten-
         # Maske) — nur Pan/Tilt/Gobo/Prisma/Optik gepatchter Lampen mit echtem
         # Dimmer (s. AppState._build_blackout_keep_mask), damit Moving Heads beim
@@ -355,6 +363,26 @@ class OutputManager:
             if getattr(self, "_laser_estop_aktiv", False):
                 self._aus_werte_merken(mask or {})
                 self._estop_wege_nachfuehren()
+
+    def set_laser_aus_verwaist(self, mask: dict[int, dict]):
+        """OUT-72: je Universum ``{adresse: aus_wert}`` von Lasern, die aus dem
+        Patch gefallen sind (entpatcht, umadressiert, Show gewechselt).
+
+        Eine frei gewordene Adresse faellt sonst auf 0 — und 0 heisst bei
+        vielen Lasern „Auto run“, also AN, waehrend niemand das Geraet mehr
+        steuern kann. Der Sende-Pfad schreibt diese Werte deshalb bei JEDEM
+        Frame (auch im Blackout und im Schlussbild) auf die Leitung, bis der
+        AppState die Adresse wieder herausnimmt (neu gepatcht). Der NOT-AUS
+        liegt weiter obenauf. Eine Zuweisung = atomar fuer den Ausgabe-Thread.
+        """
+        self._laser_aus_verwaist = {
+            int(u): {int(a): int(w) for a, w in dict(m).items()}
+            for u, m in (mask or {}).items() if m}
+
+    def laser_aus_verwaist(self) -> dict[int, dict]:
+        """Kopie der gehaltenen Aus-Werte (Anzeige, Tests)."""
+        return {u: dict(m) for u, m in
+                (getattr(self, "_laser_aus_verwaist", None) or {}).items()}
 
     def _aus_werte_merken(self, mask: dict):
         """Unter ``_wege_lock``: Aus-Werte in die klebrige Maske uebernehmen
@@ -968,15 +996,99 @@ class OutputManager:
         self.universes[number] = u
         return u
 
-    def _swap_device(self, registry: dict, universe: int, new_dev):
+    @staticmethod
+    def _ziel_von(name: str, dev) -> str:
+        """OUT-72: wohin ein Adapter sendet — Anschluss bzw. Adresse. sACN
+        ohne Adresse (Multicast) ist ``""``."""
+        if name == "enttec":
+            return str(getattr(dev, "port", "") or "")
+        if name == "artnet":
+            return str(getattr(dev, "target_ip", "") or "")
+        return str(getattr(dev, "_target_ip", None) or "")
+
+    @staticmethod
+    def _netz_universum(name: str, universe: int, ext):
+        """Die Nummer, unter der ein Netz-Adapter sendet (wie in ``_send_all``:
+        Art-Net ab 0, sACN ab 1); Enttec hat keine."""
+        if name == "enttec":
+            return None
+        if ext is not None:
+            return int(ext)
+        return universe - 1 if name == "artnet" else universe
+
+    def nachfolger_ansagen(self, universe: int, name: str, ziel: str = "",
+                           out_universe=None) -> None:
+        """OUT-72: sagt an, welcher Adapter GLEICH nach dem naechsten
+        ``remove_output(universe)`` fuer dieses Universum kommt.
+
+        ``remove_output`` weiss damit, was wirklich GEHT: jeder entfernte
+        Adapter, der nicht genau dieser ist — anderer Typ (Enttec -> Art-Net),
+        anderer Anschluss, andere Adresse, anderes Netz-Universum —, bekommt
+        vor dem Schliessen sein Schlussbild. Der gleiche Adapter (Neuaufbau
+        durch „Uebernehmen“ ohne Aenderung) bekommt keines; das waere ein
+        Dunkel-Blitzer auf der Buehne.
+
+        Bewusst eine Ansage und kein Parameter von ``remove_output``: die
+        Aufrufer fragen ``getattr(om, "nachfolger_ansagen", None)``, eine
+        Attrappe ohne die Methode bleibt beim bisherigen Verhalten. Die Ansage
+        gilt fuer genau EIN ``remove_output`` dieses Universums.
+        """
+        if name not in ("enttec", "artnet", "sacn"):
+            raise ValueError(f"unbekannter Adaptertyp: {name!r}")
+        ansagen = dict(getattr(self, "_nachfolger", None) or {})
+        ansagen[int(universe)] = (name, str(ziel or ""), out_universe)
+        self._nachfolger = ansagen
+
+    def _nachfolger_nehmen(self, universe: int):
+        ansagen = dict(getattr(self, "_nachfolger", None) or {})
+        ansage = ansagen.pop(universe, None)
+        self._nachfolger = ansagen
+        return ansage
+
+    def _ist_derselbe_adapter(self, name: str, dev, universe: int, ext,
+                              nachfolger) -> bool:
+        """Kommt ``dev`` als ``nachfolger`` unveraendert wieder?"""
+        if nachfolger is None:
+            return False
+        n_name, n_ziel, n_ext = nachfolger
+        if name != n_name or self._ziel_von(name, dev) != n_ziel:
+            return False
+        return (self._netz_universum(name, universe, ext)
+                == self._netz_universum(name, universe, n_ext))
+
+    def _swap_device(self, registry: dict, universe: int, new_dev,
+                     name: str | None = None, out_universe=None):
         """Tauscht ein Ausgabe-Geraet fuer ein Universe thread-sicher aus und
         schliesst das vorherige. Das (potenziell langsame/blockierende) OEFFNEN
         des neuen Geraets passiert BEWUSST ausserhalb des Locks, damit der
-        Output-Thread nicht waehrend eines Serial-/Socket-Open haengt."""
+        Output-Thread nicht waehrend eines Serial-/Socket-Open haengt.
+
+        OUT-72: mit ``name`` bekommt der Vorgaenger sein Schlussbild, wenn der
+        Neue ein ANDERES Ziel hat (anderer Anschluss, andere Adresse, anderes
+        Netz-Universum ``out_universe``) — der alte Adapter bzw. Knoten hielte
+        sonst das letzte Bild. Gleiches Ziel: kein Bild (Neuaufbau)."""
+        ext_alt = self._out_universe.get(universe) if name else None
         with self._io_lock:
             old = registry.get(universe)
             registry[universe] = new_dev
         if old is not None:
+            if name and not self._ist_derselbe_adapter(
+                    name, old, universe, ext_alt,
+                    (name, self._ziel_von(name, new_dev), out_universe)):
+                self._schlussbild_an(universe, ext_alt, [(name, old)])
+                # ★ NET-12: bei sACN heisst Senden auch „Besitz uebernehmen“ —
+                # das Schlussbild hat den Besitz des Universums also an den
+                # ALTEN Sender zurueckgegeben, und sein ``close`` schickte
+                # gleich eine Stream-Termination. Sendet der Neue auf DERSELBEN
+                # Netz-Nummer weiter (nur die Adresse ist anders), laeuft das
+                # Universum fuer die Quelle weiter: der Neue holt den Besitz
+                # zurueck, es wird nicht terminiert. Aendert sich die Nummer,
+                # endet die alte wirklich — dann ist die Termination richtig.
+                uebernimm = getattr(new_dev, "uebernimm", None)
+                nummer = self._netz_universum(name, universe, ext_alt)
+                if (callable(uebernimm) and nummer is not None and nummer
+                        == self._netz_universum(name, universe, out_universe)):
+                    uebernimm(nummer)
             try:
                 old.close()
             except Exception:
@@ -991,7 +1103,8 @@ class OutputManager:
         # Weg danach in der Liste, bevor ein anderes Universum ihn bekommt.
         self._estop_wege_nachfuehren()
         self.close_enttec_on_port(port)
-        self._swap_device(self._enttec_outputs, universe, _make_enttec_device(port))
+        self._swap_device(self._enttec_outputs, universe,
+                          _make_enttec_device(port), name="enttec")
         self._estop_wege_nachfuehren()       # OUT-64
         self._entfernte_wege_vergessen(universe)
 
@@ -1026,7 +1139,8 @@ class OutputManager:
 
     def add_artnet(self, universe: int, target_ip: str = "255.255.255.255",
                    out_universe=None):
-        self._swap_device(self._artnet_outputs, universe, ArtNetSender(target_ip))
+        self._swap_device(self._artnet_outputs, universe, ArtNetSender(target_ip),
+                          name="artnet", out_universe=out_universe)
         self._set_out_universe(universe, out_universe)
         self._estop_wege_nachfuehren()       # OUT-64
         self._entfernte_wege_vergessen(universe)
@@ -1051,7 +1165,8 @@ class OutputManager:
         uebernimm = getattr(neu, "uebernimm", None)
         if uebernimm is not None:
             uebernimm(universe)
-        self._swap_device(self._sacn_outputs, universe, neu)
+        self._swap_device(self._sacn_outputs, universe, neu,
+                          name="sacn", out_universe=out_universe)
         self._set_out_universe(universe, out_universe)
         self._estop_wege_nachfuehren()       # OUT-64
         self._entfernte_wege_vergessen(universe)
@@ -1100,7 +1215,14 @@ class OutputManager:
         ein Adapter mit eigenem Prozessor das letzte Bild. NICHT setzen, wenn
         gleich ein Nachfolger fuer dasselbe Universum kommt: das Bild waere
         bei jedem „Uebernehmen“ ein Dunkel-Blitzer auf der Buehne.
+
+        OUT-72: kommt ein Nachfolger, der ein ANDERER Adapter ist (Typwechsel
+        Enttec -> Art-Net, anderer Anschluss, andere Adresse), geht der alte
+        ebenfalls wirklich. Dafuer sagt der Aufrufer den Nachfolger vorher an
+        (``nachfolger_ansagen``); jeder entfernte Adapter, der nicht genau
+        dieser ist, bekommt sein Schlussbild.
         """
+        nachfolger = self._nachfolger_nehmen(universe)
         registries = {"enttec": self._enttec_outputs,
                       "artnet": self._artnet_outputs,
                       "sacn": self._sacn_outputs}
@@ -1139,8 +1261,16 @@ class OutputManager:
             if ausser is None:
                 self._out_universe.pop(universe, None)
             self._vergiss_fehler(universe)
-        if schlussbild and victims:
-            self._schlussbild_an(universe, ext, victims)
+        if schlussbild:
+            geht = list(victims)
+        elif nachfolger is not None:
+            geht = [(name, dev) for name, dev in victims
+                    if not self._ist_derselbe_adapter(name, dev, universe, ext,
+                                                      nachfolger)]
+        else:
+            geht = []
+        if geht:
+            self._schlussbild_an(universe, ext, geht)
         for _name, dev in victims:
             try:
                 dev.close()
@@ -1401,6 +1531,10 @@ class OutputManager:
         4. Laser-Aus-Werte (LAS-24/LAS-25) bei Blackout, GM < Schwelle oder
            fuer die Adressen eines Ziel-Blackouts — der Aus-Wert ist nicht
            immer 0, deshalb NACH den nullenden Paessen;
+        4b. verwaiste Laser-Aus-Werte (OUT-72): Aus-Werte nicht mehr gepatchter
+           Laser, IMMER — die Adresse gehoert keinem Geraet mehr, 0 hiesse
+           bei manchem Laser „an“. Nicht im Lade-Fenster (dort steht das
+           eingefrorene Bild), wohl aber im Schlussbild;
         5. Laser-NOT-AUS (A3D-01) als allerletzte Ebene, gewinnt immer:
            verriegelte Adressen auf ihren bekannten Aus-Wert, sonst 0.
 
@@ -1475,6 +1609,12 @@ class OutputManager:
         gm = self.grand_master
         # OUT-65: klebrige NOT-AUS-Aus-Werte EINMAL je Frame lesen.
         estop_aus = getattr(self, "_laser_estop_aus", None)
+        # OUT-72: verwaiste Aus-Werte EINMAL je Frame lesen. Im Lade-Fenster
+        # steht das eingefrorene Bild (OUT-60) — der Plan ist dort leer, alle
+        # Laser der alten Show waeren „verwaist“ und gingen fuer die Dauer des
+        # Ladens aus. Das Schlussbild traegt sie immer.
+        verwaist_masken = ((getattr(self, "_laser_aus_verwaist", None) or {})
+                           if (lade is None or schlussbild) else {})
         for univ_num, universe in list(self.universes.items()):
             # Im Freeze den festgehaltenen Stand senden statt des (u. U. direkt
             # beschriebenen) Live-Universums. Ein Universum, das es beim
@@ -1564,6 +1704,16 @@ class OutputManager:
                         if 1 <= addr <= n:
                             buf[addr - 1] = wert
                     data = bytes(buf)
+            # OUT-72: Aus-Werte nicht mehr gepatchter Laser — immer, nach allen
+            # nullenden und skalierenden Paessen, vor dem NOT-AUS.
+            verwaist = verwaist_masken.get(univ_num) if verwaist_masken else None
+            if verwaist:
+                buf = bytearray(data)
+                n = len(buf)
+                for addr, wert in verwaist.items():
+                    if 1 <= addr <= n:
+                        buf[addr - 1] = wert
+                data = bytes(buf)
             # A3D-01: Laser-NOT-AUS als ALLERLETZTE Ebene — nach Channel-Modifier,
             # Grand-Master UND Blackout die verriegelten Laser-Adressen hart auf 0
             # zwingen. Der Modifier-Pass oben laeuft VOR diesem Schritt und wuerde

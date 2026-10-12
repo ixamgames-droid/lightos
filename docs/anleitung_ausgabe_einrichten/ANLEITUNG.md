@@ -244,12 +244,31 @@ vorher **ein letztes Bild**:
   stehen; die Köpfe fahren also nicht in die Grundstellung.
 - **Beim Entfernen einer Ausgabe** (Universum gelöscht, Ausgabe auf „Disabled“
   gestellt, Art-Net oder sACN abgewählt): dasselbe Bild an genau diese Ausgabe.
-- **Nicht beim „Übernehmen“** einer Einstellung: dort folgt sofort die neue
-  Ausgabe, ein dunkles Bild wäre ein Blitzer auf der Bühne.
+- **Beim Wechsel auf einen anderen Adapter:** stellst du ein Universum von
+  ENTTEC auf Art-Net um, auf einen anderen Port, eine andere Ziel-IP oder eine
+  andere Universumsnummer im Netzwerk, bekommt der **bisherige** Adapter bzw.
+  Node dasselbe letzte Bild – er hielte sonst, was er zuletzt bekam.
+- **Nicht beim „Übernehmen“ ohne Änderung:** dort folgt sofort dieselbe Ausgabe,
+  ein dunkles Bild wäre ein Blitzer auf der Bühne.
 
 Reagiert ein Adapter nicht (abgezogen, Treiber hängt), wartet LightOS höchstens
 rund eine Sekunde und beendet sich dann trotzdem. Dieser eine Adapter bekommt
 dann kein letztes Bild – alle anderen schon.
+
+**Laser, die aus dem Patch genommen werden.** Entfernst du einen Laser aus dem
+Patch, gibst ihm eine andere Adresse oder lädst eine Show ohne ihn, hört das
+Gerät weiter auf seine bisherige Adresse. Fiele sie auf 0, schaltete das manchen
+Laser **ein** (bei vielen heißt DMX 0 „Auto run“) – und LightOS könnte ihn nicht
+mehr steuern. Deshalb bleibt der **Aus-Wert** des Lasers auf seiner bisherigen
+Adresse stehen, auch im Blackout und im letzten Bild beim Beenden, bis
+
+- die Adresse wieder gepatcht ist (dann bestimmt das neue Gerät), oder
+- LightOS beendet wird.
+
+Das gilt nur für Adressen, deren Aus-Wert nicht 0 ist. Solange so ein Wert
+gehalten wird, kommt auf dieser Adresse nichts anderes hinaus – auch kein Wert
+aus einem Skript oder vom Simple Desk. Der DMX Monitor zeigt den gehaltenen
+Wert.
 
 > **Wichtig:** Das letzte Bild ersetzt keinen Hauptschalter. Stürzt der Rechner
 > ab oder fällt der Strom aus, sendet niemand mehr etwas, und ein Adapter hält,
