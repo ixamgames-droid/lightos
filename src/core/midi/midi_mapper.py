@@ -30,6 +30,25 @@ ACTION_EFFECT_PARAM = "effect_param"    # continuous -> effect_live.set_param_no
 ACTION_EFFECT_ACTION = "effect_action"  # button     -> effect_live.do_action
 ACTION_NONE = "none"
 
+# ── MIDI-14: Motorfader ──────────────────────────────────────────────────────
+#: ``MidiOutFeedback.message_type`` einer Motorfader-Rueckmeldung.
+FEEDBACK_MOTOR = "pitchbend"
+#: Solange vom Fader Werte kommen (die Hand bewegt ihn) und diese Zeit danach,
+#: sendet LightOS nichts an seinen Motor — er arbeitete sonst gegen die Hand.
+MOTOR_HAND_RUHE_S = 0.35
+#: Was in dieser Zeit NACH einer eigenen Sendung vom selben Fader zurueckkommt,
+#: ist der Bericht des Pults ueber die Motorfahrt und keine Eingabe. Ohne diese
+#: Sperre durchliefe ein Executor-Fader, der von 0 auf 100 % springt (Seiten-
+#: wechsel), am Ausgang alle Zwischenstellungen, die der Motor meldet.
+MOTOR_ECHO_FENSTER_S = 0.25
+#: Ab dieser Aenderung der Stellung (0..1) wird ein Motorfader nachgefuehrt —
+#: feiner als die 1 % der LED-Rueckmeldung, damit eine Ueberblendung nicht ruckt.
+MOTOR_SCHRITT = 0.002
+#: Ziele, deren Stand sich zuruecklesen laesst. Bei allen anderen stufenlosen
+#: Zielen (Programmer-Wert, Effekt-Parameter) kennt nur der Fader selbst seine
+#: Stellung — dort wird nichts aus einem geratenen Zustand nachgefuehrt.
+_MOTOR_LESBAR = (ACTION_EXECUTOR_FADER, ACTION_GRAND_MASTER)
+
 
 def _parse_effect_param(param: str) -> tuple[str, int | None]:
     """'<key>[@<fid>]' -> (key, fid|None)."""
@@ -302,6 +321,23 @@ class MidiOutFeedback:
         }
 
 
+def ist_motorfader(mapping) -> bool:
+    """MIDI-14: fuehrt dieses Mapping einen Motorfader nach? Das tut es, wenn
+    seine Rueckmeldung ``pitchbend`` heisst UND es selbst ein Pitchbend-Fader
+    ist — die Rueckmeldung geht auf demselben Kanal an denselben Fader."""
+    fb = getattr(mapping, "midi_out", None)
+    return (fb is not None and fb.message_type == FEEDBACK_MOTOR
+            and getattr(mapping, "msg_type", "") == "pitchbend")
+
+
+def motor_rueckmeldung(mapping, geraet: str = "") -> "MidiOutFeedback":
+    """MIDI-14: die Rueckmeldung, die den Motorfader dieses Mappings nachfuehrt
+    — derselbe Kanal wie der Fader; ``geraet`` = Ausgang des Pults (leer = der
+    gemeinsame Ausgang)."""
+    return MidiOutFeedback(device=str(geraet or ""), channel=int(mapping.channel),
+                           trigger_id=-1, message_type=FEEDBACK_MOTOR)
+
+
 @dataclass
 class MidiMapping:
     """Mapping object with modern config shape plus legacy flat fields."""
@@ -410,6 +446,8 @@ class MidiMapper:
     # gebautes Objekt (Tests) sie hat. Siehe start_learn.
     _learn_pitchbend = False
     _learn_note: MidiMessage | None = None
+    # MIDI-14: ebenfalls als Klassen-Vorgabe (Objekte ohne __init__ in Tests).
+    _uhr = staticmethod(time.monotonic)
 
     def __init__(self, app_state):
         self._state = app_state
@@ -426,6 +464,15 @@ class MidiMapper:
         self._feedback_state_cache: dict[str, float] = {}
         self._feedback_output_cache: dict[str, int] = {}
         self._feedback_last_send_ts: dict[str, float] = {}
+        # MIDI-14: je Motorfader (mapping_id) — wann zuletzt die Hand einen
+        # Wert schickte, wann und was LightOS zuletzt an den Motor sandte, und
+        # was nach der Hand-Ruhe noch nachzutragen ist. Geschrieben aus dem
+        # MIDI-Empfangsthread UND der Rueckmelde-Schleife.
+        self._motor_lock = threading.Lock()
+        self._motor_hand_ts: dict[str, float] = {}
+        self._motor_send_ts: dict[str, float] = {}
+        self._motor_wert: dict[str, int] = {}
+        self._motor_offen: dict[str, tuple[MidiMapping, float]] = {}
         self._feedback_queue: queue.Queue[tuple[MidiMapping, float]] = queue.Queue(maxsize=2048)
         self._feedback_running = True
         self._last_state_poll_ts = 0.0
@@ -455,6 +502,7 @@ class MidiMapper:
             with self._toggle_lock:
                 self._toggle_states.pop(mapping.mapping_id, None)
             self._feedback_state_cache.pop(mapping.mapping_id, None)
+            self._motor_vergessen(mapping.mapping_id)
 
     def get_mappings(self) -> list[MidiMapping]:
         return list(self._mappings)
@@ -466,6 +514,7 @@ class MidiMapper:
                 m.mapping_id: False for m in self._mappings
                 if m.button_mode == BUTTON_TOGGLE}
         self._feedback_state_cache = {}
+        self._motor_vergessen()
         for mapping in self._mappings:
             self._emit_mapping_state(mapping, self._read_mapping_state(mapping))
 
@@ -799,6 +848,8 @@ class MidiMapper:
             mapping.action,
             (mapping.button_mode or _infer_button_mode(mapping.action)).lower())
         if mode == BUTTON_CONTINUOUS:
+            if self._motor_eingang(mapping, msg):
+                return                      # MIDI-14: Bericht der Motorfahrt
             value = fader_wert(msg)         # MIDI-10: Pitchbend mit 14 Bit
             self._execute_continuous(mapping, value)
             self._emit_mapping_state(mapping, value)
@@ -1049,6 +1100,7 @@ class MidiMapper:
             if now - self._last_state_poll_ts >= 0.1:
                 self._last_state_poll_ts = now
                 self._poll_feedback_states()
+            self._motor_nachtrag(midi)      # MIDI-14: nach der Hand-Ruhe
 
             try:
                 mapping, value = self._feedback_queue.get(timeout=0.05)
@@ -1057,6 +1109,9 @@ class MidiMapper:
             if mapping.midi_out is None:
                 continue
             fb = mapping.midi_out
+            if ist_motorfader(mapping):
+                self._motor_melden(midi, mapping, value)    # MIDI-14
+                continue
             if mapping.msg_type == "pitchbend" and fb.trigger_id < 0:
                 # MIDI-10: keine Rueckmeldung ohne ausdruecklich gesetztes Ziel
                 # — der Rueckfall auf ``data1`` waere hier Note/CC 0.
@@ -1103,6 +1158,102 @@ class MidiMapper:
                 except Exception:
                     pass
 
+    # ── MIDI-14: Motorfader ──────────────────────────────────────────────────
+
+    def _motor_eingang(self, mapping: MidiMapping, msg: MidiMessage) -> bool:
+        """Eingang von einem Motorfader einordnen. ``True`` = das ist der
+        Bericht des Pults ueber eine Fahrt, die LightOS selbst ausgeloest hat
+        — nicht ausfuehren. Sonst merkt sich der Mapper die Hand."""
+        if not ist_motorfader(mapping) or msg.msg_type != "pitchbend":
+            return False
+        jetzt = self._uhr()
+        with self._motor_lock:
+            gesendet = self._motor_send_ts.get(mapping.mapping_id)
+            if gesendet is not None and (jetzt - gesendet) < MOTOR_ECHO_FENSTER_S:
+                return True
+            self._motor_hand_ts[mapping.mapping_id] = jetzt
+        return False
+
+    def _motor_stellung(self, mapping: MidiMapping, vorgabe: float) -> float:
+        """Wohin der Fader gehoert (0..1). Bei einem lesbaren Ziel der echte
+        Stand, zurueckgerechnet durch ``continuous_min``/``continuous_max``
+        (der Fader steht bei 0..1, das Ziel bei min..max); sonst die Vorgabe —
+        die letzte Stellung, die der Fader selbst gemeldet hat."""
+        if mapping.action not in _MOTOR_LESBAR:
+            return max(0.0, min(1.0, float(vorgabe)))
+        stand = self._read_mapping_state(mapping)
+        spanne = float(mapping.continuous_max) - float(mapping.continuous_min)
+        if abs(spanne) > 1e-9:
+            stand = (stand - float(mapping.continuous_min)) / spanne
+        return max(0.0, min(1.0, float(stand)))
+
+    def _motor_melden(self, midi, mapping: MidiMapping, value: float) -> bool:
+        """Einen Motorfader nachfuehren — aber nicht, solange die Hand ihn
+        bewegt: dann wird der Auftrag gemerkt und nach ``MOTOR_HAND_RUHE_S``
+        nachgetragen (``_motor_nachtrag``). ``True`` = gesendet."""
+        jetzt = self._uhr()
+        mid = mapping.mapping_id
+        with self._motor_lock:
+            hand = self._motor_hand_ts.get(mid)
+            if hand is not None and (jetzt - hand) < MOTOR_HAND_RUHE_S:
+                self._motor_offen[mid] = (mapping, float(value))
+                return False
+            self._motor_offen.pop(mid, None)
+        return self._motor_senden(midi, mapping, value, jetzt)
+
+    def _motor_nachtrag(self, midi) -> int:
+        """Gemerkte Auftraege senden, sobald die Hand lange genug ruht. Das
+        Pult bekommt damit auch die Stellung zurueck, die der Bediener selbst
+        eingestellt hat — Mackie-Pulte fahren den Fader nach dem Loslassen auf
+        den zuletzt GESENDETEN Wert."""
+        jetzt = self._uhr()
+        faellig = []
+        with self._motor_lock:
+            for mid, (mapping, value) in list(self._motor_offen.items()):
+                hand = self._motor_hand_ts.get(mid)
+                if hand is None or (jetzt - hand) >= MOTOR_HAND_RUHE_S:
+                    faellig.append((mapping, value))
+                    self._motor_offen.pop(mid, None)
+        return sum(1 for mapping, value in faellig
+                   if self._motor_senden(midi, mapping, value, jetzt))
+
+    def _motor_senden(self, midi, mapping: MidiMapping, value: float,
+                      jetzt: float) -> bool:
+        fb = mapping.midi_out
+        if fb is None:
+            return False
+        mid = mapping.mapping_id
+        wert = int(round(self._motor_stellung(mapping, value) * 16383.0))
+        with self._motor_lock:
+            hand = self._motor_hand_ts.get(mid, float("-inf"))
+            zuletzt = self._motor_send_ts.get(mid, float("-inf"))
+            if self._motor_wert.get(mid) == wert and hand <= zuletzt:
+                return False        # steht schon dort, und niemand hat ihn bewegt
+            # VOR dem Senden merken: was das Pult gleich zurueckmeldet, soll
+            # schon als Echo gelten.
+            self._motor_wert[mid] = wert
+            self._motor_send_ts[mid] = jetzt
+        ch = int(fb.channel or mapping.channel or 1)
+        geraet = str(fb.device or "").strip()
+        try:
+            if geraet:
+                midi.send_pitchbend_to(geraet, ch, wert)
+            else:
+                midi.send_pitchbend(ch, wert)
+        except Exception:
+            return False
+        return True
+
+    def _motor_vergessen(self, mapping_id: str | None = None) -> None:
+        """Zustand eines Motorfaders verwerfen (Mapping entfernt/ersetzt)."""
+        with self._motor_lock:
+            for tabelle in (self._motor_hand_ts, self._motor_send_ts,
+                            self._motor_wert, self._motor_offen):
+                if mapping_id is None:
+                    tabelle.clear()
+                else:
+                    tabelle.pop(mapping_id, None)
+
     @staticmethod
     def _sende(midi, geraet: str, msg_type: str, ch: int, trigger: int,
                wert: int) -> None:
@@ -1138,6 +1289,17 @@ class MidiMapper:
     def _poll_feedback_states(self):
         for mapping in self._mappings:
             if not mapping.midi_out:
+                continue
+            if ist_motorfader(mapping):
+                # MIDI-14: nur wo sich der Stand zuruecklesen laesst — sonst
+                # fuehre der Fader auf einen geratenen Zustand (0) zurueck.
+                if mapping.action not in _MOTOR_LESBAR:
+                    continue
+                value = self._motor_stellung(mapping, 0.0)
+                prev = self._feedback_state_cache.get(mapping.mapping_id)
+                if prev is None or abs(prev - value) >= MOTOR_SCHRITT:
+                    self._feedback_state_cache[mapping.mapping_id] = value
+                    self._emit_mapping_state(mapping, value)
                 continue
             value = self._read_mapping_state(mapping)
             prev = self._feedback_state_cache.get(mapping.mapping_id)

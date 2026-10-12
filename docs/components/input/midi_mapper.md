@@ -58,6 +58,26 @@ Feedback-Ausgangs. `subscribe_state()` liefert UI/VC denselben Zustand als
 **Persistenz:** `save(path)`/`load(path)` als JSON; modernes Schema
 (`from_config_dict`) und Legacy-Flachfelder werden beide gelesen.
 
+**Motorfader (MIDI-14):** ein Pitchbend-Mapping mit `midi_out.message_type ==
+"pitchbend"` (`ist_motorfader`, gebaut von `motor_rueckmeldung`) wird nachgeführt: die
+Schleife sendet die Stellung mit 14 Bit auf dem Kanal des Faders zurück
+(`MidiManager.send_pitchbend[_to]`). Drei Regeln:
+
+- **Hand vor Motor.** Kommen vom Fader Werte, geht `MOTOR_HAND_RUHE_S` (0,35 s) lang nichts
+  an seinen Motor; der Auftrag wird gemerkt und danach einmal nachgetragen
+  (`_motor_nachtrag`) – Mackie-Pulte fahren nach dem Loslassen auf den zuletzt gesendeten
+  Wert.
+- **Echo ist keine Eingabe.** Was binnen `MOTOR_ECHO_FENSTER_S` (0,25 s) nach einer eigenen
+  Sendung vom selben Fader kommt, ist der Bericht der Motorfahrt und wird nicht ausgeführt
+  (`_motor_eingang`).
+- **Nichts raten.** Nachgeführt wird aus dem echten Stand (`_motor_stellung`,
+  zurückgerechnet durch `continuous_min/max`) – nur bei Executor-Fader und Grand Master
+  (`_MOTOR_LESBAR`). Andere stufenlose Ziele bekommen nur ihre eigene Stellung zurück.
+
+Schwelle `MOTOR_SCHRITT` = 0,2 % (statt 1 % der LED-Rückmeldung). Grenze: bewegt die
+Software den Wert laufend (Überblendung), gewinnt bis MIDI-15 (Berührungs-Note) der Motor.
+VC-Fader haben keinen MIDI-Rückweg und werden nicht nachgeführt.
+
 ## Gekoppelte VC-/Engine-Teile
 
 - **`app_state.playback_engine`** — Executoren (`get_executor(slot)`, `press_btn`,
