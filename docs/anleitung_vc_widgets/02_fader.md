@@ -25,7 +25,7 @@ Es gibt **keine** Doppelklick-Sonderfunktion im Betrieb – Doppelklick im Bearb
 Kleine Status-Marker im Element:
 
 - **Gelbes `⇅` oder `▯` oben links** – `⇅` = Fader ist invertiert, `▯` = ein Teilbereich (Min/Max) ist gesetzt. Der Prozentwert oben spiegelt das bereits wider.
-- **Cyan-Punkt oben rechts** – eine MIDI-CC-Bindung ist aktiv.
+- **Cyan-Punkt oben rechts** – eine MIDI-Bindung (CC oder Pitchbend) ist aktiv.
 - **Gelbe Strich-Linie + `⊘▲`/`⊘▼` (Soft-Takeover)** – nur wenn „Pickup" aktiv ist und der Fader nach einem Bank-/Seitenwechsel auf das Durchfahren des physischen Reglers wartet (siehe [MIDI & Tastatur](#midi--tastatur)). Die gestrichelte Linie markiert den Ziel-(VC-)Wert, der zweite gelbe Strich die aktuelle physische Reglerposition, der Pfeil die Richtung, in die der physische Regler bewegt werden muss.
 
 Ist „Touch-Lock" für die VC aktiv, ignoriert der Fader Maus/Touch (reine Anzeige); MIDI/APC regelt weiter (siehe [README.md](README.md)).
@@ -58,8 +58,9 @@ Doppelklick (im Bearbeiten-Modus) öffnet den Dialog „Fader Einstellungen". De
 | **DMX-Kanal (Level-Modus)** | Nur Modus *DMX-Kanal (Level)*: Ziel-Kanal im Universe. | Ganzzahl |
 | **Playback Executor-Slot** | Nur Modus *Playback (Executor)*: der Executor-Slot-Index (0-basiert), dessen Fader dieser Regler steuert. Eigenes Feld – „nicht gesetzt" = kein Slot (der Fader wirkt dann nicht). | Ganzzahl ≥ 0 oder „nicht gesetzt" |
 | **Slot/Funktions-ID (Playback/Effekt)** | Nur in den **Effekt-Modi** sichtbar (unter „Erweitert"): Effekt-Funktions-ID(s). Mehrere IDs mit Komma = Gruppe. Leer = aktiver Effekt. Die „Steuert"-Liste überschreibt dieses Feld. Setzt **nicht** den Playback-Slot – dafür dient das eigene Feld *Playback Executor-Slot*; in Playback-Mode wird dieses Feld gar nicht angezeigt. | Ganzzahl(en), kommagetrennt |
-| **CC-Nummer (-1=keine)** | MIDI-Controller-Nummer für die CC-Bindung. | -1 (keine) bis 127 |
-| **MIDI-Kanal (0=alle)** | MIDI-Kanal der Bindung. | 0 (Alle) bis 16 |
+| **Art** | Art der MIDI-Bindung: **CC** (Fader mit Controller-Nummer, z. B. APC mini) oder **Pitchbend (Motorfader, 14 Bit)** für Mackie-Control- und X-Touch-Pulte. Bei Pitchbend gibt es keine Nummer – der Fader ist sein MIDI-Kanal. | CC / Pitchbend |
+| **CC-Nummer (-1=keine)** | MIDI-Controller-Nummer für die CC-Bindung. Bei Art *Pitchbend* gesperrt. | -1 (keine) bis 127 |
+| **MIDI-Kanal (0=alle)** | MIDI-Kanal der Bindung. Bei *Pitchbend* den Kanal des Faders wählen (Fader 1 = Kanal 1 …); mit „Alle“ bewegt jeder Fader des Pults diesen Regler. | 0 (Alle) bis 16 |
 
 ### Die Modi im Klartext
 
@@ -118,10 +119,11 @@ Die eigentliche Live-Wirkung läuft über die gemeinsame Naht `src/core/engine/e
 
 ## MIDI & Tastatur
 
-Der Fader unterstützt **MIDI-Teach** (nur CC, kein Note); eine **Tasten-Zuweisung gibt es nicht** (ein Fader braucht einen kontinuierlichen Wert, keinen Tastendruck).
+Der Fader unterstützt **MIDI-Teach** für **CC** und **Pitchbend** (kein Note); eine **Tasten-Zuweisung gibt es nicht** (ein Fader braucht einen kontinuierlichen Wert, keinen Tastendruck).
 
 - **Zuweisen:** Im Dialog die **CC-Nummer** (0–127) und optional den **MIDI-Kanal** (0 = alle) eintragen – oder per Rechtsklick „MIDI Teach…" den nächsten eingehenden CC lernen. Aktive Bindung = Cyan-Punkt oben rechts.
 - **Wirkung:** Eingehende CC-Werte (0–127) werden absolut auf 0–255 (0–100 %) abgebildet. Es zählt nur die als CC gebundene Nummer auf dem passenden Kanal.
+- **Motorfader (Mackie Control, X-Touch):** Diese Pulte senden ihre Fader nicht als CC, sondern als **Pitchbend** – je Fader ein MIDI-Kanal, der Wert mit 14 Bit (16 384 Stufen statt 128). Zuweisen: Rechtsklick „MIDI Teach…“ und den Fader am Pult bewegen (die Note, die der Berührungssensor beim Anfassen schickt, wird dabei übergangen), oder im Dialog **Art = Pitchbend** und den Kanal eintragen. Damit erreicht der Regler alle 256 Stufen; mit CC ist es nur jede zweite. **Das Pult fährt seine Fader noch nicht selbst nach** – die Rückmeldung an die Motoren ist ein eigener, offener Punkt (MIDI-14). Bis dahin hilft „Pickup“ gegen Sprünge.
 - **Soft-Takeover / „Pickup":** Ein globaler VC-Schalter für nicht-motorisierte Controller (z. B. APC mini). Nach einem Bank-/Seitenwechsel steht der physische Regler meist woanders als der VC-Wert. Bei aktivem Pickup übernimmt der Fader erst, wenn der physische Regler den aktuellen VC-Wert **einmal durchfährt** – so gibt es keinen Sprung. Bis dahin zeigt das Element den gelben Pickup-Hinweis (Ziel-Linie + Geist-Position + `⊘▲`/`⊘▼`-Richtungspfeil) und ignoriert MIDI.
 
 ## Tipps & Fallen

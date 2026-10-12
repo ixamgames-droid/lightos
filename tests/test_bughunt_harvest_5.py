@@ -49,7 +49,8 @@ class MidiLearnCallbackOnlyEmitsTest(unittest.TestCase):
                 selectedIndexes=lambda: [SimpleNamespace(row=lambda: 0)]),
             _learn_target_row=None,
             _append_log=logs.append,
-            _mapper=SimpleNamespace(start_learn=lambda cb: cbs.append(cb)),
+            # **kw: seit MIDI-10 gibt die MIDI-Ansicht `pitchbend=True` mit.
+            _mapper=SimpleNamespace(start_learn=lambda cb, **kw: cbs.append(cb)),
             _log_signal=SimpleNamespace(
                 learn_received=SimpleNamespace(emit=lambda m: emitted.append(m))),
         )

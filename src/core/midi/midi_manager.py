@@ -254,6 +254,29 @@ def _new_rtmidi_out():
     return m
 
 
+def wert14(msg) -> int:
+    """MIDI-10: der Wert einer Nachricht mit 14 Bit (0..16383). Pitchbend
+    traegt ihn in beiden Datenbytes (``data1`` = untere, ``data2`` = obere
+    7 Bit); bei allen anderen Nachrichten ist es ``data2`` auf 14 Bit gestreckt.
+    Nimmt auch schlichte Objekte mit ``msg_type``/``data1``/``data2``."""
+    d2 = int(getattr(msg, "data2", 0) or 0) & 0x7F
+    if getattr(msg, "msg_type", "") == "pitchbend":
+        return (d2 << 7) | (int(getattr(msg, "data1", 0) or 0) & 0x7F)
+    return d2 << 7
+
+
+def fader_wert(msg) -> float:
+    """MIDI-10: Stellung eines Faders als 0..1.
+
+    Pitchbend (Mackie Control, X-Touch: je Fader ein Kanal) mit 14 Bit, also
+    16384 Stufen; CC und alles andere wie bisher ``data2 / 127``. EINE Stelle
+    fuer Mapper und VC-Fader — wer ``data2`` allein nimmt, verschenkt bei
+    Pitchbend die unteren 7 Bit."""
+    if getattr(msg, "msg_type", "") == "pitchbend":
+        return wert14(msg) / 16383.0
+    return (int(getattr(msg, "data2", 0) or 0) & 0x7F) / 127.0
+
+
 @dataclass
 class MidiMessage:
     port_name: str
