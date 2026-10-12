@@ -24,7 +24,7 @@ Einen Testzugang gibt es **auf Anfrage über GitHub**
 **Lizenzdatei**. Sie ist
 
 - **persönlich** — sie nennt dich bzw. deinen Testplatz,
-- **befristet** — sie nennt ein Ablaufdatum,
+- **in der Regel befristet** — sie nennt meist ein Ablaufdatum,
 - **nicht übertragbar** — bitte nicht weitergeben.
 
 Die Datei ist signiert. Wer Name oder Datum darin ändert, macht sie ungültig.

@@ -26,8 +26,8 @@ Deutsche Fassung
 
 3. Testlizenzen.
    LightOS befindet sich in der Testphase. Die Erlaubnis zum Benutzen erteilt
-   der Urheber als Lizenzdatei. Eine solche Testlizenz ist persönlich, zeitlich
-   begrenzt und nicht übertragbar; sie erlaubt das Ausführen und Benutzen des
+   der Urheber als Lizenzdatei. Eine solche Testlizenz ist persönlich, in der
+   Regel zeitlich begrenzt und nicht übertragbar; sie erlaubt das Ausführen und Benutzen des
    Programms im vereinbarten Rahmen und nichts darüber hinaus. Die Lizenzdatei
    selbst darf nicht weitergegeben werden. Einen Testzugang gibt es auf Anfrage
    über GitHub (Adresse oben).
@@ -80,7 +80,7 @@ provided for convenience.
 
 3. Test licences.
    LightOS is in its test phase. Permission to use it is granted by the author
-   in the form of a licence file. Such a test licence is personal, limited in
+   in the form of a licence file. Such a test licence is personal, as a rule limited in
    time and non-transferable; it permits running and using the program within
    the agreed scope and nothing beyond that. The licence file itself must not
    be passed on. Test access is available on request via GitHub (address

@@ -356,7 +356,7 @@ der 3D-Visualizer startet mit `--no-sandbox` (abschaltbar über
 **Copyright (c) 2026 [ixamgames-droid](https://github.com/ixamgames-droid/lightos) — alle Rechte
 vorbehalten.** Der Quelltext ist öffentlich, damit man ihn **ansehen** kann. Benutzen, Verändern
 und Weitergeben sind nur mit schriftlicher Erlaubnis des Urhebers gestattet — der volle Text steht
-in [LICENSE](LICENSE). Einen **Testzugang** (persönliche, befristete Lizenzdatei) gibt es auf
+in [LICENSE](LICENSE). Einen **Testzugang** (persönliche, in der Regel befristete Lizenzdatei) gibt es auf
 Anfrage über GitHub; ohne gültige Lizenzdatei startet das Programm nicht. Wie das geht und wohin
 die Datei gehört: [docs/LIZENZ_UND_TESTZUGANG.md](docs/LIZENZ_UND_TESTZUGANG.md).
 
