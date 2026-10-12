@@ -59,7 +59,6 @@
 | MIDI-14 | D | - | 2026-10-11T16:21Z | - |
 | WEB-11 | A | feature/web11-qr-startbildschirm | 2026-10-11T16:32Z | - |
 | QA-96 | A | - | 2026-10-11T16:56Z | - |
-| XPLAT-54 | D | fix/xplat54-backlog-fragmente-test-windows | 2026-10-11T18:31Z | tests/test_backlog_fragmente.py |
 | WEB-12 | A | fix/web12-handy-rechte-laser | 2026-10-11T19:15Z | - |
 | LAS-36 | A | fix/las36-notaus-loesen-lasererkennung | 2026-10-11T19:15Z | - |
 | LAS-37 | D | fix/las37-eine-laser-erkennung | 2026-10-11T20:38Z | - |
@@ -228,7 +227,6 @@
 
 ## Verlauf
 
-- 2026-10-11T19:15Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-11T19:15Z A claim LAS-36
 - 2026-10-11T19:24Z D claim LAS-37
 - 2026-10-11T19:24Z D claim VCB-43
@@ -258,3 +256,4 @@
 - 2026-10-12T13:40Z A claim STAB-36
 - 2026-10-12T13:51Z D aktualisiert OUT-73: Branch - -> fix/out73-enttec-reiter-toter-anschluss; Dateien - -> src/ui/widgets/output_config.py
 - 2026-10-12T14:06Z D aktualisiert OUT-74: Branch - -> fix/out74-adapter-umzug-alte-zeile; Dateien - -> src/ui/widgets/output_config.py · src/core/app_state.py
+- 2026-10-12T14:09Z D done XPLAT-54
