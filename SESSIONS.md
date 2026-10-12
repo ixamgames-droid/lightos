@@ -83,6 +83,7 @@
 | OUT-76 | D | fix/out76-udmx-windows-treiber-erkennen | 2026-10-12T17:12Z | src/core/dmx/udmx.py · src/core/dmx/usb_treiber_windows.py · src/ui/widgets/output_config.py · INSTALL.md · docs/anleitung_ausgabe_einrichten · tests/test_out76_udmx_windows_treiber.py |
 | STAB-38 | A | fix/stab38-absturz-matrix-pingpong | 2026-10-12T17:33Z | src/ui/views/rgb_matrix_view.py |
 | FM-75 | D | fix/fm75-live-test-laser-rueckfrage | 2026-10-12T17:35Z | src/ui/widgets/fixture_generator.py · tests/test_fm75_live_test_laser_rueckfrage.py · docs/anleitung_fixture_generator |
+| PROC-21 | D | fix/test-verschmutzung-allwhite-las32 | 2026-10-12T17:48Z | tests/conftest.py · tests/test_allwhite_covers_all.py · tests/test_out61_estop_lade_fenster.py · tests/test_proc21_test_verschmutzung.py |
 
 ## Blocker & Fallen
 
@@ -249,7 +250,6 @@
 
 ## Verlauf
 
-- 2026-10-12T13:40Z D claim LAS-38
 - 2026-10-12T13:40Z A claim STAB-35
 - 2026-10-12T13:40Z A claim STAB-36
 - 2026-10-12T13:51Z D aktualisiert OUT-73: Branch - -> fix/out73-enttec-reiter-toter-anschluss; Dateien - -> src/ui/widgets/output_config.py
@@ -279,3 +279,4 @@
 - 2026-10-12T17:12Z D claim OUT-76
 - 2026-10-12T17:33Z A claim STAB-38
 - 2026-10-12T17:35Z D claim FM-75
+- 2026-10-12T17:48Z D claim PROC-21
