@@ -79,7 +79,7 @@
    },
    "moverHeads": null,
    "optik": {
-    "beamX": 0.6339,
+    "beamX": 1.0142,
     "gobo": true,
     "goboRot": 4.2524,
     "penumbra": 0.5915,
@@ -762,7 +762,7 @@
    "bars": null,
    "beam": {
     "hex": 13132850,
-    "op": 0.7059,
+    "op": 0.2757,
     "vis": true
    },
    "floorSpot": {
@@ -789,7 +789,7 @@
    },
    "moverHeads": null,
    "optik": {
-    "beamX": 0.6339,
+    "beamX": 1.0142,
     "gobo": true,
     "goboRot": 4.2524,
     "penumbra": 0.5915,

@@ -11,7 +11,8 @@ Sichtpruefung von B1/B2 am Bildschirm (12 Moving Heads, Stufe Hoch):
 3. Die Treffersuche legte die ganze flache Scheibe auf die Oberseite einer
    getroffenen Traverse: mit Gobo rechnet sie durch schmale Koerper hindurch.
 4. Der Kegel endete auf der Buehnenplatte, die Projektion lief weiter ueber den
-   Hallenboden: sie endet jetzt an derselben Flaeche.
+   Hallenboden. B3 schnitt sie dort ab; seit VIZ-102 laeuft sie weiter und der
+   Kegel reicht mit (``test_viz102_gobo_hallenboden_scene.py``).
 
 Gemessen wird ueber die ECHTE Seite (Produktiv-Push), mit stellbarer Pool-Uhr:
 Zustand, Uniform-Werte und Programmschluessel (offscreen ist der GL-Kontext
@@ -56,7 +57,6 @@ _B3_JS = """
               f.floorSpot.material.color.b],
       fleckY: f.floorSpot.position.y,
       laenge: f.baseBeamLength * f.beam.scale.y,
-      grenz: (f._goboGrenzY === undefined) ? null : f._goboGrenzY,
       durchmesser: 2 * f.beam.geometry.parameters.radius * f.beam.scale.x,
     };
   }
@@ -64,28 +64,12 @@ _B3_JS = """
     halter: pool.halter, traeger: pool.traeger || null, anteil: pool.goboAnteil || null,
     blenden: (pool.goboBlenden === undefined) ? null : pool.goboBlenden,
     projiziert: pool.goboProjiziert, vergaben: pool.vergaben,
-    licht: lichter.map(l => l.intensity), ebenen: g.ebene || null,
+    licht: lichter.map(l => l.intensity),
     maske: g.param ? g.param.map(p => p[0]) : null,
     dirty: L.renderStats().dirty, geraete: geraete,
   });
 })()
 """
-
-# Vorzeichen der Grenzebene an Weltpunkten, mit der Schattenmatrix von three.
-_EBENE_JS = """
-(function(){
-  const L = window.__lightos, T = window.THREE;
-  const i = L.spotPoolInfo().traeger.indexOf(%d);
-  const l = L.spotPoolLights()[i], e = L.goboProjektionInfo().ebene[i];
-  l.updateMatrixWorld(true); l.target.updateMatrixWorld(true);
-  l.shadow.updateMatrices(l);
-  return JSON.stringify(%s.map(p => {
-    const c = new T.Vector4(p[0], p[1], p[2], 1).applyMatrix4(l.shadow.matrix);
-    return e[0] * c.x + e[1] * c.y + e[2] * c.z + e[3] * c.w >= 0;
-  }));
-})()
-"""
-
 
 class _B3Basis(_Basis):
     def _pooluhr(self, t):
@@ -299,7 +283,7 @@ class Viz96B3HelligkeitTest(_B3Basis):
         self.assertAlmostEqual(g["deck"], dim * 0.55, places=6)
 
 
-# ── Punkt 3 + 4: Traverse, Buehnenplatte ─────────────────────────────────────
+# ── Punkt 3: Traverse, Buehnenplatte ─────────────────────────────────────
 
 _TRAV = ("b3_trav", "truss_h", (0.0, 3.0, -0.125), (2.4, 0.3, 0.3))
 _PLATTE = ("b3_platte", "platform", (0.5, 0.5, 0.5), (6.0, 1.0, 4.0))
@@ -326,16 +310,12 @@ class Viz96B3FlaechenTest(_B3Basis):
         self.assertAlmostEqual(gobo["fleckY"], 0.01, places=6,
                                msg="Muster auf der 0,3 m breiten Traverse statt am Boden")
         self.assertGreater(gobo["laenge"], offen["laenge"] + 1.0, "der Kegel reicht jetzt weiter")
-        self.assertIsNone(gobo["grenz"], "Boden: keine Grenze fuer die Projektion")
-        z = self._z()
-        slot = z["traeger"].index(_FID)
-        self.assertEqual(z["ebenen"][slot], [0, 0, 0, 1])
         # Gobo wieder aus: zurueck auf die Traverse (Verhalten ohne Gobo unveraendert).
         self._push(_payload(gobo_wheel=0))
         self._bild_um(40)
         self.assertAlmostEqual(self._g()["fleckY"], offen["fleckY"], places=6)
 
-    def test_buehnenplatte_bleibt_ziel_und_begrenzt_die_projektion(self):
+    def test_buehnenplatte_bleibt_ziel(self):
         self._load_and_wait()
         self._pooluhr(0)
         self._stage(*_PLATTE)
@@ -343,29 +323,8 @@ class Viz96B3FlaechenTest(_B3Basis):
         self._push(_payload(gobo_wheel=_RING))
         self._bild_um(0)
         self._bild_um(20)
-        g = self._g()
         # Durch die Traverse hindurch, aber AUF die Platte (Oberkante 1,0 m).
-        self.assertAlmostEqual(g["fleckY"], 1.01, places=6)
-        self.assertAlmostEqual(g["grenz"], 1.0, places=6)
-        z = self._z()
-        slot = z["traeger"].index(_FID)
-        self.assertNotEqual(z["ebenen"][slot], [0, 0, 0, 1], "Projektion endet an der Platte")
-        # Auf/ueber der Platte Licht, Hallenboden daneben nicht; die Traverse
-        # im Strahl (3 m) bekommt ihr Muster weiter.
-        punkte = [[0.5, 1.0, 0.5], [2.0, 1.0, -1.0], [0.0, 3.15, 0.0], [0.2, 0.8, 0.1],
-                  [5.0, 0.0, 4.0], [-4.0, 0.0, 0.0], [0.0, 0.5, 3.0]]
-        self.assertEqual(self._json(_EBENE_JS % (_FID, json.dumps(punkte))),
-                         [True, True, True, True, False, False, False])
-        # Kopf geschwenkt: die Ebene bleibt eine WELT-Ebene (folgt nicht dem Licht).
-        self._push(_payload(gobo_wheel=_RING, pan=120, tilt=140))
-        self._bild_um(40)
-        if self._g()["grenz"] is not None:
-            self.assertEqual(self._json(_EBENE_JS % (_FID, json.dumps(punkte))),
-                             [True, True, True, True, False, False, False])
-        # Gobo aus: keine Grenze mehr am Licht.
-        self._push(_payload(gobo_wheel=0))
-        z = self._bild_um(60)
-        self.assertEqual(z["ebenen"][slot], [0, 0, 0, 1])
+        self.assertAlmostEqual(self._g()["fleckY"], 1.01, places=6)
 
 
 # ── Stufe Niedrig: alles wie vor B3 ──────────────────────────────────────────
@@ -384,9 +343,10 @@ class Viz96B3NiedrigTest(_B3Basis):
         self._bild_um(20)
         z = self._bild_um(40)
         g = z["geraete"][str(_FID)]
-        # Treffersuche wie bisher: Muster auf der getroffenen Flaeche.
+        # Treffersuche wie bisher: die Strahlmitte trifft die Traverse. (Seit
+        # VIZ-102 wird die Scheibe dort beschnitten und der Kegel reicht zur
+        # Flaeche dahinter — test_viz102_gobo_hallenboden_scene.py.)
         self.assertAlmostEqual(g["fleckY"], offen["fleckY"], places=6)
-        self.assertAlmostEqual(g["laenge"], offen["laenge"], places=6)
         # Deckkraft ohne Angleichung, keine Blenden-Felder am Geraet.
         self.assertAlmostEqual(g["deck"], (220 / 255) * 0.55 * 1.5, places=6)
         self.assertIsNone(g["basis"])

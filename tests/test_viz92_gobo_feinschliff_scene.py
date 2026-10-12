@@ -258,7 +258,7 @@ class _Basis(unittest.TestCase):
 _STILE = ["ring_slits", "ovals", "circle_of_circles", "tetris", "dots", "spiral", "zebra"]
 
 # Groesster Abstand (Anteil des Textur-Radius) eines hellen Motiv-Pixels von
-# der Mitte, je Stil — der Kegelrand liegt bei GOBO_RAND (0,62).
+# der Mitte, je Stil — der Kegelrand liegt bei GOBO_RAND (0,88, VIZ-102).
 _MUSTER_RADIUS_JS = """
 (function(){
   const L = window.__lightos, out = {};
@@ -435,12 +435,13 @@ class Viz92MusterTest(_Basis):
     def test_muster_bleibt_am_kegelrand(self):
         self._load_and_wait()
         r = self._json(_MUSTER_RADIUS_JS)
-        # Zebra: die Balken enden knapp hinter dem Kegelrand (0,62 * 1,15),
-        # nicht mehr bei 0,94 als Streifen neben dem Fleck.
-        self.assertLessEqual(r["zebra"], 0.62 * 1.15 + 0.01, r)
-        self.assertGreater(r["zebra"], 0.62, r)
+        # VIZ-102: der Kegelrand liegt bei 0,88 der Kachel und ist zugleich der
+        # Bildrand — kein Motiv reicht darueber hinaus (weiche Kante bis 0,92).
+        # Die Zebra-Balken fuellen den Kegel bis zum Rand.
+        self.assertGreater(r["zebra"], 0.84, r)
         for stil, rmax in r.items():
-            self.assertLessEqual(rmax, 0.9, f"{stil}: Motiv reicht bis {rmax}")
+            self.assertLessEqual(rmax, 0.925, f"{stil}: Motiv reicht bis {rmax}")
+            self.assertGreater(rmax, 0.80, f"{stil}: Motiv erreicht den Kegelrand nicht")
 
     def test_textur_fein_genug_und_gefiltert(self):
         self._load_and_wait()

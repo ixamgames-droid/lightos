@@ -13,9 +13,9 @@ import { applyOptics } from './optics.js';   // VIZ-MH-OPTICS
 import { applyPrism, syncPrismToBeam } from './prism.js';   // VIZ-PRISMA-3D
 import { syncPoolSize } from './floor_pool.js';               // VIZ-15
 import { beamsOff } from '../state.js';                       // VIZ-15
-import { applyGobo, alignGoboFloor, goboWinkel, GOBO_LICHT, GOBO_STRAHL, GOBO_FLECK } from './gobo_textures.js';   // VIZ-GOBO-3D, VIZ-83
+import { applyGobo, alignGoboFloor, goboKanteAbgleichen, kegelSchnittAbgleichen, goboWinkel, GOBO_LICHT, GOBO_STRAHL, GOBO_FLECK } from './gobo_textures.js';   // VIZ-GOBO-3D, VIZ-83
 import { glattKanal, glattZiel, glattWert, glattDeckel } from './bewegung_glatt.js';   // VIZ-92
-import { goboProjektionAktiv, goboFlachDeckkraft, goboSchmal } from '../scene/gobo_projektion.js';      // VIZ-96
+import { goboProjektionAktiv, goboFlachDeckkraft, goboSchmal, strahlFussabdruck, goboUeberhangGerichtet, kegelFernLaenge } from '../scene/gobo_projektion.js';      // VIZ-96
 import { requestRender } from '../scene/render_loop.js';                 // VIZ-92
 import { buildLaserRig, applyLaser, noteLaserAnimation, LASER_BEAM_OPACITY } from './laser.js';   // VIZ-79
 import { stageObjects } from '../state.js';                   // VIZ-BEAM-OCCLUSION
@@ -93,11 +93,88 @@ function koerperTreffer(f, origin, dir) {
 // legt ihr Motiv weiter auf die Traverse und den Schatten dahinter.
 function _goboSchmalMass(f) {
   if (!f.goboAktiv || !goboProjektionAktiv()) return 0;
+  return _kegelDurchmesser(f);
+}
+
+// Durchmesser (m) des Kegels am AUFTREFFPUNKT (dort liegt der Rand des
+// Flecks) — ohne die Verbreiterung eines verlaengerten Kegels (VIZ-102).
+function _kegelDurchmesser(f) {
   const beam = f.beam;
   const p = beam && beam.geometry && beam.geometry.parameters;
   if (!p || !(p.radius > 0)) return 0;
-  const d = 2 * p.radius * (beam.scale.x || 1);
+  const d = 2 * p.radius * (beam.scale.x || 1) / (f._kegelWeit || 1);
   return (d > 0 && isFinite(d)) ? d : 0;
+}
+
+// So weit (Vielfaches der Grundlaenge) darf ein Gobo-Kegel mit Auftreffpunkt
+// reichen, wenn der ferne Rand seines Musters dort liegt.
+const KEGEL_UEBER_BASIS = 2;
+// ... und hoechstens so viel laenger als die Achse bis zur Flaeche: bei sehr
+// flachem Einfall laege der ferne Rand in beliebiger Ferne (ein Kopf mit 67
+// Grad Neigung bekaeme sonst einen fast dreimal so langen und breiten Kegel).
+// Dahinter blendet die Projektion mit dem Kegel aus.
+const KEGEL_FERN_DACH = 1.6;
+function _fernLaenge(dy, tanA, achse) {
+  return Math.min(kegelFernLaenge(dy, tanA, achse), achse * KEGEL_FERN_DACH);
+}
+
+// VIZ-102: Kegel ueber den Auftreffpunkt hinaus verlaengern, OHNE dass er
+// schmaler wird. Der Kegel hat am Ende einen festen Radius (nur scale.y traegt
+// die Laenge) — laenger hiesse sonst spitzer, und Muster wie Projektion
+// (beide lesen den Winkel aus der Kegel-Matrix) schrumpften auf der Buehne.
+// `weit` = Laenge / Laenge bis zum Auftreffpunkt; scale.x/z waechst mit.
+function _kegelWeite(f, auftreffAbstand) {
+  const beam = f.beam;
+  if (!beam || !f.baseBeamLength) return;
+  let weit = 1;
+  const bisTreffer = beamLengthScale(f.baseBeamLength, auftreffAbstand, settings.maxBeamRange);
+  if (bisTreffer > 0 && beam.scale.y > bisTreffer * 1.005) weit = beam.scale.y / bisTreffer;
+  const alt = f._kegelWeit || 1;
+  if (Math.abs(weit - alt) < 1e-4) return;
+  const k = (typeof f._optikK === 'number') ? f._optikK : (beam.scale.x || 1) / alt;
+  f._kegelWeit = weit;
+  beam.scale.x = k * weit;
+  beam.scale.z = k * weit;
+  if (typeof f._kegelDeck === 'number' && beam.material) {
+    beam.material.opacity = f._kegelDeck * kegelDeckFaktor(weit);
+  }
+}
+
+// Ein verlaengerter Kegel ist am Auftreffpunkt heller als ein kurzer: sein
+// Laengsverlauf (fixtures.js#beamFalloffTexture, 1,0 an der Linse -> 0,24 am
+// Ende) streckt sich mit, die Buehne liegt dann im hellen Teil, und der
+// Kegel ist breiter. Gemessen am Bildschirm standen die Teilstrahlen eines
+// 1,7-fach verlaengerten Kegels als weisse Balken da. Ausgleich ueber die
+// Deckkraft: 1 / weit^2 (bei 1,7 rund ein Drittel — am Auftreffpunkt wieder
+// so hell wie der Kegel, der dort endet), nie unter 0,3.
+export function kegelDeckFaktor(weit) {
+  if (!(weit > 1)) return 1;
+  return Math.max(0.3, 1 / (weit * weit));
+}
+
+// VIZ-102: Oberseite des Buehnenobjekts, zu dem ein getroffenes Mesh gehoert,
+// als gedrehtes Rechteck (gobo_projektion.js#kantenAbstand) — oder null.
+function _koerperOberseite(obj, trefferY) {
+  for (let o = obj; o; o = o.parent) {
+    const id = o.userData && o.userData.stageId;
+    if (!id || !stageObjects[id]) continue;
+    const m = stageObjects[id].mesh, d = stageObjects[id].data;
+    const g = d && d.size;
+    if (!m || !g || !(g.x > 0) || !(g.z > 0)) return null;
+    const y = m.position.y + g.y / 2;
+    if (Math.abs(y - trefferY) > 0.03) return null;     // nicht die Bounding-Box-Oberseite
+    return { cx: m.position.x, cz: m.position.z, hx: g.x / 2, hz: g.z / 2,
+             c: Math.cos(m.rotation.y), s: Math.sin(m.rotation.y), y, id };
+  }
+  return null;
+}
+
+function _koerperId(obj) {
+  for (let o = obj; o; o = o.parent) {
+    const id = o.userData && o.userData.stageId;
+    if (id) return id;
+  }
+  return null;
 }
 
 const _normale = new THREE.Vector3();
@@ -137,13 +214,26 @@ function _koerperTrefferRechnen(origin, dir, schmal = 0) {
     if (schmal > 0 && goboSchmal(_koerperGroesse(h.object), schmal)) continue;
     // `oben`: der Strahl trifft eine Oberseite (Podest, Buehnenplatte) — nur
     // dann ist die Trefferhoehe eine Flaeche, an der die Projektion enden
-    // kann (applyFloorAim -> f._goboGrenzY).
+    // kann (VIZ-102: Kante der Oberseite, s. u.).
     let oben = false;
     if (h.face && h.object) {
       _normale.copy(h.face.normal).transformDirection(h.object.matrixWorld);
       oben = _normale.y > 0.7;
     }
-    return { abstand: h.distance, y: h.point.y, oben };
+    // VIZ-102: Kante der Oberseite und die naechste Flaeche DAHINTER (ein
+    // anderer Koerper; den Boden rechnet applyFloorAim dazu) — fuer Muster und
+    // Kegel, die ueber die Kante ragen.
+    const kante = oben ? _koerperOberseite(h.object, h.point.y) : null;
+    let unten = Infinity, untenY = 0;
+    if (kante) {
+      for (const w of hits) {
+        if (w.distance <= h.distance || _koerperId(w.object) === kante.id) continue;
+        if (schmal > 0 && goboSchmal(_koerperGroesse(w.object), schmal)) continue;
+        unten = w.distance; untenY = w.point.y;
+        break;
+      }
+    }
+    return { abstand: h.distance, y: h.point.y, oben, kante, unten, untenY };
   }
   return null;
 }
@@ -1763,6 +1853,12 @@ function applyGenericColor(f, dmx) {
   }
   // Top-down icon color reflects active output color (only when bright)
   tintTopDownIcon(f.icon, color, intNorm);
+  // VIZ-102: Deckkraft des Kegels ist die Basis; ein verlaengerter Kegel
+  // zeichnet schwaecher (kegelDeckFaktor, nachgefuehrt in _kegelWeite).
+  if (f.beam && f.beam.material) {
+    f._kegelDeck = f.beam.material.opacity;
+    if ((f._kegelWeit || 1) > 1) f.beam.material.opacity = f._kegelDeck * kegelDeckFaktor(f._kegelWeit);
+  }
   // VIZ-96 B3: flaches Rueckfall-Muster an die Projektion angleichen
   // (Helligkeit) und waehrend einer Blende anteilig zeigen. Die Deckkraft
   // oben bleibt die Basis; den Anteil fuehrt scene/spot_pool.js je Bild nach.
@@ -1838,7 +1934,7 @@ function applyPanTilt(f, dmx) {
 //   baseLength  Grundlaenge des Geraetetyps (6-8 m)
 //   dist        Abstand zum Bodenauftreffpunkt, ``Infinity`` = trifft nie
 //   maxRange    globale Obergrenze in Metern, 0/ungueltig = aus
-export function beamLengthScale(baseLength, dist, maxRange) {
+export function beamLengthScale(baseLength, dist, maxRange, ueberBasis = 1) {
   if (!(baseLength > 0)) return 1;
   const deckel = (typeof maxRange === 'number' && isFinite(maxRange) && maxRange > 0)
     ? maxRange : Infinity;
@@ -1848,18 +1944,22 @@ export function beamLengthScale(baseLength, dist, maxRange) {
   // Nie laenger als der Grundkegel (sonst wuerde ein hoch haengender Scheinwerfer
   // ploetzlich 30 m weit leuchten) und nie ganz auf 0 (ein Kegel ohne Laenge
   // waere ein unsichtbarer Punkt statt eines kurzen Strahls).
-  const soll = Math.max(0.15, Math.min(baseLength, d, deckel));
+  // VIZ-102: `ueberBasis` > 1 nur fuer einen Gobo-Kegel mit Auftreffpunkt — er
+  // reicht bis zum fernen Rand seines Musters, auch ueber die Grundlaenge
+  // hinaus (die Geometrie begrenzt ihn dann, nicht die Haengehoehe).
+  const dach = baseLength * ((ueberBasis > 1 && isFinite(d)) ? ueberBasis : 1);
+  const soll = Math.max(0.15, Math.min(dach, d, deckel));
   return soll / baseLength;
 }
 
-function setBeamLength(f, dist) {
+function setBeamLength(f, dist, ueberBasis = 1) {
   const beam = f.beam;
   if (!beam || !f.baseBeamLength) return;
   // VIZ-15: die globale Obergrenze gehoert GENAU hierher und an keine zweite
   // Stelle — hier laeuft die einzige Kegellaengen-Rechnung, und zwei Stellen
   // waeren zwei Wahrheiten, von denen eine bei der naechsten Aenderung
   // stehenbleibt.
-  const k = beamLengthScale(f.baseBeamLength, dist, settings.maxBeamRange);
+  const k = beamLengthScale(f.baseBeamLength, dist, settings.maxBeamRange, ueberBasis);
   if (Math.abs((beam.scale.y || 1) - k) < 0.01) return;   // kein Zappeln
   beam.scale.y = k;
   // Der Kegel haengt mit seiner Mitte bei -laenge/2 unter der Linse; wird er
@@ -1903,6 +2003,8 @@ function applyFloorAim(f, dmx) {
   // waagerecht oder nach oben gerichteten Kopfes, der weder Boden noch Koerper
   // trifft und deshalb seine volle Grundlaenge behalten muss.
   let auftreffAbstand = Infinity;
+  let bodenAbstand = Infinity;  // VIZ-102: Zentralstrahl bis zur Bodenebene
+  let richtung = null;          // ... und seine Richtung
   let goboTreffer = null;       // VIZ-83 B2: Auftreffpunkt fuer das Gobo-Bodenmuster
   if (f.floorSpot && f.spotTarget) {
     const dir = new THREE.Vector3(0, -1, 0);
@@ -1929,10 +2031,11 @@ function applyFloorAim(f, dmx) {
     // Fall, weil Scheinwerfer ueber Buehnenelementen stehen, nicht ueber
     // leerem Boden.
     const koerper = koerperTreffer(f, origin, dir);
+    richtung = dir;
     // VIZ-98: Boden nur nach unten; ein Koerper zaehlt in jeder Richtung.
     const tBoden = dir.y < -0.001 ? -origin.y / dir.y : Infinity;
-    const flaeche = auftreffFlaeche(
-      (tBoden > 0 && tBoden < 100) ? tBoden : Infinity, koerper);
+    bodenAbstand = (tBoden > 0 && tBoden < 100) ? tBoden : Infinity;
+    const flaeche = auftreffFlaeche(bodenAbstand, koerper);
     const t = flaeche.abstand;
     if (isFinite(t)) {
       const hitX = origin.x + dir.x * t;
@@ -1958,7 +2061,60 @@ function applyFloorAim(f, dmx) {
   // Bodenfleck und ohne Auftreffpunkt. Vorher hing sie im innersten Zweig und
   // damit an drei Bedingungen; ein Geraet, das keine davon erfuellte, bekam nie
   // eine Laenge gesetzt.
-  setBeamLength(f, auftreffAbstand);
+  // VIZ-102: trifft der Strahl die Oberseite eines Koerpers und ragt sein
+  // Fleck ueber deren Kante, geht ein Teil des Lichts an der Kante vorbei auf
+  // die Flaeche darunter. Mit Gobo waechst der Kegel dann stufenlos bis
+  // dorthin (Ueberhang 0..1) — er endet nicht mehr sichtbar auf der Buehne,
+  // waehrend das Muster am Hallenboden weiterlaeuft, und springt auch nicht,
+  // wenn die Strahlmitte die Kante ueberquert. Gemessen wird der Ueberhang am
+  // FUSSABDRUCK des geneigten Kegels (weit nach vorn, kaum zurueck), und der
+  // Kegel wird so lang, dass sein ferner Rand die Flaeche darunter erreicht.
+  const kt = f._koerperTreffer;
+  const kante = (kt && kt.kante && goboTreffer && isFinite(auftreffAbstand)
+                 && Math.abs(kt.abstand - auftreffAbstand) < 1e-6) ? kt.kante : null;
+  let kegelAbstand = auftreffAbstand, ueber = 0, untenY = 0, fernUnten = 0;
+  // Tangens des halben Kegelwinkels (der Kegel endet am Auftreffpunkt mit
+  // festem Radius). Das Gobo-Motiv liegt seit VIZ-102 ganz IM Kegel.
+  const bisTreffer = isFinite(auftreffAbstand)
+    ? Math.max(0.15, Math.min(f.baseBeamLength || auftreffAbstand, auftreffAbstand)) : 0;
+  const tanA = bisTreffer > 0 ? (_kegelDurchmesser(f) / 2) / bisTreffer : 0;
+  if (kante && richtung) {
+    ueber = goboUeberhangGerichtet(
+      kante, goboTreffer[0], goboTreffer[2],
+      strahlFussabdruck(richtung.x, richtung.y, richtung.z, auftreffAbstand, tanA));
+    const unten = Math.min(bodenAbstand, kt.unten);
+    if (kt.unten < bodenAbstand) untenY = kt.untenY;
+    if (f.goboAktiv && ueber > 0 && isFinite(unten)) {
+      fernUnten = _fernLaenge(richtung.y, tanA, unten);
+    } else if (!isFinite(unten)) {
+      ueber = 0;
+    }
+  }
+  // Mit Gobo reicht der Kegel bis zum FERNEN Rand seines Musters: ein geneigter
+  // Kegel endete sonst am Auftreffpunkt der Achse, das Muster dahinter lag
+  // ohne Strahl da. Der Teil unter der Flaeche liegt im Boden bzw. wird im
+  // Schattenraum der Oberseite nicht gezeichnet (kegelSchnittAbgleichen).
+  let ueberBasis = 1;
+  if (f.goboAktiv && richtung && tanA > 0 && isFinite(auftreffAbstand)) {
+    const fernTreffer = _fernLaenge(richtung.y, tanA, auftreffAbstand);
+    kegelAbstand = fernUnten > fernTreffer
+      ? fernTreffer + (fernUnten - fernTreffer) * ueber : fernTreffer;
+    ueberBasis = KEGEL_UEBER_BASIS;
+  }
+  setBeamLength(f, kegelAbstand, ueberBasis);
+  _kegelWeite(f, auftreffAbstand);
+  // VIZ-102: Reichweite der Projektion = Reichweite des Kegels
+  // (gobo_projektion.js#goboFern). `_goboFernQ`: ferner Kegelrand auf der
+  // getroffenen Flaeche; `_goboReich`: so weit reicht der sichtbare Kegel.
+  if (richtung && tanA > 0 && f.beam && f.baseBeamLength) {
+    f._goboFernQ = kegelFernLaenge(richtung.y, tanA, auftreffAbstand);
+    // Kein Muster ohne Kegel: die Projektion reicht genau so weit wie der
+    // gezeichnete Kegel (und blendet dahinter aus, gobo_projektion.js).
+    f._goboReich = f.baseBeamLength * f.beam.scale.y;
+  } else {
+    f._goboFernQ = null;
+    f._goboReich = null;
+  }
   // VIZ-83 B2: Bodenmuster unter die Teilstrahlen drehen und den Kegelrand am
   // Boden messen — NACH setBeamLength, die Kegel-Laenge veraendert den Winkel
   // der Mantellinien (nur scale.y waechst/schrumpft, der Radius bleibt).
@@ -1969,14 +2125,14 @@ function applyFloorAim(f, dmx) {
   // FESTEN Radius — ein Scheinwerfer 10 m ueber der Buehne warf denselben Fleck
   // wie einer 2 m darueber, und ein Zoom-Zug aenderte gar nichts.
   syncPoolSize(f, auftreffAbstand, goboRand);
-  // VIZ-96 B3: endet der Kegel auf der Oberseite eines Koerpers (Podest,
-  // Buehnenplatte), endet dort auch die Projektion — sonst liefen die
-  // Motiv-Teile jenseits der Kante weit gestreckt ueber den Hallenboden,
-  // waehrend der Kegel auf der Buehne aufhoert. Boden- und Wandtreffer: keine
-  // Grenze. Gelesen von scene/spot_pool.js#_goboProjizieren.
-  const kt = f._koerperTreffer;
-  f._goboGrenzY = (kt && kt.oben && isFinite(auftreffAbstand)
-                   && Math.abs(kt.abstand - auftreffAbstand) < 1e-6) ? kt.y : null;
+  // VIZ-102: Fleck an der Kante der getroffenen Oberseite beschneiden; mit
+  // Gobo liegt der Rest als zweite Scheibe auf der Flaeche darunter
+  // (gobo_textures.js#goboKanteAbgleichen). Nichts haengt mehr in der Luft.
+  kegelSchnittAbgleichen(f, (kante && f.goboAktiv) ? kante : null);
+  if (f.floorSpot) {
+    goboKanteAbgleichen(f, kante, ueber > 0, untenY,
+                        goboTreffer ? goboTreffer[0] : 0, goboTreffer ? goboTreffer[2] : 0, ueber);
+  }
 }
 
 // Keep top-down icon position synced
