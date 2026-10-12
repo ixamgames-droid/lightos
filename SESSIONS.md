@@ -71,7 +71,7 @@
 | FM-74 | A | fix/fm74-generator-editor-startgroesse | 2026-10-11T20:43Z | - |
 | OUT-72 | D | - | 2026-10-12T13:39Z | - |
 | OUT-73 | D | fix/out73-enttec-reiter-toter-anschluss | 2026-10-12T13:51Z | src/ui/widgets/output_config.py |
-| OUT-74 | D | - | 2026-10-12T13:40Z | - |
+| OUT-74 | D | fix/out74-adapter-umzug-alte-zeile | 2026-10-12T14:06Z | src/ui/widgets/output_config.py · src/core/app_state.py |
 | LAS-38 | D | - | 2026-10-12T13:40Z | - |
 | STAB-35 | A | - | 2026-10-12T13:40Z | - |
 | STAB-36 | A | - | 2026-10-12T13:40Z | - |
@@ -228,7 +228,6 @@
 
 ## Verlauf
 
-- 2026-10-11T19:15Z A claim WEB-12
 - 2026-10-11T19:15Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-11T19:15Z A claim LAS-36
 - 2026-10-11T19:24Z D claim LAS-37
@@ -258,3 +257,4 @@
 - 2026-10-12T13:40Z A claim STAB-35
 - 2026-10-12T13:40Z A claim STAB-36
 - 2026-10-12T13:51Z D aktualisiert OUT-73: Branch - -> fix/out73-enttec-reiter-toter-anschluss; Dateien - -> src/ui/widgets/output_config.py
+- 2026-10-12T14:06Z D aktualisiert OUT-74: Branch - -> fix/out74-adapter-umzug-alte-zeile; Dateien - -> src/ui/widgets/output_config.py · src/core/app_state.py
