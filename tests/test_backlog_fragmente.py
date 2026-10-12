@@ -392,7 +392,11 @@ class WaechterTest(_GitRepo):
         p = self.repo / "BACKLOG.md"
         text = p.read_text(encoding="utf-8")
         self.assertIn(alt, text)
-        p.write_text(text.replace(alt, neu), encoding="utf-8")
+        # XPLAT-54: mit LF schreiben — ohne die Angabe schreibt Windows JEDE
+        # Zeile mit CRLF zurueck, und aus einer geaenderten Zeile werden alle
+        # (+15/-15 statt +1/-1). Die Datei im Repo hat LF; ein Editor aendert
+        # daran nichts, also darf es dieser Helfer auch nicht.
+        p.write_text(text.replace(alt, neu), encoding="utf-8", newline="\n")
 
     def test_ohne_origin_main_still(self):
         self._hand()

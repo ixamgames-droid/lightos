@@ -157,7 +157,7 @@ _HERKUNFT_FELDER = {"art", "lizenz", "urheber", "original", "geaendert"}
 _GEPRUEFT_FELDER = {"ok", "wie"}
 _MODUS_FELDER = {"name", "beschreibung", "raster", "weiss", "kanaele"}
 _KANAL_FELDER = {"name", "attribut", "default", "highlight", "invert",
-                 "aufloesung", "segment", "bereiche"}
+                 "aufloesung", "segment", "bereiche", "laser"}
 _BEREICH_FELDER = {"von", "bis", "name", "art"}
 _FORM_FELDER = {"rows", "cols"}
 
@@ -359,6 +359,10 @@ def pruefe(daten, datei: str = "") -> list[str]:
                 elif s >= n_weiss:
                     out.append(f"{wk}.segment: Weiss-Segment {s} gibt es nicht "
                                f"({n_weiss} color_w-Kanaele, 0-basiert)")
+            if "laser" in c:
+                # LAS-33: Muster, Farben, Richtung, Betriebsart (optional).
+                from src.core.laser import profilangaben as PA
+                out += PA.pruefe(c["laser"], f"{wk}.laser")
             bereiche = c.get("bereiche", [])
             if not isinstance(bereiche, list):
                 out.append(f"{wk}.bereiche: Liste erwartet")
@@ -448,6 +452,7 @@ def pruefe_bibliothek(verzeichnis: str | None = None, *,
 # ── DB -> Daten (Export) ─────────────────────────────────────────────────────
 
 def _modus_zu_daten(m) -> dict:
+    from src.core.laser import profilangaben as PA
     d: dict = {"name": m.name}
     if m.description:
         d["beschreibung"] = m.description
@@ -474,6 +479,10 @@ def _modus_zu_daten(m) -> dict:
                  "art": r.kind or ""}
                 for r in sorted(c.ranges, key=lambda r: (r.range_from, r.range_to,
                                                          r.name, r.kind or ""))]
+        # LAS-33: die Laser-Angaben gehen beim Export mit.
+        laser = PA.aus_text(c.laser_angaben)
+        if laser:
+            k["laser"] = laser
         kanaele.append(k)
     d["kanaele"] = kanaele
     return d
@@ -622,6 +631,7 @@ def daten_aus_feldern(*, hersteller: str, modell: str, kurzname: str, typ: str,
     mit Kanaelen wie in ``_ModeTab.channels`` (``attribute``/``default``/
     ``highlight``/``invert``/``resolution``/``segment``/``ranges``)."""
     from src.core.dimmer_segmente import ist_dimmer
+    from src.core.laser import profilangaben as PA
     from .fixture_db import segment_wert
     md = []
     for name, kanaele, beschreibung, raster, weiss in modi:
@@ -653,6 +663,11 @@ def daten_aus_feldern(*, hersteller: str, modell: str, kurzname: str, typ: str,
                                  for r in sorted(rs, key=lambda r: (
                                      int(r.get("range_from", 0)),
                                      int(r.get("range_to", 255))))]
+            # LAS-33: Laser-Angaben des Kanals (der Editor zeigt sie nicht,
+            # traegt sie aber mit).
+            laser = PA.bereinige(c.get("laser"))
+            if laser:
+                k["laser"] = laser
             ks.append(k)
         m["kanaele"] = ks
         md.append(m)
@@ -805,7 +820,9 @@ def _modes_data(daten: dict) -> list:
 
 def _modi_anlegen(s, prof, daten: dict) -> None:
     """Modi ueber ``_add_modes`` anlegen und danach die Felder nachtragen, die
-    die Builtin-Tupel nicht kennen (Beschreibung, Invert, Aufloesung, Segment)."""
+    die Builtin-Tupel nicht kennen (Beschreibung, Invert, Aufloesung, Segment,
+    Laser-Angaben)."""
+    from src.core.laser import profilangaben as PA
     from .fixture_db import _add_modes
     vorher = set(id(m) for m in prof.modes)
     _add_modes(s, prof, _modes_data(daten))
@@ -818,6 +835,8 @@ def _modi_anlegen(s, prof, daten: dict) -> None:
             ch.invert = bool(cd.get("invert", False))
             ch.resolution = cd.get("aufloesung", "8bit")
             ch.segment = cd.get("segment")
+            # LAS-33: Laser-Angaben (leer = keine).
+            ch.laser_angaben = PA.als_text(cd.get("laser"))
 
 
 def _provenance(daten: dict) -> str:
@@ -928,7 +947,7 @@ def _vergleichsform(prof) -> tuple:
                    m.white_rows or 0, m.white_cols or 0, m.channel_count,
                    tuple((c.channel_number, c.name, c.attribute, c.default_value,
                           c.highlight_value, bool(c.invert), c.resolution or "8bit",
-                          c.segment,
+                          c.segment, c.laser_angaben or "",
                           tuple(sorted((r.range_from, r.range_to, r.name, r.kind or "")
                                        for r in c.ranges)))
                          for c in sorted(m.channels, key=lambda c: c.channel_number)))
@@ -966,20 +985,36 @@ def _abgleichen(s, daten: dict) -> str:
     from sqlalchemy.orm import selectinload
     from .models import (ABLOESBARE_QUELLEN, FixtureChannel, FixtureMode, FixtureProfile,
                          Manufacturer)
+    from .fixture_db import ist_bearbeitet, profil_schluessel
     name_h, modell = daten["hersteller"].strip(), daten["modell"].strip()
+    # UI-74: Hersteller ohne Gross/klein — wie `_hersteller`. Sonst fand eine
+    # korrigierte Schreibweise das schon eingespielte Profil nicht wieder und
+    # legte es ein zweites Mal an.
+    hersteller_ids = [m.id for m in hersteller_ohne_gross_klein(s, name_h)]
+    # ★ FM-66: dasselbe gilt fuer das MODELL. Der Abgleich verglich es roh
+    # (`FixtureProfile.name == modell`): „PAR 7“ in der Datei fand ein „Par 7“
+    # in der DB nicht — die Datei legte ein zweites Profil an, statt das
+    # vorhandene zu pflegen, und ein gleichnamiges eigenes Profil oder Builtin
+    # verdeckte sie nicht mehr (zwei Eintraege fuer ein Geraet, FM-43).
+    # Verglichen wird ueber `fixture_db.profil_schluessel` — dieselbe
+    # Gleichheit wie beim Abloesen (FM-63) und im Dubletten-Riegel des Editors:
+    # Gross/klein und Leerzeichen zaehlen nicht, Satzzeichen SCHON („PAR-56“
+    # und „PAR 56“ sind zwei Geraete). In Python statt in SQL, weil SQLite nur
+    # ASCII faltet (s. `hersteller_ohne_gross_klein`). Erst die Namen, dann nur
+    # die Treffer mit Modi/Kanaelen laden — ein Hersteller aus einem
+    # QLC+-Import hat schnell mehrere hundert Profile.
+    ziel = profil_schluessel("", modell)[1]
+    treffer_ids = [pid for pid, pname in s.execute(
+        select(FixtureProfile.id, FixtureProfile.name)
+        .where(FixtureProfile.manufacturer_id.in_(hersteller_ids)))
+        if profil_schluessel("", pname)[1] == ziel] if hersteller_ids else []
     vorhanden = s.execute(
         select(FixtureProfile)
-        .join(Manufacturer, FixtureProfile.manufacturer_id == Manufacturer.id)
         .options(selectinload(FixtureProfile.modes)
                  .selectinload(FixtureMode.channels)
                  .selectinload(FixtureChannel.ranges))
-        # UI-74: Hersteller ohne Gross/klein — wie `_hersteller`. Sonst fand
-        # eine korrigierte Schreibweise das schon eingespielte Profil nicht
-        # wieder und legte es ein zweites Mal an.
-        .where(Manufacturer.id.in_(
-                   [m.id for m in hersteller_ohne_gross_klein(s, name_h)]),
-               FixtureProfile.name == modell)
-        .order_by(FixtureProfile.id)).scalars().all()
+        .where(FixtureProfile.id.in_(treffer_ids))
+        .order_by(FixtureProfile.id)).scalars().all() if treffer_ids else []
     if any(p.source not in (SOURCE_LIGHTOS, *ABLOESBARE_QUELLEN) for p in vorhanden):
         return "verdeckt"
     eigene = [p for p in vorhanden if p.source == SOURCE_LIGHTOS]
@@ -989,12 +1024,14 @@ def _abgleichen(s, daten: dict) -> str:
         # daneben waere also ein dauerhaftes Doppel. Steht das LightOS-Profil
         # schon in der DB (Import erst danach bearbeitet), wird es weiter
         # gepflegt statt still zu veralten.
-        from .fixture_db import ist_bearbeitet
         if any(ist_bearbeitet(p.herkunft) for p in vorhanden):
             return "verdeckt"
         _anlegen(s, daten, SOURCE_LIGHTOS)
         return "neu"
-    prof = eigene[0]
+    # FM-66: die exakte Schreibweise gewinnt, sonst der aelteste Eintrag (wie
+    # beim Hersteller). `_kopf_setzen` uebernimmt danach die Schreibweise der
+    # Datei; die Profil-ID bleibt.
+    prof = next((p for p in eigene if p.name == modell), eigene[0])
     # UI-74: stand das Profil unter einer anderen Schreibweise des Herstellers
     # (alter Datenfehler), zieht es zum richtigen Hersteller um.
     hersteller = _hersteller(s, daten)
@@ -1039,12 +1076,15 @@ def einspielen(s, verzeichnis: str | None = None,
     EINER Datei — werden gemeldet und uebersprungen, nie halb eingespielt; die
     uebrigen Dateien laufen weiter. Liefert, ob die DB geaendert wurde."""
     from sqlalchemy import select
+    from .fixture_db import profil_schluessel
     from .models import FixtureProfile, Manufacturer
     wurzel = verzeichnis or BIBLIOTHEK_DIR
     stempel = stempel or {}
     bericht: dict = {"neu": [], "aktualisiert": [], "verdeckt": [], "fehler": [],
                      "stempel": {}}
-    da = {(m.casefold(), n.casefold()) for m, n in s.execute(
+    # FM-66: dieselbe Gleichheit wie `_abgleichen` — sonst hielte die
+    # Stempel-Abkuerzung ein Profil fuer fehlend, das der Abgleich findet.
+    da = {profil_schluessel(m, n) for m, n in s.execute(
         select(Manufacturer.name, FixtureProfile.name)
         .join(FixtureProfile, FixtureProfile.manufacturer_id == Manufacturer.id)
         .where(FixtureProfile.source == SOURCE_LIGHTOS))}
@@ -1061,7 +1101,7 @@ def einspielen(s, verzeichnis: str | None = None,
             else:
                 daten = lade_datei(pfad)
             name_h, modell = daten["hersteller"].strip(), daten["modell"].strip()
-            schluessel = (name_h.casefold(), modell.casefold())
+            schluessel = profil_schluessel(name_h, modell)
             if schluessel in gesehen:
                 bericht["fehler"].append(f"{pfad}: {name_h} / {modell} doppelt in der "
                                          f"Bibliothek (schon in {gesehen[schluessel]})")

@@ -189,6 +189,34 @@ class ValidationIssue:
         return self.__str__()
 
 
+BANNER_FEHLER = "#ff4444"
+BANNER_WARNUNG = "#ffaa00"
+BANNER_HINWEIS = "#58a6ff"
+
+
+def banner_zusammenfassung(issues) -> tuple[str, str] | None:
+    """Text und Farbe des „Issues"-Banners; ``None`` = nichts zu melden.
+
+    Fehler und Warnungen wie bisher („N Issues", rot bzw. gelb). CDX-58: gibt
+    es NUR Hinweise (Schwere ``info``, z. B. „Snaps widersprechen sich"),
+    erscheint das Banner trotzdem — ruhiger gefaerbt und als „Hinweis"
+    benannt. Vorher blieb so ein Befund unsichtbar, bis jemand von sich aus
+    „Show pruefen & reparieren" oeffnete.
+    """
+    issues = list(issues or ())
+    fehler = sum(1 for i in issues if getattr(i, "severity", "") == "error")
+    warnungen = sum(1 for i in issues if getattr(i, "severity", "") == "warn")
+    if fehler or warnungen:
+        zeichen, farbe = ("!", BANNER_FEHLER) if fehler else ("*", BANNER_WARNUNG)
+        return f" {zeichen} {fehler + warnungen} Issues ", farbe
+    hinweise = sum(1 for i in issues if getattr(i, "severity", "") == "info"
+                   and not getattr(i, "auto_fixed", False))
+    if hinweise:
+        wort = "Hinweis" if hinweise == 1 else "Hinweise"
+        return f" i {hinweise} {wort} ", BANNER_HINWEIS
+    return None
+
+
 def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
     """Pruefe und repariere den App-State.
 
