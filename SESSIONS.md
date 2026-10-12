@@ -64,7 +64,7 @@
 | VCB-43 | D | fix/vcb43-halte-blackout-fremder-blackout | 2026-10-11T20:50Z | - |
 | OUT-71 | D | fix/out71-schlussbild-beim-beenden | 2026-10-11T20:58Z | - |
 | WEB-13 | A | - | 2026-10-11T20:18Z | - |
-| UI-91 | A | fix/ui91-efx-reiter-geraeteliste | 2026-10-11T20:42Z | - |
+| UI-91 | A | fix/ui91-efx-reiter-geraeteliste | 2026-10-12T16:01Z | - |
 | FM-74 | A | fix/fm74-generator-editor-startgroesse | 2026-10-11T20:43Z | - |
 | OUT-72 | D | fix/out72-schlussbild-typwechsel-laser-nachlauf | 2026-10-12T14:44Z | src/core/dmx/output_manager.py · src/core/app_state.py · src/ui/widgets/output_config.py |
 | OUT-73 | D | fix/out73-enttec-reiter-toter-anschluss | 2026-10-12T13:51Z | src/ui/widgets/output_config.py |
