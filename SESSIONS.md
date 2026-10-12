@@ -82,7 +82,6 @@
 | FM-75 | D | fix/fm75-live-test-laser-rueckfrage | 2026-10-12T17:35Z | src/ui/widgets/fixture_generator.py · tests/test_fm75_live_test_laser_rueckfrage.py · docs/anleitung_fixture_generator |
 | PROC-21 | D | fix/test-verschmutzung-allwhite-las32 | 2026-10-12T17:48Z | tests/conftest.py · tests/test_allwhite_covers_all.py · tests/test_out61_estop_lade_fenster.py · tests/test_proc21_test_verschmutzung.py |
 | OUT-77 | D | fix/out77-diagnose-udmx-seriennummer | 2026-10-12T18:00Z | src/core/diagnose_log.py · tests/test_out77_diagnose_seriennummer.py |
-| ENG-34 | A | feature/eng34-untergrund-dimmer-effekte | 2026-10-12T18:15Z | src/core/engine/rgb_matrix.py · src/ui/views/rgb_matrix_view.py |
 | ENG-36 | A | feature/eng36-cloning | 2026-10-12T18:15Z | src/core/show/klonen.py · src/ui/views/patch_view.py |
 | ENG-35 | A | - | 2026-10-12T18:15Z | - |
 | VCB-45 | A | - | 2026-10-12T18:15Z | - |
@@ -261,7 +260,6 @@
 
 ## Verlauf
 
-- 2026-10-12T15:27Z D claim VCB-44
 - 2026-10-12T15:41Z D claim UI-92
 - 2026-10-12T15:43Z A aktualisiert STAB-35: Branch - -> fix/stab36-absturz-auswahlwechsel
 - 2026-10-12T15:43Z A aktualisiert STAB-36: Branch - -> fix/stab36-absturz-auswahlwechsel
@@ -291,3 +289,4 @@
 - 2026-10-12T18:42Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-12T18:42Z D done OUT-73
 - 2026-10-12T18:55Z A claim ENG-37
+- 2026-10-12T18:56Z A done ENG-34
