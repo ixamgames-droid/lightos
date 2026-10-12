@@ -53,6 +53,7 @@ from src.core.color_utils import visual_intensity, visual_rgb
 from src.core.stage.coords import world3d_to_live
 from src.ui.widgets import mini_icons as _mini
 from src.ui.weak_slots import weak_slot
+from src.core.stage import scene_commands as _scmd
 
 
 # ── UI-Praeferenzen (analog zu programmer_view.py) ───────────────────────────
@@ -881,6 +882,22 @@ def _lod_for_screen_gap(screen_gap: float) -> int:
     return 2
 
 
+def _positionen_melden(fids) -> None:
+    """VIZ-106: „die Weltposition dieser Geraete hat sich geaendert“ — an alle,
+    die sie zeigen. Traegt die Geraete mit, damit eine offene 3D-Seite genau
+    die nachzieht (``VisualizerBridge._on_live_view_changed``); ohne Geraete
+    heisst dasselbe Ereignis nur „Layout geaendert“ (Zoom, Raster).
+
+    Bewusst eine Modul-Funktion: der Rueckgaengig-Schritt ruft sie spaeter
+    wieder und darf dafuer keine Ansicht festhalten."""
+    try:
+        from src.core.sync import get_sync, SyncEvent
+        get_sync().emit(SyncEvent.LIVE_VIEW_CHANGED,
+                        {"positionen": [int(f) for f in fids]})
+    except Exception as e:
+        print(f"[live_view] Positionen melden: {e}")
+
+
 def _grid_positions(n: int, world_w: float, world_h: float,
                     min_step: float = 90.0,
                     margin: float = 60.0) -> list[tuple[float, float]]:
@@ -998,6 +1015,9 @@ class StageCanvas(QWidget):
         self._multi_drag_start: dict[int, tuple] | None = None
         self._multi_mouse_start: QPointF | None = None
         self._multi_moved: bool = False
+        # VIZ-106: True, solange diese Ansicht selbst eine Aenderung meldet —
+        # ihre eigene Meldung ist kein Anlass, Positionen nachzuziehen.
+        self._meldet_selbst: bool = False
 
         # Touch-Mehrfachauswahl-Modus: Antippen toggelt die Auswahl (kein Shift noetig)
         self._multi_select_mode: bool = False
@@ -1044,6 +1064,10 @@ class StageCanvas(QWidget):
             # nach dem Sicherheitsnetz. An die Widget-Lebenszeit gebunden.
             sync.subscribe_widget(SyncEvent.PATCH_CHANGED, self,
                                   weak_slot(self._patch_geaendert))
+            # VIZ-106: Verschieben im 3D und jedes Rueckgaengig melden dieses
+            # Ereignis — die 2D-Ansicht las ihre Positionen sonst nur beim Laden.
+            sync.subscribe_widget(SyncEvent.LIVE_VIEW_CHANGED, self,
+                                  weak_slot(self._positionen_nachziehen))
         except Exception as e:
             print(f"[live_view] sync subscribe error: {e}")
 
@@ -1469,14 +1493,70 @@ class StageCanvas(QWidget):
         """Platziert ein Fixture an Position (x, y) — mit Snap und Persistenz."""
         x, y = self._snap(x, y)
         self._positions[fid] = (x, y)
-        try:
-            self._state.live_view_positions[fid] = (float(x), float(y))
-        except Exception:
-            pass
-        self._notify_layout_changed()
+        self._verschiebung_uebernehmen([fid])
         self.update()
 
-    def _notify_layout_changed(self) -> None:
+    def _verschiebung_uebernehmen(self, fids) -> None:
+        """VIZ-106: die frisch gesetzten 2D-Positionen von ``fids`` in die Show
+        schreiben — als EIN Rueckgaengig-Schritt und mit Meldung.
+
+        2D und 3D zeigen dieselbe Position (ein Szenengraph: X/Z gemeinsam, die
+        Hoehe gehoert dem 3D). Das Schreiben verstellte also schon immer die
+        3D-Position; nur erfuhr es weder die offene 3D-Seite (sie holt ihre
+        Geraete beim Laden) noch der Undo-Stack — Strg+Z nahm die Aktion DAVOR
+        zurueck. Der Schritt merkt sich Weltpositionen, nicht Pixel: so kommt
+        das Undo ohne Umrechnungs-Rest zurueck, auch bei angedockten Geraeten.
+        """
+        fids = [fid for fid in fids if fid in self._positions]
+        try:
+            alt = dict(self._state.visualizer_positions)
+        except Exception:
+            alt = {}
+        for fid in fids:
+            x, y = self._positions[fid]
+            try:
+                self._state.live_view_positions[fid] = (float(x), float(y))
+            except Exception:
+                pass
+        try:
+            neu = self._state.visualizer_positions
+            # Ohne alten Platz (erstes Platzieren) gibt es nichts zurueckzunehmen.
+            schritte = [(fid, alt[fid], neu[fid])
+                        for fid in fids if fid in alt and fid in neu]
+            _scmd.push_transform_fixtures(
+                self._state, schritte, label="Fixture bewegen (2D)",
+                on_applied=_positionen_melden)
+        except Exception as e:
+            print(f"[live_view] Rueckgaengig-Schritt fuer 2D-Verschieben: {e}")
+        self._notify_layout_changed(fids)
+
+    def _positionen_nachziehen(self) -> None:
+        """VIZ-106: Positionen aus dem gemeinsamen Stand uebernehmen (nach einem
+        Rueckgaengig oder einer Verschiebung im 3D). Ein laufender Drag gewinnt:
+        dessen Positionen stehen noch nicht in der Show."""
+        if (self._meldet_selbst or self._drag_fid is not None
+                or self._multi_drag_start is not None):
+            return
+        try:
+            lv = self._state.live_view_positions
+        except Exception:
+            return
+        geaendert = False
+        for fid, (x, y) in list(self._positions.items()):
+            try:
+                nx, ny = float(lv[fid][0]), float(lv[fid][1])
+            except Exception:
+                continue
+            # Pixel -> Meter -> Pixel laesst einen Rundungsrest; der ist keine
+            # Aenderung und soll gerastete Werte nicht verwackeln.
+            if abs(nx - x) > 1e-6 or abs(ny - y) > 1e-6:
+                self._positions[fid] = (nx, ny)
+                geaendert = True
+        if geaendert:
+            self._compute_label_gaps()
+            self.update()
+
+    def _notify_layout_changed(self, positionen=None) -> None:
         """P4: Layout-Aenderung melden (Dirty-Flag fuer Auto-Save).
 
         UI-26: Dieser Hook laeuft nach JEDER Positions-Mutation ausserhalb von
@@ -1486,11 +1566,18 @@ class StageCanvas(QWidget):
         zeigten weiter volle, ueberlappende Labels (und auseinandergezogene blieben
         faelschlich abgekuerzt), bis erst der naechste Show-Reload korrigierte."""
         self._compute_label_gaps()
+        self._meldet_selbst = True
         try:
-            from src.core.sync import get_sync, SyncEvent
-            get_sync().emit(SyncEvent.LIVE_VIEW_CHANGED, None)
+            if positionen:
+                # VIZ-106: mit Geraeten — offene 3D-Seiten ziehen genau die nach.
+                _positionen_melden(positionen)
+            else:
+                from src.core.sync import get_sync, SyncEvent
+                get_sync().emit(SyncEvent.LIVE_VIEW_CHANGED, None)
         except Exception:
             pass
+        finally:
+            self._meldet_selbst = False
 
     # ── Drag & Drop von der Fixture-Liste ─────────────────────────────────────
 
@@ -2335,11 +2422,7 @@ class StageCanvas(QWidget):
                 x, y = self._positions[self._drag_fid]
                 x, y = self._snap(x, y)
                 self._positions[self._drag_fid] = (x, y)
-                try:
-                    self._state.live_view_positions[self._drag_fid] = (float(x), float(y))
-                except Exception:
-                    pass
-                self._notify_layout_changed()
+                self._verschiebung_uebernehmen([self._drag_fid])
             self._drag_fid = None
             self._drag_moved = False
         elif self._multi_drag_start is not None:
@@ -2347,13 +2430,8 @@ class StageCanvas(QWidget):
             if self._multi_moved:
                 for fid in self._multi_drag_start:
                     if fid in self._positions:
-                        x, y = self._snap(*self._positions[fid])
-                        self._positions[fid] = (x, y)
-                        try:
-                            self._state.live_view_positions[fid] = (float(x), float(y))
-                        except Exception:
-                            pass
-                self._notify_layout_changed()
+                        self._positions[fid] = self._snap(*self._positions[fid])
+                self._verschiebung_uebernehmen(list(self._multi_drag_start))
             self._multi_drag_start = None
             self._multi_mouse_start = None
             self._multi_moved = False

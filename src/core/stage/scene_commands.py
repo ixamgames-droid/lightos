@@ -18,7 +18,8 @@ Command-Katalog (siehe docs/VIZ11_SCENEGRAPH_DESIGN.md (e)):
                                       die Plural-Variante (Spinbox-Commit)
   * ``push_remove_fixture``        — RemoveNode (Fixture, inkl. pos/rot/dock)
   * ``push_add_stage_element``     — AddNode (Buehnen-Element)
-  * ``push_remove_stage_element``  — RemoveNode (Buehnen-Element)
+  * ``push_remove_stage_element``  — RemoveNode (Buehnen-Element, inkl. der
+                                      Andockungen seiner Geraete, VIZ-105)
   * ``push_stage_element_property``— StageElementProperty (+ Kinder-Push)
 
 Alle Funktionen erwarten, dass der Aufrufer die Mutation BEREITS angewendet
@@ -45,6 +46,7 @@ def push_transform_fixtures(
     # Der Typ war auf 2 Argumente gesetzt, die Funktion ruft ihn aber seit jeher
     # mit (fid, pos, rot) — s. unten. Hinweis stammt aus der Design-Review.
     apply_push: Callable[[int, tuple, tuple], None] | None = None,
+    on_applied: Callable[[list], None] | None = None,
 ) -> None:
     """EIN Command fuer eine ganze Drag-Gestik, auch bei Multi-Select.
 
@@ -55,6 +57,10 @@ def push_transform_fixtures(
     ``apply_push`` ist ein optionaler Re-Push in die 3D/2D-Ansicht (z.B.
     ``bridge.push_apply_fixture_transform``), nach jedem do()/undo() mit den
     jeweils aktuellen Rotationswerten aufgerufen (fuer visuelles Feedback).
+    ``on_applied`` wird EINMAL je do()/undo()/redo() mit der Liste der
+    betroffenen fids gerufen (VIZ-106) — fuer Aufrufer, die keine einzelne
+    Ansicht kennen und die Aenderung stattdessen melden: der Command haelt so
+    kein Fenster fest, das laengst geschlossen sein kann.
     """
     changes = [(fid, old, new) for fid, old, new in entries if tuple(old) != tuple(new)]
     if not changes:
@@ -66,6 +72,8 @@ def push_transform_fixtures(
             if apply_push is not None:
                 rot = state.visualizer_rotations.get(fid, (0.0, 0.0, 0.0))
                 apply_push(fid, pos, rot)
+        if on_applied is not None:
+            on_applied(list(values))
 
     new_values = {fid: new for fid, _old, new in changes}
     old_values = {fid: old for fid, old, _new in changes}
@@ -371,6 +379,12 @@ def push_add_stage_elements(
     )
 
 
+def _docked_fids(state, eid: str) -> list:
+    """Welche Geraete haengen an diesem Buehnen-Element?"""
+    docks = getattr(state, "visualizer_docks", None) or {}
+    return sorted(fid for fid, sid in docks.items() if sid == eid)
+
+
 def push_remove_stage_element(
     state,
     stage_def,
@@ -378,9 +392,18 @@ def push_remove_stage_element(
     *,
     label: str = "Bühnen-Element löschen",
     on_change: Callable[[], None],
+    on_docks_restored: Callable[[list], None] | None = None,
 ) -> None:
     """RemoveNode-Command fuer ein geloeschtes Buehnen-Element. Muss VOR dem
     eigentlichen ``stage_def.remove(...)`` aufgerufen werden (Snapshot).
+
+    VIZ-105: zum Snapshot gehoert, WER an dem Element haengt. Der Szenengraph
+    haengt die Kinder eines geloeschten Knotens an die Wurzel
+    (``SceneGraph.remove``) — richtig, sie sollen nicht mit verschwinden, aber
+    das Undo legte bisher nur das Element wieder an und die Geraete blieben
+    lose. ``on_docks_restored`` bekommt die Geraete, die das Undo wieder
+    angehaengt hat (das 3D-Bild fuehrt die Andockung selbst und erfaehrt sie
+    nur vom Aufrufer).
     """
     eid = element.id
     index = None
@@ -388,8 +411,11 @@ def push_remove_stage_element(
         if el.id == eid:
             index = i
             break
+    docked = _docked_fids(state, eid)
 
     def _do() -> None:
+        # Redo: der Stand von JETZT zaehlt, nicht der beim ersten Loeschen.
+        docked[:] = _docked_fids(state, eid)
         stage_def.remove(eid)
         on_change()
 
@@ -400,6 +426,21 @@ def push_remove_stage_element(
             else:
                 stage_def.elements.append(element)
         on_change()
+        # Erst NACH on_change: der Knoten des Elements muss wieder im Graphen
+        # stehen, sonst legte die Dock-Sicht einen Platzhalter an.
+        docks = getattr(state, "visualizer_docks", None)
+        if docks is None or not docked:
+            return
+        positions = state.visualizer_positions
+        restored = []
+        for fid in docked:
+            # Nur was es noch gibt und inzwischen nirgends anders haengt.
+            if fid not in positions or docks.get(fid):
+                continue
+            docks[fid] = eid
+            restored.append(fid)
+        if restored and on_docks_restored is not None:
+            on_docks_restored(restored)
 
     get_undo_stack().push(
         Command(label=label, do=_do, undo=_undo, redo=_do),
