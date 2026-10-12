@@ -461,6 +461,31 @@ def _persist_output(num: int, output: str, patch: str, out_universe=_UNSET) -> b
     return _save_universe_config(rows)
 
 
+def _andere_ausgaben(om, universum: int, weg: str, ziel: str) -> list[dict]:
+    """OUT-75 (d): die Ausgaben dieses Universums, die ein „Verbinden“/
+    „Uebernehmen“ auf ``weg`` → ``ziel`` ERSETZEN wuerde — also alles, was dort
+    gerade laeuft und nicht genau dieser Weg mit genau diesem Ziel ist.
+
+    Gelesen aus ``ausgabe_status()``, derselben Quelle wie Statusleiste, Banner
+    und DMX-Monitor. Kann der Manager das nicht beantworten, gilt „nichts“ —
+    eine Rueckfrage ohne Grundlage waere schlimmer als keine.
+    """
+    status = getattr(om, "ausgabe_status", None)
+    if not callable(status):
+        return []
+    try:
+        eintraege = list(status() or [])
+    except Exception:
+        return []
+    return [e for e in eintraege
+            if e.get("universum") == universum
+            and not (e.get("weg") == weg and str(e.get("ziel") or "") == str(ziel or ""))]
+
+
+def _ausgabe_text(weg: str, ziel: str) -> str:
+    return f"{weg} → {ziel}" if ziel else weg
+
+
 class OutputConfigDialog(QDialog):
     # OUT-51: So oft wird nach „Verbinden" hoechstens nachgefragt, ob der Port
     # wirklich offen ist (je ~0,9 s). Der Serial-Worker wird als eigener Prozess
@@ -918,6 +943,13 @@ class OutputConfigDialog(QDialog):
         state = get_state()
         om = state.output_manager
 
+        # OUT-75 (d): laeuft auf diesem Universum schon eine ANDERE Ausgabe,
+        # ersetzt „Verbinden“ sie. Bisher ohne ein Wort — vorher fragen.
+        if not self._ersetzen_bestaetigt(om, univ, "Enttec", port):
+            self._lbl_enttec_status.setText(
+                "Abgebrochen — die bisherige Ausgabe läuft weiter")
+            return
+
         # Sicherstellen dass das Universe existiert
         if univ not in state.universes:
             state.universes[univ] = om.add_universe(univ)
@@ -950,6 +982,31 @@ class OutputConfigDialog(QDialog):
             self._enttec_status_pruefen_spaeter()
         except Exception as e:
             self._lbl_enttec_status.setText(f"Fehler: {e}")
+
+    # ── OUT-75: Rueckfrage vor dem Ersetzen einer laufenden Ausgabe ──────────
+
+    def _ersetzen_bestaetigt(self, om, univ: int, weg: str, ziel: str) -> bool:
+        """``True`` = es darf eingerichtet werden.
+
+        Gefragt wird nur, wenn auf diesem Universum gerade eine ANDERE Ausgabe
+        laeuft (anderer Weg oder anderes Ziel). Dieselbe Ausgabe noch einmal
+        einzurichten ist kein Ersetzen. Vorgabe ist „Nein“: ein versehentliches
+        Enter darf eine laufende Ausgabe nicht beenden.
+        """
+        andere = _andere_ausgaben(om, univ, weg, ziel)
+        if not andere:
+            return True
+        liste = "\n".join(
+            "  •  " + _ausgabe_text(str(e.get("weg") or ""), str(e.get("ziel") or ""))
+            for e in andere)
+        antwort = QMessageBox.question(
+            self, "Laufende Ausgabe ersetzen?",
+            f"Universe {univ} gibt gerade aus über:\n{liste}\n\n"
+            f"Soll das durch {_ausgabe_text(weg, ziel)} ersetzt werden? "
+            f"Die bisherige Ausgabe endet dann.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No)
+        return antwort == QMessageBox.StandardButton.Yes
 
     # ── OUT-51: den echten Verbindungsstatus nachtragen ──────────────────────
 
@@ -1052,6 +1109,11 @@ class OutputConfigDialog(QDialog):
             self._lbl_artnet_status.setText("Inaktiv")
             return
         ip = self._edit_artnet_ip.text().strip() or "255.255.255.255"
+        # OUT-75 (d): eine andere laufende Ausgabe dieses Universums wird ersetzt.
+        if not self._ersetzen_bestaetigt(state.output_manager, univ, "Art-Net", ip):
+            self._lbl_artnet_status.setText(
+                "Abgebrochen — die bisherige Ausgabe läuft weiter")
+            return
         # OUT-04: NUR das gewählte Universum belegen. Die frühere Schleife über ALLE
         # Universen überschrieb jede andere Adapter-Zuweisung — live UND in
         # universes.json (`_persist_output` je Universum) → Mixed-Setups zerstört.
@@ -1267,6 +1329,12 @@ class OutputConfigDialog(QDialog):
             return
         ip_text = self._edit_sacn_ip.text().strip()
         target_ip = None if (self._check_sacn_multicast.isChecked() or not ip_text) else ip_text
+        # OUT-75 (d): eine andere laufende Ausgabe dieses Universums wird ersetzt.
+        if not self._ersetzen_bestaetigt(state.output_manager, univ, "sACN",
+                                         target_ip or ""):
+            self._lbl_sacn_status.setText(
+                "Abgebrochen — die bisherige Ausgabe läuft weiter")
+            return
         try:
             # OUT-04: NUR das gewählte Universum belegen (nicht mehr alle über eine
             # Schleife überschreiben); andere universes.json-Zeilen bleiben erhalten.

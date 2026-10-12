@@ -283,6 +283,11 @@ class OutputManager:
         # {universe:int -> bytes(512)}. Leer, solange noch kein Frame gesendet wurde
         # -> Konsumenten fallen dann sauber auf den Rohpuffer zurueck.
         self._display_frame: dict[int, bytes] = {}
+        # OUT-75: was im letzten Frame an JEDEN Ausgabeweg ging —
+        # {universe -> ((weg, ziel, bytes), ...)}. Unterscheidet sich vom
+        # Anzeige-Snapshot nur, wenn die NOT-AUS-Sperre eines Ausgabewegs
+        # (OUT-64) greift. Nur fuer die Anzeige, nie zurueckgeschrieben.
+        self._weg_gesendet: dict[int, tuple] = {}
         # OUT-51: Fehlerregister je Ausgabeweg. Schluessel (weg, universum), z. B.
         # ("Enttec", 3); ("Tick", 0) und ("Modifier", u) fuer die beiden anderen
         # Stellen, an denen der Frame-Pfad bisher still schluckte. Geschrieben
@@ -629,7 +634,10 @@ class OutputManager:
     def ausgabe_status(self) -> list[dict]:
         """Was gerade WIRKLICH sendet — pro Universum und Ausgabeweg.
 
-        Je Eintrag ``{"universum", "weg", "ziel", "verbunden", "problem"}``.
+        Je Eintrag ``{"universum", "weg", "ziel", "verbunden", "problem",
+        "zustand"}``. ``zustand`` (OUT-75) ist die Selbstauskunft des Geraets
+        (``ZUSTAND_*``) — damit laesst sich „verbindet gerade“ von „weiss es
+        nicht“ unterscheiden, die in ``verbunden`` beide ``None`` sind.
         ``verbunden`` ist dreiwertig: ``True`` sendet, ``False`` sendet nicht,
         ``None`` = das Geraet kann darueber keine Auskunft geben (UDP-Ausgaenge
         ohne Fehlerserie). Wer daraus eine gruene Anzeige baut, muss ``None``
@@ -670,9 +678,25 @@ class OutputManager:
                             getattr(dev, "_target_ip", "") or ""),
                 "verbunden": verbunden,
                 "problem": problem["text"] if problem else "",
+                "zustand": geraet_zustand(dev),
             })
         raus.sort(key=lambda d: (d["universum"], d["weg"]))
         return raus
+
+    def gesendete_wege(self, universe: int) -> list[dict]:
+        """OUT-75: was im letzten Frame an jeden Ausgabeweg dieses Universums
+        ging — ``[{"weg", "ziel", "daten"}]``, leer ohne Ausgang oder ohne
+        gesendeten Frame.
+
+        :meth:`get_display_frame` ist das Bild des UNIVERSUMS. Greift die
+        NOT-AUS-Sperre eines Ausgabewegs (OUT-64: ein anderes Universum teilt
+        sich den Weg mit einem gesperrten Laser), sendet dieser Weg auf den
+        gesperrten Adressen deren Aus-Werte — also etwas anderes, als der
+        Monitor bisher zeigte. Nur lesen.
+        """
+        return [{"weg": weg, "ziel": ziel, "daten": daten}
+                for weg, ziel, daten in
+                (getattr(self, "_weg_gesendet", None) or {}).get(universe, ())]
 
     def display_snapshot(self) -> dict[int, bytes]:
         """Flache Kopie des Anzeige-Snapshots {universe -> bytes(512)} (POST-
@@ -1465,29 +1489,42 @@ class OutputManager:
                 # Exception darf den Output-Thread nie beenden, sonst steht die
                 # ganze Ausgabe. Neu ist nur, dass der Fehler jetzt gezaehlt und
                 # bei anhaltendem Ausfall gemeldet wird, statt spurlos zu sein.
+                # OUT-75: je Weg festhalten, was wirklich hinausgeht (Anzeige).
+                gesendet = []
                 if enttec is not None:
                     try:
-                        enttec.send_dmx(self._weg_nullen(
-                            data, wege.get(self._weg_enttec(enttec)) if wege else None))
+                        bild = self._weg_nullen(
+                            data, wege.get(self._weg_enttec(enttec)) if wege else None)
+                        gesendet.append(
+                            ("Enttec", str(getattr(enttec, "port", "") or ""), bild))
+                        enttec.send_dmx(bild)
                     except Exception as exc:
                         self._buche_fehler("Enttec", univ_num, exc)
                     else:
                         self._buche_erfolg("Enttec", univ_num)
                 if artnet is not None:
                     try:
-                        artnet.send_dmx(ext if ext is not None else univ_num - 1,
-                                        self._weg_nullen(data, wege.get(self._weg_netz(
-                                            "artnet", univ_num, ext)) if wege else None))
+                        bild = self._weg_nullen(data, wege.get(self._weg_netz(
+                            "artnet", univ_num, ext)) if wege else None)
+                        gesendet.append(
+                            ("Art-Net", str(getattr(artnet, "target_ip", "") or ""), bild))
+                        artnet.send_dmx(ext if ext is not None else univ_num - 1, bild)
                     except Exception as exc:
                         self._buche_fehler("Art-Net", univ_num, exc)
                     else:
                         self._buche_erfolg("Art-Net", univ_num)
                 if sacn is not None:
                     try:
-                        sacn.send_dmx(ext if ext is not None else univ_num,
-                                      self._weg_nullen(data, wege.get(self._weg_netz(
-                                          "sacn", univ_num, ext)) if wege else None))
+                        bild = self._weg_nullen(data, wege.get(self._weg_netz(
+                            "sacn", univ_num, ext)) if wege else None)
+                        gesendet.append(
+                            ("sACN", str(getattr(sacn, "_target_ip", "") or ""), bild))
+                        sacn.send_dmx(ext if ext is not None else univ_num, bild)
                     except Exception as exc:
                         self._buche_fehler("sACN", univ_num, exc)
                     else:
                         self._buche_erfolg("sACN", univ_num)
+                merk = getattr(self, "_weg_gesendet", None)
+                if merk is None:                 # Manager per __new__ gebaut
+                    merk = self._weg_gesendet = {}
+                merk[univ_num] = tuple(gesendet)

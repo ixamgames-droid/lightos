@@ -83,6 +83,13 @@ Tab **Enttec Pro USB**:
    (`Gespeichert: /dev/ttyUSB0 → Universe 1` = saved: …). Whether the adapter really
    sends is only shown by the status bar (step 8).
 
+**Question before replacing.** If a **different** output is already running on the
+chosen universe (another route, port or target IP), LightOS asks
+**Laufende Ausgabe ersetzen?** (replace the running output?) before setting it up – with
+**Nein** (no) everything stays as it is. This applies to **Verbinden** here and to
+**Übernehmen** in the Art-Net and sACN tabs. Setting up the same output again does not
+trigger a question.
+
 ## 3. Art-Net
 
 Tab **Art-Net**:
@@ -184,11 +191,22 @@ Tab **DMX Monitor** next to it — the same values, but with fixture names:
 1. **Universe:** — choice of `Universe 1` to `Universe 32`.
 2. **Hervorgehobene Kanäle:** (highlighted channels) — for example `1,5,10-20`; these
    channels get a yellow frame.
-3. The output display: `Universe 1 geht raus` (Universe 1 is going out) means this
-   universe has an output and is being sent. Otherwise it says
-   `⚠ Universe <n> hat keinen Ausgang — nur gerechnet` (Universe \<n> has no output —
-   only calculated) or `⚠ Universe <n>: <Weg> sendet NICHT` (Universe \<n>: \<route> is
-   NOT sending).
+3. The output display says the same as the status bar and the banner (step 8):
+
+   | Display | Meaning |
+   |---|---|
+   | `Universe 1 geht raus` (is going out; green) | The universe has an output, and it is sending. |
+   | `⚠ Universe <n>: <Weg> sendet NICHT` (\<route> is NOT sending; red) | The output is set up but is not sending – for example an ENTTEC whose port cannot be opened. The tooltip gives the reason. |
+   | `Universe <n>: <Weg> verbindet …` (is connecting; orange) | The port is being opened right now. |
+   | `⚠ Universe <n> hat keinen Ausgang — nur gerechnet` (has no output — only calculated; orange) | The values are calculated, but no adapter outputs them. |
+   | `Universe <n> ist nicht angelegt — keine Werte` (does not exist — no values; grey) | Nothing is patched in this universe and no output is set up. The grid is then dimmed and empty. |
+
+   If a universe has **several outputs** (for example ENTTEC and Art-Net), the choice
+   **Ausgang:** (output) appears next to it – the monitor shows what goes to the chosen
+   output. The outputs only send different data while the laser emergency stop locks
+   one of them; the display then adds
+   `· NOT-AUS-Sperre auf diesem Ausgang: <n> Adressen` (emergency-stop lock on this
+   output: \<n> addresses).
 4. The legend: blue frame = patched, yellow frame = highlighted. Each patched tile
    carries an abbreviation of fixture and channel, for example `PAR 1 R`.
 
