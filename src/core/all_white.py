@@ -161,9 +161,12 @@ def ist_geraet_ohne_licht(fx, channels=()) -> bool:
     typ = (getattr(fx, "fixture_type", "") or "").strip().lower()
     if typ in _OHNE_LICHT_TYPEN:
         return True
-    for c in channels or ():
-        if (getattr(c, "attribute", "") or "").startswith("laser_"):
-            return True
+    # LAS-37: der Laser-Teil ist die EINE Regel aller Sicherheits-Stellen
+    # (Typ, laser_*-Kanal, „Laser“ im Kanal- oder Geraetenamen) — dieselbe wie
+    # fuer NOT-AUS-Maske und Aus-Maske.
+    from .laser.erkennung import ist_laser
+    if ist_laser(fx, channels):
+        return True
     text = " ".join(str(getattr(fx, k, "") or "") for k in
                     ("fixture_name", "label", "manufacturer_name"))
     return bool(_OHNE_LICHT_NAME.search(text))

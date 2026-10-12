@@ -51,7 +51,7 @@ den State **und nullt die DMX-Puffer** (keine Artefakte nach „Neue Show").
 | `scene_graph` | optional: Szenegraph (VIZ-11, eine Quelle für 3D+2D+Docks; die Blöcke `visualizer`/`live_view` sind Sichten darauf) | `state._scene.to_dict` |
 | `snapshots` | gespeicherte Snapshots | `state._snapshots_data` |
 | `channel_groups` | Kanal-Gruppen | `state._channel_groups_data` |
-| `fixture_groups` | Fixture-Gruppen (inkl. `id`, Ordner, Gruppen-Modi Linked/Einzeln/Relativ). Die `id` wird beim Laden wiederhergestellt (VCB-36) — Verweise auf eine Gruppe, etwa das Blackout-Ziel einer VC-Taste, bleiben gültig. Alt-Shows ohne `id` bekommen 1..n in Datei-Reihenfolge | `_collect_fixture_groups` |
+| `fixture_groups` | Fixture-Gruppen (inkl. `id`, Ordner, Gruppen-Modi Linked/Einzeln/Relativ). Die `id` wird beim Laden wiederhergestellt (VCB-36) — Verweise auf eine Gruppe, etwa das Blackout-Ziel einer VC-Taste, bleiben gültig. Alt-Shows ohne `id` bekommen 1..n in Datei-Reihenfolge. Dazu die `uid` (VCB-42): die Kennung der Gruppe. Sie bleibt beim Umbenennen und Verschieben, eine neu angelegte Gruppe bekommt eine neue — daran erkennt eine VC-Taste, ob die Gruppe mit dieser Nummer noch die gemeinte ist (die Nummer einer gelöschten Gruppe wird neu vergeben). Alt-Shows ohne `uid` bekommen beim Laden je Gruppe eine neue | `_collect_fixture_groups` |
 | `library` | Show-Bibliothek (Snaps **und** Effekt-Verweise, Ordner) | `SnapLibrary.to_dict` |
 | `playlist` | Musik-Playlist des In-App-Players (Track-Dicts) | `state.playlist` |
 | `music_autoshow` | An Musik gekoppelte Auto-Show: `{enabled, function_ids, bank, slots}` (`slots {int: function-id}`, beim Laden ergänzt) | `state.music_autoshow` |

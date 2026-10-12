@@ -331,7 +331,9 @@ _INSTALLATION_JS = """
 
 # Randstrahlen des sichtbaren Kegels durch die ECHTE Schattenmatrix des
 # Pool-Lichts und die Uniform-Werte (wie im Shader) -> Motiv-Koordinate.
-# Soll: 0,5 * GOBO_RAND * (sin th, -cos th). Dazu die Atlas-Pixel dort.
+# Soll: 0,5 * GOBO_RAND * (sin th, -cos th) mit GOBO_RAND = 0,88 (VIZ-102: der
+# Kegelrand ist der Bildrand). Die Atlas-Pixel werden knapp INNEN vom Rand
+# gelesen (0,9) — am Rand selbst liegt die weiche Bildkante.
 _ABBILDUNG_JS = """
 (function(){
   const L = window.__lightos, T = window.THREE, f = L.fixtures['%d'];
@@ -359,8 +361,8 @@ _ABBILDUNG_JS = """
     const c = new T.Vector4(P.x, P.y, P.z, 1).applyMatrix4(l.shadow.matrix);
     const dx = c.x / c.w - 0.5, dy = c.y / c.w - 0.5;
     const u = gpm[1] * dx - gpm[2] * dy, v = gpm[2] * dx + gpm[1] * dy;
-    fehler = Math.max(fehler, Math.abs(u - 0.31 * Math.sin(th)), Math.abs(v + 0.31 * Math.cos(th)));
-    (k %% 2 === 0 ? hell : dunkel).push(pixel(u + 0.5, v + 0.5));
+    fehler = Math.max(fehler, Math.abs(u - 0.44 * Math.sin(th)), Math.abs(v + 0.44 * Math.cos(th)));
+    (k %% 2 === 0 ? hell : dunkel).push(pixel(0.9 * u + 0.5, 0.9 * v + 0.5));
   }
   return JSON.stringify({ fehler: fehler, hell: hell, dunkel: dunkel, kachel: gpm[3],
     drehung: Math.atan2(gpm[2], gpm[1]), skala: Math.hypot(gpm[1], gpm[2]),
@@ -718,8 +720,9 @@ _BILD_AUFBAU_JS = """
   beam.updateWorldMatrix(true, false);
   const strahl = (grad, y) => {
     const th = grad * Math.PI / 180;
-    const d = beam.localToWorld(new T.Vector3(p.radius * Math.sin(th), -p.height / 2,
-                                               p.radius * Math.cos(th))).sub(Lp);
+    // 0,9: knapp innen vom Kegelrand (dort sitzen die Boegen seit VIZ-102).
+    const d = beam.localToWorld(new T.Vector3(0.9 * p.radius * Math.sin(th), -p.height / 2,
+                                               0.9 * p.radius * Math.cos(th))).sub(Lp);
     return Lp.clone().addScaledVector(d, (y - Lp.y) / d.y);
   };
   // Ring-Spalte: Boegen bei th = k * 45 Grad, Luecken dazwischen.
