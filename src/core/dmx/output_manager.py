@@ -1421,9 +1421,16 @@ class OutputManager:
         # gesunder Nachbar die Serie des kranken bei jedem Frame wieder auf 0
         # setzen — der Zaehler pendelte zwischen 0 und 1 und erreichte die
         # Meldeschwelle nie. Ein Fehler in diesem Frame ist ein Fehler.
+        #
+        # OUT-71: ein Nur-Rechnen-Lauf (Schlussbild fuer EINEN Ausgang, der
+        # gerade geht) kommt aus dem UI-Thread, WAEHREND der Ausgabe-Thread
+        # laeuft. Die Tick-Callbacks (Function-Manager, Renderer) sind nicht
+        # fuer zwei Threads gebaut, und ein zusaetzlicher Tick liesse jede
+        # laufende Funktion einen Schritt springen. Das Bild wird deshalb aus
+        # dem zuletzt gerenderten Stand gerechnet, ohne zu ticken.
         tick_exc = None
         tick_name = ""
-        for cb in list(self._tick_callbacks):
+        for cb in (list(self._tick_callbacks) if _nur_rechnen is None else ()):
             try:
                 cb(FRAME_INTERVAL)
             except Exception as exc:
@@ -1431,7 +1438,9 @@ class OutputManager:
                 # Namen nur im Fehlerfall bestimmen — im Normalbetrieb kostet
                 # dieser Block nichts.
                 tick_name = getattr(cb, "__qualname__", None) or type(cb).__name__
-        if tick_exc is None:
+        if _nur_rechnen is not None:
+            pass                    # nicht getickt -> nichts zu buchen
+        elif tick_exc is None:
             self._buche_erfolg("Tick", 0)
         else:
             # Derselbe Schluessel wie beim Erfolg — der Name des Callbacks

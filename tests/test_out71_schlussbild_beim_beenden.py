@@ -234,6 +234,25 @@ class AusgabeEntfernenTest(unittest.TestCase):
         self.assertEqual(a.bilder, [bytes(512)])
         self.assertEqual([was for _n, was in a.protokoll], ["senden", "ausschreiben", "schliessen"])
 
+    def test_das_bild_fuer_einen_ausgang_tickt_die_engine_nicht(self):
+        """Der Ausgang geht im laufenden Betrieb: der Ausgabe-Thread tickt
+        Function-Manager und Renderer selbst. Ein zweiter Tick aus dem
+        UI-Thread liefe gleichzeitig (dafuer sind sie nicht gebaut) und liesse
+        jede laufende Funktion einen Schritt springen."""
+        om = _manager()
+        ticks = []
+        om.add_tick_callback(ticks.append)
+        om._enttec_outputs[1] = _Ausgang()
+        om.remove_output(1, schlussbild=True)
+        self.assertEqual(ticks, [])
+
+    def test_ein_normaler_frame_tickt_weiter(self):
+        om = _manager()
+        ticks = []
+        om.add_tick_callback(ticks.append)
+        om._send_all()
+        self.assertEqual(len(ticks), 1)
+
     def test_ohne_auftrag_kein_dunkles_bild(self):
         """Kommt gleich ein Nachfolger fuer dasselbe Universum („Uebernehmen“
         mit unveraenderter Einstellung), darf die Buehne nicht dunkel blitzen."""
