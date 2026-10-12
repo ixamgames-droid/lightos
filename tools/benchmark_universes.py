@@ -11,10 +11,10 @@ Aufruf:  venv/Scripts/python.exe tools/benchmark_universes.py [frames]   (Defaul
          (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 Ergebnis: Tabelle auf stdout + geschrieben nach docs/PERFORMANCE.md.
 
-Hinweis: get_state() wendet beim ersten Aufruf die Output-Konfig aus
-universes.json (App-Datenordner) an und oeffnet ggf. den dort konfigurierten Enttec-/sACN-Port.
-Fuer die Messung ist das irrelevant (Output-Thread aus, send_dmx() wird nie
-gerufen) — auf einer Maschine ohne den Port erscheint nur eine Warnzeile.
+Hinweis (TOOL-19): die Ausgabe-Konfiguration wird auf eine Datei umgelenkt, die
+es nicht gibt (``LIGHTOS_UNIVERSES_JSON``). Vorher wendete get_state() die echte
+universes.json an und oeffnete den dort eingetragenen Enttec-/sACN-Ausgang — fuer
+eine Messung ohne Ausgabe unnoetig und am Rig ein Griff nach dem echten Port.
 """
 from __future__ import annotations
 import os
@@ -35,6 +35,11 @@ import tempfile
 os.environ.setdefault(
     "LIGHTOS_SHOW_DB",
     os.path.join(tempfile.gettempdir(), f"lightos_bench_{os.getpid()}.db"),
+)
+# TOOL-19: keinen echten Ausgang oeffnen (s. Modulkopf) — Datei wird nie angelegt.
+os.environ.setdefault(
+    "LIGHTOS_UNIVERSES_JSON",
+    os.path.join(tempfile.gettempdir(), f"lightos_bench_{os.getpid()}_universes.json"),
 )
 
 from PySide6.QtWidgets import QApplication
