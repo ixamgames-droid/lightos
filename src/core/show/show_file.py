@@ -1575,6 +1575,12 @@ def _reset_state(state, *, emit_events: bool = True, blackout_output: bool = Tru
         state.clear_all_target_blackouts()
     except Exception as e:
         print(f"[show_file] reset target blackout error: {e}")
+    # VCB-43: ebenso gehaltene globale Blackouts — die Taste, die sie hielt,
+    # gibt es nach dem Wechsel nicht mehr. Der Schalter bleibt, wie er ist.
+    try:
+        state.output_manager.loese_alle_halte_blackouts()
+    except Exception as e:
+        print(f"[show_file] reset halte-blackout error: {e}")
 
     # Patch (gepatchte Fixtures) leeren — entfernt sie auch aus current_show.db
     _replace_patch_from_data(state, [])
