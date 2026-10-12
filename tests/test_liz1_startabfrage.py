@@ -310,3 +310,23 @@ def test_ueber_dialog_nennt_urheber_link_und_status(app, tmp_path):
     lizenz.installiere(_datei(tmp_path, bis=dt.date(2099, 1, 1)))
     text = hilfe.ueber_text()
     assert "lizenziert für Testerin, gültig bis 01.01.2099" in text
+
+
+def test_befund_einer_ungeprueften_datei_bleibt_kurz_und_reiner_text(app, tmp_path):
+    """Dateiname und Befund stammen aus einer NICHT geprueften Datei: kein HTML
+    im Dialog, und ein riesiger Feldwert landet nicht ungekuerzt in Dialog, Log
+    oder Diagnosepaket."""
+    from PySide6.QtCore import Qt
+    lang = '{"format": "<b>' + "x" * 5000 + '</b>"}'
+    pfad = _datei(tmp_path, name="boese.lic", inhalt=lang)
+    status = lizenz.pruefe_datei(pfad)
+    assert status.zustand == lizenz.UNGUELTIG
+    assert len(status.grund) < 120 and len(status.log_text()) < 140
+    dlg = LizenzDialog(OHNE)
+    try:
+        assert dlg.grund.textFormat() == Qt.TextFormat.PlainText
+        assert dlg.uebernimm(pfad) is False
+        assert "boese.lic" in dlg.grund.text() and "<b>" in dlg.grund.text()
+        assert len(dlg.grund.text()) < 260
+    finally:
+        dlg.deleteLater()

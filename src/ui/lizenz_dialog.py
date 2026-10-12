@@ -89,6 +89,9 @@ class LizenzDialog(QDialog):
 
         self.grund = QLabel(grund_text(status), self)
         self.grund.setWordWrap(True)
+        # Reiner Text: hier stehen Dateiname und Befund einer NICHT geprueften
+        # Datei — die darf kein HTML in den Dialog bringen.
+        self.grund.setTextFormat(Qt.TextFormat.PlainText)
         self.grund.setObjectName("lizenz_grund")
         lay.addWidget(self.grund)
 

@@ -222,9 +222,13 @@ def pruefe_daten(daten, heute: _dt.date | None = None, pfad: str = "",
             return Lizenzstatus(UNGUELTIG, grund="kein Lizenzformat", pfad=pfad)
         fmt = daten.get("format")
         if isinstance(fmt, bool) or fmt != FORMAT:
+            # Der Wert stammt aus einer ungeprueften Datei: gekuerzt anzeigen,
+            # sonst sprengt ein langer Text Dialog, Log und Diagnosepaket.
+            fmt = repr(fmt)
+            fmt = fmt if len(fmt) <= 24 else fmt[:23] + "…"
             return Lizenzstatus(
                 UNGUELTIG, pfad=pfad,
-                grund=f"unbekanntes Lizenzformat {fmt!r} — diese Programmversion "
+                grund=f"unbekanntes Lizenzformat {fmt} — diese Programmversion "
                       f"kennt Format {FORMAT}")
         name, kennung = daten.get("name"), daten.get("kennung")
         if not (isinstance(name, str) and name.strip()
