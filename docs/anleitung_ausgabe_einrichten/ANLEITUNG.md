@@ -70,7 +70,10 @@ Reiter **Enttec Pro USB**:
    ist mit dem gespeicherten Wert vorbelegt; stell es **vor** dem Klick auf
    **Verbinden** bewusst ein.
 4. **Verbinden** — entfernt einen anderen Ausgang dieses Universums, öffnet den Adapter
-   und speichert die Zuordnung. Danach meldet der Status erst
+   und speichert die Zuordnung. **Ein Adapter trägt genau ein Universum:** lag derselbe
+   Adapter bisher auf einem anderen Universum, verliert jene Zeile ihn (sie bleibt als
+   `Disabled` stehen), und der Status sagt es dazu, zum Beispiel
+   `… · war Universe 2 — jetzt Universe 1`. Danach meldet der Status erst
    `Eingerichtet: … (gespeichert), verbinde …` und wenig später das Ergebnis:
    `Verbunden: … (gespeichert)`, oder `Port lässt sich nicht öffnen — gespeichert, aber
    es geht kein DMX raus`, oder `antwortet nicht — Port/Kabel prüfen`.
@@ -148,6 +151,11 @@ Beim Speichern prüft LightOS die Tabelle und meldet sich, wenn
   am Empfänger zu Flackern; gespeichert wird trotzdem. Was dabei als „dasselbe Ziel"
   zählt, erklärt
   [Zwei Universen über zwei Adapter](../anleitung_zwei_universen/ANLEITUNG.md#hinweis-zwei-universen-auf-demselben-ziel).
+- **derselbe Adapter in mehreren Zeilen** steht (*Ein Adapter auf mehreren Universen*) —
+  also zweimal `Enttec` mit demselben Port. Ein Adapter sendet nur ein Universum.
+  Gespeichert wird trotzdem, eingerichtet wird der Adapter so aber für **keines** davon,
+  bis nur noch eine Zeile ihn nennt. Am schnellsten behebt es der Reiter
+  **Enttec Pro USB**: Universe wählen und **Verbinden** (Schritt 2).
 
 ## 6. Kontrolle: der Output-Monitor
 
@@ -213,7 +221,7 @@ der Ausgang genommen, während dort Geräte gepatcht sind:
    | `Enttec: <Port> verbindet …` (orange) | Der Port wird gerade geöffnet. Bleibt es dabei, ist der Adapter nicht erreichbar. |
    | `Enttec: <Port> aktiv (1 Universe)` (grün) | Eingerichtet, und der Adapter sendet. |
    | `Enttec: <Port> sendet NICHT (Universe <n>)` (rot) | Eingerichtet, aber der Port ist nicht offen — es geht kein DMX raus. USB-Kabel und Port prüfen. |
-   | `Enttec: falsch konfiguriert` (orange) | Der eingetragene Port kann auf diesem Rechner nicht stimmen (z. B. ein Windows-`COM`-Port unter Linux). Der Tooltip nennt den Grund. |
+   | `Enttec: falsch konfiguriert` (orange) | Der eingetragene Port kann auf diesem Rechner nicht stimmen (z. B. ein Windows-`COM`-Port unter Linux), oder derselbe Adapter steht auf mehreren Universen und ist deshalb für keines eingerichtet. Der Tooltip nennt den Grund. |
 
 3. **Ausgabe-Anzeige** unten rechts: normal eine Liste wie `Ausgabe: U1 Art-Net`
    (höchstens drei Einträge, der Rest als `+n`). Mit `⚠` und orange:
@@ -230,6 +238,12 @@ ausgeblendet ist. Er verschwindet von selbst, sobald der Ausgang einige Sekunden
 sendet; ein Klick öffnet den Dialog aus Schritt 1 (nicht im Kiosk-Modus). Ist **gar kein**
 Ausgang eingerichtet, steht dort dezent `Probenmodus — es wird kein DMX gesendet`; ein
 Klick blendet diesen Hinweis bis zum nächsten Programmstart aus.
+
+Derselbe rote Balken erscheint, wenn in der gespeicherten Konfiguration **ein Adapter auf
+mehreren Universen** steht (`… — steht auf Universe 1 und 2, für keines eingerichtet`).
+LightOS rät dann nicht, welches gemeint war, und richtet den Adapter für keines ein —
+sonst bekäme ein Rig womöglich die Werte eines anderen Universums. Beheben: im Reiter
+**Enttec Pro USB** das richtige Universe wählen und **Verbinden**.
 
 ## Netzwerk-Falle bei Art-Net und sACN
 

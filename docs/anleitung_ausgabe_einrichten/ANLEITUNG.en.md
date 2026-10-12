@@ -73,7 +73,11 @@ Tab **Enttec Pro USB**:
    pre-filled with the saved value; set it deliberately **before** you click
    **Verbinden** (connect).
 4. **Verbinden** — removes any other output of this universe, opens the adapter and
-   saves the assignment. The status then first reports
+   saves the assignment. **One adapter carries exactly one universe:** if the same
+   adapter was on another universe before, that row loses it (the row stays as
+   `Disabled`), and the status says so, for example
+   `… · war Universe 2 — jetzt Universe 1` (was universe 2 — now universe 1). The status
+   then first reports
    `Eingerichtet: … (gespeichert), verbinde …` (set up: … (saved), connecting …) and
    shortly afterwards the result: `Verbunden: … (gespeichert)` (connected: … (saved)),
    or `Port lässt sich nicht öffnen — gespeichert, aber es geht kein DMX raus` (port
@@ -160,6 +164,11 @@ When saving, LightOS checks the table and speaks up if
   anyway. What counts as "the same target" is explained in
   [Zwei Universen über zwei Adapter](../anleitung_zwei_universen/ANLEITUNG.md#hinweis-zwei-universen-auf-demselben-ziel)
   (German).
+- **the same adapter is in several rows** (*Ein Adapter auf mehreren Universen* = one
+  adapter on several universes) — that is, `Enttec` twice with the same port. One adapter
+  sends only one universe. It is saved anyway, but the adapter is then set up for
+  **none** of them until only one row names it. The quickest fix is the **Enttec Pro
+  USB** tab: choose the universe and click **Verbinden** (step 2).
 
 ## 6. Check: the Output monitor
 
@@ -229,7 +238,7 @@ Universe 1 had its output removed while fixtures are patched on it:
    | `Enttec: <Port> verbindet …` (= connecting …; orange) | The port is being opened right now. If it stays like that, the adapter cannot be reached. |
    | `Enttec: <Port> aktiv (1 Universe)` (= active; green) | Set up, and the adapter is sending. |
    | `Enttec: <Port> sendet NICHT (Universe <n>)` (= is NOT sending; red) | Set up, but the port is not open — no DMX is going out. Check the USB cable and the port. |
-   | `Enttec: falsch konfiguriert` (= misconfigured; orange) | The port entered cannot be right on this computer (e.g. a Windows `COM` port on Linux). The tooltip gives the reason. |
+   | `Enttec: falsch konfiguriert` (= misconfigured; orange) | The port entered cannot be right on this computer (e.g. a Windows `COM` port on Linux), or the same adapter is on several universes and is therefore set up for none of them. The tooltip gives the reason. |
 
 3. **Output indicator** at the bottom right: normally a list such as
    `Ausgabe: U1 Art-Net` (*Ausgabe* = output; three entries at most, the rest as `+n`).
@@ -248,6 +257,12 @@ sending again for a few seconds; a click opens the dialog from step 1 (not in ki
 If **no** output is set up at all, a subtle `Probenmodus — es wird kein DMX gesendet`
 (rehearsal mode — no DMX is being sent) is shown there; a click hides this hint until the
 next program start.
+
+The same red bar appears if the saved configuration has **one adapter on several
+universes** (`… — steht auf Universe 1 und 2, für keines eingerichtet` = is on universes 1
+and 2, set up for none). LightOS does not guess which one was meant and sets the adapter
+up for none of them — otherwise a rig might receive the values of another universe. To
+fix it: choose the right universe in the **Enttec Pro USB** tab and click **Verbinden**.
 
 ## Network pitfall with Art-Net and sACN
 

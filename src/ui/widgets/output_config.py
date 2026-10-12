@@ -13,6 +13,8 @@ import serial.tools.list_ports
 from src.core.app_state import get_state
 from src.core.paths import user_data_file
 from src.core.dmx.enttec_pro import EnttecPro, ENTTEC_VID, ENTTEC_PID
+from src.core.dmx.enttec_pro import diagnose_port as _diagnose_enttec_port
+from src.core.dmx import adapter_zeilen
 
 # ⚠️ Umlenkbar — und das ist keine Test-Bequemlichkeit, sondern Datenschutz.
 #
@@ -401,7 +403,8 @@ def _ext_zeile_pruefen(r: dict) -> bool:
     return angepasst
 
 
-def _persist_output(num: int, output: str, patch: str, out_universe=_UNSET) -> bool:
+def _persist_output(num: int, output: str, patch: str, out_universe=_UNSET,
+                    abgeraeumt: list | None = None) -> bool:
     """Schreibt/aktualisiert eine Zeile in universes.json, damit eine zur
     Laufzeit hergestellte Ausgabe-Verbindung beim naechsten Start automatisch
     wieder eingerichtet wird (apply_output_config). Ohne das war jede Verbindung
@@ -420,6 +423,13 @@ def _persist_output(num: int, output: str, patch: str, out_universe=_UNSET) -> b
     QA-50: Gibt jetzt zurueck, ob die Datei wirklich geschrieben wurde. Die
     Aufrufer haengen ihre „(gespeichert)"-Meldung daran — sonst steht dort
     Erfolg, waehrend die Einstellung den naechsten Start nicht ueberlebt.
+
+    OUT-74: ``abgeraeumt`` — eine Liste, die der Aufrufer mitgibt, wenn die
+    Zeile einen ADAPTER meint (Enttec, uDMX). Dann verliert jede ANDERE Zeile
+    denselben Adapter, im selben Schreibvorgang, und ihre Universumsnummern
+    stehen danach in der Liste. Ohne das blieb beim Umziehen eines Adapters die
+    alte Zeile stehen, und nach dem Neustart sendete er auf dem Universum, das
+    zufaellig weiter hinten in der Datei stand.
     """
     rows = _load_universe_config()
     found = False
@@ -458,7 +468,22 @@ def _persist_output(num: int, output: str, patch: str, out_universe=_UNSET) -> b
             entry["out_universe"] = int(out_universe)
         _ext_zeile_pruefen(entry)          # NET-13, auch fuer neue Zeilen
         rows.append(entry)
+    if abgeraeumt is not None:
+        abgeraeumt.extend(adapter_zeilen.andere_abraeumen(rows, output, patch, num))
     return _save_universe_config(rows)
+
+
+def _mit_umzug(dialog, text: str) -> str:
+    """OUT-74: haengt „war Universe 2 — jetzt Universe 1" an eine Statusmeldung.
+
+    Der Satz muss auch die spaeteren Meldungen ueberleben
+    (`_enttec_status_nachtragen` ersetzt den Text nach knapp einer Sekunde) —
+    sonst stuende er nur einen Augenblick da. Bewusst eine Funktion und keine
+    Methode: Bestandstests rufen `_enttec_status_nachtragen` auf einem Stub, der
+    nur die Felder des Dialogs mitbringt.
+    """
+    umzug = getattr(dialog, "_enttec_umzug", "")
+    return f"{text} · {umzug}" if umzug else text
 
 
 class OutputConfigDialog(QDialog):
@@ -531,6 +556,7 @@ class OutputConfigDialog(QDialog):
         connect_btn = QPushButton("Verbinden")
         connect_btn.clicked.connect(self._connect_enttec)
         self._lbl_enttec_status = QLabel("Nicht verbunden")
+        self._lbl_enttec_status.setWordWrap(True)   # OUT-74: lange Hinweise
         ef.addRow("", connect_btn)
         ef.addRow("Status:", self._lbl_enttec_status)
 
@@ -806,6 +832,20 @@ class OutputConfigDialog(QDialog):
                 self._enttec_port_waehlen(port)
                 self._lbl_enttec_status.setText(
                     f"Gespeichert: {port} → Universe {num}")
+        # ★ OUT-74: derselbe Adapter in mehr als einer Zeile. Der Reiter kann
+        # nur EINE Zeile zeigen (die mit der kleinsten Nummer) — still eine
+        # davon als „Gespeichert" auszugeben hiesse, den Fehler zu verstecken:
+        # eingerichtet ist der Adapter in diesem Zustand fuer keine (s.
+        # `apply_output_config`). Also sagen, und sagen, was ihn behebt.
+        for d in adapter_zeilen.doppelte(_load_universe_config()):
+            if d.typ == "Enttec":
+                self._lbl_enttec_status.setText(
+                    f"⚠ {d.patch} steht auf Universe "
+                    f"{adapter_zeilen.aufzaehlung(d.universen)} — ein Adapter "
+                    f"sendet nur ein Universum, eingerichtet ist er für keines. "
+                    f"Universe wählen und „Verbinden“: die anderen Zeilen "
+                    f"werden abgeräumt.")
+                break
 
         # ── Art-Net ───────────────────────────────────────────────────────────
         artnet = _gespeicherte_ausgabe_zeile("ArtNet")
@@ -933,7 +973,16 @@ class OutputConfigDialog(QDialog):
             om.remove_output(univ)
             om.add_enttec(univ, port)
             # QA-50: „(gespeichert)" nur sagen, wenn es auch gespeichert ist.
-            gespeichert = _persist_output(univ, "Enttec", port)
+            # ★ OUT-74: der Adapter gehoert jetzt DIESEM Universum — jede
+            # andere Zeile mit demselben Anschluss wird im selben
+            # Schreibvorgang abgeraeumt. `add_enttec` hat den Anschluss auf dem
+            # anderen Universum schon geschlossen; ohne das Abraeumen stand er
+            # dort weiter in der Datei und kam beim naechsten Start zurueck.
+            geraeumt: list[int] = []
+            gespeichert = _persist_output(univ, "Enttec", port,
+                                          abgeraeumt=geraeumt)
+            self._enttec_umzug = adapter_zeilen.umzug_text(geraeumt, univ)
+            self._enttec_hinweise_nachfuehren(state, univ, port, geraeumt)
             self._univ_tabelle_nachladen()   # OUT-58, wie A3D-15 beim Art-Net
             # ★ OUT-51: NICHT „Verbunden" melden. `add_enttec` startet den
             # Serial-Worker, mehr weiss es in diesem Moment nicht — der Port
@@ -941,15 +990,42 @@ class OutputConfigDialog(QDialog):
             # Der Erfolg, den dieser Zweig sicher kennt, ist „eingerichtet und
             # gespeichert"; ob DMX rausgeht, sagt erst der Adapter selbst,
             # gleich, und dann traegt es `_enttec_status_nachtragen` nach.
-            self._lbl_enttec_status.setText(
+            self._lbl_enttec_status.setText(_mit_umzug(self,
                 f"Eingerichtet: {port} → Universe {univ} "
                 f"{'(gespeichert)' if gespeichert else '(NICHT gespeichert!)'}, "
-                f"verbinde …")
+                f"verbinde …"))
             self._enttec_pruef_univ = univ
             self._enttec_pruef_versuche = 0
             self._enttec_status_pruefen_spaeter()
         except Exception as e:
             self._lbl_enttec_status.setText(f"Fehler: {e}")
+
+    # ── OUT-74: ein Adapter, ein Universum ───────────────────────────────────
+
+    @staticmethod
+    def _enttec_hinweise_nachfuehren(state, univ: int, port: str, geraeumt):
+        """Die Hinweise der Statusleiste auf den Stand nach „Verbinden" bringen.
+
+        ``enttec_port_notes`` fuellt sonst nur ``apply_output_config`` (beim
+        Start). Stand dort „Adapter auf zwei Universen" oder ein falscher
+        Anschluss, blieb „Enttec: falsch konfiguriert" bis zum Neustart
+        stehen, obwohl der Bediener es eben behoben hat.
+        """
+        if hasattr(state, "adapter_konflikte"):
+            try:
+                state.adapter_konflikte = adapter_zeilen.doppelte(
+                    _load_universe_config())
+            except Exception as e:
+                print(f"[output_config] Adapter-Pruefung: {e}")
+        notes = getattr(state, "enttec_port_notes", None)
+        if not isinstance(notes, dict):
+            return
+        for anderes in geraeumt:
+            notes.pop(anderes, None)
+        try:
+            notes[univ] = _diagnose_enttec_port(port)
+        except Exception:
+            notes.pop(univ, None)
 
     # ── OUT-51: den echten Verbindungsstatus nachtragen ──────────────────────
 
@@ -1000,21 +1076,21 @@ class OutputConfigDialog(QDialog):
                 return
             # Nach der Anlaufzeit immer noch „verbindet": das ist keine
             # Erfolgsmeldung mehr, aber auch kein bewiesener Ausfall.
-            self._lbl_enttec_status.setText(
-                f"{port} → Universe {univ}: antwortet nicht — Port/Kabel prüfen")
+            self._lbl_enttec_status.setText(_mit_umzug(self,
+                f"{port} → Universe {univ}: antwortet nicht — Port/Kabel prüfen"))
             return
         if zustand == ZUSTAND_SENDET:
-            self._lbl_enttec_status.setText(
-                f"Verbunden: {port} → Universe {univ} (gespeichert)")
+            self._lbl_enttec_status.setText(_mit_umzug(self,
+                f"Verbunden: {port} → Universe {univ} (gespeichert)"))
         elif zustand == ZUSTAND_TOT:
-            self._lbl_enttec_status.setText(
+            self._lbl_enttec_status.setText(_mit_umzug(self,
                 f"{port} → Universe {univ}: Port lässt sich nicht öffnen — "
-                f"gespeichert, aber es geht kein DMX raus")
+                f"gespeichert, aber es geht kein DMX raus"))
         else:
             # Der Adapter kann keine Auskunft geben (In-Prozess-Fallback ohne
             # Statusfeld). Dann bleibt die ehrliche Teilaussage stehen.
-            self._lbl_enttec_status.setText(
-                f"Eingerichtet: {port} → Universe {univ} (gespeichert)")
+            self._lbl_enttec_status.setText(_mit_umzug(self,
+                f"Eingerichtet: {port} → Universe {univ} (gespeichert)"))
 
     def _sync_artnet_start_univ_default(self):
         """A3D-15: die Startuniversum-Spinbox auf einen sinnvollen Wert fuer das
@@ -1218,7 +1294,21 @@ class OutputConfigDialog(QDialog):
         # Nur WARNEN, nicht korrigieren: welches der beiden Universen gemeint
         # war, weiß nur der Bediener. Eine automatische Umnummerierung würde
         # raten und dabei möglicherweise das falsche Rig dunkel schalten.
+        # ★ OUT-74: fuer einen ADAPTER (Enttec, uDMX) stimmt der Satz darunter
+        # nicht — dort senden nicht beide, sondern keiner: `apply_output_config`
+        # richtet einen Adapter, der in zwei Zeilen steht, fuer keine ein. Das
+        # bekommt seine eigene Meldung; die allgemeine gilt fuer Netz-Ziele.
+        for d in adapter_zeilen.doppelte(rows):
+            QMessageBox.warning(
+                self, "Ein Adapter auf mehreren Universen",
+                f"{d.name} steht auf Universe "
+                f"{adapter_zeilen.aufzaehlung(d.universen)}.\n\n"
+                f"Ein Adapter sendet nur ein Universum. Gespeichert wird "
+                f"trotzdem — eingerichtet wird er so aber für KEINES davon, "
+                f"bis nur noch eine Zeile ihn nennt.")
         for zeilen, was in _doppelte_ziele(rows):
+            if was.split(" → ", 1)[0] in adapter_zeilen.ADAPTER_TYPEN:
+                continue                   # oben schon gemeldet
             QMessageBox.warning(
                 self, "Zwei Universen auf demselben Ziel",
                 f"{was}\n\nBetroffen: {zeilen}.\n\nBeide senden dorthin — der "

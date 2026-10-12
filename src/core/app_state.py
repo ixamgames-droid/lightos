@@ -13,6 +13,7 @@ from .database.fixture_db import get_channels
 from .dmx.universe import Universe
 from .dmx.output_manager import OutputManager
 from .dmx.enttec_pro import diagnose_port as diagnose_enttec_port
+from .dmx import adapter_zeilen
 from .debug_log import debug_swallow
 from .attr_groups import ATTR_GROUPS, attr_label, classify_attr
 from .programmer_verlauf import ProgrammerVerlauf
@@ -311,6 +312,11 @@ class AppState:
         # nicht — benutze /dev/ttyUSB0"). Der Statusbalken liest das, damit ein
         # falsch konfigurierter Adapter nicht laenger als gruen durchgeht.
         self.enttec_port_notes: dict[int, str | None] = {}
+        # OUT-74: Adapter, die in universes.json in mehr als einer Zeile stehen
+        # und deshalb fuer keine eingerichtet sind (`adapter_zeilen.Doppelt`).
+        # Das Ausfall-Banner liest das — im Kiosk-Modus gibt es keine
+        # Statusleiste, die den Hinweis aus `enttec_port_notes` zeigen koennte.
+        self.adapter_konflikte: list = []
         self.programmer: dict[int, dict[str, int]] = {}
         # Schuetzt jeden Lese-/Schreibzugriff auf self.programmer. Der MIDI-/OSC-/
         # Web-Thread mutiert den Programmer (set_programmer_value), waehrend der
@@ -2236,6 +2242,45 @@ class AppState:
         except Exception as e:
             print(f"[app_state] apply_output_config: raeumen fehlgeschlagen: {e}")
 
+        # ★ OUT-74: derselbe Adapter in mehr als einer Zeile.
+        #
+        # Bisher richtete die Schleife unten beide Zeilen nacheinander ein;
+        # `add_enttec` schliesst den Anschluss auf dem jeweils anderen
+        # Universum, also gewann die Zeile, die zufaellig weiter hinten in der
+        # Datei steht. Der Adapter sendete dann moeglicherweise das falsche
+        # Universum — ohne Meldung. Welche Zeile gemeint war, steht nicht in
+        # der Datei; die erste oder letzte zu nehmen hiesse raten. Deshalb: der
+        # Adapter wird fuer KEINE der Zeilen eingerichtet, und es wird gesagt
+        # (Statusleiste ueber `enttec_port_notes`, Dialog, Konsole).
+        try:
+            doppelt = {adapter_zeilen.schluessel(d.typ, d.patch): d
+                       for d in adapter_zeilen.doppelte(rows)}
+        except Exception as e:
+            print(f"[app_state] apply_output_config: Adapter-Pruefung: {e}")
+            doppelt = {}
+        for d in doppelt.values():
+            print(f"[app_state] apply_output_config: {d.text}")
+        self.adapter_konflikte = list(doppelt.values())
+
+        def _merke_hinweis(universum, text):
+            # Lazy-Init wie unten begruendet (HW-5b): Stubs in Bestandstests
+            # bringen `enttec_port_notes` nicht mit.
+            notes = getattr(self, "enttec_port_notes", None)
+            if notes is None:
+                notes = {}
+                self.enttec_port_notes = notes
+            notes[universum] = text
+
+        def _vergiss_hinweis(universum):
+            notes = getattr(self, "enttec_port_notes", None)
+            if notes:
+                notes.pop(universum, None)
+
+        # Hinweise zu Universen, die es nicht mehr gibt, gehen mit ihnen.
+        for universum in list(getattr(self, "enttec_port_notes", None) or {}):
+            if universum not in konfiguriert:
+                _vergiss_hinweis(universum)
+
         for r in rows or []:
             try:
                 num = int(r.get("num", 1))
@@ -2262,6 +2307,17 @@ class AppState:
                 # weiter mit (Doppel-Output) bzw. ein "Disabled"-Universe gibt weiter
                 # Licht aus.
                 self.output_manager.remove_output(num)
+                konflikt = doppelt.get(adapter_zeilen.schluessel(output, patch))
+                if konflikt is not None:
+                    # OUT-74: nicht einrichten, s. o. — der Ausgang ist
+                    # entfernt, das Universum bleibt ohne Adapter.
+                    _merke_hinweis(num, konflikt.text)
+                    continue
+                if output != "Enttec":
+                    # Ein Hinweis aus einem frueheren Lauf (falscher Port,
+                    # doppelter Adapter) gilt nicht mehr, sobald die Zeile
+                    # keinen Enttec mehr meint.
+                    _vergiss_hinweis(num)
                 if output == "Enttec" and patch:
                     # HW-5b: den Port BEGUTACHTEN, bevor wir ihn oeffnen. Ein Name
                     # von einer anderen Plattform ("COM_FAKE" aus der Windows-Zeit
@@ -2284,11 +2340,7 @@ class AppState:
                     hinweis = diagnose_enttec_port(patch)
                     if hinweis:
                         print(f"[app_state] Universe {num} (Enttec): {hinweis}")
-                    notes = getattr(self, "enttec_port_notes", None)
-                    if notes is None:
-                        notes = {}
-                        self.enttec_port_notes = notes
-                    notes[num] = hinweis
+                    _merke_hinweis(num, hinweis)
                     self.output_manager.add_enttec(num, patch)
                 elif output == "ArtNet":
                     self.output_manager.add_artnet(num, patch or "255.255.255.255",

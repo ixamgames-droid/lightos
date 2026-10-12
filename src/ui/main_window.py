@@ -1446,7 +1446,20 @@ class MainWindow(QMainWindow):
         # keine zweite Abfrage: das Banner bekommt die eben gelesenen Wege.
         banner = getattr(self, "_ausgabe_banner", None)
         if banner is not None:
-            banner.aktualisiere(om, wege)
+            # OUT-74: ein Adapter, der in zwei Zeilen steht, ist fuer keine
+            # eingerichtet — er fehlt also in `wege`. Fuer das Banner ist das
+            # trotzdem ein Ausfall („es kommt nichts an"), und im Kiosk-Modus
+            # der einzige Ort, an dem es steht.
+            banner_wege = wege
+            try:
+                from src.core.dmx import adapter_zeilen
+                konflikte = adapter_zeilen.stoerungen(
+                    getattr(self._state, "adapter_konflikte", None))
+                if konflikte:
+                    banner_wege = list(wege) + konflikte
+            except Exception:
+                banner_wege = wege
+            banner.aktualisiere(om, banner_wege)
         # OUT-56: gepatchte Universen ohne jeden Adapter. `sendet_wirklich` ist
         # dieselbe Frage, die der DMX-Monitor stellt (OUT-52) — eine zweite
         # Antwort darauf soll es nicht geben.
