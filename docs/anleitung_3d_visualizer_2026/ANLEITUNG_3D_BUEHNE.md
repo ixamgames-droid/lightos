@@ -135,6 +135,11 @@ Gespeichert wird mit der Bühne ([Teil F](#teil-f--speichern)) — Typ, Lage, Gr
    Tilt zeigen dabei in dieselbe Richtung wie vorher. Lösen (frei ziehen bei „Andocken
    aus", oder die Traverse löschen) stellt das Gerät wieder auf den Sockel. An Stützen
    und bei PARs, Leisten und anderen Geräten ohne Bügel ändert sich nichts.
+   Der Sockel sitzt auch dann an der Unterkante, wenn die Höhe des Geräts nicht genau
+   vom Andocken stammt (von Hand eingetragen, aus einer älteren Show, Traverse
+   nachträglich dicker oder höher gemacht): bis 0,5 m unter der Unterkante rückt das
+   Bild an die Kante, die gespeicherte Höhe bleibt, wie sie ist. Liegt das Gerät weiter
+   weg, wird es bei seiner gespeicherten Position gezeichnet.
 4. **Position & Ausrichtung** — die Felder des gewählten Geräts:
    - **Unten an die Traverse:** `Y` = Unterkante der Traverse minus 0,25 m. Im Bild hängt
      Spot 1 an der Back-Traverse (`Y=6`, 0,3 m hoch): `Y=5.6`, `Z=-2.5`, `X` entlang
@@ -295,6 +300,38 @@ Licht ihr Gobo in den Raum (Muster auf Hindernissen, Schatten dahinter). Alle
 übrigen Gobo-Geräte zeigen das Muster als flachen Fleck am Boden. Wechselt ein
 echtes Licht zu einem anderen Strahl, wechselt das Gerät zwischen beiden
 Darstellungen; Größe und Lage des Musters bleiben dabei gleich.
+
+#### Gobo-Projektion im Einzelnen
+
+- **Wechsel ohne Sprung:** Wandert ein echtes Licht zu einem helleren Gerät,
+  blendet das alte Gerät in knapp 0,2 Sekunden auf sein flaches Muster über;
+  danach blendet das neue Gerät seine Projektion ein. Ein Gerät, das gerade
+  projiziert, behält sein Licht etwas länger, damit der Wechsel nicht an einem
+  knappen Helligkeitsunterschied hängt. Ein Blackout ist sofort dunkel.
+- **Traverse, Stütze, kleines Podest im Strahl:** Trifft die Strahlmitte ein
+  Element, das schmaler ist als das Muster, laufen Muster und Kegel bis zur
+  Fläche dahinter. Die Projektion legt ihr Motiv zusätzlich auf das Element,
+  dahinter bleibt sein Schatten.
+- **Bühnenkante:** Ragt ein Muster über die Kante einer Bühnenplatte oder eines
+  Podests, liegt der Teil dahinter auf dem Boden darunter. Direkt vor der Kante
+  bleibt der Schatten der Platte frei, und der Lichtkegel reicht bis zum Boden.
+  Der Kegel selbst endet auf der Platte, wo er auftrifft; nur der Teil, der an
+  der Kante vorbeigeht, läuft weiter. An der Schattengrenze läuft das Muster
+  weich aus.
+  Nichts schwebt in Höhe der Bühne in der Luft; das gilt auch für den flachen
+  Fleck und auf der Stufe Niedrig.
+- **Das Gobo-Bild liegt im Strahl:** Das Motiv füllt den Lichtkegel bis zu
+  seinem Rand und endet dort mit weicher Kante; außerhalb des Kegels (Zoom)
+  liegt kein Muster. Hinter einer Bühnenkante reicht die Projektion so weit wie
+  der Kegel und wird mit dem Abstand dunkler. Ein schräg nach vorn gerichteter
+  Kopf zieht die Teile am Hallenboden länger als auf der Bühne; das ist die
+  echte Geometrie des Strahls.
+- **Helligkeit:** Flacher Fleck und Projektion sind bei gleichem Dimmer etwa
+  gleich hell. Die Projektion nimmt die Farbe der beleuchteten Fläche an, der
+  flache Fleck bleibt etwas weißer.
+- **Bildrate:** Eine Gobo-Projektion kostet so viel wie ein offener Strahl mit
+  echtem Licht. Gobo-Wechsel und Gobo-Drehung lösen keine Neuberechnung der
+  Schatten aus; eine Kopfbewegung schon.
 
 **Warum das so ist:** jedes echte Licht rechnet die Grafikkarte für **jeden
 Bildpunkt jeder beleuchteten Fläche** einmal durch. Mit 68 Lichtern brauchte ein

@@ -12,7 +12,7 @@ Drei Funktionen machen ihn nützlich:
 
 - **Gruppieren & abgrenzen** — ein abgesetzter Rahmen mit Kopfzeile (Header) hält zusammengehörige Bedienelemente optisch beisammen.
 - **Seiten / Tabs** — der Container kann bis zu 10 Seiten haben. Jedes Kind-Element gehört zu einer Seite; über die Tabs in der Kopfzeile blendest du jeweils nur die Elemente einer Seite ein. So bekommst du mehrere Element-Sätze auf demselben Platz.
-- **Solo-Modus** — sorgt dafür, dass innerhalb des Containers immer nur **ein** Button gleichzeitig aktiv ist; beim Drücken eines Buttons werden die anderen automatisch ausgeschaltet (klassische Radio-/Solo-Logik).
+- **Solo-Modus** — sorgt dafür, dass innerhalb des Containers immer nur **ein** Button gleichzeitig aktiv ist; beim Drücken eines Buttons werden die anderen automatisch ausgeschaltet (klassische Radio-/Solo-Logik). Ausnahme: zwei Buttons, die dieselbe Funktion schalten — siehe „Tipps & Fallen".
 
 ## So sieht es aus & Bedienung im Betrieb
 
@@ -26,7 +26,7 @@ Wie die Kopfzeile aussieht, hängt von der Seitenanzahl ab:
 Klickzonen und Gesten:
 
 - **Klick auf einen Tab** (in der Kopfzeile, nur bei mehr als einer Seite) → wechselt auf die zugehörige Seite. Alle Kind-Elemente der gewählten Seite werden eingeblendet, die der anderen Seiten ausgeblendet. Der Seitenwechsel funktioniert **auch im Bearbeiten-Modus**, damit du die Elemente jeder Seite bearbeiten kannst.
-- **Solo-Modus aktiv** → drückst du im Betrieb einen Button innerhalb des Containers, schaltet der Container alle anderen gerade aktiven (gedrückten) Buttons in derselben Box automatisch aus. Es bleibt also immer nur ein Button aktiv. Ist der Rahmen im Solo-Modus, wird er zusätzlich mit einem **roten Rahmen** (`#e63946`, 2 px) gezeichnet statt mit dem normalen grauen.
+- **Solo-Modus aktiv** → drückst du im Betrieb einen Button innerhalb des Containers, schaltet der Container alle anderen gerade aktiven (gedrückten) Buttons in derselben Box automatisch aus. Es bleibt also immer nur ein Button aktiv. **Ausnahme:** Schaltet ein anderer Button dieselbe Funktion wie der gedrückte, bleibt diese Funktion vom Solo unberührt — der gedrückte Button schaltet sie um (läuft sie, geht sie aus; steht sie, geht sie an), genau wie ein einzelner Button. Ist der Rahmen im Solo-Modus, wird er zusätzlich mit einem **roten Rahmen** (`#e63946`, 2 px) gezeichnet statt mit dem normalen grauen.
 - **Effekt-Highlight (Gruppe als Einheit)** → gehört der Container bzw. eines seiner Elemente zu einem ausgewählten/angetippten Effekt, leuchtet der ganze Container als Einheit mit einem **amberfarbenen Rahmen** (`#ff9500`, 3 px) auf. Das ist nur eine optische Hervorhebung.
 
 Im **Bearbeiten-Modus** fügst du Inhalte hinzu:
@@ -46,7 +46,7 @@ Der Dialog „Frame Einstellungen" enthält genau diese Felder:
 | Beschriftung | Text, der bei **einer** Seite in der Kopfzeile zentriert angezeigt wird. Bei mehreren Seiten tragen die Tabs stattdessen feste Namen `P1…Pn`. | freier Text (leer = bisherige Beschriftung bleibt erhalten) |
 | Seitenanzahl | Anzahl der Seiten/Tabs des Containers. Bei `1` zeigt die Kopfzeile die Beschriftung; ab `2` erscheinen umschaltbare Tabs. | Ganzzahl 1–10 (Standard 1) |
 | Header anzeigen | Blendet die obere Kopfzeile (mit Beschriftung bzw. Tabs) ein oder aus. Ohne Header beginnt der Inhaltsbereich ganz oben — dann gibt es **keine Tabs** zum Seitenwechsel mehr. | An / Aus (Standard An) |
-| Modus → Solo-Frame | „Solo-Frame (nur 1 Button gleichzeitig aktiv)": Schaltet beim Drücken eines Buttons die übrigen aktiven Buttons im Container automatisch aus. Aktiv erkennbar am roten Rahmen. | An / Aus (Standard Aus) |
+| Modus → Solo-Frame | „Solo-Frame (nur 1 Button gleichzeitig aktiv)": Schaltet beim Drücken eines Buttons die übrigen aktiven Buttons im Container automatisch aus; eine Funktion, die der gedrückte Button selbst schaltet (dieselbe Funktion auf zwei Buttons), wird dabei umgeschaltet statt ausgeschaltet. Aktiv erkennbar am roten Rahmen. | An / Aus (Standard Aus) |
 
 Hintergrund- und Vordergrundfarbe des Containers stellst du nicht in diesem Dialog ein, sondern über das Rechtsklick-Kontextmenü („Vordergrund-Farbe" / „Hintergrund-Farbe").
 
@@ -58,5 +58,6 @@ Gespeichert werden Seitenanzahl, Header-Sichtbarkeit, Solo-Modus sowie alle enth
 - **Kein Container im Container:** Das Untermenü „Widget hinzufügen" listet bewusst keinen weiteren Container — Container lassen sich nicht verschachteln.
 - **Seite beachten beim Einfügen:** Per „Widget hinzufügen" und per Snap-in landet ein Element immer auf der **aktuell sichtbaren Seite**. Willst du es auf eine andere Seite legen, erst per Tab dorthin wechseln (geht auch im Bearbeiten-Modus), dann einfügen.
 - **Solo wirkt nur auf Buttons im Container:** Die Solo-Logik schaltet nur die gedrückten **Buttons** innerhalb desselben Containers gegeneinander aus — andere Elementtypen (Slider, Farb-Kacheln usw.) sind davon nicht betroffen.
+- **Zwei Knöpfe, dieselbe Funktion:** Liegt dieselbe Funktion auf zwei Buttons eines Solo-Containers (z. B. einmal allein, einmal zusammen mit einer zweiten Funktion), entscheidet über sie allein der Button, den du drückst: Er schaltet sie um, statt dass der andere Button sie erst stoppt und der gedrückte sie sofort neu startet. So lässt sie sich mit **jedem** der beiden Buttons auch wieder ausschalten. Alle **anderen** Funktionen des zweiten Buttons stoppt das Solo wie gewohnt.
 - **Löschen geht mit:** Löschst du ein Element im Container (Kontextmenü „Löschen"), übernimmt der Container das Entfernen. Das ist über die Canvas-Undo-Funktion (Strg+Z) rückgängig zu machen.
 - Der Container selbst lässt sich **nicht** an einen Effekt binden und unterstützt **kein** MIDI-/Tasten-Teach — er ist reiner Behälter. Allgemeine VC-Bedienung (Bearbeiten-Modus, Anlegen, Kontextmenü, Banks) siehe Übersicht (README.md).

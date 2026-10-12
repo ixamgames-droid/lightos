@@ -303,21 +303,41 @@ class SnapListEditor(TargetListEditor):
             pass
 
 
-def _blackout_choices() -> list[tuple[str, str]]:
-    """VCB-11: (Schluessel, Anzeigename) aller Fixture-Gruppen und gepatchten
-    Geraete — ``"g:<Name>"`` bzw. ``"f:<fid>"``. Gruppen zuerst (der Normalfall
-    „diese Seite der Buehne aus"), danach die Geraete nach fid."""
-    out: list[tuple[str, str]] = []
+def _blackout_gruppen() -> list[tuple[int, str, str]]:
+    """VCB-36: ``(id, Name, Ordner)`` aller Fixture-Gruppen; ``[]`` ohne Show-DB."""
     try:
         from sqlalchemy import select
         from src.core.database.models import FixtureGroup
         from src.core.app_state import get_state
         with get_state()._session() as s:
-            namen = sorted({n for n in s.execute(select(FixtureGroup.name)).scalars().all() if n},
-                           key=str.lower)
-        out += [(f"g:{n}", f"Gruppe: {n}") for n in namen]
+            return [(int(g.id), g.name or "", g.folder or "")
+                    for g in s.execute(select(FixtureGroup)).scalars().all()]
     except Exception:
-        pass
+        return []
+
+
+def _blackout_choices() -> list[tuple[str, str]]:
+    """VCB-11: (Schluessel, Anzeigename) aller Fixture-Gruppen und gepatchten
+    Geraete — ``"gi:<Gruppen-ID>"`` bzw. ``"f:<fid>"``. Gruppen zuerst (der
+    Normalfall „diese Seite der Buehne aus"), danach die Geraete nach fid.
+
+    VCB-36: JEDE Gruppe steht einzeln da, mit ihrer ID als Schluessel. Vorher
+    war der Schluessel der Name — zwei Gruppen „PARs“ (Ordner „Front“ und
+    „Back“) fielen zu einem Eintrag zusammen. Der Ordner steht im Anzeigenamen;
+    heissen zwei Gruppen im selben Ordner gleich, unterscheidet sie die Nummer."""
+    out: list[tuple[str, str]] = []
+    gruppen = sorted(_blackout_gruppen(),
+                     key=lambda g: (g[1].lower(), g[2].lower(), g[0]))
+    anzahl: dict[tuple[str, str], int] = {}
+    for _gid, name, ordner in gruppen:
+        anzahl[(name, ordner)] = anzahl.get((name, ordner), 0) + 1
+    for gid, name, ordner in gruppen:
+        text = f"Gruppe: {name or '(ohne Namen)'}"
+        if ordner:
+            text += f"  ({ordner})"
+        if not name or anzahl[(name, ordner)] > 1:
+            text += f"  [#{gid}]"
+        out.append((f"gi:{gid}", text))
     try:
         from src.core.app_state import get_state
         for fx in sorted(get_state().get_patched_fixtures(), key=lambda f: int(f.fid)):
@@ -328,12 +348,36 @@ def _blackout_choices() -> list[tuple[str, str]]:
     return out
 
 
-def blackout_ziel_schluessel(fids, groups) -> list[str]:
-    """VCB-11: (fids, Gruppennamen) -> Zeilen-Schluessel des BlackoutTargetEditor."""
-    out = [f"g:{g}" for g in (groups or []) if g]
+def blackout_ziel_schluessel(fids, groups, group_ids=()) -> list[str]:
+    """VCB-11: Ziel einer Taste -> Zeilen-Schluessel des BlackoutTargetEditor
+    (Gruppen-IDs, dann Gruppennamen aus alten Layouts, dann Geraete).
+
+    VCB-36: ein alter NAME wird zur ID, wenn genau eine Gruppe so heisst —
+    gemeint war dann immer diese, und mit dem naechsten OK speichert die Taste
+    die ID. Heissen mehrere so (oder keine), bleibt der Name stehen: welche
+    gemeint war, kann nur der Bediener sagen."""
+    je_name: dict[str, list[int]] = {}
+    for gid, name, _ordner in _blackout_gruppen():
+        je_name.setdefault(name, []).append(gid)
+    out: list[str] = []
+
+    def dazu(key: str):
+        if key not in out:
+            out.append(key)
+
+    for g in (group_ids or []):
+        try:
+            dazu(f"gi:{int(g)}")
+        except (TypeError, ValueError):
+            continue
+    for name in (groups or []):
+        if not name:
+            continue
+        treffer = je_name.get(str(name), [])
+        dazu(f"gi:{treffer[0]}" if len(treffer) == 1 else f"g:{name}")
     for f in (fids or []):
         try:
-            out.append(f"f:{int(f)}")
+            dazu(f"f:{int(f)}")
         except (TypeError, ValueError):
             continue
     return out
@@ -344,8 +388,9 @@ class BlackoutTargetEditor(TargetListEditor):
     Fixture-Gruppen. Leere Liste = globaler Blackout (Bestandsverhalten).
 
     Gleiche kleine API wie ``TargetListEditor``; die Zeilen-Schluessel sind
-    Strings (``"f:<fid>"`` / ``"g:<Gruppe>"``), ``fids()``/``groups()`` liefern
-    die getrennten Listen fuer die Taste."""
+    Strings: ``"f:<fid>"``, ``"gi:<Gruppen-ID>"`` und — nur noch fuer Namen aus
+    alten Layouts, die sich nicht eindeutig zuordnen lassen — ``"g:<Gruppe>"``.
+    ``fids()``/``group_ids()``/``groups()`` liefern die getrennten Listen."""
 
     def __init__(self, title: str = "Blackout-Ziel", parent=None):
         super().__init__(with_params=False, title=title, parent=parent)
@@ -359,14 +404,26 @@ class BlackoutTargetEditor(TargetListEditor):
     @staticmethod
     def _key(value):
         v = str(value)
-        if not (v.startswith("f:") or v.startswith("g:")) or len(v) < 3:
-            raise ValueError(v)
-        return v
+        for vorsatz in ("gi:", "f:", "g:"):
+            if v.startswith(vorsatz) and len(v) > len(vorsatz):
+                return v
+        raise ValueError(v)
 
     def _fehlt_label(self, value) -> str:
         v = str(value)
-        art = "Gruppe" if v.startswith("g:") else "Gerät"
-        return f"{art}: {v[2:]} (nicht gefunden)"
+        if v.startswith("gi:"):
+            return f"Gruppe #{v[3:]} (nicht gefunden)"
+        if v.startswith("g:"):
+            # VCB-36: ein Name aus einem alten Layout. Eindeutige sind schon zur
+            # ID geworden (``blackout_ziel_schluessel``) — hier steht, warum
+            # dieser es nicht ist.
+            name = v[2:]
+            gleiche = sum(1 for _gid, n, _o in _blackout_gruppen() if n == name)
+            if gleiche > 1:
+                return (f"Gruppe: {name} (mehrdeutig — {gleiche} Gruppen heißen so, "
+                        f"bitte neu wählen)")
+            return f"Gruppe: {name}" if gleiche == 1 else f"Gruppe: {name} (nicht gefunden)"
+        return f"Gerät: {v[2:]} (nicht gefunden)"
 
     def fids(self) -> list[int]:
         out: list[int] = []
@@ -378,5 +435,17 @@ class BlackoutTargetEditor(TargetListEditor):
                     continue
         return out
 
+    def group_ids(self) -> list[int]:
+        """VCB-36: die gewaehlten Gruppen, je ueber ihre ID."""
+        out: list[int] = []
+        for k in self.ids():
+            if k.startswith("gi:"):
+                try:
+                    out.append(int(k[3:]))
+                except ValueError:
+                    continue
+        return out
+
     def groups(self) -> list[str]:
+        """Gruppen-NAMEN aus alten Layouts, die keine eindeutige ID bekamen."""
         return [k[2:] for k in self.ids() if k.startswith("g:")]

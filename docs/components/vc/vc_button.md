@@ -85,8 +85,14 @@ Die Aktion wird im Button-Editor über deutsche Labels
   `LIBRARY_SNAP`; `_snap_prev` merkt vorherige Programmer-Werte für Restore.
 - **Tempo/BPM:** `src/core/engine/bpm_manager` und `tempo_bus` (Freeze/AutoSync/Bus).
 - **Laser:** `state.ensure_laser_output()` (LaserOutputManager) + `palette`.
-- **Solo-Frame:** `vc_frame.VCFrame` ruft `deactivate_for_solo()`, wenn im selben
-  Solo-Container ein anderer Button gedrückt wird.
+- **Solo-Frame:** `vc_frame.VCFrame.on_child_activated` ruft
+  `deactivate_for_solo(activator=…)`, wenn im selben Solo-Container ein anderer
+  Button gedrückt wird. **Ausnahme „gleiche Funktion" (VCB-41):** Funktionen, die
+  der auslösende Button selbst steuert (`activator._all_function_ids()`, nur bei
+  `FunctionToggle`/`FunctionFlash`), fasst der Partner nicht an — sonst stoppte er
+  sie, und der gedrückte Umschalt-Knopf startete sie sofort neu (Ausschalten
+  unmöglich). Über diese Funktionen entscheidet allein der Auslöser; alle anderen
+  Funktionen des Partners werden wie gewohnt gestoppt (ohne Fade-Out).
 - **Serialisierung:** `to_dict()`/`apply_dict()` schreiben/lesen **alle** obigen
   Felder in die `.lshow`-Datei. `apply_dict` castet IDs defensiv auf `int`
   (float-Schutz gegen `executors[float]`-Crash), fällt bei unbekannter Aktion auf

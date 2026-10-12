@@ -15,6 +15,15 @@ from PySide6.QtCore import Qt, QRect, QTimer, Signal
 from PySide6.QtGui import QPainter, QColor, QFont, QPen
 
 
+def _bild_art(msg_type: str):
+    """Welches Element im APC-Bild zu einer Bindung gehoert: "cc", "note" —
+    oder ``None`` fuer Pitchbend (MIDI-10): ein Mackie-/X-Touch-Fader kommt im
+    Bild nicht vor; ihn als Note 0 hervorzuheben waere falsch."""
+    if msg_type == "pitchbend":
+        return None
+    return "cc" if msg_type == "cc" else "note"
+
+
 # ── APC mini Layout (Note-/CC-Nummern) ────────────────────────────────────────
 _CELL = 38
 _GAP = 4
@@ -171,8 +180,13 @@ class MidiTeachDialog(QDialog):
             hint_kinds.append("eine Taste drücken")
         if "cc" in self._accept:
             hint_kinds.append("einen Fader bewegen")
-        info = QLabel("Am APC mini " + " oder ".join(hint_kinds) +
-                      " — oder ein Element im Bild anklicken.")
+        text = ("Am APC mini " + " oder ".join(hint_kinds) +
+                " — oder ein Element im Bild anklicken.")
+        if "pitchbend" in self._accept:
+            # MIDI-10
+            text += (" Motorfader (Mackie Control, X-Touch) senden Pitchbend: "
+                     "einfach den Fader am Pult bewegen.")
+        info = QLabel(text)
         info.setStyleSheet("color:#aaa;")
         info.setWordWrap(True)
         lay.addWidget(info)
@@ -211,7 +225,7 @@ class MidiTeachDialog(QDialog):
             mtype, ch, d1 = current
             self._channel = ch or 0
             self._binding = (mtype, ch, d1)
-            self._view.set_selected("cc" if mtype == "cc" else "note", d1)
+            self._view.set_selected(_bild_art(mtype), d1)
             self._update_status()
 
         # MIDI-Subscribe — Callback laeuft im MidiDispatch-Thread, daher per
@@ -240,6 +254,10 @@ class MidiTeachDialog(QDialog):
                 self._set_binding("cc", msg.channel, msg.data1)
             elif msg.msg_type == "note_on" and msg.data2 > 0 and "note" in self._accept:
                 self._set_binding("note_on", msg.channel, msg.data1)
+            elif msg.msg_type == "pitchbend" and "pitchbend" in self._accept:
+                # MIDI-10: Mackie-/X-Touch-Fader. Kennung ist der Kanal; data1
+                # (untere Bits des Werts) gehoert nicht zur Bindung.
+                self._set_binding("pitchbend", msg.channel, 0)
             # note_off / nicht akzeptierte Typen ignorieren
         except Exception:
             pass
@@ -251,7 +269,7 @@ class MidiTeachDialog(QDialog):
     def _set_binding(self, msg_type: str, channel: int, data1: int):
         self._channel = channel
         self._binding = (msg_type, channel, data1)
-        self._view.set_selected("cc" if msg_type == "cc" else "note", data1)
+        self._view.set_selected(_bild_art(msg_type), data1)
         self._update_status()
 
     def _on_clear(self):
@@ -265,6 +283,10 @@ class MidiTeachDialog(QDialog):
             return
         mtype, ch, d1 = self._binding
         ch_txt = "alle" if not ch else str(ch)
+        if mtype == "pitchbend":            # MIDI-10: keine Nummer
+            self._status.setText(
+                f"Gewählt: Pitchbend-Fader (14 Bit)  ·  Kanal {ch_txt}")
+            return
         kind = "CC / Fader" if mtype == "cc" else "Note / Taste"
         self._status.setText(f"Gewählt: {kind} {d1}  ·  Kanal {ch_txt}")
 

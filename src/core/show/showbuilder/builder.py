@@ -27,7 +27,9 @@ from __future__ import annotations
 import os
 from enum import Enum
 
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+from src.core.qt_plattform import offscreen_fuer_werkzeuge
+
+offscreen_fuer_werkzeuge()      # STAB-34: nie in eine laufende App hinein
 
 from src.core.capability.reflect import get_capabilities
 from .errors import BuildError, did_you_mean

@@ -11,13 +11,15 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QTimer, Signal, QObject
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import QTabWidget
-from src.core.midi.midi_manager import get_midi_manager, MidiMessage, RTMIDI_OK
+from src.core.midi.midi_manager import (
+    get_midi_manager, MidiMessage, RTMIDI_OK, fader_wert, wert14)
 from src.core.midi.midi_mapper import (
     MidiMapping, MidiOutFeedback, get_midi_mapper,
     BUTTON_TOGGLE, BUTTON_FLASH, BUTTON_CONTINUOUS, BUTTON_PRESS,
     normalize_button_mode,
     ACTION_EXECUTOR_GO, ACTION_EXECUTOR_BACK, ACTION_EXECUTOR_FLASH,
-    ACTION_EXECUTOR_FADER, ACTION_PROGRAMMER_VAL, ACTION_GRAND_MASTER, ACTION_NONE
+    ACTION_EXECUTOR_FADER, ACTION_PROGRAMMER_VAL, ACTION_GRAND_MASTER, ACTION_NONE,
+    _binding_type_from_msg_type,
 )
 from src.core.app_state import get_state
 try:
@@ -36,6 +38,13 @@ ACTION_LABELS = {
 }
 
 MAP_COLS = ["Name", "Target", "Typ", "Ch", "D1", "Mode", "ON", "OFF", "Port"]
+
+
+def pitchbend_zeile(msg) -> str:
+    """Zeile des MIDI-Monitors fuer einen Pitchbend (MIDI-10): der 14-Bit-Wert
+    und Prozent statt zweier Datenbytes, die fuer sich nichts sagen."""
+    return (f"PITCH [{msg.port_name[:20]}] CH{msg.channel:2d} "
+            f"Wert={wert14(msg):5d} ({fader_wert(msg) * 100:5.1f} %)")
 
 
 class MidiLogSignal(QObject):
@@ -393,7 +402,7 @@ class MidiView(QWidget):
         # CC-Strom (Fader) auf ~60 Hz drosseln, damit die Qt-Event-Loop nicht überflutet
         # wird. Betrifft nur die Monitor-Anzeige; die Fader-Steuerung im MidiMapper
         # bleibt ungedrosselt.
-        if msg.msg_type == "cc":
+        if msg.msg_type in ("cc", "pitchbend"):     # MIDI-10: Motorfader ebenso
             now = time.monotonic()
             if now - self._last_monitor_emit < 0.015:
                 return
@@ -402,6 +411,9 @@ class MidiView(QWidget):
 
     def _on_midi_msg_ui(self, msg: MidiMessage):
         # Läuft thread-sicher im GUI-Thread (queued Signal aus _on_midi_msg).
+        if msg.msg_type == "pitchbend":             # MIDI-10
+            self._console.appendPlainText(pitchbend_zeile(msg))
+            return
         prefixes = {
             "cc":       "CC   ",
             "note_on":  "NOTE+",
@@ -537,8 +549,10 @@ class MidiView(QWidget):
             m.midi_in.device = m.port_filter
             m.midi_in.channel = m.channel
             m.midi_in.trigger_id = m.data1
-            m.midi_in.message_type = "cc" if m.msg_type == "cc" else "note"
-            if m.midi_out:
+            # MIDI-10: "pitchbend" in der Spalte Typ bleibt Pitchbend.
+            m.midi_in.message_type = _binding_type_from_msg_type(m.msg_type)
+            if m.midi_out and m.msg_type != "pitchbend":
+                # (MIDI-10: ein Pitchbend-Fader hat keine LED mit seiner Nummer)
                 if m.midi_out.trigger_id < 0:
                     m.midi_out.trigger_id = m.data1
                 m.midi_out.channel = m.channel
@@ -558,8 +572,10 @@ class MidiView(QWidget):
         # QueuedConnection auf dem GUI-Thread. Frueher lief der Handler direkt im
         # MIDI-Thread und oeffnete dort einen MODALEN QInputDialog + mutierte die
         # Mapping-Tabelle (Cross-Thread-Qt, Absturzgefahr).
+        # MIDI-10: die Mapping-Tabelle kann Pitchbend-Fader (Mackie, X-Touch).
         self._mapper.start_learn(
-            lambda msg: self._log_signal.learn_received.emit(msg))
+            lambda msg: self._log_signal.learn_received.emit(msg),
+            pitchbend=True)
 
     def _on_learn_received(self, msg: MidiMessage):
         row = self._learn_target_row
@@ -568,6 +584,13 @@ class MidiView(QWidget):
             return
         m = mappings[row]
         m.set_from_learn_message(msg)
+        if msg.msg_type == "pitchbend":
+            # MIDI-10: ein Fader ohne Nummer und ohne LED — keine Frage nach
+            # Velocity ON/OFF; der Typ in der Tabelle heisst "pitchbend".
+            self._refresh_map_table()
+            self._append_log(
+                f"✓ Learn: Pitchbend-Fader CH{msg.channel} (14 Bit)")
+            return
         self._prompt_feedback_values(m)
         self._refresh_map_table()
         self._append_log(f"✓ Learn: {msg.msg_type} CH{msg.channel} D1={msg.data1}")
@@ -580,6 +603,13 @@ class MidiView(QWidget):
         row = list(rows)[0]
         mappings = self._mapper.get_mappings()
         if row < 0 or row >= len(mappings):
+            return
+        if mappings[row].msg_type == "pitchbend":      # MIDI-10
+            QMessageBox.information(
+                self, "Feedback",
+                "Ein Pitchbend-Fader hat keine LED, die sich über Velocity "
+                "schalten lässt.\nDas Nachführen von Motorfadern ist ein "
+                "eigener Punkt (MIDI-14).")
             return
         self._prompt_feedback_values(mappings[row])
         self._refresh_map_table()

@@ -1,4 +1,4 @@
-"""Output-Konfigurations-Dialog (Enttec / Art-Net / sACN / Universe-Manager)."""
+"""Output-Konfigurations-Dialog (Enttec / uDMX / Art-Net / sACN / Universe-Manager)."""
 from __future__ import annotations
 import json
 import os
@@ -13,6 +13,7 @@ import serial.tools.list_ports
 from src.core.app_state import get_state
 from src.core.paths import user_data_file
 from src.core.dmx.enttec_pro import EnttecPro, ENTTEC_VID, ENTTEC_PID
+from src.core.dmx import anschluss_auswahl
 
 # ⚠️ Umlenkbar — und das ist keine Test-Bequemlichkeit, sondern Datenschutz.
 #
@@ -75,6 +76,34 @@ def _ext_universe_bereich(typ) -> tuple[int, int] | None:
     dort eingetragenen Wert dann weder klemmen noch melden, s. `_coerce_ext_universe`.
     """
     return _EXT_UNIVERSE_BEREICHE.get((typ or "").strip())
+
+
+#: Ausgabetypen der Universen-Tabelle — genau die Texte, die in
+#: ``universes.json`` stehen und die ``apply_output_config`` vergleicht.
+#: OUT-68: ``uDMX`` ergaenzt; alle anderen unveraendert an ihrer Stelle.
+AUSGABE_TYPEN = ("Disabled", "Enttec", "uDMX", "sACN", "ArtNet")
+
+
+def _udmx_suchen() -> dict:
+    """OUT-68: uDMX-Adapter aufzaehlen — laeuft in einem HILFS-THREAD.
+
+    Das Aufzaehlen liest USB-Beschreibungen (mit Zeitlimit) und gehoert deshalb
+    nicht in den UI-Thread. Zurueck kommen nur einfache Daten, kein
+    Geraete-Objekt: ``{"geraete": [(beschriftung, schluessel)], "unklar": n,
+    "code": G_*, "text": str}``.
+    """
+    from src.core.dmx import udmx
+    try:
+        geraete = udmx.liste_geraete()
+    except udmx.UdmxFehler as e:
+        return {"geraete": [], "unklar": 0, "code": e.code, "text": str(e)}
+    except Exception as e:                               # noqa: BLE001
+        return {"geraete": [], "unklar": 0, "code": udmx.G_ANTWORTET_NICHT,
+                "text": f"Adapter-Suche gescheitert: {type(e).__name__}: {e}"}
+    return {"geraete": [(g.beschriftung(), g.schluessel)
+                        for g in geraete if g.bestaetigt],
+            "unklar": sum(1 for g in geraete if not g.bestaetigt),
+            "code": udmx.G_OK, "text": ""}
 
 
 def _list_ifaces() -> list:
@@ -153,7 +182,7 @@ def _effektives_universum(typ: str, num: int, extern) -> int | None:
     (``enttec.send_dmx(data)`` ohne Universum). Zwei Zeilen auf demselben Port
     kollidieren deshalb IMMER — ihre internen Nummern sind dafuer bedeutungslos.
     """
-    if typ == "Enttec":
+    if typ in ("Enttec", "uDMX"):     # OUT-68: uDMX sendet wie Enttec ohne Nummer
         return None
     if extern is not None:
         return int(extern)
@@ -488,8 +517,24 @@ class OutputConfigDialog(QDialog):
         ef = QFormLayout(enttec_tab)
 
         self._combo_port = QComboBox()
+        # OUT-73: Anschluesse ohne USB-Geraet (leere ttyS…, COM1, Bluetooth)
+        # stehen nur auf Wunsch in der Liste — der Haken und die Hinweiszeile
+        # muessen VOR dem ersten `_refresh_ports` existieren.
+        self._check_alle_ports = QCheckBox("Alle Anschlüsse zeigen")
+        self._check_alle_ports.setToolTip(
+            "Zeigt auch serielle Anschlüsse, hinter denen kein USB-Gerät\n"
+            "erkannt wird (eingebaute Schnittstelle, Bluetooth, leere\n"
+            "Anschlüsse). Ein Enttec Pro ist ein USB-Gerät und steht auch\n"
+            "ohne diesen Haken in der Liste.")
+        self._lbl_port_hinweis = QLabel("")
+        self._lbl_port_hinweis.setWordWrap(True)
         self._refresh_ports()
         ef.addRow("COM-Port:", self._combo_port)
+        ef.addRow("", self._check_alle_ports)
+        ef.addRow("", self._lbl_port_hinweis)
+        # Parameterlose Bound-Methods, s. Begruendung beim Knopf darunter.
+        self._check_alle_ports.toggled.connect(self._ports_neu_einlesen)
+        self._combo_port.currentIndexChanged.connect(self._port_hinweis_nachziehen)
 
         refresh_btn = QPushButton("Ports aktualisieren")
         # ★ Bewusst eine parameterlose Bound-Method statt eines Lambdas — aus
@@ -535,6 +580,40 @@ class OutputConfigDialog(QDialog):
         ef.addRow("Status:", self._lbl_enttec_status)
 
         tabs.addTab(enttec_tab, "Enttec Pro USB")
+
+        # ── uDMX Tab (OUT-68) ─────────────────────────────────────────────────
+        udmx_tab = QWidget()
+        xf = QFormLayout(udmx_tab)
+        self._combo_udmx = QComboBox()
+        self._combo_udmx.addItem("Noch nicht gesucht", "")
+        xf.addRow("Adapter:", self._combo_udmx)
+        udmx_such_btn = QPushButton("Adapter suchen")
+        udmx_such_btn.clicked.connect(self._udmx_suche_knopf)
+        xf.addRow("", udmx_such_btn)
+        self._spin_udmx_univ = QSpinBox()
+        self._spin_udmx_univ.setRange(1, 32)
+        xf.addRow("Universe:", self._spin_udmx_univ)
+        udmx_btn = QPushButton("Verbinden")
+        udmx_btn.clicked.connect(self._connect_udmx)
+        self._lbl_udmx_status = QLabel("Nicht verbunden")
+        self._lbl_udmx_status.setWordWrap(True)
+        xf.addRow("", udmx_btn)
+        xf.addRow("Status:", self._lbl_udmx_status)
+        # Erklaerender Hinweis bei fehlender Berechtigung / fehlendem Treiber /
+        # fehlendem pyusb — der Satz kommt aus `udmx.grund_text`, damit Dialog,
+        # Diagnosepaket und Anleitung dasselbe sagen.
+        self._lbl_udmx_hinweis = QLabel(
+            "uDMX-Adapter (z. B. Anyma uDMX, CYL-6602 „USB-DMX512“) hängen "
+            "direkt am USB, ohne COM-Port. Ein Adapter trägt ein Universum.")
+        self._lbl_udmx_hinweis.setWordWrap(True)
+        self._lbl_udmx_hinweis.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse)
+        xf.addRow(self._lbl_udmx_hinweis)
+        tabs.addTab(udmx_tab, "uDMX (USB)")
+        self._udmx_tab_index = tabs.indexOf(udmx_tab)
+        self._udmx_gesucht = False
+        self._udmx_such_thread = None
+        tabs.currentChanged.connect(self._tab_gewechselt)
 
         # ── Art-Net Tab ───────────────────────────────────────────────────────
         artnet_tab = QWidget()
@@ -718,7 +797,7 @@ class OutputConfigDialog(QDialog):
         uf = QVBoxLayout(univ_tab)
         uf.addWidget(QLabel(
             "Universen verwalten - bis zu 32 Universen.\n"
-            "Pro Universe: Name, Output-Typ (Disabled / Enttec / sACN / ArtNet), "
+            "Pro Universe: Name, Output-Typ (Disabled / Enttec / uDMX / sACN / ArtNet), "
             "Patch-Adresse, optionale externe Universe-Nummer."
         ))
         self._univ_table = QTableWidget(0, 5)
@@ -807,6 +886,16 @@ class OutputConfigDialog(QDialog):
                 self._lbl_enttec_status.setText(
                     f"Gespeichert: {port} → Universe {num}")
 
+        # ── uDMX (OUT-68) ─────────────────────────────────────────────────────
+        udmx_zeile = _gespeicherte_ausgabe_zeile("uDMX")
+        if udmx_zeile is not None:
+            num = int(udmx_zeile.get("num", 1))
+            schluessel = _patch_text(udmx_zeile)
+            self._spin_udmx_univ.setValue(num)
+            self._udmx_adapter_waehlen(schluessel, "gespeichert")
+            self._lbl_udmx_status.setText(
+                f"Gespeichert: {schluessel or 'einziger Adapter'} → Universe {num}")
+
         # ── Art-Net ───────────────────────────────────────────────────────────
         artnet = _gespeicherte_ausgabe_zeile("ArtNet")
         if artnet is not None:
@@ -872,20 +961,59 @@ class OutputConfigDialog(QDialog):
         Port da, und „Verbinden" nahm ihn. Jetzt gewinnt in dieser Reihenfolge:
         ein ausdruecklich uebergebener Port, sonst die aktuelle Auswahl, sonst
         der in ``universes.json`` gespeicherte.
+
+        OUT-73: und wenn es keinen davon gibt — frischer Datenordner — NICHT
+        mehr der erste Eintrag des Betriebssystems. Das war auf einem
+        Linux-Rechner ein ``/dev/ttyS…`` ohne Geraet, unter Windows ``COM1``:
+        „Verbinden" richtete einen toten Anschluss ein und speicherte ihn, der
+        eingesteckte Enttec blieb ohne Universum. Jetzt steht der erkannte
+        Adapter oben und ist vorgewaehlt; Anschluesse ohne USB-Geraet stehen nur
+        mit „Alle Anschlüsse zeigen" in der Liste. Ohne erkannten Adapter bleibt
+        die Auswahl leer (Regeln in ``anschluss_auswahl``).
         """
         aktuell = (bevorzugt or self._combo_port.currentData()
                    or _gespeicherter_enttec_port())
-        self._combo_port.clear()
-        for p in serial.tools.list_ports.comports():
-            label = f"{p.device}"
-            if p.description:
-                label += f"  —  {p.description}"
-            if p.vid == ENTTEC_VID and p.pid == ENTTEC_PID:
-                label += "  [Enttec Pro]"
-            self._combo_port.addItem(label, p.device)
-        self._enttec_port_waehlen(aktuell)
-        if self._combo_port.count() == 0:
-            self._combo_port.addItem("Kein Port gefunden", "")
+        alle_zeigen = self._check_alle_ports.isChecked()
+        anschluesse = anschluss_auswahl.ordnen(
+            serial.tools.list_ports.comports())
+        self._anschluesse = anschluesse
+        # Der Neuaufbau meldet jede Zwischenauswahl — die Hinweiszeile wird
+        # einmal am Ende gesetzt, nicht je Eintrag.
+        war_blockiert = self._combo_port.blockSignals(True)
+        try:
+            self._combo_port.clear()
+            for a in anschluss_auswahl.sichtbare(
+                    anschluesse, alle_zeigen, immer=(aktuell,)):
+                self._combo_port.addItem(a.text, a.device)
+            if aktuell:
+                self._enttec_port_waehlen(aktuell)
+            else:
+                vorschlag = anschluss_auswahl.vorschlag(anschluesse)
+                if vorschlag:
+                    self._enttec_port_waehlen(vorschlag)
+                elif self._combo_port.count():
+                    # Nur fremde USB-Geraete (oder, mit Haken, Anschluesse ohne
+                    # Geraet): keinen davon von selbst waehlen.
+                    self._combo_port.insertItem(0, "— Anschluss wählen —", "")
+                    self._combo_port.setCurrentIndex(0)
+            if self._combo_port.count() == 0:
+                self._combo_port.addItem("Kein Port gefunden", "")
+        finally:
+            self._combo_port.blockSignals(war_blockiert)
+        self._port_hinweis_nachziehen()
+
+    def _port_hinweis_nachziehen(self):
+        """OUT-73: die Zeile unter der Portliste (leer = unsichtbar).
+
+        Rechnet mit der zuletzt eingelesenen Liste — ein Wechsel der Auswahl
+        fragt das Betriebssystem nicht neu ab.
+        """
+        text = anschluss_auswahl.hinweis(
+            getattr(self, "_anschluesse", ()),
+            self._combo_port.currentData() or "",
+            self._check_alle_ports.isChecked())
+        self._lbl_port_hinweis.setText(text)
+        self._lbl_port_hinweis.setVisible(bool(text))
 
     def _enttec_port_waehlen(self, port: str | None):
         """Einen Port in der Liste auswaehlen; fehlt er, ihn sichtbar machen.
@@ -1016,6 +1144,180 @@ class OutputConfigDialog(QDialog):
             self._lbl_enttec_status.setText(
                 f"Eingerichtet: {port} → Universe {univ} (gespeichert)")
 
+    # ── OUT-68: uDMX-Adapter ─────────────────────────────────────────────────
+
+    def _tab_gewechselt(self, index: int):
+        """Beim ERSTEN Oeffnen des uDMX-Reiters von selbst suchen — nicht schon
+        beim Dialogbau: wer nur Art-Net einstellt, soll keinen USB-Zugriff
+        ausloesen."""
+        if index == getattr(self, "_udmx_tab_index", -1) and not self._udmx_gesucht:
+            self._udmx_suche_starten()
+
+    def _udmx_suche_knopf(self):
+        self._udmx_suche_starten()
+
+    def _udmx_suche_starten(self):
+        """Adapter im Hilfs-Thread aufzaehlen; das Ergebnis holt ein Timer ab.
+
+        Der Thread bekommt nur ein Ergebnis-Dict, nie ``self`` — er darf den
+        Dialog ueberleben, ohne ein Qt-Objekt anzufassen."""
+        import threading
+        t = self._udmx_such_thread
+        if t is not None and t.is_alive():
+            return
+        self._udmx_gesucht = True
+        self._lbl_udmx_status.setText("Suche Adapter …")
+        ergebnis: dict = {}
+        self._udmx_such_ergebnis = ergebnis
+
+        def lauf(ziel=ergebnis):
+            ziel.update(_udmx_suchen())
+
+        self._udmx_such_thread = threading.Thread(
+            target=lauf, name="UdmxSuche", daemon=True)
+        self._udmx_such_thread.start()
+        timer = getattr(self, "_udmx_such_timer", None)
+        if timer is None:
+            timer = QTimer(self)
+            timer.setInterval(100)
+            timer.timeout.connect(self._udmx_suche_abholen)
+            self._udmx_such_timer = timer
+        timer.start()
+
+    def _udmx_suche_abholen(self):
+        t = self._udmx_such_thread
+        if t is not None and t.is_alive():
+            return
+        timer = getattr(self, "_udmx_such_timer", None)
+        if timer is not None:
+            timer.stop()
+        self._udmx_liste_zeigen(getattr(self, "_udmx_such_ergebnis", None) or {})
+
+    def _udmx_liste_zeigen(self, ergebnis: dict):
+        """Suchergebnis in die Auswahl uebernehmen — ohne die Auswahl zu
+        verlieren (gleiche Regel wie ``_refresh_ports``)."""
+        from src.core.dmx import udmx
+        aktuell = self._combo_udmx.currentData() or _patch_text(
+            _gespeicherte_ausgabe_zeile("uDMX") or {})
+        geraete = list(ergebnis.get("geraete") or [])
+        self._combo_udmx.clear()
+        for beschriftung, schluessel in geraete:
+            self._combo_udmx.addItem(beschriftung, schluessel)
+        if aktuell:
+            self._udmx_adapter_waehlen(aktuell, "derzeit nicht gefunden")
+        code = int(ergebnis.get("code") or udmx.G_OK)
+        if code != udmx.G_OK:
+            if self._combo_udmx.count() == 0:
+                self._combo_udmx.addItem("Keine Adapter-Suche möglich", "")
+            self._lbl_udmx_status.setText("Adapter-Suche nicht möglich")
+            self._lbl_udmx_hinweis.setText(str(ergebnis.get("text") or
+                                               udmx.grund_text(code)))
+            return
+        if not geraete:
+            if self._combo_udmx.count() == 0:
+                self._combo_udmx.addItem("Kein Adapter gefunden", "")
+            self._lbl_udmx_status.setText("Kein uDMX-Adapter gefunden")
+            hinweis = "Kein uDMX-Adapter gefunden — eingesteckt?"
+            if ergebnis.get("unklar"):
+                hinweis = udmx.grund_text(udmx.G_NAME_UNKLAR)
+            elif os.name == "nt":
+                hinweis += " " + udmx.rechte_hinweis()
+            self._lbl_udmx_hinweis.setText(hinweis)
+            return
+        self._lbl_udmx_status.setText(
+            f"{len(geraete)} Adapter gefunden — „Verbinden“ richtet ihn ein")
+        self._lbl_udmx_hinweis.setText(
+            udmx.grund_text(udmx.G_NAME_UNKLAR) if ergebnis.get("unklar") else "")
+
+    def _udmx_adapter_waehlen(self, schluessel: str, zusatz: str):
+        """Einen Adapter auswaehlen; fehlt er in der Liste, sichtbar anhaengen
+        statt still auf den ersten zu fallen (wie ``_enttec_port_waehlen``)."""
+        if not schluessel:
+            return
+        i = self._combo_udmx.findData(schluessel)
+        if i < 0:
+            self._combo_udmx.addItem(f"{schluessel} — {zusatz}", schluessel)
+            i = self._combo_udmx.count() - 1
+        self._combo_udmx.setCurrentIndex(i)
+
+    def _connect_udmx(self):
+        schluessel = self._combo_udmx.currentData()
+        if not schluessel:
+            self._lbl_udmx_status.setText(
+                "Kein Adapter gewählt — erst „Adapter suchen“")
+            return
+        univ = self._spin_udmx_univ.value()
+        state = get_state()
+        om = state.output_manager
+        if univ not in state.universes:
+            state.universes[univ] = om.add_universe(univ)
+        try:
+            # MU-01: erst ALLE Alt-Adapter dieses Universums entfernen.
+            om.remove_output(univ)
+            # Oeffnet nichts im UI-Thread: add_udmx startet nur den Sender.
+            om.add_udmx(univ, schluessel)
+            gespeichert = _persist_output(univ, "uDMX", schluessel)
+            self._univ_tabelle_nachladen()
+            self._lbl_udmx_status.setText(
+                f"Eingerichtet: {schluessel} → Universe {univ} "
+                f"{'(gespeichert)' if gespeichert else '(NICHT gespeichert!)'}, "
+                f"verbinde …")
+            self._udmx_pruef_univ = univ
+            self._udmx_pruef_versuche = 0
+            self._udmx_status_pruefen_spaeter()
+        except Exception as e:
+            self._lbl_udmx_status.setText(f"Fehler: {e}")
+
+    def _udmx_status_pruefen_spaeter(self, ms: int = 900):
+        t = getattr(self, "_udmx_pruef_timer", None)
+        if t is None:
+            t = QTimer(self)
+            t.setSingleShot(True)
+            t.timeout.connect(self._udmx_status_nachtragen)
+            self._udmx_pruef_timer = t
+        t.start(ms)
+
+    def _udmx_status_nachtragen(self):
+        """Meldet, ob der eben eingerichtete Adapter WIRKLICH sendet — und wenn
+        nicht, warum (Berechtigung, Treiber, pyusb, abgezogen)."""
+        from src.core.dmx.output_manager import (
+            geraet_zustand, ZUSTAND_SENDET, ZUSTAND_VERBINDET)
+        univ = getattr(self, "_udmx_pruef_univ", None)
+        if univ is None:
+            return
+        try:
+            dev = get_state().output_manager._udmx_outputs.get(univ)
+        except Exception:
+            dev = None
+        if dev is None:
+            return
+        zustand = geraet_zustand(dev)
+        wer = getattr(dev, "port", "") or "Adapter"
+        if zustand == ZUSTAND_VERBINDET:
+            self._udmx_pruef_versuche += 1
+            if self._udmx_pruef_versuche < self._MAX_PRUEF_VERSUCHE:
+                self._udmx_status_pruefen_spaeter()
+                return
+            self._lbl_udmx_status.setText(
+                f"{wer} → Universe {univ}: antwortet nicht — Adapter/Kabel prüfen")
+            return
+        if zustand == ZUSTAND_SENDET:
+            self._lbl_udmx_status.setText(
+                f"Verbunden: {wer} → Universe {univ} (gespeichert)")
+            self._lbl_udmx_hinweis.setText("")
+            return
+        grund = ""
+        f = getattr(dev, "grund_text", None)
+        if callable(f):
+            try:
+                grund = str(f() or "")
+            except Exception:
+                grund = ""
+        self._lbl_udmx_status.setText(
+            f"{wer} → Universe {univ}: sendet nicht — gespeichert, aber es "
+            f"geht kein DMX raus")
+        self._lbl_udmx_hinweis.setText(grund or "Adapter prüfen und neu einstecken.")
+
     def _sync_artnet_start_univ_default(self):
         """A3D-15: die Startuniversum-Spinbox auf einen sinnvollen Wert fuer das
         aktuell gewaehlte interne Universum stellen — eine bereits gespeicherte
@@ -1115,7 +1417,7 @@ class OutputConfigDialog(QDialog):
             self._univ_table.setItem(i, 0, num_item)
             self._univ_table.setItem(i, 1, QTableWidgetItem(str(r.get("name", "Universe"))))
             combo = QComboBox()
-            for opt in ("Disabled", "Enttec", "sACN", "ArtNet"):
+            for opt in AUSGABE_TYPEN:
                 combo.addItem(opt)
             combo.setCurrentText(str(r.get("output", "Disabled")))
             self._univ_table.setCellWidget(i, 2, combo)
@@ -1135,7 +1437,7 @@ class OutputConfigDialog(QDialog):
         self._univ_table.setItem(row, 0, QTableWidgetItem(str(row + 1)))
         self._univ_table.setItem(row, 1, QTableWidgetItem(f"Universe {row + 1}"))
         combo = QComboBox()
-        for opt in ("Disabled", "Enttec", "sACN", "ArtNet"):
+        for opt in AUSGABE_TYPEN:
             combo.addItem(opt)
         self._univ_table.setCellWidget(row, 2, combo)
         self._univ_table.setItem(row, 3, QTableWidgetItem(""))

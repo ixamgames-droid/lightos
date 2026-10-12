@@ -1829,12 +1829,33 @@ class RgbMatrixView(QWidget):
 
     # ── Draft / Dirty-State ───────────────────────────────────────────────────
 
+    #: UI-80: Felder der Function-Basis, die NICHT dieser Editor bearbeitet.
+    #: ``speed``/``intensity`` setzen die VC-Regler „Effekt-Tempo" und
+    #: „Effekt-Helligkeit" am laufenden Effekt, ``folder`` die Bibliothek. Der
+    #: Entwurf uebernimmt sie (die Vorschau laeuft so schnell wie der echte
+    #: Effekt), aber sie zaehlen nicht als Aenderung und werden beim Speichern
+    #: nicht zurueckgeschrieben (``apply_dict`` fasst sie nicht an).
+    _FREMDE_BASISFELDER = ("speed", "intensity", "folder")
+
     def _make_draft(self):
         """Erzeugt einen Draft (Arbeitskopie) aus self._saved."""
         if self._saved is None:
             self._current = None
         else:
             self._current = RgbMatrixInstance.from_dict(self._saved.to_dict())
+            for feld in self._FREMDE_BASISFELDER:
+                setattr(self._current, feld, getattr(self._saved, feld))
+
+    def _editor_dict(self, inst) -> dict:
+        """Was der Editor an ``inst`` bearbeiten kann — der Massstab fuer
+        „ungespeicherte Aenderungen". Ohne die fremden Basisfelder: ein
+        VC-Regler, der das Tempo der Matrix veraendert, ist keine Aenderung
+        im Editor (UI-80: sonst stand der Hinweis an jeder Matrix mit
+        Regler-Tempo ungleich 1, und „Speichern" bekam ihn nie weg)."""
+        d = inst.to_dict()
+        for feld in self._FREMDE_BASISFELDER:
+            d.pop(feld, None)
+        return d
 
     def _save_edit(self):
         """Kopiert alle editierbaren Felder vom Draft in die gespeicherte Instanz."""
@@ -1871,7 +1892,7 @@ class RgbMatrixView(QWidget):
         dirty = (
             self._saved is not None
             and self._current is not None
-            and self._current.to_dict() != self._saved.to_dict()
+            and self._editor_dict(self._current) != self._editor_dict(self._saved)
         )
         self._dirty_lbl.setText("● ungespeicherte Änderungen" if dirty else "")
         self._btn_save.setEnabled(dirty)

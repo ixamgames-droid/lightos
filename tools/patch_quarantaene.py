@@ -21,6 +21,17 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+# TOOL-19: dieses Werkzeug arbeitet bewusst auf der ECHTEN Show-DB — aber es
+# gibt kein Licht aus. Ohne die beiden Schalter richtete get_state() die echte
+# Ausgabe-Konfiguration ein (Enttec-Port offen) und startete den Sende-Thread:
+# ein Wartungslauf haette am Rig DMX gesendet. Die Wegwerfdatei wird nie angelegt.
+import tempfile                                                      # noqa: E402
+os.environ.setdefault("LIGHTOS_NO_OUTPUT_THREAD", "1")
+os.environ.setdefault(
+    "LIGHTOS_UNIVERSES_JSON",
+    os.path.join(tempfile.gettempdir(),
+                 f"lightos_quarantaene_{os.getpid()}_universes.json"),
+)
 
 from src.core.show import patch_dedup                                # noqa: E402
 
