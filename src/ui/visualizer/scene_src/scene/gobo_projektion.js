@@ -71,10 +71,23 @@ export const GOBO_FLACH_HELL = 0.8;
 /** Buehnen-Elemente bis zu dieser mittleren Kantenlaenge (m) koennen fuer ein
  *  Gobo-Muster "schmal" sein (Traverse, Stuetze, kleines Podest). */
 export const GOBO_SCHMAL_MAX = 1.2;
-/** So weit (m) unter der Flaeche, auf der der Kegel endet, endet auch die
- *  Projektion. Die Luft faengt den Versatz der Schattenmatrix waehrend einer
- *  Kopfbewegung ab (sie ist hoechstens ein Bild alt). */
-export const GOBO_GRENZE_LUFT = 0.25;
+/** VIZ-102: Reichweite der Projektion entlang der Lichtachse.
+ *
+ *  B3 schnitt die Projektion an der Buehnenkante ab. Jetzt laeuft sie ueber
+ *  Kanten weiter (die Buehne wirft ihren Schatten), gehoert aber zum KEGEL:
+ *
+ *   * `quadrat`: Achsabstand des fernen Kegelrands auf der getroffenen
+ *     Flaeche. Bis dahin volle Staerke (das Muster auf seiner Flaeche bleibt,
+ *     wie es war); was tiefer faellt (Hallenboden hinter der Kante), wird mit
+ *     dem Abstandsquadrat schwaecher — es ist dort nie heller als oben.
+ *   * `reich`: so weit reicht der sichtbare Kegel (mindestens `quadrat`).
+ *     Dahinter blendet die Projektion bis GOBO_AUSBLENDE x `reich` weich aus:
+ *     kein Muster ohne Strahl, auch wenn der Kegel an seiner Grundlaenge
+ *     endet.
+ */
+export const GOBO_AUSBLENDE = 1.15;
+/** "Keine Grenze" (kein Auftreffpunkt, Licht ohne Gobo). */
+export const GOBO_FERN_AUS = 1e6;
 
 /** Ein Zeitschritt der Blende: `anteil` (0..1) laeuft linear auf `ziel`. */
 export function goboBlendeSchritt(anteil, ziel, dtMs, dauerMs = GOBO_BLENDE_MS) {
@@ -108,26 +121,167 @@ export function goboSchmal(groesse, durchmesser) {
   return k[1] < Math.min(GOBO_SCHMAL_MAX, durchmesser);
 }
 
-/** Grenzebene der Projektion in den Koordinaten des Schattenlichts.
+/** VIZ-102: Reichweiten-Paar [quadrat, reich] eines projizierenden Lichts.
+ *  Unbrauchbare Werte: keine Grenze. */
+export function goboFern(quadrat, reich) {
+  const ok = (v) => v > 0 && isFinite(v) && v < 90;
+  if (!ok(quadrat)) return [GOBO_FERN_AUS, GOBO_FERN_AUS];
+  return [quadrat, ok(reich) ? Math.max(quadrat, reich) : GOBO_FERN_AUS];
+}
+
+/** Faktor, den der Shader bei Achsabstand `w` anlegt (Test-Seam, dieselbe
+ *  Rechnung wie GOBO_GLSL_MASKE). */
+export function goboFernFaktor(fern, w) {
+  const q = fern[0] / Math.max(w, 0.0001);
+  const a = fern[1], b = fern[1] * GOBO_AUSBLENDE;
+  const t = Math.max(0, Math.min(1, (w - a) / (b - a)));
+  return Math.min(1, q * q) * (1 - t * t * (3 - 2 * t));
+}
+
+// ── VIZ-102: Kante der getroffenen Oberseite ────────────────────────────────
+// `kante` beschreibt die Oberseite eines Buehnenkoerpers als gedrehtes
+// Rechteck in der Welt: Mitte (cx, cz), halbe Kanten (hx, hz), Drehung um y
+// als (c, s) = (cos, sin), Hoehe y. Lokale x-Achse = (c, -s), z-Achse = (s, c).
+
+/** Abstand (m) des Punkts (x, z) zur naechsten Kante, von innen gemessen;
+ *  negativ = ausserhalb. */
+export function kantenAbstand(kante, x, z) {
+  const dx = x - kante.cx, dz = z - kante.cz;
+  const lx = dx * kante.c - dz * kante.s;
+  const lz = dx * kante.s + dz * kante.c;
+  return Math.min(kante.hx - Math.abs(lx), kante.hz - Math.abs(lz));
+}
+
+/** Wie weit ragt ein Muster mit Radius `radius` um den Auftreffpunkt ueber
+ *  die Kante (0 = ganz auf der Flaeche, 1 = Mitte auf der Kante)? Weich
+ *  (smoothstep): daran haengt die Kegellaenge, sie soll nicht springen. */
+export function goboUeberhang(randAbstand, radius) {
+  if (!(radius > 0) || typeof randAbstand !== 'number' || !isFinite(randAbstand)) return 0;
+  const u = Math.max(0, Math.min(1, 1 - randAbstand / radius));
+  return u * u * (3 - 2 * u);
+}
+
+// Groesster Winkel (rad) eines Randstrahls zur Senkrechten, mit dem gerechnet
+// wird — flacher trifft er die Flaeche erst in beliebiger Ferne.
+const FLACH_DACH = 1.45;
+
+/** Fussabdruck eines geneigten Kegels auf einer waagerechten Flaeche: wie weit
+ *  reicht er vom Auftreffpunkt der Achse aus in acht Richtungen?
  *
- *  Welt-Ebene y >= `y` - GOBO_GRENZE_LUFT, als Zeilenvektor n = (0, 1, 0, -y').
- *  Der Shader kennt nur `vSpotShadowCoord = M * welt`; n * welt ist dort
- *  (n * M^-1) * vSpotShadowCoord — exakt, ohne perspektivische Division.
+ *  Ein geneigter Kegel schneidet die Flaeche in einer Ellipse, die vom Geraet
+ *  WEG viel weiter reicht als zu ihm hin (Neigung 42 Grad, halber Winkel 24
+ *  Grad: 5,7 m nach vorn, 1,6 m zurueck). Ob ein Muster ueber eine Kante ragt,
+ *  entscheidet deshalb die Richtung, nicht ein Radius.
  *
- *  @param minv  Elemente der INVERSEN Schattenmatrix (spaltenweise, wie three)
- *  @returns [a, b, c, d], auf den groessten Betrag normiert
+ *  @param dx,dy,dz  Strahlrichtung (normiert, dy < 0 = nach unten)
+ *  @param abstand   Achse: Spitze -> Auftreffpunkt (m)
+ *  @param tanA      Tangens des halben Oeffnungswinkels
+ *  @returns [{dx, dz, weit}] — Richtung in der Flaeche (normiert), Reichweite (m)
  */
-export function goboEbene(minv, y) {
-  const g = y - GOBO_GRENZE_LUFT;
-  const out = [0, 0, 0, 0];
-  let m = 0;
-  for (let j = 0; j < 4; j++) {
-    out[j] = minv[j * 4 + 1] - g * minv[j * 4 + 3];
-    m = Math.max(m, Math.abs(out[j]));
+export function strahlFussabdruck(dx, dy, dz, abstand, tanA) {
+  if (!(abstand > 0) || !(tanA > 0) || !isFinite(abstand) || !isFinite(tanA)) return [];
+  const th = Math.acos(Math.max(-1, Math.min(1, -dy)));
+  if (!(th < FLACH_DACH)) return [];
+  const a = Math.atan(tanA), H = abstand * Math.cos(th);
+  const vor = H * (Math.tan(Math.min(th + a, FLACH_DACH)) - Math.tan(th));
+  const zurueck = H * (Math.tan(th) - Math.tan(th - a));
+  const quer = abstand * tanA;
+  let ux = dx, uz = dz;
+  const l = Math.hypot(ux, uz);
+  if (l > 1e-6) { ux /= l; uz /= l; } else { ux = 1; uz = 0; }
+  const px = -uz, pz = ux;
+  const schraeg = (laengs) => 1 / Math.sqrt(0.5 / (laengs * laengs) + 0.5 / (quer * quer));
+  const w = Math.SQRT1_2;
+  return [
+    { dx: ux, dz: uz, weit: vor }, { dx: -ux, dz: -uz, weit: zurueck },
+    { dx: px, dz: pz, weit: quer }, { dx: -px, dz: -pz, weit: quer },
+    { dx: (ux + px) * w, dz: (uz + pz) * w, weit: schraeg(vor) },
+    { dx: (ux - px) * w, dz: (uz - pz) * w, weit: schraeg(vor) },
+    { dx: (-ux + px) * w, dz: (-uz + pz) * w, weit: schraeg(zurueck) },
+    { dx: (-ux - px) * w, dz: (-uz - pz) * w, weit: schraeg(zurueck) },
+  ];
+}
+
+/** Ueberhang (0..1, weich) eines Fussabdrucks ueber die Kante: je Richtung
+ *  der Weg vom Auftreffpunkt bis zur Kante gegen die Reichweite dorthin. */
+export function goboUeberhangGerichtet(kante, x, z, fuss) {
+  if (!kante || !fuss || !fuss.length) return 0;
+  const ox = x - kante.cx, oz = z - kante.cz;
+  const lx = ox * kante.c - oz * kante.s, lz = ox * kante.s + oz * kante.c;
+  if (Math.abs(lx) >= kante.hx || Math.abs(lz) >= kante.hz) return 1;
+  let u = 0;
+  for (const r of fuss) {
+    if (!(r.weit > 0)) continue;
+    const rx = r.dx * kante.c - r.dz * kante.s, rz = r.dx * kante.s + r.dz * kante.c;
+    let platz = Infinity;
+    if (rx > 1e-9) platz = Math.min(platz, (kante.hx - lx) / rx);
+    else if (rx < -1e-9) platz = Math.min(platz, (-kante.hx - lx) / rx);
+    if (rz > 1e-9) platz = Math.min(platz, (kante.hz - lz) / rz);
+    else if (rz < -1e-9) platz = Math.min(platz, (-kante.hz - lz) / rz);
+    u = Math.max(u, 1 - platz / r.weit);
   }
-  if (!(m > 0) || !isFinite(m)) return [0, 0, 0, 1];
-  for (let j = 0; j < 4; j++) out[j] /= m;
+  u = Math.max(0, Math.min(1, u));
+  return u * u * (3 - 2 * u);
+}
+
+/** Wie lang (m, entlang der Achse) muss der Kegel sein, damit sein FERNER
+ *  Rand die Flaeche unter der Kante erreicht? `untenAbstand` = Achse bis zu
+ *  dieser Flaeche. Senkrecht nach unten ist das genau `untenAbstand`. */
+export function kegelFernLaenge(dy, tanA, untenAbstand) {
+  if (!(untenAbstand > 0) || !isFinite(untenAbstand)) return untenAbstand;
+  const th = Math.acos(Math.max(-1, Math.min(1, -dy)));
+  const a = Math.atan(Math.max(0, tanA) || 0);
+  if (!(th < FLACH_DACH)) return untenAbstand;
+  const H = untenAbstand * Math.cos(th);
+  return Math.max(untenAbstand, H / Math.cos(Math.min(th + a, FLACH_DACH)) * Math.cos(a));
+}
+
+/** VIZ-102: Schattenraum UNTER einer Oberseite, vom Lichtpunkt aus — die
+ *  Pyramide durch die vier Kanten, unterhalb der Oberseite. Der Lichtkegel
+ *  wird darin nicht gezeichnet: was auf der Oberseite auftrifft, endet dort;
+ *  nur was an der Kante vorbeigeht, laeuft weiter.
+ *
+ *  @returns fuenf Ebenen [nx, ny, nz, d] — ein Punkt liegt im Schattenraum,
+ *           wenn n * p + d fuer ALLE fuenf negativ ist (clipIntersection);
+ *           null, wenn das Licht nicht ueber der Oberseite steht.
+ */
+export function schattenPyramide(kante, ax, ay, az) {
+  if (!kante || !(ay - kante.y > 1e-3)) return null;
+  const ecke = (ex, ez) => {
+    const lx = ex * kante.hx, lz = ez * kante.hz;
+    return [kante.cx + lx * kante.c + lz * kante.s, kante.y, kante.cz - lx * kante.s + lz * kante.c];
+  };
+  const e = [ecke(1, 1), ecke(1, -1), ecke(-1, -1), ecke(-1, 1)];
+  const out = [];
+  for (let k = 0; k < 4; k++) {
+    const p = e[k], q = e[(k + 1) % 4];
+    const ux = p[0] - ax, uy = p[1] - ay, uz = p[2] - az;
+    const vx = q[0] - ax, vy = q[1] - ay, vz = q[2] - az;
+    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const l = Math.hypot(nx, ny, nz);
+    if (!(l > 1e-9)) return null;
+    nx /= l; ny /= l; nz /= l;
+    let d = -(nx * ax + ny * ay + nz * az);
+    // Innen (Mitte der Oberseite) negativ.
+    if (nx * kante.cx + ny * kante.y + nz * kante.cz + d > 0) { nx = -nx; ny = -ny; nz = -nz; d = -d; }
+    out.push([nx, ny, nz, d]);
+  }
+  out.push([0, 1, 0, -kante.y]);      // unterhalb der Oberseite negativ
   return out;
+}
+
+/** Schatten der Oberseite auf der Ebene `yUnten`, vom Lichtpunkt (ax, ay, az)
+ *  aus: wieder ein Rechteck gleicher Drehung (zentrische Streckung um den
+ *  Lichtfusspunkt). null, wenn das Licht nicht ueber der Oberseite steht. */
+export function schattenRechteck(kante, ax, ay, az, yUnten) {
+  const oben = ay - kante.y, ganz = ay - yUnten;
+  if (!(oben > 1e-3) || !(ganz > oben)) return null;
+  const k = ganz / oben;
+  if (!isFinite(k) || k > 50) return null;
+  return {
+    cx: ax + (kante.cx - ax) * k, cz: az + (kante.cz - az) * k,
+    hx: kante.hx * k, hz: kante.hz * k, c: kante.c, s: kante.s, y: yUnten,
+  };
 }
 
 // ── Shader-Patch ────────────────────────────────────────────────────────────
@@ -144,6 +298,60 @@ export const GOBO_ANKER =
 // aus (/\[\s*i\s*\]/ -> `[ 0 ]`, `[ 1 ]`, ...). Ein nacktes `i` bliebe stehen.
 // `w` wird nach unten begrenzt: hinter dem Licht waere die Division sonst
 // 0/0 -> NaN, und NaN * 0 (Licht dort ohnehin aus) bliebe NaN.
+// ── VIZ-102: weicher Schattenrand im Gobo-Bild ──────────────────────────────
+// Der Schatten einer Kante (Buehnenplatte, Wuerfel) schneidet hart durch die
+// Motiv-Teile; was die Schattengrenze nur knapp ueberragt, blieb als duenner
+// Keil oder Splitter stehen. Fuer projizierende Lichter liest die Maske die
+// Shadow-Map deshalb an acht Stellen im Umkreis (zwei Ringe) und laesst das
+// Bild dort weich auslaufen, wo ein Teil der Umgebung im Schatten liegt:
+// schmale Reste verschwinden, die Grenze bekommt einen Halbschatten.
+// Als verdeckt zaehlt eine Stelle nur, wenn der Schattenwerfer DEUTLICH
+// naeher am Licht liegt (GOBO_SAUM_TIEFE) — so wirft eine schraeg getroffene
+// Flaeche keinen Scheinschatten auf sich selbst (die Tiefe aendert sich dort
+// ueber den Umkreis um Zentimeter), ein Hindernis mit Abstand aber schon.
+/** Radien der beiden Ringe in Texeln der Shadow-Map. */
+export const GOBO_SAUM_RINGE = [3, 7];
+/** Mindestabstand (m) Schattenwerfer -> Flaeche fuer den weichen Rand. */
+export const GOBO_SAUM_TIEFE = 0.3;
+/** Near-Ebene der Schattenkamera der Pool-Lichter (spot_pool.js#SCHATTEN_NEAR;
+ *  ein Szenen-Test haelt beide gleich). Damit wird GOBO_SAUM_TIEFE in
+ *  Tiefenpuffer-Einheiten umgerechnet: dz = 0,5 * near * dm / w^2 (far >> near). */
+export const GOBO_SCHATTEN_NAH = 0.5;
+/** Anteil unverdeckter Stellen, ab dem das Bild beginnt bzw. voll steht. */
+export const GOBO_SAUM_STUFE = [0.3, 0.9];
+
+function _saumGlsl() {
+  const [r1, r2] = GOBO_SAUM_RINGE;
+  const d = (r2 * Math.SQRT1_2).toFixed(3);
+  const versatz = [
+    [r1.toFixed(1), '0.0'], ['-' + r1.toFixed(1), '0.0'], ['0.0', r1.toFixed(1)], ['0.0', '-' + r1.toFixed(1)],
+    [d, d], ['-' + d, d], [d, '-' + d], ['-' + d, '-' + d],
+  ];
+  const k = (0.5 * GOBO_SCHATTEN_NAH * GOBO_SAUM_TIEFE).toFixed(4);
+  const zeilen = [
+    '\t\t\tif ( receiveShadow && lightosGp.x > 0.0 && lightosGm > 0.0 ) {',
+    '\t\t\t\tvec3 lightosGc = vSpotShadowCoord[ i ].xyz / lightosGw;',
+    '\t\t\t\tfloat lightosGz = lightosGc.z + spotLightShadow.shadowBias - ' + k + ' / ( lightosGw * lightosGw );',
+    '\t\t\t\tvec2 lightosGt = 1.0 / spotLightShadow.shadowMapSize;',
+    '\t\t\t\tfloat lightosGs = 0.0;',
+  ];
+  for (const [x, y] of versatz) {
+    zeilen.push('\t\t\t\tlightosGs += texture2DCompare( spotShadowMap[ i ], lightosGc.xy + vec2( '
+                + x + ', ' + y + ' ) * lightosGt, lightosGz );');
+  }
+  zeilen.push('\t\t\t\tlightosGm *= smoothstep( ' + GOBO_SAUM_STUFE[0].toFixed(2) + ', '
+              + GOBO_SAUM_STUFE[1].toFixed(2) + ', lightosGs * 0.125 );');
+  zeilen.push('\t\t\t}');
+  return zeilen;
+}
+
+/** Dieselbe Rechnung wie im Shader (Test-Seam): `frei` = Zahl der acht
+ *  Stellen, die NICHT verdeckt sind. */
+export function goboSaumFaktor(frei) {
+  const t = Math.max(0, Math.min(1, (frei / 8 - GOBO_SAUM_STUFE[0]) / (GOBO_SAUM_STUFE[1] - GOBO_SAUM_STUFE[0])));
+  return t * t * (3 - 2 * t);
+}
+
 export const GOBO_GLSL_MASKE = [
   '',
   '\t\t{',
@@ -154,16 +362,19 @@ export const GOBO_GLSL_MASKE = [
   '\t\t\tfloat lightosGnr = floor( lightosGp.w + 0.5 );',
   '\t\t\tvec2 lightosGk = vec2( mod( lightosGnr, ' + GOBO_ATLAS_SPALTEN + '.0 ), floor( lightosGnr / ' + GOBO_ATLAS_SPALTEN + '.0 ) );',
   '\t\t\tfloat lightosGm = texture2D( lightosGoboMap, ( lightosGk + clamp( lightosGd, 0.002, 0.998 ) ) / vec2( ' + GOBO_ATLAS_SPALTEN + '.0, ' + GOBO_ATLAS_ZEILEN + '.0 ) ).r * lightosGin;',
-  '\t\t\tlightosGm *= step( 0.0, dot( lightosGoboEbene[ i ], vSpotShadowCoord[ i ] ) );',
+  '\t\t\tfloat lightosGw = max( vSpotShadowCoord[ i ].w, 0.0001 );',
+  '\t\t\tfloat lightosGf = lightosGoboFern[ i ].x / lightosGw;',
+  '\t\t\tlightosGm *= min( 1.0, lightosGf * lightosGf ) * ( 1.0 - smoothstep( lightosGoboFern[ i ].y, lightosGoboFern[ i ].y * ' + GOBO_AUSBLENDE.toFixed(2) + ', lightosGw ) );',
+].concat(_saumGlsl(), [
   '\t\t\tdirectLight.color *= mix( 1.0, lightosGm, lightosGp.x );',
   '\t\t}',
-].join('\n');
+]).join('\n');
 
 export const GOBO_GLSL_KOPF = [
   '#if defined( USE_SHADOWMAP ) && NUM_SPOT_LIGHT_SHADOWS > 0',
   'uniform sampler2D lightosGoboMap;',
   'uniform vec4 lightosGoboParam[ NUM_SPOT_LIGHT_SHADOWS ];',
-  'uniform vec4 lightosGoboEbene[ NUM_SPOT_LIGHT_SHADOWS ];',
+  'uniform vec2 lightosGoboFern[ NUM_SPOT_LIGHT_SHADOWS ];',
   '#endif',
   '',
 ].join('\n');
@@ -276,9 +487,9 @@ let _chunk = null;
 const _uniforms = {
   lightosGoboMap: { value: null },
   lightosGoboParam: { value: [] },
-  // B3: Grenzebene je Schatten-Licht; (0, 0, 0, 1) = keine Grenze (w > 0 vor
-  // dem Licht).
-  lightosGoboEbene: { value: [] },
+  // VIZ-102: [quadrat, reich] je Schatten-Licht (goboFern), flach abgelegt
+  // (2 Zahlen je Licht); GOBO_FERN_AUS = keine Grenze.
+  lightosGoboFern: { value: [] },
 };
 
 // EINE Funktion fuer alle Materialien: three nimmt `onBeforeCompile.toString()`
@@ -289,7 +500,7 @@ function lightosGoboHook(shader) {
   shader.fragmentShader = fs;
   shader.uniforms.lightosGoboMap = _uniforms.lightosGoboMap;
   shader.uniforms.lightosGoboParam = _uniforms.lightosGoboParam;
-  shader.uniforms.lightosGoboEbene = _uniforms.lightosGoboEbene;
+  shader.uniforms.lightosGoboFern = _uniforms.lightosGoboFern;
   _gepatcht += 1;
 }
 
@@ -313,9 +524,9 @@ export function installGoboProjektion(opt) {
   const werte = [];
   for (let i = 0; i < GOBO_MAX_LICHTER; i++) werte.push(new o.Vector4(0, 1, 0, 0));
   _uniforms.lightosGoboParam.value = werte;
-  const ebenen = [];
-  for (let i = 0; i < GOBO_MAX_LICHTER; i++) ebenen.push(new o.Vector4(0, 0, 0, 1));
-  _uniforms.lightosGoboEbene.value = ebenen;
+  const fern = [];
+  for (let i = 0; i < 2 * GOBO_MAX_LICHTER; i++) fern.push(GOBO_FERN_AUS);
+  _uniforms.lightosGoboFern.value = fern;
   for (const klasse of o.materialKlassen) klasse.prototype.onBeforeCompile = lightosGoboHook;
   _aktiv = true;
   return true;
@@ -343,16 +554,16 @@ export function setzeGoboLicht(i, an, cs, sn, kachel) {
 export function loescheGoboLicht(i) {
   const v = _uniforms.lightosGoboParam.value[i];
   if (v && v.x !== 0) v.set(0, 1, 0, 0);
-  setzeGoboEbene(i, null);
+  setzeGoboFern(i, null);
 }
 
-/** B3: Grenzebene des Schatten-Lichts `i` (Ergebnis von goboEbene); null =
- *  keine Grenze. */
-export function setzeGoboEbene(i, e) {
-  const v = _uniforms.lightosGoboEbene.value[i];
-  if (!v) return false;
-  if (e) v.set(e[0], e[1], e[2], e[3]);
-  else if (v.w !== 1 || v.x !== 0 || v.y !== 0 || v.z !== 0) v.set(0, 0, 0, 1);
+/** VIZ-102: Reichweiten-Paar des Schatten-Lichts `i` (Ergebnis von goboFern);
+ *  null = keine Grenze. */
+export function setzeGoboFern(i, fern) {
+  const a = _uniforms.lightosGoboFern.value;
+  if (!(i >= 0 && 2 * i + 1 < a.length)) return false;
+  a[2 * i] = fern ? fern[0] : GOBO_FERN_AUS;
+  a[2 * i + 1] = fern ? fern[1] : GOBO_FERN_AUS;
   return true;
 }
 
@@ -366,6 +577,7 @@ export function goboProjektionInfo() {
     zeilen: GOBO_ATLAS_ZEILEN,
     index: Object.assign({}, _index),
     param: _uniforms.lightosGoboParam.value.map(v => [v.x, v.y, v.z, v.w]),
-    ebene: _uniforms.lightosGoboEbene.value.map(v => [v.x, v.y, v.z, v.w]),
+    fern: _uniforms.lightosGoboFern.value.filter((v, k) => k % 2 === 0)
+      .map((v, k) => [v, _uniforms.lightosGoboFern.value[2 * k + 1]]),
   };
 }

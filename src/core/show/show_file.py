@@ -1147,6 +1147,29 @@ def _show_daten(state, probleme: list) -> dict:
     return show
 
 
+def _mit_herkunft(show: dict) -> dict:
+    """LIZ-1: Vermerk ``erstellt_mit`` in den Kopf der show.json (direkt hinter
+    ``version``/``name``).
+
+    Nur beim SCHREIBEN der Datei, bewusst NICHT in :func:`_show_daten`: der
+    Vermerk ist kein Show-Inhalt — er darf weder den Aenderungs-Vergleich
+    (:func:`show_hat_aenderungen`) noch einen Block-Fingerabdruck beruehren. Der
+    Wert ist fest (haengt nur an der Programmversion), wiederholtes Speichern
+    schreibt also weiter dieselben Bytes. Beim Laden wird er nicht gelesen:
+    Shows ohne das Feld laden unveraendert.
+    """
+    try:
+        from src.core.lizenz import erstellt_mit
+        vermerk = erstellt_mit()
+    except Exception as e:
+        print(f"[show_file] Herkunftsvermerk nicht geschrieben: {e}")
+        return show
+    kopf = {k: show[k] for k in ("version", "name") if k in show}
+    kopf["erstellt_mit"] = vermerk
+    kopf.update((k, v) for k, v in show.items() if k not in kopf)
+    return kopf
+
+
 def save_show(path: str | os.PathLike, layout: dict | None = None):
     """Save the current show state to a .lshow ZIP file.
 
@@ -1168,7 +1191,7 @@ def save_show(path: str | os.PathLike, layout: dict | None = None):
         # echten state._scene (keine Kopie) -- konsistent mit load_show, wo
         # dieselbe Aufraeumfunktion nach dem Graph-Aufbau laeuft.
         _prune_ghost_placeholder_nodes(scene)
-    show = _show_daten(state, _speicherprobleme)
+    show = _mit_herkunft(_show_daten(state, _speicherprobleme))
     # Reihenfolge der Bloecke wie bisher: Fensterlayout VOR dem Szenegraphen.
     scene_graph_data = show.pop("scene_graph", None)
     if layout:
@@ -1575,6 +1598,12 @@ def _reset_state(state, *, emit_events: bool = True, blackout_output: bool = Tru
         state.clear_all_target_blackouts()
     except Exception as e:
         print(f"[show_file] reset target blackout error: {e}")
+    # VCB-43: ebenso gehaltene globale Blackouts — die Taste, die sie hielt,
+    # gibt es nach dem Wechsel nicht mehr. Der Schalter bleibt, wie er ist.
+    try:
+        state.output_manager.loese_alle_halte_blackouts()
+    except Exception as e:
+        print(f"[show_file] reset halte-blackout error: {e}")
 
     # Patch (gepatchte Fixtures) leeren — entfernt sie auch aus current_show.db
     _replace_patch_from_data(state, [])

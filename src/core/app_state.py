@@ -15,6 +15,7 @@ from .dmx.output_manager import OutputManager
 from .dmx.enttec_pro import diagnose_port as diagnose_enttec_port
 from .debug_log import debug_swallow
 from .attr_groups import ATTR_GROUPS, attr_label, classify_attr
+from .laser.erkennung import ist_laser, ist_laserkanal, nur_ueber_namen
 from .programmer_verlauf import ProgrammerVerlauf
 from .stage.scene_graph import SceneGraph
 from .stage.scene_adapters import _DockView, _LiveViewDict, _SceneBackedDict, _ViewRegistry
@@ -458,6 +459,9 @@ class AppState:
         # Universum seit der Aktivierung des Latches; erst das Loesen leert sie.
         self._laser_estop_klebrig: dict[int, frozenset] = {}
         self._laser_fids: frozenset = frozenset()            # fids aller DMX-Laser
+        # LAS-37: die Teilmenge, die wie ein Laser BEDIENT wird (Typ oder
+        # laser_*-Kanal) — nur deren Muster-/Betriebsart-Abruf loest den NOT-AUS.
+        self._laser_rearm_fids: frozenset = frozenset()
         # STAB-15: Der 44-Hz-Renderer (_render_frame) liest den Render-Plan
         # (_fix_index/_default_frame/_commit_spans/_patched_set/_laser_estop_addrs),
         # waehrend _rebuild_render_plan ihn beim Umpatchen feldweise austauscht.
@@ -862,6 +866,17 @@ class AppState:
             bound = next(
                 (f for f in self._patch_cache if f.fid == snapshot["fid"]), None
             )
+            # LAS-37: gilt das Geraet NUR ueber einen Namen als Laser (Lichtset
+            # mit „Laser: Red“, Moving Head mit Laserdiode), das beim Patchen
+            # sagen — NOT-AUS und Blackout schalten dann das GANZE Geraet dunkel.
+            try:
+                if bound is not None:
+                    from .laser.erkennung import hinweis_text
+                    laser_hinweis = hinweis_text(bound, get_channels_for_patched(bound))
+                    if laser_hinweis:
+                        self._emit("hinweis", laser_hinweis)
+            except Exception as e:
+                debug_swallow("app_state.add_fixture.laser_hinweis", e)
             # FM-HEADLAYOUT: head_mode == "single" ("als EINE Lampe") unterdrueckt
             # die automatische Kopf-Matrix-Gruppe. "auto" (Default, Alt-Shows) und
             # "heads" legen sie wie bisher an.
@@ -1716,6 +1731,7 @@ class AppState:
         addrs: dict[int, set] = {}
         laser_addrs: dict[int, set] = {}   # UXT-12: Adressen aller DMX-Laser
         laser_fids: set = set()
+        laser_rearm_fids: set = set()
         for fx in self._patch_cache:
             chans = get_channels_for_patched(fx)
             # FM-12: Override-Cache hier mit vorwaermen (gleiche Stelle, an der
@@ -1729,14 +1745,21 @@ class AppState:
             # ihre Platzhalter-Adresse darf nie ins Live-Universe committen.
             if not fixture_uses_dmx(fx):
                 continue
-            # UXT-12: DMX-Laser erkennen (fixture_type 'laser' ODER laser_*-Kanäle
-            # — dieselbe Definition wie capability.is_laser_fixture, aber mit den
-            # schon geladenen chans, ohne Zweit-Load).
-            is_laser = ((getattr(fx, "fixture_type", "") or "").lower() == "laser"
-                        or any((getattr(ch, "attribute", "") or "").startswith("laser_")
-                               for ch in chans))
+            # UXT-12/LAS-37: DMX-Laser erkennen — die EINE, weite Regel aller
+            # Sicherheits-Stellen (laser.erkennung: Typ, laser_*-Kanal, „Laser“
+            # im Kanal- oder Geraetenamen), mit den schon geladenen chans. Die
+            # NOT-AUS-Maske deckt ALLE Adressen eines erkannten Geraets — auch
+            # bei einem Lichtset, dessen Laser nur zwei Kanaele belegt: lieber
+            # das ganze Geraet dunkel als ein Laserkanal, den niemand kannte.
+            is_laser = ist_laser(fx, chans)
             if is_laser:
                 laser_fids.add(fx.fid)
+                # Nur ueber einen Namen erkannt (Lichtset, Moving Head mit
+                # Laserdiode): gedeckt vom NOT-AUS, aber ein Gobo-/Shutter-/Makro-
+                # Wert an so einem Geraet ist kein „Laser wieder an“ und darf den
+                # NOT-AUS nicht loesen.
+                if not nur_ueber_namen(fx, chans):
+                    laser_rearm_fids.add(fx.fid)
             for ch in chans:
                 addr = fx.address + ch.channel_number - 1
                 if not (1 <= addr <= 512):
@@ -1795,6 +1818,7 @@ class AppState:
         new_patched_set = {u: frozenset(s) for u, s in addrs.items()}
         new_laser_estop_addrs = {u: frozenset(s) for u, s in laser_addrs.items()}
         new_laser_fids = frozenset(laser_fids)
+        new_laser_rearm_fids = frozenset(laser_rearm_fids)
         # A3D-18: Snapshot der bisher gepatchten Adressen VOR dem Tausch — Adressen,
         # die jetzt NICHT mehr gepatcht sind (Fixture entfernt/umadressiert), muessen
         # danach im Live-Universe freigegeben werden (sonst Zombie-Kanal).
@@ -1871,6 +1895,7 @@ class AppState:
                 self._patched_set = new_patched_set
                 self._laser_estop_addrs = new_laser_estop_addrs
                 self._laser_fids = new_laser_fids
+                self._laser_rearm_fids = new_laser_rearm_fids
         # STAB-14: die zuletzt als Engine-Extra committeten Roh-Kanaele aktiv
         # freigeben, statt das Tracking nur zu leeren (sonst Zombie, s. Helfer).
         self._release_engine_extra()
@@ -2290,6 +2315,12 @@ class AppState:
                         self.enttec_port_notes = notes
                     notes[num] = hinweis
                     self.output_manager.add_enttec(num, patch)
+                elif output == "uDMX":
+                    # OUT-68: ``patch`` = Adapter-Schluessel (Kennung +
+                    # Seriennummer/Anschluss); leer = der einzige vorhandene.
+                    # Geoeffnet wird im Sender, nicht hier — ein fehlender
+                    # Adapter oder fehlendes pyusb haelt den Start nicht auf.
+                    self.output_manager.add_udmx(num, patch)
                 elif output == "ArtNet":
                     self.output_manager.add_artnet(num, patch or "255.255.255.255",
                                                    out_universe=out_u)
@@ -2573,6 +2604,15 @@ class AppState:
         unscharf — Scharfschalten ist ein eigener Schritt."""
         self.set_laser_estop(False)
 
+    def _laser_rearm_menge(self) -> frozenset:
+        """LAS-37: die Geraete, deren Muster-/Betriebsart-Abruf den NOT-AUS
+        loest — die wie ein Laser bedienten. Ein Zustand ohne diese Menge (vor
+        dem ersten Plan) faellt auf alle erkannten Laser zurueck."""
+        menge = getattr(self, "_laser_rearm_fids", None)
+        if menge is None:
+            menge = getattr(self, "_laser_fids", frozenset())
+        return menge or frozenset()
+
     def laser_anzahl(self) -> int:
         """LAS-31: Zahl der als Laser erkannten gepatchten Geraete — DMX-Laser
         aus dem Render-Plan plus Netzwerk-Laser (Ether Dream/IDN). Nur fuer die
@@ -2586,6 +2626,13 @@ class AppState:
         except Exception:
             pass
         return len(fids)
+
+    def laser_universen(self) -> frozenset:
+        """LAS-37: die DMX-Universen, in denen ein als Laser erkanntes Geraet
+        steht (dieselbe Erkennung wie die NOT-AUS-Maske) — fuer Sperren, die ein
+        ganzes Universum betreffen, z. B. ein Testsignal."""
+        adressen = getattr(self, "_laser_estop_addrs", {}) or {}
+        return frozenset(u for u, a in adressen.items() if a)
 
     def _channels_for_fid(self, fid: int):
         """Kanalliste des gepatchten Fixtures — oder ``None``, wenn es (noch)
@@ -2706,7 +2753,7 @@ class AppState:
         # "#N"-Suffix abspalten, sonst entriegelt ein Kopf>0-Gate den Not-Aus nicht.
         if (getattr(self, "laser_estop_active", False)
                 and str(attribute).split("#", 1)[0] in _LASER_REARM_ATTRS
-                and int(fid) in getattr(self, "_laser_fids", frozenset())):
+                and int(fid) in self._laser_rearm_menge()):
             # A3D-01: Flag-Wechsel und Mask-Push atomar koppeln (siehe _get_estop_lock).
             with self._get_estop_lock():
                 self.laser_estop_active = False
@@ -5007,6 +5054,18 @@ class AppState:
             return 0
         return None
 
+    @staticmethod
+    def _raw_laser_aus_wert(ch) -> int:
+        """LAS-37: „aus“ eines Roh-Kanals mit „Laser“ im Namen: die Untergrenze
+        eines Bereichs der Art ``closed``, sonst 0."""
+        for rg in getattr(ch, "ranges", None) or ():
+            if (getattr(rg, "kind", "") or "").lower() == "closed":
+                try:
+                    return max(0, min(255, int(rg.range_from)))
+                except (TypeError, ValueError):
+                    continue
+        return 0
+
     def _build_gm_laser_aus_mask(self, fix_index) -> dict[int, dict[int, int]]:
         """LAS-24: ``{universum: {adresse: aus_wert}}`` fuer DMX-Laser, die der
         Grand Master ueber Dimmer/Farbe nicht (sicher) erreicht.
@@ -5024,17 +5083,22 @@ class AppState:
         for _fid, (fx, chans) in fix_index.items():
             if not fixture_uses_dmx(fx):
                 continue
-            is_laser = ((getattr(fx, "fixture_type", "") or "").lower() == "laser"
-                        or any((getattr(ch, "attribute", "") or "").startswith("laser_")
-                               for ch in chans))
-            if not is_laser:
+            if not ist_laser(fx, chans):           # LAS-37: dieselbe Regel wie der NOT-AUS
                 continue
             nur_eindeutig = bool(self._fixture_intensity_addrs(fx, chans))
             for ch in chans:
                 attr = (getattr(ch, "attribute", "") or "").lower()
-                if attr not in self._GM_LASER_AUS_ATTRS:
+                if attr in self._GM_LASER_AUS_ATTRS:
+                    wert = self._laser_aus_wert(ch, nur_eindeutig=nur_eindeutig)
+                elif attr == "raw" and ist_laserkanal(ch):
+                    # LAS-37: ein Roh-Kanal, der „Laser“ im Namen traegt (KLS
+                    # Laser Bar „Laser: Red“, Multi FX Bar „Laser Red Strobe“),
+                    # ist Helligkeit oder Takt des Lasers — „aus“ ist dort 0,
+                    # sofern das Profil nicht ausdruecklich einen geschlossenen
+                    # Bereich nennt.
+                    wert = self._raw_laser_aus_wert(ch)
+                else:
                     continue
-                wert = self._laser_aus_wert(ch, nur_eindeutig=nur_eindeutig)
                 if wert is None:
                     continue
                 try:

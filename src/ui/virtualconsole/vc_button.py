@@ -316,10 +316,27 @@ _BLACKOUT_ZIEL_UNLESBAR = "(unlesbares Blackout-Ziel)"
 
 def _clear_target_blackout_slot(slot) -> None:
     """VCB-11: gibt den gezielten Blackout einer (geloeschten/umgestellten) Taste
-    frei — sonst bliebe ihr Teil-Blackout als Geist haengen."""
+    frei — sonst bliebe ihr Teil-Blackout als Geist haengen. VCB-43: ebenso
+    ihren gehaltenen globalen Blackout."""
     try:
         from src.core.app_state import get_state
         get_state().clear_target_blackout(slot)
+    except Exception:
+        pass
+    _loese_halte_blackout(slot)
+
+
+def _loese_halte_blackout(slot) -> None:
+    """VCB-43: den gehaltenen Blackout einer Taste freigeben (Taste geloescht
+    oder umgestellt, waehrend sie gedrueckt war) — sonst bliebe es dunkel, ohne
+    dass irgendwo etwas gedrueckt ist."""
+    try:
+        from src.core.app_state import get_state
+        om = get_state().output_manager
+        # Nur, wenn die Taste wirklich haelt — dieses Aufraeumen laeuft bei jedem
+        # Umstellen und Loeschen einer Taste.
+        if slot in (getattr(om, "_blackout_halter", None) or ()):
+            om.halte_blackout(slot, False)
     except Exception:
         pass
 
@@ -1320,7 +1337,10 @@ class VCButton(VCWidget):
                 else:
                     state.clear_target_blackout(id(self))
             else:
-                state.output_manager.set_blackout(bool(press))
+                # VCB-43: HALTEN auf einem eigenen Platz — Loslassen nimmt nur
+                # zurueck, was diese Taste gesetzt hat. Steht der Blackout am
+                # Pult oder haelt ihn eine andere Taste, bleibt es dunkel.
+                state.output_manager.halte_blackout(id(self), bool(press))
             return
 
         if self.action == ButtonAction.STOP_ALL:
