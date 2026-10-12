@@ -80,6 +80,7 @@
 | VIZ-106 | B | fix/viz105-buehne-undo-traverse-2d-verschieben | 2026-10-12T15:26Z | src/core/stage/scene_commands.py · src/ui/views/live_view.py · src/ui/visualizer/visualizer_window.py · tests/test_viz106_2d_verschieben_3d_undo.py |
 | VCB-44 | D | fix/vcb44-blackout-ziele-streng-dialog-pruefung | 2026-10-12T15:27Z | src/core/group_ref.py · src/ui/virtualconsole/vc_button.py · src/core/sync.py · src/ui/widgets/validation_dialog.py |
 | UI-92 | D | fix/ui92-kleinkram-kuerzel-speichernfrage-sicherungen | 2026-10-12T15:41Z | src/ui/hilfe.py · src/core/show/sicherungen.py · src/ui/visualizer/visualizer_window.py |
+| VIZ-108 | B | fix/viz107-3d-fenster-gobo-niedrig-einstellungen | 2026-10-12T15:46Z | src/ui/visualizer/visualizer_window.py · tests/test_viz108_reiter_einstellungen_breite.py |
 
 ## Blocker & Fallen
 
@@ -239,7 +240,6 @@
 
 ## Verlauf
 
-- 2026-10-11T20:42Z A claim UI-91
 - 2026-10-11T20:43Z A claim FM-74
 - 2026-10-11T20:50Z D aktualisiert VCB-43: Branch - -> fix/vcb43-halte-blackout-fremder-blackout
 - 2026-10-11T20:58Z D aktualisiert OUT-71: Branch - -> fix/out71-schlussbild-beim-beenden
@@ -269,3 +269,4 @@
 - 2026-10-12T15:41Z D claim UI-92
 - 2026-10-12T15:43Z A aktualisiert STAB-35: Branch - -> fix/stab36-absturz-auswahlwechsel
 - 2026-10-12T15:43Z A aktualisiert STAB-36: Branch - -> fix/stab36-absturz-auswahlwechsel
+- 2026-10-12T15:46Z B claim VIZ-108
