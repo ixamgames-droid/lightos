@@ -132,6 +132,20 @@ def _axis_coord(col: int, row: int, cols: int, rows: int, axis: str) -> tuple[in
     return col, max(1, cols)  # H (Default)
 
 
+# ENG-34: Arten des Untergrunds (s. RgbMatrixInstance._untergrund_pegel).
+# Zeichenketten, damit weitere Arten ohne Formatbruch dazukommen koennen.
+UNTERGRUND_AUS = "aus"
+UNTERGRUND_FEST = "fest"
+UNTERGRUND_ATMEN = "atmen"
+UNTERGRUND_ARTEN = (UNTERGRUND_AUS, UNTERGRUND_FEST, UNTERGRUND_ATMEN)
+# Ein Atemzug dauert bei Tempo-Faktor 1 so viele Schritte (am Bus: Beats).
+UNTERGRUND_ATEM_SCHRITTE = 4.0
+UNTERGRUND_TEMPO_MIN = 0.25
+UNTERGRUND_TEMPO_MAX = 4.0
+# Pegel, mit dem der Editor einen Untergrund einschaltet, der vorher auf 0 stand.
+UNTERGRUND_START_PEGEL = 51      # 20 %
+
+
 def _scale(rgb: Color, b: float) -> Color:
     """Skaliert eine Farbe mit Helligkeit b (0..1, geklemmt)."""
     if b <= 0.0:
@@ -680,19 +694,139 @@ class RgbMatrixInstance(Function):
         L = self._pixel_brightness(rgb)
         return max(0, min(255, int(round(lo + (hi - lo) * L))))
 
-    def _dimmer_output(self, rgb: Color) -> int:
-        """Dimmer-Kanalwert fuer ein gerendertes Pixel (ENG-08).
+    # ── ENG-34: Untergrund (was die Zellen OHNE Laeufer tun) ─────────────────
+    #
+    # Der Untergrund ist die UNTERGRENZE des Dimmer-Stils — dieselbe Stelle, an
+    # der seit jeher ``intensity_min`` gerechnet wird. Er wirkt nur auf den
+    # Dimmer-Teil; Farbe bleibt getrennt.
+    #
+    # Gespeichert wird:
+    #   ``intensity_min``              der Pegel 0..255 (unveraendertes Feld)
+    #   ``params["untergrund_art"]``   "fest" | "atmen"  (fehlt = Altbestand)
+    #   ``params["untergrund_tempo"]`` Tempo-Faktor des Atmens (fehlt = 1.0)
+    #   ``params["untergrund_tief"]``  Tiefpunkt des Atmens in Prozent (fehlt = 0)
+    #
+    # ★ FEHLT die Art, gilt exakt das alte Verhalten: Pegel = ``intensity_min``,
+    # und bei „Dimmer pro Runde wechseln" wird er ignoriert. Eine alte Show
+    # bekommt also keinen neuen Schluessel und speichert byte-gleich. Erst eine
+    # ausdruecklich gesetzte Art laesst den Untergrund auch unter dem
+    # Stufen-Wechsel wirken — sonst bekaeme eine alte Show mit vergessenem
+    # Min-Wert ploetzlich Licht, das sie nie hatte.
+    #
+    # Die Art ist eine Zeichenkette, keine Zahl und kein Schalter: spaetere
+    # Arten (Funkeln, Durchscheinen, zweiter Effekt) kommen als weitere Werte
+    # dazu. Ein Wert, den dieser Stand nicht kennt, faellt auf „fest" zurueck.
 
-        Bei aktivem ``dimmer_cycle`` (nur CHASE) liefert ``_render`` bereits
-        explizite Grau-Stufen ``(lvl, lvl, lvl)`` aus der ``DimmerSequence`` —
-        dann den Wert *direkt* durchreichen: die programmierten Stufen SIND die
-        Ausgabe, ``intensity_min``/``intensity_max`` werden bewusst ignoriert
-        (sonst wuerde der gewuenschte Wert verschoben). Sonst das bisherige
-        Verhalten: Pixel-Helligkeit linear in ``[intensity_min, intensity_max]``.
+    def _dimmer_stufen_aktiv(self) -> bool:
+        """„Dimmer pro Runde wechseln" ist an (gibt es nur beim Lauflicht)."""
+        return (self.algorithm == RgbAlgorithm.CHASE
+                and bool(self.params.get("dimmer_cycle")))
+
+    def untergrund_art(self) -> str:
+        """Die WIRKSAME Art des Untergrunds: "aus", "fest" oder "atmen".
+
+        Ohne gespeicherte Art wird sie aus dem Altbestand abgeleitet: ein
+        ``intensity_min`` ueber 0 ist ein fester Wert — ausser unter dem
+        Stufen-Wechsel, wo er bisher wirkungslos war und es bleibt."""
+        art = self.params.get("untergrund_art")
+        if art is None:
+            if self.intensity_min > 0 and not self._dimmer_stufen_aktiv():
+                return UNTERGRUND_FEST
+            return UNTERGRUND_AUS
+        art = str(art)
+        if art in (UNTERGRUND_AUS, UNTERGRUND_ATMEN):
+            return art
+        return UNTERGRUND_FEST
+
+    def _untergrund_pegel(self, idx: int | None = None) -> int:
+        """Dimmerwert 0..255, auf dem eine Zelle OHNE Laeufer steht.
+
+        ``idx`` ist der Zellindex. Fester Wert und Atmen sind fuer alle Zellen
+        gleich und brauchen ihn nicht; er steht in der Signatur, damit eine
+        Art, die je Zelle rechnet, ohne Umbau der Aufrufer dazukommen kann.
+
+        Gerechnet wird aus ``self._step`` — der Uhr des Effekts. Damit laeuft
+        das Atmen ohne Zusatz im Takt von BPM und Tempo-Bus, und Vorschau und
+        Ausgabe (beide rufen ``_dimmer_output``) zeigen dasselbe."""
+        if "untergrund_art" not in self.params:
+            # Altbestand: Zeichen fuer Zeichen das bisherige Verhalten.
+            return 0 if self._dimmer_stufen_aktiv() else self.intensity_min
+        art = self.untergrund_art()
+        if art == UNTERGRUND_AUS:
+            return 0
+        hell = max(0, min(255, int(self.intensity_min)))
+        if art != UNTERGRUND_ATMEN:
+            return hell
+        try:
+            tief_pct = float(self.params.get("untergrund_tief", 0.0))
+        except (TypeError, ValueError):
+            tief_pct = 0.0
+        tief = min(hell, max(0, int(round(tief_pct * 255.0 / 100.0))))
+        try:
+            faktor = float(self.params.get("untergrund_tempo", 1.0))
+        except (TypeError, ValueError):
+            faktor = 1.0
+        faktor = max(UNTERGRUND_TEMPO_MIN, min(UNTERGRUND_TEMPO_MAX, faktor))
+        # Ein Atemzug (dunkel -> hell -> dunkel) dauert bei Faktor 1 vier
+        # Schritte, am Tempo-Bus also einen 4/4-Takt. Beginnt am Tiefpunkt.
+        welle = (1.0 - math.cos(
+            2.0 * math.pi * self._step * faktor / UNTERGRUND_ATEM_SCHRITTE)) / 2.0
+        return max(0, min(255, int(round(tief + (hell - tief) * welle))))
+
+    def _dimmer_output(self, rgb: Color, idx: int | None = None) -> int:
+        """Dimmer-Kanalwert fuer ein gerendertes Pixel (ENG-08, ENG-34).
+
+        Die Pixel-Helligkeit wird linear zwischen Untergrund und
+        ``intensity_max`` gelegt: eine dunkle Zelle steht auf dem Untergrund,
+        der Laeufer auf ``intensity_max``, der Schweif dazwischen — er blendet
+        also auf den Untergrund aus, nicht auf 0.
+
+        Bei aktivem ``dimmer_cycle`` (nur CHASE) liefert ``_render`` explizite
+        Grau-Stufen ``(lvl, lvl, lvl)`` aus der ``DimmerSequence``. Ohne
+        Untergrund werden sie *direkt* durchgereicht: die programmierten Stufen
+        SIND die Ausgabe, ``intensity_max`` wird bewusst ignoriert. Mit
+        Untergrund bleibt der Laeufer auf seiner Stufe, und nur die Zellen
+        darunter werden bis zum Untergrund angehoben.
         """
-        if self.algorithm == RgbAlgorithm.CHASE and self.params.get("dimmer_cycle"):
-            return max(0, min(255, int(round(self._pixel_brightness(rgb) * 255))))
-        return self._scalar_level(rgb, self.intensity_min, self.intensity_max)
+        lo = self._untergrund_pegel(idx)
+        if self._dimmer_stufen_aktiv():
+            direkt = max(0, min(255, int(round(self._pixel_brightness(rgb) * 255))))
+            if lo <= 0:
+                return direkt
+            stufe = self._dimmer_stufe(self._render_phase())
+            if stufe <= 0:
+                return lo       # Stufe 0: es gibt keinen Laeufer, nur Untergrund
+            anteil = min(1.0, direkt / float(stufe))
+            return max(0, min(255, int(round(lo + (stufe - lo) * anteil))))
+        return self._scalar_level(rgb, lo, self.intensity_max)
+
+    def _render_phase(self) -> float:
+        """Die Phase, mit der ``_render`` aus ``self._step`` rechnet (Versatz
+        und Laufrichtung eingerechnet) — eine Stelle, damit der Untergrund
+        dieselbe Runde sieht wie das Lauflicht."""
+        phase = self._step + float(self.params.get("offset", 0.0))
+        return -phase if self.direction == "reverse" else phase
+
+    def _dimmer_stufe(self, p: float) -> int:
+        """Die Stufe der ``DimmerSequence``, die in der Runde zur Phase ``p``
+        gilt (ENG-08). Reihenfolge normal / zufaellig / Ping-Pong
+        (``dimmer_order``), Intervall wie bei der Color-Sequence."""
+        params = self.params
+        axis = str(params.get("axis", "H"))
+        cols, rows = self.cols, self.rows
+        levels = self.dimmer_levels.enabled_levels()
+        length_hint = cols if axis == "H" else (rows if axis == "V" else max(1, cols + rows - 1))
+        interval = max(1, int(params.get("dimmer_interval", 1)))
+        rnd = int(p) // max(1, length_hint * interval)   # Runden-Index (×Intervall)
+        nl = len(levels)
+        order = str(params.get("dimmer_order", "normal"))
+        if order == "random":
+            return levels[random.Random((rnd * 2654435761) & 0x7FFFFFFF).randrange(nl)]
+        if order == "pingpong" and nl > 2:
+            period = 2 * (nl - 1)
+            pos = rnd % period
+            return levels[pos if pos < nl else period - pos]
+        return levels[rnd % nl]
 
     def preview_pixels(self) -> list[Color]:
         """Style-aware Pixelliste fuer die Vorschau (ruft intern _generate()).
@@ -706,8 +840,8 @@ class RgbMatrixInstance(Function):
             return grid
         if self.style == MatrixStyle.DIMMER:
             result = []
-            for rgb in grid:
-                v = self._dimmer_output(rgb)
+            for idx, rgb in enumerate(grid):
+                v = self._dimmer_output(rgb, idx)
                 result.append((v, v, v))
             return result
         if self.style == MatrixStyle.SHUTTER:
@@ -837,6 +971,9 @@ class RgbMatrixInstance(Function):
         # Der Merker lebt genau einen Frame; die Kanaele koennen sich zwischen
         # Frames aendern (Patch-Aenderung), zwischen Zellen nicht.
         _achsen_cache: dict[int, bool] = {}
+        # ENG-34: Dimmerwerte, die in DIESEM Frame schon eine Kopf-Zelle auf
+        # eine Adresse geschrieben hat (s. u. beim Schreiben).
+        _kopf_dimmer: dict[tuple[int, int], int] = {}
         try:
             from src.core.app_state import (get_channels_for_patched,
                                             channels_for_head,
@@ -1045,9 +1182,24 @@ class RgbMatrixInstance(Function):
                         val = int(val * inten)
                 elif self.style == MatrixStyle.DIMMER:
                     if attr in ("intensity", "dimmer", "master"):
-                        val = self._dimmer_output(rgb)
+                        val = self._dimmer_output(rgb, idx)
                     else:
                         continue  # Farb-/Shutter-Kanaele unangetastet lassen
+                    # ENG-34: Mehrkopf-Geraet mit GETEILTEM Dimmer — mehrere
+                    # Kopf-Zellen schreiben dieselbe Adresse. Bisher gewann die
+                    # letzte Zelle der Liste: stand der Laeufer auf Kopf 1 von 4,
+                    # schrieb Kopf 4 seinen dunklen Wert darueber. Festgelegt
+                    # ist jetzt: es gilt der HOECHSTE Wert der Zellen. Mit
+                    # Untergrund heisst das — der gemeinsame Dimmer steht auf
+                    # dem Untergrund und geht hoch, sobald ein Laeufer auf
+                    # irgendeinem Kopf des Geraets liegt. Betrifft nur Zellen
+                    # mit Kopf-Angabe; ganze Geraete schreiben wie bisher.
+                    if _head is not None:
+                        _ka = (fx.universe, fx.address + ch.channel_number - 1)
+                        _alt = _kopf_dimmer.get(_ka)
+                        if _alt is not None and _alt >= val:
+                            continue
+                        _kopf_dimmer[_ka] = val
                 elif self.style == MatrixStyle.SHUTTER:
                     if attr == "shutter":
                         val = self._scalar_level(rgb, self.shutter_min, self.shutter_max)
@@ -1421,20 +1573,7 @@ class RgbMatrixInstance(Function):
         # Reihenfolge normal / zufaellig / Ping-Pong (dimmer_order), Intervall
         # wie bei der Color-Sequence (dimmer_interval).
         if self.style == MatrixStyle.DIMMER and params.get("dimmer_cycle"):
-            levels = self.dimmer_levels.enabled_levels()
-            length_hint = cols if axis == "H" else (rows if axis == "V" else max(1, cols + rows - 1))
-            interval = max(1, int(params.get("dimmer_interval", 1)))
-            rnd = int(p) // max(1, length_hint * interval)   # Runden-Index (×Intervall)
-            nl = len(levels)
-            order = str(params.get("dimmer_order", "normal"))
-            if order == "random":
-                lvl = levels[random.Random((rnd * 2654435761) & 0x7FFFFFFF).randrange(nl)]
-            elif order == "pingpong" and nl > 2:
-                period = 2 * (nl - 1)
-                pos = rnd % period
-                lvl = levels[pos if pos < nl else period - pos]
-            else:  # normal
-                lvl = levels[rnd % nl]
+            lvl = self._dimmer_stufe(p)
             base = (lvl, lvl, lvl)
         # Farbe: optional pro Runde durch die Color-Sequence wechselnd (Abschnitt 6).
         # Reihenfolge normal / zufällig / Ping-Pong (color_order).
@@ -1867,10 +2006,21 @@ class RgbMatrixInstance(Function):
         if self.style == MatrixStyle.DIMMER:
             specs.extend([
                 ParamSpec("intensity_min", "Dimmer min", "int", 0, 0, 255, 1,
-                          "Untergrenze des Dimmer-Styles"),
+                          "Untergrund: Helligkeit der Zellen ohne Läufer "
+                          "(Untergrenze des Dimmer-Styles)"),
                 ParamSpec("intensity_max", "Dimmer max", "int", 255, 0, 255, 1,
                           "Obergrenze des Dimmer-Styles"),
             ])
+            # ENG-34: nur anbieten, wenn der Untergrund atmet — sonst bewegte
+            # ein Regler etwas, das nichts bewirkt.
+            if self.untergrund_art() == UNTERGRUND_ATMEN:
+                specs.extend([
+                    ParamSpec("untergrund_tempo", "Untergrund Tempo ×", "float", 1.0,
+                              UNTERGRUND_TEMPO_MIN, UNTERGRUND_TEMPO_MAX, 0.25,
+                              "Atmen des Untergrunds relativ zum Tempo des Effekts"),
+                    ParamSpec("untergrund_tief", "Untergrund Tiefpunkt", "int", 0, 0, 100, 1,
+                              "Tiefpunkt des Atmens in Prozent"),
+                ])
         elif self.style == MatrixStyle.SHUTTER:
             specs.extend([
                 ParamSpec("shutter_min", "Shutter min", "int", 0, 0, 255, 1,
@@ -1949,6 +2099,12 @@ class RgbMatrixInstance(Function):
             return float(getattr(self, "env_fade_in", 0.0))
         if key == "env_curve":
             return getattr(self, "env_curve", "linear")
+        if key == "untergrund_art":
+            return self.untergrund_art()
+        if key == "untergrund_tempo":
+            return float(self.params.get("untergrund_tempo", 1.0))
+        if key == "untergrund_tief":
+            return int(self.params.get("untergrund_tief", 0))
         return self.params.get(key)
 
     def set_param(self, key: str, value) -> bool:
@@ -2035,6 +2191,22 @@ class RgbMatrixInstance(Function):
             return True
         if key == "env_curve":
             self.env_curve = str(value or "linear")
+            return True
+        if key == "untergrund_art":
+            self.params["untergrund_art"] = str(value or UNTERGRUND_AUS)
+            return True
+        if key == "untergrund_tempo":
+            try:
+                self.params[key] = max(UNTERGRUND_TEMPO_MIN,
+                                       min(UNTERGRUND_TEMPO_MAX, float(value)))
+            except (TypeError, ValueError):
+                pass
+            return True
+        if key == "untergrund_tief":
+            try:
+                self.params[key] = max(0, min(100, int(round(float(value)))))
+            except (TypeError, ValueError):
+                pass
             return True
         # Algo-spezifisch: in params ablegen, ueber die Meta-Spec klemmen.
         spec = None

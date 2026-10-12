@@ -135,7 +135,7 @@ Der **Style** ist eine **Kanalmaske**: Je Style werden nur die passenden Kanäle
 |---|---|---|
 | **RGB** | Rot/Grün/Blau-Kanäle. | Farben (C1–C3 bzw. Sequence) |
 | **RGBW** | Wie RGB, plus echtes Weiß auf dem W-Kanal (Weißanteil = min(R,G,B)). | Farben |
-| **Dimmer** | Nur Dimmer-/Intensitäts-Kanal. Die Pixel-Helligkeit wird in den Bereich Min…Max gemappt. **Farbe ist abgeschaltet.** | Dimmer-Bereich (Min/Max) |
+| **Dimmer** | Nur Dimmer-/Intensitäts-Kanal. Die Pixel-Helligkeit wird zwischen **Untergrund** und **Dimmer-Bereich → Max** gelegt. **Farbe ist abgeschaltet.** | Dimmer-Bereich (Max), Gruppe **Untergrund** (Art, Helligkeit in %; siehe [Dimmer-Matrix](../anleitung_dimmermatrix/ANLEITUNG_DIMMERMATRIX.md)) |
 | **Shutter** | Nur Shutter-Kanal. Pixel-Helligkeit wird in den Shutter-Bereich Min…Max gemappt. **Farbe ist abgeschaltet.** | Shutter-Bereich (Min/Max) |
 
 > **Wichtig:** Stellst du den Style auf **Dimmer** oder **Shutter**, verschwindet die Farbwahl komplett – die Matrix steuert dann nur Helligkeit bzw. Verschluss. In der Vorschau werden diese Styles als Graustufen dargestellt.

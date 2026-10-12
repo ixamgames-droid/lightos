@@ -38,9 +38,10 @@ Die **Vorschau** zeigt die Helligkeit als Graustufen-Lauflicht (weiße Balken = 
 > In **Bewegung & Parameter** steuerst du die **Läufer-Anzahl** (mehr Läufer = voller/dichter),
 > die **Läufer-Breite** und **Schweif (%)** (0 % → harte Kante ohne Schweif, höher → langes weiches
 > Nachfaden hinter dem Läufer). In der Gruppe **Farben** legst du bei Stil *Dimmer* über den
-> **Dimmer-Bereich** (Spinboxen **Min** / **Max**) den Helligkeitsbereich fest — außer wenn
-> **„Dimmer pro Runde wechseln"** aktiv ist: dann gilt die Dimmerwert-Folge, Min/Max sind
-> ausgeblendet.
+> **Dimmer-Bereich** (Feld **Max**) fest, wie hell der Läufer wird — außer wenn
+> **„Dimmer pro Runde wechseln"** aktiv ist: dann gilt die Dimmerwert-Folge, das Feld ist
+> ausgeblendet. Was die Lampen **ohne** Läufer tun, stellst du in der Gruppe **Untergrund**
+> ein (Abschnitt 4) — dorthin ist das frühere Feld **Min** gewandert.
 
 ## 3. Geschwindigkeit: fest einstellen oder ans Tempo koppeln
 
@@ -90,7 +91,46 @@ Die Virtuelle Konsole dient anschließend zum Live-Umschalten der Faktoren:
 
 ![SpeedDial und Tempo-Bus in der Virtuellen Konsole](img/02_vc_tempo_bus.png)
 
-## 4. Ergebnis
+## 4. Untergrund: was die anderen Lampen tun
+
+Beim Lauflicht stehen die Lampen, auf denen gerade kein Läufer liegt, normalerweise auf 0.
+In der Gruppe **Untergrund** (nur bei **Stil: Dimmer**, unter der Gruppe **Farben**) legst du
+fest, was sie stattdessen tun. Der Untergrund wirkt **nur auf den Dimmer** — die Farbe kommt
+weiter von deinem getrennten Farb-Effekt und wird nie angefasst.
+
+| **Art:** | Was passiert | Felder |
+|---|---|---|
+| **Aus** | Wie bisher: Lampen ohne Läufer sind dunkel. | – |
+| **Fester Wert** | Lampen ohne Läufer stehen auf einer festen Helligkeit. | **Helligkeit** (in %) |
+| **Atmen** | Lampen ohne Läufer pulsieren gemeinsam weich zwischen **Tiefpunkt** und **Helligkeit**. | **Helligkeit**, **Tiefpunkt**, **Tempo ×** |
+
+- Der **Läufer** bleibt, wie er ist; seine Helligkeit bestimmt weiter **Dimmer-Bereich → Max**.
+- Der **Schweif** blendet auf den Untergrund aus, nicht mehr auf 0.
+- **Atmen** läuft mit dem Tempo des Effekts: bei **Tempo × = 1** dauert ein Atemzug vier
+  Schritte, am Tempo-Bus also einen Takt; **2** ist doppelt so schnell, **0,5** halb so
+  schnell. Der Faktor gilt zusätzlich zum **Tempo ×** des Effekts in **Tempo & Blende**.
+- Der Untergrund gilt für alle Dimmer-Algorithmen (Chase, Wipe, Wave, Random …) und auch bei
+  **„Dimmer pro Runde wechseln"** — dort musst du die Art einmal ausdrücklich wählen.
+- Der Fader **Helligkeit** des Effekts, Gruppen-Fader und Master dimmen Läufer und Untergrund
+  gemeinsam. Stoppst du den Effekt, ist auch der Untergrund aus.
+- **Invertieren** dreht das Bild um: dann ist der Läufer die Stelle, die auf dem Untergrund
+  steht.
+- In der **Virtuellen Konsole** ist die Helligkeit des Untergrunds der Effekt-Parameter
+  **„Dimmer min"** (Regler 20 % = Untergrund 20 %). Beim Atmen kommen **„Untergrund Tempo ×"**
+  und **„Untergrund Tiefpunkt"** dazu.
+- Bei Geräten mit mehreren Köpfen und **einem gemeinsamen Dimmer** zählt der hellste Kopf:
+  liegt ein Läufer auf einem der Köpfe, ist das ganze Gerät hell, sonst steht es auf dem
+  Untergrund.
+
+**Alte Shows** bleiben, wie sie sind: ein früher eingetragenes **Min** über 0 erscheint als
+**Fester Wert** mit der passenden Prozentzahl.
+
+> **Bilder folgen.** Für diesen Abschnitt sind noch aufzunehmen: (1) Editor mit Gruppe
+> **Untergrund**, Art **Fester Wert**; (2) Vorschau vorher/nachher — Läufer auf Schwarz gegen
+> Läufer auf 20 %; (3) bewegtes Bild **Atmen** mit Läufer und Schweif; (4) Virtuelle Konsole:
+> Taste plus Regler **„Dimmer min"**.
+
+## 5. Ergebnis
 
 So sieht ein Dimmer-Layer (hier grün-weiß, atmend) über den Geräten aus:
 
@@ -103,7 +143,8 @@ Im Hardstyle-Look kombiniert: blauer Farb-Chase + schnellerer Dimmer-Puls, per V
 ---
 
 **Kurz:** Gruppe wählen → Matrix-Tab → **+ Neu** → **Stil Dimmer** + Algorithmus *Chase* (Raster
-folgt der Auswahl) → Helligkeit über **Dimmer-Bereich** (Min/Max) → **💾 Speichern** →
+folgt der Auswahl) → Läufer-Helligkeit über **Dimmer-Bereich** (Max), die übrigen Lampen über
+**Untergrund** → **💾 Speichern** →
 **▶ Start**. Tempo: neue Matrizen hängen am Bus **Global** (folgt der Musik-BPM); schneller als
 die Farb-Matrix wird der Puls über **Tempo ×** — **Geschwindigkeit** wirkt nur ohne laufende BPM.
 Live umschalten in der **Virtuellen Konsole** (Speed-Rad, Element **Tempo-Bus**, Buttons

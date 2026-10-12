@@ -8,6 +8,9 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
 from PySide6.QtCore import Qt, QTimer, QRect, Signal
 from PySide6.QtGui import QPainter, QColor, QFont, QPen
 from src.core.engine.rgb_matrix import RgbMatrixInstance, RgbAlgorithm, MatrixStyle, Color, is_gap
+from src.core.engine.rgb_matrix import (UNTERGRUND_AUS, UNTERGRUND_FEST, UNTERGRUND_ATMEN,
+                                        UNTERGRUND_START_PEGEL, UNTERGRUND_TEMPO_MIN,
+                                        UNTERGRUND_TEMPO_MAX)
 from src.core.engine.rgb_matrix_meta import ALGO_META
 from src.ui.virtualconsole.vc_effect_meta import option_label
 from src.ui.widgets.select_all_spinbox import SelectAllSpinBox
@@ -1080,18 +1083,24 @@ class RgbMatrixView(QWidget):
         fc.addRow(self._color_interval_label, self._color_interval_spin)
 
         # Dimmer-Bereich (nur DIMMER)
+        #
+        # ENG-34: „Min" ist als „Helligkeit" in die Gruppe „Untergrund"
+        # gewandert und wird dort in Prozent gezeigt. Dieses Feld bleibt der
+        # TRAEGER des genauen Werts 0..255 — unsichtbar und in keinem Layout.
+        # So schreibt _param_change bei jeder anderen Aenderung exakt den
+        # geladenen Wert zurueck (eine alte Show mit Min 50 bleibt 50 und wird
+        # nicht ueber 20 % zu 51).
         dim_row = QHBoxLayout()
-        self._imin_spin = QSpinBox()
+        self._imin_spin = QSpinBox(self)
         self._imin_spin.setRange(0, 255)
         self._imin_spin.setValue(0)
-        self._imin_spin.setPrefix("Min ")
+        self._imin_spin.hide()
         self._imin_spin.valueChanged.connect(self._param_change)
         self._imax_spin = QSpinBox()
         self._imax_spin.setRange(0, 255)
         self._imax_spin.setValue(255)
         self._imax_spin.setPrefix("Max ")
         self._imax_spin.valueChanged.connect(self._param_change)
-        dim_row.addWidget(self._imin_spin)
         dim_row.addWidget(self._imax_spin)
         self._dim_form_label = QLabel("Dimmer-Bereich:")
         fc.addRow(self._dim_form_label, dim_row)
@@ -1129,6 +1138,55 @@ class RgbMatrixView(QWidget):
         self._shut_form_label = QLabel("Shutter-Bereich:")
         fc.addRow(self._shut_form_label, shut_row)
         body.addWidget(grp_colors)
+
+        # ── Gruppe: Untergrund (ENG-34) — nur Style „Dimmer" ─────────────────
+        # Was die Zellen OHNE Laeufer tun. Die Felder sind FEST und werden nur
+        # ein- und ausgeblendet; hier wird nie etwas im eigenen Signal geloescht
+        # oder neu gebaut (STAB-38).
+        self._grp_untergrund = QGroupBox("Untergrund")
+        self._grp_untergrund.setStyleSheet(_grp_style)
+        fu = QFormLayout(self._grp_untergrund)
+        fu.setSpacing(6)
+        self._ug_art_combo = QComboBox()
+        self._ug_art_combo.addItem("Aus", UNTERGRUND_AUS)
+        self._ug_art_combo.addItem("Fester Wert", UNTERGRUND_FEST)
+        self._ug_art_combo.addItem("Atmen", UNTERGRUND_ATMEN)
+        self._ug_art_combo.setToolTip(
+            "Was die Lampen tun, auf denen gerade kein Läufer liegt.\n"
+            "Wirkt nur auf den Dimmer — die Farbe bleibt unberührt.")
+        self._ug_art_combo.currentIndexChanged.connect(self._untergrund_art_gewaehlt)
+        fu.addRow(QLabel("Art:"), self._ug_art_combo)
+        self._ug_hell_spin = QSpinBox()
+        self._ug_hell_spin.setRange(0, 100)
+        self._ug_hell_spin.setSuffix(" %")
+        self._ug_hell_spin.setToolTip(
+            "Fester Wert: Helligkeit der Lampen ohne Läufer.\n"
+            "Atmen: bis hierhin atmet der Untergrund auf.\n"
+            "In der virtuellen Konsole ist das der Regler „Dimmer min“.")
+        self._ug_hell_spin.valueChanged.connect(self._untergrund_helligkeit_gesetzt)
+        self._ug_hell_label = QLabel("Helligkeit:")
+        fu.addRow(self._ug_hell_label, self._ug_hell_spin)
+        self._ug_tief_spin = QSpinBox()
+        self._ug_tief_spin.setRange(0, 100)
+        self._ug_tief_spin.setSuffix(" %")
+        self._ug_tief_spin.setToolTip(
+            "Atmen: so weit sinkt der Untergrund ab (0 % = ganz aus).")
+        self._ug_tief_spin.valueChanged.connect(self._untergrund_tiefpunkt_gesetzt)
+        self._ug_tief_label = QLabel("Tiefpunkt:")
+        fu.addRow(self._ug_tief_label, self._ug_tief_spin)
+        self._ug_tempo_spin = QDoubleSpinBox()
+        self._ug_tempo_spin.setRange(UNTERGRUND_TEMPO_MIN, UNTERGRUND_TEMPO_MAX)
+        self._ug_tempo_spin.setSingleStep(0.25)
+        self._ug_tempo_spin.setDecimals(2)
+        self._ug_tempo_spin.setValue(1.0)
+        self._ug_tempo_spin.setToolTip(
+            "Atmen: Tempo relativ zum Tempo des Effekts.\n"
+            "1 = ein Atemzug je vier Schritte (am Tempo-Bus: je Takt), "
+            "2 = doppelt so schnell, 0,5 = halb so schnell.")
+        self._ug_tempo_spin.valueChanged.connect(self._untergrund_tempo_gesetzt)
+        self._ug_tempo_label = QLabel("Tempo ×:")
+        fu.addRow(self._ug_tempo_label, self._ug_tempo_spin)
+        body.addWidget(self._grp_untergrund)
 
         # ── Gruppe: Bewegung & Parameter (Richtung + dynamische Algo-Parameter) ─
         # Richtung liegt in einer EIGENEN, dauerhaften Form-Zeile; die dynamischen
@@ -1489,7 +1547,7 @@ class RgbMatrixView(QWidget):
 
         # Dimmer-Bereich
         self._dim_form_label.setVisible(is_dimmer)
-        self._imin_spin.setVisible(is_dimmer)
+        # ENG-34: _imin_spin ist nur noch Wert-Traeger und bleibt unsichtbar.
         self._imax_spin.setVisible(is_dimmer)
         # Shutter-Bereich
         self._shut_form_label.setVisible(is_shutter)
@@ -1568,8 +1626,8 @@ class RgbMatrixView(QWidget):
         self._dimmer_seq_editor.setVisible(dc_active)
         self._dimmer_seq_label.setVisible(dc_active)
         # Min/Max-Bereich nur ohne aktive Dimmer-Sequenz (sonst irrelevant).
+        # (ENG-34: „Min" steht als Helligkeit in der Gruppe „Untergrund".)
         self._dim_form_label.setVisible(is_dimmer and not dc_active)
-        self._imin_spin.setVisible(is_dimmer and not dc_active)
         self._imax_spin.setVisible(is_dimmer and not dc_active)
         # Die ganze "Farben"-Gruppe ausblenden, wenn nichts darin sichtbar ist
         # (z. B. Rainbow ohne Farben bei RGB) — kein leerer Gruppenkasten.
@@ -1584,6 +1642,103 @@ class RgbMatrixView(QWidget):
             or (not self._dimmer_seq_editor.isHidden())
         )
         self._grp_colors.setVisible(any_color)
+        self._untergrund_anzeigen(style)
+
+    # ── ENG-34: Untergrund ───────────────────────────────────────────────────
+
+    def _untergrund_anzeigen(self, style: MatrixStyle | None = None):
+        """Bringt die Gruppe „Untergrund" auf den Stand des Entwurfs.
+
+        Setzt Werte und blendet Felder ein oder aus — mehr nicht. Es wird kein
+        Widget erzeugt oder geloescht, deshalb darf das auch aus dem Signal
+        eines dieser Felder heraus laufen."""
+        if style is None:
+            try:
+                style = MatrixStyle(self._style_combo.currentText())
+            except ValueError:
+                style = MatrixStyle.RGB
+        m = self._current
+        self._grp_untergrund.setVisible(style == MatrixStyle.DIMMER)
+        art = m.untergrund_art() if m is not None else UNTERGRUND_AUS
+        felder = (self._ug_art_combo, self._ug_hell_spin, self._ug_tief_spin,
+                  self._ug_tempo_spin)
+        for w in felder:
+            w.blockSignals(True)
+        try:
+            i = self._ug_art_combo.findData(art)
+            self._ug_art_combo.setCurrentIndex(i if i >= 0 else 0)
+            if m is not None:
+                self._ug_hell_spin.setValue(
+                    int(round(max(0, min(255, int(m.intensity_min))) * 100.0 / 255.0)))
+                self._ug_tief_spin.setValue(int(m.get_param("untergrund_tief") or 0))
+                self._ug_tempo_spin.setValue(
+                    float(m.get_param("untergrund_tempo") or 1.0))
+        except (TypeError, ValueError):
+            pass
+        finally:
+            for w in felder:
+                w.blockSignals(False)
+        an = art != UNTERGRUND_AUS
+        atmen = art == UNTERGRUND_ATMEN
+        self._ug_hell_label.setVisible(an)
+        self._ug_hell_spin.setVisible(an)
+        self._ug_tief_label.setVisible(atmen)
+        self._ug_tief_spin.setVisible(atmen)
+        self._ug_tempo_label.setVisible(atmen)
+        self._ug_tempo_spin.setVisible(atmen)
+
+    def _untergrund_pegel_setzen(self, wert: int):
+        """Schreibt den Pegel 0..255 in Entwurf und Traeger-Feld."""
+        wert = max(0, min(255, int(wert)))
+        self._imin_spin.blockSignals(True)
+        self._imin_spin.setValue(wert)
+        self._imin_spin.blockSignals(False)
+        self._current.intensity_min = wert
+
+    def _untergrund_art_gewaehlt(self, _index: int = 0):
+        """Der Nutzer hat die Art umgestellt.
+
+        „Aus" raeumt die Schluessel wieder weg und setzt den Pegel auf 0 — der
+        Effekt steht dann genau so in der Show wie einer, der nie einen
+        Untergrund hatte. „Fester Wert"/„Atmen" schreiben die Art ausdruecklich;
+        stand der Pegel auf 0, beginnt er bei 20 %, sonst saehe man nichts."""
+        if self._current is None or self._loading:
+            return
+        art = self._ug_art_combo.currentData() or UNTERGRUND_AUS
+        params = self._current.params
+        if art == UNTERGRUND_AUS:
+            for key in ("untergrund_art", "untergrund_tempo", "untergrund_tief"):
+                params.pop(key, None)
+            self._untergrund_pegel_setzen(0)
+        else:
+            params["untergrund_art"] = art
+            if int(self._current.intensity_min) <= 0:
+                self._untergrund_pegel_setzen(UNTERGRUND_START_PEGEL)
+        self._untergrund_anzeigen()
+        self._update_dirty()
+
+    def _untergrund_helligkeit_gesetzt(self, prozent: int):
+        if self._current is None or self._loading:
+            return
+        # Wer den Pegel anfasst, benutzt die Funktion: Art festschreiben, damit
+        # sie nicht mehr aus dem Pegel abgeleitet wird (sonst spraenge die
+        # Auswahl bei 0 % auf „Aus" und das Feld verschwaende unter der Hand).
+        self._current.params.setdefault(
+            "untergrund_art", self._ug_art_combo.currentData() or UNTERGRUND_FEST)
+        self._untergrund_pegel_setzen(int(round(int(prozent) * 255.0 / 100.0)))
+        self._update_dirty()
+
+    def _untergrund_tiefpunkt_gesetzt(self, prozent: int):
+        if self._current is None or self._loading:
+            return
+        self._current.set_param("untergrund_tief", prozent)
+        self._update_dirty()
+
+    def _untergrund_tempo_gesetzt(self, faktor: float):
+        if self._current is None or self._loading:
+            return
+        self._current.set_param("untergrund_tempo", faktor)
+        self._update_dirty()
 
     def _load_ui(self, m: RgbMatrixInstance):
         # Guard: Beim Befüllen der Widgets aus dem Draft dürfen die Widget-
