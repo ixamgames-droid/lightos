@@ -1042,21 +1042,32 @@ def _reset_sync_subscribers():
     uebersteht KEIN Test-Leak die Test-Grenze; persistente/Modul-Subscriber aus
     dem Schnappschuss bleiben unangetastet. Bewusst OHNE erzwungenes gc.collect ---
     die jetzt unreferenzierten Views sammelt Python regulaer + gefahrlos ein."""
-    from src.core import sync as _S
-    sync = getattr(_S, "_sync", None)   # NICHT get_sync() -> Singleton nicht erzwingen
-    snapshot = None
-    if sync is not None:
-        try:
-            snapshot = {ev: list(cbs) for ev, cbs in sync._subscribers.items()}
-        except Exception:
-            snapshot = None
+    snapshot = _sync_abos_merken()
     yield
+    _sync_abos_zuruecksetzen(snapshot)
+
+
+def _sync_abos_merken():
+    """Der Subscriber-Stand des Bus, oder ``None`` wenn es den Bus noch nicht
+    gibt (NICHT ``get_sync()`` — das Singleton wird hier nicht erzwungen)."""
+    from src.core import sync as _S
+    sync = getattr(_S, "_sync", None)
+    if sync is None:
+        return None
+    try:
+        return {ev: list(cbs) for ev, cbs in sync._subscribers.items()}
+    except Exception:
+        return None
+
+
+def _sync_abos_zuruecksetzen(snapshot) -> None:
+    from src.core import sync as _S
     sync = getattr(_S, "_sync", None)
     if sync is None:
         return
     try:
         if snapshot is None:
-            # Singleton entstand erst WAEHREND des Tests -> alle Subscriber sind Leaks
+            # Singleton entstand erst WAEHREND des Laufs -> alle Subscriber sind Leaks
             for ev in list(sync._subscribers):
                 sync._subscribers[ev] = []
         else:
@@ -1064,6 +1075,43 @@ def _reset_sync_subscribers():
                 sync._subscribers[ev] = list(snapshot.get(ev, []))
     except Exception:
         pass
+
+
+@pytest.fixture(autouse=True, scope="class")
+def _reset_sync_subscribers_je_klasse():
+    """PROC-21: dieselbe Sicherung eine Stufe hoeher — fuer alles, was eine
+    Testklasse in ``setUpClass``/``setup_class`` am Bus anmeldet.
+
+    DIE LUECKE: ``_reset_sync_subscribers`` sichert je TEST. ``setUpClass``
+    laeuft aber VOR dem ersten Test der Klasse — was dort angemeldet wird,
+    steht schon im Schnappschuss des ersten Tests und gilt fortan als
+    „war vorher da“. Es ueberlebt die Klasse und die Datei.
+
+    BELEG: ``test_las31_notaus_kopfleiste`` baut in ``setUpClass`` ein echtes
+    ``MainWindow``; das meldet ``_on_show_loaded`` am Bus an (ohne
+    ``subscribe_widget``). ``deleteLater`` im ``tearDownClass`` meldet nichts
+    ab, der Bus haelt das Fenster am Leben. Laedt ein SPAETERER Test eine
+    Show, laeuft das alte Fenster mit — und verbraucht z. B. den einmaligen
+    Sperrzonen-Hinweis, den ``test_las32_nachbesserung`` gerade pruefen will
+    (dort rot, allein gruen).
+
+    Dieses Fixture wird vor dem ``setUpClass`` der Klasse aufgebaut und nach
+    ihrem ``tearDownClass`` abgebaut (pytest ordnet autouse-Fixtures aus der
+    conftest vor die der Klasse). Bei Tests ohne Klasse wirkt es je Test — wie
+    das Fixture oben, also ohne Folgen."""
+    snapshot = _sync_abos_merken()
+    yield
+    _sync_abos_zuruecksetzen(snapshot)
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _reset_sync_subscribers_je_modul():
+    """PROC-21: und noch eine Stufe hoeher, fuer ``setUpModule``/
+    ``setup_module`` und Fixtures mit ``scope="module"`` — aus demselben Grund
+    wie ``_reset_sync_subscribers_je_klasse``."""
+    snapshot = _sync_abos_merken()
+    yield
+    _sync_abos_zuruecksetzen(snapshot)
 
 
 # ── PROC-05: warum hier NICHT ``QApplication.allWidgets()`` steht ────────────
