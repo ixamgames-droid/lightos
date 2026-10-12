@@ -66,12 +66,20 @@ Tab **Enttec Pro USB**:
 
 ![The Enttec Pro USB tab](img/02_enttec.png)
 
-1. **COM-Port:** — all serial ports of the computer. A detected ENTTEC carries the
-   suffix `[Enttec Pro]`. If the saved port is not there at the moment, it is listed with
-   `— derzeit nicht gefunden` (currently not found) instead of silently jumping to
-   another port. Without any port it says `Kein Port gefunden` (no port found).
+1. **COM-Port:** — the serial ports that have a **USB device** behind them. A detected
+   ENTTEC carries the suffix `[Enttec Pro]`, is listed **first** and is **preselected**
+   on a fresh computer. Ports without a USB device (the built-in port `COM1`,
+   Bluetooth, empty `/dev/ttyS…`) are hidden; the checkbox **Alle Anschlüsse zeigen**
+   (show all ports) below brings them into the list. If no ENTTEC is detected, the
+   selection stays empty — LightOS then does not pick a port by itself. If the saved
+   port is not there at the moment, it is listed with `— derzeit nicht gefunden`
+   (currently not found) instead of silently jumping to another port; if nothing is
+   connected to it, it is marked `(kein USB-Gerät erkannt)` (no USB device detected).
+   In both cases the line below the list names the detected adapter. Without any port
+   it says `Kein Port gefunden` (no port found).
 2. **Ports aktualisieren** (refresh ports) — read the list in again after plugging in.
-   The selection is kept.
+   The selection is kept; if nothing was selected yet, the ENTTEC you just plugged in
+   is preselected.
 3. **Universe:** — which LightOS universe goes out through this adapter. The field is
    pre-filled with the saved value; set it deliberately **before** you click
    **Verbinden** (connect).

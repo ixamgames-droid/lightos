@@ -292,8 +292,9 @@ class InputProfileEditor(QDialog):
             # sicher). Die eigentliche Model-/UI-Arbeit passiert in _on_learned auf
             # dem GUI-Thread (QueuedConnection). Frueher mutierte der Callback direkt
             # _refresh_table()/self._table cross-thread -> Absturzgefahr.
+            # MIDI-10: Profile fuer Mackie-/X-Touch-Pulte brauchen Pitchbend.
             state.midi_mapper.start_learn(
-                lambda msg: self._learned_signal.emit(msg))
+                lambda msg: self._learned_signal.emit(msg), pitchbend=True)
         except Exception as e:
             QMessageBox.warning(self, "Fehler", str(e))
 
@@ -303,16 +304,19 @@ class InputProfileEditor(QDialog):
         if not self._profile:
             return
         try:
+            # MIDI-10: ein Pitchbend-Fader hat keine Nummer — data1 sind die
+            # unteren Bits des Werts, die sich mit jeder Bewegung aendern.
+            d1 = 0 if msg.msg_type == "pitchbend" else msg.data1
             r = self._table.currentRow()
             if r < 0 or r >= len(self._profile.mappings):
                 m = MidiMapping(name="Gelernt", msg_type=msg.msg_type, channel=msg.channel,
-                                data1=msg.data1, action=ACTION_NONE, param="", port_filter="")
+                                data1=d1, action=ACTION_NONE, param="", port_filter="")
                 self._profile.mappings.append(m)
             else:
                 m = self._profile.mappings[r]
                 m.msg_type = msg.msg_type
                 m.channel = msg.channel
-                m.data1 = msg.data1
+                m.data1 = d1
             self._save_meta()
             self._refresh_table()
         except Exception as e:

@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (QDialog, QFormLayout, QLineEdit, QComboBox,
                                 QCheckBox, QWidget, QVBoxLayout, QHBoxLayout)
 from PySide6.QtCore import Qt, QRect, QPoint, Signal
 from PySide6.QtGui import QPainter, QColor, QFont, QLinearGradient, QPen
+from src.core.midi.midi_manager import fader_wert          # MIDI-10
 from .vc_widget import VCWidget
 from .vc_style import paint_slider_handle   # VC3D-02: plastischer Fader-Griff
 
@@ -173,6 +174,10 @@ class VCSlider(VCWidget):
         # MIDI CC binding
         self.midi_cc: int = -1        # -1 = kein MIDI
         self.midi_ch: int = 0         # 0 = alle Kanäle
+        # MIDI-10: "cc" (wie bisher) oder "pitchbend" — Mackie-/X-Touch-Fader
+        # senden Pitchbend, je Fader ein Kanal, 14 Bit. Bei Pitchbend ist
+        # ``midi_cc`` nur der Merker „gebunden" (0), die Kennung ist ``midi_ch``.
+        self.midi_type: str = "cc"
         # Soft-Takeover-Laufzeitzustand (s. Klassen-Flag soft_takeover):
         #   _pickup_armed = True  -> wartet, bis der physische Fader den VC-Wert
         #                            durchfährt; bis dahin wird MIDI ignoriert.
@@ -689,13 +694,14 @@ class VCSlider(VCWidget):
             self.update()
 
     def handle_midi(self, msg) -> bool:
-        if self.midi_cc < 0 or msg.msg_type != "cc":
+        if self.midi_cc < 0 or msg.msg_type != self.midi_type:
             return False
         if self.midi_ch != 0 and self.midi_ch != msg.channel:
             return False
-        if msg.data1 != self.midi_cc:
+        if self.midi_type == "cc" and msg.data1 != self.midi_cc:
             return False
-        iv = round(msg.data2 / 127.0 * 255)
+        # MIDI-10: Pitchbend mit 14 Bit — alle 256 Stufen erreichbar (CC: 128).
+        iv = round(fader_wert(msg) * 255)
 
         # Ohne Soft-Takeover (oder nicht „armiert"): direkt übernehmen.
         if not VCSlider.soft_takeover or not self._pickup_armed:
@@ -718,26 +724,45 @@ class VCSlider(VCWidget):
             self.update()              # nur den Pickup-Hinweis (Pfeil) auffrischen
         return True
 
-    # ── MIDI Teach (siehe VCWidget) — Fader bindet nur CC ──────────────────────
+    # ── MIDI Teach (siehe VCWidget) — Fader bindet CC oder Pitchbend ───────────
 
     def supports_midi_teach(self) -> bool:
         return True
 
     def _midi_teach_kinds(self):
-        return ("cc",)
+        return ("cc", "pitchbend")          # MIDI-10
 
     def current_midi_binding(self):
         if self.midi_cc is None or self.midi_cc < 0:
             return None
+        if self.midi_type == "pitchbend":
+            return ("pitchbend", self.midi_ch, 0)
         return ("cc", self.midi_ch, self.midi_cc)
 
     def apply_midi_binding(self, msg_type, channel, data1):
         if data1 is None or data1 < 0:
             self.midi_cc = -1
+            self.midi_type = "cc"
             return
-        if msg_type == "cc":
+        if msg_type == "pitchbend":
+            self.midi_type = "pitchbend"
+            self.midi_cc = 0                # gebunden; die Kennung ist der Kanal
+            self.midi_ch = channel or 0
+        elif msg_type == "cc":
+            self.midi_type = "cc"
             self.midi_cc = data1
             self.midi_ch = channel or 0
+
+    def _midi_bindung_aus_dialog(self, art: str, cc: int, kanal: int):
+        """MIDI-10: Eingaben des Eigenschaften-Dialogs uebernehmen. Pitchbend
+        hat keine Nummer — gewaehlt heisst gebunden, die Kennung ist der Kanal."""
+        if art == "pitchbend":
+            self.midi_type = "pitchbend"
+            self.midi_cc = 0
+        else:
+            self.midi_type = "cc"
+            self.midi_cc = int(cc)
+        self.midi_ch = int(kanal)
 
     # ── Track geometry ────────────────────────────────────────────────────────
 
@@ -1134,13 +1159,31 @@ class VCSlider(VCWidget):
         btns.accepted.connect(dlg.accept)
         btns.rejected.connect(dlg.reject)
         form.addRow(btns)
-        form.addRow(QLabel("── MIDI CC Bindung ──"))
+        form.addRow(QLabel("── MIDI-Bindung ──"))
+
+        # MIDI-10: CC (APC & Co.) oder Pitchbend (Mackie Control, X-Touch).
+        midi_type_combo = QComboBox()
+        midi_type_combo.addItem("CC", "cc")
+        midi_type_combo.addItem("Pitchbend (Motorfader, 14 Bit)", "pitchbend")
+        midi_type_combo.setCurrentIndex(1 if self.midi_type == "pitchbend" else 0)
+        midi_type_combo.setToolTip(
+            "CC: Fader mit Controller-Nummer. Pitchbend: Mackie-Control-/X-Touch-"
+            "Fader — je Fader ein MIDI-Kanal, keine Nummer. Bei Pitchbend den "
+            "Kanal wählen: mit „Alle“ bewegt jeder Fader des Pults diesen Regler.")
+        form.addRow("Art:", midi_type_combo)
 
         midi_cc_spin = QSpinBox()
         midi_cc_spin.setRange(-1, 127)
-        midi_cc_spin.setValue(self.midi_cc)
+        # Bei Pitchbend ist midi_cc nur der Merker „gebunden“ — beim Wechsel
+        # auf CC soll daraus nicht still CC 0 werden.
+        midi_cc_spin.setValue(-1 if self.midi_type == "pitchbend" else self.midi_cc)
         midi_cc_spin.setSpecialValueText("keine")
         form.addRow("CC-Nummer (-1=keine):", midi_cc_spin)
+
+        def _midi_art_gewechselt(_index=0):
+            midi_cc_spin.setEnabled(midi_type_combo.currentData() != "pitchbend")
+        midi_type_combo.currentIndexChanged.connect(_midi_art_gewechselt)
+        _midi_art_gewechselt()
 
         midi_ch_spin = QSpinBox()
         midi_ch_spin.setRange(0, 16)
@@ -1212,8 +1255,9 @@ class VCSlider(VCWidget):
             self.invert = invert_cb.isChecked()
             self.range_min = rmin.value()
             self.range_max = rmax.value()
-            self.midi_cc = midi_cc_spin.value()
-            self.midi_ch = midi_ch_spin.value()
+            self._midi_bindung_aus_dialog(
+                midi_type_combo.currentData() or "cc",
+                midi_cc_spin.value(), midi_ch_spin.value())
             self.update()
             self._post_dialog_mode_sync(_old_mode, _old_group)
 
@@ -1297,6 +1341,10 @@ class VCSlider(VCWidget):
         d["value"] = self._value
         d["midi_cc"] = self.midi_cc
         d["midi_ch"] = self.midi_ch
+        if self.midi_type != "cc":
+            # MIDI-10: nur schreiben, wenn es kein CC ist — ein CC-Fader bleibt
+            # in der Datei Zeichen fuer Zeichen wie bisher.
+            d["midi_type"] = self.midi_type
         return d
 
     def apply_dict(self, d: dict):
@@ -1357,6 +1405,8 @@ class VCSlider(VCWidget):
         self._value = max(0, min(255, int(d.get("value", 0) or 0)))
         self.midi_cc = d.get("midi_cc", -1)
         self.midi_ch = d.get("midi_ch", 0)
+        _mt = d.get("midi_type", "cc")
+        self.midi_type = "pitchbend" if _mt == "pitchbend" else "cc"   # MIDI-10
         # VCB-32: Die Direktzuweisung an self._value (oben) umgeht den @value.setter,
         # der _apply() ruft. Modi mit persistentem App-State (GROUP_DIMMER schreibt
         # fixture_dimmers, SUBMASTER einen Output-Slot) muessen ihren geladenen Wert

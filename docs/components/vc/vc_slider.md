@@ -42,7 +42,7 @@ Der Modus wird im Editor über deutsche Labels (`SLIDER_MODE_LABELS`) gewählt.
   startet den/die Ziel-Effekte, Wert == 0 stoppt sie wirklich.
 - **Multi-Effekt (Phase E):** `function_ids` regeln mehrere Effekte gemeinsam;
   `param_keys_per_id` gibt je Effekt einen eigenen Parameter im `EFFECT_PARAM`-Modus.
-- **MIDI:** `midi_cc`/`midi_ch` (0 = alle Kanäle); Soft-Takeover global über
+- **MIDI:** `midi_cc`/`midi_ch` (0 = alle Kanäle), dazu `midi_type` = `"pitchbend"` für Mackie-/X-Touch-Fader (MIDI-10; 14 Bit, Kennung ist der Kanal, `midi_cc` dann 0 = gebunden; bei CC wird das Feld nicht geschrieben); Soft-Takeover global über
   `soft_takeover` (Toolbar) mit Laufzeitzustand `_pickup_armed`/`_last_cc`.
 
 ## Verknüpfungen
