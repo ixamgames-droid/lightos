@@ -84,7 +84,6 @@
 | VCB-45 | A | - | 2026-10-12T18:15Z | - |
 | VCB-46 | A | - | 2026-10-12T18:15Z | - |
 | ENG-37 | A | feature/eng37-modify-effekte | 2026-10-12T18:55Z | src/core/engine/function_manager.py · src/core/engine/rgb_matrix.py · src/ui/views/rgb_matrix_view.py |
-| LIZ-1 | A | feature/liz1-aktivierung-urhebervermerk | 2026-10-12T19:08Z | main.py · src/core/lizenz.py · LICENSE · README.md |
 | DOC-72 | A | docs/doc72-externe-pulte | 2026-10-12T19:47Z | - |
 | LIZ-2 | D | fix/liz2-fremdlizenzen-windows-setup | 2026-10-12T20:56Z | THIRD_PARTY_NOTICES.md · licenses · packaging/windows/bundle_inhalt.py · packaging/windows/LightOS.spec · src/core/selbsttest.py · tests/test_liz2_fremdlizenzen_setup.py |
 
@@ -288,7 +287,6 @@
 
 ## Verlauf
 
-- 2026-10-12T15:49Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-12T16:05Z B claim DOC-71
 - 2026-10-12T16:20Z B claim STAB-37
 - 2026-10-12T16:22Z D done LAS-37
@@ -318,3 +316,4 @@
 - 2026-10-12T19:47Z A claim DOC-72
 - 2026-10-12T19:59Z D claim LIZ-2
 - 2026-10-12T20:02Z D done FM-66
+- 2026-10-12T21:01Z A done LIZ-1
