@@ -81,6 +81,7 @@
 | UI-92 | D | fix/ui92-kleinkram-kuerzel-speichernfrage-sicherungen | 2026-10-12T15:41Z | src/ui/hilfe.py · src/core/show/sicherungen.py · src/ui/visualizer/visualizer_window.py |
 | VIZ-108 | B | fix/viz107-3d-fenster-gobo-niedrig-einstellungen | 2026-10-12T15:46Z | src/ui/visualizer/visualizer_window.py · tests/test_viz108_reiter_einstellungen_breite.py |
 | VIZ-107 | B | fix/viz107-3d-fenster-gobo-niedrig-einstellungen | 2026-10-12T15:46Z | tests/test_viz107_gobo_niedrig_buehnenkante_scene.py |
+| DOC-71 | B | docs/doc71-laser-blackout-anleitungen | 2026-10-12T16:05Z | docs/anleitung_ausgabe_einrichten · docs/anleitung_vc_widgets/01_button.md · docs/anleitung_vc_widgets/01_button.en.md · docs/anleitung_erste_schritte/ANLEITUNG.en.md · docs/components/engine/script.md · docs/anleitung_laser/ANLEITUNG_LASER.md · docs/OUTPUT_MERGE_CONTRACT.md · tests/test_doc71_laser_blackout_einheitlich.py · tools/doku_gates.txt |
 
 ## Blocker & Fallen
 
@@ -240,7 +241,6 @@
 
 ## Verlauf
 
-- 2026-10-11T21:02Z A done UI-86
 - 2026-10-11T21:35Z D done VCB-36
 - 2026-10-11T21:55Z D done VIZ-103
 - 2026-10-11T22:18Z A done LAS-33
@@ -270,3 +270,4 @@
 - 2026-10-12T15:46Z B claim VIZ-107
 - 2026-10-12T15:49Z A done OUT-68
 - 2026-10-12T15:49Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-12T16:05Z B claim DOC-71
