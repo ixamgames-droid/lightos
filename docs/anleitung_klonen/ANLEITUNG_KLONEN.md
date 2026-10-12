@@ -43,7 +43,8 @@ Reiter **Patch** stehen (**+ Gerät hinzufügen** oder **Mit Offset kopieren…*
    - **Wie** — **Hinzufügen** oder **Ersetzen**. Hier ist nichts vorgewählt; solange du
      nicht gewählt hast, bleibt **Anwenden** grau und die Vorschau leer.
    - **Position in Gruppe, Raster und Fächer** — **ans Ende** (Vorgabe) oder
-     **neben die Quelle**.
+     **neben die Quelle**. Eine Quelle auf mehrere Ziele: die Ziele stehen in der
+     Reihenfolge ihrer Nummern hinter der Quelle (1 auf 2–5 ergibt 1, 2, 3, 4, 5).
 5. Die **Vorschau** rechts lesen (siehe unten), dann **Anwenden**.
 
 Unten in der Statuszeile steht danach, wie viele Stellen geklont wurden.
@@ -52,7 +53,8 @@ Unten in der Statuszeile steht danach, wie viele Stellen geklont wurden.
 
 Der Unterschied zeigt sich nur dort, wo das Ziel **schon einen Wert hat**.
 
-Snap „Rot": Lampe 1 hat Rot 255 und Grün 0. Lampe 5 steht schon mit Rot 7 und Blau 99 drin.
+Snap „Rot", beide Lampen vom selben Typ: Lampe 1 hat Rot 255 und Grün 0. Lampe 5 steht
+schon mit Rot 7 und Blau 99 drin.
 
 | | Rot | Grün | Blau |
 |---|---|---|---|
@@ -66,13 +68,45 @@ nie angefasst.
 Bei Mitgliedschaften (Gruppen, Raster, Gerätelisten) gibt es keinen Unterschied: ist
 das Ziel schon dabei, bleibt es, wo es ist.
 
+### Farbe zwischen verschiedenen Gerätetypen: ganze Farbe oder einzelner Kanal
+
+Sind Quelle und Ziel **derselbe Typ**, gilt die Tabelle oben Kanal für Kanal. Sind sie
+**verschieden** (zum Beispiel RGB-PAR auf RGBW-PAR), kommt es darauf an, was die Quelle
+an der Stelle gespeichert hat:
+
+- **Eine ganze Farbe** — alle Farbkanäle der Quelle sind gesetzt (Rot, Grün **und**
+  Blau). Dann bekommt das Ziel dieselbe Farbe in seinem eigenen Farbsystem, und dafür
+  werden **alle** Kanäle seiner Farbmischung gesetzt. Die Vorschau sagt es ausdrücklich:
+  „Farbe wird als Ganzes ersetzt". Das ist kein Löschen, sondern dieselbe Farbe anders
+  geschrieben — ein halb übernommenes Rot mit altem Grün wäre eine dritte Farbe.
+- **Ein einzelner Kanal** — die Quelle hat dort zum Beispiel nur Rot gesetzt. Dann geht
+  nur dieser Kanal auf den **gleichnamigen** Kanal des Ziels; alles andere am Ziel
+  bleibt. Hat das Ziel keinen gleichnamigen Kanal (Rot auf ein CMY-Gerät), fällt der
+  Wert weg und steht unter „fällt weg".
+
+Beispiel RGB-PAR auf RGBW-PAR, das Ziel steht schon mit Grün 99 und Weiß 50 im Snap:
+
+| Quelle hat | **Ersetzen** | **Hinzufügen** |
+|---|---|---|
+| Rot 255, Grün 0, Blau 0 (ganze Farbe) | Rot 255, Grün 0, Blau 0, Weiß 0 | Rot 255, Blau 0 kommen dazu; Grün 99 und Weiß 50 bleiben |
+| nur Rot 255 (einzelner Kanal) | Rot 255; Grün 99 und Weiß 50 bleiben | Rot 255 kommt dazu; Grün 99 und Weiß 50 bleiben |
+
+**Hinzufügen** überschreibt auch hier nie einen Wert, den das Ziel schon hat. Amber
+und UV sind eigene Lichtquellen und zählen nicht zur Farbmischung: sie werden nur
+übernommen, wenn beide Geräte sie haben, und sonst am Ziel nicht angefasst.
+
 ## 5. Die Vorschau lesen
+
+Sind Quelle und Ziel verschiedene Gerätetypen, steht ganz oben ein gelber Satz, was in
+dieser Fassung **nicht** übertragen wird: Bewegung (Pan/Tilt), Gobo, Optik (Zoom,
+Fokus, Prisma), Shutter/Strobe, Makros und Werte einzelner Köpfe.
 
 Über der Liste stehen drei Zähler, jede Zeile trägt eines der drei Kennzeichen:
 
 - **unverändert übernommen** (grün, ✓) — der Wert oder die Mitgliedschaft geht 1:1 ans Ziel.
-- **übersetzt** (gelb, ≈) — der Wert wurde für das Ziel umgerechnet; die Zeile nennt
-  die Farbe und die neuen Werte.
+- **übersetzt** (gelb, ≈) — der Wert wurde für das Ziel umgerechnet; die Zeile beginnt
+  mit „Farbe wird als Ganzes ersetzt" (bei **Hinzufügen**: „… übersetzt") und nennt die
+  Farbe und die neuen Werte.
 - **fällt weg** (rot, ✗) — das Ziel kann es nicht, oder es kommt erst in einem späteren
   Schritt. Der Grund steht dabei.
 
@@ -81,8 +115,17 @@ geschieht, weil das Ziel dort schon steht.
 
 Jede Zeile nennt den Ort beim Namen, zum Beispiel `Snap „Rot“ · 1 → 5`. Eine Cueliste
 oder Sequenz wird zu einer Zeile je Kennzeichen zusammengefasst („· 12 Stellen").
-Unter der Liste stehen Hinweise in Gelb, etwa wenn Quelle und Ziel verschiedene
-Gerätetypen sind.
+Unter der Liste stehen Hinweise in Gelb, etwa wenn die Quelle keinen Dimmer hat.
+
+**Lange Vorschau:** Die Liste ist nach Bereichen geordnet. Jeder Bereich hat eine
+Kopfzeile mit seinen Zählern (zum Beispiel „Snaps & Szenen — 590 ✓ · 10 ✗") und zeigt
+zuerst nur die ersten 30 Zeilen. Ein Klick auf „… und X weitere" klappt 200 weitere auf.
+Die Zähler ganz oben und die Zahl im Knopf **Anwenden** zählen immer alles.
+
+**Große Shows:** Dauert das Rechnen spürbar (eine Quelle auf sehr viele Ziele, hunderte
+Snaps), rechnet die Vorschau nicht nach jedem Häkchen sofort neu, sondern kurz nachdem
+du fertig geklickt hast — solange steht dort „Vorschau wird neu berechnet …" und
+**Anwenden** ist grau. Beim Anwenden zeigt der Mauszeiger die Sanduhr.
 
 ## 6. Verschiedene Gerätetypen: was übersetzt wird, was wegfällt
 
@@ -93,8 +136,9 @@ Paletten, Grundwerte):
 | Baustein | Was geschieht |
 |---|---|
 | Dimmer | Dimmer → Dimmer, Wert 1:1. Ziel ohne Dimmer: fällt weg. |
-| RGB ↔ RGBW | über die sichtbare Farbe. Hat das Ziel einen Weiß-Kanal, wandert der Weißanteil dorthin (wie beim Farbwähler): Weiß 255/255/255 wird Weiß 255, Rot/Grün/Blau 0. |
-| RGB/RGBW ↔ CMY | über die sichtbare Farbe: Cyan = 255 − Rot und so weiter. |
+| RGB ↔ RGBW | nur eine **ganze** Farbe (siehe [Abschnitt 4](#4-hinzufügen-oder-ersetzen)), über die sichtbare Farbe. Hat das Ziel einen Weiß-Kanal, wandert der Weißanteil dorthin (wie beim Farbwähler): Weiß 255/255/255 wird Weiß 255, Rot/Grün/Blau 0. |
+| RGB/RGBW ↔ CMY | nur eine **ganze** Farbe, über die sichtbare Farbe: Cyan = 255 − Rot und so weiter. |
+| einzelner Farbkanal (nicht alle Farbkanäle der Quelle gesetzt) | geht nur auf den gleichnamigen Kanal des Ziels, sonst fällt er weg. Der Rest des Ziels bleibt. |
 | Amber, UV | nur, wenn beide Geräte den Kanal haben; sonst fällt er weg. |
 | Farbe → Farbrad | der nächstliegende **benannte** Platz im Rad, in der Vorschau als „ungefähr" markiert. Passt kein Platz: fällt weg. |
 | Farbrad → Farbmischung | die Farbe des Platzes laut seinem Namen. Platz ohne Farbwort oder Rotation: fällt weg. |
@@ -164,7 +208,9 @@ Diese Anleitung ist bisher nur Text. Aufzunehmen sind:
 3. Dialog **Klonen** direkt nach dem Öffnen: nichts unter **Wie** gewählt, **Anwenden** grau.
 4. Dialog **Klonen**, gleicher Typ, **Hinzufügen**, Vorschau gefüllt.
 5. Dialog **Klonen**, verschiedene Typen (RGB-PAR → RGBW-PAR und → Gerät mit Farbrad),
-   mit „übersetzt" und „fällt weg".
+   mit dem gelben Satz oben, „übersetzt" und „fällt weg".
 6. Vorher/Nachher einer Fixture-Gruppe und eines Matrix-Rasters (ans Ende / neben die Quelle).
 7. **Datei → Ältere Version öffnen…** mit dem Eintrag „vor dem Klonen".
 8. Menü **Bearbeiten** mit dem Eintrag „Rückgängig: Klonen 1 → 5".
+9. Dialog **Klonen** mit einer Quelle auf viele Ziele: Kopfzeilen je Bereich und die
+   Zeile „… und X weitere".

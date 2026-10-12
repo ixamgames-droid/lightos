@@ -112,7 +112,8 @@ def test_vorschau_zaehler_stimmen_mit_liste_und_plan(show):
     text = dlg._zaehler.text()
     assert "2 unverändert übernommen" in text and "1 übersetzt" in text \
         and "0 fällt weg" in text
-    assert "verschiedene Gerätetypen" in dlg._hinweise.text()
+    assert "Verschiedene Gerätetypen" in dlg._typ_hinweis.text()
+    assert not dlg._typ_hinweis.isHidden()
     assert "(3 Stellen)" in dlg._anwenden.text()
 
     # ein Häkchen weniger → die Vorschau rechnet neu
@@ -135,10 +136,13 @@ def test_faellt_weg_steht_in_der_vorschau(show):
     dlg, _u = _dialog(show, [3], [1])            # Kopf (CMY, Pan/Tilt) → RGB-PAR
     dlg._hinzufuegen.setChecked(True)
     z = dlg.plan().zaehler()
-    assert z[K.UEBERSETZT] == 1 and z[K.FAELLT_WEG] == 1
+    # Nur Cyan gesetzt = Teilwert: das RGB-Ziel hat kein Cyan → fällt weg,
+    # es wird keine ganze Farbe daraus gemacht.
+    assert z[K.UEBERSETZT] == 0 and z[K.FAELLT_WEG] == 2
     weg = [dlg._liste.item(i).text() for i in range(dlg._liste.count())
            if dlg._liste.item(i).data(Qt.ItemDataRole.UserRole) == K.FAELLT_WEG]
-    assert "Pan" in weg[0] and "späteren Schritt" in weg[0]
+    assert any("Pan" in w and "späteren Schritt" in w for w in weg)
+    assert any("keine vollständige Farbe" in w for w in weg)
 
 
 def test_nichts_wird_geschrieben_vor_anwenden_und_sicherung_kommt_zuerst(show):
@@ -271,3 +275,152 @@ def test_patch_einstieg_knopf_und_kontextmenue(show, monkeypatch):
     assert "Klonen auf …" in dict(pv._kontextmenue_eintraege(zeile[2]))
     pv._btn_klonen.click()
     assert sorted(aufrufe[-1]) == [1, 3]
+
+
+# ── Gegenprüfung: große Shows, Abbruch, Hinweis oben ────────────────────────
+
+def _viele(show, ziele=40, snaps=3):
+    show.patch(1, RGB, "Quelle")
+    for fid in range(101, 101 + ziele):
+        show.patch(fid, RGB)
+    for i in range(snaps):
+        show.snaps.add_snap(f"S{i}", "", {1: {"color_r": i, "intensity": 200}})
+    show.gruppe("Front", {"0,0": 1})
+    return list(range(101, 101 + ziele))
+
+
+def _texte(dlg) -> list:
+    return [dlg._liste.item(i).text() for i in range(dlg._liste.count())]
+
+
+def test_lange_vorschau_wird_zusammengefasst_und_klappt_auf(show):
+    ziele = _viele(show)                         # 40 Gruppen-, 120 Snap-Zeilen
+    dlg, _u = _dialog(show, [1], ziele)
+    dlg._hinzufuegen.setChecked(True)
+    plan = dlg.plan()
+    assert len(plan.eintraege) == 160
+    je = D.ZEILEN_JE_BEREICH
+    assert _zeilen(dlg) == {K.UNVERAENDERT: 2 * je}, "je Bereich nur die ersten"
+    texte = _texte(dlg)
+    assert any(t.startswith("Gruppen — 40 ✓") for t in texte)
+    assert any(t.startswith("Snaps & Szenen — 120 ✓") for t in texte)
+    assert sum("und 10 weitere" in t for t in texte) == 1
+    assert sum("und 90 weitere" in t for t in texte) == 1
+    assert "160 unverändert übernommen" in dlg._zaehler.text(), \
+        "die Zähler oben zählen alles, nicht nur das Gezeigte"
+    assert "(160 Stellen)" in dlg._anwenden.text()
+
+    gerechnet = dlg.berechnungen
+    mehr = next(dlg._liste.item(i) for i in range(dlg._liste.count())
+                if "und 90 weitere" in dlg._liste.item(i).text())
+    dlg._liste.itemClicked.emit(mehr)
+    assert _zeilen(dlg) == {K.UNVERAENDERT: je + 120}
+    assert not any("weitere in „Snaps" in t for t in _texte(dlg))
+    assert dlg.berechnungen == gerechnet, "Aufklappen rechnet nicht neu"
+    assert dlg.plan() is plan
+
+
+def test_wechsel_der_wahl_rechnet_einmal_nicht_zweimal(show):
+    _beispiel(show)
+    dlg, _u = _dialog(show, [1], [2])
+    dlg._hinzufuegen.setChecked(True)
+    n = dlg.berechnungen
+    dlg._ersetzen.setChecked(True)               # meldet „aus" und „an"
+    assert dlg.berechnungen == n + 1
+    dlg._neben.setChecked(True)
+    assert dlg.berechnungen == n + 2
+    assert dlg.plan().optionen.position == K.POS_NEBEN
+
+
+def test_grosse_show_klicks_werden_gesammelt(show):
+    _beispiel(show)
+    dlg, _u = _dialog(show, [1], [2])
+    dlg._hinzufuegen.setChecked(True)
+    n = dlg.berechnungen
+    dlg.dauer_rechnen = 1.0                      # die letzte Rechnung war langsam
+    for bereich in (K.BEREICH_GRUPPEN, K.BEREICH_CUES, K.BEREICH_PALETTEN):
+        dlg._haekchen[bereich].setChecked(False)
+    assert dlg.berechnungen == n, "drei Klicks, noch keine Rechnung"
+    assert dlg._entprellen.isActive()
+    assert not dlg._anwenden.isEnabled(), "kein Anwenden auf einem alten Plan"
+    assert "berechnet" in dlg._zaehler.text()
+    plan = dlg.plan()                            # holt die Rechnung sofort nach
+    assert dlg.berechnungen == n + 1 and not dlg._entprellen.isActive()
+    assert K.BEREICH_GRUPPEN not in plan.optionen.bereiche
+    assert dlg._anwenden.isEnabled()
+    # kleine Show: danach wieder sofort
+    dlg._haekchen[K.BEREICH_GRUPPEN].setChecked(True)
+    assert dlg.berechnungen == n + 2 and not dlg._entprellen.isActive()
+
+
+def test_entprellte_rechnung_kommt_von_selbst(show):
+    _beispiel(show)
+    dlg, _u = _dialog(show, [1], [2])
+    dlg._hinzufuegen.setChecked(True)
+    n = dlg.berechnungen
+    dlg.dauer_rechnen = 1.0
+    dlg._haekchen[K.BEREICH_GRUPPEN].setChecked(False)
+    dlg._entprellen.timeout.emit()               # die Pause ist um
+    assert dlg.berechnungen == n + 1 and dlg._plan is not None
+
+
+def test_abbrechen_schreibt_nichts(show):
+    snap = _beispiel(show)
+    vorher = {k: dict(v) for k, v in snap.values.items()}
+    umgebung = _Umgebung(show.state)
+    dlg, _ = _dialog(show, [1], [2], umgebung=umgebung)
+    dlg._ersetzen.setChecked(True)
+    dlg._neben.setChecked(True)
+    assert dlg._anwenden.isEnabled()
+    dlg.reject()
+    assert dlg.result() == D.QDialog.DialogCode.Rejected and dlg.ergebnis is None
+    assert snap.values == vorher
+    assert show.state.group_fids_by_name("Front") == [1]
+    assert umgebung.gesichert == 0 and umgebung.nachgezogen == 0
+    assert not get_undo_stack().can_undo()
+
+
+def test_anwenden_zeigt_die_sanduhr_und_nimmt_sie_wieder_weg(show):
+    _beispiel(show)
+    zeiger = []
+
+    class _U(_Umgebung):
+        def nachziehen(self, plan):
+            z = QApplication.overrideCursor()
+            zeiger.append(z.shape() if z is not None else None)
+
+    dlg, _ = _dialog(show, [1], [2], umgebung=_U(show.state))
+    dlg._hinzufuegen.setChecked(True)
+    dlg._anwenden.click()
+    assert zeiger == [Qt.CursorShape.WaitCursor]
+    assert QApplication.overrideCursor() is None
+
+
+def test_satz_was_nicht_uebertragen_wird_steht_oben(show):
+    _beispiel(show)
+    dlg, _u = _dialog(show, [1], [2, 3])         # RGB → RGBW und CMY
+    dlg._hinzufuegen.setChecked(True)
+    satz = dlg._typ_hinweis.text()
+    assert not dlg._typ_hinweis.isHidden()
+    assert "NICHT übertragen" in satz and "1 → 2, 3" in satz
+    for wort in ("Bewegung", "Gobo", "Optik", "Shutter", "Köpfe"):
+        assert wort in satz
+    lay = dlg._typ_hinweis.parentWidget().findChildren(type(dlg._typ_hinweis))
+    assert lay.index(dlg._typ_hinweis) < lay.index(dlg._hinweise), \
+        "über der Liste, nicht bei den Hinweisen darunter"
+    # gleicher Typ: kein Satz
+    show.patch(9, RGB)
+    dlg, _u = _dialog(show, [1], [9])
+    dlg._hinzufuegen.setChecked(True)
+    assert dlg._typ_hinweis.isHidden() and dlg._typ_hinweis.text() == ""
+
+
+def test_gesperrte_konsole_rechnet_nicht_waehrend_des_aufbaus(show, capfd):
+    _beispiel(show)
+    umgebung = _Umgebung(show.state)
+    umgebung.abholen = lambda: setattr(umgebung, "konsole_gesperrt", True)
+    dlg, _ = _dialog(show, [1], [2], umgebung=umgebung)
+    assert not dlg._haekchen[K.BEREICH_KONSOLE].isEnabled()
+    assert "AttributeError" not in capfd.readouterr().err
+    dlg._hinzufuegen.setChecked(True)
+    assert K.BEREICH_KONSOLE not in dlg.plan().optionen.bereiche

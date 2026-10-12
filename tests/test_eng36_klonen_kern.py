@@ -230,7 +230,9 @@ def test_hinweis_wenn_quelle_keinen_dimmer_hat(show):
     show.patch(2, RGBW)
     plan = show.plane([6], [2])
     assert any("hat keinen Dimmer" in h and "getrennt" in h for h in plan.hinweise)
-    assert any("verschiedene Gerätetypen" in h for h in plan.hinweise)
+    assert "Verschiedene Gerätetypen (6 → 2)" in plan.typ_hinweis
+    assert not any("Gerätetypen" in h for h in plan.hinweise), \
+        "der Satz steht einmal oben, nicht je Paar"
 
 
 def test_rueckgaengig_laesst_spaetere_handarbeit_stehen(show):
@@ -594,7 +596,8 @@ def _volle_show(show):
     for fid, typ in ((1, RGB), (2, RGBW), (3, CMY), (4, CMY)):
         show.patch(fid, typ)
     st = show.state
-    show.snaps.add_snap("Rot", "", {1: {"color_r": 255, "intensity": 200},
+    show.snaps.add_snap("Rot", "", {1: {"color_r": 255, "color_g": 0,
+                                        "color_b": 0, "intensity": 200},
                                     3: {"pan": 5, "cmy_c": 9}})
     show.gruppe("Front", {"0,0": 1, "1,0": 3})
     m = st.function_manager.new_rgb_matrix("M")

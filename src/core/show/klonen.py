@@ -27,6 +27,15 @@ keinen Dimmer, bekommt das Ziel keinen — das steht nur als Hinweis im Plan.
 die Quelle an dieser Stelle hat. Was das Ziel dort sonst noch tut und wo die
 Quelle gar nicht vorkommt, bleibt unberührt.
 
+★ **Farbe zwischen verschiedenen Typen — voll oder Teilwert.** Übersetzt wird
+der Baustein Farbe nur als Ganzes: hat die Quelle an der Stelle ALLE Kanäle
+ihrer Farbmischung gesetzt, bekommt das Ziel dieselbe Farbe in seinem
+Farbsystem (alle Kanäle seiner Mischung — das ist kein Löschen, sondern
+dieselbe Farbe anders geschrieben). Hat die Quelle nur einzelne Farbkanäle
+gesetzt (Teilwert), geht jeder nur auf den gleichnamigen Kanal des Ziels, der
+Rest des Ziels bleibt; ohne gleichnamigen Kanal fällt der Teilwert weg. Aus
+einem einzelnen „Rot 255" wird also nie „Grün 0, Blau 0, Weiß 0".
+
 Der Rückweg je Stelle (:class:`Schritt`): steht die Stelle noch genau so da,
 wie das Klonen sie hinterlassen hat, kommt der Stand von davor zurück —
 zeichengleich. Wurde seither von Hand daran gearbeitet, werden nur die vom
@@ -94,6 +103,11 @@ POS_NEBEN = "neben"
 GRUND_SPAETER = "kommt in einem späteren Schritt"
 GRUND_KOPF = ("Wert eines einzelnen Kopfes — zwischen verschiedenen "
               "Gerätetypen kommt das in einem späteren Schritt")
+GRUND_TEILWERT = ("einzelner Farbkanal, keine vollständige Farbe — das Ziel "
+                  "hat keinen gleichnamigen Kanal")
+#: Was zwischen verschiedenen Gerätetypen in dieser Fassung NICHT mitgeht.
+NICHT_UEBERTRAGEN = ("Bewegung (Pan/Tilt)", "Gobo", "Optik (Zoom, Fokus, Prisma)",
+                     "Shutter/Strobe", "Makros", "Werte einzelner Köpfe")
 
 _DIMMER = ("intensity", "dimmer", "master")
 _MISCH = ("color_r", "color_g", "color_b", "color_w")
@@ -126,11 +140,15 @@ class Schritt:
     """
 
     def __init__(self, lesen: Callable, schreiben: Callable,
-                 einfuegen: Callable, entfernen: Callable):
+                 einfuegen: Callable, entfernen: Callable,
+                 kopie: Callable = copy.deepcopy):
         self._lesen = lesen
         self._schreiben = schreiben
         self._einfuegen = einfuegen
         self._entfernen = entfernen
+        #: Flache Stände (ein Werte-Dict, eine Liste von Nummern) brauchen
+        #: keine tiefe Kopie — bei 30 000 Stellen ist das der Unterschied.
+        self._kopie = kopie
         self._vor = None
         self._nach = None
         self._angewendet = False
@@ -138,14 +156,18 @@ class Schritt:
     def vorschau(self):
         """``(vor, nach)`` — ohne zu schreiben."""
         vor = self._lesen()
-        return vor, self._einfuegen(copy.deepcopy(vor))
+        return vor, self.rechne(vor)
+
+    def rechne(self, stand):
+        """Der Stand nach dem Einfügen in ``stand`` — ohne zu schreiben."""
+        return self._einfuegen(self._kopie(stand))
 
     def anwenden(self) -> bool:
         vor, nach = self.vorschau()
         self._vor, self._nach, self._angewendet = vor, nach, True
         if nach == vor:
             return False
-        self._schreiben(copy.deepcopy(nach))
+        self._schreiben(self._kopie(nach))
         return True
 
     def zuruecknehmen(self) -> None:
@@ -156,10 +178,10 @@ class Schritt:
             return
         jetzt = self._lesen()
         if jetzt == self._nach:
-            self._schreiben(copy.deepcopy(self._vor))
+            self._schreiben(self._kopie(self._vor))
         else:
             self._schreiben(self._entfernen(
-                copy.deepcopy(jetzt), self._vor, self._nach))
+                self._kopie(jetzt), self._vor, self._nach))
 
 
 @dataclass
@@ -186,8 +208,32 @@ class Plan:
     optionen: Optionen
     eintraege: list = field(default_factory=list)
     hinweise: list = field(default_factory=list)
+    #: Paare ``(quelle, ziel)`` mit verschiedenem Gerätetyp.
+    verschiedene_typen: list = field(default_factory=list)
     _melder: Callable | None = None
     _angewendet: bool = False
+    #: Ziele, die im selben Plan schon VOR dem laufenden Paar von derselben
+    #: Quelle geklont werden — „neben die Quelle" reiht sich hinter sie ein.
+    _davor: tuple = ()
+    #: Stand von Gruppen, Rastern und Fächern nach den bisherigen Paaren —
+    #: die Vorschau des dritten Ziels rechnet auf dem Ergebnis der ersten zwei.
+    _sim: dict = field(default_factory=dict)
+    #: Bündelt die Datenbank-Zugriffe der Gruppen-Schritte (ein Commit).
+    _gruppen: object = None
+
+    @property
+    def typ_hinweis(self) -> str:
+        """Der eine Satz für oben in der Vorschau: was zwischen verschiedenen
+        Gerätetypen in dieser Fassung NICHT übertragen wird. Leer, wenn alle
+        Paare denselben Typ haben."""
+        if not self.verschiedene_typen:
+            return ""
+        quellen = _nummern_text(_ohne_doppelte(q for q, _ in self.verschiedene_typen))
+        ziele = _nummern_text(_ohne_doppelte(z for _, z in self.verschiedene_typen))
+        return (f"Verschiedene Gerätetypen ({quellen} → {ziele}): übertragen "
+                "werden bei gespeicherten Werten nur Dimmer und Farbe. NICHT "
+                "übertragen werden in dieser Fassung: "
+                + ", ".join(NICHT_UEBERTRAGEN) + ".")
 
     def zaehler(self) -> dict:
         out = {UNVERAENDERT: 0, UEBERSETZT: 0, FAELLT_WEG: 0, BLEIBT: 0}
@@ -227,16 +273,22 @@ class Plan:
         zurückgenommen und der Fehler geht weiter — eine halb geklonte Show
         bleibt nicht stehen."""
         schritte = self._alle_schritte()
+        puffer = self._gruppen or _KeineSperre()
         with _plan_sperre(state):
             try:
-                for s in schritte:
-                    s.anwenden()
+                with puffer:
+                    for s in schritte:
+                        s.anwenden()
             except Exception:
-                for s in reversed(schritte):
-                    try:
-                        s.zuruecknehmen()
-                    except Exception:      # noqa: BLE001 — Rest trotzdem zurück
-                        pass
+                try:
+                    with puffer:
+                        for s in reversed(schritte):
+                            try:
+                                s.zuruecknehmen()
+                            except Exception:  # noqa: BLE001 — Rest trotzdem zurück
+                                pass
+                except Exception:              # noqa: BLE001 — Fehler geht unten weiter
+                    pass
                 self._angewendet = False
                 self._melden(state)
                 raise
@@ -247,7 +299,7 @@ class Plan:
     def zuruecknehmen(self, state) -> None:
         if not self._angewendet:
             return
-        with _plan_sperre(state):
+        with _plan_sperre(state), (self._gruppen or _KeineSperre()):
             for s in reversed(self._alle_schritte()):
                 s.zuruecknehmen()
         self._angewendet = False
@@ -309,12 +361,13 @@ class _Geraet:
         self.attrs = {(getattr(c, "attribute", "") or "").lower()
                       for c in self.kanaele}
         self.attrs.discard("")
-
-    @property
-    def typ(self) -> tuple:
-        return (getattr(self.fx, "fixture_profile_id", None),
-                getattr(self.fx, "mode_name", None),
-                getattr(self.fx, "channel_count", None))
+        #: Profil, Modus, Kanalzahl — gleich heißt: Werte gehen 1:1.
+        self.typ: tuple = (getattr(fx, "fixture_profile_id", None),
+                           getattr(fx, "mode_name", None),
+                           getattr(fx, "channel_count", None))
+        #: Übersetzungen dieser Quelle, je Ziel-Typ und Wertesatz gemerkt
+        #: (lebt nur so lange wie der Plan, der das Gerät aufgebaut hat).
+        self.gemerkt: dict = {}
 
     @property
     def hat_dimmer(self) -> bool:
@@ -420,6 +473,23 @@ def uebersetze_werte(werte: dict, quelle: _Geraet, ziel: _Geraet) -> Uebersetzun
     return u
 
 
+def _uebersetze_gemerkt(werte: dict, quelle: _Geraet, ziel: _Geraet) -> Uebersetzung:
+    """Wie :func:`uebersetze_werte`, aber je Ziel-TYP und Wertesatz nur einmal
+    gerechnet: eine Quelle auf 50 gleiche Ziele rechnet jede Farbe einmal,
+    nicht fünfzigmal. Das Ergebnis wird geteilt — nicht verändern."""
+    if not isinstance(werte, dict):
+        return uebersetze_werte(werte, quelle, ziel)
+    try:
+        key = (ziel.typ if ziel.typ[0] is not None else ("gerät", ziel.fid),
+               tuple(werte.items()))
+        u = quelle.gemerkt.get(key)
+    except TypeError:                        # Wert nicht als Schlüssel brauchbar
+        return uebersetze_werte(werte, quelle, ziel)
+    if u is None:
+        u = quelle.gemerkt[key] = uebersetze_werte(werte, quelle, ziel)
+    return u
+
+
 def _zahl(wert) -> int:
     try:
         return max(0, min(255, int(wert)))
@@ -427,12 +497,32 @@ def _zahl(wert) -> int:
         return 0
 
 
+def _teilwerte(werte: dict, ziel: _Geraet, u: Uebersetzung) -> None:
+    """Einzelne Farbkanäle (keine vollständige Farbe): jeder nur auf den
+    gleichnamigen Kanal des Ziels. Der Rest des Ziels bleibt, wie er ist."""
+    for k, v in werte.items():
+        zk = k if k in ziel.attrs else None
+        if zk is None:                       # cmy_c ↔ cyan: derselbe Kanal
+            for namen in _CMY:
+                if k in namen:
+                    i = namen.index(k)
+                    zk = next((t[i] for t in _CMY if t[i] in ziel.attrs), None)
+        if zk is not None:
+            u.gleich[zk] = v
+        else:
+            u.weg.append((k, GRUND_TEILWERT if ziel.hat_farbe
+                          else "Ziel hat keine Farbe"))
+
+
 def _uebersetze_farbe(farbe: dict, quelle: _Geraet, ziel: _Geraet,
                       u: Uebersetzung) -> None:
+    """★ Übersetzt wird nur eine VOLLSTÄNDIGE Farbe (alle Kanäle der
+    Farbmischung der Quelle gesetzt) — dann als Ganzes. Einzelne Kanäle gehen
+    über :func:`_teilwerte` nur auf den gleichnamigen Kanal."""
     from .. import color_utils as C
     misch = {k: v for k, v in farbe.items() if k in _MISCH}
-    cmy = next(({k: farbe[k] for k in t if k in farbe}
-                for t in _CMY if any(k in farbe for k in t)), {})
+    cmy_namen = next((t for t in _CMY if any(k in farbe for k in t)), ())
+    cmy = {k: farbe[k] for k in cmy_namen if k in farbe}
     gemischt = False
 
     # Amber/UV: eigene Emitter — nur, wenn beide Geräte sie haben.
@@ -444,7 +534,10 @@ def _uebersetze_farbe(farbe: dict, quelle: _Geraet, ziel: _Geraet,
                 u.weg.append((k, f"Ziel hat kein {attr_label(k)}"))
 
     if misch:
-        if (quelle.attrs & set(_MISCH)) == (ziel.attrs & set(_MISCH)):
+        q_misch = quelle.attrs & set(_MISCH)
+        if not q_misch or not q_misch <= set(misch):
+            _teilwerte(misch, ziel, u)      # Teilwert: nur gleichnamige Kanäle
+        elif q_misch == (ziel.attrs & set(_MISCH)):
             u.gleich.update(misch)          # dieselbe Mischung → Werte 1:1
             gemischt = True
         else:
@@ -454,12 +547,13 @@ def _uebersetze_farbe(farbe: dict, quelle: _Geraet, ziel: _Geraet,
         for k in cmy:
             u.weg.append((k, "die Farbe kommt schon aus der RGB-Mischung"))
     elif cmy:
-        if all(k in ziel.attrs for k in cmy):
+        if len(cmy) < len(cmy_namen):
+            _teilwerte(cmy, ziel, u)
+        elif all(k in ziel.attrs for k in cmy):
             u.gleich.update(cmy)
             gemischt = True
         else:
-            namen = next(t for t in _CMY if any(k in cmy for k in t))
-            rgb = tuple(255 - _zahl(cmy.get(k, 0)) for k in namen)
+            rgb = tuple(255 - _zahl(cmy.get(k, 0)) for k in cmy_namen)
             gemischt = _schreibe_farbe(rgb, list(cmy), ziel, u)
 
     bekannt = set(_MISCH) | set(_EXTRA) | set(_RAD) | {k for t in _CMY for k in t}
@@ -580,37 +674,49 @@ def _werte_schritt(behaelter: Callable, schluessel, neu: dict, wie: str) -> Schr
 
     return Schritt(lesen, schreiben,
                    lambda stand: _werte_mischen(stand, neu, wie),
-                   _werte_entfernen)
+                   _werte_entfernen, kopie=_flach)
 
 
 # ── Schritte für Listen, Bewegungs-Effekte, Matrix, Gruppen, Szenen ─────────
 
-def _liste_einfuegen(liste: list, q: int, z: int, position: str) -> list:
+def _liste_einfuegen(liste: list, q: int, z: int, position: str,
+                     davor: tuple = ()) -> list:
+    """``davor``: Ziele derselben Quelle, die im selben Plan schon vorher
+    eingefügt wurden. „Neben die Quelle" heißt dann: hinter sie — eine Quelle
+    auf 2, 3, 4 ergibt 1, 2, 3, 4 und nicht 1, 4, 3, 2."""
     if z in liste or q not in liste:
         return liste
     out = list(liste)
     if position == POS_NEBEN:
-        letzter = max(i for i, x in enumerate(out) if x == q)
-        out.insert(letzter + 1, z)
+        stelle = max(i for i, x in enumerate(out) if x == q) + 1
+        while stelle < len(out) and out[stelle] in davor:
+            stelle += 1
+        out.insert(stelle, z)
     else:
         out.append(z)
     return out
 
 
 def _listen_schritt(holen: Callable, setzen: Callable, q: int, z: int,
-                    position: str) -> Schritt:
+                    position: str, davor: tuple = ()) -> Schritt:
     def lesen():
         l = holen()
         return [_als_int(x) for x in l] if isinstance(l, list) else None
 
     def einfuegen(stand):
-        return stand if stand is None else _liste_einfuegen(stand, q, z, position)
+        return stand if stand is None else _liste_einfuegen(
+            stand, q, z, position, davor)
 
     def entfernen(jetzt, _vor, _nach):
         return jetzt if jetzt is None else [x for x in jetzt if x != z]
 
     return Schritt(lesen, lambda stand: stand is not None and setzen(list(stand)),
-                   einfuegen, entfernen)
+                   einfuegen, entfernen, kopie=_flach)
+
+
+def _flach(stand):
+    """Kopie eines flachen Stands (Werte-Dict oder Nummern-Liste)."""
+    return stand if stand is None else type(stand)(stand)
 
 
 def _als_int(x):
@@ -623,7 +729,8 @@ def _als_int(x):
 _EFX_FELDER = ("fid", "start_offset", "pan_attr", "tilt_attr", "head")
 
 
-def _efx_schritt(efx, q: _Geraet, z: _Geraet, position: str) -> Schritt:
+def _efx_schritt(efx, q: _Geraet, z: _Geraet, position: str,
+                 davor: tuple = ()) -> Schritt:
     gleich = _gleicher_typ(q, z)
 
     def lesen():
@@ -662,6 +769,8 @@ def _efx_schritt(efx, q: _Geraet, z: _Geraet, position: str) -> Schritt:
         out = list(stand)
         if position == POS_NEBEN:
             stelle = quell[-1][0] + 1
+            while stelle < len(out) and out[stelle]["fid"] in davor:
+                stelle += 1                  # hinter die schon geklonten Ziele
             out[stelle:stelle] = neu
         else:
             out.extend(neu)
@@ -678,7 +787,8 @@ def _auffuellen(liste: list, laenge: int) -> None:
         liste.append(None)
 
 
-def _matrix_schritt(m, q: _Geraet, z: _Geraet, position: str) -> Schritt:
+def _matrix_schritt(m, q: _Geraet, z: _Geraet, position: str,
+                    davor: tuple = ()) -> Schritt:
     gleich = _gleicher_typ(q, z)
 
     def lesen():
@@ -701,7 +811,8 @@ def _matrix_schritt(m, q: _Geraet, z: _Geraet, position: str) -> Schritt:
                 preset[k] = copy.deepcopy(stand[k])
 
     def einfuegen(stand):
-        return _matrix_einfuegen(stand, q.fid, z.fid, gleich, position)[0]
+        return _matrix_einfuegen(stand, q.fid, z.fid, gleich, position,
+                                 davor)[0]
 
     def entfernen(jetzt, _vor, _nach):
         fg, hg, wg = jetzt["fixture_grid"], jetzt["head_grid"], jetzt["weiss_grid"]
@@ -719,7 +830,7 @@ def _matrix_schritt(m, q: _Geraet, z: _Geraet, position: str) -> Schritt:
 
 
 def _matrix_einfuegen(stand: dict, q: int, z: int, gleich: bool,
-                      position: str) -> tuple:
+                      position: str, davor: tuple = ()) -> tuple:
     """``(neuer Stand, info)``. ``info``: ``neu`` (Zellen), ``schon``,
     ``koepfe_zusammen``, ``weiss_weg``, ``gewachsen``."""
     info = {"neu": 0, "schon": False, "koepfe_zusammen": False,
@@ -777,6 +888,13 @@ def _matrix_einfuegen(stand: dict, q: int, z: int, gleich: bool,
 
     if position == POS_NEBEN and eindimensional:
         stelle = max(i_f + i_w) + 1
+
+        def geklont(i) -> bool:              # Zelle eines schon geklonten Ziels
+            return ((i < len(fg) and fg[i] in davor)
+                    or (i < len(wg) and bool(wg[i]) and wg[i][0] in davor))
+
+        while davor and geklont(stelle):
+            stelle += 1
         for zelle in neu:
             setzen(stelle, zelle, schieben=True)
             stelle += 1
@@ -798,7 +916,8 @@ def _matrix_einfuegen(stand: dict, q: int, z: int, gleich: bool,
     return stand, info
 
 
-def _gruppe_einfuegen(stand, q: int, z: int, gleich: bool, position: str) -> tuple:
+def _gruppe_einfuegen(stand, q: int, z: int, gleich: bool, position: str,
+                      davor: tuple = ()) -> tuple:
     """``(neuer Stand, info)`` für eine Fixture-Gruppe
     (``stand = {"cols", "rows", "roh": positions_json}``)."""
     info = {"neu": 0, "schon": False, "koepfe_zusammen": False, "weiss_weg": 0,
@@ -884,6 +1003,11 @@ def _gruppe_einfuegen(stand, q: int, z: int, gleich: bool, position: str) -> tup
     # Mehrkopf-Gerät wird nicht Kopf für Kopf mit dem Ziel verzahnt.
     anker = quell[-1]
     neben = position == POS_NEBEN
+    while neben and davor:                   # hinter die schon geklonten Ziele
+        rechts = (anker[0], anker[1] + 1)
+        if rechts not in rc or parse_zelle(pos[rc[rechts]])[0] not in davor:
+            break
+        anker = rechts
     for _quelle, wert in neu:
         if neben and daneben(anker, wert):
             anker = (anker[0], anker[1] + 1)
@@ -896,31 +1020,85 @@ def _gruppe_einfuegen(stand, q: int, z: int, gleich: bool, position: str) -> tup
     return {"cols": cols, "rows": rows, "roh": json.dumps(pos)}, info
 
 
-def _gruppen_schritt(state, gid: int, q: _Geraet, z: _Geraet,
-                     position: str) -> Schritt:
+class _GruppenPuffer:
+    """Bündelt die Datenbank-Zugriffe aller Gruppen-Schritte eines Plans.
+
+    Innerhalb von ``with puffer:`` wird jede Gruppe einmal gelesen, im
+    Speicher fortgeschrieben und am Ende mit EINEM Commit gespeichert — eine
+    Quelle auf 50 Ziele in 10 Gruppen sind sonst 500 Commits. Außerhalb davon
+    geht jeder Zugriff direkt an die Datenbank."""
+
+    def __init__(self, state):
+        self._state = state
+        self._tiefe = 0
+        self._stand: dict = {}
+        self._geaendert: set = set()
+
+    def __enter__(self):
+        self._tiefe += 1
+        return self
+
+    def __exit__(self, *_):
+        self._tiefe -= 1
+        if self._tiefe == 0:
+            try:
+                self._speichern()
+            finally:
+                self._stand.clear()
+                self._geaendert.clear()
+        return False
+
+    def lesen(self, gid: int):
+        if self._tiefe and gid in self._stand:
+            stand = self._stand[gid]
+        else:
+            from ..database.models import FixtureGroup
+            with self._state._session() as s:
+                g = s.get(FixtureGroup, gid)
+                stand = None if g is None else {
+                    "cols": g.cols, "rows": g.rows, "roh": g.positions_json or "{}"}
+            if self._tiefe:
+                self._stand[gid] = stand
+        return None if stand is None else dict(stand)
+
+    def schreiben(self, gid: int, stand) -> None:
+        if stand is None:
+            return
+        if self._tiefe:
+            if self.lesen(gid) is not None:      # eine gelöschte Gruppe bleibt weg
+                self._stand[gid] = dict(stand)
+                self._geaendert.add(gid)
+            return
+        self._speichern({gid: stand})
+
+    def _speichern(self, staende: dict | None = None) -> None:
+        if staende is None:
+            staende = {gid: self._stand[gid] for gid in self._geaendert}
+        if not staende:
+            return
+        from ..database.models import FixtureGroup
+        with self._state._session() as s:
+            for gid, stand in staende.items():
+                g = s.get(FixtureGroup, gid)
+                if g is not None and stand is not None:
+                    g.cols, g.rows = stand["cols"], stand["rows"]
+                    g.positions_json = stand["roh"]
+            s.commit()
+
+
+def _gruppen_schritt(puffer: _GruppenPuffer, gid: int, q: _Geraet, z: _Geraet,
+                     position: str, davor: tuple = ()) -> Schritt:
     gleich = _gleicher_typ(q, z)
 
     def lesen():
-        from ..database.models import FixtureGroup
-        with state._session() as s:
-            g = s.get(FixtureGroup, gid)
-            if g is None:
-                return None
-            return {"cols": g.cols, "rows": g.rows, "roh": g.positions_json or "{}"}
+        return puffer.lesen(gid)
 
     def schreiben(stand):
-        if stand is None:
-            return
-        from ..database.models import FixtureGroup
-        with state._session() as s:
-            g = s.get(FixtureGroup, gid)
-            if g is None:
-                return
-            g.cols, g.rows, g.positions_json = stand["cols"], stand["rows"], stand["roh"]
-            s.commit()
+        puffer.schreiben(gid, stand)
 
     def einfuegen(stand):
-        return _gruppe_einfuegen(stand, q.fid, z.fid, gleich, position)[0]
+        return _gruppe_einfuegen(stand, q.fid, z.fid, gleich, position,
+                                 davor)[0]
 
     def entfernen(jetzt, _vor, _nach):
         if jetzt is None:
@@ -934,7 +1112,7 @@ def _gruppen_schritt(state, gid: int, q: _Geraet, z: _Geraet,
         rest = {k: v for k, v in pos.items() if parse_zelle(v)[0] != z.fid}
         return dict(jetzt, roh=json.dumps(rest))
 
-    return Schritt(lesen, schreiben, einfuegen, entfernen)
+    return Schritt(lesen, schreiben, einfuegen, entfernen, kopie=_flach)
 
 
 def _szenen_schritt(szene, z: int, neu: dict, wie: str) -> Schritt:
@@ -1033,7 +1211,9 @@ class _Sammler:
             neu(UNVERAENDERT, _labels(self.gleich) + mal, True)
         if self.uebersetzt_texte:
             texte = _ohne_doppelte(self.uebersetzt_texte)
-            neu(UEBERSETZT, "; ".join(texte[:3])
+            vorsatz = ("Farbe wird als Ganzes ersetzt: " if self.wie == ERSETZEN
+                       else "Farbe wird als Ganzes übersetzt: ")
+            neu(UEBERSETZT, vorsatz + "; ".join(texte[:3])
                 + (f" … und {len(texte) - 3} weitere" if len(texte) > 3 else ""),
                 True)
         for grund, keys in self.weg.items():
@@ -1058,24 +1238,27 @@ def plane(state, quellen, ziele, optionen: Optionen, *,
     plan = Plan(paare=paare, optionen=optionen)
     plan._melder = lambda st, bereiche: _benachrichtigen(
         st, bereiche, palette_manager)
+    bisher: dict[int, list] = {}
     for q_fid, z_fid in paare:
         q, z = geraete[q_fid], geraete[z_fid]
+        plan._davor = tuple(bisher.get(q_fid, ()))
         _hinweise(plan, q, z)
         for bereich in BEREICHE:
             if bereich in optionen.bereiche:
                 _PLANER[bereich](plan, state, q, z, optionen,
                                  snap_library, palette_manager)
+        bisher.setdefault(q_fid, []).append(z_fid)
+    plan._davor = ()
+    plan._sim = {}
     plan.hinweise = _ohne_doppelte(plan.hinweise)
     return plan
 
 
 def _hinweise(plan: Plan, q: _Geraet, z: _Geraet) -> None:
     if not _gleicher_typ(q, z):
-        plan.hinweise.append(
-            f"{q.fid} „{q.name}“ und {z.fid} „{z.name}“ sind verschiedene "
-            "Gerätetypen: Dimmer und Farbe werden übersetzt; Bewegung, Zoom, "
-            "Fokus, Gobo, Prisma, Shutter und Makros kommen in einem späteren "
-            "Schritt und fallen bei gespeicherten Werten weg.")
+        # Der Satz dazu steht EINMAL oben in der Vorschau (``typ_hinweis``),
+        # nicht je Paar — bei 1 auf 50 wären das 50 gleiche Zeilen.
+        plan.verschiedene_typen.append((q.fid, z.fid))
         if not z.kanaele:
             plan.hinweise.append(
                 f"Zu {z.fid} „{z.name}“ sind keine Kanäle bekannt (Profil fehlt) "
@@ -1111,21 +1294,33 @@ def _wo(position: str) -> str:
 def _plane_gruppen(plan, state, q, z, opt, _snaps, _pal) -> None:
     if getattr(state, "_show_engine", None) is None:
         return
-    from sqlalchemy import select
-    from ..database.models import FixtureGroup
-    with state._session() as s:
-        gruppen = [(g.id, g.name or "", g.cols, g.rows, g.positions_json or "{}")
-                   for g in s.execute(select(FixtureGroup)).scalars()]
-    eigene = None
-    finde = getattr(state, "find_head_matrix_group", None)
-    if callable(finde):
-        eigene = finde(q.fid, dedicated=True)
+    sim = plan._sim
+    if plan._gruppen is None:
+        plan._gruppen = _GruppenPuffer(state)
+    gruppen = sim.get("gruppen")
+    if gruppen is None:                      # einmal je Plan, nicht je Paar
+        from sqlalchemy import select
+        from ..database.models import FixtureGroup
+        with state._session() as s:
+            gruppen = sim["gruppen"] = [
+                (g.id, g.name or "",
+                 {"cols": g.cols, "rows": g.rows, "roh": g.positions_json or "{}"})
+                for g in s.execute(select(FixtureGroup)).scalars()]
+    if ("eigene", q.fid) not in sim:
+        finde = getattr(state, "find_head_matrix_group", None)
+        sim[("eigene", q.fid)] = (finde(q.fid, dedicated=True)
+                                  if callable(finde) else None)
+    eigene = sim[("eigene", q.fid)]
     gleich = _gleicher_typ(q, z)
-    for gid, name, cols, rows, roh in gruppen:
+    davor = plan._davor
+    for gid, name, stand in gruppen:
         if gid == eigene:
             continue          # die automatische Köpfe-Gruppe gehört der Quelle
-        _neu, info = _gruppe_einfuegen({"cols": cols, "rows": rows, "roh": roh},
-                                       q.fid, z.fid, gleich, opt.position)
+        stand = sim.get(("gruppe", gid), stand)
+        neu, info = _gruppe_einfuegen(stand, q.fid, z.fid, gleich,
+                                      opt.position, davor)
+        if info["neu"]:
+            sim[("gruppe", gid)] = neu
         objekt = f"Gruppe „{name}“"
         if info["unlesbar"]:
             _weg(plan, BEREICH_GRUPPEN, objekt, q, z,
@@ -1147,7 +1342,7 @@ def _plane_gruppen(plan, state, q, z, opt, _snaps, _pal) -> None:
             kennz = UEBERSETZT
             text += " — die Kopf-Zellen der Quelle werden zu einer Zelle für das ganze Gerät"
         _mitglied(plan, BEREICH_GRUPPEN, objekt, q, z,
-                  _gruppen_schritt(state, gid, q, z, opt.position),
+                  _gruppen_schritt(plan._gruppen, gid, q, z, opt.position, davor),
                   schon=info["schon"], text=text, kennzeichen=kennz)
         if info["weiss_weg"] and not info["schon"]:
             _weg(plan, BEREICH_GRUPPEN, objekt, q, z,
@@ -1163,13 +1358,22 @@ def _plane_effekte(plan, state, q, z, opt, _snaps, _pal) -> None:
     from ..engine.efx import EfxInstance
     from ..engine.rgb_matrix import RgbMatrixInstance
     gleich = _gleicher_typ(q, z)
-    for f in _funktionen(state):
+    davor, sim = plan._davor, plan._sim
+    funktionen = sim.get("funktionen")
+    if funktionen is None:
+        funktionen = sim["funktionen"] = _funktionen(state)
+    for f in funktionen:
         name = getattr(f, "name", "") or f"Funktion {getattr(f, 'id', '?')}"
         if isinstance(f, RgbMatrixInstance):
-            schritt = _matrix_schritt(f, q, z, opt.position)
-            vor, _nach = schritt.vorschau()
+            if (q.fid not in (f.fixture_grid or ())
+                    and not any(w and w[0] == q.fid for w in (f.weiss_grid or ()))):
+                continue
+            schritt = _matrix_schritt(f, q, z, opt.position, davor)
+            vor = sim.get(("matrix", id(f)))
+            if vor is None:
+                vor = schritt.vorschau()[0]
             _n, info = _matrix_einfuegen(copy.deepcopy(vor), q.fid, z.fid,
-                                         gleich, opt.position)
+                                         gleich, opt.position, davor)
             objekt = f"Matrix „{name}“"
             if not info["quelle"] and not info["schon"]:
                 continue
@@ -1192,6 +1396,8 @@ def _plane_effekte(plan, state, q, z, opt, _snaps, _pal) -> None:
             if info["koepfe_zusammen"]:
                 kennz = UEBERSETZT
                 text += " — die Kopf-Zellen der Quelle werden zu einer Zelle für das ganze Gerät"
+            if not info["schon"]:
+                sim[("matrix", id(f))] = _n
             _mitglied(plan, BEREICH_EFFEKTE, objekt, q, z, schritt,
                       schon=info["schon"], text=text, kennzeichen=kennz)
             if info["weiss_weg"] and not info["schon"]:
@@ -1211,8 +1417,13 @@ def _plane_effekte(plan, state, q, z, opt, _snaps, _pal) -> None:
                      "das Ziel hat die Bewegungs-Kanäle nicht ("
                      + ", ".join(attr_label(a) for a in achsen) + ")")
                 continue
-            schritt = _efx_schritt(f, q, z, opt.position)
-            vor, nach = schritt.vorschau()
+            schritt = _efx_schritt(f, q, z, opt.position, davor)
+            vor = sim.get(("efx", id(f)))
+            if vor is None:
+                vor = schritt.vorschau()[0]
+            nach = schritt.rechne(vor)
+            if not schon:
+                sim[("efx", id(f))] = nach
             text = (f"in den Fächer {_wo(opt.position)} — der Fächer verteilt "
                     f"sich neu ({len(vor)} → {len(nach)} Ziele)")
             kennz = UNVERAENDERT
@@ -1229,7 +1440,7 @@ def _plane_effekte(plan, state, q, z, opt, _snaps, _pal) -> None:
             _mitglied(plan, BEREICH_EFFEKTE, f"Effekt „{name}“", q, z,
                       _listen_schritt(lambda f=f: f.fixture_ids,
                                       lambda l, f=f: setattr(f, "fixture_ids", l),
-                                      q.fid, z.fid, opt.position),
+                                      q.fid, z.fid, opt.position, davor),
                       schon=z.fid in liste,
                       text=f"in die Geräteliste {_wo(opt.position)}")
 
@@ -1242,7 +1453,7 @@ def _plane_werte(sammler: _Sammler, behaelter: Callable, q: _Geraet, z: _Geraet,
     qk = _finde_schluessel(d, q.fid)
     if qk is None or not isinstance(d.get(qk), dict):
         return
-    u = uebersetze_werte(d[qk], q, z)
+    u = _uebersetze_gemerkt(d[qk], q, z)
     zk = _finde_schluessel(d, z.fid)
     if zk is None:
         zk = str(z.fid) if isinstance(qk, str) else z.fid
@@ -1349,7 +1560,7 @@ def _plane_cues(plan, state, q, z, opt, _snaps, _pal) -> None:
             sm.schritte.append(_listen_schritt(
                 lambda f=f: f.bound_fixtures,
                 lambda l, f=f: setattr(f, "bound_fixtures", l),
-                q.fid, z.fid, opt.position))
+                q.fid, z.fid, opt.position, plan._davor))
         plan.eintraege.extend(sm.eintraege())
 
 
@@ -1432,7 +1643,8 @@ def _plane_konsole(plan, state, q, z, opt, _snaps, _pal) -> None:
                     k[feld] = l
 
             _mitglied(plan, BEREICH_KONSOLE, objekt, q, z,
-                      _listen_schritt(holen, setzen, q.fid, z.fid, opt.position),
+                      _listen_schritt(holen, setzen, q.fid, z.fid, opt.position,
+                                      plan._davor),
                       schon=z.fid in ids,
                       text=f"in die Geräteliste {_wo(opt.position)}")
 

@@ -8,13 +8,21 @@ Rückgängig-Verlauf.
 Die Vorschau ist eine Liste aus Einträgen (keine eingebetteten Widgets): sie
 wird bei jeder Neuberechnung geleert und neu gefüllt, ohne dass ein Widget in
 seinem eigenen Signal gelöscht wird.
+
+Große Shows (eine Quelle auf 50 Ziele, hunderte Snaps): die Liste zeigt je
+Bereich die Zähler und nur die ersten ``ZEILEN_JE_BEREICH`` Zeilen, der Rest
+klappt über „… und X weitere" auf. Hat die letzte Berechnung spürbar gedauert,
+werden weitere Klicks gesammelt und erst nach einer kurzen Pause gerechnet —
+ohne Thread, der Plan liest den Show-Zustand im Oberflächen-Faden.
 """
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+import time
+
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (
-    QAbstractItemView, QButtonGroup, QCheckBox, QDialog, QDialogButtonBox,
+    QAbstractItemView, QApplication, QButtonGroup, QCheckBox, QDialog, QDialogButtonBox,
     QGroupBox, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QMessageBox,
     QPushButton, QRadioButton, QVBoxLayout,
 )
@@ -28,6 +36,31 @@ _FARBEN = {
     K.BLEIBT: "#999999",
 }
 _ZEICHEN = {K.UNVERAENDERT: "✓", K.UEBERSETZT: "≈", K.FAELLT_WEG: "✗", K.BLEIBT: "·"}
+
+#: So viele Zeilen zeigt die Vorschau je Bereich sofort.
+ZEILEN_JE_BEREICH = 30
+#: So viele kommen je Klick auf „… und X weitere" dazu.
+ZEILEN_JE_KLICK = 200
+#: Höchstens so viele Hinweise unter der Liste.
+HINWEISE_HOECHSTENS = 4
+#: Hat die letzte Berechnung länger gedauert, wird die nächste entprellt.
+ENTPRELLEN_AB_S = 0.08
+ENTPRELLEN_MS = 250
+
+_ROLLE_KENNZEICHEN = Qt.ItemDataRole.UserRole
+_ROLLE_MEHR = Qt.ItemDataRole.UserRole + 1
+
+
+class _Sanduhr:
+    """Sanduhr-Zeiger für die Dauer eines Blocks."""
+
+    def __enter__(self):
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        return self
+
+    def __exit__(self, *_):
+        QApplication.restoreOverrideCursor()
+        return False
 
 
 def _geraete_text(state, fids) -> str:
@@ -189,8 +222,24 @@ class KlonenDialog(QDialog):
         self._plan = None
         #: Zahl der geänderten Stellen nach „Anwenden", sonst ``None``.
         self.ergebnis: int | None = None
+        #: Dauer der letzten Berechnung und des letzten Füllens (Sekunden).
+        self.dauer_rechnen = 0.0
+        self.dauer_fuellen = 0.0
+        #: Wie oft wirklich gerechnet wurde (Tests, Messung).
+        self.berechnungen = 0
+        #: Je Bereich: wie viele Zeilen aufgeklappt sind.
+        self._gezeigt: dict[str, int] = {}
+        self._entprellen = QTimer(self)
+        self._entprellen.setSingleShot(True)
+        self._entprellen.setInterval(ENTPRELLEN_MS)
+        self._entprellen.timeout.connect(self._neu_rechnen)
+        #: Erst nach dem Aufbau wird gerechnet — vorher fehlen die Knöpfe,
+        #: die ``optionen()`` liest (das Häkchen einer gesperrten Konsole wird
+        #: schon beim Aufbau umgestellt).
+        self._aufgebaut = False
         self._umgebung.abholen()
         self._aufbauen()
+        self._aufgebaut = True
         self._neu_rechnen()
 
     # ── Aufbau ───────────────────────────────────────────────────────────────
@@ -212,7 +261,7 @@ class KlonenDialog(QDialog):
         for bereich in K.BEREICHE:
             cb = QCheckBox(K.BEREICH_TEXT[bereich])
             cb.setChecked(True)
-            cb.toggled.connect(self._neu_rechnen)
+            cb.toggled.connect(self._geaendert)
             self._haekchen[bereich] = cb
             wl.addWidget(cb)
         if self._umgebung.konsole_gesperrt:
@@ -234,7 +283,7 @@ class KlonenDialog(QDialog):
         self._wie.addButton(self._hinzufuegen)
         self._wie.addButton(self._ersetzen)
         for rb in (self._hinzufuegen, self._ersetzen):
-            rb.toggled.connect(self._neu_rechnen)
+            rb.toggled.connect(self._gewaehlt)
             hl.addWidget(rb)
         nichts = QLabel("Es wird nichts gelöscht, was das Ziel sonst noch tut.")
         nichts.setStyleSheet("color:#aaa; font-size:11px;")
@@ -250,7 +299,7 @@ class KlonenDialog(QDialog):
         self._wo.addButton(self._neben)
         self._ans_ende.setChecked(True)
         for rb in (self._ans_ende, self._neben):
-            rb.toggled.connect(self._neu_rechnen)
+            rb.toggled.connect(self._gewaehlt)
             ol.addWidget(rb)
         links.addWidget(wo)
         links.addStretch()
@@ -261,9 +310,17 @@ class KlonenDialog(QDialog):
         self._zaehler.setStyleSheet("padding:4px; font-size:13px;")
         self._zaehler.setTextFormat(Qt.TextFormat.RichText)
         rechts.addWidget(self._zaehler)
+        #: Oben, vor der Liste: was zwischen verschiedenen Typen NICHT mitgeht.
+        self._typ_hinweis = QLabel("")
+        self._typ_hinweis.setWordWrap(True)
+        self._typ_hinweis.setStyleSheet(
+            "color:#ffcc44; padding:4px; border:1px solid #665522;")
+        self._typ_hinweis.hide()
+        rechts.addWidget(self._typ_hinweis)
         self._liste = QListWidget()
         self._liste.setWordWrap(True)
         self._liste.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        self._liste.itemClicked.connect(self._zeile_geklickt)
         rechts.addWidget(self._liste, stretch=1)
         self._hinweise = QLabel("")
         self._hinweise.setWordWrap(True)
@@ -301,35 +358,63 @@ class KlonenDialog(QDialog):
             position=K.POS_NEBEN if self._neben.isChecked() else K.POS_ENDE)
 
     def plan(self):
+        """Der Plan zur jetzigen Wahl. Steht eine entprellte Berechnung noch
+        aus, wird sie hier sofort nachgeholt."""
+        if self._entprellen.isActive():
+            self._neu_rechnen()
         return self._plan
 
-    def _neu_rechnen(self, *_args) -> None:
-        self._liste.clear()
+    def _gewaehlt(self, an: bool) -> None:
+        # Ein Wechsel zwischen zwei Radioknöpfen meldet sich zweimal (aus/an)
+        # — gerechnet wird nur einmal.
+        if an:
+            self._geaendert()
+
+    def _geaendert(self, *_args) -> None:
+        if not self._aufgebaut:
+            return
+        if self.dauer_rechnen + self.dauer_fuellen <= ENTPRELLEN_AB_S:
+            self._neu_rechnen()
+            return
+        # Die Show ist groß: nicht bei jedem Klick sofort alles neu rechnen.
         self._plan = None
+        self._anwenden.setEnabled(False)
+        self._anwenden.setText("Anwenden")
+        self._zaehler.setText("Vorschau wird neu berechnet …")
+        self._entprellen.start()
+
+    def _melden(self, text: str) -> None:
+        self._liste.clear()
+        self._zaehler.setText(text)
+        self._typ_hinweis.hide()
+        self._hinweise.setText("")
+        self._anwenden.setEnabled(False)
+        self._anwenden.setText("Anwenden")
+
+    def _neu_rechnen(self, *_args) -> None:
+        self._entprellen.stop()
+        self._plan = None
+        self._gezeigt = {}
         opt = self.optionen()
         if opt.wie is None:
-            self._zaehler.setText(
-                "Bitte wählen: <b>Hinzufügen</b> oder <b>Ersetzen</b> — "
-                "dann erscheint hier die Vorschau.")
-            self._hinweise.setText("")
-            self._anwenden.setEnabled(False)
+            self._melden("Bitte wählen: <b>Hinzufügen</b> oder <b>Ersetzen</b> — "
+                         "dann erscheint hier die Vorschau.")
             return
+        beginn = time.perf_counter()
         try:
-            plan = K.plane(self._state, self._quellen, self._ziele, opt,
-                           snap_library=self._snaps,
-                           palette_manager=self._paletten)
+            with _Sanduhr():
+                plan = K.plane(self._state, self._quellen, self._ziele, opt,
+                               snap_library=self._snaps,
+                               palette_manager=self._paletten)
         except K.KlonFehler as e:
-            self._zaehler.setText(f"<span style='color:#ff7777'>{e}</span>")
-            self._hinweise.setText("")
-            self._anwenden.setEnabled(False)
+            self._melden(f"<span style='color:#ff7777'>{e}</span>")
             return
         except Exception as e:                       # noqa: BLE001
-            self._zaehler.setText(
-                "<span style='color:#ff7777'>Die Vorschau konnte nicht "
-                f"berechnet werden ({e}). Es wurde nichts geändert.</span>")
-            self._hinweise.setText("")
-            self._anwenden.setEnabled(False)
+            self._melden("<span style='color:#ff7777'>Die Vorschau konnte nicht "
+                         f"berechnet werden ({e}). Es wurde nichts geändert.</span>")
             return
+        self.berechnungen += 1
+        self.dauer_rechnen = time.perf_counter() - beginn
         self._plan = plan
         z = plan.zaehler()
         text = (f"<b style='color:{_FARBEN[K.UNVERAENDERT]}'>"
@@ -341,39 +426,90 @@ class KlonenDialog(QDialog):
         if z[K.BLEIBT]:
             text += f" &middot; {z[K.BLEIBT]} bleibt, wie es ist"
         self._zaehler.setText(text)
-        bereich = None
-        for e in plan.eintraege:
-            if e.bereich != bereich:
-                bereich = e.bereich
-                kopf = QListWidgetItem(K.BEREICH_TEXT[bereich])
-                schrift = kopf.font()
-                schrift.setBold(True)
-                kopf.setFont(schrift)
-                kopf.setFlags(Qt.ItemFlag.NoItemFlags)
-                kopf.setForeground(QBrush(QColor("#dddddd")))
-                self._liste.addItem(kopf)
-            item = QListWidgetItem(
-                f"  {_ZEICHEN[e.kennzeichen]}  {e.zeile}"
-                + (f"  [{K.KENNZEICHEN_TEXT[e.kennzeichen]}]"
-                   if e.kennzeichen != K.BLEIBT else ""))
-            item.setData(Qt.ItemDataRole.UserRole, e.kennzeichen)
-            item.setForeground(QBrush(QColor(_FARBEN[e.kennzeichen])))
-            self._liste.addItem(item)
-        if not plan.eintraege:
-            leer = QListWidgetItem(
-                "Die Quelle kommt in den gewählten Bereichen nirgends vor.")
-            leer.setFlags(Qt.ItemFlag.NoItemFlags)
-            self._liste.addItem(leer)
-        self._hinweise.setText("\n".join("• " + h for h in plan.hinweise))
+        self._typ_hinweis.setText(plan.typ_hinweis)
+        self._typ_hinweis.setVisible(bool(plan.typ_hinweis))
+        hinweise = ["• " + h for h in plan.hinweise[:HINWEISE_HOECHSTENS]]
+        if len(plan.hinweise) > HINWEISE_HOECHSTENS:
+            hinweise.append(f"… und {len(plan.hinweise) - HINWEISE_HOECHSTENS} "
+                            "weitere Hinweise dieser Art")
+        self._hinweise.setText("\n".join(hinweise))
+        self._fuellen()
         self._anwenden.setEnabled(plan.aenderungen > 0)
         self._anwenden.setText(
             f"Anwenden ({plan.aenderungen} Stellen)" if plan.aenderungen
             else "Anwenden")
 
+    def _fuellen(self) -> None:
+        """Die Liste aus dem Plan füllen: je Bereich eine Kopfzeile mit
+        Zählern, die ersten Zeilen und „… und X weitere" zum Aufklappen."""
+        beginn = time.perf_counter()
+        plan = self._plan
+        rollbalken = self._liste.verticalScrollBar()
+        stelle = rollbalken.value()
+        self._liste.clear()
+        if plan is None:
+            return
+        je_bereich: dict[str, list] = {}
+        for e in plan.eintraege:
+            je_bereich.setdefault(e.bereich, []).append(e)
+        for bereich in K.BEREICHE:
+            eintraege = je_bereich.get(bereich)
+            if not eintraege:
+                continue
+            zahl = {k: 0 for k in _ZEICHEN}
+            for e in eintraege:
+                zahl[e.kennzeichen] += 1
+            kopf = QListWidgetItem(
+                f"{K.BEREICH_TEXT[bereich]} — " + " · ".join(
+                    f"{zahl[k]} {_ZEICHEN[k]}" for k in _ZEICHEN if zahl[k]))
+            kopf.setToolTip(", ".join(f"{zahl[k]} {K.KENNZEICHEN_TEXT[k]}"
+                                      for k in _ZEICHEN if zahl[k]))
+            schrift = kopf.font()
+            schrift.setBold(True)
+            kopf.setFont(schrift)
+            kopf.setFlags(Qt.ItemFlag.NoItemFlags)
+            kopf.setForeground(QBrush(QColor("#dddddd")))
+            self._liste.addItem(kopf)
+            offen = self._gezeigt.get(bereich, ZEILEN_JE_BEREICH)
+            for e in eintraege[:offen]:
+                item = QListWidgetItem(
+                    f"  {_ZEICHEN[e.kennzeichen]}  {e.zeile}"
+                    + (f"  [{K.KENNZEICHEN_TEXT[e.kennzeichen]}]"
+                       if e.kennzeichen != K.BLEIBT else ""))
+                item.setData(_ROLLE_KENNZEICHEN, e.kennzeichen)
+                item.setForeground(QBrush(QColor(_FARBEN[e.kennzeichen])))
+                self._liste.addItem(item)
+            rest = len(eintraege) - offen
+            if rest > 0:
+                mehr = QListWidgetItem(
+                    f"  ▸ … und {rest} weitere in „{K.BEREICH_TEXT[bereich]}“ "
+                    "— anklicken zum Aufklappen")
+                mehr.setData(_ROLLE_MEHR, bereich)
+                mehr.setForeground(QBrush(QColor("#66aaff")))
+                self._liste.addItem(mehr)
+        if not plan.eintraege:
+            leer = QListWidgetItem(
+                "Die Quelle kommt in den gewählten Bereichen nirgends vor.")
+            leer.setFlags(Qt.ItemFlag.NoItemFlags)
+            self._liste.addItem(leer)
+        rollbalken.setValue(stelle)
+        self.dauer_fuellen = time.perf_counter() - beginn
+
+    def _zeile_geklickt(self, item) -> None:
+        bereich = item.data(_ROLLE_MEHR)
+        if bereich:
+            self.aufklappen(bereich)
+
+    def aufklappen(self, bereich: str) -> None:
+        """Weitere Zeilen eines Bereichs zeigen — ohne neu zu rechnen."""
+        self._gezeigt[bereich] = (self._gezeigt.get(bereich, ZEILEN_JE_BEREICH)
+                                  + ZEILEN_JE_KLICK)
+        self._fuellen()
+
     # ── Anwenden ─────────────────────────────────────────────────────────────
 
     def _anwenden_geklickt(self) -> None:
-        plan = self._plan
+        plan = self.plan()
         if plan is None or not plan.aenderungen:
             return
         if self._umgebung.sichern() is None:
@@ -385,10 +521,14 @@ class KlonenDialog(QDialog):
                 QMessageBox.StandardButton.No)
             if antwort != QMessageBox.StandardButton.Yes:
                 return
+        self._anwenden.setEnabled(False)
+        self._anwenden.setText("Klonen läuft …")
+        self._anwenden.repaint()
         try:
-            self.ergebnis = K.anwenden_mit_rueckweg(
-                self._state, plan, davor=self._umgebung.abholen,
-                danach=self._umgebung.nachziehen)
+            with _Sanduhr():
+                self.ergebnis = K.anwenden_mit_rueckweg(
+                    self._state, plan, davor=self._umgebung.abholen,
+                    danach=self._umgebung.nachziehen)
         except Exception as e:                       # noqa: BLE001
             try:
                 plan.zuruecknehmen(self._state)
@@ -399,6 +539,7 @@ class KlonenDialog(QDialog):
                 f"Das Klonen ist fehlgeschlagen ({e}).\nBereits geschriebene "
                 "Stellen wurden zurückgenommen; die Sicherung „vor dem "
                 "Klonen“ liegt unter Datei → Ältere Version öffnen….")
+            self._neu_rechnen()
             return
         self.accept()
 
