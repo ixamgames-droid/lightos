@@ -58,7 +58,7 @@ class _Port:
 
 def _enttec(device, description="FT232R USB UART"):
     return _Port(device, description, 0x0403, 0x6001,
-                 "USB VID:PID=0403:6001 SER=EN000000")
+                 "USB VID:PID=0403:6001")
 
 
 def _fremd(device, description="USB-SERIAL CH340"):
