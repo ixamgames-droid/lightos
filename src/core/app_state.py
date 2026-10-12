@@ -2290,6 +2290,12 @@ class AppState:
                         self.enttec_port_notes = notes
                     notes[num] = hinweis
                     self.output_manager.add_enttec(num, patch)
+                elif output == "uDMX":
+                    # OUT-68: ``patch`` = Adapter-Schluessel (Kennung +
+                    # Seriennummer/Anschluss); leer = der einzige vorhandene.
+                    # Geoeffnet wird im Sender, nicht hier — ein fehlender
+                    # Adapter oder fehlendes pyusb haelt den Start nicht auf.
+                    self.output_manager.add_udmx(num, patch)
                 elif output == "ArtNet":
                     self.output_manager.add_artnet(num, patch or "255.255.255.255",
                                                    out_universe=out_u)
