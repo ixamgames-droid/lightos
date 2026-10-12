@@ -323,6 +323,35 @@ class MatrixFolgeEditorTest(unittest.TestCase):
         self.assertEqual([7, 8, 9], neu.fixture_grid)
         self.assertEqual([10, 20, 30], self.alt.fixture_grid)
 
+    def test_show_laden_beendet_das_folgen(self):
+        """Funktions-ids stehen in der Show-Datei: traegt eine geladene Matrix
+        die id der zuvor frisch angelegten, darf sie der Auswahl nicht folgen."""
+        from src.core.sync import get_sync, SyncEvent
+        self.view.show()
+        _pump()
+        vorher = {f.id for f in self.fm.all()}
+        self.view._add()
+        neu = self.view._saved
+        self.assertNotIn(neu.id, vorher)
+        self.assertEqual([7, 8], neu.fixture_grid)
+        d = self.fm.to_dict()
+        for fd in d["functions"]:
+            if fd.get("id") == neu.id:
+                fd["fixture_grid"] = [10, 20, 30]
+                fd["cols"], fd["rows"] = 3, 1
+        self.fm.from_dict(d)
+        get_sync().emit(SyncEvent.SHOW_LOADED, None)
+        _pump()
+        geladen = self.fm.get(neu.id)
+        self.assertIsNot(neu, geladen)
+        self._neu = [f for f in self.fm.all() if f.id not in vorher]
+        self.alt = self.fm.get(self.alt.id)
+        self._sel = [1]
+        self._sync()
+        _pump()
+        self.assertEqual([10, 20, 30], list(geladen.fixture_grid),
+                         "geladene Matrix folgt der Auswahl")
+
 
 # ── Doku nennt die Regel ─────────────────────────────────────────────────────
 

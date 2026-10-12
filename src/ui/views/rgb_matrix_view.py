@@ -649,11 +649,18 @@ class RgbMatrixView(QWidget):
         self._group_header.setText(txt)
         self._group_header.setVisible(True)
 
+    def _on_show_loaded(self):
+        """SHOW_LOADED: Funktions-ids stehen in der Show-Datei. Traegt eine
+        geladene Matrix zufaellig die id der zuvor hier frisch angelegten, darf
+        sie der Auswahl nicht folgen (UI-91) — geladen = gespeichert."""
+        self._folgt_id = None
+        self._rebuild_from_state()
+
     def _connect_sync(self):
         try:
             from src.core.sync import get_sync, SyncEvent
             sync = get_sync()
-            sync.subscribe_widget(SyncEvent.SHOW_LOADED, self, lambda *_: self._rebuild_from_state())
+            sync.subscribe_widget(SyncEvent.SHOW_LOADED, self, lambda *_: self._on_show_loaded())
             sync.subscribe_widget(SyncEvent.REFRESH_ALL, self, lambda *_: self._rebuild_from_state())
             # Abschnitt 1: neu erstellte/umbenannte/geloeschte Matrizen erscheinen
             # sofort in beiden Matrix-Ansichten (Programmer-Seite + Sub-Tab).
