@@ -13,6 +13,8 @@ from .effect_func import LayeredEffect
 from .carousel import Carousel
 from .efx import EfxInstance
 from .rgb_matrix import RgbMatrixInstance
+from .modify import (ist_modify, normalize_mode, normalize_strength,
+                     write_modify)
 
 if TYPE_CHECKING:
     from src.core.dmx.universe import Universe
@@ -455,8 +457,15 @@ class FunctionManager:
             # bleibt der Tie-Break). Hoehere Prioritaet steht hinten und schreibt
             # damit zuletzt = gewinnt LTP bei Kanal-Ueberschneidung. Default 0
             # laesst die Reihenfolge unveraendert (kein Regressionsrisiko).
-            ordered.sort(key=lambda fid: getattr(
-                self._functions.get(fid), "priority", 0))
+            # ENG-37: Modify-Effekte ticken innerhalb ihrer Prioritaetsstufe
+            # ZULETZT (mehrere in Start-Reihenfolge) — sie verrechnen sich mit
+            # dem, was die normalen Effekte geschrieben haben, egal wer zuerst
+            # gestartet wurde. Ohne Modify-Effekt ist der zweite Schluesselteil
+            # ueberall 0 und die Reihenfolge exakt wie bisher.
+            def _tick_key(fid):
+                fn = self._functions.get(fid)
+                return (getattr(fn, "priority", 0), 1 if ist_modify(fn) else 0)
+            ordered.sort(key=_tick_key)
         for fid in ordered:
             f = self._functions.get(fid)
             if f is None or not f.is_running:
@@ -475,7 +484,13 @@ class FunctionManager:
                     env = f.env_factor(dt)
                 except AttributeError:
                     env = 1.0
-                if inten >= 0.999 and env >= 0.999:
+                if ist_modify(f):
+                    # ENG-37: verrechnen statt setzen. Effekt-Helligkeit und
+                    # Huellkurve skalieren die STAERKE des Modify-Effekts, nicht
+                    # das Ergebnis (sonst wuerde das Darunterliegende mitgedimmt).
+                    write_modify(f, universes, patch_cache, dt, self._functions,
+                                 faktor=inten * max(0.0, min(1.0, float(env))))
+                elif inten >= 0.999 and env >= 0.999:
                     f.write(universes, patch_cache, dt, self._functions)
                 else:
                     if dim_map is None:
@@ -640,6 +655,11 @@ class FunctionManager:
             # gemeinsamen Beat-Raster (Free-Run-Effekte mit leerer tempo_bus_id
             # bleiben davon unberuehrt).
             f.align_on_start = bool(fd.get("align_on_start", True))
+            # ENG-37: Modify-Kennzeichnung generisch laden. Fehlende Schluessel
+            # (jede Alt-Show) -> Vorgaben = normaler Effekt.
+            f.modify = bool(fd.get("modify", False))
+            f.modify_mode = normalize_mode(fd.get("modify_mode", "add"))
+            f.modify_strength = normalize_strength(fd.get("modify_strength", 100))
             self._functions[f.id] = f
         # ID-Zaehler hinter die hoechste geladene ID setzen, sonst kollidieren
         # neu erstellte Funktionen mit geladenen und ueberschreiben sie.

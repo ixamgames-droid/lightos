@@ -28,6 +28,17 @@ class Universe:
             self._write_log = None
             return log
 
+    def was_written(self, channel: int) -> bool | None:
+        """Steht ``channel`` im laufenden Schreib-Protokoll?
+
+        ``None`` = es laeuft gar kein Protokoll (dann ist die Frage nicht
+        beantwortbar). ENG-37: Modify-Effekte „Abziehen"/„Abdunkeln" greifen nur,
+        wo in diesem Frame schon ein Effekt geschrieben hat."""
+        with self._lock:
+            if self._write_log is None:
+                return None
+            return channel in self._write_log
+
     def set_channel(self, channel: int, value: int):
         """Setzt einen Kanal (1-basiert, Wert 0-255).
 

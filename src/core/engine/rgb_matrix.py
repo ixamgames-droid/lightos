@@ -1871,6 +1871,17 @@ class RgbMatrixInstance(Function):
                 ParamSpec("intensity_max", "Dimmer max", "int", 255, 0, 255, 1,
                           "Obergrenze des Dimmer-Styles"),
             ])
+            # ENG-37: nur bei gesetztem Haken — ein normaler Effekt bietet der
+            # Konsole exakt dieselbe Parameterliste an wie bisher.
+            if self.modify_wirksam():
+                from .modify import MODIFY_MODES
+                specs.extend([
+                    ParamSpec("modify_strength", "Modify-Stärke", "int", 100, 0, 100, 1,
+                              "Wie kräftig der Modify-Effekt zugreift (Prozent)"),
+                    ParamSpec("modify_mode", "Modify-Art", "select", "add",
+                              options=MODIFY_MODES,
+                              tooltip="Addieren, Abziehen oder Abdunkeln"),
+                ])
         elif self.style == MatrixStyle.SHUTTER:
             specs.extend([
                 ParamSpec("shutter_min", "Shutter min", "int", 0, 0, 255, 1,
@@ -1937,6 +1948,10 @@ class RgbMatrixInstance(Function):
             return float(self.params.get("offset", 0.0))
         if key in ("white_amount", "intensity_min", "intensity_max", "shutter_min", "shutter_max"):
             return getattr(self, key)
+        if key == "modify_strength":
+            return int(getattr(self, "modify_strength", 100))
+        if key == "modify_mode":
+            return getattr(self, "modify_mode", "add")
         if key == "tempo_bus_id":
             return getattr(self, "tempo_bus_id", "")
         if key == "tempo_multiplier":
@@ -2005,6 +2020,15 @@ class RgbMatrixInstance(Function):
         if key in ("white_amount", "intensity_min", "intensity_max", "shutter_min", "shutter_max"):
             hi = 100 if key == "white_amount" else 255
             setattr(self, key, max(0, min(hi, int(round(float(value)))))); return True
+        if key == "modify_strength":
+            from .modify import normalize_strength
+            self.modify_strength = normalize_strength(value); return True
+        if key == "modify_mode":
+            from .modify import MODIFY_MODES
+            s = str(value or "").strip().lower()
+            if s not in MODIFY_MODES:
+                return False
+            self.modify_mode = s; return True
         if key == "tempo_bus_id":
             self.tempo_bus_id = str(value or "").strip(); return True
         if key == "tempo_multiplier":
@@ -2206,6 +2230,14 @@ class RgbMatrixInstance(Function):
         """Freeze-Auftauen: eigener monotonic-Anker mit (s. Function.shift_clock)."""
         self._last_tick += float(seconds)
 
+    def modify_wirksam(self) -> bool:
+        """ENG-37 Schritt 1: Modify gibt es nur im Stil Dimmer.
+
+        Steht der Haken bei einem anderen Stil (z. B. nach einem Stilwechsel),
+        laeuft der Effekt als ganz normaler Effekt — Farbe wird nie verrechnet
+        und zieht den Dimmer nie mit."""
+        return bool(getattr(self, "modify", False)) and self.style == MatrixStyle.DIMMER
+
     def to_dict(self) -> dict:
         d = super().to_dict()  # id, name, type, intensity, speed, folder
         d.update({
@@ -2321,6 +2353,14 @@ class RgbMatrixInstance(Function):
             self.priority = int(d.get("priority", getattr(self, "priority", 0)))
         except (TypeError, ValueError):
             self.priority = 0
+        # ENG-37: Modify-Kennzeichnung im Draft-/Preset-Roundtrip. to_dict laesst
+        # die Schluessel bei Vorgabewerten WEG — ein fehlender Schluessel heisst
+        # hier deshalb „Vorgabe", nicht „aktuellen Wert behalten" (sonst bliebe
+        # ein im Editor entfernter Haken beim Speichern stehen).
+        from .modify import normalize_mode, normalize_strength
+        self.modify = bool(d.get("modify", False))
+        self.modify_mode = normalize_mode(d.get("modify_mode", "add"))
+        self.modify_strength = normalize_strength(d.get("modify_strength", 100))
         # ARC-04: Hüllkurven-Zeiten ebenfalls im Draft-Roundtrip erhalten.
         try:
             self.env_fade_in = max(0.0, float(d.get("env_fade_in",

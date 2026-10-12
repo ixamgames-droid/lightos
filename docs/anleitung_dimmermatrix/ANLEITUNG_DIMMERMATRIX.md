@@ -100,6 +100,98 @@ Im Hardstyle-Look kombiniert: blauer Farb-Chase + schnellerer Dimmer-Puls, per V
 **Default-/Leader-Bus** gelegt und damit musik-synchron — zu sehen in der laufenden Show
 (siehe *Virtuelle Konsole*, GIF „Hardstyle-Show läuft").
 
+## 5. Modify-Effekt: auf laufende Effekte addieren, abziehen, abdunkeln
+
+Ein normaler Dimmer-Effekt **setzt** die Helligkeit seiner Lampen — läuft ein zweiter darüber,
+gewinnt der zuletzt gestartete. Ein **Modify-Effekt** setzt nichts: er wird mit dem **verrechnet**,
+was darunter gerade läuft. Beispiel: Im Hintergrund funkelt es die ganze Zeit; ein Modify-Lauflicht
+legt auf zwei Lampen 100 % obendrauf, wandert weiter — und die Lampen dahinter funkeln wieder
+ganz normal.
+
+### Einrichten
+
+1. Matrix wie in Abschnitt 2 anlegen: **Stil Dimmer**, Algorithmus z. B. *Chase*, Lampen zuweisen.
+2. Unter **Stil** den Haken **Modify-Effekt** setzen. Darunter erscheint die Gruppe **Modify** mit
+   **Betriebsart** (Addieren / Abziehen / Abdunkeln) und **Stärke** (0–100 %, Vorgabe 100 %).
+   Haken raus = wieder ein ganz normaler Effekt; Betriebsart und Stärke bleiben gemerkt.
+3. **💾 Speichern** und den Effekt auf eine normale Taste der Virtuellen Konsole legen:
+   Taste an = der Modify-Effekt wirkt, Taste aus = alles läuft wie vorher weiter.
+4. Wer mag, legt einen Regler auf den Effekt-Parameter **Modify-Stärke**. Der Regler
+   **Helligkeit** des Modify-Effekts und seine Ein-/Ausblendzeit wirken ebenfalls nur auf die
+   Stärke — das Darunterliegende wird davon nie mitgedimmt.
+
+### Die drei Betriebsarten
+
+| Betriebsart | Rechnung je Lampe | Lampe im Modify-Effekt gerade nicht dran |
+|---|---|---|
+| **Addieren** | unten + Betrag × Stärke | bleibt unverändert |
+| **Abziehen** | unten − Betrag × Stärke | bleibt unverändert |
+| **Abdunkeln** | unten × (1 − Betrag × Stärke) | bleibt unverändert |
+
+**Betrag** ist das, was der Modify-Effekt für die Lampe ausrechnet (Läufer an = 100 %, aus = 0 %,
+ein Schweif liegt dazwischen). Gekappt wird bei 0 % und 100 %. *Abdunkeln* heißt „um so viel
+Prozent dunkler" — 50 % halbiert die Helligkeit, egal wie hell es darunter gerade ist. Das ist der
+Unterschied zu *Abziehen*, das einen festen Betrag wegnimmt.
+
+### Durchgerechnet
+
+Darunter steht ein Dimmer-Effekt gerade auf 40 %. Das Modify-Lauflicht hat zwei Läufer auf acht
+Lampen, im Moment auf Lampe 3 und 7:
+
+| Lampe | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+|---|---|---|---|---|---|---|---|---|
+| Effekt darunter | 40 | 40 | 40 | 40 | 40 | 40 | 40 | 40 |
+| Modify-Lauflicht (Betrag) | 0 | 0 | 100 | 0 | 0 | 0 | 100 | 0 |
+| Addieren, Stärke 100 % | 40 | 40 | 100 | 40 | 40 | 40 | 100 | 40 |
+| Abziehen, Stärke 100 % | 40 | 40 | 0 | 40 | 40 | 40 | 0 | 40 |
+| Abdunkeln, Stärke 100 % | 40 | 40 | 0 | 40 | 40 | 40 | 0 | 40 |
+| Addieren, Stärke 50 % | 40 | 40 | 90 | 40 | 40 | 40 | 90 | 40 |
+| Abziehen, Stärke 50 % | 40 | 40 | 0 | 40 | 40 | 40 | 0 | 40 |
+| Abdunkeln, Stärke 50 % | 40 | 40 | 20 | 40 | 40 | 40 | 20 | 40 |
+
+(40 + 100 = 140 → gekappt auf 100. 40 − 50 = −10 → gekappt auf 0.) Im nächsten Schritt stehen die
+Läufer auf Lampe 4 und 8 — Lampe 3 und 7 sind dann wieder exakt bei den 40 % des Effekts darunter.
+
+### Reihenfolge
+
+- Ein Modify-Effekt rechnet immer **nach** den normalen Effekten seiner **Layer-Priorität** und
+  aller niedrigeren — egal, was zuerst gestartet wurde.
+- Mehrere Modify-Effekte wirken **nacheinander in Start-Reihenfolge**, jeder kappt für sich.
+  Beispiel auf 40 %: erst Addieren 50 %, dann Abziehen 100 % ergibt 0 %; umgekehrt gestartet
+  ergibt es 50 %.
+- Ein normaler Effekt mit **höherer** Priorität überschreibt alles darunter, auch das Verrechnete.
+
+### Grenzen (Stand Schritt 1)
+
+- Modify gibt es bisher nur im **Stil Dimmer**. Bei RGB, RGBW und Shutter ist der Haken gesperrt;
+  ein dort noch gesetzter Haken hat keine Wirkung. Farbe und Dimmer bleiben getrennt — ein
+  Dimmer-Modify fasst nie eine Farbe an.
+- Verrechnet wird mit **laufenden Effekten**. **Snap-Tasten, Programmer und Cuelisten** liegen in
+  LightOS darüber und werden nicht verrechnet.
+- **Addieren ohne Effekt darunter** arbeitet auf 0 und sieht aus wie ein normaler Dimmer-Effekt.
+  Ihm gehört dann der Dimmer der Lampe; ein Programmer- oder Snap-Dimmer zählt währenddessen
+  nicht — genau wie bei jedem anderen Dimmer-Effekt.
+- **Abziehen und Abdunkeln ohne Effekt darunter** tun nichts. Sie greifen nur dort, wo ein Effekt
+  den Dimmer gerade treibt; Grundwerte, Snaps und Programmer-Helligkeit werden nie abgedunkelt.
+- Steht **Dimmer-Bereich Min** im Modify-Effekt über 0, bekommt **jede** Lampe diesen Grundbetrag
+  ab (der Editor weist darauf hin).
+- Als **Chaser-Schritt** läuft ein Modify-Effekt wie ein normaler Effekt. In einer Collection wird
+  er mit dem verrechnet, was bis dahin geschrieben ist (also auch mit den Effekten, die in der
+  Collection vor ihm stehen).
+- Die Vorschau im Editor zeigt den Modify-Effekt allein, eingefärbt nach Betriebsart
+  (Bernstein = Addieren, Blau = Abziehen, schraffiert = Abdunkeln).
+
+### Noch aufzunehmende Bilder
+
+Für diesen Abschnitt gibt es noch keine Bilder. Aufzunehmen sind:
+
+1. Matrix-Editor, Stil Dimmer, Haken **Modify-Effekt** aus.
+2. Matrix-Editor mit gesetztem Haken und der Gruppe **Modify**.
+3. Lampenreihe: Effekt darunter allein / Modify-Lauflicht allein / Ergebnis mit Addieren.
+4. Dieselbe Reihe mit Abziehen und Abdunkeln nebeneinander.
+5. Virtuelle Konsole: Taste für den Modify-Effekt und Regler **Modify-Stärke**.
+6. Kurzes GIF: Taste an/aus über einem laufenden Funkeln.
+
 ---
 
 **Kurz:** Gruppe wählen → Matrix-Tab → **+ Neu** → **Stil Dimmer** + Algorithmus *Chase* (Raster

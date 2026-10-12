@@ -6,9 +6,10 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
                                 QComboBox, QLineEdit, QLabel, QScrollArea,
                                 QColorDialog, QFrame, QSlider, QCheckBox, QDialog)
 from PySide6.QtCore import Qt, QTimer, QRect, Signal
-from PySide6.QtGui import QPainter, QColor, QFont, QPen
+from PySide6.QtGui import QPainter, QColor, QFont, QPen, QBrush
 from src.core.engine.rgb_matrix import RgbMatrixInstance, RgbAlgorithm, MatrixStyle, Color, is_gap
 from src.core.engine.rgb_matrix_meta import ALGO_META
+from src.core.engine.modify import MODIFY_LABELS, MODIFY_MODES, normalize_mode
 from src.ui.virtualconsole.vc_effect_meta import option_label
 from src.ui.widgets.select_all_spinbox import SelectAllSpinBox
 from src.ui.widgets.color_sequence_editor import ColorSequenceField
@@ -234,6 +235,10 @@ class MatrixPreview(QWidget):
         cell_w = (self.width() - 10) / cols
         cell_h = (self.height() - 10) / rows
         grid_assign = self._matrix.fixture_grid
+        modify_art = None
+        _mw = getattr(self._matrix, "modify_wirksam", None)
+        if _mw is not None and _mw():
+            modify_art = normalize_mode(getattr(self._matrix, "modify_mode", "add"))
         for row in range(rows):
             for col in range(cols):
                 idx = row * cols + col
@@ -252,7 +257,25 @@ class MatrixPreview(QWidget):
                     p.drawLine(x, y, x + w - 1, y + h - 1)
                     continue
                 r, g, b = self._grid[idx]
-                p.fillRect(x, y, w, h, QColor(r, g, b))
+                if modify_art is None:
+                    p.fillRect(x, y, w, h, QColor(r, g, b))
+                else:
+                    # ENG-37: Modify allein, nach Art eingefaerbt (Betrag = Helligkeit).
+                    lvl = max(r, g, b) / 255.0
+                    if modify_art == "add":
+                        p.fillRect(x, y, w, h, QColor(
+                            int(255 * lvl), int(176 * lvl), 0))
+                    elif modify_art == "sub":
+                        p.fillRect(x, y, w, h, QColor(
+                            int(64 * lvl), int(140 * lvl), int(255 * lvl)))
+                    else:
+                        p.fillRect(x, y, w, h, QColor("#0d1117"))
+                        g_ = int(200 * lvl)
+                        p.fillRect(x, y, w, h, QBrush(
+                            QColor(g_, g_, g_), Qt.BrushStyle.BDiagPattern))
+        if modify_art is not None:
+            p.setPen(QColor("#e6edf3"))
+            p.drawText(8, 18, {"add": "+", "sub": "−", "dim": "×"}[modify_art])
         # Zuordnungs-Overlay ZULETZT und nur als Rahmen: die Effektfarbe darunter
         # bleibt vollstaendig sichtbar (sie ist der Zweck der Vorschau).
         if self._show_assignment:
@@ -846,6 +869,13 @@ class RgbMatrixView(QWidget):
         self._style_combo.currentTextChanged.connect(self._on_style_change)
         fg.addRow("Stil:", self._style_combo)
 
+        # ENG-37: Modify-Effekt — verrechnen statt setzen. FESTES Feld; die
+        # zugehoerige Gruppe „Modify" (weiter unten) wird nur ein-/ausgeblendet,
+        # nie neu gebaut (STAB-38).
+        self._cb_modify = QCheckBox("Modify-Effekt")
+        self._cb_modify.toggled.connect(self._on_modify_toggled)
+        fg.addRow("", self._cb_modify)
+
         self._cols_spin = SelectAllSpinBox()   # UXT-11a
         self._cols_spin.setRange(1, 64)
         self._cols_spin.setValue(8)
@@ -1129,6 +1159,39 @@ class RgbMatrixView(QWidget):
         self._shut_form_label = QLabel("Shutter-Bereich:")
         fc.addRow(self._shut_form_label, shut_row)
         body.addWidget(grp_colors)
+
+        # ── Gruppe: Modify (ENG-37) — feste Felder, nur ein-/ausgeblendet ─────
+        self._grp_modify = QGroupBox("Modify")
+        self._grp_modify.setStyleSheet(_grp_style)
+        fm_ = QFormLayout(self._grp_modify)
+        fm_.setSpacing(6)
+        self._modify_mode_combo = QComboBox()
+        for _mode in MODIFY_MODES:
+            self._modify_mode_combo.addItem(MODIFY_LABELS[_mode], _mode)
+        self._modify_mode_combo.setToolTip(
+            "Addieren: legt den Betrag obendrauf.\n"
+            "Abziehen: nimmt den Betrag weg.\n"
+            "Abdunkeln: macht um so viel Prozent dunkler.\n"
+            "Wo der Effekt gerade nichts ausgibt, bleibt das Darunterliegende "
+            "unverändert.")
+        self._modify_mode_combo.currentIndexChanged.connect(self._param_change)
+        fm_.addRow("Betriebsart:", self._modify_mode_combo)
+        self._modify_strength_spin = SelectAllSpinBox()
+        self._modify_strength_spin.setRange(0, 100)
+        self._modify_strength_spin.setValue(100)
+        self._modify_strength_spin.setSuffix(" %")
+        self._modify_strength_spin.setToolTip(
+            "Wie kräftig der Modify-Effekt zugreift. Der Regler "
+            "„Helligkeit“ des Effekts und seine Ein-/Ausblendzeit wirken "
+            "ebenfalls nur auf diese Stärke.")
+        self._modify_strength_spin.valueChanged.connect(self._param_change)
+        fm_.addRow("Stärke:", self._modify_strength_spin)
+        self._modify_hint = QLabel("")
+        self._modify_hint.setWordWrap(True)
+        self._modify_hint.setStyleSheet("color:#8b949e; font-size:11px;")
+        fm_.addRow(self._modify_hint)
+        self._grp_modify.setVisible(False)
+        body.addWidget(self._grp_modify)
 
         # ── Gruppe: Bewegung & Parameter (Richtung + dynamische Algo-Parameter) ─
         # Richtung liegt in einer EIGENEN, dauerhaften Form-Zeile; die dynamischen
@@ -1495,10 +1558,45 @@ class RgbMatrixView(QWidget):
         self._shut_form_label.setVisible(is_shutter)
         self._smin_spin.setVisible(is_shutter)
         self._smax_spin.setVisible(is_shutter)
+        # ENG-37: Modify gibt es (Schritt 1) nur im Stil Dimmer.
+        self._apply_modify_visibility(style)
         # Farben-Zeile (C1/C2/C3 bzw. Sequence): Anzahl haengt von Style UND
         # Algorithmus ab. ZULETZT aufrufen, damit die Sichtbarkeit der ganzen
         # "Farben"-Gruppe den vollstaendigen, gerade gesetzten Zustand sieht.
         self._apply_color_visibility(style)
+
+    def _apply_modify_visibility(self, style: MatrixStyle | None = None):
+        """ENG-37: Haken freigeben/sperren und die Gruppe „Modify" zeigen.
+
+        ★ Reine Sichtbarkeit (``setVisible``/``setEnabled``) auf FESTEN Feldern —
+        hier wird nichts gebaut und nichts geloescht; die Methode laeuft auch aus
+        dem ``toggled``-Signal des Hakens selbst (STAB-38)."""
+        if style is None:
+            try:
+                style = MatrixStyle(self._style_combo.currentText())
+            except ValueError:
+                style = MatrixStyle.RGB
+        erlaubt = style == MatrixStyle.DIMMER
+        self._cb_modify.setEnabled(erlaubt)
+        self._cb_modify.setToolTip(
+            "Der Effekt setzt seine Werte nicht, sondern verrechnet sie mit dem, "
+            "was darunter läuft (addieren, abziehen, abdunkeln)."
+            if erlaubt else
+            "Modify-Effekte gibt es bisher nur im Stil „Dimmer“.")
+        aktiv = erlaubt and self._cb_modify.isChecked()
+        self._grp_modify.setVisible(aktiv)
+        hinweis = ("Wirkt auf laufende Effekte gleicher oder niedrigerer "
+                   "Priorität — nicht auf Snaps und Programmer. Als Chaser-Schritt "
+                   "läuft er wie ein normaler Effekt.")
+        if aktiv and self._imin_spin.value() > 0:
+            hinweis = ("Dimmer-Bereich „Min“ steht über 0: jede Lampe bekommt "
+                       "diesen Grundbetrag ab. " + hinweis)
+        self._modify_hint.setText(hinweis)
+
+    def _on_modify_toggled(self, _checked: bool = False):
+        """Haken „Modify-Effekt": Gruppe ein-/ausblenden, Wert uebernehmen."""
+        self._apply_modify_visibility()
+        self._param_change()
 
     def _apply_color_visibility(self, style: MatrixStyle | None = None):
         """Zeigt nur so viele Farbfelder, wie der aktive Algorithmus auswertet.
@@ -1655,6 +1753,19 @@ class RgbMatrixView(QWidget):
             self._cb_dimmer_cycle.blockSignals(True)
             self._cb_dimmer_cycle.setChecked(bool(m.params.get("dimmer_cycle", False)))
             self._cb_dimmer_cycle.blockSignals(False)
+            # ENG-37: Modify-Felder (fest) befuellen; Sichtbarkeit setzt
+            # _apply_style_visibility gleich darunter.
+            self._cb_modify.blockSignals(True)
+            self._cb_modify.setChecked(bool(getattr(m, "modify", False)))
+            self._cb_modify.blockSignals(False)
+            self._modify_mode_combo.blockSignals(True)
+            _mi = self._modify_mode_combo.findData(getattr(m, "modify_mode", "add"))
+            self._modify_mode_combo.setCurrentIndex(_mi if _mi >= 0 else 0)
+            self._modify_mode_combo.blockSignals(False)
+            self._modify_strength_spin.blockSignals(True)
+            self._modify_strength_spin.setValue(
+                int(getattr(m, "modify_strength", 100)))
+            self._modify_strength_spin.blockSignals(False)
             self._apply_style_visibility(m.style)
             # I2.4: Algorithmus-Parameter laden (erst Felder aufbauen, dann Werte laden)
             self._dir_combo.blockSignals(True)
@@ -1708,6 +1819,12 @@ class RgbMatrixView(QWidget):
         self._current.shutter_min = self._smin_spin.value()
         self._current.shutter_max = self._smax_spin.value()
         self._current.priority = self._priority_spin.value()
+        # ENG-37: Modify-Kennzeichnung. Art und Staerke bleiben auch bei
+        # entferntem Haken gemerkt.
+        self._current.modify = self._cb_modify.isChecked()
+        self._current.modify_mode = self._modify_mode_combo.currentData() or "add"
+        self._current.modify_strength = self._modify_strength_spin.value()
+        self._apply_modify_visibility()
         self._current.env_fade_in = self._env_in_spin.value()
         self._current.env_fade_out = self._env_out_spin.value()
         self._current.env_curve = self._env_curve_combo.currentData() or "linear"
