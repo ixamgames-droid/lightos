@@ -13,6 +13,7 @@ import serial.tools.list_ports
 from src.core.app_state import get_state
 from src.core.paths import user_data_file
 from src.core.dmx.enttec_pro import EnttecPro, ENTTEC_VID, ENTTEC_PID
+from src.core.dmx import anschluss_auswahl
 
 # ⚠️ Umlenkbar — und das ist keine Test-Bequemlichkeit, sondern Datenschutz.
 #
@@ -516,8 +517,24 @@ class OutputConfigDialog(QDialog):
         ef = QFormLayout(enttec_tab)
 
         self._combo_port = QComboBox()
+        # OUT-73: Anschluesse ohne USB-Geraet (leere ttyS…, COM1, Bluetooth)
+        # stehen nur auf Wunsch in der Liste — der Haken und die Hinweiszeile
+        # muessen VOR dem ersten `_refresh_ports` existieren.
+        self._check_alle_ports = QCheckBox("Alle Anschlüsse zeigen")
+        self._check_alle_ports.setToolTip(
+            "Zeigt auch serielle Anschlüsse, hinter denen kein USB-Gerät\n"
+            "erkannt wird (eingebaute Schnittstelle, Bluetooth, leere\n"
+            "Anschlüsse). Ein Enttec Pro ist ein USB-Gerät und steht auch\n"
+            "ohne diesen Haken in der Liste.")
+        self._lbl_port_hinweis = QLabel("")
+        self._lbl_port_hinweis.setWordWrap(True)
         self._refresh_ports()
         ef.addRow("COM-Port:", self._combo_port)
+        ef.addRow("", self._check_alle_ports)
+        ef.addRow("", self._lbl_port_hinweis)
+        # Parameterlose Bound-Methods, s. Begruendung beim Knopf darunter.
+        self._check_alle_ports.toggled.connect(self._ports_neu_einlesen)
+        self._combo_port.currentIndexChanged.connect(self._port_hinweis_nachziehen)
 
         refresh_btn = QPushButton("Ports aktualisieren")
         # ★ Bewusst eine parameterlose Bound-Method statt eines Lambdas — aus
@@ -944,20 +961,59 @@ class OutputConfigDialog(QDialog):
         Port da, und „Verbinden" nahm ihn. Jetzt gewinnt in dieser Reihenfolge:
         ein ausdruecklich uebergebener Port, sonst die aktuelle Auswahl, sonst
         der in ``universes.json`` gespeicherte.
+
+        OUT-73: und wenn es keinen davon gibt — frischer Datenordner — NICHT
+        mehr der erste Eintrag des Betriebssystems. Das war auf einem
+        Linux-Rechner ein ``/dev/ttyS…`` ohne Geraet, unter Windows ``COM1``:
+        „Verbinden" richtete einen toten Anschluss ein und speicherte ihn, der
+        eingesteckte Enttec blieb ohne Universum. Jetzt steht der erkannte
+        Adapter oben und ist vorgewaehlt; Anschluesse ohne USB-Geraet stehen nur
+        mit „Alle Anschlüsse zeigen" in der Liste. Ohne erkannten Adapter bleibt
+        die Auswahl leer (Regeln in ``anschluss_auswahl``).
         """
         aktuell = (bevorzugt or self._combo_port.currentData()
                    or _gespeicherter_enttec_port())
-        self._combo_port.clear()
-        for p in serial.tools.list_ports.comports():
-            label = f"{p.device}"
-            if p.description:
-                label += f"  —  {p.description}"
-            if p.vid == ENTTEC_VID and p.pid == ENTTEC_PID:
-                label += "  [Enttec Pro]"
-            self._combo_port.addItem(label, p.device)
-        self._enttec_port_waehlen(aktuell)
-        if self._combo_port.count() == 0:
-            self._combo_port.addItem("Kein Port gefunden", "")
+        alle_zeigen = self._check_alle_ports.isChecked()
+        anschluesse = anschluss_auswahl.ordnen(
+            serial.tools.list_ports.comports())
+        self._anschluesse = anschluesse
+        # Der Neuaufbau meldet jede Zwischenauswahl — die Hinweiszeile wird
+        # einmal am Ende gesetzt, nicht je Eintrag.
+        war_blockiert = self._combo_port.blockSignals(True)
+        try:
+            self._combo_port.clear()
+            for a in anschluss_auswahl.sichtbare(
+                    anschluesse, alle_zeigen, immer=(aktuell,)):
+                self._combo_port.addItem(a.text, a.device)
+            if aktuell:
+                self._enttec_port_waehlen(aktuell)
+            else:
+                vorschlag = anschluss_auswahl.vorschlag(anschluesse)
+                if vorschlag:
+                    self._enttec_port_waehlen(vorschlag)
+                elif self._combo_port.count():
+                    # Nur fremde USB-Geraete (oder, mit Haken, Anschluesse ohne
+                    # Geraet): keinen davon von selbst waehlen.
+                    self._combo_port.insertItem(0, "— Anschluss wählen —", "")
+                    self._combo_port.setCurrentIndex(0)
+            if self._combo_port.count() == 0:
+                self._combo_port.addItem("Kein Port gefunden", "")
+        finally:
+            self._combo_port.blockSignals(war_blockiert)
+        self._port_hinweis_nachziehen()
+
+    def _port_hinweis_nachziehen(self):
+        """OUT-73: die Zeile unter der Portliste (leer = unsichtbar).
+
+        Rechnet mit der zuletzt eingelesenen Liste — ein Wechsel der Auswahl
+        fragt das Betriebssystem nicht neu ab.
+        """
+        text = anschluss_auswahl.hinweis(
+            getattr(self, "_anschluesse", ()),
+            self._combo_port.currentData() or "",
+            self._check_alle_ports.isChecked())
+        self._lbl_port_hinweis.setText(text)
+        self._lbl_port_hinweis.setVisible(bool(text))
 
     def _enttec_port_waehlen(self, port: str | None):
         """Einen Port in der Liste auswaehlen; fehlt er, ihn sichtbar machen.
