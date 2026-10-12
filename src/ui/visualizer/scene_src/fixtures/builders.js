@@ -15,7 +15,7 @@ import { syncPoolSize } from './floor_pool.js';               // VIZ-15
 import { beamsOff } from '../state.js';                       // VIZ-15
 import { applyGobo, alignGoboFloor, goboKanteAbgleichen, kegelSchnittAbgleichen, goboWinkel, GOBO_LICHT, GOBO_STRAHL, GOBO_FLECK } from './gobo_textures.js';   // VIZ-GOBO-3D, VIZ-83
 import { glattKanal, glattZiel, glattWert, glattDeckel } from './bewegung_glatt.js';   // VIZ-92
-import { goboProjektionAktiv, goboFlachDeckkraft, goboSchmal, strahlFussabdruck, goboUeberhangGerichtet, kegelFernLaenge } from '../scene/gobo_projektion.js';      // VIZ-96
+import { goboProjektionAktiv, goboFlachDeckkraft, goboSchmal, strahlFussabdruck, goboUeberhangGerichtet, kegelFernLaenge, goboInnenGerichtet, kantenAbstand } from '../scene/gobo_projektion.js';      // VIZ-96, VIZ-107
 import { requestRender } from '../scene/render_loop.js';                 // VIZ-92
 import { buildLaserRig, applyLaser, noteLaserAnimation, LASER_BEAM_OPACITY } from './laser.js';   // VIZ-79
 import { stageObjects } from '../state.js';                   // VIZ-BEAM-OCCLUSION
@@ -175,6 +175,69 @@ function _koerperId(obj) {
     if (id) return id;
   }
   return null;
+}
+
+// VIZ-107: Buehnenkoerper, deren ganze Oberseite eine ebene Flaeche ist — nur
+// bei ihnen laesst sich die Oberseite OHNE Treffer aus Lage und Groesse
+// angeben (ein DJ-Pult oder eine Treppe hat oben keine volle Platte).
+const _EBENE_OBERSEITE = new Set(['platform', 'floor']);
+
+/** VIZ-107: die Oberseite, die der KEGEL noch trifft, waehrend seine Mitte
+ *  schon daneben auf dem Boden liegt — das Gegenstueck zum Ueberhang.
+ *
+ *  Die Treffersuche verfolgt nur den Zentralstrahl. Ueberquerte er die Kante
+ *  einer Buehnenplatte, galt von einem DMX-Schritt auf den naechsten „trifft
+ *  den Boden“: Beschnitt und zweite Scheibe fielen weg, der Teil des Musters
+ *  auf der Platte verschwand in einem Bild, obwohl der halbe Kegel sie noch
+ *  traf — auf Stufe Niedrig, wo jedes Gobo die flache Scheibe ist, sprang das
+ *  Muster an der Buehnenkante. Hier wird die Platte deshalb aus ihrer Lage
+ *  gesucht: wo durchstoesst die Kegelachse ihre Ebene, und reicht der
+ *  Fussabdruck von dort noch auf das Rechteck?
+ *
+ *  @param bodenAbstand  Achse bis zum Auftreffpunkt am Boden (m)
+ *  @returns {kante, abstand, x, z, innen} — `abstand` Achse bis zur Ebene der
+ *           Oberseite, (x, z) der Durchstosspunkt, `innen` 0..1 (weich); oder
+ *           null. Gewaehlt wird die hoechste solche Oberseite.
+ */
+function _oberseiteImKegel(f, origin, dir, bodenAbstand) {
+  if (!(dir.y < -1e-3) || !isFinite(bodenAbstand)) return null;
+  const radius = _kegelDurchmesser(f) / 2;
+  if (!(radius > 0)) return null;
+  // Dieselbe Kostenbremse wie die Treffersuche: `_koerperSchluessel` steht
+  // fuer Strahl UND Buehne (koerperTreffer lief in diesem Durchgang schon).
+  // Im Ruhezustand — DMX kommt mit 44 Hz, auch wenn nichts faehrt — kostet das
+  // einen Vergleich statt einer Schleife ueber die Buehne.
+  const schluessel = (f._koerperSchluessel || 0) + radius * 31 + bodenAbstand * 37;
+  if (f._nebenSchluessel === schluessel) return f._neben || null;
+  f._nebenSchluessel = schluessel;
+  f._neben = _oberseiteImKegelRechnen(f, origin, dir, bodenAbstand, radius);
+  return f._neben;
+}
+
+function _oberseiteImKegelRechnen(f, origin, dir, bodenAbstand, radius) {
+  const schmal = _goboSchmalMass(f);
+  let best = null;
+  for (const id in stageObjects) {
+    const so = stageObjects[id];
+    const m = so && so.mesh, d = so && so.data, g = d && d.size;
+    if (!m || !g || !_EBENE_OBERSEITE.has(d.type) || !(g.x > 0) || !(g.z > 0)) continue;
+    // Was die Treffersuche mit Gobo als „schmal“ ueberspringt, zaehlt auch hier nicht.
+    if (schmal > 0 && goboSchmal(g, schmal)) continue;
+    const y = m.position.y + g.y / 2;
+    const abstand = (y - origin.y) / dir.y;
+    if (!(abstand > 0.05) || !(abstand < bodenAbstand - 1e-3)) continue;
+    if (best && y <= best.kante.y) continue;
+    const kante = { cx: m.position.x, cz: m.position.z, hx: g.x / 2, hz: g.z / 2,
+                    c: Math.cos(m.rotation.y), s: Math.sin(m.rotation.y), y, id };
+    const x = origin.x + dir.x * abstand, z = origin.z + dir.z * abstand;
+    // Laege die Achse AUF der Platte, haette der Zentralstrahl sie getroffen.
+    if (kantenAbstand(kante, x, z) >= 0) continue;
+    const tanA = radius / Math.max(0.15, Math.min(f.baseBeamLength || abstand, abstand));
+    const innen = goboInnenGerichtet(
+      kante, x, z, strahlFussabdruck(dir.x, dir.y, dir.z, abstand, tanA));
+    if (innen > 0) best = { kante, abstand, x, z, innen };
+  }
+  return best;
 }
 
 const _normale = new THREE.Vector3();
@@ -2005,6 +2068,7 @@ function applyFloorAim(f, dmx) {
   let auftreffAbstand = Infinity;
   let bodenAbstand = Infinity;  // VIZ-102: Zentralstrahl bis zur Bodenebene
   let richtung = null;          // ... und seine Richtung
+  let ursprung = null;          // VIZ-107: ... und sein Ursprung (die Linse)
   let goboTreffer = null;       // VIZ-83 B2: Auftreffpunkt fuer das Gobo-Bodenmuster
   if (f.floorSpot && f.spotTarget) {
     const dir = new THREE.Vector3(0, -1, 0);
@@ -2032,6 +2096,7 @@ function applyFloorAim(f, dmx) {
     // leerem Boden.
     const koerper = koerperTreffer(f, origin, dir);
     richtung = dir;
+    ursprung = origin;
     // VIZ-98: Boden nur nach unten; ein Koerper zaehlt in jeder Richtung.
     const tBoden = dir.y < -0.001 ? -origin.y / dir.y : Infinity;
     bodenAbstand = (tBoden > 0 && tBoden < 100) ? tBoden : Infinity;
@@ -2073,10 +2138,27 @@ function applyFloorAim(f, dmx) {
   const kante = (kt && kt.kante && goboTreffer && isFinite(auftreffAbstand)
                  && Math.abs(kt.abstand - auftreffAbstand) < 1e-6) ? kt.kante : null;
   let kegelAbstand = auftreffAbstand, ueber = 0, untenY = 0, fernUnten = 0;
+  // VIZ-107: der spiegelbildliche Fall. Die Strahlmitte hat die Kante schon
+  // ueberquert und trifft den BODEN, der Kegel trifft die Oberseite aber noch.
+  // Bisher galt von diesem DMX-Schritt an „keine Kante“: Beschnitt und zweite
+  // Scheibe fielen weg, der Teil des Musters auf der Buehne verschwand in
+  // einem Bild, und Kegelwinkel und Helligkeit wechselten mit. Jetzt bleibt
+  // die Anordnung stehen, bis der Kegel die Oberseite ganz verlassen hat:
+  // erste Scheibe auf der Oberseite (beschnitten), zweite am Boden.
+  let neben = null;
+  if (!kante && f.goboAktiv && ursprung && goboTreffer && isFinite(auftreffAbstand)
+      && auftreffAbstand === bodenAbstand) {
+    neben = _oberseiteImKegel(f, ursprung, richtung, bodenAbstand);
+  }
+  // Abstand, auf den sich der Kegelwinkel bezieht (der Kegel endet dort mit
+  // festem Radius): am Kantenwechsel die Oberseite wie kurz davor, dann mit
+  // dem Anteil des Kegels auf der Oberseite stufenlos zum Boden.
+  const bezug = neben
+    ? auftreffAbstand + (neben.abstand - auftreffAbstand) * neben.innen : auftreffAbstand;
   // Tangens des halben Kegelwinkels (der Kegel endet am Auftreffpunkt mit
   // festem Radius). Das Gobo-Motiv liegt seit VIZ-102 ganz IM Kegel.
-  const bisTreffer = isFinite(auftreffAbstand)
-    ? Math.max(0.15, Math.min(f.baseBeamLength || auftreffAbstand, auftreffAbstand)) : 0;
+  const bisTreffer = isFinite(bezug)
+    ? Math.max(0.15, Math.min(f.baseBeamLength || bezug, bezug)) : 0;
   const tanA = bisTreffer > 0 ? (_kegelDurchmesser(f) / 2) / bisTreffer : 0;
   if (kante && richtung) {
     ueber = goboUeberhangGerichtet(
@@ -2102,7 +2184,7 @@ function applyFloorAim(f, dmx) {
     ueberBasis = KEGEL_UEBER_BASIS;
   }
   setBeamLength(f, kegelAbstand, ueberBasis);
-  _kegelWeite(f, auftreffAbstand);
+  _kegelWeite(f, bezug);
   // VIZ-102: Reichweite der Projektion = Reichweite des Kegels
   // (gobo_projektion.js#goboFern). `_goboFernQ`: ferner Kegelrand auf der
   // getroffenen Flaeche; `_goboReich`: so weit reicht der sichtbare Kegel.
@@ -2118,9 +2200,18 @@ function applyFloorAim(f, dmx) {
   // VIZ-83 B2: Bodenmuster unter die Teilstrahlen drehen und den Kegelrand am
   // Boden messen — NACH setBeamLength, die Kegel-Laenge veraendert den Winkel
   // der Mantellinien (nur scale.y waechst/schrumpft, der Radius bleibt).
-  const goboRand = goboTreffer
-    ? alignGoboFloor(f, goboTreffer[0], goboTreffer[1], goboTreffer[2])
-    : alignGoboFloor(f);          // kein Treffer: Scheibe zurueck auf TRS
+  let goboRand = null;
+  if (neben) {
+    // VIZ-107: die erste Scheibe bleibt auf der OBERSEITE, am Durchstosspunkt
+    // der Achse — dieselbe Rechnung wie kurz vor dem Kantenwechsel.
+    goboRand = alignGoboFloor(f, neben.x, neben.kante.y + 0.01, neben.z);
+    if (goboRand === null) neben = null;      // nicht ausrichtbar: wie bisher
+  }
+  if (!neben) {
+    goboRand = goboTreffer
+      ? alignGoboFloor(f, goboTreffer[0], goboTreffer[1], goboTreffer[2])
+      : alignGoboFloor(f);        // kein Treffer: Scheibe zurueck auf TRS
+  }
   // VIZ-15: derselbe Abstand macht den Boden-Pool gross. Er hatte bisher einen
   // FESTEN Radius — ein Scheinwerfer 10 m ueber der Buehne warf denselben Fleck
   // wie einer 2 m darueber, und ein Zoom-Zug aenderte gar nichts.
@@ -2128,10 +2219,19 @@ function applyFloorAim(f, dmx) {
   // VIZ-102: Fleck an der Kante der getroffenen Oberseite beschneiden; mit
   // Gobo liegt der Rest als zweite Scheibe auf der Flaeche darunter
   // (gobo_textures.js#goboKanteAbgleichen). Nichts haengt mehr in der Luft.
-  kegelSchnittAbgleichen(f, (kante && f.goboAktiv) ? kante : null);
+  const kanteWirkt = kante || (neben ? neben.kante : null);
+  kegelSchnittAbgleichen(f, (kanteWirkt && f.goboAktiv) ? kanteWirkt : null);
   if (f.floorSpot) {
-    goboKanteAbgleichen(f, kante, ueber > 0, untenY,
-                        goboTreffer ? goboTreffer[0] : 0, goboTreffer ? goboTreffer[2] : 0, ueber);
+    if (neben) {
+      // VIZ-107: die zweite Scheibe liegt dort, wo die Strahlmitte auftrifft
+      // (am Boden), und wird heller, je weniger vom Kegel noch oben liegt —
+      // hat er die Oberseite verlassen, liegt dort wieder die eine Scheibe.
+      goboKanteAbgleichen(f, neben.kante, true, goboTreffer[1] - 0.01,
+                          goboTreffer[0], goboTreffer[2], 1, 1 - neben.innen);
+    } else {
+      goboKanteAbgleichen(f, kante, ueber > 0, untenY,
+                          goboTreffer ? goboTreffer[0] : 0, goboTreffer ? goboTreffer[2] : 0, ueber);
+    }
   }
 }
 

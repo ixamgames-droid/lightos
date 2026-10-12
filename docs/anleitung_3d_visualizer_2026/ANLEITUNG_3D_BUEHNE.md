@@ -320,6 +320,9 @@ Darstellungen; Größe und Lage des Musters bleiben dabei gleich.
   weich aus.
   Nichts schwebt in Höhe der Bühne in der Luft; das gilt auch für den flachen
   Fleck und auf der Stufe Niedrig.
+  Schwenkt der Kopf über die Kante hinaus, bleibt der Teil des Musters auf der
+  Platte liegen, solange der Kegel sie noch trifft. Er wird dabei kleiner, der
+  Teil am Boden größer und heller; nichts springt.
 - **Das Gobo-Bild liegt im Strahl:** Das Motiv füllt den Lichtkegel bis zu
   seinem Rand und endet dort mit weicher Kante; außerhalb des Kegels (Zoom)
   liegt kein Muster. Hinter einer Bühnenkante reicht die Projektion so weit wie

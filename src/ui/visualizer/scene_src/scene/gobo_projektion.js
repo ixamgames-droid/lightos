@@ -224,6 +224,41 @@ export function goboUeberhangGerichtet(kante, x, z, fuss) {
   return u * u * (3 - 2 * u);
 }
 
+/** VIZ-107: Gegenstueck zum Ueberhang fuer einen Punkt NEBEN der Oberseite —
+ *  wie weit reicht der Fussabdruck noch auf sie (0 = gar nicht, 1 = der Punkt
+ *  liegt auf der Kante oder auf der Oberseite)? Je Richtung der Weg vom Punkt
+ *  bis zum Eintritt ins Rechteck gegen die Reichweite dorthin. Weich
+ *  (smoothstep) wie der Ueberhang: daran haengen Kegelwinkel und Helligkeit,
+ *  nachdem die Strahlmitte die Kante ueberquert hat — sie sollen nicht
+ *  springen. */
+export function goboInnenGerichtet(kante, x, z, fuss) {
+  if (!kante || !fuss || !fuss.length) return 0;
+  const ox = x - kante.cx, oz = z - kante.cz;
+  const lx = ox * kante.c - oz * kante.s, lz = ox * kante.s + oz * kante.c;
+  if (Math.abs(lx) <= kante.hx && Math.abs(lz) <= kante.hz) return 1;
+  let u = 0;
+  for (const r of fuss) {
+    if (!(r.weit > 0)) continue;
+    const rx = r.dx * kante.c - r.dz * kante.s, rz = r.dx * kante.s + r.dz * kante.c;
+    // Strahl (lx, lz) + s * (rx, rz), s >= 0, gegen das Rechteck: Eintritt
+    // und Austritt je Achse (Scheiben-Verfahren).
+    let ein = 0, aus = Infinity, trifft = true;
+    for (const [p, d, h] of [[lx, rx, kante.hx], [lz, rz, kante.hz]]) {
+      if (Math.abs(d) < 1e-9) {
+        if (Math.abs(p) > h) trifft = false;
+        continue;
+      }
+      const a = (-h - p) / d, b = (h - p) / d;
+      ein = Math.max(ein, Math.min(a, b));
+      aus = Math.min(aus, Math.max(a, b));
+    }
+    if (!trifft || !(ein <= aus)) continue;
+    u = Math.max(u, 1 - ein / r.weit);
+  }
+  u = Math.max(0, Math.min(1, u));
+  return u * u * (3 - 2 * u);
+}
+
 /** Wie lang (m, entlang der Achse) muss der Kegel sein, damit sein FERNER
  *  Rand die Flaeche unter der Kante erreicht? `untenAbstand` = Achse bis zu
  *  dieser Flaeche. Senkrecht nach unten ist das genau `untenAbstand`. */
