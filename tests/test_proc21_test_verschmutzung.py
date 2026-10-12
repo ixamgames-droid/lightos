@@ -128,7 +128,8 @@ def _in_einem_prozess(*dateien) -> subprocess.CompletedProcess:
     return subprocess.run(
         [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider",
          *[os.path.join("tests", d) for d in dateien]],
-        cwd=_REPO, capture_output=True, text=True, timeout=240,
+        cwd=_REPO, capture_output=True, text=True, encoding="utf-8",
+        errors="replace", timeout=240,
         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
 
 
@@ -153,7 +154,8 @@ def test_alles_weiss_laesst_keinen_patch_zurueck():
         "print('REST', rest)\n"
         "sys.exit(rc or (3 if rest else 0))\n")
     lauf = subprocess.run([sys.executable, "-c", code], cwd=_REPO,
-                          capture_output=True, text=True, timeout=240,
+                          capture_output=True, text=True, encoding="utf-8",
+                          errors="replace", timeout=240,
                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     assert lauf.returncode == 0, lauf.stdout[-2000:]
     assert "REST []" in lauf.stdout
