@@ -85,6 +85,7 @@
 | PROC-21 | D | fix/test-verschmutzung-allwhite-las32 | 2026-10-12T17:48Z | tests/conftest.py · tests/test_allwhite_covers_all.py · tests/test_out61_estop_lade_fenster.py · tests/test_proc21_test_verschmutzung.py |
 | OUT-77 | D | fix/out77-diagnose-udmx-seriennummer | 2026-10-12T18:00Z | src/core/diagnose_log.py · tests/test_out77_diagnose_seriennummer.py |
 | ENG-34 | A | feature/eng34-untergrund-dimmer-effekte | 2026-10-12T18:15Z | src/core/engine/rgb_matrix.py · src/ui/views/rgb_matrix_view.py |
+| ENG-36 | A | feature/eng36-cloning | 2026-10-12T18:15Z | src/core/show/klonen.py · src/ui/views/patch_view.py |
 
 ## Blocker & Fallen
 
@@ -255,7 +256,6 @@
 
 ## Verlauf
 
-- 2026-10-12T14:06Z D aktualisiert OUT-74: Branch - -> fix/out74-adapter-umzug-alte-zeile; Dateien - -> src/ui/widgets/output_config.py · src/core/app_state.py
 - 2026-10-12T14:09Z D done XPLAT-54
 - 2026-10-12T14:24Z D aktualisiert LAS-38: Branch - -> fix/las38-laser-erkennung-alle-modi; Dateien - -> src/core/laser/erkennung.py · src/core/app_state.py
 - 2026-10-12T14:26Z A claim WEB-14
@@ -285,3 +285,4 @@
 - 2026-10-12T17:50Z D done XPLAT-53
 - 2026-10-12T18:00Z D claim OUT-77
 - 2026-10-12T18:15Z A claim ENG-34
+- 2026-10-12T18:15Z A claim ENG-36
