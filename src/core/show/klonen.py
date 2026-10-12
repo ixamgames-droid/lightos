@@ -243,7 +243,11 @@ class Plan:
 
     @property
     def aenderungen(self) -> int:
-        """Zahl der Stellen, an denen wirklich etwas geschrieben wird."""
+        """Zahl der Vorschau-ZEILEN, mit denen etwas geschrieben wird
+        („unverändert übernommen" + „übersetzt") — dieselbe Zählung wie die
+        Zähler der Vorschau. Das sind nicht die Speicherstellen: zwischen
+        verschiedenen Typen hat ein Snap zwei Zeilen (Dimmer, Farbe), eine
+        Cueliste mit 40 Cues dagegen nur eine."""
         return sum(1 for e in self.eintraege
                    if e.kennzeichen in (UNVERAENDERT, UEBERSETZT))
 

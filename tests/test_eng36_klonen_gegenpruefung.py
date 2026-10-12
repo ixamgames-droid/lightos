@@ -326,3 +326,13 @@ def test_typ_hinweis_ein_satz_fuer_alle_paare(show):
         assert wort in satz
     assert "NICHT" in satz
     assert show.plane([1], [7]).typ_hinweis == ""
+
+
+# ── Nach der zweiten Gegenprüfung ───────────────────────────────────────────
+
+def test_cmy_steht_mit_namen_in_der_vorschau(show):
+    _farb_show(show, VOLL, None, zieltyp=CMY)
+    plan = show.plane([1], [2], wie=K.ERSETZEN, bereiche=[K.BEREICH_SNAPS])
+    text = plan.eintraege[0].text
+    assert "Cyan 0 · Magenta 255 · Gelb 255" in text
+    assert "cmy_" not in text
