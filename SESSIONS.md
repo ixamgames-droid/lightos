@@ -75,6 +75,7 @@
 | STAB-35 | A | - | 2026-10-12T13:40Z | - |
 | STAB-36 | A | - | 2026-10-12T13:40Z | - |
 | WEB-14 | A | - | 2026-10-12T14:26Z | - |
+| OUT-75 | D | fix/out75-dmx-monitor-eine-wahrheit | 2026-10-12T15:08Z | src/ui/views/dmx_monitor_view.py · src/core/dmx/output_manager.py · src/ui/widgets/output_config.py |
 
 ## Blocker & Fallen
 
@@ -231,7 +232,6 @@
 
 ## Verlauf
 
-- 2026-10-11T19:24Z D claim OUT-71
 - 2026-10-11T19:35Z D done UI-80
 - 2026-10-11T19:55Z D done UI-78
 - 2026-10-11T20:18Z A claim WEB-13
@@ -261,3 +261,4 @@
 - 2026-10-12T14:24Z D aktualisiert LAS-38: Branch - -> fix/las38-laser-erkennung-alle-modi; Dateien - -> src/core/laser/erkennung.py · src/core/app_state.py
 - 2026-10-12T14:26Z A claim WEB-14
 - 2026-10-12T14:44Z D aktualisiert OUT-72: Branch - -> fix/out72-schlussbild-typwechsel-laser-nachlauf; Dateien - -> src/core/dmx/output_manager.py · src/core/app_state.py · src/ui/widgets/output_config.py
+- 2026-10-12T15:08Z D claim OUT-75
