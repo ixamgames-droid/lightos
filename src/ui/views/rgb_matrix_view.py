@@ -1150,9 +1150,12 @@ class RgbMatrixView(QWidget):
         dir_form.setSpacing(6)
         dir_form.addRow(self._dir_label, self._dir_combo)
         pbl.addLayout(dir_form)
-        self._param_form = QFormLayout()
-        self._param_form.setSpacing(6)
-        pbl.addLayout(self._param_form)
+        # STAB-38: die dynamischen Felder sitzen in einem eigenen Traeger-Widget,
+        # das beim Neuaufbau als Ganzes ersetzt wird (_neues_param_formular).
+        self._param_box_layout = pbl
+        self._param_traeger = None
+        self._param_form = None
+        self._neues_param_formular()
         body.addWidget(self._param_box)
 
         # ── Gruppe: Fixture-Grid-Zuweisung ────────────────────────────────────
@@ -1343,6 +1346,33 @@ class RgbMatrixView(QWidget):
             self._load_params_into_widgets(self._current)
         self._param_change()
 
+    def _neues_param_formular(self):
+        """Ersetzt das Formular der dynamischen Parameterfelder durch ein leeres.
+
+        STAB-38: der Neuaufbau laeuft oft IM Signal eines dieser Felder — wer
+        „Bewegung“ auf „Ping-Pong“ stellt, laesst damit „Laeufer-Anzahl“ und
+        „Schweif“ verschwinden. Die alten Felder duerfen deshalb NICHT sofort
+        geloescht werden (``QFormLayout.removeRow`` tat genau das): Qt arbeitet
+        nach dem Signal auf der sendenden Auswahlbox weiter (Aufklappliste
+        schliessen, ``activated`` senden) und griff dann in freigegebenen
+        Speicher — harter Absturz ohne Python-Traceback.
+
+        Darum: den ganzen Traeger aus dem Layout nehmen, verstecken und
+        VERZOEGERT loeschen. Er lebt, bis die Ereignisschleife wieder dran ist,
+        also bis das laufende Signal sicher zurueckgekehrt ist."""
+        alt = self._param_traeger
+        if alt is not None:
+            self._param_box_layout.removeWidget(alt)
+            # Bis das verzoegerte Loeschen greift, bliebe der alte Traeger sonst
+            # an alter Stelle sichtbar (vgl. UI-64a).
+            alt.hide()
+            alt.deleteLater()
+        self._param_traeger = QWidget(self._param_box)
+        self._param_form = QFormLayout(self._param_traeger)
+        self._param_form.setContentsMargins(0, 0, 0, 0)
+        self._param_form.setSpacing(6)
+        self._param_box_layout.addWidget(self._param_traeger)
+
     def _rebuild_param_fields(self, algo):
         """Baut die Param-Felder dynamisch aus den Algorithmus-Metadaten —
         gefiltert nach aktuellem Style und Bedingungen (WP-2): es werden nur die
@@ -1351,8 +1381,7 @@ class RgbMatrixView(QWidget):
         from PySide6.QtWidgets import QSpinBox, QDoubleSpinBox, QCheckBox, QComboBox
         from src.core.engine.rgb_matrix_meta import visible_specs
         # alte Felder entfernen
-        while self._param_form.rowCount():
-            self._param_form.removeRow(0)
+        self._neues_param_formular()
         self._param_widgets = {}
         meta = ALGO_META.get(algo)
         # Richtung je Metadaten — ENG-22: und nur, wenn sie an dieser Stelle
