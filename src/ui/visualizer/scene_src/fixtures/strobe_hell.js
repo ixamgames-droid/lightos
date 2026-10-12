@@ -69,7 +69,8 @@ function _stellen(f) {
 /** Nach der vollen Anwendung des Stands OHNE Strobe: Helligkeiten ablesen. */
 export function hellMerken(f, dmx) {
   const m = f._hell || (f._hell = { stellen: _stellen(f), basis: [], spot: 0,
-                                    fleck: 0, fleckBasis: undefined, lum: 0 });
+                                    fleck: 0, fleckBasis: undefined,
+                                    kegelDeck: undefined, lum: 0 });
   const st = m.stellen;
   for (let i = 0; i < st.length; i++) {
     const mat = st[i].o.material;
@@ -78,6 +79,7 @@ export function hellMerken(f, dmx) {
   m.spot = f.spot ? f.spot.intensity : 0;
   m.fleck = f.floorSpot ? f.floorSpot.material.opacity : 0;
   m.fleckBasis = f._fleckBasis;
+  m.kegelDeck = f._kegelDeck;
   // Dasselbe Mass wie applyGenericColor (A3D-25/28): Dimmer mal hellste Farbe.
   const c = dmx && dmx.color;
   m.lum = (dmx && c) ? dmx.intNorm * Math.max(c.r, c.g, c.b) : 0;
@@ -124,6 +126,10 @@ export function hellSetzen(f, fak, kopfFak) {
       s.o.visible = beamsSichtbar(f, (s.o === f.beam) ? m.lum * k : wert);
     }
   }
+  // VIZ-102: die Zielrechnung leitet die Deckkraft eines aufgeweiteten Kegels
+  // aus dieser Basis neu ab (auch je Bild aus der Glaettung) — sie muss
+  // mitgehen, sonst leuchtete ein schwenkender Kopf in der Dunkelphase auf.
+  if (typeof m.kegelDeck === 'number') f._kegelDeck = m.kegelDeck * ganz;
   if (f.prismCones && f.beam) {
     // Die Nebenstrahlen teilen das Material des Hauptstrahls; nur ihre
     // Sichtbarkeit ist eigen (prism.js#syncPrismToBeam, ohne dessen Geometrie).
