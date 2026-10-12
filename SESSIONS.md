@@ -86,6 +86,7 @@
 | VCB-46 | A | - | 2026-10-12T18:15Z | - |
 | ENG-37 | A | feature/eng37-modify-effekte | 2026-10-12T18:55Z | src/core/engine/function_manager.py · src/core/engine/rgb_matrix.py · src/ui/views/rgb_matrix_view.py |
 | LIZ-1 | A | feature/liz1-aktivierung-urhebervermerk | 2026-10-12T19:08Z | main.py · src/core/lizenz.py · LICENSE · README.md |
+| DOC-72 | A | docs/doc72-externe-pulte | 2026-10-12T19:47Z | - |
 
 ## Blocker & Fallen
 
@@ -266,7 +267,6 @@
 
 ## Verlauf
 
-- 2026-10-12T15:46Z B claim VIZ-108
 - 2026-10-12T15:46Z B claim VIZ-107
 - 2026-10-12T15:49Z A done OUT-68
 - 2026-10-12T15:49Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
@@ -296,3 +296,4 @@
 - 2026-10-12T19:03Z A done UI-89
 - 2026-10-12T19:08Z A claim LIZ-1
 - 2026-10-12T19:29Z A done VIZ-102
+- 2026-10-12T19:47Z A claim DOC-72
