@@ -261,8 +261,8 @@ def test_nach_der_suche_gewinnt_der_fehlende_treiber():
                                   "code": udmx.G_OK})
     assert status == "1 Adapter am USB gefunden — Treiber fehlt (Windows), Schritte unten"
     assert html.startswith("<html>") and html.count("<li>") == 5
-    assert f'<a href="{udmx.LINK_ZADIG}">' in html
-    assert f'<a href="{udmx.LINK_WINUSB}">' in html
+    assert f'<a href="{udmx.LINK_ZADIG}" style="color:{th.LINK_FARBE};">' in html
+    assert f'<a href="{udmx.LINK_WINUSB}" style="color:{th.LINK_FARBE};">' in html
     assert "CYL-6602" in html and "2008:1066" in html
     assert "Treiber nicht installiert" in html              # Code 28 des Geräte-Managers
     assert "liefert und installiert keinen" in html
@@ -283,6 +283,15 @@ def test_falscher_treiber_und_unsichere_kennung():
     _status, html = th.nach_suche({"treiber": _daten((ANYMA, "", 28, "", ""))})
     assert "geteilten Kennung 16c0:05dc" in html
     assert "Nur zuweisen, wenn das Gerät sicher dein uDMX-Adapter ist" in html
+
+
+def test_links_sind_auf_dem_dunklen_design_lesbar():
+    """Ohne eigene Farbe nimmt Qt das Blau der Palette — dunkelblau auf dem
+    dunklen Grund von LightOS. Die Linkfarbe muss deutlich heller sein."""
+    r, g, b = (int(th.LINK_FARBE[i:i + 2], 16) for i in (1, 3, 5))
+    helligkeit = 0.2126 * r + 0.7152 * g + 0.0722 * b
+    assert helligkeit > 120, th.LINK_FARBE
+    assert th.schritte_html("2008:1066").count(f'style="color:{th.LINK_FARBE};"') >= 2
 
 
 def test_texte_werden_maskiert():

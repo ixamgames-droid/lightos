@@ -27,10 +27,18 @@ from src.core.dmx.udmx_treiber_text import befund_satz, ohne_treiber
 _LINK = re.compile(r"https://[^\s<>()]+[^\s<>().,;:]")
 
 
+#: Linkfarbe. Qt nimmt sonst das Blau der Palette — auf dem dunklen Design von
+#: LightOS (assets/themes/dark.qss) dunkelblau auf dunkelgrau, kaum lesbar
+#: (im Bild geprueft). Dieses Hellblau traegt auf dunklem wie auf hellem Grund.
+LINK_FARBE = "#5aa9ff"
+
+
 def _mit_links(text: str) -> str:
     """Text maskieren und Adressen anklickbar machen."""
-    return _LINK.sub(lambda m: f'<a href="{m.group(0)}">{m.group(0)}</a>',
-                     escape(text, quote=False))
+    return _LINK.sub(
+        lambda m: (f'<a href="{m.group(0)}" style="color:{LINK_FARBE};">'
+                   f'{m.group(0)}</a>'),
+        escape(text, quote=False))
 
 
 def schritte_html(kennung: str = "", einleitung: str = "", zusatz: str = "") -> str:
