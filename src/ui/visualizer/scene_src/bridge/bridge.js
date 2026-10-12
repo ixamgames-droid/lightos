@@ -6,7 +6,8 @@ import * as THREE from '../three/three.js';
 import { scene, gpuTier, setDeviceRatio } from '../scene/renderer.js';
 import { applyBrightness } from '../scene/lights.js';
 import { fixtures, settings, stageObjects, view } from '../state.js';
-import { addFixture, removeFixture } from '../fixtures/fixtures.js';
+import { addFixture, removeFixture, strobeNeuBewerten } from '../fixtures/fixtures.js';
+import { strobeModus } from '../fixtures/strobe.js';   // VIZ-104
 import { applyDmx } from './dmx_apply.js';                                // VIZ-71
 import { forgetDmx, noteShowGen, pruneDmxCache } from '../fixtures/dmx_cache.js';      // VIZ-71
 import { resyncBeamVisibility, fleckSichtbar } from '../fixtures/builders.js';   // VIZ-98
@@ -273,6 +274,12 @@ export function applySettings(s) {
   // VIZ-14: Raum-Huelle. syncRoomShell baut sie AUS DEM AKTUELLEN INHALT neu
   // auf — eine feste Groesse wuerde bei grossen Rigs mitten durchschneiden.
   if (typeof s.showRoom === 'boolean') { settings.showRoom = s.showRoom; syncRoomShell(); }
+  // VIZ-104: Strobe im 3D zeigen — 'flash' | 'soft' | 'off' (Geraete-Praeferenz
+  // `viz_strobe_mode`). Unbekanntes faellt auf die Vorgabe.
+  if (typeof s.strobeMode === 'string') {
+    const m = strobeModus(s.strobeMode);
+    if (m !== settings.strobeMode) { settings.strobeMode = m; strobeNeuBewerten(); }
+  }
   for (const fid in fixtures) {
     const f = fixtures[fid];
     // A3D-05: Kegel-Sichtbarkeit (Einzelkopf + Laser-Faecher + Multi-Head-Pro-Kopf)

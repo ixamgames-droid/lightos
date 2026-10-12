@@ -38,6 +38,7 @@ test_fm52_programmer_verlauf.py    # Wortlaut in anleitung_programmer_grundlagen
 test_ui64_programmer_playback.py
 test_viz69_render_ruckler.py       # Wortlaut in ANLEITUNG_3D_BUEHNE.md
 test_viz71_qualitaetsstufen.py
+test_viz104_strobe_im_3d.py      # Abschnitt „Strobe im 3D" in ANLEITUNG_3D_BUEHNE.md
 test_xplat44_datenort.py           # Datenort-Angaben in docs/*.md
 test_ui_verification_checklist.py
 test_open_points_source.py

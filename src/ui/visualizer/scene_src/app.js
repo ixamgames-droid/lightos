@@ -58,6 +58,7 @@ import { applyDmx } from './bridge/dmx_apply.js';                  // VIZ-71
 import { dmxCacheInfo, resetDmxCache } from './fixtures/dmx_cache.js';           // VIZ-71
 import { removeFixture as _removeFixtureForTouch, syncSpotShadowBudget,
          beamFalloffTexture, shadowBudgetInfo } from './fixtures/fixtures.js';  // VIZ-15
+import { tickStrobe, strobeInfo, setStrobeUhr } from './fixtures/fixtures.js';   // VIZ-104
 import { updateLabelZoomVisibility } from './fixtures/labels.js';  // VIZ-14: Fixture-Label Zoom-Gate
 import {
   startRenderLoop, requestRender, registerLiveAnimation, renderStats, renderTick,
@@ -131,6 +132,11 @@ function perFrameUpdate() {
   // VIZ-79: Laser mit Eigenbewegung (dynamische Kanalbereiche, Auto-Programm)
   // zeitgesteuert weiterdrehen — reine Transformation, keine neuen Objekte.
   tickLaserAnimation();
+  // VIZ-104: Strobe im Bildtakt an/aus schalten (fixtures/strobe.js). VOR der
+  // Bewegungsglaettung: eine Neuanwendung stellt den Kopf aufs Ziel, die
+  // Glaettung holt ihn im selben Bild auf den Zwischenstand zurueck. Fordert
+  // sein Bild selbst an, nur bei einem Wechsel — keine Live-Probe.
+  tickStrobe();
   // VIZ-92: Pan/Tilt/Gobo-Drehung zwischen zwei DMX-Updates weiterziehen
   // (Kegel, Bodenmuster und Pool-Ziel folgen dem angezeigten Kopf). Fordert
   // sein Bild selbst an (requestRender), nur wenn es weitergerueckt ist —
@@ -278,6 +284,8 @@ window.__lightos = {
   beamLengthScale,
   // VIZ-79: Laser-Zustand/Pose als Zahlen; optional zu einer festen Zeit t (s).
   laserInfo,
+  // VIZ-104: Strobe-Zustand je Geraet, Takt von Hand, Test-Uhr.
+  strobeInfo, __strobeTick: tickStrobe, __strobeUhr: setStrobeUhr,
   // VIZ-79 (Review H1): derselbe Fixture-Pick wie Klick/Hover/Zug.
   __pickFixture: pickFixture,
   // VIZ-15 Boden-Pools: die Groessen-Rechnung ist rein (Abstand + Zoom-Winkel

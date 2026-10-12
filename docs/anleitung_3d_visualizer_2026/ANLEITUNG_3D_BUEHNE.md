@@ -370,6 +370,39 @@ Kegel, Bodenflecken und Linsen zeigen alle Geräte auf jeder Stufe.
 - **Maximal** nur auf einer starken Desktop-Grafikkarte wählen. Ruckelt die
   Ansicht, zurück auf **Hoch**.
 
+## Strobe im 3D (Tab „Einstellungen" → „Render-Qualität")
+
+Steht der Shutter eines Geräts im Strobe-Bereich, **blitzt** es in der
+3D-Ansicht: Lichtkegel, Bodenfleck, Linse und das echte Licht gehen kurz an und
+bleiben den größeren Teil der Zeit dunkel (an für etwa ein Viertel der Zeit) —
+so wirkt ein Strobe, im Unterschied zu einem Blinker. Geräte mit derselben
+Frequenz blitzen gemeinsam.
+
+- **Wie schnell:** Die Frequenz kommt aus dem Geräteprofil. Nennt der
+  Strobe-Bereich eine Frequenz („Strobe 1–25 Hz"), gilt sie; sonst steigt sie
+  innerhalb des Bereichs von 0,5 auf 20 Blitze je Sekunde. Dieselbe Rechnung
+  nutzt die 2D-Ansicht der Live View. Shutter „offen" und „zu" blitzen nicht.
+- **Begrenzung:** Gezeigt werden höchstens 12 Blitze je Sekunde und nie mehr
+  als ein Drittel der Bildrate (ein Bild an, zwei aus). Läuft die Ansicht mit
+  30 Bildern je Sekunde, sind es also höchstens 10, bei 15 Bildern höchstens 5.
+  Ein schnellerer Strobe sieht damit „schnell" aus, aber nicht exakt so schnell
+  wie am Gerät — ohne diese Grenze würde das Bild unregelmäßig flackern.
+- **Nur die Helligkeit** wird getaktet. Farbe und Dimmerwert bleiben, wie sie
+  sind; ein Dimmer-Effekt, der selbst an- und ausschaltet, sieht aus wie bisher.
+- **Einstellung „Strobe im 3D zeigen":**
+  - **Blitzen** (Vorgabe) — wie oben beschrieben.
+  - **Gedämpft (weiches Pulsieren)** — statt An/Aus ein langsames, flaches
+    Pulsieren (höchstens zweimal je Sekunde, nie dunkler als gut die Hälfte).
+  - **Aus (Dauerlicht wie bisher)** — das Gerät leuchtet durchgehend.
+
+  Die Wahl gilt für **dieses Gerät**, nicht für die Show, und wirkt sofort —
+  im Vollfenster und in der 3D-Ansicht der Live View. An der DMX-Ausgabe ändert
+  sie nichts.
+
+> **Achtung:** Schnelle Lichtblitze können bei photosensitiver Epilepsie
+> Anfälle auslösen. Im Zweifel **Gedämpft** oder **Aus** wählen — auch für
+> Zuschauer und für Bildschirmaufnahmen.
+
 ## Tastenkürzel im Visualizer
 
 | Taste | Wirkung |

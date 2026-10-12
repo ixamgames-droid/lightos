@@ -405,6 +405,7 @@ def _build_fixture_payload(fixture, attrs: dict[str, int],
     dauerhaft voll hell."""
     from src.core.app_state import unapply_pan_tilt_orientation
     from src.core.color_utils import visual_intensity, visual_rgb
+    from src.core.strobe import hat_kopf_shutter, strobe_hz_aus_attrs
 
     r, g, b = visual_rgb(attrs, channels)
     intensity = visual_intensity(attrs, channels)
@@ -431,6 +432,11 @@ def _build_fixture_payload(fixture, attrs: dict[str, int],
         "intensity": intensity,
         "pan": pan,
         "tilt": tilt,
+        # VIZ-104: Blitzfrequenz des Shutters in Hz (0 = Dauerlicht). Die Szene
+        # blitzt damit selbst im Bildtakt — ueber die Helligkeit liesse sich
+        # ein 20-Hz-Strobe bei 15-44 Pushes/s nicht abbilden. ``intensity``
+        # bleibt die Helligkeit OHNE Strobe (Farbe und Dimmer unberuehrt).
+        "strobe_hz": round(strobe_hz_aus_attrs(attrs, channels), 2),
     }
     # VIZ-MH-OPTICS (David-Wunsch 2026-07-16): Optik-Attribute mitschicken.
     # Sie waren im Programmer schon steuerbar, kamen aber NIE im 3D an — der
@@ -482,6 +488,7 @@ def _build_fixture_payload(fixture, attrs: dict[str, int],
     head_count = _multihead_count(attrs)
     if head_count >= 2:
         heads = []
+        kopf_shutter = hat_kopf_shutter(channels)
         # VIZ-63: Pan/Tilt je Kopf aus ``pt`` (invert/swap zurueckgenommen, wie
         # fuer das Gesamtgeraet) und mit Feinkanal — bis 2026-09-29 kamen sie aus
         # den DRAHT-Werten ``attrs``: eine Mover-Bar mit ``invert_pan`` stand im
@@ -521,6 +528,12 @@ def _build_fixture_payload(fixture, attrs: dict[str, int],
                 "pan": _mit_fein(pt, "pan", sfx=sfx) if f"pan{sfx}" in pt else pan,
                 "tilt": tilt_sources[h],
             })
+            # VIZ-104: eigener Shutter je Kopf -> eigene Frequenz. Nur dann;
+            # sonst bleibt der Kopf-Eintrag wie er war (das Geraet blitzt als
+            # Ganzes mit ``strobe_hz``).
+            if kopf_shutter:
+                heads[-1]["strobe_hz"] = round(
+                    strobe_hz_aus_attrs(attrs, channels, sfx), 2)
         payload["heads"] = heads
     return payload
 

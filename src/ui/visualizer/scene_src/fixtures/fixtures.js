@@ -29,6 +29,9 @@ import { syncMountPose } from './mount_pose.js';   // VIZ-100
 // VIZ-72: echte Lichter nur noch aus dem Spot-Pool (scene/spot_pool.js).
 import { initSpotPool, resizeSpotPool } from '../scene/spot_pool.js';
 import { goboProjektionInfo } from '../scene/gobo_projektion.js';   // VIZ-96
+import {
+  FPS_VORGABE, fpsNachfuehren, strobeAnzeigeHz, strobeFaktor, strobeModus,
+} from './strobe.js';   // VIZ-104
 
 initSpotPool(fixtures);
 
@@ -663,6 +666,22 @@ export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads, extra) 
 
   if (heads) f.lastHeads = heads;
 
+  // VIZ-104: Blitzfrequenz des Shutters (0 = Dauerlicht). Ein voller Eintrag
+  // ohne das Feld heisst „kein Strobe"; ein Teil-Aufruf (Alt-Aufrufer, Tests)
+  // laesst den Stand stehen. `dmx` bleibt der Stand OHNE Strobe — der Takt
+  // (tickStrobe) wendet ihn mit dem jeweiligen Helligkeitsfaktor neu an.
+  if (extra && (typeof extra.strobe_hz === 'number' || istVollerEintrag(extra))) {
+    f.strobeHz = (extra.strobe_hz > 0) ? extra.strobe_hz : 0;
+  }
+  f._dmx = dmx;
+  const fak = _strobeEinordnen(f, _strobeJetzt());
+  f._strobeFaktor = fak;
+  if (fak !== 1) {
+    updateFixtureDmx(f, _mitStrobe(dmx, fak));
+    requestRender();
+    return;
+  }
+
   // Dispatch ueber die FixtureType-Registry (Design (e)) — ersetzt die alte
   // if-Kette (Spider/ParBar/MoverBar -> Rest) verhaltens-identisch:
   // f.type ist das Render-Modell aus addFixture (data.model || data.type),
@@ -676,6 +695,88 @@ export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads, extra) 
   // Batch UND den addFixture-Initialaufruf ab (reiner Flag-Setter, N-fach
   // billig; rAF coalesced auf einen Frame).
   requestRender();
+}
+
+// ── VIZ-104: Strobe im Bildtakt ─────────────────────────────────────────────
+// Regeln und Rechnung: fixtures/strobe.js. Hier nur der Zustand: welche
+// Geraete gerade blitzen, die gemessene Bildrate und die Neuanwendung des
+// gemerkten DMX-Stands mit dem Helligkeitsfaktor. Angewandt wird NUR bei einem
+// Wechsel des Faktors (zweimal je Blitz), nicht in jedem Bild. Eine Shadow-Map
+// kostet das nicht: sie haengt an der Lage der Lichter, nicht an ihrer
+// Helligkeit (scene/shadow_update.js), und der Spot-Pool haelt den Platz eines
+// kurz dunklen Geraets (DUNKEL_GNADE_MS, scene/spot_pool.js).
+const _strobeAktiv = new Set();
+let _strobeFps = FPS_VORGABE;
+let _strobeLetzt = -1;
+let _strobeUhr = null;
+/** Test-Seam: eigene Uhr (ms) und feste Bildrate; null = performance.now(). */
+export function setStrobeUhr(fn, fps) {
+  _strobeUhr = (typeof fn === 'function') ? fn : null;
+  _strobeLetzt = -1;
+  _strobeFps = (fps > 0) ? fps : FPS_VORGABE;
+}
+function _strobeJetzt() { return _strobeUhr ? _strobeUhr() : performance.now(); }
+
+function _mitStrobe(dmx, fak) {
+  // Nur die Helligkeit: Farbe, Kopf-Farben, Pan/Tilt, Optik bleiben wie gemeldet.
+  return Object.assign({}, dmx, { intNorm: dmx.intNorm * fak, intensity: dmx.intensity * fak });
+}
+
+// Blitzt das Geraet gerade? Fuehrt die Menge nach und liefert den Faktor.
+function _strobeEinordnen(f, jetzt) {
+  const modus = strobeModus(settings.strobeMode);
+  const blitzt = f.strobeHz > 0 && modus !== 'off' && f._dmx && f._dmx.intNorm > 0;
+  if (!blitzt) { _strobeAktiv.delete(f); return 1; }
+  _strobeAktiv.add(f);
+  return strobeFaktor(jetzt, f.strobeHz, modus, _strobeFps);
+}
+
+/** Vor jedem Bild (app.js#perFrameUpdate). Kostet ohne Strobe eine Messung. */
+export function tickStrobe(t) {
+  const jetzt = (t === undefined) ? _strobeJetzt() : t;
+  if (!_strobeUhr) {
+    if (_strobeLetzt >= 0) _strobeFps = fpsNachfuehren(_strobeFps, jetzt - _strobeLetzt);
+    _strobeLetzt = jetzt;
+  }
+  if (!_strobeAktiv.size) return false;
+  let geaendert = false;
+  for (const f of _strobeAktiv) {
+    if (fixtures[f.fid] !== f) { _strobeAktiv.delete(f); continue; }   // entfernt/neu gebaut
+    const fak = _strobeEinordnen(f, jetzt);
+    if (fak === f._strobeFaktor) continue;
+    f._strobeFaktor = fak;
+    updateFixtureDmx(f, fak === 1 ? f._dmx : _mitStrobe(f._dmx, fak));
+    geaendert = true;
+  }
+  if (geaendert) requestRender();
+  return geaendert;
+}
+
+/** Einstellung geaendert (bridge.js#applySettings): alle Geraete neu bewerten. */
+export function strobeNeuBewerten() {
+  const jetzt = _strobeJetzt();
+  for (const fid in fixtures) {
+    const f = fixtures[fid];
+    if (!f || !f._dmx || !(f.strobeHz > 0)) continue;
+    const fak = _strobeEinordnen(f, jetzt);
+    if (fak === f._strobeFaktor) continue;
+    f._strobeFaktor = fak;
+    updateFixtureDmx(f, fak === 1 ? f._dmx : _mitStrobe(f._dmx, fak));
+  }
+  requestRender();
+}
+
+/** Test-/Diagnose-Seam: Strobe-Zustand eines Geraets als reine Zahlen. */
+export function strobeInfo(fid) {
+  const f = fixtures[fid];
+  if (!f) return null;
+  const modus = strobeModus(settings.strobeMode);
+  return {
+    hz: f.strobeHz || 0,
+    anzeigeHz: strobeAnzeigeHz(f.strobeHz || 0, _strobeFps),
+    faktor: (f._strobeFaktor === undefined) ? 1 : f._strobeFaktor,
+    modus, fps: _strobeFps, aktiv: _strobeAktiv.has(f), blitzend: _strobeAktiv.size,
+  };
 }
 
 // ── Spaet-Bindung (zirkulaere Abhaengigkeit: removeFixture() ruft im
