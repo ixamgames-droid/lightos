@@ -139,6 +139,7 @@ sie unverändert ein. LightOS ändert keine dieser Bibliotheken.
 | blinker | MIT | <https://github.com/pallets-eco/blinker> |
 | cffi | MIT-0 | <https://github.com/python-cffi/cffi> |
 | click | BSD-3-Clause | <https://github.com/pallets/click> |
+| colorama | BSD-3-Clause | <https://github.com/tartley/colorama> |
 | flask | BSD-3-Clause | <https://github.com/pallets/flask> |
 | flask-socketio | MIT | <https://github.com/miguelgrinberg/Flask-SocketIO> |
 | h11 | MIT | <https://github.com/python-hyper/h11> |

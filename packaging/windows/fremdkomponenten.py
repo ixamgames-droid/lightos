@@ -57,6 +57,12 @@ PAKETE: dict[str, dict] = {
                 "angaben": ("MIT License",)},
     "cffi": {"lizenz": "MIT-0", "quelle": "https://github.com/python-cffi/cffi"},
     "click": {"lizenz": "BSD-3-Clause", "quelle": "https://github.com/pallets/click"},
+    # Nicht in jedem Bundle: am Test-Rechner fehlte es, auf dem Runner der
+    # Pipeline kam es mit (Farbausgabe fuer click unter Windows) — der Bau der
+    # Pipeline brach daran ab, bis dieser Eintrag stand. Genau dafuer ist die
+    # Pruefung da.
+    "colorama": {"lizenz": "BSD-3-Clause", "quelle": "https://github.com/tartley/colorama",
+                 "angaben": ("BSD License",)},
     "flask": {"lizenz": "BSD-3-Clause", "quelle": "https://github.com/pallets/flask"},
     "flask-socketio": {"lizenz": "MIT",
                        "quelle": "https://github.com/miguelgrinberg/Flask-SocketIO",
