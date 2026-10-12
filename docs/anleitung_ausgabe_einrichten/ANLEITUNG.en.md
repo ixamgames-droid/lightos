@@ -207,7 +207,7 @@ When saving, LightOS checks the table and speaks up if
   [Zwei Universen über zwei Adapter](../anleitung_zwei_universen/ANLEITUNG.md#hinweis-zwei-universen-auf-demselben-ziel)
   (German).
 - **the same adapter is in several rows** (*Ein Adapter auf mehreren Universen* = one
-  adapter on several universes) — that is, `Enttec` twice with the same port. One adapter
+  adapter on several universes) — that is, `Enttec` twice with the same port or `uDMX` twice with the same adapter. One adapter
   sends only one universe. It is saved anyway, but the adapter is then set up for
   **none** of them until only one row names it. The quickest fix is the **Enttec Pro
   USB** tab: choose the universe and click **Verbinden** (step 2).

@@ -501,7 +501,7 @@ def _persist_output(num: int, output: str, patch: str, out_universe=_UNSET,
     return _save_universe_config(rows)
 
 
-def _mit_umzug(dialog, text: str) -> str:
+def _mit_umzug(dialog, text: str, feld: str = "_enttec_umzug") -> str:
     """OUT-74: haengt „war Universe 2 — jetzt Universe 1" an eine Statusmeldung.
 
     Der Satz muss auch die spaeteren Meldungen ueberleben
@@ -510,7 +510,7 @@ def _mit_umzug(dialog, text: str) -> str:
     Methode: Bestandstests rufen `_enttec_status_nachtragen` auf einem Stub, der
     nur die Felder des Dialogs mitbringt.
     """
-    umzug = getattr(dialog, "_enttec_umzug", "")
+    umzug = getattr(dialog, feld, "")
     return f"{text} · {umzug}" if umzug else text
 
 
@@ -918,6 +918,16 @@ class OutputConfigDialog(QDialog):
             self._udmx_adapter_waehlen(schluessel, "gespeichert")
             self._lbl_udmx_status.setText(
                 f"Gespeichert: {schluessel or 'einziger Adapter'} → Universe {num}")
+        # OUT-74: derselbe uDMX-Adapter in mehr als einer Zeile (s. Enttec oben).
+        for d in adapter_zeilen.doppelte(_load_universe_config()):
+            if d.typ == "uDMX":
+                self._lbl_udmx_status.setText(
+                    f"⚠ {d.patch or 'Der uDMX-Adapter'} steht auf Universe "
+                    f"{adapter_zeilen.aufzaehlung(d.universen)} — ein Adapter "
+                    f"sendet nur ein Universum, eingerichtet ist er für keines. "
+                    f"Universe wählen und „Verbinden“: die anderen Zeilen "
+                    f"werden abgeräumt.")
+                break
 
         # ── Art-Net ───────────────────────────────────────────────────────────
         artnet = _gespeicherte_ausgabe_zeile("ArtNet")
@@ -1083,6 +1093,20 @@ class OutputConfigDialog(QDialog):
         Anschluss, blieb „Enttec: falsch konfiguriert" bis zum Neustart
         stehen, obwohl der Bediener es eben behoben hat.
         """
+        OutputConfigDialog._adapter_hinweise_nachfuehren(state, univ, geraeumt)
+        notes = getattr(state, "enttec_port_notes", None)
+        if not isinstance(notes, dict):
+            return
+        try:
+            notes[univ] = _diagnose_enttec_port(port)
+        except Exception:
+            notes.pop(univ, None)
+
+    @staticmethod
+    def _adapter_hinweise_nachfuehren(state, univ: int, geraeumt):
+        """Was fuer JEDEN Adaptertyp gilt (Enttec, uDMX): die Liste der
+        doppelten Adapter neu lesen (Banner) und die Hinweise der beteiligten
+        Universen verwerfen — sie stammen aus dem Stand vor „Verbinden“."""
         if hasattr(state, "adapter_konflikte"):
             try:
                 state.adapter_konflikte = adapter_zeilen.doppelte(
@@ -1092,12 +1116,8 @@ class OutputConfigDialog(QDialog):
         notes = getattr(state, "enttec_port_notes", None)
         if not isinstance(notes, dict):
             return
-        for anderes in geraeumt:
-            notes.pop(anderes, None)
-        try:
-            notes[univ] = _diagnose_enttec_port(port)
-        except Exception:
-            notes.pop(univ, None)
+        for nummer in list(geraeumt) + [univ]:
+            notes.pop(nummer, None)
 
     # ── OUT-51: den echten Verbindungsstatus nachtragen ──────────────────────
 
@@ -1276,12 +1296,19 @@ class OutputConfigDialog(QDialog):
             om.remove_output(univ)
             # Oeffnet nichts im UI-Thread: add_udmx startet nur den Sender.
             om.add_udmx(univ, schluessel)
-            gespeichert = _persist_output(univ, "uDMX", schluessel)
+            # OUT-74: ein Adapter, ein Universum — wie beim Enttec verliert
+            # jede andere Zeile denselben Adapter im selben Schreibvorgang.
+            geraeumt: list[int] = []
+            gespeichert = _persist_output(univ, "uDMX", schluessel,
+                                          abgeraeumt=geraeumt)
+            self._udmx_umzug = adapter_zeilen.umzug_text(geraeumt, univ)
+            self._adapter_hinweise_nachfuehren(state, univ, geraeumt)
             self._univ_tabelle_nachladen()
-            self._lbl_udmx_status.setText(
+            self._lbl_udmx_status.setText(_mit_umzug(
+                self,
                 f"Eingerichtet: {schluessel} → Universe {univ} "
                 f"{'(gespeichert)' if gespeichert else '(NICHT gespeichert!)'}, "
-                f"verbinde …")
+                f"verbinde …", "_udmx_umzug"))
             self._udmx_pruef_univ = univ
             self._udmx_pruef_versuche = 0
             self._udmx_status_pruefen_spaeter()
@@ -1318,12 +1345,15 @@ class OutputConfigDialog(QDialog):
             if self._udmx_pruef_versuche < self._MAX_PRUEF_VERSUCHE:
                 self._udmx_status_pruefen_spaeter()
                 return
-            self._lbl_udmx_status.setText(
-                f"{wer} → Universe {univ}: antwortet nicht — Adapter/Kabel prüfen")
+            self._lbl_udmx_status.setText(_mit_umzug(
+                self,
+                f"{wer} → Universe {univ}: antwortet nicht — Adapter/Kabel prüfen",
+                "_udmx_umzug"))
             return
         if zustand == ZUSTAND_SENDET:
-            self._lbl_udmx_status.setText(
-                f"Verbunden: {wer} → Universe {univ} (gespeichert)")
+            self._lbl_udmx_status.setText(_mit_umzug(
+                self, f"Verbunden: {wer} → Universe {univ} (gespeichert)",
+                "_udmx_umzug"))
             self._lbl_udmx_hinweis.setText("")
             return
         grund = ""
@@ -1333,9 +1363,10 @@ class OutputConfigDialog(QDialog):
                 grund = str(f() or "")
             except Exception:
                 grund = ""
-        self._lbl_udmx_status.setText(
+        self._lbl_udmx_status.setText(_mit_umzug(
+            self,
             f"{wer} → Universe {univ}: sendet nicht — gespeichert, aber es "
-            f"geht kein DMX raus")
+            f"geht kein DMX raus", "_udmx_umzug"))
         self._lbl_udmx_hinweis.setText(grund or "Adapter prüfen und neu einstecken.")
 
     def _sync_artnet_start_univ_default(self):

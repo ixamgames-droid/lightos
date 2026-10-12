@@ -193,7 +193,8 @@ Beim Speichern prüft LightOS die Tabelle und meldet sich, wenn
   zählt, erklärt
   [Zwei Universen über zwei Adapter](../anleitung_zwei_universen/ANLEITUNG.md#hinweis-zwei-universen-auf-demselben-ziel).
 - **derselbe Adapter in mehreren Zeilen** steht (*Ein Adapter auf mehreren Universen*) —
-  also zweimal `Enttec` mit demselben Port. Ein Adapter sendet nur ein Universum.
+  also zweimal `Enttec` mit demselben Port oder zweimal `uDMX` mit demselben Adapter. Ein
+  Adapter sendet nur ein Universum.
   Gespeichert wird trotzdem, eingerichtet wird der Adapter so aber für **keines** davon,
   bis nur noch eine Zeile ihn nennt. Am schnellsten behebt es der Reiter
   **Enttec Pro USB**: Universe wählen und **Verbinden** (Schritt 2).

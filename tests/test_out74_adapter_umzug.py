@@ -73,7 +73,9 @@ class _FakeOutputManager:
         self._enttec_outputs: dict[int, _Geraet] = {}
         self._artnet_outputs: dict[int, str] = {}
         self._sacn_outputs: dict[int, object] = {}
+        self._udmx_outputs: dict[int, _Geraet] = {}
         self.eingerichtet: list[tuple[int, str]] = []
+        self.eingerichtet_udmx: list[tuple[int, str]] = []
 
     def add_universe(self, universe):
         return object()
@@ -90,8 +92,19 @@ class _FakeOutputManager:
     def add_sacn(self, universe, target_ip=None, out_universe=None):
         self._sacn_outputs[int(universe)] = target_ip
 
+    def add_udmx(self, universe, schluessel=""):
+        # wie der echte Manager: derselbe Adapter wird am anderen Universum geschlossen
+        for u in [u for u, d in self._udmx_outputs.items() if d.port == schluessel]:
+            self._udmx_outputs.pop(u)
+        self._udmx_outputs[int(universe)] = _Geraet(schluessel)
+        self.eingerichtet_udmx.append((int(universe), schluessel))
+
+    def udmx_ports(self):
+        return {u: d.port for u, d in self._udmx_outputs.items()}
+
     def remove_output(self, universe, ausser=None, **_):
-        for reg in (self._enttec_outputs, self._artnet_outputs, self._sacn_outputs):
+        for reg in (self._enttec_outputs, self._artnet_outputs, self._sacn_outputs,
+                    self._udmx_outputs):
             reg.pop(int(universe), None)
 
     def ausgabe_status(self):
@@ -366,6 +379,87 @@ class DreiZeilenTest(_MitKonfig):
         self.assertEqual(self._enttec_zeilen(), [(7, USB0)])
         self.assertIn("war Universe 2 und 4 — jetzt Universe 7",
                       self.dlg._lbl_enttec_status.text())
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# uDMX (OUT-68): dieselbe Regel
+# ══════════════════════════════════════════════════════════════════════════════
+
+UDMX = "16c0:05dc@1-4"
+
+
+class UdmxUmzugTest(_MitKonfig):
+    zeilen = [{"num": 1, "name": "Bühne", "output": "Disabled", "patch": ""}]
+
+    def _verbinde_udmx(self, schluessel, univ):
+        dlg = self.dlg or self._dialog()
+        dlg._combo_udmx.clear()
+        dlg._combo_udmx.addItem(schluessel, schluessel)
+        dlg._spin_udmx_univ.setValue(univ)
+        dlg._connect_udmx()
+
+    def _udmx_zeilen(self):
+        return sorted((z["num"], z["patch"]) for z in self._datei()
+                      if z.get("output") == "uDMX")
+
+    def test_die_alte_zeile_verliert_den_adapter(self):
+        self._verbinde_udmx(UDMX, 2)
+        self._verbinde_udmx(UDMX, 1)
+        self.assertEqual(self._udmx_zeilen(), [(1, UDMX)])
+        alt = self._zeile(2)
+        self.assertEqual((alt["output"], alt["patch"]), ("Disabled", ""))
+
+    def test_der_status_sagt_woher_der_adapter_kam(self):
+        self._verbinde_udmx(UDMX, 2)
+        self._verbinde_udmx(UDMX, 1)
+        self.assertIn("war Universe 2 — jetzt Universe 1",
+                      self.dlg._lbl_udmx_status.text())
+        self.assertNotIn("war Universe", self.dlg._lbl_enttec_status.text())
+
+    def test_nach_dem_neustart_liegt_er_auf_universum_1(self):
+        self._verbinde_udmx(UDMX, 2)
+        self._verbinde_udmx(UDMX, 1)
+        frisch = self._neustart()
+        self.assertEqual(frisch.output_manager.udmx_ports(), {1: UDMX})
+
+    def test_ein_enttec_mit_demselben_text_ist_ein_anderer_adapter(self):
+        """Der Schluessel gilt je Typ — eine Enttec-Zeile bleibt unberuehrt."""
+        self._schreibe([{"num": 2, "name": "U2", "output": "Enttec", "patch": UDMX}])
+        self._verbinde_udmx(UDMX, 1)
+        self.assertEqual(self._enttec_zeilen(), [(2, UDMX)])
+
+
+class UdmxDoppeltBeimLadenTest(_MitKonfig):
+    zeilen = [{"num": 1, "name": "A", "output": "uDMX", "patch": UDMX},
+              {"num": 2, "name": "B", "output": "uDMX", "patch": UDMX}]
+
+    def test_fuer_keine_der_zeilen_eingerichtet_und_gemeldet(self):
+        state = self._neustart()
+        self.assertEqual(state.output_manager.eingerichtet_udmx, [])
+        self.assertIn("Universe 1 und 2", state.enttec_port_notes.get(1) or "")
+        self.assertIn("uDMX", state.enttec_port_notes.get(2) or "")
+        self.assertEqual([(d.typ, d.universen) for d in state.adapter_konflikte],
+                         [("uDMX", (1, 2))])
+
+    def test_der_udmx_reiter_sagt_es(self):
+        dlg = self._dialog()
+        text = dlg._lbl_udmx_status.text()
+        self.assertIn("Universe 1 und 2", text)
+        self.assertIn("für keines", text)
+
+    def test_zwei_udmx_ohne_angabe_sind_derselbe_adapter(self):
+        self._schreibe([{"num": 1, "name": "A", "output": "uDMX", "patch": ""},
+                        {"num": 2, "name": "B", "output": "uDMX", "patch": ""}])
+        state = self._neustart()
+        self.assertEqual(state.output_manager.eingerichtet_udmx, [])
+
+    def test_zwei_verschiedene_udmx_laufen_beide(self):
+        self._schreibe([{"num": 1, "name": "A", "output": "uDMX", "patch": UDMX},
+                        {"num": 2, "name": "B", "output": "uDMX", "patch": "16c0:05dc@1-5"}])
+        state = self._neustart()
+        self.assertEqual(state.output_manager.udmx_ports(),
+                         {1: UDMX, 2: "16c0:05dc@1-5"})
+        self.assertFalse(any(state.enttec_port_notes.values()))
 
 
 class KeinFehlalarmTest(_MitKonfig):
