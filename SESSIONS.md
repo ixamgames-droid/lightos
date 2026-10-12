@@ -88,6 +88,7 @@
 | ENG-36 | A | feature/eng36-cloning | 2026-10-12T18:15Z | src/core/show/klonen.py · src/ui/views/patch_view.py |
 | ENG-35 | A | - | 2026-10-12T18:15Z | - |
 | VCB-45 | A | - | 2026-10-12T18:15Z | - |
+| VCB-46 | A | - | 2026-10-12T18:15Z | - |
 
 ## Blocker & Fallen
 
@@ -258,7 +259,6 @@
 
 ## Verlauf
 
-- 2026-10-12T14:26Z A claim WEB-14
 - 2026-10-12T14:44Z D aktualisiert OUT-72: Branch - -> fix/out72-schlussbild-typwechsel-laser-nachlauf; Dateien - -> src/core/dmx/output_manager.py · src/core/app_state.py · src/ui/widgets/output_config.py
 - 2026-10-12T15:08Z D claim OUT-75
 - 2026-10-12T15:08Z A claim VIZ-104
@@ -288,3 +288,4 @@
 - 2026-10-12T18:15Z A claim ENG-36
 - 2026-10-12T18:15Z A claim ENG-35
 - 2026-10-12T18:15Z A claim VCB-45
+- 2026-10-12T18:15Z A claim VCB-46
