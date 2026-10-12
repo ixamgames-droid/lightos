@@ -60,7 +60,6 @@
 | QA-96 | A | - | 2026-10-11T16:56Z | - |
 | WEB-12 | A | fix/web12-handy-rechte-laser | 2026-10-11T19:15Z | - |
 | LAS-36 | A | fix/las36-notaus-loesen-lasererkennung | 2026-10-11T19:15Z | - |
-| LAS-37 | D | fix/las37-eine-laser-erkennung | 2026-10-11T20:38Z | - |
 | VCB-43 | D | fix/vcb43-halte-blackout-fremder-blackout | 2026-10-11T20:50Z | - |
 | OUT-71 | D | fix/out71-schlussbild-beim-beenden | 2026-10-11T20:58Z | - |
 | WEB-13 | A | - | 2026-10-11T20:18Z | - |
@@ -243,7 +242,6 @@
 
 ## Verlauf
 
-- 2026-10-11T21:55Z D done VIZ-103
 - 2026-10-11T22:18Z A done LAS-33
 - 2026-10-12T13:39Z D claim OUT-72
 - 2026-10-12T13:39Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
@@ -273,3 +271,4 @@
 - 2026-10-12T15:49Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-12T16:05Z B claim DOC-71
 - 2026-10-12T16:20Z B claim STAB-37
+- 2026-10-12T16:22Z D done LAS-37
