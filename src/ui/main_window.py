@@ -1674,8 +1674,11 @@ class MainWindow(QMainWindow):
             pass
 
     def _toggle_blackout(self, checked: bool):
-        self._state.output_manager.set_blackout(checked)
-        self._sync_blackout_button(checked)
+        om = self._state.output_manager
+        om.set_blackout(checked)
+        # VCB-43: anzeigen, ob es wirklich dunkel IST — haelt eine VC-Taste den
+        # Blackout, macht „aus“ hier nicht hell, und der Knopf bleibt an.
+        self._sync_blackout_button(bool(om.blackout))
 
     def _sync_blackout_button(self, an: bool):
         """UI-58: der Knopf zeigt den ECHTEN Blackout-Zustand, auch wenn ihn ein

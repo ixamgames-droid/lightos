@@ -8,7 +8,10 @@ from PySide6.QtGui import QPainter, QColor, QPen, QCursor, QAction
 def midi_binding_matches(msg, midi_type: str, midi_ch: int, midi_data1: int) -> bool:
     """Gemeinsame MIDI-Bindungs-Prüfung (T-6: war byte-gleich in VCButton/VCColor).
 
-    note_on bindet auch note_off (für Press/Release); Kanal 0 = alle Kanäle."""
+    note_on bindet auch note_off (für Press/Release); Kanal 0 = alle Kanäle.
+
+    MIDI-10: ein Pitchbend-Fader ist sein Kanal — ``data1`` sind dort die
+    unteren 7 Bit des Werts und zählen nicht zur Bindung."""
     if midi_data1 is None or midi_data1 < 0:
         return False
     if midi_type == "note_on":
@@ -18,6 +21,8 @@ def midi_binding_matches(msg, midi_type: str, midi_ch: int, midi_data1: int) -> 
         return False
     if midi_ch != 0 and midi_ch != msg.channel:
         return False
+    if midi_type == "pitchbend":
+        return True
     return midi_data1 == msg.data1
 
 

@@ -15,6 +15,8 @@ Jedes **VC-Widget** kann an ein APC-Element gebunden werden:
 
 Die Bindung wird **mit der Show** gespeichert.
 
+> **Anderes Pult mit Motorfadern (Mackie Control, X-Touch)?** Deren Fader senden Pitchbend statt CC. „MIDI Teach“ am VC-Fader lernt sie genauso – siehe [Fader, Abschnitt MIDI](../anleitung_vc_widgets/02_fader.md#midi--tastatur).
+
 ## 2. Weg A — schnell per „MIDI Lernen" (nur Tasten/Pads)
 
 > **Wichtig:** „MIDI Lernen" bindet **ausschließlich VCButtons** (Pads/Tasten). Ein angeklickter
