@@ -43,7 +43,6 @@
 | VCB-42 | D | fix/vcb42-blackout-ziel-gruppe-wiedererkennen | 2026-10-11T12:13Z | src/core/app_state.py · src/core/show/show_file.py · src/ui/virtualconsole/vc_button.py · src/ui/virtualconsole/target_list_editor.py · tests/test_vcb42_blackout_ziel_wiedererkennen.py |
 | WEB-09 | A | feature/web09-handy-seite-rueckmeldung | 2026-10-11T12:08Z | - |
 | UI-88 | D | perf/ui88-2d-bild-schneller | 2026-10-11T14:27Z | src/ui/views/live_view.py · tests/test_ui88_2d_bild_schneller.py |
-| UI-89 | A | fix/ui89-programmer-reiter-nur-passende | 2026-10-11T12:14Z | - |
 | LAS-34 | A | feature/las34-laser-tab | 2026-10-11T13:51Z | - |
 | LAS-35 | A | feature/las35-zonen-planer | 2026-10-11T18:11Z | - |
 | MIDI-15 | D | feature/midi15-touch-sperre | 2026-10-12T18:42Z | src/core/midi/midi_mapper.py · src/ui/views/midi_view.py · tests/test_midi15_touch_sperre.py |
@@ -261,7 +260,6 @@
 
 ## Verlauf
 
-- 2026-10-12T15:41Z D claim UI-92
 - 2026-10-12T15:43Z A aktualisiert STAB-35: Branch - -> fix/stab36-absturz-auswahlwechsel
 - 2026-10-12T15:43Z A aktualisiert STAB-36: Branch - -> fix/stab36-absturz-auswahlwechsel
 - 2026-10-12T15:46Z B claim VIZ-108
@@ -291,3 +289,4 @@
 - 2026-10-12T18:42Z D done OUT-73
 - 2026-10-12T18:55Z A claim ENG-37
 - 2026-10-12T18:56Z A done ENG-34
+- 2026-10-12T19:03Z A done UI-89
