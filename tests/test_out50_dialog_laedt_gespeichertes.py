@@ -53,9 +53,14 @@ def _xplat15_no_leaked_widgets():
 
 
 class _FakePort:
-    """Nachbildung eines `serial.tools.list_ports`-Eintrags."""
+    """Nachbildung eines `serial.tools.list_ports`-Eintrags.
 
-    def __init__(self, device, description="FTDI", vid=None, pid=None):
+    OUT-73: mit der USB-Kennung, die ein `/dev/ttyUSB…` wirklich hat (hier der
+    FTDI-Chip des Enttec Pro). Ohne Kennung waere es ein Anschluss ohne Geraet,
+    und die stehen seit OUT-73 nur noch auf Wunsch in der Liste.
+    """
+
+    def __init__(self, device, description="FTDI", vid=0x0403, pid=0x6001):
         self.device = device
         self.description = description
         self.vid = vid
