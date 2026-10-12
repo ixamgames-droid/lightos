@@ -53,7 +53,6 @@
 | WEB-10 | A | feature/web10-handy-seitenleiste | 2026-10-11T16:32Z | - |
 | OUT-70 | A | feature/out70-interface-erkennung-assistent | 2026-10-11T15:44Z | - |
 | UI-90 | D | - | 2026-10-11T16:21Z | - |
-| XPLAT-53 | D | fix/xplat53-viz72-teilen | 2026-10-11T16:40Z | tests/test_viz72_spot_pool_umgebung.py · tests/test_viz72b_spot_pool_bewegung_scene.py · tests/test_viz72c_umgebung_modi_scene.py · tests/_viz72_szene.py · tests/test_xplat53_viz72_geteilt.py |
 | MIDI-14 | D | - | 2026-10-11T16:21Z | - |
 | WEB-11 | A | feature/web11-qr-startbildschirm | 2026-10-11T16:32Z | - |
 | QA-96 | A | - | 2026-10-11T16:56Z | - |
@@ -250,7 +249,6 @@
 
 ## Verlauf
 
-- 2026-10-12T13:40Z A claim STAB-35
 - 2026-10-12T13:40Z A claim STAB-36
 - 2026-10-12T13:51Z D aktualisiert OUT-73: Branch - -> fix/out73-enttec-reiter-toter-anschluss; Dateien - -> src/ui/widgets/output_config.py
 - 2026-10-12T14:06Z D aktualisiert OUT-74: Branch - -> fix/out74-adapter-umzug-alte-zeile; Dateien - -> src/ui/widgets/output_config.py · src/core/app_state.py
@@ -280,3 +278,4 @@
 - 2026-10-12T17:33Z A claim STAB-38
 - 2026-10-12T17:35Z D claim FM-75
 - 2026-10-12T17:48Z D claim PROC-21
+- 2026-10-12T17:50Z D done XPLAT-53
