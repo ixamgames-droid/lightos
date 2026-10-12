@@ -71,7 +71,7 @@
 | OUT-72 | D | - | 2026-10-12T13:39Z | - |
 | OUT-73 | D | fix/out73-enttec-reiter-toter-anschluss | 2026-10-12T13:51Z | src/ui/widgets/output_config.py |
 | OUT-74 | D | fix/out74-adapter-umzug-alte-zeile | 2026-10-12T14:06Z | src/ui/widgets/output_config.py · src/core/app_state.py |
-| LAS-38 | D | - | 2026-10-12T13:40Z | - |
+| LAS-38 | D | fix/las38-laser-erkennung-alle-modi | 2026-10-12T14:24Z | src/core/laser/erkennung.py · src/core/app_state.py |
 | STAB-35 | A | - | 2026-10-12T13:40Z | - |
 | STAB-36 | A | - | 2026-10-12T13:40Z | - |
 
@@ -227,7 +227,6 @@
 
 ## Verlauf
 
-- 2026-10-11T19:15Z A claim LAS-36
 - 2026-10-11T19:24Z D claim LAS-37
 - 2026-10-11T19:24Z D claim VCB-43
 - 2026-10-11T19:24Z D claim OUT-71
@@ -257,3 +256,4 @@
 - 2026-10-12T13:51Z D aktualisiert OUT-73: Branch - -> fix/out73-enttec-reiter-toter-anschluss; Dateien - -> src/ui/widgets/output_config.py
 - 2026-10-12T14:06Z D aktualisiert OUT-74: Branch - -> fix/out74-adapter-umzug-alte-zeile; Dateien - -> src/ui/widgets/output_config.py · src/core/app_state.py
 - 2026-10-12T14:09Z D done XPLAT-54
+- 2026-10-12T14:24Z D aktualisiert LAS-38: Branch - -> fix/las38-laser-erkennung-alle-modi; Dateien - -> src/core/laser/erkennung.py · src/core/app_state.py
