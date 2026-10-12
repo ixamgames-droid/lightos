@@ -1,4 +1,4 @@
-"""ENG-37 Schritt 1: Modify-Effekte — verrechnen statt setzen (Matrix, Stil Dimmer).
+"""ENG-37: Modify-Effekte — verrechnen statt setzen (Matrix, Stil Dimmer).
 
 Ein Modify-Effekt setzt seine Kanaele nicht, er wird mit dem verrechnet, was
 darunter laeuft:
@@ -14,9 +14,13 @@ Das Beispiel des Betreibers, durchgerechnet (Dimmer-Matrix-Anleitung, Abschnitt 
 steht ein Dimmer-Effekt auf 40 %, darueber ein Modify-Lauflicht mit zwei
 Laeufern auf acht Lampen.
 
-Geprueft wird hier die Engine (Mischstelle im FunctionManager, Show-Format,
-Konsolen-Parameter, Renderer). Der Editor hat eine eigene Datei
-(test_eng37_modify_editor.py).
+Geprueft wird hier die Engine (Rechnung, Sammeln im FunctionManager,
+Show-Format, Konsolen-Parameter, Renderer). Seit dem spaeten Rechengang gilt:
+Modify rechnet auf das FERTIGE Bild — auch auf Werte, die kein Effekt
+geschrieben hat (Ruhewert, Snap), und auf Effekte hoeherer Prioritaet. Die
+Schichten darueber (Master, Blackout, NOT-AUS), Sammlungen und Chaser-Schritte
+prueft test_eng37_modify_fertiges_bild.py, den Editor
+test_eng37_modify_editor.py.
 """
 from __future__ import annotations
 
@@ -279,14 +283,18 @@ def test_startreihenfolge_ist_egal(rig, mode):
     assert bilder[0] != [P40] * N           # der Modify hat gewirkt
 
 
-def test_normaler_effekt_hoeherer_prioritaet_ueberschreibt(rig):
+def test_modify_wirkt_auch_auf_effekt_hoeherer_prioritaet(rig):
+    """Modify rechnet auf das FERTIGE Bild: ein normaler Effekt hoeherer
+    Layer-Prioritaet gewinnt gegen den Effekt darunter — und der Modify
+    verrechnet sich dann mit dem Gewinner."""
     unten = _pegel()
-    mod = _lauflicht("add")
+    mod = _spion(_lauflicht("add"))
     oben = _pegel(30)
     oben.priority = 5
     fm = _fm(unten, mod, oben, start=(oben, unten, mod))
     bild, _ = _tick(fm, rig)
-    assert bild == [30] * N
+    assert len(_aktiv(mod)) == 2
+    assert bild == [255 if i in _aktiv(mod) else 30 for i in range(N)]
 
 
 def test_modify_hoeherer_prioritaet_verrechnet_alles_darunter(rig):
@@ -336,8 +344,10 @@ def test_addieren_allein_wirkt_wie_ein_normaler_effekt(rig):
     bild_normal, geschrieben_normal = _tick(_fm(normal), rig)
     assert bild == bild_normal
     assert sorted(bild) == [0] * 6 + [255] * 2
-    # … und treibt den Dimmer aller acht Lampen wie ein normaler Effekt
-    assert geschrieben == geschrieben_normal == set(range(1, N + 1))
+    # … aber er TREIBT nur, was er aendert: die zwei Lampen unter dem Laeufer.
+    # Ein normaler Effekt schreibt alle acht (auch die dunklen).
+    assert geschrieben == {i + 1 for i in _aktiv(mod)}
+    assert geschrieben_normal == set(range(1, N + 1))
 
 
 @pytest.mark.parametrize("mode", ["sub", "dim"])
@@ -350,23 +360,26 @@ def test_abziehen_und_abdunkeln_allein_schreiben_nichts(rig, mode):
 
 
 @pytest.mark.parametrize("mode", ["sub", "dim"])
-def test_abziehen_trifft_keinen_ruhewert(rig, mode):
-    """Steht ein Kanal ohne Effekt auf einem Ruhewert ueber 0 (Default-Frame),
-    zieht Abziehen/Abdunkeln davon NICHT ab — es greift nur, wo ein Effekt
-    in diesem Frame geschrieben hat."""
-    mod = _lauflicht(mode)
+def test_abziehen_wirkt_auf_das_was_im_bild_steht(rig, mode):
+    """Modify rechnet auf das fertige Bild — auch auf einen Wert, den kein
+    Effekt geschrieben hat (Ruhewert, Snap). Unter dem Laeufer wird abgezogen,
+    daneben bleibt der Wert exakt stehen."""
+    mod = _spion(_lauflicht(mode))
     fm = _fm(mod)
     u = Universe(1)
     u.set_range(1, bytes([200] * N))        # Ruhewerte
     u.begin_write_log()
     fm.tick({1: u}, rig, DT)
-    assert u.end_write_log() == set()
-    assert list(u.get_all()[:N]) == [200] * N
+    aktiv = _aktiv(mod)
+    assert len(aktiv) == 2
+    assert u.end_write_log() == {i + 1 for i in aktiv}
+    assert list(u.get_all()[:N]) == [0 if i in aktiv else 200 for i in range(N)]
 
 
 @pytest.mark.parametrize("mode", ["sub", "dim"])
-def test_abziehen_greift_nur_auf_lampen_mit_effekt_darunter(rig, mode):
-    """Unter-Effekt nur auf Lampe 1–4; Lampen 5–8 haben einen Ruhewert."""
+def test_abziehen_greift_auf_alle_lampen_des_modify_effekts(rig, mode):
+    """Unter-Effekt nur auf Lampe 1–4; Lampen 5–8 haben einen Ruhewert. Der
+    Modify-Effekt ist auf allen acht voll dran -> alle acht werden dunkel."""
     unten = _pegel()
     unten.fixture_grid = [1, 2, 3, 4, None, None, None, None]
     mod = _lauflicht(mode)
@@ -376,8 +389,8 @@ def test_abziehen_greift_nur_auf_lampen_mit_effekt_darunter(rig, mode):
     u.set_range(1, bytes([200] * N))
     u.begin_write_log()
     fm.tick({1: u}, rig, DT)
-    assert u.end_write_log() == {1, 2, 3, 4}
-    assert list(u.get_all()[:N]) == [0, 0, 0, 0, 200, 200, 200, 200]
+    assert u.end_write_log() == set(range(1, N + 1))
+    assert list(u.get_all()[:N]) == [0] * N
 
 
 def test_ohne_schreibprotokoll_entscheidet_der_wert(rig):
@@ -772,7 +785,7 @@ def test_parameter_sind_dem_faehigkeiten_abgleich_bekannt():
     assert {"modify_strength", "modify_mode"} <= _UNIVERSAL_MATRIX_PARAMS
 
 
-# ── Renderer: Snaps/Programmer liegen darueber ───────────────────────────────
+# ── Renderer: Modify rechnet auf das fertige Bild (auch Snaps/Programmer) ────
 
 
 def _zustand(monkeypatch, fm, default=0):
@@ -807,38 +820,45 @@ def _ausgabe(st):
 
 
 @pytest.mark.parametrize("mode", ["sub", "dim"])
-def test_abziehen_allein_verdunkelt_keine_programmer_werte(monkeypatch, mode):
-    """Kein Verdunkeln durch die Hintertuer: laeuft nur ein Abziehen-/Abdunkeln-
-    Modify, bleiben Programmer-/Snap-Dimmer exakt stehen."""
-    mod = _lauflicht(mode)
+def test_abziehen_wirkt_auf_programmer_werte(monkeypatch, mode):
+    """Snap-/Programmer-Dimmer auf 50 %: unter dem Laeufer wird abgezogen,
+    alle anderen Lampen bleiben exakt auf dem Snap-Wert."""
+    mod = _spion(_lauflicht(mode))
     st = _zustand(monkeypatch, _fm(mod))
     st.programmer = {fid: {"intensity": 128} for fid in range(1, N + 1)}
     st._render_frame(DT)
-    assert _ausgabe(st) == [128] * N
+    aktiv = _aktiv(mod)
+    assert len(aktiv) == 2
+    assert _ausgabe(st) == [0 if i in aktiv else 128 for i in range(N)]
 
 
 @pytest.mark.parametrize("mode", ["sub", "dim"])
-def test_abziehen_allein_laesst_ruhewerte_stehen(monkeypatch, mode):
-    mod = _lauflicht(mode)
+def test_abziehen_wirkt_auf_ruhewerte(monkeypatch, mode):
+    mod = _spion(_lauflicht(mode))
     st = _zustand(monkeypatch, _fm(mod), default=200)
     st._render_frame(DT)
-    assert _ausgabe(st) == [200] * N
+    aktiv = _aktiv(mod)
+    assert _ausgabe(st) == [0 if i in aktiv else 200 for i in range(N)]
 
 
-def test_addieren_allein_besitzt_den_dimmer_wie_jeder_dimmer_effekt(monkeypatch):
-    """Grenze von Schritt 1 (so festgelegt): ein laufender Addieren-Modify
-    treibt den Dimmer — ein Programmer-Dimmer darunter zaehlt dann nicht,
-    genau wie bei einem normalen Dimmer-Effekt."""
-    bilder = []
-    for haken in (True, False):
-        mod = _lauflicht("add")
-        mod.modify = haken
-        st = _zustand(monkeypatch, _fm(mod))
-        st.programmer = {fid: {"intensity": 128} for fid in range(1, N + 1)}
-        st._render_frame(DT)
-        bilder.append(_ausgabe(st))
-    assert bilder[0] == bilder[1]
-    assert sorted(bilder[0]) == [0] * 6 + [255] * 2
+def test_addieren_besitzt_den_dimmer_nicht(monkeypatch):
+    """Ein Addieren-Modify ist KEIN Besitzer des Dimmers: der Programmer-/
+    Snap-Dimmer darunter zaehlt weiter, der Laeufer legt obendrauf. Ohne Haken
+    (normaler Dimmer-Effekt) gehoert der Dimmer dem Effekt wie bisher."""
+    mod = _spion(_lauflicht("add"))
+    st = _zustand(monkeypatch, _fm(mod))
+    st.programmer = {fid: {"intensity": 128} for fid in range(1, N + 1)}
+    st._render_frame(DT)
+    aktiv = _aktiv(mod)
+    assert len(aktiv) == 2
+    assert _ausgabe(st) == [255 if i in aktiv else 128 for i in range(N)]
+
+    normal = _lauflicht("add")
+    normal.modify = False
+    st = _zustand(monkeypatch, _fm(normal))
+    st.programmer = {fid: {"intensity": 128} for fid in range(1, N + 1)}
+    st._render_frame(DT)
+    assert sorted(_ausgabe(st)) == [0] * 6 + [255] * 2
 
 
 def test_renderer_beispiel_mit_effekt_darunter(monkeypatch):

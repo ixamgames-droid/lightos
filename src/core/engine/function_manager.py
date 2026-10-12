@@ -13,8 +13,9 @@ from .effect_func import LayeredEffect
 from .carousel import Carousel
 from .efx import EfxInstance
 from .rgb_matrix import RgbMatrixInstance
-from .modify import (ist_modify, normalize_mode, normalize_strength,
-                     write_modify)
+from .modify import (ModifySammler, ist_modify, modify_posten,
+                     normalize_mode, normalize_strength, posten_anwenden,
+                     setze_sammler)
 
 if TYPE_CHECKING:
     from src.core.dmx.universe import Universe
@@ -427,17 +428,41 @@ class FunctionManager:
         self._dim_map_key = key
         return result
 
+    def modify_aufschieben(self, an: bool = True) -> None:
+        """ENG-37: den NAECHSTEN ``tick`` anweisen, die Modify-Posten nur zu
+        sammeln (``True``) — der Aufrufer verrechnet sie dann selbst ueber
+        ``modify_anwenden``. Der Renderer meldet das vor jedem ``tick`` an und
+        nimmt es danach wieder zurueck (``False``); so bleibt die Signatur von
+        ``tick`` fuer alle Aufrufer und Ersatz-Manager unveraendert."""
+        self._modify_aufschieben = bool(an)
+
+    def modify_anwenden(self, universes: dict[int, "Universe"]) -> bool:
+        """ENG-37: die im letzten ``tick`` gesammelten Modify-Posten auf
+        ``universes`` verrechnen (und verbrauchen). Der Renderer ruft das NACH
+        Cuelisten, Programmer/Snaps und Grundhelligkeit und VOR den Mastern.
+        ``True``, wenn es etwas zu verrechnen gab."""
+        posten = getattr(self, "_modify_posten", None)
+        if not posten:
+            return False
+        self._modify_posten = []
+        posten_anwenden(posten, universes)
+        return True
+
     def tick(self, universes: dict[int, "Universe"],
              patch_cache: list["PatchedFixture"],
-             dt: float):
+             dt: float, modify_spaeter: bool = False):
         """Called every frame (44 Hz). Drives all running functions.
+
+        ENG-37: Modify-Effekte schreiben hier NICHT. Ihre Betraege werden
+        gesammelt und entweder am Ende dieses Aufrufs verrechnet (Vorgabe) oder
+        — ``modify_spaeter=True`` bzw. vorher ``modify_aufschieben()``, so macht
+        es der Renderer — erst durch ``modify_anwenden`` auf das fertige Bild
+        vor den Mastern.
 
         Per-Effekt-Intensitaet (Block B): Funktionen mit intensity < 1.0 werden
         in ein privates Universum gerendert und ihre geaenderten Kanaele skaliert
         ins gemeinsame Scratch gemerged (Dim-/Farbadressen * intensity). Bei
         intensity == 1.0 wird direkt geschrieben (Fast-Path, kein Kopieraufwand)."""
-        from src.core.dmx.universe import Universe
-        dim_map = None  # lazy — nur bei Bedarf aufbauen
         finished = set()
         # LTP-Reihenfolge: in Start-Reihenfolge ticken — die zuletzt gestartete
         # Funktion schreibt zuletzt und gewinnt damit bei Kanal-Ueberschneidung
@@ -457,15 +482,36 @@ class FunctionManager:
             # bleibt der Tie-Break). Hoehere Prioritaet steht hinten und schreibt
             # damit zuletzt = gewinnt LTP bei Kanal-Ueberschneidung. Default 0
             # laesst die Reihenfolge unveraendert (kein Regressionsrisiko).
-            # ENG-37: Modify-Effekte ticken innerhalb ihrer Prioritaetsstufe
-            # ZULETZT (mehrere in Start-Reihenfolge) — sie verrechnen sich mit
-            # dem, was die normalen Effekte geschrieben haben, egal wer zuerst
-            # gestartet wurde. Ohne Modify-Effekt ist der zweite Schluesselteil
-            # ueberall 0 und die Reihenfolge exakt wie bisher.
-            def _tick_key(fid):
-                fn = self._functions.get(fid)
-                return (getattr(fn, "priority", 0), 1 if ist_modify(fn) else 0)
-            ordered.sort(key=_tick_key)
+            ordered.sort(key=lambda fid: getattr(
+                self._functions.get(fid), "priority", 0))
+        # ENG-37: Sammler fuer die Modify-Posten dieses Frames. Modify-Effekte
+        # (auch als Kind einer Sammlung/Show) legen ihre Betraege hier ab statt
+        # zu schreiben; die Reihenfolge der Posten ist die Tick-Reihenfolge
+        # (Layer-Prioritaet, darin Start-Reihenfolge).
+        sammler = ModifySammler()
+        sammler_alt = setze_sammler(sammler)
+        try:
+            self._tick_funktionen(ordered, universes, patch_cache, dt,
+                                  finished, sammler)
+        finally:
+            setze_sammler(sammler_alt)
+        self._modify_posten = sammler.posten
+        if not (modify_spaeter or getattr(self, "_modify_aufschieben", False)):
+            self.modify_anwenden(universes)
+        if finished:
+            with self._lock:
+                self._running_ids -= finished
+                # _start_order mit _running_ids synchron halten: selbst-beendete
+                # Funktionen (die nicht ueber stop() liefen) hier entfernen, damit
+                # die Liste nicht mit stale-IDs volllaeuft.
+                self._start_order = [fid for fid in self._start_order
+                                     if fid in self._running_ids]
+
+    def _tick_funktionen(self, ordered, universes, patch_cache, dt,
+                         finished, sammler):
+        """Schleife ueber die laufenden Funktionen (Rumpf von ``tick``)."""
+        from src.core.dmx.universe import Universe
+        dim_map = None  # lazy — nur bei Bedarf aufbauen
         for fid in ordered:
             f = self._functions.get(fid)
             if f is None or not f.is_running:
@@ -484,12 +530,19 @@ class FunctionManager:
                     env = f.env_factor(dt)
                 except AttributeError:
                     env = 1.0
+                # ENG-37: Helligkeit x Huellkurve dieser Funktion — Staerke-
+                # Faktor fuer sie selbst (Modify) bzw. fuer ihre Modify-Kinder
+                # (Sammlung/Show). Skaliert NIE das Darunterliegende.
+                try:
+                    sammler.faktor = inten * max(0.0, min(1.0, float(env)))
+                except (TypeError, ValueError):
+                    sammler.faktor = inten
                 if ist_modify(f):
-                    # ENG-37: verrechnen statt setzen. Effekt-Helligkeit und
-                    # Huellkurve skalieren die STAERKE des Modify-Effekts, nicht
-                    # das Ergebnis (sonst wuerde das Darunterliegende mitgedimmt).
-                    write_modify(f, universes, patch_cache, dt, self._functions,
-                                 faktor=inten * max(0.0, min(1.0, float(env))))
+                    # Verrechnen statt setzen: nur den Posten merken.
+                    p = modify_posten(f, universes, patch_cache, dt,
+                                      self._functions, sammler.faktor)
+                    if p is not None:
+                        sammler.posten.append(p)
                 elif inten >= 0.999 and env >= 0.999:
                     f.write(universes, patch_cache, dt, self._functions)
                 else:
@@ -533,14 +586,6 @@ class FunctionManager:
                 print(f"[FunctionManager] tick error in function {fid}: {exc}")
             if not f.is_running:
                 finished.add(fid)
-        if finished:
-            with self._lock:
-                self._running_ids -= finished
-                # _start_order mit _running_ids synchron halten: selbst-beendete
-                # Funktionen (die nicht ueber stop() liefen) hier entfernen, damit
-                # die Liste nicht mit stale-IDs volllaeuft.
-                self._start_order = [fid for fid in self._start_order
-                                     if fid in self._running_ids]
 
     # ── Serialisation ─────────────────────────────────────────────────────────
 
