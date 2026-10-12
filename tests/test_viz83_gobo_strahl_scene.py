@@ -423,9 +423,15 @@ _TREFFER_JS = """
     const uu = (l.x / Rd + 1) / 2, vv = (l.y / Rd + 1) / 2;
     let hell = -1;
     if (bd) {
-      const px = Math.floor(uu * bc.width), py = Math.floor((1 - vv) * bc.height);
-      if (px >= 0 && py >= 0 && px < bc.width && py < bc.height)
-        hell = bd[(py * bc.width + px) * 4];
+      // VIZ-102: der Kegelrand ist der Bildrand, das Bodenelement sitzt INNEN
+      // daran. Gelesen wird deshalb am Endpunkt des Teilstrahls und knapp
+      // innen davon (ein Zwoelftel zur Scheibenmitte) — eins von beiden muss Licht tragen.
+      for (const k of [1.0, 0.92]) {
+        const px = Math.floor(((uu - 0.5) * k + 0.5) * bc.width);
+        const py = Math.floor(((0.5 - vv) * k + 0.5) * bc.height);
+        if (px >= 0 && py >= 0 && px < bc.width && py < bc.height)
+          hell = Math.max(hell, bd[(py * bc.width + px) * 4]);
+      }
     }
     out.push({u: +u.toFixed(4), px: +uu.toFixed(3), py: +(1 - vv).toFixed(3), hell: hell});
   }
