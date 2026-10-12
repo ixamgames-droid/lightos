@@ -17,6 +17,7 @@ ohne Thread, der Plan liest den Show-Zustand im Oberflächen-Faden.
 """
 from __future__ import annotations
 
+import html
 import time
 
 from PySide6.QtCore import Qt, QTimer
@@ -61,6 +62,12 @@ class _Sanduhr:
     def __exit__(self, *_):
         QApplication.restoreOverrideCursor()
         return False
+
+
+def _ohne_kuerzel(text: str) -> str:
+    """Beschriftung für Knöpfe und Häkchen: Qt liest ein einzelnes „&" als
+    Tastenkürzel und verschluckt es („Snaps & Szenen" → „Snaps _Szenen")."""
+    return text.replace("&", "&&")
 
 
 def _geraete_text(state, fids) -> str:
@@ -155,6 +162,7 @@ class ZielAuswahlDialog(QDialog):
         lay = QVBoxLayout(self)
         kopf = QLabel(f"Quelle: {_geraete_text(state, self._quellen)}\n"
                       "Auf welche Geräte soll übertragen werden?")
+        kopf.setTextFormat(Qt.TextFormat.PlainText)   # Gerätenamen wörtlich
         kopf.setWordWrap(True)
         lay.addWidget(kopf)
         self._liste = QListWidget()
@@ -214,7 +222,7 @@ class KlonenDialog(QDialog):
         super().__init__(parent)
         self._snaps, self._paletten = snap_library, palette_manager
         self.setWindowTitle("Klonen")
-        self.setMinimumSize(860, 520)
+        self.setMinimumSize(860, 560)
         self._state = state
         self._quellen = [int(q) for q in quellen]
         self._ziele = [int(z) for z in ziele]
@@ -247,8 +255,11 @@ class KlonenDialog(QDialog):
     def _aufbauen(self) -> None:
         lay = QVBoxLayout(self)
         self._kopf = QLabel(
-            f"<b>Von:</b> {_geraete_text(self._state, self._quellen)}"
-            f" &nbsp;→&nbsp; <b>Auf:</b> {_geraete_text(self._state, self._ziele)}")
+            # Gerätenamen wörtlich: ein „&" oder „<" im Namen ist kein HTML.
+            f"<b>Von:</b> {html.escape(_geraete_text(self._state, self._quellen))}"
+            " &nbsp;→&nbsp; <b>Auf:</b> "
+            f"{html.escape(_geraete_text(self._state, self._ziele))}")
+        self._kopf.setTextFormat(Qt.TextFormat.RichText)
         self._kopf.setWordWrap(True)
         lay.addWidget(self._kopf)
 
@@ -259,7 +270,7 @@ class KlonenDialog(QDialog):
         wl = QVBoxLayout(was)
         self._haekchen: dict[str, QCheckBox] = {}
         for bereich in K.BEREICHE:
-            cb = QCheckBox(K.BEREICH_TEXT[bereich])
+            cb = QCheckBox(_ohne_kuerzel(K.BEREICH_TEXT[bereich]))
             cb.setChecked(True)
             cb.toggled.connect(self._geaendert)
             self._haekchen[bereich] = cb
@@ -309,6 +320,9 @@ class KlonenDialog(QDialog):
         self._zaehler = QLabel("")
         self._zaehler.setStyleSheet("padding:4px; font-size:13px;")
         self._zaehler.setTextFormat(Qt.TextFormat.RichText)
+        # Die Zeile ist mit „· N bleibt, wie es ist" breiter als die Spalte:
+        # sie bricht um, statt am Rand abgeschnitten zu werden.
+        self._zaehler.setWordWrap(True)
         rechts.addWidget(self._zaehler)
         #: Oben, vor der Liste: was zwischen verschiedenen Typen NICHT mitgeht.
         self._typ_hinweis = QLabel("")
