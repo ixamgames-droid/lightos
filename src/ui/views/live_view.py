@@ -1018,6 +1018,8 @@ class StageCanvas(QWidget):
         # VIZ-106: True, solange diese Ansicht selbst eine Aenderung meldet —
         # ihre eigene Meldung ist kein Anlass, Positionen nachzuziehen.
         self._meldet_selbst: bool = False
+        # ... und True, wenn waehrend eines Drags eine fremde Meldung kam.
+        self._nachziehen_offen: bool = False
 
         # Touch-Mehrfachauswahl-Modus: Antippen toggelt die Auswahl (kein Shift noetig)
         self._multi_select_mode: bool = False
@@ -1534,9 +1536,14 @@ class StageCanvas(QWidget):
         """VIZ-106: Positionen aus dem gemeinsamen Stand uebernehmen (nach einem
         Rueckgaengig oder einer Verschiebung im 3D). Ein laufender Drag gewinnt:
         dessen Positionen stehen noch nicht in der Show."""
-        if (self._meldet_selbst or self._drag_fid is not None
-                or self._multi_drag_start is not None):
+        if self._meldet_selbst:
             return
+        if self._drag_fid is not None or self._multi_drag_start is not None:
+            # Nach dem Loslassen nachholen — sonst blieben die ANDEREN Geraete
+            # stehen, bis irgendwann wieder jemand meldet.
+            self._nachziehen_offen = True
+            return
+        self._nachziehen_offen = False
         try:
             lv = self._state.live_view_positions
         except Exception:
@@ -2444,6 +2451,8 @@ class StageCanvas(QWidget):
             self._band_origin = None
             self._band_rect = None
             self.update()
+        if self._nachziehen_offen:
+            self._positionen_nachziehen()      # VIZ-106: waehrend des Drags verpasst
 
     # ── Tastatur / Mausrad / Kontextmenue ─────────────────────────────────────
 

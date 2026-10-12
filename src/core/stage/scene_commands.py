@@ -431,6 +431,13 @@ def push_remove_stage_element(
         docks = getattr(state, "visualizer_docks", None)
         if docks is None or not docked:
             return
+        # Steht der Knoten des Elements NICHT wieder im Graphen (die Buehne
+        # wurde inzwischen gewechselt, das Undo trifft die alte), gibt es
+        # nichts, woran sich anhaengen liesse — die Dock-Sicht legte sonst
+        # einen Platzhalter an und haengte die Geraete an ein Phantom.
+        scene = getattr(state, "_scene", None)
+        if scene is not None and scene.get(eid) is None:
+            return
         positions = state.visualizer_positions
         restored = []
         for fid in docked:

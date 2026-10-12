@@ -251,6 +251,38 @@ def test_verschieben_im_3d_erscheint_im_offenen_2d(buehne):
     assert buehne.canvas._positions[2] == pytest.approx((250.0, 300.0))
 
 
+def test_ausrichten_im_3d_meldet_auch_sein_undo(buehne, bridge):
+    """Review: Ausrichten/Verteilen/Anordnen im 3D kommen je Geraet ueber
+    ``fixturePositionChanged``. Ihr Rueckgaengig nahm die Position nur im
+    AppState zurueck — die 3D-Seite und die 2D-Ansicht blieben stehen."""
+    alt = buehne.state.visualizer_positions[2]
+    neu = _welt(250.0, 300.0, 0.6)
+    bridge.bridge.fixturePositionChanged("2", *neu)
+    assert buehne.canvas._positions[2] == pytest.approx((250.0, 300.0))
+    bridge.gesendet.clear()
+
+    assert buehne.undo.undo()
+    assert buehne.state.visualizer_positions[2] == alt
+    assert [(p["fid"], p["x"], p["z"]) for p in bridge.gesendet] == [
+        (2, pytest.approx(alt[0]), pytest.approx(alt[2]))], "die 3D-Seite zieht nach"
+    assert buehne.canvas._positions[2] == pytest.approx((400.0, 100.0)), "die 2D-Ansicht auch"
+
+
+def test_waehrend_des_drags_verpasstes_nachziehen_wird_nachgeholt(buehne):
+    """Review: kommt waehrend eines 2D-Drags eine fremde Aenderung (anderes
+    Geraet im 3D verschoben, Rueckgaengig), blieb sie in der 2D-Ansicht
+    liegen, bis irgendwann wieder jemand meldete."""
+    c = buehne.canvas
+    _maus(c, QEvent.Type.MouseButtonPress, 100, 100)
+    _maus(c, QEvent.Type.MouseMove, 160, 215)
+    buehne.state.visualizer_positions[2] = _welt(250.0, 300.0, 0.6)
+    get_sync().emit(SyncEvent.LIVE_VIEW_CHANGED, None)
+    assert c._positions[2] == (400.0, 100.0), "waehrend des Drags bleibt alles stehen"
+    _maus(c, QEvent.Type.MouseButtonRelease, 160, 215)
+    assert c._positions[1] == (150.0, 200.0)
+    assert c._positions[2] == pytest.approx((250.0, 300.0)), "nach dem Loslassen nachgeholt"
+
+
 def test_laufender_2d_drag_wird_dabei_nicht_zurueckgesetzt(buehne):
     c = buehne.canvas
     _maus(c, QEvent.Type.MouseButtonPress, 100, 100)

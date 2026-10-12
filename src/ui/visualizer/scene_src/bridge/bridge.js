@@ -72,10 +72,10 @@ export function jsRemoveStageObject(id) {
   if (typeof id === 'string' && id.charAt(0) === '[') {
     let ids = [];
     try { ids = JSON.parse(id); } catch (e) { ids = []; }
-    gebuendelt(() => ids.forEach(i => removeStageObject(i)));
+    gebuendelt(() => ids.forEach(i => removeStageObject(i, true)));
     return;
   }
-  removeStageObject(id);
+  removeStageObject(id, true);     // VIZ-105: kein Loesch-Echo zurueck an Python
 }
 
 export function jsSelectStageObject(id) {

@@ -236,6 +236,24 @@ class CommandTests(_Basis):
         self.undo.undo()
         self.assertEqual(self.state.visualizer_docks.get(2), self.boden.id)
 
+    def test_undo_nach_buehnenwechsel_haengt_nichts_an_ein_phantom(self):
+        """Review: zwischen Loeschen und Rueckgaengig wurde die Buehne
+        gewechselt. Das Undo trifft dann die ALTE Buehne — der Knoten der
+        Traverse kommt nicht in den Graphen zurueck, und es gibt nichts, woran
+        sich anhaengen liesse. Vorher legte die Dock-Sicht einen Platzhalter an
+        und haengte die Geraete an ein Element, das es nicht gibt."""
+        w = _fenster(self.state, self.stage, ausgewaehlt=self.truss)
+        self._bestuecken(w)
+        w.loeschen_knopf()
+        w._current_stage = StageDefinition(name="Andere Bühne")   # Wechsel
+        vorher = dict(self.state.visualizer_positions)
+
+        self.undo.undo()
+        self.assertIsNone(self.state._scene.get(self.truss.id),
+                          "kein Platzhalter-Knoten fuer die alte Traverse")
+        self.assertEqual(dict(self.state.visualizer_docks), {3: self.boden.id})
+        self.assertEqual(dict(self.state.visualizer_positions), vorher)
+
     def test_callback_bekommt_nur_die_wirklich_angehaengten(self):
         w = _fenster(self.state, self.stage)
         self._bestuecken(w)

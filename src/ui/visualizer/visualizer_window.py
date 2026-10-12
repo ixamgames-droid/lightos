@@ -741,6 +741,19 @@ def _stage_loesch_on_change(window, el):
     return _on_delete_change
 
 
+def _positionen_melden(fids) -> None:
+    """VIZ-106: „die Weltposition dieser Geraete hat sich geaendert“ — dieselbe
+    Meldung wie aus der 2D-Ansicht (``live_view._positionen_melden``). Modul-
+    Funktion: ein Rueckgaengig-Schritt ruft sie spaeter und haelt dafuer kein
+    Fenster fest."""
+    try:
+        from src.core.sync import get_sync, SyncEvent
+        get_sync().emit(SyncEvent.LIVE_VIEW_CHANGED,
+                        {"positionen": [int(f) for f in fids]})
+    except Exception as e:
+        print(f"[Visualizer] Positionen melden: {e}")
+
+
 def _docks_nach_undo_melden(window, sid: str, fids) -> None:
     """VIZ-105: das Undo eines geloeschten Buehnen-Elements hat ``fids`` wieder
     angehaengt — dem 3D-Bild sagen. Es fuehrt ``dockedTo`` selbst und bekommt
@@ -1368,6 +1381,11 @@ class VisualizerBridge(QObject):
         self.pyFixtureMoved.emit(fid, float(x), float(y), float(z))
         _scmd.push_transform_fixtures(
             self._state, [(fid, old_pos, new_pos)], label="Fixture bewegen",
+            # VIZ-106: dieser Weg (Ausrichten, Verteilen, Anordnen im 3D) nahm
+            # sein Rueckgaengig nur im AppState zurueck — die 3D-Seite und die
+            # 2D-Ansicht blieben stehen. Die Meldung traegt die Geraete; jede
+            # offene Bridge (auch diese) und die 2D-Ansicht ziehen nach.
+            on_applied=_positionen_melden,
         )
 
     @Slot(str, float, float, float)
