@@ -1131,6 +1131,36 @@ class VCButton(VCWidget):
             c = self._bo_verloren_cache = (jetzt, self._blackout_ziele_verloren())
         return c[1]
 
+    def _blackout_leer_bestaetigt(self, S: dict, parent=None) -> bool:
+        """VCB-44: ``True`` = der Dialog darf mit OK schliessen.
+
+        Steht die Aktion auf Blackout und hat der Ziel-Editor nur leere Zeilen,
+        wird gefragt, ob die Taste wirklich ALLES dunkel schalten soll. „Ja“
+        merkt das in ``S["blackout_entscheid"]`` (dann uebernimmt ``apply`` das leere
+        Ziel), „Nein“ laesst den Dialog offen. Vorgabe ist „Nein“.
+        """
+        from PySide6.QtWidgets import QMessageBox
+        editor = S.get("blackout_editor")
+        combo = S.get("action_combo")
+        if editor is None or combo is None:
+            return True
+        if (combo.currentData() != ButtonAction.BLACKOUT.value
+                or not editor.nur_leere_zeilen()):
+            return True
+        antwort = QMessageBox.question(
+            parent, "Blackout ohne Ziel?",
+            "Im Blackout-Ziel steht eine leere Zeile, aber kein Gerät und keine "
+            "Gruppe.\n\nOhne Ziel schaltet die Taste ALLES dunkel (globaler "
+            "Blackout).\n\nSoll sie ein globaler Blackout sein?\n\n"
+            "„Nein“ führt zurück in den Dialog — dort ein Ziel wählen oder die "
+            "leere Zeile entfernen.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No)
+        if antwort == QMessageBox.StandardButton.Yes:
+            S.get("blackout_entscheid", {})["global_ok"] = True
+            return True
+        return False
+
     def _blackout_editor_fuellen(self, editor):
         """Den Ziel-Editor des Dialogs mit dem Ziel dieser Taste fuellen.
         Verlorene Gruppen-Ziele stehen als eigene Zeile da (``gx:``), mit ihrem
@@ -2418,6 +2448,10 @@ class VCButton(VCWidget):
         LP = ButtonAction.LASER_PATTERN   # LAS-18: Laser-Muster abrufen
         BO = ButtonAction.BLACKOUT        # VCB-11: Blackout mit optionalem Ziel
 
+        # VCB-44: ob ein Blackout OHNE Ziel ausdruecklich bestaetigt wurde
+        # (Rueckfrage beim OK des Dialogs). ``apply`` liest es.
+        blackout_entscheid: dict = {}
+
         def apply():
             self.caption = cap.text() or self.caption
             self.action = ButtonAction(act.currentData() or self.action.value)
@@ -2458,7 +2492,18 @@ class VCButton(VCWidget):
             # freigegeben (Ziel/Aktion koennten sich gerade geaendert haben).
             self._release_target_blackout()
             if self.action == BO:
-                self._blackout_ziel_aus_editor(blackout_editor)
+                # ★ VCB-44: eine Zeile, in der nichts gewaehlt ist, lieferte
+                # „kein Ziel“ — und kein Ziel heisst GLOBALER Blackout. Die
+                # Taste wurde so still vom gezielten zum globalen Blackout
+                # (oder ein neues Ziel ging verloren). Ohne ausdrueckliches Ja
+                # (Rueckfrage im Dialog, s. ``_blackout_leer_bestaetigt``)
+                # bleibt das Ziel, wie es war.
+                if blackout_editor.nur_leere_zeilen() and not blackout_entscheid.get("global_ok"):
+                    self._show_status(
+                        "Blackout-Ziel: leere Zeile — kein Gerät und keine "
+                        "Gruppe gewählt. Das Ziel der Taste bleibt unverändert.")
+                else:
+                    self._blackout_ziel_aus_editor(blackout_editor)
             else:
                 self.blackout_fids, self.blackout_groups = [], []
                 self.blackout_group_ids, self.blackout_group_refs = [], {}
@@ -2540,6 +2585,8 @@ class VCButton(VCWidget):
 
         return {
             "apply": apply,
+            "blackout_editor": blackout_editor,
+            "blackout_entscheid": blackout_entscheid,
             "update_visibility": update_visibility,
             "action_combo": act,
             "pad_combo": pad_style_combo,
@@ -2630,7 +2677,13 @@ class VCButton(VCWidget):
 
         btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
                                 QDialogButtonBox.StandardButton.Cancel)
-        btns.accepted.connect(dlg.accept)
+        def _ok():
+            # VCB-44: erst fragen, dann schliessen — bei „Nein“ bleibt der
+            # Dialog offen, damit das Ziel gewaehlt werden kann.
+            if self._blackout_leer_bestaetigt(S, dlg):
+                dlg.accept()
+
+        btns.accepted.connect(_ok)
         btns.rejected.connect(dlg.reject)
         form.addRow(btns)
 

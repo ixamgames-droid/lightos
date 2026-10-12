@@ -11,15 +11,21 @@ from PySide6.QtGui import QColor, QBrush
 class ValidationDialog(QDialog):
     """Modal-Dialog zur Anzeige der ValidationIssue-Liste."""
 
-    def __init__(self, issues: list, parent=None):
+    def __init__(self, issues: list, parent=None, reparieren=None):
+        """``reparieren`` (VCB-44): eine Funktion, die die Reparatur ausfuehrt
+        und die neue Befundliste liefert. Gibt es sie und ist etwas reparierbar,
+        bietet der Dialog „Reparieren“ an — bis dahin ist nichts veraendert."""
         super().__init__(parent)
         self.setWindowTitle("Show-Validierung")
         self.setMinimumSize(600, 400)
+        self._reparieren = reparieren
+        self.repariert = False
         self._setup_ui(issues or [])
 
     def _setup_ui(self, issues: list):
-        layout = QVBoxLayout(self)
+        self._fuelle(QVBoxLayout(self), issues)
 
+    def _fuelle(self, layout, issues: list):
         if not issues:
             lbl = QLabel("Show ist sauber - keine Probleme gefunden.")
             lbl.setStyleSheet("color: #9DFF52; font-weight: bold; padding: 12px;")
@@ -59,4 +65,39 @@ class ValidationDialog(QDialog):
         btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         btns.rejected.connect(self.reject)
         btns.accepted.connect(self.accept)
+        # VCB-44: erst zeigen, dann — auf Wunsch — reparieren. Bis hierhin
+        # reparierte „Show prüfen“ ohne Rückfrage, noch bevor der Dialog
+        # erschien (entfernte also Werte aus Cues und Szenen ungefragt).
+        offen = [i for i in issues if getattr(i, "reparierbar", False)]
+        self._btn_reparieren = None
+        if offen and callable(self._reparieren):
+            hinweis = QLabel(
+                f"{len(offen)} davon lassen sich automatisch beheben. "
+                "Es ist noch nichts verändert.")
+            hinweis.setWordWrap(True)
+            hinweis.setStyleSheet("color: #b0b6c0; padding: 4px 6px;")
+            layout.addWidget(hinweis)
+            self._btn_reparieren = btns.addButton(
+                f"Reparieren ({len(offen)})", QDialogButtonBox.ButtonRole.ActionRole)
+            self._btn_reparieren.clicked.connect(self._reparieren_geklickt)
         layout.addWidget(btns)
+
+    def _reparieren_geklickt(self):
+        """Reparatur ausfuehren und das Ergebnis im selben Dialog zeigen."""
+        try:
+            neu = self._reparieren()
+        except Exception as e:                           # noqa: BLE001
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.warning(self, "Reparatur", f"Fehler: {e}")
+            return
+        self.repariert = True
+        self._reparieren = None
+        alt = self.layout()
+        while alt.count():
+            item = alt.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.setParent(None)
+                w.deleteLater()
+        # Das alte Layout bleibt das Layout des Dialogs — neu befuellen.
+        self._fuelle(alt, list(neu or []))

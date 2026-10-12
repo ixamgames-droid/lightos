@@ -53,11 +53,14 @@ def ziel_gilt(gemerkt, jetzt) -> bool:
 
     1. Keine Gruppe mit dieser ID -> verloren.
     2. Dieselbe Kennung -> dieselbe Gruppe, auch umbenannt oder verschoben.
-    3. Sonst: derselbe Name im selben Ordner -> gilt als dieselbe (die Buehne
-       wurde in einer anderen Show-Datei getrennt angelegt, oder die Gruppe
-       geloescht und gleich wieder so angelegt). Ein LEERER Name ist dafuer
-       kein Beleg — zwei namenlose Gruppen sind nicht „dieselbe“.
-    4. Sonst verloren — lieber kein Ziel als ein fremdes.
+    3. Zwei VERSCHIEDENE Kennungen -> eine andere Gruppe, verloren — auch wenn
+       sie gleich heisst und im selben Ordner liegt (VCB-44). Eine geloeschte
+       und unter demselben Namen neu angelegte Gruppe ist eine neue Gruppe;
+       bis VCB-44 erbte sie hier das Ziel der alten.
+    4. Kennt eine Seite keine Kennung (Ziel aus einem Layout der Zeit davor):
+       derselbe Name im selben Ordner -> gilt als dieselbe. Ein LEERER Name ist
+       dafuer kein Beleg — zwei namenlose Gruppen sind nicht „dieselbe“.
+    5. Sonst verloren — lieber kein Ziel als ein fremdes.
     """
     if jetzt is None:
         return False
@@ -65,6 +68,9 @@ def ziel_gilt(gemerkt, jetzt) -> bool:
         return True
     name, ordner, uid = gemerkt
     j_name, j_ordner, j_uid = jetzt
-    if uid and j_uid and uid == j_uid:
-        return True
+    if uid and j_uid:
+        # Beide Kennungen bekannt: nur sie entscheiden. Der Name ist dann kein
+        # Beleg mehr — er laesst „umbenannt“ und „geloescht und neu angelegt“
+        # nicht unterscheiden, die Kennung schon.
+        return uid == j_uid
     return bool(name) and name == j_name and (ordner or "") == (j_ordner or "")

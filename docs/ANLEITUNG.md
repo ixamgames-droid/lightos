@@ -279,7 +279,7 @@ Schritt für Schritt:
 - **Datei → Zuletzt verwendet** öffnet frühere Shows schnell.
 - **Datei → Demo-Show öffnen** lädt eine mitgelieferte Beispiel-Show als neue,
   ungespeicherte Show (Speichern legt deine Kopie an).
-- **Datei → Show prüfen & reparieren…** (`Strg+Shift+R`) findet/behebt Probleme.
+- **Datei → Show prüfen & reparieren…** (`Strg+Shift+R`) prüft die Show und zeigt, was gefunden wurde. Geändert wird dabei nichts; erst der Knopf **Reparieren** im Dialog behebt, was sich automatisch beheben lässt.
 
 ### Das „Issues"-Banner und die Meldungen zu Knöpfen
 

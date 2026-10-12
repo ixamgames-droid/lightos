@@ -140,9 +140,16 @@ class RegelTest(unittest.TestCase):
         self.assertFalse(group_ref.ziel_gilt(("PARs", "Front", "k1"), ("Neu", "Front", "k2")))
         self.assertFalse(group_ref.ziel_gilt(("PARs", "Front", "k1"), ("PARs", "Back", "k2")))
 
-    def test_andere_kennung_aber_gleicher_name_und_ordner_gilt(self):
-        self.assertTrue(group_ref.ziel_gilt(("PARs", "Front", "k1"), ("PARs", "Front", "k2")))
+    def test_andere_kennung_ist_eine_andere_gruppe_auch_bei_gleichem_namen(self):
+        """VCB-44: tragen beide Seiten eine Kennung, entscheidet nur sie —
+        geloescht und gleichnamig neu angelegt ist eine NEUE Gruppe."""
+        self.assertFalse(group_ref.ziel_gilt(("PARs", "Front", "k1"), ("PARs", "Front", "k2")))
+
+    def test_ohne_kennung_auf_einer_seite_gilt_name_und_ordner(self):
+        """Ein Ziel aus einem Layout der Zeit vor den Kennungen."""
         self.assertTrue(group_ref.ziel_gilt(("PARs", "", ""), ("PARs", "", "k2")))
+        self.assertTrue(group_ref.ziel_gilt(("PARs", "Front", "k1"), ("PARs", "Front", "")))
+        self.assertFalse(group_ref.ziel_gilt(("PARs", "", ""), ("PARs", "Back", "k2")))
 
     def test_keine_gruppe_mit_dieser_nummer_ist_verloren(self):
         self.assertFalse(group_ref.ziel_gilt(("PARs", "", "k1"), None))
@@ -223,12 +230,15 @@ class WiederverwendeteNummerTest(_MitState):
         self.assertEqual(
             self.state._target_blackout_fids(self.state._ziel_blackout_specs[slot]), {23})
 
-    def test_gleicher_name_im_selben_ordner_gilt_als_dieselbe_gruppe(self):
-        """Die bewusste Grenze der Regel: wer die Gruppe loescht und unter
-        demselben Namen im selben Ordner neu anlegt, meint dieselbe."""
+    def test_geloescht_und_gleichnamig_neu_angelegt_erbt_das_ziel_nicht(self):
+        """VCB-44, der Befund aus QA-96: die neue Gruppe heisst wie die alte und
+        liegt im selben Ordner — sie ist trotzdem eine andere (neue Kennung).
+        Bis VCB-44 galt sie hier als dieselbe und uebernahm das Ziel."""
         b = self._taste(self.back)
         self._nummer_neu_vergeben(self.back, name="PARs", folder="Back", fids=(41,))
-        self.assertEqual(self._ziele(b), {41})
+        self.assertEqual(self._ziele(b), set())
+        self.assertEqual(len(b._blackout_ziele_verloren()), 1)
+        self.assertTrue(b.has_blackout_target(), "verloren ist kein globaler Blackout")
 
     def test_gleicher_name_in_anderem_ordner_ist_eine_andere_gruppe(self):
         b = self._taste(self.back)
@@ -291,13 +301,29 @@ class AndereShowTest(_MitState):
         self.assertEqual(self._ziele(neu), set())
         self.assertTrue(neu.has_blackout_target())
 
-    def test_gleiche_nummer_gleicher_name_gleicher_ordner_gilt(self):
-        """Dieselbe Buehne in zwei Show-Dateien, getrennt angelegt: das Layout
-        soll dort wirken."""
+    def test_getrennt_angelegte_gruppe_gleichen_namens_ist_eine_andere(self):
+        """VCB-44: dieselbe Buehne in zwei Show-Dateien, GETRENNT angelegt — die
+        Gruppen tragen verschiedene Kennungen. Das Layout trifft dort nichts und
+        sagt es; der Bediener waehlt das Ziel neu. (Eine KOPIE der Show behaelt
+        die Kennungen, dort gilt das Ziel weiter.)"""
         d = self._layout_aus_show_eins()
         _gruppen_leeren(self.state)
         _gruppe(self.state, "PARs", "Front", [71])
         _gruppe(self.state, "PARs", "Back", [81, 82])
+        neu = self._taste()
+        neu.apply_dict(d)
+        self.assertEqual(self._ziele(neu), set())
+        self.assertEqual(len(neu._blackout_ziele_verloren()), 1)
+
+    def test_kopie_der_show_mit_denselben_kennungen_gilt(self):
+        d = self._layout_aus_show_eins()
+        kennungen = _uids(self.state)
+        _gruppen_leeren(self.state)
+        front = _gruppe(self.state, "PARs", "Front", [71])
+        back = _gruppe(self.state, "PARs", "Back", [81, 82])
+        alt = sorted(kennungen)
+        _aendern(self.state, front, uid=kennungen[alt[0]])
+        _aendern(self.state, back, uid=kennungen[alt[1]])
         neu = self._taste()
         neu.apply_dict(d)
         self.assertEqual(self._ziele(neu), {81, 82})
@@ -671,6 +697,7 @@ class AnzeigeTest(_MitState):
 
     def test_taste_zeichnet_die_warnung_und_nimmt_sie_zurueck(self):
         b = self._taste(self.back)
+        kennung = _uids(self.state)[self.back]
         b.resize(120, 60)
         b.grab()
         self.assertNotIn("Blackout-Ziel", b.toolTip())
@@ -679,8 +706,14 @@ class AnzeigeTest(_MitState):
         b.grab()
         self.assertIn("Blackout-Ziel", b.toolTip())
         self.assertIn("PARs", b.toolTip())
-        # wieder da (gleicher Name, gleicher Ordner) -> Warnung weg
+        # wieder da (die Gruppe traegt ihre Kennung wieder, wie nach einem
+        # Rueckgaengig des Loeschens) -> Warnung weg. Gleicher Name allein
+        # genuegt seit VCB-44 nicht mehr.
         _aendern(self.state, self.back, name="PARs", folder="Back")
+        b._blackout_anzeige_veraltet()
+        b.grab()
+        self.assertIn("Blackout-Ziel", b.toolTip())
+        _aendern(self.state, self.back, uid=kennung)
         b._blackout_anzeige_veraltet()
         b.grab()
         self.assertNotIn("Blackout-Ziel", b.toolTip())

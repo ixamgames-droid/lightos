@@ -3198,8 +3198,13 @@ class MainWindow(QMainWindow):
         try:
             from src.core.sync import validate_and_repair
             from src.ui.widgets.validation_dialog import ValidationDialog
-            issues = validate_and_repair(self._state, fix=True)
-            dlg = ValidationDialog(issues, self)
+            # VCB-44: erst NUR pruefen. Repariert wird, wenn der Bediener im
+            # Dialog „Reparieren“ waehlt — vorher lief die Reparatur ungefragt,
+            # noch bevor der Dialog erschien.
+            issues = validate_and_repair(self._state, fix=False)
+            dlg = ValidationDialog(
+                issues, self,
+                reparieren=lambda: validate_and_repair(self._state, fix=True))
             dlg.exec()
             # Trigger Refresh-All danach
             try:
