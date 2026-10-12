@@ -216,6 +216,16 @@ class OutputManager:
         # geschlossen werden (testbar ueberschreibbar).
         self._stop_join_s = 2.0
         self._blackout = False
+        # VCB-43: Quellen, die den Blackout gerade HALTEN (gedrueckte VC-Taste,
+        # auch per MIDI/Tastatur) — je Quelle ein Platz. Dunkel ist es, solange
+        # der Schalter oben steht ODER irgendein Platz belegt ist; wer loslaesst,
+        # nimmt nur seinen Platz weg. Immer als Ganzes ersetzt (frozenset), damit
+        # der Sende-Thread nie eine halb geaenderte Menge sieht.
+        self._blackout_halter: frozenset = frozenset()
+        # Druecken/Loslassen kann aus mehreren Threads kommen (Oberflaeche,
+        # MIDI, Fernbedienung): Lesen-Aendern-Schreiben der Menge unter Lock,
+        # sonst ginge ein Loslassen verloren und es bliebe dunkel.
+        self._blackout_halter_lock = threading.Lock()
         # BUG-FBW Slice 3: eingefrorene Frames (None = laeuft normal), s. set_freeze.
         self._freeze_frames: dict[int, bytes] | None = None
         # OUT-60 (+Folgen): Zustand der Lade-Sperre als EIN Tupel
@@ -837,27 +847,78 @@ class OutputManager:
         lade = self._lade
         return lade[1] if lade is not None else None
 
-    def set_blackout(self, enabled: bool):
-        """Blackout an/aus. UI-58: jede Aenderung wird gemeldet — egal ob sie aus
-        der Kopfzeile, einem VC-Taster, Web, OSC oder der Kommandozeile kommt.
-        Ohne das zeigte der Kopfzeilen-Knopf nach einer fremden Aenderung den
-        alten Stand, und sein naechster Druck machte das Gegenteil (Blackout
-        „an" gedrueckt -> nichts wurde dunkel)."""
-        enabled = bool(enabled)
-        geaendert = enabled != self._blackout
-        self._blackout = enabled
-        if not geaendert:
+    def _blackout_wirksam(self) -> bool:
+        """VCB-43: ist es dunkel — durch den Schalter ODER eine haltende Quelle?
+        ``getattr``: Tests bauen den Manager teils per ``__new__`` ohne ``__init__``."""
+        return bool(self._blackout) or bool(getattr(self, "_blackout_halter", None))
+
+    def _blackout_melden(self, vorher: bool, erzwingen: bool = False):
+        """Abonnenten den WIRKSAMEN Zustand melden — bei jeder Aenderung, und
+        (``erzwingen``) wenn ein Wunsch nicht wirksam wurde: wer den Schalter bei
+        gehaltener Taste ausschaltet, soll sehen, dass es dunkel bleibt."""
+        jetzt = self._blackout_wirksam()
+        if jetzt == vorher and not erzwingen:
             return
-        # getattr: Tests bauen den Manager teils per __new__ ohne __init__.
-        self._blackout_epoch = getattr(self, "_blackout_epoch", 0) + 1
         for cb in list(self._blackout_callbacks):
             try:
-                cb(enabled)
+                cb(jetzt)
             except Exception:
                 pass
 
+    def set_blackout(self, enabled: bool):
+        """Der Blackout-SCHALTER an/aus (Kopfzeile, Web, OSC, Kommandozeile,
+        Skript). UI-58: jede Aenderung wird gemeldet — egal woher sie kommt.
+        Ohne das zeigte der Kopfzeilen-Knopf nach einer fremden Aenderung den
+        alten Stand, und sein naechster Druck machte das Gegenteil (Blackout
+        „an" gedrueckt -> nichts wurde dunkel).
+
+        VCB-43: gemeldet wird, ob es WIRKLICH dunkel ist. Haelt gerade eine
+        Taste den Blackout (``halte_blackout``), macht „aus“ hier nicht hell —
+        die Abonnenten bekommen dann „dunkel“ zurueck."""
+        enabled = bool(enabled)
+        vorher = self._blackout_wirksam()
+        geaendert = enabled != self._blackout
+        self._blackout = enabled
+        if geaendert:
+            # getattr: Tests bauen den Manager teils per __new__ ohne __init__.
+            # Die Epoche zaehlt NUR den Schalter (OUT-57, Schutz der Skripte).
+            self._blackout_epoch = getattr(self, "_blackout_epoch", 0) + 1
+        self._blackout_melden(vorher, erzwingen=enabled != self._blackout_wirksam())
+
+    def halte_blackout(self, slot, an: bool) -> bool:
+        """VCB-43: Blackout HALTEN bzw. loslassen — fuer Quellen, die nur so
+        lange dunkel wollen, wie sie gedrueckt sind (VC-Blackout-Taste ohne Ziel;
+        Maus, MIDI und Tastatur loesen dieselbe Taste aus).
+
+        ``slot`` kennzeichnet die Quelle. Loslassen nimmt nur DIESEN Platz weg:
+        steht der Schalter oder haelt eine andere Quelle, bleibt es dunkel.
+        Doppeltes Druecken/Loslassen ist unschaedlich. Liefert den wirksamen
+        Zustand."""
+        lock = getattr(self, "_blackout_halter_lock", None)
+        if lock is None:                    # Manager per __new__ (Tests)
+            lock = self._blackout_halter_lock = threading.Lock()
+        with lock:
+            vorher = self._blackout_wirksam()
+            halter = getattr(self, "_blackout_halter", None) or frozenset()
+            self._blackout_halter = (halter | {slot}) if an else (halter - {slot})
+        self._blackout_melden(vorher)       # Abonnenten ausserhalb des Locks
+        return self._blackout_wirksam()
+
+    def loese_alle_halte_blackouts(self):
+        """VCB-43: alle gehaltenen Blackouts freigeben (Show-Wechsel) — der
+        Schalter bleibt, wie er ist."""
+        vorher = self._blackout_wirksam()
+        self._blackout_halter = frozenset()
+        self._blackout_melden(vorher)
+
     @property
     def blackout(self) -> bool:
+        """Ist es dunkel? (Schalter ODER gehaltene Quelle, VCB-43.)"""
+        return self._blackout_wirksam()
+
+    @property
+    def blackout_schalter(self) -> bool:
+        """Nur der Schalter — ohne gehaltene Quellen."""
         return bool(self._blackout)
 
     @property
@@ -1439,7 +1500,7 @@ class OutputManager:
         # sehen Blackout-, GM-, Laser-Aus- und Ziel-Pass womoeglich
         # verschiedene Staende (z. B. Blackout an im ersten, aus im
         # Laser-Aus-Pass -> Betriebsart 0 statt Aus-Wert).
-        blackout = bool(self._blackout)
+        blackout = self._blackout_wirksam()     # VCB-43: Schalter ODER gehalten
         gm = self.grand_master
         # OUT-65: klebrige NOT-AUS-Aus-Werte EINMAL je Frame lesen.
         estop_aus = getattr(self, "_laser_estop_aus", None)
