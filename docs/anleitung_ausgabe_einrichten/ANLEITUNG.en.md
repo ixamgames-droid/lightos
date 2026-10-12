@@ -19,6 +19,9 @@
   [Erste Schritte](../anleitung_erste_schritte/ANLEITUNG.md) (German).
 - **For USB:** an ENTTEC DMX USB Pro. Windows brings the driver along; notes are in
   [INSTALL.md](../../INSTALL.md#enttec-dmx-usb-pro) (German).
+- **For USB without a COM port:** a uDMX adapter, see
+  [uDMX adapters (USB)](#udmx-adapters-usb). It needs the optional package `pyusb` and,
+  once, an access right or a driver.
 - **For network:** an Art-Net or sACN node (or a fixture with a built-in network input)
   and a computer **on the same network**, see
   [Network pitfall](#network-pitfall-with-art-net-and-sacn).
@@ -41,7 +44,7 @@ the pictures are made on a computer without a connected ENTTEC, which is why it 
 2. Or: click the Enttec indicator at the bottom left of the status bar
    (`Enttec: …`). It opens the same dialog.
 
-The dialog **Ausgabe konfigurieren** has five tabs: **Enttec Pro USB**, **Art-Net**,
+The dialog **Ausgabe konfigurieren** has six tabs: **Enttec Pro USB**, **uDMX (USB)**, **Art-Net**,
 **sACN (E1.31)**, **DMX Input** and **Universen** (universes). There are two ways:
 
 - **Individual tabs** (steps 2–4): put one universe on one output and connect right
@@ -90,6 +93,44 @@ Tab **Enttec Pro USB**:
 5. **Status:** — when the dialog opens, this shows what is **saved**
    (`Gespeichert: /dev/ttyUSB0 → Universe 1` = saved: …). Whether the adapter really
    sends is only shown by the status bar (step 8).
+
+## uDMX adapters (USB)
+
+Tab **uDMX (USB)** — for adapters that sit directly on USB and have **no COM port**:
+the *Anyma uDMX* and its clones, and the *CYL-6602 "USB-DMX512"* (reports itself as
+"Sun-light USBDMX512"). One adapter carries **one** universe. This tab has no picture
+yet.
+
+- **Adapter:** — the adapters found, with name, USB ID and serial number or port.
+  LightOS searches when the tab is first opened and on **Adapter suchen** (search
+  adapters). The saved adapter stays in the list even when it is missing
+  (`— derzeit nicht gefunden` = currently not found).
+- **Universe:** and **Verbinden** (connect) — as with the ENTTEC. The status first says
+  `Eingerichtet: … (gespeichert), verbinde …` and then `Verbunden: …` (connected) or
+  `sendet nicht — gespeichert, aber es geht kein DMX raus` (not sending — saved, but no
+  DMX is going out).
+- Below the status you then find the **reason** and what to do. The most common ones:
+  - *No access rights* (Linux): set up a udev rule once.
+  - *Cannot be opened* (Windows): assign the WinUSB driver to the adapter.
+  - *pyusb missing*: install the optional package.
+
+  All three are described in [INSTALL.md](../../INSTALL.md#udmx-adapter-usb). LightOS
+  installs no drivers itself and changes no system settings.
+
+If two identical adapters have no serial number, LightOS tells them apart by their USB
+port. If you move one of them, select it again in the tab.
+
+> **Test status.** Tested on the CYL-6602 device: communication yes; output with a
+> connected fixture not yet confirmed; OUT2 untested. The Anyma uDMX is built to the
+> specification and tested with a mock only. On Windows the WinUSB route has not been
+> tried on a device yet.
+
+> **Important for lasers and blackout.** Blackout, grand master and the laser emergency
+> stop take effect before LightOS hands the frame to the adapter — as with every other
+> output. A uDMX adapter has its own small processor, though, and probably **keeps
+> sending its last frame** when the USB cable is pulled or the PC crashes (not
+> measured). The emergency stop in LightOS only works while computer, cable and adapter
+> work. Key switch and interlock on the laser remain the real safeguard.
 
 ## 3. Art-Net
 
@@ -145,10 +186,11 @@ Tab **Universen** — here you see and edit all outputs in one table:
 
 Each row is one universe: **#** (1–32), **Name** (free to choose) and:
 
-1. **Output** — `Disabled`, `Enttec`, `sACN` or `ArtNet`.
+1. **Output** — `Disabled`, `Enttec`, `uDMX`, `sACN` or `ArtNet`.
 2. **Patch (Port/IP)** — depending on the output: for `Enttec` the port (`COM3`,
    `/dev/ttyUSB0`), for `ArtNet` the target IP (empty = `255.255.255.255`), for `sACN` a
-   unicast IP (empty = multicast).
+   unicast IP (empty = multicast), for `uDMX` the adapter key (for example
+   `2008:1066@1-2`; easiest to have the **uDMX (USB)** tab enter it).
 3. **Ext-Universe** — optionally the universe number on the network. If empty, the
    default applies: Art-Net `#` minus 1, sACN `#`.
 4. **+ Universe hinzufügen** (add universe) — new row (32 at most). **Löschen** (delete)

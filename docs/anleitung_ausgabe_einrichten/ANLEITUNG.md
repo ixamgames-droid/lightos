@@ -16,6 +16,9 @@
   [Erste Schritte](../anleitung_erste_schritte/ANLEITUNG.md).
 - **Für USB:** einen ENTTEC DMX USB Pro. Den Treiber bringt Windows mit, Hinweise
   stehen in [INSTALL.md](../../INSTALL.md#enttec-dmx-usb-pro).
+- **Für USB ohne COM-Port:** einen uDMX-Adapter, siehe
+  [uDMX-Adapter (USB)](#udmx-adapter-usb). Er braucht das Zusatzpaket `pyusb` und
+  einmalig ein Zugriffsrecht bzw. einen Treiber.
 - **Für Netzwerk:** einen Art-Net- oder sACN-Node (oder ein Gerät mit eingebautem
   Netzwerkeingang) und einen Rechner **im selben Netz**, siehe
   [Netzwerk-Falle](#netzwerk-falle-bei-art-net-und-sacn).
@@ -37,7 +40,7 @@ entstehen auf einem Rechner ohne angeschlossenen ENTTEC, deshalb steht dort „E
 2. Oder: Klick auf die Enttec-Anzeige unten links in der Statusleiste
    (`Enttec: …`). Sie öffnet denselben Dialog.
 
-Der Dialog **Ausgabe konfigurieren** hat fünf Reiter: **Enttec Pro USB**, **Art-Net**,
+Der Dialog **Ausgabe konfigurieren** hat sechs Reiter: **Enttec Pro USB**, **uDMX (USB)**, **Art-Net**,
 **sACN (E1.31)**, **DMX Input** und **Universen**. Es gibt zwei Wege:
 
 - **Einzel-Reiter** (Schritte 2–4): ein Universum auf einen Ausgang legen und sofort
@@ -85,6 +88,43 @@ Reiter **Enttec Pro USB**:
 5. **Status:** — beim Öffnen steht hier, was **gespeichert** ist
    (`Gespeichert: /dev/ttyUSB0 → Universe 1`). Ob der Adapter wirklich sendet, zeigt
    erst die Statusleiste (Schritt 8).
+
+## uDMX-Adapter (USB)
+
+Reiter **uDMX (USB)** — für Adapter, die direkt am USB hängen und **keinen COM-Port**
+haben: den *Anyma uDMX* und baugleiche Nachbauten sowie den *CYL-6602 „USB-DMX512“*
+(meldet sich als „Sun-light USBDMX512“). Ein Adapter trägt **ein** Universum. Dieser
+Reiter hat noch kein Bild.
+
+- **Adapter:** — die gefundenen Adapter mit Name, USB-Kennung und Seriennummer bzw.
+  Anschluss. Gesucht wird beim ersten Öffnen des Reiters und mit **Adapter suchen**.
+  Der gespeicherte Adapter bleibt in der Liste, auch wenn er gerade fehlt
+  (`— derzeit nicht gefunden`).
+- **Universe:** und **Verbinden** — wie beim ENTTEC. Der Status meldet erst
+  `Eingerichtet: … (gespeichert), verbinde …` und danach `Verbunden: …` oder
+  `sendet nicht — gespeichert, aber es geht kein DMX raus`.
+- Unter dem Status steht dann der **Grund** und was zu tun ist. Die häufigsten:
+  - *Kein Zugriffsrecht* (Linux): einmalig eine udev-Regel einrichten.
+  - *Lässt sich nicht öffnen* (Windows): dem Adapter den WinUSB-Treiber zuweisen.
+  - *pyusb fehlt*: das Zusatzpaket nachinstallieren.
+
+  Alle drei Wege stehen in [INSTALL.md](../../INSTALL.md#udmx-adapter-usb). LightOS
+  installiert selbst keine Treiber und ändert keine Systemeinstellungen.
+
+Haben zwei gleiche Adapter keine Seriennummer, unterscheidet LightOS sie am
+USB-Anschluss. Steckst du einen davon um, wähle ihn im Reiter neu aus.
+
+> **Stand der Prüfung.** Am Gerät CYL-6602 getestet: Kommunikation ja; Ausgang mit
+> angeschlossenem Gerät noch nicht bestätigt; OUT2 ungeprüft. Der Anyma uDMX ist nach
+> Spezifikation gebaut und nur mit einer Attrappe getestet. Unter Windows ist der Weg
+> über WinUSB noch nicht am Gerät erprobt.
+
+> **Wichtig für Laser und Blackout.** Blackout, Grand Master und der Laser-NOT-AUS
+> wirken, bevor LightOS das Bild an den Adapter gibt — wie bei jedem anderen Ausgang.
+> Ein uDMX-Adapter hat aber einen eigenen kleinen Rechner und sendet vermutlich sein
+> **letztes Bild weiter**, wenn das USB-Kabel gezogen wird oder der PC abstürzt (nicht
+> gemessen). Der NOT-AUS in LightOS wirkt nur, solange Rechner, Kabel und Adapter
+> arbeiten. Schlüsselschalter und Interlock am Laser bleiben die eigentliche Sicherung.
 
 ## 3. Art-Net
 
@@ -137,10 +177,11 @@ Reiter **Universen** — hier siehst und bearbeitest du alle Ausgänge in einer 
 
 Jede Zeile ist ein Universum: **#** (1–32), **Name** (frei wählbar) und:
 
-1. **Output** — `Disabled`, `Enttec`, `sACN` oder `ArtNet`.
+1. **Output** — `Disabled`, `Enttec`, `uDMX`, `sACN` oder `ArtNet`.
 2. **Patch (Port/IP)** — je nach Output: bei `Enttec` der Port (`COM3`,
    `/dev/ttyUSB0`), bei `ArtNet` die Ziel-IP (leer = `255.255.255.255`), bei `sACN` eine
-   Unicast-IP (leer = Multicast).
+   Unicast-IP (leer = Multicast), bei `uDMX` der Adapter-Schlüssel (zum Beispiel
+   `2008:1066@1-2`; am einfachsten über den Reiter **uDMX (USB)** eintragen lassen).
 3. **Ext-Universe** — optional die Universumsnummer im Netzwerk. Leer gilt der Standard:
    Art-Net `#` minus 1, sACN `#`.
 4. **+ Universe hinzufügen** — neue Zeile (höchstens 32). **Löschen** entfernt die
