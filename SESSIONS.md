@@ -46,7 +46,6 @@
 | UI-89 | A | fix/ui89-programmer-reiter-nur-passende | 2026-10-11T12:14Z | - |
 | LAS-34 | A | feature/las34-laser-tab | 2026-10-11T13:51Z | - |
 | LAS-35 | A | feature/las35-zonen-planer | 2026-10-11T18:11Z | - |
-| MIDI-10 | D | feature/midi10-pitchbend-fader | 2026-10-11T14:47Z | src/core/midi/midi_manager.py · src/core/midi/midi_mapper.py · src/ui/virtualconsole/vc_widget.py · src/ui/virtualconsole/vc_slider.py · src/ui/views/midi_view.py · src/ui/widgets/midi_teach_dialog.py · src/ui/widgets/input_profile_editor.py · tests/test_midi10_pitchbend_fader.py · docs/anleitung_vc_widgets/02_fader.md · docs/anleitung_vc_widgets/02_fader.en.md |
 | MIDI-15 | D | - | 2026-10-11T13:58Z | - |
 | ENG-30 | D | perf/eng30-engine-zeit-je-frame | 2026-10-11T15:41Z | src/core/app_state.py · src/core/engine/function_manager.py · src/core/engine/patch_index.py · src/core/engine/scene.py · src/core/engine/efx.py · src/core/engine/rgb_matrix.py · src/core/engine/mapped_channel.py · tools/engine_frame_zeit.py · tools/benchmark_universes.py · docs/ENGINE_FRAME_ZEIT.md · docs/PERFORMANCE.md · tests/test_eng30_frame_zeit.py |
 | OUT-69 | A | - | 2026-10-11T14:04Z | - |
@@ -259,7 +258,6 @@
 
 ## Verlauf
 
-- 2026-10-12T14:44Z D aktualisiert OUT-72: Branch - -> fix/out72-schlussbild-typwechsel-laser-nachlauf; Dateien - -> src/core/dmx/output_manager.py · src/core/app_state.py · src/ui/widgets/output_config.py
 - 2026-10-12T15:08Z D claim OUT-75
 - 2026-10-12T15:08Z A claim VIZ-104
 - 2026-10-12T15:15Z D done STAB-34
@@ -289,3 +287,4 @@
 - 2026-10-12T18:15Z A claim ENG-35
 - 2026-10-12T18:15Z A claim VCB-45
 - 2026-10-12T18:15Z A claim VCB-46
+- 2026-10-12T18:23Z D done MIDI-10
