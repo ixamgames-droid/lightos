@@ -32,7 +32,6 @@
 | XPLAT-51 | A | fix/xplat51-arm64-nicht-unterstuetzt | 2026-10-10T14:17Z | - |
 | XPLAT-52 | A | fix/xplat52-installer-venv-arch | 2026-10-10T14:17Z | - |
 | VIZ-101 | A | fix/viz101-licht-durch-wand | 2026-10-10T14:38Z | - |
-| TOOL-18 | D | fix/tool18-bilder-hinweis-gpu-szenen | 2026-10-10T22:54Z | - |
 | UI-87 | D | fix/ui87-hilfe-oeffnen-windows | 2026-10-10T22:54Z | - |
 | QA-91 | D | - | 2026-10-10T22:54Z | - |
 | DOC-70 | D | - | 2026-10-10T22:54Z | - |
@@ -289,7 +288,6 @@
 
 ## Verlauf
 
-- 2026-10-12T16:05Z B claim DOC-71
 - 2026-10-12T16:20Z B claim STAB-37
 - 2026-10-12T16:22Z D done LAS-37
 - 2026-10-12T16:44Z D done VCB-43
@@ -319,3 +317,4 @@
 - 2026-10-12T19:59Z D claim LIZ-2
 - 2026-10-12T20:02Z D done FM-66
 - 2026-10-12T21:01Z A done LIZ-1
+- 2026-10-12T21:34Z D done TOOL-18
