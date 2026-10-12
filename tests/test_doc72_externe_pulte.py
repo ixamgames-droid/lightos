@@ -344,6 +344,26 @@ class Doc72ExternePulteTest(unittest.TestCase):
         self.assertIn("Der DMX-Eingang wird nicht gespeichert.", self.text)
         self.assertIn("ArtPoll", self.text)
 
+    def test_grenzen_des_eingangs_reiters_stimmen_mit_dem_code(self):
+        """Drei Aussagen unter „Gut zu wissen" (Aufbau B) und im NOT-AUS-Absatz,
+        die nur gelten, solange der Code so bleibt."""
+        dialog = _lies("src", "ui", "widgets", "output_config.py")
+        # Der Reiter laedt den laufenden Zustand nicht: niemand setzt die Haken.
+        for haken in ("_check_artnet_in", "_check_sacn_in"):
+            with self.subTest(haken):
+                self.assertNotIn(f"self.{haken}.setChecked(", dialog)
+        self.assertIn("Der Reiter zeigt den laufenden Zustand nicht an.", self.text)
+        # Der sACN-Eingang liest die Prioritaet nicht aus dem Paket.
+        self.assertNotIn("priority", _lies("src", "core", "dmx", "sacn_input.py").lower())
+        self.assertIn("**Priorität** des Absenders nicht aus", self.text)
+        # Der Dialog legt HTP als ersten Eintrag vor.
+        self.assertIn("Vorgabe ist `HTP`", self.text)
+        # Aufbau B nennt den Schritt am Pult.
+        i = self.text.index("### Aufbau B — LightOS empfängt vom Pult")
+        j = self.text.index("### Aufbau C — das Pult löst Cues aus")
+        self.assertIn("**Am Pult**", self.text[i:j])
+        self.assertIn("in LightOS gepatchten", _abschnitt(self.text, "## 6. Sicherheit"))
+
     # ── Bilder und oeffentliches Repo ────────────────────────────────────────
 
     def test_eingebundene_bilder_existieren(self):
