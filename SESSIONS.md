@@ -73,6 +73,7 @@
 | OUT-73 | D | - | 2026-10-12T13:39Z | - |
 | OUT-74 | D | - | 2026-10-12T13:40Z | - |
 | LAS-38 | D | - | 2026-10-12T13:40Z | - |
+| STAB-35 | A | - | 2026-10-12T13:40Z | - |
 
 ## Blocker & Fallen
 
@@ -224,7 +225,6 @@
 
 ## Verlauf
 
-- 2026-10-11T18:40Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-11T19:02Z D done TOOL-19
 - 2026-10-11T19:02Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-11T19:15Z A claim WEB-12
@@ -254,3 +254,4 @@
 - 2026-10-12T13:39Z D claim OUT-73
 - 2026-10-12T13:40Z D claim OUT-74
 - 2026-10-12T13:40Z D claim LAS-38
+- 2026-10-12T13:40Z A claim STAB-35
