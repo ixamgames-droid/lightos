@@ -10,11 +10,11 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QTimer
 import serial.tools.list_ports
+from src.core.dmx import adapter_zeilen
+from src.core.dmx.enttec_pro import diagnose_port as _diagnose_enttec_port
 from src.core.app_state import get_state
 from src.core.paths import user_data_file
 from src.core.dmx.enttec_pro import EnttecPro, ENTTEC_VID, ENTTEC_PID
-from src.core.dmx.enttec_pro import diagnose_port as _diagnose_enttec_port
-from src.core.dmx import adapter_zeilen
 
 # ⚠️ Umlenkbar — und das ist keine Test-Bequemlichkeit, sondern Datenschutz.
 #
