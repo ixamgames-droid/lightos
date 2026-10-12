@@ -34,7 +34,6 @@
 | XPLAT-52 | A | fix/xplat52-installer-venv-arch | 2026-10-10T14:17Z | - |
 | VIZ-101 | A | fix/viz101-licht-durch-wand | 2026-10-10T14:38Z | - |
 | TOOL-18 | D | fix/tool18-bilder-hinweis-gpu-szenen | 2026-10-10T22:54Z | - |
-| VIZ-102 | A | feature/viz102-gobo-hallenboden | 2026-10-11T16:09Z | - |
 | UI-87 | D | fix/ui87-hilfe-oeffnen-windows | 2026-10-10T22:54Z | - |
 | QA-91 | D | - | 2026-10-10T22:54Z | - |
 | DOC-70 | D | - | 2026-10-10T22:54Z | - |
@@ -265,7 +264,6 @@
 
 ## Verlauf
 
-- 2026-10-12T15:43Z A aktualisiert STAB-36: Branch - -> fix/stab36-absturz-auswahlwechsel
 - 2026-10-12T15:46Z B claim VIZ-108
 - 2026-10-12T15:46Z B claim VIZ-107
 - 2026-10-12T15:49Z A done OUT-68
@@ -295,3 +293,4 @@
 - 2026-10-12T18:56Z A done ENG-34
 - 2026-10-12T19:03Z A done UI-89
 - 2026-10-12T19:08Z A claim LIZ-1
+- 2026-10-12T19:29Z A done VIZ-102
