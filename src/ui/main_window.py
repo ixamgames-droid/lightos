@@ -2192,10 +2192,15 @@ class MainWindow(QMainWindow):
                       "Datei wichtig ist: erst eine Kopie sichern."
                     + _ladehinweise_text(hinweise))
             elif hinweise:
-                # Kein Dialog: gelesen ist alles. Zuletzt gesetzt, damit die
-                # Statuszeile den Hinweis zeigt und nicht „geladen“ ihn verdeckt.
-                self.statusBar().showMessage(
-                    "Hinweis: " + hinweise[0]
+                # Kein Dialog: gelesen ist alles. Der Hinweis kommt HINTER das,
+                # was die Statuszeile gerade sagt — „bitte speichern“ bzw.
+                # „Speichern legt deine eigene Kopie an“ ist das, wonach der
+                # Nutzer handeln muss, und darf nicht verdraengt werden.
+                leiste = self.statusBar()
+                bisher = leiste.currentMessage()
+                leiste.showMessage(
+                    (bisher + "  ·  " if bisher else "")
+                    + "Hinweis: " + hinweise[0]
                     + (f" (und {len(hinweise) - 1} weitere)" if len(hinweise) > 1 else ""),
                     15000)
         else:

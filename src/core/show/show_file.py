@@ -418,6 +418,56 @@ def _patched_fixture_from_data(d: dict, fallback_fid: int):
     )
 
 
+def _dublette_ohne_folgen(session, gewaehlt: int, rivalen: list,
+                          mode_name: str, channel_count: int) -> bool:
+    """STAB-37: ist es fuer DIESE Show gleich, welches der gleichnamigen
+    Profile genommen wurde?
+
+    ``rivalen`` sind die uebrigen Treffer, die den Modus der Show ebenfalls
+    tragen — alle anderen kommen fuer die Show ohnehin nicht in Frage. Gleich
+    heisst: dieselbe Geraeteart und im Modus der Show dieselbe Folge von
+    Kanal-Attributen. Dann faehrt in jedem Fall dasselbe Geraet, und die
+    Dublette ist eine Sache der Bibliothek. Laesst sich das nicht nachsehen,
+    gilt ``False`` — im Zweifel wird gewarnt.
+    """
+    if not rivalen:
+        return True
+    try:
+        from sqlalchemy import select
+        from src.core.database.models import (FixtureChannel, FixtureMode,
+                                              FixtureProfile)
+        from src.core.database.modus_wahl import ist_zwilling
+
+        def _bild(pid: int):
+            typ = session.execute(
+                select(FixtureProfile.fixture_type)
+                .where(FixtureProfile.id == pid)).scalar_one_or_none()
+            modi = session.execute(
+                select(FixtureMode.id, FixtureMode.name, FixtureMode.channel_count)
+                .where(FixtureMode.fixture_id == pid)
+                .order_by(FixtureMode.id)).all()
+            # Dieselbe Regel wie ``_exakt`` im Aufrufer: Name + Kanalzahl,
+            # sonst der umbenannte Zwilling (FM-73).
+            passt = [m for m in modi if m[1] == mode_name
+                     and (not channel_count or int(m[2] or 0) == channel_count)]
+            if not passt and channel_count:
+                passt = [m for m in modi if int(m[2] or 0) == channel_count
+                         and ist_zwilling(m[1], mode_name)]
+            if not passt:
+                return None
+            kanaele = tuple(session.execute(
+                select(FixtureChannel.attribute)
+                .where(FixtureChannel.mode_id == passt[0][0])
+                .order_by(FixtureChannel.channel_number)).scalars())
+            return (typ or "", kanaele)
+
+        eigen = _bild(int(gewaehlt))
+        return eigen is not None and all(_bild(int(r)) == eigen for r in rivalen)
+    except Exception as e:
+        print(f"[show_file] Dubletten-Vergleich: {e}")
+        return False
+
+
 def _resolve_fixture_profile_id(profile_id: int, manufacturer_name: str,
                                 fixture_name: str, *, mode_name: str = "",
                                 channel_count: int = 0) -> int:
@@ -447,12 +497,15 @@ def _resolve_fixture_profile_id(profile_id: int, manufacturer_name: str,
     Meldeweg: der Fall gehoert in denselben Dialog wie ein nicht lesbarer
     Show-Block, und ein zweiter Kanal waere ein zweiter, der uebersehen wird.
 
-    ★ **STAB-37: die Dublette selbst ist ein HINWEIS, kein Ladeproblem.** Wird
-    eindeutig und mit passendem Modus gewaehlt, ist von der Show nichts
-    verworfen — die Meldung „steht 2× in der Geraetebibliothek“ geht deshalb
-    in ``_ladehinweise`` (dieselbe Stelle der Oberflaeche, aber nicht unter
-    „Speichern schreibt den Verlust fest“). Die drei Ausgaenge oben bleiben
-    Ladeprobleme.
+    ★ **STAB-37: eine Dublette OHNE FOLGEN ist ein Hinweis, kein Ladeproblem.**
+    Steht der Modus der Show im gewaehlten Profil und bietet kein anderer
+    Treffer denselben Modus mit anderer Kanalbelegung oder Geraeteart an
+    (``_dublette_ohne_folgen``), ist von der Show nichts verworfen — die
+    Meldung „steht 2× in der Geraetebibliothek“ geht dann in
+    ``_ladehinweise`` (dieselbe Stelle der Oberflaeche, aber nicht unter
+    „Speichern schreibt den Verlust fest“). Traegt die Show keinen Modus oder
+    unterscheiden sich die Treffer wirklich, bleibt sie ein Ladeproblem wie
+    die drei Ausgaenge oben.
 
     ★★ **Und die Mehrdeutigkeit wird nicht mehr von der Einfuegereihenfolge
     entschieden.** Bisher gewann ``order_by(FixtureProfile.id).first()`` —
@@ -589,15 +642,29 @@ def _resolve_fixture_profile_id(profile_id: int, manufacturer_name: str,
                     # Mehrdeutig: gemeldet, nicht verschwiegen. Der Mensch sieht
                     # sonst ein Geraet, das *fast* stimmt, und sucht den Fehler
                     # ueberall — nur nicht in der Bibliothek.
-                    # STAB-37: als HINWEIS. Der Modus passt (sonst steht oben
-                    # ein Ladeproblem), von der Show ist nichts verworfen — im
-                    # Verlust-Sammler machte der Satz aus jeder Show mit einem
-                    # doppelt vorhandenen Profil einen Schadensfall.
-                    _ladehinweis(
+                    # STAB-37: nur ein HINWEIS, wenn die Wahl fuer diese Show
+                    # feststeht — der Modus der Show steht im gewaehlten Profil,
+                    # und kein anderer Treffer bietet denselben Modus mit einer
+                    # ANDEREN Kanalbelegung oder Geraeteart an. Dann ist von der
+                    # Show nichts verworfen; im Verlust-Sammler machte der Satz
+                    # aus jeder Show mit einem doppelt vorhandenen Profil einen
+                    # Schadensfall. Laesst sich das nicht pruefen (Show ohne
+                    # Modus) oder unterscheiden sich die Treffer wirklich, bleibt
+                    # es eine Warnung: dann kann das falsche Geraet fahren, und
+                    # Speichern schriebe die Wahl fest.
+                    text = (
                         f"„{_geraet}“ steht {len(andere) + 1}× in der Geraetebibliothek — "
                         f"genommen wurde Profil {resolved} "
                         f"({gewaehlt[1] or 'ohne Herkunft'}). Wenn das Geraet falsch "
                         f"aussieht, liegt es an der Dublette, nicht an der Show.")
+                    if (mode_name and _exakt(gewaehlt)
+                            and _dublette_ohne_folgen(
+                                session, resolved,
+                                [int(t[0]) for t in andere if _exakt(t)],
+                                mode_name, channel_count)):
+                        _ladehinweis(text)
+                    else:
+                        _ladeprobleme.append(text)
                 return resolved
             # FM-43: ab hier ist das Geraet NICHT aufloesbar. Bis 2026-09-03
             # endete die Funktion hier stumm mit der alten ID — und was diese

@@ -412,10 +412,23 @@ class C_BestehenderPatchLaedtWeiter(_Basis):
                      attrs=("intensity", "color_r", "color_g", "color_b"))
         pf = self._fremd("4-Kanal", 4)
         self.assertEqual(pf.fixture_profile_id, self.neu)
-        # STAB-37: gewarnt wird als Hinweis — gelesen ist alles.
+        # STAB-37: beide Profile belegen den Modus der Show gleich — gemeldet
+        # wird als Hinweis, gelesen ist alles.
         self.assertTrue(any("Dublette" in p for p in self.sf.letzte_ladehinweise()),
                         self.sf.letzte_ladehinweise())
         self.assertEqual(self.sf.letzte_ladeprobleme(), [])
+
+    def test_dublette_mit_anderer_belegung_bleibt_ein_ladeproblem(self):
+        """STAB-37 (Review): derselbe Modus-Name, aber der Dimmer liegt beim
+        Zwilling hinten. Welches Profil gewinnt, entscheidet dann, was am
+        Geraet passiert — das bleibt eine Warnung."""
+        self._profil("Testwerk", "Par 7", "builtin", modus="4-Kanal",
+                     attrs=("color_r", "color_g", "color_b", "intensity"))
+        pf = self._fremd("4-Kanal", 4)
+        self.assertEqual(pf.fixture_profile_id, self.neu)
+        self.assertTrue(any("Dublette" in p for p in self.sf.letzte_ladeprobleme()),
+                        self.sf.letzte_ladeprobleme())
+        self.assertEqual(self.sf.letzte_ladehinweise(), [])
 
 
 class E_ShowbuilderStrict(_Basis):
