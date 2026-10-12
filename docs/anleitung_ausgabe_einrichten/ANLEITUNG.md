@@ -63,12 +63,20 @@ Reiter **Enttec Pro USB**:
 
 ![Reiter Enttec Pro USB](img/02_enttec.png)
 
-1. **COM-Port:** — alle seriellen Anschlüsse des Rechners. Ein erkannter ENTTEC trägt
-   den Zusatz `[Enttec Pro]`. Ist der gespeicherte Port gerade nicht da, steht er mit
-   `— derzeit nicht gefunden` in der Liste, statt still auf einen anderen Port
-   umzuspringen. Ohne jeden Port steht dort `Kein Port gefunden`.
+1. **COM-Port:** — die seriellen Anschlüsse, an denen ein **USB-Gerät** hängt. Ein
+   erkannter ENTTEC trägt den Zusatz `[Enttec Pro]`, steht **oben** und ist auf einem
+   frischen Rechner **vorgewählt**. Anschlüsse ohne USB-Gerät (die eingebaute
+   Schnittstelle `COM1`, Bluetooth, leere `/dev/ttyS…`) sind ausgeblendet; der Haken
+   **Alle Anschlüsse zeigen** darunter holt sie in die Liste. Wird kein ENTTEC
+   erkannt, bleibt die Auswahl leer — LightOS wählt dann keinen Anschluss von selbst.
+   Ist der gespeicherte Port gerade nicht da, steht er mit `— derzeit nicht gefunden`
+   in der Liste, statt still auf einen anderen Port umzuspringen; hängt an ihm kein
+   Gerät, steht `(kein USB-Gerät erkannt)` dabei. In beiden Fällen nennt die Zeile
+   unter der Liste den erkannten Adapter. Ohne jeden Port steht dort
+   `Kein Port gefunden`.
 2. **Ports aktualisieren** — nach dem Einstecken die Liste neu einlesen. Die Auswahl
-   bleibt dabei erhalten.
+   bleibt dabei erhalten; war noch nichts gewählt, wird der eben eingesteckte ENTTEC
+   vorgewählt.
 3. **Universe:** — welches LightOS-Universum über diesen Adapter hinausgeht. Das Feld
    ist mit dem gespeicherten Wert vorbelegt; stell es **vor** dem Klick auf
    **Verbinden** bewusst ein.
