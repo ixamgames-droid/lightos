@@ -86,6 +86,7 @@
 | OUT-77 | D | fix/out77-diagnose-udmx-seriennummer | 2026-10-12T18:00Z | src/core/diagnose_log.py · tests/test_out77_diagnose_seriennummer.py |
 | ENG-34 | A | feature/eng34-untergrund-dimmer-effekte | 2026-10-12T18:15Z | src/core/engine/rgb_matrix.py · src/ui/views/rgb_matrix_view.py |
 | ENG-36 | A | feature/eng36-cloning | 2026-10-12T18:15Z | src/core/show/klonen.py · src/ui/views/patch_view.py |
+| ENG-35 | A | - | 2026-10-12T18:15Z | - |
 
 ## Blocker & Fallen
 
@@ -256,7 +257,6 @@
 
 ## Verlauf
 
-- 2026-10-12T14:09Z D done XPLAT-54
 - 2026-10-12T14:24Z D aktualisiert LAS-38: Branch - -> fix/las38-laser-erkennung-alle-modi; Dateien - -> src/core/laser/erkennung.py · src/core/app_state.py
 - 2026-10-12T14:26Z A claim WEB-14
 - 2026-10-12T14:44Z D aktualisiert OUT-72: Branch - -> fix/out72-schlussbild-typwechsel-laser-nachlauf; Dateien - -> src/core/dmx/output_manager.py · src/core/app_state.py · src/ui/widgets/output_config.py
@@ -286,3 +286,4 @@
 - 2026-10-12T18:00Z D claim OUT-77
 - 2026-10-12T18:15Z A claim ENG-34
 - 2026-10-12T18:15Z A claim ENG-36
+- 2026-10-12T18:15Z A claim ENG-35
