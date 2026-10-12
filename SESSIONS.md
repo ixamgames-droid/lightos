@@ -71,6 +71,7 @@
 | FM-74 | A | fix/fm74-generator-editor-startgroesse | 2026-10-11T20:43Z | - |
 | OUT-72 | D | - | 2026-10-12T13:39Z | - |
 | OUT-73 | D | - | 2026-10-12T13:39Z | - |
+| OUT-74 | D | - | 2026-10-12T13:40Z | - |
 
 ## Blocker & Fallen
 
@@ -222,7 +223,6 @@
 
 ## Verlauf
 
-- 2026-10-11T18:31Z D claim XPLAT-54
 - 2026-10-11T18:40Z A done STAB-32
 - 2026-10-11T18:40Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-11T19:02Z D done TOOL-19
@@ -252,3 +252,4 @@
 - 2026-10-12T13:39Z D claim OUT-72
 - 2026-10-12T13:39Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-12T13:39Z D claim OUT-73
+- 2026-10-12T13:40Z D claim OUT-74
