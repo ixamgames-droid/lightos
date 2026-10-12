@@ -1,7 +1,7 @@
 # Fremd-Komponenten in LightOS (Third-Party Notices)
 
 LightOS selbst steht unter **keiner** Open-Source-Lizenz (Entscheidung des
-Projektinhabers). Diese Datei betrifft die **fremden** Dateien, die im Repo
+Projektinhabers): alle Rechte vorbehalten, siehe [`LICENSE`](LICENSE). Diese Datei betrifft nur die **fremden** Dateien, die im Repo
 mitgeliefert werden, und alles Fremde, das nur im Windows-Installationspaket steckt
 (Python, Qt mit PySide6 und die Python-Pakete, die LightOS benutzt – ab dem Abschnitt
 „Windows-Installationspaket“): Ihre Lizenzen erlauben die Weitergabe, verlangen aber,

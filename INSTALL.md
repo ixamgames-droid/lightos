@@ -39,6 +39,17 @@ Das war's. Das Script:
 Die Test-Abhaengigkeiten (pytest & Co.) installiert das Script **nicht** — wer
 die Testsuite fahren will, siehe [Entwickeln und Tests](#entwickeln-und-tests).
 
+## Lizenz und Testzugang
+
+LightOS ist in der Testphase und startet nur mit einer gueltigen **Lizenzdatei**
+(Urheber: [ixamgames-droid](https://github.com/ixamgames-droid/lightos), alle
+Rechte vorbehalten - siehe [LICENSE](LICENSE)). Beim ersten Start fragt LightOS
+danach: **Lizenzdatei auswaehlen…** anklicken und die erhaltene Datei waehlen.
+Von Hand gehoert sie als `lightos-lizenz.lic` in den App-Datenordner
+(`%APPDATA%\LightOS` bzw. `~/.local/share/LightOS`). Geprueft wird nur beim
+Start, ohne Internet; eine laufende Show wird nie unterbrochen. Testzugang und
+Einzelheiten: [docs/LIZENZ_UND_TESTZUGANG.md](docs/LIZENZ_UND_TESTZUGANG.md).
+
 ## Voraussetzungen
 
 | | x64 (AMD64) | ARM64 (Snapdragon) |

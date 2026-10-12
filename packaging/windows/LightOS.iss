@@ -66,6 +66,7 @@ Source: "{#DistDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs cr
 ; nicht aus dem Repo - nur dort liegen die beim Bauen erzeugte Liste
 ; (BUNDLE-KOMPONENTEN.txt), Pythons Lizenztext und die Texte der Python-Pakete.
 Source: "{#RepoDir}\THIRD_PARTY_NOTICES.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#RepoDir}\LICENSE"; DestDir: "{app}"; DestName: "LICENSE.txt"; Flags: ignoreversion
 Source: "{#DistDir}\_internal\licenses\*"; DestDir: "{app}\licenses"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]

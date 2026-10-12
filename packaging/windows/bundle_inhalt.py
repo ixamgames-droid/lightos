@@ -45,6 +45,7 @@ DATENORDNER: tuple[str, ...] = (
 #: Einzeldateien (relativ zum Repo).
 EINZELDATEIEN: tuple[str, ...] = (
     "THIRD_PARTY_NOTICES.md",
+    "LICENSE",                     # LIZ-1: Lizenztext (Dialog „Lizenztext anzeigen“)
     # main.py als DATEI: audio_recorder liest APP_VERSION daraus (Rueckfall
     # ueber ``__main__`` existiert, die Datei ist der Normalweg).
     "main.py",
