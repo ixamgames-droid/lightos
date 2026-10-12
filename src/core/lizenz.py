@@ -47,6 +47,11 @@ URHEBER = "ixamgames-droid"
 QUELLE = "https://github.com/ixamgames-droid/lightos"
 COPYRIGHT = f"Copyright (c) 2026 {URHEBER} — alle Rechte vorbehalten"
 
+# Kennzeichen des Herkunftsvermerks in erzeugten Dateien (Show, Diagnosepaket);
+# aendert sich nur, wenn sich der Aufbau des Vermerks aendert.
+_VERMERK_SHOW = "2fc2b88a94d5"
+_VERMERK_PAKET = "3b97438b"
+
 # ── Lizenzdatei ──────────────────────────────────────────────────────────────
 DATEINAME = "lightos-lizenz.lic"
 ENV_PFAD = "LIGHTOS_LIZENZ"
@@ -147,6 +152,49 @@ class Lizenzstatus:
         if self.zustand == FEHLT:
             return "fehlt"
         return "ungueltig" + (f" ({self.grund})" if self.grund else "")
+
+
+# ── Herkunftsvermerk in erzeugten Dateien ────────────────────────────────────
+
+_version_cache: list[str] = []
+
+
+def programmversion() -> str:
+    """``APP_VERSION`` aus ``main.py`` (einmal gelesen); ``"?"``, wenn nicht
+    ermittelbar."""
+    if not _version_cache:
+        version = None
+        try:
+            from src.core.audio.audio_recorder import _lightos_version
+            version = _lightos_version()
+        except Exception:                           # noqa: BLE001
+            version = None
+        _version_cache.append(version if isinstance(version, str) and version else "?")
+    return _version_cache[0]
+
+
+def erstellt_mit() -> dict:
+    """Der Vermerk im Kopf einer gespeicherten Show (``show.json``).
+
+    Fest und deterministisch: haengt nur an der Programmversion, nicht an Uhr,
+    Rechner oder Lizenznehmer — zweimal Speichern ergibt dieselben Bytes."""
+    return {
+        "programm": PROGRAMM,
+        "urheber": URHEBER,
+        "quelle": QUELLE,
+        "version": programmversion(),
+        "kennzeichen": _VERMERK_SHOW,
+    }
+
+
+def vermerk_zeile(version: str | None = None) -> str:
+    """„erstellt mit LightOS … von ixamgames-droid“ fuer Textdateien."""
+    return (f"erstellt mit {PROGRAMM} {version or programmversion()} von "
+            f"{URHEBER} — {QUELLE}")
+
+
+def paket_kennzeichen() -> str:
+    return f"1-{_VERMERK_PAKET}"
 
 
 # ── Lesen und Pruefen ────────────────────────────────────────────────────────
